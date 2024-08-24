@@ -45,6 +45,14 @@ FilegroupMatcher::FilegroupMatcher(Format *format) : Matcher(format) {}
 
 
 void FilegroupMatcher::onFinishedScan(RawFile* rawfile) {
+
+  if (seqs.empty() || instrsets.empty()) {
+    seqs.clear();
+    instrsets.clear();
+    sampcolls.clear();
+    return;
+  }
+
   // xsflib files are loaded recursively with xsf files. We want to scan the xsflib and the xsf
   // files together as if they're one file, so ignore this callback and wait for the xsf to finish.
   if (std::regex_match(rawfile->extension(), std::regex(R"(\w*sf\w?lib$)")))

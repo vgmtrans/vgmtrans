@@ -208,8 +208,6 @@ std::vector<PSXSampColl *> PSXSampColl::searchForPSXADPCMs(RawFile *file, const 
 
       if (filterRangeByte == 0 && keyFlagByte == 0)
         continue;
-      //if ((keyFlagByte & 0x04) == 0)
-      //	continue;
       if ((keyFlagByte & 0xF8) != 0)
         continue;
 

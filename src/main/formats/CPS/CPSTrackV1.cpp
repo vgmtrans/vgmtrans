@@ -213,7 +213,6 @@ bool CPSTrackV1::readEvent() {
           }
           case YM2151:
             curOffset++;
-            vol = 0;
             this->addVol(beginOffset, curOffset - beginOffset, vol);
             break;
         }
