@@ -39,7 +39,7 @@ static constexpr int finetune_table[] = {
 
 static constexpr double finetune_coeff = 0.025766555011594949755217727389848;
 
-static constexpr float defaultWDReverbPercent = 0.75;
+static constexpr float defaultWDReverbPercent = 0.5;
 
 // **********
 // WDInstrSet
@@ -121,7 +121,7 @@ bool WDInstr::loadInstr() {
     rgn->addChild(k * 0x20 + 0x12 + dwOffset, 1, "Finetune");
     rgn->addChild(k * 0x20 + 0x13 + dwOffset, 1, "UnityKey");
     rgn->addChild(k * 0x20 + 0x14 + dwOffset, 1, "Key High");
-    rgn->addChild(k * 0x20 + 0x15 + dwOffset, 1, "Velocity High");
+    rgn->addChild(k * 0x20 + 0x15 + dwOffset, 1, "Unknown");
     rgn->addChild(k * 0x20 + 0x16 + dwOffset, 1, "Attenuation");
     rgn->addChild(k * 0x20 + 0x17 + dwOffset, 1, "Pan");
 
@@ -136,7 +136,6 @@ bool WDInstr::loadInstr() {
     rgn->fineTune = readByte(k * 0x20 + 0x12 + dwOffset);
     rgn->unityKey = 0x3A - readByte(k * 0x20 + 0x13 + dwOffset);
     rgn->keyHigh = readByte(k * 0x20 + 0x14 + dwOffset);
-    rgn->velHigh = convert7bitPercentVolValToStdMidiVal(readByte(k * 0x20 + 0x15 + dwOffset));
 
     uint8_t vol = readByte(k * 0x20 + 0x16 + dwOffset);
     rgn->setVolume(vol / 127.0);
@@ -162,8 +161,6 @@ bool WDInstr::loadInstr() {
   }
 
   // First, do key and velocity ranges
-  uint8_t prevKeyHigh = 0;
-  uint8_t prevVelHigh = 0;
   for (size_t k = 0; k < regions().size(); k++) {
     auto region = dynamic_cast<WDRgn*>(regions()[k]);
     auto prevRegion = k > 0 ? regions()[k-1] : nullptr;
@@ -182,25 +179,6 @@ bool WDInstr::loadInstr() {
 
     if (region->bLastRegion)
       region->keyHigh = 0x7F;
-
-    // Velocity ranges
-    if (region->velHigh == prevVelHigh && prevRegion)
-      region->velLow = prevRegion->velLow;
-    else
-      region->velLow = prevVelHigh + 1;
-    prevVelHigh = region->velHigh;
-
-    if (k == 0) //if it's the first region of the instrument
-      region->velLow = 0;
-    else if (region->velHigh == prevRegion->velHigh) {
-      region->velLow = prevRegion->velLow;
-      region->velHigh = 0x7F;     // FFX 0022, aka sight of spira, was giving me problems, hence this
-      prevRegion->velHigh = 0x7F; // hDLSFile.aInstrs.back()->aRgns.back()->usVelHigh = 0x7F;
-    }
-    else if (prevRegion->velHigh == 0x7F)
-     region->velLow = 0;
-    else
-      region->velLow = prevRegion->velHigh + 1;
   }
   return true;
 }

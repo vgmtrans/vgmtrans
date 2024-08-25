@@ -23,7 +23,7 @@ void AkaoMatcher::onFinishedScan(RawFile* rawfile) {
 
   // We assume psf files contain all of the files necessary to form a collection. Therefore, we
   // treat each one as a one-off and remove all of its detected files from future match consideration.
-  if (rawfile->extension() == "psf") {
+  if (rawfile->extension() == "psf" || rawfile->extension() == "minipsf") {
     auto eraseByRawFile = [rawfile](auto& map) {
       std::erase_if(map, [rawfile](const auto& pair) {
           return pair.second->rawFile() == rawfile;
@@ -118,9 +118,8 @@ bool AkaoMatcher::tryCreateCollection(int id) {
     for (const auto &instr : instrSet->aInstrs) {
       for (const auto &region : instr->regions()) {
         AkaoRgn* akaoRegion = static_cast<AkaoRgn*>(region);
-        // We will exclude articulation id 0, as it often indicates an unused artic
-        // Also ignoring values > 0x60 is a hack that allows compatability with many psfs.
-        if (akaoRegion->artNum != 0 && akaoRegion->artNum <= 0x60)
+        // We will exclude articulation id 0, as it often just indicates an unused region
+        if (akaoRegion->artNum != 0)
           requiredArtIds.emplace_back(akaoRegion->artNum);
       }
     }
@@ -154,36 +153,30 @@ bool AkaoMatcher::tryCreateCollection(int id) {
     }
 
     if (matchingSampColls.size() > 0) {
-      if (std::all_of(requiredArtIds.begin(), requiredArtIds.end(), [&matchingSampColls](int artId) {
-            return std::any_of(matchingSampColls.begin(), matchingSampColls.end(), [artId](AkaoSampColl *sc) {
-              return artId >= sc->starting_art_id && artId < (sc->starting_art_id + sc->nNumArts);
-            });
-          })) {
-        auto coll = fmt->newCollection();
-        if (!coll) return false;
+      auto coll = fmt->newCollection();
+      if (!coll) return false;
 
-        coll->setName(seq->name());
-        coll->useSeq(seq);
-        coll->addInstrSet(instrSet);
+      coll->setName(seq->name());
+      coll->useSeq(seq);
+      coll->addInstrSet(instrSet);
 
-        // Sort the vector by starting_art_id in ascending order
-        std::sort(matchingSampColls.begin(), matchingSampColls.end(),
-        [](AkaoSampColl* a, AkaoSampColl* b) {
-            return a->starting_art_id < b->starting_art_id;
-        });
-        for (auto *sc : matchingSampColls) {
-          coll->addSampColl(sc);
-        }
-
-        seqs.erase(seq->seq_id);
-
-        if (!coll->load()) {
-          delete coll;
-          return false;
-        }
-
-        return true;
+      // Sort the vector by starting_art_id in ascending order
+      std::sort(matchingSampColls.begin(), matchingSampColls.end(),
+      [](AkaoSampColl* a, AkaoSampColl* b) {
+          return a->starting_art_id < b->starting_art_id;
+      });
+      for (auto *sc : matchingSampColls) {
+        coll->addSampColl(sc);
       }
+
+      seqs.erase(seq->seq_id);
+
+      if (!coll->load()) {
+        delete coll;
+        return false;
+      }
+
+      return true;
     }
   }
   return false;

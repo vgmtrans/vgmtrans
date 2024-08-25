@@ -20,6 +20,7 @@ static constexpr uint8_t NOTE_VELOCITY = 127;
 AkaoSeq::AkaoSeq(RawFile *file, uint32_t offset, AkaoPs1Version version, std::string name)
     : VGMSeq(AkaoFormat::name, file, offset, 0, std::move(name)), seq_id(0), version_(version),
       instrument_set_offset_(0), drum_set_offset_(0), condition(0) {
+  setAlwaysWriteInitialVol(127);
   setAlwaysWriteInitialPitchBendRange(12 * 100);
   setUseLinearAmplitudeScale(true);        //I think this applies, but not certain, see FF9 320, track 3 for example of problem
   //UseLinearPanAmplitudeScale(PanVolumeCorrectionMode::kAdjustVolumeController); // disabled, it only changes the volume and the pan slightly, and also its output becomes undefined if pan and volume slides are used at the same time

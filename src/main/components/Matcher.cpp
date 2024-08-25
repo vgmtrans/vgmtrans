@@ -98,6 +98,23 @@ bool FilegroupMatcher::onCloseSampColl(VGMSampColl *sampcoll) {
 
 void FilegroupMatcher::lookForMatch() {
   while (!seqs.empty() && !instrsets.empty()) {
+    // If there's only 1 of any collection type left, match to largest size.
+    if (seqs.size() == 1 && sampcolls.size() > 1) {
+      sampcolls.sort([](const VGMSampColl* a, const VGMSampColl* b) {
+        return a->size() > b->size();
+      });
+    }
+    else if (seqs.size() == 1 && instrsets.size() > 1) {
+      instrsets.sort([](const VGMInstrSet* a, const VGMInstrSet* b) {
+        return a->size() > b->size();
+      });
+    }
+    else if (instrsets.size() == 1 && seqs.size() > 1) {
+      seqs.sort([](const VGMSeq* a, const VGMSeq* b) {
+        return a->size() > b->size();
+      });
+    }
+
     VGMSeq* seq = seqs.front();
     seqs.pop_front();
     VGMInstrSet* instrset = instrsets.front();

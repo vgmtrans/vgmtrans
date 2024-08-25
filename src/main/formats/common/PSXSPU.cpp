@@ -169,11 +169,11 @@ bool PSXSampColl::parseSampleInfo() {
 }
 
 
-#define NUM_CHUNKS_READAHEAD 10
-#define MAX_ALLOWED_RANGE_DIFF 10
-#define MAX_ALLOWED_FILTER_DIFF 5
-#define MIN_ALLOWED_RANGE_DIFF 0
-#define MIN_ALLOWED_FILTER_DIFF 0
+constexpr u32 NUM_CHUNKS_READAHEAD = 10;
+constexpr int MAX_FILTER_DIFF_SUM = NUM_CHUNKS_READAHEAD * 2.5;
+constexpr int MAX_RANGE_FILTER_DIFF_SUM = NUM_CHUNKS_READAHEAD * 2.5;
+constexpr int MIN_UNIQUE_BYTES = NUM_CHUNKS_READAHEAD * 4.5;
+constexpr int MAX_BYTE_REPETITION = NUM_CHUNKS_READAHEAD * 5.5;
 
 // GENERIC FUNCTION USED FOR SCANNERS
 PSXSampColl *PSXSampColl::searchForPSXADPCM(RawFile *file, const string &format) {
@@ -198,65 +198,129 @@ PSXSampColl *PSXSampColl::searchForPSXADPCM(RawFile *file, const string &format)
 std::vector<PSXSampColl *> PSXSampColl::searchForPSXADPCMs(RawFile *file, const string &format) {
   std::vector<PSXSampColl *> sampColls;
   size_t nFileLength = file->size();
-  for (uint32_t i = 0; i + 16 + NUM_CHUNKS_READAHEAD * 16 < nFileLength; i++) {
-    // if we have 16 0s in a row.
-    if (file->readWord(i) == 0 && file->readWord(i + 4) == 0 && file->readWord(i + 8) == 0 && file->readWord(i + 12) == 0) {
-      bool bBad = false;
-      uint32_t firstChunk = i + 16;
-      uint8_t filterRangeByte = file->readByte(firstChunk);
-      uint8_t keyFlagByte = file->readByte(firstChunk + 1);
 
-      if (filterRangeByte == 0 && keyFlagByte == 0)
-        continue;
-      //if ((keyFlagByte & 0x04) == 0)
-      //	continue;
-      if ((keyFlagByte & 0xF8) != 0)
-        continue;
+  for (u32 i = 0; i + 16 + NUM_CHUNKS_READAHEAD * 16 < nFileLength; i++) {
+    // Search for 16 consecutive null bytes.
+    u8 chunk[16];
+    file->readBytes(i, 16, &chunk);
 
-      uint8_t maxRangeChange = 0;
-      uint8_t maxFilterChange = 0;
-      int prevRange = file->readByte(firstChunk + 16)
-          & 0xF;                    //+16 because we're skipping the first chunk for uncertain reasons
-      int prevFilter = (file->readByte(firstChunk + 16) & 0xF0) >> 4;
-      for (uint32_t j = 0; j < NUM_CHUNKS_READAHEAD; j++) {
-        uint32_t curChunk = firstChunk + 16 + j * 16;
-        keyFlagByte = file->readByte(curChunk + 1);
-        if ((keyFlagByte & 0xF0) != 0) {
-          bBad = true;
-          break;
-        }
-        if ((file->readWord(curChunk) == 0
-            && ((file->readWord(curChunk + 4) == 0) || file->readWord(curChunk + 8) == 0))) {
-          bBad = true;
-          break;
-        }
-
-        //do range and filter value comparison
-        const int range = file->readByte(firstChunk + 16 + j * 16) & 0xF;
-        int diff = abs(range - prevRange);
-        if (diff > maxRangeChange)
-          maxRangeChange = diff;
-        prevRange = range;
-        const int filter = (file->readByte(firstChunk + 16 + j * 16) & 0xF0) >> 4;
-        diff = abs(filter - prevFilter);
-        if (diff > maxFilterChange)
-          maxFilterChange = diff;
-        prevFilter = filter;
+    const u64* block64 = reinterpret_cast<const u64*>(chunk);
+    if (block64[0] != 0 || block64[1] != 0) {
+      // Find the last non-zero byte (if any)
+      int nonZeroIndex = 15;
+      while (nonZeroIndex > 0 && chunk[nonZeroIndex] == 0) {
+        --nonZeroIndex;
       }
-      if ((maxRangeChange > MAX_ALLOWED_RANGE_DIFF || maxFilterChange > MAX_ALLOWED_FILTER_DIFF) ||
-          (maxRangeChange < MIN_ALLOWED_RANGE_DIFF || maxFilterChange < MIN_ALLOWED_FILTER_DIFF))
-        continue;
-      else if (bBad)
-        continue;
-
-      PSXSampColl *newSampColl = new PSXSampColl(PS1Format::name, file, i);
-      if (!newSampColl->loadVGMFile()) {
-        delete newSampColl;
-        continue;
-      }
-      sampColls.push_back(newSampColl);
-      i += newSampColl->unLength - 1;
+      i += nonZeroIndex;
+      continue;
     }
+
+
+    // We found 16 consecutive null bytes. Do further testing for a positive match.
+    bool isValid = true;
+    u32 firstChunkOffset = i + 16;
+
+    // Expect first byte of first chunk to be non-zero
+    if (file->readByte(firstChunkOffset + 0) == 0)
+      continue;
+
+    // Inspect Flag Bytes
+    for (u32 j = 0; j < NUM_CHUNKS_READAHEAD; ++j) {
+      u32 flagByteOffset = firstChunkOffset + (j * 16) + 1;
+      u8 flagByte = file->readByte(flagByteOffset);
+      if (flagByte != 0x00 && flagByte != 0x02 && !(j <= 1 && flagByte == 0x04)) {
+        isValid = false;
+        break;
+      }
+    }
+    if (!isValid) {
+      continue;
+    }
+
+    int byteCount[256] = {};
+    int uniqueBytes = 0;
+    int sumFilterIndexDiff = 0;
+    int sumRangeFilterDiff = 0;
+
+    // Process each chunk.
+    for (u32 j = 0; j < NUM_CHUNKS_READAHEAD; ++j) {
+      u32 curChunkOffset = firstChunkOffset + j * 16;
+
+      file->readBytes(curChunkOffset, 16, &chunk);
+
+      // Check for 16 null bytes. While this is valid (and indicates the beginning of a new sample)
+      // it is extremely unlikely that the first sample is so short, and this will weed out many
+      // false positives
+      const u64* block64 = reinterpret_cast<const u64*>(chunk);
+      if (block64[0] == 0 && block64[1] == 0) {
+        isValid = false;
+        break;
+      }
+
+      // For the sample region, add to the byte count table and unique byte counter
+      for (int k = 2; k < 16; ++k) {
+        byteCount[chunk[k]] += 1;
+        if (byteCount[chunk[k]] == 1) {
+          uniqueBytes += 1;
+        }
+      }
+
+      // It is extremely improbable that the first chunk will have null filter/range and flag bytes
+      // and also contain at least ten null bytes amongst the samples. This Weeds out another common
+      // false positive pattern.
+      if (j == 0 && chunk[0] == 0 && chunk[1] == 0 && byteCount[0] >= 10) {
+        isValid = false;
+        break;
+      }
+
+      // Read the filter and range nibbles from the first byte.
+      u8 firstByte = chunk[0];
+      int filterIndex = (firstByte & 0xF0) >> 4;
+      int rangeFilter = firstByte & 0x0F;
+
+      // Sum the marginal difference of each filter index nibble and range filter nibble between
+      // each chunk and its predecessor. These typically remain close in value. We skip the first
+      // chunk as there's no previous chunk to compare it against.
+      if (j > 0) {
+        u8 prevFirstByte = file->readByte(firstChunkOffset + (j - 1) * 16);
+        int prevFilterIndex = (prevFirstByte & 0xF0) >> 4;
+        int prevRangeFilter = prevFirstByte & 0x0F;
+
+        // Calculate the absolute differences.
+        sumFilterIndexDiff += abs(filterIndex - prevFilterIndex);
+        sumRangeFilterDiff += abs(rangeFilter - prevRangeFilter);
+      }
+    }
+
+    // Validate the cumulative differences against the thresholds
+    if (!isValid || sumFilterIndexDiff > MAX_FILTER_DIFF_SUM || sumRangeFilterDiff > MAX_RANGE_FILTER_DIFF_SUM) {
+      continue;
+    }
+
+    // Expect a wide range of unique byte values among sample bytes
+    if (uniqueBytes < MIN_UNIQUE_BYTES) {
+      continue;
+    }
+
+    // Expect that there won't be excessive repetition of specific byte values among sample bytes
+    for (int k = 0; k < 256; ++k) {
+      if (byteCount[k] > MAX_BYTE_REPETITION) {
+        isValid = false;
+        break;
+      }
+    }
+    if (!isValid) {
+      continue;
+    }
+
+    // Create and load the sample collection if the match passes all checks.
+    PSXSampColl *newSampColl = new PSXSampColl(PS1Format::name, file, i);
+    if (!newSampColl->loadVGMFile()) {
+      delete newSampColl;
+      continue;
+    }
+    sampColls.push_back(newSampColl);
+    i += newSampColl->unLength - 1;
   }
   return sampColls;
 }
@@ -281,7 +345,7 @@ PSXSamp::~PSXSamp() {
 }
 
 double PSXSamp::compressionRatio() {
-  return ((28.0 / 16.0) * 2); //aka 3.5;
+  return ((28.0 / 16.0) * 2);
 }
 
 void PSXSamp::convertToStdWave(uint8_t *buf) {
@@ -324,8 +388,8 @@ void PSXSamp::convertToStdWave(uint8_t *buf) {
 
     rawFile()->readBytes(dwOffset + k + 2, 14, theBlock.brr);
 
-    //each decompressed pcm block is 52 bytes   EDIT: (wait, isn't it 56 bytes? or is it 28?)
-    decompVAGBlk(uncompBuf + ((k * 28) / 16),
+    //each decompressed pcm block is 56 bytes (28 samples, 16-bit each)
+    decompVAGBlk(uncompBuf + ((k / 16) * 28),
                  &theBlock,
                  &prev1,
                  &prev2);
