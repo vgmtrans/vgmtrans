@@ -45,14 +45,6 @@ FilegroupMatcher::FilegroupMatcher(Format *format) : Matcher(format) {}
 
 
 void FilegroupMatcher::onFinishedScan(RawFile* rawfile) {
-
-  if (seqs.empty() || instrsets.empty()) {
-    seqs.clear();
-    instrsets.clear();
-    sampcolls.clear();
-    return;
-  }
-
   // xsflib files are loaded recursively with xsf files. We want to scan the xsflib and the xsf
   // files together as if they're one file, so ignore this callback and wait for the xsf to finish.
   if (std::regex_match(rawfile->extension(), std::regex(R"(\w*sf\w?lib$)")))
@@ -106,6 +98,23 @@ bool FilegroupMatcher::onCloseSampColl(VGMSampColl *sampcoll) {
 
 void FilegroupMatcher::lookForMatch() {
   while (!seqs.empty() && !instrsets.empty()) {
+    // If there's only 1 of any collection type left, match to largest size.
+    if (seqs.size() == 1 && sampcolls.size() > 1) {
+      sampcolls.sort([](const VGMSampColl* a, const VGMSampColl* b) {
+        return a->size() > b->size();
+      });
+    }
+    else if (seqs.size() == 1 && instrsets.size() > 1) {
+      instrsets.sort([](const VGMInstrSet* a, const VGMInstrSet* b) {
+        return a->size() > b->size();
+      });
+    }
+    else if (instrsets.size() == 1 && seqs.size() > 1) {
+      seqs.sort([](const VGMSeq* a, const VGMSeq* b) {
+        return a->size() > b->size();
+      });
+    }
+
     VGMSeq* seq = seqs.front();
     seqs.pop_front();
     VGMInstrSet* instrset = instrsets.front();

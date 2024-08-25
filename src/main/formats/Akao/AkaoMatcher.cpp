@@ -118,9 +118,8 @@ bool AkaoMatcher::tryCreateCollection(int id) {
     for (const auto &instr : instrSet->aInstrs) {
       for (const auto &region : instr->regions()) {
         AkaoRgn* akaoRegion = static_cast<AkaoRgn*>(region);
-        // We will exclude articulation id 0, as it often indicates an unused artic
-        // Also ignoring values > 0x60 is a hack that allows compatability with many psfs.
-        if (akaoRegion->artNum != 0)// && akaoRegion->artNum <= 0x60)
+        // We will exclude articulation id 0, as it often just indicates an unused region
+        if (akaoRegion->artNum != 0)
           requiredArtIds.emplace_back(akaoRegion->artNum);
       }
     }
