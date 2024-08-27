@@ -17,16 +17,13 @@ public:
       : VGMColl(std::move(name)) {}
 
   bool loadMain() override;
-  void preSynthFileCreation() override;
-  void postSynthFileCreation() override;
-
-  AkaoInstrSet *origInstrSet = nullptr;
-  uint32_t numInstrsToAdd = 0;
+  void preSynthFileCreation() const override;
+  void postSynthFileCreation() const override;
 
 private:
   std::tuple<std::unordered_map<int, AkaoArt *>, std::unordered_map<int, int>,
              std::unordered_map<int, AkaoSampColl *>>
-  mapSampleCollections();
+  mapSampleCollections() const;
 };
 
 // **********

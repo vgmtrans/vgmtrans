@@ -15,6 +15,7 @@
 #include "SF2File.h"
 #include "VGMSeq.h"
 #include "LogManager.h"
+#include "SF2Conversion.h"
 
 /**
  * @brief Routines to read file data from memory.
@@ -164,7 +165,7 @@ bool SequencePlayer::playCollection(VGMColl *coll) {
     return false;
   }
 
-  SF2File *sf2 = coll->createSF2File();
+  SF2File *sf2 = conversion::createSF2File(*coll);
   if (!sf2) {
     L_ERROR("Failed to play collection as a soundfont file could not be produced.");
     return false;

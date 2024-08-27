@@ -1,5 +1,5 @@
 /*
- * VGMTrans (c) 2002-2021
+ * VGMTrans (c) 2002-2024
  * Licensed under the zlib license,
  * refer to the included LICENSE.txt file
  */
@@ -10,6 +10,8 @@
 #include "SF2File.h"
 #include "VGMColl.h"
 #include "VGMSeq.h"
+#include "SF2Conversion.h"
+#include "DLSConversion.h"
 
 /*
  * The following free functions implement
@@ -28,8 +30,8 @@ inline constexpr uint32_t operator&(Target a, Target b) {
   return static_cast<uint32_t>(a) & static_cast<uint32_t>(b);
 }
 
-bool saveAsDLS(const VGMInstrSet &set, const std::string &filepath);
-bool saveAsSF2(const VGMInstrSet &set, const std::string &filepath);
+bool saveAsDLS(VGMInstrSet &set, const std::string &filepath);
+bool saveAsSF2(VGMInstrSet &set, const std::string &filepath);
 
 void saveAllAsWav(const VGMSampColl &coll, const std::string &save_dir);
 
@@ -47,16 +49,15 @@ void saveAs(VGMColl &coll, const std::string &dir_path) {
 
   if constexpr ((options & Target::DLS) != 0) {
     DLSFile dlsfile;
-    if (coll.createDLSFile(dlsfile)) {
+    if (createDLSFile(dlsfile, coll)) {
       dlsfile.saveDLSFile(filepath + ".dls");
     }
   }
 
   if constexpr ((options & Target::SF2) != 0) {
-    if (SF2File *sf2file = coll.createSF2File()) {
+    if (SF2File *sf2file = createSF2File(coll)) {
       sf2file->saveSF2File(filepath + ".sf2");
     }
   }
 }
-
 }
