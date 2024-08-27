@@ -33,23 +33,16 @@ class VGMColl {
   void addMiscFile(VGMMiscFile* theMiscFile);
   bool load();
   virtual bool loadMain() { return true; }
-  virtual bool createDLSFile(DLSFile& dls);
-  virtual SF2File* createSF2File();
-  virtual void preSynthFileCreation() {}
-  virtual SynthFile* createSynthFile();
-  virtual bool mainDLSCreation(DLSFile& dls);
-  virtual void postSynthFileCreation() {}
+  virtual void preSynthFileCreation() const {}
+  virtual void postSynthFileCreation() const {}
 
   bool containsVGMFile(const VGMFile*) const;
 
-  const std::vector<VGMInstrSet*>& instrSets() { return m_instrsets; }
-  const std::vector<VGMSampColl*>& sampColls() { return m_sampcolls; }
-  const std::vector<VGMMiscFile*>& miscFiles() { return m_miscfiles; }
+  const std::vector<VGMInstrSet*>& instrSets() const { return m_instrsets; }
+  const std::vector<VGMSampColl*>& sampColls() const { return m_sampcolls; }
+  const std::vector<VGMMiscFile*>& miscFiles() const { return m_miscfiles; }
 
  private:
-  static void unpackSampColl(DLSFile& dls, const VGMSampColl* sampColl, std::vector<VGMSamp*>& finalSamps);
-  static void unpackSampColl(SynthFile& synthfile, const VGMSampColl* sampColl, std::vector<VGMSamp*>& finalSamps);
-
   std::vector<VGMInstrSet*> m_instrsets;
   std::vector<VGMSampColl*> m_sampcolls;
   std::vector<VGMMiscFile*> m_miscfiles;

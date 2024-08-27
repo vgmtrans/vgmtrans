@@ -13,7 +13,7 @@
 // that load more than one sample collection at a time.
 std::tuple<std::unordered_map<int, AkaoArt *>, std::unordered_map<int, int>,
            std::unordered_map<int, AkaoSampColl *>>
-AkaoColl::mapSampleCollections() {
+AkaoColl::mapSampleCollections() const {
   std::vector<AkaoSampColl *> orderedSampColls;
   orderedSampColls.reserve(sampColls().size());
 
@@ -102,7 +102,7 @@ bool AkaoColl::loadMain() {
   return true;
 }
 
-void AkaoColl::preSynthFileCreation() {
+void AkaoColl::preSynthFileCreation() const {
   if (!static_cast<AkaoSeq*>(seq())->bUsesIndividualArts)  // only do this if the 0xA1 event is actually used
     return;
 
@@ -112,9 +112,9 @@ void AkaoColl::preSynthFileCreation() {
   for (auto vgmsampcoll : sampColls()) {
     const auto sampcoll = dynamic_cast<AkaoSampColl*>(vgmsampcoll);
     const uint32_t numArts = static_cast<uint32_t>(sampcoll->akArts.size());
-    numInstrsToAdd = numArts;
+    int numInstrsToAdd = numArts;
 
-    for (uint32_t i = 0; i < numInstrsToAdd; i++) {
+    for (int i = 0; i < numInstrsToAdd; i++) {
       AkaoArt *art = &sampcoll->akArts[i];
       AkaoInstr *newInstr = new AkaoInstr(instrSet, 0, 0, 0, sampcoll->starting_art_id + i);
 
@@ -141,14 +141,20 @@ void AkaoColl::preSynthFileCreation() {
   }
 }
 
-void AkaoColl::postSynthFileCreation() {
+void AkaoColl::postSynthFileCreation() const {
   // if the 0xA1 event isn't used in the sequence, then we didn't modify the instrset
   // so skip this
   if (!static_cast<AkaoSeq*>(seq())->bUsesIndividualArts)
     return;
 
   AkaoInstrSet *instrSet = reinterpret_cast<AkaoInstrSet *>(instrSets()[0]);
-  for (size_t i = 0; i < numInstrsToAdd; i++) {
+  size_t numArticulations = 0;
+  for (const auto* coll : sampColls()) {
+    auto akaoSampColl = dynamic_cast<const AkaoSampColl*>(coll);
+    if (akaoSampColl)
+      numArticulations += akaoSampColl->akArts.size();
+  }
+  for (size_t i = 0; i < numArticulations; i++) {
     delete instrSet->aInstrs.back();
     instrSet->aInstrs.pop_back();
   }
