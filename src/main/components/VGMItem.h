@@ -105,6 +105,7 @@ public:
   VGMItem* addChild(uint32_t offset, uint32_t length, const std::string &name);
   VGMItem* addUnknownChild(uint32_t offset, uint32_t length);
   VGMHeader* addHeader(uint32_t offset, uint32_t length, const std::string &name = "Header");
+  void transferChildren(VGMItem* destination);
 
   template <std::ranges::input_range Range>
   requires std::convertible_to<std::ranges::range_value_t<Range>, VGMItem*>
@@ -123,7 +124,6 @@ protected:
   [[nodiscard]] uint32_t getWordBE(uint32_t offset) const;
   bool isValidOffset(uint32_t offset) const;
   // FIXME: clearChildren() is a workaround for VGMSeqNoTrks' multiple inheritance diamond problem
-  void clearChildren() { m_children.clear(); }
 
 public:
   uint32_t dwOffset;  // offset in the pDoc data buffer

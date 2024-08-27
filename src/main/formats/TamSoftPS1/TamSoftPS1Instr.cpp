@@ -46,12 +46,7 @@ bool TamSoftPS1InstrSet::parseInstrPointers() {
     return false;
   }
 
-  PSXSampColl *newSampColl = new PSXSampColl(TamSoftPS1Format::name, this, dwOffset + 0x800, unLength - 0x800, vagLocations);
-  if (!newSampColl->loadVGMFile()) {
-    delete newSampColl;
-    return false;
-  }
-
+  sampColl = new PSXSampColl(TamSoftPS1Format::name, this, dwOffset + 0x800, unLength - 0x800, vagLocations);
   return true;
 }
 

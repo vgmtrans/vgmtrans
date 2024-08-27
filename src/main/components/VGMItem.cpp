@@ -115,6 +115,11 @@ VGMHeader* VGMItem::addHeader(uint32_t offset, uint32_t length, const std::strin
   return header;
 }
 
+void VGMItem::transferChildren(VGMItem* destination) {
+  destination->addChildren(m_children);
+  m_children.clear();
+}
+
 void VGMItem::sortChildrenByOffset() {
   std::ranges::sort(m_children, [](const VGMItem *a, const VGMItem *b) {
     return a->dwOffset < b->dwOffset;
