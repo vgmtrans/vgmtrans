@@ -38,8 +38,7 @@ bool VGMSeqNoTrks::loadMain() {
   // SeqTrack have their own m_children fields. VGMSeq is the one we care about. We need to transfer
   // SeqTrack::m_children into VGMSeq::m_children and then clear it from SeqTrack so that their
   // destructors don't doubly delete the children.
-  VGMSeq::addChildren(SeqTrack::children());
-  SeqTrack::clearChildren();
+  SeqTrack::transferChildren(static_cast<VGMSeq*>(this));
 
   if (length() == 0) {
     VGMSeq::setGuessedLength();

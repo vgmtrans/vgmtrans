@@ -7,6 +7,7 @@
 #include "VGMInstrSet.h"
 #include <spdlog/fmt/fmt.h>
 #include "VGMSampColl.h"
+#include "VGMSamp.h"
 #include "VGMRgn.h"
 #include "VGMColl.h"
 #include "Root.h"
@@ -67,6 +68,8 @@ bool VGMInstrSet::load() {
   if (sampColl != nullptr) {
     if (!sampColl->load()) {
       L_WARN("Failed to load VGMSampColl");
+    } else {
+      sampColl->transferChildren(this);
     }
   }
 
