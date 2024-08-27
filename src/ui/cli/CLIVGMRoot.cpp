@@ -16,6 +16,8 @@
 #include "SF2File.h"
 #include "VGMColl.h"
 #include "VGMSeq.h"
+#include "SF2Conversion.h"
+#include "DLSConversion.h"
 
 using namespace std;
 namespace fs = std::filesystem;
@@ -171,7 +173,7 @@ bool CLIVGMRoot::saveMidi(const VGMColl* coll) {
 bool CLIVGMRoot::saveSF2(VGMColl* coll) {
   string collName = coll->name();
   string filepath = UI_getSaveFilePath(collName, "sf2");
-  SF2File *sf2file = coll->createSF2File();
+  SF2File *sf2file = conversion::createSF2File(*coll);
   bool success = false;
   if (sf2file != nullptr) {
     if (sf2file->saveSF2File(filepath)) {
@@ -193,7 +195,7 @@ bool CLIVGMRoot::saveDLS(VGMColl* coll) {
   string filepath = UI_getSaveFilePath(collName, "dls");
   DLSFile dlsfile;
   bool success = false;
-  if (coll->createDLSFile(dlsfile)) {
+  if (conversion::createDLSFile(dlsfile, *coll)) {
     if (dlsfile.saveDLSFile(filepath)) {
       success = true;
     }
