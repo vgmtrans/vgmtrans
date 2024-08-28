@@ -18,6 +18,7 @@
 #include <vector>
 
 #include "QtVGMRoot.h"
+#include "Format.h"
 
 #include <VGMSeq.h>
 #include <VGMColl.h>
@@ -135,8 +136,6 @@ QListWidget *ManualCollectionDialog::makeSampleCollectionList() {
 }
 
 void ManualCollectionDialog::createCollection() {
-  auto coll = new VGMColl(m_name_field->text().toStdString());
-
   VGMSeq *chosen_seq = nullptr;
   for (int i = 0; i < m_seq_list->count(); i++) {
     auto item = m_seq_list->item(i);
@@ -151,6 +150,10 @@ void ManualCollectionDialog::createCollection() {
     QMessageBox::critical(this, "Error creating collection", "A music sequence must be selected");
     return;
   }
+
+  // Get the VGMColl class for the format of the chosen sequence
+  auto coll = chosen_seq->format()->newCollection();
+  coll->setName(m_name_field->text().toStdString());
   coll->useSeq(chosen_seq);
 
   for (int i = 0; i < m_instr_list->count(); i++) {
@@ -180,6 +183,6 @@ void ManualCollectionDialog::createCollection() {
                           "No sample collections were selected\nThe instrument bank will be silent...");
   }
 
-  qtVGMRoot.addVGMColl(coll);
+  coll->load();
   close();
 }

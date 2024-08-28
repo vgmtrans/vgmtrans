@@ -42,7 +42,7 @@ bool FFTSeq::parseHeader(void) {
   int titleLength = ptPercussionTbl - ptSongTitle;
   char *songtitle = new char[titleLength];
   readBytes(dwOffset + ptSongTitle, titleLength, songtitle);
-  setName(std::string(songtitle, songtitle + titleLength));
+  setName(std::string(songtitle, songtitle + titleLength - 1));
   delete[] songtitle;
 
   VGMHeader *hdr = addHeader(dwOffset, 0x22);
