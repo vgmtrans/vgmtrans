@@ -183,6 +183,6 @@ void ManualCollectionDialog::createCollection() {
                           "No sample collections were selected\nThe instrument bank will be silent...");
   }
 
-  qtVGMRoot.addVGMColl(coll);
+  coll->load();
   close();
 }
