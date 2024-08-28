@@ -6,7 +6,6 @@
 
 #include "PSF2Loader.h"
 #include <zlib-ng.h>
-#include "Root.h"
 #include "LogManager.h"
 #include "components/PSFFile.h"
 

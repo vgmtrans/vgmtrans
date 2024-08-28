@@ -5,8 +5,7 @@
  */
 #pragma once
 #include "Format.h"
-#include "Matcher.h"
-#include "Root.h"
+#include "FilegroupMatcher.h"
 #include "KonamiSnesScanner.h"
 
 

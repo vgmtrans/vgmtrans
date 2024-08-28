@@ -3,7 +3,6 @@
 #include "VGMSamp.h"
 #include "VGMItem.h"
 #include "ScaleConversion.h"
-#include "Root.h"
 #include "LogManager.h"
 
 // All of the ADSR calculations herein (except where inaccurate) are derived from Neill Corlett's work in

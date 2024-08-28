@@ -57,6 +57,7 @@ target_include_directories(vgmtranscore PUBLIC
         .
         ./components
         ./components/instr
+        ./components/matcher
         ./components/seq
         ./conversion
         ./formats

@@ -7,7 +7,6 @@
 #include "Matcher.h"
 #include <vector>
 #include <unordered_map>
-#include <iostream>
 
 class VGMSeq;
 class VGMInstrSet;

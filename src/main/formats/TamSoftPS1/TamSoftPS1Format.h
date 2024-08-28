@@ -1,7 +1,6 @@
 #pragma once
 #include "Format.h"
-#include "Matcher.h"
-#include "Root.h"
+#include "FilegroupMatcher.h"
 #include "TamSoftPS1Scanner.h"
 
 

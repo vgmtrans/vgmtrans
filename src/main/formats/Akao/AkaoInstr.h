@@ -9,7 +9,6 @@
 #include "VGMSampColl.h"
 #include "VGMRgn.h"
 #include "AkaoFormat.h"
-#include "Matcher.h"
 
 struct AkaoInstrDatLocation {
   uint32_t instrAllOffset;

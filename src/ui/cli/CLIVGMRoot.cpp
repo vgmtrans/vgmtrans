@@ -9,7 +9,6 @@
 
 #include <version.h>
 #include "Format.h"
-#include "Matcher.h"
 #include "CLIVGMRoot.h"
 #include "DLSFile.h"
 #include "LogManager.h"

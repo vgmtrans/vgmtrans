@@ -1,7 +1,7 @@
 #pragma once
 #include "Format.h"
 #include "HeartBeatPS1Scanner.h"
-#include "Matcher.h"
+#include "FilegroupMatcher.h"
 
 #define HEARTBEATPS1_SND_HEADER_SIZE 0x3C
 
