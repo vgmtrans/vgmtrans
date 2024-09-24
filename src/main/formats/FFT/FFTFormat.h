@@ -1,6 +1,6 @@
 #pragma once
 #include "Format.h"
-#include "Matcher.h"
+#include "GetIdMatcher.h"
 #include "FFTScanner.h"
 
 BEGIN_FORMAT(FFT)

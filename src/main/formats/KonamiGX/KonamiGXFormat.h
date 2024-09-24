@@ -1,7 +1,5 @@
 #pragma once
 #include "Format.h"
-#include "Root.h"
-#include "VGMColl.h"
 #include "KonamiGXScanner.h"
 
 

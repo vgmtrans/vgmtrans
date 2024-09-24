@@ -3,7 +3,7 @@
  * Licensed under the zlib license,
  * refer to the included LICENSE.txt file
  */
-#include "Root.h"
+#include "common.h"
 #include "CPS1Scanner.h"
 #include "CPSSeq.h"
 #include "CPS1Instr.h"

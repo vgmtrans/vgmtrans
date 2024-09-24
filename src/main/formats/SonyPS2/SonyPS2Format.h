@@ -1,8 +1,7 @@
 #pragma once
 #include "Format.h"
-#include "Root.h"
 #include "SonyPS2Scanner.h"
-#include "Matcher.h"
+#include "FilenameMatcher.h"
 #include "VGMColl.h"
 
 typedef struct _VersCk {

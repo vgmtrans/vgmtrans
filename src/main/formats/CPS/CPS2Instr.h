@@ -2,7 +2,6 @@
 #include "VGMInstrSet.h"
 #include "VGMSampColl.h"
 #include "VGMMiscFile.h"
-#include "CPS2Format.h"
 
 class CPS2Instr;
 

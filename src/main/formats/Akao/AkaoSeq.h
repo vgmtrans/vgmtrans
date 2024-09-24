@@ -11,7 +11,6 @@
 #include "VGMSeq.h"
 #include "SeqTrack.h"
 #include "AkaoFormatVersion.h"
-#include "Matcher.h"
 
 class AkaoSeq;
 class AkaoTrack;

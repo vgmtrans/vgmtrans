@@ -1,45 +1,19 @@
 /*
- * VGMTrans (c) 2002-2014
+ * VGMTrans (c) 2002-2024
  * Licensed under the zlib license,
  * refer to the included LICENSE.txt file
- */
+*/
 
 #pragma once
-#include <variant>
-#include <map>
-#include "Format.h"
 
+#include <map>
+
+#include "Matcher.h"
+#include "Format.h"
 #include "VGMSeq.h"
 #include "VGMInstrSet.h"
 #include "VGMSampColl.h"
 #include "VGMColl.h"
-
-class VGMMiscFile;
-
-// *******
-// Matcher
-// *******
-
-class Matcher {
-public:
-  explicit Matcher(Format *format);
-  virtual ~Matcher() = default;
-
-  virtual void onFinishedScan(RawFile *rawfile) {}
-
-  virtual bool onNewFile(std::variant<VGMSeq *, VGMInstrSet *, VGMSampColl *, VGMMiscFile *> file);
-  virtual bool onCloseFile(std::variant<VGMSeq *, VGMInstrSet *, VGMSampColl *, VGMMiscFile *> file);
-
-protected:
-  virtual bool onNewSeq(VGMSeq *) { return false; }
-  virtual bool onNewInstrSet(VGMInstrSet *) { return false; }
-  virtual bool onNewSampColl(VGMSampColl *) { return false; }
-  virtual bool onCloseSeq(VGMSeq *) { return false; }
-  virtual bool onCloseInstrSet(VGMInstrSet *) { return false; }
-  virtual bool onCloseSampColl(VGMSampColl *) { return false; }
-
-  Format *fmt;
-};
 
 // *************
 // SimpleMatcher
@@ -118,7 +92,6 @@ protected:
           onCloseSampColl(matchingSampColl);
           return false;
         }
-        // pRoot->AddVGMFile(matchingSampColl);
       }
     }
 
@@ -178,7 +151,6 @@ protected:
             onCloseSampColl(sampcoll);
             return false;
           }
-          // pRoot->AddVGMFile(sampcoll);
         }
       }
 
@@ -257,92 +229,4 @@ private:
   std::multimap<IdType, VGMSeq *> seqs;
   std::map<IdType, VGMInstrSet *> instrsets;
   std::map<IdType, VGMSampColl *> sampcolls;
-};
-
-// ************
-// GetIdMatcher
-// ************
-
-class GetIdMatcher : public SimpleMatcher<uint32_t> {
-public:
-  explicit GetIdMatcher(Format *format, bool bRequiresSampColl = false)
-      : SimpleMatcher(format, bRequiresSampColl) {}
-
-  bool seqId(VGMSeq *seq, uint32_t &id) override {
-    id = seq->id();
-    return (id != -1u);
-  }
-
-  bool instrSetId(VGMInstrSet *instrset, uint32_t &id) override {
-    id = instrset->id();
-    return (id != -1u);
-  }
-
-  bool sampCollId(VGMSampColl *sampcoll, uint32_t &id) override {
-    id = sampcoll->id();
-    return (id != -1u);
-  }
-};
-
-// ***************
-// FilenameMatcher
-// ***************
-
-class FilenameMatcher : public SimpleMatcher<std::string> {
-public:
-  explicit FilenameMatcher(Format *format, bool bRequiresSampColl = false)
-      : SimpleMatcher(format, bRequiresSampColl) {}
-
-  bool seqId(VGMSeq *seq, std::string &id) override {
-    RawFile *rawfile = seq->rawFile();
-    id = rawfile->path().string();
-    return !id.empty();
-  }
-
-  bool instrSetId(VGMInstrSet *instrset, std::string &id) override {
-    RawFile *rawfile = instrset->rawFile();
-    id = rawfile->path().string();
-    return !id.empty();
-  }
-
-  bool sampCollId(VGMSampColl *sampcoll, std::string &id) override {
-    RawFile *rawfile = sampcoll->rawFile();
-    id = rawfile->path().string();
-    return !id.empty();
-  }
-};
-
-// ****************
-// FilegroupMatcher
-// ****************
-
-// FilegroupMatcher handles formats where the only method of associating sequences, instrument sets,
-// and sample collections is that they are loaded together within the same RawFile. When loading is
-// complete, FilegroupMatcher processes the VGMFiles in the order they were added and groups them
-// into collections: thus, it assumes association by order. FilegroupMatcher does not retain
-// state between loads, so it will never create a collection that spans multiple RawFiles, with the
-// exception that FilegroupMatcher processes a psf file and all of its psflib dependencies together
-// as a single load.
-
-class FilegroupMatcher : public Matcher {
-public:
-  explicit FilegroupMatcher(Format *format);
-
-  void onFinishedScan(RawFile *rawfile) override;
-
-protected:
-  bool onNewSeq(VGMSeq *seq) override;
-  bool onNewInstrSet(VGMInstrSet *instrset) override;
-  bool onNewSampColl(VGMSampColl *sampcoll) override;
-
-  bool onCloseSeq(VGMSeq *seq) override;
-  bool onCloseInstrSet(VGMInstrSet *instrset) override;
-  bool onCloseSampColl(VGMSampColl *sampcoll) override;
-
-  virtual void lookForMatch();
-
-protected:
-  std::list<VGMSeq *> seqs;
-  std::list<VGMInstrSet *> instrsets;
-  std::list<VGMSampColl *> sampcolls;
 };
