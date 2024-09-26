@@ -4,8 +4,7 @@
 #include "VGMSeq.h"
 #include "SF2File.h"
 #include "LogManager.h"
-//#include "InstrClient.h"
-//#include "InstrServerMessage.h"
+#include "SF2Conversion.h"
 
 using namespace std;
 
@@ -255,7 +254,7 @@ bool VSTSequencePlayer::loadVST() {
 }
 
 bool VSTSequencePlayer::sendSF2ToVST(VGMColl* coll) {
-  SF2File* sf2 = coll->createSF2File();
+  SF2File* sf2 = conversion::createSF2File(*coll);
   if (!sf2) {
     L_ERROR("Failed to play collection as a soundfont file could not be produced.");
     return false;
