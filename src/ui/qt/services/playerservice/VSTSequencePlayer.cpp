@@ -271,7 +271,7 @@ bool VSTSequencePlayer::sendSF2ToVST(VGMColl* coll) {
 // This reads n bytes from a buffer (where n is <= 7) and converts them into a n+1 size
 // chunk of 7-bit bytes. The first byte stores the 8th bit of every subsequent byte
 // starting from the 0th bit.
-uint64_t VSTSequencePlayer::convertTo7BitMidiChunk(uint8_t* buf, uint8_t n) {
+inline uint64_t VSTSequencePlayer::convertTo7BitMidiChunk(uint8_t* buf, uint8_t n) {
   uint64_t result = 0;
   uint64_t firstByte = 0; // To store the combined 8th bits
 
@@ -289,29 +289,26 @@ uint64_t VSTSequencePlayer::convertTo7BitMidiChunk(uint8_t* buf, uint8_t n) {
   return result;
 }
 
-std::vector<uint8_t> VSTSequencePlayer::encode6BitVariableLengthQuantity(uint32_t value) {
-  std::vector<uint8_t> encodedBytes;
-  encodedBytes.reserve(6);
-
-  // Start with the least significant 7 bits of value
+size_t VSTSequencePlayer::encode6BitVariableLengthQuantity(uint32_t value, uint8_t* output) {
   uint64_t buffer = value & 0x3F;
+  size_t count = 0;
 
-  // Shift value to process next 7 bits
+  // Shift value to process next 6 bits, same as the vector version
   while (value >>= 6) {
-    // Move to the next 7 bits block and set the continuation bit
     buffer <<= 8;
-    buffer |= ((value & 0x3F) | 0x40);
+    buffer |= ((value & 0x3F) | 0x40);  // Set continuation bit for non-final bytes
   }
 
-  // Push bytes to the vector
-  while (true) {
-    encodedBytes.emplace_back(buffer & 0xFF);  // Push the least significant byte
-    if (buffer & 0x40) {
-      buffer >>= 8;  // Move to the next byte if the continuation bit is set
-    } else {
-      return encodedBytes;  // Last byte reached, exit loop
-    }
+  // Push all bytes to the output array
+  while (buffer & 0x40) {  // While there are continuation bits
+    output[count++] = buffer & 0xFF;
+    buffer >>= 8;
   }
+
+  // Push the final byte without the continuation bit
+  output[count++] = buffer & 0xFF;
+
+  return count;
 }
 
 juce::MidiMessage VSTSequencePlayer::createSysExMessage(
@@ -336,7 +333,6 @@ void VSTSequencePlayer::populateSF2MidiBuffer(uint8_t* rawSF2, uint32_t sf2Size)
     return;
   }
 
-  const size_t maxPacketSize = 64*1024 - 16; //65536-8;
   const size_t chunkSize = 8; // Size of chunks to process
   const size_t chunkDataSize = 7;
 
@@ -345,17 +341,15 @@ void VSTSequencePlayer::populateSF2MidiBuffer(uint8_t* rawSF2, uint32_t sf2Size)
   const size_t lastChunkSize = sf2Size % chunkDataSize;
   const size_t chunksPerPacket = maxPacketSize / chunkSize;
 
-  auto packetBuf = new uint8_t[maxPacketSize];
-  auto eventBuf = new uint8_t[maxPacketSize];
-
-  auto test = encode6BitVariableLengthQuantity(0x1FFFFF);
+  u8 encodedSize[8];
 
   // send a sysex message indicating the begin of the SF2 send and its total size
-  auto encodedSize = encode6BitVariableLengthQuantity(sf2Size);
+  // auto oldEncodedSize = oldEncode6BitVariableLengthQuantity(sf2Size);
+  auto encodedSizeSize = encode6BitVariableLengthQuantity(sf2Size, encodedSize);
   auto startSF2SendEvent = createSysExMessage(
     0x10,
-    encodedSize.data(),
-    encodedSize.size(),
+    encodedSize,
+    encodedSizeSize,
     eventBuf);
 
   sendSF2MidiBuffer.addEvent(startSF2SendEvent, 0);
@@ -402,8 +396,6 @@ void VSTSequencePlayer::populateSF2MidiBuffer(uint8_t* rawSF2, uint32_t sf2Size)
     sendSF2MidiBuffer.addEvent(packet, 0);
   }
   readyToSendSF2 = true;
-  delete[] packetBuf;
-  delete[] eventBuf;
 }
 
 void VSTSequencePlayer::clearState() {
