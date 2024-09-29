@@ -134,10 +134,6 @@ target_include_directories(vgmtrans PRIVATE
         ./workarea
         "${PROJECT_SOURCE_DIR}/lib/ymmy/src")
 
-set_target_properties(juce_recommended_config_flags PROPERTIES
-        INTERFACE_COMPILE_DEFINITIONS
-        JUCE_PLUGINHOST_VST3=1)
-
 target_compile_definitions(vgmtrans PRIVATE
         JUCE_PLUGINHOST_AU=0
         JUCE_PLUGINHOST_LADSPA=0
@@ -254,7 +250,7 @@ add_custom_command(TARGET vgmtrans
         "${RESOURCE_PATH}" &&
         ${CMAKE_COMMAND} -E make_directory "${RESOURCE_PATH}/vst" &&
         ${CMAKE_COMMAND} -E copy_directory
-        "${YMMY_BUILD_DIR}/ymmy_artefacts/${CMAKE_BUILD_TYPE}/VST3/ymmy.vst3"
+        "${YMMY_BUILD_DIR}/ymmy_artefacts/${CMAKE_CFG_INTDIR}/VST3/ymmy.vst3"
         "${RESOURCE_PATH}/vst/ymmy.vst3")
 
 set(CPACK_PACKAGE_NAME "vgmtrans")
