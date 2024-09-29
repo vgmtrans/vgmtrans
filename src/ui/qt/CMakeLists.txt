@@ -134,7 +134,6 @@ target_link_libraries(
           Qt::Svg
           juce::juce_audio_utils
           juce::juce_audio_processors)
-#          juicysfplugin_network)
 
 # Workaround macdeployqt not correctly deploying QtDbus
 if(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
@@ -211,6 +210,13 @@ elseif(CMAKE_SYSTEM_NAME MATCHES "FreeBSD|OpenBSD|Linux")
           DESTINATION "${CMAKE_INSTALL_PREFIX}/share/applications")
 endif()
 
+# Set the CONFIGURATION_TYPE variable based on platform specifics
+if(CMAKE_CFG_INTDIR AND NOT CMAKE_CFG_INTDIR STREQUAL ".")
+  set(CONFIGURATION_TYPE ${CMAKE_CFG_INTDIR})
+else()
+  set(CONFIGURATION_TYPE ${CMAKE_BUILD_TYPE})
+endif()
+
 # Copy MAME rom definitions, copy VST3 plugin
 add_custom_command(TARGET vgmtrans
         POST_BUILD
@@ -219,7 +225,7 @@ add_custom_command(TARGET vgmtrans
         "${RESOURCE_PATH}" &&
         ${CMAKE_COMMAND} -E make_directory "${RESOURCE_PATH}/vst" &&
         ${CMAKE_COMMAND} -E copy_directory
-        "${YMMY_BUILD_DIR}/ymmy_artefacts/${CMAKE_CFG_INTDIR}/VST3/ymmy.vst3"
+        "${YMMY_BUILD_DIR}/ymmy_artefacts/${CONFIGURATION_TYPE}/VST3/ymmy.vst3"
         "${RESOURCE_PATH}/vst/ymmy.vst3")
 
 set(CPACK_PACKAGE_NAME "vgmtrans")
