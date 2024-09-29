@@ -189,7 +189,6 @@ target_link_libraries(
           Qt6::Svg
           juce::juce_audio_utils
           juce::juce_audio_processors)
-#          juicysfplugin_network)
 
 if(Qt6DBus_FOUND)
   target_link_libraries(vgmtrans PRIVATE Qt6::DBus)
@@ -382,6 +381,14 @@ if (NOT NO_QT_DEPLOY)
   install(SCRIPT ${deploy_script})
 endif()
 
+# Set the CONFIGURATION_TYPE variable based on platform specifics
+if(CMAKE_CFG_INTDIR AND NOT CMAKE_CFG_INTDIR STREQUAL ".")
+  set(CONFIGURATION_TYPE ${CMAKE_CFG_INTDIR})
+else()
+  set(CONFIGURATION_TYPE ${CMAKE_BUILD_TYPE})
+endif()
+
+# Copy MAME rom definitions, copy VST3 plugin
 add_custom_command(TARGET vgmtrans
         POST_BUILD
         COMMAND ${CMAKE_COMMAND} -E copy_if_different
@@ -389,7 +396,7 @@ add_custom_command(TARGET vgmtrans
         "${RESOURCE_PATH}" &&
         ${CMAKE_COMMAND} -E make_directory "${RESOURCE_PATH}/vst" &&
         ${CMAKE_COMMAND} -E copy_directory
-        "${YMMY_BUILD_DIR}/ymmy_artefacts/${CMAKE_CFG_INTDIR}/VST3/ymmy.vst3"
+        "${YMMY_BUILD_DIR}/ymmy_artefacts/${CONFIGURATION_TYPE}/VST3/ymmy.vst3"
         "${RESOURCE_PATH}/vst/ymmy.vst3")
 
 # ~~~
