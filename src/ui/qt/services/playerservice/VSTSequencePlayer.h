@@ -98,10 +98,15 @@ private:
                                         const juce::AudioIODeviceCallbackContext& context) override;
 
 private:
-  std::vector<uint8_t> encode6BitVariableLengthQuantity(uint32_t value);
+  std::vector<uint8_t> oldEncode6BitVariableLengthQuantity(uint32_t value);
+  size_t encode6BitVariableLengthQuantity(uint32_t value, uint8_t* output);
   juce::MidiMessage createSysExMessage(uint8_t commandByte, uint8_t* data, uint32_t dataSize, uint8_t* eventBuffer);
   uint64_t convertTo7BitMidiChunk(uint8_t* buf, uint8_t n);
   void populateSF2MidiBuffer(uint8_t* rawSF2, uint32_t sf2Size);
+
+  static constexpr size_t maxPacketSize = 64 * 1024 - 16;
+  uint8_t packetBuf[maxPacketSize];
+  uint8_t eventBuf[maxPacketSize + 4];
 
   PlaybackState state;
 
