@@ -150,6 +150,7 @@ void SeqTrack::addInitialMidiEvents(int trackNum) {
   pMidiTrack->addTrackName(ssTrackName);
 
   pMidiTrack->addMidiPort(channelGroup);
+  pMidiTrack->addYmmySynthAssignment(channel, synthTypeToString(synthType));
 
   if (trackNum == 0) {
     pMidiTrack->addGMReset();
