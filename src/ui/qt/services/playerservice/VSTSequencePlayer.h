@@ -21,6 +21,11 @@ enum MusicState {
   Playing
 };
 
+enum SynthFileType {
+  SoundFont2 = 0,
+  YM2151_OPM = 1
+};
+
 struct PlaybackState {
   std::unique_ptr<MidiFile> midiFile;
   std::vector<MidiEvent*> events;
@@ -100,9 +105,9 @@ private:
 private:
   std::vector<uint8_t> oldEncode6BitVariableLengthQuantity(uint32_t value);
   size_t encode6BitVariableLengthQuantity(uint32_t value, uint8_t* output);
-  juce::MidiMessage createSysExMessage(uint8_t commandByte, uint8_t* data, uint32_t dataSize, uint8_t* eventBuffer);
+  juce::MidiMessage createSysExMessage(uint8_t commandByte, SynthFileType fileType, uint8_t* data, uint32_t dataSize, uint8_t* eventBuffer);
   uint64_t convertTo7BitMidiChunk(uint8_t* buf, uint8_t n);
-  void populateSF2MidiBuffer(uint8_t* rawSF2, uint32_t sf2Size);
+  void populateFileMidiBuffer(uint8_t* fileData, uint32_t fileSize, SynthFileType fileType);
 
   static constexpr size_t maxPacketSize = 64 * 1024 - 16;
   uint8_t packetBuf[maxPacketSize];
@@ -117,8 +122,8 @@ private:
 
   juce::MidiBuffer midiBuffer;
   juce::MidiBuffer seekMidiBuffer;
-  juce::MidiBuffer sendSF2MidiBuffer;
-  bool readyToSendSF2 = false;
+  juce::MidiBuffer sendFileMidiBuffer;
+  bool readyToSendFile = false;
 
   juce::ScopedJuceInitialiser_GUI juceInitialiser;
   juce::AudioDeviceManager deviceManager;
