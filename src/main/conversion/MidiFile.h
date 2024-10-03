@@ -60,7 +60,8 @@ typedef enum {
   MIDIEVENT_ENDOFTRACK,
   MIDIEVENT_TEXT,
   MIDIEVENT_RESET,
-  MIDIEVENT_MIDIPORT
+  MIDIEVENT_MIDIPORT,
+  MIDIEVENT_YMMY_SYNTHASSIGN
 } MidiEventType;
 
 class MidiTrack {
@@ -189,6 +190,9 @@ class MidiTrack {
                     uint8_t databyte2,
                     int8_t priority,
                     uint32_t absTime);
+
+  // YMMY EVENTS
+  void addYmmySynthAssignment(uint8_t channel, std::string synthName);
 
  public:
   MidiFile *parentSeq;
@@ -666,36 +670,38 @@ class XGResetEvent
   MidiEventType eventType() override { return MIDIEVENT_RESET; }
 };
 
+// ***********
+// YMMY Events
+// ***********
 
-
-/*
-class AFX_EXT_CLASS ProgChangeEvent
-	: public MidiEvent
-{
-	ProgChangeEvent(void);
-	~ProgramChangeEvent(void);
-
-	uint8_t progNum;
-}
-
-class AFX_EXT_CLASS ControllerEvent
-	: public MidiEvent
-{
+class YmmySynthChangeEvent
+    : public SysexEvent {
 public:
-	NoteEvent(void);
-	~NoteEvent(void);
+  YmmySynthChangeEvent(MidiTrack *prntTrk, uint8_t channel, uint8_t group, uint32_t absoluteTime, std::string synthName)
+      : SysexEvent(prntTrk, absoluteTime, buildData(channel, group, synthName), PRIORITY_HIGHEST) {
+    // SysexEvent(prntTrk, absoluteTime, sysexData, PRIORITY_HIGHEST);
+  }
+  MidiEventType eventType() override { return MIDIEVENT_YMMY_SYNTHASSIGN; }
 
-	int8_t key;
-	int8_t vel;
-};*/
+private:
+  // Helper function to construct the data vector
+  static std::vector<uint8_t> buildData(uint8_t channel, uint8_t group, const std::string& synthName) {
+    std::vector<uint8_t> data;
 
-/*class AFX_EXT_CLASS NoteEventDur
-	: public MidiEvent
-{
-public:
-	NoteEvent(void);
-	~NoteEvent(void);
+    // Add YMMY Sysex event identifier
+    data.push_back(0x7D);
 
-	int8_t key;
-	int8_t vel;
-}*/
+    // Add Synth assignment opcode
+    data.push_back(0x7E);
+
+    // Add channel and group
+    data.push_back(channel);
+    data.push_back(group);
+
+    // Add the contents of synthName followed by a null terminator (0x00)
+    data.insert(data.end(), synthName.begin(), synthName.end());
+    data.push_back(0x00);  // Null-terminated ASCII string
+
+    return data;
+  }
+};
