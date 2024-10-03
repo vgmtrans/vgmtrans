@@ -262,7 +262,7 @@ bool VSTSequencePlayer::sendSF2ToVST(VGMColl* coll) {
 
   auto rawSF2 = sf2->saveToMem();
   auto sf2Size = sf2->size();
-  populateSF2MidiBuffer(rawSF2, sf2Size);
+  populateFileMidiBuffer(rawSF2, sf2Size, SoundFont2);
 
   delete[] rawSF2;
   return true;
@@ -312,7 +312,8 @@ size_t VSTSequencePlayer::encode6BitVariableLengthQuantity(uint32_t value, uint8
 }
 
 juce::MidiMessage VSTSequencePlayer::createSysExMessage(
-    uint8_t commandByte,
+    uint8_t command,
+    SynthFileType fileType,
     uint8_t* data,
     uint32_t dataSize,
     uint8_t* eventBuffer
@@ -320,16 +321,17 @@ juce::MidiMessage VSTSequencePlayer::createSysExMessage(
   int i = 0;
   eventBuffer[i++] = 0xF0;
   eventBuffer[i++] = 0x7D;
-  eventBuffer[i++] = commandByte;
+  eventBuffer[i++] = command;
+  eventBuffer[i++] = fileType;
   memcpy(eventBuffer+i, data, dataSize);
   i += dataSize;
   eventBuffer[i++] = 0xF7;
   return juce::MidiMessage(eventBuffer, i, 0);
 }
 
-void VSTSequencePlayer::populateSF2MidiBuffer(uint8_t* rawSF2, uint32_t sf2Size) {
-  // If an SF2 send is already queued, don't mess with the midi buffer
-  if (readyToSendSF2) {
+void VSTSequencePlayer::populateFileMidiBuffer(uint8_t* fileData, uint32_t fileSize, SynthFileType fileType) {
+  // If an file send is already queued, don't mess with the midi buffer
+  if (readyToSendFile) {
     return;
   }
 
@@ -337,28 +339,29 @@ void VSTSequencePlayer::populateSF2MidiBuffer(uint8_t* rawSF2, uint32_t sf2Size)
   const size_t chunkDataSize = 7;
 
   // Calculate the number of full chunks and the size of the last chunk (if any)
-  const size_t numFullChunks = sf2Size / chunkDataSize;
-  const size_t lastChunkSize = sf2Size % chunkDataSize;
+  const size_t numFullChunks = fileSize / chunkDataSize;
+  const size_t lastChunkSize = fileSize % chunkDataSize;
   const size_t chunksPerPacket = maxPacketSize / chunkSize;
 
   u8 encodedSize[8];
 
-  // send a sysex message indicating the begin of the SF2 send and its total size
-  // auto oldEncodedSize = oldEncode6BitVariableLengthQuantity(sf2Size);
-  auto encodedSizeSize = encode6BitVariableLengthQuantity(sf2Size, encodedSize);
-  auto startSF2SendEvent = createSysExMessage(
+  // send a sysex message indicating the begin of the file send and its total size
+  // auto oldEncodedSize = oldEncode6BitVariableLengthQuantity(fileSize);
+  auto encodedSizeSize = encode6BitVariableLengthQuantity(fileSize, encodedSize);
+  auto startFileSendEvent = createSysExMessage(
     0x10,
+    fileType,
     encodedSize,
     encodedSizeSize,
     eventBuf);
 
-  sendSF2MidiBuffer.addEvent(startSF2SendEvent, 0);
+  sendFileMidiBuffer.addEvent(startFileSendEvent, 0);
 
   int chunkNum = 0;
   int packetIx = 0;
   for (size_t i = 0; i < numFullChunks; ++i) {
     // Process each 8-byte chunk
-    uint64_t processedChunk = convertTo7BitMidiChunk(rawSF2 + i * chunkDataSize, chunkDataSize);
+    uint64_t processedChunk = convertTo7BitMidiChunk(fileData + i * chunkDataSize, chunkDataSize);
 
     // Add the processed chunk to the packet data
     for (int j = 7; j >= 0; --j) {
@@ -369,10 +372,11 @@ void VSTSequencePlayer::populateSF2MidiBuffer(uint8_t* rawSF2, uint32_t sf2Size)
       // Packet is full. Store it in a MidiMessage and add it to the midiBuffer
       auto packet = createSysExMessage(
           0x11,
+          fileType,
           packetBuf,
           packetIx,
           eventBuf);
-      sendSF2MidiBuffer.addEvent(packet, 0);
+      sendFileMidiBuffer.addEvent(packet, 0);
       packetIx = 0;
       chunkNum = 0;
     }
@@ -380,7 +384,7 @@ void VSTSequencePlayer::populateSF2MidiBuffer(uint8_t* rawSF2, uint32_t sf2Size)
 
   // Process the final partial data chunk if it exists
   if (lastChunkSize > 0) {
-    uint64_t processedChunk = convertTo7BitMidiChunk(rawSF2 + numFullChunks * chunkDataSize, lastChunkSize);
+    uint64_t processedChunk = convertTo7BitMidiChunk(fileData + numFullChunks * chunkDataSize, lastChunkSize);
     for (int j = 7; j >= 0; --j) {
       packetBuf[packetIx++] = (processedChunk >> (8 * j)) & 0xFF;
     }
@@ -390,12 +394,13 @@ void VSTSequencePlayer::populateSF2MidiBuffer(uint8_t* rawSF2, uint32_t sf2Size)
   if (packetIx > 0) {
     auto packet = createSysExMessage(
         0x11,
+        fileType,
         packetBuf,
         packetIx,
         eventBuf);
-    sendSF2MidiBuffer.addEvent(packet, 0);
+    sendFileMidiBuffer.addEvent(packet, 0);
   }
-  readyToSendSF2 = true;
+  readyToSendFile = true;
 }
 
 void VSTSequencePlayer::clearState() {
@@ -570,10 +575,10 @@ void VSTSequencePlayer::audioDeviceIOCallbackWithContext (const float* const* in
 
   // If the sendSF2MidiBuffer is non-empty, we'll exclusively process its messages in this
   // callback iteration.
-  if (readyToSendSF2 && !sendSF2MidiBuffer.isEmpty()) {
-    pluginInstance->processBlock(buffer, sendSF2MidiBuffer);
-    sendSF2MidiBuffer.clear();
-    readyToSendSF2 = false;
+  if (readyToSendFile && !sendFileMidiBuffer.isEmpty()) {
+    pluginInstance->processBlock(buffer, sendFileMidiBuffer);
+    sendFileMidiBuffer.clear();
+    readyToSendFile = false;
     return;
   }
 
