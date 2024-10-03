@@ -63,7 +63,8 @@ typedef enum {
   MIDIEVENT_ENDOFTRACK,
   MIDIEVENT_TEXT,
   MIDIEVENT_RESET,
-  MIDIEVENT_MIDIPORT
+  MIDIEVENT_MIDIPORT,
+  MIDIEVENT_YMMY_SYNTHASSIGN
 } MidiEventType;
 
 class MidiTrack {
@@ -194,6 +195,9 @@ class MidiTrack {
                     u8 databyte2,
                     s8 priority,
                     u32 absTime);
+
+  // YMMY EVENTS
+  void addYmmySynthAssignment(u8 channel, std::string synthName);
 
  public:
   MidiFile *parentSeq;
@@ -681,36 +685,38 @@ class XGResetEvent
   MidiEventType eventType() override { return MIDIEVENT_RESET; }
 };
 
+// ***********
+// YMMY Events
+// ***********
 
-
-/*
-class AFX_EXT_CLASS ProgChangeEvent
-	: public MidiEvent
-{
-	ProgChangeEvent(void);
-	~ProgramChangeEvent(void);
-
-	u8 progNum;
-}
-
-class AFX_EXT_CLASS ControllerEvent
-	: public MidiEvent
-{
+class YmmySynthChangeEvent
+    : public SysexEvent {
 public:
-	NoteEvent(void);
-	~NoteEvent(void);
+  YmmySynthChangeEvent(MidiTrack *prntTrk, u8 channel, u8 group, u32 absoluteTime, std::string synthName)
+      : SysexEvent(prntTrk, absoluteTime, buildData(channel, group, synthName), PRIORITY_HIGHEST) {
+    // SysexEvent(prntTrk, absoluteTime, sysexData, PRIORITY_HIGHEST);
+  }
+  MidiEventType eventType() override { return MIDIEVENT_YMMY_SYNTHASSIGN; }
 
-	s8 key;
-	s8 vel;
-};*/
+private:
+  // Helper function to construct the data vector
+  static std::vector<u8> buildData(u8 channel, u8 group, const std::string& synthName) {
+    std::vector<u8> data;
 
-/*class AFX_EXT_CLASS NoteEventDur
-	: public MidiEvent
-{
-public:
-	NoteEvent(void);
-	~NoteEvent(void);
+    // Add YMMY Sysex event identifier
+    data.push_back(0x7D);
 
-	s8 key;
-	s8 vel;
-}*/
+    // Add Synth assignment opcode
+    data.push_back(0x7E);
+
+    // Add channel and group
+    data.push_back(channel);
+    data.push_back(group);
+
+    // Add the contents of synthName followed by a null terminator (0x00)
+    data.insert(data.end(), synthName.begin(), synthName.end());
+    data.push_back(0x00);  // Null-terminated ASCII string
+
+    return data;
+  }
+};

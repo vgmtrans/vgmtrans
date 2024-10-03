@@ -677,6 +677,12 @@ void MidiTrack::insertMarker(u8 channel,
   aEvents.push_back(new MarkerEvent(this, channel, absTime, markername, databyte1, databyte2, priority));
 }
 
+// YMMY Events
+
+void MidiTrack::addYmmySynthAssignment(uint8_t channel, std::string synthName) {
+  aEvents.push_back(new YmmySynthChangeEvent(this, channel, channelGroup, getDelta(), synthName));
+}
+
 //  *********
 //  MidiEvent
 //  *********
@@ -697,7 +703,8 @@ bool MidiEvent::isMetaEvent() {
 bool MidiEvent::isSysexEvent() {
   MidiEventType type = eventType();
   return type == MIDIEVENT_MASTERVOL ||
-         type == MIDIEVENT_RESET;
+         type == MIDIEVENT_RESET ||
+         type == MIDIEVENT_YMMY_SYNTHASSIGN;
 }
 
 void MidiEvent::writeVarLength(std::vector<u8> &buf, u32 value) {
@@ -980,7 +987,6 @@ MidiPortEvent::MidiPortEvent(MidiTrack *prntTrk, u32 absoluteTime, u8 port)
 u32 MidiPortEvent::writeEvent(std::vector<u8> &buf, u32 time) {
   return writeMetaEvent(buf, time, 0x21, &port, 1);
 }
-
 
 //  ************
 //  TimeSigEvent
