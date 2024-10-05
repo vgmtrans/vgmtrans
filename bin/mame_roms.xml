@@ -273,6 +273,10 @@
         <romgroup type="audiocpu" load_method="append" seq_table="0x1100" >
             <rom>kd_9.12a</rom>
         </romgroup>
+        <romgroup type="oki6295" load_method="append">
+            <rom>kd_18.11c</rom>
+            <rom>kd_19.12c</rom>
+        </romgroup>
     </game>
     <game name="mmatrix" format="CPS2" fmt_version="1.80">
         <romgroup type="audiocpu" load_method="append" seq_table="0x9005" instr_table_ptrs="0x3C05" num_instr_banks="9" samp_table="0x6000" samp_table_length="0x828" artic_table="0x8000">
@@ -350,6 +354,10 @@
     <game name="msword" format="CPS1" fmt_version="CPS1_3.50">
         <romgroup type="audiocpu" load_method="append" seq_table="0x1000" >
             <rom>ms_09.12b</rom>
+        </romgroup>
+        <romgroup type="oki6295" load_method="append">
+            <rom>ms_18.11c</rom>
+            <rom>ms_19.12c</rom>
         </romgroup>
     </game>
     <game name="mtwins" format="CPS1" fmt_version="CPS1_4.25">

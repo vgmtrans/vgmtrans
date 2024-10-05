@@ -22,6 +22,12 @@ MenuManager::MenuManager() {
       std::make_shared<CommandSeparator>(),
       std::make_shared<CloseVGMFileCommand>(),
   });
+  registerCommands<CPS1OPMInstrSet, VGMItem>({
+      std::make_shared<CloseVGMFileCommand>(),
+      std::make_shared<CommandSeparator>(),
+      std::make_shared<SaveAsOPMCommand>(),
+      std::make_shared<SaveAsOriginalFormatCommand<VGMFile>>(),
+  });
   registerCommands<VGMSampColl, VGMItem>({
       std::make_shared<SaveWavBatchCommand>(),
       std::make_shared<SaveAsOriginalFormatCommand<VGMFile>>(),

@@ -37,7 +37,8 @@ void CPS1Scanner::scan(RawFile *file, void *info) {
 }
 
 void CPS1Scanner::loadCPS1(MAMEGame *gameentry, CPSFormatVer fmt_ver) {
-  CPS1SampleInstrSet *instrset = nullptr;
+  CPS1OPMInstrSet *opmInstrset = nullptr;
+  CPS1SampleInstrSet *sampleInstrset = nullptr;
   CPS1SampColl *sampcoll = nullptr;
 
   MAMERomGroup* seqRomGroupEntry = gameentry->getRomGroupOfType("audiocpu");
@@ -51,26 +52,39 @@ void CPS1Scanner::loadCPS1(MAMEGame *gameentry, CPSFormatVer fmt_ver) {
 
   RawFile *programFile = seqRomGroupEntry->file;
 
+  // Load the YM2151 Instrument Set
+  const uint32_t opmInstrTablePtrOffset = 2;
+  uint32_t opm_instr_table_offset = programFile->readShortBE(seq_table_offset + opmInstrTablePtrOffset);
+
+  auto instrset_name = fmt::format("{} YM2151 instrument set", gameentry->name);
+
+  opmInstrset = new CPS1OPMInstrSet(programFile,
+                                    fmt_ver, opm_instr_table_offset,
+                                    instrset_name);
+  if (!opmInstrset->loadVGMFile()) {
+    delete opmInstrset;
+    opmInstrset = NULL;
+  }
+
   MAMERomGroup* sampsRomGroupEntry = gameentry->getRomGroupOfType("oki6295");
   if (sampsRomGroupEntry && sampsRomGroupEntry->file) {
-    uint32_t instrTablePtrOffset = 4;
-    uint32_t instr_table_offset = programFile->readShortBE(seq_table_offset + instrTablePtrOffset);
+    const uint32_t sampleInstrTablePtrOffset = 4;
+    uint32_t sample_instr_table_offset = programFile->readShortBE(seq_table_offset + sampleInstrTablePtrOffset);
 
     RawFile *samplesFile = sampsRomGroupEntry->file;
 
     auto instrset_name = fmt::format("{} oki msm6295 instrument set", gameentry->name);
     auto sampcoll_name = fmt::format("{} sample collection", gameentry->name);
 
-    instrset = new CPS1SampleInstrSet(programFile,
-                                      fmt_ver,
-                                      instr_table_offset,
+    sampleInstrset = new CPS1SampleInstrSet(programFile,
+                                      fmt_ver, sample_instr_table_offset,
                                       instrset_name);
-    if (!instrset->loadVGMFile()) {
-      delete instrset;
-      instrset = nullptr;
+    if (!sampleInstrset->loadVGMFile()) {
+      delete sampleInstrset;
+      sampleInstrset = nullptr;
     }
 
-    sampcoll = new CPS1SampColl(samplesFile, instrset, 0, static_cast<uint32_t>(samplesFile->size()), sampcoll_name);
+    sampcoll = new CPS1SampColl(samplesFile, sampleInstrset, 0, static_cast<uint32_t>(samplesFile->size()), sampcoll_name);
     if (!sampcoll->loadVGMFile()) {
       delete sampcoll;
       sampcoll = nullptr;
@@ -133,14 +147,17 @@ void CPS1Scanner::loadCPS1(MAMEGame *gameentry, CPSFormatVer fmt_ver) {
       continue;
     }
 
-    auto collName = fmt::format("{} song {}", gameentry->name, seqNum++);
-    VGMColl* coll = new VGMColl(collName);
+    if (opmInstrset && sampleInstrset && sampcoll) {
+      auto collName = fmt::format("{} song {}", gameentry->name, seqNum++);
+      VGMColl* coll = new VGMColl(collName);
 
-    coll->useSeq(newSeq);
-    coll->addInstrSet(instrset);
-    coll->addSampColl(sampcoll);
-    if (!coll->load()) {
-      delete coll;
+      coll->useSeq(newSeq);
+      coll->addInstrSet(opmInstrset);
+      coll->addInstrSet(sampleInstrset);
+      coll->addSampColl(sampcoll);
+      if (!coll->load()) {
+        delete coll;
+      }
     }
   }
 }

@@ -220,9 +220,9 @@ public:
 };
 
 
-// ***********
+// *********
 // CPS2Instr
-// ***********
+// *********
 
 class CPS2Instr : public VGMInstr {
 public:
