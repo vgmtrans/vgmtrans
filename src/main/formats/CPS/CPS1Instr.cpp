@@ -124,10 +124,9 @@ std::string CPS1OPMInstrSet::generateOPMFile() {
   output << header;
 
   for (size_t i = 0; i < aInstrs.size(); ++i) {
-    CPS1OPMInstr* instr = dynamic_cast<CPS1OPMInstr*>(aInstrs[i]);
-    if (instr != nullptr) {
-      output << instr->toOPMString(i) << "\n";
-    }
+        if (auto* instr = dynamic_cast<CPS1OPMInstr*>(aInstrs[i]); instr != nullptr) {
+            output << instr->toOPMString(i) << '\n';
+        }
   }
   return output.str();
 }
