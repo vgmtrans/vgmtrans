@@ -688,6 +688,9 @@ private:
   static std::vector<uint8_t> buildData(uint8_t channel, uint8_t group, const std::string& synthName) {
     std::vector<uint8_t> data;
 
+    // Add length of data
+    data.push_back(synthName.size() + 5 + 1);
+
     // Add YMMY Sysex event identifier
     data.push_back(0x7D);
 
