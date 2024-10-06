@@ -3,6 +3,8 @@
 #include "CPS2Format.h"
 #include "VGMRgn.h"
 #include "OkiAdpcm.h"
+#include "version.h"
+#include "Root.h"
 
 // ******************
 // CPS1SampleInstrSet
@@ -11,12 +13,9 @@
 CPS1SampleInstrSet::CPS1SampleInstrSet(RawFile *file,
                                        CPSFormatVer version,
                                        uint32_t offset,
-                                       std::string &name)
+                                       std::string name)
     : VGMInstrSet(CPS1Format::name, file, offset, 0, std::move(name)),
       fmt_version(version) {
-}
-
-CPS1SampleInstrSet::~CPS1SampleInstrSet(void) {
 }
 
 bool CPS1SampleInstrSet::parseInstrPointers() {
@@ -91,4 +90,71 @@ bool CPS1SampColl::parseSampleInfo() {
     samples.push_back(sample);
   }
   return true;
+}
+
+// ******************
+// CPS1SampleInstrSet
+// ******************
+
+CPS1OPMInstrSet::CPS1OPMInstrSet(RawFile *file,
+                               CPSFormatVer version,
+                               uint32_t offset,
+                               const std::string& name)
+    : VGMInstrSet(CPS1Format::name, file, offset, 0, name),
+      fmt_version(version) {
+}
+
+bool CPS1OPMInstrSet::parseInstrPointers() {
+  for (int i = 0; i < 128; ++i) {
+    auto offset = dwOffset + (i * sizeof(CPS1OPMInstrData));
+    if (VGMFile::readWord(offset) == 0 && VGMFile::readWord(offset+4) == 0) {
+      break;
+    }
+
+    auto instr = new CPS1OPMInstr(this, offset, sizeof(CPS1OPMInstrData), 0,
+      i, fmt::format("Instrument {}", i));
+    aInstrs.push_back(instr);
+  }
+  return true;
+}
+
+std::string CPS1OPMInstrSet::generateOPMFile() {
+  std::ostringstream output;
+  std::string header = std::string("// Converted using VGMTrans version: ") + VGMTRANS_VERSION + "\n";
+  output << header;
+
+  for (size_t i = 0; i < aInstrs.size(); ++i) {
+        if (auto* instr = dynamic_cast<CPS1OPMInstr*>(aInstrs[i]); instr != nullptr) {
+            output << instr->toOPMString(i) << '\n';
+        }
+  }
+  return output.str();
+}
+
+bool CPS1OPMInstrSet::saveAsOPMFile(const std::string &filepath) {
+  auto content = generateOPMFile();
+  pRoot->UI_writeBufferToFile(filepath, reinterpret_cast<uint8_t*>(const_cast<char*>(content.data())), static_cast<uint32_t>(content.size()));
+}
+
+// ************
+// CPS1OPMInstr
+// ************
+
+CPS1OPMInstr::CPS1OPMInstr(VGMInstrSet *instrSet,
+                     uint32_t offset,
+                     uint32_t length,
+                     uint32_t theBank,
+                     uint32_t theInstrNum,
+                     const std::string &name)
+    : VGMInstr(instrSet, offset, length, theBank, theInstrNum, name) {
+}
+
+bool CPS1OPMInstr::loadInstr() {
+
+  this->readBytes(dwOffset, sizeof(CPS1OPMInstrData), &opmData);
+  return true;
+}
+
+std::string CPS1OPMInstr::toOPMString(int num) {
+  return opmData.convertToOPMData(name()).toOPMString(num);
 }
