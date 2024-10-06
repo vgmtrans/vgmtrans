@@ -11,7 +11,8 @@
 #include "Root.h"
 #include "VGMMiscFile.h"
 
-VGMColl::VGMColl(std::string theName) : m_name(std::move(theName)) {}
+VGMColl::VGMColl(std::string name, std::set<SynthFileType> supportedFormats)
+  : m_name(std::move(name)), m_supportedFormats(std::move(supportedFormats)) {}
 
 void VGMColl::removeFileAssocs() {
   if (m_seq) {
@@ -97,4 +98,20 @@ bool VGMColl::containsVGMFile(const VGMFile* file) const {
     return true;
   }
   return false;
+}
+
+void VGMColl::addSupportedFormat(SynthFileType format) {
+  m_supportedFormats.insert(format);
+}
+
+void VGMColl::removeSupportedFormat(SynthFileType format) {
+  m_supportedFormats.erase(format);
+}
+
+bool VGMColl::isFormatSupported(SynthFileType format) const {
+  return m_supportedFormats.find(format) != m_supportedFormats.end();
+}
+
+const std::set<SynthFileType>& VGMColl::supportedFormats() const {
+  return m_supportedFormats;
 }

@@ -1,4 +1,5 @@
 #pragma once
+#include "VGMColl.h"
 #include "common.h"
 #include "VGMFile.h"
 
@@ -19,6 +20,11 @@ public:
   VGMInstrSet(const std::string &format, RawFile *file, uint32_t offset, uint32_t length = 0,
               std::string name = "VGMInstrSet", VGMSampColl *theSampColl = nullptr);
   ~VGMInstrSet() override;
+
+  bool isFormatSupported(SynthFileType format) const;
+  [[nodiscard]] virtual const std::set<SynthFileType>& supportedFormats() const {
+    return { SoundFont2 };
+  }
 
   bool loadVGMFile() override;
   bool load() override;

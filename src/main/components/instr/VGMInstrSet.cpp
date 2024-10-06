@@ -28,6 +28,10 @@ VGMInstrSet::~VGMInstrSet() {
   delete sampColl;
 }
 
+bool VGMInstrSet::isFormatSupported(SynthFileType format) const {
+  return supportedFormats().contains(format);
+}
+
 VGMInstr *VGMInstrSet::addInstr(uint32_t offset, uint32_t length, uint32_t bank,
                                 uint32_t instrNum, const std::string &instrName) {
   VGMInstr *instr =

@@ -17,6 +17,9 @@
 namespace conversion {
 
 SF2File* createSF2File(const VGMColl& coll) {
+  if (!coll.isFormatSupported(SoundFont2))
+    return nullptr;
+
   coll.preSynthFileCreation();
   SynthFile *synthfile = createSynthFile(coll.instrSets(), coll.sampColls());
   coll.postSynthFileCreation();
