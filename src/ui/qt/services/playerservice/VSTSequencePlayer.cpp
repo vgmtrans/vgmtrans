@@ -311,7 +311,7 @@ size_t VSTSequencePlayer::encode6BitVariableLengthQuantity(uint32_t value, uint8
   return count;
 }
 
-juce::MidiMessage VSTSequencePlayer::createSysExMessage(
+juce::MidiMessage VSTSequencePlayer::createYmmySysExMessage(
     uint8_t command,
     SynthFileType fileType,
     uint8_t* data,
@@ -348,7 +348,7 @@ void VSTSequencePlayer::populateFileMidiBuffer(uint8_t* fileData, uint32_t fileS
   // send a sysex message indicating the begin of the file send and its total size
   // auto oldEncodedSize = oldEncode6BitVariableLengthQuantity(fileSize);
   auto encodedSizeSize = encode6BitVariableLengthQuantity(fileSize, encodedSize);
-  auto startFileSendEvent = createSysExMessage(
+  auto startFileSendEvent = createYmmySysExMessage(
     0x10,
     fileType,
     encodedSize,
@@ -370,7 +370,7 @@ void VSTSequencePlayer::populateFileMidiBuffer(uint8_t* fileData, uint32_t fileS
     chunkNum += 1;
     if (chunkNum == chunksPerPacket) {
       // Packet is full. Store it in a MidiMessage and add it to the midiBuffer
-      auto packet = createSysExMessage(
+      auto packet = createYmmySysExMessage(
           0x11,
           fileType,
           packetBuf,
@@ -392,7 +392,7 @@ void VSTSequencePlayer::populateFileMidiBuffer(uint8_t* fileData, uint32_t fileS
 
   // Send the last packet if there's remaining data
   if (packetIx > 0) {
-    auto packet = createSysExMessage(
+    auto packet = createYmmySysExMessage(
         0x11,
         fileType,
         packetBuf,
@@ -513,6 +513,10 @@ juce::MidiMessage VSTSequencePlayer::convertToChannelGroupMessage(MidiEvent* eve
 juce::MidiMessage VSTSequencePlayer::convertToJuceMidiMessage(MidiEvent* event) const {
   vector<uint8_t> eventData;
   event->writeEvent(eventData, event->absTime);
+  if (event->isSysexEvent()) {
+    // Sysex events contain a data length byte in MIDI files. To pass as a realtime event, skip it.
+    return juce::MidiMessage::createSysExMessage(eventData.data()+3, eventData.size()-3);
+  }
   return juce::MidiMessage(eventData.data()+1, eventData.size()-1, 0);
 }
 
