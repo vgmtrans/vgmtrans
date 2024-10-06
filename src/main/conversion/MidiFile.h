@@ -703,6 +703,9 @@ private:
   static std::vector<u8> buildData(u8 channel, u8 group, const std::string& synthName) {
     std::vector<u8> data;
 
+    // Add length of data
+    data.push_back(synthName.size() + 5 + 1);
+
     // Add YMMY Sysex event identifier
     data.push_back(0x7D);
 
