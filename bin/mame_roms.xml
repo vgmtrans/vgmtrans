@@ -74,6 +74,10 @@
         <romgroup type="audiocpu" load_method="append" seq_table="0x1100" >
             <rom>cc_09.11a</rom>
         </romgroup>
+        <romgroup type="oki6295" load_method="append">
+            <rom>cc_18.11c</rom>
+            <rom>cc_19.12c</rom>
+        </romgroup>
     </game>
     <game name="choko" format="CPS2" fmt_version="1.80">
         <romgroup type="audiocpu" load_method="append" seq_table="0x9005" instr_table_ptrs="0x3C05" num_instr_banks="2" samp_table="0x3D95" artic_table="0x40BD">
@@ -183,6 +187,10 @@
         <romgroup type="audiocpu" load_method="append" seq_table="0x1000">
             <rom>ff_09.12b</rom>
         </romgroup>
+        <romgroup type="oki6295" load_method="append">
+            <rom>ff_18.11c</rom>
+            <rom>ff_19.12c</rom>
+        </romgroup>
     </game>
     <game name="gigawing" format="CPS2" fmt_version="1.40">
         <romgroup type="audiocpu" load_method="append" seq_table="0x9005" instr_table_ptrs="0x3C05" num_instr_banks="6" samp_table="0x6000" artic_table="0x8000">
@@ -267,6 +275,10 @@
     <game name="knights" format="CPS1" fmt_version="CPS1_4.25">
         <romgroup type="audiocpu" load_method="append" seq_table="0x1100" >
             <rom>kr_09.11a</rom>
+        </romgroup>
+        <romgroup type="oki6295" load_method="append">
+            <rom>kr_18.11c</rom>
+            <rom>kr_19.12c</rom>
         </romgroup>
     </game>
     <game name="kod" format="CPS1" fmt_version="CPS1_4.25">

@@ -14,6 +14,9 @@
 
 CPSTrackV1::CPSTrackV1(CPSSeq *parentSeq, CPSSynth channelSynth, uint32_t offset, uint32_t length)
     : SeqTrack(parentSeq, offset, length), channelSynth(channelSynth) {
+  if (channelSynth == CPSSynth::YM2151) {
+    synthType = SynthType::YM2151;
+  }
   CPSTrackV1::resetVars();
 }
 
@@ -76,6 +79,8 @@ bool CPSTrackV1::readEvent() {
       if (channelSynth == CPSSynth::OKIM6295) {
         // OKIM6295 doesn't control pitch, so we'll use middle C for all notes
         key = 0x3C;
+      } else if (channelSynth == CPSSynth::YM2151) {
+        key = (status_byte & 0x1F) + octave_table[noteState & 0x0F] + 12 - 1;
       } else {
         key = (status_byte & 0x1F) + octave_table[noteState & 0x0F] - 1;
       }
@@ -213,7 +218,7 @@ bool CPSTrackV1::readEvent() {
           }
           case YM2151:
             vol = readByte(curOffset++);
-            vol = convertPercentAmpToStdMidiVal(vol_table[vol] / (double) 0x1FFF);
+            vol = convertPercentAmpToStdMidiVal(vol_table[vol] / static_cast<double>(0x1FFF));
             this->addVol(beginOffset, curOffset - beginOffset, vol);
             break;
         }

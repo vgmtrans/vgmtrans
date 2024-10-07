@@ -56,13 +56,10 @@ public:
   ~CPS1OPMInstrSet() override = default;
 
   bool parseInstrPointers() override;
+  std::string generateOPMFile();
   bool saveAsOPMFile(const std::string &filepath);
-
 public:
   CPSFormatVer fmt_version;
-
-private:
-  std::string generateOPMFile();
 };
 
 // ************

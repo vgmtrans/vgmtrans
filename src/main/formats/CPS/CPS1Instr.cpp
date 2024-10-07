@@ -114,6 +114,20 @@ bool CPS1OPMInstrSet::parseInstrPointers() {
     auto instr = new CPS1OPMInstr(this, offset, sizeof(CPS1OPMInstrData), 0,
       i, fmt::format("Instrument {}", i));
     aInstrs.push_back(instr);
+    instr->addChild(new VGMItem(this, offset, 1, "Transpose"));
+    instr->addChild(new VGMItem(this, offset+1, 1, "LFO_ENABLE_AND_WF"));
+    instr->addChild(new VGMItem(this, offset+2, 1, "LFRQ"));
+    instr->addChild(new VGMItem(this, offset+3, 1, "PMD"));
+    instr->addChild(new VGMItem(this, offset+4, 1, "AMD"));
+    instr->addChild(new VGMItem(this, offset+5, 1, "FL_CON"));
+    instr->addChild(new VGMItem(this, offset+6, 1, "PMS_AMS"));
+    instr->addChild(new VGMItem(this, offset+7, 1, "SLOT_MASK"));
+    instr->addChild(new VGMItem(this, offset+8, 12, "Driver-specific Volume Params"));
+    instr->addChild(new VGMItem(this, offset+20, 4, "DT1_MUL"));
+    instr->addChild(new VGMItem(this, offset+24, 4, "KS_AR"));
+    instr->addChild(new VGMItem(this, offset+28, 4, "AMSEN_D1R"));
+    instr->addChild(new VGMItem(this, offset+32, 4, "DT2_D2R"));
+    instr->addChild(new VGMItem(this, offset+36, 4, "D1L_RR"));
   }
   return true;
 }
