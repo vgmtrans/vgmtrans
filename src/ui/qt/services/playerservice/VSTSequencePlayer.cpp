@@ -5,6 +5,7 @@
 #include "SF2File.h"
 #include "LogManager.h"
 #include "SF2Conversion.h"
+#include "CPS/CPS1Instr.h"
 
 using namespace std;
 
@@ -39,6 +40,7 @@ bool VSTSequencePlayer::loadCollection(VGMColl *coll, std::function<void()> cons
 
   auto bgLoadSF2 = [coll, this, onCompletion]() {
     sendSF2ToVST(coll);
+    sendOpmToVST(coll);
     state.musicState = MusicState::Stopped;
     onCompletion();
   };
@@ -268,10 +270,21 @@ bool VSTSequencePlayer::sendSF2ToVST(VGMColl* coll) {
   return true;
 }
 
+bool VSTSequencePlayer::sendOpmToVST(VGMColl* coll) {
+  for (auto instrSet : coll->instrSets()) {
+    if (auto cps1instrset = dynamic_cast<CPS1OPMInstrSet*>(instrSet)) {
+      std::string opmFile = cps1instrset->generateOPMFile();
+      auto opmFileData = reinterpret_cast<const uint8_t*>(opmFile.c_str());
+      populateFileMidiBuffer(opmFileData, opmFile.length(), YM2151_OPM);
+    }
+  }
+  return true;
+}
+
 // This reads n bytes from a buffer (where n is <= 7) and converts them into a n+1 size
 // chunk of 7-bit bytes. The first byte stores the 8th bit of every subsequent byte
 // starting from the 0th bit.
-inline uint64_t VSTSequencePlayer::convertTo7BitMidiChunk(uint8_t* buf, uint8_t n) {
+inline uint64_t VSTSequencePlayer::convertTo7BitMidiChunk(const uint8_t* buf, uint8_t n) {
   uint64_t result = 0;
   uint64_t firstByte = 0; // To store the combined 8th bits
 
@@ -329,12 +342,7 @@ juce::MidiMessage VSTSequencePlayer::createYmmySysExMessage(
   return juce::MidiMessage(eventBuffer, i, 0);
 }
 
-void VSTSequencePlayer::populateFileMidiBuffer(uint8_t* fileData, uint32_t fileSize, SynthFileType fileType) {
-  // If an file send is already queued, don't mess with the midi buffer
-  if (readyToSendFile) {
-    return;
-  }
-
+void VSTSequencePlayer::populateFileMidiBuffer(const uint8_t* fileData, uint32_t fileSize, SynthFileType fileType) {
   const size_t chunkSize = 8; // Size of chunks to process
   const size_t chunkDataSize = 7;
 
