@@ -87,6 +87,7 @@ private:
   void clearState();
   bool prepMidiPlayback(VGMSeq* seq);
   bool sendSF2ToVST(VGMColl* coll);
+  bool sendOpmToVST(VGMColl* coll);
   std::vector<int> generateEventSampleTimes(std::vector<MidiEvent*>& events, int ppqn) const;
   juce::MidiMessage convertToChannelGroupMessage(MidiEvent* event) const;
   juce::MidiMessage convertToJuceMidiMessage(MidiEvent* event) const;
@@ -106,8 +107,8 @@ private:
   std::vector<uint8_t> oldEncode6BitVariableLengthQuantity(uint32_t value);
   size_t encode6BitVariableLengthQuantity(uint32_t value, uint8_t* output);
   juce::MidiMessage createYmmySysExMessage(uint8_t commandByte, SynthFileType fileType, uint8_t* data, uint32_t dataSize, uint8_t* eventBuffer);
-  uint64_t convertTo7BitMidiChunk(uint8_t* buf, uint8_t n);
-  void populateFileMidiBuffer(uint8_t* fileData, uint32_t fileSize, SynthFileType fileType);
+  uint64_t convertTo7BitMidiChunk(const uint8_t* buf, uint8_t n);
+  void populateFileMidiBuffer(const uint8_t* fileData, uint32_t fileSize, SynthFileType fileType);
 
   static constexpr size_t maxPacketSize = 64 * 1024 - 16;
   uint8_t packetBuf[maxPacketSize];
