@@ -47,12 +47,14 @@ class DialogicAdpcmSamp
 public:
 
   DialogicAdpcmSamp(
-      VGMSampColl *sampColl, uint32_t offset, uint32_t length, uint32_t theRate, std::string name
+      VGMSampColl *sampColl, uint32_t offset, uint32_t length, uint32_t theRate, float gain, std::string name
   );
   ~DialogicAdpcmSamp() override;
 
   double compressionRatio() override;
   void convertToStdWave(uint8_t *buf) override;
+
+  float gain;
 
 private:
   static oki_adpcm_state okiAdpcmState;

@@ -75,7 +75,7 @@ bool CPS1SampColl::parseSampleInfo() {
   int i = 1;
   for (int offset = 8; offset < 0x400; offset += 8) {
     auto sampAddr = readShort(offset);
-    if (sampAddr == 0xFFFF) {
+    if (sampAddr == 0xFFFF || sampAddr == 0) {
       break;
     }
     auto begin = readWordBE(offset) >> 8;
@@ -83,7 +83,7 @@ bool CPS1SampColl::parseSampleInfo() {
 
     auto name = fmt::format("Sample {}", i);
     i += 1;
-    auto sample = new DialogicAdpcmSamp(this, begin, end-begin, CPS1_OKIMSM6295_SAMPLE_RATE, name);
+    auto sample = new DialogicAdpcmSamp(this, begin, end > begin ? end-begin : 0, CPS1_OKIMSM6295_SAMPLE_RATE, CPS1_OKI_GAIN, name);
     sample->setWaveType(WT_PCM16);
     sample->setLoopStatus(false);
     sample->unityKey = 0x3C;
@@ -99,19 +99,21 @@ bool CPS1SampColl::parseSampleInfo() {
 CPS1OPMInstrSet::CPS1OPMInstrSet(RawFile *file,
                                CPSFormatVer version,
                                uint32_t offset,
+                               uint32_t length,
                                const std::string& name)
-    : VGMInstrSet(CPS1Format::name, file, offset, 0, name),
+    : VGMInstrSet(CPS1Format::name, file, offset, length, name),
       fmt_version(version) {
 }
 
 bool CPS1OPMInstrSet::parseInstrPointers() {
-  for (int i = 0; i < 128; ++i) {
-    auto offset = dwOffset + (i * sizeof(CPS1OPMInstrData));
+  int numInstrs = std::min(unLength / static_cast<u32>(sizeof(CPS1OPMInstrDataV4_25)), 128U);
+  for (int i = 0; i < numInstrs; ++i) {
+    auto offset = dwOffset + (i * sizeof(CPS1OPMInstrDataV4_25));
     if (VGMFile::readWord(offset) == 0 && VGMFile::readWord(offset+4) == 0) {
       break;
     }
 
-    auto instr = new CPS1OPMInstr(this, offset, sizeof(CPS1OPMInstrData), 0,
+    auto instr = new CPS1OPMInstr(this, offset, sizeof(CPS1OPMInstrDataV4_25), 0,
       i, fmt::format("Instrument {}", i));
     aInstrs.push_back(instr);
     instr->addChild(new VGMItem(this, offset, 1, "Transpose"));
@@ -138,9 +140,9 @@ std::string CPS1OPMInstrSet::generateOPMFile() {
   output << header;
 
   for (size_t i = 0; i < aInstrs.size(); ++i) {
-        if (auto* instr = dynamic_cast<CPS1OPMInstr*>(aInstrs[i]); instr != nullptr) {
-            output << instr->toOPMString(i) << '\n';
-        }
+    if (auto* instr = dynamic_cast<CPS1OPMInstr*>(aInstrs[i]); instr != nullptr) {
+      output << instr->toOPMString(i) << '\n';
+    }
   }
   return output.str();
 }
@@ -165,7 +167,7 @@ CPS1OPMInstr::CPS1OPMInstr(VGMInstrSet *instrSet,
 
 bool CPS1OPMInstr::loadInstr() {
 
-  this->readBytes(dwOffset, sizeof(CPS1OPMInstrData), &opmData);
+  this->readBytes(dwOffset, sizeof(CPS1OPMInstrDataV4_25), &opmData);
   return true;
 }
 

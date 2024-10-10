@@ -82,13 +82,17 @@ static const uint16_t lfo_rate_table[128] = {
 class CPSSeq:
     public VGMSeq {
 public:
-  CPSSeq(RawFile *file, uint32_t offset, CPSFormatVer fmt_version, std::string name);
+  CPSSeq(RawFile *file, uint32_t offset, CPSFormatVer fmt_version, std::string name, std::vector<s8> instrTransposeTable = {});
   ~CPSSeq() override;
 
   bool parseHeader() override;
   bool parseTrackPointers() override;
   bool postLoad() override;
+  s8 getTransposeForInstr(u8 instrIndex);
 
 public:
   CPSFormatVer fmt_version;
+
+private:
+  std::vector<s8> instrTransposeTable;
 };

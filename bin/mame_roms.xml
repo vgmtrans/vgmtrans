@@ -107,6 +107,10 @@
         <romgroup type="audiocpu" load_method="append" seq_table="0x1100" >
             <rom>q5_23.13b</rom>
         </romgroup>
+        <romgroup type="oki6295" load_method="append">
+            <rom>q5_30.12c</rom>
+            <rom>q5_31.13c</rom>
+        </romgroup>
     </game>
     <game name="cybots" format="CPS2" fmt_version="1.05a">
         <romgroup type="audiocpu" load_method="append" seq_table="0x9005" instr_table="0x7000" num_instr_banks="2" samp_table="0x8000" samp_table_length="0x868">
@@ -190,6 +194,15 @@
         <romgroup type="oki6295" load_method="append">
             <rom>ff_18.11c</rom>
             <rom>ff_19.12c</rom>
+        </romgroup>
+    </game>
+    <game name="ganbare" format="CPS1" fmt_version="CPS1_5.00">
+        <romgroup type="audiocpu" load_method="append" seq_table="0x1C80" instr_table="0x1000">
+            <rom>mrnj_09.12a</rom>
+        </romgroup>
+        <romgroup type="oki6295" load_method="append">
+            <rom>mrnj_18.11c</rom>
+            <rom>mrnj_19.12c</rom>
         </romgroup>
     </game>
     <game name="gigawing" format="CPS2" fmt_version="1.40">
@@ -300,8 +313,12 @@
         </romgroup>
     </game>
     <game name="megaman" format="CPS1" fmt_version="CPS1_5.02">
-        <romgroup type="audiocpu" load_method="append" seq_table="0x1C80" >
+        <romgroup type="audiocpu" load_method="append" seq_table="0x1C80" instr_table="0x1000">
             <rom>rcm_09.11a</rom>
+        </romgroup>
+        <romgroup type="oki6295" load_method="append">
+            <rom>rcm_18.11c</rom>
+            <rom>rcm_19.12c</rom>
         </romgroup>
     </game>
     <game name="megaman2" format="CPS2" fmt_version="1.15c">
@@ -341,6 +358,15 @@
         <romgroup type="qsound" load_method="append_swap16">
             <rom>mpn-simm.05a</rom>
             <rom>mpn-simm.05b</rom>
+        </romgroup>
+    </game>
+    <game name="mpumpkin" format="CPS1" fmt_version="CPS1_5.00">
+        <romgroup type="audiocpu" load_method="append" seq_table="0x1280" instr_table="0x1000" >
+            <rom>mpa_09.12a</rom>
+        </romgroup>
+        <romgroup type="oki6295" load_method="append">
+            <rom>mpa_18.11c</rom>
+            <rom>mpa_19.12c</rom>
         </romgroup>
     </game>
     <game name="msh" format="CPS2" fmt_version="1.05">
@@ -390,6 +416,10 @@
     <game name="nemo" format="CPS1" fmt_version="CPS1_4.25">
         <romgroup type="audiocpu" load_method="append" seq_table="0x1100" >
             <rom>nme_09.12b</rom>
+        </romgroup>
+        <romgroup type="oki6295" load_method="append">
+            <rom>nme_18.11c</rom>
+            <rom>nme_19.12c</rom>
         </romgroup>
     </game>
     <game name="nwarr" format="CPS2" fmt_version="1.05a">
@@ -455,6 +485,10 @@
     <game name="qad" format="CPS1" fmt_version="CPS1_4.25">
         <romgroup type="audiocpu" load_method="append" seq_table="0x1100" >
             <rom>qd_23.13b</rom>
+        </romgroup>
+        <romgroup type="oki6295" load_method="append">
+            <rom>qdu_30.12c</rom>
+            <rom>qdu_31.13c</rom>
         </romgroup>
     </game>
     <game name="qndream" format="CPS2" fmt_version="1.16b">
@@ -780,6 +814,10 @@
     <game name="varth" format="CPS1" fmt_version="CPS1_4.25">
         <romgroup type="audiocpu" load_method="append" seq_table="0x1100" >
             <rom>va_09.12b</rom>
+        </romgroup>
+        <romgroup type="oki6295" load_method="append">
+            <rom>va_18.11c</rom>
+            <rom>va_19.12c</rom>
         </romgroup>
     </game>
     <game name="vhunt2" format="CPS2" fmt_version="1.30">

@@ -52,6 +52,7 @@ public:
   CPS1OPMInstrSet(RawFile *file,
                  CPSFormatVer fmt_version,
                  uint32_t offset,
+                 uint32_t length,
                  const std::string& name);
   ~CPS1OPMInstrSet() override = default;
 
@@ -122,7 +123,13 @@ struct OPMData {
   }
 };
 
-struct CPS1OPMInstrData {
+struct CPS1OPMVolData {
+  uint8_t extra_atten;
+  uint8_t key_scale;
+  uint8_t vol;
+};
+
+struct CPS1OPMInstrDataV4_25 {
   int8_t transpose;
   uint8_t LFO_ENABLE_AND_WF;
   uint8_t LFRQ;
@@ -131,39 +138,78 @@ struct CPS1OPMInstrData {
   uint8_t FL_CON;
   uint8_t PMS_AMS;
   uint8_t SLOT_MASK;
-  uint8_t unknown[12];
+  CPS1OPMVolData volData[4];
   uint8_t DT1_MUL[4];
   uint8_t KS_AR[4];
   uint8_t AMSEN_D1R[4];
   uint8_t DT2_D2R[4];
   uint8_t D1L_RR[4];
 
+  u8 volToAttenuation(u8 instrVol) const {
+    u16 uVar4 = (((u16)instrVol << 8) | (instrVol >> 4)) & 0xF07;
+
+    u8 key_scale_atten = (char)(uVar4 >> 8);
+
+    u8 bVar3 = 0x7f << 1;
+    u8 bVar2 = bVar3;
+    bVar2 = (((bVar2 << 1 | bVar2 >> 7) & 0xf0) >> 4) * (((s8)uVar4 << 1) & 0x0f);
+    bVar2 = bVar2 >> 4;
+    if ((bVar3 & 0x80) != 0) {
+      bVar2 = -bVar2;
+    }
+    s8 cVar1 = bVar2 + 0x10 + key_scale_atten;
+    return cVar1 > 0x7f ? 0x7F : cVar1;
+  }
+
+  // Simplified implementation, but might have to revisit the first when we add key scale
+  u8 volToAttenuation2(u8 instrVol) const {
+    u8 m = instrVol >> 4;  // Number of 16-step blocks
+    u8 attenuation = 17 + (instrVol & 0x0F) - 2 * m - (m == 0 ? 1 : 0);
+    return attenuation > 0x7F ? 0x7F : attenuation;
+  }
+
   OPMData convertToOPMData(const std::string& name) const {
+    bool enableLFO = LFO_ENABLE_AND_WF & 0x80 != 0;
     // LFO
     OPMData::LFO lfo{};
-    lfo.WF = (LFO_ENABLE_AND_WF >> 5) & 0b11;
-    lfo.NFRQ = 0;  // the driver doesn't define noise frequency
+    if (enableLFO) {
+      lfo.LFRQ = LFRQ;
+      lfo.AMD = AMD;
+      lfo.PMD = PMD;
+      lfo.WF = (LFO_ENABLE_AND_WF >> 5) & 0b11;
+      lfo.NFRQ = 0;  // the driver doesn't define noise frequency
+    }
 
     // CH
     OPMData::CH ch{};
     ch.PAN = 0b11000000; // the driver always sets R/L, ie PAN, to 0xC0 (sf2ce 0xDC0)
     ch.FL = (FL_CON >> 3) & 0b111;
     ch.CON = FL_CON & 0b111;
-    ch.AMS = PMS_AMS & 0b11;
-    ch.PMS = (PMS_AMS >> 4) & 0b1111;
+    ch.AMS = enableLFO ? PMS_AMS & 0b11 : 0;
+    ch.PMS = enableLFO ? (PMS_AMS >> 4) & 0b1111 : 0;
     ch.SLOT_MASK = SLOT_MASK;
     ch.NE = 0;
 
     // OP
+    uint8_t CON_limits[4] = { 7, 5, 4, 0 };
     OPMData::OP op[4];
     for (int i = 0; i < 4; i ++) {
+      auto conLimit = CON_limits[i];
       auto& opx = op[i];
       opx.AR = KS_AR[i] & 0b11111;
       opx.D1R = AMSEN_D1R[i] & 0b11111;
       opx.D2R = DT2_D2R[i] & 0b11111;
       opx.RR = D1L_RR[i] & 0b1111;
       opx.D1L = D1L_RR[i] >> 4;
-      opx.TL = 25; // the driver dynamically calculates TL each note. set to a default for now
+      if (ch.CON < conLimit) {
+        u8 atten = volToAttenuation(volData[i].vol);
+        opx.TL = (atten + volData[i].extra_atten) & 0x7F;
+      } else {
+        uint8_t masterVolumeAtten = 0x7F - 0x7C;
+        u8 atten = volToAttenuation(volData[i].vol);
+        opx.TL = (atten + masterVolumeAtten) & 0x7F;
+      }
+      // opx.TL = 25; // the driver dynamically calculates TL each note. set to a default for now
       opx.KS = KS_AR[i] >> 6;
       opx.MUL = DT1_MUL[i] & 0b1111;
       opx.DT1 = (DT1_MUL[i] >> 4) & 0b111;
@@ -187,10 +233,10 @@ public:
   bool loadInstr() override;
 
   std::string toOPMString(int num);
+  s8 getTranspose() const { return opmData.transpose; }
 
-protected:
-  CPS1OPMInstrData opmData;
-
+private:
+  CPS1OPMInstrDataV4_25 opmData;
   int info_ptr;        //pointer to start of instrument set block
   int nNumRegions;
 };

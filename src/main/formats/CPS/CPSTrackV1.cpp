@@ -56,6 +56,7 @@ void CPSTrackV1::calculateAndAddPortamentoTimeNoItem(int8_t noteDistance) {
 bool CPSTrackV1::readEvent() {
   uint32_t beginOffset = curOffset;
   uint8_t status_byte = readByte(curOffset++);
+  bool isCps1 = static_cast<CPSSeq*>(parentSeq)->fmt_version <= VER_CPS1_502;
 
   if (status_byte >= 0x20) {
 
@@ -74,7 +75,7 @@ bool CPSTrackV1::readEvent() {
 
     //if it's not a rest
     if ((status_byte & 0x1F) != 0) {
-      uint32_t absDur = static_cast<uint32_t>((delta / 256.0) * noteDuration);
+      u8 absDur = static_cast<u8>(static_cast<u16>(delta * noteDuration) >> 8);
 
       if (channelSynth == CPSSynth::OKIM6295) {
         // OKIM6295 doesn't control pitch, so we'll use middle C for all notes
@@ -93,8 +94,13 @@ bool CPSTrackV1::readEvent() {
         }
         else if (key != prevTieNote) {
           calculateAndAddPortamentoTimeNoItem(key - prevTieNote);
-          addNoteOn(beginOffset, curOffset - beginOffset, key, 127, "Note On (tied)");
-          addNoteOffNoItem(prevTieNote);
+          if (isCps1) {
+            addNoteOffNoItem(prevTieNote);
+            addNoteOn(beginOffset, curOffset - beginOffset, key, 127, "Note On (tied)");
+          } else {
+            addNoteOn(beginOffset, curOffset - beginOffset, key, 127, "Note On (tied)");
+            addNoteOffNoItem(prevTieNote);
+          }
         }
         else
           addGenericEvent(beginOffset, curOffset - beginOffset, "Tie", "", CLR_NOTEON);
@@ -105,8 +111,13 @@ bool CPSTrackV1::readEvent() {
         if (bPrevNoteTie) {
           if (key != prevTieNote) {
             calculateAndAddPortamentoTimeNoItem(key - prevTieNote);
-            addNoteByDur(beginOffset, curOffset - beginOffset, key, 127, absDur);
-            addNoteOffNoItem(prevTieNote);
+            if (isCps1) {
+              addNoteOffNoItem(prevTieNote);
+              addNoteByDur(beginOffset, curOffset - beginOffset, key, 127, absDur);
+            } else {
+              addNoteByDur(beginOffset, curOffset - beginOffset, key, 127, absDur);
+              addNoteOffNoItem(prevTieNote);
+            }
             insertPortamentoNoItem(false, getTime()+absDur);
           }
           else {
@@ -117,7 +128,7 @@ bool CPSTrackV1::readEvent() {
           }
         }
         else {
-          addNoteByDur(beginOffset, curOffset - beginOffset, key, 127, absDur);
+          addNoteByDur(beginOffset, curOffset - beginOffset, key, 127, absDur - (isCps1 ? 1 : 0));
         }
         bPrevNoteTie = false;
       }
@@ -218,7 +229,7 @@ bool CPSTrackV1::readEvent() {
           }
           case YM2151:
             vol = readByte(curOffset++);
-            vol = convertPercentAmpToStdMidiVal(vol_table[vol] / static_cast<double>(0x1FFF));
+            // vol = convertPercentAmpToStdMidiVal(vol_table[vol] / static_cast<double>(0x1FFF));
             this->addVol(beginOffset, curOffset - beginOffset, vol);
             break;
         }
@@ -229,6 +240,9 @@ bool CPSTrackV1::readEvent() {
         //if (((CPSSeq*)parentSeq)->fmt_version < VER_116) {
         addBankSelectNoItem((bank * 2) + (progNum / 128));
         addProgramChange(beginOffset, curOffset - beginOffset, progNum % 128);
+        if (channelSynth == CPSSynth::YM2151) {
+          cKeyCorrection = static_cast<CPSSeq*>(parentSeq)->getTransposeForInstr(progNum);
+        }
         //}
         //else
         //	AddProgramChange(beginOffset, curOffset-beginOffset, progNum);
@@ -244,11 +258,6 @@ bool CPSTrackV1::readEvent() {
 
       // Global Transpose
       case 0x0A : {
-        // For now, skip 0x0A on CPS1, I'll come back to it for the YM2151 implementation
-        if (channelSynth == CPSSynth::OKIM6295 || channelSynth == CPSSynth::YM2151) {
-          curOffset++;
-          break;
-        }
         int8_t globalTranspose = readByte(curOffset++);
         addGlobalTranspose(beginOffset, curOffset - beginOffset, globalTranspose);
         break;
@@ -437,6 +446,7 @@ bool CPSTrackV1::readEvent() {
       }
 
       case 0x19 :
+        // TODO: For YM2151 tracks, this is master vol attenuation
         curOffset++;
         addUnknown(beginOffset, curOffset - beginOffset, "Reg9 Event (unknown to MAME)");
         break;

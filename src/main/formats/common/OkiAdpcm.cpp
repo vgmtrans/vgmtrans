@@ -134,9 +134,9 @@ void oki_adpcm_state::compute_tables()
 oki_adpcm_state DialogicAdpcmSamp::okiAdpcmState;
 
 DialogicAdpcmSamp::DialogicAdpcmSamp(VGMSampColl *sampColl, uint32_t offset, uint32_t length,
-                                     uint32_t theRate, std::string name)
+                                     uint32_t theRate, float gain, std::string name)
     : VGMSamp(sampColl, offset, length, offset, length, 1, 16, theRate,
-         std::move(name)) {}
+         std::move(name)), gain(gain) {}
 
 DialogicAdpcmSamp::~DialogicAdpcmSamp() {}
 
@@ -145,6 +145,9 @@ double DialogicAdpcmSamp::compressionRatio() {
 }
 
 void DialogicAdpcmSamp::convertToStdWave(uint8_t *buf) {
+
+  const int16_t maxValue = std::numeric_limits<int16_t>::max();
+  const int16_t minValue = std::numeric_limits<int16_t>::min();
 
   auto* uncompBuf = reinterpret_cast<int16_t*>(buf);
 
@@ -157,6 +160,13 @@ void DialogicAdpcmSamp::convertToStdWave(uint8_t *buf) {
     for (int n = 0; n < 2; ++n) {
       uint8_t nibble = byte >> (((n & 1) << 2) ^ 4);
       int16_t sample = DialogicAdpcmSamp::okiAdpcmState.clock(nibble);
+      int32_t amplifiedSample = static_cast<int32_t>(sample) * gain;
+      sample = static_cast<int16_t>(
+        std::clamp(amplifiedSample,
+          static_cast<int32_t>(minValue),
+          static_cast<int32_t>(maxValue)
+        )
+      );
       uncompBuf[sampleNum++] = sample;
     }
   }

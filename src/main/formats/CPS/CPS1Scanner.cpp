@@ -54,23 +54,24 @@ void CPS1Scanner::loadCPS1(MAMEGame *gameentry, CPSFormatVer fmt_ver) {
 
   // Load the YM2151 Instrument Set
   const uint32_t opmInstrTablePtrOffset = 2;
+  const uint32_t sampleInstrTablePtrOffset = 4;
   uint32_t opm_instr_table_offset = programFile->readShortBE(seq_table_offset + opmInstrTablePtrOffset);
+  uint32_t sample_instr_table_offset = programFile->readShortBE(seq_table_offset + sampleInstrTablePtrOffset);
 
   auto instrset_name = fmt::format("{} YM2151 instrument set", gameentry->name);
 
+  int opmInstrsetLength = std::min(127 * static_cast<u32>(sizeof(CPS1OPMInstrDataV4_25)), sample_instr_table_offset);
   opmInstrset = new CPS1OPMInstrSet(programFile,
                                     fmt_ver, opm_instr_table_offset,
+                                    opmInstrsetLength,
                                     instrset_name);
   if (!opmInstrset->loadVGMFile()) {
     delete opmInstrset;
-    opmInstrset = NULL;
+    opmInstrset = nullptr;
   }
 
   MAMERomGroup* sampsRomGroupEntry = gameentry->getRomGroupOfType("oki6295");
   if (sampsRomGroupEntry && sampsRomGroupEntry->file) {
-    const uint32_t sampleInstrTablePtrOffset = 4;
-    uint32_t sample_instr_table_offset = programFile->readShortBE(seq_table_offset + sampleInstrTablePtrOffset);
-
     RawFile *samplesFile = sampsRomGroupEntry->file;
 
     auto instrset_name = fmt::format("{} oki msm6295 instrument set", gameentry->name);
@@ -128,6 +129,17 @@ void CPS1Scanner::loadCPS1(MAMEGame *gameentry, CPSFormatVer fmt_ver) {
     return;
   }
 
+  // Create instrument transpose table
+  std::vector<s8> instrTransposeTable;
+  if (opmInstrset) {
+    instrTransposeTable.reserve(opmInstrset->aInstrs.size());
+    for (const auto instr : opmInstrset->aInstrs) {
+      if (auto* opmInstr = dynamic_cast<CPS1OPMInstr*>(instr); opmInstr != nullptr) {
+        instrTransposeTable.emplace_back(opmInstr->getTranspose());
+      }
+    }
+  }
+
   int seqNum = 0;
   for (k = ptrsStart; (seq_table_length == 0 || k < seq_table_length); k += ptrSize) {
 
@@ -140,7 +152,7 @@ void CPS1Scanner::loadCPS1(MAMEGame *gameentry, CPSFormatVer fmt_ver) {
     seqTable->addChild(seq_table_offset + k, ptrSize, "Sequence Pointer");
 
     auto seqName = fmt::format("{} seq {}", gameentry->name, seqNum);
-    CPSSeq *newSeq = new CPSSeq(programFile, seqPointer, fmt_ver, seqName);
+    CPSSeq *newSeq = new CPSSeq(programFile, seqPointer, fmt_ver, seqName, instrTransposeTable);
 
     if (!newSeq->loadVGMFile()) {
       delete newSeq;
