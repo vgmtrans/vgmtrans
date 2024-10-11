@@ -63,3 +63,11 @@ public:
 
   VGMSampColl *parSampColl;
 };
+
+class EmptySamp : public VGMSamp {
+public:
+  EmptySamp(VGMSampColl* sampColl): VGMSamp(sampColl, 0, 0, 0, 16) {}
+  void convertToStdWave(uint8_t *buf) override {
+    memset(buf, 0, 16);
+  }
+};
