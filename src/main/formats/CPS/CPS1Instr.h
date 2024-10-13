@@ -190,6 +190,10 @@ struct CPS1OPMInstrDataV2_00 {
 
     return {name, lfo, ch, { op[0], op[1], op[2], op[3] }};
   }
+
+  std::string toOPMString(uint8_t masterVol, const std::string& name, int num) const {
+    return convertToOPMData(masterVol, name).toOPMString(num);
+  }
 };
 
 struct CPS1OPMVolData4_25 {
@@ -289,6 +293,22 @@ struct CPS1OPMInstrDataV4_25 {
 
     return {name, lfo, ch, { op[0], op[1], op[2], op[3] }};
   }
+
+  std::string toOPMString(uint8_t masterVol, const std::string& name, int num) const {
+    std::ostringstream ss;
+
+    // Generate the OPM data string first
+    OPMData opmData = convertToOPMData(masterVol, name);
+    ss << opmData.toOPMString(num);
+
+    // Add supplementary data
+    ss << "\nCPS:";
+    for (int i = 0; i < 4; i ++) {
+      ss << " " << +volData[i].vol << " " << +volData[i].key_scale << " " << +volData[i].extra_atten;
+    }
+    ss << "\n";
+    return ss.str();
+  }
 };
 
 template <class OPMType>
@@ -309,7 +329,7 @@ public:
   }
 
   std::string toOPMString(int num) {
-    return opmData.convertToOPMData(masterVol, name()).toOPMString(num);
+    return opmData.toOPMString(masterVol, name(), num);
   }
   s8 getTranspose() const { return opmData.transpose; }
 
