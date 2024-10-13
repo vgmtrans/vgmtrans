@@ -18,7 +18,7 @@ constexpr double CPS3_DRIVER_RATE_HZ = 59.599491;
 
 // The amount by which we will amplify CPS1 MSM6295 samples to achieve balance with the YM2151.
 // This is done by ear.
-constexpr double CPS1_OKI_GAIN = 14.0;
+constexpr double CPS1_OKI_GAIN = 11.0;
 
 BEGIN_FORMAT(CPS1)
   USING_SCANNER(CPS1Scanner)

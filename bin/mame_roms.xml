@@ -297,6 +297,10 @@
         <romgroup type="audiocpu" load_method="append" tables="0x1100" >
             <rom>knm_09.12a</rom>
         </romgroup>
+        <romgroup type="oki6295" load_method="append">
+            <rom>knm_18.11c</rom>
+            <rom>knm_19.12c</rom>
+        </romgroup>
     </game>
     <game name="knights" format="CPS1" fmt_version="CPS1_4.25">
         <romgroup type="audiocpu" load_method="append" tables="0x1100" >

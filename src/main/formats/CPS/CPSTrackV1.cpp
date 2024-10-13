@@ -274,15 +274,24 @@ bool CPSTrackV1::readEvent() {
       case 0x0C : {
         uint8_t pitchbend = readByte(curOffset++);
         //double cents = (pitchbend / 256.0) * 100;
-        addMarker(beginOffset,
-                  curOffset - beginOffset,
-                  std::string("pitchbend"),
-                  pitchbend,
-                  0,
-                  "Pitch Bend",
-                  PRIORITY_MIDDLE,
-                  CLR_PITCHBEND);
-        //AddPitchBend(beginOffset, curOffset-beginOffset, (cents / 200) * 8192);
+        if (channelSynth == CPSSynth::YM2151) {
+          pitchbend >>= 2;
+          double cents = pitchbend * 1.587301587301587;
+          if (pitchbend >= 32) {
+            cents = -100 + cents;
+          }
+          addPitchBendAsPercent(beginOffset, curOffset-beginOffset, cents / 200.0);
+        } else {
+          addMarker(beginOffset,
+                    curOffset - beginOffset,
+                    std::string("pitchbend"),
+                    pitchbend,
+                    0,
+                    "Pitch Bend",
+                    PRIORITY_MIDDLE,
+                    CLR_PITCHBEND);
+          //AddPitchBend(beginOffset, curOffset-beginOffset, (cents / 200) * 8192);
+        }
       }
       break;
       case 0x0D : {
