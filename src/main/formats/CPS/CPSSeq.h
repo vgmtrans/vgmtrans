@@ -89,10 +89,13 @@ public:
   bool parseTrackPointers() override;
   bool postLoad() override;
   s8 getTransposeForInstr(u8 instrIndex);
+  u8 masterVolume() { return masterVol; }
+  void setMasterVolume(u8 vol) { masterVol = vol; }
 
 public:
   CPSFormatVer fmt_version;
 
 private:
   std::vector<s8> instrTransposeTable;
+  u8 masterVol = 127;
 };

@@ -56,7 +56,9 @@ void CPSTrackV1::calculateAndAddPortamentoTimeNoItem(int8_t noteDistance) {
 bool CPSTrackV1::readEvent() {
   uint32_t beginOffset = curOffset;
   uint8_t status_byte = readByte(curOffset++);
-  bool isCps1 = static_cast<CPSSeq*>(parentSeq)->fmt_version <= VER_CPS1_502;
+  auto cpsSeq = static_cast<CPSSeq*>(parentSeq);
+  bool isCps1 = cpsSeq->fmt_version <= VER_CPS1_502;
+  u8 masterVol = cpsSeq->masterVolume();
 
   if (status_byte >= 0x20) {
 
@@ -89,16 +91,16 @@ bool CPSTrackV1::readEvent() {
       // Tie note
       if ((noteState & 0x40) > 0) {
         if (!bPrevNoteTie) {
-          addNoteOn(beginOffset, curOffset - beginOffset, key, 127, "Note On (tied / with portamento)");
+          addNoteOn(beginOffset, curOffset - beginOffset, key, masterVol, "Note On (tied / with portamento)");
           addPortamentoNoItem(true);
         }
         else if (key != prevTieNote) {
           calculateAndAddPortamentoTimeNoItem(key - prevTieNote);
           if (isCps1) {
             addNoteOffNoItem(prevTieNote);
-            addNoteOn(beginOffset, curOffset - beginOffset, key, 127, "Note On (tied)");
+            addNoteOn(beginOffset, curOffset - beginOffset, key, masterVol, "Note On (tied)");
           } else {
-            addNoteOn(beginOffset, curOffset - beginOffset, key, 127, "Note On (tied)");
+            addNoteOn(beginOffset, curOffset - beginOffset, key, masterVol, "Note On (tied)");
             addNoteOffNoItem(prevTieNote);
           }
         }
@@ -113,9 +115,9 @@ bool CPSTrackV1::readEvent() {
             calculateAndAddPortamentoTimeNoItem(key - prevTieNote);
             if (isCps1) {
               addNoteOffNoItem(prevTieNote);
-              addNoteByDur(beginOffset, curOffset - beginOffset, key, 127, absDur);
+              addNoteByDur(beginOffset, curOffset - beginOffset, key, masterVol, absDur);
             } else {
-              addNoteByDur(beginOffset, curOffset - beginOffset, key, 127, absDur);
+              addNoteByDur(beginOffset, curOffset - beginOffset, key, masterVol, absDur);
               addNoteOffNoItem(prevTieNote);
             }
             insertPortamentoNoItem(false, getTime()+absDur);
@@ -128,7 +130,7 @@ bool CPSTrackV1::readEvent() {
           }
         }
         else {
-          addNoteByDur(beginOffset, curOffset - beginOffset, key, 127, absDur - (isCps1 ? 1 : 0));
+          addNoteByDur(beginOffset, curOffset - beginOffset, key, masterVol, absDur - (isCps1 ? 1 : 0));
         }
         bPrevNoteTie = false;
       }
@@ -181,7 +183,7 @@ bool CPSTrackV1::readEvent() {
         break;
 
       case 0x05 : {
-        if ((static_cast<CPSSeq*>(parentSeq))->fmt_version >= VER_140) {
+        if (cpsSeq->fmt_version >= VER_140) {
           // This byte is clearly the desired BPM, however there is a loss of resolution when the driver
           // converts this value because it is represented with 16 bits... See the table in sfa3 at 0x3492.
           // I've decided to keep the desired BPM rather than use the exact tempo value from the table
@@ -241,7 +243,7 @@ bool CPSTrackV1::readEvent() {
         addBankSelectNoItem((bank * 2) + (progNum / 128));
         addProgramChange(beginOffset, curOffset - beginOffset, progNum % 128);
         if (channelSynth == CPSSynth::YM2151) {
-          cKeyCorrection = static_cast<CPSSeq*>(parentSeq)->getTransposeForInstr(progNum);
+          cKeyCorrection = cpsSeq->getTransposeForInstr(progNum);
         }
         //}
         //else
@@ -349,7 +351,7 @@ bool CPSTrackV1::readEvent() {
 
         {
           uint32_t jump;
-          if (static_cast<CPSSeq*>(parentSeq)->fmt_version <= VER_CPS1_425) {
+          if (cpsSeq->fmt_version <= VER_CPS1_425) {
             jump = getShortBE(curOffset);
             curOffset += 2;
 
@@ -408,7 +410,7 @@ bool CPSTrackV1::readEvent() {
             curOffset += 2;
             addGenericEvent(beginOffset, curOffset - beginOffset, "Loop Break", "", CLR_LOOP);
 
-            if (static_cast<CPSSeq*>(parentSeq)->fmt_version <= VER_CPS1_425) {
+            if (cpsSeq->fmt_version <= VER_CPS1_425) {
               curOffset = jump;
             }
             else {
@@ -423,7 +425,7 @@ bool CPSTrackV1::readEvent() {
       // Loop Always
       case 0x16 : {
         uint32_t jump;
-        if (static_cast<CPSSeq*>(parentSeq)->fmt_version <= VER_CPS1_425) {
+        if (cpsSeq->fmt_version <= VER_CPS1_425) {
           jump = getShortBE(curOffset);
         }
         else {
@@ -461,9 +463,12 @@ bool CPSTrackV1::readEvent() {
         break;
 
       case 0x1A : {
-        vol = readByte(curOffset++);
+        uint8_t masterVol = readByte(curOffset++);
         addGenericEvent(beginOffset, curOffset - beginOffset, "Master Volume", "", CLR_UNKNOWN);
-        //this->AddMasterVol(beginOffset, curOffset-beginOffset, vol);
+        // addMasterVol(beginOffset, curOffset-beginOffset, masterVol);
+        if (channelSynth == YM2151) {
+          cpsSeq->setMasterVolume(masterVol);
+        }
         break;
       }
 
@@ -591,7 +596,7 @@ bool CPSTrackV1::readEvent() {
       break;
       case 0x1F : {
         uint8_t value = readByte(curOffset++);
-        if (static_cast<CPSSeq*>(parentSeq)->fmt_version < VER_116) {
+        if (cpsSeq->fmt_version < VER_116) {
           addBankSelectNoItem(2 + (value / 128));
           addProgramChange(beginOffset, curOffset - beginOffset, value % 128);
         }

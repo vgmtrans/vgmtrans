@@ -204,7 +204,7 @@ struct CPS1OPMVolData4_25 {
 
 struct CPS1OPMInstrDataV4_25 {
   int8_t transpose;
-  uint8_t LFO_ENABLE_AND_WF;
+  uint8_t LFO_ENABLE_AND_WF;  // bit 7: enable LFO, bit 5-6: WF, bit 1: reset LFO
   uint8_t LFRQ;
   uint8_t PMD;
   uint8_t AMD;
@@ -303,8 +303,11 @@ struct CPS1OPMInstrDataV4_25 {
 
     // Add supplementary data
     ss << "\nCPS:";
+    uint8_t enableLfo = LFO_ENABLE_AND_WF >> 7;
+    uint8_t resetLfo = (LFO_ENABLE_AND_WF >> 1) & 1;
+    ss << " " << +enableLfo << " " <<  +resetLfo;
     for (int i = 0; i < 4; i ++) {
-      ss << " " << +volData[i].vol << " " << +volData[i].key_scale << " " << +volData[i].extra_atten;
+      ss << " " << +volData[i].key_scale << " " << +volData[i].extra_atten;
     }
     ss << "\n";
     return ss.str();
