@@ -141,6 +141,8 @@ uint32_t VGMItem::guessLength() {
   // NOTE: child items can sometimes overlap each other
   uint32_t guessedLength = 0;
   for (const auto child : m_children) {
+    if (dwOffset > child->dwOffset)
+      continue;
     assert(dwOffset <= child->dwOffset);
 
     uint32_t itemLength = child->unLength;

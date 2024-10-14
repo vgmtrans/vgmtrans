@@ -15,5 +15,6 @@ END_FORMAT()
 
 enum NamcoSnesVersion: uint8_t {
   NAMCOSNES_NONE = 0,              // Unknown Version
-  NAMCOSNES_STANDARD,              // Wagyan Paradise etc.
+  NAMCOSNES_V1,                    // Blue Crystal Rod
+  NAMCOSNES_V2,                    // Wagyan Paradise
 };

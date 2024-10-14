@@ -12,6 +12,31 @@ namespace vgmtrans::scanners {
 ScannerRegistration<NamcoSnesScanner> s_namco_snes("NamcoSnes", {"spc"});
 }
 
+// Blue Crystal Rod SPC
+// 08a8: e4 38     mov   a,$38
+// 08aa: 8d 03     mov   y,#$03
+// 08ac: cf        mul   ya
+// 08ad: fd        mov   y,a
+// 08ae: f6 08 f0  mov   a,$f008+y
+// 08b1: 1c        asl   a
+// 08b2: 5d        mov   x,a
+// 08b3: e4 38     mov   a,$38
+// 08b5: d4 49     mov   $49+x,a           ; song number
+// 08b7: f6 09 f0  mov   a,$f009+y
+// 08ba: d4 00     mov   $00+x,a
+// 08bc: f6 0a f0  mov   a,$f00a+y
+// 08bf: d4 01     mov   $01+x,a           ; set vcmd read ptr from song list (starting from $f009)
+BytePattern NamcoSnesScanner::ptnReadSongListBCR(
+	"\xe4\x38\x8d\x03\xcf\xfd\xf6\x08"
+	"\xf0\x1c\x5d\xe4\x38\xd4\x49\xf6"
+	"\x09\xf0\xd4\x00\xf6\x0a\xf0\xd4"
+	"\x01",
+	"x?xxxxx?"
+	"?xxx?x?x"
+	"??xxx??x"
+	"x",
+	25);
+
 // Wagan Paradise SPC
 // 05cc: 68 60     cmp   a,#$60
 // 05ce: b0 0a     bcs   $05da
@@ -135,45 +160,63 @@ void NamcoSnesScanner::searchForNamcoSnesFromARAM(RawFile *file) {
   uint16_t addrSongList;
   if (file->searchBytePattern(ptnReadSongList, ofsReadSongList)) {
     addrSongList = file->readByte(ofsReadSongList + 5) | (file->readByte(ofsReadSongList + 9) << 8);
-    version = NAMCOSNES_STANDARD;
+    version = NAMCOSNES_V2;
+  } else if (file->searchBytePattern(ptnReadSongListBCR, ofsReadSongList)) {
+    addrSongList = file->readByte(ofsReadSongList + 7) | (file->readByte(ofsReadSongList + 8) << 8);
+    version = NAMCOSNES_V1;
   } else {
     return;
   }
 
-  // search song start sequence
-  uint32_t ofsStartSong;
-  uint8_t addrSongIndexArray;
-  uint8_t addrSongSlotIndex;
-  if (file->searchBytePattern(ptnStartSong, ofsStartSong)) {
-    addrSongIndexArray = file->readByte(ofsStartSong + 11);
-    addrSongSlotIndex = file->readByte(ofsStartSong + 15);
-  } else {
-    return;
-  }
+  uint16_t addrEventStart;
+  if (version == NAMCOSNES_V1) {
+    // limited experimental support for Blue Crystal Rod
+    for (uint8_t songIndex = 0; songIndex <= 0x26; songIndex++) {
+      uint16_t addrSeqHeader = addrSongList + (songIndex * 3);
+      addrEventStart = file->readShort(addrSeqHeader + 1);
 
-  // determine song index
-  uint8_t songSlot = file->readByte(addrSongSlotIndex); // 0..3
-  uint8_t songIndex = file->readByte(addrSongIndexArray + songSlot);
-  uint16_t addrSeqHeader = addrSongList + (songIndex * 3);
-  if (addrSeqHeader + 3 < 0x10000) {
-    if (file->readByte(addrSeqHeader) > 3 || (file->readShort(addrSeqHeader + 1) & 0xff00) == 0) {
-      songIndex = 1;
+      NamcoSnesSeq *newSeq = new NamcoSnesSeq(file, version, addrEventStart, name);
+      if (!newSeq->loadVGMFile()) {
+        delete newSeq;
+        return;
+      }
     }
-    addrSeqHeader = addrSongList + (songIndex * 3);
-  }
-  if (addrSeqHeader + 3 > 0x10000) {
-    return;
-  }
+  } else {
+    // search song start sequence
+    uint32_t ofsStartSong;
+    uint8_t addrSongIndexArray;
+    uint8_t addrSongSlotIndex;
+    if (file->searchBytePattern(ptnStartSong, ofsStartSong)) {
+      addrSongIndexArray = file->readByte(ofsStartSong + 11);
+      addrSongSlotIndex = file->readByte(ofsStartSong + 15);
+    } else {
+      return;
+    }
 
-  uint16_t addrEventStart = file->readShort(addrSeqHeader + 1);
-  if (addrEventStart + 1 > 0x10000) {
-    return;
-  }
+    // determine song index
+    uint8_t songSlot = file->readByte(addrSongSlotIndex);  // 0..3
+    uint8_t songIndex = file->readByte(addrSongIndexArray + songSlot);
+    uint16_t addrSeqHeader = addrSongList + (songIndex * 3);
+    if (addrSeqHeader + 3 < 0x10000) {
+      if (file->readByte(addrSeqHeader) > 3 || (file->readShort(addrSeqHeader + 1) & 0xff00) == 0) {
+        songIndex = 1;
+      }
+      addrSeqHeader = addrSongList + (songIndex * 3);
+    }
+    if (addrSeqHeader + 3 > 0x10000) {
+      return;
+    }
 
-  NamcoSnesSeq *newSeq = new NamcoSnesSeq(file, version, addrEventStart, name);
-  if (!newSeq->loadVGMFile()) {
-    delete newSeq;
-    return;
+    addrEventStart = file->readShort(addrSeqHeader + 1);
+    if (addrEventStart + 1 > 0x10000) {
+      return;
+    }
+
+    NamcoSnesSeq *newSeq = new NamcoSnesSeq(file, version, addrEventStart, name);
+    if (!newSeq->loadVGMFile()) {
+      delete newSeq;
+      return;
+    }
   }
 
   uint32_t ofsLoadInstrTuning;

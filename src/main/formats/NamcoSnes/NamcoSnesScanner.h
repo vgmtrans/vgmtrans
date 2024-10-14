@@ -19,6 +19,7 @@ class NamcoSnesScanner : public VGMScanner {
  private:
   std::map<uint8_t, uint8_t> getInitDspRegMap(RawFile *file);
 
+  static BytePattern ptnReadSongListBCR;
   static BytePattern ptnReadSongList;
   static BytePattern ptnStartSong;
   static BytePattern ptnLoadInstrTuning;
