@@ -5,6 +5,7 @@ struct MAMEGame;
 
 enum CPSFormatVer: uint8_t {
   VER_UNDEFINED,
+  VER_CPS1_100,
   VER_CPS1_200,
   VER_CPS1_200ff,  //Final Fight is laballed 2.00, but has unique 3 byte seq table header
   VER_CPS1_350,

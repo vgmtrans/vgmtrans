@@ -23,6 +23,7 @@ void CPS1Scanner::scan(RawFile *file, void *info) {
   }
 
   switch (fmt_ver) {
+    case VER_CPS1_100:
     case VER_CPS1_200:
     case VER_CPS1_200ff:
     case VER_CPS1_350:
@@ -58,6 +59,12 @@ void CPS1Scanner::loadCPS1(MAMEGame *gameentry, CPSFormatVer fmt_ver) {
   u8 numSeqs;
   u8 masterVol;
   switch (fmt_ver) {
+    case VER_CPS1_100:
+      numSeqs = programFile->readByte(tables_offset + 0);
+      masterVol = 0x7F;
+      seq_table_offset = tables_offset + 3;
+      opm_instr_table_offset = seq_table_offset + (numSeqs+1) * 2;
+      break;
     case VER_CPS1_200ff:
       numSeqs = programFile->readByte(tables_offset + 0);
       masterVol = 0x7F;
@@ -109,8 +116,6 @@ void CPS1Scanner::loadCPS1(MAMEGame *gameentry, CPSFormatVer fmt_ver) {
   switch (fmt_ver) {
     case VER_CPS1_200ff:
     case VER_CPS1_200:
-    case VER_CPS1_500:
-    case VER_CPS1_502:
       opmInstrsetLength = 127 * static_cast<u32>(sizeof(CPS1OPMInstrDataV2_00));
       opmInstrset = new CPS1OPMInstrSet(programFile,
                                         fmt_ver, masterVol, opm_instr_table_offset,
@@ -118,6 +123,16 @@ void CPS1Scanner::loadCPS1(MAMEGame *gameentry, CPSFormatVer fmt_ver) {
                                         instrset_name);
       break;
 
+    case VER_CPS1_500:
+    case VER_CPS1_502:
+      opmInstrsetLength = 127 * static_cast<u32>(sizeof(CPS1OPMInstrDataV5_02));
+      opmInstrset = new CPS1OPMInstrSet(programFile,
+                                        fmt_ver, masterVol, opm_instr_table_offset,
+                                        opmInstrsetLength,
+                                        instrset_name);
+      break;
+
+    case VER_CPS1_100:
     case VER_CPS1_350:
       opmInstrsetLength = 127 * static_cast<u32>(sizeof(CPS1OPMInstrDataV4_25));
       opmInstrset = new CPS1OPMInstrSet(programFile,

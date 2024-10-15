@@ -21,6 +21,7 @@ private:
   CPSSynth channelSynth;
   u8 noteDuration;
   s8 key;
+  s8 progNum = -1;
   bool bPrevNoteTie;
   u8 prevTieNote;
   u8 curDeltaTable;

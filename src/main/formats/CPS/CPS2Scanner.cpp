@@ -12,6 +12,7 @@
 #include "VGMColl.h"
 
 CPSFormatVer versionEnum(const std::string &versionStr) {
+  if (versionStr == "CPS1_1.00") return VER_CPS1_100;
   if (versionStr == "CPS1_2.00") return VER_CPS1_200;
   if (versionStr == "CPS1_2.00ff") return VER_CPS1_200ff;
   if (versionStr == "CPS1_3.50") return VER_CPS1_350;

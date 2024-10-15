@@ -20,6 +20,7 @@ CPS1SampleInstrSet::CPS1SampleInstrSet(RawFile *file,
 
 bool CPS1SampleInstrSet::parseInstrPointers() {
   switch (fmt_version) {
+    case VER_CPS1_100:
     case VER_CPS1_200ff:
     case VER_CPS1_200:
     case VER_CPS1_350:
@@ -136,10 +137,13 @@ bool CPS1OPMInstrSet::parseInstrPointers() {
   switch (fmt_version) {
     case VER_CPS1_200:
     case VER_CPS1_200ff:
-    case VER_CPS1_500:
-    case VER_CPS1_502:
       instrSize = sizeof(CPS1OPMInstrDataV2_00);
       break;
+    case VER_CPS1_500:
+    case VER_CPS1_502:
+      instrSize = sizeof(CPS1OPMInstrDataV5_02);
+      break;
+    case VER_CPS1_100:
     case VER_CPS1_350:
     case VER_CPS1_425:
       instrSize = sizeof(CPS1OPMInstrDataV4_25);
@@ -157,14 +161,20 @@ bool CPS1OPMInstrSet::parseInstrPointers() {
 
     switch (fmt_version) {
       case VER_CPS1_200ff:
-      case VER_CPS1_200:
-      case VER_CPS1_500:
-      case VER_CPS1_502: {
+      case VER_CPS1_200: {
         auto instr = new CPS1OPMInstr<CPS1OPMInstrDataV2_00>(this, masterVol, offset, instrSize, 0,
   i, name);
         aInstrs.push_back(instr);
         break;
       }
+      case VER_CPS1_500:
+      case VER_CPS1_502: {
+        auto instr = new CPS1OPMInstr<CPS1OPMInstrDataV5_02>(this, masterVol, offset, instrSize, 0,
+  i, name);
+        aInstrs.push_back(instr);
+        break;
+      }
+      case VER_CPS1_100:
       case VER_CPS1_350:
       case VER_CPS1_425: {
         auto instr = new CPS1OPMInstr<CPS1OPMInstrDataV4_25>(this, masterVol, offset, instrSize, 0,
@@ -200,12 +210,17 @@ std::string CPS1OPMInstrSet::generateOPMFile() {
     switch (fmt_version) {
       case VER_CPS1_200ff:
       case VER_CPS1_200:
-      case VER_CPS1_500:
-      case VER_CPS1_502:
         if (auto* instr = dynamic_cast<CPS1OPMInstr<CPS1OPMInstrDataV2_00>*>(aInstrs[i]); instr != nullptr) {
           output << instr->toOPMString(i) << '\n';
         }
         break;
+      case VER_CPS1_500:
+      case VER_CPS1_502:
+        if (auto* instr = dynamic_cast<CPS1OPMInstr<CPS1OPMInstrDataV5_02>*>(aInstrs[i]); instr != nullptr) {
+          output << instr->toOPMString(i) << '\n';
+        }
+        break;
+      case VER_CPS1_100:
       case VER_CPS1_350:
       case VER_CPS1_425:
         if (auto* instr = dynamic_cast<CPS1OPMInstr<CPS1OPMInstrDataV4_25>*>(aInstrs[i]); instr != nullptr) {

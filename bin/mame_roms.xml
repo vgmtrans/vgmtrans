@@ -176,6 +176,15 @@
             <rom>vam.12m</rom>
         </romgroup>
     </game>
+    <game name="dynwar" format="CPS1" fmt_version="CPS1_1.00">
+        <romgroup type="audiocpu" load_method="append" tables="0xE57">
+            <rom>tke_17.12b</rom>
+        </romgroup>
+        <romgroup type="oki6295" load_method="append">
+            <rom>tke_18.11c</rom>
+            <rom>tke_19.12c</rom>
+        </romgroup>
+    </game>
     <game name="ecofghtr" format="CPS2" fmt_version="1.04">
         <romgroup type="audiocpu" load_method="append" seq_table="0x9005" instr_table="0x7000" num_instr_banks="2" samp_table="0x8000">
             <rom>uec.01</rom>
@@ -823,6 +832,15 @@
             <rom>ps1-01m.3b</rom>
         </romgroup>
     </game>
+    <game name="strider" format="CPS1" fmt_version="CPS1_1.00">
+        <romgroup type="audiocpu" load_method="append" tables="0xDCD">
+            <rom>09.12b</rom>
+        </romgroup>
+        <romgroup type="oki6295" load_method="append">
+            <rom>18.11c</rom>
+            <rom>19.12c</rom>
+        </romgroup>
+    </game>
     <game name="strider2" format="CPS2"  fmt_version="2.10">
         <romgroup type="audiocpu" load_method="append" seq_table="0x9008" instr_table_ptrs="0x7079" num_instr_banks="2" samp_table="0x7145" samp_table_length="0x168" artic_table="0x72AD">>
             <rom>hr2_02.2e</rom>
@@ -846,6 +864,14 @@
         </romgroup>
         <romgroup type="qsound" load_method="append_swap16">
             <rom>ts2-01m.3b</rom>
+        </romgroup>
+    </game>
+    <game name="unsquad" format="CPS1" fmt_version="CPS1_1.00">
+        <romgroup type="audiocpu" load_method="append" tables="0xE59" >
+            <rom>ar_09.12b</rom>
+        </romgroup>
+        <romgroup type="oki6295" load_method="append">
+            <rom>aru_18.11c</rom>
         </romgroup>
     </game>
     <game name="varth" format="CPS1" fmt_version="CPS1_4.25">
@@ -885,6 +911,15 @@
         <romgroup type="qsound" load_method="append_swap16">
             <rom>vs2.11m</rom>
             <rom>vs2.12m</rom>
+        </romgroup>
+    </game>
+    <game name="willow" format="CPS1" fmt_version="CPS1_1.00">
+        <romgroup type="audiocpu" load_method="append" tables="0xe6d">
+            <rom>wl_09.12b</rom>
+        </romgroup>
+        <romgroup type="oki6295" load_method="append">
+            <rom>wl_18.11c</rom>
+            <rom>wl_19.12c</rom>
         </romgroup>
     </game>
     <game name="wof" format="CPS2" fmt_version="1.00">

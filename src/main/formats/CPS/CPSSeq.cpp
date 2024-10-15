@@ -60,11 +60,17 @@ bool CPSSeq::parseTrackPointers() {
     SeqTrack *newTrack;
 
     switch (fmt_version) {
+      case VER_CPS1_100:
+        return false;
       case VER_CPS1_200:
       case VER_CPS1_200ff:
       case VER_CPS1_350:
       case VER_CPS1_425:
         newTrack = new CPSTrackV1(this, i < 8 ? CPSSynth::YM2151 : CPSSynth::OKIM6295, offset);
+        break;
+      case VER_CPS1_500:
+      case VER_CPS1_502:
+        newTrack = new CPSTrackV1(this, i < 8 ? CPSSynth::YM2151 : CPSSynth::OKIM6295, offset + dwOffset);
         break;
       case VER_200:
       case VER_201B:
@@ -73,8 +79,6 @@ bool CPSSeq::parseTrackPointers() {
       case VER_CPS3:
         newTrack = new CPSTrackV2(this, offset + dwOffset);
         break;
-      default:
-        newTrack = new CPSTrackV1(this, CPSSynth::QSOUND, offset + dwOffset);
     }
     aTracks.push_back(newTrack);
     header->addChild(dwOffset + 1 + (i * 2), 2, "Track Pointer");
@@ -90,6 +94,10 @@ bool CPSSeq::postLoad() {
 
   if (readMode != READMODE_CONVERT_TO_MIDI)
     return true;
+
+  if (fmt_version <= VER_CPS1_502) {
+    return true;
+  }
 
   const double UPDATE_RATE_IN_HZ = (fmt_version == VER_CPS3) ? CPS3_DRIVER_RATE_HZ : CPS2_DRIVER_RATE_HZ;
 

@@ -27,6 +27,7 @@ void CPSTrackV1::resetVars() {
   curDeltaTable = 0;
   noteState = 0;
   bank = 0;
+  progNum = -1;
   portamentoCentsPerSec = 0;
   prevPortamentoDuration = 0;
   memset(loop, 0, sizeof(loop));
@@ -57,7 +58,7 @@ bool CPSTrackV1::readEvent() {
   uint32_t beginOffset = curOffset;
   uint8_t status_byte = readByte(curOffset++);
   auto cpsSeq = static_cast<CPSSeq*>(parentSeq);
-  bool isCps1 = cpsSeq->fmt_version <= VER_CPS1_502;
+  bool isCps1 = version() <= VER_CPS1_502;
   u8 masterVol = cpsSeq->masterVolume();
 
   if (status_byte >= 0x20) {
@@ -80,6 +81,13 @@ bool CPSTrackV1::readEvent() {
       u8 absDur = static_cast<u8>(static_cast<u16>(delta * noteDuration) >> 8);
 
       if (channelSynth == CPSSynth::OKIM6295) {
+        if (version() >= VER_CPS1_500) {
+          s8 newProgNum = (status_byte & 0x1F) + octave_table[noteState & 0x0F] - 1;
+          if (progNum != newProgNum) {
+            progNum = newProgNum;
+            addProgramChangeNoItem(newProgNum, false);
+          }
+        }
         // OKIM6295 doesn't control pitch, so we'll use middle C for all notes
         key = 0x3C;
       } else if (channelSynth == CPSSynth::YM2151) {
@@ -183,7 +191,7 @@ bool CPSTrackV1::readEvent() {
         break;
 
       case 0x05 : {
-        if (cpsSeq->fmt_version >= VER_140) {
+        if (version() >= VER_140) {
           // This byte is clearly the desired BPM, however there is a loss of resolution when the driver
           // converts this value because it is represented with 16 bits... See the table in sfa3 at 0x3492.
           // I've decided to keep the desired BPM rather than use the exact tempo value from the table
@@ -351,7 +359,7 @@ bool CPSTrackV1::readEvent() {
 
         {
           uint32_t jump;
-          if (cpsSeq->fmt_version <= VER_CPS1_425) {
+          if (version() <= VER_CPS1_425) {
             jump = getShortBE(curOffset);
             curOffset += 2;
 
@@ -410,7 +418,7 @@ bool CPSTrackV1::readEvent() {
             curOffset += 2;
             addGenericEvent(beginOffset, curOffset - beginOffset, "Loop Break", "", CLR_LOOP);
 
-            if (cpsSeq->fmt_version <= VER_CPS1_425) {
+            if (version() <= VER_CPS1_425) {
               curOffset = jump;
             }
             else {
@@ -425,7 +433,7 @@ bool CPSTrackV1::readEvent() {
       // Loop Always
       case 0x16 : {
         uint32_t jump;
-        if (cpsSeq->fmt_version <= VER_CPS1_425) {
+        if (version() <= VER_CPS1_425) {
           jump = getShortBE(curOffset);
         }
         else {
@@ -542,7 +550,7 @@ bool CPSTrackV1::readEvent() {
           }
         }
         break;
-      case 0x1C :
+      case 0x1C:
         if (version() < VER_171) {
           const uint8_t tremeloDepth = readByte(curOffset++);
           addMarker(beginOffset,
@@ -596,7 +604,7 @@ bool CPSTrackV1::readEvent() {
       break;
       case 0x1F : {
         uint8_t value = readByte(curOffset++);
-        if (cpsSeq->fmt_version < VER_116) {
+        if (version() < VER_116) {
           addBankSelectNoItem(2 + (value / 128));
           addProgramChange(beginOffset, curOffset - beginOffset, value % 128);
         }
