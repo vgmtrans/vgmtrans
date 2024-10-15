@@ -79,6 +79,8 @@ bool CPSSeq::parseTrackPointers() {
       case VER_CPS3:
         newTrack = new CPSTrackV2(this, offset + dwOffset);
         break;
+      default:
+        newTrack = new CPSTrackV1(this, CPSSynth::QSOUND, offset + dwOffset);
     }
     aTracks.push_back(newTrack);
     header->addChild(dwOffset + 1 + (i * 2), 2, "Track Pointer");
