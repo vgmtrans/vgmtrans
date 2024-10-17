@@ -209,6 +209,20 @@
             <rom>ff_19.12c</rom>
         </romgroup>
     </game>
+    <game name="forgottn" format="CPS1" fmt_version="CPS1_1.00">
+        <romgroup type="audiocpu" load_method="append" tables="0xDD0">
+            <rom>lw_37.13c</rom>
+        </romgroup>
+        <romgroup type="oki6295" load_method="append">
+            <rom>lw-03u.12e</rom>
+            <rom>lw-04u.13e</rom>
+        </romgroup>
+    </game>
+    <game name="ghouls" format="CPS1" fmt_version="CPS1_1.00">
+        <romgroup type="audiocpu" load_method="append" tables="0xDF0">
+            <rom>26.10a</rom>
+        </romgroup>
+    </game>
     <game name="gulunpa" format="CPS1" fmt_version="CPS1_4.25">
         <romgroup type="audiocpu" load_method="append" tables="0x1100" >
             <rom>9</rom>
@@ -867,7 +881,7 @@
         </romgroup>
     </game>
     <game name="unsquad" format="CPS1" fmt_version="CPS1_1.00">
-        <romgroup type="audiocpu" load_method="append" tables="0xE59" >
+        <romgroup type="audiocpu" load_method="append" tables="0xE57" >
             <rom>ar_09.12b</rom>
         </romgroup>
         <romgroup type="oki6295" load_method="append">

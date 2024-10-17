@@ -5,6 +5,7 @@
  */
 #include "common.h"
 #include "CPS1Scanner.h"
+#include "CPS0Seq.h"
 #include "CPSSeq.h"
 #include "CPS1Instr.h"
 #include "MAMELoader.h"
@@ -186,7 +187,8 @@ void CPS1Scanner::loadCPS1(MAMEGame *gameentry, CPSFormatVer fmt_ver) {
 
   // Create instrument transpose table
   std::vector<s8> instrTransposeTable;
-  if (opmInstrset && fmt_ver == VER_CPS1_425 || opmInstrset && fmt_ver == VER_CPS1_350) {
+  if (opmInstrset && fmt_ver == VER_CPS1_425 || opmInstrset && fmt_ver == VER_CPS1_350 ||
+    opmInstrset && fmt_ver == VER_CPS1_100) {
     instrTransposeTable.reserve(opmInstrset->aInstrs.size());
     for (const auto instr : opmInstrset->aInstrs) {
       if (auto* opmInstr = dynamic_cast<CPS1OPMInstr<CPS1OPMInstrDataV4_25>*>(instr); opmInstr != nullptr) {
@@ -196,7 +198,9 @@ void CPS1Scanner::loadCPS1(MAMEGame *gameentry, CPSFormatVer fmt_ver) {
   }
 
   for (u32 seqId = 0; seqId < numSeqs; ++seqId) {
-    uint32_t seqPointer = programFile->readShortBE(seq_table_offset + (seqId * sizeof(u16)));
+    uint32_t seqPointer = (fmt_ver > VER_CPS1_100) ?
+      programFile->readShortBE(seq_table_offset + (seqId * sizeof(u16))) :
+      programFile->readShort(seq_table_offset + (seqId * sizeof(u16)));
 
     if (seqPointer == 0) {
       continue;
@@ -205,21 +209,28 @@ void CPS1Scanner::loadCPS1(MAMEGame *gameentry, CPSFormatVer fmt_ver) {
     seqTable->addChild(seq_table_offset + (seqId * sizeof(u16)), sizeof(u16), "Sequence Pointer");
 
     auto seqName = fmt::format("{} seq {}", gameentry->name, seqId);
-    CPSSeq *newSeq = new CPSSeq(programFile, seqPointer, fmt_ver, seqName, instrTransposeTable);
+    VGMSeq* newSeq;
+    if (fmt_ver > VER_CPS1_100) {
+      newSeq = new CPSSeq(programFile, seqPointer, fmt_ver, seqName, instrTransposeTable);
+    } else {
+      newSeq = new CPS0Seq(programFile, seqPointer, seqName, instrTransposeTable);
+    }
 
     if (!newSeq->loadVGMFile()) {
       delete newSeq;
       continue;
     }
 
-    if (opmInstrset && sampleInstrset && sampcoll) {
+    if (opmInstrset) {
       auto collName = fmt::format("{} song {}", gameentry->name, seqId);
       VGMColl* coll = new VGMColl(collName);
 
       coll->useSeq(newSeq);
       coll->addInstrSet(opmInstrset);
-      coll->addInstrSet(sampleInstrset);
-      coll->addSampColl(sampcoll);
+      if (sampleInstrset && sampcoll) {
+        coll->addInstrSet(sampleInstrset);
+        coll->addSampColl(sampcoll);
+      }
       if (!coll->load()) {
         delete coll;
       }

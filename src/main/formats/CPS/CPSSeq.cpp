@@ -4,6 +4,7 @@
  * refer to the included LICENSE.txt file
  */
 #include "CPSSeq.h"
+#include "CPSTrackV0.h"
 #include "CPSTrackV1.h"
 #include "CPSTrackV2.h"
 #include "CPS2Instr.h"
