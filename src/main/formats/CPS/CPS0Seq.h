@@ -14,9 +14,6 @@ public:
   u8 masterVolume() { return masterVol; }
   void setMasterVolume(u8 vol) { masterVol = vol; }
 
-public:
-  u16 tempoRaw = 1;
-
 private:
   std::vector<s8> instrTransposeTable;
   uint8_t masterVol = 0x7F;
