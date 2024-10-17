@@ -20,7 +20,10 @@ private:
   s8 instrTranspose = 0;
   s8 cps0transpose = 0;
   bool restFlag = false;
-  bool dottedNoteFlag = false;
+  bool extendDeltaFlag = false;
+  bool tieNoteFlag = false;
+  u8 shortenDeltaCounter = 0;
+  u8 tieNoteCounter = 0;
 
   bool bPrevNoteTie;
   u8 prevTieNote;

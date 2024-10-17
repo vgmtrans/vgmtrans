@@ -19,6 +19,9 @@ void CPSTrackV0::resetVars() {
   progNum = -1;
   cps0transpose = 0;
   restFlag = false;
+  extendDeltaFlag = false;
+  tieNoteFlag = false;
+  shortenDeltaCounter = false;
   portamentoCentsPerSec = 0;
   prevPortamentoDuration = 0;
   memset(loop, 0, sizeof(loop));
@@ -40,12 +43,15 @@ bool CPSTrackV0::readEvent() {
   if (statusByte >= 0x40) {
     int shiftAmount = ((statusByte >> 5) & 0x07) - 2;
     shiftAmount = shiftAmount < 0 ? 0 : shiftAmount;
-    uint32_t delta = (cpsSeq->tempoRaw << shiftAmount) >> 8;
-    // uint32_t delta = shiftAmount << 8;
+    uint32_t delta = (3 << shiftAmount);
 
-    if (dottedNoteFlag) {
+    if (shortenDeltaCounter > 0) {
+      delta /= 1.5;
+      shortenDeltaCounter--;
+    }
+    if (extendDeltaFlag) {
       delta += (delta / 2);
-      dottedNoteFlag = false;
+      extendDeltaFlag = false;
     }
 
     u8 absDur = static_cast<u8>(static_cast<u16>(delta * noteDuration) >> 8);
@@ -69,32 +75,27 @@ bool CPSTrackV0::readEvent() {
   }
 
   if (statusByte >= 0x20) {
-    // if ((statusByte & 0xF0) != 0x20) {
     if (statusByte >= 0x30) {
-      // pChanState->field_0x9 = statusByte & 0xf;
+      shortenDeltaCounter = statusByte & 0xf;
+      std::string desc = fmt::format("Shorten next {:d} events", shortenDeltaCounter);
+      addGenericEvent(beginOffset, curOffset-beginOffset, desc, "", CLR_CHANGESTATE);
     } else {
-      // pChanState->field_0xa = (statusByte & 0xf) + 1;
-      // pChanState->set_by_event_06 = pChanState->set_by_event_06 | 2;
+      tieNoteCounter = (statusByte & 0xf) + 1;
+      tieNoteFlag = true;
+      std::string desc = fmt::format("Tie next {:d} notes", tieNoteCounter);
+      addGenericEvent(beginOffset, curOffset-beginOffset, desc, "", CLR_CHANGESTATE);
     }
     return true;
   }
+  // statusByte is between 00-1F
 
   int loopNum;
   switch (statusByte) {
     case 0x00: {  // tempo
       u8 tempoByte = readByte(curOffset++);
       u16 newTempo = (((u8)(tempoByte + 0x80U) >> 3) << 8) | (((u8)(tempoByte + 0x80U) >> 2) << 7);
-
-      cpsSeq->tempoRaw = newTempo;
-      u16 ticks_per_iteration = ((cpsSeq->tempoRaw + 0x80) & 0xFC) << 5;
-      // u16 ticks_per_iteration =cpsSeq->tempoRaw;
-      auto internal_ppqn = parentSeq->ppqn() << 8;
-      // auto internal_ppqn = newTempo;
-      auto iterations_per_beat = static_cast<double>(internal_ppqn) / ticks_per_iteration;
-      const uint32_t micros_per_beat = lround((iterations_per_beat / CPS2_DRIVER_RATE_HZ) * 1000000);
-      // addTempo(beginOffset, curOffset - beginOffset, micros_per_beat);
-      addTempoBPM(beginOffset, curOffset - beginOffset, 290);
-      // addTempoBPM(beginOffset, curOffset - beginOffset, cpsSeq->tempoRaw);
+      const uint32_t micros_per_beat = newTempo << 7;
+      addTempo(beginOffset, curOffset - beginOffset, micros_per_beat);
 
       // if (some status byte == 0) {
       //   some_status_byte = 0;
@@ -129,15 +130,19 @@ bool CPSTrackV0::readEvent() {
 
     doLoop: {
       u8 numLoops = readByte(curOffset++);
+      u16 offset = readShort(curOffset);
       // If the num loops is 0, then loop forever
       if (numLoops == 0) {
-        bool should_continue = addLoopForever(beginOffset, 3);
-        curOffset = readShort(curOffset);;
+        bool should_continue = addLoopForever(beginOffset, 4);
+        curOffset = offset;
         return should_continue;
       }
       // Otherwise, if the current loopCounter is 0, it hasn't been set yet
       if (loop[loopNum] == 0) {
         loop[loopNum] = numLoops;
+        std::string name = fmt::format("Loop #{:d}", loopNum);
+        std::string desc = fmt::format("Loop count: {:d}. Offset: {:X}", numLoops, offset);
+        addGenericEvent(beginOffset, 4, name, desc, CLR_LOOP);
       } else {
         // The loop counter was previously set: decrement the counter
         loop[loopNum]--;
@@ -148,7 +153,7 @@ bool CPSTrackV0::readEvent() {
         }
       }
       // Do the loop
-      curOffset = readShort(curOffset);
+      curOffset = offset;
       break;
     }
 
@@ -160,23 +165,32 @@ bool CPSTrackV0::readEvent() {
         break;
       }
       curOffset += 2;
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Loop break", "", CLR_LOOP);
       break;
     }
 
     case 0x06:        // set dotted note flag
-      dottedNoteFlag = true;
+      extendDeltaFlag = true;
+      addGenericEvent(beginOffset, curOffset-beginOffset, "Extend next event", "", CLR_CHANGESTATE);
       break;
 
     case 0x07: {      // transpose
       cps0transpose = readByte(curOffset++);
-      std::string desc = fmt::format("Transpose: {:d} semitones", cps0transpose);
+      std::string desc = fmt::format("{:+d} semitones", cps0transpose);
       addGenericEvent(beginOffset, curOffset-beginOffset, "Transpose", desc, CLR_TRANSPOSE);
       break;
     }
 
-    case 0x08:        // set some state
-      curOffset++;
+    case 0x08: {      // set some state
+      uint8_t pitchbend = readByte(curOffset++);
+      pitchbend >>= 2;
+      double cents = pitchbend * 1.587301587301587;
+      if (pitchbend >= 32) {
+        cents = -100 + cents;
+      }
+      addPitchBendAsPercent(beginOffset, curOffset-beginOffset, cents / 200.0);
       break;
+    }
 
     case 0x09:        // set an attenuation related state
       curOffset++;
@@ -184,6 +198,7 @@ bool CPSTrackV0::readEvent() {
 
     case 0x0A:        // NOP
       curOffset++;
+      addGenericEvent(beginOffset, curOffset-beginOffset, "NOP", "", CLR_MISC);
       break;
 
     case 0x0B:        // NOP
