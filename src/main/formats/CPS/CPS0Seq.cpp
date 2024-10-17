@@ -11,7 +11,7 @@ CPS0Seq::CPS0Seq(RawFile *file, uint32_t offset, std::string name, std::vector<s
 }
 
 bool CPS0Seq::parseHeader() {
-  setPPQN(0x30);
+  setPPQN(24);
   return true;
 }
 
