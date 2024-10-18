@@ -14,7 +14,7 @@ public:
 
 private:
   CPSSynth channelSynth;
-  u8 noteDuration;
+  u8 noteDuration = 0;
   s8 key;
   s8 progNum = -1;
   s8 instrTranspose = 0;
@@ -25,8 +25,8 @@ private:
   u8 shortenDeltaCounter = 0;
   u8 tieNoteCounter = 0;
 
-  bool bPrevNoteTie;
-  u8 prevTieNote;
+  bool bPrevNoteTie = false;
+  u8 prevTieNote = 0;
   u8 curDeltaTable;
   u8 noteState;
   u8 bank;

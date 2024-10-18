@@ -10,7 +10,7 @@ CPSTrackV0::CPSTrackV0(CPS0Seq *parentSeq, CPSSynth channelSynth, uint32_t offse
 }
 
 void CPSTrackV0::resetVars() {
-  noteDuration = 0xFF;
+  noteDuration = 0;
   bPrevNoteTie = false;
   prevTieNote = 0;
   curDeltaTable = 0;
@@ -55,10 +55,13 @@ bool CPSTrackV0::readEvent() {
     }
 
     u8 absDur = static_cast<u8>(static_cast<u16>(delta * noteDuration) >> 8);
-    absDur = (absDur == 0) ? 1 : absDur;
+    absDur += 1;
 
     key = (statusByte & 0x1F);
     if (key == 0) {
+      if (bPrevNoteTie) {
+        addNoteOffNoItem(prevTieNote);
+      }
       restFlag = true;
       addRest(beginOffset, curOffset - beginOffset, delta);
     } else {
@@ -66,7 +69,40 @@ bool CPSTrackV0::readEvent() {
       while (key > 0x60) { key -= 12; }
       while (key < 0) { key += 12; }
       key += 12;
-      addNoteByDur(beginOffset, curOffset - beginOffset, key, masterVol, absDur);
+
+      // Tie note
+      if (tieNoteCounter > 1) {
+        if (!bPrevNoteTie) {
+          addNoteOn(beginOffset, curOffset - beginOffset, key, masterVol, "Note On (tied / with portamento)");
+        }
+        else if (key != prevTieNote) {
+          addNoteOffNoItem(prevTieNote);
+          addNoteOn(beginOffset, curOffset - beginOffset, key, masterVol, "Note On (tied)");
+        }
+        else
+          addGenericEvent(beginOffset, curOffset - beginOffset, "Tie", "", CLR_NOTEON);
+        bPrevNoteTie = true;
+        prevTieNote = key;
+        tieNoteCounter--;
+      }
+      else {
+        if (bPrevNoteTie) {
+          if (key != prevTieNote) {
+            addNoteOffNoItem(prevTieNote);
+            addNoteByDur(beginOffset, curOffset - beginOffset, key, masterVol, absDur-1);
+          }
+          else {
+            addTime(absDur);
+            delta -= absDur;
+            addNoteOff(beginOffset, curOffset - beginOffset, prevTieNote, "Note Off (tied)");
+          }
+        }
+        else {
+          addNoteByDur(beginOffset, curOffset - beginOffset, key, masterVol, absDur-1);
+        }
+        bPrevNoteTie = false;
+      }
+
       addTime(delta);
       restFlag = false;
     }
