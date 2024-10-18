@@ -779,7 +779,7 @@ NoteEvent::NoteEvent(MidiTrack *prntTrk,
                      bool bNoteDown,
                      u8 theKey,
                      u8 theVel)
-    : MidiEvent(prntTrk, absoluteTime, channel, bNoteDown ? PRIORITY_LOWER : PRIORITY_HIGHER),
+    : MidiEvent(prntTrk, absoluteTime, channel, PRIORITY_LOWER),
       bNoteDown(bNoteDown),
       key(theKey),
       vel(theVel) {
