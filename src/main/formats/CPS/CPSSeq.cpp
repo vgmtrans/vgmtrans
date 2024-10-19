@@ -24,9 +24,6 @@ CPSSeq::CPSSeq(RawFile *file, uint32_t offset, CPSFormatVer fmtVersion, std::str
   setUsesMonophonicTracks();
   setAlwaysWriteInitialVol(127);
   setAlwaysWriteInitialMonoMode(true);
-  // Until we add CPS3 vibrato and pitch bend using markers, set the default pitch bend range here
-  if (fmt_version >= VER_200)
-    setAlwaysWriteInitialPitchBendRange(12 * 100);
 }
 
 CPSSeq::~CPSSeq() {
@@ -47,7 +44,7 @@ bool CPSSeq::parseTrackPointers() {
   this->addHeader(dwOffset, 1, "Sequence Flags");
   VGMHeader *header = this->addHeader(dwOffset + 1, readShortBE(dwOffset + 1) - 1, "Track Pointers");
 
-  const int maxTracks = fmt_version <= VER_CPS1_502 ? 12 : 16;
+  const int maxTracks = fmt_version <= CPS_FM_V502 ? 12 : 16;
 
   for (int i = 0; i < maxTracks; i++) {
     uint32_t offset = readShortBE(dwOffset + 1 + i * 2);
@@ -61,23 +58,22 @@ bool CPSSeq::parseTrackPointers() {
     SeqTrack *newTrack;
 
     switch (fmt_version) {
-      case VER_CPS1_100:
+      case CPS_FM_V100:
         return false;
-      case VER_CPS1_200:
-      case VER_CPS1_200ff:
-      case VER_CPS1_350:
-      case VER_CPS1_425:
+      case CPS_FM_V200:
+      case CPS_FM_V350:
+      case CPS_FM_V425:
         newTrack = new CPSTrackV1(this, i < 8 ? CPSSynth::YM2151 : CPSSynth::OKIM6295, offset);
         break;
-      case VER_CPS1_500:
-      case VER_CPS1_502:
+      case CPS_FM_V500:
+      case CPS_FM_V502:
         newTrack = new CPSTrackV1(this, i < 8 ? CPSSynth::YM2151 : CPSSynth::OKIM6295, offset + dwOffset);
         break;
-      case VER_200:
-      case VER_201B:
-      case VER_210:
-      case VER_211:
-      case VER_CPS3:
+      case CPS_QSOUND_V200:
+      case CPS_QSOUND_V201B:
+      case CPS_QSOUND_V210:
+      case CPS_QSOUND_V211:
+      case CPS3:
         newTrack = new CPSTrackV2(this, offset + dwOffset);
         break;
       default:
@@ -98,11 +94,11 @@ bool CPSSeq::postLoad() {
   if (readMode != READMODE_CONVERT_TO_MIDI)
     return true;
 
-  if (fmt_version <= VER_CPS1_502) {
+  if (fmt_version <= CPS_FM_V502) {
     return true;
   }
 
-  const double UPDATE_RATE_IN_HZ = (fmt_version == VER_CPS3) ? CPS3_DRIVER_RATE_HZ : CPS2_DRIVER_RATE_HZ;
+  const double UPDATE_RATE_IN_HZ = (fmt_version == CPS3) ? CPS3_DRIVER_RATE_HZ : CPS2_DRIVER_RATE_HZ;
 
   // We need to add pitch bend events for vibrato, which is controlled by a software LFO
   //  This is actually a bit tricky because the LFO is running independent of the sequence
@@ -147,7 +143,7 @@ bool CPSSeq::postLoad() {
     // This represents the pitch bend range set for the MIDI track. It will change to accomodate
     // vibrato depth. When vibrato depth changes, this becomes the format's actual pitch bend range
     // (fmtPitchBendRange) plus the range of vibrato depth, ceiled to the nearest semitone.
-    uint32_t pitchbendRange = fmt_version >= VER_200 ? 1200 : 200; // pitch bend range in cents.
+    uint32_t pitchbendRange = fmt_version >= CPS_QSOUND_V200 ? 1200 : 200; // pitch bend range in cents.
     double vibratoCents = 0;          // vibrato depth in cents
     uint16_t tremelo = 0;        // tremelo depth.  we divide this value by 0x10000 to get percent amplitude attenuation
     uint16_t lfoRate = 0;        // value added to lfo env every lfo tick
@@ -206,7 +202,7 @@ bool CPSSeq::postLoad() {
         }
       }
 
-      uint32_t fmtPitchBendRange = fmt_version >= VER_200 ? 1200 : 50;
+      uint32_t fmtPitchBendRange = fmt_version >= CPS_QSOUND_V200 ? 1200 : 50;
 
       // We just handled LFO-induced events in the span between the prior event up to this one. Now,
       // check if the event is a tempo or marker event, which require special handling.

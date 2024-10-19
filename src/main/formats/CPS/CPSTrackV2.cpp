@@ -77,7 +77,7 @@ bool CPSTrackV2::readEvent() {
       auto internal_ppqn = parentSeq->ppqn() << 8;
       auto iterations_per_beat = static_cast<double>(internal_ppqn) / ticks_per_iteration;
       auto fmt_version = static_cast<CPSSeq*>(parentSeq)->fmt_version;
-      const double ITERATIONS_PER_SEC = fmt_version == VER_CPS3 ? CPS3_DRIVER_RATE_HZ : CPS2_DRIVER_RATE_HZ;
+      const double ITERATIONS_PER_SEC = fmt_version == CPS3 ? CPS3_DRIVER_RATE_HZ : CPS2_DRIVER_RATE_HZ;
       const uint32_t micros_per_beat = lround((iterations_per_beat / ITERATIONS_PER_SEC) * 1000000);
       addTempo(beginOffset, curOffset - beginOffset, micros_per_beat);
       break;

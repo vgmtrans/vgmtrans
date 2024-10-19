@@ -18,19 +18,18 @@ void CPS1Scanner::scan(RawFile *file, void *info) {
   MAMEGame *gameentry = static_cast<MAMEGame*>(info);
   CPSFormatVer fmt_ver = versionEnum(gameentry->fmt_version_str);
 
-  if (fmt_ver == VER_UNDEFINED) {
+  if (fmt_ver == VERSION_UNDEFINED) {
     L_ERROR("XML entry uses an undefined format version: {}", gameentry->fmt_version_str);
     return;
   }
 
   switch (fmt_ver) {
-    case VER_CPS1_100:
-    case VER_CPS1_200:
-    case VER_CPS1_200ff:
-    case VER_CPS1_350:
-    case VER_CPS1_425:
-    case VER_CPS1_500:
-    case VER_CPS1_502:
+    case CPS_FM_V100:
+    case CPS_FM_V200:
+    case CPS_FM_V350:
+    case CPS_FM_V425:
+    case CPS_FM_V500:
+    case CPS_FM_V502:
       loadCPS1(gameentry, fmt_ver);
       break;
     default:
@@ -60,33 +59,32 @@ void CPS1Scanner::loadCPS1(MAMEGame *gameentry, CPSFormatVer fmt_ver) {
   u8 numSeqs;
   u8 masterVol;
   switch (fmt_ver) {
-    case VER_CPS1_100:
+    case CPS_FM_V100:
       numSeqs = programFile->readByte(tables_offset + 0);
       masterVol = 0x7F;
       seq_table_offset = tables_offset + 3;
       opm_instr_table_offset = seq_table_offset + (numSeqs+1) * 2;
       break;
-    case VER_CPS1_200ff:
+    case CPS_FM_V200:
       numSeqs = programFile->readByte(tables_offset + 0);
       masterVol = 0x7F;
       opm_instr_table_offset = programFile->readShortBE(tables_offset + 1);
       seq_table_offset = tables_offset + 3;
       break;
-    case VER_CPS1_200:
-    case VER_CPS1_350:
+    case CPS_FM_V350:
       numSeqs = programFile->readByte(tables_offset + 0);
       masterVol = programFile->readByte(tables_offset + 1);
       opm_instr_table_offset = programFile->readShortBE(tables_offset + 2);
       seq_table_offset = tables_offset + 4;
       break;
-    case VER_CPS1_425:
+    case CPS_FM_V425:
       numSeqs = programFile->readByte(tables_offset + 0);
       masterVol = programFile->readByte(tables_offset + 1);
       opm_instr_table_offset = programFile->readShortBE(tables_offset + 2);
       sample_instr_table_offset = programFile->readShortBE(tables_offset + 4);
       seq_table_offset = tables_offset + 6;
       break;
-    case VER_CPS1_500: {
+    case CPS_FM_V500: {
       opm_instr_table_length = programFile->readShortBE(tables_offset);
       opm_instr_table_offset = tables_offset + 2;
       u32 seq_info_offset = opm_instr_table_offset + opm_instr_table_length;
@@ -95,7 +93,7 @@ void CPS1Scanner::loadCPS1(MAMEGame *gameentry, CPSFormatVer fmt_ver) {
       seq_table_offset = seq_info_offset + 2;
       break;
     }
-    case VER_CPS1_502: {
+    case CPS_FM_V502: {
       opm_instr_table_length = programFile->readShortBE(tables_offset);
       opm_instr_table_offset = tables_offset + 2;
       u32 seq_info_offset = opm_instr_table_offset + opm_instr_table_length;
@@ -115,8 +113,7 @@ void CPS1Scanner::loadCPS1(MAMEGame *gameentry, CPSFormatVer fmt_ver) {
   int opmInstrsetLength;
 
   switch (fmt_ver) {
-    case VER_CPS1_200ff:
-    case VER_CPS1_200:
+    case CPS_FM_V200:
       opmInstrsetLength = 127 * static_cast<u32>(sizeof(CPS1OPMInstrDataV2_00));
       opmInstrset = new CPS1OPMInstrSet(programFile,
                                         fmt_ver, masterVol, opm_instr_table_offset,
@@ -124,8 +121,8 @@ void CPS1Scanner::loadCPS1(MAMEGame *gameentry, CPSFormatVer fmt_ver) {
                                         instrset_name);
       break;
 
-    case VER_CPS1_500:
-    case VER_CPS1_502:
+    case CPS_FM_V500:
+    case CPS_FM_V502:
       opmInstrsetLength = 127 * static_cast<u32>(sizeof(CPS1OPMInstrDataV5_02));
       opmInstrset = new CPS1OPMInstrSet(programFile,
                                         fmt_ver, masterVol, opm_instr_table_offset,
@@ -133,15 +130,15 @@ void CPS1Scanner::loadCPS1(MAMEGame *gameentry, CPSFormatVer fmt_ver) {
                                         instrset_name);
       break;
 
-    case VER_CPS1_100:
-    case VER_CPS1_350:
+    case CPS_FM_V100:
+    case CPS_FM_V350:
       opmInstrsetLength = 127 * static_cast<u32>(sizeof(CPS1OPMInstrDataV4_25));
       opmInstrset = new CPS1OPMInstrSet(programFile,
                                       fmt_ver, masterVol, opm_instr_table_offset,
                                       opmInstrsetLength,
                                       instrset_name);
       break;
-    case VER_CPS1_425:
+    case CPS_FM_V425:
       opmInstrsetLength = std::min(127 * static_cast<u32>(sizeof(CPS1OPMInstrDataV4_25)), sample_instr_table_offset);
       opmInstrset = new CPS1OPMInstrSet(programFile,
                                         fmt_ver, masterVol, opm_instr_table_offset,
@@ -187,8 +184,8 @@ void CPS1Scanner::loadCPS1(MAMEGame *gameentry, CPSFormatVer fmt_ver) {
 
   // Create instrument transpose table
   std::vector<s8> instrTransposeTable;
-  if (opmInstrset && fmt_ver == VER_CPS1_425 || opmInstrset && fmt_ver == VER_CPS1_350 ||
-    opmInstrset && fmt_ver == VER_CPS1_100) {
+  if (opmInstrset && fmt_ver == CPS_FM_V425 || opmInstrset && fmt_ver == CPS_FM_V350 ||
+    opmInstrset && fmt_ver == CPS_FM_V100) {
     instrTransposeTable.reserve(opmInstrset->aInstrs.size());
     for (const auto instr : opmInstrset->aInstrs) {
       if (auto* opmInstr = dynamic_cast<CPS1OPMInstr<CPS1OPMInstrDataV4_25>*>(instr); opmInstr != nullptr) {
@@ -198,7 +195,7 @@ void CPS1Scanner::loadCPS1(MAMEGame *gameentry, CPSFormatVer fmt_ver) {
   }
 
   for (u32 seqId = 0; seqId < numSeqs; ++seqId) {
-    uint32_t seqPointer = (fmt_ver > VER_CPS1_100) ?
+    uint32_t seqPointer = (fmt_ver > CPS_FM_V100) ?
       programFile->readShortBE(seq_table_offset + (seqId * sizeof(u16))) :
       programFile->readShort(seq_table_offset + (seqId * sizeof(u16)));
 
@@ -210,7 +207,7 @@ void CPS1Scanner::loadCPS1(MAMEGame *gameentry, CPSFormatVer fmt_ver) {
 
     auto seqName = fmt::format("{} seq {}", gameentry->name, seqId);
     VGMSeq* newSeq;
-    if (fmt_ver > VER_CPS1_100) {
+    if (fmt_ver > CPS_FM_V100) {
       newSeq = new CPSSeq(programFile, seqPointer, fmt_ver, seqName, instrTransposeTable);
     } else {
       newSeq = new CPS0Seq(programFile, seqPointer, seqName, instrTransposeTable);

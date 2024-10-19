@@ -213,7 +213,7 @@ public:
   bool parseInstrPointers() override;
 
 public:
-  CPSFormatVer fmt_version{VER_UNDEFINED};
+  CPSFormatVer fmt_version{VERSION_UNDEFINED};
   uint32_t num_instr_banks{};
   CPSSampleInfoTable *sampInfoTable;
   CPSArticTable *articTable;

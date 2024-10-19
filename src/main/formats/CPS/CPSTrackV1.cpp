@@ -58,7 +58,7 @@ bool CPSTrackV1::readEvent() {
   uint32_t beginOffset = curOffset;
   uint8_t status_byte = readByte(curOffset++);
   auto cpsSeq = static_cast<CPSSeq*>(parentSeq);
-  bool isCps1 = version() <= VER_CPS1_502;
+  bool isCps1 = version() <= CPS_FM_V502;
   u8 masterVol = cpsSeq->masterVolume();
 
   if (status_byte >= 0x20) {
@@ -81,7 +81,7 @@ bool CPSTrackV1::readEvent() {
       u8 absDur = static_cast<u8>(static_cast<u16>(delta * noteDuration) >> 8);
 
       if (channelSynth == CPSSynth::OKIM6295) {
-        if (version() >= VER_CPS1_500) {
+        if (version() >= CPS_FM_V500) {
           s8 newProgNum = (status_byte & 0x1F) + octave_table[noteState & 0x0F] - 1;
           if (progNum != newProgNum) {
             progNum = newProgNum;
@@ -191,7 +191,7 @@ bool CPSTrackV1::readEvent() {
         break;
 
       case 0x05 : {
-        if (version() >= VER_140) {
+        if (version() >= CPS_QSOUND_V140) {
           // This byte is clearly the desired BPM, however there is a loss of resolution when the driver
           // converts this value because it is represented with 16 bits... See the table in sfa3 at 0x3492.
           // I've decided to keep the desired BPM rather than use the exact tempo value from the table
@@ -359,7 +359,7 @@ bool CPSTrackV1::readEvent() {
 
         {
           uint32_t jump;
-          if (version() <= VER_CPS1_425) {
+          if (version() <= CPS_FM_V425) {
             jump = getShortBE(curOffset);
             curOffset += 2;
 
@@ -418,7 +418,7 @@ bool CPSTrackV1::readEvent() {
             curOffset += 2;
             addGenericEvent(beginOffset, curOffset - beginOffset, "Loop Break", "", CLR_LOOP);
 
-            if (version() <= VER_CPS1_425) {
+            if (version() <= CPS_FM_V425) {
               curOffset = jump;
             }
             else {
@@ -433,7 +433,7 @@ bool CPSTrackV1::readEvent() {
       // Loop Always
       case 0x16 : {
         uint32_t jump;
-        if (version() <= VER_CPS1_425) {
+        if (version() <= CPS_FM_V425) {
           jump = getShortBE(curOffset);
         }
         else {
@@ -482,7 +482,7 @@ bool CPSTrackV1::readEvent() {
 
       //Vibrato depth...
       case 0x1B :
-        if (version() < VER_171) {
+        if (version() < CPS_QSOUND_V171) {
           uint8_t vibratoDepth = readByte(curOffset++);
           addMarker(beginOffset,
                     curOffset - beginOffset,
@@ -551,7 +551,7 @@ bool CPSTrackV1::readEvent() {
         }
         break;
       case 0x1C:
-        if (version() < VER_171) {
+        if (version() < CPS_QSOUND_V171) {
           const uint8_t tremeloDepth = readByte(curOffset++);
           addMarker(beginOffset,
                     curOffset - beginOffset,
@@ -572,7 +572,7 @@ bool CPSTrackV1::readEvent() {
       // LFO rate (for versions < 1.71)
       case 0x1D : {
         uint8_t rate = readByte(curOffset++);
-        if (version() < VER_171)
+        if (version() < CPS_QSOUND_V171)
           addMarker(beginOffset,
                     curOffset - beginOffset,
                     std::string("lfo"),
@@ -589,7 +589,7 @@ bool CPSTrackV1::readEvent() {
       // Reset LFO state (for versions < 1.71)
       case 0x1E : {
         uint8_t data = readByte(curOffset++);
-        if (version() < VER_171)
+        if (version() < CPS_QSOUND_V171)
           addMarker(beginOffset,
                     curOffset - beginOffset,
                     std::string("resetlfo"),
@@ -604,7 +604,7 @@ bool CPSTrackV1::readEvent() {
       break;
       case 0x1F : {
         uint8_t value = readByte(curOffset++);
-        if (version() < VER_116) {
+        if (version() < CPS_QSOUND_V116) {
           addBankSelectNoItem(2 + (value / 128));
           addProgramChange(beginOffset, curOffset - beginOffset, value % 128);
         }
