@@ -3,16 +3,16 @@
  * Licensed under the zlib license,
  * refer to the included LICENSE.txt file
  */
-#include "CPSTrackV2.h"
+#include "CPS2TrackV2.h"
 #include "ScaleConversion.h"
 
 
-CPSTrackV2::CPSTrackV2(CPSSeq *parentSeq, uint32_t offset, uint32_t length)
+CPS2TrackV2::CPS2TrackV2(CPS2Seq *parentSeq, uint32_t offset, uint32_t length)
     : SeqTrack(parentSeq, offset, length) {
-  CPSTrackV2::resetVars();
+  CPS2TrackV2::resetVars();
 }
 
-void CPSTrackV2::resetVars() {
+void CPS2TrackV2::resetVars() {
   m_master_volume = 0;
   m_secondary_volume = 0x40;
   memset(loopCounter, 0, sizeof(loopCounter));
@@ -20,7 +20,7 @@ void CPSTrackV2::resetVars() {
   SeqTrack::resetVars();
 }
 
-uint32_t CPSTrackV2::readVarLength() {
+uint32_t CPS2TrackV2::readVarLength() {
   uint32_t delta = 0;
   uint8_t byte;
   do {
@@ -32,7 +32,7 @@ uint32_t CPSTrackV2::readVarLength() {
   return delta;
 }
 
-bool CPSTrackV2::readEvent() {
+bool CPS2TrackV2::readEvent() {
   uint32_t beginOffset = curOffset;
   uint8_t status_byte = readByte(curOffset++);
 
@@ -76,8 +76,8 @@ bool CPSTrackV2::readEvent() {
       curOffset += 2;
       auto internal_ppqn = parentSeq->ppqn() << 8;
       auto iterations_per_beat = static_cast<double>(internal_ppqn) / ticks_per_iteration;
-      auto fmt_version = static_cast<CPSSeq*>(parentSeq)->fmt_version;
-      const double ITERATIONS_PER_SEC = fmt_version == VER_CPS3 ? CPS3_DRIVER_RATE_HZ : CPS2_DRIVER_RATE_HZ;
+      auto fmt_version = static_cast<CPS2Seq*>(parentSeq)->fmt_version;
+      const double ITERATIONS_PER_SEC = fmt_version == CPS3 ? CPS3_DRIVER_RATE_HZ : CPS2_DRIVER_RATE_HZ;
       const uint32_t micros_per_beat = lround((iterations_per_beat / ITERATIONS_PER_SEC) * 1000000);
       addTempo(beginOffset, curOffset - beginOffset, micros_per_beat);
       break;
@@ -338,8 +338,9 @@ bool CPSTrackV2::readEvent() {
     }
 
     // NEW IN CPS3 (maybe sfiii3 specifically)
-    // This seems to be used to trigger events in the game itself. For example, this event controls
-    // sfiii3's intro animation sequence which is timed to the music.
+    // This triggers events within the main game logic. For example, this event controls
+    // sfiii3's intro animation sequence which is timed to the music. It also determines at what
+    // point in a sequence to transition to the variant sequence for round 2 and 3.
     case E8_META_EVENT: {
       uint8_t slot = readByte(curOffset++);
       uint8_t value = readByte(curOffset++);
