@@ -57,6 +57,10 @@ bool CPSTrackV0::readEvent() {
     u8 absDur = static_cast<u8>(static_cast<u16>(delta * noteDuration) >> 8);
     absDur += 1;
 
+    // We must provide some time between sequential notes to allow the YM2151 envelope to reset.
+    // A dumb but effective solution is to shorten note duration by a tick.
+    absDur = std::max(1, absDur-1);
+
     key = (statusByte & 0x1F);
     if (key == 0) {
       if (bPrevNoteTie) {
@@ -89,7 +93,7 @@ bool CPSTrackV0::readEvent() {
         if (bPrevNoteTie) {
           if (key != prevTieNote) {
             addNoteOffNoItem(prevTieNote);
-            addNoteByDur(beginOffset, curOffset - beginOffset, key, masterVol, absDur-1);
+            addNoteByDur(beginOffset, curOffset - beginOffset, key, masterVol, absDur);
           }
           else {
             addTime(absDur);
@@ -98,7 +102,7 @@ bool CPSTrackV0::readEvent() {
           }
         }
         else {
-          addNoteByDur(beginOffset, curOffset - beginOffset, key, masterVol, absDur-1);
+          addNoteByDur(beginOffset, curOffset - beginOffset, key, masterVol, absDur);
         }
         bPrevNoteTie = false;
       }
