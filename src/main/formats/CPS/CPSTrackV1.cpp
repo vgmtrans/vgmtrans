@@ -123,7 +123,7 @@ bool CPSTrackV1::readEvent() {
             calculateAndAddPortamentoTimeNoItem(key - prevTieNote);
             if (isCps1) {
               addNoteOffNoItem(prevTieNote);
-              addNoteByDur(beginOffset, curOffset - beginOffset, key, masterVol, absDur);
+              addNoteByDur(beginOffset, curOffset - beginOffset, key, masterVol, absDur - 1);
             } else {
               addNoteByDur(beginOffset, curOffset - beginOffset, key, masterVol, absDur);
               addNoteOffNoItem(prevTieNote);

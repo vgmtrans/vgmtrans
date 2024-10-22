@@ -50,7 +50,7 @@ void CPS1Scanner::loadCPS1(MAMEGame *gameentry, CPSFormatVer fmt_ver) {
   u32 seq_table_length;
   u32 opm_instr_table_offset;
   u32 opm_instr_table_length;
-  u32 sample_instr_table_offset;
+  u32 sample_instr_table_offset = 0;
 
   u32 tables_offset;
   if (!seqRomGroupEntry->getHexAttribute("tables", &tables_offset))
