@@ -4,7 +4,6 @@
 #include "CPS1Scanner.h"
 
 enum CPSSynth {
-  QSOUND,
   OKIM6295,
   YM2151
 };

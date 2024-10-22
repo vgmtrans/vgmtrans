@@ -188,7 +188,7 @@ bool CPS2InstrSet::parseHeader() {
 bool CPS2InstrSet::parseInstrPointers() {
   // Load the instr_info tables.
 
-  if (fmt_version <= CPS_QSOUND_V115) {
+  if (fmt_version <= CPS2_V115) {
     // In these versions, there are no instr_info_table pointers, it's hard-coded into the assembly code.
     // There are two possible instr_info banks stored next to each other with 256 entries in each,
     // unlike higher versions, where the number of instr_infos in each bank is variable and less than 0x7F.
@@ -208,7 +208,7 @@ bool CPS2InstrSet::parseInstrPointers() {
   }
   else {
     uint8_t instr_info_length = sizeof(qs_prog_info_ver_130);
-    if (fmt_version < CPS_QSOUND_V130 || fmt_version == CPS_QSOUND_V200 || fmt_version == CPS_QSOUND_V201B) {
+    if (fmt_version < CPS2_V130 || fmt_version == CPS2_V200 || fmt_version == CPS2_V201B) {
       instr_info_length = sizeof(qs_prog_info_ver_103);        //1.16 (Xmen vs SF) is like this
     }
     else if (fmt_version == CPS3) {
@@ -295,7 +295,7 @@ CPS2Instr::CPS2Instr(VGMInstrSet *instrSet,
 bool CPS2Instr::loadInstr() {
   std::vector<VGMRgn*> rgns;
   const CPSFormatVer formatVer = formatVersion();
-  if (formatVer < CPS_QSOUND_V103) {
+  if (formatVer < CPS2_V103) {
     VGMRgn* rgn = new VGMRgn(this, dwOffset, unLength);
     rgns.push_back(rgn);
     rgn->addChild(this->dwOffset,     1, "Sample Info Index");
@@ -316,7 +316,7 @@ bool CPS2Instr::loadInstr() {
     this->sustain_rate = progInfo.sustain_rate;
     this->release_rate = progInfo.release_rate;
   }
-  else if (formatVer < CPS_QSOUND_V130 || formatVer == CPS_QSOUND_V200 || formatVer == CPS_QSOUND_V201B) {
+  else if (formatVer < CPS2_V130 || formatVer == CPS2_V200 || formatVer == CPS2_V201B) {
     VGMRgn* rgn = new VGMRgn(this, dwOffset, unLength);
     rgns.push_back(rgn);
     qs_prog_info_ver_103 progInfo;

@@ -13,7 +13,7 @@ class CPS1SampleInstrSet
     : public VGMInstrSet {
 public:
   CPS1SampleInstrSet(RawFile *file,
-                     CPSFormatVer fmt_version,
+                     CPS1FormatVer fmt_version,
                      uint32_t offset,
                      std::string name);
   ~CPS1SampleInstrSet() override = default;
@@ -21,7 +21,7 @@ public:
   bool parseInstrPointers() override;
 
 public:
-  CPSFormatVer fmt_version;
+  CPS1FormatVer fmt_version;
 };
 
 // **************
@@ -50,7 +50,7 @@ class CPS1OPMInstrSet
     : public VGMInstrSet {
 public:
   CPS1OPMInstrSet(RawFile *file,
-                 CPSFormatVer fmt_version,
+                 CPS1FormatVer fmt_version,
                  u8 masterVol,
                  uint32_t offset,
                  uint32_t length,
@@ -61,7 +61,7 @@ public:
   std::string generateOPMFile();
   bool saveAsOPMFile(const std::string &filepath);
 public:
-  CPSFormatVer fmt_version;
+  CPS1FormatVer fmt_version;
   u8 masterVol;
 };
 

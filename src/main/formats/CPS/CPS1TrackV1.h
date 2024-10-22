@@ -1,13 +1,13 @@
 #pragma once
 #include "VGMSeq.h"
 #include "SeqTrack.h"
-#include "CPS0Seq.h"
+#include "CPS1Seq.h"
 #include "CPS2Format.h"
 
-class CPSTrackV0
+class CPS1TrackV1
     : public SeqTrack {
 public:
-  CPSTrackV0(CPS0Seq *parentSeq, CPSSynth channelSynth, uint32_t offset = 0, uint32_t length = 0);
+  CPS1TrackV1(CPS1Seq *parentSeq, CPSSynth channelSynth, uint32_t offset = 0, uint32_t length = 0);
   void resetVars() override;
   void addInitialMidiEvents(int trackNum) override;
   bool readEvent() override;

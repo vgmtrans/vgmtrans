@@ -5,53 +5,47 @@
  */
 #include "Root.h"
 #include "CPS2Scanner.h"
-#include "CPSSeq.h"
+#include "CPS2Seq.h"
 #include "CPS2Instr.h"
 #include "MAMELoader.h"
 #include "CPS2Format.h"
 #include "VGMColl.h"
 
-CPSFormatVer versionEnum(const std::string &versionStr) {
+CPSFormatVer cps2VersionEnum(const std::string &versionStr) {
     static const std::unordered_map<std::string, CPSFormatVer> versionMap = {
-        {"CPS_FM_V1.00", CPS_FM_V100},
-        {"CPS_FM_V2.00", CPS_FM_V200},
-        {"CPS_FM_V3.50", CPS_FM_V350},
-        {"CPS_FM_V4.25", CPS_FM_V425},
-        {"CPS_FM_V5.00", CPS_FM_V500},
-        {"CPS_FM_V5.02", CPS_FM_V502},
-        {"CPS_QSOUND_V1.00", CPS_QSOUND_V100},
-        {"CPS_QSOUND_V1.01", CPS_QSOUND_V101},
-        {"CPS_QSOUND_V1.03", CPS_QSOUND_V103},
-        {"CPS_QSOUND_V1.04", CPS_QSOUND_V104},
-        {"CPS_QSOUND_V1.05A", CPS_QSOUND_V105A},
-        {"CPS_QSOUND_V1.05C", CPS_QSOUND_V105C},
-        {"CPS_QSOUND_V1.05", CPS_QSOUND_V105},
-        {"CPS_QSOUND_V1.06B", CPS_QSOUND_V106B},
-        {"CPS_QSOUND_V1.15C", CPS_QSOUND_V115C},
-        {"CPS_QSOUND_V1.15", CPS_QSOUND_V115},
-        {"CPS_QSOUND_V1.16B", CPS_QSOUND_V116B},
-        {"CPS_QSOUND_V1.16", CPS_QSOUND_V116},
-        {"CPS_QSOUND_V1.30", CPS_QSOUND_V130},
-        {"CPS_QSOUND_V1.31", CPS_QSOUND_V131},
-        {"CPS_QSOUND_V1.40", CPS_QSOUND_V140},
-        {"CPS_QSOUND_V1.71", CPS_QSOUND_V171},
-        {"CPS_QSOUND_V1.80", CPS_QSOUND_V180},
-        {"CPS_QSOUND_V2.00", CPS_QSOUND_V200},
-        {"CPS_QSOUND_V2.01B", CPS_QSOUND_V201B},
-        {"CPS_QSOUND_V2.10", CPS_QSOUND_V210},
-        {"CPS_QSOUND_V2.11", CPS_QSOUND_V211},
+        {"CPS2_V1.00", CPS2_V100},
+        {"CPS2_V1.01", CPS2_V101},
+        {"CPS2_V1.03", CPS2_V103},
+        {"CPS2_V1.04", CPS2_V104},
+        {"CPS2_V1.05A", CPS2_V105A},
+        {"CPS2_V1.05C", CPS2_V105C},
+        {"CPS2_V1.05", CPS2_V105},
+        {"CPS2_V1.06B", CPS2_V106B},
+        {"CPS2_V1.15C", CPS2_V115C},
+        {"CPS2_V1.15", CPS2_V115},
+        {"CPS2_V1.16B", CPS2_V116B},
+        {"CPS2_V1.16", CPS2_V116},
+        {"CPS2_V1.30", CPS2_V130},
+        {"CPS2_V1.31", CPS2_V131},
+        {"CPS2_V1.40", CPS2_V140},
+        {"CPS2_V1.71", CPS2_V171},
+        {"CPS2_V1.80", CPS2_V180},
+        {"CPS2_V2.00", CPS2_V200},
+        {"CPS2_V2.01B", CPS2_V201B},
+        {"CPS2_V2.10", CPS2_V210},
+        {"CPS2_V2.11", CPS2_V211},
         {"CPS3", CPS3}
     };
 
     auto it = versionMap.find(versionStr);
-    return it != versionMap.end() ? it->second : VERSION_UNDEFINED;
+    return it != versionMap.end() ? it->second : CPS2_VERSION_UNDEFINED;
 }
 
 void CPS2Scanner::scan(RawFile* /*file*/, void* info) {
   MAMEGame *gameentry = static_cast<MAMEGame*>(info);
-  CPSFormatVer fmt_ver = versionEnum(gameentry->fmt_version_str);
+  CPSFormatVer fmt_ver = cps2VersionEnum(gameentry->fmt_version_str);
 
-  if (fmt_ver == VERSION_UNDEFINED) {
+  if (fmt_ver == CPS2_VERSION_UNDEFINED) {
     L_ERROR("XML entry uses an undefined QSound version: {}", gameentry->fmt_version_str);
     return;
   }
@@ -76,37 +70,37 @@ void CPS2Scanner::scan(RawFile* /*file*/, void* info) {
   seqRomGroupEntry->getHexAttribute("samp_table_length", &samp_table_length);
 
   switch (fmt_ver) {
-    case CPS_QSOUND_V100:
-    case CPS_QSOUND_V101:
-    case CPS_QSOUND_V103:
-    case CPS_QSOUND_V104:
-    case CPS_QSOUND_V105A:
-    case CPS_QSOUND_V105C:
-    case CPS_QSOUND_V105:
-    case CPS_QSOUND_V106B:
-    case CPS_QSOUND_V115C:
-    case CPS_QSOUND_V115:
+    case CPS2_V100:
+    case CPS2_V101:
+    case CPS2_V103:
+    case CPS2_V104:
+    case CPS2_V105A:
+    case CPS2_V105C:
+    case CPS2_V105:
+    case CPS2_V106B:
+    case CPS2_V115C:
+    case CPS2_V115:
       if (!seqRomGroupEntry->getHexAttribute("instr_table", &instr_table_offset))
         return;
       break;
-    case CPS_QSOUND_V200:
-    case CPS_QSOUND_V201B:
+    case CPS2_V200:
+    case CPS2_V201B:
     case CPS3:
       if (!seqRomGroupEntry->getHexAttribute("instr_table_ptrs", &instr_table_offset))
         return;
       break;
-    case CPS_QSOUND_V116B:
-    case CPS_QSOUND_V116:
-    case CPS_QSOUND_V130:
-    case CPS_QSOUND_V131:
-    case CPS_QSOUND_V140:
-    case CPS_QSOUND_V171:
-    case CPS_QSOUND_V180:
-    case CPS_QSOUND_V210:
-    case CPS_QSOUND_V211:
+    case CPS2_V116B:
+    case CPS2_V116:
+    case CPS2_V130:
+    case CPS2_V131:
+    case CPS2_V140:
+    case CPS2_V171:
+    case CPS2_V180:
+    case CPS2_V210:
+    case CPS2_V211:
       if (!seqRomGroupEntry->getHexAttribute("instr_table_ptrs", &instr_table_offset))
         return;
-      if (fmt_ver >= CPS_QSOUND_V130 && !seqRomGroupEntry->getHexAttribute("artic_table", &artic_table_offset))
+      if (fmt_ver >= CPS2_V130 && !seqRomGroupEntry->getHexAttribute("artic_table", &artic_table_offset))
         return;
       break;
     default:
@@ -208,7 +202,7 @@ void CPS2Scanner::scan(RawFile* /*file*/, void* info) {
     std::string collName = fmt::format("{} song {}", gameentry->name, k / 4);
     VGMColl *coll = new VGMColl(collName);
     std::string seqName = fmt::format("{} seq {}", gameentry->name, k / 4);
-    CPSSeq *newSeq = new CPSSeq(programFile, seqPointer, fmt_ver, seqName);
+    CPS2Seq *newSeq = new CPS2Seq(programFile, seqPointer, fmt_ver, seqName);
     if (newSeq->loadVGMFile()) {
       coll->useSeq(newSeq);
       coll->addInstrSet(instrset);

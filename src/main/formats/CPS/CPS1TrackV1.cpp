@@ -1,15 +1,14 @@
-#include "CPSTrackV0.h"
+#include "CPS1TrackV1.h"
 
-
-CPSTrackV0::CPSTrackV0(CPS0Seq *parentSeq, CPSSynth channelSynth, uint32_t offset, uint32_t length)
+CPS1TrackV1::CPS1TrackV1(CPS1Seq *parentSeq, CPSSynth channelSynth, uint32_t offset, uint32_t length)
     : SeqTrack(parentSeq, offset, length), channelSynth(channelSynth) {
   if (channelSynth == CPSSynth::YM2151) {
     synthType = SynthType::YM2151;
   }
-  CPSTrackV0::resetVars();
+  CPS1TrackV1::resetVars();
 }
 
-void CPSTrackV0::resetVars() {
+void CPS1TrackV1::resetVars() {
   noteDuration = 0;
   bPrevNoteTie = false;
   prevTieNote = 0;
@@ -29,15 +28,15 @@ void CPSTrackV0::resetVars() {
   SeqTrack::resetVars();
 }
 
-void CPSTrackV0::addInitialMidiEvents(int trackNum) {
+void CPS1TrackV1::addInitialMidiEvents(int trackNum) {
   SeqTrack::addInitialMidiEvents(trackNum);
   addPortamentoTime14BitNoItem(0);
 }
 
-bool CPSTrackV0::readEvent() {
+bool CPS1TrackV1::readEvent() {
   u32 beginOffset = curOffset;
   u8 statusByte = readByte(curOffset++);
-  auto cpsSeq = static_cast<CPS0Seq*>(parentSeq);
+  auto cpsSeq = static_cast<CPS1Seq*>(parentSeq);
   u8 masterVol = cpsSeq->masterVolume();
 
   if (statusByte >= 0x40) {
@@ -249,7 +248,7 @@ bool CPSTrackV0::readEvent() {
       uint8_t progNum = readByte(curOffset++);
       addProgramChange(beginOffset, curOffset - beginOffset, progNum % 128);
       if (channelSynth == CPSSynth::YM2151) {
-        instrTranspose = cpsSeq->getTransposeForInstr(progNum);
+        instrTranspose = cpsSeq->transposeForInstr(progNum);
       }
       break;
     }

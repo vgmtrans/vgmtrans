@@ -3,11 +3,12 @@
  * Licensed under the zlib license,
  * refer to the included LICENSE.txt file
  */
-#include "CPSSeq.h"
-#include "CPSTrackV0.h"
-#include "CPSTrackV1.h"
-#include "CPSTrackV2.h"
+#include "CPS2Seq.h"
+#include "CPS1TrackV1.h"
+#include "CPS2TrackV1.h"
+#include "CPS2TrackV2.h"
 #include "CPS2Instr.h"
+#include "CPSCommon.h"
 #include "ScaleConversion.h"
 #include "SeqEvent.h"
 
@@ -18,7 +19,7 @@ DECLARE_FORMAT(CPS2);
 // CPSSeq
 // ******
 
-CPSSeq::CPSSeq(RawFile *file, uint32_t offset, CPSFormatVer fmtVersion, std::string name, std::vector<s8> instrTransposeTable)
+CPS2Seq::CPS2Seq(RawFile *file, uint32_t offset, CPSFormatVer fmtVersion, std::string name, std::vector<s8> instrTransposeTable)
     : VGMSeq(CPS2Format::name, file, offset, 0, std::move(name)),
       fmt_version(fmtVersion), instrTransposeTable(instrTransposeTable) {
   setUsesMonophonicTracks();
@@ -26,16 +27,16 @@ CPSSeq::CPSSeq(RawFile *file, uint32_t offset, CPSFormatVer fmtVersion, std::str
   setAlwaysWriteInitialMonoMode(true);
 }
 
-CPSSeq::~CPSSeq() {
+CPS2Seq::~CPS2Seq() {
 }
 
-bool CPSSeq::parseHeader() {
-  setPPQN(0x30);
+bool CPS2Seq::parseHeader() {
+  setPPQN(48);
   return true;
 }
 
 
-bool CPSSeq::parseTrackPointers() {
+bool CPS2Seq::parseTrackPointers() {
   // CPS1 games sometimes have this set. Suggests 4 byte seq.
   // Oddly, some tracks have first byte set to 0x92 in D&D Shadow Over Mystara
   if ((readByte(dwOffset) & 0x80) > 0)
@@ -44,9 +45,7 @@ bool CPSSeq::parseTrackPointers() {
   this->addHeader(dwOffset, 1, "Sequence Flags");
   VGMHeader *header = this->addHeader(dwOffset + 1, readShortBE(dwOffset + 1) - 1, "Track Pointers");
 
-  const int maxTracks = fmt_version <= CPS_FM_V502 ? 12 : 16;
-
-  for (int i = 0; i < maxTracks; i++) {
+  for (int i = 0; i < 16; i++) {
     uint32_t offset = readShortBE(dwOffset + 1 + i * 2);
     if (offset == 0) {
       header->addChild(dwOffset + 1 + (i * 2), 2, "No Track");
@@ -58,26 +57,15 @@ bool CPSSeq::parseTrackPointers() {
     SeqTrack *newTrack;
 
     switch (fmt_version) {
-      case CPS_FM_V100:
-        return false;
-      case CPS_FM_V200:
-      case CPS_FM_V350:
-      case CPS_FM_V425:
-        newTrack = new CPSTrackV1(this, i < 8 ? CPSSynth::YM2151 : CPSSynth::OKIM6295, offset);
-        break;
-      case CPS_FM_V500:
-      case CPS_FM_V502:
-        newTrack = new CPSTrackV1(this, i < 8 ? CPSSynth::YM2151 : CPSSynth::OKIM6295, offset + dwOffset);
-        break;
-      case CPS_QSOUND_V200:
-      case CPS_QSOUND_V201B:
-      case CPS_QSOUND_V210:
-      case CPS_QSOUND_V211:
+      case CPS2_V200:
+      case CPS2_V201B:
+      case CPS2_V210:
+      case CPS2_V211:
       case CPS3:
-        newTrack = new CPSTrackV2(this, offset + dwOffset);
+        newTrack = new CPS2TrackV2(this, offset + dwOffset);
         break;
       default:
-        newTrack = new CPSTrackV1(this, CPSSynth::QSOUND, offset + dwOffset);
+        newTrack = new CPS2TrackV1(this, offset + dwOffset);
     }
     aTracks.push_back(newTrack);
     header->addChild(dwOffset + 1 + (i * 2), 2, "Track Pointer");
@@ -88,13 +76,13 @@ bool CPSSeq::parseTrackPointers() {
   return true;
 }
 
-bool CPSSeq::postLoad() {
+bool CPS2Seq::postLoad() {
   bool succeeded = VGMSeq::postLoad();
 
   if (readMode != READMODE_CONVERT_TO_MIDI)
     return true;
 
-  if (fmt_version <= CPS_FM_V502) {
+  if (fmt_version <= CPS1_V502) {
     return true;
   }
 
@@ -143,7 +131,7 @@ bool CPSSeq::postLoad() {
     // This represents the pitch bend range set for the MIDI track. It will change to accomodate
     // vibrato depth. When vibrato depth changes, this becomes the format's actual pitch bend range
     // (fmtPitchBendRange) plus the range of vibrato depth, ceiled to the nearest semitone.
-    uint32_t pitchbendRange = fmt_version >= CPS_QSOUND_V200 ? 1200 : 200; // pitch bend range in cents.
+    uint32_t pitchbendRange = fmt_version >= CPS2_V200 ? 1200 : 200; // pitch bend range in cents.
     double vibratoCents = 0;          // vibrato depth in cents
     uint16_t tremelo = 0;        // tremelo depth.  we divide this value by 0x10000 to get percent amplitude attenuation
     uint16_t lfoRate = 0;        // value added to lfo env every lfo tick
@@ -202,7 +190,7 @@ bool CPSSeq::postLoad() {
         }
       }
 
-      uint32_t fmtPitchBendRange = fmt_version >= CPS_QSOUND_V200 ? 1200 : 50;
+      uint32_t fmtPitchBendRange = fmt_version >= CPS2_V200 ? 1200 : 50;
 
       // We just handled LFO-induced events in the span between the prior event up to this one. Now,
       // check if the event is a tempo or marker event, which require special handling.
@@ -272,7 +260,7 @@ bool CPSSeq::postLoad() {
   return succeeded;
 }
 
-s8 CPSSeq::getTransposeForInstr(u8 instrIndex) {
+s8 CPS2Seq::transposeForInstr(u8 instrIndex) {
   if (instrIndex >= instrTransposeTable.size()) {
     return 0;
   }
