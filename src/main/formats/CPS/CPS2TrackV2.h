@@ -1,9 +1,9 @@
 #pragma once
 #include "VGMSeq.h"
 #include "SeqTrack.h"
-#include "CPSSeq.h"
+#include "CPS2Seq.h"
 
-enum CPSFormatVer: uint8_t;
+enum CPS2FormatVer: uint8_t;
 
 
 enum CPSv2SeqEventType {
@@ -54,15 +54,15 @@ enum CPSv2SeqEventType {
 
 // Class for 2.xx CPS sequences. This iteration of the format is found in CPS3 games, ZN1-based games, and oddly,
 // a single CPS2 game: Super Puzzle Fighter 2 Turbo.
-class CPSTrackV2
+class CPS2TrackV2
     : public SeqTrack {
 public:
-  CPSTrackV2(CPSSeq *parentSeq, uint32_t offset = 0, uint32_t length = 0);
+  CPS2TrackV2(CPS2Seq *parentSeq, uint32_t offset = 0, uint32_t length = 0);
   void resetVars() override;
   bool readEvent() override;
 
 private:
-  CPSFormatVer version() const { return static_cast<CPSSeq*>(this->parentSeq)->fmt_version; }
+  CPS2FormatVer version() const { return static_cast<CPS2Seq*>(this->parentSeq)->fmt_version; }
   uint32_t readVarLength();
 
   uint8_t m_master_volume{0};

@@ -11,6 +11,7 @@
 #include "VGMSeq.h"
 #include <spdlog/common.h>
 #include "LogManager.h"
+#include "SynthType.h"
 
 class VGMSeq;
 class SeqEvent;
@@ -177,6 +178,8 @@ class SeqTrack : public VGMItem {
   bool active;            //indicates whether a VGMSeq is loading this track
   long totalTicks;
   int foreverLoops;
+
+  SynthType synthType = SynthType::SoundFont;
 
  protected:
   bool bMonophonic;
