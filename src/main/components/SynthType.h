@@ -11,6 +11,6 @@ constexpr const char* synthTypeToString(SynthType st) throw()
   {
     case SynthType::SoundFont: return "soundfont";
     case SynthType::YM2151: return "ym2151";
-    default: throw std::invalid_argument("Unimplemented item");
+    default: return nullptr;
   }
 }
