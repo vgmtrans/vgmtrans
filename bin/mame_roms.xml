@@ -223,13 +223,13 @@
             <rom>26.10a</rom>
         </romgroup>
     </game>
-    <game name="gulunpa" format="CPS1" fmt_version="CPS1_V4.25">
-        <romgroup type="audiocpu" load_method="append" tables="0x1100" >
-            <rom>9</rom>
+    <game name="gaiapols" format="KonamiArcade">
+        <romgroup type="soundcpu" load_method="append" seq_table="0x263b">
+            <rom>123e13.9c</rom>
         </romgroup>
-        <romgroup type="oki6295" load_method="append">
-            <rom>18</rom>
-            <rom>19</rom>
+        <romgroup type="sound"  load_method="append">
+            <rom>123e14.2g</rom>
+            <rom>123e15.2m</rom>
         </romgroup>
     </game>
     <game name="ganbare" format="CPS1" fmt_version="CPS1_V5.00">
@@ -239,6 +239,15 @@
         <romgroup type="oki6295" load_method="append">
             <rom>mrnj_18.11c</rom>
             <rom>mrnj_19.12c</rom>
+        </romgroup>
+    </game>
+    <game name="gulunpa" format="CPS1" fmt_version="CPS1_V4.25">
+        <romgroup type="audiocpu" load_method="append" tables="0x1100" >
+            <rom>9</rom>
+        </romgroup>
+        <romgroup type="oki6295" load_method="append">
+            <rom>18</rom>
+            <rom>19</rom>
         </romgroup>
     </game>
     <game name="gigawing" format="CPS2" fmt_version="CPS2_V1.40">
@@ -380,6 +389,15 @@
             <rom>so2_19.12c</rom>
         </romgroup>
     </game>
+    <game name="metamrph" format="KonamiArcade">
+        <romgroup type="soundcpu" load_method="append" seq_table="0x23FB">
+            <rom>224a05</rom>
+        </romgroup>
+        <romgroup type="sound"  load_method="append">
+            <rom>224a06</rom>
+            <rom>224a07</rom>
+        </romgroup>
+    </game>
     <game name="mmancp2u" format="CPS2" fmt_version="CPS2_V1.05A">
         <romgroup type="audiocpu" load_method="append" seq_table="0x9005" instr_table="0x7000" num_instr_banks="2" samp_table="0x8000">
             <rom>rcm.01</rom>
@@ -393,6 +411,15 @@
             <rom>rcm.56</rom>
             <rom>rcm.57</rom>
             <rom>rcm.58</rom>
+        </romgroup>
+    </game>
+    <game name="mmaulers" format="KonamiArcade">
+        <romgroup type="soundcpu" load_method="append" seq_table="0x3EA3">
+            <rom>170a13.9c</rom>
+        </romgroup>
+        <romgroup type="sound"  load_method="append">
+            <rom>170a14.2g</rom>
+            <rom>170a15.2m</rom>
         </romgroup>
     </game>
     <game name="mpang" format="CPS2" fmt_version="CPS2_V1.80">
@@ -442,6 +469,15 @@
             <rom>ms_19.12c</rom>
         </romgroup>
     </game>
+    <game name="mtlchamp" format="KonamiArcade">
+        <romgroup type="soundcpu" load_method="append" seq_table="0x3F06">
+            <rom>234_d05.6b</rom>
+        </romgroup>
+        <romgroup type="sound"  load_method="append">
+            <rom>234a06.2d</rom>
+            <rom>234a07.1d</rom>
+        </romgroup>
+    </game>
     <game name="mtwins" format="CPS1" fmt_version="CPS1_V4.25">
         <romgroup type="audiocpu" load_method="append" tables="0x1100" >
             <rom>ch_09.12b</rom>
@@ -459,6 +495,15 @@
         <romgroup type="qsound" load_method="append_swap16">
             <rom>mvc.11m</rom>
             <rom>mvc.12m</rom>
+        </romgroup>
+    </game>
+    <game name="mystwarr" format="KonamiArcade">
+        <romgroup type="soundcpu" load_method="append" seq_table="0x2286">
+            <rom>128a05.6b</rom>
+        </romgroup>
+        <romgroup type="sound"  load_method="append">
+            <rom>128a06.2d</rom>
+            <rom>128a07.1d</rom>
         </romgroup>
     </game>
     <game name="nemo" format="CPS1" fmt_version="CPS1_V4.25">
@@ -917,6 +962,15 @@
         <romgroup type="qsound" load_method="append_swap16">
             <rom>vh2.11m</rom>
             <rom>vh2.12m</rom>
+        </romgroup>
+    </game>
+    <game name="viostorm" format="KonamiArcade">
+        <romgroup type="soundcpu" load_method="append" seq_table="0x3813">
+            <rom>168a05.7c</rom>
+        </romgroup>
+        <romgroup type="sound"  load_method="append">
+            <rom>168a06.1c</rom>
+            <rom>168a07.1e</rom>
         </romgroup>
     </game>
     <game name="vsav" format="CPS2" fmt_version="CPS2_V1.30">
