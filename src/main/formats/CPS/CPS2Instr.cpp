@@ -134,11 +134,6 @@ CPS3SampleInfoTable::CPS3SampleInfoTable(RawFile *file,
     : CPSSampleInfoTable(file, std::move(name), offset, length) {
 }
 
-//CPS3SampleInfoTable::~CPS3SampleInfoTable(void) {
-//  if (infos)
-//    delete[] infos;
-//}
-
 bool CPS3SampleInfoTable::loadMain() {
 
   this->numSamples = unLength / 16;
@@ -173,7 +168,7 @@ bool CPS3SampleInfoTable::loadMain() {
 // ***********
 
 CPS2InstrSet::CPS2InstrSet(RawFile *file,
-                         CPSFormatVer version,
+                         CPS2FormatVer version,
                          uint32_t offset,
                          int numInstrBanks,
                          CPSSampleInfoTable *theSampInfoTable,
@@ -193,7 +188,7 @@ bool CPS2InstrSet::parseHeader() {
 bool CPS2InstrSet::parseInstrPointers() {
   // Load the instr_info tables.
 
-  if (fmt_version <= VER_115) {
+  if (fmt_version <= CPS2_V115) {
     // In these versions, there are no instr_info_table pointers, it's hard-coded into the assembly code.
     // There are two possible instr_info banks stored next to each other with 256 entries in each,
     // unlike higher versions, where the number of instr_infos in each bank is variable and less than 0x7F.
@@ -213,16 +208,16 @@ bool CPS2InstrSet::parseInstrPointers() {
   }
   else {
     uint8_t instr_info_length = sizeof(qs_prog_info_ver_130);
-    if (fmt_version < VER_130 || fmt_version == VER_200 || fmt_version == VER_201B) {
+    if (fmt_version < CPS2_V130 || fmt_version == CPS2_V200 || fmt_version == CPS2_V201B) {
       instr_info_length = sizeof(qs_prog_info_ver_103);        //1.16 (Xmen vs SF) is like this
     }
-    else if (fmt_version == VER_CPS3) {
+    else if (fmt_version == CPS3) {
       instr_info_length = 12;     // qs_prog_info_ver_cps3
     }
 
     std::vector<uint32_t> instr_table_ptrs;
     for (unsigned int i = 0; i < num_instr_banks; i++) {
-      if (fmt_version == VER_CPS3) {
+      if (fmt_version == CPS3) {
         instr_table_ptrs.push_back(readWordBE(dwOffset + i * 4));    //get the instr table ptrs
       }
       else {
@@ -232,7 +227,7 @@ bool CPS2InstrSet::parseInstrPointers() {
     int totalInstrs = 0;
     for (uint8_t i = 0; i < instr_table_ptrs.size(); i++) {
 
-      if (fmt_version == VER_CPS3) {
+      if (fmt_version == CPS3) {
         uint8_t bank = i;
         uint32_t bankOff = instr_table_ptrs[bank] - 0x6000000;
 
@@ -299,8 +294,8 @@ CPS2Instr::CPS2Instr(VGMInstrSet *instrSet,
 
 bool CPS2Instr::loadInstr() {
   std::vector<VGMRgn*> rgns;
-  const CPSFormatVer formatVer = formatVersion();
-  if (formatVer < VER_103) {
+  const CPS2FormatVer formatVer = formatVersion();
+  if (formatVer < CPS2_V103) {
     VGMRgn* rgn = new VGMRgn(this, dwOffset, unLength);
     rgns.push_back(rgn);
     rgn->addChild(this->dwOffset,     1, "Sample Info Index");
@@ -321,7 +316,7 @@ bool CPS2Instr::loadInstr() {
     this->sustain_rate = progInfo.sustain_rate;
     this->release_rate = progInfo.release_rate;
   }
-  else if (formatVer < VER_130 || formatVer == VER_200 || formatVer == VER_201B) {
+  else if (formatVer < CPS2_V130 || formatVer == CPS2_V200 || formatVer == CPS2_V201B) {
     VGMRgn* rgn = new VGMRgn(this, dwOffset, unLength);
     rgns.push_back(rgn);
     qs_prog_info_ver_103 progInfo;
@@ -341,8 +336,7 @@ bool CPS2Instr::loadInstr() {
     this->sustain_rate = progInfo.sustain_rate;
     this->release_rate = progInfo.release_rate;
   }
-  else if (formatVer == VER_CPS3) {
-
+  else if (formatVer == CPS3) {
     uint8_t prevKeyHigh = 0;
     uint32_t off;
     for (off = dwOffset; readShort(off) != 0xFFFF; off += 12) {
@@ -423,7 +417,7 @@ bool CPS2Instr::loadInstr() {
     uint16_t Sr = decay_rate_table[this->sustain_rate];
     uint16_t Rr = decay_rate_table[this->release_rate];
 
-    const double UPDATE_RATE_IN_HZ = formatVer == VER_CPS3 ? CPS3_DRIVER_RATE_HZ : CPS2_DRIVER_RATE_HZ;
+    const double UPDATE_RATE_IN_HZ = formatVer == CPS3 ? CPS3_DRIVER_RATE_HZ : CPS2_DRIVER_RATE_HZ;
     // The rate values are all measured from max to min, as the SF2 and DLS specs call for.
     //  In the actual code, the envelope level starts at different points
     // Attack rate 134A in sfa2
@@ -517,9 +511,9 @@ bool CPS2SampColl::parseSampleInfo() {
     if (sampOffset > unLength)
       break;
 
-    // Sanity check for mshvsf, which has samples of sizez 2. Fluidsynth does not like this (perhaps violates sf2 spec?)
+    // Sanity check for mshvsf, which has samples of size 2. Fluidsynth does not like this (perhaps violates sf2 spec?)
     if (sampLength <= 2) {
-      sampLength = 100;
+      sampLength = 16;
     }
 
     uint32_t relativeLoopOffset = loop_offset - sampOffset;
@@ -530,7 +524,7 @@ bool CPS2SampColl::parseSampleInfo() {
 
     // CPS3 frequency is (42954545 hz / 3) / 384) ~= 37287
     // CPS2 frequency is (60 MHz / 2 / 1248) ~= 24038
-    uint32_t frequency = instrset->fmt_version == VER_CPS3 ? 37287 : 24038;
+    uint32_t frequency = instrset->fmt_version == CPS3 ? 37287 : 24038;
     VGMSamp *newSamp = addSamp(sampOffset,
                                sampLength,
                                sampOffset,

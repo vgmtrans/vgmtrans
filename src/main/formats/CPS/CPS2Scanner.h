@@ -1,41 +1,36 @@
 #pragma once
 #include "Scanner.h"
+#include "common.h"
 
 struct MAMEGame;
 
-enum CPSFormatVer: uint8_t {
-  VER_UNDEFINED,
-  VER_CPS1_200,
-  VER_CPS1_200ff,  //Final Fight is laballed 2.00, but has unique 3 byte seq table header
-  VER_CPS1_350,
-  VER_CPS1_425,
-  VER_CPS1_500,
-  VER_CPS1_502,
-  VER_100,
-  VER_101,
-  VER_103,
-  VER_104,
-  VER_105A,
-  VER_105C,
-  VER_105,
-  VER_106B,
-  VER_115C,
-  VER_115,
-  VER_116B,
-  VER_116,
-  VER_130,
-  VER_131,
-  VER_140,
-  VER_171,
-  VER_180,
-  VER_200,
-  VER_201B,
-  VER_210,
-  VER_211,
-  VER_CPS3
+enum CPS2FormatVer: u8 {
+  CPS2_VERSION_UNDEFINED,
+  CPS2_V100,
+  CPS2_V101,
+  CPS2_V103,
+  CPS2_V104,
+  CPS2_V105A,
+  CPS2_V105C,
+  CPS2_V105,
+  CPS2_V106B,
+  CPS2_V115C,
+  CPS2_V115,
+  CPS2_V116B,
+  CPS2_V116,
+  CPS2_V130,
+  CPS2_V131,
+  CPS2_V140,
+  CPS2_V171,
+  CPS2_V180,
+  CPS2_V200,
+  CPS2_V201B,
+  CPS2_V210,
+  CPS2_V211,
+  CPS3
 };
 
-CPSFormatVer versionEnum(const std::string &versionStr);
+CPS2FormatVer cps2VersionEnum(const std::string &versionStr);
 
 class CPS2Scanner : public VGMScanner {
 public:

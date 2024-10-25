@@ -5,49 +5,47 @@
  */
 #include "Root.h"
 #include "CPS2Scanner.h"
-#include "CPSSeq.h"
+#include "CPS2Seq.h"
 #include "CPS2Instr.h"
 #include "MAMELoader.h"
 #include "CPS2Format.h"
 #include "VGMColl.h"
 
-CPSFormatVer versionEnum(const std::string &versionStr) {
-  if (versionStr == "CPS1_2.00") return VER_CPS1_200;
-  if (versionStr == "CPS1_2.00ff") return VER_CPS1_200ff;
-  if (versionStr == "CPS1_3.50") return VER_CPS1_350;
-  if (versionStr == "CPS1_4.25") return VER_CPS1_425;
-  if (versionStr == "CPS1_5.00") return VER_CPS1_500;
-  if (versionStr == "CPS1_5.02") return VER_CPS1_502;
-  if (versionStr == "1.00") return VER_100;
-  if (versionStr == "1.01") return VER_101;
-  if (versionStr == "1.03") return VER_103;
-  if (versionStr == "1.04") return VER_104;
-  if (versionStr == "1.05a") return VER_105A;
-  if (versionStr == "1.05c") return VER_105C;
-  if (versionStr == "1.05") return VER_105;
-  if (versionStr == "1.06b") return VER_106B;
-  if (versionStr == "1.15c") return VER_115C;
-  if (versionStr == "1.15") return VER_115;
-  if (versionStr == "1.16b") return VER_116B;
-  if (versionStr == "1.16") return VER_116;
-  if (versionStr == "1.30") return VER_130;
-  if (versionStr == "1.31") return VER_131;
-  if (versionStr == "1.40") return VER_140;
-  if (versionStr == "1.71") return VER_171;
-  if (versionStr == "1.80") return VER_180;
-  if (versionStr == "2.00") return VER_200;
-  if (versionStr == "2.01b") return VER_201B;
-  if (versionStr == "2.10") return VER_210;
-  if (versionStr == "2.11") return VER_211;
-  if (versionStr == "CPS3") return VER_CPS3;
-  return VER_UNDEFINED;
+CPS2FormatVer cps2VersionEnum(const std::string &versionStr) {
+    static const std::unordered_map<std::string, CPS2FormatVer> versionMap = {
+        {"CPS2_V1.00", CPS2_V100},
+        {"CPS2_V1.01", CPS2_V101},
+        {"CPS2_V1.03", CPS2_V103},
+        {"CPS2_V1.04", CPS2_V104},
+        {"CPS2_V1.05A", CPS2_V105A},
+        {"CPS2_V1.05C", CPS2_V105C},
+        {"CPS2_V1.05", CPS2_V105},
+        {"CPS2_V1.06B", CPS2_V106B},
+        {"CPS2_V1.15C", CPS2_V115C},
+        {"CPS2_V1.15", CPS2_V115},
+        {"CPS2_V1.16B", CPS2_V116B},
+        {"CPS2_V1.16", CPS2_V116},
+        {"CPS2_V1.30", CPS2_V130},
+        {"CPS2_V1.31", CPS2_V131},
+        {"CPS2_V1.40", CPS2_V140},
+        {"CPS2_V1.71", CPS2_V171},
+        {"CPS2_V1.80", CPS2_V180},
+        {"CPS2_V2.00", CPS2_V200},
+        {"CPS2_V2.01B", CPS2_V201B},
+        {"CPS2_V2.10", CPS2_V210},
+        {"CPS2_V2.11", CPS2_V211},
+        {"CPS3", CPS3}
+    };
+
+    auto it = versionMap.find(versionStr);
+    return it != versionMap.end() ? it->second : CPS2_VERSION_UNDEFINED;
 }
 
 void CPS2Scanner::scan(RawFile* /*file*/, void* info) {
   MAMEGame *gameentry = static_cast<MAMEGame*>(info);
-  CPSFormatVer fmt_ver = versionEnum(gameentry->fmt_version_str);
+  CPS2FormatVer fmt_ver = cps2VersionEnum(gameentry->fmt_version_str);
 
-  if (fmt_ver == VER_UNDEFINED) {
+  if (fmt_ver == CPS2_VERSION_UNDEFINED) {
     L_ERROR("XML entry uses an undefined QSound version: {}", gameentry->fmt_version_str);
     return;
   }
@@ -72,37 +70,37 @@ void CPS2Scanner::scan(RawFile* /*file*/, void* info) {
   seqRomGroupEntry->getHexAttribute("samp_table_length", &samp_table_length);
 
   switch (fmt_ver) {
-    case VER_100:
-    case VER_101:
-    case VER_103:
-    case VER_104:
-    case VER_105A:
-    case VER_105C:
-    case VER_105:
-    case VER_106B:
-    case VER_115C:
-    case VER_115:
+    case CPS2_V100:
+    case CPS2_V101:
+    case CPS2_V103:
+    case CPS2_V104:
+    case CPS2_V105A:
+    case CPS2_V105C:
+    case CPS2_V105:
+    case CPS2_V106B:
+    case CPS2_V115C:
+    case CPS2_V115:
       if (!seqRomGroupEntry->getHexAttribute("instr_table", &instr_table_offset))
         return;
       break;
-    case VER_200:
-    case VER_201B:
-    case VER_CPS3:
+    case CPS2_V200:
+    case CPS2_V201B:
+    case CPS3:
       if (!seqRomGroupEntry->getHexAttribute("instr_table_ptrs", &instr_table_offset))
         return;
       break;
-    case VER_116B:
-    case VER_116:
-    case VER_130:
-    case VER_131:
-    case VER_140:
-    case VER_171:
-    case VER_180:
-    case VER_210:
-    case VER_211:
+    case CPS2_V116B:
+    case CPS2_V116:
+    case CPS2_V130:
+    case CPS2_V131:
+    case CPS2_V140:
+    case CPS2_V171:
+    case CPS2_V180:
+    case CPS2_V210:
+    case CPS2_V211:
       if (!seqRomGroupEntry->getHexAttribute("instr_table_ptrs", &instr_table_offset))
         return;
-      if (fmt_ver >= VER_130 && !seqRomGroupEntry->getHexAttribute("artic_table", &artic_table_offset))
+      if (fmt_ver >= CPS2_V130 && !seqRomGroupEntry->getHexAttribute("artic_table", &artic_table_offset))
         return;
       break;
     default:
@@ -127,20 +125,14 @@ void CPS2Scanner::scan(RawFile* /*file*/, void* info) {
   samp_info_table_name = fmt::format("{} sample info table", gameentry->name);
   seq_table_name =fmt::format("{} sequence pointer table", gameentry->name);
 
-
   RawFile *programFile = seqRomGroupEntry->file;
   RawFile *samplesFile = sampsRomGroupEntry->file;
 
-  // LOAD INSTRUMENTS AND SAMPLES
-
-  //fix because Vampire Savior sample table bleeds into artic table and no way to detect this
-  if (!samp_table_length && (artic_table_offset > samp_table_offset))
-    samp_table_length = artic_table_offset - samp_table_offset;
-  if (fmt_ver < VER_CPS3) {
-    sampInfoTable = new CPS2SampleInfoTable(programFile, samp_info_table_name, samp_table_offset, samp_table_length);
+  if (fmt_ver == CPS3) {
+    sampInfoTable = new CPS3SampleInfoTable(programFile, samp_info_table_name, samp_table_offset, samp_table_length);
   }
   else {
-    sampInfoTable = new CPS3SampleInfoTable(programFile, samp_info_table_name, samp_table_offset, samp_table_length);
+    sampInfoTable = new CPS2SampleInfoTable(programFile, samp_info_table_name, samp_table_offset, samp_table_length);
   }
   sampInfoTable->loadVGMFile();
   if (artic_table_offset) {
@@ -176,7 +168,7 @@ void CPS2Scanner::scan(RawFile* /*file*/, void* info) {
   uint32_t seqPointer = 0;
   while (seqPointer == 0)
     seqPointer = programFile->readWordBE(seq_table_offset + (k++ * 4)) & 0x0FFFFF;
-  if (fmt_ver == VER_CPS3) {
+  if (fmt_ver == CPS3) {
     seq_table_length = seqPointer - 8;
   }
   else {
@@ -197,7 +189,7 @@ void CPS2Scanner::scan(RawFile* /*file*/, void* info) {
     if (programFile->readWordBE(seq_table_offset + k) == 0)
       continue;
 
-    if (fmt_ver == VER_CPS3) {
+    if (fmt_ver == CPS3) {
       seqPointer = programFile->readWordBE(seq_table_offset + k) + seq_table_offset - 8;
     }
     else {
@@ -210,7 +202,7 @@ void CPS2Scanner::scan(RawFile* /*file*/, void* info) {
     std::string collName = fmt::format("{} song {}", gameentry->name, k / 4);
     VGMColl *coll = new VGMColl(collName);
     std::string seqName = fmt::format("{} seq {}", gameentry->name, k / 4);
-    CPSSeq *newSeq = new CPSSeq(programFile, seqPointer, fmt_ver, seqName);
+    CPS2Seq *newSeq = new CPS2Seq(programFile, seqPointer, fmt_ver, seqName);
     if (newSeq->loadVGMFile()) {
       coll->useSeq(newSeq);
       coll->addInstrSet(instrset);
