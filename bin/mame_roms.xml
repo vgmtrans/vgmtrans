@@ -965,7 +965,7 @@
         </romgroup>
     </game>
     <game name="viostorm" format="KonamiArcade">
-        <romgroup type="soundcpu" load_method="append" seq_table="0x3813">
+        <romgroup type="soundcpu" load_method="append" seq_table="0x3813" samp_tables="0x40AC">
             <rom>168a05.7c</rom>
         </romgroup>
         <romgroup type="sound"  load_method="append">
