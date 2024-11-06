@@ -4,14 +4,13 @@ static const int16_t DPCM_TABLE[16] = {
     0, 256, 512, 1024, 2048, 4096, 8192, 16384, 0, -16384, -8192, -4096, -2048, -1024, -512, -256
 };
 
-K054539AdpcmSamp::K054539AdpcmSamp(VGMSampColl *sampColl, uint32_t offset, uint32_t length,
-                                     uint32_t theRate, std::string name)
-    : VGMSamp(sampColl, offset, length, offset, length, 1, 16, theRate, std::move(name)) {}
-
-
 double K054539AdpcmSamp::compressionRatio() {
   return (16.0 / 4); // 4 bit samples converted up to 16 bit samples
 }
+
+K054539AdpcmSamp::K054539AdpcmSamp(VGMSampColl *sampColl, uint32_t offset, uint32_t length,
+                                     uint32_t theRate, std::string name)
+    : VGMSamp(sampColl, offset, length, offset, length, 1, 16, theRate, std::move(name)) {}
 
 void K054539AdpcmSamp::convertToStdWave(uint8_t *buf) {
   auto* uncompBuf = reinterpret_cast<int16_t*>(buf);

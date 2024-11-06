@@ -28,6 +28,7 @@ public:
 
 private:
   bool bInJump;
+  bool percussion;
   u32 loopMarker[2] = {};
   int loopCounter[2] = {};
   s16 loopAtten[2] = {};

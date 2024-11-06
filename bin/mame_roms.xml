@@ -498,7 +498,7 @@
         </romgroup>
     </game>
     <game name="mystwarr" format="KonamiArcade">
-        <romgroup type="soundcpu" load_method="append" seq_table="0x2286">
+        <romgroup type="soundcpu" load_method="append" seq_table="0x2286" samp_tables="0x4A71" drum_samp_table="0x5286" drum_table="0x5499">
             <rom>128a05.6b</rom>
         </romgroup>
         <romgroup type="sound"  load_method="append">
@@ -965,7 +965,7 @@
         </romgroup>
     </game>
     <game name="viostorm" format="KonamiArcade">
-        <romgroup type="soundcpu" load_method="append" seq_table="0x3813" samp_tables="0x40AC">
+        <romgroup type="soundcpu" load_method="append" seq_table="0x3813" samp_tables="0x40AC" drum_samp_table="0x4C0F" drum_table="0x4D38">
             <rom>168a05.7c</rom>
         </romgroup>
         <romgroup type="sound"  load_method="append">

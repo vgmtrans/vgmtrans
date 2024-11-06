@@ -44,6 +44,7 @@ KonamiArcadeTrack::KonamiArcadeTrack(KonamiArcadeSeq *parentSeq, uint32_t offset
 
 void KonamiArcadeTrack::resetVars() {
   bInJump = false;
+  percussion = false;
   prevDelta = 0;
   prevDur = 0;
   jump_return_offset = 0;
@@ -59,12 +60,14 @@ bool KonamiArcadeTrack::readEvent() {
   uint8_t status_byte = readByte(curOffset++);
 
   if (status_byte == 0x60) {
-    addUnknown(beginOffset, curOffset - beginOffset);
+    addGenericEvent(beginOffset, curOffset - beginOffset, "Percussion On", "", CLR_CHANGESTATE);
+    percussion = true;
     return true;
   }
 
   if (status_byte == 0x61) {
-    addUnknown(beginOffset, curOffset - beginOffset);
+    addGenericEvent(beginOffset, curOffset - beginOffset, "Percussion Off", "", CLR_CHANGESTATE);
+    percussion = false;
     return true;
   }
 
@@ -95,9 +98,11 @@ bool KonamiArcadeTrack::readEvent() {
     u8 atten = 0x7f - vel;
 
     uint32_t newdur = (delta * dur) / 0x64;
+    note += 24;
     if (newdur == 0)
       newdur = 1;
-    addNoteByDur(beginOffset, curOffset - beginOffset, note, vel, newdur);
+    if (!percussion)
+      addNoteByDur(beginOffset, curOffset - beginOffset, note, vel, newdur);
     addTime(delta);
     return true;
   }
@@ -333,6 +338,7 @@ bool KonamiArcadeTrack::readEvent() {
     case 0xF9: {
       u8 data = readByte(curOffset++);
       addUnknown(beginOffset, curOffset - beginOffset);
+      break;
     }
 
     //release rate
@@ -376,6 +382,7 @@ bool KonamiArcadeTrack::readEvent() {
     }
     case 0xFF: {
       if (bInJump) {
+        addGenericEvent(beginOffset, 1, "Return", "", CLR_LOOP);
         bInJump = false;
         curOffset = jump_return_offset;
       }
