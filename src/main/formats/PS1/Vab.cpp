@@ -120,7 +120,7 @@ bool Vab::parseInstrPointers() {
     VGMHeader *vagOffsetHdr = addHeader(offVAGOffsets, 2 * 256, "VAG Pointer Table");
 
     uint32_t vagStartOffset = offVAGOffsets + 2 * 256;
-    uint32_t vagOffset = vagStartOffset;
+    uint32_t vagOffset = 0;
 
     for (uint32_t i = 0; i < numVAGs; i++) {
       uint32_t vagSize = readShort(offVAGOffsets + i * 2) * 8;
@@ -128,12 +128,13 @@ bool Vab::parseInstrPointers() {
       snprintf(name, 256, "VAG Size /8 #%u", i);
       vagOffsetHdr->addChild(offVAGOffsets + i * 2, 2, name);
 
-      if (vagOffset + vagSize <= nEndOffset) {
+      auto absoluteVagOffset = vagStartOffset + vagOffset;
+      if (absoluteVagOffset + vagSize <= nEndOffset) {
         vagLocations.emplace_back(vagOffset, vagSize);
         totalVAGSize += vagSize;
       }
       else {
-        L_WARN("VAG #{} pointer (offset=0x{:08X}, size={}) is invalid.", i, vagOffset, vagSize);
+        L_WARN("VAG #{} pointer (offset=0x{:08X}, size={}) is invalid.", i, absoluteVagOffset, vagSize);
       }
 
       vagOffset += vagSize;
