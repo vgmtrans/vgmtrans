@@ -1,4 +1,6 @@
 #include "KonamiArcadeSeq.h"
+#include "KonamiArcadeDefinitions.h"
+#include "ScaleConversion.h"
 #include <spdlog/fmt/fmt.h>
 
 DECLARE_FORMAT(KonamiArcade);
@@ -7,21 +9,40 @@ DECLARE_FORMAT(KonamiArcade);
 // KonamiArcadeSeq
 // ***************
 
-KonamiArcadeSeq::KonamiArcadeSeq(RawFile *file, u32 offset, u32 ramOffset)
+KonamiArcadeSeq::KonamiArcadeSeq(
+  RawFile *file,
+  u32 offset,
+  u32 ramOffset,
+  const std::array<KonamiArcadeInstrSet::drum, 46>& drums,
+  float nmiRate
+)
     : VGMSeq(KonamiArcadeFormat::name, file, offset, 0, "Konami Arcade Seq"),
-      m_memOffset(ramOffset) {
+      m_memOffset(ramOffset), m_drums(drums), m_nmiRate(nmiRate) {
+  setUseLinearAmplitudeScale(true);
   setAllowDiscontinuousTrackData(true);
   setAlwaysWriteInitialVol(127);
+  setAlwaysWriteInitialTempo(120);
 }
 
 bool KonamiArcadeSeq::parseHeader() {
-  setPPQN(0x30);
+  setPPQN(24);
   return true;
 }
 
 bool KonamiArcadeSeq::parseTrackPointers() {
-  uint32_t pos = dwOffset;
-  for (int i = 0; i < 16; i++) {
+  u32 pos = dwOffset;
+  int numTracks = 16;
+  // Check to see if this sequence uses 16 tracks or 8 tracks for games with only 1 K054539.
+  // We'll check for any pattern of 0x0000 where the second set of track pointers would be, as this
+  // is typically present.
+  for (int pos = dwOffset + 16; pos < dwOffset + 32; pos += 2) {
+    if (readWord(pos) == 0) {
+      numTracks = 8;
+      break;
+    }
+  }
+
+  for (int i = 0; i < numTracks; i++) {
     u16 memTrackOffset = readWord(pos);
     if (memTrackOffset == 0) continue;
 
@@ -39,19 +60,21 @@ bool KonamiArcadeSeq::parseTrackPointers() {
 
 
 KonamiArcadeTrack::KonamiArcadeTrack(KonamiArcadeSeq *parentSeq, uint32_t offset, uint32_t length)
-    : SeqTrack(parentSeq, offset, length), bInJump(false) {
+    : SeqTrack(parentSeq, offset, length), m_inJump(false) {
 }
 
 void KonamiArcadeTrack::resetVars() {
-  bInJump = false;
-  percussion = false;
-  prevDelta = 0;
-  prevDur = 0;
-  jump_return_offset = 0;
-  memset(loopCounter, 0, sizeof(loopCounter));
-  memset(loopMarker, 0, sizeof(loopMarker));
-  memset(loopAtten, 0, sizeof(loopAtten));
-  memset(loopTranspose, 0, sizeof(loopTranspose));
+  m_inJump = false;
+  m_percussion = false;
+  m_releaseRate = 0;
+  m_curProg = 0;
+  m_prevDelta = 0;
+  m_duration = 0;
+  m_jumpReturnOffset = 0;
+  memset(m_loopCounter, 0, sizeof(m_loopCounter));
+  memset(m_loopMarker, 0, sizeof(m_loopMarker));
+  memset(m_loopAtten, 0, sizeof(m_loopAtten));
+  memset(m_loopTranspose, 0, sizeof(m_loopTranspose));
   SeqTrack::resetVars();
 }
 
@@ -61,13 +84,16 @@ bool KonamiArcadeTrack::readEvent() {
 
   if (status_byte == 0x60) {
     addGenericEvent(beginOffset, curOffset - beginOffset, "Percussion On", "", CLR_CHANGESTATE);
-    percussion = true;
+    m_percussion = true;
+    addBankSelectNoItem(1);
+    addProgramChangeNoItem(0, false);
     return true;
   }
 
   if (status_byte == 0x61) {
     addGenericEvent(beginOffset, curOffset - beginOffset, "Percussion Off", "", CLR_CHANGESTATE);
-    percussion = false;
+    m_percussion = false;
+    addProgramChangeNoItem(m_curProg, true);
     return true;
   }
 
@@ -77,32 +103,57 @@ bool KonamiArcadeTrack::readEvent() {
     if (status_byte < 0x60) {
       delta = readByte(curOffset++);
       note = status_byte;
-      prevDelta = delta;
+      m_prevDelta = delta;
     }
     else {
-      delta = prevDelta;
+      delta = m_prevDelta;
       note = status_byte - 0x62;
     }
 
     uint8_t durOrVel = readByte(curOffset++);
-    uint8_t dur, vel;
+    uint8_t vel;
     if (durOrVel < 0x80) {
-      dur = durOrVel;
-      prevDur = dur;
+      m_duration = durOrVel;
       vel = readByte(curOffset++);
     }
     else {
-      dur = prevDur;
       vel = durOrVel - 0x80;
     }
     u8 atten = 0x7f - vel;
 
-    uint32_t newdur = (delta * dur) / 0x64;
+    u8 linearVel = volTable[atten] * 0x7F;
+
+    // TODO: fix duration calculation. It uses dur as index to table at 0x1F0 in viostorm.
+    // Something like this - need to verify the + 0.5 rounding thing
+    //
+    // if (m_duration > 0 && m_duration < 100) {
+    //   durNumerator = durationTable[m_duration];
+    //   durFraction = (durNumerator / 255.0)
+    //   u8 actualDuration = (u8)(durFraction * delta + 0.5)
+    //   // Adjust the result if numerator is even and greater than 128
+    //   if (durNumerator > 128 && (durNumerator % 2) == 0) {
+    //     actualDuration -= 1;
+    //   }
+    // }
+
     note += 24;
-    if (newdur == 0)
-      newdur = 1;
-    if (!percussion)
-      addNoteByDur(beginOffset, curOffset - beginOffset, note, vel, newdur);
+
+    uint32_t actualDuration;
+    if (m_duration == 0) {
+      if (m_percussion && (note - 24) < 46) {
+        auto seq = static_cast<KonamiArcadeSeq*>(parentSeq);
+        u8 defaultDrumDur = seq->drums()[note-24].default_duration;
+        actualDuration = (delta * defaultDrumDur) / 0x64;
+      } else {
+        actualDuration = delta;
+      }
+    } else {
+      if (m_releaseRate != 0)
+        actualDuration = (delta * m_duration) / 0x64;
+      else
+        actualDuration = delta;
+    }
+    addNoteByDur(beginOffset, curOffset - beginOffset, note, linearVel, actualDuration);
     addTime(delta);
     return true;
   }
@@ -168,8 +219,8 @@ bool KonamiArcadeTrack::readEvent() {
     // Rest
     case 0xE0: {
       uint8_t delta = readByte(curOffset++);
-      // addTime(delta);
       addRest(beginOffset, curOffset-beginOffset, delta);
+      m_prevDelta = delta;
       break;
     }
 
@@ -183,25 +234,31 @@ bool KonamiArcadeTrack::readEvent() {
       addTime(delta - newdur);
       auto desc = fmt::format("total delta: {:d} ticks  additional duration: {:d} ticks", delta, newdur);
       addGenericEvent(beginOffset, curOffset - beginOffset, "Hold", desc, CLR_TIE);
+      m_prevDelta = delta;
       break;
     }
 
     // program change
     case 0xE2: {
-      uint8_t progNum = readByte(curOffset++);
-      addProgramChange(beginOffset, curOffset - beginOffset, progNum);
+      m_curProg = readByte(curOffset++);
+      if (m_curProg > 0x7F) {
+        printf("program # is greater than 0x7f\n");
+      }
+      addProgramChange(beginOffset, curOffset - beginOffset, m_curProg);
       break;
     }
 
     // Pan
-    case 0xE3:
-      // 0x00 seems centered.
-      // 0x01 causes full left,
-      // 0x7F causes full right, channel
-      // but collapses to center very quickly. 0x05 sounds centered, as does 0x7F - 4
-      curOffset++;
-      addUnknown(beginOffset, curOffset - beginOffset, "Pan");
+    case 0xE3: {
+      u8 rawPan = (readByte(curOffset++) & 0xF) - 1;
+      double rightPan = panTable[rawPan];
+      double leftPan = panTable[0xE - rawPan];
+      double volumeScale;
+      u8 midiPan = convertVolumeBalanceToStdMidiPan(leftPan, rightPan, &volumeScale);
+
+      addPan(beginOffset, curOffset - beginOffset, midiPan);
       break;
+    }
 
     // LFO settings (or perhaps just vibrato)
     case 0xE4: {
@@ -223,7 +280,7 @@ bool KonamiArcadeTrack::readEvent() {
     case 0xE8: {
       loopNum = 1;
     loopMarker:
-      loopMarker[loopNum] = curOffset;
+      m_loopMarker[loopNum] = curOffset;
       auto name = fmt::format("Loop {:d} Marker", loopNum);
       addGenericEvent(beginOffset, curOffset - beginOffset, name, "", CLR_LOOP);
       break;
@@ -238,24 +295,24 @@ bool KonamiArcadeTrack::readEvent() {
       u8 loopCount = readByte(curOffset++);
       u8 initialLoopAtten = -readByte(curOffset++);
       u8 initialLoopTranspose = readByte(curOffset++);
-      if (loopCounter[loopNum] == 0) {
+      if (m_loopCounter[loopNum] == 0) {
         if (loopCount == 1) {
-          loopAtten[loopNum] = 0;
-          loopTranspose[loopNum] = 0;
+          m_loopAtten[loopNum] = 0;
+          m_loopTranspose[loopNum] = 0;
           break;
         }
-        loopCounter[loopNum] = loopCount - 1;
-        loopAtten[loopNum] = initialLoopAtten;
-        loopTranspose[loopNum] = initialLoopTranspose;
+        m_loopCounter[loopNum] = loopCount - 1;
+        m_loopAtten[loopNum] = initialLoopAtten;
+        m_loopTranspose[loopNum] = initialLoopTranspose;
       }
       else {
-        if (loopCount > 0 && --loopCounter[loopNum] == 0) {
-          loopAtten[loopNum] = 0;
-          loopTranspose[loopNum] = 0;
+        if (loopCount > 0 && --m_loopCounter[loopNum] == 0) {
+          m_loopAtten[loopNum] = 0;
+          m_loopTranspose[loopNum] = 0;
           break;
         }
-        loopAtten[loopNum] += initialLoopAtten;
-        loopTranspose[loopNum] += initialLoopTranspose;
+        m_loopAtten[loopNum] += initialLoopAtten;
+        m_loopTranspose[loopNum] += initialLoopTranspose;
       }
 
       // TODO: confusing logic sets a couple channel state vars here based on atten and transpose
@@ -269,20 +326,28 @@ bool KonamiArcadeTrack::readEvent() {
           initialLoopAtten, initialLoopTranspose);
         addGenericEvent(beginOffset, curOffset - beginOffset, "Loop", desc, CLR_LOOP);
       }
-      if (loopMarker[loopNum] < parentSeq->dwOffset) {
+      if (m_loopMarker[loopNum] < parentSeq->dwOffset) {
         L_ERROR("KonamiArcadeSeq wants to loopMarker outside bounds of sequence. Loop at %X", beginOffset);
         return false;
       }
       printf("E7/E9 LOOPING FROM %X", beginOffset);
-      curOffset = loopMarker[loopNum];
+      curOffset = m_loopMarker[loopNum];
       printf(" TO: %X\n", curOffset);
       return shouldContinue;
     }
 
     //tempo
     case 0xEA: {
-      u8 bpm = readByte(curOffset++);
-      addTempoBPM(beginOffset, curOffset - beginOffset, bpm);
+      u8 tempoValue = readByte(curOffset++);
+
+      // The tempo value is added to a counter every other NMI. When it carries, a tick is processed
+      double nmisPerTick = 256.0 / static_cast<double>(tempoValue);
+      float nmiRate = static_cast<KonamiArcadeSeq*>(parentSeq)->nmiRate();
+
+      double timePerTickSeconds = nmisPerTick / nmiRate;
+      double timePerBeatSeconds = timePerTickSeconds * parentSeq->ppqn();
+      double timePerBeatMicroseconds = timePerBeatSeconds * 1000000;
+      addTempo(beginOffset, curOffset - beginOffset, timePerBeatMicroseconds);
       break;
     }
 
@@ -294,9 +359,9 @@ bool KonamiArcadeTrack::readEvent() {
     // Volume
     case 0xEE: {
       u8 vol = readByte(curOffset++);
-      u8 atten = ~vol & 0x7F;
-      addVol(beginOffset, curOffset - beginOffset, vol);
-      //AddMasterVol(beginOffset, curOffset-beginOffset, vol);
+      u8 volIndex = ~vol & 0x7F;
+      u8 linearVol = volTable[volIndex] * 0x7F;
+      addVol(beginOffset, curOffset - beginOffset, linearVol);
       break;
     }
 
@@ -344,7 +409,7 @@ bool KonamiArcadeTrack::readEvent() {
     //release rate
     case 0xFA: {
       // lower value results in longer sustain
-      u8 releaseRate = readByte(curOffset++);
+      m_releaseRate = readByte(curOffset++);
       addUnknown(beginOffset, curOffset - beginOffset, "Release Rate");
       break;
     }
@@ -353,21 +418,26 @@ bool KonamiArcadeTrack::readEvent() {
       auto seq = static_cast<KonamiArcadeSeq*>(parentSeq);
       u16 memJumpOffset = readShort(curOffset);
       u32 romOffset = seq->dwOffset + (memJumpOffset - seq->memOffset());
-      bool shouldContinue = addLoopForever(beginOffset, 3);
+      bool shouldContinue = true;
+      if (romOffset < beginOffset) {
+        shouldContinue = addLoopForever(beginOffset, 3);
+      } else {
+        addGenericEvent(beginOffset, 3, "Jump", "", CLR_LOOP);
+      }
       if (romOffset < seq->dwOffset) {
         L_ERROR("KonamiArcadeEvent FD attempted jump to offset outside the sequence at {:X}.  Jump offset: {:X}", beginOffset, romOffset);
         return false;
       }
       printf("FD LOOPING FROM %X", beginOffset);
       curOffset = romOffset;
-      printf(" TO: %X\n", curOffset);
+      printf(" TO: %X.  But shouldContinue? %d\n", curOffset, shouldContinue);
       return shouldContinue;
     }
 
     case 0xFE: {
-      bInJump = true;
-      jump_return_offset = curOffset + 2;
-      addGenericEvent(beginOffset, jump_return_offset - beginOffset, "Jump", "", CLR_LOOP);
+      m_inJump = true;
+      m_jumpReturnOffset = curOffset + 2;
+      addGenericEvent(beginOffset, m_jumpReturnOffset - beginOffset, "Jump", "", CLR_LOOP);
       auto seq = static_cast<KonamiArcadeSeq*>(parentSeq);
       u16 memJumpOffset = readShort(curOffset);
       u32 romOffset = seq->dwOffset + (memJumpOffset - seq->memOffset());
@@ -381,10 +451,10 @@ bool KonamiArcadeTrack::readEvent() {
       break;
     }
     case 0xFF: {
-      if (bInJump) {
+      if (m_inJump) {
         addGenericEvent(beginOffset, 1, "Return", "", CLR_LOOP);
-        bInJump = false;
-        curOffset = jump_return_offset;
+        m_inJump = false;
+        curOffset = m_jumpReturnOffset;
       }
       else {
         addEndOfTrack(beginOffset, curOffset - beginOffset);

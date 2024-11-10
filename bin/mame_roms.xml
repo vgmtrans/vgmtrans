@@ -224,7 +224,7 @@
         </romgroup>
     </game>
     <game name="gaiapols" format="KonamiArcade">
-        <romgroup type="soundcpu" load_method="append" seq_table="0x263b">
+        <romgroup type="soundcpu" load_method="append" seq_table="0x263b" samp_tables="0x41B0" drum_samp_table="0x4A5E" drum_table="0x4B48">
             <rom>123e13.9c</rom>
         </romgroup>
         <romgroup type="sound"  load_method="append">
@@ -390,7 +390,7 @@
         </romgroup>
     </game>
     <game name="metamrph" format="KonamiArcade">
-        <romgroup type="soundcpu" load_method="append" seq_table="0x23FB">
+        <romgroup type="soundcpu" load_method="append" seq_table="0x23FB" samp_tables="0x402B" drum_samp_table="0x46CF" drum_table="0x4756">
             <rom>224a05</rom>
         </romgroup>
         <romgroup type="sound"  load_method="append">
@@ -414,7 +414,7 @@
         </romgroup>
     </game>
     <game name="mmaulers" format="KonamiArcade">
-        <romgroup type="soundcpu" load_method="append" seq_table="0x3EA3">
+        <romgroup type="soundcpu" load_method="append" seq_table="0x3EA3" samp_tables="0x54DE" drum_samp_table="0x60FE" drum_table="0x61CD">
             <rom>170a13.9c</rom>
         </romgroup>
         <romgroup type="sound"  load_method="append">
@@ -470,7 +470,7 @@
         </romgroup>
     </game>
     <game name="mtlchamp" format="KonamiArcade">
-        <romgroup type="soundcpu" load_method="append" seq_table="0x3F06">
+        <romgroup type="soundcpu" load_method="append" seq_table="0x3F06" samp_tables="0x4B2D" drum_samp_table="0x57CB" drum_table="0x58F4">
             <rom>234_d05.6b</rom>
         </romgroup>
         <romgroup type="sound"  load_method="append">

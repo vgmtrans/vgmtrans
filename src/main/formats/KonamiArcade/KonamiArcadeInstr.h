@@ -5,9 +5,28 @@
  */
 #pragma once
 
-#include "KonamiArcadeScanner.h"
 #include "VGMSampColl.h"
 #include "VGMInstrSet.h"
+
+// Mystic Warrior driver sample info
+
+struct konami_mw_sample_info {
+  enum class sample_type: u8 {
+    PCM_8 = 0,
+    PCM_16 = 4,
+    ADPCM = 8,
+  };
+
+  u8 loop_lsb;
+  u8 loop_mid;
+  u8 loop_msb;
+  u8 start_lsb;
+  u8 start_mid;
+  u8 start_msb;
+  sample_type type;
+  bool loops;
+  u8 attenuation;
+};
 
 // ********************
 // KonamiArcadeInstrSet
@@ -16,12 +35,28 @@
 class KonamiArcadeInstrSet
     : public VGMInstrSet {
 public:
+  struct drum {
+    u8 samp_num;
+    u8 unity_key;
+    s8 pitch_bend;
+    u8 pan;
+    u16 unknown_1;
+    u8 default_duration;
+    u8 unknown_2;
+  };
+
   KonamiArcadeInstrSet(RawFile *file,
-                     uint32_t offset,
-                     std::string name);
+                       u32 offset,
+                       std::string name,
+                       u32 drumTableOffset);
   ~KonamiArcadeInstrSet() override = default;
 
   bool parseInstrPointers() override;
+  const std::array<drum, 46>& drums() { return m_drums;}
+
+private:
+  u32 m_drumTableOffset;
+  std::array<drum, 46> m_drums;
 };
 
 // ********************
@@ -34,7 +69,7 @@ public:
   KonamiArcadeSampColl(
     RawFile* file,
     KonamiArcadeInstrSet* instrset,
-    std::vector<konami_mw_sample_info>& sampInfos,
+    const std::vector<konami_mw_sample_info>& sampInfos,
     u32 offset,
     u32 length = 0,
     std::string name = std::string("Konami MW Sample Collection")
@@ -47,5 +82,5 @@ private:
 
   std::vector<VGMItem*> samplePointers;
   KonamiArcadeInstrSet *instrset;
-  std::vector<konami_mw_sample_info> sampInfos;
+  const std::vector<konami_mw_sample_info> sampInfos;
 };

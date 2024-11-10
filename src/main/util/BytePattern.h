@@ -3,6 +3,8 @@
 
 #pragma once
 
+#include "common.h"
+
 class BytePattern {
  private:
   /** The pattern to scan for */
