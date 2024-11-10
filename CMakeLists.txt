@@ -51,7 +51,7 @@ if(GIT_FOUND)
     OUTPUT_VARIABLE VCS_TAG
     OUTPUT_STRIP_TRAILING_WHITESPACE)
 else()
-  set(VCS_TAG "v$(CMAKE_PROJECT_VERSION)")
+  set(VCS_TAG "v${CMAKE_PROJECT_VERSION}")
   set(VCS_HASH "unknown")
   set(VCS_BRANCH "unknown")
 endif()
