@@ -165,8 +165,8 @@ bool KonamiArcadeTrack::readEvent() {
       addUnknown(beginOffset, curOffset - beginOffset);
       break;
 
-    case 0xC2:
-    case 0xC3:
+    case 0xC2:    // writes to undocumented reg 0x1BF. Looks like pan value.
+    case 0xC3:    // writes to undocumented reg 0x1FF. Looks like pan value.
       curOffset++;
       addUnknown(beginOffset, curOffset - beginOffset);
       break;
@@ -181,32 +181,36 @@ bool KonamiArcadeTrack::readEvent() {
       addUnknown(beginOffset, curOffset - beginOffset);
       break;
 
+    case 0xD2:  // reverb vol
+      curOffset += 2;
+      addUnknown(beginOffset, curOffset - beginOffset, "Reverb Volume");
+      break;
+
     case 0xD1:
-    case 0xD2:
-    case 0xD3:
-    case 0xD4:
-    case 0xD5:
-    case 0xD6:
+    case 0xD3:        // writes to undocumented reg 0x13E
+    case 0xD4:        // writes to undocumented reg 0x17E - same logic as D3
+    case 0xD5:        // writes to undocumented reg 0x1BE - same logic as D3
+    case 0xD6:        // writes to undocumented reg 0x1FE - same logic as D3
       curOffset += 2;
       addUnknown(beginOffset, curOffset - beginOffset);
       break;
 
-    case 0xD7:
+    case 0xD7:    // writes to undocumented registers 0x216 - 0x21A
       curOffset += 3;
       addUnknown(beginOffset, curOffset - beginOffset);
       break;
 
-    case 0xD8:
+    case 0xD8:    // writes to undocumented registers 0x21B - 0x21C
       curOffset += 2;
       addUnknown(beginOffset, curOffset - beginOffset);
       break;
 
-    case 0xD9:
+    case 0xD9:    // writes to undocumented registers 0x21D - 0x221, same logic as D7
       curOffset += 3;
       addUnknown(beginOffset, curOffset - beginOffset);
       break;
 
-    case 0xDA:
+    case 0xDA:    // writes to undocumented registers 0x222 - 0x223, same logic as D8
       curOffset += 2;
       addUnknown(beginOffset, curOffset - beginOffset);
       break;
