@@ -25,7 +25,7 @@ KonamiArcadeSeq::KonamiArcadeSeq(
 }
 
 bool KonamiArcadeSeq::parseHeader() {
-  setPPQN(24);
+  setPPQN(48);
   return true;
 }
 
@@ -66,6 +66,7 @@ KonamiArcadeTrack::KonamiArcadeTrack(KonamiArcadeSeq *parentSeq, uint32_t offset
 void KonamiArcadeTrack::resetVars() {
   m_inJump = false;
   m_percussion = false;
+  m_pan = 0;
   m_releaseRate = 0;
   m_curProg = 0;
   m_prevDelta = 0;
@@ -78,6 +79,20 @@ void KonamiArcadeTrack::resetVars() {
   SeqTrack::resetVars();
 }
 
+u8 KonamiArcadeTrack::calculateMidiPanForK054539(u8 pan) {
+  if (pan >= 0x81 && pan <= 0x8f)
+    pan -= 0x81;
+  else if (pan >= 0x11 && pan <= 0x1f)
+    pan -= 0x11;
+  else
+    pan = 0x18 - 0x11;
+  double rightPan = panTable[pan];
+  double leftPan = panTable[0xE - pan];
+  double volumeScale;
+  u8 newPan = convertVolumeBalanceToStdMidiPan(leftPan, rightPan, &volumeScale);
+  return newPan;
+}
+
 bool KonamiArcadeTrack::readEvent() {
   uint32_t beginOffset = curOffset;
   uint8_t status_byte = readByte(curOffset++);
@@ -85,6 +100,7 @@ bool KonamiArcadeTrack::readEvent() {
   if (status_byte == 0x60) {
     addGenericEvent(beginOffset, curOffset - beginOffset, "Percussion On", "", CLR_CHANGESTATE);
     m_percussion = true;
+    // Drums define their own pan, which is only used if the pan state value is 0
     addBankSelectNoItem(1);
     addProgramChangeNoItem(0, false);
     return true;
@@ -93,6 +109,11 @@ bool KonamiArcadeTrack::readEvent() {
   if (status_byte == 0x61) {
     addGenericEvent(beginOffset, curOffset - beginOffset, "Percussion Off", "", CLR_CHANGESTATE);
     m_percussion = false;
+    if (m_pan == 0) {
+      u8 midiPan = calculateMidiPanForK054539(0);
+      if (midiPan != prevPan)
+        addPanNoItem(midiPan);
+    }
     addProgramChangeNoItem(m_curProg, true);
     return true;
   }
@@ -142,14 +163,22 @@ bool KonamiArcadeTrack::readEvent() {
     if (m_duration == 0) {
       if (m_percussion && (note - 24) < 46) {
         auto seq = static_cast<KonamiArcadeSeq*>(parentSeq);
-        u8 defaultDrumDur = seq->drums()[note-24].default_duration;
-        actualDuration = (delta * defaultDrumDur) / 0x64;
+        auto& drum = seq->drums()[note-24];
+        u8 defaultDrumDur = drum.default_duration;
+        actualDuration = (delta * defaultDrumDur) / 100;
+
+        // Drums provide their own pan, but this is only applied when the channel pan value is 0
+        if (m_pan == 0) {
+          u8 midiPan = calculateMidiPanForK054539(drum.pan | 0x10);
+          if (midiPan != prevPan)
+            addPanNoItem(midiPan);
+        }
       } else {
         actualDuration = delta;
       }
     } else {
       if (m_releaseRate != 0)
-        actualDuration = (delta * m_duration) / 0x64;
+        actualDuration = (delta * m_duration) / 100;
       else
         actualDuration = delta;
     }
@@ -254,12 +283,8 @@ bool KonamiArcadeTrack::readEvent() {
 
     // Pan
     case 0xE3: {
-      u8 rawPan = (readByte(curOffset++) & 0xF) - 1;
-      double rightPan = panTable[rawPan];
-      double leftPan = panTable[0xE - rawPan];
-      double volumeScale;
-      u8 midiPan = convertVolumeBalanceToStdMidiPan(leftPan, rightPan, &volumeScale);
-
+      m_pan = (readByte(curOffset++));
+      u8 midiPan = calculateMidiPanForK054539(m_pan | 0x10);
       addPan(beginOffset, curOffset - beginOffset, midiPan);
       break;
     }
@@ -364,6 +389,7 @@ bool KonamiArcadeTrack::readEvent() {
     case 0xEE: {
       u8 vol = readByte(curOffset++);
       u8 volIndex = ~vol & 0x7F;
+      m_vol = volIndex;
       u8 linearVol = volTable[volIndex] * 0x7F;
       addVol(beginOffset, curOffset - beginOffset, linearVol);
       break;

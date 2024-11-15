@@ -37,6 +37,8 @@ public:
   bool readEvent() override;
 
 private:
+  u8 calculateMidiPanForK054539(u8 pan);
+
   bool m_inJump;
   bool m_percussion;
   u8 m_releaseRate;
@@ -45,7 +47,9 @@ private:
   int m_loopCounter[2] = {};
   s16 m_loopAtten[2] = {};
   s16 m_loopTranspose[2] = {};
-  uint8_t m_prevDelta;
-  uint8_t m_duration;
-  uint32_t m_jumpReturnOffset;
+  u8 m_prevDelta;
+  u8 m_duration;
+  u8 m_vol;
+  u8 m_pan;
+  u32 m_jumpReturnOffset;
 };
