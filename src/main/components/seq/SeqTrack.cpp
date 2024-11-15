@@ -841,7 +841,7 @@ void SeqTrack::addPan(uint32_t offset, uint32_t length, uint8_t pan, const std::
 
 void SeqTrack::addPanNoItem(uint8_t pan) {
   if (readMode == READMODE_CONVERT_TO_MIDI) {
-    const uint8_t midiPan = parentSeq->usesLinearAmplitudeScale()
+    const uint8_t midiPan = parentSeq->usesLinearPanAmplitudeScale()
       ? convert7bitLinearPercentPanValToStdMidiVal(pan, &panVolumeCorrectionRate)
       : pan;
     pMidiTrack->addPan(channel, midiPan);
