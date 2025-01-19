@@ -212,7 +212,7 @@ static std::string logEvent(uint8_t statusByte, spdlog::level::level_enum level 
 
   std::ostringstream description;
   description <<  title << ": 0x" << std::hex << std::setfill('0') << std::setw(2)
-              << std::uppercase << statusByte << std::dec << std::setfill(' ') << std::setw(0);
+              << std::uppercase << static_cast<unsigned>(statusByte) << std::dec << std::setfill(' ') << std::setw(0);
 
   // Use a fold expression to process each argument
   int arg_idx = 1;
