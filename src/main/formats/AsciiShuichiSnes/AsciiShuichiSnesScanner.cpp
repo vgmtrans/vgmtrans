@@ -9,7 +9,7 @@
 #include "ScannerManager.h"
 
 namespace vgmtrans::scanners {
-ScannerRegistration<AsciiShuichiSnesScanner> s_graph_snes("AsciiShuichiSnes", {"spc"});
+ScannerRegistration<AsciiShuichiSnesScanner> s_ascii_shuichi_snes("AsciiShuichiSnes", {"spc"});
 }
 
 // Only tested with:
