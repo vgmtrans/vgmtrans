@@ -1334,7 +1334,13 @@ void SeqTrack::addTempoBPMNoItem(double bpm) const {
   if (readMode == READMODE_CONVERT_TO_MIDI) {
     // Some MIDI tool can recognise tempo event only in the first track.
     MidiTrack *pFirstMidiTrack = parentSeq->firstMidiTrack();
-    pFirstMidiTrack->insertTempoBPM(bpm, pMidiTrack->getDelta());
+    if (!pFirstMidiTrack->bHasEndOfTrack) {
+      pFirstMidiTrack->insertTempoBPM(bpm, pMidiTrack->getDelta());
+    } else {
+      // Adding an event after the EOT is even worse. So here's a little workaround.
+      // Test case - SNES Wizardry VI "Rest"
+      pMidiTrack->addTempoBPM(bpm);
+    }
   }
 }
 
