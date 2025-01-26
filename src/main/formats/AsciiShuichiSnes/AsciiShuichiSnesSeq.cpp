@@ -596,9 +596,11 @@ bool AsciiShuichiSnesTrack::readEvent() {
     case EVENT_MASTER_VOLUME: {
       const auto newVolL = static_cast<int8_t>(readByte(curOffset++));
       const auto newVolR = static_cast<int8_t>(readByte(curOffset++));
-      const auto newVol = static_cast<int8_t>(
-        min(abs(newVolL) + abs(newVolR), 255) / 2);  // workaround: convert to mono
-      addMasterVol(beginOffset, curOffset - beginOffset, newVol, "Master Volume L/R");
+
+
+      const auto desc = fmt::format("Master Volume - left: {:d}, right: {:d}", newVolL, newVolR);
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Master Volume L/R", desc, CLR_VOLUME,
+                      ICON_CONTROL);
       break;
     }
 
