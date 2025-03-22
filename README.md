@@ -35,8 +35,9 @@ VGMTrans converts a music files used in console video games into standard midi a
 - Compile's SNES sequence and instrument format (.spc)
 - Namco's SNES sequence and instrument format (.spc)
 - Prism Kikaku's SNES sequence and instrument format (.spc)
+- ASCII Corporation, Shuichi Ukai's SNES sequence and instrument format (.spc)
 
-The source code includes preliminary work on additional formats. 
+The source code includes preliminary work on additional formats.
 
 This software is released under the zlib/libpng License. See LICENSE.txt.
 
