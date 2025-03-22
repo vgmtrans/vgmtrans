@@ -61,6 +61,11 @@ Contributors
 - Mike: The original author of the tool, worked on a lot of formats.
 - loveemu: Creator of github project, worked on bugfixes/improvements.
 - sykhro: Worked on the Qt port, CI whisperer, contributed improvements and general housekeeping.
+
+[View more contributors on GitHub](https://github.com/vgmtrans/vgmtrans/graphs/contributors).
+
+Before GitHub:
+
 - Sound Test: 774: Anonymous Japanese guy in 2ch BBS, worked on the HOSA format, analyzing the TriAcePS1 format and such.
 
 ### Special Thanks
