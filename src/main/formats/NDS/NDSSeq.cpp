@@ -15,7 +15,7 @@ bool NDSSeq::parseHeader(void) {
   SSEQHdr->addChild(dwOffset + 12, 2, "Header Size");
   SSEQHdr->addUnknownChild(dwOffset + 14, 2);
   //SeqChunkHdr->addSimpleChild(dwOffset, 4, "Blah");
-  unLength = readShort(dwOffset + 8);
+  unLength = readWord(dwOffset + 8);
   setPPQN(0x30);
   return true;        //successful
 }
