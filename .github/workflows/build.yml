@@ -77,7 +77,7 @@ jobs:
           name: VGMTrans-${{ github.sha }}-${{ env.GITHUB_REF_NAME }}-${{ matrix.target }}-${{ runner.os }}.dmg
           path: "build/macos-${{ matrix.target }}/bin/VGMTrans-${{ github.sha }}.dmg"
   linux:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-22.04
     name: Linux, x64
     permissions:
       id-token: write
