@@ -7,6 +7,7 @@
 
 #include "VGMSampColl.h"
 #include "VGMInstrSet.h"
+#include <array>
 
 // Mystic Warrior driver sample info
 
