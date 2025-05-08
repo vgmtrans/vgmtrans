@@ -1,30 +1,31 @@
 #pragma once
 
-#include "constexprHelpers.h"
+#include "constevalHelpers.h"
 #include <array>
 
-constexpr int K054539_CLOCK_RATE = 18432000;
-#define NMI_TIMER_HERZ(data, skipCount) (((38 + (data)) * (K054539_CLOCK_RATE / 384.0f / 14400.0f)) / ((skipCount)+1))
+constexpr int K054539_CLOCK_RATE = 18'432'000;
+#define NMI_TIMER_HERZ(data, skipCount) \
+    (((38 + (data)) * (K054539_CLOCK_RATE/384.0/14400.0)) / ((skipCount)+1))
 
-// The volume and pan table logic is based on the MAME k054539 emulation source code by
-// Olivier Galibert. That source code is distributed under the BSD-3-Clause license.
 
-constexpr std::array<double, 256> generate_volume_table() {
-  std::array<double, 256> volTable = {};
-  for (int i = 0; i < 256; ++i) {
-    // volTable[i] = constexpr_pow(10.0, (-36.0 * static_cast<double>(i) / 64.0) / 20.0) / 4.0;
-    volTable[i] = constexpr_pow(10.0, (-36.0 * static_cast<double>(i) / 64.0) / 20.0);
+template <std::size_t N = 256>
+consteval std::array<double, N> make_volume_table() {
+  std::array<double, N> table{};
+  for (std::size_t i = 0; i < N; ++i) {
+    // The MAME implementation divides these values by 4, this causes them to be too quiet
+    table[i] = ct::pow(10.0, (-36.0 * static_cast<double>(i) / 64.0) / 20.0);
   }
-  return volTable;
+  return table;
 }
 
-constexpr std::array<double, 0xf> generate_pan_table() {
-  std::array<double, 0xf> panTable = {};
-  for (int i = 0; i < 0xf; ++i) {
-    panTable[i] = constexpr_sqrt(static_cast<double>(i)) / constexpr_sqrt(0xe);
+template <std::size_t N = 0xF>
+consteval std::array<double, N> make_pan_table() {
+  std::array<double, N> table{};
+  for (std::size_t i = 0; i < N; ++i) {
+    table[i] = ct::sqrt(static_cast<double>(i)) / ct::sqrt(static_cast<double>(N - 1));
   }
-  return panTable;
+  return table;
 }
 
-constexpr std::array<double, 256> volTable = generate_volume_table();
-constexpr std::array<double, 0xf> panTable = generate_pan_table();
+constexpr auto volTable = make_volume_table();
+constexpr auto panTable = make_pan_table();

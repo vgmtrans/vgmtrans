@@ -359,9 +359,7 @@ bool KonamiArcadeTrack::readEvent() {
         L_ERROR("KonamiArcadeSeq wants to loopMarker outside bounds of sequence. Loop at %X", beginOffset);
         return false;
       }
-      printf("E7/E9 LOOPING FROM %X", beginOffset);
       curOffset = m_loopMarker[loopNum];
-      printf(" TO: %X\n", curOffset);
       return shouldContinue;
     }
 
@@ -458,9 +456,7 @@ bool KonamiArcadeTrack::readEvent() {
         L_ERROR("KonamiArcadeEvent FD attempted jump to offset outside the sequence at {:X}.  Jump offset: {:X}", beginOffset, romOffset);
         return false;
       }
-      printf("FD LOOPING FROM %X", beginOffset);
       curOffset = romOffset;
-      printf(" TO: %X.  But shouldContinue? %d\n", curOffset, shouldContinue);
       return shouldContinue;
     }
 
@@ -475,9 +471,7 @@ bool KonamiArcadeTrack::readEvent() {
         L_ERROR("KonamiArcade Event FE attempted jump to offset outside the sequence at {:X}.  Jump offset: {:X}", beginOffset, romOffset);
         return false;
       }
-      printf("FE LOOPING FROM %X", beginOffset);
       curOffset = romOffset;
-      printf(" TO: %X\n", curOffset);
       break;
     }
     case 0xFF: {
