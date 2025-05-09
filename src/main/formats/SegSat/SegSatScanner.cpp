@@ -88,6 +88,9 @@ void SegSatScanner::scan(RawFile *file, void *info) {
     }
 
     u32 lastSeqPtr = file->readWordBE(i + 2 + ((numSeqs-1) * 4));
+    // Sanity check the pointer
+    if (lastSeqPtr > fileLength)
+      break;
     i += lastSeqPtr + minSeqSize;
   }
 }
