@@ -14,11 +14,11 @@ using namespace std;
 // ***********
 
 PSXSampColl::PSXSampColl(const string &format, RawFile *rawfile, uint32_t offset, uint32_t length)
-    : VGMSampColl(format, rawfile, offset, length) {
+    : VGMSampColl(format, rawfile, offset, length, "PSX Sample Collection") {
 }
 
 PSXSampColl::PSXSampColl(const string &format, VGMInstrSet *instrset, uint32_t offset, uint32_t length)
-    : VGMSampColl(format, instrset->rawFile(), instrset, offset, length) {
+    : VGMSampColl(format, instrset->rawFile(), instrset, offset, length, "PSX Sample Collection") {
 }
 
 PSXSampColl::PSXSampColl(const string &format,
@@ -26,7 +26,8 @@ PSXSampColl::PSXSampColl(const string &format,
                          uint32_t offset,
                          uint32_t length,
                          const std::vector<SizeOffsetPair> &vagLocations)
-    : VGMSampColl(format, instrset->rawFile(), instrset, offset, length), vagLocations(vagLocations) {
+    : VGMSampColl(format, instrset->rawFile(), instrset, offset, length, "PSX Sample Collection"),
+      vagLocations(vagLocations) {
 }
 
 bool PSXSampColl::parseSampleInfo() {
@@ -134,6 +135,9 @@ bool PSXSampColl::parseSampleInfo() {
   else {
     uint32_t sampleIndex = 0;
     for (std::vector<SizeOffsetPair>::iterator it = vagLocations.begin(); it != vagLocations.end(); ++it) {
+      if (it->offset == 0 && it->size == 0)
+        continue;
+
       uint32_t offSampStart = dwOffset + it->offset;
       uint32_t offDataEnd = offSampStart + it->size;
       uint32_t offSampEnd = offSampStart;
@@ -168,13 +172,6 @@ bool PSXSampColl::parseSampleInfo() {
   return unLength > 0x20;
 }
 
-
-constexpr u32 NUM_CHUNKS_READAHEAD = 10;
-constexpr int MAX_FILTER_DIFF_SUM = NUM_CHUNKS_READAHEAD * 2.5;
-constexpr int MAX_RANGE_FILTER_DIFF_SUM = NUM_CHUNKS_READAHEAD * 2.5;
-constexpr int MIN_UNIQUE_BYTES = NUM_CHUNKS_READAHEAD * 4.5;
-constexpr int MAX_BYTE_REPETITION = NUM_CHUNKS_READAHEAD * 5.5;
-
 // GENERIC FUNCTION USED FOR SCANNERS
 PSXSampColl *PSXSampColl::searchForPSXADPCM(RawFile *file, const string &format) {
   const std::vector<PSXSampColl *> &sampColls = searchForPSXADPCMs(file, format);
@@ -195,139 +192,172 @@ PSXSampColl *PSXSampColl::searchForPSXADPCM(RawFile *file, const string &format)
   }
 }
 
-std::vector<PSXSampColl *> PSXSampColl::searchForPSXADPCMs(RawFile *file, const string &format) {
-  std::vector<PSXSampColl *> sampColls;
-  size_t nFileLength = file->size();
+constexpr u32 NUM_CHUNKS_READAHEAD      = 10;
+constexpr int MAX_FILTER_DIFF_SUM       = NUM_CHUNKS_READAHEAD * 2.5;
+constexpr int MAX_RANGE_FILTER_DIFF_SUM = NUM_CHUNKS_READAHEAD * 3.2;
+constexpr int MIN_UNIQUE_BYTES_STRICT   = NUM_CHUNKS_READAHEAD * 4;
+constexpr int MAX_BYTE_REPETITION       = NUM_CHUNKS_READAHEAD * 5.5;
+constexpr u32 BACK_SCAN_LIMIT           = 0x5000;
 
-  for (u32 i = 0; i + 16 + NUM_CHUNKS_READAHEAD * 16 < nFileLength; i++) {
-    // Search for 16 consecutive null bytes.
-    u8 chunk[16];
-    file->readBytes(i, 16, &chunk);
+/// Check for a sequence of 16 null bytes - an empty ADPCM frame
+static inline bool isZero16(const RawFile* f, u32 ofs) {
+  if (!f->isValidOffset(ofs + 15)) return false;
+  const u64* blk = reinterpret_cast<const u64*>(f->data() + ofs);
+  return blk[0] == 0 && blk[1] == 0;
+}
 
-    const u64* block64 = reinterpret_cast<const u64*>(chunk);
-    if (block64[0] != 0 || block64[1] != 0) {
-      // Find the last non-zero byte (if any)
-      int nonZeroIndex = 15;
-      while (nonZeroIndex > 0 && chunk[nonZeroIndex] == 0) {
-        --nonZeroIndex;
-      }
-      i += nonZeroIndex;
-      continue;
-    }
+static inline bool isValidFilterShiftByte(u8 b) {
+  u8 filter = b >> 4;
+  u8 shift  = b & 0x0F;
+  return filter <= 4 && shift <= 0x0C;
+}
 
-
-    // We found 16 consecutive null bytes. Do further testing for a positive match.
-    bool isValid = true;
-    u32 firstChunkOffset = i + 16;
-
-    // Expect first byte of first chunk to be non-zero
-    if (file->readByte(firstChunkOffset + 0) == 0)
-      continue;
-
-    // Inspect Flag Bytes
-    for (u32 j = 0; j < NUM_CHUNKS_READAHEAD; ++j) {
-      u32 flagByteOffset = firstChunkOffset + (j * 16) + 1;
-      u8 flagByte = file->readByte(flagByteOffset);
-      if (flagByte != 0x00 && flagByte != 0x02 && !(j <= 1 && flagByte == 0x04)) {
-        isValid = false;
-        break;
-      }
-    }
-    if (!isValid) {
-      continue;
-    }
-
-    int byteCount[256] = {};
-    int uniqueBytes = 0;
-    int sumFilterIndexDiff = 0;
-    int sumRangeFilterDiff = 0;
-
-    // Process each chunk.
-    for (u32 j = 0; j < NUM_CHUNKS_READAHEAD; ++j) {
-      u32 curChunkOffset = firstChunkOffset + j * 16;
-
-      file->readBytes(curChunkOffset, 16, &chunk);
-
-      // Check for 16 null bytes. While this is valid (and indicates the beginning of a new sample)
-      // it is extremely unlikely that the first sample is so short, and this will weed out many
-      // false positives
-      const u64* block64 = reinterpret_cast<const u64*>(chunk);
-      if (block64[0] == 0 && block64[1] == 0) {
-        isValid = false;
-        break;
-      }
-
-      // For the sample region, add to the byte count table and unique byte counter
-      for (int k = 2; k < 16; ++k) {
-        byteCount[chunk[k]] += 1;
-        if (byteCount[chunk[k]] == 1) {
-          uniqueBytes += 1;
-        }
-      }
-
-      // It is extremely improbable that the first chunk will have null filter/range and flag bytes
-      // and also contain at least ten null bytes amongst the samples. This Weeds out another common
-      // false positive pattern.
-      if (j == 0 && chunk[0] == 0 && chunk[1] == 0 && byteCount[0] >= 10) {
-        isValid = false;
-        break;
-      }
-
-      // Read the filter and range nibbles from the first byte.
-      u8 firstByte = chunk[0];
-      int filterIndex = (firstByte & 0xF0) >> 4;
-      int rangeFilter = firstByte & 0x0F;
-
-      // Sum the marginal difference of each filter index nibble and range filter nibble between
-      // each chunk and its predecessor. These typically remain close in value. We skip the first
-      // chunk as there's no previous chunk to compare it against.
-      if (j > 0) {
-        u8 prevFirstByte = file->readByte(firstChunkOffset + (j - 1) * 16);
-        int prevFilterIndex = (prevFirstByte & 0xF0) >> 4;
-        int prevRangeFilter = prevFirstByte & 0x0F;
-
-        // Calculate the absolute differences.
-        sumFilterIndexDiff += abs(filterIndex - prevFilterIndex);
-        sumRangeFilterDiff += abs(rangeFilter - prevRangeFilter);
-      }
-    }
-
-    // Validate the cumulative differences against the thresholds
-    if (!isValid || sumFilterIndexDiff > MAX_FILTER_DIFF_SUM || sumRangeFilterDiff > MAX_RANGE_FILTER_DIFF_SUM) {
-      continue;
-    }
-
-    // Expect a wide range of unique byte values among sample bytes
-    if (uniqueBytes < MIN_UNIQUE_BYTES) {
-      continue;
-    }
-
-    // Expect that there won't be excessive repetition of specific byte values among sample bytes
-    for (int k = 0; k < 256; ++k) {
-      if (byteCount[k] > MAX_BYTE_REPETITION) {
-        isValid = false;
-        break;
-      }
-    }
-    if (!isValid) {
-      continue;
-    }
-
-    // Create and load the sample collection if the match passes all checks.
-    PSXSampColl *newSampColl = new PSXSampColl(PS1Format::name, file, i);
-    if (!newSampColl->loadVGMFile()) {
-      delete newSampColl;
-      continue;
-    }
-    sampColls.push_back(newSampColl);
-    i += newSampColl->unLength - 1;
-  }
-  return sampColls;
+static inline bool isValidFlagByte(u8 b) {
+  return (b & 0xF8) == 0;   // 0x00-0x07 are valid
 }
 
 
+/// Determine whether the offset is the start of a PSX ADPCM sample.
+/// when allowShort is false, the algorithm is stricter and reads 10 frames of data (forward pass)
+/// when allowShort is true, the algorithm is less strict and allows samples of any size (back scan)
+static bool isValidSampleStart(const RawFile* file, u32 offset, bool allowShort) {
+  if (!isZero16(file, offset)) return false;
 
+  const u32 first = offset + 16;
+  if (!file->isValidOffset(first + 15)) return false;
+  if (file->readShort(first) == 0)      return false;
 
+  u8  chunk[16];
+  int byteCount[256]     = {};
+  int uniqueBytes        = 0;
+  int sumFilterDiff      = 0;
+  int sumRangeFilterDiff = 0;
+  bool ok                = true;
+  u8  prevFirstByte      = 0;
+  u32 framesSeen         = 0;
+
+  for (u32 j = 0; j < NUM_CHUNKS_READAHEAD; ++j) {
+    const u32 cur = first + j * 16;
+    file->readBytes(cur, 16, &chunk);
+
+    if (isZero16(file, cur)) {
+      if (!allowShort)          // disallow any null frames in the readahead range in strict mode
+        ok = false;
+      if (cur == offset + 16)   // always disallow two consecutive 16 null frames
+        ok = false;
+      break;
+    }
+    ++framesSeen;
+
+    // check flag byte and filter/shift byte validity
+    const u8 filterShift = chunk[0];
+    const u8 flag = chunk[1];
+    if (!isValidFlagByte(flag) || !isValidFilterShiftByte(filterShift)) {
+      ok = false;
+      break;
+    }
+
+    // uniqueness statistics
+    for (int k = 2; k < 16; ++k) {
+      byteCount[chunk[k]]++;
+      if (byteCount[chunk[k]] == 1)
+        ++uniqueBytes;
+    }
+
+    // improbable pattern guard
+    if (j == 0 && chunk[0] == 0 && chunk[1] == 0) {
+      int zeros = 0;
+      for (int k = 2; k < 16; ++k) {
+        if (chunk[k] == 0)
+          ++zeros;
+      }
+      if (zeros >= 10) {
+        ok = false;
+        break;
+      }
+    }
+
+    // predictor/range continuity
+    const int filt = (chunk[0] & 0xF0) >> 4;
+    const int rng  =  chunk[0] & 0x0F;
+    if (j) {
+      const int pf = (prevFirstByte & 0xF0) >> 4;
+      const int pr =  prevFirstByte & 0x0F;
+      sumFilterDiff      += abs(filt - pf);
+      sumRangeFilterDiff += abs(rng  - pr);
+    }
+    prevFirstByte = chunk[0];
+  }
+
+  if (!ok)
+    return false;
+  if (sumFilterDiff > MAX_FILTER_DIFF_SUM)
+    return false;
+  if (sumRangeFilterDiff > MAX_RANGE_FILTER_DIFF_SUM)
+    return false;
+
+  // dynamic uniqueness: strict needs many; relaxed needs few
+  const int minUnique = allowShort ? 8 : MIN_UNIQUE_BYTES_STRICT;
+  if (uniqueBytes < minUnique)
+    return false;
+
+  for (int k = 0; k < 256; ++k) {
+    if (byteCount[k] > MAX_BYTE_REPETITION)
+      return false;
+  }
+
+  // if strict path, must have looked at all 10 frames
+  if (!allowShort && framesSeen < NUM_CHUNKS_READAHEAD)
+    return false;
+
+  return true;
+}
+
+std::vector<PSXSampColl*> PSXSampColl::searchForPSXADPCMs(RawFile* file, const std::string&) {
+  std::vector<PSXSampColl*> out;
+  const size_t len = file->size();
+
+  for (u32 i = 0; i + 16 + NUM_CHUNKS_READAHEAD * 16 < len; ++i)
+  {
+    // Look for a 16-byte silent frame which usually indicates the start of a sample
+    if (!isZero16(file, i))
+    {
+      u8 buf[16]; file->readBytes(i, 16, &buf);
+      int nz = 15; while (nz && buf[nz] == 0) --nz;
+      i += nz;
+      continue;
+    }
+
+    // Use strict validation for the forward pass (10 frame readahead)
+    if (!isValidSampleStart(file, i, false))
+      continue;
+
+    // We found a valid sample. Now back scan to check for shorter samples we might have skipped
+    u32 start   = i;
+    u32 scanned = 16;
+    while (start - scanned >= 16 && scanned < BACK_SCAN_LIMIT)
+    {
+      const u32 offset = i - scanned;
+      scanned += 16;
+
+      // Look for a 16 null byte frame which usually prefixes a sample
+      if (!isZero16(file, offset))
+        continue;
+
+      if (!isValidSampleStart(file, offset, true))
+        break;
+
+      start = offset; // extend the start of the sample collection backward
+    }
+
+    auto* coll = new PSXSampColl(PS1Format::name, file, start);
+    if (!coll->loadVGMFile()) { delete coll; continue; }
+
+    out.push_back(coll);
+    i = start + coll->unLength - 1;                      // skip parsed area
+  }
+  return out;
+}
 
 //  *******
 //  PSXSamp
