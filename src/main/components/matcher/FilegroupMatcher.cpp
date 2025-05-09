@@ -76,8 +76,8 @@ void FilegroupMatcher::lookForMatch() {
 
   // An instrument set plus an optional extra sample collection to add to the VGMColl
   struct InstrAssoc {
-    VGMInstrSet* instr;
-    VGMSampColl* extraSamp;   // nullptr when no extra sample collection is needed
+    VGMInstrSet* instrSet;
+    VGMSampColl* sampColl;
   };
 
   std::vector<InstrAssoc> instrAssocs;
@@ -133,9 +133,9 @@ void FilegroupMatcher::lookForMatch() {
     VGMColl* coll = fmt->newCollection();
     coll->setName(seq->name());
     coll->useSeq(seq);
-    coll->addInstrSet(assoc.instr);
-    if (assoc.extraSamp) {
-      coll->addSampColl(assoc.extraSamp);
+    coll->addInstrSet(assoc.instrSet);
+    if (assoc.sampColl) {
+      coll->addSampColl(assoc.sampColl);
     }
 
     if (!coll->load()) {
