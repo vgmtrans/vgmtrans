@@ -21,7 +21,8 @@ void FilegroupMatcher::onFinishedScan(RawFile* rawfile) {
   if (std::regex_match(rawfile->extension(), std::regex(R"(\w*sf\w?lib$)")))
     return;
 
-  lookForMatch();
+  if (!seqs.empty() && !instrsets.empty())
+    lookForMatch();
 
   seqs.clear();
   instrsets.clear();
@@ -68,9 +69,6 @@ bool FilegroupMatcher::onCloseSampColl(VGMSampColl *sampcoll) {
 }
 
 void FilegroupMatcher::lookForMatch() {
-  if (seqs.empty())
-    return;
-
   // 1. Sort all three containers by descending file‑offset
   auto byOffsetDesc = [](auto* a, auto* b) { return a->dwOffset > b->dwOffset; };
   seqs.sort(byOffsetDesc);
