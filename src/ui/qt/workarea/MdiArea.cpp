@@ -8,7 +8,7 @@
 
 #include <QTabBar>
 #include <QApplication>
-#include <QKeyEvent>
+#include <QShortcut>
 #include <VGMFile.h>
 #include "VGMFileView.h"
 #include "Metrics.h"
@@ -31,6 +31,41 @@ MdiArea::MdiArea(QWidget *parent) : QMdiArea(parent) {
     tab_bar->setElideMode(Qt::ElideNone);
 #endif
   }
+
+  // Create OS-specific keyboard shortcuts
+  auto addShortcut = [this](const QKeySequence &seq, auto slot)
+  {
+    auto *sc = new QShortcut(seq, this);
+    sc->setContext(Qt::WindowShortcut);          // active for this window only
+    connect(sc, &QShortcut::activated, this, slot);
+  };
+
+#ifdef Q_OS_MAC
+  // Cmd ⇧ [  /  Cmd ⇧ ]
+  addShortcut(QKeySequence(Qt::CTRL | Qt::SHIFT | Qt::Key_BracketLeft),
+              &QMdiArea::activatePreviousSubWindow);
+  addShortcut(QKeySequence(Qt::CTRL | Qt::SHIFT | Qt::Key_BracketRight),
+              &QMdiArea::activateNextSubWindow);
+
+  // Cmd ⌥ ←  /  Cmd ⌥ →
+  addShortcut(QKeySequence(Qt::CTRL | Qt::ALT | Qt::Key_Left),
+              &QMdiArea::activatePreviousSubWindow);
+  addShortcut(QKeySequence(Qt::CTRL | Qt::ALT | Qt::Key_Right),
+              &QMdiArea::activateNextSubWindow);
+
+#else   // Windows & Linux
+  // Ctrl + Tab  /  Ctrl + Shift + Tab
+  addShortcut(QKeySequence(Qt::CTRL | Qt::Key_Tab),
+              &QMdiArea::activateNextSubWindow);
+  addShortcut(QKeySequence(Qt::CTRL | Qt::SHIFT | Qt::Key_Tab),
+              &QMdiArea::activatePreviousSubWindow);
+
+  // Ctrl + PageDown / Ctrl + PageUp
+  addShortcut(QKeySequence(Qt::CTRL | Qt::Key_PageDown),
+              &QMdiArea::activateNextSubWindow);
+  addShortcut(QKeySequence(Qt::CTRL | Qt::Key_PageUp),
+              &QMdiArea::activatePreviousSubWindow);
+#endif
 }
 
 void MdiArea::newView(VGMFile *file) {
@@ -110,22 +145,6 @@ void MdiArea::onVGMFileSelected(const VGMFile *file, QWidget *caller) {
     // Reassert the focus back to the caller
     if (caller && callerHadFocus) {
       caller->setFocus();
-    }
-  }
-}
-
-void MdiArea::keyPressEvent(QKeyEvent* event) {
-  QMdiArea::keyPressEvent(event);
-
-  // Handle MacOS shortcut for switching tabs
-  if ((event->modifiers() & Qt::ShiftModifier) && (event->modifiers() & Qt::ControlModifier)) {
-    switch (event->key()) {
-      case Qt::Key_BracketLeft:
-        this->activatePreviousSubWindow();
-        break;
-      case Qt::Key_BracketRight:
-        this->activateNextSubWindow();
-        break;
     }
   }
 }
