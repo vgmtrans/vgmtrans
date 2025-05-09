@@ -21,7 +21,12 @@ constexpr int SRCH_BUF_SIZE = 0x20000;
 void PS1SeqScanner::scan(RawFile* file, void* /*info*/) {
   auto seqs = searchForPS1Seq(file);
   auto vabs = searchForVab(file);
-  if (vabs.empty() || vabs[0]->dwOffset != 0) {
+  bool vabsDontOwnSampColls = std::ranges::any_of(
+    vabs,
+    [](Vab* vab) { return vab->sampColl == nullptr; }
+  );
+  // skip sample collection search if we found vabs and every one had an associated sample collection
+  if (vabs.empty() || vabsDontOwnSampColls) {
     PSXSampColl::searchForPSXADPCM(file, PS1Format::name);
   }
 }
