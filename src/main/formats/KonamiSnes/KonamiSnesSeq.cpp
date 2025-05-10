@@ -54,6 +54,8 @@ KonamiSnesSeq::KonamiSnesSeq(RawFile *file, KonamiSnesVersion ver, uint32_t seqd
 
   useReverb();
   setAlwaysWriteInitialReverb(0);
+  setVolumeAmplitudeScale(AmplitudeScale::Logarithmic);
+  setPanAmplitudeScale(AmplitudeScale::Logarithmic, PanVolumeCorrectionMode::kNoVolumeAdjust);
 
   loadEventMap();
 }

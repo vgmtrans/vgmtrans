@@ -22,7 +22,8 @@ GraphResSnesSeq::GraphResSnesSeq(RawFile *file, GraphResSnesVersion ver, uint32_
     : VGMSeq(GraphResSnesFormat::name, file, seqdataOffset, 0, std::move(name)), version(ver) {
   bLoadTickByTick = true;
   setAllowDiscontinuousTrackData(true);
-  setUseLinearAmplitudeScale(true);
+  setVolumeAmplitudeScale(AmplitudeScale::Linear);
+  setPanAmplitudeScale(AmplitudeScale::Linear, PanVolumeCorrectionMode::kNoVolumeAdjust);
 
   setAlwaysWriteInitialTempo(60000000.0 / ((125 * 0x85) * SEQ_PPQN)); // good ol' frame-based sequence!
 

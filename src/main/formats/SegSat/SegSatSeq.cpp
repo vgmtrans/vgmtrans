@@ -6,6 +6,8 @@ DECLARE_FORMAT(SegSat);
 
 SegSatSeq::SegSatSeq(RawFile *file, uint32_t offset, std::string name)
     : VGMSeqNoTrks(SegSatFormat::name, file, offset, std::move(name)) {
+  setVolumeAmplitudeScale(AmplitudeScale::Logarithmic);
+  setPanAmplitudeScale(AmplitudeScale::Logarithmic, PanVolumeCorrectionMode::kNoVolumeAdjust);
 }
 
 void SegSatSeq::resetVars() {

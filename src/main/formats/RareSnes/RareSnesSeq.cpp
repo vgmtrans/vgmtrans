@@ -35,6 +35,8 @@ RareSnesSeq::RareSnesSeq(RawFile *file, RareSnesVersion ver, uint32_t seqdataOff
     : VGMSeq(RareSnesFormat::name, file, seqdataOffset, 0, newName), version(ver) {
   bLoadTickByTick = true;
   setAllowDiscontinuousTrackData(true);
+  setVolumeAmplitudeScale(AmplitudeScale::Logarithmic);
+  setPanAmplitudeScale(AmplitudeScale::Logarithmic, PanVolumeCorrectionMode::kNoVolumeAdjust);
 
   useReverb();
   setAlwaysWriteInitialReverb(0);

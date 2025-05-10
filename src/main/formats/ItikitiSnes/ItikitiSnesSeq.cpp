@@ -18,7 +18,8 @@ ItikitiSnesSeq::ItikitiSnesSeq(RawFile *file, uint32_t offset, std::string new_n
     : VGMSeq(ItikitiSnesFormat::name, file, offset, 0, std::move(new_name)) {
   bLoadTickByTick = true;
   setAllowDiscontinuousTrackData(true);
-  setUseLinearAmplitudeScale(true);
+  setVolumeAmplitudeScale(AmplitudeScale::Linear);
+  setPanAmplitudeScale(AmplitudeScale::Linear, PanVolumeCorrectionMode::kNoVolumeAdjust);
 
   useReverb();
   setAlwaysWriteInitialReverb(0);

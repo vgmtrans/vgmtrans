@@ -31,7 +31,8 @@ AsciiShuichiSnesSeq::AsciiShuichiSnesSeq(RawFile *file, uint32_t seqHeaderOffset
     : VGMSeq(AsciiShuichiSnesFormat::name, file, seqHeaderOffset, 0, move(name)) {
   bLoadTickByTick = true;
   setAllowDiscontinuousTrackData(true);
-  setUseLinearAmplitudeScale(true);
+  setVolumeAmplitudeScale(AmplitudeScale::Linear);
+  setPanAmplitudeScale(AmplitudeScale::Linear, PanVolumeCorrectionMode::kNoVolumeAdjust);
 
   useReverb();
   setAlwaysWriteInitialReverb(0);

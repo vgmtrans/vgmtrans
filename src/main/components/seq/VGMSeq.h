@@ -25,6 +25,11 @@ enum class PanVolumeCorrectionMode : uint8_t {
   kAdjustExpressionController
 };
 
+enum class AmplitudeScale : uint8_t {
+  Linear,
+  Logarithmic       // Standard MIDI uses a Logarithmic scale
+};
+
 class VGMSeq : public VGMFile {
  public:
   VGMSeq(const std::string &format, RawFile *file, uint32_t offset, uint32_t length = 0,
@@ -51,13 +56,14 @@ class VGMSeq : public VGMFile {
   [[nodiscard]] bool usesMonophonicTracks() const { return m_use_monophonic_tracks; }
   void setUsesMonophonicTracks() { m_use_monophonic_tracks = true; }
 
-  [[nodiscard]] bool usesLinearAmplitudeScale() const { return m_use_linear_amplitude_scale; }
-  void setUseLinearAmplitudeScale(bool set) { m_use_linear_amplitude_scale = set; }
+  [[nodiscard]] AmplitudeScale volumeAmplitudeScale() const { return m_vol_amplitude_scale; }
+  void setVolumeAmplitudeScale(AmplitudeScale scale) { m_vol_amplitude_scale = scale; }
 
-  [[nodiscard]] bool usesLinearPanAmplitudeScale() const { return m_use_linear_pan_amplitude_scale; }
-  void setUseLinearPanAmplitudeScale(PanVolumeCorrectionMode mode) {
-    m_use_linear_pan_amplitude_scale = true;
-    panVolumeCorrectionMode = mode;
+  [[nodiscard]] AmplitudeScale panAmplitudeScale() const { return m_pan_amplitude_scale; }
+  [[nodiscard]] PanVolumeCorrectionMode panVolumeCorrectionMode() const { return m_pan_vol_correction_mode; }
+  void setPanAmplitudeScale(AmplitudeScale scale, PanVolumeCorrectionMode mode) {
+    m_pan_amplitude_scale = scale;
+    m_pan_vol_correction_mode = mode;
   }
 
   [[nodiscard]] bool alwaysWriteInitialVol() const { return m_always_write_initial_vol; }
@@ -123,8 +129,6 @@ private:
   double tempoBPM;
   uint32_t time;                // absolute current time (ticks)
 
-  PanVolumeCorrectionMode panVolumeCorrectionMode;
-
   // True if each tracks in a sequence needs to be loaded simultaneously in tick by tick, as the real music player does.
   // Pros:
   //   - It allows to share some variables between two or more tracks.
@@ -167,11 +171,13 @@ private:
   bool m_use_monophonic_tracks;   // Only 1 voice at a time on a track.  We can assume note offs always
                                 // use last note on key. which is important when drivers allow things
                                 // like global transposition events mid note
-  bool m_use_linear_amplitude_scale;  // This will cause all all velocity, volume, and expression
+  AmplitudeScale m_vol_amplitude_scale;  // This will cause all all velocity, volume, and expression
                                   // events to be automatically converted from a linear scale to
                                   // MIDI's logarithmic scale
-  bool m_use_linear_pan_amplitude_scale; // This will cause all all pan events to be automatically
-                                    // converted from a linear scale to MIDI's sin/cos scale
+  AmplitudeScale m_pan_amplitude_scale; // This will cause all all pan events to be automatically
+                                  // converted from a linear scale to MIDI's sin/cos scale
+  PanVolumeCorrectionMode m_pan_vol_correction_mode;  // Determines which MIDI controller to use
+                                  // to perform pan-related volume adjustment
   bool m_use_reverb;
 
 };

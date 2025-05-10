@@ -18,7 +18,8 @@ KonamiArcadeSeq::KonamiArcadeSeq(
 )
     : VGMSeq(KonamiArcadeFormat::name, file, offset, 0, "Konami Arcade Seq"),
       m_memOffset(ramOffset), m_drums(drums), m_nmiRate(nmiRate) {
-  setUseLinearAmplitudeScale(true);
+  setVolumeAmplitudeScale(AmplitudeScale::Linear);
+  setPanAmplitudeScale(AmplitudeScale::Linear, PanVolumeCorrectionMode::kNoVolumeAdjust);
   setAllowDiscontinuousTrackData(true);
   setAlwaysWriteInitialVol(127);
   setAlwaysWriteInitialTempo(120);

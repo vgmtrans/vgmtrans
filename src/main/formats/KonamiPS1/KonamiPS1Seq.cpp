@@ -18,6 +18,8 @@ DECLARE_FORMAT(KonamiPS1);
 KonamiPS1Seq::KonamiPS1Seq(RawFile *file, uint32_t offset, const std::string &name)
     : VGMSeq(KonamiPS1Format::name, file, offset, kHeaderSize + file->readWord(offset + 4), name) {
   bLoadTickByTick = true;
+  setVolumeAmplitudeScale(AmplitudeScale::Logarithmic);
+  setPanAmplitudeScale(AmplitudeScale::Logarithmic, PanVolumeCorrectionMode::kNoVolumeAdjust);
 
   useReverb();
 }

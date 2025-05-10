@@ -10,7 +10,8 @@ using namespace std;
 
 BGMSeq::BGMSeq(RawFile *file, uint32_t offset)
     : VGMSeq(SquarePS2Format::name, file, offset) {
-  setUseLinearAmplitudeScale(true);
+  setVolumeAmplitudeScale(AmplitudeScale::Linear);
+  setPanAmplitudeScale(AmplitudeScale::Linear, PanVolumeCorrectionMode::kNoVolumeAdjust);
   useReverb();
   setAlwaysWriteInitialVol(127);
 }

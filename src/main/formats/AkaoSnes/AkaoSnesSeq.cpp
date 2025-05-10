@@ -31,7 +31,9 @@ AkaoSnesSeq::AkaoSnesSeq(RawFile *file,
       addrSequenceEnd(0) {
   bLoadTickByTick = true;
   setAllowDiscontinuousTrackData(true);
-  setUseLinearAmplitudeScale(true);
+  setVolumeAmplitudeScale(AmplitudeScale::Linear);
+  setPanAmplitudeScale(AmplitudeScale::Linear, PanVolumeCorrectionMode::kNoVolumeAdjust);
+
 
   useReverb();
   setAlwaysWriteInitialReverb(0);

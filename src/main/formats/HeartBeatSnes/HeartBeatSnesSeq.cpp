@@ -40,6 +40,8 @@ HeartBeatSnesSeq::HeartBeatSnesSeq(RawFile *file,
       version(ver) {
   bLoadTickByTick = true;
   setAllowDiscontinuousTrackData(true);
+  setVolumeAmplitudeScale(AmplitudeScale::Logarithmic);
+  setPanAmplitudeScale(AmplitudeScale::Logarithmic, PanVolumeCorrectionMode::kNoVolumeAdjust);
 
   useReverb();
 

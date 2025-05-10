@@ -12,7 +12,8 @@ NeverlandSnesSeq::NeverlandSnesSeq(RawFile *file, NeverlandSnesVersion ver, uint
     : VGMSeq(NeverlandSnesFormat::name, file, seqdataOffset), version(ver) {
   bLoadTickByTick = true;
   setAllowDiscontinuousTrackData(true);
-  setUseLinearAmplitudeScale(true);
+  setVolumeAmplitudeScale(AmplitudeScale::Linear);
+  setPanAmplitudeScale(AmplitudeScale::Linear, PanVolumeCorrectionMode::kNoVolumeAdjust);
 
   useReverb();
   setAlwaysWriteInitialReverb(0);

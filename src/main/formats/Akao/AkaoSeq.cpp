@@ -22,7 +22,8 @@ AkaoSeq::AkaoSeq(RawFile *file, uint32_t offset, AkaoPs1Version version, std::st
       instrument_set_offset_(0), drum_set_offset_(0), condition(0) {
   setAlwaysWriteInitialVol(127);
   setAlwaysWriteInitialPitchBendRange(12 * 100);
-  setUseLinearAmplitudeScale(true);        //I think this applies, but not certain, see FF9 320, track 3 for example of problem
+  setVolumeAmplitudeScale(AmplitudeScale::Linear); //I think this applies, but not certain, see FF9 320, track 3 for example of problem
+  setPanAmplitudeScale(AmplitudeScale::Linear, PanVolumeCorrectionMode::kNoVolumeAdjust);
   //UseLinearPanAmplitudeScale(PanVolumeCorrectionMode::kAdjustVolumeController); // disabled, it only changes the volume and the pan slightly, and also its output becomes undefined if pan and volume slides are used at the same time
   bUsesIndividualArts = false;
   useReverb();

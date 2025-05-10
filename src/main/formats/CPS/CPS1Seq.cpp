@@ -10,6 +10,8 @@ CPS1Seq::CPS1Seq(RawFile *file, uint32_t offset, CPS1FormatVer fmtVersion, std::
   setUsesMonophonicTracks();
   setAlwaysWriteInitialVol(127);
   setAlwaysWriteInitialMonoMode(true);
+  setVolumeAmplitudeScale(AmplitudeScale::Logarithmic);
+  setPanAmplitudeScale(AmplitudeScale::Logarithmic, PanVolumeCorrectionMode::kNoVolumeAdjust);
 }
 
 bool CPS1Seq::parseHeader() {

@@ -6,6 +6,8 @@ using namespace std;
 
 NDSSeq::NDSSeq(RawFile *file, uint32_t offset, uint32_t length, string name)
     : VGMSeq(NDSFormat::name, file, offset, length, name) {
+  setVolumeAmplitudeScale(AmplitudeScale::Logarithmic);
+  setPanAmplitudeScale(AmplitudeScale::Logarithmic, PanVolumeCorrectionMode::kNoVolumeAdjust);
 }
 
 bool NDSSeq::parseHeader(void) {

@@ -15,6 +15,8 @@ DECLARE_FORMAT(HeartBeatPS1)
 HeartBeatPS1Seq::HeartBeatPS1Seq(RawFile *file, uint32_t offset, uint32_t length, const std::string &name)
     : VGMSeqNoTrks(HeartBeatPS1Format::name, file, offset, name) {
   this->length() = length;
+  setVolumeAmplitudeScale(AmplitudeScale::Logarithmic);
+  setPanAmplitudeScale(AmplitudeScale::Logarithmic, PanVolumeCorrectionMode::kNoVolumeAdjust);
 
   useReverb();
 }

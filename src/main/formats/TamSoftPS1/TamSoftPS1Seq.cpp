@@ -40,7 +40,8 @@ const uint16_t TamSoftPS1Seq::PITCH_TABLE[73] = {
 TamSoftPS1Seq::TamSoftPS1Seq(RawFile *file, uint32_t offset, uint8_t theSong, const std::string &name)
     : VGMSeq(TamSoftPS1Format::name, file, offset, 0, name), song(theSong), ps2(false), type(0) {
   bLoadTickByTick = true;
-  setUseLinearAmplitudeScale(true);
+  setVolumeAmplitudeScale(AmplitudeScale::Linear);
+  setPanAmplitudeScale(AmplitudeScale::Linear, PanVolumeCorrectionMode::kNoVolumeAdjust);
 
   const double PSX_NTSC_FRAMERATE = 53222400.0 / 263.0 / 3413.0;
   setAlwaysWriteInitialTempo(60.0 / (SEQ_PPQN / PSX_NTSC_FRAMERATE));

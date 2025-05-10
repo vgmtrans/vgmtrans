@@ -31,6 +31,8 @@ NinSnesSeq::NinSnesSeq(RawFile *file,
   bLoadTickByTick = true;
   setAllowDiscontinuousTrackData(true);
 
+  setVolumeAmplitudeScale(AmplitudeScale::Logarithmic);
+  setPanAmplitudeScale(AmplitudeScale::Logarithmic, PanVolumeCorrectionMode::kNoVolumeAdjust);
   useReverb();
   setAlwaysWriteInitialReverb(0);
 

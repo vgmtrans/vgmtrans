@@ -32,7 +32,8 @@ CompileSnesSeq::CompileSnesSeq(RawFile *file, CompileSnesVersion ver, uint32_t s
       STATUS_DURATION_MAX(0xee) {
   bLoadTickByTick = true;
   setAllowDiscontinuousTrackData(true);
-
+  setVolumeAmplitudeScale(AmplitudeScale::Logarithmic);
+  setPanAmplitudeScale(AmplitudeScale::Logarithmic, PanVolumeCorrectionMode::kNoVolumeAdjust);
   loadEventMap();
 }
 

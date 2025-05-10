@@ -374,7 +374,7 @@ void SeqTrack::addNoteOn(uint32_t offset, uint32_t length, int8_t key, int8_t ve
 void SeqTrack::addNoteOnNoItem(int8_t key, int8_t velocity) {
   if (readMode == READMODE_CONVERT_TO_MIDI) {
     uint8_t finalVel = velocity;
-    if (parentSeq->usesLinearAmplitudeScale())
+    if (parentSeq->volumeAmplitudeScale() == AmplitudeScale::Linear)
       finalVel = convert7bitPercentVolValToStdMidiVal(velocity);
 
     if (cDrumNote == -1) {
@@ -423,7 +423,7 @@ void SeqTrack::insertNoteOn(uint32_t offset,
   onEvent(offset, length);
 
   uint8_t finalVel = vel;
-  if (parentSeq->usesLinearAmplitudeScale())
+  if (parentSeq->volumeAmplitudeScale() == AmplitudeScale::Linear)
     finalVel = convert7bitPercentVolValToStdMidiVal(vel);
 
   if (readMode == READMODE_ADD_TO_UI && !isItemAtOffset(offset, true)) {
@@ -517,7 +517,7 @@ void SeqTrack::addNoteByDur(uint32_t offset,
 void SeqTrack::addNoteByDurNoItem(int8_t key, int8_t vel, uint32_t dur) {
   if (readMode == READMODE_CONVERT_TO_MIDI) {
     uint8_t finalVel = vel;
-    if (parentSeq->usesLinearAmplitudeScale())
+    if (parentSeq->volumeAmplitudeScale() == AmplitudeScale::Linear)
       finalVel = convert7bitPercentVolValToStdMidiVal(vel);
 
     if (cDrumNote == -1) {
@@ -546,7 +546,7 @@ void SeqTrack::addNoteByDur_Extend(uint32_t offset,
 void SeqTrack::addNoteByDurNoItem_Extend(int8_t key, int8_t vel, uint32_t dur) {
   if (readMode == READMODE_CONVERT_TO_MIDI) {
     uint8_t finalVel = vel;
-    if (parentSeq->usesLinearAmplitudeScale())
+    if (parentSeq->volumeAmplitudeScale() == AmplitudeScale::Linear)
       finalVel = convert7bitPercentVolValToStdMidiVal(vel);
 
     if (cDrumNote == -1) {
@@ -612,7 +612,7 @@ void SeqTrack::insertNoteByDur(uint32_t offset,
   }
   else if (readMode == READMODE_CONVERT_TO_MIDI) {
     uint8_t finalVel = vel;
-    if (parentSeq->usesLinearAmplitudeScale())
+    if (parentSeq->volumeAmplitudeScale() == AmplitudeScale::Linear)
       finalVel = convert7bitPercentVolValToStdMidiVal(vel);
 
     pMidiTrack->insertNoteByDur(channel, key + cKeyCorrection + transpose, finalVel, dur, absTime);
@@ -658,9 +658,9 @@ void SeqTrack::addVol(uint32_t offset, uint32_t length, uint8_t newVol, const st
 void SeqTrack::addVolNoItem(uint8_t newVol) {
   if (readMode == READMODE_CONVERT_TO_MIDI) {
     double newVolPercent = newVol / 127.0;
-    if (parentSeq->panVolumeCorrectionMode == PanVolumeCorrectionMode::kAdjustVolumeController)
+    if (parentSeq->panVolumeCorrectionMode() == PanVolumeCorrectionMode::kAdjustVolumeController)
       newVolPercent *= panVolumeCorrectionRate;
-    if (parentSeq->usesLinearAmplitudeScale())
+    if (parentSeq->volumeAmplitudeScale() == AmplitudeScale::Linear)
       newVolPercent = sqrt(newVolPercent);
 
     const uint8_t finalVol = static_cast<uint8_t>(std::min(newVolPercent * 127, 127.0));
@@ -682,9 +682,9 @@ void SeqTrack::addVolume14Bit(uint32_t offset, uint32_t length, uint16_t volume,
 void SeqTrack::addVolume14BitNoItem(uint16_t volume) {
   if (readMode == READMODE_CONVERT_TO_MIDI) {
     double newVolPercent = std::min(volume / (127.0 * 127.0), 1.0);
-    if (parentSeq->panVolumeCorrectionMode == PanVolumeCorrectionMode::kAdjustVolumeController)
+    if (parentSeq->panVolumeCorrectionMode() == PanVolumeCorrectionMode::kAdjustVolumeController)
       newVolPercent *= panVolumeCorrectionRate;
-    if (parentSeq->usesLinearAmplitudeScale())
+    if (parentSeq->volumeAmplitudeScale() == AmplitudeScale::Linear)
       newVolPercent = sqrt(newVolPercent);
 
     const uint16_t finalVol = static_cast<uint16_t>(std::min(newVolPercent * 16383.0, 16383.0));
@@ -706,11 +706,13 @@ void SeqTrack::addVolSlide(uint32_t offset,
   if (readMode == READMODE_ADD_TO_UI && !isItemAtOffset(offset, true))
     addEvent(new VolSlideSeqEvent(this, targVol, dur, offset, length, sEventName));
   else if (readMode == READMODE_CONVERT_TO_MIDI)
-    addControllerSlide(dur,
-                       vol,
-                       targVol,
-                       parentSeq->usesLinearAmplitudeScale() ? convert7bitPercentVolValToStdMidiVal : nullptr,
-                       &MidiTrack::insertVol);
+    addControllerSlide(
+      dur,
+      vol,
+      targVol,
+      parentSeq->volumeAmplitudeScale() == AmplitudeScale::Linear ? convert7bitPercentVolValToStdMidiVal : nullptr,
+      &MidiTrack::insertVol
+    );
 }
 
 void SeqTrack::insertVol(uint32_t offset,
@@ -721,9 +723,9 @@ void SeqTrack::insertVol(uint32_t offset,
   onEvent(offset, length);
 
   double newVolPercent = newVol / 127.0;
-  if (parentSeq->panVolumeCorrectionMode == PanVolumeCorrectionMode::kAdjustVolumeController)
+  if (parentSeq->panVolumeCorrectionMode() == PanVolumeCorrectionMode::kAdjustVolumeController)
     newVolPercent *= panVolumeCorrectionRate;
-  if (parentSeq->usesLinearAmplitudeScale())
+  if (parentSeq->volumeAmplitudeScale() == AmplitudeScale::Linear)
     newVolPercent = sqrt(newVolPercent);
 
   const uint8_t finalVol = static_cast<uint8_t>(std::min(newVolPercent * 127, 127.0));
@@ -745,9 +747,9 @@ void SeqTrack::addExpression(uint32_t offset, uint32_t length, uint8_t level, co
 void SeqTrack::addExpressionNoItem(uint8_t level) {
   if (readMode == READMODE_CONVERT_TO_MIDI) {
     double newVolPercent = level / 127.0;
-    if (parentSeq->panVolumeCorrectionMode == PanVolumeCorrectionMode::kAdjustExpressionController)
+    if (parentSeq->panVolumeCorrectionMode() == PanVolumeCorrectionMode::kAdjustExpressionController)
       newVolPercent *= panVolumeCorrectionRate;
-    if (parentSeq->usesLinearAmplitudeScale())
+    if (parentSeq->volumeAmplitudeScale() == AmplitudeScale::Linear)
       newVolPercent = sqrt(newVolPercent);
 
     const uint8_t finalExpression = static_cast<uint8_t>(std::min(newVolPercent * 127, 127.0));
@@ -766,11 +768,13 @@ void SeqTrack::addExpressionSlide(uint32_t offset,
   if (readMode == READMODE_ADD_TO_UI && !isItemAtOffset(offset, true))
     addEvent(new ExpressionSlideSeqEvent(this, targExpr, dur, offset, length, sEventName));
   else if (readMode == READMODE_CONVERT_TO_MIDI)
-    addControllerSlide(dur,
-                       expression,
-                       targExpr,
-                       parentSeq->usesLinearAmplitudeScale() ? convert7bitPercentVolValToStdMidiVal : nullptr,
-                       &MidiTrack::insertExpression);
+    addControllerSlide(
+      dur,
+      expression,
+      targExpr,
+      parentSeq->volumeAmplitudeScale() == AmplitudeScale::Linear ? convert7bitPercentVolValToStdMidiVal : nullptr,
+      &MidiTrack::insertExpression
+    );
 }
 
 void SeqTrack::insertExpression(uint32_t offset,
@@ -781,9 +785,9 @@ void SeqTrack::insertExpression(uint32_t offset,
   onEvent(offset, length);
 
   double newVolPercent = level / 127.0;
-  if (parentSeq->panVolumeCorrectionMode == PanVolumeCorrectionMode::kAdjustExpressionController)
+  if (parentSeq->panVolumeCorrectionMode() == PanVolumeCorrectionMode::kAdjustExpressionController)
     newVolPercent *= panVolumeCorrectionRate;
-  if (parentSeq->usesLinearAmplitudeScale())
+  if (parentSeq->volumeAmplitudeScale() == AmplitudeScale::Linear)
     newVolPercent = sqrt(newVolPercent);
 
   const uint8_t finalExpression = static_cast<uint8_t>(std::min(newVolPercent * 127, 127.0));
@@ -806,7 +810,7 @@ void SeqTrack::addMasterVol(uint32_t offset, uint32_t length, uint8_t newVol, co
 void SeqTrack::addMasterVolNoItem(uint8_t newVol) {
   if (readMode == READMODE_CONVERT_TO_MIDI) {
     uint8_t finalVol = newVol;
-    if (parentSeq->usesLinearAmplitudeScale())
+    if (parentSeq->volumeAmplitudeScale() == AmplitudeScale::Linear)
       finalVol = convert7bitPercentVolValToStdMidiVal(newVol);
 
     pMidiTrack->addMasterVol(channel, finalVol);
@@ -824,11 +828,12 @@ void SeqTrack::addMastVolSlide(uint32_t offset,
   if (readMode == READMODE_ADD_TO_UI && !isItemAtOffset(offset, true))
     addEvent(new MastVolSlideSeqEvent(this, targVol, dur, offset, length, sEventName));
   else if (readMode == READMODE_CONVERT_TO_MIDI)
-    addControllerSlide(dur,
-                       mastVol,
-                       targVol,
-                       parentSeq->usesLinearAmplitudeScale() ? convert7bitPercentVolValToStdMidiVal : nullptr,
-                       &MidiTrack::insertMasterVol);
+    addControllerSlide(
+      dur,
+      mastVol,
+      targVol,
+      parentSeq->volumeAmplitudeScale() == AmplitudeScale::Linear ? convert7bitPercentVolValToStdMidiVal : nullptr,
+      &MidiTrack::insertMasterVol);
 }
 
 void SeqTrack::addPan(uint32_t offset, uint32_t length, uint8_t pan, const std::string &sEventName) {
@@ -841,12 +846,12 @@ void SeqTrack::addPan(uint32_t offset, uint32_t length, uint8_t pan, const std::
 
 void SeqTrack::addPanNoItem(uint8_t pan) {
   if (readMode == READMODE_CONVERT_TO_MIDI) {
-    const uint8_t midiPan = parentSeq->usesLinearPanAmplitudeScale()
+    const uint8_t midiPan = parentSeq->panAmplitudeScale() == AmplitudeScale::Linear
       ? convert7bitLinearPercentPanValToStdMidiVal(pan, &panVolumeCorrectionRate)
       : pan;
     pMidiTrack->addPan(channel, midiPan);
 
-    switch (parentSeq->panVolumeCorrectionMode) {
+    switch (parentSeq->panVolumeCorrectionMode()) {
     case PanVolumeCorrectionMode::kAdjustVolumeController:
       addVolNoItem(vol);
       break;
@@ -886,13 +891,13 @@ void SeqTrack::insertPan(uint32_t offset,
   if (readMode == READMODE_ADD_TO_UI && !isItemAtOffset(offset, true))
     addEvent(new PanSeqEvent(this, pan, offset, length, sEventName));
   else if (readMode == READMODE_CONVERT_TO_MIDI) {
-    const uint8_t midiPan = parentSeq->usesLinearAmplitudeScale()
+    const uint8_t midiPan = parentSeq->panAmplitudeScale() == AmplitudeScale::Linear
       ? convert7bitLinearPercentPanValToStdMidiVal(pan, &panVolumeCorrectionRate)
       : pan;
     pMidiTrack->insertPan(channel, midiPan, absTime);
 
     // TODO: (bugfix) Pan volume compensation does not work properly when using pan slider and volume slider at the same time
-    switch (parentSeq->panVolumeCorrectionMode) {
+    switch (parentSeq->panVolumeCorrectionMode()) {
     case PanVolumeCorrectionMode::kAdjustVolumeController:
       insertVol(offset, length, vol, absTime);
       break;

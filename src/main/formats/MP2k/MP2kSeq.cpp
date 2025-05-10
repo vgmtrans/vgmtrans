@@ -36,6 +36,8 @@ constexpr u8 STATE_MODULATION = 6;
 MP2kSeq::MP2kSeq(RawFile *file, uint32_t offset, std::string name)
     : VGMSeq(MP2kFormat::name, file, offset, 0, std::move(name)) {
   setAllowDiscontinuousTrackData(true);
+  setVolumeAmplitudeScale(AmplitudeScale::Logarithmic);   // TODO: verify this is intended.
+  setPanAmplitudeScale(AmplitudeScale::Logarithmic, PanVolumeCorrectionMode::kNoVolumeAdjust);
 }
 
 bool MP2kSeq::parseHeader() {

@@ -6,10 +6,10 @@ OrgSeq::OrgSeq(RawFile *file, uint32_t offset)
     : VGMSeq(OrgFormat::name, file, offset, 0, "Org Seq") {
 }
 
-OrgSeq::~OrgSeq(void) {
+OrgSeq::~OrgSeq() {
 }
 
-bool OrgSeq::parseHeader(void) {
+bool OrgSeq::parseHeader() {
   waitTime = readShort(dwOffset + 6);
   beatsPerMeasure = readByte(dwOffset + 8);
   setPPQN(readByte(dwOffset + 9));
