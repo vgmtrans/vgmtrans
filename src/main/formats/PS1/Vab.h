@@ -2,8 +2,9 @@
 #include "VGMInstrSet.h"
 #include "VGMSampColl.h"
 #include "VGMRgn.h"
+#include "VGMSamp.h"
 
-//VAB Header
+// VAB Header
 struct VabHdr {
   int32_t form;
   /*always "VABp"*/
@@ -109,9 +110,13 @@ class Vab:
 
   virtual bool parseHeader();
   virtual bool parseInstrPointers();
+  bool isViableSampCollMatch(VGMSampColl* sampColl) override;
 
  public:
   VabHdr hdr;
+
+private:
+  std::vector<SizeOffsetPair> m_vagLocations;
 };
 
 

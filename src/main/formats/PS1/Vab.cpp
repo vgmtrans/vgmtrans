@@ -115,14 +115,13 @@ bool Vab::parseInstrPointers() {
 
   if ((offVAGOffsets + 2 * 256) <= nEndOffset) {
     char name[256];
-    std::vector<SizeOffsetPair> vagLocations;
     uint32_t totalVAGSize = 0;
     VGMHeader *vagOffsetHdr = addHeader(offVAGOffsets, 2 * 256, "VAG Pointer Table");
 
     uint32_t vagStartOffset = offVAGOffsets + 2 * 256;
     uint32_t vagOffset = 0;
 
-    for (uint32_t i = 0; i < numVAGs; i++) {
+    for (uint32_t i = 1; i < numVAGs + 1; i++) {
       uint32_t vagSize = readShort(offVAGOffsets + i * 2) * 8;
 
       snprintf(name, 256, "VAG Size /8 #%u", i);
@@ -130,7 +129,7 @@ bool Vab::parseInstrPointers() {
 
       auto absoluteVagOffset = vagStartOffset + vagOffset;
       if (absoluteVagOffset + vagSize <= nEndOffset) {
-        vagLocations.emplace_back(vagOffset, vagSize);
+        m_vagLocations.emplace_back(vagOffset, vagSize);
         totalVAGSize += vagSize;
       }
       else {
@@ -141,13 +140,16 @@ bool Vab::parseInstrPointers() {
     }
     unLength = vagStartOffset - dwOffset;
 
-    // single VAB file?
-    if (dwOffset == 0 && vagLocations.size() != 0) {
-      // load samples as well
-      PSXSampColl *newSampColl = new PSXSampColl(formatName(), this, vagStartOffset, totalVAGSize, vagLocations);
+    if (rawFile()->size() < vagStartOffset + 0x20)
+      return true;
+
+    // Check if samples are appended at the end, preceded by a size value
+    const u32 sampCollSize = rawFile()->readWord(vagStartOffset);
+    if (m_vagLocations.size() != 0 && sampCollSize == totalVAGSize) {
+      PSXSampColl *newSampColl = new PSXSampColl(formatName(), this, vagStartOffset + 4, totalVAGSize, m_vagLocations);
       if (newSampColl->loadVGMFile()) {
         pRoot->addVGMFile(newSampColl);
-        //this->sampColl = newSampColl;
+        this->sampColl = newSampColl;
       }
       else {
         delete newSampColl;
@@ -158,10 +160,24 @@ bool Vab::parseInstrPointers() {
   return true;
 }
 
+bool Vab::isViableSampCollMatch(VGMSampColl* sampColl) {
+  int sampleIndex = 0;
+  auto sampCollOffset = sampColl->dwOffset;
+  for (auto& vagLoc : m_vagLocations) {
+    if (vagLoc.offset == 0 && vagLoc.size == 0)
+      continue;
 
+    if (sampleIndex >= sampColl->samples.size())
+      return false;
 
-
-
+    auto sample = sampColl->samples[sampleIndex++];
+    auto sampleRelOffset = sample->dwOffset - sampCollOffset;
+    if (sampleRelOffset != vagLoc.offset ||
+      (sample->unLength > vagLoc.size + 32 || sample->unLength < vagLoc.size))
+      return false;
+  }
+  return true;
+}
 
 // ********
 // VabInstr
@@ -177,7 +193,7 @@ VabInstr::VabInstr(VGMInstrSet *instrSet,
       masterVol(127) {
 }
 
-VabInstr::~VabInstr(void) {
+VabInstr::~VabInstr() {
 }
 
 
@@ -187,16 +203,12 @@ bool VabInstr::loadInstr() {
     VabRgn *rgn = new VabRgn(this, dwOffset + i * 0x20);
     if (!rgn->loadRgn()) {
       delete rgn;
-      return false;
+      continue;
     }
     addRgn(rgn);
   }
   return true;
 }
-
-
-
-
 
 // ******
 // VabRgn
@@ -205,7 +217,6 @@ bool VabInstr::loadInstr() {
 VabRgn::VabRgn(VabInstr *instr, uint32_t offset)
     : VGMRgn(instr, offset) {
 }
-
 
 bool VabRgn::loadRgn() {
   VabInstr *instr = (VabInstr *) parInstr;
@@ -242,6 +253,7 @@ bool VabRgn::loadRgn() {
     sampNum = 0;
 
   if (keyLow > keyHigh) {
+    // This error may be present in actual game data. Example: Final Fantasy Origins: Chaos' Temple
     L_ERROR("Low Key ({}) is higher than High Key ({})  Offset: 0x{:X}", keyLow, keyHigh, dwOffset);
     return false;
   }

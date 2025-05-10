@@ -35,8 +35,13 @@ bool PS1Seq::parseHeader() {
   seqHeader->addSig(offset() + 0x0D, 2); // Rhythm (Numerator) and Rhythm (Denominator) (2^n)
 
   if (readByte(offset() + 0xF) == 0 && readByte(offset() + 0x10) == 0) {
+    u32 newSeqOffset = offset() + readShortBE(offset() + 0x11) + 0x13 - 6;
+    // Check that there's a plausible amount of space for the sequence
+    if (newSeqOffset > rawFile()->size() - 100)
+      return false;
+
     setEventsOffset(offset() + 0x0F + 4);
-    PS1Seq *newPS1Seq = new PS1Seq(rawFile(), offset() + readShortBE(offset() + 0x11) + 0x13 - 6);
+    PS1Seq *newPS1Seq = new PS1Seq(rawFile(), newSeqOffset);
     if (!newPS1Seq->loadVGMFile()) {
       delete newPS1Seq;
     }

@@ -25,6 +25,7 @@ public:
   virtual bool parseHeader();
   virtual bool parseInstrPointers();
   virtual bool loadInstrs();
+  virtual bool isViableSampCollMatch(VGMSampColl*) { return true; }
 
   VGMInstr *addInstr(uint32_t offset, uint32_t length, uint32_t bank, uint32_t instrNum,
                      const std::string &instrName = "");
