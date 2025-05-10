@@ -8,6 +8,7 @@
 
 #include <QTabBar>
 #include <QApplication>
+#include <QShortcut>
 #include <VGMFile.h>
 #include "VGMFileView.h"
 #include "Metrics.h"
@@ -30,6 +31,46 @@ MdiArea::MdiArea(QWidget *parent) : QMdiArea(parent) {
     tab_bar->setElideMode(Qt::ElideNone);
 #endif
   }
+
+  // Create OS-specific keyboard shortcuts
+  auto addShortcut = [this](const QKeySequence &seq, auto slot)
+  {
+    auto *sc = new QShortcut(seq, this);
+    sc->setContext(Qt::WindowShortcut);
+    connect(sc, &QShortcut::activated, this, slot);
+  };
+
+#ifdef Q_OS_MAC
+  // Cmd ⇧ [  /  Cmd ⇧ ]
+  addShortcut(QKeySequence(Qt::CTRL | Qt::SHIFT | Qt::Key_BracketLeft),
+              &QMdiArea::activatePreviousSubWindow);
+  addShortcut(QKeySequence(Qt::CTRL | Qt::SHIFT | Qt::Key_BracketRight),
+              &QMdiArea::activateNextSubWindow);
+
+  // Cmd ⌥ ←  /  Cmd ⌥ →
+  addShortcut(QKeySequence(Qt::CTRL | Qt::ALT | Qt::Key_Left),
+              &QMdiArea::activatePreviousSubWindow);
+  addShortcut(QKeySequence(Qt::CTRL | Qt::ALT | Qt::Key_Right),
+              &QMdiArea::activateNextSubWindow);
+
+  // Ctrl + PageDown / Ctrl + PageUp
+  addShortcut(QKeySequence(Qt::META | Qt::Key_PageDown),
+              &QMdiArea::activateNextSubWindow);
+  addShortcut(QKeySequence(Qt::META | Qt::Key_PageUp),
+              &QMdiArea::activatePreviousSubWindow);
+#else   // Windows & Linux
+  // Ctrl + Tab  /  Ctrl + Shift + Tab
+  addShortcut(QKeySequence(Qt::CTRL | Qt::Key_Tab),
+              &QMdiArea::activateNextSubWindow);
+  addShortcut(QKeySequence(Qt::CTRL | Qt::SHIFT | Qt::Key_Tab),
+              &QMdiArea::activatePreviousSubWindow);
+
+  // Ctrl + PageDown / Ctrl + PageUp
+  addShortcut(QKeySequence(Qt::CTRL | Qt::Key_PageDown),
+              &QMdiArea::activateNextSubWindow);
+  addShortcut(QKeySequence(Qt::CTRL | Qt::Key_PageUp),
+              &QMdiArea::activatePreviousSubWindow);
+#endif
 }
 
 void MdiArea::newView(VGMFile *file) {
