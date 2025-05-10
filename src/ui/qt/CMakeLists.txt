@@ -168,7 +168,7 @@ if(CMAKE_SYSTEM_NAME MATCHES "Darwin")
 elseif(CMAKE_SYSTEM_NAME MATCHES "Windows")
   # Make sure the executable ends up in the binary directory without any
   # additional folders
-  set(RESOURCE_PATH ${CMAKE_RUNTIME_OUTPUT_DIRECTORY})
+  set(RESOURCE_PATH "$<TARGET_FILE_DIR:vgmtrans>")
 
   set_target_properties(
     vgmtrans PROPERTIES RUNTIME_OUTPUT_DIRECTORY
@@ -200,7 +200,7 @@ elseif(CMAKE_SYSTEM_NAME MATCHES "Windows")
       "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}")
 
 elseif(CMAKE_SYSTEM_NAME MATCHES "FreeBSD|OpenBSD|Linux")
-  set(RESOURCE_PATH ${CMAKE_RUNTIME_OUTPUT_DIRECTORY})
+  set(RESOURCE_PATH "$<TARGET_FILE_DIR:vgmtrans>")
 
   install(TARGETS vgmtrans DESTINATION "${CMAKE_INSTALL_PREFIX}/bin")
   install(
