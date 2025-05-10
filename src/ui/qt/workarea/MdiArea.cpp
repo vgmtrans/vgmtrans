@@ -36,7 +36,7 @@ MdiArea::MdiArea(QWidget *parent) : QMdiArea(parent) {
   auto addShortcut = [this](const QKeySequence &seq, auto slot)
   {
     auto *sc = new QShortcut(seq, this);
-    sc->setContext(Qt::WindowShortcut);          // active for this window only
+    sc->setContext(Qt::WindowShortcut);
     connect(sc, &QShortcut::activated, this, slot);
   };
 
@@ -53,6 +53,11 @@ MdiArea::MdiArea(QWidget *parent) : QMdiArea(parent) {
   addShortcut(QKeySequence(Qt::CTRL | Qt::ALT | Qt::Key_Right),
               &QMdiArea::activateNextSubWindow);
 
+  // Ctrl + PageDown / Ctrl + PageUp
+  addShortcut(QKeySequence(Qt::META | Qt::Key_PageDown),
+              &QMdiArea::activateNextSubWindow);
+  addShortcut(QKeySequence(Qt::META | Qt::Key_PageUp),
+              &QMdiArea::activatePreviousSubWindow);
 #else   // Windows & Linux
   // Ctrl + Tab  /  Ctrl + Shift + Tab
   addShortcut(QKeySequence(Qt::CTRL | Qt::Key_Tab),
