@@ -34,6 +34,8 @@ void AkaoSeq::resetVars() {
   condition = 0;
   if (rawFile()->tag.album == "Final Fantasy 9" && rawFile()->tag.title == "Final Battle")
     condition = 2;
+  else if (rawFile()->tag.album == "Parasite Eve" && rawFile()->tag.title == "UB")
+    condition = 2;
 }
 
 bool AkaoSeq::isPossibleAkaoSeq(const RawFile *file, uint32_t offset) {
