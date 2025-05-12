@@ -12,5 +12,8 @@ class PS1Seq:
   virtual bool readEvent();
 
  private:
-  uint8_t runningStatus;
+  u8 m_runningStatus;
+  u8 m_hasSetProgramForChannel[16]{};  // It seems the program assignment defaults to channel number,
+                                       // (example: Umihara Kawase: Shun). We use these flags to track if
+                                       // a default program change event is necessary for each channel
 };

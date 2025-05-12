@@ -27,7 +27,7 @@ void PS1SeqScanner::scan(RawFile* file, void* /*info*/) {
   );
   // skip sample collection search if we found vabs and every one had an associated sample collection
   if (vabs.empty() || vabsDontOwnSampColls) {
-    PSXSampColl::searchForPSXADPCM(file, PS1Format::name);
+    PSXSampColl::searchForPSXADPCMs(file, PS1Format::name);
   }
 }
 

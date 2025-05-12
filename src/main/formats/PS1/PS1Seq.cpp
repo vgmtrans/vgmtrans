@@ -65,6 +65,7 @@ void PS1Seq::resetVars() {
   uint8_t numer = readByte(offset() + 0x0D);
   uint8_t denom = readByte(offset() + 0x0E);
   addTimeSig(offset() + 0x0D, 2, numer, 1 << denom, (uint8_t) ppqn());
+  std::ranges::fill(m_hasSetProgramForChannel, u8{0});
 }
 
 bool PS1Seq::readEvent() {
@@ -119,11 +120,11 @@ bool PS1Seq::readEvent() {
         return false;
       }
     }
-    status_byte = runningStatus;
+    status_byte = m_runningStatus;
     curOffset--;
   }
   else
-    runningStatus = status_byte;
+    m_runningStatus = status_byte;
 
 
   channel = status_byte & 0x0F;
@@ -135,8 +136,13 @@ bool PS1Seq::readEvent() {
       auto key = readByte(curOffset++);
       auto vel = readByte(curOffset++);
       //if the velocity is > 0, it's a note on. otherwise it's a note off
-      if (vel > 0)
+      if (vel > 0) {
+        if (!m_hasSetProgramForChannel[channel]) {
+          addProgramChangeNoItem(channel, false);
+          m_hasSetProgramForChannel[channel] = true;
+        }
         addNoteOn(beginOffset, curOffset - beginOffset, key, vel);
+      }
       else
         addNoteOff(beginOffset, curOffset - beginOffset, key);
       break;
@@ -265,6 +271,7 @@ bool PS1Seq::readEvent() {
     case 0xC0 : {
       uint8_t progNum = readByte(curOffset++);
       addProgramChange(beginOffset, curOffset - beginOffset, progNum);
+      m_hasSetProgramForChannel[channel] = true;
     }
       break;
 

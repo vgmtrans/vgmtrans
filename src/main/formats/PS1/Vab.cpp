@@ -139,22 +139,6 @@ bool Vab::parseInstrPointers() {
       vagOffset += vagSize;
     }
     unLength = vagStartOffset - dwOffset;
-
-    if (rawFile()->size() < vagStartOffset + 0x20)
-      return true;
-
-    // Check if samples are appended at the end, preceded by a size value
-    const u32 sampCollSize = rawFile()->readWord(vagStartOffset);
-    if (m_vagLocations.size() != 0 && sampCollSize == totalVAGSize) {
-      PSXSampColl *newSampColl = new PSXSampColl(formatName(), this, vagStartOffset + 4, totalVAGSize, m_vagLocations);
-      if (newSampColl->loadVGMFile()) {
-        pRoot->addVGMFile(newSampColl);
-        this->sampColl = newSampColl;
-      }
-      else {
-        delete newSampColl;
-      }
-    }
   }
 
   return true;
