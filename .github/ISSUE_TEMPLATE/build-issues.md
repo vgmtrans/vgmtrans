@@ -1,7 +1,9 @@
 ---
 name: Build issues
 about: Report failures related to the build system (only for the Qt version)
-labels: 
+title: ''
+labels: ''
+assignees: ''
 
 ---
 
