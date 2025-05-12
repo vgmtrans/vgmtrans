@@ -8,6 +8,10 @@
 using namespace std;
 
 
+static bool isValidSampleStart(const RawFile* file, u32 offset, bool allowShort);
+static bool isZero16(const RawFile* f, u32 ofs);
+static bool isValidFilterShiftByte(u8 b);
+static bool isValidFlagByte(u8 b);
 
 // ***********
 // PSXSampColl
@@ -36,11 +40,11 @@ bool PSXSampColl::parseSampleInfo() {
     //We do this by searching for series of 16 0x00 value bytes.  These indicate the beginning of a sample,
     //and they will never be found at any other point within the adpcm sample data.
 
-    uint32_t nEndOffset = dwOffset + unLength;
+    u32 nEndOffset = dwOffset + unLength;
     if (unLength == 0)
       nEndOffset = endOffset();
 
-    uint32_t i = dwOffset;
+    u32 i = dwOffset;
     while (i + 32 <= nEndOffset) {
       bool isSample = false;
 
@@ -83,57 +87,85 @@ bool PSXSampColl::parseSampleInfo() {
         }
       }
 
-      if (isSample) {
-        uint32_t extraGunkLength = 0;
-        uint8_t filterRangeByte = readByte(i + 16);
-        uint8_t keyFlagByte = readByte(i + 16 + 1);
-        if ((keyFlagByte & 0xF8) != 0)
-          break;
+      if (!isSample)
+        break;
 
-        //if (filterRangeByte == 0 && keyFlagByte == 0)	// Breaking on FFXII 309 - Eruyt Village at 61D50 of the WD
-        if (readWord(i + 16) == 0 && readWord(i + 20) == 0 && readWord(i + 24) == 0 && readWord(i + 28) == 0)
-          break;
+      // We've found the start of a sample. Now we determine its length and add it.
 
-        uint32_t beginOffset = i;
+      u32 extraGunkLength = 0;
+      u8 filterRangeByte = readByte(i + 16);
+      u8 keyFlagByte = readByte(i + 16 + 1);
+
+      if (!isValidFlagByte(keyFlagByte) || !isValidFilterShiftByte(filterRangeByte))
+        break;
+
+      if (isZero16(rawFile(), i + 16))
+        break;
+
+      u32 beginOffset = i;
+      i += 16;
+
+      //skip through until we reach the chunk with the end flag set
+      u32 endLoopOffset = 0;  // This will mark the end of the first frame that has an end flag set.
+                              // Occasionally, the data for a given sample may extend beyond this point
+                              // for some reason. For conversion, we treat this as the end of the sample.
+      while (i + 16 <= nEndOffset) {
+
+        // This is uncommon, but seen in poorly-ripped PSFs
+        if (isZero16(rawFile(), i)) {
+          break;
+        }
+
+        u8 flagByte = readByte(i + 1);
+        u8 endFlag = ((flagByte & 1) != 0);
         i += 16;
 
-        //skip through until we reach the chunk with the end flag set
-        bool loopEnd = false;
-        while (i + 16 <= nEndOffset && !loopEnd) {
-          loopEnd = ((readByte(i + 1) & 1) != 0);
-          i += 16;
-        }
+        if (endFlag) {
+          endLoopOffset = endLoopOffset == 0 ? i : endLoopOffset;
 
-        //deal with exceptional cases where we see 00 07 77 77 77 77 77 etc.
-        while (i + 16 <= nEndOffset) {
-          loopEnd = ((readByte(i + 1) & 1) != 0);
-          if (!loopEnd) {
+          // We found an end flag. Check for vestigial ADPCM frames beyond it
+          if (i + 16 < nEndOffset) {
+            u8 nextFilterShiftByte = readByte(i);
+            u8 nextFlagByte = readByte(i + 1);
+            if (nextFlagByte < 1 || nextFlagByte > 3 || !isValidFilterShiftByte(nextFilterShiftByte)) {
+              break;
+            }
+          } else {
             break;
           }
+        }
+      }
+
+      // Handle the case of an end frame using the format 00 07 77 77 77 77 77 etc
+      while (i + 16 <= nEndOffset) {
+        u8 filterShiftByte = readByte(i);
+        u8 flagByte = readByte(i + 1);
+        if (filterShiftByte == 0 && flagByte == 7) {
           extraGunkLength += 16;
           i += 16;
+        } else {
+          break;
         }
-
-        ostringstream name;
-        name << "Sample " << samples.size();
-        PSXSamp *samp = new PSXSamp(this,
-                                    beginOffset,
-                                    i - beginOffset,
-                                    beginOffset,
-                                    i - beginOffset - extraGunkLength,
-                                    1,
-                                    16,
-                                    44100,
-                                    name.str());
-        samples.push_back(samp);
       }
-      else
-        break;
+      PSXSamp *samp = new PSXSamp(this,
+                                  beginOffset,
+                                  i - beginOffset,
+                                  beginOffset,
+                                  endLoopOffset - beginOffset - extraGunkLength,
+                                  1,
+                                  16,
+                                  44100,
+                                  fmt::format("Sample {:d}", samples.size()));
+      samples.push_back(samp);
     }
     unLength = i - dwOffset;
   }
   else {
     uint32_t sampleIndex = 0;
+
+    if (!isValidSampleStart(rawFile(), dwOffset, true))
+      return false;
+
     for (std::vector<SizeOffsetPair>::iterator it = vagLocations.begin(); it != vagLocations.end(); ++it) {
       if (it->offset == 0 && it->size == 0)
         continue;
@@ -154,8 +186,6 @@ bool PSXSampColl::parseSampleInfo() {
         offSampEnd += 16;
       } while (!lastBlock);
 
-      ostringstream name;
-      name << "Sample " << sampleIndex;
       PSXSamp *samp = new PSXSamp(this,
                                   dwOffset + it->offset,
                                   it->size,
@@ -164,32 +194,13 @@ bool PSXSampColl::parseSampleInfo() {
                                   1,
                                   16,
                                   44100,
-                                  name.str());
+                                  fmt::format("Sample {:d}", sampleIndex));
+
       samples.push_back(samp);
       sampleIndex++;
     }
   }
   return unLength > 0x20;
-}
-
-// GENERIC FUNCTION USED FOR SCANNERS
-PSXSampColl *PSXSampColl::searchForPSXADPCM(RawFile *file, const string &format) {
-  const std::vector<PSXSampColl *> &sampColls = searchForPSXADPCMs(file, format);
-  if (sampColls.size() != 0) {
-    // pick up one of the SampColls
-    size_t bestSampleCount = 0;
-    PSXSampColl *bestSampColl = sampColls[0];
-    for (size_t i = 0; i < sampColls.size(); i++) {
-      if (sampColls[i]->samples.size() > bestSampleCount) {
-        bestSampleCount = sampColls[i]->samples.size();
-        bestSampColl = sampColls[i];
-      }
-    }
-    return bestSampColl;
-  }
-  else {
-    return nullptr;
-  }
 }
 
 constexpr u32 NUM_CHUNKS_READAHEAD      = 10;
@@ -314,7 +325,7 @@ static bool isValidSampleStart(const RawFile* file, u32 offset, bool allowShort)
 }
 
 std::vector<PSXSampColl*> PSXSampColl::searchForPSXADPCMs(RawFile* file, const std::string&) {
-  std::vector<PSXSampColl*> out;
+  std::vector<PSXSampColl*> sampColls;
   const size_t len = file->size();
 
   for (u32 i = 0; i + 16 + NUM_CHUNKS_READAHEAD * 16 < len; ++i)
@@ -333,6 +344,7 @@ std::vector<PSXSampColl*> PSXSampColl::searchForPSXADPCMs(RawFile* file, const s
       continue;
 
     // We found a valid sample. Now back scan to check for shorter samples we might have skipped
+    u32 origOffset = i;
     u32 start   = i;
     u32 scanned = 16;
     while (start - scanned >= 16 && scanned < BACK_SCAN_LIMIT)
@@ -341,8 +353,15 @@ std::vector<PSXSampColl*> PSXSampColl::searchForPSXADPCMs(RawFile* file, const s
       scanned += 16;
 
       // Look for a 16 null byte frame which usually prefixes a sample
-      if (!isZero16(file, offset))
+      if (!isZero16(file, offset)) {
+        // Make sure the data we scan past is still potentially valid frames
+        u8 filterShiftByte = file->readByte(offset);
+        u8 flagByte = file->readByte(offset + 1);
+        if (!isValidFilterShiftByte(filterShiftByte) || !isValidFlagByte(flagByte)) {
+          break;
+        }
         continue;
+      }
 
       if (!isValidSampleStart(file, offset, true))
         break;
@@ -353,10 +372,16 @@ std::vector<PSXSampColl*> PSXSampColl::searchForPSXADPCMs(RawFile* file, const s
     auto* coll = new PSXSampColl(PS1Format::name, file, start);
     if (!coll->loadVGMFile()) { delete coll; continue; }
 
-    out.push_back(coll);
-    i = start + coll->unLength - 1;                      // skip parsed area
+    sampColls.push_back(coll);
+
+    // Sanity check that the detected sampcoll isn't smaller than the back scanned distance
+    if ((start + coll->unLength - 1) < origOffset) {
+      i = origOffset + 32;
+    } else {
+      i = start + coll->unLength - 1;                      // skip parsed area
+    }
   }
-  return out;
+  return sampColls;
 }
 
 //  *******
