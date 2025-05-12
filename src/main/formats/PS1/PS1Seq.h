@@ -13,7 +13,7 @@ class PS1Seq:
 
  private:
   u8 m_runningStatus;
-  u8 m_hasSetProgramForChannel[16]{};  // It seems the program assignment defaults to channel number,
-                                       // (example: Umihara Kawase: Shun). We use these flags to track if
-                                       // a default program change event is necessary for each channel
+  bool m_hasSetProgramForChannel[16]{};  // It seems the program assignment defaults to channel number,
+                                         // (example: Umihara Kawase: Shun). We use these flags to track if
+                                         // a default program change event is necessary for each channel
 };

@@ -65,7 +65,7 @@ void PS1Seq::resetVars() {
   uint8_t numer = readByte(offset() + 0x0D);
   uint8_t denom = readByte(offset() + 0x0E);
   addTimeSig(offset() + 0x0D, 2, numer, 1 << denom, (uint8_t) ppqn());
-  std::ranges::fill(m_hasSetProgramForChannel, u8{0});
+  std::ranges::fill(m_hasSetProgramForChannel, false);
 }
 
 bool PS1Seq::readEvent() {

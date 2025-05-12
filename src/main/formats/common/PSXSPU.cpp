@@ -147,9 +147,6 @@ bool PSXSampColl::parseSampleInfo() {
           break;
         }
       }
-
-      ostringstream name;
-      name << "Sample " << samples.size();
       PSXSamp *samp = new PSXSamp(this,
                                   beginOffset,
                                   i - beginOffset,
@@ -158,7 +155,7 @@ bool PSXSampColl::parseSampleInfo() {
                                   1,
                                   16,
                                   44100,
-                                  name.str());
+                                  fmt::format("Sample {:d}", samples.size()));
       samples.push_back(samp);
     }
     unLength = i - dwOffset;
@@ -189,8 +186,6 @@ bool PSXSampColl::parseSampleInfo() {
         offSampEnd += 16;
       } while (!lastBlock);
 
-      ostringstream name;
-      name << "Sample " << sampleIndex;
       PSXSamp *samp = new PSXSamp(this,
                                   dwOffset + it->offset,
                                   it->size,
@@ -199,7 +194,8 @@ bool PSXSampColl::parseSampleInfo() {
                                   1,
                                   16,
                                   44100,
-                                  name.str());
+                                  fmt::format("Sample {:d}", sampleIndex));
+
       samples.push_back(samp);
       sampleIndex++;
     }
