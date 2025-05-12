@@ -110,6 +110,12 @@ bool PSXSampColl::parseSampleInfo() {
                               // Occasionally, the data for a given sample may extend beyond this point
                               // for some reason. For conversion, we treat this as the end of the sample.
       while (i + 16 <= nEndOffset) {
+
+        // This is uncommon, but seen in poorly-ripped PSFs
+        if (isZero16(rawFile(), i)) {
+          break;
+        }
+
         u8 flagByte = readByte(i + 1);
         u8 endFlag = ((flagByte & 1) != 0);
         i += 16;
