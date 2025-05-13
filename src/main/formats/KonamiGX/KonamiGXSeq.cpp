@@ -266,13 +266,13 @@ bool KonamiGXTrack::readEvent(void) {
 
       case 0xFD:
         curOffset += 4;
-        addGenericEvent(beginOffset, curOffset - beginOffset, "Loop", "", CLR_LOOP);
+        addGenericEvent(beginOffset, curOffset - beginOffset, "Loop", "", Type::Loop);
         break;
 
       case 0xFE:
         bInJump = true;
         jump_return_offset = curOffset + 4;
-        addGenericEvent(beginOffset, jump_return_offset - beginOffset, "Jump", "", CLR_LOOP);
+        addGenericEvent(beginOffset, jump_return_offset - beginOffset, "Jump", "", Type::Loop);
         curOffset = getWordBE(curOffset);
         //if (curOffset > 0x100000)
         //	return 0;

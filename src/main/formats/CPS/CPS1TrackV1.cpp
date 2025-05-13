@@ -83,7 +83,7 @@ bool CPS1TrackV1::readEvent() {
           addNoteOn(beginOffset, curOffset - beginOffset, key, masterVol, "Note On (tied)");
         }
         else
-          addGenericEvent(beginOffset, curOffset - beginOffset, "Tie", "", CLR_NOTEON);
+          addGenericEvent(beginOffset, curOffset - beginOffset, "Tie", "", Type::NoteOn);
         bPrevNoteTie = true;
         prevTieNote = key;
         tieNoteCounter--;
@@ -117,12 +117,12 @@ bool CPS1TrackV1::readEvent() {
     if (statusByte >= 0x30) {
       shortenDeltaCounter = statusByte & 0xf;
       std::string desc = fmt::format("Shorten next {:d} events", shortenDeltaCounter);
-      addGenericEvent(beginOffset, curOffset-beginOffset, desc, "", CLR_CHANGESTATE);
+      addGenericEvent(beginOffset, curOffset-beginOffset, desc, "", Type::ChangeState);
     } else {
       tieNoteCounter = (statusByte & 0xf) + 1;
       tieNoteFlag = true;
       std::string desc = fmt::format("Tie next {:d} notes", tieNoteCounter);
-      addGenericEvent(beginOffset, curOffset-beginOffset, desc, "", CLR_CHANGESTATE);
+      addGenericEvent(beginOffset, curOffset-beginOffset, desc, "", Type::ChangeState);
     }
     return true;
   }
@@ -147,7 +147,7 @@ bool CPS1TrackV1::readEvent() {
     }
     case 0x01: {
       noteDuration = readByte(curOffset++);
-      addGenericEvent(beginOffset, curOffset - beginOffset, "Set Duration", "", CLR_CHANGESTATE);
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Set Duration", "", Type::ChangeState);
       break;
     }
     case 0x02: { // loop break
@@ -181,7 +181,7 @@ bool CPS1TrackV1::readEvent() {
         loop[loopNum] = numLoops;
         std::string name = fmt::format("Loop #{:d}", loopNum);
         std::string desc = fmt::format("Loop count: {:d}. Offset: {:X}", numLoops, offset);
-        addGenericEvent(beginOffset, 4, name, desc, CLR_LOOP);
+        addGenericEvent(beginOffset, 4, name, desc, Type::Loop);
       } else {
         // The loop counter was previously set: decrement the counter
         loop[loopNum]--;
@@ -204,19 +204,19 @@ bool CPS1TrackV1::readEvent() {
         break;
       }
       curOffset += 2;
-      addGenericEvent(beginOffset, curOffset - beginOffset, "Loop break", "", CLR_LOOP);
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Loop break", "", Type::Loop);
       break;
     }
 
     case 0x06:        // set dotted note flag
       extendDeltaFlag = true;
-      addGenericEvent(beginOffset, curOffset-beginOffset, "Extend next event", "", CLR_CHANGESTATE);
+      addGenericEvent(beginOffset, curOffset-beginOffset, "Extend next event", "", Type::ChangeState);
       break;
 
     case 0x07: {      // transpose
       cps0transpose = readByte(curOffset++);
       std::string desc = fmt::format("{:+d} semitones", cps0transpose);
-      addGenericEvent(beginOffset, curOffset-beginOffset, "Transpose", desc, CLR_TRANSPOSE);
+      addGenericEvent(beginOffset, curOffset-beginOffset, "Transpose", desc, Type::Transpose);
       break;
     }
 
@@ -237,7 +237,7 @@ bool CPS1TrackV1::readEvent() {
 
     case 0x0A:        // NOP
       curOffset++;
-      addGenericEvent(beginOffset, curOffset-beginOffset, "NOP", "", CLR_MISC);
+      addGenericEvent(beginOffset, curOffset-beginOffset, "NOP", "", Type::Misc);
       break;
 
     case 0x0B:        // NOP

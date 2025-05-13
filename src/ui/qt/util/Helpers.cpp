@@ -155,77 +155,77 @@ const QIcon &iconForItemType(VGMItem::Icon type) {
   return i_gen;
 }
 
-QColor colorForEventColor(VGMItem::EventColor eventColor) {
-  switch (eventColor) {
-    case VGMItem::CLR_UNKNOWN:
+QColor colorForItemType(VGMItem::Type type) {
+  switch (type) {
+    case VGMItem::Type::Unknown:
       return EventColors::CLR_BG_DARK;
-    case VGMItem::CLR_UNRECOGNIZED:
+    case VGMItem::Type::Unrecognized:
       return EventColors::CLR_RED;
-    case VGMItem::CLR_HEADER:
+    case VGMItem::Type::Header:
       return EventColors::CLR_GRAY;
-    case VGMItem::CLR_MISC:
+    case VGMItem::Type::Misc:
       return EventColors::CLR_DARK_GRAY;
-    case VGMItem::CLR_MARKER:
+    case VGMItem::Type::Marker:
       return EventColors::CLR_DARK_GRAY;
-    case VGMItem::CLR_TIMESIG:
+    case VGMItem::Type::TimeSignature:
       return EventColors::CLR_ORANGE;
-    case VGMItem::CLR_TEMPO:
+    case VGMItem::Type::Tempo:
       return EventColors::CLR_GREEN;
-    case VGMItem::CLR_PROGCHANGE:
+    case VGMItem::Type::ProgramChange:
       return EventColors::CLR_PERIWINKLE;
-    case VGMItem::CLR_BANKSELECT:
+    case VGMItem::Type::BankSelect:
       return EventColors::CLR_PERIWINKLE;
-    case VGMItem::CLR_TRANSPOSE:
+    case VGMItem::Type::Transpose:
       return EventColors::CLR_DARK_GREEN;
-    case VGMItem::CLR_PRIORITY:
+    case VGMItem::Type::Priority:
       return EventColors::CLR_DARK_GREEN;
-    case VGMItem::CLR_VOLUME:
+    case VGMItem::Type::Volume:
       return EventColors::CLR_MAGENTA;
-    case VGMItem::CLR_EXPRESSION:
+    case VGMItem::Type::Expression:
       return EventColors::CLR_MAGENTA;
-    case VGMItem::CLR_PAN:
+    case VGMItem::Type::Pan:
       return EventColors::CLR_ORANGE;
-    case VGMItem::CLR_NOTEON:
-    case VGMItem::CLR_DURNOTE:
+    case VGMItem::Type::NoteOn:
+    case VGMItem::Type::DurationNote:
       return EventColors::CLR_BLUE;
-    case VGMItem::CLR_NOTEOFF:
+    case VGMItem::Type::NoteOff:
       return EventColors::CLR_LIGHT_BLUE;
-    case VGMItem::CLR_TIE:
+    case VGMItem::Type::Tie:
       return EventColors::CLR_LIGHT_BLUE;
-    case VGMItem::CLR_REST:
+    case VGMItem::Type::Rest:
       return EventColors::CLR_LIGHT_BLUE;
-    case VGMItem::CLR_PITCHBEND:
+    case VGMItem::Type::PitchBend:
       return EventColors::CLR_GREEN;
-    case VGMItem::CLR_PITCHBENDRANGE:
+    case VGMItem::Type::PitchBendRange:
       return EventColors::CLR_DARK_GREEN;
-    case VGMItem::CLR_MODULATION:
+    case VGMItem::Type::Modulation:
       return EventColors::CLR_LIGHT_GREEN;
-    case VGMItem::CLR_PORTAMENTO:
+    case VGMItem::Type::Portamento:
       return EventColors::CLR_LIGHT_GREEN;
-    case VGMItem::CLR_PORTAMENTOTIME:
+    case VGMItem::Type::PortamentoTime:
       return EventColors::CLR_LIGHT_GREEN;
-    case VGMItem::CLR_CHANGESTATE:
+    case VGMItem::Type::ChangeState:
       return EventColors::CLR_GRAY;
-    case VGMItem::CLR_ADSR:
+    case VGMItem::Type::Adsr:
       return EventColors::CLR_GRAY;
-    case VGMItem::CLR_LFO:
+    case VGMItem::Type::Lfo:
       return EventColors::CLR_GRAY;
-    case VGMItem::CLR_REVERB:
+    case VGMItem::Type::Reverb:
       return EventColors::CLR_GRAY;
-    case VGMItem::CLR_SUSTAIN:
+    case VGMItem::Type::Sustain:
       return EventColors::CLR_YELLOW;
-    case VGMItem::CLR_LOOP:
+    case VGMItem::Type::Loop:
       return EventColors::CLR_LIGHT_RED;
-    case VGMItem::CLR_LOOPFOREVER:
+    case VGMItem::Type::LoopForever:
       return EventColors::CLR_LIGHT_RED;
-    case VGMItem::CLR_TRACKEND:
+    case VGMItem::Type::TrackEnd:
       return EventColors::CLR_RED;
   }
   return EventColors::CLR_RED;
 }
 
-QColor textColorForEventColor(VGMItem::EventColor eventColor) {
-    if (eventColor == VGMItem::CLR_UNKNOWN) {
+QColor textColorForItemType(VGMItem::Type type) {
+    if (type == VGMItem::Type::Unknown) {
       return EventColors::CLR_GRAY;
     }
     return EventColors::CLR_BG_DARK;

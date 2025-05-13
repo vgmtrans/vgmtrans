@@ -279,12 +279,12 @@ void SeqTrack::addGenericEvent(uint32_t offset,
                                uint32_t length,
                                const std::string &sEventName,
                                const std::string &sEventDesc,
-                               EventColor color,
+                               Type type,
                                Icon icon) {
   onEvent(offset, length);
 
   if (readMode == READMODE_ADD_TO_UI && !isItemAtOffset(offset, true)) {
-    addEvent(new SeqEvent(this, offset, length, sEventName, color, icon, sEventDesc));
+    addEvent(new SeqEvent(this, offset, length, sEventName, type, icon, sEventDesc));
   }
   else if (readMode == READMODE_CONVERT_TO_MIDI) {
     if (bWriteGenericEventAsTextEvent) {
@@ -306,7 +306,7 @@ void SeqTrack::addUnknown(uint32_t offset,
   onEvent(offset, length);
 
   if (readMode == READMODE_ADD_TO_UI && !isItemAtOffset(offset, true)) {
-    addEvent(new SeqEvent(this, offset, length, sEventName, CLR_UNKNOWN, ICON_BINARY, sEventDesc));
+    addEvent(new SeqEvent(this, offset, length, sEventName, Type::Unknown, ICON_BINARY, sEventDesc));
   }
   else if (readMode == READMODE_CONVERT_TO_MIDI) {
     if (bWriteGenericEventAsTextEvent) {
@@ -333,7 +333,7 @@ void SeqTrack::addIncrementOctave(uint32_t offset, uint32_t length, const std::s
 
   octave++;
   if (readMode == READMODE_ADD_TO_UI && !isItemAtOffset(offset, true))
-    addEvent(new SeqEvent(this, offset, length, sEventName, CLR_CHANGESTATE));
+    addEvent(new SeqEvent(this, offset, length, sEventName, Type::ChangeState));
 }
 
 void SeqTrack::addDecrementOctave(uint32_t offset, uint32_t length, const std::string &sEventName) {
@@ -341,7 +341,7 @@ void SeqTrack::addDecrementOctave(uint32_t offset, uint32_t length, const std::s
 
   octave--;
   if (readMode == READMODE_ADD_TO_UI && !isItemAtOffset(offset, true))
-    addEvent(new SeqEvent(this, offset, length, sEventName, CLR_CHANGESTATE));
+    addEvent(new SeqEvent(this, offset, length, sEventName, Type::ChangeState));
 }
 
 void SeqTrack::addRest(uint32_t offset, uint32_t length, uint32_t restTime, const std::string &sEventName) {
@@ -360,7 +360,7 @@ void SeqTrack::addHold(uint32_t offset, uint32_t length, const std::string &sEve
   onEvent(offset, length);
 
   if (readMode == READMODE_ADD_TO_UI && !isItemAtOffset(offset, true))
-    addEvent(new SeqEvent(this, offset, length, sEventName, CLR_TIE));
+    addEvent(new SeqEvent(this, offset, length, sEventName, Type::Tie));
 }
 
 void SeqTrack::addNoteOn(uint32_t offset, uint32_t length, int8_t key, int8_t vel, const std::string &sEventName) {
@@ -1441,11 +1441,11 @@ void SeqTrack::addMarker(uint32_t offset,
                          uint8_t databyte2,
                          const std::string &sEventName,
                          int8_t priority,
-                         EventColor color) {
+                         Type type) {
   onEvent(offset, length);
 
   if (readMode == READMODE_ADD_TO_UI && !isItemAtOffset(offset, true))
-    addEvent(new MarkerSeqEvent(this, markername, databyte1, databyte2, offset, length, sEventName, color));
+    addEvent(new MarkerSeqEvent(this, markername, databyte1, databyte2, offset, length, sEventName, type));
   addMarkerNoItem(markername, databyte1, databyte2, priority);
 }
 

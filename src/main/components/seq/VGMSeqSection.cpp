@@ -13,8 +13,8 @@ VGMSeqSection::VGMSeqSection(VGMMultiSectionSeq *parentFile,
                              uint32_t theOffset,
                              uint32_t theLength,
                              const std::string& name,
-                             EventColor color)
-    : VGMItem(parentFile, theOffset, theLength, name, color),
+                             Type type)
+    : VGMItem(parentFile, theOffset, theLength, name, type),
       parentSeq(parentFile) {
 }
 

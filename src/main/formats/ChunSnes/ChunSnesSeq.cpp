@@ -293,7 +293,7 @@ bool ChunSnesTrack::readEvent() {
     }
 
     case EVENT_NOP: {
-      addGenericEvent(beginOffset, curOffset - beginOffset, "NOP", desc, CLR_MISC, ICON_BINARY);
+      addGenericEvent(beginOffset, curOffset - beginOffset, "NOP", desc, Type::Misc, ICON_BINARY);
       break;
     }
 
@@ -337,7 +337,7 @@ bool ChunSnesTrack::readEvent() {
       }
       else if (tie) {
         // update note duration without changing note pitch
-        addGenericEvent(beginOffset, curOffset - beginOffset, "Tie", desc, CLR_TIE, ICON_NOTE);
+        addGenericEvent(beginOffset, curOffset - beginOffset, "Tie", desc, Type::Tie, ICON_NOTE);
         makePrevDurNoteEnd(getTime() + dur);
         addTime(noteLength);
       }
@@ -346,7 +346,7 @@ bool ChunSnesTrack::readEvent() {
           // slurred note with same key works as tie
           makePrevDurNoteEnd(getTime() + dur);
           desc = fmt::format("Abs Key: {} ({})   Duration: {}", key, MidiEvent::getNoteName(key), dur);
-          addGenericEvent(beginOffset, curOffset - beginOffset, "Note with Duration", desc, CLR_TIE, ICON_NOTE);
+          addGenericEvent(beginOffset, curOffset - beginOffset, "Note with Duration", desc, Type::Tie, ICON_NOTE);
         }
         else {
           addNoteByDur(beginOffset, curOffset - beginOffset, key, NOTE_VELOCITY, dur);
@@ -377,7 +377,7 @@ bool ChunSnesTrack::readEvent() {
       else {
         desc = fmt::format("Duration Rate: {}/256", noteDurationRate+1);
       }
-      addGenericEvent(beginOffset, curOffset - beginOffset, "Duration Rate from Table", desc, CLR_DURNOTE);
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Duration Rate from Table", desc, Type::DurationNote);
       break;
     }
 
@@ -386,7 +386,7 @@ bool ChunSnesTrack::readEvent() {
       curOffset += 2;
       uint16_t dest = curOffset + destOffset;
       desc = fmt::format("Destination: ${:04X}", dest);
-      addGenericEvent(beginOffset, curOffset - beginOffset, "Loop Break (Alt)", desc, CLR_LOOP, ICON_ENDREP);
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Loop Break (Alt)", desc, Type::Loop, ICON_ENDREP);
 
       if (loopCountAlt != 0) {
         curOffset = dest;
@@ -400,7 +400,7 @@ bool ChunSnesTrack::readEvent() {
       curOffset += 2;
       uint16_t dest = curOffset + destOffset;
       desc = fmt::format("Destination: ${:04X}", dest);
-      addGenericEvent(beginOffset, curOffset - beginOffset, "Loop Again (Alt)", desc, CLR_LOOP, ICON_ENDREP);
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Loop Again (Alt)", desc, Type::Loop, ICON_ENDREP);
 
       if (loopCountAlt == 0) {
         loopCountAlt = 2;
@@ -417,7 +417,7 @@ bool ChunSnesTrack::readEvent() {
     case EVENT_ADSR_RELEASE_SR: {
       uint8_t release_sr = readByte(curOffset++) & 31;
       desc = fmt::format("SR (Release): {}", release_sr);
-      addGenericEvent(beginOffset, curOffset - beginOffset, "ADSR Release Rate", desc, CLR_ADSR, ICON_CONTROL);
+      addGenericEvent(beginOffset, curOffset - beginOffset, "ADSR Release Rate", desc, Type::Adsr, ICON_CONTROL);
       break;
     }
 
@@ -432,7 +432,7 @@ bool ChunSnesTrack::readEvent() {
       uint8_t sr = adsr2 & 0x1f;
       desc = fmt::format("AR: {:d}  DR: {:d}  SL: {:d}  SR: {:d}  SR (Release): {:d}",
                           ar, dr, sl, sr, release_sr);
-      addGenericEvent(beginOffset, curOffset - beginOffset, "ADSR & Release Rate", desc, CLR_ADSR, ICON_CONTROL);
+      addGenericEvent(beginOffset, curOffset - beginOffset, "ADSR & Release Rate", desc, Type::Adsr, ICON_CONTROL);
       break;
     }
 
@@ -443,7 +443,7 @@ bool ChunSnesTrack::readEvent() {
       desc = fmt::format("Invert Left: {}  Invert Right: {}",
                                 invertLeft ? "On" : "Off",
                                 invertRight ? "On" : "Off");
-      addGenericEvent(beginOffset, curOffset - beginOffset, "Surround", desc, CLR_PAN, ICON_CONTROL);
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Surround", desc, Type::Pan, ICON_CONTROL);
       break;
     }
 
@@ -453,7 +453,7 @@ bool ChunSnesTrack::readEvent() {
       uint8_t condValue = readByte(curOffset++);
       uint16_t dest = curOffset + destOffset;
       desc = fmt::format("Destination: ${:04X}", dest);
-      addGenericEvent(beginOffset, curOffset - beginOffset, "Conditional Jump", desc, CLR_MISC);
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Conditional Jump", desc, Type::Misc);
 
       if ((parentSeq->conditionVar & 0x7f) == condValue) {
         // repeat again
@@ -469,7 +469,7 @@ bool ChunSnesTrack::readEvent() {
 
     case EVENT_INC_COUNTER: {
       // increment a counter value, which will be sent to main CPU
-      addGenericEvent(beginOffset, curOffset - beginOffset, "Increment Counter", desc, CLR_MISC);
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Increment Counter", desc, Type::Misc);
       break;
     }
 
@@ -481,17 +481,17 @@ bool ChunSnesTrack::readEvent() {
       else {
         desc = fmt::format("Envelope: {:d}", envelopeIndex);
       }
-      addGenericEvent(beginOffset, curOffset - beginOffset, "Pitch Envelope", desc, CLR_LFO, ICON_CONTROL);
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Pitch Envelope", desc, Type::Lfo, ICON_CONTROL);
       break;
     }
 
     case EVENT_NOISE_ON: {
-      addGenericEvent(beginOffset, curOffset - beginOffset, "Noise On", desc, CLR_PROGCHANGE, ICON_PROGCHANGE);
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Noise On", desc, Type::ProgramChange, ICON_PROGCHANGE);
       break;
     }
 
     case EVENT_NOISE_OFF: {
-      addGenericEvent(beginOffset, curOffset - beginOffset, "Noise Off", desc, CLR_PROGCHANGE, ICON_PROGCHANGE);
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Noise Off", desc, Type::ProgramChange, ICON_PROGCHANGE);
       break;
     }
 
@@ -518,7 +518,7 @@ bool ChunSnesTrack::readEvent() {
       // fade channel volume to zero or full, do not know where it is used
       uint8_t arg1 = readByte(curOffset++);
       desc = fmt::format("Arg1: {:d}", arg1);
-      addGenericEvent(beginOffset, curOffset - beginOffset, "Fade", desc, CLR_VOLUME, ICON_CONTROL);
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Fade", desc, Type::Volume, ICON_CONTROL);
       break;
     }
 
@@ -551,7 +551,7 @@ bool ChunSnesTrack::readEvent() {
 
       curOffset = dest;
       if (!isOffsetUsed(dest)) {
-        addGenericEvent(beginOffset, length, "Jump", desc, CLR_LOOPFOREVER);
+        addGenericEvent(beginOffset, length, "Jump", desc, Type::LoopForever);
       }
       else {
         bContinue = addLoopForever(beginOffset, length, "Jump");
@@ -582,7 +582,7 @@ bool ChunSnesTrack::readEvent() {
       else {
         desc = fmt::format("Duration Rate: {:d}/256", noteDurationRate);
       }
-      addGenericEvent(beginOffset, curOffset - beginOffset, "Duration Rate", desc, CLR_DURNOTE);
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Duration Rate", desc, Type::DurationNote);
       break;
     }
 
@@ -612,7 +612,7 @@ bool ChunSnesTrack::readEvent() {
       uint8_t sr = adsr2 & 0x1f;
 
       desc = fmt::format("AR: {:d}  DR: {:d}  SL: {:d}  SR: {:d}", ar, dr, sl, sr);
-      addGenericEvent(beginOffset, curOffset - beginOffset, "ADSR", desc, CLR_ADSR, ICON_CONTROL);
+      addGenericEvent(beginOffset, curOffset - beginOffset, "ADSR", desc, Type::Adsr, ICON_CONTROL);
       break;
     }
 
@@ -628,13 +628,13 @@ bool ChunSnesTrack::readEvent() {
       // refresh duration info promptly
       syncNoteLengthWithPriorTrack();
 
-      addGenericEvent(beginOffset, curOffset - beginOffset, "Sync Note Length On", desc, CLR_DURNOTE);
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Sync Note Length On", desc, Type::DurationNote);
       break;
     }
 
     case EVENT_SYNC_NOTE_LEN_OFF: {
       syncNoteLen = false;
-      addGenericEvent(beginOffset, curOffset - beginOffset, "Sync Note Length Off", desc, CLR_DURNOTE);
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Sync Note Length Off", desc, Type::DurationNote);
       break;
     }
 
@@ -643,7 +643,7 @@ bool ChunSnesTrack::readEvent() {
       curOffset += 2;
       uint16_t dest = curOffset + destOffset;
       desc = fmt::format("Destination: ${:04X}", dest);
-      addGenericEvent(beginOffset, curOffset - beginOffset, "Loop Again", desc, CLR_LOOP, ICON_ENDREP);
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Loop Again", desc, Type::Loop, ICON_ENDREP);
 
       if (loopCount == 0) {
         loopCount = 2;
@@ -663,7 +663,7 @@ bool ChunSnesTrack::readEvent() {
       curOffset += 2;
       uint16_t dest = curOffset + destOffset;
       desc = fmt::format("Times: {:d}  Destination: ${:04X}", times, dest);
-      addGenericEvent(beginOffset, curOffset - beginOffset, "Loop Until", desc, CLR_LOOP, ICON_ENDREP);
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Loop Until", desc, Type::Loop, ICON_ENDREP);
 
       if (loopCount == 0) {
         loopCount = times;
@@ -689,7 +689,7 @@ bool ChunSnesTrack::readEvent() {
       uint16_t dest = curOffset + destOffset;
       desc = fmt::format("Destination: ${:04X}", dest);
 
-      addGenericEvent(beginOffset, curOffset - beginOffset, "Pattern Play", desc, CLR_LOOP, ICON_STARTREP);
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Pattern Play", desc, Type::Loop, ICON_STARTREP);
 
       if (subNestLevel >= CHUNSNES_SUBLEVEL_MAX) {
         // stack overflow
@@ -705,7 +705,7 @@ bool ChunSnesTrack::readEvent() {
     }
 
     case EVENT_RET: {
-      addGenericEvent(beginOffset, curOffset - beginOffset, "Pattern End", desc, CLR_LOOP, ICON_ENDREP);
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Pattern End", desc, Type::Loop, ICON_ENDREP);
 
       if (subNestLevel > 0) {
         curOffset = subReturnAddr[subNestLevel - 1];
@@ -729,7 +729,7 @@ bool ChunSnesTrack::readEvent() {
                       semitones,
                       length);
 
-      addGenericEvent(beginOffset, curOffset - beginOffset, "Pitch Slide", desc, CLR_PITCHBEND, ICON_CONTROL);
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Pitch Slide", desc, Type::PitchBend, ICON_CONTROL);
       break;
     }
 
@@ -759,12 +759,12 @@ bool ChunSnesTrack::readEvent() {
         case PRESET_CONDITION:
           desc = fmt::format("Value: {:d}", presetIndex);
           parentSeq->conditionVar = presetIndex; // luckily those preset starts from preset 0 :)
-          addGenericEvent(beginOffset, curOffset - beginOffset, "Set Condition Value", desc, CLR_CHANGESTATE);
+          addGenericEvent(beginOffset, curOffset - beginOffset, "Set Condition Value", desc, Type::ChangeState);
           break;
 
         default:
           desc = fmt::format("Preset: {:d}", presetIndex);
-          addGenericEvent(beginOffset, curOffset - beginOffset, "Load Preset", desc, CLR_MISC);
+          addGenericEvent(beginOffset, curOffset - beginOffset, "Load Preset", desc, Type::Misc);
           break;
       }
 
@@ -774,7 +774,7 @@ bool ChunSnesTrack::readEvent() {
     case EVENT_END: {
       if (subNestLevel > 0) {
         // return from subroutine (normally not used)
-        addGenericEvent(beginOffset, curOffset - beginOffset, "End of Track", desc, CLR_TRACKEND, ICON_TRACKEND);
+        addGenericEvent(beginOffset, curOffset - beginOffset, "End of Track", desc, Type::TrackEnd, ICON_TRACKEND);
         curOffset = subReturnAddr[subNestLevel - 1];
         subNestLevel--;
       }

@@ -85,7 +85,7 @@ bool CPS2TrackV2::readEvent() {
 
     case C2_SETBANK:
       addBankSelectNoItem(readByte(curOffset++) * 2);
-      addGenericEvent(beginOffset, curOffset - beginOffset, "Bank Change", "", CLR_PROGCHANGE);
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Bank Change", "", Type::ProgramChange);
       break;
 
     case C3_PITCHBEND: {
@@ -97,7 +97,7 @@ bool CPS2TrackV2::readEvent() {
                 0,
                 "Pitch Bend",
                 PRIORITY_MIDDLE,
-                CLR_PITCHBEND);
+                Type::PitchBend);
       break;
     }
 
@@ -116,7 +116,7 @@ bool CPS2TrackV2::readEvent() {
                 0,
                 "Vibrato",
                 PRIORITY_HIGH,
-                CLR_PITCHBEND);
+                Type::PitchBend);
       break;
     }
 
@@ -183,22 +183,22 @@ bool CPS2TrackV2::readEvent() {
 
     case D0_LOOP_1_START:
       loopOffset[0] = curOffset;
-      addGenericEvent(beginOffset, curOffset - beginOffset, "Loop 1 Start", "", CLR_LOOP);
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Loop 1 Start", "", Type::Loop);
       break;
 
     case D1_LOOP_2_START:
       loopOffset[1] = curOffset;
-      addGenericEvent(beginOffset, curOffset - beginOffset, "Loop 2 Start", "", CLR_LOOP);
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Loop 2 Start", "", Type::Loop);
       break;
 
     case D2_LOOP_3_START:
       loopOffset[2] = curOffset;
-      addGenericEvent(beginOffset, curOffset - beginOffset, "Loop 3 Start", "", CLR_LOOP);
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Loop 3 Start", "", Type::Loop);
       break;
 
     case D3_LOOP_4_START:
       loopOffset[3] = curOffset;
-      addGenericEvent(beginOffset, curOffset - beginOffset, "Loop 4 Start", "", CLR_LOOP);
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Loop 4 Start", "", Type::Loop);
       break;
 
     case D4_LOOP_1: loopNum = 0; goto handleLoop;
@@ -226,7 +226,7 @@ bool CPS2TrackV2::readEvent() {
         curOffset = loopOffset[loopNum];
       }
       else {
-        addGenericEvent(beginOffset, curOffset - beginOffset, "Loop", "", CLR_LOOP);
+        addGenericEvent(beginOffset, curOffset - beginOffset, "Loop", "", Type::Loop);
         loopCounter[loopNum] = loopCount; //start loop
         curOffset = loopOffset[loopNum];
       }
@@ -241,7 +241,7 @@ bool CPS2TrackV2::readEvent() {
       if (loopCounter[loopNum] - 1 == 0) {
         loopCounter[loopNum] = 0;
         uint16_t jump = getShortBE(curOffset);
-        addGenericEvent(beginOffset, (curOffset+2) - beginOffset, "Loop Break", "", CLR_LOOP);
+        addGenericEvent(beginOffset, (curOffset+2) - beginOffset, "Loop Break", "", Type::Loop);
         curOffset += jump + 2;
       }
       else {
@@ -256,7 +256,7 @@ bool CPS2TrackV2::readEvent() {
 
     case DD_TRANSPOSE:
       transpose += static_cast<int8_t>(readByte(curOffset++));
-      addGenericEvent(beginOffset, curOffset - beginOffset, "Transpose", "", CLR_CHANGESTATE);
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Transpose", "", Type::ChangeState);
       break;
 
     case EVENT_DE:
@@ -279,7 +279,7 @@ bool CPS2TrackV2::readEvent() {
                 0,
                 "LFO Reset",
                 PRIORITY_MIDDLE,
-                CLR_LFO);
+                Type::Lfo);
       break;
     }
 
@@ -292,7 +292,7 @@ bool CPS2TrackV2::readEvent() {
                 0,
                 "LFO Rate",
                 PRIORITY_MIDDLE,
-                CLR_LFO);
+                Type::Lfo);
       break;
     }
 
@@ -305,7 +305,7 @@ bool CPS2TrackV2::readEvent() {
                 0,
                 "Tremelo",
                 PRIORITY_MIDDLE,
-                CLR_EXPRESSION);
+                Type::Expression);
       break;
     }
 
@@ -345,7 +345,7 @@ bool CPS2TrackV2::readEvent() {
       uint8_t slot = readByte(curOffset++);
       uint8_t value = readByte(curOffset++);
       auto description = fmt::format("Slot: {:d} Value: {:d}", slot, value);
-      addGenericEvent(beginOffset, curOffset - beginOffset, "Meta Event", description, CLR_MARKER);
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Meta Event", description, Type::Marker);
       break;
     }
 
@@ -354,7 +354,7 @@ bool CPS2TrackV2::readEvent() {
       return false;
 
     default :
-      addGenericEvent(beginOffset, curOffset - beginOffset, "UNKNOWN", "", CLR_UNRECOGNIZED);
+      addGenericEvent(beginOffset, curOffset - beginOffset, "UNKNOWN", "", Type::Unrecognized);
       break;
   }
 

@@ -194,7 +194,7 @@ bool TamSoftPS1Track::readEvent() {
   if (statusByte >= 0x00 && statusByte <= 0x7f) {
     // if status_byte == 0, it actually sets 0xffffffff to delta-time o_O
     desc << "Delta Time: " << statusByte;
-    addGenericEvent(beginOffset, curOffset - beginOffset, "Delta Time", desc.str(), CLR_REST);
+    addGenericEvent(beginOffset, curOffset - beginOffset, "Delta Time", desc.str(), Type::Rest);
     addTime(statusByte);
   }
   else if (statusByte >= 0x80 && statusByte <= 0xdf) {
@@ -230,7 +230,7 @@ bool TamSoftPS1Track::readEvent() {
         uint8_t midiPan = convertVolumeBalanceToStdMidiPan(volumeBalanceLeft / 256.0, volumeBalanceRight / 256.0, &volumeScale);
 
         desc << "Left Volume: " << volumeBalanceLeft << "  Right Volume: " << volumeBalanceRight;
-        addGenericEvent(beginOffset, curOffset - beginOffset, "Volume Balance", desc.str(), CLR_PAN, ICON_CONTROL);
+        addGenericEvent(beginOffset, curOffset - beginOffset, "Volume Balance", desc.str(), Type::Pan, ICON_CONTROL);
         addPanNoItem(midiPan);
         break;
       }
@@ -283,7 +283,7 @@ bool TamSoftPS1Track::readEvent() {
       case 0xE6: {
         uint8_t mode = readByte(curOffset++);
         desc << "Reverb Mode: " << mode;
-        addGenericEvent(beginOffset, curOffset - beginOffset, "Reverb Mode", desc.str(), CLR_REVERB, ICON_CONTROL);
+        addGenericEvent(beginOffset, curOffset - beginOffset, "Reverb Mode", desc.str(), Type::Reverb, ICON_CONTROL);
         break;
       }
 
@@ -291,7 +291,7 @@ bool TamSoftPS1Track::readEvent() {
         uint8_t depth = readByte(curOffset++);
         desc << "Reverb Depth: " << depth;
         parentSeq->reverbDepth = depth << 8;
-        addGenericEvent(beginOffset, curOffset - beginOffset, "Reverb Depth", desc.str(), CLR_REVERB, ICON_CONTROL);
+        addGenericEvent(beginOffset, curOffset - beginOffset, "Reverb Depth", desc.str(), Type::Reverb, ICON_CONTROL);
         break;
       }
 
@@ -316,7 +316,7 @@ bool TamSoftPS1Track::readEvent() {
 
       case 0xF0: {
         finalizeAllNotes();
-        addGenericEvent(beginOffset, curOffset - beginOffset, "Note Off", desc.str(), CLR_NOTEOFF, ICON_NOTE);
+        addGenericEvent(beginOffset, curOffset - beginOffset, "Note Off", desc.str(), Type::NoteOff, ICON_NOTE);
         break;
       }
 
@@ -337,7 +337,7 @@ bool TamSoftPS1Track::readEvent() {
 
         curOffset = dest;
         if (!isOffsetUsed(dest)) {
-          addGenericEvent(beginOffset, length, "Jump", desc.str().c_str(), CLR_LOOPFOREVER);
+          addGenericEvent(beginOffset, length, "Jump", desc.str().c_str(), Type::LoopForever);
         }
         else {
           bContinue = addLoopForever(beginOffset, length, "Jump");

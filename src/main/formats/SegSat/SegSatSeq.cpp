@@ -139,7 +139,7 @@ bool SegSatSeq::readEvent() {
           curOffset += 2;
           remainingEventsInLoop = readByte(curOffset++);
           loopEndPos = curOffset;
-          addGenericEvent(beginOffset, curOffset - beginOffset, "Loop", "", CLR_LOOP);
+          addGenericEvent(beginOffset, curOffset - beginOffset, "Loop", "", Type::Loop);
           curOffset = loopOffset;
           bInLoop = true;
           break;
@@ -149,7 +149,7 @@ bool SegSatSeq::readEvent() {
           if (foreverLoopStart == -1) {
             foreverLoopStart = curOffset;
             addGenericEvent(beginOffset, curOffset - beginOffset,
-              "Forever Loop Start Point", "", CLR_LOOP, ICON_STARTREP);
+              "Forever Loop Start Point", "", Type::Loop, ICON_STARTREP);
           } else {
             if (!addLoopForever(beginOffset, curOffset - beginOffset))
               return false;
@@ -161,23 +161,23 @@ bool SegSatSeq::readEvent() {
           addEndOfTrack(beginOffset, curOffset - beginOffset);
           return false;
         case 0x87:
-          addGenericEvent(beginOffset, curOffset - beginOffset, "Add 256 Duration Ticks", "", CLR_TIE);
+          addGenericEvent(beginOffset, curOffset - beginOffset, "Add 256 Duration Ticks", "", Type::Tie);
           durationAccumulator += 256;
           break;
         case 0x88:
-          addGenericEvent(beginOffset, curOffset - beginOffset, "Add 512 Duration Ticks", "", CLR_TIE);
+          addGenericEvent(beginOffset, curOffset - beginOffset, "Add 512 Duration Ticks", "", Type::Tie);
           durationAccumulator += 512;
           break;
         case 0x89:
-          addGenericEvent(beginOffset, curOffset - beginOffset, "Add 2048 Duration Ticks", "", CLR_TIE);
+          addGenericEvent(beginOffset, curOffset - beginOffset, "Add 2048 Duration Ticks", "", Type::Tie);
           durationAccumulator += 2048;
           break;
         case 0x8A:
-          addGenericEvent(beginOffset, curOffset - beginOffset, "Add 4096 Duration Ticks", "", CLR_TIE);
+          addGenericEvent(beginOffset, curOffset - beginOffset, "Add 4096 Duration Ticks", "", Type::Tie);
           durationAccumulator += 4096;
           break;
         case 0x8B:
-          addGenericEvent(beginOffset, curOffset - beginOffset, "Add 8192 Duration Ticks", "", CLR_TIE);
+          addGenericEvent(beginOffset, curOffset - beginOffset, "Add 8192 Duration Ticks", "", Type::Tie);
           durationAccumulator += 8192;
           break;
         case 0x8C:

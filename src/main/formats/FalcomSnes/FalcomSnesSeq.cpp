@@ -263,7 +263,7 @@ bool FalcomSnesTrack::readEvent() {
     case EVENT_NOP1: {
       uint8_t arg1 = readByte(curOffset++);
       desc = describeUnknownEvent(statusByte, arg1);
-      addGenericEvent(beginOffset, curOffset - beginOffset, "NOP.1", desc, CLR_MISC, ICON_BINARY);
+      addGenericEvent(beginOffset, curOffset - beginOffset, "NOP.1", desc, Type::Misc, ICON_BINARY);
       break;
     }
 
@@ -313,7 +313,7 @@ bool FalcomSnesTrack::readEvent() {
         if (prevNoteSlurred && key == prevNoteKey) {
           // tie
           makePrevDurNoteEnd(getTime() + dur);
-          addGenericEvent(beginOffset, curOffset - beginOffset, "Tie", desc, CLR_TIE, ICON_NOTE);
+          addGenericEvent(beginOffset, curOffset - beginOffset, "Tie", desc, Type::Tie, ICON_NOTE);
         }
         else {
           // note
@@ -353,7 +353,7 @@ bool FalcomSnesTrack::readEvent() {
       uint8_t vibratoRate = readByte(curOffset++);
 
       desc = fmt::format("Delay: {:d}  Depth: {:d}  Rate: {:d}", vibratoDelay, vibratoDepth, vibratoRate);
-      addGenericEvent(beginOffset, curOffset - beginOffset, "Vibrato", desc, CLR_MODULATION, ICON_CONTROL);
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Vibrato", desc, Type::Modulation, ICON_CONTROL);
       break;
     }
 
@@ -361,7 +361,7 @@ bool FalcomSnesTrack::readEvent() {
       bool vibratoOn = readByte(curOffset++) != 0;
 
       desc = fmt::format("Vibrato: {}", vibratoOn ? "On" : "Off");
-      addGenericEvent(beginOffset, curOffset - beginOffset, "Vibrato On/Off", desc, CLR_MODULATION, ICON_CONTROL);
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Vibrato On/Off", desc, Type::Modulation, ICON_CONTROL);
       break;
     }
 
@@ -369,7 +369,7 @@ bool FalcomSnesTrack::readEvent() {
       uint8_t newQuantize = readByte(curOffset++);
 
       desc = fmt::format("Duration Rate: 1.0 - {:d}/256", newQuantize);
-      addGenericEvent(beginOffset, curOffset - beginOffset, "Duration Rate", desc, CLR_DURNOTE);
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Duration Rate", desc, Type::DurationNote);
       spcNoteQuantize = newQuantize;
       break;
     }
@@ -390,7 +390,7 @@ bool FalcomSnesTrack::readEvent() {
       uint8_t amount = amounts[statusByte - 0xdf];
 
       desc = fmt::format("Decrease Volume by : {:d}", amount);
-      addGenericEvent(beginOffset, curOffset - beginOffset, desc, "", CLR_VOLUME, ICON_CONTROL);
+      addGenericEvent(beginOffset, curOffset - beginOffset, desc, "", Type::Volume, ICON_CONTROL);
 
       // add MIDI events only if updated
       uint8_t newVolume = static_cast<uint8_t>(std::max(static_cast<int8_t>(spcVolume) - amount, 0));
@@ -406,7 +406,7 @@ bool FalcomSnesTrack::readEvent() {
       uint8_t amount = amounts[statusByte - 0xe3];
 
       desc = fmt::format("Increase Volume by : {:d}", amount);
-      addGenericEvent(beginOffset, curOffset - beginOffset, desc, "", CLR_VOLUME, ICON_CONTROL);
+      addGenericEvent(beginOffset, curOffset - beginOffset, desc, "", Type::Volume, ICON_CONTROL);
 
       // add MIDI events only if updated
       uint8_t newVolume = static_cast<uint8_t>(std::min(spcVolume + amount, 0x7f));
@@ -432,7 +432,7 @@ bool FalcomSnesTrack::readEvent() {
       uint8_t amount = 8;
 
       desc = fmt::format("Decrease Pan by : {:d}", amount);
-      addGenericEvent(beginOffset, curOffset - beginOffset, desc, "", CLR_PAN, ICON_CONTROL);
+      addGenericEvent(beginOffset, curOffset - beginOffset, desc, "", Type::Pan, ICON_CONTROL);
 
       // add MIDI events only if updated
       uint8_t newPan = static_cast<uint8_t>(std::max(static_cast<int8_t>(spcPan) - amount, 0));
@@ -451,7 +451,7 @@ bool FalcomSnesTrack::readEvent() {
       uint8_t amount = 8;
 
       desc = fmt::format("Increase Pan by : {:d}", amount);
-      addGenericEvent(beginOffset, curOffset - beginOffset, desc, "", CLR_PAN, ICON_CONTROL);
+      addGenericEvent(beginOffset, curOffset - beginOffset, desc, "", Type::Pan, ICON_CONTROL);
 
       // add MIDI events only if updated
       uint8_t newPan = static_cast<uint8_t>(std::min(spcPan + amount, 0x7f));
@@ -472,7 +472,7 @@ bool FalcomSnesTrack::readEvent() {
       uint8_t lfoRate = readByte(curOffset++);
 
       desc = fmt::format("Delay: {:d}  Depth: {:d}  Rate: {:d}", lfoDelay, lfoDepth, lfoRate);
-      addGenericEvent(beginOffset, curOffset - beginOffset, "Pan LFO", desc, CLR_MODULATION, ICON_CONTROL);
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Pan LFO", desc, Type::Modulation, ICON_CONTROL);
       break;
     }
 
@@ -480,7 +480,7 @@ bool FalcomSnesTrack::readEvent() {
       bool lfoOn = readByte(curOffset++) != 0;
 
       desc = fmt::format("Pan LFO: {}", lfoOn ? "On" : "Off");
-      addGenericEvent(beginOffset, curOffset - beginOffset, "Pan LFO On/Off", desc, CLR_MODULATION, ICON_CONTROL);
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Pan LFO On/Off", desc, Type::Modulation, ICON_CONTROL);
       break;
     }
 
@@ -488,7 +488,7 @@ bool FalcomSnesTrack::readEvent() {
       int8_t newTuning = readByte(curOffset++);
 
       desc = fmt::format("Herz: {}{}Hz", newTuning >= 0 ? "+" : "-", newTuning);
-      addGenericEvent(beginOffset, curOffset - beginOffset, "Fine Tuning", desc, CLR_TRANSPOSE, ICON_CONTROL);
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Fine Tuning", desc, Type::Transpose, ICON_CONTROL);
 
       // TODO: more accurate fine tuning
       addFineTuningNoItem(newTuning / 128.0 * 64.0);
@@ -500,7 +500,7 @@ bool FalcomSnesTrack::readEvent() {
 
       desc = fmt::format("Loop Count {:d}", count);
       uint16_t repeatCountAddr = curOffset++;
-      addGenericEvent(beginOffset, curOffset - beginOffset, "Loop Start", desc, CLR_LOOP, ICON_STARTREP);
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Loop Start", desc, Type::Loop, ICON_STARTREP);
 
       // save the repeat count
       parentSeq->repeatCountMap[repeatCountAddr] = count;
@@ -514,7 +514,7 @@ bool FalcomSnesTrack::readEvent() {
       int16_t repeatCountOffset = readShort(dest - 2);
       uint16_t repeatCountAddr = dest + repeatCountOffset;
       desc = fmt::format("Destination: ${:04X}  Loop Count Address: ${:04X}", dest, repeatCountAddr);
-      addGenericEvent(beginOffset, curOffset - beginOffset, "Loop Break", desc, CLR_LOOP, ICON_ENDREP);
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Loop Break", desc, Type::Loop, ICON_ENDREP);
 
       if (!parentSeq->repeatCountMap.contains(repeatCountAddr)) {
         bContinue = false;
@@ -534,7 +534,7 @@ bool FalcomSnesTrack::readEvent() {
       uint16_t repeatCountAddr = curOffset + destOffset;
       uint16_t dest = repeatCountAddr + 1;
       desc = fmt::format("Destination: ${:04X}", dest);
-      addGenericEvent(beginOffset, curOffset - beginOffset, "Loop End", desc, CLR_LOOP, ICON_ENDREP);
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Loop End", desc, Type::Loop, ICON_ENDREP);
 
       if (!parentSeq->repeatCountMap.contains(repeatCountAddr)) {
         bContinue = false;
@@ -556,7 +556,7 @@ bool FalcomSnesTrack::readEvent() {
       uint8_t pitchEnvelopeRate = readByte(curOffset++);
 
       desc = fmt::format("Delay: {:d}  Depth: {:d}  Rate: {:d}", pitchEnvelopeDelay, pitchEnvelopeDepth, pitchEnvelopeRate);
-      addGenericEvent(beginOffset, curOffset - beginOffset, "Pitch Envelope", desc, CLR_PITCHBEND, ICON_CONTROL);
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Pitch Envelope", desc, Type::PitchBend, ICON_CONTROL);
       break;
     }
 
@@ -564,7 +564,7 @@ bool FalcomSnesTrack::readEvent() {
       bool pitchEnvelopeOn = readByte(curOffset++) != 0;
 
       desc = fmt::format("Pitch Envelope: {}", pitchEnvelopeOn ? "On" : "Off");
-      addGenericEvent(beginOffset, curOffset - beginOffset, "Pitch Envelope On/Off", desc, CLR_PITCHBEND, ICON_CONTROL);
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Pitch Envelope On/Off", desc, Type::PitchBend, ICON_CONTROL);
       break;
     }
 
@@ -573,7 +573,7 @@ bool FalcomSnesTrack::readEvent() {
       uint8_t adsr2 = readByte(curOffset++);
 	    spcADSR = adsr1 | (adsr2 << 8);
       desc = fmt::format("ADSR(1): ${:02X}  ADSR(2): ${:02X}", adsr1, adsr2);
-      addGenericEvent(beginOffset, curOffset - beginOffset, "ADSR", desc, CLR_ADSR, ICON_CONTROL);
+      addGenericEvent(beginOffset, curOffset - beginOffset, "ADSR", desc, Type::Adsr, ICON_CONTROL);
       break;
     }
 
@@ -582,7 +582,7 @@ bool FalcomSnesTrack::readEvent() {
       uint8_t newGAIN = readByte(curOffset++);
 
       desc = fmt::format("GAIN: ${:02X}", newGAIN);
-      addGenericEvent(beginOffset, curOffset - beginOffset, "GAIN", desc, CLR_ADSR, ICON_CONTROL);
+      addGenericEvent(beginOffset, curOffset - beginOffset, "GAIN", desc, Type::Adsr, ICON_CONTROL);
       break;
     }
 
@@ -590,7 +590,7 @@ bool FalcomSnesTrack::readEvent() {
       uint8_t newNCK = readByte(curOffset++) & 0x1f;
 
       desc = fmt::format("Noise Frequency (NCK): {:d}", newNCK);
-      addGenericEvent(beginOffset, curOffset - beginOffset, "Noise Frequency", desc.c_str(), CLR_CHANGESTATE, ICON_CONTROL);
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Noise Frequency", desc.c_str(), Type::ChangeState, ICON_CONTROL);
       break;
     }
 
@@ -598,7 +598,7 @@ bool FalcomSnesTrack::readEvent() {
       bool pitchModOn = (readByte(curOffset++) != 0);
 
       desc = fmt::format("Pitch Modulation: {}", pitchModOn ? "On" : "Off");
-      addGenericEvent(beginOffset, curOffset - beginOffset, "Echo", desc, CLR_REVERB, ICON_CONTROL);
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Echo", desc, Type::Reverb, ICON_CONTROL);
       break;
     }
 
@@ -606,7 +606,7 @@ bool FalcomSnesTrack::readEvent() {
       bool echoOn = (readByte(curOffset++) != 0);
 
       desc = fmt::format("Echo Write: {}", echoOn ? "On" : "Off");
-      addGenericEvent(beginOffset, curOffset - beginOffset, "Echo", desc, CLR_REVERB, ICON_CONTROL);
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Echo", desc, Type::Reverb, ICON_CONTROL);
       addReverbNoItem(echoOn ? 40 : 0);
       break;
     }
@@ -617,7 +617,7 @@ bool FalcomSnesTrack::readEvent() {
       uint8_t spcFIR = readByte(curOffset++);
 
       desc = fmt::format("Delay: {:d}  Feedback: {:d}  FIR: {:d}", spcEDL, spcEFB, spcFIR);
-      addGenericEvent(beginOffset, curOffset - beginOffset, "Echo Param", desc, CLR_REVERB, ICON_CONTROL);
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Echo Param", desc, Type::Reverb, ICON_CONTROL);
 
       // enable echo for the channel
       addReverbNoItem(40);
@@ -628,7 +628,7 @@ bool FalcomSnesTrack::readEvent() {
       bool echoVolumeOn = readByte(curOffset++) != 0;
 
       desc = fmt::format("Echo Volume: {}", echoVolumeOn ? "On" : "Off");
-      addGenericEvent(beginOffset, curOffset - beginOffset, "Echo Volume On/Off", desc, CLR_REVERB, ICON_CONTROL);
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Echo Volume On/Off", desc, Type::Reverb, ICON_CONTROL);
       break;
     }
 
@@ -637,7 +637,7 @@ bool FalcomSnesTrack::readEvent() {
       int8_t echoVolumeRight = readByte(curOffset++);
 
       desc = fmt::format("Echo Volume Left: {:d}  Echo Volume Right: {:d}", echoVolumeLeft, echoVolumeRight);
-      addGenericEvent(beginOffset, curOffset - beginOffset, "Echo Volume", desc, CLR_REVERB, ICON_CONTROL);
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Echo Volume", desc, Type::Reverb, ICON_CONTROL);
       break;
     }
 
@@ -646,7 +646,7 @@ bool FalcomSnesTrack::readEvent() {
       curOffset += 8; // FIR C0-C7
 
       desc = fmt::format("Preset: #{:d}", presetNo);
-      addGenericEvent(beginOffset, curOffset - beginOffset, "Echo FIR Overwrite", desc, CLR_REVERB, ICON_CONTROL);
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Echo FIR Overwrite", desc, Type::Reverb, ICON_CONTROL);
       break;
     }
 
@@ -665,7 +665,7 @@ bool FalcomSnesTrack::readEvent() {
 
         curOffset = dest;
         if (!isOffsetUsed(dest)) {
-          addGenericEvent(beginOffset, length, "Jump", desc, CLR_LOOPFOREVER);
+          addGenericEvent(beginOffset, length, "Jump", desc, Type::LoopForever);
         }
         else {
           bContinue = addLoopForever(beginOffset, length, "Jump");

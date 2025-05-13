@@ -232,7 +232,7 @@ bool CPS2InstrSet::parseInstrPointers() {
         uint32_t bankOff = instr_table_ptrs[bank] - 0x6000000;
 
         auto pointersName = fmt::format("Bank {:d} Instrument Pointers", bank);
-        auto instrPointersItem = new VGMItem(vgmFile(), bankOff, 128*2, pointersName, CLR_HEADER);
+        auto instrPointersItem = new VGMItem(vgmFile(), bankOff, 128*2, pointersName, Type::Header);
 
         // For each bank, iterate over all instr ptrs and create instruments
         for (uint8_t j = 0; j < 128; j++) {

@@ -257,7 +257,7 @@ bool AsciiShuichiSnesTrack::readEvent() {
 
       if (isSlurEvent) {
         // i.e. combine with next note - omit key-off and just change pitch
-        addGenericEvent(beginOffset, curOffset - beginOffset, "Tie / Slur", "", CLR_TIE, ICON_NOTE);
+        addGenericEvent(beginOffset, curOffset - beginOffset, "Tie / Slur", "", Type::Tie, ICON_NOTE);
         slurDeferred = true;
       } else {
         // note event
@@ -289,7 +289,7 @@ bool AsciiShuichiSnesTrack::readEvent() {
     case EVENT_INFINITE_LOOP_START: {
       infiniteLoopPoint = static_cast<uint16_t>(curOffset);
       addGenericEvent(beginOffset, curOffset - beginOffset, "Infinite Loop Point",
-                      "", CLR_LOOP, ICON_STARTREP);
+                      "", Type::Loop, ICON_STARTREP);
       break;
     }
 
@@ -300,7 +300,7 @@ bool AsciiShuichiSnesTrack::readEvent() {
     }
 
     case EVENT_LOOP_START:
-      addGenericEvent(beginOffset, curOffset - beginOffset, "Loop Start", "", CLR_LOOP,
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Loop Start", "", Type::Loop,
                       ICON_STARTREP);
       repeatStartAddressStack[repeatStartNestLevel] = static_cast<uint16_t>(curOffset);
       repeatStartNestLevel++;
@@ -311,7 +311,7 @@ bool AsciiShuichiSnesTrack::readEvent() {
       const int realLoopCount = (count == 0) ? 256 : count;
 
       const auto desc = fmt::format("Loop count: {:d}", realLoopCount);
-      addGenericEvent(beginOffset, curOffset - beginOffset, "Loop End", desc, CLR_LOOP,
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Loop End", desc, Type::Loop,
                       ICON_ENDREP);
 
       bool firstTime =
@@ -356,7 +356,7 @@ bool AsciiShuichiSnesTrack::readEvent() {
     }
 
     case EVENT_LOOP_BREAK: {
-      addGenericEvent(beginOffset, curOffset - beginOffset, "Loop Break", "", CLR_LOOP,
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Loop Break", "", Type::Loop,
                       ICON_ENDREP);
 
       if (!reachedRepeatBreakBefore) {
@@ -385,7 +385,7 @@ bool AsciiShuichiSnesTrack::readEvent() {
       curOffset += 2;
 
       const auto desc = fmt::format("Destination: {:#04x}", dest);
-      addGenericEvent(beginOffset, 3, "Pattern Play", desc, CLR_LOOP, ICON_STARTREP);
+      addGenericEvent(beginOffset, 3, "Pattern Play", desc, Type::Loop, ICON_STARTREP);
 
       if (callNestLevel >= callStack.size()) {
         L_WARN("Stack overflow in Pattern Play Event.");
@@ -403,7 +403,7 @@ bool AsciiShuichiSnesTrack::readEvent() {
     }
 
     case EVENT_RET: {
-      addGenericEvent(beginOffset, curOffset - beginOffset, "End Pattern", "", CLR_LOOP,
+      addGenericEvent(beginOffset, curOffset - beginOffset, "End Pattern", "", Type::Loop,
                       ICON_ENDREP);
 
       if (callNestLevel == 0) {
@@ -425,7 +425,7 @@ bool AsciiShuichiSnesTrack::readEvent() {
     case EVENT_RELEASE_ADSR: {
       const uint8_t adsr2 = readByte(curOffset++);
       const auto desc = fmt::format("ADSR(2): {:#02x}", adsr2);
-      addGenericEvent(beginOffset, curOffset - beginOffset, "Release ADSR", desc, CLR_ADSR,
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Release ADSR", desc, Type::Adsr,
                       ICON_CONTROL);
       break;
     }
@@ -475,7 +475,7 @@ bool AsciiShuichiSnesTrack::readEvent() {
 
       const auto desc = logEvent(statusByte, spdlog::level::off, "Event", static_cast<int>(arg1),
                       static_cast<int>(arg2));
-      addGenericEvent(beginOffset, curOffset - beginOffset, "Pitch Bend Slide", desc, CLR_PITCHBEND,
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Pitch Bend Slide", desc, Type::PitchBend,
                       ICON_CONTROL);
       // TODO: pitch bend slide
       break;
@@ -492,7 +492,7 @@ bool AsciiShuichiSnesTrack::readEvent() {
       const int actualRate = (rate == 0) ? 256 : rate;
       const auto desc =
           fmt::format("Note Length: {:d}/256 ({:.1f}%)", actualRate, actualRate / 256.0);
-      addGenericEvent(beginOffset, curOffset - beginOffset, "Duration Rate", desc, CLR_DURNOTE,
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Duration Rate", desc, Type::DurationNote,
                       ICON_CONTROL);
       break;
     }
@@ -503,7 +503,7 @@ bool AsciiShuichiSnesTrack::readEvent() {
       noteDuration = ticks;
 
       const auto desc = fmt::format("Note Length: {:d} ticks", ticks);
-      addGenericEvent(beginOffset, curOffset - beginOffset, "Duration", desc, CLR_DURNOTE,
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Duration", desc, Type::DurationNote,
                       ICON_CONTROL);
       break;
     }
@@ -514,7 +514,7 @@ bool AsciiShuichiSnesTrack::readEvent() {
       spcVolume = volume;
 
       const auto desc = fmt::format("Volume: {:d}, pan: {:d}/{:d}", volume, pan, countof(panTable));
-      addGenericEvent(beginOffset, curOffset - beginOffset, "Volume & Pan", desc, CLR_VOLUME,
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Volume & Pan", desc, Type::Volume,
                       ICON_CONTROL);
 
       addVolNoItem(spcVolume / 2);
@@ -529,7 +529,7 @@ bool AsciiShuichiSnesTrack::readEvent() {
       spcVolume = volume;
 
       const auto desc = fmt::format("Volume: {:d}", volume);
-      addGenericEvent(beginOffset, curOffset - beginOffset, "Volume", desc, CLR_VOLUME,
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Volume", desc, Type::Volume,
                       ICON_CONTROL);
       addVolNoItem(spcVolume / 2);
       break;
@@ -540,7 +540,7 @@ bool AsciiShuichiSnesTrack::readEvent() {
       spcVolume += volumeDelta;
 
       const auto desc = fmt::format("Volume delta: {:d}", volumeDelta);
-      addGenericEvent(beginOffset, curOffset - beginOffset, "Volume (Relative)", desc, CLR_VOLUME,
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Volume (Relative)", desc, Type::Volume,
                       ICON_CONTROL);
       addVolNoItem(spcVolume / 2);
       break;
@@ -550,7 +550,7 @@ bool AsciiShuichiSnesTrack::readEvent() {
       const auto volumeDelta = static_cast<int8_t>(readByte(curOffset++));
 
       const auto desc = fmt::format("Volume delta: {:d}", volumeDelta);
-      addGenericEvent(beginOffset, curOffset - beginOffset, "Volume (One-Shot)", desc, CLR_VOLUME,
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Volume (One-Shot)", desc, Type::Volume,
                       ICON_CONTROL);
       // TODO: volume MIDI CC
       break;
@@ -560,7 +560,7 @@ bool AsciiShuichiSnesTrack::readEvent() {
       const uint8_t pan = readByte(curOffset++);
 
       const auto desc = fmt::format("Pan: {:d}/{:d}", pan, countof(panTable));
-      addGenericEvent(beginOffset, curOffset - beginOffset, "Pan", desc, CLR_PAN, ICON_CONTROL);
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Pan", desc, Type::Pan, ICON_CONTROL);
 
       const int8_t midiPan = calcMidiPanValue(pan);
       addPanNoItem(midiPan);  // TODO: apply volume scale
@@ -574,7 +574,7 @@ bool AsciiShuichiSnesTrack::readEvent() {
 
       const auto desc = logEvent(statusByte, spdlog::level::off, "Event", static_cast<int>(arg1),
                       static_cast<int>(arg2), static_cast<int>(arg3));
-      addGenericEvent(beginOffset, curOffset - beginOffset, "Pan Fade", desc, CLR_PAN, ICON_CONTROL);
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Pan Fade", desc, Type::Pan, ICON_CONTROL);
       break;
     }
 
@@ -587,7 +587,7 @@ bool AsciiShuichiSnesTrack::readEvent() {
       const auto desc =
           fmt::format("Volume Fade - delay: {:d}, rate: {:d}, depth: {:d}, step length: {:d}",
                       delay, rate, depth, stepLength);
-      addGenericEvent(beginOffset, curOffset - beginOffset, "Volume Fade", desc, CLR_VOLUME,
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Volume Fade", desc, Type::Volume,
                       ICON_CONTROL);
       // TODO: volume MIDI CC
       break;
@@ -599,7 +599,7 @@ bool AsciiShuichiSnesTrack::readEvent() {
 
 
       const auto desc = fmt::format("Master Volume - left: {:d}, right: {:d}", newVolL, newVolR);
-      addGenericEvent(beginOffset, curOffset - beginOffset, "Master Volume L/R", desc, CLR_VOLUME,
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Master Volume L/R", desc, Type::Volume,
                       ICON_CONTROL);
       break;
     }
@@ -611,7 +611,7 @@ bool AsciiShuichiSnesTrack::readEvent() {
       
       const auto desc = fmt::format("Echo delay: {:d}, feedback: {:d}, arg3: {:d}", delay, feedback, arg3);
       addGenericEvent(beginOffset, curOffset - beginOffset, "Echo Delay & Feedback", desc,
-                      CLR_REVERB, ICON_CONTROL);
+                      Type::Reverb, ICON_CONTROL);
       break;
     }
 
@@ -619,7 +619,7 @@ bool AsciiShuichiSnesTrack::readEvent() {
       const uint8_t dspEchoOn = readByte(curOffset++);
 
       const auto desc = fmt::format("Echo channels: {:#02x}", dspEchoOn);
-      addGenericEvent(beginOffset, curOffset - beginOffset, "Echo Channels", desc, CLR_REVERB,
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Echo Channels", desc, Type::Reverb,
                       ICON_CONTROL);
 
       // TODO: output MIDI reverb
@@ -635,13 +635,13 @@ bool AsciiShuichiSnesTrack::readEvent() {
       const auto desc =
           fmt::format("Vibrato delay: {:d}, rate: {:d}, depth: {:d}, step length: {:d}", delay,
                       rate, depth, stepLength);
-      addGenericEvent(beginOffset, curOffset - beginOffset, "Vibrato", desc, CLR_MODULATION,
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Vibrato", desc, Type::Modulation,
                       ICON_CONTROL);
       break;
     }
 
     case EVENT_VIBRATO_OFF: {
-      addGenericEvent(beginOffset, curOffset - beginOffset, "Vibrato Off", "", CLR_MODULATION,
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Vibrato Off", "", Type::Modulation,
                       ICON_CONTROL);
       break;
     }
@@ -662,13 +662,13 @@ bool AsciiShuichiSnesTrack::readEvent() {
 
     case EVENT_NOISE_ON:
       lastNoteKey = -1;
-      addGenericEvent(beginOffset, curOffset - beginOffset, "Noise On", "", CLR_PROGCHANGE,
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Noise On", "", Type::ProgramChange,
                       ICON_CONTROL);
       break;
 
     case EVENT_NOISE_OFF:
       lastNoteKey = -1;
-      addGenericEvent(beginOffset, curOffset - beginOffset, "Noise Off", "", CLR_PROGCHANGE,
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Noise Off", "", Type::ProgramChange,
                       ICON_CONTROL);
       break;
 
@@ -676,7 +676,7 @@ bool AsciiShuichiSnesTrack::readEvent() {
       const uint8_t channels = readByte(curOffset++);
 
       const auto desc = fmt::format("Mute channels: {:#02x}", channels);
-      addGenericEvent(beginOffset, curOffset - beginOffset, "Mute Channels", desc, CLR_REVERB,
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Mute Channels", desc, Type::Reverb,
                       ICON_CONTROL);
       break;
     }
@@ -691,7 +691,7 @@ bool AsciiShuichiSnesTrack::readEvent() {
           fmt::format("Instrument: {:d}, volume: {:d}, pan: {:d}/{:d}, transpose: {:d}",
                       newProgramNumber, volume, pan, countof(panTable), newTranspose);
       addGenericEvent(beginOffset, curOffset - beginOffset, "Instrument, Volume, Pan, Transpose",
-                      desc, CLR_PROGCHANGE, ICON_CONTROL);
+                      desc, Type::ProgramChange, ICON_CONTROL);
 
       addProgramChangeNoItem(newProgramNumber, true);
 
@@ -710,7 +710,7 @@ bool AsciiShuichiSnesTrack::readEvent() {
     case EVENT_WRITE_TO_PORT: {
       const uint8_t value = readByte(curOffset++);
       const auto desc = fmt::format("APUI02: {:d} ({:#02x})", value, value);
-      addGenericEvent(beginOffset, curOffset - beginOffset, "Write to I/O Port", desc, CLR_MISC,
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Write to I/O Port", desc, Type::Misc,
                       ICON_CONTROL);
       break;
     }

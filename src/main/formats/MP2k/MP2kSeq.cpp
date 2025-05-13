@@ -121,10 +121,10 @@ bool MP2kTrack::readEvent() {
     if (readByte(curOffset) > 0x7F) {
       addNoteByDurNoItem(prevKey, prevVel, curDuration);
       addGenericEvent(beginOffset, curOffset - beginOffset,
-                      "Duration Note State + Note On (prev key and vel)", "", CLR_DURNOTE);
+                      "Duration Note State + Note On (prev key and vel)", "", Type::DurationNote);
     } else {
       addGenericEvent(beginOffset, curOffset - beginOffset, "Duration Note State", "",
-                      CLR_CHANGESTATE);
+                      Type::ChangeState);
     }
   } else if (status_byte == 0xB1) { /* End of track */
     addEndOfTrack(beginOffset, curOffset - beginOffset);
@@ -137,7 +137,7 @@ bool MP2kTrack::readEvent() {
 
     curOffset = destOffset;
     if (!isOffsetUsed(destOffset) || loopEndPositions.size() != 0) {
-      addGenericEvent(beginOffset, length, "Goto", "", CLR_LOOPFOREVER);
+      addGenericEvent(beginOffset, length, "Goto", "", Type::LoopForever);
     } else {
       bContinue = addLoopForever(beginOffset, length, "Goto");
     }
@@ -225,14 +225,14 @@ void MP2kTrack::handleSpecialCommand(u32 beginOffset, u8 status_byte) {
       uint32_t destOffset = getWord(curOffset);
       curOffset += 4;
       loopEndPositions.push_back(curOffset);
-      addGenericEvent(beginOffset, curOffset - beginOffset, "Pattern Play", "", CLR_LOOP);
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Pattern Play", "", Type::Loop);
       curOffset = destOffset - 0x8000000;
       break;
     }
 
     // Branch Break
     case 0xB4: {
-      addGenericEvent(beginOffset, curOffset - beginOffset, "Pattern End", "", CLR_LOOP);
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Pattern End", "", Type::Loop);
       if (loopEndPositions.size() != 0) {
         curOffset = loopEndPositions.back();
         loopEndPositions.pop_back();
@@ -242,7 +242,7 @@ void MP2kTrack::handleSpecialCommand(u32 beginOffset, u8 status_byte) {
 
     case 0xBA: {
       curOffset++;
-      addGenericEvent(beginOffset, curOffset - beginOffset, "Priority", "", CLR_PRIORITY);
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Priority", "", Type::Priority);
       break;
     }
 
@@ -254,7 +254,7 @@ void MP2kTrack::handleSpecialCommand(u32 beginOffset, u8 status_byte) {
 
     case 0xBC: {
       transpose = readByte(curOffset++);
-      addGenericEvent(beginOffset, curOffset - beginOffset, "Key Shift", "", CLR_TRANSPOSE);
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Key Shift", "", Type::Transpose);
       break;
     }
 
@@ -265,14 +265,14 @@ void MP2kTrack::handleSpecialCommand(u32 beginOffset, u8 status_byte) {
     }
 
     case 0xBE: {
-      addGenericEvent(beginOffset, curOffset - beginOffset, "Volume State", "", CLR_CHANGESTATE);
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Volume State", "", Type::ChangeState);
       state = STATE_VOL;
       break;
     }
 
     // pan
     case 0xBF: {
-      addGenericEvent(beginOffset, curOffset - beginOffset, "Pan State", "", CLR_CHANGESTATE);
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Pan State", "", Type::ChangeState);
       state = STATE_PAN;
       break;
     }
@@ -280,7 +280,7 @@ void MP2kTrack::handleSpecialCommand(u32 beginOffset, u8 status_byte) {
     // pitch bend
     case 0xC0: {
       addGenericEvent(beginOffset, curOffset - beginOffset, "Pitch Bend State", "",
-                      CLR_CHANGESTATE);
+                      Type::ChangeState);
       state = STATE_PITCHBEND;
       break;
     }
@@ -289,28 +289,28 @@ void MP2kTrack::handleSpecialCommand(u32 beginOffset, u8 status_byte) {
     case 0xC1: {
       curOffset++;
       addGenericEvent(beginOffset, curOffset - beginOffset, "Pitch Bend Range", "",
-                      CLR_PITCHBENDRANGE);
+                      Type::PitchBendRange);
       break;
     }
 
     // lfo speed
     case 0xC2: {
       curOffset++;
-      addGenericEvent(beginOffset, curOffset - beginOffset, "LFO Speed", "", CLR_LFO);
+      addGenericEvent(beginOffset, curOffset - beginOffset, "LFO Speed", "", Type::Lfo);
       break;
     }
 
     // lfo delay
     case 0xC3: {
       curOffset++;
-      addGenericEvent(beginOffset, curOffset - beginOffset, "LFO Delay", "", CLR_LFO);
+      addGenericEvent(beginOffset, curOffset - beginOffset, "LFO Delay", "", Type::Lfo);
       break;
     }
 
     // modulation depth
     case 0xC4: {
       addGenericEvent(beginOffset, curOffset - beginOffset, "Modulation Depth State", "",
-                      CLR_MODULATION);
+                      Type::Modulation);
       state = STATE_MODULATION;
       break;
     }
@@ -318,13 +318,13 @@ void MP2kTrack::handleSpecialCommand(u32 beginOffset, u8 status_byte) {
     // modulation type
     case 0xC5: {
       curOffset++;
-      addGenericEvent(beginOffset, curOffset - beginOffset, "Modulation Type", "", CLR_MODULATION);
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Modulation Type", "", Type::Modulation);
       break;
     }
 
     case 0xC8: {
       curOffset++;
-      addGenericEvent(beginOffset, curOffset - beginOffset, "Microtune", "", CLR_PITCHBEND);
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Microtune", "", Type::PitchBend);
       break;
     }
 
@@ -341,17 +341,17 @@ void MP2kTrack::handleSpecialCommand(u32 beginOffset, u8 status_byte) {
 
       if (subCommand == 0x08 && subParam <= 127) {
         curOffset++;
-        addGenericEvent(beginOffset, curOffset - beginOffset, "Echo Volume", "", CLR_MISC);
+        addGenericEvent(beginOffset, curOffset - beginOffset, "Echo Volume", "", Type::Misc);
       } else if (subCommand == 0x09 && subParam <= 127) {
         curOffset++;
-        addGenericEvent(beginOffset, curOffset - beginOffset, "Echo Length", "", CLR_MISC);
+        addGenericEvent(beginOffset, curOffset - beginOffset, "Echo Length", "", Type::Misc);
       } else {
         // Heuristic method
         while (subParam <= 127) {
           curOffset++;
           subParam = readByte(curOffset);
         }
-        addGenericEvent(beginOffset, curOffset - beginOffset, "Extend Command", "", CLR_UNKNOWN);
+        addGenericEvent(beginOffset, curOffset - beginOffset, "Extend Command", "", Type::Unknown);
       }
       break;
     }
@@ -364,9 +364,9 @@ void MP2kTrack::handleSpecialCommand(u32 beginOffset, u8 status_byte) {
       if (readByte(curOffset) > 0x7F) {
         addNoteOffNoItem(prevKey);
         addGenericEvent(beginOffset, curOffset - beginOffset, "End Tie State + End Tie", "",
-                        CLR_TIE);
+                        Type::Tie);
       } else
-        addGenericEvent(beginOffset, curOffset - beginOffset, "End Tie State", "", CLR_TIE);
+        addGenericEvent(beginOffset, curOffset - beginOffset, "End Tie State", "", Type::Tie);
       break;
     }
 
@@ -375,9 +375,9 @@ void MP2kTrack::handleSpecialCommand(u32 beginOffset, u8 status_byte) {
       if (readByte(curOffset) > 0x7F) {
         addNoteOnNoItem(prevKey, prevVel);
         addGenericEvent(beginOffset, curOffset - beginOffset,
-                        "Tie State + Tie (with prev key and vel)", "", CLR_TIE);
+                        "Tie State + Tie (with prev key and vel)", "", Type::Tie);
       } else
-        addGenericEvent(beginOffset, curOffset - beginOffset, "Tie State", "", CLR_TIE);
+        addGenericEvent(beginOffset, curOffset - beginOffset, "Tie State", "", Type::Tie);
       break;
     }
 

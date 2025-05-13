@@ -224,7 +224,7 @@ bool HOSATrack::readEvent(void) {
           //Reverb
         case (0x02):
           curOffset++;
-          addGenericEvent(beginOffset, curOffset - beginOffset, "Reverb Depth", "", CLR_REVERB);
+          addGenericEvent(beginOffset, curOffset - beginOffset, "Reverb Depth", "", Type::Reverb);
           break;
           //------------
           //Instrument
@@ -261,7 +261,7 @@ bool HOSATrack::readEvent(void) {
           //Dal Segno. (Loop)
         case (0x09):
           curOffset++;
-          addGenericEvent(beginOffset, curOffset - beginOffset, "Dal Segno.(Loop)", "", CLR_LOOP);
+          addGenericEvent(beginOffset, curOffset - beginOffset, "Dal Segno.(Loop)", "", Type::Loop);
           break;
           //------------
           //Unknown
@@ -281,7 +281,7 @@ bool HOSATrack::readEvent(void) {
       uint32_t beginOffset2 = curOffset;
       ReadDeltaTime(cCom_bit5, &iDeltaTimeCom);
       if (curOffset != beginOffset2) {
-        addGenericEvent(beginOffset2, curOffset - beginOffset2, "Delta time", "", CLR_CHANGESTATE);
+        addGenericEvent(beginOffset2, curOffset - beginOffset2, "Delta time", "", Type::ChangeState);
       };
 
       //----------------------------------

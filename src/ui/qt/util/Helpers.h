@@ -13,8 +13,8 @@
 const QIcon &iconForFile(VGMFileVariant file);
 const QIcon &iconForItemType(VGMItem::Icon type);
 
-QColor colorForEventColor(VGMItem::EventColor eventColor);
-QColor textColorForEventColor(VGMItem::EventColor eventColor);
+QColor colorForItemType(VGMItem::Type type);
+QColor textColorForItemType(VGMItem::Type type);
 
 QString getFullDescriptionForTooltip(VGMItem* item);
 
