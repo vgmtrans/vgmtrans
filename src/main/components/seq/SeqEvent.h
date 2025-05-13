@@ -370,6 +370,7 @@ class PitchBendSeqEvent : public SeqEvent {
   PitchBendSeqEvent(SeqTrack *pTrack, short thePitchBend, uint32_t offset = 0,
                     uint32_t length = 0, const std::string &name = "");
   EventType eventType() override { return EVENTTYPE_PITCHBEND; }
+  Icon icon() override { return ICON_PITCHBEND; }
 
   std::string description() override {
     return fmt::format("{} - pitch bend: {}", name(), static_cast<int>(pitchbend));

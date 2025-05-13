@@ -137,6 +137,11 @@ const QIcon &iconForItemType(VGMItem::Icon type) {
       return i_gen;
     }
 
+    case VGMItem::ICON_PITCHBEND: {
+      static QIcon i_gen{":/images/pitchbend.svg"};
+      return i_gen;
+    }
+
     default:
       break;
   }

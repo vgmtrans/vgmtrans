@@ -31,6 +31,7 @@
   <file>images/pan.svg</file>
   <file>images/repeat-begin.svg</file>
   <file>images/repeat-end.svg</file>
+  <file>images/pitchbend.svg</file>
   <file alias="legal/VGMTrans">../../../../LICENSE</file>
   <file alias="legal/oki_adpcm_state">../../../../licenses/LICENSE_oki_adpcm_state</file>
 </qresource>

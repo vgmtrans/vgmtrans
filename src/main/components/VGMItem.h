@@ -40,6 +40,7 @@ public:
     ICON_VOLUME,
     ICON_PAN,
     ICON_ADSR,
+    ICON_PITCHBEND,
   };
   enum EventColor {
     CLR_UNKNOWN,
