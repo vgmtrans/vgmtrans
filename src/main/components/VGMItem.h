@@ -20,6 +20,7 @@ public:
     ICON_SAMPCOLL,
     ICON_UNKNOWN,
     ICON_NOTE,
+    ICON_NOTE_OFF,
     ICON_TRACK,
     ICON_REST,
     ICON_CONTROL,
@@ -33,7 +34,12 @@ public:
     ICON_INSTR,
     ICON_SAMP,
     ICON_BINARY,
-    ICON_MAX
+    ICON_MAX,
+    ICON_LOOP,
+    ICON_LOOP_FOREVER,
+    ICON_VOLUME,
+    ICON_PAN,
+    ICON_ADSR,
   };
   enum EventColor {
     CLR_UNKNOWN,

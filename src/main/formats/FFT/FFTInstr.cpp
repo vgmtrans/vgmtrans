@@ -145,12 +145,12 @@ bool WdsInstr::loadInstr() {
     uint8_t Sm = (adsr_mode >> 4) & 0x07;
     uint8_t Rm = (adsr_mode >> 8) & 0x07;
 
-    rgn->addGeneralItem(dwOffset + 0x08, sizeof(uint8_t), "ADSR Attack Rate");
-    rgn->addGeneralItem(dwOffset + 0x09, sizeof(uint8_t), "ADSR Decay Rate & Sustain Level");
-    rgn->addGeneralItem(dwOffset + 0x0a, sizeof(uint8_t), "ADSR Sustain Rate");
-    rgn->addGeneralItem(dwOffset + 0x0b, sizeof(uint8_t), "ADSR Release Rate");
-    rgn->addGeneralItem(dwOffset + 0x0c, sizeof(uint8_t), "ADSR Attack Mode & Sustain Mode / Direction");
-    rgn->addGeneralItem(dwOffset + 0x0d, sizeof(uint8_t), "ADSR Release Mode");
+    rgn->addADSRValue(dwOffset + 0x08, sizeof(uint8_t), "ADSR Attack Rate");
+    rgn->addADSRValue(dwOffset + 0x09, sizeof(uint8_t), "ADSR Decay Rate & Sustain Level");
+    rgn->addADSRValue(dwOffset + 0x0a, sizeof(uint8_t), "ADSR Sustain Rate");
+    rgn->addADSRValue(dwOffset + 0x0b, sizeof(uint8_t), "ADSR Release Rate");
+    rgn->addADSRValue(dwOffset + 0x0c, sizeof(uint8_t), "ADSR Attack Mode & Sustain Mode / Direction");
+    rgn->addADSRValue(dwOffset + 0x0d, sizeof(uint8_t), "ADSR Release Mode");
     rgn->addUnknown(dwOffset + 0x0e, sizeof(uint8_t));
     rgn->addUnknown(dwOffset + 0x0f, sizeof(uint8_t));
 
@@ -161,12 +161,12 @@ bool WdsInstr::loadInstr() {
     psxConvADSR(rgn, rgndata.Am > 1, rgndata.Ar, rgndata.Dr, rgndata.Sl, 1, 1, rgndata.Sr, 1, rgndata.Rr, false);
     addRgn(rgn);
 
-    rgn->addGeneralItem(dwOffset + 0x08, sizeof(uint8_t), "Attack Rate");
-    rgn->addGeneralItem(dwOffset + 0x09, sizeof(uint8_t), "Decay Rate");
-    rgn->addGeneralItem(dwOffset + 0x0A, sizeof(uint8_t), "Sustain Rate");
-    rgn->addGeneralItem(dwOffset + 0x0B, sizeof(uint8_t), "Release Rate");
-    rgn->addGeneralItem(dwOffset + 0x0C, sizeof(uint8_t), "Sustain Level");
-    rgn->addGeneralItem(dwOffset + 0x0D, sizeof(uint8_t), "Attack Rate Mode?");
+    rgn->addADSRValue(dwOffset + 0x08, sizeof(uint8_t), "Attack Rate");
+    rgn->addADSRValue(dwOffset + 0x09, sizeof(uint8_t), "Decay Rate");
+    rgn->addADSRValue(dwOffset + 0x0A, sizeof(uint8_t), "Sustain Rate");
+    rgn->addADSRValue(dwOffset + 0x0B, sizeof(uint8_t), "Release Rate");
+    rgn->addADSRValue(dwOffset + 0x0C, sizeof(uint8_t), "Sustain Level");
+    rgn->addADSRValue(dwOffset + 0x0D, sizeof(uint8_t), "Attack Rate Mode?");
     rgn->addUnknown(dwOffset + 0x0E, sizeof(uint8_t));
     rgn->addUnknown(dwOffset + 0x0F, sizeof(uint8_t));
   }

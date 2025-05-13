@@ -130,7 +130,7 @@ class NoteOffSeqEvent:
   NoteOffSeqEvent
       (SeqTrack *pTrack, uint8_t absoluteKey, uint32_t offset = 0, uint32_t length = 0, const std::string &name = "");
   EventType eventType() override { return EVENTTYPE_NOTEOFF; }
-  Icon icon() override { return ICON_NOTE; }
+  Icon icon() override { return ICON_NOTE_OFF; }
 
   std::string description() override {
     return fmt::format("{} - abs key: {} ({})", name(), static_cast<int>(absKey),
@@ -183,6 +183,7 @@ class VolSeqEvent : public SeqEvent {
   VolSeqEvent(SeqTrack *pTrack, uint8_t volume, uint32_t offset = 0, uint32_t length = 0,
               const std::string &name = "");
   EventType eventType() override { return EVENTTYPE_VOLUME; }
+  Icon icon() override { return ICON_VOLUME; }
 
   std::string description() override {
     return fmt::format("{} - volume: {:d}", name(), vol);
@@ -200,6 +201,7 @@ public:
   Volume14BitSeqEvent(SeqTrack *pTrack, uint16_t volume, uint32_t offset = 0, uint32_t length = 0,
                       const std::string &name = "");
   EventType eventType() override { return EVENTTYPE_VOLUME; }
+  Icon icon() override { return ICON_VOLUME; }
 
   std::string description() override {
     return fmt::format("{} - volume: {:d}", name(), m_volume);
@@ -217,6 +219,7 @@ class VolSlideSeqEvent : public SeqEvent {
   VolSlideSeqEvent(SeqTrack *pTrack, uint8_t targetVolume, uint32_t duration, uint32_t offset = 0,
                    uint32_t length = 0, const std::string &name = "");
   EventType eventType() override { return EVENTTYPE_VOLUMESLIDE; }
+  Icon icon() override { return ICON_VOLUME; }
 
   std::string description() override {
     return fmt::format("{} - target volume: {}, duration: {}", name(),
@@ -235,6 +238,7 @@ class MastVolSeqEvent : public SeqEvent {
  public:
     MastVolSeqEvent(SeqTrack *pTrack, uint8_t volume, uint32_t offset = 0, uint32_t length = 0,
                     const std::string &name = "");
+    Icon icon() override { return ICON_VOLUME; }
 
     std::string description() override {
         return fmt::format("{} - master volume: {}", name(), static_cast<int>(vol));
@@ -251,6 +255,7 @@ class MastVolSlideSeqEvent : public SeqEvent {
  public:
     MastVolSlideSeqEvent(SeqTrack *pTrack, uint8_t targetVolume, uint32_t duration,
                          uint32_t offset = 0, uint32_t length = 0, const std::string &name = "");
+    Icon icon() override { return ICON_VOLUME; }
 
     std::string description() override {
         return fmt::format("{} - target volume: {}, duration: {}", name(),
@@ -270,6 +275,7 @@ class ExpressionSeqEvent : public SeqEvent {
   ExpressionSeqEvent(SeqTrack *pTrack, uint8_t level, uint32_t offset = 0, uint32_t length = 0,
                      const std::string &name = "");
   EventType eventType() override { return EVENTTYPE_EXPRESSION; }
+  Icon icon() override { return ICON_VOLUME; }
 
   std::string description() override {
     return fmt::format("{} - expression: {}", name(), static_cast<int>(level));
@@ -288,6 +294,7 @@ class ExpressionSlideSeqEvent : public SeqEvent {
     ExpressionSlideSeqEvent(SeqTrack *pTrack, uint8_t targetExpression, uint32_t duration,
                             uint32_t offset = 0, uint32_t length = 0, const std::string &name = "");
   EventType eventType() override { return EVENTTYPE_EXPRESSIONSLIDE; }
+  Icon icon() override { return ICON_VOLUME; }
 
   std::string description() override {
     return fmt::format("{} - target expression: {}, duration: {}", name(),
@@ -307,6 +314,7 @@ class PanSeqEvent : public SeqEvent {
   PanSeqEvent(SeqTrack *pTrack, uint8_t pan, uint32_t offset = 0, uint32_t length = 0,
               const std::string &name = "");
   EventType eventType() override { return EVENTTYPE_PAN; }
+  Icon icon() override { return ICON_PAN; }
 
   std::string description() override {
     return fmt::format("{} - pan: {}", name(), static_cast<int>(pan));
@@ -324,6 +332,7 @@ class PanSlideSeqEvent : public SeqEvent {
  public:
   PanSlideSeqEvent(SeqTrack *pTrack, uint8_t targetPan, uint32_t duration, uint32_t offset = 0,
                    uint32_t length = 0, const std::string &name = "");
+  Icon icon() override { return ICON_PAN; }
 
   std::string description() override {
       return fmt::format("{} - target pan: {}, duration: {}", name(),
@@ -535,6 +544,7 @@ class ProgChangeSeqEvent : public SeqEvent {
   ProgChangeSeqEvent(SeqTrack *pTrack, uint32_t programNumber, uint32_t offset = 0,
                      uint32_t length = 0, const std::string &name = "");
   EventType eventType() override { return EVENTTYPE_PROGCHANGE; }
+  Icon icon() override { return ICON_PROGCHANGE; }
 
   std::string description() override {
     return fmt::format("{} - program number: {}", name(), progNum);
@@ -545,7 +555,7 @@ class ProgChangeSeqEvent : public SeqEvent {
 };
 
 //  ******************
-//  ProgChangeSeqEvent
+//  BankSelectSeqEvent
 //  ******************
 
 class BankSelectSeqEvent : public SeqEvent {
@@ -553,6 +563,7 @@ public:
   BankSelectSeqEvent(SeqTrack *pTrack, uint32_t bank, uint32_t offset = 0,
                      uint32_t length = 0, const std::string &name = "");
   EventType eventType() override { return EVENTTYPE_BANKSELECT; }
+  Icon icon() override { return ICON_PROGCHANGE; }
 
   std::string description() override {
     return fmt::format("{} - bank: {}", name(), bank);
@@ -671,6 +682,7 @@ class TrackEndSeqEvent : public SeqEvent {
                    const std::string &name = "")
       : SeqEvent(pTrack, offset, length, name, CLR_TRACKEND) {}
   EventType eventType() override { return EVENTTYPE_TRACKEND; }
+  Icon icon() override { return ICON_TRACKEND; }
 };
 
 //  *******************
@@ -680,7 +692,8 @@ class TrackEndSeqEvent : public SeqEvent {
 class LoopForeverSeqEvent : public SeqEvent {
  public:
   explicit LoopForeverSeqEvent(SeqTrack *pTrack, uint32_t offset = 0, uint32_t length = 0,
-                      const std::string &name = "")
+                      const std::string &name = "", const std::string &descr = "")
       : SeqEvent(pTrack, offset, length, name, CLR_LOOPFOREVER) {}
   EventType eventType() override { return EVENTTYPE_LOOPFOREVER; }
+  Icon icon() override { return ICON_LOOP_FOREVER; }
 };

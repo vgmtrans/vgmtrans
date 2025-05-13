@@ -197,10 +197,10 @@ bool AkaoDrumKit::loadInstr() {
       rgn->sustainRate = readByte(dwOffset + 3);
       rgn->sustainMode = readByte(dwOffset + 4);
       rgn->releaseRate = readByte(dwOffset + 5);
-      rgn->addGeneralItem(rgn_offset + 2, 1, "ADSR Attack Rate");
-      rgn->addGeneralItem(rgn_offset + 3, 1, "ADSR Sustain Rate");
-      rgn->addGeneralItem(rgn_offset + 4, 1, "ADSR Sustain Mode");
-      rgn->addGeneralItem(rgn_offset + 5, 1, "ADSR Release Rate");
+      rgn->addADSRValue(rgn_offset + 2, 1, "ADSR Attack Rate");
+      rgn->addADSRValue(rgn_offset + 3, 1, "ADSR Sustain Rate");
+      rgn->addADSRValue(rgn_offset + 4, 1, "ADSR Sustain Mode");
+      rgn->addADSRValue(rgn_offset + 5, 1, "ADSR Release Rate");
       rgn->addGeneralItem(rgn_offset + 6, 1, "Attenuation");
       const uint8_t raw_pan_reverb = readByte(rgn_offset + 7);
       const uint8_t pan = raw_pan_reverb & 0x7f;
@@ -278,10 +278,10 @@ bool AkaoRgn::loadRgn() {
   releaseRate = readByte(dwOffset + 6);
   // TODO: Need to confirm the details of these ADSR values. Sustain Mode values are using 3 bits
   //  which indicates it's more than sustain mode.
-  addGeneralItem(dwOffset + 3, 1, "ADSR Attack Rate");
-  addGeneralItem(dwOffset + 4, 1, "ADSR Sustain Rate");
-  addGeneralItem(dwOffset + 5, 1, "ADSR Sustain Mode");
-  addGeneralItem(dwOffset + 6, 1, "ADSR Release Rate");
+  addADSRValue(dwOffset + 3, 1, "ADSR Attack Rate");
+  addADSRValue(dwOffset + 4, 1, "ADSR Sustain Rate");
+  addADSRValue(dwOffset + 5, 1, "ADSR Sustain Mode");
+  addADSRValue(dwOffset + 6, 1, "ADSR Release Rate");
   const uint8_t raw_volume = readByte(dwOffset + 7);
   const double volume = raw_volume == 0 ? 1.0 : raw_volume / 128.0;
   addVolume(volume, dwOffset + 7, 1);

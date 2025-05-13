@@ -44,6 +44,7 @@ class VGMRgn : public VGMItem {
   void addVelLow(uint8_t velLow, uint32_t offset, uint32_t length = 1);
   void addVelHigh(uint8_t velHigh, uint32_t offset, uint32_t length = 1);
   void addSampNum(int sampNum, uint32_t offset, uint32_t length = 1);
+  void addADSRValue(uint32_t offset, uint32_t length, const std::string& name);
   //void setAttack();
   //void setDelay();
   //void setSustain();
@@ -107,7 +108,8 @@ class VGMRgnItem : public VGMItem {
     RIT_VELHIGH,
     RIT_PAN,
     RIT_VOL,
-    RIT_SAMPNUM
+    RIT_SAMPNUM,
+    RIT_ADSR,
   };        //HIT = Header Item Type
 
   VGMRgnItem(const VGMRgn *rgn, RgnItemType theType, uint32_t offset, uint32_t length, std::string name);

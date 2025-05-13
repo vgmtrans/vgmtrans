@@ -1119,10 +1119,10 @@ bool NinSnesTrack::readEvent(void) {
       // Add the next "END" event to UI
       if (curOffset < 0x10000 && readByte(curOffset) == parentSeq->STATUS_END) {
         if (shared->loopCount == 0) {
-          addGenericEvent(curOffset, 1, "Section End", desc.str().c_str(), CLR_TRACKEND, ICON_TRACKEND);
+          addGenericEvent(curOffset, 1, "Section End", desc.str().c_str(), CLR_TRACKEND, ICON_ENDREP);
         }
         else {
-          addGenericEvent(curOffset, 1, "Pattern End", desc.str().c_str(), CLR_TRACKEND, ICON_TRACKEND);
+          addGenericEvent(curOffset, 1, "Pattern End", desc.str().c_str(), CLR_TRACKEND, ICON_ENDREP);
         }
       }
 
@@ -1769,7 +1769,7 @@ bool NinSnesTrack::readEvent(void) {
       addGenericEvent(curOffset, 1, "Section End", desc.str().c_str(), CLR_TRACKEND, ICON_TRACKEND);
     }
     else {
-      addGenericEvent(curOffset, 1, "Pattern End", desc.str().c_str(), CLR_TRACKEND, ICON_TRACKEND);
+      addGenericEvent(curOffset, 1, "Pattern End", desc.str().c_str(), CLR_TRACKEND, ICON_ENDREP);
     }
   }
 
