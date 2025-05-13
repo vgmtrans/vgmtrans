@@ -13,7 +13,6 @@ class VGMHeader;
 
 class VGMItem {
 public:
-  enum ItemType { ITEMTYPE_UNDEFINED, ITEMTYPE_VGMFILE, ITEMTYPE_SEQEVENT };
   enum Icon {
     ICON_SEQ,
     ICON_INSTRSET,
@@ -104,7 +103,6 @@ public:
   virtual uint32_t guessLength();
   virtual void setGuessedLength();
   virtual std::string description() { return ""; }
-  [[nodiscard]] virtual ItemType type() const { return ITEMTYPE_UNDEFINED; }
   virtual Icon icon() { return ICON_BINARY; }
   virtual void addToUI(VGMItem *parent, void *UI_specific);
 
