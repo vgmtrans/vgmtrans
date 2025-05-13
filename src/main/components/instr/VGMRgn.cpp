@@ -162,6 +162,10 @@ void VGMRgn::addSampNum(int sn, uint32_t offset, uint32_t length) {
   addChild(new VGMRgnItem(this, VGMRgnItem::RIT_SAMPNUM, offset, length, "Sample Number"));
 }
 
+void VGMRgn::addADSRValue(uint32_t offset, uint32_t length, const std::string& name) {
+  addChild(new VGMRgnItem(this, VGMRgnItem::RIT_ADSR, offset, length, name));
+}
+
 
 // **********
 // VGMRgnItem
@@ -172,5 +176,13 @@ VGMRgnItem::VGMRgnItem(const VGMRgn *rgn, RgnItemType theType, uint32_t offset, 
 }
 
 VGMItem::Icon VGMRgnItem::icon() {
+  switch (type) {
+    case RIT_ADSR:
+      return ICON_ADSR;
+    case RIT_VOL:
+      return ICON_VOLUME;
+    case RIT_PAN:
+      return ICON_PAN;
+  }
   return ICON_BINARY;
 }

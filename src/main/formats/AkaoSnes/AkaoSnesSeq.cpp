@@ -251,7 +251,7 @@ void AkaoSnesSeq::LoadEventMap() {
     EventMap[0xf3] = EVENT_PAN_FADE;
     EventMap[0xf4] = EVENT_GOTO;
     EventMap[0xf5] = EVENT_LOOP_BREAK;
-    EventMap[0xf6] = EVENT_UNKNOWN0; // cpu-controled jump?
+    EventMap[0xf6] = EVENT_UNKNOWN0; // cpu-controlled jump?
     EventMap[0xf7] = EVENT_END; // duplicated
     EventMap[0xf8] = EVENT_END; // duplicated
     EventMap[0xf9] = EVENT_END; // duplicated
@@ -299,7 +299,7 @@ void AkaoSnesSeq::LoadEventMap() {
     EventMap[0xf3] = EVENT_PROGCHANGE;
     EventMap[0xf4] = EVENT_VOLUME_ENVELOPE;
     EventMap[0xf5] = EVENT_SLUR_OFF;
-    EventMap[0xf6] = EVENT_UNKNOWN2; // cpu-controled jump?
+    EventMap[0xf6] = EVENT_UNKNOWN2; // cpu-controlled jump?
     EventMap[0xf7] = EVENT_TUNING;
     EventMap[0xf8] = EVENT_END; // duplicated
     EventMap[0xf9] = EVENT_END; // duplicated
@@ -1439,7 +1439,7 @@ bool AkaoSnesTrack::readEvent(void) {
 
     case EVENT_CPU_CONTROLED_SET_VALUE: {
       uint8_t value = readByte(curOffset++);
-      addUnknown(beginOffset, curOffset - beginOffset, "Set Value for CPU-Controled Jump", desc);
+      addUnknown(beginOffset, curOffset - beginOffset, "Set Value for CPU-Controlled Jump", desc);
       break;
     }
 
@@ -1447,7 +1447,7 @@ bool AkaoSnesTrack::readEvent(void) {
       uint16_t dest = getShortAddress(curOffset);
       curOffset += 2;
       desc = fmt::format("Destination: ${:04X}", dest);
-      addGenericEvent(beginOffset, curOffset - beginOffset, "CPU-Controled Jump", desc,
+      addGenericEvent(beginOffset, curOffset - beginOffset, "CPU-Controlled Jump", desc,
                       CLR_LOOP);
 
       if (jumpActivatedByMainCpu) {
@@ -1466,7 +1466,7 @@ bool AkaoSnesTrack::readEvent(void) {
       uint16_t dest = getShortAddress(curOffset);
       curOffset += 2;
       desc = fmt::format("Arg1: {}  Destination: ${:04X}", arg1, dest);
-      addUnknown(beginOffset, curOffset - beginOffset, "CPU-Controled Jump", desc);
+      addUnknown(beginOffset, curOffset - beginOffset, "CPU-Controlled Jump", desc);
       break;
     }
 

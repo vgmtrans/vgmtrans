@@ -223,8 +223,8 @@ bool VabRgn::loadRgn() {
   addGeneralItem(dwOffset + 13, 1, "Pitch Bend Max");
   addGeneralItem(dwOffset + 14, 1, "Reserved");
   addGeneralItem(dwOffset + 15, 1, "Reserved");
-  addGeneralItem(dwOffset + 16, 2, "ADSR1");
-  addGeneralItem(dwOffset + 18, 2, "ADSR2");
+  addADSRValue(dwOffset + 16, 2, "ADSR1");
+  addADSRValue(dwOffset + 18, 2, "ADSR2");
   addGeneralItem(dwOffset + 20, 2, "Parent Program");
   addSampNum(readShort(dwOffset + 22) - 1, dwOffset + 22, 2);
   addGeneralItem(dwOffset + 24, 2, "Reserved");

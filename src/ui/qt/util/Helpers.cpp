@@ -37,6 +37,11 @@ const QIcon &iconForItemType(VGMItem::Icon type) {
       return i_gen;
     }
 
+    case VGMItem::ICON_NOTE_OFF: {
+      static QIcon i_gen{":/images/noteoff.svg"};
+      return i_gen;
+    }
+
     case VGMItem::ICON_SEQ: {
       static QIcon i_gen{":/images/sequence.svg"};
       return i_gen;
@@ -57,13 +62,21 @@ const QIcon &iconForItemType(VGMItem::Icon type) {
       return i_gen;
     }
 
-    case VGMItem::ICON_STARTREP:
+    case VGMItem::ICON_STARTREP: {
+      static QIcon i_gen{":/images/repeat-begin.svg"};
+      return i_gen;
+    }
+
     case VGMItem::ICON_TRACK: {
       static QIcon i_gen{":/images/track.svg"};
       return i_gen;
     }
 
-    case VGMItem::ICON_ENDREP:
+    case VGMItem::ICON_ENDREP: {
+      static QIcon i_gen{":/images/repeat-end.svg"};
+      return i_gen;
+    }
+
     case VGMItem::ICON_TRACKEND: {
       static QIcon i_gen{":/images/trackend.svg"};
       return i_gen;
@@ -96,6 +109,41 @@ const QIcon &iconForItemType(VGMItem::Icon type) {
 
     case VGMItem::ICON_SAMP: {
       static QIcon i_gen{":/images/sample.svg"};
+      return i_gen;
+    }
+
+    case VGMItem::ICON_LOOP: {
+      static QIcon i_gen{":/images/loop.svg"};
+      return i_gen;
+    }
+
+    case VGMItem::ICON_LOOP_FOREVER: {
+      static QIcon i_gen{":/images/loop-forever.svg"};
+      return i_gen;
+    }
+
+    case VGMItem::ICON_VOLUME: {
+      static QIcon i_gen{":/images/volume.svg"};
+      return i_gen;
+    }
+
+    case VGMItem::ICON_PAN: {
+      static QIcon i_gen{":/images/pan.svg"};
+      return i_gen;
+    }
+
+    case VGMItem::ICON_ADSR: {
+      static QIcon i_gen{":/images/adsr.svg"};
+      return i_gen;
+    }
+
+    case VGMItem::ICON_PITCHBEND: {
+      static QIcon i_gen{":/images/pitchbend.svg"};
+      return i_gen;
+    }
+
+    case VGMItem::ICON_JUMP: {
+      static QIcon i_gen{":/images/jump.svg"};
       return i_gen;
     }
 

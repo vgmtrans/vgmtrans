@@ -1,0 +1,23 @@
+<svg width="48" height="48" viewBox="0 0 24 24" fill="#cecece" color="#cecece" xmlns="http://www.w3.org/2000/svg">
+  <path
+    d="M2 12 
+       L6 12 
+       C8 12 8 8 10 8 
+       C12 8 12 16 14 16 
+       C16 16 16 12 18 12 
+       L20 12"
+    stroke="currentColor"
+    stroke-width="2"
+    fill="none"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+  />
+  <path
+    d="M20 10 L22 12 L20 14"
+    stroke="currentColor"
+    stroke-width="2"
+    fill="none"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+  />
+</svg>

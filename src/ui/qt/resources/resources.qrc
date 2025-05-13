@@ -16,12 +16,22 @@
   <file>images/instrument-set.svg</file>
   <file>images/instr.svg</file>
   <file>images/note.svg</file>
+  <file>images/noteoff.svg</file>
   <file>images/control.svg</file>
   <file>images/track.svg</file>
   <file>images/trackend.svg</file>
   <file>images/binary.svg</file>
   <file>images/rest.svg</file>
   <file>images/tempo.svg</file>
+  <file>images/progchange.svg</file>
+  <file>images/loop.svg</file>
+  <file>images/loop-forever.svg</file>
+  <file>images/volume.svg</file>
+  <file>images/adsr.svg</file>
+  <file>images/pan.svg</file>
+  <file>images/repeat-begin.svg</file>
+  <file>images/repeat-end.svg</file>
+  <file>images/pitchbend.svg</file>
   <file alias="legal/VGMTrans">../../../../LICENSE</file>
   <file alias="legal/oki_adpcm_state">../../../../licenses/LICENSE_oki_adpcm_state</file>
 </qresource>
