@@ -55,7 +55,6 @@ class SeqEvent:
   std::string description() override {
     return m_description;
   }
-  [[nodiscard]] ItemType type() const override { return ITEMTYPE_SEQEVENT; }
   virtual EventType eventType() { return EVENTTYPE_UNDEFINED; }
   Icon icon() override { return m_icon; }
 
