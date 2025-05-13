@@ -105,7 +105,7 @@ bool CPS2TrackV1::readEvent() {
           addNoteOffNoItem(prevTieNote);
         }
         else
-          addGenericEvent(beginOffset, curOffset - beginOffset, "Tie", "", CLR_NOTEON);
+          addGenericEvent(beginOffset, curOffset - beginOffset, "Tie", "", Type::NoteOn);
         bPrevNoteTie = true;
         prevTieNote = key;
       }
@@ -131,7 +131,7 @@ bool CPS2TrackV1::readEvent() {
       }
     }
     else {
-      addGenericEvent(beginOffset, curOffset - beginOffset, "Rest", "", CLR_REST);
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Rest", "", Type::Rest);
     }
     addTime(delta);
   }
@@ -144,7 +144,7 @@ bool CPS2TrackV1::readEvent() {
                         curOffset - beginOffset,
                         "Note State xor 0x20 (change duration table)",
                         "",
-                        CLR_CHANGESTATE);
+                        Type::ChangeState);
         break;
       case 0x01 :
         noteState ^= 0x40;
@@ -152,7 +152,7 @@ bool CPS2TrackV1::readEvent() {
                         curOffset - beginOffset,
                         "Note State xor 0x40 (Toggle tie)",
                         "",
-                        CLR_CHANGESTATE);
+                        Type::ChangeState);
         break;
       case 0x02 :
         noteState |= (1 << 4);
@@ -160,7 +160,7 @@ bool CPS2TrackV1::readEvent() {
                         curOffset - beginOffset,
                         "Note State |= 0x10 (change duration table)",
                         "",
-                        CLR_CHANGESTATE);
+                        Type::ChangeState);
         break;
       case 0x03 :
         noteState ^= 8;
@@ -168,13 +168,13 @@ bool CPS2TrackV1::readEvent() {
                         curOffset - beginOffset,
                         "Note State xor 8 (change octave)",
                         "",
-                        CLR_CHANGESTATE);
+                        Type::ChangeState);
         break;
 
       case 0x04 :
         noteState &= 0x97;
         noteState |= readByte(curOffset++);
-        addGenericEvent(beginOffset, curOffset - beginOffset, "Change Note State (& 0x97)", "", CLR_CHANGESTATE);
+        addGenericEvent(beginOffset, curOffset - beginOffset, "Change Note State (& 0x97)", "", Type::ChangeState);
         break;
 
       case 0x05 : {
@@ -207,7 +207,7 @@ bool CPS2TrackV1::readEvent() {
 
       case 0x06 :
         noteDuration = readByte(curOffset++);
-        addGenericEvent(beginOffset, curOffset - beginOffset, "Set Duration", "", CLR_CHANGESTATE);
+        addGenericEvent(beginOffset, curOffset - beginOffset, "Set Duration", "", Type::ChangeState);
         break;
 
       case 0x07 :
@@ -227,7 +227,7 @@ bool CPS2TrackV1::readEvent() {
       case 0x09 :
         noteState &= 0xF8;
         noteState |= readByte(curOffset++);
-        addGenericEvent(beginOffset, curOffset - beginOffset, "Set Octave", "", CLR_CHANGESTATE);
+        addGenericEvent(beginOffset, curOffset - beginOffset, "Set Octave", "", Type::ChangeState);
         break;
 
       // Global Transpose
@@ -254,7 +254,7 @@ bool CPS2TrackV1::readEvent() {
                   0,
                   "Pitch Bend",
                   PRIORITY_MIDDLE,
-                  CLR_PITCHBEND);
+                  Type::PitchBend);
       }
       break;
       case 0x0D : {
@@ -267,7 +267,7 @@ bool CPS2TrackV1::readEvent() {
         } else {
           portamentoCentsPerSec = 0;
         }
-        addGenericEvent(beginOffset, curOffset - beginOffset, "Portamento Time", "", CLR_PORTAMENTOTIME);
+        addGenericEvent(beginOffset, curOffset - beginOffset, "Portamento Time", "", Type::PortamentoTime);
         break;
       }
 
@@ -320,7 +320,7 @@ bool CPS2TrackV1::readEvent() {
             curOffset += 2;
           }
 
-          addGenericEvent(beginOffset, curOffset - beginOffset, "Loop", "", CLR_LOOP);
+          addGenericEvent(beginOffset, curOffset - beginOffset, "Loop", "", Type::Loop);
 
           if (loop[loopNum] == 0) {
             bInLoop = false;
@@ -357,7 +357,7 @@ bool CPS2TrackV1::readEvent() {
           {
             u16 jump = getShortBE(curOffset);
             curOffset += 2;
-            addGenericEvent(beginOffset, curOffset - beginOffset, "Loop Break", "", CLR_LOOP);
+            addGenericEvent(beginOffset, curOffset - beginOffset, "Loop Break", "", Type::Loop);
             curOffset += static_cast<int16_t>(jump);
           }
         }
@@ -401,7 +401,7 @@ bool CPS2TrackV1::readEvent() {
 
       case 0x1A : {
         uint8_t masterVol = readByte(curOffset++);
-        addGenericEvent(beginOffset, curOffset - beginOffset, "Master Volume", "", CLR_UNKNOWN);
+        addGenericEvent(beginOffset, curOffset - beginOffset, "Master Volume", "", Type::Unknown);
         // addMasterVol(beginOffset, curOffset-beginOffset, masterVol);
         break;
       }
@@ -417,7 +417,7 @@ bool CPS2TrackV1::readEvent() {
                     0,
                     "Vibrato",
                     PRIORITY_HIGH,
-                    CLR_PITCHBEND);
+                    Type::PitchBend);
         }
         else {
           // First data byte defines behavior 0-3
@@ -433,7 +433,7 @@ bool CPS2TrackV1::readEvent() {
                         0,
                         "Vibrato",
                         PRIORITY_HIGH,
-                        CLR_PITCHBEND);
+                        Type::PitchBend);
               break;
 
             // tremelo
@@ -445,7 +445,7 @@ bool CPS2TrackV1::readEvent() {
                         0,
                         "Tremelo",
                         PRIORITY_MIDDLE,
-                        CLR_EXPRESSION);
+                        Type::Expression);
               break;
 
             // LFO rate
@@ -457,7 +457,7 @@ bool CPS2TrackV1::readEvent() {
                         0,
                         "LFO Rate",
                         PRIORITY_MIDDLE,
-                        CLR_LFO);
+                        Type::Lfo);
               break;
 
             // LFO reset
@@ -469,7 +469,7 @@ bool CPS2TrackV1::readEvent() {
                         0,
                         "LFO Reset",
                         PRIORITY_MIDDLE,
-                        CLR_LFO);
+                        Type::Lfo);
               break;
             default:
               break;
@@ -486,7 +486,7 @@ bool CPS2TrackV1::readEvent() {
                     0,
                     "Tremelo",
                     PRIORITY_MIDDLE,
-                    CLR_EXPRESSION);
+                    Type::Expression);
         }
         else {
           // I'm not sure at all about the behavior here, need to test
@@ -506,7 +506,7 @@ bool CPS2TrackV1::readEvent() {
                     0,
                     "LFO Rate",
                     PRIORITY_MIDDLE,
-                    CLR_LFO);
+                    Type::Lfo);
         else
           addUnknown(beginOffset, curOffset - beginOffset, "NOP");
         break;
@@ -523,7 +523,7 @@ bool CPS2TrackV1::readEvent() {
                     0,
                     "LFO Reset",
                     PRIORITY_MIDDLE,
-                    CLR_LFO);
+                    Type::Lfo);
         else
           addUnknown(beginOffset, curOffset - beginOffset, "NOP");
       }
@@ -537,7 +537,7 @@ bool CPS2TrackV1::readEvent() {
         else {
           bank = value;
           addBankSelectNoItem(bank * 2);
-          addGenericEvent(beginOffset, curOffset - beginOffset, "Bank Change", "", CLR_PROGCHANGE);
+          addGenericEvent(beginOffset, curOffset - beginOffset, "Bank Change", "", Type::ProgramChange);
         }
         break;
       }
@@ -563,7 +563,7 @@ bool CPS2TrackV1::readEvent() {
         break;
 
       default :
-        addGenericEvent(beginOffset, curOffset - beginOffset, "UNKNOWN", "", CLR_UNRECOGNIZED);
+        addGenericEvent(beginOffset, curOffset - beginOffset, "UNKNOWN", "", Type::Unrecognized);
     }
   }
   return true;

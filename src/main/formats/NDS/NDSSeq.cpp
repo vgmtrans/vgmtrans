@@ -132,7 +132,7 @@ bool NDSTrack::readEvent(void) {
         // Add an End Track if it exists afterward, for completeness sake
         if (readMode == READMODE_ADD_TO_UI && !isOffsetUsed(curOffset)) {
           if (readByte(curOffset) == 0xFF) {
-            addGenericEvent(curOffset, 1, "End of Track", "", CLR_TRACKEND, ICON_TRACKEND);
+            addGenericEvent(curOffset, 1, "End of Track", "", Type::TrackEnd, ICON_TRACKEND);
           }
         }
 
@@ -144,7 +144,7 @@ bool NDSTrack::readEvent(void) {
           bContinue = false;
         }
         else {
-          addGenericEvent(beginOffset, 4, "Jump", "", CLR_LOOPFOREVER);
+          addGenericEvent(beginOffset, 4, "Jump", "", Type::LoopForever);
         }
 
         curOffset = jumpAddr;
@@ -154,7 +154,7 @@ bool NDSTrack::readEvent(void) {
       case 0x95:
         hasLoopReturnOffset = true;
         loopReturnOffset = curOffset + 3;
-        addGenericEvent(beginOffset, curOffset + 3 - beginOffset, "Call", "", CLR_LOOP);
+        addGenericEvent(beginOffset, curOffset + 3 - beginOffset, "Call", "", Type::Loop);
         curOffset = readByte(curOffset) + (readByte(curOffset + 1) << 8)
             + (readByte(curOffset + 2) << 16) + parentSeq->dwOffset + 0x1C;
         break;
@@ -261,7 +261,7 @@ bool NDSTrack::readEvent(void) {
       // [loveemu] (ex: Children of Mana: SEQ_BGM000)
       case 0xC6:
         curOffset++;
-        addGenericEvent(beginOffset, curOffset - beginOffset, "Priority", "", CLR_CHANGESTATE);
+        addGenericEvent(beginOffset, curOffset - beginOffset, "Priority", "", Type::ChangeState);
         break;
 
       // [loveemu] (ex: Castlevania Dawn of Sorrow: SDL_BGM_ARR1_)
@@ -398,7 +398,7 @@ bool NDSTrack::readEvent(void) {
           bContinue = false;
         }
 
-        addGenericEvent(beginOffset, curOffset - beginOffset, "Return", "", CLR_LOOP);
+        addGenericEvent(beginOffset, curOffset - beginOffset, "Return", "", Type::Loop);
         curOffset = loopReturnOffset;
         return bContinue;
 	  }

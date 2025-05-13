@@ -4,11 +4,11 @@
 #include "Root.h"
 #include "helper.h"
 
-VGMItem::VGMItem() : m_vgmfile(nullptr), dwOffset(0), unLength(0), color(CLR_UNKNOWN) {
+VGMItem::VGMItem() : m_vgmfile(nullptr), dwOffset(0), unLength(0), type(Type::Unknown) {
 }
 
-VGMItem::VGMItem(VGMFile *vgmfile, uint32_t offset, uint32_t length, std::string name, EventColor color)
-    : m_vgmfile(vgmfile), m_name(std::move(name)), dwOffset(offset), unLength(length), color(color) {
+VGMItem::VGMItem(VGMFile *vgmfile, uint32_t offset, uint32_t length, std::string name, Type type)
+    : m_vgmfile(vgmfile), m_name(std::move(name)), dwOffset(offset), unLength(length), type(type) {
 }
 
 VGMItem::~VGMItem() {
@@ -98,7 +98,7 @@ VGMItem* VGMItem::addChild(VGMItem *item) {
 }
 
 VGMItem* VGMItem::addChild(uint32_t offset, uint32_t length, const std::string &name) {
-  auto child = new VGMItem(vgmFile(), offset, length, name, CLR_HEADER);
+  auto child = new VGMItem(vgmFile(), offset, length, name, Type::Header);
   m_children.emplace_back(child);
   return child;
 }

@@ -48,7 +48,7 @@ class SeqEvent:
                     uint32_t offset = 0,
                     uint32_t length = 0,
                     const std::string &name = "",
-                    EventColor color = CLR_UNKNOWN,
+                    Type type = Type::Unknown,
                     Icon icon = ICON_BINARY,
                     const std::string &desc = "");
   ~SeqEvent() override = default;
@@ -644,8 +644,8 @@ class MarkerSeqEvent : public SeqEvent {
                  uint32_t offset = 0,
                  uint32_t length = 0,
                  const std::string &name = "",
-                 EventColor color = CLR_MARKER)
-      : SeqEvent(pTrack, offset, length, name, color), databyte1(databyte1), databyte2(databyte2),
+                 Type type = Type::Marker)
+      : SeqEvent(pTrack, offset, length, name, type), databyte1(databyte1), databyte2(databyte2),
         markerName(markername) {}
   EventType eventType() override { return EVENTTYPE_MARKER; }
 
@@ -680,7 +680,7 @@ class TrackEndSeqEvent : public SeqEvent {
  public:
   explicit TrackEndSeqEvent(SeqTrack *pTrack, uint32_t offset = 0, uint32_t length = 0,
                    const std::string &name = "")
-      : SeqEvent(pTrack, offset, length, name, CLR_TRACKEND) {}
+      : SeqEvent(pTrack, offset, length, name, Type::TrackEnd) {}
   EventType eventType() override { return EVENTTYPE_TRACKEND; }
   Icon icon() override { return ICON_TRACKEND; }
 };
@@ -693,7 +693,7 @@ class LoopForeverSeqEvent : public SeqEvent {
  public:
   explicit LoopForeverSeqEvent(SeqTrack *pTrack, uint32_t offset = 0, uint32_t length = 0,
                       const std::string &name = "", const std::string &descr = "")
-      : SeqEvent(pTrack, offset, length, name, CLR_LOOPFOREVER) {}
+      : SeqEvent(pTrack, offset, length, name, Type::LoopForever) {}
   EventType eventType() override { return EVENTTYPE_LOOPFOREVER; }
   Icon icon() override { return ICON_LOOP_FOREVER; }
 };

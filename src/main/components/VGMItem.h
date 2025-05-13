@@ -33,7 +33,6 @@ public:
     ICON_INSTR,
     ICON_SAMP,
     ICON_BINARY,
-    ICON_MAX,
     ICON_LOOP,
     ICON_LOOP_FOREVER,
     ICON_VOLUME,
@@ -42,39 +41,40 @@ public:
     ICON_PITCHBEND,
     ICON_JUMP,
   };
-  enum EventColor {
-    CLR_UNKNOWN,
-    CLR_UNRECOGNIZED,
-    CLR_HEADER,
-    CLR_MISC,
-    CLR_MARKER,
-    CLR_TIMESIG,
-    CLR_TEMPO,
-    CLR_PROGCHANGE,
-    CLR_BANKSELECT,
-    CLR_TRANSPOSE,
-    CLR_PRIORITY,
-    CLR_VOLUME,
-    CLR_EXPRESSION,
-    CLR_PAN,
-    CLR_NOTEON,
-    CLR_NOTEOFF,
-    CLR_DURNOTE,
-    CLR_TIE,
-    CLR_REST,
-    CLR_PITCHBEND,
-    CLR_PITCHBENDRANGE,
-    CLR_MODULATION,
-    CLR_PORTAMENTO,
-    CLR_PORTAMENTOTIME,
-    CLR_CHANGESTATE,
-    CLR_ADSR,
-    CLR_LFO,
-    CLR_REVERB,
-    CLR_SUSTAIN,
-    CLR_LOOP,
-    CLR_LOOPFOREVER,
-    CLR_TRACKEND,
+  enum class Type {
+    Unknown,
+    Unrecognized,
+    Header,
+    Misc,
+    Marker,
+    TimeSignature,
+    Tempo,
+    ProgramChange,
+    BankSelect,
+    Transpose,
+    Priority,
+    MasterVolume,
+    Volume,
+    Expression,
+    Pan,
+    NoteOn,
+    NoteOff,
+    DurationNote,
+    Tie,
+    Rest,
+    PitchBend,
+    PitchBendRange,
+    Modulation,
+    Portamento,
+    PortamentoTime,
+    ChangeState,
+    Adsr,
+    Lfo,
+    Reverb,
+    Sustain,
+    Loop,
+    LoopForever,
+    TrackEnd,
   };
 
 public:
@@ -83,7 +83,7 @@ public:
           uint32_t offset,
           uint32_t length = 0,
           std::string name = "",
-          EventColor color = CLR_UNKNOWN);
+          Type type = Type::Unknown);
   virtual ~VGMItem();
 
   friend bool operator>(VGMItem &item1, VGMItem &item2);
@@ -134,7 +134,7 @@ protected:
 public:
   uint32_t dwOffset;  // offset in the pDoc data buffer
   uint32_t unLength;  // num of bytes the event engulfs
-  EventColor color;
+  Type type;
 
 private:
   std::vector<VGMItem *> m_children;

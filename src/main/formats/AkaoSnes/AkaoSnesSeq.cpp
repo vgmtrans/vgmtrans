@@ -677,7 +677,7 @@ bool AkaoSnesTrack::readEvent(void) {
       }
       else if (noteIndex == parentSeq->STATUS_NOTEINDEX_TIE) {
         makePrevDurNoteEnd(getTime() + dur);
-        addGenericEvent(beginOffset, curOffset - beginOffset, "Tie", desc, CLR_TIE, ICON_NOTE);
+        addGenericEvent(beginOffset, curOffset - beginOffset, "Tie", desc, Type::Tie, ICON_NOTE);
         addTime(len);
       }
       else {
@@ -688,13 +688,13 @@ bool AkaoSnesTrack::readEvent(void) {
     }
 
     case EVENT_NOP: {
-      addGenericEvent(beginOffset, curOffset - beginOffset, "NOP", desc, CLR_MISC, ICON_BINARY);
+      addGenericEvent(beginOffset, curOffset - beginOffset, "NOP", desc, Type::Misc, ICON_BINARY);
       break;
     }
 
     case EVENT_NOP1: {
       curOffset++;
-      addGenericEvent(beginOffset, curOffset - beginOffset, "NOP", desc, CLR_MISC, ICON_BINARY);
+      addGenericEvent(beginOffset, curOffset - beginOffset, "NOP", desc, Type::Misc, ICON_BINARY);
       break;
     }
 
@@ -722,7 +722,7 @@ bool AkaoSnesTrack::readEvent(void) {
                         curOffset - beginOffset,
                         "Volume Fade",
                         fmt::format("Fade Length: {}  Volume: {}", fadeLength, vol),
-                        CLR_VOLUME,
+                        Type::Volume,
                         ICON_CONTROL);
       }
       else {
@@ -757,7 +757,7 @@ bool AkaoSnesTrack::readEvent(void) {
       // TODO: apply volume scale
       if (fadeLength != 0) {
         desc = fmt::format("Fade Length: {}  Pan: {}", fadeLength, pan);
-        addGenericEvent(beginOffset, curOffset - beginOffset, "Pan Fade", desc, CLR_PAN, ICON_CONTROL);
+        addGenericEvent(beginOffset, curOffset - beginOffset, "Pan Fade", desc, Type::Pan, ICON_CONTROL);
       }
       else {
         addPan(beginOffset, curOffset - beginOffset, midiPan);
@@ -789,7 +789,7 @@ bool AkaoSnesTrack::readEvent(void) {
                       curOffset - beginOffset,
                       "Pitch Slide On",
                       desc,
-                      CLR_PITCHBEND,
+                      Type::PitchBend,
                       ICON_CONTROL);
       break;
     }
@@ -799,7 +799,7 @@ bool AkaoSnesTrack::readEvent(void) {
                       curOffset - beginOffset,
                       "Pitch Slide Off",
                       desc,
-                      CLR_PITCHBEND,
+                      Type::PitchBend,
                       ICON_CONTROL);
       break;
     }
@@ -811,7 +811,7 @@ bool AkaoSnesTrack::readEvent(void) {
                       curOffset - beginOffset,
                       "Pitch Slide",
                       fmt::format("Length: {}  Key: {} semitones", pitchSlideLength, pitchSlideSemitones),
-                      CLR_PITCHBEND,
+                      Type::PitchBend,
                       ICON_CONTROL);
       break;
     }
@@ -824,7 +824,7 @@ bool AkaoSnesTrack::readEvent(void) {
                       curOffset - beginOffset,
                       "Vibrato",
                       fmt::format("Delay: {}  Rate: {}  Depth: {}", lfoDelay, lfoRate, lfoDepth),
-                      CLR_MODULATION,
+                      Type::Modulation,
                       ICON_CONTROL);
       break;
     }
@@ -834,7 +834,7 @@ bool AkaoSnesTrack::readEvent(void) {
                       curOffset - beginOffset,
                       "Vibrato Off",
                       desc,
-                      CLR_MODULATION,
+                      Type::Modulation,
                       ICON_CONTROL);
       break;
     }
@@ -847,7 +847,7 @@ bool AkaoSnesTrack::readEvent(void) {
                       curOffset - beginOffset,
                       "Tremolo",
                       fmt::format("Delay {}  Rate: {}  Depth {}", lfoDelay, lfoRate, lfoDepth),
-                      CLR_MODULATION,
+                      Type::Modulation,
                       ICON_CONTROL);
       break;
     }
@@ -857,7 +857,7 @@ bool AkaoSnesTrack::readEvent(void) {
                       curOffset - beginOffset,
                       "Tremolo Off",
                       desc,
-                      CLR_MODULATION,
+                      Type::Modulation,
                       ICON_CONTROL);
       break;
     }
@@ -869,7 +869,7 @@ bool AkaoSnesTrack::readEvent(void) {
                       curOffset - beginOffset,
                       "Pan LFO",
                       fmt::format("Depth: {}  Rate: {}", lfoDepth, lfoRate),
-                      CLR_MODULATION,
+                      Type::Modulation,
                       ICON_CONTROL);
       break;
     }
@@ -882,7 +882,7 @@ bool AkaoSnesTrack::readEvent(void) {
                       curOffset - beginOffset,
                       "Pan LFO",
                       fmt::format("Delay: {}  Rate: {}  Depth: {}", lfoDelay, lfoRate, lfoDepth),
-                      CLR_MODULATION,
+                      Type::Modulation,
                       ICON_CONTROL);
       break;
     }
@@ -892,7 +892,7 @@ bool AkaoSnesTrack::readEvent(void) {
                       curOffset - beginOffset,
                       "Pan LFO Off",
                       desc,
-                      CLR_MODULATION,
+                      Type::Modulation,
                       ICON_CONTROL);
       break;
     }
@@ -903,7 +903,7 @@ bool AkaoSnesTrack::readEvent(void) {
                       curOffset - beginOffset,
                       "Noise Frequency",
                       fmt::format("Noise Frequency (NCK): {}", newNCK),
-                      CLR_CHANGESTATE,
+                      Type::ChangeState,
                       ICON_CONTROL);
       break;
     }
@@ -913,7 +913,7 @@ bool AkaoSnesTrack::readEvent(void) {
                       curOffset - beginOffset,
                       "Noise On",
                       desc,
-                      CLR_CHANGESTATE,
+                      Type::ChangeState,
                       ICON_CONTROL);
       break;
     }
@@ -923,7 +923,7 @@ bool AkaoSnesTrack::readEvent(void) {
                       curOffset - beginOffset,
                       "Noise Off",
                       desc,
-                      CLR_CHANGESTATE,
+                      Type::ChangeState,
                       ICON_CONTROL);
       break;
     }
@@ -933,7 +933,7 @@ bool AkaoSnesTrack::readEvent(void) {
                       curOffset - beginOffset,
                       "Pitch Modulation On",
                       desc,
-                      CLR_CHANGESTATE,
+                      Type::ChangeState,
                       ICON_CONTROL);
       break;
     }
@@ -943,18 +943,18 @@ bool AkaoSnesTrack::readEvent(void) {
                       curOffset - beginOffset,
                       "Pitch Modulation Off",
                       desc,
-                      CLR_CHANGESTATE,
+                      Type::ChangeState,
                       ICON_CONTROL);
       break;
     }
 
     case EVENT_ECHO_ON: {
-      addGenericEvent(beginOffset, curOffset - beginOffset, "Echo On", desc, CLR_REVERB, ICON_CONTROL);
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Echo On", desc, Type::Reverb, ICON_CONTROL);
       break;
     }
 
     case EVENT_ECHO_OFF: {
-      addGenericEvent(beginOffset, curOffset - beginOffset, "Echo Off", desc, CLR_REVERB, ICON_CONTROL);
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Echo Off", desc, Type::Reverb, ICON_CONTROL);
       break;
     }
 
@@ -1015,7 +1015,7 @@ bool AkaoSnesTrack::readEvent(void) {
                       curOffset - beginOffset,
                       "Volume Envelope",
                       fmt::format("Envelope: {}", envelopeIndex),
-                      CLR_VOLUME,
+                      Type::Volume,
                       ICON_CONTROL);
       break;
     }
@@ -1026,7 +1026,7 @@ bool AkaoSnesTrack::readEvent(void) {
                       curOffset - beginOffset,
                       "Release Rate (GAIN)",
                       fmt::format("GAIN: {}", gain),
-                      CLR_ADSR,
+                      Type::Adsr,
                       ICON_CONTROL);
       break;
     }
@@ -1041,7 +1041,7 @@ bool AkaoSnesTrack::readEvent(void) {
                       curOffset - beginOffset,
                       "Duration Rate",
                       fmt::format("Note Length: {} %", rate),
-                      CLR_DURNOTE,
+                      Type::DurationNote,
                       ICON_CONTROL);
       break;
     }
@@ -1052,7 +1052,7 @@ bool AkaoSnesTrack::readEvent(void) {
                       curOffset - beginOffset,
                       "ADSR Attack Rate",
                       fmt::format("AR: {}", newAR),
-                      CLR_ADSR,
+                      Type::Adsr,
                       ICON_CONTROL);
       break;
     }
@@ -1063,7 +1063,7 @@ bool AkaoSnesTrack::readEvent(void) {
                       curOffset - beginOffset,
                       "ADSR Decay Rate",
                       fmt::format("DR: {}", newDR),
-                      CLR_ADSR,
+                      Type::Adsr,
                       ICON_CONTROL);
       break;
     }
@@ -1074,7 +1074,7 @@ bool AkaoSnesTrack::readEvent(void) {
                       curOffset - beginOffset,
                       "ADSR Sustain Level",
                       fmt::format("SL: {}", newSL),
-                      CLR_ADSR,
+                      Type::Adsr,
                       ICON_CONTROL);
       break;
     }
@@ -1085,7 +1085,7 @@ bool AkaoSnesTrack::readEvent(void) {
                       curOffset - beginOffset,
                       "ADSR Sustain Rate",
                       fmt::format("SR: {}", newSR),
-                      CLR_ADSR,
+                      Type::Adsr,
                       ICON_CONTROL);
       break;
     }
@@ -1095,7 +1095,7 @@ bool AkaoSnesTrack::readEvent(void) {
                       curOffset - beginOffset,
                       "Default ADSR",
                       desc,
-                      CLR_ADSR,
+                      Type::Adsr,
                       ICON_CONTROL);
       break;
     }
@@ -1107,7 +1107,7 @@ bool AkaoSnesTrack::readEvent(void) {
       }
 
       desc = fmt::format("Loop Count: {}", count);
-      addGenericEvent(beginOffset, curOffset - beginOffset, "Loop Start", desc, CLR_LOOP, ICON_STARTREP);
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Loop Start", desc, Type::Loop, ICON_STARTREP);
 
       loopStart[loopLevel] = curOffset;
       if (parentSeq->version == AKAOSNES_V4) {
@@ -1133,7 +1133,7 @@ bool AkaoSnesTrack::readEvent(void) {
         curOffset = loopStart[prevLoopLevel];
       }
       else {
-        addGenericEvent(beginOffset, curOffset - beginOffset, "Loop End", desc, CLR_LOOP, ICON_ENDREP);
+        addGenericEvent(beginOffset, curOffset - beginOffset, "Loop End", desc, Type::Loop, ICON_ENDREP);
 
         if (loopDecCount[prevLoopLevel] - 1 == 0) {
           // repeat end
@@ -1163,7 +1163,7 @@ bool AkaoSnesTrack::readEvent(void) {
                       curOffset - beginOffset,
                       "Slur On (No Key Off/On)",
                       desc,
-                      CLR_CHANGESTATE,
+                      Type::ChangeState,
                       ICON_CONTROL);
       slur = true;
       break;
@@ -1174,7 +1174,7 @@ bool AkaoSnesTrack::readEvent(void) {
                       curOffset - beginOffset,
                       "Slur Off",
                       desc,
-                      CLR_CHANGESTATE,
+                      Type::ChangeState,
                       ICON_CONTROL);
       slur = false;
       break;
@@ -1185,7 +1185,7 @@ bool AkaoSnesTrack::readEvent(void) {
                       curOffset - beginOffset,
                       "Legato On (No Key Off)",
                       desc,
-                      CLR_CHANGESTATE,
+                      Type::ChangeState,
                       ICON_CONTROL);
       legato = true;
       break;
@@ -1196,7 +1196,7 @@ bool AkaoSnesTrack::readEvent(void) {
                       curOffset - beginOffset,
                       "Legato Off",
                       desc,
-                      CLR_CHANGESTATE,
+                      Type::ChangeState,
                       ICON_CONTROL);
       legato = false;
       break;
@@ -1206,7 +1206,7 @@ bool AkaoSnesTrack::readEvent(void) {
       uint8_t dur = readByte(curOffset++);
       onetimeDuration = dur;
       desc = fmt::format("Duration: {}", dur);
-      addGenericEvent(beginOffset, curOffset - beginOffset, "Duration (One-Time)", desc, CLR_DURNOTE);
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Duration (One-Time)", desc, Type::DurationNote);
       break;
     }
 
@@ -1268,7 +1268,7 @@ bool AkaoSnesTrack::readEvent(void) {
 
       if (fadeLength != 0) {
         desc = fmt::format("Fade Length: {}  BPM: {}", fadeLength, parentSeq->getTempoInBPM(newTempo));
-        addGenericEvent(beginOffset, curOffset - beginOffset, "Tempo Fade", desc, CLR_TEMPO, ICON_TEMPO);
+        addGenericEvent(beginOffset, curOffset - beginOffset, "Tempo Fade", desc, Type::Tempo, ICON_TEMPO);
       }
       else {
         addTempoBPM(beginOffset, curOffset - beginOffset, parentSeq->getTempoInBPM(newTempo));
@@ -1282,7 +1282,7 @@ bool AkaoSnesTrack::readEvent(void) {
                       curOffset - beginOffset,
                       "Echo Volume",
                       fmt::format("Volume: {}", vol),
-                      CLR_REVERB,
+                      Type::Reverb,
                       ICON_CONTROL);
       break;
     }
@@ -1295,7 +1295,7 @@ bool AkaoSnesTrack::readEvent(void) {
                       curOffset - beginOffset,
                       "Echo Volume Fade",
                       fmt::format("Fade Length: {}  Volume {}", fadeLength, vol),
-                      CLR_REVERB,
+                      Type::Reverb,
                       ICON_CONTROL);
       break;
     }
@@ -1307,7 +1307,7 @@ bool AkaoSnesTrack::readEvent(void) {
                       curOffset - beginOffset,
                       "Echo Feedback & FIR",
                       fmt::format("Feedback: {},  FIR: {}", feedback, filterIndex),
-                      CLR_REVERB,
+                      Type::Reverb,
                       ICON_CONTROL);
       break;
     }
@@ -1327,7 +1327,7 @@ bool AkaoSnesTrack::readEvent(void) {
                       curOffset - beginOffset,
                       "Loop Break / Jump to Volta",
                       fmt::format("Count: {}  Destination: ${:04X}", count, dest),
-                      CLR_LOOP,
+                      Type::Loop,
                       ICON_ENDREP);
 
       uint8_t prevLoopLevel = (loopLevel != 0 ? loopLevel : AKAOSNES_LOOP_LEVEL_MAX) - 1;
@@ -1371,7 +1371,7 @@ bool AkaoSnesTrack::readEvent(void) {
 
       curOffset = dest;
       if (!isOffsetUsed(dest)) {
-        addGenericEvent(beginOffset, length, "Jump", desc, CLR_LOOPFOREVER);
+        addGenericEvent(beginOffset, length, "Jump", desc, Type::LoopForever);
       }
       else {
         bContinue = addLoopForever(beginOffset, length, "Jump");
@@ -1397,7 +1397,7 @@ bool AkaoSnesTrack::readEvent(void) {
                       curOffset - beginOffset,
                       "Echo Feedback Fade",
                       fmt::format("Fade Length: {}  Feedback: {}", fadeLength, feedback),
-                      CLR_REVERB,
+                      Type::Reverb,
                       ICON_CONTROL);
       break;
     }
@@ -1410,7 +1410,7 @@ bool AkaoSnesTrack::readEvent(void) {
                       curOffset - beginOffset,
                       "Echo FIR Fade",
                       fmt::format("Fade Length: {}  FIR: {}", fadeLength, vol),
-                      CLR_REVERB,
+                      Type::Reverb,
                       ICON_CONTROL);
       break;
     }
@@ -1421,7 +1421,7 @@ bool AkaoSnesTrack::readEvent(void) {
                       curOffset - beginOffset,
                       "Echo Feedback",
                       fmt::format("Feedback: {}", feedback),
-                      CLR_REVERB,
+                      Type::Reverb,
                       ICON_CONTROL);
       break;
     }
@@ -1432,7 +1432,7 @@ bool AkaoSnesTrack::readEvent(void) {
         curOffset - beginOffset,
         "Echo FIR",
         fmt::format("FIR: {}", vol),
-        CLR_REVERB,
+        Type::Reverb,
         ICON_CONTROL);
       break;
     }
@@ -1448,7 +1448,7 @@ bool AkaoSnesTrack::readEvent(void) {
       curOffset += 2;
       desc = fmt::format("Destination: ${:04X}", dest);
       addGenericEvent(beginOffset, curOffset - beginOffset, "CPU-Controlled Jump", desc,
-                      CLR_LOOP);
+                      Type::Loop);
 
       if (jumpActivatedByMainCpu) {
         curOffset = dest;
@@ -1475,7 +1475,7 @@ bool AkaoSnesTrack::readEvent(void) {
                       curOffset - beginOffset,
                       "Percussion On",
                       desc,
-                      CLR_CHANGESTATE,
+                      Type::ChangeState,
                       ICON_CONTROL);
       percussion = true;
       addProgramChangeNoItem(AkaoSnesInstrSet::DRUMKIT_PROGRAM, true);
@@ -1487,7 +1487,7 @@ bool AkaoSnesTrack::readEvent(void) {
                       curOffset - beginOffset,
                       "Percussion Off",
                       desc,
-                      CLR_CHANGESTATE,
+                      Type::ChangeState,
                       ICON_CONTROL);
       percussion = false;
       addProgramChangeNoItem(nonPercussionProgram, true);
@@ -1501,7 +1501,7 @@ bool AkaoSnesTrack::readEvent(void) {
                       curOffset - beginOffset,
                       "Ignore Master Volume (Broken)",
                       desc,
-                      CLR_VOLUME,
+                      Type::Volume,
                       ICON_CONTROL);
       break;
     }
@@ -1511,7 +1511,7 @@ bool AkaoSnesTrack::readEvent(void) {
                       curOffset - beginOffset,
                       "Ignore Master Volume",
                       desc,
-                      CLR_VOLUME,
+                      Type::Volume,
                       ICON_CONTROL);
       break;
     }
@@ -1522,7 +1522,7 @@ bool AkaoSnesTrack::readEvent(void) {
                       curOffset - beginOffset,
                       "Ignore Master Volume By Program Number",
                       fmt::format("Program Number: {}", ignoreMasterVolumeProgNum),
-                      CLR_VOLUME,
+                      Type::Volume,
                       ICON_CONTROL);
       break;
     }

@@ -103,7 +103,7 @@ bool CPS1TrackV2::readEvent() {
           addNoteOn(beginOffset, curOffset - beginOffset, key, masterVol, "Note On (tied)");
         }
         else
-          addGenericEvent(beginOffset, curOffset - beginOffset, "Tie", "", CLR_NOTEON);
+          addGenericEvent(beginOffset, curOffset - beginOffset, "Tie", "", Type::NoteOn);
         bPrevNoteTie = true;
         prevTieNote = key;
       }
@@ -129,7 +129,7 @@ bool CPS1TrackV2::readEvent() {
       }
     }
     else {
-      addGenericEvent(beginOffset, curOffset - beginOffset, "Rest", "", CLR_REST);
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Rest", "", Type::Rest);
     }
     addTime(delta);
   }
@@ -142,7 +142,7 @@ bool CPS1TrackV2::readEvent() {
                         curOffset - beginOffset,
                         "Note State xor 0x20 (change duration table)",
                         "",
-                        CLR_CHANGESTATE);
+                        Type::ChangeState);
         break;
       case 0x01 :
         noteState ^= 0x40;
@@ -150,7 +150,7 @@ bool CPS1TrackV2::readEvent() {
                         curOffset - beginOffset,
                         "Note State xor 0x40 (Toggle tie)",
                         "",
-                        CLR_CHANGESTATE);
+                        Type::ChangeState);
         break;
       case 0x02 :
         noteState |= (1 << 4);
@@ -158,7 +158,7 @@ bool CPS1TrackV2::readEvent() {
                         curOffset - beginOffset,
                         "Note State |= 0x10 (change duration table)",
                         "",
-                        CLR_CHANGESTATE);
+                        Type::ChangeState);
         break;
       case 0x03 :
         noteState ^= 8;
@@ -166,13 +166,13 @@ bool CPS1TrackV2::readEvent() {
                         curOffset - beginOffset,
                         "Note State xor 8 (change octave)",
                         "",
-                        CLR_CHANGESTATE);
+                        Type::ChangeState);
         break;
 
       case 0x04 :
         noteState &= 0x97;
         noteState |= readByte(curOffset++);
-        addGenericEvent(beginOffset, curOffset - beginOffset, "Change Note State (& 0x97)", "", CLR_CHANGESTATE);
+        addGenericEvent(beginOffset, curOffset - beginOffset, "Change Note State (& 0x97)", "", Type::ChangeState);
         break;
 
       case 0x05 : {
@@ -188,7 +188,7 @@ bool CPS1TrackV2::readEvent() {
 
       case 0x06 :
         noteDuration = readByte(curOffset++);
-        addGenericEvent(beginOffset, curOffset - beginOffset, "Set Duration", "", CLR_CHANGESTATE);
+        addGenericEvent(beginOffset, curOffset - beginOffset, "Set Duration", "", Type::ChangeState);
         break;
 
       case 0x07 :
@@ -221,7 +221,7 @@ bool CPS1TrackV2::readEvent() {
       case 0x09 :
         noteState &= 0xF8;
         noteState |= readByte(curOffset++);
-        addGenericEvent(beginOffset, curOffset - beginOffset, "Set Octave", "", CLR_CHANGESTATE);
+        addGenericEvent(beginOffset, curOffset - beginOffset, "Set Octave", "", Type::ChangeState);
         break;
 
       // Global Transpose
@@ -250,7 +250,7 @@ bool CPS1TrackV2::readEvent() {
       }
       case 0x0D : {
         uint8_t portamentoRate = readByte(curOffset++);
-        addGenericEvent(beginOffset, curOffset - beginOffset, "Portamento Time", "", CLR_PORTAMENTOTIME);
+        addGenericEvent(beginOffset, curOffset - beginOffset, "Portamento Time", "", Type::PortamentoTime);
         break;
       }
 
@@ -311,7 +311,7 @@ bool CPS1TrackV2::readEvent() {
             }
           }
 
-          addGenericEvent(beginOffset, curOffset - beginOffset, "Loop", "", CLR_LOOP);
+          addGenericEvent(beginOffset, curOffset - beginOffset, "Loop", "", Type::Loop);
 
           if (loop[loopNum] == 0) {
             bInLoop = false;
@@ -348,7 +348,7 @@ bool CPS1TrackV2::readEvent() {
           {
             uint16_t jump = getShortBE(curOffset);
             curOffset += 2;
-            addGenericEvent(beginOffset, curOffset - beginOffset, "Loop Break", "", CLR_LOOP);
+            addGenericEvent(beginOffset, curOffset - beginOffset, "Loop Break", "", Type::Loop);
 
             if (version() <= CPS1_V425) {
               curOffset = jump;
@@ -403,7 +403,7 @@ bool CPS1TrackV2::readEvent() {
 
       case 0x1A : {
         uint8_t masterVol = readByte(curOffset++);
-        addGenericEvent(beginOffset, curOffset - beginOffset, "Master Volume", "", CLR_UNKNOWN);
+        addGenericEvent(beginOffset, curOffset - beginOffset, "Master Volume", "", Type::Unknown);
         cpsSeq->setMasterVolume(masterVol);
         break;
       }
@@ -438,7 +438,7 @@ bool CPS1TrackV2::readEvent() {
         break;
 
       default :
-        addGenericEvent(beginOffset, curOffset - beginOffset, "UNKNOWN", "", CLR_UNRECOGNIZED);
+        addGenericEvent(beginOffset, curOffset - beginOffset, "UNKNOWN", "", Type::Unrecognized);
     }
   }
   return true;

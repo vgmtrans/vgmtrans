@@ -233,7 +233,7 @@ bool PandoraBoxSnesTrack::readEvent() {
     }
 
     case EVENT_NOP: {
-      addGenericEvent(beginOffset, curOffset - beginOffset, "NOP", desc.str(), CLR_MISC, ICON_BINARY);
+      addGenericEvent(beginOffset, curOffset - beginOffset, "NOP", desc.str(), Type::Misc, ICON_BINARY);
       break;
     }
 
@@ -274,7 +274,7 @@ bool PandoraBoxSnesTrack::readEvent() {
         if (prevNoteSlurred && key == prevNoteKey) {
           // tie
           makePrevDurNoteEnd(getTime() + dur);
-          addGenericEvent(beginOffset, curOffset - beginOffset, "Tie", desc.str(), CLR_TIE, ICON_NOTE);
+          addGenericEvent(beginOffset, curOffset - beginOffset, "Tie", desc.str(), Type::Tie, ICON_NOTE);
         }
         else {
           // note
@@ -291,14 +291,14 @@ bool PandoraBoxSnesTrack::readEvent() {
     case EVENT_OCTAVE: {
       octave = (statusByte - 0x40);
       desc << "Octave: " << octave;
-      addGenericEvent(beginOffset, curOffset - beginOffset, "Octave", desc.str(), CLR_CHANGESTATE);
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Octave", desc.str(), Type::ChangeState);
       break;
     }
 
     case EVENT_QUANTIZE: {
       spcNoteQuantize = (statusByte - 0x48);
       desc << "Length: " << spcNoteQuantize << "/8";
-      addGenericEvent(beginOffset, curOffset - beginOffset, "Duration Rate", desc.str(), CLR_DURNOTE);
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Duration Rate", desc.str(), Type::DurationNote);
       break;
     }
 
@@ -328,7 +328,7 @@ bool PandoraBoxSnesTrack::readEvent() {
     case EVENT_TUNING: {
       int8_t newTuning = readByte(curOffset++);
       desc << "Hearz: " << (newTuning >= 0 ? "+" : "") << newTuning << " Hz";
-      addGenericEvent(beginOffset, curOffset - beginOffset, "Fine Tuning", desc.str(), CLR_TRANSPOSE, ICON_CONTROL);
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Fine Tuning", desc.str(), Type::Transpose, ICON_CONTROL);
       break;
     }
 
@@ -398,7 +398,7 @@ bool PandoraBoxSnesTrack::readEvent() {
           "  Arg4: " << arg4 <<
           "  Arg5: " << arg5;
 
-      addGenericEvent(beginOffset, curOffset - beginOffset, "Vibrato Param", desc.str(), CLR_MODULATION, ICON_CONTROL);
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Vibrato Param", desc.str(), Type::Modulation, ICON_CONTROL);
       break;
     }
 
@@ -409,7 +409,7 @@ bool PandoraBoxSnesTrack::readEvent() {
                       curOffset - beginOffset,
                       "Vibrato On/Off",
                       desc.str(),
-                      CLR_MODULATION,
+                      Type::Modulation,
                       ICON_CONTROL);
       break;
     }
@@ -427,7 +427,7 @@ bool PandoraBoxSnesTrack::readEvent() {
     case EVENT_LOOP_START: {
       uint8_t count = readByte(curOffset++);
       desc << "Times: " << (int) count;
-      addGenericEvent(beginOffset, 2, "Loop Start", desc.str(), CLR_LOOP, ICON_STARTREP);
+      addGenericEvent(beginOffset, 2, "Loop Start", desc.str(), Type::Loop, ICON_STARTREP);
 
       if (spcCallStackPtr + 5 > PANDORABOXSNES_CALLSTACK_SIZE) {
         // stack overflow
@@ -460,7 +460,7 @@ bool PandoraBoxSnesTrack::readEvent() {
       }
       else {
         // regular loop
-        addGenericEvent(beginOffset, curOffset - beginOffset, "Loop End", desc.str(), CLR_LOOP, ICON_ENDREP);
+        addGenericEvent(beginOffset, curOffset - beginOffset, "Loop End", desc.str(), Type::Loop, ICON_ENDREP);
 
         // decrease repeat count (0 becomes an infinite loop, as a result)
         spcCallStack[spcCallStackPtr - 1]--;
@@ -483,7 +483,7 @@ bool PandoraBoxSnesTrack::readEvent() {
     }
 
     case EVENT_LOOP_BREAK: {
-      addGenericEvent(beginOffset, curOffset - beginOffset, "Loop Break", desc.str(), CLR_LOOP, ICON_ENDREP);
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Loop Break", desc.str(), Type::Loop, ICON_ENDREP);
 
       if (spcCallStackPtr < 5) {
         // access violation
@@ -504,7 +504,7 @@ bool PandoraBoxSnesTrack::readEvent() {
       uint8_t dspValue = readByte(curOffset++);
       desc << "Register: $" << std::hex << std::setfill('0') << std::setw(2) << std::uppercase << (int) dspReg
           << "  Value: $" << (int) dspValue;
-      addGenericEvent(beginOffset, curOffset - beginOffset, "Write to DSP", desc.str(), CLR_CHANGESTATE);
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Write to DSP", desc.str(), Type::ChangeState);
       break;
     }
 
@@ -527,7 +527,7 @@ bool PandoraBoxSnesTrack::readEvent() {
         desc << "  Noise Frequency (NCK): " << " (Keep Current)";
       }
 
-      addGenericEvent(beginOffset, curOffset - beginOffset, "Noise Param", desc.str(), CLR_CHANGESTATE, ICON_CONTROL);
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Noise Param", desc.str(), Type::ChangeState, ICON_CONTROL);
       break;
     }
 
@@ -550,7 +550,7 @@ bool PandoraBoxSnesTrack::readEvent() {
           "  SL: " << slRate << "/127" << " (" << sl << ")" <<
           "  Arg5: " << xxRate << "/127";
 
-      addGenericEvent(beginOffset, curOffset - beginOffset, "ADSR", desc.str(), CLR_ADSR, ICON_CONTROL);
+      addGenericEvent(beginOffset, curOffset - beginOffset, "ADSR", desc.str(), Type::Adsr, ICON_CONTROL);
       break;
     }
 

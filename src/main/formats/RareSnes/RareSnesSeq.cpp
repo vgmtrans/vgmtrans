@@ -476,7 +476,7 @@ bool RareSnesTrack::readEvent(void) {
 
         curOffset = dest;
         if (!isOffsetUsed(dest) || rptNestLevel != 0) // nest level check is required for Stickerbrush Symphony
-          addGenericEvent(beginOffset, length, "Jump", desc.str().c_str(), CLR_LOOPFOREVER);
+          addGenericEvent(beginOffset, length, "Jump", desc.str().c_str(), Type::LoopForever);
         else
           bContinue = addLoopForever(beginOffset, length, "Jump");
         break;
@@ -493,7 +493,7 @@ bool RareSnesTrack::readEvent(void) {
                         curOffset - beginOffset,
                         (times == 1 ? "Pattern Play" : "Pattern Repeat"),
                         desc.str().c_str(),
-                        CLR_LOOP,
+                        Type::Loop,
                         ICON_STARTREP);
 
         if (rptNestLevel == RARESNES_RPTNESTMAX) {
@@ -519,7 +519,7 @@ bool RareSnesTrack::readEvent(void) {
                         curOffset - beginOffset,
                         "Pattern Play",
                         desc.str().c_str(),
-                        CLR_LOOP,
+                        Type::Loop,
                         ICON_STARTREP);
 
         if (rptNestLevel == RARESNES_RPTNESTMAX) {
@@ -541,7 +541,7 @@ bool RareSnesTrack::readEvent(void) {
                         curOffset - beginOffset,
                         "End Pattern",
                         desc.str().c_str(),
-                        CLR_TRACKEND,
+                        Type::TrackEnd,
                         ICON_ENDREP);
 
         if (rptNestLevel == 0) {
@@ -577,7 +577,7 @@ bool RareSnesTrack::readEvent(void) {
                         curOffset - beginOffset,
                         "Default Duration On",
                         desc.str().c_str(),
-                        CLR_DURNOTE,
+                        Type::DurationNote,
                         ICON_NOTE);
         break;
       }
@@ -588,7 +588,7 @@ bool RareSnesTrack::readEvent(void) {
                         curOffset - beginOffset,
                         "Default Duration Off",
                         desc.str().c_str(),
-                        CLR_DURNOTE,
+                        Type::DurationNote,
                         ICON_NOTE);
         break;
 
@@ -598,7 +598,7 @@ bool RareSnesTrack::readEvent(void) {
                         curOffset - beginOffset,
                         "Pitch Slide Up",
                         desc.str().c_str(),
-                        CLR_PITCHBEND,
+                        Type::PitchBend,
                         ICON_CONTROL);
         break;
       }
@@ -609,7 +609,7 @@ bool RareSnesTrack::readEvent(void) {
                         curOffset - beginOffset,
                         "Pitch Slide Down",
                         desc.str().c_str(),
-                        CLR_PITCHBEND,
+                        Type::PitchBend,
                         ICON_CONTROL);
         break;
       }
@@ -619,7 +619,7 @@ bool RareSnesTrack::readEvent(void) {
                         curOffset - beginOffset,
                         "Pitch Slide Off",
                         desc.str().c_str(),
-                        CLR_PITCHBEND,
+                        Type::PitchBend,
                         ICON_CONTROL);
         break;
 
@@ -648,7 +648,7 @@ bool RareSnesTrack::readEvent(void) {
                         curOffset - beginOffset,
                         "Vibrato (Short)",
                         desc.str().c_str(),
-                        CLR_MODULATION,
+                        Type::Modulation,
                         ICON_CONTROL);
         break;
       }
@@ -658,7 +658,7 @@ bool RareSnesTrack::readEvent(void) {
                         curOffset - beginOffset,
                         "Vibrato Off",
                         desc.str().c_str(),
-                        CLR_MODULATION,
+                        Type::Modulation,
                         ICON_CONTROL);
         break;
 
@@ -668,7 +668,7 @@ bool RareSnesTrack::readEvent(void) {
                         curOffset - beginOffset,
                         "Vibrato",
                         desc.str().c_str(),
-                        CLR_MODULATION,
+                        Type::Modulation,
                         ICON_CONTROL);
         break;
       }
@@ -678,7 +678,7 @@ bool RareSnesTrack::readEvent(void) {
                         curOffset - beginOffset,
                         "Tremolo Off",
                         desc.str().c_str(),
-                        CLR_MODULATION,
+                        Type::Modulation,
                         ICON_CONTROL);
         break;
 
@@ -688,7 +688,7 @@ bool RareSnesTrack::readEvent(void) {
                         curOffset - beginOffset,
                         "Tremolo",
                         desc.str().c_str(),
-                        CLR_MODULATION,
+                        Type::Modulation,
                         ICON_CONTROL);
         break;
       }
@@ -699,7 +699,7 @@ bool RareSnesTrack::readEvent(void) {
         spcADSR = newADSR;
 
         desc << "ADSR: " << std::hex << std::setfill('0') << std::setw(4) << std::uppercase << (int) newADSR;
-        addGenericEvent(beginOffset, curOffset - beginOffset, "ADSR", desc.str().c_str(), CLR_ADSR, ICON_CONTROL);
+        addGenericEvent(beginOffset, curOffset - beginOffset, "ADSR", desc.str().c_str(), Type::Adsr, ICON_CONTROL);
         break;
       }
 
@@ -707,7 +707,7 @@ bool RareSnesTrack::readEvent(void) {
         // TODO: At least it's not Master Volume in Donkey Kong Country 2
         uint8_t newVol = readByte(curOffset++);
         desc << "Volume: " << newVol;
-        addGenericEvent(beginOffset, curOffset - beginOffset, "Master Volume?", desc.str(), CLR_VOLUME, ICON_CONTROL);
+        addGenericEvent(beginOffset, curOffset - beginOffset, "Master Volume?", desc.str(), Type::Volume, ICON_CONTROL);
         break;
       }
 
@@ -728,7 +728,7 @@ bool RareSnesTrack::readEvent(void) {
                         curOffset - beginOffset,
                         "Tuning",
                         desc.str().c_str(),
-                        CLR_PITCHBEND,
+                        Type::PitchBend,
                         ICON_CONTROL);
         break;
       }
@@ -741,7 +741,7 @@ bool RareSnesTrack::readEvent(void) {
 
         // add event without MIDI event
         desc << "Transpose: " << newTransp;
-        addGenericEvent(beginOffset, curOffset - beginOffset, "Transpose", desc.str(), CLR_TRANSPOSE, ICON_CONTROL);
+        addGenericEvent(beginOffset, curOffset - beginOffset, "Transpose", desc.str(), Type::Transpose, ICON_CONTROL);
 
         cKeyCorrection = SEQ_KEYOFS;
         break;
@@ -758,7 +758,7 @@ bool RareSnesTrack::readEvent(void) {
                         curOffset - beginOffset,
                         "Transpose (Relative)",
                         desc.str(),
-                        CLR_TRANSPOSE,
+                        Type::Transpose,
                         ICON_CONTROL);
 
         cKeyCorrection += deltaTransp;
@@ -777,7 +777,7 @@ bool RareSnesTrack::readEvent(void) {
                         curOffset - beginOffset,
                         "Echo Param",
                         desc.str().c_str(),
-                        CLR_REVERB,
+                        Type::Reverb,
                         ICON_CONTROL);
         break;
       }
@@ -806,7 +806,7 @@ bool RareSnesTrack::readEvent(void) {
                         curOffset - beginOffset,
                         "Echo FIR",
                         desc.str().c_str(),
-                        CLR_REVERB,
+                        Type::Reverb,
                         ICON_CONTROL);
         break;
       }
@@ -818,7 +818,7 @@ bool RareSnesTrack::readEvent(void) {
                         curOffset - beginOffset,
                         "Noise Frequency",
                         desc.str().c_str(),
-                        CLR_CHANGESTATE,
+                        Type::ChangeState,
                         ICON_CONTROL);
         break;
       }
@@ -828,7 +828,7 @@ bool RareSnesTrack::readEvent(void) {
                         curOffset - beginOffset,
                         "Noise On",
                         desc.str().c_str(),
-                        CLR_CHANGESTATE,
+                        Type::ChangeState,
                         ICON_CONTROL);
         break;
 
@@ -837,7 +837,7 @@ bool RareSnesTrack::readEvent(void) {
                         curOffset - beginOffset,
                         "Noise Off",
                         desc.str().c_str(),
-                        CLR_CHANGESTATE,
+                        Type::ChangeState,
                         ICON_CONTROL);
         break;
 
@@ -848,7 +848,7 @@ bool RareSnesTrack::readEvent(void) {
                         curOffset - beginOffset,
                         "Set Alt Note 1",
                         desc.str().c_str(),
-                        CLR_CHANGESTATE,
+                        Type::ChangeState,
                         ICON_NOTE);
         break;
 
@@ -859,7 +859,7 @@ bool RareSnesTrack::readEvent(void) {
                         curOffset - beginOffset,
                         "Set Alt Note 2",
                         desc.str().c_str(),
-                        CLR_CHANGESTATE,
+                        Type::ChangeState,
                         ICON_NOTE);
         break;
 
@@ -869,7 +869,7 @@ bool RareSnesTrack::readEvent(void) {
                         curOffset - beginOffset,
                         "Pitch Slide Down (Short)",
                         desc.str().c_str(),
-                        CLR_PITCHBEND,
+                        Type::PitchBend,
                         ICON_CONTROL);
         break;
       }
@@ -880,7 +880,7 @@ bool RareSnesTrack::readEvent(void) {
                         curOffset - beginOffset,
                         "Pitch Slide Up (Short)",
                         desc.str().c_str(),
-                        CLR_PITCHBEND,
+                        Type::PitchBend,
                         ICON_CONTROL);
         break;
       }
@@ -891,7 +891,7 @@ bool RareSnesTrack::readEvent(void) {
                         curOffset - beginOffset,
                         "Long Duration On",
                         desc.str().c_str(),
-                        CLR_DURNOTE,
+                        Type::DurationNote,
                         ICON_NOTE);
         break;
 
@@ -901,7 +901,7 @@ bool RareSnesTrack::readEvent(void) {
                         curOffset - beginOffset,
                         "Long Duration Off",
                         desc.str().c_str(),
-                        CLR_DURNOTE,
+                        Type::DurationNote,
                         ICON_NOTE);
         break;
 
@@ -928,7 +928,7 @@ bool RareSnesTrack::readEvent(void) {
                         curOffset - beginOffset,
                         "Set Vol/ADSR Preset 1",
                         desc.str(),
-                        CLR_VOLUME,
+                        Type::Volume,
                         ICON_CONTROL);
         break;
       }
@@ -956,7 +956,7 @@ bool RareSnesTrack::readEvent(void) {
                         curOffset - beginOffset,
                         "Set Vol/ADSR Preset 2",
                         desc.str(),
-                        CLR_VOLUME,
+                        Type::Volume,
                         ICON_CONTROL);
         break;
       }
@@ -984,7 +984,7 @@ bool RareSnesTrack::readEvent(void) {
                         curOffset - beginOffset,
                         "Set Vol/ADSR Preset 3",
                         desc.str(),
-                        CLR_VOLUME,
+                        Type::Volume,
                         ICON_CONTROL);
         break;
       }
@@ -1012,7 +1012,7 @@ bool RareSnesTrack::readEvent(void) {
                         curOffset - beginOffset,
                         "Set Vol/ADSR Preset 4",
                         desc.str(),
-                        CLR_VOLUME,
+                        Type::Volume,
                         ICON_CONTROL);
         break;
       }
@@ -1040,7 +1040,7 @@ bool RareSnesTrack::readEvent(void) {
                         curOffset - beginOffset,
                         "Set Vol/ADSR Preset 5",
                         desc.str(),
-                        CLR_VOLUME,
+                        Type::Volume,
                         ICON_CONTROL);
         break;
       }
@@ -1093,7 +1093,7 @@ bool RareSnesTrack::readEvent(void) {
 
       case EVENT_RESETADSR:
         spcADSR = 0x8FE0;
-        addGenericEvent(beginOffset, curOffset - beginOffset, "Reset ADSR", "ADSR: 8FE0", CLR_ADSR, ICON_CONTROL);
+        addGenericEvent(beginOffset, curOffset - beginOffset, "Reset ADSR", "ADSR: 8FE0", Type::Adsr, ICON_CONTROL);
         break;
 
       case EVENT_RESETADSRSOFT:
@@ -1102,7 +1102,7 @@ bool RareSnesTrack::readEvent(void) {
                         curOffset - beginOffset,
                         "Reset ADSR (Soft)",
                         "ADSR: 8EE0",
-                        CLR_ADSR,
+                        Type::Adsr,
                         ICON_CONTROL);
         break;
 
@@ -1174,7 +1174,7 @@ bool RareSnesTrack::readEvent(void) {
                         curOffset - beginOffset,
                         "Echo Delay",
                         desc.str().c_str(),
-                        CLR_REVERB,
+                        Type::Reverb,
                         ICON_CONTROL);
         break;
       }
@@ -1198,7 +1198,7 @@ bool RareSnesTrack::readEvent(void) {
                         curOffset - beginOffset,
                         "Set Volume Preset",
                         desc.str(),
-                        CLR_VOLUME,
+                        Type::Volume,
                         ICON_CONTROL);
         break;
       }
@@ -1220,7 +1220,7 @@ bool RareSnesTrack::readEvent(void) {
                         curOffset - beginOffset,
                         "Pitch Slide/Vibrato/Tremolo Off",
                         desc.str(),
-                        CLR_CHANGESTATE,
+                        Type::ChangeState,
                         ICON_CONTROL);
         break;
 
@@ -1257,7 +1257,7 @@ void RareSnesTrack::addVolLR(uint32_t offset,
 
   std::ostringstream desc;
   desc << "Left Volume: " << spcVolL << "  Right Volume: " << spcVolR;
-  addGenericEvent(offset, length, sEventName, desc.str(), CLR_VOLUME, ICON_CONTROL);
+  addGenericEvent(offset, length, sEventName, desc.str(), Type::Volume, ICON_CONTROL);
 
   // add MIDI events only if updated
   if (newMidiVol != vol) {

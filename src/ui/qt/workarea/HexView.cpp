@@ -462,8 +462,8 @@ bool HexView::handleSelectedItemPaintEvent(QObject* obj, QPaintEvent* event) {
     auto itemData = std::vector<uint8_t>(selectedItem->unLength);
     vgmfile->readBytes(selectedItem->dwOffset, selectedItem->unLength, itemData.data());
 
-    QColor bgColor = colorForEventColor(selectedItem->color);
-    QColor textColor = textColorForEventColor(selectedItem->color);
+    QColor bgColor = colorForItemType(selectedItem->type);
+    QColor textColor = textColorForItemType(selectedItem->type);
 
     pixmapPainter.setFont(this->font());
     pixmapPainter.translate(SELECTION_PADDING, SELECTION_PADDING);
@@ -653,8 +653,8 @@ void HexView::printData(QPainter& painter, int startAddress, int endAddress) con
         translateAndPrintAscii(painter, data + dataOffset, col, emptyAddressBytes, windowColor, defaultTextColor);
         emptyAddressBytes = 0;
       }
-      QColor bgColor = colorForEventColor(item->color);
-      QColor textColor = textColorForEventColor(item->color);
+      QColor bgColor = colorForItemType(item->type);
+      QColor textColor = textColorForItemType(item->type);
       int col = startCol + offset;
 
       // In case the event spans multiple lines, account for how far into the event we are at this line

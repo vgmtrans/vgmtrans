@@ -181,7 +181,7 @@ bool FFTTrack::readEvent() {
       case 0x91:
         infiniteLoopPt = curOffset;
         infiniteLoopOctave = octave;
-        addGenericEvent(beginOffset, curOffset - beginOffset, "Track Repeat Point", "", CLR_LOOP);
+        addGenericEvent(beginOffset, curOffset - beginOffset, "Track Repeat Point", "", Type::Loop);
         //AddEventItem(_T("Repeat"), ICON_STARTREP, beginOffset, curOffset-beginOffset, BG_CLR_WHEAT);
         break;
 
@@ -226,14 +226,14 @@ bool FFTTrack::readEvent() {
         loop_counter[loop_layer] = 0;
         loop_repeats[loop_layer] = loopCount - 1;
         loop_octave[loop_layer] = octave;            //1,Sep.2009 revise
-        addGenericEvent(beginOffset, curOffset - beginOffset, "Repeat Begin", "", CLR_LOOP);
+        addGenericEvent(beginOffset, curOffset - beginOffset, "Repeat Begin", "", Type::Loop);
         //AddEventItem("Loop Begin", ICON_STARTREP, beginOffset, curOffset-beginOffset, BG_CLR_WHEAT);
         break;
       }
 
         //Repeat End
       case 0x99:
-        addGenericEvent(beginOffset, curOffset - beginOffset, "Repeat End", "", CLR_LOOP);
+        addGenericEvent(beginOffset, curOffset - beginOffset, "Repeat End", "", Type::Loop);
         //AddEventItem("Loop End", ICON_ENDREP, beginOffset, curOffset-beginOffset, BG_CLR_WHEAT);
 
         // hitting loop end for first time
@@ -263,7 +263,7 @@ bool FFTTrack::readEvent() {
 
         //Repeat break on last repeat
       case 0x9A:
-        addGenericEvent(beginOffset, curOffset - beginOffset, "Repeat Break", "", CLR_LOOP);
+        addGenericEvent(beginOffset, curOffset - beginOffset, "Repeat Break", "", Type::Loop);
         //AddEventItem("Loop Break", ICON_ENDREP, beginOffset, curOffset-beginOffset, BG_CLR_WHEAT);
 
         // if this is the last run of the loop, we break
@@ -323,22 +323,22 @@ bool FFTTrack::readEvent() {
 
         //Percussion On
       case 0xAE :
-        addGenericEvent(beginOffset, curOffset - beginOffset, "Percussion On", "", CLR_CHANGESTATE);
+        addGenericEvent(beginOffset, curOffset - beginOffset, "Percussion On", "", Type::ChangeState);
         break;
 
         //Percussion Off
       case 0xAF:
-        addGenericEvent(beginOffset, curOffset - beginOffset, "Percussion Off", "", CLR_CHANGESTATE);
+        addGenericEvent(beginOffset, curOffset - beginOffset, "Percussion Off", "", Type::ChangeState);
         break;
 
         //Slur On
       case 0xB0:
-        addGenericEvent(beginOffset, curOffset - beginOffset, "Slur On", "", CLR_PORTAMENTO);
+        addGenericEvent(beginOffset, curOffset - beginOffset, "Slur On", "", Type::Portamento);
         break;
 
         //Slur Off
       case 0xB1:
-        addGenericEvent(beginOffset, curOffset - beginOffset, "Slur Off", "", CLR_PORTAMENTO);
+        addGenericEvent(beginOffset, curOffset - beginOffset, "Slur Off", "", Type::Portamento);
         break;
 
         //unknown
@@ -358,12 +358,12 @@ bool FFTTrack::readEvent() {
 
         //Reverb On
       case 0xBA :
-        addGenericEvent(beginOffset, curOffset - beginOffset, "Reverb On", "", CLR_REVERB);
+        addGenericEvent(beginOffset, curOffset - beginOffset, "Reverb On", "", Type::Reverb);
         break;
 
         //Reverb Off
       case 0xBB :
-        addGenericEvent(beginOffset, curOffset - beginOffset, "Reverb Off", "", CLR_REVERB);
+        addGenericEvent(beginOffset, curOffset - beginOffset, "Reverb Off", "", Type::Reverb);
         break;
 
         //--------
@@ -371,27 +371,27 @@ bool FFTTrack::readEvent() {
 
         //ADSR Reset
       case 0xC0:
-        addGenericEvent(beginOffset, curOffset - beginOffset, "ADSR: Reset", "", CLR_ADSR);
+        addGenericEvent(beginOffset, curOffset - beginOffset, "ADSR: Reset", "", Type::Adsr);
         break;
 
       case 0xC2: {
         const auto arg1 = readByte(curOffset++);
         desc = describeUnknownEvent(status_byte, arg1);
-        addGenericEvent(beginOffset, curOffset - beginOffset, "ADSR: Attack Rate?", desc, CLR_ADSR);
+        addGenericEvent(beginOffset, curOffset - beginOffset, "ADSR: Attack Rate?", desc, Type::Adsr);
         break;
       }
 
       case 0xC4: {
         const auto arg1 = readByte(curOffset++);
         desc = describeUnknownEvent(status_byte, arg1);
-        addGenericEvent(beginOffset, curOffset - beginOffset, "ADSR: Sustain Rate?", desc, CLR_ADSR);
+        addGenericEvent(beginOffset, curOffset - beginOffset, "ADSR: Sustain Rate?", desc, Type::Adsr);
         break;
       }
 
       case 0xC5: {
         const auto arg1 = readByte(curOffset++);
         desc = describeUnknownEvent(status_byte, arg1);
-        addGenericEvent(beginOffset, curOffset - beginOffset, "ADSR: Release Rate?", desc, CLR_ADSR);
+        addGenericEvent(beginOffset, curOffset - beginOffset, "ADSR: Release Rate?", desc, Type::Adsr);
         break;
       }
 
@@ -420,14 +420,14 @@ bool FFTTrack::readEvent() {
       case 0xC9: {
         const auto arg1 = readByte(curOffset++);
         desc = describeUnknownEvent(status_byte, arg1);
-        addGenericEvent(beginOffset, curOffset - beginOffset, "ADSR: Decay Rate?", desc, CLR_ADSR);
+        addGenericEvent(beginOffset, curOffset - beginOffset, "ADSR: Decay Rate?", desc, Type::Adsr);
         break;
       }
 
       case 0xCA: {
         const auto arg1 = readByte(curOffset++);
         desc = describeUnknownEvent(status_byte, arg1);
-        addGenericEvent(beginOffset, curOffset - beginOffset, "ADSR: Sustain Level?", desc, CLR_ADSR);
+        addGenericEvent(beginOffset, curOffset - beginOffset, "ADSR: Sustain Level?", desc, Type::Adsr);
         break;
       }
 
@@ -454,7 +454,7 @@ bool FFTTrack::readEvent() {
       case 0xD2: {
         const auto arg1 = readByte(curOffset++);
         desc = describeUnknownEvent(status_byte, arg1);
-        addGenericEvent(beginOffset, curOffset - beginOffset, "Pitch Bend?", desc, CLR_PITCHBEND);
+        addGenericEvent(beginOffset, curOffset - beginOffset, "Pitch Bend?", desc, Type::PitchBend);
         break;
       }
 
@@ -463,7 +463,7 @@ bool FFTTrack::readEvent() {
         uint8_t cPitchSlideTimes = readByte(curOffset++);        //slide times [ticks]
         uint8_t cPitchSlideDepth = readByte(curOffset++);        //Target Panpot
         desc = fmt::format("Duration: {:d} ticks  Target: {:d}", cPitchSlideTimes, cPitchSlideDepth);
-        addGenericEvent(beginOffset, curOffset - beginOffset, "Portamento", desc, CLR_PORTAMENTO);
+        addGenericEvent(beginOffset, curOffset - beginOffset, "Portamento", desc, Type::Portamento);
         break;
       }
 
@@ -471,7 +471,7 @@ bool FFTTrack::readEvent() {
       case 0xD6: {
         const auto arg1 = readByte(curOffset++);
         desc = describeUnknownEvent(status_byte, arg1);
-        addGenericEvent(beginOffset, curOffset - beginOffset, "Detune?", desc, CLR_PITCHBEND);
+        addGenericEvent(beginOffset, curOffset - beginOffset, "Detune?", desc, Type::PitchBend);
         break;
       }
 
@@ -479,7 +479,7 @@ bool FFTTrack::readEvent() {
       case 0xD7: {
         uint8_t cPitchLFO_Depth = readByte(curOffset++);        //slide times [ticks]
         desc = fmt::format("Depth: {:d}", cPitchLFO_Depth);
-        addGenericEvent(beginOffset, curOffset - beginOffset, "LFO Depth (Pitch bend)", desc, CLR_LFO);
+        addGenericEvent(beginOffset, curOffset - beginOffset, "LFO Depth (Pitch bend)", desc, Type::Lfo);
         break;
       }
 
@@ -489,7 +489,7 @@ bool FFTTrack::readEvent() {
         uint8_t cPitchLFO_Cycle = readByte(curOffset++);
         uint8_t cPitchLFO_Decay1 = readByte(curOffset++);
         desc = fmt::format("decay2: {:d}  cycle: {:d}  decay1: {:d}", cPitchLFO_Decay2, cPitchLFO_Cycle, cPitchLFO_Decay1);
-        addGenericEvent(beginOffset, curOffset - beginOffset, "LFO Length (Pitch bend)", desc, CLR_LFO);
+        addGenericEvent(beginOffset, curOffset - beginOffset, "LFO Length (Pitch bend)", desc, Type::Lfo);
         break;
       }
 
@@ -499,7 +499,7 @@ bool FFTTrack::readEvent() {
         const auto arg2 = readByte(curOffset++);
         const auto arg3 = readByte(curOffset++);
         desc = describeUnknownEvent(status_byte, arg1, arg2, arg3);
-        addGenericEvent(beginOffset, curOffset - beginOffset, "LFO ? (Pitch bend)", desc, CLR_LFO);
+        addGenericEvent(beginOffset, curOffset - beginOffset, "LFO ? (Pitch bend)", desc, Type::Lfo);
         break;
       }
 
@@ -538,7 +538,7 @@ bool FFTTrack::readEvent() {
       case 0xE3: {
         uint8_t cVolLFO_Depth = readByte(curOffset++);        //
         desc = fmt::format("Depth: {:d}", cVolLFO_Depth);
-        addGenericEvent(beginOffset, curOffset - beginOffset, "LFO Depth (Volume)", desc, CLR_LFO);
+        addGenericEvent(beginOffset, curOffset - beginOffset, "LFO Depth (Volume)", desc, Type::Lfo);
         break;
       }
 
@@ -548,7 +548,7 @@ bool FFTTrack::readEvent() {
         uint8_t cVolLFO_Cycle = readByte(curOffset++);
         uint8_t cVolLFO_Decay1 = readByte(curOffset++);
         desc = fmt::format("decay2: {:d}  cycle: {:d}  decay1: {:d}", cVolLFO_Decay2, cVolLFO_Cycle, cVolLFO_Decay1);
-        addGenericEvent(beginOffset, curOffset - beginOffset, "LFO Length (Volume)", desc, CLR_LFO);
+        addGenericEvent(beginOffset, curOffset - beginOffset, "LFO Length (Volume)", desc, Type::Lfo);
         break;
       }
 
@@ -558,7 +558,7 @@ bool FFTTrack::readEvent() {
         const auto arg2 = readByte(curOffset++);
         const auto arg3 = readByte(curOffset++);
         desc = describeUnknownEvent(status_byte, arg1, arg2, arg3);
-        addGenericEvent(beginOffset, curOffset - beginOffset, "LFO ? (Volume)", desc, CLR_LFO);
+        addGenericEvent(beginOffset, curOffset - beginOffset, "LFO ? (Volume)", desc, Type::Lfo);
         break;
       }
 
@@ -597,7 +597,7 @@ bool FFTTrack::readEvent() {
       case 0xEB: {
         uint8_t cPanLFO_Depth = readByte(curOffset++);
         desc = fmt::format("Depth: {:d}", cPanLFO_Depth);
-        addGenericEvent(beginOffset, curOffset - beginOffset, "LFO Depth (Panpot)", desc, CLR_LFO);
+        addGenericEvent(beginOffset, curOffset - beginOffset, "LFO Depth (Panpot)", desc, Type::Lfo);
         break;
       }
 
@@ -607,7 +607,7 @@ bool FFTTrack::readEvent() {
         uint8_t cPanLFO_Cycle = readByte(curOffset++);
         uint8_t cPanLFO_Decay1 = readByte(curOffset++);
         desc = fmt::format("decay2: {:d}  cycle: {:d}  decay1: {:d}", cPanLFO_Decay2, cPanLFO_Cycle, cPanLFO_Decay1);
-        addGenericEvent(beginOffset, curOffset - beginOffset, "LFO Length (Panpot)", desc, CLR_LFO);
+        addGenericEvent(beginOffset, curOffset - beginOffset, "LFO Length (Panpot)", desc, Type::Lfo);
         break;
       }
 
@@ -617,7 +617,7 @@ bool FFTTrack::readEvent() {
         const auto arg2 = readByte(curOffset++);
         const auto arg3 = readByte(curOffset++);
         desc = describeUnknownEvent(status_byte, arg1, arg2, arg3);
-        addGenericEvent(beginOffset, curOffset - beginOffset, "LFO ? (Panpot)", desc, CLR_LFO);
+        addGenericEvent(beginOffset, curOffset - beginOffset, "LFO ? (Panpot)", desc, Type::Lfo);
         break;
       }
 
@@ -678,7 +678,7 @@ bool FFTTrack::readEvent() {
       case 0xFE: {
         uint8_t cProgBankNum = readByte(curOffset++);        //Bank Number [ticks]
         desc = fmt::format(" Bank: {:d}", cProgBankNum);
-        addGenericEvent(beginOffset, curOffset - beginOffset, "Program bank select", desc, CLR_PROGCHANGE);
+        addGenericEvent(beginOffset, curOffset - beginOffset, "Program bank select", desc, Type::ProgramChange);
         break;
       }
 

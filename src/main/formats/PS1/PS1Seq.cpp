@@ -155,13 +155,13 @@ bool PS1Seq::readEvent() {
       {
         //bank select
         case 0 :
-          addGenericEvent(beginOffset, curOffset - beginOffset, "Bank Select", "", CLR_MISC);
+          addGenericEvent(beginOffset, curOffset - beginOffset, "Bank Select", "", Type::Misc);
           addBankSelectNoItem(value);
           break;
 
         //data entry
         case 6 :
-          addGenericEvent(beginOffset, curOffset - beginOffset, "NRPN Data Entry", "", CLR_MISC);
+          addGenericEvent(beginOffset, curOffset - beginOffset, "NRPN Data Entry", "", Type::Misc);
           if (VGMSeq::readMode == READMODE_CONVERT_TO_MIDI) {
             pMidiTrack->addControllerEvent(channel, controlNum, value);
           }
@@ -196,15 +196,15 @@ bool PS1Seq::readEvent() {
         case 98 :
           switch (value) {
             case 20 :
-              addGenericEvent(beginOffset, curOffset - beginOffset, "NRPN 1 #20", "", CLR_MISC);
+              addGenericEvent(beginOffset, curOffset - beginOffset, "NRPN 1 #20", "", Type::Misc);
               break;
 
             case 30 :
-              addGenericEvent(beginOffset, curOffset - beginOffset, "NRPN 1 #30", "", CLR_MISC);
+              addGenericEvent(beginOffset, curOffset - beginOffset, "NRPN 1 #30", "", Type::Misc);
               break;
 
             default:
-              addGenericEvent(beginOffset, curOffset - beginOffset, "NRPN 1", "", CLR_MISC);
+              addGenericEvent(beginOffset, curOffset - beginOffset, "NRPN 1", "", Type::Misc);
               break;
           }
 
@@ -217,15 +217,15 @@ bool PS1Seq::readEvent() {
         case 99 :
           switch (value) {
             case 20 :
-              addGenericEvent(beginOffset, curOffset - beginOffset, "Loop Start", "", CLR_LOOP, ICON_STARTREP);
+              addGenericEvent(beginOffset, curOffset - beginOffset, "Loop Start", "", Type::Loop, ICON_STARTREP);
               break;
 
             case 30 :
-              addGenericEvent(beginOffset, curOffset - beginOffset, "Loop End", "", CLR_LOOP, ICON_ENDREP);
+              addGenericEvent(beginOffset, curOffset - beginOffset, "Loop End", "", Type::Loop, ICON_ENDREP);
               break;
 
             default:
-              addGenericEvent(beginOffset, curOffset - beginOffset, "NRPN 2", "", CLR_MISC);
+              addGenericEvent(beginOffset, curOffset - beginOffset, "NRPN 2", "", Type::Misc);
               break;
           }
 
@@ -236,7 +236,7 @@ bool PS1Seq::readEvent() {
 
         //(0x64) RPN 1 (LSB), no effect?
         case 100 :
-          addGenericEvent(beginOffset, curOffset - beginOffset, "RPN 1", "", CLR_MISC);
+          addGenericEvent(beginOffset, curOffset - beginOffset, "RPN 1", "", Type::Misc);
           if (VGMSeq::readMode == READMODE_CONVERT_TO_MIDI) {
             pMidiTrack->addControllerEvent(channel, controlNum, value);
           }
@@ -244,7 +244,7 @@ bool PS1Seq::readEvent() {
 
         //(0x65) RPN 2 (MSB), no effect?
         case 101 :
-          addGenericEvent(beginOffset, curOffset - beginOffset, "RPN 2", "", CLR_MISC);
+          addGenericEvent(beginOffset, curOffset - beginOffset, "RPN 2", "", Type::Misc);
           if (VGMSeq::readMode == READMODE_CONVERT_TO_MIDI) {
             pMidiTrack->addControllerEvent(channel, controlNum, value);
           }
@@ -252,14 +252,14 @@ bool PS1Seq::readEvent() {
 
         //reset all controllers
         case 121 :
-          addGenericEvent(beginOffset, curOffset - beginOffset, "Reset All Controllers", "", CLR_MISC);
+          addGenericEvent(beginOffset, curOffset - beginOffset, "Reset All Controllers", "", Type::Misc);
           if (VGMSeq::readMode == READMODE_CONVERT_TO_MIDI) {
             pMidiTrack->addControllerEvent(channel, controlNum, value);
           }
           break;
 
         default:
-          addGenericEvent(beginOffset, curOffset - beginOffset, "Control Event", "", CLR_UNKNOWN);
+          addGenericEvent(beginOffset, curOffset - beginOffset, "Control Event", "", Type::Unknown);
           if (VGMSeq::readMode == READMODE_CONVERT_TO_MIDI) {
             pMidiTrack->addControllerEvent(channel, controlNum, value);
           }

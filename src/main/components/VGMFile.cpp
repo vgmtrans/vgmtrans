@@ -94,7 +94,7 @@ void VGMHeader::addSig(uint32_t offset, uint32_t length, const std::string &name
 
 VGMHeaderItem::VGMHeaderItem(const VGMHeader *hdr, HdrItemType theType, uint32_t offset, uint32_t length,
                              const std::string &name)
-    : VGMItem(hdr->vgmFile(), offset, length, name, CLR_HEADER), type(theType) {}
+    : VGMItem(hdr->vgmFile(), offset, length, name, Type::Header), type(theType) {}
 
 VGMItem::Icon VGMHeaderItem::icon() {
   switch (type) {

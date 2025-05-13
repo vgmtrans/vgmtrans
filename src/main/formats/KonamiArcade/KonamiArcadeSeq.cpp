@@ -98,7 +98,7 @@ bool KonamiArcadeTrack::readEvent() {
   uint8_t status_byte = readByte(curOffset++);
 
   if (status_byte == 0x60) {
-    addGenericEvent(beginOffset, curOffset - beginOffset, "Percussion On", "", CLR_CHANGESTATE);
+    addGenericEvent(beginOffset, curOffset - beginOffset, "Percussion On", "", Type::ChangeState);
     m_percussion = true;
     // Drums define their own pan, which is only used if the pan state value is 0
     addBankSelectNoItem(1);
@@ -107,7 +107,7 @@ bool KonamiArcadeTrack::readEvent() {
   }
 
   if (status_byte == 0x61) {
-    addGenericEvent(beginOffset, curOffset - beginOffset, "Percussion Off", "", CLR_CHANGESTATE);
+    addGenericEvent(beginOffset, curOffset - beginOffset, "Percussion Off", "", Type::ChangeState);
     m_percussion = false;
     if (m_pan == 0) {
       u8 midiPan = calculateMidiPanForK054539(0);
@@ -266,7 +266,7 @@ bool KonamiArcadeTrack::readEvent() {
       this->makePrevDurNoteEnd();
       addTime(delta - newdur);
       auto desc = fmt::format("total delta: {:d} ticks  additional duration: {:d} ticks", delta, newdur);
-      addGenericEvent(beginOffset, curOffset - beginOffset, "Hold", desc, CLR_TIE);
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Hold", desc, Type::Tie);
       m_prevDelta = delta;
       break;
     }
@@ -311,7 +311,7 @@ bool KonamiArcadeTrack::readEvent() {
     loopMarker:
       m_loopMarker[loopNum] = curOffset;
       auto name = fmt::format("Loop {:d} Marker", loopNum);
-      addGenericEvent(beginOffset, curOffset - beginOffset, name, "", CLR_LOOP);
+      addGenericEvent(beginOffset, curOffset - beginOffset, name, "", Type::Loop, ICON_STARTREP);
       break;
     }
 
@@ -353,7 +353,7 @@ bool KonamiArcadeTrack::readEvent() {
       else {
         auto desc = fmt::format("count: {:d}  attenuation: {:d}  transpose {:d}", loopCount,
           initialLoopAtten, initialLoopTranspose);
-        addGenericEvent(beginOffset, curOffset - beginOffset, "Loop", desc, CLR_LOOP);
+        addGenericEvent(beginOffset, curOffset - beginOffset, "Loop", desc, Type::Loop);
       }
       if (m_loopMarker[loopNum] < parentSeq->dwOffset) {
         L_ERROR("KonamiArcadeSeq wants to loopMarker outside bounds of sequence. Loop at %X", beginOffset);
@@ -450,7 +450,7 @@ bool KonamiArcadeTrack::readEvent() {
       if (romOffset < beginOffset) {
         shouldContinue = addLoopForever(beginOffset, 3);
       } else {
-        addGenericEvent(beginOffset, 3, "Jump", "", CLR_LOOP);
+        addGenericEvent(beginOffset, 3, "Jump", "", Type::Loop);
       }
       if (romOffset < seq->dwOffset) {
         L_ERROR("KonamiArcadeEvent FD attempted jump to offset outside the sequence at {:X}.  Jump offset: {:X}", beginOffset, romOffset);
@@ -463,7 +463,7 @@ bool KonamiArcadeTrack::readEvent() {
     case 0xFE: {
       m_inJump = true;
       m_jumpReturnOffset = curOffset + 2;
-      addGenericEvent(beginOffset, m_jumpReturnOffset - beginOffset, "Jump", "", CLR_LOOP);
+      addGenericEvent(beginOffset, m_jumpReturnOffset - beginOffset, "Jump", "", Type::Loop);
       auto seq = static_cast<KonamiArcadeSeq*>(parentSeq);
       u16 memJumpOffset = readShort(curOffset);
       u32 romOffset = seq->dwOffset + (memJumpOffset - seq->memOffset());
@@ -476,7 +476,7 @@ bool KonamiArcadeTrack::readEvent() {
     }
     case 0xFF: {
       if (m_inJump) {
-        addGenericEvent(beginOffset, 1, "Return", "", CLR_LOOP);
+        addGenericEvent(beginOffset, 1, "Return", "", Type::Loop);
         m_inJump = false;
         curOffset = m_jumpReturnOffset;
       }

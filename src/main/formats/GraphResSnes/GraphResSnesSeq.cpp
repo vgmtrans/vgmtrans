@@ -262,7 +262,7 @@ bool GraphResSnesTrack::readEvent(void) {
         int8_t midiKey = (octave * 12) + NOTE_KEY_TABLE[key];
         if (prevNoteSlurred && midiKey == prevNoteKey) {
           desc = fmt::format("Duration: {:d}", dur);
-          addGenericEvent(beginOffset, curOffset - beginOffset, "Tie", desc, CLR_TIE, ICON_NOTE);
+          addGenericEvent(beginOffset, curOffset - beginOffset, "Tie", desc, Type::Tie, ICON_NOTE);
           makePrevDurNoteEnd(getTime() + dur);
           addTime(len);
         }
@@ -299,7 +299,7 @@ bool GraphResSnesTrack::readEvent(void) {
     case EVENT_INSTANT_OCTAVE: {
       octave = statusByte & 15;
       desc = fmt::format("Octave {:d}", octave);
-      addGenericEvent(beginOffset, curOffset - beginOffset, "Octave", desc, CLR_CHANGESTATE);
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Octave", desc, Type::ChangeState);
       break;
     }
 
@@ -321,7 +321,7 @@ bool GraphResSnesTrack::readEvent(void) {
       int8_t newVolL = readByte(curOffset++);
       int8_t newVolR = readByte(curOffset++);
       desc = fmt::format("Left Volume: {:d}  Right Volume: {:d}", newVolL, newVolR);
-      addGenericEvent(beginOffset, curOffset - beginOffset, "Echo Volume", desc, CLR_REVERB, ICON_CONTROL);
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Echo Volume", desc, Type::Reverb, ICON_CONTROL);
       break;
     }
 
@@ -336,7 +336,7 @@ bool GraphResSnesTrack::readEvent(void) {
     }
 
     case EVENT_LOOP_START: {
-      addGenericEvent(beginOffset, curOffset - beginOffset, "", desc, CLR_LOOP, ICON_STARTREP);
+      addGenericEvent(beginOffset, curOffset - beginOffset, "", desc, Type::Loop, ICON_STARTREP);
 
       if (loopStackPtr == 0) {
         // stack overflow
@@ -354,7 +354,7 @@ bool GraphResSnesTrack::readEvent(void) {
       curOffset += 2;
       dest += beginOffset; // relative offset to address
       desc = fmt::format("Times: {:d}  Destination: ${:04X}", count, dest);
-      addGenericEvent(beginOffset, curOffset - beginOffset, "Loop End", desc, CLR_LOOP, ICON_ENDREP);
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Loop End", desc, Type::Loop, ICON_ENDREP);
 
       if (loopStackPtr >= GRAPHRESSNES_LOOP_LEVEL_MAX) {
         // access violation
@@ -389,7 +389,7 @@ bool GraphResSnesTrack::readEvent(void) {
       uint8_t newDurationRate = readByte(curOffset++);
       durationRate = newDurationRate;
       desc = fmt::format("Duration Rate: {:d}/8", newDurationRate);
-      addGenericEvent(beginOffset, curOffset - beginOffset, "Duration Rate", desc, CLR_DURNOTE);
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Duration Rate", desc, Type::DurationNote);
       break;
     }
 
@@ -397,12 +397,12 @@ bool GraphResSnesTrack::readEvent(void) {
       uint8_t dspReg = readByte(curOffset++);
       uint8_t dspValue = readByte(curOffset++);
       desc = fmt::format("Register: ${:02X}  Value: ${:d}", dspReg, dspValue);
-      addGenericEvent(beginOffset, curOffset - beginOffset, "Write to DSP", desc, CLR_CHANGESTATE);
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Write to DSP", desc, Type::ChangeState);
       break;
     }
 
     case EVENT_NOISE_TOGGLE: {
-      addGenericEvent(beginOffset, curOffset - beginOffset, "Noise On/Off", desc, CLR_CHANGESTATE, ICON_CONTROL);
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Noise On/Off", desc, Type::ChangeState, ICON_CONTROL);
       break;
     }
 
@@ -418,7 +418,7 @@ bool GraphResSnesTrack::readEvent(void) {
                       curOffset - beginOffset,
                       "Master Volume Fade",
                       fmt::format("Delta Volume: {:d}", vol),
-                      CLR_VOLUME,
+                      Type::Volume,
                       ICON_CONTROL);
       break;
     }
@@ -451,12 +451,12 @@ bool GraphResSnesTrack::readEvent(void) {
       spcADSR = newADSR;
 
       desc = fmt::format("ADSR: {:04X}", newADSR);
-      addGenericEvent(beginOffset, curOffset - beginOffset, "ADSR", desc, CLR_ADSR, ICON_CONTROL);
+      addGenericEvent(beginOffset, curOffset - beginOffset, "ADSR", desc, Type::Adsr, ICON_CONTROL);
       break;
     }
 
     case EVENT_RET: {
-      addGenericEvent(beginOffset, curOffset - beginOffset, "End Pattern", desc, CLR_LOOP, ICON_ENDREP);
+      addGenericEvent(beginOffset, curOffset - beginOffset, "End Pattern", desc, Type::Loop, ICON_ENDREP);
 
       if (callStackPtr == 0) {
         // access violation
@@ -474,7 +474,7 @@ bool GraphResSnesTrack::readEvent(void) {
       dest += beginOffset; // relative offset to address
 
       desc = fmt::format("Destination: ${:04X}", dest);
-      addGenericEvent(beginOffset, 3, "Pattern Play", desc, CLR_LOOP, ICON_STARTREP);
+      addGenericEvent(beginOffset, 3, "Pattern Play", desc, Type::Loop, ICON_STARTREP);
 
       if (callStackPtr >= GRAPHRESSNES_CALLSTACK_SIZE) {
         // stack overflow
@@ -500,7 +500,7 @@ bool GraphResSnesTrack::readEvent(void) {
 
       curOffset = dest;
       if (!isOffsetUsed(dest)) {
-        addGenericEvent(beginOffset, length, "Jump", desc, CLR_LOOPFOREVER);
+        addGenericEvent(beginOffset, length, "Jump", desc, Type::LoopForever);
       }
       else {
         bContinue = addLoopForever(beginOffset, length, "Jump");
@@ -518,12 +518,12 @@ bool GraphResSnesTrack::readEvent(void) {
     case EVENT_DEFAULT_LENGTH: {
       defaultNoteLength = readByte(curOffset++);
       desc = fmt::format("Duration: {:d}", defaultNoteLength);
-      addGenericEvent(beginOffset, curOffset - beginOffset, "Default Note Length", desc, CLR_DURNOTE);
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Default Note Length", desc, Type::DurationNote);
       break;
     }
 
     case EVENT_SLUR:
-      addGenericEvent(beginOffset, curOffset - beginOffset, "Slur On", desc, CLR_TIE);
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Slur On", desc, Type::Tie);
       break;
 
     case EVENT_END:

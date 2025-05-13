@@ -12,7 +12,7 @@ class VGMSeqSection
                 uint32_t theOffset,
                 uint32_t theLength = 0,
                 const std::string& name = "Section",
-                EventColor color = CLR_HEADER);
+                Type type = Type::Header);
 
   virtual bool load();
   virtual bool parseTrackPointers();
