@@ -142,6 +142,11 @@ const QIcon &iconForItemType(VGMItem::Icon type) {
       return i_gen;
     }
 
+    case VGMItem::ICON_JUMP: {
+      static QIcon i_gen{":/images/jump.svg"};
+      return i_gen;
+    }
+
     default:
       break;
   }

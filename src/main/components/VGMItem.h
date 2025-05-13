@@ -41,6 +41,7 @@ public:
     ICON_PAN,
     ICON_ADSR,
     ICON_PITCHBEND,
+    ICON_JUMP,
   };
   enum EventColor {
     CLR_UNKNOWN,
