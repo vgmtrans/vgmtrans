@@ -404,16 +404,15 @@ double PSXSamp::compressionRatio() {
 }
 
 void PSXSamp::convertToStdWave(uint8_t *buf) {
-  int16_t *uncompBuf = reinterpret_cast<int16_t*>(buf);
+  s16 *uncompBuf = reinterpret_cast<s16*>(buf);
   VAGBlk theBlock;
-  f32 prev1 = 0;
-  f32 prev2 = 0;
+  s32  prev[2] = {0, 0};
 
   if (this->bSetLoopOnConversion)
     setLoopStatus(0); //loopStatus is initiated to -1.  We should default it now to not loop
 
   bool addrOutOfVirtFile = false;
-  for (uint32_t k = 0; k < dataLength; k += 0x10)                //for every adpcm chunk
+  for (u32 k = 0; k < dataLength; k += 0x10)                //for every adpcm chunk
   {
     if (dwOffset + k + 16 > vgmFile()->endOffset()) {
       L_WARN("\"{}\" unexpected EOF.", name());
@@ -444,10 +443,7 @@ void PSXSamp::convertToStdWave(uint8_t *buf) {
     rawFile()->readBytes(dwOffset + k + 2, 14, theBlock.brr);
 
     //each decompressed pcm block is 56 bytes (28 samples, 16-bit each)
-    decompVAGBlk(uncompBuf + ((k / 16) * 28),
-                 &theBlock,
-                 &prev1,
-                 &prev2);
+    decompVAGBlk(uncompBuf + ((k / 16) * 28), &theBlock, prev);
   }
 }
 
@@ -473,49 +469,42 @@ uint32_t PSXSamp::getSampleLength(const RawFile *file, uint32_t offset, uint32_t
   }
 }
 
-//This next function is taken from Antires's work
-void PSXSamp::decompVAGBlk(s16 *pSmp, const VAGBlk* pVBlk, f32 *prev1, f32 *prev2) {
-  u32 i, shift;                                //Shift amount for compressed samples
-  f32 t;                                       //Temporary sample
-  f32 f1, f2;
-  f32 p1, p2;
-  static const f32 Coeff[5][2] = {
-      {0.0, 0.0},
-      {60.0 / 64.0, 0.0},
-      {115.0 / 64.0, 52.0 / 64.0},
-      {98.0 / 64.0, 55.0 / 64.0},
-      {122.0 / 64.0, 60.0 / 64.0}};
+inline void PSXSamp::decompVAGBlk(s16* pSmp, const VAGBlk* pVBlk, s32 prev[2]) {
+  static constexpr s16 COEF[5][2] = {
+    {   0,   0 }, {  60,   0 },
+    { 115, -52 }, {  98, -55 },
+    { 122, -60 }
+  };
 
+  const u8 shift  = pVBlk->range & 0x0F;          // 0–12
+  const u8 filt   = std::min<u8>(pVBlk->filter, 4);
 
-  //Expand samples ---------------------------
-  shift = pVBlk->range + 16;
+  const s16 c0 = COEF[filt][0];
+  const s16 c1 = COEF[filt][1];
 
-  for (i = 0; i < 14; i++) {
-    pSmp[i * 2] = (static_cast<s32>(pVBlk->brr[i]) << 28) >> shift;
-    pSmp[i * 2 + 1] = (static_cast<s32>(pVBlk->brr[i] & 0xF0) << 24) >> shift;
+  s32 s1 = prev[0];
+  s32 s2 = prev[1];
+
+  // iterate over every nibble sample in the 14 bytes of compressed samples
+  for (int i = 0; i < 28; ++i) {
+    // fetch 4-bit nibble and sign-extend to 8 bits
+    const u8 byte   = static_cast<u8>(pVBlk->brr[i >> 1]);
+    const s8 nibble = (i & 1) ? (byte >> 4) : (byte & 0x0F);
+    const s8 sn     = static_cast<s8>(nibble << 4) >> 4;
+
+    // core formula: ((sn << 12) >> shift) + predictor
+    s32 sample      = (static_cast<s32>(sn) << 12) >> shift;
+    sample         += ((c0 * s1 + c1 * s2) >> 6);
+
+    // saturate to signed 16-bit
+    sample = std::clamp(sample, -0x8000, 0x7FFF);
+
+    pSmp[i] = static_cast<s16>(sample);
+
+    s2 = s1;
+    s1 = sample;
   }
 
-  //Apply ADPCM decompression ----------------
-  i = pVBlk->filter;
-
-  if (i) {
-    f1 = Coeff[i][0];
-    f2 = Coeff[i][1];
-    p1 = *prev1;
-    p2 = *prev2;
-
-    for (i = 0; i < 28; i++) {
-      t = pSmp[i] + (p1 * f1) - (p2 * f2);
-      pSmp[i] = static_cast<s16>(t);
-      p2 = p1;
-      p1 = t;
-    }
-
-    *prev1 = p1;
-    *prev2 = p2;
-  }
-  else {
-    *prev2 = pSmp[26];
-    *prev1 = pSmp[27];
-  }
+  prev[0] = s1;
+  prev[1] = s2;
 }
