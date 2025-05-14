@@ -101,7 +101,7 @@ private:
       case HIT_UNKNOWN: return Type::Unknown;
       case HIT_POINTER: return Type::Misc;
       case HIT_TEMPO:   return Type::Tempo;
-      case HIT_SIG:     return Type::TimeSignature;
+      case HIT_SIG:     return Type::Misc;
       default:          return Type::Misc;
     }
   }
