@@ -25,3 +25,6 @@ ed533cd46d853523d184ff1a60f769223ee97845
 
 # Rename the Qt implementation methods
 6a066930d0281c1ddd356baaedf4db3a1c3fada4
+
+# Rename VGMItem::EventColor to VGMItem::Type
+52a20efc1561423b95146da6f688defe7d00f0f5
