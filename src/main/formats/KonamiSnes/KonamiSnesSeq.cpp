@@ -450,7 +450,7 @@ bool KonamiSnesTrack::readEvent(void) {
         // TODO: Note volume can be changed during a tied note
         // See the end of Konami Logo sequence for example
         makePrevDurNoteEnd(getTime() + dur);
-        addGenericEvent(beginOffset, curOffset - beginOffset, "Tie", desc.str().c_str(), Type::Tie, ICON_NOTE);
+        addGenericEvent(beginOffset, curOffset - beginOffset, "Tie", desc.str().c_str(), Type::Tie);
       }
       else {
         addNoteByDur(beginOffset, curOffset - beginOffset, key, vel, dur);
@@ -486,7 +486,7 @@ bool KonamiSnesTrack::readEvent(void) {
 
       desc << "GAIN: " << (int) newGAINAmount << " ($" << std::hex << std::setfill('0') << std::setw(2)
           << std::uppercase << (int) newGAIN << ")";
-      addGenericEvent(beginOffset, curOffset - beginOffset, "GAIN", desc.str().c_str(), Type::Adsr, ICON_CONTROL);
+      addGenericEvent(beginOffset, curOffset - beginOffset, "GAIN", desc.str().c_str(), Type::Adsr);
       break;
     }
 
@@ -529,12 +529,12 @@ bool KonamiSnesTrack::readEvent(void) {
         }
 
         makePrevDurNoteEnd(getTime() + dur);
-        addGenericEvent(beginOffset, curOffset - beginOffset, "Tie", desc.str().c_str(), Type::Tie, ICON_NOTE);
+        addGenericEvent(beginOffset, curOffset - beginOffset, "Tie", desc.str().c_str(), Type::Tie);
         addTime(noteLength);
         prevNoteSlurred = (noteDurationRate == parentSeq->NOTE_DUR_RATE_MAX);
       }
       else {
-        addGenericEvent(beginOffset, curOffset - beginOffset, "Tie", desc.str().c_str(), Type::Tie, ICON_NOTE);
+        addGenericEvent(beginOffset, curOffset - beginOffset, "Tie", desc.str().c_str(), Type::Tie);
         addTime(noteLength);
       }
       break;
@@ -584,16 +584,14 @@ bool KonamiSnesTrack::readEvent(void) {
                         curOffset - beginOffset,
                         "Per-Instrument Pan Off",
                         desc.str().c_str(),
-                        Type::Pan,
-                        ICON_CONTROL);
+                        Type::Pan);
       }
       else if (instrumentPanOn) {
         addGenericEvent(beginOffset,
                         curOffset - beginOffset,
                         "Per-Instrument Pan On",
                         desc.str().c_str(),
-                        Type::Pan,
-                        ICON_CONTROL);
+                        Type::Pan);
       }
       else {
         uint8_t volumeLeft;
@@ -643,8 +641,7 @@ bool KonamiSnesTrack::readEvent(void) {
                       curOffset - beginOffset,
                       "Vibrato",
                       desc.str().c_str(),
-                      Type::Modulation,
-                      ICON_CONTROL);
+                      Type::Vibrato);
       break;
     }
 
@@ -658,13 +655,12 @@ bool KonamiSnesTrack::readEvent(void) {
                       curOffset - beginOffset,
                       "Random Pitch",
                       desc.str().c_str(),
-                      Type::Modulation,
-                      ICON_CONTROL);
+                      Type::Modulation);
       break;
     }
 
     case EVENT_LOOP_START: {
-      addGenericEvent(beginOffset, curOffset - beginOffset, "Loop Start", desc.str().c_str(), Type::Loop, ICON_STARTREP);
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Loop Start", desc.str().c_str(), Type::RepeatStart);
       loopReturnAddr = curOffset;
       break;
     }
@@ -680,7 +676,7 @@ bool KonamiSnesTrack::readEvent(void) {
         bContinue = addLoopForever(beginOffset, curOffset - beginOffset, "Loop End");
       }
       else {
-        addGenericEvent(beginOffset, curOffset - beginOffset, "Loop End", desc.str().c_str(), Type::Loop, ICON_STARTREP);
+        addGenericEvent(beginOffset, curOffset - beginOffset, "Loop End", desc.str().c_str(), Type::RepeatStart);
       }
 
       bool loopAgain;
@@ -713,8 +709,7 @@ bool KonamiSnesTrack::readEvent(void) {
                       curOffset - beginOffset,
                       "Loop Start #2",
                       desc.str().c_str(),
-                      Type::Loop,
-                      ICON_STARTREP);
+                      Type::RepeatStart);
       loopReturnAddr2 = curOffset;
       break;
     }
@@ -734,8 +729,7 @@ bool KonamiSnesTrack::readEvent(void) {
                         curOffset - beginOffset,
                         "Loop End #2",
                         desc.str().c_str(),
-                        Type::Loop,
-                        ICON_STARTREP);
+                        Type::RepeatStart);
       }
 
       bool loopAgain;
@@ -776,7 +770,7 @@ bool KonamiSnesTrack::readEvent(void) {
       uint8_t newTempo = readByte(curOffset++);
       uint8_t fadeSpeed = readByte(curOffset++);
       desc << "BPM: " << parentSeq->getTempoInBPM(newTempo) << "  Fade Length: " << (int) fadeSpeed;
-      addGenericEvent(beginOffset, curOffset - beginOffset, "Tempo Fade", desc.str().c_str(), Type::Tempo, ICON_TEMPO);
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Tempo Fade", desc.str().c_str(), Type::Tempo);
       break;
     }
 
@@ -789,14 +783,14 @@ bool KonamiSnesTrack::readEvent(void) {
     case EVENT_ADSR1: {
       uint8_t newADSR1 = readByte(curOffset++);
       desc << "ADSR(1): $" << std::hex << std::setfill('0') << std::setw(2) << std::uppercase << (int) newADSR1;
-      addGenericEvent(beginOffset, curOffset - beginOffset, "ADSR(1)", desc.str().c_str(), Type::Adsr, ICON_CONTROL);
+      addGenericEvent(beginOffset, curOffset - beginOffset, "ADSR(1)", desc.str().c_str(), Type::Adsr);
       break;
     }
 
     case EVENT_ADSR2: {
       uint8_t newADSR2 = readByte(curOffset++);
       desc << "ADSR(2): $" << std::hex << std::setfill('0') << std::setw(2) << std::uppercase << (int) newADSR2;
-      addGenericEvent(beginOffset, curOffset - beginOffset, "ADSR(2)", desc.str().c_str(), Type::Adsr, ICON_CONTROL);
+      addGenericEvent(beginOffset, curOffset - beginOffset, "ADSR(2)", desc.str().c_str(), Type::Adsr);
       break;
     }
 
@@ -815,8 +809,7 @@ bool KonamiSnesTrack::readEvent(void) {
                       curOffset - beginOffset,
                       "Volume Fade",
                       desc.str().c_str(),
-                      Type::Volume,
-                      ICON_CONTROL);
+                      Type::VolumeSlide);
       break;
     }
 
@@ -827,8 +820,7 @@ bool KonamiSnesTrack::readEvent(void) {
                       curOffset - beginOffset,
                       "Portamento",
                       desc.str().c_str(),
-                      Type::Portamento,
-                      ICON_CONTROL);
+                      Type::Portamento);
       break;
     }
 
@@ -842,8 +834,7 @@ bool KonamiSnesTrack::readEvent(void) {
                       curOffset - beginOffset,
                       "Pitch Envelope",
                       desc.str().c_str(),
-                      Type::Modulation,
-                      ICON_CONTROL);
+                      Type::PitchEnvelope);
       break;
     }
 
@@ -859,8 +850,7 @@ bool KonamiSnesTrack::readEvent(void) {
                       curOffset - beginOffset,
                       "Pitch Envelope",
                       desc.str().c_str(),
-                      Type::Modulation,
-                      ICON_CONTROL);
+                      Type::PitchEnvelope);
       break;
     }
 
@@ -880,8 +870,7 @@ bool KonamiSnesTrack::readEvent(void) {
                       curOffset - beginOffset,
                       "Pitch Slide",
                       desc.str().c_str(),
-                      Type::PitchBend,
-                      ICON_CONTROL);
+                      Type::PitchBendSlide);
       break;
     }
 
@@ -902,8 +891,7 @@ bool KonamiSnesTrack::readEvent(void) {
                       curOffset - beginOffset,
                       "Pitch Slide",
                       desc.str().c_str(),
-                      Type::PitchBend,
-                      ICON_CONTROL);
+                      Type::PitchBendSlide);
       break;
     }
 
@@ -922,8 +910,7 @@ bool KonamiSnesTrack::readEvent(void) {
                       curOffset - beginOffset,
                       "Pitch Slide",
                       desc.str().c_str(),
-                      Type::PitchBend,
-                      ICON_CONTROL);
+                      Type::PitchBendSlide);
       break;
     }
 
@@ -935,7 +922,7 @@ bool KonamiSnesTrack::readEvent(void) {
       desc << "EON: " << (int) echoChannels << "  EVOL(L): " << (int) echoVolumeL << "  EVOL(R): "
           << (int) echoVolumeR;
 
-      addGenericEvent(beginOffset, curOffset - beginOffset, "Echo", desc.str().c_str(), Type::Reverb, ICON_CONTROL);
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Echo", desc.str().c_str(), Type::Reverb);
       break;
     }
 
@@ -950,8 +937,7 @@ bool KonamiSnesTrack::readEvent(void) {
                       curOffset - beginOffset,
                       "Echo Param",
                       desc.str().c_str(),
-                      Type::Reverb,
-                      ICON_CONTROL);
+                      Type::Reverb);
       break;
     }
 
@@ -960,8 +946,7 @@ bool KonamiSnesTrack::readEvent(void) {
                       curOffset - beginOffset,
                       "Loop With Volta Start",
                       desc.str().c_str(),
-                      Type::Loop,
-                      ICON_STARTREP);
+                      Type::RepeatStart);
 
       voltaLoopStart = curOffset;
       voltaEndMeansPlayFromStart = false;
@@ -974,8 +959,7 @@ bool KonamiSnesTrack::readEvent(void) {
                       curOffset - beginOffset,
                       "Loop With Volta End",
                       desc.str().c_str(),
-                      Type::Loop,
-                      ICON_STARTREP);
+                      Type::RepeatStart);
 
       if (voltaEndMeansPlayFromStart) {
         // second time - end of first volta bracket: play from start
@@ -1001,7 +985,7 @@ bool KonamiSnesTrack::readEvent(void) {
       uint8_t newPan = readByte(curOffset++);
       uint8_t fadeSpeed = readByte(curOffset++);
       desc << "Pan: " << (int) newPan << "  Fade Length: " << (int) fadeSpeed;
-      addGenericEvent(beginOffset, curOffset - beginOffset, "Pan Fade", desc.str().c_str(), Type::Pan, ICON_CONTROL);
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Pan Fade", desc.str().c_str(), Type::PanSlide);
       break;
     }
 
@@ -1012,8 +996,7 @@ bool KonamiSnesTrack::readEvent(void) {
                       curOffset - beginOffset,
                       "Vibrato Fade",
                       desc.str().c_str(),
-                      Type::Modulation,
-                      ICON_CONTROL);
+                      Type::Vibrato);
       break;
     }
 
@@ -1025,7 +1008,7 @@ bool KonamiSnesTrack::readEvent(void) {
 
       desc << "ADSR(1): $" << std::hex << std::setfill('0') << std::setw(2) << std::uppercase << (int) newADSR1
           << "  ADSR(2): $" << (int) newADSR2 << "  GAIN: $" << (int) newGAIN;
-      addGenericEvent(beginOffset, curOffset - beginOffset, "ADSR(2)", desc.str().c_str(), Type::Adsr, ICON_CONTROL);
+      addGenericEvent(beginOffset, curOffset - beginOffset, "ADSR(2)", desc.str().c_str(), Type::Adsr);
       break;
     }
 
@@ -1038,7 +1021,7 @@ bool KonamiSnesTrack::readEvent(void) {
       assert(dest >= dwOffset);
 
       if (curOffset < 0x10000 && readByte(curOffset) == 0xff) {
-        addGenericEvent(curOffset, 1, "End of Track", "", Type::TrackEnd, ICON_TRACKEND);
+        addGenericEvent(curOffset, 1, "End of Track", "", Type::TrackEnd);
       }
 
       curOffset = dest;
@@ -1060,8 +1043,7 @@ bool KonamiSnesTrack::readEvent(void) {
                       curOffset - beginOffset,
                       "Pattern Play",
                       desc.str().c_str(),
-                      Type::Loop,
-                      ICON_STARTREP);
+                      Type::RepeatStart);
 
       assert(dest >= dwOffset);
 
@@ -1077,8 +1059,7 @@ bool KonamiSnesTrack::readEvent(void) {
                         curOffset - beginOffset,
                         "End Pattern",
                         desc.str().c_str(),
-                        Type::TrackEnd,
-                        ICON_ENDREP);
+                        Type::RepeatEnd);
 
         inSubroutine = false;
         curOffset = subReturnAddr;

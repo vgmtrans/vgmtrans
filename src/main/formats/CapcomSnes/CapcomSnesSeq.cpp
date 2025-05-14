@@ -303,7 +303,7 @@ bool CapcomSnesTrack::readEvent() {
         addTime(dur);
         makePrevDurNoteEnd();
         addTime(len - dur);
-        addGenericEvent(beginOffset, curOffset - beginOffset, "Tie", desc, Type::Tie, ICON_NOTE);
+        addGenericEvent(beginOffset, curOffset - beginOffset, "Tie", desc, Type::Tie);
       }
       else {
         addNoteByDur(beginOffset, curOffset - beginOffset, key, vel, dur);
@@ -363,22 +363,22 @@ bool CapcomSnesTrack::readEvent() {
 
       case EVENT_TOGGLE_TRIPLET:
         setNoteTriplet(!isNoteTriplet());
-        addGenericEvent(beginOffset, curOffset - beginOffset, "Toggle Triplet", "", Type::DurationNote, ICON_CONTROL);
+        addGenericEvent(beginOffset, curOffset - beginOffset, "Toggle Triplet", "", Type::DurationChange);
         break;
 
       case EVENT_TOGGLE_SLUR:
         setNoteSlurred(!isNoteSlurred());
-        addGenericEvent(beginOffset, curOffset - beginOffset, "Toggle Slur/Tie", "", Type::DurationNote, ICON_CONTROL);
+        addGenericEvent(beginOffset, curOffset - beginOffset, "Toggle Slur/Tie", "", Type::Portamento);
         break;
 
       case EVENT_DOTTED_NOTE_ON:
         setNoteDotted(true);
-        addGenericEvent(beginOffset, curOffset - beginOffset, "Dotted Note On", "", Type::DurationNote, ICON_CONTROL);
+        addGenericEvent(beginOffset, curOffset - beginOffset, "Dotted Note On", "", Type::DurationChange);
         break;
 
       case EVENT_TOGGLE_OCTAVE_UP:
         setNoteOctaveUp(!isNoteOctaveUp());
-        addGenericEvent(beginOffset, curOffset - beginOffset, "Toggle 2-Octave Up", "", Type::DurationNote, ICON_CONTROL);
+        addGenericEvent(beginOffset, curOffset - beginOffset, "Toggle 2-Octave Up", "", Type::Octave);
         break;
 
       case EVENT_NOTE_ATTRIBUTES: {
@@ -393,8 +393,7 @@ bool CapcomSnesTrack::readEvent() {
                         curOffset - beginOffset,
                         "Note Attributes",
                         desc,
-                        Type::DurationNote,
-                        ICON_CONTROL);
+                        Type::ChangeState);
         break;
       }
 
@@ -413,8 +412,7 @@ bool CapcomSnesTrack::readEvent() {
                         curOffset - beginOffset,
                         "Duration",
                         fmt::format("Duration: {:d}/256", newDurationRate),
-                        Type::DurationNote,
-                        ICON_CONTROL);
+                        Type::DurationChange);
         break;
       }
 
@@ -448,7 +446,7 @@ bool CapcomSnesTrack::readEvent() {
         uint8_t newOctave = readByte(curOffset++);
         desc = fmt::format("Octave: {}", newOctave);
         setNoteOctave(newOctave);
-        addGenericEvent(beginOffset, curOffset - beginOffset, "Octave", desc, Type::DurationNote, ICON_CONTROL);
+        addGenericEvent(beginOffset, curOffset - beginOffset, "Octave", desc, Type::Octave);
         break;
       }
 
@@ -478,8 +476,7 @@ bool CapcomSnesTrack::readEvent() {
                         curOffset - beginOffset,
                         "Portamento Time",
                         fmt::format("Time: {:d}", newPortamentoTime),
-                        Type::PortamentoTime,
-                        ICON_CONTROL);
+                        Type::PortamentoTime);
         addPortamentoTimeNoItem(newPortamentoTime >> 1);
         addPortamentoNoItem(newPortamentoTime != 0);
         break;
@@ -519,8 +516,7 @@ bool CapcomSnesTrack::readEvent() {
                           curOffset - beginOffset,
                           repeatEventName,
                           desc,
-                          Type::Loop,
-                          ICON_STARTREP);
+                          Type::RepeatEnd);
         }
 
         if (repeatCount[repeatSlot] == 0) {
@@ -563,8 +559,7 @@ bool CapcomSnesTrack::readEvent() {
                         curOffset - beginOffset,
                         repeatEventName,
                         desc,
-                        Type::Loop,
-                        ICON_STARTREP);
+                        Type::LoopBreak);
 
         if (repeatCount[repeatSlot] == 1) {
           repeatCount[repeatSlot] = 0;
@@ -649,7 +644,7 @@ bool CapcomSnesTrack::readEvent() {
         uint8_t lfoType = readByte(curOffset++);
         uint8_t lfoAmount = readByte(curOffset++);
         desc = fmt::format("Type: {:d}  Amount: {:d}", lfoType, lfoAmount);
-        addGenericEvent(beginOffset, curOffset - beginOffset, "LFO Param", desc, Type::Lfo, ICON_CONTROL);
+        addGenericEvent(beginOffset, curOffset - beginOffset, "LFO Param", desc, Type::Lfo);
         break;
       }
 
@@ -661,8 +656,7 @@ bool CapcomSnesTrack::readEvent() {
                         curOffset - beginOffset,
                         "Echo Param",
                         desc,
-                        Type::Reverb,
-                        ICON_CONTROL);
+                        Type::Reverb);
         break;
       }
 
@@ -682,8 +676,7 @@ bool CapcomSnesTrack::readEvent() {
                         curOffset - beginOffset,
                         "Release Rate",
                         fmt::format("GAIN: ${:02X}", gain),
-                        Type::Sustain,
-                        ICON_CONTROL);
+                        Type::Adsr);
         break;
       }
 

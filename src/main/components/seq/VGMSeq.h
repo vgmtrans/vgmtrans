@@ -31,8 +31,6 @@ class VGMSeq : public VGMFile {
          std::string name = "VGM Sequence");
   ~VGMSeq() override;
 
-  Icon icon() override { return ICON_SEQ; }
-
   bool loadVGMFile() override;
   bool load() override;              // Function to load all the information about the sequence
   virtual bool loadMain();

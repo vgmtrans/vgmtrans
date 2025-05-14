@@ -72,8 +72,6 @@ public:
             const std::string &name = "Header");
   ~VGMHeader() override;
 
-  Icon icon() override { return ICON_BINARY; };
-
   void addPointer(uint32_t offset, uint32_t length, uint32_t destAddress, bool notNull,
                   const std::string &name = "Pointer");
   void addTempo(uint32_t offset, uint32_t length, const std::string &name = "Tempo");
@@ -94,9 +92,17 @@ public:
     HIT_UNKNOWN
   };  // HIT = Header Item Type
 
-  VGMHeaderItem(const VGMHeader *hdr, HdrItemType theType, uint32_t offset, uint32_t length,
+  VGMHeaderItem(const VGMHeader *hdr, HdrItemType headerType, uint32_t offset, uint32_t length,
                 const std::string &name);
-  Icon icon() override;
 
-  HdrItemType type;
+private:
+  static Type resolveType(HdrItemType headerType) {
+    switch (headerType) {
+      case HIT_UNKNOWN: return Type::Unknown;
+      case HIT_POINTER: return Type::Misc;
+      case HIT_TEMPO:   return Type::Tempo;
+      case HIT_SIG:     return Type::Misc;
+      default:          return Type::Misc;
+    }
+  }
 };

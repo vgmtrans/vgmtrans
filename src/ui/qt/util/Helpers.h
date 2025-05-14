@@ -11,7 +11,7 @@
 #include <VGMItem.h>
 
 const QIcon &iconForFile(VGMFileVariant file);
-const QIcon &iconForItemType(VGMItem::Icon type);
+const QIcon &iconForItemType(VGMItem::Type type);
 
 QColor colorForItemType(VGMItem::Type type);
 QColor textColorForItemType(VGMItem::Type type);

@@ -15,7 +15,7 @@
 //  ********
 
 SeqTrack::SeqTrack(VGMSeq *parentFile, uint32_t offset, uint32_t length, std::string name)
-    : VGMItem(parentFile, offset, length, std::move(name)),
+    : VGMItem(parentFile, offset, length, std::move(name), Type::Track),
       dwStartOffset(offset),
       parentSeq(parentFile),
       pMidiTrack(nullptr),
@@ -279,12 +279,11 @@ void SeqTrack::addGenericEvent(uint32_t offset,
                                uint32_t length,
                                const std::string &sEventName,
                                const std::string &sEventDesc,
-                               Type type,
-                               Icon icon) {
+                               Type type) {
   onEvent(offset, length);
 
   if (readMode == READMODE_ADD_TO_UI && !isItemAtOffset(offset, true)) {
-    addEvent(new SeqEvent(this, offset, length, sEventName, type, icon, sEventDesc));
+    addEvent(new SeqEvent(this, offset, length, sEventName, type, sEventDesc));
   }
   else if (readMode == READMODE_CONVERT_TO_MIDI) {
     if (bWriteGenericEventAsTextEvent) {
@@ -306,7 +305,7 @@ void SeqTrack::addUnknown(uint32_t offset,
   onEvent(offset, length);
 
   if (readMode == READMODE_ADD_TO_UI && !isItemAtOffset(offset, true)) {
-    addEvent(new SeqEvent(this, offset, length, sEventName, Type::Unknown, ICON_BINARY, sEventDesc));
+    addEvent(new SeqEvent(this, offset, length, sEventName, Type::Unknown, sEventDesc));
   }
   else if (readMode == READMODE_CONVERT_TO_MIDI) {
     if (bWriteGenericEventAsTextEvent) {

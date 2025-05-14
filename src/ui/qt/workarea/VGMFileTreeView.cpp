@@ -270,7 +270,7 @@ void VGMFileTreeView::setItemText(VGMItem* item, VGMTreeItem* treeItem) const {
   } else {
     treeItem->setText(0, name);
   }
-  treeItem->setIcon(0, iconForItemType(item->icon()));
+  treeItem->setIcon(0, iconForItemType(item->type));
   treeItem->setToolTip(0, QString::fromStdString(item->description()));
 }
 

@@ -132,7 +132,7 @@ bool NDSTrack::readEvent(void) {
         // Add an End Track if it exists afterward, for completeness sake
         if (readMode == READMODE_ADD_TO_UI && !isOffsetUsed(curOffset)) {
           if (readByte(curOffset) == 0xFF) {
-            addGenericEvent(curOffset, 1, "End of Track", "", Type::TrackEnd, ICON_TRACKEND);
+            addGenericEvent(curOffset, 1, "End of Track", "", Type::TrackEnd);
           }
         }
 

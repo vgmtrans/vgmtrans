@@ -50,8 +50,6 @@ public:
            uint32_t instrNum, std::string name = "Instrument",
            float reverb = defaultReverbPercent);
 
-  Icon icon() override { return ICON_INSTR; };
-
   const std::vector<VGMRgn*>& regions() { return m_regions; }
 
   inline void setBank(uint32_t bankNum);

@@ -149,7 +149,7 @@ bool SegSatSeq::readEvent() {
           if (foreverLoopStart == -1) {
             foreverLoopStart = curOffset;
             addGenericEvent(beginOffset, curOffset - beginOffset,
-              "Forever Loop Start Point", "", Type::Loop, ICON_STARTREP);
+              "Forever Loop Start Point", "", Type::RepeatStart);
           } else {
             if (!addLoopForever(beginOffset, curOffset - beginOffset))
               return false;
