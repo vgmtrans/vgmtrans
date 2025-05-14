@@ -355,7 +355,7 @@ class PSXSamp : public VGMSamp {
   static uint32_t getSampleLength(const RawFile *file, uint32_t offset, uint32_t endOffset, bool &loop);
 
  private:
-  static void decompVAGBlk(s16 *pSmp, const VAGBlk* pVBlk, f32 *prev1, f32 *prev2);
+  static void decompVAGBlk(s16 *pSmp, const VAGBlk* pVBlk, s32 prev[2]);
 
  public:
   bool bSetLoopOnConversion{false};
