@@ -257,16 +257,6 @@ const QIcon &iconForItemType(VGMItem::Type type) {
       return i_gen;
     }
 
-    case VGMItem::Type::SlurOn: {
-      static QIcon i_gen{":/images/control.svg"};
-      return i_gen;
-    }
-
-    case VGMItem::Type::SlurOff: {
-      static QIcon i_gen{":/images/control.svg"};
-      return i_gen;
-    }
-
     case VGMItem::Type::Sustain: {
       static QIcon i_gen{":/images/control.svg"};
       return i_gen;
@@ -397,8 +387,6 @@ QColor colorForItemType(VGMItem::Type type) {
     case VGMItem::Type::Rest:              return EventColors::CLR_LIGHT_BLUE;
     case VGMItem::Type::Reverb:            return EventColors::CLR_GRAY;
     case VGMItem::Type::Sample:            return EventColors::CLR_GRAY;
-    case VGMItem::Type::SlurOff:           return EventColors::CLR_LIGHT_GREEN;
-    case VGMItem::Type::SlurOn:            return EventColors::CLR_LIGHT_GREEN;
     case VGMItem::Type::Sustain:           return EventColors::CLR_YELLOW;
     case VGMItem::Type::Tempo:             return EventColors::CLR_GREEN;
     case VGMItem::Type::Tie:               return EventColors::CLR_LIGHT_BLUE;

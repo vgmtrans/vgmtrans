@@ -836,7 +836,7 @@ bool SuzukiSnesTrack::readEvent() {
                       curOffset - beginOffset,
                       "Slur On",
                       desc.str().c_str(),
-                      Type::SlurOn);
+                      Type::Portamento);
       break;
     }
 
@@ -845,7 +845,7 @@ bool SuzukiSnesTrack::readEvent() {
                       curOffset - beginOffset,
                       "Slur Off",
                       desc.str().c_str(),
-                      Type::SlurOff);
+                      Type::Portamento);
       break;
     }
 

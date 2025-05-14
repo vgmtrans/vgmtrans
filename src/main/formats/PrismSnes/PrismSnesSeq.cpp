@@ -486,13 +486,13 @@ bool PrismSnesTrack::readEvent() {
 
     case EVENT_SLUR_OFF: {
       slur = false;
-      addGenericEvent(beginOffset, curOffset - beginOffset, "Slur Off", desc.str(), Type::SlurOff);
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Slur Off", desc.str(), Type::Portamento);
       break;
     }
 
     case EVENT_SLUR_ON: {
       slur = true;
-      addGenericEvent(beginOffset, curOffset - beginOffset, "Slur On", desc.str(), Type::SlurOn);
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Slur On", desc.str(), Type::Portamento);
       break;
     }
 

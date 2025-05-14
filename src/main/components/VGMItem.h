@@ -60,8 +60,6 @@ public:
     Rest,
     Reverb,
     Sample,
-    SlurOn,
-    SlurOff,
     Sustain,
     Tempo,
     Tie,

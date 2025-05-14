@@ -368,7 +368,7 @@ bool CapcomSnesTrack::readEvent() {
 
       case EVENT_TOGGLE_SLUR:
         setNoteSlurred(!isNoteSlurred());
-        addGenericEvent(beginOffset, curOffset - beginOffset, "Toggle Slur/Tie", "", Type::SlurOn);
+        addGenericEvent(beginOffset, curOffset - beginOffset, "Toggle Slur/Tie", "", Type::Portamento);
         break;
 
       case EVENT_DOTTED_NOTE_ON:
