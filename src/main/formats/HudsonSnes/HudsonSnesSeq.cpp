@@ -592,13 +592,13 @@ bool HudsonSnesTrack::readEvent() {
     }
 
     case EVENT_NOP: {
-      addGenericEvent(beginOffset, curOffset - beginOffset, "NOP", desc.str().c_str(), Type::Misc, ICON_BINARY);
+      addGenericEvent(beginOffset, curOffset - beginOffset, "NOP", desc.str().c_str(), Type::Nop);
       break;
     }
 
     case EVENT_NOP1: {
       curOffset++;
-      addGenericEvent(beginOffset, curOffset - beginOffset, "NOP", desc.str().c_str(), Type::Misc, ICON_BINARY);
+      addGenericEvent(beginOffset, curOffset - beginOffset, "NOP", desc.str().c_str(), Type::Nop);
       break;
     }
 
@@ -668,7 +668,7 @@ bool HudsonSnesTrack::readEvent() {
         if (prevNoteSlurred && key == prevNoteKey) {
           // tie
           makePrevDurNoteEnd(getTime() + dur);
-          addGenericEvent(beginOffset, curOffset - beginOffset, "Tie", desc.str().c_str(), Type::Tie, ICON_NOTE);
+          addGenericEvent(beginOffset, curOffset - beginOffset, "Tie", desc.str().c_str(), Type::Tie);
         }
         else {
           // note
@@ -762,8 +762,7 @@ bool HudsonSnesTrack::readEvent() {
                       curOffset - beginOffset,
                       "Reverse Phase",
                       desc.str().c_str(),
-                      Type::ChangeState,
-                      ICON_CONTROL);
+                      Type::ChangeState);
       break;
     }
 
@@ -784,7 +783,7 @@ bool HudsonSnesTrack::readEvent() {
     case EVENT_LOOP_START: {
       uint8_t count = readByte(curOffset);
       desc << "Loop Count: " << (int) count;
-      addGenericEvent(beginOffset, 2, "Loop Start", desc.str().c_str(), Type::Loop, ICON_STARTREP);
+      addGenericEvent(beginOffset, 2, "Loop Start", desc.str().c_str(), Type::RepeatStart);
 
       if (spcCallStackPtr + 3 > HUDSONSNES_CALLSTACK_SIZE) {
         // stack overflow
@@ -804,7 +803,7 @@ bool HudsonSnesTrack::readEvent() {
     }
 
     case EVENT_LOOP_END: {
-      addGenericEvent(beginOffset, curOffset - beginOffset, "Loop End", desc.str().c_str(), Type::Loop, ICON_ENDREP);
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Loop End", desc.str().c_str(), Type::RepeatEnd);
 
       if (spcCallStackPtr < 3) {
         // access violation
@@ -829,7 +828,7 @@ bool HudsonSnesTrack::readEvent() {
     case EVENT_SUBROUTINE: {
       uint16_t dest = readShort(curOffset);
       desc << "Destination: $" << std::hex << std::setfill('0') << std::setw(4) << std::uppercase << (int) dest;
-      addGenericEvent(beginOffset, 3, "Pattern Play", desc.str().c_str(), Type::Loop, ICON_STARTREP);
+      addGenericEvent(beginOffset, 3, "Pattern Play", desc.str().c_str(), Type::RepeatStart);
 
       if (spcCallStackPtr + 2 > HUDSONSNES_CALLSTACK_SIZE) {
         // stack overflow
@@ -879,8 +878,7 @@ bool HudsonSnesTrack::readEvent() {
                         curOffset - beginOffset,
                         "Vibrato",
                         desc.str().c_str(),
-                        Type::Modulation,
-                        ICON_CONTROL);
+                        Type::Vibrato);
       }
       else { // HUDSONSNES_V2
         uint8_t arg1 = readByte(curOffset++);
@@ -891,8 +889,7 @@ bool HudsonSnesTrack::readEvent() {
                         curOffset - beginOffset,
                         "Vibrato",
                         desc.str().c_str(),
-                        Type::Modulation,
-                        ICON_CONTROL);
+                        Type::Vibrato);
       }
       break;
     }
@@ -904,8 +901,7 @@ bool HudsonSnesTrack::readEvent() {
                       curOffset - beginOffset,
                       "Vibrato Delay",
                       desc.str().c_str(),
-                      Type::Modulation,
-                      ICON_CONTROL);
+                      Type::Vibrato);
       break;
     }
 
@@ -917,8 +913,7 @@ bool HudsonSnesTrack::readEvent() {
                       curOffset - beginOffset,
                       "Echo Volume",
                       desc.str().c_str(),
-                      Type::Reverb,
-                      ICON_CONTROL);
+                      Type::Reverb);
       break;
     }
 
@@ -932,13 +927,12 @@ bool HudsonSnesTrack::readEvent() {
                       curOffset - beginOffset,
                       "Echo Parameter",
                       desc.str().c_str(),
-                      Type::Reverb,
-                      ICON_CONTROL);
+                      Type::Reverb);
       break;
     }
 
     case EVENT_ECHO_ON: {
-      addGenericEvent(beginOffset, curOffset - beginOffset, "Echo On", desc.str().c_str(), Type::Reverb, ICON_CONTROL);
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Echo On", desc.str().c_str(), Type::Reverb);
       break;
     }
 
@@ -964,8 +958,7 @@ bool HudsonSnesTrack::readEvent() {
                       curOffset - beginOffset,
                       "Attack Pitch Envelope On",
                       desc.str().c_str(),
-                      Type::PitchBend,
-                      ICON_CONTROL);
+                      Type::PitchEnvelope);
       break;
     }
 
@@ -974,8 +967,7 @@ bool HudsonSnesTrack::readEvent() {
                       curOffset - beginOffset,
                       "Attack Pitch Envelope Off",
                       desc.str().c_str(),
-                      Type::PitchBend,
-                      ICON_CONTROL);
+                      Type::PitchEnvelope);
       break;
     }
 
@@ -985,8 +977,7 @@ bool HudsonSnesTrack::readEvent() {
                       curOffset - beginOffset,
                       "Infinite Loop Point",
                       desc.str().c_str(),
-                      Type::Loop,
-                      ICON_STARTREP);
+                      Type::RepeatStart);
       break;
     }
 
@@ -1001,8 +992,7 @@ bool HudsonSnesTrack::readEvent() {
                       curOffset - beginOffset,
                       "Infinite Loop Point (Ignore after the Second Time)",
                       desc.str().c_str(),
-                      Type::Loop,
-                      ICON_STARTREP);
+                      Type::RepeatStart);
       if (!loopPointOnceProcessed) {
         infiniteLoopPoint = curOffset;
         loopPointOnceProcessed = true;
@@ -1065,8 +1055,7 @@ bool HudsonSnesTrack::readEvent() {
                         curOffset - beginOffset,
                         "End Pattern",
                         desc.str().c_str(),
-                        Type::Loop,
-                        ICON_ENDREP);
+                        Type::RepeatEnd);
 
         if (spcCallStackPtr < 2) {
           // access violation
@@ -1148,7 +1137,7 @@ bool HudsonSnesTrack::readEvent() {
         }
 
         case SUBEVENT_NOP: {
-          addGenericEvent(beginOffset, curOffset - beginOffset, "NOP", desc.str().c_str(), Type::Misc, ICON_BINARY);
+          addGenericEvent(beginOffset, curOffset - beginOffset, "NOP", desc.str().c_str(), Type::Nop);
           break;
         }
 
@@ -1163,8 +1152,7 @@ bool HudsonSnesTrack::readEvent() {
                           curOffset - beginOffset,
                           "Echo Off",
                           desc.str().c_str(),
-                          Type::Reverb,
-                          ICON_CONTROL);
+                          Type::Reverb);
           break;
         }
 
@@ -1173,8 +1161,7 @@ bool HudsonSnesTrack::readEvent() {
                           curOffset - beginOffset,
                           "Percussion On",
                           desc.str().c_str(),
-                          Type::ChangeState,
-                          ICON_CONTROL);
+                          Type::UseDrumKit);
           break;
         }
 
@@ -1183,8 +1170,7 @@ bool HudsonSnesTrack::readEvent() {
                           curOffset - beginOffset,
                           "Percussion Off",
                           desc.str().c_str(),
-                          Type::ChangeState,
-                          ICON_CONTROL);
+                          Type::UseDrumKit);
           break;
         }
 
@@ -1195,14 +1181,13 @@ bool HudsonSnesTrack::readEvent() {
                           curOffset - beginOffset,
                           "Vibrato Type",
                           desc.str().c_str(),
-                          Type::Lfo,
-                          ICON_CONTROL);
+                          Type::Vibrato);
           break;
         }
 
         case SUBEVENT_NOTE_VEL_OFF: {
           parentSeq->DisableNoteVelocity = true;
-          addGenericEvent(beginOffset, curOffset - beginOffset, "Note Velocity Off", desc.str().c_str(), Type::Misc, ICON_CONTROL);
+          addGenericEvent(beginOffset, curOffset - beginOffset, "Note Velocity Off", desc.str().c_str(), Type::ChangeState);
           break;
         }
 
@@ -1344,8 +1329,7 @@ bool HudsonSnesTrack::readEvent() {
                           curOffset - beginOffset,
                           "ADSR Attack Rate",
                           desc.str().c_str(),
-                          Type::Adsr,
-                          ICON_CONTROL);
+                          Type::Adsr);
           break;
         }
 
@@ -1356,8 +1340,7 @@ bool HudsonSnesTrack::readEvent() {
                           curOffset - beginOffset,
                           "ADSR Decay Rate",
                           desc.str().c_str(),
-                          Type::Adsr,
-                          ICON_CONTROL);
+                          Type::Adsr);
           break;
         }
 
@@ -1368,8 +1351,7 @@ bool HudsonSnesTrack::readEvent() {
                           curOffset - beginOffset,
                           "ADSR Sustain Level",
                           desc.str().c_str(),
-                          Type::Adsr,
-                          ICON_CONTROL);
+                          Type::Adsr);
           break;
         }
 
@@ -1380,8 +1362,7 @@ bool HudsonSnesTrack::readEvent() {
                           curOffset - beginOffset,
                           "ADSR Sustain Rate",
                           desc.str().c_str(),
-                          Type::Adsr,
-                          ICON_CONTROL);
+                          Type::Adsr);
           break;
         }
 
@@ -1392,8 +1373,7 @@ bool HudsonSnesTrack::readEvent() {
                           curOffset - beginOffset,
                           "ADSR Release Rate",
                           desc.str().c_str(),
-                          Type::Adsr,
-                          ICON_CONTROL);
+                          Type::Adsr);
           break;
         }
 

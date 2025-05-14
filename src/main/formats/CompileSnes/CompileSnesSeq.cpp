@@ -315,7 +315,7 @@ bool CompileSnesTrack::readEvent() {
       curOffset += 2;
 
       desc = fmt::format("Nest Level: {:d}  Destination: ${:04X}", repeatNest, dest);
-      addGenericEvent(beginOffset, curOffset - beginOffset, "Repeat End", desc, Type::Loop, ICON_ENDREP);
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Repeat End", desc, Type::RepeatEnd);
 
       repeatCount[repeatNest]--;
       if (repeatCount[repeatNest] != 0) {
@@ -337,8 +337,7 @@ bool CompileSnesTrack::readEvent() {
                       curOffset - beginOffset,
                       "Vibrato",
                       desc,
-                      Type::Modulation,
-                      ICON_CONTROL);
+                      Type::Vibrato);
       break;
     }
 
@@ -349,8 +348,7 @@ bool CompileSnesTrack::readEvent() {
                       curOffset - beginOffset,
                       "Portamento Time",
                       desc,
-                      Type::PortamentoTime,
-                      ICON_CONTROL);
+                      Type::PortamentoTime);
       break;
     }
 
@@ -369,8 +367,7 @@ bool CompileSnesTrack::readEvent() {
                       curOffset - beginOffset,
                       "Volume Envelope",
                       desc,
-                      Type::Volume,
-                      ICON_CONTROL);
+                      Type::VolumeEnvelope);
       break;
     }
 
@@ -416,7 +413,7 @@ bool CompileSnesTrack::readEvent() {
       int actualTimes = (times == 0) ? 256 : times;
 
       desc = fmt::format("Nest Level: {:d}  Times: {:d}", repeatNest, actualTimes);
-      addGenericEvent(beginOffset, curOffset - beginOffset, "Loop Count", desc, Type::Loop, ICON_STARTREP);
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Loop Count", desc, Type::RepeatStart);
 
       repeatCount[repeatNest] = times;
       break;
@@ -429,8 +426,7 @@ bool CompileSnesTrack::readEvent() {
                       curOffset - beginOffset,
                       "Flags",
                       desc,
-                      Type::ChangeState,
-                      ICON_CONTROL);
+                      Type::ChangeState);
       break;
     }
 
@@ -455,8 +451,7 @@ bool CompileSnesTrack::readEvent() {
                       curOffset - beginOffset,
                       "Tuning",
                       fmt::format("Pitch Register Delta: {:d}", newTuning),
-                      Type::ChangeState,
-                      ICON_CONTROL);
+                      Type::FineTune);
       break;
     }
 
@@ -469,8 +464,7 @@ bool CompileSnesTrack::readEvent() {
                       curOffset - beginOffset,
                       "Pattern Play",
                       desc,
-                      Type::Loop,
-                      ICON_STARTREP);
+                      Type::RepeatStart);
 
       subReturnAddress = curOffset;
       curOffset = dest;
@@ -482,8 +476,7 @@ bool CompileSnesTrack::readEvent() {
                       curOffset - beginOffset,
                       "End Pattern",
                       desc,
-                      Type::TrackEnd,
-                      ICON_ENDREP);
+                      Type::RepeatEnd);
       curOffset = subReturnAddress;
       break;
     }
@@ -497,7 +490,7 @@ bool CompileSnesTrack::readEvent() {
     case EVENT_ADSR: {
       uint8_t envelopeIndex = readByte(curOffset++);
       desc = fmt::format("Envelope Index: {:d}", envelopeIndex);
-      addGenericEvent(beginOffset, curOffset - beginOffset, "ADSR", desc, Type::Volume, ICON_CONTROL);
+      addGenericEvent(beginOffset, curOffset - beginOffset, "ADSR", desc, Type::Adsr);
       break;
     }
 
@@ -507,8 +500,7 @@ bool CompileSnesTrack::readEvent() {
                       curOffset - beginOffset,
                       "Portamento On",
                       desc,
-                      Type::Portamento,
-                      ICON_CONTROL);
+                      Type::Portamento);
       break;
     }
 
@@ -518,8 +510,7 @@ bool CompileSnesTrack::readEvent() {
                       curOffset - beginOffset,
                       "Portamento Off",
                       desc,
-                      Type::Portamento,
-                      ICON_CONTROL);
+                      Type::Portamento);
       break;
     }
 
@@ -530,8 +521,7 @@ bool CompileSnesTrack::readEvent() {
                       curOffset - beginOffset,
                       "Panpot Envelope",
                       desc,
-                      Type::Pan,
-                      ICON_CONTROL);
+                      Type::PanEnvelope);
       break;
     }
 
@@ -552,7 +542,7 @@ bool CompileSnesTrack::readEvent() {
       curOffset += 2;
 
       desc = fmt::format("Nest Level: {:d}  Destination: ${:04X}", repeatNest, dest);
-      addGenericEvent(beginOffset, curOffset - beginOffset, "Repeat Break", desc, Type::Loop, ICON_ENDREP);
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Repeat Break", desc, Type::LoopBreak);
 
       repeatCount[repeatNest]--;
       if (repeatCount[repeatNest] == 0) {
@@ -574,8 +564,7 @@ bool CompileSnesTrack::readEvent() {
                       curOffset - beginOffset,
                       "Duration (Direct)",
                       desc,
-                      Type::DurationNote,
-                      ICON_CONTROL);
+                      Type::DurationChange);
       break;
     }
 
@@ -588,7 +577,7 @@ bool CompileSnesTrack::readEvent() {
       spcNoteDuration = duration;
 
       desc = fmt::format("Duration: {:d}", duration);
-      addGenericEvent(beginOffset, curOffset - beginOffset, "Duration", desc, Type::DurationNote, ICON_CONTROL);
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Duration", desc, Type::DurationChange);
       break;
     }
 

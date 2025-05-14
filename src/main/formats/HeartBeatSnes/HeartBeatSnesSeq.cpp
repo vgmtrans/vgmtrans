@@ -326,13 +326,13 @@ bool HeartBeatSnesTrack::readEvent() {
       break;
     }
 
+    // Is this Slur or Portamento?
     case EVENT_SLUR_ON: {
       addGenericEvent(beginOffset,
                       curOffset - beginOffset,
                       "Slur On",
                       desc,
-                      Type::Portamento,
-                      ICON_CONTROL);
+                      Type::Portamento);
       slur = true;
       break;
     }
@@ -342,8 +342,7 @@ bool HeartBeatSnesTrack::readEvent() {
                       curOffset - beginOffset,
                       "Slur Off",
                       desc,
-                      Type::Portamento,
-                      ICON_CONTROL);
+                      Type::Portamento);
       slur = false;
       break;
     }
@@ -397,8 +396,7 @@ bool HeartBeatSnesTrack::readEvent() {
                       curOffset - beginOffset,
                       "Vibrato",
                       desc,
-                      Type::Modulation,
-                      ICON_CONTROL);
+                      Type::Vibrato);
       break;
     }
 
@@ -409,8 +407,7 @@ bool HeartBeatSnesTrack::readEvent() {
                       curOffset - beginOffset,
                       "Vibrato Fade",
                       desc,
-                      Type::Modulation,
-                      ICON_CONTROL);
+                      Type::Vibrato);
       break;
     }
 
@@ -419,8 +416,7 @@ bool HeartBeatSnesTrack::readEvent() {
                       curOffset - beginOffset,
                       "Vibrato Off",
                       desc,
-                      Type::Modulation,
-                      ICON_CONTROL);
+                      Type::Vibrato);
       break;
     }
 
@@ -467,8 +463,7 @@ bool HeartBeatSnesTrack::readEvent() {
                       curOffset - beginOffset,
                       "Tremolo",
                       desc,
-                      Type::Modulation,
-                      ICON_CONTROL);
+                      Type::Tremelo);
       break;
     }
 
@@ -477,8 +472,7 @@ bool HeartBeatSnesTrack::readEvent() {
                       curOffset - beginOffset,
                       "Tremolo Off",
                       desc,
-                      Type::Modulation,
-                      ICON_CONTROL);
+                      Type::Tremelo);
       break;
     }
 
@@ -505,8 +499,7 @@ bool HeartBeatSnesTrack::readEvent() {
                       curOffset - beginOffset,
                       "Pitch Envelope (To)",
                       desc,
-                      Type::PitchBend,
-                      ICON_CONTROL);
+                      Type::PitchBendSlide);
       break;
     }
 
@@ -520,8 +513,7 @@ bool HeartBeatSnesTrack::readEvent() {
                       curOffset - beginOffset,
                       "Pitch Envelope (From)",
                       desc,
-                      Type::PitchBend,
-                      ICON_CONTROL);
+                      Type::PitchBendSlide);
       break;
     }
 
@@ -530,8 +522,7 @@ bool HeartBeatSnesTrack::readEvent() {
                       curOffset - beginOffset,
                       "Pitch Envelope Off",
                       desc,
-                      Type::PitchBend,
-                      ICON_CONTROL);
+                      Type::PitchBend);
       break;
     }
 
@@ -549,8 +540,7 @@ bool HeartBeatSnesTrack::readEvent() {
                       curOffset - beginOffset,
                       "Echo Volume",
                       desc,
-                      Type::Reverb,
-                      ICON_CONTROL);
+                      Type::Reverb);
       break;
     }
 
@@ -560,7 +550,7 @@ bool HeartBeatSnesTrack::readEvent() {
       uint8_t spcFIR = readByte(curOffset++);
 
       desc = fmt::format("Delay: {:d}  Feedback: {:d}  FIR: {:d}", spcEDL, spcEFB, spcFIR);
-      addGenericEvent(beginOffset, curOffset - beginOffset, "Echo Off", desc, Type::Reverb, ICON_CONTROL);
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Echo Off", desc, Type::Reverb);
       break;
     }
 
@@ -576,7 +566,7 @@ bool HeartBeatSnesTrack::readEvent() {
 
     case EVENT_ECHO_FIR: {
       curOffset += 8; // FIR C0-C7
-      addGenericEvent(beginOffset, curOffset - beginOffset, "Echo FIR", desc, Type::Reverb, ICON_CONTROL);
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Echo FIR", desc, Type::Reverb);
       break;
     }
 
@@ -590,7 +580,7 @@ bool HeartBeatSnesTrack::readEvent() {
       uint8_t sr = adsr2 & 0x1f;
 
       desc = fmt::format("AR: {:d}  DR: {:d}  SL: {:d}  SR: {:d}", ar, dr, sl, sr);
-      addGenericEvent(beginOffset, curOffset - beginOffset, "ADSR", desc, Type::Adsr, ICON_CONTROL);
+      addGenericEvent(beginOffset, curOffset - beginOffset, "ADSR", desc, Type::Adsr);
       break;
     }
 
@@ -632,8 +622,7 @@ bool HeartBeatSnesTrack::readEvent() {
                       curOffset - beginOffset,
                       "Pattern Play",
                       desc,
-                      Type::Loop,
-                      ICON_STARTREP);
+                      Type::RepeatStart);
 
       subReturnOffset = curOffset - parentSeq->dwOffset;
 
@@ -642,7 +631,7 @@ bool HeartBeatSnesTrack::readEvent() {
     }
 
     case EVENT_RET: {
-      addGenericEvent(beginOffset, curOffset - beginOffset, "Pattern End", desc, Type::Loop, ICON_ENDREP);
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Pattern End", desc, Type::RepeatEnd);
       curOffset = parentSeq->dwOffset + subReturnOffset;
       break;
     }
@@ -652,8 +641,7 @@ bool HeartBeatSnesTrack::readEvent() {
                       curOffset - beginOffset,
                       "Noise On",
                       desc,
-                      Type::ChangeState,
-                      ICON_CONTROL);
+                      Type::Noise);
       break;
     }
 
@@ -662,8 +650,7 @@ bool HeartBeatSnesTrack::readEvent() {
                       curOffset - beginOffset,
                       "Noise Off",
                       desc,
-                      Type::ChangeState,
-                      ICON_CONTROL);
+                      Type::Noise);
       break;
     }
 
@@ -674,8 +661,7 @@ bool HeartBeatSnesTrack::readEvent() {
                       curOffset - beginOffset,
                       "Noise Frequency",
                       desc,
-                      Type::ChangeState,
-                      ICON_CONTROL);
+                      Type::Noise);
       break;
     }
 
@@ -735,8 +721,7 @@ bool HeartBeatSnesTrack::readEvent() {
                           curOffset - beginOffset,
                           "Loop Count",
                           desc,
-                          Type::Loop,
-                          ICON_STARTREP);
+                          Type::Loop);
           break;
         }
 
@@ -749,8 +734,7 @@ bool HeartBeatSnesTrack::readEvent() {
                           curOffset - beginOffset,
                           "Loop Again",
                           desc,
-                          Type::Loop,
-                          ICON_ENDREP);
+                          Type::Loop);
 
           if (loopCount != 0) {
             loopCount--;
@@ -768,8 +752,7 @@ bool HeartBeatSnesTrack::readEvent() {
                           curOffset - beginOffset,
                           "ADSR Attack Rate",
                           desc,
-                          Type::Adsr,
-                          ICON_CONTROL);
+                          Type::Adsr);
           break;
         }
 
@@ -780,8 +763,7 @@ bool HeartBeatSnesTrack::readEvent() {
                           curOffset - beginOffset,
                           "ADSR Decay Rate",
                           desc,
-                          Type::Adsr,
-                          ICON_CONTROL);
+                          Type::Adsr);
           break;
         }
 
@@ -792,8 +774,7 @@ bool HeartBeatSnesTrack::readEvent() {
                           curOffset - beginOffset,
                           "ADSR Sustain Level",
                           desc,
-                          Type::Adsr,
-                          ICON_CONTROL);
+                          Type::Adsr);
           break;
         }
 
@@ -804,8 +785,7 @@ bool HeartBeatSnesTrack::readEvent() {
                           curOffset - beginOffset,
                           "ADSR Release Rate",
                           desc,
-                          Type::Adsr,
-                          ICON_CONTROL);
+                          Type::Adsr);
           break;
         }
 
@@ -816,8 +796,7 @@ bool HeartBeatSnesTrack::readEvent() {
                           curOffset - beginOffset,
                           "ADSR Sustain Rate",
                           desc,
-                          Type::Adsr,
-                          ICON_CONTROL);
+                          Type::Adsr);
           break;
         }
 
@@ -826,7 +805,7 @@ bool HeartBeatSnesTrack::readEvent() {
           bool invertRight = readByte(curOffset++) != 0;
           desc = fmt::format("Invert Left: {}  Invert Right: {}",
                              invertLeft ? "On" : "Off", invertRight ? "On" : "Off");
-          addGenericEvent(beginOffset, curOffset - beginOffset, "Surround", desc, Type::Pan, ICON_CONTROL);
+          addGenericEvent(beginOffset, curOffset - beginOffset, "Surround", desc, Type::Pan);
           break;
         }
 

@@ -312,7 +312,7 @@ bool SuzukiSnesTrack::readEvent() {
       }
       else if (noteIndex == 13) {
         makePrevDurNoteEnd(getTime() + dur);
-        addGenericEvent(beginOffset, curOffset - beginOffset, "Tie", desc.str().c_str(), Type::Tie, ICON_NOTE);
+        addGenericEvent(beginOffset, curOffset - beginOffset, "Tie", desc.str().c_str(), Type::Tie);
         addTime(dur);
       }
       else {
@@ -339,7 +339,7 @@ bool SuzukiSnesTrack::readEvent() {
     }
 
     case EVENT_NOP: {
-      addGenericEvent(beginOffset, curOffset - beginOffset, "NOP", desc.str().c_str(), Type::Misc, ICON_BINARY);
+      addGenericEvent(beginOffset, curOffset - beginOffset, "NOP", desc.str().c_str(), Type::Nop);
       break;
     }
 
@@ -350,8 +350,7 @@ bool SuzukiSnesTrack::readEvent() {
                       curOffset - beginOffset,
                       "Noise Frequency",
                       desc.str().c_str(),
-                      Type::ChangeState,
-                      ICON_CONTROL);
+                      Type::Noise);
       break;
     }
 
@@ -360,8 +359,7 @@ bool SuzukiSnesTrack::readEvent() {
                       curOffset - beginOffset,
                       "Noise On",
                       desc.str().c_str(),
-                      Type::ChangeState,
-                      ICON_CONTROL);
+                      Type::Noise);
       break;
     }
 
@@ -370,8 +368,7 @@ bool SuzukiSnesTrack::readEvent() {
                       curOffset - beginOffset,
                       "Noise Off",
                       desc.str().c_str(),
-                      Type::ChangeState,
-                      ICON_CONTROL);
+                      Type::Noise);
       break;
     }
 
@@ -380,8 +377,7 @@ bool SuzukiSnesTrack::readEvent() {
                       curOffset - beginOffset,
                       "Pitch Modulation On",
                       desc.str().c_str(),
-                      Type::ChangeState,
-                      ICON_CONTROL);
+                      Type::ChangeState);
       break;
     }
 
@@ -390,8 +386,7 @@ bool SuzukiSnesTrack::readEvent() {
                       curOffset - beginOffset,
                       "Pitch Modulation Off",
                       desc.str().c_str(),
-                      Type::ChangeState,
-                      ICON_CONTROL);
+                      Type::ChangeState);
       break;
     }
 
@@ -474,8 +469,7 @@ bool SuzukiSnesTrack::readEvent() {
                       curOffset - beginOffset,
                       "Timer 1 Frequency",
                       desc.str().c_str(),
-                      Type::ChangeState,
-                      ICON_TEMPO);
+                      Type::Tempo);
       break;
     }
 
@@ -486,8 +480,7 @@ bool SuzukiSnesTrack::readEvent() {
                       curOffset - beginOffset,
                       "Timer 1 Frequency (Relative)",
                       desc.str().c_str(),
-                      Type::ChangeState,
-                      ICON_TEMPO);
+                      Type::ChangeState);
       break;
     }
 
@@ -496,7 +489,7 @@ bool SuzukiSnesTrack::readEvent() {
       int realLoopCount = (count == 0) ? 256 : count;
 
       desc << "Loop Count: " << realLoopCount;
-      addGenericEvent(beginOffset, curOffset - beginOffset, "Loop Start", desc.str().c_str(), Type::Loop, ICON_STARTREP);
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Loop Start", desc.str().c_str(), Type::RepeatStart);
 
       if (loopLevel >= SUZUKISNES_LOOP_LEVEL_MAX) {
         // stack overflow
@@ -511,7 +504,7 @@ bool SuzukiSnesTrack::readEvent() {
     }
 
     case EVENT_LOOP_END: {
-      addGenericEvent(beginOffset, curOffset - beginOffset, "Loop End", desc.str().c_str(), Type::Loop, ICON_ENDREP);
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Loop End", desc.str().c_str(), Type::RepeatEnd);
 
       if (loopLevel == 0) {
         // stack overflow
@@ -534,7 +527,7 @@ bool SuzukiSnesTrack::readEvent() {
     }
 
     case EVENT_LOOP_BREAK: {
-      addGenericEvent(beginOffset, curOffset - beginOffset, "Loop Break", desc.str().c_str(), Type::Loop, ICON_ENDREP);
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Loop Break", desc.str().c_str(), Type::RepeatEnd);
 
       if (loopLevel == 0) {
         // stack overflow
@@ -556,8 +549,7 @@ bool SuzukiSnesTrack::readEvent() {
                       curOffset - beginOffset,
                       "Infinite Loop Point",
                       desc.str().c_str(),
-                      Type::Loop,
-                      ICON_STARTREP);
+                      Type::RepeatStart);
       break;
     }
 
@@ -566,8 +558,7 @@ bool SuzukiSnesTrack::readEvent() {
                       curOffset - beginOffset,
                       "Default ADSR",
                       desc.str().c_str(),
-                      Type::Adsr,
-                      ICON_CONTROL);
+                      Type::Adsr);
       break;
     }
 
@@ -578,8 +569,7 @@ bool SuzukiSnesTrack::readEvent() {
                       curOffset - beginOffset,
                       "ADSR Attack Rate",
                       desc.str().c_str(),
-                      Type::Adsr,
-                      ICON_CONTROL);
+                      Type::Adsr);
       break;
     }
 
@@ -590,8 +580,7 @@ bool SuzukiSnesTrack::readEvent() {
                       curOffset - beginOffset,
                       "ADSR Decay Rate",
                       desc.str().c_str(),
-                      Type::Adsr,
-                      ICON_CONTROL);
+                      Type::Adsr);
       break;
     }
 
@@ -602,8 +591,7 @@ bool SuzukiSnesTrack::readEvent() {
                       curOffset - beginOffset,
                       "ADSR Sustain Level",
                       desc.str().c_str(),
-                      Type::Adsr,
-                      ICON_CONTROL);
+                      Type::Adsr);
       break;
     }
 
@@ -614,8 +602,7 @@ bool SuzukiSnesTrack::readEvent() {
                       curOffset - beginOffset,
                       "ADSR Sustain Rate",
                       desc.str().c_str(),
-                      Type::Adsr,
-                      ICON_CONTROL);
+                      Type::Adsr);
       break;
     }
 
@@ -640,8 +627,7 @@ bool SuzukiSnesTrack::readEvent() {
                       curOffset - beginOffset,
                       "Noise Frequency (Relative)",
                       desc.str().c_str(),
-                      Type::ChangeState,
-                      ICON_CONTROL);
+                      Type::Noise);
       break;
     }
 
@@ -667,8 +653,7 @@ bool SuzukiSnesTrack::readEvent() {
                       curOffset - beginOffset,
                       "Volume Fade",
                       desc.str().c_str(),
-                      Type::Volume,
-                      ICON_CONTROL);
+                      Type::VolumeSlide);
       break;
     }
 
@@ -680,8 +665,7 @@ bool SuzukiSnesTrack::readEvent() {
                       curOffset - beginOffset,
                       "Portamento",
                       desc.str().c_str(),
-                      Type::Portamento,
-                      ICON_CONTROL);
+                      Type::Portamento);
       break;
     }
 
@@ -690,8 +674,7 @@ bool SuzukiSnesTrack::readEvent() {
                       curOffset - beginOffset,
                       "Portamento On/Off",
                       desc.str().c_str(),
-                      Type::Portamento,
-                      ICON_CONTROL);
+                      Type::Portamento);
       break;
     }
 
@@ -712,7 +695,7 @@ bool SuzukiSnesTrack::readEvent() {
       desc << "Fade Length: " << (int) fadeLength << "  Pan: " << (int) (pan >> 1);
 
       // TODO: correct midi pan value, apply volume scale, do pan slide
-      addGenericEvent(beginOffset, curOffset - beginOffset, "Pan Fade", desc.str().c_str(), Type::Pan, ICON_CONTROL);
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Pan Fade", desc.str().c_str(), Type::PanSlide);
       break;
     }
 
@@ -724,8 +707,7 @@ bool SuzukiSnesTrack::readEvent() {
                       curOffset - beginOffset,
                       "Pan LFO",
                       desc.str().c_str(),
-                      Type::Modulation,
-                      ICON_CONTROL);
+                      Type::PanLfo);
       break;
     }
 
@@ -734,8 +716,7 @@ bool SuzukiSnesTrack::readEvent() {
                       curOffset - beginOffset,
                       "Pan LFO Restart",
                       desc.str().c_str(),
-                      Type::Modulation,
-                      ICON_CONTROL);
+                      Type::PanLfo);
       break;
     }
 
@@ -744,8 +725,7 @@ bool SuzukiSnesTrack::readEvent() {
                       curOffset - beginOffset,
                       "Pan LFO Off",
                       desc.str().c_str(),
-                      Type::Modulation,
-                      ICON_CONTROL);
+                      Type::PanLfo);
       break;
     }
 
@@ -770,8 +750,7 @@ bool SuzukiSnesTrack::readEvent() {
                       curOffset - beginOffset,
                       "Percussion On",
                       desc.str().c_str(),
-                      Type::ChangeState,
-                      ICON_CONTROL);
+                      Type::UseDrumKit);
       break;
     }
 
@@ -780,8 +759,7 @@ bool SuzukiSnesTrack::readEvent() {
                       curOffset - beginOffset,
                       "Percussion Off",
                       desc.str().c_str(),
-                      Type::ChangeState,
-                      ICON_CONTROL);
+                      Type::UseDrumKit);
       break;
     }
 
@@ -793,8 +771,7 @@ bool SuzukiSnesTrack::readEvent() {
                       curOffset - beginOffset,
                       "Vibrato",
                       desc.str().c_str(),
-                      Type::Modulation,
-                      ICON_CONTROL);
+                      Type::Vibrato);
       break;
     }
 
@@ -807,8 +784,7 @@ bool SuzukiSnesTrack::readEvent() {
                       curOffset - beginOffset,
                       "Vibrato",
                       desc.str().c_str(),
-                      Type::Modulation,
-                      ICON_CONTROL);
+                      Type::Vibrato);
       break;
     }
 
@@ -817,8 +793,7 @@ bool SuzukiSnesTrack::readEvent() {
                       curOffset - beginOffset,
                       "Vibrato Off",
                       desc.str().c_str(),
-                      Type::Modulation,
-                      ICON_CONTROL);
+                      Type::Vibrato);
       break;
     }
 
@@ -830,8 +805,7 @@ bool SuzukiSnesTrack::readEvent() {
                       curOffset - beginOffset,
                       "Tremolo",
                       desc.str().c_str(),
-                      Type::Modulation,
-                      ICON_CONTROL);
+                      Type::Tremelo);
       break;
     }
 
@@ -844,8 +818,7 @@ bool SuzukiSnesTrack::readEvent() {
                       curOffset - beginOffset,
                       "Tremolo",
                       desc.str().c_str(),
-                      Type::Modulation,
-                      ICON_CONTROL);
+                      Type::Tremelo);
       break;
     }
 
@@ -854,8 +827,7 @@ bool SuzukiSnesTrack::readEvent() {
                       curOffset - beginOffset,
                       "Tremolo Off",
                       desc.str().c_str(),
-                      Type::Modulation,
-                      ICON_CONTROL);
+                      Type::Tremelo);
       break;
     }
 
@@ -864,8 +836,7 @@ bool SuzukiSnesTrack::readEvent() {
                       curOffset - beginOffset,
                       "Slur On",
                       desc.str().c_str(),
-                      Type::ChangeState,
-                      ICON_CONTROL);
+                      Type::SlurOn);
       break;
     }
 
@@ -874,18 +845,17 @@ bool SuzukiSnesTrack::readEvent() {
                       curOffset - beginOffset,
                       "Slur Off",
                       desc.str().c_str(),
-                      Type::ChangeState,
-                      ICON_CONTROL);
+                      Type::SlurOff);
       break;
     }
 
     case EVENT_ECHO_ON: {
-      addGenericEvent(beginOffset, curOffset - beginOffset, "Echo On", desc.str().c_str(), Type::Reverb, ICON_CONTROL);
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Echo On", desc.str().c_str(), Type::Reverb);
       break;
     }
 
     case EVENT_ECHO_OFF: {
-      addGenericEvent(beginOffset, curOffset - beginOffset, "Echo Off", desc.str().c_str(), Type::Reverb, ICON_CONTROL);
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Echo Off", desc.str().c_str(), Type::Reverb);
       break;
     }
 

@@ -92,21 +92,7 @@ void VGMHeader::addSig(uint32_t offset, uint32_t length, const std::string &name
 // VGMHeaderItem
 // *************
 
-VGMHeaderItem::VGMHeaderItem(const VGMHeader *hdr, HdrItemType theType, uint32_t offset, uint32_t length,
+VGMHeaderItem::VGMHeaderItem(const VGMHeader *hdr, HdrItemType headerType, uint32_t offset, uint32_t length,
                              const std::string &name)
-    : VGMItem(hdr->vgmFile(), offset, length, name, Type::Header), type(theType) {}
-
-VGMItem::Icon VGMHeaderItem::icon() {
-  switch (type) {
-    case HIT_UNKNOWN:
-      return ICON_UNKNOWN;
-    case HIT_POINTER:
-      return ICON_BINARY;
-    case HIT_TEMPO:
-      return ICON_TEMPO;
-    case HIT_SIG:
-      [[fallthrough]];
-    default:
-      return ICON_BINARY;
-  }
+    : VGMItem(hdr->vgmFile(), offset, length, name, resolveType(headerType)) {
 }

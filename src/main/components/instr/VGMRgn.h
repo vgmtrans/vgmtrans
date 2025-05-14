@@ -113,10 +113,16 @@ class VGMRgnItem : public VGMItem {
   };        //HIT = Header Item Type
 
   VGMRgnItem(const VGMRgn *rgn, RgnItemType theType, uint32_t offset, uint32_t length, std::string name);
-  Icon icon() override;
 
- public:
-  RgnItemType type;
+private:
+  static Type resolveType(RgnItemType rgnItemType) {
+    switch (rgnItemType) {
+      case RIT_ADSR:    return Type::Adsr;
+      case RIT_VOL:     return Type::Volume;
+      case RIT_PAN:     return Type::Pan;
+      default:          return Type::Misc;
+    }
+  }
 };
 
 

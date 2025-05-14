@@ -20,8 +20,6 @@ public:
           std::string name = "Sample");
   ~VGMSamp() override = default;
 
-  Icon icon() override { return ICON_SAMP; };
-
   virtual double compressionRatio();  // ratio of space conserved.  should generally be > 1
   // used to calculate both uncompressed sample size and loopOff after conversion
   virtual void convertToStdWave(uint8_t *buf);

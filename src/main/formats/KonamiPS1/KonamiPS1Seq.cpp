@@ -129,7 +129,7 @@ bool KonamiPS1Track::readEvent() {
     std::stringstream description;
     description << "Duration: " << delta;
     addGenericEvent(beginOffset, curOffset - beginOffset, "Delta Time",
-      description.str(), Type::Rest, ICON_REST);
+      description.str(), Type::Rest);
 
     skipDeltaTime = true;
     return true;
@@ -195,7 +195,7 @@ bool KonamiPS1Track::readEvent() {
       case 15:
         description << "Parameter: " << paramByte;
         addGenericEvent(beginOffset, curOffset - beginOffset, "Stereo Widening (?)",
-                        description.str(), Type::Pan, ICON_CONTROL);
+                        description.str(), Type::Pan);
         if (readMode == READMODE_CONVERT_TO_MIDI) {
           pMidiTrack->addControllerEvent(channel, command, paramByte);
         }
@@ -208,8 +208,8 @@ bool KonamiPS1Track::readEvent() {
 
       case 70:
         description << "Parameter: " << paramByte;
-        addGenericEvent(beginOffset, curOffset - beginOffset, "Set Channe", description.str(),
-                        Type::Pan, ICON_CONTROL);
+        addGenericEvent(beginOffset, curOffset - beginOffset, "Set Channel", description.str(),
+                        Type::Pan);
         if (readMode == READMODE_CONVERT_TO_MIDI) {
           pMidiTrack->addControllerEvent(channel, command, paramByte);
         }

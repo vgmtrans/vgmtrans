@@ -15,10 +15,9 @@ SeqEvent::SeqEvent(SeqTrack *pTrack,
                    uint32_t length,
                    const std::string &name,
                    Type type,
-                   Icon icon,
                    const std::string &desc)
     : VGMItem(pTrack->parentSeq, offset, length, name, type), channel(0),
-      parentTrack(pTrack), m_icon(icon), m_description(desc) {}
+      parentTrack(pTrack), m_description(desc) {}
 
 // ***************
 // DurNoteSeqEvent
@@ -105,7 +104,7 @@ VolSlideSeqEvent::VolSlideSeqEvent(SeqTrack *pTrack,
                                    uint32_t offset,
                                    uint32_t length,
                                    const std::string &name)
-    : SeqEvent(pTrack, offset, length, name, Type::Volume), targVol(targetVolume), dur(duration) { }
+    : SeqEvent(pTrack, offset, length, name, Type::VolumeSlide), targVol(targetVolume), dur(duration) { }
 
 // ***********
 // MastVolSeqEvent
@@ -128,7 +127,7 @@ MastVolSlideSeqEvent::MastVolSlideSeqEvent(SeqTrack *pTrack,
                                            uint32_t offset,
                                            uint32_t length,
                                            const std::string &name)
-    : SeqEvent(pTrack, offset, length, name, Type::MasterVolume), targVol(targetVolume), dur(duration) { }
+    : SeqEvent(pTrack, offset, length, name, Type::MasterVolumeSlide), targVol(targetVolume), dur(duration) { }
 
 // ******************
 // ExpressionSeqEvent
@@ -151,7 +150,7 @@ ExpressionSlideSeqEvent::ExpressionSlideSeqEvent(SeqTrack *pTrack,
                                                  uint32_t offset,
                                                  uint32_t length,
                                                  const std::string &name)
-    : SeqEvent(pTrack, offset, length, name, Type::Expression), targExpr(targetExpression), dur(duration) { }
+    : SeqEvent(pTrack, offset, length, name, Type::ExpressionSlide), targExpr(targetExpression), dur(duration) { }
 
 
 
@@ -172,7 +171,7 @@ PanSlideSeqEvent::PanSlideSeqEvent(SeqTrack *pTrack,
                                    uint32_t offset,
                                    uint32_t length,
                                    const std::string &name)
-    : SeqEvent(pTrack, offset, length, name, Type::Pan), targPan(targetPan), dur(duration) { }
+    : SeqEvent(pTrack, offset, length, name, Type::PanSlide), targPan(targetPan), dur(duration) { }
 
 // **************
 // ReverbSeqEvent

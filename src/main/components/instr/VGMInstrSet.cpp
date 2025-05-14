@@ -21,7 +21,8 @@
 
 VGMInstrSet::VGMInstrSet(const std::string &format, RawFile *file, uint32_t offset, uint32_t length,
                          std::string name, VGMSampColl *theSampColl)
-    : VGMFile(format, file, offset, length, std::move(name)), sampColl(theSampColl) {
+    : VGMFile(format, file, offset, length, std::move(name)),
+      sampColl(theSampColl) {
 }
 
 VGMInstrSet::~VGMInstrSet() {
@@ -102,8 +103,8 @@ bool VGMInstrSet::loadInstrs() {
 
 VGMInstr::VGMInstr(VGMInstrSet *instrSet, uint32_t offset, uint32_t length, uint32_t theBank,
                    uint32_t theInstrNum, std::string name, float reverb)
-    : VGMItem(instrSet, offset, length, std::move(name)), bank(theBank), instrNum(theInstrNum),
-      parInstrSet(instrSet), reverb(reverb) {
+    : VGMItem(instrSet, offset, length, std::move(name), Type::Instrument),
+      bank(theBank), instrNum(theInstrNum), parInstrSet(instrSet), reverb(reverb) {
 }
 
 void VGMInstr::setBank(uint32_t bankNum) {

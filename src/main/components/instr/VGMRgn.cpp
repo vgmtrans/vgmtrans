@@ -171,18 +171,6 @@ void VGMRgn::addADSRValue(uint32_t offset, uint32_t length, const std::string& n
 // VGMRgnItem
 // **********
 
-VGMRgnItem::VGMRgnItem(const VGMRgn *rgn, RgnItemType theType, uint32_t offset, uint32_t length, std::string name)
-    : VGMItem(rgn->vgmFile(), offset, length, std::move(name)), type(theType) {
-}
-
-VGMItem::Icon VGMRgnItem::icon() {
-  switch (type) {
-    case RIT_ADSR:
-      return ICON_ADSR;
-    case RIT_VOL:
-      return ICON_VOLUME;
-    case RIT_PAN:
-      return ICON_PAN;
-  }
-  return ICON_BINARY;
+VGMRgnItem::VGMRgnItem(const VGMRgn *rgn, RgnItemType rgnItemType, uint32_t offset, uint32_t length, std::string name)
+    : VGMItem(rgn->vgmFile(), offset, length, std::move(name), resolveType(rgnItemType)) {
 }

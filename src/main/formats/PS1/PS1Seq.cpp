@@ -217,11 +217,11 @@ bool PS1Seq::readEvent() {
         case 99 :
           switch (value) {
             case 20 :
-              addGenericEvent(beginOffset, curOffset - beginOffset, "Loop Start", "", Type::Loop, ICON_STARTREP);
+              addGenericEvent(beginOffset, curOffset - beginOffset, "Loop Start", "", Type::RepeatStart);
               break;
 
             case 30 :
-              addGenericEvent(beginOffset, curOffset - beginOffset, "Loop End", "", Type::Loop, ICON_ENDREP);
+              addGenericEvent(beginOffset, curOffset - beginOffset, "Loop End", "", Type::RepeatEnd);
               break;
 
             default:

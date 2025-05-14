@@ -311,7 +311,7 @@ bool KonamiArcadeTrack::readEvent() {
     loopMarker:
       m_loopMarker[loopNum] = curOffset;
       auto name = fmt::format("Loop {:d} Marker", loopNum);
-      addGenericEvent(beginOffset, curOffset - beginOffset, name, "", Type::Loop, ICON_STARTREP);
+      addGenericEvent(beginOffset, curOffset - beginOffset, name, "", Type::RepeatStart);
       break;
     }
 
@@ -353,7 +353,7 @@ bool KonamiArcadeTrack::readEvent() {
       else {
         auto desc = fmt::format("count: {:d}  attenuation: {:d}  transpose {:d}", loopCount,
           initialLoopAtten, initialLoopTranspose);
-        addGenericEvent(beginOffset, curOffset - beginOffset, "Loop", desc, Type::Loop);
+        addGenericEvent(beginOffset, curOffset - beginOffset, "Loop", desc, Type::RepeatEnd);
       }
       if (m_loopMarker[loopNum] < parentSeq->dwOffset) {
         L_ERROR("KonamiArcadeSeq wants to loopMarker outside bounds of sequence. Loop at %X", beginOffset);

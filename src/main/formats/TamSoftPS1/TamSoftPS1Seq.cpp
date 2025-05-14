@@ -230,7 +230,7 @@ bool TamSoftPS1Track::readEvent() {
         uint8_t midiPan = convertVolumeBalanceToStdMidiPan(volumeBalanceLeft / 256.0, volumeBalanceRight / 256.0, &volumeScale);
 
         desc << "Left Volume: " << volumeBalanceLeft << "  Right Volume: " << volumeBalanceRight;
-        addGenericEvent(beginOffset, curOffset - beginOffset, "Volume Balance", desc.str(), Type::Pan, ICON_CONTROL);
+        addGenericEvent(beginOffset, curOffset - beginOffset, "Volume Balance", desc.str(), Type::Pan);
         addPanNoItem(midiPan);
         break;
       }
@@ -283,7 +283,7 @@ bool TamSoftPS1Track::readEvent() {
       case 0xE6: {
         uint8_t mode = readByte(curOffset++);
         desc << "Reverb Mode: " << mode;
-        addGenericEvent(beginOffset, curOffset - beginOffset, "Reverb Mode", desc.str(), Type::Reverb, ICON_CONTROL);
+        addGenericEvent(beginOffset, curOffset - beginOffset, "Reverb Mode", desc.str(), Type::Reverb);
         break;
       }
 
@@ -291,7 +291,7 @@ bool TamSoftPS1Track::readEvent() {
         uint8_t depth = readByte(curOffset++);
         desc << "Reverb Depth: " << depth;
         parentSeq->reverbDepth = depth << 8;
-        addGenericEvent(beginOffset, curOffset - beginOffset, "Reverb Depth", desc.str(), Type::Reverb, ICON_CONTROL);
+        addGenericEvent(beginOffset, curOffset - beginOffset, "Reverb Depth", desc.str(), Type::Reverb);
         break;
       }
 
@@ -316,7 +316,7 @@ bool TamSoftPS1Track::readEvent() {
 
       case 0xF0: {
         finalizeAllNotes();
-        addGenericEvent(beginOffset, curOffset - beginOffset, "Note Off", desc.str(), Type::NoteOff, ICON_NOTE);
+        addGenericEvent(beginOffset, curOffset - beginOffset, "Note Off", desc.str(), Type::NoteOff);
         break;
       }
 
