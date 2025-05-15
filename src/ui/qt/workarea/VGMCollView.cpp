@@ -151,7 +151,7 @@ VGMCollView::VGMCollView(QItemSelectionModel *collListSelModel, QWidget *parent)
   auto commit_rename = new QPushButton("Rename");
   commit_rename->setEnabled(false);
   commit_rename->setAutoDefault(true);
-  commit_rename->setIcon(QIcon(":/images/collection.svg"));
+  commit_rename->setIcon(QIcon(":/icons/collection.svg"));
   rename_layout->addWidget(commit_rename);
   layout->addLayout(rename_layout);
 

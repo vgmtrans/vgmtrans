@@ -6,24 +6,24 @@
 
 #include "Helpers.h"
 #include "Colors.h"
-#include <QBitmap>
+#include "TintableSvgIconEngine.h"
 
 const QIcon &iconForFile(VGMFileVariant file) {
   static Visitor icon{
     [](VGMSeq *) -> const QIcon & {
-      static QIcon i_gen{":/images/sequence.svg"};
+      static QIcon i_gen{":/icons/sequence.svg"};
       return i_gen;
     },
     [](VGMInstrSet *) -> const QIcon & {
-      static QIcon i_gen{":/images/instrument-set.svg"};
+      static QIcon i_gen{":/icons/instrument-set.svg"};
       return i_gen;
     },
     [](VGMSampColl *) -> const QIcon & {
-      static QIcon i_gen{":/images/sample-collection.svg"};
+      static QIcon i_gen{":/icons/sample-collection.svg"};
       return i_gen;
     },
     [](VGMMiscFile *) -> const QIcon & {
-      static QIcon i_gen{":/images/binary.svg"};
+      static QIcon i_gen{":/icons/binary.svg"};
       return i_gen;
     },
   };
@@ -31,304 +31,305 @@ const QIcon &iconForFile(VGMFileVariant file) {
 }
 
 const QIcon &iconForItemType(VGMItem::Type type) {
+  auto tint = (type == VGMItem::Type::Unknown) ? EventColors::CLR_GRAY : colorForItemType(type);
   switch (type) {
     case VGMItem::Type::Adsr: {
-      static QIcon i_gen{":/images/adsr.svg"};
+      static QIcon i_gen(new TintableSvgIconEngine(":/icons/adsr.svg",  tint));
       return i_gen;
     }
 
     case VGMItem::Type::BankSelect: {
-      static QIcon i_gen{":/images/progchange.svg"};
+      static QIcon i_gen(new TintableSvgIconEngine(":/icons/progchange.svg",  tint));
       return i_gen;
     }
 
     case VGMItem::Type::ChangeState: {
-      static QIcon i_gen{":/images/control.svg"};
+      static QIcon i_gen(new TintableSvgIconEngine(":/icons/control.svg",  tint));
       return i_gen;
     }
 
     case VGMItem::Type::Control: {
-      static QIcon i_gen{":/images/control.svg"};
+      static QIcon i_gen(new TintableSvgIconEngine(":/icons/control.svg",  tint));
       return i_gen;
     }
 
     case VGMItem::Type::DurationChange: {
-      static QIcon i_gen{":/images/control.svg"};
+      static QIcon i_gen(new TintableSvgIconEngine(":/icons/control.svg",  tint));
       return i_gen;
     }
 
     case VGMItem::Type::DurationNote: {
-      static QIcon i_gen{":/images/note.svg"};
+      static QIcon i_gen(new TintableSvgIconEngine(":/icons/note.svg",  tint));
       return i_gen;
     }
 
     case VGMItem::Type::Expression: {
-      static QIcon i_gen{":/images/volume.svg"};
+      static QIcon i_gen(new TintableSvgIconEngine(":/icons/volume.svg",  tint));
       return i_gen;
     }
 
     case VGMItem::Type::ExpressionSlide: {
-      static QIcon i_gen{":/images/volume.svg"};
+      static QIcon i_gen(new TintableSvgIconEngine(":/icons/volume.svg",  tint));
       return i_gen;
     }
 
     case VGMItem::Type::FineTune: {
-      static QIcon i_gen{":/images/pitchbend.svg"};
+      static QIcon i_gen(new TintableSvgIconEngine(":/icons/pitchbend.svg",  tint));
       return i_gen;
     }
 
     case VGMItem::Type::Header: {
-      static QIcon i_gen{":/images/binary.svg"};
+      static QIcon i_gen(new TintableSvgIconEngine(":/icons/binary.svg",  tint));
       return i_gen;
     }
 
     case VGMItem::Type::Instrument: {
-      static QIcon i_gen{":/images/instr.svg"};
+      static QIcon i_gen(new TintableSvgIconEngine(":/icons/instr.svg",  tint));
       return i_gen;
     }
 
     case VGMItem::Type::Jump: {
-      static QIcon i_gen{":/images/jump.svg"};
+      static QIcon i_gen(new TintableSvgIconEngine(":/icons/jump.svg",  tint));
       return i_gen;
     }
 
     case VGMItem::Type::JumpConditional: {
-      static QIcon i_gen{":/images/jump.svg"};
+      static QIcon i_gen(new TintableSvgIconEngine(":/icons/jump.svg",  tint));
       return i_gen;
     }
 
     case VGMItem::Type::Loop: {
-      static QIcon i_gen{":/images/loop.svg"};
+      static QIcon i_gen(new TintableSvgIconEngine(":/icons/loop.svg",  tint));
       return i_gen;
     }
 
     case VGMItem::Type::LoopBreak: {
-      static QIcon i_gen{":/images/loop.svg"};
+      static QIcon i_gen(new TintableSvgIconEngine(":/icons/loop.svg",  tint));
       return i_gen;
     }
 
     case VGMItem::Type::LoopForever: {
-      static QIcon i_gen{":/images/loop-forever.svg"};
+      static QIcon i_gen(new TintableSvgIconEngine(":/icons/loop-forever.svg",  tint));
       return i_gen;
     }
 
     case VGMItem::Type::Lfo: {
-      static QIcon i_gen{":/images/control.svg"};
+      static QIcon i_gen(new TintableSvgIconEngine(":/icons/control.svg",  tint));
       return i_gen;
     }
 
     case VGMItem::Type::Marker: {
-      static QIcon i_gen{":/images/binary.svg"};
+      static QIcon i_gen(new TintableSvgIconEngine(":/icons/binary.svg",  tint));
       return i_gen;
     }
 
     case VGMItem::Type::MasterVolume: {
-      static QIcon i_gen{":/images/volume.svg"};
+      static QIcon i_gen(new TintableSvgIconEngine(":/icons/volume.svg",  tint));
       return i_gen;
     }
 
     case VGMItem::Type::MasterVolumeSlide: {
-      static QIcon i_gen{":/images/volume.svg"};
+      static QIcon i_gen(new TintableSvgIconEngine(":/icons/volume.svg",  tint));
       return i_gen;
     }
 
     case VGMItem::Type::Misc: {
-      static QIcon i_gen{":/images/binary.svg"};
+      static QIcon i_gen(new TintableSvgIconEngine(":/icons/binary.svg",  tint));
       return i_gen;
     }
 
     case VGMItem::Type::Modulation: {
-      static QIcon i_gen{":/images/pitchbend.svg"};
+      static QIcon i_gen(new TintableSvgIconEngine(":/icons/pitchbend.svg",  tint));
       return i_gen;
     }
 
     case VGMItem::Type::Mute: {
-      static QIcon i_gen{":/images/control.svg"};
+      static QIcon i_gen(new TintableSvgIconEngine(":/icons/control.svg",  tint));
       return i_gen;
     }
 
     case VGMItem::Type::Noise: {
-      static QIcon i_gen{":/images/control.svg"};
+      static QIcon i_gen(new TintableSvgIconEngine(":/icons/control.svg",  tint));
       return i_gen;
     }
 
     case VGMItem::Type::Nop: {
-      static QIcon i_gen{":/images/binary.svg"};
+      static QIcon i_gen(new TintableSvgIconEngine(":/icons/binary.svg",  tint));
       return i_gen;
     }
 
     case VGMItem::Type::NoteOff: {
-      static QIcon i_gen{":/images/noteoff.svg"};
+      static QIcon i_gen(new TintableSvgIconEngine(":/icons/noteoff.svg",  tint));
       return i_gen;
     }
 
     case VGMItem::Type::NoteOn: {
-      static QIcon i_gen{":/images/note.svg"};
+      static QIcon i_gen(new TintableSvgIconEngine(":/icons/note.svg", tint));
       return i_gen;
     }
 
     case VGMItem::Type::Octave: {
-      static QIcon i_gen{":/images/control.svg"};
+      static QIcon i_gen(new TintableSvgIconEngine(":/icons/control.svg", tint));
       return i_gen;
     }
 
     case VGMItem::Type::Pan: {
-      static QIcon i_gen{":/images/pan.svg"};
+      static QIcon i_gen(new TintableSvgIconEngine(":/icons/pan.svg", tint));
       return i_gen;
     }
 
     case VGMItem::Type::PanLfo: {
-      static QIcon i_gen{":/images/lfo.svg"};
+      static QIcon i_gen(new TintableSvgIconEngine(":/icons/lfo.svg", tint));
       return i_gen;
     }
 
     case VGMItem::Type::PanSlide: {
-      static QIcon i_gen{":/images/pan.svg"};
+      static QIcon i_gen(new TintableSvgIconEngine(":/icons/pan.svg", tint));
       return i_gen;
     }
 
     case VGMItem::Type::PanEnvelope: {
-      static QIcon i_gen{":/images/pan.svg"};
+      static QIcon i_gen(new TintableSvgIconEngine(":/icons/pan.svg", tint));
       return i_gen;
     }
 
     case VGMItem::Type::PitchBend: {
-      static QIcon i_gen{":/images/pitchbend.svg"};
+      static QIcon i_gen(new TintableSvgIconEngine(":/icons/pitchbend.svg", tint));
       return i_gen;
     }
 
     case VGMItem::Type::PitchBendSlide: {
-      static QIcon i_gen{":/images/pitchbend.svg"};
+      static QIcon i_gen(new TintableSvgIconEngine(":/icons/pitchbend.svg", tint));
       return i_gen;
     }
 
     case VGMItem::Type::PitchBendRange: {
-      static QIcon i_gen{":/images/control.svg"};
+      static QIcon i_gen(new TintableSvgIconEngine(":/icons/control.svg", tint));
       return i_gen;
     }
 
     case VGMItem::Type::PitchEnvelope: {
-      static QIcon i_gen{":/images/adsr.svg"};
+      static QIcon i_gen(new TintableSvgIconEngine(":/icons/adsr.svg", tint));
       return i_gen;
     }
 
     case VGMItem::Type::Portamento: {
-      static QIcon i_gen{":/images/binary.svg"};
+      static QIcon i_gen(new TintableSvgIconEngine(":/icons/binary.svg", tint));
       return i_gen;
     }
 
     case VGMItem::Type::PortamentoTime: {
-      static QIcon i_gen{":/images/binary.svg"};
+      static QIcon i_gen(new TintableSvgIconEngine(":/icons/binary.svg", tint));
       return i_gen;
     }
 
     case VGMItem::Type::Priority: {
-      static QIcon i_gen{":/images/binary.svg"};
+      static QIcon i_gen(new TintableSvgIconEngine(":/icons/binary.svg", tint));
       return i_gen;
     }
 
     case VGMItem::Type::ProgramChange: {
-      static QIcon i_gen{":/images/progchange.svg"};
+      static QIcon i_gen(new TintableSvgIconEngine(":/icons/progchange.svg", tint));
       return i_gen;
     }
 
     case VGMItem::Type::RepeatStart: {
-      static QIcon i_gen{":/images/repeat-begin.svg"};
+      static QIcon i_gen(new TintableSvgIconEngine(":/icons/repeat-begin.svg", tint));
       return i_gen;
     }
 
     case VGMItem::Type::RepeatEnd: {
-      static QIcon i_gen{":/images/repeat-end.svg"};
+      static QIcon i_gen(new TintableSvgIconEngine(":/icons/repeat-end.svg", tint));
       return i_gen;
     }
 
     case VGMItem::Type::Rest: {
-      static QIcon i_gen{":/images/rest.svg"};
+      static QIcon i_gen(new TintableSvgIconEngine(":/icons/rest.svg", tint));
       return i_gen;
     }
 
     case VGMItem::Type::Reverb: {
-      static QIcon i_gen{":/images/control.svg"};
+      static QIcon i_gen(new TintableSvgIconEngine(":/icons/control.svg", tint));
       return i_gen;
     }
 
     case VGMItem::Type::Sample: {
-      static QIcon i_gen{":/images/sample.svg"};
+      static QIcon i_gen(new TintableSvgIconEngine(":/icons/sample.svg", tint));
       return i_gen;
     }
 
     case VGMItem::Type::Sustain: {
-      static QIcon i_gen{":/images/control.svg"};
+      static QIcon i_gen(new TintableSvgIconEngine(":/icons/control.svg", tint));
       return i_gen;
     }
 
     case VGMItem::Type::Tempo: {
-      static QIcon i_gen{":/images/tempo.svg"};
+      static QIcon i_gen(new TintableSvgIconEngine(":/icons/tempo.svg", tint));
       return i_gen;
     }
 
     case VGMItem::Type::Tie: {
-      static QIcon i_gen{":/images/binary.svg"};
+      static QIcon i_gen(new TintableSvgIconEngine(":/icons/binary.svg", tint));
       return i_gen;
     }
 
     case VGMItem::Type::TimeSignature: {
-      static QIcon i_gen{":/images/binary.svg"};
+      static QIcon i_gen(new TintableSvgIconEngine(":/icons/binary.svg", tint));
       return i_gen;
     }
 
     case VGMItem::Type::Track: {
-      static QIcon i_gen{":/images/track.svg"};
+      static QIcon i_gen(new TintableSvgIconEngine(":/icons/track.svg", tint));
       return i_gen;
     }
 
     case VGMItem::Type::TrackEnd: {
-      static QIcon i_gen{":/images/trackend.svg"};
+      static QIcon i_gen(new TintableSvgIconEngine(":/icons/trackend.svg", tint));
       return i_gen;
     }
 
     case VGMItem::Type::Transpose: {
-      static QIcon i_gen{":/images/binary.svg"};
+      static QIcon i_gen(new TintableSvgIconEngine(":/icons/binary.svg", tint));
       return i_gen;
     }
 
     case VGMItem::Type::Tremelo: {
-      static QIcon i_gen{":/images/control.svg"};
+      static QIcon i_gen(new TintableSvgIconEngine(":/icons/control.svg", tint));
       return i_gen;
     }
 
     case VGMItem::Type::Unrecognized: {
-      static QIcon i_gen{":/images/binary.svg"};
+      static QIcon i_gen(new TintableSvgIconEngine(":/icons/binary.svg", tint));
       return i_gen;
     }
 
     case VGMItem::Type::Unknown: {
-      static QIcon i_gen{":/images/binary.svg"};
+      static QIcon i_gen(new TintableSvgIconEngine(":/icons/binary.svg", tint));
       return i_gen;
     }
 
     case VGMItem::Type::UseDrumKit: {
-      static QIcon i_gen{":/images/progchange.svg"};
+      static QIcon i_gen(new TintableSvgIconEngine(":/icons/progchange.svg", tint));
       return i_gen;
     }
 
     case VGMItem::Type::Vibrato: {
-      static QIcon i_gen{":/images/control.svg"};
+      static QIcon i_gen(new TintableSvgIconEngine(":/icons/control.svg", tint));
       return i_gen;
     }
 
     case VGMItem::Type::Volume: {
-      static QIcon i_gen{":/images/volume.svg"};
+      static QIcon i_gen(new TintableSvgIconEngine(":/icons/volume.svg", tint));
       return i_gen;
     }
 
     case VGMItem::Type::VolumeSlide: {
-      static QIcon i_gen{":/images/volume.svg"};
+      static QIcon i_gen(new TintableSvgIconEngine(":/icons/volume.svg", tint));
       return i_gen;
     }
 
     case VGMItem::Type::VolumeEnvelope: {
-      static QIcon i_gen{":/images/volume.svg"};
+      static QIcon i_gen(new TintableSvgIconEngine(":/icons/volume.svg", tint));
       return i_gen;
     }
 
@@ -336,7 +337,7 @@ const QIcon &iconForItemType(VGMItem::Type type) {
       break;
   }
 
-  static auto i_gen = QIcon(":/images/file.svg");
+  static auto i_gen = QIcon(":/icons/file.svg");
   return i_gen;
 }
 
