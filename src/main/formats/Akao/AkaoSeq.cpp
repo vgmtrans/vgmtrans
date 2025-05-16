@@ -114,9 +114,8 @@ bool AkaoSeq::parseHeader() {
     hdr->addChild(dwOffset + 0x4, 2, "ID");
     hdr->addChild(dwOffset + 0x6, 2, "Size (Excluding first 16 bytes)");
     hdr->addChild(dwOffset + 0x8, 2, "Reverb Type");
-    std::ostringstream timestamp_text;
-    timestamp_text << "Timestamp (" << readTimestampAsText() << ")";
-    hdr->addChild(dwOffset + 0xA, 6, timestamp_text.str());
+    auto timestamp_text = fmt::format("Timestamp ({})", readTimestampAsText());
+    hdr->addChild(dwOffset + 0xA, 6, timestamp_text);
     hdr->addChild(dwOffset + 0x10, 4, "Number of Tracks (# of true bits)");
 
     unLength = 0x10 + readShort(dwOffset + 6);
@@ -145,9 +144,8 @@ bool AkaoSeq::parseHeader() {
 
   VGMHeader *track_pointer_header = addHeader(dwOffset + track_header_offset, nNumTracks * 2);
   for (unsigned int i = 0; i < nNumTracks; i++) {
-    std::stringstream name;
-    name << "Offset: Track " << (i + 1);
-    track_pointer_header->addChild(dwOffset + track_header_offset + (i * 2), 2, name.str());
+    auto name = fmt::format("Offset: Track {}", i + 1);
+    track_pointer_header->addChild(dwOffset + track_header_offset + (i * 2), 2, name);
   }
 
   return true;
@@ -197,14 +195,13 @@ std::string AkaoSeq::readTimestampAsText() const {
   // Should we solve the year 2000 problem?
   const unsigned int year_bcd_full = 0x1900 + year_bcd;
 
-  std::ostringstream text;
-  text << std::hex << std::setfill('0') << std::setw(2) << std::uppercase << year_bcd_full << "-"
-    << std::hex << std::setfill('0') << std::setw(2) << std::uppercase << month_bcd << "-"
-    << std::hex << std::setfill('0') << std::setw(2) << std::uppercase << day_bcd << "T"
-    << std::hex << std::setfill('0') << std::setw(2) << std::uppercase << hour_bcd << ":"
-    << std::hex << std::setfill('0') << std::setw(2) << std::uppercase << minute_bcd << ":"
-    << std::hex << std::setfill('0') << std::setw(2) << std::uppercase << second_bcd;
-  return text.str();
+  return fmt::format("{:02X}-{:02X}-{:02X}T{:02X}:{:02X}:{:02X}",
+                     year_bcd_full,
+                     month_bcd,
+                     day_bcd,
+                     hour_bcd,
+                     minute_bcd,
+                     second_bcd);
 }
 
 double AkaoSeq::getTempoInBPM(uint16_t tempo) const {
@@ -557,11 +554,6 @@ bool AkaoTrack::readEvent() {
   const uint32_t beginOffset = curOffset;
   const uint8_t status_byte = readByte(curOffset++);
 
-  std::stringstream desc;
-
-  std::stringstream opcode_strm;
-  opcode_strm << "0x" << std::hex << std::setfill('0') << std::setw(2) << std::uppercase << status_byte;
-
   const bool op_note_with_length = (version >= AkaoPs1Version::VERSION_3_0)
     && (status_byte >= 0xF0) && (status_byte <= 0xFD);
 
@@ -616,8 +608,8 @@ bool AkaoTrack::readEvent() {
     {
       makePrevDurNoteEnd(getTime() + dur);
       addTime(delta_time);
-      desc << "Length: " << delta_time << "  Duration: " << dur;
-      addGenericEvent(beginOffset, curOffset - beginOffset, "Tie", desc.str(), Type::Tie);
+      auto desc = fmt::format("Length: {}  Duration: {}", delta_time, dur);
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Tie", desc, Type::Tie);
     }
     else // rest
     {
@@ -637,8 +629,6 @@ bool AkaoTrack::readEvent() {
       const auto event_iterator = parentSeq->sub_event_map.find(op);
       if (event_iterator != parentSeq->sub_event_map.end())
         event = event_iterator->second;
-
-      opcode_strm << " 0x" << std::hex << std::setfill('0') << std::setw(2) << std::uppercase << op;
     }
     else if ((version == AkaoPs1Version::VERSION_1_2 || version == AkaoPs1Version::VERSION_2) && status_byte == 0xFC)
     {
@@ -646,8 +636,6 @@ bool AkaoTrack::readEvent() {
       const auto event_iterator = parentSeq->sub_event_map.find(op);
       if (event_iterator != parentSeq->sub_event_map.end())
         event = event_iterator->second;
-
-      opcode_strm << " 0x" << std::hex << std::setfill('0') << std::setw(2) << std::uppercase << op;
     }
     else
     {
@@ -655,8 +643,6 @@ bool AkaoTrack::readEvent() {
       if (event_iterator != parentSeq->event_map.end())
         event = event_iterator->second;
     }
-
-    const std::string opcode_str = opcode_strm.str();
 
     switch (event) {
     case EVENT_END:
@@ -676,8 +662,8 @@ bool AkaoTrack::readEvent() {
       const uint8_t delta_time = readByte(curOffset++);
       last_delta_time = one_time_delta_time = delta_time;
       use_one_time_delta_time = true;
-      desc << "Length: " << delta_time;
-      addGenericEvent(beginOffset, curOffset - beginOffset, "Next Note Length", desc.str(), Type::DurationChange);
+      auto desc = fmt::format("Length: {}", delta_time);
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Next Note Length", desc, Type::DurationChange);
       break;
     }
 
@@ -699,8 +685,8 @@ bool AkaoTrack::readEvent() {
       const uint8_t raw_length = readByte(curOffset++);
       const uint16_t length = raw_length == 0 ? 256 : raw_length;
       const int8_t semitones = readByte(curOffset++);
-      desc << "Length: " << length << "  Key: " << semitones << " semitones";
-      addGenericEvent(beginOffset, curOffset - beginOffset, "Pitch Slide", desc.str(), Type::PitchBendSlide);
+      auto desc = fmt::format("Length: {}  Key: {} semitones", length, semitones);
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Pitch Slide", desc, Type::PitchBendSlide);
       break;
     }
 
@@ -740,9 +726,9 @@ bool AkaoTrack::readEvent() {
       const uint8_t raw_length = readByte(curOffset++);
       const uint16_t length = raw_length == 0 ? 256 : raw_length;
       const uint8_t expression = readByte(curOffset++);
-      desc << "Target Expression: " << expression << "  Duration: " << length;
+      auto desc = fmt::format("Target Expression: {}  Duration: {}", expression, length);
       addGenericEvent(beginOffset, curOffset - beginOffset, "Expression Slide Per Note",
-        desc.str(), Type::ExpressionSlide);
+        desc, Type::ExpressionSlide);
       break;
     }
 
@@ -765,61 +751,62 @@ bool AkaoTrack::readEvent() {
     case EVENT_NOISE_CLOCK: {
       const uint8_t raw_clock = readByte(curOffset++);
       const bool relative = (raw_clock & 0xc0) != 0;
+      std::string desc;
       if (relative)
       {
         const uint8_t clock = raw_clock & 0x3f;
         const int8_t signed_clock = ((clock & 0x20) != 0) ? (0x20 - (clock & 0x1f)) : clock;
-        desc << "Clock: " << signed_clock << " (Relative)";
+        desc = fmt::format("Clock: {} (Relative)", signed_clock);
       }
       else
       {
         const uint8_t clock = raw_clock & 0x3f;
-        desc << "Clock: " << clock;
+        desc = fmt::format("Clock: {}", clock);
       }
-      addGenericEvent(beginOffset, curOffset - beginOffset, "Noise Clock", desc.str(), Type::ChangeState);
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Noise Clock", desc, Type::ChangeState);
       break;
     }
 
     case EVENT_ADSR_ATTACK_RATE: {
       const uint8_t ar = readByte(curOffset++); // 0-127
-      desc << "AR: " << ar;
-      addGenericEvent(beginOffset, curOffset - beginOffset, "ADSR Attack Rate", desc.str(), Type::Adsr);
+      auto desc = fmt::format("AR: {}", ar);
+      addGenericEvent(beginOffset, curOffset - beginOffset, "ADSR Attack Rate", desc, Type::Adsr);
       break;
     }
 
     case EVENT_ADSR_DECAY_RATE: {
       const uint8_t dr = readByte(curOffset++); // 0-15
-      desc << "DR: " << dr;
-      addGenericEvent(beginOffset, curOffset - beginOffset, "ADSR Decay Rate", desc.str(), Type::Adsr);
+      auto desc = fmt::format("DR: {}", dr);
+      addGenericEvent(beginOffset, curOffset - beginOffset, "ADSR Decay Rate", desc, Type::Adsr);
       break;
     }
 
     case EVENT_ADSR_SUSTAIN_LEVEL: {
       const uint8_t sl = readByte(curOffset++); // 0-15
-      desc << "SL: " << sl;
-      addGenericEvent(beginOffset, curOffset - beginOffset, "ADSR Sustain Level", desc.str(), Type::Adsr);
+      auto desc = fmt::format("SL: {}", sl);
+      addGenericEvent(beginOffset, curOffset - beginOffset, "ADSR Sustain Level", desc, Type::Adsr);
       break;
     }
 
     case EVENT_ADSR_DECAY_RATE_AND_SUSTAIN_LEVEL: {
       const uint8_t dr = readByte(curOffset++); // 0-15
       const uint8_t sl = readByte(curOffset++); // 0-15
-      desc << "DR: " << dr << "  SL: " << sl;
-      addGenericEvent(beginOffset, curOffset - beginOffset, "ADSR Decay Rate & Sustain Level", desc.str(), Type::Adsr);
+      auto desc = fmt::format("DR: {}  SL: {}", dr, sl);
+      addGenericEvent(beginOffset, curOffset - beginOffset, "ADSR Decay Rate & Sustain Level", desc, Type::Adsr);
       break;
     }
 
     case EVENT_ADSR_SUSTAIN_RATE: {
       const uint8_t sr = readByte(curOffset++); // 0-127
-      desc << "SR: " << sr;
-      addGenericEvent(beginOffset, curOffset - beginOffset, "ADSR Sustain Rate", desc.str(), Type::Adsr);
+      auto desc = fmt::format("SR: {}", sr);
+      addGenericEvent(beginOffset, curOffset - beginOffset, "ADSR Sustain Rate", desc, Type::Adsr);
       break;
     }
 
     case EVENT_ADSR_RELEASE_RATE: {
       const uint8_t rr = readByte(curOffset++); // 0-127
-      desc << "RR: " << rr;
-      addGenericEvent(beginOffset, curOffset - beginOffset, "ADSR Release Rate", desc.str(), Type::Adsr);
+      auto desc = fmt::format("RR: {}", rr);
+      addGenericEvent(beginOffset, curOffset - beginOffset, "ADSR Release Rate", desc, Type::Adsr);
       break;
     }
 
@@ -832,8 +819,8 @@ bool AkaoTrack::readEvent() {
       const uint8_t raw_rate = readByte(curOffset++);
       const uint16_t rate = raw_rate == 0 ? 256 : raw_rate;
       const uint8_t type = readByte(curOffset++); // 0-15
-      desc << "Delay: " << delay << "  Rate: " << rate << "  LFO Type: " << type;
-      addGenericEvent(beginOffset, curOffset - beginOffset, "Vibrato", desc.str(), Type::Vibrato);
+      auto desc = fmt::format("Delay: {}  Rate: {}  LFO Type: {}", delay, rate, type);
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Vibrato", desc, Type::Vibrato);
       break;
     }
 
@@ -841,14 +828,10 @@ bool AkaoTrack::readEvent() {
       const uint8_t raw_depth = readByte(curOffset++);
       const uint8_t depth = raw_depth & 0x7f;
       const uint8_t depth_type = (raw_depth & 0x80) >> 7;
-      desc << "Depth: " << depth;
-      if (depth_type == 0) {
-        desc << " (15/256 scale, approx 50 cents at maximum)";
-      }
-      else {
-        desc << " (1/1 scale, approx 700 cents at maximum)";
-      }
-      addGenericEvent(beginOffset, curOffset - beginOffset, "Vibrato Depth", desc.str(), Type::Vibrato);
+      auto desc = depth_type == 0
+           ? fmt::format("Depth: {} (15/256 scale, approx 50 cents at maximum)", depth)
+           : fmt::format("Depth: {} (1/1 scale, approx 700 cents at maximum)", depth);
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Vibrato Depth", desc, Type::Vibrato);
       break;
     }
 
@@ -858,8 +841,8 @@ bool AkaoTrack::readEvent() {
 
     case EVENT_ADSR_ATTACK_MODE: {
       const uint8_t ar_mode = readByte(curOffset++);
-      desc << "Mode: " << ar_mode;
-      addGenericEvent(beginOffset, curOffset - beginOffset, "ADSR Attack Rate Mode", desc.str(), Type::Adsr);
+      auto desc = fmt::format("Mode: {}", ar_mode);
+      addGenericEvent(beginOffset, curOffset - beginOffset, "ADSR Attack Rate Mode", desc, Type::Adsr);
       break;
     }
 
@@ -868,15 +851,15 @@ bool AkaoTrack::readEvent() {
       const uint8_t raw_rate = readByte(curOffset++);
       const uint16_t rate = raw_rate == 0 ? 256 : raw_rate;
       const uint8_t type = readByte(curOffset++); // 0-15
-      desc << "Delay: " << delay << "  Rate: " << rate << "  LFO Type: " << type;
-      addGenericEvent(beginOffset, curOffset - beginOffset, "Tremolo", desc.str(), Type::Tremelo);
+      auto desc = fmt::format("Delay: {}  Rate: {}  LFO Type: {}", delay, rate, type);
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Tremolo", desc, Type::Tremelo);
       break;
     }
 
     case EVENT_TREMOLO_DEPTH: {
       const uint8_t depth = readByte(curOffset++);
-      desc << "Depth: " << depth;
-      addGenericEvent(beginOffset, curOffset - beginOffset, "Tremolo Depth", desc.str(), Type::Tremelo);
+      auto desc = fmt::format("Depth: {}", depth);
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Tremolo Depth", desc, Type::Tremelo);
       break;
     }
 
@@ -886,8 +869,8 @@ bool AkaoTrack::readEvent() {
 
     case EVENT_ADSR_SUSTAIN_MODE: {
       const uint8_t sr_mode = readByte(curOffset++);
-      desc << "Mode: " << sr_mode;
-      addGenericEvent(beginOffset, curOffset - beginOffset, "ADSR Sustain Rate Mode", desc.str(), Type::Adsr);
+      auto desc = fmt::format("Mode: {}", sr_mode);
+      addGenericEvent(beginOffset, curOffset - beginOffset, "ADSR Sustain Rate Mode", desc, Type::Adsr);
       break;
     }
 
@@ -895,15 +878,15 @@ bool AkaoTrack::readEvent() {
       const uint8_t raw_rate = readByte(curOffset++);
       const uint16_t rate = raw_rate == 0 ? 256 : raw_rate;
       const uint8_t type = readByte(curOffset++); // 0-15
-      desc << "Rate: " << rate << "  LFO Type: " << type;
-      addGenericEvent(beginOffset, curOffset - beginOffset, "Pan LFO", desc.str(), Type::PanLfo);
+      auto desc = fmt::format("Rate: {}  LFO Type: {}", rate, type);
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Pan LFO", desc, Type::PanLfo);
       break;
     }
 
     case EVENT_PAN_LFO_DEPTH: {
       const uint8_t depth = readByte(curOffset++);
-      desc << "Depth: " << depth;
-      addGenericEvent(beginOffset, curOffset - beginOffset, "Pan LFO Depth", desc.str(), Type::PanLfo);
+      auto desc = fmt::format("Depth: {}", depth);
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Pan LFO Depth", desc, Type::PanLfo);
       break;
     }
 
@@ -913,8 +896,8 @@ bool AkaoTrack::readEvent() {
 
     case EVENT_ADSR_RELEASE_MODE: {
       const uint8_t rr_mode = readByte(curOffset++);
-      desc << "Mode: " << rr_mode;
-      addGenericEvent(beginOffset, curOffset - beginOffset, "ADSR Release Rate Mode", desc.str(), Type::Adsr);
+      auto desc = fmt::format("Mode: {}", rr_mode);
+      addGenericEvent(beginOffset, curOffset - beginOffset, "ADSR Release Rate Mode", desc, Type::Adsr);
       break;
     }
 
@@ -968,8 +951,8 @@ bool AkaoTrack::readEvent() {
       const uint8_t raw_count = readByte(curOffset++);
       const uint16_t count = raw_count == 0 ? 256 : raw_count;
 
-      desc << "Count: " << count;
-      addGenericEvent(beginOffset, curOffset - beginOffset, "Repeat Until", desc.str(), Type::RepeatEnd);
+      auto desc = fmt::format("Count: {}", count);
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Repeat Until", desc, Type::RepeatEnd);
 
       loop_counter[loop_layer]++;
       if (loop_counter[loop_layer] == count)
@@ -1009,16 +992,16 @@ bool AkaoTrack::readEvent() {
     case EVENT_NOISE_ON_DELAY_TOGGLE: {
       const uint8_t raw_delay = readByte(curOffset++);
       const uint16_t delay = raw_delay == 0 ? 1 : raw_delay + 1;
-      desc << "Delay: " << delay;
-      addGenericEvent(beginOffset, curOffset - beginOffset, "Noise On & Delay Switching", desc.str(), Type::Noise);
+      auto desc = fmt::format("Delay: {}", delay);
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Noise On & Delay Switching", desc, Type::Noise);
       break;
     }
 
     case EVENT_NOISE_DELAY_TOGGLE: {
       const uint8_t raw_delay = readByte(curOffset++);
       const uint16_t delay = raw_delay == 0 ? 1 : raw_delay + 1;
-      desc << "Delay: " << delay;
-      addGenericEvent(beginOffset, curOffset - beginOffset, "Noise On/Off Delay Switching", desc.str(), Type::Noise);
+      auto desc = fmt::format("Delay: {}", delay);
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Noise On/Off Delay Switching", desc, Type::Noise);
       break;
     }
 
@@ -1035,16 +1018,16 @@ bool AkaoTrack::readEvent() {
     case EVENT_PITCH_MOD_ON_DELAY_TOGGLE: {
       const uint8_t raw_delay = readByte(curOffset++);
       const uint16_t delay = raw_delay == 0 ? 1 : raw_delay + 1;
-      desc << "Delay: " << delay;
-      addGenericEvent(beginOffset, curOffset - beginOffset, "FM (Pitch LFO) On & Delay Switching", desc.str(), Type::ProgramChange);
+      auto desc = fmt::format("Delay: {}", delay);
+      addGenericEvent(beginOffset, curOffset - beginOffset, "FM (Pitch LFO) On & Delay Switching", desc, Type::ProgramChange);
       break;
     }
 
     case EVENT_PITCH_MOD_DELAY_TOGGLE: {
       const uint8_t raw_delay = readByte(curOffset++);
       const uint16_t delay = raw_delay == 0 ? 1 : raw_delay + 1;
-      desc << "Delay: " << delay;
-      addGenericEvent(beginOffset, curOffset - beginOffset, "FM (Pitch LFO) On/Off Delay Switching", desc.str(), Type::ProgramChange);
+      auto desc = fmt::format("Delay: {}", delay);
+      addGenericEvent(beginOffset, curOffset - beginOffset, "FM (Pitch LFO) On/Off Delay Switching", desc, Type::ProgramChange);
       break;
     }
 
@@ -1082,8 +1065,11 @@ bool AkaoTrack::readEvent() {
       const int div = tuning >= 0 ? 128 : 256;
       const double scale = tuning / static_cast<double>(div);
       const double cents = (scale / log(2.0)) * 1200.0;
-      desc << "Amount: " << relative_tuning <<  "  Tuning: " << cents << " cents (" << tuning << "/" << div << ")";
-      addGenericEvent(beginOffset, curOffset - beginOffset, "Tuning (Relative)", desc.str(), Type::FineTune);
+      auto desc = fmt::format(
+"Amount: {}  Tuning: {} cents ({}/{})",
+        relative_tuning, cents, tuning, div
+      );
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Tuning (Relative)", desc, Type::FineTune);
       addFineTuningNoItem(cents);
       break;
     }
@@ -1091,8 +1077,8 @@ bool AkaoTrack::readEvent() {
     case EVENT_PORTAMENTO_ON: {
       const uint8_t raw_speed = readByte(curOffset++);
       const uint16_t speed = raw_speed == 0 ? 256 : raw_speed;
-      desc << "Time: " << speed << " tick(s)";
-      addGenericEvent(beginOffset, curOffset - beginOffset, "Portamento", desc.str(), Type::Portamento);
+      auto desc = fmt::format("Time: {} tick(s)", speed);
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Portamento", desc, Type::Portamento);
       double millisPerTick = 60000.0 / (parentSeq->tempoBPM * parentSeq->ppqn());
       addPortamentoTime14BitNoItem(millisPerTick * speed);
       addPortamentoNoItem(true);
@@ -1101,7 +1087,7 @@ bool AkaoTrack::readEvent() {
     }
 
     case EVENT_PORTAMENTO_OFF: {
-      addGenericEvent(beginOffset, curOffset - beginOffset, "Portamento Off", desc.str(), Type::Portamento);
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Portamento Off", "", Type::Portamento);
       addPortamentoNoItem(false);
       portamento = false;
       break;
@@ -1111,8 +1097,8 @@ bool AkaoTrack::readEvent() {
       const int8_t relative_length = readByte(curOffset++);
       const int16_t length = std::min(std::max(last_delta_time + relative_length, 1), 255);
       delta_time_overwrite = length;
-      desc << "Duration (Relative Amount): " << relative_length;
-      addGenericEvent(beginOffset, curOffset - beginOffset, "Fixed Note Length", desc.str(), Type::DurationChange);
+      auto desc = fmt::format("Duration (Relative Amount): {}", relative_length);
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Fixed Note Length", desc, Type::DurationChange);
       break;
     }
 
@@ -1122,14 +1108,11 @@ bool AkaoTrack::readEvent() {
       const uint8_t raw_depth = readByte(curOffset++);
       const uint8_t depth = raw_depth & 0x7f;
       const uint8_t depth_type = (raw_depth & 0x80) >> 7;
-      desc << "Duration: " << length << "  Target Depth: " << depth;
-      if (depth_type == 0) {
-        desc << " (15/256 scale, approx 50 cents at maximum)";
-      }
-      else {
-        desc << " (1/1 scale, approx 700 cents at maximum)";
-      }
-      addGenericEvent(beginOffset, curOffset - beginOffset, "Vibrato Depth Slide", desc.str(), Type::Lfo);
+      auto desc = depth_type == 0
+           ? fmt::format("Duration: {}  Target Depth: {} (15/256 scale, approx 50 cents at maximum)", length, depth)
+           : fmt::format("Duration: {}  Target Depth: {} (1/1 scale, approx 700 cents at maximum)", length, depth);
+
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Vibrato Depth Slide", desc, Type::Lfo);
       break;
     }
 
@@ -1137,8 +1120,8 @@ bool AkaoTrack::readEvent() {
       const uint8_t raw_length = readByte(curOffset++);
       const uint16_t length = raw_length == 0 ? 256 : raw_length;
       const uint8_t depth = readByte(curOffset++);
-      desc << "Duration: " << length << "  Target Depth: " << depth;
-      addGenericEvent(beginOffset, curOffset - beginOffset, "Tremolo Depth Slide", desc.str(), Type::Lfo);
+      auto desc = fmt::format("Duration: {}  Target Depth: {}", length, depth);
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Tremolo Depth Slide", desc, Type::Lfo);
       break;
     }
 
@@ -1146,8 +1129,8 @@ bool AkaoTrack::readEvent() {
       const uint8_t raw_length = readByte(curOffset++);
       const uint16_t length = raw_length == 0 ? 256 : raw_length;
       const uint8_t depth = readByte(curOffset++);
-      desc << "Duration: " << length << "  Target Depth: " << depth;
-      addGenericEvent(beginOffset, curOffset - beginOffset, "Pan LFO Depth Slide", desc.str(), Type::Lfo);
+      auto desc = fmt::format("Duration: {}  Target Depth: {}", length, depth);
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Pan LFO Depth Slide", desc, Type::Lfo);
       break;
     }
 
@@ -1155,8 +1138,8 @@ bool AkaoTrack::readEvent() {
       const uint8_t raw_length = readByte(curOffset++);
       const uint16_t length = raw_length == 0 ? 256 : raw_length;
       const uint8_t rate = readByte(curOffset++);
-      desc << "Duration: " << length << "  Target Rate: " << rate;
-      addGenericEvent(beginOffset, curOffset - beginOffset, "Vibrato Rate Slide", desc.str(), Type::Lfo);
+      auto desc = fmt::format("Duration: {}  Target Rate: {}", length, rate);
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Vibrato Rate Slide", desc, Type::Lfo);
       break;
     }
 
@@ -1164,8 +1147,8 @@ bool AkaoTrack::readEvent() {
       const uint8_t raw_length = readByte(curOffset++);
       const uint16_t length = raw_length == 0 ? 256 : raw_length;
       const uint8_t rate = readByte(curOffset++);
-      desc << "Duration: " << length << "  Target Rate: " << rate;
-      addGenericEvent(beginOffset, curOffset - beginOffset, "Tremolo Rate Slide", desc.str(), Type::Lfo);
+      auto desc = fmt::format("Duration: {}  Target Rate: {}", length, rate);
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Tremolo Rate Slide", desc, Type::Lfo);
       break;
     }
 
@@ -1173,27 +1156,27 @@ bool AkaoTrack::readEvent() {
       const uint8_t raw_length = readByte(curOffset++);
       const uint16_t length = raw_length == 0 ? 256 : raw_length;
       const uint8_t rate = readByte(curOffset++);
-      desc << "Duration: " << length << "  Target Rate: " << rate;
-      addGenericEvent(beginOffset, curOffset - beginOffset, "Pan LFO Rate Slide", desc.str(), Type::Lfo);
+      auto desc = fmt::format("Duration: {}  Target Rate: {}", length, rate);
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Pan LFO Rate Slide", desc, Type::Lfo);
       break;
     }
 
     case EVENT_E0: {
       addUnknown(beginOffset, curOffset - beginOffset);
-      logUnknownEvent(opcode_str, beginOffset);
+      logUnknownEvent(beginOffset);
       break;
     }
 
     case EVENT_E1: {
       curOffset++;
       addUnknown(beginOffset, curOffset - beginOffset);
-      logUnknownEvent(opcode_str, beginOffset);
+      logUnknownEvent(beginOffset);
       break;
     }
 
     case EVENT_E2: {
       addUnknown(beginOffset, curOffset - beginOffset);
-      logUnknownEvent(opcode_str, beginOffset);
+      logUnknownEvent(beginOffset);
       break;
     }
 
@@ -1221,8 +1204,8 @@ bool AkaoTrack::readEvent() {
       const int16_t depth = readShort(curOffset);
       curOffset += 2;
 
-      desc << "Depth: " << depth;
-      addGenericEvent(beginOffset, curOffset - beginOffset, "Reverb Depth", desc.str(), Type::Reverb);
+      auto desc = fmt::format("Depth: {}", depth);
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Reverb Depth", desc, Type::Reverb);
       break;
     }
 
@@ -1232,8 +1215,8 @@ bool AkaoTrack::readEvent() {
       const int16_t depth = readShort(curOffset);
       curOffset += 2;
 
-      desc << "Duration: " << length << "  Target Depth: " << depth;
-      addGenericEvent(beginOffset, curOffset - beginOffset, "Reverb Depth Slide", desc.str(), Type::Reverb);
+      auto desc = fmt::format("Duration: {}  Target Depth: {}", length, depth);
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Reverb Depth Slide", desc, Type::Reverb);
       break;
     }
 
@@ -1242,8 +1225,8 @@ bool AkaoTrack::readEvent() {
       curOffset += 2;
       const uint32_t drum_instrset_offset = curOffset + relative_drum_offset;
 
-      desc << "Offset: 0x" << std::hex << std::setfill('0') << std::uppercase << drum_instrset_offset;
-      addGenericEvent(beginOffset, curOffset - beginOffset, "Drum Kit On", desc.str(), Type::UseDrumKit);
+      auto d = fmt::format("Offset: 0x{:X}", drum_instrset_offset);
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Drum Kit On", d, Type::UseDrumKit);
 
       if (readMode == READMODE_ADD_TO_UI) {
         parentSeq->drum_instrument_addresses.insert(drum_instrset_offset);
@@ -1262,7 +1245,7 @@ bool AkaoTrack::readEvent() {
     }
 
     case EVENT_DRUM_ON_V2: {
-      addGenericEvent(beginOffset, curOffset - beginOffset, "Drum Kit On", desc.str(), Type::UseDrumKit);
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Drum Kit On", "", Type::UseDrumKit);
       addBankSelectNoItem(127);
       addProgramChangeNoItem(127, false);
       drum = true;
@@ -1282,11 +1265,11 @@ bool AkaoTrack::readEvent() {
       curOffset += 2;
       const uint32_t length = curOffset - beginOffset;
 
-      desc << "Destination: 0x" << std::hex << std::setfill('0') << std::uppercase << dest;
+      auto d = fmt::format("Destination: 0x{:X}", dest);
       curOffset = dest;
 
       if (!isOffsetUsed(dest)) {
-        addGenericEvent(beginOffset, length, "Jump", desc.str(), Type::LoopForever);
+        addGenericEvent(beginOffset, length, "Jump", d, Type::LoopForever);
       }
       else {
         if (!addLoopForever(beginOffset, length, "Jump"))
@@ -1302,7 +1285,7 @@ bool AkaoTrack::readEvent() {
       curOffset += 2;
       const uint32_t length = curOffset - beginOffset;
 
-      desc << "Conditional Value" << target_value << "  Destination: 0x" << std::hex << std::setfill('0') << std::uppercase << dest;
+      auto desc = fmt::format("Conditional Value {}  Destination: 0x{:X}", target_value, dest);
 
       if (readMode == READMODE_ADD_TO_UI) {
         // This event performs conditional jump if certain CPU variable matches to the condValue.
@@ -1322,7 +1305,7 @@ bool AkaoTrack::readEvent() {
           curOffset = dest;
       }
 
-      addGenericEvent(beginOffset, length, "CPU-Conditional Jump", desc.str(), Type::Loop);
+      addGenericEvent(beginOffset, length, "CPU-Conditional Jump", desc, Type::Loop);
       break;
     }
 
@@ -1334,8 +1317,8 @@ bool AkaoTrack::readEvent() {
       curOffset += 2;
       const uint32_t length = curOffset - beginOffset;
 
-      desc << "Count: " << count << "  Destination: 0x" << std::hex << std::setfill('0') << std::uppercase << dest;
-      addGenericEvent(beginOffset, length, "Repeat Branch", desc.str(), Type::Misc);
+      auto desc = fmt::format("Count: {}  Destination: 0x{:X}", count, dest);
+      addGenericEvent(beginOffset, length, "Repeat Branch", desc, Type::Misc);
 
       if (loop_counter[loop_layer] + 1 == count)
         curOffset = dest;
@@ -1350,9 +1333,9 @@ bool AkaoTrack::readEvent() {
       const uint32_t dest = curOffset + relative_offset + (version >= AkaoPs1Version::VERSION_3_0 ? 0 : 2);
       curOffset += 2;
       const uint32_t length = curOffset - beginOffset;
+      auto desc = fmt::format("Count {}  Destination: 0x{:X}", count, dest);
 
-      desc << "Count: " << count << "  Destination: 0x" << std::hex << std::setfill('0') << std::uppercase << dest;
-      addGenericEvent(beginOffset, length, "Repeat Break", desc.str(), Type::Misc);
+      addGenericEvent(beginOffset, length, "Repeat Break", desc, Type::Misc);
 
       if (loop_counter[loop_layer] + 1 == count)
         curOffset = dest;
@@ -1371,13 +1354,13 @@ bool AkaoTrack::readEvent() {
 
     case EVENT_F3_FF7: {
       addUnknown(beginOffset, curOffset - beginOffset);
-      logUnknownEvent(opcode_str, beginOffset);
+      logUnknownEvent(beginOffset);
       break;
     }
 
     case EVENT_F3_SAGAFRO: {
       addUnknown(beginOffset, curOffset - beginOffset);
-      logUnknownEvent(opcode_str, beginOffset);
+      logUnknownEvent(beginOffset);
       break;
     }
 
@@ -1386,8 +1369,11 @@ bool AkaoTrack::readEvent() {
       const uint8_t artNum = readByte(curOffset++);
       const uint8_t artNum2 = readByte(curOffset++);
 
-      desc << "Program Number for Primary Voice: " << artNum << "  Program Number for Secondary Voice: " << artNum2;
-      addGenericEvent(beginOffset, curOffset - beginOffset, "Overlay Voice On (With Program Change)", desc.str(), Type::ProgramChange);
+      auto desc = fmt::format(
+        "Program Number for Primary Voice: {}  Program Number for Secondary Voice: {}",
+        artNum, artNum2
+      );
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Overlay Voice On (With Program Change)", desc, Type::ProgramChange);
       addBankSelectNoItem(0);
       addProgramChangeNoItem(artNum, false);
       break;
@@ -1402,8 +1388,11 @@ bool AkaoTrack::readEvent() {
       const uint8_t balance = readByte(curOffset++);
       const int primary_percent = (127 - balance) * 100 / 256;
       const int secondary_percent = balance * 100 / 256;
-      desc << "Balance: " << balance << " (Primary Voice Volume " << primary_percent << "%, Secondary Voice Volume " << secondary_percent << "%)";
-      addGenericEvent(beginOffset, curOffset - beginOffset, "Overlay Volume Balance", desc.str(), Type::Volume);
+      auto desc = fmt::format(
+        "Balance: {} (Primary Voice Volume {}%, Secondary Voice Volume {}%)",
+        balance, primary_percent, secondary_percent
+      );
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Overlay Volume Balance", desc, Type::Volume);
       break;
     }
 
@@ -1413,15 +1402,18 @@ bool AkaoTrack::readEvent() {
       const uint8_t balance = readByte(curOffset++);
       const int primary_percent = (127 - balance) * 100 / 256;
       const int secondary_percent = balance * 100 / 256;
-      desc << "Duration: " << length << "  Target Balance: " << balance << " (Primary Voice Volume " << primary_percent << "%, Secondary Voice Volume " << secondary_percent << "%)";
-      addGenericEvent(beginOffset, curOffset - beginOffset, "Overlay Volume Balance Fade", desc.str(), Type::VolumeSlide);
+      auto desc = fmt::format(
+        "Duration: {}  Target Balance: {} (Primary Voice Volume {}%, Secondary Voice Volume {}%)",
+        length, balance, primary_percent, secondary_percent
+      );
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Overlay Volume Balance Fade", desc, Type::VolumeSlide);
       break;
     }
 
     case EVENT_ALTERNATE_VOICE_ON: {
       const uint8_t rr = readByte(curOffset++); // 0-127
-      desc << "Release Rate: " << rr;
-      addGenericEvent(beginOffset, curOffset - beginOffset, "Alternate Voice On", desc.str(), Type::Misc);
+      auto desc = fmt::format("Release Rate: {}", rr);
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Alternate Voice On", desc, Type::Misc);
       break;
     }
 
@@ -1433,40 +1425,40 @@ bool AkaoTrack::readEvent() {
     case EVENT_FC_0C: {
       curOffset += 2;
       addUnknown(beginOffset, curOffset - beginOffset);
-      logUnknownEvent(opcode_str, beginOffset);
+      logUnknownEvent(beginOffset);
       break;
     }
 
     case EVENT_FC_0D: {
       addUnknown(beginOffset, curOffset - beginOffset);
-      logUnknownEvent(opcode_str, beginOffset);
+      logUnknownEvent(beginOffset);
       break;
     }
 
     case EVENT_FC_0E: {
       curOffset++;
       addUnknown(beginOffset, curOffset - beginOffset);
-      logUnknownEvent(opcode_str, beginOffset);
+      logUnknownEvent(beginOffset);
       break;
     }
 
     case EVENT_FC_0F: {
       curOffset += 2;
       addUnknown(beginOffset, curOffset - beginOffset);
-      logUnknownEvent(opcode_str, beginOffset);
+      logUnknownEvent(beginOffset);
       break;
     }
 
     case EVENT_FC_10: {
       curOffset++;
       addUnknown(beginOffset, curOffset - beginOffset);
-      logUnknownEvent(opcode_str, beginOffset);
+      logUnknownEvent(beginOffset);
       break;
     }
 
     case EVENT_FC_11: {
       addUnknown(beginOffset, curOffset - beginOffset);
-      logUnknownEvent(opcode_str, beginOffset);
+      logUnknownEvent(beginOffset);
       break;
     }
 
@@ -1476,8 +1468,8 @@ bool AkaoTrack::readEvent() {
       curOffset += 2;
       const uint32_t length = curOffset - beginOffset;
 
-      desc << "Destination: 0x" << std::hex << std::setfill('0') << std::uppercase << dest;
-      addGenericEvent(beginOffset, length, "Play Pattern", desc.str(), Type::Misc);
+      auto desc = fmt::format("Destination: 0x{:X}", dest);
+      addGenericEvent(beginOffset, length, "Play Pattern", desc, Type::Misc);
 
       pattern_return_offset = curOffset;
       curOffset = dest;
@@ -1492,15 +1484,15 @@ bool AkaoTrack::readEvent() {
 
     case EVENT_ALLOC_RESERVED_VOICES: {
       const uint8_t count = readByte(curOffset++);
-      desc << "Number of Voices: " << count;
-      addGenericEvent(beginOffset, curOffset - beginOffset, "Allocate Reserved Voices", desc.str(), Type::Misc);
+      auto desc = fmt::format("Number of Voices: {}", count);
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Allocate Reserved Voices", desc, Type::Misc);
       break;
     }
 
     case EVENT_FREE_RESERVED_VOICES: {
       constexpr uint8_t count = 0;
-      desc << "Number of Voices: " << count;
-      addGenericEvent(beginOffset, curOffset - beginOffset, "Free Reserved Voices", desc.str(), Type::Misc);
+      auto desc = fmt::format("Number of Voices: {}", count);
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Free Reserved Voices", desc, Type::Misc);
       break;
     }
 
@@ -1520,8 +1512,8 @@ bool AkaoTrack::readEvent() {
     case EVENT_MEASURE: {
       const uint16_t measure = readShort(curOffset);
       curOffset += 2;
-      desc << "Measure: " << measure;
-      addGenericEvent(beginOffset, curOffset - beginOffset, "Marker (Measure Number)", desc.str(), Type::Misc);
+      auto desc = fmt::format("Measure: {}", measure);
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Marker (Measure Number)", desc, Type::Misc);
       // TODO: write midi marker event
       break;
     }
@@ -1531,7 +1523,7 @@ bool AkaoTrack::readEvent() {
       // Chrono Cross - 119 Hydra Marshes
       // Chrono Cross - 302 Chronopolis
       addUnknown(beginOffset, curOffset - beginOffset);
-      logUnknownEvent(opcode_str, beginOffset);
+      logUnknownEvent(beginOffset);
       break;
     }
 
@@ -1540,8 +1532,8 @@ bool AkaoTrack::readEvent() {
       curOffset += 2;
       const uint32_t key_split_regions_offset = curOffset + relative_key_split_regions_offset;
 
-      desc << "Offset: 0x" << std::hex << std::setfill('0') << std::uppercase << key_split_regions_offset;
-      addGenericEvent(beginOffset, curOffset - beginOffset, "Program Change (Key-Split Instrument)", desc.str(), Type::ProgramChange);
+      auto desc = fmt::format("Offset: 0x{:X}", key_split_regions_offset);
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Program Change (Key-Split Instrument)", desc, Type::ProgramChange);
 
       if (readMode == READMODE_ADD_TO_UI) {
         parentSeq->custom_instrument_addresses.insert(key_split_regions_offset);
@@ -1566,7 +1558,7 @@ bool AkaoTrack::readEvent() {
     case EVENT_FE_1C: {
       curOffset++;
       addUnknown(beginOffset, curOffset - beginOffset);
-      logUnknownEvent(opcode_str, beginOffset);
+      logUnknownEvent(beginOffset);
       break;
     }
 
@@ -1580,7 +1572,7 @@ bool AkaoTrack::readEvent() {
 
     default:
       addUnknown(beginOffset, curOffset - beginOffset);
-      logUnknownEvent(opcode_str, beginOffset);
+      logUnknownEvent(beginOffset);
       return false;
     }
   }
@@ -1588,7 +1580,13 @@ bool AkaoTrack::readEvent() {
   return true;
 }
 
-void AkaoTrack::logUnknownEvent(const std::string& opcode_str, u32 beginOffset) const {
+void AkaoTrack::logUnknownEvent(u32 beginOffset) const {
+  const u8 status_byte = readByte(beginOffset);
+  const u8 data_byte = readByte(beginOffset + 1);
+  auto opcode_str = curOffset - beginOffset > 1 ?
+    fmt::format("0x{:02X}  0x{:02X}", status_byte, data_byte) :
+    fmt::format("0x{:02X}", status_byte);
+
   L_WARN("Unknown Event - Filename: {} Event: {} Address: {:#010X}", parentSeq->rawFile()->name(),
     opcode_str, beginOffset);
 }
