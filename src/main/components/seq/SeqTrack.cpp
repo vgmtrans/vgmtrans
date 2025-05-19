@@ -22,7 +22,8 @@ SeqTrack::SeqTrack(VGMSeq *parentFile, uint32_t offset, uint32_t length, std::st
       bMonophonic(parentSeq->usesMonophonicTracks()),
       panVolumeCorrectionRate(1.0),
       bDetermineTrackLengthEventByEvent(false),
-      bWriteGenericEventAsTextEvent(false) {
+      bWriteGenericEventAsTextEvent(false),
+      m_offsetStack() {
   SeqTrack::resetVars();
 }
 
@@ -115,19 +116,66 @@ void SeqTrack::loadTrackMainLoop(uint32_t stopOffset, int32_t stopTime) {
     }
 
     onTickEnd();
-  }
-  else {
-    while (curOffset < stopOffset && getTime() < static_cast<uint32_t>(stopTime)) {
-      m_state = readEvent();
-      if (m_state != State::Active) {
-        break;
+
+    // ------------------------------------------------------------
+    //  NEW:  during READMODE_ADD_TO_UI we may have queued a second
+    //  parsing path (the branch destination).  When the contiguous
+    //  block we were disassembling finishes, revive the track and
+    //  continue from that queued offset, so every byte is scanned.
+    // ------------------------------------------------------------
+    if (!active) {
+      uint32_t resume;
+      if (popPendingOffset(resume) && !isOffsetUsed(resume)) {
+        curOffset  = resume;
+        deltaTime  = 0;
+        active     = true;
       }
     }
+  }
+  else {
+    // while (curOffset < stopOffset && getTime() < static_cast<uint32_t>(stopTime)) {
+    //   if (!readEvent()) {
+    //     active = false;
+    //     break;
+    //   }
+    // }
+    //
+    // if (readMode == READMODE_FIND_DELTA_LENGTH) {
+    //   totalTicks = getTime();
+    // }
+    for (;;) {
+      while (curOffset < stopOffset &&
+             getTime()  < static_cast<uint32_t>(stopTime)) {
+        if (!readEvent()) {
+          active = false;
+          break;
+        }
+      }
 
-    if (readMode == READMODE_FIND_DELTA_LENGTH) {
-      totalTicks = getTime();
+      if (readMode == READMODE_FIND_DELTA_LENGTH)
+        totalTicks = getTime();
+
+      // -------- NEW --------
+      uint32_t resume;
+      // if (active && popPendingOffset(resume) && !isOffsetUsed(resume)) {
+      if (popPendingOffset(resume) && !isOffsetUsed(resume)) {
+        curOffset = resume;
+        continue;                 // parse the queued destination
+      }
+      // ---------------------
+      break;                      // no more work – leave main loop
     }
   }
+}
+
+bool SeqTrack::popPendingOffset(uint32_t& newOffset) {
+  if (readMode != READMODE_ADD_TO_UI)
+    return false;
+  if (m_offsetStack.empty())
+    return false;
+  newOffset = m_offsetStack.back();
+  m_offsetStack.pop_back();
+  return true;
 }
 
 void SeqTrack::setChannelAndGroupFromTrkNum(int theTrackNum) {

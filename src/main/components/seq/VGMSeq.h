@@ -25,6 +25,19 @@ enum class PanVolumeCorrectionMode : uint8_t {
   kAdjustExpressionController
 };
 
+struct CondBranchEvt {
+  uint32_t absTime;        // tick when the branch opcode was executed
+  uint32_t srcOffset;      // where the opcode lives in the stream
+  uint32_t dstOffset;      // branch destination
+  uint8_t  expectValue;    // value to compare against
+  uint32_t trackIndex;     // owner track – helps when resuming
+};
+
+struct CondValueChange {     // built *after* pass-0, consumed during MIDI pass
+  uint32_t absTime;
+  uint8_t  newValue;
+};
+
 class VGMSeq : public VGMFile {
  public:
   VGMSeq(const std::string &format, RawFile *file, uint32_t offset, uint32_t length = 0,
@@ -174,6 +187,24 @@ private:
                                     // converted from a linear scale to MIDI's sin/cos scale
   bool m_use_reverb;
 
+  public:                               // accessible to SeqTrack
+    uint8_t m_curCondValue {0};
+
+  protected:
+    std::vector<CondBranchEvt>  m_branchesFound;
+    std::vector<CondValueChange> m_timeline;
+    uint32_t  m_nextTimelineIdx {0};
+    bool      m_hasConditionalBranches {false};
+
+  public:
+    // called by any track that encounters a conditional-branch opcode
+    inline void registerConditionalBranch(const CondBranchEvt& evt) {
+      m_branchesFound.push_back(evt);
+      m_hasConditionalBranches = true;
+    }
+
+  private:
+    void buildBranchTimeline();
 };
 
 extern uint8_t mode;

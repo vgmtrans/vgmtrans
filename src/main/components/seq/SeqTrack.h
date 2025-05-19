@@ -174,6 +174,11 @@ class SeqTrack : public VGMItem {
   State state() { return m_state; }
   void setState(State state) { m_state = state; }
 
+  inline bool shouldTakeBranch(uint8_t expected) const {
+    return parentSeq->m_curCondValue == expected;
+  }
+  bool popPendingOffset(uint32_t& newOffset);
+
  public:
   ReadMode readMode;        //state variable that determines behavior for all methods.  Are we adding UI items or converting to MIDI?
 

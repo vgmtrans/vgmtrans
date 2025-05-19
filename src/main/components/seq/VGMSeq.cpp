@@ -72,6 +72,11 @@ bool VGMSeq::load() {
 MidiFile *VGMSeq::convertToMidi() {
   size_t numTracks = aTracks.size();
 
+  if (m_hasConditionalBranches) {
+    buildBranchTimeline();
+    bLoadTickByTick = true;     // mandatory for perfect sync
+  }
+
   if (!loadTracks(READMODE_FIND_DELTA_LENGTH)) {
       return nullptr;
   }
@@ -152,6 +157,9 @@ bool VGMSeq::loadTracks(ReadMode readMode, uint32_t stopTime) {
 
 void VGMSeq::loadTracksMain(uint32_t stopTime) {
   // determine the stop offsets
+  if (readMode != READMODE_ADD_TO_UI)
+    m_nextTimelineIdx = 0;
+
   uint32_t *aStopOffset = new uint32_t[nNumTracks];
   for (uint32_t trackNum = 0; trackNum < nNumTracks; trackNum++) {
     if (readMode == READMODE_ADD_TO_UI) {
@@ -187,7 +195,16 @@ void VGMSeq::loadTracksMain(uint32_t stopTime) {
           break;
         }
 
+      //   update condition value  (NEW)
+      printf("Time: %d   m_timeline[m_nextTimelineIdx].absTime: %d\n", time, m_timeline[m_nextTimelineIdx].absTime);
+      while (m_nextTimelineIdx < m_timeline.size() &&
+             time >= m_timeline[m_nextTimelineIdx].absTime) {
+        m_curCondValue = m_timeline[m_nextTimelineIdx].newValue;
+        ++m_nextTimelineIdx;
+      }
+
       // process tracks
+
       for (uint32_t trackNum = 0; trackNum < nNumTracks; trackNum++) {
         if (aTracks[trackNum]->state() != SeqTrack::State::Active)
           continue;
@@ -309,6 +326,12 @@ void VGMSeq::resetVars() {
 
   if (readMode == READMODE_ADD_TO_UI) {
     aInstrumentsUsed.clear();
+
+    // -------- NEW --------
+    m_branchesFound.clear();
+    m_timeline.clear();
+    m_hasConditionalBranches = false;
+    // ---------------------
   }
 }
 
@@ -336,4 +359,38 @@ bool VGMSeq::saveAsMidi(const std::string &filepath) {
   bool result = midi->saveMidiFile(filepath);
   delete midi;
   return result;
+}
+
+
+void VGMSeq::buildBranchTimeline()
+{
+  //----------------------------------------------------------------
+  // 1.  Keep the LAST encounter of every opcode                  --
+  //----------------------------------------------------------------
+  std::unordered_map<uint32_t /*src offset*/, CondBranchEvt> last;
+  for (const auto& b : m_branchesFound)
+    last[b.srcOffset] = b;               // later occurrences overwrite
+
+  std::vector<CondBranchEvt> uniq;
+  uniq.reserve(last.size());
+  for (auto& kv : last) uniq.push_back(kv.second);
+
+  std::sort(uniq.begin(), uniq.end(),
+            [](auto& a, auto& b) { return a.absTime < b.absTime; });
+
+  //----------------------------------------------------------------
+  // 2.  Build a linear time-line: every time the expected value   --
+  //     differs from the current one, schedule a change one tick --
+  //     *after* the last encounter.                              --
+  //----------------------------------------------------------------
+  m_timeline.clear();
+  uint8_t curVal = m_curCondValue;
+  for (const auto& b : uniq) {
+    if (b.expectValue != curVal) {
+      // m_timeline.push_back({ b.absTime + 1, b.expectValue });
+      m_timeline.push_back({ b.absTime, b.expectValue });
+      curVal = b.expectValue;
+    }
+  }
+  m_nextTimelineIdx = 0;
 }
