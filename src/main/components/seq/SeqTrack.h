@@ -165,6 +165,11 @@ class SeqTrack : public VGMItem {
 
   bool addLoopForever(uint32_t offset, uint32_t length, const std::string &sEventName = "Loop Forever");
 
+  inline bool shouldTakeBranch(uint8_t expected) const {
+    return parentSeq->m_curCondValue == expected;
+  }
+  bool popPendingOffset(uint32_t& newOffset);
+
  public:
   ReadMode readMode;        //state variable that determines behavior for all methods.  Are we adding UI items or converting to MIDI?
 
@@ -195,6 +200,7 @@ class SeqTrack : public VGMItem {
   uint32_t curOffset;
   bool bInLoop;
   int8_t cDrumNote;            //-1 signals do not use drumNote, otherwise,
+  std::vector<uint32_t> m_offsetStack;   // used only in READMODE_ADD_TO_UI
 
   //Table Related Variables
   int8_t cKeyCorrection;    //steps to offset the key by

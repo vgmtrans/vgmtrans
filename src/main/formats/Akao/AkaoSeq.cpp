@@ -30,10 +30,10 @@ AkaoSeq::AkaoSeq(RawFile *file, uint32_t offset, AkaoPs1Version version, std::st
 
 void AkaoSeq::resetVars() {
   VGMSeq::resetVars();
-
-  condition = 0;
-  if (rawFile()->tag.album == "Final Fantasy 9" && rawFile()->tag.title == "Final Battle")
-    condition = 2;
+  //
+  // condition = 0;
+  // if (rawFile()->tag.album == "Final Fantasy 9" && rawFile()->tag.title == "Final Battle")
+  //   condition = 2;
 }
 
 bool AkaoSeq::isPossibleAkaoSeq(const RawFile *file, uint32_t offset) {
@@ -1287,26 +1287,50 @@ bool AkaoTrack::readEvent() {
 
       auto desc = fmt::format("Conditional Value {}  Destination: 0x{:X}", target_value, dest);
 
+
+
       if (readMode == READMODE_ADD_TO_UI) {
-        // This event performs conditional jump if certain CPU variable matches to the condValue.
-        // VGMTrans will simply try to parse all events as far as possible, instead.
-        // (Test case: FF9 416 Final Battle)
-        if (!isOffsetUsed(beginOffset)) {
-          // For the first time, VGMTrans just skips the event,
-          // but remembers the destination address for future jump.
-          conditional_jump_destinations.push_back(dest);
-        }
-        else {
-          // For the second time, VGMTrans jumps to the destination address.
-          curOffset = dest;
-        }
-      } else {
-        if (parentSeq->condition == target_value)
-          curOffset = dest;
+        CondBranchEvt info;
+        info.absTime     = getTime();   // global tick
+        info.srcOffset   = curOffset;
+        info.dstOffset   = dest;
+        info.expectValue = target_value;
+        info.trackIndex  = 0;                    // int supplied by caller
+        parentSeq->registerConditionalBranch(info);
+
+
+        // queue destination for later disassembly
+        m_offsetStack.push_back(dest);
+        addGenericEvent(beginOffset, length, "CPU-Conditional Jump", desc, Type::Loop);
       }
 
-      addGenericEvent(beginOffset, length, "CPU-Conditional Jump", desc, Type::Loop);
+      // ---- decide whether to jump in *this* execution
+      if (shouldTakeBranch(target_value)) {
+        curOffset = dest;
+      }
       break;
+
+
+      // if (readMode == READMODE_ADD_TO_UI) {
+      //   // This event performs conditional jump if certain CPU variable matches to the condValue.
+      //   // VGMTrans will simply try to parse all events as far as possible, instead.
+      //   // (Test case: FF9 416 Final Battle)
+      //   if (!isOffsetUsed(beginOffset)) {
+      //     // For the first time, VGMTrans just skips the event,
+      //     // but remembers the destination address for future jump.
+      //     conditional_jump_destinations.push_back(dest);
+      //   }
+      //   else {
+      //     // For the second time, VGMTrans jumps to the destination address.
+      //     curOffset = dest;
+      //   }
+      // } else {
+      //   if (parentSeq->condition == target_value)
+      //     curOffset = dest;
+      // }
+      //
+      // addGenericEvent(beginOffset, length, "CPU-Conditional Jump", desc.str(), Type::Loop);
+      // break;
     }
 
     case EVENT_LOOP_BRANCH: {
