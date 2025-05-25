@@ -66,7 +66,7 @@ jobs:
             "bin/VGMTrans-${{ github.sha }}.dmg" \
             "bin"
       - name: Generate artifact attestation
-        uses: actions/attest-build-provenance@v1
+        uses: actions/attest-build-provenance@v2
         if: ${{ github.event_name != 'pull_request' }}
         with:
           subject-name: VGMTrans-${{ github.sha }}-${{ env.GITHUB_REF_NAME }}-${{ matrix.target }}-${{ runner.os }}
@@ -145,7 +145,7 @@ jobs:
           cp ${{ github.workspace }}/LICENSE appdir/usr/share/licenses/VGMTrans/
           mv VGMTrans*.AppImage VGMTrans.AppImage
       - name: Generate artifact attestation
-        uses: actions/attest-build-provenance@v1
+        uses: actions/attest-build-provenance@v2
         if: ${{ github.event_name != 'pull_request' }}
         with:
           subject-name: VGMTrans-${{ github.sha }}-${{ env.BRANCH }}-x86_64-${{ runner.os }}
@@ -191,7 +191,7 @@ jobs:
          run: 7z a "VGMTrans-${{ github.sha }}.zip" -r ".\build\win-${{ matrix.target }}\bin\*"
 
        - name: Generate artifact attestation
-         uses: actions/attest-build-provenance@v1
+         uses: actions/attest-build-provenance@v2
          if: ${{ github.event_name != 'pull_request' }}
          with:
            subject-name: VGMTrans-${{ github.sha }}-${{ env.BRANCH }}-${{ matrix.target }}-${{ runner.os }}
