@@ -138,15 +138,16 @@ bool PSXSampColl::parseSampleInfo() {
 
       // Handle the case of an end frame using the format 00 07 77 77 77 77 77 etc
       while (i + 16 <= nEndOffset) {
-        u8 filterShiftByte = readByte(i);
         u8 flagByte = readByte(i + 1);
-        if (filterShiftByte == 0 && flagByte == 7) {
+        if (flagByte == 7) {
           extraGunkLength += 16;
           i += 16;
         } else {
           break;
         }
       }
+      // If endLoopOffset wasn't set, default it to the end of the sample
+      endLoopOffset = endLoopOffset >= beginOffset ? endLoopOffset : i;
       PSXSamp *samp = new PSXSamp(this,
                                   beginOffset,
                                   i - beginOffset,
