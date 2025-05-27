@@ -23,8 +23,8 @@ IconBar::IconBar(QWidget *parent) : QWidget(parent) {
 }
 
 void IconBar::setupControls() {
-  s_playicon = QIcon(":/images/player_play.svg");
-  s_pauseicon = QIcon(":/images/player_pause.svg");
+  s_playicon = QIcon(":/icons/player_play.svg");
+  s_pauseicon = QIcon(":/icons/player_pause.svg");
 
   m_create = new QPushButton("Create collection manually");
   m_create->setAutoDefault(false);
@@ -46,7 +46,7 @@ void IconBar::setupControls() {
   layout()->addWidget(m_play);
 
   m_stop = new QPushButton();
-  m_stop->setIcon(QIcon(":/images/player_stop.svg"));
+  m_stop->setIcon(QIcon(":/icons/player_stop.svg"));
   m_stop->setDisabled(true);
   m_stop->setToolTip("Stop playback (Esc)");
   connect(m_stop, &QPushButton::pressed, this, &IconBar::stopPressed);
