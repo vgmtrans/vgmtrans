@@ -17,7 +17,7 @@
 #include "VGMExport.h"
 
 static const QIcon& fileIcon() {
-  static QIcon fileIcon(":/images/file.svg");
+  static QIcon fileIcon(":/icons/file.svg");
   return fileIcon;
 }
 
