@@ -396,7 +396,7 @@ QColor colorForItemType(VGMItem::Type type) {
     case VGMItem::Type::TrackEnd:          return EventColors::CLR_RED;
     case VGMItem::Type::Transpose:         return EventColors::CLR_DARK_GREEN;
     case VGMItem::Type::Tremelo:           return EventColors::CLR_MAGENTA;
-    case VGMItem::Type::Unknown:           return EventColors::CLR_MAGENTA;
+    case VGMItem::Type::Unknown:           return EventColors::CLR_BG_DARK;
     case VGMItem::Type::Unrecognized:      return EventColors::CLR_RED;
     case VGMItem::Type::UseDrumKit:        return EventColors::CLR_PERIWINKLE;
     case VGMItem::Type::Vibrato:           return EventColors::CLR_GREEN;
