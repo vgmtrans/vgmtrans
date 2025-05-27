@@ -14,7 +14,7 @@
 #include "services/MenuManager.h"
 
 static const QIcon &VGMCollIcon() {
-  static QIcon icon(":/images/collection.svg");
+  static QIcon icon(":/icons/collection.svg");
   return icon;
 }
 
