@@ -1,4 +1,5 @@
 #include "SquarePS2Seq.h"
+#include "spdlog/fmt/fmt.h"
 
 DECLARE_FORMAT(SquarePS2);
 
@@ -30,11 +31,10 @@ bool BGMSeq::parseHeader() {
   setPPQN(readShort(dwOffset + 0xE));
   unLength = readWord(dwOffset + 0x10);
 
-  ostringstream theName;
-  theName << "BGM " << seqID;
+  std::string name = fmt::format("BGM {}", seqID);
   if (seqID != assocWDID)
-    theName << "using WD " << assocWDID;
-  setName(theName.str());
+    name += fmt::format("using WD {}", assocWDID);
+  setName(name);
   return true;
 }
 

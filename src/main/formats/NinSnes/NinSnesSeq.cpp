@@ -1,6 +1,7 @@
 #include "NinSnesSeq.h"
 #include "SeqEvent.h"
 #include "ScaleConversion.h"
+#include "spdlog/fmt/fmt.h"
 
 DECLARE_FORMAT(NinSnes);
 
@@ -655,9 +656,8 @@ bool NinSnesSection::parseTrackPointers() {
         }
       }
 
-      std::stringstream trackName;
-      trackName << "Track " << (trackIndex + 1);
-      track = new NinSnesTrack(this, startAddress, 0, trackName.str());
+      auto trackName = fmt::format("Track {}", trackIndex + 1);
+      track = new NinSnesTrack(this, startAddress, 0, trackName);
 
       numActiveTracks++;
     }
