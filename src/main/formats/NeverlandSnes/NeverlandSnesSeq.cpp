@@ -1,4 +1,5 @@
 #include "NeverlandSnesSeq.h"
+#include <spdlog/fmt/fmt.h>
 
 DECLARE_FORMAT(NeverlandSnes);
 
@@ -70,17 +71,15 @@ bool NeverlandSnesSeq::parseHeader(void) {
     uint16_t trackSignPtr = dwOffset + 0x10 + trackIndex;
     uint8_t trackSign = readByte(trackSignPtr);
 
-    std::stringstream trackSignName;
-    trackSignName << "Track " << (trackIndex + 1) << " Entry";
-    header->addChild(trackSignPtr, 1, trackSignName.str());
+    auto trackSignName = fmt::format("Track {} Entry", trackIndex + 1);
+    header->addChild(trackSignPtr, 1, trackSignName);
 
     uint16_t sectionListOffsetPtr = dwOffset + 0x20 + (trackIndex * 2);
     if (trackSign != 0xff) {
       uint16_t sectionListAddress = getShortAddress(sectionListOffsetPtr);
 
-      std::stringstream playlistName;
-      playlistName << "Track " << (trackIndex + 1) << " Playlist Pointer";
-      header->addChild(sectionListOffsetPtr, 2, playlistName.str());
+      auto playlistName = fmt::format("Track {} Playlist Pointer", trackIndex + 1);
+      header->addChild(sectionListOffsetPtr, 2, playlistName);
 
       NeverlandSnesTrack *track = new NeverlandSnesTrack(this, sectionListAddress);
       aTracks.push_back(track);
@@ -140,7 +139,7 @@ bool NeverlandSnesTrack::readEvent(void) {
   uint8_t statusByte = readByte(curOffset++);
   bool bContinue = true;
 
-  std::stringstream desc;
+  std::string desc;
 
   NeverlandSnesSeqEventType eventType = (NeverlandSnesSeqEventType) 0;
   std::map<uint8_t, NeverlandSnesSeqEventType>::iterator pEventType = parentSeq->EventMap.find(statusByte);
@@ -150,27 +149,22 @@ bool NeverlandSnesTrack::readEvent(void) {
 
   switch (eventType) {
     case EVENT_UNKNOWN0:
-      desc << "Event: 0x" << std::hex << std::setfill('0') << std::setw(2) << std::uppercase << (int) statusByte;
-      addUnknown(beginOffset, curOffset - beginOffset, "Unknown Event", desc.str());
+      desc = fmt::format("Event: 0x{:02X}", statusByte);
+      addUnknown(beginOffset, curOffset - beginOffset, "Unknown Event", desc);
       break;
 
     case EVENT_UNKNOWN1: {
       uint8_t arg1 = readByte(curOffset++);
-      desc << "Event: 0x" << std::hex << std::setfill('0') << std::setw(2) << std::uppercase << (int) statusByte
-          << std::dec << std::setfill(' ') << std::setw(0)
-          << "  Arg1: " << (int) arg1;
-      addUnknown(beginOffset, curOffset - beginOffset, "Unknown Event", desc.str());
+      desc = fmt::format("Event: 0x{:02X}  Arg1: {:d}", statusByte, arg1);
+      addUnknown(beginOffset, curOffset - beginOffset, "Unknown Event", desc);
       break;
     }
 
     case EVENT_UNKNOWN2: {
       uint8_t arg1 = readByte(curOffset++);
       uint8_t arg2 = readByte(curOffset++);
-      desc << "Event: 0x" << std::hex << std::setfill('0') << std::setw(2) << std::uppercase << (int) statusByte
-          << std::dec << std::setfill(' ') << std::setw(0)
-          << "  Arg1: " << (int) arg1
-          << "  Arg2: " << (int) arg2;
-      addUnknown(beginOffset, curOffset - beginOffset, "Unknown Event", desc.str());
+      desc = fmt::format("Event: 0x{:02X}  Arg1: {:d}  Arg2: {:d}", statusByte, arg1, arg2);
+      addUnknown(beginOffset, curOffset - beginOffset, "Unknown Event", desc);
       break;
     }
 
@@ -178,12 +172,8 @@ bool NeverlandSnesTrack::readEvent(void) {
       uint8_t arg1 = readByte(curOffset++);
       uint8_t arg2 = readByte(curOffset++);
       uint8_t arg3 = readByte(curOffset++);
-      desc << "Event: 0x" << std::hex << std::setfill('0') << std::setw(2) << std::uppercase << (int) statusByte
-          << std::dec << std::setfill(' ') << std::setw(0)
-          << "  Arg1: " << (int) arg1
-          << "  Arg2: " << (int) arg2
-          << "  Arg3: " << (int) arg3;
-      addUnknown(beginOffset, curOffset - beginOffset, "Unknown Event", desc.str());
+      desc = fmt::format("Event: 0x{:02X}  Arg1: {:d}  Arg2: {:d}  Arg3: {:d}", statusByte, arg1, arg2, arg3);
+      addUnknown(beginOffset, curOffset - beginOffset, "Unknown Event", desc);
       break;
     }
 
@@ -192,13 +182,10 @@ bool NeverlandSnesTrack::readEvent(void) {
       uint8_t arg2 = readByte(curOffset++);
       uint8_t arg3 = readByte(curOffset++);
       uint8_t arg4 = readByte(curOffset++);
-      desc << "Event: 0x" << std::hex << std::setfill('0') << std::setw(2) << std::uppercase << (int) statusByte
-          << std::dec << std::setfill(' ') << std::setw(0)
-          << "  Arg1: " << (int) arg1
-          << "  Arg2: " << (int) arg2
-          << "  Arg3: " << (int) arg3
-          << "  Arg4: " << (int) arg4;
-      addUnknown(beginOffset, curOffset - beginOffset, "Unknown Event", desc.str());
+      desc = fmt::format(
+          "Event: 0x{:02X}  Arg1: {:d}  Arg2: {:d}  Arg3: {:d}  Arg4: {:d}",
+          statusByte, arg1, arg2, arg3, arg4);
+      addUnknown(beginOffset, curOffset - beginOffset, "Unknown Event", desc);
       break;
     }
 

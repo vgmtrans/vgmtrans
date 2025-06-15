@@ -5,6 +5,7 @@
  */
 #include "GraphResSnesSeq.h"
 #include "ScaleConversion.h"
+#include <spdlog/fmt/fmt.h>
 
 using namespace std;
 
@@ -49,8 +50,7 @@ bool GraphResSnesSeq::parseHeader() {
 
   uint32_t curOffset = dwOffset;
   for (uint8_t trackIndex = 0; trackIndex < MAX_TRACKS; trackIndex++) {
-    std::stringstream trackName;
-    trackName << "Track Pointer " << (trackIndex + 1);
+    auto trackName = fmt::format("Track Pointer {}", trackIndex + 1);
 
     bool trackUsed = (readByte(curOffset) != 0);
     if (trackUsed) {
@@ -59,7 +59,7 @@ bool GraphResSnesSeq::parseHeader() {
     else {
       header->addChild(curOffset, 1, "Disable Track");
     }
-    header->addChild(curOffset + 1, 2, trackName.str());
+    header->addChild(curOffset + 1, 2, trackName);
     curOffset += 3;
   }
 

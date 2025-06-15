@@ -6,7 +6,6 @@
 
 #include "KonamiPS1Seq.h"
 
-#include <sstream>
 #include <spdlog/fmt/fmt.h>
 
 DECLARE_FORMAT(KonamiPS1);
@@ -126,10 +125,9 @@ bool KonamiPS1Track::readEvent() {
     uint32_t delta = readVarLen(curOffset);
     addTime(delta);
 
-    std::stringstream description;
-    description << "Duration: " << delta;
+    std::string description = fmt::format("Duration: {}", delta);
     addGenericEvent(beginOffset, curOffset - beginOffset, "Delta Time",
-      description.str(), Type::Rest);
+                    description, Type::Rest);
 
     skipDeltaTime = true;
     return true;
@@ -150,7 +148,7 @@ bool KonamiPS1Track::readEvent() {
     prevKey = noteNumber;
     prevVel = velocity;
   } else {
-    std::stringstream description;
+    std::string description;
 
     uint8_t paramByte;
     if (command == 0x4a) {
@@ -172,9 +170,9 @@ bool KonamiPS1Track::readEvent() {
         break;
 
       case 6:
-        description << "Parameter: " << paramByte;
+        description = fmt::format("Parameter: {}", paramByte);
         addGenericEvent(beginOffset, curOffset - beginOffset, "NRPN Data Entry",
-          description.str(), Type::Misc);
+                        description, Type::Misc);
         if (readMode == READMODE_CONVERT_TO_MIDI) {
           pMidiTrack->addControllerEvent(channel, command, paramByte);
         }
@@ -193,22 +191,21 @@ bool KonamiPS1Track::readEvent() {
         break;
 
       case 15:
-        description << "Parameter: " << paramByte;
+        description = fmt::format("Parameter: {}", paramByte);
         addGenericEvent(beginOffset, curOffset - beginOffset, "Stereo Widening (?)",
-                        description.str(), Type::Pan);
+                        description, Type::Pan);
         if (readMode == READMODE_CONVERT_TO_MIDI) {
           pMidiTrack->addControllerEvent(channel, command, paramByte);
         }
         break;
 
       case 64:
-        description << "Parameter: " << paramByte;
         addSustainEvent(beginOffset, curOffset - beginOffset, paramByte);
         break;
 
       case 70:
-        description << "Parameter: " << paramByte;
-        addGenericEvent(beginOffset, curOffset - beginOffset, "Set Channel", description.str(),
+        description = fmt::format("Parameter: {}", paramByte);
+        addGenericEvent(beginOffset, curOffset - beginOffset, "Set Channel", description,
                         Type::Pan);
         if (readMode == READMODE_CONVERT_TO_MIDI) {
           pMidiTrack->addControllerEvent(channel, command, paramByte);
@@ -268,8 +265,8 @@ bool KonamiPS1Track::readEvent() {
         break;
 
       case 99:
-        description << "Parameter: " << paramByte;
-        addGenericEvent(beginOffset, curOffset - beginOffset, "NRPN (LSB)", description.str(),
+        description = fmt::format("Parameter: {}", paramByte);
+        addGenericEvent(beginOffset, curOffset - beginOffset, "NRPN (LSB)", description,
                         Type::Misc);
         if (readMode == READMODE_CONVERT_TO_MIDI) {
           pMidiTrack->addControllerEvent(channel, command, paramByte);
@@ -282,8 +279,8 @@ bool KonamiPS1Track::readEvent() {
         } else if (paramByte == 30) {
           addGenericEvent(beginOffset, curOffset - beginOffset, "Loop End", "", Type::Loop);
         } else {
-          description << "Parameter: " << paramByte;
-          addGenericEvent(beginOffset, curOffset - beginOffset, "NRPN (LSB)", description.str(),
+          description = fmt::format("Parameter: {}", paramByte);
+          addGenericEvent(beginOffset, curOffset - beginOffset, "NRPN (LSB)", description,
                           Type::Misc);
         }
         if (readMode == READMODE_CONVERT_TO_MIDI) {
@@ -292,8 +289,8 @@ bool KonamiPS1Track::readEvent() {
         break;
 
       case 118:
-        description << "Parameter: " << paramByte;
-        addGenericEvent(beginOffset, curOffset - beginOffset, "Seq Beat", description.str(),
+        description = fmt::format("Parameter: {}", paramByte);
+        addGenericEvent(beginOffset, curOffset - beginOffset, "Seq Beat", description,
                         Type::Misc);
         if (readMode == READMODE_CONVERT_TO_MIDI) {
           pMidiTrack->addControllerEvent(channel, command, paramByte);

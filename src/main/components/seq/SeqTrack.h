@@ -225,3 +225,8 @@ template<typename... Args>
 static std::string describeUnknownEvent(uint8_t statusByte, Args... args) {
   return logEvent(statusByte, spdlog::level::off, "Event", args...);
 }
+
+template<typename... Args>
+static std::string describeUnknownSubevent(uint8_t statusByte, Args... args) {
+  return logEvent(statusByte, spdlog::level::off, "Subevent", args...);
+}

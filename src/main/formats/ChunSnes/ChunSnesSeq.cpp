@@ -5,6 +5,7 @@
  */
 #include "ChunSnesSeq.h"
 #include "ScaleConversion.h"
+#include <spdlog/fmt/fmt.h>
 
 DECLARE_FORMAT(ChunSnes);
 
@@ -75,9 +76,8 @@ bool ChunSnesSeq::parseHeader() {
       addrTrackStart = dwOffset + ofsTrackStart;
     }
 
-    std::stringstream trackName;
-    trackName << "Track Pointer " << (trackIndex + 1);
-    header->addChild(curOffset, 2, trackName.str());
+    auto trackName = fmt::format("Track Pointer {}", trackIndex + 1);
+    header->addChild(curOffset, 2, trackName);
 
     ChunSnesTrack *track = new ChunSnesTrack(this, addrTrackStart);
     track->index = static_cast<uint8_t>(aTracks.size());
@@ -430,8 +430,9 @@ bool ChunSnesTrack::readEvent() {
       uint8_t dr = (adsr1 & 0x70) >> 4;
       uint8_t sl = (adsr2 & 0xe0) >> 5;
       uint8_t sr = adsr2 & 0x1f;
-      desc = fmt::format("AR: {:d}  DR: {:d}  SL: {:d}  SR: {:d}  SR (Release): {:d}",
-                          ar, dr, sl, sr, release_sr);
+      desc = fmt::format(
+          "AR: {:d}  DR: {:d}  SL: {:d}  SR: {:d}  SR (Release): {:d}",
+          ar, dr, sl, sr, release_sr);
       addGenericEvent(beginOffset, curOffset - beginOffset, "ADSR & Release Rate", desc, Type::Adsr);
       break;
     }
@@ -440,9 +441,7 @@ bool ChunSnesTrack::readEvent() {
       uint8_t param = readByte(curOffset++);
       bool invertLeft = (param & 1) != 0;
       bool invertRight = (param & 2) != 0;
-      desc = fmt::format("Invert Left: {}  Invert Right: {}",
-                                invertLeft ? "On" : "Off",
-                                invertRight ? "On" : "Off");
+      desc = fmt::format("Invert Left: {}  Invert Right: {}", invertLeft ? "On" : "Off", invertRight ? "On" : "Off");
       addGenericEvent(beginOffset, curOffset - beginOffset, "Surround", desc, Type::Pan);
       break;
     }
@@ -724,10 +723,7 @@ bool ChunSnesTrack::readEvent() {
     case EVENT_PITCH_SLIDE: {
       int8_t semitones = readByte(curOffset++);
       uint8_t length = readByte(curOffset++);
-      desc = fmt::format("Key: {}{} semitones  Length: {:d}",
-                          semitones > 0 ? "+" : "",
-                      semitones,
-                      length);
+      desc = fmt::format("Key: {}{} semitones  Length: {:d}", semitones > 0 ? "+" : "", semitones, length);
 
       addGenericEvent(beginOffset, curOffset - beginOffset, "Pitch Slide", desc, Type::PitchBendSlide);
       break;
