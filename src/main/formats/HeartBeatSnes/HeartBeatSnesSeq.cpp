@@ -75,7 +75,7 @@ bool HeartBeatSnesSeq::parseHeader() {
       break;
     }
 
-    auto trackName = fmt::format("Track Pointer {}", trackIndex + 1);
+    auto trackName = fmt::format("Track Pointer {:d}", trackIndex + 1);
     header->addChild(curOffset, 2, trackName);
 
     curOffset += 2;
