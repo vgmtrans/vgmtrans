@@ -1,5 +1,6 @@
 #include "RareSnesSeq.h"
 #include "ScaleConversion.h"
+#include "spdlog/fmt/fmt.h"
 
 using namespace std;
 
@@ -297,7 +298,7 @@ bool RareSnesTrack::readEvent(void) {
   uint8_t newMidiVol, newMidiPan;
   bool bContinue = true;
 
-  stringstream desc;
+  std::string desc;
 
   if (statusByte >= 0x80) {
     uint8_t noteByte = statusByte;
@@ -370,56 +371,43 @@ bool RareSnesTrack::readEvent(void) {
     }
 
     switch (eventType) {
-      case EVENT_UNKNOWN0:
-        desc << "Event: 0x" << std::hex << std::setfill('0') << std::setw(2) << std::uppercase << (int) statusByte;
-        addUnknown(beginOffset, curOffset - beginOffset, "Unknown Event", desc.str().c_str());
+      case EVENT_UNKNOWN0: {
+        auto desc = describeUnknownEvent(statusByte);
+        addUnknown(beginOffset, curOffset - beginOffset, "Unknown Event", desc);
         break;
+      }
 
       case EVENT_UNKNOWN1: {
-        uint8_t arg1 = readByte(curOffset++);
-        desc << "Event: 0x" << std::hex << std::setfill('0') << std::setw(2) << std::uppercase << (int) statusByte
-            << std::dec << std::setfill(' ') << std::setw(0)
-            << "  Arg1: " << (int) arg1;
-        addUnknown(beginOffset, curOffset - beginOffset, "Unknown Event", desc.str().c_str());
+        const int arg1 = readByte(curOffset++);
+        auto desc = describeUnknownEvent(statusByte, arg1);
+        addUnknown(beginOffset, curOffset - beginOffset, "Unknown Event", desc);
         break;
       }
 
       case EVENT_UNKNOWN2: {
-        uint8_t arg1 = readByte(curOffset++);
-        uint8_t arg2 = readByte(curOffset++);
-        desc << "Event: 0x" << std::hex << std::setfill('0') << std::setw(2) << std::uppercase << (int) statusByte
-            << std::dec << std::setfill(' ') << std::setw(0)
-            << "  Arg1: " << (int) arg1
-            << "  Arg2: " << (int) arg2;
-        addUnknown(beginOffset, curOffset - beginOffset, "Unknown Event", desc.str().c_str());
+        const int arg1 = readByte(curOffset++);
+        const int arg2 = readByte(curOffset++);
+        auto desc = describeUnknownEvent(statusByte, arg1, arg2);
+        addUnknown(beginOffset, curOffset - beginOffset, "Unknown Event", desc);
         break;
       }
 
       case EVENT_UNKNOWN3: {
-        uint8_t arg1 = readByte(curOffset++);
-        uint8_t arg2 = readByte(curOffset++);
-        uint8_t arg3 = readByte(curOffset++);
-        desc << "Event: 0x" << std::hex << std::setfill('0') << std::setw(2) << std::uppercase << (int) statusByte
-            << std::dec << std::setfill(' ') << std::setw(0)
-            << "  Arg1: " << (int) arg1
-            << "  Arg2: " << (int) arg2
-            << "  Arg3: " << (int) arg3;
-        addUnknown(beginOffset, curOffset - beginOffset, "Unknown Event", desc.str().c_str());
+        const int arg1 = readByte(curOffset++);
+        const int arg2 = readByte(curOffset++);
+        const int arg3 = readByte(curOffset++);
+        auto desc = describeUnknownEvent(statusByte, arg1, arg2, arg3);
+        addUnknown(beginOffset, curOffset - beginOffset, "Unknown Event", desc);
         break;
       }
 
       case EVENT_UNKNOWN4: {
-        uint8_t arg1 = readByte(curOffset++);
-        uint8_t arg2 = readByte(curOffset++);
-        uint8_t arg3 = readByte(curOffset++);
-        uint8_t arg4 = readByte(curOffset++);
-        desc << "Event: 0x" << std::hex << std::setfill('0') << std::setw(2) << std::uppercase << (int) statusByte
-            << std::dec << std::setfill(' ') << std::setw(0)
-            << "  Arg1: " << (int) arg1
-            << "  Arg2: " << (int) arg2
-            << "  Arg3: " << (int) arg3
-            << "  Arg4: " << (int) arg4;
-        addUnknown(beginOffset, curOffset - beginOffset, "Unknown Event", desc.str().c_str());
+        const int arg1 = readByte(curOffset++);
+        const int arg2 = readByte(curOffset++);
+        const int arg3 = readByte(curOffset++);
+        const int arg4 = readByte(curOffset++);
+        auto desc = describeUnknownEvent(statusByte, arg1, arg2, arg3, arg4);
+        addUnknown(beginOffset, curOffset - beginOffset, "Unknown Event", desc);
         break;
       }
 
@@ -469,30 +457,27 @@ bool RareSnesTrack::readEvent(void) {
       }
 
       case EVENT_GOTO: {
-        uint16_t dest = readShort(curOffset);
+        const uint16_t dest = readShort(curOffset);
         curOffset += 2;
-        desc << "Destination: $" << std::hex << std::setfill('0') << std::setw(4) << std::uppercase << (int) dest;
-        uint32_t length = curOffset - beginOffset;
+        auto desc = fmt::format("Destination: ${:04X}", dest);
+        const uint32_t length = curOffset - beginOffset;
 
         curOffset = dest;
-        if (!isOffsetUsed(dest) || rptNestLevel != 0) // nest level check is required for Stickerbrush Symphony
-          addGenericEvent(beginOffset, length, "Jump", desc.str().c_str(), Type::LoopForever);
+        if (!isOffsetUsed(dest) || rptNestLevel != 0)  // nest level check is required for Stickerbrush Symphony
+          addGenericEvent(beginOffset, length, "Jump", desc, Type::LoopForever);
         else
           bContinue = addLoopForever(beginOffset, length, "Jump");
         break;
       }
 
       case EVENT_CALLNTIMES: {
-        uint8_t times = readByte(curOffset++);
-        uint16_t dest = readShort(curOffset);
+        const int times = readByte(curOffset++);
+        const uint16_t dest = readShort(curOffset);
         curOffset += 2;
 
-        desc << "Times: " << (int) times << "  Destination: $" << std::hex << std::setfill('0') << std::setw(4)
-            << std::uppercase << (int) dest;
-        addGenericEvent(beginOffset,
-                        curOffset - beginOffset,
-                        (times == 1 ? "Pattern Play" : "Pattern Repeat"),
-                        desc.str().c_str(),
+        auto desc = fmt::format("Times: {:d}  Destination: ${:04X}", times, dest);
+        addGenericEvent(beginOffset, curOffset - beginOffset,
+                        (times == 1 ? "Pattern Play" : "Pattern Repeat"), desc,
                         Type::RepeatStart);
 
         if (rptNestLevel == RARESNES_RPTNESTMAX) {
@@ -510,15 +495,12 @@ bool RareSnesTrack::readEvent(void) {
       }
 
       case EVENT_CALLONCE: {
-        uint16_t dest = readShort(curOffset);
+        const uint16_t dest = readShort(curOffset);
         curOffset += 2;
 
-        desc << "Destination: $" << std::hex << std::setfill('0') << std::setw(4) << std::uppercase << (int) dest;
-        addGenericEvent(beginOffset,
-                        curOffset - beginOffset,
-                        "Pattern Play",
-                        desc.str().c_str(),
-                        Type::RepeatStart);
+        auto desc = fmt::format("Destination: ${:04X}", dest);
+        addGenericEvent(beginOffset, curOffset - beginOffset, "Pattern Play",
+                        desc, Type::RepeatStart);
 
         if (rptNestLevel == RARESNES_RPTNESTMAX) {
           L_ERROR("Subroutine nest level overflow");
@@ -535,10 +517,7 @@ bool RareSnesTrack::readEvent(void) {
       }
 
       case EVENT_RET: {
-        addGenericEvent(beginOffset,
-                        curOffset - beginOffset,
-                        "End Pattern",
-                        desc.str().c_str(),
+        addGenericEvent(beginOffset, curOffset - beginOffset, "End Pattern", "",
                         Type::RepeatEnd);
 
         if (rptNestLevel == 0) {
@@ -570,49 +549,34 @@ bool RareSnesTrack::readEvent(void) {
           defNoteDur = readByte(curOffset++);
         }
 
-        addGenericEvent(beginOffset,
-                        curOffset - beginOffset,
-                        "Default Duration On",
-                        desc.str().c_str(),
-                        Type::DurationChange);
+        addGenericEvent(beginOffset, curOffset - beginOffset,
+                        "Default Duration On", "", Type::DurationChange);
         break;
       }
 
       case EVENT_DEFDUROFF:
         defNoteDur = 0;
-        addGenericEvent(beginOffset,
-                        curOffset - beginOffset,
-                        "Default Duration Off",
-                        desc.str().c_str(),
-                        Type::DurationChange);
+        addGenericEvent(beginOffset, curOffset - beginOffset,
+                        "Default Duration Off", "", Type::DurationChange);
         break;
 
       case EVENT_PITCHSLIDEUP: {
         curOffset += 5;
-        addGenericEvent(beginOffset,
-                        curOffset - beginOffset,
-                        "Pitch Slide Up",
-                        desc.str().c_str(),
-                        Type::PitchBendSlide);
+        addGenericEvent(beginOffset, curOffset - beginOffset, "Pitch Slide Up",
+                        "", Type::PitchBendSlide);
         break;
       }
 
       case EVENT_PITCHSLIDEDOWN: {
         curOffset += 5;
-        addGenericEvent(beginOffset,
-                        curOffset - beginOffset,
-                        "Pitch Slide Down",
-                        desc.str().c_str(),
-                        Type::PitchBendSlide);
+        addGenericEvent(beginOffset, curOffset - beginOffset, "Pitch Slide Down",
+                        "", Type::PitchBendSlide);
         break;
       }
 
       case EVENT_PITCHSLIDEOFF:
-        addGenericEvent(beginOffset,
-                        curOffset - beginOffset,
-                        "Pitch Slide Off",
-                        desc.str().c_str(),
-                        Type::PitchBendSlide);
+        addGenericEvent(beginOffset, curOffset - beginOffset, "Pitch Slide Off",
+                        "", Type::PitchBendSlide);
         break;
 
       case EVENT_TEMPO: {
@@ -636,46 +600,31 @@ bool RareSnesTrack::readEvent(void) {
 
       case EVENT_VIBRATOSHORT: {
         curOffset += 3;
-        addGenericEvent(beginOffset,
-                        curOffset - beginOffset,
-                        "Vibrato (Short)",
-                        desc.str().c_str(),
-                        Type::Vibrato);
+        addGenericEvent(beginOffset, curOffset - beginOffset, "Vibrato (Short)",
+                        "", Type::Vibrato);
         break;
       }
 
       case EVENT_VIBRATOOFF:
-        addGenericEvent(beginOffset,
-                        curOffset - beginOffset,
-                        "Vibrato Off",
-                        desc.str().c_str(),
+        addGenericEvent(beginOffset, curOffset - beginOffset, "Vibrato Off", "",
                         Type::Vibrato);
         break;
 
       case EVENT_VIBRATO: {
         curOffset += 4;
-        addGenericEvent(beginOffset,
-                        curOffset - beginOffset,
-                        "Vibrato",
-                        desc.str().c_str(),
+        addGenericEvent(beginOffset, curOffset - beginOffset, "Vibrato", "",
                         Type::Vibrato);
         break;
       }
 
       case EVENT_TREMOLOOFF:
-        addGenericEvent(beginOffset,
-                        curOffset - beginOffset,
-                        "Tremolo Off",
-                        desc.str().c_str(),
+        addGenericEvent(beginOffset, curOffset - beginOffset, "Tremolo Off", "",
                         Type::Tremelo);
         break;
 
       case EVENT_TREMOLO: {
         curOffset += 4;
-        addGenericEvent(beginOffset,
-                        curOffset - beginOffset,
-                        "Tremolo",
-                        desc.str().c_str(),
+        addGenericEvent(beginOffset, curOffset - beginOffset, "Tremolo", "",
                         Type::Tremelo);
         break;
       }
@@ -685,16 +634,18 @@ bool RareSnesTrack::readEvent(void) {
         curOffset += 2;
         spcADSR = newADSR;
 
-        desc << "ADSR: " << std::hex << std::setfill('0') << std::setw(4) << std::uppercase << (int) newADSR;
-        addGenericEvent(beginOffset, curOffset - beginOffset, "ADSR", desc.str().c_str(), Type::Adsr);
+        auto desc = fmt::format("ADSR: {:04X}", newADSR);
+        addGenericEvent(beginOffset, curOffset - beginOffset, "ADSR", desc,
+                        Type::Adsr);
         break;
       }
 
       case EVENT_MASTVOL: {
         // TODO: At least it's not Master Volume in Donkey Kong Country 2
         uint8_t newVol = readByte(curOffset++);
-        desc << "Volume: " << newVol;
-        addGenericEvent(beginOffset, curOffset - beginOffset, "Master Volume?", desc.str(), Type::MasterVolume);
+        auto desc = fmt::format("Volume: {:d}", newVol);
+        addGenericEvent(beginOffset, curOffset - beginOffset, "Master Volume?",
+                        desc, Type::MasterVolume);
         break;
       }
 
@@ -707,44 +658,37 @@ bool RareSnesTrack::readEvent(void) {
       }
 
       case EVENT_TUNING: {
-        int8_t newTuning = (int8_t) readByte(curOffset++);
+        int8_t newTuning = static_cast<int8_t>(readByte(curOffset++));
         spcTuning = newTuning;
-        desc << "Tuning: " << (int) newTuning << " (" << (int) (getTuningInSemitones(newTuning) * 100 + 0.5)
-            << " cents)";
-        addGenericEvent(beginOffset,
-                        curOffset - beginOffset,
-                        "Tuning",
-                        desc.str().c_str(),
+        auto desc = fmt::format("Tuning: {:d} ({:d} cents)", newTuning,
+                                int(getTuningInSemitones(newTuning) * 100 + 0.5));
+        addGenericEvent(beginOffset, curOffset - beginOffset, "Tuning", desc,
                         Type::FineTune);
         break;
       }
 
       case EVENT_TRANSPABS: // should be used for pitch correction of instrument
       {
-        int8_t newTransp = (int8_t) readByte(curOffset++);
+        int8_t newTransp = static_cast<int8_t>(readByte(curOffset++));
         spcTranspose = spcTransposeAbs = newTransp;
         //AddTranspose(beginOffset, curOffset-beginOffset, 0, "Transpose (Abs)");
 
-        // add event without MIDI event
-        desc << "Transpose: " << newTransp;
-        addGenericEvent(beginOffset, curOffset - beginOffset, "Transpose", desc.str(), Type::Transpose);
+        auto desc = fmt::format("Transpose: {:d}", newTransp);
+        addGenericEvent(beginOffset, curOffset - beginOffset, "Transpose", desc,
+                        Type::Transpose);
 
         cKeyCorrection = SEQ_KEYOFS;
         break;
       }
 
       case EVENT_TRANSPREL: {
-        int8_t deltaTransp = (int8_t) readByte(curOffset++);
+        int8_t deltaTransp = static_cast<int8_t>(readByte(curOffset++));
         spcTranspose = (spcTranspose + deltaTransp) & 0xff;
         //AddTranspose(beginOffset, curOffset-beginOffset, spcTransposeAbs - spcTranspose, "Transpose (Rel)");
 
-        // add event without MIDI event
-        desc << "Transpose: " << deltaTransp;
-        addGenericEvent(beginOffset,
-                        curOffset - beginOffset,
-                        "Transpose (Relative)",
-                        desc.str(),
-                        Type::Transpose);
+        auto desc = fmt::format("Transpose: {:d}", deltaTransp);
+        addGenericEvent(beginOffset, curOffset - beginOffset,
+                        "Transpose (Relative)", desc, Type::Transpose);
 
         cKeyCorrection += deltaTransp;
         break;
@@ -757,11 +701,9 @@ bool RareSnesTrack::readEvent(void) {
         parentSeq->midiReverb = min(abs((int) newVolL) + abs((int) newVolR), 255) / 2;
         // TODO: update MIDI reverb value for each tracks?
 
-        desc << "Feedback: " << (int) newFeedback << "  Volume: " << (int) newVolL << ", " << (int) newVolR;
-        addGenericEvent(beginOffset,
-                        curOffset - beginOffset,
-                        "Echo Param",
-                        desc.str().c_str(),
+        auto desc = fmt::format("Feedback: {:d}  Volume: {:d}, {:d}", newFeedback,
+                                 newVolL, newVolR);
+        addGenericEvent(beginOffset, curOffset - beginOffset, "Echo Param", desc,
                         Type::Reverb);
         break;
       }
@@ -779,104 +721,74 @@ bool RareSnesTrack::readEvent(void) {
         readBytes(curOffset, 8, newFIR);
         curOffset += 8;
 
-        desc << "Filter: ";
-        for (int iFIRIndex = 0; iFIRIndex < 8; iFIRIndex++) {
-          if (iFIRIndex != 0)
-            desc << " ";
-          desc << std::hex << std::setfill('0') << std::setw(2) << std::uppercase << (int) newFIR[iFIRIndex];
+        std::string desc = fmt::format("Filter: {:02X}", newFIR[0]);
+        for (int iFIRIndex = 1; iFIRIndex < 8; iFIRIndex++) {
+          desc += fmt::format(" {:02X}", newFIR[iFIRIndex]);
         }
 
-        addGenericEvent(beginOffset,
-                        curOffset - beginOffset,
-                        "Echo FIR",
-                        desc.str().c_str(),
+        addGenericEvent(beginOffset, curOffset - beginOffset, "Echo FIR", desc,
                         Type::Reverb);
         break;
       }
 
       case EVENT_NOISECLK: {
         uint8_t newCLK = readByte(curOffset++);
-        desc << "CLK: " << (int) newCLK;
-        addGenericEvent(beginOffset,
-                        curOffset - beginOffset,
-                        "Noise Frequency",
-                        desc.str().c_str(),
-                        Type::Noise);
+        auto desc = fmt::format("CLK: {:d}", newCLK);
+        addGenericEvent(beginOffset, curOffset - beginOffset, "Noise Frequency",
+                        desc, Type::Noise);
         break;
       }
 
       case EVENT_NOISEON:
-        addGenericEvent(beginOffset,
-                        curOffset - beginOffset,
-                        "Noise On",
-                        desc.str().c_str(),
+        addGenericEvent(beginOffset, curOffset - beginOffset, "Noise On", "",
                         Type::Noise);
         break;
 
       case EVENT_NOISEOFF:
-        addGenericEvent(beginOffset,
-                        curOffset - beginOffset,
-                        "Noise Off",
-                        desc.str().c_str(),
+        addGenericEvent(beginOffset, curOffset - beginOffset, "Noise Off", "",
                         Type::Noise);
         break;
 
       case EVENT_SETALTNOTE1:
         altNoteByte1 = readByte(curOffset++);
-        desc << "Note: " << std::hex << std::setfill('0') << std::setw(2) << std::uppercase << (int) altNoteByte1;
-        addGenericEvent(beginOffset,
-                        curOffset - beginOffset,
-                        "Set Alt Note 1",
-                        desc.str().c_str(),
-                        Type::ChangeState);
+        desc = fmt::format("Note: {:02X}", altNoteByte1);
+        addGenericEvent(beginOffset, curOffset - beginOffset, "Set Alt Note 1",
+                        desc.c_str(), Type::ChangeState);
         break;
 
       case EVENT_SETALTNOTE2:
         altNoteByte2 = readByte(curOffset++);
-        desc << "Note: " << std::hex << std::setfill('0') << std::setw(2) << std::uppercase << (int) altNoteByte2;
-        addGenericEvent(beginOffset,
-                        curOffset - beginOffset,
-                        "Set Alt Note 2",
-                        desc.str().c_str(),
-                        Type::ChangeState);
+        desc = fmt::format("Note: {:02X}", altNoteByte2);
+        addGenericEvent(beginOffset, curOffset - beginOffset, "Set Alt Note 2",
+                        desc.c_str(), Type::ChangeState);
         break;
 
       case EVENT_PITCHSLIDEDOWNSHORT: {
         curOffset += 4;
-        addGenericEvent(beginOffset,
-                        curOffset - beginOffset,
-                        "Pitch Slide Down (Short)",
-                        desc.str().c_str(),
+        addGenericEvent(beginOffset, curOffset - beginOffset,
+                        "Pitch Slide Down (Short)", "",
                         Type::PitchBendSlide);
         break;
       }
 
       case EVENT_PITCHSLIDEUPSHORT: {
         curOffset += 4;
-        addGenericEvent(beginOffset,
-                        curOffset - beginOffset,
-                        "Pitch Slide Up (Short)",
-                        desc.str().c_str(),
+        addGenericEvent(beginOffset, curOffset - beginOffset,
+                        "Pitch Slide Up (Short)", "",
                         Type::PitchBendSlide);
         break;
       }
 
       case EVENT_LONGDURON:
         useLongDur = true;
-        addGenericEvent(beginOffset,
-                        curOffset - beginOffset,
-                        "Long Duration On",
-                        desc.str().c_str(),
-                        Type::DurationChange);
+        addGenericEvent(beginOffset, curOffset - beginOffset, "Long Duration On",
+                        "", Type::DurationChange);
         break;
 
       case EVENT_LONGDUROFF:
         useLongDur = false;
-        addGenericEvent(beginOffset,
-                        curOffset - beginOffset,
-                        "Long Duration Off",
-                        desc.str().c_str(),
-                        Type::DurationChange);
+        addGenericEvent(beginOffset, curOffset - beginOffset,
+                        "Long Duration Off", "", Type::DurationChange);
         break;
 
       case EVENT_SETVOLADSRPRESET1: {
@@ -896,13 +808,11 @@ bool RareSnesTrack::readEvent(void) {
 
         // add event without MIDI events
         calculateVolPanFromVolLR(spcVolL, spcVolR, newMidiVol, newMidiPan);
-        desc << "Left Volume: " << newVolL << "  Right Volume: " << newVolR << "  AR: " << (int) ar << "  DR: "
-            << (int) dr << "  SL: " << (int) sl << "  SR: " << (int) sr;
-        addGenericEvent(beginOffset,
-                        curOffset - beginOffset,
-                        "Set Vol/ADSR Preset 1",
-                        desc.str(),
-                        Type::Volume);
+        desc = fmt::format(
+            "Left Volume: {:d}  Right Volume: {:d}  AR: {:d}  DR: {:d}  SL: {:d}  SR: {:d}",
+            newVolL, newVolR, ar, dr, sl, sr);
+        addGenericEvent(beginOffset, curOffset - beginOffset,
+                        "Set Vol/ADSR Preset 1", desc, Type::Volume);
         break;
       }
 
@@ -923,13 +833,11 @@ bool RareSnesTrack::readEvent(void) {
 
         // add event without MIDI events
         calculateVolPanFromVolLR(spcVolL, spcVolR, newMidiVol, newMidiPan);
-        desc << "Left Volume: " << newVolL << "  Right Volume: " << newVolR << "  AR: " << (int) ar << "  DR: "
-            << (int) dr << "  SL: " << (int) sl << "  SR: " << (int) sr;
-        addGenericEvent(beginOffset,
-                        curOffset - beginOffset,
-                        "Set Vol/ADSR Preset 2",
-                        desc.str(),
-                        Type::Volume);
+        desc = fmt::format(
+            "Left Volume: {:d}  Right Volume: {:d}  AR: {:d}  DR: {:d}  SL: {:d}  SR: {:d}",
+            newVolL, newVolR, ar, dr, sl, sr);
+        addGenericEvent(beginOffset, curOffset - beginOffset,
+                        "Set Vol/ADSR Preset 2", desc, Type::Volume);
         break;
       }
 
@@ -950,13 +858,11 @@ bool RareSnesTrack::readEvent(void) {
 
         // add event without MIDI events
         calculateVolPanFromVolLR(spcVolL, spcVolR, newMidiVol, newMidiPan);
-        desc << "Left Volume: " << newVolL << "  Right Volume: " << newVolR << "  AR: " << (int) ar << "  DR: "
-            << (int) dr << "  SL: " << (int) sl << "  SR: " << (int) sr;
-        addGenericEvent(beginOffset,
-                        curOffset - beginOffset,
-                        "Set Vol/ADSR Preset 3",
-                        desc.str(),
-                        Type::Volume);
+        desc = fmt::format(
+            "Left Volume: {:d}  Right Volume: {:d}  AR: {:d}  DR: {:d}  SL: {:d}  SR: {:d}",
+            newVolL, newVolR, ar, dr, sl, sr);
+        addGenericEvent(beginOffset, curOffset - beginOffset,
+                        "Set Vol/ADSR Preset 3", desc, Type::Volume);
         break;
       }
 
@@ -977,13 +883,11 @@ bool RareSnesTrack::readEvent(void) {
 
         // add event without MIDI events
         calculateVolPanFromVolLR(spcVolL, spcVolR, newMidiVol, newMidiPan);
-        desc << "Left Volume: " << newVolL << "  Right Volume: " << newVolR << "  AR: " << (int) ar << "  DR: "
-            << (int) dr << "  SL: " << (int) sl << "  SR: " << (int) sr;
-        addGenericEvent(beginOffset,
-                        curOffset - beginOffset,
-                        "Set Vol/ADSR Preset 4",
-                        desc.str(),
-                        Type::Volume);
+        desc = fmt::format(
+            "Left Volume: {:d}  Right Volume: {:d}  AR: {:d}  DR: {:d}  SL: {:d}  SR: {:d}",
+            newVolL, newVolR, ar, dr, sl, sr);
+        addGenericEvent(beginOffset, curOffset - beginOffset,
+                        "Set Vol/ADSR Preset 4", desc, Type::Volume);
         break;
       }
 
@@ -1004,13 +908,11 @@ bool RareSnesTrack::readEvent(void) {
 
         // add event without MIDI events
         calculateVolPanFromVolLR(spcVolL, spcVolR, newMidiVol, newMidiPan);
-        desc << "Left Volume: " << newVolL << "  Right Volume: " << newVolR << "  AR: " << (int) ar << "  DR: "
-            << (int) dr << "  SL: " << (int) sl << "  SR: " << (int) sr;
-        addGenericEvent(beginOffset,
-                        curOffset - beginOffset,
-                        "Set Vol/ADSR Preset 5",
-                        desc.str(),
-                        Type::Volume);
+        desc = fmt::format(
+            "Left Volume: {:d}  Right Volume: {:d}  AR: {:d}  DR: {:d}  SL: {:d}  SR: {:d}",
+            newVolL, newVolR, ar, dr, sl, sr);
+        addGenericEvent(beginOffset, curOffset - beginOffset,
+                        "Set Vol/ADSR Preset 5", desc, Type::Volume);
         break;
       }
 
@@ -1079,8 +981,10 @@ bool RareSnesTrack::readEvent(void) {
         int8_t newTransp = (int8_t) readByte(curOffset++);
         int8_t newTuning = (int8_t) readByte(curOffset++);
 
-        desc << "Program Number: " << (int) newProg << "  Transpose: " << (int) newTransp << "  Tuning: "
-            << (int) newTuning << " (" << (int) (getTuningInSemitones(newTuning) * 100 + 0.5) << " cents)";;
+        desc = fmt::format(
+            "Program Number: {:d}  Transpose: {:d}  Tuning: {:d} ({:d} cents)",
+            newProg, newTransp, newTuning,
+            int(getTuningInSemitones(newTuning) * 100 + 0.5));
 
         // instrument
         spcInstr = newProg;
@@ -1104,10 +1008,11 @@ bool RareSnesTrack::readEvent(void) {
         uint16_t newADSR = getShortBE(curOffset);
         curOffset += 2;
 
-        desc << "Program Number: " << (int) newProg << "  Transpose: " << (int) newTransp << "  Tuning: "
-            << (int) newTuning << " (" << (int) (getTuningInSemitones(newTuning) * 100 + 0.5) << " cents)";;
-        desc << "  Volume: " << (int) newVolL << ", " << (int) newVolR;
-        desc << "  ADSR: " << std::hex << std::setfill('0') << std::setw(4) << std::uppercase << (int) newADSR;
+        desc = fmt::format(
+            "Program Number: {:d}  Transpose: {:d}  Tuning: {:d} ({:d} cents)  Volume: {:d}, {:d}  ADSR: {:04X}",
+            newProg, newTransp, newTuning,
+            int(getTuningInSemitones(newTuning) * 100 + 0.5), newVolL, newVolR,
+            newADSR);
 
         // instrument
         spcInstr = newProg;
@@ -1137,11 +1042,8 @@ bool RareSnesTrack::readEvent(void) {
 
       case EVENT_ECHODELAY: {
         uint8_t newEDL = readByte(curOffset++);
-        desc << "Delay: " << (int) newEDL;
-        addGenericEvent(beginOffset,
-                        curOffset - beginOffset,
-                        "Echo Delay",
-                        desc.str().c_str(),
+        auto desc = fmt::format("Delay: {:d}", newEDL);
+        addGenericEvent(beginOffset, curOffset - beginOffset, "Echo Delay", desc,
                         Type::Reverb);
         break;
       }
@@ -1159,13 +1061,11 @@ bool RareSnesTrack::readEvent(void) {
 
         // add event without MIDI events
         calculateVolPanFromVolLR(parentSeq->presetVolL[0], parentSeq->presetVolR[0], newMidiVol, newMidiPan);
-        desc << "Left Volume 1: " << newVolL1 << "  Right Volume 1: " << newVolR1 << "  Left Volume 2: " << newVolL2
-            << "  Right Volume 2: " << newVolR2;
-        addGenericEvent(beginOffset,
-                        curOffset - beginOffset,
-                        "Set Volume Preset",
-                        desc.str(),
-                        Type::Control);
+        desc = fmt::format(
+            "Left Volume 1: {:d}  Right Volume 1: {:d}  Left Volume 2: {:d}  Right Volume 2: {:d}",
+            newVolL1, newVolR1, newVolL2, newVolR2);
+        addGenericEvent(beginOffset, curOffset - beginOffset, "Set Volume Preset",
+                        desc, Type::Control);
         break;
       }
 
@@ -1182,10 +1082,8 @@ bool RareSnesTrack::readEvent(void) {
         break;
 
       case EVENT_LFOOFF:
-        addGenericEvent(beginOffset,
-                        curOffset - beginOffset,
-                        "Pitch Slide/Vibrato/Tremolo Off",
-                        desc.str(),
+        addGenericEvent(beginOffset, curOffset - beginOffset,
+                        "Pitch Slide/Vibrato/Tremolo Off", "",
                         Type::ChangeState);
         break;
 
@@ -1220,9 +1118,8 @@ void RareSnesTrack::addVolLR(uint32_t offset,
   uint8_t newMidiPan;
   calculateVolPanFromVolLR(spcVolL, spcVolR, newMidiVol, newMidiPan);
 
-  std::ostringstream desc;
-  desc << "Left Volume: " << spcVolL << "  Right Volume: " << spcVolR;
-  addGenericEvent(offset, length, sEventName, desc.str(), Type::Volume);
+  auto desc = fmt::format("Left Volume: {:d}  Right Volume: {:d}", spcVolL, spcVolR);
+  addGenericEvent(offset, length, sEventName, desc, Type::Volume);
 
   // add MIDI events only if updated
   if (newMidiVol != vol) {

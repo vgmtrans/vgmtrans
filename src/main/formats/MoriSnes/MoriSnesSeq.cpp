@@ -4,6 +4,7 @@
  * refer to the included LICENSE.txt file
  */
 #include "MoriSnesSeq.h"
+#include "spdlog/fmt/fmt.h"
 
 DECLARE_FORMAT(MoriSnes);
 
@@ -74,9 +75,8 @@ bool MoriSnesSeq::parseHeader() {
       curOffset += 2;
       TrackStartAddress[trackIndex] = curOffset + ofsTrackStart;
 
-      std::stringstream trackName;
-      trackName << "Track " << (trackIndex + 1) << " Offset";
-      header->addChild(beginOffset, curOffset - beginOffset, trackName.str().c_str());
+      auto trackName = fmt::format("Track {} Offset", trackIndex + 1);
+      header->addChild(beginOffset, curOffset - beginOffset, trackName.c_str());
     }
     else {
       header->addUnknownChild(beginOffset, curOffset - beginOffset);
@@ -204,13 +204,13 @@ bool MoriSnesTrack::readEvent() {
   uint8_t statusByte = readByte(curOffset++);
   bool bContinue = true;
 
-  std::stringstream desc;
+  std::string desc;
 
   // note param
   uint8_t newDelta = spcDeltaTime;
   if (statusByte < 0x80) {
     newDelta = statusByte;
-    desc << "Delta Time: " << (int) newDelta;
+    desc = fmt::format("Delta Time: {:d}", newDelta);
     if (newDelta != 0) {
       spcDeltaTime = newDelta;
     }
@@ -218,20 +218,20 @@ bool MoriSnesTrack::readEvent() {
     statusByte = readByte(curOffset);
     if (statusByte < 0x80) {
       spcNoteDuration = statusByte;
-      desc << "  Dulation: " << (int) spcNoteDuration;
+      desc += fmt::format("  Duration: {:d}", spcNoteDuration);
       curOffset++;
 
       statusByte = readByte(curOffset);
       if (statusByte < 0x80) {
         spcNoteVelocity = statusByte;
-        desc << "  Velocity: " << (int) spcNoteVelocity;
+        desc += fmt::format("  Velocity: {:d}", spcNoteVelocity);
         curOffset++;
       }
     }
 
-    addGenericEvent(beginOffset, curOffset - beginOffset, "Note Param", desc.str().c_str(), Type::DurationNote);
+    addGenericEvent(beginOffset, curOffset - beginOffset, "Note Param", desc.c_str(), Type::DurationNote);
     beginOffset = curOffset;
-    desc.str("");
+    desc.clear();
 
     if (curOffset >= 0x10000) {
       return false;
@@ -248,27 +248,22 @@ bool MoriSnesTrack::readEvent() {
 
   switch (eventType) {
     case EVENT_UNKNOWN0:
-      desc << "Event: 0x" << std::hex << std::setfill('0') << std::setw(2) << std::uppercase << (int) statusByte;
-      addUnknown(beginOffset, curOffset - beginOffset, "Unknown Event", desc.str().c_str());
+      desc = fmt::format("Event: 0x{:02X}", statusByte);
+      addUnknown(beginOffset, curOffset - beginOffset, "Unknown Event", desc.c_str());
       break;
 
     case EVENT_UNKNOWN1: {
       uint8_t arg1 = readByte(curOffset++);
-      desc << "Event: 0x" << std::hex << std::setfill('0') << std::setw(2) << std::uppercase << (int) statusByte
-          << std::dec << std::setfill(' ') << std::setw(0)
-          << "  Arg1: " << (int) arg1;
-      addUnknown(beginOffset, curOffset - beginOffset, "Unknown Event", desc.str().c_str());
+      desc = fmt::format("Event: 0x{:02X}  Arg1: {:d}", statusByte, arg1);
+      addUnknown(beginOffset, curOffset - beginOffset, "Unknown Event", desc.c_str());
       break;
     }
 
     case EVENT_UNKNOWN2: {
       uint8_t arg1 = readByte(curOffset++);
       uint8_t arg2 = readByte(curOffset++);
-      desc << "Event: 0x" << std::hex << std::setfill('0') << std::setw(2) << std::uppercase << (int) statusByte
-          << std::dec << std::setfill(' ') << std::setw(0)
-          << "  Arg1: " << (int) arg1
-          << "  Arg2: " << (int) arg2;
-      addUnknown(beginOffset, curOffset - beginOffset, "Unknown Event", desc.str().c_str());
+      desc = fmt::format("Event: 0x{:02X}  Arg1: {:d}  Arg2: {:d}", statusByte, arg1, arg2);
+      addUnknown(beginOffset, curOffset - beginOffset, "Unknown Event", desc.c_str());
       break;
     }
 
@@ -276,12 +271,10 @@ bool MoriSnesTrack::readEvent() {
       uint8_t arg1 = readByte(curOffset++);
       uint8_t arg2 = readByte(curOffset++);
       uint8_t arg3 = readByte(curOffset++);
-      desc << "Event: 0x" << std::hex << std::setfill('0') << std::setw(2) << std::uppercase << (int) statusByte
-          << std::dec << std::setfill(' ') << std::setw(0)
-          << "  Arg1: " << (int) arg1
-          << "  Arg2: " << (int) arg2
-          << "  Arg3: " << (int) arg3;
-      addUnknown(beginOffset, curOffset - beginOffset, "Unknown Event", desc.str().c_str());
+      desc = fmt::format(
+          "Event: 0x{:02X}  Arg1: {:d}  Arg2: {:d}  Arg3: {:d}",
+          statusByte, arg1, arg2, arg3);
+      addUnknown(beginOffset, curOffset - beginOffset, "Unknown Event", desc.c_str());
       break;
     }
 
@@ -290,13 +283,10 @@ bool MoriSnesTrack::readEvent() {
       uint8_t arg2 = readByte(curOffset++);
       uint8_t arg3 = readByte(curOffset++);
       uint8_t arg4 = readByte(curOffset++);
-      desc << "Event: 0x" << std::hex << std::setfill('0') << std::setw(2) << std::uppercase << (int) statusByte
-          << std::dec << std::setfill(' ') << std::setw(0)
-          << "  Arg1: " << (int) arg1
-          << "  Arg2: " << (int) arg2
-          << "  Arg3: " << (int) arg3
-          << "  Arg4: " << (int) arg4;
-      addUnknown(beginOffset, curOffset - beginOffset, "Unknown Event", desc.str().c_str());
+      desc = fmt::format(
+          "Event: 0x{:02X}  Arg1: {:d}  Arg2: {:d}  Arg3: {:d}  Arg4: {:d}",
+          statusByte, arg1, arg2, arg3, arg4);
+      addUnknown(beginOffset, curOffset - beginOffset, "Unknown Event", desc.c_str());
       break;
     }
 
@@ -330,7 +320,7 @@ bool MoriSnesTrack::readEvent() {
       auto prevTiedNoteIter = std::find(tiedNoteKeys.begin(), tiedNoteKeys.end(), key);
       if (prevTiedNoteIter != tiedNoteKeys.end()) {
         makePrevDurNoteEnd(getTime() + dur);
-        addGenericEvent(beginOffset, curOffset - beginOffset, "Tie", desc.str().c_str(), Type::Tie);
+        addGenericEvent(beginOffset, curOffset - beginOffset, "Tie", desc.c_str(), Type::Tie);
 
         if (!tied) {
           // finish tied note
@@ -352,7 +342,7 @@ bool MoriSnesTrack::readEvent() {
       int16_t instrOffset = readShort(curOffset);
       curOffset += 2;
       uint16_t instrAddress = curOffset + instrOffset;
-      desc << "Envelope: $" << std::hex << std::setfill('0') << std::setw(4) << std::uppercase << (int) instrAddress;
+      desc = fmt::format("Envelope: ${:04X}", instrAddress);
 
       uint8_t instrNum;
       for (instrNum = 0; instrNum < parentSeq->InstrumentAddresses.size(); instrNum++) {
@@ -370,7 +360,7 @@ bool MoriSnesTrack::readEvent() {
       addGenericEvent(beginOffset,
                       curOffset - beginOffset,
                       "Program Change",
-                      desc.str().c_str(),
+                      desc.c_str(),
                       Type::ProgramChange);
       addProgramChangeNoItem(instrNum, false);
       break;
@@ -388,7 +378,7 @@ bool MoriSnesTrack::readEvent() {
         addPan(beginOffset, curOffset - beginOffset, midiPan);
       }
       else {
-        addGenericEvent(beginOffset, curOffset - beginOffset, "Random Pan", desc.str().c_str(), Type::Pan);
+        addGenericEvent(beginOffset, curOffset - beginOffset, "Random Pan", desc.c_str(), Type::Pan);
       }
       break;
     }
@@ -409,8 +399,8 @@ bool MoriSnesTrack::readEvent() {
 
     case EVENT_PRIORITY: {
       uint8_t newPriority = readByte(curOffset++);
-      desc << "Priority: " << (int) newPriority;
-      addGenericEvent(beginOffset, curOffset - beginOffset, "Priority", desc.str().c_str(), Type::Priority);
+      desc = fmt::format("Priority: {:d}", newPriority);
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Priority", desc.c_str(), Type::Priority);
       break;
     }
 
@@ -424,13 +414,13 @@ bool MoriSnesTrack::readEvent() {
     }
 
     case EVENT_ECHO_ON: {
-      addGenericEvent(beginOffset, curOffset - beginOffset, "Echo On", desc.str().c_str(), Type::Reverb);
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Echo On", desc.c_str(), Type::Reverb);
       addReverbNoItem(40);
       break;
     }
 
     case EVENT_ECHO_OFF: {
-      addGenericEvent(beginOffset, curOffset - beginOffset, "Echo Off", desc.str().c_str(), Type::Reverb);
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Echo Off", desc.c_str(), Type::Reverb);
       addReverbNoItem(0);
       break;
     }
@@ -440,12 +430,12 @@ bool MoriSnesTrack::readEvent() {
       int8_t volume = readByte(curOffset++);
       int8_t feedback = readByte(curOffset++);
       uint8_t filterIndex = readByte(curOffset++);
-      desc << "Delay: " << (int) delay << "  FIR: " << (int) volume << "  volume: " << (int) feedback << "  FIR: "
-          << (int) filterIndex;
+      desc = fmt::format("Delay: {:d}  FIR: {:d}  volume: {:d}  FIR: {:d}", delay, volume, feedback,
+                         filterIndex);
       addGenericEvent(beginOffset,
                       curOffset - beginOffset,
                       "Echo Param",
-                      desc.str().c_str(),
+                      desc.c_str(),
                       Type::Reverb);
       break;
     }
@@ -454,12 +444,12 @@ bool MoriSnesTrack::readEvent() {
       uint16_t dest = readShort(curOffset);
       curOffset += 2;
       dest += curOffset; // relative offset to address
-      desc << "Destination: $" << std::hex << std::setfill('0') << std::setw(4) << std::uppercase << (int) dest;
+      desc = fmt::format("Destination: ${:04X}", dest);
       uint32_t length = curOffset - beginOffset;
 
       curOffset = dest;
       if (!isOffsetUsed(dest)) {
-        addGenericEvent(beginOffset, length, "Jump", desc.str().c_str(), Type::LoopForever);
+        addGenericEvent(beginOffset, length, "Jump", desc.c_str(), Type::LoopForever);
       }
       else {
         bContinue = addLoopForever(beginOffset, length, "Jump");
@@ -471,11 +461,11 @@ bool MoriSnesTrack::readEvent() {
       uint16_t dest = readShort(curOffset);
       curOffset += 2;
       dest += curOffset; // relative offset to address
-      desc << "Destination: $" << std::hex << std::setfill('0') << std::setw(4) << std::uppercase << (int) dest;
+      desc = fmt::format("Destination: ${:04X}", dest);
       addGenericEvent(beginOffset,
                       curOffset - beginOffset,
                       "Pattern Play",
-                      desc.str().c_str(),
+                      desc.c_str(),
                       Type::RepeatStart);
 
       if (spcCallStackPtr + 2 > MORISNES_CALLSTACK_SIZE) {
@@ -497,7 +487,7 @@ bool MoriSnesTrack::readEvent() {
     }
 
     case EVENT_RET: {
-      addGenericEvent(beginOffset, curOffset - beginOffset, "End Pattern", desc.str().c_str(), Type::RepeatEnd);
+      addGenericEvent(beginOffset, curOffset - beginOffset, "End Pattern", desc.c_str(), Type::RepeatEnd);
 
       if (spcCallStackPtr < 2) {
         // access violation
@@ -512,8 +502,8 @@ bool MoriSnesTrack::readEvent() {
 
     case EVENT_LOOP_START: {
       uint8_t count = readByte(curOffset++);
-      desc << "Loop Count: " << (int) count;
-      addGenericEvent(beginOffset, curOffset - beginOffset, "Loop Start", desc.str().c_str(), Type::RepeatStart);
+      desc = fmt::format("Loop Count: {:d}", count);
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Loop Start", desc.c_str(), Type::RepeatStart);
 
       if (spcCallStackPtr + 3 > MORISNES_CALLSTACK_SIZE) {
         // stack overflow
@@ -530,7 +520,7 @@ bool MoriSnesTrack::readEvent() {
     }
 
     case EVENT_LOOP_END: {
-      addGenericEvent(beginOffset, curOffset - beginOffset, "Loop End", desc.str().c_str(), Type::RepeatEnd);
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Loop End", desc.c_str(), Type::RepeatEnd);
 
       if (spcCallStackPtr < 3) {
         // access violation
@@ -561,7 +551,7 @@ bool MoriSnesTrack::readEvent() {
     case EVENT_NOTE_NUMBER: {
       int8_t newNoteNumber = readByte(curOffset++);
       spcNoteNumberBase = newNoteNumber;
-      addGenericEvent(beginOffset, curOffset - beginOffset, "Note Number Base", desc.str().c_str(), Type::NoteOn);
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Note Number Base", desc.c_str(), Type::NoteOn);
       break;
     }
 
@@ -580,8 +570,8 @@ bool MoriSnesTrack::readEvent() {
     case EVENT_WAIT: {
       // do not stop tied note here
       // example: Gokinjo Bouken Tai - Battle (28:0000, Sax at 3rd channel)
-      desc << "Duration: " << spcDeltaTime;
-      addGenericEvent(beginOffset, curOffset - beginOffset, "Wait", desc.str().c_str(), Type::Rest);
+      desc = fmt::format("Duration: {:d}", spcDeltaTime);
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Wait", desc.c_str(), Type::Rest);
       addTime(spcDeltaTime);
       break;
     }
@@ -617,12 +607,12 @@ bool MoriSnesTrack::readEvent() {
     }
 
     case EVENT_KEY_ON: {
-      addGenericEvent(beginOffset, curOffset - beginOffset, "Key On", desc.str().c_str(), Type::NoteOn);
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Key On", desc.c_str(), Type::NoteOn);
       break;
     }
 
     case EVENT_KEY_OFF: {
-      addGenericEvent(beginOffset, curOffset - beginOffset, "Key Off", desc.str().c_str(), Type::NoteOff);
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Key Off", desc.c_str(), Type::NoteOff);
       break;
     }
 
@@ -644,8 +634,8 @@ bool MoriSnesTrack::readEvent() {
 
     case EVENT_TIMEBASE: {
       bool fast = ((readByte(curOffset++) & 1) != 0);
-      desc << "Timebase: " << (fast ? SEQ_PPQN : SEQ_PPQN / 2);
-      addGenericEvent(beginOffset, curOffset - beginOffset, "Timebase", desc.str().c_str(), Type::Tempo);
+      desc = fmt::format("Timebase: {:d}", fast ? SEQ_PPQN : SEQ_PPQN / 2);
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Timebase", desc.c_str(), Type::Tempo);
 
       if (parentSeq->fastTempo != fast) {
         addTempoBPMNoItem(parentSeq->getTempoInBPM(parentSeq->spcTempo, fast));
