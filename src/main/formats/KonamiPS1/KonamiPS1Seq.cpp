@@ -113,12 +113,12 @@ void KonamiPS1Track::resetVars() {
   skipDeltaTime = false;
 }
 
-bool KonamiPS1Track::readEvent() {
+SeqTrack::State KonamiPS1Track::readEvent() {
   KonamiPS1Seq *parentSeq = (KonamiPS1Seq *)this->parentSeq;
 
   uint32_t beginOffset = curOffset;
   if (curOffset >= vgmFile()->endOffset()) {
-    return false;
+    return State::Finished;
   }
 
   if (!skipDeltaTime) {
@@ -130,14 +130,13 @@ bool KonamiPS1Track::readEvent() {
                     description, Type::Rest);
 
     skipDeltaTime = true;
-    return true;
+    return State::Active;
   }
 
   uint8_t statusByte = readByte(curOffset++);
   uint8_t command = statusByte & 0x7f;
   bool note = (statusByte & 0x80) == 0;
 
-  bool bContinue = true;
   if (note) {
     uint8_t noteNumber = command;
     uint8_t paramByte = readByte(curOffset++);
@@ -299,8 +298,7 @@ bool KonamiPS1Track::readEvent() {
 
       case 127:
         addEndOfTrack(beginOffset, curOffset - beginOffset);
-        bContinue = false;
-        break;
+        return State::Finished;
 
       default:
         addUnknown(beginOffset, curOffset - beginOffset);
@@ -313,5 +311,5 @@ bool KonamiPS1Track::readEvent() {
     }
   }
 
-  return bContinue;
+  return State::Active;
 }

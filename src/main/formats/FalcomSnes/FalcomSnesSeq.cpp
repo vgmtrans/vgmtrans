@@ -201,16 +201,15 @@ int8_t FalcomSnesTrack::calculatePanValue(uint8_t pan, double &volumeScale) {
   return midiPan;
 }
 
-bool FalcomSnesTrack::readEvent() {
+SeqTrack::State FalcomSnesTrack::readEvent() {
   FalcomSnesSeq *parentSeq = static_cast<FalcomSnesSeq*>(this->parentSeq);
 
   uint32_t beginOffset = curOffset;
   if (curOffset >= 0x10000) {
-    return false;
+    return State::Finished;
   }
 
   uint8_t statusByte = readByte(curOffset++);
-  bool bContinue = true;
 
   std::string desc;
 
@@ -517,8 +516,7 @@ bool FalcomSnesTrack::readEvent() {
       addGenericEvent(beginOffset, curOffset - beginOffset, "Loop Break", desc, Type::LoopBreak);
 
       if (!parentSeq->repeatCountMap.contains(repeatCountAddr)) {
-        bContinue = false;
-        break;
+        return State::Suspended;
       }
 
       if (parentSeq->repeatCountMap[repeatCountAddr] == 1) {
@@ -537,8 +535,7 @@ bool FalcomSnesTrack::readEvent() {
       addGenericEvent(beginOffset, curOffset - beginOffset, "Loop End", desc, Type::RepeatEnd);
 
       if (!parentSeq->repeatCountMap.contains(repeatCountAddr)) {
-        bContinue = false;
-        break;
+        return State::Suspended;
       }
 
       parentSeq->repeatCountMap[repeatCountAddr]--;
@@ -656,7 +653,7 @@ bool FalcomSnesTrack::readEvent() {
 
       if (destOffset == 0) {
         addEndOfTrack(beginOffset, curOffset - beginOffset);
-        bContinue = false;
+        return State::Finished;
       }
       else {
         uint16_t dest = curOffset + destOffset;
@@ -668,7 +665,7 @@ bool FalcomSnesTrack::readEvent() {
           addGenericEvent(beginOffset, length, "Jump", desc, Type::LoopForever);
         }
         else {
-          bContinue = addLoopForever(beginOffset, length, "Jump");
+          return addLoopForever(beginOffset, length, "Jump");
         }
       }
       break;
@@ -677,7 +674,7 @@ bool FalcomSnesTrack::readEvent() {
     default:
       auto description = logEvent(statusByte);
       addUnknown(beginOffset, curOffset - beginOffset, "Unknown Event", description);
-      bContinue = false;
+      return State::Finished;
       break;
   }
 
@@ -685,5 +682,5 @@ bool FalcomSnesTrack::readEvent() {
   //ssTrace << "" << std::hex << std::setfill('0') << std::setw(8) << std::uppercase << beginOffset << ": " << std::setw(2) << (int)statusByte  << " -> " << std::setw(8) << curOffset << std::endl;
   //OutputDebugString(ssTrace.str().c_str());
 
-  return bContinue;
+  return State::Active;
 }

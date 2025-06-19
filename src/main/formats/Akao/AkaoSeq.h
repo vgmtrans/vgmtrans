@@ -211,7 +211,7 @@ class AkaoTrack final
   explicit AkaoTrack(AkaoSeq *parentFile, uint32_t offset = 0, uint32_t length = 0);
 
   void resetVars() override;
-  bool readEvent() override;
+  State readEvent() override;
 
   [[nodiscard]] AkaoSeq * seq() const noexcept {
     return reinterpret_cast<AkaoSeq*>(this->parentSeq);

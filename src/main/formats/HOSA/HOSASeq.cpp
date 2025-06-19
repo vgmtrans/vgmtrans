@@ -100,7 +100,7 @@ HOSATrack::HOSATrack(HOSASeq *parentFile, uint32_t offset, uint32_t length) :
 //	Memo
 //		SeqTrack::LoadTrack() から call される。
 //==============================================================
-bool HOSATrack::readEvent(void) {
+SeqTrack::State HOSATrack::readEvent() {
 
   //==================================
   //	[ Local 変数 ]
@@ -213,7 +213,7 @@ bool HOSATrack::readEvent(void) {
         //End of Track
         case (0x00):
           addEndOfTrack(beginOffset, curOffset - beginOffset);
-          return false;
+          return State::Finished;
           //------------
           //Tempo
         case (0x01):
@@ -323,8 +323,7 @@ bool HOSATrack::readEvent(void) {
   addTime(iDeltaTimeCom);
 
 
-  return true;
-
+  return State::Active;
 }
 //==============================================================
 //		Read delta time

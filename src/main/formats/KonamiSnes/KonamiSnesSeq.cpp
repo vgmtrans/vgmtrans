@@ -59,16 +59,16 @@ KonamiSnesSeq::KonamiSnesSeq(RawFile *file, KonamiSnesVersion ver, uint32_t seqd
   loadEventMap();
 }
 
-KonamiSnesSeq::~KonamiSnesSeq(void) {
+KonamiSnesSeq::~KonamiSnesSeq() {
 }
 
-void KonamiSnesSeq::resetVars(void) {
+void KonamiSnesSeq::resetVars() {
   VGMSeq::resetVars();
 
   tempo = 0;
 }
 
-bool KonamiSnesSeq::parseHeader(void) {
+bool KonamiSnesSeq::parseHeader() {
   setPPQN(SEQ_PPQN);
 
   // Number of tracks can be less than 8.
@@ -97,7 +97,7 @@ bool KonamiSnesSeq::parseHeader(void) {
 }
 
 
-bool KonamiSnesSeq::parseTrackPointers(void) {
+bool KonamiSnesSeq::parseTrackPointers() {
   for (uint32_t trackNumber = 0; trackNumber < nNumTracks; trackNumber++) {
     uint16_t trkOff = readShort(dwOffset + trackNumber * 2);
     aTracks.push_back(new KonamiSnesTrack(this, trkOff));
@@ -273,7 +273,7 @@ KonamiSnesTrack::KonamiSnesTrack(KonamiSnesSeq *parentFile, uint32_t offset, uin
   bWriteGenericEventAsTextEvent = false;
 }
 
-void KonamiSnesTrack::resetVars(void) {
+void KonamiSnesTrack::resetVars() {
   SeqTrack::resetVars();
 
   inSubroutine = false;
@@ -318,15 +318,14 @@ uint8_t KonamiSnesTrack::convertGAINAmountToGAIN(uint8_t gainAmount) {
   return gain;
 }
 
-bool KonamiSnesTrack::readEvent(void) {
+SeqTrack::State KonamiSnesTrack::readEvent() {
   KonamiSnesSeq *parentSeq = (KonamiSnesSeq *) this->parentSeq;
   uint32_t beginOffset = curOffset;
   if (curOffset >= 0x10000) {
-    return false;
+    return State::Finished;
   }
 
   uint8_t statusByte = readByte(curOffset++);
-  bool bContinue = true;
 
   std::string desc;
 
@@ -640,11 +639,12 @@ bool KonamiSnesTrack::readEvent(void) {
       uint8_t times = readByte(curOffset++);
       int8_t volumeDelta = readByte(curOffset++);
       int8_t pitchDelta = readByte(curOffset++);
+      State newState = State::Active;
 
       desc = fmt::format("Times: {:d}  Volume Delta: {:d}  Pitch Delta: {:d}",
                          times, volumeDelta, pitchDelta);
       if (times == 0) {
-        bContinue = addLoopForever(beginOffset, curOffset - beginOffset, "Loop End");
+        newState = addLoopForever(beginOffset, curOffset - beginOffset, "Loop End");
       }
       else {
         addGenericEvent(beginOffset, curOffset - beginOffset, "Loop End", desc, Type::RepeatStart);
@@ -672,7 +672,7 @@ bool KonamiSnesTrack::readEvent(void) {
         loopVolumeDelta = 0;
         loopPitchDelta = 0;
       }
-      break;
+      return newState;
     }
 
       case EVENT_LOOP_START_2: {
@@ -689,7 +689,7 @@ bool KonamiSnesTrack::readEvent(void) {
       desc = fmt::format("Times: {:d}  Volume Delta: {:d}  Pitch Delta: {:d}",
                          times, volumeDelta, pitchDelta);
       if (times == 0) {
-        bContinue = addLoopForever(beginOffset, curOffset - beginOffset, "Loop End #2");
+        return addLoopForever(beginOffset, curOffset - beginOffset, "Loop End #2");
       }
       else {
         addGenericEvent(beginOffset, curOffset - beginOffset, "Loop End #2", desc, Type::RepeatStart);
@@ -957,7 +957,7 @@ bool KonamiSnesTrack::readEvent(void) {
         addGenericEvent(beginOffset, length, "Jump", desc, Type::LoopForever);
       }
       else {
-        bContinue = addLoopForever(beginOffset, length, "Jump");
+        return addLoopForever(beginOffset, length, "Jump");
       }
       break;
     }
@@ -988,7 +988,7 @@ bool KonamiSnesTrack::readEvent(void) {
       }
       else {
         addEndOfTrack(beginOffset, curOffset - beginOffset);
-        bContinue = false;
+        return State::Finished;
       }
       break;
     }
@@ -996,13 +996,12 @@ bool KonamiSnesTrack::readEvent(void) {
     default: {
       auto descr = logEvent(statusByte);
       addUnknown(beginOffset, curOffset - beginOffset, "Unknown Event", descr);
-      bContinue = false;
-      break;
+      return State::Finished;
     }
   }
 
   //auto trace = fmt::format("{:08X}: {:02X} -> {:08X}", beginOffset, statusByte, curOffset);
   //LogDebug(trace);
 
-  return bContinue;
+  return State::Active;
 }

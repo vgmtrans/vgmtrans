@@ -229,12 +229,12 @@ void ChunSnesTrack::resetVars() {
 }
 
 
-bool ChunSnesTrack::readEvent() {
+SeqTrack::State ChunSnesTrack::readEvent() {
   ChunSnesSeq *parentSeq = static_cast<ChunSnesSeq*>(this->parentSeq);
 
   uint32_t beginOffset = curOffset;
   if (curOffset >= 0x10000) {
-    return false;
+    return State::Finished;
   }
 
   if (syncNoteLen) {
@@ -242,7 +242,6 @@ bool ChunSnesTrack::readEvent() {
   }
 
   uint8_t statusByte = readByte(curOffset++);
-  bool bContinue = true;
 
   std::string desc;
 
@@ -552,7 +551,7 @@ bool ChunSnesTrack::readEvent() {
         addGenericEvent(beginOffset, length, "Jump", desc, Type::LoopForever);
       }
       else {
-        bContinue = addLoopForever(beginOffset, length, "Jump");
+        return addLoopForever(beginOffset, length, "Jump");
       }
       break;
     }
@@ -691,8 +690,7 @@ bool ChunSnesTrack::readEvent() {
 
       if (subNestLevel >= CHUNSNES_SUBLEVEL_MAX) {
         // stack overflow
-        bContinue = false;
-        break;
+        return State::Finished;
       }
 
       subReturnAddr[subNestLevel] = curOffset;
@@ -776,7 +774,7 @@ bool ChunSnesTrack::readEvent() {
       else {
         // end of track
         addEndOfTrack(beginOffset, curOffset - beginOffset);
-        bContinue = false;
+        return State::Finished;
       }
       break;
     }
@@ -784,15 +782,14 @@ bool ChunSnesTrack::readEvent() {
     default:
       auto descr = logEvent(statusByte);
       addUnknown(beginOffset, curOffset - beginOffset, "Unknown Event", descr);
-      bContinue = false;
-      break;
+      return State::Finished;
   }
 
   //std::ostringstream ssTrace;
   //ssTrace << "" << std::hex << std::setfill('0') << std::setw(8) << std::uppercase << beginOffset << ": " << std::setw(2) << (int)statusByte  << " -> " << std::setw(8) << curOffset << std::endl;
   //OutputDebugString(ssTrace.str().c_str());
 
-  return bContinue;
+  return State::Active;
 }
 
 void ChunSnesTrack::syncNoteLengthWithPriorTrack() {

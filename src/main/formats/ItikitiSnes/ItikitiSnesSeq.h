@@ -110,7 +110,7 @@ class ItikitiSnesTrack : public SeqTrack {
  public:
   ItikitiSnesTrack(ItikitiSnesSeq *seq, uint32_t offset = 0, uint32_t length = 0);
   void resetVars() override;
-  bool readEvent() override;
+  State readEvent() override;
 
   [[nodiscard]] ItikitiSnesSeq *seq() const {
     return reinterpret_cast<ItikitiSnesSeq *>(parentSeq);

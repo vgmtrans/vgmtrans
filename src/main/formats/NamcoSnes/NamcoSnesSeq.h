@@ -54,7 +54,7 @@ class NamcoSnesSeq
 
   virtual bool parseHeader();
   virtual void resetVars();
-  virtual bool readEvent();
+  virtual State readEvent();
   virtual bool postLoad();
 
   NamcoSnesVersion version;

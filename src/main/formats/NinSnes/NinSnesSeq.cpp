@@ -697,7 +697,7 @@ NinSnesTrackSharedData::NinSnesTrackSharedData() {
   resetVars();
 }
 
-void NinSnesTrackSharedData::resetVars(void) {
+void NinSnesTrackSharedData::resetVars() {
   loopCount = 0;
   spcTranspose = 0;
 
@@ -724,7 +724,7 @@ NinSnesTrack::NinSnesTrack(NinSnesSection *parentSection, uint32_t offset, uint3
   bDetermineTrackLengthEventByEvent = true;
 }
 
-void NinSnesTrack::resetVars(void) {
+void NinSnesTrack::resetVars() {
   SeqTrack::resetVars();
 
   cKeyCorrection = SEQ_KEYOFS;
@@ -733,19 +733,18 @@ void NinSnesTrack::resetVars(void) {
   }
 }
 
-bool NinSnesTrack::readEvent(void) {
+SeqTrack::State NinSnesTrack::readEvent() {
   if (!available) {
-    return false;
+    return State::Finished;
   }
 
   NinSnesSeq *parentSeq = (NinSnesSeq *) this->parentSeq;
   uint32_t beginOffset = curOffset;
   if (curOffset >= 0x10000) {
-    return false;
+    return State::Finished;
   }
 
   uint8_t statusByte = readByte(curOffset++);
-  bool bContinue = true;
 
   std::string desc;
 
@@ -829,8 +828,8 @@ bool NinSnesTrack::readEvent(void) {
         }
 
         parentSeq->deactivateAllTracks();
-        bContinue = false;
         parentSeq->bIncTickAfterProcessingTracks = false;
+        return State::Finished;
       }
       else {
         uint32_t eventLength = curOffset - beginOffset;
@@ -1709,8 +1708,7 @@ bool NinSnesTrack::readEvent(void) {
     default: {
       auto descr = logEvent(statusByte);
       addUnknown(beginOffset, curOffset - beginOffset, "Unknown Event", descr);
-      bContinue = false;
-      break;
+      return State::Finished;
     }
   }
 
@@ -1725,7 +1723,7 @@ bool NinSnesTrack::readEvent(void) {
     }
   }
 
-  return bContinue;
+  return State::Active;
 }
 
 uint16_t NinSnesTrack::convertToApuAddress(uint16_t offset) {

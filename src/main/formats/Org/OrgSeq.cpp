@@ -6,10 +6,10 @@ OrgSeq::OrgSeq(RawFile *file, uint32_t offset)
     : VGMSeq(OrgFormat::name, file, offset, 0, "Org Seq") {
 }
 
-OrgSeq::~OrgSeq(void) {
+OrgSeq::~OrgSeq() {
 }
 
-bool OrgSeq::parseHeader(void) {
+bool OrgSeq::parseHeader() {
   waitTime = readShort(dwOffset + 6);
   beatsPerMeasure = readByte(dwOffset + 8);
   setPPQN(readByte(dwOffset + 9));
@@ -67,7 +67,7 @@ bool OrgTrack::loadTrack(uint32_t trackNum, uint32_t stopOffset, long stopDelta)
   return true;
 }
 
-bool OrgTrack::readEvent() {
+SeqTrack::State OrgTrack::readEvent() {
   uint8_t key = readByte(curOffset + (numNotes - curNote) * 4 + curNote);
   uint8_t vel = readByte(curOffset + (numNotes - curNote) * 4 + numNotes * 2 + curNote) / 2;
   uint8_t dur = readByte(curOffset + (numNotes - curNote) * 4 + numNotes + curNote);
@@ -92,5 +92,5 @@ bool OrgTrack::readEvent() {
   curOffset += 4;
   curNote++;
 
-  return true;
+  return State::Active;
 }

@@ -57,7 +57,7 @@ KonamiGXTrack::KonamiGXTrack(KonamiGXSeq *parentSeq, uint32_t offset, uint32_t l
 
 
 // I'm going to try to follow closely to the original Salamander 2 code at 0x30C6
-bool KonamiGXTrack::readEvent(void) {
+SeqTrack::State KonamiGXTrack::readEvent() {
   uint32_t beginOffset = curOffset;
   uint32_t deltatest = getTime();
   //AddDelta(ReadVarLen(curOffset));
@@ -71,14 +71,14 @@ bool KonamiGXTrack::readEvent(void) {
     }
     else {
       addEndOfTrack(beginOffset, curOffset - beginOffset);
-      return 0;
+      return State::Finished;
     }
   }
   else if (status_byte == 0x60) {
-    return 1;
+    return State::Active;
   }
   else if (status_byte == 0x61) {
-    return 1;
+    return State::Active;
   }
   else if (status_byte < 0xC0)    //note event
   {
@@ -280,7 +280,7 @@ bool KonamiGXTrack::readEvent(void) {
 
       default:
         addEndOfTrack(beginOffset, curOffset - beginOffset);
-        return false;
+        return State::Finished;
     }
-  return true;
+  return State::Active;
 }

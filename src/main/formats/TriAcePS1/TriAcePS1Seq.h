@@ -48,7 +48,7 @@ class TriAcePS1Track
   uint32_t readScorePattern(uint32_t offset);
   virtual bool isOffsetUsed(uint32_t offset);
   virtual void addEvent(SeqEvent *pSeqEvent);
-  virtual bool readEvent();
+  virtual State readEvent();
 
   uint8_t impliedNoteDur;
   uint8_t impliedVelocity;

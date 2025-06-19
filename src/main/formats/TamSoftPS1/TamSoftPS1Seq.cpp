@@ -175,13 +175,13 @@ void TamSoftPS1Track::resetVars() {
   lastNoteKey = -1;
 }
 
-bool TamSoftPS1Track::readEvent() {
+SeqTrack::State TamSoftPS1Track::readEvent() {
   TamSoftPS1Seq *parentSeq = (TamSoftPS1Seq *)this->parentSeq;
 
   uint32_t beginOffset = curOffset;
   if (curOffset >= vgmFile()->endOffset()) {
     finalizeAllNotes();
-    return false;
+    return State::Finished;
   }
 
   uint8_t statusByte = readByte(curOffset++);
@@ -338,7 +338,7 @@ bool TamSoftPS1Track::readEvent() {
           addGenericEvent(beginOffset, length, "Jump", desc, Type::LoopForever);
         }
         else {
-          bContinue = addLoopForever(beginOffset, length, "Jump");
+          bContinue = addLoopForever(beginOffset, length, "Jump") == State::Active;
         }
         break;
       }
@@ -371,7 +371,7 @@ bool TamSoftPS1Track::readEvent() {
     finalizeAllNotes();
   }
 
-  return bContinue;
+  return bContinue ? State::Active : State::Finished;
 }
 
 void TamSoftPS1Track::finalizeAllNotes() {

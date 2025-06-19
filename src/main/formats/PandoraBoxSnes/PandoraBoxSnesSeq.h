@@ -71,7 +71,7 @@ class PandoraBoxSnesTrack
  public:
   PandoraBoxSnesTrack(PandoraBoxSnesSeq *parentFile, uint32_t offset = 0, uint32_t length = 0);
   virtual void resetVars();
-  virtual bool readEvent();
+  virtual State readEvent();
 
  private:
   uint8_t getVolume(uint8_t volumeIndex);

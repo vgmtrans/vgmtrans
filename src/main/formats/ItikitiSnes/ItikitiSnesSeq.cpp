@@ -139,17 +139,16 @@ void ItikitiSnesTrack::resetVars() {
   m_alt_loop_count = 0; // actual driver does not initialize this
 }
 
-bool ItikitiSnesTrack::readEvent() {
+SeqTrack::State ItikitiSnesTrack::readEvent() {
   auto *seq = this->seq();
 
   const auto start = curOffset;
   if (curOffset >= 0x10000)
-    return false;
+    return State::Finished;
 
   const uint8_t command = readByte(curOffset++);
   const auto event_type = seq->getEventType(command);
 
-  bool stop_parser = false;
   std::string desc;
   switch (event_type) {
     case ItikitiSnesSeqEventType::EVENT_UNKNOWN0:
@@ -211,8 +210,7 @@ bool ItikitiSnesTrack::readEvent() {
 
     case ItikitiSnesSeqEventType::EVENT_END: {
       addEndOfTrack(start, curOffset - start);
-      stop_parser = true;
-      break;
+      return State::Finished;
     }
 
     case ItikitiSnesSeqEventType::EVENT_MASTER_VOLUME: {
@@ -527,8 +525,7 @@ bool ItikitiSnesTrack::readEvent() {
 
       if (m_loop_level + 1 >= kItikitiSnesSeqMaxLoopLevel) {
         L_WARN("Loop Start: too many nesting loops");
-        stop_parser = true;
-        break;
+        return State::Finished;
       }
       m_loop_level++;
       m_loop_counts[m_loop_level] = (count == 0) ? 0 : count + 1;
@@ -547,7 +544,7 @@ bool ItikitiSnesTrack::readEvent() {
       if (!isOffsetUsed(dest)) {
         addGenericEvent(start, length, "Jump", desc, Type::LoopForever);
       } else {
-        stop_parser = !addLoopForever(start, length, "Jump");
+        return addLoopForever(start, length, "Jump");
       }
       break;
     }
@@ -555,8 +552,9 @@ bool ItikitiSnesTrack::readEvent() {
     case ItikitiSnesSeqEventType::EVENT_LOOP_END: {
       if (m_loop_counts[m_loop_level] == 0) {
         // infinite loop
-        stop_parser = !addLoopForever(start, curOffset - start);
+        auto newState = addLoopForever(start, curOffset - start);
         curOffset = m_loop_start_addresses[m_loop_level];
+        return newState;
       } else {
         addGenericEvent(start, curOffset - start, "Loop End", desc, Type::RepeatEnd);
 
@@ -591,9 +589,8 @@ bool ItikitiSnesTrack::readEvent() {
     default:
       desc = logEvent(command);
       addUnknown(start, curOffset - start, "Unknown Event", desc);
-      stop_parser = true;
-      break;
+      return State::Finished;
   }
 
-  return !stop_parser;
+  return State::Active;
 }

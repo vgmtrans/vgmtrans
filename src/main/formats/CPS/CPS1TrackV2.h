@@ -12,7 +12,7 @@ public:
   CPS1TrackV2(VGMSeq *parentSeq, CPSSynth channelSynth, uint32_t offset = 0, uint32_t length = 0);
   void resetVars() override;
   void addInitialMidiEvents(int trackNum) override;
-  bool readEvent() override;
+  State readEvent() override;
 
 private:
   CPS1FormatVer version() const { return (static_cast<CPS1Seq*>(this->parentSeq))->formatVersion(); }

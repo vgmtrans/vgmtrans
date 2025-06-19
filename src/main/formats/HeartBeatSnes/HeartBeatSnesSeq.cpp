@@ -206,16 +206,15 @@ void HeartBeatSnesTrack::resetVars(void) {
 }
 
 
-bool HeartBeatSnesTrack::readEvent() {
+SeqTrack::State HeartBeatSnesTrack::readEvent() {
   HeartBeatSnesSeq *parentSeq = static_cast<HeartBeatSnesSeq*>(this->parentSeq);
 
   uint32_t beginOffset = curOffset;
   if (curOffset >= 0x10000) {
-    return false;
+    return State::Finished;
   }
 
   uint8_t statusByte = readByte(curOffset++);
-  bool bContinue = true;
 
   std::string desc;
 
@@ -258,8 +257,7 @@ bool HeartBeatSnesTrack::readEvent() {
 
     case EVENT_END: {
       addEndOfTrack(beginOffset, curOffset - beginOffset);
-      bContinue = false;
-      break;
+      return State::Finished;
     }
 
     case EVENT_NOTE_LENGTH: {
@@ -608,7 +606,7 @@ bool HeartBeatSnesTrack::readEvent() {
         addGenericEvent(beginOffset, length, "Jump", desc, Type::LoopForever);
       }
       else {
-        bContinue = addLoopForever(beginOffset, length, "Jump");
+        return addLoopForever(beginOffset, length, "Jump");
       }
       break;
     }
@@ -812,8 +810,7 @@ bool HeartBeatSnesTrack::readEvent() {
         default: {
           auto descr = logEvent(subStatusByte, spdlog::level::err, "Subevent");
           addUnknown(beginOffset, curOffset - beginOffset, "Unknown Event", descr);
-          bContinue = false;
-          break;
+          return State::Finished;
         }
       }
 
@@ -823,8 +820,7 @@ bool HeartBeatSnesTrack::readEvent() {
     default: {
       auto descr = logEvent(statusByte);
       addUnknown(beginOffset, curOffset - beginOffset, "Unknown Event", descr);
-      bContinue = false;
-      break;
+      return State::Finished;
     }
   }
 
@@ -832,5 +828,5 @@ bool HeartBeatSnesTrack::readEvent() {
   //ssTrace << "" << std::hex << std::setfill('0') << std::setw(8) << std::uppercase << beginOffset << ": " << std::setw(2) << (int)statusByte  << " -> " << std::setw(8) << curOffset << std::endl;
   //OutputDebugString(ssTrace.str().c_str());
 
-  return bContinue;
+  return State::Active;
 }

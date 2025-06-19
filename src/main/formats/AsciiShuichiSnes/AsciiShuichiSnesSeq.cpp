@@ -177,16 +177,15 @@ void AsciiShuichiSnesTrack::resetVars() {
   ranges::fill(callStack, 0);
 }
 
-bool AsciiShuichiSnesTrack::readEvent() {
+SeqTrack::State AsciiShuichiSnesTrack::readEvent() {
   const auto parentSeq = dynamic_cast<AsciiShuichiSnesSeq*>(this->parentSeq);
 
   const uint32_t beginOffset = curOffset;
   if (curOffset >= 0x10000) {
-    return false;
+    return State::Finished;
   }
 
   const uint8_t statusByte = readByte(curOffset++);
-  bool bContinue = true;
 
   auto eventType = static_cast<AsciiShuichiSnesSeqEventType>(0);
   const auto pEventType = parentSeq->EventMap.find(statusByte);
@@ -237,8 +236,7 @@ bool AsciiShuichiSnesTrack::readEvent() {
 
     case EVENT_END: {
       addEndOfTrack(beginOffset, curOffset - beginOffset);
-      bContinue = false;
-      break;
+      return State::Finished;
     }
 
     case EVENT_NOTE: {
@@ -294,9 +292,9 @@ bool AsciiShuichiSnesTrack::readEvent() {
     }
 
     case EVENT_INFINITE_LOOP_END: {
-      bContinue = addLoopForever(beginOffset, curOffset - beginOffset);
+      auto newState = addLoopForever(beginOffset, curOffset - beginOffset);
       curOffset = infiniteLoopPoint;
-      break;
+      return newState;
     }
 
     case EVENT_LOOP_START:
@@ -345,7 +343,7 @@ bool AsciiShuichiSnesTrack::readEvent() {
       if (shouldRepeatAgain) {
         if (repeatStartNestLevel == 0) {
           L_WARN("Stack overflow in Loop End Event.");
-          bContinue = false;
+          return State::Finished;
         } else {
           curOffset = repeatStartAddressStack[repeatStartNestLevel - 1];
         }
@@ -362,7 +360,7 @@ bool AsciiShuichiSnesTrack::readEvent() {
       } else {
         if (repeatEndNestLevel == 0) {
           L_WARN("Stack overflow in Loop Break Event.");
-          bContinue = false;
+          return State::Finished;
         } else {
           // end the repeat if last time
           if (repeatCountStack[repeatEndNestLevel - 1] == 1) {
@@ -386,8 +384,7 @@ bool AsciiShuichiSnesTrack::readEvent() {
 
       if (callNestLevel >= callStack.size()) {
         L_WARN("Stack overflow in Pattern Play Event.");
-        bContinue = false;
-        break;
+        return State::Finished;
       }
 
       // save loop start address and repeat count
@@ -404,8 +401,7 @@ bool AsciiShuichiSnesTrack::readEvent() {
 
       if (callNestLevel == 0) {
         L_WARN("Stack overflow in Pattern End Event.");
-        bContinue = false;
-        break;
+        return State::Finished;
       }
 
       curOffset = callStack[--callNestLevel];
@@ -697,12 +693,11 @@ bool AsciiShuichiSnesTrack::readEvent() {
     default: {
       const auto desc = logEvent(statusByte);
       addUnknown(beginOffset, curOffset - beginOffset, "Unknown Event", desc);
-      bContinue = false;
-      break;
+      return State::Finished;
     }
   }
 
-  return bContinue;
+  return State::Active;
 }
 
 void AsciiShuichiSnesTrack::getVolumeBalance(uint8_t pan, double &volumeLeft, double &volumeRight) {

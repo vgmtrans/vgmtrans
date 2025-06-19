@@ -23,7 +23,7 @@ class KonamiGXTrack
  public:
   KonamiGXTrack(KonamiGXSeq *parentSeq, uint32_t offset = 0, uint32_t length = 0);
 
-  virtual bool readEvent(void);
+  virtual SeqTrack::State readEvent();
 
  private:
   bool bInJump;

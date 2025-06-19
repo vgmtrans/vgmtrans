@@ -120,7 +120,7 @@ void FFTTrack::resetVars() {
 //	2009. 6.17(Wed.) :	Re-make by "Sound tester 774" in "内蔵音源をMIDI変換するスレ(in http://www.2ch.net)"
 //						Add un-known command(op-code).
 //--------------------------------------------------
-bool FFTTrack::readEvent() {
+SeqTrack::State FFTTrack::readEvent() {
   uint32_t beginOffset = curOffset;
   uint8_t status_byte = readByte(curOffset++);
 
@@ -168,16 +168,17 @@ bool FFTTrack::readEvent() {
         //Track Event
 
         //end of track
-      case 0x90:
+      case 0x90: {
         if (infiniteLoopPt == 0) {
           addEndOfTrack(beginOffset, curOffset - beginOffset);
-          return false;
+          return State::Finished;
         }
         octave = infiniteLoopOctave;
         curOffset = infiniteLoopPt;
         return addLoopForever(beginOffset, 1);
 
         //Dal Segno. (Infinite loop)
+      }
       case 0x91:
         infiniteLoopPt = curOffset;
         infiniteLoopOctave = octave;
@@ -685,6 +686,6 @@ bool FFTTrack::readEvent() {
       default:
         break;
     }
-  return true;
+  return State::Active;
 }
 

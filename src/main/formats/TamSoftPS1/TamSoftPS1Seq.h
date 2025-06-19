@@ -30,7 +30,7 @@ class TamSoftPS1Track
   TamSoftPS1Track(TamSoftPS1Seq *parentSeq, uint32_t offset);
 
   virtual void resetVars();
-  virtual bool readEvent();
+  virtual State readEvent();
 
  protected:
   void finalizeAllNotes();

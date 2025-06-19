@@ -23,7 +23,7 @@ class MP2kTrack final : public SeqTrack {
 public:
   MP2kTrack(MP2kSeq *parentSeq, uint32_t offset = 0, uint32_t length = 0);
 
-  bool readEvent() override;
+  State readEvent() override;
 
 private:
   uint8_t state = 0;

@@ -133,7 +133,7 @@ class AkaoSnesTrack : public SeqTrack {
 public:
   AkaoSnesTrack(AkaoSnesSeq *parentFile, uint32_t offset = 0, uint32_t length = 0);
   void resetVars() override;
-  bool readEvent() override;
+  State readEvent() override;
 
   uint16_t romAddressToApuAddress(uint16_t romAddress) const;
   uint16_t getShortAddress(uint32_t offset) const;
@@ -145,6 +145,8 @@ public:
   bool percussion;
   uint8_t nonPercussionProgram;
   bool jumpActivatedByMainCpu;
+  u8 condJumpTargetValue{0};
+  std::unordered_set<u32 /*offset*/> condBranches;
 
   uint8_t loopLevel;
   uint8_t loopIncCount[AKAOSNES_LOOP_LEVEL_MAX];

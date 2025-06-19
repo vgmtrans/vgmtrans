@@ -548,7 +548,7 @@ void AkaoTrack::resetVars() {
   conditional_jump_destinations.clear();
 }
 
-bool AkaoTrack::readEvent() {
+SeqTrack::State AkaoTrack::readEvent() {
   AkaoSeq *parentSeq = seq();
   const AkaoPs1Version version = parentSeq->version();
   const uint32_t beginOffset = curOffset;
@@ -618,7 +618,7 @@ bool AkaoTrack::readEvent() {
   }
   else if ((status_byte >= 0x9A) && (status_byte <= 0x9F)) {
     addUnknown(beginOffset, curOffset - beginOffset, "Undefined");
-    return false; // they should not be used
+    return State::Finished; // they should not be used
   }
   else {
     auto event = static_cast<AkaoSeqEventType>(0);
@@ -647,7 +647,7 @@ bool AkaoTrack::readEvent() {
     switch (event) {
     case EVENT_END:
       addEndOfTrack(beginOffset, curOffset - beginOffset);
-      return false;
+      return State::Finished;
 
     case EVENT_PROGCHANGE: {
       // change program to articulation number
@@ -1272,8 +1272,7 @@ bool AkaoTrack::readEvent() {
         addGenericEvent(beginOffset, length, "Jump", d, Type::LoopForever);
       }
       else {
-        if (!addLoopForever(beginOffset, length, "Jump"))
-          return anyUnvisitedJumpDestinations();
+        return addLoopForever(beginOffset, length, "Jump");
       }
       break;
     }
@@ -1573,11 +1572,11 @@ bool AkaoTrack::readEvent() {
     default:
       addUnknown(beginOffset, curOffset - beginOffset);
       logUnknownEvent(beginOffset);
-      return false;
+      return State::Finished;
     }
   }
 
-  return true;
+  return State::Active;
 }
 
 void AkaoTrack::logUnknownEvent(u32 beginOffset) const {

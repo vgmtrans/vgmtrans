@@ -183,13 +183,13 @@ void VGMSeq::loadTracksMain(uint32_t stopTime) {
           L_WARN("{} - reached tick-by-tick stop time during load.", name());
         }
 
-        deactivateAllTracks();
-        break;
-      }
+          suspendAllActiveTracks();
+          break;
+        }
 
       // process tracks
       for (uint32_t trackNum = 0; trackNum < nNumTracks; trackNum++) {
-        if (!aTracks[trackNum]->active)
+        if (aTracks[trackNum]->state() != SeqTrack::State::Active)
           continue;
 
         // tick
@@ -227,8 +227,8 @@ void VGMSeq::loadTracksMain(uint32_t stopTime) {
 
       // check loop count
       int requiredLoops = (readMode == READMODE_ADD_TO_UI) ? 1 : ConversionOptions::the().numSequenceLoops();
-      if (foreverLoopCount() >= requiredLoops) {
-        deactivateAllTracks();
+      if (foreverLoopCount() > requiredLoops) {
+        suspendAllActiveTracks();
         break;
       }
     }
@@ -240,7 +240,7 @@ void VGMSeq::loadTracksMain(uint32_t stopTime) {
       time = initialTime;
 
       aTracks[trackNum]->loadTrackMainLoop(aStopOffset[trackNum], stopTime);
-      aTracks[trackNum]->active = false;
+      aTracks[trackNum]->setState(SeqTrack::State::Finished);
     }
   }
   delete[] aStopOffset;
@@ -248,7 +248,7 @@ void VGMSeq::loadTracksMain(uint32_t stopTime) {
 
 bool VGMSeq::hasActiveTracks() {
   for (uint32_t trackNum = 0; trackNum < nNumTracks; trackNum++) {
-    if (aTracks[trackNum]->active)
+    if (aTracks[trackNum]->state() == SeqTrack::State::Active)
       return true;
   }
   return false;
@@ -256,7 +256,23 @@ bool VGMSeq::hasActiveTracks() {
 
 void VGMSeq::deactivateAllTracks() {
   for (uint32_t trackNum = 0; trackNum < nNumTracks; trackNum++) {
-    aTracks[trackNum]->active = false;
+    aTracks[trackNum]->setState(SeqTrack::State::Finished);
+  }
+}
+
+void VGMSeq::suspendAllActiveTracks() {
+  for (const auto track : aTracks) {
+    if (track->state() == SeqTrack::State::Active) {
+      track->setState(SeqTrack::State::Suspended);
+    }
+  }
+}
+
+void VGMSeq::activateAllSuspendedTracks() {
+  for (const auto track : aTracks) {
+    if (track->state() == SeqTrack::State::Suspended) {
+      track->setState(SeqTrack::State::Active);
+    }
   }
 }
 
@@ -265,12 +281,12 @@ int VGMSeq::foreverLoopCount() {
     return 0;
 
   int foreverLoops = INT_MAX;
-  for (uint32_t trackNum = 0; trackNum < nNumTracks; trackNum++) {
-    if (!aTracks[trackNum]->active)
+  for (const auto track : aTracks) {
+    if (track->state() != SeqTrack::State::Active)
       continue;
 
-    if (foreverLoops > aTracks[trackNum]->foreverLoops)
-      foreverLoops = aTracks[trackNum]->foreverLoops;
+    if (foreverLoops > track->foreverLoops)
+      foreverLoops = track->foreverLoops;
   }
   return (foreverLoops != INT_MAX) ? foreverLoops : 0;
 }

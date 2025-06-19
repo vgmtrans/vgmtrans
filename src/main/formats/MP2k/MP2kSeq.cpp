@@ -103,10 +103,9 @@ MP2kTrack::MP2kTrack(MP2kSeq *parentFile, uint32_t offset, uint32_t length)
     : SeqTrack(parentFile, offset, length) {
 }
 
-bool MP2kTrack::readEvent() {
+SeqTrack::State MP2kTrack::readEvent() {
   uint32_t beginOffset = curOffset;
   uint8_t status_byte = readByte(curOffset++);
-  bool bContinue = true;
 
   /* Status change event (note, vel (fade), vol, ...) */
   if (status_byte <= 0x7F) {
@@ -128,18 +127,19 @@ bool MP2kTrack::readEvent() {
     }
   } else if (status_byte == 0xB1) { /* End of track */
     addEndOfTrack(beginOffset, curOffset - beginOffset);
-    return false;
+    return State::Finished;
   } else if (status_byte == 0xB2) { /* Goto */
     uint32_t destOffset = getWord(curOffset) - 0x8000000;
     curOffset += 4;
     uint32_t length = curOffset - beginOffset;
     uint32_t dwEndTrackOffset = curOffset;
+    State newState = State::Active;
 
     curOffset = destOffset;
     if (!isOffsetUsed(destOffset) || loopEndPositions.size() != 0) {
       addGenericEvent(beginOffset, length, "Goto", "", Type::LoopForever);
     } else {
-      bContinue = addLoopForever(beginOffset, length, "Goto");
+      newState = addLoopForever(beginOffset, length, "Goto");
     }
 
     // Add next end of track event
@@ -151,11 +151,12 @@ bool MP2kTrack::readEvent() {
         }
       }
     }
+    return newState;
   } else if (status_byte > 0xB2 && status_byte <= 0xCF) { /* Special event */
     handleSpecialCommand(beginOffset, status_byte);
   }
 
-  return bContinue;
+  return State::Active;
 }
 
 void MP2kTrack::handleStatusCommand(u32 beginOffset, u8 status_byte) {

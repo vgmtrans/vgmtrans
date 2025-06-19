@@ -14,7 +14,7 @@ class HeartBeatPS1Seq:
 
   bool parseHeader() override;
   void resetVars() override;
-  bool readEvent() override;
+  State readEvent() override;
 
  private:
   uint8_t key;

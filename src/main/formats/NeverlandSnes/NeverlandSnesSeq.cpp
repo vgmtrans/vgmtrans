@@ -21,14 +21,14 @@ NeverlandSnesSeq::NeverlandSnesSeq(RawFile *file, NeverlandSnesVersion ver, uint
   loadEventMap();
 }
 
-NeverlandSnesSeq::~NeverlandSnesSeq(void) {
+NeverlandSnesSeq::~NeverlandSnesSeq() {
 }
 
-void NeverlandSnesSeq::resetVars(void) {
+void NeverlandSnesSeq::resetVars() {
   VGMSeq::resetVars();
 }
 
-bool NeverlandSnesSeq::parseHeader(void) {
+bool NeverlandSnesSeq::parseHeader() {
   setPPQN(SEQ_PPQN);
 
   VGMHeader *header = addHeader(dwOffset, 0);
@@ -92,7 +92,7 @@ bool NeverlandSnesSeq::parseHeader(void) {
   return true;
 }
 
-bool NeverlandSnesSeq::parseTrackPointers(void) {
+bool NeverlandSnesSeq::parseTrackPointers() {
   return true;
 }
 
@@ -124,20 +124,19 @@ NeverlandSnesTrack::NeverlandSnesTrack(NeverlandSnesSeq *parentFile, uint32_t of
   bWriteGenericEventAsTextEvent = false;
 }
 
-void NeverlandSnesTrack::resetVars(void) {
+void NeverlandSnesTrack::resetVars() {
   SeqTrack::resetVars();
 }
 
-bool NeverlandSnesTrack::readEvent(void) {
+SeqTrack::State NeverlandSnesTrack::readEvent() {
   NeverlandSnesSeq *parentSeq = (NeverlandSnesSeq *) this->parentSeq;
 
   uint32_t beginOffset = curOffset;
   if (curOffset >= 0x10000) {
-    return false;
+    return State::Finished;
   }
 
   uint8_t statusByte = readByte(curOffset++);
-  bool bContinue = true;
 
   std::string desc;
 
@@ -191,8 +190,7 @@ bool NeverlandSnesTrack::readEvent(void) {
     default: {
       auto descr = logEvent(statusByte);
       addUnknown(beginOffset, curOffset - beginOffset, "Unknown Event", descr);
-      bContinue = false;
-      break;
+      return State::Finished;
     }
   }
 
@@ -200,7 +198,7 @@ bool NeverlandSnesTrack::readEvent(void) {
   //ssTrace << "" << std::hex << std::setfill('0') << std::setw(8) << std::uppercase << beginOffset << ": " << std::setw(2) << (int)statusByte  << " -> " << std::setw(8) << curOffset << std::endl;
   //OutputDebugString(ssTrace.str().c_str());
 
-  return bContinue;
+  return State::Active;
 }
 
 uint16_t NeverlandSnesTrack::convertToApuAddress(uint16_t offset) {

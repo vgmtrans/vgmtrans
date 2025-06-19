@@ -247,16 +247,15 @@ void PrismSnesTrack::resetVars() {
   subReturnAddr = 0;
 }
 
-bool PrismSnesTrack::readEvent() {
+SeqTrack::State PrismSnesTrack::readEvent() {
   PrismSnesSeq *parentSeq = (PrismSnesSeq *) this->parentSeq;
 
   uint32_t beginOffset = curOffset;
   if (curOffset >= 0x10000) {
-    return false;
+    return State::Finished;
   }
 
   uint8_t statusByte = readByte(curOffset++);
-  bool bContinue = true;
 
   std::string desc;
 
@@ -318,12 +317,12 @@ bool PrismSnesTrack::readEvent() {
 
       uint8_t len;
       if (!readDeltaTime(curOffset, len)) {
-        return false;
+        return State::Finished;
       }
 
       uint8_t durDelta;
       if (!readDuration(curOffset, len, durDelta)) {
-        return false;
+        return State::Finished;
       }
 
       uint8_t dur = getDuration(curOffset, len, durDelta);
@@ -362,12 +361,12 @@ bool PrismSnesTrack::readEvent() {
 
       uint8_t len;
       if (!readDeltaTime(curOffset, len)) {
-        return false;
+        return State::Finished;
       }
 
       uint8_t durDelta;
       if (!readDuration(curOffset, len, durDelta)) {
-        return false;
+        return State::Finished;
       }
 
       uint8_t dur = getDuration(curOffset, len, durDelta);
@@ -387,12 +386,12 @@ bool PrismSnesTrack::readEvent() {
     case EVENT_TIE_WITH_DUR: {
       uint8_t len;
       if (!readDeltaTime(curOffset, len)) {
-        return false;
+        return State::Finished;
       }
 
       uint8_t durDelta;
       if (!readDuration(curOffset, len, durDelta)) {
-        return false;
+        return State::Finished;
       }
 
       uint8_t dur = getDuration(curOffset, len, durDelta);
@@ -422,7 +421,7 @@ bool PrismSnesTrack::readEvent() {
     case EVENT_REST: {
       uint8_t len;
       if (!readDeltaTime(curOffset, len)) {
-        return false;
+        return State::Finished;
       }
 
       desc = fmt::format("Duration: {:d}", len);
@@ -671,7 +670,7 @@ bool PrismSnesTrack::readEvent() {
         addGenericEvent(beginOffset, length, "Jump", desc, Type::LoopForever);
       }
       else {
-        bContinue = addLoopForever(beginOffset, length, "Jump");
+        return addLoopForever(beginOffset, length, "Jump");
       }
 
       if (curOffset < dwOffset) {
@@ -878,15 +877,13 @@ bool PrismSnesTrack::readEvent() {
 
     case EVENT_END: {
       addEndOfTrack(beginOffset, curOffset - beginOffset);
-      bContinue = false;
-      break;
+      return State::Finished;
     }
 
     default: {
       auto descr = logEvent(statusByte);
       addUnknown(beginOffset, curOffset - beginOffset, "Unknown Event", descr);
-      bContinue = false;
-      break;
+      return State::Finished;
     }
   }
 
@@ -896,7 +893,7 @@ bool PrismSnesTrack::readEvent() {
   //ssTrace << "" << std::hex << std::setfill('0') << std::setw(8) << std::uppercase << beginOffset << ": " << std::setw(2) << (int)statusByte  << " -> " << std::setw(8) << curOffset << std::endl;
   //OutputDebugString(ssTrace.str().c_str());
 
-  return bContinue;
+  return State::Active;
 }
 
 bool PrismSnesTrack::readDeltaTime(uint32_t &curOffset, uint8_t &len) {

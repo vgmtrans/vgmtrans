@@ -33,7 +33,7 @@ void CPS1TrackV1::addInitialMidiEvents(int trackNum) {
   addPortamentoTime14BitNoItem(0);
 }
 
-bool CPS1TrackV1::readEvent() {
+SeqTrack::State CPS1TrackV1::readEvent() {
   u32 beginOffset = curOffset;
   u8 statusByte = readByte(curOffset++);
   auto cpsSeq = static_cast<CPS1Seq*>(parentSeq);
@@ -110,7 +110,7 @@ bool CPS1TrackV1::readEvent() {
       restFlag = false;
     }
 
-    return true;
+    return State::Active;
   }
 
   if (statusByte >= 0x20) {
@@ -124,7 +124,7 @@ bool CPS1TrackV1::readEvent() {
       std::string desc = fmt::format("Tie next {:d} notes", tieNoteCounter);
       addGenericEvent(beginOffset, curOffset-beginOffset, desc, "", Type::ChangeState);
     }
-    return true;
+    return State::Active;
   }
   // statusByte is between 00-1F
 
@@ -172,9 +172,8 @@ bool CPS1TrackV1::readEvent() {
       u16 offset = readShort(curOffset);
       // If the num loops is 0, then loop forever
       if (numLoops == 0) {
-        bool should_continue = addLoopForever(beginOffset, 4);
         curOffset = offset;
-        return should_continue;
+        return addLoopForever(beginOffset, 4);
       }
       // Otherwise, if the current loopCounter is 0, it hasn't been set yet
       if (loop[loopNum] == 0) {
@@ -265,8 +264,8 @@ bool CPS1TrackV1::readEvent() {
 
     case 0x0F:        // End of Track
       addEndOfTrack(beginOffset, curOffset - beginOffset);
-      return false;
+      return State::Finished;
   }
 
-  return true;
+  return State::Active;
 }

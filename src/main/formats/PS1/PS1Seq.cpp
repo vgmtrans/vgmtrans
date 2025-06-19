@@ -68,11 +68,11 @@ void PS1Seq::resetVars() {
   std::ranges::fill(m_hasSetProgramForChannel, false);
 }
 
-bool PS1Seq::readEvent() {
+SeqTrack::State PS1Seq::readEvent() {
   uint32_t beginOffset = curOffset;
   uint32_t delta = readVarLen(curOffset);
   if (curOffset >= rawFile()->size())
-    return false;
+    return State::Finished;
   addTime(delta);
 
   uint8_t status_byte = readByte(curOffset++);
@@ -117,7 +117,7 @@ bool PS1Seq::readEvent() {
       if (no_next_data) {
         L_WARN("SEQ parser has reached zero-filled data at 0x{:X}. Parser terminates the analysis"
           "because it is considered to be out of bounds of the song data.", beginOffset);
-        return false;
+        return State::Finished;
       }
     }
     status_byte = m_runningStatus;
@@ -293,23 +293,23 @@ bool PS1Seq::readEvent() {
 
           case 0x2F :
             addEndOfTrack(beginOffset, curOffset - beginOffset);
-            return false;
+            return State::Finished;
 
           default :
             addUnknown(beginOffset, curOffset - beginOffset, "Meta Event");
-            return false;
+            return State::Finished;
         }
       }
       else {
         addUnknown(beginOffset, curOffset - beginOffset);
-        return false;
+        return State::Finished;
       }
     }
       break;
 
     default:
       addUnknown(beginOffset, curOffset - beginOffset);
-      return false;
+      return State::Finished;
   }
-  return true;
+  return State::Active;
 }

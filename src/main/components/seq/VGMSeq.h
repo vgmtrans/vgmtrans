@@ -95,6 +95,8 @@ class VGMSeq : public VGMFile {
   bool saveAsMidi(const std::string &filepath);
 
   void deactivateAllTracks();
+  void suspendAllActiveTracks();
+  void activateAllSuspendedTracks();
 
   [[nodiscard]] uint8_t initialVolume() const { return m_initial_volume; }
   void setInitialVolume(uint8_t volume) { m_initial_volume = volume; }

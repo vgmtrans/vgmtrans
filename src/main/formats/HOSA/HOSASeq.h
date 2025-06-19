@@ -29,7 +29,7 @@ class HOSATrack: public SeqTrack {
  public:
   HOSATrack(HOSASeq *parentFile, uint32_t offset = 0, uint32_t length = 0);
 
-  bool readEvent() override;
+  State readEvent() override;
   void ReadDeltaTime(unsigned char cCom_bit5, unsigned int *iVariable);
   uint32_t decodeVariable();    //Decode of 可変長
 

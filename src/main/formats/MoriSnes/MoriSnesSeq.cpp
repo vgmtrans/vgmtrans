@@ -193,16 +193,15 @@ void MoriSnesTrack::resetVars() {
 }
 
 
-bool MoriSnesTrack::readEvent() {
+SeqTrack::State MoriSnesTrack::readEvent() {
   MoriSnesSeq *parentSeq = static_cast<MoriSnesSeq*>(this->parentSeq);
 
   uint32_t beginOffset = curOffset;
   if (curOffset >= 0x10000) {
-    return false;
+    return State::Finished;
   }
 
   uint8_t statusByte = readByte(curOffset++);
-  bool bContinue = true;
 
   std::string desc;
 
@@ -234,7 +233,7 @@ bool MoriSnesTrack::readEvent() {
     desc.clear();
 
     if (curOffset >= 0x10000) {
-      return false;
+      return State::Finished;
     }
 
     statusByte = readByte(curOffset++);
@@ -450,7 +449,7 @@ bool MoriSnesTrack::readEvent() {
         addGenericEvent(beginOffset, length, "Jump", desc, Type::LoopForever);
       }
       else {
-        bContinue = addLoopForever(beginOffset, length, "Jump");
+        return addLoopForever(beginOffset, length, "Jump");
       }
       break;
     }
@@ -468,8 +467,7 @@ bool MoriSnesTrack::readEvent() {
 
       if (spcCallStackPtr + 2 > MORISNES_CALLSTACK_SIZE) {
         // stack overflow
-        bContinue = false;
-        break;
+        return State::Finished;
       }
 
       // save return address
@@ -489,8 +487,7 @@ bool MoriSnesTrack::readEvent() {
 
       if (spcCallStackPtr < 2) {
         // access violation
-        bContinue = false;
-        break;
+        return State::Finished;
       }
 
       curOffset = spcCallStack[spcCallStackPtr - 2] | (spcCallStack[spcCallStackPtr - 1] << 8);
@@ -505,8 +502,7 @@ bool MoriSnesTrack::readEvent() {
 
       if (spcCallStackPtr + 3 > MORISNES_CALLSTACK_SIZE) {
         // stack overflow
-        bContinue = false;
-        break;
+        return State::Finished;
       }
 
       // save loop start address and repeat count
@@ -522,8 +518,7 @@ bool MoriSnesTrack::readEvent() {
 
       if (spcCallStackPtr < 3) {
         // access violation
-        bContinue = false;
-        break;
+        return State::Finished;
       }
 
       uint8_t count = spcCallStack[spcCallStackPtr - 1];
@@ -542,8 +537,7 @@ bool MoriSnesTrack::readEvent() {
 
     case EVENT_END: {
       addEndOfTrack(beginOffset, curOffset - beginOffset);
-      bContinue = false;
-      break;
+      return State::Finished;
     }
 
     case EVENT_NOTE_NUMBER: {
@@ -645,8 +639,7 @@ bool MoriSnesTrack::readEvent() {
     default: {
       auto descr = logEvent(statusByte);
       addUnknown(beginOffset, curOffset - beginOffset, "Unknown Event", descr);
-      bContinue = false;
-      break;
+      return State::Finished;
     }
   }
 
@@ -661,7 +654,7 @@ bool MoriSnesTrack::readEvent() {
   //	AddTime(spcDeltaTime);
   //}
 
-  return bContinue;
+  return State::Active;
 }
 
 void MoriSnesTrack::parseInstrument(uint16_t instrAddress, uint8_t instrNum) {

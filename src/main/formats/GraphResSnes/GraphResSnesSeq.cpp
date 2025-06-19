@@ -164,16 +164,15 @@ void GraphResSnesTrack::resetVars(void) {
   }
 }
 
-bool GraphResSnesTrack::readEvent(void) {
+SeqTrack::State GraphResSnesTrack::readEvent() {
   GraphResSnesSeq *parentSeq = static_cast<GraphResSnesSeq*>(this->parentSeq);
 
   uint32_t beginOffset = curOffset;
   if (curOffset >= 0x10000) {
-    return false;
+    return State::Finished;
   }
 
   uint8_t statusByte = readByte(curOffset++);
-  bool bContinue = true;
 
   std::string desc;
 
@@ -340,8 +339,7 @@ bool GraphResSnesTrack::readEvent(void) {
 
       if (loopStackPtr == 0) {
         // stack overflow
-        bContinue = false;
-        break;
+        return State::Finished;
       }
 
       loopStackPtr--;
@@ -358,8 +356,7 @@ bool GraphResSnesTrack::readEvent(void) {
 
       if (loopStackPtr >= GRAPHRESSNES_LOOP_LEVEL_MAX) {
         // access violation
-        bContinue = false;
-        break;
+        return State::Finished;
       }
 
       if (loopCount[loopStackPtr] != 0) {
@@ -459,8 +456,7 @@ bool GraphResSnesTrack::readEvent(void) {
 
       if (callStackPtr == 0) {
         // access violation
-        bContinue = false;
-        break;
+        return State::Finished;
       }
 
       curOffset = callStack[--callStackPtr];
@@ -477,8 +473,7 @@ bool GraphResSnesTrack::readEvent(void) {
 
       if (callStackPtr >= GRAPHRESSNES_CALLSTACK_SIZE) {
         // stack overflow
-        bContinue = false;
-        break;
+        return State::Finished;
       }
 
       // save loop start address and repeat count
@@ -502,7 +497,7 @@ bool GraphResSnesTrack::readEvent(void) {
         addGenericEvent(beginOffset, length, "Jump", desc, Type::LoopForever);
       }
       else {
-        bContinue = addLoopForever(beginOffset, length, "Jump");
+        return addLoopForever(beginOffset, length, "Jump");
       }
       break;
     }
@@ -527,14 +522,12 @@ bool GraphResSnesTrack::readEvent(void) {
 
     case EVENT_END:
       addEndOfTrack(beginOffset, curOffset - beginOffset);
-      bContinue = false;
-      break;
+      return State::Finished;
 
     default: {
       auto descr = logEvent(statusByte);
       addUnknown(beginOffset, curOffset - beginOffset, "Unknown Event", desc);
-      bContinue = false;
-      break;
+      return State::Finished;
     }
   }
 
@@ -542,5 +535,5 @@ bool GraphResSnesTrack::readEvent(void) {
   //ssTrace << "" << std::hex << std::setfill('0') << std::setw(8) << std::uppercase << beginOffset << ": " << std::setw(2) << (int)statusByte  << " -> " << std::setw(8) << curOffset << std::endl;
   //OutputDebugString(ssTrace.str().c_str());
 
-  return bContinue;
+  return State::Active;
 }

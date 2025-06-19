@@ -23,7 +23,7 @@ class SonyPS2Seq:
   ~SonyPS2Seq() override = default;
 
   bool parseHeader() override;
-  bool readEvent() override;
+  State readEvent() override;
   uint8_t getDataByte(uint32_t offset);
 
  private:

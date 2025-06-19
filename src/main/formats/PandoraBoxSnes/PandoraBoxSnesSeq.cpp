@@ -159,12 +159,12 @@ void PandoraBoxSnesTrack::resetVars() {
   spcCallStackPtr = 0;
 }
 
-bool PandoraBoxSnesTrack::readEvent() {
+SeqTrack::State PandoraBoxSnesTrack::readEvent() {
   PandoraBoxSnesSeq *parentSeq = (PandoraBoxSnesSeq *) this->parentSeq;
 
   uint32_t beginOffset = curOffset;
   if (curOffset >= 0x10000) {
-    return false;
+    return State::Finished;
   }
 
   uint8_t statusByte = readByte(curOffset++);
@@ -434,7 +434,7 @@ bool PandoraBoxSnesTrack::readEvent() {
 
       if (spcCallStack[spcCallStackPtr - 1] == 0xff) {
         // infinite loop
-        bContinue = addLoopForever(beginOffset, curOffset - beginOffset, "Loop End");
+        return addLoopForever(beginOffset, curOffset - beginOffset, "Loop End");
       }
       else {
         // regular loop
@@ -548,7 +548,7 @@ bool PandoraBoxSnesTrack::readEvent() {
   //ssTrace << "" << std::hex << std::setfill('0') << std::setw(8) << std::uppercase << beginOffset << ": " << std::setw(2) << (int)statusByte  << " -> " << std::setw(8) << curOffset << std::endl;
   //OutputDebugString(ssTrace.str().c_str());
 
-  return bContinue;
+  return State::Active;
 }
 
 uint8_t PandoraBoxSnesTrack::getVolume(uint8_t volumeIndex) {

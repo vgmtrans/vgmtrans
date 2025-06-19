@@ -42,5 +42,5 @@ class SoftCreatSnesTrack
  public:
   SoftCreatSnesTrack(SoftCreatSnesSeq *parentFile, uint32_t offset = 0, uint32_t length = 0);
   virtual void resetVars();
-  virtual bool readEvent();
+  virtual State readEvent();
 };

@@ -35,7 +35,7 @@ bool SegSatSeq::parseHeader() {
 
 int counter = 0;
 
-bool SegSatSeq::readEvent() {
+SeqTrack::State SegSatSeq::readEvent() {
   if (bInLoop) {
     remainingEventsInLoop--;
     if (remainingEventsInLoop == -1) {
@@ -53,7 +53,7 @@ bool SegSatSeq::readEvent() {
       tempoDelta = readWordBE(curOffset);
       curOffset += 8;
     }
-    return true;
+    return State::Active;
   }
 
   uint32_t beginOffset = curOffset;
@@ -151,15 +151,17 @@ bool SegSatSeq::readEvent() {
             addGenericEvent(beginOffset, curOffset - beginOffset,
               "Forever Loop Start Point", "", Type::RepeatStart);
           } else {
-            if (!addLoopForever(beginOffset, curOffset - beginOffset))
-              return false;
+            auto newState = addLoopForever(beginOffset, curOffset - beginOffset);
+            if (newState != State::Active)
+              return newState;
             if (SeqTrack::isValidOffset(foreverLoopStart))
               curOffset = foreverLoopStart;
+            return newState;
           }
           break;
         case 0x83:
           addEndOfTrack(beginOffset, curOffset - beginOffset);
-          return false;
+          return State::Finished;
         case 0x87:
           addGenericEvent(beginOffset, curOffset - beginOffset, "Add 256 Duration Ticks", "", Type::Tie);
           durationAccumulator += 256;
@@ -195,5 +197,5 @@ bool SegSatSeq::readEvent() {
       }
     }
   }
-  return true;
+  return State::Active;
 }

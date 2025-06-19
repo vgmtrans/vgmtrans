@@ -9,7 +9,7 @@ class SegSatSeq:
 
   void resetVars() override;
   bool parseHeader() override;
-  bool readEvent() override;
+  State readEvent() override;
 
  public:
   u32 normalTrackOffset;
