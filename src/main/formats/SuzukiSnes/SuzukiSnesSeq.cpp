@@ -70,7 +70,7 @@ bool SuzukiSnesSeq::parseHeader() {
 
     if (addrTrackStart != 0) {
       auto trackName = fmt::format("Track Pointer {:d}", trackIndex + 1);
-      header->addChild(curOffset, 2, trackName.c_str());
+      header->addChild(curOffset, 2, trackName);
 
       aTracks.push_back(new SuzukiSnesTrack(this, addrTrackStart));
     }
@@ -236,13 +236,13 @@ bool SuzukiSnesTrack::readEvent() {
   switch (eventType) {
     case EVENT_UNKNOWN0:
       desc = fmt::format("Event: 0x{:02X}", statusByte);
-      addUnknown(beginOffset, curOffset - beginOffset, "Unknown Event", desc.c_str());
+      addUnknown(beginOffset, curOffset - beginOffset, "Unknown Event", desc);
       break;
 
     case EVENT_UNKNOWN1: {
       uint8_t arg1 = readByte(curOffset++);
       desc = fmt::format("Event: 0x{:02X}  Arg1: {:d}", statusByte, arg1);
-      addUnknown(beginOffset, curOffset - beginOffset, "Unknown Event", desc.c_str());
+      addUnknown(beginOffset, curOffset - beginOffset, "Unknown Event", desc);
       break;
     }
 
@@ -250,7 +250,7 @@ bool SuzukiSnesTrack::readEvent() {
       uint8_t arg1 = readByte(curOffset++);
       uint8_t arg2 = readByte(curOffset++);
       desc = fmt::format("Event: 0x{:02X}  Arg1: {:d}  Arg2: {:d}", statusByte, arg1, arg2);
-      addUnknown(beginOffset, curOffset - beginOffset, "Unknown Event", desc.c_str());
+      addUnknown(beginOffset, curOffset - beginOffset, "Unknown Event", desc);
       break;
     }
 
@@ -260,7 +260,7 @@ bool SuzukiSnesTrack::readEvent() {
       uint8_t arg3 = readByte(curOffset++);
       desc = fmt::format("Event: 0x{:02X}  Arg1: {:d}  Arg2: {:d}  Arg3: {:d}",
                          statusByte, arg1, arg2, arg3);
-      addUnknown(beginOffset, curOffset - beginOffset, "Unknown Event", desc.c_str());
+      addUnknown(beginOffset, curOffset - beginOffset, "Unknown Event", desc);
       break;
     }
 
@@ -271,7 +271,7 @@ bool SuzukiSnesTrack::readEvent() {
       uint8_t arg4 = readByte(curOffset++);
       desc = fmt::format("Event: 0x{:02X}  Arg1: {:d}  Arg2: {:d}  Arg3: {:d}  Arg4: {:d}",
                          statusByte, arg1, arg2, arg3, arg4);
-      addUnknown(beginOffset, curOffset - beginOffset, "Unknown Event", desc.c_str());
+      addUnknown(beginOffset, curOffset - beginOffset, "Unknown Event", desc);
       break;
     }
 
@@ -364,7 +364,7 @@ bool SuzukiSnesTrack::readEvent() {
       // TODO: EVENT_JUMP_TO_SFX_LO
       uint8_t sfxIndex = readByte(curOffset++);
       desc = fmt::format("SFX: {:d}", sfxIndex);
-      addUnknown(beginOffset, curOffset - beginOffset, "Jump to SFX (LOWORD)", desc.c_str());
+      addUnknown(beginOffset, curOffset - beginOffset, "Jump to SFX (LOWORD)", desc);
       bContinue = false;
       break;
     }
@@ -373,7 +373,7 @@ bool SuzukiSnesTrack::readEvent() {
       // TODO: EVENT_JUMP_TO_SFX_HI
       uint8_t sfxIndex = readByte(curOffset++);
       desc = fmt::format("SFX: {:d}", sfxIndex);
-      addUnknown(beginOffset, curOffset - beginOffset, "Jump to SFX (HIWORD)", desc.c_str());
+      addUnknown(beginOffset, curOffset - beginOffset, "Jump to SFX (HIWORD)", desc);
       bContinue = false;
       break;
     }
@@ -382,7 +382,7 @@ bool SuzukiSnesTrack::readEvent() {
       // TODO: EVENT_CALL_SFX_LO
       uint8_t sfxIndex = readByte(curOffset++);
       desc = fmt::format("SFX: {:d}", sfxIndex);
-      addUnknown(beginOffset, curOffset - beginOffset, "Call SFX (LOWORD)", desc.c_str());
+      addUnknown(beginOffset, curOffset - beginOffset, "Call SFX (LOWORD)", desc);
       bContinue = false;
       break;
     }
@@ -391,7 +391,7 @@ bool SuzukiSnesTrack::readEvent() {
       // TODO: EVENT_CALL_SFX_HI
       uint8_t sfxIndex = readByte(curOffset++);
       desc = fmt::format("SFX: {:d}", sfxIndex);
-      addUnknown(beginOffset, curOffset - beginOffset, "Call SFX (HIWORD)", desc.c_str());
+      addUnknown(beginOffset, curOffset - beginOffset, "Call SFX (HIWORD)", desc);
       bContinue = false;
       break;
     }

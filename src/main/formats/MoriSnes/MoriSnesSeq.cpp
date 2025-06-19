@@ -76,7 +76,7 @@ bool MoriSnesSeq::parseHeader() {
       TrackStartAddress[trackIndex] = curOffset + ofsTrackStart;
 
       auto trackName = fmt::format("Track {} Offset", trackIndex + 1);
-      header->addChild(beginOffset, curOffset - beginOffset, trackName.c_str());
+      header->addChild(beginOffset, curOffset - beginOffset, trackName);
     }
     else {
       header->addUnknownChild(beginOffset, curOffset - beginOffset);
@@ -249,13 +249,13 @@ bool MoriSnesTrack::readEvent() {
   switch (eventType) {
     case EVENT_UNKNOWN0:
       desc = fmt::format("Event: 0x{:02X}", statusByte);
-      addUnknown(beginOffset, curOffset - beginOffset, "Unknown Event", desc.c_str());
+      addUnknown(beginOffset, curOffset - beginOffset, "Unknown Event", desc);
       break;
 
     case EVENT_UNKNOWN1: {
       uint8_t arg1 = readByte(curOffset++);
       desc = fmt::format("Event: 0x{:02X}  Arg1: {:d}", statusByte, arg1);
-      addUnknown(beginOffset, curOffset - beginOffset, "Unknown Event", desc.c_str());
+      addUnknown(beginOffset, curOffset - beginOffset, "Unknown Event", desc);
       break;
     }
 
@@ -263,7 +263,7 @@ bool MoriSnesTrack::readEvent() {
       uint8_t arg1 = readByte(curOffset++);
       uint8_t arg2 = readByte(curOffset++);
       desc = fmt::format("Event: 0x{:02X}  Arg1: {:d}  Arg2: {:d}", statusByte, arg1, arg2);
-      addUnknown(beginOffset, curOffset - beginOffset, "Unknown Event", desc.c_str());
+      addUnknown(beginOffset, curOffset - beginOffset, "Unknown Event", desc);
       break;
     }
 
@@ -273,7 +273,7 @@ bool MoriSnesTrack::readEvent() {
       uint8_t arg3 = readByte(curOffset++);
       desc = fmt::format("Event: 0x{:02X}  Arg1: {:d}  Arg2: {:d}  Arg3: {:d}",
                          statusByte, arg1, arg2, arg3);
-      addUnknown(beginOffset, curOffset - beginOffset, "Unknown Event", desc.c_str());
+      addUnknown(beginOffset, curOffset - beginOffset, "Unknown Event", desc);
       break;
     }
 
@@ -284,7 +284,7 @@ bool MoriSnesTrack::readEvent() {
       uint8_t arg4 = readByte(curOffset++);
       desc = fmt::format("Event: 0x{:02X}  Arg1: {:d}  Arg2: {:d}  Arg3: {:d}  Arg4: {:d}",
                          statusByte, arg1, arg2, arg3, arg4);
-      addUnknown(beginOffset, curOffset - beginOffset, "Unknown Event", desc.c_str());
+      addUnknown(beginOffset, curOffset - beginOffset, "Unknown Event", desc);
       break;
     }
 

@@ -1002,7 +1002,7 @@ bool KonamiSnesTrack::readEvent(void) {
   }
 
   //auto trace = fmt::format("{:08X}: {:02X} -> {:08X}", beginOffset, statusByte, curOffset);
-  //LogDebug(trace.c_str());
+  //LogDebug(trace);
 
   return bContinue;
 }

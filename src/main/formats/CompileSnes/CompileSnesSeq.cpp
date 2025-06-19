@@ -59,7 +59,7 @@ bool CompileSnesSeq::parseHeader() {
   for (uint8_t trackIndex = 0; trackIndex < nNumTracks; trackIndex++) {
     auto trackName = fmt::format("Track {}", trackIndex + 1);
 
-    VGMHeader *trackHeader = header->addHeader(curOffset, 14, trackName.c_str());
+    VGMHeader *trackHeader = header->addHeader(curOffset, 14, trackName);
     trackHeader->addChild(curOffset, 1, "Channel");
     trackHeader->addChild(curOffset + 1, 1, "Flags");
     trackHeader->addChild(curOffset + 2, 1, "Volume");
