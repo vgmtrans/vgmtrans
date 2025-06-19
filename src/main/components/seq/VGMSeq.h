@@ -8,6 +8,9 @@
 #include "VGMFile.h"
 #include "RawFile.h"
 #include "MidiFile.h"
+#include "SeqTrack.h"
+
+#include <queue>
 
 class SeqTrack;
 class SeqEvent;
@@ -26,16 +29,15 @@ enum class PanVolumeCorrectionMode : uint8_t {
 };
 
 struct CondBranchEvt {
-  uint32_t absTime;        // tick when the branch opcode was executed
-  uint32_t srcOffset;      // where the opcode lives in the stream
-  uint32_t dstOffset;      // branch destination
-  uint8_t  expectValue;    // value to compare against
-  uint32_t trackIndex;     // owner track – helps when resuming
+  u32 absTime;        // tick when the branch opcode was executed
+  u32 srcOffset;      // where the opcode lives in the stream
+  u32 dstOffset;      // branch destination
+  s32 expectValue;    // value to compare against
 };
 
 struct CondValueChange {     // built *after* pass-0, consumed during MIDI pass
-  uint32_t absTime;
-  uint8_t  newValue;
+  u32 absTime;
+  s32 newValue;
 };
 
 class VGMSeq : public VGMFile {
@@ -188,10 +190,12 @@ private:
   bool m_use_reverb;
 
   public:                               // accessible to SeqTrack
-    uint8_t m_curCondValue {0};
+    s32 m_curCondValue {-1};
+    bool hasConditionalBranches() { return m_hasConditionalBranches; }
+    bool hasPendingOffsets();
 
   protected:
-    std::vector<CondBranchEvt>  m_branchesFound;
+    std::deque<CondBranchEvt>  m_condBranches;
     std::vector<CondValueChange> m_timeline;
     uint32_t  m_nextTimelineIdx {0};
     bool      m_hasConditionalBranches {false};
@@ -199,12 +203,12 @@ private:
   public:
     // called by any track that encounters a conditional-branch opcode
     inline void registerConditionalBranch(const CondBranchEvt& evt) {
-      m_branchesFound.push_back(evt);
+      m_condBranches.push_back(evt);
       m_hasConditionalBranches = true;
     }
 
   private:
-    void buildBranchTimeline();
+    // void buildBranchTimeline();
 };
 
 extern uint8_t mode;

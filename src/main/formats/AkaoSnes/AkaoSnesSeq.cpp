@@ -1409,17 +1409,39 @@ SeqTrack::State AkaoSnesTrack::readEvent() {
     case EVENT_CPU_CONTROLED_JUMP: {
       uint16_t dest = getShortAddress(curOffset);
       curOffset += 2;
-      desc = fmt::format("Destination: ${:04X}", dest);
-      addGenericEvent(beginOffset, curOffset - beginOffset, "CPU-Controlled Jump", desc,
-                      Type::Loop);
+      if (!condBranches.contains(curOffset)) {
+        ++condJumpTargetValue;
+        condBranches.insert(curOffset);
+        // }
 
-      if (jumpActivatedByMainCpu) {
-        curOffset = dest;
-
-        if (parentSeq->version == AKAOSNES_V3 ||
-            (parentSeq->version == AKAOSNES_V4 && parentSeq->minorVersion == AKAOSNES_V4_FF6))
-          jumpActivatedByMainCpu = false;
+        CondBranchEvt info;
+        info.absTime     = getTime();   // global tick
+        info.srcOffset   = curOffset;
+        info.dstOffset   = dest;
+        info.expectValue = condJumpTargetValue;
+        parentSeq->registerConditionalBranch(info);
       }
+
+      if (readMode == READMODE_ADD_TO_UI) {
+        desc = fmt::format("Destination: ${:04X}", dest);
+        addGenericEvent(beginOffset, curOffset - beginOffset, "CPU-Controlled Jump", desc,
+                        Type::Loop);
+        // m_offsetStack.push_back(dest);
+      }
+
+      printf("shouldTakeBranch? condJumpTargetValue: %d  readMode: %d  time: %d\n", condJumpTargetValue, readMode, getTime());
+      if (shouldTakeBranch(condJumpTargetValue)) {
+        printf("Taking branch to: %X\n", dest);
+        curOffset = dest;
+      }
+
+      // if (jumpActivatedByMainCpu) {
+      //   curOffset = dest;
+      //
+      //   if (parentSeq->version == AKAOSNES_V3 ||
+      //       (parentSeq->version == AKAOSNES_V4 && parentSeq->minorVersion == AKAOSNES_V4_FF6))
+      //     jumpActivatedByMainCpu = false;
+      // }
 
       break;
     }
@@ -1428,8 +1450,31 @@ SeqTrack::State AkaoSnesTrack::readEvent() {
       uint8_t arg1 = readByte(curOffset++) & 15;
       uint16_t dest = getShortAddress(curOffset);
       curOffset += 2;
-      desc = fmt::format("Arg1: {:d}  Destination: ${:04X}", arg1, dest);
-      addUnknown(beginOffset, curOffset - beginOffset, "CPU-Controlled Jump", desc);
+      const u8 targetValue = arg1;
+
+      CondBranchEvt info;
+      info.absTime     = getTime();   // global tick
+      info.srcOffset   = curOffset;
+      info.dstOffset   = dest;
+      info.expectValue = targetValue;
+      parentSeq->registerConditionalBranch(info);
+
+      if (readMode == READMODE_ADD_TO_UI) {
+        desc = fmt::format("Arg1: {}  Destination: ${:04X}", arg1, dest);
+        // desc = fmt::format("Destination: ${:04X}", dest);
+        addGenericEvent(beginOffset, curOffset - beginOffset, "CPU-Controlled Jump", desc,
+                        Type::Loop);
+        // addUnknown(beginOffset, curOffset - beginOffset, "CPU-Controlled Jump", desc);
+
+        // m_offsetStack.push_back(dest);
+      }
+
+      if (shouldTakeBranch(targetValue)) {
+        curOffset = dest;
+      }
+
+      // desc = fmt::format("Arg1: {}  Destination: ${:04X}", arg1, dest);
+      // addUnknown(beginOffset, curOffset - beginOffset, "CPU-Controlled Jump", desc);
       break;
     }
 

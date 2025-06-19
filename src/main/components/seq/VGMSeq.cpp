@@ -73,12 +73,12 @@ MidiFile *VGMSeq::convertToMidi() {
   size_t numTracks = aTracks.size();
 
   if (m_hasConditionalBranches) {
-    buildBranchTimeline();
+    // buildBranchTimeline();
     bLoadTickByTick = true;     // mandatory for perfect sync
   }
-
+  else
   if (!loadTracks(READMODE_FIND_DELTA_LENGTH)) {
-      return nullptr;
+    return nullptr;
   }
 
   // Find the greatest length of all tracks to use as stop point for every track
@@ -86,6 +86,7 @@ MidiFile *VGMSeq::convertToMidi() {
   for (size_t i = 0; i < numTracks; i++)
     stopTime = std::max(stopTime, aTracks[i]->totalTicks);
 
+  printf("Stop Time: %d\n", stopTime);
   auto *newmidi = new MidiFile(this);
   this->midi = newmidi;
   if (!loadTracks(READMODE_CONVERT_TO_MIDI, stopTime)) {
@@ -184,81 +185,117 @@ void VGMSeq::loadTracksMain(uint32_t stopTime) {
 
   // load all tracks
   if (bLoadTickByTick) {
-    while (hasActiveTracks()) {
-      // check time limit
-      if (time >= stopTime) {
-        if (readMode == READMODE_ADD_TO_UI) {
-          L_WARN("{} - reached tick-by-tick stop time during load.", name());
-        }
+    // for (const auto& timeline : m_timeline) {
+      // printf("Timeline event. value: %d. absTime: %d\n", timeline.newValue, timeline.absTime);
+    // }
+    do {
+      if (!m_condBranches.empty()) {
+        m_curCondValue = m_condBranches.front().expectValue;
+        printf("Time: %d  Setting conditional value to: %d\n", time, m_curCondValue);
+        while (!m_condBranches.empty() && m_condBranches.front().expectValue == m_curCondValue)
+          m_condBranches.pop_front();
+        activateAllSuspendedTracks();
+      }
+      while (hasActiveTracks()) {
+        // check time limit
+        if (time >= stopTime) {
+          if (readMode == READMODE_ADD_TO_UI) {
+            L_WARN("{} - reached tick-by-tick stop time during load.", name());
+          }
 
+          // deactivateAllTracks();
           suspendAllActiveTracks();
           break;
         }
 
-      //   update condition value  (NEW)
-      printf("Time: %d   m_timeline[m_nextTimelineIdx].absTime: %d\n", time, m_timeline[m_nextTimelineIdx].absTime);
-      while (m_nextTimelineIdx < m_timeline.size() &&
-             time >= m_timeline[m_nextTimelineIdx].absTime) {
-        m_curCondValue = m_timeline[m_nextTimelineIdx].newValue;
-        ++m_nextTimelineIdx;
-      }
+        //   update condition value  (NEW)
+        // printf("Time: %d  readMode == convertotomidi: %d\n", time, readMode == READMODE_CONVERT_TO_MIDI);
+        // while (m_nextTimelineIdx < m_timeline.size() &&
+        //        time >= m_timeline[m_nextTimelineIdx].absTime) {
+        //
+        //   printf("Time: %d timeLine value: %d  timeLine Event absTime: %d\n", time,
+        //      m_timeline[m_nextTimelineIdx].newValue, m_timeline[m_nextTimelineIdx].absTime);
+        //
+        //   m_curCondValue = m_timeline[m_nextTimelineIdx].newValue;
+        //   ++m_nextTimelineIdx;
+        //        }
 
-      // process tracks
-
-      for (uint32_t trackNum = 0; trackNum < nNumTracks; trackNum++) {
-        if (aTracks[trackNum]->state() != SeqTrack::State::Active)
-          continue;
-
-        // tick
-        aTracks[trackNum]->loadTrackMainLoop(aStopOffset[trackNum], stopTime);
-      }
-
-      // process sliders
-      auto itrSlider = aSliders.begin();
-      while (itrSlider != aSliders.end()) {
-        auto itrNextSlider = itrSlider + 1;
-
-        ISeqSlider *slider = *itrSlider;
-        if (slider->isStarted(time)) {
-          if (slider->isActive(time)) {
-            slider->write(time);
-          } else {
-            itrNextSlider = aSliders.erase(itrSlider);
-          }
-        }
-
-        itrSlider = itrNextSlider;
-      }
-
-      if (bIncTickAfterProcessingTracks == true) {
-        time++;
-      }
-      bIncTickAfterProcessingTracks = true;
-      if (readMode == READMODE_CONVERT_TO_MIDI) {
+        // process tracks
         for (uint32_t trackNum = 0; trackNum < nNumTracks; trackNum++) {
-          if (aTracks.at(trackNum)->pMidiTrack != nullptr) {
-            aTracks[trackNum]->pMidiTrack->setDelta(time);
+          if (aTracks[trackNum]->state() != SeqTrack::State::Active)
+            continue;
+
+          // tick
+          aTracks[trackNum]->loadTrackMainLoop(aStopOffset[trackNum], stopTime);
+        }
+
+        // process sliders
+        auto itrSlider = aSliders.begin();
+        while (itrSlider != aSliders.end()) {
+          auto itrNextSlider = itrSlider + 1;
+
+          ISeqSlider *slider = *itrSlider;
+          if (slider->isStarted(time)) {
+            if (slider->isActive(time)) {
+              slider->write(time);
+            } else {
+              itrNextSlider = aSliders.erase(itrSlider);
+            }
+          }
+
+          itrSlider = itrNextSlider;
+        }
+
+        if (bIncTickAfterProcessingTracks == true) {
+          time++;
+        }
+        bIncTickAfterProcessingTracks = true;
+        if (readMode == READMODE_CONVERT_TO_MIDI) {
+          for (uint32_t trackNum = 0; trackNum < nNumTracks; trackNum++) {
+            if (aTracks.at(trackNum)->pMidiTrack != nullptr) {
+              aTracks[trackNum]->pMidiTrack->setDelta(time);
+            }
+          }
+        }
+
+        // check loop count
+        if (readMode != READMODE_ADD_TO_UI || !m_hasConditionalBranches) {
+          int requiredLoops = (readMode == READMODE_ADD_TO_UI) ? 1 + 1 : ConversionOptions::the().numSequenceLoops();
+          // if (!hasConditionalBranches() && foreverLoopCount() >= requiredLoops) {
+          // if (foreverLoopCount() >= requiredLoops) {
+          // if (foreverLoopCount() > requiredLoops + 1) {
+          if (foreverLoopCount() > requiredLoops) {
+            // if (hasConditionalBranches() && hasPendingOffsets())
+            // continue;
+            // deactivateAllTracks();
+            suspendAllActiveTracks();
+            break;
           }
         }
       }
-
-      // check loop count
-      int requiredLoops = (readMode == READMODE_ADD_TO_UI) ? 1 : ConversionOptions::the().numSequenceLoops();
-      if (foreverLoopCount() > requiredLoops) {
-        suspendAllActiveTracks();
-        break;
-      }
-    }
+    } while (!m_condBranches.empty());
   } else {
     uint32_t initialTime = time;  // preserve current time for multi section sequence
 
     // load track by track
-    for (uint32_t trackNum = 0; trackNum < nNumTracks && trackNum < aTracks.size(); trackNum++) {
-      time = initialTime;
+    do {
+      if (!m_condBranches.empty()) {
+        std::sort(m_condBranches.begin(), m_condBranches.end(), [](auto& a, auto& b) {
+          return a.absTime < b.absTime;
+        });
 
-      aTracks[trackNum]->loadTrackMainLoop(aStopOffset[trackNum], stopTime);
-      aTracks[trackNum]->setState(SeqTrack::State::Finished);
-    }
+        m_curCondValue = m_condBranches.front().expectValue;
+        while (m_condBranches.front().expectValue == m_curCondValue)
+          m_condBranches.pop_front();
+      }
+      for (uint32_t trackNum = 0; trackNum < nNumTracks && trackNum < aTracks.size(); trackNum++) {
+        time = initialTime;
+
+        aTracks[trackNum]->loadTrackMainLoop(aStopOffset[trackNum], stopTime);
+        // aTracks[trackNum]->active = false;
+      }
+    } while (!m_condBranches.empty());
+    // deactivateAllTracks();
   }
   delete[] aStopOffset;
 }
@@ -298,12 +335,22 @@ int VGMSeq::foreverLoopCount() {
     return 0;
 
   int foreverLoops = INT_MAX;
+
   for (const auto track : aTracks) {
     if (track->state() != SeqTrack::State::Active)
       continue;
 
-    if (foreverLoops > track->foreverLoops)
-      foreverLoops = track->foreverLoops;
+    int trackLoopCount;
+    // if (hasConditionalBranches()) {
+    if (true) {
+      if (track->loopsPerOffset.empty())
+        continue;
+      trackLoopCount = std::ranges::min(track->loopsPerOffset | std::views::values) ;
+    } else {
+      trackLoopCount = track->foreverLoops;
+    }
+    if (foreverLoops > trackLoopCount)
+      foreverLoops = trackLoopCount;
   }
   return (foreverLoops != INT_MAX) ? foreverLoops : 0;
 }
@@ -321,6 +368,7 @@ bool VGMSeq::parseTrackPointers() {
 void VGMSeq::resetVars() {
   time = 0;
   tempoBPM = initialTempoBPM;
+  m_curCondValue = -1;
 
   deleteVect<ISeqSlider>(aSliders);
 
@@ -328,7 +376,7 @@ void VGMSeq::resetVars() {
     aInstrumentsUsed.clear();
 
     // -------- NEW --------
-    m_branchesFound.clear();
+    m_condBranches.clear();
     m_timeline.clear();
     m_hasConditionalBranches = false;
     // ---------------------
@@ -362,35 +410,42 @@ bool VGMSeq::saveAsMidi(const std::string &filepath) {
 }
 
 
-void VGMSeq::buildBranchTimeline()
-{
-  //----------------------------------------------------------------
-  // 1.  Keep the LAST encounter of every opcode                  --
-  //----------------------------------------------------------------
-  std::unordered_map<uint32_t /*src offset*/, CondBranchEvt> last;
-  for (const auto& b : m_branchesFound)
-    last[b.srcOffset] = b;               // later occurrences overwrite
+// void VGMSeq::buildBranchTimeline() {
+//   //----------------------------------------------------------------
+//   // 1.  Keep the LAST encounter of every opcode                  --
+//   //----------------------------------------------------------------
+//   std::unordered_map<uint32_t /*src offset*/, CondBranchEvt> last;
+//   for (const auto& b : m_condBranches)
+//     last[b.srcOffset] = b;               // later occurrences overwrite
+//
+//   std::vector<CondBranchEvt> uniq;
+//   uniq.reserve(last.size());
+//   for (auto& kv : last) uniq.push_back(kv.second);
+//
+//   std::sort(uniq.begin(), uniq.end(),
+//             [](auto& a, auto& b) { return a.absTime < b.absTime; });
+//
+//   //----------------------------------------------------------------
+//   // 2.  Build a linear time-line: every time the expected value   --
+//   //     differs from the current one, schedule a change one tick --
+//   //     *after* the last encounter.                              --
+//   //----------------------------------------------------------------
+//   m_timeline.clear();
+//   s32 curVal = m_curCondValue;
+//   for (const auto& b : uniq) {
+//     if (b.expectValue != curVal) {
+//       // m_timeline.push_back({ b.absTime + 1, b.expectValue });
+//       m_timeline.push_back({ b.absTime, b.expectValue });
+//       curVal = b.expectValue;
+//     }
+//   }
+//   m_nextTimelineIdx = 0;
+// }
 
-  std::vector<CondBranchEvt> uniq;
-  uniq.reserve(last.size());
-  for (auto& kv : last) uniq.push_back(kv.second);
-
-  std::sort(uniq.begin(), uniq.end(),
-            [](auto& a, auto& b) { return a.absTime < b.absTime; });
-
-  //----------------------------------------------------------------
-  // 2.  Build a linear time-line: every time the expected value   --
-  //     differs from the current one, schedule a change one tick --
-  //     *after* the last encounter.                              --
-  //----------------------------------------------------------------
-  m_timeline.clear();
-  uint8_t curVal = m_curCondValue;
-  for (const auto& b : uniq) {
-    if (b.expectValue != curVal) {
-      // m_timeline.push_back({ b.absTime + 1, b.expectValue });
-      m_timeline.push_back({ b.absTime, b.expectValue });
-      curVal = b.expectValue;
-    }
+bool VGMSeq::hasPendingOffsets() {
+  for (const auto track : aTracks) {
+    if (track->hasPendingOffset())
+      return true;
   }
-  m_nextTimelineIdx = 0;
+  return false;
 }

@@ -31,6 +31,10 @@ void SeqTrack::resetVars() {
   m_state = State::Active;
   bInLoop = false;
   foreverLoops = 0;
+  // loopsPerOffset.clear();
+  for (auto &value : loopsPerOffset | std::views::values)
+    value = 0;
+  m_offsetStack.clear();
   totalTicks = -1;
   deltaTime = 0;
   vol = 100;
@@ -123,14 +127,14 @@ void SeqTrack::loadTrackMainLoop(uint32_t stopOffset, int32_t stopTime) {
     //  block we were disassembling finishes, revive the track and
     //  continue from that queued offset, so every byte is scanned.
     // ------------------------------------------------------------
-    if (!active) {
-      uint32_t resume;
-      if (popPendingOffset(resume) && !isOffsetUsed(resume)) {
-        curOffset  = resume;
-        deltaTime  = 0;
-        active     = true;
-      }
-    }
+    // if (!active) {
+    //   uint32_t resume;
+    //   if (popPendingOffset(resume) && !isOffsetUsed(resume)) {
+    //     curOffset  = resume;
+    //     deltaTime  = 0;
+    //     active     = true;
+    //   }
+    // }
   }
   else {
     // while (curOffset < stopOffset && getTime() < static_cast<uint32_t>(stopTime)) {
@@ -145,9 +149,9 @@ void SeqTrack::loadTrackMainLoop(uint32_t stopOffset, int32_t stopTime) {
     // }
     for (;;) {
       while (curOffset < stopOffset &&
-             getTime()  < static_cast<uint32_t>(stopTime)) {
-        if (!readEvent()) {
-          active = false;
+             getTime() < static_cast<u32>(stopTime)) {
+        m_state = readEvent();
+        if (m_state != State::Active) {
           break;
         }
       }
@@ -156,16 +160,20 @@ void SeqTrack::loadTrackMainLoop(uint32_t stopOffset, int32_t stopTime) {
         totalTicks = getTime();
 
       // -------- NEW --------
-      uint32_t resume;
-      // if (active && popPendingOffset(resume) && !isOffsetUsed(resume)) {
-      if (popPendingOffset(resume) && !isOffsetUsed(resume)) {
-        curOffset = resume;
-        continue;                 // parse the queued destination
-      }
+      // uint32_t resume;
+      // // if (active && popPendingOffset(resume) && !isOffsetUsed(resume)) {
+      // if (popPendingOffset(resume) && !isOffsetUsed(resume)) {
+      //   curOffset = resume;
+      //   continue;                 // parse the queued destination
+      // }
       // ---------------------
       break;                      // no more work – leave main loop
     }
   }
+}
+
+bool SeqTrack::shouldTakeBranch(uint8_t expected) const {
+  return parentSeq->m_curCondValue == expected;
 }
 
 bool SeqTrack::popPendingOffset(uint32_t& newOffset) {
@@ -1517,16 +1525,26 @@ void SeqTrack::insertMarkerNoItem(uint32_t absTime,
 SeqTrack::State SeqTrack::addLoopForever(uint32_t offset, uint32_t length, const std::string &sEventName) {
   onEvent(offset, length);
 
-  this->foreverLoops++;
+  // this->foreverLoops++;
+  auto &count = loopsPerOffset[offset];
+  ++count;
   if (readMode == READMODE_ADD_TO_UI) {
     if (!isItemAtOffset(offset, true))
       addEvent(new LoopForeverSeqEvent(this, offset, length, sEventName));
-    return State::Suspended;
+    // if (parentSeq->hasConditionalBranches()) {
+    // if (true) {
+      // return (count < ConversionOptions::the().numSequenceLoops()) ? State::Active : State::Suspended;
+      return count <= 1 ? State::Active : State::Suspended;
+      // return (this->foreverLoops < ConversionOptions::the().numSequenceLoops());
+    // }
   }
   else if (readMode == READMODE_FIND_DELTA_LENGTH) {
     totalTicks = getTime();
-    return (this->foreverLoops <= ConversionOptions::the().numSequenceLoops()) ? State::Active : State::Suspended;
-
+    // return (this->foreverLoops < ConversionOptions::the().numSequenceLoops());
+    return (count <= ConversionOptions::the().numSequenceLoops()) ? State::Active : State::Suspended;
+  }
+  else if (readMode == READMODE_CONVERT_TO_MIDI && parentSeq->hasConditionalBranches()) {
+    return (count <= ConversionOptions::the().numSequenceLoops()) ? State::Active : State::Suspended;
   }
   return State::Active;
 

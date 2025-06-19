@@ -1272,39 +1272,45 @@ SeqTrack::State AkaoTrack::readEvent() {
         addGenericEvent(beginOffset, length, "Jump", d, Type::LoopForever);
       }
       else {
-        return addLoopForever(beginOffset, length, "Jump");
+        // if (!addLoopForever(beginOffset, length, "Jump"))
+          // return anyUnvisitedJumpDestinations();
+        // if (readMode == READMODE_FIND_DELTA_LENGTH) {
+          // totalTicks = getTime();
+        // }
+        // addGenericEvent(beginOffset, length, "Jump", desc.str(), Type::LoopForever);
+        // break;
+        auto loopForeverVal = addLoopForever(beginOffset, length, "Jump");
+
+        // printf("loopForeverVal: %u\n", loopForeverVal);
+        // return loopForeverVal;
       }
       break;
     }
 
     case EVENT_CPU_CONDITIONAL_JUMP: {
-      const uint8_t target_value = readByte(curOffset++);
-      const int16_t relative_offset = readShort(curOffset);
-      const uint32_t dest = curOffset + relative_offset + (version >= AkaoPs1Version::VERSION_3_0 ? 0 : 2);
+      const uint8_t targetValue = readByte(curOffset++);
+      const int16_t relativeOffset = readShort(curOffset);
+      const uint32_t dest = curOffset + relativeOffset + (version >= AkaoPs1Version::VERSION_3_0 ? 0 : 2);
       curOffset += 2;
       const uint32_t length = curOffset - beginOffset;
 
-      auto desc = fmt::format("Conditional Value {}  Destination: 0x{:X}", target_value, dest);
 
-
+      CondBranchEvt info;
+      info.absTime     = getTime();   // global tick
+      info.srcOffset   = curOffset;
+      info.dstOffset   = dest;
+      info.expectValue = targetValue;
+      parentSeq->registerConditionalBranch(info);
 
       if (readMode == READMODE_ADD_TO_UI) {
-        CondBranchEvt info;
-        info.absTime     = getTime();   // global tick
-        info.srcOffset   = curOffset;
-        info.dstOffset   = dest;
-        info.expectValue = target_value;
-        info.trackIndex  = 0;                    // int supplied by caller
-        parentSeq->registerConditionalBranch(info);
-
-
         // queue destination for later disassembly
-        m_offsetStack.push_back(dest);
+        // m_offsetStack.push_back(dest);
+        auto desc = fmt::format("Conditional Value {}  Destination: 0x{:X}", targetValue, dest);
         addGenericEvent(beginOffset, length, "CPU-Conditional Jump", desc, Type::Loop);
       }
 
       // ---- decide whether to jump in *this* execution
-      if (shouldTakeBranch(target_value)) {
+      if (shouldTakeBranch(targetValue)) {
         curOffset = dest;
       }
       break;
