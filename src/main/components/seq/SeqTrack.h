@@ -223,10 +223,10 @@ static std::string logEvent(uint8_t statusByte, spdlog::level::level_enum level 
 
 template<typename... Args>
 static std::string describeUnknownEvent(uint8_t statusByte, Args... args) {
-  return logEvent(statusByte, spdlog::level::off, "Event", args...);
+  return logEvent(statusByte, spdlog::level::off, "Unknown Event", args...);
 }
 
 template<typename... Args>
 static std::string describeUnknownSubevent(uint8_t statusByte, Args... args) {
-  return logEvent(statusByte, spdlog::level::off, "Subevent", args...);
+  return logEvent(statusByte, spdlog::level::off, "Unknown Subevent", args...);
 }
