@@ -191,13 +191,13 @@ bool TamSoftPS1Track::readEvent() {
 
   if (statusByte >= 0x00 && statusByte <= 0x7f) {
     // if status_byte == 0, it actually sets 0xffffffff to delta-time o_O
-    desc = fmt::format("Delta Time: {}", statusByte);
+    desc = fmt::format("Delta Time: {:d}", statusByte);
     addGenericEvent(beginOffset, curOffset - beginOffset, "Delta Time", desc, Type::Rest);
     addTime(statusByte);
   }
   else if (statusByte >= 0x80 && statusByte <= 0xdf) {
     uint8_t key = statusByte & 0x7f;
-    desc = fmt::format("Key: {}", key);
+    desc = fmt::format("Key: {:d}", key);
 
     if (lastNoteKey >= 0) {
       finalizeAllNotes();
@@ -227,7 +227,7 @@ bool TamSoftPS1Track::readEvent() {
         double volumeScale;
         uint8_t midiPan = convertVolumeBalanceToStdMidiPan(volumeBalanceLeft / 256.0, volumeBalanceRight / 256.0, &volumeScale);
 
-        desc = fmt::format("Left Volume: {}  Right Volume: {}", volumeBalanceLeft, volumeBalanceRight);
+        desc = fmt::format("Left Volume: {:d}  Right Volume: {:d}", volumeBalanceLeft, volumeBalanceRight);
         addGenericEvent(beginOffset, curOffset - beginOffset, "Volume Balance", desc, Type::Pan);
         addPanNoItem(midiPan);
         break;
@@ -250,7 +250,7 @@ bool TamSoftPS1Track::readEvent() {
         // pitch bend
         uint16_t pitchRegValue = readShort(curOffset);
         curOffset += 2;
-        desc = fmt::format("Pitch: {}", pitchRegValue);
+        desc = fmt::format("Pitch: {:d}", pitchRegValue);
 
         double cents = 0;
         if (lastNoteKey >= 0) {
@@ -266,7 +266,7 @@ bool TamSoftPS1Track::readEvent() {
         // pitch bend that updates volume/ADSR registers too?
         uint16_t pitchRegValue = readShort(curOffset);
         curOffset += 2;
-        desc = fmt::format("Pitch: {}", pitchRegValue);
+        desc = fmt::format("Pitch: {:d}", pitchRegValue);
 
         double cents = 0;
         if (lastNoteKey >= 0) {
@@ -280,14 +280,14 @@ bool TamSoftPS1Track::readEvent() {
 
       case 0xE6: {
         uint8_t mode = readByte(curOffset++);
-        desc = fmt::format("Reverb Mode: {}", mode);
+        desc = fmt::format("Reverb Mode: {:d}", mode);
         addGenericEvent(beginOffset, curOffset - beginOffset, "Reverb Mode", desc, Type::Reverb);
         break;
       }
 
       case 0xE7: {
         uint8_t depth = readByte(curOffset++);
-        desc = fmt::format("Reverb Depth: {}", depth);
+        desc = fmt::format("Reverb Depth: {:d}", depth);
         parentSeq->reverbDepth = depth << 8;
         addGenericEvent(beginOffset, curOffset - beginOffset, "Reverb Depth", desc, Type::Reverb);
         break;
@@ -335,7 +335,7 @@ bool TamSoftPS1Track::readEvent() {
 
         curOffset = dest;
         if (!isOffsetUsed(dest)) {
-          addGenericEvent(beginOffset, length, "Jump", desc.c_str(), Type::LoopForever);
+          addGenericEvent(beginOffset, length, "Jump", desc, Type::LoopForever);
         }
         else {
           bContinue = addLoopForever(beginOffset, length, "Jump");

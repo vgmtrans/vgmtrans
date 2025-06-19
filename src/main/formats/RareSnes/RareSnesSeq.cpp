@@ -635,8 +635,7 @@ bool RareSnesTrack::readEvent(void) {
         spcADSR = newADSR;
 
         auto desc = fmt::format("ADSR: {:04X}", newADSR);
-        addGenericEvent(beginOffset, curOffset - beginOffset, "ADSR", desc,
-                        Type::Adsr);
+        addGenericEvent(beginOffset, curOffset - beginOffset, "ADSR", desc, Type::Adsr);
         break;
       }
 
@@ -662,8 +661,7 @@ bool RareSnesTrack::readEvent(void) {
         spcTuning = newTuning;
         auto desc = fmt::format("Tuning: {:d} ({:d} cents)", newTuning,
                                 int(getTuningInSemitones(newTuning) * 100 + 0.5));
-        addGenericEvent(beginOffset, curOffset - beginOffset, "Tuning", desc,
-                        Type::FineTune);
+        addGenericEvent(beginOffset, curOffset - beginOffset, "Tuning", desc, Type::FineTune);
         break;
       }
 
@@ -674,8 +672,7 @@ bool RareSnesTrack::readEvent(void) {
         //AddTranspose(beginOffset, curOffset-beginOffset, 0, "Transpose (Abs)");
 
         auto desc = fmt::format("Transpose: {:d}", newTransp);
-        addGenericEvent(beginOffset, curOffset - beginOffset, "Transpose", desc,
-                        Type::Transpose);
+        addGenericEvent(beginOffset, curOffset - beginOffset, "Transpose", desc, Type::Transpose);
 
         cKeyCorrection = SEQ_KEYOFS;
         break;
@@ -701,10 +698,9 @@ bool RareSnesTrack::readEvent(void) {
         parentSeq->midiReverb = min(abs((int) newVolL) + abs((int) newVolR), 255) / 2;
         // TODO: update MIDI reverb value for each tracks?
 
-        auto desc = fmt::format("Feedback: {:d}  Volume: {:d}, {:d}", newFeedback,
-                                 newVolL, newVolR);
-        addGenericEvent(beginOffset, curOffset - beginOffset, "Echo Param", desc,
-                        Type::Reverb);
+        auto desc = fmt::format("Feedback: {:d}  Volume: {:d}, {:d}",
+                                      newFeedback, newVolL, newVolR);
+        addGenericEvent(beginOffset, curOffset - beginOffset, "Echo Param", desc, Type::Reverb);
         break;
       }
 
@@ -726,8 +722,7 @@ bool RareSnesTrack::readEvent(void) {
           desc += fmt::format(" {:02X}", newFIR[iFIRIndex]);
         }
 
-        addGenericEvent(beginOffset, curOffset - beginOffset, "Echo FIR", desc,
-                        Type::Reverb);
+        addGenericEvent(beginOffset, curOffset - beginOffset, "Echo FIR", desc, Type::Reverb);
         break;
       }
 
@@ -753,29 +748,27 @@ bool RareSnesTrack::readEvent(void) {
         altNoteByte1 = readByte(curOffset++);
         desc = fmt::format("Note: {:02X}", altNoteByte1);
         addGenericEvent(beginOffset, curOffset - beginOffset, "Set Alt Note 1",
-                        desc.c_str(), Type::ChangeState);
+                        desc, Type::ChangeState);
         break;
 
       case EVENT_SETALTNOTE2:
         altNoteByte2 = readByte(curOffset++);
         desc = fmt::format("Note: {:02X}", altNoteByte2);
         addGenericEvent(beginOffset, curOffset - beginOffset, "Set Alt Note 2",
-                        desc.c_str(), Type::ChangeState);
+                        desc, Type::ChangeState);
         break;
 
       case EVENT_PITCHSLIDEDOWNSHORT: {
         curOffset += 4;
         addGenericEvent(beginOffset, curOffset - beginOffset,
-                        "Pitch Slide Down (Short)", "",
-                        Type::PitchBendSlide);
+                        "Pitch Slide Down (Short)", "", Type::PitchBendSlide);
         break;
       }
 
       case EVENT_PITCHSLIDEUPSHORT: {
         curOffset += 4;
         addGenericEvent(beginOffset, curOffset - beginOffset,
-                        "Pitch Slide Up (Short)", "",
-                        Type::PitchBendSlide);
+                        "Pitch Slide Up (Short)", "", Type::PitchBendSlide);
         break;
       }
 
@@ -808,9 +801,8 @@ bool RareSnesTrack::readEvent(void) {
 
         // add event without MIDI events
         calculateVolPanFromVolLR(spcVolL, spcVolR, newMidiVol, newMidiPan);
-        desc = fmt::format(
-            "Left Volume: {:d}  Right Volume: {:d}  AR: {:d}  DR: {:d}  SL: {:d}  SR: {:d}",
-            newVolL, newVolR, ar, dr, sl, sr);
+        desc = fmt::format("Left Volume: {:d}  Right Volume: {:d}  AR: {:d}  DR: {:d}  SL: {:d}  SR: {:d}",
+                           newVolL, newVolR, ar, dr, sl, sr);
         addGenericEvent(beginOffset, curOffset - beginOffset,
                         "Set Vol/ADSR Preset 1", desc, Type::Volume);
         break;
@@ -833,9 +825,8 @@ bool RareSnesTrack::readEvent(void) {
 
         // add event without MIDI events
         calculateVolPanFromVolLR(spcVolL, spcVolR, newMidiVol, newMidiPan);
-        desc = fmt::format(
-            "Left Volume: {:d}  Right Volume: {:d}  AR: {:d}  DR: {:d}  SL: {:d}  SR: {:d}",
-            newVolL, newVolR, ar, dr, sl, sr);
+        desc = fmt::format("Left Volume: {:d}  Right Volume: {:d}  AR: {:d}  DR: {:d}  SL: {:d}  SR: {:d}",
+                           newVolL, newVolR, ar, dr, sl, sr);
         addGenericEvent(beginOffset, curOffset - beginOffset,
                         "Set Vol/ADSR Preset 2", desc, Type::Volume);
         break;
@@ -858,9 +849,8 @@ bool RareSnesTrack::readEvent(void) {
 
         // add event without MIDI events
         calculateVolPanFromVolLR(spcVolL, spcVolR, newMidiVol, newMidiPan);
-        desc = fmt::format(
-            "Left Volume: {:d}  Right Volume: {:d}  AR: {:d}  DR: {:d}  SL: {:d}  SR: {:d}",
-            newVolL, newVolR, ar, dr, sl, sr);
+        desc = fmt::format("Left Volume: {:d}  Right Volume: {:d}  AR: {:d}  DR: {:d}  SL: {:d}  SR: {:d}",
+                           newVolL, newVolR, ar, dr, sl, sr);
         addGenericEvent(beginOffset, curOffset - beginOffset,
                         "Set Vol/ADSR Preset 3", desc, Type::Volume);
         break;
@@ -883,11 +873,9 @@ bool RareSnesTrack::readEvent(void) {
 
         // add event without MIDI events
         calculateVolPanFromVolLR(spcVolL, spcVolR, newMidiVol, newMidiPan);
-        desc = fmt::format(
-            "Left Volume: {:d}  Right Volume: {:d}  AR: {:d}  DR: {:d}  SL: {:d}  SR: {:d}",
-            newVolL, newVolR, ar, dr, sl, sr);
-        addGenericEvent(beginOffset, curOffset - beginOffset,
-                        "Set Vol/ADSR Preset 4", desc, Type::Volume);
+        desc = fmt::format("Left Volume: {:d}  Right Volume: {:d}  AR: {:d}  DR: {:d}  SL: {:d}  SR: {:d}",
+                           newVolL, newVolR, ar, dr, sl, sr);
+        addGenericEvent(beginOffset, curOffset - beginOffset, "Set Vol/ADSR Preset 4", desc, Type::Volume);
         break;
       }
 
@@ -908,11 +896,9 @@ bool RareSnesTrack::readEvent(void) {
 
         // add event without MIDI events
         calculateVolPanFromVolLR(spcVolL, spcVolR, newMidiVol, newMidiPan);
-        desc = fmt::format(
-            "Left Volume: {:d}  Right Volume: {:d}  AR: {:d}  DR: {:d}  SL: {:d}  SR: {:d}",
-            newVolL, newVolR, ar, dr, sl, sr);
-        addGenericEvent(beginOffset, curOffset - beginOffset,
-                        "Set Vol/ADSR Preset 5", desc, Type::Volume);
+        desc = fmt::format("Left Volume: {:d}  Right Volume: {:d}  AR: {:d}  DR: {:d}  SL: {:d}  SR: {:d}",
+                           newVolL, newVolR, ar, dr, sl, sr);
+        addGenericEvent(beginOffset, curOffset - beginOffset, "Set Vol/ADSR Preset 5", desc, Type::Volume);
         break;
       }
 
@@ -988,7 +974,8 @@ bool RareSnesTrack::readEvent(void) {
 
         // instrument
         spcInstr = newProg;
-        addProgramChange(beginOffset, curOffset - beginOffset, newProg, true, "Program Change, Transpose, Tuning");
+        addProgramChange(beginOffset, curOffset - beginOffset, newProg, true,
+                         "Program Change, Transpose, Tuning");
 
         // transpose
         spcTranspose = spcTransposeAbs = newTransp;
@@ -1043,8 +1030,7 @@ bool RareSnesTrack::readEvent(void) {
       case EVENT_ECHODELAY: {
         uint8_t newEDL = readByte(curOffset++);
         auto desc = fmt::format("Delay: {:d}", newEDL);
-        addGenericEvent(beginOffset, curOffset - beginOffset, "Echo Delay", desc,
-                        Type::Reverb);
+        addGenericEvent(beginOffset, curOffset - beginOffset, "Echo Delay", desc, Type::Reverb);
         break;
       }
 
@@ -1082,8 +1068,7 @@ bool RareSnesTrack::readEvent(void) {
         break;
 
       case EVENT_LFOOFF:
-        addGenericEvent(beginOffset, curOffset - beginOffset,
-                        "Pitch Slide/Vibrato/Tremolo Off", "",
+        addGenericEvent(beginOffset, curOffset - beginOffset, "Pitch Slide/Vibrato/Tremolo Off", "",
                         Type::ChangeState);
         break;
 

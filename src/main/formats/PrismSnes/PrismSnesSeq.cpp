@@ -765,11 +765,7 @@ bool PrismSnesTrack::readEvent() {
       uint16_t envelopeAddress = readShort(curOffset);
       curOffset += 2;
       desc = fmt::format("Envelope: ${:04X}", envelopeAddress);
-      addGenericEvent(beginOffset,
-                      curOffset - beginOffset,
-                      "GAIN Envelope (Rest)",
-                      desc,
-                      Type::Adsr);
+      addGenericEvent(beginOffset, curOffset - beginOffset, "GAIN Envelope (Rest)", desc, Type::Adsr);
       addGAINEnvelope(envelopeAddress);
       break;
     }
@@ -778,11 +774,7 @@ bool PrismSnesTrack::readEvent() {
       uint8_t dur = readByte(curOffset++);
       uint8_t gain = readByte(curOffset++);
       desc = fmt::format("Duration: Full-Length - {:d}  GAIN: ${:02X}", dur, gain);
-      addGenericEvent(beginOffset,
-                      curOffset - beginOffset,
-                      "GAIN Envelope Decay Time",
-                      desc,
-                      Type::Adsr);
+      addGenericEvent(beginOffset, curOffset - beginOffset, "GAIN Envelope Decay Time", desc, Type::Adsr);
       break;
     }
 
@@ -810,11 +802,7 @@ bool PrismSnesTrack::readEvent() {
       uint16_t envelopeAddress = readShort(curOffset);
       curOffset += 2;
       desc = fmt::format("Envelope: ${:04X}", envelopeAddress);
-      addGenericEvent(beginOffset,
-                      curOffset - beginOffset,
-                      "GAIN Envelope (Sustain)",
-                      desc,
-                      Type::Adsr);
+      addGenericEvent(beginOffset, curOffset - beginOffset, "GAIN Envelope (Sustain)", desc, Type::Adsr);
       addGAINEnvelope(envelopeAddress);
       break;
     }
@@ -823,11 +811,7 @@ bool PrismSnesTrack::readEvent() {
       uint16_t envelopeAddress = readShort(curOffset);
       curOffset += 2;
       desc = fmt::format("Envelope: ${:04X}", envelopeAddress);
-      addGenericEvent(beginOffset,
-                      curOffset - beginOffset,
-                      "Echo Volume Envelope",
-                      desc,
-                      Type::Reverb);
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Echo Volume Envelope", desc, Type::Reverb);
       addEchoVolumeEnvelope(envelopeAddress);
       break;
     }
@@ -836,9 +820,8 @@ bool PrismSnesTrack::readEvent() {
       int8_t echoVolumeLeft = readByte(curOffset++);
       int8_t echoVolumeRight = readByte(curOffset++);
       int8_t echoVolumeMono = readByte(curOffset++);
-      desc = fmt::format(
-          "Left Volume: {:d}  Right Volume: {:d}  Mono Volume: {:d}",
-          echoVolumeLeft, echoVolumeRight, echoVolumeMono);
+      desc = fmt::format("Left Volume: {:d}  Right Volume: {:d}  Mono Volume: {:d}",
+                         echoVolumeLeft, echoVolumeRight, echoVolumeMono);
       addGenericEvent(beginOffset, curOffset - beginOffset, "Echo Volume", desc, Type::Reverb);
       break;
     }
@@ -858,9 +841,8 @@ bool PrismSnesTrack::readEvent() {
       int8_t echoVolumeLeft = readByte(curOffset++);
       int8_t echoVolumeRight = readByte(curOffset++);
       int8_t echoVolumeMono = readByte(curOffset++);
-      desc = fmt::format(
-          "Feedback: {:d}  Left Volume: {:d}  Right Volume: {:d}  Mono Volume: {:d}",
-          echoFeedback, echoVolumeLeft, echoVolumeRight, echoVolumeMono);
+      desc = fmt::format("Feedback: {:d}  Left Volume: {:d}  Right Volume: {:d}  Mono Volume: {:d}",
+                         echoFeedback, echoVolumeLeft, echoVolumeRight, echoVolumeMono);
       addGenericEvent(beginOffset, curOffset - beginOffset, "Echo Param", desc, Type::Reverb);
       break;
     }
@@ -883,11 +865,7 @@ bool PrismSnesTrack::readEvent() {
       uint16_t envelopeAddress = readShort(curOffset);
       curOffset += 2;
       desc = fmt::format("Envelope: ${:04X}", envelopeAddress);
-      addGenericEvent(beginOffset,
-                      curOffset - beginOffset,
-                      "GAIN Envelope (Decay)",
-                      desc,
-                      Type::Adsr);
+      addGenericEvent(beginOffset, curOffset - beginOffset, "GAIN Envelope (Decay)", desc, Type::Adsr);
       addGAINEnvelope(envelopeAddress);
       break;
     }

@@ -430,9 +430,8 @@ bool ChunSnesTrack::readEvent() {
       uint8_t dr = (adsr1 & 0x70) >> 4;
       uint8_t sl = (adsr2 & 0xe0) >> 5;
       uint8_t sr = adsr2 & 0x1f;
-      desc = fmt::format(
-          "AR: {:d}  DR: {:d}  SL: {:d}  SR: {:d}  SR (Release): {:d}",
-          ar, dr, sl, sr, release_sr);
+      desc = fmt::format("AR: {:d}  DR: {:d}  SL: {:d}  SR: {:d}  SR (Release): {:d}",
+                         ar, dr, sl, sr, release_sr);
       addGenericEvent(beginOffset, curOffset - beginOffset, "ADSR & Release Rate", desc, Type::Adsr);
       break;
     }

@@ -217,14 +217,14 @@ bool ItikitiSnesTrack::readEvent() {
 
     case ItikitiSnesSeqEventType::EVENT_MASTER_VOLUME: {
       const uint8_t vol = readByte(curOffset++);
-      desc = fmt::format("Volume: {}", vol);
+      desc = fmt::format("Volume: {:d}", vol);
       addGenericEvent(start, curOffset - start, "Master Volume", desc, Type::MasterVolume);
       break;
     }
 
     case ItikitiSnesSeqEventType::EVENT_ECHO_VOLUME: {
       const uint8_t vol = readByte(curOffset++);
-      desc = fmt::format("Volume: {}", vol);
+      desc = fmt::format("Volume: {:d}", vol);
       addGenericEvent(start, curOffset - start, "Echo Volume", desc, Type::Reverb);
       break;
     }
@@ -238,9 +238,8 @@ bool ItikitiSnesTrack::readEvent() {
     case ItikitiSnesSeqEventType::EVENT_ECHO_FEEDBACK_FIR: {
       const int8_t feedback = static_cast<int8_t>(readByte(curOffset++));
       const uint8_t filter_index = readByte(curOffset++);
-      desc = fmt::format("Feedback: {}  FIR: {}", feedback, filter_index);
-      addGenericEvent(start, curOffset - start, "Echo Feedback & FIR", desc,
-                      Type::Reverb);
+      desc = fmt::format("Feedback: {:d}  FIR: {:d}", feedback, filter_index);
+      addGenericEvent(start, curOffset - start, "Echo Feedback & FIR", desc, Type::Reverb);
       break;
     }
 
@@ -260,9 +259,8 @@ bool ItikitiSnesTrack::readEvent() {
     case ItikitiSnesSeqEventType::EVENT_NOISE_FREQ: {
       // Driver bug: This command sets the noise frequency for the next track from the current.
       const uint8_t nck = readByte(curOffset++) & 0x1f;
-      desc = fmt::format("Noise Frequency (NCK): {}", nck);
-      addGenericEvent(start, curOffset - start, "Noise Frequency", desc,
-                      Type::Noise);
+      desc = fmt::format("Noise Frequency (NCK): {:d}", nck);
+      addGenericEvent(start, curOffset - start, "Noise Frequency", desc, Type::Noise);
       break;
     }
 
@@ -270,8 +268,7 @@ bool ItikitiSnesTrack::readEvent() {
       const uint16_t bits = readShort(curOffset);
       curOffset += 2;
       desc = fmt::format("Length Bits: 0x{:04X}", bits);
-      addGenericEvent(start, curOffset - start, "Note Length Pattern", desc,
-                      Type::DurationNote);
+      addGenericEvent(start, curOffset - start, "Note Length Pattern", desc, Type::DurationNote);
 
       size_t size_written = 0;
       for (unsigned int index = 0; index < 16 && size_written < m_note_length_table.size();
@@ -292,7 +289,7 @@ bool ItikitiSnesTrack::readEvent() {
       const uint8_t arg5 = readByte(curOffset++);
       const uint8_t arg6 = readByte(curOffset++);
       const uint8_t arg7 = readByte(curOffset++);
-      desc = fmt::format("Lengths: {}, {}, {}, {}, {}, {}, {}",
+      desc = fmt::format("Lengths: {:d}, {:d}, {:d}, {:d}, {:d}, {:d}, {:d}",
                                arg1, arg2, arg3, arg4, arg5, arg6, arg7);
       addGenericEvent(start, curOffset - start, "Custom Note Length Pattern", desc,
                       Type::DurationNote);
@@ -309,9 +306,8 @@ bool ItikitiSnesTrack::readEvent() {
 
     case ItikitiSnesSeqEventType::EVENT_NOTE_NUMBER_BASE: {
       const uint8_t note_number = readByte(curOffset++);
-      desc = fmt::format("Note Number: {}", note_number);
-      addGenericEvent(start, curOffset - start, "Note Number Base", desc,
-                      Type::ChangeState);
+      desc = fmt::format("Note Number: {:d}", note_number);
+      addGenericEvent(start, curOffset - start, "Note Number Base", desc, Type::ChangeState);
       m_note_number_base = note_number;
       break;
     }
@@ -361,28 +357,28 @@ bool ItikitiSnesTrack::readEvent() {
 
     case ItikitiSnesSeqEventType::EVENT_ADSR_AR: {
       const uint8_t ar = readByte(curOffset++) & 15;
-      desc = fmt::format("AR: {}", ar);
+      desc = fmt::format("AR: {:d}", ar);
       addGenericEvent(start, curOffset - start, "ADSR Attack Rate", desc, Type::Adsr);
       break;
     }
 
     case ItikitiSnesSeqEventType::EVENT_ADSR_DR: {
       const uint8_t dr = readByte(curOffset++) & 7;
-      desc = fmt::format("DR: {}", dr);
+      desc = fmt::format("DR: {:d}", dr);
       addGenericEvent(start, curOffset - start, "ADSR Decay Rate", desc, Type::Adsr);
       break;
     }
 
     case ItikitiSnesSeqEventType::EVENT_ADSR_SL: {
       const uint8_t sl = readByte(curOffset++) & 7;
-      desc = fmt::format("SL: {}", sl);
+      desc = fmt::format("SL: {:d}", sl);
       addGenericEvent(start, curOffset - start, "ADSR Sustain Level", desc, Type::Adsr);
       break;
     }
 
     case ItikitiSnesSeqEventType::EVENT_ADSR_SR: {
       const uint8_t sr = readByte(curOffset++) & 15;
-      desc = fmt::format("SR: {}", sr);
+      desc = fmt::format("SR: {:d}", sr);
       addGenericEvent(start, curOffset - start, "ADSR Sustain Rate", desc, Type::Adsr);
       break;
     }
@@ -409,7 +405,7 @@ bool ItikitiSnesTrack::readEvent() {
         const uint8_t delay = readByte(curOffset++);
         const uint8_t rate = readByte(curOffset++);
         const uint8_t depth = readByte(curOffset++);
-        desc = fmt::format("Delay: {}  Rate: {}  Depth: {}", delay, rate, depth);
+        desc = fmt::format("Delay: {:d}  Rate: {:d}  Depth: {:d}", delay, rate, depth);
         addGenericEvent(start, curOffset - start, "Vibrato", desc, Type::Vibrato);
         break;
     }
@@ -425,7 +421,7 @@ bool ItikitiSnesTrack::readEvent() {
       const uint8_t delay = readByte(curOffset++);
       const uint8_t rate = readByte(curOffset++);
       const uint8_t depth = readByte(curOffset++);
-      desc = fmt::format("Delay: {}  Rate: {}  Depth: {}", delay, rate, depth);
+      desc = fmt::format("Delay: {:d}  Rate: {:d}  Depth: {:d}", delay, rate, depth);
       addGenericEvent(start, curOffset - start, "Tremolo", desc, Type::Tremelo);
       break;
     }
@@ -438,7 +434,7 @@ bool ItikitiSnesTrack::readEvent() {
     case ItikitiSnesSeqEventType::EVENT_PAN_LFO_ON: {
       const uint8_t depth = readByte(curOffset++);
       const uint8_t rate = readByte(curOffset++);
-      desc = fmt::format("Depth: {}  Rate: {}", depth, rate);
+      desc = fmt::format("Depth: {:d}  Rate: {:d}", depth, rate);
       addGenericEvent(start, curOffset - start, "Pan LFO", desc, Type::PanLfo);
       break;
     }
@@ -495,7 +491,7 @@ bool ItikitiSnesTrack::readEvent() {
     case ItikitiSnesSeqEventType::EVENT_SPECIAL: {
       const uint8_t value = readByte(curOffset++);
       if (value <= 0x7f) {
-        desc = fmt::format("Range: {} semitones", value);
+        desc = fmt::format("Range: {:d} semitones", value);
         addGenericEvent(start, curOffset - start, "Note Randomization On", desc,
                         Type::ChangeState);
       } else if (value == 0x83) {
@@ -518,7 +514,7 @@ bool ItikitiSnesTrack::readEvent() {
     case ItikitiSnesSeqEventType::EVENT_PITCH_SLIDE: {
       const uint8_t length = readByte(curOffset++); // in ticks
       const int8_t semitones = static_cast<int8_t>(readByte(curOffset++));
-      desc = fmt::format("Length: {}  Key: {} semitones", length, semitones);
+      desc = fmt::format("Length: {:d}  Key: {:d} semitones", length, semitones);
       addGenericEvent(start, curOffset - start, "Pitch Slide", desc, Type::PitchBendSlide);
       break;
     }
@@ -526,7 +522,7 @@ bool ItikitiSnesTrack::readEvent() {
     case ItikitiSnesSeqEventType::EVENT_LOOP_START: {
       const uint8_t count = readByte(curOffset++);
       desc = (count == 0) ? std::string("Repeat Count: Infinite")
-                                 : fmt::format("Repeat Count: {}", count + 1);
+                                 : fmt::format("Repeat Count: {:d}", count + 1);
       addGenericEvent(start, curOffset - start, "Loop Start", desc, Type::RepeatStart);
 
       if (m_loop_level + 1 >= kItikitiSnesSeqMaxLoopLevel) {
@@ -581,7 +577,7 @@ bool ItikitiSnesTrack::readEvent() {
       const uint16_t dest = readDecodedOffset(curOffset);
       curOffset += 2;
 
-      desc = fmt::format("Count: {}  Destination: ${:04X}", target_count, dest);
+      desc = fmt::format("Count: {:d}  Destination: ${:04X}", target_count, dest);
       addGenericEvent(start, curOffset - start, "Loop Break / Jump to Volta", desc,
                       Type::LoopBreak);
       

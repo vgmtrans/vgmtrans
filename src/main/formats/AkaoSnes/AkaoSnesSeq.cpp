@@ -89,8 +89,7 @@ bool AkaoSnesSeq::parseHeader() {
   for (uint8_t trackIndex = 0; trackIndex < MAX_TRACKS; trackIndex++) {
     uint16_t addrTrackStart = getShortAddress(curOffset);
     if (addrTrackStart != addrSequenceEnd) {
-      header->addChild(curOffset, 2,
-                       fmt::format("Track Pointer {}", trackIndex + 1));
+      header->addChild(curOffset, 2, fmt::format("Track Pointer {}", trackIndex + 1));
     }
     else {
       header->addChild(curOffset, 2, "NULL");

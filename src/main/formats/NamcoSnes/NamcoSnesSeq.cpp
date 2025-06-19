@@ -177,7 +177,7 @@ bool NamcoSnesSeq::readEvent() {
       desc = "Tracks:";
       for (uint8_t trackIndex = 0; trackIndex < 8; trackIndex++) {
         if ((targetChannels & (0x80 >> trackIndex)) != 0) {
-          desc += fmt::format(" {}", trackIndex + 1);
+          desc += fmt::format(" {:d}", trackIndex + 1);
         }
       }
 
@@ -192,7 +192,7 @@ bool NamcoSnesSeq::readEvent() {
       addGenericEvent(beginOffset,
                       curOffset - beginOffset,
                       "Pattern Play",
-                      desc.c_str(),
+                      desc,
                       Type::RepeatStart);
 
       subReturnAddress = curOffset;
@@ -211,7 +211,7 @@ bool NamcoSnesSeq::readEvent() {
         addGenericEvent(beginOffset,
                         curOffset - beginOffset,
                         "Pattern End",
-                        desc.c_str(),
+                        desc,
                         Type::RepeatEnd);
         curOffset = subReturnAddress;
         subReturnAddress = 0;
@@ -237,7 +237,7 @@ bool NamcoSnesSeq::readEvent() {
       uint16_t dest = readShort(curOffset);
       curOffset += 2;
       desc = fmt::format("Times: {:d}  Destination: ${:04X}", count, dest);
-      addGenericEvent(beginOffset, curOffset - beginOffset, "Loop Again", desc.c_str(), Type::RepeatEnd);
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Loop Again", desc, Type::RepeatEnd);
 
       loopCount++;
       if (loopCount == count) {
@@ -257,7 +257,7 @@ bool NamcoSnesSeq::readEvent() {
       uint16_t dest = readShort(curOffset);
       curOffset += 2;
       desc = fmt::format("Times: {:d}  Destination: ${:04X}", count, dest);
-      addGenericEvent(beginOffset, curOffset - beginOffset, "Loop Break", desc.c_str(), Type::RepeatEnd);
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Loop Break", desc, Type::RepeatEnd);
 
       loopCount++;
       if (loopCount == count) {
@@ -277,7 +277,7 @@ bool NamcoSnesSeq::readEvent() {
       addGenericEvent(beginOffset,
                       curOffset - beginOffset,
                       "Loop Again (Alt)",
-                      desc.c_str(),
+                      desc,
                       Type::RepeatEnd);
 
       loopCountAlt++;
@@ -298,7 +298,7 @@ bool NamcoSnesSeq::readEvent() {
       uint16_t dest = readShort(curOffset);
       curOffset += 2;
       desc = fmt::format("Times: {:d}  Destination: ${:04X}", count, dest);
-      addGenericEvent(beginOffset, curOffset - beginOffset, "Loop Break", desc.c_str(), Type::RepeatEnd);
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Loop Break", desc, Type::RepeatEnd);
 
       loopCountAlt++;
       if (loopCountAlt == count) {
@@ -323,7 +323,7 @@ bool NamcoSnesSeq::readEvent() {
 
       curOffset = dest;
       if (!isOffsetUsed(dest)) {
-        addGenericEvent(beginOffset, length, "Jump", desc.c_str(), Type::LoopForever);
+        addGenericEvent(beginOffset, length, "Jump", desc, Type::LoopForever);
       }
       else {
         bContinue = addLoopForever(beginOffset, length, "Jump");
@@ -345,21 +345,21 @@ bool NamcoSnesSeq::readEvent() {
           if (keyByte >= NOTE_NUMBER_PERCUSSION_MIN) {
             key = keyByte - NOTE_NUMBER_PERCUSSION_MIN;
             noteType = NOTE_PERCUSSION;
-            desc += fmt::format(" [{}] Perc {}", trackIndex + 1, key);
+            desc += fmt::format(" [{:d}] Perc {}", trackIndex + 1, key);
           }
           else if (keyByte >= NOTE_NUMBER_NOISE_MIN) {
             key = keyByte & 0x1f;
             noteType = NOTE_NOISE;
-            desc += fmt::format(" [{}] Noise {}", trackIndex + 1, key);
+            desc += fmt::format(" [{:d}] Noise {}", trackIndex + 1, key);
           }
           else if (keyByte == NOTE_NUMBER_REST) {
             noteType = prevNoteType[trackIndex];
-            desc += fmt::format(" [{}] Rest", trackIndex + 1);
+            desc += fmt::format(" [{:d}] Rest", trackIndex + 1);
           }
           else {
             key = keyByte;
             noteType = NOTE_MELODY;
-            desc += fmt::format(" [{}] {} ({})", trackIndex + 1, key, MidiEvent::getNoteName(key + transpose));
+            desc += fmt::format(" [{:d}] {:d} ({})", trackIndex + 1, key, MidiEvent::getNoteName(key + transpose));
           }
 
           if (VGMSeq::readMode == READMODE_CONVERT_TO_MIDI) {
@@ -421,7 +421,7 @@ bool NamcoSnesSeq::readEvent() {
       for (uint8_t trackIndex = 0; trackIndex < 8; trackIndex++) {
         if ((targetChannels & (0x80 >> trackIndex)) != 0) {
           uint8_t newValue = readByte(curOffset++);
-          desc += fmt::format(" [{}] {:d}", trackIndex + 1, newValue);
+          desc += fmt::format(" [{:d}] {:d}", trackIndex + 1, newValue);
         }
       }
 
@@ -489,7 +489,7 @@ bool NamcoSnesSeq::readEvent() {
       for (uint8_t trackIndex = 0; trackIndex < 8; trackIndex++) {
         if ((targetChannels & (0x80 >> trackIndex)) != 0) {
           uint8_t newValue = readByte(curOffset++);
-          desc += fmt::format(" [{}] {:d}", trackIndex + 1, newValue);
+          desc += fmt::format(" [{:d}] {:d}", trackIndex + 1, newValue);
 
           if (VGMSeq::readMode == READMODE_CONVERT_TO_MIDI) {
             channel = trackIndex;
@@ -526,11 +526,7 @@ bool NamcoSnesSeq::readEvent() {
 
       switch (controlType) {
         case CONTROL_PROGCHANGE:
-          addGenericEvent(beginOffset,
-                          curOffset - beginOffset,
-                          controlName,
-                          desc,
-                          Type::ProgramChange);
+          addGenericEvent(beginOffset, curOffset - beginOffset, controlName, desc, Type::ProgramChange);
           break;
 
         case CONTROL_VOLUME:

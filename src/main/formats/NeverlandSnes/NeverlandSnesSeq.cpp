@@ -71,14 +71,14 @@ bool NeverlandSnesSeq::parseHeader(void) {
     uint16_t trackSignPtr = dwOffset + 0x10 + trackIndex;
     uint8_t trackSign = readByte(trackSignPtr);
 
-    auto trackSignName = fmt::format("Track {} Entry", trackIndex + 1);
+    auto trackSignName = fmt::format("Track {:d} Entry", trackIndex + 1);
     header->addChild(trackSignPtr, 1, trackSignName);
 
     uint16_t sectionListOffsetPtr = dwOffset + 0x20 + (trackIndex * 2);
     if (trackSign != 0xff) {
       uint16_t sectionListAddress = getShortAddress(sectionListOffsetPtr);
 
-      auto playlistName = fmt::format("Track {} Playlist Pointer", trackIndex + 1);
+      auto playlistName = fmt::format("Track {:d} Playlist Pointer", trackIndex + 1);
       header->addChild(sectionListOffsetPtr, 2, playlistName);
 
       NeverlandSnesTrack *track = new NeverlandSnesTrack(this, sectionListAddress);
@@ -182,9 +182,8 @@ bool NeverlandSnesTrack::readEvent(void) {
       uint8_t arg2 = readByte(curOffset++);
       uint8_t arg3 = readByte(curOffset++);
       uint8_t arg4 = readByte(curOffset++);
-      desc = fmt::format(
-          "Event: 0x{:02X}  Arg1: {:d}  Arg2: {:d}  Arg3: {:d}  Arg4: {:d}",
-          statusByte, arg1, arg2, arg3, arg4);
+      desc = fmt::format("Event: 0x{:02X}  Arg1: {:d}  Arg2: {:d}  Arg3: {:d}  Arg4: {:d}",
+                         statusByte, arg1, arg2, arg3, arg4);
       addUnknown(beginOffset, curOffset - beginOffset, "Unknown Event", desc);
       break;
     }

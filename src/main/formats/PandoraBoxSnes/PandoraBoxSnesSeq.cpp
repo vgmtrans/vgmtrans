@@ -59,7 +59,7 @@ bool PandoraBoxSnesSeq::parseHeader() {
   for (uint8_t trackIndex = 0; trackIndex < MAX_TRACKS; trackIndex++) {
     uint16_t ofsTrackStart = readShort(curOffset);
     if (ofsTrackStart != 0xffff) {
-      auto trackName = fmt::format("Track Pointer {}", trackIndex + 1);
+      auto trackName = fmt::format("Track Pointer {:d}", trackIndex + 1);
       header->addChild(curOffset, 2, trackName);
     }
     else {
@@ -313,7 +313,7 @@ bool PandoraBoxSnesTrack::readEvent() {
 
     case EVENT_TUNING: {
       int8_t newTuning = readByte(curOffset++);
-      desc = fmt::format("{}{} Hz", (newTuning >= 0 ? "+" : ""), static_cast<int>(newTuning));
+      desc = fmt::format("{}{:d} Hz", (newTuning >= 0 ? "+" : ""), newTuning);
       addGenericEvent(beginOffset, curOffset - beginOffset, "Fine Tuning", desc, Type::FineTune);
       break;
     }
@@ -489,8 +489,7 @@ bool PandoraBoxSnesTrack::readEvent() {
       uint8_t param = readByte(curOffset++);
 
       uint8_t newTarget = param & 3;
-      std::string targetDesc =
-          fmt::format("Channel Type: {}{}", newTarget, newTarget ? "" : " (Keep Current)");
+      std::string targetDesc = fmt::format("Channel Type: {:d}{}", newTarget, newTarget ? "" : " (Keep Current)");
 
       if ((param & 0x80) == 0) {
         uint8_t newNCK = (param >> 2) & 15;
@@ -516,8 +515,7 @@ bool PandoraBoxSnesTrack::readEvent() {
       uint8_t sr = (srRate * 0x1f) / 127;
       spcADSR = ((0x80 | (dr << 4) | ar) << 8) | ((sl << 5) | sr);
 
-      desc = fmt::format(
-          "AR: {:d}/127 ({:d})  DR: {:d}/127 ({:d})  SR: {:d}/127 ({:d})  SL: {:d}/127 ({:d})  Arg5: {:d}/127",
+      desc = fmt::format("AR: {:d}/127 ({:d})  DR: {:d}/127 ({:d})  SR: {:d}/127 ({:d})  SL: {:d}/127 ({:d})  Arg5: {:d}/127",
           arRate, ar, drRate, dr, srRate, sr, slRate, sl, xxRate);
 
       addGenericEvent(beginOffset, curOffset - beginOffset, "ADSR", desc, Type::Adsr);

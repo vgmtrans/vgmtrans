@@ -590,7 +590,7 @@ bool FalcomSnesTrack::readEvent() {
       uint8_t newNCK = readByte(curOffset++) & 0x1f;
 
       desc = fmt::format("Noise Frequency (NCK): {:d}", newNCK);
-      addGenericEvent(beginOffset, curOffset - beginOffset, "Noise Frequency", desc.c_str(), Type::Noise);
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Noise Frequency", desc, Type::Noise);
       break;
     }
 

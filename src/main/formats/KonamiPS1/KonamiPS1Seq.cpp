@@ -125,7 +125,7 @@ bool KonamiPS1Track::readEvent() {
     uint32_t delta = readVarLen(curOffset);
     addTime(delta);
 
-    std::string description = fmt::format("Duration: {}", delta);
+    std::string description = fmt::format("Duration: {:d}", delta);
     addGenericEvent(beginOffset, curOffset - beginOffset, "Delta Time",
                     description, Type::Rest);
 
@@ -170,7 +170,7 @@ bool KonamiPS1Track::readEvent() {
         break;
 
       case 6:
-        description = fmt::format("Parameter: {}", paramByte);
+        description = fmt::format("Parameter: {:d}", paramByte);
         addGenericEvent(beginOffset, curOffset - beginOffset, "NRPN Data Entry",
                         description, Type::Misc);
         if (readMode == READMODE_CONVERT_TO_MIDI) {
@@ -191,7 +191,7 @@ bool KonamiPS1Track::readEvent() {
         break;
 
       case 15:
-        description = fmt::format("Parameter: {}", paramByte);
+        description = fmt::format("Parameter: {:d}", paramByte);
         addGenericEvent(beginOffset, curOffset - beginOffset, "Stereo Widening (?)",
                         description, Type::Pan);
         if (readMode == READMODE_CONVERT_TO_MIDI) {
@@ -204,7 +204,7 @@ bool KonamiPS1Track::readEvent() {
         break;
 
       case 70:
-        description = fmt::format("Parameter: {}", paramByte);
+        description = fmt::format("Parameter: {:d}", paramByte);
         addGenericEvent(beginOffset, curOffset - beginOffset, "Set Channel", description,
                         Type::Pan);
         if (readMode == READMODE_CONVERT_TO_MIDI) {
@@ -265,7 +265,7 @@ bool KonamiPS1Track::readEvent() {
         break;
 
       case 99:
-        description = fmt::format("Parameter: {}", paramByte);
+        description = fmt::format("Parameter: {:d}", paramByte);
         addGenericEvent(beginOffset, curOffset - beginOffset, "NRPN (LSB)", description,
                         Type::Misc);
         if (readMode == READMODE_CONVERT_TO_MIDI) {
@@ -279,7 +279,7 @@ bool KonamiPS1Track::readEvent() {
         } else if (paramByte == 30) {
           addGenericEvent(beginOffset, curOffset - beginOffset, "Loop End", "", Type::Loop);
         } else {
-          description = fmt::format("Parameter: {}", paramByte);
+          description = fmt::format("Parameter: {:d}", paramByte);
           addGenericEvent(beginOffset, curOffset - beginOffset, "NRPN (LSB)", description,
                           Type::Misc);
         }
@@ -289,7 +289,7 @@ bool KonamiPS1Track::readEvent() {
         break;
 
       case 118:
-        description = fmt::format("Parameter: {}", paramByte);
+        description = fmt::format("Parameter: {:d}", paramByte);
         addGenericEvent(beginOffset, curOffset - beginOffset, "Seq Beat", description,
                         Type::Misc);
         if (readMode == READMODE_CONVERT_TO_MIDI) {
