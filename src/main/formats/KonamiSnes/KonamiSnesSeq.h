@@ -96,7 +96,7 @@ class KonamiSnesTrack
  public:
   KonamiSnesTrack(KonamiSnesSeq *parentFile, uint32_t offset = 0, uint32_t length = 0);
   virtual void resetVars();
-  virtual bool readEvent();
+  virtual State readEvent();
 
   uint8_t noteLength;
   uint8_t noteDurationRate;

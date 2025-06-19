@@ -54,7 +54,7 @@ bool SonyPS2Seq::parseHeader() {
 }
 
 
-bool SonyPS2Seq::readEvent(void) {
+SeqTrack::State SonyPS2Seq::readEvent() {
   uint32_t beginOffset = curOffset;
   uint32_t deltaTime;
   if (bSkipDeltaTime)
@@ -63,7 +63,7 @@ bool SonyPS2Seq::readEvent(void) {
     deltaTime = readVarLen(curOffset);
   addTime(deltaTime);
   if (curOffset >= rawFile()->size())
-    return false;
+    return State::Finished;
 
   bSkipDeltaTime = false;
 
@@ -74,7 +74,7 @@ bool SonyPS2Seq::readEvent(void) {
     // some games were ripped to PSF with the EndTrack event missing, so
     // if we read a sequence of four 0 bytes, then just treat that as the end of the track
     if (status_byte == 0 && readWord(curOffset) == 0) {
-      return false;
+      return State::Finished;
     }
     status_byte = runningStatus;
     curOffset--;
@@ -186,11 +186,11 @@ bool SonyPS2Seq::readEvent(void) {
 
           case 0x2F :
             addEndOfTrack(beginOffset, curOffset - beginOffset);
-            return false;
+            return State::Finished;
 
           default :
             addEndOfTrack(beginOffset, curOffset - beginOffset - 1);
-            return false;
+            return State::Finished;
         }
       }
       break;
@@ -198,9 +198,9 @@ bool SonyPS2Seq::readEvent(void) {
 
     default:
       addGenericEvent(beginOffset, curOffset - beginOffset, "UNKNOWN", "", Type::Unrecognized);
-      return false;
+      return State::Finished;
   }
-  return true;
+  return State::Active;
 }
 
 uint8_t SonyPS2Seq::getDataByte(uint32_t offset) {

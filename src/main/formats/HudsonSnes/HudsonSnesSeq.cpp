@@ -518,16 +518,15 @@ void HudsonSnesTrack::resetVars() {
 }
 
 
-bool HudsonSnesTrack::readEvent() {
+SeqTrack::State HudsonSnesTrack::readEvent() {
   HudsonSnesSeq *parentSeq = (HudsonSnesSeq *) this->parentSeq;
 
   uint32_t beginOffset = curOffset;
   if (curOffset >= 0x10000) {
-    return false;
+    return State::Finished;
   }
 
   uint8_t statusByte = readByte(curOffset++);
-  bool bContinue = true;
 
   std::stringstream desc;
 
@@ -787,8 +786,7 @@ bool HudsonSnesTrack::readEvent() {
 
       if (spcCallStackPtr + 3 > HUDSONSNES_CALLSTACK_SIZE) {
         // stack overflow
-        bContinue = false;
-        break;
+        return State::Finished;
       }
 
       // save loop start address and repeat count
@@ -807,8 +805,7 @@ bool HudsonSnesTrack::readEvent() {
 
       if (spcCallStackPtr < 3) {
         // access violation
-        bContinue = false;
-        break;
+        return State::Finished;
       }
 
       uint8_t count = spcCallStack[spcCallStackPtr - 1];
@@ -832,8 +829,7 @@ bool HudsonSnesTrack::readEvent() {
 
       if (spcCallStackPtr + 2 > HUDSONSNES_CALLSTACK_SIZE) {
         // stack overflow
-        bContinue = false;
-        break;
+        return State::Finished;
       }
 
       // save loop start address and repeat count
@@ -857,7 +853,7 @@ bool HudsonSnesTrack::readEvent() {
         addGenericEvent(beginOffset, length, "Jump", desc.str().c_str(), Type::LoopForever);
       }
       else {
-        bContinue = addLoopForever(beginOffset, length, "Jump");
+        return addLoopForever(beginOffset, length, "Jump");
       }
       break;
     }
@@ -982,9 +978,9 @@ bool HudsonSnesTrack::readEvent() {
     }
 
     case EVENT_JUMP_TO_LOOP_POINT: {
-      bContinue = addLoopForever(beginOffset, curOffset - beginOffset);
+      auto newState = addLoopForever(beginOffset, curOffset - beginOffset);
       curOffset = infiniteLoopPoint;
-      break;
+      return newState;
     }
 
     case EVENT_LOOP_POINT_ONCE: {
@@ -1047,7 +1043,7 @@ bool HudsonSnesTrack::readEvent() {
       if (spcCallStackPtr == 0) {
         // end of track
         addEndOfTrack(beginOffset, curOffset - beginOffset);
-        bContinue = false;
+        return State::Finished;
       }
       else {
         // end subroutine
@@ -1059,8 +1055,7 @@ bool HudsonSnesTrack::readEvent() {
 
         if (spcCallStackPtr < 2) {
           // access violation
-          bContinue = false;
-          break;
+          return State::Finished;
         }
 
         curOffset = (spcCallStack[spcCallStackPtr - 2] | (spcCallStack[spcCallStackPtr - 1] << 8)) + 2;
@@ -1143,8 +1138,7 @@ bool HudsonSnesTrack::readEvent() {
 
         case SUBEVENT_END: {
           addEndOfTrack(beginOffset, curOffset - beginOffset);
-          bContinue = false;
-          break;
+          return State::Finished;
         }
 
         case SUBEVENT_ECHO_OFF: {
@@ -1380,8 +1374,7 @@ bool HudsonSnesTrack::readEvent() {
         default: {
           auto descr = logEvent(subStatusByte, spdlog::level::err, "Subevent");
           addUnknown(beginOffset, curOffset - beginOffset, "Unknown Event", descr);
-          bContinue = false;
-          break;
+          return State::Finished;
         }
       }
 
@@ -1391,8 +1384,7 @@ bool HudsonSnesTrack::readEvent() {
     default: {
       auto descr = logEvent(statusByte);
       addUnknown(beginOffset, curOffset - beginOffset, "Unknown Event", descr);
-      bContinue = false;
-      break;
+      return State::Finished;
     }
   }
 
@@ -1400,5 +1392,5 @@ bool HudsonSnesTrack::readEvent() {
   //ssTrace << "" << std::hex << std::setfill('0') << std::setw(8) << std::uppercase << beginOffset << ": " << std::setw(2) << (int)statusByte  << " -> " << std::setw(8) << curOffset << std::endl;
   //OutputDebugString(ssTrace.str().c_str());
 
-  return bContinue;
+  return State::Active;
 }

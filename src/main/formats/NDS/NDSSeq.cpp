@@ -8,7 +8,7 @@ NDSSeq::NDSSeq(RawFile *file, uint32_t offset, uint32_t length, string name)
     : VGMSeq(NDSFormat::name, file, offset, length, name) {
 }
 
-bool NDSSeq::parseHeader(void) {
+bool NDSSeq::parseHeader() {
   VGMHeader *SSEQHdr = addHeader(dwOffset, 0x10, "SSEQ Chunk Header");
   SSEQHdr->addSig(dwOffset, 8);
   SSEQHdr->addChild(dwOffset + 8, 4, "Size");
@@ -20,7 +20,7 @@ bool NDSSeq::parseHeader(void) {
   return true;        //successful
 }
 
-bool NDSSeq::parseTrackPointers(void) {
+bool NDSSeq::parseTrackPointers() {
   VGMHeader *DATAHdr = addHeader(dwOffset + 0x10, 0xC, "DATA Chunk Header");
   DATAHdr->addSig(dwOffset + 0x10, 4);
   DATAHdr->addChild(dwOffset + 0x10 + 4, 4, "Size");
@@ -92,7 +92,7 @@ void NDSTrack::resetVars() {
   SeqTrack::resetVars();
 }
 
-bool NDSTrack::readEvent(void) {
+SeqTrack::State NDSTrack::readEvent() {
   uint32_t beginOffset = curOffset;
   uint8_t status_byte = readByte(curOffset++);
 
@@ -138,17 +138,17 @@ bool NDSTrack::readEvent(void) {
 
         // The event usually appears at last of the song, but there can be an exception.
         // See Zelda The Spirit Tracks - SSEQ_0018 (overworld train theme)
-        bool bContinue = true;
+        State newState = State::Active;
         if (isOffsetUsed(jumpAddr)) {
           addLoopForever(beginOffset, 4, "Loop");
-          bContinue = false;
+          newState = State::Suspended;
         }
         else {
           addGenericEvent(beginOffset, 4, "Jump", "", Type::LoopForever);
         }
 
         curOffset = jumpAddr;
-        return bContinue;
+        return newState;
       }
 
       case 0x95:
@@ -400,7 +400,7 @@ bool NDSTrack::readEvent(void) {
 
         addGenericEvent(beginOffset, curOffset - beginOffset, "Return", "", Type::Loop);
         curOffset = loopReturnOffset;
-        return bContinue;
+        return bContinue ? State::Active : State::Finished;
 	  }
 
       // [loveemu] allocate track, however should not handle in this function
@@ -411,11 +411,11 @@ bool NDSTrack::readEvent(void) {
 
       case 0xFF:
         addEndOfTrack(beginOffset, curOffset - beginOffset);
-        return false;
+        return State::Finished;
 
       default:
         addUnknown(beginOffset, curOffset - beginOffset);
-        return false;
+        return State::Finished;
     }
-  return true;
+  return State::Active;
 }

@@ -234,15 +234,14 @@ double CapcomSnesTrack::getTuningInSemitones(int8_t tuning) {
   return tuning / 256.0;
 }
 
-bool CapcomSnesTrack::readEvent() {
+SeqTrack::State CapcomSnesTrack::readEvent() {
   CapcomSnesSeq *parentSeq = static_cast<CapcomSnesSeq*>(this->parentSeq);
   uint32_t beginOffset = curOffset;
   if (curOffset >= 0x10000) {
-    return false;
+    return State::Finished;
   }
 
   uint8_t statusByte = readByte(curOffset++);
-  bool bContinue = true;
 
   std::string desc;
 
@@ -502,13 +501,14 @@ bool CapcomSnesTrack::readEvent() {
         desc = fmt::format("Times: {:d}  Destination: ${:04X}", times, dest);
         if (times == 0 && repeatCount[repeatSlot] == 0) {
           // infinite loop
-          bContinue = addLoopForever(beginOffset, curOffset - beginOffset, repeatEventName);
+          auto newState = addLoopForever(beginOffset, curOffset - beginOffset, repeatEventName);
 
           if (readMode == READMODE_ADD_TO_UI) {
             if (readByte(curOffset) == 0x17) {
               addEndOfTrack(curOffset, 1);
             }
           }
+          return newState;
         }
         else {
           // regular N-times loop
@@ -581,13 +581,14 @@ bool CapcomSnesTrack::readEvent() {
           addGenericEvent(beginOffset, length, "Jump", desc, Type::LoopForever);
         }
         else {
-          bContinue = addLoopForever(beginOffset, length, "Jump");
+          auto newState = addLoopForever(beginOffset, length, "Jump");
 
           if (readMode == READMODE_ADD_TO_UI) {
             if (readByte(curOffset) == 0x17) {
               addEndOfTrack(curOffset, 1);
             }
           }
+          return newState;
         }
         curOffset = dest;
         break;
@@ -595,8 +596,7 @@ bool CapcomSnesTrack::readEvent() {
 
       case EVENT_END:
         addEndOfTrack(beginOffset, curOffset - beginOffset);
-        bContinue = false;
-        break;
+        return State::Finished;
 
       case EVENT_PAN: {
         uint8_t newPan = readByte(curOffset++) + 0x80; // signed -> unsigned
@@ -683,7 +683,7 @@ bool CapcomSnesTrack::readEvent() {
       default:
         auto description = logEvent(statusByte);
         addUnknown(beginOffset, curOffset - beginOffset, "Unknown Event", description);
-        bContinue = false;
+        return State::Finished;
         break;
     }
   }
@@ -692,7 +692,7 @@ bool CapcomSnesTrack::readEvent() {
   //ssTrace << "" << std::hex << std::setfill('0') << std::setw(8) << std::uppercase << beginOffset << ": " << std::setw(2) << (int)statusByte  << " -> " << std::setw(8) << curOffset << std::endl;
   //LogDebug(ssTrace.str().c_str());
 
-  return bContinue;
+  return State::Active;
 }
 
 void CapcomSnesTrack::onTickBegin() {}

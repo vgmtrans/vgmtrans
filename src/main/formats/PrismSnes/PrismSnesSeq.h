@@ -102,7 +102,7 @@ class PrismSnesTrack
  public:
   PrismSnesTrack(PrismSnesSeq *parentFile, uint32_t offset = 0, uint32_t length = 0);
   virtual void resetVars();
-  virtual bool readEvent();
+  virtual State readEvent();
 
   std::vector<uint8_t> panTable;
 

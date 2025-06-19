@@ -99,7 +99,7 @@ class HeartBeatSnesTrack
  public:
   HeartBeatSnesTrack(HeartBeatSnesSeq *parentFile, uint32_t offset = 0, uint32_t length = 0);
   void resetVars() override;
-  bool readEvent() override;
+  State readEvent() override;
 
  private:
   uint8_t spcNoteDuration;

@@ -75,7 +75,7 @@ class CompileSnesTrack
   CompileSnesTrack(CompileSnesSeq *parentFile, uint32_t offset = 0, uint32_t length = 0);
   void resetVars() override;
   void addInitialMidiEvents(int trackNum) override;
-  bool readEvent() override;
+  State readEvent() override;
 
   uint8_t spcNoteDuration{};
   uint8_t spcFlags{};

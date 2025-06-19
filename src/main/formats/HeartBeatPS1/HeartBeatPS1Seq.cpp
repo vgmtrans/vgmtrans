@@ -115,7 +115,7 @@ void HeartBeatPS1Seq::resetVars() {
   addTimeSigNoItem(numer, 1 << denom, static_cast<uint8_t>(ppqn()));
 }
 
-bool HeartBeatPS1Seq::readEvent() {
+SeqTrack::State HeartBeatPS1Seq::readEvent() {
   uint32_t beginOffset = curOffset;
 
   // in this format, end of track (FF 2F 00) comes without delta-time.
@@ -126,13 +126,13 @@ bool HeartBeatPS1Seq::readEvent() {
         readByte(curOffset + 2) == 0x00) {
       curOffset += 3;
       addEndOfTrack(beginOffset, curOffset - beginOffset);
-      return false;
+      return State::Finished;
     }
   }
 
   uint32_t delta = readVarLen(curOffset);
   if (curOffset >= rawFile()->size())
-    return false;
+    return State::Finished;
   addTime(delta);
 
   uint8_t status_byte = readByte(curOffset++);
@@ -172,7 +172,7 @@ bool HeartBeatPS1Seq::readEvent() {
 
     case 0xA0 :
       addUnknown(beginOffset, curOffset - beginOffset);
-      return false;
+      return State::Finished;
 
     case 0xB0 : {
       uint8_t controlNum = readByte(curOffset++);
@@ -475,7 +475,7 @@ bool HeartBeatPS1Seq::readEvent() {
 
     case 0xD0 :
       addUnknown(beginOffset, curOffset - beginOffset);
-      return false;
+      return State::Finished;
 
     case 0xE0 : {
       uint8_t lo = readByte(curOffset++);
@@ -487,12 +487,12 @@ bool HeartBeatPS1Seq::readEvent() {
     case 0xF0 : {
       if (status_byte == 0xFF) {
         if (curOffset + 1 > rawFile()->size())
-          return false;
+          return State::Finished;
 
         uint8_t metaNum = readByte(curOffset++);
         uint32_t metaLen = readVarLen(curOffset);
         if (curOffset + metaLen > rawFile()->size())
-          return false;
+          return State::Finished;
 
         switch (metaNum) {
           case 0x51 :
@@ -513,7 +513,7 @@ bool HeartBeatPS1Seq::readEvent() {
           case 0x2F : // apparently not used, but just in case.
             addEndOfTrack(beginOffset, curOffset + metaLen - beginOffset);
             curOffset += metaLen;
-            return false;
+            return State::Finished;
 
           default :
             addUnknown(beginOffset, curOffset + metaLen - beginOffset);
@@ -523,7 +523,7 @@ bool HeartBeatPS1Seq::readEvent() {
       }
       else {
         addUnknown(beginOffset, curOffset - beginOffset);
-        return false;
+        return State::Finished;
       }
     }
       break;
@@ -531,5 +531,5 @@ bool HeartBeatPS1Seq::readEvent() {
     default:
       break;
   }
-  return true;
+  return State::Active;
 }

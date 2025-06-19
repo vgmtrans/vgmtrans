@@ -95,11 +95,11 @@ uint32_t TriAcePS1Track::readScorePattern(uint32_t offset) {
   curOffset = offset;    //start at beginning of track
   impliedNoteDur = 0;    //reset the implied values (from event 0x9E)
   impliedVelocity = 0;
-  while (readEvent());
+  while (readEvent() == State::Active);
   return curOffset;
 }
 
-bool TriAcePS1Track::readEvent(void) {
+SeqTrack::State TriAcePS1Track::readEvent() {
   uint32_t beginOffset = curOffset;
 
   uint8_t status_byte = readByte(curOffset++);
@@ -120,7 +120,7 @@ bool TriAcePS1Track::readEvent(void) {
     switch (status_byte) {
       case 0x80 :
         addGenericEvent(beginOffset, curOffset - beginOffset, "Score Pattern End", "", Type::TrackEnd);
-        return false;
+        return State::Finished;
 
       //unknown
       case 0x81 :
@@ -303,13 +303,13 @@ bool TriAcePS1Track::readEvent(void) {
 
       default :
         addUnknown(beginOffset, curOffset - beginOffset);
-        return false;
+        return State::Finished;
     }
 
   if (event_dur)
     addTime(event_dur);
 
-  return true;
+  return State::Active;
 }
 
 // The following two functions are overridden so that events become children of the Score Patterns and not the tracks.

@@ -9,7 +9,7 @@ class PS1Seq:
 
   virtual bool parseHeader();
   virtual void resetVars();
-  virtual bool readEvent();
+  virtual State readEvent();
 
  private:
   u8 m_runningStatus;

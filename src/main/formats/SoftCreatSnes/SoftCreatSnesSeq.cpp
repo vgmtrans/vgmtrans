@@ -25,14 +25,14 @@ SoftCreatSnesSeq::SoftCreatSnesSeq(RawFile *file,
   loadEventMap();
 }
 
-SoftCreatSnesSeq::~SoftCreatSnesSeq(void) {
+SoftCreatSnesSeq::~SoftCreatSnesSeq() {
 }
 
-void SoftCreatSnesSeq::resetVars(void) {
+void SoftCreatSnesSeq::resetVars() {
   VGMSeq::resetVars();
 }
 
-bool SoftCreatSnesSeq::parseHeader(void) {
+bool SoftCreatSnesSeq::parseHeader() {
   setPPQN(SEQ_PPQN);
 
   VGMHeader *header = addHeader(dwOffset, headerAlignSize * MAX_TRACKS);
@@ -62,7 +62,7 @@ bool SoftCreatSnesSeq::parseHeader(void) {
   return true;
 }
 
-bool SoftCreatSnesSeq::parseTrackPointers(void) {
+bool SoftCreatSnesSeq::parseTrackPointers() {
   return true;
 }
 
@@ -86,20 +86,19 @@ SoftCreatSnesTrack::SoftCreatSnesTrack(SoftCreatSnesSeq *parentFile, uint32_t of
   bWriteGenericEventAsTextEvent = false;
 }
 
-void SoftCreatSnesTrack::resetVars(void) {
+void SoftCreatSnesTrack::resetVars() {
   SeqTrack::resetVars();
 }
 
-bool SoftCreatSnesTrack::readEvent(void) {
+SeqTrack::State SoftCreatSnesTrack::readEvent() {
   SoftCreatSnesSeq *parentSeq = (SoftCreatSnesSeq *) this->parentSeq;
 
   uint32_t beginOffset = curOffset;
   if (curOffset >= 0x10000) {
-    return false;
+    return State::Finished;
   }
 
   uint8_t statusByte = readByte(curOffset++);
-  bool bContinue = true;
 
   std::stringstream desc;
 
@@ -166,8 +165,7 @@ bool SoftCreatSnesTrack::readEvent(void) {
     default: {
       auto descr = logEvent(statusByte);
       addUnknown(beginOffset, curOffset - beginOffset, "Unknown Event", descr);
-      bContinue = false;
-      break;
+      return State::Finished;
     }
   }
 
@@ -175,5 +173,5 @@ bool SoftCreatSnesTrack::readEvent(void) {
   //ssTrace << "" << std::hex << std::setfill('0') << std::setw(8) << std::uppercase << beginOffset << ": " << std::setw(2) << (int)statusByte  << " -> " << std::setw(8) << curOffset << std::endl;
   //OutputDebugString(ssTrace.str().c_str());
 
-  return bContinue;
+  return State::Active;
 }

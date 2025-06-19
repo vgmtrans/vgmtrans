@@ -42,10 +42,10 @@ RareSnesSeq::RareSnesSeq(RawFile *file, RareSnesVersion ver, uint32_t seqdataOff
   loadEventMap();
 }
 
-RareSnesSeq::~RareSnesSeq(void) {
+RareSnesSeq::~RareSnesSeq() {
 }
 
-void RareSnesSeq::resetVars(void) {
+void RareSnesSeq::resetVars() {
   VGMSeq::resetVars();
 
   midiReverb = 40;
@@ -62,7 +62,7 @@ void RareSnesSeq::resetVars(void) {
   setAlwaysWriteInitialTempo(tempoBPM);
 }
 
-bool RareSnesSeq::parseHeader(void) {
+bool RareSnesSeq::parseHeader() {
   setPPQN(SEQ_PPQN);
 
   VGMHeader *seqHeader = addHeader(dwOffset, MAX_TRACKS * 2 + 2, "Sequence Header");
@@ -80,7 +80,7 @@ bool RareSnesSeq::parseHeader(void) {
 }
 
 
-bool RareSnesSeq::parseTrackPointers(void) {
+bool RareSnesSeq::parseTrackPointers() {
   for (int i = 0; i < MAX_TRACKS; i++) {
     uint16_t trkOff = readShort(dwOffset + i * 2);
     if (trkOff != 0)
@@ -250,7 +250,7 @@ RareSnesTrack::RareSnesTrack(RareSnesSeq *parentFile, uint32_t offset, uint32_t 
   bWriteGenericEventAsTextEvent = false;
 }
 
-void RareSnesTrack::resetVars(void) {
+void RareSnesTrack::resetVars() {
   SeqTrack::resetVars();
 
   cKeyCorrection = SEQ_KEYOFS;
@@ -286,16 +286,15 @@ void RareSnesTrack::calculateVolPanFromVolLR(int8_t volL, int8_t volR, uint8_t &
   }
 }
 
-bool RareSnesTrack::readEvent(void) {
+SeqTrack::State RareSnesTrack::readEvent() {
   RareSnesSeq *parentSeq = (RareSnesSeq *) this->parentSeq;
   uint32_t beginOffset = curOffset;
   if (curOffset >= 0x10000) {
-    return false;
+    return State::Finished;
   }
 
   uint8_t statusByte = readByte(curOffset++);
   uint8_t newMidiVol, newMidiPan;
-  bool bContinue = true;
 
   stringstream desc;
 
@@ -425,9 +424,8 @@ bool RareSnesTrack::readEvent(void) {
 
       case EVENT_END:
         addEndOfTrack(beginOffset, curOffset - beginOffset);
-        bContinue = false;
         //loaded = true;
-        break;
+        return State::Finished;
 
       case EVENT_PROGCHANGE: {
         uint8_t newProg = readByte(curOffset++);
@@ -478,7 +476,7 @@ bool RareSnesTrack::readEvent(void) {
         if (!isOffsetUsed(dest) || rptNestLevel != 0) // nest level check is required for Stickerbrush Symphony
           addGenericEvent(beginOffset, length, "Jump", desc.str().c_str(), Type::LoopForever);
         else
-          bContinue = addLoopForever(beginOffset, length, "Jump");
+          return addLoopForever(beginOffset, length, "Jump");
         break;
       }
 
@@ -497,8 +495,7 @@ bool RareSnesTrack::readEvent(void) {
 
         if (rptNestLevel == RARESNES_RPTNESTMAX) {
           L_ERROR("Subroutine nest level overflow");
-          bContinue = false;
-          break;
+          return State::Finished;
         }
 
         rptRetnAddr[rptNestLevel] = curOffset;
@@ -522,8 +519,7 @@ bool RareSnesTrack::readEvent(void) {
 
         if (rptNestLevel == RARESNES_RPTNESTMAX) {
           L_ERROR("Subroutine nest level overflow");
-          bContinue = false;
-          break;
+          return State::Finished;
         }
 
         rptRetnAddr[rptNestLevel] = curOffset;
@@ -543,8 +539,7 @@ bool RareSnesTrack::readEvent(void) {
 
         if (rptNestLevel == 0) {
           L_ERROR("Subroutine nest level overflow");
-          bContinue = false;
-          break;
+          return State::Finished;
         }
 
         rptNestLevel--;
@@ -1192,8 +1187,7 @@ bool RareSnesTrack::readEvent(void) {
       default: {
         auto descr = logEvent(statusByte);
         addUnknown(beginOffset, curOffset - beginOffset, "Unknown Event", descr);
-        bContinue = false;
-        break;
+        return State::Finished;
       }
     }
   }
@@ -1202,13 +1196,13 @@ bool RareSnesTrack::readEvent(void) {
   //ssTrace << "" << std::hex << std::setfill('0') << std::setw(8) << std::uppercase << beginOffset << ": " << std::setw(2) << (int)statusByte  << " -> " << std::setw(8) << curOffset << std::endl;
   //LogDebug(ssTrace.str().c_str());
 
-  return bContinue;
+  return State::Active;
 }
 
-void RareSnesTrack::onTickBegin(void) {
+void RareSnesTrack::onTickBegin() {
 }
 
-void RareSnesTrack::onTickEnd(void) {
+void RareSnesTrack::onTickEnd() {
 }
 
 void RareSnesTrack::addVolLR(uint32_t offset,

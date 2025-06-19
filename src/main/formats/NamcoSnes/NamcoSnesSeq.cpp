@@ -111,14 +111,13 @@ void NamcoSnesSeq::loadEventMap() {
   ControlChangeNames[CONTROL_ADSR] = "ADSR";
 }
 
-bool NamcoSnesSeq::readEvent() {
+SeqTrack::State NamcoSnesSeq::readEvent() {
   uint32_t beginOffset = curOffset;
   if (curOffset >= 0x10000) {
-    return false;
+    return State::Finished;
   }
 
   uint8_t statusByte = readByte(curOffset++);
-  bool bContinue = true;
 
   std::stringstream desc;
 
@@ -211,7 +210,7 @@ bool NamcoSnesSeq::readEvent() {
       if ((subReturnAddress & 0xff00) == 0) {
         // end of track
         addEndOfTrack(beginOffset, curOffset - beginOffset);
-        bContinue = false;
+        return State::Finished;
       }
       else {
         // end of subroutine
@@ -337,7 +336,7 @@ bool NamcoSnesSeq::readEvent() {
         addGenericEvent(beginOffset, length, "Jump", desc.str().c_str(), Type::LoopForever);
       }
       else {
-        bContinue = addLoopForever(beginOffset, length, "Jump");
+        return addLoopForever(beginOffset, length, "Jump");
       }
       break;
     }
@@ -568,8 +567,7 @@ bool NamcoSnesSeq::readEvent() {
     default: {
       auto descr = logEvent(statusByte);
       addUnknown(beginOffset, curOffset - beginOffset, "Unknown Event", descr);
-      bContinue = false;
-      break;
+      return State::Finished;
     }
   }
 
@@ -577,7 +575,7 @@ bool NamcoSnesSeq::readEvent() {
   //ssTrace << "" << std::hex << std::setfill('0') << std::setw(8) << std::uppercase << beginOffset << ": " << std::setw(2) << (int)statusByte  << " -> " << std::setw(8) << curOffset << std::endl;
   //OutputDebugString(ssTrace.str().c_str());
 
-  return bContinue;
+  return State::Active;
 }
 
 bool NamcoSnesSeq::postLoad() {

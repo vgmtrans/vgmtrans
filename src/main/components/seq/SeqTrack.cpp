@@ -27,7 +27,7 @@ SeqTrack::SeqTrack(VGMSeq *parentFile, uint32_t offset, uint32_t length, std::st
 }
 
 void SeqTrack::resetVars() {
-  active = true;
+  m_state = State::Active;
   bInLoop = false;
   foreverLoops = 0;
   totalTicks = -1;
@@ -50,8 +50,8 @@ void SeqTrack::resetVisitedAddresses() {
   visitedAddressMax = 0;
 }
 
-bool SeqTrack::readEvent() {
-  return false;        //by default, don't add any events, just stop immediately.
+SeqTrack::State SeqTrack::readEvent() {
+  return State::Finished;        //by default, don't add any events, just stop immediately.
 }
 
 bool SeqTrack::loadTrackInit(int trackNum, MidiTrack *preparedMidiTrack) {
@@ -78,7 +78,7 @@ bool SeqTrack::loadTrackInit(int trackNum, MidiTrack *preparedMidiTrack) {
 }
 
 void SeqTrack::loadTrackMainLoop(uint32_t stopOffset, int32_t stopTime) {
-  if (!active) {
+  if (m_state != State::Active) {
     return;
   }
 
@@ -87,7 +87,7 @@ void SeqTrack::loadTrackMainLoop(uint32_t stopOffset, int32_t stopTime) {
   }
 
   if (getTime() >= static_cast<uint32_t>(stopTime)) {
-    active = false;
+    m_state = State::Finished;
     return;
   }
 
@@ -103,13 +103,13 @@ void SeqTrack::loadTrackMainLoop(uint32_t stopOffset, int32_t stopTime) {
         if (readMode == READMODE_FIND_DELTA_LENGTH)
           totalTicks = getTime();
 
-        active = false;
+        m_state = State::Finished;
         break;
       }
 
-      if (!readEvent()) {
+      m_state = readEvent();
+      if (m_state != State::Active) {
         totalTicks = getTime();
-        active = false;
         break;
       }
     }
@@ -118,8 +118,8 @@ void SeqTrack::loadTrackMainLoop(uint32_t stopOffset, int32_t stopTime) {
   }
   else {
     while (curOffset < stopOffset && getTime() < static_cast<uint32_t>(stopTime)) {
-      if (!readEvent()) {
-        active = false;
+      m_state = readEvent();
+      if (m_state != State::Active) {
         break;
       }
     }
@@ -1466,19 +1466,20 @@ void SeqTrack::insertMarkerNoItem(uint32_t absTime,
 }
 
 // when in FIND_DELTA_LENGTH mode, returns true until we've hit the max number of loops defined in options
-bool SeqTrack::addLoopForever(uint32_t offset, uint32_t length, const std::string &sEventName) {
+SeqTrack::State SeqTrack::addLoopForever(uint32_t offset, uint32_t length, const std::string &sEventName) {
   onEvent(offset, length);
 
   this->foreverLoops++;
   if (readMode == READMODE_ADD_TO_UI) {
     if (!isItemAtOffset(offset, true))
       addEvent(new LoopForeverSeqEvent(this, offset, length, sEventName));
-    return false;
+    return State::Suspended;
   }
   else if (readMode == READMODE_FIND_DELTA_LENGTH) {
     totalTicks = getTime();
-    return (this->foreverLoops < ConversionOptions::the().numSequenceLoops());
+    return (this->foreverLoops <= ConversionOptions::the().numSequenceLoops()) ? State::Active : State::Suspended;
+
   }
-  return true;
+  return State::Active;
 
 }

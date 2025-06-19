@@ -34,7 +34,7 @@ public:
   KonamiArcadeTrack(KonamiArcadeSeq *parentSeq, uint32_t offset = 0, uint32_t length = 0);
 
   void resetVars() override;
-  bool readEvent() override;
+  State readEvent() override;
 
 private:
   u8 calculateMidiPanForK054539(u8 pan);

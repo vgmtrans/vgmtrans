@@ -37,5 +37,5 @@ private:
   ConversionOptions() = default;
 
   BankSelectStyle m_bs_style{BankSelectStyle::GS};
-  int m_sequence_loops{1};
+  int m_sequence_loops{2};
 };

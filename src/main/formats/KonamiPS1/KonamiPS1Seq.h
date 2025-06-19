@@ -33,7 +33,7 @@ public:
     KonamiPS1Track(KonamiPS1Seq *parentSeq, uint32_t offset, uint32_t length);
 
     virtual void resetVars();
-    virtual bool readEvent();
+    virtual State readEvent();
 
 private:
     bool skipDeltaTime;

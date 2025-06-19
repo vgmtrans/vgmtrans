@@ -25,7 +25,7 @@ class OrgTrack
   OrgTrack(OrgSeq *parentFile, uint32_t offset, uint32_t length, uint8_t realTrk);
 
   virtual bool loadTrack(uint32_t trackNum, uint32_t stopOffset, long stopDelta);
-  virtual bool readEvent();
+  virtual State readEvent();
 
  public:
   uint8_t prevPan;

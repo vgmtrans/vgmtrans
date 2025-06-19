@@ -142,7 +142,7 @@ class HudsonSnesTrack
  public:
   HudsonSnesTrack(HudsonSnesSeq *parentFile, uint32_t offset = 0, uint32_t length = 0);
   void resetVars() override;
-  bool readEvent() override;
+  State readEvent() override;
 
  private:
   uint8_t vel;

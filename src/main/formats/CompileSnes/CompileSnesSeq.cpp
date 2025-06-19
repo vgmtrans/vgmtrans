@@ -223,16 +223,15 @@ void CompileSnesTrack::addInitialMidiEvents(int trackNum) {
   addReverbNoItem(0);
 }
 
-bool CompileSnesTrack::readEvent() {
+SeqTrack::State CompileSnesTrack::readEvent() {
   CompileSnesSeq *parentSeq = static_cast<CompileSnesSeq*>(this->parentSeq);
 
   uint32_t beginOffset = curOffset;
   if (curOffset >= 0x10000) {
-    return false;
+    return State::Finished;
   }
 
   uint8_t statusByte = readByte(curOffset++);
-  bool bContinue = true;
 
   std::string desc;
 
@@ -304,7 +303,7 @@ bool CompileSnesTrack::readEvent() {
         addGenericEvent(beginOffset, length, "Jump", desc, Type::LoopForever);
       }
       else {
-        bContinue = addLoopForever(beginOffset, length, "Jump");
+        return addLoopForever(beginOffset, length, "Jump");
       }
       break;
     }
@@ -326,8 +325,7 @@ bool CompileSnesTrack::readEvent() {
 
     case EVENT_END: {
       addEndOfTrack(beginOffset, curOffset - beginOffset);
-      bContinue = false;
-      break;
+      return State::Finished;
     }
 
     case EVENT_VIBRATO: {
@@ -555,7 +553,7 @@ bool CompileSnesTrack::readEvent() {
       uint8_t duration;
       if (!readDurationBytes(curOffset, duration)) {
         // address out of range
-        return false;
+        return State::Finished;
       }
       spcNoteDuration = duration;
 
@@ -572,7 +570,7 @@ bool CompileSnesTrack::readEvent() {
       uint8_t duration;
       if (!readDurationBytes(curOffset, duration)) {
         // address out of range
-        return false;
+        return State::Finished;
       }
       spcNoteDuration = duration;
 
@@ -598,8 +596,7 @@ bool CompileSnesTrack::readEvent() {
     default: {
       auto descr = logEvent(statusByte);
       addUnknown(beginOffset, curOffset - beginOffset, "Unknown Event", descr);
-      bContinue = false;
-      break;
+      return State::Finished;
     }
   }
 
@@ -607,7 +604,7 @@ bool CompileSnesTrack::readEvent() {
   //ssTrace << "" << std::hex << std::setfill('0') << std::setw(8) << std::uppercase << beginOffset << ": " << std::setw(2) << (int)statusByte  << " -> " << std::setw(8) << curOffset << std::endl;
   //OutputDebugString(ssTrace.str().c_str());
 
-  return bContinue;
+  return State::Active;
 }
 
 bool CompileSnesTrack::readDurationBytes(uint32_t& offset, uint8_t& duration) const {

@@ -79,7 +79,7 @@ bool VGMSeqNoTrks::loadEvents(long stopTime) {
       break;
     }
 
-    if (!readEvent()) {
+    if (readEvent() != State::Active) {
       break;
     }
   }

@@ -59,7 +59,7 @@ class CPS2TrackV2
 public:
   CPS2TrackV2(CPS2Seq *parentSeq, uint32_t offset = 0, uint32_t length = 0);
   void resetVars() override;
-  bool readEvent() override;
+  State readEvent() override;
 
 private:
   CPS2FormatVer version() const { return static_cast<CPS2Seq*>(this->parentSeq)->fmt_version; }

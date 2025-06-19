@@ -93,7 +93,7 @@ u8 KonamiArcadeTrack::calculateMidiPanForK054539(u8 pan) {
   return newPan;
 }
 
-bool KonamiArcadeTrack::readEvent() {
+SeqTrack::State KonamiArcadeTrack::readEvent() {
   uint32_t beginOffset = curOffset;
   uint8_t status_byte = readByte(curOffset++);
 
@@ -103,7 +103,7 @@ bool KonamiArcadeTrack::readEvent() {
     // Drums define their own pan, which is only used if the pan state value is 0
     addBankSelectNoItem(1);
     addProgramChangeNoItem(0, false);
-    return true;
+    return State::Active;
   }
 
   if (status_byte == 0x61) {
@@ -115,7 +115,7 @@ bool KonamiArcadeTrack::readEvent() {
         addPanNoItem(midiPan);
     }
     addProgramChangeNoItem(m_curProg, true);
-    return true;
+    return State::Active;
   }
 
   // Note
@@ -184,7 +184,7 @@ bool KonamiArcadeTrack::readEvent() {
     }
     addNoteByDur(beginOffset, curOffset - beginOffset, note, linearVel, actualDuration);
     addTime(delta);
-    return true;
+    return State::Active;
   }
 
   int loopNum;
@@ -346,9 +346,9 @@ bool KonamiArcadeTrack::readEvent() {
 
       // TODO: confusing logic sets a couple channel state vars here based on atten and transpose
 
-      bool shouldContinue = true;
+      auto newState = State::Active;
       if (loopCount == 0) {
-        shouldContinue = addLoopForever(beginOffset, curOffset - beginOffset);
+        newState = addLoopForever(beginOffset, curOffset - beginOffset);
       }
       else {
         auto desc = fmt::format("count: {:d}  attenuation: {:d}  transpose {:d}", loopCount,
@@ -357,10 +357,10 @@ bool KonamiArcadeTrack::readEvent() {
       }
       if (m_loopMarker[loopNum] < parentSeq->dwOffset) {
         L_ERROR("KonamiArcadeSeq wants to loopMarker outside bounds of sequence. Loop at %X", beginOffset);
-        return false;
+        return State::Finished;
       }
       curOffset = m_loopMarker[loopNum];
-      return shouldContinue;
+      return newState;
     }
 
     //tempo
@@ -446,18 +446,18 @@ bool KonamiArcadeTrack::readEvent() {
       auto seq = static_cast<KonamiArcadeSeq*>(parentSeq);
       u16 memJumpOffset = readShort(curOffset);
       u32 romOffset = seq->dwOffset + (memJumpOffset - seq->memOffset());
-      bool shouldContinue = true;
+      auto newState = State::Active;
       if (romOffset < beginOffset) {
-        shouldContinue = addLoopForever(beginOffset, 3);
+        newState = addLoopForever(beginOffset, 3);
       } else {
         addGenericEvent(beginOffset, 3, "Jump", "", Type::Loop);
       }
       if (romOffset < seq->dwOffset) {
         L_ERROR("KonamiArcadeEvent FD attempted jump to offset outside the sequence at {:X}.  Jump offset: {:X}", beginOffset, romOffset);
-        return false;
+        return State::Finished;
       }
       curOffset = romOffset;
-      return shouldContinue;
+      return newState;
     }
 
     case 0xFE: {
@@ -469,7 +469,7 @@ bool KonamiArcadeTrack::readEvent() {
       u32 romOffset = seq->dwOffset + (memJumpOffset - seq->memOffset());
       if (romOffset < seq->dwOffset) {
         L_ERROR("KonamiArcade Event FE attempted jump to offset outside the sequence at {:X}.  Jump offset: {:X}", beginOffset, romOffset);
-        return false;
+        return State::Finished;
       }
       curOffset = romOffset;
       break;
@@ -482,14 +482,14 @@ bool KonamiArcadeTrack::readEvent() {
       }
       else {
         addEndOfTrack(beginOffset, curOffset - beginOffset);
-        return false;
+        return State::Finished;
       }
       break;
     }
 
     default:
       addEndOfTrack(beginOffset, curOffset - beginOffset);
-      return false;
+      return State::Finished;
   }
-  return true;
+  return State::Active;
 }

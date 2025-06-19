@@ -32,7 +32,7 @@ uint32_t CPS2TrackV2::readVarLength() {
   return delta;
 }
 
-bool CPS2TrackV2::readEvent() {
+SeqTrack::State CPS2TrackV2::readEvent() {
   uint32_t beginOffset = curOffset;
   uint8_t status_byte = readByte(curOffset++);
 
@@ -51,7 +51,7 @@ bool CPS2TrackV2::readEvent() {
     curOffset--;
 
     addRest(beginOffset, curOffset-beginOffset, delta);
-    return true;
+    return State::Active;
   }
 
   // Note opcodes are [0x80 - 0xBF]
@@ -61,7 +61,7 @@ bool CPS2TrackV2::readEvent() {
     uint8_t note = readByte(curOffset++) & 0x7F;
     uint32_t duration = readVarLength();
     addNoteByDur(beginOffset, curOffset - beginOffset, note, midiVel, duration);
-    return true;
+    return State::Active;
   }
 
   // All other event opcodes are [0xC0 - 0xFF]
@@ -168,14 +168,14 @@ bool CPS2TrackV2::readEvent() {
     case CE_GOTO: {
       int16_t relative_offset = static_cast<int16_t>(getShortBE(curOffset));
       curOffset += 2;
-      auto should_continue = addLoopForever(beginOffset, curOffset - beginOffset);
+      auto newState = addLoopForever(beginOffset, curOffset - beginOffset);
       if (readMode == READMODE_ADD_TO_UI) {
         if (readByte(curOffset) == 0xFF) {
           addEndOfTrack(curOffset, 1);
         }
       }
       curOffset += relative_offset;
-      return should_continue;;
+      return newState;
     }
 
     case EVENT_CF: // jumps to a new offset
@@ -209,18 +209,18 @@ bool CPS2TrackV2::readEvent() {
 
       uint8_t loopCount = readByte(curOffset++);
       if (loopCount == 0) {
-        auto should_continue = addLoopForever(beginOffset, curOffset - beginOffset);
+        auto newState = addLoopForever(beginOffset, curOffset - beginOffset);
         if (readMode == READMODE_ADD_TO_UI) {
           if (readByte(curOffset) == 0xFF) {
             addEndOfTrack(curOffset, 1);
           }
         }
         curOffset = loopOffset[loopNum];
-        return should_continue;
+        return newState;
       }
       loopCounter[loopNum]--;
       if (loopCounter[loopNum] == 0) {      //finished loop
-        return true;
+        return State::Active;
       }
       if (loopCounter[loopNum] > 0) {       //still in loop
         curOffset = loopOffset[loopNum];
@@ -351,12 +351,12 @@ bool CPS2TrackV2::readEvent() {
 
     case FF_END:
       addEndOfTrack(beginOffset, curOffset-beginOffset);
-      return false;
+      return State::Finished;
 
     default :
       addGenericEvent(beginOffset, curOffset - beginOffset, "UNKNOWN", "", Type::Unrecognized);
       break;
   }
 
-  return true;
+  return State::Active;
 }

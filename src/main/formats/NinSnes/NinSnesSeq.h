@@ -188,7 +188,7 @@ class NinSnesTrack
       (NinSnesSection *parentSection, uint32_t offset = 0, uint32_t length = 0, const std::string &theName = "NinSnes Track");
 
   virtual void resetVars();
-  virtual bool readEvent();
+  virtual State readEvent();
 
   uint16_t convertToApuAddress(uint16_t offset);
   uint16_t getShortAddress(uint32_t offset);

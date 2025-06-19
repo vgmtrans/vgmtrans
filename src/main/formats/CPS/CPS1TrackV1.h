@@ -10,7 +10,7 @@ public:
   CPS1TrackV1(CPS1Seq *parentSeq, CPSSynth channelSynth, uint32_t offset = 0, uint32_t length = 0);
   void resetVars() override;
   void addInitialMidiEvents(int trackNum) override;
-  bool readEvent() override;
+  State readEvent() override;
 
 private:
   CPSSynth channelSynth;

@@ -81,7 +81,7 @@ class FalcomSnesTrack
  public:
   FalcomSnesTrack(FalcomSnesSeq *parentFile, uint32_t offset = 0, uint32_t length = 0);
   void resetVars() override;
-  bool readEvent() override;
+  State readEvent() override;
 
   static int8_t calculatePanValue(uint8_t pan, double &volumeScale);
 

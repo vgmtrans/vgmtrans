@@ -583,21 +583,22 @@ void AkaoSnesTrack::resetVars() {
   percussion = false;
   nonPercussionProgram = 0;
   jumpActivatedByMainCpu = true; // it should be false in the actual driver, but for convenience
+  condBranches.clear();
+  condJumpTargetValue = 0;
 
   ignoreMasterVolumeProgNum = 0xff;
 }
 
 
-bool AkaoSnesTrack::readEvent(void) {
+SeqTrack::State AkaoSnesTrack::readEvent() {
   AkaoSnesSeq *parentSeq = static_cast<AkaoSnesSeq*>(this->parentSeq);
 
   uint32_t beginOffset = curOffset;
   if (curOffset >= 0x10000) {
-    return false;
+    return State::Finished;
   }
 
   uint8_t statusByte = readByte(curOffset++);
-  bool bContinue = true;
 
   std::string desc;
 
@@ -1105,8 +1106,9 @@ bool AkaoSnesTrack::readEvent(void) {
 
       if (loopDecCount[prevLoopLevel] == 0) {
         // infinite loop
-        bContinue = addLoopForever(beginOffset, curOffset - beginOffset);
+        auto newState = addLoopForever(beginOffset, curOffset - beginOffset);
         curOffset = loopStart[prevLoopLevel];
+        return newState;
       }
       else {
         addGenericEvent(beginOffset, curOffset - beginOffset, "Loop End", desc, Type::RepeatEnd);
@@ -1188,8 +1190,7 @@ bool AkaoSnesTrack::readEvent(void) {
       uint8_t sfxIndex = readByte(curOffset++);
       desc = fmt::format("SFX: {}", sfxIndex);
       addUnknown(beginOffset, curOffset - beginOffset, "Jump to SFX (LOWORD)", desc);
-      bContinue = false;
-      break;
+      return State::Finished;
     }
 
     case EVENT_JUMP_TO_SFX_HI: {
@@ -1197,8 +1198,7 @@ bool AkaoSnesTrack::readEvent(void) {
       uint8_t sfxIndex = readByte(curOffset++);
       desc = fmt::format("SFX: {}", sfxIndex);
       addUnknown(beginOffset, curOffset - beginOffset, "Jump to SFX (HIWORD)", desc);
-      bContinue = false;
-      break;
+      return State::Finished;
     }
 
     case EVENT_PLAY_SFX: {
@@ -1211,8 +1211,7 @@ bool AkaoSnesTrack::readEvent(void) {
 
     case EVENT_END: {
       addEndOfTrack(beginOffset, curOffset - beginOffset);
-      bContinue = false;
-      break;
+      return State::Finished;
     }
 
     case EVENT_TEMPO: {
@@ -1343,7 +1342,7 @@ bool AkaoSnesTrack::readEvent(void) {
         addGenericEvent(beginOffset, length, "Jump", desc, Type::LoopForever);
       }
       else {
-        bContinue = addLoopForever(beginOffset, length, "Jump");
+        return addLoopForever(beginOffset, length, "Jump");
       }
       break;
     }
@@ -1496,15 +1495,14 @@ bool AkaoSnesTrack::readEvent(void) {
     default:
       auto description = logEvent(statusByte);
       addUnknown(beginOffset, curOffset - beginOffset, "Unknown Event", description);
-      bContinue = false;
-      break;
+      return State::Finished;
   }
 
   //ostringstream ssTrace;
   //ssTrace << "" << std::hex << std::setfill('0') << std::setw(8) << std::uppercase << beginOffset << ": " << std::setw(2) << (int)statusByte  << " -> " << std::setw(8) << curOffset << std::endl;
   //OutputDebugString(ssTrace.str().c_str());
 
-  return bContinue;
+  return State::Active;
 }
 
 uint16_t AkaoSnesTrack::romAddressToApuAddress(uint16_t romAddress) const {

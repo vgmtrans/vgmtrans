@@ -62,7 +62,7 @@ BGMTrack::BGMTrack(BGMSeq *parentSeq, uint32_t offset, uint32_t length)
 }
 
 
-bool BGMTrack::readEvent(void) {
+SeqTrack::State BGMTrack::readEvent() {
   int value1;
 
   uint32_t beginOffset = curOffset;
@@ -73,7 +73,7 @@ bool BGMTrack::readEvent(void) {
     if (readMode== ReadMode::READMODE_ADD_TO_UI) {
       L_WARN("{}: Address out of range. Conversion aborted.", vgmFile()->name());
     }
-    return false;
+    return State::Finished;
   }
 
   uint8_t status_byte = readByte(curOffset++);
@@ -82,7 +82,7 @@ bool BGMTrack::readEvent(void) {
     //end of track
     case 0x00 :
       addEndOfTrack(beginOffset, curOffset - beginOffset);
-      return false;
+      return State::Finished;
 
     // Loop begin
     case 0x02 :
@@ -254,5 +254,5 @@ bool BGMTrack::readEvent(void) {
       break;
 
   }
-  return true;
+  return State::Active;
 }

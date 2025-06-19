@@ -22,5 +22,5 @@ class BGMTrack : public SeqTrack {
  public:
   BGMTrack(BGMSeq *parentSeq, uint32_t offset = 0, uint32_t length = 0);
 
-  bool readEvent() override;
+  State readEvent() override;
 };

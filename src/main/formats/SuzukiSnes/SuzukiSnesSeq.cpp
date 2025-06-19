@@ -214,16 +214,15 @@ void SuzukiSnesTrack::resetVars() {
   infiniteLoopPoint = 0;
 }
 
-bool SuzukiSnesTrack::readEvent() {
+SeqTrack::State SuzukiSnesTrack::readEvent() {
   SuzukiSnesSeq *parentSeq = (SuzukiSnesSeq *) this->parentSeq;
 
   uint32_t beginOffset = curOffset;
   if (curOffset >= 0x10000) {
-    return false;
+    return State::Finished;
   }
 
   uint8_t statusByte = readByte(curOffset++);
-  bool bContinue = true;
 
   std::stringstream desc;
 
@@ -395,8 +394,7 @@ bool SuzukiSnesTrack::readEvent() {
       uint8_t sfxIndex = readByte(curOffset++);
       desc << "SFX: " << (int) sfxIndex;
       addUnknown(beginOffset, curOffset - beginOffset, "Jump to SFX (LOWORD)", desc.str().c_str());
-      bContinue = false;
-      break;
+      return State::Finished;
     }
 
     case EVENT_JUMP_TO_SFX_HI: {
@@ -404,8 +402,7 @@ bool SuzukiSnesTrack::readEvent() {
       uint8_t sfxIndex = readByte(curOffset++);
       desc << "SFX: " << (int) sfxIndex;
       addUnknown(beginOffset, curOffset - beginOffset, "Jump to SFX (HIWORD)", desc.str().c_str());
-      bContinue = false;
-      break;
+      return State::Finished;
     }
 
     case EVENT_CALL_SFX_LO: {
@@ -413,8 +410,7 @@ bool SuzukiSnesTrack::readEvent() {
       uint8_t sfxIndex = readByte(curOffset++);
       desc << "SFX: " << (int) sfxIndex;
       addUnknown(beginOffset, curOffset - beginOffset, "Call SFX (LOWORD)", desc.str().c_str());
-      bContinue = false;
-      break;
+      return State::Finished;
     }
 
     case EVENT_CALL_SFX_HI: {
@@ -422,8 +418,7 @@ bool SuzukiSnesTrack::readEvent() {
       uint8_t sfxIndex = readByte(curOffset++);
       desc << "SFX: " << (int) sfxIndex;
       addUnknown(beginOffset, curOffset - beginOffset, "Call SFX (HIWORD)", desc.str().c_str());
-      bContinue = false;
-      break;
+      return State::Finished;
     }
 
     case EVENT_TUNING: {
@@ -435,12 +430,13 @@ bool SuzukiSnesTrack::readEvent() {
     case EVENT_END: {
       // TODO: add "return from SFX" handler
       if ((infiniteLoopPoint & 0xff00) != 0) {
-        bContinue = addLoopForever(beginOffset, curOffset - beginOffset);
+        auto newState = addLoopForever(beginOffset, curOffset - beginOffset);
         curOffset = infiniteLoopPoint;
+        return newState;
       }
       else {
         addEndOfTrack(beginOffset, curOffset - beginOffset);
-        bContinue = false;
+        return State::Finished;
       }
       break;
     }
@@ -862,8 +858,7 @@ bool SuzukiSnesTrack::readEvent() {
     default: {
       auto descr = logEvent(statusByte);
       addUnknown(beginOffset, curOffset - beginOffset, "Unknown Event", descr);
-      bContinue = false;
-      break;
+      return State::Finished;;
     }
   }
 
@@ -871,5 +866,5 @@ bool SuzukiSnesTrack::readEvent() {
   //ssTrace << "" << std::hex << std::setfill('0') << std::setw(8) << std::uppercase << beginOffset << ": " << std::setw(2) << (int)statusByte  << " -> " << std::setw(8) << curOffset << std::endl;
   //OutputDebugString(ssTrace.str().c_str());
 
-  return bContinue;
+  return State::Active;
 }

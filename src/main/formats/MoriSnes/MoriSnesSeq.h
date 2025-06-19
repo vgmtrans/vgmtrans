@@ -77,7 +77,7 @@ class MoriSnesTrack
  public:
   MoriSnesTrack(MoriSnesSeq *parentFile, uint32_t offset = 0, uint32_t length = 0);
   virtual void resetVars();
-  virtual bool readEvent();
+  virtual State readEvent();
 
   void parseInstrument(uint16_t instrAddress, uint8_t instrNum);
   void parseInstrumentEvents(uint16_t offset, uint8_t instrNum, bool percussion = false, uint8_t percNoteKey = 0);

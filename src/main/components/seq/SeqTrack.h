@@ -21,6 +21,12 @@ enum ReadMode : uint8_t;
 
 class SeqTrack : public VGMItem {
  public:
+  enum class State {
+    Active,
+    Suspended,
+    Finished
+  };
+
   SeqTrack(VGMSeq *parentSeqFile, uint32_t offset = 0, uint32_t length = 0, std::string name = "Track");
 
   virtual void resetVars();
@@ -30,7 +36,7 @@ class SeqTrack : public VGMItem {
   virtual void loadTrackMainLoop(uint32_t stopOffset, int32_t stopTime);
   virtual void setChannelAndGroupFromTrkNum(int theTrackNum);
   virtual void addInitialMidiEvents(int trackNum);
-  virtual bool readEvent();
+  virtual State readEvent();
   virtual void onTickBegin() {}
   virtual void onTickEnd() {}
 
@@ -163,7 +169,10 @@ class SeqTrack : public VGMItem {
   void addMarkerNoItem(const std::string &markername, uint8_t databyte1, uint8_t databyte2, int8_t priority) const;
   void insertMarkerNoItem(uint32_t absTime, const std::string &markername, uint8_t databyte1, uint8_t databyte2, int8_t priority) const;
 
-  bool addLoopForever(uint32_t offset, uint32_t length, const std::string &sEventName = "Loop Forever");
+  State addLoopForever(uint32_t offset, uint32_t length, const std::string &sEventName = "Loop Forever");
+
+  State state() { return m_state; }
+  void setState(State state) { m_state = state; }
 
  public:
   ReadMode readMode;        //state variable that determines behavior for all methods.  Are we adding UI items or converting to MIDI?
@@ -173,7 +182,6 @@ class SeqTrack : public VGMItem {
 
   int channel;
   int channelGroup;
-  bool active;            //indicates whether a VGMSeq is loading this track
   long totalTicks;
   int foreverLoops;
 
@@ -195,6 +203,8 @@ class SeqTrack : public VGMItem {
   uint32_t curOffset;
   bool bInLoop;
   int8_t cDrumNote;            //-1 signals do not use drumNote, otherwise,
+  std::vector<uint32_t> m_offsetStack;   // used only in READMODE_ADD_TO_UI
+  State m_state;
 
   //Table Related Variables
   int8_t cKeyCorrection;    //steps to offset the key by

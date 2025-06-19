@@ -78,7 +78,7 @@ class AsciiShuichiSnesTrack
  public:
   AsciiShuichiSnesTrack(AsciiShuichiSnesSeq *parentFile, uint32_t offset = 0, uint32_t length = 0);
   void resetVars() override;
-  bool readEvent() override;
+  State readEvent() override;
 
   static void getVolumeBalance(uint8_t pan, double &volumeLeft, double &volumeRight);
   static int8_t calcMidiPanValue(uint8_t pan);

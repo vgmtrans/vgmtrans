@@ -91,7 +91,7 @@ class ChunSnesTrack
  public:
   ChunSnesTrack(ChunSnesSeq *parentFile, uint32_t offset = 0, uint32_t length = 0);
   void resetVars() override;
-  bool readEvent() override;
+  State readEvent() override;
 
   void syncNoteLengthWithPriorTrack();
   static uint8_t multiply8bit(uint8_t multiplicand, uint8_t multiplier);

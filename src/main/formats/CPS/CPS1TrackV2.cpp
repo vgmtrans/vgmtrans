@@ -53,7 +53,7 @@ void CPS1TrackV2::calculateAndAddPortamentoTimeNoItem(int8_t noteDistance) {
   addPortamentoTime14BitNoItem(durationInMillis);
 }
 
-bool CPS1TrackV2::readEvent() {
+SeqTrack::State CPS1TrackV2::readEvent() {
   uint32_t beginOffset = curOffset;
   uint8_t status_byte = readByte(curOffset++);
   auto cpsSeq = static_cast<CPS1Seq*>(parentSeq);
@@ -280,7 +280,7 @@ bool CPS1TrackV2::readEvent() {
           // hack to check for infinite loop scenario in Punisher at 0xDF07: one 0E loop contains another 0E loop.
           // Also in slammast at f1a7, f1ab.. two 0E loops (song 0x26).  Actual game behavior is an infinite loop, see 0xF840 for
           // track ptrs repeating over the same tiny range.
-          return false;
+          return State::Finished;
         }
 
         //already engaged in loop - decrement loop counter
@@ -298,7 +298,7 @@ bool CPS1TrackV2::readEvent() {
             // sf2ce seq 0x84 seems to have a bug at D618
             // where it jumps to offset 0. verified with mame debugger.
             if (jump == 0) {
-              return false;
+              return State::Finished;
             }
           }
           else {
@@ -371,7 +371,7 @@ bool CPS1TrackV2::readEvent() {
         else {
           jump = curOffset + 2 + static_cast<int16_t>(getShortBE(curOffset));
         }
-        bool should_continue = addLoopForever(beginOffset, 3);
+        auto newState = addLoopForever(beginOffset, 3);
         if (readMode == READMODE_ADD_TO_UI) {
           curOffset += 2;
           if (readByte(curOffset) == 0x17) {
@@ -379,12 +379,12 @@ bool CPS1TrackV2::readEvent() {
           }
         }
         curOffset = jump;
-        return should_continue;
+        return newState;
       }
 
       case 0x17 :
         addEndOfTrack(beginOffset, curOffset - beginOffset);
-        return false;
+        return State::Finished;
 
       // pan
       case 0x18 : {
@@ -441,5 +441,5 @@ bool CPS1TrackV2::readEvent() {
         addGenericEvent(beginOffset, curOffset - beginOffset, "UNKNOWN", "", Type::Unrecognized);
     }
   }
-  return true;
+  return State::Active;
 }
