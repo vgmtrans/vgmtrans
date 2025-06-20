@@ -5,6 +5,7 @@
  */
 #include "HeartBeatSnesSeq.h"
 #include "ScaleConversion.h"
+#include <spdlog/fmt/fmt.h>
 
 using namespace std;
 
@@ -74,9 +75,8 @@ bool HeartBeatSnesSeq::parseHeader() {
       break;
     }
 
-    std::stringstream trackName;
-    trackName << "Track Pointer " << (trackIndex + 1);
-    header->addChild(curOffset, 2, trackName.str().c_str());
+    auto trackName = fmt::format("Track Pointer {}", trackIndex + 1);
+    header->addChild(curOffset, 2, trackName);
 
     curOffset += 2;
   }

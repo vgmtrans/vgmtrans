@@ -6,6 +6,7 @@
 #include "AkaoSnesSeq.h"
 #include "AkaoSnesInstr.h"
 #include "ScaleConversion.h"
+#include <spdlog/fmt/fmt.h>
 
 DECLARE_FORMAT(AkaoSnes);
 
@@ -88,9 +89,7 @@ bool AkaoSnesSeq::parseHeader() {
   for (uint8_t trackIndex = 0; trackIndex < MAX_TRACKS; trackIndex++) {
     uint16_t addrTrackStart = getShortAddress(curOffset);
     if (addrTrackStart != addrSequenceEnd) {
-      std::stringstream trackName;
-      trackName << "Track Pointer " << (trackIndex + 1);
-      header->addChild(curOffset, 2, trackName.str().c_str());
+      header->addChild(curOffset, 2, fmt::format("Track Pointer {}", trackIndex + 1));
     }
     else {
       header->addChild(curOffset, 2, "NULL");
@@ -1177,7 +1176,7 @@ bool AkaoSnesTrack::readEvent(void) {
     case EVENT_ONETIME_DURATION: {
       uint8_t dur = readByte(curOffset++);
       onetimeDuration = dur;
-      desc = fmt::format("Duration: {}", dur);
+      desc = fmt::format("Duration: {:d}", dur);
       addGenericEvent(beginOffset, curOffset - beginOffset, "Duration (One-Time)",
         desc, Type::DurationChange);
       break;
@@ -1186,7 +1185,7 @@ bool AkaoSnesTrack::readEvent(void) {
     case EVENT_JUMP_TO_SFX_LO: {
       // TODO: EVENT_JUMP_TO_SFX_LO
       uint8_t sfxIndex = readByte(curOffset++);
-      desc = fmt::format("SFX: {}", sfxIndex);
+      desc = fmt::format("SFX: {:d}", sfxIndex);
       addUnknown(beginOffset, curOffset - beginOffset, "Jump to SFX (LOWORD)", desc);
       bContinue = false;
       break;
@@ -1195,7 +1194,7 @@ bool AkaoSnesTrack::readEvent(void) {
     case EVENT_JUMP_TO_SFX_HI: {
       // TODO: EVENT_JUMP_TO_SFX_HI
       uint8_t sfxIndex = readByte(curOffset++);
-      desc = fmt::format("SFX: {}", sfxIndex);
+      desc = fmt::format("SFX: {:d}", sfxIndex);
       addUnknown(beginOffset, curOffset - beginOffset, "Jump to SFX (HIWORD)", desc);
       bContinue = false;
       break;
@@ -1204,7 +1203,7 @@ bool AkaoSnesTrack::readEvent(void) {
     case EVENT_PLAY_SFX: {
       // TODO: EVENT_PLAY_SFX
       uint8_t arg1 = readByte(curOffset++);
-      desc = fmt::format("Arg1: {}", arg1);
+      desc = fmt::format("Arg1: {:d}", arg1);
       addUnknown(beginOffset, curOffset - beginOffset, "Play SFX", desc);
       break;
     }
@@ -1430,7 +1429,7 @@ bool AkaoSnesTrack::readEvent(void) {
       uint8_t arg1 = readByte(curOffset++) & 15;
       uint16_t dest = getShortAddress(curOffset);
       curOffset += 2;
-      desc = fmt::format("Arg1: {}  Destination: ${:04X}", arg1, dest);
+      desc = fmt::format("Arg1: {:d}  Destination: ${:04X}", arg1, dest);
       addUnknown(beginOffset, curOffset - beginOffset, "CPU-Controlled Jump", desc);
       break;
     }

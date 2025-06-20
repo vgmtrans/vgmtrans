@@ -1,4 +1,5 @@
 #include "SoftCreatSnesSeq.h"
+#include <spdlog/fmt/fmt.h>
 
 DECLARE_FORMAT(SoftCreatSnes);
 
@@ -47,10 +48,9 @@ bool SoftCreatSnesSeq::parseHeader(void) {
       return false;
     }
 
-    std::stringstream trackName;
-    trackName << "Track Pointer " << (trackIndex + 1);
-    header->addChild(addrTrackLowPtr, 1, trackName.str() + " (LSB)");
-    header->addChild(addrTrackHighPtr, 1, trackName.str() + " (MSB)");
+    auto trackName = fmt::format("Track Pointer {:d}", trackIndex + 1);
+    header->addChild(addrTrackLowPtr, 1, trackName + " (LSB)");
+    header->addChild(addrTrackHighPtr, 1, trackName + " (MSB)");
 
     uint16_t addrTrackStart = readByte(addrTrackLowPtr) | (readByte(addrTrackHighPtr) << 8);
     if (addrTrackStart != 0xffff) {
@@ -101,7 +101,6 @@ bool SoftCreatSnesTrack::readEvent(void) {
   uint8_t statusByte = readByte(curOffset++);
   bool bContinue = true;
 
-  std::stringstream desc;
 
   SoftCreatSnesSeqEventType eventType = (SoftCreatSnesSeqEventType) 0;
   std::map<uint8_t, SoftCreatSnesSeqEventType>::iterator pEventType = parentSeq->EventMap.find(statusByte);
@@ -109,29 +108,26 @@ bool SoftCreatSnesTrack::readEvent(void) {
     eventType = pEventType->second;
   }
 
+  std::string desc;
+
   switch (eventType) {
     case EVENT_UNKNOWN0:
-      desc << "Event: 0x" << std::hex << std::setfill('0') << std::setw(2) << std::uppercase << (int) statusByte;
-      addUnknown(beginOffset, curOffset - beginOffset, "Unknown Event", desc.str());
+      desc = fmt::format("Event: 0x{:02X}", statusByte);
+      addUnknown(beginOffset, curOffset - beginOffset, "Unknown Event", desc);
       break;
 
     case EVENT_UNKNOWN1: {
       uint8_t arg1 = readByte(curOffset++);
-      desc << "Event: 0x" << std::hex << std::setfill('0') << std::setw(2) << std::uppercase << (int) statusByte
-          << std::dec << std::setfill(' ') << std::setw(0)
-          << "  Arg1: " << (int) arg1;
-      addUnknown(beginOffset, curOffset - beginOffset, "Unknown Event", desc.str());
+      desc = fmt::format("Event: 0x{:02X}  Arg1: {:d}", statusByte, arg1);
+      addUnknown(beginOffset, curOffset - beginOffset, "Unknown Event", desc);
       break;
     }
 
     case EVENT_UNKNOWN2: {
       uint8_t arg1 = readByte(curOffset++);
       uint8_t arg2 = readByte(curOffset++);
-      desc << "Event: 0x" << std::hex << std::setfill('0') << std::setw(2) << std::uppercase << (int) statusByte
-          << std::dec << std::setfill(' ') << std::setw(0)
-          << "  Arg1: " << (int) arg1
-          << "  Arg2: " << (int) arg2;
-      addUnknown(beginOffset, curOffset - beginOffset, "Unknown Event", desc.str());
+      desc = fmt::format("Event: 0x{:02X}  Arg1: {:d}  Arg2: {:d}", statusByte, arg1, arg2);
+      addUnknown(beginOffset, curOffset - beginOffset, "Unknown Event", desc);
       break;
     }
 
@@ -139,12 +135,9 @@ bool SoftCreatSnesTrack::readEvent(void) {
       uint8_t arg1 = readByte(curOffset++);
       uint8_t arg2 = readByte(curOffset++);
       uint8_t arg3 = readByte(curOffset++);
-      desc << "Event: 0x" << std::hex << std::setfill('0') << std::setw(2) << std::uppercase << (int) statusByte
-          << std::dec << std::setfill(' ') << std::setw(0)
-          << "  Arg1: " << (int) arg1
-          << "  Arg2: " << (int) arg2
-          << "  Arg3: " << (int) arg3;
-      addUnknown(beginOffset, curOffset - beginOffset, "Unknown Event", desc.str());
+      desc = fmt::format("Event: 0x{:02X}  Arg1: {:d}  Arg2: {:d}  Arg3: {:d}",
+                         statusByte, arg1, arg2, arg3);
+      addUnknown(beginOffset, curOffset - beginOffset, "Unknown Event", desc);
       break;
     }
 
@@ -153,13 +146,9 @@ bool SoftCreatSnesTrack::readEvent(void) {
       uint8_t arg2 = readByte(curOffset++);
       uint8_t arg3 = readByte(curOffset++);
       uint8_t arg4 = readByte(curOffset++);
-      desc << "Event: 0x" << std::hex << std::setfill('0') << std::setw(2) << std::uppercase << (int) statusByte
-          << std::dec << std::setfill(' ') << std::setw(0)
-          << "  Arg1: " << (int) arg1
-          << "  Arg2: " << (int) arg2
-          << "  Arg3: " << (int) arg3
-          << "  Arg4: " << (int) arg4;
-      addUnknown(beginOffset, curOffset - beginOffset, "Unknown Event", desc.str());
+      desc = fmt::format("Event: 0x{:02X}  Arg1: {:d}  Arg2: {:d}  Arg3: {:d}  Arg4: {:d}",
+                         statusByte, arg1, arg2, arg3, arg4);
+      addUnknown(beginOffset, curOffset - beginOffset, "Unknown Event", desc);
       break;
     }
 

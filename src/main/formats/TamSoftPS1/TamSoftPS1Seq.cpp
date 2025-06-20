@@ -7,7 +7,6 @@
 #include <iomanip>
 
 #include <spdlog/fmt/fmt.h>
-#include <sstream>
 #include "ScaleConversion.h"
 #include "TamSoftPS1Seq.h"
 
@@ -120,9 +119,8 @@ bool TamSoftPS1Seq::parseHeader() {
       for (uint8_t trackIndex = 0; trackIndex < maxTracks; trackIndex++) {
         uint32_t dwTrackHeaderOffset = dwHeaderOffset + 4 * trackIndex;
 
-        std::stringstream trackHeaderName;
-        trackHeaderName << "Track " << (trackIndex + 1);
-        VGMHeader *trackHeader = seqHeader->addHeader(dwTrackHeaderOffset, 4, trackHeaderName.str());
+        auto trackHeaderName = fmt::format("Track {}", trackIndex + 1);
+        VGMHeader *trackHeader = seqHeader->addHeader(dwTrackHeaderOffset, 4, trackHeaderName);
 
         uint8_t live = readByte(dwTrackHeaderOffset);
         uint32_t dwRelTrackOffset = readShort(dwTrackHeaderOffset + 2);
@@ -189,17 +187,17 @@ bool TamSoftPS1Track::readEvent() {
   uint8_t statusByte = readByte(curOffset++);
   bool bContinue = true;
 
-  std::stringstream desc;
+  std::string desc;
 
   if (statusByte >= 0x00 && statusByte <= 0x7f) {
     // if status_byte == 0, it actually sets 0xffffffff to delta-time o_O
-    desc << "Delta Time: " << statusByte;
-    addGenericEvent(beginOffset, curOffset - beginOffset, "Delta Time", desc.str(), Type::Rest);
+    desc = fmt::format("Delta Time: {:d}", statusByte);
+    addGenericEvent(beginOffset, curOffset - beginOffset, "Delta Time", desc, Type::Rest);
     addTime(statusByte);
   }
   else if (statusByte >= 0x80 && statusByte <= 0xdf) {
     uint8_t key = statusByte & 0x7f;
-    desc << "Key: " << key;
+    desc = fmt::format("Key: {:d}", key);
 
     if (lastNoteKey >= 0) {
       finalizeAllNotes();
@@ -229,8 +227,8 @@ bool TamSoftPS1Track::readEvent() {
         double volumeScale;
         uint8_t midiPan = convertVolumeBalanceToStdMidiPan(volumeBalanceLeft / 256.0, volumeBalanceRight / 256.0, &volumeScale);
 
-        desc << "Left Volume: " << volumeBalanceLeft << "  Right Volume: " << volumeBalanceRight;
-        addGenericEvent(beginOffset, curOffset - beginOffset, "Volume Balance", desc.str(), Type::Pan);
+        desc = fmt::format("Left Volume: {:d}  Right Volume: {:d}", volumeBalanceLeft, volumeBalanceRight);
+        addGenericEvent(beginOffset, curOffset - beginOffset, "Volume Balance", desc, Type::Pan);
         addPanNoItem(midiPan);
         break;
       }
@@ -244,7 +242,7 @@ bool TamSoftPS1Track::readEvent() {
       case 0xE3: {
         uint16_t a1 = readShort(curOffset);
         curOffset += 2;
-        addUnknown(beginOffset, curOffset - beginOffset, "NOP", desc.str());
+        addUnknown(beginOffset, curOffset - beginOffset, "NOP", desc);
         break;
       }
 
@@ -252,15 +250,15 @@ bool TamSoftPS1Track::readEvent() {
         // pitch bend
         uint16_t pitchRegValue = readShort(curOffset);
         curOffset += 2;
-        desc << "Pitch: " << pitchRegValue;
+        desc = fmt::format("Pitch: {:d}", pitchRegValue);
 
         double cents = 0;
         if (lastNoteKey >= 0) {
           cents = pitchScaleToCents((double)pitchRegValue / lastNotePitch);
-          desc << " (" << cents << " cents)";
+          desc += fmt::format(" ({} cents)", cents);
         }
 
-        addUnknown(beginOffset, curOffset - beginOffset, "Pitch Bend", desc.str());
+        addUnknown(beginOffset, curOffset - beginOffset, "Pitch Bend", desc);
         break;
       }
 
@@ -268,30 +266,30 @@ bool TamSoftPS1Track::readEvent() {
         // pitch bend that updates volume/ADSR registers too?
         uint16_t pitchRegValue = readShort(curOffset);
         curOffset += 2;
-        desc << "Pitch: " << pitchRegValue;
+        desc = fmt::format("Pitch: {:d}", pitchRegValue);
 
         double cents = 0;
         if (lastNoteKey >= 0) {
           cents = pitchScaleToCents((double)pitchRegValue / lastNotePitch);
-          desc << " (" << cents << " cents)";
+          desc += fmt::format(" ({} cents)", cents);
         }
 
-        addUnknown(beginOffset, curOffset - beginOffset, "Note By Pitch?", desc.str());
+        addUnknown(beginOffset, curOffset - beginOffset, "Note By Pitch?", desc);
         break;
       }
 
       case 0xE6: {
         uint8_t mode = readByte(curOffset++);
-        desc << "Reverb Mode: " << mode;
-        addGenericEvent(beginOffset, curOffset - beginOffset, "Reverb Mode", desc.str(), Type::Reverb);
+        desc = fmt::format("Reverb Mode: {:d}", mode);
+        addGenericEvent(beginOffset, curOffset - beginOffset, "Reverb Mode", desc, Type::Reverb);
         break;
       }
 
       case 0xE7: {
         uint8_t depth = readByte(curOffset++);
-        desc << "Reverb Depth: " << depth;
+        desc = fmt::format("Reverb Depth: {:d}", depth);
         parentSeq->reverbDepth = depth << 8;
-        addGenericEvent(beginOffset, curOffset - beginOffset, "Reverb Depth", desc.str(), Type::Reverb);
+        addGenericEvent(beginOffset, curOffset - beginOffset, "Reverb Depth", desc, Type::Reverb);
         break;
       }
 
@@ -316,14 +314,14 @@ bool TamSoftPS1Track::readEvent() {
 
       case 0xF0: {
         finalizeAllNotes();
-        addGenericEvent(beginOffset, curOffset - beginOffset, "Note Off", desc.str(), Type::NoteOff);
+        addGenericEvent(beginOffset, curOffset - beginOffset, "Note Off", desc, Type::NoteOff);
         break;
       }
 
       case 0xF1: {
         uint16_t a1 = readByte(curOffset++);
-        desc << "Arg1: " << a1;
-        addUnknown(beginOffset, curOffset - beginOffset, "Unknown Event F1", desc.str());
+        desc = fmt::format("Arg1: {:d}", a1);
+        addUnknown(beginOffset, curOffset - beginOffset, "Unknown Event F1", desc);
         break;
       }
 
@@ -332,12 +330,12 @@ bool TamSoftPS1Track::readEvent() {
         curOffset += 2;
 
         uint32_t dest = curOffset + relOffset;
-        desc << "Destination: $" << std::hex << std::setfill('0') << std::setw(4) << std::uppercase << (int) dest;
+        desc = fmt::format("Destination: ${:04X}", dest);
         uint32_t length = curOffset - beginOffset;
 
         curOffset = dest;
         if (!isOffsetUsed(dest)) {
-          addGenericEvent(beginOffset, length, "Jump", desc.str().c_str(), Type::LoopForever);
+          addGenericEvent(beginOffset, length, "Jump", desc, Type::LoopForever);
         }
         else {
           bContinue = addLoopForever(beginOffset, length, "Jump");
@@ -346,7 +344,7 @@ bool TamSoftPS1Track::readEvent() {
       }
 
       case 0xF9: {
-        addUnknown(beginOffset, curOffset - beginOffset, "Unknown Event F9", desc.str());
+        addUnknown(beginOffset, curOffset - beginOffset, "Unknown Event F9", desc);
         break;
       }
 

@@ -1,5 +1,6 @@
 #include "FalcomSnesSeq.h"
 #include "ScaleConversion.h"
+#include <spdlog/fmt/fmt.h>
 
 DECLARE_FORMAT(FalcomSnes);
 
@@ -68,9 +69,8 @@ bool FalcomSnesSeq::parseHeader() {
   for (uint8_t trackIndex = 0; trackIndex < MAX_TRACKS; trackIndex++) {
     uint16_t ofsTrackStart = readShort(curOffset);
     if (ofsTrackStart != 0) {
-      std::stringstream trackName;
-      trackName << "Track Pointer " << (trackIndex + 1);
-      header->addChild(curOffset, 2, trackName.str());
+      auto trackName = fmt::format("Track Pointer {}", trackIndex + 1);
+      header->addChild(curOffset, 2, trackName);
     }
     else {
       header->addChild(curOffset, 2, "NULL");
@@ -590,7 +590,7 @@ bool FalcomSnesTrack::readEvent() {
       uint8_t newNCK = readByte(curOffset++) & 0x1f;
 
       desc = fmt::format("Noise Frequency (NCK): {:d}", newNCK);
-      addGenericEvent(beginOffset, curOffset - beginOffset, "Noise Frequency", desc.c_str(), Type::Noise);
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Noise Frequency", desc, Type::Noise);
       break;
     }
 
