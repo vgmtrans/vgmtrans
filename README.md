@@ -1,48 +1,68 @@
-VGMTrans - Video Game Music Translator
-======================================
-![Build status](https://github.com/vgmtrans/vgmtrans/actions/workflows/build.yml/badge.svg?branch=master)
+# VGMTrans - Video Game Music Translator &middot; ![Build status](https://github.com/vgmtrans/vgmtrans/actions/workflows/build.yml/badge.svg?branch=master)
+
+VGMTrans is a cross-platform desktop application that converts sequenced video game music into standard formats.
+
+* Converts various formats into MIDI, SoundFont2, and DLS
+* Built-in playback to preview tracks
+* Interactive hex viewer for inspecting music data
 
 ## Download
 You can download the bleeding edge version from [here](https://nightly.link/vgmtrans/vgmtrans/workflows/build/master). We have builds for macOS, Windows & Linux.
 
-## About
+## Supported Formats
 
-VGMTrans converts a music files used in console video games into standard midi and dls/sf2 files.  It also plays these files in-program.  The following formats are supported with varying degrees of accuracy:
+The following formats are supported with varying degrees of accuracy:
 
-- Sony's PS2 sequence and instrument formats (.bq, .hd, .bd)
-- Squaresoft's PS2 sequence and instrument formats (.bgm, .wd)
-- Nintendo's Nintendo DS sequence and instrument formats (SDAT)
-- Squaresoft's PS1 format known as AKAO - sequences and instruments
-- Sony's PS1 sequence and instrument formats (.seq, .vab)
-- Heartbeat's PS1 sequence format used in PS1 Dragon Quest games (.seqq)
-- Tamsoft's PS1 sequence and instrument formats (.tsq, .tvb)
-- Capcom's sequence and sampled instrument formats used in CPS1/CPS2/CPS3 arcade games
-- Squaresoft's PS1 format used in certain PS1 games like Final Fantasy Tactics (smds/dwds)
-- Konami's PS1 sequence format known as KDT1
-- Sega's Sega Saturn sequence format
-- Nintendo's Gameboy Advance sequence and instrument format known as MP2k
-- Nintendo's SNES sequence and instrument format known as N-SPC (.spc)
-- Squaresoft's SNES sequence and instrument format (AKAO/SUZUKI/Itikiti) (.spc)
-- Capcom's SNES sequence and instrument format (.spc)
-- Konami's SNES sequence and instrument format (.spc)
-- Hudson's SNES sequence and instrument format (.spc)
-- Rare's SNES sequence and instrument format (.spc)
-- Heartbeat's SNES sequence and instrument format used in SNES Dragon Quest VI and III (.spc)
-- Akihiko Mori's SNES sequence and instrument format (.spc)
-- Pandora Box's SNES sequence and instrument format (.spc)
-- Graphic Research's SNES sequence and instrument format (.spc)
-- Chunsoft's SNES sequence and instrument format (.spc)
-- Compile's SNES sequence and instrument format (.spc)
-- Namco's SNES sequence and instrument format (.spc)
-- Prism Kikaku's SNES sequence and instrument format (.spc)
-- ASCII Corporation, Shuichi Ukai's SNES sequence and instrument format (.spc)
+#### Arcade
 
-The source code includes preliminary work on additional formats.
+* Capcom's sequence and sampled instrument formats used in CPS1/CPS2/CPS3 arcade games
 
-This software is released under the zlib/libpng License. See LICENSE.txt.
 
-How to use it
--------------
+#### Super Nintendo Entertainment System (SNES)
+
+* Akihiko Mori's sequence and instrument format (.spc)
+* ASCII Corporation, Shuichi Ukai's sequence and instrument format (.spc)
+* Capcom's sequence and instrument format (.spc)
+* Chunsoft's sequence and instrument format (.spc)
+* Compile's sequence and instrument format (.spc)
+* Graphic Research's sequence and instrument format (.spc)
+* Heartbeat's sequence and instrument format used in *Dragon Quest VI* and *III* (.spc)
+* Hudson's sequence and instrument format (.spc)
+* Konami's sequence and instrument format (.spc)
+* Namco's sequence and instrument format (.spc)
+* Nintendo's sequence and instrument format known as N-SPC (.spc)
+* Pandora Box's sequence and instrument format (.spc)
+* Prism Kikaku's sequence and instrument format (.spc)
+* Rare's sequence and instrument format (.spc)
+* Squaresoft's sequence and instrument format (AKAO/SUZUKI/Itikiti) (.spc)
+
+#### Sega Saturn
+
+* Sega's sequence format
+
+#### PlayStation
+
+* Heartbeat's sequence format used in *Dragon Quest* games (.seqq)
+* Konami's sequence format known as KDT1
+* Sony's sequence and instrument formats (.seq, .vab)
+* Squaresoft's format known as AKAO – sequences and instruments
+* Squaresoft's format used in games such as *Final Fantasy Tactics* (smds/dwds)
+* Tamsoft's sequence and instrument formats (.tsq, .tvb)
+
+#### PlayStation 2
+
+* Sony's sequence and instrument formats (.bq, .hd, .bd)
+* Squaresoft's sequence and instrument formats (.bgm, .wd)
+
+#### Game Boy Advance
+
+* Nintendo's sequence and instrument format known as MP2k
+
+#### Nintendo DS
+
+* Nintendo's sequence and instrument formats (SDAT)
+
+## How to use it
 
 To load a file, drag and drop the file into the application window.  The program will scan any file for contained music files. It knows how to unpack psf, psf2 and certain zipped mame rom sets as specified in the mame_roms.xml file.  For example, drag on an NDS rom file and it will detect SDAT files and their contents.
 
@@ -50,13 +70,11 @@ Once loaded, double-clicking a file listed under "Detected Music Files" will bri
 
 The "Collections" window displays file groupings that the software was able to infer.  A sequence file will be paired with one or more instrument sets and/or sample collections. A collection can be played by double-clicking it or by highlighting it and pressing the play button or spacebar.
 
-How to compile it
------------------
+## How to compile it
 
 Please refer to [the wiki](https://github.com/vgmtrans/vgmtrans/wiki) for compilation instructions.
 
-Contributors
-------------
+## Contributors
 
 - Mike: The original author of the tool, worked on a lot of formats.
 - loveemu: Creator of github project, worked on bugfixes/improvements.
@@ -64,20 +82,16 @@ Contributors
 
 [View more contributors on GitHub](https://github.com/vgmtrans/vgmtrans/graphs/contributors).
 
-Before GitHub:
+#### Before GitHub:
 
 - Sound Test: 774: Anonymous Japanese guy in 2ch BBS, worked on the HOSA format, analyzing the TriAcePS1 format and such.
 
-### Special Thanks
+#### Special Thanks
 
 - Bregalad: Author of [GBAMusRiper](https://www.romhacking.net/utilities/881/), great reference of MP2k interpretation.
 - Nisto: Author of [kdt-tool](https://github.com/Nisto/kdt-tool), thank you for your approval of porting to VGMTrans.
 - [Gnilda](https://twitter.com/god_gnilda): for his/her dedicated research of SNES AKAO format. <https://gnilda.cloudfree.jp/spc/>
 - [@brr890](https://twitter.com/brr890) and [@tssf](https://twitter.com/tssf): Contributed a lot of hints on PS1 AKAO format.
 
-Contact
--------
-
-If you enjoy the software, or have any questions please contact the development team.
-
-<https://github.com/vgmtrans/vgmtrans>
+## License
+Licensed under the zlib/libpng License. See [`LICENSE`](https://github.com/vgmtrans/vgmtrans/blob/master/LICENSE).
