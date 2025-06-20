@@ -7,7 +7,10 @@ VGMTrans is a cross-platform desktop application that converts sequenced video g
 * Interactive hex viewer for inspecting music data
 
 ## Download
-You can download the bleeding edge version from [here](https://nightly.link/vgmtrans/vgmtrans/workflows/build/master). We have builds for macOS, Windows & Linux.
+We have builds for macOS, Windows & Linux.
+
+* [Official releases](https://github.com/vgmtrans/vgmtrans/releases)
+* [Bleeding edge versions](https://nightly.link/vgmtrans/vgmtrans/workflows/build/master)
 
 ## Supported Formats
 
@@ -16,7 +19,6 @@ The following formats are supported with varying degrees of accuracy:
 #### Arcade
 
 * Capcom's sequence and sampled instrument formats used in CPS1/CPS2/CPS3 arcade games
-
 
 #### Super Nintendo Entertainment System (SNES)
 
@@ -62,7 +64,7 @@ The following formats are supported with varying degrees of accuracy:
 
 * Nintendo's sequence and instrument formats (SDAT)
 
-## How to use it
+## Usage
 
 To load a file, drag and drop the file into the application window.  The program will scan any file for contained music files. It knows how to unpack psf, psf2 and certain zipped mame rom sets as specified in the mame_roms.xml file.  For example, drag on an NDS rom file and it will detect SDAT files and their contents.
 
@@ -70,7 +72,7 @@ Once loaded, double-clicking a file listed under "Detected Music Files" will bri
 
 The "Collections" window displays file groupings that the software was able to infer.  A sequence file will be paired with one or more instrument sets and/or sample collections. A collection can be played by double-clicking it or by highlighting it and pressing the play button or spacebar.
 
-## How to compile it
+## Building
 
 Please refer to [the wiki](https://github.com/vgmtrans/vgmtrans/wiki) for compilation instructions.
 
