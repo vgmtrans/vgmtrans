@@ -66,11 +66,40 @@ The following formats are supported with varying degrees of accuracy:
 
 ## Usage
 
-To load a file, drag and drop the file into the application window.  The program will scan any file for contained music files. It knows how to unpack psf, psf2 and certain zipped mame rom sets as specified in the mame_roms.xml file.  For example, drag on an NDS rom file and it will detect SDAT files and their contents.
+### Loading Files
+Load files by dragging them into the application window or by using the `File` => `Open` menu action. The program will scan a
+file for contained music files, which when found will appear under the "Detected Music Files" panel. 
 
-Once loaded, double-clicking a file listed under "Detected Music Files" will bring up a color-coded hexadecimal display of the file with a break-down of each format element.  Click the hexadecimal to highlight an element and see more information.  Right click a detected file to bring up save options.  To remove files from the "Detected Music Files" or "Scanned Files" list, highlight the files and press the delete key.
+VGMTrans is able to 
+unpack portable sound format files (PSF) and derivatives (PSF2, SSF, etc). SNES formats generally must be loaded from SPC or RSN files. 
+Arcade formats are loaded via mame rom set zip files, which are catalogued in `mame_roms.xml`.
 
-The "Collections" window displays file groupings that the software was able to infer.  A sequence file will be paired with one or more instrument sets and/or sample collections. A collection can be played by double-clicking it or by highlighting it and pressing the play button or spacebar.
+### Detected Music Files
+Right-clicking a file listed in the Detected Music Files panel will bring up a menu of conversion options. Double-clicking 
+a detected file will open it in the Hex View. 
+
+### Collections
+For some formats, when files representing musical sequences, instruments, and samples are all loaded, VGMTrans may
+associate these files together into a Collection. Collections are listed in the Collections panel at the bottom of the
+main window. Double-clicking a collection or selecting one and pressing the space bar or clicking the green Play button 
+will attempt to play back the sequence using its associated instrument data.
+
+Right-clicking a collection will bring up a menu with conversion options.
+
+### Manual Collection Creation (advanced)
+Sometimes VGMTrans cannot properly associate detected files into Collections. In this event, the "Create collection manually" 
+button at the bottom of the Collection panel can be used. This buttons open a dialog that allows detected files
+to be selected to form a new Collection.
+
+
+### Hex View
+Double-clicking a detected file opens an interactive Hex View. The Hex View provides a visual
+breakdown of a file's structure, with each element color-coded and annotated upon selection. 
+The accompanying File Structure panel to the right of the Hex View provides a hierarchical list of all the elements 
+within the file. Clicking an element, either in the Hex View or the File Structure panel, highlights it and
+displays more information about the element in the status bar at the bottom of the main window. When enabled, the "Show Details"
+toggle button in the top right corner of the File Structure panel will display details for each element directly
+in the File Structure panel.
 
 ## Building
 
