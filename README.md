@@ -6,6 +6,9 @@ VGMTrans is a cross-platform desktop application that converts sequenced video g
 * Preview conversion with built-in audio playback.
 * Inspect data with an interactive hex view.
 
+<img width="1155" alt="Screenshot 2025-06-20 at 12 20 01 PMb" src="https://github.com/user-attachments/assets/c6952d5a-924b-4004-9cb1-541b748b7609" />
+<sub>(data in screenshot is randomized)</sub>
+
 ## Download
 We have builds for macOS, Windows, and Linux.
 
