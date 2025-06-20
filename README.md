@@ -3,7 +3,7 @@
 VGMTrans is a cross-platform desktop application that converts sequenced video game music into standard formats.
 
 * Converts various formats into MIDI, SoundFont2, and DLS
-* Built-in playback to preview tracks
+* Built-in playback for previewing conversion
 * Interactive hex viewer for inspecting music data
 
 ## Download
@@ -71,7 +71,7 @@ Load files by dragging them into the application window or by using the `File` =
 file for contained music files, which when found will appear under the "Detected Music Files" panel. 
 
 VGMTrans is able to 
-unpack portable sound format files (PSF) and derivatives (PSF2, SSF, etc). SNES formats generally must be loaded from SPC or RSN files. 
+unpack portable sound format files (PSF) and related formats (PSF2, SSF, etc). SNES formats generally must be loaded from SPC or RSN files. 
 Arcade formats are loaded via mame rom set zip files, which are catalogued in `mame_roms.xml`.
 
 #### *Scanned Files*
@@ -94,8 +94,8 @@ Right-clicking a collection will bring up a menu with conversion options.
 
 #### *Manual Collection Creation (advanced)*
 Sometimes VGMTrans cannot properly associate detected files into Collections. In this event, the "Create collection manually" 
-button at the bottom of the Collection panel can be used. This buttons open a dialog that allows detected files
-to be selected to form a new Collection.
+button at the bottom of the Collection panel can be used. The button opens a dialog to select a set of detected files for
+which to create a new Collection.
 
 
 #### *Hex View*
@@ -125,11 +125,11 @@ Please refer to [the wiki](https://github.com/vgmtrans/vgmtrans/wiki) for compil
 
 [View more contributors on GitHub](https://github.com/vgmtrans/vgmtrans/graphs/contributors).
 
-#### Before GitHub:
+#### *Before GitHub*:
 
 - Sound Test: 774: Anonymous Japanese guy in 2ch BBS, worked on the HOSA format, analyzing the TriAcePS1 format and such.
 
-#### Special Thanks
+#### *Special Thanks*
 
 - Bregalad: Author of [GBAMusRiper](https://www.romhacking.net/utilities/881/), great reference of MP2k interpretation.
 - Nisto: Author of [kdt-tool](https://github.com/Nisto/kdt-tool), thank you for your approval of porting to VGMTrans.
