@@ -2,12 +2,12 @@
 
 VGMTrans is a cross-platform desktop application that converts sequenced video game music into standard formats.
 
-* Converts various formats into MIDI, SoundFont2, and DLS
-* Built-in playback for previewing conversion
-* Interactive hex viewer for inspecting music data
+* Convert various formats into MIDI, SoundFont2, and DLS.
+* Preview conversion with built-in audio playback.
+* Inspect data with an interactive hex view.
 
 ## Download
-We have builds for macOS, Windows & Linux.
+We have builds for macOS, Windows, and Linux.
 
 * [Official releases](https://github.com/vgmtrans/vgmtrans/releases)
 * [Bleeding edge versions](https://nightly.link/vgmtrans/vgmtrans/workflows/build/master)
@@ -36,7 +36,7 @@ The following formats are supported with varying degrees of accuracy:
 * Pandora Box's sequence and instrument format (.spc)
 * Prism Kikaku's sequence and instrument format (.spc)
 * Rare's sequence and instrument format (.spc)
-* Squaresoft's sequence and instrument format (AKAO/SUZUKI/Itikiti) (.spc)
+* SquareSoft's sequence and instrument format (AKAO/SUZUKI/Itikiti) (.spc)
 
 #### *Sega Saturn*
 
@@ -47,14 +47,14 @@ The following formats are supported with varying degrees of accuracy:
 * Heartbeat's sequence format used in *Dragon Quest* games (.seqq)
 * Konami's sequence format known as KDT1
 * Sony's sequence and instrument formats (.seq, .vab)
-* Squaresoft's format known as AKAO – sequences and instruments
-* Squaresoft's format used in games such as *Final Fantasy Tactics* (smds/dwds)
+* SquareSoft's format known as AKAO – sequences and instruments
+* SquareSoft's format used in games such as *Final Fantasy Tactics* (smds/dwds)
 * Tamsoft's sequence and instrument formats (.tsq, .tvb)
 
 #### *PlayStation 2*
 
 * Sony's sequence and instrument formats (.bq, .hd, .bd)
-* Squaresoft's sequence and instrument formats (.bgm, .wd)
+* SquareSoft's sequence and instrument formats (.bgm, .wd)
 
 #### *Game Boy Advance*
 
@@ -71,29 +71,29 @@ Load files by dragging them into the application window or by using the `File` =
 file for contained music files, which when found will appear under the "Detected Music Files" panel. 
 
 VGMTrans is able to 
-unpack portable sound format files (PSF) and related formats (PSF2, SSF, etc). SNES formats generally must be loaded from SPC or RSN files. 
-Arcade formats are loaded via mame rom set zip files, which are catalogued in `mame_roms.xml`.
+unpack portable sound format files (`psf`) and related formats (`psf2`, `ssf`, etc). SNES formats generally must be loaded 
+from `spc` or `rsn` files. Arcade formats are loaded via mame rom set `zip` files, which are catalogued in `mame_roms.xml`.
 
 #### *Scanned Files*
 
-The Scanned Files panel lists all files that have been scanned by VGMTrans for which any contained files were detected.
-A scanned file can be removed by selecting it and pressing Delete or Backspace, or by right-clicking and selecting Close.
-When removed, all detected files belonging to the scanned file will also be removed.
+The Scanned Files panel lists all files that have been scanned by VGMTrans which yielded detected files.
+A scanned file can be removed by selecting it and pressing `Delete` or `Backspace`, or by right-clicking and selecting `Close`.
+When removed, all detected files contained in the scanned file will also be removed.
 
 #### *Detected Music Files*
-Right-clicking a file listed in the Detected Music Files panel will bring up a menu of conversion options. Double-clicking 
-a detected file will open it in the Hex View. Detected Files can be removed by pressing Delete or Backspace, or by right-clicking and selecting Close.
+Right-clicking a file listed in the Detected Music Files panel brings up a menu of conversion options. Double-clicking 
+a detected file will open it in the Hex View. Detected Files can be removed by pressing `Delete` or `Backspace`, or by right-clicking and selecting `Close`.
 
 #### *Collections*
 For some formats, when files representing musical sequences, instruments, and samples are all loaded, VGMTrans may
 associate these files together into a Collection. Collections are listed in the Collections panel at the bottom of the
-main window. Double-clicking a collection or selecting one and pressing the space bar or clicking the green Play button 
+main window. Double-clicking a collection or selecting one and pressing the `Space Bar` or clicking the green Play button 
 will attempt to play back the sequence using its associated instrument data.
 
 Right-clicking a collection will bring up a menu with conversion options.
 
 #### *Manual Collection Creation (advanced)*
-Sometimes VGMTrans cannot properly associate detected files into Collections. In this event, the "Create collection manually" 
+Sometimes VGMTrans cannot properly group detected files into Collections. In this event, the `Create collection manually` 
 button at the bottom of the Collection panel can be used. The button opens a dialog to select a set of detected files for
 which to create a new Collection.
 
@@ -117,6 +117,11 @@ selecting multiple and right-clicking the selection.
 
 Please refer to [the wiki](https://github.com/vgmtrans/vgmtrans/wiki) for compilation instructions.
 
+## Contributing
+
+Pull requests are greatly appreciated. Check out our [guidelines](CONTRIBUTING.md)
+for contributing effectively.
+
 ## Contributors
 
 - Mike: The original author of the tool, worked on a lot of formats.
@@ -137,4 +142,4 @@ Please refer to [the wiki](https://github.com/vgmtrans/vgmtrans/wiki) for compil
 - [@brr890](https://twitter.com/brr890) and [@tssf](https://twitter.com/tssf): Contributed a lot of hints on PS1 AKAO format.
 
 ## License
-Licensed under the zlib/libpng License. See [`LICENSE`](https://github.com/vgmtrans/vgmtrans/blob/master/LICENSE).
+Licensed under the zlib/libpng License. See [`LICENSE`](LICENSE).
