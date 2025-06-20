@@ -16,11 +16,11 @@ We have builds for macOS, Windows & Linux.
 
 The following formats are supported with varying degrees of accuracy:
 
-#### Arcade
+#### *Arcade*
 
 * Capcom's sequence and sampled instrument formats used in CPS1/CPS2/CPS3 arcade games
 
-#### Super Nintendo Entertainment System (SNES)
+#### *Super Nintendo Entertainment System (SNES)*
 
 * Akihiko Mori's sequence and instrument format (.spc)
 * ASCII Corporation, Shuichi Ukai's sequence and instrument format (.spc)
@@ -38,11 +38,11 @@ The following formats are supported with varying degrees of accuracy:
 * Rare's sequence and instrument format (.spc)
 * Squaresoft's sequence and instrument format (AKAO/SUZUKI/Itikiti) (.spc)
 
-#### Sega Saturn
+#### *Sega Saturn*
 
 * Sega's sequence format
 
-#### PlayStation
+#### *PlayStation*
 
 * Heartbeat's sequence format used in *Dragon Quest* games (.seqq)
 * Konami's sequence format known as KDT1
@@ -51,22 +51,22 @@ The following formats are supported with varying degrees of accuracy:
 * Squaresoft's format used in games such as *Final Fantasy Tactics* (smds/dwds)
 * Tamsoft's sequence and instrument formats (.tsq, .tvb)
 
-#### PlayStation 2
+#### *PlayStation 2*
 
 * Sony's sequence and instrument formats (.bq, .hd, .bd)
 * Squaresoft's sequence and instrument formats (.bgm, .wd)
 
-#### Game Boy Advance
+#### *Game Boy Advance*
 
 * Nintendo's sequence and instrument format known as MP2k
 
-#### Nintendo DS
+#### *Nintendo DS*
 
 * Nintendo's sequence and instrument formats (SDAT)
 
 ## Usage
 
-### Loading Files
+#### *Loading Files*
 Load files by dragging them into the application window or by using the `File` => `Open` menu action. The program will scan a
 file for contained music files, which when found will appear under the "Detected Music Files" panel. 
 
@@ -74,11 +74,17 @@ VGMTrans is able to
 unpack portable sound format files (PSF) and derivatives (PSF2, SSF, etc). SNES formats generally must be loaded from SPC or RSN files. 
 Arcade formats are loaded via mame rom set zip files, which are catalogued in `mame_roms.xml`.
 
-### Detected Music Files
-Right-clicking a file listed in the Detected Music Files panel will bring up a menu of conversion options. Double-clicking 
-a detected file will open it in the Hex View. 
+#### *Scanned Files*
 
-### Collections
+The Scanned Files panel lists all files that have been scanned by VGMTrans for which any contained files were detected.
+A scanned file can be removed by selecting it and pressing Delete or Backspace, or by right-clicking and selecting Close.
+When removed, all detected files belonging to the scanned file will also be removed.
+
+#### *Detected Music Files*
+Right-clicking a file listed in the Detected Music Files panel will bring up a menu of conversion options. Double-clicking 
+a detected file will open it in the Hex View. Detected Files can be removed by pressing Delete or Backspace, or by right-clicking and selecting Close.
+
+#### *Collections*
 For some formats, when files representing musical sequences, instruments, and samples are all loaded, VGMTrans may
 associate these files together into a Collection. Collections are listed in the Collections panel at the bottom of the
 main window. Double-clicking a collection or selecting one and pressing the space bar or clicking the green Play button 
@@ -86,13 +92,13 @@ will attempt to play back the sequence using its associated instrument data.
 
 Right-clicking a collection will bring up a menu with conversion options.
 
-### Manual Collection Creation (advanced)
+#### *Manual Collection Creation (advanced)*
 Sometimes VGMTrans cannot properly associate detected files into Collections. In this event, the "Create collection manually" 
 button at the bottom of the Collection panel can be used. This buttons open a dialog that allows detected files
 to be selected to form a new Collection.
 
 
-### Hex View
+#### *Hex View*
 Double-clicking a detected file opens an interactive Hex View. The Hex View provides a visual
 breakdown of a file's structure, with each element color-coded and annotated upon selection. 
 The accompanying File Structure panel to the right of the Hex View provides a hierarchical list of all the elements 
@@ -100,6 +106,12 @@ within the file. Clicking an element, either in the Hex View or the File Structu
 displays more information about the element in the status bar at the bottom of the main window. When enabled, the "Show Details"
 toggle button in the top right corner of the File Structure panel will display details for each element directly
 in the File Structure panel.
+
+#### *Batch Conversion*
+
+To convert files in batch, select multiple files of the same type (denoted by icon) in the Detected Music Files panel, 
+then right-click the selection and choose a conversion action. Similarly, Collections can be converted in batch by 
+selecting multiple and right-clicking the selection.
 
 ## Building
 
