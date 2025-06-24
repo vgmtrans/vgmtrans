@@ -65,13 +65,18 @@ KonamiArcadeTrack::KonamiArcadeTrack(KonamiArcadeSeq *parentSeq, uint32_t offset
 
 void KonamiArcadeTrack::resetVars() {
   m_inJump = false;
-  m_percussion = false;
+  m_percussionFlag1 = false;
+  m_percussionFlag2 = false;
   m_pan = 0;
   m_releaseRate = 0;
   m_curProg = 0;
   m_prevDelta = 0;
   m_duration = 0;
   m_jumpReturnOffset = 0;
+  m_inSubRoutine = false;
+  m_needsSubroutineEnd = false;
+  m_subroutineOffset = -1;
+  m_subroutineReturnOffset = -1;
   memset(m_loopCounter, 0, sizeof(m_loopCounter));
   memset(m_loopMarker, 0, sizeof(m_loopMarker));
   memset(m_loopAtten, 0, sizeof(m_loopAtten));
@@ -93,28 +98,41 @@ u8 KonamiArcadeTrack::calculateMidiPanForK054539(u8 pan) {
   return newPan;
 }
 
+void KonamiArcadeTrack::enablePercussion(bool& flag) {
+  flag = true;
+  // Drums define their own pan, which is only used if the pan state value is 0
+  addBankSelectNoItem(1);
+  addProgramChangeNoItem(0, false);
+}
+
+void KonamiArcadeTrack::disablePercussion(bool& flag) {
+  flag = false;
+
+  // If either percussion flag is still set, exit and don't disable percussion
+  if (m_percussionFlag1 || m_percussionFlag2)
+    return;
+
+  if (m_pan == 0) {
+    u8 midiPan = calculateMidiPanForK054539(0);
+    if (midiPan != prevPan)
+      addPanNoItem(midiPan);
+  }
+  addProgramChangeNoItem(m_curProg, true);
+}
+
 bool KonamiArcadeTrack::readEvent() {
   uint32_t beginOffset = curOffset;
   uint8_t status_byte = readByte(curOffset++);
 
   if (status_byte == 0x60) {
     addGenericEvent(beginOffset, curOffset - beginOffset, "Percussion On", "", Type::ChangeState);
-    m_percussion = true;
-    // Drums define their own pan, which is only used if the pan state value is 0
-    addBankSelectNoItem(1);
-    addProgramChangeNoItem(0, false);
+    enablePercussion(m_percussionFlag1);
     return true;
   }
 
   if (status_byte == 0x61) {
     addGenericEvent(beginOffset, curOffset - beginOffset, "Percussion Off", "", Type::ChangeState);
-    m_percussion = false;
-    if (m_pan == 0) {
-      u8 midiPan = calculateMidiPanForK054539(0);
-      if (midiPan != prevPan)
-        addPanNoItem(midiPan);
-    }
-    addProgramChangeNoItem(m_curProg, true);
+    disablePercussion(m_percussionFlag1);
     return true;
   }
 
@@ -161,7 +179,7 @@ bool KonamiArcadeTrack::readEvent() {
 
     uint32_t actualDuration;
     if (m_duration == 0) {
-      if (m_percussion && (note - 24) < 46) {
+      if ((m_percussionFlag1 || m_percussionFlag2) && (note - 24) < 46) {
         auto seq = static_cast<KonamiArcadeSeq*>(parentSeq);
         auto& drum = seq->drums()[note-24];
         u8 defaultDrumDur = drum.default_duration;
@@ -244,8 +262,21 @@ bool KonamiArcadeTrack::readEvent() {
       addUnknown(beginOffset, curOffset - beginOffset);
       break;
 
-    case 0xDE:
-      curOffset++;
+    // 0xDE sets a flag distinct from the 0x60/0x61 percussion flag, but still checked to enable percussion
+    case 0xDE: {
+      uint8_t bEnablePercussion = readByte(curOffset++);
+      if (bEnablePercussion != 0) {
+        addGenericEvent(beginOffset, curOffset - beginOffset, "Enable Percussion", "", Type::UseDrumKit);
+        enablePercussion(m_percussionFlag2);
+      } else {
+        addGenericEvent(beginOffset, curOffset - beginOffset, "Disable Percussion", "", Type::UseDrumKit);
+        disablePercussion(m_percussionFlag2);
+      }
+      break;
+    }
+
+    case 0xDF:
+      curOffset += 3;
       addUnknown(beginOffset, curOffset - beginOffset);
       break;
 
@@ -378,7 +409,14 @@ bool KonamiArcadeTrack::readEvent() {
       break;
     }
 
+    case 0xEB:
+      curOffset += 2;
+      addUnknown(beginOffset, curOffset - beginOffset);
+      break;
+
+
     case 0xEC:
+      // Transpose?
       curOffset++;
       addUnknown(beginOffset, curOffset - beginOffset);
       break;
@@ -419,9 +457,36 @@ bool KonamiArcadeTrack::readEvent() {
       break;
 
     case 0xF6:
-    case 0xF7:
-      addUnknown(beginOffset, curOffset - beginOffset);
+      m_subroutineOffset = curOffset;
+      m_needsSubroutineEnd = true;
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Subroutine Start", "", Type::Loop);
       break;
+
+    case 0xF7:
+      if (m_needsSubroutineEnd) {
+        m_needsSubroutineEnd = false;
+        m_inSubRoutine = false;
+        addGenericEvent(beginOffset, curOffset - beginOffset, "Subroutine Return", "", Type::Loop);
+        printf("Encountered subroutine return offset: %X\n", beginOffset);
+      } else {
+        if (m_inSubRoutine) {
+          curOffset = m_subroutineReturnOffset;
+          m_inSubRoutine = false;
+          printf("Returning from subroutine: %X. Jumping back to: %X\n", beginOffset, curOffset);
+        } else {
+          addGenericEvent(beginOffset, curOffset - beginOffset, "Call Subroutine", "", Type::Loop);
+          m_inSubRoutine = true;
+          m_subroutineReturnOffset = curOffset;
+          curOffset = m_subroutineOffset;
+          printf("Calling subroutine: %X. Jumping to: %X\n", beginOffset, curOffset);
+        }
+      }
+      break;
+
+    // case 0xF6:
+    // case 0xF7:
+    //   addUnknown(beginOffset, curOffset - beginOffset);
+    //   break;
 
     case 0xF8:
       curOffset += 2;
@@ -450,7 +515,8 @@ bool KonamiArcadeTrack::readEvent() {
       if (romOffset < beginOffset) {
         shouldContinue = addLoopForever(beginOffset, 3);
       } else {
-        addGenericEvent(beginOffset, 3, "Jump", "", Type::Loop);
+        auto desc = fmt::format("Destination: ${:X}", romOffset);
+        addGenericEvent(beginOffset, 3, "Jump", desc, Type::Loop);
       }
       if (romOffset < seq->dwOffset) {
         L_ERROR("KonamiArcadeEvent FD attempted jump to offset outside the sequence at {:X}.  Jump offset: {:X}", beginOffset, romOffset);
@@ -463,7 +529,6 @@ bool KonamiArcadeTrack::readEvent() {
     case 0xFE: {
       m_inJump = true;
       m_jumpReturnOffset = curOffset + 2;
-      addGenericEvent(beginOffset, m_jumpReturnOffset - beginOffset, "Jump", "", Type::Loop);
       auto seq = static_cast<KonamiArcadeSeq*>(parentSeq);
       u16 memJumpOffset = readShort(curOffset);
       u32 romOffset = seq->dwOffset + (memJumpOffset - seq->memOffset());
@@ -471,6 +536,8 @@ bool KonamiArcadeTrack::readEvent() {
         L_ERROR("KonamiArcade Event FE attempted jump to offset outside the sequence at {:X}.  Jump offset: {:X}", beginOffset, romOffset);
         return false;
       }
+      auto desc = fmt::format("Destination: ${:X}", romOffset);
+      addGenericEvent(beginOffset, m_jumpReturnOffset - beginOffset, "Jump", desc, Type::Loop);
       curOffset = romOffset;
       break;
     }
