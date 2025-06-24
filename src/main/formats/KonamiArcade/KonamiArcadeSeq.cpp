@@ -103,6 +103,7 @@ void KonamiArcadeTrack::enablePercussion(bool& flag) {
   // Drums define their own pan, which is only used if the pan state value is 0
   addBankSelectNoItem(1);
   addProgramChangeNoItem(0, false);
+  applyTranspose();
 }
 
 void KonamiArcadeTrack::disablePercussion(bool& flag) {
@@ -118,6 +119,28 @@ void KonamiArcadeTrack::disablePercussion(bool& flag) {
       addPanNoItem(midiPan);
   }
   addProgramChangeNoItem(m_curProg, true);
+  applyTranspose();
+}
+
+void KonamiArcadeTrack::applyTranspose() {
+  // If percussion is active we cannot transpose by activating a different note since drums use
+  // a drumkit instrument (where each note is a different percussive sound). Instead we use fine tune.
+  if (m_percussionFlag1 || m_percussionFlag2) {
+    transpose = 0;
+    if (coarseTuningSemitones != m_driverTranspose) {
+      // TODO: uncomment this when we stop using BASS. Bass doesn't properly implement coarse
+      // fine-tuning. It shifts the actual note played instead of only affecting pitch.
+      // This screws up drum kits
+      // addCoarseTuningNoItem(m_driverTranspose);
+    }
+  }
+  else {
+    transpose = m_driverTranspose;
+    if (coarseTuningSemitones != 0) {
+      // TODO: same as above
+      // addCoarseTuningNoItem(0);
+    }
+  }
 }
 
 bool KonamiArcadeTrack::readEvent() {
@@ -220,6 +243,11 @@ bool KonamiArcadeTrack::readEvent() {
 
     case 0xCE:
       curOffset += 2;
+      addUnknown(beginOffset, curOffset - beginOffset);
+      break;
+
+    case 0xCF:
+      curOffset += 3;
       addUnknown(beginOffset, curOffset - beginOffset);
       break;
 
@@ -415,9 +443,15 @@ bool KonamiArcadeTrack::readEvent() {
       break;
 
 
-    case 0xEC:
-      // Transpose?
-      curOffset++;
+    case 0xEC: {
+      m_driverTranspose = readByte(curOffset++);
+      addTranspose(beginOffset, curOffset - beginOffset, m_driverTranspose);
+      applyTranspose();
+      break;
+    }
+
+    case 0xED:
+      curOffset += 3;
       addUnknown(beginOffset, curOffset - beginOffset);
       break;
 
@@ -482,11 +516,6 @@ bool KonamiArcadeTrack::readEvent() {
         }
       }
       break;
-
-    // case 0xF6:
-    // case 0xF7:
-    //   addUnknown(beginOffset, curOffset - beginOffset);
-    //   break;
 
     case 0xF8:
       curOffset += 2;
