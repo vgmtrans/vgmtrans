@@ -211,6 +211,14 @@ FineTuningSeqEvent::FineTuningSeqEvent(SeqTrack *pTrack, double cents,
                                        uint32_t offset, uint32_t length, const std::string &name)
     : SeqEvent(pTrack, offset, length, name, Type::Misc), m_cents(cents) { }
 
+// ********************
+// CoarseTuningSeqEvent
+// ********************
+
+CoarseTuningSeqEvent::CoarseTuningSeqEvent(SeqTrack *pTrack, double semitones,
+                                       uint32_t offset, uint32_t length, const std::string &name)
+    : SeqEvent(pTrack, offset, length, name, Type::Misc), m_semitones(semitones) { }
+
 // ****************************
 // ModulationDepthRangeSeqEvent
 // ****************************
