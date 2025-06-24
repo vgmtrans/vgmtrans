@@ -352,6 +352,23 @@ private:
   double m_cents;
 };
 
+//  ********************
+//  CoarseTuningSeqEvent
+//  ********************
+
+class CoarseTuningSeqEvent : public SeqEvent {
+public:
+  CoarseTuningSeqEvent(SeqTrack *pTrack, double semitones, uint32_t offset = 0, uint32_t length = 0,
+                       const std::string &name = "");
+
+  std::string description() override {
+    return fmt::format("{} - coarse tuning: {}", name(), m_semitones);
+  };
+
+private:
+  double m_semitones;
+};
+
 //  ****************************
 //  ModulationDepthRangeSeqEvent
 //  ****************************

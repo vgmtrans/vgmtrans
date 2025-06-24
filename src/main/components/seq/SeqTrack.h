@@ -113,7 +113,9 @@ class SeqTrack : public VGMItem {
   void addPitchBendRange(uint32_t offset, uint32_t length, uint16_t cents, const std::string &sEventName = "Pitch Bend Range");
   void addPitchBendRangeNoItem(uint16_t cents) const;
   void addFineTuning(uint32_t offset, uint32_t length, double cents, const std::string &sEventName = "Fine Tuning");
-  void addFineTuningNoItem(double cents) const;
+  void addFineTuningNoItem(double cents);
+  void addCoarseTuning(uint32_t offset, uint32_t length, double semitones, const std::string &sEventName = "Coarse Tuning");
+  void addCoarseTuningNoItem(double semitones);
   void addModulationDepthRange(uint32_t offset, uint32_t length, double semitones, const std::string &sEventName = "Modulation Depth Range");
   void addModulationDepthRangeNoItem(double semitones) const;
   void addTranspose(uint32_t offset, uint32_t length, int8_t transpose, const std::string &sEventName = "Transpose");
@@ -192,6 +194,8 @@ class SeqTrack : public VGMItem {
   uint8_t prevPan;
   uint8_t prevReverb;
   int8_t transpose;
+  double fineTuningCents;
+  double coarseTuningSemitones;
   uint32_t curOffset;
   bool bInLoop;
   int8_t cDrumNote;            //-1 signals do not use drumNote, otherwise,

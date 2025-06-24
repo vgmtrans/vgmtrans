@@ -39,6 +39,8 @@ void SeqTrack::resetVars() {
   prevReverb = 40;
   channelGroup = 0;
   transpose = 0;
+  fineTuningCents = 0;
+  coarseTuningSemitones = 0;
   cDrumNote = -1;
   cKeyCorrection = 0;
   panVolumeCorrectionRate = 1.0;
@@ -984,13 +986,27 @@ void SeqTrack::addFineTuning(uint32_t offset, uint32_t length, double cents, con
 
   if (readMode == READMODE_ADD_TO_UI && !isItemAtOffset(offset, true))
     addEvent(new FineTuningSeqEvent(this, cents, offset, length, sEventName));
-  else if (readMode == READMODE_CONVERT_TO_MIDI)
-    pMidiTrack->addFineTuning(channel, cents);
+  addFineTuningNoItem(cents);
 }
 
-void SeqTrack::addFineTuningNoItem(double cents) const {
+void SeqTrack::addFineTuningNoItem(double cents) {
   if (readMode == READMODE_CONVERT_TO_MIDI)
     pMidiTrack->addFineTuning(channel, cents);
+  fineTuningCents = cents;
+}
+
+void SeqTrack::addCoarseTuning(uint32_t offset, uint32_t length, double semitones, const std::string &sEventName) {
+  onEvent(offset, length);
+
+  if (readMode == READMODE_ADD_TO_UI && !isItemAtOffset(offset, true))
+    addEvent(new CoarseTuningSeqEvent(this, semitones, offset, length, sEventName));
+  addCoarseTuningNoItem(semitones);
+}
+
+void SeqTrack::addCoarseTuningNoItem(double semitones) {
+  if (readMode == READMODE_CONVERT_TO_MIDI)
+    pMidiTrack->addCoarseTuning(channel, semitones);
+  coarseTuningSemitones = semitones;
 }
 
 void SeqTrack::addModulationDepthRange(uint32_t offset,
