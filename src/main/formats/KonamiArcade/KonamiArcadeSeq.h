@@ -40,10 +40,12 @@ private:
   u8 calculateMidiPanForK054539(u8 pan);
   void enablePercussion(bool& flag);
   void disablePercussion(bool& flag);
+  void applyTranspose();
 
   bool m_inJump;
   bool m_percussionFlag1;
   bool m_percussionFlag2;
+  s8 m_driverTranspose;
   u8 m_releaseRate;
   u8 m_curProg;
   u32 m_loopMarker[2] = {};
