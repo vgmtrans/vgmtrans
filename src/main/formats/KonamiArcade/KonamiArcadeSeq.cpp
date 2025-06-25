@@ -501,18 +501,15 @@ bool KonamiArcadeTrack::readEvent() {
         m_needsSubroutineEnd = false;
         m_inSubRoutine = false;
         addGenericEvent(beginOffset, curOffset - beginOffset, "Subroutine Return", "", Type::Loop);
-        printf("Encountered subroutine return offset: %X\n", beginOffset);
       } else {
         if (m_inSubRoutine) {
           curOffset = m_subroutineReturnOffset;
           m_inSubRoutine = false;
-          printf("Returning from subroutine: %X. Jumping back to: %X\n", beginOffset, curOffset);
         } else {
           addGenericEvent(beginOffset, curOffset - beginOffset, "Call Subroutine", "", Type::Loop);
           m_inSubRoutine = true;
           m_subroutineReturnOffset = curOffset;
           curOffset = m_subroutineOffset;
-          printf("Calling subroutine: %X. Jumping to: %X\n", beginOffset, curOffset);
         }
       }
       break;
