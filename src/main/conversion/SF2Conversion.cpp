@@ -132,8 +132,9 @@ SynthFile* createSynthFile(
           }
         }
         // Otherwise, the sample number should be explicitly defined in the rgn.
-        else
+        else {
           realSampNum = rgn->sampNum;
+        }
 
         // Determine the sampCollNum (index into our finalSampColls vector)
         auto sampCollNum = finalSampColls.size();
@@ -149,6 +150,12 @@ SynthFile* createSynthFile(
         // get the real sampNum in the final DLS file.
         for (uint32_t k = 0; k < sampCollNum; k++)
           realSampNum += finalSampColls[k]->samples.size();
+
+        if (realSampNum >= finalSamps.size()) {
+          L_ERROR("Region has an explicit sample number that exceeds sample count. Sample Num: {:d} (Instrset "
+                  "{}, Instr {}, Region {})", realSampNum, inst, i, j);
+          realSampNum = 0;
+        }
 
         SynthRgn *newRgn = newInstr->addRgn();
         newRgn->setRanges(rgn->keyLow, rgn->keyHigh, rgn->velLow, rgn->velHigh);

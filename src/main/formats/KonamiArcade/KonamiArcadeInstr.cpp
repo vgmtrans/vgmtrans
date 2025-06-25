@@ -33,9 +33,27 @@ bool KonamiArcadeInstrSet::parseInstrPointers() {
   for (u32 off = instrSampleTableOffset; off < sfxSampleTableOffset; off += sizeof(konami_mw_sample_info)) {
     std::string name = fmt::format("Instrument {}", sampNum);
     VGMInstr* instr = new VGMInstr(this, off, sizeof(konami_mw_sample_info), 0, sampNum, name);
-    VGMRgn* rgn = new VGMRgn(instr, off);
+    VGMRgn* rgn = new VGMRgn(instr, off, sizeof(konami_mw_sample_info));
     rgn->sampNum = sampNum++;
     instr->addRgn(rgn);
+
+    rgn->addChild(off, 3, "Loop Offset");
+    rgn->addChild(off + 3, 3, "Sample Offset");
+    std::string sampleTypeStr;
+    switch (readByte(off + 6)) {
+      case static_cast<int>(konami_mw_sample_info::sample_type::PCM_8):
+        sampleTypeStr = "PCM 8";
+        break;
+      case static_cast<int>(konami_mw_sample_info::sample_type::PCM_16):
+        sampleTypeStr = "PCM 16";
+        break;
+      case static_cast<int>(konami_mw_sample_info::sample_type::ADPCM):
+        sampleTypeStr = "ADPCM";
+        break;
+    }
+    rgn->addChild(off + 6, 1, fmt::format("Sample Type: {}", sampleTypeStr));
+    rgn->addChild(off + 7, 1, fmt::format("Loops: {}", readByte(off + 7) > 0 ? "True" : "False"));
+    rgn->addChild(off + 8, 1, "Attenuation");
     aInstrs.push_back(instr);
   }
 
@@ -46,7 +64,7 @@ bool KonamiArcadeInstrSet::parseInstrPointers() {
   VGMInstr* drumInstr = new VGMInstr(
     this,
     m_drumTableOffset,
-    sizeof(konami_mw_sample_info),
+    sizeof(m_drums),
     1,
     0,
     "Drum Kit"
@@ -56,13 +74,21 @@ bool KonamiArcadeInstrSet::parseInstrPointers() {
     u32 off = m_drumTableOffset + i * sizeof(drum);
     int sampNum = numMelodicInstrs + d.samp_num;
 
-    VGMRgn* rgn = new VGMRgn(drumInstr, off, sizeof(drum));
+    VGMRgn* rgn = new VGMRgn(drumInstr, off, sizeof(drum), fmt::format("Region {:d}", i));
     // The driver offsets notes up 2 octaves relative to midi note values.
     rgn->keyLow = i + 24;
     rgn->keyHigh = i + 24;
     int unityKey = (i + 24) + (0x2A - d.unity_key);
     rgn->sampNum = sampNum;
     rgn->unityKey = unityKey; //i + 24;
+
+    rgn->addChild(off, 1, "Sample Number");
+    rgn->addChild(off + 1, 1, "Unity Key");
+    rgn->addChild(off + 2, 1, "Pitch Bend");
+    rgn->addChild(off + 3, 1, "Pan");
+    rgn->addChild(off + 4, 2, "Unknown");
+    rgn->addChild(off + 6, 1, "Default Duration");
+    rgn->addChild(off + 7, 1, "Unknown");
     drumInstr->addRgn(rgn);
   }
   aInstrs.push_back(drumInstr);
