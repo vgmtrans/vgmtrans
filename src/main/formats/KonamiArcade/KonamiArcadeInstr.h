@@ -49,14 +49,17 @@ public:
   KonamiArcadeInstrSet(RawFile *file,
                        u32 offset,
                        std::string name,
-                       u32 drumTableOffset);
+                       u32 drumTableOffset,
+                       u32 drumSampleTableOffset);
   ~KonamiArcadeInstrSet() override = default;
 
+  void addSampleInfoChildren(VGMItem* sampInfoItem, u32 off);
   bool parseInstrPointers() override;
   const std::array<drum, 46>& drums() { return m_drums;}
 
 private:
   u32 m_drumTableOffset;
+  u32 m_drumSampleTableOffset;
   std::array<drum, 46> m_drums;
 };
 
