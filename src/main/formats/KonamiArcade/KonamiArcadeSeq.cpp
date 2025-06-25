@@ -183,7 +183,7 @@ bool KonamiArcadeTrack::readEvent() {
     }
     u8 atten = 0x7f - vel;
 
-    u8 linearVel = volTable[atten] * 0x7F;
+    u8 linearVel = std::max(0.0, volTable[atten]) * 0x7F;
 
     // TODO: fix duration calculation. It uses dur as index to table at 0x1F0 in viostorm.
     // Something like this - need to verify the + 0.5 rounding thing
