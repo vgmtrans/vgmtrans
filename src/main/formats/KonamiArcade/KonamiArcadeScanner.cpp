@@ -4,6 +4,7 @@
 #include "KonamiArcadeInstr.h"
 #include "VGMColl.h"
 #include "MAMELoader.h"
+#include "VGMMiscFile.h"
 
 // Mystic Warrior
 // 208D  ld   a,$71        3E 71
@@ -63,7 +64,7 @@ void KonamiArcadeScanner::scan(RawFile *file, void *info) {
 
   std::string instrSetName = fmt::format("{} instrument set", gameentry->name);
 
-  auto instrSet = new KonamiArcadeInstrSet(codeFile, samp_tables_offset, instrSetName, drum_table);
+  auto instrSet = new KonamiArcadeInstrSet(codeFile, samp_tables_offset, instrSetName, drum_table, drum_samp_table_offset);
   if (!instrSet->loadVGMFile()) {
     delete instrSet;
     instrSet = nullptr;
@@ -82,7 +83,8 @@ void KonamiArcadeScanner::scan(RawFile *file, void *info) {
     seqRomGroupEntry->file,
     seq_table_offset,
     instrSet->drums(),
-    nmiRate
+    nmiRate,
+    gameentry->name
   );
 
   for (auto seq : seqs) {
@@ -107,10 +109,19 @@ struct sequence_table_entry {
 
 const std::vector<KonamiArcadeSeq*> KonamiArcadeScanner::loadSeqTable(
   RawFile *file,
-  uint32_t offset,
+  u32 offset,
   const std::array<KonamiArcadeInstrSet::drum, 46>& drums,
-  float nmiRate
+  float nmiRate,
+  std::string gameName
 ) {
+  auto seqTableName = fmt::format("{} sequence pointer table", gameName);
+  VGMMiscFile *seqTable = new VGMMiscFile(KonamiArcadeFormat::name, file, offset, 1, seqTableName);
+  // Add SeqTable as Miscfile
+  if (!seqTable->loadVGMFile()) {
+    delete seqTable;
+    return {};
+  }
+
   std::vector<KonamiArcadeSeq*> seqs;
   uint32_t nFileLength = static_cast<uint32_t>(file->size());
   while (offset < nFileLength) {
@@ -128,8 +139,17 @@ const std::vector<KonamiArcadeSeq*> KonamiArcadeScanner::loadSeqTable(
       delete newSeq;
     else
       seqs.push_back(newSeq);
+
+    auto child = seqTable->addChild(offset, sizeof(sequence_table_entry), "Sequence Pointer");
+    child->addUnknownChild(offset, 7);
+    child->addChild(offset + 7, 1, "Bank");
+    child->addChild(offset + 8, 2, "Memory Destination");
+    child->addUnknownChild(offset + 10, 4);
+
     offset += sizeof(sequence_table_entry);
   }
+  seqTable->unLength = offset - seqTable->startOffset();
+
   return seqs;
 }
 

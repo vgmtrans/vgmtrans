@@ -19,9 +19,30 @@
 KonamiArcadeInstrSet::KonamiArcadeInstrSet(RawFile *file,
                                            u32 offset,
                                            std::string name,
-                                           u32 drumTableOffset)
+                                           u32 drumTableOffset,
+                                           u32 drumSampleTableOffset)
     : VGMInstrSet(KonamiArcadeFormat::name, file, offset, 0, std::move(name)),
-      m_drumTableOffset(drumTableOffset) {
+      m_drumTableOffset(drumTableOffset), m_drumSampleTableOffset(drumSampleTableOffset) {
+}
+
+void KonamiArcadeInstrSet::addSampleInfoChildren(VGMItem* sampInfoItem, u32 off) {
+  sampInfoItem->addChild(off, 3, "Loop Offset");
+  sampInfoItem->addChild(off + 3, 3, "Sample Offset");
+  std::string sampleTypeStr;
+  switch (readByte(off + 6)) {
+    case static_cast<int>(konami_mw_sample_info::sample_type::PCM_8):
+      sampleTypeStr = "PCM 8";
+      break;
+    case static_cast<int>(konami_mw_sample_info::sample_type::PCM_16):
+      sampleTypeStr = "PCM 16";
+      break;
+    case static_cast<int>(konami_mw_sample_info::sample_type::ADPCM):
+      sampleTypeStr = "ADPCM";
+      break;
+  }
+  sampInfoItem->addChild(off + 6, 1, fmt::format("Sample Type: {}", sampleTypeStr));
+  sampInfoItem->addChild(off + 7, 1, fmt::format("Loops: {}", readByte(off + 7) > 0 ? "True" : "False"));
+  sampInfoItem->addChild(off + 8, 1, "Attenuation");
 }
 
 bool KonamiArcadeInstrSet::parseInstrPointers() {
@@ -29,34 +50,34 @@ bool KonamiArcadeInstrSet::parseInstrPointers() {
   u32 instrSampleTableOffset = readShort(dwOffset);
   u32 sfxSampleTableOffset = readShort(dwOffset+2);
 
+  disableAutoAddInstrumentsAsChildren();
+
+  auto instrSampInfos = addChild(instrSampleTableOffset, sfxSampleTableOffset - instrSampleTableOffset,
+                                      "Instrument Sample Infos");
   int sampNum = 0;
   for (u32 off = instrSampleTableOffset; off < sfxSampleTableOffset; off += sizeof(konami_mw_sample_info)) {
     std::string name = fmt::format("Instrument {}", sampNum);
     VGMInstr* instr = new VGMInstr(this, off, sizeof(konami_mw_sample_info), 0, sampNum, name);
     VGMRgn* rgn = new VGMRgn(instr, off, sizeof(konami_mw_sample_info));
-    rgn->sampNum = sampNum++;
+    rgn->sampNum = sampNum;
     instr->addRgn(rgn);
 
-    rgn->addChild(off, 3, "Loop Offset");
-    rgn->addChild(off + 3, 3, "Sample Offset");
-    std::string sampleTypeStr;
-    switch (readByte(off + 6)) {
-      case static_cast<int>(konami_mw_sample_info::sample_type::PCM_8):
-        sampleTypeStr = "PCM 8";
-        break;
-      case static_cast<int>(konami_mw_sample_info::sample_type::PCM_16):
-        sampleTypeStr = "PCM 16";
-        break;
-      case static_cast<int>(konami_mw_sample_info::sample_type::ADPCM):
-        sampleTypeStr = "ADPCM";
-        break;
-    }
-    rgn->addChild(off + 6, 1, fmt::format("Sample Type: {}", sampleTypeStr));
-    rgn->addChild(off + 7, 1, fmt::format("Loops: {}", readByte(off + 7) > 0 ? "True" : "False"));
-    rgn->addChild(off + 8, 1, "Attenuation");
+    auto instrSampInfoItem = instrSampInfos->addChild(off, sizeof(konami_mw_sample_info),
+                                      fmt::format("Instrument Sample Info {}", sampNum));
+    addSampleInfoChildren(instrSampInfoItem, off);
+    sampNum++;
+
     aInstrs.push_back(instr);
   }
 
+  auto drumSampInfos = addChild(m_drumSampleTableOffset, m_drumTableOffset - m_drumSampleTableOffset,
+                                      "Drum Sample Infos");
+  sampNum = 0;
+  for (u32 off = m_drumSampleTableOffset; off < m_drumTableOffset; off += sizeof(konami_mw_sample_info)) {
+    auto drumSampInfoItem = drumSampInfos->addChild(off, sizeof(konami_mw_sample_info),
+                                                    fmt::format("Drum Sample Info {}", sampNum++));
+    addSampleInfoChildren(drumSampInfoItem, off);
+  }
 
   // Load drum table
   int numMelodicInstrs = aInstrs.size();
@@ -69,6 +90,7 @@ bool KonamiArcadeInstrSet::parseInstrPointers() {
     0,
     "Drum Kit"
   );
+  std::vector<VGMInstr *> aDrumKit;
   for (int i = 0; i < sizeof(m_drums) / sizeof(drum); ++i) {
     drum& d = m_drums[i];
     u32 off = m_drumTableOffset + i * sizeof(drum);
@@ -92,6 +114,8 @@ bool KonamiArcadeInstrSet::parseInstrPointers() {
     drumInstr->addRgn(rgn);
   }
   aInstrs.push_back(drumInstr);
+  aDrumKit.push_back(drumInstr);
+  addChildren(aDrumKit);
 
   return true;
 }

@@ -21,7 +21,8 @@ public:
     RawFile *file,
     uint32_t offset,
     const std::array<KonamiArcadeInstrSet::drum, 46>& drums,
-    float nmiRate
+    float nmiRate,
+    std::string gameName
   );
   const std::vector<konami_mw_sample_info> loadSampleInfos(
     RawFile *file,
