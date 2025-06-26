@@ -187,17 +187,13 @@ void KonamiArcadeTrack::applyTranspose() {
   if (percussionEnabled()) {
     transpose = 0;
     if (coarseTuningSemitones != m_driverTranspose) {
-      // TODO: uncomment this when we stop using BASS. Bass doesn't properly implement coarse
-      // fine-tuning. It shifts the actual note played instead of only affecting pitch.
-      // This screws up drum kits
-      // addCoarseTuningNoItem(m_driverTranspose);
+      addCoarseTuningNoItem(m_driverTranspose);
     }
   }
   else {
     transpose = m_driverTranspose;
     if (coarseTuningSemitones != 0) {
-      // TODO: same as above
-      // addCoarseTuningNoItem(0);
+      addCoarseTuningNoItem(0);
     }
   }
 }
