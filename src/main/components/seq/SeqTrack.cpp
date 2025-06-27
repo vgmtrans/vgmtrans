@@ -1487,8 +1487,10 @@ bool SeqTrack::addLoopForever(uint32_t offset, uint32_t length, const std::strin
 
   this->foreverLoops++;
   if (readMode == READMODE_ADD_TO_UI) {
-    if (!isItemAtOffset(offset, true))
+    if (!isItemAtOffset(offset, true)) {
       addEvent(new LoopForeverSeqEvent(this, offset, length, sEventName));
+      return true;
+    }
     return false;
   }
   else if (readMode == READMODE_FIND_DELTA_LENGTH) {

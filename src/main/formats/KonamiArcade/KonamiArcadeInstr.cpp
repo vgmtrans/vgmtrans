@@ -20,9 +20,11 @@ KonamiArcadeInstrSet::KonamiArcadeInstrSet(RawFile *file,
                                            u32 offset,
                                            std::string name,
                                            u32 drumTableOffset,
-                                           u32 drumSampleTableOffset)
+                                           u32 drumSampleTableOffset,
+                                           KonamiArcadeFormatVer fmtVer)
     : VGMInstrSet(KonamiArcadeFormat::name, file, offset, 0, std::move(name)),
-      m_drumTableOffset(drumTableOffset), m_drumSampleTableOffset(drumSampleTableOffset) {
+      m_drumTableOffset(drumTableOffset), m_drumSampleTableOffset(drumSampleTableOffset),
+      m_fmtVer(fmtVer) {
 }
 
 void KonamiArcadeInstrSet::addSampleInfoChildren(VGMItem* sampInfoItem, u32 off) {
@@ -47,8 +49,8 @@ void KonamiArcadeInstrSet::addSampleInfoChildren(VGMItem* sampInfoItem, u32 off)
 
 bool KonamiArcadeInstrSet::parseInstrPointers() {
 
-  u32 instrSampleTableOffset = readShort(dwOffset);
-  u32 sfxSampleTableOffset = readShort(dwOffset+2);
+  u32 instrSampleTableOffset = m_fmtVer == MysticWarrior ? readShort(dwOffset) : readWordBE(dwOffset);
+  u32 sfxSampleTableOffset = m_fmtVer == MysticWarrior ? readShort(dwOffset + 2) : readWordBE(dwOffset + 4);
 
   disableAutoAddInstrumentsAsChildren();
 

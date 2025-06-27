@@ -8,6 +8,7 @@ class KonamiArcadeSeq:
 public:
   KonamiArcadeSeq(
     RawFile *file,
+    KonamiArcadeFormatVer fmt_version,
     u32 offset,
     u32 memOffset,
     const std::array<KonamiArcadeInstrSet::drum, 46>& drums,
@@ -20,6 +21,9 @@ public:
   u32 memOffset() { return m_memOffset; }
   const std::array<KonamiArcadeInstrSet::drum, 46>& drums() { return m_drums; }
   float nmiRate() { return m_nmiRate; }
+
+public:
+  KonamiArcadeFormatVer fmtVer;
 
 private:
   u32 m_memOffset;

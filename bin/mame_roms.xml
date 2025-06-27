@@ -126,6 +126,15 @@
             <rom>cyb.12m</rom>
         </romgroup>
     </game>
+    <game name="daiskiss" format="KonamiArcade" fmt_version="GX">
+        <romgroup type="soundcpu" load_method="deinterlace">
+            <rom>535a08.9c</rom>
+            <rom>535a09.7c</rom>
+        </romgroup>
+        <romgroup type="sound"  load_method="append">
+            <rom>535a22.9g</rom>
+        </romgroup>
+    </game>
     <game name="ddsom" format="CPS2" fmt_version="CPS2_V1.15">
         <romgroup type="audiocpu" load_method="append" seq_table="0x9005" instr_table="0x39E9" num_instr_banks="2" samp_table="0x49E9">
             <rom>dd2.01</rom>
@@ -164,6 +173,15 @@
             <rom>cd-q2.2k</rom>
             <rom>cd-q3.3k</rom>
             <rom>cd-q4.4k</rom>
+        </romgroup>
+    </game>
+    <game name="dragoona" format="KonamiArcade" fmt_version="GX">
+        <romgroup type="soundcpu" load_method="deinterlace" seq_table="0x8070">
+            <rom>417a06.9c</rom>
+            <rom>417a07.7c</rom>
+        </romgroup>
+        <romgroup type="sound"  load_method="append">
+            <rom>417a17.9g</rom>
         </romgroup>
     </game>
     <game name="dstlk" format="CPS2" fmt_version="CPS2_V1.05">
@@ -209,6 +227,15 @@
             <rom>ff_19.12c</rom>
         </romgroup>
     </game>
+    <game name="fiveside" format="KonamiArcade" fmt_version="GX">
+        <romgroup type="soundcpu" load_method="append" seq_table="0x33C8">
+            <rom>479_a05.bin</rom>
+        </romgroup>
+        <romgroup type="sound"  load_method="append">
+            <rom>479_a06.bin</rom>
+            <rom>479_a07.bin</rom>
+        </romgroup>
+    </game>
     <game name="forgottn" format="CPS1" fmt_version="CPS1_V1.00">
         <romgroup type="audiocpu" load_method="append" tables="0xDD0">
             <rom>lw_37.13c</rom>
@@ -239,6 +266,16 @@
         <romgroup type="oki6295" load_method="append">
             <rom>mrnj_18.11c</rom>
             <rom>mrnj_19.12c</rom>
+        </romgroup>
+    </game>
+    <game name="gokuparo" format="KonamiArcade" fmt_version="GX">
+        <romgroup type="soundcpu" load_method="deinterlace">
+            <rom>321b06.9c</rom>
+            <rom>321b07.7c</rom>
+        </romgroup>
+        <romgroup type="sound"  load_method="append">
+            <rom>321b17.9g</rom>
+            <rom>321b18.7g</rom>
         </romgroup>
     </game>
     <game name="gulunpa" format="CPS1" fmt_version="CPS1_V4.25">
@@ -352,6 +389,16 @@
             <rom>kd_19.12c</rom>
         </romgroup>
     </game>
+    <game name="le2" format="KonamiArcade" fmt_version="GX">
+        <romgroup type="soundcpu" load_method="deinterlace">
+            <rom>312b06.9c</rom>
+            <rom>312b07.7c</rom>
+        </romgroup>
+        <romgroup type="sound"  load_method="append">
+            <rom>312a17.9g</rom>
+            <rom>312a18.7g</rom>
+        </romgroup>
+    </game>
     <game name="mmatrix" format="CPS2" fmt_version="CPS2_V1.80">
         <romgroup type="audiocpu" load_method="append" seq_table="0x9005" instr_table_ptrs="0x3C05" num_instr_banks="9" samp_table="0x6000" samp_table_length="0x828" artic_table="0x8000">
             <rom>mmx.01</rom>
@@ -396,6 +443,16 @@
         <romgroup type="sound"  load_method="append">
             <rom>224a06</rom>
             <rom>224a07</rom>
+        </romgroup>
+    </game>
+    <game name="midnrun" format="KonamiArcade" fmt_version="GX">
+        <romgroup type="soundcpu" load_method="append" seq_table="0x6C08" samp_tables="0x61B4" drum_samp_table="0x675B" drum_table="0x67D9">
+            <rom>477a07.19l</rom>
+        </romgroup>
+        <romgroup type="sound"  load_method="append">
+            <rom>477a08.5r</rom>
+            <rom>477a09.3r</rom>
+            <rom>477a10.5n</rom>
         </romgroup>
     </game>
     <game name="mmancp2u" format="CPS2" fmt_version="CPS2_V1.05A">
@@ -525,6 +582,16 @@
             <rom>vph.12m</rom>
         </romgroup>
     </game>
+    <game name="opengolf" format="KonamiArcade" fmt_version="GX">
+        <romgroup type="soundcpu" load_method="deinterlace" seq_table="0x6162">
+            <rom>218a06.8p</rom>
+            <rom>218a07.6p</rom>
+        </romgroup>
+        <romgroup type="sound"  load_method="append">
+            <rom>218a17.14y</rom>
+            <rom>218a18.12y</rom>
+        </romgroup>
+    </game>
     <game name="pang3" format="CPS1" fmt_version="CPS1_V5.00">
         <romgroup type="audiocpu" load_method="append" tables="0xFFE" >
             <rom>pa3_11.11f</rom>
@@ -582,6 +649,16 @@
             <rom>ps-q4.4k</rom>
         </romgroup>
     </game>
+    <game name="puzldama" format="KonamiArcade" fmt_version="GX">
+        <romgroup type="soundcpu" load_method="deinterlace" seq_table="0x6A68">
+            <rom>315a06.9c</rom>
+            <rom>315a07.7c</rom>
+        </romgroup>
+        <romgroup type="sound"  load_method="append">
+            <rom>315a17.9g</rom>
+            <rom>315a18.7g</rom>
+        </romgroup>
+    </game>
     <game name="pzloop2" format="CPS2" fmt_version="CPS2_V1.80">
         <romgroup type="audiocpu" load_method="append" seq_table="0x9005" instr_table_ptrs="0x3C05" num_instr_banks="2" samp_table="0x3F5D" artic_table="0x45A5">
             <rom>pl2.01</rom>
@@ -618,6 +695,16 @@
             <rom>tn2j_19.12c</rom>
         </romgroup>
     </game>
+    <game name="racinfrc" format="KonamiArcade" fmt_version="GX">
+        <romgroup type="soundcpu" load_method="deinterlace" seq_table="0xB748">
+            <rom>250a06.8p</rom>
+            <rom>250a07.6p</rom>
+        </romgroup>
+        <romgroup type="sound"  load_method="append">
+            <rom>250a17.14y</rom>
+            <rom>250a18.12y</rom>
+        </romgroup>
+    </game>
     <game name="redearth" format="CPS2" fmt_version="CPS3">
         <romgroup type="audiocpu" load_method="deinterlace" encryption="cps3" key1="0x9e300ab1" key2="0xa175b82c" seq_table="0xbc198" samp_table="0xb83ec" samp_table_length="0x1690" instr_table_ptrs="0xb9a7c" num_instr_banks="2">
             <rom>redearthn/redearth-simm1.0</rom>
@@ -652,7 +739,26 @@
             <rom>smb.12m</rom>
         </romgroup>
     </game>
-    <game name="rvschool" format="CPS2"  fmt_version="CPS2_V2.10">
+    <game name="rungun2" format="KonamiArcade" fmt_version="GX">
+        <romgroup type="soundcpu" load_method="deinterlace" seq_table="0x80E6">
+            <rom>505a06.9m</rom>
+            <rom>505a07.7m</rom>
+        </romgroup>
+        <romgroup type="sound"  load_method="append">
+            <rom>505a23.7r</rom>
+            <rom>505a22.9r</rom>
+        </romgroup>
+    </game>
+    <game name="rushhero" format="KonamiArcade" fmt_version="GX">
+        <romgroup type="soundcpu" load_method="deinterlace" seq_table="0xB4DA">
+            <rom>605a06.9m</rom>
+            <rom>605a07.7m</rom>
+        </romgroup>
+        <romgroup type="sound"  load_method="append">
+            <rom>605a23.7r</rom>
+        </romgroup>
+    </game>
+    <game name="rvschool" format="CPS2" fmt_version="CPS2_V2.10">
         <romgroup type="audiocpu" load_method="append" seq_table="0x9008" instr_table_ptrs="0x7079" num_instr_banks="2" samp_table="0x733D" samp_table_length="0x468" artic_table="0x77A5">
             <rom>jst_02.2e</rom>
             <rom>jst_03.3e</rom>
@@ -661,14 +767,24 @@
             <rom>jst-01m.3b</rom>
         </romgroup>
     </game>
-    <game name="salmndr2" format="KonamiGX">
-        <romgroup type="soundcpu" load_method="deinterlace" seq_table="0x6B04">
+    <game name="salmndr2" format="KonamiArcade" fmt_version="GX">
+        <romgroup type="soundcpu" load_method="deinterlace" seq_table="0x6AD8">
             <rom>521-a04.9c</rom>
             <rom>521-a05.7c</rom>
         </romgroup>
-        <romgroup type="shared"  load_method="append">
+        <romgroup type="sound"  load_method="append">
             <rom>521-a12.9g</rom>
             <rom>521-a13.7g</rom>
+        </romgroup>
+    </game>
+    <game name="sexyparo" format="KonamiArcade" fmt_version="GX">
+        <romgroup type="soundcpu" load_method="deinterlace" seq_table="0x7ACE">
+            <rom>533a08.9c</rom>
+            <rom>533a09.7c</rom>
+        </romgroup>
+        <romgroup type="sound"  load_method="append">
+            <rom>533a22.9g</rom>
+            <rom>533a23.7g</rom>
         </romgroup>
     </game>
     <game name="sf2" format="CPS1" fmt_version="CPS1_V4.25">
@@ -859,6 +975,15 @@
             <rom>mb-q8.4m</rom>
         </romgroup>
     </game>
+    <game name="soccerss" format="KonamiArcade" fmt_version="GX">
+        <romgroup type="soundcpu" load_method="deinterlace" seq_table="0x27DA">
+            <rom>427a07.6m</rom>
+            <rom>427a06.9m</rom>
+        </romgroup>
+        <romgroup type="sound"  load_method="append">
+            <rom>427a16.9r</rom>
+        </romgroup>
+    </game>
     <game name="spf2t" format="CPS2" fmt_version="CPS2_V2.01B">
         <romgroup type="audiocpu" load_method="append" seq_table="0x6004" instr_table_ptrs="0x3FE4" num_instr_banks="14" samp_table="0x4F78">
             <rom>pzf.01</rom>
@@ -920,6 +1045,16 @@
             <rom>hr2-01m.3a</rom>
         </romgroup>
     </game>
+    <game name="tbyahhoo" format="KonamiArcade" fmt_version="GX">
+        <romgroup type="soundcpu" load_method="deinterlace">
+            <rom>424a06.9c</rom>
+            <rom>424a07.7c</rom>
+        </romgroup>
+        <romgroup type="sound"  load_method="append">
+            <rom>424a17.9g</rom>
+            <rom>424a18.7g</rom>
+        </romgroup>
+    </game>
     <game name="techromn" format="CPS2" fmt_version="CPS2_V2.11">
         <romgroup type="audiocpu" load_method="append" seq_table="0x9008" instr_table_ptrs="0x3EF4" num_instr_banks="3" samp_table="0x430c" samp_table_length="0x6E8" artic_table="0x49f4">
             <rom>kio_02.2e</rom>
@@ -927,6 +1062,26 @@
         </romgroup>
         <romgroup type="qsound" load_method="append_swap16">
             <rom>kio-01m.3a</rom>
+        </romgroup>
+    </game>
+    <game name="tkmmpzdm" format="KonamiArcade" fmt_version="GX">
+        <romgroup type="soundcpu" load_method="deinterlace">
+            <rom>515a04.9c</rom>
+            <rom>515a05.7c</rom>
+        </romgroup>
+        <romgroup type="sound"  load_method="append">
+            <rom>515a13.9g</rom>
+            <rom>515a14.7g</rom>
+        </romgroup>
+    </game>
+    <game name="tokkae" format="KonamiArcade" fmt_version="GX">
+        <romgroup type="soundcpu" load_method="deinterlace">
+            <rom>615a08.9c</rom>
+            <rom>615a09.7c</rom>
+        </romgroup>
+        <romgroup type="sound"  load_method="append">
+            <rom>615a22.9g</rom>
+            <rom>615a23.7g</rom>
         </romgroup>
     </game>
     <game name="ts2" format="CPS2" fmt_version="CPS2_V1.05">
@@ -964,7 +1119,7 @@
             <rom>vh2.12m</rom>
         </romgroup>
     </game>
-    <game name="viostorm" format="KonamiArcade">
+    <game name="viostorm" format="KonamiArcade" fmt_version="MysticWarrior">
         <romgroup type="soundcpu" load_method="append" seq_table="0x3813" samp_tables="0x40AC" drum_samp_table="0x4C0F" drum_table="0x4D38">
             <rom>168a05.7c</rom>
         </romgroup>
@@ -993,6 +1148,15 @@
             <rom>vs2.12m</rom>
         </romgroup>
     </game>
+    <game name="vsnetscr" format="KonamiArcade" fmt_version="GX">
+        <romgroup type="soundcpu" load_method="deinterlace">
+            <rom>627b06.9m</rom>
+            <rom>627b07.7m</rom>
+        </romgroup>
+        <romgroup type="sound"  load_method="append">
+            <rom>627a23.7r</rom>
+        </romgroup>
+    </game>
     <game name="willow" format="CPS1" fmt_version="CPS1_V1.00">
         <romgroup type="audiocpu" load_method="append" tables="0xe6d">
             <rom>wl_09.12b</rom>
@@ -1000,6 +1164,15 @@
         <romgroup type="oki6295" load_method="append">
             <rom>wl_18.11c</rom>
             <rom>wl_19.12c</rom>
+        </romgroup>
+    </game>
+    <game name="winspike" format="KonamiArcade" fmt_version="GX">
+        <romgroup type="soundcpu" load_method="deinterlace">
+            <rom>705a08.9c</rom>
+            <rom>705a09.7c</rom>
+        </romgroup>
+        <romgroup type="sound"  load_method="append">
+            <rom>705a22.9g</rom>
         </romgroup>
     </game>
     <game name="wof" format="CPS2" fmt_version="CPS2_V1.00">

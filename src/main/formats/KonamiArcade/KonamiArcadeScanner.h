@@ -9,7 +9,14 @@
 #include "KonamiArcadeInstr.h"
 #include "common.h"
 
+struct MAMEGame;
 class KonamiArcadeSeq;
+
+enum KonamiArcadeFormatVer: uint8_t {
+  VERSION_UNDEFINED,
+  MysticWarrior,
+  GX
+};
 
 class KonamiArcadeScanner:
     public VGMScanner {
@@ -17,7 +24,16 @@ public:
   explicit KonamiArcadeScanner(Format* format) : VGMScanner(format) {}
 
   virtual void scan(RawFile *file, void *info);
+  void loadGX(MAMEGame* gameentry, KonamiArcadeFormatVer fmt_ver);
+  void loadMysticWarrior(MAMEGame* gameentry, KonamiArcadeFormatVer fmt_ver);
   const std::vector<KonamiArcadeSeq*> loadSeqTable(
+    RawFile *file,
+    uint32_t offset,
+    const std::array<KonamiArcadeInstrSet::drum, 46>& drums,
+    float nmiRate,
+    std::string gameName
+  );
+  const std::vector<KonamiArcadeSeq*> loadGXSeqTable(
     RawFile *file,
     uint32_t offset,
     const std::array<KonamiArcadeInstrSet::drum, 46>& drums,
@@ -28,10 +44,14 @@ public:
     RawFile *file,
     u32 tablesOffset,
     u32 drumSampTableOffset,
-    u32 drumInstrTableOffset
+    u32 drumInstrTableOffset,
+    KonamiArcadeFormatVer fmtVer
   );
 
 private:
-  static BytePattern ptnSetNmiRate;
-  static BytePattern ptnNmiSkip;
+  static BytePattern ptn_MW_SetNmiRate;
+  static BytePattern ptn_MW_NmiSkip;
+  static BytePattern ptn_GX_setSeqTableTable;
+  static BytePattern ptn_GX_setSampInfoSetPtrTable;
+  static BytePattern ptn_GX_setDrumkitPtrs;
 };
