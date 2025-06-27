@@ -161,24 +161,14 @@ void KonamiArcadeScanner::scan(RawFile *file, void *info) {
     sampcoll = nullptr;
   }
 
-  std::vector<KonamiArcadeSeq*> seqs;
-  if (fmt_ver == MysticWarrior) {
-    seqs = loadSeqTable(
-      seqRomGroupEntry->file,
-      seq_table_offset,
-      instrSet->drums(),
-      nmiRate,
-      gameentry->name
-    );
-  } else {
-    seqs = loadGXSeqTable(
-      seqRomGroupEntry->file,
-      seq_table_offset,
-      instrSet->drums(),
-      nmiRate,
-      gameentry->name
-   );
-  }
+  std::vector<KonamiArcadeSeq*> seqs = loadSeqTable(
+    seqRomGroupEntry->file,
+    seq_table_offset,
+    instrSet->drums(),
+    nmiRate,
+    gameentry->name,
+    fmt_ver
+  );
 
   // if (fmt_ver == MysticWarrior) {
     for (auto seq : seqs) {
@@ -215,60 +205,13 @@ struct sequence_table_entry_gx {
   u32 seqPointer;
 };
 
-const std::vector<KonamiArcadeSeq*> KonamiArcadeScanner::loadGXSeqTable(
-  RawFile *file,
-  u32 offset,
-  const std::array<KonamiArcadeInstrSet::drum, 46>& drums,
-  float nmiRate,
-  std::string gameName
-) {
-  auto seqTableName = fmt::format("{} sequence pointer table", gameName);
-  VGMMiscFile *seqTable = new VGMMiscFile(KonamiArcadeFormat::name, file, offset, 1, seqTableName);
-  // Add SeqTable as Miscfile
-  if (!seqTable->loadVGMFile()) {
-    delete seqTable;
-    return {};
-  }
-
-  int entryLength = 12;
-  u32 testLong = file->readWordBE(offset + 12);
-  if (testLong > 0x1000 && testLong < 0x20000)
-    entryLength = 16;
-
-  std::vector<KonamiArcadeSeq*> seqs;
-  uint32_t nFileLength = static_cast<uint32_t>(file->size());
-  while (offset < nFileLength) {
-    u32 unknown = file->readWordBE(offset);
-    // First 4 bytes seem to typically use only lsb
-    if (unknown >= 0x5000)
-      break;
-    u32 seqPointer = file->readWordBE(offset + 8);
-    if (seqPointer == 0 || seqPointer >= nFileLength)
-      break;
-    KonamiArcadeSeq *newSeq = new KonamiArcadeSeq(file, GX, seqPointer, 0, drums, nmiRate);
-    if (!newSeq->loadVGMFile())
-      delete newSeq;
-    else
-      seqs.push_back(newSeq);
-
-    auto child = seqTable->addChild(offset, sizeof(sequence_table_entry_gx), "Sequence Info Block");
-    child->addUnknownChild(offset, 8);
-    child->addChild(offset+8, 4, "Sequence Pointer");
-
-    offset += entryLength;
-  }
-  seqTable->unLength = offset - seqTable->startOffset();
-
-  return seqs;
-}
-
-
 const std::vector<KonamiArcadeSeq*> KonamiArcadeScanner::loadSeqTable(
   RawFile *file,
   u32 offset,
   const std::array<KonamiArcadeInstrSet::drum, 46>& drums,
   float nmiRate,
-  std::string gameName
+  std::string gameName,
+  KonamiArcadeFormatVer fmtVer
 ) {
   auto seqTableName = fmt::format("{} sequence pointer table", gameName);
   VGMMiscFile *seqTable = new VGMMiscFile(KonamiArcadeFormat::name, file, offset, 1, seqTableName);
@@ -277,33 +220,61 @@ const std::vector<KonamiArcadeSeq*> KonamiArcadeScanner::loadSeqTable(
     delete seqTable;
     return {};
   }
-
   std::vector<KonamiArcadeSeq*> seqs;
   uint32_t nFileLength = static_cast<uint32_t>(file->size());
-  while (offset < nFileLength) {
-    if (file->readShort(offset) != 0x0000) {
-      break;
+
+  if (fmtVer == GX) {
+    int entryLength = 12;
+    u32 testLong = file->readWordBE(offset + 12);
+    if (testLong > 0x1000 && testLong < 0x20000)
+      entryLength = 16;
+
+    while (offset < nFileLength) {
+      u32 unknown = file->readWordBE(offset);
+      if (unknown >= 0x5000)
+        break;
+      u32 seqPointer = file->readWordBE(offset + 8);
+      if (seqPointer == 0 || seqPointer >= nFileLength)
+        break;
+      KonamiArcadeSeq *newSeq = new KonamiArcadeSeq(file, GX, seqPointer, 0, drums, nmiRate);
+      if (!newSeq->loadVGMFile())
+        delete newSeq;
+      else
+        seqs.push_back(newSeq);
+
+      auto child = seqTable->addChild(offset, sizeof(sequence_table_entry_gx), "Sequence Info Block");
+      child->addUnknownChild(offset, 8);
+      child->addChild(offset + 8, 4, "Sequence Pointer");
+
+      offset += entryLength;
     }
-    sequence_table_entry entry;
-    file->readBytes(offset, sizeof(sequence_table_entry), &entry);
-    u16 dest = entry.memDestinationHigh << 8 | entry.memDestinationLow;
-    u32 seqOffset = (entry.bank * 0x400) + (dest - 0x8000);
-    if (seqOffset == 0 || seqOffset >= nFileLength)
-      break;
-    KonamiArcadeSeq *newSeq = new KonamiArcadeSeq(file, MysticWarrior, seqOffset, dest, drums, nmiRate);
-    if (!newSeq->loadVGMFile())
-      delete newSeq;
-    else
-      seqs.push_back(newSeq);
+  } else { // MysticWarrior
+    while (offset < nFileLength) {
+      if (file->readShort(offset) != 0x0000) {
+        break;
+      }
+      sequence_table_entry entry;
+      file->readBytes(offset, sizeof(sequence_table_entry), &entry);
+      u16 dest = (entry.memDestinationHigh << 8) | entry.memDestinationLow;
+      u32 seqOffset = (entry.bank * 0x400) + (dest - 0x8000);
+      if (seqOffset == 0 || seqOffset >= nFileLength)
+        break;
+      KonamiArcadeSeq *newSeq = new KonamiArcadeSeq(file, MysticWarrior, seqOffset, dest, drums, nmiRate);
+      if (!newSeq->loadVGMFile())
+        delete newSeq;
+      else
+        seqs.push_back(newSeq);
 
-    auto child = seqTable->addChild(offset, sizeof(sequence_table_entry), "Sequence Pointer");
-    child->addUnknownChild(offset, 7);
-    child->addChild(offset + 7, 1, "Bank");
-    child->addChild(offset + 8, 2, "Memory Destination");
-    child->addUnknownChild(offset + 10, 4);
+      auto child = seqTable->addChild(offset, sizeof(sequence_table_entry), "Sequence Pointer");
+      child->addUnknownChild(offset, 7);
+      child->addChild(offset + 7, 1, "Bank");
+      child->addChild(offset + 8, 2, "Memory Destination");
+      child->addUnknownChild(offset + 10, 4);
 
-    offset += sizeof(sequence_table_entry);
+      offset += sizeof(sequence_table_entry);
+    }
   }
+
   seqTable->unLength = offset - seqTable->startOffset();
 
   return seqs;

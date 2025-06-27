@@ -31,14 +31,8 @@ public:
     uint32_t offset,
     const std::array<KonamiArcadeInstrSet::drum, 46>& drums,
     float nmiRate,
-    std::string gameName
-  );
-  const std::vector<KonamiArcadeSeq*> loadGXSeqTable(
-    RawFile *file,
-    uint32_t offset,
-    const std::array<KonamiArcadeInstrSet::drum, 46>& drums,
-    float nmiRate,
-    std::string gameName
+    std::string gameName,
+    KonamiArcadeFormatVer fmtVer
   );
   const std::vector<konami_mw_sample_info> loadSampleInfos(
     RawFile *file,

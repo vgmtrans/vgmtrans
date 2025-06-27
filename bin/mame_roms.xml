@@ -250,7 +250,7 @@
             <rom>26.10a</rom>
         </romgroup>
     </game>
-    <game name="gaiapols" format="KonamiArcade">
+    <game name="gaiapols" format="KonamiArcade" fmt_version="MysticWarrior">
         <romgroup type="soundcpu" load_method="append" seq_table="0x263b" samp_tables="0x41B0" drum_samp_table="0x4A5E" drum_table="0x4B48">
             <rom>123e13.9c</rom>
         </romgroup>
@@ -436,7 +436,7 @@
             <rom>so2_19.12c</rom>
         </romgroup>
     </game>
-    <game name="metamrph" format="KonamiArcade">
+    <game name="metamrph" format="KonamiArcade" fmt_version="MysticWarrior">
         <romgroup type="soundcpu" load_method="append" seq_table="0x23FB" samp_tables="0x402B" drum_samp_table="0x46CF" drum_table="0x4756">
             <rom>224a05</rom>
         </romgroup>
@@ -470,7 +470,7 @@
             <rom>rcm.58</rom>
         </romgroup>
     </game>
-    <game name="mmaulers" format="KonamiArcade">
+    <game name="mmaulers" format="KonamiArcade" fmt_version="MysticWarrior">
         <romgroup type="soundcpu" load_method="append" seq_table="0x3EA3" samp_tables="0x54DE" drum_samp_table="0x60FE" drum_table="0x61CD">
             <rom>170a13.9c</rom>
         </romgroup>
@@ -526,7 +526,7 @@
             <rom>ms_19.12c</rom>
         </romgroup>
     </game>
-    <game name="mtlchamp" format="KonamiArcade">
+    <game name="mtlchamp" format="KonamiArcade" fmt_version="MysticWarrior">
         <romgroup type="soundcpu" load_method="append" seq_table="0x3F06" samp_tables="0x4B2D" drum_samp_table="0x57CB" drum_table="0x58F4">
             <rom>234_d05.6b</rom>
         </romgroup>
@@ -554,7 +554,7 @@
             <rom>mvc.12m</rom>
         </romgroup>
     </game>
-    <game name="mystwarr" format="KonamiArcade">
+    <game name="mystwarr" format="KonamiArcade" fmt_version="MysticWarrior">
         <romgroup type="soundcpu" load_method="append" seq_table="0x2286" samp_tables="0x4A71" drum_samp_table="0x5286" drum_table="0x5499">
             <rom>128a05.6b</rom>
         </romgroup>
