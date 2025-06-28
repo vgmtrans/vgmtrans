@@ -234,7 +234,7 @@ bool KonamiArcadeTrack::readEvent() {
       }
     } else {
       if (m_releaseRate != 0)
-        actualDuration = (delta * m_duration) / 100;
+        actualDuration = std::max(1, (delta * m_duration) / 100);
       else
         actualDuration = delta;
     }
@@ -505,12 +505,15 @@ bool KonamiArcadeTrack::readEvent() {
       addUnknown(beginOffset, curOffset - beginOffset);
       break;
 
-    case 0xF2:
-      curOffset++;
-      addUnknown(beginOffset, curOffset - beginOffset);
+    case 0xF2: {
+      s8 pitchBend = readByte(curOffset++);
+      // data byte of 0x40 == 1 semitone. Equivalent to 4096 in MIDI when range is default 2 semitones
+      addPitchBend(beginOffset, curOffset - beginOffset, pitchBend * 64);
       break;
+    }
 
     case 0xF3:
+      // probably pitch slide
       curOffset += 3;
       addUnknown(beginOffset, curOffset - beginOffset);
       break;
