@@ -18,13 +18,13 @@ KonamiArcadeFormatVer konamiArcadeVersionEnum(const std::string &versionStr) {
   return it != versionMap.end() ? it->second : VERSION_UNDEFINED;
 }
 
-// Mystic Warrior
+// Mystic Warrior (Z80)
 // 208D  ld   a,$71        3E 71
 // 208F  ld   ($E227),a    32 27 E2   ; set NMI rate to 0x71
 
 BytePattern KonamiArcadeScanner::ptn_MW_SetNmiRate("\x3E\x71\x32\x27\xE2", "x?xxx", 5);
 
-// Mystic Warrior
+// Mystic Warrior (Z80)
 // 006F  ld   a,$03        3E 03      ; set nmi_skip_mask to 3
 // 0071  and  (hl)         A6         ; nmi_counter & nmi_skip_mask
 // 0072  jp   nz,$0078     C2 78 00   ; handle NMI if nmi_count & nmi_skip_mask == 0 (in this case every fourth NMI)
@@ -33,13 +33,18 @@ BytePattern KonamiArcadeScanner::ptn_MW_SetNmiRate("\x3E\x71\x32\x27\xE2", "x?xx
 
 BytePattern KonamiArcadeScanner::ptn_MW_NmiSkip("\x3E\x03\xA6\xC2\x78\x00\x2C\x36\x01", "x?xxxxxxx", 9);
 
+// Salamander 2 (MC68000)
+// 14A0  move.b #0x6d, $20044e.l   13 fc 00 6d 00 20 04 4e    ; set k054539 timer (NMI rate) to 0x6d
+
+BytePattern KonamiArcadeScanner::ptn_GX_SetNmiRate("\x13\xfc\x00\x6d\x00\x20\x04\x4e", "xxx?xxxx", 8);
+
 // Konami GX
 // 207c000067e4  movea.l    #0x67e4, A0
 // 227c00102344  movea.l    #0x102344, A1
 // 7401          moveq      #0x1, D2
 // 7207          moveq      #0x7, D1
 // 2458          movea.l    (A0)+, A2
-BytePattern KonamiArcadeScanner::ptn_GX_setSeqTableTable("\x20\x7C\x00\x00\x67\xE4\x22\x7C\x00\x10\x23\x44", "xx????xxxxxx", 12);
+BytePattern KonamiArcadeScanner::ptn_GX_setSeqPlaylistTable("\x20\x7C\x00\x00\x67\xE4\x22\x7C\x00\x10\x23\x44", "xx????xxxxxx", 12);
 
 
 // Konami GX
@@ -106,12 +111,21 @@ void KonamiArcadeScanner::scan(RawFile *file, void *info) {
       return;
     u8 nmiTimerByte = codeFile->readByte(setNmiRateAddr + 1);
     nmiRate = NMI_TIMER_HERZ(nmiTimerByte, nmiSkipCount);
-  } else {
-    nmiRate = NMI_TIMER_HERZ(107, 1);
+  } else {    // GX
+    // Same explanation as above.
+    u32 setNmiRateAddr;
+    if (!codeFile->searchBytePattern(ptn_GX_SetNmiRate, setNmiRateAddr))
+      return;
+    u8 nmiTimerByte = codeFile->readByte(setNmiRateAddr + 3);
+
+    // The skip count is consistently 1. An example of the logic in Salamander 2:
+    // 1C0E  cmpi.b  #0x2,$10230a.l  ; loop while IRQ tick counter is less than 2
+    // The IRQ tick counter is reset upon execution.
+    nmiRate = NMI_TIMER_HERZ(nmiTimerByte, 1);
 
     if (seq_table_offset == 0) {
       u32 setSeqTableTableAddr;
-      if (!codeFile->searchBytePattern(ptn_GX_setSeqTableTable, setSeqTableTableAddr))
+      if (!codeFile->searchBytePattern(ptn_GX_setSeqPlaylistTable, setSeqTableTableAddr))
         return;
       u32 seq_table_table_offset = codeFile->readWordBE(setSeqTableTableAddr + 2);
       u32 seq_playlist_offset = codeFile->readWordBE(seq_table_table_offset + 4);

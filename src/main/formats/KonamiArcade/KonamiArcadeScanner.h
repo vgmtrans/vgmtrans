@@ -45,7 +45,8 @@ public:
 private:
   static BytePattern ptn_MW_SetNmiRate;
   static BytePattern ptn_MW_NmiSkip;
-  static BytePattern ptn_GX_setSeqTableTable;
+  static BytePattern ptn_GX_SetNmiRate;
+  static BytePattern ptn_GX_setSeqPlaylistTable;
   static BytePattern ptn_GX_setSampInfoSetPtrTable;
   static BytePattern ptn_GX_setDrumkitPtrs;
 };
