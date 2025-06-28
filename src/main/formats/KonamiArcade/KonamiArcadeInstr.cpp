@@ -72,6 +72,10 @@ bool KonamiArcadeInstrSet::parseInstrPointers() {
     aInstrs.push_back(instr);
   }
 
+  if (m_drumTableOffset == 0 || m_drumSampleTableOffset == 0) {
+    return true;
+  }
+
   auto drumSampInfos = addChild(m_drumSampleTableOffset, m_drumTableOffset - m_drumSampleTableOffset,
                                       "Drum Sample Infos");
   sampNum = 0;

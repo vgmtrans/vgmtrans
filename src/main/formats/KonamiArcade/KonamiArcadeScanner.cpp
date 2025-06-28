@@ -114,9 +114,12 @@ void KonamiArcadeScanner::scan(RawFile *file, void *info) {
   } else {    // GX
     // Same explanation as above.
     u32 setNmiRateAddr;
-    if (!codeFile->searchBytePattern(ptn_GX_SetNmiRate, setNmiRateAddr))
-      return;
-    u8 nmiTimerByte = codeFile->readByte(setNmiRateAddr + 3);
+    u8 nmiTimerByte;
+    if (codeFile->searchBytePattern(ptn_GX_SetNmiRate, setNmiRateAddr)) {
+      nmiTimerByte = codeFile->readByte(setNmiRateAddr + 3);
+    } else {
+      nmiTimerByte = 109;
+    }
 
     // The skip count is consistently 1. An example of the logic in Salamander 2:
     // 1C0E  cmpi.b  #0x2,$10230a.l  ; loop while IRQ tick counter is less than 2
@@ -139,12 +142,13 @@ void KonamiArcadeScanner::scan(RawFile *file, void *info) {
       samp_tables_offset = codeFile->readWordBE(sampInfoSetPtrTableAddr + 2);
     }
 
+    // Some later games of the format don't use drumkits
     if (drum_samp_table_offset == 0 || drum_table == 0) {
       u32 setDrumKitPtrsAddr;
-      if (!codeFile->searchBytePattern(ptn_GX_setDrumkitPtrs, setDrumKitPtrsAddr))
-        return;
-      drum_samp_table_offset = codeFile->readWordBE(setDrumKitPtrsAddr + 10);
-      drum_table = codeFile->readWordBE(setDrumKitPtrsAddr + 18);
+      if (codeFile->searchBytePattern(ptn_GX_setDrumkitPtrs, setDrumKitPtrsAddr)) {
+        drum_samp_table_offset = codeFile->readWordBE(setDrumKitPtrsAddr + 10);
+        drum_table = codeFile->readWordBE(setDrumKitPtrsAddr + 18);
+      }
     }
   }
 
@@ -196,14 +200,6 @@ void KonamiArcadeScanner::scan(RawFile *file, void *info) {
       }
     }
   // }
-}
-
-void KonamiArcadeScanner::loadGX(MAMEGame *gameentry, KonamiArcadeFormatVer fmt_ver) {
-
-}
-
-void KonamiArcadeScanner::loadMysticWarrior(MAMEGame *gameentry, KonamiArcadeFormatVer fmt_ver) {
-
 }
 
 struct sequence_table_entry {
@@ -310,10 +306,12 @@ const std::vector<konami_mw_sample_info> KonamiArcadeScanner::loadSampleInfos(
     file->readBytes(off, sizeof(konami_mw_sample_info), &info);
     sampInfos.push_back(info);
   }
-  for (u32 off = drumSampTableOffset; off < drumInstrTableOffset; off += sizeof(konami_mw_sample_info)) {
-    konami_mw_sample_info info;
-    file->readBytes(off, sizeof(konami_mw_sample_info), &info);
-    sampInfos.push_back(info);
+  if (drumSampTableOffset != 0) {
+    for (u32 off = drumSampTableOffset; off < drumInstrTableOffset; off += sizeof(konami_mw_sample_info)) {
+      konami_mw_sample_info info;
+      file->readBytes(off, sizeof(konami_mw_sample_info), &info);
+      sampInfos.push_back(info);
+    }
   }
   return sampInfos;
 }

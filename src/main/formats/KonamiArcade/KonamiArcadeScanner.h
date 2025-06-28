@@ -24,8 +24,6 @@ public:
   explicit KonamiArcadeScanner(Format* format) : VGMScanner(format) {}
 
   virtual void scan(RawFile *file, void *info);
-  void loadGX(MAMEGame* gameentry, KonamiArcadeFormatVer fmt_ver);
-  void loadMysticWarrior(MAMEGame* gameentry, KonamiArcadeFormatVer fmt_ver);
   const std::vector<KonamiArcadeSeq*> loadSeqTable(
     RawFile *file,
     uint32_t offset,

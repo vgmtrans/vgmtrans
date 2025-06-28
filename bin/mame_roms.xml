@@ -131,7 +131,7 @@
             <rom>535a08.9c</rom>
             <rom>535a09.7c</rom>
         </romgroup>
-        <romgroup type="sound"  load_method="append">
+        <romgroup type="sound" load_method="append">
             <rom>535a22.9g</rom>
         </romgroup>
     </game>
@@ -180,7 +180,7 @@
             <rom>417a06.9c</rom>
             <rom>417a07.7c</rom>
         </romgroup>
-        <romgroup type="sound"  load_method="append">
+        <romgroup type="sound" load_method="append">
             <rom>417a17.9g</rom>
         </romgroup>
     </game>
@@ -228,10 +228,10 @@
         </romgroup>
     </game>
     <game name="fiveside" format="KonamiArcade" fmt_version="GX">
-        <romgroup type="soundcpu" load_method="append" seq_table="0x33C8">
+        <romgroup type="soundcpu" load_method="append" seq_table="0x33C8" samp_tables="0x3086">
             <rom>479_a05.bin</rom>
         </romgroup>
-        <romgroup type="sound"  load_method="append">
+        <romgroup type="sound" load_method="append">
             <rom>479_a06.bin</rom>
             <rom>479_a07.bin</rom>
         </romgroup>
@@ -254,7 +254,7 @@
         <romgroup type="soundcpu" load_method="append" seq_table="0x263b" samp_tables="0x41B0" drum_samp_table="0x4A5E" drum_table="0x4B48">
             <rom>123e13.9c</rom>
         </romgroup>
-        <romgroup type="sound"  load_method="append">
+        <romgroup type="sound" load_method="append">
             <rom>123e14.2g</rom>
             <rom>123e15.2m</rom>
         </romgroup>
@@ -273,7 +273,7 @@
             <rom>321b06.9c</rom>
             <rom>321b07.7c</rom>
         </romgroup>
-        <romgroup type="sound"  load_method="append">
+        <romgroup type="sound" load_method="append">
             <rom>321b17.9g</rom>
             <rom>321b18.7g</rom>
         </romgroup>
@@ -303,6 +303,16 @@
         </romgroup>
         <romgroup type="qsound" load_method="append_swap16">
             <rom>hs2.11m</rom>
+        </romgroup>
+    </game>
+    <game name="jetwave" format="KonamiArcade" fmt_version="GX">
+        <romgroup type="soundcpu" load_method="append_swap16" seq_table="0x68E4" samp_tables="0x5E4C">
+            <rom>678a07.19l</rom>
+        </romgroup>
+        <romgroup type="sound" load_method="append">
+            <rom>678a08.5r</rom>
+            <rom>678a09.3r</rom>
+            <rom>678a10.5n</rom>
         </romgroup>
     </game>
     <game name="jojo" format="CPS2" fmt_version="CPS3">
@@ -394,7 +404,7 @@
             <rom>312b06.9c</rom>
             <rom>312b07.7c</rom>
         </romgroup>
-        <romgroup type="sound"  load_method="append">
+        <romgroup type="sound" load_method="append">
             <rom>312a17.9g</rom>
             <rom>312a18.7g</rom>
         </romgroup>
@@ -440,16 +450,16 @@
         <romgroup type="soundcpu" load_method="append" seq_table="0x23FB" samp_tables="0x402B" drum_samp_table="0x46CF" drum_table="0x4756">
             <rom>224a05</rom>
         </romgroup>
-        <romgroup type="sound"  load_method="append">
+        <romgroup type="sound" load_method="append">
             <rom>224a06</rom>
             <rom>224a07</rom>
         </romgroup>
     </game>
     <game name="midnrun" format="KonamiArcade" fmt_version="GX">
-        <romgroup type="soundcpu" load_method="append" seq_table="0x6C08" samp_tables="0x61B4" drum_samp_table="0x675B" drum_table="0x67D9">
+        <romgroup type="soundcpu" load_method="append_swap16" seq_table="0x6C08" samp_tables="0x61B4" drum_samp_table="0x675B" drum_table="0x67D9">
             <rom>477a07.19l</rom>
         </romgroup>
-        <romgroup type="sound"  load_method="append">
+        <romgroup type="sound" load_method="append">
             <rom>477a08.5r</rom>
             <rom>477a09.3r</rom>
             <rom>477a10.5n</rom>
@@ -474,7 +484,7 @@
         <romgroup type="soundcpu" load_method="append" seq_table="0x3EA3" samp_tables="0x54DE" drum_samp_table="0x60FE" drum_table="0x61CD">
             <rom>170a13.9c</rom>
         </romgroup>
-        <romgroup type="sound"  load_method="append">
+        <romgroup type="sound" load_method="append">
             <rom>170a14.2g</rom>
             <rom>170a15.2m</rom>
         </romgroup>
@@ -530,7 +540,7 @@
         <romgroup type="soundcpu" load_method="append" seq_table="0x3F06" samp_tables="0x4B2D" drum_samp_table="0x57CB" drum_table="0x58F4">
             <rom>234_d05.6b</rom>
         </romgroup>
-        <romgroup type="sound"  load_method="append">
+        <romgroup type="sound" load_method="append">
             <rom>234a06.2d</rom>
             <rom>234a07.1d</rom>
         </romgroup>
@@ -558,7 +568,7 @@
         <romgroup type="soundcpu" load_method="append" seq_table="0x2286" samp_tables="0x4A71" drum_samp_table="0x5286" drum_table="0x5499">
             <rom>128a05.6b</rom>
         </romgroup>
-        <romgroup type="sound"  load_method="append">
+        <romgroup type="sound" load_method="append">
             <rom>128a06.2d</rom>
             <rom>128a07.1d</rom>
         </romgroup>
@@ -587,7 +597,7 @@
             <rom>218a06.8p</rom>
             <rom>218a07.6p</rom>
         </romgroup>
-        <romgroup type="sound"  load_method="append">
+        <romgroup type="sound" load_method="append">
             <rom>218a17.14y</rom>
             <rom>218a18.12y</rom>
         </romgroup>
@@ -608,6 +618,14 @@
         </romgroup>
         <romgroup type="qsound" load_method="append_swap16">
             <rom>sg2-01m.3a</rom>
+        </romgroup>
+    </game>
+    <game name="plygonet" format="KonamiArcade" fmt_version="MysticWarrior">
+        <romgroup type="soundcpu" load_method="append" seq_table="0x228B" samp_tables="0x2CD7" drum_samp_table="0x32B5" drum_table="0x33D5">
+            <rom>305b05.7b</rom>
+        </romgroup>
+        <romgroup type="sound" load_method="append">
+            <rom>305b08.2e</rom>
         </romgroup>
     </game>
     <game name="pnickj" format="CPS1" fmt_version="CPS1_V4.25">
@@ -654,7 +672,7 @@
             <rom>315a06.9c</rom>
             <rom>315a07.7c</rom>
         </romgroup>
-        <romgroup type="sound"  load_method="append">
+        <romgroup type="sound" load_method="append">
             <rom>315a17.9g</rom>
             <rom>315a18.7g</rom>
         </romgroup>
@@ -700,7 +718,7 @@
             <rom>250a06.8p</rom>
             <rom>250a07.6p</rom>
         </romgroup>
-        <romgroup type="sound"  load_method="append">
+        <romgroup type="sound" load_method="append">
             <rom>250a17.14y</rom>
             <rom>250a18.12y</rom>
         </romgroup>
@@ -739,12 +757,21 @@
             <rom>smb.12m</rom>
         </romgroup>
     </game>
+    <game name="rungun" format="KonamiArcade" fmt_version="MysticWarrior">
+        <romgroup type="soundcpu" load_method="append" seq_table="0x26D1" samp_tables="0x4FCB" drum_samp_table="0x5E07" drum_table="0x5F03">
+            <rom>247a05</rom>
+        </romgroup>
+        <romgroup type="sound" load_method="append">
+            <rom>247-a06</rom>
+            <rom>247-a07</rom>
+        </romgroup>
+    </game>
     <game name="rungun2" format="KonamiArcade" fmt_version="GX">
         <romgroup type="soundcpu" load_method="deinterlace" seq_table="0x80E6">
             <rom>505a06.9m</rom>
             <rom>505a07.7m</rom>
         </romgroup>
-        <romgroup type="sound"  load_method="append">
+        <romgroup type="sound" load_method="append">
             <rom>505a23.7r</rom>
             <rom>505a22.9r</rom>
         </romgroup>
@@ -754,7 +781,7 @@
             <rom>605a06.9m</rom>
             <rom>605a07.7m</rom>
         </romgroup>
-        <romgroup type="sound"  load_method="append">
+        <romgroup type="sound" load_method="append">
             <rom>605a23.7r</rom>
         </romgroup>
     </game>
@@ -772,7 +799,7 @@
             <rom>521-a04.9c</rom>
             <rom>521-a05.7c</rom>
         </romgroup>
-        <romgroup type="sound"  load_method="append">
+        <romgroup type="sound" load_method="append">
             <rom>521-a12.9g</rom>
             <rom>521-a13.7g</rom>
         </romgroup>
@@ -782,7 +809,7 @@
             <rom>533a08.9c</rom>
             <rom>533a09.7c</rom>
         </romgroup>
-        <romgroup type="sound"  load_method="append">
+        <romgroup type="sound" load_method="append">
             <rom>533a22.9g</rom>
             <rom>533a23.7g</rom>
         </romgroup>
@@ -980,7 +1007,7 @@
             <rom>427a07.6m</rom>
             <rom>427a06.9m</rom>
         </romgroup>
-        <romgroup type="sound"  load_method="append">
+        <romgroup type="sound" load_method="append">
             <rom>427a16.9r</rom>
         </romgroup>
     </game>
@@ -1050,7 +1077,7 @@
             <rom>424a06.9c</rom>
             <rom>424a07.7c</rom>
         </romgroup>
-        <romgroup type="sound"  load_method="append">
+        <romgroup type="sound" load_method="append">
             <rom>424a17.9g</rom>
             <rom>424a18.7g</rom>
         </romgroup>
@@ -1069,7 +1096,7 @@
             <rom>515a04.9c</rom>
             <rom>515a05.7c</rom>
         </romgroup>
-        <romgroup type="sound"  load_method="append">
+        <romgroup type="sound" load_method="append">
             <rom>515a13.9g</rom>
             <rom>515a14.7g</rom>
         </romgroup>
@@ -1079,7 +1106,7 @@
             <rom>615a08.9c</rom>
             <rom>615a09.7c</rom>
         </romgroup>
-        <romgroup type="sound"  load_method="append">
+        <romgroup type="sound" load_method="append">
             <rom>615a22.9g</rom>
             <rom>615a23.7g</rom>
         </romgroup>
@@ -1123,7 +1150,7 @@
         <romgroup type="soundcpu" load_method="append" seq_table="0x3813" samp_tables="0x40AC" drum_samp_table="0x4C0F" drum_table="0x4D38">
             <rom>168a05.7c</rom>
         </romgroup>
-        <romgroup type="sound"  load_method="append">
+        <romgroup type="sound" load_method="append">
             <rom>168a06.1c</rom>
             <rom>168a07.1e</rom>
         </romgroup>
@@ -1153,7 +1180,7 @@
             <rom>627b06.9m</rom>
             <rom>627b07.7m</rom>
         </romgroup>
-        <romgroup type="sound"  load_method="append">
+        <romgroup type="sound" load_method="append">
             <rom>627a23.7r</rom>
         </romgroup>
     </game>
@@ -1171,7 +1198,7 @@
             <rom>705a08.9c</rom>
             <rom>705a09.7c</rom>
         </romgroup>
-        <romgroup type="sound"  load_method="append">
+        <romgroup type="sound" load_method="append">
             <rom>705a22.9g</rom>
         </romgroup>
     </game>
