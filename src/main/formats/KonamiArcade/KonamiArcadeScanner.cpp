@@ -7,7 +7,6 @@
 #include "VGMMiscFile.h"
 
 
-
 KonamiArcadeFormatVer konamiArcadeVersionEnum(const std::string &versionStr) {
   static const std::unordered_map<std::string, KonamiArcadeFormatVer> versionMap = {
     {"MysticWarrior", MysticWarrior},
@@ -21,7 +20,6 @@ KonamiArcadeFormatVer konamiArcadeVersionEnum(const std::string &versionStr) {
 // Mystic Warrior (Z80)
 // 208D  ld   a,$71        3E 71
 // 208F  ld   ($E227),a    32 27 E2   ; set NMI rate to 0x71
-
 BytePattern KonamiArcadeScanner::ptn_MW_SetNmiRate("\x3E\x71\x32\x27\xE2", "x?xxx", 5);
 
 // Mystic Warrior (Z80)
@@ -30,38 +28,33 @@ BytePattern KonamiArcadeScanner::ptn_MW_SetNmiRate("\x3E\x71\x32\x27\xE2", "x?xx
 // 0072  jp   nz,$0078     C2 78 00   ; handle NMI if nmi_count & nmi_skip_mask == 0 (in this case every fourth NMI)
 // 0075  inc  l            2C
 // 0076  ld   (hl),$01     36 01      ; set nmi_skip flag. will enter infinite loop
-
 BytePattern KonamiArcadeScanner::ptn_MW_NmiSkip("\x3E\x03\xA6\xC2\x78\x00\x2C\x36\x01", "x?xxxxxxx", 9);
 
 // Salamander 2 (MC68000)
 // 14A0  move.b #0x6d, $20044e.l   13 fc 00 6d 00 20 04 4e    ; set k054539 timer (NMI rate) to 0x6d
-
 BytePattern KonamiArcadeScanner::ptn_GX_SetNmiRate("\x13\xfc\x00\x6d\x00\x20\x04\x4e", "xxx?xxxx", 8);
 
-// Konami GX
-// 207c000067e4  movea.l    #0x67e4, A0
-// 227c00102344  movea.l    #0x102344, A1
-// 7401          moveq      #0x1, D2
-// 7207          moveq      #0x7, D1
-// 2458          movea.l    (A0)+, A2
+// Salamander 2 (MC68000)
+// 1994  movea.l  #0x67e4, A0      20 7c 00 00 67 e4
+// 199A  movea.l  #0x102344, A1    22 7c 00 10 23 44
+// 19A0  moveq    #0x1, D2         74 01
+// 19A2  moveq    #0x7, D1         72 07
+// 19A4  movea.l  (A0)+, A2        24 58
 BytePattern KonamiArcadeScanner::ptn_GX_setSeqPlaylistTable("\x20\x7C\x00\x00\x67\xE4\x22\x7C\x00\x10\x23\x44", "xx????xxxxxx", 12);
 
 
-// Konami GX
-// 2c7c00005fc2  movea.l    #samp_info_set_pointers,A6
-// 2c766000      movea.l    (0x0,A6,D6.w)=>samp_info_set_pointers,A6
-
+// Salamander 2 (MC68000)
+// 2296  movea.l   #samp_info_set_pointers,A6                 2c 7c 00 00 5f c2
+// 229C  movea.l   (0x0,A6,D6.w)=>samp_info_set_pointers,A6.  2c 76 60 00
 BytePattern KonamiArcadeScanner::ptn_GX_setSampInfoSetPtrTable("\x2C\x7C\x00\x00\x5F\xC2\x2C\x76\x60\x00", "xx????xxxx", 10);
 
-// Konami GX
-// 217c000039b2014e  move.l     #read_3_params,(offset DAT_0010014e,A0)     ; set read 3 params callback
-// 217c0000658400e2  move.l     #DAT_00006584,(offset DAT_001000e2,A0)      ; set drumkit samp info table addr
-// 217c0000669b00e6  move.l     #DAT_0000669b,(offset DAT_001000e6,A0)      ; set drumkit table addr
-
+// Salamander 2 (MC68000)
+// move.l  #read_3_params,(offset DAT_0010014e,A0)   21 7c 00 00 39 b2 01 4e  ; set read 3 params callback
+// move.l  #DAT_00006584,(offset DAT_001000e2,A0)    21 7c 00 00 65 84 00 e2  ; set drumkit samp info table addr
+// move.l  #DAT_0000669b,(offset DAT_001000e6,A0)    21 7c 00 00 66 9b 00 e6  ; set drumkit table addr
 BytePattern KonamiArcadeScanner::ptn_GX_setDrumkitPtrs(
   "\x21\x7C\x00\x00\x39\xB2\x01\x4E\x21\x7C\x00\x00\x65\x84\x00\xE2\x21\x7C\x00\x00\x66\x9B\x00\xE6",
   "xx????xxxx????xxxx????xx", 24);
-
 
 
 void KonamiArcadeScanner::scan(RawFile *file, void *info) {
@@ -188,18 +181,16 @@ void KonamiArcadeScanner::scan(RawFile *file, void *info) {
     fmt_ver
   );
 
-  // if (fmt_ver == MysticWarrior) {
-    for (auto seq : seqs) {
-      VGMColl* coll = new VGMColl(seq->name());
+  for (auto seq : seqs) {
+    VGMColl* coll = new VGMColl(seq->name());
 
-      coll->useSeq(seq);
-      coll->addInstrSet(instrSet);
-      coll->addSampColl(sampcoll);
-      if (!coll->load()) {
-        delete coll;
-      }
+    coll->useSeq(seq);
+    coll->addInstrSet(instrSet);
+    coll->addSampColl(sampcoll);
+    if (!coll->load()) {
+      delete coll;
     }
-  // }
+  }
 }
 
 struct sequence_table_entry {

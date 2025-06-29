@@ -59,7 +59,7 @@ bool KonamiArcadeSeq::parseTrackPointers() {
       u32 trackOffset = readWordBE(pos);
       if (trackOffset == 0) continue;
 
-      // Racin' Force has tracks that precede the start of the sequence
+      // Racin' Force has jumps to sequence data that precede the start of the sequence
       if (trackOffset < dwOffset) {
         dwOffset = trackOffset;
       }
@@ -451,10 +451,9 @@ bool KonamiArcadeTrack::readEvent() {
     //tempo
     case 0xEA: {
       u8 tempoValue = readByte(curOffset++);
-      auto seq = static_cast<KonamiArcadeSeq*>(parentSeq);
-`      // The tempo value is added to a counter every other NMI. When it carries, a tick is processed
+      // The tempo value is added to a counter every other NMI. When it carries, a tick is processed
       double nmisPerTick = 256.0 / static_cast<double>(tempoValue);
-      float nmiRate = seq->nmiRate();
+      float nmiRate = static_cast<KonamiArcadeSeq*>(parentSeq)->nmiRate();
 
       double timePerTickSeconds = nmisPerTick / nmiRate;
       double timePerBeatSeconds = timePerTickSeconds * parentSeq->ppqn();
@@ -534,7 +533,7 @@ bool KonamiArcadeTrack::readEvent() {
 
       // First check that the delay isn't longer than the previous note duration. This can still
       // have an effect because a note can be audible after note off via the software release
-      // envelope. We can't account for this unless we use pitch bend events (maybe) instead of portamento.
+      // envelope. We can't account for this unless (maybe) we use pitch bend events instead of portamento.
       if (delay >= m_prevNoteDur) {
         L_DEBUG("Ignoring pitch slide event with a delay > note dur. Offset: {:X}  Time: {}\n", beginOffset, getTime());
         break;
