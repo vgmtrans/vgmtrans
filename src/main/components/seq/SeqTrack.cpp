@@ -266,7 +266,9 @@ void SeqTrack::addEvent(SeqEvent *pSeqEvent) {
   // care for a case where the new event is located before the start address
   // (example: Donkey Kong Country - Map, Track 7 of 8)
   if (dwOffset > pSeqEvent->dwOffset) {
-    unLength += (dwOffset - pSeqEvent->dwOffset);
+    if (bDetermineTrackLengthEventByEvent) {
+      unLength += (dwOffset - pSeqEvent->dwOffset);
+    }
     dwOffset = pSeqEvent->dwOffset;
   }
 
