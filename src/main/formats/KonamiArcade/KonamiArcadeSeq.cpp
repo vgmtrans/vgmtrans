@@ -24,6 +24,7 @@ KonamiArcadeSeq::KonamiArcadeSeq(
   setAllowDiscontinuousTrackData(true);
   setAlwaysWriteInitialVol(127);
   setAlwaysWriteInitialTempo(120);
+  useReverb();
 }
 
 bool KonamiArcadeSeq::parseHeader() {
