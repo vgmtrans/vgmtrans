@@ -233,6 +233,7 @@ const std::vector<KonamiArcadeSeq*> KonamiArcadeScanner::loadSeqTable(
   std::vector<KonamiArcadeSeq*> seqs;
   uint32_t nFileLength = static_cast<uint32_t>(file->size());
 
+  int seqCounter = 0;
   if (fmtVer == GX) {
     int entryLength = 12;
     u32 testLong = file->readWordBE(offset + 12);
@@ -246,7 +247,8 @@ const std::vector<KonamiArcadeSeq*> KonamiArcadeScanner::loadSeqTable(
       u32 seqPointer = file->readWordBE(offset + 8);
       if (seqPointer == 0 || seqPointer >= nFileLength)
         break;
-      KonamiArcadeSeq *newSeq = new KonamiArcadeSeq(file, GX, seqPointer, 0, drums, nmiRate);
+      auto name = fmt::format("{} {:d}", gameName, seqCounter++);
+      KonamiArcadeSeq *newSeq = new KonamiArcadeSeq(file, GX, seqPointer, 0, drums, nmiRate, name);
       if (!newSeq->loadVGMFile())
         delete newSeq;
       else
@@ -269,7 +271,8 @@ const std::vector<KonamiArcadeSeq*> KonamiArcadeScanner::loadSeqTable(
       u32 seqOffset = (entry.bank * 0x400) + (dest - 0x8000);
       if (seqOffset == 0 || seqOffset >= nFileLength)
         break;
-      KonamiArcadeSeq *newSeq = new KonamiArcadeSeq(file, MysticWarrior, seqOffset, dest, drums, nmiRate);
+      auto name = fmt::format("{} {:d}", gameName, seqCounter++);
+      KonamiArcadeSeq *newSeq = new KonamiArcadeSeq(file, MysticWarrior, seqOffset, dest, drums, nmiRate, name);
       if (!newSeq->loadVGMFile())
         delete newSeq;
       else

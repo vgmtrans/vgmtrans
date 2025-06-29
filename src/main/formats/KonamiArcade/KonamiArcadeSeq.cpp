@@ -15,9 +15,10 @@ KonamiArcadeSeq::KonamiArcadeSeq(
   u32 offset,
   u32 ramOffset,
   const std::array<KonamiArcadeInstrSet::drum, 46>& drums,
-  float nmiRate
+  float nmiRate,
+  const std::string& name
 )
-    : VGMSeq(KonamiArcadeFormat::name, file, offset, 0, "Konami Arcade Seq"),
+    : VGMSeq(KonamiArcadeFormat::name, file, offset, 0, name),
       fmtVer(fmtVer), m_memOffset(ramOffset), m_drums(drums), m_nmiRate(nmiRate) {
   setUseLinearAmplitudeScale(true);
   setAllowDiscontinuousTrackData(true);
@@ -82,6 +83,9 @@ void KonamiArcadeTrack::resetVars() {
   m_inJump = false;
   m_percussionFlag1 = false;
   m_percussionFlag2 = false;
+  m_driverTranspose = 0;
+  m_prevNoteAbsTime = 0;
+  m_timePerTickMicroseconds = 0;
   m_pan = 0;
   m_releaseRate = 0;
   m_curProg = 0;
@@ -178,8 +182,8 @@ bool KonamiArcadeTrack::readEvent() {
   if (status_byte < 0xC0) {
     uint8_t note, delta;
     if (status_byte < 0x60) {
-      delta = readByte(curOffset++);
       note = status_byte;
+      delta = readByte(curOffset++);
       m_prevDelta = delta;
     }
     else {
@@ -239,6 +243,8 @@ bool KonamiArcadeTrack::readEvent() {
         actualDuration = delta;
     }
     addNoteByDur(beginOffset, curOffset - beginOffset, note, linearVel, actualDuration);
+    m_prevNoteAbsTime = getTime();
+    m_prevNoteDur = actualDuration;
     addTime(delta);
     return true;
   }
@@ -446,19 +452,15 @@ bool KonamiArcadeTrack::readEvent() {
     case 0xEA: {
       u8 tempoValue = readByte(curOffset++);
       auto seq = static_cast<KonamiArcadeSeq*>(parentSeq);
-      // if (seq->fmtVer == MysticWarrior) {
-      if (true) {
-        // The tempo value is added to a counter every other NMI. When it carries, a tick is processed
-        double nmisPerTick = 256.0 / static_cast<double>(tempoValue);
-        float nmiRate = seq->nmiRate();
+`      // The tempo value is added to a counter every other NMI. When it carries, a tick is processed
+      double nmisPerTick = 256.0 / static_cast<double>(tempoValue);
+      float nmiRate = seq->nmiRate();
 
-        double timePerTickSeconds = nmisPerTick / nmiRate;
-        double timePerBeatSeconds = timePerTickSeconds * parentSeq->ppqn();
-        double timePerBeatMicroseconds = timePerBeatSeconds * 1000000;
-        addTempo(beginOffset, curOffset - beginOffset, timePerBeatMicroseconds);
-      } else {
-        addTempoBPM(beginOffset, curOffset - beginOffset, tempoValue * 1.2);
-      }
+      double timePerTickSeconds = nmisPerTick / nmiRate;
+      double timePerBeatSeconds = timePerTickSeconds * parentSeq->ppqn();
+      double timePerBeatMicroseconds = timePerBeatSeconds * 1000000;
+      addTempo(beginOffset, curOffset - beginOffset, timePerBeatMicroseconds);
+      m_timePerTickMicroseconds = timePerTickSeconds * 1000.0;
       break;
     }
 
@@ -512,11 +514,41 @@ bool KonamiArcadeTrack::readEvent() {
       break;
     }
 
-    case 0xF3:
-      // probably pitch slide
-      curOffset += 3;
-      addUnknown(beginOffset, curOffset - beginOffset);
+    case 0xF3: {      // Pitch Slide
+      u8 delay = readByte(curOffset++);
+      u8 duration = readByte(curOffset++);
+      u8 targetNote = readByte(curOffset++);
+      delay = delay == 0 ? 1 : delay;
+      targetNote += 24;
+      auto desc = fmt::format("Delay: {:d}  Duration: {:d}  Target Note: {:d}",
+        delay, duration, targetNote);
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Pitch Slide", desc, Type::PitchBendSlide);
+
+      // Pitch slide events are given immediately after the note to be slid. Since the slide is
+      // expressed using a target note rather than cents, we use portamento control rather than
+      // pitch bend, since the range could be huge, and portamento is closer in representation.
+
+      // Since portamento creates a slide from overlapping note events, the strategy is to insert
+      // a new note which overlaps with the previous duration note at the correct point (the delay value).
+      // We shorten the duration of the interrupted note for cleanliness sake.
+
+      // First check that the delay isn't longer than the previous note duration. This can still
+      // have an effect because a note can be audible after note off via the software release
+      // envelope. We can't account for this unless we use pitch bend events (maybe) instead of portamento.
+      if (delay >= m_prevNoteDur) {
+        L_DEBUG("Ignoring pitch slide event with a delay > note dur. Offset: {:X}  Time: {}\n", beginOffset, getTime());
+        break;
+      }
+
+      // insertPortamentoNoItem(true, m_prevNoteAbsTime);
+      makePrevDurNoteEnd(m_prevNoteAbsTime + delay + 1);  // add one to ensure the notes overlap to trigger portamento effect
+      insertPortamentoTime14BitNoItem(duration * m_timePerTickMicroseconds, m_prevNoteAbsTime + delay);
+      insertPortamentoControlNoItem(prevKey, m_prevNoteAbsTime + delay);
+      u32 newNoteDur = m_prevNoteDur - delay;
+      insertNoteByDurNoItem(targetNote, prevVel, newNoteDur, m_prevNoteAbsTime + delay);
+      // insertPortamentoNoItem(false, m_prevNoteAbsTime + m_prevNoteDur);
       break;
+    }
 
     case 0xF6:
       m_subroutineOffset = curOffset;
