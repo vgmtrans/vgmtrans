@@ -354,6 +354,10 @@ void MidiTrack::addPortamentoControl(uint8_t channel, uint8_t key) {
   aEvents.push_back(new PortamentoControlEvent(this, channel, getDelta(), key));
 }
 
+void MidiTrack::insertPortamentoControl(uint8_t channel, uint8_t key, uint32_t absTime) {
+  aEvents.push_back(new PortamentoControlEvent(this, channel, absTime, key));
+}
+
 void MidiTrack::addMono(uint8_t channel) {
   aEvents.push_back(new MonoEvent(this, channel, getDelta()));
 }

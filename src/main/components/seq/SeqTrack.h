@@ -81,6 +81,7 @@ class SeqTrack : public VGMItem {
   void addPercNoteByDur(uint32_t offset, uint32_t length, int8_t key, int8_t vel, uint32_t dur, const std::string &sEventName = "Percussion Note with Duration");
   void addPercNoteByDurNoItem(int8_t key, int8_t vel, uint32_t dur);
   void insertNoteByDur(uint32_t offset, uint32_t length, int8_t key, int8_t vel, uint32_t dur, uint32_t absTime, const std::string &sEventName = "Note On With Duration");
+  void insertNoteByDurNoItem(int8_t key, int8_t vel, uint32_t dur, uint32_t absTime);
 
   void makePrevDurNoteEnd() const;
   void makePrevDurNoteEnd(uint32_t absTime) const;
@@ -137,7 +138,10 @@ class SeqTrack : public VGMItem {
   void insertPortamentoTimeNoItem(uint8_t time, uint32_t absTime) const;
   void addPortamentoTime14Bit(uint32_t offset, uint32_t length, uint16_t time, const std::string &sEventName = "Portamento Time");
   void addPortamentoTime14BitNoItem(uint16_t time) const;
+  void insertPortamentoTime14Bit(uint32_t offset, uint32_t length, uint16_t time, uint32_t absTime, const std::string &sEventName);
+  void insertPortamentoTime14BitNoItem(uint16_t time, uint32_t absTime) const;
   void addPortamentoControlNoItem(uint8_t key) const;
+  void insertPortamentoControlNoItem(uint8_t key, uint32_t absTime) const;
   void addProgramChange(uint32_t offset, uint32_t length, uint32_t progNum, const std::string &sEventName = "Program Change");
   void addProgramChange(uint32_t offset, uint32_t length, uint32_t progNum, uint8_t chan, const std::string &sEventName = "Program Change");
   void addProgramChange(uint32_t offset, uint32_t length, uint32_t progNum, bool requireBank, const std::string &sEventName = "Program Change");

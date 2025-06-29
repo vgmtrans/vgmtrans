@@ -66,6 +66,7 @@ void PS1Seq::resetVars() {
   uint8_t denom = readByte(offset() + 0x0E);
   addTimeSig(offset() + 0x0D, 2, numer, 1 << denom, (uint8_t) ppqn());
   std::ranges::fill(m_hasSetProgramForChannel, false);
+  m_loopStart = 0;
 }
 
 bool PS1Seq::readEvent() {
@@ -218,11 +219,16 @@ bool PS1Seq::readEvent() {
           switch (value) {
             case 20 :
               addGenericEvent(beginOffset, curOffset - beginOffset, "Loop Start", "", Type::RepeatStart);
+              m_loopStart = curOffset;
               break;
 
-            case 30 :
-              addGenericEvent(beginOffset, curOffset - beginOffset, "Loop End", "", Type::RepeatEnd);
-              break;
+            case 30 : {
+              bool shouldContinue = addLoopForever(beginOffset, curOffset - beginOffset);
+              if (m_loopStart != 0) {
+                curOffset = m_loopStart;
+              }
+              return shouldContinue;
+            }
 
             default:
               addGenericEvent(beginOffset, curOffset - beginOffset, "NRPN 2", "", Type::Misc);

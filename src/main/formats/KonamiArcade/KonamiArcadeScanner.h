@@ -9,7 +9,14 @@
 #include "KonamiArcadeInstr.h"
 #include "common.h"
 
+struct MAMEGame;
 class KonamiArcadeSeq;
+
+enum KonamiArcadeFormatVer: uint8_t {
+  VERSION_UNDEFINED,
+  MysticWarrior,
+  GX
+};
 
 class KonamiArcadeScanner:
     public VGMScanner {
@@ -22,16 +29,22 @@ public:
     uint32_t offset,
     const std::array<KonamiArcadeInstrSet::drum, 46>& drums,
     float nmiRate,
-    std::string gameName
+    std::string gameName,
+    KonamiArcadeFormatVer fmtVer
   );
   const std::vector<konami_mw_sample_info> loadSampleInfos(
     RawFile *file,
     u32 tablesOffset,
     u32 drumSampTableOffset,
-    u32 drumInstrTableOffset
+    u32 drumInstrTableOffset,
+    KonamiArcadeFormatVer fmtVer
   );
 
 private:
-  static BytePattern ptnSetNmiRate;
-  static BytePattern ptnNmiSkip;
+  static BytePattern ptn_MW_SetNmiRate;
+  static BytePattern ptn_MW_NmiSkip;
+  static BytePattern ptn_GX_SetNmiRate;
+  static BytePattern ptn_GX_setSeqPlaylistTable;
+  static BytePattern ptn_GX_setSampInfoSetPtrTable;
+  static BytePattern ptn_GX_setDrumkitPtrs;
 };
