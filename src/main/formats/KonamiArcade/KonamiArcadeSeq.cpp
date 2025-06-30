@@ -86,8 +86,14 @@ void KonamiArcadeTrack::resetVars() {
   m_percussionFlag2 = false;
   m_driverTranspose = 0;
   m_prevNoteAbsTime = 0;
+  m_prevNoteDelta = 0;
+  m_prevFinalKey = 0;
   m_timePerTickMicroseconds = 0;
   m_pan = 0;
+  m_portamentoEnabled = false;
+  m_slideModeDelay = 0;
+  m_slideModeDuration = 0;
+  m_slideModeDepth = 0;
   m_releaseRate = 0;
   m_curProg = 0;
   m_prevDelta = 0;
@@ -159,6 +165,15 @@ void KonamiArcadeTrack::applyTranspose() {
     if (coarseTuningSemitones != 0) {
       // TODO: same as above
       // addCoarseTuningNoItem(0);
+    }
+  }
+}
+
+void KonamiArcadeTrack::makeTrulyPrevDurNoteEnd(uint32_t absTime) const {
+  if (readMode == READMODE_CONVERT_TO_MIDI) {
+    if (pMidiTrack->prevDurNoteOffs.size() > 0) {
+      auto prevDurNoteOff = pMidiTrack->prevDurNoteOffs.back();
+      prevDurNoteOff->absTime = absTime;
     }
   }
 }
@@ -243,9 +258,38 @@ bool KonamiArcadeTrack::readEvent() {
       else
         actualDuration = delta;
     }
-    addNoteByDur(beginOffset, curOffset - beginOffset, note, linearVel, actualDuration);
+    note += m_loopTranspose[0] / 32 + m_loopTranspose[1] / 32;
+    note = note > 0x7F ? 0x7F : note;
+
+    if (m_portamentoEnabled && prevKey != note) {
+      if (m_prevNoteAbsTime + m_prevNoteDur == getTime()) {
+        addPortamentoControlNoItem(m_prevFinalKey);
+        makeTrulyPrevDurNoteEnd(getTime() + 1);
+        addNoteByDur(beginOffset, curOffset - beginOffset, note, linearVel, actualDuration);
+      } else if (actualDuration > 2) {
+        addNoteByDurNoItem(prevKey, linearVel, 2);
+        insertPortamentoControlNoItem(m_prevFinalKey, getTime() + 1);
+        insertNoteByDur(beginOffset, curOffset - beginOffset, note, linearVel, actualDuration - 1, getTime() + 1);
+      } else {
+        L_DEBUG("{} at {:X}: didn't apply portamento because note duration <= 2.", parentSeq->name(), beginOffset);
+        addNoteByDur(beginOffset, curOffset - beginOffset, note, linearVel, actualDuration);
+      }
+    } else if (m_slideModeDepth != 0 && m_slideModeDuration > 0 && actualDuration > (m_slideModeDelay + 1)) {
+      // Slide note
+      u8 slideStartNote = note - m_slideModeDepth;
+      addNoteByDurNoItem(slideStartNote, linearVel, m_slideModeDelay + 1);
+      insertPortamentoTime14BitNoItem(m_slideModeDuration * m_timePerTickMicroseconds, m_slideModeDelay);
+      insertPortamentoControlNoItem(slideStartNote, getTime() + m_slideModeDelay);
+      insertNoteByDur(beginOffset, curOffset - beginOffset, note, linearVel, actualDuration - m_slideModeDelay, getTime() + m_slideModeDelay);
+    } else {
+      addNoteByDur(beginOffset, curOffset - beginOffset, note, linearVel, actualDuration);
+    }
+
+
     m_prevNoteAbsTime = getTime();
     m_prevNoteDur = actualDuration;
+    m_prevNoteDelta = delta;
+    m_prevFinalKey = note + transpose;    // needed for sliding prev notes with portamento control
     addTime(delta);
     return true;
   }
@@ -353,6 +397,8 @@ bool KonamiArcadeTrack::readEvent() {
       addTime(delta - newdur);
       auto desc = fmt::format("total delta: {:d} ticks  additional duration: {:d} ticks", delta, newdur);
       addGenericEvent(beginOffset, curOffset - beginOffset, "Hold", desc, Type::Tie);
+      m_prevNoteDur += newdur;
+      m_prevNoteDelta += delta;
       m_prevDelta = delta;
       break;
     }
@@ -409,7 +455,8 @@ bool KonamiArcadeTrack::readEvent() {
     doLoop:
       u8 loopCount = readByte(curOffset++);
       u8 initialLoopAtten = -readByte(curOffset++);
-      u8 initialLoopTranspose = readByte(curOffset++);
+      s8 initialLoopTranspose = readByte(curOffset++);
+      // TODO: This also effects pan. Needs investigation
       if (m_loopCounter[loopNum] == 0) {
         if (loopCount == 1) {
           m_loopAtten[loopNum] = 0;
@@ -497,15 +544,39 @@ bool KonamiArcadeTrack::readEvent() {
       addUnknown(beginOffset, curOffset - beginOffset);
       break;
 
-    case 0xF0:
-      curOffset++;
-      addUnknown(beginOffset, curOffset - beginOffset);
+    case 0xF0: {
+      u8 portamentoTime = readByte(curOffset++);
+      if (portamentoTime > 0) {
+        u16 actualPortamentoTime = portamentoTime * m_timePerTickMicroseconds;
+        addPortamentoTime14BitNoItem(actualPortamentoTime);
+        auto desc = fmt::format("Portamento Time: {:d} milliseconds", actualPortamentoTime);
+        addGenericEvent(beginOffset, curOffset - beginOffset, "Portamento On", desc, Type::Portamento);
+        m_portamentoEnabled = true;
+        m_portamentoTime = portamentoTime;
+      } else {
+        addGenericEvent(beginOffset, curOffset - beginOffset, "Portamento Off", "", Type::Portamento);
+        m_portamentoEnabled = false;
+        m_portamentoTime = 0;
+      }
       break;
+    }
 
-    case 0xF1:
-      curOffset += 3;
-      addUnknown(beginOffset, curOffset - beginOffset);
+    case 0xF1: {
+      // Pitch Slide Mode
+      // When enabled, triggers a pitch slide similar to event F3 on every note on.
+      // Unlike F3, pitch is given as a relative value, and the slide goes FROM
+      // the new pitch to the pitch of the triggered note (F3 goes note pitch to slide pitch)
+      // Sequences disable this by calling the same event with 00 param values
+      m_slideModeDelay = readByte(curOffset++);
+      m_slideModeDelay = m_slideModeDelay == 0 ? 1 : m_slideModeDelay;
+      m_slideModeDuration = readByte(curOffset++);
+      m_slideModeDepth = readByte(curOffset++);
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Slide Mode", "", Type::PitchBendSlide);
+      if (m_slideModeDepth == 0 || m_slideModeDelay == 0 && m_portamentoEnabled) {
+        addPortamentoTime14BitNoItem(m_portamentoTime * m_timePerTickMicroseconds);
+      }
       break;
+    }
 
     case 0xF2: {
       s8 pitchBend = readByte(curOffset++);
@@ -543,7 +614,7 @@ bool KonamiArcadeTrack::readEvent() {
       // insertPortamentoNoItem(true, m_prevNoteAbsTime);
       makePrevDurNoteEnd(m_prevNoteAbsTime + delay + 1);  // add one to ensure the notes overlap to trigger portamento effect
       insertPortamentoTime14BitNoItem(duration * m_timePerTickMicroseconds, m_prevNoteAbsTime + delay);
-      insertPortamentoControlNoItem(prevKey, m_prevNoteAbsTime + delay);
+      insertPortamentoControlNoItem(m_prevFinalKey, m_prevNoteAbsTime + delay);
       u32 newNoteDur = m_prevNoteDur - delay;
       insertNoteByDurNoItem(targetNote, prevVel, newNoteDur, m_prevNoteAbsTime + delay);
       // insertPortamentoNoItem(false, m_prevNoteAbsTime + m_prevNoteDur);

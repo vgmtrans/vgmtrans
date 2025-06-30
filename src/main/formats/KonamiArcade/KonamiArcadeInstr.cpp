@@ -12,6 +12,12 @@
 
 #include <spdlog/fmt/fmt.h>
 
+// The driver doesn't define an envelope at the instrument level. Instead, it sets release time
+// via sequence events, which are currently unhandled. Adding artificial release times generally
+// makes things sound better.
+const double instrReleaseTime = 0.5;
+const double drumReleaseTime = 0.7;
+
 // ********************
 // KonamiArcadeInstrSet
 // ********************
@@ -62,6 +68,7 @@ bool KonamiArcadeInstrSet::parseInstrPointers() {
     VGMInstr* instr = new VGMInstr(this, off, sizeof(konami_mw_sample_info), 0, sampNum, name);
     VGMRgn* rgn = new VGMRgn(instr, off, sizeof(konami_mw_sample_info));
     rgn->sampNum = sampNum;
+    rgn->release_time = instrReleaseTime;
     instr->addRgn(rgn);
 
     auto instrSampInfoItem = instrSampInfos->addChild(off, sizeof(konami_mw_sample_info),
@@ -108,7 +115,8 @@ bool KonamiArcadeInstrSet::parseInstrPointers() {
     rgn->keyHigh = i + 24;
     int unityKey = (i + 24) + (0x2A - d.unity_key);
     rgn->sampNum = sampNum;
-    rgn->unityKey = unityKey; //i + 24;
+    rgn->unityKey = unityKey;
+    rgn->release_time = drumReleaseTime;
 
     rgn->addChild(off, 1, "Sample Number");
     rgn->addChild(off + 1, 1, "Unity Key");
