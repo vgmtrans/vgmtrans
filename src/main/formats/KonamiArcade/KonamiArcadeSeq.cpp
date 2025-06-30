@@ -393,7 +393,7 @@ bool KonamiArcadeTrack::readEvent() {
       uint8_t dur = readByte(curOffset++);
       uint32_t newdur = (delta * dur) / 0x64;
       addTime(newdur);
-      this->makePrevDurNoteEnd();
+      makePrevDurNoteEnd();
       addTime(delta - newdur);
       auto desc = fmt::format("total delta: {:d} ticks  additional duration: {:d} ticks", delta, newdur);
       addGenericEvent(beginOffset, curOffset - beginOffset, "Hold", desc, Type::Tie);
@@ -611,13 +611,14 @@ bool KonamiArcadeTrack::readEvent() {
         break;
       }
 
-      // insertPortamentoNoItem(true, m_prevNoteAbsTime);
-      makePrevDurNoteEnd(m_prevNoteAbsTime + delay + 1);  // add one to ensure the notes overlap to trigger portamento effect
+      makeTrulyPrevDurNoteEnd(m_prevNoteAbsTime + delay + 1);  // add one to ensure the notes overlap to trigger portamento effect
       insertPortamentoTime14BitNoItem(duration * m_timePerTickMicroseconds, m_prevNoteAbsTime + delay);
       insertPortamentoControlNoItem(m_prevFinalKey, m_prevNoteAbsTime + delay);
       u32 newNoteDur = m_prevNoteDur - delay;
       insertNoteByDurNoItem(targetNote, prevVel, newNoteDur, m_prevNoteAbsTime + delay);
-      // insertPortamentoNoItem(false, m_prevNoteAbsTime + m_prevNoteDur);
+      if (m_portamentoEnabled) {
+        insertPortamentoTime14BitNoItem(m_portamentoTime * m_timePerTickMicroseconds, m_prevNoteAbsTime + m_prevNoteDur);
+      }
       break;
     }
 
