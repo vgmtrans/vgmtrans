@@ -42,6 +42,8 @@ public:
   bool readEvent() override;
 
 private:
+  void makeTrulyPrevDurNoteEnd(uint32_t absTime) const;
+
   u8 calculateMidiPanForK054539(u8 pan);
   void enablePercussion(bool& flag);
   void disablePercussion(bool& flag);
@@ -52,7 +54,14 @@ private:
   bool m_percussionFlag2;
   u32 m_prevNoteAbsTime;
   u32 m_prevNoteDur;
+  u32 m_prevNoteDelta;
+  u8 m_prevFinalKey;
   double m_timePerTickMicroseconds;
+  bool m_portamentoEnabled;
+  u8 m_portamentoTime;
+  u8 m_slideModeDelay;
+  u8 m_slideModeDuration;
+  s8 m_slideModeDepth;
   s8 m_driverTranspose;
   u8 m_releaseRate;
   u8 m_curProg;
