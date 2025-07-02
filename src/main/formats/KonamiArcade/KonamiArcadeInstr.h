@@ -11,6 +11,8 @@
 
 // Mystic Warrior driver sample info
 
+enum KonamiArcadeFormatVer : uint8_t;
+
 struct konami_mw_sample_info {
   enum class sample_type: u8 {
     PCM_8 = 0,
@@ -50,7 +52,8 @@ public:
                        u32 offset,
                        std::string name,
                        u32 drumTableOffset,
-                       u32 drumSampleTableOffset);
+                       u32 drumSampleTableOffset,
+                       KonamiArcadeFormatVer fmtVer);
   ~KonamiArcadeInstrSet() override = default;
 
   void addSampleInfoChildren(VGMItem* sampInfoItem, u32 off);
@@ -58,6 +61,7 @@ public:
   const std::array<drum, 46>& drums() { return m_drums;}
 
 private:
+  KonamiArcadeFormatVer m_fmtVer;
   u32 m_drumTableOffset;
   u32 m_drumSampleTableOffset;
   std::array<drum, 46> m_drums;

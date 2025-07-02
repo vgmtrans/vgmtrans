@@ -117,6 +117,7 @@ class MidiTrack {
   void addPortamentoTimeFine(uint8_t channel, uint8_t time);
   void insertPortamentoTimeFine(uint8_t channel, uint8_t time, uint32_t absTime);
   void addPortamentoControl(uint8_t channel, uint8_t key);
+  void insertPortamentoControl(uint8_t channel, uint8_t key, uint32_t absTime);
   void addMono(uint8_t channel);
   void insertMono(uint8_t channel, uint32_t absTime);
 

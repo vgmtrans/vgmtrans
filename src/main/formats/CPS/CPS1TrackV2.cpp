@@ -372,6 +372,8 @@ bool CPS1TrackV2::readEvent() {
           jump = curOffset + 2 + static_cast<int16_t>(getShortBE(curOffset));
         }
         bool should_continue = addLoopForever(beginOffset, 3);
+        if (jump == 0)
+          return false;
         if (readMode == READMODE_ADD_TO_UI) {
           curOffset += 2;
           if (readByte(curOffset) == 0x17) {

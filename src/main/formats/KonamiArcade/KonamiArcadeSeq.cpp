@@ -11,17 +11,20 @@ DECLARE_FORMAT(KonamiArcade);
 
 KonamiArcadeSeq::KonamiArcadeSeq(
   RawFile *file,
+  KonamiArcadeFormatVer fmtVer,
   u32 offset,
   u32 ramOffset,
   const std::array<KonamiArcadeInstrSet::drum, 46>& drums,
-  float nmiRate
+  float nmiRate,
+  const std::string& name
 )
-    : VGMSeq(KonamiArcadeFormat::name, file, offset, 0, "Konami Arcade Seq"),
-      m_memOffset(ramOffset), m_drums(drums), m_nmiRate(nmiRate) {
+    : VGMSeq(KonamiArcadeFormat::name, file, offset, 0, name),
+      fmtVer(fmtVer), m_memOffset(ramOffset), m_drums(drums), m_nmiRate(nmiRate) {
   setUseLinearAmplitudeScale(true);
   setAllowDiscontinuousTrackData(true);
   setAlwaysWriteInitialVol(127);
   setAlwaysWriteInitialTempo(120);
+  useReverb();
 }
 
 bool KonamiArcadeSeq::parseHeader() {
@@ -32,24 +35,38 @@ bool KonamiArcadeSeq::parseHeader() {
 bool KonamiArcadeSeq::parseTrackPointers() {
   u32 pos = dwOffset;
   int numTracks = 16;
-  // Check to see if this sequence uses 16 tracks or 8 tracks for games with only 1 K054539.
-  // We'll check for any pattern of 0x0000 where the second set of track pointers would be, as this
-  // is typically present.
-  for (int pos = dwOffset + 16; pos < dwOffset + 32; pos += 2) {
-    if (readWord(pos) == 0) {
-      numTracks = 8;
-      break;
+  if (fmtVer == MysticWarrior) {
+    // Check to see if this sequence uses 16 tracks or 8 tracks for games with only 1 K054539.
+    // We'll check for any pattern of 0x0000 where the second set of track pointers would be, as this
+    // is typically present.
+    for (int pos = dwOffset + 16; pos < dwOffset + 32; pos += 2) {
+      if (readWord(pos) == 0) {
+        numTracks = 8;
+        break;
+      }
     }
-  }
 
-  for (int i = 0; i < numTracks; i++) {
-    u16 memTrackOffset = readWord(pos);
-    if (memTrackOffset == 0) continue;
+    for (int i = 0; i < numTracks; i++) {
+      u16 memTrackOffset = readShort(pos);
+      if (memTrackOffset == 0) continue;
 
-    u32 romTrackOffset = dwOffset + (memTrackOffset - m_memOffset);
+      u32 romTrackOffset = dwOffset + (memTrackOffset - m_memOffset);
 
-    aTracks.push_back(new KonamiArcadeTrack(this, romTrackOffset, 0));
-    pos += 2;
+      aTracks.push_back(new KonamiArcadeTrack(this, romTrackOffset, 0));
+      pos += 2;
+    }
+  } else {
+    for (int i = 0; i < numTracks; i++) {
+      u32 trackOffset = readWordBE(pos);
+      if (trackOffset == 0) continue;
+
+      // Racin' Force has jumps to sequence data that precede the start of the sequence
+      if (trackOffset < dwOffset) {
+        dwOffset = trackOffset;
+      }
+      aTracks.push_back(new KonamiArcadeTrack(this, trackOffset, 0));
+      pos += 4;
+    }
   }
   return true;
 }
@@ -67,6 +84,9 @@ void KonamiArcadeTrack::resetVars() {
   m_inJump = false;
   m_percussionFlag1 = false;
   m_percussionFlag2 = false;
+  m_driverTranspose = 0;
+  m_prevNoteAbsTime = 0;
+  m_timePerTickMicroseconds = 0;
   m_pan = 0;
   m_releaseRate = 0;
   m_curProg = 0;
@@ -163,8 +183,8 @@ bool KonamiArcadeTrack::readEvent() {
   if (status_byte < 0xC0) {
     uint8_t note, delta;
     if (status_byte < 0x60) {
-      delta = readByte(curOffset++);
       note = status_byte;
+      delta = readByte(curOffset++);
       m_prevDelta = delta;
     }
     else {
@@ -219,11 +239,13 @@ bool KonamiArcadeTrack::readEvent() {
       }
     } else {
       if (m_releaseRate != 0)
-        actualDuration = (delta * m_duration) / 100;
+        actualDuration = std::max(1, (delta * m_duration) / 100);
       else
         actualDuration = delta;
     }
     addNoteByDur(beginOffset, curOffset - beginOffset, note, linearVel, actualDuration);
+    m_prevNoteAbsTime = getTime();
+    m_prevNoteDur = actualDuration;
     addTime(delta);
     return true;
   }
@@ -237,6 +259,11 @@ bool KonamiArcadeTrack::readEvent() {
 
     case 0xC2:    // writes to undocumented reg 0x1BF. Looks like pan value.
     case 0xC3:    // writes to undocumented reg 0x1FF. Looks like pan value.
+      curOffset++;
+      addUnknown(beginOffset, curOffset - beginOffset);
+      break;
+
+    case 0xCD:
       curOffset++;
       addUnknown(beginOffset, curOffset - beginOffset);
       break;
@@ -425,7 +452,6 @@ bool KonamiArcadeTrack::readEvent() {
     //tempo
     case 0xEA: {
       u8 tempoValue = readByte(curOffset++);
-
       // The tempo value is added to a counter every other NMI. When it carries, a tick is processed
       double nmisPerTick = 256.0 / static_cast<double>(tempoValue);
       float nmiRate = static_cast<KonamiArcadeSeq*>(parentSeq)->nmiRate();
@@ -434,6 +460,7 @@ bool KonamiArcadeTrack::readEvent() {
       double timePerBeatSeconds = timePerTickSeconds * parentSeq->ppqn();
       double timePerBeatMicroseconds = timePerBeatSeconds * 1000000;
       addTempo(beginOffset, curOffset - beginOffset, timePerBeatMicroseconds);
+      m_timePerTickMicroseconds = timePerTickSeconds * 1000.0;
       break;
     }
 
@@ -480,15 +507,48 @@ bool KonamiArcadeTrack::readEvent() {
       addUnknown(beginOffset, curOffset - beginOffset);
       break;
 
-    case 0xF2:
-      curOffset++;
-      addUnknown(beginOffset, curOffset - beginOffset);
+    case 0xF2: {
+      s8 pitchBend = readByte(curOffset++);
+      // data byte of 0x40 == 1 semitone. Equivalent to 4096 in MIDI when range is default 2 semitones
+      addPitchBend(beginOffset, curOffset - beginOffset, pitchBend * 64);
       break;
+    }
 
-    case 0xF3:
-      curOffset += 3;
-      addUnknown(beginOffset, curOffset - beginOffset);
+    case 0xF3: {      // Pitch Slide
+      u8 delay = readByte(curOffset++);
+      u8 duration = readByte(curOffset++);
+      u8 targetNote = readByte(curOffset++);
+      delay = delay == 0 ? 1 : delay;
+      targetNote += 24;
+      auto desc = fmt::format("Delay: {:d}  Duration: {:d}  Target Note: {:d}",
+        delay, duration, targetNote);
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Pitch Slide", desc, Type::PitchBendSlide);
+
+      // Pitch slide events are given immediately after the note to be slid. Since the slide is
+      // expressed using a target note rather than cents, we use portamento control rather than
+      // pitch bend, since the range could be huge, and portamento is closer in representation.
+
+      // Since portamento creates a slide from overlapping note events, the strategy is to insert
+      // a new note which overlaps with the previous duration note at the correct point (the delay value).
+      // We shorten the duration of the interrupted note for cleanliness sake.
+
+      // First check that the delay isn't longer than the previous note duration. This can still
+      // have an effect because a note can be audible after note off via the software release
+      // envelope. We can't account for this unless (maybe) we use pitch bend events instead of portamento.
+      if (delay >= m_prevNoteDur) {
+        L_DEBUG("Ignoring pitch slide event with a delay > note dur. Offset: {:X}  Time: {}\n", beginOffset, getTime());
+        break;
+      }
+
+      // insertPortamentoNoItem(true, m_prevNoteAbsTime);
+      makePrevDurNoteEnd(m_prevNoteAbsTime + delay + 1);  // add one to ensure the notes overlap to trigger portamento effect
+      insertPortamentoTime14BitNoItem(duration * m_timePerTickMicroseconds, m_prevNoteAbsTime + delay);
+      insertPortamentoControlNoItem(prevKey, m_prevNoteAbsTime + delay);
+      u32 newNoteDur = m_prevNoteDur - delay;
+      insertNoteByDurNoItem(targetNote, prevVel, newNoteDur, m_prevNoteAbsTime + delay);
+      // insertPortamentoNoItem(false, m_prevNoteAbsTime + m_prevNoteDur);
       break;
+    }
 
     case 0xF6:
       m_subroutineOffset = curOffset;
@@ -535,36 +595,48 @@ bool KonamiArcadeTrack::readEvent() {
 
     case 0xFD: {
       auto seq = static_cast<KonamiArcadeSeq*>(parentSeq);
-      u16 memJumpOffset = readShort(curOffset);
-      u32 romOffset = seq->dwOffset + (memJumpOffset - seq->memOffset());
-      bool shouldContinue = true;
-      if (romOffset < beginOffset) {
-        shouldContinue = addLoopForever(beginOffset, 3);
+      u32 dest;
+      int eventLength = seq->fmtVer == MysticWarrior ? 3 : 5;
+      if (seq->fmtVer == MysticWarrior) {
+        u16 memJumpOffset = readShort(curOffset);
+        dest = seq->dwOffset + (memJumpOffset - seq->memOffset());
       } else {
-        auto desc = fmt::format("Destination: ${:X}", romOffset);
-        addGenericEvent(beginOffset, 3, "Jump", desc, Type::Loop);
+        dest = getWordBE(curOffset);
       }
-      if (romOffset < seq->dwOffset) {
-        L_ERROR("KonamiArcadeEvent FD attempted jump to offset outside the sequence at {:X}.  Jump offset: {:X}", beginOffset, romOffset);
+      bool shouldContinue = true;
+      if (dest < beginOffset) {
+        shouldContinue = addLoopForever(beginOffset, eventLength);
+      } else {
+        auto desc = fmt::format("Destination: ${:X}", dest);
+        addGenericEvent(beginOffset, eventLength, "Jump", desc, Type::Loop);
+      }
+      if (dest < seq->dwOffset) {
+        L_ERROR("KonamiArcadeEvent FD attempted jump to offset outside the sequence at {:X}.  Jump offset: {:X}", beginOffset, dest);
         return false;
       }
-      curOffset = romOffset;
+      curOffset = dest;
       return shouldContinue;
     }
 
     case 0xFE: {
       m_inJump = true;
-      m_jumpReturnOffset = curOffset + 2;
+      u32 dest;
       auto seq = static_cast<KonamiArcadeSeq*>(parentSeq);
-      u16 memJumpOffset = readShort(curOffset);
-      u32 romOffset = seq->dwOffset + (memJumpOffset - seq->memOffset());
-      if (romOffset < seq->dwOffset) {
-        L_ERROR("KonamiArcade Event FE attempted jump to offset outside the sequence at {:X}.  Jump offset: {:X}", beginOffset, romOffset);
+      if (seq->fmtVer == MysticWarrior) {
+        m_jumpReturnOffset = curOffset + 2;
+        u16 memJumpOffset = readShort(curOffset);
+        dest = seq->dwOffset + (memJumpOffset - seq->memOffset());
+      } else {
+        m_jumpReturnOffset = curOffset + 4;
+        dest = getWordBE(curOffset);
+      }
+      if (dest < seq->dwOffset) {
+        L_ERROR("KonamiArcade Event FE attempted jump to offset outside the sequence at {:X}.  Jump offset: {:X}", beginOffset, dest);
         return false;
       }
-      auto desc = fmt::format("Destination: ${:X}", romOffset);
+      auto desc = fmt::format("Destination: ${:X}", dest);
       addGenericEvent(beginOffset, m_jumpReturnOffset - beginOffset, "Jump", desc, Type::Loop);
-      curOffset = romOffset;
+      curOffset = dest;
       break;
     }
     case 0xFF: {
