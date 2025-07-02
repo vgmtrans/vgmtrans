@@ -69,7 +69,7 @@ class VGMSeq : public VGMFile {
     m_initial_expression = level;
   }
 
-  [[nodiscard]] bool alwaysWriteInitialReverb() const { return m_always_write_initial_expression; }
+  [[nodiscard]] bool alwaysWriteInitialReverb() const { return m_always_write_initial_reverb; }
   void setAlwaysWriteInitialReverb(uint8_t level = 127) {
     m_always_write_initial_reverb = true;
     m_initial_reverb_level = level;
