@@ -69,8 +69,10 @@ private:
   double m_microsecsPerTick;
 
   u8 m_volSlideDuration;
+  s16 m_volSlideTarget;
   s16 m_volSlideIncrement;
   u8 m_panSlideDuration;
+  s16 m_panSlideTarget;
   s16 m_panSlideIncrement;
   u8 m_portamentoTime;
   u8 m_slideModeDelay;

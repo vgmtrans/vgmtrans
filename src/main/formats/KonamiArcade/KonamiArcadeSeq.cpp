@@ -100,8 +100,10 @@ void KonamiArcadeTrack::resetVars() {
   m_pan = 8;
   m_actualPan = 0x800;
   m_volSlideDuration = 0;
+  m_volSlideTarget = 0;
   m_volSlideIncrement = 0;
   m_panSlideDuration = 0;
+  m_panSlideTarget = 0;
   m_panSlideIncrement = 0;
   m_slideModeDelay = 0;
   m_slideModeDuration = 0;
@@ -205,27 +207,35 @@ std::pair<double, double>  KonamiArcadeTrack::calculateTempo(double tempoValue) 
 void KonamiArcadeTrack::onTickBegin() {
   // Handle Volume Slide
   if (m_volSlideDuration > 0) {
-    m_vol += m_volSlideIncrement;
-    m_vol = std::max<s16>(m_vol, 0);
+    m_volSlideDuration -= 1;
+    if (m_volSlideDuration == 0) {
+      m_vol = m_volSlideTarget;
+    } else {
+      m_vol += m_volSlideIncrement;
+      m_vol = std::max<s16>(m_vol, 0);
+    }
     u8 volByte = m_vol >> 8;
     u8 volIndex = ~volByte & 0x7F;
     u8 linearVol = volTable[volIndex] * 0x7F;
     if (linearVol != vol) {
       addVolNoItem(linearVol);
     }
-    m_volSlideDuration -= 1;
   }
 
   // Handle Pan Slide
   if (m_panSlideDuration > 0) {
-    m_actualPan += m_panSlideIncrement;
-    m_actualPan = std::clamp<s16>(m_actualPan, 0x100, 0x1F00);
+    m_panSlideDuration -= 1;
+    if (m_panSlideDuration == 0) {
+      m_actualPan = m_panSlideTarget;
+    } else {
+      m_actualPan += m_panSlideIncrement;
+      m_actualPan = std::clamp<s16>(m_actualPan, 0x100, 0x1F00);
+    }
     u8 panByte = m_actualPan >> 8;
     u8 midiPan = calculateMidiPanForK054539(panByte | 0x10);
     if (midiPan != prevPan) {
       addPanNoItem(midiPan);
     }
-    m_panSlideDuration -= 1;
   }
 
   // Handle Tempo Slide
@@ -613,9 +623,9 @@ bool KonamiArcadeTrack::readEvent() {
     // Volume Slide
     case 0xEF: {
       m_volSlideDuration = readByte(curOffset++);
-      s16 targetVol = readByte(curOffset++) << 8;
-      m_volSlideIncrement = (targetVol - m_vol) /  m_volSlideDuration;
-      auto desc = fmt::format("Duration: {:d}  Target Volume: {}", m_volSlideDuration, targetVol);
+      m_volSlideTarget = readByte(curOffset++) << 8;
+      m_volSlideIncrement = (m_volSlideTarget - m_vol) /  m_volSlideDuration;
+      auto desc = fmt::format("Duration: {:d}  Target Volume: {}", m_volSlideDuration, m_volSlideTarget);
       addGenericEvent(beginOffset, curOffset - beginOffset, "Volume Slide", desc, Type::VolumeSlide);
       break;
     }
@@ -721,9 +731,9 @@ bool KonamiArcadeTrack::readEvent() {
     // Pan Slide
     case 0xF8: {
       m_panSlideDuration = readByte(curOffset++);
-      s16 targetPan = readByte(curOffset++) << 8;
-      m_panSlideIncrement = (targetPan - m_actualPan) /  m_panSlideDuration;
-      auto desc = fmt::format("Duration: {:d}  Target Pan: {}", m_panSlideDuration, targetPan);
+      m_panSlideTarget = readByte(curOffset++) << 8;
+      m_panSlideIncrement = (m_panSlideTarget - m_actualPan) /  m_panSlideDuration;
+      auto desc = fmt::format("Duration: {:d}  Target Pan: {}", m_panSlideDuration, m_panSlideTarget);
       addGenericEvent(beginOffset, curOffset - beginOffset, "Pan Slide", desc, Type::PanSlide);
       break;
     }
