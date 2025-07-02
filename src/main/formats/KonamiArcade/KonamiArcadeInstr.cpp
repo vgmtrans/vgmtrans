@@ -117,6 +117,7 @@ bool KonamiArcadeInstrSet::parseInstrPointers() {
     rgn->sampNum = sampNum;
     rgn->unityKey = unityKey;
     rgn->release_time = drumReleaseTime;
+    rgn->volume = volTable[d.attenuation];
 
     rgn->addChild(off, 1, "Sample Number");
     rgn->addChild(off + 1, 1, "Unity Key");
@@ -124,7 +125,7 @@ bool KonamiArcadeInstrSet::parseInstrPointers() {
     rgn->addChild(off + 3, 1, "Pan");
     rgn->addChild(off + 4, 2, "Unknown");
     rgn->addChild(off + 6, 1, "Default Duration");
-    rgn->addChild(off + 7, 1, "Unknown");
+    rgn->addChild(off + 7, 1, "Attenuation");
     drumInstr->addRgn(rgn);
   }
   aInstrs.push_back(drumInstr);

@@ -43,9 +43,10 @@ public:
     u8 unity_key;
     s8 pitch_bend;
     u8 pan;
-    u16 unknown_1;
+    u8 unknown_0;
+    u8 unknown_1;
     u8 default_duration;
-    u8 unknown_2;
+    u8 attenuation;
   };
 
   KonamiArcadeInstrSet(RawFile *file,
