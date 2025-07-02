@@ -15,7 +15,7 @@ public:
     float nmiRate,
     const std::string& name
   );
-
+  void resetVars() override;
   bool parseHeader() override;
   bool parseTrackPointers() override;
 
@@ -25,11 +25,18 @@ public:
 
 public:
   KonamiArcadeFormatVer fmtVer;
+  u8 getTempoSlideDuration() { return m_tempoSlideDuration; }
+  void setTempoSlideDuration(u8 dur) { m_tempoSlideDuration = dur; }
+  double getTempoSlideIncrement() { return m_tempoSlideIncrement; }
+  void setTempoSlideIncrement(double increment) { m_tempoSlideIncrement = increment; }
 
 private:
   u32 m_memOffset;
   const std::array<KonamiArcadeInstrSet::drum, 46> m_drums;
   float m_nmiRate;
+
+  u8 m_tempoSlideDuration;
+  double m_tempoSlideIncrement;
 };
 
 
@@ -40,9 +47,11 @@ public:
 
   void resetVars() override;
   bool readEvent() override;
+  void onTickBegin() override;
 
 private:
   void makeTrulyPrevDurNoteEnd(uint32_t absTime) const;
+  std::pair<double, double> calculateTempo(double tempoByte);
 
   u8 calculateMidiPanForK054539(u8 pan);
   void enablePercussion(bool& flag);
@@ -56,8 +65,13 @@ private:
   u32 m_prevNoteDur;
   u32 m_prevNoteDelta;
   u8 m_prevFinalKey;
-  double m_timePerTickMicroseconds;
-  bool m_portamentoEnabled;
+  double m_tempo;
+  double m_microsecsPerTick;
+
+  u8 m_volSlideDuration;
+  s16 m_volSlideIncrement;
+  u8 m_panSlideDuration;
+  s16 m_panSlideIncrement;
   u8 m_portamentoTime;
   u8 m_slideModeDelay;
   u8 m_slideModeDuration;
@@ -71,8 +85,9 @@ private:
   s16 m_loopTranspose[2] = {};
   u8 m_prevDelta;
   u8 m_duration;
-  u8 m_vol;
+  s16 m_vol;
   u8 m_pan;
+  s16 m_actualPan;
   u32 m_subroutineOffset;
   u32 m_subroutineReturnOffset;
   bool m_needsSubroutineEnd = false;

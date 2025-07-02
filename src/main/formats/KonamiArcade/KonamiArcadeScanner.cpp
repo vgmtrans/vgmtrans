@@ -246,7 +246,9 @@ const std::vector<KonamiArcadeSeq*> KonamiArcadeScanner::loadSeqTable(
         seqs.push_back(newSeq);
 
       auto child = seqTable->addChild(offset, sizeof(sequence_table_entry_gx), "Sequence Info Block");
-      child->addUnknownChild(offset, 8);
+      child->addUnknownChild(offset, 5);
+      child->addChild(offset + 5, 1, "Tempo Related");
+      child->addUnknownChild(offset + 6, 2);
       child->addChild(offset + 8, 4, "Sequence Pointer");
 
       offset += entryLength;
