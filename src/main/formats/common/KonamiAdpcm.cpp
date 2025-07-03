@@ -12,32 +12,39 @@ K054539AdpcmSamp::K054539AdpcmSamp(VGMSampColl *sampColl, uint32_t offset, uint3
                                      uint32_t theRate, std::string name)
     : VGMSamp(sampColl, offset, length, offset, length, 1, 16, theRate, std::move(name)) {}
 
-void K054539AdpcmSamp::convertToStdWave(uint8_t *buf) {
-  auto* uncompBuf = reinterpret_cast<int16_t*>(buf);
+void K054539AdpcmSamp::convertToStdWave(u8* buf)
+{
+  auto* uncompBuf = reinterpret_cast<s16*>(buf);
 
-  int32_t curVal = 0; // Current PCM sample value
-  int32_t prevVal = 0; // Previous PCM sample value
-  int sampleNum = 0;
+  std::size_t sampleNum = 0;          // write index in the PCM buffer
+  std::int32_t prevVal  = 0;          // “integrator” – same as the chip
 
-  for (uint32_t off = dwOffset; off < (dwOffset + unLength); ++off) {
-    uint8_t sampleByte = readByte(off);
+  const auto emit = [&](u8 nibble) {
+    // turn the 4-bit code into a delta and integrate it
+    std::int32_t curVal = std::clamp(prevVal + DPCM_TABLE[nibble], -32768, 32767);
 
-    // Process both nibbles (4-bit samples) in the byte
-    for (int nibble_shift = 0; nibble_shift <= 4; nibble_shift += 4) {
-      uint8_t nibble = (sampleByte >> nibble_shift) & 0x0F;  // Extract 4-bit value
-      int16_t delta = DPCM_TABLE[nibble];  // Get corresponding delta from DPCM table
+    uncompBuf[sampleNum++] = static_cast<s16>(curVal);
+    prevVal = curVal;
+  };
 
-      // Apply the delta to the previous value
-      curVal = prevVal + delta;
+     // Walk through the compressed data either forwards or backwards.
+     // In *reverse* mode we:
+     //   • start at the last byte,
+     //   • step the address backwards one byte at a time
+     //   • still decode *low nibble first,* then high nibble.
 
-      // Saturate to the range of a 16-bit PCM sample
-      curVal = std::clamp(curVal, -32768, 32767);
-
-      // Append the computed PCM value to the output
-      uncompBuf[sampleNum++] = static_cast<int16_t>(curVal);
-
-      // Update previous value for the next sample
-      prevVal = curVal;
+  if (!reverse()) {
+    for (std::uint32_t off = dwOffset; off < dwOffset + unLength; ++off) {
+      std::uint8_t b = readByte(off);
+      emit( b        & 0x0F );
+      emit( b >> 4   & 0x0F );
+    }
+  }
+  else {
+    for (std::uint32_t off = dwOffset + unLength;  off-- > dwOffset; ) {
+      std::uint8_t b = readByte(off);
+      emit( b        & 0x0F );
+      emit( b >> 4   & 0x0F );
     }
   }
 }

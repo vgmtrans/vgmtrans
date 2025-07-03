@@ -141,7 +141,7 @@ u8 KonamiArcadeTrack::calculateMidiPanForK054539(u8 pan) {
 void KonamiArcadeTrack::enablePercussion(bool& flag) {
   flag = true;
   // Drums define their own pan, which is only used if the pan state value is 0
-  addBankSelectNoItem(1);
+  addBankSelectNoItem(2);
   addProgramChangeNoItem(0, false);
   applyTranspose();
 }
@@ -485,7 +485,7 @@ bool KonamiArcadeTrack::readEvent() {
       if (m_curProg > 0x7F) {
         printf("program # is greater than 0x7f\n");
       }
-      addProgramChange(beginOffset, curOffset - beginOffset, m_curProg);
+      addProgramChange(beginOffset, curOffset - beginOffset, m_curProg, true);
       break;
     }
 
