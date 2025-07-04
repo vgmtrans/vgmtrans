@@ -191,11 +191,11 @@ u32 KonamiArcadeSampColl::determineSampleSize(u32 startOffset,
         return startOffset - off;
       }
     }
-  } else {
-    for (u32 off = startOffset; off < unLength + 2; off += inc) {
-      if (readShort(off) == endMarker) {
-        return off - startOffset;
-      }
+    return startOffset;
+  }
+  for (u32 off = startOffset; off < unLength + 2; off += inc) {
+    if (readShort(off) == endMarker) {
+      return off - startOffset;
     }
   }
   return unLength - startOffset;
