@@ -26,20 +26,33 @@ double VGMSamp::compressionRatio() {
   return 1.0;
 }
 
-void VGMSamp::convertToStdWave(uint8_t *buf) {
-  switch (waveType) {
-    case WT_PCM8:
-      readBytes(dataOff, dataLength, buf);
-      /* Need to transform to unsigned (despite what the type imples), as standard WAVE uses PCM8
-       * unsigned */
-      for (unsigned int i = 0; i < dataLength; i++)
-        buf[i] ^= 0x80;
-      break;
-    case WT_PCM16:
-    default:
-      /* Nothing to do here, PCM16 is signed */
-      readBytes(dataOff, dataLength, buf);
-      break;
+void VGMSamp::convertToStdWave(std::uint8_t* buf)
+{
+  readBytes(dataOff, dataLength, buf);
+
+  if (m_reverse) {
+    switch (waveType) {
+      case WT_PCM16: {
+          // treat the buffer as an array of 16-bit little-endian words;
+          //   reversing the *words* keeps each sample’s byte order intact
+        auto samples = std::span<u16>(
+            reinterpret_cast<u16*>(buf),      // first element
+            dataLength / 2);            // # of 16-bit words
+        std::reverse(samples.begin(), samples.end());
+        break;
+      }
+      case WT_PCM8:
+      default:
+        std::reverse(buf, buf + dataLength);
+        break;
+
+    }
+  }
+
+  // process 8-bit samples (signed to unsigned)
+  if (waveType == WT_PCM8) {
+    for (std::size_t i = 0; i < dataLength; ++i)
+      buf[i] ^= 0x80;
   }
 }
 

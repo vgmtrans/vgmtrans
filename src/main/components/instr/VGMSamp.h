@@ -37,6 +37,8 @@ public:
   inline void setLoopLength(uint32_t theLoopLength) { loop.loopLength = theLoopLength; }
   inline void setLoopStartMeasure(LoopMeasure measure) { loop.loopStartMeasure = measure; }
   inline void setLoopLengthMeasure(LoopMeasure measure) { loop.loopLengthMeasure = measure; }
+  inline bool reverse() { return m_reverse; }
+  inline void setReverse(bool reverse) { m_reverse = reverse; }
 
   bool onSaveAsWav();
   bool saveAsWav(const std::string &filepath);
@@ -61,6 +63,9 @@ public:
   long pan{0};
 
   VGMSampColl *parSampColl;
+
+private:
+  bool m_reverse = false;
 };
 
 
