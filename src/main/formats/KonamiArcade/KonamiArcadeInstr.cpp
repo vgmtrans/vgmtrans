@@ -207,10 +207,11 @@ bool KonamiArcadeSampColl::parseSampleInfo() {
   for (auto sampInfo : sampInfos) {
     u32 sampleOffset = sampInfo.start_msb << 16 | sampInfo.start_mid << 8 | sampInfo.start_lsb;
     u32 sampleLoopOffset = sampInfo.loop_msb << 16 | sampInfo.loop_mid << 8 | sampInfo.loop_lsb;
-    u32 relativeLoopOffset = sampleLoopOffset - sampleOffset;
+    s32 relativeLoopOffset = sampleLoopOffset - sampleOffset;
     u32 sampleSize = determineSampleSize(sampleOffset, sampInfo.type(), sampInfo.reverse());
     if (sampInfo.reverse()) {
       sampleOffset = sampleOffset - sampleSize;
+      relativeLoopOffset = -relativeLoopOffset;
     }
 
     auto name = fmt::format("Sample {:d}", sampNum++);
