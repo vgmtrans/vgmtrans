@@ -141,7 +141,7 @@ u8 KonamiArcadeTrack::calculateMidiPanForK054539(u8 pan) {
 void KonamiArcadeTrack::enablePercussion(bool& flag) {
   flag = true;
   // Drums define their own pan, which is only used if the pan state value is 0
-  addBankSelectNoItem(1);
+  addBankSelectNoItem(2);
   addProgramChangeNoItem(0, false);
   applyTranspose();
 }
@@ -479,13 +479,10 @@ bool KonamiArcadeTrack::readEvent() {
       break;
     }
 
-    // program change
+    // Program Change
     case 0xE2: {
       m_curProg = readByte(curOffset++);
-      if (m_curProg > 0x7F) {
-        printf("program # is greater than 0x7f\n");
-      }
-      addProgramChange(beginOffset, curOffset - beginOffset, m_curProg);
+      addProgramChange(beginOffset, curOffset - beginOffset, m_curProg, true);
       break;
     }
 
@@ -513,6 +510,7 @@ bool KonamiArcadeTrack::readEvent() {
       addUnknown(beginOffset, curOffset - beginOffset);
       break;
 
+    // Loop Start Marker
     case 0xE6:
       loopNum = 0;
       goto loopMarker;
@@ -525,6 +523,7 @@ bool KonamiArcadeTrack::readEvent() {
       break;
     }
 
+    // Loop
     case 0xE7:
       loopNum = 0;
       goto doLoop;
@@ -646,12 +645,12 @@ bool KonamiArcadeTrack::readEvent() {
       break;
     }
 
+    // Pitch Slide Mode
+    // When enabled, triggers a pitch slide similar to event F3 on every note on.
+    // Unlike F3, pitch is given as a relative value, and the slide goes FROM
+    // the new pitch to the pitch of the triggered note (F3 slides from note to target note)
+    // Pitch slide is disabled by setting the duration value to 0.
     case 0xF1: {
-      // Pitch Slide Mode
-      // When enabled, triggers a pitch slide similar to event F3 on every note on.
-      // Unlike F3, pitch is given as a relative value, and the slide goes FROM
-      // the new pitch to the pitch of the triggered note (F3 goes note pitch to slide pitch)
-      // Sequences disable this by calling the same event with 00 param values
       m_slideModeDelay = readByte(curOffset++);
       m_slideModeDelay = m_slideModeDelay == 0 ? 1 : m_slideModeDelay;
       m_slideModeDuration = readByte(curOffset++);
@@ -660,6 +659,7 @@ bool KonamiArcadeTrack::readEvent() {
       break;
     }
 
+    // Pitch Bend
     case 0xF2: {
       s8 pitchBend = readByte(curOffset++);
       // data byte of 0x40 == 1 semitone. Equivalent to 4096 in MIDI when range is default 2 semitones
@@ -667,7 +667,8 @@ bool KonamiArcadeTrack::readEvent() {
       break;
     }
 
-    case 0xF3: {      // Pitch Slide
+    // Pitch Slide
+    case 0xF3: {
       u8 delay = readByte(curOffset++);
       u8 duration = readByte(curOffset++);
       u8 targetNote = readByte(curOffset++);
@@ -704,12 +705,14 @@ bool KonamiArcadeTrack::readEvent() {
       break;
     }
 
+    // Subroutine Start
     case 0xF6:
       m_subroutineOffset = curOffset;
       m_needsSubroutineEnd = true;
       addGenericEvent(beginOffset, curOffset - beginOffset, "Subroutine Start", "", Type::Loop);
       break;
 
+    // Subroutine Return / Call Subroutine
     case 0xF7:
       if (m_needsSubroutineEnd) {
         m_needsSubroutineEnd = false;
@@ -744,7 +747,7 @@ bool KonamiArcadeTrack::readEvent() {
       break;
     }
 
-    //release rate
+    // Release Rate
     case 0xFA: {
       // lower value results in longer sustain
       m_releaseRate = readByte(curOffset++);
@@ -752,6 +755,7 @@ bool KonamiArcadeTrack::readEvent() {
       break;
     }
 
+    // Jump
     case 0xFD: {
       auto seq = static_cast<KonamiArcadeSeq*>(parentSeq);
       u32 dest;
@@ -777,6 +781,7 @@ bool KonamiArcadeTrack::readEvent() {
       return shouldContinue;
     }
 
+    // Call
     case 0xFE: {
       m_inJump = true;
       u32 dest;
@@ -798,6 +803,8 @@ bool KonamiArcadeTrack::readEvent() {
       curOffset = dest;
       break;
     }
+
+    // Return  / End of Track
     case 0xFF: {
       if (m_inJump) {
         addGenericEvent(beginOffset, 1, "Return", "", Type::Loop);

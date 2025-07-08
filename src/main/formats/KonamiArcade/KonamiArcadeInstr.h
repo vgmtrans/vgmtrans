@@ -26,9 +26,22 @@ struct konami_mw_sample_info {
   u8 start_lsb;
   u8 start_mid;
   u8 start_msb;
-  sample_type type;
+  u8 flags;
   bool loops;
   u8 attenuation;
+
+private:
+  static constexpr u8 mask_sample_type = 0b0000'1100;  // bits 2-3
+  static constexpr u8 mask_reverse     = 0b0010'0000;  // bit 5
+
+public:
+  [[nodiscard]] constexpr sample_type type() const noexcept {
+    return static_cast<sample_type>(flags & mask_sample_type);
+  }
+
+  [[nodiscard]] constexpr bool reverse() const noexcept {
+    return (flags & mask_reverse) != 0;
+  }
 };
 
 // ********************
@@ -87,7 +100,7 @@ public:
   bool parseSampleInfo() override;
 
 private:
-  u32 determineSampleSize(u32 startOffset, konami_mw_sample_info::sample_type type);
+  u32 determineSampleSize(u32 startOffset, konami_mw_sample_info::sample_type type, bool reverse);
 
   std::vector<VGMItem*> samplePointers;
   KonamiArcadeInstrSet *instrset;
