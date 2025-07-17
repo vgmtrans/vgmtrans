@@ -56,6 +56,7 @@ private:
   u8 calculateMidiPanForK054539(u8 pan);
   void enablePercussion(bool& flag);
   void disablePercussion(bool& flag);
+  bool percussionEnabled();
   void applyTranspose();
 
   bool m_inJump;

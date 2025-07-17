@@ -162,7 +162,7 @@ void KonamiArcadeTrack::disablePercussion(bool& flag) {
   flag = false;
 
   // If either percussion flag is still set, exit and don't disable percussion
-  if (m_percussionFlag1 || m_percussionFlag2)
+  if (percussionEnabled())
     return;
 
   if (m_pan == 0) {
@@ -175,10 +175,14 @@ void KonamiArcadeTrack::disablePercussion(bool& flag) {
   applyTranspose();
 }
 
+bool KonamiArcadeTrack::percussionEnabled() {
+  return m_percussionFlag1 || m_percussionFlag2;
+}
+
 void KonamiArcadeTrack::applyTranspose() {
   // If percussion is active we cannot transpose by activating a different note since drums use
   // a drumkit instrument (where each note is a different percussive sound). Instead we use fine tune.
-  if (m_percussionFlag1 || m_percussionFlag2) {
+  if (percussionEnabled()) {
     transpose = 0;
     if (coarseTuningSemitones != m_driverTranspose) {
       // TODO: uncomment this when we stop using BASS. Bass doesn't properly implement coarse
@@ -324,7 +328,7 @@ bool KonamiArcadeTrack::readEvent() {
 
     uint32_t actualDuration;
     if (m_duration == 0) {
-      if ((m_percussionFlag1 || m_percussionFlag2) && (note - 24) < 46) {
+      if (percussionEnabled() && (note - 24) < 46) {
         auto seq = static_cast<KonamiArcadeSeq*>(parentSeq);
         auto& drum = seq->drums()[note-24];
         u8 defaultDrumDur = drum.default_duration;
@@ -348,10 +352,19 @@ bool KonamiArcadeTrack::readEvent() {
     note += m_loopTranspose[0] / 32 + m_loopTranspose[1] / 32;
     note = note > 0x7F ? 0x7F : note;
 
+    // If an event caused the duration tie to be canceled, remove the duration tie flag and set
+    // expression back to max (unless this is a new tied duration note, which will add its own expression)
+    if (m_didCancelDurTie && m_tiePrevNote) {
+      m_tiePrevNote = false;
+      if (m_duration != 100 || percussionEnabled()) {
+        addExpressionNoItem(127);
+      }
+    }
+
     // When the duration is 100%, the note acts like a tie. However, in this state, the note
     // 'velocity' (as we treat it) still affects volume. We handle this by setting the MIDI velocity
     // of these notes to max (0x7F) and manipulating volume with expression events.
-    if (m_tiePrevNote || m_duration == 100) {
+    if ((m_tiePrevNote || m_duration == 100) && !percussionEnabled()) {
       addExpressionNoItem(linearVel);
       linearVel = 0x7F;
     }
@@ -378,9 +391,9 @@ bool KonamiArcadeTrack::readEvent() {
       insertNoteByDur(beginOffset, curOffset - beginOffset, note, linearVel, actualDuration - m_slideModeDelay, getTime() + m_slideModeDelay);
     } else {
 
-      // When the previous note was tied, and this note is the same, and there wasn't a program
-      // change, just extend the previous note instead of creating a new note.
-      if (m_tiePrevNote && note == prevKey && !m_didCancelDurTie) {
+      // When the previous note was tied, and this note is the same, just extend the previous note
+      // instead of creating a new note.
+      if (m_tiePrevNote && note == prevKey) {
         makePrevDurNoteEnd(getTime() + actualDuration);
         auto desc = fmt::format("Note with Duration (tied) - abs key: {} ({}), velocity: {}, duration: {}",
           static_cast<int>(prevKey), MidiEvent::getNoteName(prevKey), static_cast<int>(linearVel), actualDuration);
@@ -389,13 +402,11 @@ bool KonamiArcadeTrack::readEvent() {
         addNoteByDur(beginOffset, curOffset - beginOffset, note, linearVel, actualDuration);
       }
     }
-    if (m_tiePrevNote && m_duration != 100) {
-      insertExpressionNoItem(127, getTime() + delta);
+    if (m_tiePrevNote && (m_duration != 100 || percussionEnabled())) {
+      insertExpressionNoItem(127, getTime() + actualDuration);
     }
-    m_tiePrevNote = m_duration == 100;
+    m_tiePrevNote = m_duration == 100 && !percussionEnabled();
     m_didCancelDurTie = false;
-
-
 
     m_prevNoteAbsTime = getTime();
     m_prevNoteDur = actualDuration;
