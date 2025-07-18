@@ -145,4 +145,7 @@ for contributing effectively.
 - [@brr890](https://twitter.com/brr890) and [@tssf](https://twitter.com/tssf): Contributed a lot of hints on PS1 AKAO format.
 
 ## License
-Licensed under the zlib/libpng License. See [`LICENSE`](LICENSE).
+Licensed under the zlib License. See [`LICENSE`](LICENSE).
+
+This project bundles some third‑party components, each under its own license. You can review every license in the 
+`licenses/` folder of the source tree or, in the compiled app, via **About → License**.
