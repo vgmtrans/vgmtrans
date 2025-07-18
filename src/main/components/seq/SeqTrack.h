@@ -19,6 +19,11 @@ class MidiTrack;
 
 enum ReadMode : uint8_t;
 
+enum class LevelController : uint8_t {
+  Volume,
+  Expression,
+};
+
 class SeqTrack : public VGMItem {
  public:
   SeqTrack(VGMSeq *parentSeqFile, uint32_t offset = 0, uint32_t length = 0, std::string name = "Track");
@@ -51,7 +56,11 @@ class SeqTrack : public VGMItem {
  protected:
   virtual void onEvent(uint32_t offset, uint32_t length);
   virtual void addEvent(SeqEvent *pSeqEvent);
+ private:
   void addControllerSlide(uint32_t dur, uint8_t &prevVal, uint8_t targVal, uint8_t (*scalerFunc)(uint8_t), void (MidiTrack::*insertFunc)(uint8_t, uint8_t, uint32_t)) const;
+  double calculateLevelPercent(u8 level, LevelController controller);
+  u8 calculateLevel(u8 level, LevelController controller);
+  u16 calculateLevel14bit(u8 level, LevelController controller);
  public:
   void addGenericEvent(uint32_t offset, uint32_t length, const std::string &sEventName, const std::string &sEventDesc, Type type);
   void addSetOctave(uint32_t offset, uint32_t length, uint8_t newOctave, const std::string &sEventName = "Set Octave");
@@ -97,6 +106,7 @@ class SeqTrack : public VGMItem {
   void addExpressionNoItem(uint8_t level);
   void addExpressionSlide(uint32_t offset, uint32_t length, uint32_t dur, uint8_t targExpr, const std::string &sEventName = "Expression Slide");
   void insertExpression(uint32_t offset, uint32_t length, uint8_t level, uint32_t absTime, const std::string &sEventName = "Expression");
+  void insertExpressionNoItem(uint8_t level, uint32_t absTime);
   void addMasterVol(uint32_t offset, uint32_t length, uint8_t vol, const std::string &sEventName = "Master Volume");
   void addMasterVolNoItem(uint8_t newVol);
   void addMastVolSlide(uint32_t offset, uint32_t length, uint32_t dur, uint8_t targVol, const std::string &sEventName = "Master Volume Slide");

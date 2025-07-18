@@ -65,6 +65,8 @@ private:
   u32 m_prevNoteDur;
   u32 m_prevNoteDelta;
   u8 m_prevFinalKey;
+  bool m_tiePrevNote;
+  bool m_didCancelDurTie;
   double m_tempo;
   double m_microsecsPerTick;
 

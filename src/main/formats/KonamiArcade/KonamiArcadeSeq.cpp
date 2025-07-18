@@ -24,6 +24,7 @@ KonamiArcadeSeq::KonamiArcadeSeq(
   setUseLinearAmplitudeScale(true);
   setAllowDiscontinuousTrackData(true);
   setAlwaysWriteInitialVol(127);
+  setAlwaysWriteInitialExpression(127);
   setAlwaysWriteInitialTempo(120);
   useReverb();
 }
@@ -42,6 +43,9 @@ bool KonamiArcadeSeq::parseHeader() {
 bool KonamiArcadeSeq::parseTrackPointers() {
   u32 pos = dwOffset;
   int numTracks = 16;
+
+  auto trackPtrTableItem = addChild(dwOffset, numTracks * 2, "Track Pointer Table");
+
   if (fmtVer == MysticWarrior) {
     // Check to see if this sequence uses 16 tracks or 8 tracks for games with only 1 K054539.
     // We'll check for any pattern of 0x0000 where the second set of track pointers would be, as this
@@ -59,6 +63,8 @@ bool KonamiArcadeSeq::parseTrackPointers() {
 
       u32 romTrackOffset = dwOffset + (memTrackOffset - m_memOffset);
 
+      trackPtrTableItem->addChild(pos, 2, fmt::format("Track {} Pointer", i));
+
       aTracks.push_back(new KonamiArcadeTrack(this, romTrackOffset, 0));
       pos += 2;
     }
@@ -71,6 +77,9 @@ bool KonamiArcadeSeq::parseTrackPointers() {
       if (trackOffset < dwOffset) {
         dwOffset = trackOffset;
       }
+
+      trackPtrTableItem->addChild(pos, 4, fmt::format("Track {} Pointer", i));
+
       aTracks.push_back(new KonamiArcadeTrack(this, trackOffset, 0));
       pos += 4;
     }
@@ -95,6 +104,8 @@ void KonamiArcadeTrack::resetVars() {
   m_prevNoteAbsTime = 0;
   m_prevNoteDelta = 0;
   m_prevFinalKey = 0;
+  m_tiePrevNote = false;
+  m_didCancelDurTie = false;
   m_microsecsPerTick = 0;
   m_vol = 0;
   m_pan = 8;
@@ -143,6 +154,7 @@ void KonamiArcadeTrack::enablePercussion(bool& flag) {
   // Drums define their own pan, which is only used if the pan state value is 0
   addBankSelectNoItem(2);
   addProgramChangeNoItem(0, false);
+  m_didCancelDurTie = true;
   applyTranspose();
 }
 
@@ -159,6 +171,7 @@ void KonamiArcadeTrack::disablePercussion(bool& flag) {
       addPanNoItem(midiPan);
   }
   addProgramChangeNoItem(m_curProg, true);
+  m_didCancelDurTie = true;
   applyTranspose();
 }
 
@@ -335,6 +348,14 @@ bool KonamiArcadeTrack::readEvent() {
     note += m_loopTranspose[0] / 32 + m_loopTranspose[1] / 32;
     note = note > 0x7F ? 0x7F : note;
 
+    // When the duration is 100%, the note acts like a tie. However, in this state, the note
+    // 'velocity' (as we treat it) still affects volume. We handle this by setting the MIDI velocity
+    // of these notes to max (0x7F) and manipulating volume with expression events.
+    if (m_tiePrevNote || m_duration == 100) {
+      addExpressionNoItem(linearVel);
+      linearVel = 0x7F;
+    }
+
     if (m_portamentoTime > 0 && prevKey != note) {
       if (m_prevNoteAbsTime + m_prevNoteDur == getTime()) {
         addPortamentoControlNoItem(m_prevFinalKey);
@@ -356,8 +377,24 @@ bool KonamiArcadeTrack::readEvent() {
       insertPortamentoControlNoItem(slideStartNote, getTime() + m_slideModeDelay);
       insertNoteByDur(beginOffset, curOffset - beginOffset, note, linearVel, actualDuration - m_slideModeDelay, getTime() + m_slideModeDelay);
     } else {
-      addNoteByDur(beginOffset, curOffset - beginOffset, note, linearVel, actualDuration);
+
+      // When the previous note was tied, and this note is the same, and there wasn't a program
+      // change, just extend the previous note instead of creating a new note.
+      if (m_tiePrevNote && note == prevKey && !m_didCancelDurTie) {
+        makePrevDurNoteEnd(getTime() + actualDuration);
+        auto desc = fmt::format("Note with Duration (tied) - abs key: {} ({}), velocity: {}, duration: {}",
+          static_cast<int>(prevKey), MidiEvent::getNoteName(prevKey), static_cast<int>(linearVel), actualDuration);
+        addGenericEvent(beginOffset, curOffset - beginOffset, "Note with Duration (tied)", desc, Type::Tie);
+      } else {
+        addNoteByDur(beginOffset, curOffset - beginOffset, note, linearVel, actualDuration);
+      }
     }
+    if (m_tiePrevNote && m_duration != 100) {
+      insertExpressionNoItem(127, getTime() + delta);
+    }
+    m_tiePrevNote = m_duration == 100;
+    m_didCancelDurTie = false;
+
 
 
     m_prevNoteAbsTime = getTime();
@@ -460,6 +497,7 @@ bool KonamiArcadeTrack::readEvent() {
       uint8_t delta = readByte(curOffset++);
       addRest(beginOffset, curOffset-beginOffset, delta);
       m_prevDelta = delta;
+      m_didCancelDurTie = true;
       break;
     }
 
@@ -476,6 +514,7 @@ bool KonamiArcadeTrack::readEvent() {
       m_prevNoteDur += newdur;
       m_prevNoteDelta += delta;
       m_prevDelta = delta;
+      m_didCancelDurTie = true;
       break;
     }
 
@@ -483,6 +522,7 @@ bool KonamiArcadeTrack::readEvent() {
     case 0xE2: {
       m_curProg = readByte(curOffset++);
       addProgramChange(beginOffset, curOffset - beginOffset, m_curProg, true);
+      m_didCancelDurTie = true;
       break;
     }
 

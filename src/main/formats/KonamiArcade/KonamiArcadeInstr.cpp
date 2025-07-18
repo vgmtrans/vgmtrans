@@ -115,6 +115,10 @@ bool KonamiArcadeInstrSet::parseInstrPointers() {
     u32 off = m_drumTableOffset + i * sizeof(drum);
     int sampNum = numMelodicInstrs + d.samp_num;
 
+    if (d.unity_key >= 0x60) {
+      break;
+    }
+
     VGMRgn* rgn = new VGMRgn(drumInstr, off, sizeof(drum), fmt::format("Region {:d}", i));
     // The driver offsets notes up 2 octaves relative to midi note values.
     rgn->keyLow = i + 24;
@@ -198,7 +202,11 @@ u32 KonamiArcadeSampColl::determineSampleSize(u32 startOffset,
       return off - startOffset;
     }
   }
-  return unLength - startOffset;
+  if (reverse) {
+    return startOffset - dwOffset;
+  } else {
+    return unLength - startOffset;
+  }
 }
 
 bool KonamiArcadeSampColl::parseSampleInfo() {
