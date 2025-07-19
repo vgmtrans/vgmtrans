@@ -56,6 +56,7 @@ private:
   u8 calculateMidiPanForK054539(u8 pan);
   void enablePercussion(bool& flag);
   void disablePercussion(bool& flag);
+  bool percussionEnabled();
   void applyTranspose();
 
   bool m_inJump;
@@ -65,6 +66,8 @@ private:
   u32 m_prevNoteDur;
   u32 m_prevNoteDelta;
   u8 m_prevFinalKey;
+  bool m_tiePrevNote;
+  bool m_didCancelDurTie;
   double m_tempo;
   double m_microsecsPerTick;
 

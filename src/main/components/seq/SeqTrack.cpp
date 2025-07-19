@@ -664,13 +664,7 @@ void SeqTrack::addVol(uint32_t offset, uint32_t length, uint8_t newVol, const st
 
 void SeqTrack::addVolNoItem(uint8_t newVol) {
   if (readMode == READMODE_CONVERT_TO_MIDI) {
-    double newVolPercent = newVol / 127.0;
-    if (parentSeq->panVolumeCorrectionMode == PanVolumeCorrectionMode::kAdjustVolumeController)
-      newVolPercent *= panVolumeCorrectionRate;
-    if (parentSeq->usesLinearAmplitudeScale())
-      newVolPercent = sqrt(newVolPercent);
-
-    const uint8_t finalVol = static_cast<uint8_t>(std::min(newVolPercent * 127, 127.0));
+    const u8 finalVol = calculateLevel(newVol, LevelController::Volume);
     pMidiTrack->addVol(channel, finalVol);
   }
   vol = newVol;
@@ -688,13 +682,7 @@ void SeqTrack::addVolume14Bit(uint32_t offset, uint32_t length, uint16_t volume,
 // is in the range of 0 -> 127^2, but we normalize the value to the full 14 bit range: 0 -> (1 << 14) - 1
 void SeqTrack::addVolume14BitNoItem(uint16_t volume) {
   if (readMode == READMODE_CONVERT_TO_MIDI) {
-    double newVolPercent = std::min(volume / (127.0 * 127.0), 1.0);
-    if (parentSeq->panVolumeCorrectionMode == PanVolumeCorrectionMode::kAdjustVolumeController)
-      newVolPercent *= panVolumeCorrectionRate;
-    if (parentSeq->usesLinearAmplitudeScale())
-      newVolPercent = sqrt(newVolPercent);
-
-    const uint16_t finalVol = static_cast<uint16_t>(std::min(newVolPercent * 16383.0, 16383.0));
+    const u16 finalVol = calculateLevel14bit(volume, LevelController::Volume);
     uint8_t volume_hi = static_cast<uint8_t>((finalVol >> 7) & 0x7F);
     uint8_t volume_lo = static_cast<uint8_t>(finalVol & 0x7F);
     pMidiTrack->addVolumeFine(channel, volume_lo);
@@ -727,13 +715,7 @@ void SeqTrack::insertVol(uint32_t offset,
                          const std::string &sEventName) {
   onEvent(offset, length);
 
-  double newVolPercent = newVol / 127.0;
-  if (parentSeq->panVolumeCorrectionMode == PanVolumeCorrectionMode::kAdjustVolumeController)
-    newVolPercent *= panVolumeCorrectionRate;
-  if (parentSeq->usesLinearAmplitudeScale())
-    newVolPercent = sqrt(newVolPercent);
-
-  const uint8_t finalVol = static_cast<uint8_t>(std::min(newVolPercent * 127, 127.0));
+  const u8 finalVol = calculateLevel(newVol, LevelController::Volume);
   if (readMode == READMODE_ADD_TO_UI && !isItemAtOffset(offset, true))
     addEvent(new VolSeqEvent(this, newVol, offset, length, sEventName));
   else if (readMode == READMODE_CONVERT_TO_MIDI)
@@ -749,15 +731,30 @@ void SeqTrack::addExpression(uint32_t offset, uint32_t length, uint8_t level, co
   addExpressionNoItem(level);
 }
 
+double SeqTrack::calculateLevelPercent(u8 level, LevelController controller) {
+  double newVolPercent = level / 127.0;
+  PanVolumeCorrectionMode relevantCorrectionMode = controller == LevelController::Volume ?
+    PanVolumeCorrectionMode::kAdjustVolumeController : PanVolumeCorrectionMode::kAdjustExpressionController;
+  if (parentSeq->panVolumeCorrectionMode == relevantCorrectionMode)
+    newVolPercent *= panVolumeCorrectionRate;
+  if (parentSeq->usesLinearAmplitudeScale())
+    newVolPercent = sqrt(newVolPercent);
+  return newVolPercent;
+}
+
+u8 SeqTrack::calculateLevel(u8 level, LevelController controller) {
+  double levelPercent = calculateLevelPercent(level, controller);
+  return static_cast<uint8_t>(std::min(levelPercent * 127, 127.0));
+}
+
+u16 SeqTrack::calculateLevel14bit(u8 level, LevelController controller) {
+  double levelPercent = calculateLevelPercent(level, controller);
+  return static_cast<uint16_t>(std::min(levelPercent * 16383.0, 16383.0));
+}
+
 void SeqTrack::addExpressionNoItem(uint8_t level) {
   if (readMode == READMODE_CONVERT_TO_MIDI) {
-    double newVolPercent = level / 127.0;
-    if (parentSeq->panVolumeCorrectionMode == PanVolumeCorrectionMode::kAdjustExpressionController)
-      newVolPercent *= panVolumeCorrectionRate;
-    if (parentSeq->usesLinearAmplitudeScale())
-      newVolPercent = sqrt(newVolPercent);
-
-    const uint8_t finalExpression = static_cast<uint8_t>(std::min(newVolPercent * 127, 127.0));
+    u8 finalExpression = calculateLevel(level, LevelController::Expression);
     pMidiTrack->addExpression(channel, finalExpression);
   }
   expression = level;
@@ -787,13 +784,7 @@ void SeqTrack::insertExpression(uint32_t offset,
                                 const std::string &sEventName) {
   onEvent(offset, length);
 
-  double newVolPercent = level / 127.0;
-  if (parentSeq->panVolumeCorrectionMode == PanVolumeCorrectionMode::kAdjustExpressionController)
-    newVolPercent *= panVolumeCorrectionRate;
-  if (parentSeq->usesLinearAmplitudeScale())
-    newVolPercent = sqrt(newVolPercent);
-
-  const uint8_t finalExpression = static_cast<uint8_t>(std::min(newVolPercent * 127, 127.0));
+  const u8 finalExpression = calculateLevel(level,  LevelController::Expression);
   if (readMode == READMODE_ADD_TO_UI && !isItemAtOffset(offset, true))
     addEvent(new ExpressionSeqEvent(this, level, offset, length, sEventName));
   else if (readMode == READMODE_CONVERT_TO_MIDI)
@@ -801,6 +792,13 @@ void SeqTrack::insertExpression(uint32_t offset,
   expression = level;
 }
 
+void SeqTrack::insertExpressionNoItem(uint8_t level,
+                                      uint32_t absTime) {
+  u8 finalExpression = calculateLevel(level, LevelController::Expression);
+  if (readMode == READMODE_CONVERT_TO_MIDI)
+    pMidiTrack->insertExpression(channel, finalExpression, absTime);
+  expression = level;
+}
 
 void SeqTrack::addMasterVol(uint32_t offset, uint32_t length, uint8_t newVol, const std::string &sEventName) {
   onEvent(offset, length);
