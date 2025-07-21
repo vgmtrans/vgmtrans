@@ -668,7 +668,7 @@ double SeqTrack::applyLevelCorrection(double level, LevelController controller) 
   return level;
 }
 
-void SeqTrack::addLevelPercentNoItem(double level, LevelController controller, Resolution res, int absTime) {
+void SeqTrack::addLevelNoItem(double level, LevelController controller, Resolution res, int absTime) {
   u16 origLevel = static_cast<u16>(level * (res == Resolution::FourteenBit ? 16383.0 : 127.0));
   switch (controller) {
     case LevelController::Volume:
@@ -764,7 +764,7 @@ void SeqTrack::addVol(u32 offset, u32 length, double volPercent, Resolution res,
 
   if (readMode == READMODE_ADD_TO_UI && !isItemAtOffset(offset, true))
     addEvent(new VolSeqEvent(this, volPercent, offset, length, sEventName));
-  addLevelPercentNoItem(volPercent, LevelController::Volume, res, -1);
+  addLevelNoItem(volPercent, LevelController::Volume, res, -1);
 }
 
 void SeqTrack::addVol(uint32_t offset, uint32_t length, uint8_t newVol, const std::string &sEventName) {
@@ -776,7 +776,7 @@ void SeqTrack::addVol(uint32_t offset, uint32_t length, uint8_t newVol, const st
 }
 
 void SeqTrack::addVolNoItem(uint8_t newVol) {
-  addLevelPercentNoItem(newVol / 127.0, LevelController::Volume, Resolution::SevenBit);
+  addLevelNoItem(newVol / 127.0, LevelController::Volume, Resolution::SevenBit);
 }
 
 void SeqTrack::addVolSlide(uint32_t offset,
@@ -805,7 +805,7 @@ void SeqTrack::insertVol(uint32_t offset,
 
   if (readMode == READMODE_ADD_TO_UI && !isItemAtOffset(offset, true))
     addEvent(new VolSeqEvent(this, newVol, offset, length, sEventName));
-  addLevelPercentNoItem(newVol / 127.0, LevelController::Volume, Resolution::SevenBit);
+  addLevelNoItem(newVol / 127.0, LevelController::Volume, Resolution::SevenBit);
 }
 
 void SeqTrack::addExpression(u32 offset, u32 length, double levelPercent, Resolution res, const std::string &sEventName) {
@@ -813,7 +813,7 @@ void SeqTrack::addExpression(u32 offset, u32 length, double levelPercent, Resolu
 
   if (readMode == READMODE_ADD_TO_UI && !isItemAtOffset(offset, true))
     addEvent(new ExpressionSeqEvent(this, levelPercent, offset, length, sEventName));
-  addLevelPercentNoItem(levelPercent, LevelController::Expression, res, -1);
+  addLevelNoItem(levelPercent, LevelController::Expression, res, -1);
 }
 
 
@@ -826,7 +826,7 @@ void SeqTrack::addExpression(uint32_t offset, uint32_t length, uint8_t level, co
 }
 
 void SeqTrack::addExpressionNoItem(uint8_t level) {
-  addLevelPercentNoItem(level / 127.0, LevelController::Expression, Resolution::SevenBit);
+  addLevelNoItem(level / 127.0, LevelController::Expression, Resolution::SevenBit);
   expression = level;
 }
 
@@ -860,7 +860,7 @@ void SeqTrack::insertExpression(uint32_t offset,
 }
 
 void SeqTrack::insertExpressionNoItem(uint8_t level, uint32_t absTime) {
-  addLevelPercentNoItem(level / 127.0, LevelController::Expression, Resolution::SevenBit, absTime);
+  addLevelNoItem(level / 127.0, LevelController::Expression, Resolution::SevenBit, absTime);
 }
 
 void SeqTrack::addMasterVol(uint32_t offset, uint32_t length, uint8_t newVol, const std::string &sEventName) {
@@ -872,7 +872,7 @@ void SeqTrack::addMasterVol(uint32_t offset, uint32_t length, uint8_t newVol, co
 }
 
 void SeqTrack::addMasterVolNoItem(uint8_t newVol) {
-  addLevelPercentNoItem(newVol / 127.0, LevelController::MasterVolume, Resolution::SevenBit);
+  addLevelNoItem(newVol / 127.0, LevelController::MasterVolume, Resolution::SevenBit);
 }
 
 void SeqTrack::addMastVolSlide(uint32_t offset,

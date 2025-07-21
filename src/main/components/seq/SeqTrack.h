@@ -62,7 +62,7 @@ class SeqTrack : public VGMItem {
  protected:
   virtual void onEvent(uint32_t offset, uint32_t length);
   virtual void addEvent(SeqEvent *pSeqEvent);
-  void addLevelPercentNoItem(double level, LevelController controller, Resolution res, int absTime = -1);
+  void addLevelNoItem(double level, LevelController controller, Resolution res, int absTime = -1);
 
  private:
   void addControllerSlide(u32 dur, u16 &prevVal, u16 targVal, uint8_t (*scalerFunc)(uint8_t), void (MidiTrack::*insertFunc)(uint8_t, uint8_t, uint32_t)) const;
