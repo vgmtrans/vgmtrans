@@ -210,11 +210,12 @@ bool CPS2TrackV1::readEvent() {
         addGenericEvent(beginOffset, curOffset - beginOffset, "Set Duration", "", Type::ChangeState);
         break;
 
-      case 0x07 :
-        vol = readByte(curOffset++);
-        vol = convertPercentAmpToStdMidiVal(vol_table[vol] / static_cast<double>(0x1FFF));
-        this->addVol(beginOffset, curOffset - beginOffset, vol);
+      case 0x07 : {
+        u8 volIndex = readByte(curOffset++);
+        double volPercent = vol_table[volIndex] / static_cast<double>(0x1FFF);
+        addVol(beginOffset, curOffset - beginOffset, volPercent, Resolution::FourteenBit);
         break;
+      }
 
       case 0x08 : {
         uint8_t progNum = readByte(curOffset++);

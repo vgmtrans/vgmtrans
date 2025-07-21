@@ -207,8 +207,8 @@ uint32_t SeqTrack::readVarLen(uint32_t &offset) const {
 }
 
 void SeqTrack::addControllerSlide(uint32_t dur,
-                                  uint8_t &prevVal,
-                                  uint8_t targVal,
+                                  u16 &prevVal,
+                                  u16 targVal,
                                   uint8_t(*scalerFunc)(uint8_t),
                                   void (MidiTrack::*insertFunc)(uint8_t, uint8_t, uint32_t)) const {
   if (readMode != READMODE_CONVERT_TO_MIDI)
@@ -654,6 +654,119 @@ void SeqTrack::limitPrevDurNoteEnd(uint32_t absTime) const {
   }
 }
 
+
+double SeqTrack::applyLevelCorrection(double level, LevelController controller) const {
+  if (controller != LevelController::MasterVolume) {
+    PanVolumeCorrectionMode relevantCorrectionMode = controller == LevelController::Volume ?
+      PanVolumeCorrectionMode::kAdjustVolumeController :
+      PanVolumeCorrectionMode::kAdjustExpressionController;
+    if (parentSeq->panVolumeCorrectionMode == relevantCorrectionMode)
+      level *= panVolumeCorrectionRate;
+  }
+  if (parentSeq->usesLinearAmplitudeScale())
+    level = sqrt(level);
+  return level;
+}
+
+void SeqTrack::addLevelNoItem(double level, LevelController controller, Resolution res, int absTime) {
+  u16 origLevel = static_cast<u16>(level * (res == Resolution::FourteenBit ? 16383.0 : 127.0));
+  switch (controller) {
+    case LevelController::Volume:
+      vol = origLevel;
+      break;
+    case LevelController::Expression:
+      expression = origLevel;
+      break;
+    case LevelController::MasterVolume:
+      mastVol = origLevel;
+      break;
+  }
+
+  level = applyLevelCorrection(level, LevelController::Volume);
+  switch (res) {
+    case Resolution::SevenBit: {
+      u8 midiLevel = static_cast<uint8_t>(std::min(level * 127.0, 127.0));
+      switch (controller) {
+        case LevelController::Volume:
+          if (readMode == READMODE_CONVERT_TO_MIDI) {
+            if (absTime < 0) {
+              pMidiTrack->addVol(channel, midiLevel);
+            } else {
+              pMidiTrack->insertVol(channel, midiLevel, absTime);
+            }
+          }
+          break;
+        case LevelController::Expression:
+          if (readMode == READMODE_CONVERT_TO_MIDI) {
+            if (absTime < 0) {
+              pMidiTrack->addExpression(channel, midiLevel);
+            } else {
+              pMidiTrack->insertExpression(channel, midiLevel, absTime);
+            }
+          }
+          break;
+        case LevelController::MasterVolume:
+          if (readMode == READMODE_CONVERT_TO_MIDI) {
+            if (absTime < 0) {
+              pMidiTrack->addMasterVol(channel, midiLevel);
+            } else {
+              pMidiTrack->insertMasterVol(channel, midiLevel, 0, absTime);
+            }
+          }
+          break;
+      }
+      break;
+    }
+    case Resolution::FourteenBit: {
+      u16 midiLevel = static_cast<uint16_t>(std::min(level * 16383.0, 16383.0));
+      u8 levelHi = static_cast<uint8_t>((midiLevel >> 7) & 0x7F);
+      u8 levelLo = static_cast<uint8_t>(midiLevel & 0x7F);
+      switch (controller) {
+        case LevelController::Volume:
+          if (readMode == READMODE_CONVERT_TO_MIDI) {
+            if (absTime < 0) {
+              pMidiTrack->addVolumeFine(channel, levelLo);
+              pMidiTrack->addVol(channel, levelHi);
+            } else {
+              pMidiTrack->insertVolumeFine(channel, levelLo, absTime);
+              pMidiTrack->insertVol(channel, levelHi, absTime);
+            }
+          }
+          break;
+        case LevelController::Expression:
+          if (readMode == READMODE_CONVERT_TO_MIDI) {
+            if (absTime < 0) {
+              pMidiTrack->addExpressionFine(channel, levelLo);
+              pMidiTrack->addExpression(channel, levelHi);
+            } else {
+              pMidiTrack->insertExpressionFine(channel, levelLo, absTime);
+              pMidiTrack->insertVol(channel, levelHi, absTime);
+            }
+          }
+          break;
+        case LevelController::MasterVolume:
+          if (readMode == READMODE_CONVERT_TO_MIDI) {
+            if (absTime < 0) {
+              pMidiTrack->addMasterVol(channel, levelHi, levelLo);
+            } else {
+              pMidiTrack->insertMasterVol(channel, levelHi, levelLo, absTime);
+            }
+          }
+          break;
+      }
+      break;
+    }
+  }
+}
+
+void SeqTrack::addVol(u32 offset, u32 length, double volPercent, Resolution res, const std::string &sEventName) {
+  onEvent(offset, length);
+
+  if (readMode == READMODE_ADD_TO_UI && !isItemAtOffset(offset, true))
+    addEvent(new VolSeqEvent(this, volPercent, offset, length, sEventName));
+  addLevelNoItem(volPercent, LevelController::Volume, res, -1);
+}
+
 void SeqTrack::addVol(uint32_t offset, uint32_t length, uint8_t newVol, const std::string &sEventName) {
   onEvent(offset, length);
 
@@ -663,32 +776,7 @@ void SeqTrack::addVol(uint32_t offset, uint32_t length, uint8_t newVol, const st
 }
 
 void SeqTrack::addVolNoItem(uint8_t newVol) {
-  if (readMode == READMODE_CONVERT_TO_MIDI) {
-    const u8 finalVol = calculateLevel(newVol, LevelController::Volume);
-    pMidiTrack->addVol(channel, finalVol);
-  }
-  vol = newVol;
-}
-
-void SeqTrack::addVolume14Bit(uint32_t offset, uint32_t length, uint16_t volume, const std::string &sEventName) {
-  onEvent(offset, length);
-
-  if (readMode == READMODE_ADD_TO_UI && !isItemAtOffset(offset, true))
-    addEvent(new Volume14BitSeqEvent(this, volume, offset, length, sEventName));
-  addVolume14BitNoItem(volume);
-}
-
-// Add a 14 bit volume event by writing to controllers 39 and 7. Note that we assume the parameter
-// is in the range of 0 -> 127^2, but we normalize the value to the full 14 bit range: 0 -> (1 << 14) - 1
-void SeqTrack::addVolume14BitNoItem(uint16_t volume) {
-  if (readMode == READMODE_CONVERT_TO_MIDI) {
-    const u16 finalVol = calculateLevel14bit(volume, LevelController::Volume);
-    uint8_t volume_hi = static_cast<uint8_t>((finalVol >> 7) & 0x7F);
-    uint8_t volume_lo = static_cast<uint8_t>(finalVol & 0x7F);
-    pMidiTrack->addVolumeFine(channel, volume_lo);
-    pMidiTrack->addVol(channel, volume_hi);
-  }
-  vol = static_cast<uint8_t>((volume >> 7) & 0x7F);
+  addLevelNoItem(newVol / 127.0, LevelController::Volume, Resolution::SevenBit);
 }
 
 void SeqTrack::addVolSlide(uint32_t offset,
@@ -715,13 +803,19 @@ void SeqTrack::insertVol(uint32_t offset,
                          const std::string &sEventName) {
   onEvent(offset, length);
 
-  const u8 finalVol = calculateLevel(newVol, LevelController::Volume);
   if (readMode == READMODE_ADD_TO_UI && !isItemAtOffset(offset, true))
     addEvent(new VolSeqEvent(this, newVol, offset, length, sEventName));
-  else if (readMode == READMODE_CONVERT_TO_MIDI)
-    pMidiTrack->insertVol(channel, finalVol, absTime);
-  vol = newVol;
+  addLevelNoItem(newVol / 127.0, LevelController::Volume, Resolution::SevenBit);
 }
+
+void SeqTrack::addExpression(u32 offset, u32 length, double levelPercent, Resolution res, const std::string &sEventName) {
+  onEvent(offset, length);
+
+  if (readMode == READMODE_ADD_TO_UI && !isItemAtOffset(offset, true))
+    addEvent(new ExpressionSeqEvent(this, levelPercent, offset, length, sEventName));
+  addLevelNoItem(levelPercent, LevelController::Expression, res, -1);
+}
+
 
 void SeqTrack::addExpression(uint32_t offset, uint32_t length, uint8_t level, const std::string &sEventName) {
   onEvent(offset, length);
@@ -731,32 +825,8 @@ void SeqTrack::addExpression(uint32_t offset, uint32_t length, uint8_t level, co
   addExpressionNoItem(level);
 }
 
-double SeqTrack::calculateLevelPercent(u8 level, LevelController controller) {
-  double newVolPercent = level / 127.0;
-  PanVolumeCorrectionMode relevantCorrectionMode = controller == LevelController::Volume ?
-    PanVolumeCorrectionMode::kAdjustVolumeController : PanVolumeCorrectionMode::kAdjustExpressionController;
-  if (parentSeq->panVolumeCorrectionMode == relevantCorrectionMode)
-    newVolPercent *= panVolumeCorrectionRate;
-  if (parentSeq->usesLinearAmplitudeScale())
-    newVolPercent = sqrt(newVolPercent);
-  return newVolPercent;
-}
-
-u8 SeqTrack::calculateLevel(u8 level, LevelController controller) {
-  double levelPercent = calculateLevelPercent(level, controller);
-  return static_cast<uint8_t>(std::min(levelPercent * 127, 127.0));
-}
-
-u16 SeqTrack::calculateLevel14bit(u8 level, LevelController controller) {
-  double levelPercent = calculateLevelPercent(level, controller);
-  return static_cast<uint16_t>(std::min(levelPercent * 16383.0, 16383.0));
-}
-
 void SeqTrack::addExpressionNoItem(uint8_t level) {
-  if (readMode == READMODE_CONVERT_TO_MIDI) {
-    u8 finalExpression = calculateLevel(level, LevelController::Expression);
-    pMidiTrack->addExpression(channel, finalExpression);
-  }
+  addLevelNoItem(level / 127.0, LevelController::Expression, Resolution::SevenBit);
   expression = level;
 }
 
@@ -784,20 +854,13 @@ void SeqTrack::insertExpression(uint32_t offset,
                                 const std::string &sEventName) {
   onEvent(offset, length);
 
-  const u8 finalExpression = calculateLevel(level,  LevelController::Expression);
   if (readMode == READMODE_ADD_TO_UI && !isItemAtOffset(offset, true))
     addEvent(new ExpressionSeqEvent(this, level, offset, length, sEventName));
-  else if (readMode == READMODE_CONVERT_TO_MIDI)
-    pMidiTrack->insertExpression(channel, finalExpression, absTime);
-  expression = level;
+  insertExpressionNoItem(level, absTime);
 }
 
-void SeqTrack::insertExpressionNoItem(uint8_t level,
-                                      uint32_t absTime) {
-  u8 finalExpression = calculateLevel(level, LevelController::Expression);
-  if (readMode == READMODE_CONVERT_TO_MIDI)
-    pMidiTrack->insertExpression(channel, finalExpression, absTime);
-  expression = level;
+void SeqTrack::insertExpressionNoItem(uint8_t level, uint32_t absTime) {
+  addLevelNoItem(level / 127.0, LevelController::Expression, Resolution::SevenBit, absTime);
 }
 
 void SeqTrack::addMasterVol(uint32_t offset, uint32_t length, uint8_t newVol, const std::string &sEventName) {
@@ -809,14 +872,7 @@ void SeqTrack::addMasterVol(uint32_t offset, uint32_t length, uint8_t newVol, co
 }
 
 void SeqTrack::addMasterVolNoItem(uint8_t newVol) {
-  if (readMode == READMODE_CONVERT_TO_MIDI) {
-    uint8_t finalVol = newVol;
-    if (parentSeq->usesLinearAmplitudeScale())
-      finalVol = convert7bitPercentVolValToStdMidiVal(newVol);
-
-    pMidiTrack->addMasterVol(channel, finalVol);
-  }
-  mastVol = newVol;
+  addLevelNoItem(newVol / 127.0, LevelController::MasterVolume, Resolution::SevenBit);
 }
 
 void SeqTrack::addMastVolSlide(uint32_t offset,

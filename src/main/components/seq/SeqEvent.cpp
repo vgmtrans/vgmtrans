@@ -87,6 +87,9 @@ SetOctaveSeqEvent::SetOctaveSeqEvent(SeqTrack *pTrack,
 VolSeqEvent::VolSeqEvent(SeqTrack *pTrack, uint8_t volume, uint32_t offset, uint32_t length, const std::string &name)
     : SeqEvent(pTrack, offset, length, name, Type::Volume), vol(volume) { }
 
+VolSeqEvent::VolSeqEvent(SeqTrack *pTrack, double volume, uint32_t offset, uint32_t length, const std::string &name)
+    : SeqEvent(pTrack, offset, length, name, Type::Volume), percentVol(volume) { }
+
 // ***********
 // Volume14BitSeqEvent
 // ***********
@@ -133,12 +136,11 @@ MastVolSlideSeqEvent::MastVolSlideSeqEvent(SeqTrack *pTrack,
 // ExpressionSeqEvent
 // ******************
 
-ExpressionSeqEvent::ExpressionSeqEvent(SeqTrack *pTrack,
-                                       uint8_t theLevel,
-                                       uint32_t offset,
-                                       uint32_t length,
-                                       const std::string &name)
+ExpressionSeqEvent::ExpressionSeqEvent(SeqTrack *pTrack, u8 theLevel, u32 offset, u32 length, const std::string &name)
     : SeqEvent(pTrack, offset, length, name, Type::Expression), level(theLevel) { }
+
+ExpressionSeqEvent::ExpressionSeqEvent(SeqTrack *pTrack, double level, u32 offset, u32 length, const std::string &name)
+    : SeqEvent(pTrack, offset, length, name, Type::Expression), percentLevel(level) { }
 
 // ***********************
 // ExpressionSlideSeqEvent

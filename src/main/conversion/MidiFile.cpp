@@ -298,15 +298,23 @@ void MidiTrack::addVolumeFine(uint8_t channel, uint8_t volume_lsb) {
   aEvents.push_back(new VolumeFineEvent(this, channel, getDelta(), volume_lsb));
 }
 
+void MidiTrack::insertVolumeFine(uint8_t channel, uint8_t volume_lsb, uint32_t absTime) {
+  aEvents.push_back(new VolumeFineEvent(this, channel, absTime, volume_lsb));
+}
+
 //TODO: Master Volume sysex events are meant to be global to device, not per channel.
 // For per channel master volume, we should add a system for normalizing controller vol events.
-void MidiTrack::addMasterVol(uint8_t channel, uint8_t mastVol) {
-  MidiEvent *newEvent = new MasterVolEvent(this, channel, getDelta(), mastVol);
+void MidiTrack::addMasterVol(uint8_t channel, u8 volMsb, u8 volLsb) {
+  MidiEvent *newEvent = new MasterVolEvent(this, channel, getDelta(), volMsb, volLsb);
   aEvents.push_back(newEvent);
 }
 
-void MidiTrack::insertMasterVol(uint8_t channel, uint8_t mastVol, uint32_t absTime) {
-  MidiEvent *newEvent = new MasterVolEvent(this, channel, absTime, mastVol);
+void MidiTrack::insertMasterVol(uint8_t channel, u8 volMsb, uint32_t absTime) {
+  insertMasterVol(channel, volMsb, 0, absTime);
+}
+
+void MidiTrack::insertMasterVol(uint8_t channel, u8 volMsb, u8 volLsb, uint32_t absTime) {
+  MidiEvent *newEvent = new MasterVolEvent(this, channel, absTime, volMsb, volLsb);
   aEvents.push_back(newEvent);
 }
 
@@ -316,6 +324,14 @@ void MidiTrack::addExpression(uint8_t channel, uint8_t expression) {
 
 void MidiTrack::insertExpression(uint8_t channel, uint8_t expression, uint32_t absTime) {
   aEvents.push_back(new ExpressionEvent(this, channel, absTime, expression));
+}
+
+void MidiTrack::addExpressionFine(uint8_t channel, uint8_t expression_lsb) {
+  aEvents.push_back(new ExpressionFineEvent(this, channel, getDelta(), expression_lsb));
+}
+
+void MidiTrack::insertExpressionFine(uint8_t channel, uint8_t expression_lsb, uint32_t absTime) {
+  aEvents.push_back(new ExpressionFineEvent(this, channel, absTime, expression_lsb));
 }
 
 void MidiTrack::addSustain(uint8_t channel, uint8_t depth) {

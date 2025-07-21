@@ -96,12 +96,16 @@ class MidiTrack {
   void addVol(uint8_t channel, uint8_t vol/*, int8_t priority = PRIORITY_MIDDLE*/);
   void insertVol(uint8_t channel, uint8_t vol, uint32_t absTime/*, int8_t priority = PRIORITY_MIDDLE*/);
   void addVolumeFine(uint8_t channel, uint8_t volume_lsb);
-  void addMasterVol(uint8_t channel, uint8_t mastVol/*, int8_t priority = PRIORITY_HIGHER*/);
-  void insertMasterVol(uint8_t channel, uint8_t mastVol, uint32_t absTime/*, int8_t priority = PRIORITY_HIGHER*/);
+  void insertVolumeFine(uint8_t channel, uint8_t volume_lsb, uint32_t absTime);
+  void addMasterVol(uint8_t channel, u8 volMsb, u8 volLsb = 0);
+  void insertMasterVol(uint8_t channel, u8 volMsb, uint32_t absTime);
+  void insertMasterVol(uint8_t channel, u8 volMsb, u8 volLsb, uint32_t absTime);
   void addPan(uint8_t channel, uint8_t pan);
   void insertPan(uint8_t channel, uint8_t pan, uint32_t absTime);
   void addExpression(uint8_t channel, uint8_t expression);
+  void addExpressionFine(uint8_t channel, uint8_t expression_lsb);
   void insertExpression(uint8_t channel, uint8_t expression, uint32_t absTime);
+  void insertExpressionFine(uint8_t channel, uint8_t expression_lsb, uint32_t absTime);
   void addReverb(uint8_t channel, uint8_t reverb);
   void insertReverb(uint8_t channel, uint8_t reverb, uint32_t absTime);
   void addModulation(uint8_t channel, uint8_t depth);
@@ -345,6 +349,14 @@ class ExpressionEvent
   MidiEventType eventType() override { return MIDIEVENT_EXPRESSION; }
 };
 
+class ExpressionFineEvent
+    : public ControllerEvent {
+public:
+  ExpressionFineEvent(MidiTrack *prntTrk, uint8_t channel, uint32_t absoluteTime, uint8_t expression_lsb)
+      : ControllerEvent(prntTrk, channel, absoluteTime, 43, expression_lsb, PRIORITY_MIDDLE) { }
+  MidiEventType eventType() override { return MIDIEVENT_EXPRESSION; }
+};
+
 class SustainEvent
     : public ControllerEvent {
  public:
@@ -451,8 +463,8 @@ public:
 class MasterVolEvent
     : public SysexEvent {
 public:
-  MasterVolEvent(MidiTrack *prntTrk, uint8_t /* channel */, uint32_t absoluteTime, uint8_t msb)
-      : SysexEvent(prntTrk, absoluteTime, {0x07, 0x7F, 0x7F, 0x04, 0x01, 0, msb }, PRIORITY_HIGHER) { }
+  MasterVolEvent(MidiTrack *prntTrk, uint8_t /* channel */, uint32_t absoluteTime, u8 msb, u8 lsb)
+      : SysexEvent(prntTrk, absoluteTime, {0x07, 0x7F, 0x7F, 0x04, 0x01, lsb, msb }, PRIORITY_HIGHER) { }
   MidiEventType eventType() override { return MIDIEVENT_MASTERVOL; }
 };
 

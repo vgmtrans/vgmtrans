@@ -139,12 +139,18 @@ class VolSeqEvent : public SeqEvent {
  public:
   VolSeqEvent(SeqTrack *pTrack, uint8_t volume, uint32_t offset = 0, uint32_t length = 0,
               const std::string &name = "");
+  VolSeqEvent(SeqTrack *pTrack, double volume, uint32_t offset = 0, uint32_t length = 0,
+              const std::string &name = "");
 
   std::string description() override {
+    if (percentVol > 0) {
+      return fmt::format("{} - volume: {:.1f}", name(), percentVol);
+    }
     return fmt::format("{} - volume: {:d}", name(), vol);
   };
 
-  uint8_t vol;
+  uint8_t vol = -1;
+  double percentVol = -1;
 };
 
 //  *******************
@@ -221,15 +227,19 @@ class MastVolSlideSeqEvent : public SeqEvent {
 
 class ExpressionSeqEvent : public SeqEvent {
  public:
-  ExpressionSeqEvent(SeqTrack *pTrack, uint8_t level, uint32_t offset = 0, uint32_t length = 0,
-                     const std::string &name = "");
+  ExpressionSeqEvent(SeqTrack *pTrack, u8 level, u32 offset = 0, u32 length = 0, const std::string &name = "");
+  ExpressionSeqEvent(SeqTrack *pTrack, double level, u32 offset = 0, u32 length = 0, const std::string &name = "");
 
   std::string description() override {
-    return fmt::format("{} - expression: {}", name(), static_cast<int>(level));
+    if (percentLevel > 0) {
+      return fmt::format("{} - expression: {:.1f}", name(), percentLevel);
+    }
+    return fmt::format("{} - expression: {:d}", name(), level);
   };
 
  public:
-  uint8_t level;
+  u8 level = -1;
+  double percentLevel = -1;
 };
 
 //  ***********************

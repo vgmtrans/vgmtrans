@@ -22,6 +22,12 @@ enum ReadMode : uint8_t;
 enum class LevelController : uint8_t {
   Volume,
   Expression,
+  MasterVolume,
+};
+
+enum class Resolution : uint8_t {
+  SevenBit,
+  FourteenBit,
 };
 
 class SeqTrack : public VGMItem {
@@ -56,11 +62,12 @@ class SeqTrack : public VGMItem {
  protected:
   virtual void onEvent(uint32_t offset, uint32_t length);
   virtual void addEvent(SeqEvent *pSeqEvent);
+
  private:
-  void addControllerSlide(uint32_t dur, uint8_t &prevVal, uint8_t targVal, uint8_t (*scalerFunc)(uint8_t), void (MidiTrack::*insertFunc)(uint8_t, uint8_t, uint32_t)) const;
-  double calculateLevelPercent(u8 level, LevelController controller);
-  u8 calculateLevel(u8 level, LevelController controller);
-  u16 calculateLevel14bit(u8 level, LevelController controller);
+  void addControllerSlide(u32 dur, u16 &prevVal, u16 targVal, uint8_t (*scalerFunc)(uint8_t), void (MidiTrack::*insertFunc)(uint8_t, uint8_t, uint32_t)) const;
+  double applyLevelCorrection(double level, LevelController controller) const;
+  void addLevelNoItem(double level, LevelController controller, Resolution res, int absTime = -1);
+
  public:
   void addGenericEvent(uint32_t offset, uint32_t length, const std::string &sEventName, const std::string &sEventDesc, Type type);
   void addSetOctave(uint32_t offset, uint32_t length, uint8_t newOctave, const std::string &sEventName = "Set Octave");
@@ -98,11 +105,11 @@ class SeqTrack : public VGMItem {
   void limitPrevDurNoteEnd(uint32_t absTime) const;
   void addVol(uint32_t offset, uint32_t length, uint8_t vol, const std::string &sEventName = "Volume");
   void addVolNoItem(uint8_t vol);
-  void addVolume14Bit(uint32_t offset, uint32_t length, uint16_t volume, const std::string &sEventName = "Volume");
-  void addVolume14BitNoItem(uint16_t volume);
+  void addVol(u32 offset, u32 length, double volPercent, Resolution res, const std::string &sEventName = "Volume");
   void addVolSlide(uint32_t offset, uint32_t length, uint32_t dur, uint8_t targVol, const std::string &sEventName = "Volume Slide");
   void insertVol(uint32_t offset, uint32_t length, uint8_t vol, uint32_t absTime, const std::string &sEventName = "Volume");
   void addExpression(uint32_t offset, uint32_t length, uint8_t level, const std::string &sEventName = "Expression");
+  void addExpression(u32 offset, u32 length, double levelPercent, Resolution res, const std::string &sEventName = "Expression");
   void addExpressionNoItem(uint8_t level);
   void addExpressionSlide(uint32_t offset, uint32_t length, uint32_t dur, uint8_t targExpr, const std::string &sEventName = "Expression Slide");
   void insertExpression(uint32_t offset, uint32_t length, uint8_t level, uint32_t absTime, const std::string &sEventName = "Expression");
@@ -201,11 +208,11 @@ class SeqTrack : public VGMItem {
   uint8_t prevKey;
   uint8_t prevVel;
   uint8_t octave;
-  uint8_t vol;
-  uint8_t expression;
-  uint8_t mastVol;
+  u16 vol;
+  u16 expression;
+  u16 mastVol;
   double panVolumeCorrectionRate; // as percentage of original volume (default: 1.0)
-  uint8_t prevPan;
+  u16 prevPan;
   uint8_t prevReverb;
   int8_t transpose;
   double fineTuningCents;
