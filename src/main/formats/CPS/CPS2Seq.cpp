@@ -25,6 +25,7 @@ CPS2Seq::CPS2Seq(RawFile *file, uint32_t offset, CPS2FormatVer fmtVersion, std::
   setUsesMonophonicTracks();
   setAlwaysWriteInitialVol(127);
   setAlwaysWriteInitialMonoMode(true);
+  setUseLinearAmplitudeScale(true);
 }
 
 CPS2Seq::~CPS2Seq() {

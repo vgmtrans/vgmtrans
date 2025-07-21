@@ -57,10 +57,10 @@ bool CPS2TrackV2::readEvent() {
   // Note opcodes are [0x80 - 0xBF]
   if (status_byte < 0xC0) {
     uint8_t velocity = status_byte & 0x3F;
-    uint8_t midiVel = convertPercentAmpToStdMidiVal(static_cast<double>(velocity) / static_cast<double>(0x3F));
+    velocity = (static_cast<double>(velocity) / static_cast<double>(0x3F)) * 127.0;
     uint8_t note = readByte(curOffset++) & 0x7F;
     uint32_t duration = readVarLength();
-    addNoteByDur(beginOffset, curOffset - beginOffset, note, midiVel, duration);
+    addNoteByDur(beginOffset, curOffset - beginOffset, note, velocity, duration);
     return true;
   }
 
@@ -122,9 +122,8 @@ bool CPS2TrackV2::readEvent() {
 
     case C6_TRACK_MASTER_VOLUME: {
       m_master_volume = readByte(curOffset++);
-      double volume_percent = m_master_volume * m_secondary_volume / (127.0 * 127.0);
-      uint16_t final_volume = convertPercentAmpToStd14BitMidiVal(volume_percent);
-      addVolume14Bit(beginOffset, curOffset - beginOffset, final_volume, "Track Master Volume");
+      double volPercent = (m_master_volume * m_secondary_volume) / (127.0 * 127.0);
+      addVol(beginOffset, curOffset - beginOffset, volPercent, Resolution::FourteenBit, "Track Master Volume");
       break;
     }
 
@@ -136,9 +135,8 @@ bool CPS2TrackV2::readEvent() {
 
     case EVENT_C8: {
       m_secondary_volume = readByte(curOffset++);
-      double volume_percent = m_master_volume * m_secondary_volume / (127.0 * 127.0);
-      uint16_t final_volume = convertPercentAmpToStd14BitMidiVal(volume_percent);
-      addVolume14Bit(beginOffset, curOffset - beginOffset, final_volume);
+      double volPercent = (m_master_volume * m_secondary_volume) / (127.0 * 127.0);
+      addVol(beginOffset, curOffset - beginOffset, volPercent, Resolution::FourteenBit);
       break;
     }
 

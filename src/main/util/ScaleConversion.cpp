@@ -124,9 +124,9 @@ uint8_t convertPercentAmpToStdMidiVal(double percent) {
 }
 
 // Takes a percentage amplitude value - one using a -20*log10(percent) scale for db attenuation
-// and converts it to a standard 14 bit midi value that uses -40*log10(x/(127*127)) for db attenuation
+// and converts it to a standard 14 bit midi value that uses -40*log10(x/16383) for db attenuation
 uint16_t convertPercentAmpToStd14BitMidiVal(double percent) {
-  return std::round((127.0 * 127.0) * sqrt(percent));
+  return std::round(16383.0 * sqrt(percent));
 }
 
 // db attenuation is expressed as a positive value. So, a reduction of 3.2db is expressed as 3.2, not -3.2.
