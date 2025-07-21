@@ -62,14 +62,12 @@ class SeqTrack : public VGMItem {
  protected:
   virtual void onEvent(uint32_t offset, uint32_t length);
   virtual void addEvent(SeqEvent *pSeqEvent);
-  void addLevelNoItem(double level, LevelController controller, Resolution res, int absTime = -1);
 
  private:
   void addControllerSlide(u32 dur, u16 &prevVal, u16 targVal, uint8_t (*scalerFunc)(uint8_t), void (MidiTrack::*insertFunc)(uint8_t, uint8_t, uint32_t)) const;
   double applyLevelCorrection(double level, LevelController controller) const;
-  double calculateLevelPercent(u16 level, LevelController controller, Resolution inputRes =  Resolution::SevenBit) const;
-  u8 calculateLevel(u8 level, LevelController controller);
-  u16 calculateLevel14bit(u16 level, LevelController controller);
+  void addLevelNoItem(double level, LevelController controller, Resolution res, int absTime = -1);
+
  public:
   void addGenericEvent(uint32_t offset, uint32_t length, const std::string &sEventName, const std::string &sEventDesc, Type type);
   void addSetOctave(uint32_t offset, uint32_t length, uint8_t newOctave, const std::string &sEventName = "Set Octave");
