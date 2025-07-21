@@ -144,7 +144,7 @@ class VolSeqEvent : public SeqEvent {
 
   std::string description() override {
     if (percentVol > 0) {
-      return fmt::format("{} - volume: {:f}", name(), percentVol);
+      return fmt::format("{} - volume: {:.1f}", name(), percentVol);
     }
     return fmt::format("{} - volume: {:d}", name(), vol);
   };
@@ -232,7 +232,7 @@ class ExpressionSeqEvent : public SeqEvent {
 
   std::string description() override {
     if (percentLevel > 0) {
-      return fmt::format("{} - expression: {:f}", name(), percentLevel);
+      return fmt::format("{} - expression: {:.1f}", name(), percentLevel);
     }
     return fmt::format("{} - expression: {:d}", name(), level);
   };
