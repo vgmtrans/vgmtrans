@@ -13,15 +13,11 @@ if (USE_VENDORED_ZLIBNG)
   set(ZLIB_ENABLE_TESTS OFF)
   set(ZLIBNG_ENABLE_TESTS OFF)
   set(WITH_GTEST OFF)
-  set(ZLIB_COMPAT ON CACHE BOOL "Build zlib-ng with zlib-compatible API" FORCE)
   add_subdirectory("${PROJECT_SOURCE_DIR}/lib/zlib-ng" "${CMAKE_BINARY_DIR}/lib/zlib-ng" EXCLUDE_FROM_ALL)
 
-#  set(ZLIBNG_FOUND TRUE)
-#  set(ZLIBNG_INCLUDE_DIRS "${PROJECT_SOURCE_DIR}/lib/zlib-ng" "${CMAKE_BINARY_DIR}/lib/zlib-ng")
-#  set(ZLIBNG_LIBRARY $<TARGET_FILE:zlibstatic>)
-
-  # ensure libchdr can find this build when searching for ZLIB
-  list(PREPEND CMAKE_PREFIX_PATH "${CMAKE_BINARY_DIR}/lib/zlib-ng")
+  set(ZLIBNG_FOUND TRUE)
+  set(ZLIBNG_INCLUDE_DIRS "${PROJECT_SOURCE_DIR}/lib/zlib-ng" "${CMAKE_BINARY_DIR}/lib/zlib-ng")
+  set(ZLIBNG_LIBRARY $<TARGET_FILE:zlibstatic>)
 endif()
 
 # Configure minizip-ng to use zlib and none of the other options
@@ -51,7 +47,6 @@ set(BUILD_SHARED_LIBS OFF CACHE BOOL "Build libunarr as a shared library" FORCE)
 set(USE_SYSTEM_ZLIB OFF CACHE BOOL "Build with system zlib if possible" FORCE)
 add_subdirectory("${PROJECT_SOURCE_DIR}/lib/unarr" "${CMAKE_BINARY_DIR}/lib/unarr" EXCLUDE_FROM_ALL)
 
-set(WITH_SYSTEM_ZLIB ON CACHE BOOL "Use system zlib" FORCE)
 add_subdirectory("${PROJECT_SOURCE_DIR}/lib/libchdr" "${CMAKE_BINARY_DIR}/lib/libchdr" EXCLUDE_FROM_ALL)
 
 file(GLOB_RECURSE MAIN_FILES "${PROJECT_SOURCE_DIR}/src/main/*.cpp"
