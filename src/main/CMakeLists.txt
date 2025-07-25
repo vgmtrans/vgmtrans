@@ -33,6 +33,8 @@ set(MZ_WZAES OFF)
 set(MZ_OPENSSL OFF)
 set(MZ_DECOMPRESS_ONLY ON)
 set(SKIP_INSTALL_ALL ON)
+set(MZ_FETCH_LIBS OFF CACHE BOOL "Disable minizip-ng third-party fetching" FORCE)
+set(MZ_FORCE_FETCH_LIBS OFF CACHE BOOL "Disable minizip-ng forced fetching" FORCE)
 
 # Add minizip-ng subdirectory
 add_subdirectory("${PROJECT_SOURCE_DIR}/lib/minizip-ng" "${CMAKE_BINARY_DIR}/lib/minizip-ng" EXCLUDE_FROM_ALL)
