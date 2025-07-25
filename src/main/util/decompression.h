@@ -7,7 +7,7 @@
 #pragma once
 
 #define ZLIB_CONST
-#include <zlib-ng.h>
+#include <zlib.h>
 #include <stdexcept>
 #include <array>
 
@@ -16,13 +16,13 @@ std::vector<char> zdecompress(T src) {
   std::vector<char> result;
 
   /* allocate inflate state */
-  zng_stream strm;
+  z_stream strm;
   strm.zalloc = Z_NULL;
   strm.zfree = Z_NULL;
   strm.opaque = Z_NULL;
   strm.avail_in = 0;
   strm.next_in = Z_NULL;
-  int ret = zng_inflateInit(&strm);
+  int ret = inflateInit(&strm);
   if (ret != Z_OK) {
     throw std::runtime_error("Failed to init decompression");
   }
@@ -36,7 +36,7 @@ std::vector<char> zdecompress(T src) {
   do {
     strm.avail_out = CHUNK;
     strm.next_out = reinterpret_cast<Bytef *>(out.data());
-    ret = zng_inflate(&strm, Z_NO_FLUSH);
+    ret = inflate(&strm, Z_NO_FLUSH);
 
     assert(ret != Z_STREAM_ERROR);
 
@@ -45,7 +45,7 @@ std::vector<char> zdecompress(T src) {
         [[fallthrough]];
       case Z_DATA_ERROR:
       case Z_MEM_ERROR:
-        (void)zng_inflateEnd(&strm);
+        (void)inflateEnd(&strm);
         throw std::runtime_error("Decompression failed");
     }
 
@@ -55,6 +55,6 @@ std::vector<char> zdecompress(T src) {
 
   assert(ret == Z_STREAM_END);
 
-  (void)zng_inflateEnd(&strm);
+  (void)inflateEnd(&strm);
   return result;
 }
