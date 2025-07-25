@@ -5,6 +5,7 @@
 # we added it in the root CMakeLists.txt file.
 
 option(USE_VENDORED_ZLIBNG "Use the vendored version of zlib-ng" ON)
+set(ZLIB_COMPAT ON CACHE BOOL "Compile zlib-ng with zlib compatible API" FORCE)
 
 if (USE_VENDORED_ZLIBNG)
   #include zlib-ng sans tests
@@ -15,9 +16,9 @@ if (USE_VENDORED_ZLIBNG)
   set(WITH_GTEST OFF)
   add_subdirectory("${PROJECT_SOURCE_DIR}/lib/zlib-ng" "${CMAKE_BINARY_DIR}/lib/zlib-ng" EXCLUDE_FROM_ALL)
 
-  set(ZLIBNG_FOUND TRUE)
-  set(ZLIBNG_INCLUDE_DIRS "${PROJECT_SOURCE_DIR}/lib/zlib-ng" "${CMAKE_BINARY_DIR}/lib/zlib-ng")
-  set(ZLIBNG_LIBRARY $<TARGET_FILE:zlibstatic>)
+  set(ZLIB_FOUND TRUE)
+  set(ZLIB_INCLUDE_DIRS "${PROJECT_SOURCE_DIR}/lib/zlib-ng" "${CMAKE_BINARY_DIR}/lib/zlib-ng")
+  set(ZLIB_LIBRARIES $<TARGET_FILE:zlibstatic>)
 endif()
 
 # Configure minizip-ng to use zlib and none of the other options

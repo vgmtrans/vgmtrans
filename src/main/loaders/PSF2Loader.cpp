@@ -5,7 +5,7 @@
  */
 
 #include "PSF2Loader.h"
-#include <zlib-ng.h>
+#include <zlib.h>
 #include "LogManager.h"
 #include "components/PSFFile.h"
 
@@ -47,7 +47,7 @@ int PSF2Loader::psf2_decompress_block(const RawFile *file, unsigned fileoffset,
   file->readBytes(tempOffset, current_block, zblock);
 
   destlen = blocksize;
-  if (zng_uncompress(decompressedblock, &destlen, zblock, current_block) != Z_OK) {
+  if (uncompress(decompressedblock, &destlen, zblock, current_block) != Z_OK) {
     L_ERROR("Decompression failed");
     delete[] zblock;
     delete[] blocks;
