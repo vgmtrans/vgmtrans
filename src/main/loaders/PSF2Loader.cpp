@@ -34,7 +34,7 @@ static u32 get32lsb(const u8 *src) {
 int PSF2Loader::psf2_decompress_block(const RawFile *file, unsigned fileoffset,
                                       unsigned blocknumber, unsigned numblocks,
                                       unsigned char *decompressedblock, unsigned blocksize) {
-  size_t destlen;
+  unsigned long destlen;
   u8 *blocks = new u8[numblocks * 4];
 
   file->readBytes(fileoffset, numblocks * 4, blocks);
