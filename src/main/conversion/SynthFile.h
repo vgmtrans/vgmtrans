@@ -146,7 +146,7 @@ class SynthWave {
 
   SynthSampInfo *addSampInfo();
 
-  void convertTo16bitSigned();
+  void convertTo16bit();
 
  public:
   SynthSampInfo *sampinfo;

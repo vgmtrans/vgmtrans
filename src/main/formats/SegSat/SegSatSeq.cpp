@@ -6,6 +6,7 @@ DECLARE_FORMAT(SegSat);
 
 SegSatSeq::SegSatSeq(RawFile *file, uint32_t offset, std::string name)
     : VGMSeqNoTrks(SegSatFormat::name, file, offset, std::move(name)) {
+  setUseLinearAmplitudeScale(true);
 }
 
 void SegSatSeq::resetVars() {
@@ -33,24 +34,35 @@ bool SegSatSeq::parseHeader() {
   return true;
 }
 
+void SegSatSeq::changeChannel(u8 ch) {
+  setCurTrack(ch);
+  if (ch == 9) {
+    channel = 0;
+    channelGroup = 1;
+    if (VGMSeq::readMode == READMODE_CONVERT_TO_MIDI && pMidiTrack->channelGroup != 1) {
+      pMidiTrack->setChannelGroup(1);
+      pMidiTrack->addMidiPort(1);
+    }
+  } else {
+    channel = ch;
+    channelGroup = 0;
+    if (VGMSeq::readMode == READMODE_CONVERT_TO_MIDI && pMidiTrack->channelGroup != 0) {
+      pMidiTrack->setChannelGroup(0);
+      pMidiTrack->addMidiPort(0);
+    }
+  }
+}
+
 int counter = 0;
 
 bool SegSatSeq::readEvent() {
-  if (bInLoop) {
-    remainingEventsInLoop--;
-    if (remainingEventsInLoop == -1) {
-      bInLoop = false;
-      curOffset = loopEndPos;
-    }
-  }
-
   // If we're in the tempo track, expect a tempo event
   if (curOffset < normalTrackOffset) {
-    u32 tempoDelta = 0;
+    u32 time = 0;
     while (curOffset < normalTrackOffset) {
       u32 mpqn = readWordBE(curOffset + 4);
-      insertTempo(curOffset, 8, mpqn, tempoDelta);
-      tempoDelta = readWordBE(curOffset);
+      insertTempo(curOffset, 8, mpqn, time);
+      time += readWordBE(curOffset);
       curOffset += 8;
     }
     return true;
@@ -61,13 +73,13 @@ bool SegSatSeq::readEvent() {
 
   if (status_byte <= 0x7F)            // note on
   {
-    channel = status_byte & 0x0F;
+    changeChannel(status_byte & 0x0F);
     u16 durBit8 = (status_byte & 0x40) << 2;
     u16 deltaBit8 = (status_byte & 0x20) << 3;
     if ((status_byte & 0x10) > 0) {
       L_DEBUG("found 0x10 bit on for note on status byte {:x}", beginOffset);
     }
-    setCurTrack(channel);
+
     auto key = readByte(curOffset++);
     auto vel = readByte(curOffset++);
     u16 noteDuration = readByte(curOffset++) | durBit8;
@@ -76,12 +88,15 @@ bool SegSatSeq::readEvent() {
     u16 deltaTime = readByte(curOffset++) | deltaBit8;
     addTime(deltaTime);
     addNoteByDur(beginOffset, curOffset - beginOffset, key, vel, noteDuration);
+
+    // if (beginOffset >= 0x73ABC && beginOffset <= 0x73AFD) {
+      // printf("OFF: %X  T: %d  CH: %d  KEY: %d  DUR: %d  delta: %d\n", beginOffset, getTime(), channel, key, noteDuration, deltaTime);
+    // }
   }
   else {
     if ((status_byte & 0xF0) == Midi::CONTROL_CHANGE) {
       // BX are midi controller events
-      channel = status_byte & 0x0F;
-      setCurTrack(channel);
+      changeChannel(status_byte & 0x0F);
       u8 controllerType = readByte(curOffset++);
       u8 controllerValue = readByte(curOffset++);
       u8 deltaTime = readByte(curOffset++);
@@ -116,20 +131,21 @@ bool SegSatSeq::readEvent() {
       }
     }
     else if ((status_byte & 0xF0) == 0xC0) {
-      channel = status_byte & 0x0F;
-      setCurTrack(channel);
+      changeChannel(status_byte & 0x0F);
       u8 progNum = readByte(curOffset++);
       addTime(readByte(curOffset++));
       addProgramChange(beginOffset, curOffset - beginOffset, progNum);
     }
     else if ((status_byte & 0xF0) == 0xE0) {
-      channel = status_byte & 0x0F;
-      setCurTrack(channel);
+      changeChannel(status_byte & 0x0F);
       s16 bend = (static_cast<s32>(readByte(curOffset++)) << 7) - 8192;
       addTime(readByte(curOffset++));
       addPitchBend(beginOffset, curOffset - beginOffset, bend);
     }
     else {
+      if (remainingEventsInLoop != -1) {
+        remainingEventsInLoop++;
+      }
       switch (status_byte) {
         case 0x81: {
           if (remainingEventsInLoop != -1) {
@@ -195,5 +211,14 @@ bool SegSatSeq::readEvent() {
       }
     }
   }
+
+  if (bInLoop) {
+    remainingEventsInLoop--;
+    if (remainingEventsInLoop == -1) {
+      bInLoop = false;
+      curOffset = loopEndPos;
+    }
+  }
+
   return true;
 }
