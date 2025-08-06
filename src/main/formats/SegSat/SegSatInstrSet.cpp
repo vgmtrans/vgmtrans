@@ -1,0 +1,246 @@
+/*
+ * VGMTrans (c) 2002-2025
+ * Licensed under the zlib license,
+ * refer to the included LICENSE.txt file
+ */
+
+#include "SegSatInstrSet.h"
+
+#include "VGMSamp.h"
+
+#include <spdlog/fmt/fmt.h>
+
+// **************
+// SegSatInstrSet
+// **************
+
+SegSatInstrSet::SegSatInstrSet(RawFile* file, uint32_t offset, int numInstrs, const std::string& name) :
+    VGMInstrSet(SegSatFormat::name, file, offset, 0, name), m_numInstrs(numInstrs) {
+  sampColl = new VGMSampColl(SegSatFormat::name, file, this, offset);
+}
+
+bool SegSatInstrSet::parseHeader() {
+
+  // TODO: parse mix, vl, peg, plfo tables
+  addChild(dwOffset + 0, 2, "Mixer Tables Pointer");
+  addChild(dwOffset + 2, 2, "Velocity Tables Pointer");
+  addChild(dwOffset + 4, 2, "PEG Tables Pointer");
+  addChild(dwOffset + 6, 2, "PLFO Tables Pointer");
+
+  u32 vlTablesOffset = readShortBE(dwOffset + 2) + dwOffset;
+  u32 pegTablesOffset = readShortBE(dwOffset + 4) + dwOffset;
+
+  // Parse Velocity Level Tables
+  u32 offset = vlTablesOffset;
+  int i = 0;
+  do {
+    VLTable vlTable;
+    readBytes(offset, 10, &vlTable);
+    m_vlTables.push_back(vlTable);
+
+    auto tableItem = addChild(offset, 10, fmt::format("VL Table {:d}", i));
+    tableItem->addChild(offset, 1, "Rate 0");
+    tableItem->addChild(offset + 1, 1, "Point 0");
+    tableItem->addChild(offset + 2, 1, "Level 0");
+    tableItem->addChild(offset + 3, 1, "Rate 1");
+    tableItem->addChild(offset + 4, 1, "Point 1");
+    tableItem->addChild(offset + 5, 1, "Level 1");
+    tableItem->addChild(offset + 6, 1, "Rate 2");
+    tableItem->addChild(offset + 7, 1, "Point 2");
+    tableItem->addChild(offset + 8, 1, "Level 2");
+    tableItem->addChild(offset + 9, 1, "Rate 3");
+
+    offset += 10;
+    ++i;
+  } while (offset < pegTablesOffset);
+
+  return true;
+}
+
+bool SegSatInstrSet::parseInstrPointers() {
+  size_t off = dwOffset + 8;
+  auto instrList = addChild(off, m_numInstrs * 2, "Instrument Pointers");
+  for (int i = 0; i < m_numInstrs; i++) {
+    u32 instrOff = rawFile()->getBE<u16>(off + (i * 2)) + dwOffset;
+    u8 numRgns = rawFile()->readByte(instrOff + 2) + 1;
+    size_t instrSize = 4 + numRgns * 0x20;
+    auto name = fmt::format("Instrument {:d}", i);
+    aInstrs.push_back(new SegSatInstr(this, instrOff, instrSize, 0, i, name));
+    instrList->addChild(off + (i * 2), 2, fmt::format("Instrument {:d} Pointer", i));
+  }
+
+  return true;
+}
+
+
+// ***********
+// SegSatInstr
+// ***********
+
+SegSatInstr::SegSatInstr(SegSatInstrSet* set, size_t offset, size_t length, u32 bank, u32 number, const std::string &name)
+    : VGMInstr(set, offset, length, bank, number, name) {
+}
+
+bool SegSatInstr::loadInstr() {
+  addChild(dwOffset, 1, "Pitchbend Range");
+  addChild(dwOffset+1, 1, "Portamento");
+  addChild(dwOffset+2, 1, "Region Count");
+  addChild(dwOffset+3, 1, "Volume Bias");
+  u8 numRgns = rawFile()->readByte(dwOffset + 2) + 1;
+  auto sampColl = parInstrSet->sampColl;
+  for (int i = 0; i < numRgns; ++i) {
+    // Add region
+    auto name = fmt::format("Region {:d}", i);
+    auto rgn = new SegSatRgn(this, dwOffset + 4 + (i * 0x20), name);
+    addRgn(rgn);
+
+    // Add sample
+    u32 sampLength = rgn->sampleLoopEnd();
+    u8 bps = rgn->sampleType() == SegSatRgn::SampleType::PCM16 ? 16 : 8;
+    auto instrSet = static_cast<SegSatInstrSet*>(parInstrSet);
+    // check if a sample at the offset was already added
+    bool inserted = instrSet->sampleOffsets.insert(rgn->sampOffset).second;
+
+    u32 sampOffset = rgn->sampOffset;// & (bps == 16 ? ~1 : ~0);
+    if (inserted) {
+      auto sample = sampColl->addSamp(
+       sampOffset,
+       sampLength,
+       sampOffset,
+       sampLength,
+       1,
+       bps,
+       44100,
+       fmt::format("Sample: 0x{:X}",  rgn->sampOffset)
+      );
+      sample->setWaveType(bps == 16 ? WT_PCM16 : WT_PCM8);
+      sample->setSignedness(Signedness::Signed);
+      sample->loop = rgn->loop;
+      sample->setEndianness(Endianness::Big);
+      // TODO: We should only reverse the looped portion of the sample
+      if (rgn->loopType() == SegSatRgn::LoopType::Reverse)
+        sample->setReverse(true);
+
+      size_t newLength = sampOffset + sampLength - instrSet->dwOffset;
+      if (sampColl->unLength < newLength) {
+        sampColl->unLength = newLength;
+      }
+      if (instrSet->unLength < newLength) {
+        instrSet->unLength = newLength;
+      }
+    }
+  }
+  return true;
+}
+
+// *********
+// SegSatRgn
+// *********
+
+SegSatRgn::SegSatRgn(SegSatInstr* instr, uint32_t offset, const std::string& name) :
+  VGMRgn(instr, offset, 0x20, name) {
+  addKeyLow(readByte(offset), offset, 1);
+  addKeyHigh(readByte(offset+1), offset+1, 1);
+
+  u8 pitchFlags = readByte(offset+2);
+  m_enablePeg = pitchFlags >> 7;
+  m_enablePlfo = (pitchFlags >> 6) & 1;
+  addChild(offset + 2, 1, "Enable PEG / PLFO Flags");
+
+
+  u8 loopFlag = (readByte(offset + 3) >> 5) & 3;
+  m_loopType = static_cast<LoopType>(loopFlag);
+  m_sampleType = static_cast<SampleType>((readByte(offset + 3) >> 4) & 1);
+
+  u8 bytesPerSamp = m_sampleType == SampleType::PCM16 ? 2 : 1;
+
+  u32 instrSetOffset = parInstr->parInstrSet->dwOffset;
+  sampOffset = (getWordBE(offset + 2) & 0x7FFFF);
+  if (m_sampleType == SampleType::PCM16)
+    sampOffset = sampOffset & ~1;
+  sampOffset += instrSetOffset;
+  if (m_loopType == LoopType::Reverse) {
+    printf("FOUND REVERSE LOOP");
+  }
+  addChild(offset + 3, 3, "Sample Offset, Sample Type, Loop Type");
+  m_sampLoopStart = getShortBE(offset + 6) * bytesPerSamp;
+  m_sampLoopEnd = getShortBE(offset + 8) * bytesPerSamp;
+  setLoopInfo(m_loopType == LoopType::Off ? 0 : 1, m_sampLoopStart, m_sampLoopEnd - m_sampLoopStart);
+  addChild(offset + 6, 2, "Loop Start");
+  addChild(offset + 8, 2, "Loop End");
+
+  u16 adsr1 = getShortBE(offset + 10);
+  m_attackRate = adsr1 & 0x1F;
+  m_decayRate1 = (adsr1 >> 6) & 0x1F;
+  m_decayRate2 = (adsr1 >> 11) & 0x1F;
+  addADSRValue(offset + 10, 2, "Attack Rate, Decay Rate, Sustain Rate");
+  u16 adsr2 = getShortBE(offset + 12);
+  m_releaseRate = adsr2 & 0x1F;
+  m_decayLevel = (adsr2 >> 5) & 0x1F;
+  m_keyRateScale = (adsr2 >> 10) & 0x1F;
+  addADSRValue(offset + 12, 2, "Release Rate, Sustain Level, Key Rate Scale");
+
+  attack_time = ARTimes[m_attackRate * 2] / 1000.0;
+  decay_time = DRTimes[m_decayRate1 * 2] / 1000.0;
+  sustain_level = (0x1F - m_decayLevel) / 31.0;
+  release_time = DRTimes[m_releaseRate * 2] / 1000.0;
+  double decay2Time = DRTimes[m_decayRate2 * 2] / 1000.0;
+  if (sustain_level > 0.9 && decay2Time < 10) {
+    decay_time = decay2Time;
+    sustain_level = 0;
+  }
+
+
+  u8 enableModFlags = readByte(offset + 14);
+  m_enableLfoModulation = (enableModFlags >> 7) & 1;
+  m_enablePegModulation = (enableModFlags >> 6) & 1;
+  m_enablePlfoModulation = (enableModFlags >> 5) & 1;
+  addChild(offset + 14, 1, "Enable PEG Modulation / PLFO Modulation Flags");
+
+  m_totalLevel = readByte(offset + 15);
+  addChild(offset + 15, 1, "Total Level");
+
+  m_enableTotalLevelModulation = (readByte(offset + 18) >> 2) & 1;
+  addChild(offset + 18, 1, "Enable Total Level Modulation");
+
+  u8 lfoResetFreqAndWave = readByte(offset + 20);
+  m_lfoReset = (lfoResetFreqAndWave & 0x80) > 0;
+  m_lfoFreq = (lfoResetFreqAndWave >> 2) & 0x1F;
+  u8 lfoWave1 = (lfoResetFreqAndWave) & 1;
+  u8 lfoWave2 = (readByte(offset + 21) >> 3) & 3;
+
+  // The pitch LFO wave selection is split across bits non-contiguous bits. Very weird.
+  if (lfoWave1 == 1)
+    m_pitchLfoWave = LFOWave::Square;
+  else if (lfoWave2 == 2)
+    m_pitchLfoWave = LFOWave::Triangle;
+  else if (lfoWave2 == 3)
+    m_pitchLfoWave = LFOWave::Noise;
+  else
+    m_pitchLfoWave = LFOWave::SawTooth;
+  addChild(offset + 20, 1, "LFO Frequency, LFO Reset, Pitch LFO Wave");
+
+  u8 lfoPitchDepthAmpWaveAmpDepth = readByte(offset + 21);
+  m_pitchLfoDepth = (lfoPitchDepthAmpWaveAmpDepth >> 5) & 7;
+  u8 ampLfoWave = (lfoPitchDepthAmpWaveAmpDepth >> 3) & 3;
+  m_ampLfoWave = static_cast<LFOWave>(ampLfoWave);
+  m_ampLfoDepth = lfoPitchDepthAmpWaveAmpDepth & 0x7;
+
+  // m_ampLfoWave
+  addChild(offset + 21, 1, "Pitch LFO Depth, Amp LFO Depth, Amp LFO Wave");
+
+
+  addChild(offset + 23, 1, "Effect Select, Effect Send");
+  addChild(offset + 24, 1, "Direct Level, Direct Pan");
+  addUnityKey(readByte(offset + 25), offset + 0x19, 1);
+  addFineTune((static_cast<s8>(readByte(offset + 26)) / 128.0) * 50, offset + 26, 1);
+
+  m_velocityTableIndex = readByte(offset + 29);
+  addChild(offset + 29, 1, "Velocity Table Index");
+
+  m_PegIndex = readByte(offset + 30);
+  m_PlfoIndex = readByte(offset + 31);
+
+  addChild(offset + 30, 1, "PEG Index");
+  addChild(offset + 31, 1, "PLFO Index");
+}

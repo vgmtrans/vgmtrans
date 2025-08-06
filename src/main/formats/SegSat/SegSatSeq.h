@@ -11,6 +11,9 @@ class SegSatSeq:
   bool parseHeader() override;
   bool readEvent() override;
 
+ private:
+  void changeChannel(u8 ch);
+
  public:
   u32 normalTrackOffset;
   int remainingEventsInLoop = -1;

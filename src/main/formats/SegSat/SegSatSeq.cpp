@@ -33,24 +33,35 @@ bool SegSatSeq::parseHeader() {
   return true;
 }
 
+void SegSatSeq::changeChannel(u8 ch) {
+  setCurTrack(ch);
+  if (ch == 9) {
+    channel = 0;
+    channelGroup = 1;
+    if (VGMSeq::readMode == READMODE_CONVERT_TO_MIDI && pMidiTrack->channelGroup != 1) {
+      pMidiTrack->setChannelGroup(1);
+      pMidiTrack->addMidiPort(1);
+    }
+  } else {
+    channel = ch;
+    channelGroup = 0;
+    if (VGMSeq::readMode == READMODE_CONVERT_TO_MIDI && pMidiTrack->channelGroup != 0) {
+      pMidiTrack->setChannelGroup(0);
+      pMidiTrack->addMidiPort(0);
+    }
+  }
+}
+
 int counter = 0;
 
 bool SegSatSeq::readEvent() {
-  if (bInLoop) {
-    remainingEventsInLoop--;
-    if (remainingEventsInLoop == -1) {
-      bInLoop = false;
-      curOffset = loopEndPos;
-    }
-  }
-
   // If we're in the tempo track, expect a tempo event
   if (curOffset < normalTrackOffset) {
-    u32 tempoDelta = 0;
+    u32 time = 0;
     while (curOffset < normalTrackOffset) {
       u32 mpqn = readWordBE(curOffset + 4);
-      insertTempo(curOffset, 8, mpqn, tempoDelta);
-      tempoDelta = readWordBE(curOffset);
+      insertTempo(curOffset, 8, mpqn, time);
+      time += readWordBE(curOffset);
       curOffset += 8;
     }
     return true;
@@ -67,6 +78,7 @@ bool SegSatSeq::readEvent() {
     if ((status_byte & 0x10) > 0) {
       L_DEBUG("found 0x10 bit on for note on status byte {:x}", beginOffset);
     }
+
     auto key = readByte(curOffset++);
     auto vel = readByte(curOffset++);
     u16 noteDuration = readByte(curOffset++) | durBit8;
@@ -75,6 +87,10 @@ bool SegSatSeq::readEvent() {
     u16 deltaTime = readByte(curOffset++) | deltaBit8;
     addTime(deltaTime);
     addNoteByDur(beginOffset, curOffset - beginOffset, key, vel, noteDuration);
+
+    // if (beginOffset >= 0x73ABC && beginOffset <= 0x73AFD) {
+      // printf("OFF: %X  T: %d  CH: %d  KEY: %d  DUR: %d  delta: %d\n", beginOffset, getTime(), channel, key, noteDuration, deltaTime);
+    // }
   }
   else {
     if ((status_byte & 0xF0) == Midi::CONTROL_CHANGE) {
@@ -126,6 +142,9 @@ bool SegSatSeq::readEvent() {
       addPitchBend(beginOffset, curOffset - beginOffset, bend);
     }
     else {
+      if (remainingEventsInLoop != -1) {
+        remainingEventsInLoop++;
+      }
       switch (status_byte) {
         case 0x81: {
           if (remainingEventsInLoop != -1) {
@@ -191,5 +210,14 @@ bool SegSatSeq::readEvent() {
       }
     }
   }
+
+  if (bInLoop) {
+    remainingEventsInLoop--;
+    if (remainingEventsInLoop == -1) {
+      bInLoop = false;
+      curOffset = loopEndPos;
+    }
+  }
+
   return true;
 }
