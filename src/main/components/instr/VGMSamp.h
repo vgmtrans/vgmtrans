@@ -42,6 +42,10 @@ public:
   inline void setAttenuation(double decibels) { m_attenDb = decibels;}
   inline bool reverse() { return m_reverse; }
   inline void setReverse(bool reverse) { m_reverse = reverse; }
+  inline Endianness endianness() const { return m_endianness; }
+  inline void setEndianness(Endianness e) { m_endianness = e; }
+  inline Signedness signedness() const { return m_signedness; }
+  inline void setSignedness(Signedness s) { m_signedness = s; }
 
   bool onSaveAsWav();
   bool saveAsWav(const std::string &filepath);
@@ -69,6 +73,9 @@ public:
 private:
   double m_attenDb {0};
   bool m_reverse = false;
+  Endianness m_endianness = Endianness::Little;
+  Signedness m_signedness = Signedness::Signed;
+
 };
 
 

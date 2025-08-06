@@ -135,7 +135,7 @@ void FilegroupMatcher::lookForMatch() {
     coll->setName(seq->name());
     coll->useSeq(seq);
     coll->addInstrSet(assoc.instrSet);
-    if (assoc.sampColl) {
+    if (assoc.sampColl && assoc.instrSet->sampColl == nullptr) {
       coll->addSampColl(assoc.sampColl);
     }
 
