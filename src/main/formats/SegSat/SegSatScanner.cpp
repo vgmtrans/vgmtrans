@@ -8,6 +8,7 @@
 #include "SegSatSeq.h"
 #include "ScannerManager.h"
 #include "SegSatInstrSet.h"
+#include "VGMMiscFile.h"
 
 #include <array>
 
@@ -76,6 +77,7 @@ void SegSatScanner::searchForSequences(RawFile *file) {
     if (bInvalid)
       continue;
 
+    bool bParsedSeq = false;
     for (int n = 0; n < numSeqs; ++n) {
       u32 seqPtr = file->readWordBE(i + 2 + (n * 4));
       u16 tempoTrkPtr = 8;
@@ -88,9 +90,21 @@ void SegSatScanner::searchForSequences(RawFile *file) {
         break;
       }
 
-      SegSatSeq* seq = new SegSatSeq(file, i + seqPtr, "Sega Saturn Sequence");
+      auto name = fmt::format("{} {:d}", file->name(), n);
+      SegSatSeq* seq = new SegSatSeq(file, i + seqPtr, name);
       if (!seq->loadVGMFile())
         delete seq;
+      else
+        bParsedSeq = true;
+    }
+    if (bParsedSeq) {
+      auto seqTable = new VGMMiscFile(SegSatFormat::name, file, i,
+        2 + (numSeqs * 4), "Sega Saturn Seq Table");
+      seqTable->addChild(i, 2, "Sequence Count");
+      for (int j = 0; j < numSeqs; j++) {
+        seqTable->addChild(i + 2 + (j * 4), 4, fmt::format("Sequence {:d} Pointer", j));
+      }
+      seqTable->loadVGMFile();
     }
 
     u32 lastSeqPtr = file->readWordBE(i + 2 + ((numSeqs-1) * 4));
