@@ -39,12 +39,12 @@ bool saveAsOriginal(const VGMFile& file, const std::string& filepath);
 bool saveAsOriginal(const RawFile& rawfile, const std::string& filepath);
 
 template <Target options>
-void saveAs(VGMColl &coll, const std::string &dir_path) {
+void saveAs(const VGMColl &coll, const std::string &dir_path) {
   auto filename = ConvertToSafeFileName(coll.name());
   auto filepath = dir_path + "/" + filename;
 
   if constexpr ((options & Target::MIDI) != 0) {
-    coll.seq()->saveAsMidi(filepath + ".mid");
+    coll.seq()->saveAsMidi(filepath + ".mid", &coll);
   }
 
   if constexpr ((options & Target::DLS) != 0) {

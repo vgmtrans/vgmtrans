@@ -160,7 +160,7 @@ bool CLIVGMRoot::saveMidi(const VGMColl* coll) {
   if (coll->seq() != nullptr) {
     string collName = coll->name();
     string filepath = UI_getSaveFilePath(collName, "mid");
-    if (!coll->seq()->saveAsMidi(filepath)) {
+    if (!coll->seq()->saveAsMidi(filepath, coll)) {
       L_ERROR("Failed to save MIDI file");
       return false;
     }

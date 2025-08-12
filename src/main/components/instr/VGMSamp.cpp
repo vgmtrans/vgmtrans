@@ -27,8 +27,7 @@ double VGMSamp::compressionRatio() {
   return 1.0;
 }
 
-void VGMSamp::convertToStdWave(std::uint8_t* buf)
-{
+void VGMSamp::convertToStdWave(std::uint8_t* buf) {
   readBytes(dataOff, dataLength, buf);
 
   if (m_endianness == Endianness::Big && waveType == WT_PCM16) {

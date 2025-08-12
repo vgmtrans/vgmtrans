@@ -23,6 +23,31 @@ static const double DRTimes[64] = {100000/*infinity*/,100000/*infinity*/,118200.
           920.0,790.0,690.0,550.0,460.0,390.0,340.0,270.0,230.0,200.0,170.0,140.0,110.0,98.0,85.0,68.0,57.0,49.0,43.0,34.0,
           28.0,25.0,22.0,18.0,14.0,12.0,11.0,8.5,7.1,6.1,5.4,4.3,3.6,3.1};
 
+// Velocity Level Table, defines a curve to transform note velocity
+struct SegSatVLTable {
+  u8 rate0, point0, level0;
+  u8 rate1, point1, level1;
+  u8 rate2, point2, level2;
+  u8 rate3;
+};
+
+struct SegSatMixerTable {
+  u8 data[18];
+  [[nodiscard]] u8 effLevel(int idx) const {
+    return data[idx] >> 5;
+  }
+  [[nodiscard]] u8 effPan(int idx) const {
+    return data[idx] & 0x1F;
+  }
+};
+
+struct SegSatPlfoTable {
+  u8 delay;
+  u8 frequency;
+  u8 amp;
+  u8 fadeTime;
+};
+
 // **************
 // SegSatInstrSet
 // **************
@@ -30,27 +55,24 @@ static const double DRTimes[64] = {100000/*infinity*/,100000/*infinity*/,118200.
 class SegSatInstrSet:
     public VGMInstrSet {
 public:
-
-  // Velocity Level Table, defines a curve to transform note velocity
-  struct VLTable {
-    u8 rate0, point0, level0;
-    u8 rate1, point1, level1;
-    u8 rate2, point2, level2;
-    u8 rate3;
-  };
-
   SegSatInstrSet(RawFile* file, uint32_t offset, int numInstrs, const std::string& name = "SegSatInstrSet");
   ~SegSatInstrSet() = default;
 
   virtual bool parseHeader();
   virtual bool parseInstrPointers();
+  std::vector<SegSatMixerTable> mixerTables() { return m_mixerTables; }
+  std::vector<SegSatVLTable> vlTables() { return  m_vlTables; }
+  std::vector<SegSatPlfoTable> plfoTables() { return  m_plfoTables; }
 
   std::unordered_set<uint32_t> sampleOffsets;
+
 
 private:
 
   int m_numInstrs;
-  std::vector<VLTable> m_vlTables;
+  std::vector<SegSatMixerTable> m_mixerTables;
+  std::vector<SegSatVLTable> m_vlTables;
+  std::vector<SegSatPlfoTable> m_plfoTables;
 };
 
 // ***********
@@ -64,6 +86,11 @@ public:
   ~SegSatInstr() = default;
 
   virtual bool loadInstr();
+
+private:
+  u8 m_pitchBendRange;
+  u8 m_volBias;
+  u8 m_portamento;
 };
 
 // *********
@@ -90,11 +117,13 @@ public:
   SegSatRgn(SegSatInstr* instr, uint32_t offset, const std::string& name);
   ~SegSatRgn() = default;
 
-  u32 sampleLoopStart() { return m_sampLoopStart; }
-  u32 sampleLoopEnd() { return m_sampLoopEnd; }
-  u32 sampleLoopLength() { return m_sampLoopEnd - m_sampLoopStart; }
-  SampleType sampleType() { return m_sampleType; }
-  LoopType loopType() { return m_loopType; }
+  u32 sampleLoopStart() const { return m_sampLoopStart; }
+  u32 sampleLoopEnd() const { return m_sampLoopEnd; }
+  u32 sampleLoopLength() const { return m_sampLoopEnd - m_sampLoopStart; }
+  SampleType sampleType() const { return m_sampleType; }
+  LoopType loopType() const { return m_loopType; }
+  u8 vlTableIndex() const { return m_vlTableIndex; }
+  u8 totalLevel() const { return m_totalLevel; }
 
 private:
   u8 m_attackRate;
@@ -123,7 +152,7 @@ private:
   u8 m_totalLevel;
   bool m_enableTotalLevelModulation;
 
-  u8 m_velocityTableIndex;
+  u8 m_vlTableIndex;
   u8 m_PegIndex;
   u8 m_PlfoIndex;
 };

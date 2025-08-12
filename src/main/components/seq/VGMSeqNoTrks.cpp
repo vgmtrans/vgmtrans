@@ -86,8 +86,10 @@ bool VGMSeqNoTrks::loadEvents(long stopTime) {
   return true;
 }
 
-MidiFile *VGMSeqNoTrks::convertToMidi() {
+MidiFile *VGMSeqNoTrks::convertToMidi(const VGMColl* coll) {
   this->SeqTrack::readMode = this->VGMSeq::readMode = READMODE_FIND_DELTA_LENGTH;
+
+  useColl(coll);
 
   if (!loadEvents())
     return nullptr;
@@ -129,8 +131,15 @@ void VGMSeqNoTrks::tryExpandMidiTracks(uint32_t numTracks) {
     return;
   if (midiTracks.size() < numTracks) {
     size_t initialTrackSize = midiTracks.size();
-    for (size_t i = 0; i < numTracks - initialTrackSize; i++)
-      midiTracks.push_back(midi->addTrack());
+    for (size_t i = initialTrackSize; i < numTracks; i++) {
+      auto* midiTrack = midi->addTrack();
+      midiTracks.push_back(midiTrack);
+      // TODO: add option to write to channel 10
+      if (i == 9) {
+        midiTrack->setChannelGroup(1);
+        midiTrack->addMidiPort(1);
+      }
+    }
   }
 }
 

@@ -27,14 +27,33 @@ bool SegSatInstrSet::parseHeader() {
   addChild(dwOffset + 4, 2, "PEG Tables Pointer");
   addChild(dwOffset + 6, 2, "PLFO Tables Pointer");
 
+  u32 mixerTablesOffset = readShortBE(dwOffset) + dwOffset;
   u32 vlTablesOffset = readShortBE(dwOffset + 2) + dwOffset;
   u32 pegTablesOffset = readShortBE(dwOffset + 4) + dwOffset;
+  u32 plfoTablesOffset = readShortBE(dwOffset + 6) + dwOffset;
+  u32 firstInstrOffset = readShortBE(dwOffset + 8) + dwOffset;
 
-  // Parse Velocity Level Tables
-  u32 offset = vlTablesOffset;
+  // Parse Mixer Tables
+  u32 offset = mixerTablesOffset;
   int i = 0;
   do {
-    VLTable vlTable;
+    SegSatMixerTable mixerTable;
+    readBytes(offset, 18, &mixerTable);
+    m_mixerTables.push_back(mixerTable);
+
+    auto tableItem = addChild(offset, 18, fmt::format("Mixer Table {:d}", i));
+    for (int j = 0; j < 18; ++j) {
+      tableItem->addChild(offset + j, 1, fmt::format("Channel {:d}  Effect Send/Pan", j));
+    }
+    offset += 18;
+    ++i;
+  } while (offset < vlTablesOffset);
+
+  // Parse Velocity Level Tables
+  offset = vlTablesOffset;
+  i = 0;
+  do {
+    SegSatVLTable vlTable;
     readBytes(offset, 10, &vlTable);
     m_vlTables.push_back(vlTable);
 
@@ -53,6 +72,24 @@ bool SegSatInstrSet::parseHeader() {
     offset += 10;
     ++i;
   } while (offset < pegTablesOffset);
+
+  // Parse PLFO Tables
+  offset = plfoTablesOffset;
+  i = 0;
+  do {
+    SegSatPlfoTable plfoTable;
+    readBytes(offset, 4, &plfoTable);
+    m_plfoTables.push_back(plfoTable);
+
+    auto tableItem = addChild(offset, 4, fmt::format("PLFO Table {:d}", i));
+    tableItem->addChild(offset, 1, "Delay");
+    tableItem->addChild(offset + 1, 1, "Frequency");
+    tableItem->addChild(offset + 2, 1, "Amplitude");
+    tableItem->addChild(offset + 3, 1, "Fade Time");
+
+    offset += 4;
+    ++i;
+  } while (offset < firstInstrOffset);
 
   return true;
 }
@@ -86,7 +123,11 @@ bool SegSatInstr::loadInstr() {
   addChild(dwOffset+1, 1, "Portamento");
   addChild(dwOffset+2, 1, "Region Count");
   addChild(dwOffset+3, 1, "Volume Bias");
+  m_pitchBendRange = rawFile()->readByte(dwOffset);
+  m_portamento = rawFile()->readByte(dwOffset + 1);
   u8 numRgns = rawFile()->readByte(dwOffset + 2) + 1;
+  m_volBias = rawFile()->readByte(dwOffset + 3);
+
   auto sampColl = parInstrSet->sampColl;
   for (int i = 0; i < numRgns; ++i) {
     // Add region
@@ -180,16 +221,22 @@ SegSatRgn::SegSatRgn(SegSatInstr* instr, uint32_t offset, const std::string& nam
   m_keyRateScale = (adsr2 >> 10) & 0x1F;
   addADSRValue(offset + 12, 2, "Release Rate, Sustain Level, Key Rate Scale");
 
-  attack_time = ARTimes[m_attackRate * 2] / 1000.0;
+  // Calculate envelope values in seconds
+  // MAME starts the envelope at 0x17F. The ARTimes table represents time from 0 to max (0x3FF).
+  // Effectively, this scales down AR time to 62.5%
+  attack_time = (ARTimes[m_attackRate * 2] / 1000.0) * 0.625;
+  attack_time *= 0.625;
   decay_time = DRTimes[m_decayRate1 * 2] / 1000.0;
   sustain_level = (0x1F - m_decayLevel) / 31.0;
+  // sustain_level = pow(10.0, (-3.0 * static_cast<double>(m_decayLevel)) / 20.0);
+
   release_time = DRTimes[m_releaseRate * 2] / 1000.0;
   double decay2Time = DRTimes[m_decayRate2 * 2] / 1000.0;
-  if (sustain_level > 0.9 && decay2Time < 10) {
+
+  if ((decay_time < 2 || sustain_level > 0.7) && decay2Time < 88600) {
     decay_time = decay2Time;
     sustain_level = 0;
   }
-
 
   u8 enableModFlags = readByte(offset + 14);
   m_enableLfoModulation = (enableModFlags >> 7) & 1;
@@ -229,13 +276,14 @@ SegSatRgn::SegSatRgn(SegSatInstr* instr, uint32_t offset, const std::string& nam
   // m_ampLfoWave
   addChild(offset + 21, 1, "Pitch LFO Depth, Amp LFO Depth, Amp LFO Wave");
 
-
   addChild(offset + 23, 1, "Effect Select, Effect Send");
   addChild(offset + 24, 1, "Direct Level, Direct Pan");
   addUnityKey(readByte(offset + 25), offset + 0x19, 1);
-  addFineTune((static_cast<s8>(readByte(offset + 26)) / 128.0) * 50, offset + 26, 1);
+  s8 fineTuneByte = static_cast<s8>(readByte(offset + 26));
+  s16 fineTuneCents = (fineTuneByte / 128.0) * 50;
+  addFineTune(fineTuneCents, offset + 26, 1);
 
-  m_velocityTableIndex = readByte(offset + 29);
+  m_vlTableIndex = readByte(offset + 29);
   addChild(offset + 29, 1, "Velocity Table Index");
 
   m_PegIndex = readByte(offset + 30);
