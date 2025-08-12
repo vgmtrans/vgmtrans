@@ -75,7 +75,7 @@ int MP2kInstrSet::makeOrGetSample(size_t sample_pointer) {
   samp->unityKey = original_pitch;
   samp->fineTune = pitch_correction;
   samp->rate = m_operating_rate;
-  samp->volume = 1;
+  samp->setAttenuation(0);
   samp->bps = 8;
   samp->setName(fmt::format("{:#x}", sample_pointer));
 

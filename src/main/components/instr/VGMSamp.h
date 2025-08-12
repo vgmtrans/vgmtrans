@@ -37,6 +37,9 @@ public:
   inline void setLoopLength(uint32_t theLoopLength) { loop.loopLength = theLoopLength; }
   inline void setLoopStartMeasure(LoopMeasure measure) { loop.loopStartMeasure = measure; }
   inline void setLoopLengthMeasure(LoopMeasure measure) { loop.loopLengthMeasure = measure; }
+  inline double attenDb() const { return m_attenDb; }
+  void setVolume(double volume);
+  inline void setAttenuation(double decibels) { m_attenDb = decibels;}
   inline bool reverse() { return m_reverse; }
   inline void setReverse(bool reverse) { m_reverse = reverse; }
 
@@ -56,15 +59,15 @@ public:
   Loop loop;
 
   /* FIXME: these placeholders value are not so clean... */
-  int8_t unityKey = -1;
-  short fineTune = 0;
-  double volume = -1;  // as percent of full volume.  This will be converted to attenuation for SynthFile
+  int8_t unityKey {-1};
+  short fineTune {0};
 
   long pan{0};
 
   VGMSampColl *parSampColl;
 
 private:
+  double m_attenDb {0};
   bool m_reverse = false;
 };
 

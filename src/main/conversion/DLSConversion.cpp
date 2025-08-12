@@ -242,10 +242,10 @@ bool mainDLSCreation(
           realFineTune = rgn->fineTune;
 
         long realAttenuation;
-        if (rgn->attenDb() == 0 && samp->volume == -1)
+        if (rgn->attenDb() == 0 && samp->attenDb() == 0)
           realAttenuation = 0;
         else if (rgn->attenDb() == 0)
-          realAttenuation = static_cast<long>(convertPercentAmplitudeToAttenDB(samp->volume) * DLS_DECIBEL_UNIT * 10);
+          realAttenuation = static_cast<long>(samp->attenDb() * DLS_DECIBEL_UNIT * 10);
         else {
           realAttenuation = static_cast<long>(rgn->attenDb() * DLS_DECIBEL_UNIT * 10);
         }

@@ -215,13 +215,7 @@ SynthFile* createSynthFile(
         else
           realFineTune = rgn->fineTune;
 
-        double attenuation;
-        if (samp->volume != -1)
-          attenuation = convertPercentAmplitudeToAttenDB(samp->volume);
-        else
-          attenuation = 0;
-
-        sampInfo->setPitchInfo(realUnityKey, realFineTune, attenuation);
+        sampInfo->setPitchInfo(realUnityKey, realFineTune, samp->attenDb());
 
         double sustainLevAttenDb;
         if (rgn->sustain_level == -1)
@@ -274,10 +268,8 @@ void unpackSampColl(SynthFile &synthfile, const VGMSampColl *sampColl, std::vect
     } else
       sampInfo->setLoopInfo(samp->loop, samp);
 
-    double attenuation = (samp->volume != -1) ? convertPercentAmplitudeToAttenDB(samp->volume) : 0;
     uint8_t unityKey = (samp->unityKey != -1) ? samp->unityKey : 0x3C;
-    short fineTune = samp->fineTune;
-    sampInfo->setPitchInfo(unityKey, fineTune, attenuation);
+    sampInfo->setPitchInfo(unityKey, samp->fineTune, samp->attenDb());
   }
 }
 

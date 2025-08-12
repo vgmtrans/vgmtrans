@@ -8,6 +8,7 @@
 #include "VGMSamp.h"
 #include "VGMSampColl.h"
 #include "Root.h"
+#include "ScaleConversion.h"
 #include "helper.h"
 
 // *******
@@ -54,6 +55,10 @@ void VGMSamp::convertToStdWave(std::uint8_t* buf)
     for (std::size_t i = 0; i < dataLength; ++i)
       buf[i] ^= 0x80;
   }
+}
+
+void VGMSamp::setVolume(double volume) {
+  m_attenDb = convertPercentAmplitudeToAttenDB(volume);
 }
 
 bool VGMSamp::onSaveAsWav() {

@@ -78,15 +78,15 @@ class VGMRgn : public VGMItem {
   //int sampCollNum;	//optional value. for formats that use multiple sampColls and reference samples base 0 for each sampColl (NDS, for instance)
   VGMSampColl *sampCollPtr;
 
-  double pan;        //percentage.  0 = full left. 0.5 = center.  1 = full right
-  double attack_time;            //in seconds
+  double pan;                 // percentage.  0 = full left. 0.5 = center.  1 = full right
+  double attack_time;         // in seconds
   uint16_t attack_transform;
-  double hold_time;            //in seconds
-  double decay_time;            //in seconds
-  double sustain_level;        //as a percentage
-  double sustain_time;        //in seconds (we don't support positive rate here, as is possible on psx)
+  double hold_time;           // in seconds
+  double decay_time;          // in seconds
+  double sustain_level;       // as a percentage of amplitude
+  double sustain_time;        // in seconds (we don't support positive rate here, as is possible on psx)
   uint16_t release_transform;
-  double release_time;        //in seconds
+  double release_time;        // in seconds
 
 private:
   double m_attenDb {0};   // attenuation in decibels;
