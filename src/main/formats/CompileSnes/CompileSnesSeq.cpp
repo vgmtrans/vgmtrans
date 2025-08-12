@@ -217,7 +217,7 @@ void CompileSnesTrack::addInitialMidiEvents(int trackNum) {
 
   double volumeScale;
   addProgramChangeNoItem(spcSRCN, true);
-  addVolNoItem(convert7bitPercentAmpValToStdMidiVal(spcVolume / 2));
+  addVolNoItem(convert7bitPercentAmpToStdMidiVal(spcVolume / 2));
   addPanNoItem(convert7bitLinearPercentPanValToStdMidiVal(static_cast<uint8_t>(spcPan + 0x80) / 2, &volumeScale));
   addExpressionNoItem(convertPercentAmpToStdMidiVal(volumeScale));
   addReverbNoItem(0);
@@ -355,7 +355,7 @@ bool CompileSnesTrack::readEvent() {
     case EVENT_VOLUME: {
       uint8_t newVolume = readByte(curOffset++);
       spcVolume = newVolume;
-      uint8_t midiVolume = convert7bitPercentAmpValToStdMidiVal(spcVolume / 2);
+      uint8_t midiVolume = convert7bitPercentAmpToStdMidiVal(spcVolume / 2);
       addVol(beginOffset, curOffset - beginOffset, midiVolume);
       break;
     }
@@ -381,7 +381,7 @@ bool CompileSnesTrack::readEvent() {
     case EVENT_VOLUME_REL: {
       int8_t delta = static_cast<int8_t>(readByte(curOffset++));
       spcVolume += delta;
-      uint8_t midiVolume = convert7bitPercentAmpValToStdMidiVal(spcVolume / 2);
+      uint8_t midiVolume = convert7bitPercentAmpToStdMidiVal(spcVolume / 2);
       addVol(beginOffset, curOffset - beginOffset, midiVolume, "Volume (Relative)");
       break;
     }

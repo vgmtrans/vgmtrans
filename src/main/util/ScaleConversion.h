@@ -24,7 +24,7 @@ double linearAmpDecayTimeToLinDBDecayTime(double secondsToFullAtten,
 //                                   double tau = 0.25,     // seconds; try 0.2–0.35
 //                                   int samples = 64);      // integration resolution
 
-uint8_t convert7bitPercentAmpValToStdMidiVal(uint8_t percentVal);
+uint8_t convert7bitPercentAmpToStdMidiVal(uint8_t percentVal);
 uint8_t convertPercentAmpToStdMidiVal(double percent);
 uint16_t convertPercentAmpToStd14BitMidiVal(double percent);
 uint8_t convertDBAttenuationToStdMidiVal(double dbAtten);

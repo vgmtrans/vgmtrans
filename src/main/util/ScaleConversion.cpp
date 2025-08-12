@@ -66,7 +66,7 @@ double linearAmpDecayTimeToLinDBDecayTime(double secondsToFullAtten,
   return secondsToFullAtten * (w * k_short + (1.0 - w) * k_long);
 }
 
-uint8_t convert7bitPercentAmpValToStdMidiVal(uint8_t percentVal) {
+uint8_t convert7bitPercentAmpToStdMidiVal(uint8_t percentVal) {
   return convertPercentAmpToStdMidiVal(percentVal / 127.0);
 }
 
