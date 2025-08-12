@@ -33,11 +33,13 @@ class VGMRgn : public VGMItem {
   void setFineTune(int16_t relativePitchCents) { fineTune = relativePitchCents; }
   void setPan(uint8_t pan);
   void addPan(uint8_t pan, uint32_t offset, uint32_t length = 1, const std::string& name = "Pan");
-  //void setAttenuation(long attenuation);
-  //void addAttenuation(long atten, uint32_t offset, uint32_t length = 1);
   void setVolume(double volume);
+  void setAttenuation(double decibels);
+  double attenDb() { return m_attenDb; }
   void addVolume(double volume, uint32_t offset, uint32_t length = 1);
+  void addAttenuation(double decibels, uint32_t offset, uint32_t length = 1);
   void addUnityKey(uint8_t unityKey, uint32_t offset, uint32_t length = 1);
+  void addCoarseTune(int16_t relativeSemitones, uint32_t offset, uint32_t length = 1);
   void addFineTune(int16_t relativePitchCents, uint32_t offset, uint32_t length = 1);
   void addKeyLow(uint8_t keyLow, uint32_t offset, uint32_t length = 1);
   void addKeyHigh(uint8_t keyHigh, uint32_t offset, uint32_t length = 1);
@@ -76,8 +78,6 @@ class VGMRgn : public VGMItem {
   //int sampCollNum;	//optional value. for formats that use multiple sampColls and reference samples base 0 for each sampColl (NDS, for instance)
   VGMSampColl *sampCollPtr;
 
-  //long attenuation;
-  double volume;    // as percentage of full volume.  This will be converted to to an attenuation when we convert to a SynthFile
   double pan;        //percentage.  0 = full left. 0.5 = center.  1 = full right
   double attack_time;            //in seconds
   uint16_t attack_transform;
@@ -87,6 +87,9 @@ class VGMRgn : public VGMItem {
   double sustain_time;        //in seconds (we don't support positive rate here, as is possible on psx)
   uint16_t release_transform;
   double release_time;        //in seconds
+
+private:
+  double m_attenDb {0};   // attenuation in decibels;
 };
 
 

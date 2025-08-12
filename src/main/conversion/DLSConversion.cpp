@@ -242,12 +242,13 @@ bool mainDLSCreation(
           realFineTune = rgn->fineTune;
 
         long realAttenuation;
-        if (rgn->volume == -1 && samp->volume == -1)
+        if (rgn->attenDb() == 0 && samp->volume == -1)
           realAttenuation = 0;
-        else if (rgn->volume == -1)
-          realAttenuation = static_cast<long>(-(convertLogScaleValToAtten(samp->volume) * DLS_DECIBEL_UNIT * 10));
-        else
-          realAttenuation = static_cast<long>(-(convertLogScaleValToAtten(rgn->volume) * DLS_DECIBEL_UNIT * 10));
+        else if (rgn->attenDb() == 0)
+          realAttenuation = static_cast<long>(convertPercentAmplitudeToAttenDB(samp->volume) * DLS_DECIBEL_UNIT * 10);
+        else {
+          realAttenuation = static_cast<long>(rgn->attenDb() * DLS_DECIBEL_UNIT * 10);
+        }
 
         long convAttack = static_cast<long>(std::round(secondsToTimecents(rgn->attack_time) * 65536));
         long convHold = static_cast<long>(std::round(secondsToTimecents(rgn->hold_time) * 65536));
@@ -257,7 +258,7 @@ bool mainDLSCreation(
           convSustainLev = 0x03e80000;        //sustain at full if no sustain level provided
         else {
           // the DLS envelope is a range from 0 to -96db.
-          double attenInDB = convertLogScaleValToAtten(rgn->sustain_level);
+          double attenInDB = convertPercentAmplitudeToAttenDB(rgn->sustain_level);
           convSustainLev = static_cast<long>(((96.0 - attenInDB) / 96.0) * 0x03e80000);
         }
 

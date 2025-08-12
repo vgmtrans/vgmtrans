@@ -127,6 +127,10 @@ void SynthRgn::setWaveLinkInfo(uint16_t options, uint16_t phaseGroup, uint32_t t
   tableIndex = theTableIndex;
 }
 
+void SynthRgn::setAttenuationDb(double attenuation) {
+  attenDb = attenuation;
+}
+
 //  ********
 //  SynthArt
 //  ********

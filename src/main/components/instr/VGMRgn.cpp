@@ -1,8 +1,9 @@
 /*
-* VGMTrans (c) 2002-2024
+ * VGMTrans (c) 2002-2024
  * Licensed under the zlib license,
  * refer to the included LICENSE.txt file
  */
+#include "ScaleConversion.h"
 #include "VGMRgn.h"
 #include "VGMInstrSet.h"
 
@@ -22,7 +23,6 @@ VGMRgn::VGMRgn(VGMInstr *instr, uint32_t offset, uint32_t length, std::string na
       sampNum(0),
       sampOffset(-1),
       sampCollPtr(nullptr),
-      volume(-1),
       pan(0.5),
       attack_time(0),
       attack_transform(no_transform),
@@ -47,7 +47,6 @@ VGMRgn::VGMRgn(VGMInstr *instr, uint32_t offset, uint32_t length, uint8_t theKey
       sampNum(theSampNum),
       sampOffset(-1),
       sampCollPtr(nullptr),
-      volume(-1),
       pan(0.5),
       attack_time(0),
       attack_transform(no_transform),
@@ -119,12 +118,21 @@ void VGMRgn::addPan(uint8_t p, uint32_t offset, uint32_t length, const std::stri
 }
 
 void VGMRgn::setVolume(double vol) {
-  volume = vol;
+  m_attenDb = convertPercentAmplitudeToAttenDB(vol);
+}
+
+void VGMRgn::setAttenuation(double attenDb) {
+  m_attenDb = attenDb;
 }
 
 void VGMRgn::addVolume(double vol, uint32_t offset, uint32_t length) {
-  volume = vol;
+  setVolume(vol);
   addChild(new VGMRgnItem(this, VGMRgnItem::RIT_VOL, offset, length, "Volume"));
+}
+
+void VGMRgn::addAttenuation(double attenDb, uint32_t offset, uint32_t length) {
+  setAttenuation(attenDb);
+  addChild(new VGMRgnItem(this, VGMRgnItem::RIT_VOL, offset, length, "Attenuation"));
 }
 
 void VGMRgn::addUnityKey(uint8_t uk, uint32_t offset, uint32_t length) {

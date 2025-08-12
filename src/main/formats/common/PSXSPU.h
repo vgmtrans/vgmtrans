@@ -247,7 +247,7 @@ void psxConvADSR(T *realADSR,
         samples = l;
       }
       double timeInSecs = samples / sampleRate;
-      realADSR->sustain_time = /*Sm ? timeInSecs : */linearAmpDecayTimeToLinDBDecayTime(timeInSecs, 0x800);
+      realADSR->sustain_time = /*Sm ? timeInSecs : */linearAmpDecayTimeToLinDBDecayTime(timeInSecs);
     }
   }
 
@@ -259,7 +259,7 @@ void psxConvADSR(T *realADSR,
 
   // If decay is going unused, and there's a sustain rate with sustain level close to max...
   //  we'll put the sustain_rate in place of the decay rate.
-  if ((realADSR->decay_time < 2 || (Dr == 0x0F && Sl >= 0x0C)) && Sr < 0x7E && Sd == 1) {
+  if ((realADSR->decay_time < 2 || (Dr >= 0x0E && Sl >= 0x0C)) && Sr < 0x7E && Sd == 1) {
     realADSR->sustain_level = 0;
     realADSR->decay_time = realADSR->sustain_time;
     //realADSR->decay_time = 0.5;
@@ -305,7 +305,7 @@ void psxConvADSR(T *realADSR,
   //if (Rm == 0) // if it's linear
   //	timeInSecs *=  LINEAR_RELEASE_COMPENSATION;
 
-  realADSR->release_time = /*Rm ? timeInSecs : */linearAmpDecayTimeToLinDBDecayTime(timeInSecs, 0x800);
+  realADSR->release_time = /*Rm ? timeInSecs : */linearAmpDecayTimeToLinDBDecayTime(timeInSecs);
 
   // We need to compensate the decay and release times to represent them as the time from full vol to -100db
   // where the drop in db is a fixed amount per time unit (SoundFont2 spec for vol envelopes, pg44.)

@@ -127,7 +127,7 @@ bool KonamiArcadeInstrSet::parseInstrPointers() {
     rgn->sampNum = sampNum;
     rgn->unityKey = unityKey;
     rgn->release_time = drumReleaseTime;
-    rgn->volume = volTable[d.attenuation];
+    rgn->setVolume(volTable[d.attenuation]);
 
     rgn->addChild(off, 1, "Sample Number");
     rgn->addChild(off + 1, 1, "Unity Key");

@@ -13,107 +13,60 @@
 #define M_PI_2 1.57079632679489661923132169163975144 /* pi/2           */
 #endif
 
-// A lot of games use a simple linear amplitude decay/release for their envelope.
-// In other words, the envelope level drops at a constant rate (say from
-// 0xFFFF to 0 (cps2) ), and to get the attenuation we multiply by this
-// percent value (env_level / 0xFFFF).  This means the attenuation will be
-// -20*log10( env_level / 0xFFFF ) decibels.  Wonderful, but SF2 and DLS have
-// the a linear decay in decibels - not amplitude - for their decay/release slopes.
-// So if you were to graph it, the SF2/DLS attenuation over time graph would be
-// a simple line.
+// Both SF2 and DLS specs define decay and release (not attack) as a constant
+// rate of change in dB attenuation over time. In contrast, most game drivers
+// change **amplitude** at a constant rate. SF2 and DLS typically express decay/release
+// as the time to reach a large attenuation (100 dB for SF2; 96 dB for DLS).
+//
+// If we naively take the time it would take a linear-amplitude fade to reach −100 dB and
+// plug that straight in as an SF2 decay/release time, the result will **sound** too short:
+// a linear-in-dB envelope corresponds to an **exponential** drop in amplitude, which
+// plunges quickly at the start and lingers at very low levels later. For example, halfway
+// through a linear-amplitude fade, the level is 50% (−6.02 dB), but halfway through a
+// linear-in-dB fade to −100 dB, the level is already at −50 dB.
+//
+// Even if we compute the time as “driver max internal volume -> 0,” the shape mismatch
+// remains: linear amplitude vs. linear dB will not perceptually align.
 
-// (Note these are obviously crude ASCII drawings and in no way accurate!)
-// 100db
-// |                  /
-// |               /
-// |            /
-// |         /
-// |      /  
-//10db /                   -  half volume
-// |/
-// |--------------------TIME
+// Goal: convert a constant-amplitude decay/release time (t = secondsToFullAtten)
+// into an SF2-style time that is linear-in-dB but sounds similar. We blend two
+// principled anchors and crossfade them with a smooth knee:
+//
+//   1) Short-time anchor (match initial dB/sec slope):
+//        k_short = targetDb_InitialSlope * (ln 10) / 20
+//      (For 100 dB, k_short ≈ 11.51.)
+//
+//   2) Long-time anchor (least-squares match in dB over the full fade):
+//        k_long  = targetDb_LeastSquares * (ln 10) / 45
+//      (For 100 dB, k_long ≈ 5.12.)
+//
+//   Knee blend (p > 1):
+//        w(t)   = 1 / (1 + (t / T_knee)^p)
+//        T_sf2  = t * [ k_long + (k_short - k_long) * w(t) ]
+//
+// Interpretation:
+//   • T_knee is the **50/50 time** (at t = T_knee, short/long contributions are equal).
+//   • p controls the **knee sharpness** (higher p -> crisper transition).
+double linearAmpDecayTimeToLinDBDecayTime(double secondsToFullAtten,
+                                          double targetDb_LeastSquares,
+                                          double targetDb_InitialSlope) {
+  if (secondsToFullAtten <= 0.0) return 0.0;
 
-// But games using linear amplitude have a convex curve
-// 100db
-// |                  -
-// |                  -
-// |                 -
-// |                -
-// |             -  
-//10db       x             -  half volume
-// |-   -  
-// |-------------------TIME
+  const double ln10 = 2.302585092994046;
+  const double k_short = targetDb_InitialSlope / (20.0 / ln10);
+  const double k_long  = targetDb_LeastSquares * ln10 / 45.0;
 
-// Now keep in mind that 10db of attenuation is half volume to the human ear.
-// What this mean is that SF2/DLS are going to sound like they have much shorter
-// decay/release rates if we simply plug in a time value from 0 atten to full atten
-// from a linear amplitude game. 
+  // Knee near temporal integration (100–150 ms). p controls sharpness.
+  const double T_knee = 0.12; // seconds
+  const double p = 2.0;
 
-// My approach at the moment is to calculate the time it takes to get to half volume
-// and then use that value accordingly with the SF2/DLS decay time.  In other words
-// Take the second graph, find where y = 10db, and the draw a line from the origin
-// through it to get your DLS/SF2 decay/release line 
-// (the actual output value is time where y = 100db for sf2 or 96db for DLS, SynthFile class uses 100db).
+  const double x = secondsToFullAtten / T_knee;
+  const double w = 1.0 / (1.0 + std::pow(x, p)); // w≈1 for very short; →0 for long
 
-
-// This next function converts seconds to full attenuation in a linear amplitude decay scale
-// and approximates the time to full attenuation in a linear DB decay scale.
-double linearAmpDecayTimeToLinDBDecayTime(double secondsToFullAtten, int linearVolumeRange) {
-  double expMinDecibel = -100.0;
-  double linearMinDecibel = log10(1.0 / linearVolumeRange) * 20.0;
-  double linearToExpScale = log(linearMinDecibel - expMinDecibel) / log(2.0);
-  return secondsToFullAtten * linearToExpScale;
+  return secondsToFullAtten * (w * k_short + (1.0 - w) * k_long);
 }
 
-uint8_t convert7bitPercentVolValToStdMidiVal(uint8_t percentVal) {
-  // MIDI uses the following formula for db attenuation on velocity/volume values.
-  // (see http://www.midi.org/techspecs/gmguide2.pdf pg9 or dls1 spec page 14)
-  //
-  //   20*log10(x^2/127^2)
-  // = 40*log10(x/127)
-  //
-  // So the values translate as follows:
-  //   CC#7  Amplitude
-  //   --------------
-  //    127      0db
-  //     96   -4.8db
-  //     64  -11.9db
-  //     32  -23.9db
-  //     16  -36.0db
-  //      0  -infinity
-  //
-  // A 16-bit PCM sample uses a different formula for amplitude:
-  //   20*log10(abs(x)/32767)
-  //
-  // So if a game uses this formula with volume values ranging from 0-127 like MIDI,
-  // we would get the following chart:
-  //   CC#7  Amplitude
-  //   --------------
-  //    127      0db
-  //     96   -2.4db
-  //     64   -6.0db
-  //     32  -12.0db
-  //     16  -18.0db
-  //      0  -infinity
-  //
-  // This doesn't offer much dynamic range, as -10db is perceived as half-volume.
-  //
-  // To convert a range 0-127 value using the second formula to the MIDI formula,
-  // solve for y using the following equation:
-  //   20*log10(x/127) = 40*log10(y/127)
-  //   y = sqrt(x*127)
-
-  // In standard MIDI, the attenuation for volume in db is 40*log10(127/val) == 20*log10(127^2/val^2). (dls1 spec page 14)
-  // (Also stated in GM guidelines page 9 http://www.midi.org/techspecs/gmguide2.pdf)
-  // Here, the scale is different.  We get rid of the exponents
-  // so it's just 20*log10(127/val).
-  // Therefore, we must convert from one scale to the other.
-  // The equation for the first line is obvious.
-  // For the second line, I simply solved db = 40*log10(127/val) for val.
-  // The result is val = 127*10^(-0.025*db).  So, by plugging in the original val into
-  // the original scale equation, we get a db that we can plug into that second equation to get
-  // the new val.
-
+uint8_t convert7bitPercentAmpValToStdMidiVal(uint8_t percentVal) {
   return convertPercentAmpToStdMidiVal(percentVal / 127.0);
 }
 
@@ -129,31 +82,20 @@ uint16_t convertPercentAmpToStd14BitMidiVal(double percent) {
   return std::round(16383.0 * sqrt(percent));
 }
 
-// db attenuation is expressed as a positive value. So, a reduction of 3.2db is expressed as 3.2, not -3.2.
+// dbAtten is positive for attenuation: 3.2 => -3.2 dB level
 uint8_t convertDBAttenuationToStdMidiVal(double dbAtten) {
-  return std::round(pow(10, -dbAtten / 40.0));
+  const double amp = std::pow(10.0, -dbAtten / 40.0);
+  int vi = (int)std::lround(amp * 127.0);
+  return (uint8_t)std::clamp(vi, 0, 127);
 }
 
-double convertLogScaleValToAtten(double percent) {
+// Convert a percent of amplitude to attenuation in decibels.
+//  ex: convertPercentAmplitudeToAttenDB(0.5) returns 6.02db = half perceived loudness
+double convertPercentAmplitudeToAttenDB(double percent, double maxAtten) {
   if (percent == 0)
-    return 100.0;  // assume 0 is -100.0db attenuation
-  double atten = 20 * log10(percent) * 2;
-  return std::min(-atten, 100.0);
-}
-
-// Convert a percent of volume value to it's attenuation in decibels.
-//  ex: ConvertPercentVolToAttenDB(0.5) returns -6.02db = half perceived loudness
-double convertPercentAmplitudeToAttenDB(double percent) {
-  return 20 * log10(percent);
-}
-
-// Convert a percent of volume value to it's attenuation in decibels.
-//  ex: ConvertPercentVolToAttenDB_SF2(0.5) returns -(-6.02db) = half perceived loudness
-double convertPercentAmplitudeToAttenDB_SF2(double percent) {
-  if (percent == 0)
-    return 100.0;        // assume 0 is -100.0db attenuation
-  double atten = 20 * log10(percent);
-  return std::min(-atten, 100.0);
+    return maxAtten;
+  double atten = -20 * log10(percent);
+  return std::min(atten, maxAtten);
 }
 
 double secondsToTimecents(double secs) {

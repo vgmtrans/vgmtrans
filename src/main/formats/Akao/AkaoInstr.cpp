@@ -229,7 +229,7 @@ bool AkaoDrumKit::loadInstr() {
       addRgn(rgn);
       rgn->drumRelUnityKey = readByte(rgn_offset + 1);
       const uint16_t raw_volume = getWord(rgn_offset + 2);
-      rgn->setVolume(raw_volume / static_cast<double>(127 * 128));
+      rgn->setVolume(raw_volume / (127 * 128.0));
       rgn->addGeneralItem(rgn_offset, 1, "Associated Articulation ID");
       rgn->addGeneralItem(rgn_offset + 1, 1, "Relative Unity Key");
       rgn->addGeneralItem(rgn_offset + 2, 2, "Attenuation");

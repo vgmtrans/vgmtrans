@@ -336,10 +336,10 @@ bool SonyPS2Instr::loadInstr() {
       uint8_t noteHigh = splitblock.splitRangeHigh;
       if (noteHigh < noteLow)
         noteHigh = 0x7F;
-      uint8_t sampSetVelLow = convert7bitPercentVolValToStdMidiVal(sampSetParam.velLimitLow);
-      uint8_t sampSetVelHigh = convert7bitPercentVolValToStdMidiVal(sampSetParam.velLimitHigh);
-      uint8_t velLow = convert7bitPercentVolValToStdMidiVal(sampParam.velRangeLow);//sampSetParam.velLimitLow;
-      uint8_t velHigh = convert7bitPercentVolValToStdMidiVal(sampParam.velRangeHigh);//sampSetParam.velLimitHigh;
+      uint8_t sampSetVelLow = convert7bitPercentAmpValToStdMidiVal(sampSetParam.velLimitLow);
+      uint8_t sampSetVelHigh = convert7bitPercentAmpValToStdMidiVal(sampSetParam.velLimitHigh);
+      uint8_t velLow = convert7bitPercentAmpValToStdMidiVal(sampParam.velRangeLow);//sampSetParam.velLimitLow;
+      uint8_t velHigh = convert7bitPercentAmpValToStdMidiVal(sampParam.velRangeHigh);//sampSetParam.velLimitHigh;
       if (velLow < sampSetVelLow)
         velLow = sampSetVelLow;
       if (velHigh > sampSetVelHigh)

@@ -96,7 +96,7 @@ uint32_t emulateSDSPGAIN(uint8_t gain,
     }
     else if (mode == 4) { // 4: linear decrease
       uint32_t total_samples_full = (0x800 / 0x20) * SDSP_COUNTER_RATES[rate];
-      sf2_time = linearAmpDecayTimeToLinDBDecayTime(total_samples_full / 32000.0, 0x800);
+      sf2_time = linearAmpDecayTimeToLinDBDecayTime(total_samples_full / 32000.0);
     }
     else if (mode == 5) { // 5: exponential decrease
       // Exponential decrease mode is almost exponential.
@@ -112,7 +112,7 @@ uint32_t emulateSDSPGAIN(uint8_t gain,
           double decibelAtStart = convertPercentAmplitudeToAttenDB(env_from / 2047.0);
           double decibelAtExpFinal = convertPercentAmplitudeToAttenDB(env_exp_final / 2047.0);
           double timeAtExpFinal = (tick_exp * SDSP_COUNTER_RATES[rate]) / 32000.0;
-          sf2_time = timeAtExpFinal * (-100.0 / (decibelAtExpFinal - decibelAtStart));
+          sf2_time = timeAtExpFinal * (100.0 / (decibelAtExpFinal - decibelAtStart));
         }
         else {
           // linear part (very small volume)
@@ -134,7 +134,7 @@ uint32_t emulateSDSPGAIN(uint8_t gain,
             double decibelAtStart = convertPercentAmplitudeToAttenDB(env_from / 2047.0);
             double decibelAtFinal = convertPercentAmplitudeToAttenDB(env_final / 2047.0);
             double timeAtExpFinal = (tick_total * SDSP_COUNTER_RATES[rate]) / 32000.0;
-            sf2_time = timeAtExpFinal * (-100.0 / (decibelAtFinal - decibelAtStart));
+            sf2_time = timeAtExpFinal * (100.0 / (decibelAtFinal - decibelAtStart));
           }
 
           // Alternate method:
@@ -223,7 +223,7 @@ void convertSNESADSR(uint8_t adsr1,
     // release
     // decrease envelope by 8 for every sample
     samples = (env_sustain_start + 7) / 8;
-    release_time = linearAmpDecayTimeToLinDBDecayTime(samples / 32000.0, 0x7ff);
+    release_time = linearAmpDecayTimeToLinDBDecayTime(samples / 32000.0);
   }
   else {
     uint8_t mode = gain >> 5;
@@ -237,7 +237,7 @@ void convertSNESADSR(uint8_t adsr1,
       // release
       // decrease envelope by 8 for every sample
       samples = (env_from + 7) / 8;
-      release_time = linearAmpDecayTimeToLinDBDecayTime(samples / 32000.0, 0x7ff);
+      release_time = linearAmpDecayTimeToLinDBDecayTime(samples / 32000.0);
     }
     else {
       env = env_from;
@@ -254,7 +254,7 @@ void convertSNESADSR(uint8_t adsr1,
         // release
         // decrease envelope by 8 for every sample
         samples = (env_to + 7) / 8;
-        release_time = linearAmpDecayTimeToLinDBDecayTime(samples / 32000.0, 0x7ff);
+        release_time = linearAmpDecayTimeToLinDBDecayTime(samples / 32000.0);
       }
       else {
         attack_time = 0.0;
@@ -265,7 +265,7 @@ void convertSNESADSR(uint8_t adsr1,
         // release
         // decrease envelope by 8 for every sample
         samples = (env_from + 7) / 8;
-        release_time = linearAmpDecayTimeToLinDBDecayTime(samples / 32000.0, 0x7ff);
+        release_time = linearAmpDecayTimeToLinDBDecayTime(samples / 32000.0);
       }
     }
   }
