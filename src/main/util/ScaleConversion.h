@@ -7,23 +7,9 @@
 
 #include <cstdint>
 
-static double linAmpTimeToLinDb_MatchInitialDbSlope(double secondsToFullAtten, double targetDb = 100.0);
-static double linAmpTimeToLinDb_LeastSquaresDB(double secondsToFullAtten, double targetDb = 100.0);
-static double linAmpTimeToLinDb_LoudnessThreshold(double secondsToFullAtten, double targetDb = 100.0, double thresholdDb = 50.0);
-static double smoothstep01(double x);
-// double linearAmpDecayTimeToLinDBDecayTime(double secondsToFullAtten,
-//                                        double targetDb_LeastSquares = 70.0,
-//                                        double targetDb_InitialSlope = 120.0,
-//                                        double shortThresholdSec = 0.2,
-//                                        double blendWidthSec    = 0.10);
 double linearAmpDecayTimeToLinDBDecayTime(double secondsToFullAtten,
                                           double targetDb_LeastSquares = 70,
                                           double targetDb_InitialSlope = 140);
-// double linearAmpDecayTimeToLinDBDecayTime(double secondsToFullAtten,
-//                                   double targetDb = 200.0,
-//                                   double tau = 0.25,     // seconds; try 0.2–0.35
-//                                   int samples = 64);      // integration resolution
-
 uint8_t convert7bitPercentAmpToStdMidiVal(uint8_t percentVal);
 uint8_t convertPercentAmpToStdMidiVal(double percent);
 uint16_t convertPercentAmpToStd14BitMidiVal(double percent);
