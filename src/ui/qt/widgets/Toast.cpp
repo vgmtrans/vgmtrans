@@ -84,7 +84,7 @@ Toast::Toast(QWidget* parent)
 
   auto* row = new QHBoxLayout(m_bubble);
   row->setContentsMargins(16,12,16,12);
-  row->setSpacing(12);
+  row->setSpacing(0);
 
   m_icon->setStyleSheet(QStringLiteral("border: none;"));
   m_icon->setFixedSize(kIconPx, kIconPx);
@@ -100,9 +100,10 @@ Toast::Toast(QWidget* parent)
   m_close->setAccessibleName(QStringLiteral("Dismiss"));
   m_close->setIconSize(QSize(kCloseIconPx, kCloseIconPx));
   m_close->setStyleSheet(QStringLiteral(
-      "border: none; background: transparent; padding-bottom: 8px; padding-left: 8px;"));
+      "border: none; background: transparent; padding-bottom: 8px; padding-left: 12px;"));
 
-  row->addWidget(m_icon, 0, Qt::AlignTop);
+  row->addWidget(m_icon, 0, Qt::AlignVCenter);
+  row->addSpacing(12);
   row->addWidget(m_text, 1, Qt::AlignVCenter);
   row->addWidget(m_close, 0, Qt::AlignTop);
 
