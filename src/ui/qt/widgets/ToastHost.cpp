@@ -12,11 +12,13 @@
 
 ToastHost::ToastHost(QWidget* parentWidget)
   : QObject(parentWidget), m_parent(parentWidget) {
-  if (m_parent) m_parent->installEventFilter(this);
+  if (m_parent)
+    m_parent->installEventFilter(this);
 }
 
 Toast* ToastHost::showToast(const QString& message, ToastType type, int duration_ms) {
-  if (!m_parent) return nullptr;
+  if (!m_parent)
+    return nullptr;
 
   // Newest toast goes at index 0 (top)
   auto* t = new Toast(m_parent);
@@ -32,7 +34,8 @@ Toast* ToastHost::showToast(const QString& message, ToastType type, int duration
 
 void ToastHost::onToastDismissed(Toast* t) {
   const int idx = m_toasts.indexOf(t);
-  if (idx >= 0) m_toasts.removeAt(idx);
+  if (idx >= 0)
+    m_toasts.removeAt(idx);
   // Toast deletes itself; just reflow others
   reflow();
 }
@@ -45,11 +48,13 @@ bool ToastHost::eventFilter(QObject* watched, QEvent* event) {
 }
 
 void ToastHost::reflow() {
-  if (!m_parent) return;
+  if (!m_parent)
+    return;
 
   int y = 0; // stack offset from top, grows downward
   for (Toast* t : m_toasts) {
-    if (!t) continue;
+    if (!t)
+      continue;
     t->setMargins(m_marginX, m_marginY);
     t->setStackOffset(y);
     // X/Y are applied by Toast's eventFilter as well; set once here:

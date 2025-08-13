@@ -48,7 +48,8 @@ static inline QPixmap tintedIcon(const QIcon& base, const QSize& pxSize, const Q
 
 const ToastTheme& Toast::themeFor(ToastType type) noexcept {
   const int idx = static_cast<int>(type);
-  if (idx >= 0 && idx < static_cast<int>(std::size(kThemes))) return kThemes[idx];
+  if (idx >= 0 && idx < static_cast<int>(std::size(kThemes)))
+    return kThemes[idx];
   static const ToastTheme fallback{ QColor("#ffffff"), QColor("#222222"), QColor("#cccccc"), kInfoIcon };
   return fallback;
 }
@@ -66,7 +67,8 @@ Toast::Toast(QWidget* parent)
   setAttribute(Qt::WA_ShowWithoutActivating);
   setWindowFlags(Qt::FramelessWindowHint);
 
-  if (parent) parent->installEventFilter(this);
+  if (parent)
+    parent->installEventFilter(this);
 
   auto* outer = new QVBoxLayout(this);
   outer->setContentsMargins(0,0,0,0);
@@ -119,7 +121,10 @@ Toast::Toast(QWidget* parent)
       m_timer.start(m_duration_ms);
     } else {
       // fade-out complete
-      if (!m_emittedDismissed) { m_emittedDismissed = true; emit dismissed(this); }
+      if (!m_emittedDismissed) {
+        m_emittedDismissed = true;
+        emit dismissed(this);
+      }
       hide();
       deleteLater();
     }
@@ -213,7 +218,10 @@ void Toast::showMessage(const QString& message, ToastType type, int duration_ms)
 }
 
 void Toast::onCloseClicked() noexcept {
-  if (!m_emittedDismissed) { m_emittedDismissed = true; emit dismissed(this); }
+  if (!m_emittedDismissed) {
+    m_emittedDismissed = true;
+    emit dismissed(this);
+  }
   cancelAnimations();
   hide();
   deleteLater();
