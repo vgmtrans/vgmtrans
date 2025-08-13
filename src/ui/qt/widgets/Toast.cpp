@@ -150,13 +150,22 @@ void Toast::setTextHtml(const QString& message) {
   f.setPixelSize(kFontPx);
   m_text->setFont(f);
 
-  const QString html = QString::fromLatin1(
-    "<div style='line-height:%1; font-size:%2px; white-space:pre-wrap; word-break:break-word;'>%3</div>")
-    .arg(QString::number(kLineHeight, 'f', 2))
-    .arg(kFontPx)
-    .arg(message.toHtmlEscaped().replace(QLatin1Char('\n'), QLatin1String("<br/>")));
-  m_text->setTextFormat(Qt::RichText);
-  m_text->setText(html);
+  const bool isRich = Qt::mightBeRichText(message);
+
+  const QString body = isRich
+    ? message                                  // accept caller HTML
+    : message.toHtmlEscaped()
+             .replace(QLatin1Char('\n'), QLatin1String("<br/>")); // preserve newlines
+
+  const QString wrapped =
+    QString::fromLatin1(
+      "<div style='line-height:%1; font-size:%2px; white-space:pre-wrap; word-break:break-word;'>%3</div>")
+      .arg(QString::number(kLineHeight, 'f', 2))
+      .arg(kFontPx)
+      .arg(body);
+
+  m_text->setTextFormat(Qt::RichText);         // we’re giving it HTML
+  m_text->setText(wrapped);
 }
 
 void Toast::startFadeIn() {
