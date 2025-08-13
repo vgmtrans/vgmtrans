@@ -30,6 +30,7 @@
 #include "TitleBar.h"
 #include "StatusBarContent.h"
 #include "LogManager.h"
+#include "widgets/Toast.h"
 
 MainWindow::MainWindow() : QMainWindow(nullptr) {
   setWindowTitle("VGMTrans");
@@ -107,6 +108,7 @@ void MainWindow::createElements() {
   m_menu_bar = new MenuBar(this, docks);
   setMenuBar(m_menu_bar);
   createStatusBar();
+  m_toast = new Toast(this);
 }
 
 void MainWindow::createStatusBar() {
@@ -146,6 +148,7 @@ void MainWindow::routeSignals() {
     ManualCollectionDialog wiz(this);
     wiz.exec();
   });
+  connect(&qtVGMRoot, &QtVGMRoot::UI_toastRequested, this, &MainWindow::showToast);
 }
 
 void MainWindow::dragEnterEvent(QDragEnterEvent *event) {
@@ -207,4 +210,9 @@ void MainWindow::openFileInternal(const QString& filename) {
   }
 
   qtVGMRoot.openRawFile(filename.toStdString());
+}
+
+void MainWindow::showToast(const QString& message, ToastType type, int duration_ms) {
+  if (m_toast)
+    m_toast->showMessage(message, type, duration_ms);
 }

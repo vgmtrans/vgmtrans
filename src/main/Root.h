@@ -31,6 +31,8 @@ T* variantToType(VGMFileVariant variant) {
 VGMFile* variantToVGMFile(VGMFileVariant variant);
 VGMFileVariant vgmFileToVariant(VGMFile* vgmfile);
 
+enum class ToastType { Info, Warning, Error, Success };
+
 class VGMRoot {
 public:
   VGMRoot() = default;
@@ -65,6 +67,8 @@ public:
   virtual void UI_beginRemoveVGMFiles() {}
   virtual void UI_endRemoveVGMFiles() {}
   virtual void UI_log(LogItem *) { }
+  virtual void UI_toast(const std::string& message, ToastType type = ToastType::Info,
+                        int duration_ms = 10000) {}
 
   virtual void UI_removeVGMColl(VGMColl *) {}
   virtual void UI_beginRemoveVGMColls() {}

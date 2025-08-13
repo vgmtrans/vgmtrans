@@ -7,6 +7,7 @@
 #pragma once
 
 #include <QMainWindow>
+#include "Root.h"
 
 class QDockWidget;
 class MenuBar;
@@ -16,6 +17,7 @@ class VGMCollListView;
 class VGMCollView;
 class QPushButton;
 class StatusBarContent;
+class Toast;
 
 class MainWindow final : public QMainWindow {
   Q_OBJECT
@@ -36,6 +38,7 @@ private:
 
   void openFile();
   void openFileInternal(const QString& filename);
+  void showToast(const QString& message, ToastType type, int duration_ms);
 
   QDockWidget *m_rawfile_dock{};
   QDockWidget *m_vgmfile_dock{};
@@ -47,4 +50,5 @@ private:
   VGMCollListView *m_coll_listview{};
   VGMCollView *m_coll_view{};
   QPushButton *m_manual_creation_btn{};
+  Toast *m_toast{};
 };

@@ -7,12 +7,16 @@
 #pragma once
 
 #include <QObject>
+#include <QMetaType>
 #include "Root.h"
+
+Q_DECLARE_METATYPE(ToastType);
 
 class QtVGMRoot final : public QObject, public VGMRoot {
   Q_OBJECT
 
 public:
+  QtVGMRoot();
   ~QtVGMRoot() override = default;
 
   std::string UI_getResourceDirPath() override;
@@ -32,6 +36,7 @@ public:
   void UI_endRemoveVGMFiles() override;
   void UI_beginRemoveVGMColls() override;
   void UI_endRemoveVGMColls() override;
+  void UI_toast(const std::string& message, ToastType type, int duration_ms) override;
   void UI_addItem(VGMItem* item, VGMItem* parent, const std::string& itemName,
                   void* UI_specific) override;
   std::string UI_getSaveFilePath(const std::string& suggestedFilename,
@@ -53,6 +58,7 @@ signals:
   void UI_addedVGMFile();
   void UI_addedVGMColl();
   void UI_removedVGMColl();
+  void UI_toastRequested(QString message, ToastType type, int duration_ms);
   void UI_removeVGMColl(VGMColl* targColl) override;
   void UI_removeVGMFile(VGMFile* targFile) override;
   void UI_log(LogItem* theLog) override;
