@@ -62,7 +62,8 @@ class VGMRgn : public VGMItem {
   uint8_t velHigh;
 
   int8_t unityKey;
-  int16_t fineTune;
+  int16_t coarseTune;     // in semitones
+  int16_t fineTune;       // in cents
 
   Loop loop;
 
