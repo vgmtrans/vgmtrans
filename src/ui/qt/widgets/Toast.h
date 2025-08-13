@@ -10,15 +10,14 @@
 
 class QLabel;
 class QPushButton;
-class QPropertyAnimation;
 class QGraphicsOpacityEffect;
-class QFrame;
 class QVariantAnimation;
+class QFrame;
 enum class ToastType;
 
 struct ToastTheme {
   QColor bg, text, border;
-  const char* icon; // qrc path (utf-8 literal)
+  const char* icon; // qrc path
 };
 
 class Toast : public QWidget {
@@ -26,6 +25,14 @@ class Toast : public QWidget {
 public:
   explicit Toast(QWidget* parent = nullptr);
   void showMessage(const QString& message, ToastType type, int duration_ms = 3000);
+
+  // host-controlled placement knobs
+  void setMargins(int marginX, int marginY) noexcept { m_marginX = marginX; m_marginY = marginY; }
+  void setStackOffset(int offsetY) noexcept { m_stackOffsetY = offsetY; }
+
+  signals:
+    // emitted exactly once when the toast is dismissed (fadeout or close)
+    void dismissed(Toast* self);
 
 protected:
   bool eventFilter(QObject* watched, QEvent* event) override;
@@ -36,7 +43,7 @@ private slots:
 private:
   static const ToastTheme& themeFor(ToastType type) noexcept;
   void applyTheme(const ToastTheme& th);
-  void setTextHtml(const QString& message, const QColor& textColor);
+  void setTextHtml(const QString& message);
   void startFadeIn();
   void startFadeOut();
   void cancelAnimations() noexcept;
@@ -49,17 +56,23 @@ private:
 
   QTimer m_timer;
   QGraphicsOpacityEffect* m_opacity_effect{nullptr};
-  QVariantAnimation* m_opacity_anim{nullptr}; // single anim for both directions
+  QVariantAnimation* m_opacity_anim{nullptr};
 
-  int m_duration_ms{3000};
+  int m_duration_ms{5000};
 
-  // Config
+  // config
   static constexpr int kFadeMs = 500;
-  static constexpr int kMarginX = 10;
-  static constexpr int kMarginY = 10;
   static constexpr int kIconPx = 24;
   static constexpr int kCloseIconPx = 16;
   static constexpr int kBubbleWidth = 400;
   static constexpr int kFontPx = 13;
   static constexpr double kLineHeight = 1.0;
+
+  // host-provided placement parameters
+  int m_marginX{10};
+  int m_marginY{10};
+  int m_stackOffsetY{0};
+
+  // internal: to ensure dismissed() is sent once
+  bool m_emittedDismissed{false};
 };

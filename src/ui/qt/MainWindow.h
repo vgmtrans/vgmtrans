@@ -17,7 +17,7 @@ class VGMCollListView;
 class VGMCollView;
 class QPushButton;
 class StatusBarContent;
-class Toast;
+class ToastHost;
 
 class MainWindow final : public QMainWindow {
   Q_OBJECT
@@ -50,5 +50,5 @@ private:
   VGMCollListView *m_coll_listview{};
   VGMCollView *m_coll_view{};
   QPushButton *m_manual_creation_btn{};
-  Toast *m_toast{};
+  ToastHost *m_toastHost{};
 };
