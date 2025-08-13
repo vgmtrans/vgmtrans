@@ -7,42 +7,59 @@
 #pragma once
 #include <QWidget>
 #include <QTimer>
-#include "Root.h"
 
 class QLabel;
 class QPushButton;
 class QPropertyAnimation;
 class QGraphicsOpacityEffect;
 class QFrame;
+class QVariantAnimation;
+enum class ToastType;
 
 struct ToastTheme {
   QColor bg, text, border;
-  const char* icon;    // qrc path
+  const char* icon; // qrc path (utf-8 literal)
 };
 
 class Toast : public QWidget {
   Q_OBJECT
 public:
-  explicit Toast(QWidget *parent = nullptr);
+  explicit Toast(QWidget* parent = nullptr);
   void showMessage(const QString& message, ToastType type, int duration_ms = 3000);
 
 protected:
   bool eventFilter(QObject* watched, QEvent* event) override;
 
 private slots:
-  void onFadeOutFinished();
-  void onCloseClicked();
+  void onCloseClicked() noexcept;
 
 private:
-  static ToastTheme themeFor(ToastType type);
+  static const ToastTheme& themeFor(ToastType type) noexcept;
+  void applyTheme(const ToastTheme& th);
+  void setTextHtml(const QString& message, const QColor& textColor);
+  void startFadeIn();
+  void startFadeOut();
+  void cancelAnimations() noexcept;
 
-  QFrame* m_bubble;
-  QLabel* m_icon;
-  QLabel* m_text;
-  QPushButton* m_close;
+private:
+  QFrame* m_bubble{nullptr};
+  QLabel* m_icon{nullptr};
+  QLabel* m_text{nullptr};
+  QPushButton* m_close{nullptr};
+
   QTimer m_timer;
-  QGraphicsOpacityEffect* m_opacity_effect;
-  QPropertyAnimation* m_fade_in;
-  QPropertyAnimation* m_fade_out;
-  int m_duration_ms{};
+  QGraphicsOpacityEffect* m_opacity_effect{nullptr};
+  QVariantAnimation* m_opacity_anim{nullptr}; // single anim for both directions
+
+  int m_duration_ms{3000};
+
+  // Config
+  static constexpr int kFadeMs = 500;
+  static constexpr int kMarginX = 10;
+  static constexpr int kMarginY = 10;
+  static constexpr int kIconPx = 24;
+  static constexpr int kCloseIconPx = 16;
+  static constexpr int kBubbleWidth = 400;
+  static constexpr int kFontPx = 13;
+  static constexpr double kLineHeight = 1.0;
 };

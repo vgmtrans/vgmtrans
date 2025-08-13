@@ -6,58 +6,63 @@
 
 #include "Toast.h"
 
+#include "Root.h"
 #include <QApplication>
-#include <QGraphicsOpacityEffect>
-#include <QVBoxLayout>
-#include <QLabel>
-#include <QPushButton>
-#include <QPropertyAnimation>
-#include <QScreen>
-#include <QIcon>
-#include <QPainter>
 #include <QColor>
+#include <QEvent>
+#include <QGraphicsOpacityEffect>
+#include <QIcon>
+#include <QLabel>
+#include <QPainter>
 #include <QPixmap>
+#include <QPushButton>
+#include <QScreen>
 #include <QSizePolicy>
-#include <QFrame>
+#include <QVariantAnimation>
+#include <QVBoxLayout>
 
-constexpr int FADE_DURATION_MS = 500;
-constexpr int MARGIN_X = 10;
-constexpr int MARGIN_Y = 10;
-constexpr int ICON_SIZE = 24;
-constexpr int CLOSE_ICON_SIZE = 16;
-constexpr int BUBBLE_WIDTH = 400;
-constexpr int FONT_PX = 13;
-constexpr double LINE_HEIGHT = 1.0;
+static constexpr const char* kInfoIcon    = ":/icons/toast_info.svg";
+static constexpr const char* kWarnIcon    = ":/icons/toast_warning.svg";
+static constexpr const char* kErrorIcon   = ":/icons/toast_error.svg";
+static constexpr const char* kSuccessIcon = ":/icons/toast_success.svg";
+static constexpr const char* kCloseIcon   = ":/icons/toast_close.svg";
 
-// Per-type colors + icon
-ToastTheme Toast::themeFor(ToastType type) {
-  switch (type) {
-    case ToastType::Info:
-      return { QColor(209,231,243), QColor(82,123,167), QColor(171,194,202),
-               ":/icons/toast_info.svg" };
-    case ToastType::Warning:
-      return { QColor(247,243,217), QColor(137,111,60), QColor(211,210,180),
-               ":/icons/toast_warning.svg" };
-    case ToastType::Error:
-      return { QColor(230,201,197), QColor(155,64,68), QColor(173,151,151),
-               ":/icons/toast_error.svg" };
-    case ToastType::Success:
-      return { QColor(226,242,216), QColor(98,114,88), QColor(198,209,188),
-               ":/icons/toast_success.svg" };
+static const ToastTheme kThemes[] = {
+  /* ToastType::Info    */ { QColor(209,231,243), QColor( 82,123,167), QColor(171,194,202), kInfoIcon    },
+  /* ToastType::Warning */ { QColor(247,243,217), QColor(137,111, 60), QColor(211,210,180), kWarnIcon    },
+  /* ToastType::Error   */ { QColor(230,201,197), QColor(155, 64, 68), QColor(173,151,151), kErrorIcon   },
+  /* ToastType::Success */ { QColor(226,242,216), QColor( 98,114, 88), QColor(198,209,188), kSuccessIcon },
+};
+
+static inline QPixmap tintedIcon(const QIcon& base, const QSize& pxSize, const QColor& color) {
+  // Preserve DPR for HiDPI
+  QPixmap pm = base.pixmap(pxSize);
+  if (!pm.isNull()) {
+    const qreal dpr = pm.devicePixelRatio();
+    QPainter p(&pm);
+    p.setCompositionMode(QPainter::CompositionMode_SourceIn);
+    p.fillRect(QRect(QPoint(0,0), pm.deviceIndependentSize().toSize()), color);
+    p.end();
+    pm.setDevicePixelRatio(dpr);
   }
-  return { QColor("#ffffff"), QColor("#222222"), QColor("#cccccc"),
-           ":/icons/toast_info.svg" };
+  return pm;
 }
 
-Toast::Toast(QWidget *parent)
-    : QWidget(parent),
-      m_bubble(new QFrame(this)),
-      m_icon(new QLabel(m_bubble)),
-      m_text(new QLabel(m_bubble)),
-      m_close(new QPushButton(m_bubble)),
-      m_opacity_effect(new QGraphicsOpacityEffect(this)),
-      m_fade_in(new QPropertyAnimation(m_opacity_effect, "opacity", this)),
-      m_fade_out(new QPropertyAnimation(m_opacity_effect, "opacity", this)) {
+const ToastTheme& Toast::themeFor(ToastType type) noexcept {
+  const int idx = static_cast<int>(type);
+  if (idx >= 0 && idx < static_cast<int>(std::size(kThemes))) return kThemes[idx];
+  static const ToastTheme fallback{ QColor("#ffffff"), QColor("#222222"), QColor("#cccccc"), kInfoIcon };
+  return fallback;
+}
+
+Toast::Toast(QWidget* parent)
+  : QWidget(parent),
+    m_bubble(new QFrame(this)),
+    m_icon(new QLabel(m_bubble)),
+    m_text(new QLabel(m_bubble)),
+    m_close(new QPushButton(m_bubble)),
+    m_opacity_effect(new QGraphicsOpacityEffect(this)),
+    m_opacity_anim(new QVariantAnimation(this)) {
 
   setAttribute(Qt::WA_TranslucentBackground);
   setAttribute(Qt::WA_ShowWithoutActivating);
@@ -65,7 +70,7 @@ Toast::Toast(QWidget *parent)
 
   if (parent) parent->installEventFilter(this);
 
-  auto outer = new QVBoxLayout(this);
+  auto* outer = new QVBoxLayout(this);
   outer->setContentsMargins(0, 0, 0, 0);
   outer->setSpacing(0);
   outer->addWidget(m_bubble);
@@ -74,146 +79,152 @@ Toast::Toast(QWidget *parent)
   m_bubble->setObjectName(QStringLiteral("bubble"));
   m_bubble->setAttribute(Qt::WA_StyledBackground, true);
   m_bubble->setFrameStyle(QFrame::NoFrame);
+  m_bubble->setFixedWidth(kBubbleWidth);
   m_bubble->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Minimum);
-  m_bubble->setFixedWidth(BUBBLE_WIDTH); m_bubble->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Minimum);
 
-  auto row = new QHBoxLayout(m_bubble);
+  auto* row = new QHBoxLayout(m_bubble);
   row->setContentsMargins(16, 12, 16, 12);
   row->setSpacing(12);
 
-  m_icon->setStyleSheet("border: none;");
-  m_icon->setFixedSize(ICON_SIZE, ICON_SIZE);
-  // m_icon->setScaledContents(false);            // default false; keeps crisp SVG raster
+  m_icon->setStyleSheet(QStringLiteral("border: none;"));
+  m_icon->setFixedSize(kIconPx, kIconPx);
 
-  m_text->setObjectName("toast_text");
+  m_text->setObjectName(QStringLiteral("toast_text"));
   m_text->setWordWrap(true);
   m_text->setTextFormat(Qt::RichText);
-  m_text->setStyleSheet("border: none;");
+  m_text->setStyleSheet(QStringLiteral("border: none;"));
   m_text->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Preferred);
+  m_text->setAccessibleName(QStringLiteral("Toast message"));
 
   m_close->setFlat(true);
   m_close->setFocusPolicy(Qt::NoFocus);
-  m_close->setStyleSheet("border: none; background: transparent;");
-  m_close->setIconSize(QSize(CLOSE_ICON_SIZE, CLOSE_ICON_SIZE));
-  // Add padding to increase the clickable area
-  m_close->setStyleSheet("border: none; background: transparent; padding-bottom: 8px; padding-left: 8px;");
+  m_close->setAccessibleName(QStringLiteral("Dismiss"));
+  m_close->setIconSize(QSize(kCloseIconPx, kCloseIconPx));
+  m_close->setStyleSheet(QStringLiteral(
+    "border: none; background: transparent; padding-bottom: 8px; padding-left: 8px;"
+  ));
 
   row->addWidget(m_icon, 0, Qt::AlignTop);
   row->addWidget(m_text, 1, Qt::AlignVCenter);
   row->addWidget(m_close, 0, Qt::AlignTop);
 
   setGraphicsEffect(m_opacity_effect);
-  m_fade_in->setDuration(FADE_DURATION_MS);
-  m_fade_out->setDuration(FADE_DURATION_MS);
-  connect(m_fade_out, &QPropertyAnimation::finished, this, &Toast::onFadeOutFinished);
-  connect(m_close, &QPushButton::clicked, this, &Toast::onCloseClicked);
-  connect(m_fade_in, &QPropertyAnimation::finished, [this]() { m_timer.start(m_duration_ms); });
+  m_opacity_effect->setOpacity(0.0);
+
+  // Single animation for both directions
+  m_opacity_anim->setStartValue(0.0);
+  m_opacity_anim->setEndValue(1.0);
+  m_opacity_anim->setDuration(kFadeMs);
+  connect(m_opacity_anim, &QVariantAnimation::valueChanged, this, [this](const QVariant& v){
+    m_opacity_effect->setOpacity(v.toDouble());
+  });
+  connect(m_opacity_anim, &QVariantAnimation::finished, this, [this]{
+    // If we just faded in, start the auto close timer.
+    if (qFuzzyCompare(m_opacity_effect->opacity(), 1.0)) {
+      m_timer.start(m_duration_ms);
+    } else {
+      hide();
+    }
+  });
 
   m_timer.setSingleShot(true);
-  connect(&m_timer, &QTimer::timeout, [this]() {
-    m_fade_out->setStartValue(1.0);
-    m_fade_out->setEndValue(0.0);
-    m_fade_out->start();
-  });
+  connect(&m_timer, &QTimer::timeout, this, [this]{ startFadeOut(); });
+
+  connect(m_close, &QPushButton::clicked, this, &Toast::onCloseClicked);
+}
+
+void Toast::applyTheme(const ToastTheme& th) {
+  const QString bg   = th.bg.name(QColor::HexRgb);
+  const QString text = th.text.name(QColor::HexRgb);
+  const QString border = th.border.name(QColor::HexRgb);
+
+  m_bubble->setStyleSheet(QStringLiteral(
+    "QFrame#bubble {"
+      "background-color:%1;"
+      "border:1px solid %2;"
+      "border-radius:8px;"
+    "}"
+    "QFrame#bubble QLabel#toast_text { color:%3; }"
+  ).arg(bg, border, text));
+
+  // Icon + close tint
+  m_icon->setPixmap(tintedIcon(QIcon(QString(kThemes[0].icon)), QSize(kIconPx, kIconPx), th.text)); // icon set later by showMessage
+  QPixmap closePm = tintedIcon(QIcon(QString(kCloseIcon)), QSize(kCloseIconPx, kCloseIconPx), th.text);
+  m_close->setIcon(QIcon(closePm));
+}
+
+void Toast::setTextHtml(const QString& message, const QColor& textColor) {
+  QFont f = m_text->font();
+  f.setPixelSize(kFontPx);
+  m_text->setFont(f);
+
+  const QString html = QString::fromLatin1(
+    "<div style='line-height:%1; font-size:%2px; white-space:pre-wrap; word-break:break-word;'>%3</div>"
+  ).arg(QString::number(kLineHeight, 'f', 2))
+   .arg(kFontPx)
+   .arg(message.toHtmlEscaped().replace(QLatin1Char('\n'), QLatin1String("<br/>")));
+
+  Q_UNUSED(textColor);
+  m_text->setTextFormat(Qt::RichText);
+  m_text->setText(html);
+}
+
+void Toast::startFadeIn() {
+  m_opacity_anim->stop();
+  m_opacity_anim->setDirection(QAbstractAnimation::Forward);
+  m_opacity_anim->start();
+}
+void Toast::startFadeOut() {
+  m_opacity_anim->stop();
+  m_opacity_anim->setDirection(QAbstractAnimation::Backward);
+  m_opacity_anim->start();
+}
+void Toast::cancelAnimations() noexcept {
+  m_timer.stop();
+  m_opacity_anim->stop();
+  m_opacity_effect->setOpacity(0.0);
 }
 
 void Toast::showMessage(const QString& message, ToastType type, int duration_ms) {
   m_duration_ms = duration_ms;
-  m_timer.stop();
-  m_fade_in->stop();
-  m_fade_out->stop();
-  m_opacity_effect->setOpacity(0.0);
+  cancelAnimations();
 
-  const ToastTheme th = themeFor(type);
+  const ToastTheme& th = themeFor(type);
+  applyTheme(th);
+  setTextHtml(message, th.text);
 
-  // Bubble palette
-  const QString style = QString(
-      "QFrame#bubble {"
-      "  background-color: rgb(%1,%2,%3);"
-      "  border: 1px solid rgb(%4,%5,%6);"
-      "  border-radius: 8px;"
-      "}"
-      "QFrame#bubble QLabel#toast_text {"
-      "  color: rgb(%7,%8,%9);"
-      "}")
-      .arg(th.bg.red()).arg(th.bg.green()).arg(th.bg.blue())
-      .arg(th.border.red()).arg(th.border.green()).arg(th.border.blue())
-      .arg(th.text.red()).arg(th.text.green()).arg(th.text.blue());
-  m_bubble->setStyleSheet(style);
-
+  // Icon (correct file & tint)
   {
-    QFont f = m_text->font();
-    f.setPixelSize(FONT_PX);
-    m_text->setFont(f);
-
-    const QString html =
-      QString("<div style='line-height:%1; font-size:%2px; white-space:pre-wrap; "
-          "word-break:break-word;'>%3</div>")
-        .arg(QString::number(LINE_HEIGHT, 'f', 2))
-        .arg(FONT_PX)
-        .arg(message.toHtmlEscaped().replace("\n", "<br/>"));
-    m_text->setTextFormat(Qt::RichText);
-    m_text->setText(html);
-  }
-
-  // Icon style. Tint to match text color
-  {
-    QPixmap iconPix = QIcon(th.icon).pixmap(ICON_SIZE, ICON_SIZE);
-    if (!iconPix.isNull()) {
-      QPainter p(&iconPix);
-      p.setCompositionMode(QPainter::CompositionMode_SourceIn);
-      p.fillRect(iconPix.rect(), th.text);
-      p.end();
-    }
-    m_icon->setPixmap(iconPix);
-  }
-
-  // Close icon matches text color
-  {
-    QPixmap closePix = QIcon(":/icons/toast_close.svg").pixmap(CLOSE_ICON_SIZE, CLOSE_ICON_SIZE);
-    if (!closePix.isNull()) {
-      QPainter p(&closePix);
-      p.setCompositionMode(QPainter::CompositionMode_SourceIn);
-      p.fillRect(closePix.rect(), th.text);
-      p.end();
-    }
-    m_close->setIcon(QIcon(closePix));
+    QIcon icon(QString::fromUtf8(th.icon));
+    QPixmap pm = tintedIcon(icon, QSize(kIconPx, kIconPx), th.text);
+    m_icon->setPixmap(pm);
   }
 
   adjustSize();
 
-  if (parentWidget()) {
-    move(parentWidget()->width() - width() - MARGIN_X, MARGIN_Y);
-  } else {
-    QScreen* screen = QApplication::primaryScreen();
+  if (QWidget* pw = parentWidget()) {
+    move(pw->width() - width() - kMarginX, kMarginY);
+  } else if (QScreen* screen = QGuiApplication::primaryScreen()) {
     const QRect geom = screen->availableGeometry();
-    move(geom.right() - width() - MARGIN_X, geom.top() + MARGIN_Y);
+    move(geom.right() - width() - kMarginX, geom.top() + kMarginY);
   }
 
   show();
   raise();
-  m_fade_in->setStartValue(0.0);
-  m_fade_in->setEndValue(1.0);
-  m_fade_in->start();
+  startFadeIn();
 }
 
-void Toast::onFadeOutFinished() {
-  hide();
-}
-
-void Toast::onCloseClicked() {
-  m_timer.stop();
-  m_fade_in->stop();
-  m_fade_out->stop();
-  m_opacity_effect->setOpacity(0.0);
+void Toast::onCloseClicked() noexcept {
+  cancelAnimations();
   hide();
 }
 
 bool Toast::eventFilter(QObject* watched, QEvent* event) {
-  QWidget* p = parentWidget();
-  if (watched == p && (event->type() == QEvent::Move || event->type() == QEvent::Resize)) {
-    if (isVisible() && p) {
-      move(p->width() - width() - MARGIN_X, MARGIN_Y);
+  if (watched == parentWidget() &&
+      (event->type() == QEvent::Move || event->type() == QEvent::Resize)) {
+    if (isVisible()) {
+      QWidget* pw = parentWidget();
+      if (pw) move(pw->width() - width() - kMarginX, kMarginY);
     }
   }
   return QWidget::eventFilter(watched, event);
