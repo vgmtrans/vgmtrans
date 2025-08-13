@@ -13,10 +13,6 @@
 
 QtVGMRoot qtVGMRoot;
 
-QtVGMRoot::QtVGMRoot() {
-  qRegisterMetaType<ToastType>("ToastType");
-}
-
 std::string QtVGMRoot::UI_getResourceDirPath() {
 #if defined(Q_OS_WIN)
   return (QApplication::applicationDirPath() + "/").toStdString();

@@ -7,16 +7,12 @@
 #pragma once
 
 #include <QObject>
-#include <QMetaType>
 #include "Root.h"
-
-Q_DECLARE_METATYPE(ToastType);
 
 class QtVGMRoot final : public QObject, public VGMRoot {
   Q_OBJECT
 
 public:
-  QtVGMRoot();
   ~QtVGMRoot() override = default;
 
   std::string UI_getResourceDirPath() override;
