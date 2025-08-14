@@ -80,6 +80,10 @@ add_executable(
   widgets/SnappingSplitter.h
   widgets/StatusBarContent.cpp
   widgets/StatusBarContent.h
+  widgets/Toast.cpp
+  widgets/Toast.h
+  widgets/ToastHost.cpp
+  widgets/ToastHost.h
   widgets/TableView.cpp
   widgets/TableView.h
   widgets/TitleBar.cpp

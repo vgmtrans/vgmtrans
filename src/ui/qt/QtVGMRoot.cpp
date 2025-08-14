@@ -6,6 +6,7 @@
 
 #include <QApplication>
 #include <QFileDialog>
+#include <QString>
 #include "QtVGMRoot.h"
 #include "VGMFileTreeView.h"
 #include "UIHelpers.h"
@@ -80,6 +81,10 @@ void QtVGMRoot::UI_beginRemoveVGMColls() {
 
 void QtVGMRoot::UI_endRemoveVGMColls() {
   this->UI_endedRemovingVGMColls();
+}
+
+void QtVGMRoot::UI_toast(const std::string& message, ToastType type, int duration_ms) {
+  this->UI_toastRequested(QString::fromStdString(message), type, duration_ms);
 }
 
 void QtVGMRoot::UI_addItem(VGMItem* item, VGMItem* parent, const std::string& itemName,

@@ -32,6 +32,11 @@
   <file>icons/repeat-begin.svg</file>
   <file>icons/repeat-end.svg</file>
   <file>icons/pitchbend.svg</file>
+  <file>icons/toast_info.svg</file>
+  <file>icons/toast_warning.svg</file>
+  <file>icons/toast_error.svg</file>
+  <file>icons/toast_success.svg</file>
+  <file>icons/toast_close.svg</file>
   <file alias="legal/VGMTrans">../../../../LICENSE</file>
   <file alias="legal/oki_adpcm_state">../../../../licenses/LICENSE_oki_adpcm_state</file>
 </qresource>
