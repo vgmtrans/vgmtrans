@@ -127,7 +127,7 @@ bool KonamiArcadeInstrSet::parseInstrPointers() {
     rgn->sampNum = sampNum;
     rgn->unityKey = unityKey;
     rgn->release_time = drumReleaseTime;
-    rgn->volume = volTable[d.attenuation];
+    rgn->setVolume(volTable[d.attenuation]);
 
     rgn->addChild(off, 1, "Sample Number");
     rgn->addChild(off + 1, 1, "Unity Key");
@@ -243,7 +243,7 @@ bool KonamiArcadeSampColl::parseSampleInfo() {
     sample->setLoopStatus(sampInfo.loops == 1);
     sample->setLoopOffset(relativeLoopOffset);
     sample->unityKey = 0x3C + 6;
-    sample->volume = volTable[sampInfo.attenuation];
+    sample->setVolume(volTable[sampInfo.attenuation]);
     sample->setReverse(sampInfo.reverse());
   }
   return true;

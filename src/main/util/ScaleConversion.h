@@ -7,15 +7,15 @@
 
 #include <cstdint>
 
-double linearAmpDecayTimeToLinDBDecayTime(double secondsToFullAtten, int linearVolumeRange);
-
-uint8_t convert7bitPercentVolValToStdMidiVal(uint8_t percentVal);
+double linearAmpDecayTimeToLinDBDecayTime(double secondsToFullAtten,
+                                          double targetDb_LeastSquares = 70,
+                                          double targetDb_InitialSlope = 140);
+uint8_t convert7bitPercentAmpToStdMidiVal(uint8_t percentVal);
 uint8_t convertPercentAmpToStdMidiVal(double percent);
 uint16_t convertPercentAmpToStd14BitMidiVal(double percent);
 uint8_t convertDBAttenuationToStdMidiVal(double dbAtten);
 double convertLogScaleValToAtten(double percent);
-double convertPercentAmplitudeToAttenDB(double percent);
-double convertPercentAmplitudeToAttenDB_SF2(double percent);
+double convertPercentAmplitudeToAttenDB(double percent, double maxAtten = 100.0);
 
 double secondsToTimecents(double secs);
 uint8_t convertPercentPanValToStdMidiVal(double percent);

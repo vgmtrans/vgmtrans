@@ -116,7 +116,8 @@ SynthFile* createSynthFile(
         if (rgn->sampOffset != -1) {
           bool bFoundIt = false;
           for (uint32_t s = 0; s < sampColl->samples.size(); s++) {  //for every sample
-            if (rgn->sampOffset == sampColl->samples[s]->dwOffset - sampColl->dwOffset - sampColl->sampDataOffset) {
+            if (rgn->sampOffset == sampColl->samples[s]->dwOffset ||
+                rgn->sampOffset == sampColl->samples[s]->dwOffset - sampColl->dwOffset - sampColl->sampDataOffset) {
               realSampNum = s;
 
               //samples[m]->loop.loopStart = parInstrSet->aInstrs[i]->aRgns[k]->loop.loopStart;
@@ -160,6 +161,7 @@ SynthFile* createSynthFile(
         SynthRgn *newRgn = newInstr->addRgn();
         newRgn->setRanges(rgn->keyLow, rgn->keyHigh, rgn->velLow, rgn->velHigh);
         newRgn->setWaveLinkInfo(0, 0, 1, static_cast<uint32_t>(realSampNum));
+        newRgn->setAttenuationDb(rgn->attenDb());
 
         if (realSampNum >= finalSamps.size()) {
           L_ERROR("Sample {} does not exist. Instr index: {:d}, Instr num: {:d}, Region index: {:d}", realSampNum, i, vgminstr->instrNum, j);
@@ -213,21 +215,13 @@ SynthFile* createSynthFile(
         else
           realFineTune = rgn->fineTune;
 
-        double attenuation;
-        if (rgn->volume != -1)
-          attenuation = convertLogScaleValToAtten(rgn->volume);
-        else if (samp->volume != -1)
-          attenuation = convertLogScaleValToAtten(samp->volume);
-        else
-          attenuation = 0;
-
-        sampInfo->setPitchInfo(realUnityKey, realFineTune, attenuation);
+        sampInfo->setPitchInfo(realUnityKey, realFineTune, samp->attenDb());
 
         double sustainLevAttenDb;
         if (rgn->sustain_level == -1)
           sustainLevAttenDb = 0.0;
         else
-          sustainLevAttenDb = convertPercentAmplitudeToAttenDB_SF2(rgn->sustain_level);
+          sustainLevAttenDb = convertPercentAmplitudeToAttenDB(rgn->sustain_level, 100.0);
 
         SynthArt *newArt = newRgn->addArt();
         newArt->addPan(rgn->pan);
@@ -274,10 +268,8 @@ void unpackSampColl(SynthFile &synthfile, const VGMSampColl *sampColl, std::vect
     } else
       sampInfo->setLoopInfo(samp->loop, samp);
 
-    double attenuation = (samp->volume != -1) ? convertLogScaleValToAtten(samp->volume) : 0;
     uint8_t unityKey = (samp->unityKey != -1) ? samp->unityKey : 0x3C;
-    short fineTune = samp->fineTune;
-    sampInfo->setPitchInfo(unityKey, fineTune, attenuation);
+    sampInfo->setPitchInfo(unityKey, samp->fineTune, samp->attenDb());
   }
 }
 

@@ -173,7 +173,7 @@ PrismSnesRgn::PrismSnesRgn(PrismSnesInstr *instr,
   snesConvADSR<VGMRgn>(this, adsr1, adsr2, gain);
 
   // put a random release time, it would be better than plain key off (actual music engine never do key off)
-  release_time = linearAmpDecayTimeToLinDBDecayTime(0.002 * SDSP_COUNTER_RATES[0x14], 0x7ff);
+  release_time = linearAmpDecayTimeToLinDBDecayTime(0.002 * SDSP_COUNTER_RATES[0x14]);
 
   setGuessedLength();
 }

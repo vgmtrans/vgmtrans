@@ -378,7 +378,7 @@ void SeqTrack::addNoteOnNoItem(int8_t key, int8_t velocity) {
   if (readMode == READMODE_CONVERT_TO_MIDI) {
     uint8_t finalVel = velocity;
     if (parentSeq->usesLinearAmplitudeScale())
-      finalVel = convert7bitPercentVolValToStdMidiVal(velocity);
+      finalVel = convert7bitPercentAmpToStdMidiVal(velocity);
 
     if (cDrumNote == -1) {
       pMidiTrack->addNoteOn(channel, key + cKeyCorrection + transpose, finalVel);
@@ -427,7 +427,7 @@ void SeqTrack::insertNoteOn(uint32_t offset,
 
   uint8_t finalVel = vel;
   if (parentSeq->usesLinearAmplitudeScale())
-    finalVel = convert7bitPercentVolValToStdMidiVal(vel);
+    finalVel = convert7bitPercentAmpToStdMidiVal(vel);
 
   if (readMode == READMODE_ADD_TO_UI && !isItemAtOffset(offset, true)) {
     addEvent(new NoteOnSeqEvent(this, key, vel, offset, length, sEventName));
@@ -521,7 +521,7 @@ void SeqTrack::addNoteByDurNoItem(int8_t key, int8_t vel, uint32_t dur) {
   if (readMode == READMODE_CONVERT_TO_MIDI) {
     uint8_t finalVel = vel;
     if (parentSeq->usesLinearAmplitudeScale())
-      finalVel = convert7bitPercentVolValToStdMidiVal(vel);
+      finalVel = convert7bitPercentAmpToStdMidiVal(vel);
 
     if (cDrumNote == -1) {
       pMidiTrack->addNoteByDur(channel, key + cKeyCorrection + transpose, finalVel, dur);
@@ -550,7 +550,7 @@ void SeqTrack::addNoteByDurNoItem_Extend(int8_t key, int8_t vel, uint32_t dur) {
   if (readMode == READMODE_CONVERT_TO_MIDI) {
     uint8_t finalVel = vel;
     if (parentSeq->usesLinearAmplitudeScale())
-      finalVel = convert7bitPercentVolValToStdMidiVal(vel);
+      finalVel = convert7bitPercentAmpToStdMidiVal(vel);
 
     if (cDrumNote == -1) {
       pMidiTrack->addNoteByDur_TriAce(channel, key + cKeyCorrection + transpose, finalVel, dur);
@@ -620,7 +620,7 @@ void SeqTrack::insertNoteByDurNoItem(int8_t key, int8_t vel, uint32_t dur, uint3
   if (readMode == READMODE_CONVERT_TO_MIDI) {
     uint8_t finalVel = vel;
     if (parentSeq->usesLinearAmplitudeScale())
-      finalVel = convert7bitPercentVolValToStdMidiVal(vel);
+      finalVel = convert7bitPercentAmpToStdMidiVal(vel);
 
     pMidiTrack->insertNoteByDur(channel, key + cKeyCorrection + transpose, finalVel, dur, absTime);
   }
@@ -792,7 +792,7 @@ void SeqTrack::addVolSlide(uint32_t offset,
     addControllerSlide(dur,
                        vol,
                        targVol,
-                       parentSeq->usesLinearAmplitudeScale() ? convert7bitPercentVolValToStdMidiVal : nullptr,
+                       parentSeq->usesLinearAmplitudeScale() ? convert7bitPercentAmpToStdMidiVal : nullptr,
                        &MidiTrack::insertVol);
 }
 
@@ -843,7 +843,7 @@ void SeqTrack::addExpressionSlide(uint32_t offset,
     addControllerSlide(dur,
                        expression,
                        targExpr,
-                       parentSeq->usesLinearAmplitudeScale() ? convert7bitPercentVolValToStdMidiVal : nullptr,
+                       parentSeq->usesLinearAmplitudeScale() ? convert7bitPercentAmpToStdMidiVal : nullptr,
                        &MidiTrack::insertExpression);
 }
 
@@ -888,7 +888,7 @@ void SeqTrack::addMastVolSlide(uint32_t offset,
     addControllerSlide(dur,
                        mastVol,
                        targVol,
-                       parentSeq->usesLinearAmplitudeScale() ? convert7bitPercentVolValToStdMidiVal : nullptr,
+                       parentSeq->usesLinearAmplitudeScale() ? convert7bitPercentAmpToStdMidiVal : nullptr,
                        &MidiTrack::insertMasterVol);
 }
 

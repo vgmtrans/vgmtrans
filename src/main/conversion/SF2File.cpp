@@ -221,7 +221,7 @@ SF2File::SF2File(SynthFile *synthfile)
     for (size_t j = 0; j < numRgns; j++) {
       sfInstBag instBag{};
       instBag.wInstGenNdx = instGenCounter;
-      instGenCounter += 12;
+      instGenCounter += 13;
       instBag.wInstModNdx = 0;
 
       memcpy(ibagCk->data + (rgnCounter++ * sizeof(sfInstBag)), &instBag, sizeof(sfInstBag));
@@ -247,7 +247,7 @@ SF2File::SF2File(SynthFile *synthfile)
   // igen chunk
   //***********
   Chunk *igenCk = new Chunk("igen");
-  igenCk->setSize((numTotalRgns * sizeof(sfInstGenList) * 12) + sizeof(sfInstGenList));
+  igenCk->setSize((numTotalRgns * sizeof(sfInstGenList) * 13) + sizeof(sfInstGenList));
   igenCk->data = new uint8_t[igenCk->size()];
   dataPtr = 0;
   for (size_t i = 0; i < numInstrs; i++) {
@@ -296,6 +296,12 @@ SF2File::SF2File(SynthFile *synthfile)
       // overridingRootKey
       instGenList.sfGenOper = overridingRootKey;
       instGenList.genAmount.wAmount = rgn->sampinfo->usUnityNote;
+      memcpy(igenCk->data + dataPtr, &instGenList, sizeof(sfInstGenList));
+      dataPtr += sizeof(sfInstGenList);
+
+      // initialAttenuation - expressed in centibels
+      instGenList.sfGenOper = initialAttenuation;
+      instGenList.genAmount.wAmount = static_cast<u16>(rgn->attenDb * 10.0);
       memcpy(igenCk->data + dataPtr, &instGenList, sizeof(sfInstGenList));
       dataPtr += sizeof(sfInstGenList);
 
