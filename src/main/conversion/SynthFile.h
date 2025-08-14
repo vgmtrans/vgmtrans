@@ -90,6 +90,7 @@ class SynthRgn {
   SynthSampInfo *addSampInfo();
   void setRanges(uint16_t keyLow = 0, uint16_t keyHigh = 0x7F, uint16_t velLow = 0, uint16_t velHigh = 0x7F);
   void setWaveLinkInfo(uint16_t options, uint16_t phaseGroup, uint32_t theChannel, uint32_t theTableIndex);
+  void setFineTune(int16_t semitones, int16_t fineTune);
   void setAttenuationDb(double attenuation);
 
   uint16_t usKeyLow {0};
@@ -101,6 +102,9 @@ class SynthRgn {
   uint16_t usPhaseGroup {0};  // ''
   uint32_t channel {1};       // ''
   uint32_t tableIndex {0};
+
+  int16_t coarseTuneSemitones {0};
+  int16_t fineTuneCents {0};
 
   double attenDb {0};   // attenuation in decibels
 

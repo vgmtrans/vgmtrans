@@ -161,6 +161,7 @@ SynthFile* createSynthFile(
         SynthRgn *newRgn = newInstr->addRgn();
         newRgn->setRanges(rgn->keyLow, rgn->keyHigh, rgn->velLow, rgn->velHigh);
         newRgn->setWaveLinkInfo(0, 0, 1, static_cast<uint32_t>(realSampNum));
+        newRgn->setFineTune(rgn->coarseTune, rgn->fineTune);
         newRgn->setAttenuationDb(rgn->attenDb());
 
         if (realSampNum >= finalSamps.size()) {
@@ -210,10 +211,7 @@ SynthFile* createSynthFile(
           realUnityKey = 0x3C;
 
         short realFineTune;
-        if (rgn->fineTune == 0)
-          realFineTune = samp->fineTune;
-        else
-          realFineTune = rgn->fineTune;
+        realFineTune = samp->fineTune;
 
         sampInfo->setPitchInfo(realUnityKey, realFineTune, samp->attenDb());
 
