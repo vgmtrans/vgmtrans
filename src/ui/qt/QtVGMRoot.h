@@ -30,6 +30,8 @@ public:
   void UI_addVGMColl(VGMColl* theColl) override;
   void UI_beginRemoveVGMFiles() override;
   void UI_endRemoveVGMFiles() override;
+  void UI_beginRemoveVGMColls() override;
+  void UI_endRemoveVGMColls() override;
   void UI_addItem(VGMItem* item, VGMItem* parent, const std::string& itemName,
                   void* UI_specific) override;
   std::string UI_getSaveFilePath(const std::string& suggestedFilename,
@@ -44,6 +46,8 @@ signals:
   void UI_endedLoadingRawFile();
   void UI_beganRemovingVGMFiles();
   void UI_endedRemovingVGMFiles();
+  void UI_beganRemovingVGMColls();
+  void UI_endedRemovingVGMColls();
   void UI_addedRawFile();
   void UI_removedRawFile();
   void UI_addedVGMFile();

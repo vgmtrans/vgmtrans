@@ -67,6 +67,8 @@ public:
   virtual void UI_log(LogItem *) { }
 
   virtual void UI_removeVGMColl(VGMColl *) {}
+  virtual void UI_beginRemoveVGMColls() {}
+  virtual void UI_endRemoveVGMColls() {}
   virtual void UI_addItem(VGMItem *, VGMItem *, const std::string &, void *) {}
   virtual std::string UI_getSaveFilePath(const std::string &suggestedFilename,
                                          const std::string &extension = "") = 0;
