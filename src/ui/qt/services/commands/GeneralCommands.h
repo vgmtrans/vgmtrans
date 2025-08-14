@@ -91,6 +91,7 @@ private:
 class CloseVGMFileCommand : public CloseCommand<VGMFile> {
 public:
   CloseVGMFileCommand() : CloseCommand<VGMFile>() {}
+  [[nodiscard]] std::string name() const override { return "Remove"; }
 
   void close(VGMFile* file) const override {
     pRoot->removeVGMFile(vgmFileToVariant(file));
@@ -106,5 +107,18 @@ public:
 
   void close(RawFile* file) const override {
     pRoot->closeRawFile(file);
+  }
+};
+
+/**
+ * A command for closing a VGMColl
+ */
+class CloseVGMCollCommand : public CloseCommand<VGMColl> {
+public:
+  CloseVGMCollCommand() : CloseCommand<VGMColl>() {}
+
+  [[nodiscard]] std::string name() const override { return "Remove"; }
+  void close(VGMColl* coll) const override {
+    pRoot->removeVGMColl(coll);
   }
 };

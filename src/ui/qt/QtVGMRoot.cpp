@@ -74,6 +74,14 @@ void QtVGMRoot::UI_endRemoveVGMFiles() {
   this->UI_endedRemovingVGMFiles();
 }
 
+void QtVGMRoot::UI_beginRemoveVGMColls() {
+  this->UI_beganRemovingVGMColls();
+}
+
+void QtVGMRoot::UI_endRemoveVGMColls() {
+  this->UI_endedRemovingVGMColls();
+}
+
 void QtVGMRoot::UI_addItem(VGMItem* item, VGMItem* parent, const std::string& itemName,
                            void* UI_specific) {
   auto treeview = static_cast<VGMFileTreeView*>(UI_specific);

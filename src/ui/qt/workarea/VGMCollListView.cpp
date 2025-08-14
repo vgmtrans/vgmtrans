@@ -36,7 +36,8 @@ VGMCollListViewModel::VGMCollListViewModel(QObject *parent) : QAbstractListModel
   connect(&qtVGMRoot, &QtVGMRoot::UI_endedLoadingRawFile, endResettingModel);
   connect(&qtVGMRoot, &QtVGMRoot::UI_beganRemovingVGMFiles, startResettingModel);
   connect(&qtVGMRoot, &QtVGMRoot::UI_endedRemovingVGMFiles, endResettingModel);
-
+  connect(&qtVGMRoot, &QtVGMRoot::UI_beganRemovingVGMColls, startResettingModel);
+  connect(&qtVGMRoot, &QtVGMRoot::UI_endedRemovingVGMColls, endResettingModel);
 
   connect(&qtVGMRoot, &QtVGMRoot::UI_addedVGMColl,
           [this]() {
@@ -159,6 +160,21 @@ void VGMCollListView::keyPressEvent(QKeyEvent *e) {
     case Qt::Key_Escape:
       handleStopRequest();
       break;
+    case Qt::Key_Delete:
+    case Qt::Key_Backspace: {
+      if (!selectionModel()->hasSelection())
+        return;
+
+      QModelIndexList list = selectionModel()->selectedRows();
+      pRoot->UI_beginRemoveVGMColls();
+      for (auto & idx : std::ranges::reverse_view(list)) {
+        qtVGMRoot.removeVGMColl(qtVGMRoot.vgmColls()[idx.row()]);
+      }
+      pRoot->UI_endRemoveVGMColls();
+
+      clearSelection();
+      return;
+    }
     default:
       QListView::keyPressEvent(e);
   }
