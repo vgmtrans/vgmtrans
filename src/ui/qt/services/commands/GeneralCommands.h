@@ -56,6 +56,42 @@ public:
   }
 };
 
+template <typename T>
+class ItemListCommand : public Command {
+public:
+  ItemListCommand()
+      : m_contextFactory(std::make_shared<ItemListContextFactory<T>>()) {}
+
+  void execute(CommandContext& context) override {
+    auto& vgmContext = dynamic_cast<ItemListCommandContext<T>&>(context);
+    const auto& items = vgmContext.items();
+
+    for (auto item : items) {
+      auto specificItem = dynamic_cast<T*>(item);
+      executeItem(specificItem);
+    }
+  }
+
+  [[nodiscard]] std::shared_ptr<CommandContextFactory> contextFactory() const override {
+    return m_contextFactory;
+  }
+
+  virtual void executeItem(T* item) const = 0;
+
+private:
+  std::shared_ptr<ItemListContextFactory<T>> m_contextFactory;
+};
+
+template <typename T>
+class SingleItemCommand : public ItemListCommand<T> {
+public:
+  void execute(CommandContext& context) override {
+    auto& vgmContext = dynamic_cast<ItemListCommandContext<T>&>(context);
+    T* item = vgmContext.items().front();
+    this->executeItem(item);
+  }
+};
+
 /**
  * The base Command class for a "Close" command. Receives a vector of pointers to the instances to close
  */
@@ -128,30 +164,11 @@ public:
   }
 };
 
-class OpenCommand : public Command {
+class OpenCommand : public ItemListCommand<VGMFile> {
 public:
-  OpenCommand()
-      : m_contextFactory(std::make_shared<ItemListContextFactory<VGMFile>>()) {}
-
-  void execute(CommandContext& context) override {
-    auto& vgmContext = dynamic_cast<ItemListCommandContext<VGMFile>&>(context);
-    const auto& files = vgmContext.items();
-
-    for (auto file : files) {
-      MdiArea::the()->newView(file);
-    }
+  void executeItem(VGMFile* file) const override {
+    MdiArea::the()->newView(file);
   }
-
-  [[nodiscard]] std::shared_ptr<CommandContextFactory> contextFactory() const override {
-    return m_contextFactory;
-  }
-
-  [[nodiscard]] QKeySequence shortcutKeySequence() const override {
-    return Qt::Key_Return;
-  };
-
+  [[nodiscard]] QKeySequence shortcutKeySequence() const override { return Qt::Key_Return; };
   [[nodiscard]] std::string name() const override { return "Open"; }
-
-private:
-  std::shared_ptr<ItemListContextFactory<VGMFile>> m_contextFactory;
 };

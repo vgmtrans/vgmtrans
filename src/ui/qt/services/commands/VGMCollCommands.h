@@ -11,27 +11,11 @@
 #include "services/commands/Command.h"
 #include "VGMColl.h"
 
-class PlayCommand : public Command {
+class PlayCommand : public SingleItemCommand<VGMColl> {
 public:
-  PlayCommand()
-      : m_contextFactory(std::make_shared<ItemListContextFactory<VGMColl>>()) {}
-
-  void execute(CommandContext& context) override {
-    auto& vgmContext = dynamic_cast<ItemListCommandContext<VGMColl>&>(context);
-    const VGMColl* coll = vgmContext.items().front();
+  void executeItem(VGMColl* coll) const override {
     SequencePlayer::the().playCollection(coll);
   }
-
-  [[nodiscard]] std::shared_ptr<CommandContextFactory> contextFactory() const override {
-    return m_contextFactory;
-  }
-
-  [[nodiscard]] QKeySequence shortcutKeySequence() const override {
-    return Qt::Key_Return;
-  };
-
+  [[nodiscard]] QKeySequence shortcutKeySequence() const override { return Qt::Key_Return; };
   [[nodiscard]] std::string name() const override { return "Play / Pause"; }
-
-private:
-  std::shared_ptr<ItemListContextFactory<VGMColl>> m_contextFactory;
 };
