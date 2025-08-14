@@ -1,11 +1,12 @@
 /*
-* VGMTrans (c) 2002-2023
+* VGMTrans (c) 2002-2025
 * Licensed under the zlib license,
 * refer to the included LICENSE.txt file
  */
 
 #pragma once
 
+#include "MdiArea.h"
 #include "services/commands/Command.h"
 #include "VGMFile.h"
 
@@ -78,6 +79,10 @@ public:
     return m_contextFactory;
   }
 
+  [[nodiscard]] QKeySequence shortcutKeySequence() const override {
+    return Qt::Key_Backspace;
+  };
+
   virtual void close(TClosable* specificFile) const = 0;
   [[nodiscard]] std::string name() const override { return "Close"; }
 
@@ -121,4 +126,32 @@ public:
   void close(VGMColl* coll) const override {
     pRoot->removeVGMColl(coll);
   }
+};
+
+class OpenCommand : public Command {
+public:
+  OpenCommand()
+      : m_contextFactory(std::make_shared<ItemListContextFactory<VGMFile>>()) {}
+
+  void execute(CommandContext& context) override {
+    auto& vgmContext = dynamic_cast<ItemListCommandContext<VGMFile>&>(context);
+    const auto& files = vgmContext.items();
+
+    for (auto file : files) {
+      MdiArea::the()->newView(file);
+    }
+  }
+
+  [[nodiscard]] std::shared_ptr<CommandContextFactory> contextFactory() const override {
+    return m_contextFactory;
+  }
+
+  [[nodiscard]] QKeySequence shortcutKeySequence() const override {
+    return Qt::Key_Return;
+  };
+
+  [[nodiscard]] std::string name() const override { return "Open"; }
+
+private:
+  std::shared_ptr<ItemListContextFactory<VGMFile>> m_contextFactory;
 };

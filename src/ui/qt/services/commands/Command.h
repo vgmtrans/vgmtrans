@@ -1,3 +1,8 @@
+/*
+ * VGMTrans (c) 2002-2025
+ * Licensed under the zlib license,
+ * refer to the included LICENSE.txt file
+ */
 
 #pragma once
 
@@ -6,6 +11,7 @@
 #include <variant>
 #include <vector>
 #include <map>
+#include <QKeySequence.h>
 
 class VGMFile;
 class VGMSeq;
@@ -115,6 +121,12 @@ public:
    * @return A shared pointer to the CommandContextFactory.
    */
   [[nodiscard]] virtual std::shared_ptr<CommandContextFactory> contextFactory() const = 0;
+
+  /**
+   * Defines a key sequence that will be displayed in the menu as a shortcut for the command
+   * @return the keyboard shortcut
+   */
+  [[nodiscard]] virtual QKeySequence shortcutKeySequence() const { return -1; };
 };
 
 class CommandSeparator : public Command {
