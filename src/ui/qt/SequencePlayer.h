@@ -69,7 +69,7 @@ public:
    * @param collection
    * @return true if data was loaded correctly
    */
-  bool playCollection(VGMColl *collection);
+  bool playCollection(const VGMColl *collection);
 
 signals:
   void statusChange(bool playing);
@@ -78,7 +78,7 @@ signals:
 private:
   SequencePlayer();
 
-  VGMColl *m_active_vgmcoll{};
+  const VGMColl *m_active_vgmcoll{};
   HSTREAM m_active_stream{};
   HSOUNDFONT m_loaded_sf{};
 

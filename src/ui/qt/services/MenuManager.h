@@ -156,7 +156,7 @@ public:
       auto contextFactory = command->contextFactory();
       auto propSpecs = contextFactory->propertySpecifications();
 
-      menu->addAction(command->name().c_str(), [command, items, propSpecs, contextFactory] {
+      auto action = menu->addAction(command->name().c_str(), [command, items, propSpecs, contextFactory] {
         PropertyMap propMap;
         for (const auto& propSpec : propSpecs) {
 
@@ -198,6 +198,10 @@ public:
         }
         command->execute(*context);
       });
+      if (const auto& keySequence = command->shortcutKeySequence(); keySequence != -1) {
+        action->setShortcut(keySequence);
+        action->setShortcutVisibleInContextMenu(true);
+      }
     }
     return menu;
   }

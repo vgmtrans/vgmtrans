@@ -5,17 +5,22 @@
  */
 
 #include "MenuManager.h"
+#include "commands/VGMCollCommands.h"
 #include "services/commands/GeneralCommands.h"
 #include "services/commands/SaveCommands.h"
 
 MenuManager::MenuManager() {
   registerCommands<VGMSeq, VGMItem>({
+      std::make_shared<OpenCommand>(),
+      std::make_shared<CommandSeparator>(),
       std::make_shared<SaveAsMidiCommand>(),
       std::make_shared<SaveAsOriginalFormatCommand<VGMFile>>(),
       std::make_shared<CommandSeparator>(),
       std::make_shared<CloseVGMFileCommand>(),
   });
   registerCommands<VGMInstrSet, VGMItem>({
+      std::make_shared<OpenCommand>(),
+      std::make_shared<CommandSeparator>(),
       std::make_shared<SaveAsSF2Command>(),
       std::make_shared<SaveAsDLSCommand>(),
       std::make_shared<SaveAsOriginalFormatCommand<VGMFile>>(),
@@ -23,19 +28,23 @@ MenuManager::MenuManager() {
       std::make_shared<CloseVGMFileCommand>(),
   });
   registerCommands<CPS1OPMInstrSet, VGMItem>({
+      std::make_shared<OpenCommand>(),
+      std::make_shared<CommandSeparator>(),
       std::make_shared<CloseVGMFileCommand>(),
       std::make_shared<CommandSeparator>(),
       std::make_shared<SaveAsOPMCommand>(),
       std::make_shared<SaveAsOriginalFormatCommand<VGMFile>>(),
   });
   registerCommands<VGMSampColl, VGMItem>({
+      std::make_shared<OpenCommand>(),
+      std::make_shared<CommandSeparator>(),
       std::make_shared<SaveWavBatchCommand>(),
       std::make_shared<SaveAsOriginalFormatCommand<VGMFile>>(),
       std::make_shared<CommandSeparator>(),
       std::make_shared<CloseVGMFileCommand>(),
   });
   registerCommands<VGMFile, VGMItem>({
-      std::make_shared<CloseVGMFileCommand>(),
+      std::make_shared<OpenCommand>(),
       std::make_shared<CommandSeparator>(),
       std::make_shared<SaveAsOriginalFormatCommand<VGMFile>>(),
       std::make_shared<CommandSeparator>(),
@@ -49,7 +58,8 @@ MenuManager::MenuManager() {
   });
 
   registerCommands<VGMColl>({
-      std::make_shared<SaveCollCommand<conversion::Target::MIDI | conversion::Target::SF2>>(),
+      std::make_shared<PlayCommand>(),
+      std::make_shared<CommandSeparator>(),      std::make_shared<SaveCollCommand<conversion::Target::MIDI | conversion::Target::SF2>>(),
       std::make_shared<SaveCollCommand<conversion::Target::MIDI | conversion::Target::DLS>>(),
       std::make_shared<SaveCollCommand<conversion::Target::MIDI | conversion::Target::SF2
                        | conversion::Target::DLS>>(),
