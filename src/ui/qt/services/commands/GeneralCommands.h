@@ -56,6 +56,10 @@ public:
   }
 };
 
+
+/**
+ * A base Command class for simple batchable commands. Receives a vector of pointers to the instances
+ */
 template <typename T>
 class ItemListCommand : public Command {
 public:
@@ -82,6 +86,10 @@ private:
   std::shared_ptr<ItemListContextFactory<T>> m_contextFactory;
 };
 
+/**
+ * A base Command class for single item commands. Works identically to ItemListCommand, but only
+ * executes the first item of an item list
+ */
 template <typename T>
 class SingleItemCommand : public ItemListCommand<T> {
 public:
@@ -93,77 +101,44 @@ public:
 };
 
 /**
- * The base Command class for a "Close" command. Receives a vector of pointers to the instances to close
- */
-template <typename TClosable>
-class CloseCommand : public Command {
-public:
-  CloseCommand()
-      : m_contextFactory(std::make_shared<ItemListContextFactory<TClosable>>()) {}
-
-  void execute(CommandContext& context) override {
-    auto& vgmContext = dynamic_cast<ItemListCommandContext<TClosable>&>(context);
-    const auto& files = vgmContext.items();
-
-    for (auto file : files) {
-      auto specificFile = dynamic_cast<TClosable*>(file);
-      close(specificFile);
-    }
-  }
-
-  [[nodiscard]] std::shared_ptr<CommandContextFactory> contextFactory() const override {
-    return m_contextFactory;
-  }
-
-  [[nodiscard]] QKeySequence shortcutKeySequence() const override {
-    return Qt::Key_Backspace;
-  };
-
-  virtual void close(TClosable* specificFile) const = 0;
-  [[nodiscard]] std::string name() const override { return "Close"; }
-
-private:
-  std::shared_ptr<ItemListContextFactory<TClosable>> m_contextFactory;
-};
-
-/**
  * A command for closing a VGMFile
  */
-class CloseVGMFileCommand : public CloseCommand<VGMFile> {
+class CloseVGMFileCommand : public ItemListCommand<VGMFile> {
 public:
-  CloseVGMFileCommand() : CloseCommand<VGMFile>() {}
-  [[nodiscard]] std::string name() const override { return "Remove"; }
-
-  void close(VGMFile* file) const override {
+  void executeItem(VGMFile* file) const override {
     pRoot->removeVGMFile(vgmFileToVariant(file));
   }
+  [[nodiscard]] QKeySequence shortcutKeySequence() const override { return Qt::Key_Backspace; };
+  [[nodiscard]] std::string name() const override { return "Remove"; }
 };
 
 /**
  * A command for closing a RawFile
  */
-class CloseRawFileCommand : public CloseCommand<RawFile> {
+class CloseRawFileCommand : public ItemListCommand<RawFile> {
 public:
-  CloseRawFileCommand() : CloseCommand<RawFile>() {}
-
-  void close(RawFile* file) const override {
+  void executeItem(RawFile* file) const override {
     pRoot->closeRawFile(file);
   }
+  [[nodiscard]] QKeySequence shortcutKeySequence() const override { return Qt::Key_Backspace; };
+  [[nodiscard]] std::string name() const override { return "Close"; }
 };
 
 /**
  * A command for closing a VGMColl
  */
-class CloseVGMCollCommand : public CloseCommand<VGMColl> {
+class CloseVGMCollCommand : public ItemListCommand<VGMColl> {
 public:
-  CloseVGMCollCommand() : CloseCommand<VGMColl>() {}
-
-  [[nodiscard]] std::string name() const override { return "Remove"; }
-  void close(VGMColl* coll) const override {
+  void executeItem(VGMColl* coll) const override {
     pRoot->removeVGMColl(coll);
   }
+  [[nodiscard]] QKeySequence shortcutKeySequence() const override { return Qt::Key_Backspace; };
+  [[nodiscard]] std::string name() const override { return "Remove"; }
 };
 
+/**
+ * A command for opening a VGMFile in the MdiArea
+ */
 class OpenCommand : public ItemListCommand<VGMFile> {
 public:
   void executeItem(VGMFile* file) const override {

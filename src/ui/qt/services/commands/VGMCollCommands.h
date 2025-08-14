@@ -11,6 +11,9 @@
 #include "services/commands/Command.h"
 #include "VGMColl.h"
 
+/**
+ * A command for playing or pausing a collection with the SequencePlayer
+ */
 class PlayCommand : public SingleItemCommand<VGMColl> {
 public:
   void executeItem(VGMColl* coll) const override {
