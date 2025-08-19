@@ -108,16 +108,6 @@ const SegSatRgn* SegSatSeq::resolveRegion(u8 bank, u8 progNum, u8 noteNum) {
   return nullptr;
 }
 
-constexpr double SegSatSeq::tlDB(uint8_t tl) {
-  // bit0..bit7 weights:
-  // constexpr double w[8] = { 0.4, 0.8, 1.5, 3.0, 6.0, 12.0, 24.0, 48.0 };
-  // double sum = 0.0;
-  // for (int i = 0; i < 8; ++i)
-  //   if (tl & (1u << i)) sum += w[i];
-  // return sum;
-  return tl * 0.375;
-}
-
 u8 SegSatSeq::resolveVelocity(u8 vel, const SegSatRgn& rgn, u8 ch) {
   u8 vlTableIndex = rgn.vlTableIndex();
   const auto& vlTables = m_collContext.m_vlTables;
@@ -194,7 +184,7 @@ u8 SegSatSeq::resolveVelocity(u8 vel, const SegSatRgn& rgn, u8 ch) {
     // printf("TL (with vol): %X.  ch: %d\n", amp, ch);
   // }
 
-  u8 result = convertDBAttenuationToStdMidiVal(tlDB(tl));
+  u8 result = convertDBAttenuationToStdMidiVal(tlToDB(tl));
   return result;
 }
 
@@ -266,7 +256,7 @@ bool SegSatSeq::readEvent() {
         case Midi::VOLUME_MSB: {
           m_vol[ch] = controllerValue;
           u8 scsp_tl = (uint8_t)std::max(0, 254 - 2*controllerValue);
-          double attenDb = tlDB(scsp_tl);
+          double attenDb = tlToDB(scsp_tl);
           u8 newVol = convertDBAttenuationToStdMidiVal(attenDb);
           if (controllerType == Midi::EXPRESSION_MSB) {
             addVol(beginOffset, curOffset - beginOffset, newVol);

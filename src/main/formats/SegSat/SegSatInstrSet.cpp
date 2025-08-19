@@ -12,47 +12,16 @@
 
 struct GainsDB { double left_dB, right_dB; };
 
-// --- Core: DISDL + DIPAN -> per-channel dB ---------------------------------
-// constexpr GainsDB direct_gains_db(std::uint8_t DISDL, std::uint8_t DIPAN) {
-//   // Clamp to register widths
-//   DISDL &= 0x07;
-//   DIPAN &= 0x1F;
-//
-//   // DISDL table in dB (MAME’s SDLT): 0 => mute
-//   constexpr double INF = std::numeric_limits<double>::infinity();
-//   constexpr std::array<double, 8> SDL_dB{
-//     -INF, -36.0, -30.0, -24.0, -18.0, -12.0, -6.0, 0.0
-//   };
-//
-//   // DIPAN low-nibble attenuation table in dB.
-//   // Bit-weights: 1=−3 dB, 2=−6 dB, 4=−12 dB, 8=−24 dB; 0xF => mute (−∞).
-//   constexpr std::array<double, 16> PAN_dB{
-//     0.0,  -3.0,  -6.0,  -9.0,
-//   -12.0, -15.0, -18.0, -21.0,
-//   -24.0, -27.0, -30.0, -33.0,
-//   -36.0, -39.0, -42.0, -INF
-//   };
-//
-//   const double s = SDL_dB[DISDL];
-//   const bool pan_right_side = (DIPAN & 0x10) != 0;  // which side gets attenuated
-//   const double p = PAN_dB[DIPAN & 0x0F];
-//
-//   // Non-selected side is 0 dB; selected side gets P dB.
-//   const double left  = s + (pan_right_side ? 0.0 : p);
-//   const double right = s + (pan_right_side ? p   : 0.0);
-//   return { left, right };
-// }
-
 static const float SDLT[8] = {1000000.0f,36.0f,30.0f,24.0f,18.0f,12.0f,6.0f,0.0f};
 
 constexpr double tlToDB(u8 tl) {
-  // bit0..bit7 weights:
-  // constexpr double w[8] = { 0.4, 0.8, 1.5, 3.0, 6.0, 12.0, 24.0, 48.0 };
-  // double sum = 0.0;
-  // for (int i = 0; i < 8; ++i)
-  //   if (tl & (1u << i)) sum += w[i];
-  // return sum;
-  return tl * 0.375;
+  // The hardware level method for calculating dB attenuation is to translate each TL bit to a dB
+  // weight. Specifically, the weights for bit0..bit7 are:
+  // { 0.4, 0.8, 1.5, 3.0, 6.0, 12.0, 24.0, 48.0 }
+  // These weights aren't perfectly linear, but close. Since the final TL is the product of many
+  // volume modifying values (velocity, volume, instrument settings), as we convert each one, we
+  // instead multiply by the average change. It gets us pretty close.
+  return tl * 0.37529;
 }
 
 struct PanLinAmp { double lPan, rPan; };
@@ -82,54 +51,6 @@ constexpr PanLinAmp panToAmp(u8 pan) {
   }
 
   return { LPAN, RPAN };
-}
-
-constexpr PanLinAmp dbFromRegs(int iTL, int iPAN, int iSDL) {
-  float TL;
-  float SegaDB = 0.0f;
-  float fSDL;
-  float PAN;
-  float LPAN,RPAN;
-
-  if (iTL & 0x01) SegaDB -= 0.4f;
-  if (iTL & 0x02) SegaDB -= 0.8f;
-  if (iTL & 0x04) SegaDB -= 1.5f;
-  if (iTL & 0x08) SegaDB -= 3.0f;
-  if (iTL & 0x10) SegaDB -= 6.0f;
-  if (iTL & 0x20) SegaDB -= 12.0f;
-  if (iTL & 0x40) SegaDB -= 24.0f;
-  if (iTL & 0x80) SegaDB -= 48.0f;
-
-  TL=powf(10.0f, SegaDB / 20.0f);
-
-  SegaDB=0;
-  if (iPAN & 0x1) SegaDB -= 3.0f;
-  if (iPAN & 0x2) SegaDB -= 6.0f;
-  if (iPAN & 0x4) SegaDB -= 12.0f;
-  if (iPAN & 0x8) SegaDB -= 24.0f;
-
-  if ((iPAN & 0xf) == 0xf) PAN = 0.0;
-  else PAN=powf(10.0f, SegaDB / 20.0f);
-
-  if (iPAN < 0x10)
-  {
-    LPAN = PAN;
-    RPAN = 1.0;
-  }
-  else
-  {
-    RPAN = PAN;
-    LPAN = 1.0;
-  }
-
-  if (iSDL)
-    fSDL = powf(10.0f, (SDLT[iSDL]) / 20.0f);
-  else
-    fSDL = 0.0;
-
-  double lPanAmp = (LPAN * TL * fSDL);
-  double rPanAmp = (RPAN * TL * fSDL);
-  return { lPanAmp, rPanAmp };
 }
 
 
@@ -396,17 +317,13 @@ SegSatRgn::SegSatRgn(SegSatInstr* instr, uint32_t offset, const std::string& nam
   m_ampLfoWave = static_cast<LFOWave>(ampLfoWave);
   m_ampLfoDepth = lfoPitchDepthAmpWaveAmpDepth & 0x7;
 
-  // m_ampLfoWave
   addChild(offset + 21, 1, "Pitch LFO Depth, Amp LFO Depth, Amp LFO Wave");
-
   addChild(offset + 23, 1, "Effect Select, Effect Send");
 
   u8 disdl_dipan = readByte(offset + 24);
   m_directLevel = (disdl_dipan >> 5) & 0x7;
   m_directPan = disdl_dipan & 0x1F;
   addChild(offset + 24, 1, "Direct Level, Direct Pan");
-
-  // auto chanGainsDb = direct_gains_db(m_directLevel, m_directPan);
 
   addUnityKey(readByte(offset + 25), offset + 0x19, 1);
   s8 fineTuneByte = static_cast<s8>(readByte(offset + 26));
@@ -425,8 +342,8 @@ SegSatRgn::SegSatRgn(SegSatInstr* instr, uint32_t offset, const std::string& nam
   // Calculate attenuation, using TL, DISDL, and PAN
   double sdlDb = SDLT[m_directLevel];
   double tlDb = tlToDB(m_totalLevel);
-
   PanLinAmp pan = panToAmp(m_directPan);
+
   double volScale;
   double panPerc = convertVolumeBalanceToStdMidiPercentPan(pan.lPan, pan.rPan, &volScale);
   const double fiftyFiftyComp = 3.0103;

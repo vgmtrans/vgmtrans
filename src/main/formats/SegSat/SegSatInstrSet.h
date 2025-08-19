@@ -23,6 +23,8 @@ static const double DRTimes[64] = {100000/*infinity*/,100000/*infinity*/,118200.
           920.0,790.0,690.0,550.0,460.0,390.0,340.0,270.0,230.0,200.0,170.0,140.0,110.0,98.0,85.0,68.0,57.0,49.0,43.0,34.0,
           28.0,25.0,22.0,18.0,14.0,12.0,11.0,8.5,7.1,6.1,5.4,4.3,3.6,3.1};
 
+constexpr double tlToDB(u8 tl);
+
 // Velocity Level Table, defines a curve to transform note velocity
 struct SegSatVLTable {
   u8 rate0, point0, level0;
