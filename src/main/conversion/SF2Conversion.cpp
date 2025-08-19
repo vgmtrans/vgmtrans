@@ -219,7 +219,7 @@ SynthFile* createSynthFile(
         if (rgn->sustain_level == -1)
           sustainLevAttenDb = 0.0;
         else
-          sustainLevAttenDb = convertPercentAmplitudeToAttenDB(rgn->sustain_level, 100.0);
+          sustainLevAttenDb = ampToDb(rgn->sustain_level, 100.0);
 
         SynthArt *newArt = newRgn->addArt();
         newArt->addPan(rgn->pan);

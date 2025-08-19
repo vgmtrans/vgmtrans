@@ -109,8 +109,8 @@ uint32_t emulateSDSPGAIN(uint8_t gain,
       else {
         if (env_from > 255) {
           // exponential part
-          double decibelAtStart = convertPercentAmplitudeToAttenDB(env_from / 2047.0);
-          double decibelAtExpFinal = convertPercentAmplitudeToAttenDB(env_exp_final / 2047.0);
+          double decibelAtStart = ampToDb(env_from / 2047.0);
+          double decibelAtExpFinal = ampToDb(env_exp_final / 2047.0);
           double timeAtExpFinal = (tick_exp * SDSP_COUNTER_RATES[rate]) / 32000.0;
           sf2_time = timeAtExpFinal * (100.0 / (decibelAtExpFinal - decibelAtStart));
         }
@@ -131,8 +131,8 @@ uint32_t emulateSDSPGAIN(uint8_t gain,
               tick_total--;
             }
 
-            double decibelAtStart = convertPercentAmplitudeToAttenDB(env_from / 2047.0);
-            double decibelAtFinal = convertPercentAmplitudeToAttenDB(env_final / 2047.0);
+            double decibelAtStart = ampToDb(env_from / 2047.0);
+            double decibelAtFinal = ampToDb(env_final / 2047.0);
             double timeAtExpFinal = (tick_total * SDSP_COUNTER_RATES[rate]) / 32000.0;
             sf2_time = timeAtExpFinal * (100.0 / (decibelAtFinal - decibelAtStart));
           }

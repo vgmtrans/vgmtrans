@@ -15,7 +15,8 @@ uint8_t convertPercentAmpToStdMidiVal(double percent);
 uint16_t convertPercentAmpToStd14BitMidiVal(double percent);
 uint8_t convertDBAttenuationToStdMidiVal(double dbAtten);
 double convertLogScaleValToAtten(double percent);
-double convertPercentAmplitudeToAttenDB(double percent, double maxAtten = 100.0);
+double ampToDb(double amp, double maxAtten = 100.0);
+double dbToAmp(double db);
 
 double secondsToTimecents(double secs);
 uint8_t convertPercentPanValToStdMidiVal(double percent);
