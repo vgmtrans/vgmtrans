@@ -69,14 +69,14 @@ public:
   void setLoopInfo(Loop &loop, VGMSamp *samp);
   void setPitchInfo(uint16_t unityNote, int16_t fineTune, double attenuation);
 
-  uint16_t usUnityNote;
-  int16_t sFineTune;
-  double attenuation;  // in decibels.
-  int8_t cSampleLoops;
+  uint16_t usUnityNote{0x3C};
+  int16_t sFineTune{0};
+  double attenuation{0};  // in decibels.
+  int8_t cSampleLoops{0};
 
-  uint32_t ulLoopType;
-  uint32_t ulLoopStart;
-  uint32_t ulLoopLength;
+  uint32_t ulLoopType{0};
+  uint32_t ulLoopStart{0};
+  uint32_t ulLoopLength{0};
 };
 
 class SynthRgn {
@@ -153,7 +153,7 @@ class SynthWave {
 
   SynthSampInfo *addSampInfo();
 
-  void convertTo16bitSigned();
+  void convertTo16bit();
 
  public:
   SynthSampInfo *sampinfo;
