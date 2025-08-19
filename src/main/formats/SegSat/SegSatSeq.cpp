@@ -76,7 +76,7 @@ bool SegSatSeq::parseHeader() {
 void SegSatSeq::changeChannel(u8 ch) {
   setCurTrack(ch);
   if (ch == 9) {
-    channel = 15;
+    channel = 0;
     channelGroup = 1;
     // if (VGMSeq::readMode == READMODE_CONVERT_TO_MIDI && pMidiTrack->channelGroup != 1) {
     // if (VGMSeq::readMode == READMODE_CONVERT_TO_MIDI) {
@@ -110,11 +110,12 @@ const SegSatRgn* SegSatSeq::resolveRegion(u8 bank, u8 progNum, u8 noteNum) {
 
 constexpr double SegSatSeq::tlDB(uint8_t tl) {
   // bit0..bit7 weights:
-  constexpr double w[8] = { 0.4, 0.8, 1.5, 3.0, 6.0, 12.0, 24.0, 48.0 };
-  double sum = 0.0;
-  for (int i = 0; i < 8; ++i)
-    if (tl & (1u << i)) sum += w[i];
-  return sum;
+  // constexpr double w[8] = { 0.4, 0.8, 1.5, 3.0, 6.0, 12.0, 24.0, 48.0 };
+  // double sum = 0.0;
+  // for (int i = 0; i < 8; ++i)
+  //   if (tl & (1u << i)) sum += w[i];
+  // return sum;
+  return tl * 0.375;
 }
 
 u8 SegSatSeq::resolveVelocity(u8 vel, const SegSatRgn& rgn, u8 ch) {
@@ -175,12 +176,14 @@ u8 SegSatSeq::resolveVelocity(u8 vel, const SegSatRgn& rgn, u8 ch) {
       break;
   }
   newVel = std::clamp<u8>(newVel, 0, 0x7F);
-  u32 volScale = (newVel + 1) * ((~rgn.totalLevel() + 1) & 0xFF);
+  // In original logic, rgn.totalLevel() would go where 0 is. We instead apply it as region attenuation
+  u32 volScale = (newVel + 1) * (256 - 0);
 
   // uint32_t vol_scale_word = (uint32_t)( (new_vel & 0x7F) + 1 ) * (256 - P);   // 1..32768
   // m_volScaleRow[ch] = (volScale >> 11) & 0x0F;
 
   u8 amp = (volScale * ( (0x7F&0x7F)+1 )*4 - 1) >> 16;
+  // u8 amp = (volScale * ( (m_vol[ch]&0x7F)+1 )*4 - 1) >> 16;
   // TODO: add vol bias
   u8 tl = ~std::clamp<u8>(amp, 0, 255);
 

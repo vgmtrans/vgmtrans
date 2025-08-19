@@ -142,6 +142,8 @@ private:
   u8 m_lfoFreq;
   u8 m_pitchLfoDepth;
   u8 m_ampLfoDepth;
+  u8 m_directLevel;
+  u8 m_directPan;
 
   bool m_enableLfoModulation;
   bool m_enablePeg;

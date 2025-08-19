@@ -29,4 +29,7 @@ long convertPercentPanTo10thPercentUnits(double percentPan);
 
 double pitchScaleToCents(double scale);
 
+double dbToAmp(double db);
+double ampToDb(double a);
+
 #define DLS_DECIBEL_UNIT 65536        // DLS1 spec p25
