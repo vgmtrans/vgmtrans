@@ -52,7 +52,7 @@ SF2File::SF2File(SynthFile *synthfile)
   uint32_t smplCkSize = 0;
   for (size_t i = 0; i < numWaves; i++) {
     SynthWave *wave = synthfile->vWaves[i];
-    wave->convertTo16bitSigned();
+    wave->convertTo16bit();
     smplCkSize += wave->dataSize + (46 * 2);    // plus the 46 padding samples required by sf2 spec
   }
   smplCk->setSize(smplCkSize);
@@ -221,7 +221,7 @@ SF2File::SF2File(SynthFile *synthfile)
     for (size_t j = 0; j < numRgns; j++) {
       sfInstBag instBag{};
       instBag.wInstGenNdx = instGenCounter;
-      instGenCounter += 15;
+      instGenCounter += 14;
       instBag.wInstModNdx = 0;
 
       memcpy(ibagCk->data + (rgnCounter++ * sizeof(sfInstBag)), &instBag, sizeof(sfInstBag));
@@ -247,7 +247,7 @@ SF2File::SF2File(SynthFile *synthfile)
   // igen chunk
   //***********
   Chunk *igenCk = new Chunk("igen");
-  igenCk->setSize((numTotalRgns * sizeof(sfInstGenList) * 15) + sizeof(sfInstGenList));
+  igenCk->setSize((numTotalRgns * sizeof(sfInstGenList) * 14) + sizeof(sfInstGenList));
   igenCk->data = new uint8_t[igenCk->size()];
   dataPtr = 0;
   for (size_t i = 0; i < numInstrs; i++) {
@@ -277,7 +277,10 @@ SF2File::SF2File(SynthFile *synthfile)
 
       // initialAttenuation
       instGenList.sfGenOper = initialAttenuation;
-      instGenList.genAmount.shAmount = static_cast<int16_t>(rgn->sampinfo->attenuation * 10);
+      u16 atten = static_cast<u16>(std::clamp(
+        std::round((rgn->attenDb + rgn->sampinfo->attenuation) * 10),
+        0.0, 1440.0));
+      instGenList.genAmount.wAmount = atten;
       memcpy(igenCk->data + dataPtr, &instGenList, sizeof(sfInstGenList));
       dataPtr += sizeof(sfInstGenList);
 
@@ -308,12 +311,6 @@ SF2File::SF2File(SynthFile *synthfile)
       // fineTune
       instGenList.sfGenOper = fineTune;
       instGenList.genAmount.shAmount = rgn->fineTuneCents;
-      memcpy(igenCk->data + dataPtr, &instGenList, sizeof(sfInstGenList));
-      dataPtr += sizeof(sfInstGenList);
-
-      // initialAttenuation - expressed in centibels
-      instGenList.sfGenOper = initialAttenuation;
-      instGenList.genAmount.wAmount = static_cast<u16>(rgn->attenDb * 10.0);
       memcpy(igenCk->data + dataPtr, &instGenList, sizeof(sfInstGenList));
       dataPtr += sizeof(sfInstGenList);
 

@@ -193,7 +193,7 @@ void SynthSampInfo::setPitchInfo(uint16_t unityNote, short fineTune, double atte
 //  SynthWave
 //  *********
 
-void SynthWave::convertTo16bitSigned() {
+void SynthWave::convertTo16bit() {
   if (wBitsPerSample == 8) {
     this->wBitsPerSample = 16;
     this->wBlockAlign = 16 / 8 * this->wChannels;
@@ -201,7 +201,7 @@ void SynthWave::convertTo16bitSigned() {
 
     int16_t *newData = new int16_t[this->dataSize];
     for (unsigned int i = 0; i < this->dataSize; i++)
-      newData[i] = (static_cast<int16_t>(this->data[i]) - 128) << 8;
+      newData[i] = static_cast<int16_t>(this->data[i]) << 8;
     delete[] this->data;
     this->data = reinterpret_cast<uint8_t*>(newData);
     this->dataSize *= 2;

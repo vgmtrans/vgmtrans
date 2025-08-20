@@ -76,3 +76,6 @@ struct SizeOffsetPair {
 
   SizeOffsetPair(std::uint32_t offset_, std::uint32_t size_) : size(size_), offset(offset_) {}
 };
+
+enum class Endianness { Little, Big };
+enum class Signedness { Signed, Unsigned };

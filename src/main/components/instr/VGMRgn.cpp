@@ -140,6 +140,11 @@ void VGMRgn::addUnityKey(uint8_t uk, uint32_t offset, uint32_t length) {
   addChild(new VGMRgnItem(this, VGMRgnItem::RIT_UNITYKEY, offset, length, "Unity Key"));
 }
 
+void VGMRgn::addCoarseTune(int16_t relativeSemitones, uint32_t offset, uint32_t length) {
+  this->coarseTune = relativeSemitones;
+  addChild(new VGMRgnItem(this, VGMRgnItem::RIT_FINETUNE, offset, length, "Coarse Tune"));
+}
+
 void VGMRgn::addFineTune(int16_t relativePitchCents, uint32_t offset, uint32_t length) {
   this->fineTune = relativePitchCents;
   addChild(new VGMRgnItem(this, VGMRgnItem::RIT_FINETUNE, offset, length, "Fine Tune"));
