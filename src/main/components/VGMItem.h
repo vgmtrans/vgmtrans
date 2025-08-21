@@ -83,7 +83,6 @@ public:
           uint32_t length = 0,
           std::string name = "",
           Type type = Type::Unknown);
-  VGMItem(const VGMItem& rhs);
   virtual ~VGMItem();
 
   friend bool operator>(VGMItem &item1, VGMItem &item2);
