@@ -23,7 +23,15 @@ static const double DRTimes[64] = {100000/*infinity*/,100000/*infinity*/,118200.
           920.0,790.0,690.0,550.0,460.0,390.0,340.0,270.0,230.0,200.0,170.0,140.0,110.0,98.0,85.0,68.0,57.0,49.0,43.0,34.0,
           28.0,25.0,22.0,18.0,14.0,12.0,11.0,8.5,7.1,6.1,5.4,4.3,3.6,3.1};
 
-constexpr double tlToDB(u8 tl);
+constexpr double tlToDB(u8 tl) {
+  // The hardware level method for calculating dB attenuation is to translate each TL bit to a dB
+  // weight. Specifically, the weights for bit0..bit7 are:
+  // { 0.4, 0.8, 1.5, 3.0, 6.0, 12.0, 24.0, 48.0 }
+  // These weights aren't perfectly linear, but close. Since the final TL is the product of many
+  // volume modifying values (velocity, volume, instrument settings), as we convert each one, we
+  // instead multiply by the average change. It gets us pretty close.
+  return tl * 0.37529;
+}
 
 // Velocity Level Table, defines a curve to transform note velocity
 struct SegSatVLTable {

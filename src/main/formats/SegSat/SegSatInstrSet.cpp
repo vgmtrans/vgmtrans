@@ -14,16 +14,6 @@ struct GainsDB { double left_dB, right_dB; };
 
 static const float SDLT[8] = {1000000.0f,36.0f,30.0f,24.0f,18.0f,12.0f,6.0f,0.0f};
 
-constexpr double tlToDB(u8 tl) {
-  // The hardware level method for calculating dB attenuation is to translate each TL bit to a dB
-  // weight. Specifically, the weights for bit0..bit7 are:
-  // { 0.4, 0.8, 1.5, 3.0, 6.0, 12.0, 24.0, 48.0 }
-  // These weights aren't perfectly linear, but close. Since the final TL is the product of many
-  // volume modifying values (velocity, volume, instrument settings), as we convert each one, we
-  // instead multiply by the average change. It gets us pretty close.
-  return tl * 0.37529;
-}
-
 struct PanLinAmp { double lPan, rPan; };
 
 constexpr PanLinAmp panToAmp(u8 pan) {
