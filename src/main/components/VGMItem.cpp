@@ -11,12 +11,6 @@ VGMItem::VGMItem(VGMFile *vgmfile, uint32_t offset, uint32_t length, std::string
     : m_vgmfile(vgmfile), m_name(std::move(name)), dwOffset(offset), unLength(length), type(type) {
 }
 
-VGMItem::VGMItem(const VGMItem& rhs)
-  : m_vgmfile(rhs.m_vgmfile), m_name(rhs.m_name), dwOffset(rhs.dwOffset),
-    unLength(rhs.unLength), type(rhs.type), m_children{} {
-
-}
-
 VGMItem::~VGMItem() {
   deleteVect(m_children);
 }
@@ -119,6 +113,10 @@ VGMHeader* VGMItem::addHeader(uint32_t offset, uint32_t length, const std::strin
   auto *header = new VGMHeader(this, offset, length, name);
   m_children.emplace_back(header);
   return header;
+}
+
+void VGMItem::removeChildren() {
+  m_children.clear();
 }
 
 void VGMItem::transferChildren(VGMItem* destination) {

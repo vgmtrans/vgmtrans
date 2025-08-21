@@ -49,8 +49,12 @@ void SegSatSeq::useColl(const VGMColl* coll) {
     rgnCopies.reserve(rgns.size());
 
     for (const VGMRgn* p : rgns) {
-      VGMRgn rgnCopy = *p;
-      rgnCopies.push_back(*static_cast<const SegSatRgn*>(p));
+      const SegSatRgn* pRgn = dynamic_cast<const SegSatRgn*>(p);
+      if (!pRgn)
+        continue;
+      SegSatRgn rgnCopy = *pRgn;
+      rgnCopy.removeChildren();
+      rgnCopies.push_back(rgnCopy);
     }
 
     m_collContext.instrs.emplace_back(std::move(rgnCopies));
