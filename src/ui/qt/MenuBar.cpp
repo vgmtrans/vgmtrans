@@ -59,6 +59,16 @@ void MenuBar::appendOptionsMenu(const QList<QDockWidget *> &dockWidgets) {
     }
   });
 
+  act = options_dropdown->addAction("Skip MIDI channel 10");
+  act->setCheckable(true);
+  act->setChecked(Settings::the()->conversion.skipChannel10());
+  connect(act, &QAction::toggled,
+[](bool skip) {
+  if (!skip)
+    pRoot->UI_toast("Tracks using MIDI channel 10 will be silent during in-app playback.", ToastType::Info);
+  Settings::the()->conversion.setSkipChannel10(skip);
+});
+
   options_dropdown->addSeparator();
 
   for (auto &widget : dockWidgets) {

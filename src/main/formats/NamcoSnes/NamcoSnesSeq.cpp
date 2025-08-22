@@ -130,8 +130,7 @@ bool NamcoSnesSeq::readEvent() {
   }
 
   // default first track
-  channel = 0;
-  setCurTrack(channel);
+  setChannel(0);
 
   switch (eventType) {
     case EVENT_UNKNOWN0:
@@ -363,8 +362,7 @@ bool NamcoSnesSeq::readEvent() {
           }
 
           if (VGMSeq::readMode == READMODE_CONVERT_TO_MIDI) {
-            channel = trackIndex;
-            setCurTrack(channel);
+            setChannel(trackIndex);
 
             // key off previous note
             if (prevNoteKey[trackIndex] != -1) {
@@ -492,8 +490,7 @@ bool NamcoSnesSeq::readEvent() {
           desc += fmt::format(" [{:d}] {:d}", trackIndex + 1, newValue);
 
           if (VGMSeq::readMode == READMODE_CONVERT_TO_MIDI) {
-            channel = trackIndex;
-            setCurTrack(channel);
+            setChannel(trackIndex);
 
             switch (controlType) {
               case CONTROL_PROGCHANGE:
@@ -577,8 +574,7 @@ bool NamcoSnesSeq::postLoad() {
 void NamcoSnesSeq::keyOffAllNotes() {
   for (uint8_t trackIndex = 0; trackIndex < MAX_TRACKS; trackIndex++) {
     if (prevNoteKey[trackIndex] != -1) {
-      channel = trackIndex;
-      setCurTrack(channel);
+      setChannel(trackIndex);
 
       addNoteOffNoItem(prevNoteKey[trackIndex]);
       prevNoteKey[trackIndex] = -1;

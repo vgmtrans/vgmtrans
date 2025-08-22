@@ -5,6 +5,7 @@
  */
 
 #include "VGMSeqNoTrks.h"
+#include "Options.h"
 
 VGMSeqNoTrks::VGMSeqNoTrks(const std::string &format, RawFile *file, uint32_t offset, std::string name)
     : VGMSeq(format, file, offset, 0, std::move(name)), SeqTrack(this) {
@@ -18,7 +19,7 @@ void VGMSeqNoTrks::resetVars() {
   tryExpandMidiTracks(nNumTracks);
 
   channel = 0;
-  setCurTrack(channel);
+  setCurTrack(0);
 
   VGMSeq::resetVars();
   SeqTrack::resetVars();
@@ -129,9 +130,23 @@ void VGMSeqNoTrks::tryExpandMidiTracks(uint32_t numTracks) {
     return;
   if (midiTracks.size() < numTracks) {
     size_t initialTrackSize = midiTracks.size();
-    for (size_t i = 0; i < numTracks - initialTrackSize; i++)
-      midiTracks.push_back(midi->addTrack());
+    for (size_t i = initialTrackSize; i < numTracks; i++) {
+      auto* midiTrack = midi->addTrack();
+      midiTracks.push_back(midiTrack);
+      if (i == 9 && ConversionOptions::the().skipChannel10()) {
+        midiTrack->setChannelGroup(1);
+        midiTrack->addMidiPort(1);
+      }
+    }
   }
+}
+
+void VGMSeqNoTrks::setChannel(u8 newChannel) {
+  setCurTrack(newChannel);
+  if (newChannel == 9 && ConversionOptions::the().skipChannel10())
+    channel = 0;
+  else
+    channel = newChannel;
 }
 
 void VGMSeqNoTrks::setCurTrack(uint32_t trackNum) {

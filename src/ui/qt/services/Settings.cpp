@@ -54,3 +54,9 @@ void Settings::ConversionSettings::setNumSequenceLoops(int n) const {
   ConversionOptions::the().setNumSequenceLoops(n);
   saveFromOptionsStore();
 }
+
+void Settings::ConversionSettings::setSkipChannel10(bool skip) const {
+  ConversionOptions::the().setSkipChannel10(skip);
+  saveFromOptionsStore();
+}
+

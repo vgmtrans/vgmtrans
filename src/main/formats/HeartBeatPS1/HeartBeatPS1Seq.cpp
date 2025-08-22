@@ -145,8 +145,7 @@ bool HeartBeatPS1Seq::readEvent() {
   else
     runningStatus = status_byte;
 
-  channel = status_byte & 0x0F;
-  setCurTrack(channel);
+  setChannel(status_byte & 0x0F);
 
   switch (status_byte & 0xF0) {
     //note off

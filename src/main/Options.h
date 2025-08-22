@@ -20,6 +20,8 @@ struct OptionStore {
 
   virtual int getInt(std::string_view key, int def) const = 0;
   virtual void setInt(std::string_view key, int value) = 0;
+  virtual int getBool(std::string_view key, bool def) const = 0;
+  virtual void setBool(std::string_view key, bool value) = 0;
 };
 
 enum class BankSelectStyle {
@@ -49,18 +51,23 @@ public:
   int numSequenceLoops() const { return m_sequence_loops; }
   void setNumSequenceLoops(int numLoops) { m_sequence_loops = numLoops; }
 
+  bool skipChannel10() const { return m_skip_channel_10; }
+  void setSkipChannel10(bool should) { m_skip_channel_10 = should; }
+
   void load(OptionStore& store) {
     auto g = store.beginGroup("ConversionOptions");
     const int bs = store.getInt("bankSelectStyle", static_cast<int>(BankSelectStyle::GS));
     m_bs_style = (bs == static_cast<int>(BankSelectStyle::MMA)) ? BankSelectStyle::MMA
                                                                 : BankSelectStyle::GS;
     m_sequence_loops = store.getInt("sequenceLoops", 1);
+    m_skip_channel_10 = store.getBool("skipChannel10", true);
   }
 
   void save(OptionStore& store) const {
     auto g = store.beginGroup("ConversionOptions");
     store.setInt("bankSelectStyle", static_cast<int>(m_bs_style));
     store.setInt("sequenceLoops",   m_sequence_loops);
+    store.setBool("skipChannel10", m_skip_channel_10);
   }
 
 private:
@@ -68,4 +75,5 @@ private:
 
   BankSelectStyle m_bs_style{BankSelectStyle::GS};
   int m_sequence_loops{1};
+  bool m_skip_channel_10{true};
 };
