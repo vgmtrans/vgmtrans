@@ -24,6 +24,7 @@ uint8_t convertLinearPercentPanValToStdMidiVal(double percent, double *ptrVolume
 uint8_t convert7bitLinearPercentPanValToStdMidiVal(uint8_t percentVal, double *ptrVolumeScale = nullptr);
 void convertStdMidiPanToVolumeBalance(uint8_t midiPan, double &percentLeft, double &percentRight);
 uint8_t convertVolumeBalanceToStdMidiPan(double percentLeft, double percentRight, double *ptrVolumeScale = nullptr);
+double convertVolumeBalanceToStdMidiPercentPan(double percentLeft, double percentRight, double *ptrVolumeScale = nullptr);
 long convertPercentPanTo10thPercentUnits(double percentPan);
 
 double pitchScaleToCents(double scale);

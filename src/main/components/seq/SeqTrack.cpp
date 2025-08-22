@@ -175,20 +175,20 @@ uint32_t SeqTrack::getTime() const {
   return parentSeq->time;
 }
 
-void SeqTrack::setTime(uint32_t NewDelta) const {
-  parentSeq->time = NewDelta;
+void SeqTrack::setTime(uint32_t newTime) {
+  parentSeq->time = newTime;
   if (readMode == READMODE_CONVERT_TO_MIDI)
-    pMidiTrack->setDelta(NewDelta);
+    pMidiTrack->setDelta(newTime);
 }
 
-void SeqTrack::addTime(uint32_t AddDelta) {
+void SeqTrack::addTime(uint32_t delta) {
   if (parentSeq->bLoadTickByTick) {
-    deltaTime += AddDelta;
+    deltaTime += delta;
   }
   else {
-    parentSeq->time += AddDelta;
+    parentSeq->time += delta;
     if (readMode == READMODE_CONVERT_TO_MIDI)
-      pMidiTrack->addDelta(AddDelta);
+      pMidiTrack->addDelta(delta);
   }
 }
 
@@ -682,7 +682,7 @@ void SeqTrack::addLevelNoItem(double level, LevelController controller, Resoluti
       break;
   }
 
-  level = applyLevelCorrection(level, LevelController::Volume);
+  level = applyLevelCorrection(level, controller);
   switch (res) {
     case Resolution::SevenBit: {
       u8 midiLevel = static_cast<uint8_t>(std::min(level * 127.0, 127.0));

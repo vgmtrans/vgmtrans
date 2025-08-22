@@ -124,11 +124,13 @@ bool PSXSampColl::parseSampleInfo() {
           endLoopOffset = endLoopOffset == 0 ? i : endLoopOffset;
 
           // We found an end flag. Check for vestigial ADPCM frames beyond it
-          if (i + 16 < nEndOffset) {
+          if (i + 32 < nEndOffset) {
             u8 nextFilterShiftByte = readByte(i);
             u8 nextFlagByte = readByte(i + 1);
             if (nextFlagByte < 1 || nextFlagByte > 3 || !isValidFilterShiftByte(nextFilterShiftByte)) {
-              break;
+              // Some games (ex: Ogre Battle) have a single weirdly-formatted ADPCM frame before a subsequent sample
+              if ((nextFlagByte != 0 || nextFilterShiftByte != 0) && !isZero16(rawFile(), i + 16))
+                break;
             }
           } else {
             break;

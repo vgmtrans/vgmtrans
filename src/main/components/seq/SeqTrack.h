@@ -46,8 +46,8 @@ class SeqTrack : public VGMItem {
   virtual void onTickEnd() {}
 
   uint32_t getTime() const;
-  void setTime(uint32_t NewDelta) const;
-  void addTime(uint32_t AddDelta);
+  virtual void setTime(uint32_t newTime);
+  virtual void addTime(uint32_t delta);
 
   uint32_t readVarLen(uint32_t &offset) const;
 

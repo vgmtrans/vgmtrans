@@ -121,7 +121,7 @@ private:
   double tempoBPM;
   uint32_t time;                // absolute current time (ticks)
 
-  PanVolumeCorrectionMode panVolumeCorrectionMode;
+  PanVolumeCorrectionMode panVolumeCorrectionMode{PanVolumeCorrectionMode::kNoVolumeAdjust};
 
   // True if each tracks in a sequence needs to be loaded simultaneously in tick by tick, as the real music player does.
   // Pros:
