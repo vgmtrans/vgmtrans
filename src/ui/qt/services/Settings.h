@@ -1,15 +1,43 @@
 /*
-* VGMTrans (c) 2002-2024
+* VGMTrans (c) 2002-2025
 * Licensed under the zlib license,
 * refer to the included LICENSE.txt file
 */
 
 #pragma once
 
+#include "Options.h"
 #include <QObject>
 #include <QSettings>
 
 class Settings;
+
+class QtOptionsStore : public OptionStore {
+public:
+  explicit QtOptionsStore(QSettings& s) : m_settings(s) {}
+
+  std::unique_ptr<Group> beginGroup(std::string_view path) override {
+    m_settings.beginGroup(QString::fromUtf8(path.data(), int(path.size())));
+    struct G : Group {
+      explicit G(QSettings& s) : s(s) {}
+      ~G() override { s.endGroup(); }
+      QSettings& s;
+    };
+    return std::make_unique<G>(m_settings);
+  }
+
+  int getInt(std::string_view key, int def) const override {
+    return m_settings.value(QString::fromUtf8(key.data(), int(key.size())), def).toInt();
+  }
+
+  void setInt(std::string_view key, int value) override {
+    m_settings.setValue(QString::fromUtf8(key.data(), int(key.size())), value);
+  }
+
+private:
+  QSettings& m_settings;
+};
+
 
 struct SettingsGroup {
   SettingsGroup(Settings* parent);
@@ -39,6 +67,24 @@ public:
     void setShowDetails(bool) const;
   };
   VGMFileTreeViewSettings VGMFileTreeView;
+
+  struct ConversionSettings : public SettingsGroup {
+    using SettingsGroup::SettingsGroup;
+
+    void loadIntoOptionsStore() const;
+    void saveFromOptionsStore() const;
+
+    BankSelectStyle bankSelectStyle() const {
+      return ConversionOptions::the().bankSelectStyle();
+    }
+    void setBankSelectStyle(BankSelectStyle s) const;
+
+    int numSequenceLoops() const {
+      return ConversionOptions::the().numSequenceLoops();
+    }
+    void setNumSequenceLoops(int n) const;
+  };
+  ConversionSettings conversion;
 
 private:
   explicit Settings(QObject *parent = nullptr);
