@@ -40,7 +40,8 @@ public:
     }
   }
 
-  virtual void addTime(uint32_t delta);
+  void setTime(uint32_t newTime) override;
+  void addTime(uint32_t delta) override;
 
   void setCurTrack(uint32_t trackNum);
   void tryExpandMidiTracks(uint32_t numTracks);

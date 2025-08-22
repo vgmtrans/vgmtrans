@@ -142,8 +142,15 @@ void VGMSeqNoTrks::setCurTrack(uint32_t trackNum) {
   pMidiTrack = midiTracks[trackNum];
 }
 
+void VGMSeqNoTrks::setTime(uint32_t newTime) {
+  time = newTime;
+  if (VGMSeq::readMode == READMODE_CONVERT_TO_MIDI)
+    for (uint32_t i = 0; i < midiTracks.size(); i++)
+      pMidiTrack->setDelta(newTime);
+}
+
 void VGMSeqNoTrks::addTime(uint32_t delta) {
-  VGMSeq::time += delta;
+  time += delta;
   if (VGMSeq::readMode == READMODE_CONVERT_TO_MIDI) {
     for (uint32_t i = 0; i < midiTracks.size(); i++)
       midiTracks[i]->addDelta(delta);
