@@ -368,11 +368,7 @@ void SeqTrack::addRest(uint32_t offset, uint32_t length, uint32_t restTime, cons
   else if (readMode == READMODE_CONVERT_TO_MIDI) {
     pMidiTrack->purgePrevNoteOffs();
   }
-  if (auto *noTrksSeq = dynamic_cast<VGMSeqNoTrks*>(parentSeq)) {
-    noTrksSeq->addTime(restTime);
-  } else {
-    addTime(restTime);
-  }
+  addTime(restTime);
 }
 
 void SeqTrack::addHold(uint32_t offset, uint32_t length, const std::string &sEventName) {
