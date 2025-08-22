@@ -89,13 +89,19 @@ uint8_t convertDBAttenuationToStdMidiVal(double dbAtten) {
   return (uint8_t)std::clamp(vi, 0, 127);
 }
 
-// Convert a percent of amplitude to attenuation in decibels.
-//  ex: convertPercentAmplitudeToAttenDB(0.5) returns 6.02db = half perceived loudness
-double convertPercentAmplitudeToAttenDB(double percent, double maxAtten) {
-  if (percent == 0)
+// Convert a linear amplitude multiplier to attenuation in decibels.
+//  ex: ampToDb(0.5) returns 6.02db
+double ampToDb(double amp, double maxAtten) {
+  if (amp == 0)
     return maxAtten;
-  double atten = -20 * log10(percent);
+  double atten = -20 * log10(amp);
   return std::min(atten, maxAtten);
+}
+
+// Convert a dB of attenuation value to a linear amplitude multiplier.
+//  ex: dbToAmp(6.02) returns 0.5
+double dbToAmp(double db) {
+  return std::pow(10.0, -db / 20.0);
 }
 
 double secondsToTimecents(double secs) {
@@ -206,6 +212,41 @@ uint8_t convertVolumeBalanceToStdMidiPan(double percentLeft, double percentRight
   }
 
   return midiPan;
+}
+
+// Convert L/R volume balance (0.0..1.0) to midi percent pan, where
+// 0 is hard left, 0.5 is center, and 1 is hard right. Also writes volume attenuation as a
+// linear amplitude multiplier via the ptrVolumeScale param
+double convertVolumeBalanceToStdMidiPercentPan(double percentLeft, double percentRight, double *ptrVolumeScale) {
+  uint8_t midiPan;
+  double percentPan;
+  if (percentRight == 0) {
+    midiPan = 0;
+    percentPan = 0;
+  }
+  else if (percentLeft == percentRight) {
+    midiPan = 64;
+    percentPan = 0.5;
+  }
+  else if (percentLeft == 0) {
+    midiPan = 127;
+    percentPan = 1.0;
+  }
+  else {
+    percentPan = percentRight / (percentLeft + percentRight);
+    midiPan = convertLinearPercentPanValToStdMidiVal(percentPan);
+  }
+
+  if (ptrVolumeScale != NULL) {
+    double volumeLeftMidi;
+    double volumeRightMidi;
+    convertStdMidiPanToVolumeBalance(midiPan, volumeLeftMidi, volumeRightMidi);
+
+    // note that it can be more than 1.0
+    *ptrVolumeScale = (percentLeft + percentRight) / (volumeLeftMidi + volumeRightMidi);
+  }
+
+  return percentPan;
 }
 
 // Convert a pan value where 0 = left 0.5 = center and 1 = right to

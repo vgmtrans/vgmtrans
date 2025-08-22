@@ -258,7 +258,7 @@ bool mainDLSCreation(
           convSustainLev = 0x03e80000;        //sustain at full if no sustain level provided
         else {
           // the DLS envelope is a range from 0 to -96db.
-          double attenInDB = convertPercentAmplitudeToAttenDB(rgn->sustain_level);
+          double attenInDB = ampToDb(rgn->sustain_level);
           convSustainLev = static_cast<long>(((96.0 - attenInDB) / 96.0) * 0x03e80000);
         }
 

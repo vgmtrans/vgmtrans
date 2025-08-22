@@ -118,7 +118,7 @@ void VGMRgn::addPan(uint8_t p, uint32_t offset, uint32_t length, const std::stri
 }
 
 void VGMRgn::setVolume(double vol) {
-  m_attenDb = convertPercentAmplitudeToAttenDB(vol);
+  m_attenDb = ampToDb(vol);
 }
 
 void VGMRgn::setAttenuation(double attenDb) {

@@ -178,9 +178,9 @@ void ManualCollectionDialog::createCollection() {
       coll->addSampColl(sampcoll);
     }
   }
-  if (coll->sampColls().empty()) {
-    QMessageBox::warning(this, windowTitle(),
-                          "No sample collections were selected\nThe instrument bank will be silent...");
+  if (coll->sampColls().empty() && coll->instrSets().front()->sampColl == nullptr) {
+    pRoot->UI_toast("The created collection does not contain a sample collection. "
+                    "The instrument bank will be silent.", ToastType::Warning);
   }
 
   coll->load();

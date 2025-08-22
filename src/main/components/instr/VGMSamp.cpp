@@ -78,7 +78,7 @@ void VGMSamp::convertToStdWave(std::uint8_t* buf) {
 }
 
 void VGMSamp::setVolume(double volume) {
-  m_attenDb = convertPercentAmplitudeToAttenDB(volume);
+  m_attenDb = ampToDb(volume);
 }
 
 bool VGMSamp::onSaveAsWav() {

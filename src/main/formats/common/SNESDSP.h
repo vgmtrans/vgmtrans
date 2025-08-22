@@ -83,7 +83,7 @@ void snesConvADSR(T *rgn, uint8_t adsr1, uint8_t adsr2, uint8_t gain) {
       }
     }
     else if (rgn->sustain_time != -1) {
-      double decibelAtSustainStart = convertPercentAmplitudeToAttenDB(rgn->sustain_level);
+      double decibelAtSustainStart = ampToDb(rgn->sustain_level);
       double decayTimeRate = decibelAtSustainStart / 100.0;
       rgn->decay_time = (rgn->decay_time * decayTimeRate) + (rgn->sustain_time * (1.0 - decayTimeRate));
 
