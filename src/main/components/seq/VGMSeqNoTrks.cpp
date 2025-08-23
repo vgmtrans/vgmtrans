@@ -86,8 +86,10 @@ bool VGMSeqNoTrks::loadEvents(long stopTime) {
   return true;
 }
 
-MidiFile *VGMSeqNoTrks::convertToMidi() {
+MidiFile *VGMSeqNoTrks::convertToMidi(const VGMColl* coll) {
   this->SeqTrack::readMode = this->VGMSeq::readMode = READMODE_FIND_DELTA_LENGTH;
+
+  useColl(coll);
 
   if (!loadEvents())
     return nullptr;

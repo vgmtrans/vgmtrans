@@ -43,6 +43,9 @@ class VGMScanner;
 #define USING_COLL(coll) \
   virtual VGMColl* newCollection() { return new coll(); }
 
+#define USES_COLLECTION_FOR_SEQ_CONVERSION() \
+  bool usesCollectionDataForSeqConversion() override { return true; }
+
 class Format;
 class VGMFile;
 class VGMSeq;
@@ -69,6 +72,7 @@ public:
   virtual bool onNewFile(std::variant<VGMSeq *, VGMInstrSet *, VGMSampColl *, VGMMiscFile *> file);
   virtual bool onCloseFile(std::variant<VGMSeq *, VGMInstrSet *, VGMSampColl *, VGMMiscFile *> file);
   virtual bool onMatch(std::vector<VGMFile *> &) { return true; }
+  virtual bool usesCollectionDataForSeqConversion() { return false; }
 
   Matcher *matcher;
   VGMScanner *scanner;

@@ -37,7 +37,8 @@ class VGMSeq : public VGMFile {
   virtual bool parseHeader();
   virtual bool parseTrackPointers();  // Function to find all of the track pointers.   Returns number of total tracks.
   virtual void resetVars();
-  virtual MidiFile *convertToMidi();
+  virtual void useColl(const VGMColl* coll) {}
+  virtual MidiFile *convertToMidi(const VGMColl* coll = nullptr);
   virtual MidiTrack *firstMidiTrack();
   void setPPQN(uint16_t ppqn);
   [[nodiscard]] uint16_t ppqn() const;
@@ -92,7 +93,7 @@ class VGMSeq : public VGMFile {
   [[nodiscard]] bool allowDiscontinuousTrackData() const { return m_allow_discontinuous_track_data; }
   void setAllowDiscontinuousTrackData(bool allow) { m_allow_discontinuous_track_data = allow; }
 
-  bool saveAsMidi(const std::string &filepath);
+  bool saveAsMidi(const std::string &filepath, const VGMColl* coll = nullptr);
 
   void deactivateAllTracks();
 
