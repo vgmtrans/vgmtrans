@@ -125,6 +125,7 @@ bool SegSatScanner::validateBankAt(RawFile* file, u32 base) {
   const u16 ptrVel   = file->readShortBE(base + 2);
   const u16 ptrPegs  = file->readShortBE(base + 4);
   const u16 ptrPlfo  = file->readShortBE(base + 6);
+  const u16 ptrInstr0  = file->readShortBE(base + 8);
 
   // --- Fast rejects on the first four words ---
   // 1) Even alignment is cheap to test and catches lots of junk.
@@ -137,32 +138,40 @@ bool SegSatScanner::validateBankAt(RawFile* file, u32 base) {
   if (!(ptrMixes < ptrVel && ptrVel < ptrPegs && ptrPegs < ptrPlfo)) return false;
 
   // 3) Unit-size (“multiple of …”) checks on the first 3 gaps.
-  const u32 d0 = static_cast<u32>(ptrVel  ) - ptrMixes; // vel - mixes
-  const u32 d1 = static_cast<u32>(ptrPegs ) - ptrVel;   // pegs - vel
-  const u32 d2 = static_cast<u32>(ptrPlfo ) - ptrPegs;  // plfo - pegs
+  const u32 d0 = static_cast<u32>(ptrVel  ) - ptrMixes;  // vel - mixes
+  const u32 d1 = static_cast<u32>(ptrPegs ) - ptrVel;    // pegs - vel
+  const u32 d2 = static_cast<u32>(ptrPlfo ) - ptrPegs;   // plfo - pegs
+  const u32 d3 = static_cast<u32>(ptrInstr0 ) - ptrPlfo; // instr0 - plfo
   if ((d0 % 0x12u) != 0) return false;
   if ((d1 % 0x0Au) != 0) return false;
   if ((d2 % 0x0Au) != 0) return false;
+  if ((d3 % 0x04u) != 0) return false;
 
-  // 4) Voice count (derived from ptrMixes).
-  //    (ptrMixes - 8) must be even and >= 2 → at least one voice.
+  // More sanity checks on sizes
+  if (d0 > (20*0x12)) return false;   // assume no more than 20 mixer tables
+  if (d1 > (20*0x0A)) return false;   // assume no more than 20 velocity level tables
+  if (d2 > (20*0x0A)) return false;   // assume no more than 20 PEG tables
+  if (d3 > (20*0x04)) return false;   // assume no more than 20 PLFO tables
+
+  // 4) Instrument count (derived from ptrMixes).
+  //    (ptrMixes - 8) must be even and >= 2 to fit at least one instrument.
   if (ptrMixes < 10) return false;            // < 0x0A
   if ((ptrMixes & 1) != 0) return false;      // makes (ptrMixes - 8) odd
-  int numVoices = static_cast<int>((ptrMixes - 8) / 2);
-  if (numVoices <= 0) return false;
+  int numInstrs = static_cast<int>((ptrMixes - 8) / 2);
+  if (numInstrs <= 0) return false;
 
-  // Check for an improbably high voice count
-  static constexpr int kMaxVoices = 256;
-  if (numVoices > kMaxVoices) return false;
+  // Check for an improbably high instrument count
+  static constexpr int kMaxInstrs = 256;
+  if (numInstrs > kMaxInstrs) return false;
 
-  // Ensure the voice-pointer table itself is in-bounds.
-  const u32 voiceTblEnd = base + 8u + static_cast<u32>(numVoices) * 2u;
-  if (voiceTblEnd > n) return false;
+  // Ensure the instrument-pointer table itself is in-bounds.
+  const u32 instrTblEnd = base + 8u + static_cast<u32>(numInstrs) * 2u;
+  if (instrTblEnd > n) return false;
 
-  // Now check the remaining gaps between voices
-  // Voice gap rule: (delta % 0x20) == 0x04  ⇒ use bit-test: (delta & 0x1F) == 0x04
+  // Now check the remaining gaps between instruments
+  // Instrument gap rule: (delta % 0x20) == 0x04  ⇒ use bit-test: (delta & 0x1F) == 0x04
   u32 prev = file->readShortBE(base + 8) - 4;
-  for (int j = 0; j < numVoices; ++j) {
+  for (int j = 0; j < numInstrs; ++j) {
     const u16 v = file->readShortBE(base + 8 + j * 2);
     if (v <= prev) return false;
     const u32 delta = static_cast<u32>(v) - prev;
@@ -188,21 +197,26 @@ void SegSatScanner::searchForInstrumentSets(RawFile* file) {
     const u16 ptrMixes = file->readShortBE(base + 0);
     if (ptrMixes < 0x000A || (ptrMixes & 1)) { ++base; continue; }
 
-    const u16 ptrVel = (base + 2 <= fileLength) ? file->readShortBE(base + 2) : 0;
+    const u16 ptrVel = (base + 2 + 2 <= fileLength) ? file->readShortBE(base + 2) : 0;
     if (ptrVel <= ptrMixes) { ++base; continue; }
 
-    // Optional: quick check of the next two as well (very cheap, helps a lot)
-    const u16 ptrPegs = (base + 4 <= fileLength) ? file->readShortBE(base + 4) : 0;
-    const u16 ptrPlfo = (base + 6 <= fileLength) ? file->readShortBE(base + 6) : 0;
-    if (!(ptrMixes < ptrVel && ptrVel < ptrPegs && ptrPegs < ptrPlfo)) { ++base; continue; }
+    // Quick check of the next two as well (very cheap, helps a lot)
+    const u16 ptrPegs = (base + 4 + 2 <= fileLength) ? file->readShortBE(base + 4) : 0;
+    const u16 ptrPlfo = (base + 6 + 2 <= fileLength) ? file->readShortBE(base + 6) : 0;
+    const u16 ptrInstr0 = (base + 8 + 2 <= fileLength) ? file->readShortBE(base + 8) : 0;
+    if (!(ptrMixes < ptrVel && ptrVel < ptrPegs && ptrPegs < ptrPlfo && ptrPlfo < ptrInstr0)) {
+      ++base;
+      continue;
+    }
 
-    // Optional: fast unit-size checks on header gaps before full pass
+    // Fast unit-size checks on header gaps before full pass
     const u32 d0 = static_cast<u32>(ptrVel)  - ptrMixes;
     const u32 d1 = static_cast<u32>(ptrPegs) - ptrVel;
     const u32 d2 = static_cast<u32>(ptrPlfo) - ptrPegs;
-    if ((d0 % 0x12u) | (d1 % 0x0Au) | (d2 % 0x0Au)) { ++base; continue; }
+    const u32 d3 = static_cast<u32>(ptrInstr0) - ptrPlfo;
+    if ((d0 % 0x12u) | (d1 % 0x0Au) | (d2 % 0x0Au) | (d3 % 0x04u)) { ++base; continue; }
 
-    // Full validation (reads voice table lazily and bails early on mismatch)
+    // Full validation (reads instrument table lazily and bails early on mismatch)
     if (validateBankAt(file, base)) {
       u32 numInstrs = ((ptrMixes - 8) / 2);
       auto instrSet = new SegSatInstrSet(file, base, numInstrs);
@@ -210,7 +224,7 @@ void SegSatScanner::searchForInstrumentSets(RawFile* file) {
         delete instrSet;
       }
 
-      // We can safely skip ahead: the voice table runs until base + ptrMixes
+      // We can safely skip ahead: the instrument table runs until base + ptrMixes
       // Jumping avoids re-scanning in the middle of a confirmed bank.
       base += 2; // or: base = std::min(base + ptrMixes, fileLength - 8);
     } else {

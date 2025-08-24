@@ -10,7 +10,6 @@
 #include "VGMSampColl.h"
 #include "VGMRgn.h"
 #include "SegSatFormat.h"
-
 #include <unordered_set>
 
 //Envelope times in ms, taken from MAME's SCSP implementation
@@ -27,9 +26,10 @@ constexpr double tlToDB(u8 tl) {
   // The hardware level method for calculating dB attenuation is to translate each TL bit to a dB
   // weight. Specifically, the weights for bit0..bit7 are:
   // { 0.4, 0.8, 1.5, 3.0, 6.0, 12.0, 24.0, 48.0 }
-  // These weights aren't perfectly linear, but close. Since the final TL is the product of many
-  // volume modifying values (velocity, volume, instrument settings), as we convert each one, we
-  // instead multiply by the average change. It gets us pretty close.
+  // These weights aren't perfectly linear, but they're close. Since the final TL is the product of
+  // many volume modifying values (velocity, volume, instrument settings), we practically
+  // recalculate TL attenuation at each point during conversion. Instead, we treat the table as
+  // linear: ∑(the table) / 0xFF == 0.37529. This gets us pretty close.
   return tl * 0.37529;
 }
 
