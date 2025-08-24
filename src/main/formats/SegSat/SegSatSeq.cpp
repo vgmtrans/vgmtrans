@@ -61,13 +61,12 @@ bool SegSatSeq::readEvent() {
 
   if (status_byte <= 0x7F)            // note on
   {
-    channel = status_byte & 0x0F;
+    setChannel(status_byte & 0x0F);
     u16 durBit8 = (status_byte & 0x40) << 2;
     u16 deltaBit8 = (status_byte & 0x20) << 3;
     if ((status_byte & 0x10) > 0) {
       L_DEBUG("found 0x10 bit on for note on status byte {:x}", beginOffset);
     }
-    setCurTrack(channel);
     auto key = readByte(curOffset++);
     auto vel = readByte(curOffset++);
     u16 noteDuration = readByte(curOffset++) | durBit8;
@@ -80,8 +79,7 @@ bool SegSatSeq::readEvent() {
   else {
     if ((status_byte & 0xF0) == Midi::CONTROL_CHANGE) {
       // BX are midi controller events
-      channel = status_byte & 0x0F;
-      setCurTrack(channel);
+      setChannel(status_byte & 0x0F);
       u8 controllerType = readByte(curOffset++);
       u8 controllerValue = readByte(curOffset++);
       u8 deltaTime = readByte(curOffset++);
@@ -116,15 +114,13 @@ bool SegSatSeq::readEvent() {
       }
     }
     else if ((status_byte & 0xF0) == 0xC0) {
-      channel = status_byte & 0x0F;
-      setCurTrack(channel);
+      setChannel(status_byte & 0x0F);
       u8 progNum = readByte(curOffset++);
       addTime(readByte(curOffset++));
       addProgramChange(beginOffset, curOffset - beginOffset, progNum);
     }
     else if ((status_byte & 0xF0) == 0xE0) {
-      channel = status_byte & 0x0F;
-      setCurTrack(channel);
+      setChannel(status_byte & 0x0F);
       s16 bend = (static_cast<s32>(readByte(curOffset++)) << 7) - 8192;
       addTime(readByte(curOffset++));
       addPitchBend(beginOffset, curOffset - beginOffset, bend);

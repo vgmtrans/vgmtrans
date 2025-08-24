@@ -34,6 +34,14 @@ public:
     m_settings.setValue(QString::fromUtf8(key.data(), int(key.size())), value);
   }
 
+  int getBool(std::string_view key, bool def) const override {
+    return m_settings.value(QString::fromUtf8(key.data(), int(key.size())), def).toBool();
+  }
+
+  void setBool(std::string_view key, bool value) override {
+    m_settings.setValue(QString::fromUtf8(key.data(), int(key.size())), value);
+  }
+
 private:
   QSettings& m_settings;
 };
@@ -83,6 +91,11 @@ public:
       return ConversionOptions::the().numSequenceLoops();
     }
     void setNumSequenceLoops(int n) const;
+
+    bool skipChannel10() const {
+      return ConversionOptions::the().skipChannel10();
+    }
+    void setSkipChannel10(bool skip) const;
   };
   ConversionSettings conversion;
 

@@ -48,8 +48,7 @@ bool SonyPS2Seq::parseHeader() {
   }
 
   nNumTracks = 16;
-  channel = 0;
-  setCurTrack(channel);
+  setChannel(0);
   return true;
 }
 
@@ -83,8 +82,7 @@ bool SonyPS2Seq::readEvent(void) {
     runningStatus = status_byte;
 
 
-  channel = status_byte & 0x0F;
-  setCurTrack(channel);
+  setChannel(status_byte & 0x0F);
 
   switch (status_byte & 0xF0) {
     //note off event. Unlike SMF, there is no velocity data byte, just the note val.

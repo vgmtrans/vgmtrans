@@ -43,7 +43,7 @@ public:
   void setTime(uint32_t newTime) override;
   void addTime(uint32_t delta) override;
 
-  void setCurTrack(uint32_t trackNum);
+  void setChannel(u8 newChannel);
   void tryExpandMidiTracks(uint32_t numTracks);
 
   bool loadMain() override;  // Function to load all the information about the sequence
@@ -54,6 +54,8 @@ public:
   uint32_t dwEventsOffset;
 
 protected:
+  void setCurTrack(uint32_t trackNum);
+
   // an array of midi tracks... we will change pMidiTrack, which all the SeqTrack functions write
   // to, to the corresponding MidiTrack in this vector before we write every event
   std::vector<MidiTrack *> midiTracks;

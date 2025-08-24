@@ -132,15 +132,26 @@ void SeqTrack::loadTrackMainLoop(uint32_t stopOffset, int32_t stopTime) {
   }
 }
 
-void SeqTrack::setChannelAndGroupFromTrkNum(int theTrackNum) {
-  if (theTrackNum > 39)
-    theTrackNum += 3;
-  else if (theTrackNum > 23)
-    theTrackNum += 2;                    //compensate for channel 10 - drum track.  we'll skip it, by default
-  else if (theTrackNum > 8)
-    theTrackNum++;                        //''
-  channel = theTrackNum % 16;
-  channelGroup = theTrackNum / 16;
+/// Assign a MIDI channel/group from a track index, optionally skipping channel 9
+void SeqTrack::setChannelAndGroupFromTrkNum(int trk) {
+  constexpr int kChannelsPerBank = 16;
+  constexpr int kSkippedChannel  = 9;
+
+  if (ConversionOptions::the().skipChannel10()) {
+    // Pack tracks into 15 usable slots per 16-channel bank, skipping 9.
+    constexpr int kUsablePerBank = kChannelsPerBank - 1; // 15
+    const int group  = trk / kUsablePerBank;
+    const int slot15 = trk % kUsablePerBank;
+    const int ch     = (slot15 < kSkippedChannel) ? slot15 : slot15 + 1;
+
+    channel      = ch;        // 0..15, never 9
+    channelGroup = group;
+  } else {
+    // Straight 16-wide mapping with no skipped channel.
+    channel      = trk % kChannelsPerBank;
+    channelGroup = trk / kChannelsPerBank;
+  }
+
   if (readMode == READMODE_CONVERT_TO_MIDI)
     pMidiTrack->setChannelGroup(channelGroup);
 }
@@ -569,7 +580,8 @@ void SeqTrack::addPercNoteByDur(uint32_t offset,
                                 uint32_t dur,
                                 const std::string &sEventName) {
   uint8_t origChan = channel;
-  channel = 9;
+  if (!ConversionOptions::the().skipChannel10())
+    channel = 9;
   int8_t origDrumNote = cDrumNote;
   cDrumNote = -1;
 //	DrumAssoc* pDrumAssoc = parentSeq->GetDrumAssoc(key);

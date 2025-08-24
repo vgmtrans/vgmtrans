@@ -5,6 +5,7 @@
  */
 
 #include "PS1Seq.h"
+#include "Options.h"
 #include "formats/PS1/PS1Format.h"
 
 DECLARE_FORMAT(PS1)
@@ -127,9 +128,7 @@ bool PS1Seq::readEvent() {
   else
     m_runningStatus = status_byte;
 
-
-  channel = status_byte & 0x0F;
-  setCurTrack(channel);
+  setChannel(status_byte & 0x0F);
 
   switch (status_byte & 0xF0) {
     //note event
