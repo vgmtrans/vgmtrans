@@ -1,5 +1,5 @@
 /*
-* VGMTrans (c) 2002-2024
+* VGMTrans (c) 2002-2025
 * Licensed under the zlib license,
 * refer to the included LICENSE.txt file
  */
@@ -10,9 +10,13 @@
 SettingsGroup::SettingsGroup(Settings* parent) : parent(parent), settings(parent->settings) {
 }
 
-Settings::Settings(QObject *parent) :
-      VGMFileTreeView(this)
-{}
+Settings::Settings(QObject *parent)
+  : QObject(parent),
+    VGMFileTreeView(this),
+    conversion(this)
+{
+  conversion.loadIntoOptionsStore();
+}
 
 void Settings::VGMFileTreeViewSettings::setShowDetails(bool showDetails) const {
   settings.beginGroup("VGMFileTreeView");
@@ -27,4 +31,26 @@ bool Settings::VGMFileTreeViewSettings::showDetails() const {
   settings.endGroup();
 
   return showDetails;
+}
+
+/// Put settings into an OptionStore and have ConversionOptions load from it
+void Settings::ConversionSettings::loadIntoOptionsStore() const {
+  QtOptionsStore store(settings);
+  ConversionOptions::the().load(store);
+}
+
+/// Put settings into an OptionStore and have ConversionOptions save into it
+void Settings::ConversionSettings::saveFromOptionsStore() const {
+  QtOptionsStore store(settings);
+  ConversionOptions::the().save(store);
+}
+
+void Settings::ConversionSettings::setBankSelectStyle(BankSelectStyle s) const {
+  ConversionOptions::the().setBankSelectStyle(s);
+  saveFromOptionsStore();
+}
+
+void Settings::ConversionSettings::setNumSequenceLoops(int n) const {
+  ConversionOptions::the().setNumSequenceLoops(n);
+  saveFromOptionsStore();
 }

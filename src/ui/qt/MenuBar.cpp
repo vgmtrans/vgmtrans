@@ -1,5 +1,5 @@
 /*
- * VGMTrans (c) 2002-2019
+ * VGMTrans (c) 2002-2025
  * Licensed under the zlib license,
  * refer to the included LICENSE.txt file
  */
@@ -11,6 +11,7 @@
 #include "Options.h"
 #include "Root.h"
 #include "LogManager.h"
+#include "services/Settings.h"
 
 MenuBar::MenuBar(QWidget *parent, const QList<QDockWidget *> &dockWidgets) : QMenuBar(parent) {
   appendFileMenu();
@@ -35,20 +36,23 @@ void MenuBar::appendOptionsMenu(const QList<QDockWidget *> &dockWidgets) {
   QMenu *options_dropdown = addMenu("Options");
   auto bs = options_dropdown->addMenu("Bank select style");
 
+  auto bankSelectStyle = Settings::the()->conversion.bankSelectStyle();
+
   QActionGroup *bs_grp = new QActionGroup(this);
   auto act = bs->addAction("GS (Default)");
   act->setCheckable(true);
-  act->setChecked(true);
+  act->setChecked(bankSelectStyle == BankSelectStyle::GS);
   bs_grp->addAction(act);
   act = bs->addAction("MMA");
   act->setCheckable(true);
+  act->setChecked(bankSelectStyle == BankSelectStyle::MMA);
   bs_grp->addAction(act);
 
   connect(bs_grp, &QActionGroup::triggered, [](const QAction *bs_style) {
     if (auto text = bs_style->text(); text == "GS (Default)") {
-      ConversionOptions::the().setBankSelectStyle(BankSelectStyle::GS);
+      Settings::the()->conversion.setBankSelectStyle(BankSelectStyle::GS);
     } else if (text == "MMA") {
-      ConversionOptions::the().setBankSelectStyle(BankSelectStyle::MMA);
+      Settings::the()->conversion.setBankSelectStyle(BankSelectStyle::MMA);
       L_WARN("MMA style (CC0 * 128 + CC32) bank select was chosen and "
              "it will be used for bank select events in generated MIDIs. This "
              "will cause in-program playback to sound incorrect!");

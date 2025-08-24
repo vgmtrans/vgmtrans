@@ -1,10 +1,26 @@
 /**
- * VGMTrans (c) - 2002-2021
+ * VGMTrans (c) - 2002-2025
  * Licensed under the zlib license
  * See the included LICENSE for more information
  */
 
 #pragma once
+#include <memory>
+#include <string_view>
+
+struct OptionStore {
+  struct Group {
+    virtual ~Group() = default;
+  };
+
+  virtual ~OptionStore() = default;
+
+  // Grouping, RAII-style so callers can't forget endGroup()
+  virtual std::unique_ptr<Group> beginGroup(std::string_view path) = 0;
+
+  virtual int getInt(std::string_view key, int def) const = 0;
+  virtual void setInt(std::string_view key, int value) = 0;
+};
 
 enum class BankSelectStyle {
   /* CC0 MSB (default) */
@@ -32,6 +48,20 @@ public:
 
   int numSequenceLoops() const { return m_sequence_loops; }
   void setNumSequenceLoops(int numLoops) { m_sequence_loops = numLoops; }
+
+  void load(OptionStore& store) {
+    auto g = store.beginGroup("ConversionOptions");
+    const int bs = store.getInt("bankSelectStyle", static_cast<int>(BankSelectStyle::GS));
+    m_bs_style = (bs == static_cast<int>(BankSelectStyle::MMA)) ? BankSelectStyle::MMA
+                                                                : BankSelectStyle::GS;
+    m_sequence_loops = store.getInt("sequenceLoops", 1);
+  }
+
+  void save(OptionStore& store) const {
+    auto g = store.beginGroup("ConversionOptions");
+    store.setInt("bankSelectStyle", static_cast<int>(m_bs_style));
+    store.setInt("sequenceLoops",   m_sequence_loops);
+  }
 
 private:
   ConversionOptions() = default;
