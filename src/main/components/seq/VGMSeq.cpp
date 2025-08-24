@@ -69,12 +69,14 @@ bool VGMSeq::load() {
   return true;
 }
 
-MidiFile *VGMSeq::convertToMidi() {
+MidiFile *VGMSeq::convertToMidi(const VGMColl* coll) {
   size_t numTracks = aTracks.size();
 
   if (!loadTracks(READMODE_FIND_DELTA_LENGTH)) {
       return nullptr;
   }
+
+  useColl(coll);
 
   // Find the greatest length of all tracks to use as stop point for every track
   long stopTime = 0;
@@ -313,8 +315,8 @@ void VGMSeq::addInstrumentRef(uint32_t progNum) {
   }
 }
 
-bool VGMSeq::saveAsMidi(const std::string &filepath) {
-  MidiFile *midi = this->convertToMidi();
+bool VGMSeq::saveAsMidi(const std::string &filepath, const VGMColl* coll) {
+  MidiFile *midi = this->convertToMidi(coll);
   if (!midi)
     return false;
   bool result = midi->saveMidiFile(filepath);

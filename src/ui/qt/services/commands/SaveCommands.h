@@ -6,6 +6,7 @@
 
 #pragma once
 
+#include "Format.h"
 #include "services/MenuManager.h"
 #include "VGMSeq.h"
 #include "VGMInstrSet.h"
@@ -161,7 +162,26 @@ public:
   SaveAsMidiCommand() : SaveCommand<VGMSeq, VGMFile>(false) {}
 
   void save(const std::string& path, VGMSeq* seq) const override {
-    seq->saveAsMidi(path);
+    int numAssocColls = seq->assocColls.size();
+    if (numAssocColls > 0) {
+      if (numAssocColls > 1 && seq->format()->usesCollectionDataForSeqConversion()) {
+        pRoot->UI_toast("This sequence format uses collection data as context for "
+          "conversion, however, more than one collection is associated with the sequence. The first "
+          "associated collection was used.\n\nYou can resolve this by selecting a conversion action "
+          "on a collection directly.",
+          ToastType::Info, 15000);
+      }
+      seq->saveAsMidi(path, seq->assocColls[0]);
+    } else {
+      if (seq->format()->usesCollectionDataForSeqConversion()) {
+        pRoot->UI_toast("This sequence format uses collection data as context for "
+          "conversion, however, there is currently no collection containing the sequence. Conversion "
+          "results may improve if the sequence is first grouped into a collection with an "
+          "associated instrument set.",
+          ToastType::Info, 15000);
+      }
+      seq->saveAsMidi(path);
+    }
   }
   [[nodiscard]] std::string name() const override { return "Save as MIDI"; }
   [[nodiscard]] std::string extension() const override { return "mid"; }

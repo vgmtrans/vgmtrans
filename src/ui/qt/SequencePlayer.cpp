@@ -183,7 +183,7 @@ bool SequencePlayer::playCollection(const VGMColl *coll) {
     return false;
   }
 
-  MidiFile *midi = seq->convertToMidi();
+  MidiFile *midi = seq->convertToMidi(coll);
   std::vector<uint8_t> raw_midi;
   midi->writeMidiToBuffer(raw_midi);
   /* Set up the MIDI stream */
