@@ -54,8 +54,6 @@ SegSatInstrSet::SegSatInstrSet(RawFile* file, uint32_t offset, int numInstrs, co
 }
 
 bool SegSatInstrSet::parseHeader() {
-
-  // TODO: parse mix, vl, peg, plfo tables
   addChild(dwOffset + 0, 2, "Mixer Tables Pointer");
   addChild(dwOffset + 2, 2, "Velocity Tables Pointer");
   addChild(dwOffset + 4, 2, "PEG Tables Pointer");
@@ -234,9 +232,7 @@ SegSatRgn::SegSatRgn(SegSatInstr* instr, uint32_t offset, const std::string& nam
   if (m_sampleType == SampleType::PCM16)
     sampOffset = sampOffset & ~1;
   sampOffset += instrSetOffset;
-  if (m_loopType == LoopType::Reverse) {
-    printf("FOUND REVERSE LOOP");
-  }
+
   addChild(offset + 3, 3, "Sample Offset, Sample Type, Loop Type");
   m_sampLoopStart = getShortBE(offset + 6) * bytesPerSamp;
   m_sampLoopEnd = getShortBE(offset + 8) * bytesPerSamp;
@@ -261,8 +257,7 @@ SegSatRgn::SegSatRgn(SegSatInstr* instr, uint32_t offset, const std::string& nam
   attack_time = (ARTimes[m_attackRate * 2] / 1000.0) * 0.625;
   attack_time *= 0.625;
   decay_time = DRTimes[m_decayRate1 * 2] / 1000.0;
-  sustain_level = (0x1F - m_decayLevel) / 31.0;
-  // sustain_level = pow(10.0, (-3.0 * static_cast<double>(m_decayLevel)) / 20.0);
+  sustain_level = (31 - m_decayLevel) / 31.0;
 
   release_time = DRTimes[m_releaseRate * 2] / 1000.0;
   double decay2Time = DRTimes[m_decayRate2 * 2] / 1000.0;

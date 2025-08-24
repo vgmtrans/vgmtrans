@@ -1,5 +1,5 @@
 /*
- * VGMTrans (c) 2002-2024
+ * VGMTrans (c) 2002-2025
  * Licensed under the zlib license,
  * refer to the included LICENSE.txt file
  */
@@ -204,8 +204,6 @@ void SegSatScanner::searchForInstrumentSets(RawFile* file) {
 
     // Full validation (reads voice table lazily and bails early on mismatch)
     if (validateBankAt(file, base)) {
-      printf("Verified SegSat Instr candidate at %X\n", base);
-
       u32 numInstrs = ((ptrMixes - 8) / 2);
       auto instrSet = new SegSatInstrSet(file, base, numInstrs);
       if (!instrSet->loadVGMFile()) {
