@@ -77,6 +77,7 @@ bool SegSatSeq::parseHeader() {
   return true;
 }
 
+/// For a given bank, program number, and note, determine the applied instrument region.
 const SegSatRgn* SegSatSeq::resolveRegion(u8 bank, u8 progNum, u8 noteNum) {
   const auto& instrs = m_collContext.instrs;
   if (progNum >= instrs.size())
@@ -91,7 +92,11 @@ const SegSatRgn* SegSatSeq::resolveRegion(u8 bank, u8 progNum, u8 noteNum) {
   return nullptr;
 }
 
-u8 SegSatSeq::resolveVelocity(u8 vel, const SegSatRgn& rgn, u8 ch) {
+/// For a velocity and instrument region, determine the final velocity value by applying the
+/// Velocity Level table transformation and accounting for the TL register attenuation behavior.
+/// TODO: account for the region's volume bias value.
+/// The logic is based on the 1.33 version of the driver (circa "95/08/07")
+u8 SegSatSeq::resolveVelocity(u8 vel, const SegSatRgn& rgn) {
   u8 vlTableIndex = rgn.vlTableIndex();
   const auto& vlTables = m_collContext.m_vlTables;
   if (vlTableIndex >= vlTables.size())
@@ -101,7 +106,6 @@ u8 SegSatSeq::resolveVelocity(u8 vel, const SegSatRgn& rgn, u8 ch) {
   u8 base = 0;
   u8 rate = vlTable.rate0;
   u8 point = 0;
-  // printf("origVel is: %X VL Rate: %X\n", vel, rate);
   if (vel > vlTable.point0) {
     point = vlTable.point0;
     base = vlTable.level0;
@@ -118,9 +122,8 @@ u8 SegSatSeq::resolveVelocity(u8 vel, const SegSatRgn& rgn, u8 ch) {
     }
   }
 
-  // printf("origVel is: %X  resolved base: %X.  rate: %X\n", vel, base, rate);
-
-  // Now we handle the rate
+  // Now we handle the rate. This logic is specific to the 1.33 driver. There are logical
+  // differences in future versions (and perhaps older versions too?)
   u8 shift = rate >> 4;
   bool boost = (rate >> 3) & 1;
   u8 mode = rate & 7;
@@ -151,21 +154,9 @@ u8 SegSatSeq::resolveVelocity(u8 vel, const SegSatRgn& rgn, u8 ch) {
   newVel = std::clamp<u8>(newVel, 0, 0x7F);
   // In original logic, rgn.totalLevel() would go where 0 is. We instead apply it as region attenuation
   u32 volScale = (newVel + 1) * (256 - 0);
-
-  // uint32_t vol_scale_word = (uint32_t)( (new_vel & 0x7F) + 1 ) * (256 - P);   // 1..32768
-  // m_volScaleRow[ch] = (volScale >> 11) & 0x0F;
-
-  u8 amp = (volScale * ( (0x7F&0x7F)+1 )*4 - 1) >> 16;
-  // u8 amp = (volScale * ( (m_vol[ch]&0x7F)+1 )*4 - 1) >> 16;
+  u8 amp = (volScale * ( (0x7F & 0x7F)+1 )*4 - 1) >> 16;
   // TODO: add vol bias
   u8 tl = ~std::clamp<u8>(amp, 0, 255);
-
-  // {
-    // u8 amp2 = (volScale * ( (m_vol[ch]&0x7F)+1 )*4 - 1) >> 16;
-    // tl = ~std::clamp<u8>(idx2, 0, 255);
-    // printf("Instr total Level: %X. Ch Vol: %X\n", rgn.totalLevel(), m_vol[ch]);
-    // printf("TL (with vol): %X.  ch: %d\n", amp, ch);
-  // }
 
   u8 result = convertDBAttenuationToStdMidiVal(tlToDB(tl));
   return result;
@@ -187,8 +178,7 @@ bool SegSatSeq::readEvent() {
   uint32_t beginOffset = curOffset;
   uint8_t status_byte = readByte(curOffset++);
 
-  if (status_byte <= 0x7F)            // note on
-  {
+  if (status_byte <= 0x7F) {            // note on
     u8 ch = status_byte & 0x0F;
     setChannel(ch);
     u16 durBit8 = (status_byte & 0x40) << 2;
@@ -207,18 +197,12 @@ bool SegSatSeq::readEvent() {
 
     auto* rgn = resolveRegion(0, m_progNum[ch], key);
     if (rgn) {
-      u8 origVel = vel;
-      vel = resolveVelocity(vel, *rgn, ch);
-      // printf("Vel from: %d.  to: %d\n", origVel, vel);
+      vel = resolveVelocity(vel, *rgn);
     } else {
-      printf("DiDn't find region for offset: %X\n", beginOffset);
+      L_WARN("Didn't find an instrument region with key range covering note event at offset: {:X}", beginOffset);
     }
 
     addNoteByDur(beginOffset, curOffset - beginOffset, key, vel, noteDuration);
-
-    // if (beginOffset >= 0x73ABC && beginOffset <= 0x73AFD) {
-      // printf("OFF: %X  T: %d  CH: %d  KEY: %d  DUR: %d  delta: %d\n", beginOffset, getTime(), channel, key, noteDuration, deltaTime);
-    // }
   }
   else {
     if ((status_byte & 0xF0) == Midi::CONTROL_CHANGE) {
@@ -239,7 +223,6 @@ bool SegSatSeq::readEvent() {
           break;
         case Midi::EXPRESSION_MSB:
         case Midi::VOLUME_MSB: {
-          m_vol[ch] = controllerValue;
           u8 scsp_tl = (uint8_t)std::max(0, 254 - 2*controllerValue);
           double attenDb = tlToDB(scsp_tl);
           u8 newVol = convertDBAttenuationToStdMidiVal(attenDb);
@@ -273,8 +256,6 @@ bool SegSatSeq::readEvent() {
       u8 dataByte = readByte(curOffset++);
       u8 progNum = dataByte & 0x7F;
       u16 deltaBit8 = 0; //(dataByte & 0x80) << 1;
-      if (deltaBit8 > 0)
-        printf("DELTA BIT 8 AT %X\n", beginOffset);
       m_progNum[ch] = progNum;
       addTime(readByte(curOffset++) | deltaBit8);
       if (dataByte < 0x80)
@@ -284,8 +265,6 @@ bool SegSatSeq::readEvent() {
       setChannel(status_byte & 0x0F);
       u8 dataByte = readByte(curOffset++);
       u16 deltaBit8 = 0; //(dataByte & 0x80) << 1;
-      if (deltaBit8 > 0)
-        printf("DELTA BIT 8 AT %X\n", beginOffset);
       addTime(readByte(curOffset++) | deltaBit8);
       // TODO: add channel pressure events to SeqTrack and MidiFile
       addUnknown(beginOffset, curOffset - beginOffset, "Channel Pressure");
@@ -295,8 +274,6 @@ bool SegSatSeq::readEvent() {
       u8 dataByte = readByte(curOffset++);
       s16 bend = (static_cast<s32>(dataByte) << 7) - 8192;
       u16 deltaBit8 = 0; //(dataByte & 0x80) << 1;
-      if (deltaBit8 > 0)
-        printf("DELTA BIT 8 AT %X\n", beginOffset);
       addTime(readByte(curOffset++) | deltaBit8);
       addPitchBend(beginOffset, curOffset - beginOffset, bend);
     }

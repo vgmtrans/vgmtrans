@@ -19,8 +19,7 @@ class SegSatSeq:
  private:
   const SegSatRgn* resolveRegion(u8 bank, u8 progNum, u8 noteNum);
   constexpr double tlDB(uint8_t tl);
-  u8 resolveVelocity(u8 vel, const SegSatRgn& rgn, u8 ch);
-  void changeChannel(u8 ch);
+  u8 resolveVelocity(u8 vel, const SegSatRgn& rgn);
 
   struct CollContext {
     std::vector<SegSatVLTable> m_vlTables;
@@ -33,7 +32,6 @@ class SegSatSeq:
   u32 m_foreverLoopStart = -1;
   u32 m_durationAccumulator = 0;
   u8 m_volScaleRow[16];
-  u8 m_vol[16];
   u8 m_bank[16];
   u8 m_progNum[16];
 };
