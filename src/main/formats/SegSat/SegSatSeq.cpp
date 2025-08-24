@@ -77,27 +77,6 @@ bool SegSatSeq::parseHeader() {
   return true;
 }
 
-void SegSatSeq::changeChannel(u8 ch) {
-  setCurTrack(ch);
-  if (ch == 9) {
-    channel = 0;
-    channelGroup = 1;
-    // if (VGMSeq::readMode == READMODE_CONVERT_TO_MIDI && pMidiTrack->channelGroup != 1) {
-    // if (VGMSeq::readMode == READMODE_CONVERT_TO_MIDI) {
-      // pMidiTrack->setChannelGroup(1);
-      // pMidiTrack->addMidiPort(1);
-    // }
-  } else {
-    channel = ch;
-    channelGroup = 0;
-    // if (VGMSeq::readMode == READMODE_CONVERT_TO_MIDI && pMidiTrack->channelGroup != 0) {
-    // if (VGMSeq::readMode == READMODE_CONVERT_TO_MIDI) {
-      // pMidiTrack->setChannelGroup(0);
-      // pMidiTrack->addMidiPort(0);
-    // }
-  }
-}
-
 const SegSatRgn* SegSatSeq::resolveRegion(u8 bank, u8 progNum, u8 noteNum) {
   const auto& instrs = m_collContext.instrs;
   if (progNum >= instrs.size())
@@ -210,7 +189,8 @@ bool SegSatSeq::readEvent() {
 
   if (status_byte <= 0x7F)            // note on
   {
-    setChannel(status_byte & 0x0F);
+    u8 ch = status_byte & 0x0F;
+    setChannel(ch);
     u16 durBit8 = (status_byte & 0x40) << 2;
     u16 deltaBit8 = (status_byte & 0x20) << 3;
     if ((status_byte & 0x10) > 0) {
@@ -243,7 +223,8 @@ bool SegSatSeq::readEvent() {
   else {
     if ((status_byte & 0xF0) == Midi::CONTROL_CHANGE) {
       // BX are midi controller events
-      setChannel(status_byte & 0x0F);
+      u8 ch = status_byte & 0x0F;
+      setChannel(ch);
       u8 controllerType = readByte(curOffset++);
       u8 value = readByte(curOffset++);
       u8 controllerValue = value & 0x7F;
@@ -266,7 +247,6 @@ bool SegSatSeq::readEvent() {
             addVol(beginOffset, curOffset - beginOffset, newVol);
           } else {
             addExpression(beginOffset, curOffset - beginOffset, newVol);
-            // addVol(beginOffset, curOffset - beginOffset, newVol);
           }
           break;
         }
@@ -288,7 +268,8 @@ bool SegSatSeq::readEvent() {
       }
     }
     else if ((status_byte & 0xF0) == 0xC0) {
-      setChannel(status_byte & 0x0F);
+      u8 ch = status_byte & 0x0F;
+      setChannel(ch);
       u8 dataByte = readByte(curOffset++);
       u8 progNum = dataByte & 0x7F;
       u16 deltaBit8 = 0; //(dataByte & 0x80) << 1;
@@ -300,8 +281,7 @@ bool SegSatSeq::readEvent() {
         addProgramChange(beginOffset, curOffset - beginOffset, progNum);
     }
     else if ((status_byte & 0xF0) == 0xD0) {
-      u8 ch = status_byte & 0x0F;
-      changeChannel(ch);
+      setChannel(status_byte & 0x0F);
       u8 dataByte = readByte(curOffset++);
       u16 deltaBit8 = 0; //(dataByte & 0x80) << 1;
       if (deltaBit8 > 0)
