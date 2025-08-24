@@ -10,9 +10,7 @@
 #include "VGMSamp.h"
 #include <spdlog/fmt/fmt.h>
 
-struct GainsDB { double left_dB, right_dB; };
-
-static const float SDLT[8] = {1000000.0f,36.0f,30.0f,24.0f,18.0f,12.0f,6.0f,0.0f};
+static const float SDLT[8] = { 1000000.0f, 36.0f, 30.0f, 24.0f, 18.0f, 12.0f, 6.0f, 0.0f };
 
 struct PanLinAmp { double lPan, rPan; };
 
@@ -255,7 +253,6 @@ SegSatRgn::SegSatRgn(SegSatInstr* instr, uint32_t offset, const std::string& nam
   // MAME starts the envelope at 0x17F. The ARTimes table represents time from 0 to max (0x3FF).
   // Effectively, this scales down AR time to 62.5%
   attack_time = (ARTimes[m_attackRate * 2] / 1000.0) * 0.625;
-  attack_time *= 0.625;
   decay_time = DRTimes[m_decayRate1 * 2] / 1000.0;
   sustain_level = (31 - m_decayLevel) / 31.0;
 
@@ -285,7 +282,7 @@ SegSatRgn::SegSatRgn(SegSatInstr* instr, uint32_t offset, const std::string& nam
   u8 lfoWave1 = (lfoResetFreqAndWave) & 1;
   u8 lfoWave2 = (readByte(offset + 21) >> 3) & 3;
 
-  // The pitch LFO wave selection is split across bits non-contiguous bits. Very weird.
+  // The pitch LFO wave selection is split across non-contiguous bits. Weird.
   if (lfoWave1 == 1)
     m_pitchLfoWave = LFOWave::Square;
   else if (lfoWave2 == 2)

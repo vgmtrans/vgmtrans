@@ -147,8 +147,6 @@ private:
   std::vector<ISeqSlider *> aSliders;
 
 private:
-  VGMColl* m_coll = nullptr;
-
   uint16_t m_ppqn;
 
   uint8_t m_initial_volume;
