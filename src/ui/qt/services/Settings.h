@@ -99,6 +99,17 @@ public:
   };
   ConversionSettings conversion;
 
+  struct DetectionSettings : public SettingsGroup {
+    using SettingsGroup::SettingsGroup;
+
+    void loadIntoOptionsStore() const;
+    void saveFromOptionsStore() const;
+
+    int minSequenceSize() const { return ConversionOptions::the().minSequenceSize(); }
+    void setMinSequenceSize(int size) const;
+  };
+  DetectionSettings detection;
+
 private:
   explicit Settings(QObject *parent = nullptr);
   QSettings settings;

@@ -25,6 +25,7 @@ signals:
 private:
   void appendFileMenu();
   void appendConversionMenu();
+  void appendDetectionMenu();
   void appendWindowsMenu(const QList<QDockWidget *> &dockWidgets);
   void appendInfoMenu();
 

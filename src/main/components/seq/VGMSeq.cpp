@@ -47,26 +47,27 @@ VGMSeq::~VGMSeq() {
 }
 
 bool VGMSeq::loadVGMFile() {
-  bool val = load();
-  if (!val) {
+  if (!load()) {
     return false;
   }
+
+  if (unLength < ConversionOptions::the().minSequenceSize()) {
+    return false;
+  }
+
+  rawFile()->addContainedVGMFile(std::make_shared<std::variant<VGMSeq *, VGMInstrSet *, VGMSampColl *,
+    VGMMiscFile *>>(this));
+  pRoot->addVGMFile(this);
 
   if (auto fmt = format(); fmt) {
     fmt->onNewFile(std::variant<VGMSeq *, VGMInstrSet *, VGMSampColl *, VGMMiscFile *>(this));
   }
 
-  return val;
+  return true;
 }
 
 bool VGMSeq::load() {
-  if (!loadMain())
-    return false;
-
-  rawFile()->addContainedVGMFile(std::make_shared<std::variant<VGMSeq *, VGMInstrSet *, VGMSampColl *,
-    VGMMiscFile *>>(this));
-  pRoot->addVGMFile(this);
-  return true;
+  return loadMain();
 }
 
 MidiFile *VGMSeq::convertToMidi(const VGMColl* coll) {
