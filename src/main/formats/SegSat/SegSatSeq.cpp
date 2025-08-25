@@ -153,7 +153,7 @@ u8 SegSatSeq::resolveVelocity(u8 vel, const SegSatRgn& rgn) {
   }
   newVel = std::clamp<u8>(newVel, 0, 0x7F);
   // In original logic, rgn.totalLevel() would go where 0 is. We instead apply it as region attenuation
-  u32 volScale = (newVel + 1) * (256 - 0);
+  u32 volScale = (newVel + 1) * (256 - rgn.totalLevel());
   u8 amp = (volScale * ( (0x7F & 0x7F)+1 )*4 - 1) >> 16;
   // TODO: add vol bias
   u8 tl = ~std::clamp<u8>(amp, 0, 255);

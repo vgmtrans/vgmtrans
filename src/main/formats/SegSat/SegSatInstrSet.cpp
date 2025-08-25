@@ -5,7 +5,6 @@
  */
 
 #include "SegSatInstrSet.h"
-
 #include "ScaleConversion.h"
 #include "VGMSamp.h"
 #include <spdlog/fmt/fmt.h>
@@ -323,13 +322,12 @@ SegSatRgn::SegSatRgn(SegSatInstr* instr, uint32_t offset, const std::string& nam
 
   // Calculate attenuation, using TL, DISDL, and PAN
   double sdlDb = SDLT[m_directLevel];
-  double tlDb = tlToDB(m_totalLevel);
   PanLinAmp pan = panToAmp(m_directPan);
 
   double volScale;
   double panPerc = convertVolumeBalanceToStdMidiPercentPan(pan.lPan, pan.rPan, &volScale);
   const double fiftyFiftyComp = 3.0103;
-  double finalAtten = sdlDb + tlDb + ampToDb(volScale) + fiftyFiftyComp;
+  double finalAtten = sdlDb + ampToDb(volScale) + fiftyFiftyComp;
   setAttenuation(finalAtten);
   this->pan = panPerc;
 }
