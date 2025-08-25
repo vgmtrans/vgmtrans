@@ -46,7 +46,7 @@ public:
   void setChannel(u8 newChannel);
   void tryExpandMidiTracks(uint32_t numTracks);
 
-  bool loadMain() override;  // Function to load all the information about the sequence
+  bool load() override;  // Function to load all the information about the sequence
   virtual bool loadEvents(long stopTime = 1000000);
   MidiFile *convertToMidi(const VGMColl* coll) override;
   MidiTrack *firstMidiTrack() override;

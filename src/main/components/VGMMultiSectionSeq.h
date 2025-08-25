@@ -12,7 +12,7 @@ class VGMMultiSectionSeq : public VGMSeq {
                      std::string name = "VGM Sequence");
 
   void resetVars() override;
-  bool loadMain() override;
+  bool load() override;
 
   void addSection(VGMSeqSection *section);
   bool addLoopForeverNoItem();
