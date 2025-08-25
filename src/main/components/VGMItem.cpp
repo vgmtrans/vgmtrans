@@ -115,6 +115,10 @@ VGMHeader* VGMItem::addHeader(uint32_t offset, uint32_t length, const std::strin
   return header;
 }
 
+void VGMItem::removeChildren() {
+  m_children.clear();
+}
+
 void VGMItem::transferChildren(VGMItem* destination) {
   destination->addChildren(m_children);
   m_children.clear();

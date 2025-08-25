@@ -278,7 +278,7 @@ SF2File::SF2File(SynthFile *synthfile)
       // initialAttenuation
       instGenList.sfGenOper = initialAttenuation;
       u16 atten = static_cast<u16>(std::clamp(
-        std::round((rgn->attenDb + rgn->sampinfo->attenuation) * 10),
+        std::round((rgn->attenDb + rgn->sampinfo->attenuation) * 10.0),
         0.0, 1440.0));
       instGenList.genAmount.wAmount = atten;
       memcpy(igenCk->data + dataPtr, &instGenList, sizeof(sfInstGenList));
