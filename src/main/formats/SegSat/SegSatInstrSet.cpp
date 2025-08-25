@@ -320,7 +320,7 @@ SegSatRgn::SegSatRgn(SegSatInstr* instr, uint32_t offset, const std::string& nam
   addChild(offset + 30, 1, "PEG Index");
   addChild(offset + 31, 1, "PLFO Index");
 
-  // Calculate attenuation, using TL, DISDL, and PAN
+  // Calculate attenuation, using DISDL, and PAN
   double sdlDb = SDLT[m_directLevel];
   PanLinAmp pan = panToAmp(m_directPan);
 

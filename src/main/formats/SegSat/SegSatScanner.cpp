@@ -127,7 +127,7 @@ bool SegSatScanner::validateBankAt(RawFile* file, u32 base) {
   const u16 ptrPlfo  = file->readShortBE(base + 6);
   const u16 ptrInstr0  = file->readShortBE(base + 8);
 
-  // --- Fast rejects on the first four words ---
+  // Fast rejects on the first four words
   // 1) Even alignment is cheap to test and catches lots of junk.
   if ((ptrMixes | ptrVel | ptrPegs | ptrPlfo) & 1) return false;
 
@@ -137,7 +137,7 @@ bool SegSatScanner::validateBankAt(RawFile* file, u32 base) {
   // 2) Strictly increasing (monotonic)
   if (!(ptrMixes < ptrVel && ptrVel < ptrPegs && ptrPegs < ptrPlfo)) return false;
 
-  // 3) Unit-size (“multiple of …”) checks on the first 3 gaps.
+  // 3) Unit-size (“multiple of _”) checks on the first 3 gaps.
   const u32 d0 = static_cast<u32>(ptrVel  ) - ptrMixes;  // vel - mixes
   const u32 d1 = static_cast<u32>(ptrPegs ) - ptrVel;    // pegs - vel
   const u32 d2 = static_cast<u32>(ptrPlfo ) - ptrPegs;   // plfo - pegs
@@ -169,7 +169,7 @@ bool SegSatScanner::validateBankAt(RawFile* file, u32 base) {
   if (instrTblEnd > n) return false;
 
   // Now check the remaining gaps between instruments
-  // Instrument gap rule: (delta % 0x20) == 0x04  ⇒ use bit-test: (delta & 0x1F) == 0x04
+  // Instrument gap rule: (delta % 0x20) == 0x04  -> use bit-test: (delta & 0x1F) == 0x04
   u32 prev = file->readShortBE(base + 8) - 4;
   for (int j = 0; j < numInstrs; ++j) {
     const u16 v = file->readShortBE(base + 8 + j * 2);
@@ -188,7 +188,6 @@ void SegSatScanner::searchForInstrumentSets(RawFile* file) {
 
   for (u32 base = 0; base + 8 <= fileLength; /* increment at bottom */) {
     // Heuristic skip #1: early out on long zero runs.
-    // You already had a version of this; keep it cheap.
     const u32 firstWord = (base + 4 <= fileLength) ? file->readWordBE(base) : 0;
     if (firstWord == 0) { base += 2; continue; }
     if (firstWord <= 0xFF) { base += 1; continue; }
@@ -200,7 +199,7 @@ void SegSatScanner::searchForInstrumentSets(RawFile* file) {
     const u16 ptrVel = (base + 2 + 2 <= fileLength) ? file->readShortBE(base + 2) : 0;
     if (ptrVel <= ptrMixes) { ++base; continue; }
 
-    // Quick check of the next two as well (very cheap, helps a lot)
+    // Quick check that header pointers are monotonic
     const u16 ptrPegs = (base + 4 + 2 <= fileLength) ? file->readShortBE(base + 4) : 0;
     const u16 ptrPlfo = (base + 6 + 2 <= fileLength) ? file->readShortBE(base + 6) : 0;
     const u16 ptrInstr0 = (base + 8 + 2 <= fileLength) ? file->readShortBE(base + 8) : 0;
@@ -216,7 +215,7 @@ void SegSatScanner::searchForInstrumentSets(RawFile* file) {
     const u32 d3 = static_cast<u32>(ptrInstr0) - ptrPlfo;
     if ((d0 % 0x12u) | (d1 % 0x0Au) | (d2 % 0x0Au) | (d3 % 0x04u)) { ++base; continue; }
 
-    // Full validation (reads instrument table lazily and bails early on mismatch)
+    // Full validation (read instrument table lazily and bail early on mismatch)
     if (validateBankAt(file, base)) {
       u32 numInstrs = ((ptrMixes - 8) / 2);
       auto instrSet = new SegSatInstrSet(file, base, numInstrs);
@@ -226,7 +225,7 @@ void SegSatScanner::searchForInstrumentSets(RawFile* file) {
 
       // We can safely skip ahead: the instrument table runs until base + ptrMixes
       // Jumping avoids re-scanning in the middle of a confirmed bank.
-      base += 2; // or: base = std::min(base + ptrMixes, fileLength - 8);
+      base = std::min(base + instrSet->unLength, fileLength - 8);
     } else {
       ++base;
     }
