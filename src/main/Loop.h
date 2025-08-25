@@ -1,6 +1,12 @@
+/*
+ * VGMTrans (c) - 2002-2025
+ * Licensed under the zlib license
+ * See the included LICENSE for more information
+*/
+
 #pragma once
 
-#include <cstdint>
+#include "common.h"
 
 enum LoopMeasure {
   LM_SAMPLES,
@@ -8,16 +14,11 @@ enum LoopMeasure {
 };
 
 
-struct Loop
-{
-  Loop()
-      : loopStatus(-1), loopType(0), loopStartMeasure(LM_BYTES), loopLengthMeasure(LM_BYTES), loopStart(0),
-        loopLength(0) { }
-
-  int loopStatus;
-  uint32_t loopType;
-  uint8_t loopStartMeasure;
-  uint8_t loopLengthMeasure;
-  uint32_t loopStart;
-  uint32_t loopLength;
+struct Loop {
+  int loopStatus       {-1};
+  u32 loopType         {0};
+  u8 loopStartMeasure  {LM_BYTES};
+  u8 loopLengthMeasure {LM_BYTES};
+  u32 loopStart        {0};
+  u32 loopLength       {0};
 };
