@@ -31,7 +31,6 @@ class SegSatSeq:
   u32 m_loopEndPos = -1;
   u32 m_foreverLoopStart = -1;
   u32 m_durationAccumulator = 0;
-  u8 m_volScaleRow[16];
   u8 m_vol[16];
   u8 m_bank[16];
   u8 m_progNum[16];
