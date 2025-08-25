@@ -12,6 +12,7 @@ SegSatSeq::SegSatSeq(RawFile *file, uint32_t offset, std::string name)
     : VGMSeqNoTrks(SegSatFormat::name, file, offset, std::move(name)) {
   setUseLinearAmplitudeScale(false);
   setInitialVolume(0x7F);
+  setInitialExpression(0x7F);
 }
 
 void SegSatSeq::resetVars() {
@@ -21,6 +22,7 @@ void SegSatSeq::resetVars() {
   m_loopEndPos = -1;
   m_foreverLoopStart = -1;
   m_durationAccumulator = 0;
+  memset(m_vol, 0x7F, 16);
 }
 
 void SegSatSeq::useColl(const VGMColl* coll) {
@@ -96,7 +98,7 @@ const SegSatRgn* SegSatSeq::resolveRegion(u8 bank, u8 progNum, u8 noteNum) {
 /// Velocity Level table transformation and accounting for the TL register attenuation behavior.
 /// TODO: account for the region's volume bias value.
 /// The logic is based on the 1.33 version of the driver (circa "95/08/07")
-u8 SegSatSeq::resolveVelocity(u8 vel, const SegSatRgn& rgn) {
+u8 SegSatSeq::resolveVelocity(u8 vel, const SegSatRgn& rgn, u8 ch) {
   u8 vlTableIndex = rgn.vlTableIndex();
   const auto& vlTables = m_collContext.m_vlTables;
   if (vlTableIndex >= vlTables.size())
@@ -152,12 +154,20 @@ u8 SegSatSeq::resolveVelocity(u8 vel, const SegSatRgn& rgn) {
       break;
   }
   newVel = std::clamp<u8>(newVel, 0, 0x7F);
-  // In original logic, rgn.totalLevel() would go where 0 is. We instead apply it as region attenuation
   u32 volScale = (newVel + 1) * (256 - rgn.totalLevel());
   u8 amp = (volScale * ( (0x7F & 0x7F)+1 )*4 - 1) >> 16;
+  // The driver actually performs the following calculation, multiplying channel volume with
+  // the velocity and region total level values. This is unfortunate. It means we can't calculate
+  // volume attenuation independent of these values like in MIDI, and we can't easily adhere to the
+  // driver behavior as volume changes on live notes will break (and each channel is polyphonic,
+  // so any workaround would have to change volume per note). We choose to keep vol/expression
+  // events and lose some volume accuracy.
+  // Note that this version of the driver treats volume and expression events as one and the same.
+  // Later versions treat them as distinct, though details remain unexamined.
+  // u8 amp = (volScale * ( (m_vol[ch] & 0x7F)+1 )*4 - 1) >> 16;
+
   // TODO: add vol bias
   u8 tl = ~std::clamp<u8>(amp, 0, 255);
-
   u8 result = convertDBAttenuationToStdMidiVal(tlToDB(tl));
   return result;
 }
@@ -197,7 +207,7 @@ bool SegSatSeq::readEvent() {
 
     auto* rgn = resolveRegion(0, m_progNum[ch], key);
     if (rgn) {
-      vel = resolveVelocity(vel, *rgn);
+      vel = resolveVelocity(vel, *rgn, ch);
     } else {
       L_WARN("Didn't find an instrument region with key range covering note event at offset: {:X}", beginOffset);
     }
@@ -223,10 +233,14 @@ bool SegSatSeq::readEvent() {
           break;
         case Midi::EXPRESSION_MSB:
         case Midi::VOLUME_MSB: {
-          u8 scsp_tl = (uint8_t)std::max(0, 254 - 2*controllerValue);
+          m_vol[ch] = controllerValue;
+          u8 scsp_tl = (uint8_t)std::max(0, (254 - 2*controllerValue));
+          if (scsp_tl > 0)
+            --scsp_tl;
           double attenDb = tlToDB(scsp_tl);
+
           u8 newVol = convertDBAttenuationToStdMidiVal(attenDb);
-          if (controllerType == Midi::EXPRESSION_MSB) {
+          if (controllerType == Midi::VOLUME_MSB) {
             addVol(beginOffset, curOffset - beginOffset, newVol);
           } else {
             addExpression(beginOffset, curOffset - beginOffset, newVol);
