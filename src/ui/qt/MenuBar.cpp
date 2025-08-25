@@ -8,6 +8,7 @@
 
 #include <QActionGroup>
 #include <QDockWidget>
+#include <vector>
 #include "Options.h"
 #include "Root.h"
 #include "LogManager.h"
@@ -16,6 +17,7 @@
 MenuBar::MenuBar(QWidget *parent, const QList<QDockWidget *> &dockWidgets) : QMenuBar(parent) {
   appendFileMenu();
   appendConversionMenu();
+  appendDetectionMenu();
   appendWindowsMenu(dockWidgets);
   appendInfoMenu();
 }
@@ -71,6 +73,29 @@ void MenuBar::appendConversionMenu() {
   });
 
   options_dropdown->addSeparator();
+}
+
+void MenuBar::appendDetectionMenu() {
+  QMenu *options_dropdown = addMenu("Detection");
+  auto minSizeMenu = options_dropdown->addMenu("Minimum sequence size");
+
+  const int currentSize = Settings::the()->detection.minSequenceSize();
+
+  QActionGroup *sizeGroup = new QActionGroup(this);
+  const std::vector<int> sizes = {0, 0x80, 0x100, 0x200, 0x500, 0x1000};
+  for (int size : sizes) {
+    QString text = size == 0 ? QString("No minimum") :
+                               QString("0x%1 Bytes").arg(size, 0, 16);
+    QAction *act = minSizeMenu->addAction(text);
+    act->setCheckable(true);
+    act->setChecked(currentSize == size);
+    act->setData(size);
+    sizeGroup->addAction(act);
+  }
+
+  connect(sizeGroup, &QActionGroup::triggered, [](const QAction *action) {
+    Settings::the()->detection.setMinSequenceSize(action->data().toInt());
+  });
 }
 
 void MenuBar::appendWindowsMenu(const QList<QDockWidget *> &dockWidgets) {

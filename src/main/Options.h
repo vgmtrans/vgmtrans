@@ -54,6 +54,9 @@ public:
   bool skipChannel10() const { return m_skip_channel_10; }
   void setSkipChannel10(bool should) { m_skip_channel_10 = should; }
 
+  int minSequenceSize() const { return m_min_sequence_size; }
+  void setMinSequenceSize(int size) { m_min_sequence_size = size; }
+
   void load(OptionStore& store) {
     auto g = store.beginGroup("ConversionOptions");
     const int bs = store.getInt("bankSelectStyle", static_cast<int>(BankSelectStyle::GS));
@@ -61,6 +64,7 @@ public:
                                                                 : BankSelectStyle::GS;
     m_sequence_loops = store.getInt("sequenceLoops", 1);
     m_skip_channel_10 = store.getBool("skipChannel10", true);
+    m_min_sequence_size = store.getInt("minSequenceSize", 0);
   }
 
   void save(OptionStore& store) const {
@@ -68,6 +72,7 @@ public:
     store.setInt("bankSelectStyle", static_cast<int>(m_bs_style));
     store.setInt("sequenceLoops",   m_sequence_loops);
     store.setBool("skipChannel10", m_skip_channel_10);
+    store.setInt("minSequenceSize", m_min_sequence_size);
   }
 
 private:
@@ -76,4 +81,5 @@ private:
   BankSelectStyle m_bs_style{BankSelectStyle::GS};
   int m_sequence_loops{1};
   bool m_skip_channel_10{true};
+  int m_min_sequence_size{0};
 };
