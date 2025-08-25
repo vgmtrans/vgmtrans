@@ -70,11 +70,13 @@ AkaoInstrSet::AkaoInstrSet(RawFile *file, uint32_t offset,
 bool AkaoInstrSet::parseInstrPointers() {
   if (bMelInstrs) {
     VGMHeader *SSEQHdr = addHeader(instrSetOff, 0x10, "Instr Ptr Table");
-    int i = 0;
-    //-1 aka 0xFFFF if signed or 0 and past the first pointer value
-    for (int j = instrSetOff; (readShort(j) != static_cast<uint16_t>(-1)) && ((readShort(j) != 0) || i == 0) && i < 16; j += 2) {
-      SSEQHdr->addChild(j, 2, "Instr Pointer");
-      aInstrs.push_back(new AkaoInstr(this, instrSetOff + 0x20 + readShort(j), 0, 1, i++));
+    for (int i = 0; i < 16; ++i) {
+      u32 ptrOff = instrSetOff + (i * 2);
+      u16 instrPtr = readShort(ptrOff);
+      if (instrPtr == 0xFFFF || (instrPtr == 0 && i != 0))
+        continue;
+      SSEQHdr->addChild(ptrOff, 2, "Instr Pointer");
+      aInstrs.push_back(new AkaoInstr(this, instrSetOff + 0x20 + instrPtr, 0, 1, i));
     }
   }
   else if (!custom_instrument_addresses.empty()) {
