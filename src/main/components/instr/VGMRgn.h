@@ -19,8 +19,6 @@ class VGMRgn : public VGMItem {
 
   virtual bool loadRgn() { return true; }
 
-  //VGMArt* addArt(vector<connectionBlock*> connBlocks);
-  //VGMSamp* addSamp(void);
   void setRanges(uint8_t keyLow, uint8_t keyHigh, uint8_t velLow = 0, uint8_t velHigh = 0x7F);
   void setUnityKey(uint8_t unityNote);
   void setSampNum(uint8_t sampNumber);
@@ -47,50 +45,40 @@ class VGMRgn : public VGMItem {
   void addVelHigh(uint8_t velHigh, uint32_t offset, uint32_t length = 1);
   void addSampNum(int sampNum, uint32_t offset, uint32_t length = 1);
   void addADSRValue(uint32_t offset, uint32_t length, const std::string& name);
-  //void setAttack();
-  //void setDelay();
-  //void setSustain();
-  //void setRelease();
 
-  //void SetWaveLinkInfo(uint16_t options, uint16_t phaseGroup, uint32_t theChannel, uint32_t theTableIndex);
-
- public:
+public:
   VGMInstr *parInstr;
-  uint8_t keyLow;
-  uint8_t keyHigh;
-  uint8_t velLow;
-  uint8_t velHigh;
+  u8 keyLow       {0};
+  u8 keyHigh      {0x7F};
+  u8 velLow       {0};
+  u8 velHigh      {0x7F};
 
-  int8_t unityKey;
-  int16_t coarseTune;     // in semitones
-  int16_t fineTune;       // in cents
+  s8 unityKey     {-1};
+  s16 coarseTune  {0};     // in semitones
+  s16 fineTune    {0};     // in cents
 
   Loop loop;
 
-  //uint16_t fusOptions;
-  //uint16_t usPhaseGroup;
-  //uint32_t channel;
-  //uint32_t tableIndex;
+  u32 sampNum     {0};
+  s32 sampOffset  {-1};     //optional value. If a sample offset is provided, then find the sample
+  // number based on this offset. It will match a sample with an identical absolute offset, or
+  // sample's offset relative to the beginning of sample data (VGMSampColl::sampDataOffset)
 
-  uint32_t sampNum;
-  uint32_t sampOffset;        //optional value. If a sample offset is provided, then find the sample number based on this offset.
-  // This is an absolute offset into the SampColl.  It's not necessarily relative to the beginning of the
-  // actual sample data, unless the sample data begins at offset 0.
-  //int sampCollNum;	//optional value. for formats that use multiple sampColls and reference samples base 0 for each sampColl (NDS, for instance)
-  VGMSampColl *sampCollPtr;
+  // For formats that use multiple sampColls and reference samples base 0 for each sampColl (NDS)
+  VGMSampColl *sampCollPtr {nullptr};
 
-  double pan;                 // percentage.  0 = full left. 0.5 = center.  1 = full right
-  double attack_time;         // in seconds
-  uint16_t attack_transform;
-  double hold_time;           // in seconds
-  double decay_time;          // in seconds
-  double sustain_level;       // as a percentage of amplitude
-  double sustain_time;        // in seconds (we don't support positive rate here, as is possible on psx)
-  uint16_t release_transform;
-  double release_time;        // in seconds
+  double pan            {0.5};   // percentage.  0 = full left. 0.5 = center.  1 = full right
+  double attack_time    {0};     // in seconds
+  u16 attack_transform  {no_transform};
+  double hold_time      {0};     // in seconds
+  double decay_time     {0};     // in seconds
+  double sustain_level  {-1};    // as a percentage of amplitude
+  double sustain_time   {0};     // in seconds (we don't support positive rate here, as is possible on psx)
+  u16 release_transform {no_transform};
+  double release_time   {0};     // in seconds
 
 private:
-  double m_attenDb {0};   // attenuation in decibels;
+  double m_attenDb      {0};     // attenuation in decibels;
 };
 
 
@@ -114,7 +102,7 @@ class VGMRgnItem : public VGMItem {
     RIT_VOL,
     RIT_SAMPNUM,
     RIT_ADSR,
-  };        //HIT = Header Item Type
+  };
 
   VGMRgnItem(const VGMRgn *rgn, RgnItemType theType, uint32_t offset, uint32_t length, std::string name);
 
@@ -128,14 +116,3 @@ private:
     }
   }
 };
-
-
-
-/*
-class VGMArt :
-	public VGMItem
-{
-public:
-	VGMArt();
-	~VGMArt();
-};*/
