@@ -109,6 +109,7 @@ public:
   VGMItem* addChild(uint32_t offset, uint32_t length, const std::string &name);
   VGMItem* addUnknownChild(uint32_t offset, uint32_t length);
   VGMHeader* addHeader(uint32_t offset, uint32_t length, const std::string &name = "Header");
+  void removeChildren();
   void transferChildren(VGMItem* destination);
 
   template <std::ranges::input_range Range>

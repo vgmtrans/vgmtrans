@@ -8,6 +8,7 @@
 #include "SeqEvent.h"
 #include "ScaleConversion.h"
 #include "Options.h"
+#include "VGMSeqNoTrks.h"
 #include "helper.h"
 
 //  ********
