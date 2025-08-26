@@ -353,9 +353,6 @@ void MP2kSamp::convertToStdWave(u8 *buf) {
   switch (m_type) {
     case MP2kWaveType::PCM8: {
       readBytes(dataOff, dataLength, buf);
-      for (unsigned int i = 0; i < dataLength; i++) {
-        buf[i] ^= 0x80;
-      }
       break;
     }
 
