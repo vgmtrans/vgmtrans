@@ -33,7 +33,7 @@ jobs:
             target: 'desktop'
             arch: 'clang_64'
 
-      - name: "Install dependencies"
+      - name: "Set environment variables"
         run: |
           echo "BRANCH=$(git rev-parse --abbrev-ref HEAD)" >> $GITHUB_ENV
           echo "/usr/local/bin" >> $GITHUB_PATH
@@ -106,35 +106,49 @@ jobs:
         with:
           submodules: recursive
           show-progress: false
+
       - name: "Set environment variables"
         run: |
           echo "BRANCH=$(git rev-parse --abbrev-ref HEAD)" >> $GITHUB_ENV
+
+      - name: Install Qt
+        uses: jurplel/install-qt-action@v3
+        with:
+          aqtversion: '==3.1.*'
+          version: '6.8.3'
+          host: 'linux'
+          target: 'desktop'
+          arch: 'linux_gcc_64'
+
       - name: "Install dependencies"
         run: |
           wget https://apt.llvm.org/llvm.sh
           chmod +x llvm.sh
-          sudo ./llvm.sh 18
-          sudo add-apt-repository ppa:okirby/qt6-backports
-          sudo apt-get update && sudo apt-get upgrade -y
+          sudo ./llvm.sh 20
+
+          sudo apt-get update
           sudo apt-get install -y --no-install-recommends \
             pkg-config \
-            clang-18 lld-18 ninja-build \
-            qt6-base-dev libqt6svg6-dev libqt6svg6 \
-            qt6-tools-dev qt6-tools-dev-tools libgl1-mesa-dev \
-            libjack-dev libsndfile1-dev libpulse-dev \
+            clang-20 lld-20 \
+            ninja-build \
             fuse
           echo 'export PATH="/usr/local/opt/llvm/bin:$PATH"' >> ~/.bash_profile
+
       - name: "Prepare build"
         run: |
           export LDFLAGS="-L/usr/local/opt/llvm/lib"
-          export CPPFLAGS="-I/usr/local/opt/llvm/include -fuse-ld=lld"
-          export CC=clang-18
-          export CXX=clang++-18
+          export CFLAGS="-I/usr/local/opt/llvm/include -fuse-ld=lld"
+          export CXXFLAGS="-I/usr/local/opt/llvm/include -fuse-ld=lld"
+
+          export CC=clang-20
+          export CXX=clang++-20
           cmake --preset linux-x64 \
             -G "Ninja Multi-Config" \
             -DCMAKE_INSTALL_PREFIX=/usr
+
       - name: "Build project"
         run: cmake --build --preset linux-x64-release
+
       - name: "Run install target"
         run: |
           export DESTDIR=appdir
@@ -143,24 +157,30 @@ jobs:
         working-directory: "build/linux-x64"
         run: |
           echo "Creating AppDir structure for AppImage"
+
           find appdir/
           mkdir -p appdir/usr/share
+
           cp ${{ github.workspace }}/bin/mame_roms.xml appdir/usr/bin
           cp ${{ github.workspace }}/src/ui/qt/resources/VGMTrans.desktop appdir/usr/share
           cp ${{ github.workspace }}/src/ui/qt/resources/vgmtrans.png appdir/
+
           mkdir -p appdir/usr/lib
           cp ${{ github.workspace }}/lib/bass/*.so appdir/usr/lib/
+
           echo "Downloading linuxdeployqt"
           wget -c -nv "https://github.com/probonopd/linuxdeployqt/releases/download/continuous/linuxdeployqt-continuous-x86_64.AppImage"
           chmod a+x linuxdeployqt-continuous-x86_64.AppImage
+
           echo "Creating AppImage"
           ./linuxdeployqt-continuous-x86_64.AppImage appdir/usr/share/VGMTrans.desktop \
             -executable=appdir/usr/lib/libbass.so -executable=appdir/usr/lib/libbassmidi.so \
             -appimage -extra-plugins=platforms/,platformthemes/ \
-            -qmake=/usr/lib/qt6/bin/qmake6 \
             -verbose=10
+
           mkdir -p appdir/usr/share/licenses/VGMTrans
           cp ${{ github.workspace }}/LICENSE appdir/usr/share/licenses/VGMTrans/
+
           mv VGMTrans*.AppImage VGMTrans.AppImage
       - name: Generate artifact attestation
         uses: actions/attest-build-provenance@v2
