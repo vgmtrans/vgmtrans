@@ -373,10 +373,6 @@ void NDSSamp::convertToStdWave(uint8_t *buf) {
     convertImaAdpcm(buf);
   } else if (waveType == PCM8) {
     readBytes(dataOff, dataLength, buf);
-    // convert every byte from signed to unsigned value
-    // since the WAV standard has PCM8 unsigned and PCM16 signed
-    for (unsigned int i = 0; i < dataLength; i++)
-      buf[i] ^= 0x80;
   } else {
     readBytes(dataOff, dataLength, buf);
   }
