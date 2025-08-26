@@ -16,8 +16,8 @@
 
 MenuBar::MenuBar(QWidget *parent, const QList<QDockWidget *> &dockWidgets) : QMenuBar(parent) {
   appendFileMenu();
-  appendConversionMenu();
   appendDetectionMenu();
+  appendConversionMenu();
   appendWindowsMenu(dockWidgets);
   appendInfoMenu();
 }
@@ -85,7 +85,7 @@ void MenuBar::appendDetectionMenu() {
   const std::vector<int> sizes = {0, 0x80, 0x100, 0x200, 0x500, 0x1000};
   for (int size : sizes) {
     QString text = size == 0 ? QString("No minimum") :
-                               QString("0x%1 Bytes").arg(size, 0, 16);
+                               QString("0x%1 bytes").arg(size, 0, 16);
     QAction *act = minSizeMenu->addAction(text);
     act->setCheckable(true);
     act->setChecked(currentSize == size);
