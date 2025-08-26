@@ -23,28 +23,44 @@ jobs:
         with:
           submodules: recursive
           show-progress: false
+
+      - name: Install Qt
+        uses: jurplel/install-qt-action@v3
+        with:
+            aqtversion: '==3.1.*'
+            version: '6.8.3'
+            host: 'mac'
+            target: 'desktop'
+            arch: 'clang_64'
+
       - name: "Install dependencies"
         run: |
-          brew install -f --overwrite qt@6
           echo "BRANCH=$(git rev-parse --abbrev-ref HEAD)" >> $GITHUB_ENV
           echo "/usr/local/bin" >> $GITHUB_PATH
+
       - name: "Prepare build"
         run: cmake --preset "macos-${{ matrix.target }}"
+
       - name: "Build project"
         # $(sysctl -n hw.logicalcpu) is required to not make XCode spawn infinite threads...
-        run: cmake --build --preset "macos-${{ matrix.target }}-release" --parallel $(sysctl -n hw.logicalcpu) --target vgmtrans
+        run: cmake --build --preset "macos-${{ matrix.target }}-release" \
+          --parallel $(sysctl -n hw.logicalcpu) \
+          --target vgmtrans
+
       - name: "Package DMG (macOS)"
         working-directory: "build/macos-${{ matrix.target }}/"
         run: |
-          ${{ env.HOMEBREW_PREFIX }}/bin/macdeployqt \
+          macdeployqt \
             bin/VGMTrans.app \
             -verbose=3 -always-overwrite -appstore-compliant
+
       - name: "Checkout create-dmg"
         uses: actions/checkout@v4
         with:
           repository: create-dmg/create-dmg
           path: "./build/macos-${{ matrix.target }}/create-dmg"
           ref: master
+
       - name: Build macOS DMG
         shell: bash
         working-directory: "build/macos-${{ matrix.target }}/"
@@ -69,13 +85,15 @@ jobs:
         uses: actions/attest-build-provenance@v2
         if: ${{ github.event_name != 'pull_request' }}
         with:
-          subject-name: VGMTrans-${{ github.sha }}-${{ env.GITHUB_REF_NAME }}-${{ matrix.target }}-${{ runner.os }}
+          subject-name: VGMTrans-${{ github.sha }}-${{ env.BRANCH }}-${{ matrix.target }}-${{ runner.os }}
           subject-path: "build/macos-${{ matrix.target }}/bin/VGMTrans-${{ github.sha }}.dmg"
+
       - name: "Upload artifact"
         uses: actions/upload-artifact@v4
         with:
-          name: VGMTrans-${{ github.sha }}-${{ env.GITHUB_REF_NAME }}-${{ matrix.target }}-${{ runner.os }}.dmg
+          name: VGMTrans-${{ github.sha }}-${{ env.BRANCH }}-${{ matrix.target }}-${{ runner.os }}.dmg
           path: "build/macos-${{ matrix.target }}/bin/VGMTrans-${{ github.sha }}.dmg"
+          
   linux:
     runs-on: ubuntu-22.04
     name: Linux, x64
