@@ -26,7 +26,7 @@ void VGMSeqNoTrks::resetVars() {
 }
 
 // LoadMain() - loads all sequence data into the class
-bool VGMSeqNoTrks::loadMain() {
+bool VGMSeqNoTrks::load() {
   this->SeqTrack::readMode = READMODE_ADD_TO_UI;
   this->VGMSeq::readMode = READMODE_ADD_TO_UI;
   if (!parseHeader())

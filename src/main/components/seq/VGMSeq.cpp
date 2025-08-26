@@ -66,10 +66,6 @@ bool VGMSeq::loadVGMFile() {
   return true;
 }
 
-bool VGMSeq::load() {
-  return loadMain();
-}
-
 MidiFile *VGMSeq::convertToMidi(const VGMColl* coll) {
   size_t numTracks = aTracks.size();
 
@@ -99,8 +95,7 @@ MidiTrack *VGMSeq::firstMidiTrack() {
   return aTracks.empty() ? nullptr : aTracks[0]->pMidiTrack;
 }
 
-// Load() - Function to load all the sequence data into the class
-bool VGMSeq::loadMain() {
+bool VGMSeq::load() {
   readMode = READMODE_ADD_TO_UI;
 
   if (!parseHeader())

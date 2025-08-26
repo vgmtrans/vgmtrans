@@ -24,7 +24,7 @@ void VGMMultiSectionSeq::resetVars() {
   foreverLoops = 0;
 }
 
-bool VGMMultiSectionSeq::loadMain() {
+bool VGMMultiSectionSeq::load() {
   readMode = READMODE_ADD_TO_UI;
 
   if (!parseHeader())
