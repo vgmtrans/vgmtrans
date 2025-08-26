@@ -18,18 +18,22 @@
         {
             "name": "win-x64",
             "inherits": "windows-base",
-            "displayName": "Windows x64",
-            "description": "Build VGMTrans for Windows x64",
+            "displayName": "Windows x64 (MSVC)",
+            "description": "Build VGMTrans for Windows x64 using MSVC",
             "architecture": {
                 "value": "x64",
                 "strategy": "external"
+            },
+            "cacheVariables": {
+              "WITH_AVX512": false,
+              "WITH_AVX2": false
             }
         },
         {
             "name": "win-arm64",
             "inherits": "windows-base",
-            "displayName": "Windows ARM64",
-            "description": "Build VGMTrans for Windows ARM64",
+            "displayName": "Windows ARM64 (MSVC)",
+            "description": "Build VGMTrans for Windows ARM64 using MSVC",
             "architecture": {
                 "value": "arm64",
                 "strategy": "external"
@@ -37,6 +41,22 @@
             "cacheVariables": {
                 "ENABLE_UI_QT": false
             }
+        },
+        {
+          "name": "win-x64-clang",
+          "inherits": "windows-base",
+          "displayName": "Windows x64 (Clang)",
+          "description": "Build VGMTrans for Windows x64 using Clang",
+          "environment": {
+            "CXXFLAGS": "$penv{CXXFLAGS} -fuse-ld=lld --target=x86_64-pc-windows-msvc"
+          },
+          "cacheVariables": {
+            "CMAKE_C_COMPILER": "clang-cl.exe",
+            "CMAKE_CXX_COMPILER": "clang-cl.exe",
+            "WITH_LZMA_ASM": false,
+            "WITH_AVX512": false,
+            "WITH_AVX2": false
+          }
         },
         {
             "name": "macos-base",
@@ -102,6 +122,18 @@
             "name": "win-x64-release",
             "displayName": "Windows x64, Release",
             "configurePreset": "win-x64",
+            "configuration": "Release"
+        },
+        {
+            "name": "win-x64-clang-debug",
+            "displayName": "Windows x64, Debug (Clang)",
+            "configurePreset": "win-x64-clang",
+            "configuration": "Debug"
+        },
+        {
+            "name": "win-x64-clang-release",
+            "displayName": "Windows x64, Release (Clang)",
+            "configurePreset": "win-x64-clang",
             "configuration": "Release"
         },
         {
