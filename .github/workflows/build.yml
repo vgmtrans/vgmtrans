@@ -159,7 +159,7 @@ jobs:
     runs-on: windows-2022
     strategy:
       matrix:
-        target: ['x64']
+        target: ['x64', 'x64-clang']
     permissions:
       id-token: write
       contents: read
@@ -172,6 +172,7 @@ jobs:
           show-progress: false
 
        - name: "Source vcvars for ${{ matrix.target }}"
+         if: ${{ !contains(matrix.target, '-clang') }}
          uses: ilammy/msvc-dev-cmd@v1
          with:
             arch: ${{ matrix.target != 'x64' && (format('{0}_{1}', 'amd64', matrix.target)) || matrix.target }}
