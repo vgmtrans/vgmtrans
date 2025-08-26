@@ -74,6 +74,7 @@ bool NDSInstr::loadInstr() {
       VGMRgn *rgn = addRgn(dwOffset, 10, readShort(dwOffset));
       getSampCollPtr(rgn, readShort(dwOffset + 2));
       getArticData(rgn, dwOffset + 4);
+      rgn->addChild(dwOffset + 2, 2, "Sample Collection Index");
       break;
     }
 
@@ -115,10 +116,13 @@ bool NDSInstr::loadInstr() {
       uint8_t highKey = readByte(dwOffset + 1);
       uint8_t nRgns = (highKey - lowKey) + 1;
       for (uint8_t i = 0; i < nRgns; i++) {
-        VGMRgn *rgn = addRgn(dwOffset + 2 + i * 12, 12, readShort(dwOffset + 2 + 2 + i * 12),
+        u32 rgnOff = dwOffset + 2 + i * 12;
+        VGMRgn *rgn = addRgn(rgnOff, 12, readShort(rgnOff + 2),
                              lowKey + i, lowKey + i);
-        getSampCollPtr(rgn, readShort(dwOffset + 2 + (i * 12) + 4));
-        getArticData(rgn, dwOffset + 2 + 6 + i * 12);
+        getSampCollPtr(rgn, readShort(rgnOff + 4));
+        getArticData(rgn, rgnOff + 6);
+        rgn->addChild(rgnOff + 2, 2, "Sample Num");
+        rgn->addChild(rgnOff + 4, 2, "Sample Collection Index");
       }
       unLength = 2 + nRgns * 12;
 
@@ -136,13 +140,16 @@ bool NDSInstr::loadInstr() {
         } else {
           break;
         }
+        addChild(dwOffset + i, 1, "Key Range");
       }
 
       for (int i = 0; i < nRgns; i++) {
-        VGMRgn *rgn = addRgn(dwOffset + 8 + i * 12, 12, readShort(dwOffset + 8 + i * 12 + 2),
+        u32 rgnOff = dwOffset + 8 + i * 12;
+        VGMRgn *rgn = addRgn(rgnOff, 12, readShort(rgnOff + 2),
                              (i == 0) ? 0 : keyRanges[i - 1] + 1, keyRanges[i]);
-        getSampCollPtr(rgn, readShort(dwOffset + 8 + (i * 12) + 4));
-        getArticData(rgn, dwOffset + 8 + i * 12 + 6);
+        getSampCollPtr(rgn, readShort(rgnOff + 4));
+        getArticData(rgn, rgnOff + 6);
+        addChild(rgnOff + 4, 2, "Sample Collection Index");
       }
       unLength = nRgns * 12 + 8;
 
@@ -178,12 +185,19 @@ void NDSInstr::getArticData(VGMRgn *rgn, uint32_t offset) const {
       0xFFE7, 0xFFE9, 0xFFEA, 0xFFEC, 0xFFED, 0xFFEF, 0xFFF0, 0xFFF2, 0xFFF3, 0xFFF5, 0xFFF6,
       0xFFF8, 0xFFF9, 0xFFFA, 0xFFFC, 0xFFFD, 0xFFFF, 0x0000};
 
-  rgn->setUnityKey(readByte(offset++));
-  uint8_t AttackTime = readByte(offset++);
-  uint8_t DecayTime = readByte(offset++);
-  uint8_t SustainLev = readByte(offset++);
-  uint8_t ReleaseTime = readByte(offset++);
-  uint8_t Pan = readByte(offset++);
+
+  rgn->addUnityKey(readByte(offset), offset, 1);
+  uint8_t AttackTime = readByte(offset + 1);
+  uint8_t DecayTime = readByte(offset + 2);
+  uint8_t SustainLev = readByte(offset + 3);
+  uint8_t ReleaseTime = readByte(offset + 4);
+  uint8_t Pan = readByte(offset + 5);
+
+  rgn->addADSRValue(offset + 1, 1, "Attack Rate");
+  rgn->addADSRValue(offset + 2, 1, "Decay Rate");
+  rgn->addADSRValue(offset + 3, 1, "Sustain Level");
+  rgn->addADSRValue(offset + 4, 1, "Release Time");
+  rgn->addChild(offset + 5, 1, "Pan");
 
   if (AttackTime >= 0x6D)
     realAttack = AttackTimeTable[0x7F - AttackTime];
