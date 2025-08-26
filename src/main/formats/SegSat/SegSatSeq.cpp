@@ -28,6 +28,7 @@ void SegSatSeq::resetVars() {
   m_foreverLoopStart = -1;
   m_durationAccumulator = 0;
   memset(m_vol, 0x7F, 16);
+  memset(m_progNum, 0, 16);
 }
 
 void SegSatSeq::useColl(const VGMColl* coll) {
