@@ -13,8 +13,9 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
   endif()
 endif()
 
-if(NOT Qt6_DIR AND CMAKE_SYSTEM_NAME STREQUAL "Windows")
-  message(STATUS "Using vendored Qt6")
+find_package(Qt6 COMPONENTS Core Gui Widgets Svg)
+if(NOT Qt6_FOUND AND CMAKE_SYSTEM_NAME STREQUAL "Windows")
+  message(STATUS "Qt6 could not be found, falling back to vendored Qt6")
   set(Qt6_DIR
       "${CMAKE_SOURCE_DIR}/lib/vgmtrans-ext-win/qt6.6.1-x86_64-pc-windows-msvc/lib/cmake/Qt6"
   )
@@ -26,7 +27,6 @@ if(NOT Qt6_DIR AND CMAKE_SYSTEM_NAME STREQUAL "Windows")
   endif()
 endif()
 
-find_package(Qt6 REQUIRED COMPONENTS Core Gui Widgets Svg)
 message(STATUS "Using Qt ${Qt6_VERSION}")
 
 # ~~~
