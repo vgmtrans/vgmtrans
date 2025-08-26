@@ -15,7 +15,8 @@
 
 MenuBar::MenuBar(QWidget *parent, const QList<QDockWidget *> &dockWidgets) : QMenuBar(parent) {
   appendFileMenu();
-  appendOptionsMenu(dockWidgets);
+  appendConversionMenu();
+  appendWindowsMenu(dockWidgets);
   appendInfoMenu();
 }
 
@@ -32,8 +33,8 @@ void MenuBar::appendFileMenu() {
   connect(menu_app_exit, &QAction::triggered, this, &MenuBar::exit);
 }
 
-void MenuBar::appendOptionsMenu(const QList<QDockWidget *> &dockWidgets) {
-  QMenu *options_dropdown = addMenu("Options");
+void MenuBar::appendConversionMenu() {
+  QMenu *options_dropdown = addMenu("Conversion");
   auto bs = options_dropdown->addMenu("Bank select style");
 
   auto bankSelectStyle = Settings::the()->conversion.bankSelectStyle();
@@ -66,15 +67,20 @@ void MenuBar::appendOptionsMenu(const QList<QDockWidget *> &dockWidgets) {
 [](bool skip) {
   if (!skip)
     pRoot->UI_toast("Tracks using MIDI channel 10 will be silent during in-app playback.", ToastType::Info);
-  Settings::the()->conversion.setSkipChannel10(skip);
-});
+    Settings::the()->conversion.setSkipChannel10(skip);
+  });
 
   options_dropdown->addSeparator();
+}
+
+void MenuBar::appendWindowsMenu(const QList<QDockWidget *> &dockWidgets) {
+  QMenu *windowsDropdown = addMenu("Windows");
 
   for (auto &widget : dockWidgets) {
-    options_dropdown->addAction(widget->toggleViewAction());
+    windowsDropdown->addAction(widget->toggleViewAction());
   }
 }
+
 
 void MenuBar::appendInfoMenu() {
   QMenu *info_dropdown = addMenu("Help");
