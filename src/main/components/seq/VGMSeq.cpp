@@ -95,7 +95,6 @@ MidiTrack *VGMSeq::firstMidiTrack() {
   return aTracks.empty() ? nullptr : aTracks[0]->pMidiTrack;
 }
 
-// Load() - Function to load all the sequence data into the class
 bool VGMSeq::load() {
   readMode = READMODE_ADD_TO_UI;
 
