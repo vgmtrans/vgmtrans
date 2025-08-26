@@ -13,26 +13,8 @@
 
 VGMRgn::VGMRgn(VGMInstr *instr, uint32_t offset, uint32_t length, std::string name)
     : VGMItem(instr->parInstrSet, offset, length, std::move(name)),
-      parInstr(instr),
-      keyLow(0),
-      keyHigh(0x7F),
-      velLow(0),
-      velHigh(0x7F),
-      unityKey(-1),
-      fineTune(0),
-      sampNum(0),
-      sampOffset(-1),
-      sampCollPtr(nullptr),
-      pan(0.5),
-      attack_time(0),
-      attack_transform(no_transform),
-      hold_time(0),
-      decay_time(0),
-      sustain_level(-1),
-      sustain_time(0),
-      release_transform(no_transform),
-      release_time(0) {
-}
+      parInstr(instr)
+{}
 
 VGMRgn::VGMRgn(VGMInstr *instr, uint32_t offset, uint32_t length, uint8_t theKeyLow, uint8_t theKeyHigh,
                uint8_t theVelLow, uint8_t theVelHigh, int theSampNum, std::string name)
@@ -42,21 +24,8 @@ VGMRgn::VGMRgn(VGMInstr *instr, uint32_t offset, uint32_t length, uint8_t theKey
       keyHigh(theKeyHigh),
       velLow(theVelLow),
       velHigh(theVelHigh),
-      unityKey(-1),
-      fineTune(0),
-      sampNum(theSampNum),
-      sampOffset(-1),
-      sampCollPtr(nullptr),
-      pan(0.5),
-      attack_time(0),
-      attack_transform(no_transform),
-      hold_time(0),
-      decay_time(0),
-      sustain_level(-1),
-      sustain_time(0),
-      release_transform(no_transform),
-      release_time(0) {
-}
+      sampNum(theSampNum)
+{}
 
 void VGMRgn::setRanges(uint8_t theKeyLow, uint8_t theKeyHigh, uint8_t theVelLow, uint8_t theVelHigh) {
   keyLow = theKeyLow;
