@@ -2,7 +2,7 @@
 #include "AkaoSeq.h"
 #include "AkaoInstr.h"
 
-bool isPsxPSFFile(RawFile* file) {
+bool isPsfFile(RawFile* file) {
   return file->extension() == "psf" ||
          file->extension() == "minipsf" ||
          file->extension() == "psflib";
@@ -24,7 +24,7 @@ void AkaoMatcher::onFinishedScan(RawFile* rawfile) {
 
   // We assume psf files contain all of the files necessary to form a collection. Therefore, we
   // treat each one as a one-off and remove all of its detected files from future match consideration.
-  if (isPsxPSFFile(rawfile)) {
+  if (isPsfFile(rawfile)) {
     auto eraseByRawFile = [rawfile](auto& map) {
       std::erase_if(map, [rawfile](const auto& pair) {
           return pair.second->rawFile() == rawfile;
@@ -101,7 +101,7 @@ bool AkaoMatcher::tryCreateCollection(int id) {
         sampCollsToCheck.push_back(*it);
       } else {
         // PSF files may optimize out the IDs, so be lenient
-        if (isPsxPSFFile(seq->rawFile()))
+        if (isPsfFile(seq->rawFile()))
           return false;
       }
     }
