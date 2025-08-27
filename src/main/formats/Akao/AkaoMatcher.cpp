@@ -2,12 +2,12 @@
 #include "AkaoSeq.h"
 #include "AkaoInstr.h"
 
-void AkaoMatcher::onFinishedScan(RawFile* rawfile) {
-  // psflib files are loaded recursively with psf files. We want to scan the psflib and the psf
-  // files together as if they're one file, so ignore this callback and wait for the psf to finish.
-  if (rawfile->extension() == "psflib")
-    return;
+bool isPsxPSFFile(RawFile* file) {
+  // Signature of a playstation psf or psflib file is ASCII "PSF" + 0x01
+  return file->readWordBE(0) == 0x50534601;
+}
 
+void AkaoMatcher::onFinishedScan(RawFile* rawfile) {
   std::vector<int> keys;
   keys.reserve(seqs.size());
   for (const auto& pair : seqs) {
@@ -23,7 +23,7 @@ void AkaoMatcher::onFinishedScan(RawFile* rawfile) {
 
   // We assume psf files contain all of the files necessary to form a collection. Therefore, we
   // treat each one as a one-off and remove all of its detected files from future match consideration.
-  if (rawfile->extension() == "psf" || rawfile->extension() == "minipsf") {
+  if (isPsxPSFFile(rawfile)) {
     auto eraseByRawFile = [rawfile](auto& map) {
       std::erase_if(map, [rawfile](const auto& pair) {
           return pair.second->rawFile() == rawfile;
@@ -100,10 +100,8 @@ bool AkaoMatcher::tryCreateCollection(int id) {
         sampCollsToCheck.push_back(*it);
       } else {
         // PSF files may optimize out the IDs, so be lenient
-        auto extension = seq->rawFile()->extension();
-        if (extension != "psf" && extension != "minipsf") {
+        if (isPsxPSFFile(seq->rawFile()))
           return false;
-        }
       }
     }
     // Add the rest of the sample collections that are not already in sampCollsToCheck.
