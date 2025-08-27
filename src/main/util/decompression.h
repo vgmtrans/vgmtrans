@@ -12,8 +12,8 @@
 #include <array>
 
 template <typename T>
-std::vector<char> zdecompress(T src) {
-  std::vector<char> result;
+std::vector<unsigned char> zdecompress(T src) {
+  std::vector<unsigned char> result;
 
   /* allocate inflate state */
   z_stream strm;
@@ -32,7 +32,7 @@ std::vector<char> zdecompress(T src) {
 
   unsigned actual_size = 0;
   constexpr int CHUNK = 4096;
-  std::array<char, CHUNK> out;
+  std::array<unsigned char, CHUNK> out;
   do {
     strm.avail_out = CHUNK;
     strm.next_out = reinterpret_cast<Bytef *>(out.data());

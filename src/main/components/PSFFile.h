@@ -26,12 +26,11 @@ class PSFFile {
 
     [[nodiscard]] uint8_t version() const noexcept { return m_version; }
     [[nodiscard]] const std::map<std::string, std::string> &tags() const noexcept { return m_tags; }
-    [[nodiscard]] const std::vector<char> &exe() const noexcept { return m_exe_data; }
-    [[nodiscard]] const std::vector<char> &reservedSection() const noexcept { return m_reserved_data; }
+    [[nodiscard]] const std::vector<unsigned char> &exe() const noexcept { return m_exe_data; }
+    [[nodiscard]] const std::vector<unsigned char> &reservedSection() const noexcept { return m_reserved_data; }
 
-    template <typename T>
-    T getExe(size_t ind) const {
-        assert(ind + sizeof(T) < m_exe_data.size());
+    template <typename T> T getExe(size_t ind) const {
+        assert(ind + sizeof(T) <= m_exe_data.size());
 
         T value = 0;
         for (size_t i = 0; i < sizeof(T); i++) {
@@ -43,7 +42,7 @@ class PSFFile {
 
     template <typename T>
     T getRes(size_t ind) const {
-        assert(ind + sizeof(T) < m_reserved_data.size());
+        assert(ind + sizeof(T) <= m_reserved_data.size());
 
         T value = 0;
         for (size_t i = 0; i < sizeof(T); i++) {
@@ -56,8 +55,8 @@ class PSFFile {
    private:
     uint8_t m_version;
     uint32_t m_exe_CRC;
-    std::vector<char> m_exe_data;
-    std::vector<char> m_reserved_data;
+    std::vector<unsigned char> m_exe_data;
+    std::vector<unsigned char> m_reserved_data;
     std::map<std::string, std::string> m_tags;
 
     void parseTags(std::span<const char> data);
