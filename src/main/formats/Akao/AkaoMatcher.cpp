@@ -3,8 +3,9 @@
 #include "AkaoInstr.h"
 
 bool isPsxPSFFile(RawFile* file) {
-  // Signature of a playstation psf or psflib file is ASCII "PSF" + 0x01
-  return file->readWordBE(0) == 0x50534601;
+  return file->extension() == "psf" ||
+         file->extension() == "minipsf" ||
+         file->extension() == "psflib";
 }
 
 void AkaoMatcher::onFinishedScan(RawFile* rawfile) {
