@@ -8,6 +8,7 @@
 #include "VGMFile.h"
 #include "RawFile.h"
 #include "MidiFile.h"
+#include <set>
 
 class SeqTrack;
 class SeqEvent;
@@ -43,6 +44,8 @@ class VGMSeq : public VGMFile {
   [[nodiscard]] uint16_t ppqn() const;
   // void setTimeSignature(uint8_t numer, denom);
   void addInstrumentRef(uint32_t progNum);
+  void addBankReference(uint16_t bank);
+  [[nodiscard]] const std::set<uint16_t>& referencedBanks() const;
 
   void useReverb() { m_use_reverb = true; }
 
@@ -146,6 +149,8 @@ private:
   std::vector<ISeqSlider *> aSliders;
 
 private:
+  std::set<uint16_t> m_referencedBanks;
+
   uint16_t m_ppqn;
 
   uint8_t m_initial_volume;
