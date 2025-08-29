@@ -295,6 +295,7 @@ void VGMSeq::resetVars() {
 
   if (readMode == READMODE_ADD_TO_UI) {
     aInstrumentsUsed.clear();
+    m_referencedBanks.clear();
   }
 }
 
@@ -313,6 +314,14 @@ void VGMSeq::addInstrumentRef(uint32_t progNum) {
   if (std::ranges::find(aInstrumentsUsed, progNum) == aInstrumentsUsed.end()) {
     aInstrumentsUsed.push_back(progNum);
   }
+}
+
+void VGMSeq::addBankReference(uint16_t bank) {
+  m_referencedBanks.insert(bank);
+}
+
+const std::set<uint16_t>& VGMSeq::referencedBanks() const {
+  return m_referencedBanks;
 }
 
 bool VGMSeq::saveAsMidi(const std::string &filepath, const VGMColl* coll) {

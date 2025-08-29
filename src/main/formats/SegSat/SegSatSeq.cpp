@@ -258,7 +258,10 @@ bool SegSatSeq::readEvent() {
           break;
         case Midi::BANK_SELECT_LSB:
           m_bank[ch] = controllerValue;
-          addBankSelect(beginOffset, curOffset - beginOffset, m_bank[ch]);
+          // Skip bank select during MIDI conversion if the seq uses only a single bank
+          if (VGMSeq::readMode == READMODE_ADD_TO_UI || parentSeq->referencedBanks().size() > 1) {
+            addBankSelect(beginOffset, curOffset - beginOffset, m_bank[ch]);
+          }
           break;
         case Midi::SUSTAIN_SWITCH:
           addSustainEvent(beginOffset, curOffset - beginOffset, controllerValue);

@@ -70,6 +70,7 @@ public:
 
   virtual bool parseHeader();
   virtual bool parseInstrPointers();
+  void assignBankNumber(u8 bankNum);
   std::vector<SegSatMixerTable> mixerTables() { return m_mixerTables; }
   std::vector<SegSatVLTable> vlTables() { return  m_vlTables; }
   std::vector<SegSatPlfoTable> plfoTables() { return  m_plfoTables; }
@@ -127,6 +128,7 @@ public:
   SegSatRgn(SegSatInstr* instr, uint32_t offset, const std::string& name);
   ~SegSatRgn() = default;
 
+  bool isRegionValid();
   u32 sampleLoopStart() const { return m_sampLoopStart; }
   u32 sampleLoopEnd() const { return m_sampLoopEnd; }
   u32 sampleLoopLength() const { return m_sampLoopEnd - m_sampLoopStart; }

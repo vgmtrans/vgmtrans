@@ -1367,6 +1367,7 @@ void SeqTrack::addBankSelect(uint32_t offset, uint32_t length, uint8_t bank, con
   onEvent(offset, length);
 
   if (readMode == READMODE_ADD_TO_UI) {
+    parentSeq->addBankReference(bank);
     addEvent(new BankSelectSeqEvent(this, bank, offset, length, sEventName));
   }
   addBankSelectNoItem(bank);

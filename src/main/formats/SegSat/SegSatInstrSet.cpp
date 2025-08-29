@@ -138,6 +138,12 @@ bool SegSatInstrSet::parseInstrPointers() {
   return true;
 }
 
+void SegSatInstrSet::assignBankNumber(u8 bankNum) {
+  for (auto instr : aInstrs) {
+    instr->bank = bankNum;
+  }
+}
+
 
 // ***********
 // SegSatInstr
@@ -159,9 +165,17 @@ bool SegSatInstr::loadInstr() {
 
   auto sampColl = parInstrSet->sampColl;
   for (int i = 0; i < numRgns; ++i) {
+    u32 rgnOff = dwOffset + 4 + (i * 0x20);
+    // Validate region data
+    // if (readByte(rgnOff) == 0xFF)
+      // break;
     // Add region
     auto name = fmt::format("Region {:d}", i);
-    auto rgn = new SegSatRgn(this, dwOffset + 4 + (i * 0x20), name);
+    auto rgn = new SegSatRgn(this, rgnOff, name);
+    if (!rgn->isRegionValid()) {
+      delete rgn;
+      continue;
+    }
     addRgn(rgn);
 
     // Add sample
@@ -258,7 +272,7 @@ SegSatRgn::SegSatRgn(SegSatInstr* instr, uint32_t offset, const std::string& nam
   release_time = DRTimes[m_releaseRate * 2] / 1000.0;
   double decay2Time = DRTimes[m_decayRate2 * 2] / 1000.0;
 
-  if ((decay_time < 0.5 && sustain_level > 0.7) && decay2Time < 88600) {
+  if (((decay_time < 0.5 && sustain_level > 0.7) || sustain_level == 1.0) && decay2Time < 88600) {
     decay_time = decay2Time;
     sustain_level = 0;
   }
@@ -331,3 +345,13 @@ SegSatRgn::SegSatRgn(SegSatInstr* instr, uint32_t offset, const std::string& nam
   setAttenuation(finalAtten);
   this->pan = panPerc;
 }
+
+bool SegSatRgn::isRegionValid() {
+  if (keyLow == 0xFF) return false;
+  if (keyLow > keyHigh) return false;
+  u32 instrSetOffset = parInstr->parInstrSet->dwOffset;
+  if (sampOffset == instrSetOffset) return false;
+  if (sampOffset >= instrSetOffset + 0x7FFFE) return false;
+  return true;
+}
+
