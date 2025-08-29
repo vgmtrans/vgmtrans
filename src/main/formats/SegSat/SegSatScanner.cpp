@@ -8,12 +8,18 @@
 #include "SegSatSeq.h"
 #include "ScannerManager.h"
 #include "SegSatInstrSet.h"
+#include "VGMColl.h"
 #include "VGMMiscFile.h"
-
 #include <array>
 
 namespace vgmtrans::scanners {
 ScannerRegistration<SegSatScanner> s_segsat("SegSat");
+}
+
+bool isSsfFile(RawFile* file) {
+  return file->extension() == "ssf" ||
+         file->extension() == "minissf" ||
+         file->extension() == "ssflib";
 }
 
 std::array<u8, 4> uint32ToBytes(u32 num) {
@@ -26,16 +32,73 @@ std::array<u8, 4> uint32ToBytes(u32 num) {
 }
 
 void SegSatScanner::scan(RawFile *file, void *info) {
-  searchForSequences(file);
-  searchForInstrumentSets(file);
+  auto extension = file->extension();
+  if (isSsfFile(file)) {
+    auto instrSets = searchForInstrumentSets(file, false);
+
+    std::map<u8, SegSatInstrSet*> banks;
+    if (instrSets.size() > 1) {
+      for (u32 i = 0x500; i < 0x600; i+= 8) {
+        u32 bankNumAndPtr = file->readWordBE(i);
+        // The 4 bytes after offset are bank size, but we don't use it
+        u8 bankNum = bankNumAndPtr >> 24;
+        u32 bankPtr = bankNumAndPtr & 0x00FFFFFF;
+        if (bankNum == 0xFF || bankPtr >= file->size() + 8)
+          break;
+        if (banks.contains(bankNum))
+          continue;
+
+        for (const auto instrSet : instrSets) {
+          if (instrSet->dwOffset == bankPtr) {
+            instrSet->assignBankNumber(bankNum);
+            banks[bankNum] = instrSet;
+          }
+        }
+      }
+    }
+    auto seqs = searchForSequences(file, false);
+
+    if (instrSets.size() == 0)
+      return;
+
+    for (const auto seq : seqs) {
+      VGMColl* coll = new VGMColl(seq->name());
+      coll->useSeq(seq);
+      if (instrSets.size() == 1) {
+        instrSets[0]->assignBankNumber(0);
+        coll->addInstrSet(instrSets[0]);
+      } else {
+        auto referencedBanks = seq->referencedBanks();
+        auto numRefBanks = referencedBanks.size();
+        for (auto bankNum : referencedBanks) {
+          SegSatInstrSet* bank = nullptr;
+          auto it = banks.find(bankNum);
+          if (it == banks.end())
+            bank = instrSets[0];
+          else
+            bank = it->second;
+          bank->assignBankNumber(numRefBanks == 1 ? 0 : bankNum);
+          coll->addInstrSet(bank);
+        }
+      }
+      if (!coll->load()) {
+        delete coll;
+      }
+    }
+  } else {
+    searchForSequences(file, true);
+    searchForInstrumentSets(file, true);
+  }
 }
-void SegSatScanner::searchForSequences(RawFile *file) {
+
+std::vector<SegSatSeq*> SegSatScanner::searchForSequences(RawFile *file, bool match) {
   constexpr u32 minSeqSize = 16;
 
   u32 fileLength = file->size();
+  std::vector<SegSatSeq*> seqs;
+  int seqTableCounter = 0;
 
   for (u32 i = 0; i + 0x20 < fileLength; i++) {
-
     u32 firstWord = file->readWordBE(i);
     // If the first word is 0, skip the first 3 bytes
     if (firstWord == 0) {
@@ -90,12 +153,14 @@ void SegSatScanner::searchForSequences(RawFile *file) {
         break;
       }
 
-      auto name = fmt::format("{} {:d}", file->name(), n);
+      auto name = fmt::format("{} {:d}_{:d}", file->name(), seqTableCounter, n);
       SegSatSeq* seq = new SegSatSeq(file, i + seqPtr, name);
-      if (!seq->loadVGMFile())
+      if (match ? !seq->loadVGMFile() : !seq->load())
         delete seq;
-      else
+      else {
         bParsedSeq = true;
+        seqs.push_back(seq);
+      }
     }
     if (bParsedSeq) {
       auto seqTable = new VGMMiscFile(SegSatFormat::name, file, i,
@@ -105,6 +170,7 @@ void SegSatScanner::searchForSequences(RawFile *file) {
         seqTable->addChild(i + 2 + (j * 4), 4, fmt::format("Sequence {:d} Pointer", j));
       }
       seqTable->loadVGMFile();
+      seqTableCounter += 1;
     }
 
     u32 lastSeqPtr = file->readWordBE(i + 2 + ((numSeqs-1) * 4));
@@ -113,6 +179,7 @@ void SegSatScanner::searchForSequences(RawFile *file) {
       break;
     i += lastSeqPtr + minSeqSize;
   }
+  return seqs;
 }
 
 // Return true if a valid Sega Saturn instrument bank header/table is at `base`.
@@ -149,8 +216,9 @@ bool SegSatScanner::validateBankAt(RawFile* file, u32 base) {
 
   // More sanity checks on sizes
   if (d0 > (20*0x12)) return false;   // assume no more than 20 mixer tables
-  if (d1 > (20*0x0A)) return false;   // assume no more than 20 velocity level tables
-  if (d2 > (20*0x0A)) return false;   // assume no more than 20 PEG tables
+  if (d1 > (20*0x0A) && d1 != (100*0x0A)) return false;   // assume no more than 20 velocity level tables
+                                                          // special exception for Tengai Makyou
+  if (d2 > (30*0x0A)) return false;   // assume no more than 20 PEG tables
   if (d3 > (20*0x04)) return false;   // assume no more than 20 PLFO tables
 
   // 4) Instrument count (derived from ptrMixes).
@@ -182,10 +250,11 @@ bool SegSatScanner::validateBankAt(RawFile* file, u32 base) {
   return true;
 }
 
-void SegSatScanner::searchForInstrumentSets(RawFile* file) {
+std::vector<SegSatInstrSet*> SegSatScanner::searchForInstrumentSets(RawFile* file, bool match) {
   const u32 fileLength = file->size();
-  if (fileLength < 10) return;
+  if (fileLength < 10) return {};
 
+  std::vector<SegSatInstrSet*> instrSets;
   for (u32 base = 0; base + 8 <= fileLength; /* increment at bottom */) {
     // Heuristic skip #1: early out on long zero runs.
     const u32 firstWord = (base + 4 <= fileLength) ? file->readWordBE(base) : 0;
@@ -219,15 +288,17 @@ void SegSatScanner::searchForInstrumentSets(RawFile* file) {
     if (validateBankAt(file, base)) {
       u32 numInstrs = ((ptrMixes - 8) / 2);
       auto instrSet = new SegSatInstrSet(file, base, numInstrs);
-      if (!instrSet->loadVGMFile()) {
+      if (match ? !instrSet->loadVGMFile() : !instrSet->load())
         delete instrSet;
-      }
+      else
+        instrSets.push_back(instrSet);
 
       // We can safely skip ahead: the instrument table runs until base + ptrMixes
       // Jumping avoids re-scanning in the middle of a confirmed bank.
-      base = std::min(base + instrSet->unLength, fileLength - 8);
+      base += 2;
     } else {
       ++base;
     }
   }
+  return instrSets;
 }

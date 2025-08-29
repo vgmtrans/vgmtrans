@@ -8,12 +8,15 @@
 #include "common.h"
 #include <span>
 
+class SegSatSeq;
+class SegSatInstrSet;
+
 class SegSatScanner : public VGMScanner {
  public:
   explicit SegSatScanner(Format* format) : VGMScanner(format) {}
 
   virtual void scan(RawFile *file, void *info = 0);
-  void searchForSequences(RawFile *file);
-  bool validateBankAt(RawFile* file, u32 base);
-  void searchForInstrumentSets(RawFile *file);
+  std::vector<SegSatSeq *> searchForSequences(RawFile *file, bool match);
+  bool validateBankAt(RawFile *file, u32 base);
+  std::vector<SegSatInstrSet *> searchForInstrumentSets(RawFile *file, bool match);
 };
