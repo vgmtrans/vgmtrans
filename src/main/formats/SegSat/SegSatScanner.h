@@ -6,7 +6,7 @@
 #pragma once
 #include "Scanner.h"
 #include "common.h"
-#include <span>
+#include <vector>
 
 class SegSatSeq;
 class SegSatInstrSet;
