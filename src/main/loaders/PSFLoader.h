@@ -14,5 +14,5 @@ class PSFLoader : public FileLoader {
     void apply(const RawFile *) override;
 
    private:
-    void psf_read_exe(const RawFile *file, int version);
+    void psf_read_exe(const RawFile *file);
 };
