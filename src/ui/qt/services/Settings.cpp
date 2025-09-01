@@ -13,9 +13,11 @@ SettingsGroup::SettingsGroup(Settings* parent) : parent(parent), settings(parent
 Settings::Settings(QObject *parent)
   : QObject(parent),
     VGMFileTreeView(this),
-    conversion(this)
+    conversion(this),
+    detection(this)
 {
   conversion.loadIntoOptionsStore();
+  detection.loadIntoOptionsStore();
 }
 
 void Settings::VGMFileTreeViewSettings::setShowDetails(bool showDetails) const {
@@ -57,6 +59,23 @@ void Settings::ConversionSettings::setNumSequenceLoops(int n) const {
 
 void Settings::ConversionSettings::setSkipChannel10(bool skip) const {
   ConversionOptions::the().setSkipChannel10(skip);
+  saveFromOptionsStore();
+}
+
+/// Put settings into an OptionStore and have ConversionOptions load from it
+void Settings::DetectionSettings::loadIntoOptionsStore() const {
+  QtOptionsStore store(settings);
+  ConversionOptions::the().load(store);
+}
+
+/// Put settings into an OptionStore and have ConversionOptions save into it
+void Settings::DetectionSettings::saveFromOptionsStore() const {
+  QtOptionsStore store(settings);
+  ConversionOptions::the().save(store);
+}
+
+void Settings::DetectionSettings::setMinSequenceSize(int size) const {
+  ConversionOptions::the().setMinSequenceSize(size);
   saveFromOptionsStore();
 }
 
