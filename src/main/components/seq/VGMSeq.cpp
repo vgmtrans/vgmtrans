@@ -51,10 +51,6 @@ bool VGMSeq::loadVGMFile() {
     return false;
   }
 
-  if (unLength < ConversionOptions::the().minSequenceSize()) {
-    return false;
-  }
-
   rawFile()->addContainedVGMFile(std::make_shared<std::variant<VGMSeq *, VGMInstrSet *, VGMSampColl *,
     VGMMiscFile *>>(this));
   pRoot->addVGMFile(this);
