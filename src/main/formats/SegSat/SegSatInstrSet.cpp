@@ -240,9 +240,9 @@ double calculateDriverHz(SegSatDriverVer driverVer) {
   double driverHz = calculateScspIrqHz(44100, 1, 0xD4);
   switch (driverVer) {
     default:
-    case V1_28:
-    case V2_08: return driverHz / 4.0;
-    case V2_20: return driverHz;
+    case SegSatDriverVer::V1_28:
+    case SegSatDriverVer::V2_08: return driverHz / 4.0;
+    case SegSatDriverVer::V2_20: return driverHz;
   }
 }
 

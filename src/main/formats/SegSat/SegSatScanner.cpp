@@ -61,7 +61,7 @@ void SegSatScanner::scan(RawFile *file, void *info) {
   if (isSsfFile(file)) {
     handleSsfFile(file);
   } else {
-    SegSatDriverVer driverVer = Unknown;
+    SegSatDriverVer driverVer = SegSatDriverVer::Unknown;
     searchForSeqs(file, true);
     searchForInstrSets(file, driverVer, true);
   }
@@ -70,23 +70,23 @@ void SegSatScanner::scan(RawFile *file, void *info) {
 SegSatDriverVer SegSatScanner::determineVersion(RawFile* file) {
   u32 ptnOff;
   if (file->searchBytePattern(ptn_v1_28_handle_8_slots_per_irq, ptnOff)) {
-    return V1_28;
+    return SegSatDriverVer::V1_28;
   }
   if (file->searchBytePattern(ptn_v2_08_self_modifying_8_slots_per_irq, ptnOff)) {
     // If the last instruction self-modifies the last 2 bytes of the first instruction in the pattern
     if (file->readShortBE(ptnOff + 16) == ptnOff + 2) {
       // This test also succeeds on 1.33, so we'll probably need additional tests to distinguish
-      return V2_08;
+      return SegSatDriverVer::V2_08;
     }
   }
   if (file->searchBytePattern(ptn_v2_20_handle_all_slots_per_irq, ptnOff)) {
-    return V2_20;
+    return SegSatDriverVer::V2_20;
   }
-  return V2_08;
+  return SegSatDriverVer::V2_08;
 }
 
 void SegSatScanner::handleSsfFile(RawFile* file) {
-  SegSatDriverVer ver = Unknown;
+  SegSatDriverVer ver = SegSatDriverVer::Unknown;
   auto instrSets = searchForInstrSets(file, ver, false);
 
   std::map<u8, SegSatInstrSet*> banks;
@@ -335,7 +335,7 @@ std::vector<SegSatInstrSet*> SegSatScanner::searchForInstrSets(RawFile* file, Se
 
     // Full validation (read instrument table lazily and bail early on mismatch)
     if (validateBankAt(file, base)) {
-      if (ver == Unknown)
+      if (ver == SegSatDriverVer::Unknown)
         ver = determineVersion(file);
       u32 numInstrs = ((ptrMixes - 8) / 2);
       auto instrSet = new SegSatInstrSet(file, base, numInstrs, ver);

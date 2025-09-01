@@ -62,7 +62,7 @@ struct SegSatPlfoTable {
 // SegSatInstrSet
 // **************
 
-enum SegSatDriverVer : uint8_t;
+enum class SegSatDriverVer : uint8_t;
 
 class SegSatInstrSet:
     public VGMInstrSet {

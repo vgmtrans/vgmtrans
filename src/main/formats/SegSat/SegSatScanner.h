@@ -12,7 +12,7 @@
 class SegSatSeq;
 class SegSatInstrSet;
 
-enum SegSatDriverVer: uint8_t {
+enum class SegSatDriverVer: uint8_t {
   Unknown,
   V1_28,
   V2_08,
