@@ -46,6 +46,13 @@ class VGMRgn : public VGMItem {
   void addSampNum(int sampNum, uint32_t offset, uint32_t length = 1);
   void addADSRValue(uint32_t offset, uint32_t length, const std::string& name);
 
+  void setLfoVibFreqHz(double freq) { m_lfoVibFreqHz = freq; }
+  void setLfoVibDepthCents(double cents) { m_lfoVibDepthCents = cents; }
+  void setLfoVibDelaySeconds(double seconds) { m_lfoVibDelaySeconds = seconds; }
+  [[nodiscard]] double lfoVibFreqHz() const { return m_lfoVibFreqHz; }
+  [[nodiscard]] double lfoVibDepthCents() const { return m_lfoVibDepthCents; }
+  [[nodiscard]] double lfoVibDelaySeconds() const { return m_lfoVibDelaySeconds; }
+
 public:
   VGMInstr *parInstr;
   u8 keyLow       {0};
@@ -79,6 +86,10 @@ public:
 
 private:
   double m_attenDb      {0};     // attenuation in decibels;
+
+  double m_lfoVibFreqHz       {0};
+  double m_lfoVibDepthCents   {0};
+  double m_lfoVibDelaySeconds {0};
 };
 
 

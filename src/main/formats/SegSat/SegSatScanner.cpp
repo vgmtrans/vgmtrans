@@ -31,67 +31,116 @@ std::array<u8, 4> uint32ToBytes(u32 num) {
   return bytes;
 }
 
+// moveq      #0x0,D4                 78 00
+// move.w     #0x100,D5w              3a 3c 01 00   ; will increment d4 by 0x100 for each irq count (0x20 * 8)
+// move.b     (DAT_00001827,A6),D0b   10 2e 18 27   ; read irq counter
+// andi.w     #0x3,D0w                02 40 00 03   ; mod irq counter by 4
+// add.w      D0w,D0w                 d0 40         ; prep d0 as switch jump offset
+BytePattern SegSatScanner::ptn_v1_28_handle_8_slots_per_irq(
+   "\x78\x00\x3a\x3c\x01\x00\x10\x2e\x18\x27\x02\x40\x00\x03\xd0\x40",
+   "xxxxxxxx??xxxxxx", 16);
+
+// move.w     #0x000,D4w              38 3c 00 00       ; write initial slot offset, this is at offset 0x1412
+// addi.w     #0x100,D4w              06 44 01 00       ; add 0x100 (0x20 * 8) - next set of 8 slots
+// andi.w     #0x300,D4w              02 44 03 00       ; mod 0x400
+// move.w     D4w,(LAB_00001412+2).l  33 c4 00 00 14 14 ; overwrite the first instruction at offset 0x1412!
+//                                                      ; increment the initial slot offset by 0x100
+BytePattern SegSatScanner::ptn_v2_08_self_modifying_8_slots_per_irq(
+   "\x38\x3C\x00\x00\x06\x44\x01\x00\x02\x44\x03\x00\x33\xc4\x00\x00\x14\x14",
+   "xx??xxxxxxxxxxxx??", 18);
+
+// lea        (0x1000,A6),A4          49 ee 10 00
+// movem.l    {  A5 A4},-(SP          48 e7 00 0c
+// moveq      #0x1f,D7                7e 1f
+// move.b     (0x34,A4),D0b           10 2c 00 34
+BytePattern SegSatScanner::ptn_v2_20_handle_all_slots_per_irq(
+   "\x49\xee\x10\x00\x48\xe7\x00\x0c\x7e\x1f\x10\x2c\x00\x34",
+   "xxxxxxxxxxxxxx", 14);
+
 void SegSatScanner::scan(RawFile *file, void *info) {
-  auto extension = file->extension();
   if (isSsfFile(file)) {
-    auto instrSets = searchForInstrumentSets(file, false);
-
-    std::map<u8, SegSatInstrSet*> banks;
-    if (instrSets.size() > 1) {
-      for (u32 i = 0x500; i < 0x600; i+= 8) {
-        u32 bankNumAndPtr = file->readWordBE(i);
-        // The 4 bytes after offset are bank size, but we don't use it
-        u8 bankNum = bankNumAndPtr >> 24;
-        u32 bankPtr = bankNumAndPtr & 0x00FFFFFF;
-        if (bankNum == 0xFF || bankPtr >= file->size() + 8)
-          break;
-        if (banks.contains(bankNum))
-          continue;
-
-        for (const auto instrSet : instrSets) {
-          if (instrSet->dwOffset == bankPtr) {
-            instrSet->assignBankNumber(bankNum);
-            banks[bankNum] = instrSet;
-          }
-        }
-      }
-    }
-    auto seqs = searchForSequences(file, false);
-
-    if (instrSets.size() == 0)
-      return;
-
-    for (const auto seq : seqs) {
-      VGMColl* coll = new VGMColl(seq->name());
-      coll->useSeq(seq);
-      if (instrSets.size() == 1) {
-        instrSets[0]->assignBankNumber(0);
-        coll->addInstrSet(instrSets[0]);
-      } else {
-        auto referencedBanks = seq->referencedBanks();
-        auto numRefBanks = referencedBanks.size();
-        for (auto bankNum : referencedBanks) {
-          SegSatInstrSet* bank = nullptr;
-          auto it = banks.find(bankNum);
-          if (it == banks.end())
-            bank = instrSets[0];
-          else
-            bank = it->second;
-          bank->assignBankNumber(numRefBanks == 1 ? 0 : bankNum);
-          coll->addInstrSet(bank);
-        }
-      }
-      if (!coll->load()) {
-        delete coll;
-      }
-    }
+    handleSsfFile(file);
   } else {
-    searchForSequences(file, true);
-    searchForInstrumentSets(file, true);
+    SegSatDriverVer driverVer = Unknown;
+    searchForSeqs(file, true);
+    searchForInstrSets(file, driverVer, true);
   }
 }
 
-std::vector<SegSatSeq*> SegSatScanner::searchForSequences(RawFile *file, bool match) {
+SegSatDriverVer SegSatScanner::determineVersion(RawFile* file) {
+  u32 ptnOff;
+  if (file->searchBytePattern(ptn_v1_28_handle_8_slots_per_irq, ptnOff)) {
+    return V1_28;
+  }
+  if (file->searchBytePattern(ptn_v2_08_self_modifying_8_slots_per_irq, ptnOff)) {
+    // If the last instruction self-modifies the last 2 bytes of the first instruction in the pattern
+    if (file->readShortBE(ptnOff + 16) == ptnOff + 2) {
+      // This test also succeeds on 1.33, so we'll probably need additional tests to distinguish
+      return V2_08;
+    }
+  }
+  if (file->searchBytePattern(ptn_v2_20_handle_all_slots_per_irq, ptnOff)) {
+    return V2_20;
+  }
+  return V2_08;
+}
+
+void SegSatScanner::handleSsfFile(RawFile* file) {
+  SegSatDriverVer ver = Unknown;
+  auto instrSets = searchForInstrSets(file, ver, false);
+
+  std::map<u8, SegSatInstrSet*> banks;
+  if (instrSets.size() > 1) {
+    for (u32 i = 0x500; i < 0x600; i+= 8) {
+      u32 bankNumAndPtr = file->readWordBE(i);
+      // The 4 bytes after offset are bank size, but we don't use it
+      u8 bankNum = bankNumAndPtr >> 24;
+      u32 bankPtr = bankNumAndPtr & 0x00FFFFFF;
+      if (bankNum == 0xFF || bankPtr >= file->size() + 8)
+        break;
+      if (banks.contains(bankNum))
+        continue;
+
+      for (const auto instrSet : instrSets) {
+        if (instrSet->dwOffset == bankPtr) {
+          instrSet->assignBankNumber(bankNum);
+          banks[bankNum] = instrSet;
+        }
+      }
+    }
+  }
+  auto seqs = searchForSeqs(file, false);
+
+  if (instrSets.size() == 0)
+    return;
+
+  for (const auto seq : seqs) {
+    VGMColl* coll = new VGMColl(seq->name());
+    coll->useSeq(seq);
+    if (instrSets.size() == 1) {
+      instrSets[0]->assignBankNumber(0);
+      coll->addInstrSet(instrSets[0]);
+    } else {
+      auto referencedBanks = seq->referencedBanks();
+      auto numRefBanks = referencedBanks.size();
+      for (auto bankNum : referencedBanks) {
+        SegSatInstrSet* bank = nullptr;
+        auto it = banks.find(bankNum);
+        if (it == banks.end())
+          bank = instrSets[0];
+        else
+          bank = it->second;
+        bank->assignBankNumber(numRefBanks == 1 ? 0 : bankNum);
+        coll->addInstrSet(bank);
+      }
+    }
+    if (!coll->load()) {
+      delete coll;
+    }
+  }
+}
+
+std::vector<SegSatSeq*> SegSatScanner::searchForSeqs(RawFile *file, bool useMatcher) {
   constexpr u32 minSeqSize = 16;
 
   u32 fileLength = file->size();
@@ -155,7 +204,7 @@ std::vector<SegSatSeq*> SegSatScanner::searchForSequences(RawFile *file, bool ma
 
       auto name = fmt::format("{} {:d}_{:d}", file->name(), seqTableCounter, n);
       SegSatSeq* seq = new SegSatSeq(file, i + seqPtr, name);
-      if (match ? !seq->loadVGMFile() : !seq->load())
+      if (useMatcher ? !seq->loadVGMFile() : !seq->load())
         delete seq;
       else {
         bParsedSeq = true;
@@ -250,7 +299,7 @@ bool SegSatScanner::validateBankAt(RawFile* file, u32 base) {
   return true;
 }
 
-std::vector<SegSatInstrSet*> SegSatScanner::searchForInstrumentSets(RawFile* file, bool match) {
+std::vector<SegSatInstrSet*> SegSatScanner::searchForInstrSets(RawFile* file, SegSatDriverVer& ver, bool useMatcher) {
   const u32 fileLength = file->size();
   if (fileLength < 10) return {};
 
@@ -286,9 +335,11 @@ std::vector<SegSatInstrSet*> SegSatScanner::searchForInstrumentSets(RawFile* fil
 
     // Full validation (read instrument table lazily and bail early on mismatch)
     if (validateBankAt(file, base)) {
+      if (ver == Unknown)
+        ver = determineVersion(file);
       u32 numInstrs = ((ptrMixes - 8) / 2);
-      auto instrSet = new SegSatInstrSet(file, base, numInstrs);
-      if (match ? !instrSet->loadVGMFile() : !instrSet->load())
+      auto instrSet = new SegSatInstrSet(file, base, numInstrs, ver);
+      if (useMatcher ? !instrSet->loadVGMFile() : !instrSet->load())
         delete instrSet;
       else
         instrSets.push_back(instrSet);

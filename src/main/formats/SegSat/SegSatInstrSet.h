@@ -53,8 +53,8 @@ struct SegSatMixerTable {
 
 struct SegSatPlfoTable {
   u8 delay;
-  u8 frequency;
   u8 amp;
+  u8 frequency;
   u8 fadeTime;
 };
 
@@ -62,15 +62,19 @@ struct SegSatPlfoTable {
 // SegSatInstrSet
 // **************
 
+enum SegSatDriverVer : uint8_t;
+
 class SegSatInstrSet:
     public VGMInstrSet {
 public:
-  SegSatInstrSet(RawFile* file, uint32_t offset, int numInstrs, const std::string& name = "SegSatInstrSet");
+  SegSatInstrSet(RawFile* file, uint32_t offset, int numInstrs, SegSatDriverVer ver, const std::string& name = "SegSatInstrSet");
   ~SegSatInstrSet() = default;
 
   virtual bool parseHeader();
   virtual bool parseInstrPointers();
   void assignBankNumber(u8 bankNum);
+  [[nodiscard]] SegSatDriverVer driverVer() const { return m_driverVer; }
+
   std::vector<SegSatMixerTable> mixerTables() { return m_mixerTables; }
   std::vector<SegSatVLTable> vlTables() { return  m_vlTables; }
   std::vector<SegSatPlfoTable> plfoTables() { return  m_plfoTables; }
@@ -79,8 +83,8 @@ public:
 
 
 private:
-
   int m_numInstrs;
+  SegSatDriverVer m_driverVer;
   std::vector<SegSatMixerTable> m_mixerTables;
   std::vector<SegSatVLTable> m_vlTables;
   std::vector<SegSatPlfoTable> m_plfoTables;
@@ -162,11 +166,12 @@ private:
   bool m_enablePegModulation;
   bool m_enablePlfo;
   bool m_enablePlfoModulation;
+  bool m_soundDirectEnable;
 
   u8 m_totalLevel;
   bool m_enableTotalLevelModulation;
 
   u8 m_vlTableIndex;
   u8 m_PegIndex;
-  u8 m_PlfoIndex;
+  u8 m_plfoIndex;
 };
