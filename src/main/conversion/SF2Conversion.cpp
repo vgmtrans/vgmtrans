@@ -163,6 +163,9 @@ SynthFile* createSynthFile(
         newRgn->setWaveLinkInfo(0, 0, 1, static_cast<uint32_t>(realSampNum));
         newRgn->setFineTune(rgn->coarseTune, rgn->fineTune);
         newRgn->setAttenuationDb(rgn->attenDb());
+        newRgn->setLfoVibFreqHz(rgn->lfoVibFreqHz());
+        newRgn->setLfoVibDepthCents(rgn->lfoVibDepthCents());
+        newRgn->setLfoVibDelaySeconds(rgn->lfoVibDelaySeconds());
 
         if (realSampNum >= finalSamps.size()) {
           L_ERROR("Sample {} does not exist. Instr index: {:d}, Instr num: {:d}, Region index: {:d}", realSampNum, i, vgminstr->instrNum, j);

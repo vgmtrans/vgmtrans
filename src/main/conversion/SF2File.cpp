@@ -10,6 +10,7 @@
 #include "SynthFile.h"
 #include "ScaleConversion.h"
 #include "Root.h"
+#include "VGMRgn.h"
 
 SF2InfoListChunk::SF2InfoListChunk(const std::string& name)
     : LISTChunk("INFO") {
@@ -34,6 +35,16 @@ SF2InfoListChunk::SF2InfoListChunk(const std::string& name)
 //  *******
 //  SF2File
 //  *******
+
+int SF2File::numOfGeneratorsForRgn(SynthRgn* rgn) {
+  int numOfGenerators = 14;
+  if (rgn->lfoVibDepthCents() > 0 && rgn->lfoVibFreqHz() > 0) {
+    numOfGenerators += 2;
+    if (rgn->lfoVibDelaySeconds() > 0)
+      numOfGenerators += 1;
+  }
+  return numOfGenerators;
+}
 
 SF2File::SF2File(SynthFile *synthfile)
     : RiffFile(synthfile->m_name, "sfbk") {
@@ -221,7 +232,7 @@ SF2File::SF2File(SynthFile *synthfile)
     for (size_t j = 0; j < numRgns; j++) {
       sfInstBag instBag{};
       instBag.wInstGenNdx = instGenCounter;
-      instGenCounter += 14;
+      instGenCounter += numOfGeneratorsForRgn(instr->vRgns[j]);
       instBag.wInstModNdx = 0;
 
       memcpy(ibagCk->data + (rgnCounter++ * sizeof(sfInstBag)), &instBag, sizeof(sfInstBag));
@@ -246,8 +257,15 @@ SF2File::SF2File(SynthFile *synthfile)
   //***********
   // igen chunk
   //***********
+  u32 numTotalGens = 1;
+  for (const auto instr : synthfile->vInstrs) {
+    for (const auto rgn : instr->vRgns) {
+      numTotalGens += numOfGeneratorsForRgn(rgn);
+    }
+  }
+
   Chunk *igenCk = new Chunk("igen");
-  igenCk->setSize((numTotalRgns * sizeof(sfInstGenList) * 14) + sizeof(sfInstGenList));
+  igenCk->setSize(numTotalGens * sizeof(sfInstGenList));
   igenCk->data = new uint8_t[igenCk->size()];
   dataPtr = 0;
   for (size_t i = 0; i < numInstrs; i++) {
@@ -355,6 +373,27 @@ SF2File::SF2File(SynthFile *synthfile)
       //instGenList.genAmount.shAmount = 800;
       //memcpy(pgenCk->data + dataPtr, &instGenList, sizeof(sfInstGenList));
       //dataPtr += sizeof(sfInstGenList);
+
+      if (rgn->lfoVibDepthCents() > 0 && rgn->lfoVibFreqHz() > 0) {
+        instGenList.sfGenOper = vibLfoToPitch;
+        instGenList.genAmount.shAmount = round(rgn->lfoVibDepthCents());
+        memcpy(igenCk->data + dataPtr, &instGenList, sizeof(sfInstGenList));
+        dataPtr += sizeof(sfInstGenList);
+
+        instGenList.sfGenOper = freqVibLFO;
+        double hz = rgn->lfoVibFreqHz();
+        instGenList.genAmount.shAmount = round( 1200 * log2( hz / 8.176 ) );
+        memcpy(igenCk->data + dataPtr, &instGenList, sizeof(sfInstGenList));
+        dataPtr += sizeof(sfInstGenList);
+
+        if (rgn->lfoVibDelaySeconds() > 0) {
+          instGenList.sfGenOper = delayVibLFO;
+          double delaySeconds = rgn->lfoVibDelaySeconds();
+          instGenList.genAmount.shAmount = round( 1200 * log2( delaySeconds ) );
+          memcpy(igenCk->data + dataPtr, &instGenList, sizeof(sfInstGenList));
+          dataPtr += sizeof(sfInstGenList);
+        }
+      }
 
       // sampleID - this is the terminal chunk
       instGenList.sfGenOper = sampleID;

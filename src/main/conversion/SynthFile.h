@@ -93,6 +93,13 @@ class SynthRgn {
   void setFineTune(int16_t semitones, int16_t fineTune);
   void setAttenuationDb(double attenuation);
 
+  void setLfoVibFreqHz(double freq) { m_lfoVibFreqHz = freq; }
+  void setLfoVibDepthCents(double cents) { m_lfoVibDepthCents = cents; }
+  void setLfoVibDelaySeconds(double seconds) { m_lfoVibDelaySeconds = seconds; }
+  [[nodiscard]] double lfoVibFreqHz() const { return m_lfoVibFreqHz; }
+  [[nodiscard]] double lfoVibDepthCents() const { return m_lfoVibDepthCents; }
+  [[nodiscard]] double lfoVibDelaySeconds() const { return m_lfoVibDelaySeconds; }
+
   uint16_t usKeyLow {0};
   uint16_t usKeyHigh {0x7F};
   uint16_t usVelLow {0};
@@ -110,6 +117,11 @@ class SynthRgn {
 
   SynthSampInfo *sampinfo {nullptr};
   SynthArt *art {nullptr};
+
+private:
+  double m_lfoVibFreqHz       {0};
+  double m_lfoVibDepthCents   {0};
+  double m_lfoVibDelaySeconds {0};
 };
 
 class SynthArt {

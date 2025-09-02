@@ -272,11 +272,14 @@ class SF2sdtaChunk: public LISTChunk {
 };
 
 class SynthFile;
+class SynthRgn;
 
 class SF2File: public RiffFile {
  public:
   SF2File(SynthFile *synthfile);
   ~SF2File() override = default;
+
+  static int numOfGeneratorsForRgn(SynthRgn* rgn);
 
   std::vector<uint8_t> saveToMem();
   bool saveSF2File(const std::string &filepath);

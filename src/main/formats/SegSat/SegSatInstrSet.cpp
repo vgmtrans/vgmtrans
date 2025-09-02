@@ -45,8 +45,8 @@ constexpr PanLinAmp panToAmp(u8 pan) {
 // SegSatInstrSet
 // **************
 
-SegSatInstrSet::SegSatInstrSet(RawFile* file, uint32_t offset, int numInstrs, const std::string& name) :
-    VGMInstrSet(SegSatFormat::name, file, offset, 0, name), m_numInstrs(numInstrs) {
+SegSatInstrSet::SegSatInstrSet(RawFile* file, uint32_t offset, int numInstrs, SegSatDriverVer ver, const std::string& name) :
+    VGMInstrSet(SegSatFormat::name, file, offset, 0, name), m_numInstrs(numInstrs), m_driverVer(ver) {
   sampColl = new VGMSampColl(SegSatFormat::name, file, this, offset);
 }
 
@@ -112,8 +112,8 @@ bool SegSatInstrSet::parseHeader() {
 
     auto tableItem = addChild(offset, 4, fmt::format("PLFO Table {:d}", i));
     tableItem->addChild(offset, 1, "Delay");
-    tableItem->addChild(offset + 1, 1, "Frequency");
-    tableItem->addChild(offset + 2, 1, "Amplitude");
+    tableItem->addChild(offset + 1, 1, "Amplitude");
+    tableItem->addChild(offset + 2, 1, "Frequency");
     tableItem->addChild(offset + 3, 1, "Fade Time");
 
     offset += 4;
@@ -217,6 +217,51 @@ bool SegSatInstr::loadInstr() {
 // SegSatRgn
 // *********
 
+
+/// Compute the SCSP timer interrupt rate (in Hz) from TxCTL, TIMx, and the audio sample rate Fs.
+///
+/// TxCTL (3 bits): prescaler; counter advances once every 2^TxCTL samples (i.e., skips 2^TxCTL−1 samples).
+/// TIMx  (8 bits): preload 0..255; steps until overflow = (255 - TIMx).
+/// Fs             : SCSP stream/sample rate; typically chip_clock/512 (512 internal ticks per output sample).
+///
+/// Derivation:
+///   - Time per counter increment = (2^TxCTL) / Fs  seconds  (it “skips” 2^TxCTL−1 samples)
+///   - Increments to overflow     = (255 - TIMx)
+///   - Period                     = ((2^TxCTL) / Fs) * (255 - TIMx)
+///   - Frequency                  =  Fs / ( (2^TxCTL) * (255 - TIMx) )
+constexpr double calculateScspIrqHz(double Fs, u32 TxCTL, u32 TIMx) {
+  const std::uint32_t steps = 255u - (TIMx & 0xffu);
+  if (steps == 0) return 0.0;
+  const std::uint32_t prescaler = 1u << (TxCTL & 7u);
+  return Fs / (static_cast<double>(prescaler) * static_cast<double>(steps));
+}
+
+double calculateDriverHz(SegSatDriverVer driverVer) {
+  double driverHz = calculateScspIrqHz(44100, 1, 0xD4);
+  switch (driverVer) {
+    default:
+    case SegSatDriverVer::V1_28:
+    case SegSatDriverVer::V2_08: return driverHz / 4.0;
+    case SegSatDriverVer::V2_20: return driverHz;
+  }
+}
+
+// Calculate the total fade (in) given PLFO freq and fade bytes, and the rate of driver updates (Hz)
+double calculatePlfoFadeTimeSeconds(uint8_t freq, uint8_t fade, double R)
+{
+  int x = fade * fade;       // x = fade^2
+  x >>= 6;                   // x = floor(fade^2 / 64)
+  if (x == 0)                // no fade (engine also shortens the first half-cycle, but fade time = 0)
+    return 0.0;
+
+  int numHalfCycles = (x << 1) - 1; // fade length in half-cycles
+  double freqSq = freq * freq;      // freq^2
+
+  // Half-cycle duration = freq^2 / (64 * R), so total fade time:
+  return numHalfCycles * (freqSq / (64.0 * R));
+}
+
+
 SegSatRgn::SegSatRgn(SegSatInstr* instr, uint32_t offset, const std::string& name) :
   VGMRgn(instr, offset, 0x20, name) {
   addKeyLow(readByte(offset), offset, 1);
@@ -277,6 +322,7 @@ SegSatRgn::SegSatRgn(SegSatInstr* instr, uint32_t offset, const std::string& nam
   m_enableLfoModulation = (enableModFlags >> 7) & 1;
   m_enablePegModulation = (enableModFlags >> 6) & 1;
   m_enablePlfoModulation = (enableModFlags >> 5) & 1;
+  m_soundDirectEnable = enableModFlags & 1;
   addChild(offset + 14, 1, "Enable PEG Modulation / PLFO Modulation Flags");
 
   m_totalLevel = readByte(offset + 15);
@@ -325,7 +371,7 @@ SegSatRgn::SegSatRgn(SegSatInstr* instr, uint32_t offset, const std::string& nam
   addChild(offset + 29, 1, "Velocity Table Index");
 
   m_PegIndex = readByte(offset + 30);
-  m_PlfoIndex = readByte(offset + 31);
+  m_plfoIndex = readByte(offset + 31);
 
   addChild(offset + 30, 1, "PEG Index");
   addChild(offset + 31, 1, "PLFO Index");
@@ -340,6 +386,51 @@ SegSatRgn::SegSatRgn(SegSatInstr* instr, uint32_t offset, const std::string& nam
   double finalAtten = sdlDb + ampToDb(volScale) + fiftyFiftyComp;
   setAttenuation(finalAtten);
   this->pan = panPerc;
+
+  SegSatInstrSet* instrSet = static_cast<SegSatInstrSet*>(parInstr->parInstrSet);
+  SegSatDriverVer driverVer = instrSet->driverVer();
+  double driverHz = calculateDriverHz(driverVer);
+
+  if (m_enablePlfo) {
+    auto plfos = instrSet->plfoTables();
+    if (m_plfoIndex < plfos.size()) {
+      auto plfo = plfos[m_plfoIndex];
+
+      // Calculate delay. Since SF2 has no way to set an LFO fade-in time we'll increase the delay
+      // by half of the fade time.
+      double delay = (plfo.delay * plfo.delay) / (16 * driverHz);
+      double fadeTime = calculatePlfoFadeTimeSeconds(plfo.frequency, plfo.fadeTime, driverHz);
+      delay += fadeTime / 2;
+      setLfoVibDelaySeconds(delay);
+
+      // Calculate Frequency
+      double freqSq = (plfo.frequency * plfo.frequency);
+      double freq = (driverHz * 32) / freqSq;
+      setLfoVibFreqHz(freq);
+
+      // Calculate pitch depth. The plfo.amp value is actually the slope of the LFO triangle.
+      // Therefore, pitch depth is calculated using both the amp and frequency values.
+      // Also, weirdly, fade time scales the depth when it's non-zero.
+      // This algorithm is reversed from the 1.33 driver. Later versions seem to use different logic.
+      double amp = (plfo.amp * plfo.amp * freqSq) / ((8192 * 256) / 100.0);
+      u32 fadeDepthModifier =  (plfo.fadeTime * plfo.fadeTime) >> 6;
+      if (fadeDepthModifier > 0) {
+        amp *= 2.0 * fadeDepthModifier;
+      }
+
+      setLfoVibDepthCents(amp);
+    }
+  } else if (!m_enableLfoModulation && m_pitchLfoWave == LFOWave::Triangle && m_pitchLfoDepth > 0) {
+    static const float LFOFreq[32] = {
+      0.17f,0.19f,0.23f,0.27f,0.34f,0.39f,0.45f,0.55f,0.68f,0.78f,0.92f,1.10f,1.39f,1.60f,1.87f,2.27f,
+      2.87f,3.31f,3.92f,4.79f,6.15f,7.18f,8.60f,10.8f,14.4f,17.2f,21.5f,28.7f,43.1f,57.4f,86.1f,172.3f
+    };
+    // static const float ampScaleDb[8] = {0.0f,0.4f,0.8f,1.5f,3.0f,6.0f,12.0f,24.0f};
+    static const float pitchScaleCents[8] = {0.0f, 7.0f, 13.5f, 27.0f, 55.0f, 112.0f, 230.0f, 494.0f};
+
+    setLfoVibDepthCents(pitchScaleCents[m_pitchLfoDepth]);
+    setLfoVibFreqHz(LFOFreq[m_lfoFreq]);
+  }
 }
 
 bool SegSatRgn::isRegionValid() {
