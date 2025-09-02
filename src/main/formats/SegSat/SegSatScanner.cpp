@@ -295,7 +295,7 @@ std::vector<SegSatInstrSet*> SegSatScanner::searchForInstrumentSets(RawFile* fil
 
       // We can safely skip ahead: the instrument table runs until base + ptrMixes
       // Jumping avoids re-scanning in the middle of a confirmed bank.
-      base += 2;
+      base = std::min(base + instrSet->unLength, fileLength - 8);
     } else {
       ++base;
     }

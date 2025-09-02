@@ -166,10 +166,6 @@ bool SegSatInstr::loadInstr() {
   auto sampColl = parInstrSet->sampColl;
   for (int i = 0; i < numRgns; ++i) {
     u32 rgnOff = dwOffset + 4 + (i * 0x20);
-    // Validate region data
-    // if (readByte(rgnOff) == 0xFF)
-      // break;
-    // Add region
     auto name = fmt::format("Region {:d}", i);
     auto rgn = new SegSatRgn(this, rgnOff, name);
     if (!rgn->isRegionValid()) {
@@ -185,7 +181,7 @@ bool SegSatInstr::loadInstr() {
     // check if a sample at the offset was already added
     bool inserted = instrSet->sampleOffsets.insert(rgn->sampOffset).second;
 
-    u32 sampOffset = rgn->sampOffset;// & (bps == 16 ? ~1 : ~0);
+    u32 sampOffset = rgn->sampOffset;
     if (inserted) {
       auto sample = sampColl->addSamp(
        sampOffset,
@@ -354,4 +350,3 @@ bool SegSatRgn::isRegionValid() {
   if (sampOffset >= instrSetOffset + 0x7FFFE) return false;
   return true;
 }
-
