@@ -21,14 +21,16 @@ bool VGMMiscFile::loadMain() {
   return true;
 }
 
-bool VGMMiscFile::loadVGMFile() {
+bool VGMMiscFile::loadVGMFile(bool useMatcher) {
   bool val = load();
   if (!val) {
     return false;
   }
 
-  if (auto fmt = format(); fmt) {
-    fmt->onNewFile(std::variant<VGMSeq *, VGMInstrSet *, VGMSampColl *, VGMMiscFile *>(this));
+  if (useMatcher) {
+    if (auto fmt = format(); fmt) {
+      fmt->onNewFile(std::variant<VGMSeq *, VGMInstrSet *, VGMSampColl *, VGMMiscFile *>(this));
+    }
   }
 
   return val;

@@ -17,7 +17,7 @@ class VGMSampColl : public VGMFile {
                 uint32_t length = 0, std::string theName = "VGMSampColl");
   void useInstrSet(VGMInstrSet *instrset) { parInstrSet = instrset; }
 
-  bool loadVGMFile() override;
+  bool loadVGMFile(bool useMatcher = true) override;
   bool load() override;
   virtual bool parseHeader();        // retrieve any header data
   virtual bool parseSampleInfo();        // retrieve sample info, including pointers to data, # channels, rate, etc.

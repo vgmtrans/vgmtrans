@@ -32,14 +32,16 @@ VGMSampColl::VGMSampColl(const std::string &format, RawFile *rawfile, VGMInstrSe
       parInstrSet(instrset) {
 }
 
-bool VGMSampColl::loadVGMFile() {
+bool VGMSampColl::loadVGMFile(bool useMatcher) {
   bool val = load();
   if (!val) {
     return false;
   }
 
-  if (auto fmt = format(); fmt) {
-    fmt->onNewFile(std::variant<VGMSeq *, VGMInstrSet *, VGMSampColl *, VGMMiscFile *>(this));
+  if (useMatcher) {
+    if (auto fmt = format(); fmt) {
+      fmt->onNewFile(std::variant<VGMSeq *, VGMInstrSet *, VGMSampColl *, VGMMiscFile *>(this));
+    }
   }
 
   return val;

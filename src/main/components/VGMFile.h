@@ -21,7 +21,7 @@ public:
 
   [[nodiscard]] std::string description() override;
 
-  virtual bool loadVGMFile() = 0;
+  virtual bool loadVGMFile(bool useMatcher) = 0;
   virtual bool load() = 0;
   Format* format() const;
   [[nodiscard]] std::string formatName();

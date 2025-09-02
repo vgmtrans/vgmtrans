@@ -18,7 +18,7 @@ public:
   VGMMiscFile(const std::string &format, RawFile *file, uint32_t offset, uint32_t length = 0,
               std::string name = "VGMMiscFile");
 
-  bool loadVGMFile() override;
+  bool loadVGMFile(bool useMatcher = true) override;
   virtual bool loadMain();
   bool load() override;
 };

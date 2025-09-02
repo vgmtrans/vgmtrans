@@ -32,7 +32,7 @@ class VGMSeq : public VGMFile {
          std::string name = "VGM Sequence");
   ~VGMSeq() override;
 
-  bool loadVGMFile() override;
+  bool loadVGMFile(bool useMatcher = true) override;
   bool load() override;
   virtual bool parseHeader();
   virtual bool parseTrackPointers();  // Function to find all of the track pointers.   Returns number of total tracks.

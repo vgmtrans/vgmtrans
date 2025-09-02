@@ -38,14 +38,16 @@ VGMInstr *VGMInstrSet::addInstr(uint32_t offset, uint32_t length, uint32_t bank,
   return instr;
 }
 
-bool VGMInstrSet::loadVGMFile() {
+bool VGMInstrSet::loadVGMFile(bool useMatcher) {
   bool val = load();
   if (!val) {
     return false;
   }
 
-  if (auto fmt = format(); fmt) {
-    fmt->onNewFile(std::variant<VGMSeq *, VGMInstrSet *, VGMSampColl *, VGMMiscFile *>(this));
+  if (useMatcher) {
+    if (auto fmt = format(); fmt) {
+      fmt->onNewFile(std::variant<VGMSeq *, VGMInstrSet *, VGMSampColl *, VGMMiscFile *>(this));
+    }
   }
 
   return val;

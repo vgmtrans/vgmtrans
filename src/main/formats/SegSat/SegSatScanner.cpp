@@ -204,7 +204,7 @@ std::vector<SegSatSeq*> SegSatScanner::searchForSeqs(RawFile *file, bool useMatc
 
       auto name = fmt::format("{} {:d}_{:d}", file->name(), seqTableCounter, n);
       SegSatSeq* seq = new SegSatSeq(file, i + seqPtr, name);
-      if (useMatcher ? !seq->loadVGMFile() : !seq->load())
+      if (!seq->loadVGMFile(useMatcher))
         delete seq;
       else {
         bParsedSeq = true;
