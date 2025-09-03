@@ -13,7 +13,8 @@ SettingsGroup::SettingsGroup(Settings* parent) : parent(parent), settings(parent
 Settings::Settings(QObject *parent)
   : QObject(parent),
     VGMFileTreeView(this),
-    conversion(this)
+    conversion(this),
+    recentFiles(this)
 {
   conversion.loadIntoOptionsStore();
 }
@@ -58,5 +59,30 @@ void Settings::ConversionSettings::setNumSequenceLoops(int n) const {
 void Settings::ConversionSettings::setSkipChannel10(bool skip) const {
   ConversionOptions::the().setSkipChannel10(skip);
   saveFromOptionsStore();
+}
+
+QStringList Settings::RecentFilesSettings::list() const {
+  settings.beginGroup("RecentFiles");
+  auto files = settings.value("files").toStringList();
+  settings.endGroup();
+  return files;
+}
+
+void Settings::RecentFilesSettings::add(const QString& path) const {
+  auto files = list();
+  files.removeAll(path);
+  files.prepend(path);
+  constexpr int MaxRecentFiles = 10;
+  while (files.size() > MaxRecentFiles)
+    files.removeLast();
+  settings.beginGroup("RecentFiles");
+  settings.setValue("files", files);
+  settings.endGroup();
+}
+
+void Settings::RecentFilesSettings::clear() const {
+  settings.beginGroup("RecentFiles");
+  settings.remove("files");
+  settings.endGroup();
 }
 

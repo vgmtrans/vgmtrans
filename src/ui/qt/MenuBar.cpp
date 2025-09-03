@@ -8,6 +8,7 @@
 
 #include <QActionGroup>
 #include <QDockWidget>
+#include <QDir>
 #include "Options.h"
 #include "Root.h"
 #include "LogManager.h"
@@ -25,6 +26,11 @@ void MenuBar::appendFileMenu() {
   menu_open_file = file_dropdown->addAction("Open");
   menu_open_file->setShortcut(QKeySequence(QStringLiteral("Ctrl+O")));
   connect(menu_open_file, &QAction::triggered, this, &MenuBar::openFile);
+
+  file_dropdown->addSeparator();
+
+  menu_recent_files = file_dropdown->addMenu("Recent Files");
+  updateRecentFilesMenu();
 
   file_dropdown->addSeparator();
 
@@ -81,9 +87,31 @@ void MenuBar::appendWindowsMenu(const QList<QDockWidget *> &dockWidgets) {
   }
 }
 
-
 void MenuBar::appendInfoMenu() {
   QMenu *info_dropdown = addMenu("Help");
   menu_about_dlg = info_dropdown->addAction("About VGMTrans");
   connect(menu_about_dlg, &QAction::triggered, this, &MenuBar::showAbout);
+}
+
+void MenuBar::updateRecentFilesMenu() {
+  menu_recent_files->clear();
+  auto files = Settings::the()->recentFiles.list();
+  const QString homeDir = QDir::homePath();
+  for (const auto& file : files) {
+    QString display = file;
+    if (display.startsWith(homeDir, Qt::CaseInsensitive)) {
+      display.replace(0, homeDir.length(), "~");
+    }
+    auto act = menu_recent_files->addAction(display);
+    connect(act, &QAction::triggered, this, [this, file]() { emit openRecentFile(file); });
+  }
+  if (!files.isEmpty()) {
+    menu_recent_files->addSeparator();
+    auto clear_act = menu_recent_files->addAction("Clear Items");
+    connect(clear_act, &QAction::triggered, this, [this]() {
+      Settings::the()->recentFiles.clear();
+      updateRecentFilesMenu();
+    });
+  }
+  menu_recent_files->setEnabled(!files.isEmpty());
 }

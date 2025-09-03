@@ -22,6 +22,7 @@
 #include "About.h"
 #include "Logger.h"
 #include "SequencePlayer.h"
+#include "services/Settings.h"
 #include "workarea/RawFileListView.h"
 #include "workarea/VGMFileListView.h"
 #include "workarea/VGMCollListView.h"
@@ -133,6 +134,7 @@ void MainWindow::showEvent(QShowEvent* event) {
 
 void MainWindow::routeSignals() {
   connect(m_menu_bar, &MenuBar::openFile, this, &MainWindow::openFile);
+  connect(m_menu_bar, &MenuBar::openRecentFile, this, &MainWindow::openFileInternal);
   connect(m_menu_bar, &MenuBar::exit, this, &MainWindow::close);
   connect(m_menu_bar, &MenuBar::showAbout, [this]() {
     About about(this);
@@ -209,7 +211,10 @@ void MainWindow::openFileInternal(const QString& filename) {
     }
   }
 
-  qtVGMRoot.openRawFile(filename.toStdString());
+  if (qtVGMRoot.openRawFile(filename.toStdString())) {
+    Settings::the()->recentFiles.add(filename);
+    m_menu_bar->updateRecentFilesMenu();
+  }
 }
 
 void MainWindow::showToast(const QString& message, ToastType type, int duration_ms) {

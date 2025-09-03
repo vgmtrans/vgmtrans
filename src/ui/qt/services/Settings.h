@@ -9,6 +9,7 @@
 #include "Options.h"
 #include <QObject>
 #include <QSettings>
+#include <QStringList>
 
 class Settings;
 
@@ -98,6 +99,15 @@ public:
     void setSkipChannel10(bool skip) const;
   };
   ConversionSettings conversion;
+
+  struct RecentFilesSettings : public SettingsGroup {
+    using SettingsGroup::SettingsGroup;
+
+    QStringList list() const;
+    void add(const QString& path) const;
+    void clear() const;
+  };
+  RecentFilesSettings recentFiles;
 
 private:
   explicit Settings(QObject *parent = nullptr);

@@ -8,6 +8,7 @@
 #include <QMenu>
 #include <QMenuBar>
 #include <QList>
+#include <QString>
 
 class QDockWidget;
 
@@ -16,9 +17,11 @@ class MenuBar final : public QMenuBar {
 
 public:
   explicit MenuBar(QWidget *parent = nullptr, const QList<QDockWidget *>& dockWidgets = {});
+  void updateRecentFilesMenu();
 
 signals:
   void openFile();
+  void openRecentFile(const QString& filename);
   void exit();
   void showAbout();
 
@@ -30,6 +33,7 @@ private:
 
   // File actions
   QAction *menu_open_file;
+  QMenu *menu_recent_files;
   QAction *menu_app_exit;
 
   // Info actions
