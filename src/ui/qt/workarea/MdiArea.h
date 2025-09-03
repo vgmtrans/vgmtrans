@@ -11,6 +11,7 @@
 #include <QMdiSubWindow>
 
 class VGMFile;
+class QEvent;
 
 class MdiArea : public QMdiArea {
   Q_OBJECT
@@ -32,8 +33,12 @@ public:
   void newView(VGMFile *file);
   void removeView(const VGMFile *file);
 
+protected:
+  void changeEvent(QEvent *event) override;
+
 private:
   MdiArea(QWidget *parent = nullptr);
+  void updateBackgroundColor();
   void onSubWindowActivated(QMdiSubWindow *window);
   void onVGMFileSelected(const VGMFile *file, QWidget *caller);
   static void ensureMaximizedSubWindow(QMdiSubWindow *window);
