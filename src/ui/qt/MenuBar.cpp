@@ -11,6 +11,7 @@
 #include <QtGlobal>
 #include <QInputDialog>
 #include <QSignalBlocker>
+#include <QDir>
 #include "Options.h"
 #include "Root.h"
 #include "LogManager.h"
@@ -44,6 +45,9 @@ void MenuBar::appendFileMenu() {
   menu_open_file = m_fileMenu->addAction("Scan File");
   menu_open_file->setShortcut(QKeySequence(QStringLiteral("Ctrl+O")));
   connect(menu_open_file, &QAction::triggered, this, &MenuBar::openFile);
+
+  menu_recent_files = m_fileMenu->addMenu("Recent Files");
+  updateRecentFilesMenu();
 
   menu_exit_separator = m_fileMenu->addSeparator();
 
@@ -351,4 +355,27 @@ QMenu* MenuBar::ensureMenuForPath(const MenuManager::MenuPath& path) {
   }
 
   return currentMenu;
+}
+
+void MenuBar::updateRecentFilesMenu() {
+  menu_recent_files->clear();
+  auto files = Settings::the()->recentFiles.list();
+  const QString homeDir = QDir::homePath();
+  for (const auto& file : files) {
+    QString display = file;
+    if (display.startsWith(homeDir, Qt::CaseInsensitive)) {
+      display.replace(0, homeDir.length(), "~");
+    }
+    auto act = menu_recent_files->addAction(display);
+    connect(act, &QAction::triggered, this, [this, file]() { emit openRecentFile(file); });
+  }
+  if (!files.isEmpty()) {
+    menu_recent_files->addSeparator();
+    auto clear_act = menu_recent_files->addAction("Clear Items");
+    connect(clear_act, &QAction::triggered, this, [this]() {
+      Settings::the()->recentFiles.clear();
+      updateRecentFilesMenu();
+    });
+  }
+  menu_recent_files->setEnabled(!files.isEmpty());
 }
