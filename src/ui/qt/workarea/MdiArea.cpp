@@ -8,6 +8,8 @@
 
 #include <QTabBar>
 #include <QApplication>
+#include <QEvent>
+#include <QPalette>
 #include <QShortcut>
 #include <VGMFile.h>
 #include "VGMFileView.h"
@@ -19,6 +21,7 @@ MdiArea::MdiArea(QWidget *parent) : QMdiArea(parent) {
   setDocumentMode(true);
   setTabsMovable(true);
   setTabsClosable(true);
+  updateBackgroundColor();
 
   connect(this, &QMdiArea::subWindowActivated, this, &MdiArea::onSubWindowActivated);
   connect(NotificationCenter::the(), &NotificationCenter::vgmFileSelected, this, &MdiArea::onVGMFileSelected);
@@ -71,6 +74,18 @@ MdiArea::MdiArea(QWidget *parent) : QMdiArea(parent) {
   addShortcut(QKeySequence(Qt::CTRL | Qt::Key_PageUp),
               &QMdiArea::activatePreviousSubWindow);
 #endif
+}
+
+void MdiArea::changeEvent(QEvent *event) {
+  if (event->type() == QEvent::PaletteChange ||
+      event->type() == QEvent::ApplicationPaletteChange) {
+    updateBackgroundColor();
+  }
+  QMdiArea::changeEvent(event);
+}
+
+void MdiArea::updateBackgroundColor() {
+  setBackground(palette().color(QPalette::Window));
 }
 
 void MdiArea::newView(VGMFile *file) {
