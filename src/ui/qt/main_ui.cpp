@@ -6,10 +6,26 @@
 
 #include <QApplication>
 #include <QFile>
+#include <QFileOpenEvent>
 #include <QFontDatabase>
 #include <QStyleFactory>
 #include "MainWindow.h"
 #include "QtVGMRoot.h"
+
+class VGMTransApplication final : public QApplication {
+public:
+  using QApplication::QApplication;
+
+protected:
+  bool event(QEvent* event) override {
+    if (event->type() == QEvent::FileOpen) {
+      auto* fileEvent = static_cast<QFileOpenEvent*>(event);
+      qtVGMRoot.openRawFile(fileEvent->file().toStdString());
+      return true;
+    }
+    return QApplication::event(event);
+  }
+};
 
 int main(int argc, char *argv[]) {
   QCoreApplication::setOrganizationName("VGMTrans");
@@ -18,7 +34,7 @@ int main(int argc, char *argv[]) {
 
   QGuiApplication::setHighDpiScaleFactorRoundingPolicy(Qt::HighDpiScaleFactorRoundingPolicy::Round);
 
-  QApplication app(argc, argv);
+  VGMTransApplication app(argc, argv);
   #ifdef _WIN32
   app.setStyle(QStyleFactory::create("fusion"));
   #endif
@@ -28,6 +44,11 @@ int main(int argc, char *argv[]) {
 
   MainWindow window;
   window.show();
+
+  const QStringList args = app.arguments();
+  for (int i = 1; i < args.size(); i++) {
+    qtVGMRoot.openRawFile(args.at(i).toStdString());
+  }
 
   return app.exec();
 }
