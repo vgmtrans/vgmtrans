@@ -46,7 +46,7 @@ VGMSeq::~VGMSeq() {
   delete midi;
 }
 
-bool VGMSeq::loadVGMFile() {
+bool VGMSeq::loadVGMFile(bool useMatcher) {
   if (!load()) {
     return false;
   }
@@ -55,8 +55,10 @@ bool VGMSeq::loadVGMFile() {
     VGMMiscFile *>>(this));
   pRoot->addVGMFile(this);
 
-  if (auto fmt = format(); fmt) {
-    fmt->onNewFile(std::variant<VGMSeq *, VGMInstrSet *, VGMSampColl *, VGMMiscFile *>(this));
+  if (useMatcher) {
+    if (auto fmt = format(); fmt) {
+      fmt->onNewFile(std::variant<VGMSeq *, VGMInstrSet *, VGMSampColl *, VGMMiscFile *>(this));
+    }
   }
 
   return true;

@@ -20,7 +20,7 @@ public:
               std::string name = "VGMInstrSet", VGMSampColl *theSampColl = nullptr);
   ~VGMInstrSet() override;
 
-  bool loadVGMFile() override;
+  bool loadVGMFile(bool useMatcher = true) override;
   bool load() override;
   virtual bool parseHeader();
   virtual bool parseInstrPointers();
