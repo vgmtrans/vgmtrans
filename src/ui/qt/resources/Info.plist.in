@@ -20,5 +20,157 @@
     <true/>
     <key>CSResourcesFileMapped</key>
     <true/>
+    <key>CFBundleDocumentTypes</key>
+    <array>
+        <dict>
+            <key>CFBundleOSTypes</key>
+            <array>
+                <string>PSF </string>
+            </array>
+            <key>CFBundleTypeExtensions</key>
+            <array>
+                <string>psf</string>
+                <string>minipsf</string>
+            </array>
+            <key>CFBundleTypeName</key>
+            <string>PSF Soundtrack</string>
+            <key>CFBundleTypeRole</key>
+            <string>Viewer</string>
+            <key>LSHandlerRank</key>
+            <string>Alternate</string>
+        </dict>
+        <dict>
+            <key>CFBundleOSTypes</key>
+            <array>
+                <string>PSF2</string>
+            </array>
+            <key>CFBundleTypeExtensions</key>
+            <array>
+                <string>psf2</string>
+                <string>minipsf2</string>
+            </array>
+            <key>CFBundleTypeName</key>
+            <string>PSF2 Soundtrack</string>
+            <key>CFBundleTypeRole</key>
+            <string>Viewer</string>
+            <key>LSHandlerRank</key>
+            <string>Alternate</string>
+        </dict>
+        <dict>
+            <key>CFBundleOSTypes</key>
+            <array>
+                <string>SSF </string>
+            </array>
+            <key>CFBundleTypeExtensions</key>
+            <array>
+                <string>ssf</string>
+                <string>minissf</string>
+            </array>
+            <key>CFBundleTypeName</key>
+            <string>SSF Soundtrack</string>
+            <key>CFBundleTypeRole</key>
+            <string>Viewer</string>
+            <key>LSHandlerRank</key>
+            <string>Alternate</string>
+        </dict>
+        <dict>
+            <key>CFBundleOSTypes</key>
+            <array>
+                <string>2SF </string>
+            </array>
+            <key>CFBundleTypeExtensions</key>
+            <array>
+                <string>2sf</string>
+                <string>mini2sf</string>
+            </array>
+            <key>CFBundleTypeName</key>
+            <string>2SF Soundtrack</string>
+            <key>CFBundleTypeRole</key>
+            <string>Viewer</string>
+            <key>LSHandlerRank</key>
+            <string>Alternate</string>
+        </dict>
+        <dict>
+            <key>CFBundleOSTypes</key>
+            <array>
+                <string>GASF</string>
+            </array>
+            <key>CFBundleTypeExtensions</key>
+            <array>
+				<string>gsf</string>
+				<string>minigsf</string>
+            </array>
+            <key>CFBundleTypeName</key>
+            <string>GSF Soundtrack</string>
+            <key>CFBundleTypeRole</key>
+            <string>Viewer</string>
+            <key>LSHandlerRank</key>
+            <string>Alternate</string>
+        </dict>
+        <dict>
+            <key>CFBundleOSTypes</key>
+            <array>
+                <string>SPC </string>
+            </array>
+            <key>CFBundleTypeExtensions</key>
+            <array>
+                <string>spc</string>
+            </array>
+            <key>CFBundleTypeName</key>
+            <string>SPC Soundtrack</string>
+            <key>CFBundleTypeRole</key>
+            <string>Viewer</string>
+            <key>LSHandlerRank</key>
+            <string>Alternate</string>
+        </dict>
+        <dict>
+            <key>CFBundleOSTypes</key>
+            <array>
+                <string>RSN </string>
+            </array>
+            <key>CFBundleTypeExtensions</key>
+            <array>
+                <string>rsn</string>
+            </array>
+            <key>CFBundleTypeName</key>
+            <string>RSN Soundtrack Archive</string>
+            <key>CFBundleTypeRole</key>
+            <string>Viewer</string>
+            <key>LSHandlerRank</key>
+            <string>Alternate</string>
+        </dict>
+        <dict>
+            <key>CFBundleOSTypes</key>
+            <array>
+                <string>ZIP </string>
+            </array>
+            <key>CFBundleTypeExtensions</key>
+            <array>
+                <string>zip</string>
+            </array>
+            <key>CFBundleTypeName</key>
+            <string>ZIP Archive</string>
+            <key>CFBundleTypeRole</key>
+            <string>Viewer</string>
+            <key>LSHandlerRank</key>
+            <string>Alternate</string>
+        </dict>
+        <dict>
+            <key>CFBundleOSTypes</key>
+            <array>
+                <string>CHD </string>
+            </array>
+            <key>CFBundleTypeExtensions</key>
+            <array>
+                <string>chd</string>
+            </array>
+            <key>CFBundleTypeName</key>
+            <string>CHD Disk Image</string>
+            <key>CFBundleTypeRole</key>
+            <string>Viewer</string>
+            <key>LSHandlerRank</key>
+            <string>Alternate</string>
+        </dict>
+    </array>
 </dict>
 </plist>
