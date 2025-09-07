@@ -25,7 +25,7 @@ jobs:
           show-progress: false
 
       - name: Install Qt
-        uses: jurplel/install-qt-action@v3
+        uses: jurplel/install-qt-action@v4
         with:
             aqtversion: '==3.1.*'
             version: '6.8.3'
@@ -82,7 +82,7 @@ jobs:
             "bin/VGMTrans-${{ github.sha }}.dmg" \
             "bin"
       - name: Generate artifact attestation
-        uses: actions/attest-build-provenance@v2
+        uses: actions/attest-build-provenance@v3
         if: ${{ github.event_name != 'pull_request' }}
         with:
           subject-name: VGMTrans-${{ github.sha }}-${{ env.BRANCH }}-${{ matrix.target }}-${{ runner.os }}
@@ -112,7 +112,7 @@ jobs:
           echo "BRANCH=$(git rev-parse --abbrev-ref HEAD)" >> $GITHUB_ENV
 
       - name: Install Qt
-        uses: jurplel/install-qt-action@v3
+        uses: jurplel/install-qt-action@v4
         with:
           aqtversion: '==3.1.*'
           version: '6.8.3'
@@ -186,7 +186,7 @@ jobs:
 
           mv VGMTrans*.AppImage VGMTrans.AppImage
       - name: Generate artifact attestation
-        uses: actions/attest-build-provenance@v2
+        uses: actions/attest-build-provenance@v3
         if: ${{ github.event_name != 'pull_request' }}
         with:
           subject-name: VGMTrans-${{ github.sha }}-${{ env.BRANCH }}-x86_64-${{ runner.os }}
@@ -219,7 +219,7 @@ jobs:
             arch: ${{ matrix.target != 'x64' && (format('{0}_{1}', 'amd64', matrix.target)) || matrix.target }}
 
        - name: Install Qt
-         uses: jurplel/install-qt-action@v3
+         uses: jurplel/install-qt-action@v4
          with:
            aqtversion: '==3.1.*'
            version: '6.8.3'
@@ -242,7 +242,7 @@ jobs:
          run: 7z a "VGMTrans-${{ github.sha }}.zip" -r ".\build\win-${{ matrix.target }}\bin\*"
 
        - name: Generate artifact attestation
-         uses: actions/attest-build-provenance@v2
+         uses: actions/attest-build-provenance@v3
          if: ${{ github.event_name != 'pull_request' }}
          with:
            subject-name: VGMTrans-${{ github.sha }}-${{ env.BRANCH }}-${{ matrix.target }}-${{ runner.os }}
