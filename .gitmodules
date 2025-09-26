@@ -4,12 +4,6 @@
 [submodule "lib/spdlog"]
 	path = lib/spdlog
 	url = https://github.com/gabime/spdlog.git
-[submodule "lib/zlib-ng"]
-	path = lib/zlib-ng
-	url = https://github.com/zlib-ng/zlib-ng.git
-[submodule "lib/minizip-ng"]
-	path = lib/minizip-ng
-	url = https://github.com/zlib-ng/minizip-ng.git
 [submodule "lib/libchdr"]
 	path = lib/libchdr
 	url = https://github.com/rtissera/libchdr.git
