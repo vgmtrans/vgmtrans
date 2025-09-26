@@ -16,9 +16,36 @@ if (USE_VENDORED_ZLIBNG)
   set(WITH_GTEST OFF)
   add_subdirectory("${PROJECT_SOURCE_DIR}/lib/zlib-ng" "${CMAKE_BINARY_DIR}/lib/zlib-ng" EXCLUDE_FROM_ALL)
 
+  if(NOT TARGET ZLIB::ZLIB)
+    add_library(ZLIB::ZLIB INTERFACE IMPORTED)
+  endif()
+
+  set(ZLIB_INCLUDE_DIR "${PROJECT_SOURCE_DIR}/lib/zlib-ng")
+  set(ZLIB_INCLUDE_DIRS
+          "${PROJECT_SOURCE_DIR}/lib/zlib-ng"
+          "${CMAKE_BINARY_DIR}/lib/zlib-ng"
+  )
+
+  get_directory_property(ZLIB_VERSION DIRECTORY "${CMAKE_BINARY_DIR}/lib/zlib-ng" DEFINITION PROJECT_VERSION)
+  if(NOT ZLIB_VERSION)
+    set(ZLIB_VERSION "0")
+  endif()
+  set(ZLIB_VERSION_STRING "${ZLIB_VERSION}")
+
+  set_target_properties(ZLIB::ZLIB PROPERTIES
+          INTERFACE_INCLUDE_DIRECTORIES "${ZLIB_INCLUDE_DIRS}"
+          INTERFACE_LINK_LIBRARIES "zlib"
+  )
+
+  set(_vgmtrans_zlib_config_dir "${CMAKE_BINARY_DIR}/vgmtrans-zlib")
+  configure_file("${PROJECT_SOURCE_DIR}/cmake/zlib/ZLIBConfig.cmake.in"
+          "${_vgmtrans_zlib_config_dir}/ZLIBConfig.cmake"
+          @ONLY)
+
   set(ZLIB_FOUND TRUE)
-  set(ZLIB_INCLUDE_DIRS "${PROJECT_SOURCE_DIR}/lib/zlib-ng" "${CMAKE_BINARY_DIR}/lib/zlib-ng")
-  set(ZLIB_LIBRARIES $<TARGET_FILE:zlibstatic>)
+  set(ZLIB_DIR "${_vgmtrans_zlib_config_dir}" CACHE PATH "Path to vendored zlib configuration" FORCE)
+  set(ZLIB_LIBRARIES ZLIB::ZLIB)
+  set(ZLIB_LIBRARY ZLIB::ZLIB)
 endif()
 
 # Configure minizip-ng to use zlib and none of the other options
