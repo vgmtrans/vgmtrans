@@ -24,10 +24,6 @@
             "environment": {
                 "CFLAGS": "/permissive- /Zc:strictStrings- /W3 -DNOMINMAX -D_CRT_SECURE_NO_DEPRECATE -D_CRT_NONSTDC_NO_DEPRECATE -D_USE_MATH_DEFINES",
                 "CXXFLAGS": "/permissive- /Zc:strictStrings- /W3 -DNOMINMAX -D_CRT_SECURE_NO_DEPRECATE -D_CRT_NONSTDC_NO_DEPRECATE -D_USE_MATH_DEFINES"
-            },
-            "cacheVariables": {
-                "WITH_AVX512": false,
-                "WITH_AVX2": false
             }
         },
         {
@@ -55,9 +51,7 @@
             "cacheVariables": {
                 "CMAKE_C_COMPILER": "clang-cl.exe",
                 "CMAKE_CXX_COMPILER": "clang-cl.exe",
-                "WITH_LZMA_ASM": false,
-                "WITH_AVX512": false,
-                "WITH_AVX2": false
+                "WITH_LZMA_ASM": false
             }
         },
         {
