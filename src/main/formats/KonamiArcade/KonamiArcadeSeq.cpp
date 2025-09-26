@@ -102,6 +102,7 @@ void KonamiArcadeTrack::resetVars() {
   m_percussionFlag2 = false;
   m_driverTranspose = 0;
   m_prevNoteAbsTime = 0;
+  m_prevNoteDur = 0;
   m_prevNoteDelta = 0;
   m_prevFinalKey = 0;
   m_tiePrevNote = false;
@@ -116,6 +117,7 @@ void KonamiArcadeTrack::resetVars() {
   m_panSlideDuration = 0;
   m_panSlideTarget = 0;
   m_panSlideIncrement = 0;
+  m_portamentoTime = 0;
   m_slideModeDelay = 0;
   m_slideModeDuration = 0;
   m_slideModeDepth = 0;
