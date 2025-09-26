@@ -7,3 +7,6 @@
 [submodule "lib/libchdr"]
 	path = lib/libchdr
 	url = https://github.com/rtissera/libchdr.git
+[submodule "zlib"]
+	path = lib/zlib
+	url = https://github.com/madler/zlib.git
