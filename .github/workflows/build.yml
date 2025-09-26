@@ -44,7 +44,6 @@ jobs:
       - name: "Build project"
         # $(sysctl -n hw.logicalcpu) is required to not make XCode spawn infinite threads...
         run: cmake --build --preset "macos-${{ matrix.target }}-release" \
-          --parallel $(sysctl -n hw.logicalcpu) \
           --target vgmtrans
 
       - name: "Package DMG (macOS)"
@@ -146,7 +145,6 @@ jobs:
           export CC=clang-20
           export CXX=clang++-20
           cmake --preset linux-x64 \
-            -G "Ninja Multi-Config" \
             -DCMAKE_INSTALL_PREFIX=/usr
 
       - name: "Build project"
