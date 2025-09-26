@@ -143,24 +143,17 @@ if(CMAKE_SYSTEM_NAME MATCHES "Darwin")
   set_source_files_properties("${CMAKE_CURRENT_LIST_DIR}/resources/appicon.icns"
                               PROPERTIES MACOSX_PACKAGE_LOCATION Resources)
 
+  get_target_property(BASS_DLL_LOCATION BASS::BASS IMPORTED_LOCATION)
+  get_target_property(BASSMIDI_DLL_LOCATION BASS::MIDI IMPORTED_LOCATION)
+
   add_custom_command(
     TARGET vgmtrans
     POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy_if_different "${CMAKE_SOURCE_DIR}/bin/mame_roms.xml"
-    "${BUNDLE_PATH}/Contents/Resources/")
-
-  get_target_property(BASS_DLL_LOCATION BASS::BASS IMPORTED_LOCATION)
-  add_custom_command(
-    TARGET vgmtrans
-    POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E copy_if_different "${BASS_DLL_LOCATION}"
-            "${BUNDLE_PATH}/Contents/MacOS/")
-  get_target_property(BASSMIDI_DLL_LOCATION BASS::MIDI IMPORTED_LOCATION)
-  add_custom_command(
-    TARGET vgmtrans
-    POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E copy_if_different "${BASSMIDI_DLL_LOCATION}"
-            "${BUNDLE_PATH}/Contents/MacOS/")
+          "$<TARGET_FILE_DIR:vgmtrans>/../Resources"
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different "${BASS_DLL_LOCATION}"  "$<TARGET_FILE_DIR:vgmtrans>/"
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different "${BASSMIDI_DLL_LOCATION}"  "$<TARGET_FILE_DIR:vgmtrans>/"
+  )
 elseif(CMAKE_SYSTEM_NAME MATCHES "Windows")
   # Make sure the executable ends up in the binary directory without any
   # additional folders
