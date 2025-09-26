@@ -41,7 +41,6 @@ endif()
 
 target_include_directories(minizip PUBLIC "${MINIZIP_DIR}")
 target_link_libraries(minizip PUBLIC ZLIB::ZLIB)
-add_library(MINIZIP::minizip ALIAS minizip)
 
 # Add libunarr
 message(INFO "Using built-in unarr")
@@ -75,5 +74,5 @@ target_include_directories(vgmtranscore PUBLIC
         ${CMAKE_CURRENT_BINARY_DIR})
 target_link_libraries(
   vgmtranscore
-  PUBLIC spdlog::spdlog unarr ZLIB::ZLIB MINIZIP::minizip tinyxml mio chdr-static
+  PUBLIC spdlog::spdlog unarr ZLIB::ZLIB minizip tinyxml mio chdr-static
 )
