@@ -8,24 +8,11 @@ endif()
 
 if (NOT ZLIB_FOUND)
   message(STATUS "System zlib not found; building vendored zlib (static)")
-
-  set(ZLIB_BUILD_TESTING OFF CACHE BOOL "" FORCE)
-  set(ZLIB_BUILD_SHARED  OFF CACHE BOOL "" FORCE)
-  set(ZLIB_BUILD_STATIC  ON  CACHE BOOL "" FORCE)
-  set(ZLIB_INSTALL       OFF CACHE BOOL "" FORCE)
-
+  set(ZLIB_BUILD_EXAMPLES OFF CACHE BOOL "Build zlib examples" FORCE)
   add_subdirectory("${PROJECT_SOURCE_DIR}/lib/zlib"
           "${CMAKE_BINARY_DIR}/lib/zlib"
           EXCLUDE_FROM_ALL)
   add_library(ZLIB::ZLIB ALIAS zlibstatic)
-else()
-  # Make a canonical imported target if FindZLIB didn't provide one
-  if (NOT TARGET ZLIB::ZLIB)
-    add_library(ZLIB::ZLIB UNKNOWN IMPORTED)
-    set_target_properties(ZLIB::ZLIB PROPERTIES
-            IMPORTED_LOCATION "${ZLIB_LIBRARY}"
-            INTERFACE_INCLUDE_DIRECTORIES "${ZLIB_INCLUDE_DIRS}")
-  endif()
 endif()
 
 # Add minizip from our vendored zlib
