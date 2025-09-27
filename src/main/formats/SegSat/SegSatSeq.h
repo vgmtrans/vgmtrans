@@ -2,6 +2,7 @@
 #include "VGMSeqNoTrks.h"
 
 class SegSatRgn;
+class SegSatInstr;
 class SegSatInstrSet;
 struct SegSatVLTable;
 
@@ -19,11 +20,11 @@ class SegSatSeq:
  private:
   const SegSatRgn* resolveRegion(u8 bank, u8 progNum, u8 noteNum);
   constexpr double tlDB(uint8_t tl);
-  u8 resolveVelocity(u8 vel, const SegSatRgn& rgn, u8 ch);
+  u8 resolveVelocity(u8 vel, const SegSatRgn& rgn, s8 volBias, u8 ch);
 
   struct CollContext {
     std::vector<SegSatVLTable> m_vlTables;
-    std::vector<std::vector<SegSatRgn>> instrs;
+    std::vector<SegSatInstr> instrs;
   };
   CollContext m_collContext;
   u32 m_normalTrackOffset;

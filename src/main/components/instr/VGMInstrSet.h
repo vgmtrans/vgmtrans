@@ -50,7 +50,7 @@ public:
            uint32_t instrNum, std::string name = "Instrument",
            float reverb = defaultReverbPercent);
 
-  const std::vector<VGMRgn*>& regions() { return m_regions; }
+  const std::vector<VGMRgn*>& regions() const { return m_regions; }
 
   inline void setBank(uint32_t bankNum);
   inline void setInstrNum(uint32_t theInstrNum);
