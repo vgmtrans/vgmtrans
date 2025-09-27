@@ -28,7 +28,7 @@ void VSTSequencePlayer::initializeAudio() {
   juce::String error = deviceManager.initialiseWithDefaultDevices(0, 2);
 }
 
-bool VSTSequencePlayer::loadCollection(VGMColl *coll, std::function<void()> const& onCompletion) {
+bool VSTSequencePlayer::loadCollection(const VGMColl *coll, std::function<void()> const& onCompletion) {
 
   // If we haven't loaded the VST yet, do it now.
   if (! pluginInstance) {
@@ -255,7 +255,7 @@ bool VSTSequencePlayer::loadVST() {
   return true;
 }
 
-bool VSTSequencePlayer::sendSF2ToVST(VGMColl* coll) {
+bool VSTSequencePlayer::sendSF2ToVST(const VGMColl* coll) {
   SF2File* sf2 = conversion::createSF2File(*coll);
   if (!sf2) {
     L_ERROR("Failed to play collection as a soundfont file could not be produced.");
@@ -270,7 +270,7 @@ bool VSTSequencePlayer::sendSF2ToVST(VGMColl* coll) {
   return true;
 }
 
-bool VSTSequencePlayer::sendOpmToVST(VGMColl* coll) {
+bool VSTSequencePlayer::sendOpmToVST(const VGMColl* coll) {
   for (auto instrSet : coll->instrSets()) {
     if (auto cps1instrset = dynamic_cast<CPS1OPMInstrSet*>(instrSet)) {
       std::string opmFile = cps1instrset->generateOPMFile();
