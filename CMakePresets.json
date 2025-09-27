@@ -56,6 +56,7 @@
         },
         {
             "name": "macos-base",
+            "generator": "Ninja Multi-Config",
             "binaryDir": "${sourceDir}/build/${presetName}",
             "hidden": true,
             "environment": {
@@ -94,6 +95,7 @@
         },
         {
             "name": "linux-x64",
+            "generator": "Ninja Multi-Config",
             "binaryDir": "${sourceDir}/build/${presetName}",
             "displayName": "Linux x64",
             "description": "Build VGMTrans for Linux x64",
