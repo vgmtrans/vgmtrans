@@ -101,7 +101,7 @@ bool AkaoMatcher::tryCreateCollection(int id) {
         sampCollsToCheck.push_back(*it);
       } else {
         // PSF files may optimize out the IDs, so be lenient
-        if (isPsfFile(seq->rawFile()))
+        if (!isPsfFile(seq->rawFile()))
           return false;
       }
     }
