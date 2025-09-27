@@ -7,7 +7,7 @@
 #pragma once
 
 #include "GeneralCommands.h"
-#include "SequencePlayer.h"
+#include "services/playerservice/PlayerService.h"
 #include "services/commands/Command.h"
 #include "VGMColl.h"
 
@@ -19,7 +19,7 @@ using MenuPath = Command::MenuPath;
 class PlayCommand : public SingleItemCommand<VGMColl> {
 public:
   void executeItem(VGMColl* coll) const override {
-    SequencePlayer::the().playCollection(coll);
+    PlayerService::getInstance()->playCollection(coll);
   }
   [[nodiscard]] QList<QKeySequence> shortcutKeySequences() const override { return {Qt::Key_Return}; };
   [[nodiscard]] std::string name() const override { return "Play / Pause"; }
