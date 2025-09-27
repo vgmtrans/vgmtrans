@@ -59,7 +59,7 @@ public:
    * @param collection
    * @return true if data was loaded correctly
    */
-  bool loadCollection(VGMColl* coll, std::function<void()> const& onCompletion = [](){});
+  bool loadCollection(const VGMColl* coll, std::function<void()> const& onCompletion = [](){});
   void stop();
   void pause();
   void play();
@@ -86,8 +86,8 @@ private:
   bool loadVST();
   void clearState();
   bool prepMidiPlayback(VGMSeq* seq);
-  bool sendSF2ToVST(VGMColl* coll);
-  bool sendOpmToVST(VGMColl* coll);
+  bool sendSF2ToVST(const VGMColl* coll);
+  bool sendOpmToVST(const VGMColl* coll);
   std::vector<int> generateEventSampleTimes(std::vector<MidiEvent*>& events, int ppqn) const;
   juce::MidiMessage convertToChannelGroupMessage(MidiEvent* event) const;
   juce::MidiMessage convertToJuceMidiMessage(MidiEvent* event) const;
