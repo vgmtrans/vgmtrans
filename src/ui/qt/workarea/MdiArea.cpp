@@ -287,7 +287,7 @@ void MdiArea::paintEvent(QPaintEvent *event) {
 
   if (!hasRawFiles) {
     InstructionHint dropHint{QStringLiteral(":/icons/tray-arrow-down.svg"), tr("Drop files to scan"),
-                             1.6, 6.0, 0.5};
+                             2, 4.0, 0.3};
     const InstructionMetrics metrics = computeInstructionMetrics(dropHint, baseFont);
     const int left = areaRect.center().x() - metrics.size.width() / 2;
     const int top = areaRect.center().y() - metrics.size.height() / 2;
