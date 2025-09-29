@@ -12,6 +12,7 @@
 
 class VGMFile;
 class QEvent;
+class QPaintEvent;
 
 class MdiArea : public QMdiArea {
   Q_OBJECT
@@ -35,6 +36,7 @@ public:
 
 protected:
   void changeEvent(QEvent *event) override;
+  void paintEvent(QPaintEvent *event) override;
 
 private:
   MdiArea(QWidget *parent = nullptr);

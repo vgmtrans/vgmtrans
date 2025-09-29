@@ -32,6 +32,10 @@
   <file>icons/repeat-begin.svg</file>
   <file>icons/repeat-end.svg</file>
   <file>icons/pitchbend.svg</file>
+  <file>icons/midi-port.svg</file>
+  <file>icons/magnify.svg</file>
+  <file>icons/volume-high.svg</file>
+  <file>icons/tray-arrow-down.svg</file>
   <file>icons/toast_info.svg</file>
   <file>icons/toast_warning.svg</file>
   <file>icons/toast_error.svg</file>
