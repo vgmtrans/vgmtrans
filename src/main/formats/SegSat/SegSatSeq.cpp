@@ -52,20 +52,10 @@ void SegSatSeq::useColl(const VGMColl* coll) {
   m_collContext.instrs.reserve(instrSet->aInstrs.size());
 
   for (VGMInstr* instr : instrSet->aInstrs) {
-    const auto& rgns = instr->regions();
-    std::vector<SegSatRgn> rgnCopies;
-    rgnCopies.reserve(rgns.size());
-
-    for (const VGMRgn* p : rgns) {
-      const SegSatRgn* pRgn = dynamic_cast<const SegSatRgn*>(p);
-      if (!pRgn)
-        continue;
-      SegSatRgn rgnCopy = *pRgn;
-      rgnCopy.removeChildren();
-      rgnCopies.push_back(rgnCopy);
-    }
-
-    m_collContext.instrs.emplace_back(std::move(rgnCopies));
+    const SegSatInstr* pInstr = dynamic_cast<const SegSatInstr*>(instr);
+    SegSatInstr instrCopy = *pInstr;
+    instrCopy.removeChildren();
+    m_collContext.instrs.push_back(instrCopy);
   }
 }
 
@@ -87,14 +77,15 @@ bool SegSatSeq::parseHeader() {
 
 /// For a given bank, program number, and note, determine the applied instrument region.
 const SegSatRgn* SegSatSeq::resolveRegion(u8 bank, u8 progNum, u8 noteNum) {
-  const auto& instrs = m_collContext.instrs;
+  auto& instrs = m_collContext.instrs;
   if (progNum >= instrs.size())
     return nullptr;
 
-  const auto& rgns = instrs[progNum];
-  for (const auto& rgn : rgns) {
-    if (noteNum >= rgn.keyLow && noteNum <= rgn.keyHigh) {
-      return &rgn;
+  const auto& rgns = instrs[progNum].regions();
+  for (const auto* rgn : rgns) {
+    auto segSatRgn = dynamic_cast<const SegSatRgn*>(rgn);
+    if (noteNum >= segSatRgn->keyLow && noteNum <= segSatRgn->keyHigh) {
+      return segSatRgn;
     }
   }
   return nullptr;
@@ -102,9 +93,8 @@ const SegSatRgn* SegSatSeq::resolveRegion(u8 bank, u8 progNum, u8 noteNum) {
 
 /// For a velocity and instrument region, determine the final velocity value by applying the
 /// Velocity Level table transformation and accounting for the TL register attenuation behavior.
-/// TODO: account for the region's volume bias value.
 /// The logic is based on the 1.33 version of the driver (circa "95/08/07")
-u8 SegSatSeq::resolveVelocity(u8 vel, const SegSatRgn& rgn, u8 ch) {
+u8 SegSatSeq::resolveVelocity(u8 vel, const SegSatRgn& rgn, s8 volBias, u8 ch) {
   u8 vlTableIndex = rgn.vlTableIndex();
   const auto& vlTables = m_collContext.m_vlTables;
   if (vlTableIndex >= vlTables.size())
@@ -172,8 +162,7 @@ u8 SegSatSeq::resolveVelocity(u8 vel, const SegSatRgn& rgn, u8 ch) {
   // Later versions treat them as distinct, though details remain unexamined.
   // u8 amp = (volScale * ( (m_vol[ch] & 0x7F)+1 )*4 - 1) >> 16;
 
-  // TODO: add vol bias
-  u8 tl = ~std::clamp<u8>(amp, 0, 255);
+  u8 tl = ~static_cast<u8>(std::clamp<int>(amp + volBias, 0, 255));
   u8 result = convertDBAttenuationToStdMidiVal(tlToDB(tl));
   return result;
 }
@@ -211,9 +200,11 @@ bool SegSatSeq::readEvent() {
     u16 deltaTime = readByte(curOffset++) | deltaBit8;
     addTime(deltaTime);
 
+    u8 progNum = m_progNum[ch];
     auto* rgn = resolveRegion(0, m_progNum[ch], key);
     if (rgn) {
-      vel = resolveVelocity(vel, *rgn, ch);
+      s8 volBias = m_collContext.instrs[progNum].volBias();
+      vel = resolveVelocity(vel, *rgn, volBias, ch);
     } else {
       L_WARN("Didn't find an instrument region with key range covering note event at offset: {:X}", beginOffset);
     }
