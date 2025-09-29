@@ -77,7 +77,7 @@ bool SegSatSeq::parseHeader() {
 
 /// For a given bank, program number, and note, determine the applied instrument region.
 const SegSatRgn* SegSatSeq::resolveRegion(u8 bank, u8 progNum, u8 noteNum) {
-  const auto& instrs = m_collContext.instrs;
+  auto& instrs = m_collContext.instrs;
   if (progNum >= instrs.size())
     return nullptr;
 
