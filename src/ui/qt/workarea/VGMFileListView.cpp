@@ -129,6 +129,9 @@ VGMFileListView::VGMFileListView(QWidget *parent) : TableView(parent) {
   connect(this, &QAbstractItemView::customContextMenuRequested, this, &VGMFileListView::itemMenu);
   connect(this, &QAbstractItemView::doubleClicked, this, &VGMFileListView::requestVGMFileView);
   connect(NotificationCenter::the(), &NotificationCenter::vgmFileSelected, this, &VGMFileListView::onVGMFileSelected);
+  connect(selectionModel(), &QItemSelectionModel::selectionChanged, this, &VGMFileListView::onSelectionChanged);
+
+  updateContextualMenus();
 }
 
 void VGMFileListView::itemMenu(const QPoint &pos) {
@@ -148,6 +151,29 @@ void VGMFileListView::itemMenu(const QPoint &pos) {
   auto menu = MenuManager::the()->createMenuForItems<VGMItem>(selectedFiles);
   menu->exec(mapToGlobal(pos));
   menu->deleteLater();
+}
+
+void VGMFileListView::onSelectionChanged(const QItemSelection&, const QItemSelection&) {
+  updateContextualMenus();
+}
+
+void VGMFileListView::updateContextualMenus() const {
+  if (!selectionModel()) {
+    NotificationCenter::the()->updateContextualMenusForVGMFiles({});
+    return;
+  }
+
+  QModelIndexList list = selectionModel()->selectedRows();
+  QList<VGMFile*> files;
+  files.reserve(list.size());
+
+  for (const auto& index : list) {
+    if (index.isValid()) {
+      files.append(variantToVGMFile(qtVGMRoot.vgmFiles()[index.row()]));
+    }
+  }
+
+  NotificationCenter::the()->updateContextualMenusForVGMFiles(files);
 }
 
 void VGMFileListView::keyPressEvent(QKeyEvent *input) {

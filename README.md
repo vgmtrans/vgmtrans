@@ -70,8 +70,8 @@ The following formats are supported with varying degrees of accuracy:
 ## Usage
 
 #### *Loading Files*
-Load files by dragging them into the application window or by using the `File` => `Open` menu action. The program will scan a
-file for contained music files, which when found will appear under the "Detected Music Files" panel. 
+Load files by dragging them into the application window or by choosing `Import File` from the File menu. The program will scan a
+file for contained music files, which when found will appear under the "Detected Music Files" panel.
 
 VGMTrans is able to 
 unpack portable sound format files (`psf`) and related formats (`psf2`, `ssf`, etc). SNES formats generally must be loaded 
@@ -80,20 +80,20 @@ from `spc` or `rsn` files. Arcade formats are loaded via mame rom set `zip` file
 #### *Scanned Files*
 
 The Scanned Files panel lists all files that have been scanned by VGMTrans which yielded detected files.
-A scanned file can be removed by selecting it and pressing `Delete` or `Backspace`, or by right-clicking and selecting `Close`.
+A scanned file can be removed by selecting it and pressing `Delete` or `Backspace`, or by selecting `Remove` from the File menu or right-click context menu.
 When removed, all detected files contained in the scanned file will also be removed.
 
 #### *Detected Music Files*
-Right-clicking a file listed in the Detected Music Files panel brings up a menu of conversion options. Double-clicking 
-a detected file will open it in the Hex View. Detected Files can be removed by pressing `Delete` or `Backspace`, or by right-clicking and selecting `Close`.
+Selecting files enables actions in the Convert menu and right-click context menu. Double-clicking
+a detected file will open it in an Analysis View. Detected Files can be removed by pressing `Delete` or `Backspace`, or by selecting `Remove` from the File menu or right-click context menu.
 
 #### *Collections*
 For some formats, when files representing musical sequences, instruments, and samples are all loaded, VGMTrans may
 associate these files together into a Collection. Collections are listed in the Collections panel at the bottom of the
-main window. Double-clicking a collection or selecting one and pressing the `Space Bar` or clicking the green Play button 
+main window. Double-clicking a collection or selecting one and pressing `Space Bar`, choosing `Play / Pause` from the Preview menu, or clicking the green Play button
 will attempt to play back the sequence using its associated instrument data.
 
-Right-clicking a collection will bring up a menu with conversion options.
+Conversion commands are available from the Convert menu or by right-clicking a collection.
 
 #### *Manual Collection Creation (advanced)*
 Sometimes VGMTrans cannot properly group detected files into Collections. In this event, the `Create collection manually` 
@@ -101,20 +101,20 @@ button at the bottom of the Collection panel can be used. The button opens a dia
 which to create a new Collection.
 
 
-#### *Hex View*
-Double-clicking a detected file opens an interactive Hex View. The Hex View provides a visual
-breakdown of a file's structure, with each element color-coded and annotated upon selection. 
-The accompanying File Structure panel to the right of the Hex View provides a hierarchical list of all the elements 
-within the file. Clicking an element, either in the Hex View or the File Structure panel, highlights it and
+#### *Analysis View*
+Double-clicking a detected file opens an interactive Analysis View. The Analysis View provides a visual
+breakdown of a file's structure as color-coded hexadecimal data.
+The accompanying File Structure panel on the right of the view provides a hierarchical list of all the elements
+within the file. Clicking an element, either in the Analysis View or the File Structure panel, highlights it and
 displays more information about the element in the status bar at the bottom of the main window. When enabled, the "Show Details"
 toggle button in the top right corner of the File Structure panel will display details for each element directly
 in the File Structure panel.
 
 #### *Batch Conversion*
 
-To convert files in batch, select multiple files of the same type (denoted by icon) in the Detected Music Files panel, 
-then right-click the selection and choose a conversion action. Similarly, Collections can be converted in batch by 
-selecting multiple and right-clicking the selection.
+To convert files in batch, select multiple files of the same type (denoted by icon) in the Detected Music Files panel,
+then use the Convert menu or right-click the selection and choose a conversion action. Similarly, Collections can be converted in batch by
+selecting multiple.
 
 ## Building
 

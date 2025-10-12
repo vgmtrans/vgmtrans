@@ -7,6 +7,7 @@
 #pragma once
 
 #include <filesystem>
+#include <optional>
 #include <typeindex>
 #include <variant>
 #include <vector>
@@ -100,6 +101,8 @@ public:
  */
 class Command {
 public:
+  using MenuPath = std::vector<std::string>;
+
   virtual ~Command() = default;
 
   /**
@@ -127,6 +130,13 @@ public:
    * @return the keyboard shortcut
    */
   [[nodiscard]] virtual QKeySequence shortcutKeySequence() const { return -1; };
+
+  /**
+   * Specifies the menu path where this command should be surfaced in the main menu bar.
+   * Returning std::nullopt means the command is contextual only.
+   * The first element of the path represents the top-level menu name.
+   */
+  [[nodiscard]] virtual std::optional<MenuPath> menuPath() const { return std::nullopt; }
 };
 
 class CommandSeparator : public Command {
@@ -138,3 +148,9 @@ public:
   [[nodiscard]] std::shared_ptr<CommandContextFactory> contextFactory() const override { return nullptr; }
   [[nodiscard]] std::string name() const override { return "separator"; }
 };
+
+namespace MenuPaths {
+inline const Command::MenuPath File{"File"};
+inline const Command::MenuPath Convert{"Convert"};
+inline const Command::MenuPath Preview{"Preview"};
+}

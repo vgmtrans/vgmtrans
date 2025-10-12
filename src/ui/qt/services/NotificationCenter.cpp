@@ -33,3 +33,11 @@ void NotificationCenter::updateStatusForItem(VGMItem* item) {
 void NotificationCenter::selectVGMFile(VGMFile* vgmfile, QWidget* caller) {
   emit vgmFileSelected(vgmfile, caller);
 }
+
+void NotificationCenter::updateContextualMenusForVGMFiles(const QList<VGMFile*>& files) {
+  emit vgmFileContextCommandsChanged(files);
+}
+
+void NotificationCenter::updateContextualMenusForVGMColls(const QList<VGMColl*>& colls) {
+  emit vgmCollContextCommandsChanged(colls);
+}

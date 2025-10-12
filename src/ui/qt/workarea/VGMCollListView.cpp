@@ -12,6 +12,7 @@
 #include "SequencePlayer.h"
 #include "QtVGMRoot.h"
 #include "services/MenuManager.h"
+#include "services/NotificationCenter.h"
 
 static const QIcon &VGMCollIcon() {
   static QIcon icon(":/icons/collection.svg");
@@ -125,6 +126,9 @@ VGMCollListView::VGMCollListView(QWidget *parent) : QListView(parent) {
       selectionModel()->currentChanged({}, {});
     }
   });
+  connect(selectionModel(), &QItemSelectionModel::selectionChanged, this, &VGMCollListView::onSelectionChanged);
+
+  updateContextualMenus();
 }
 
 void VGMCollListView::collectionMenu(const QPoint &pos) const {
@@ -193,4 +197,27 @@ void VGMCollListView::handlePlaybackRequest() {
 
 void VGMCollListView::handleStopRequest() {
   SequencePlayer::the().stop();
+}
+
+void VGMCollListView::onSelectionChanged(const QItemSelection&, const QItemSelection&) {
+  updateContextualMenus();
+}
+
+void VGMCollListView::updateContextualMenus() const {
+  if (!selectionModel()) {
+    NotificationCenter::the()->updateContextualMenusForVGMColls({});
+    return;
+  }
+
+  QModelIndexList list = selectionModel()->selectedRows();
+  QList<VGMColl*> colls;
+  colls.reserve(list.size());
+
+  for (const auto& index : list) {
+    if (index.isValid()) {
+      colls.append(qtVGMRoot.vgmColls()[index.row()]);
+    }
+  }
+
+  NotificationCenter::the()->updateContextualMenusForVGMColls(colls);
 }

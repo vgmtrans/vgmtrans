@@ -16,6 +16,7 @@
 #include "formats/CPS/CPS1Instr.h"
 
 namespace fs = std::filesystem;
+using MenuPath = Command::MenuPath;
 
 /**
  * A command context for saving files. Provides a list of items to save and a path to save them to.
@@ -155,6 +156,7 @@ public:
   }
   [[nodiscard]] std::string name() const override { return "Save as original format"; }
   [[nodiscard]] std::string extension() const override { return ""; }
+  [[nodiscard]] std::optional<MenuPath> menuPath() const override { return MenuPaths::Convert; }
 };
 
 class SaveAsMidiCommand : public SaveCommand<VGMSeq, VGMFile> {
@@ -185,6 +187,7 @@ public:
   }
   [[nodiscard]] std::string name() const override { return "Save as MIDI"; }
   [[nodiscard]] std::string extension() const override { return "mid"; }
+  [[nodiscard]] std::optional<MenuPath> menuPath() const override { return MenuPaths::Convert; }
 };
 
 
@@ -197,6 +200,7 @@ public:
   }
   [[nodiscard]] std::string name() const override { return "Save as DLS"; }
   [[nodiscard]] std::string extension() const override { return "dls"; }
+  [[nodiscard]] std::optional<MenuPath> menuPath() const override { return MenuPaths::Convert; }
 };
 
 
@@ -209,6 +213,7 @@ public:
   }
   [[nodiscard]] std::string name() const override { return "Save as SF2"; }
   [[nodiscard]] std::string extension() const override { return "sf2"; }
+  [[nodiscard]] std::optional<MenuPath> menuPath() const override { return MenuPaths::Convert; }
 };
 
 class SaveAsOPMCommand : public SaveCommand<CPS1OPMInstrSet, VGMFile> {
@@ -220,6 +225,7 @@ public:
   }
   [[nodiscard]] std::string name() const override { return "Save as OPM"; }
   [[nodiscard]] std::string extension() const override { return "opm"; }
+  [[nodiscard]] std::optional<MenuPath> menuPath() const override { return MenuPaths::Convert; }
 };
 
 
@@ -232,6 +238,7 @@ public:
   }
   [[nodiscard]] std::string name() const override { return "Save all samples as WAV"; }
   [[nodiscard]] std::string extension() const override { return "wav"; }
+  [[nodiscard]] std::optional<MenuPath> menuPath() const override { return MenuPaths::Convert; }
 };
 
 template <conversion::Target options>
@@ -270,4 +277,5 @@ public:
     return name;
   }
   [[nodiscard]] std::string extension() const override { return ""; }
+  [[nodiscard]] std::optional<MenuPath> menuPath() const override { return MenuPaths::Convert; }
 };

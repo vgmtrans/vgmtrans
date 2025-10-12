@@ -13,6 +13,7 @@
 
 #include "VGMFile.h"
 
+class QItemSelection;
 class VGMFileListModel : public QAbstractTableModel {
     Q_OBJECT
 
@@ -44,11 +45,13 @@ class VGMFileListView final : public TableView {
     void onVGMFileSelected(VGMFile *file, const QWidget* caller);
 
   private:
-    void updateStatusBar() const;
-    void focusInEvent(QFocusEvent *event) override;
-    void currentChanged(const QModelIndex &current, const QModelIndex &previous) override;
-    void keyPressEvent(QKeyEvent *input) override;
-    void itemMenu(const QPoint &pos);
+  void updateStatusBar() const;
+  void focusInEvent(QFocusEvent *event) override;
+  void currentChanged(const QModelIndex &current, const QModelIndex &previous) override;
+  void keyPressEvent(QKeyEvent *input) override;
+  void itemMenu(const QPoint &pos);
+  void onSelectionChanged(const QItemSelection &selected, const QItemSelection &deselected);
+  void updateContextualMenus() const;
 
-    VGMFileListModel *view_model;
+  VGMFileListModel *view_model;
 };

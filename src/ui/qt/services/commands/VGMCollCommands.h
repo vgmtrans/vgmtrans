@@ -11,6 +11,8 @@
 #include "services/commands/Command.h"
 #include "VGMColl.h"
 
+using MenuPath = Command::MenuPath;
+
 /**
  * A command for playing or pausing a collection with the SequencePlayer
  */
@@ -21,4 +23,5 @@ public:
   }
   [[nodiscard]] QKeySequence shortcutKeySequence() const override { return Qt::Key_Return; };
   [[nodiscard]] std::string name() const override { return "Play / Pause"; }
+  [[nodiscard]] std::optional<MenuPath> menuPath() const override { return MenuPaths::Preview; }
 };
