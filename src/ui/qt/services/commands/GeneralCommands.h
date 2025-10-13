@@ -125,6 +125,7 @@ public:
   }
   [[nodiscard]] QKeySequence shortcutKeySequence() const override { return Qt::Key_Backspace; };
   [[nodiscard]] std::string name() const override { return "Close"; }
+  [[nodiscard]] std::optional<MenuPath> menuPath() const override { return MenuPaths::File; }
 };
 
 /**

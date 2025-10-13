@@ -16,6 +16,8 @@
 #include "VGMItem.h"
 #include "VGMColl.h"
 #include "VGMFile.h"
+#include "RawFile.h"
+
 
 MenuBar::MenuBar(QWidget *parent, const QList<QDockWidget *> &dockWidgets) : QMenuBar(parent) {
   appendFileMenu();
@@ -27,6 +29,8 @@ MenuBar::MenuBar(QWidget *parent, const QList<QDockWidget *> &dockWidgets) : QMe
           this, &MenuBar::handleVGMFileContextChange);
   connect(NotificationCenter::the(), &NotificationCenter::vgmCollContextCommandsChanged,
           this, &MenuBar::handleVGMCollContextChange);
+  connect(NotificationCenter::the(), &NotificationCenter::rawFileContextCommandsChanged,
+          this, &MenuBar::handleRawFileContextChange);
 }
 
 void MenuBar::appendFileMenu() {
@@ -105,6 +109,7 @@ void MenuBar::handleVGMFileContextChange(const QList<VGMFile*>& files) {
   m_selectedVGMFiles = files;
   if (!m_selectedVGMFiles.isEmpty()) {
     m_selectedVGMColls.clear();
+    m_selectedRawFiles.clear();
   }
   refreshContextualMenus();
 }
@@ -113,12 +118,37 @@ void MenuBar::handleVGMCollContextChange(const QList<VGMColl*>& colls) {
   m_selectedVGMColls = colls;
   if (!m_selectedVGMColls.isEmpty()) {
     m_selectedVGMFiles.clear();
+    m_selectedRawFiles.clear();
+  }
+  refreshContextualMenus();
+}
+
+void MenuBar::handleRawFileContextChange(const QList<RawFile*>& files) {
+  m_selectedRawFiles = files;
+  if (!m_selectedRawFiles.isEmpty()) {
+    m_selectedVGMFiles.clear();
+    m_selectedVGMColls.clear();
   }
   refreshContextualMenus();
 }
 
 void MenuBar::refreshContextualMenus() {
   clearContextualMenus();
+
+  if (!m_selectedRawFiles.isEmpty()) {
+    auto items = std::make_shared<std::vector<RawFile*>>();
+    items->reserve(m_selectedRawFiles.size());
+    for (auto* file : m_selectedRawFiles) {
+      if (file) {
+        items->push_back(file);
+      }
+    }
+    if (!items->empty()) {
+      auto commands = MenuManager::the()->commandsByMenuForItems<RawFile>(items);
+      appendContextualCommands<RawFile>(commands, items);
+    }
+    return;
+  }
 
   if (!m_selectedVGMFiles.isEmpty()) {
     auto items = std::make_shared<std::vector<VGMFile*>>();

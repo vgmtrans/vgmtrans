@@ -128,6 +128,10 @@ RawFileListView::RawFileListView(QWidget *parent) : TableView(parent) {
   connect(this, &QAbstractItemView::customContextMenuRequested, this,
           &RawFileListView::rawFilesMenu);
   connect(NotificationCenter::the(), &NotificationCenter::vgmFileSelected, this, &RawFileListView::onVGMFileSelected);
+  connect(selectionModel(), &QItemSelectionModel::selectionChanged, this,
+          &RawFileListView::onSelectionChanged);
+
+  updateContextualMenus();
 }
 
 /*
@@ -151,6 +155,29 @@ void RawFileListView::rawFilesMenu(const QPoint &pos) const {
   auto menu = MenuManager::the()->createMenuForItems<RawFile>(selectedFiles);
   menu->exec(mapToGlobal(pos));
   menu->deleteLater();
+}
+
+void RawFileListView::onSelectionChanged(const QItemSelection&, const QItemSelection&) {
+  updateContextualMenus();
+}
+
+void RawFileListView::updateContextualMenus() const {
+  if (!selectionModel()) {
+    NotificationCenter::the()->updateContextualMenusForRawFiles({});
+    return;
+  }
+
+  QModelIndexList list = selectionModel()->selectedRows();
+  QList<RawFile*> files;
+  files.reserve(list.size());
+
+  for (const auto& index : list) {
+    if (index.isValid()) {
+      files.append(qtVGMRoot.rawFiles()[index.row()]);
+    }
+  }
+
+  NotificationCenter::the()->updateContextualMenusForRawFiles(files);
 }
 
 void RawFileListView::keyPressEvent(QKeyEvent *input) {

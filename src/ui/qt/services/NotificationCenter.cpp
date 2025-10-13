@@ -41,3 +41,7 @@ void NotificationCenter::updateContextualMenusForVGMFiles(const QList<VGMFile*>&
 void NotificationCenter::updateContextualMenusForVGMColls(const QList<VGMColl*>& colls) {
   emit vgmCollContextCommandsChanged(colls);
 }
+
+void NotificationCenter::updateContextualMenusForRawFiles(const QList<RawFile*>& files) {
+  emit rawFileContextCommandsChanged(files);
+}

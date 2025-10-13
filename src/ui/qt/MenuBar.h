@@ -22,6 +22,7 @@
 class QDockWidget;
 class VGMFile;
 class VGMColl;
+class RawFile;
 
 class MenuBar final : public QMenuBar {
   Q_OBJECT
@@ -37,6 +38,7 @@ signals:
 private slots:
   void handleVGMFileContextChange(const QList<VGMFile*>& files);
   void handleVGMCollContextChange(const QList<VGMColl*>& colls);
+  void handleRawFileContextChange(const QList<RawFile*>& files);
 
 private:
   void appendFileMenu();
@@ -76,6 +78,7 @@ private:
 
   QList<VGMFile*> m_selectedVGMFiles;
   QList<VGMColl*> m_selectedVGMColls;
+  QList<RawFile*> m_selectedRawFiles;
 };
 
 template <typename Base, typename T>

@@ -12,6 +12,7 @@
 class VGMItem;
 class VGMFile;
 class VGMColl;
+class RawFile;
 
 class NotificationCenter : public QObject {
   Q_OBJECT
@@ -36,6 +37,7 @@ public:
   void selectVGMFile(VGMFile* vgmfile, QWidget* caller);
   void updateContextualMenusForVGMFiles(const QList<VGMFile*>& files);
   void updateContextualMenusForVGMColls(const QList<VGMColl*>& colls);
+  void updateContextualMenusForRawFiles(const QList<RawFile*>& files);
 
   void vgmfiletree_setShowDetails(bool showDetails) { emit vgmfiletree_showDetailsChanged(showDetails); }
 
@@ -47,6 +49,7 @@ signals:
   void vgmFileSelected(VGMFile *file, QWidget* caller);
   void vgmFileContextCommandsChanged(const QList<VGMFile*>& files);
   void vgmCollContextCommandsChanged(const QList<VGMColl*>& colls);
+  void rawFileContextCommandsChanged(const QList<RawFile*>& files);
 
   void vgmfiletree_showDetailsChanged(bool showDetails);
 };
