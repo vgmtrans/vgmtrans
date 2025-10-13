@@ -107,28 +107,22 @@ void MenuBar::appendOptionsMenu() {
 
 void MenuBar::handleVGMFileContextChange(const QList<VGMFile*>& files) {
   m_selectedVGMFiles = files;
-  if (!m_selectedVGMFiles.isEmpty()) {
-    m_selectedVGMColls.clear();
-    m_selectedRawFiles.clear();
-  }
+  m_selectedVGMColls.clear();
+  m_selectedRawFiles.clear();
   refreshContextualMenus();
 }
 
 void MenuBar::handleVGMCollContextChange(const QList<VGMColl*>& colls) {
   m_selectedVGMColls = colls;
-  if (!m_selectedVGMColls.isEmpty()) {
-    m_selectedVGMFiles.clear();
-    m_selectedRawFiles.clear();
-  }
+  m_selectedVGMFiles.clear();
+  m_selectedRawFiles.clear();
   refreshContextualMenus();
 }
 
 void MenuBar::handleRawFileContextChange(const QList<RawFile*>& files) {
   m_selectedRawFiles = files;
-  if (!m_selectedRawFiles.isEmpty()) {
-    m_selectedVGMFiles.clear();
-    m_selectedVGMColls.clear();
-  }
+  m_selectedVGMFiles.clear();
+  m_selectedVGMColls.clear();
   refreshContextualMenus();
 }
 
