@@ -127,8 +127,6 @@ VGMCollListView::VGMCollListView(QWidget *parent) : QListView(parent) {
     }
   });
   connect(selectionModel(), &QItemSelectionModel::selectionChanged, this, &VGMCollListView::onSelectionChanged);
-
-  updateContextualMenus();
 }
 
 void VGMCollListView::collectionMenu(const QPoint &pos) const {

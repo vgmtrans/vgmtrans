@@ -44,6 +44,8 @@ public:
 private:
   void keyPressEvent(QKeyEvent *e) override;
   void itemMenu(const QPoint &pos);
+  void onSelectionChanged(const QItemSelection &selected, const QItemSelection &deselected);
+  void updateContextualMenus() const;
 
 private slots:
   void removeVGMColl(const VGMColl *coll) const;

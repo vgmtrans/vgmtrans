@@ -130,8 +130,6 @@ VGMFileListView::VGMFileListView(QWidget *parent) : TableView(parent) {
   connect(this, &QAbstractItemView::doubleClicked, this, &VGMFileListView::requestVGMFileView);
   connect(NotificationCenter::the(), &NotificationCenter::vgmFileSelected, this, &VGMFileListView::onVGMFileSelected);
   connect(selectionModel(), &QItemSelectionModel::selectionChanged, this, &VGMFileListView::onSelectionChanged);
-
-  updateContextualMenus();
 }
 
 void VGMFileListView::itemMenu(const QPoint &pos) {
