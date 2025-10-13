@@ -7,6 +7,7 @@
 #include "MenuBar.h"
 
 #include <QDockWidget>
+#include <QtGlobal>
 #include "Options.h"
 #include "Root.h"
 #include "LogManager.h"
@@ -41,11 +42,39 @@ void MenuBar::appendFileMenu() {
   menu_open_file->setShortcut(QKeySequence(QStringLiteral("Ctrl+O")));
   connect(menu_open_file, &QAction::triggered, this, &MenuBar::openFile);
 
-  m_fileMenu->addSeparator();
+  menu_exit_separator = m_fileMenu->addSeparator();
 
   menu_app_exit = m_fileMenu->addAction("Exit");
   menu_app_exit->setShortcut(QKeySequence(QStringLiteral("Alt+F4")));
+  menu_app_exit->setMenuRole(QAction::QuitRole);
   connect(menu_app_exit, &QAction::triggered, this, &MenuBar::exit);
+}
+
+void MenuBar::ensureExitActionAtBottom() {
+#if defined(Q_OS_MACOS) || defined(Q_OS_MAC)
+  return;
+#endif
+
+  if (!m_fileMenu || !menu_app_exit) {
+    return;
+  }
+
+  if (menu_exit_separator) {
+    m_fileMenu->removeAction(menu_exit_separator);
+  }
+
+  m_fileMenu->removeAction(menu_app_exit);
+
+  if (!m_fileMenu->actions().isEmpty()) {
+    if (!menu_exit_separator) {
+      menu_exit_separator = new QAction(m_fileMenu);
+      menu_exit_separator->setSeparator(true);
+    }
+
+    m_fileMenu->addAction(menu_exit_separator);
+  }
+
+  m_fileMenu->addAction(menu_app_exit);
 }
 
 void MenuBar::appendViewMenu(const QList<QDockWidget *> &dockWidgets) {

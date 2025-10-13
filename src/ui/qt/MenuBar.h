@@ -49,6 +49,7 @@ private:
   void refreshContextualMenus();
   void clearContextualMenus();
   QMenu* ensureMenuForPath(const MenuManager::MenuPath& path);
+  void ensureExitActionAtBottom();
 
   template <typename Base, typename T>
   void appendContextualCommands(const MenuManager::MenuCommandMap& commands,
@@ -62,6 +63,7 @@ private:
 
   // File actions
   QAction *menu_open_file{};
+  QAction *menu_exit_separator{};
   QAction *menu_app_exit{};
 
   // Info actions
@@ -106,5 +108,9 @@ void MenuBar::appendContextualCommands(const MenuManager::MenuCommandMap& comman
     auto actions = MenuManager::the()->createActionsForCommands<Base>(commandList, items, targetMenu, false);
     auto& storedActions = m_contextActions[targetMenu];
     storedActions.insert(storedActions.end(), actions.begin(), actions.end());
+
+    if (targetMenu == m_fileMenu) {
+      ensureExitActionAtBottom();
+    }
   }
 }
