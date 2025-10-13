@@ -22,8 +22,8 @@
 MenuBar::MenuBar(QWidget *parent, const QList<QDockWidget *> &dockWidgets) : QMenuBar(parent) {
   appendFileMenu();
   appendViewMenu(dockWidgets);
-  appendInfoMenu();
   appendOptionsMenu();
+  appendInfoMenu();
 
   connect(NotificationCenter::the(), &NotificationCenter::vgmFileContextCommandsChanged,
           this, &MenuBar::handleVGMFileContextChange);
@@ -231,7 +231,9 @@ QMenu* MenuBar::ensureMenuForPath(const MenuManager::MenuPath& path) {
     menu = m_topLevelMenus.value(topLevelName);
   } else {
     menu = new QMenu(topLevelName, this);
-    if (m_optionsMenu) {
+    if (m_helpMenu) {
+      insertMenu(m_helpMenu->menuAction(), menu);
+    } else if (m_optionsMenu) {
       insertMenu(m_optionsMenu->menuAction(), menu);
     } else {
       addMenu(menu);
