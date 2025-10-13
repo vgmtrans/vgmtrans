@@ -70,7 +70,7 @@ The following formats are supported with varying degrees of accuracy:
 ## Usage
 
 #### *Loading Files*
-Load files by dragging them into the application window or by choosing `Import File` from the File menu. The program will scan a
+Load files by dragging them into the application window or by choosing `Scan File` from the File menu. The program will scan a
 file for contained music files, which when found will appear under the "Detected Music Files" panel.
 
 VGMTrans is able to 

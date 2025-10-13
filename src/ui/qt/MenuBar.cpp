@@ -33,7 +33,7 @@ void MenuBar::appendFileMenu() {
   m_fileMenu = addMenu("File");
   m_topLevelMenus.insert("File", m_fileMenu);
 
-  menu_open_file = m_fileMenu->addAction("Import File");
+  menu_open_file = m_fileMenu->addAction("Scan File");
   menu_open_file->setShortcut(QKeySequence(QStringLiteral("Ctrl+O")));
   connect(menu_open_file, &QAction::triggered, this, &MenuBar::openFile);
 
