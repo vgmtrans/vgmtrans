@@ -261,7 +261,7 @@ void VGMCollView::updateContextualMenus() const {
 
   for (const auto& index : list) {
     if (index.isValid()) {
-      files.append(variantToVGMFile(qtVGMRoot.vgmFiles()[index.row()]));
+      files.append(vgmCollViewModel->fileFromIndex(index));
     }
   }
 
