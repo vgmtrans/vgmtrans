@@ -5,6 +5,9 @@
  */
 
 #include <QDragEnterEvent>
+#include <QDragLeaveEvent>
+#include <QDragMoveEvent>
+#include <QDropEvent>
 #include <QMimeData>
 #include <QFileInfo>
 #include <QFileDialog>
@@ -13,6 +16,7 @@
 #include <QPushButton>
 #include <QMessageBox>
 #include <QStatusBar>
+#include <QResizeEvent>
 #include <version.h>
 #include "ManualCollectionDialog.h"
 #include "MainWindow.h"
@@ -42,6 +46,14 @@ MainWindow::MainWindow() : QMainWindow(nullptr) {
 
   createElements();
   routeSignals();
+
+  m_dragOverlay = new QWidget(this);
+  m_dragOverlay->setObjectName(QStringLiteral("dragOverlay"));
+  m_dragOverlay->setAttribute(Qt::WA_TransparentForMouseEvents);
+  m_dragOverlay->setAcceptDrops(false);
+  m_dragOverlay->hide();
+  updateDragOverlayAppearance();
+  updateDragOverlayGeometry();
 
   auto infostring = QString("Running %1 (%4, %5), BASS %2, Qt %3")
                         .arg(VGMTRANS_VERSION,
@@ -129,6 +141,8 @@ void MainWindow::showEvent(QShowEvent* event) {
   sizes << totalHeight / 4;        // Collections
 
   resizeDocks({m_rawfile_dock, m_vgmfile_dock, m_coll_dock}, sizes, Qt::Vertical);
+
+  updateDragOverlayGeometry();
 }
 
 void MainWindow::routeSignals() {
@@ -153,14 +167,34 @@ void MainWindow::routeSignals() {
 
 void MainWindow::dragEnterEvent(QDragEnterEvent *event) {
   event->acceptProposedAction();
+  if (m_dragOverlay) {
+    updateDragOverlayGeometry();
+    m_dragOverlay->show();
+    m_dragOverlay->raise();
+  }
 }
 
 void MainWindow::dragMoveEvent(QDragMoveEvent *event) {
   event->acceptProposedAction();
+  if (m_dragOverlay && !m_dragOverlay->isVisible()) {
+    m_dragOverlay->show();
+    m_dragOverlay->raise();
+  }
+}
+
+void MainWindow::dragLeaveEvent(QDragLeaveEvent *event) {
+  event->accept();
+  if (m_dragOverlay) {
+    m_dragOverlay->hide();
+  }
 }
 
 void MainWindow::dropEvent(QDropEvent *event) {
   const auto &files = event->mimeData()->urls();
+
+  if (m_dragOverlay) {
+    m_dragOverlay->hide();
+  }
 
   if (files.isEmpty())
     return;
@@ -215,4 +249,24 @@ void MainWindow::openFileInternal(const QString& filename) {
 void MainWindow::showToast(const QString& message, ToastType type, int duration_ms) {
   if (m_toastHost)
     m_toastHost->showToast(message, type, duration_ms);
+}
+
+void MainWindow::resizeEvent(QResizeEvent *event) {
+  QMainWindow::resizeEvent(event);
+  updateDragOverlayGeometry();
+}
+
+void MainWindow::updateDragOverlayAppearance() {
+  if (!m_dragOverlay)
+    return;
+
+  m_dragOverlay->setStyleSheet(QStringLiteral("background-color: rgba(0, 0, 0, 102);"));
+}
+
+void MainWindow::updateDragOverlayGeometry() {
+  if (!m_dragOverlay)
+    return;
+
+  m_dragOverlay->setGeometry(rect());
+  m_dragOverlay->raise();
 }

@@ -9,6 +9,7 @@
 #include <QMainWindow>
 #include "Root.h"
 
+class QWidget;
 class QDockWidget;
 class MenuBar;
 class IconBar;
@@ -18,6 +19,11 @@ class VGMCollView;
 class QPushButton;
 class StatusBarContent;
 class ToastHost;
+class QDragEnterEvent;
+class QDragMoveEvent;
+class QDragLeaveEvent;
+class QDropEvent;
+class QResizeEvent;
 
 class MainWindow final : public QMainWindow {
   Q_OBJECT
@@ -29,12 +35,16 @@ public:
 protected:
   void dragEnterEvent(QDragEnterEvent *event) override;
   void dragMoveEvent(QDragMoveEvent *event) override;
+  void dragLeaveEvent(QDragLeaveEvent *event) override;
   void dropEvent(QDropEvent *event) override;
+  void resizeEvent(QResizeEvent *event) override;
 
 private:
   void createElements();
   void createStatusBar();
   void routeSignals();
+  void updateDragOverlayAppearance();
+  void updateDragOverlayGeometry();
 
   void openFile();
   void openFileInternal(const QString& filename);
@@ -51,4 +61,5 @@ private:
   VGMCollView *m_coll_view{};
   QPushButton *m_manual_creation_btn{};
   ToastHost *m_toastHost{};
+  QWidget *m_dragOverlay{};
 };
