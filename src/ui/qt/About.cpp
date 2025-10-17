@@ -56,7 +56,7 @@ void About::setupInfoTab(QWidget* tab) {
   text_label->setContentsMargins(15, 0, 15, 0);
 
   QLabel *copyright = new QLabel(
-      "<p style='margin-top:0; margin-bottom:0; font-size:small;'>&copy; 2002-2022 "
+      "<p style='margin-top:0; margin-bottom:0; font-size:small;'>&copy; 2002-2025 "
       "VGMTrans Team. Licensed under the zlib license<br/>SoundFont&reg; is a "
       "registered trademark of Creative Technology Ltd.<br/>Commercial use of this software requires "
       "a license for the <a href='https://www.un4seen.com/'>BASS library</a>.</p>");

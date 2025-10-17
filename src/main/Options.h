@@ -5,6 +5,7 @@
  */
 
 #pragma once
+#include <algorithm>
 #include <memory>
 #include <string_view>
 
@@ -33,6 +34,8 @@ enum class BankSelectStyle {
 
 class ConversionOptions {
 public:
+  static constexpr int kMaxSequenceLoops = 100;
+
   static auto &the() {
     static ConversionOptions instance;
     return instance;
@@ -49,7 +52,9 @@ public:
   void setBankSelectStyle(BankSelectStyle style) { m_bs_style = style; }
 
   int numSequenceLoops() const { return m_sequence_loops; }
-  void setNumSequenceLoops(int numLoops) { m_sequence_loops = numLoops; }
+  void setNumSequenceLoops(int numLoops) {
+    m_sequence_loops = std::clamp(numLoops, 0, kMaxSequenceLoops);
+  }
 
   bool skipChannel10() const { return m_skip_channel_10; }
   void setSkipChannel10(bool should) { m_skip_channel_10 = should; }
@@ -59,7 +64,7 @@ public:
     const int bs = store.getInt("bankSelectStyle", static_cast<int>(BankSelectStyle::GS));
     m_bs_style = (bs == static_cast<int>(BankSelectStyle::MMA)) ? BankSelectStyle::MMA
                                                                 : BankSelectStyle::GS;
-    m_sequence_loops = store.getInt("sequenceLoops", 1);
+    m_sequence_loops = std::clamp(store.getInt("sequenceLoops", 1), 0, kMaxSequenceLoops);
     m_skip_channel_10 = store.getBool("skipChannel10", true);
   }
 
