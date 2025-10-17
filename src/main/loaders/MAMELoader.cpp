@@ -24,6 +24,8 @@ namespace vgmtrans::loaders {
 LoaderRegistration<MAMELoader> _mame("MAME");
 }
 
+using json = nlohmann::json;
+
 bool MAMERomGroup::getHexAttribute(const std::string& attrName, uint32_t* out) const {
   auto it = attributes.find(attrName);
   if (it == attributes.end()) {
@@ -58,8 +60,6 @@ MAMELoader::~MAMELoader() {
 }
 
 namespace {
-
-using nlohmann::json;
 
 constexpr const char* kMameJsonFilename = "mame_roms.json";
 
