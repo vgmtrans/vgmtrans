@@ -126,7 +126,7 @@ void MenuBar::appendOptionsMenu() {
     }
   });
 
-  auto loopsMenu = options_dropdown->addMenu(tr("Sequence loops"));
+  auto loopsMenu = m_optionsMenu->addMenu(tr("Sequence loops"));
 
   QActionGroup *loopsGroup = new QActionGroup(this);
   loopsGroup->setExclusive(true);
