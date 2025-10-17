@@ -6,36 +6,99 @@
 
 #include "MenuBar.h"
 
-#include <QActionGroup>
 #include <QDockWidget>
+#include <QtGlobal>
 #include "Options.h"
 #include "Root.h"
 #include "LogManager.h"
+#include "services/MenuManager.h"
 #include "services/Settings.h"
+#include "services/NotificationCenter.h"
+#include "VGMItem.h"
+#include "VGMColl.h"
+#include "VGMFile.h"
+#include "RawFile.h"
+
 
 MenuBar::MenuBar(QWidget *parent, const QList<QDockWidget *> &dockWidgets) : QMenuBar(parent) {
   appendFileMenu();
-  appendConversionMenu();
-  appendWindowsMenu(dockWidgets);
+  appendViewMenu(dockWidgets);
+  appendOptionsMenu();
   appendInfoMenu();
+
+  connect(NotificationCenter::the(), &NotificationCenter::vgmFileContextCommandsChanged,
+          this, &MenuBar::handleVGMFileContextChange);
+  connect(NotificationCenter::the(), &NotificationCenter::vgmCollContextCommandsChanged,
+          this, &MenuBar::handleVGMCollContextChange);
+  connect(NotificationCenter::the(), &NotificationCenter::rawFileContextCommandsChanged,
+          this, &MenuBar::handleRawFileContextChange);
 }
 
 void MenuBar::appendFileMenu() {
-  QMenu *file_dropdown = addMenu("File");
-  menu_open_file = file_dropdown->addAction("Open");
+  m_fileMenu = addMenu("File");
+  m_topLevelMenus.insert("File", m_fileMenu);
+
+  menu_open_file = m_fileMenu->addAction("Scan File");
   menu_open_file->setShortcut(QKeySequence(QStringLiteral("Ctrl+O")));
   connect(menu_open_file, &QAction::triggered, this, &MenuBar::openFile);
 
-  file_dropdown->addSeparator();
+  menu_exit_separator = m_fileMenu->addSeparator();
 
-  menu_app_exit = file_dropdown->addAction("Exit");
+  menu_app_exit = m_fileMenu->addAction("Exit");
   menu_app_exit->setShortcut(QKeySequence(QStringLiteral("Alt+F4")));
+  menu_app_exit->setMenuRole(QAction::QuitRole);
   connect(menu_app_exit, &QAction::triggered, this, &MenuBar::exit);
 }
 
-void MenuBar::appendConversionMenu() {
-  QMenu *options_dropdown = addMenu("Conversion");
-  auto bs = options_dropdown->addMenu("Bank select style");
+void MenuBar::ensureExitActionAtBottom() {
+#if defined(Q_OS_MACOS) || defined(Q_OS_MAC)
+  return;
+#endif
+
+  if (!m_fileMenu || !menu_app_exit) {
+    return;
+  }
+
+  if (menu_exit_separator) {
+    m_fileMenu->removeAction(menu_exit_separator);
+  }
+
+  m_fileMenu->removeAction(menu_app_exit);
+
+  if (!m_fileMenu->actions().isEmpty()) {
+    if (!menu_exit_separator) {
+      menu_exit_separator = new QAction(m_fileMenu);
+      menu_exit_separator->setSeparator(true);
+    }
+
+    m_fileMenu->addAction(menu_exit_separator);
+  }
+
+  m_fileMenu->addAction(menu_app_exit);
+}
+
+void MenuBar::appendViewMenu(const QList<QDockWidget *> &dockWidgets) {
+  m_viewMenu = addMenu("View");
+  m_topLevelMenus.insert("View", m_viewMenu);
+
+  auto *toolWindowsMenu = m_viewMenu->addMenu("Tool Windows");
+
+  for (auto &widget : dockWidgets) {
+    toolWindowsMenu->addAction(widget->toggleViewAction());
+  }
+}
+
+void MenuBar::appendInfoMenu() {
+  m_helpMenu = addMenu("Help");
+  m_topLevelMenus.insert("Help", m_helpMenu);
+  menu_about_dlg = m_helpMenu->addAction("About VGMTrans");
+  connect(menu_about_dlg, &QAction::triggered, this, &MenuBar::showAbout);
+}
+
+void MenuBar::appendOptionsMenu() {
+  m_optionsMenu = addMenu("Options");
+  m_topLevelMenus.insert("Options", m_optionsMenu);
+  auto bs = m_optionsMenu->addMenu("Bank select style");
 
   auto bankSelectStyle = Settings::the()->conversion.bankSelectStyle();
 
@@ -60,7 +123,7 @@ void MenuBar::appendConversionMenu() {
     }
   });
 
-  act = options_dropdown->addAction("Skip MIDI channel 10");
+  act = m_optionsMenu->addAction("Skip MIDI channel 10");
   act->setCheckable(true);
   act->setChecked(Settings::the()->conversion.skipChannel10());
   connect(act, &QAction::toggled,
@@ -69,21 +132,162 @@ void MenuBar::appendConversionMenu() {
     pRoot->UI_toast("Tracks using MIDI channel 10 will be silent during in-app playback.", ToastType::Info);
     Settings::the()->conversion.setSkipChannel10(skip);
   });
-
-  options_dropdown->addSeparator();
 }
 
-void MenuBar::appendWindowsMenu(const QList<QDockWidget *> &dockWidgets) {
-  QMenu *windowsDropdown = addMenu("Windows");
+void MenuBar::handleVGMFileContextChange(const QList<VGMFile*>& files) {
+  m_selectedVGMFiles = files;
+  m_selectedVGMColls.clear();
+  m_selectedRawFiles.clear();
+  refreshContextualMenus();
+}
 
-  for (auto &widget : dockWidgets) {
-    windowsDropdown->addAction(widget->toggleViewAction());
+void MenuBar::handleVGMCollContextChange(const QList<VGMColl*>& colls) {
+  m_selectedVGMColls = colls;
+  m_selectedVGMFiles.clear();
+  m_selectedRawFiles.clear();
+  refreshContextualMenus();
+}
+
+void MenuBar::handleRawFileContextChange(const QList<RawFile*>& files) {
+  m_selectedRawFiles = files;
+  m_selectedVGMFiles.clear();
+  m_selectedVGMColls.clear();
+  refreshContextualMenus();
+}
+
+void MenuBar::refreshContextualMenus() {
+  clearContextualMenus();
+
+  if (!m_selectedRawFiles.isEmpty()) {
+    auto items = std::make_shared<std::vector<RawFile*>>();
+    items->reserve(m_selectedRawFiles.size());
+    for (auto* file : m_selectedRawFiles) {
+      if (file) {
+        items->push_back(file);
+      }
+    }
+    if (!items->empty()) {
+      auto commands = MenuManager::the()->commandsByMenuForItems<RawFile>(items);
+      appendContextualCommands<RawFile>(commands, items);
+    }
+    return;
+  }
+
+  if (!m_selectedVGMFiles.isEmpty()) {
+    auto items = std::make_shared<std::vector<VGMFile*>>();
+    items->reserve(m_selectedVGMFiles.size());
+    for (auto* file : m_selectedVGMFiles) {
+      if (file) {
+        items->push_back(file);
+      }
+    }
+    if (!items->empty()) {
+      auto commands = MenuManager::the()->commandsByMenuForItems<VGMItem>(items);
+      appendContextualCommands<VGMItem>(commands, items);
+    }
+    return;
+  }
+
+  if (!m_selectedVGMColls.isEmpty()) {
+    auto items = std::make_shared<std::vector<VGMColl*>>();
+    items->reserve(m_selectedVGMColls.size());
+    for (auto* coll : m_selectedVGMColls) {
+      if (coll) {
+        items->push_back(coll);
+      }
+    }
+    if (!items->empty()) {
+      auto commands = MenuManager::the()->commandsByMenuForItems<VGMColl>(items);
+      appendContextualCommands<VGMColl>(commands, items);
+    }
   }
 }
 
+void MenuBar::clearContextualMenus() {
+  for (auto& [menu, actions] : m_contextActions) {
+    for (auto* action : actions) {
+      if (menu && action) {
+        menu->removeAction(action);
+        action->deleteLater();
+      }
+    }
+  }
+  m_contextActions.clear();
 
-void MenuBar::appendInfoMenu() {
-  QMenu *info_dropdown = addMenu("Help");
-  menu_about_dlg = info_dropdown->addAction("About VGMTrans");
-  connect(menu_about_dlg, &QAction::triggered, this, &MenuBar::showAbout);
+  for (auto& [menu, separator] : m_contextSeparators) {
+    if (menu && separator) {
+      menu->removeAction(separator);
+      separator->deleteLater();
+    }
+  }
+  m_contextSeparators.clear();
+
+  for (auto* submenu : m_dynamicSubmenus) {
+    if (!submenu) {
+      continue;
+    }
+    QMenu* parentMenu = qobject_cast<QMenu*>(submenu->parentWidget());
+    if (!parentMenu) {
+      parentMenu = qobject_cast<QMenu*>(submenu->parent());
+    }
+    if (parentMenu) {
+      parentMenu->removeAction(submenu->menuAction());
+    }
+    submenu->deleteLater();
+  }
+  m_dynamicSubmenus.clear();
+
+  for (auto* menu : m_dynamicTopLevelMenus) {
+    if (!menu) {
+      continue;
+    }
+    removeAction(menu->menuAction());
+    m_topLevelMenus.remove(menu->title());
+    menu->deleteLater();
+  }
+  m_dynamicTopLevelMenus.clear();
+}
+
+QMenu* MenuBar::ensureMenuForPath(const MenuManager::MenuPath& path) {
+  if (path.empty()) {
+    return nullptr;
+  }
+
+  const QString topLevelName = QString::fromStdString(path.front());
+  QMenu* menu = nullptr;
+
+  if (m_topLevelMenus.contains(topLevelName)) {
+    menu = m_topLevelMenus.value(topLevelName);
+  } else {
+    menu = new QMenu(topLevelName, this);
+    if (m_helpMenu) {
+      insertMenu(m_helpMenu->menuAction(), menu);
+    } else if (m_optionsMenu) {
+      insertMenu(m_optionsMenu->menuAction(), menu);
+    } else {
+      addMenu(menu);
+    }
+    m_topLevelMenus.insert(topLevelName, menu);
+    m_dynamicTopLevelMenus.push_back(menu);
+  }
+
+  QMenu* currentMenu = menu;
+  for (size_t i = 1; i < path.size(); ++i) {
+    const QString submenuTitle = QString::fromStdString(path[i]);
+    QMenu* submenu = nullptr;
+    const auto submenus = currentMenu->findChildren<QMenu*>(QString(), Qt::FindDirectChildrenOnly);
+    for (auto* candidate : submenus) {
+      if (candidate->title() == submenuTitle) {
+        submenu = candidate;
+        break;
+      }
+    }
+    if (!submenu) {
+      submenu = currentMenu->addMenu(submenuTitle);
+      m_dynamicSubmenus.push_back(submenu);
+    }
+    currentMenu = submenu;
+  }
+
+  return currentMenu;
 }

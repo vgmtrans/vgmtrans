@@ -24,6 +24,8 @@ public:
   template<typename T, typename Base = T>
   using CheckFunc = std::function<bool(Base*)>;
   using CommandsList = std::vector<std::shared_ptr<Command>>;
+  using MenuPath = Command::MenuPath;
+  using MenuCommandMap = std::map<MenuPath, CommandsList>;
   template<typename T>
   using CheckedTypeEntry = std::pair<CheckFunc<T>, CommandsList>;
 
@@ -144,16 +146,50 @@ public:
       return nullptr;
     }
     auto commands = findCommonCommands<Base>(*items);
+    createActionsForCommands<Base>(commands, items, menu, true);
+    return menu;
+  }
+
+  template <typename Base, typename T = Base>
+  MenuCommandMap commandsByMenuForItems(std::shared_ptr<std::vector<T*>> items) {
+    MenuCommandMap groupedCommands;
+    if (!items || items->empty()) {
+      return groupedCommands;
+    }
+
+    auto commands = findCommonCommands<Base>(*items);
+    for (const auto& command : commands) {
+      auto path = command->menuPath();
+      if (!path || path->empty()) {
+        continue;
+      }
+      groupedCommands[*path].push_back(command);
+    }
+
+    return groupedCommands;
+  }
+
+  template <typename Base, typename T = Base>
+  std::vector<QAction*> createActionsForCommands(const std::vector<std::shared_ptr<Command>>& commands,
+                                                 std::shared_ptr<std::vector<T*>> items,
+                                                 QMenu* menu,
+                                                 bool includeSeparators = false) {
+    std::vector<QAction*> createdActions;
 
     for (const auto& command : commands) {
-
-      // Handle CommandSeparator
-      if (dynamic_cast<CommandSeparator*>(command.get()) != nullptr) {
-        menu->addSeparator();
+      if (includeSeparators) {
+        if (dynamic_cast<CommandSeparator*>(command.get()) != nullptr) {
+          createdActions.push_back(menu->addSeparator());
+          continue;
+        }
+      } else if (dynamic_cast<CommandSeparator*>(command.get()) != nullptr) {
         continue;
       }
 
       auto contextFactory = command->contextFactory();
+      if (!contextFactory) {
+        continue;
+      }
       auto propSpecs = contextFactory->propertySpecifications();
 
       auto action = menu->addAction(command->name().c_str(), [command, items, propSpecs, contextFactory] {
@@ -202,7 +238,9 @@ public:
         action->setShortcut(keySequence);
         action->setShortcutVisibleInContextMenu(true);
       }
+      createdActions.push_back(action);
     }
-    return menu;
+
+    return createdActions;
   }
 };

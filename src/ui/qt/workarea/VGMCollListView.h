@@ -12,6 +12,7 @@
 
 class VGMColl;
 class VGMCollListView;
+class QItemSelection;
 
 class VGMCollListViewModel : public QAbstractListModel {
 public:
@@ -46,4 +47,6 @@ public slots:
 private:
   void collectionMenu(const QPoint &pos) const;
   void keyPressEvent(QKeyEvent *e) override;
+  void onSelectionChanged(const QItemSelection &selected, const QItemSelection &deselected);
+  void updateContextualMenus() const;
 };

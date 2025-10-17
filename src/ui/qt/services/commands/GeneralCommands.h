@@ -10,6 +10,8 @@
 #include "services/commands/Command.h"
 #include "VGMFile.h"
 
+using MenuPath = Command::MenuPath;
+
 /**
  * A command context that provides a vector of pointers
  */
@@ -110,6 +112,7 @@ public:
   }
   [[nodiscard]] QKeySequence shortcutKeySequence() const override { return Qt::Key_Backspace; };
   [[nodiscard]] std::string name() const override { return "Remove"; }
+  [[nodiscard]] std::optional<MenuPath> menuPath() const override { return MenuPaths::File; }
 };
 
 /**
@@ -122,6 +125,7 @@ public:
   }
   [[nodiscard]] QKeySequence shortcutKeySequence() const override { return Qt::Key_Backspace; };
   [[nodiscard]] std::string name() const override { return "Close"; }
+  [[nodiscard]] std::optional<MenuPath> menuPath() const override { return MenuPaths::File; }
 };
 
 /**
@@ -134,6 +138,7 @@ public:
   }
   [[nodiscard]] QKeySequence shortcutKeySequence() const override { return Qt::Key_Backspace; };
   [[nodiscard]] std::string name() const override { return "Remove"; }
+  [[nodiscard]] std::optional<MenuPath> menuPath() const override { return MenuPaths::File; }
 };
 
 /**
@@ -145,5 +150,6 @@ public:
     MdiArea::the()->newView(file);
   }
   [[nodiscard]] QKeySequence shortcutKeySequence() const override { return Qt::Key_Return; };
-  [[nodiscard]] std::string name() const override { return "Open"; }
+  [[nodiscard]] std::string name() const override { return "Open Analysis"; }
+  [[nodiscard]] std::optional<MenuPath> menuPath() const override { return MenuPaths::File; }
 };

@@ -7,6 +7,8 @@
 #pragma once
 #include "TableView.h"
 
+class QItemSelection;
+class RawFile;
 class VGMFile;
 
 class RawFileListViewModel : public QAbstractTableModel {
@@ -40,6 +42,8 @@ private:
   void rawFilesMenu(const QPoint &pos) const;
   void deleteRawFiles();
   void updateStatusBar() const;
+  void onSelectionChanged(const QItemSelection &selected, const QItemSelection &deselected);
+  void updateContextualMenus() const;
 
   RawFileListViewModel *rawFileListViewModel;
   QMenu *rawfile_context_menu;

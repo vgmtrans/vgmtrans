@@ -172,8 +172,8 @@ VGMCollView::VGMCollView(QItemSelectionModel *collListSelModel, QWidget *parent)
   connect(this, &QAbstractItemView::customContextMenuRequested, this, &VGMCollView::itemMenu);
   connect(m_listview, &QListView::doubleClicked, this, &VGMCollView::doubleClickedSlot);
   connect(m_listview->selectionModel(), &QItemSelectionModel::currentChanged, this, &VGMCollView::handleCurrentChanged);
+  connect(m_listview->selectionModel(), &QItemSelectionModel::selectionChanged, this, &VGMCollView::onSelectionChanged);
   connect(NotificationCenter::the(), &NotificationCenter::vgmFileSelected, this, &VGMCollView::onVGMFileSelected);
-
 
   QObject::connect(collListSelModel, &QItemSelectionModel::currentChanged,
     [this, commit_rename](const QModelIndex& index) {
@@ -243,6 +243,29 @@ void VGMCollView::keyPressEvent(QKeyEvent *e) {
     default:
       QGroupBox::keyPressEvent(e);
   }
+}
+
+void VGMCollView::onSelectionChanged(const QItemSelection&, const QItemSelection&) {
+  updateContextualMenus();
+}
+
+void VGMCollView::updateContextualMenus() const {
+  if (!m_listview->selectionModel()) {
+    NotificationCenter::the()->updateContextualMenusForVGMFiles({});
+    return;
+  }
+
+  QModelIndexList list = m_listview->selectionModel()->selectedRows();
+  QList<VGMFile*> files;
+  files.reserve(list.size());
+
+  for (const auto& index : list) {
+    if (index.isValid()) {
+      files.append(vgmCollViewModel->fileFromIndex(index));
+    }
+  }
+
+  NotificationCenter::the()->updateContextualMenusForVGMFiles(files);
 }
 
 void VGMCollView::removeVGMColl(const VGMColl *coll) const {
