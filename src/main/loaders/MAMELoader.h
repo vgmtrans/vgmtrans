@@ -11,7 +11,6 @@
 
 #include "components/FileLoader.h"
 
-class TiXmlElement;
 class VirtFile;
 
 enum class LoadMethod { APPEND, APPEND_SWAP16, DEINTERLACE, DEINTERLACE_PAIRS };
@@ -73,9 +72,7 @@ class MAMELoader : public FileLoader {
                                   const unzFile &cur_file);
     static void deleteBuffers(const std::list<std::pair<uint8_t *, uint32_t>> &buffers);
 
-    int loadXML();
-    static MAMEGame *loadGameEntry(TiXmlElement *gameElmt);
-    static int loadRomGroupEntry(TiXmlElement *romgroupElmt, MAMEGame *gameentry);
+    bool loadJSON();
 
     GameMap gamemap;
     bool bLoadedXml;

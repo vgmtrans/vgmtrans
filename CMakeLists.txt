@@ -72,9 +72,9 @@ option(ENABLE_CLI "Build the CLI application" ON)
 
 # Include our own until we switch to TinyXML2 (should also be moved to
 # vgmtranscore)
-add_compile_definitions(TIXML_USE_STL)
-add_subdirectory("${PROJECT_SOURCE_DIR}/lib/tinyxml"
-                 "${CMAKE_CURRENT_BINARY_DIR}/tinyxml" EXCLUDE_FROM_ALL)
+#add_compile_definitions(TIXML_USE_STL)
+#add_subdirectory("${PROJECT_SOURCE_DIR}/lib/tinyxml"
+#                 "${CMAKE_CURRENT_BINARY_DIR}/tinyxml" EXCLUDE_FROM_ALL)
 
 add_subdirectory("${PROJECT_SOURCE_DIR}/lib/spdlog")
 add_subdirectory("${PROJECT_SOURCE_DIR}/lib/mio")
