@@ -81,40 +81,54 @@ void About::setupInfoTab(QWidget* tab) {
 }
 
 void About::setupLicensesTab(QWidget* tab) {
-  QHBoxLayout *layout = new QHBoxLayout(this);
+  auto *layout = new QHBoxLayout(this);
 
-  QListWidget *listWidget = new QListWidget();
+  auto *listWidget = new QListWidget();
   layout->addWidget(listWidget, 1);
 
-  QTextEdit *textEdit = new QTextEdit();
+  auto *textEdit = new QTextEdit();
   textEdit->setReadOnly(true);
   layout->addWidget(textEdit, 3);
 
-  QMap<QString, QString> licenses;
+  QHash<QString, QString> licenses;
   loadLicenses(licenses);
 
-  for (auto it = licenses.constBegin(); it != licenses.constEnd(); ++it) {
-    listWidget->addItem(it.key());
+  // Build an ordered key list: alphabetical, but force "VGMTrans" to the top.
+  QStringList keys = licenses.keys();
+  std::sort(keys.begin(), keys.end(),
+            [](const QString &a, const QString &b) { return a.localeAwareCompare(b) < 0; });
+
+  const QString vgmtrans = QStringLiteral("VGMTrans");
+  if (keys.removeOne(vgmtrans)) {
+    keys.prepend(vgmtrans);
   }
 
-  connect(listWidget, &QListWidget::currentTextChanged, [textEdit, licenses](const QString &currentText) {
-    textEdit->setText(licenses.value(currentText));
-  });
+  listWidget->addItems(keys);
+
+  // Initialize selection and detail pane
+  if (!keys.isEmpty()) {
+    listWidget->setCurrentRow(0);
+    textEdit->setText(licenses.value(keys.first()));
+  }
+
+  // Update the text when a different license is clicked
+  connect(listWidget, &QListWidget::currentTextChanged,
+          this, [textEdit, licenses](const QString &currentText) {
+            textEdit->setText(licenses.value(currentText));
+          });
 
   tab->setLayout(layout);
 }
 
-void About::loadLicenses(QMap<QString, QString>& licenses) {
+void About::loadLicenses(QHash<QString, QString>& licenses) {
   QDir directory(":/legal");
 
-  foreach (QString filename, directory.entryList(QDir::Files)) {
+  const QStringList files = directory.entryList(QDir::Files, QDir::Name);
+  for (const QString &filename : files) {
     QFile file(directory.filePath(filename));
-
     if (file.open(QIODevice::ReadOnly | QIODevice::Text)) {
       QTextStream in(&file);
-      QString content = in.readAll();
-      licenses.insert(filename, content);
-
+      licenses.insert(filename, in.readAll());
       file.close();
     } else {
       qDebug() << "Failed to open file:" << filename;

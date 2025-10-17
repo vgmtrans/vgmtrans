@@ -42,6 +42,12 @@
   <file>icons/toast_success.svg</file>
   <file>icons/toast_close.svg</file>
   <file alias="legal/VGMTrans">../../../../LICENSE</file>
+  <file alias="legal/zlib">../../../../lib/zlib/LICENSE</file>
+  <file alias="legal/unarr">../../../../lib/unarr/COPYING</file>
+  <file alias="legal/spdlog">../../../../lib/spdlog/LICENSE</file>
+  <file alias="legal/libchdr">../../../../lib/libchdr/LICENSE.txt</file>
+  <file alias="legal/mio">../../../../licenses/LICENSE_mio</file>
+  <file alias="legal/JSON for Modern C++">../../../../licenses/LICENSE_nlohmann_json</file>
   <file alias="legal/oki_adpcm_state">../../../../licenses/LICENSE_oki_adpcm_state</file>
 </qresource>
 </RCC>

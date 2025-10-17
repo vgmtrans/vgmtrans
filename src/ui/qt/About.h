@@ -17,7 +17,7 @@ class About final : public QDialog {
    private:
     static void setupInfoTab(QWidget* tab);
     void setupLicensesTab(QWidget* tab);
-    static void loadLicenses(QMap<QString, QString>& licenses);
+    static void loadLicenses(QHash<QString, QString>& licenses);
 
     QTabWidget* tabs{};
 };
