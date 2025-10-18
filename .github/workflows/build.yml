@@ -161,7 +161,7 @@ jobs:
           find appdir/
           mkdir -p appdir/usr/share
 
-          cp ${{ github.workspace }}/bin/mame_roms.xml appdir/usr/bin
+          cp ${{ github.workspace }}/bin/mame_roms.json appdir/usr/bin
           cp ${{ github.workspace }}/src/ui/qt/resources/VGMTrans.desktop appdir/usr/share
           cp ${{ github.workspace }}/src/ui/qt/resources/vgmtrans.png appdir/
 

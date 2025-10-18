@@ -149,7 +149,7 @@ if(CMAKE_SYSTEM_NAME MATCHES "Darwin")
   add_custom_command(
     TARGET vgmtrans
     POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E copy_if_different "${CMAKE_SOURCE_DIR}/bin/mame_roms.xml"
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different "${CMAKE_SOURCE_DIR}/bin/mame_roms.json"
           "$<TARGET_FILE_DIR:vgmtrans>/../Resources"
     COMMAND ${CMAKE_COMMAND} -E copy_if_different "${BASS_DLL_LOCATION}"  "$<TARGET_FILE_DIR:vgmtrans>/"
     COMMAND ${CMAKE_COMMAND} -E copy_if_different "${BASSMIDI_DLL_LOCATION}"  "$<TARGET_FILE_DIR:vgmtrans>/"
@@ -169,7 +169,7 @@ elseif(CMAKE_SYSTEM_NAME MATCHES "Windows")
     POST_BUILD
     COMMAND
       ${CMAKE_COMMAND} -E copy_if_different
-      "${CMAKE_SOURCE_DIR}/bin/mame_roms.xml"
+      "${CMAKE_SOURCE_DIR}/bin/mame_roms.json"
       "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}")
 
   get_target_property(MOC_EXECUTABLE_LOCATION Qt${Qt_VERSION_MAJOR}::moc

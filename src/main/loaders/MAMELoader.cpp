@@ -4,9 +4,10 @@
  * refer to the included LICENSE.txt file
  */
 
-#include <tinyxml.h>
+#include <nlohmann/json.hpp>
 #include <spdlog/fmt/fmt.h>
 #include <cstdlib>
+#include <fstream>
 #include <ranges>
 
 #include "MAMELoader.h"
@@ -22,6 +23,8 @@
 namespace vgmtrans::loaders {
 LoaderRegistration<MAMELoader> _mame("MAME");
 }
+
+using json = nlohmann::json;
 
 bool MAMERomGroup::getHexAttribute(const std::string& attrName, uint32_t* out) const {
   auto it = attributes.find(attrName);
@@ -49,62 +52,164 @@ MAMERomGroup* MAMEGame::getRomGroupOfType(const std::string& strType) {
 }
 
 MAMELoader::MAMELoader() {
-  bLoadedXml = !loadXML();
+  bLoadedXml = loadJSON();
 }
 
 MAMELoader::~MAMELoader() {
   deleteMap<std::string, MAMEGame>(gamemap);
 }
 
-int MAMELoader::loadXML() {
-    const std::string xmlFilePath = pRoot->UI_getResourceDirPath() + "mame_roms.xml";
+namespace {
 
-  TiXmlDocument doc(xmlFilePath);
-  if (!doc.LoadFile())  // if loading the xml file fails
-    return 1;
+constexpr const char* kMameJsonFilename = "mame_roms.json";
 
-  TiXmlElement* rootElmt = doc.FirstChildElement();
-  const std::string& className = rootElmt->ValueStr();
-  if (className != "romlist")
-    return 1;
-
-  /// for all "game" elements
-  for (TiXmlElement* gameElmt = rootElmt->FirstChildElement(); gameElmt != nullptr;
-       gameElmt = gameElmt->NextSiblingElement()) {
-    if (gameElmt->ValueStr() != "game")
-      return 1;
-    MAMEGame* gameentry = loadGameEntry(gameElmt);
-    if (!gameentry)
-      return 1;
-    gamemap[gameentry->name] = gameentry;
-  }
-  return 0;
+std::string jsonToString(const json& value) {
+  if (value.is_string())
+    return value.get<std::string>();
+  if (value.is_null())
+    return {};
+  return value.dump();
 }
 
-MAMEGame* MAMELoader::loadGameEntry(TiXmlElement* gameElmt) {
-  MAMEGame* gameentry = new MAMEGame;
-  std::string gamename, fmtVersionStr;
+bool parseLoadMethod(const std::string& method, LoadMethod* out) {
+  if (method == "append")
+    *out = LoadMethod::APPEND;
+  else if (method == "append_swap16")
+    *out = LoadMethod::APPEND_SWAP16;
+  else if (method == "deinterlace")
+    *out = LoadMethod::DEINTERLACE;
+  else if (method == "deinterlace_pairs")
+    *out = LoadMethod::DEINTERLACE_PAIRS;
+  else
+    return false;
 
-  if (gameElmt->QueryValueAttribute("name", &gameentry->name) != TIXML_SUCCESS) {
-    delete gameentry;
+  return true;
+}
+
+bool parseLoadOrder(const std::string& order, LoadOrder* out) {
+  if (order == "normal" || order.empty())
+    *out = LoadOrder::NORMAL;
+  else if (order == "reverse")
+    *out = LoadOrder::REVERSE;
+  else
+    return false;
+
+  return true;
+}
+
+void ingestAttributes(const json& attributesObject, std::map<const std::string, std::string>& attributes) {
+  if (!attributesObject.is_object())
+    return;
+
+  for (const auto& [key, value] : attributesObject.items())
+    attributes[key] = jsonToString(value);
+}
+
+bool loadRomGroupEntry(const json& romgroupJson, MAMEGame* gameentry) {
+  if (!romgroupJson.is_object())
+    return false;
+
+  MAMERomGroup romgroupentry;
+
+  auto typeIt = romgroupJson.find("type");
+  auto loadMethodIt = romgroupJson.find("load_method");
+  if (typeIt == romgroupJson.end() || !typeIt->is_string() || loadMethodIt == romgroupJson.end() ||
+      !loadMethodIt->is_string()) {
+    return false;
+  }
+
+  romgroupentry.type = typeIt->get<std::string>();
+
+  if (!parseLoadMethod(loadMethodIt->get<std::string>(), &romgroupentry.loadmethod)) {
+    return false;
+  }
+
+  auto loadOrderIt = romgroupJson.find("load_order");
+  if (loadOrderIt != romgroupJson.end()) {
+    if (!loadOrderIt->is_string() ||
+        !parseLoadOrder(loadOrderIt->get<std::string>(), &romgroupentry.load_order)) {
+      return false;
+    }
+  } else {
+    romgroupentry.load_order = LoadOrder::NORMAL;
+  }
+
+  auto encryptionIt = romgroupJson.find("encryption");
+  if (encryptionIt != romgroupJson.end()) {
+    if (!encryptionIt->is_string()) {
+      return false;
+    }
+    romgroupentry.encryption = encryptionIt->get<std::string>();
+  }
+
+  auto attributesIt = romgroupJson.find("attributes");
+  if (attributesIt != romgroupJson.end()) {
+    ingestAttributes(*attributesIt, romgroupentry.attributes);
+  }
+
+  for (const auto& [key, value] : romgroupJson.items()) {
+    if (key == "type" || key == "load_method" || key == "load_order" || key == "roms" ||
+        key == "encryption" || key == "attributes") {
+      continue;
+    }
+    if (value.is_object() || value.is_array()) {
+      continue;
+    }
+    romgroupentry.attributes[key] = jsonToString(value);
+  }
+
+  auto romsIt = romgroupJson.find("roms");
+  if (romsIt == romgroupJson.end() || !romsIt->is_array() || romsIt->empty()) {
+    return false;
+  }
+
+  for (const auto& rom : *romsIt) {
+    if (!rom.is_string()) {
+      return false;
+    }
+    romgroupentry.roms.push_back(rom.get<std::string>());
+  }
+
+  gameentry->romgroupentries.push_back(std::move(romgroupentry));
+  return true;
+}
+
+MAMEGame* loadGameEntry(const json& gameJson) {
+  if (!gameJson.is_object()) {
     return nullptr;
   }
-  if (gameElmt->QueryValueAttribute("format", &gameentry->format) != TIXML_SUCCESS) {
-    delete gameentry;
+
+  auto nameIt = gameJson.find("name");
+  auto formatIt = gameJson.find("format");
+  if (nameIt == gameJson.end() || !nameIt->is_string() || formatIt == gameJson.end() ||
+      !formatIt->is_string()) {
     return nullptr;
   }
-  if (gameElmt->QueryValueAttribute("fmt_version", &gameentry->fmt_version_str) != TIXML_SUCCESS) {
-    gameentry->fmt_version_str = "";
+
+  auto* gameentry = new MAMEGame;
+  gameentry->name = nameIt->get<std::string>();
+  gameentry->format = formatIt->get<std::string>();
+  if (auto fmtVersionIt = gameJson.find("fmt_version");
+      fmtVersionIt != gameJson.end() && fmtVersionIt->is_string()) {
+    gameentry->fmt_version_str = fmtVersionIt->get<std::string>();
   }
 
-  // Load rom groups
-  for (TiXmlElement* romgroupElmt = gameElmt->FirstChildElement(); romgroupElmt != nullptr;
-       romgroupElmt = romgroupElmt->NextSiblingElement()) {
-    if (romgroupElmt->ValueStr() != "romgroup") {
+  const json* romGroupsArray = nullptr;
+  if (auto romGroupsIt = gameJson.find("rom_groups"); romGroupsIt != gameJson.end()) {
+    if (!romGroupsIt->is_array()) {
       delete gameentry;
       return nullptr;
     }
-    if (loadRomGroupEntry(romgroupElmt, gameentry)) {
+    romGroupsArray = &(*romGroupsIt);
+  }
+
+  if (!romGroupsArray) {
+    delete gameentry;
+    return nullptr;
+  }
+
+  for (const auto& romgroupJson : *romGroupsArray) {
+    if (!loadRomGroupEntry(romgroupJson, gameentry)) {
       delete gameentry;
       return nullptr;
     }
@@ -112,64 +217,54 @@ MAMEGame* MAMELoader::loadGameEntry(TiXmlElement* gameElmt) {
   return gameentry;
 }
 
-int MAMELoader::loadRomGroupEntry(TiXmlElement* romgroupElmt, MAMEGame* gameentry) {
-  MAMERomGroup romgroupentry;
+}  // namespace
 
-  // First, get the "type" and "load_method" attributes.  If they don't exist, we return with an
-  // error.
-  if (romgroupElmt->QueryValueAttribute("type", &romgroupentry.type) != TIXML_SUCCESS)
-    return 1;
-
-  std::string load_method;
-  if (romgroupElmt->QueryValueAttribute("load_method", &load_method) != TIXML_SUCCESS)
-    return 1;
-
-  std::string load_order;
-  if (romgroupElmt->QueryValueAttribute("load_order", &load_order) != TIXML_SUCCESS)
-    load_order = "normal";
-
-  // Read the encryption type string, if it exists
-  romgroupElmt->QueryValueAttribute("encryption", &romgroupentry.encryption);
-
-  // Iterate through the attributes of the romgroup element, recording any user-defined values.
-  for (TiXmlAttribute* attr = romgroupElmt->FirstAttribute(); attr; attr = attr->Next()) {
-    // NameTStr() is returning an std::string because we have defined TIXML_USE_STL
-    const std::string& attrName = attr->NameTStr();
-    // Ignore the attribute if it is "type" or "load_method"; we already dealt with those, they
-    // are mandated.
-    if (attrName.compare("type") && attrName.compare("load_method"))
-      romgroupentry.attributes[attrName] = attr->ValueStr();
+bool MAMELoader::loadJSON() {
+  const std::string jsonFilePath = pRoot->UI_getResourceDirPath() + kMameJsonFilename;
+  std::ifstream jsonFile(jsonFilePath);
+  if (!jsonFile.is_open()) {
+    L_ERROR("Failed to open MAME ROM definition JSON at {}", jsonFilePath);
+    return false;
   }
 
-  if (load_method == "append")
-    romgroupentry.loadmethod = LoadMethod::APPEND;
-  else if (load_method == "append_swap16")
-    romgroupentry.loadmethod = LoadMethod::APPEND_SWAP16;
-  else if (load_method == "deinterlace")
-    romgroupentry.loadmethod = LoadMethod::DEINTERLACE;
-  else if (load_method == "deinterlace_pairs")
-    romgroupentry.loadmethod = LoadMethod::DEINTERLACE_PAIRS;
-  else
-    return 1;
-
-  if (load_order == "normal")
-    romgroupentry.load_order = LoadOrder::NORMAL;
-  else if (load_order == "reverse")
-    romgroupentry.load_order = LoadOrder::REVERSE;
-  else
-    return 1;
-
-  // load rom entries
-  for (TiXmlElement* romElmt = romgroupElmt->FirstChildElement(); romElmt != nullptr;
-       romElmt = romElmt->NextSiblingElement()) {
-    const std::string& elmtName = romElmt->ValueStr();
-    if (elmtName != "rom")
-      return 1;
-    romgroupentry.roms.push_back(romElmt->GetText());
+  json document;
+  try {
+    document = json::parse(jsonFile);
+  } catch (const json::parse_error& error) {
+    L_ERROR("Failed to parse MAME ROM definition JSON: {}", error.what());
+    return false;
   }
 
-  gameentry->romgroupentries.push_back(romgroupentry);
-  return 0;
+  const json* games = nullptr;
+  if (document.is_array()) {
+    games = &document;
+  }
+  else if (document.is_object()) {
+    if (auto gamesIt = document.find("games"); gamesIt != document.end() && gamesIt->is_array()) {
+      games = &(*gamesIt);
+    }
+  }
+
+  if (!games) {
+    if (auto gamesIt = document.find("games"); gamesIt != document.end() && gamesIt->is_array()) {
+      games = &(*gamesIt);
+    }
+  }
+
+  if (!games) {
+    L_ERROR("MAME ROM definition JSON does not contain a 'games' array");
+    return false;
+  }
+
+  for (const auto& gameJson : *games) {
+    MAMEGame* gameentry = loadGameEntry(gameJson);
+    if (!gameentry) {
+      return false;
+    }
+    gamemap[gameentry->name] = gameentry;
+  }
+
+  return true;
 }
 
 void MAMELoader::apply(const RawFile* file) {
@@ -178,7 +273,7 @@ void MAMELoader::apply(const RawFile* file) {
 
   std::string filename = file->stem();
 
-  /* Look for the game in our databse */
+  /* Look for the game in our database */
   GameMap::iterator it = gamemap.find(filename);
   if (it == gamemap.end()) {
     return;

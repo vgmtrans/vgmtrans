@@ -1,0 +1,3568 @@
+{
+  "version": 1,
+  "games": [
+    {
+      "name": "1941",
+      "format": "CPS1",
+      "fmt_version": "CPS1_V2.00",
+      "rom_groups": [
+        {
+          "type": "audiocpu",
+          "load_method": "append",
+          "attributes": {
+            "tables": "0x1000"
+          },
+          "roms": [
+            "41_9.12b"
+          ]
+        },
+        {
+          "type": "oki6295",
+          "load_method": "append",
+          "roms": [
+            "41_18.11c",
+            "41_19.12c"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "1944",
+      "format": "CPS2",
+      "fmt_version": "CPS2_V1.80",
+      "rom_groups": [
+        {
+          "type": "audiocpu",
+          "load_method": "append",
+          "attributes": {
+            "seq_table": "0x9005",
+            "instr_table_ptrs": "0x3C05",
+            "num_instr_banks": "9",
+            "samp_table": "0x6000",
+            "artic_table": "0x8000"
+          },
+          "roms": [
+            "nff.01"
+          ]
+        },
+        {
+          "type": "qsound",
+          "load_method": "append_swap16",
+          "roms": [
+            "nff.11m",
+            "nff.12m"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "19xx",
+      "format": "CPS2",
+      "fmt_version": "CPS2_V1.05",
+      "rom_groups": [
+        {
+          "type": "audiocpu",
+          "load_method": "append",
+          "attributes": {
+            "seq_table": "0x9005",
+            "instr_table": "0x7000",
+            "num_instr_banks": "2",
+            "samp_table": "0x8000"
+          },
+          "roms": [
+            "19x.01"
+          ]
+        },
+        {
+          "type": "qsound",
+          "load_method": "append_swap16",
+          "roms": [
+            "19x.11m",
+            "19x.12m"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "3wonders",
+      "format": "CPS1",
+      "fmt_version": "CPS1_V4.25",
+      "rom_groups": [
+        {
+          "type": "audiocpu",
+          "load_method": "append",
+          "attributes": {
+            "tables": "0x1100"
+          },
+          "roms": [
+            "rt_9.12b"
+          ]
+        },
+        {
+          "type": "oki6295",
+          "load_method": "append",
+          "roms": [
+            "rt_18.11c",
+            "rt_19.12c"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "armwar",
+      "format": "CPS2",
+      "fmt_version": "CPS2_V1.05A",
+      "rom_groups": [
+        {
+          "type": "audiocpu",
+          "load_method": "append",
+          "attributes": {
+            "seq_table": "0x9005",
+            "instr_table": "0x7000",
+            "num_instr_banks": "2",
+            "samp_table": "0x8000",
+            "samp_table_length": "0x6E0"
+          },
+          "roms": [
+            "pwg.01",
+            "pwg.02"
+          ]
+        },
+        {
+          "type": "qsound",
+          "load_method": "append_swap16",
+          "roms": [
+            "pwg.11m",
+            "pwg.12m"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "avsp",
+      "format": "CPS2",
+      "fmt_version": "CPS2_V1.04",
+      "rom_groups": [
+        {
+          "type": "audiocpu",
+          "load_method": "append",
+          "attributes": {
+            "seq_table": "0x9005",
+            "instr_table": "0x7000",
+            "num_instr_banks": "2",
+            "samp_table": "0x8000"
+          },
+          "roms": [
+            "avp.01"
+          ]
+        },
+        {
+          "type": "qsound",
+          "load_method": "append_swap16",
+          "roms": [
+            "avp.11m",
+            "avp.12m"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "batcir",
+      "format": "CPS2",
+      "fmt_version": "CPS2_V1.16B",
+      "rom_groups": [
+        {
+          "type": "audiocpu",
+          "load_method": "append",
+          "attributes": {
+            "seq_table": "0x9005",
+            "instr_table_ptrs": "0x4004",
+            "num_instr_banks": "2",
+            "samp_table": "0x5008"
+          },
+          "roms": [
+            "btc.01",
+            "btc.02"
+          ]
+        },
+        {
+          "type": "qsound",
+          "load_method": "append_swap16",
+          "roms": [
+            "btc.11m",
+            "btc.12m"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "cawing",
+      "format": "CPS1",
+      "fmt_version": "CPS1_V4.25",
+      "rom_groups": [
+        {
+          "type": "audiocpu",
+          "load_method": "append",
+          "attributes": {
+            "tables": "0x1100"
+          },
+          "roms": [
+            "ca_9.12b"
+          ]
+        },
+        {
+          "type": "oki6295",
+          "load_method": "append",
+          "roms": [
+            "ca_18.11c",
+            "ca_19.12c"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "captcomm",
+      "format": "CPS1",
+      "fmt_version": "CPS1_V4.25",
+      "rom_groups": [
+        {
+          "type": "audiocpu",
+          "load_method": "append",
+          "attributes": {
+            "tables": "0x1100"
+          },
+          "roms": [
+            "cc_09.11a"
+          ]
+        },
+        {
+          "type": "oki6295",
+          "load_method": "append",
+          "roms": [
+            "cc_18.11c",
+            "cc_19.12c"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "choko",
+      "format": "CPS2",
+      "fmt_version": "CPS2_V1.80",
+      "rom_groups": [
+        {
+          "type": "audiocpu",
+          "load_method": "append",
+          "attributes": {
+            "seq_table": "0x9005",
+            "instr_table_ptrs": "0x3C05",
+            "num_instr_banks": "2",
+            "samp_table": "0x3D95",
+            "artic_table": "0x40BD"
+          },
+          "roms": [
+            "tko.01"
+          ]
+        },
+        {
+          "type": "qsound",
+          "load_method": "deinterlace",
+          "load_order": "reverse",
+          "roms": [
+            "tkoj5_a.simm5",
+            "tkoj5_b.simm5"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "csclub",
+      "format": "CPS2",
+      "fmt_version": "CPS2_V1.30",
+      "rom_groups": [
+        {
+          "type": "audiocpu",
+          "load_method": "append",
+          "attributes": {
+            "seq_table": "0x7005",
+            "instr_table_ptrs": "0x3b04",
+            "num_instr_banks": "16",
+            "samp_table": "0x5000",
+            "artic_table": "0x6000"
+          },
+          "roms": [
+            "csc.01"
+          ]
+        },
+        {
+          "type": "qsound",
+          "load_method": "append_swap16",
+          "roms": [
+            "csc.51",
+            "csc.52",
+            "csc.53",
+            "csc.54",
+            "csc.55",
+            "csc.56",
+            "csc.57",
+            "csc.58"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "cworld2j",
+      "format": "CPS1",
+      "fmt_version": "CPS1_V4.25",
+      "rom_groups": [
+        {
+          "type": "audiocpu",
+          "load_method": "append",
+          "attributes": {
+            "tables": "0x1100"
+          },
+          "roms": [
+            "q5_23.13b"
+          ]
+        },
+        {
+          "type": "oki6295",
+          "load_method": "append",
+          "roms": [
+            "q5_30.12c",
+            "q5_31.13c"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "cybots",
+      "format": "CPS2",
+      "fmt_version": "CPS2_V1.05A",
+      "rom_groups": [
+        {
+          "type": "audiocpu",
+          "load_method": "append",
+          "attributes": {
+            "seq_table": "0x9005",
+            "instr_table": "0x7000",
+            "num_instr_banks": "2",
+            "samp_table": "0x8000",
+            "samp_table_length": "0x868"
+          },
+          "roms": [
+            "cyb.01",
+            "cyb.02"
+          ]
+        },
+        {
+          "type": "qsound",
+          "load_method": "append_swap16",
+          "roms": [
+            "cyb.11m",
+            "cyb.12m"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "daiskiss",
+      "format": "KonamiArcade",
+      "fmt_version": "GX",
+      "rom_groups": [
+        {
+          "type": "soundcpu",
+          "load_method": "deinterlace",
+          "roms": [
+            "535a08.9c",
+            "535a09.7c"
+          ]
+        },
+        {
+          "type": "sound",
+          "load_method": "append",
+          "roms": [
+            "535a22.9g"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "ddsom",
+      "format": "CPS2",
+      "fmt_version": "CPS2_V1.15",
+      "rom_groups": [
+        {
+          "type": "audiocpu",
+          "load_method": "append",
+          "attributes": {
+            "seq_table": "0x9005",
+            "instr_table": "0x39E9",
+            "num_instr_banks": "2",
+            "samp_table": "0x49E9"
+          },
+          "roms": [
+            "dd2.01",
+            "dd2.02"
+          ]
+        },
+        {
+          "type": "qsound",
+          "load_method": "append_swap16",
+          "roms": [
+            "dd2.11m",
+            "dd2.12m"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "ddtod",
+      "format": "CPS2",
+      "fmt_version": "CPS2_V1.04",
+      "rom_groups": [
+        {
+          "type": "audiocpu",
+          "load_method": "append",
+          "attributes": {
+            "seq_table": "0x9005",
+            "instr_table": "0x7000",
+            "num_instr_banks": "2",
+            "samp_table": "0x8000"
+          },
+          "roms": [
+            "dad.01"
+          ]
+        },
+        {
+          "type": "qsound",
+          "load_method": "append_swap16",
+          "roms": [
+            "dad.11m",
+            "dad.12m"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "dimahoou",
+      "format": "CPS2",
+      "fmt_version": "CPS2_V1.80",
+      "rom_groups": [
+        {
+          "type": "audiocpu",
+          "load_method": "append",
+          "attributes": {
+            "seq_table": "0x9005",
+            "instr_table_ptrs": "0x3C05",
+            "num_instr_banks": "5",
+            "samp_table": "0x6000",
+            "artic_table": "0x8000"
+          },
+          "roms": [
+            "gmd.01",
+            "gmd.02"
+          ]
+        },
+        {
+          "type": "qsound",
+          "load_method": "append_swap16",
+          "roms": [
+            "gmd.11m",
+            "gmd.12m"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "dino",
+      "format": "CPS2",
+      "fmt_version": "CPS2_V1.00",
+      "rom_groups": [
+        {
+          "type": "audiocpu",
+          "load_method": "append",
+          "encryption": "kabuki",
+          "attributes": {
+            "kabuki_swap_key1": "0x76543210",
+            "kabuki_swap_key2": "0x24601357",
+            "kabuki_addr_key": "0x4343",
+            "kabuki_xor_key": "0x43",
+            "seq_table": "0x8005",
+            "instr_table": "0x6E62",
+            "num_instr_banks": "1",
+            "samp_table": "0x6A82",
+            "samp_table_length": "0x3E0"
+          },
+          "roms": [
+            "cd_q.5k"
+          ]
+        },
+        {
+          "type": "qsound",
+          "load_method": "append",
+          "roms": [
+            "cd-q1.1k",
+            "cd-q2.2k",
+            "cd-q3.3k",
+            "cd-q4.4k"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "dragoona",
+      "format": "KonamiArcade",
+      "fmt_version": "GX",
+      "rom_groups": [
+        {
+          "type": "soundcpu",
+          "load_method": "deinterlace",
+          "attributes": {
+            "seq_table": "0x8070"
+          },
+          "roms": [
+            "417a06.9c",
+            "417a07.7c"
+          ]
+        },
+        {
+          "type": "sound",
+          "load_method": "append",
+          "roms": [
+            "417a17.9g"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "dstlk",
+      "format": "CPS2",
+      "fmt_version": "CPS2_V1.05",
+      "rom_groups": [
+        {
+          "type": "audiocpu",
+          "load_method": "append",
+          "attributes": {
+            "seq_table": "0x9005",
+            "seq_table_length": "0xAC4",
+            "instr_table": "0x7000",
+            "num_instr_banks": "1",
+            "samp_table": "0x8000"
+          },
+          "roms": [
+            "vam.01",
+            "vam.02"
+          ]
+        },
+        {
+          "type": "qsound",
+          "load_method": "append_swap16",
+          "roms": [
+            "vam.11m",
+            "vam.12m"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "dynwar",
+      "format": "CPS1",
+      "fmt_version": "CPS1_V1.00",
+      "rom_groups": [
+        {
+          "type": "audiocpu",
+          "load_method": "append",
+          "attributes": {
+            "tables": "0xE57"
+          },
+          "roms": [
+            "tke_17.12b"
+          ]
+        },
+        {
+          "type": "oki6295",
+          "load_method": "append",
+          "roms": [
+            "tke_18.11c",
+            "tke_19.12c"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "ecofghtr",
+      "format": "CPS2",
+      "fmt_version": "CPS2_V1.04",
+      "rom_groups": [
+        {
+          "type": "audiocpu",
+          "load_method": "append",
+          "attributes": {
+            "seq_table": "0x9005",
+            "instr_table": "0x7000",
+            "num_instr_banks": "2",
+            "samp_table": "0x8000"
+          },
+          "roms": [
+            "uec.01"
+          ]
+        },
+        {
+          "type": "qsound",
+          "load_method": "append_swap16",
+          "roms": [
+            "uec.11m",
+            "uec.12m"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "elvactr",
+      "format": "TaitoF3",
+      "rom_groups": [
+        {
+          "type": "audiocpu",
+          "load_method": "deinterlace",
+          "roms": [
+            "e02-13.32",
+            "e02-14.33"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "ffight",
+      "format": "CPS1",
+      "fmt_version": "CPS1_V2.00",
+      "rom_groups": [
+        {
+          "type": "audiocpu",
+          "load_method": "append",
+          "attributes": {
+            "tables": "0x1000"
+          },
+          "roms": [
+            "ff_09.12b"
+          ]
+        },
+        {
+          "type": "oki6295",
+          "load_method": "append",
+          "roms": [
+            "ff_18.11c",
+            "ff_19.12c"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "fiveside",
+      "format": "KonamiArcade",
+      "fmt_version": "GX",
+      "rom_groups": [
+        {
+          "type": "soundcpu",
+          "load_method": "append",
+          "attributes": {
+            "seq_table": "0x33C8",
+            "samp_tables": "0x3086"
+          },
+          "roms": [
+            "479_a05.bin"
+          ]
+        },
+        {
+          "type": "sound",
+          "load_method": "append",
+          "roms": [
+            "479_a06.bin",
+            "479_a07.bin"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "forgottn",
+      "format": "CPS1",
+      "fmt_version": "CPS1_V1.00",
+      "rom_groups": [
+        {
+          "type": "audiocpu",
+          "load_method": "append",
+          "attributes": {
+            "tables": "0xDD0"
+          },
+          "roms": [
+            "lw_37.13c"
+          ]
+        },
+        {
+          "type": "oki6295",
+          "load_method": "append",
+          "roms": [
+            "lw-03u.12e",
+            "lw-04u.13e"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "ghouls",
+      "format": "CPS1",
+      "fmt_version": "CPS1_V1.00",
+      "rom_groups": [
+        {
+          "type": "audiocpu",
+          "load_method": "append",
+          "attributes": {
+            "tables": "0xDF0"
+          },
+          "roms": [
+            "26.10a"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "gaiapols",
+      "format": "KonamiArcade",
+      "fmt_version": "MysticWarrior",
+      "rom_groups": [
+        {
+          "type": "soundcpu",
+          "load_method": "append",
+          "attributes": {
+            "seq_table": "0x263b",
+            "samp_tables": "0x41B0",
+            "drum_samp_table": "0x4A5E",
+            "drum_table": "0x4B48"
+          },
+          "roms": [
+            "123e13.9c"
+          ]
+        },
+        {
+          "type": "sound",
+          "load_method": "append",
+          "roms": [
+            "123e14.2g",
+            "123e15.2m"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "ganbare",
+      "format": "CPS1",
+      "fmt_version": "CPS1_V5.00",
+      "rom_groups": [
+        {
+          "type": "audiocpu",
+          "load_method": "append",
+          "attributes": {
+            "tables": "0xFFE"
+          },
+          "roms": [
+            "mrnj_09.12a"
+          ]
+        },
+        {
+          "type": "oki6295",
+          "load_method": "append",
+          "roms": [
+            "mrnj_18.11c",
+            "mrnj_19.12c"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "gokuparo",
+      "format": "KonamiArcade",
+      "fmt_version": "GX",
+      "rom_groups": [
+        {
+          "type": "soundcpu",
+          "load_method": "deinterlace",
+          "roms": [
+            "321b06.9c",
+            "321b07.7c"
+          ]
+        },
+        {
+          "type": "sound",
+          "load_method": "append",
+          "roms": [
+            "321b17.9g",
+            "321b18.7g"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "gulunpa",
+      "format": "CPS1",
+      "fmt_version": "CPS1_V4.25",
+      "rom_groups": [
+        {
+          "type": "audiocpu",
+          "load_method": "append",
+          "attributes": {
+            "tables": "0x1100"
+          },
+          "roms": [
+            "9"
+          ]
+        },
+        {
+          "type": "oki6295",
+          "load_method": "append",
+          "roms": [
+            "18",
+            "19"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "gigawing",
+      "format": "CPS2",
+      "fmt_version": "CPS2_V1.40",
+      "rom_groups": [
+        {
+          "type": "audiocpu",
+          "load_method": "append",
+          "attributes": {
+            "seq_table": "0x9005",
+            "instr_table_ptrs": "0x3C05",
+            "num_instr_banks": "6",
+            "samp_table": "0x6000",
+            "artic_table": "0x8000"
+          },
+          "roms": [
+            "ggw.01"
+          ]
+        },
+        {
+          "type": "qsound",
+          "load_method": "append_swap16",
+          "roms": [
+            "ggw.11m",
+            "ggw.12m"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "hsf2",
+      "format": "CPS2",
+      "fmt_version": "CPS2_V1.06B",
+      "rom_groups": [
+        {
+          "type": "audiocpu",
+          "load_method": "append",
+          "attributes": {
+            "seq_table": "0x9005",
+            "instr_table": "0x7000",
+            "num_instr_banks": "2",
+            "samp_table": "0x8000"
+          },
+          "roms": [
+            "hs2.01",
+            "hs2.02"
+          ]
+        },
+        {
+          "type": "qsound",
+          "load_method": "append_swap16",
+          "roms": [
+            "hs2.11m"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "jetwave",
+      "format": "KonamiArcade",
+      "fmt_version": "GX",
+      "rom_groups": [
+        {
+          "type": "soundcpu",
+          "load_method": "append_swap16",
+          "attributes": {
+            "seq_table": "0x68E4",
+            "samp_tables": "0x5E4C"
+          },
+          "roms": [
+            "678a07.19l"
+          ]
+        },
+        {
+          "type": "sound",
+          "load_method": "append",
+          "roms": [
+            "678a08.5r",
+            "678a09.3r",
+            "678a10.5n"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "jojo",
+      "format": "CPS2",
+      "fmt_version": "CPS3",
+      "rom_groups": [
+        {
+          "type": "audiocpu",
+          "load_method": "deinterlace",
+          "encryption": "cps3",
+          "attributes": {
+            "key1": "0x02203ee3",
+            "key2": "0x01301972",
+            "seq_table": "0x760008",
+            "samp_table": "0x75c000",
+            "samp_table_length": "0x2480",
+            "instr_table_ptrs": "0x758000",
+            "num_instr_banks": "2"
+          },
+          "roms": [
+            "jojon/jojo-simm1.0",
+            "jojon/jojo-simm1.1",
+            "jojon/jojo-simm1.2",
+            "jojon/jojo-simm1.3"
+          ]
+        },
+        {
+          "type": "qsound",
+          "load_method": "deinterlace_pairs",
+          "load_order": "reverse",
+          "roms": [
+            "jojon/jojo-simm3.0",
+            "jojon/jojo-simm3.1"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "jojon",
+      "format": "CPS2",
+      "fmt_version": "CPS3",
+      "rom_groups": [
+        {
+          "type": "audiocpu",
+          "load_method": "deinterlace",
+          "encryption": "cps3",
+          "attributes": {
+            "key1": "0x02203ee3",
+            "key2": "0x01301972",
+            "seq_table": "0x760008",
+            "samp_table": "0x75c000",
+            "samp_table_length": "0x2480",
+            "instr_table_ptrs": "0x758000",
+            "num_instr_banks": "2"
+          },
+          "roms": [
+            "jojo-simm1.0",
+            "jojo-simm1.1",
+            "jojo-simm1.2",
+            "jojo-simm1.3"
+          ]
+        },
+        {
+          "type": "qsound",
+          "load_method": "deinterlace_pairs",
+          "load_order": "reverse",
+          "roms": [
+            "jojo-simm3.0",
+            "jojo-simm3.1"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "jojoba",
+      "format": "CPS2",
+      "fmt_version": "CPS3",
+      "rom_groups": [
+        {
+          "type": "audiocpu",
+          "load_method": "deinterlace",
+          "encryption": "cps3",
+          "attributes": {
+            "key1": "0x23323ee3",
+            "key2": "0x03021972",
+            "seq_table": "0x760008",
+            "samp_table": "0x75c000",
+            "samp_table_length": "0x2480",
+            "instr_table_ptrs": "0x758000",
+            "num_instr_banks": "2"
+          },
+          "roms": [
+            "jojoban/jojoba-simm1.0",
+            "jojoban/jojoba-simm1.1",
+            "jojoban/jojoba-simm1.2",
+            "jojoban/jojoba-simm1.3"
+          ]
+        },
+        {
+          "type": "qsound",
+          "load_method": "deinterlace_pairs",
+          "load_order": "reverse",
+          "roms": [
+            "jojoban/jojoba-simm3.0",
+            "jojoban/jojoba-simm3.1"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "jojoban",
+      "format": "CPS2",
+      "fmt_version": "CPS3",
+      "rom_groups": [
+        {
+          "type": "audiocpu",
+          "load_method": "deinterlace",
+          "encryption": "cps3",
+          "attributes": {
+            "key1": "0x23323ee3",
+            "key2": "0x03021972",
+            "seq_table": "0x760008",
+            "samp_table": "0x75c000",
+            "samp_table_length": "0x2480",
+            "instr_table_ptrs": "0x758000",
+            "num_instr_banks": "2"
+          },
+          "roms": [
+            "jojoba-simm1.0",
+            "jojoba-simm1.1",
+            "jojoba-simm1.2",
+            "jojoba-simm1.3"
+          ]
+        },
+        {
+          "type": "qsound",
+          "load_method": "deinterlace_pairs",
+          "load_order": "reverse",
+          "roms": [
+            "jojoba-simm3.0",
+            "jojoba-simm3.1"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "jyangoku",
+      "format": "CPS2",
+      "fmt_version": "CPS2_V1.80",
+      "rom_groups": [
+        {
+          "type": "audiocpu",
+          "load_method": "append",
+          "attributes": {
+            "seq_table": "0x9005",
+            "instr_table_ptrs": "0x3EF4",
+            "num_instr_banks": "3",
+            "samp_table": "0x40B8",
+            "artic_table": "0x4428"
+          },
+          "roms": [
+            "maj_01.1a"
+          ]
+        },
+        {
+          "type": "qsound",
+          "load_method": "deinterlace",
+          "load_order": "reverse",
+          "roms": [
+            "maj5_a.simm5",
+            "maj5_b.simm5"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "kenseim",
+      "format": "CPS1",
+      "fmt_version": "CPS1_V4.25",
+      "rom_groups": [
+        {
+          "type": "audiocpu",
+          "load_method": "append",
+          "attributes": {
+            "tables": "0x1100"
+          },
+          "roms": [
+            "knm_09.12a"
+          ]
+        },
+        {
+          "type": "oki6295",
+          "load_method": "append",
+          "roms": [
+            "knm_18.11c",
+            "knm_19.12c"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "knights",
+      "format": "CPS1",
+      "fmt_version": "CPS1_V4.25",
+      "rom_groups": [
+        {
+          "type": "audiocpu",
+          "load_method": "append",
+          "attributes": {
+            "tables": "0x1100"
+          },
+          "roms": [
+            "kr_09.11a"
+          ]
+        },
+        {
+          "type": "oki6295",
+          "load_method": "append",
+          "roms": [
+            "kr_18.11c",
+            "kr_19.12c"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "kod",
+      "format": "CPS1",
+      "fmt_version": "CPS1_V4.25",
+      "rom_groups": [
+        {
+          "type": "audiocpu",
+          "load_method": "append",
+          "attributes": {
+            "tables": "0x1100"
+          },
+          "roms": [
+            "kd_9.12a"
+          ]
+        },
+        {
+          "type": "oki6295",
+          "load_method": "append",
+          "roms": [
+            "kd_18.11c",
+            "kd_19.12c"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "le2",
+      "format": "KonamiArcade",
+      "fmt_version": "GX",
+      "rom_groups": [
+        {
+          "type": "soundcpu",
+          "load_method": "deinterlace",
+          "roms": [
+            "312b06.9c",
+            "312b07.7c"
+          ]
+        },
+        {
+          "type": "sound",
+          "load_method": "append",
+          "roms": [
+            "312a17.9g",
+            "312a18.7g"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "mmatrix",
+      "format": "CPS2",
+      "fmt_version": "CPS2_V1.80",
+      "rom_groups": [
+        {
+          "type": "audiocpu",
+          "load_method": "append",
+          "attributes": {
+            "seq_table": "0x9005",
+            "instr_table_ptrs": "0x3C05",
+            "num_instr_banks": "9",
+            "samp_table": "0x6000",
+            "samp_table_length": "0x828",
+            "artic_table": "0x8000"
+          },
+          "roms": [
+            "mmx.01"
+          ]
+        },
+        {
+          "type": "qsound",
+          "load_method": "append_swap16",
+          "roms": [
+            "mmx.11m",
+            "mmx.12m"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "megaman",
+      "format": "CPS1",
+      "fmt_version": "CPS1_V5.02",
+      "rom_groups": [
+        {
+          "type": "audiocpu",
+          "load_method": "append",
+          "attributes": {
+            "tables": "0xFFE"
+          },
+          "roms": [
+            "rcm_09.11a"
+          ]
+        },
+        {
+          "type": "oki6295",
+          "load_method": "append",
+          "roms": [
+            "rcm_18.11c",
+            "rcm_19.12c"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "megaman2",
+      "format": "CPS2",
+      "fmt_version": "CPS2_V1.15C",
+      "rom_groups": [
+        {
+          "type": "audiocpu",
+          "load_method": "append",
+          "attributes": {
+            "seq_table": "0x9005",
+            "instr_table": "0x4000",
+            "num_instr_banks": "2",
+            "samp_table": "0x5000"
+          },
+          "roms": [
+            "rm2.01a",
+            "rm2.02"
+          ]
+        },
+        {
+          "type": "qsound",
+          "load_method": "append_swap16",
+          "roms": [
+            "rm2.11m",
+            "rm2.12m"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "mercs",
+      "format": "CPS1",
+      "fmt_version": "CPS1_V3.50",
+      "rom_groups": [
+        {
+          "type": "audiocpu",
+          "load_method": "append",
+          "attributes": {
+            "tables": "0x1000"
+          },
+          "roms": [
+            "so2_09.12b"
+          ]
+        },
+        {
+          "type": "oki6295",
+          "load_method": "append",
+          "roms": [
+            "so2_18.11c",
+            "so2_19.12c"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "metamrph",
+      "format": "KonamiArcade",
+      "fmt_version": "MysticWarrior",
+      "rom_groups": [
+        {
+          "type": "soundcpu",
+          "load_method": "append",
+          "attributes": {
+            "seq_table": "0x23FB",
+            "samp_tables": "0x402B",
+            "drum_samp_table": "0x46CF",
+            "drum_table": "0x4756"
+          },
+          "roms": [
+            "224a05"
+          ]
+        },
+        {
+          "type": "sound",
+          "load_method": "append",
+          "roms": [
+            "224a06",
+            "224a07"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "midnrun",
+      "format": "KonamiArcade",
+      "fmt_version": "GX",
+      "rom_groups": [
+        {
+          "type": "soundcpu",
+          "load_method": "append_swap16",
+          "attributes": {
+            "seq_table": "0x6C08",
+            "samp_tables": "0x61B4",
+            "drum_samp_table": "0x675B",
+            "drum_table": "0x67D9"
+          },
+          "roms": [
+            "477a07.19l"
+          ]
+        },
+        {
+          "type": "sound",
+          "load_method": "append",
+          "roms": [
+            "477a08.5r",
+            "477a09.3r",
+            "477a10.5n"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "mmancp2u",
+      "format": "CPS2",
+      "fmt_version": "CPS2_V1.05A",
+      "rom_groups": [
+        {
+          "type": "audiocpu",
+          "load_method": "append",
+          "attributes": {
+            "seq_table": "0x9005",
+            "instr_table": "0x7000",
+            "num_instr_banks": "2",
+            "samp_table": "0x8000"
+          },
+          "roms": [
+            "rcm.01"
+          ]
+        },
+        {
+          "type": "qsound",
+          "load_method": "append_swap16",
+          "roms": [
+            "rcm.51",
+            "rcm.52",
+            "rcm.53",
+            "rcm.54",
+            "rcm.55",
+            "rcm.56",
+            "rcm.57",
+            "rcm.58"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "mmaulers",
+      "format": "KonamiArcade",
+      "fmt_version": "MysticWarrior",
+      "rom_groups": [
+        {
+          "type": "soundcpu",
+          "load_method": "append",
+          "attributes": {
+            "seq_table": "0x3EA3",
+            "samp_tables": "0x54DE",
+            "drum_samp_table": "0x60FE",
+            "drum_table": "0x61CD"
+          },
+          "roms": [
+            "170a13.9c"
+          ]
+        },
+        {
+          "type": "sound",
+          "load_method": "append",
+          "roms": [
+            "170a14.2g",
+            "170a15.2m"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "mpang",
+      "format": "CPS2",
+      "fmt_version": "CPS2_V1.80",
+      "rom_groups": [
+        {
+          "type": "audiocpu",
+          "load_method": "append",
+          "attributes": {
+            "seq_table": "0x9005",
+            "instr_table_ptrs": "0x3C05",
+            "num_instr_banks": "3",
+            "samp_table": "0x3FBF",
+            "artic_table": "0x45E7"
+          },
+          "roms": [
+            "mpn.01"
+          ]
+        },
+        {
+          "type": "qsound",
+          "load_method": "append_swap16",
+          "roms": [
+            "mpn-simm.05a",
+            "mpn-simm.05b"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "mpumpkin",
+      "format": "CPS1",
+      "fmt_version": "CPS1_V5.00",
+      "rom_groups": [
+        {
+          "type": "audiocpu",
+          "load_method": "append",
+          "attributes": {
+            "tables": "0xFFE"
+          },
+          "roms": [
+            "mpa_09.12a"
+          ]
+        },
+        {
+          "type": "oki6295",
+          "load_method": "append",
+          "roms": [
+            "mpa_18.11c",
+            "mpa_19.12c"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "msh",
+      "format": "CPS2",
+      "fmt_version": "CPS2_V1.05",
+      "rom_groups": [
+        {
+          "type": "audiocpu",
+          "load_method": "append",
+          "attributes": {
+            "seq_table": "0x9005",
+            "instr_table": "0x7000",
+            "num_instr_banks": "2",
+            "samp_table": "0x8000"
+          },
+          "roms": [
+            "msh.01",
+            "msh.02"
+          ]
+        },
+        {
+          "type": "qsound",
+          "load_method": "append_swap16",
+          "roms": [
+            "msh.11m",
+            "msh.12m"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "mshvsf",
+      "format": "CPS2",
+      "fmt_version": "CPS2_V1.31",
+      "rom_groups": [
+        {
+          "type": "audiocpu",
+          "load_method": "append",
+          "attributes": {
+            "seq_table": "0x9005",
+            "instr_table_ptrs": "0x3C05",
+            "num_instr_banks": "28",
+            "samp_table": "0x6000",
+            "samp_table_length": "0x1B48",
+            "artic_table": "0x8000"
+          },
+          "roms": [
+            "mvs.01",
+            "mvs.02"
+          ]
+        },
+        {
+          "type": "qsound",
+          "load_method": "append_swap16",
+          "roms": [
+            "mvs.11m",
+            "mvs.12m"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "msword",
+      "format": "CPS1",
+      "fmt_version": "CPS1_V3.50",
+      "rom_groups": [
+        {
+          "type": "audiocpu",
+          "load_method": "append",
+          "attributes": {
+            "tables": "0x1000"
+          },
+          "roms": [
+            "ms_09.12b"
+          ]
+        },
+        {
+          "type": "oki6295",
+          "load_method": "append",
+          "roms": [
+            "ms_18.11c",
+            "ms_19.12c"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "mtlchamp",
+      "format": "KonamiArcade",
+      "fmt_version": "MysticWarrior",
+      "rom_groups": [
+        {
+          "type": "soundcpu",
+          "load_method": "append",
+          "attributes": {
+            "seq_table": "0x3F06",
+            "samp_tables": "0x4B2D",
+            "drum_samp_table": "0x57CB",
+            "drum_table": "0x58F4"
+          },
+          "roms": [
+            "234_d05.6b"
+          ]
+        },
+        {
+          "type": "sound",
+          "load_method": "append",
+          "roms": [
+            "234a06.2d",
+            "234a07.1d"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "mtwins",
+      "format": "CPS1",
+      "fmt_version": "CPS1_V4.25",
+      "rom_groups": [
+        {
+          "type": "audiocpu",
+          "load_method": "append",
+          "attributes": {
+            "tables": "0x1100"
+          },
+          "roms": [
+            "ch_09.12b"
+          ]
+        },
+        {
+          "type": "oki6295",
+          "load_method": "append",
+          "roms": [
+            "ch_18.11c",
+            "ch_19.12c"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "mvsc",
+      "format": "CPS2",
+      "fmt_version": "CPS2_V1.30",
+      "rom_groups": [
+        {
+          "type": "audiocpu",
+          "load_method": "append",
+          "attributes": {
+            "seq_table": "0x9005",
+            "instr_table_ptrs": "0x3B04",
+            "num_instr_banks": "16",
+            "samp_table": "0x5000",
+            "artic_table": "0x8000"
+          },
+          "roms": [
+            "mvc.01",
+            "mvc.02"
+          ]
+        },
+        {
+          "type": "qsound",
+          "load_method": "append_swap16",
+          "roms": [
+            "mvc.11m",
+            "mvc.12m"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "mystwarr",
+      "format": "KonamiArcade",
+      "fmt_version": "MysticWarrior",
+      "rom_groups": [
+        {
+          "type": "soundcpu",
+          "load_method": "append",
+          "attributes": {
+            "seq_table": "0x2286",
+            "samp_tables": "0x4A71",
+            "drum_samp_table": "0x5286",
+            "drum_table": "0x5499"
+          },
+          "roms": [
+            "128a05.6b"
+          ]
+        },
+        {
+          "type": "sound",
+          "load_method": "append",
+          "roms": [
+            "128a06.2d",
+            "128a07.1d"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "nemo",
+      "format": "CPS1",
+      "fmt_version": "CPS1_V4.25",
+      "rom_groups": [
+        {
+          "type": "audiocpu",
+          "load_method": "append",
+          "attributes": {
+            "tables": "0x1100"
+          },
+          "roms": [
+            "nme_09.12b"
+          ]
+        },
+        {
+          "type": "oki6295",
+          "load_method": "append",
+          "roms": [
+            "nme_18.11c",
+            "nme_19.12c"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "nwarr",
+      "format": "CPS2",
+      "fmt_version": "CPS2_V1.05A",
+      "rom_groups": [
+        {
+          "type": "audiocpu",
+          "load_method": "append",
+          "attributes": {
+            "seq_table": "0x9005",
+            "instr_table": "0x7000",
+            "num_instr_banks": "2",
+            "samp_table": "0x8000",
+            "samp_table_length": "0x8E8"
+          },
+          "roms": [
+            "vph.01",
+            "vph.02"
+          ]
+        },
+        {
+          "type": "qsound",
+          "load_method": "append_swap16",
+          "roms": [
+            "vph.11m",
+            "vph.12m"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "opengolf",
+      "format": "KonamiArcade",
+      "fmt_version": "GX",
+      "rom_groups": [
+        {
+          "type": "soundcpu",
+          "load_method": "deinterlace",
+          "attributes": {
+            "seq_table": "0x6162"
+          },
+          "roms": [
+            "218a06.8p",
+            "218a07.6p"
+          ]
+        },
+        {
+          "type": "sound",
+          "load_method": "append",
+          "roms": [
+            "218a17.14y",
+            "218a18.12y"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "pang3",
+      "format": "CPS1",
+      "fmt_version": "CPS1_V5.00",
+      "rom_groups": [
+        {
+          "type": "audiocpu",
+          "load_method": "append",
+          "attributes": {
+            "tables": "0xFFE"
+          },
+          "roms": [
+            "pa3_11.11f"
+          ]
+        },
+        {
+          "type": "oki6295",
+          "load_method": "append",
+          "roms": [
+            "pa3_05.10d",
+            "pa3_06.11d"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "plsmaswd",
+      "format": "CPS2",
+      "fmt_version": "CPS2_V2.10",
+      "rom_groups": [
+        {
+          "type": "audiocpu",
+          "load_method": "append",
+          "attributes": {
+            "seq_table": "0x9008",
+            "instr_table_ptrs": "0x3FF4",
+            "num_instr_banks": "3",
+            "samp_table": "0x6000",
+            "samp_table_length": "0x480",
+            "artic_table": "0x8000"
+          },
+          "roms": [
+            "sg2_02.2e",
+            "sg2_03.3e"
+          ]
+        },
+        {
+          "type": "qsound",
+          "load_method": "append_swap16",
+          "roms": [
+            "sg2-01m.3a"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "plygonet",
+      "format": "KonamiArcade",
+      "fmt_version": "MysticWarrior",
+      "rom_groups": [
+        {
+          "type": "soundcpu",
+          "load_method": "append",
+          "attributes": {
+            "seq_table": "0x228B",
+            "samp_tables": "0x2CD7",
+            "drum_samp_table": "0x32B5",
+            "drum_table": "0x33D5"
+          },
+          "roms": [
+            "305b05.7b"
+          ]
+        },
+        {
+          "type": "sound",
+          "load_method": "append",
+          "roms": [
+            "305b08.2e"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "pnickj",
+      "format": "CPS1",
+      "fmt_version": "CPS1_V4.25",
+      "rom_groups": [
+        {
+          "type": "audiocpu",
+          "load_method": "append",
+          "attributes": {
+            "tables": "0x1100"
+          },
+          "roms": [
+            "pnij_17.13b"
+          ]
+        },
+        {
+          "type": "oki6295",
+          "load_method": "append",
+          "roms": [
+            "pnij_24.12c",
+            "pnij_25.13c"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "pokonyan",
+      "format": "CPS1",
+      "fmt_version": "CPS1_V4.25",
+      "rom_groups": [
+        {
+          "type": "audiocpu",
+          "load_method": "append",
+          "attributes": {
+            "tables": "0x1100"
+          },
+          "roms": [
+            "xmqq-13b.bin"
+          ]
+        },
+        {
+          "type": "oki6295",
+          "load_method": "append",
+          "roms": [
+            "xmqq-12c.bin"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "progear",
+      "format": "CPS2",
+      "fmt_version": "CPS2_V1.80",
+      "rom_groups": [
+        {
+          "type": "audiocpu",
+          "load_method": "append",
+          "attributes": {
+            "seq_table": "0x9005",
+            "instr_table_ptrs": "0x3C05",
+            "num_instr_banks": "4",
+            "samp_table": "0x6000",
+            "artic_table": "0x8000"
+          },
+          "roms": [
+            "pga.01"
+          ]
+        },
+        {
+          "type": "qsound",
+          "load_method": "append_swap16",
+          "roms": [
+            "pga-simm.05a",
+            "pga-simm.05b",
+            "pga-simm.06a",
+            "pga-simm.06b"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "punisher",
+      "format": "CPS2",
+      "fmt_version": "CPS2_V1.01",
+      "rom_groups": [
+        {
+          "type": "audiocpu",
+          "load_method": "append",
+          "encryption": "kabuki",
+          "attributes": {
+            "kabuki_swap_key1": "0x67452103",
+            "kabuki_swap_key2": "0x75316024",
+            "kabuki_addr_key": "0x2222",
+            "kabuki_xor_key": "0x22",
+            "seq_table": "0x8005",
+            "instr_table": "0x6F75",
+            "num_instr_banks": "2",
+            "samp_table": "0x6A9D",
+            "samp_table_length": "0x4D8"
+          },
+          "roms": [
+            "ps_q.5k"
+          ]
+        },
+        {
+          "type": "qsound",
+          "load_method": "append",
+          "roms": [
+            "ps-q1.1k",
+            "ps-q2.2k",
+            "ps-q3.3k",
+            "ps-q4.4k"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "puzldama",
+      "format": "KonamiArcade",
+      "fmt_version": "GX",
+      "rom_groups": [
+        {
+          "type": "soundcpu",
+          "load_method": "deinterlace",
+          "attributes": {
+            "seq_table": "0x6A68"
+          },
+          "roms": [
+            "315a06.9c",
+            "315a07.7c"
+          ]
+        },
+        {
+          "type": "sound",
+          "load_method": "append",
+          "roms": [
+            "315a17.9g",
+            "315a18.7g"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "pzloop2",
+      "format": "CPS2",
+      "fmt_version": "CPS2_V1.80",
+      "rom_groups": [
+        {
+          "type": "audiocpu",
+          "load_method": "append",
+          "attributes": {
+            "seq_table": "0x9005",
+            "instr_table_ptrs": "0x3C05",
+            "num_instr_banks": "2",
+            "samp_table": "0x3F5D",
+            "artic_table": "0x45A5"
+          },
+          "roms": [
+            "pl2.01"
+          ]
+        },
+        {
+          "type": "qsound",
+          "load_method": "append_swap16",
+          "roms": [
+            "pl2-simm.05a",
+            "pl2-simm.05b"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "qad",
+      "format": "CPS1",
+      "fmt_version": "CPS1_V4.25",
+      "rom_groups": [
+        {
+          "type": "audiocpu",
+          "load_method": "append",
+          "attributes": {
+            "tables": "0x1100"
+          },
+          "roms": [
+            "qd_23.13b"
+          ]
+        },
+        {
+          "type": "oki6295",
+          "load_method": "append",
+          "roms": [
+            "qdu_30.12c",
+            "qdu_31.13c"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "qndream",
+      "format": "CPS2",
+      "fmt_version": "CPS2_V1.16B",
+      "rom_groups": [
+        {
+          "type": "audiocpu",
+          "load_method": "append",
+          "attributes": {
+            "seq_table": "0x9005",
+            "instr_table_ptrs": "0x4004",
+            "num_instr_banks": "15",
+            "samp_table": "0x5062"
+          },
+          "roms": [
+            "tqz.01"
+          ]
+        },
+        {
+          "type": "qsound",
+          "load_method": "append_swap16",
+          "roms": [
+            "tqz.11m",
+            "tqz.12m"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "qtono2j",
+      "format": "CPS1",
+      "fmt_version": "CPS1_V5.00",
+      "rom_groups": [
+        {
+          "type": "audiocpu",
+          "load_method": "append",
+          "attributes": {
+            "tables": "0xFFE"
+          },
+          "roms": [
+            "tn2j_09.12a"
+          ]
+        },
+        {
+          "type": "oki6295",
+          "load_method": "append",
+          "roms": [
+            "tn2j_18.11c",
+            "tn2j_19.12c"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "racinfrc",
+      "format": "KonamiArcade",
+      "fmt_version": "GX",
+      "rom_groups": [
+        {
+          "type": "soundcpu",
+          "load_method": "deinterlace",
+          "attributes": {
+            "seq_table": "0xB748"
+          },
+          "roms": [
+            "250a06.8p",
+            "250a07.6p"
+          ]
+        },
+        {
+          "type": "sound",
+          "load_method": "append",
+          "roms": [
+            "250a17.14y",
+            "250a18.12y"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "redearth",
+      "format": "CPS2",
+      "fmt_version": "CPS3",
+      "rom_groups": [
+        {
+          "type": "audiocpu",
+          "load_method": "deinterlace",
+          "encryption": "cps3",
+          "attributes": {
+            "key1": "0x9e300ab1",
+            "key2": "0xa175b82c",
+            "seq_table": "0xbc198",
+            "samp_table": "0xb83ec",
+            "samp_table_length": "0x1690",
+            "instr_table_ptrs": "0xb9a7c",
+            "num_instr_banks": "2"
+          },
+          "roms": [
+            "redearthn/redearth-simm1.0",
+            "redearthn/redearth-simm1.1",
+            "redearthn/redearth-simm1.2",
+            "redearthn/redearth-simm1.3"
+          ]
+        },
+        {
+          "type": "qsound",
+          "load_method": "deinterlace_pairs",
+          "load_order": "reverse",
+          "roms": [
+            "redearthn/redearth-simm3.0",
+            "redearthn/redearth-simm3.1"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "redearthn",
+      "format": "CPS2",
+      "fmt_version": "CPS3",
+      "rom_groups": [
+        {
+          "type": "audiocpu",
+          "load_method": "deinterlace",
+          "encryption": "cps3",
+          "attributes": {
+            "key1": "0x9e300ab1",
+            "key2": "0xa175b82c",
+            "seq_table": "0xbc198",
+            "samp_table": "0xb83ec",
+            "samp_table_length": "0x1690",
+            "instr_table_ptrs": "0xb9a7c",
+            "num_instr_banks": "2"
+          },
+          "roms": [
+            "redearth-simm1.0",
+            "redearth-simm1.1",
+            "redearth-simm1.2",
+            "redearth-simm1.3"
+          ]
+        },
+        {
+          "type": "qsound",
+          "load_method": "deinterlace_pairs",
+          "load_order": "reverse",
+          "roms": [
+            "redearth-simm3.0",
+            "redearth-simm3.1"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "ringdest",
+      "format": "CPS2",
+      "fmt_version": "CPS2_V1.05A",
+      "rom_groups": [
+        {
+          "type": "audiocpu",
+          "load_method": "append",
+          "attributes": {
+            "seq_table": "0x9005",
+            "instr_table": "0x7000",
+            "num_instr_banks": "2",
+            "samp_table": "0x8000"
+          },
+          "roms": [
+            "smb.01",
+            "smb.02"
+          ]
+        },
+        {
+          "type": "qsound",
+          "load_method": "append_swap16",
+          "roms": [
+            "smb.11m",
+            "smb.12m"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "rungun",
+      "format": "KonamiArcade",
+      "fmt_version": "MysticWarrior",
+      "rom_groups": [
+        {
+          "type": "soundcpu",
+          "load_method": "append",
+          "attributes": {
+            "seq_table": "0x26D1",
+            "samp_tables": "0x4FCB",
+            "drum_samp_table": "0x5E07",
+            "drum_table": "0x5F03"
+          },
+          "roms": [
+            "247a05"
+          ]
+        },
+        {
+          "type": "sound",
+          "load_method": "append",
+          "roms": [
+            "247-a06",
+            "247-a07"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "rungun2",
+      "format": "KonamiArcade",
+      "fmt_version": "GX",
+      "rom_groups": [
+        {
+          "type": "soundcpu",
+          "load_method": "deinterlace",
+          "attributes": {
+            "seq_table": "0x80E6"
+          },
+          "roms": [
+            "505a06.9m",
+            "505a07.7m"
+          ]
+        },
+        {
+          "type": "sound",
+          "load_method": "append",
+          "roms": [
+            "505a23.7r",
+            "505a22.9r"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "rushhero",
+      "format": "KonamiArcade",
+      "fmt_version": "GX",
+      "rom_groups": [
+        {
+          "type": "soundcpu",
+          "load_method": "deinterlace",
+          "attributes": {
+            "seq_table": "0xB4DA"
+          },
+          "roms": [
+            "605a06.9m",
+            "605a07.7m"
+          ]
+        },
+        {
+          "type": "sound",
+          "load_method": "append",
+          "roms": [
+            "605a23.7r"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "rvschool",
+      "format": "CPS2",
+      "fmt_version": "CPS2_V2.10",
+      "rom_groups": [
+        {
+          "type": "audiocpu",
+          "load_method": "append",
+          "attributes": {
+            "seq_table": "0x9008",
+            "instr_table_ptrs": "0x7079",
+            "num_instr_banks": "2",
+            "samp_table": "0x733D",
+            "samp_table_length": "0x468",
+            "artic_table": "0x77A5"
+          },
+          "roms": [
+            "jst_02.2e",
+            "jst_03.3e"
+          ]
+        },
+        {
+          "type": "qsound",
+          "load_method": "append_swap16",
+          "roms": [
+            "jst-01m.3b"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "salmndr2",
+      "format": "KonamiArcade",
+      "fmt_version": "GX",
+      "rom_groups": [
+        {
+          "type": "soundcpu",
+          "load_method": "deinterlace",
+          "attributes": {
+            "seq_table": "0x6AD8"
+          },
+          "roms": [
+            "521-a04.9c",
+            "521-a05.7c"
+          ]
+        },
+        {
+          "type": "sound",
+          "load_method": "append",
+          "roms": [
+            "521-a12.9g",
+            "521-a13.7g"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "sexyparo",
+      "format": "KonamiArcade",
+      "fmt_version": "GX",
+      "rom_groups": [
+        {
+          "type": "soundcpu",
+          "load_method": "deinterlace",
+          "attributes": {
+            "seq_table": "0x7ACE"
+          },
+          "roms": [
+            "533a08.9c",
+            "533a09.7c"
+          ]
+        },
+        {
+          "type": "sound",
+          "load_method": "append",
+          "roms": [
+            "533a22.9g",
+            "533a23.7g"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "sf2",
+      "format": "CPS1",
+      "fmt_version": "CPS1_V4.25",
+      "rom_groups": [
+        {
+          "type": "audiocpu",
+          "load_method": "append",
+          "attributes": {
+            "tables": "0x1100"
+          },
+          "roms": [
+            "sf2_9.12a"
+          ]
+        },
+        {
+          "type": "oki6295",
+          "load_method": "append",
+          "roms": [
+            "sf2_18.11c",
+            "sf2_19.12c"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "sf2ce",
+      "format": "CPS1",
+      "fmt_version": "CPS1_V4.25",
+      "rom_groups": [
+        {
+          "type": "audiocpu",
+          "load_method": "append",
+          "attributes": {
+            "tables": "0x1100"
+          },
+          "roms": [
+            "s92_09.11a"
+          ]
+        },
+        {
+          "type": "oki6295",
+          "load_method": "append",
+          "roms": [
+            "s92_18.11c",
+            "s92_19.12c"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "sf2hf",
+      "format": "CPS1",
+      "fmt_version": "CPS1_V4.25",
+      "rom_groups": [
+        {
+          "type": "audiocpu",
+          "load_method": "append",
+          "attributes": {
+            "tables": "0x1100"
+          },
+          "roms": [
+            "s92_09.11a"
+          ]
+        },
+        {
+          "type": "oki6295",
+          "load_method": "append",
+          "roms": [
+            "s92_18.11c",
+            "s92_19.12c"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "sfa",
+      "format": "CPS2",
+      "fmt_version": "CPS2_V1.05A",
+      "rom_groups": [
+        {
+          "type": "audiocpu",
+          "load_method": "append",
+          "attributes": {
+            "seq_table": "0x9005",
+            "instr_table": "0x7000",
+            "num_instr_banks": "2",
+            "samp_table": "0x8000"
+          },
+          "roms": [
+            "sfz.01",
+            "sfz.02"
+          ]
+        },
+        {
+          "type": "qsound",
+          "load_method": "append_swap16",
+          "roms": [
+            "sfz.11m",
+            "sfz.12m"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "sfa2",
+      "format": "CPS2",
+      "fmt_version": "CPS2_V1.05C",
+      "rom_groups": [
+        {
+          "type": "audiocpu",
+          "load_method": "append",
+          "attributes": {
+            "seq_table": "0x9005",
+            "instr_table": "0x7000",
+            "num_instr_banks": "2",
+            "samp_table": "0x8000"
+          },
+          "roms": [
+            "sz2.01a",
+            "sz2.02a"
+          ]
+        },
+        {
+          "type": "qsound",
+          "load_method": "append_swap16",
+          "roms": [
+            "sz2.11m",
+            "sz2.12m"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "sfz2al",
+      "format": "CPS2",
+      "fmt_version": "CPS2_V1.05C",
+      "rom_groups": [
+        {
+          "type": "audiocpu",
+          "load_method": "append",
+          "attributes": {
+            "seq_table": "0x9005",
+            "instr_table": "0x7000",
+            "num_instr_banks": "2",
+            "samp_table": "0x8000"
+          },
+          "roms": [
+            "sza.01",
+            "sza.02"
+          ]
+        },
+        {
+          "type": "qsound",
+          "load_method": "append_swap16",
+          "roms": [
+            "sza.11m",
+            "sza.12m"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "sfa3",
+      "format": "CPS2",
+      "fmt_version": "CPS2_V1.71",
+      "rom_groups": [
+        {
+          "type": "audiocpu",
+          "load_method": "append",
+          "attributes": {
+            "seq_table": "0x8C05",
+            "instr_table_ptrs": "0x3C05",
+            "num_instr_banks": "16",
+            "samp_table": "0x6000",
+            "samp_table_length": "0x1A30",
+            "artic_table": "0x8000"
+          },
+          "roms": [
+            "sz3.01",
+            "sz3.02"
+          ]
+        },
+        {
+          "type": "qsound",
+          "load_method": "append_swap16",
+          "roms": [
+            "sz3.11m",
+            "sz3.12m"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "sfex",
+      "format": "CPS2",
+      "fmt_version": "CPS2_V2.00",
+      "rom_groups": [
+        {
+          "type": "audiocpu",
+          "load_method": "append",
+          "attributes": {
+            "seq_table": "0x6004",
+            "seq_table_length": "0x58",
+            "instr_table_ptrs": "0x39F4",
+            "num_instr_banks": "6",
+            "samp_table": "0x4638"
+          },
+          "roms": [
+            "sfe_02.2e",
+            "sfe_03.3e"
+          ]
+        },
+        {
+          "type": "qsound",
+          "load_method": "append_swap16",
+          "roms": [
+            "sfe-01m.3b"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "sfexp",
+      "format": "CPS2",
+      "fmt_version": "CPS2_V2.00",
+      "rom_groups": [
+        {
+          "type": "audiocpu",
+          "load_method": "append",
+          "attributes": {
+            "seq_table": "0x6004",
+            "seq_table_length": "0x58",
+            "instr_table_ptrs": "0x39F4",
+            "num_instr_banks": "6",
+            "samp_table": "0x4638"
+          },
+          "roms": [
+            "sfe_02.2e",
+            "sfe_03.3e"
+          ]
+        },
+        {
+          "type": "qsound",
+          "load_method": "append_swap16",
+          "roms": [
+            "sfe-01m.3b"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "sfiii",
+      "format": "CPS2",
+      "fmt_version": "CPS3",
+      "rom_groups": [
+        {
+          "type": "audiocpu",
+          "load_method": "deinterlace",
+          "encryption": "cps3",
+          "attributes": {
+            "key1": "0xb5fe053e",
+            "key2": "0xfc03925a",
+            "seq_table": "0x3865cc",
+            "samp_table": "0x3829FC",
+            "samp_table_length": "0x1750",
+            "instr_table_ptrs": "0x38414C",
+            "num_instr_banks": "2"
+          },
+          "roms": [
+            "sfiiin/sfiii-simm1.0",
+            "sfiiin/sfiii-simm1.1",
+            "sfiiin/sfiii-simm1.2",
+            "sfiiin/sfiii-simm1.3"
+          ]
+        },
+        {
+          "type": "qsound",
+          "load_method": "deinterlace_pairs",
+          "load_order": "reverse",
+          "roms": [
+            "sfiiin/sfiii-simm3.0",
+            "sfiiin/sfiii-simm3.1"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "sfiiin",
+      "format": "CPS2",
+      "fmt_version": "CPS3",
+      "rom_groups": [
+        {
+          "type": "audiocpu",
+          "load_method": "deinterlace",
+          "encryption": "cps3",
+          "attributes": {
+            "key1": "0xb5fe053e",
+            "key2": "0xfc03925a",
+            "seq_table": "0x3865cc",
+            "samp_table": "0x3829FC",
+            "samp_table_length": "0x1750",
+            "instr_table_ptrs": "0x38414C",
+            "num_instr_banks": "2"
+          },
+          "roms": [
+            "sfiii-simm1.0",
+            "sfiii-simm1.1",
+            "sfiii-simm1.2",
+            "sfiii-simm1.3"
+          ]
+        },
+        {
+          "type": "qsound",
+          "load_method": "deinterlace_pairs",
+          "load_order": "reverse",
+          "roms": [
+            "sfiii-simm3.0",
+            "sfiii-simm3.1"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "sfiii2",
+      "format": "CPS2",
+      "fmt_version": "CPS3",
+      "rom_groups": [
+        {
+          "type": "audiocpu",
+          "load_method": "deinterlace",
+          "encryption": "cps3",
+          "attributes": {
+            "key1": "0x00000000",
+            "key2": "0x00000000",
+            "seq_table": "0x52c29C",
+            "samp_table": "0x5271b0",
+            "samp_table_length": "0x2300",
+            "instr_table_ptrs": "0x5294b0",
+            "num_instr_banks": "2"
+          },
+          "roms": [
+            "sfiii2n/sfiii2-simm1.0",
+            "sfiii2n/sfiii2-simm1.1",
+            "sfiii2n/sfiii2-simm1.2",
+            "sfiii2n/sfiii2-simm1.3"
+          ]
+        },
+        {
+          "type": "qsound",
+          "load_method": "deinterlace_pairs",
+          "load_order": "reverse",
+          "roms": [
+            "sfiii2n/sfiii2-simm3.0",
+            "sfiii2n/sfiii2-simm3.1",
+            "sfiii2n/sfiii2-simm3.2",
+            "sfiii2n/sfiii2-simm3.3"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "sfiii2n",
+      "format": "CPS2",
+      "fmt_version": "CPS3",
+      "rom_groups": [
+        {
+          "type": "audiocpu",
+          "load_method": "deinterlace",
+          "encryption": "cps3",
+          "attributes": {
+            "key1": "0x00000000",
+            "key2": "0x00000000",
+            "seq_table": "0x52c29C",
+            "samp_table": "0x5271b0",
+            "samp_table_length": "0x2300",
+            "instr_table_ptrs": "0x5294b0",
+            "num_instr_banks": "2"
+          },
+          "roms": [
+            "sfiii2-simm1.0",
+            "sfiii2-simm1.1",
+            "sfiii2-simm1.2",
+            "sfiii2-simm1.3"
+          ]
+        },
+        {
+          "type": "qsound",
+          "load_method": "deinterlace_pairs",
+          "load_order": "reverse",
+          "roms": [
+            "sfiii2-simm3.0",
+            "sfiii2-simm3.1"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "sfiii3",
+      "format": "CPS2",
+      "fmt_version": "CPS3",
+      "rom_groups": [
+        {
+          "type": "audiocpu",
+          "load_method": "deinterlace",
+          "encryption": "cps3",
+          "attributes": {
+            "key1": "0xa55432b4",
+            "key2": "0x0c129981",
+            "seq_table": "0x78f008",
+            "samp_table": "0x78C000",
+            "samp_table_length": "0x2DD0",
+            "instr_table_ptrs": "0x788000",
+            "num_instr_banks": "16"
+          },
+          "roms": [
+            "sfiii3n/sfiii3-simm1.0",
+            "sfiii3n/sfiii3-simm1.1",
+            "sfiii3n/sfiii3-simm1.2",
+            "sfiii3n/sfiii3-simm1.3"
+          ]
+        },
+        {
+          "type": "qsound",
+          "load_method": "deinterlace_pairs",
+          "load_order": "reverse",
+          "roms": [
+            "sfiii3n/sfiii3-simm3.0",
+            "sfiii3n/sfiii3-simm3.1",
+            "sfiii3n/sfiii3-simm3.2",
+            "sfiii3n/sfiii3-simm3.3"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "sfiii3n",
+      "format": "CPS2",
+      "fmt_version": "CPS3",
+      "rom_groups": [
+        {
+          "type": "audiocpu",
+          "load_method": "deinterlace",
+          "encryption": "cps3",
+          "attributes": {
+            "key1": "0xa55432b4",
+            "key2": "0x0c129981",
+            "seq_table": "0x78f008",
+            "samp_table": "0x78C000",
+            "samp_table_length": "0x2DD0",
+            "instr_table_ptrs": "0x788000",
+            "num_instr_banks": "16"
+          },
+          "roms": [
+            "sfiii3-simm1.0",
+            "sfiii3-simm1.1",
+            "sfiii3-simm1.2",
+            "sfiii3-simm1.3"
+          ]
+        },
+        {
+          "type": "qsound",
+          "load_method": "deinterlace_pairs",
+          "load_order": "reverse",
+          "roms": [
+            "sfiii3-simm3.0",
+            "sfiii3-simm3.1",
+            "sfiii3-simm3.2",
+            "sfiii3-simm3.3"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "sgemf",
+      "format": "CPS2",
+      "fmt_version": "CPS2_V1.30",
+      "rom_groups": [
+        {
+          "type": "audiocpu",
+          "load_method": "append",
+          "attributes": {
+            "seq_table": "0x9005",
+            "instr_table_ptrs": "0x3B04",
+            "num_instr_banks": "16",
+            "samp_table": "0x5000",
+            "artic_table": "0x8000"
+          },
+          "roms": [
+            "pcf.01",
+            "pcf.02"
+          ]
+        },
+        {
+          "type": "qsound",
+          "load_method": "append_swap16",
+          "roms": [
+            "pcf.11m",
+            "pcf.12m"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "slammast",
+      "format": "CPS2",
+      "fmt_version": "CPS2_V1.01",
+      "rom_groups": [
+        {
+          "type": "audiocpu",
+          "load_method": "append",
+          "encryption": "kabuki",
+          "attributes": {
+            "kabuki_swap_key1": "0x54321076",
+            "kabuki_swap_key2": "0x65432107",
+            "kabuki_addr_key": "0x3131",
+            "kabuki_xor_key": "0x19",
+            "seq_table": "0x8005",
+            "instr_table": "0x72DA",
+            "num_instr_banks": "1",
+            "samp_table": "0x6AF2",
+            "samp_table_length": "0x7E8"
+          },
+          "roms": [
+            "mb_qa.5k"
+          ]
+        },
+        {
+          "type": "qsound",
+          "load_method": "append",
+          "roms": [
+            "mb-q1.1k",
+            "mb-q2.2k",
+            "mb-q3.3k",
+            "mb-q4.4k",
+            "mb-q5.1m",
+            "mb-q6.2m",
+            "mb-q7.3m",
+            "mb-q8.4m"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "soccerss",
+      "format": "KonamiArcade",
+      "fmt_version": "GX",
+      "rom_groups": [
+        {
+          "type": "soundcpu",
+          "load_method": "deinterlace",
+          "attributes": {
+            "seq_table": "0x27DA"
+          },
+          "roms": [
+            "427a07.6m",
+            "427a06.9m"
+          ]
+        },
+        {
+          "type": "sound",
+          "load_method": "append",
+          "roms": [
+            "427a16.9r"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "spf2t",
+      "format": "CPS2",
+      "fmt_version": "CPS2_V2.01B",
+      "rom_groups": [
+        {
+          "type": "audiocpu",
+          "load_method": "append",
+          "attributes": {
+            "seq_table": "0x6004",
+            "instr_table_ptrs": "0x3FE4",
+            "num_instr_banks": "14",
+            "samp_table": "0x4F78"
+          },
+          "roms": [
+            "pzf.01",
+            "pzf.02"
+          ]
+        },
+        {
+          "type": "qsound",
+          "load_method": "append_swap16",
+          "roms": [
+            "pzf.11m",
+            "pzf.12m"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "ssf2",
+      "format": "CPS2",
+      "fmt_version": "CPS2_V1.03",
+      "rom_groups": [
+        {
+          "type": "audiocpu",
+          "load_method": "append",
+          "attributes": {
+            "seq_table": "0x7C15",
+            "instr_table": "0x6C00",
+            "num_instr_banks": "1",
+            "samp_table": "0x7410"
+          },
+          "roms": [
+            "ssf-01a"
+          ]
+        },
+        {
+          "type": "qsound",
+          "load_method": "append",
+          "roms": [
+            "ssf.q01",
+            "ssf.q02",
+            "ssf.q03",
+            "ssf.q04",
+            "ssf.q05",
+            "ssf.q06",
+            "ssf.q07",
+            "ssf.q08"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "ssf2t",
+      "format": "CPS2",
+      "fmt_version": "CPS2_V1.04",
+      "rom_groups": [
+        {
+          "type": "audiocpu",
+          "load_method": "append",
+          "attributes": {
+            "seq_table": "0x9005",
+            "instr_table": "0x7000",
+            "num_instr_banks": "2",
+            "samp_table": "0x8000"
+          },
+          "roms": [
+            "sfx.01",
+            "sfx.02"
+          ]
+        },
+        {
+          "type": "qsound",
+          "load_method": "append_swap16",
+          "roms": [
+            "sfx.11m",
+            "sfx.12m"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "starglad",
+      "format": "CPS2",
+      "fmt_version": "CPS2_V2.01B",
+      "rom_groups": [
+        {
+          "type": "audiocpu",
+          "load_method": "append",
+          "attributes": {
+            "seq_table": "0x6008",
+            "instr_table_ptrs": "0x3EF4",
+            "num_instr_banks": "6",
+            "samp_table": "0x4700"
+          },
+          "roms": [
+            "ps1_02a.2e",
+            "ps1_03a.3e"
+          ]
+        },
+        {
+          "type": "qsound",
+          "load_method": "append_swap16",
+          "roms": [
+            "ps1-01m.3b"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "strider",
+      "format": "CPS1",
+      "fmt_version": "CPS1_V1.00",
+      "rom_groups": [
+        {
+          "type": "audiocpu",
+          "load_method": "append",
+          "attributes": {
+            "tables": "0xDCD"
+          },
+          "roms": [
+            "09.12b"
+          ]
+        },
+        {
+          "type": "oki6295",
+          "load_method": "append",
+          "roms": [
+            "18.11c",
+            "19.12c"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "strider2",
+      "format": "CPS2",
+      "fmt_version": "CPS2_V2.10",
+      "rom_groups": [
+        {
+          "type": "audiocpu",
+          "load_method": "append",
+          "attributes": {
+            "seq_table": "0x9008",
+            "instr_table_ptrs": "0x7079",
+            "num_instr_banks": "2",
+            "samp_table": "0x7145",
+            "samp_table_length": "0x168",
+            "artic_table": "0x72AD"
+          },
+          "roms": [
+            "hr2_02.2e"
+          ]
+        },
+        {
+          "type": "qsound",
+          "load_method": "append_swap16",
+          "roms": [
+            "hr2-01m.3a"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "tbyahhoo",
+      "format": "KonamiArcade",
+      "fmt_version": "GX",
+      "rom_groups": [
+        {
+          "type": "soundcpu",
+          "load_method": "deinterlace",
+          "roms": [
+            "424a06.9c",
+            "424a07.7c"
+          ]
+        },
+        {
+          "type": "sound",
+          "load_method": "append",
+          "roms": [
+            "424a17.9g",
+            "424a18.7g"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "techromn",
+      "format": "CPS2",
+      "fmt_version": "CPS2_V2.11",
+      "rom_groups": [
+        {
+          "type": "audiocpu",
+          "load_method": "append",
+          "attributes": {
+            "seq_table": "0x9008",
+            "instr_table_ptrs": "0x3EF4",
+            "num_instr_banks": "3",
+            "samp_table": "0x430c",
+            "samp_table_length": "0x6E8",
+            "artic_table": "0x49f4"
+          },
+          "roms": [
+            "kio_02.2e",
+            "kio_03.3e"
+          ]
+        },
+        {
+          "type": "qsound",
+          "load_method": "append_swap16",
+          "roms": [
+            "kio-01m.3a"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "tkmmpzdm",
+      "format": "KonamiArcade",
+      "fmt_version": "GX",
+      "rom_groups": [
+        {
+          "type": "soundcpu",
+          "load_method": "deinterlace",
+          "roms": [
+            "515a04.9c",
+            "515a05.7c"
+          ]
+        },
+        {
+          "type": "sound",
+          "load_method": "append",
+          "roms": [
+            "515a13.9g",
+            "515a14.7g"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "tokkae",
+      "format": "KonamiArcade",
+      "fmt_version": "GX",
+      "rom_groups": [
+        {
+          "type": "soundcpu",
+          "load_method": "deinterlace",
+          "roms": [
+            "615a08.9c",
+            "615a09.7c"
+          ]
+        },
+        {
+          "type": "sound",
+          "load_method": "append",
+          "roms": [
+            "615a22.9g",
+            "615a23.7g"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "ts2",
+      "format": "CPS2",
+      "fmt_version": "CPS2_V1.05",
+      "rom_groups": [
+        {
+          "type": "audiocpu",
+          "load_method": "append",
+          "attributes": {
+            "seq_table": "0x4809",
+            "instr_table": "0x3847",
+            "num_instr_banks": "1",
+            "samp_table": "0x4047",
+            "samp_table_length": "0x2E0"
+          },
+          "roms": [
+            "ts2_02.2e"
+          ]
+        },
+        {
+          "type": "qsound",
+          "load_method": "append_swap16",
+          "roms": [
+            "ts2-01m.3b"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "unsquad",
+      "format": "CPS1",
+      "fmt_version": "CPS1_V1.00",
+      "rom_groups": [
+        {
+          "type": "audiocpu",
+          "load_method": "append",
+          "attributes": {
+            "tables": "0xE57"
+          },
+          "roms": [
+            "ar_09.12b"
+          ]
+        },
+        {
+          "type": "oki6295",
+          "load_method": "append",
+          "roms": [
+            "aru_18.11c"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "varth",
+      "format": "CPS1",
+      "fmt_version": "CPS1_V4.25",
+      "rom_groups": [
+        {
+          "type": "audiocpu",
+          "load_method": "append",
+          "attributes": {
+            "tables": "0x1100"
+          },
+          "roms": [
+            "va_09.12b"
+          ]
+        },
+        {
+          "type": "oki6295",
+          "load_method": "append",
+          "roms": [
+            "va_18.11c",
+            "va_19.12c"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "vhunt2",
+      "format": "CPS2",
+      "fmt_version": "CPS2_V1.30",
+      "rom_groups": [
+        {
+          "type": "audiocpu",
+          "load_method": "append",
+          "attributes": {
+            "seq_table": "0x9005",
+            "instr_table_ptrs": "0x3B04",
+            "num_instr_banks": "8",
+            "samp_table": "0x46E0",
+            "artic_table": "0x59A8"
+          },
+          "roms": [
+            "vh2.01",
+            "vh2.02"
+          ]
+        },
+        {
+          "type": "qsound",
+          "load_method": "append_swap16",
+          "roms": [
+            "vh2.11m",
+            "vh2.12m"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "viostorm",
+      "format": "KonamiArcade",
+      "fmt_version": "MysticWarrior",
+      "rom_groups": [
+        {
+          "type": "soundcpu",
+          "load_method": "append",
+          "attributes": {
+            "seq_table": "0x3813",
+            "samp_tables": "0x40AC",
+            "drum_samp_table": "0x4C0F",
+            "drum_table": "0x4D38"
+          },
+          "roms": [
+            "168a05.7c"
+          ]
+        },
+        {
+          "type": "sound",
+          "load_method": "append",
+          "roms": [
+            "168a06.1c",
+            "168a07.1e"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "vsav",
+      "format": "CPS2",
+      "fmt_version": "CPS2_V1.30",
+      "rom_groups": [
+        {
+          "type": "audiocpu",
+          "load_method": "append",
+          "attributes": {
+            "seq_table": "0x9005",
+            "instr_table_ptrs": "0x3B04",
+            "num_instr_banks": "7",
+            "samp_table": "0x45FA",
+            "samp_table_length": "0x1420",
+            "artic_table": "0x5A1A"
+          },
+          "roms": [
+            "vm3.01",
+            "vm3.02"
+          ]
+        },
+        {
+          "type": "qsound",
+          "load_method": "append_swap16",
+          "roms": [
+            "vm3.11m",
+            "vm3.12m"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "vsav2",
+      "format": "CPS2",
+      "fmt_version": "CPS2_V1.30",
+      "rom_groups": [
+        {
+          "type": "audiocpu",
+          "load_method": "append",
+          "attributes": {
+            "seq_table": "0x9005",
+            "instr_table_ptrs": "0x3B04",
+            "num_instr_banks": "8",
+            "samp_table": "0x4798",
+            "samp_table_length": "0x1440",
+            "artic_table": "0x5BD8"
+          },
+          "roms": [
+            "vs2.01",
+            "vs2.02"
+          ]
+        },
+        {
+          "type": "qsound",
+          "load_method": "append_swap16",
+          "roms": [
+            "vs2.11m",
+            "vs2.12m"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "vsnetscr",
+      "format": "KonamiArcade",
+      "fmt_version": "GX",
+      "rom_groups": [
+        {
+          "type": "soundcpu",
+          "load_method": "deinterlace",
+          "roms": [
+            "627b06.9m",
+            "627b07.7m"
+          ]
+        },
+        {
+          "type": "sound",
+          "load_method": "append",
+          "roms": [
+            "627a23.7r"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "willow",
+      "format": "CPS1",
+      "fmt_version": "CPS1_V1.00",
+      "rom_groups": [
+        {
+          "type": "audiocpu",
+          "load_method": "append",
+          "attributes": {
+            "tables": "0xe6d"
+          },
+          "roms": [
+            "wl_09.12b"
+          ]
+        },
+        {
+          "type": "oki6295",
+          "load_method": "append",
+          "roms": [
+            "wl_18.11c",
+            "wl_19.12c"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "winspike",
+      "format": "KonamiArcade",
+      "fmt_version": "GX",
+      "rom_groups": [
+        {
+          "type": "soundcpu",
+          "load_method": "deinterlace",
+          "roms": [
+            "705a08.9c",
+            "705a09.7c"
+          ]
+        },
+        {
+          "type": "sound",
+          "load_method": "append",
+          "roms": [
+            "705a22.9g"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "wof",
+      "format": "CPS2",
+      "fmt_version": "CPS2_V1.00",
+      "rom_groups": [
+        {
+          "type": "audiocpu",
+          "load_method": "append",
+          "encryption": "kabuki",
+          "attributes": {
+            "kabuki_swap_key1": "0x01234567",
+            "kabuki_swap_key2": "0x54163072",
+            "kabuki_addr_key": "0x5151",
+            "kabuki_xor_key": "0x51",
+            "seq_table": "0x8005",
+            "instr_table": "0x6DDA",
+            "num_instr_banks": "1",
+            "samp_table": "0x6A82",
+            "samp_table_length": "0x358"
+          },
+          "roms": [
+            "tk2_qa.rom"
+          ]
+        },
+        {
+          "type": "qsound",
+          "load_method": "append",
+          "roms": [
+            "tk2_q1.rom",
+            "tk2_q2.rom",
+            "tk2_q3.rom",
+            "tk2_q4.rom"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "xmcota",
+      "format": "CPS2",
+      "fmt_version": "CPS2_V1.05",
+      "rom_groups": [
+        {
+          "type": "audiocpu",
+          "load_method": "append",
+          "attributes": {
+            "seq_table": "0x9005",
+            "seq_table_length": "0xC50",
+            "instr_table": "0x7000",
+            "num_instr_banks": "2",
+            "samp_table": "0x8000",
+            "samp_table_length": "0x978"
+          },
+          "roms": [
+            "xmn.01a",
+            "xmn.02a"
+          ]
+        },
+        {
+          "type": "qsound",
+          "load_method": "append_swap16",
+          "roms": [
+            "xmn.11m",
+            "xmn.12m"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "xmvsf",
+      "format": "CPS2",
+      "fmt_version": "CPS2_V1.16",
+      "rom_groups": [
+        {
+          "type": "audiocpu",
+          "load_method": "append",
+          "attributes": {
+            "seq_table": "0x9005",
+            "instr_table_ptrs": "0x4004",
+            "num_instr_banks": "21",
+            "samp_table": "0x54F6",
+            "samp_table_length": "0xE20"
+          },
+          "roms": [
+            "xvs.01",
+            "xvs.02"
+          ]
+        },
+        {
+          "type": "qsound",
+          "load_method": "append_swap16",
+          "roms": [
+            "xvs.11m",
+            "xvs.12m"
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -58,8 +58,9 @@ target_include_directories(vgmtranscore PUBLIC
         ./io
         ./loaders
         ./util
+        ${PROJECT_SOURCE_DIR}/lib
         ${CMAKE_CURRENT_BINARY_DIR})
 target_link_libraries(
   vgmtranscore
-  PUBLIC spdlog::spdlog unarr ZLIB::ZLIB minizip tinyxml mio chdr-static
+  PUBLIC spdlog::spdlog unarr ZLIB::ZLIB minizip mio chdr-static
 )

@@ -75,7 +75,7 @@ file for contained music files, which when found will appear under the "Detected
 
 VGMTrans is able to 
 unpack portable sound format files (`psf`) and related formats (`psf2`, `ssf`, etc). SNES formats generally must be loaded 
-from `spc` or `rsn` files. Arcade formats are loaded via mame rom set `zip` files, which are catalogued in `mame_roms.xml`.
+from `spc` or `rsn` files. Arcade formats are loaded via mame rom set `zip` files, which are catalogued in `mame_roms.json`.
 
 #### *Scanned Files*
 
