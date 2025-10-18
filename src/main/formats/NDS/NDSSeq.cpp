@@ -140,8 +140,7 @@ bool NDSTrack::readEvent(void) {
         // See Zelda The Spirit Tracks - SSEQ_0018 (overworld train theme)
         bool bContinue = true;
         if (isOffsetUsed(jumpAddr)) {
-          addLoopForever(beginOffset, 4, "Loop");
-          bContinue = false;
+          bContinue = addLoopForever(beginOffset, 4, "Loop");
         }
         else {
           addGenericEvent(beginOffset, 4, "Jump", "", Type::LoopForever);
@@ -394,11 +393,17 @@ bool NDSTrack::readEvent(void) {
         // However, a complicated sequence with a ton of conditional events, it sometimes confuses the parser and causes an infinite loop.
         // See Animal Crossing: Wild World - SSEQ_270
         bool bContinue = true;
-        if (!hasLoopReturnOffset || isOffsetUsed(loopReturnOffset)) {
+        if (!hasLoopReturnOffset) {
           bContinue = false;
         }
 
-        addGenericEvent(beginOffset, curOffset - beginOffset, "Return", "", Type::Loop);
+        // If the subsequent event is end of track, treat this as an infinite loop
+        if (readByte(curOffset) == 0xFF) {
+          bContinue = addLoopForever(beginOffset, curOffset - beginOffset, "Loop");
+          addEndOfTrack(curOffset, 1);
+        } else {
+          addGenericEvent(beginOffset, curOffset - beginOffset, "Return", "", Type::Loop);
+        }
         curOffset = loopReturnOffset;
         return bContinue;
 	  }
