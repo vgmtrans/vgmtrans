@@ -5,7 +5,7 @@
  */
 
 #include "About.h"
-
+#include <algorithm>
 #include <QVBoxLayout>
 #include <QLabel>
 #include <QPushButton>
