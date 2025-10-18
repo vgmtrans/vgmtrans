@@ -1591,7 +1591,7 @@ bool SeqTrack::addLoopForever(uint32_t offset, uint32_t length, const std::strin
   }
   else if (readMode == READMODE_FIND_DELTA_LENGTH) {
     totalTicks = getTime();
-    return (this->foreverLoops < ConversionOptions::the().numSequenceLoops());
+    return (this->foreverLoops <= ConversionOptions::the().numSequenceLoops());
   }
   return true;
 

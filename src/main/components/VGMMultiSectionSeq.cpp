@@ -133,7 +133,7 @@ bool VGMMultiSectionSeq::addLoopForeverNoItem() {
     return false;
   }
   else if (readMode == READMODE_FIND_DELTA_LENGTH) {
-    return (foreverLoops < ConversionOptions::the().numSequenceLoops());
+    return (foreverLoops <= ConversionOptions::the().numSequenceLoops());
   }
   return true;
 }

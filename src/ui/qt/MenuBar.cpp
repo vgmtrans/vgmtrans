@@ -6,8 +6,11 @@
 
 #include "MenuBar.h"
 
+#include <array>
 #include <QDockWidget>
 #include <QtGlobal>
+#include <QInputDialog>
+#include <QSignalBlocker>
 #include "Options.h"
 #include "Root.h"
 #include "LogManager.h"
@@ -123,13 +126,71 @@ void MenuBar::appendOptionsMenu() {
     }
   });
 
+  auto loopsMenu = m_optionsMenu->addMenu(tr("Sequence loops"));
+
+  QActionGroup *loopsGroup = new QActionGroup(this);
+  loopsGroup->setExclusive(true);
+
+  auto addLoopOption = [loopsMenu, loopsGroup](const QString &label, int loops) {
+    QAction *action = loopsMenu->addAction(label);
+    action->setCheckable(true);
+    action->setData(loops);
+    loopsGroup->addAction(action);
+    return action;
+  };
+
+  std::array presetLoopActions = {
+      addLoopOption(tr("0 loops"), 0),
+      addLoopOption(tr("1 loop"), 1),
+      addLoopOption(tr("2 loops"), 2),
+  };
+
+  QAction *customLoopsAction = addLoopOption(tr("Custom..."), -1);
+
+  auto updateLoopMenu = [this, presetLoopActions, customLoopsAction, loopsGroup]() mutable {
+    const int currentLoops = Settings::the()->conversion.numSequenceLoops();
+    QSignalBlocker blocker(loopsGroup);
+
+    if (currentLoops >= 0 && currentLoops < static_cast<int>(presetLoopActions.size())) {
+      customLoopsAction->setText(tr("Custom..."));
+      presetLoopActions.at(static_cast<size_t>(currentLoops))->setChecked(true);
+    } else {
+      customLoopsAction->setText(tr("Custom (%1)").arg(currentLoops));
+      customLoopsAction->setChecked(true);
+    }
+  };
+
+  connect(loopsGroup, &QActionGroup::triggered, this, [this, presetLoopActions, customLoopsAction, loopsGroup, updateLoopMenu](QAction *action) mutable {
+    const int selectedLoops = action->data().toInt();
+    if (selectedLoops >= 0) {
+      if (selectedLoops != Settings::the()->conversion.numSequenceLoops()) {
+        Settings::the()->conversion.setNumSequenceLoops(selectedLoops);
+      }
+      updateLoopMenu();
+      return;
+    }
+
+    bool ok = false;
+    const int currentLoops = Settings::the()->conversion.numSequenceLoops();
+    const int newLoops = QInputDialog::getInt(this, tr("Sequence loops"), tr("Number of loops"),
+      currentLoops, 0, ConversionOptions::kMaxSequenceLoops, 1, &ok);
+    if (ok) {
+      Settings::the()->conversion.setNumSequenceLoops(newLoops);
+    }
+
+    updateLoopMenu();
+  });
+
+  connect(loopsMenu, &QMenu::aboutToShow, this, [updateLoopMenu]() mutable { updateLoopMenu(); });
+  updateLoopMenu();
+
   act = m_optionsMenu->addAction("Skip MIDI channel 10");
   act->setCheckable(true);
   act->setChecked(Settings::the()->conversion.skipChannel10());
-  connect(act, &QAction::toggled,
-[](bool skip) {
-  if (!skip)
-    pRoot->UI_toast("Tracks using MIDI channel 10 will be silent during in-app playback.", ToastType::Info);
+  connect(act, &QAction::toggled, [](bool skip) {
+    if (!skip) {
+      pRoot->UI_toast("Tracks using MIDI channel 10 will be silent during in-app playback.", ToastType::Info);
+    }
     Settings::the()->conversion.setSkipChannel10(skip);
   });
 }

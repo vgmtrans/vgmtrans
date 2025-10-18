@@ -222,8 +222,10 @@ void VGMSeq::loadTracksMain(uint32_t stopTime) {
       }
 
       // check loop count
-      int requiredLoops = (readMode == READMODE_ADD_TO_UI) ? 1 : ConversionOptions::the().numSequenceLoops();
-      if (foreverLoopCount() >= requiredLoops) {
+      const int desiredLoopRepeats =
+          (readMode == READMODE_ADD_TO_UI) ? 0 : ConversionOptions::the().numSequenceLoops();
+      const int requiredPlayThroughs = desiredLoopRepeats + 1;  // include the initial playthrough
+      if (foreverLoopCount() >= requiredPlayThroughs) {
         deactivateAllTracks();
         break;
       }
