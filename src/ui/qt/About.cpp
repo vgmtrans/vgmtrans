@@ -13,6 +13,7 @@
 #include <QListWidget>
 #include <QTextEdit>
 #include <QDir>
+#include <QHash>
 
 About::About(QWidget *parent) : QDialog(parent) {
   setWindowTitle("About VGMTrans");
