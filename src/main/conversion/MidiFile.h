@@ -7,7 +7,7 @@
 #include <string>
 #include <vector>
 #include <list>
-#include <map>
+#include <unordered_map>
 
 class VGMSeq;
 
@@ -203,7 +203,7 @@ class MidiTrack {
   // final realized key, which will be different when a global transpose is set. It helps us resolve
   // the correct note off events when a global transpose event occurs amidst live note on events,
   // and also allows us to warn about unpaired note on/off events.
-  std::map<uint8_t, uint8_t> activeNotes;
+  std::unordered_map<uint8_t, uint8_t> activeNotes;
 };
 
 class MidiFile {
