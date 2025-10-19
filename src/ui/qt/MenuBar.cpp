@@ -369,13 +369,12 @@ void MenuBar::updateRecentFilesMenu() {
     auto act = menu_recent_files->addAction(display);
     connect(act, &QAction::triggered, this, [this, file]() { emit openRecentFile(file); });
   }
-  if (!files.isEmpty()) {
-    menu_recent_files->addSeparator();
-    auto clear_act = menu_recent_files->addAction("Clear Items");
-    connect(clear_act, &QAction::triggered, this, [this]() {
-      Settings::the()->recentFiles.clear();
-      updateRecentFilesMenu();
-    });
-  }
+  menu_recent_files->addSeparator();
+  auto clear_act = menu_recent_files->addAction("Clear Items");
+  connect(clear_act, &QAction::triggered, this, [this]() {
+    Settings::the()->recentFiles.clear();
+    updateRecentFilesMenu();
+  });
+  clear_act->setEnabled(!files.isEmpty());
   menu_recent_files->setEnabled(!files.isEmpty());
 }
