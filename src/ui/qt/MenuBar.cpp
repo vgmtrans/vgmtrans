@@ -46,7 +46,7 @@ void MenuBar::appendFileMenu() {
   menu_open_file->setShortcut(QKeySequence(QStringLiteral("Ctrl+O")));
   connect(menu_open_file, &QAction::triggered, this, &MenuBar::openFile);
 
-  menu_recent_files = m_fileMenu->addMenu("Recent Files");
+  menu_recent_files = m_fileMenu->addMenu("Scan Recent");
   updateRecentFilesMenu();
 
   menu_exit_separator = m_fileMenu->addSeparator();
