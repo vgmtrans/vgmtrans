@@ -53,8 +53,13 @@ bool VGMRoot::init() {
 
 /* Opens up a file from the filesystem and scans it */
 bool VGMRoot::openRawFile(const std::string &filename) {
+  try {
     auto newfile = new DiskFile(filename);
     return setupNewRawFile(newfile);
+  } catch (...) {
+    UI_toast("Error opening file at path: " + filename, ToastType::Error);
+  }
+  return false;
 }
 
 /* Creates a new file backed by RAM */
