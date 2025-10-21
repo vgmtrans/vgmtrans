@@ -39,7 +39,7 @@ public:
   virtual ~VGMRoot() = default;
 
   virtual bool init();
-  virtual bool openRawFile(const std::string &filename);
+  virtual bool openRawFile(const std::string &filePath);
   bool createVirtFile(const uint8_t* databuf, uint32_t fileSize, const std::string& filename,
                       const std::string& parRawFileFullPath = "", const VGMTag& tag = VGMTag());
   bool setupNewRawFile(RawFile* newRawFile);

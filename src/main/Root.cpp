@@ -52,12 +52,12 @@ bool VGMRoot::init() {
 }
 
 /* Opens up a file from the filesystem and scans it */
-bool VGMRoot::openRawFile(const std::string &filename) {
+bool VGMRoot::openRawFile(const std::string &filePath) {
   try {
-    auto newfile = new DiskFile(filename);
+    auto newfile = new DiskFile(filePath);
     return setupNewRawFile(newfile);
   } catch (...) {
-    UI_toast("Error opening file at path: " + filename, ToastType::Error);
+    UI_toast("Error opening file at path: " + filePath, ToastType::Error);
   }
   return false;
 }
