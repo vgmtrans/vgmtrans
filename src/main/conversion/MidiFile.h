@@ -7,6 +7,7 @@
 #include <string>
 #include <vector>
 #include <list>
+#include <unordered_map>
 
 class VGMSeq;
 
@@ -195,10 +196,14 @@ class MidiTrack {
   uint32_t DeltaTime;            //a time value to be used for AddEvent
   DurNoteEvent *prevDurEvent;
   std::vector<NoteEvent *> prevDurNoteOffs;
-  int8_t prevKey;
   bool bSustain;
 
   std::vector<MidiEvent *> aEvents;
+  // activeNotes tracks which keys are on during conversion. It maps the note's original key to the
+  // final realized key, which will be different when a global transpose is set. It helps us resolve
+  // the correct note off events when a global transpose event occurs amidst live note on events,
+  // and also allows us to warn about unpaired note on/off events.
+  std::unordered_map<uint8_t, uint8_t> activeNotes;
 };
 
 class MidiFile {

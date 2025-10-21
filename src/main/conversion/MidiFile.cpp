@@ -9,6 +9,7 @@
 #include "VGMSeq.h"
 #include "Root.h"
 #include "helper.h"
+#include "LogManager.h"
 
 MidiFile::MidiFile(VGMSeq *theAssocSeq)
     : assocSeq(theAssocSeq),
@@ -114,7 +115,6 @@ MidiTrack::MidiTrack(MidiFile *theParentSeq, bool monophonic)
       channelGroup(0),
       DeltaTime(0),
       prevDurEvent(nullptr),
-      prevKey(0),
       bSustain(false) {}
 
 MidiTrack::~MidiTrack() {
@@ -758,14 +758,29 @@ NoteEvent::NoteEvent(MidiTrack *prntTrk,
 
 uint32_t NoteEvent::writeEvent(std::vector<uint8_t> &buf, uint32_t time) {
   writeVarLength(buf, absTime - time);
-  if (bNoteDown)
+
+  uint8_t finalKey = key + ((channel == 9) ? 0 : prntTrk->parentSeq->globalTranspose);
+
+  if (bNoteDown) {
     buf.push_back(0x90 + channel);
-  else
+    if (prntTrk->activeNotes.contains(key)) {
+      L_WARN("During MIDI conversion, received note on event for a key with an already live note on event."
+        " Channel: {} Key: {}", channel, key);
+    }
+    prntTrk->activeNotes[key] = finalKey;
+  }
+  else {
     buf.push_back(0x80 + channel);
+    if (prntTrk->activeNotes.contains(key)) {
+      finalKey = prntTrk->activeNotes[key];
+      prntTrk->activeNotes.erase(key);
+    } else {
+      L_WARN("During MIDI conversion, a note off event could not find a matching prior note on event."
+        " Channel: {} Key: {}", channel, key);
+    }
+  }
 
-  prntTrk->prevKey = key + ((channel == 9) ? 0 : prntTrk->parentSeq->globalTranspose);
-  buf.push_back(prntTrk->prevKey);
-
+  buf.push_back(finalKey);
   buf.push_back(vel);
 
   return absTime;
