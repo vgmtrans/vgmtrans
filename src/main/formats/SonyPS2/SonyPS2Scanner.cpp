@@ -89,7 +89,10 @@ void SonyPS2Scanner::searchForSampColl(RawFile *file) {
 
     SonyPS2SampColl *sampColl = new SonyPS2SampColl(file, 0);
     Format *fmt = sampColl->format();
-    if (fmt)
+    if (fmt) {
       fmt->onNewFile(sampColl);
+      file->addContainedVGMFile(
+        std::make_shared<std::variant<VGMSeq *, VGMInstrSet *, VGMSampColl *, VGMMiscFile *>>(sampColl));
+    }
   }
 }

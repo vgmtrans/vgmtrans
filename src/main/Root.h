@@ -22,6 +22,8 @@ class VGMSampColl;
 class VGMMiscFile;
 class LogItem;
 
+constexpr int DEFAULT_TOAST_DURATION = 8000;
+
 template <typename T>
 T* variantToType(VGMFileVariant variant) {
   T* vgmFilePtr = nullptr;
@@ -68,7 +70,7 @@ public:
   virtual void UI_endRemoveVGMFiles() {}
   virtual void UI_log(LogItem *) { }
   virtual void UI_toast(const std::string& message, ToastType type = ToastType::Info,
-                        int duration_ms = 8000) {}
+                        int duration_ms = DEFAULT_TOAST_DURATION) {}
 
   virtual void UI_removeVGMColl(VGMColl *) {}
   virtual void UI_beginRemoveVGMColls() {}
