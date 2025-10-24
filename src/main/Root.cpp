@@ -51,24 +51,40 @@ bool VGMRoot::init() {
     return true;
 }
 
-/* Opens up a file from the filesystem and scans it */
-bool VGMRoot::openRawFile(const std::string &filename) {
-    auto newfile = new DiskFile(filename);
-    return setupNewRawFile(newfile);
+/* Opens up a file from the filesystem and scans it.
+ * Returns bool indicating if VGMFiles were found. */
+bool VGMRoot::openRawFile(const std::string &filePath) {
+  DiskFile* newFile = nullptr;
+  try {
+    newFile = new DiskFile(filePath);
+  } catch (...) {
+    UI_toast("Error opening file at path: " + filePath, ToastType::Error);
+    return false;
+  }
+  size_t vgmFileCountBefore = vgmFiles().size();
+  if (!setupNewRawFile(newFile)) {
+    delete newFile;
+  }
+  return vgmFiles().size() > vgmFileCountBefore;
 }
 
 /* Creates a new file backed by RAM */
 bool VGMRoot::createVirtFile(const uint8_t *databuf, uint32_t fileSize, const std::string& filename,
                              const std::string &parRawFileFullPath, const VGMTag& tag) {
-    assert(fileSize != 0);
+  assert(fileSize != 0);
 
-    auto newVirtFile = new VirtFile(databuf, fileSize, filename,
-      parRawFileFullPath, tag);
+  auto newVirtFile = new VirtFile(databuf, fileSize, filename,
+    parRawFileFullPath, tag);
 
-    return setupNewRawFile(newVirtFile);
+  if (!setupNewRawFile(newVirtFile)) {
+    delete newVirtFile;
+    return false;
+  }
+  return true;
 }
 
-/* Applies loaders and scanners to a file, registering it if it contains anything */
+// Applies loaders and scanners to a rawfile, loading any discovered files
+// returns true if files were discovered
 bool VGMRoot::setupNewRawFile(RawFile *newRawFile) {
   UI_onBeginLoadRawFile();
   if (newRawFile->useLoaders()) {
@@ -81,7 +97,9 @@ bool VGMRoot::setupNewRawFile(RawFile *newRawFile) {
         newRawFile->setUseScanners(false);
 
         for (const auto &file : res) {
-          setupNewRawFile(file);
+          if (!setupNewRawFile(file)) {
+            delete file;
+          }
         }
       }
     }
@@ -111,13 +129,14 @@ bool VGMRoot::setupNewRawFile(RawFile *newRawFile) {
     }
   }
 
-  if (!newRawFile->containedVGMFiles().empty()) {
+  bool foundFiles = !newRawFile->containedVGMFiles().empty();
+  if (foundFiles) {
     m_rawfiles.emplace_back(newRawFile);
     UI_addRawFile(newRawFile);
   }
 
   UI_onEndLoadRawFile();
-  return true;
+  return foundFiles;
 }
 
 bool VGMRoot::closeRawFile(RawFile *targFile) {
