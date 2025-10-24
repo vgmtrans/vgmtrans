@@ -31,54 +31,71 @@ enum class Resolution : uint8_t {
   FourteenBit,
 };
 
+struct LoopState {
+  uint32_t endOffset;
+  uint32_t remainingCount;
+
+  bool operator==(const LoopState &other) const = default;
+};
+
+struct ControlFlowState {
+  uint32_t offset;
+  std::vector<uint32_t> returnStack;
+  std::vector<LoopState> loopStack;
+
+  bool operator==(const ControlFlowState &other) const = default;
+};
+
+struct ControlFlowStateHasher {
+  static inline void hashCombine(std::size_t& seed, std::size_t v) noexcept {
+    // 64-bit and 32-bit friendly “golden ratio” constant
+    constexpr std::size_t k = (sizeof(std::size_t) == 8)
+      ? 0x9e3779b97f4a7c15ull
+      : 0x9e3779b9ul;
+    seed ^= v + k + (seed << 6) + (seed >> 2);
+  }
+
+  std::size_t operator()(const ControlFlowState& s) const noexcept {
+    std::size_t seed = std::hash<uint32_t>{}(s.offset);
+
+    // Mix return stack (length + elements)
+    hashCombine(seed, s.returnStack.size());
+    for (uint32_t v : s.returnStack)
+      hashCombine(seed, v);
+
+    // Mix loop stack (length + each loop’s fields)
+    hashCombine(seed, s.loopStack.size());
+    for (const auto& lp : s.loopStack) {
+      hashCombine(seed, lp.endOffset);
+      hashCombine(seed, lp.remainingCount);
+    }
+    return seed;
+  }
+};
+
 class SeqTrack : public VGMItem {
  public:
   SeqTrack(VGMSeq *parentSeqFile, uint32_t offset = 0, uint32_t length = 0, std::string name = "Track");
 
+  virtual bool loadTrackInit(int trackNum, MidiTrack *preparedMidiTrack);
+  virtual void loadTrackMainLoop(uint32_t stopOffset, int32_t stopTime);
+
+protected:
   virtual void resetVars();
   void resetVisitedAddresses();
 
-  virtual bool loadTrackInit(int trackNum, MidiTrack *preparedMidiTrack);
-  virtual void loadTrackMainLoop(uint32_t stopOffset, int32_t stopTime);
   virtual void setChannelAndGroupFromTrkNum(int theTrackNum);
   virtual void addInitialMidiEvents(int trackNum);
   virtual bool readEvent();
   virtual void onTickBegin() {}
   virtual void onTickEnd() {}
 
+  uint32_t readVarLen(uint32_t &offset) const;
   uint32_t getTime() const;
   virtual void setTime(uint32_t newTime);
   virtual void addTime(uint32_t delta);
 
-  uint32_t readVarLen(uint32_t &offset) const;
-
- public:
   virtual bool isOffsetUsed(uint32_t offset);
-
-  uint32_t dwStartOffset;
-
-  std::unordered_set<uint32_t> visitedAddresses;
-  uint32_t visitedAddressMax;
-
- protected:
-  struct LoopState {
-    uint32_t endOffset;
-    uint32_t remainingCount;
-
-    bool operator==(const LoopState &other) const = default;
-  };
-
-  struct ControlFlowState {
-    uint32_t offset;
-    std::vector<uint32_t> returnStack;
-    std::vector<LoopState> loopStack;
-
-    bool operator==(const ControlFlowState &other) const = default;
-  };
-
-  struct ControlFlowStateHasher {
-    std::size_t operator()(const ControlFlowState &state) const noexcept;
-  };
 
   virtual bool onEvent(uint32_t offset, uint32_t length);
   virtual void addEvent(SeqEvent *pSeqEvent);
@@ -218,6 +235,7 @@ class SeqTrack : public VGMItem {
   bool addReturn(u32 offset, u32 length, const std::string &sEventName = "Return");
 
  public:
+  uint32_t dwStartOffset;
   ReadMode readMode;        //state variable that determines behavior for all methods.  Are we adding UI items or converting to MIDI?
 
   VGMSeq *parentSeq;
@@ -256,6 +274,9 @@ class SeqTrack : public VGMItem {
   //SETTINGS
   bool bDetermineTrackLengthEventByEvent;
   bool bWriteGenericEventAsTextEvent;
+
+  std::unordered_set<uint32_t> visitedAddresses;
+  uint32_t visitedAddressMax;
 
   std::vector<uint32_t> returnOffsets;
   std::vector<LoopState> loopStack;
