@@ -51,7 +51,8 @@ bool VGMRoot::init() {
     return true;
 }
 
-/* Opens up a file from the filesystem and scans it */
+/* Opens up a file from the filesystem and scans it.
+ * Returns bool indicating if VGMFiles were found. */
 bool VGMRoot::openRawFile(const std::string &filePath) {
   DiskFile* newFile = nullptr;
   try {
@@ -60,11 +61,11 @@ bool VGMRoot::openRawFile(const std::string &filePath) {
     UI_toast("Error opening file at path: " + filePath, ToastType::Error);
     return false;
   }
+  size_t vgmFileCountBefore = vgmFiles().size();
   if (!setupNewRawFile(newFile)) {
     delete newFile;
-    return false;
   }
-  return true;
+  return vgmFiles().size() > vgmFileCountBefore;
 }
 
 /* Creates a new file backed by RAM */
