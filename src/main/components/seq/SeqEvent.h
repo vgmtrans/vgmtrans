@@ -644,3 +644,78 @@ class LoopForeverSeqEvent : public SeqEvent {
                       const std::string &name = "", const std::string &descr = "")
       : SeqEvent(pTrack, offset, length, name, Type::LoopForever) {}
 };
+
+//  ************
+//  JumpSeqEvent
+//  ************
+
+class JumpSeqEvent : public SeqEvent {
+public:
+  JumpSeqEvent(SeqTrack *pTrack,
+               uint32_t destination,
+               uint32_t offset = 0,
+               uint32_t length = 0,
+               const std::string &name = "")
+    : SeqEvent(pTrack, offset, length, name, Type::Jump), m_destination(destination) {}
+
+
+  std::string description() override {
+    return fmt::format("{} - destination: 0x{:X}", name(), m_destination);
+  }
+
+private:
+  uint32_t m_destination;
+};
+
+//  ************
+//  CallSeqEvent
+//  ************
+
+class CallSeqEvent : public SeqEvent {
+public:
+  CallSeqEvent(SeqTrack *pTrack,
+               uint32_t destination,
+               uint32_t returnOffset,
+               uint32_t offset = 0,
+               uint32_t length = 0,
+               const std::string &name = "")
+  : SeqEvent(pTrack, offset, length, name, Type::Misc),
+    m_destination(destination),
+    m_returnOffset(returnOffset) {}
+
+  std::string description() override {
+    return fmt::format("{} - destination: 0x{:X}, return: 0x{:X}", name(), m_destination, m_returnOffset);
+  }
+
+private:
+  uint32_t m_destination;
+  uint32_t m_returnOffset;
+};
+
+//  **************
+//  ReturnSeqEvent
+//  **************
+
+class ReturnSeqEvent : public SeqEvent {
+public:
+  ReturnSeqEvent(SeqTrack *pTrack,
+                 uint32_t destination,
+                 bool hasDestination,
+                 uint32_t offset = 0,
+                 uint32_t length = 0,
+                 const std::string &name = "")
+  : SeqEvent(pTrack, offset, length, name, Type::Misc),
+    m_destination(destination),
+    m_hasDestination(hasDestination) {}
+
+  std::string description() override {
+    if (!m_hasDestination) {
+      return fmt::format("{} - no return address", name());
+    }
+    return fmt::format("{} - destination: 0x{:X}", name(), m_destination);
+  }
+
+private:
+  uint32_t m_destination;
+  bool m_hasDestination;
+};

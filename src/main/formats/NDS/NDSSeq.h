@@ -22,8 +22,5 @@ class NDSTrack
   virtual bool readEvent();
 
   uint32_t dur;
-  uint8_t jumpCount;
-  uint32_t loopReturnOffset;
-  bool hasLoopReturnOffset;
   bool noteWithDelta;
 };

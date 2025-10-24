@@ -95,6 +95,9 @@ class VGMSeq : public VGMFile {
   [[nodiscard]] bool allowDiscontinuousTrackData() const { return m_allow_discontinuous_track_data; }
   void setAllowDiscontinuousTrackData(bool allow) { m_allow_discontinuous_track_data = allow; }
 
+  void setShouldTrackControlFlowState(bool enable) { m_track_control_flow_state = enable; }
+  [[nodiscard]] bool shouldTrackControlFlowState() const { return m_track_control_flow_state; }
+
   bool saveAsMidi(const std::string &filepath, const VGMColl* coll = nullptr);
 
   void deactivateAllTracks();
@@ -176,6 +179,9 @@ private:
   bool m_use_linear_pan_amplitude_scale; // This will cause all all pan events to be automatically
                                     // converted from a linear scale to MIDI's sin/cos scale
   bool m_use_reverb;
+
+  bool m_track_control_flow_state;  // When enabled, we log a hash of the control flow state every
+                                    // time we parse an event to allow detection of infinite loops.
 
 };
 

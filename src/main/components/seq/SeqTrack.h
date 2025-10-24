@@ -5,8 +5,9 @@
  */
 #pragma once
 
-#include <unordered_set>
 #include <sstream>
+#include <unordered_set>
+#include <vector>
 #include "VGMItem.h"
 #include "VGMSeq.h"
 #include <spdlog/common.h>
@@ -60,8 +61,33 @@ class SeqTrack : public VGMItem {
   uint32_t visitedAddressMax;
 
  protected:
-  virtual void onEvent(uint32_t offset, uint32_t length);
+  struct LoopState {
+    uint32_t endOffset;
+    uint32_t remainingCount;
+
+    bool operator==(const LoopState &other) const = default;
+  };
+
+  struct ControlFlowState {
+    uint32_t offset;
+    std::vector<uint32_t> returnStack;
+    std::vector<LoopState> loopStack;
+
+    bool operator==(const ControlFlowState &other) const = default;
+  };
+
+  struct ControlFlowStateHasher {
+    std::size_t operator()(const ControlFlowState &state) const noexcept;
+  };
+
+  virtual bool onEvent(uint32_t offset, uint32_t length);
   virtual void addEvent(SeqEvent *pSeqEvent);
+
+  bool shouldTrackControlFlowState() const;
+  void addControlFlowState(uint32_t destinationOffset);
+  bool checkControlStateForInfiniteLoop(u32 offset);
+  void pushReturnOffset(uint32_t returnOffset);
+  bool popReturnOffset(uint32_t &returnOffset);
 
  private:
   void addControllerSlide(u32 dur, u16 &prevVal, u16 targVal, uint8_t (*scalerFunc)(uint8_t), void (MidiTrack::*insertFunc)(uint8_t, uint8_t, uint32_t)) const;
@@ -187,6 +213,9 @@ class SeqTrack : public VGMItem {
   void insertMarkerNoItem(uint32_t absTime, const std::string &markername, uint8_t databyte1, uint8_t databyte2, int8_t priority) const;
 
   bool addLoopForever(uint32_t offset, uint32_t length, const std::string &sEventName = "Loop Forever");
+  bool addJump(u32 offset, u32 length, u32 destination, const std::string &sEventName = "Jump");
+  bool addCall(u32 offset, u32 length, u32 destination, u32 returnOffset, const std::string &sEventName = "Call");
+  bool addReturn(u32 offset, u32 length, const std::string &sEventName = "Return");
 
  public:
   ReadMode readMode;        //state variable that determines behavior for all methods.  Are we adding UI items or converting to MIDI?
@@ -198,7 +227,7 @@ class SeqTrack : public VGMItem {
   int channelGroup;
   bool active;            //indicates whether a VGMSeq is loading this track
   long totalTicks;
-  int foreverLoops;
+  int infiniteLoops;
 
   SynthType synthType = SynthType::SoundFont;
 
@@ -227,6 +256,10 @@ class SeqTrack : public VGMItem {
   //SETTINGS
   bool bDetermineTrackLengthEventByEvent;
   bool bWriteGenericEventAsTextEvent;
+
+  std::vector<uint32_t> returnOffsets;
+  std::vector<LoopState> loopStack;
+  std::unordered_set<ControlFlowState, ControlFlowStateHasher> visitedControlFlowStates;
 };
 
 template<typename... Args>
