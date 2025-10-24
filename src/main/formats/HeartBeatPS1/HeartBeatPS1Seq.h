@@ -20,4 +20,5 @@ class HeartBeatPS1Seq:
   uint8_t key;
   uint32_t seqHeaderOffset;
   uint8_t runningStatus;
+  u32 m_loopStart;
 };

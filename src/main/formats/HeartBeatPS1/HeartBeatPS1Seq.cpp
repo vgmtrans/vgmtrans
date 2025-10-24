@@ -107,6 +107,7 @@ bool HeartBeatPS1Seq::parseHeader() {
 void HeartBeatPS1Seq::resetVars() {
   VGMSeqNoTrks::resetVars();
 
+  m_loopStart = -1;
   uint32_t initialTempo = (readShortBE(seqHeaderOffset + 10) << 8) | readByte(seqHeaderOffset + 10 + 2);
   addTempoNoItem(initialTempo);
 
@@ -419,10 +420,14 @@ bool HeartBeatPS1Seq::readEvent() {
           switch (value) {
             case 20 :
               addGenericEvent(beginOffset, curOffset - beginOffset, "Loop Start", "", Type::Loop);
+              m_loopStart = curOffset;
               break;
 
             case 30 :
-              addGenericEvent(beginOffset, curOffset - beginOffset, "Loop End", "", Type::Loop);
+              if (!addLoopForever(beginOffset, curOffset - beginOffset, "Loop End"))
+                return false;
+              if (SeqTrack::isValidOffset(m_loopStart))
+                curOffset = m_loopStart;
               break;
 
             default:
