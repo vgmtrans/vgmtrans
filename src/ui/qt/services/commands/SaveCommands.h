@@ -154,7 +154,7 @@ public:
   void save(const std::string& path, TFile* file) const override {
     conversion::saveAsOriginal(*file, path);
   }
-  [[nodiscard]] std::string name() const override { return "Save as original format"; }
+  [[nodiscard]] std::string name() const override { return "Save as Original Format"; }
   [[nodiscard]] std::string extension() const override { return ""; }
   [[nodiscard]] std::optional<MenuPath> menuPath() const override { return MenuPaths::Convert; }
 };
