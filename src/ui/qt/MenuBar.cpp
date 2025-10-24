@@ -105,7 +105,7 @@ void MenuBar::appendInfoMenu() {
 void MenuBar::appendOptionsMenu() {
   m_optionsMenu = addMenu("Options");
   m_topLevelMenus.insert("Options", m_optionsMenu);
-  auto bs = m_optionsMenu->addMenu("Bank select style");
+  auto bs = m_optionsMenu->addMenu("Bank Select Style");
 
   auto bankSelectStyle = Settings::the()->conversion.bankSelectStyle();
 
@@ -130,7 +130,7 @@ void MenuBar::appendOptionsMenu() {
     }
   });
 
-  auto loopsMenu = m_optionsMenu->addMenu(tr("Sequence loops"));
+  auto loopsMenu = m_optionsMenu->addMenu(tr("Sequence Loops"));
 
   QActionGroup *loopsGroup = new QActionGroup(this);
   loopsGroup->setExclusive(true);
@@ -144,9 +144,9 @@ void MenuBar::appendOptionsMenu() {
   };
 
   std::array presetLoopActions = {
-      addLoopOption(tr("0 loops"), 0),
-      addLoopOption(tr("1 loop"), 1),
-      addLoopOption(tr("2 loops"), 2),
+      addLoopOption(tr("0 Loops"), 0),
+      addLoopOption(tr("1 Loop"), 1),
+      addLoopOption(tr("2 Loops"), 2),
   };
 
   QAction *customLoopsAction = addLoopOption(tr("Custom..."), -1);
