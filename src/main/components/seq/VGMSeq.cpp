@@ -38,7 +38,8 @@ VGMSeq::VGMSeq(const std::string &format, RawFile *file, uint32_t offset, uint32
       m_initial_reverb_level(40),                  // GM standard
       m_initial_pitch_bend_range_cents(200), // GM standard.  Means +/- 2 semitones (4 total range)
       initialTempoBPM(120),
-      m_use_reverb(false) {
+      m_use_reverb(false),
+      m_track_control_flow_state(false) {
 }
 
 VGMSeq::~VGMSeq() {
@@ -267,8 +268,8 @@ int VGMSeq::foreverLoopCount() {
     if (!aTracks[trackNum]->active)
       continue;
 
-    if (foreverLoops > aTracks[trackNum]->foreverLoops)
-      foreverLoops = aTracks[trackNum]->foreverLoops;
+    if (foreverLoops > aTracks[trackNum]->infiniteLoops)
+      foreverLoops = aTracks[trackNum]->infiniteLoops;
   }
   return (foreverLoops != INT_MAX) ? foreverLoops : 0;
 }

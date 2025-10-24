@@ -1,5 +1,5 @@
 /*
- * VGMTrans (c) 2002-2024
+ * VGMTrans (c) 2002-2025
  * Licensed under the zlib license,
  * refer to the included LICENSE.txt file
  */
@@ -10,10 +10,6 @@
 #include "Options.h"
 #include "VGMSeqNoTrks.h"
 #include "helper.h"
-
-//  ********
-//  SeqTrack
-//  ********
 
 SeqTrack::SeqTrack(VGMSeq *parentFile, uint32_t offset, uint32_t length, std::string name)
     : VGMItem(parentFile, offset, length, std::move(name), Type::Track),
@@ -30,7 +26,7 @@ SeqTrack::SeqTrack(VGMSeq *parentFile, uint32_t offset, uint32_t length, std::st
 void SeqTrack::resetVars() {
   active = true;
   bInLoop = false;
-  foreverLoops = 0;
+  infiniteLoops = 0;
   totalTicks = -1;
   deltaTime = 0;
   vol = 100;
@@ -45,6 +41,9 @@ void SeqTrack::resetVars() {
   cDrumNote = -1;
   cKeyCorrection = 0;
   panVolumeCorrectionRate = 1.0;
+  returnOffsets.clear();
+  loopStack.clear();
+  visitedControlFlowStates.clear();
 }
 
 void SeqTrack::resetVisitedAddresses() {
@@ -71,6 +70,8 @@ bool SeqTrack::loadTrackInit(int trackNum, MidiTrack *preparedMidiTrack) {
   setChannelAndGroupFromTrkNum(trackNum);
 
   curOffset = dwStartOffset;    //start at beginning of track
+
+  addControlFlowState(curOffset);
 
   if (readMode == READMODE_CONVERT_TO_MIDI) {
     if (preparedMidiTrack == nullptr) {
@@ -262,11 +263,12 @@ bool SeqTrack::isOffsetUsed(uint32_t offset) {
 }
 
 
-void SeqTrack::onEvent(uint32_t offset, uint32_t length) {
+bool SeqTrack::onEvent(uint32_t offset, uint32_t length) {
   if (offset > visitedAddressMax) {
     visitedAddressMax = offset;
   }
-  visitedAddresses.insert(offset);
+  addControlFlowState(offset);
+  return visitedAddresses.insert(offset).second;
 }
 
 void SeqTrack::addEvent(SeqEvent *pSeqEvent) {
@@ -1577,11 +1579,121 @@ void SeqTrack::insertMarkerNoItem(uint32_t absTime,
     pMidiTrack->insertMarker(channel, markername, databyte1, databyte2, priority, absTime);
 }
 
+bool SeqTrack::shouldTrackControlFlowState() const {
+  return parentSeq != nullptr && parentSeq->shouldTrackControlFlowState();
+}
+
+void SeqTrack::addControlFlowState(u32 destinationOffset) {
+  if (!shouldTrackControlFlowState()) {
+    return;
+  }
+
+  ControlFlowState state{destinationOffset, returnOffsets, loopStack};
+  visitedControlFlowStates.insert(state);
+}
+
+// Check if a tentative control flow state for a given offset has been visited. If it hasn't,
+// increment the infiniteLoops counter and return a bool indicating whether to continue parsing.
+bool SeqTrack::checkControlStateForInfiniteLoop(u32 offset) {
+  // We handle READMODE_FIND_DELTA_LENGTH to determine total time WITH loops.
+  // We handle READMODE_ADD_TO_UI so that we stop adding events when the first infinite loop point is reached.
+  // We ignore READMODE_CONVERT_TO_MIDI as we use stopTime to determine when to stop parsing.
+  if (!shouldTrackControlFlowState())
+    return true;
+
+  ControlFlowState state{offset, returnOffsets, loopStack};
+  bool isVisited = visitedControlFlowStates.contains(state);
+  if (!isVisited)
+    return true;
+
+  // We've hit infinite loop point. Increment the infiniteLoop counter and record the time.
+  infiniteLoops++;
+  totalTicks = getTime();
+
+  if (readMode == READMODE_CONVERT_TO_MIDI) {
+    // Workaround for tracks that never increment the time - exit on first infinite loop point
+    if (getTime() == 0)
+      return false;
+    return true;
+  }
+
+  // For READMODE_ADD_TO_UI, we quit after visiting every event once. We've done that at this point.
+  if (readMode == READMODE_ADD_TO_UI) {
+    return false;
+  }
+  // When we've hit the maximum number of sequence loops, quit parsing
+  if (infiniteLoops > ConversionOptions::the().numSequenceLoops()) {
+    return false;
+  }
+  // Otherwise, clear control flow states to allow another full loop of conversion
+  visitedControlFlowStates.clear();
+  return true;
+}
+
+void SeqTrack::pushReturnOffset(u32 returnOffset) {
+  returnOffsets.push_back(returnOffset);
+}
+
+bool SeqTrack::popReturnOffset(u32 &returnOffset) {
+  if (returnOffsets.empty()) {
+    return false;
+  }
+
+  returnOffset = returnOffsets.back();
+  returnOffsets.pop_back();
+  return true;
+}
+
+// A jump event simply moves the current track offset. It can create infinite loops.
+bool SeqTrack::addJump(u32 offset, u32 length, u32 destination, const std::string &sEventName) {
+  bool isNewOffset = onEvent(offset, length);
+  curOffset = destination;
+
+  if (readMode == READMODE_ADD_TO_UI && isNewOffset) {
+    addEvent(new JumpSeqEvent(this, destination, offset, length, sEventName));
+  }
+
+  return checkControlStateForInfiniteLoop(destination);
+}
+
+// A call event jumps to an offset and records a return offset (for a return event).
+bool SeqTrack::addCall(u32 offset, u32 length, u32 destination, u32 returnOffset, const std::string &sEventName) {
+  bool isNewOffset = onEvent(offset, length);
+  curOffset = destination;
+
+  pushReturnOffset(returnOffset);
+
+  if (readMode == READMODE_ADD_TO_UI && isNewOffset) {
+    addEvent(new CallSeqEvent(this, destination, returnOffset, offset, length, sEventName));
+  }
+
+  return checkControlStateForInfiniteLoop(destination);
+}
+
+// A return event marks the end of a call - we jump back to after the call event offset.
+bool SeqTrack::addReturn(u32 offset, u32 length, const std::string &sEventName) {
+  bool isNewOffset = onEvent(offset, length);
+
+  uint32_t destination = 0;
+  bool hasDestination = popReturnOffset(destination);
+
+  if (readMode == READMODE_ADD_TO_UI && isNewOffset) {
+    addEvent(new ReturnSeqEvent(this, destination, hasDestination, offset, length, sEventName));
+  }
+
+  if (!hasDestination) {
+    return false;
+  }
+
+  curOffset = destination;
+  return checkControlStateForInfiniteLoop(destination);
+}
+
 // when in FIND_DELTA_LENGTH mode, returns true until we've hit the max number of loops defined in options
 bool SeqTrack::addLoopForever(uint32_t offset, uint32_t length, const std::string &sEventName) {
   onEvent(offset, length);
 
-  this->foreverLoops++;
+  this->infiniteLoops++;
   if (readMode == READMODE_ADD_TO_UI) {
     if (!isItemAtOffset(offset, true)) {
       addEvent(new LoopForeverSeqEvent(this, offset, length, sEventName));
@@ -1591,7 +1703,7 @@ bool SeqTrack::addLoopForever(uint32_t offset, uint32_t length, const std::strin
   }
   else if (readMode == READMODE_FIND_DELTA_LENGTH) {
     totalTicks = getTime();
-    return (this->foreverLoops <= ConversionOptions::the().numSequenceLoops());
+    return (this->infiniteLoops <= ConversionOptions::the().numSequenceLoops());
   }
   return true;
 

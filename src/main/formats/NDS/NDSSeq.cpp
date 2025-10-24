@@ -6,6 +6,7 @@ using namespace std;
 
 NDSSeq::NDSSeq(RawFile *file, uint32_t offset, uint32_t length, string name)
     : VGMSeq(NDSFormat::name, file, offset, length, name) {
+  setShouldTrackControlFlowState(true);
 }
 
 bool NDSSeq::parseHeader(void) {
@@ -86,10 +87,8 @@ NDSTrack::NDSTrack(NDSSeq *parentFile, uint32_t offset, uint32_t length)
 }
 
 void NDSTrack::resetVars() {
-  jumpCount = 0;
-  loopReturnOffset = 0;
-  hasLoopReturnOffset = false;
   SeqTrack::resetVars();
+  noteWithDelta = false;
 }
 
 bool NDSTrack::readEvent(void) {
@@ -125,39 +124,20 @@ bool NDSTrack::readEvent(void) {
         break;
 
       case 0x94: {
-        uint32_t jumpAddr = readByte(curOffset) + (readByte(curOffset + 1) << 8)
+        u32 jumpAddr = readByte(curOffset) + (readByte(curOffset + 1) << 8)
             + (readByte(curOffset + 2) << 16) + parentSeq->dwOffset + 0x1C;
         curOffset += 3;
 
-        // Add an End Track if it exists afterward, for completeness sake
-        if (readMode == READMODE_ADD_TO_UI && !isOffsetUsed(curOffset)) {
-          if (readByte(curOffset) == 0xFF) {
-            addGenericEvent(curOffset, 1, "End of Track", "", Type::TrackEnd);
-          }
-        }
-
-        // The event usually appears at last of the song, but there can be an exception.
-        // See Zelda The Spirit Tracks - SSEQ_0018 (overworld train theme)
-        bool bContinue = true;
-        if (isOffsetUsed(jumpAddr)) {
-          addLoopForever(beginOffset, 4, "Loop");
-          bContinue = false;
-        }
-        else {
-          addGenericEvent(beginOffset, 4, "Jump", "", Type::LoopForever);
-        }
-
-        curOffset = jumpAddr;
-        return bContinue;
+        return addJump(beginOffset, curOffset - beginOffset, jumpAddr);
       }
 
-      case 0x95:
-        hasLoopReturnOffset = true;
-        loopReturnOffset = curOffset + 3;
-        addGenericEvent(beginOffset, curOffset + 3 - beginOffset, "Call", "", Type::Loop);
-        curOffset = readByte(curOffset) + (readByte(curOffset + 1) << 8)
+      case 0x95: {
+        u32 destination = readByte(curOffset) + (readByte(curOffset + 1) << 8)
             + (readByte(curOffset + 2) << 16) + parentSeq->dwOffset + 0x1C;
-        break;
+        curOffset += 3;
+        u32 returnOffset = curOffset;
+        return addCall(beginOffset, curOffset - beginOffset, destination, returnOffset, "Call");
+      }
 
       // [loveemu] (ex: Hanjuku Hero DS: NSE_45, New Mario Bros: BGM_AMB_CHIKA, Slime Morimori Dragon Quest 2: SE_187, SE_210, Advance Wars)
       case 0xA0: {
@@ -390,18 +370,8 @@ bool NDSTrack::readEvent(void) {
         break;
 
       case 0xFD: {
-        // This event usually does not cause an infinite loop.
-        // However, a complicated sequence with a ton of conditional events, it sometimes confuses the parser and causes an infinite loop.
-        // See Animal Crossing: Wild World - SSEQ_270
-        bool bContinue = true;
-        if (!hasLoopReturnOffset || isOffsetUsed(loopReturnOffset)) {
-          bContinue = false;
-        }
-
-        addGenericEvent(beginOffset, curOffset - beginOffset, "Return", "", Type::Loop);
-        curOffset = loopReturnOffset;
-        return bContinue;
-	  }
+        return addReturn(beginOffset, curOffset - beginOffset, "Return");
+      }
 
       // [loveemu] allocate track, however should not handle in this function
       case 0xFE:
