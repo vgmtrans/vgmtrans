@@ -11,6 +11,31 @@
 #include "VGMSeqNoTrks.h"
 #include "helper.h"
 
+std::size_t SeqTrack::ControlFlowStateHasher::operator()(const ControlFlowState &state) const noexcept {
+  auto hashCombine = [](std::size_t &seed, uint32_t value) {
+    seed ^= std::hash<uint32_t>{}(value) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
+  };
+
+  std::size_t seed = std::hash<uint32_t>{}(state.offset);
+
+  if (!state.returnStack.empty()) {
+    hashCombine(seed, static_cast<uint32_t>(state.returnStack.size()));
+    for (uint32_t value : state.returnStack) {
+      hashCombine(seed, value);
+    }
+  }
+
+  if (!state.loopStack.empty()) {
+    hashCombine(seed, static_cast<uint32_t>(state.loopStack.size()));
+    for (const auto &loop : state.loopStack) {
+      hashCombine(seed, loop.endOffset);
+      hashCombine(seed, loop.remainingCount);
+    }
+  }
+
+  return seed;
+}
+
 SeqTrack::SeqTrack(VGMSeq *parentFile, uint32_t offset, uint32_t length, std::string name)
     : VGMItem(parentFile, offset, length, std::move(name), Type::Track),
       dwStartOffset(offset),
