@@ -8,6 +8,9 @@
 #include <QShortcut>
 #include <QScrollArea>
 #include <QScrollBar>
+#include <QtGlobal>
+#include <algorithm>
+#include <cmath>
 #include "VGMFileView.h"
 #include "VGMFile.h"
 #include "HexView.h"
@@ -43,6 +46,8 @@ VGMFileView::VGMFileView(VGMFile *vgmfile)
   m_hexScrollArea->setMaximumWidth(hexViewFullWidth());
   m_treeview->setMinimumWidth(treeViewMinimumWidth);
 
+  m_defaultHexFont = m_hexview->font();
+
   connect(m_hexview, &HexView::selectionChanged, this, &VGMFileView::onSelectionChange);
 
   connect(m_treeview, &VGMFileTreeView::currentItemChanged,
@@ -56,18 +61,17 @@ VGMFileView::VGMFileView(VGMFile *vgmfile)
             onSelectionChange(vgmitem);
           });
 
-  connect(new QShortcut(QKeySequence::ZoomIn, this), &QShortcut::activated, [&] {
-    updateHexViewFont(+0.5);
-  });
+  connect(new QShortcut(QKeySequence::ZoomIn, this), &QShortcut::activated,
+          this, &VGMFileView::increaseHexViewFont);
 
-  QShortcut* shortcutEqual = new QShortcut(QKeySequence(Qt::CTRL | Qt::Key_Equal), this);
-  connect(shortcutEqual, &QShortcut::activated, [&] {
-    updateHexViewFont(+0.5);
-  });
+  auto *shortcutEqual = new QShortcut(QKeySequence(Qt::CTRL | Qt::Key_Equal), this);
+  connect(shortcutEqual, &QShortcut::activated, this, &VGMFileView::increaseHexViewFont);
 
-  connect(new QShortcut(QKeySequence::ZoomOut, this), &QShortcut::activated, [&] {
-    updateHexViewFont(-0.5);
-  });
+  connect(new QShortcut(QKeySequence::ZoomOut, this), &QShortcut::activated,
+          this, &VGMFileView::decreaseHexViewFont);
+
+  connect(new QShortcut(QKeySequence(Qt::CTRL | Qt::Key_0), this), &QShortcut::activated,
+          this, &VGMFileView::resetHexViewFont);
 
   setWidget(m_splitter);
 }
@@ -100,32 +104,49 @@ void VGMFileView::updateHexViewFont(qreal sizeIncrement) const {
   // Increment the font size until it has an actual effect on width
   QFont font = m_hexview->font();
   QFontMetricsF fontMetrics(font);
-  qreal origWidth = fontMetrics.horizontalAdvance("A");
+  const qreal origWidth = fontMetrics.horizontalAdvance("A");
   qreal fontSize = font.pointSizeF();
   for (int i = 0; i < 3; i++) {
     fontSize += sizeIncrement;
     font.setPointSizeF(fontSize);
     fontMetrics = QFontMetricsF(font);
-    if (fontMetrics.horizontalAdvance("A") != origWidth) {
+    if (!qFuzzyCompare(fontMetrics.horizontalAdvance("A"), origWidth)) {
       break;
     }
   }
 
-  // Updating the font will shrink or expand the maximum possible width of the hex view
-  int actualWidthBeforeResize = m_splitter->sizes()[0];
-  int fullWidthBeforeResize = hexViewFullWidth();
+  applyHexViewFont(font);
+}
+
+void VGMFileView::applyHexViewFont(QFont font) const {
+  const QList<int> splitterSizes = m_splitter->sizes();
+  const int actualWidthBeforeResize = splitterSizes.isEmpty() ? hexViewFullWidth() : splitterSizes.first();
+  const int fullWidthBeforeResize = std::max(1, hexViewFullWidth());
 
   m_hexview->setFont(font);
   m_hexScrollArea->setMaximumWidth(hexViewFullWidth());
 
-  // We'll scale the hex view size such that approximately the same portion of text will be visible
-  float percentHexViewVisible = static_cast<float>(actualWidthBeforeResize) / static_cast<float>(fullWidthBeforeResize);
-  int fullWidthAfterResize = hexViewFullWidth();
-  int widthChange = fullWidthAfterResize - fullWidthBeforeResize;
-  int newWidth = actualWidthBeforeResize + static_cast<int>(round(static_cast<float>(widthChange) * percentHexViewVisible));
+  const float percentHexViewVisible = static_cast<float>(actualWidthBeforeResize) /
+                                      static_cast<float>(fullWidthBeforeResize);
+  const int fullWidthAfterResize = std::max(1, hexViewFullWidth());
+  const int widthChange = fullWidthAfterResize - fullWidthBeforeResize;
+  const auto scaledWidthChange = static_cast<int>(std::round(static_cast<float>(widthChange) * percentHexViewVisible));
+  const int newWidth = std::max(1, actualWidthBeforeResize + scaledWidthChange);
   resetSnapRanges();
   m_splitter->setSizes(QList<int>{newWidth, treeViewMinimumWidth});
   m_splitter->persistState();
+}
+
+void VGMFileView::resetHexViewFont() {
+  applyHexViewFont(m_defaultHexFont);
+}
+
+void VGMFileView::increaseHexViewFont() {
+  updateHexViewFont(+0.5);
+}
+
+void VGMFileView::decreaseHexViewFont() {
+  updateHexViewFont(-0.5);
 }
 
 void VGMFileView::closeEvent(QCloseEvent *) {

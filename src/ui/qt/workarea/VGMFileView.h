@@ -5,6 +5,7 @@
  */
 
 #pragma once
+#include <QFont>
 #include <QMdiSubWindow>
 
 class SnappingSplitter;
@@ -30,13 +31,18 @@ private:
   int hexViewWidthSansAscii() const;
   int hexViewWidthSansAsciiAndAddress() const;
   void updateHexViewFont(qreal sizeIncrement) const;
+  void applyHexViewFont(QFont font) const;
 
   VGMFileTreeView* m_treeview{};
   VGMFile* m_vgmfile{};
   QScrollArea* m_hexScrollArea;
   HexView* m_hexview{};
   SnappingSplitter* m_splitter;
+  QFont m_defaultHexFont;
 
 public slots:
   void onSelectionChange(VGMItem* item) const;
+  void resetHexViewFont();
+  void increaseHexViewFont();
+  void decreaseHexViewFont();
 };
