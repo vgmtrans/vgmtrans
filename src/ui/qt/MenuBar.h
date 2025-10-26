@@ -24,6 +24,7 @@ class QDockWidget;
 class VGMFile;
 class VGMColl;
 class RawFile;
+class VGMFileView;
 
 class MenuBar final : public QMenuBar {
   Q_OBJECT
@@ -48,6 +49,8 @@ private:
   void appendViewMenu(const QList<QDockWidget *> &dockWidgets);
   void appendInfoMenu();
   void appendOptionsMenu();
+  void updateHexFontActions();
+  VGMFileView* currentVGMFileView() const;
 
   void refreshContextualMenus();
   void clearContextualMenus();
@@ -63,6 +66,10 @@ private:
   QMenu *m_viewMenu{};
   QMenu *m_optionsMenu{};
   QMenu *m_helpMenu{};
+
+  QAction *menu_reset_hex_font{};
+  QAction *menu_increase_hex_font{};
+  QAction *menu_decrease_hex_font{};
 
   // File actions
   QAction *menu_open_file{};

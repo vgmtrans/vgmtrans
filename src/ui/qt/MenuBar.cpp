@@ -22,6 +22,8 @@
 #include "VGMColl.h"
 #include "VGMFile.h"
 #include "RawFile.h"
+#include "workarea/MdiArea.h"
+#include "workarea/VGMFileView.h"
 
 
 MenuBar::MenuBar(QWidget *parent, const QList<QDockWidget *> &dockWidgets) : QMenuBar(parent) {
@@ -92,6 +94,62 @@ void MenuBar::appendViewMenu(const QList<QDockWidget *> &dockWidgets) {
 
   for (auto &widget : dockWidgets) {
     toolWindowsMenu->addAction(widget->toggleViewAction());
+  }
+
+  m_viewMenu->addSeparator();
+
+  menu_increase_hex_font = m_viewMenu->addAction(tr("Increase Font Size in Hex View"));
+  menu_increase_hex_font->setShortcut(QKeySequence::ZoomIn);
+  menu_increase_hex_font->setShortcutContext(Qt::WidgetShortcut);
+  connect(menu_increase_hex_font, &QAction::triggered, this, [this]() {
+    if (auto *view = currentVGMFileView()) {
+      view->increaseHexViewFont();
+    }
+  });
+
+  menu_decrease_hex_font = m_viewMenu->addAction(tr("Decrease Font Size in Hex View"));
+  menu_decrease_hex_font->setShortcut(QKeySequence::ZoomOut);
+  menu_decrease_hex_font->setShortcutContext(Qt::WidgetShortcut);
+  connect(menu_decrease_hex_font, &QAction::triggered, this, [this]() {
+    if (auto *view = currentVGMFileView()) {
+      view->decreaseHexViewFont();
+    }
+  });
+
+  menu_reset_hex_font = m_viewMenu->addAction(tr("Reset Font Size in Hex View"));
+  menu_reset_hex_font->setShortcut(QKeySequence(Qt::CTRL | Qt::Key_0));
+  menu_reset_hex_font->setShortcutContext(Qt::WidgetShortcut);
+  connect(menu_reset_hex_font, &QAction::triggered, this, [this]() {
+    if (auto *view = currentVGMFileView()) {
+      view->resetHexViewFont();
+    }
+  });
+
+#if defined(Q_OS_MACOS)
+  // Add a separator between these actions and the automatically added "Enter Full Screen" action.
+  m_viewMenu->addSeparator();
+#endif
+
+  connect(MdiArea::the(), &QMdiArea::subWindowActivated, this,
+          [this](QMdiSubWindow *) { updateHexFontActions(); });
+  updateHexFontActions();
+}
+
+VGMFileView* MenuBar::currentVGMFileView() const {
+  return qobject_cast<VGMFileView*>(MdiArea::the()->activeSubWindow());
+}
+
+void MenuBar::updateHexFontActions() {
+  const bool hasActiveView = currentVGMFileView() != nullptr;
+
+  if (menu_reset_hex_font) {
+    menu_reset_hex_font->setEnabled(hasActiveView);
+  }
+  if (menu_increase_hex_font) {
+    menu_increase_hex_font->setEnabled(hasActiveView);
+  }
+  if (menu_decrease_hex_font) {
+    menu_decrease_hex_font->setEnabled(hasActiveView);
   }
 }
 
