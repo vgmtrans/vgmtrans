@@ -8,11 +8,11 @@ endif()
 
 if (NOT ZLIB_FOUND)
   message(STATUS "System zlib not found; building vendored zlib (static)")
-  set(ZLIB_BUILD_TESTING OFF CACHE BOOL "Enable Zlib Examples as tests"              FORCE)
-  set(ZLIB_BUILD_SHARED  OFF CACHE BOOL "Enable building zlib shared library"        FORCE)
-  set(ZLIB_BUILD_STATIC  ON  CACHE BOOL "Enable building zlib static library"        FORCE)
-  set(ZLIB_BUILD_MINIZIP OFF CACHE BOOL "Enable building libminizip contrib library" FORCE)
-  set(ZLIB_INSTALL       OFF CACHE BOOL "Enable installation of zlib"                FORCE)
+  set(ZLIB_BUILD_TESTING OFF CACHE BOOL "[zlib] Enable Zlib Examples as tests"              FORCE)
+  set(ZLIB_BUILD_SHARED  OFF CACHE BOOL "[zlib] Enable building zlib shared library"        FORCE)
+  set(ZLIB_BUILD_STATIC  ON  CACHE BOOL "[zlib] Enable building zlib static library"        FORCE)
+  set(ZLIB_BUILD_MINIZIP OFF CACHE BOOL "[zlib] Enable building libminizip contrib library" FORCE)
+  set(ZLIB_INSTALL       OFF CACHE BOOL "[zlib] Enable installation of zlib"                FORCE)
 
   add_subdirectory("${PROJECT_SOURCE_DIR}/lib/zlib"
           "${CMAKE_BINARY_DIR}/lib/zlib"
@@ -37,17 +37,18 @@ target_link_libraries(minizip PUBLIC ZLIB::ZLIB)
 
 # Add libunarr
 message(INFO "Using built-in unarr")
-set(ENABLE_7Z OFF CACHE BOOL "Build with 7z support" FORCE)
-set(USE_SYSTEM_BZ2 OFF CACHE BOOL "Build with system bzip2 if possible" FORCE)
-set(BUILD_SHARED_LIBS OFF CACHE BOOL "Build libunarr as a shared library" FORCE)
-set(USE_SYSTEM_ZLIB OFF CACHE BOOL "Build with system zlib if possible" FORCE)
+set(ENABLE_7Z         OFF CACHE BOOL "[unarr] Build with 7z support"               FORCE)
+set(USE_SYSTEM_BZ2    OFF CACHE BOOL "[unarr] Build with system bzip2 if possible" FORCE)
+set(BUILD_SHARED_LIBS OFF CACHE BOOL "[unarr] Build libunarr as a shared library"  FORCE)
+set(USE_SYSTEM_ZLIB   OFF CACHE BOOL "[unarr] Build with system zlib if possible"  FORCE)
 add_subdirectory("${PROJECT_SOURCE_DIR}/lib/unarr" "${CMAKE_BINARY_DIR}/lib/unarr" EXCLUDE_FROM_ALL)
 
 # Add libchdr
 if (ZLIB_FOUND)
-  set(WITH_SYSTEM_ZLIB ON  CACHE BOOL "" FORCE)
+  set(WITH_SYSTEM_ZLIB ON  CACHE BOOL "[libchdr] Use system provided zlib library" FORCE)
 else()
-  set(WITH_SYSTEM_ZLIB OFF CACHE BOOL "" FORCE)  # triggers our vendored zlibstatic path
+  # triggers our vendored zlibstatic path instead of libchdr's vendored zlib
+  set(WITH_SYSTEM_ZLIB OFF CACHE BOOL "[libchdr] Use system provided zlib library" FORCE)
 endif()
 add_subdirectory("${PROJECT_SOURCE_DIR}/lib/libchdr" "${CMAKE_BINARY_DIR}/lib/libchdr" EXCLUDE_FROM_ALL)
 
