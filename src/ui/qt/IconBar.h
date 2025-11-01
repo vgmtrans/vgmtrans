@@ -12,6 +12,7 @@ class QSlider;
 class QPushButton;
 class QLabel;
 class MarqueeLabel;
+class ClickJumpSlider;
 
 class IconBar final : public QWidget {
   Q_OBJECT
@@ -36,7 +37,7 @@ private:
   QPushButton *m_create{};
   QPushButton *m_play{};
   QPushButton *m_stop{};
-  QSlider *m_slider{};
+  ClickJumpSlider *m_slider{};
   MarqueeLabel *m_title;
   inline static QIcon s_playicon;
   inline static QIcon s_pauseicon;
