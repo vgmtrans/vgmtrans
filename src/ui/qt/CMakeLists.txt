@@ -74,6 +74,8 @@ add_executable(
   util/LambdaEventFilter.h
   util/UIHelpers.cpp
   util/UIHelpers.h
+  widgets/ClickJumpSlider.cpp
+  widgets/ClickJumpSlider.h
   widgets/MarqueeLabel.cpp
   widgets/MarqueeLabel.h
   widgets/SnappingSplitter.cpp

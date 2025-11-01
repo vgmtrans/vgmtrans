@@ -15,6 +15,7 @@
 #include "SequencePlayer.h"
 #include "Helpers.h"
 #include "MarqueeLabel.h"
+#include "ClickJumpSlider.h"
 
 IconBar::IconBar(QWidget *parent) : QWidget(parent) {
   setLayout(new QHBoxLayout());
@@ -52,7 +53,7 @@ void IconBar::setupControls() {
   connect(m_stop, &QPushButton::pressed, this, &IconBar::stopPressed);
   layout()->addWidget(m_stop);
 
-  m_slider = new QSlider(Qt::Horizontal);
+  m_slider = new ClickJumpSlider(Qt::Horizontal);
   /* Needed to make sure the slider is properly rendered */
   m_slider->setRange(0, 1);
   m_slider->setValue(0);
