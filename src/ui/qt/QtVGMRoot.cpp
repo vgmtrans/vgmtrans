@@ -67,8 +67,8 @@ void QtVGMRoot::UI_addVGMColl(VGMColl*) {
   this->UI_addedVGMColl();
 }
 
-void QtVGMRoot::UI_beginRemoveVGMFiles() {
-  this->UI_beganRemovingVGMFiles();
+void QtVGMRoot::UI_beginRemoveVGMFiles(int startIdx, int endIdx) {
+  this->UI_beganRemovingVGMFiles(startIdx, endIdx);
 }
 
 void QtVGMRoot::UI_endRemoveVGMFiles() {

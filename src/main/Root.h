@@ -48,6 +48,7 @@ public:
   bool closeRawFile(RawFile *targFile);
   void addVGMFile(VGMFileVariant file);
   void removeVGMFile(VGMFileVariant file, bool bRemoveEmptyRawFile = true);
+  void removeVGMFile(size_t idx, bool bRemoveEmptyRawFile = true);
   void addVGMColl(VGMColl *theColl);
   void removeVGMColl(VGMColl *theFile);
   void log(LogItem *theLog);
@@ -66,7 +67,7 @@ public:
   virtual void UI_addVGMMisc(VGMMiscFile *) {}
   virtual void UI_addVGMColl(VGMColl *) {}
   virtual void UI_removeVGMFile(VGMFile *) {}
-  virtual void UI_beginRemoveVGMFiles() {}
+  virtual void UI_beginRemoveVGMFiles(int startIdx, int endIdx) {}
   virtual void UI_endRemoveVGMFiles() {}
   virtual void UI_log(LogItem *) { }
   virtual void UI_toast(const std::string& message, ToastType type = ToastType::Info,
