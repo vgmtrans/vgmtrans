@@ -25,7 +25,9 @@
  */
 
 VGMFileListModel::VGMFileListModel(QObject *parent) : QAbstractTableModel(parent) {
-  connect(&qtVGMRoot, &QtVGMRoot::UI_addedVGMFile, this, &VGMFileListModel::addVGMFile);
+  connect(&qtVGMRoot, &QtVGMRoot::UI_addedVGMFile, this, &VGMFileListModel::addedVGMFile);
+  connect(&qtVGMRoot, &QtVGMRoot::UI_beganRemovingVGMFiles, this, &VGMFileListModel::beganRemovingVGMFiles);
+  connect(&qtVGMRoot, &QtVGMRoot::UI_endedRemovingVGMFiles, this, &VGMFileListModel::endedRemovingVGMFiles);
 }
 
 QVariant VGMFileListModel::data(const QModelIndex &index, int role) const {
@@ -96,19 +98,19 @@ int VGMFileListModel::columnCount(const QModelIndex &parent) const {
   return 2;
 }
 
-void VGMFileListModel::addVGMFile() {
+void VGMFileListModel::addedVGMFile() {
   int position = static_cast<int>(qtVGMRoot.vgmFiles().size()) - 1;
-  beginInsertRows(QModelIndex(), position, position);
-  endInsertRows();
+  if (position >= 0) {
+    beginInsertRows(QModelIndex(), position, position);
+    endInsertRows();
+  }
 }
 
-void VGMFileListModel::removeVGMFile() {
-  int position = static_cast<int>(qtVGMRoot.vgmFiles().size()) - 1;
-  if (position < 0) {
-    return;
-  }
+void VGMFileListModel::beganRemovingVGMFiles(int startIdx, int endIdx) {
+  beginRemoveRows(QModelIndex(), startIdx, endIdx);
+}
 
-  beginRemoveRows(QModelIndex(), position, position);
+void VGMFileListModel::endedRemovingVGMFiles() {
   endRemoveRows();
 }
 
@@ -130,6 +132,13 @@ VGMFileListView::VGMFileListView(QWidget *parent) : TableView(parent) {
   connect(this, &QAbstractItemView::doubleClicked, this, &VGMFileListView::requestVGMFileView);
   connect(NotificationCenter::the(), &NotificationCenter::vgmFileSelected, this, &VGMFileListView::onVGMFileSelected);
   connect(selectionModel(), &QItemSelectionModel::selectionChanged, this, &VGMFileListView::onSelectionChanged);
+  connect(&qtVGMRoot, &QtVGMRoot::UI_beganRemovingVGMFiles, this, [this]() {
+    // QAbstractItemModel::beginRemoveRows(), which we must call to remove items, suffers a major
+    // perf penalty if items are selected. While this could degrade UI behavior by deselecting
+    // items that are not being removed (the removal could be triggered by closing a raw file, for
+    // instance), the performance hit and unlikeliness make this a worthwhile tradeoff.
+    clearSelection();
+  });
 }
 
 void VGMFileListView::itemMenu(const QPoint &pos) {
@@ -187,13 +196,20 @@ void VGMFileListView::keyPressEvent(QKeyEvent *input) {
         return;
 
       QModelIndexList list = selectionModel()->selectedRows();
-      pRoot->UI_beginRemoveVGMFiles();
-      for (auto & idx : std::ranges::reverse_view(list)) {
-        qtVGMRoot.removeVGMFile(qtVGMRoot.vgmFiles()[idx.row()], true);
-      }
-      pRoot->UI_endRemoveVGMFiles();
-
       clearSelection();
+
+      // If all items are selected, it's more performant to close every RawFile: doing so skips
+      // finding and removing each VGMFile from its parent RawFile's list of contained files.
+      if (list.size() == qtVGMRoot.vgmFiles().size()) {
+        auto rawFiles = qtVGMRoot.rawFiles();
+        for (const auto rawFile : rawFiles) {
+          qtVGMRoot.closeRawFile(rawFile);
+        }
+      } else {
+        for (auto & idx : std::ranges::reverse_view(list)) {
+          qtVGMRoot.removeVGMFile(idx.row(), true);
+        }
+      }
       return;
     }
 
@@ -205,7 +221,6 @@ void VGMFileListView::keyPressEvent(QKeyEvent *input) {
 
 void VGMFileListView::removeVGMFile(const VGMFile *file) const {
   MdiArea::the()->removeView(file);
-  view_model->removeVGMFile();
 }
 
 void VGMFileListView::requestVGMFileView(const QModelIndex& index) {

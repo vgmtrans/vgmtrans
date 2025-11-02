@@ -200,11 +200,11 @@ void RawFileListView::deleteRawFiles() {
     return;
 
   QModelIndexList list = selectionModel()->selectedRows();
+  clearSelection();
   for (auto & idx : std::ranges::reverse_view(list)) {
     const auto rawfile = qtVGMRoot.rawFiles()[idx.row()];
     qtVGMRoot.closeRawFile(rawfile);
   }
-  clearSelection();
 }
 
 void RawFileListView::onVGMFileSelected(const VGMFile* vgmfile, const QWidget* caller) {

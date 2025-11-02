@@ -147,11 +147,9 @@ bool VGMRoot::closeRawFile(RawFile *targFile) {
   auto file = std::ranges::find(m_rawfiles, targFile);
   if (file != m_rawfiles.end()) {
     auto &vgmfiles = (*file)->containedVGMFiles();
-    UI_beginRemoveVGMFiles();
     for (const auto & vgmfile : vgmfiles) {
       removeVGMFile(*vgmfile, false);
     }
-    UI_endRemoveVGMFiles();
 
     m_rawfiles.erase(file);
 
@@ -174,6 +172,17 @@ void VGMRoot::addVGMFile(
 // Removes a VGMFile from the interface.  The UI_RemoveVGMFile will handle the
 // interface-specific stuff
 void VGMRoot::removeVGMFile(std::variant<VGMSeq *, VGMInstrSet *, VGMSampColl *, VGMMiscFile *> file, bool bRemoveEmptyRawFile) {
+  auto iter = std::ranges::find(m_vgmfiles, file);
+  removeVGMFile(iter - m_vgmfiles.begin(), bRemoveEmptyRawFile);
+}
+
+void VGMRoot::removeVGMFile(size_t idx, bool bRemoveEmptyRawFile) {
+  if (idx >= m_vgmfiles.size() || idx < 0) {
+    L_WARN("Requested deletion for VGMFile but it was not found");
+    return;
+  }
+
+  auto file = m_vgmfiles[idx];
   auto targFile = variantToVGMFile(file);
   // First we should call the format's onClose handler in case it needs to use
   // the RawFile before we close it (FilenameMatcher, for ex)
@@ -181,14 +190,10 @@ void VGMRoot::removeVGMFile(std::variant<VGMSeq *, VGMInstrSet *, VGMSampColl *,
     fmt->onCloseFile(file);
   }
 
-  auto iter = std::ranges::find(m_vgmfiles, file);
-
-  if (iter != m_vgmfiles.end()) {
-    UI_removeVGMFile(targFile);
-    m_vgmfiles.erase(iter);
-  } else {
-    L_WARN("Requested deletion for VGMFile but it was not found");
-  }
+  UI_beginRemoveVGMFiles(idx, idx);
+  UI_removeVGMFile(targFile);
+  m_vgmfiles.erase(m_vgmfiles.begin() + static_cast<std::ptrdiff_t>(idx));
+  UI_endRemoveVGMFiles();
 
   while (!targFile->assocColls.empty()) {
     removeVGMColl(targFile->assocColls.back());

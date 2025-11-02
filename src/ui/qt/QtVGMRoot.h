@@ -28,7 +28,7 @@ public:
   void UI_addVGMSampColl(VGMSampColl* theSampColl) override;
   void UI_addVGMMisc(VGMMiscFile* theMiscFile) override;
   void UI_addVGMColl(VGMColl* theColl) override;
-  void UI_beginRemoveVGMFiles() override;
+  void UI_beginRemoveVGMFiles(int startIdx, int endIdx) override;
   void UI_endRemoveVGMFiles() override;
   void UI_beginRemoveVGMColls() override;
   void UI_endRemoveVGMColls() override;
@@ -45,7 +45,7 @@ private:
 signals:
   void UI_beganLoadingRawFile();
   void UI_endedLoadingRawFile();
-  void UI_beganRemovingVGMFiles();
+  void UI_beganRemovingVGMFiles(int startIdx, int endIdx);
   void UI_endedRemovingVGMFiles();
   void UI_beganRemovingVGMColls();
   void UI_endedRemovingVGMColls();
