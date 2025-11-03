@@ -217,6 +217,7 @@ void VGMRoot::addVGMColl(VGMColl *theColl) {
 }
 
 void VGMRoot::removeVGMColl(VGMColl *targColl) {
+  UI_beginRemoveVGMColls();
   auto iter = std::ranges::find(m_vgmcolls, targColl);
   if (iter != m_vgmcolls.end())
     m_vgmcolls.erase(iter);
@@ -225,6 +226,7 @@ void VGMRoot::removeVGMColl(VGMColl *targColl) {
 
   targColl->removeFileAssocs();
   UI_removeVGMColl(targColl);
+  UI_endRemoveVGMColls();
   delete targColl;
 }
 

@@ -127,6 +127,10 @@ VGMCollListView::VGMCollListView(QWidget *parent) : QListView(parent) {
     }
   });
   connect(selectionModel(), &QItemSelectionModel::selectionChanged, this, &VGMCollListView::onSelectionChanged);
+  connect(&qtVGMRoot, &QtVGMRoot::UI_beganRemovingVGMColls, this, [this]() {
+    // This is needed to prevent a noticeable performance hit when deleting rows.
+    clearSelection();
+  });
 }
 
 void VGMCollListView::collectionMenu(const QPoint &pos) const {
@@ -168,13 +172,13 @@ void VGMCollListView::keyPressEvent(QKeyEvent *e) {
         return;
 
       QModelIndexList list = selectionModel()->selectedRows();
+      clearSelection();
       pRoot->UI_beginRemoveVGMColls();
       for (auto & idx : std::ranges::reverse_view(list)) {
         qtVGMRoot.removeVGMColl(qtVGMRoot.vgmColls()[idx.row()]);
       }
       pRoot->UI_endRemoveVGMColls();
 
-      clearSelection();
       return;
     }
     default:
