@@ -147,11 +147,9 @@ bool VGMRoot::removeRawFile(size_t idx) {
 
   auto rawfile = m_rawfiles[idx];
   auto &vgmfiles = rawfile->containedVGMFiles();
-  UI_beginRemoveVGMColls();
   for (const auto & vgmfile : vgmfiles) {
     removeVGMFile(*vgmfile, false);
   }
-  UI_endRemoveVGMColls();
 
   UI_beginRemoveRawFiles(idx, idx);
   UI_removeRawFile(rawfile);
