@@ -152,10 +152,10 @@ bool VGMRoot::removeRawFile(size_t idx) {
     removeVGMFile(*vgmfile, false);
   }
 
-  UI_beginRemoveRawFiles();
+  pushRemoveRawFiles();
   UI_removeRawFile(rawfile);
   m_rawfiles.erase(m_rawfiles.begin() + static_cast<std::ptrdiff_t>(idx));
-  UI_endRemoveRawFiles();
+  popRemoveRawFiles();
 
   delete rawfile;
   return true;
@@ -192,10 +192,10 @@ void VGMRoot::removeVGMFile(size_t idx, bool bRemoveEmptyRawFile) {
     fmt->onCloseFile(file);
   }
 
-  UI_beginRemoveVGMFiles();
+  pushRemoveVGMFiles();
   UI_removeVGMFile(targFile);
   m_vgmfiles.erase(m_vgmfiles.begin() + static_cast<std::ptrdiff_t>(idx));
-  UI_endRemoveVGMFiles();
+  popRemoveVGMFiles();
 
   while (!targFile->assocColls.empty()) {
     removeVGMColl(targFile->assocColls.back());
@@ -228,7 +228,7 @@ void VGMRoot::removeVGMColl(size_t idx) {
   }
   auto coll = m_vgmcolls[idx];
 
-  UI_beginRemoveVGMColls();
+  pushRemoveVGMColls();
   auto iter = std::ranges::find(m_vgmcolls, coll);
   if (iter != m_vgmcolls.end())
     m_vgmcolls.erase(iter);
@@ -237,7 +237,7 @@ void VGMRoot::removeVGMColl(size_t idx) {
 
   coll->removeFileAssocs();
   UI_removeVGMColl(coll);
-  UI_endRemoveVGMColls();
+  popRemoveVGMColls();
   delete coll;
 }
 
@@ -246,38 +246,38 @@ void VGMRoot::removeVGMColl(VGMColl *coll) {
   removeVGMColl(iter - m_vgmcolls.begin());
 }
 
-void VGMRoot::UI_beginRemoveRawFiles() {
+void VGMRoot::pushRemoveRawFiles() {
   if (rawFileRemoveStack++ == 0)
-    this->UI_beganRemovingRawFiles();
+    this->UI_beginRemoveRawFiles();
 }
 
-void VGMRoot::UI_endRemoveRawFiles() {
+void VGMRoot::popRemoveRawFiles() {
   if (--rawFileRemoveStack == 0)
-    this->UI_endedRemovingRawFiles();
+    this->UI_endRemoveRawFiles();
 }
 
-void VGMRoot::UI_beginRemoveVGMFiles() {
+void VGMRoot::pushRemoveVGMFiles() {
   if (vgmFileRemoveStack++ == 0)
-    this->UI_beganRemovingVGMFiles();
+    this->UI_beginRemoveVGMFiles();
 }
 
-void VGMRoot::UI_endRemoveVGMFiles() {
+void VGMRoot::popRemoveVGMFiles() {
   if (--vgmFileRemoveStack == 0)
-    this->UI_endedRemovingVGMFiles();
+    this->UI_endRemoveVGMFiles();
 }
 
-void VGMRoot::UI_beginRemoveVGMColls() {
+void VGMRoot::pushRemoveVGMColls() {
   if (vgmCollRemoveStack++ == 0)
-    this->UI_beganRemovingVGMColls();
+    this->UI_beginRemoveVGMColls();
 }
 
-void VGMRoot::UI_endRemoveVGMColls() {
+void VGMRoot::popRemoveVGMColls() {
   if (--vgmCollRemoveStack == 0)
-    this->UI_endedRemovingVGMColls();
+    this->UI_endRemoveVGMColls();
 }
 
 void VGMRoot::removeAllFilesAndCollections() {
-  UI_beginRemoveAll();
+  pushRemoveAll();
 
   deleteVect(m_vgmcolls);
   for (auto variant : m_vgmfiles)
@@ -285,19 +285,19 @@ void VGMRoot::removeAllFilesAndCollections() {
   m_vgmfiles.clear();
   deleteVect(m_rawfiles);
 
-  UI_endRemoveAll();
+  popRemoveAll();
 }
 
-void VGMRoot::UI_beginRemoveAll() {
-  UI_beginRemoveRawFiles();
-  UI_beginRemoveVGMFiles();
-  UI_beginRemoveVGMColls();
+void VGMRoot::pushRemoveAll() {
+  pushRemoveRawFiles();
+  pushRemoveVGMFiles();
+  pushRemoveVGMColls();
 }
 
-void VGMRoot::UI_endRemoveAll() {
-  UI_endRemoveVGMColls();
-  UI_endRemoveVGMFiles();
-  UI_endRemoveRawFiles();
+void VGMRoot::popRemoveAll() {
+  popRemoveVGMColls();
+  popRemoveVGMFiles();
+  popRemoveRawFiles();
 }
 
 // This virtual function is called whenever a VGMFile is added to the interface.

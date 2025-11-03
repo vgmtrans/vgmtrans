@@ -26,8 +26,8 @@
 
 VGMFileListModel::VGMFileListModel(QObject *parent) : QAbstractTableModel(parent) {
   connect(&qtVGMRoot, &QtVGMRoot::UI_addedVGMFile, this, &VGMFileListModel::addedVGMFile);
-  connect(&qtVGMRoot, &QtVGMRoot::UI_beganRemovingVGMFiles, this, &VGMFileListModel::beganRemovingVGMFiles);
-  connect(&qtVGMRoot, &QtVGMRoot::UI_endedRemovingVGMFiles, this, &VGMFileListModel::endedRemovingVGMFiles);
+  connect(&qtVGMRoot, &QtVGMRoot::UI_beginRemoveVGMFiles, this, &VGMFileListModel::beganRemovingVGMFiles);
+  connect(&qtVGMRoot, &QtVGMRoot::UI_endRemoveVGMFiles, this, &VGMFileListModel::endedRemovingVGMFiles);
 }
 
 void VGMFileListModel::addedVGMFile() {
@@ -132,7 +132,7 @@ VGMFileListView::VGMFileListView(QWidget *parent) : TableView(parent) {
   connect(this, &QAbstractItemView::doubleClicked, this, &VGMFileListView::requestVGMFileView);
   connect(NotificationCenter::the(), &NotificationCenter::vgmFileSelected, this, &VGMFileListView::onVGMFileSelected);
   connect(selectionModel(), &QItemSelectionModel::selectionChanged, this, &VGMFileListView::onSelectionChanged);
-  connect(&qtVGMRoot, &QtVGMRoot::UI_beganRemovingVGMFiles, this, [this]() {
+  connect(&qtVGMRoot, &QtVGMRoot::UI_beginRemoveVGMFiles, this, [this]() {
     // QAbstractItemModel::beginRemoveRows(), which we must call to remove items, suffers a major
     // performance penalty if items are selected. While this could degrade UI behavior by deselecting
     // items that are not being removed (the removal could be triggered by closing a raw file, for

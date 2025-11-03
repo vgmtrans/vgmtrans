@@ -110,11 +110,11 @@ public:
     if (vgmfiles.size() == pRoot->vgmFiles().size()) {
       pRoot->removeAllFilesAndCollections();
     } else {
-      pRoot->UI_beginRemoveAll();
+      pRoot->pushRemoveAll();
       for (auto vgmfile : vgmfiles) {
         pRoot->removeVGMFile(vgmFileToVariant(vgmfile));
       }
-      pRoot->UI_endRemoveAll();
+      pRoot->popRemoveAll();
     }
   }
   [[nodiscard]] QList<QKeySequence> shortcutKeySequences() const override { return {Qt::Key_Backspace, Qt::Key_Delete}; };
@@ -132,11 +132,11 @@ public:
     if (rawfiles.size() == pRoot->rawFiles().size()) {
       pRoot->removeAllFilesAndCollections();
     } else {
-      pRoot->UI_beginRemoveAll();
+      pRoot->pushRemoveAll();
       for (auto rawfile : rawfiles) {
         pRoot->removeRawFile(rawfile);
       }
-      pRoot->UI_endRemoveAll();
+      pRoot->popRemoveAll();
     }
   }
   [[nodiscard]] QList<QKeySequence> shortcutKeySequences() const override { return {Qt::Key_Backspace, Qt::Key_Delete}; };
@@ -150,11 +150,11 @@ public:
 class CloseVGMCollCommand : public ItemListCommand<VGMColl> {
 public:
   void executeItems(std::vector<VGMColl*> vgmcolls) const override {
-    pRoot->UI_beginRemoveVGMColls();
+    pRoot->pushRemoveVGMColls();
     for (auto coll : vgmcolls) {
       pRoot->removeVGMColl(coll);
     }
-    pRoot->UI_endRemoveVGMColls();
+    pRoot->popRemoveVGMColls();
   }
   [[nodiscard]] QList<QKeySequence> shortcutKeySequences() const override { return {Qt::Key_Backspace, Qt::Key_Delete}; };
   [[nodiscard]] std::string name() const override { return "Remove"; }

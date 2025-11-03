@@ -27,8 +27,8 @@ static const QIcon& fileIcon() {
 
 RawFileListViewModel::RawFileListViewModel(QObject *parent) : QAbstractTableModel(parent) {
   connect(&qtVGMRoot, &QtVGMRoot::UI_addedRawFile, this, &RawFileListViewModel::addRawFile);
-  connect(&qtVGMRoot, &QtVGMRoot::UI_beganRemovingRawFiles, this, &RawFileListViewModel::beganRemovingRawFiles);
-  connect(&qtVGMRoot, &QtVGMRoot::UI_endedRemovingRawFiles, this, &RawFileListViewModel::endedRemovingRawFiles);
+  connect(&qtVGMRoot, &QtVGMRoot::UI_beginRemoveRawFiles, this, &RawFileListViewModel::beganRemovingRawFiles);
+  connect(&qtVGMRoot, &QtVGMRoot::UI_endRemoveRawFiles, this, &RawFileListViewModel::endedRemovingRawFiles);
 }
 
 void RawFileListViewModel::addRawFile() {
