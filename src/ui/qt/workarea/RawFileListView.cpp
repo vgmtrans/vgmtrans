@@ -27,7 +27,8 @@ static const QIcon& fileIcon() {
 
 RawFileListViewModel::RawFileListViewModel(QObject *parent) : QAbstractTableModel(parent) {
   connect(&qtVGMRoot, &QtVGMRoot::UI_addedRawFile, this, &RawFileListViewModel::addRawFile);
-  connect(&qtVGMRoot, &QtVGMRoot::UI_removedRawFile, this, &RawFileListViewModel::removeRawFile);
+  connect(&qtVGMRoot, &QtVGMRoot::UI_beganRemovingRawFiles, this, &RawFileListViewModel::beganRemovingRawFiles);
+  connect(&qtVGMRoot, &QtVGMRoot::UI_endedRemovingRawFiles, this, &RawFileListViewModel::endedRemovingRawFiles);
 }
 
 int RawFileListViewModel::rowCount(const QModelIndex &parent) const {
@@ -52,15 +53,12 @@ void RawFileListViewModel::addRawFile() {
   }
 }
 
-void RawFileListViewModel::removeRawFile() {
-  int position = static_cast<int>(qtVGMRoot.rawFiles().size()) - 1;
-  if (position >= 0) {
-    beginRemoveRows(QModelIndex(), position, position);
-    endRemoveRows();
-  } else {
-    // hack to refresh the view when deleting the last column
-    dataChanged(index(0, 0), index(0, 0));
-  }
+void RawFileListViewModel::beganRemovingRawFiles(int startIdx, int endIdx) {
+  beginRemoveRows(QModelIndex(), startIdx, endIdx);
+}
+
+void RawFileListViewModel::endedRemovingRawFiles() {
+  endRemoveRows();
 }
 
 QVariant RawFileListViewModel::headerData(int column, Qt::Orientation orientation, int role) const {

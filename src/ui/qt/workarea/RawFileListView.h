@@ -22,7 +22,8 @@ public:
 
 public slots:
   void addRawFile();
-  void removeRawFile();
+  void beganRemovingRawFiles(int startIdx, int endIdx);
+  void endedRemovingRawFiles();
 
 private:
   enum Property : uint8_t { Name = 0, ContainedFiles = 1 };
