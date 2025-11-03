@@ -45,12 +45,12 @@ void QtVGMRoot::UI_endRemoveRawFiles() {
   this->UI_endedRemovingRawFiles();
 }
 
-void QtVGMRoot::UI_onBeginLoadRawFile() {
+void QtVGMRoot::UI_beginLoadRawFile() {
   if (rawFileLoadRecurseStack++ == 0)
     this->UI_beganLoadingRawFile();
 }
 
-void QtVGMRoot::UI_onEndLoadRawFile() {
+void QtVGMRoot::UI_endLoadRawFile() {
   if (--rawFileLoadRecurseStack == 0)
     this->UI_endedLoadingRawFile();
 }

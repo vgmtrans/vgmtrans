@@ -219,7 +219,7 @@ TriAcePS1Seq *TriAcePS1Scanner::decompressTriAceSLZFile(RawFile *file, uint32_t 
 
   newVirtFile->setUseLoaders(false);
   newVirtFile->setUseScanners(false);
-  pRoot->setupNewRawFile(newVirtFile);
+  pRoot->loadRawFile(newVirtFile);
 
   if (bLoadSucceed)
     return newSeq;

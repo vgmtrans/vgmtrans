@@ -44,8 +44,8 @@ public:
   virtual bool openRawFile(const std::string &filePath);
   bool createVirtFile(const uint8_t* databuf, uint32_t fileSize, const std::string& filename,
                       const std::string& parRawFileFullPath = "", const VGMTag& tag = VGMTag());
-  bool setupNewRawFile(RawFile* newRawFile);
-  bool closeRawFile(RawFile *targFile);
+  bool loadRawFile(RawFile* newRawFile);
+  bool removeRawFile(RawFile *targFile);
   void addVGMFile(VGMFileVariant file);
   void removeVGMFile(VGMFileVariant file, bool bRemoveEmptyRawFile = true);
   void removeVGMFile(size_t idx, bool bRemoveEmptyRawFile = true);
@@ -60,8 +60,8 @@ public:
   virtual void UI_beginRemoveRawFiles(int startIdx, int endIdx) {}
   virtual void UI_endRemoveRawFiles() {}
 
-  virtual void UI_onBeginLoadRawFile() {}
-  virtual void UI_onEndLoadRawFile() {}
+  virtual void UI_beginLoadRawFile() {}
+  virtual void UI_endLoadRawFile() {}
   virtual void UI_addVGMFile(VGMFileVariant file);
   virtual void UI_addVGMSeq(VGMSeq *) {}
   virtual void UI_addVGMInstrSet(VGMInstrSet *) {}

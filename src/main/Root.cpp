@@ -62,7 +62,7 @@ bool VGMRoot::openRawFile(const std::string &filePath) {
     return false;
   }
   size_t vgmFileCountBefore = vgmFiles().size();
-  if (!setupNewRawFile(newFile)) {
+  if (!loadRawFile(newFile)) {
     delete newFile;
   }
   return vgmFiles().size() > vgmFileCountBefore;
@@ -76,7 +76,7 @@ bool VGMRoot::createVirtFile(const uint8_t *databuf, uint32_t fileSize, const st
   auto newVirtFile = new VirtFile(databuf, fileSize, filename,
     parRawFileFullPath, tag);
 
-  if (!setupNewRawFile(newVirtFile)) {
+  if (!loadRawFile(newVirtFile)) {
     delete newVirtFile;
     return false;
   }
@@ -85,8 +85,8 @@ bool VGMRoot::createVirtFile(const uint8_t *databuf, uint32_t fileSize, const st
 
 // Applies loaders and scanners to a rawfile, loading any discovered files
 // returns true if files were discovered
-bool VGMRoot::setupNewRawFile(RawFile *newRawFile) {
-  UI_onBeginLoadRawFile();
+bool VGMRoot::loadRawFile(RawFile *newRawFile) {
+  UI_beginLoadRawFile();
   if (newRawFile->useLoaders()) {
     for (const auto &l : LoaderManager::get().loaders()) {
       l->apply(newRawFile);
@@ -97,7 +97,7 @@ bool VGMRoot::setupNewRawFile(RawFile *newRawFile) {
         newRawFile->setUseScanners(false);
 
         for (const auto &file : res) {
-          if (!setupNewRawFile(file)) {
+          if (!loadRawFile(file)) {
             delete file;
           }
         }
@@ -135,11 +135,11 @@ bool VGMRoot::setupNewRawFile(RawFile *newRawFile) {
     UI_addRawFile(newRawFile);
   }
 
-  UI_onEndLoadRawFile();
+  UI_endLoadRawFile();
   return foundFiles;
 }
 
-bool VGMRoot::closeRawFile(RawFile *targFile) {
+bool VGMRoot::removeRawFile(RawFile *targFile) {
   if (!targFile) {
     return false;
   }
@@ -205,7 +205,7 @@ void VGMRoot::removeVGMFile(size_t idx, bool bRemoveEmptyRawFile) {
     const auto rawFile = targFile->rawFile();
     rawFile->removeContainedVGMFile(file);
     if (rawFile->containedVGMFiles().empty()) {
-      closeRawFile(rawFile);
+      removeRawFile(rawFile);
     }
   }
   delete targFile;

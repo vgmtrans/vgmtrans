@@ -20,8 +20,8 @@ public:
   void UI_addRawFile(RawFile* newFile) override;
   void UI_removeRawFile(RawFile* targFile) override;
 
-  void UI_onBeginLoadRawFile() override;
-  void UI_onEndLoadRawFile() override;
+  void UI_beginLoadRawFile() override;
+  void UI_endLoadRawFile() override;
   void UI_addVGMFile(VGMFileVariant file) override;
   void UI_addVGMSeq(VGMSeq* theSeq) override;
   void UI_addVGMInstrSet(VGMInstrSet* theInstrSet) override;
