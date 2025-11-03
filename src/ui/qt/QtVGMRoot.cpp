@@ -83,8 +83,8 @@ void QtVGMRoot::UI_endRemoveVGMFiles() {
   this->UI_endedRemovingVGMFiles();
 }
 
-void QtVGMRoot::UI_beginRemoveVGMColls() {
-  this->UI_beganRemovingVGMColls();
+void QtVGMRoot::UI_beginRemoveVGMColls(int startIdx, int endIdx) {
+  this->UI_beganRemovingVGMColls(startIdx, endIdx);
 }
 
 void QtVGMRoot::UI_endRemoveVGMColls() {

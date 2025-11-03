@@ -48,9 +48,10 @@ public:
   bool removeRawFile(size_t idx);
   bool removeRawFile(RawFile *targFile);
   void addVGMFile(VGMFileVariant file);
-  void removeVGMFile(VGMFileVariant file, bool bRemoveEmptyRawFile = true);
   void removeVGMFile(size_t idx, bool bRemoveEmptyRawFile = true);
+  void removeVGMFile(VGMFileVariant file, bool bRemoveEmptyRawFile = true);
   void addVGMColl(VGMColl *theColl);
+  void removeVGMColl(size_t idx);
   void removeVGMColl(VGMColl *theFile);
   void log(LogItem *theLog);
 
@@ -72,7 +73,7 @@ public:
   virtual void UI_beginRemoveVGMFiles(int startIdx, int endIdx) {}
   virtual void UI_endRemoveVGMFiles() {}
   virtual void UI_removeVGMColl(VGMColl *) {}
-  virtual void UI_beginRemoveVGMColls() {}
+  virtual void UI_beginRemoveVGMColls(int startIdx, int endIdx) {}
   virtual void UI_endRemoveVGMColls() {}
   virtual void UI_addItem(VGMItem *, VGMItem *, const std::string &, void *) {}
   virtual std::string UI_getSaveFilePath(const std::string &suggestedFilename,

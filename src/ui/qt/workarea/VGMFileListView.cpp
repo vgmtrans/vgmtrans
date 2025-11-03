@@ -30,6 +30,22 @@ VGMFileListModel::VGMFileListModel(QObject *parent) : QAbstractTableModel(parent
   connect(&qtVGMRoot, &QtVGMRoot::UI_endedRemovingVGMFiles, this, &VGMFileListModel::endedRemovingVGMFiles);
 }
 
+void VGMFileListModel::addedVGMFile() {
+  int position = static_cast<int>(qtVGMRoot.vgmFiles().size()) - 1;
+  if (position >= 0) {
+    beginInsertRows(QModelIndex(), position, position);
+    endInsertRows();
+  }
+}
+
+void VGMFileListModel::beganRemovingVGMFiles(int startIdx, int endIdx) {
+  beginRemoveRows(QModelIndex(), startIdx, endIdx);
+}
+
+void VGMFileListModel::endedRemovingVGMFiles() {
+  endRemoveRows();
+}
+
 QVariant VGMFileListModel::data(const QModelIndex &index, int role) const {
   if (!index.isValid()) {
     return QVariant();
@@ -96,22 +112,6 @@ int VGMFileListModel::columnCount(const QModelIndex &parent) const {
   }
 
   return 2;
-}
-
-void VGMFileListModel::addedVGMFile() {
-  int position = static_cast<int>(qtVGMRoot.vgmFiles().size()) - 1;
-  if (position >= 0) {
-    beginInsertRows(QModelIndex(), position, position);
-    endInsertRows();
-  }
-}
-
-void VGMFileListModel::beganRemovingVGMFiles(int startIdx, int endIdx) {
-  beginRemoveRows(QModelIndex(), startIdx, endIdx);
-}
-
-void VGMFileListModel::endedRemovingVGMFiles() {
-  endRemoveRows();
 }
 
 /*
@@ -190,28 +190,6 @@ void VGMFileListView::keyPressEvent(QKeyEvent *input) {
       if (currentIndex().isValid())
         requestVGMFileView(currentIndex());
       break;
-    case Qt::Key_Delete:
-    case Qt::Key_Backspace: {
-      if (!selectionModel()->hasSelection())
-        return;
-
-      QModelIndexList list = selectionModel()->selectedRows();
-      clearSelection();
-
-      // If all items are selected, it's more performant to close every RawFile: doing so skips
-      // finding and removing each VGMFile from its parent RawFile's list of contained files.
-      if (list.size() == qtVGMRoot.vgmFiles().size()) {
-        auto rawFiles = qtVGMRoot.rawFiles();
-        for (const auto rawFile : rawFiles) {
-          qtVGMRoot.removeRawFile(rawFile);
-        }
-      } else {
-        for (auto & idx : std::ranges::reverse_view(list)) {
-          qtVGMRoot.removeVGMFile(idx.row(), true);
-        }
-      }
-      return;
-    }
 
     // Pass the event back to the base class, needed for keyboard navigation
     default:

@@ -107,6 +107,24 @@ public:
  */
 class CloseVGMFileCommand : public ItemListCommand<VGMFile> {
 public:
+  void execute(CommandContext& context) override {
+    auto& vgmContext = dynamic_cast<ItemListCommandContext<VGMFile>&>(context);
+    const auto& vgmfiles = vgmContext.items();
+
+    // If all items are selected, it's more performant to close every RawFile. Doing so skips
+    // finding and removing each VGMFile from its parent RawFile's list of contained files.
+    if (vgmfiles.size() == pRoot->vgmFiles().size()) {
+      auto& rawfiles = pRoot->rawFiles();
+      for (auto rawfile : rawfiles) {
+        pRoot->removeRawFile(rawfile);
+      }
+    } else {
+      for (auto vgmfile : vgmfiles) {
+        pRoot->removeVGMFile(vgmFileToVariant(vgmfile));
+      }
+    }
+  }
+
   void executeItem(VGMFile* file) const override {
     pRoot->removeVGMFile(vgmFileToVariant(file));
   }

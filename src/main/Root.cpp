@@ -169,8 +169,7 @@ bool VGMRoot::removeRawFile(RawFile *targFile) {
   return removeRawFile(iter - m_rawfiles.begin());
 }
 
-void VGMRoot::addVGMFile(
-  std::variant<VGMSeq *, VGMInstrSet *, VGMSampColl *, VGMMiscFile *> file) {
+void VGMRoot::addVGMFile(std::variant<VGMSeq *, VGMInstrSet *, VGMSampColl *, VGMMiscFile *> file) {
   m_vgmfiles.push_back(file);
   L_INFO("Loaded {} successfully.", variantToVGMFile(file)->name());
   UI_addVGMFile(file);
@@ -217,22 +216,29 @@ void VGMRoot::removeVGMFile(std::variant<VGMSeq *, VGMInstrSet *, VGMSampColl *,
 }
 
 void VGMRoot::addVGMColl(VGMColl *theColl) {
-    m_vgmcolls.push_back(theColl);
-    UI_addVGMColl(theColl);
+  m_vgmcolls.push_back(theColl);
+  UI_addVGMColl(theColl);
 }
 
-void VGMRoot::removeVGMColl(VGMColl *targColl) {
-  UI_beginRemoveVGMColls();
-  auto iter = std::ranges::find(m_vgmcolls, targColl);
+void VGMRoot::removeVGMColl(size_t idx) {
+  auto coll = m_vgmcolls[idx];
+
+  UI_beginRemoveVGMColls(idx, idx);
+  auto iter = std::ranges::find(m_vgmcolls, coll);
   if (iter != m_vgmcolls.end())
     m_vgmcolls.erase(iter);
   else
     L_WARN("Requested deletion for VGMColl but it was not found");
 
-  targColl->removeFileAssocs();
-  UI_removeVGMColl(targColl);
+  coll->removeFileAssocs();
+  UI_removeVGMColl(coll);
   UI_endRemoveVGMColls();
-  delete targColl;
+  delete coll;
+}
+
+void VGMRoot::removeVGMColl(VGMColl *coll) {
+  auto iter = std::ranges::find(m_vgmcolls, coll);
+  removeVGMColl(iter - m_vgmcolls.begin());
 }
 
 // This virtual function is called whenever a VGMFile is added to the interface.
