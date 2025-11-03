@@ -246,6 +246,30 @@ void VGMRoot::removeVGMColl(VGMColl *coll) {
   removeVGMColl(iter - m_vgmcolls.begin());
 }
 
+void VGMRoot::removeAllFilesAndCollections() {
+  pushRemoveAll();
+
+  for (auto vgmcoll : m_vgmcolls)
+    UI_removeVGMColl(vgmcoll);
+  deleteVect(m_vgmcolls);
+
+  for (auto variant : m_vgmfiles) {
+    auto vgmfile = variantToVGMFile(variant);
+    if (Format *fmt = vgmfile->format()) {
+      fmt->onCloseFile(variant);
+    }
+    UI_removeVGMFile(vgmfile);
+    delete variantToVGMFile(variant);
+  }
+  m_vgmfiles.clear();
+
+  for (auto rawfile: m_rawfiles)
+    UI_removeRawFile(rawfile);
+  deleteVect(m_rawfiles);
+
+  popRemoveAll();
+}
+
 void VGMRoot::pushRemoveRawFiles() {
   if (rawFileRemoveStack++ == 0)
     this->UI_beginRemoveRawFiles();
@@ -274,30 +298,6 @@ void VGMRoot::pushRemoveVGMColls() {
 void VGMRoot::popRemoveVGMColls() {
   if (--vgmCollRemoveStack == 0)
     this->UI_endRemoveVGMColls();
-}
-
-void VGMRoot::removeAllFilesAndCollections() {
-  pushRemoveAll();
-
-  for (auto vgmcoll : m_vgmcolls)
-    UI_removeVGMColl(vgmcoll);
-  deleteVect(m_vgmcolls);
-
-  for (auto variant : m_vgmfiles) {
-    auto vgmfile = variantToVGMFile(variant);
-    if (Format *fmt = vgmfile->format()) {
-      fmt->onCloseFile(variant);
-    }
-    UI_removeVGMFile(vgmfile);
-    delete variantToVGMFile(variant);
-  }
-  m_vgmfiles.clear();
-
-  for (auto rawfile: m_rawfiles)
-    UI_removeRawFile(rawfile);
-  deleteVect(m_rawfiles);
-
-  popRemoveAll();
 }
 
 void VGMRoot::pushRemoveAll() {
