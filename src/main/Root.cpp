@@ -221,6 +221,10 @@ void VGMRoot::addVGMColl(VGMColl *theColl) {
 }
 
 void VGMRoot::removeVGMColl(size_t idx) {
+  if (idx >= m_vgmcolls.size()) {
+    L_WARN("Requested deletion of VGMColl with invalid index");
+    return;
+  }
   auto coll = m_vgmcolls[idx];
 
   UI_beginRemoveVGMColls(idx, idx);

@@ -115,8 +115,8 @@ public:
     // finding and removing each VGMFile from its parent RawFile's list of contained files.
     if (vgmfiles.size() == pRoot->vgmFiles().size()) {
       auto& rawfiles = pRoot->rawFiles();
-      for (auto rawfile : rawfiles) {
-        pRoot->removeRawFile(rawfile);
+      while (!rawfiles.empty()) {
+        pRoot->removeRawFile(rawfiles.back());
       }
     } else {
       for (auto vgmfile : vgmfiles) {
