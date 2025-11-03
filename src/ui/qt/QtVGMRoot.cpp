@@ -29,7 +29,7 @@ void QtVGMRoot::UI_setRootPtr(VGMRoot** theRoot) {
   *theRoot = &qtVGMRoot;
 }
 
-void QtVGMRoot::UI_addRawFile(RawFile*) {
+void QtVGMRoot::UI_loadRawFile(RawFile*) {
   this->UI_addedRawFile();
 }
 

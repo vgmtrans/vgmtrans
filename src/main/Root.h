@@ -56,11 +56,7 @@ public:
 
   virtual std::string UI_getResourceDirPath();
   virtual void UI_setRootPtr(VGMRoot **theRoot) = 0;
-  virtual void UI_addRawFile(RawFile *) {}
-  virtual void UI_removeRawFile(RawFile *) {}
-  virtual void UI_beginRemoveRawFiles(int startIdx, int endIdx) {}
-  virtual void UI_endRemoveRawFiles() {}
-
+  virtual void UI_loadRawFile(RawFile *) {}
   virtual void UI_beginLoadRawFile() {}
   virtual void UI_endLoadRawFile() {}
   virtual void UI_addVGMFile(VGMFileVariant file);
@@ -69,13 +65,12 @@ public:
   virtual void UI_addVGMSampColl(VGMSampColl *) {}
   virtual void UI_addVGMMisc(VGMMiscFile *) {}
   virtual void UI_addVGMColl(VGMColl *) {}
+  virtual void UI_removeRawFile(RawFile *) {}
+  virtual void UI_beginRemoveRawFiles(int startIdx, int endIdx) {}
+  virtual void UI_endRemoveRawFiles() {}
   virtual void UI_removeVGMFile(VGMFile *) {}
   virtual void UI_beginRemoveVGMFiles(int startIdx, int endIdx) {}
   virtual void UI_endRemoveVGMFiles() {}
-  virtual void UI_log(LogItem *) { }
-  virtual void UI_toast(const std::string& message, ToastType type = ToastType::Info,
-                        int duration_ms = DEFAULT_TOAST_DURATION) {}
-
   virtual void UI_removeVGMColl(VGMColl *) {}
   virtual void UI_beginRemoveVGMColls() {}
   virtual void UI_endRemoveVGMColls() {}
@@ -84,6 +79,10 @@ public:
                                          const std::string &extension = "") = 0;
   virtual std::string UI_getSaveDirPath(const std::string &suggestedDir = "") = 0;
   virtual bool UI_writeBufferToFile(const std::string &filepath, uint8_t *buf, size_t size);
+
+  virtual void UI_log(LogItem *) { }
+  virtual void UI_toast(const std::string& message, ToastType type = ToastType::Info,
+                        int duration_ms = DEFAULT_TOAST_DURATION) {}
 
   const std::vector<RawFile*>& rawFiles() { return m_rawfiles; }
   const std::vector<VGMFileVariant>& vgmFiles() { return m_vgmfiles; }
