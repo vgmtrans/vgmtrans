@@ -22,7 +22,7 @@ public:
 
 public slots:
   void addRawFile();
-  void beganRemovingRawFiles(int startIdx, int endIdx);
+  void beganRemovingRawFiles();
   void endedRemovingRawFiles();
 
 private:
