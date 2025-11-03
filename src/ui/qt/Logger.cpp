@@ -23,7 +23,8 @@
 
 namespace {
 
-constexpr int kFlushIntervalMs = 500;
+constexpr int FLUSH_INTERVAL_MS = 500;
+constexpr int FLUSH_MESSAGE_THRESHOLD = 5000;
 
 QString levelPrefix(LogLevel level) {
   switch (level) {
@@ -143,7 +144,13 @@ void Logger::push(const LogItem *item) {
   message.append(QString::fromStdString(item->text()));
 
   m_pendingMessages.append({message, item->logLevel()});
-  m_flushTimer->start(kFlushIntervalMs);
+
+  if (m_pendingMessages.size() >= FLUSH_MESSAGE_THRESHOLD) {
+    flushPending();
+    return;
+  }
+
+  m_flushTimer->start(FLUSH_INTERVAL_MS);
 }
 
 void Logger::flushPending() {
