@@ -33,8 +33,16 @@ void QtVGMRoot::UI_addRawFile(RawFile*) {
   this->UI_addedRawFile();
 }
 
-void QtVGMRoot::UI_closeRawFile(RawFile*) {
+void QtVGMRoot::UI_removeRawFile(RawFile*) {
   this->UI_removedRawFile();
+}
+
+void QtVGMRoot::UI_beginRemoveRawFiles(int startIdx, int endIdx) {
+  this->UI_beganRemovingRawFiles(startIdx, endIdx);
+}
+
+void QtVGMRoot::UI_endRemoveRawFiles() {
+  this->UI_endedRemovingRawFiles();
 }
 
 void QtVGMRoot::UI_onBeginLoadRawFile() {

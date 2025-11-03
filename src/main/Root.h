@@ -56,7 +56,9 @@ public:
   virtual std::string UI_getResourceDirPath();
   virtual void UI_setRootPtr(VGMRoot **theRoot) = 0;
   virtual void UI_addRawFile(RawFile *) {}
-  virtual void UI_closeRawFile(RawFile *) {}
+  virtual void UI_removeRawFile(RawFile *) {}
+  virtual void UI_beginRemoveRawFiles(int startIdx, int endIdx) {}
+  virtual void UI_endRemoveRawFiles() {}
 
   virtual void UI_onBeginLoadRawFile() {}
   virtual void UI_onEndLoadRawFile() {}

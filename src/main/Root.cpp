@@ -145,15 +145,17 @@ bool VGMRoot::closeRawFile(RawFile *targFile) {
   }
 
   auto file = std::ranges::find(m_rawfiles, targFile);
+  auto idx = file - m_rawfiles.begin();
   if (file != m_rawfiles.end()) {
     auto &vgmfiles = (*file)->containedVGMFiles();
     for (const auto & vgmfile : vgmfiles) {
       removeVGMFile(*vgmfile, false);
     }
 
+    UI_beginRemoveRawFiles(idx, idx);
+    UI_removeRawFile(targFile);
     m_rawfiles.erase(file);
-
-    UI_closeRawFile(targFile);
+    UI_endRemoveRawFiles();
   } else {
     L_WARN("Requested deletion for RawFile but it was not found");
     return false;

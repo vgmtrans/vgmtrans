@@ -18,7 +18,7 @@ public:
   std::string UI_getResourceDirPath() override;
   void UI_setRootPtr(VGMRoot** theRoot) override;
   void UI_addRawFile(RawFile* newFile) override;
-  void UI_closeRawFile(RawFile* targFile) override;
+  void UI_removeRawFile(RawFile* targFile) override;
 
   void UI_onBeginLoadRawFile() override;
   void UI_onEndLoadRawFile() override;
@@ -28,6 +28,8 @@ public:
   void UI_addVGMSampColl(VGMSampColl* theSampColl) override;
   void UI_addVGMMisc(VGMMiscFile* theMiscFile) override;
   void UI_addVGMColl(VGMColl* theColl) override;
+  void UI_beginRemoveRawFiles(int startIdx, int endIdx) override;
+  void UI_endRemoveRawFiles() override;
   void UI_beginRemoveVGMFiles(int startIdx, int endIdx) override;
   void UI_endRemoveVGMFiles() override;
   void UI_beginRemoveVGMColls() override;
@@ -45,6 +47,8 @@ private:
 signals:
   void UI_beganLoadingRawFile();
   void UI_endedLoadingRawFile();
+  void UI_beganRemovingRawFiles(int startIdx, int endIdx);
+  void UI_endedRemovingRawFiles();
   void UI_beganRemovingVGMFiles(int startIdx, int endIdx);
   void UI_endedRemovingVGMFiles();
   void UI_beganRemovingVGMColls();
