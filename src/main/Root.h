@@ -79,12 +79,12 @@ public:
   void UI_beginRemoveVGMColls();
   void UI_endRemoveVGMColls();
 
-  virtual void UI_beganRemovingRawFiles() {};
-  virtual void UI_endedRemovingRawFiles() {};
-  virtual void UI_beganRemovingVGMFiles() {};
-  virtual void UI_endedRemovingVGMFiles() {};
-  virtual void UI_beganRemovingVGMColls() {};
-  virtual void UI_endedRemovingVGMColls() {};
+  virtual void UI_beganRemovingRawFiles() {}
+  virtual void UI_endedRemovingRawFiles() {}
+  virtual void UI_beganRemovingVGMFiles() {}
+  virtual void UI_endedRemovingVGMFiles() {}
+  virtual void UI_beganRemovingVGMColls() {}
+  virtual void UI_endedRemovingVGMColls() {}
 
   void UI_beginRemoveAll();
   void UI_endRemoveAll();
