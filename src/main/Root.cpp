@@ -279,10 +279,19 @@ void VGMRoot::popRemoveVGMColls() {
 void VGMRoot::removeAllFilesAndCollections() {
   pushRemoveAll();
 
+  for (auto vgmcoll : m_vgmcolls)
+    UI_removeVGMColl(vgmcoll);
   deleteVect(m_vgmcolls);
-  for (auto variant : m_vgmfiles)
+
+  for (auto variant : m_vgmfiles) {
+    auto vgmfile = variantToVGMFile(variant);
+    UI_removeVGMFile(vgmfile);
     delete variantToVGMFile(variant);
+  }
   m_vgmfiles.clear();
+
+  for (auto rawfile: m_rawfiles)
+    UI_removeRawFile(rawfile);
   deleteVect(m_rawfiles);
 
   popRemoveAll();
