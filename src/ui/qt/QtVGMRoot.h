@@ -42,12 +42,12 @@ private:
 signals:
   void UI_beganLoadingRawFile();
   void UI_endedLoadingRawFile();
-  void UI_beganRemovingRawFiles() override;
-  void UI_endedRemovingRawFiles() override;
-  void UI_beganRemovingVGMFiles() override;
-  void UI_endedRemovingVGMFiles() override;
-  void UI_beganRemovingVGMColls() override;
-  void UI_endedRemovingVGMColls() override;
+  void UI_beginRemoveRawFiles() override;
+  void UI_endRemoveRawFiles() override;
+  void UI_beginRemoveVGMFiles() override;
+  void UI_endRemoveVGMFiles() override;
+  void UI_beginRemoveVGMColls() override;
+  void UI_endRemoveVGMColls() override;
   void UI_addedRawFile();
   void UI_removedRawFile();
   void UI_addedVGMFile();

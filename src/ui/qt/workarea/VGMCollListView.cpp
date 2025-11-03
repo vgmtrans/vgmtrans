@@ -24,8 +24,8 @@ static const QIcon &VGMCollIcon() {
  */
 VGMCollListViewModel::VGMCollListViewModel(QObject *parent) : QAbstractListModel(parent) {
   connect(&qtVGMRoot, &QtVGMRoot::UI_addedVGMColl, this, &VGMCollListViewModel::addedVGMColl);
-  connect(&qtVGMRoot, &QtVGMRoot::UI_beganRemovingVGMColls, this, &VGMCollListViewModel::beganRemovingVGMColls);
-  connect(&qtVGMRoot, &QtVGMRoot::UI_endedRemovingVGMColls, this, &VGMCollListViewModel::endedRemovingVGMColls);
+  connect(&qtVGMRoot, &QtVGMRoot::UI_beginRemoveVGMColls, this, &VGMCollListViewModel::beganRemovingVGMColls);
+  connect(&qtVGMRoot, &QtVGMRoot::UI_endRemoveVGMColls, this, &VGMCollListViewModel::endedRemovingVGMColls);
 }
 
 void VGMCollListViewModel::addedVGMColl() {
@@ -115,7 +115,7 @@ VGMCollListView::VGMCollListView(QWidget *parent) : QListView(parent) {
     }
   });
   connect(selectionModel(), &QItemSelectionModel::selectionChanged, this, &VGMCollListView::onSelectionChanged);
-  connect(&qtVGMRoot, &QtVGMRoot::UI_beganRemovingVGMColls, this, [this]() {
+  connect(&qtVGMRoot, &QtVGMRoot::UI_beginRemoveVGMColls, this, [this]() {
     // This is needed to prevent a noticeable performance hit when deleting rows.
     clearSelection();
   });

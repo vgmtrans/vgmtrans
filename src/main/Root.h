@@ -55,6 +55,15 @@ public:
   void removeVGMColl(VGMColl *theFile);
   void removeAllFilesAndCollections();
 
+  void pushRemoveRawFiles();
+  void popRemoveRawFiles();
+  void pushRemoveVGMFiles();
+  void popRemoveVGMFiles();
+  void pushRemoveVGMColls();
+  void popRemoveVGMColls();
+  void pushRemoveAll();
+  void popRemoveAll();
+
   void log(LogItem *theLog);
 
   virtual std::string UI_getResourceDirPath();
@@ -72,22 +81,13 @@ public:
   virtual void UI_removeVGMFile(VGMFile *) {}
   virtual void UI_removeVGMColl(VGMColl *) {}
 
-  void UI_beginRemoveRawFiles();
-  void UI_endRemoveRawFiles();
-  void UI_beginRemoveVGMFiles();
-  void UI_endRemoveVGMFiles();
-  void UI_beginRemoveVGMColls();
-  void UI_endRemoveVGMColls();
+  virtual void UI_beginRemoveRawFiles() {}
+  virtual void UI_endRemoveRawFiles() {}
+  virtual void UI_beginRemoveVGMFiles() {}
+  virtual void UI_endRemoveVGMFiles() {}
+  virtual void UI_beginRemoveVGMColls() {}
+  virtual void UI_endRemoveVGMColls() {}
 
-  virtual void UI_beganRemovingRawFiles() {}
-  virtual void UI_endedRemovingRawFiles() {}
-  virtual void UI_beganRemovingVGMFiles() {}
-  virtual void UI_endedRemovingVGMFiles() {}
-  virtual void UI_beganRemovingVGMColls() {}
-  virtual void UI_endedRemovingVGMColls() {}
-
-  void UI_beginRemoveAll();
-  void UI_endRemoveAll();
   virtual void UI_addItem(VGMItem *, VGMItem *, const std::string &, void *) {}
   virtual std::string UI_getSaveFilePath(const std::string &suggestedFilename,
                                          const std::string &extension = "") = 0;
