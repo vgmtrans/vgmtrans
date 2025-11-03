@@ -28,12 +28,7 @@ public:
   void UI_addVGMSampColl(VGMSampColl* theSampColl) override;
   void UI_addVGMMisc(VGMMiscFile* theMiscFile) override;
   void UI_addVGMColl(VGMColl* theColl) override;
-  void UI_beginRemoveRawFiles() override;
-  void UI_endRemoveRawFiles() override;
-  void UI_beginRemoveVGMFiles() override;
-  void UI_endRemoveVGMFiles() override;
-  void UI_beginRemoveVGMColls() override;
-  void UI_endRemoveVGMColls() override;
+
   void UI_toast(const std::string& message, ToastType type, int duration_ms = DEFAULT_TOAST_DURATION) override;
   void UI_addItem(VGMItem* item, VGMItem* parent, const std::string& itemName,
                   void* UI_specific) override;
@@ -43,18 +38,16 @@ public:
 
 private:
   int rawFileLoadRecurseStack = 0;
-  int vgmFileRemoveStack = 0;
-  int vgmCollRemoveStack = 0;
 
 signals:
   void UI_beganLoadingRawFile();
   void UI_endedLoadingRawFile();
-  void UI_beganRemovingRawFiles();
-  void UI_endedRemovingRawFiles();
-  void UI_beganRemovingVGMFiles();
-  void UI_endedRemovingVGMFiles();
-  void UI_beganRemovingVGMColls();
-  void UI_endedRemovingVGMColls();
+  void UI_beganRemovingRawFiles() override;
+  void UI_endedRemovingRawFiles() override;
+  void UI_beganRemovingVGMFiles() override;
+  void UI_endedRemovingVGMFiles() override;
+  void UI_beganRemovingVGMColls() override;
+  void UI_endedRemovingVGMColls() override;
   void UI_addedRawFile();
   void UI_removedRawFile();
   void UI_addedVGMFile();

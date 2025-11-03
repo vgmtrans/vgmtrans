@@ -246,6 +246,36 @@ void VGMRoot::removeVGMColl(VGMColl *coll) {
   removeVGMColl(iter - m_vgmcolls.begin());
 }
 
+void VGMRoot::UI_beginRemoveRawFiles() {
+  if (rawFileRemoveStack++ == 0)
+    this->UI_beganRemovingRawFiles();
+}
+
+void VGMRoot::UI_endRemoveRawFiles() {
+  if (--rawFileRemoveStack == 0)
+    this->UI_endedRemovingRawFiles();
+}
+
+void VGMRoot::UI_beginRemoveVGMFiles() {
+  if (vgmFileRemoveStack++ == 0)
+    this->UI_beganRemovingVGMFiles();
+}
+
+void VGMRoot::UI_endRemoveVGMFiles() {
+  if (--vgmFileRemoveStack == 0)
+    this->UI_endedRemovingVGMFiles();
+}
+
+void VGMRoot::UI_beginRemoveVGMColls() {
+  if (vgmCollRemoveStack++ == 0)
+    this->UI_beganRemovingVGMColls();
+}
+
+void VGMRoot::UI_endRemoveVGMColls() {
+  if (--vgmCollRemoveStack == 0)
+    this->UI_endedRemovingVGMColls();
+}
+
 void VGMRoot::removeAllFilesAndCollections() {
   UI_beginRemoveAll();
 

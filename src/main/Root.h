@@ -69,14 +69,23 @@ public:
   virtual void UI_addVGMMisc(VGMMiscFile *) {}
   virtual void UI_addVGMColl(VGMColl *) {}
   virtual void UI_removeRawFile(RawFile *) {}
-  virtual void UI_beginRemoveRawFiles() {}
-  virtual void UI_endRemoveRawFiles() {}
   virtual void UI_removeVGMFile(VGMFile *) {}
-  virtual void UI_beginRemoveVGMFiles() {}
-  virtual void UI_endRemoveVGMFiles() {}
   virtual void UI_removeVGMColl(VGMColl *) {}
-  virtual void UI_beginRemoveVGMColls() {}
-  virtual void UI_endRemoveVGMColls() {}
+
+  void UI_beginRemoveRawFiles();
+  void UI_endRemoveRawFiles();
+  void UI_beginRemoveVGMFiles();
+  void UI_endRemoveVGMFiles();
+  void UI_beginRemoveVGMColls();
+  void UI_endRemoveVGMColls();
+
+  virtual void UI_beganRemovingRawFiles() {};
+  virtual void UI_endedRemovingRawFiles() {};
+  virtual void UI_beganRemovingVGMFiles() {};
+  virtual void UI_endedRemovingVGMFiles() {};
+  virtual void UI_beganRemovingVGMColls() {};
+  virtual void UI_endedRemovingVGMColls() {};
+
   void UI_beginRemoveAll();
   void UI_endRemoveAll();
   virtual void UI_addItem(VGMItem *, VGMItem *, const std::string &, void *) {}
@@ -94,6 +103,10 @@ public:
   const std::vector<VGMColl*>& vgmColls() { return m_vgmcolls; }
 
 private:
+  int rawFileRemoveStack = 0;
+  int vgmFileRemoveStack = 0;
+  int vgmCollRemoveStack = 0;
+
   std::vector<RawFile *> m_rawfiles;
   std::vector<VGMFileVariant> m_vgmfiles;
   std::vector<VGMColl *> m_vgmcolls;
