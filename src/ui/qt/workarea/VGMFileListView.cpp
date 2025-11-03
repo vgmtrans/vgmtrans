@@ -134,7 +134,7 @@ VGMFileListView::VGMFileListView(QWidget *parent) : TableView(parent) {
   connect(selectionModel(), &QItemSelectionModel::selectionChanged, this, &VGMFileListView::onSelectionChanged);
   connect(&qtVGMRoot, &QtVGMRoot::UI_beganRemovingVGMFiles, this, [this]() {
     // QAbstractItemModel::beginRemoveRows(), which we must call to remove items, suffers a major
-    // perf penalty if items are selected. While this could degrade UI behavior by deselecting
+    // performance penalty if items are selected. While this could degrade UI behavior by deselecting
     // items that are not being removed (the removal could be triggered by closing a raw file, for
     // instance), the performance hit and unlikeliness make this a worthwhile tradeoff.
     clearSelection();
