@@ -115,10 +115,6 @@ VGMCollListView::VGMCollListView(QWidget *parent) : QListView(parent) {
     }
   });
   connect(selectionModel(), &QItemSelectionModel::selectionChanged, this, &VGMCollListView::onSelectionChanged);
-  connect(&qtVGMRoot, &QtVGMRoot::UI_beginRemoveVGMColls, this, [this]() {
-    // This is needed to prevent a noticeable performance hit when deleting rows.
-    clearSelection();
-  });
 }
 
 void VGMCollListView::collectionMenu(const QPoint &pos) const {
