@@ -43,14 +43,7 @@ set(BUILD_SHARED_LIBS OFF CACHE BOOL "[unarr] Build libunarr as a shared library
 set(USE_SYSTEM_ZLIB   OFF CACHE BOOL "[unarr] Build with system zlib if possible"  FORCE)
 add_subdirectory("${PROJECT_SOURCE_DIR}/lib/unarr" "${CMAKE_BINARY_DIR}/lib/unarr" EXCLUDE_FROM_ALL)
 
-# Add libchdr
-if (ZLIB_FOUND)
-  set(WITH_SYSTEM_ZLIB ON  CACHE BOOL "[libchdr] Use system provided zlib library" FORCE)
-else()
-  # triggers our vendored zlibstatic path instead of libchdr's vendored zlib
-  set(WITH_SYSTEM_ZLIB OFF CACHE BOOL "[libchdr] Use system provided zlib library" FORCE)
-endif()
-add_subdirectory("${PROJECT_SOURCE_DIR}/lib/libchdr" "${CMAKE_BINARY_DIR}/lib/libchdr" EXCLUDE_FROM_ALL)
+# We would normally add libchdr here but for  the need of the hack explained in ../CMakeLists.txt
 
 file(GLOB_RECURSE MAIN_FILES "${PROJECT_SOURCE_DIR}/src/main/*.cpp"
      "${PROJECT_SOURCE_DIR}/src/main/*.h")
