@@ -23,33 +23,21 @@ static const QIcon &VGMCollIcon() {
  * VGMCollListViewModel
  */
 VGMCollListViewModel::VGMCollListViewModel(QObject *parent) : QAbstractListModel(parent) {
-  auto startResettingModel = [this]() {
-    resettingModel = true;
-    beginResetModel();
-  };
+  connect(&qtVGMRoot, &QtVGMRoot::UI_addedVGMColl, this, &VGMCollListViewModel::addedVGMColl);
+  connect(&qtVGMRoot, &QtVGMRoot::UI_beganRemovingVGMColls, this, &VGMCollListViewModel::beganRemovingVGMColls);
+  connect(&qtVGMRoot, &QtVGMRoot::UI_endedRemovingVGMColls, this, &VGMCollListViewModel::endedRemovingVGMColls);
+}
 
-  auto endResettingModel = [this]() {
-    endResetModel();
-    resettingModel = false;
-  };
+void VGMCollListViewModel::addedVGMColl() {
+  dataChanged(index(0, 0), index(rowCount() - 1, 0));
+}
 
-  connect(&qtVGMRoot, &QtVGMRoot::UI_beganLoadingRawFile, startResettingModel);
-  connect(&qtVGMRoot, &QtVGMRoot::UI_endedLoadingRawFile, endResettingModel);
-  connect(&qtVGMRoot, &QtVGMRoot::UI_beganRemovingVGMFiles, startResettingModel);
-  connect(&qtVGMRoot, &QtVGMRoot::UI_endedRemovingVGMFiles, endResettingModel);
-  connect(&qtVGMRoot, &QtVGMRoot::UI_beganRemovingVGMColls, startResettingModel);
-  connect(&qtVGMRoot, &QtVGMRoot::UI_endedRemovingVGMColls, endResettingModel);
+void VGMCollListViewModel::beganRemovingVGMColls(int startIdx, int endIdx) {
+  beginRemoveRows(QModelIndex(), startIdx, endIdx);
+}
 
-  connect(&qtVGMRoot, &QtVGMRoot::UI_addedVGMColl,
-          [this]() {
-            if (!resettingModel)
-              dataChanged(index(0, 0), index(rowCount() - 1, 0));
-          });
-  connect(&qtVGMRoot, &QtVGMRoot::UI_removeVGMColl,
-          [this]() {
-            if (!resettingModel)
-              dataChanged(index(0, 0), index(rowCount() - 1, 0));
-          });
+void VGMCollListViewModel::endedRemovingVGMColls() {
+  endRemoveRows();
 }
 
 int VGMCollListViewModel::rowCount(const QModelIndex &) const {
@@ -166,21 +154,6 @@ void VGMCollListView::keyPressEvent(QKeyEvent *e) {
     case Qt::Key_Escape:
       handleStopRequest();
       break;
-    case Qt::Key_Delete:
-    case Qt::Key_Backspace: {
-      if (!selectionModel()->hasSelection())
-        return;
-
-      QModelIndexList list = selectionModel()->selectedRows();
-      clearSelection();
-      pRoot->UI_beginRemoveVGMColls();
-      for (auto & idx : std::ranges::reverse_view(list)) {
-        qtVGMRoot.removeVGMColl(qtVGMRoot.vgmColls()[idx.row()]);
-      }
-      pRoot->UI_endRemoveVGMColls();
-
-      return;
-    }
     default:
       QListView::keyPressEvent(e);
   }

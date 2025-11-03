@@ -31,20 +31,6 @@ RawFileListViewModel::RawFileListViewModel(QObject *parent) : QAbstractTableMode
   connect(&qtVGMRoot, &QtVGMRoot::UI_endedRemovingRawFiles, this, &RawFileListViewModel::endedRemovingRawFiles);
 }
 
-int RawFileListViewModel::rowCount(const QModelIndex &parent) const {
-  if (parent.isValid())
-    return 0;
-
-  return static_cast<int>(qtVGMRoot.rawFiles().size());
-}
-
-int RawFileListViewModel::columnCount(const QModelIndex &parent) const {
-  if (parent.isValid())
-    return 0;
-
-  return 2;
-}
-
 void RawFileListViewModel::addRawFile() {
   int position = static_cast<int>(qtVGMRoot.rawFiles().size()) - 1;
   if (position >= 0) {
@@ -59,6 +45,20 @@ void RawFileListViewModel::beganRemovingRawFiles(int startIdx, int endIdx) {
 
 void RawFileListViewModel::endedRemovingRawFiles() {
   endRemoveRows();
+}
+
+int RawFileListViewModel::rowCount(const QModelIndex &parent) const {
+  if (parent.isValid())
+    return 0;
+
+  return static_cast<int>(qtVGMRoot.rawFiles().size());
+}
+
+int RawFileListViewModel::columnCount(const QModelIndex &parent) const {
+  if (parent.isValid())
+    return 0;
+
+  return 2;
 }
 
 QVariant RawFileListViewModel::headerData(int column, Qt::Orientation orientation, int role) const {
@@ -176,32 +176,6 @@ void RawFileListView::updateContextualMenus() const {
   }
 
   NotificationCenter::the()->updateContextualMenusForRawFiles(files);
-}
-
-void RawFileListView::keyPressEvent(QKeyEvent *input) {
-  // On Backspace or Delete keypress, remove all selected files
-  switch (input->key()) {
-    case Qt::Key_Delete:
-    case Qt::Key_Backspace: {
-      deleteRawFiles();
-      break;
-    }
-
-    // Pass the event back to the base class, needed for keyboard navigation
-    default:
-      QTableView::keyPressEvent(input);
-  }
-}
-
-void RawFileListView::deleteRawFiles() {
-  if (!selectionModel()->hasSelection())
-    return;
-
-  QModelIndexList list = selectionModel()->selectedRows();
-  clearSelection();
-  for (auto & idx : std::ranges::reverse_view(list)) {
-    qtVGMRoot.removeRawFile(idx.row());
-  }
 }
 
 void RawFileListView::onVGMFileSelected(const VGMFile* vgmfile, const QWidget* caller) {

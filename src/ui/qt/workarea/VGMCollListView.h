@@ -15,11 +15,18 @@ class VGMCollListView;
 class QItemSelection;
 
 class VGMCollListViewModel : public QAbstractListModel {
+  Q_OBJECT
+
 public:
   explicit VGMCollListViewModel(QObject *parent = nullptr);
   int rowCount(const QModelIndex &parent = QModelIndex()) const override;
   QVariant data(const QModelIndex &index, int role = Qt::DisplayRole) const override;
   Qt::ItemFlags flags(const QModelIndex &index) const override;
+
+public slots:
+  void addedVGMColl();
+  void beganRemovingVGMColls(int startIdx, int endIdx);
+  void endedRemovingVGMColls();
 
 private:
   bool resettingModel = false;
