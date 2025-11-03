@@ -203,7 +203,7 @@ void VGMFileListView::keyPressEvent(QKeyEvent *input) {
       if (list.size() == qtVGMRoot.vgmFiles().size()) {
         auto rawFiles = qtVGMRoot.rawFiles();
         for (const auto rawFile : rawFiles) {
-          qtVGMRoot.closeRawFile(rawFile);
+          qtVGMRoot.removeRawFile(rawFile);
         }
       } else {
         for (auto & idx : std::ranges::reverse_view(list)) {

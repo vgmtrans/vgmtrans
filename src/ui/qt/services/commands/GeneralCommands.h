@@ -121,7 +121,7 @@ public:
 class CloseRawFileCommand : public ItemListCommand<RawFile> {
 public:
   void executeItem(RawFile* file) const override {
-    pRoot->closeRawFile(file);
+    pRoot->removeRawFile(file);
   }
   [[nodiscard]] QKeySequence shortcutKeySequence() const override { return Qt::Key_Backspace; };
   [[nodiscard]] std::string name() const override { return "Close"; }
