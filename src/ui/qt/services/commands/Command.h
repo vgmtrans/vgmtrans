@@ -12,8 +12,8 @@
 #include <variant>
 #include <vector>
 #include <map>
-#include <qkeysequence.h>
-#include <qlist>
+#include <QKeySequence>
+#include <QList>
 
 class VGMFile;
 class VGMSeq;
