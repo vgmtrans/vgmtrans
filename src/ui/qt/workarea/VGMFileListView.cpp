@@ -127,13 +127,12 @@ VGMFileListView::VGMFileListView(QWidget *parent) : TableView(parent) {
 
   setContextMenuPolicy(Qt::CustomContextMenu);
 
-  connect(&qtVGMRoot, &QtVGMRoot::UI_removeVGMFile, this, &VGMFileListView::removeVGMFile);
   connect(this, &QAbstractItemView::customContextMenuRequested, this, &VGMFileListView::itemMenu);
   connect(this, &QAbstractItemView::doubleClicked, this, &VGMFileListView::requestVGMFileView);
   connect(NotificationCenter::the(), &NotificationCenter::vgmFileSelected, this, &VGMFileListView::onVGMFileSelected);
   connect(selectionModel(), &QItemSelectionModel::selectionChanged, this, &VGMFileListView::onSelectionChanged);
   connect(&qtVGMRoot, &QtVGMRoot::UI_beginRemoveVGMFiles, this, [this]() {
-    // QAbstractItemModel::beginRemoveRows(), which we must call to remove items, suffers a major
+    // QAbstractItemModel::beginResetmodel(), which we must call to remove items, suffers a major
     // performance penalty if items are selected. While this could degrade UI behavior by deselecting
     // items that are not being removed (the removal could be triggered by closing a raw file, for
     // instance), the performance hit and unlikeliness make this a worthwhile tradeoff.
@@ -195,10 +194,6 @@ void VGMFileListView::keyPressEvent(QKeyEvent *input) {
     default:
       QTableView::keyPressEvent(input);
   }
-}
-
-void VGMFileListView::removeVGMFile(const VGMFile *file) const {
-  MdiArea::the()->removeView(file);
 }
 
 void VGMFileListView::requestVGMFileView(const QModelIndex& index) {

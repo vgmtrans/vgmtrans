@@ -42,7 +42,6 @@ class VGMFileListView final : public TableView {
 
   public slots:
     static void requestVGMFileView(const QModelIndex& index);
-    void removeVGMFile(const VGMFile *file) const;
     void onVGMFileSelected(VGMFile *file, const QWidget* caller);
 
   private:
