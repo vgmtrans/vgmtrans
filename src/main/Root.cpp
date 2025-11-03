@@ -132,7 +132,7 @@ bool VGMRoot::loadRawFile(RawFile *newRawFile) {
   bool foundFiles = !newRawFile->containedVGMFiles().empty();
   if (foundFiles) {
     m_rawfiles.emplace_back(newRawFile);
-    UI_addRawFile(newRawFile);
+    UI_loadRawFile(newRawFile);
   }
 
   UI_endLoadRawFile();
