@@ -200,8 +200,7 @@ void RawFileListView::deleteRawFiles() {
   QModelIndexList list = selectionModel()->selectedRows();
   clearSelection();
   for (auto & idx : std::ranges::reverse_view(list)) {
-    const auto rawfile = qtVGMRoot.rawFiles()[idx.row()];
-    qtVGMRoot.removeRawFile(rawfile);
+    qtVGMRoot.removeRawFile(idx.row());
   }
 }
 

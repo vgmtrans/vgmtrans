@@ -45,6 +45,7 @@ public:
   bool createVirtFile(const uint8_t* databuf, uint32_t fileSize, const std::string& filename,
                       const std::string& parRawFileFullPath = "", const VGMTag& tag = VGMTag());
   bool loadRawFile(RawFile* newRawFile);
+  bool removeRawFile(size_t idx);
   bool removeRawFile(RawFile *targFile);
   void addVGMFile(VGMFileVariant file);
   void removeVGMFile(VGMFileVariant file, bool bRemoveEmptyRawFile = true);
