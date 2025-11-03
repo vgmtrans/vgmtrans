@@ -131,13 +131,6 @@ VGMFileListView::VGMFileListView(QWidget *parent) : TableView(parent) {
   connect(this, &QAbstractItemView::doubleClicked, this, &VGMFileListView::requestVGMFileView);
   connect(NotificationCenter::the(), &NotificationCenter::vgmFileSelected, this, &VGMFileListView::onVGMFileSelected);
   connect(selectionModel(), &QItemSelectionModel::selectionChanged, this, &VGMFileListView::onSelectionChanged);
-  connect(&qtVGMRoot, &QtVGMRoot::UI_beginRemoveVGMFiles, this, [this]() {
-    // QAbstractItemModel::beginResetmodel(), which we must call to remove items, suffers a major
-    // performance penalty if items are selected. While this could degrade UI behavior by deselecting
-    // items that are not being removed (the removal could be triggered by closing a raw file, for
-    // instance), the performance hit and unlikeliness make this a worthwhile tradeoff.
-    clearSelection();
-  });
 }
 
 void VGMFileListView::itemMenu(const QPoint &pos) {

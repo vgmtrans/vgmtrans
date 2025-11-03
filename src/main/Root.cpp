@@ -285,6 +285,9 @@ void VGMRoot::removeAllFilesAndCollections() {
 
   for (auto variant : m_vgmfiles) {
     auto vgmfile = variantToVGMFile(variant);
+    if (Format *fmt = vgmfile->format()) {
+      fmt->onCloseFile(variant);
+    }
     UI_removeVGMFile(vgmfile);
     delete variantToVGMFile(variant);
   }
