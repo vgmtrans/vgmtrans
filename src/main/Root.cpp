@@ -21,6 +21,7 @@
 #include "LoaderManager.h"
 #include "ScannerManager.h"
 #include "LogManager.h"
+#include "helper.h"
 
 #include <filesystem>
 
@@ -151,7 +152,7 @@ bool VGMRoot::removeRawFile(size_t idx) {
     removeVGMFile(*vgmfile, false);
   }
 
-  UI_beginRemoveRawFiles(idx, idx);
+  UI_beginRemoveRawFiles();
   UI_removeRawFile(rawfile);
   m_rawfiles.erase(m_rawfiles.begin() + static_cast<std::ptrdiff_t>(idx));
   UI_endRemoveRawFiles();
@@ -191,7 +192,7 @@ void VGMRoot::removeVGMFile(size_t idx, bool bRemoveEmptyRawFile) {
     fmt->onCloseFile(file);
   }
 
-  UI_beginRemoveVGMFiles(idx, idx);
+  UI_beginRemoveVGMFiles();
   UI_removeVGMFile(targFile);
   m_vgmfiles.erase(m_vgmfiles.begin() + static_cast<std::ptrdiff_t>(idx));
   UI_endRemoveVGMFiles();
@@ -227,7 +228,7 @@ void VGMRoot::removeVGMColl(size_t idx) {
   }
   auto coll = m_vgmcolls[idx];
 
-  UI_beginRemoveVGMColls(idx, idx);
+  UI_beginRemoveVGMColls();
   auto iter = std::ranges::find(m_vgmcolls, coll);
   if (iter != m_vgmcolls.end())
     m_vgmcolls.erase(iter);
@@ -245,35 +246,59 @@ void VGMRoot::removeVGMColl(VGMColl *coll) {
   removeVGMColl(iter - m_vgmcolls.begin());
 }
 
+void VGMRoot::removeAllFilesAndCollections() {
+  UI_beginRemoveAll();
+
+  deleteVect(m_vgmcolls);
+  for (auto variant : m_vgmfiles)
+    delete variantToVGMFile(variant);
+  m_vgmfiles.clear();
+  deleteVect(m_rawfiles);
+
+  UI_endRemoveAll();
+}
+
+void VGMRoot::UI_beginRemoveAll() {
+  UI_beginRemoveRawFiles();
+  UI_beginRemoveVGMFiles();
+  UI_beginRemoveVGMColls();
+}
+
+void VGMRoot::UI_endRemoveAll() {
+  UI_endRemoveVGMColls();
+  UI_endRemoveVGMFiles();
+  UI_endRemoveRawFiles();
+}
+
 // This virtual function is called whenever a VGMFile is added to the interface.
 // By default, it simply sorts out what type of file was added and then calls a more
 // specific virtual function for the file type.  It is virtual in case a user-interface
 // wants do something universally whenever any type of VGMFiles is added.
 void VGMRoot::UI_addVGMFile(std::variant<VGMSeq *, VGMInstrSet *, VGMSampColl *, VGMMiscFile *> file) {
-    if(auto seq = std::get_if<VGMSeq *>(&file)) {
-        UI_addVGMSeq(*seq);
-    } else if(auto instr = std::get_if<VGMInstrSet *>(&file)) {
-        UI_addVGMInstrSet(*instr);
-    } else if(auto sampcoll = std::get_if<VGMSampColl *>(&file)) {
-        UI_addVGMSampColl(*sampcoll);
-    } else if(auto misc = std::get_if<VGMMiscFile *>(&file)) {
-        UI_addVGMMisc(*misc);
-    }
+  if(auto seq = std::get_if<VGMSeq *>(&file)) {
+    UI_addVGMSeq(*seq);
+  } else if(auto instr = std::get_if<VGMInstrSet *>(&file)) {
+    UI_addVGMInstrSet(*instr);
+  } else if(auto sampcoll = std::get_if<VGMSampColl *>(&file)) {
+    UI_addVGMSampColl(*sampcoll);
+  } else if(auto misc = std::get_if<VGMMiscFile *>(&file)) {
+    UI_addVGMMisc(*misc);
+  }
 }
 
 // Given a pointer to a buffer of data, size, and a filename, this function writes the data
 // into a file on the filesystem.
 bool VGMRoot::UI_writeBufferToFile(const std::string &filepath, uint8_t *buf, size_t size) {
-    std::ofstream outfile(filepath, std::ios::out | std::ios::trunc | std::ios::binary);
+  std::ofstream outfile(filepath, std::ios::out | std::ios::trunc | std::ios::binary);
 
-    if (!outfile.is_open()) {
-      L_ERROR(std::string("Error: could not open file " + filepath + " for writing").c_str());
-        return false;
-    }
+  if (!outfile.is_open()) {
+    L_ERROR(std::string("Error: could not open file " + filepath + " for writing").c_str());
+      return false;
+  }
 
-    outfile.write(reinterpret_cast<char *>(buf), size);
-    outfile.close();
-    return true;
+  outfile.write(reinterpret_cast<char *>(buf), size);
+  outfile.close();
+  return true;
 }
 
 // Adds a log item to the interface. The UI_AddLog function will handle the interface-specific stuff

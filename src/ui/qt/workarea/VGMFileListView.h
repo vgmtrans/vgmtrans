@@ -27,7 +27,7 @@ class VGMFileListModel : public QAbstractTableModel {
 
   public slots:
     void addedVGMFile();
-    void beganRemovingVGMFiles(int startIdx, int endIdx);
+    void beganRemovingVGMFiles();
     void endedRemovingVGMFiles();
 
   private:

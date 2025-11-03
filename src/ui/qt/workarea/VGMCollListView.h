@@ -25,7 +25,7 @@ public:
 
 public slots:
   void addedVGMColl();
-  void beganRemovingVGMColls(int startIdx, int endIdx);
+  void beganRemovingVGMColls();
   void endedRemovingVGMColls();
 
 private:

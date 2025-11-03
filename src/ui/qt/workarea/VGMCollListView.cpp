@@ -32,12 +32,12 @@ void VGMCollListViewModel::addedVGMColl() {
   dataChanged(index(0, 0), index(rowCount() - 1, 0));
 }
 
-void VGMCollListViewModel::beganRemovingVGMColls(int startIdx, int endIdx) {
-  beginRemoveRows(QModelIndex(), startIdx, endIdx);
+void VGMCollListViewModel::beganRemovingVGMColls() {
+  beginResetModel();
 }
 
 void VGMCollListViewModel::endedRemovingVGMColls() {
-  endRemoveRows();
+  endResetModel();
 }
 
 int VGMCollListViewModel::rowCount(const QModelIndex &) const {

@@ -38,12 +38,12 @@ void VGMFileListModel::addedVGMFile() {
   }
 }
 
-void VGMFileListModel::beganRemovingVGMFiles(int startIdx, int endIdx) {
-  beginRemoveRows(QModelIndex(), startIdx, endIdx);
+void VGMFileListModel::beganRemovingVGMFiles() {
+  beginResetModel();
 }
 
 void VGMFileListModel::endedRemovingVGMFiles() {
-  endRemoveRows();
+  endResetModel();
 }
 
 QVariant VGMFileListModel::data(const QModelIndex &index, int role) const {

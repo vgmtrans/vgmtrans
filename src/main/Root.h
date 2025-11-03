@@ -53,6 +53,8 @@ public:
   void addVGMColl(VGMColl *theColl);
   void removeVGMColl(size_t idx);
   void removeVGMColl(VGMColl *theFile);
+  void removeAllFilesAndCollections();
+
   void log(LogItem *theLog);
 
   virtual std::string UI_getResourceDirPath();
@@ -67,14 +69,16 @@ public:
   virtual void UI_addVGMMisc(VGMMiscFile *) {}
   virtual void UI_addVGMColl(VGMColl *) {}
   virtual void UI_removeRawFile(RawFile *) {}
-  virtual void UI_beginRemoveRawFiles(int startIdx, int endIdx) {}
+  virtual void UI_beginRemoveRawFiles() {}
   virtual void UI_endRemoveRawFiles() {}
   virtual void UI_removeVGMFile(VGMFile *) {}
-  virtual void UI_beginRemoveVGMFiles(int startIdx, int endIdx) {}
+  virtual void UI_beginRemoveVGMFiles() {}
   virtual void UI_endRemoveVGMFiles() {}
   virtual void UI_removeVGMColl(VGMColl *) {}
-  virtual void UI_beginRemoveVGMColls(int startIdx, int endIdx) {}
+  virtual void UI_beginRemoveVGMColls() {}
   virtual void UI_endRemoveVGMColls() {}
+  void UI_beginRemoveAll();
+  void UI_endRemoveAll();
   virtual void UI_addItem(VGMItem *, VGMItem *, const std::string &, void *) {}
   virtual std::string UI_getSaveFilePath(const std::string &suggestedFilename,
                                          const std::string &extension = "") = 0;

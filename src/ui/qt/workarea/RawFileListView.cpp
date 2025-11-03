@@ -39,12 +39,12 @@ void RawFileListViewModel::addRawFile() {
   }
 }
 
-void RawFileListViewModel::beganRemovingRawFiles(int startIdx, int endIdx) {
-  beginRemoveRows(QModelIndex(), startIdx, endIdx);
+void RawFileListViewModel::beganRemovingRawFiles() {
+  beginResetModel();
 }
 
 void RawFileListViewModel::endedRemovingRawFiles() {
-  endRemoveRows();
+  endResetModel();
 }
 
 int RawFileListViewModel::rowCount(const QModelIndex &parent) const {

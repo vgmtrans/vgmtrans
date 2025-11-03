@@ -37,8 +37,8 @@ void QtVGMRoot::UI_removeRawFile(RawFile*) {
   this->UI_removedRawFile();
 }
 
-void QtVGMRoot::UI_beginRemoveRawFiles(int startIdx, int endIdx) {
-  this->UI_beganRemovingRawFiles(startIdx, endIdx);
+void QtVGMRoot::UI_beginRemoveRawFiles() {
+  this->UI_beganRemovingRawFiles();
 }
 
 void QtVGMRoot::UI_endRemoveRawFiles() {
@@ -75,20 +75,24 @@ void QtVGMRoot::UI_addVGMColl(VGMColl*) {
   this->UI_addedVGMColl();
 }
 
-void QtVGMRoot::UI_beginRemoveVGMFiles(int startIdx, int endIdx) {
-  this->UI_beganRemovingVGMFiles(startIdx, endIdx);
+void QtVGMRoot::UI_beginRemoveVGMFiles() {
+  if (vgmFileRemoveStack++ == 0)
+    this->UI_beganRemovingVGMFiles();
 }
 
 void QtVGMRoot::UI_endRemoveVGMFiles() {
-  this->UI_endedRemovingVGMFiles();
+  if (--vgmFileRemoveStack == 0)
+    this->UI_endedRemovingVGMFiles();
 }
 
-void QtVGMRoot::UI_beginRemoveVGMColls(int startIdx, int endIdx) {
-  this->UI_beganRemovingVGMColls(startIdx, endIdx);
+void QtVGMRoot::UI_beginRemoveVGMColls() {
+  if (vgmCollRemoveStack++ == 0)
+    this->UI_beganRemovingVGMColls();
 }
 
 void QtVGMRoot::UI_endRemoveVGMColls() {
-  this->UI_endedRemovingVGMColls();
+  if (--vgmCollRemoveStack == 0)
+    this->UI_endedRemovingVGMColls();
 }
 
 void QtVGMRoot::UI_toast(const std::string& message, ToastType type, int duration_ms) {
