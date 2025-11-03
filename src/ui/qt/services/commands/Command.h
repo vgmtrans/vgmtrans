@@ -13,6 +13,7 @@
 #include <vector>
 #include <map>
 #include <qkeysequence.h>
+#include <qlist>
 
 class VGMFile;
 class VGMSeq;
@@ -129,7 +130,7 @@ public:
    * Defines a key sequence that will be displayed in the menu as a shortcut for the command
    * @return the keyboard shortcut
    */
-  [[nodiscard]] virtual QKeySequence shortcutKeySequence() const { return -1; };
+  [[nodiscard]] virtual QList<QKeySequence> shortcutKeySequences() const { return {}; };
 
   /**
    * Specifies the menu path where this command should be surfaced in the main menu bar.

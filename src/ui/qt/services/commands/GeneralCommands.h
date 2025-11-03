@@ -128,7 +128,7 @@ public:
   void executeItem(VGMFile* file) const override {
     pRoot->removeVGMFile(vgmFileToVariant(file));
   }
-  [[nodiscard]] QKeySequence shortcutKeySequence() const override { return Qt::Key_Backspace; };
+  [[nodiscard]] QList<QKeySequence> shortcutKeySequences() const override { return {Qt::Key_Backspace, Qt::Key_Delete}; };
   [[nodiscard]] std::string name() const override { return "Remove"; }
   [[nodiscard]] std::optional<MenuPath> menuPath() const override { return MenuPaths::File; }
 };
@@ -141,7 +141,7 @@ public:
   void executeItem(RawFile* file) const override {
     pRoot->removeRawFile(file);
   }
-  [[nodiscard]] QKeySequence shortcutKeySequence() const override { return Qt::Key_Backspace; };
+  [[nodiscard]] QList<QKeySequence> shortcutKeySequences() const override { return {Qt::Key_Backspace, Qt::Key_Delete}; };
   [[nodiscard]] std::string name() const override { return "Close"; }
   [[nodiscard]] std::optional<MenuPath> menuPath() const override { return MenuPaths::File; }
 };
@@ -154,7 +154,7 @@ public:
   void executeItem(VGMColl* coll) const override {
     pRoot->removeVGMColl(coll);
   }
-  [[nodiscard]] QKeySequence shortcutKeySequence() const override { return Qt::Key_Backspace; };
+  [[nodiscard]] QList<QKeySequence> shortcutKeySequences() const override { return {Qt::Key_Backspace, Qt::Key_Delete}; };
   [[nodiscard]] std::string name() const override { return "Remove"; }
   [[nodiscard]] std::optional<MenuPath> menuPath() const override { return MenuPaths::File; }
 };
@@ -167,7 +167,7 @@ public:
   void executeItem(VGMFile* file) const override {
     MdiArea::the()->newView(file);
   }
-  [[nodiscard]] QKeySequence shortcutKeySequence() const override { return Qt::Key_Return; };
+  [[nodiscard]] QList<QKeySequence> shortcutKeySequences() const override { return {Qt::Key_Return}; };
   [[nodiscard]] std::string name() const override { return "Open Analysis"; }
   [[nodiscard]] std::optional<MenuPath> menuPath() const override { return MenuPaths::File; }
 };
