@@ -92,8 +92,6 @@ if(USE_SYSTEM_LIBCHDR)
   find_package(libchdr REQUIRED)
 else()
   message(STATUS "Using vendored libchdr library")
-  set(WITH_SYSTEM_ZLIB ${USE_SYSTEM_ZLIB} CACHE BOOL "[libchdr] Use system provided zlib library" FORCE)
-  add_subdirectory(${PROJECT_SOURCE_DIR}/lib/libchdr ${CMAKE_CURRENT_BINARY_DIR}/lib/libchdr EXCLUDE_FROM_ALL)
 endif()
 
 # ~~~
