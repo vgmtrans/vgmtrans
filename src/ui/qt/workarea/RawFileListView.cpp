@@ -27,7 +27,10 @@ static const QIcon& fileIcon() {
 
 RawFileListViewModel::RawFileListViewModel(QObject *parent) : QAbstractTableModel(parent) {
   auto startResettingModel = [this]() { beginResetModel(); };
-  auto endResettingModel = [this]() { endResetModel(); };
+  auto endResettingModel = [this]() {
+    endResetModel();
+    NotificationCenter::the()->updateContextualMenusForRawFiles({});
+  };
 
   auto beginLoad = [this]() {
     filesBeforeLoad = pRoot->vgmFiles().size();

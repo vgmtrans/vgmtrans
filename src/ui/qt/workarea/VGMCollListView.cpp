@@ -24,7 +24,10 @@ static const QIcon &VGMCollIcon() {
  */
 VGMCollListViewModel::VGMCollListViewModel(QObject *parent) : QAbstractListModel(parent) {
   auto startResettingModel = [this]() { beginResetModel(); };
-  auto endResettingModel = [this]() { endResetModel(); };
+  auto endResettingModel = [this]() {
+    endResetModel();
+    NotificationCenter::the()->updateContextualMenusForVGMColls({});
+  };
 
   auto beginLoad = [this]() {
     collsBeforeLoad = pRoot->vgmFiles().size();

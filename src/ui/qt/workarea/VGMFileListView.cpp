@@ -26,7 +26,10 @@
 
 VGMFileListModel::VGMFileListModel(QObject *parent) : QAbstractTableModel(parent) {
   auto startResettingModel = [this]() { beginResetModel(); };
-  auto endResettingModel = [this]() { endResetModel(); };
+  auto endResettingModel = [this]() {
+    endResetModel();
+    NotificationCenter::the()->updateContextualMenusForVGMFiles({});
+  };
 
   auto beginLoad = [this]() {
     filesBeforeLoad = pRoot->vgmFiles().size();
@@ -264,3 +267,8 @@ void VGMFileListView::onVGMFileSelected(VGMFile* file, const QWidget* caller) {
 
   scrollTo(firstIndex, QAbstractItemView::EnsureVisible);
 }
+
+// void VGMFileListView::regenerateSelection() {
+//   NotificationCenter::the()->selectVGMFile()
+//   selectionModel()->select(newSel, QItemSelectionModel::ClearAndSelect | QItemSelectionModel::Rows);
+// }
