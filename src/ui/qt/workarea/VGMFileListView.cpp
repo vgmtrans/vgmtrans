@@ -28,8 +28,20 @@ VGMFileListModel::VGMFileListModel(QObject *parent) : QAbstractTableModel(parent
   auto startResettingModel = [this]() { beginResetModel(); };
   auto endResettingModel = [this]() { endResetModel(); };
 
-  connect(&qtVGMRoot, &QtVGMRoot::UI_beganLoadingRawFile, startResettingModel);
-  connect(&qtVGMRoot, &QtVGMRoot::UI_endedLoadingRawFile, endResettingModel);
+  auto beginLoad = [this]() {
+    filesBeforeLoad = pRoot->vgmFiles().size();
+  };
+  auto endLoad = [this]() {
+    int filesLoaded = pRoot->vgmFiles().size() - filesBeforeLoad;
+    if (filesLoaded <= 0)
+      return;
+    int position = static_cast<int>(qtVGMRoot.vgmFiles().size()) - 1;
+    beginInsertRows(QModelIndex(), position, position + filesLoaded - 1);
+    endInsertRows();
+  };
+
+  connect(&qtVGMRoot, &QtVGMRoot::UI_beganLoadingRawFile, beginLoad);
+  connect(&qtVGMRoot, &QtVGMRoot::UI_endedLoadingRawFile, endLoad);
   connect(&qtVGMRoot, &QtVGMRoot::UI_beginRemoveVGMFiles, startResettingModel);
   connect(&qtVGMRoot, &QtVGMRoot::UI_endRemoveVGMFiles, endResettingModel);
 }

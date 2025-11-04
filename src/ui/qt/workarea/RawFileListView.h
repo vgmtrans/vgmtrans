@@ -21,6 +21,7 @@ public:
 
 private:
   enum Property : uint8_t { Name = 0, ContainedFiles = 1 };
+  size_t filesBeforeLoad;
 };
 
 class RawFileListView : public TableView {
