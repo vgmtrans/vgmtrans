@@ -37,8 +37,7 @@ VGMCollListViewModel::VGMCollListViewModel(QObject *parent) : QAbstractListModel
     int filesLoaded = pRoot->vgmColls().size() - collsBeforeLoad;
     if (filesLoaded <= 0)
       return;
-    int position = static_cast<int>(qtVGMRoot.vgmColls().size()) - 1;
-    beginInsertRows(QModelIndex(), position, position + filesLoaded - 1);
+    beginInsertRows(QModelIndex(), collsBeforeLoad, collsBeforeLoad + filesLoaded - 1);
     endInsertRows();
   };
 

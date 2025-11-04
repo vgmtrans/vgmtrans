@@ -40,8 +40,7 @@ RawFileListViewModel::RawFileListViewModel(QObject *parent) : QAbstractTableMode
     int filesLoaded = pRoot->rawFiles().size() - filesBeforeLoad;
     if (filesLoaded <= 0)
       return;
-    int position = static_cast<int>(qtVGMRoot.rawFiles().size()) - 1;
-    beginInsertRows(QModelIndex(), position, position + filesLoaded - 1);
+    beginInsertRows(QModelIndex(), filesBeforeLoad, filesBeforeLoad + filesLoaded - 1);
     endInsertRows();
   };
 
