@@ -26,25 +26,13 @@ static const QIcon& fileIcon() {
  */
 
 RawFileListViewModel::RawFileListViewModel(QObject *parent) : QAbstractTableModel(parent) {
-  connect(&qtVGMRoot, &QtVGMRoot::UI_addedRawFile, this, &RawFileListViewModel::addRawFile);
-  connect(&qtVGMRoot, &QtVGMRoot::UI_beginRemoveRawFiles, this, &RawFileListViewModel::beganRemovingRawFiles);
-  connect(&qtVGMRoot, &QtVGMRoot::UI_endRemoveRawFiles, this, &RawFileListViewModel::endedRemovingRawFiles);
-}
+  auto startResettingModel = [this]() { beginResetModel(); };
+  auto endResettingModel = [this]() { endResetModel(); };
 
-void RawFileListViewModel::addRawFile() {
-  int position = static_cast<int>(qtVGMRoot.rawFiles().size()) - 1;
-  if (position >= 0) {
-    beginInsertRows(QModelIndex(), position, position);
-    endInsertRows();
-  }
-}
-
-void RawFileListViewModel::beganRemovingRawFiles() {
-  beginResetModel();
-}
-
-void RawFileListViewModel::endedRemovingRawFiles() {
-  endResetModel();
+  connect(&qtVGMRoot, &QtVGMRoot::UI_beganLoadingRawFile, startResettingModel);
+  connect(&qtVGMRoot, &QtVGMRoot::UI_endedLoadingRawFile, endResettingModel);
+  connect(&qtVGMRoot, &QtVGMRoot::UI_beginRemoveRawFiles, startResettingModel);
+  connect(&qtVGMRoot, &QtVGMRoot::UI_endRemoveRawFiles, endResettingModel);
 }
 
 int RawFileListViewModel::rowCount(const QModelIndex &parent) const {

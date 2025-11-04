@@ -15,8 +15,6 @@
 
 class QItemSelection;
 class VGMFileListModel : public QAbstractTableModel {
-    Q_OBJECT
-
   public:
     explicit VGMFileListModel(QObject *parent = nullptr);
 
@@ -24,11 +22,6 @@ class VGMFileListModel : public QAbstractTableModel {
     QVariant headerData(int section, Qt::Orientation orientation, int role) const override;
     int rowCount(const QModelIndex &parent = QModelIndex()) const override;
     int columnCount(const QModelIndex &parent) const override;
-
-  public slots:
-    void addedVGMFile();
-    void beganRemovingVGMFiles();
-    void endedRemovingVGMFiles();
 
   private:
     enum Property : uint8_t { Name = 0, Format = 1 };

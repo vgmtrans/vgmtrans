@@ -25,25 +25,13 @@
  */
 
 VGMFileListModel::VGMFileListModel(QObject *parent) : QAbstractTableModel(parent) {
-  connect(&qtVGMRoot, &QtVGMRoot::UI_addedVGMFile, this, &VGMFileListModel::addedVGMFile);
-  connect(&qtVGMRoot, &QtVGMRoot::UI_beginRemoveVGMFiles, this, &VGMFileListModel::beganRemovingVGMFiles);
-  connect(&qtVGMRoot, &QtVGMRoot::UI_endRemoveVGMFiles, this, &VGMFileListModel::endedRemovingVGMFiles);
-}
+  auto startResettingModel = [this]() { beginResetModel(); };
+  auto endResettingModel = [this]() { endResetModel(); };
 
-void VGMFileListModel::addedVGMFile() {
-  int position = static_cast<int>(qtVGMRoot.vgmFiles().size()) - 1;
-  if (position >= 0) {
-    beginInsertRows(QModelIndex(), position, position);
-    endInsertRows();
-  }
-}
-
-void VGMFileListModel::beganRemovingVGMFiles() {
-  beginResetModel();
-}
-
-void VGMFileListModel::endedRemovingVGMFiles() {
-  endResetModel();
+  connect(&qtVGMRoot, &QtVGMRoot::UI_beganLoadingRawFile, startResettingModel);
+  connect(&qtVGMRoot, &QtVGMRoot::UI_endedLoadingRawFile, endResettingModel);
+  connect(&qtVGMRoot, &QtVGMRoot::UI_beginRemoveVGMFiles, startResettingModel);
+  connect(&qtVGMRoot, &QtVGMRoot::UI_endRemoveVGMFiles, endResettingModel);
 }
 
 QVariant VGMFileListModel::data(const QModelIndex &index, int role) const {
