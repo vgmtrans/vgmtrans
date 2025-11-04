@@ -140,13 +140,16 @@ bool VGMRoot::loadRawFile(RawFile *newRawFile) {
   return foundFiles;
 }
 
-bool VGMRoot::removeRawFile(size_t idx) {
-  if (idx >= m_rawfiles.size()) {
-    L_WARN("Requested deletion of RawFile with invalid index");
+bool VGMRoot::removeRawFile(RawFile *rawfile) {
+  if (!rawfile)
+    return false;
+
+  auto iter = std::ranges::find(m_rawfiles, rawfile);
+  if (iter == m_rawfiles.end()) {
+    L_WARN("Requested deletion of a RawFile not stored in Root");
     return false;
   }
 
-  auto rawfile = m_rawfiles[idx];
   auto &vgmfiles = rawfile->containedVGMFiles();
   for (const auto & vgmfile : vgmfiles) {
     removeVGMFile(*vgmfile, false);
@@ -154,20 +157,11 @@ bool VGMRoot::removeRawFile(size_t idx) {
 
   pushRemoveRawFiles();
   UI_removeRawFile(rawfile);
-  m_rawfiles.erase(m_rawfiles.begin() + static_cast<std::ptrdiff_t>(idx));
+  m_rawfiles.erase(iter);
   popRemoveRawFiles();
 
   delete rawfile;
   return true;
-}
-
-
-bool VGMRoot::removeRawFile(RawFile *targFile) {
-  if (!targFile)
-    return false;
-
-  auto iter = std::ranges::find(m_rawfiles, targFile);
-  return removeRawFile(iter - m_rawfiles.begin());
 }
 
 void VGMRoot::addVGMFile(std::variant<VGMSeq *, VGMInstrSet *, VGMSampColl *, VGMMiscFile *> file) {
@@ -178,13 +172,7 @@ void VGMRoot::addVGMFile(std::variant<VGMSeq *, VGMInstrSet *, VGMSampColl *, VG
 
 // Removes a VGMFile from the interface.  The UI_RemoveVGMFile will handle the
 // interface-specific stuff
-void VGMRoot::removeVGMFile(size_t idx, bool bRemoveEmptyRawFile) {
-  if (idx >= m_vgmfiles.size()) {
-    L_WARN("Requested deletion of VGMFile with invalid index");
-    return;
-  }
-
-  auto file = m_vgmfiles[idx];
+void VGMRoot::removeVGMFile(std::variant<VGMSeq *, VGMInstrSet *, VGMSampColl *, VGMMiscFile *> file, bool bRemoveEmptyRawFile) {
   auto targFile = variantToVGMFile(file);
   // First we should call the format's onClose handler in case it needs to use
   // the RawFile before we close it (FilenameMatcher, for ex)
@@ -192,10 +180,16 @@ void VGMRoot::removeVGMFile(size_t idx, bool bRemoveEmptyRawFile) {
     fmt->onCloseFile(file);
   }
 
-  pushRemoveVGMFiles();
-  UI_removeVGMFile(targFile);
-  m_vgmfiles.erase(m_vgmfiles.begin() + static_cast<std::ptrdiff_t>(idx));
-  popRemoveVGMFiles();
+  auto iter = std::ranges::find(m_vgmfiles, file);
+
+  if (iter != m_vgmfiles.end()) {
+    pushRemoveVGMFiles();
+    UI_removeVGMFile(targFile);
+    m_vgmfiles.erase(iter);
+    popRemoveVGMFiles();
+  } else {
+    L_WARN("Requested deletion for VGMFile but it was not found");
+  }
 
   while (!targFile->assocColls.empty()) {
     removeVGMColl(targFile->assocColls.back());
@@ -221,29 +215,19 @@ void VGMRoot::addVGMColl(VGMColl *theColl) {
   UI_addVGMColl(theColl);
 }
 
-void VGMRoot::removeVGMColl(size_t idx) {
-  if (idx >= m_vgmcolls.size()) {
-    L_WARN("Requested deletion of VGMColl with invalid index");
-    return;
-  }
-  auto coll = m_vgmcolls[idx];
-
-  pushRemoveVGMColls();
+void VGMRoot::removeVGMColl(VGMColl *coll) {
   auto iter = std::ranges::find(m_vgmcolls, coll);
-  if (iter != m_vgmcolls.end())
+  pushRemoveVGMColls();
+  if (iter != m_vgmcolls.end()) {
     m_vgmcolls.erase(iter);
-  else
-    L_WARN("Requested deletion for VGMColl but it was not found");
+  } else {
+    L_WARN("Requested deletion of VGMColl not stored in Root");
+  }
 
   coll->removeFileAssocs();
   UI_removeVGMColl(coll);
   popRemoveVGMColls();
   delete coll;
-}
-
-void VGMRoot::removeVGMColl(VGMColl *coll) {
-  auto iter = std::ranges::find(m_vgmcolls, coll);
-  removeVGMColl(iter - m_vgmcolls.begin());
 }
 
 void VGMRoot::removeAllFilesAndCollections() {
