@@ -12,7 +12,6 @@ class RawFile;
 class VGMFile;
 
 class RawFileListViewModel : public QAbstractTableModel {
-  Q_OBJECT
 public:
   explicit RawFileListViewModel(QObject *parent = nullptr);
   int rowCount(const QModelIndex &parent = QModelIndex()) const override;
@@ -20,13 +19,9 @@ public:
   QVariant headerData(int section, Qt::Orientation orientation, int role) const override;
   QVariant data(const QModelIndex &index, int role = Qt::DisplayRole) const override;
 
-public slots:
-  void addRawFile();
-  void beganRemovingRawFiles();
-  void endedRemovingRawFiles();
-
 private:
   enum Property : uint8_t { Name = 0, ContainedFiles = 1 };
+  size_t filesBeforeLoad;
 };
 
 class RawFileListView : public TableView {

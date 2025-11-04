@@ -25,25 +25,28 @@
  */
 
 VGMFileListModel::VGMFileListModel(QObject *parent) : QAbstractTableModel(parent) {
-  connect(&qtVGMRoot, &QtVGMRoot::UI_addedVGMFile, this, &VGMFileListModel::addedVGMFile);
-  connect(&qtVGMRoot, &QtVGMRoot::UI_beginRemoveVGMFiles, this, &VGMFileListModel::beganRemovingVGMFiles);
-  connect(&qtVGMRoot, &QtVGMRoot::UI_endRemoveVGMFiles, this, &VGMFileListModel::endedRemovingVGMFiles);
-}
+  auto startResettingModel = [this]() { beginResetModel(); };
+  auto endResettingModel = [this]() {
+    endResetModel();
+    NotificationCenter::the()->updateContextualMenusForVGMFiles({});
+  };
 
-void VGMFileListModel::addedVGMFile() {
-  int position = static_cast<int>(qtVGMRoot.vgmFiles().size()) - 1;
-  if (position >= 0) {
-    beginInsertRows(QModelIndex(), position, position);
+  auto beginLoad = [this]() {
+    filesBeforeLoad = pRoot->vgmFiles().size();
+  };
+  auto endLoad = [this]() {
+    int filesLoaded = pRoot->vgmFiles().size() - filesBeforeLoad;
+    if (filesLoaded <= 0)
+      return;
+    int position = static_cast<int>(qtVGMRoot.vgmFiles().size()) - 1;
+    beginInsertRows(QModelIndex(), position, position + filesLoaded - 1);
     endInsertRows();
-  }
-}
+  };
 
-void VGMFileListModel::beganRemovingVGMFiles() {
-  beginResetModel();
-}
-
-void VGMFileListModel::endedRemovingVGMFiles() {
-  endResetModel();
+  connect(&qtVGMRoot, &QtVGMRoot::UI_beganLoadingRawFile, beginLoad);
+  connect(&qtVGMRoot, &QtVGMRoot::UI_endedLoadingRawFile, endLoad);
+  connect(&qtVGMRoot, &QtVGMRoot::UI_beginRemoveVGMFiles, startResettingModel);
+  connect(&qtVGMRoot, &QtVGMRoot::UI_endRemoveVGMFiles, endResettingModel);
 }
 
 QVariant VGMFileListModel::data(const QModelIndex &index, int role) const {
@@ -264,3 +267,8 @@ void VGMFileListView::onVGMFileSelected(VGMFile* file, const QWidget* caller) {
 
   scrollTo(firstIndex, QAbstractItemView::EnsureVisible);
 }
+
+// void VGMFileListView::regenerateSelection() {
+//   NotificationCenter::the()->selectVGMFile()
+//   selectionModel()->select(newSel, QItemSelectionModel::ClearAndSelect | QItemSelectionModel::Rows);
+// }

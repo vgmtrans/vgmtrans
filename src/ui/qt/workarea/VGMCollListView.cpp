@@ -23,21 +23,29 @@ static const QIcon &VGMCollIcon() {
  * VGMCollListViewModel
  */
 VGMCollListViewModel::VGMCollListViewModel(QObject *parent) : QAbstractListModel(parent) {
-  connect(&qtVGMRoot, &QtVGMRoot::UI_addedVGMColl, this, &VGMCollListViewModel::addedVGMColl);
-  connect(&qtVGMRoot, &QtVGMRoot::UI_beginRemoveVGMColls, this, &VGMCollListViewModel::beganRemovingVGMColls);
-  connect(&qtVGMRoot, &QtVGMRoot::UI_endRemoveVGMColls, this, &VGMCollListViewModel::endedRemovingVGMColls);
-}
+  auto startResettingModel = [this]() { beginResetModel(); };
+  auto endResettingModel = [this]() {
+    endResetModel();
+    NotificationCenter::the()->updateContextualMenusForVGMColls({});
+  };
 
-void VGMCollListViewModel::addedVGMColl() {
-  dataChanged(index(0, 0), index(rowCount() - 1, 0));
-}
+  auto beginLoad = [this]() {
+    collsBeforeLoad = pRoot->vgmFiles().size();
+  };
 
-void VGMCollListViewModel::beganRemovingVGMColls() {
-  beginResetModel();
-}
+  auto endLoad = [this]() {
+    int filesLoaded = pRoot->vgmFiles().size() - collsBeforeLoad;
+    if (filesLoaded <= 0)
+      return;
+    int position = static_cast<int>(qtVGMRoot.vgmFiles().size()) - 1;
+    beginInsertRows(QModelIndex(), position, position + filesLoaded - 1);
+    endInsertRows();
+  };
 
-void VGMCollListViewModel::endedRemovingVGMColls() {
-  endResetModel();
+  connect(&qtVGMRoot, &QtVGMRoot::UI_beganLoadingRawFile, beginLoad);
+  connect(&qtVGMRoot, &QtVGMRoot::UI_endedLoadingRawFile, endLoad);
+  connect(&qtVGMRoot, &QtVGMRoot::UI_beginRemoveVGMColls, startResettingModel);
+  connect(&qtVGMRoot, &QtVGMRoot::UI_endRemoveVGMColls, endResettingModel);
 }
 
 int VGMCollListViewModel::rowCount(const QModelIndex &) const {

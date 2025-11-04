@@ -26,25 +26,29 @@ static const QIcon& fileIcon() {
  */
 
 RawFileListViewModel::RawFileListViewModel(QObject *parent) : QAbstractTableModel(parent) {
-  connect(&qtVGMRoot, &QtVGMRoot::UI_addedRawFile, this, &RawFileListViewModel::addRawFile);
-  connect(&qtVGMRoot, &QtVGMRoot::UI_beginRemoveRawFiles, this, &RawFileListViewModel::beganRemovingRawFiles);
-  connect(&qtVGMRoot, &QtVGMRoot::UI_endRemoveRawFiles, this, &RawFileListViewModel::endedRemovingRawFiles);
-}
+  auto startResettingModel = [this]() { beginResetModel(); };
+  auto endResettingModel = [this]() {
+    endResetModel();
+    NotificationCenter::the()->updateContextualMenusForRawFiles({});
+  };
 
-void RawFileListViewModel::addRawFile() {
-  int position = static_cast<int>(qtVGMRoot.rawFiles().size()) - 1;
-  if (position >= 0) {
-    beginInsertRows(QModelIndex(), position, position);
+  auto beginLoad = [this]() {
+    filesBeforeLoad = pRoot->vgmFiles().size();
+  };
+
+  auto endLoad = [this]() {
+    int filesLoaded = pRoot->vgmFiles().size() - filesBeforeLoad;
+    if (filesLoaded <= 0)
+      return;
+    int position = static_cast<int>(qtVGMRoot.vgmFiles().size()) - 1;
+    beginInsertRows(QModelIndex(), position, position + filesLoaded - 1);
     endInsertRows();
-  }
-}
+  };
 
-void RawFileListViewModel::beganRemovingRawFiles() {
-  beginResetModel();
-}
-
-void RawFileListViewModel::endedRemovingRawFiles() {
-  endResetModel();
+  connect(&qtVGMRoot, &QtVGMRoot::UI_beganLoadingRawFile, beginLoad);
+  connect(&qtVGMRoot, &QtVGMRoot::UI_endedLoadingRawFile, endLoad);
+  connect(&qtVGMRoot, &QtVGMRoot::UI_beginRemoveRawFiles, startResettingModel);
+  connect(&qtVGMRoot, &QtVGMRoot::UI_endRemoveRawFiles, endResettingModel);
 }
 
 int RawFileListViewModel::rowCount(const QModelIndex &parent) const {
