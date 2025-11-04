@@ -30,14 +30,14 @@ VGMCollListViewModel::VGMCollListViewModel(QObject *parent) : QAbstractListModel
   };
 
   auto beginLoad = [this]() {
-    collsBeforeLoad = pRoot->vgmFiles().size();
+    collsBeforeLoad = pRoot->vgmColls().size();
   };
 
   auto endLoad = [this]() {
-    int filesLoaded = pRoot->vgmFiles().size() - collsBeforeLoad;
+    int filesLoaded = pRoot->vgmColls().size() - collsBeforeLoad;
     if (filesLoaded <= 0)
       return;
-    int position = static_cast<int>(qtVGMRoot.vgmFiles().size()) - 1;
+    int position = static_cast<int>(qtVGMRoot.vgmColls().size()) - 1;
     beginInsertRows(QModelIndex(), position, position + filesLoaded - 1);
     endInsertRows();
   };

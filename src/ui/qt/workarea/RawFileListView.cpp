@@ -33,14 +33,14 @@ RawFileListViewModel::RawFileListViewModel(QObject *parent) : QAbstractTableMode
   };
 
   auto beginLoad = [this]() {
-    filesBeforeLoad = pRoot->vgmFiles().size();
+    filesBeforeLoad = pRoot->rawFiles().size();
   };
 
   auto endLoad = [this]() {
-    int filesLoaded = pRoot->vgmFiles().size() - filesBeforeLoad;
+    int filesLoaded = pRoot->rawFiles().size() - filesBeforeLoad;
     if (filesLoaded <= 0)
       return;
-    int position = static_cast<int>(qtVGMRoot.vgmFiles().size()) - 1;
+    int position = static_cast<int>(qtVGMRoot.rawFiles().size()) - 1;
     beginInsertRows(QModelIndex(), position, position + filesLoaded - 1);
     endInsertRows();
   };
