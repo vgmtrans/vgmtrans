@@ -52,6 +52,8 @@ public:
   void removeVGMColl(VGMColl *coll);
   void removeAllFilesAndCollections();
 
+  void pushLoadRawFile();
+  void popLoadRawFile();
   void pushRemoveRawFiles();
   void popRemoveRawFiles();
   void pushRemoveVGMFiles();
@@ -100,6 +102,7 @@ public:
   const std::vector<VGMColl*>& vgmColls() { return m_vgmcolls; }
 
 private:
+  int rawFileLoadRecurseStack = 0;
   int rawFileRemoveStack = 0;
   int vgmFileRemoveStack = 0;
   int vgmCollRemoveStack = 0;

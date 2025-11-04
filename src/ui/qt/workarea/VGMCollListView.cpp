@@ -42,8 +42,8 @@ VGMCollListViewModel::VGMCollListViewModel(QObject *parent) : QAbstractListModel
     endInsertRows();
   };
 
-  connect(&qtVGMRoot, &QtVGMRoot::UI_beganLoadingRawFile, beginLoad);
-  connect(&qtVGMRoot, &QtVGMRoot::UI_endedLoadingRawFile, endLoad);
+  connect(&qtVGMRoot, &QtVGMRoot::UI_beginLoadRawFile, beginLoad);
+  connect(&qtVGMRoot, &QtVGMRoot::UI_endLoadRawFile, endLoad);
   connect(&qtVGMRoot, &QtVGMRoot::UI_beginRemoveVGMColls, startResettingModel);
   connect(&qtVGMRoot, &QtVGMRoot::UI_endRemoveVGMColls, endResettingModel);
 }

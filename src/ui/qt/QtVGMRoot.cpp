@@ -37,16 +37,6 @@ void QtVGMRoot::UI_removeRawFile(RawFile*) {
   this->UI_removedRawFile();
 }
 
-void QtVGMRoot::UI_beginLoadRawFile() {
-  if (rawFileLoadRecurseStack++ == 0)
-    this->UI_beganLoadingRawFile();
-}
-
-void QtVGMRoot::UI_endLoadRawFile() {
-  if (--rawFileLoadRecurseStack == 0)
-    this->UI_endedLoadingRawFile();
-}
-
 void QtVGMRoot::UI_addVGMFile(VGMFileVariant file) {
   this->UI_addedVGMFile();
 }

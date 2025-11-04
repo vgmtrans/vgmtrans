@@ -20,8 +20,6 @@ public:
   void UI_loadRawFile(RawFile* newFile) override;
   void UI_removeRawFile(RawFile* targFile) override;
 
-  void UI_beginLoadRawFile() override;
-  void UI_endLoadRawFile() override;
   void UI_addVGMFile(VGMFileVariant file) override;
   void UI_addVGMSeq(VGMSeq* theSeq) override;
   void UI_addVGMInstrSet(VGMInstrSet* theInstrSet) override;
@@ -36,12 +34,9 @@ public:
                                           const std::string& extension) override;
   std::string UI_getSaveDirPath(const std::string& suggestedDir) override;
 
-private:
-  int rawFileLoadRecurseStack = 0;
-
 signals:
-  void UI_beganLoadingRawFile();
-  void UI_endedLoadingRawFile();
+  void UI_beginLoadRawFile() override;
+  void UI_endLoadRawFile() override;
   void UI_beginRemoveRawFiles() override;
   void UI_endRemoveRawFiles() override;
   void UI_beginRemoveVGMFiles() override;

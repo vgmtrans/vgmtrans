@@ -45,8 +45,8 @@ RawFileListViewModel::RawFileListViewModel(QObject *parent) : QAbstractTableMode
     endInsertRows();
   };
 
-  connect(&qtVGMRoot, &QtVGMRoot::UI_beganLoadingRawFile, beginLoad);
-  connect(&qtVGMRoot, &QtVGMRoot::UI_endedLoadingRawFile, endLoad);
+  connect(&qtVGMRoot, &QtVGMRoot::UI_beginLoadRawFile, beginLoad);
+  connect(&qtVGMRoot, &QtVGMRoot::UI_endLoadRawFile, endLoad);
   connect(&qtVGMRoot, &QtVGMRoot::UI_beginRemoveRawFiles, startResettingModel);
   connect(&qtVGMRoot, &QtVGMRoot::UI_endRemoveRawFiles, endResettingModel);
 }

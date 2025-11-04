@@ -87,7 +87,7 @@ bool VGMRoot::createVirtFile(const uint8_t *databuf, uint32_t fileSize, const st
 // Applies loaders and scanners to a rawfile, loading any discovered files
 // returns true if files were discovered
 bool VGMRoot::loadRawFile(RawFile *newRawFile) {
-  UI_beginLoadRawFile();
+  pushLoadRawFile();
   if (newRawFile->useLoaders()) {
     for (const auto &l : LoaderManager::get().loaders()) {
       l->apply(newRawFile);
@@ -136,7 +136,7 @@ bool VGMRoot::loadRawFile(RawFile *newRawFile) {
     UI_loadRawFile(newRawFile);
   }
 
-  UI_endLoadRawFile();
+  popLoadRawFile();
   return foundFiles;
 }
 
@@ -205,11 +205,6 @@ void VGMRoot::removeVGMFile(std::variant<VGMSeq *, VGMInstrSet *, VGMSampColl *,
   delete targFile;
 }
 
-void VGMRoot::removeVGMFile(std::variant<VGMSeq *, VGMInstrSet *, VGMSampColl *, VGMMiscFile *> file, bool bRemoveEmptyRawFile) {
-  auto iter = std::ranges::find(m_vgmfiles, file);
-  removeVGMFile(iter - m_vgmfiles.begin(), bRemoveEmptyRawFile);
-}
-
 void VGMRoot::addVGMColl(VGMColl *theColl) {
   m_vgmcolls.push_back(theColl);
   UI_addVGMColl(theColl);
@@ -252,6 +247,16 @@ void VGMRoot::removeAllFilesAndCollections() {
   deleteVect(m_rawfiles);
 
   popRemoveAll();
+}
+
+void VGMRoot::pushLoadRawFile() {
+  if (rawFileLoadRecurseStack++ == 0)
+    this->UI_beginLoadRawFile();
+}
+
+void VGMRoot::popLoadRawFile() {
+  if (--rawFileLoadRecurseStack == 0)
+    this->UI_endLoadRawFile();
 }
 
 void VGMRoot::pushRemoveRawFiles() {
