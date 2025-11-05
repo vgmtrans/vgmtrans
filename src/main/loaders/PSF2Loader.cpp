@@ -99,6 +99,8 @@ int PSF2Loader::psf2unpack(const RawFile *file, unsigned long fileoffset, unsign
 
         if (r) {
           //string.Format("File %s failed to decompress",filename);
+          delete[] dblock;
+          delete[] newdataBuf;
           return -1;
         }
         if (filesize > buffersize) {
@@ -113,6 +115,7 @@ int PSF2Loader::psf2unpack(const RawFile *file, unsigned long fileoffset, unsign
 
       enqueue(new VirtFile(newdataBuf, actualFileSize, filename, file->path().string()));
       delete[] dblock;
+      delete[] newdataBuf;
     }
   }
 

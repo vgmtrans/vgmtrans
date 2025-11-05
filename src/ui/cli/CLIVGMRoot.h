@@ -44,7 +44,7 @@ public:
 
   void UI_setRootPtr(VGMRoot** theRoot) override;
 
-  void UI_log(LogItem* theLog) override;
+  void UI_log(LogItem theLog) override;
 
   std::string UI_getSaveFilePath(const std::string& suggestedFilename,
                                  const std::string& extension = "") override;

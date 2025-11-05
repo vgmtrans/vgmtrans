@@ -95,6 +95,7 @@ int MP2kInstrSet::makeOrGetSample(size_t sample_pointer) {
   } else {
     /* Invalid loop, assume the whole thing is garbage */
     L_ERROR("Garbage loop data {}", loop);
+    delete samp;
     return -1;
   }
 

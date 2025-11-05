@@ -57,7 +57,7 @@ signals:
   void UI_toastRequested(QString message, ToastType type, int duration_ms);
   void UI_removeVGMColl(VGMColl* targColl) override;
   void UI_removeVGMFile(VGMFile* targFile) override;
-  void UI_log(LogItem* theLog) override;
+  void UI_log(LogItem theLog) override;
 };
 
 extern QtVGMRoot qtVGMRoot;

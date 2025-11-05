@@ -56,10 +56,14 @@ bool VGMInstrSet::loadVGMFile(bool useMatcher) {
 bool VGMInstrSet::load() {
   if (!parseHeader())
     return false;
-  if (!parseInstrPointers())
+  if (!parseInstrPointers()) {
+    deleteVect(aInstrs);
     return false;
-  if (!loadInstrs())
+  }
+  if (!loadInstrs()) {
+    deleteVect(aInstrs);
     return false;
+  }
 
   if (m_auto_add_instruments_as_children)
     addChildren(aInstrs);

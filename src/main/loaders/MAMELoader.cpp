@@ -435,6 +435,7 @@ VirtFile* MAMELoader::loadRomGroup(const MAMERomGroup& entry, const std::string&
         L_ERROR("MAMELoader was going to load a rom group by deinterlacing rom pairs, but there"
                 "an odd number of roms in the group. Aborting.");
         deleteBuffers(buffers);
+        delete[] destFile;
         return nullptr;
       }
 
@@ -499,6 +500,7 @@ VirtFile* MAMELoader::loadRomGroup(const MAMERomGroup& entry, const std::string&
       new VirtFile(destFile, destFileSize, fmt::format("romgroup - {}", entry.type.c_str()));
   newVirtFile->setUseLoaders(false);
   newVirtFile->setUseScanners(false);
+  delete[] destFile;
   return newVirtFile;
 }
 

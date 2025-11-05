@@ -253,8 +253,8 @@ bool VGMRoot::UI_writeBufferToFile(const std::string &filepath, uint8_t *buf, si
 }
 
 // Adds a log item to the interface. The UI_AddLog function will handle the interface-specific stuff
-void VGMRoot::log(LogItem *theLog) {
-  UI_log(theLog);
+void VGMRoot::log(LogItem theLog) {
+  UI_log(std::move(theLog));
 }
 
 std::string VGMRoot::UI_getResourceDirPath() {

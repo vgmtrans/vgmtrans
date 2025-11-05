@@ -10,6 +10,7 @@
 
 #include "common.h"
 #include "VGMTag.h"
+#include "LogItem.h"
 
 class VGMScanner;
 class VGMColl;
@@ -50,7 +51,7 @@ public:
   void removeVGMFile(VGMFileVariant file, bool bRemoveEmptyRawFile = true);
   void addVGMColl(VGMColl *theColl);
   void removeVGMColl(VGMColl *theFile);
-  void log(LogItem *theLog);
+  void log(LogItem theLog);
 
   virtual std::string UI_getResourceDirPath();
   virtual void UI_setRootPtr(VGMRoot **theRoot) = 0;
@@ -68,7 +69,7 @@ public:
   virtual void UI_removeVGMFile(VGMFile *) {}
   virtual void UI_beginRemoveVGMFiles() {}
   virtual void UI_endRemoveVGMFiles() {}
-  virtual void UI_log(LogItem *) { }
+  virtual void UI_log(LogItem log) { }
   virtual void UI_toast(const std::string& message, ToastType type = ToastType::Info,
                         int duration_ms = DEFAULT_TOAST_DURATION) {}
 

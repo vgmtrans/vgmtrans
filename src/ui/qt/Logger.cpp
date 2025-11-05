@@ -78,17 +78,17 @@ void Logger::exportLog() {
   log.commit();
 }
 
-void Logger::push(const LogItem *item) const {
+void Logger::push(LogItem item) const {
   static constexpr const char *log_colors[]{"red", "orange", "darkgrey", "black"};
 
-  if (item->logLevel() > m_level) {
+  if (item.logLevel() > m_level) {
     return;
   }
 
   // If the source string is empty, don't print it, otherwise encapsulate it in brackets
-  auto source = item->source().empty() ? ""
-    : "[" + QString::fromStdString(item->source()) + "]";
+  auto source = item.source().empty() ? ""
+    : "[" + QString::fromStdString(item.source()) + "]";
   logger_textarea->appendHtml(QStringLiteral("<font color=%2>%1 %3</font>")
-    .arg(source, QString(log_colors[static_cast<int>(item->logLevel())]),
-      QString::fromStdString(item->text())));
+    .arg(source, QString(log_colors[static_cast<int>(item.logLevel())]),
+      QString::fromStdString(item.text())));
 }
