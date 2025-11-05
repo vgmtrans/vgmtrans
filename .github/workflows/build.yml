@@ -8,7 +8,7 @@ on:
 jobs:
   macos:
     name: macOS 11.x+
-    runs-on: ${{ (matrix.target == 'intel' && 'macos-13') || 'macos-14' }}
+    runs-on: ${{ (matrix.target == 'intel' && 'macos-15') || 'macos-15' }}
     strategy:
       matrix:
         target: [ "intel", "arm64" ]
