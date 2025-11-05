@@ -57,6 +57,7 @@ void saveAs(const VGMColl &coll, const std::string &dir_path) {
   if constexpr ((options & Target::SF2) != 0) {
     if (SF2File *sf2file = createSF2File(coll)) {
       sf2file->saveSF2File(filepath + ".sf2");
+      delete sf2file;
     }
   }
 }
