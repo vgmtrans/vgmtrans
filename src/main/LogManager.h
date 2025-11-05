@@ -20,8 +20,9 @@ class UISink : public spdlog::sinks::base_sink<Mutex> {
 protected:
   void sink_it_(const spdlog::details::log_msg& msg) override {
     auto level = convertSpdlogLevel(msg.level);
-    LogItem item(fmt::to_string(msg.payload), level, msg.source.filename);
-    pRoot->log(std::move(item));
+    auto logItem = new LogItem( fmt::to_string(msg.payload), level, msg.source.filename);
+    pRoot->log(logItem);
+    delete logItem;
   }
 
   void flush_() override {}

@@ -212,10 +212,10 @@ void CLIVGMRoot::UI_setRootPtr(VGMRoot** theRoot) {
   *theRoot = &cliroot;
 }
 
-void CLIVGMRoot::UI_log(LogItem theLog) {
-  if (theLog.logLevel() <= LOG_LEVEL_WARN) {
-    const string& source = theLog.source();
-    const string& text = theLog.text();
+void CLIVGMRoot::UI_log(LogItem* theLog) {
+  if (theLog->logLevel() <= LOG_LEVEL_WARN) {
+    string source = theLog->source();
+    string text = theLog->text();
     cerr << "[" << source << "]" << text << endl;
   }
 }
