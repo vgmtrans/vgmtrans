@@ -66,6 +66,9 @@ private:
 class VGMTreeDisplayItem : public QStyledItemDelegate {
   Q_OBJECT
 public:
+  explicit VGMTreeDisplayItem(QObject *parent = nullptr)
+      : QStyledItemDelegate(parent) {}
+
   void paint(QPainter *painter, const QStyleOptionViewItem &option,
              const QModelIndex &index) const override;
   QSize sizeHint(const QStyleOptionViewItem &option, const QModelIndex &index) const override;

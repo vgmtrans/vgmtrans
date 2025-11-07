@@ -52,6 +52,7 @@ void RSNLoader::apply(const RawFile *file) {
     }
     auto virtFile = new VirtFile(buffer, static_cast<uint32_t>(size), raw_filename, "", file->tag);
     enqueue(virtFile);
+    delete[] buffer;
   }
   ar_close_archive(ar);
   ar_close(stream);

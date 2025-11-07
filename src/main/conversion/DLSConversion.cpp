@@ -35,6 +35,7 @@ void unpackSampColl(DLSFile &dls, const VGMSampColl *sampColl, std::vector<VGMSa
     uint16_t blockAlign = samp->bps / 8 * samp->channels;
     dls.addWave(1, samp->channels, samp->rate, samp->rate * blockAlign, blockAlign,
                 samp->bps, bufSize, uncompSampBuf, samp->name());
+    delete[] uncompSampBuf;
     finalSamps.push_back(samp);
   }
 }

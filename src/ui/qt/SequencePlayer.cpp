@@ -171,6 +171,7 @@ bool SequencePlayer::playCollection(const VGMColl *coll) {
   }
 
   auto rawSF2 = sf2->saveToMem();
+  delete sf2;
   /* Deleted by MemFile::mem_close */
   auto sf2_data_blob = new MemFile::DataBlob{0, std::move(rawSF2)};
 

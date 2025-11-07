@@ -137,7 +137,7 @@ VGMFileTreeView::VGMFileTreeView(VGMFile *file, QWidget *parent) : QTreeWidget(p
   VMGFileTreeHeaderView *headerView = new VMGFileTreeHeaderView(Qt::Horizontal, this, showDetails);
   this->setHeader(headerView);
 
-  setItemDelegate(new VGMTreeDisplayItem());
+  setItemDelegate(new VGMTreeDisplayItem(this));
 
   connect(NotificationCenter::the(), &NotificationCenter::vgmfiletree_showDetailsChanged,
           this, &VGMFileTreeView::onShowDetailsChanged);

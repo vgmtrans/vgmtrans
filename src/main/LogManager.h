@@ -22,6 +22,7 @@ protected:
     auto level = convertSpdlogLevel(msg.level);
     auto logItem = new LogItem( fmt::to_string(msg.payload), level, msg.source.filename);
     pRoot->log(logItem);
+    delete logItem;
   }
 
   void flush_() override {}

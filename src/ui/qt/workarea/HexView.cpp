@@ -62,7 +62,8 @@ HexView::HexView(VGMFile* vgmfile, QWidget *parent) :
           return this->handleOverlayPaintEvent(obj, static_cast<QPaintEvent*>(event));
         }
         return false;
-      })
+      },
+      overlay)
   );
 
   overlayOpacityEffect = new QGraphicsOpacityEffect(this);
@@ -82,7 +83,8 @@ HexView::HexView(VGMFile* vgmfile, QWidget *parent) :
           return handleSelectedItemPaintEvent(obj, static_cast<QPaintEvent*>(event));
         }
         return false;
-      })
+      },
+      selectionView)
   );
 
   initAnimations();
@@ -331,7 +333,8 @@ void HexView::changeEvent(QEvent *event) {
             return false;
           }
           return false;
-        })
+        },
+        scrollArea)
     );
 
     connect(scrollArea->verticalScrollBar(), &QScrollBar::valueChanged, this, [this, scrollArea](int value) {
