@@ -6,16 +6,58 @@
 
 #include "Logger.h"
 
-#include <QGridLayout>
 #include <QComboBox>
-#include <QPushButton>
-#include <QPlainTextEdit>
-#include <QSaveFile>
+#include <QColor>
 #include <QFileDialog>
+#include <QFontDatabase>
+#include <QGridLayout>
+#include <QPlainTextEdit>
+#include <QPushButton>
+#include <QSaveFile>
+#include <QTextCharFormat>
+#include <QTextCursor>
+#include <QTimer>
+#include <QPalette>
 #include <LogItem.h>
 #include "QtVGMRoot.h"
 
-Logger::Logger(QWidget *parent) : QDockWidget("Log", parent), m_level(LOG_LEVEL_INFO) {
+namespace {
+
+constexpr int FLUSH_INTERVAL_MS = 500;
+constexpr int FLUSH_MESSAGE_THRESHOLD = 5000;
+
+QString levelPrefix(LogLevel level) {
+  switch (level) {
+  case LOG_LEVEL_ERR:
+    return QStringLiteral("[ERR]");
+  case LOG_LEVEL_WARN:
+    return QStringLiteral("[WRN]");
+  case LOG_LEVEL_INFO:
+    return QStringLiteral("[INF]");
+  case LOG_LEVEL_DEBUG:
+  default:
+    return QStringLiteral("[DBG]");
+  }
+}
+
+QColor levelColor(LogLevel level) {
+  switch (level) {
+  case LOG_LEVEL_ERR:
+    return QColor(QStringLiteral("red"));
+  case LOG_LEVEL_WARN:
+    return QColor(QStringLiteral("orange"));
+  case LOG_LEVEL_INFO:
+    return QColor(QStringLiteral("cyan"));
+  case LOG_LEVEL_DEBUG:
+  default:
+    return QColor(QStringLiteral("mediumpurple"));
+  }
+}
+
+} // namespace
+
+Logger::Logger(QWidget *parent)
+    : QDockWidget("Log", parent), m_level(LOG_LEVEL_INFO), m_flushTimer(new QTimer(this)) {
   setAllowedAreas(Qt::AllDockWidgetAreas);
 
   createElements();
@@ -30,6 +72,8 @@ void Logger::createElements() {
   logger_textarea->setVerticalScrollBarPolicy(Qt::ScrollBarAsNeeded);
   logger_textarea->setHorizontalScrollBarPolicy(Qt::ScrollBarAsNeeded);
   logger_textarea->setFont(QFontDatabase::systemFont(QFontDatabase::FixedFont));
+  m_flushTimer->setSingleShot(true);
+  connect(m_flushTimer, &QTimer::timeout, this, &Logger::flushPending);
 
   logger_filter = new QComboBox(logger_wrapper);
   logger_filter->setEditable(false);
@@ -52,7 +96,7 @@ void Logger::createElements() {
 };
 
 void Logger::connectElements() {
-  connect(logger_clear, &QPushButton::pressed, logger_textarea, &QPlainTextEdit::clear);
+  connect(logger_clear, &QPushButton::pressed, this, &Logger::clearLog);
   connect(logger_filter, QOverload<int>::of(&QComboBox::currentIndexChanged),
           [this](int level) { m_level = level; });
   connect(logger_save, &QPushButton::pressed, this, &Logger::exportLog);
@@ -60,6 +104,7 @@ void Logger::connectElements() {
 }
 
 void Logger::exportLog() {
+  flushPending();
   if (logger_textarea->toPlainText().isEmpty()) {
     return;
   }
@@ -78,17 +123,65 @@ void Logger::exportLog() {
   log.commit();
 }
 
-void Logger::push(const LogItem *item) const {
-  static constexpr const char *log_colors[]{"red", "orange", "darkgrey", "black"};
+void Logger::clearLog() {
+  m_flushTimer->stop();
+  m_pendingMessages.clear();
+  logger_textarea->clear();
+}
 
+void Logger::push(const LogItem *item) {
   if (item->logLevel() > m_level) {
     return;
   }
 
   // If the source string is empty, don't print it, otherwise encapsulate it in brackets
-  auto source = item->source().empty() ? ""
-    : "[" + QString::fromStdString(item->source()) + "]";
-  logger_textarea->appendHtml(QStringLiteral("<font color=%2>%1 %3</font>")
-    .arg(source, QString(log_colors[static_cast<int>(item->logLevel())]),
-      QString::fromStdString(item->text())));
+  QString message;
+  if (!item->source().empty()) {
+    message.append('[');
+    message.append(QString::fromStdString(item->source()));
+    message.append("] ");
+  }
+  message.append(QString::fromStdString(item->text()));
+
+  m_pendingMessages.append({message, item->logLevel()});
+
+  if (m_pendingMessages.size() >= FLUSH_MESSAGE_THRESHOLD) {
+    flushPending();
+    return;
+  }
+
+  m_flushTimer->start(FLUSH_INTERVAL_MS);
+}
+
+void Logger::flushPending() {
+  m_flushTimer->stop();
+
+  if (m_pendingMessages.isEmpty()) {
+    return;
+  }
+
+  QTextCursor cursor = logger_textarea->textCursor();
+  cursor.movePosition(QTextCursor::End);
+  cursor.beginEditBlock();
+
+  logger_textarea->setUpdatesEnabled(false);
+
+  QTextCharFormat text_format;
+  text_format.setForeground(logger_textarea->palette().color(QPalette::Text));
+
+  for (const PendingMessage &entry : m_pendingMessages) {
+    QTextCharFormat prefix_format;
+    prefix_format.setForeground(levelColor(entry.level));
+    cursor.insertText(levelPrefix(entry.level), prefix_format);
+    cursor.insertText(QStringLiteral(" "), text_format);
+    cursor.insertText(entry.text, text_format);
+    cursor.insertBlock();
+  }
+
+  cursor.endEditBlock();
+  logger_textarea->setTextCursor(cursor);
+  logger_textarea->setUpdatesEnabled(true);
+  logger_textarea->ensureCursorVisible();
+
+  m_pendingMessages.clear();
 }
