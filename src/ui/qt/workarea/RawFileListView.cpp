@@ -26,8 +26,28 @@ static const QIcon& fileIcon() {
  */
 
 RawFileListViewModel::RawFileListViewModel(QObject *parent) : QAbstractTableModel(parent) {
-  connect(&qtVGMRoot, &QtVGMRoot::UI_addedRawFile, this, &RawFileListViewModel::addRawFile);
-  connect(&qtVGMRoot, &QtVGMRoot::UI_removedRawFile, this, &RawFileListViewModel::removeRawFile);
+  auto startResettingModel = [this]() { beginResetModel(); };
+  auto endResettingModel = [this]() {
+    endResetModel();
+    NotificationCenter::the()->updateContextualMenusForRawFiles({});
+  };
+
+  auto beginLoad = [this]() {
+    filesBeforeLoad = pRoot->rawFiles().size();
+  };
+
+  auto endLoad = [this]() {
+    int filesLoaded = pRoot->rawFiles().size() - filesBeforeLoad;
+    if (filesLoaded <= 0)
+      return;
+    beginInsertRows(QModelIndex(), filesBeforeLoad, filesBeforeLoad + filesLoaded - 1);
+    endInsertRows();
+  };
+
+  connect(&qtVGMRoot, &QtVGMRoot::UI_beginLoadRawFile, beginLoad);
+  connect(&qtVGMRoot, &QtVGMRoot::UI_endLoadRawFile, endLoad);
+  connect(&qtVGMRoot, &QtVGMRoot::UI_beginRemoveRawFiles, startResettingModel);
+  connect(&qtVGMRoot, &QtVGMRoot::UI_endRemoveRawFiles, endResettingModel);
 }
 
 int RawFileListViewModel::rowCount(const QModelIndex &parent) const {
@@ -42,25 +62,6 @@ int RawFileListViewModel::columnCount(const QModelIndex &parent) const {
     return 0;
 
   return 2;
-}
-
-void RawFileListViewModel::addRawFile() {
-  int position = static_cast<int>(qtVGMRoot.rawFiles().size()) - 1;
-  if (position >= 0) {
-    beginInsertRows(QModelIndex(), position, position);
-    endInsertRows();
-  }
-}
-
-void RawFileListViewModel::removeRawFile() {
-  int position = static_cast<int>(qtVGMRoot.rawFiles().size()) - 1;
-  if (position >= 0) {
-    beginRemoveRows(QModelIndex(), position, position);
-    endRemoveRows();
-  } else {
-    // hack to refresh the view when deleting the last column
-    dataChanged(index(0, 0), index(0, 0));
-  }
 }
 
 QVariant RawFileListViewModel::headerData(int column, Qt::Orientation orientation, int role) const {
@@ -178,33 +179,6 @@ void RawFileListView::updateContextualMenus() const {
   }
 
   NotificationCenter::the()->updateContextualMenusForRawFiles(files);
-}
-
-void RawFileListView::keyPressEvent(QKeyEvent *input) {
-  // On Backspace or Delete keypress, remove all selected files
-  switch (input->key()) {
-    case Qt::Key_Delete:
-    case Qt::Key_Backspace: {
-      deleteRawFiles();
-      break;
-    }
-
-    // Pass the event back to the base class, needed for keyboard navigation
-    default:
-      QTableView::keyPressEvent(input);
-  }
-}
-
-void RawFileListView::deleteRawFiles() {
-  if (!selectionModel()->hasSelection())
-    return;
-
-  QModelIndexList list = selectionModel()->selectedRows();
-  for (auto & idx : std::ranges::reverse_view(list)) {
-    const auto rawfile = qtVGMRoot.rawFiles()[idx.row()];
-    qtVGMRoot.closeRawFile(rawfile);
-  }
-  clearSelection();
 }
 
 void RawFileListView::onVGMFileSelected(const VGMFile* vgmfile, const QWidget* caller) {

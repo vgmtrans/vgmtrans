@@ -21,6 +21,7 @@
 #include "LoaderManager.h"
 #include "ScannerManager.h"
 #include "LogManager.h"
+#include "helper.h"
 
 #include <filesystem>
 
@@ -62,7 +63,7 @@ bool VGMRoot::openRawFile(const std::string &filePath) {
     return false;
   }
   size_t vgmFileCountBefore = vgmFiles().size();
-  if (!setupNewRawFile(newFile)) {
+  if (!loadRawFile(newFile)) {
     delete newFile;
   }
   return vgmFiles().size() > vgmFileCountBefore;
@@ -76,7 +77,7 @@ bool VGMRoot::createVirtFile(const uint8_t *databuf, uint32_t fileSize, const st
   auto newVirtFile = new VirtFile(databuf, fileSize, filename,
     parRawFileFullPath, tag);
 
-  if (!setupNewRawFile(newVirtFile)) {
+  if (!loadRawFile(newVirtFile)) {
     delete newVirtFile;
     return false;
   }
@@ -85,8 +86,8 @@ bool VGMRoot::createVirtFile(const uint8_t *databuf, uint32_t fileSize, const st
 
 // Applies loaders and scanners to a rawfile, loading any discovered files
 // returns true if files were discovered
-bool VGMRoot::setupNewRawFile(RawFile *newRawFile) {
-  UI_onBeginLoadRawFile();
+bool VGMRoot::loadRawFile(RawFile *newRawFile) {
+  pushLoadRawFile();
   if (newRawFile->useLoaders()) {
     for (const auto &l : LoaderManager::get().loaders()) {
       l->apply(newRawFile);
@@ -97,7 +98,7 @@ bool VGMRoot::setupNewRawFile(RawFile *newRawFile) {
         newRawFile->setUseScanners(false);
 
         for (const auto &file : res) {
-          if (!setupNewRawFile(file)) {
+          if (!loadRawFile(file)) {
             delete file;
           }
         }
@@ -132,40 +133,38 @@ bool VGMRoot::setupNewRawFile(RawFile *newRawFile) {
   bool foundFiles = !newRawFile->containedVGMFiles().empty();
   if (foundFiles) {
     m_rawfiles.emplace_back(newRawFile);
-    UI_addRawFile(newRawFile);
+    UI_loadRawFile(newRawFile);
   }
 
-  UI_onEndLoadRawFile();
+  popLoadRawFile();
   return foundFiles;
 }
 
-bool VGMRoot::closeRawFile(RawFile *targFile) {
-  if (!targFile) {
+bool VGMRoot::removeRawFile(RawFile *rawfile) {
+  if (!rawfile)
+    return false;
+
+  auto iter = std::ranges::find(m_rawfiles, rawfile);
+  if (iter == m_rawfiles.end()) {
+    L_WARN("Requested deletion of a RawFile not stored in Root");
     return false;
   }
 
-  auto file = std::ranges::find(m_rawfiles, targFile);
-  if (file != m_rawfiles.end()) {
-    auto &vgmfiles = (*file)->containedVGMFiles();
-    UI_beginRemoveVGMFiles();
-    for (const auto & vgmfile : vgmfiles) {
-      removeVGMFile(*vgmfile, false);
-    }
-    UI_endRemoveVGMFiles();
-
-    m_rawfiles.erase(file);
-
-    UI_closeRawFile(targFile);
-  } else {
-    L_WARN("Requested deletion for RawFile but it was not found");
-    return false;
+  auto &vgmfiles = rawfile->containedVGMFiles();
+  for (const auto & vgmfile : vgmfiles) {
+    removeVGMFile(*vgmfile, false);
   }
-  delete targFile;
+
+  pushRemoveRawFiles();
+  UI_removeRawFile(rawfile);
+  m_rawfiles.erase(iter);
+  popRemoveRawFiles();
+
+  delete rawfile;
   return true;
 }
 
-void VGMRoot::addVGMFile(
-  std::variant<VGMSeq *, VGMInstrSet *, VGMSampColl *, VGMMiscFile *> file) {
+void VGMRoot::addVGMFile(std::variant<VGMSeq *, VGMInstrSet *, VGMSampColl *, VGMMiscFile *> file) {
   m_vgmfiles.push_back(file);
   L_INFO("Loaded {} successfully.", variantToVGMFile(file)->name());
   UI_addVGMFile(file);
@@ -184,8 +183,10 @@ void VGMRoot::removeVGMFile(std::variant<VGMSeq *, VGMInstrSet *, VGMSampColl *,
   auto iter = std::ranges::find(m_vgmfiles, file);
 
   if (iter != m_vgmfiles.end()) {
+    pushRemoveVGMFiles();
     UI_removeVGMFile(targFile);
     m_vgmfiles.erase(iter);
+    popRemoveVGMFiles();
   } else {
     L_WARN("Requested deletion for VGMFile but it was not found");
   }
@@ -198,27 +199,106 @@ void VGMRoot::removeVGMFile(std::variant<VGMSeq *, VGMInstrSet *, VGMSampColl *,
     const auto rawFile = targFile->rawFile();
     rawFile->removeContainedVGMFile(file);
     if (rawFile->containedVGMFiles().empty()) {
-      closeRawFile(rawFile);
+      removeRawFile(rawFile);
     }
   }
   delete targFile;
 }
 
 void VGMRoot::addVGMColl(VGMColl *theColl) {
-    m_vgmcolls.push_back(theColl);
-    UI_addVGMColl(theColl);
+  m_vgmcolls.push_back(theColl);
+  UI_addVGMColl(theColl);
 }
 
-void VGMRoot::removeVGMColl(VGMColl *targColl) {
-  auto iter = std::ranges::find(m_vgmcolls, targColl);
-  if (iter != m_vgmcolls.end())
+void VGMRoot::removeVGMColl(VGMColl *coll) {
+  auto iter = std::ranges::find(m_vgmcolls, coll);
+  pushRemoveVGMColls();
+  if (iter != m_vgmcolls.end()) {
     m_vgmcolls.erase(iter);
-  else
-    L_WARN("Requested deletion for VGMColl but it was not found");
+  } else {
+    L_WARN("Requested deletion of VGMColl not stored in Root");
+  }
 
-  targColl->removeFileAssocs();
-  UI_removeVGMColl(targColl);
-  delete targColl;
+  coll->removeFileAssocs();
+  UI_removeVGMColl(coll);
+  popRemoveVGMColls();
+  delete coll;
+}
+
+void VGMRoot::removeAllFilesAndCollections() {
+  pushRemoveAll();
+
+  for (auto vgmcoll : m_vgmcolls)
+    UI_removeVGMColl(vgmcoll);
+  deleteVect(m_vgmcolls);
+
+  for (auto variant : m_vgmfiles) {
+    auto vgmfile = variantToVGMFile(variant);
+    if (Format *fmt = vgmfile->format()) {
+      fmt->onCloseFile(variant);
+    }
+    UI_removeVGMFile(vgmfile);
+    delete variantToVGMFile(variant);
+  }
+  m_vgmfiles.clear();
+
+  for (auto rawfile: m_rawfiles)
+    UI_removeRawFile(rawfile);
+  deleteVect(m_rawfiles);
+
+  popRemoveAll();
+}
+
+void VGMRoot::pushLoadRawFile() {
+  if (rawFileLoadRecurseStack++ == 0)
+    this->UI_beginLoadRawFile();
+}
+
+void VGMRoot::popLoadRawFile() {
+  if (--rawFileLoadRecurseStack == 0)
+    this->UI_endLoadRawFile();
+}
+
+void VGMRoot::pushRemoveRawFiles() {
+  if (rawFileRemoveStack++ == 0)
+    this->UI_beginRemoveRawFiles();
+}
+
+void VGMRoot::popRemoveRawFiles() {
+  if (--rawFileRemoveStack == 0)
+    this->UI_endRemoveRawFiles();
+}
+
+void VGMRoot::pushRemoveVGMFiles() {
+  if (vgmFileRemoveStack++ == 0)
+    this->UI_beginRemoveVGMFiles();
+}
+
+void VGMRoot::popRemoveVGMFiles() {
+  if (--vgmFileRemoveStack == 0)
+    this->UI_endRemoveVGMFiles();
+}
+
+void VGMRoot::pushRemoveVGMColls() {
+  if (vgmCollRemoveStack++ == 0)
+    this->UI_beginRemoveVGMColls();
+}
+
+void VGMRoot::popRemoveVGMColls() {
+  if (--vgmCollRemoveStack == 0)
+    this->UI_endRemoveVGMColls();
+}
+
+void VGMRoot::pushRemoveAll() {
+  pushRemoveRawFiles();
+  pushRemoveVGMFiles();
+  pushRemoveVGMColls();
+}
+
+void VGMRoot::popRemoveAll() {
+  popRemoveVGMColls();
+  popRemoveVGMFiles();
+  popRemoveRawFiles();
 }
 
 // This virtual function is called whenever a VGMFile is added to the interface.
@@ -226,30 +306,30 @@ void VGMRoot::removeVGMColl(VGMColl *targColl) {
 // specific virtual function for the file type.  It is virtual in case a user-interface
 // wants do something universally whenever any type of VGMFiles is added.
 void VGMRoot::UI_addVGMFile(std::variant<VGMSeq *, VGMInstrSet *, VGMSampColl *, VGMMiscFile *> file) {
-    if(auto seq = std::get_if<VGMSeq *>(&file)) {
-        UI_addVGMSeq(*seq);
-    } else if(auto instr = std::get_if<VGMInstrSet *>(&file)) {
-        UI_addVGMInstrSet(*instr);
-    } else if(auto sampcoll = std::get_if<VGMSampColl *>(&file)) {
-        UI_addVGMSampColl(*sampcoll);
-    } else if(auto misc = std::get_if<VGMMiscFile *>(&file)) {
-        UI_addVGMMisc(*misc);
-    }
+  if(auto seq = std::get_if<VGMSeq *>(&file)) {
+    UI_addVGMSeq(*seq);
+  } else if(auto instr = std::get_if<VGMInstrSet *>(&file)) {
+    UI_addVGMInstrSet(*instr);
+  } else if(auto sampcoll = std::get_if<VGMSampColl *>(&file)) {
+    UI_addVGMSampColl(*sampcoll);
+  } else if(auto misc = std::get_if<VGMMiscFile *>(&file)) {
+    UI_addVGMMisc(*misc);
+  }
 }
 
 // Given a pointer to a buffer of data, size, and a filename, this function writes the data
 // into a file on the filesystem.
 bool VGMRoot::UI_writeBufferToFile(const std::string &filepath, uint8_t *buf, size_t size) {
-    std::ofstream outfile(filepath, std::ios::out | std::ios::trunc | std::ios::binary);
+  std::ofstream outfile(filepath, std::ios::out | std::ios::trunc | std::ios::binary);
 
-    if (!outfile.is_open()) {
-      L_ERROR(std::string("Error: could not open file " + filepath + " for writing").c_str());
-        return false;
-    }
+  if (!outfile.is_open()) {
+    L_ERROR(std::string("Error: could not open file " + filepath + " for writing").c_str());
+      return false;
+  }
 
-    outfile.write(reinterpret_cast<char *>(buf), size);
-    outfile.close();
-    return true;
+  outfile.write(reinterpret_cast<char *>(buf), size);
+  outfile.close();
+  return true;
 }
 
 // Adds a log item to the interface. The UI_AddLog function will handle the interface-specific stuff

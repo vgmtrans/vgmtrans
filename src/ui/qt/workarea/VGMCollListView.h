@@ -22,7 +22,7 @@ public:
   Qt::ItemFlags flags(const QModelIndex &index) const override;
 
 private:
-  bool resettingModel = false;
+  size_t collsBeforeLoad;
 };
 
 class VGMCollNameEditor : public QStyledItemDelegate {

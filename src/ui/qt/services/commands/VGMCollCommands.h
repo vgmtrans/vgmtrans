@@ -21,7 +21,7 @@ public:
   void executeItem(VGMColl* coll) const override {
     SequencePlayer::the().playCollection(coll);
   }
-  [[nodiscard]] QKeySequence shortcutKeySequence() const override { return Qt::Key_Return; };
+  [[nodiscard]] QList<QKeySequence> shortcutKeySequences() const override { return {Qt::Key_Return}; };
   [[nodiscard]] std::string name() const override { return "Play / Pause"; }
   [[nodiscard]] std::optional<MenuPath> menuPath() const override { return MenuPaths::Preview; }
 };

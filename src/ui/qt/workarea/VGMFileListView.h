@@ -15,36 +15,30 @@
 
 class QItemSelection;
 class VGMFileListModel : public QAbstractTableModel {
-    Q_OBJECT
+public:
+  explicit VGMFileListModel(QObject *parent = nullptr);
 
-  public:
-    explicit VGMFileListModel(QObject *parent = nullptr);
+  QVariant data(const QModelIndex &index, int role) const override;
+  QVariant headerData(int section, Qt::Orientation orientation, int role) const override;
+  int rowCount(const QModelIndex &parent = QModelIndex()) const override;
+  int columnCount(const QModelIndex &parent) const override;
 
-    QVariant data(const QModelIndex &index, int role) const override;
-    QVariant headerData(int section, Qt::Orientation orientation, int role) const override;
-    int rowCount(const QModelIndex &parent) const override;
-    int columnCount(const QModelIndex &parent) const override;
-
-  public slots:
-    void addVGMFile();
-    void removeVGMFile();
-
-  private:
-    enum Property : uint8_t { Name = 0, Format = 1 };
+private:
+  enum Property : uint8_t { Name = 0, Format = 1 };
+  size_t filesBeforeLoad;
 };
 
 class VGMFileListView final : public TableView {
-    Q_OBJECT
+  Q_OBJECT
 
-  public:
-    explicit VGMFileListView(QWidget *parent = nullptr);
+public:
+  explicit VGMFileListView(QWidget *parent = nullptr);
 
-  public slots:
-    static void requestVGMFileView(const QModelIndex& index);
-    void removeVGMFile(const VGMFile *file) const;
-    void onVGMFileSelected(VGMFile *file, const QWidget* caller);
+public slots:
+  static void requestVGMFileView(const QModelIndex& index);
+  void onVGMFileSelected(VGMFile *file, const QWidget* caller);
 
-  private:
+private:
   void updateStatusBar() const;
   void focusInEvent(QFocusEvent *event) override;
   void currentChanged(const QModelIndex &current, const QModelIndex &previous) override;

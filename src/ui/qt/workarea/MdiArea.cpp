@@ -203,10 +203,10 @@ MdiArea::MdiArea(QWidget *parent) : QMdiArea(parent) {
   connect(this, &QMdiArea::subWindowActivated, this, &MdiArea::onSubWindowActivated);
   connect(NotificationCenter::the(), &NotificationCenter::vgmFileSelected, this, &MdiArea::onVGMFileSelected);
   connect(&qtVGMRoot, &QtVGMRoot::UI_addedRawFile, this, [this]() { viewport()->update(); });
-  connect(&qtVGMRoot, &QtVGMRoot::UI_removedRawFile, this, [this]() { viewport()->update(); });
+  connect(&qtVGMRoot, &QtVGMRoot::UI_endRemoveRawFiles, this, [this]() { viewport()->update(); });
   connect(&qtVGMRoot, &QtVGMRoot::UI_addedVGMColl, this, [this]() { viewport()->update(); });
-  connect(&qtVGMRoot, &QtVGMRoot::UI_removeVGMColl, this,
-          [this](VGMColl *) { viewport()->update(); });
+  connect(&qtVGMRoot, &QtVGMRoot::UI_endRemoveVGMColls, this,[this]() { viewport()->update(); });
+  connect(&qtVGMRoot, &QtVGMRoot::UI_removeVGMFile, this, [this](const VGMFile *file) { removeView(file); });
 
   if (auto *tab_bar = findChild<QTabBar *>()) {
     tab_bar->setStyleSheet(QString{"QTabBar::tab { height: %1; }"}.arg(Size::VTab));

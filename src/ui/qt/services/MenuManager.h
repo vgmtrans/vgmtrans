@@ -234,8 +234,8 @@ public:
         }
         command->execute(*context);
       });
-      if (const auto& keySequence = command->shortcutKeySequence(); keySequence != -1) {
-        action->setShortcut(keySequence);
+      if (const auto& keySequences = command->shortcutKeySequences(); !keySequences.empty()) {
+        action->setShortcuts(keySequences);
         action->setShortcutVisibleInContextMenu(true);
       }
       createdActions.push_back(action);
