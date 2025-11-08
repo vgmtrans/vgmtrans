@@ -267,6 +267,7 @@ bool VSTSequencePlayer::sendSF2ToVST(const VGMColl* coll) {
   populateFileMidiBuffer(rawSF2, sf2Size, SoundFont2);
 
   delete[] rawSF2;
+  delete sf2;
   return true;
 }
 
