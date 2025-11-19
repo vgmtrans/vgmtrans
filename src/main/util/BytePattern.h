@@ -2,6 +2,7 @@
 // Heavily inspired by SigScan at GameDeception.net
 
 #pragma once
+#include "common.h"
 
 class BytePattern {
  private:
