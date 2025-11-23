@@ -36,10 +36,10 @@ void KonamiTMNT2Seq::resetVars() {
 // }
 
 bool KonamiTMNT2Seq::parseTrackPointers() {
-  for (auto offset : m_ym2151TrackOffsets) {
-    auto *track = new KonamiTMNT2K053260Track(this, offset, 0);
-    aTracks.push_back(track);
-  }
+  // for (auto offset : m_ym2151TrackOffsets) {
+  //   auto *track = new KonamiTMNT2K053260Track(this, offset, 0);
+  //   aTracks.push_back(track);
+  // }
   for (auto offset : m_k053260TrackOffsets) {
     auto *track = new KonamiTMNT2K053260Track(this, offset, 0);
     aTracks.push_back(track);
@@ -78,6 +78,8 @@ bool KonamiTMNT2K053260Track::readEvent() {
     return false;
   }
 
+  if (curOffset == 0x9787)
+    printf("TESTING");
   uint32_t beginOffset = curOffset;
   uint8_t opcode = readByte(curOffset++);
 
@@ -104,23 +106,31 @@ bool KonamiTMNT2K053260Track::readEvent() {
       }
     }
 
-    if (opcode & 0xF0 == 0) {
+    if ((opcode & 0xF0) == 0) {
       // Don't play note?
       m_state |= 0x80;
       addRest(beginOffset, curOffset - beginOffset, dur);
       return true;
     }
-    // Melodic
-    u8 semitones = opcode >> 4;
-    // u8 durationIndex = opcode & 0x0F;
-    u8 note = semitones + m_addedToNote;
-    // note += 24;
-    printf("DUR: %d\n", dur);
-    if (dur == 0) {
-      printf("DUR 0. offset: %X\n", beginOffset);
-
+    if (percussionMode()) {
+      if (m_addedToNote > 0)
+        printf("TESTING");
+      u8 semitones = opcode >> 4;
+      s8 note = semitones + (m_addedToNote * 16);
+      note -= transpose;
+      addNoteByDur(beginOffset, curOffset - beginOffset, note, 0x7F, dur);
+    } else {
+      // Melodic
+      u8 semitones = (opcode >> 4) - 1;
+      // u8 durationIndex = opcode & 0x0F;
+      u8 note = semitones + m_addedToNote;
+      // note -= 12;
+      // printf("DUR: %d\n", dur);
+      if (dur == 0) {
+        printf("DUR 0. offset: %X\n", beginOffset);
+      }
+      addNoteByDur(beginOffset, curOffset - beginOffset, note, 0x7F, dur);
     }
-    addNoteByDur(beginOffset, curOffset - beginOffset, note, 0x7F, dur);
     addTime(dur);
     return true;
   }
@@ -187,8 +197,8 @@ bool KonamiTMNT2K053260Track::readEvent() {
           m_state = val & 0xF0;
           m_rawBaseDur = val;
           m_baseDur = val * 3;
-          u8 programNum = readByte(curOffset++);
-          addProgramChangeNoItem(programNum, false);
+          m_program = readByte(curOffset++);
+          addProgramChangeNoItem(m_program, false);
           m_attenuation = readByte(curOffset++) & 0x7F;
           u8 unsure = readByte(curOffset++);
           addGenericEvent(beginOffset, curOffset - beginOffset, "Program Change / Base Dur / Attenuation / State", "", Type::ProgramChange);
@@ -234,7 +244,8 @@ bool KonamiTMNT2K053260Track::readEvent() {
       }
       case 0xE3:
         // PROGRAM CHANGE
-        addProgramChange(beginOffset, 2, readByte(curOffset++));
+        m_program = readByte(curOffset++);
+        addProgramChange(beginOffset, 2, m_program);
         break;
       case 0xE4: {
         m_attenuation = readByte(curOffset++) & 0x7F;
@@ -299,20 +310,25 @@ bool KonamiTMNT2K053260Track::readEvent() {
       case 0xF5:
       case 0xF6:
       case 0xF7: {
-        u8 val = opcode & 0xF;
-
-        u8 semitones = val - 1;
-        if (percussionMode() == false) {
-          u8 cVar6 = val + 1;
-          u8 bVar4 = 0;
-          do {
-            semitones = bVar4;
-            cVar6 = cVar6 + -1;
-            bVar4 = semitones + 0xc;
-          } while (cVar6 != 0);
+        if (percussionMode()) {
+          m_addedToNote = (opcode & 0xF) - 1;
+        } else {
+          m_addedToNote = (opcode & 0xF) * 12;
         }
-        m_addedToNote = semitones;
-        addGenericEvent(beginOffset, 1, "Set Octave", fmt::format("Octave - {}", val), Type::Octave);
+        // u8 val = opcode & 0xF;
+
+        // u8 semitones = val - 1;
+        // if (percussionMode() == false) {
+        //   u8 cVar6 = val + 1;
+        //   u8 bVar4 = 0;
+        //   do {
+        //     semitones = bVar4;
+        //     cVar6 = cVar6 - 1;
+        //     bVar4 = semitones + 0xc;
+        //   } while (cVar6 != 0);
+        // }
+        // m_addedToNote = semitones;
+        addGenericEvent(beginOffset, 1, "Set Octave", fmt::format("Octave - {}", opcode & 0xF), Type::Octave);
 
         // if ((m_state & 2) > 0) {
         //   m_addedToNote = val - 1;

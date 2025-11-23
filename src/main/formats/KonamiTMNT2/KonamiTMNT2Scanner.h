@@ -7,6 +7,7 @@
 
 #include "Scanner.h"
 #include "BytePattern.h"
+#include <set>
 
 class KonamiTMNT2Seq;
 class MAMEGame;
@@ -23,8 +24,18 @@ class KonamiTMNT2Scanner : public VGMScanner {
 
   void scan(RawFile *file, void *info) override;
 private:
+  std::vector<KonamiTMNT2Seq*> loadSeqTable(
+    RawFile* programRom,
+    u32 seqTableAddr,
+    KonamiTMNT2FormatVer fmtVer,
+    std::string& gameName
+  );
+
   static BytePattern ptn_tmnt2_LoadSeqTable;
   static BytePattern ptn_simp_LoadSeqTable;
   static BytePattern ptn_moomesa_LoadSeqTable;
   static BytePattern ptn_tmnt2_LoadInstrTable;
+  static BytePattern ptn_tmnt2_LoadDrumTable;
+  // std::set<u32> m_instrPtrs;
+  // std::set<u32> m_drumPtrs;
 };

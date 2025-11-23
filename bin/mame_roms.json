@@ -695,6 +695,27 @@
       ]
     },
     {
+      "name": "esckids",
+      "format": "KonamiTMNT2",
+      "fmt_version": "tmnt2",
+      "rom_groups": [
+        {
+          "type": "soundcpu",
+          "load_method": "append",
+          "roms": [
+            "975f02"
+          ]
+        },
+        {
+          "type": "sound",
+          "load_method": "append",
+          "roms": [
+            "975c03"
+          ]
+        }
+      ]
+    },
+    {
       "name": "ffight",
       "format": "CPS1",
       "fmt_version": "CPS1_V2.00",
@@ -3605,6 +3626,27 @@
       ]
     },
     {
+      "name": "vendetta",
+      "format": "KonamiTMNT2",
+      "fmt_version": "tmnt2",
+      "rom_groups": [
+        {
+          "type": "soundcpu",
+          "load_method": "append",
+          "roms": [
+            "081b02"
+          ]
+        },
+        {
+          "type": "sound",
+          "load_method": "append",
+          "roms": [
+            "081a03"
+          ]
+        }
+      ]
+    },
+    {
       "name": "vhunt2",
       "format": "CPS2",
       "fmt_version": "CPS2_V1.30",
@@ -3877,6 +3919,27 @@
           "roms": [
             "xmn.11m",
             "xmn.12m"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "xmen",
+      "format": "KonamiTMNT2",
+      "fmt_version": "tmnt2",
+      "rom_groups": [
+        {
+          "type": "soundcpu",
+          "load_method": "append",
+          "roms": [
+            "065-a01.6f"
+          ]
+        },
+        {
+          "type": "sound",
+          "load_method": "append",
+          "roms": [
+            "065-a06.1f"
           ]
         }
       ]

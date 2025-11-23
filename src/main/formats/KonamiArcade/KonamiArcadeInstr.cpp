@@ -225,7 +225,14 @@ bool KonamiArcadeSampColl::parseSampleInfo() {
     auto name = fmt::format("Sample {:d}", sampNum++);
     VGMSamp* sample;
     if (sampInfo.type() == konami_mw_sample_info::sample_type::ADPCM) {
-      sample = new K054539AdpcmSamp(this, sampleOffset, sampleSize, 24000, name);
+      sample = new KonamiAdpcmSamp(
+        this,
+        sampleOffset,
+        sampleSize,
+        KonamiAdpcmChip::K054539,
+        24000,
+        name
+      );
       sample->setWaveType(WT_PCM16);
       samples.push_back(sample);
     } else {

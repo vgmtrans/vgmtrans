@@ -53,10 +53,19 @@ class KonamiTMNT2K053260Track : public SeqTrack {
   bool readEvent() override;
 
 private:
-  void setPercussionModeOn() { m_state |= 2; }
-  void setPercussionModeOff() { m_state &= ~2; }
-  bool percussionMode() { return (m_state & 2) > 0; }
+  void setPercussionModeOn() {
+    addBankSelectNoItem(1);
+    addProgramChangeNoItem(0, false);
+    m_state |= 2;
+  }
+  void setPercussionModeOff() {
+    addBankSelectNoItem(0);
+    addProgramChangeNoItem(m_program, false);
+    m_state &= ~2;
+  }
+  bool percussionMode() const { return (m_state & 2) > 0; }
 
+  u8 m_program = 0;
   u8 m_state = 0;
   u8 m_rawBaseDur = 0;
   u8 m_baseDur = 0;
