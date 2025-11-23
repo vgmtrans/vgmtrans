@@ -2,13 +2,26 @@
 
 #include "VGMSamp.h"
 
-class K054539AdpcmSamp
-    : public VGMSamp {
+enum class KonamiAdpcmChip {
+  K054539,
+  K053260
+};
+
+class KonamiAdpcmSamp : public VGMSamp {
 public:
-  K054539AdpcmSamp(
-      VGMSampColl *sampColl, uint32_t offset, uint32_t length, uint32_t theRate, std::string name
+  KonamiAdpcmSamp(
+      VGMSampColl* sampColl,
+      u32 offset,
+      u32 length,
+      KonamiAdpcmChip chip,
+      u32 theRate,
+      std::string name
   );
 
   double compressionRatio() override;
-  void convertToStdWave(uint8_t *buf) override;
+  void convertToStdWave(u8* buf) override;
+
+private:
+  KonamiAdpcmChip m_chip;
+  const s16* m_stepTable;
 };
