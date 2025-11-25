@@ -905,6 +905,29 @@
       ]
     },
     {
+      "name": "gradius3",
+      "format": "KonamiTMNT2",
+      "fmt_version": "tmnt2",
+      "rom_groups": [
+        {
+          "type": "soundcpu",
+          "load_method": "append",
+          "roms": [
+            "945_r05.d9"
+          ]
+        },
+        {
+          "type": "sound",
+          "load_method": "append",
+          "roms": [
+            "945_a10.b15",
+            "945_l11a.c18",
+            "945_l11b.c20"
+          ]
+        }
+      ]
+    },
+    {
       "name": "gulunpa",
       "format": "CPS1",
       "fmt_version": "CPS1_V4.25",
@@ -2179,6 +2202,27 @@
             "ps-q2.2k",
             "ps-q3.3k",
             "ps-q4.4k"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "punkshot",
+      "format": "KonamiTMNT2",
+      "fmt_version": "tmnt2",
+      "rom_groups": [
+        {
+          "type": "soundcpu",
+          "load_method": "append",
+          "roms": [
+            "907f01.e8"
+          ]
+        },
+        {
+          "type": "sound",
+          "load_method": "append",
+          "roms": [
+            "907d04.d3"
           ]
         }
       ]
@@ -3477,6 +3521,27 @@
           "load_method": "append_swap16",
           "roms": [
             "kio-01m.3a"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "thndrx2",
+      "format": "KonamiTMNT2",
+      "fmt_version": "tmnt2",
+      "rom_groups": [
+        {
+          "type": "soundcpu",
+          "load_method": "append",
+          "roms": [
+            "073-c01.4f"
+          ]
+        },
+        {
+          "type": "sound",
+          "load_method": "append",
+          "roms": [
+            "073-b04.2d"
           ]
         }
       ]
