@@ -20,7 +20,10 @@ KonamiTMNT2Seq::KonamiTMNT2Seq(RawFile *file,
       m_fmtVer(fmtVer),
       m_ym2151TrackOffsets(std::move(ym2151TrackOffsets)),
       m_k053260TrackOffsets(std::move(k053260TrackOffsets)) {
+  bLoadTickByTick = true;
   setPPQN(120);
+  setAlwaysWriteInitialVol(127);
+  setAlwaysWriteInitialExpression(127);
   setAlwaysWriteInitialTempo(108);
   setAllowDiscontinuousTrackData(true);
   // setShouldTrackControlFlowState(true);
@@ -28,6 +31,8 @@ KonamiTMNT2Seq::KonamiTMNT2Seq(RawFile *file,
 
 void KonamiTMNT2Seq::resetVars() {
   VGMSeq::resetVars();
+  m_globalTransposeYM2151 = 0;
+  m_globalTransposeK053260 = 0;
 }
 
 // bool KonamiTMNT2Seq::parseHeader() {
@@ -36,12 +41,12 @@ void KonamiTMNT2Seq::resetVars() {
 // }
 
 bool KonamiTMNT2Seq::parseTrackPointers() {
-  // for (auto offset : m_ym2151TrackOffsets) {
-  //   auto *track = new KonamiTMNT2K053260Track(this, offset, 0);
-  //   aTracks.push_back(track);
-  // }
+  for (auto offset : m_ym2151TrackOffsets) {
+    auto *track = new KonamiTMNT2Track(true, this, offset, 0);
+    aTracks.push_back(track);
+  }
   for (auto offset : m_k053260TrackOffsets) {
-    auto *track = new KonamiTMNT2K053260Track(this, offset, 0);
+    auto *track = new KonamiTMNT2Track(false, this, offset, 0);
     aTracks.push_back(track);
   }
 
@@ -49,10 +54,16 @@ bool KonamiTMNT2Seq::parseTrackPointers() {
   return nNumTracks > 0;
 }
 
-KonamiTMNT2K053260Track::KonamiTMNT2K053260Track(KonamiTMNT2Seq *parentSeq, uint32_t offset, uint32_t length)
-    : SeqTrack(parentSeq, offset, length) {}
+KonamiTMNT2Track::KonamiTMNT2Track(
+  bool isFmTrack,
+  KonamiTMNT2Seq *parentSeq,
+  uint32_t offset,
+  uint32_t length
+)
+    : SeqTrack(parentSeq, offset, length, isFmTrack ? "YM2151 Track" : "K053260 Track"),
+      m_isFmTrack(isFmTrack) {}
 
-void KonamiTMNT2K053260Track::resetVars() {
+void KonamiTMNT2Track::resetVars() {
   SeqTrack::resetVars();
 
   m_state = 0;
@@ -62,24 +73,22 @@ void KonamiTMNT2K053260Track::resetVars() {
   m_durSubtract = 0;
   m_attenuation = 0;
   m_octave = 0;
-  m_transpose_0 = 0;
-  m_transpose_1 = 0;
+  m_transpose = 0;
   m_addedToNote = 0;
   m_dxVal = 1;
   memset(m_loopCounter, 0, sizeof(m_loopCounter));
   memset(m_loopStartOffset, 0, sizeof(m_loopStartOffset));
+  memset(m_callOrigin, 0, sizeof(m_callOrigin));
   m_warpCounter = 0;
   m_warpOrigin = 0;
   m_warpDest = 0;
 }
 
-bool KonamiTMNT2K053260Track::readEvent() {
+bool KonamiTMNT2Track::readEvent() {
   if (!isValidOffset(curOffset)) {
     return false;
   }
 
-  if (curOffset == 0x9787)
-    printf("TESTING");
   uint32_t beginOffset = curOffset;
   uint8_t opcode = readByte(curOffset++);
 
@@ -113,17 +122,15 @@ bool KonamiTMNT2K053260Track::readEvent() {
       return true;
     }
     if (percussionMode()) {
-      if (m_addedToNote > 0)
-        printf("TESTING");
       u8 semitones = opcode >> 4;
       s8 note = semitones + (m_addedToNote * 16);
-      note -= transpose;
+      // note -= transpose;
       addNoteByDur(beginOffset, curOffset - beginOffset, note, 0x7F, dur);
     } else {
       // Melodic
       u8 semitones = (opcode >> 4) - 1;
       // u8 durationIndex = opcode & 0x0F;
-      u8 note = semitones + m_addedToNote;
+      u8 note = semitones + m_addedToNote + m_transpose + globalTranspose();
       // note -= 12;
       // printf("DUR: %d\n", dur);
       if (dur == 0) {
@@ -138,6 +145,7 @@ bool KonamiTMNT2K053260Track::readEvent() {
   // if (opcode >= 0xD0) {
     m_extendDur = 0;
     u8 loopIdx;
+    u8 callIdx;
     switch (opcode) {
       case 0xD0:
       case 0xD1:
@@ -193,8 +201,14 @@ bool KonamiTMNT2K053260Track::readEvent() {
         break;
       case 0xE0: {
         u8 val = readByte(curOffset++);
-        if ((val & 0xF0) == 0) {
-          m_state = val & 0xF0;
+
+        if (m_isFmTrack) {
+          if (val == 0) {
+            u8 tempo = readByte(curOffset++);
+            // byte acts as tempo, but unclear exact calculation
+            // lower value means slower
+            val = readByte(curOffset++);
+          }
           m_rawBaseDur = val;
           m_baseDur = val * 3;
           m_program = readByte(curOffset++);
@@ -202,36 +216,44 @@ bool KonamiTMNT2K053260Track::readEvent() {
           m_attenuation = readByte(curOffset++) & 0x7F;
           u8 unsure = readByte(curOffset++);
           addGenericEvent(beginOffset, curOffset - beginOffset, "Program Change / Base Dur / Attenuation / State", "", Type::ProgramChange);
-
-
-          // m_state = val;
-          // m_rawBaseDur = readByte(curOffset++);
-          // m_baseDur = m_rawBaseDur * 3;
-          // m_attenuation = readByte(curOffset++);
-          // // fourth byte is unclear
-          // curOffset += 1;
-        }
-        else {
-          // m_transpose_1 = (val >> 4) - 1;
-          m_addedToNote = (val >> 4) - 1;
-          m_rawBaseDur = val & 0xF;
-          m_baseDur = m_rawBaseDur * 3;
-          m_attenuation = readByte(curOffset++);
-          setPercussionModeOn();
-          addGenericEvent(beginOffset, curOffset - beginOffset, "Percussion On / Pitch / Base Dur / Attenuation", "", Type::ProgramChange);
+        } else {
+          if ((val & 0xF0) == 0) {
+            m_state = val & 0xF0;
+            m_rawBaseDur = val;
+            m_baseDur = val * 3;
+            m_program = readByte(curOffset++);
+            addProgramChangeNoItem(m_program, false);
+            m_attenuation = readByte(curOffset++) & 0x7F;
+            u8 unsure = readByte(curOffset++);
+            addGenericEvent(beginOffset, curOffset - beginOffset, "Program Change / Base Dur / Attenuation / State", "", Type::ProgramChange);
+          }
+          else {
+            // m_transpose_1 = (val >> 4) - 1;
+            m_addedToNote = (val >> 4) - 1;
+            m_rawBaseDur = val & 0xF;
+            m_baseDur = m_rawBaseDur * 3;
+            m_attenuation = readByte(curOffset++);
+            setPercussionModeOn();
+            addGenericEvent(beginOffset, curOffset - beginOffset, "Percussion On / Pitch / Base Dur / Attenuation", "", Type::ProgramChange);
+          }
         }
         break;
       }
       case 0xE1: {
-        s8 val = readByte(curOffset++);
-        setPercussionModeOff();
-        if (val == 0) {
-          addGenericEvent(beginOffset, 2, "Percussion Mode Off", "", Type::ChangeState);
-          break;
+        if (m_isFmTrack) {
+          m_state = readByte(curOffset++);
+          addGenericEvent(beginOffset, 2, "Set State", "", Type::ChangeState);
+        } else {
+          s8 val = readByte(curOffset++);
+          setPercussionModeOff();
+          if (val == 0) {
+            addGenericEvent(beginOffset, 2, "Percussion Mode Off", "", Type::ChangeState);
+            break;
+          }
+          m_addedToNote = val;
+          setPercussionModeOn();
+          addGenericEvent(beginOffset, 2, "Percussion Mode On", "", Type::ChangeState);
         }
-        m_addedToNote = val;
-        setPercussionModeOn();
-        addGenericEvent(beginOffset, 2, "Percussion Mode On", "", Type::ChangeState);
         break;
       }
       case 0xE2: {
@@ -269,7 +291,9 @@ bool KonamiTMNT2K053260Track::readEvent() {
         break;
       case 0xE8:    // NOP
       case 0xE9:    // NOP
+        // TODO: used in ssriders seq 11
       case 0xEA:    // NOP
+        // TODO: used in ssriders seq 11
         break;
       case 0xEB:
       case 0xEC: {
@@ -285,10 +309,17 @@ bool KonamiTMNT2K053260Track::readEvent() {
         transpose += ((val >> 4) & 3) * 12;   // octaves
         if ((val & 0x80) > 0)
           transpose = -transpose;
-        if ((val & 0x40) > 0)
-          addGlobalTranspose(beginOffset, 2, transpose);
-        else
-          addTranspose(beginOffset, 2, transpose);
+        if ((val & 0x40) > 0) {
+          setGlobalTranspose(transpose);
+          auto desc = fmt::format("Global Transpose - {} semitones", transpose);
+          addGenericEvent(beginOffset, 2, "Global Transpose", desc, Type::Transpose);
+        }
+        else {
+          m_transpose = transpose;
+          auto desc = fmt::format("Transpose - {} semitones", transpose);
+          addGenericEvent(beginOffset, 2, "Transpose", desc, Type::Transpose);
+          // addTranspose(beginOffset, 2, transpose);
+        }
         break;
       }
       case 0xED:
@@ -391,23 +422,29 @@ bool KonamiTMNT2K053260Track::readEvent() {
         break;
       // CALL
       case 0xFC:
-      case 0xFD: {
-        if (returnOffsets.empty()) {
+        callIdx = 0;
+        goto callMarker;
+      case 0xFD:
+        callIdx = 1;
+      callMarker: {
+        if (m_callOrigin[callIdx] == 0) {
+          m_callOrigin[callIdx] = curOffset + 2;
           u16 dest = readShort(curOffset);
-          curOffset += 2;
           if (dest < parentSeq->dwOffset) {
             return false;
           }
-          // m_callRetOffset = curOffset;
-          addCall(beginOffset, 3, dest, curOffset);
+          auto desc = fmt::format("Call - destination: %X", dest);
+          addGenericEvent(beginOffset, 3, "Call", desc, Type::Jump);
+          curOffset = dest;
         } else {
-          addReturn(beginOffset, 1);
+          addGenericEvent(beginOffset, 1, "Return", "", Type::Jump);
+          curOffset = m_callOrigin[callIdx];
+          m_callOrigin[callIdx] = 0;
         }
         break;
       }
       case 0xFE:    // weird offset toggler
         m_warpCounter += 1;          // state
-
         if (m_warpCounter == 1) {
           m_warpOrigin = curOffset;
           addGenericEvent(beginOffset, 1, "Warp Start", "", Type::RepeatStart);
