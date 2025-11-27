@@ -94,6 +94,12 @@ bool KonamiTMNT2InstrSet::parseMelodicInstrs() {
   return true;
 }
 
+double k053260_pitch_cents(uint16_t pitch_word) {
+  uint16_t P = pitch_word & 0x0FFF;
+  double ratio = 112.0 / (4096.0 - (double)P);
+  return 1200.0 * log2(ratio);      // cents relative to 31,960 Hz @ B3
+}
+
 bool KonamiTMNT2InstrSet::parseDrums() {
   auto drumOctaveTableItem = addChild(m_drumTableAddr, m_drumTables.size() * 2, "Drum Octave Table");
   u16 minDrumOffset = -1;
@@ -138,6 +144,8 @@ bool KonamiTMNT2InstrSet::parseDrums() {
       drumsItem->addChild(ptr, sizeof(konami_tmnt2_drum_info), name);
 
       const konami_tmnt2_drum_info& drumInfo = m_drumTables[i][j];
+
+      double relativePitchCents = k053260_pitch_cents((drumInfo.pitch_hi << 8) + drumInfo.pitch_lo);
       // std::string name = fmt::format("Drum {}", drumNum);
       // VGMInstr* instr = new VGMInstr(this, offset, sizeof(konami_tmnt2_instr_info), 0, instrNum, name);
       VGMRgn* rgn = new VGMRgn(drumKit, ptr, sizeof(konami_tmnt2_drum_info));
@@ -146,6 +154,8 @@ bool KonamiTMNT2InstrSet::parseDrums() {
       rgn->keyLow = key;
       rgn->keyHigh = key;
       rgn->unityKey = key;
+      rgn->coarseTune = relativePitchCents / 100;
+      rgn->fineTune = static_cast<int>(relativePitchCents) % 100;
       // rgn->sampNum = sampNum;
       // rgn->release_time = 0;
       drumKit->addRgn(rgn);
