@@ -3,6 +3,7 @@
 #include "VGMInstrSet.h"
 #include "CPS1Scanner.h"
 #include "VGMSampColl.h"
+#include "YM2151.h"
 #include <sstream>
 
 // ******************
@@ -68,62 +69,6 @@ public:
 // ************
 // CPS1OPMInstr
 // ************
-
-struct OPMData {
-  struct LFO {
-    uint8_t LFRQ;
-    uint8_t AMD;
-    uint8_t PMD;
-    uint8_t WF;
-    uint8_t NFRQ;
-  };
-
-  struct CH {
-    uint8_t PAN;
-    uint8_t FL;
-    uint8_t CON;
-    uint8_t AMS;
-    uint8_t PMS;
-    uint8_t SLOT_MASK;
-    uint8_t NE;
-  };
-
-  struct OP {
-    uint8_t AR;
-    uint8_t D1R;
-    uint8_t D2R;
-    uint8_t RR;
-    uint8_t D1L;
-    uint8_t TL;
-    uint8_t KS;
-    uint8_t MUL;
-    uint8_t DT1;
-    uint8_t DT2;
-    uint8_t AMS_EN;
-  };
-
-  std::string name;
-  LFO lfo;
-  CH ch;
-  OP op[4];
-
-  std::string toOPMString(int num) const {
-    std::ostringstream ss;
-    ss << "@:" << num << " " << name << "\n";
-    ss << "LFO:" << +lfo.LFRQ << "   " << +lfo.AMD << "   " << +lfo.PMD << "   " << +lfo.WF << "   " << +lfo.NFRQ << "\n";
-    ss << "CH: " << +ch.PAN << "   " << +ch.FL << "   " << +ch.CON << "   " << +ch.AMS << "   " << +ch.PMS << " " << +ch.SLOT_MASK << "   " << +ch.NE << "\n";
-
-    const int opIndex[4] = { 0, 2, 1, 3 };
-    const char* opNames[4] = {"M1", "C1", "M2", "C2"};
-    for (int i = 0; i < 4; ++i) {
-      const OP& op = this->op[opIndex[i]];
-      ss << opNames[i] << ": " << +op.AR << "   " << +op.D1R << "   " << +op.D2R << "   " << +op.RR << "  " << +op.D1L << "  "
-         << +op.TL << "   " << +op.KS << "   " << +op.MUL << "   " << +op.DT1 << "   " << +op.DT2 << " " << +op.AMS_EN << "\n";
-    }
-
-    return ss.str();
-  }
-};
 
 struct CPS1OPMInstrDataV2_00 {
   uint8_t SLOT_MASK;

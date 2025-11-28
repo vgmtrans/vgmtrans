@@ -80,11 +80,11 @@ public:
 };
 
 
-class KonamiTMNT2InstrSet
+class KonamiTMNT2SampleInstrSet
     : public VGMInstrSet {
 public:
 
-  KonamiTMNT2InstrSet(RawFile *file,
+  KonamiTMNT2SampleInstrSet(RawFile *file,
                        u32 offset,
                        u32 instrTableAddr,
                        u32 drumTableAddr,
@@ -92,14 +92,13 @@ public:
                        const std::vector<std::vector<konami_tmnt2_drum_info>>& drumTables,
                        std::string name,
                        KonamiTMNT2FormatVer fmtVer);
-  ~KonamiTMNT2InstrSet() override = default;
+  ~KonamiTMNT2SampleInstrSet() override = default;
 
   void addInstrInfoChildren(VGMItem* sampInfoItem, u32 off);
   bool parseInstrPointers() override;
 
   bool parseMelodicInstrs();
   bool parseDrums();
-  // const std::array<drum, 46>& drums() { return m_drums;}
 
 private:
   u32 m_instrTableAddr;
@@ -108,18 +107,14 @@ private:
   const std::vector<std::vector<konami_tmnt2_drum_info>> m_drumTables;
 
   KonamiTMNT2FormatVer m_fmtVer;
-  // u32 m_drumTableOffset;
-  // u32 m_drumSampleTableOffset;
-  // std::array<drum, 46> m_drums;
 };
-
 
 class KonamiTMNT2SampColl
     : public VGMSampColl {
 public:
   KonamiTMNT2SampColl(
     RawFile* file,
-    KonamiTMNT2InstrSet* instrset,
+    KonamiTMNT2SampleInstrSet* instrset,
     const std::vector<konami_tmnt2_instr_info>& instrInfos,
     const std::vector<std::vector<konami_tmnt2_drum_info>>& drumTables,
     u32 offset,
@@ -131,7 +126,7 @@ public:
 
 private:
   std::vector<VGMItem*> samplePointers;
-  KonamiTMNT2InstrSet *instrset;
+  KonamiTMNT2SampleInstrSet *instrset;
   const std::vector<konami_tmnt2_instr_info> instrInfos;
   const std::vector<std::vector<konami_tmnt2_drum_info>> drumTables;
 };

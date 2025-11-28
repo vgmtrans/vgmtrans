@@ -78,6 +78,16 @@ BytePattern KonamiTMNT2Scanner::ptn_tmnt2_LoadInstrTable("\x13\x1A\x21\x7B\x49\x
 BytePattern KonamiTMNT2Scanner::ptn_tmnt2_LoadDrumTable("\x4F\x06\x00\xDD\x7E\x18\x07\x5F\x50\x21\xB7\x49\x19", "xxxxx?xxxx??x", 13);
 
 
+// ram:1996 13              INC        curOffset
+// ram:1997 1a              LD         A,(curOffset)                                    read program num
+// ram:1998 d9              EXX
+// ram:1999 cb 7f           BIT        0x7,A
+// ram:199b ca a6 19        JP         Z,program_num_<=_0x7F
+// ram:199e 21 af 24        LD         HL,ym2151_instrs
+// ram:19a1 e6 7f           AND        0x7f
+BytePattern KonamiTMNT2Scanner::ptn_tmnt2_LoadYM2151InstrTable("\x13\x1A\xD9\xCB\x7F\xCA\xA6\x19\x21\xAF\x24\xE6\x7F", "xxxxxx??x??xx", 13);
+
+
 
 void KonamiTMNT2Scanner::scan(RawFile * /*file*/, void *info) {
   auto *gameEntry = static_cast<MAMEGame *>(info);
@@ -116,22 +126,26 @@ void KonamiTMNT2Scanner::scan(RawFile * /*file*/, void *info) {
   auto seqs = loadSeqTable(programRom, seqTableAddr, fmtVer, gameEntry->name);
 
   u32 loadInstrTableAddr;
-  u16 instrTableAddr = 0;
+  u16 instrTableAddrK053260 = 0;
   u16 drumTableAddr = 0;
+  u16 instrTableAddrYM2151;
   if (programRom->searchBytePattern(ptn_tmnt2_LoadInstrTable, loadInstrTableAddr)) {
-    instrTableAddr = programRom->readShort(loadInstrTableAddr + 3);
+    instrTableAddrK053260 = programRom->readShort(loadInstrTableAddr + 3);
   }
   if (programRom->searchBytePattern(ptn_tmnt2_LoadDrumTable, loadInstrTableAddr)) {
     drumTableAddr = programRom->readShort(loadInstrTableAddr + 10);
   }
-  if (instrTableAddr == 0 || drumTableAddr == 0) {
+  if (programRom->searchBytePattern(ptn_tmnt2_LoadYM2151InstrTable, loadInstrTableAddr)) {
+    instrTableAddrYM2151 = programRom->readShort(loadInstrTableAddr + 9);
+  }
+  if (instrTableAddrK053260 == 0 || drumTableAddr == 0 || instrTableAddrYM2151 == 0) {
     return;
   }
   std::vector<u32> instrPtrs;
   std::vector<u32> drumTablePtrs;
   u32 minInstrPtr = -1;
   u32 minDrumPtr = -1;
-  for (int i = instrTableAddr; i < minInstrPtr && i < drumTableAddr; i += 2) {
+  for (int i = instrTableAddrK053260; i < minInstrPtr && i < drumTableAddr; i += 2) {
     // if (i >= minInstrPtr || i >= drumTableAddr)
       // break;
     u32 instrInfoPtr = programRom->readShort(i);
@@ -182,10 +196,10 @@ void KonamiTMNT2Scanner::scan(RawFile * /*file*/, void *info) {
 
   std::string instrSetName = fmt::format("{} instrument set", gameEntry->name);
 
-  auto instrSet = new KonamiTMNT2InstrSet(
+  auto instrSet = new KonamiTMNT2SampleInstrSet(
     programRom,
-    instrTableAddr,
-    instrTableAddr,
+    instrTableAddrK053260,
+    instrTableAddrK053260,
     drumTableAddr,
     instrInfos,
     drumTables,

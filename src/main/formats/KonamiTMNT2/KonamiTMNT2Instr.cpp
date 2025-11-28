@@ -6,7 +6,7 @@
 
 #include <spdlog/fmt/fmt.h>
 
-KonamiTMNT2InstrSet::KonamiTMNT2InstrSet(
+KonamiTMNT2SampleInstrSet::KonamiTMNT2SampleInstrSet(
   RawFile *file,
   u32 offset,
   u32 instrTableAddr,
@@ -23,7 +23,7 @@ KonamiTMNT2InstrSet::KonamiTMNT2InstrSet(
 }
 
 
-void KonamiTMNT2InstrSet::addInstrInfoChildren(VGMItem* sampInfoItem, u32 off) {
+void KonamiTMNT2SampleInstrSet::addInstrInfoChildren(VGMItem* sampInfoItem, u32 off) {
   std::string sampleTypeStr;
   u8 flagsByte = readByte(off);
   sampleTypeStr = (flagsByte & 0x10) ? "KADPCM" : "PCM 8";
@@ -39,7 +39,7 @@ void KonamiTMNT2InstrSet::addInstrInfoChildren(VGMItem* sampInfoItem, u32 off) {
   sampInfoItem->addChild(off + 7, 3, "Unknown");
 }
 
-bool KonamiTMNT2InstrSet::parseInstrPointers() {
+bool KonamiTMNT2SampleInstrSet::parseInstrPointers() {
   disableAutoAddInstrumentsAsChildren();
 
   if (!parseMelodicInstrs())
@@ -50,7 +50,7 @@ bool KonamiTMNT2InstrSet::parseInstrPointers() {
   return true;
 }
 
-bool KonamiTMNT2InstrSet::parseMelodicInstrs() {
+bool KonamiTMNT2SampleInstrSet::parseMelodicInstrs() {
   auto instrTableItem = addChild(m_instrTableAddr, m_instrInfos.size() * 2, "Instrument Table");
   u16 minInstrOffset = -1;
   u16 maxInstrOffset = 0;
@@ -100,7 +100,7 @@ double k053260_pitch_cents(uint16_t pitch_word) {
   return 1200.0 * log2(ratio);      // cents relative to 31,960 Hz @ B3
 }
 
-bool KonamiTMNT2InstrSet::parseDrums() {
+bool KonamiTMNT2SampleInstrSet::parseDrums() {
   auto drumOctaveTableItem = addChild(m_drumTableAddr, m_drumTables.size() * 2, "Drum Octave Table");
   u16 minDrumOffset = -1;
   u16 maxDrumOffset = 0;
@@ -165,76 +165,86 @@ bool KonamiTMNT2InstrSet::parseDrums() {
   aInstrs.emplace_back(drumKit);
   drumsItem->dwOffset = minDrumOffset;
   drumsItem->unLength = (maxDrumOffset + sizeof(konami_tmnt2_drum_info)) - minDrumOffset;
-
-
-  // for (auto drumTable : m_drumTables) {
-    // addChild(m_drumTableAddr, 2, fmt::format("Drum Octave));
-  // }
-
-  // if (m_drumTableOffset == 0 || m_drumSampleTableOffset == 0) {
-  //   return true;
-  // }
-  //
-  // auto drumSampInfos = addChild(m_drumSampleTableOffset, m_drumTableOffset - m_drumSampleTableOffset,
-  //                                     "Drum Sample Infos");
-  // sampNum = 0;
-  // for (u32 off = m_drumSampleTableOffset; off < m_drumTableOffset; off += sizeof(konami_mw_sample_info)) {
-  //   auto drumSampInfoItem = drumSampInfos->addChild(off, sizeof(konami_mw_sample_info),
-  //                                                   fmt::format("Drum Sample Info {}", sampNum++));
-  //   addSampleInfoChildren(drumSampInfoItem, off);
-  // }
-  //
-  // // Load drum table
-  // int numMelodicInstrs = aInstrs.size();
-  // readBytes(m_drumTableOffset, sizeof(m_drums), &m_drums);
-  // VGMInstr* drumInstr = new VGMInstr(
-  //   this,
-  //   m_drumTableOffset,
-  //   sizeof(m_drums),
-  //   2,
-  //   0,
-  //   "Drum Kit"
-  // );
-  // std::vector<VGMInstr *> aDrumKit;
-  // for (int i = 0; i < sizeof(m_drums) / sizeof(drum); ++i) {
-  //   drum& d = m_drums[i];
-  //   u32 off = m_drumTableOffset + i * sizeof(drum);
-  //   int sampNum = numMelodicInstrs + d.samp_num;
-  //
-  //   if (d.unity_key >= 0x60) {
-  //     break;
-  //   }
-  //
-  //   VGMRgn* rgn = new VGMRgn(drumInstr, off, sizeof(drum), fmt::format("Region {:d}", i));
-  //   // The driver offsets notes up 2 octaves relative to midi note values.
-  //   rgn->keyLow = i + 24;
-  //   rgn->keyHigh = i + 24;
-  //   int unityKey = (i + 24) + (0x2A - d.unity_key);
-  //   rgn->sampNum = sampNum;
-  //   rgn->unityKey = unityKey;
-  //   rgn->release_time = drumReleaseTime;
-  //   rgn->setVolume(volTable[d.attenuation]);
-  //
-  //   rgn->addChild(off, 1, "Sample Number");
-  //   rgn->addChild(off + 1, 1, "Unity Key");
-  //   rgn->addChild(off + 2, 1, "Pitch Bend");
-  //   rgn->addChild(off + 3, 1, "Pan");
-  //   rgn->addChild(off + 4, 2, "Unknown");
-  //   rgn->addChild(off + 6, 1, "Default Duration");
-  //   rgn->addChild(off + 7, 1, "Attenuation");
-  //   drumInstr->addRgn(rgn);
-  // }
-  // aInstrs.push_back(drumInstr);
-  // aDrumKit.push_back(drumInstr);
-  // addChildren(aDrumKit);
-
   return true;
 }
 
 
+ // OPMData convertToOPMData(u8 masterVol, const std::string& name) const {
+ //    bool enableLFO = (LFO_ENABLE_AND_WF & 0x80) != 0;
+ //    // LFO
+ //    OPMData::LFO lfo{};
+ //    if (enableLFO) {
+ //      lfo.LFRQ = LFRQ;
+ //      lfo.AMD = AMD;
+ //      lfo.PMD = PMD;
+ //      lfo.WF = (LFO_ENABLE_AND_WF >> 5) & 0b11;
+ //      lfo.NFRQ = 0;  // the driver doesn't define noise frequency
+ //    }
+ //
+ //    // CH
+ //    OPMData::CH ch{};
+ //    ch.PAN = 0b11000000; // the driver always sets R/L, ie PAN, to 0xC0 (sf2ce 0xDC0)
+ //    ch.FL = (FL_CON >> 3) & 0b111;
+ //    ch.CON = FL_CON & 0b111;
+ //    ch.AMS = enableLFO ? PMS_AMS & 0b11 : 0;
+ //    ch.PMS = enableLFO ? (PMS_AMS >> 4) & 0b1111 : 0;
+ //    ch.SLOT_MASK = SLOT_MASK;
+ //    ch.NE = 0;
+ //
+ //    // OP
+ //    uint8_t CON_limits[4] = { 7, 5, 4, 0 };
+ //    OPMData::OP op[4];
+ //    for (int i = 0; i < 4; i ++) {
+ //      auto conLimit = CON_limits[i];
+ //      auto& opx = op[i];
+ //      opx.AR = KS_AR[i] & 0b11111;
+ //      opx.D1R = AMSEN_D1R[i] & 0b11111;
+ //      opx.D2R = DT2_D2R[i] & 0b11111;
+ //      opx.RR = D1L_RR[i] & 0b1111;
+ //      opx.D1L = D1L_RR[i] >> 4;
+ //      if (ch.CON < conLimit) {
+ //        u8 atten = volToAttenuation(volData[i].vol);
+ //        opx.TL = (atten + volData[i].extra_atten) & 0x7F;
+ //      } else {
+ //        u8 masterVolumeAtten = 0x7F - masterVol;
+ //        u8 atten = volToAttenuation(volData[i].vol);
+ //        u32 finalAtten = (atten + masterVolumeAtten) + volData[i].extra_atten;
+ //        opx.TL = std::min(finalAtten, 0x7FU);
+ //      }
+ //      opx.KS = KS_AR[i] >> 6;
+ //      opx.MUL = DT1_MUL[i] & 0b1111;
+ //      opx.DT1 = (DT1_MUL[i] >> 4) & 0b111;
+ //      opx.DT2 = DT2_D2R[i] >> 6;
+ //      opx.AMS_EN = AMSEN_D1R[i] & 0b10000000;
+ //    }
+ //
+ //    return {name, lfo, ch, { op[0], op[1], op[2], op[3] }};
+ //  }
+ //
+ //  std::string toOPMString(uint8_t masterVol, const std::string& name, int num) const {
+ //    std::ostringstream ss;
+ //
+ //    // Generate the OPM data string first
+ //    OPMData opmData = convertToOPMData(masterVol, name);
+ //    ss << opmData.toOPMString(num);
+ //
+ //    // Add supplementary data
+ //    ss << "\nCPS:";
+ //    uint8_t enableLfo = LFO_ENABLE_AND_WF >> 7;
+ //    uint8_t resetLfo = (LFO_ENABLE_AND_WF >> 1) & 1;
+ //    ss << " " << +enableLfo << " " <<  +resetLfo;
+ //    for (int i = 0; i < 4; i ++) {
+ //      ss << " " << +volData[i].key_scale << " " << +volData[i].extra_atten;
+ //    }
+ //    ss << "\n";
+ //    return ss.str();
+ //  }
+
+
+
 KonamiTMNT2SampColl::KonamiTMNT2SampColl(
     RawFile* file,
-    KonamiTMNT2InstrSet* instrset,
+    KonamiTMNT2SampleInstrSet* instrset,
     const std::vector<konami_tmnt2_instr_info>& instrInfos,
     const std::vector<std::vector<konami_tmnt2_drum_info>>& drumTables,
     u32 offset,
