@@ -61,7 +61,9 @@ KonamiTMNT2Track::KonamiTMNT2Track(
   uint32_t length
 )
     : SeqTrack(parentSeq, offset, length, isFmTrack ? "YM2151 Track" : "K053260 Track"),
-      m_isFmTrack(isFmTrack) {}
+      m_isFmTrack(isFmTrack) {
+  synthType = isFmTrack ? SynthType::YM2151 : SynthType::SoundFont;
+}
 
 void KonamiTMNT2Track::resetVars() {
   SeqTrack::resetVars();
@@ -203,6 +205,7 @@ bool KonamiTMNT2Track::readEvent() {
         u8 val = readByte(curOffset++);
 
         if (m_isFmTrack) {
+          m_state |= 4;
           if (val == 0) {
             u8 tempo = readByte(curOffset++);
             // byte acts as tempo, but unclear exact calculation
@@ -212,6 +215,9 @@ bool KonamiTMNT2Track::readEvent() {
           m_rawBaseDur = val;
           m_baseDur = val * 3;
           m_program = readByte(curOffset++);
+          // TMNT2 is weird. It has 113 FM instruments, but code to handle > 128, however, it just
+          // performs a simple &= 0x7F. Values over 127 are used in sequences.
+          m_program &= 0x7F;
           addProgramChangeNoItem(m_program, false);
           m_attenuation = readByte(curOffset++) & 0x7F;
           u8 unsure = readByte(curOffset++);
@@ -267,6 +273,11 @@ bool KonamiTMNT2Track::readEvent() {
       case 0xE3:
         // PROGRAM CHANGE
         m_program = readByte(curOffset++);
+        if (m_isFmTrack) {
+          // TMNT2 is weird. It has 113 FM instruments, but code to handle > 128, however, it just
+          // performs a simple &= 0x7F. Values over 127 are used in sequences.
+          m_program &= 0x7F;
+        }
         addProgramChange(beginOffset, 2, m_program);
         break;
       case 0xE4: {
