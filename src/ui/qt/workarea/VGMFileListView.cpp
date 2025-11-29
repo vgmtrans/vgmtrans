@@ -266,8 +266,3 @@ void VGMFileListView::onVGMFileSelected(VGMFile* file, const QWidget* caller) {
 
   scrollTo(firstIndex, QAbstractItemView::EnsureVisible);
 }
-
-// void VGMFileListView::regenerateSelection() {
-//   NotificationCenter::the()->selectVGMFile()
-//   selectionModel()->select(newSel, QItemSelectionModel::ClearAndSelect | QItemSelectionModel::Rows);
-// }
