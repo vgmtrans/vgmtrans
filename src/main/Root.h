@@ -10,12 +10,12 @@
 
 #include "common.h"
 #include "VGMTag.h"
+#include "VGMFile.h"
+#include "VGMColl.h"
+#include "RawFile.h"
 
 class VGMScanner;
-class VGMColl;
 class VGMItem;
-class VGMFile;
-class RawFile;
 class VGMSeq;
 class VGMInstrSet;
 class VGMSampColl;
