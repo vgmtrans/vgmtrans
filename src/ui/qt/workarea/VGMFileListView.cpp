@@ -25,7 +25,27 @@
  */
 
 VGMFileListModel::VGMFileListModel(QObject *parent) : QAbstractTableModel(parent) {
-  connect(&qtVGMRoot, &QtVGMRoot::UI_addedVGMFile, this, &VGMFileListModel::addVGMFile);
+  auto startResettingModel = [this]() { beginResetModel(); };
+  auto endResettingModel = [this]() {
+    endResetModel();
+    NotificationCenter::the()->updateContextualMenusForVGMFiles({});
+  };
+
+  auto beginLoad = [this]() {
+    filesBeforeLoad = pRoot->vgmFiles().size();
+  };
+  auto endLoad = [this]() {
+    int filesLoaded = pRoot->vgmFiles().size() - filesBeforeLoad;
+    if (filesLoaded <= 0)
+      return;
+    beginInsertRows(QModelIndex(), filesBeforeLoad, filesBeforeLoad + filesLoaded - 1);
+    endInsertRows();
+  };
+
+  connect(&qtVGMRoot, &QtVGMRoot::UI_beginLoadRawFile, beginLoad);
+  connect(&qtVGMRoot, &QtVGMRoot::UI_endLoadRawFile, endLoad);
+  connect(&qtVGMRoot, &QtVGMRoot::UI_beginRemoveVGMFiles, startResettingModel);
+  connect(&qtVGMRoot, &QtVGMRoot::UI_endRemoveVGMFiles, endResettingModel);
 }
 
 QVariant VGMFileListModel::data(const QModelIndex &index, int role) const {
@@ -96,22 +116,6 @@ int VGMFileListModel::columnCount(const QModelIndex &parent) const {
   return 2;
 }
 
-void VGMFileListModel::addVGMFile() {
-  int position = static_cast<int>(qtVGMRoot.vgmFiles().size()) - 1;
-  beginInsertRows(QModelIndex(), position, position);
-  endInsertRows();
-}
-
-void VGMFileListModel::removeVGMFile() {
-  int position = static_cast<int>(qtVGMRoot.vgmFiles().size()) - 1;
-  if (position < 0) {
-    return;
-  }
-
-  beginRemoveRows(QModelIndex(), position, position);
-  endRemoveRows();
-}
-
 /*
  *  VGMFileListView
  */
@@ -125,7 +129,6 @@ VGMFileListView::VGMFileListView(QWidget *parent) : TableView(parent) {
 
   setContextMenuPolicy(Qt::CustomContextMenu);
 
-  connect(&qtVGMRoot, &QtVGMRoot::UI_removeVGMFile, this, &VGMFileListView::removeVGMFile);
   connect(this, &QAbstractItemView::customContextMenuRequested, this, &VGMFileListView::itemMenu);
   connect(this, &QAbstractItemView::doubleClicked, this, &VGMFileListView::requestVGMFileView);
   connect(NotificationCenter::the(), &NotificationCenter::vgmFileSelected, this, &VGMFileListView::onVGMFileSelected);
@@ -181,31 +184,11 @@ void VGMFileListView::keyPressEvent(QKeyEvent *input) {
       if (currentIndex().isValid())
         requestVGMFileView(currentIndex());
       break;
-    case Qt::Key_Delete:
-    case Qt::Key_Backspace: {
-      if (!selectionModel()->hasSelection())
-        return;
-
-      QModelIndexList list = selectionModel()->selectedRows();
-      pRoot->UI_beginRemoveVGMFiles();
-      for (auto & idx : std::ranges::reverse_view(list)) {
-        qtVGMRoot.removeVGMFile(qtVGMRoot.vgmFiles()[idx.row()], true);
-      }
-      pRoot->UI_endRemoveVGMFiles();
-
-      clearSelection();
-      return;
-    }
 
     // Pass the event back to the base class, needed for keyboard navigation
     default:
       QTableView::keyPressEvent(input);
   }
-}
-
-void VGMFileListView::removeVGMFile(const VGMFile *file) const {
-  MdiArea::the()->removeView(file);
-  view_model->removeVGMFile();
 }
 
 void VGMFileListView::requestVGMFileView(const QModelIndex& index) {

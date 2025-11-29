@@ -29,22 +29,12 @@ void QtVGMRoot::UI_setRootPtr(VGMRoot** theRoot) {
   *theRoot = &qtVGMRoot;
 }
 
-void QtVGMRoot::UI_addRawFile(RawFile*) {
+void QtVGMRoot::UI_loadRawFile(RawFile*) {
   this->UI_addedRawFile();
 }
 
-void QtVGMRoot::UI_closeRawFile(RawFile*) {
+void QtVGMRoot::UI_removeRawFile(RawFile*) {
   this->UI_removedRawFile();
-}
-
-void QtVGMRoot::UI_onBeginLoadRawFile() {
-  if (rawFileLoadRecurseStack++ == 0)
-    this->UI_beganLoadingRawFile();
-}
-
-void QtVGMRoot::UI_onEndLoadRawFile() {
-  if (--rawFileLoadRecurseStack == 0)
-    this->UI_endedLoadingRawFile();
 }
 
 void QtVGMRoot::UI_addVGMFile(VGMFileVariant file) {
@@ -65,22 +55,6 @@ void QtVGMRoot::UI_addVGMMisc(VGMMiscFile*) {
 
 void QtVGMRoot::UI_addVGMColl(VGMColl*) {
   this->UI_addedVGMColl();
-}
-
-void QtVGMRoot::UI_beginRemoveVGMFiles() {
-  this->UI_beganRemovingVGMFiles();
-}
-
-void QtVGMRoot::UI_endRemoveVGMFiles() {
-  this->UI_endedRemovingVGMFiles();
-}
-
-void QtVGMRoot::UI_beginRemoveVGMColls() {
-  this->UI_beganRemovingVGMColls();
-}
-
-void QtVGMRoot::UI_endRemoveVGMColls() {
-  this->UI_endedRemovingVGMColls();
 }
 
 void QtVGMRoot::UI_toast(const std::string& message, ToastType type, int duration_ms) {

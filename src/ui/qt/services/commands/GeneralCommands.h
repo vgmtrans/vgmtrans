@@ -9,6 +9,7 @@
 #include "MdiArea.h"
 #include "services/commands/Command.h"
 #include "VGMFile.h"
+#include "helper.h"
 
 using MenuPath = Command::MenuPath;
 
@@ -72,17 +73,14 @@ public:
     auto& vgmContext = dynamic_cast<ItemListCommandContext<T>&>(context);
     const auto& items = vgmContext.items();
 
-    for (auto item : items) {
-      auto specificItem = dynamic_cast<T*>(item);
-      executeItem(specificItem);
-    }
+    executeItems(items);
   }
 
   [[nodiscard]] std::shared_ptr<CommandContextFactory> contextFactory() const override {
     return m_contextFactory;
   }
 
-  virtual void executeItem(T* item) const = 0;
+  virtual void executeItems(std::vector<T*> items) const = 0;
 
 private:
   std::shared_ptr<ItemListContextFactory<T>> m_contextFactory;
@@ -95,11 +93,11 @@ private:
 template <typename T>
 class SingleItemCommand : public ItemListCommand<T> {
 public:
-  void execute(CommandContext& context) override {
-    auto& vgmContext = dynamic_cast<ItemListCommandContext<T>&>(context);
-    T* item = vgmContext.items().front();
+  void executeItems(std::vector<T*> items) const override {
+    T* item = items.front();
     this->executeItem(item);
   }
+  virtual void executeItem(T* item) const = 0;
 };
 
 /**
@@ -107,10 +105,19 @@ public:
  */
 class CloseVGMFileCommand : public ItemListCommand<VGMFile> {
 public:
-  void executeItem(VGMFile* file) const override {
-    pRoot->removeVGMFile(vgmFileToVariant(file));
+  void executeItems(std::vector<VGMFile*> vgmfiles) const override {
+    // If all files are selected, we can remove everything at once more efficiently
+    if (vgmfiles.size() == pRoot->vgmFiles().size()) {
+      pRoot->removeAllFilesAndCollections();
+    } else {
+      pRoot->pushRemoveAll();
+      for (auto vgmfile : vgmfiles) {
+        pRoot->removeVGMFile(vgmFileToVariant(vgmfile));
+      }
+      pRoot->popRemoveAll();
+    }
   }
-  [[nodiscard]] QKeySequence shortcutKeySequence() const override { return Qt::Key_Backspace; };
+  [[nodiscard]] QList<QKeySequence> shortcutKeySequences() const override { return {Qt::Key_Backspace, Qt::Key_Delete}; };
   [[nodiscard]] std::string name() const override { return "Remove"; }
   [[nodiscard]] std::optional<MenuPath> menuPath() const override { return MenuPaths::File; }
 };
@@ -120,10 +127,19 @@ public:
  */
 class CloseRawFileCommand : public ItemListCommand<RawFile> {
 public:
-  void executeItem(RawFile* file) const override {
-    pRoot->closeRawFile(file);
+  void executeItems(std::vector<RawFile*> rawfiles) const override {
+    // If all files are selected, we can remove everything at once more efficiently
+    if (rawfiles.size() == pRoot->rawFiles().size()) {
+      pRoot->removeAllFilesAndCollections();
+    } else {
+      pRoot->pushRemoveAll();
+      for (auto rawfile : rawfiles) {
+        pRoot->removeRawFile(rawfile);
+      }
+      pRoot->popRemoveAll();
+    }
   }
-  [[nodiscard]] QKeySequence shortcutKeySequence() const override { return Qt::Key_Backspace; };
+  [[nodiscard]] QList<QKeySequence> shortcutKeySequences() const override { return {Qt::Key_Backspace, Qt::Key_Delete}; };
   [[nodiscard]] std::string name() const override { return "Close"; }
   [[nodiscard]] std::optional<MenuPath> menuPath() const override { return MenuPaths::File; }
 };
@@ -133,10 +149,14 @@ public:
  */
 class CloseVGMCollCommand : public ItemListCommand<VGMColl> {
 public:
-  void executeItem(VGMColl* coll) const override {
-    pRoot->removeVGMColl(coll);
+  void executeItems(std::vector<VGMColl*> vgmcolls) const override {
+    pRoot->pushRemoveVGMColls();
+    for (auto coll : vgmcolls) {
+      pRoot->removeVGMColl(coll);
+    }
+    pRoot->popRemoveVGMColls();
   }
-  [[nodiscard]] QKeySequence shortcutKeySequence() const override { return Qt::Key_Backspace; };
+  [[nodiscard]] QList<QKeySequence> shortcutKeySequences() const override { return {Qt::Key_Backspace, Qt::Key_Delete}; };
   [[nodiscard]] std::string name() const override { return "Remove"; }
   [[nodiscard]] std::optional<MenuPath> menuPath() const override { return MenuPaths::File; }
 };
@@ -146,10 +166,12 @@ public:
  */
 class OpenCommand : public ItemListCommand<VGMFile> {
 public:
-  void executeItem(VGMFile* file) const override {
-    MdiArea::the()->newView(file);
+  void executeItems(std::vector<VGMFile*> vgmfiles) const override {
+    for (auto vgmfile : vgmfiles) {
+      MdiArea::the()->newView(vgmfile);
+    }
   }
-  [[nodiscard]] QKeySequence shortcutKeySequence() const override { return Qt::Key_Return; };
+  [[nodiscard]] QList<QKeySequence> shortcutKeySequences() const override { return {Qt::Key_Return}; };
   [[nodiscard]] std::string name() const override { return "Open Analysis"; }
   [[nodiscard]] std::optional<MenuPath> menuPath() const override { return MenuPaths::File; }
 };

@@ -23,33 +23,28 @@ static const QIcon &VGMCollIcon() {
  * VGMCollListViewModel
  */
 VGMCollListViewModel::VGMCollListViewModel(QObject *parent) : QAbstractListModel(parent) {
-  auto startResettingModel = [this]() {
-    resettingModel = true;
-    beginResetModel();
-  };
-
+  auto startResettingModel = [this]() { beginResetModel(); };
   auto endResettingModel = [this]() {
     endResetModel();
-    resettingModel = false;
+    NotificationCenter::the()->updateContextualMenusForVGMColls({});
   };
 
-  connect(&qtVGMRoot, &QtVGMRoot::UI_beganLoadingRawFile, startResettingModel);
-  connect(&qtVGMRoot, &QtVGMRoot::UI_endedLoadingRawFile, endResettingModel);
-  connect(&qtVGMRoot, &QtVGMRoot::UI_beganRemovingVGMFiles, startResettingModel);
-  connect(&qtVGMRoot, &QtVGMRoot::UI_endedRemovingVGMFiles, endResettingModel);
-  connect(&qtVGMRoot, &QtVGMRoot::UI_beganRemovingVGMColls, startResettingModel);
-  connect(&qtVGMRoot, &QtVGMRoot::UI_endedRemovingVGMColls, endResettingModel);
+  auto beginLoad = [this]() {
+    collsBeforeLoad = pRoot->vgmColls().size();
+  };
 
-  connect(&qtVGMRoot, &QtVGMRoot::UI_addedVGMColl,
-          [this]() {
-            if (!resettingModel)
-              dataChanged(index(0, 0), index(rowCount() - 1, 0));
-          });
-  connect(&qtVGMRoot, &QtVGMRoot::UI_removeVGMColl,
-          [this]() {
-            if (!resettingModel)
-              dataChanged(index(0, 0), index(rowCount() - 1, 0));
-          });
+  auto endLoad = [this]() {
+    int filesLoaded = pRoot->vgmColls().size() - collsBeforeLoad;
+    if (filesLoaded <= 0)
+      return;
+    beginInsertRows(QModelIndex(), collsBeforeLoad, collsBeforeLoad + filesLoaded - 1);
+    endInsertRows();
+  };
+
+  connect(&qtVGMRoot, &QtVGMRoot::UI_beginLoadRawFile, beginLoad);
+  connect(&qtVGMRoot, &QtVGMRoot::UI_endLoadRawFile, endLoad);
+  connect(&qtVGMRoot, &QtVGMRoot::UI_beginRemoveVGMColls, startResettingModel);
+  connect(&qtVGMRoot, &QtVGMRoot::UI_endRemoveVGMColls, endResettingModel);
 }
 
 int VGMCollListViewModel::rowCount(const QModelIndex &) const {
@@ -162,21 +157,6 @@ void VGMCollListView::keyPressEvent(QKeyEvent *e) {
     case Qt::Key_Escape:
       handleStopRequest();
       break;
-    case Qt::Key_Delete:
-    case Qt::Key_Backspace: {
-      if (!selectionModel()->hasSelection())
-        return;
-
-      QModelIndexList list = selectionModel()->selectedRows();
-      pRoot->UI_beginRemoveVGMColls();
-      for (auto & idx : std::ranges::reverse_view(list)) {
-        qtVGMRoot.removeVGMColl(qtVGMRoot.vgmColls()[idx.row()]);
-      }
-      pRoot->UI_endRemoveVGMColls();
-
-      clearSelection();
-      return;
-    }
     default:
       QListView::keyPressEvent(e);
   }
