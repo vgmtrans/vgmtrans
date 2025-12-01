@@ -88,6 +88,16 @@ BytePattern KonamiTMNT2Scanner::ptn_tmnt2_LoadDrumTable("\x4F\x06\x00\xDD\x7E\x1
 BytePattern KonamiTMNT2Scanner::ptn_tmnt2_LoadYM2151InstrTable("\x13\x1A\xD9\xCB\x7F\xCA\xA6\x19\x21\xAF\x24\xE6\x7F", "xxxxxx??x??xx", 13);
 
 
+// ram:1b76 44              LD         B,H
+// ram:1b77 4d              LD         C,L
+// ram:1b78 21 bb 25        LD         HL,ym2151_instrs                                 = ram:27bb
+// ram:1b7b 09              ADD        HL,BC
+// ram:1b7c 4e              LD         C,(HL=>ym2151_instrs)                            = ram:27bb
+// ram:1b7d 23              INC        HL
+// ram:1b7e 46              LD         B,(HL=>ym2151_instrs+1)
+BytePattern KonamiTMNT2Scanner::ptn_ssriders_LoadYM2151InstrTable("\x44\x4D\x21\xBB\x25\x09\x4E\x23\x46", "xxx??xxxx", 9);
+
+
 
 void KonamiTMNT2Scanner::scan(RawFile * /*file*/, void *info) {
   auto *gameEntry = static_cast<MAMEGame *>(info);
@@ -137,6 +147,8 @@ void KonamiTMNT2Scanner::scan(RawFile * /*file*/, void *info) {
   }
   if (programRom->searchBytePattern(ptn_tmnt2_LoadYM2151InstrTable, loadInstrTableAddr)) {
     instrTableAddrYM2151 = programRom->readShort(loadInstrTableAddr + 9);
+  } else if (programRom->searchBytePattern(ptn_ssriders_LoadYM2151InstrTable, loadInstrTableAddr)) {
+    instrTableAddrYM2151 = programRom->readShort(loadInstrTableAddr + 3);
   }
   if (instrTableAddrK053260 == 0 || drumTableAddr == 0 || instrTableAddrYM2151 == 0) {
     return;

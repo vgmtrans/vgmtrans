@@ -37,6 +37,7 @@ private:
   static BytePattern ptn_tmnt2_LoadInstrTable;
   static BytePattern ptn_tmnt2_LoadDrumTable;
   static BytePattern ptn_tmnt2_LoadYM2151InstrTable;
+  static BytePattern ptn_ssriders_LoadYM2151InstrTable;
   // std::set<u32> m_instrPtrs;
   // std::set<u32> m_drumPtrs;
 };
