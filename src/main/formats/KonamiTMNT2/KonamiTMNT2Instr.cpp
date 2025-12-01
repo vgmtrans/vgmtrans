@@ -141,7 +141,15 @@ bool KonamiTMNT2SampleInstrSet::parseDrums() {
       drumOctaveItem->addChild(ptrOffset, 2, "Drum Pointer");
 
       std::string name = j == 0 ? "Unreachable Drum" : fmt::format("Drum {}", drumNum);
-      drumsItem->addChild(ptr, sizeof(konami_tmnt2_drum_info), name);
+      auto drumItem = drumsItem->addChild(ptr, sizeof(konami_tmnt2_drum_info), name);
+      drumItem->addChild(ptr + 0, 2, "Pitch");
+      drumItem->addChild(ptr + 2, 1, "Unknown");
+      drumItem->addChild(ptr + 3, 1, "Flags");
+      drumItem->addChild(ptr + 4, 2, "Sample Length");
+      drumItem->addChild(ptr + 6, 3, "Sample Address");
+      drumItem->addChild(ptr + 9, 1, "Volume");
+      drumItem->addChild(ptr + 10, 4, "Unknown");
+
 
       const konami_tmnt2_drum_info& drumInfo = m_drumTables[i][j];
 
