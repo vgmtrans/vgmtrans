@@ -23,6 +23,7 @@ public:
 
 private:
   size_t collsBeforeLoad;
+  bool isLoadingRawFile = false;
 };
 
 class VGMCollNameEditor : public QStyledItemDelegate {
