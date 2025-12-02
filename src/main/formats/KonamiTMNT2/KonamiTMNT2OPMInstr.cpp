@@ -8,7 +8,7 @@ KonamiTMNT2OPMInstrSet::KonamiTMNT2OPMInstrSet(
   u32 offset,
   std::string name
 )
-  : VGMInstrSet(KonamiTMNT2Format::name, file, offset, 0, std::move(name)),
+  : YM2151InstrSet(KonamiTMNT2Format::name, file, offset, 0, std::move(name)),
     m_fmtVer(fmtVer)
 {
 }
@@ -23,6 +23,10 @@ bool KonamiTMNT2OPMInstrSet::parseInstrPointers() {
     instrTableItem->addChild(offset, 2, "Instrument Pointer");
 
     std::string name = fmt::format("Instrument {:03d}", i);
+    konami_tmnt2_ym2151_instr instrData{};
+    readBytes(instrPtr, sizeof(konami_tmnt2_ym2151_instr), &instrData);
+    m_instrs.push_back(instrData);
+
     VGMInstr* instr = new VGMInstr(this, instrPtr, sizeof(konami_tmnt2_ym2151_instr), 0, i, name, 0);
     instr->addChild(instrPtr, 1, "RL_FB_CONECT");
     for (int i = 0; i < 4; ++i) {
@@ -36,14 +40,30 @@ bool KonamiTMNT2OPMInstrSet::parseInstrPointers() {
       opItem->addChild(offset+5, 1, "D1L_RR");
     }
     aInstrs.push_back(instr);
+    addOPMInstrument(convertToOPMData(instrData, name));
   }
   return true;
 }
 
-std::string KonamiTMNT2OPMInstrSet::generateOPMFile() {
+OPMData KonamiTMNT2OPMInstrSet::convertToOPMData(const konami_tmnt2_ym2151_instr& instr, const std::string& name) const {
+  OPMData data{};
+  data.name = name;
 
-}
+  data.ch.PAN = 0xC0; //instr.RL_FB_CONECT >> 3) & 0b111;
+  data.set_fl_con(instr.RL_FB_CONECT);
+  data.ch.AMS = 0;
+  data.ch.PMS = 0;
+  data.ch.SLOT_MASK = 0x0F;
+  data.ch.NE = 0;
 
-bool KonamiTMNT2OPMInstrSet::saveAsOPMFile(const std::string &filepath) {
+  for (int i = 0; i < 4; ++i) {
+    data.set_dt1_mul(instr.op[i].DT1_MUL, i);
+    data.set_tl(instr.op[i].TL, i);
+    data.set_ks_ar(instr.op[i].KS_AR, i);
+    data.set_asmen_d1r(instr.op[i].AMSEN_D1R, i);
+    data.set_dt2_d2r(instr.op[i].DT2_D2R, i);
+    data.set_d1l_rr(instr.op[i].D1L_RR, i);
+  }
 
+  return data;
 }

@@ -1,6 +1,6 @@
 #pragma once
 
-#include "VGMInstrSet.h"
+#include "YM2151InstrSet.h"
 
 enum KonamiTMNT2FormatVer : u8;
 
@@ -62,7 +62,7 @@ struct konami_tmnt2_ym2151_instr {
 
 
 class KonamiTMNT2OPMInstrSet
-    : public VGMInstrSet {
+    : public YM2151InstrSet {
 public:
 
   KonamiTMNT2OPMInstrSet(RawFile *file,
@@ -72,11 +72,10 @@ public:
   ~KonamiTMNT2OPMInstrSet() override = default;
 
   bool parseInstrPointers() override;
-  std::string generateOPMFile();
-  bool saveAsOPMFile(const std::string &filepath);
 
 private:
-  // const std::vector<konami_tmnt2_instr_info> m_instrInfos;
-
   KonamiTMNT2FormatVer m_fmtVer;
+  std::vector<konami_tmnt2_ym2151_instr> m_instrs;
+
+  [[nodiscard]] OPMData convertToOPMData(const konami_tmnt2_ym2151_instr& instr, const std::string& name) const;
 };
