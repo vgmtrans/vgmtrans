@@ -75,7 +75,6 @@ public:
 
 private:
   KonamiTMNT2FormatVer m_fmtVer;
-  std::vector<konami_tmnt2_ym2151_instr> m_instrs;
 
   [[nodiscard]] OPMData convertToOPMData(const konami_tmnt2_ym2151_instr& instr, const std::string& name) const;
 };
