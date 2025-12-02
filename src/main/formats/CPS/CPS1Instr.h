@@ -59,6 +59,7 @@ public:
                  const std::string& name);
   ~CPS1OPMInstrSet() override = default;
 
+  std::string generateOPMFile() const override;
   bool parseInstrPointers() override;
 public:
   CPS1FormatVer fmt_version;
