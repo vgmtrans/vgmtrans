@@ -25,7 +25,6 @@ bool KonamiTMNT2OPMInstrSet::parseInstrPointers() {
     std::string name = fmt::format("Instrument {:03d}", i);
     konami_tmnt2_ym2151_instr instrData{};
     readBytes(instrPtr, sizeof(konami_tmnt2_ym2151_instr), &instrData);
-    m_instrs.push_back(instrData);
 
     VGMInstr* instr = new VGMInstr(this, instrPtr, sizeof(konami_tmnt2_ym2151_instr), 0, i, name, 0);
     instr->addChild(instrPtr, 1, "RL_FB_CONECT");
