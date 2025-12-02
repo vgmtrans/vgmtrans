@@ -4,6 +4,7 @@
 #include "CPS1Scanner.h"
 #include "VGMSampColl.h"
 #include "YM2151.h"
+#include "YM2151InstrSet.h"
 #include <sstream>
 
 // ******************
@@ -48,7 +49,7 @@ private:
 // ***************
 
 class CPS1OPMInstrSet
-    : public VGMInstrSet {
+    : public YM2151InstrSet {
 public:
   CPS1OPMInstrSet(RawFile *file,
                  CPS1FormatVer fmt_version,
@@ -59,8 +60,6 @@ public:
   ~CPS1OPMInstrSet() override = default;
 
   bool parseInstrPointers() override;
-  std::string generateOPMFile();
-  bool saveAsOPMFile(const std::string &filepath);
 public:
   CPS1FormatVer fmt_version;
   u8 masterVol;

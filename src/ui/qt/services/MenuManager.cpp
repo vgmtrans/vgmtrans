@@ -27,7 +27,7 @@ MenuManager::MenuManager() {
       std::make_shared<CommandSeparator>(),
       std::make_shared<CloseVGMFileCommand>(),
   });
-  registerCommands<CPS1OPMInstrSet, VGMItem>({
+  registerCommands<YM2151InstrSet, VGMItem>({
       std::make_shared<OpenCommand>(),
       std::make_shared<CommandSeparator>(),
       std::make_shared<CloseVGMFileCommand>(),

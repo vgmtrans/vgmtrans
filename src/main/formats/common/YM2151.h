@@ -58,10 +58,8 @@ struct OPMData {
   }
 
   void set_fl_con(u8 fl_con) {
-    for (int i = 0; i < 4; ++i) {
-      ch.FL = (fl_con >> 3) & 0b111;
-      ch.CON = fl_con & 0b111;
-    }
+    ch.FL = (fl_con >> 3) & 0b111;
+    ch.CON = fl_con & 0b111;
   }
 
   void set_dt1_mul(u8 dt1_mul[4]) {
@@ -72,11 +70,20 @@ struct OPMData {
     }
   }
 
+  void set_dt1_mul(u8 dt1_mul, int opIdx) {
+    op[opIdx].DT1 = (dt1_mul >> 4) & 0b111;
+    op[opIdx].MUL = dt1_mul & 0b1111;
+  }
+
   void set_tl(u8 tl[4]) {
     for (int i = 0; i < 4; ++i) {
       auto& opx = op[i];
       opx.TL = tl[i];
     }
+  }
+
+  void set_tl(u8 tl, int opIdx) {
+    op[opIdx].TL = tl;
   }
 
   void set_ks_ar(u8 ks_ar[4]) {
@@ -87,12 +94,22 @@ struct OPMData {
     }
   }
 
+  void set_ks_ar(u8 ks_ar, int opIdx) {
+    op[opIdx].KS = ks_ar >> 6;
+    op[opIdx].AR = ks_ar & 0b11111;
+  }
+
   void set_asmen_d1r(u8 amsen_d1r[4]) {
     for (int i = 0; i < 4; ++i) {
       auto& opx = op[i];
       opx.AMS_EN = amsen_d1r[i] & 0b10000000;
       opx.D1R = amsen_d1r[i] & 0b11111;
     }
+  }
+
+  void set_asmen_d1r(u8 amsen_d1r, int opIdx) {
+    op[opIdx].AMS_EN = amsen_d1r & 0b10000000;
+    op[opIdx].D1R = amsen_d1r & 0b11111;
   }
 
   void set_dt2_d2r(u8 dt2_d2r[4]) {
@@ -103,12 +120,22 @@ struct OPMData {
     }
   }
 
+  void set_dt2_d2r(u8 dt2_d2r, int opIdx) {
+    op[opIdx].DT2 = dt2_d2r >> 6;
+    op[opIdx].D2R = dt2_d2r & 0b11111;
+  }
+
   void set_d1l_rr(u8 d1l_rr[4]) {
     for (int i = 0; i < 4; ++i) {
       auto& opx = op[i];
       opx.D1L = d1l_rr[i] >> 4;
       opx.RR = d1l_rr[i] & 0b1111;
     }
+  }
+
+  void set_d1l_rr(u8 d1l_rr, int opIdx) {
+    op[opIdx].D1L = d1l_rr >> 4;
+    op[opIdx].RR = d1l_rr & 0b1111;
   }
 
   void set_pms_ams(u8 pms_ams) {
