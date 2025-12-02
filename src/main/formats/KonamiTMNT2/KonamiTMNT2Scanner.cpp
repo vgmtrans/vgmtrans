@@ -8,6 +8,7 @@
 #include "MAMELoader.h"
 #include "BytePattern.h"
 #include "KonamiTMNT2Instr.h"
+#include "KonamiTMNT2OPMInstr.h"
 #include "VGMColl.h"
 #include "VGMMiscFile.h"
 
@@ -239,10 +240,17 @@ void KonamiTMNT2Scanner::scan(RawFile * /*file*/, void *info) {
     sampcoll = nullptr;
   }
 
+  auto opmInstrSet = new KonamiTMNT2OPMInstrSet(programRom, fmtVer, instrTableAddrYM2151, "YM2151 Instrument Set");
+  if (!opmInstrSet->loadVGMFile()) {
+    delete opmInstrSet;
+    opmInstrSet = nullptr;
+  }
+
   for (auto seq : seqs) {
     VGMColl* coll = new VGMColl(seq->name());
 
     coll->useSeq(seq);
+    coll->addInstrSet(opmInstrSet);
     coll->addInstrSet(instrSet);
     coll->addSampColl(sampcoll);
     if (!coll->load()) {
