@@ -59,6 +59,7 @@ public:
                  const std::string& name);
   ~CPS1OPMInstrSet() override = default;
 
+  std::string generateOPMFile() const override;
   bool parseInstrPointers() override;
 public:
   CPS1FormatVer fmt_version;
@@ -360,6 +361,7 @@ public:
                const std::string& name)
     : VGMInstr(instrSet, offset, length, theBank, theInstrNum, name), masterVol(masterVol) {}
   ~CPS1OPMInstr() override = default;
+
   bool loadInstr() override {
     this->readBytes(dwOffset, sizeof(OPMType), &opmData);
     return true;

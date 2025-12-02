@@ -3,6 +3,7 @@
 #include "CPS2Format.h"
 #include "VGMRgn.h"
 #include "OkiAdpcm.h"
+#include "version.h"
 
 // ******************
 // CPS1SampleInstrSet
@@ -114,9 +115,9 @@ bool CPS1SampColl::parseSampleInfo() {
   return true;
 }
 
-// ******************
-// CPS1SampleInstrSet
-// ******************
+// ***************
+// CPS1OPMInstrSet
+// ***************
 
 CPS1OPMInstrSet::CPS1OPMInstrSet(RawFile *file,
                                CPS1FormatVer version,
@@ -127,6 +128,38 @@ CPS1OPMInstrSet::CPS1OPMInstrSet(RawFile *file,
     : YM2151InstrSet(CPS1Format::name, file, offset, length, name),
       fmt_version(version), masterVol(masterVol) {
 }
+
+
+std::string CPS1OPMInstrSet::generateOPMFile() const {
+  std::ostringstream ss;
+  std::string header = std::string("// Converted using VGMTrans version: ") + VGMTRANS_VERSION + "\n";
+  ss << header;
+
+  for (size_t i = 0; i < aInstrs.size(); ++i) {
+    switch (fmt_version) {
+      case CPS1_V200:
+        if (auto* instr = dynamic_cast<CPS1OPMInstr<CPS1OPMInstrDataV2_00>*>(aInstrs[i]); instr != nullptr) {
+          ss << instr->toOPMString(i) << '\n';
+        }
+        break;
+      case CPS1_V500:
+      case CPS1_V502:
+        if (auto* instr = dynamic_cast<CPS1OPMInstr<CPS1OPMInstrDataV5_02>*>(aInstrs[i]); instr != nullptr) {
+          ss << instr->toOPMString(i) << '\n';
+        }
+        break;
+      case CPS1_V100:
+      case CPS1_V350:
+      case CPS1_V425:
+        if (auto* instr = dynamic_cast<CPS1OPMInstr<CPS1OPMInstrDataV4_25>*>(aInstrs[i]); instr != nullptr) {
+          ss << instr->toOPMString(i) << '\n';
+        }
+        break;
+    }
+  }
+  return ss.str();
+}
+
 
 bool CPS1OPMInstrSet::parseInstrPointers() {
   int numInstrs;

@@ -15,7 +15,7 @@ public:
                  uint32_t length,
                  std::string name);
 
-  std::string generateOPMFile() const;
+  virtual std::string generateOPMFile() const;
   bool saveAsOPMFile(const std::string& filepath) const;
 
 protected:
