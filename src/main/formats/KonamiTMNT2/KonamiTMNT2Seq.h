@@ -58,7 +58,8 @@ class KonamiTMNT2Track : public SeqTrack {
     bool isFmTrack,
     KonamiTMNT2Seq *parentSeq,
     uint32_t offset = 0,
-    uint32_t length = 0
+    uint32_t length = 0,
+    std::string name = "Track"
   );
 
   void resetVars() override;
@@ -96,13 +97,15 @@ private:
   u8 m_state = 0;
   u8 m_rawBaseDur = 0;
   u8 m_baseDur = 0;
+  u8 m_baseDurHalveBackup = 0;
   u8 m_extendDur = 0;
   u8 m_durSubtract = 0;
-  u8 m_attenuation = 0;
+  u8 m_noteDurPercent = 0;
+  u8 m_dxAtten = 0;
+  u8 m_dxAttenMultiplier = 1;
   u8 m_octave = 0;
   s8 m_transpose = 0;
   s8 m_addedToNote = 0;
-  u8 m_dxVal = 1;
   u8 m_loopCounter[2];
   u32 m_loopStartOffset[2];
   u8 m_warpCounter = 0;
@@ -110,4 +113,8 @@ private:
   u16 m_warpDest = 0;
   u16 m_callOrigin[2];
   // u32 m_callRetOffset = 0;
+
+  // k053260-specific state
+  u8 m_attenuation = 0;
+
 };

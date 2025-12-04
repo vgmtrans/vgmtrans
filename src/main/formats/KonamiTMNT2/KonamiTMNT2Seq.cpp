@@ -21,10 +21,10 @@ KonamiTMNT2Seq::KonamiTMNT2Seq(RawFile *file,
       m_ym2151TrackOffsets(std::move(ym2151TrackOffsets)),
       m_k053260TrackOffsets(std::move(k053260TrackOffsets)) {
   bLoadTickByTick = true;
-  setPPQN(120);
+  setPPQN(240);
   setAlwaysWriteInitialVol(127);
   setAlwaysWriteInitialExpression(127);
-  setAlwaysWriteInitialTempo(108);
+  setAlwaysWriteInitialTempo(110);
   setAllowDiscontinuousTrackData(true);
   // setShouldTrackControlFlowState(true);
 }
@@ -41,12 +41,18 @@ void KonamiTMNT2Seq::resetVars() {
 // }
 
 bool KonamiTMNT2Seq::parseTrackPointers() {
-  for (auto offset : m_ym2151TrackOffsets) {
-    auto *track = new KonamiTMNT2Track(true, this, offset, 0);
+  // auto *track = new KonamiTMNT2Track(true, this, m_ym2151TrackOffsets[0], 0, "FM Track");
+  // aTracks.push_back(track);
+  for (int i = 0; i < m_ym2151TrackOffsets.size(); ++i) {
+    auto offset = m_ym2151TrackOffsets[i];
+    auto name = fmt::format("FM Track {}", i);
+    auto *track = new KonamiTMNT2Track(true, this, offset, 0, name);
     aTracks.push_back(track);
   }
-  for (auto offset : m_k053260TrackOffsets) {
-    auto *track = new KonamiTMNT2Track(false, this, offset, 0);
+  for (int i = 0; i < m_k053260TrackOffsets.size(); ++i) {
+    auto offset = m_k053260TrackOffsets[i];
+    auto name = fmt::format("Sampled Track {}", i);
+    auto *track = new KonamiTMNT2Track(false, this, offset, 0, name);
     aTracks.push_back(track);
   }
 
@@ -58,9 +64,10 @@ KonamiTMNT2Track::KonamiTMNT2Track(
   bool isFmTrack,
   KonamiTMNT2Seq *parentSeq,
   uint32_t offset,
-  uint32_t length
+  uint32_t length,
+  std::string name
 )
-    : SeqTrack(parentSeq, offset, length, isFmTrack ? "YM2151 Track" : "K053260 Track"),
+    : SeqTrack(parentSeq, offset, length, std::move(name)),
       m_isFmTrack(isFmTrack) {
   synthType = isFmTrack ? SynthType::YM2151 : SynthType::SoundFont;
 }
@@ -71,13 +78,16 @@ void KonamiTMNT2Track::resetVars() {
   m_state = 0;
   m_rawBaseDur = 0;
   m_baseDur = 0;
+  m_baseDurHalveBackup = 0;
   m_extendDur = 0;
   m_durSubtract = 0;
+  m_noteDurPercent = 0;
   m_attenuation = 0;
   m_octave = 0;
   m_transpose = 0;
   m_addedToNote = 0;
-  m_dxVal = 1;
+  m_dxAtten = 0;
+  m_dxAttenMultiplier = 1;
   memset(m_loopCounter, 0, sizeof(m_loopCounter));
   memset(m_loopStartOffset, 0, sizeof(m_loopStartOffset));
   memset(m_callOrigin, 0, sizeof(m_callOrigin));
@@ -106,14 +116,14 @@ bool KonamiTMNT2Track::readEvent() {
     if ((m_state & 0x20) > 0) {
       dur *= 3;
       m_state |= 0x40;             // set bit 6
-      m_state &= (0xFF - 0x20);    // reset bit 5
+      m_state &= (0xFF ^ 0x20);    // reset bit 5
       m_durSubtract = dur;
       // TODO? stores duration value in chan_state[0x67]
     } else {
       dur *= m_baseDur;
       if ((m_state & 0x40) > 0) {
         dur -= m_durSubtract;
-        m_state &= (0xFF - 0x40);
+        m_state &= (0xFF ^ 0x40);
       }
     }
 
@@ -123,22 +133,37 @@ bool KonamiTMNT2Track::readEvent() {
       addRest(beginOffset, curOffset - beginOffset, dur);
       return true;
     }
-    if (percussionMode()) {
+    if (!m_isFmTrack && percussionMode()) {
       u8 semitones = opcode >> 4;
       s8 note = semitones + (m_addedToNote * 16);
       // note -= transpose;
-      addNoteByDur(beginOffset, curOffset - beginOffset, note, 0x7F, dur);
+      addNoteByDur(beginOffset, curOffset - beginOffset, note, /*0x7F*/ 0x50, dur);
     } else {
       // Melodic
       u8 semitones = (opcode >> 4) - 1;
       // u8 durationIndex = opcode & 0x0F;
       u8 note = semitones + m_addedToNote + m_transpose + globalTranspose();
+      if (m_isFmTrack)
+        note += 12;
       // note -= 12;
       // printf("DUR: %d\n", dur);
       if (dur == 0) {
         printf("DUR 0. offset: %X\n", beginOffset);
       }
-      addNoteByDur(beginOffset, curOffset - beginOffset, note, 0x7F, dur);
+      u32 noteDur = dur;
+      if (m_noteDurPercent > 0) {
+        noteDur = dur * (m_noteDurPercent / 256.0);
+      }
+      noteDur = std::max(1u, noteDur);
+      // YM2151 requires time between notes, otherwise it strings them together portamento style.
+      // if (m_isFmTrack && (noteDur == dur) && (noteDur > 0))
+        // noteDur -= 1;
+      // u32 finalNoteDur = (m_isFmTrack && noteDur > 1) ? noteDur - 1 : noteDur;
+      // if (finalNoteDur == 0) {
+        // printf("FINAL NOTE DUR 0\n");
+      // }
+      u8 vel = m_isFmTrack ? (0x7F - m_dxAtten) : 0x50;
+      addNoteByDur(beginOffset, curOffset - beginOffset, note, vel, noteDur);
     }
     addTime(dur);
     return true;
@@ -157,12 +182,24 @@ bool KonamiTMNT2Track::readEvent() {
       case 0xD5:
       case 0xD6:
       case 0xD7:
-        // m_dxVal
-        addUnknown(beginOffset, curOffset - beginOffset, fmt::format("Opcode {:02X}", opcode));
+        if (m_isFmTrack) {
+          m_state |= 8;
+        }
+        if (m_isFmTrack) {
+          m_dxAtten = (opcode & 0xF) * m_dxAttenMultiplier;
+          m_dxAtten = std::min<u8>(m_dxAtten, 0x7F);
+        }
+        else {
+          m_dxAtten = (opcode & 0xF) * ((m_dxAttenMultiplier == 0) ? 1 : m_dxAttenMultiplier);
+          m_dxAtten &= 0x7F;
+        }
+        addGenericEvent(beginOffset, curOffset - beginOffset, "Attenuation", "", Type::Volume);
         break;
       case 0xD8:
-        curOffset += 1;
-        addUnknown(beginOffset, curOffset - beginOffset, fmt::format("Opcode {:02X}", opcode));
+        m_dxAttenMultiplier = readByte(curOffset++);
+        if (m_isFmTrack && m_dxAttenMultiplier > 0x12)
+          m_dxAttenMultiplier = 0x12;
+        addGenericEvent(beginOffset, curOffset - beginOffset, "Attenuation Multiplier", "", Type::Volume);
         break;
       case 0xD9: {
         // Note extender
@@ -175,14 +212,32 @@ bool KonamiTMNT2Track::readEvent() {
         addGenericEvent(beginOffset, curOffset - beginOffset, "Extend Duration", desc, Type::DurationChange);
         break;
       }
-      case 0xDA:
-        curOffset += 1;
-        addUnknown(beginOffset, curOffset - beginOffset, fmt::format("Opcode {:02X}", opcode));
+
+      case 0xDA: {
+        u8 val = readByte(curOffset++);
+        if (m_isFmTrack) {
+          // Overrides RL registers (right/left channel enable) if a global state var is set to 0
+          // value 0 -> cancel override and restore instruments original RL setting
+          // 1 -> L only (0x40)
+          // 2 -> R only (0x80)
+          // 3 -> LR enabled
+          u8 pan = 64;
+          if (val == 1)
+            pan = 0;
+          else if (val == 2)
+            pan = 127;
+          addPan(beginOffset, 2, pan);
+        } else {
+          addUnknown(beginOffset, curOffset - beginOffset, "Pan");
+        }
         break;
-      case 0xDB:
-        curOffset += 1;
-        addUnknown(beginOffset, curOffset - beginOffset, fmt::format("Opcode {:02X}", opcode));
+      }
+      case 0xDB: {
+        m_noteDurPercent = readByte(curOffset++);
+        auto desc = fmt::format("Note Duration Percent - {} / 256 = {:.1f}%", m_noteDurPercent, m_noteDurPercent / 256.0);
+        addGenericEvent(beginOffset, 2, "Note Duration Percent", desc, Type::DurationChange);
         break;
+      }
       case 0xDC:
         curOffset += 1;
         addUnknown(beginOffset, curOffset - beginOffset, fmt::format("Opcode {:02X}", opcode));
@@ -199,7 +254,15 @@ bool KonamiTMNT2Track::readEvent() {
         m_state |= 0x20;
         break;
       case 0xDF:
-        addUnknown(beginOffset, curOffset - beginOffset, fmt::format("Opcode {:02X}", opcode));
+        // Halve Base Duration Toggle
+        if (m_baseDurHalveBackup == 0) {
+          m_baseDurHalveBackup = m_baseDur;
+          m_baseDur /= 2;
+        } else {
+          m_baseDur = m_baseDurHalveBackup;
+          m_baseDurHalveBackup = 0;
+        }
+        addGenericEvent(beginOffset, 1, "Halve Duration", "", Type::DurationChange);
         break;
       case 0xE0: {
         u8 val = readByte(curOffset++);
@@ -213,30 +276,37 @@ bool KonamiTMNT2Track::readEvent() {
             val = readByte(curOffset++);
           }
           m_rawBaseDur = val;
-          m_baseDur = val * 3;
+          // We multiply the raw base duration by two so we can cleanly halve durations (for event DF)
+          m_rawBaseDur *= 2;
+          m_baseDur = m_rawBaseDur * 3;
           m_program = readByte(curOffset++);
           // TMNT2 is weird. It has 113 FM instruments, but code to handle > 128, however, it just
           // performs a simple &= 0x7F. Values over 127 are used in sequences.
           m_program &= 0x7F;
           addProgramChangeNoItem(m_program, false);
-          m_attenuation = readByte(curOffset++) & 0x7F;
-          u8 unsure = readByte(curOffset++);
-          addGenericEvent(beginOffset, curOffset - beginOffset, "Program Change / Base Dur / Attenuation / State", "", Type::ProgramChange);
+          // Next byte is attenuation.
+          addVolNoItem(0x7F - (readByte(curOffset++) & 0x7F));
+          m_noteDurPercent = readByte(curOffset++);
+          addGenericEvent(beginOffset, curOffset - beginOffset, "Program Change / Base Dur / Attenuation / State / Note Dur", "", Type::ProgramChange);
         } else {
           if ((val & 0xF0) == 0) {
             m_state = val & 0xF0;
             m_rawBaseDur = val;
-            m_baseDur = val * 3;
+            // We multiply the raw base duration by two so we can cleanly halve durations (for event DF)
+            m_rawBaseDur *= 2;
+            m_baseDur = m_rawBaseDur * 3;
             m_program = readByte(curOffset++);
             addProgramChangeNoItem(m_program, false);
             m_attenuation = readByte(curOffset++) & 0x7F;
-            u8 unsure = readByte(curOffset++);
-            addGenericEvent(beginOffset, curOffset - beginOffset, "Program Change / Base Dur / Attenuation / State", "", Type::ProgramChange);
+            m_noteDurPercent = readByte(curOffset++);
+            addGenericEvent(beginOffset, curOffset - beginOffset, "Program Change / Base Dur / Attenuation / State / Note Dur", "", Type::ProgramChange);
           }
           else {
             // m_transpose_1 = (val >> 4) - 1;
             m_addedToNote = (val >> 4) - 1;
             m_rawBaseDur = val & 0xF;
+            // We multiply the raw base duration by two so we can cleanly halve durations (for event DF)
+            m_rawBaseDur *= 2;
             m_baseDur = m_rawBaseDur * 3;
             m_attenuation = readByte(curOffset++);
             setPercussionModeOn();
@@ -265,6 +335,8 @@ bool KonamiTMNT2Track::readEvent() {
       case 0xE2: {
         // Set base duration
         m_rawBaseDur = readByte(curOffset++);
+        // We multiply the raw base duration by two so we can cleanly halve durations (for event DF)
+        m_rawBaseDur *= 2;
         m_baseDur = m_rawBaseDur * 3;
         auto desc = fmt::format("Base Duration - {}", m_baseDur);
         addGenericEvent(beginOffset, 2, "Set Base Duration", desc, Type::DurationChange);
@@ -283,6 +355,8 @@ bool KonamiTMNT2Track::readEvent() {
       case 0xE4: {
         m_attenuation = readByte(curOffset++) & 0x7F;
         addGenericEvent(beginOffset, 2, "Set Attenuation", "", Type::Volume);
+        if (m_isFmTrack)
+          addVolNoItem(0x7F - m_attenuation);
         break;
       }
       case 0xE5:
@@ -306,7 +380,16 @@ bool KonamiTMNT2Track::readEvent() {
       case 0xEA:    // NOP
         // TODO: used in ssriders seq 11
         break;
-      case 0xEB:
+      case 0xEB: {
+        // u8 atten = -readByte(curOffset++);
+        // if (m_isFmTrack)
+        //   addVol(beginOffset, 2, atten);
+        // else
+        //   addGenericEvent(beginOffset, 2, "Volume", "", Type::Unknown);
+        curOffset++;
+        addUnknown(beginOffset, 2);
+        break;
+      }
       case 0xEC: {
         // Transpose
         // Bits 0–3: fine semitone offset within an octave (0–15)
@@ -321,7 +404,8 @@ bool KonamiTMNT2Track::readEvent() {
         if ((val & 0x80) > 0)
           transpose = -transpose;
         if ((val & 0x40) > 0) {
-          setGlobalTranspose(transpose);
+          if (!m_isFmTrack)
+            setGlobalTranspose(transpose);
           auto desc = fmt::format("Global Transpose - {} semitones", transpose);
           addGenericEvent(beginOffset, 2, "Global Transpose", desc, Type::Transpose);
         }
@@ -333,11 +417,17 @@ bool KonamiTMNT2Track::readEvent() {
         }
         break;
       }
-      case 0xED:
+      case 0xED: {
         // Pitch bend
-        curOffset += 1;
-        addUnknown(beginOffset, curOffset - beginOffset, "Pitchbend?");
+        s8 val = static_cast<s8>(readByte(curOffset++));
+        if (m_isFmTrack) {
+          double cents = val * (100/64.0);
+          addPitchBend(beginOffset, 2, cents);
+        } else {
+          addGenericEvent(beginOffset, 2, "Pitch Bend", "", Type::Unknown);
+        }
         break;
+      }
       case 0xEE:
         curOffset += 3;
         addUnknown(beginOffset, curOffset - beginOffset, fmt::format("Opcode {:02X}", opcode));
@@ -393,7 +483,7 @@ bool KonamiTMNT2Track::readEvent() {
         if (dest < beginOffset) {
           shouldContinue = addLoopForever(beginOffset, 3);
         } else {
-          auto desc = fmt::format("Destination: ${:X}", dest);
+          auto desc = fmt::format("Destination: {:X}", dest);
           addGenericEvent(beginOffset, 3, "Jump", desc, Type::Loop);
         }
         if (dest < parentSeq->dwOffset) {
@@ -444,7 +534,7 @@ bool KonamiTMNT2Track::readEvent() {
           if (dest < parentSeq->dwOffset) {
             return false;
           }
-          auto desc = fmt::format("Call - destination: %X", dest);
+          auto desc = fmt::format("Call - destination: {:X}", dest);
           addGenericEvent(beginOffset, 3, "Call", desc, Type::Jump);
           curOffset = dest;
         } else {
