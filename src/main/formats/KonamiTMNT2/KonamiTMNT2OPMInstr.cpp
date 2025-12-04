@@ -55,13 +55,15 @@ OPMData KonamiTMNT2OPMInstrSet::convertToOPMData(const konami_tmnt2_ym2151_instr
   data.ch.SLOT_MASK = 120;
   data.ch.NE = 0;
 
+  const int slotOrder[4] = {0, 2, 1, 3};
   for (int i = 0; i < 4; ++i) {
-    data.set_dt1_mul(instr.op[i].DT1_MUL, i);
-    data.set_tl(instr.op[i].TL, i);
-    data.set_ks_ar(instr.op[i].KS_AR, i);
-    data.set_asmen_d1r(instr.op[i].AMSEN_D1R, i);
-    data.set_dt2_d2r(instr.op[i].DT2_D2R, i);
-    data.set_d1l_rr(instr.op[i].D1L_RR, i);
+    int slot = slotOrder[i];
+    data.set_dt1_mul(instr.op[i].DT1_MUL, slot);
+    data.set_tl(instr.op[i].TL, slot);
+    data.set_ks_ar(instr.op[i].KS_AR, slot);
+    data.set_asmen_d1r(instr.op[i].AMSEN_D1R, slot);
+    data.set_dt2_d2r(instr.op[i].DT2_D2R, slot);
+    data.set_d1l_rr(instr.op[i].D1L_RR, slot);
   }
 
   return data;
