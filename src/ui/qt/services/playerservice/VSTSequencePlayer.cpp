@@ -47,7 +47,7 @@ bool VSTSequencePlayer::loadCollection(const VGMColl *coll, std::function<void()
   std::thread myThread(bgLoadSF2);
   myThread.detach();
 
-  prepMidiPlayback(coll->seq());
+  prepMidiPlayback(coll);
   enqueueResetEvent();
   return true;
 }
@@ -420,14 +420,15 @@ void VSTSequencePlayer::clearState() {
   state.sampleRate = deviceManager.getCurrentAudioDevice()->getCurrentSampleRate();
 }
 
-bool VSTSequencePlayer::prepMidiPlayback(VGMSeq* seq) {
+bool VSTSequencePlayer::prepMidiPlayback(const VGMColl* coll) {
+  VGMSeq* seq = coll->seq();
   if (deviceManager.getCurrentAudioDevice() == nullptr) {
     initializeAudio();
   }
   clearState();
 
   // Convert the VGMSeq to midi, then allocate a vector to hold every midi event in the sequence
-  MidiFile* midiFile = seq->convertToMidi();
+  MidiFile* midiFile = seq->convertToMidi(coll);
   state.midiFile.reset(midiFile);
 
   size_t reserveSize = 0;
