@@ -85,7 +85,7 @@ private:
   void enqueueResetEvent();
   bool loadVST();
   void clearState();
-  bool prepMidiPlayback(VGMSeq* seq);
+  bool prepMidiPlayback(const VGMColl *coll);
   bool sendSF2ToVST(const VGMColl* coll);
   bool sendOpmToVST(const VGMColl* coll);
   std::vector<int> generateEventSampleTimes(std::vector<MidiEvent*>& events, int ppqn) const;
