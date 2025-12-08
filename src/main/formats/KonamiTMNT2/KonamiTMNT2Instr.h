@@ -12,9 +12,9 @@ struct konami_tmnt2_instr_info {
   u8 start_mid;
   u8 start_msb;
   u8 volume;
-  u8 unknown0;
-  u8 unknown1;
-  u8 unknown2;
+  u8 note_dur;
+  u8 release_dur_and_rate;
+  u8 default_pan;
 
 private:
   // static constexpr u8 mask_sample_type = 0b0000'1100;  // bits 2-3
@@ -99,6 +99,8 @@ public:
 
   bool parseMelodicInstrs();
   bool parseDrums();
+
+  const std::vector<konami_tmnt2_instr_info> instrInfos() { return m_instrInfos; }
 
 private:
   u32 m_instrTableAddr;

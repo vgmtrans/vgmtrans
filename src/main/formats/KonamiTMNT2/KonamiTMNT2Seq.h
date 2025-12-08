@@ -8,11 +8,14 @@
 #include "VGMSeq.h"
 #include "SeqTrack.h"
 #include "KonamiTMNT2Format.h"
+#include "KonamiTMNT2Instr.h"
 
 #include <vector>
 #include <string>
 
-enum KonamiTMNT2FormatVer : uint8_t;
+struct konami_tmnt2_instr_info;
+class VGMInstr;
+enum KonamiTMNT2FormatVer : u8;
 
 class KonamiTMNT2Seq : public VGMSeq {
  public:
@@ -28,18 +31,36 @@ class KonamiTMNT2Seq : public VGMSeq {
   void resetVars() override;
   // bool parseHeader() override;
   bool parseTrackPointers() override;
+  void useColl(const VGMColl* coll) override;
 
-  void setGlobalTransposeYM2151(s8 semitones) { m_globalTransposeYM2151 = semitones; }
-  s8 globalTransposeYM2151() { return m_globalTransposeYM2151; }
-  void setGlobalTransposeK053260(s8 semitones) { m_globalTransposeK053260 = semitones; }
-  s8 globalTransposeK053260() { return m_globalTransposeK053260; }
+  void setGlobalTranspose(s8 semitones) { m_globalTranspose = semitones; }
+  s8 globalTranspose() { return m_globalTranspose; }
+
+  void setMasterAttenuationYM2151(s8 val) { m_masterAttenYM2151 = val; }
+  s8 masterAttenuationYM2151() { return m_masterAttenYM2151; }
+  void setMasterAttenuationK053260(s8 val) { m_masterAttenK053260 = val; }
+  s8 masterAttenuationK053260() { return m_masterAttenK053260; }
+
+  const std::optional<konami_tmnt2_instr_info> instrInfo(int idx) {
+    if (m_collContext.instrInfos.size() <= idx)
+      return std::nullopt;
+    return std::optional {m_collContext.instrInfos[idx]};
+  }
 
  private:
+  struct CollContext {
+    std::vector<konami_tmnt2_instr_info> instrInfos;
+  };
+  CollContext m_collContext;
+
   KonamiTMNT2FormatVer m_fmtVer;
   std::vector<u32> m_ym2151TrackOffsets;
   std::vector<u32> m_k053260TrackOffsets;
-  s8 m_globalTransposeYM2151;
-  s8 m_globalTransposeK053260;
+  // s8 m_globalTransposeYM2151;
+  // s8 m_globalTransposeK053260;
+  s8 m_globalTranspose;
+  s8 m_masterAttenYM2151;
+  s8 m_masterAttenK053260;
   // std::vector<uint32_t> m_trackOffsets;
 };
 
@@ -66,6 +87,10 @@ class KonamiTMNT2Track : public SeqTrack {
   bool readEvent() override;
 
 private:
+  std::optional<konami_tmnt2_instr_info> instrInfo(int idx) {
+    return dynamic_cast<KonamiTMNT2Seq*>(parentSeq)->instrInfo(idx);
+  }
+
   void setPercussionModeOn() {
     addBankSelectNoItem(1);
     addProgramChangeNoItem(0, false);
@@ -79,18 +104,31 @@ private:
   bool percussionMode() const { return (m_state & 2) > 0; }
 
   s8 globalTranspose() {
-    if (m_isFmTrack)
-      return static_cast<KonamiTMNT2Seq*>(parentSeq)->globalTransposeYM2151();
-    else
-      return static_cast<KonamiTMNT2Seq*>(parentSeq)->globalTransposeK053260();
+    return static_cast<KonamiTMNT2Seq*>(parentSeq)->globalTranspose();
   }
 
   void setGlobalTranspose(s8 semitones) {
-    if (m_isFmTrack)
-      static_cast<KonamiTMNT2Seq*>(parentSeq)->setGlobalTransposeYM2151(semitones);
-    else
-      static_cast<KonamiTMNT2Seq*>(parentSeq)->setGlobalTransposeK053260(semitones);
+    static_cast<KonamiTMNT2Seq*>(parentSeq)->setGlobalTranspose(semitones);
   }
+
+  s8 masterAttenuation() {
+    if (m_isFmTrack)
+      return static_cast<KonamiTMNT2Seq*>(parentSeq)->masterAttenuationYM2151();
+    return static_cast<KonamiTMNT2Seq*>(parentSeq)->masterAttenuationK053260();
+  }
+  // s8 masterAttenuationYM2151() {
+  //   return static_cast<KonamiTMNT2Seq*>(parentSeq)->masterAttenuationYM2151();
+  // }
+  // s8 masterAttenuationK053260() {
+  //   return static_cast<KonamiTMNT2Seq*>(parentSeq)->masterAttenuationK053260();
+  // }
+  void setMasterAttenuationYM2151(s8 val) {
+    static_cast<KonamiTMNT2Seq*>(parentSeq)->setMasterAttenuationYM2151(val);
+  }
+  void setMasterAttenuationK053260(s8 val) {
+    static_cast<KonamiTMNT2Seq*>(parentSeq)->setMasterAttenuationK053260(val);
+  }
+
 
   bool m_isFmTrack = false;
   u8 m_program = 0;
@@ -101,6 +139,7 @@ private:
   u8 m_extendDur = 0;
   u8 m_durSubtract = 0;
   u8 m_noteDurPercent = 0;
+  u8 m_instrDefaultPan = 0;
   u8 m_dxAtten = 0;
   u8 m_dxAttenMultiplier = 1;
   u8 m_octave = 0;

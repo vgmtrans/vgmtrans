@@ -82,7 +82,14 @@ bool KonamiTMNT2SampleInstrSet::parseMelodicInstrs() {
     }
 
     std::string name = fmt::format("Instrument {}", instrNum);
-    VGMInstr* instr = new VGMInstr(this, offset, sizeof(konami_tmnt2_instr_info), 0, instrNum, name);
+    VGMInstr* instr = new VGMInstr(
+      this,
+      offset,
+      sizeof(konami_tmnt2_instr_info),
+      instrNum / 128,
+      instrNum % 128,
+      name
+    );
     VGMRgn* rgn = new VGMRgn(instr, offset, sizeof(konami_tmnt2_instr_info));
     rgn->sampOffset = instrInfo.start();
     // rgn->sampNum = sampNum;
