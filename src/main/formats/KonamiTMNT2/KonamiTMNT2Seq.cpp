@@ -6,14 +6,35 @@
 #include "KonamiTMNT2Seq.h"
 
 #include "KonamiTMNT2Instr.h"
+#include "ScaleConversion.h"
 #include "VGMColl.h"
 
 #include <utility>
+#include <array>
 #include <spdlog/fmt/fmt.h>
 
 DECLARE_FORMAT(KonamiTMNT2);
 
-constexpr u8 K053260_BASE_VEL = 0x68;
+constexpr u8 K053260_BASE_VEL = 0x60;
+
+namespace {
+
+// Pan multipliers from the K053260 MAME implementation. The values are stored in 1.16
+// fixed-point, with 0 representing silence and 65536 representing full scale.
+constexpr std::array<std::array<int, 2>, 8> K053260_PAN_MUL = {{
+  {     0,     0 },
+  { 65536,     0 },
+  { 59870, 26656 },
+  { 53684, 37950 },
+  { 46341, 46341 },
+  { 37950, 53684 },
+  { 26656, 59870 },
+  {     0, 65536 },
+}};
+
+constexpr double K053260_PAN_SCALE = 65536.0;
+
+}  // namespace
 
 KonamiTMNT2Seq::KonamiTMNT2Seq(RawFile *file,
                                KonamiTMNT2FormatVer fmtVer,
@@ -260,8 +281,19 @@ bool KonamiTMNT2Track::readEvent() {
             pan = 127;
           addPan(beginOffset, 2, pan);
         } else {
-          // if the pan value is 0, use instr default pan (if available).
-          addUnknown(beginOffset, curOffset - beginOffset, "Pan");
+          u8 k053260Pan = val & 0x7;
+          if (k053260Pan == 0) {
+            if (m_instrDefaultPan != 0)
+              k053260Pan = m_instrDefaultPan & 0x7;
+            else
+              k053260Pan = 4;
+          }
+          double volumeScale;
+          double leftPan = static_cast<double>(K053260_PAN_MUL[k053260Pan][0]) / K053260_PAN_SCALE;
+          double rightPan = static_cast<double>(K053260_PAN_MUL[k053260Pan][1]) / K053260_PAN_SCALE;
+          u8 midiPan = convertVolumeBalanceToStdMidiPan(leftPan, rightPan, &volumeScale);
+          printf("volumeScale: %f\n", volumeScale);
+          addPan(beginOffset, curOffset - beginOffset, midiPan);
         }
         break;
       }
