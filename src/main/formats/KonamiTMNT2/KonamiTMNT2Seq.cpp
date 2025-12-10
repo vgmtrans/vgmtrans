@@ -215,9 +215,9 @@ void KonamiTMNT2Track::handleProgramChangeK053260(u8 programNum) {
       m_noteDurPercent = info->note_dur;
       m_instrPan = info->default_pan;
       m_baseVol = info->volume & 0x7F;
-      // There is special behavior when volume >= 0x80, but we'll ignore it for now
+      // There is special behavior when volume > 0x7F, but we'll ignore it for now
     }
-    updateVolume();
+    // updateVolume();
     updatePan();
   }
 }
@@ -289,12 +289,13 @@ bool KonamiTMNT2Track::readEvent() {
         }
         m_instrPan = drum ? drum->default_pan : 0;
 
-        updateVolume();
+        u8 finalAtten = 0x7F - (calculateVol(m_baseVol) * 127.0);
+        u8 vel = K053260_BASE_VEL - finalAtten;
+        // u8 vel = calculateVol(m_baseVol) * 127.0;
+        // updateVolume();
         if (m_pan == 0)
           updatePan();
-        // if (drum)
-          // printf("TEST\n");
-        addNoteByDur(beginOffset, curOffset - beginOffset, note, K053260_BASE_VEL, dur);
+        addNoteByDur(beginOffset, curOffset - beginOffset, note, vel, dur);
       } else {
         // Melodic
         u8 semitones = (opcode >> 4) - 1;
@@ -305,8 +306,12 @@ bool KonamiTMNT2Track::readEvent() {
           noteDur = dur * (m_noteDurPercent / 256.0);
         }
         noteDur = std::max(1u, noteDur);
-        updateVolume();
-        addNoteByDur(beginOffset, curOffset - beginOffset, note, K053260_BASE_VEL, noteDur);
+        // updateVolume();
+        u8 finalAtten = 0x7F - (calculateVol(m_baseVol) * 127.0);
+        u8 vel = K053260_BASE_VEL - finalAtten;
+        // u8 vel = calculateVol(m_baseVol) * 127.0;
+        printf("vel: %d\n", vel);
+        addNoteByDur(beginOffset, curOffset - beginOffset, note, vel, noteDur);
       }
     }
     addTime(dur);
@@ -334,7 +339,7 @@ bool KonamiTMNT2Track::readEvent() {
         m_dxAtten = (opcode & 0xF) * std::max<u8>(1, m_dxAttenMultiplier);
         m_dxAtten &= 0x7F;
       }
-      updateVolume();
+      // updateVolume();
       addGenericEvent(beginOffset, curOffset - beginOffset, "Attenuation", "", Type::Volume);
       break;
     case 0xD8:
@@ -503,7 +508,7 @@ bool KonamiTMNT2Track::readEvent() {
       if (m_isFmTrack)
         addVolNoItem(0x7F - m_attenuation);
       else {
-        updateVolume();
+        // updateVolume();
         // addVolNoItem(0x7F - m_attenuation);
       }
       break;
@@ -536,7 +541,7 @@ bool KonamiTMNT2Track::readEvent() {
         break;
       }
       curOffset += 4;
-      addGenericEvent(beginOffset, 5, "LFO Setup?", "", Type::Unknown);
+      addGenericEvent(beginOffset, 6, "LFO Setup?", "", Type::Unknown);
       break;
     }
     case 0xEA:    // NOP
@@ -596,7 +601,7 @@ bool KonamiTMNT2Track::readEvent() {
       setMasterAttenuationYM2151(ym2151MasterAtten);
       setMasterAttenuationK053260(k053260MasterAtten);
       if (!m_isFmTrack) {
-        updateVolume();
+        // updateVolume();
       }
       auto desc = fmt::format("YM2151: %d  K053260: %d", ym2151MasterAtten, k053260MasterAtten);
       addGenericEvent(beginOffset, 1, "Set Master Volume", desc, Type::MasterVolume);
