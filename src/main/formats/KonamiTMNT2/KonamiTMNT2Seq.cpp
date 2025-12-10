@@ -496,7 +496,10 @@ bool KonamiTMNT2Track::readEvent() {
       curOffset += 1;
       addUnknown(beginOffset, curOffset - beginOffset, "Vibrato? Tremelo? On");
       break;
-    case 0xE6:    // NOP
+    case 0xE6:
+      // used in ssriders 15
+      curOffset += 1;
+      addUnknown(beginOffset, curOffset - beginOffset, fmt::format("Opcode {:02X}", opcode));
       break;
     case 0xE7:
       curOffset += 1;
@@ -518,8 +521,10 @@ bool KonamiTMNT2Track::readEvent() {
       addGenericEvent(beginOffset, 6, "LFO Setup?", "", Type::Unknown);
       break;
     }
-    case 0xEA:    // NOP
+    case 0xEA:
       // TODO: used in ssriders seq 11
+      curOffset += 1;
+      addUnknown(beginOffset, 2, fmt::format("Opcode {:02X}", opcode));
       break;
     case 0xEB: {
       // Portamento (at least for YM2151)
@@ -578,7 +583,7 @@ bool KonamiTMNT2Track::readEvent() {
         // updateVolume();
       }
       auto desc = fmt::format("YM2151: %d  K053260: %d", ym2151MasterAtten, k053260MasterAtten);
-      addGenericEvent(beginOffset, 1, "Set Master Volume", desc, Type::MasterVolume);
+      addGenericEvent(beginOffset, 3, "Set Master Volume", desc, Type::MasterVolume);
       break;
     }
     case 0xF0:
