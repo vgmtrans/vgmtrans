@@ -161,12 +161,7 @@ private:
   u8 m_extendDur = 0;
   u8 m_durSubtract = 0;
   u8 m_noteDurPercent = 0;
-
-  u8 m_pan = 0;
-  u8 m_instrPan = 0;
-
-  u8 m_baseVol = 0x7F;
-
+  u8 m_baseVol = 0;
   u8 m_dxAtten = 0;
   u8 m_dxAttenMultiplier = 1;
   u8 m_octave = 0;
@@ -178,9 +173,10 @@ private:
   u16 m_warpOrigin = 0;
   u16 m_warpDest = 0;
   u16 m_callOrigin[2];
-  // u32 m_callRetOffset = 0;
 
   // k053260-specific state
   u8 m_attenuation = 0;
+  u8 m_pan = 0;
+  u8 m_instrPan = 0;
 
 };

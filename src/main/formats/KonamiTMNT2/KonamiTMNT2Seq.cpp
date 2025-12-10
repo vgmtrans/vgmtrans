@@ -18,7 +18,7 @@ DECLARE_FORMAT(KonamiTMNT2);
 namespace {
 
 constexpr u8 K053260_BASE_VEL = 0x7F;
-constexpr double K053260_VOL_MUL = 1;
+constexpr double K053260_VOL_MUL = 1.3;
 
 // Pan multipliers from the K053260 MAME implementation. 0 represents silence and 65536 represents
 // full scale. Values use a roughly equal-power panning law. ie. the sum of the squares of each side
@@ -55,7 +55,6 @@ KonamiTMNT2Seq::KonamiTMNT2Seq(RawFile *file,
   setAlwaysWriteInitialExpression(127);
   setAlwaysWriteInitialTempo(110);
   setAllowDiscontinuousTrackData(true);
-  // setShouldTrackControlFlowState(true);
 }
 
 void KonamiTMNT2Seq::resetVars() {
@@ -64,11 +63,6 @@ void KonamiTMNT2Seq::resetVars() {
   m_masterAttenYM2151 = 0;
   m_masterAttenK053260 = 0;
 }
-
-// bool KonamiTMNT2Seq::parseHeader() {
-  // addHeader(dwOffset, 0, "Konami TMNT2 Header");
-  // return true;
-// }
 
 bool KonamiTMNT2Seq::parseTrackPointers() {
   // if (m_ym2151TrackOffsets.size() == 8) {
@@ -134,6 +128,8 @@ void KonamiTMNT2Track::resetVars() {
   m_extendDur = 0;
   m_durSubtract = 0;
   m_noteDurPercent = 0;
+  m_baseVol = 0;
+  m_pan = 0;
   m_instrPan = 0;
   m_attenuation = 0;
   m_octave = 0;
@@ -150,9 +146,6 @@ void KonamiTMNT2Track::resetVars() {
 }
 
 double KonamiTMNT2Track::calculateVol(u8 baseVol) {
-  // if (!m_isFmTrack && percussionMode()) {
-    // return (baseVol - masterAttenuation()) * K053260_VOL_MUL;
-  // }
   s16 volume = baseVol;
   volume -= m_dxAtten;
   volume -= masterAttenuation();
@@ -160,7 +153,7 @@ double KonamiTMNT2Track::calculateVol(u8 baseVol) {
     volume -= m_attenuation;
     volume *= K053260_VOL_MUL;
   }
-  volume = std::clamp<u8>(volume, 0, 127);
+  volume = std::clamp<s16>(volume, 0, 127);
   return volume / 127.0;
 }
 
@@ -217,7 +210,6 @@ void KonamiTMNT2Track::handleProgramChangeK053260(u8 programNum) {
       m_baseVol = info->volume & 0x7F;
       // There is special behavior when volume > 0x7F, but we'll ignore it for now
     }
-    // updateVolume();
     updatePan();
   }
 }
@@ -231,15 +223,13 @@ bool KonamiTMNT2Track::readEvent() {
   uint8_t opcode = readByte(curOffset++);
 
   if (opcode < 0xD0) {
-    // NOTE
-
     // determine duration
     u16 dur = opcode & 0xF;
     if (dur == 0)
       dur = 0x10;
     dur += m_extendDur;
     m_extendDur = 0;
-    if ((m_state & 0x20) > 0) {
+    if ((m_state & 0x20) != 0) {
       dur *= 3;
       m_state |= 0x40;             // set bit 6
       m_state &= (0xFF ^ 0x20);    // reset bit 5
@@ -254,7 +244,6 @@ bool KonamiTMNT2Track::readEvent() {
     }
 
     if ((opcode & 0xF0) == 0) {
-      // Don't play note?
       m_state |= 0x80;
       addRest(beginOffset, curOffset - beginOffset, dur);
       return true;
@@ -280,7 +269,6 @@ bool KonamiTMNT2Track::readEvent() {
         u8 semitones = opcode >> 4;
         s8 note = semitones + (m_addedToNote * 16);
         auto drum = drumInfo(m_addedToNote, semitones);
-        // volume = std::clamp<u8>(volume, 0, 0x7F);
         m_baseVol = drum ? drum->volume : 0x7F;
         if (m_baseVol > 0x7F) {
           // values greater than 7F have special unimplemented behavior
@@ -291,8 +279,7 @@ bool KonamiTMNT2Track::readEvent() {
 
         u8 finalAtten = 0x7F - (calculateVol(m_baseVol) * 127.0);
         u8 vel = K053260_BASE_VEL - finalAtten;
-        // u8 vel = calculateVol(m_baseVol) * 127.0;
-        // updateVolume();
+
         if (m_pan == 0)
           updatePan();
         addNoteByDur(beginOffset, curOffset - beginOffset, note, vel, dur);
@@ -306,11 +293,10 @@ bool KonamiTMNT2Track::readEvent() {
           noteDur = dur * (m_noteDurPercent / 256.0);
         }
         noteDur = std::max(1u, noteDur);
-        // updateVolume();
+
         u8 finalAtten = 0x7F - (calculateVol(m_baseVol) * 127.0);
         u8 vel = K053260_BASE_VEL - finalAtten;
-        // u8 vel = calculateVol(m_baseVol) * 127.0;
-        printf("vel: %d\n", vel);
+
         addNoteByDur(beginOffset, curOffset - beginOffset, note, vel, noteDur);
       }
     }
@@ -430,16 +416,8 @@ bool KonamiTMNT2Track::readEvent() {
           m_baseDur = m_rawBaseDur * 3;
           m_program = readByte(curOffset++);
           addProgramChangeNoItem(m_program, false);
-          // Set default note duration if collection is loaded
-
-          // std::optional<konami_tmnt2_instr_info> info = instrInfo(m_program);
-          // if (info) {
-          //   m_instrDefaultPan = info->default_pan;
-          //   m_instrVol = info->volume;
-          // }
           m_attenuation = readByte(curOffset++) & 0x7F;
           handleProgramChangeK053260(m_program);
-          // addVolNoItem(0x7F - m_attenuation);
 
           m_noteDurPercent = readByte(curOffset++);
           addGenericEvent(beginOffset, curOffset - beginOffset, "Program Change / Base Dur / Attenuation / State / Note Dur", "", Type::ProgramChange);
@@ -451,11 +429,7 @@ bool KonamiTMNT2Track::readEvent() {
           m_rawBaseDur *= 2;
           m_baseDur = m_rawBaseDur * 3;
           m_attenuation = readByte(curOffset++);
-          // addVolNoItem((0x7F - m_attenuation) & 0x7F);
-          // double expression = calculateVol(m_instrVol) * 127;
-          // addExpressionNoItem(expression);
           setPercussionModeOn();
-          // handleProgramChangeK053260(m_program);
           addGenericEvent(beginOffset, curOffset - beginOffset, "Percussion On / Pitch / Base Dur / Attenuation", "", Type::ProgramChange);
         }
       }
@@ -628,9 +602,6 @@ bool KonamiTMNT2Track::readEvent() {
     // JUMP
     case 0xF9: {
       u16 dest = readShort(curOffset);
-      // addJump(beginOffset, 3, dest);
-      // curOffset += 2;
-      // addGenericEvent(beginOffset, 3, "Jump", "", Type::Jump);
       bool shouldContinue = true;
       if (dest < beginOffset) {
         shouldContinue = addLoopForever(beginOffset, 3);
@@ -672,7 +643,7 @@ bool KonamiTMNT2Track::readEvent() {
         }
       }
       break;
-    // CALL
+
     case 0xFC:
       callIdx = 0;
       goto callMarker;
