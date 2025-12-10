@@ -49,10 +49,10 @@ struct konami_tmnt2_drum_info {
   u8 start_mid;
   u8 start_hi;
   u8 volume;
-  u8 unknown1;
-  u8 unknown2;
-  u8 unknown3;
-  u8 unknown4;
+  u8 note_dur_lo;
+  u8 note_dur_hi;
+  u8 release_dur_and_rate;
+  u8 default_pan;
 
 private:
   // static constexpr u8 mask_sample_type = 0b0000'1100;  // bits 2-3
@@ -101,6 +101,7 @@ public:
   bool parseDrums();
 
   const std::vector<konami_tmnt2_instr_info> instrInfos() { return m_instrInfos; }
+  const std::vector<std::vector<konami_tmnt2_drum_info>> drumTables() { return m_drumTables; }
 
 private:
   u32 m_instrTableAddr;

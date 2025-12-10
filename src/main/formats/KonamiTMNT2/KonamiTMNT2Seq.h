@@ -41,15 +41,26 @@ class KonamiTMNT2Seq : public VGMSeq {
   void setMasterAttenuationK053260(s8 val) { m_masterAttenK053260 = val; }
   s8 masterAttenuationK053260() { return m_masterAttenK053260; }
 
-  const std::optional<konami_tmnt2_instr_info> instrInfo(int idx) {
+  std::optional<konami_tmnt2_instr_info> instrInfo(int idx) {
     if (m_collContext.instrInfos.size() <= idx)
       return std::nullopt;
+
     return std::optional {m_collContext.instrInfos[idx]};
+  }
+  std::optional<konami_tmnt2_drum_info> drumInfo(int tableIdx, int keyIdx) {
+    if (m_collContext.drumTables.size() <= tableIdx)
+      return std::nullopt;
+    auto table = m_collContext.drumTables[tableIdx];
+    if (table.size() <= keyIdx)
+      return std::nullopt;
+
+    return std::optional {table[keyIdx]};
   }
 
  private:
   struct CollContext {
     std::vector<konami_tmnt2_instr_info> instrInfos;
+    std::vector<std::vector<konami_tmnt2_drum_info>> drumTables;
   };
   CollContext m_collContext;
 
@@ -83,6 +94,12 @@ class KonamiTMNT2Track : public SeqTrack {
     std::string name = "Track"
   );
 
+  double calculateVol(u8 baseVol);
+  void updateVolume();
+  void handleProgramChangeK053260(u8 programNum);
+  u8 calculatePan();
+  void updatePan();
+
   void resetVars() override;
   bool readEvent() override;
 
@@ -90,6 +107,10 @@ private:
   std::optional<konami_tmnt2_instr_info> instrInfo(int idx) {
     return dynamic_cast<KonamiTMNT2Seq*>(parentSeq)->instrInfo(idx);
   }
+  std::optional<konami_tmnt2_drum_info> drumInfo(int tableIdx, int keyIdx) {
+    return dynamic_cast<KonamiTMNT2Seq*>(parentSeq)->drumInfo(tableIdx, keyIdx);
+  }
+
 
   void setPercussionModeOn() {
     addBankSelectNoItem(1);
@@ -99,6 +120,7 @@ private:
   void setPercussionModeOff() {
     addBankSelectNoItem(0);
     addProgramChangeNoItem(m_program, false);
+    handleProgramChangeK053260(m_program);
     m_state &= ~2;
   }
   bool percussionMode() const { return (m_state & 2) > 0; }
@@ -139,7 +161,12 @@ private:
   u8 m_extendDur = 0;
   u8 m_durSubtract = 0;
   u8 m_noteDurPercent = 0;
-  u8 m_instrDefaultPan = 0;
+
+  u8 m_pan = 0;
+  u8 m_instrPan = 0;
+
+  u8 m_baseVol = 0x7F;
+
   u8 m_dxAtten = 0;
   u8 m_dxAttenMultiplier = 1;
   u8 m_octave = 0;

@@ -36,7 +36,9 @@ void KonamiTMNT2SampleInstrSet::addInstrInfoChildren(VGMItem* sampInfoItem, u32 
   sampInfoItem->addChild(off + 1, 2, "Sample Length");
   sampInfoItem->addChild(off + 3, 3, "Sample Offset");
   sampInfoItem->addChild(off + 6, 1, "Volume");
-  sampInfoItem->addChild(off + 7, 3, "Unknown");
+  sampInfoItem->addChild(off + 7, 1, "Note Duration (fractional)");
+  sampInfoItem->addChild(off + 8, 1, "Release Duration / Rate?");
+  sampInfoItem->addChild(off + 9, 1, "Pan");
 }
 
 bool KonamiTMNT2SampleInstrSet::parseInstrPointers() {
@@ -92,7 +94,8 @@ bool KonamiTMNT2SampleInstrSet::parseMelodicInstrs() {
     );
     VGMRgn* rgn = new VGMRgn(instr, offset, sizeof(konami_tmnt2_instr_info));
     rgn->sampOffset = instrInfo.start();
-    rgn->setVolume((instrInfo.volume & 0x7F) / 127.0);
+    // rgn->setVolume((instrInfo.volume & 0x7F) / 127.0);
+
     // rgn->sampNum = sampNum;
     // rgn->release_time = 0;
     instr->addRgn(rgn);
@@ -156,7 +159,9 @@ bool KonamiTMNT2SampleInstrSet::parseDrums() {
       drumItem->addChild(ptr + 4, 2, "Sample Length");
       drumItem->addChild(ptr + 6, 3, "Sample Address");
       drumItem->addChild(ptr + 9, 1, "Volume");
-      drumItem->addChild(ptr + 10, 4, "Unknown");
+      drumItem->addChild(ptr + 10, 2, "Note Duration");
+      drumItem->addChild(ptr + 12, 1, "Release Duration / Rate?");
+      drumItem->addChild(ptr + 13, 1, "Pan");
 
 
       const konami_tmnt2_drum_info& drumInfo = m_drumTables[i][j];
@@ -172,7 +177,7 @@ bool KonamiTMNT2SampleInstrSet::parseDrums() {
       rgn->unityKey = key;
       rgn->coarseTune = relativePitchCents / 100;
       rgn->fineTune = static_cast<int>(relativePitchCents) % 100;
-      rgn->setVolume((drumInfo.volume & 0x7F) / 127.0);
+      // rgn->setVolume((drumInfo.volume & 0x7F) / 127.0);
 
       // rgn->sampNum = sampNum;
       // rgn->release_time = 0;
@@ -286,7 +291,7 @@ bool KonamiTMNT2SampColl::parseSampleInfo() {
       konami_tmnt2_instr_info drumInstr = {
         drumInfo.flags, drumInfo.length_lo, drumInfo.length_hi,
         drumInfo.start_lo, drumInfo.start_mid, drumInfo.start_hi,
-        drumInfo.volume, drumInfo.unknown2, drumInfo.unknown3, drumInfo.unknown4
+        drumInfo.volume, drumInfo.note_dur_lo, drumInfo.release_dur_and_rate, drumInfo.default_pan
       };
       flatDrumInfos.emplace_back(drumInstr);
     }
