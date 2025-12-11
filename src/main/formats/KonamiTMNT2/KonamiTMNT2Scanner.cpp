@@ -206,8 +206,6 @@ void KonamiTMNT2Scanner::scan(RawFile * /*file*/, void *info) {
     drumTables.push_back(drumInfos);
   }
 
-
-
   std::string instrSetName = fmt::format("{} instrument set", gameEntry->name);
 
   auto instrSet = new KonamiTMNT2SampleInstrSet(
@@ -258,20 +256,6 @@ void KonamiTMNT2Scanner::scan(RawFile * /*file*/, void *info) {
       delete coll;
     }
   }
-
-
-  // std::vector<uint32_t> trackOffsets;
-  // if (sequenceOffset != 0) {
-  //   trackOffsets.push_back(sequenceOffset);
-  // }
-  //
-  // if (trackOffsets.empty()) {
-  //   trackOffsets.push_back(0);
-  // }
-  //
-  // for (int i = 0; i < seqPtrs.size(); ++i) {
-
-  // }
 }
 
 std::vector<KonamiTMNT2Seq*> KonamiTMNT2Scanner::loadSeqTable(

@@ -29,7 +29,6 @@ class KonamiTMNT2Seq : public VGMSeq {
                  const std::string &name = std::string("Konami TMNT2 Seq"));
 
   void resetVars() override;
-  // bool parseHeader() override;
   bool parseTrackPointers() override;
   void useColl(const VGMColl* coll) override;
 
@@ -67,22 +66,10 @@ class KonamiTMNT2Seq : public VGMSeq {
   KonamiTMNT2FormatVer m_fmtVer;
   std::vector<u32> m_ym2151TrackOffsets;
   std::vector<u32> m_k053260TrackOffsets;
-  // s8 m_globalTransposeYM2151;
-  // s8 m_globalTransposeK053260;
   s8 m_globalTranspose;
   s8 m_masterAttenYM2151;
   s8 m_masterAttenK053260;
-  // std::vector<uint32_t> m_trackOffsets;
 };
-
-// class KonamiTMNT2YM2151Track : public SeqTrack {
-// public:
-//   KonamiTMNT2YM2151Track(KonamiTMNT2Seq *parentSeq, uint32_t offset = 0, uint32_t length = 0);
-//
-//   void resetVars() override;
-//   bool readEvent() override;
-// };
-
 
 class KonamiTMNT2Track : public SeqTrack {
  public:
@@ -138,19 +125,12 @@ private:
       return static_cast<KonamiTMNT2Seq*>(parentSeq)->masterAttenuationYM2151();
     return static_cast<KonamiTMNT2Seq*>(parentSeq)->masterAttenuationK053260();
   }
-  // s8 masterAttenuationYM2151() {
-  //   return static_cast<KonamiTMNT2Seq*>(parentSeq)->masterAttenuationYM2151();
-  // }
-  // s8 masterAttenuationK053260() {
-  //   return static_cast<KonamiTMNT2Seq*>(parentSeq)->masterAttenuationK053260();
-  // }
   void setMasterAttenuationYM2151(s8 val) {
     static_cast<KonamiTMNT2Seq*>(parentSeq)->setMasterAttenuationYM2151(val);
   }
   void setMasterAttenuationK053260(s8 val) {
     static_cast<KonamiTMNT2Seq*>(parentSeq)->setMasterAttenuationK053260(val);
   }
-
 
   bool m_isFmTrack = false;
   u8 m_program = 0;
@@ -178,5 +158,4 @@ private:
   u8 m_attenuation = 0;
   u8 m_pan = 0;
   u8 m_instrPan = 0;
-
 };

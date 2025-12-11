@@ -1,3 +1,9 @@
+/*
+ * VGMTrans (c) 2002-2025
+ * Licensed under the zlib license,
+ * refer to the included LICENSE.txt file
+ */
+
 #include "KonamiTMNT2Instr.h"
 #include "KonamiTMNT2Format.h"
 #include "KonamiAdpcm.h"
@@ -96,8 +102,6 @@ bool KonamiTMNT2SampleInstrSet::parseMelodicInstrs() {
     rgn->sampOffset = instrInfo.start();
     // rgn->setVolume((instrInfo.volume & 0x7F) / 127.0);
 
-    // rgn->sampNum = sampNum;
-    // rgn->release_time = 0;
     instr->addRgn(rgn);
     aInstrs.push_back(instr);
     instrNum += 1;
@@ -142,7 +146,6 @@ bool KonamiTMNT2SampleInstrSet::parseDrums() {
   for (u32 i = 0; i < m_drumTables.size(); ++i) {
     u16 drumOctaveTablePtr = readShort(m_drumTableAddr + i * 2);
     auto drumOctaveTable = m_drumTables[i];
-    // for (int j = 0; j < drumOctaveTable.size(); ++j) {
     auto drumOctaveItem = drumTablesItem->addChild(drumOctaveTablePtr, drumOctaveTable.size() * 2, fmt::format("Drum Octave {}", i));
     for (int j = 0; j < drumOctaveTable.size(); ++j) {
       u32 ptrOffset = drumOctaveTablePtr + j * 2;
@@ -179,8 +182,6 @@ bool KonamiTMNT2SampleInstrSet::parseDrums() {
       rgn->fineTune = static_cast<int>(relativePitchCents) % 100;
       // rgn->setVolume((drumInfo.volume & 0x7F) / 127.0);
 
-      // rgn->sampNum = sampNum;
-      // rgn->release_time = 0;
       drumKit->addRgn(rgn);
       drumNum += 1;
     }
@@ -190,80 +191,6 @@ bool KonamiTMNT2SampleInstrSet::parseDrums() {
   drumsItem->unLength = (maxDrumOffset + sizeof(konami_tmnt2_drum_info)) - minDrumOffset;
   return true;
 }
-
-
- // OPMData convertToOPMData(u8 masterVol, const std::string& name) const {
- //    bool enableLFO = (LFO_ENABLE_AND_WF & 0x80) != 0;
- //    // LFO
- //    OPMData::LFO lfo{};
- //    if (enableLFO) {
- //      lfo.LFRQ = LFRQ;
- //      lfo.AMD = AMD;
- //      lfo.PMD = PMD;
- //      lfo.WF = (LFO_ENABLE_AND_WF >> 5) & 0b11;
- //      lfo.NFRQ = 0;  // the driver doesn't define noise frequency
- //    }
- //
- //    // CH
- //    OPMData::CH ch{};
- //    ch.PAN = 0b11000000; // the driver always sets R/L, ie PAN, to 0xC0 (sf2ce 0xDC0)
- //    ch.FL = (FL_CON >> 3) & 0b111;
- //    ch.CON = FL_CON & 0b111;
- //    ch.AMS = enableLFO ? PMS_AMS & 0b11 : 0;
- //    ch.PMS = enableLFO ? (PMS_AMS >> 4) & 0b1111 : 0;
- //    ch.SLOT_MASK = SLOT_MASK;
- //    ch.NE = 0;
- //
- //    // OP
- //    uint8_t CON_limits[4] = { 7, 5, 4, 0 };
- //    OPMData::OP op[4];
- //    for (int i = 0; i < 4; i ++) {
- //      auto conLimit = CON_limits[i];
- //      auto& opx = op[i];
- //      opx.AR = KS_AR[i] & 0b11111;
- //      opx.D1R = AMSEN_D1R[i] & 0b11111;
- //      opx.D2R = DT2_D2R[i] & 0b11111;
- //      opx.RR = D1L_RR[i] & 0b1111;
- //      opx.D1L = D1L_RR[i] >> 4;
- //      if (ch.CON < conLimit) {
- //        u8 atten = volToAttenuation(volData[i].vol);
- //        opx.TL = (atten + volData[i].extra_atten) & 0x7F;
- //      } else {
- //        u8 masterVolumeAtten = 0x7F - masterVol;
- //        u8 atten = volToAttenuation(volData[i].vol);
- //        u32 finalAtten = (atten + masterVolumeAtten) + volData[i].extra_atten;
- //        opx.TL = std::min(finalAtten, 0x7FU);
- //      }
- //      opx.KS = KS_AR[i] >> 6;
- //      opx.MUL = DT1_MUL[i] & 0b1111;
- //      opx.DT1 = (DT1_MUL[i] >> 4) & 0b111;
- //      opx.DT2 = DT2_D2R[i] >> 6;
- //      opx.AMS_EN = AMSEN_D1R[i] & 0b10000000;
- //    }
- //
- //    return {name, lfo, ch, { op[0], op[1], op[2], op[3] }};
- //  }
- //
- //  std::string toOPMString(uint8_t masterVol, const std::string& name, int num) const {
- //    std::ostringstream ss;
- //
- //    // Generate the OPM data string first
- //    OPMData opmData = convertToOPMData(masterVol, name);
- //    ss << opmData.toOPMString(num);
- //
- //    // Add supplementary data
- //    ss << "\nCPS:";
- //    uint8_t enableLfo = LFO_ENABLE_AND_WF >> 7;
- //    uint8_t resetLfo = (LFO_ENABLE_AND_WF >> 1) & 1;
- //    ss << " " << +enableLfo << " " <<  +resetLfo;
- //    for (int i = 0; i < 4; i ++) {
- //      ss << " " << +volData[i].key_scale << " " << +volData[i].extra_atten;
- //    }
- //    ss << "\n";
- //    return ss.str();
- //  }
-
-
 
 KonamiTMNT2SampColl::KonamiTMNT2SampColl(
     RawFile* file,
@@ -306,15 +233,13 @@ bool KonamiTMNT2SampColl::parseSampleInfo() {
     u32 sampleOffset = instrInfo.start_msb << 16 | instrInfo.start_mid << 8 | instrInfo.start_lsb;
     u32 sampleSize = instrInfo.length_msb << 8 | instrInfo.length_lsb;
 
-    // if (sampInfo.reverse()) {
-    // sampleOffset = sampleOffset - sampleSize;
-    // relativeLoopOffset = -relativeLoopOffset;
+    // if (instrInfo.reverse()) {
+    //   sampleOffset = sampleOffset - sampleSize;
+    //   relativeLoopOffset = -relativeLoopOffset;
     // }
 
     auto name = fmt::format("Sample {:d}", sampNum++);
-    // auto name = fmt::format("Sample {:d}", sampNum++);
     VGMSamp* sample;
-    // if (sampInfo.type() == konami_tmnt2_instr_info::sample_type::ADPCM) {
     if (sampleOffset + sampleSize > unLength) {
       sample = new EmptySamp(this);
     }
@@ -330,7 +255,6 @@ bool KonamiTMNT2SampColl::parseSampleInfo() {
       sample->setWaveType(WT_PCM16);
       samples.push_back(sample);
     } else {
-      // u16 bps = instrInfo.type() == konami_tmnt2_instr_info::sample_type::PCM_8 ? 8 : 16;
       sample = addSamp(sampleOffset,
                            sampleSize,
                            sampleOffset,
@@ -342,13 +266,9 @@ bool KonamiTMNT2SampColl::parseSampleInfo() {
       sample->setWaveType(WT_PCM8);
       sample->setSignedness(Signedness::Signed);
     }
-    // sample->setLoopStatus(sampInfo.loops == 1);
     sample->setLoopStatus(false);
-    // sample->setLoopOffset(relativeLoopOffset);
-    // sample->unityKey = 0x3C + 6;
     sample->unityKey = 0x3B;
-    // sample->setVolume(volTable[sampInfo.attenuation]);
-    // sample->setReverse(sampInfo.reverse());
+    // sample->setReverse(instrInfo.reverse());
   }
   return true;
 }

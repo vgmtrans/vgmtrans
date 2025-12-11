@@ -1,3 +1,8 @@
+/*
+ * VGMTrans (c) 2002-2025
+ * Licensed under the zlib license,
+ * refer to the included LICENSE.txt file
+ */
 #include "KonamiTMNT2OPMInstr.h"
 #include "KonamiTMNT2Format.h"
 #include <spdlog/fmt/fmt.h>

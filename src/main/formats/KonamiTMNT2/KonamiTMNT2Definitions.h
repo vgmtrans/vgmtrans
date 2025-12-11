@@ -1,3 +1,8 @@
+/*
+ * VGMTrans (c) 2002-2025
+ * Licensed under the zlib license,
+ * refer to the included LICENSE.txt file
+ */
 #pragma once
 
 constexpr int K053260_CLOCK_RATE = 3'579'545;
