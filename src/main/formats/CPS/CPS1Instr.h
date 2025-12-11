@@ -3,6 +3,8 @@
 #include "VGMInstrSet.h"
 #include "CPS1Scanner.h"
 #include "VGMSampColl.h"
+#include "YM2151.h"
+#include "YM2151InstrSet.h"
 #include <sstream>
 
 // ******************
@@ -47,7 +49,7 @@ private:
 // ***************
 
 class CPS1OPMInstrSet
-    : public VGMInstrSet {
+    : public YM2151InstrSet {
 public:
   CPS1OPMInstrSet(RawFile *file,
                  CPS1FormatVer fmt_version,
@@ -58,8 +60,6 @@ public:
   ~CPS1OPMInstrSet() override = default;
 
   bool parseInstrPointers() override;
-  std::string generateOPMFile();
-  bool saveAsOPMFile(const std::string &filepath);
 public:
   CPS1FormatVer fmt_version;
   u8 masterVol;
@@ -68,62 +68,6 @@ public:
 // ************
 // CPS1OPMInstr
 // ************
-
-struct OPMData {
-  struct LFO {
-    uint8_t LFRQ;
-    uint8_t AMD;
-    uint8_t PMD;
-    uint8_t WF;
-    uint8_t NFRQ;
-  };
-
-  struct CH {
-    uint8_t PAN;
-    uint8_t FL;
-    uint8_t CON;
-    uint8_t AMS;
-    uint8_t PMS;
-    uint8_t SLOT_MASK;
-    uint8_t NE;
-  };
-
-  struct OP {
-    uint8_t AR;
-    uint8_t D1R;
-    uint8_t D2R;
-    uint8_t RR;
-    uint8_t D1L;
-    uint8_t TL;
-    uint8_t KS;
-    uint8_t MUL;
-    uint8_t DT1;
-    uint8_t DT2;
-    uint8_t AMS_EN;
-  };
-
-  std::string name;
-  LFO lfo;
-  CH ch;
-  OP op[4];
-
-  std::string toOPMString(int num) const {
-    std::ostringstream ss;
-    ss << "@:" << num << " " << name << "\n";
-    ss << "LFO:" << +lfo.LFRQ << "   " << +lfo.AMD << "   " << +lfo.PMD << "   " << +lfo.WF << "   " << +lfo.NFRQ << "\n";
-    ss << "CH: " << +ch.PAN << "   " << +ch.FL << "   " << +ch.CON << "   " << +ch.AMS << "   " << +ch.PMS << " " << +ch.SLOT_MASK << "   " << +ch.NE << "\n";
-
-    const int opIndex[4] = { 0, 2, 1, 3 };
-    const char* opNames[4] = {"M1", "C1", "M2", "C2"};
-    for (int i = 0; i < 4; ++i) {
-      const OP& op = this->op[opIndex[i]];
-      ss << opNames[i] << ": " << +op.AR << "   " << +op.D1R << "   " << +op.D2R << "   " << +op.RR << "  " << +op.D1L << "  "
-         << +op.TL << "   " << +op.KS << "   " << +op.MUL << "   " << +op.DT1 << "   " << +op.DT2 << " " << +op.AMS_EN << "\n";
-    }
-
-    return ss.str();
-  }
-};
 
 struct CPS1OPMInstrDataV2_00 {
   uint8_t SLOT_MASK;
@@ -189,10 +133,6 @@ struct CPS1OPMInstrDataV2_00 {
     }
 
     return {name, lfo, ch, { op[0], op[1], op[2], op[3] }};
-  }
-
-  std::string toOPMString(uint8_t masterVol, const std::string& name, int num) const {
-    return convertToOPMData(masterVol, name).toOPMString(num);
   }
 };
 
@@ -292,25 +232,6 @@ struct CPS1OPMInstrDataV4_25 {
 
     return {name, lfo, ch, { op[0], op[1], op[2], op[3] }};
   }
-
-  std::string toOPMString(uint8_t masterVol, const std::string& name, int num) const {
-    std::ostringstream ss;
-
-    // Generate the OPM data string first
-    OPMData opmData = convertToOPMData(masterVol, name);
-    ss << opmData.toOPMString(num);
-
-    // Add supplementary data
-    ss << "\nCPS:";
-    uint8_t enableLfo = LFO_ENABLE_AND_WF >> 7;
-    uint8_t resetLfo = (LFO_ENABLE_AND_WF >> 1) & 1;
-    ss << " " << +enableLfo << " " <<  +resetLfo;
-    for (int i = 0; i < 4; i ++) {
-      ss << " " << +volData[i].key_scale << " " << +volData[i].extra_atten;
-    }
-    ss << "\n";
-    return ss.str();
-  }
 };
 
 struct CPS1OPMInstrDataV5_02 {
@@ -398,10 +319,6 @@ struct CPS1OPMInstrDataV5_02 {
 
     return {name, lfo, ch, { op[0], op[1], op[2], op[3] }};
   }
-
-  std::string toOPMString(uint8_t masterVol, const std::string& name, int num) const {
-    return convertToOPMData(masterVol, name).toOPMString(num);
-  }
 };
 
 template <class OPMType>
@@ -416,14 +333,12 @@ public:
                const std::string& name)
     : VGMInstr(instrSet, offset, length, theBank, theInstrNum, name), masterVol(masterVol) {}
   ~CPS1OPMInstr() override = default;
+
   bool loadInstr() override {
     this->readBytes(dwOffset, sizeof(OPMType), &opmData);
     return true;
   }
 
-  std::string toOPMString(int num) {
-    return opmData.toOPMString(masterVol, name(), num);
-  }
   s8 getTranspose() const { return opmData.transpose; }
 
 private:
