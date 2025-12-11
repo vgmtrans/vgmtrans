@@ -15,7 +15,7 @@ DECLARE_FORMAT(SegSat);
 
 SegSatSeq::SegSatSeq(RawFile *file, uint32_t offset, std::string name)
     : VGMSeqNoTrks(SegSatFormat::name, file, offset, std::move(name)) {
-  setUseLinearAmplitudeScale(false);
+  VGMSeq::setUseLinearAmplitudeScale(false);
   setInitialVolume(0x7F);
   setInitialExpression(0x7F);
 }

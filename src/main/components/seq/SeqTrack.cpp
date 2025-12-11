@@ -391,7 +391,7 @@ void SeqTrack::addNoteOn(uint32_t offset, uint32_t length, int8_t key, int8_t ve
 void SeqTrack::addNoteOnNoItem(int8_t key, int8_t velocity) {
   if (readMode == READMODE_CONVERT_TO_MIDI) {
     uint8_t finalVel = velocity;
-    if (parentSeq->usesLinearAmplitudeScale())
+    if (usesLinearAmplitudeScale())
       finalVel = convert7bitPercentAmpToStdMidiVal(velocity);
 
     if (cDrumNote == -1) {
@@ -440,7 +440,7 @@ void SeqTrack::insertNoteOn(uint32_t offset,
   bool isNewOffset = onEvent(offset, length);
 
   uint8_t finalVel = vel;
-  if (parentSeq->usesLinearAmplitudeScale())
+  if (usesLinearAmplitudeScale())
     finalVel = convert7bitPercentAmpToStdMidiVal(vel);
 
   if (readMode == READMODE_ADD_TO_UI && isNewOffset) {
@@ -534,7 +534,7 @@ void SeqTrack::addNoteByDur(uint32_t offset,
 void SeqTrack::addNoteByDurNoItem(int8_t key, int8_t vel, uint32_t dur) {
   if (readMode == READMODE_CONVERT_TO_MIDI) {
     uint8_t finalVel = vel;
-    if (parentSeq->usesLinearAmplitudeScale())
+    if (usesLinearAmplitudeScale())
       finalVel = convert7bitPercentAmpToStdMidiVal(vel);
 
     if (cDrumNote == -1) {
@@ -563,7 +563,7 @@ void SeqTrack::addNoteByDur_Extend(uint32_t offset,
 void SeqTrack::addNoteByDurNoItem_Extend(int8_t key, int8_t vel, uint32_t dur) {
   if (readMode == READMODE_CONVERT_TO_MIDI) {
     uint8_t finalVel = vel;
-    if (parentSeq->usesLinearAmplitudeScale())
+    if (usesLinearAmplitudeScale())
       finalVel = convert7bitPercentAmpToStdMidiVal(vel);
 
     if (cDrumNote == -1) {
@@ -634,7 +634,7 @@ void SeqTrack::insertNoteByDur(uint32_t offset,
 void SeqTrack::insertNoteByDurNoItem(int8_t key, int8_t vel, uint32_t dur, uint32_t absTime) {
   if (readMode == READMODE_CONVERT_TO_MIDI) {
     uint8_t finalVel = vel;
-    if (parentSeq->usesLinearAmplitudeScale())
+    if (usesLinearAmplitudeScale())
       finalVel = convert7bitPercentAmpToStdMidiVal(vel);
 
     pMidiTrack->insertNoteByDur(channel, key + cKeyCorrection + transpose, finalVel, dur, absTime);
@@ -678,7 +678,7 @@ double SeqTrack::applyLevelCorrection(double level, LevelController controller) 
     if (parentSeq->panVolumeCorrectionMode == relevantCorrectionMode)
       level *= panVolumeCorrectionRate;
   }
-  if (parentSeq->usesLinearAmplitudeScale())
+  if (usesLinearAmplitudeScale())
     level = sqrt(level);
   return level;
 }
@@ -807,7 +807,7 @@ void SeqTrack::addVolSlide(uint32_t offset,
     addControllerSlide(dur,
                        vol,
                        targVol,
-                       parentSeq->usesLinearAmplitudeScale() ? convert7bitPercentAmpToStdMidiVal : nullptr,
+                       usesLinearAmplitudeScale() ? convert7bitPercentAmpToStdMidiVal : nullptr,
                        &MidiTrack::insertVol);
 }
 
@@ -858,7 +858,7 @@ void SeqTrack::addExpressionSlide(uint32_t offset,
     addControllerSlide(dur,
                        expression,
                        targExpr,
-                       parentSeq->usesLinearAmplitudeScale() ? convert7bitPercentAmpToStdMidiVal : nullptr,
+                       usesLinearAmplitudeScale() ? convert7bitPercentAmpToStdMidiVal : nullptr,
                        &MidiTrack::insertExpression);
 }
 
@@ -903,7 +903,7 @@ void SeqTrack::addMastVolSlide(uint32_t offset,
     addControllerSlide(dur,
                        mastVol,
                        targVol,
-                       parentSeq->usesLinearAmplitudeScale() ? convert7bitPercentAmpToStdMidiVal : nullptr,
+                       usesLinearAmplitudeScale() ? convert7bitPercentAmpToStdMidiVal : nullptr,
                        &MidiTrack::insertMasterVol);
 }
 
@@ -917,7 +917,7 @@ void SeqTrack::addPan(uint32_t offset, uint32_t length, uint8_t pan, const std::
 
 void SeqTrack::addPanNoItem(uint8_t pan) {
   if (readMode == READMODE_CONVERT_TO_MIDI) {
-    const uint8_t midiPan = parentSeq->usesLinearAmplitudeScale()
+    const uint8_t midiPan = usesLinearAmplitudeScale()
       ? convert7bitLinearPercentPanValToStdMidiVal(pan, &panVolumeCorrectionRate)
       : pan;
     pMidiTrack->addPan(channel, midiPan);
@@ -962,7 +962,7 @@ void SeqTrack::insertPan(uint32_t offset,
   if (readMode == READMODE_ADD_TO_UI && isNewOffset)
     addEvent(new PanSeqEvent(this, pan, offset, length, sEventName));
   else if (readMode == READMODE_CONVERT_TO_MIDI) {
-    const uint8_t midiPan = parentSeq->usesLinearAmplitudeScale()
+    const uint8_t midiPan = usesLinearAmplitudeScale()
       ? convert7bitLinearPercentPanValToStdMidiVal(pan, &panVolumeCorrectionRate)
       : pan;
     pMidiTrack->insertPan(channel, midiPan, absTime);

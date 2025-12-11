@@ -12,7 +12,7 @@ SonyPS2Seq::SonyPS2Seq(RawFile *file, uint32_t offset, std::string name)
     : VGMSeqNoTrks(SonyPS2Format::name, file, offset, std::move(name)),
       compOption(0),
       bSkipDeltaTime(0) {
-  setUseLinearAmplitudeScale(true);        // Onimusha: Kaede Theme track 2 for example of linear vol scale.
+  VGMSeq::setUseLinearAmplitudeScale(true);        // Onimusha: Kaede Theme track 2 for example of linear vol scale.
   useReverb();
 }
 
