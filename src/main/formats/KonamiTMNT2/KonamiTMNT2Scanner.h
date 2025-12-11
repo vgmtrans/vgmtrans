@@ -15,7 +15,8 @@ class MAMEGame;
 enum KonamiTMNT2FormatVer: uint8_t {
   VERSION_UNDEFINED,
   TMNT2,
-  SSRIDERS
+  SSRIDERS,
+  VENDETTA,
 };
 
 class KonamiTMNT2Scanner : public VGMScanner {

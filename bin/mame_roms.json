@@ -3693,7 +3693,7 @@
     {
       "name": "vendetta",
       "format": "KonamiTMNT2",
-      "fmt_version": "tmnt2",
+      "fmt_version": "vendetta",
       "rom_groups": [
         {
           "type": "soundcpu",

@@ -19,6 +19,7 @@ KonamiTMNT2FormatVer konamiTMNT2VersionEnum(const std::string &versionStr) {
   static const std::unordered_map<std::string, KonamiTMNT2FormatVer> versionMap = {
     {"tmnt2", TMNT2},
     {"ssriders", SSRIDERS},
+    {"vendetta", VENDETTA},
   };
 
   auto it = versionMap.find(versionStr);
@@ -304,58 +305,65 @@ std::vector<KonamiTMNT2Seq*> KonamiTMNT2Scanner::loadSeqTable(
   std::vector<KonamiTMNT2Seq*> seqs;
   int i = 0;
   for (u16 seqPtr : seqPtrs) {
-    auto seqType = static_cast<KonamiTMNT2Seq::SeqType>(programRom->readByte(seqPtr));
-
     int numYM3151Tracks;
     int numK053260Tracks;
-    if (fmtVer == SSRIDERS) {
-      switch (seqType) {
-        case 0:
-          numYM3151Tracks = 6;
-          numK053260Tracks = 2;
-          break;
-        case 1:
-          numYM3151Tracks = 7;
-          numK053260Tracks = 3;
-          break;
-        case 2:
-          numYM3151Tracks = 8;
-          numK053260Tracks = 3;
-          break;
-        case 3:
-        default:
-          numYM3151Tracks = 8;
-          numK053260Tracks = 4;
-          break;
-      }
+    if (fmtVer == VENDETTA) {
+      numYM3151Tracks = 8;
+      numK053260Tracks = 4;
     } else {
-      // int numTrkPtrs = seqType == KonamiTMNT2Seq::ALL_CHANS ? 12 : 9;
-      switch (seqType) {
-        case 0:
-          numYM3151Tracks = 8;
-          numK053260Tracks = 4;
-          break;
-        case 1:
-        default:
-          numYM3151Tracks = 6;
-          numK053260Tracks = 3;
-          break;
+      auto seqType = static_cast<KonamiTMNT2Seq::SeqType>(programRom->readByte(seqPtr));
+
+      if (fmtVer == SSRIDERS) {
+        switch (seqType) {
+          case 0:
+            numYM3151Tracks = 6;
+            numK053260Tracks = 2;
+            break;
+          case 1:
+            numYM3151Tracks = 7;
+            numK053260Tracks = 3;
+            break;
+          case 2:
+            numYM3151Tracks = 8;
+            numK053260Tracks = 3;
+            break;
+          case 3:
+          default:
+            numYM3151Tracks = 8;
+            numK053260Tracks = 4;
+            break;
+        }
+      } else {
+        // int numTrkPtrs = seqType == KonamiTMNT2Seq::ALL_CHANS ? 12 : 9;
+        switch (seqType) {
+          case 0:
+            numYM3151Tracks = 8;
+            numK053260Tracks = 4;
+            break;
+          case 1:
+          default:
+            numYM3151Tracks = 6;
+            numK053260Tracks = 3;
+            break;
+        }
       }
     }
+    u32 seqTypeLength = (fmtVer == VENDETTA) ? 0 : 1;
     auto totalTracks = numYM3151Tracks + numK053260Tracks;
-    auto trkList = seqTable->addChild(seqPtr, 1 + (totalTracks * 2), "Seq Track List");
-    trkList->addChild(seqPtr, 1, "Seq Type");
+    auto trkList = seqTable->addChild(seqPtr, seqTypeLength + (totalTracks * 2), "Seq Track List");
+    if (seqTypeLength)
+      trkList->addChild(seqPtr, 1, "Seq Type");
     std::vector<u32> ym2151TrkPtrs = {};
     std::vector<u32> k053260TrkPtrs;
     ym2151TrkPtrs.reserve(numYM3151Tracks);
     k053260TrkPtrs.reserve(numK053260Tracks);
     for (int i = 0; i < numYM3151Tracks; ++i) {
-      u16 offset = seqPtr + 1 + (i * 2);
+      u16 offset = seqPtr + seqTypeLength + (i * 2);
       trkList->addChild(offset, 2, "YM2151 Track Pointer");
       ym2151TrkPtrs.push_back(programRom->readShort(offset));
     }
     for (int i = 0; i < numK053260Tracks; ++i) {
-      u16 offset = seqPtr + 1 + ((numYM3151Tracks + i) * 2);
+      u16 offset = seqPtr + seqTypeLength + ((numYM3151Tracks + i) * 2);
       trkList->addChild(offset, 2, "K053260 Track Pointer");
       k053260TrkPtrs.push_back(programRom->readShort(offset));
     }
