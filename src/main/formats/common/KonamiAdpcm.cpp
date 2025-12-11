@@ -68,10 +68,10 @@ void KonamiAdpcmSamp::convertToStdWave(u8* buf)
   };
 
      // Walk through the compressed data either forwards or backwards.
-     // In *reverse* mode we:
-     //   • start at the last byte,
-     //   • step the address backwards one byte at a time
-     //   • still decode *low nibble first,* then high nibble.
+     // In reverse mode we:
+     //   - start at the last byte,
+     //   - step the address backwards one byte at a time
+     //   - still decode low nibble first, then high nibble
 
   if (!reverse()) {
     for (u32 off = dwOffset; off < dwOffset + unLength; ++off) {

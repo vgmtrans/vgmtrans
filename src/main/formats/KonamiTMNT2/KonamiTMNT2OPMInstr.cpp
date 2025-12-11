@@ -53,7 +53,7 @@ OPMData KonamiTMNT2OPMInstrSet::convertToOPMData(const konami_tmnt2_ym2151_instr
   OPMData data{};
   data.name = name;
 
-  data.ch.PAN = 0xC0; //instr.RL_FB_CONECT >> 3) & 0b111;
+  data.ch.PAN = 0xC0;
   data.set_fl_con(instr.RL_FB_CONECT);
   data.ch.AMS = 0;
   data.ch.PMS = 0;
