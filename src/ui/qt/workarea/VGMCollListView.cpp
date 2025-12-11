@@ -30,19 +30,37 @@ VGMCollListViewModel::VGMCollListViewModel(QObject *parent) : QAbstractListModel
   };
 
   auto beginLoad = [this]() {
+    isLoadingRawFile = true;
     collsBeforeLoad = pRoot->vgmColls().size();
   };
 
   auto endLoad = [this]() {
     int filesLoaded = pRoot->vgmColls().size() - collsBeforeLoad;
-    if (filesLoaded <= 0)
+    if (filesLoaded <= 0) {
+      isLoadingRawFile = false;
       return;
+    }
     beginInsertRows(QModelIndex(), collsBeforeLoad, collsBeforeLoad + filesLoaded - 1);
+    endInsertRows();
+    isLoadingRawFile = false;
+  };
+
+  auto addCollection = [this]() {
+    if (isLoadingRawFile)
+      return;
+
+    int newIndex = static_cast<int>(pRoot->vgmColls().size()) - 1;
+    if (newIndex < 0)
+      return;
+
+    beginInsertRows(QModelIndex(), newIndex, newIndex);
     endInsertRows();
   };
 
+
   connect(&qtVGMRoot, &QtVGMRoot::UI_beginLoadRawFile, beginLoad);
   connect(&qtVGMRoot, &QtVGMRoot::UI_endLoadRawFile, endLoad);
+  connect(&qtVGMRoot, &QtVGMRoot::UI_addedVGMColl, addCollection);
   connect(&qtVGMRoot, &QtVGMRoot::UI_beginRemoveVGMColls, startResettingModel);
   connect(&qtVGMRoot, &QtVGMRoot::UI_endRemoveVGMColls, endResettingModel);
 }
