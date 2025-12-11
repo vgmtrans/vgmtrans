@@ -10,6 +10,8 @@
 #include "KonamiTMNT2Definitions.h"
 #include "VGMRgn.h"
 
+#include <set>
+#include <tuple>
 #include <spdlog/fmt/fmt.h>
 
 KonamiTMNT2SampleInstrSet::KonamiTMNT2SampleInstrSet(
@@ -100,6 +102,7 @@ bool KonamiTMNT2SampleInstrSet::parseMelodicInstrs() {
     );
     VGMRgn* rgn = new VGMRgn(instr, offset, sizeof(konami_tmnt2_instr_info));
     rgn->sampOffset = instrInfo.start();
+    rgn->sampDataLength = (instrInfo.length_msb << 8) | instrInfo.length_lsb;
     // rgn->setVolume((instrInfo.volume & 0x7F) / 127.0);
 
     instr->addRgn(rgn);
@@ -176,6 +179,7 @@ bool KonamiTMNT2SampleInstrSet::parseDrums() {
 
       VGMRgn* rgn = new VGMRgn(drumKit, ptr, sizeof(konami_tmnt2_drum_info));
       rgn->sampOffset = drumInfo.start();
+      rgn->sampDataLength = (drumInfo.length_hi << 8) | drumInfo.length_lo;
       u8 key = (i * 16) + j;
       rgn->keyLow = key;
       rgn->keyHigh = key;
@@ -236,12 +240,19 @@ bool KonamiTMNT2SampColl::parseSampleInfo() {
   allInstrInfos.insert(allInstrInfos.end(), instrInfos.begin(), instrInfos.end());
   allInstrInfos.insert(allInstrInfos.end(), flatDrumInfos.begin(), flatDrumInfos.end());
 
+  std::set<std::tuple<u32, u32, bool>> seenSamples;
+
   for (auto instrInfo : allInstrInfos) {
     u32 sampleOffset = instrInfo.start_msb << 16 | instrInfo.start_mid << 8 | instrInfo.start_lsb;
     u32 sampleSize = instrInfo.length_msb << 8 | instrInfo.length_lsb;
 
     if (instrInfo.reverse()) {
       sampleOffset = sampleOffset - sampleSize;
+    }
+
+    auto sampleKey = std::make_tuple(sampleOffset, sampleSize, instrInfo.reverse());
+    if (!seenSamples.insert(sampleKey).second) {
+      continue;
     }
 
     auto name = fmt::format("Sample {:d}", sampNum++);
