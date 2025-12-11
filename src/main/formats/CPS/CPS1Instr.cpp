@@ -4,7 +4,6 @@
 #include "VGMRgn.h"
 #include "OkiAdpcm.h"
 #include "version.h"
-#include "Root.h"
 
 // ******************
 // CPS1SampleInstrSet
@@ -116,9 +115,9 @@ bool CPS1SampColl::parseSampleInfo() {
   return true;
 }
 
-// ******************
-// CPS1SampleInstrSet
-// ******************
+// ***************
+// CPS1OPMInstrSet
+// ***************
 
 CPS1OPMInstrSet::CPS1OPMInstrSet(RawFile *file,
                                CPS1FormatVer version,
@@ -126,7 +125,7 @@ CPS1OPMInstrSet::CPS1OPMInstrSet(RawFile *file,
                                u32 offset,
                                u32 length,
                                const std::string& name)
-    : VGMInstrSet(CPS1Format::name, file, offset, length, name),
+    : YM2151InstrSet(CPS1Format::name, file, offset, length, name),
       fmt_version(version), masterVol(masterVol) {
 }
 
@@ -159,24 +158,40 @@ bool CPS1OPMInstrSet::parseInstrPointers() {
 
     switch (fmt_version) {
       case CPS1_V200: {
-        auto instr = new CPS1OPMInstr<CPS1OPMInstrDataV2_00>(this, masterVol, offset, instrSize, 0,
-  i, name);
+        CPS1OPMInstrDataV2_00 instrData{};
+        readBytes(offset, static_cast<uint32_t>(instrSize), &instrData);
+        auto instr = new CPS1OPMInstr<CPS1OPMInstrDataV2_00>(this, masterVol, offset, instrSize, 0, i, name);
         aInstrs.push_back(instr);
+        addOPMInstrument(instrData.convertToOPMData(masterVol, name));
         break;
       }
       case CPS1_V500:
       case CPS1_V502: {
-        auto instr = new CPS1OPMInstr<CPS1OPMInstrDataV5_02>(this, masterVol, offset, instrSize, 0,
-  i, name);
+        CPS1OPMInstrDataV5_02 instrData{};
+        readBytes(offset, static_cast<uint32_t>(instrSize), &instrData);
+        auto instr = new CPS1OPMInstr<CPS1OPMInstrDataV5_02>(this, masterVol, offset, instrSize, 0, i, name);
         aInstrs.push_back(instr);
+        addOPMInstrument(instrData.convertToOPMData(masterVol, name));
         break;
       }
       case CPS1_V100:
       case CPS1_V350:
       case CPS1_V425: {
-        auto instr = new CPS1OPMInstr<CPS1OPMInstrDataV4_25>(this, masterVol, offset, instrSize, 0,
-        i, name);
+        CPS1OPMInstrDataV4_25 instrData{};
+        readBytes(offset, static_cast<uint32_t>(instrSize), &instrData);
+        auto instr = new CPS1OPMInstr<CPS1OPMInstrDataV4_25>(this, masterVol, offset, instrSize, 0, i, name);
         aInstrs.push_back(instr);
+        std::vector<uint8_t> driverData;
+        uint8_t enableLfo = instrData.LFO_ENABLE_AND_WF >> 7;
+        uint8_t resetLfo = (instrData.LFO_ENABLE_AND_WF >> 1) & 1;
+        driverData.push_back(enableLfo);
+        driverData.push_back(resetLfo);
+        for (int i = 0; i < 4; i ++) {
+          driverData.push_back(instrData.volData[i].key_scale);
+          driverData.push_back(instrData.volData[i].extra_atten);
+        }
+
+        addOPMInstrument(instrData.convertToOPMData(masterVol, name), "cps", std::move(driverData));
         instr->addChild(new VGMItem(this, offset, 1, "Transpose"));
         instr->addChild(new VGMItem(this, offset+1, 1, "LFO_ENABLE_AND_WF"));
         instr->addChild(new VGMItem(this, offset+2, 1, "LFRQ"));
@@ -198,38 +213,3 @@ bool CPS1OPMInstrSet::parseInstrPointers() {
   return true;
 }
 
-std::string CPS1OPMInstrSet::generateOPMFile() {
-  std::ostringstream output;
-  std::string header = std::string("// Converted using VGMTrans version: ") + VGMTRANS_VERSION + "\n";
-  output << header;
-
-  for (size_t i = 0; i < aInstrs.size(); ++i) {
-    switch (fmt_version) {
-      case CPS1_V200:
-        if (auto* instr = dynamic_cast<CPS1OPMInstr<CPS1OPMInstrDataV2_00>*>(aInstrs[i]); instr != nullptr) {
-          output << instr->toOPMString(i) << '\n';
-        }
-        break;
-      case CPS1_V500:
-      case CPS1_V502:
-        if (auto* instr = dynamic_cast<CPS1OPMInstr<CPS1OPMInstrDataV5_02>*>(aInstrs[i]); instr != nullptr) {
-          output << instr->toOPMString(i) << '\n';
-        }
-        break;
-      case CPS1_V100:
-      case CPS1_V350:
-      case CPS1_V425:
-        if (auto* instr = dynamic_cast<CPS1OPMInstr<CPS1OPMInstrDataV4_25>*>(aInstrs[i]); instr != nullptr) {
-          output << instr->toOPMString(i) << '\n';
-        }
-        break;
-    }
-  }
-  return output.str();
-}
-
-bool CPS1OPMInstrSet::saveAsOPMFile(const std::string &filepath) {
-  auto content = generateOPMFile();
-  pRoot->UI_writeBufferToFile(filepath, reinterpret_cast<uint8_t*>(const_cast<char*>(content.data())), static_cast<uint32_t>(content.size()));
-  return true;
-}
