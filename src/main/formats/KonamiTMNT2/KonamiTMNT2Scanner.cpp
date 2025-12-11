@@ -12,6 +12,8 @@
 #include "VGMColl.h"
 #include "VGMMiscFile.h"
 
+#include <optional>
+#include <utility>
 #include <spdlog/fmt/fmt.h>
 #include <vector>
 
@@ -109,56 +111,50 @@ void KonamiTMNT2Scanner::scan(RawFile * /*file*/, void *info) {
   RawFile* programRom = programRomGroup->file;
   RawFile* samplesRom = sampsRomGroup->file;
 
-  u32 loadSeqTableAddr;
-  u16 seqTableAddr;
-  if (programRom->searchBytePattern(ptn_tmnt2_LoadSeqTable, loadSeqTableAddr)) {
-    seqTableAddr = programRom->readShort(loadSeqTableAddr + 1);
-  }
-  else if (programRom->searchBytePattern(ptn_simp_LoadSeqTable, loadSeqTableAddr)) {
-    seqTableAddr = programRom->readShort(loadSeqTableAddr + 4) + 0x100;
-  }
-  else if (programRom->searchBytePattern(ptn_moomesa_LoadSeqTable, loadSeqTableAddr)) {
-    seqTableAddr = programRom->readShort(loadSeqTableAddr + 6) + 0xE;
-  }
-  else {
+  auto readTableAddr = [&](const BytePattern &pattern, u32 offset, u16 addend = 0)
+    -> std::optional<u16> {
+    u32 matchOffset;
+    if (!programRom->searchBytePattern(pattern, matchOffset)) {
+      return std::nullopt;
+    }
+    return static_cast<u16>(programRom->readShort(matchOffset + offset) + addend);
+  };
+
+  std::optional<u16> seqTableAddr = readTableAddr(ptn_tmnt2_LoadSeqTable, 1);
+  if (!seqTableAddr)
+    seqTableAddr = readTableAddr(ptn_simp_LoadSeqTable, 4, 0x100);
+  if (!seqTableAddr)
+    seqTableAddr = readTableAddr(ptn_moomesa_LoadSeqTable, 6, 0xE);
+  if (!seqTableAddr) {
     return;
   }
 
-  auto seqs = loadSeqTable(programRom, seqTableAddr, fmtVer, gameEntry->name);
+  auto seqs = loadSeqTable(programRom, *seqTableAddr, fmtVer, gameEntry->name);
 
-  u32 loadInstrTableAddr;
-  u16 instrTableAddrK053260 = 0;
-  u16 drumTableAddr = 0;
-  u16 instrTableAddrYM2151;
-  if (programRom->searchBytePattern(ptn_tmnt2_LoadInstrTable, loadInstrTableAddr)) {
-    instrTableAddrK053260 = programRom->readShort(loadInstrTableAddr + 3);
-  }
-  if (programRom->searchBytePattern(ptn_tmnt2_LoadDrumTable, loadInstrTableAddr)) {
-    drumTableAddr = programRom->readShort(loadInstrTableAddr + 10);
-  }
-  if (programRom->searchBytePattern(ptn_tmnt2_LoadYM2151InstrTable, loadInstrTableAddr)) {
-    instrTableAddrYM2151 = programRom->readShort(loadInstrTableAddr + 9);
-  } else if (programRom->searchBytePattern(ptn_ssriders_LoadYM2151InstrTable, loadInstrTableAddr)) {
-    instrTableAddrYM2151 = programRom->readShort(loadInstrTableAddr + 3);
+  u16 instrTableAddrK053260 = readTableAddr(ptn_tmnt2_LoadInstrTable, 3).value_or(0);
+  u16 drumTableAddr = readTableAddr(ptn_tmnt2_LoadDrumTable, 10).value_or(0);
+  u16 instrTableAddrYM2151 = readTableAddr(ptn_tmnt2_LoadYM2151InstrTable, 9).value_or(0);
+  if (instrTableAddrYM2151 == 0) {
+    instrTableAddrYM2151 = readTableAddr(ptn_ssriders_LoadYM2151InstrTable, 3).value_or(0);
   }
   if (instrTableAddrK053260 == 0 || drumTableAddr == 0 || instrTableAddrYM2151 == 0) {
     return;
   }
   std::vector<u32> instrPtrs;
   std::vector<u32> drumTablePtrs;
-  u32 minInstrPtr = -1;
-  u32 minDrumPtr = -1;
-  for (int i = instrTableAddrK053260; i < minInstrPtr && i < drumTableAddr; i += 2) {
-    u32 instrInfoPtr = programRom->readShort(i);
-    minInstrPtr = std::min(minInstrPtr, instrInfoPtr);
+  for (u32 offset = instrTableAddrK053260; offset < drumTableAddr; offset += 2) {
+    u32 instrInfoPtr = programRom->readShort(offset);
+    if (instrInfoPtr <= offset) {
+      break;
+    }
     instrPtrs.push_back(instrInfoPtr);
   }
 
-  for (int i = drumTableAddr;; i += 2) {
-    u32 drumInfoPtr = programRom->readShort(i);
-    minDrumPtr = std::min(minDrumPtr, drumInfoPtr);
-    if (i == minDrumPtr)
+  for (u32 offset = drumTableAddr;; offset += 2) {
+    u32 drumInfoPtr = programRom->readShort(offset);
+    if (drumInfoPtr <= offset) {
       break;
+    }
     drumTablePtrs.push_back(drumInfoPtr);
   }
 
@@ -175,21 +171,19 @@ void KonamiTMNT2Scanner::scan(RawFile * /*file*/, void *info) {
   std::unordered_set<u32> drumInfoPtrSet {};
   for (auto drumTablePtr : drumTablePtrs) {
     std::vector<konami_tmnt2_drum_info> drumInfos;
-    minDrumPtr = -1;
+    std::unordered_set<u32> visitedOffsets {};
     u32 i = drumTablePtr;
-    do {
+    while (visitedOffsets.insert(i).second && !drumTablePtrSet.contains(i) && !drumInfoPtrSet.contains(i)) {
       u32 drumInfoPtr = programRom->readShort(i);
-      if (drumInfoPtr > i + 0x1000)
+      if (drumInfoPtr <= i || drumInfoPtr > i + 0x1000) {
         break;
-      if (i >= minDrumPtr)
-        break;
-      minDrumPtr = std::min(minDrumPtr, drumInfoPtr);
+      }
       konami_tmnt2_drum_info info;
       programRom->readBytes(drumInfoPtr, sizeof(konami_tmnt2_drum_info), &info);
       drumInfos.push_back(info);
       drumInfoPtrSet.insert(drumInfoPtr);
       i += 2;
-    } while (!drumTablePtrSet.contains(i) && !drumInfoPtrSet.contains(i));
+    }
     drumTables.push_back(drumInfos);
   }
 
@@ -268,49 +262,27 @@ std::vector<KonamiTMNT2Seq*> KonamiTMNT2Scanner::loadSeqTable(
   std::vector<KonamiTMNT2Seq*> seqs;
   int i = 0;
   for (u16 seqPtr : seqPtrs) {
-    int numYM3151Tracks;
-    int numK053260Tracks;
-    if (fmtVer == VENDETTA) {
-      numYM3151Tracks = 8;
-      numK053260Tracks = 4;
-    } else {
-      auto seqType = static_cast<KonamiTMNT2Seq::SeqType>(programRom->readByte(seqPtr));
+    auto getTrackCounts = [&](KonamiTMNT2FormatVer version, u16 seqOffset) {
+      if (version == VENDETTA) {
+        return std::pair{8, 4};
+      }
 
-      if (fmtVer == SSRIDERS) {
+      auto seqType = static_cast<KonamiTMNT2Seq::SeqType>(programRom->readByte(seqOffset));
+      if (version == SSRIDERS) {
         switch (seqType) {
-          case 0:
-            numYM3151Tracks = 6;
-            numK053260Tracks = 2;
-            break;
-          case 1:
-            numYM3151Tracks = 7;
-            numK053260Tracks = 3;
-            break;
-          case 2:
-            numYM3151Tracks = 8;
-            numK053260Tracks = 3;
-            break;
+          case 0: return std::pair{6, 2};
+          case 1: return std::pair{7, 3};
+          case 2: return std::pair{8, 3};
           case 3:
-          default:
-            numYM3151Tracks = 8;
-            numK053260Tracks = 4;
-            break;
-        }
-      } else {
-        // int numTrkPtrs = seqType == KonamiTMNT2Seq::ALL_CHANS ? 12 : 9;
-        switch (seqType) {
-          case 0:
-            numYM3151Tracks = 8;
-            numK053260Tracks = 4;
-            break;
-          case 1:
-          default:
-            numYM3151Tracks = 6;
-            numK053260Tracks = 3;
-            break;
+          default: return std::pair{8, 4};
         }
       }
-    }
+
+      // int numTrkPtrs = seqType == KonamiTMNT2Seq::ALL_CHANS ? 12 : 9;
+      return seqType == 0 ? std::pair{8, 4} : std::pair{6, 3};
+    };
+
+    auto [numYM3151Tracks, numK053260Tracks] = getTrackCounts(fmtVer, seqPtr);
     u32 seqTypeLength = (fmtVer == VENDETTA) ? 0 : 1;
     auto totalTracks = numYM3151Tracks + numK053260Tracks;
     auto trkList = seqTable->addChild(seqPtr, seqTypeLength + (totalTracks * 2), "Seq Track List");
