@@ -82,8 +82,7 @@ class KonamiTMNT2Track : public SeqTrack {
   );
 
   double calculateVol(u8 baseVol);
-  void updateVolume();
-  void handleProgramChangeK053260(u8 programNum);
+  void handleProgramChangeK053260();
   u8 calculatePan();
   void updatePan();
 
@@ -107,7 +106,7 @@ private:
   void setPercussionModeOff() {
     addBankSelectNoItem(0);
     addProgramChangeNoItem(m_program, false);
-    handleProgramChangeK053260(m_program);
+    handleProgramChangeK053260();
     m_state &= ~2;
   }
   bool percussionMode() const { return (m_state & 2) > 0; }

@@ -29,22 +29,22 @@ KonamiTMNT2SampleInstrSet::KonamiTMNT2SampleInstrSet(
 }
 
 
-void KonamiTMNT2SampleInstrSet::addInstrInfoChildren(VGMItem* sampInfoItem, u32 off) {
+void KonamiTMNT2SampleInstrSet::addInstrInfoChildren(VGMItem* instrInfoItem, u32 off) {
   std::string sampleTypeStr;
   u8 flagsByte = readByte(off);
   sampleTypeStr = (flagsByte & 0x10) ? "KADPCM" : "PCM 8";
 
-  // if (flagsByte & 0x20) {
-    // sampleTypeStr += " (Reverse)";
-  // }
-  sampInfoItem->addChild(off + 0, 1, fmt::format("Flags - Sample Type: {}", sampleTypeStr));
+  if (flagsByte & 0x08) {
+    sampleTypeStr += " (Reverse)";
+  }
+  instrInfoItem->addChild(off + 0, 1, fmt::format("Flags - Sample Type: {}", sampleTypeStr));
 
-  sampInfoItem->addChild(off + 1, 2, "Sample Length");
-  sampInfoItem->addChild(off + 3, 3, "Sample Offset");
-  sampInfoItem->addChild(off + 6, 1, "Volume");
-  sampInfoItem->addChild(off + 7, 1, "Note Duration (fractional)");
-  sampInfoItem->addChild(off + 8, 1, "Release Duration / Rate?");
-  sampInfoItem->addChild(off + 9, 1, "Pan");
+  instrInfoItem->addChild(off + 1, 2, "Sample Length");
+  instrInfoItem->addChild(off + 3, 3, "Sample Offset");
+  instrInfoItem->addChild(off + 6, 1, "Volume");
+  instrInfoItem->addChild(off + 7, 1, "Note Duration (fractional)");
+  instrInfoItem->addChild(off + 8, 1, "Release Duration / Rate?");
+  instrInfoItem->addChild(off + 9, 1, "Pan");
 }
 
 bool KonamiTMNT2SampleInstrSet::parseInstrPointers() {
@@ -111,7 +111,7 @@ bool KonamiTMNT2SampleInstrSet::parseMelodicInstrs() {
 
 double k053260_pitch_cents(uint16_t pitch_word) {
   uint16_t P = pitch_word & 0x0FFF;
-  double ratio = 112.0 / (4096.0 - (double)P);
+  double ratio = TIM2_COUNT / (4096.0 - (double)P);
   return 1200.0 * log2(ratio);      // cents relative to 31,960 Hz @ B3
 }
 
@@ -154,11 +154,17 @@ bool KonamiTMNT2SampleInstrSet::parseDrums() {
       maxDrumOffset = std::max(maxDrumOffset, ptr);
       drumOctaveItem->addChild(ptrOffset, 2, "Drum Pointer");
 
+      u8 flagsByte = readByte(ptr + 3);
+      std::string sampleTypeStr = (flagsByte & 0x10) ? "KADPCM" : "PCM 8";
+      if (flagsByte & 0x08) {
+        sampleTypeStr += " (Reverse)";
+      }
+
       std::string name = j == 0 ? "Unreachable Drum" : fmt::format("Drum {}", drumNum);
       auto drumItem = drumsItem->addChild(ptr, sizeof(konami_tmnt2_drum_info), name);
       drumItem->addChild(ptr + 0, 2, "Pitch");
       drumItem->addChild(ptr + 2, 1, "Unknown");
-      drumItem->addChild(ptr + 3, 1, "Flags");
+      drumItem->addChild(ptr + 3, 1, fmt::format("Flags - Sample Type: {}", sampleTypeStr));
       drumItem->addChild(ptr + 4, 2, "Sample Length");
       drumItem->addChild(ptr + 6, 3, "Sample Address");
       drumItem->addChild(ptr + 9, 1, "Volume");
@@ -166,18 +172,16 @@ bool KonamiTMNT2SampleInstrSet::parseDrums() {
       drumItem->addChild(ptr + 12, 1, "Release Duration / Rate?");
       drumItem->addChild(ptr + 13, 1, "Pan");
 
-
       const konami_tmnt2_drum_info& drumInfo = m_drumTables[i][j];
 
-      double relativePitchCents = k053260_pitch_cents((drumInfo.pitch_hi << 8) + drumInfo.pitch_lo);
-      // std::string name = fmt::format("Drum {}", drumNum);
-      // VGMInstr* instr = new VGMInstr(this, offset, sizeof(konami_tmnt2_instr_info), 0, instrNum, name);
       VGMRgn* rgn = new VGMRgn(drumKit, ptr, sizeof(konami_tmnt2_drum_info));
       rgn->sampOffset = drumInfo.start();
       u8 key = (i * 16) + j;
       rgn->keyLow = key;
       rgn->keyHigh = key;
       rgn->unityKey = key;
+
+      double relativePitchCents = k053260_pitch_cents((drumInfo.pitch_hi << 8) + drumInfo.pitch_lo);
       rgn->coarseTune = relativePitchCents / 100;
       rgn->fineTune = static_cast<int>(relativePitchCents) % 100;
       // rgn->setVolume((drumInfo.volume & 0x7F) / 127.0);
@@ -212,6 +216,9 @@ bool KonamiTMNT2SampColl::parseHeader() {
 bool KonamiTMNT2SampColl::parseSampleInfo() {
   int sampNum = 0;
 
+  // We will consolidate all of the melodic and drum instrument data together into a single vector
+  // for the sake of iterating over all samples. We'll convert each konami_tmnt2_drum_info into a
+  // konami_tmnt2_instr_info - no relevant data will be lost.
   std::vector<konami_tmnt2_instr_info> flatDrumInfos;
   for (auto const& inner : drumTables) {
     for (auto const& drumInfo : inner) {
@@ -233,10 +240,9 @@ bool KonamiTMNT2SampColl::parseSampleInfo() {
     u32 sampleOffset = instrInfo.start_msb << 16 | instrInfo.start_mid << 8 | instrInfo.start_lsb;
     u32 sampleSize = instrInfo.length_msb << 8 | instrInfo.length_lsb;
 
-    // if (instrInfo.reverse()) {
-    //   sampleOffset = sampleOffset - sampleSize;
-    //   relativeLoopOffset = -relativeLoopOffset;
-    // }
+    if (instrInfo.reverse()) {
+      sampleOffset = sampleOffset - sampleSize;
+    }
 
     auto name = fmt::format("Sample {:d}", sampNum++);
     VGMSamp* sample;
@@ -268,7 +274,7 @@ bool KonamiTMNT2SampColl::parseSampleInfo() {
     }
     sample->setLoopStatus(false);
     sample->unityKey = 0x3B;
-    // sample->setReverse(instrInfo.reverse());
+    sample->setReverse(instrInfo.reverse());
   }
   return true;
 }

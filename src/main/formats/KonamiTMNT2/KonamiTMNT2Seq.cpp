@@ -157,13 +157,6 @@ double KonamiTMNT2Track::calculateVol(u8 baseVol) {
   return volume / 127.0;
 }
 
-void KonamiTMNT2Track::updateVolume() {
-  if (!m_isFmTrack) {
-    double volume = calculateVol(m_baseVol) * 127.0;
-    addVolNoItem(volume);
-  }
-}
-
 u8 KonamiTMNT2Track::calculatePan() {
   if (m_isFmTrack) {
     // Overrides RL registers (right/left channel enable) if a global state var is set to 0
@@ -199,9 +192,7 @@ void KonamiTMNT2Track::updatePan() {
   addPanNoItem(calculatePan());
 }
 
-void KonamiTMNT2Track::handleProgramChangeK053260(u8 programNum) {
-  m_program = programNum;
-
+void KonamiTMNT2Track::handleProgramChangeK053260() {
   if (!percussionMode()) {
     std::optional<konami_tmnt2_instr_info> info = instrInfo(m_program);
     if (info) {
@@ -325,7 +316,6 @@ bool KonamiTMNT2Track::readEvent() {
         m_dxAtten = (opcode & 0xF) * std::max<u8>(1, m_dxAttenMultiplier);
         m_dxAtten &= 0x7F;
       }
-      // updateVolume();
       addGenericEvent(beginOffset, curOffset - beginOffset, "Attenuation", "", Type::Volume);
       break;
     case 0xD8:
@@ -388,9 +378,8 @@ bool KonamiTMNT2Track::readEvent() {
       if (m_isFmTrack) {
         m_state |= 4;
         if (val == 0) {
-          u8 tempo = readByte(curOffset++);
-          // byte acts as tempo, but unclear exact calculation
-          // lower value means slower
+          u8 tickSkip = readByte(curOffset++);
+          // byte effectively sets ppqn / tempo. Still need to hammer this down
           val = readByte(curOffset++);
         }
         m_rawBaseDur = val;
@@ -402,22 +391,21 @@ bool KonamiTMNT2Track::readEvent() {
         // performs a simple &= 0x7F. Values over 127 are used in sequences.
         m_program &= 0x7F;
         addProgramChangeNoItem(m_program, false);
-        // Next byte is attenuation.
-        u8 atten = std::min<u8>(readByte(curOffset++), 0x7F);
-        addVolNoItem(0x7F - atten);
+        u8 attenuation = std::min<u8>(readByte(curOffset++), 0x7F);
+        addVolNoItem(0x7F - attenuation);
         m_noteDurPercent = readByte(curOffset++);
         addGenericEvent(beginOffset, curOffset - beginOffset, "Program Change / Base Dur / Attenuation / State / Note Dur", "", Type::ProgramChange);
       } else {
         if ((val & 0xF0) == 0) {
           m_state = val & 0xF0;
           m_rawBaseDur = val;
-          // We multiply the raw base duration by two so we can cleanly halve durations (for event DF)
+          // We multiply the raw base duration by two so we can cleanly halve durations for event DF
           m_rawBaseDur *= 2;
           m_baseDur = m_rawBaseDur * 3;
           m_program = readByte(curOffset++);
           addProgramChangeNoItem(m_program, false);
           m_attenuation = readByte(curOffset++) & 0x7F;
-          handleProgramChangeK053260(m_program);
+          handleProgramChangeK053260();
 
           m_noteDurPercent = readByte(curOffset++);
           addGenericEvent(beginOffset, curOffset - beginOffset, "Program Change / Base Dur / Attenuation / State / Note Dur", "", Type::ProgramChange);
@@ -425,7 +413,7 @@ bool KonamiTMNT2Track::readEvent() {
         else {
           m_addedToNote = (val >> 4) - 1;
           m_rawBaseDur = val & 0xF;
-          // We multiply the raw base duration by two so we can cleanly halve durations (for event DF)
+          // We multiply the raw base duration by two so we can cleanly halve durations for event DF
           m_rawBaseDur *= 2;
           m_baseDur = m_rawBaseDur * 3;
           m_attenuation = readByte(curOffset++);
@@ -469,10 +457,8 @@ bool KonamiTMNT2Track::readEvent() {
         // TMNT2 is weird. It has 113 FM instruments, but code to handle > 128, however, it just
         // performs a simple &= 0x7F. Oddly, values over 127 are what's actually used.
         m_program &= 0x7F;
-        // handleProgramChangeK053260(m_program);
       } else {
-        // Set default note duration if collection is loaded
-        handleProgramChangeK053260(m_program);
+        handleProgramChangeK053260();
       }
       addProgramChange(beginOffset, 2, m_program);
       break;
@@ -554,7 +540,6 @@ bool KonamiTMNT2Track::readEvent() {
         m_transpose = transpose;
         auto desc = fmt::format("Transpose - {} semitones", transpose);
         addGenericEvent(beginOffset, 2, "Transpose", desc, Type::Transpose);
-        // addTranspose(beginOffset, 2, transpose);
       }
       break;
     }
@@ -579,9 +564,8 @@ bool KonamiTMNT2Track::readEvent() {
       s8 k053260MasterAtten = -static_cast<s8>(readByte(curOffset++));
       setMasterAttenuationYM2151(ym2151MasterAtten);
       setMasterAttenuationK053260(k053260MasterAtten);
-      if (!m_isFmTrack) {
-        // updateVolume();
-      }
+      // It may be more accurate to immediately update the volume for the YM2151 and K053260
+
       auto desc = fmt::format("YM2151: %d  K053260: %d", ym2151MasterAtten, k053260MasterAtten);
       addGenericEvent(beginOffset, 3, "Set Master Volume", desc, Type::MasterVolume);
       break;

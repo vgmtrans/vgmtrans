@@ -17,25 +17,21 @@ struct konami_tmnt2_instr_info {
   u8 default_pan;
 
 private:
-  // static constexpr u8 mask_sample_type = 0b0000'1100;  // bits 2-3
-  // static constexpr u8 mask_reverse     = 0b0010'0000;  // bit 5
+  static constexpr u8 mask_adpcm   = 0b0001'0000;  // bits 2-3
+  static constexpr u8 mask_reverse = 0b0000'1000;  // bit 5
 
 public:
-  // [[nodiscard]] constexpr sample_type start_adds_length() const noexcept {
-  //   return static_cast<sample_type>(flags & 8);
-  // }
-
   [[nodiscard]] constexpr bool isAdpcm() const noexcept {
-    return (flags & 0x10) > 0;
+    return (flags & mask_adpcm) > 0;
+  }
+
+  [[nodiscard]] constexpr bool reverse() const noexcept {
+    return (flags & mask_reverse) != 0;
   }
 
   [[nodiscard]] constexpr u32 start() const noexcept {
     return (start_msb << 16) + (start_mid << 8) + start_lsb;
   }
-  //
-  // [[nodiscard]] constexpr bool reverse() const noexcept {
-  //   return (flags & mask_reverse) != 0;
-  // }
 };
 
 struct konami_tmnt2_drum_info {
@@ -54,29 +50,10 @@ struct konami_tmnt2_drum_info {
   u8 release_dur_and_rate;
   u8 default_pan;
 
-private:
-  // static constexpr u8 mask_sample_type = 0b0000'1100;  // bits 2-3
-  // static constexpr u8 mask_reverse     = 0b0010'0000;  // bit 5
-
 public:
-  // [[nodiscard]] constexpr sample_type start_adds_length() const noexcept {
-  //   return static_cast<sample_type>(flags & 8);
-  // }
-
-  [[nodiscard]] constexpr bool isAdpcm() const noexcept {
-    return flags & 0x80;
-  }
-
   [[nodiscard]] constexpr u32 start() const noexcept {
     return (start_hi << 16) + (start_mid << 8) + start_lo;
   }
-  // [[nodiscard]] constexpr sample_type type() const noexcept {
-  //   return static_cast<sample_type>(flags & mask_sample_type);
-  // }
-  //
-  // [[nodiscard]] constexpr bool reverse() const noexcept {
-  //   return (flags & mask_reverse) != 0;
-  // }
 };
 
 
@@ -94,7 +71,7 @@ public:
                        KonamiTMNT2FormatVer fmtVer);
   ~KonamiTMNT2SampleInstrSet() override = default;
 
-  void addInstrInfoChildren(VGMItem* sampInfoItem, u32 off);
+  void addInstrInfoChildren(VGMItem* instrInfoItem, u32 off);
   bool parseInstrPointers() override;
 
   bool parseMelodicInstrs();
