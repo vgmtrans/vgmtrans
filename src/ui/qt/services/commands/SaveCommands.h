@@ -13,7 +13,7 @@
 #include "VGMSampColl.h"
 #include "VGMExport.h"
 #include "VGMColl.h"
-#include "formats/CPS/CPS1Instr.h"
+#include "formats/common/YM2151InstrSet.h"
 
 namespace fs = std::filesystem;
 using MenuPath = Command::MenuPath;
@@ -216,11 +216,11 @@ public:
   [[nodiscard]] std::optional<MenuPath> menuPath() const override { return MenuPaths::Convert; }
 };
 
-class SaveAsOPMCommand : public SaveCommand<CPS1OPMInstrSet, VGMFile> {
+class SaveAsOPMCommand : public SaveCommand<YM2151InstrSet, VGMFile> {
 public:
-  SaveAsOPMCommand() : SaveCommand<CPS1OPMInstrSet, VGMFile>(false) {}
+  SaveAsOPMCommand() : SaveCommand<YM2151InstrSet, VGMFile>(false) {}
 
-  void save(const std::string& path, CPS1OPMInstrSet* instrSet) const override {
+  void save(const std::string& path, YM2151InstrSet* instrSet) const override {
     instrSet->saveAsOPMFile(path);
   }
   [[nodiscard]] std::string name() const override { return "Save as OPM"; }
