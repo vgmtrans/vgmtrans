@@ -273,7 +273,7 @@ bool VSTSequencePlayer::sendSF2ToVST(const VGMColl* coll) {
 
 bool VSTSequencePlayer::sendOpmToVST(const VGMColl* coll) {
   for (auto instrSet : coll->instrSets()) {
-    if (auto cps1instrset = dynamic_cast<CPS1OPMInstrSet*>(instrSet)) {
+    if (auto cps1instrset = dynamic_cast<YM2151InstrSet*>(instrSet)) {
       std::string opmFile = cps1instrset->generateOPMFile();
       auto opmFileData = reinterpret_cast<const uint8_t*>(opmFile.c_str());
       populateFileMidiBuffer(opmFileData, opmFile.length(), YM2151_OPM);
