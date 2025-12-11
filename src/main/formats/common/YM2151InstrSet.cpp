@@ -4,7 +4,6 @@
  * refer to the included LICENSE.txt file
  */
 #include "YM2151InstrSet.h"
-
 #include "Root.h"
 #include "version.h"
 

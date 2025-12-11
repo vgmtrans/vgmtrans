@@ -26,14 +26,6 @@ KonamiTMNT2FormatVer konamiTMNT2VersionEnum(const std::string &versionStr) {
   return it != versionMap.end() ? it->second : VERSION_UNDEFINED;
 }
 
-// TMNT2 (Z80)
-// 02E9  ld hl,0xF801      21 01 F8
-// 02EC  ld de,0xF800      11 00 F8
-// 02EF  exx               D9
-// 02F0  ld hl,0x55F7      21 F7 55
-// 02F3  and 0x7F          E6 7F
-// BytePattern KonamiTMNT2Scanner::ptn_LoadSeqTable("\x21\x01\xF8\x11\x00\xF8\xD9\x21\xF7\x55\xE6\x7F", "xxxxxxxx??xx", 12);
-
 // 02F0  ld hl,0x55F7      21 F7 55
 // 02F3  and 0x7F          E6 7F
 // 02F5  rlca              07
@@ -41,62 +33,59 @@ KonamiTMNT2FormatVer konamiTMNT2VersionEnum(const std::string &versionStr) {
 // 02F7  add hl,de         19
 BytePattern KonamiTMNT2Scanner::ptn_tmnt2_LoadSeqTable("\x21\xF7\x55\xE6\x7F\x07\x5F\x19", "x??xxxxx", 8);
 
-// ram:035f 26 00           LD         H,0x0
-// ram:0361 29              ADD        HL,HL
-// ram:0362 11 b2 5c        LD         DE,0x5cb2                                                5cb2 is song ptrs - 0x100 (0x5db2)
-// ram:0365 19              ADD        HL,DE                                                    for song 01, hl == 0x100
-// ram:0366 5e              LD         E=>DAT_ram_5cb2,(HL
-// ram:0367 23              INC        HL
-// ram:0368 56              LD         D,(HL=>DAT_ram_5cb3                                      = 21h    !
+// 035F  ld h,0x00         26 00
+// 0361  add hl,hl         29
+// 0362  ld de,0x5CB2      11 B2 5C      # 5CB2 is song ptrs - 0x100 (0x5DB2)
+// 0365  add hl,de         19
+// 0366  ld e,(hl)         5E
+// 0367  inc hl            23
+// 0368  ld d,(hl)         56
 BytePattern KonamiTMNT2Scanner::ptn_simp_LoadSeqTable("\x26\x00\x29\x11\xB2\x5C\x19\x5E\x23\x56", "xxxx??xxxx", 10);
 
 
-// ram:015c 5d              LD         E,L
-// ram:015d 54              LD         D,H
-// ram:015e 29              ADD        HL,HL
-// ram:015f 19              ADD        HL,DE
-// ram:0160 09              ADD        HL,BC
-// ram:0161 11 e1 2a        LD         DE,0x2ae1
+// 015C  ld e,l            5D
+// 015D  ld d,h            54
+// 015E  add hl,hl         29
+// 015F  add hl,de         19
+// 0160  add hl,bc         09
+// 0161  ld de,0x2AE1      11 E1 2A
 BytePattern KonamiTMNT2Scanner::ptn_moomesa_LoadSeqTable("\x5D\x54\x29\x19\x09\x11\xE1\x2A", "xxxxxx??", 8);
 
-// ram:3f26 13              INC        DE                     # curOffset++
-// ram:3f27 1a              LD         A,(DE)                 # read program num
-// ram:3f28 21 7b 49        LD         HL,0x497b              # load instr table offset
-// ram:3f2b 07              RLCA                              # programNum -> table index offset
-// ram:3f2c 4f              LD         C,A
-// ram:3f2d 09              ADD        HL,BC                  # instr table offset + program offset
-// ram:3f2e 4e              LD         C,(HL=>instr_ptr_table
+// 3F26  inc de            13          # curOffset++
+// 3F27  ld a,(de)         1A          # read program num
+// 3F28  ld hl,0x497B      21 7B 49    # load instr table offset
+// 3F2B  rlca              07          # programNum -> table index offset
+// 3F2C  ld c,a            4F
+// 3F2D  add hl,bc         09          # instr table offset + program offset
+// 3F2E  ld c,(hl)         4E          # instr_ptr_table
 BytePattern KonamiTMNT2Scanner::ptn_tmnt2_LoadInstrTable("\x13\x1A\x21\x7B\x49\x07\x4F\x09\x4E", "xxx??xxxx", 9);
 
-// ram:44f6 4f              LD         param_1,A
-// ram:44f7 06 00           LD         param_1,0x0
-// ram:44f9 dd 7e 18        LD         A,(IX+param_4->added_to_note_0)
-// ram:44fc 07              RLCA
-// ram:44fd 5f              LD         curOffset,A
-// ram:44fe 50              LD         curOffset,param_1
-// ram:44ff 21 b7 49        LD         HL, 0x49B7                                           drum_tables
-// ram:4502 19              ADD        HL, curOffset                                             octave (chan state val) determin
-//                                                                                              note determines index in table
+// 44F6  ld param_1,a      4F
+// 44F7  ld param_1,0x00   06 00
+// 44F9  ld a,(ix+0x18)    DD 7E 18
+// 44FC  rlca              07
+// 44FD  ld curOffset,a    5F
+// 44FE  ld curOffset,b    50
+// 44FF  ld hl,0x49B7      21 B7 49    # drum_tables
+// 4502  add hl,curOffset  19
 BytePattern KonamiTMNT2Scanner::ptn_tmnt2_LoadDrumTable("\x4F\x06\x00\xDD\x7E\x18\x07\x5F\x50\x21\xB7\x49\x19", "xxxxx?xxxx??x", 13);
 
-
-// ram:1996 13              INC        curOffset
-// ram:1997 1a              LD         A,(curOffset)                                    read program num
-// ram:1998 d9              EXX
-// ram:1999 cb 7f           BIT        0x7,A
-// ram:199b ca a6 19        JP         Z,program_num_<=_0x7F
-// ram:199e 21 af 24        LD         HL,ym2151_instrs
-// ram:19a1 e6 7f           AND        0x7f
+// 1996  inc curOffset             13
+// 1997  ld a,(curOffset)          1A          # read program num
+// 1998  exx                       D9
+// 1999  bit 7,a                   CB 7F
+// 199B  jp z,program_num_<=_0x7F  CA A6 19
+// 199E  ld hl,0x24AF.             21 AF 24.   # ym2151_instrs
+// 19A1  and 0x7F                  E6 7F
 BytePattern KonamiTMNT2Scanner::ptn_tmnt2_LoadYM2151InstrTable("\x13\x1A\xD9\xCB\x7F\xCA\xA6\x19\x21\xAF\x24\xE6\x7F", "xxxxxx??x??xx", 13);
 
-
-// ram:1b76 44              LD         B,H
-// ram:1b77 4d              LD         C,L
-// ram:1b78 21 bb 25        LD         HL,ym2151_instrs                                 = ram:27bb
-// ram:1b7b 09              ADD        HL,BC
-// ram:1b7c 4e              LD         C,(HL=>ym2151_instrs)                            = ram:27bb
-// ram:1b7d 23              INC        HL
-// ram:1b7e 46              LD         B,(HL=>ym2151_instrs+1)
+// 1B76  ld b,h                  44
+// 1B77  ld c,l                  4D
+// 1B78  ld hl,0x25BB            21 BB 25      # ym2151_instrs
+// 1B7B  add hl,bc               09
+// 1B7C  ld c,(hl)               4E
+// 1B7D  inc hl                  23
+// 1B7E  ld b,(hl)               46
 BytePattern KonamiTMNT2Scanner::ptn_ssriders_LoadYM2151InstrTable("\x44\x4D\x21\xBB\x25\x09\x4E\x23\x46", "xxx??xxxx", 9);
 
 
