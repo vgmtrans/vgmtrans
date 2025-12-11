@@ -149,8 +149,6 @@ void KonamiTMNT2Scanner::scan(RawFile * /*file*/, void *info) {
   u32 minInstrPtr = -1;
   u32 minDrumPtr = -1;
   for (int i = instrTableAddrK053260; i < minInstrPtr && i < drumTableAddr; i += 2) {
-    // if (i >= minInstrPtr || i >= drumTableAddr)
-      // break;
     u32 instrInfoPtr = programRom->readShort(i);
     minInstrPtr = std::min(minInstrPtr, instrInfoPtr);
     instrPtrs.push_back(instrInfoPtr);
@@ -261,20 +259,12 @@ std::vector<KonamiTMNT2Seq*> KonamiTMNT2Scanner::loadSeqTable(
     "Sequence Table"
   );
   std::set<u16> seqPtrs;
-  // u32 i = seqTableAddr;
   for (u32 i = seqTableAddr; !seqPtrs.contains(i); i += 2) {
     const u16 seqPtr = programRom->readShort(i);
     seqPtrs.insert(seqPtr);
     seqTable->addChild(i, 2, "Sequence Pointer");
   }
-  // seqTable->unLength = i - seqTableAddr;
 
-  // if (!seqTable->loadVGMFile()) {
-  //   delete seqTable;
-  //   return;
-  // }
-
-  // enum SeqType : u8 { ALL_CHANS = 0, RESERVE_CHANS = 1 };
   std::vector<KonamiTMNT2Seq*> seqs;
   int i = 0;
   for (u16 seqPtr : seqPtrs) {
@@ -346,7 +336,7 @@ std::vector<KonamiTMNT2Seq*> KonamiTMNT2Scanner::loadSeqTable(
       std::ranges::min(ym2151TrkPtrs),
       std::ranges::min(k053260TrkPtrs)
     );
-    // u16 start = std::ranges::min(k053260TrkPtrs);
+
     auto *sequence = new KonamiTMNT2Seq(programRom, fmtVer, start, ym2151TrkPtrs, k053260TrkPtrs, sequenceName);
     if (!sequence->loadVGMFile()) {
       delete sequence;
