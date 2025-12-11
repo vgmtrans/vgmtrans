@@ -139,26 +139,6 @@
       ]
     },
     {
-      "name": "asterix",
-      "format": "KonamiTMNT2",
-      "rom_groups": [
-        {
-          "type": "soundcpu",
-          "load_method": "append",
-          "roms": [
-            "068_a05.5f"
-          ]
-        },
-        {
-          "type": "sound",
-          "load_method": "append",
-          "roms": [
-            "068a06.1e"
-          ]
-        }
-      ]
-    },
-    {
       "name": "avsp",
       "format": "CPS2",
       "fmt_version": "CPS2_V1.04",
@@ -216,22 +196,22 @@
       ]
     },
     {
-      "name": "bucky",
+      "name": "blswhstl",
       "format": "KonamiTMNT2",
+      "fmt_version": "tmnt2",
       "rom_groups": [
         {
           "type": "soundcpu",
           "load_method": "append",
           "roms": [
-            "173a07.f5"
+            "060j01.f3"
           ]
         },
         {
           "type": "sound",
           "load_method": "append",
           "roms": [
-            "173a08.b6",
-            "173a09.a6"
+            "060e04.d1"
           ]
         }
       ]
@@ -486,27 +466,6 @@
       ]
     },
     {
-      "name": "detatwin",
-      "format": "KonamiTMNT2",
-      "fmt_version": "tmnt2",
-      "rom_groups": [
-        {
-          "type": "soundcpu",
-          "load_method": "append",
-          "roms": [
-            "060j01.f3"
-          ]
-        },
-        {
-          "type": "sound",
-          "load_method": "append",
-          "roms": [
-            "060e04.d1"
-          ]
-        }
-      ]
-    },
-    {
       "name": "dimahoou",
       "format": "CPS2",
       "fmt_version": "CPS2_V1.80",
@@ -695,27 +654,6 @@
       ]
     },
     {
-      "name": "esckids",
-      "format": "KonamiTMNT2",
-      "fmt_version": "tmnt2",
-      "rom_groups": [
-        {
-          "type": "soundcpu",
-          "load_method": "append",
-          "roms": [
-            "975f02"
-          ]
-        },
-        {
-          "type": "sound",
-          "load_method": "append",
-          "roms": [
-            "975c03"
-          ]
-        }
-      ]
-    },
-    {
       "name": "ffight",
       "format": "CPS1",
       "fmt_version": "CPS1_V2.00",
@@ -885,49 +823,6 @@
       ]
     },
     {
-      "name": "glfgreat",
-      "format": "KonamiTMNT2",
-      "rom_groups": [
-        {
-          "type": "soundcpu",
-          "load_method": "append",
-          "roms": [
-            "061f01.4e"
-          ]
-        },
-        {
-          "type": "sound",
-          "load_method": "append",
-          "roms": [
-            "061e04.1d"
-          ]
-        }
-      ]
-    },
-    {
-      "name": "gradius3",
-      "format": "KonamiTMNT2",
-      "fmt_version": "tmnt2",
-      "rom_groups": [
-        {
-          "type": "soundcpu",
-          "load_method": "append",
-          "roms": [
-            "945_r05.d9"
-          ]
-        },
-        {
-          "type": "sound",
-          "load_method": "append",
-          "roms": [
-            "945_a10.b15",
-            "945_l11a.c18",
-            "945_l11b.c20"
-          ]
-        }
-      ]
-    },
-    {
       "name": "gulunpa",
       "format": "CPS1",
       "fmt_version": "CPS1_V4.25",
@@ -977,26 +872,6 @@
           "roms": [
             "ggw.11m",
             "ggw.12m"
-          ]
-        }
-      ]
-    },
-    {
-      "name": "gijoe",
-      "format": "KonamiTMNT2",
-      "rom_groups": [
-        {
-          "type": "soundcpu",
-          "load_method": "append",
-          "roms": [
-            "069a01.7c"
-          ]
-        },
-        {
-          "type": "sound",
-          "load_method": "append",
-          "roms": [
-            "069a04.1e"
           ]
         }
       ]
@@ -1329,46 +1204,6 @@
       ]
     },
     {
-      "name": "lethalen",
-      "format": "KonamiTMNT2",
-      "rom_groups": [
-        {
-          "type": "soundcpu",
-          "load_method": "append",
-          "roms": [
-            "191a02.f4"
-          ]
-        },
-        {
-          "type": "sound",
-          "load_method": "append",
-          "roms": [
-            "191a03"
-          ]
-        }
-      ]
-    },
-    {
-      "name": "lgtnfght",
-      "format": "KonamiTMNT2",
-      "rom_groups": [
-        {
-          "type": "soundcpu",
-          "load_method": "append",
-          "roms": [
-            "939e01.d7"
-          ]
-        },
-        {
-          "type": "sound",
-          "load_method": "append",
-          "roms": [
-            "939a04.c5"
-          ]
-        }
-      ]
-    },
-    {
       "name": "mmatrix",
       "format": "CPS2",
       "fmt_version": "CPS2_V1.80",
@@ -1592,26 +1427,6 @@
           "roms": [
             "170a14.2g",
             "170a15.2m"
-          ]
-        }
-      ]
-    },
-    {
-      "name": "moomesa",
-      "format": "KonamiTMNT2",
-      "rom_groups": [
-        {
-          "type": "soundcpu",
-          "load_method": "append",
-          "roms": [
-            "151a07.f5"
-          ]
-        },
-        {
-          "type": "sound",
-          "load_method": "append",
-          "roms": [
-            "151a08.b6"
           ]
         }
       ]
@@ -1948,27 +1763,6 @@
       ]
     },
     {
-      "name": "overdriv",
-      "format": "KonamiTMNT2",
-      "rom_groups": [
-        {
-          "type": "soundcpu",
-          "load_method": "append",
-          "roms": [
-            "789_e01.e4"
-          ]
-        },
-        {
-          "type": "sound",
-          "load_method": "append",
-          "roms": [
-            "789e03.j1",
-            "789e02.f1"
-          ]
-        }
-      ]
-    },
-    {
       "name": "pang3",
       "format": "CPS1",
       "fmt_version": "CPS1_V5.00",
@@ -1989,26 +1783,6 @@
           "roms": [
             "pa3_05.10d",
             "pa3_06.11d"
-          ]
-        }
-      ]
-    },
-    {
-      "name": "parodius",
-      "format": "KonamiTMNT2",
-      "rom_groups": [
-        {
-          "type": "soundcpu",
-          "load_method": "append",
-          "roms": [
-            "955e03.d14"
-          ]
-        },
-        {
-          "type": "sound",
-          "load_method": "append",
-          "roms": [
-            "955d04.c5"
           ]
         }
       ]
@@ -2120,26 +1894,6 @@
       ]
     },
     {
-      "name": "prmrsocr",
-      "format": "KonamiTMNT2",
-      "rom_groups": [
-        {
-          "type": "soundcpu",
-          "load_method": "append",
-          "roms": [
-            "101c05.5e"
-          ]
-        },
-        {
-          "type": "sound",
-          "load_method": "append",
-          "roms": [
-            "101a06.1d"
-          ]
-        }
-      ]
-    },
-    {
       "name": "progear",
       "format": "CPS2",
       "fmt_version": "CPS2_V1.80",
@@ -2202,27 +1956,6 @@
             "ps-q2.2k",
             "ps-q3.3k",
             "ps-q4.4k"
-          ]
-        }
-      ]
-    },
-    {
-      "name": "punkshot",
-      "format": "KonamiTMNT2",
-      "fmt_version": "tmnt2",
-      "rom_groups": [
-        {
-          "type": "soundcpu",
-          "load_method": "append",
-          "roms": [
-            "907f01.e8"
-          ]
-        },
-        {
-          "type": "sound",
-          "load_method": "append",
-          "roms": [
-            "907d04.d3"
           ]
         }
       ]
@@ -2331,26 +2064,6 @@
           "roms": [
             "tqz.11m",
             "tqz.12m"
-          ]
-        }
-      ]
-    },
-    {
-      "name": "qgakumon",
-      "format": "KonamiTMNT2",
-      "rom_groups": [
-        {
-          "type": "soundcpu",
-          "load_method": "append",
-          "roms": [
-            "248a01.2f"
-          ]
-        },
-        {
-          "type": "sound",
-          "load_method": "append",
-          "roms": [
-            "248a06.1d"
           ]
         }
       ]
@@ -2503,26 +2216,6 @@
           "roms": [
             "smb.11m",
             "smb.12m"
-          ]
-        }
-      ]
-    },
-    {
-      "name": "rollerg",
-      "format": "KonamiTMNT2",
-      "rom_groups": [
-        {
-          "type": "soundcpu",
-          "load_method": "append",
-          "roms": [
-            "999m01.e11"
-          ]
-        },
-        {
-          "type": "sound",
-          "load_method": "append",
-          "roms": [
-            "999h09.c5"
           ]
         }
       ]
@@ -3192,27 +2885,6 @@
       ]
     },
     {
-      "name": "simpsons",
-      "format": "KonamiTMNT2",
-      "rom_groups": [
-        {
-          "type": "soundcpu",
-          "load_method": "append",
-          "roms": [
-            "072-e03.6g"
-          ]
-        },
-        {
-          "type": "sound",
-          "load_method": "append",
-          "roms": [
-            "072-d05.1f",
-            "072-d04.1d"
-          ]
-        }
-      ]
-    },
-    {
       "name": "slammast",
       "format": "CPS2",
       "fmt_version": "CPS2_V1.01",
@@ -3521,27 +3193,6 @@
           "load_method": "append_swap16",
           "roms": [
             "kio-01m.3a"
-          ]
-        }
-      ]
-    },
-    {
-      "name": "thndrx2",
-      "format": "KonamiTMNT2",
-      "fmt_version": "tmnt2",
-      "rom_groups": [
-        {
-          "type": "soundcpu",
-          "load_method": "append",
-          "roms": [
-            "073-c01.4f"
-          ]
-        },
-        {
-          "type": "sound",
-          "load_method": "append",
-          "roms": [
-            "073-b04.2d"
           ]
         }
       ]
@@ -3937,27 +3588,6 @@
       ]
     },
     {
-      "name": "xexex",
-      "format": "KonamiTMNT2",
-      "rom_groups": [
-        {
-          "type": "soundcpu",
-          "load_method": "append",
-          "roms": [
-            "067eaa05.4e"
-          ]
-        },
-        {
-          "type": "sound",
-          "load_method": "append",
-          "roms": [
-            "067b06.3e",
-            "067b07.1e"
-          ]
-        }
-      ]
-    },
-    {
       "name": "xmcota",
       "format": "CPS2",
       "fmt_version": "CPS2_V1.05",
@@ -3984,27 +3614,6 @@
           "roms": [
             "xmn.11m",
             "xmn.12m"
-          ]
-        }
-      ]
-    },
-    {
-      "name": "xmen",
-      "format": "KonamiTMNT2",
-      "fmt_version": "tmnt2",
-      "rom_groups": [
-        {
-          "type": "soundcpu",
-          "load_method": "append",
-          "roms": [
-            "065-a01.6f"
-          ]
-        },
-        {
-          "type": "sound",
-          "load_method": "append",
-          "roms": [
-            "065-a06.1f"
           ]
         }
       ]
