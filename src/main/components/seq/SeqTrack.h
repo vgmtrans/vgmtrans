@@ -77,6 +77,11 @@ class SeqTrack : public VGMItem {
  public:
   SeqTrack(VGMSeq *parentSeqFile, uint32_t offset = 0, uint32_t length = 0, std::string name = "Track");
 
+  [[nodiscard]] bool usesLinearAmplitudeScale() const {
+    return m_useLinearAmpScale || parentSeq->usesLinearAmplitudeScale();
+  }
+  void setUseLinearAmplitudeScale(bool set) { m_useLinearAmpScale = set; }
+
   virtual bool loadTrackInit(int trackNum, MidiTrack *preparedMidiTrack);
   virtual void loadTrackMainLoop(uint32_t stopOffset, int32_t stopTime);
 
@@ -274,6 +279,7 @@ protected:
   //SETTINGS
   bool bDetermineTrackLengthEventByEvent;
   bool bWriteGenericEventAsTextEvent;
+  bool m_useLinearAmpScale = false;
 
   std::unordered_set<uint32_t> visitedAddresses;
   uint32_t visitedAddressMax;
