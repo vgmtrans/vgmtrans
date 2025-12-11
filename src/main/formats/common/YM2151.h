@@ -1,6 +1,6 @@
 #pragma once
 
-#include <sstream>
+#include <spdlog/fmt/fmt.h>
 
 struct OPMData {
   struct LFO {
@@ -41,21 +41,36 @@ struct OPMData {
   OP op[4];
 
   std::string toOPMString(int num) const {
-    std::ostringstream ss;
-    ss << "@:" << num << " " << name << "\n";
-    ss << "LFO:" << +lfo.LFRQ << "   " << +lfo.AMD << "   " << +lfo.PMD << "   " << +lfo.WF << "   " << +lfo.NFRQ << "\n";
-    ss << "CH: " << +ch.PAN << "   " << +ch.FL << "   " << +ch.CON << "   " << +ch.AMS << "   " << +ch.PMS << " " << +ch.SLOT_MASK << "   " << +ch.NE << "\n";
+    fmt::memory_buffer buf;
+    buf.reserve(350);
+    auto out = std::back_inserter(buf);
 
-    const int opIndex[4] = { 0, 2, 1, 3 };
-    const char* opNames[4] = {"M1", "C1", "M2", "C2"};
+    fmt::format_to(out, "@:{} {}\n", num, name);
+    fmt::format_to(
+        out,
+        "LFO:{}   {}   {}   {}   {}\n",
+        +lfo.LFRQ, +lfo.AMD, +lfo.PMD, +lfo.WF, +lfo.NFRQ
+    );
+    fmt::format_to(
+        out,
+        "CH: {}   {}   {}   {}   {} {}   {}\n",
+        +ch.PAN, +ch.FL, +ch.CON, +ch.AMS, +ch.PMS, +ch.SLOT_MASK, +ch.NE
+    );
+
+    const int   opIndex[4] = { 0, 2, 1, 3 };
+    const char* opNames[4] = { "M1", "C1", "M2", "C2" };
+
     for (int i = 0; i < 4; ++i) {
       const OP& op = this->op[opIndex[i]];
-      ss << opNames[i] << ": " << +op.AR << "   " << +op.D1R << "   " << +op.D2R << "   " << +op.RR << "  " << +op.D1L << "  "
-         << +op.TL << "   " << +op.KS << "   " << +op.MUL << "   " << +op.DT1 << "   " << +op.DT2 << " " << +op.AMS_EN << "\n";
+      fmt::format_to(
+          out,
+          "{}: {}   {}   {}   {}  {}  {}   {}   {}   {}   {} {}\n",
+          opNames[i], +op.AR, +op.D1R, +op.D2R, +op.RR, +op.D1L, +op.TL, +op.KS, +op.MUL, +op.DT1, +op.DT2, +op.AMS_EN
+      );
     }
-
-    return ss.str();
+    return fmt::to_string(buf);
   }
+
 
   void set_fl_con(u8 fl_con) {
     ch.FL = (fl_con >> 3) & 0b111;

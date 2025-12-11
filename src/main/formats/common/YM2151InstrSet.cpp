@@ -13,23 +13,27 @@ YM2151InstrSet::YM2151InstrSet(const std::string& format,
   : VGMInstrSet(format, file, offset, length, std::move(name)) {}
 
 std::string OPMInstrument::toOPMString(int index) const {
-  std::ostringstream ss;
-  ss << data.toOPMString(index);
+  fmt::memory_buffer buf;
+  auto out = std::back_inserter(buf);
 
+  // Base instrument data
+  fmt::format_to(out, "{}", data.toOPMString(index));
+
+  // Optional DRIVER line
   if (!driverName.empty()) {
-    ss << "DRIVER: " << driverName;
+    fmt::format_to(out, "DRIVER: {}", driverName);
     for (auto byte : driverData) {
-      ss << " " << +byte;
+      fmt::format_to(out, " {}", +byte);
     }
-    ss << "\n";
+    fmt::format_to(out, "\n");
   }
 
-  return ss.str();
+  return fmt::to_string(buf);
 }
 
 std::string YM2151InstrSet::generateOPMFile() const {
   std::ostringstream output;
-  std::string header = std::string("// Converted using VGMTrans version: ") + VGMTRANS_VERSION + "\n";
+  std::string header = std::string("// Converted using VGMTrans version: ") + VGMTRANS_REVISION + "\n";
   output << header;
 
   for (size_t i = 0; i < m_opmInstruments.size(); ++i) {
