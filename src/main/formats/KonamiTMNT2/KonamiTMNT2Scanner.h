@@ -7,7 +7,7 @@
 
 #include "Scanner.h"
 #include "BytePattern.h"
-#include <set>
+#include <vector>
 
 class KonamiTMNT2Seq;
 class MAMEGame;
