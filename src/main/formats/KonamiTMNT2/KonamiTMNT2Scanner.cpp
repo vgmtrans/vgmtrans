@@ -142,19 +142,19 @@ void KonamiTMNT2Scanner::scan(RawFile * /*file*/, void *info) {
   }
   std::vector<u32> instrPtrs;
   std::vector<u32> drumTablePtrs;
-  for (u32 offset = instrTableAddrK053260; offset < drumTableAddr; offset += 2) {
-    u32 instrInfoPtr = programRom->readShort(offset);
-    if (instrInfoPtr <= offset) {
-      break;
-    }
+  u32 minInstrPtr = std::numeric_limits<u32>::max();
+  u32 minDrumPtr =  std::numeric_limits<u32>::max();
+  for (int i = instrTableAddrK053260; i < minInstrPtr && i < drumTableAddr; i += 2) {
+    u32 instrInfoPtr = programRom->readShort(i);
+    minInstrPtr = std::min(minInstrPtr, instrInfoPtr);
     instrPtrs.push_back(instrInfoPtr);
   }
 
-  for (u32 offset = drumTableAddr;; offset += 2) {
-    u32 drumInfoPtr = programRom->readShort(offset);
-    if (drumInfoPtr <= offset) {
+  for (int i = drumTableAddr;; i += 2) {
+    u32 drumInfoPtr = programRom->readShort(i);
+    minDrumPtr = std::min(minDrumPtr, drumInfoPtr);
+    if (i == minDrumPtr)
       break;
-    }
     drumTablePtrs.push_back(drumInfoPtr);
   }
 
@@ -171,19 +171,21 @@ void KonamiTMNT2Scanner::scan(RawFile * /*file*/, void *info) {
   std::unordered_set<u32> drumInfoPtrSet {};
   for (auto drumTablePtr : drumTablePtrs) {
     std::vector<konami_tmnt2_drum_info> drumInfos;
-    std::unordered_set<u32> visitedOffsets {};
+    minDrumPtr =  std::numeric_limits<u32>::max();
     u32 i = drumTablePtr;
-    while (visitedOffsets.insert(i).second && !drumTablePtrSet.contains(i) && !drumInfoPtrSet.contains(i)) {
+    do {
       u32 drumInfoPtr = programRom->readShort(i);
-      if (drumInfoPtr <= i || drumInfoPtr > i + 0x1000) {
+      if (drumInfoPtr > i + 0x1000)
         break;
-      }
+      if (i >= minDrumPtr)
+        break;
+      minDrumPtr = std::min(minDrumPtr, drumInfoPtr);
       konami_tmnt2_drum_info info;
       programRom->readBytes(drumInfoPtr, sizeof(konami_tmnt2_drum_info), &info);
       drumInfos.push_back(info);
       drumInfoPtrSet.insert(drumInfoPtr);
       i += 2;
-    }
+    } while (!drumTablePtrSet.contains(i) && !drumInfoPtrSet.contains(i));
     drumTables.push_back(drumInfos);
   }
 
