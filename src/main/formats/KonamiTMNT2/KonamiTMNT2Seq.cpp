@@ -217,7 +217,7 @@ void KonamiTMNT2Track::onTickBegin() {
     m_noteCountdown -= 1;
 
   if (m_noteCountdown <= 0) {
-    // note has finished
+    // note not active
     return;
   }
 
@@ -583,7 +583,7 @@ bool KonamiTMNT2Track::readEvent() {
     case 0xEA:
       // Set LFO delay
       m_lfoDelay = std::max(1, readByte(curOffset++) * 2);
-      addUnknown(beginOffset, 2, fmt::format("LFO Delay {:02X}", m_lfoDelay));
+      addGenericEvent(beginOffset, 2, "LFO Delay", "", Type::Lfo);
       break;
     case 0xEB: {
       // Portamento (at least for YM2151)
