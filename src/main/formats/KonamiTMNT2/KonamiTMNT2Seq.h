@@ -31,6 +31,7 @@ class KonamiTMNT2Seq : public VGMSeq {
   void resetVars() override;
   bool parseTrackPointers() override;
   void useColl(const VGMColl* coll) override;
+  KonamiTMNT2FormatVer fmtVersion() { return m_fmtVer; }
 
   void setGlobalTranspose(s8 semitones) { m_globalTranspose = semitones; }
   s8 globalTranspose() { return m_globalTranspose; }
@@ -85,8 +86,13 @@ class KonamiTMNT2Track : public SeqTrack {
   void handleProgramChangeK053260();
   u8 calculatePan();
   void updatePan();
+  void onNoteBegin(int noteDur);
+  KonamiTMNT2FormatVer fmtVersion() {
+    return static_cast<KonamiTMNT2Seq*>(parentSeq)->fmtVersion();
+  }
 
   void resetVars() override;
+  void onTickBegin() override;
   bool readEvent() override;
 
 private:
@@ -96,7 +102,6 @@ private:
   std::optional<konami_tmnt2_drum_info> drumInfo(int tableIdx, int keyIdx) {
     return dynamic_cast<KonamiTMNT2Seq*>(parentSeq)->drumInfo(tableIdx, keyIdx);
   }
-
 
   void setPercussionModeOn() {
     addBankSelectNoItem(1);
@@ -152,6 +157,15 @@ private:
   u16 m_warpOrigin = 0;
   u16 m_warpDest = 0;
   u16 m_callOrigin[2];
+
+  int m_noteCountdown = 0;
+
+  // LFO-related
+  int m_lfoDelay = 0;              // in ticks
+  int m_lfoDelayCountdown = 0;     // reset to m_lfoDelay on note on
+  int m_lfoRampStepTicks = 0;      // ticks that must elapse before stepping LFO ramp
+  int m_lfoRampStepCountdown = 0;  //
+  u8 m_lfoRampValue = 0;
 
   // k053260-specific state
   u8 m_attenuation = 0;
