@@ -1119,6 +1119,12 @@ void SeqTrack::addModulation(uint32_t offset, uint32_t length, uint8_t depth, co
     pMidiTrack->addModulation(channel, depth);
 }
 
+void SeqTrack::addModulationNoItem(uint8_t depth) {
+  if (readMode == READMODE_CONVERT_TO_MIDI)
+    pMidiTrack->addModulation(channel, depth);
+}
+
+
 void SeqTrack::insertModulation(uint32_t offset,
                                 uint32_t length,
                                 uint8_t depth,
@@ -1138,6 +1144,11 @@ void SeqTrack::addBreath(uint32_t offset, uint32_t length, uint8_t depth, const 
   if (readMode == READMODE_ADD_TO_UI && isNewOffset)
     addEvent(new BreathSeqEvent(this, depth, offset, length, sEventName));
   else if (readMode == READMODE_CONVERT_TO_MIDI)
+    pMidiTrack->addBreath(channel, depth);
+}
+
+void SeqTrack::addBreathNoItem(uint8_t depth) {
+  if (readMode == READMODE_CONVERT_TO_MIDI)
     pMidiTrack->addBreath(channel, depth);
 }
 
