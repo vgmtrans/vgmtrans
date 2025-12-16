@@ -168,8 +168,10 @@ private:
   int m_lfoDelay = 0;              // in ticks
   int m_lfoDelayCountdown = 0;     // reset to m_lfoDelay on note on
   int m_lfoRampStepTicks = 0;      // ticks that must elapse before stepping LFO ramp
-  int m_lfoRampStepCountdown = 0;  //
-  u8 m_lfoRampValue = 0;
+  int m_lfoRampStepCountdown = 0;  // decremented each tick. At 0, increments m_lfoRampValue and
+                                   // resets to m_lfoRampStepTicks.
+  u8 m_lfoRampValue = 0;           // PMS/AMS is updated from this every time it is incremented,
+                                   // increases until note-off or maximum PMS/AMS is reached
 
   // k053260-specific state
   u8 m_attenuation = 0;
