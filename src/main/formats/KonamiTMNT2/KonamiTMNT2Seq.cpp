@@ -40,6 +40,7 @@ constexpr std::array<std::array<int, 2>, 8> K053260_PAN_MUL = {{
 constexpr double K053260_PAN_SCALE = 65536.0;
 
 constexpr double calculateTempo(std::uint8_t clkb, double clockHz, int ppqn, int tickSkipInterval) {
+  // The driver uses YM2151's Timer B to send IRQs to the Z80. It sets CLKB at startup.
   const double ticks = 1024.0 * (256.0 - static_cast<double>(clkb));
   double tempo = (60.0 * clockHz) / (static_cast<double>(ppqn) * ticks);
   if (tickSkipInterval > 0)
