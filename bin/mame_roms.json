@@ -3102,6 +3102,9 @@
         {
           "type": "soundcpu",
           "load_method": "append",
+          "attributes": {
+            "default_tick_skip_interval": "0x16"
+          },
           "roms": [
             "064e01.2f"
           ]
