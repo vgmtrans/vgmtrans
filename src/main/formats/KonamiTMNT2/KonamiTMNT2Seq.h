@@ -26,6 +26,7 @@ class KonamiTMNT2Seq : public VGMSeq {
                  uint32_t offset,
                  std::vector<u32> ym2151TrackOffsets,
                  std::vector<u32> k053260TrackOffsets,
+                 u8 defaultTickSkipInterval,
                  const std::string &name = std::string("Konami TMNT2 Seq"));
 
   void resetVars() override;
@@ -67,6 +68,9 @@ class KonamiTMNT2Seq : public VGMSeq {
   KonamiTMNT2FormatVer m_fmtVer;
   std::vector<u32> m_ym2151TrackOffsets;
   std::vector<u32> m_k053260TrackOffsets;
+  u8 m_defaultTickSkipInterval;
+
+  // state
   s8 m_globalTranspose;
   s8 m_masterAttenYM2151;
   s8 m_masterAttenK053260;
@@ -140,8 +144,8 @@ private:
   u8 m_program = 0;
   u8 m_state = 0;
   u8 m_rawBaseDur = 0;
-  u8 m_baseDur = 0;
-  u8 m_baseDurHalveBackup = 0;
+  float m_baseDur = 0;
+  float m_baseDurHalveBackup = 0;
   u8 m_extendDur = 0;
   u8 m_durSubtract = 0;
   u8 m_noteDurPercent = 0;

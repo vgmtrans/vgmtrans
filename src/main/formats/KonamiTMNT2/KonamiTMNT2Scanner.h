@@ -29,6 +29,7 @@ private:
     RawFile* programRom,
     u32 seqTableAddr,
     KonamiTMNT2FormatVer fmtVer,
+    u8 defaultTickSkipInterval,
     std::string& gameName
   );
 
