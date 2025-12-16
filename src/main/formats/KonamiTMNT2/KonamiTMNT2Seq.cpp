@@ -19,8 +19,6 @@ DECLARE_FORMAT(KonamiTMNT2);
 namespace {
 
 constexpr int PPQN = 96;
-constexpr int TICK_MULTIPLIER = 1;
-
 constexpr u8 K053260_BASE_VEL = 0x7F;
 constexpr double K053260_VOL_MUL = 1.3;
 
@@ -44,7 +42,6 @@ constexpr double K053260_PAN_SCALE = 65536.0;
 constexpr double calculateTempo(std::uint8_t clkb, double clockHz, int ppqn, int tickSkipInterval) {
   const double ticks = 1024.0 * (256.0 - static_cast<double>(clkb));
   double tempo = (60.0 * clockHz) / (static_cast<double>(ppqn) * ticks);
-  tempo *= TICK_MULTIPLIER;
   if (tickSkipInterval > 0)
     tempo *= (tickSkipInterval - 1) / static_cast<double>(tickSkipInterval);
   return tempo;
@@ -448,8 +445,6 @@ bool KonamiTMNT2Track::readEvent() {
           val = readByte(curOffset++);
         }
         m_rawBaseDur = val;
-        // We multiply the raw base duration by two so we can cleanly halve durations (for event DF)
-        m_rawBaseDur *= TICK_MULTIPLIER;
         m_baseDur = m_rawBaseDur * 3;
         m_program = readByte(curOffset++);
         // TMNT2 is weird. It has 113 FM instruments, but code to handle > 128, however, it just
@@ -466,8 +461,6 @@ bool KonamiTMNT2Track::readEvent() {
         if ((val & 0xF0) == 0) {
           m_state = val & 0xF0;
           m_rawBaseDur = val;
-          // We multiply the raw base duration by two so we can cleanly halve durations for event DF
-          m_rawBaseDur *= TICK_MULTIPLIER;
           m_baseDur = m_rawBaseDur * 3;
           m_program = readByte(curOffset++);
           addProgramChangeNoItem(m_program, false);
@@ -480,8 +473,6 @@ bool KonamiTMNT2Track::readEvent() {
         else {
           m_addedToNote = (val >> 4) - 1;
           m_rawBaseDur = val & 0xF;
-          // We multiply the raw base duration by two so we can cleanly halve durations for event DF
-          m_rawBaseDur *= TICK_MULTIPLIER;
           m_baseDur = m_rawBaseDur * 3;
           m_attenuation = readByte(curOffset++);
           setPercussionModeOn();
@@ -510,8 +501,6 @@ bool KonamiTMNT2Track::readEvent() {
     case 0xE2: {
       // Set base duration
       m_rawBaseDur = readByte(curOffset++);
-      // We multiply the raw base duration by two so we can cleanly halve durations (for event DF)
-      m_rawBaseDur *= TICK_MULTIPLIER;
       m_baseDur = m_rawBaseDur * 3;
       auto desc = fmt::format("Base Duration - {}", m_baseDur);
       addGenericEvent(beginOffset, 2, "Set Base Duration", desc, Type::DurationChange);
@@ -587,16 +576,14 @@ bool KonamiTMNT2Track::readEvent() {
       // Set YM2151 LFO ramp rate and delay (channel). This determines how many ticks to process
       // before incrementing AMS and PMS (per channel amplitude/pitch modulation sensitivity)
 
-      // multiply these time intervals by 2 as we do with other durations so that event DF
-      // can cleanly halve durations
-      m_lfoRampStepTicks = std::max(1, ((waveformAndRampInterval & 0xF0) >> 3) * TICK_MULTIPLIER);
-      m_lfoDelay = std::max(1, readByte(curOffset++) * TICK_MULTIPLIER);
+      m_lfoRampStepTicks = std::max(1, (waveformAndRampInterval & 0xF0) >> 3);
+      m_lfoDelay = std::max<int>(1, readByte(curOffset++));
       addGenericEvent(beginOffset, 6, "LFO Setup", "", Type::Lfo);
       break;
     }
     case 0xEA:
       // Set LFO delay
-      m_lfoDelay = std::max(1, readByte(curOffset++) * TICK_MULTIPLIER);
+      m_lfoDelay = std::max<int>(1, readByte(curOffset++));
       addGenericEvent(beginOffset, 2, "LFO Delay", "", Type::Lfo);
       break;
     case 0xEB: {
