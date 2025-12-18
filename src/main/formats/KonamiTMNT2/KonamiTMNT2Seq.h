@@ -152,9 +152,10 @@ private:
   u8 m_baseVol = 0;
   u8 m_dxAtten = 0;
   u8 m_dxAttenMultiplier = 1;
-  u8 m_octave = 0;
+  u8 m_noteOffset = 0;
   s8 m_transpose = 0;
   s8 m_addedToNote = 0;
+  u8 m_drumBank = 0;
   u8 m_loopCounter[2];
   u32 m_loopStartOffset[2];
   u8 m_warpCounter = 0;

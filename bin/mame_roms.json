@@ -654,6 +654,27 @@
       ]
     },
     {
+      "name": "esckids",
+      "format": "KonamiTMNT2",
+      "fmt_version": "tmnt2",
+      "rom_groups": [
+        {
+          "type": "soundcpu",
+          "load_method": "append",
+          "roms": [
+            "975f02"
+          ]
+        },
+        {
+          "type": "sound",
+          "load_method": "append",
+          "roms": [
+            "975c03"
+          ]
+        }
+      ]
+    },
+    {
       "name": "ffight",
       "format": "CPS1",
       "fmt_version": "CPS1_V2.00",
@@ -1956,6 +1977,27 @@
             "ps-q2.2k",
             "ps-q3.3k",
             "ps-q4.4k"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "punkshot",
+      "format": "KonamiTMNT2",
+      "fmt_version": "tmnt2",
+      "rom_groups": [
+        {
+          "type": "soundcpu",
+          "load_method": "append",
+          "roms": [
+            "907f01.e8"
+          ]
+        },
+        {
+          "type": "sound",
+          "load_method": "append",
+          "roms": [
+            "907d04.d3"
           ]
         }
       ]
@@ -3352,6 +3394,13 @@
         {
           "type": "soundcpu",
           "load_method": "append",
+          "attributes": {
+            "CLKB": "0xF9",
+            "ym2151_instr_table": "0x3499",
+            "k053260_instr_table": "0x4600",
+            "k053260_instr_data_table": "0x1461",
+            "k053260_drum_banks": "0x3215"
+          },
           "roms": [
             "081b02"
           ]

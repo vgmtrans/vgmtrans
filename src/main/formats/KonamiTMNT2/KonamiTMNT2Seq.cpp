@@ -142,9 +142,10 @@ void KonamiTMNT2Track::resetVars() {
   m_pan = 0;
   m_instrPan = 0;
   m_attenuation = 0;
-  m_octave = 0;
+  m_noteOffset = 0;
   m_transpose = 0;
   m_addedToNote = 0;
+  m_drumBank = 0;
   m_dxAtten = 0;
   m_dxAttenMultiplier = 1;
   memset(m_loopCounter, 0, sizeof(m_loopCounter));
@@ -297,7 +298,7 @@ bool KonamiTMNT2Track::readEvent() {
     }
     if (m_isFmTrack) {
       u8 semitones = (opcode >> 4) - 1;
-      u8 note = semitones + m_addedToNote + m_transpose + globalTranspose();
+      u8 note = semitones + m_noteOffset + m_transpose + globalTranspose();
       note += 12;
 
       u32 noteDur = dur;
@@ -315,8 +316,8 @@ bool KonamiTMNT2Track::readEvent() {
     } else {
       if (percussionMode()) {
         u8 semitones = opcode >> 4;
-        s8 note = semitones + (m_addedToNote * 16);
-        auto drum = drumInfo(m_addedToNote, semitones);
+        s8 note = semitones + (m_drumBank * 16);
+        auto drum = drumInfo(m_drumBank, semitones);
         m_baseVol = drum ? drum->volume : 0x7F;
         if (m_baseVol > 0x7F) {
           // values greater than 7F have special unimplemented behavior
@@ -335,7 +336,7 @@ bool KonamiTMNT2Track::readEvent() {
       } else {
         // Melodic
         u8 semitones = (opcode >> 4) - 1;
-        u8 note = semitones + m_addedToNote + m_transpose + globalTranspose();
+        u8 note = semitones + m_noteOffset + m_transpose + globalTranspose();
 
         u32 noteDur = dur;
         if (m_noteDurPercent > 0) {
@@ -421,7 +422,7 @@ bool KonamiTMNT2Track::readEvent() {
       m_state |= 0x20;
       addGenericEvent(beginOffset, 1, "Set Duration-related flag", "", Type::DurationChange);
       break;
-    case 0xDF:
+    case 0xDF: {
       // Halve Base Duration Toggle
       if (m_baseDurHalveBackup == 0) {
         m_baseDurHalveBackup = m_baseDur;
@@ -430,8 +431,10 @@ bool KonamiTMNT2Track::readEvent() {
         m_baseDur = m_baseDurHalveBackup;
         m_baseDurHalveBackup = 0;
       }
-      addGenericEvent(beginOffset, 1, "Halve Duration", "", Type::DurationChange);
+      auto name = fmt::format("Halve Duration {}", m_baseDurHalveBackup == 0 ? "(on)" : "(off)");
+      addGenericEvent(beginOffset, 1, name, "", Type::DurationChange);
       break;
+    }
     case 0xE0: {
       u8 val = readByte(curOffset++);
 
@@ -472,7 +475,7 @@ bool KonamiTMNT2Track::readEvent() {
           addGenericEvent(beginOffset, curOffset - beginOffset, "Program Change / Base Dur / Attenuation / State / Note Dur", "", Type::ProgramChange);
         }
         else {
-          m_addedToNote = (val >> 4) - 1;
+          m_drumBank = (val >> 4) - 1;
           m_rawBaseDur = val & 0xF;
           m_baseDur = m_rawBaseDur * 3;
           m_attenuation = readByte(curOffset++);
@@ -493,7 +496,7 @@ bool KonamiTMNT2Track::readEvent() {
           addGenericEvent(beginOffset, 2, "Percussion Mode Off", "", Type::ChangeState);
           break;
         }
-        m_addedToNote = val;
+        m_drumBank = val;
         setPercussionModeOn();
         addGenericEvent(beginOffset, 2, "Percussion Mode On", "", Type::ChangeState);
       }
@@ -657,10 +660,10 @@ bool KonamiTMNT2Track::readEvent() {
     case 0xF5:
     case 0xF6:
     case 0xF7: {
-      if (percussionMode()) {
-        m_addedToNote = (opcode & 0xF) - 1;
+      if (!m_isFmTrack && percussionMode()) {
+        m_drumBank = (opcode & 0xF) - 1;
       } else {
-        m_addedToNote = (opcode & 0xF) * 12;
+        m_noteOffset = (opcode & 0xF) * 12;
       }
       addGenericEvent(beginOffset, 1, "Set Octave", fmt::format("Octave - {}", opcode & 0xF), Type::Octave);
       break;

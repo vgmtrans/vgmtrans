@@ -140,11 +140,18 @@ void KonamiTMNT2Scanner::scan(RawFile * /*file*/, void *info) {
     gameEntry->name
   );
 
-  u16 instrTableAddrK053260 = readTableAddr(ptn_tmnt2_LoadInstrTable, 3).value_or(0);
-  u16 drumTableAddr = readTableAddr(ptn_tmnt2_LoadDrumTable, 10).value_or(0);
-  u16 instrTableAddrYM2151 = readTableAddr(ptn_tmnt2_LoadYM2151InstrTable, 9).value_or(0);
-  if (instrTableAddrYM2151 == 0) {
-    instrTableAddrYM2151 = readTableAddr(ptn_ssriders_LoadYM2151InstrTable, 3).value_or(0);
+  u32 instrTableAddrK053260, drumTableAddr, instrTableAddrYM2151;
+  if (!programRomGroup->getHexAttribute("k053260_instr_table", &instrTableAddrK053260)) {
+    instrTableAddrK053260 = readTableAddr(ptn_tmnt2_LoadInstrTable, 3).value_or(0);
+  }
+  if (!programRomGroup->getHexAttribute("k053260_drum_table", &drumTableAddr)) {
+    drumTableAddr = readTableAddr(ptn_tmnt2_LoadDrumTable, 10).value_or(0);
+  }
+  if (!programRomGroup->getHexAttribute("k053260_instr_table", &instrTableAddrYM2151)) {
+    instrTableAddrYM2151 = readTableAddr(ptn_tmnt2_LoadYM2151InstrTable, 9).value_or(0);
+    if (instrTableAddrYM2151 == 0) {
+      instrTableAddrYM2151 = readTableAddr(ptn_ssriders_LoadYM2151InstrTable, 3).value_or(0);
+    }
   }
   if (instrTableAddrK053260 == 0 || drumTableAddr == 0 || instrTableAddrYM2151 == 0) {
     return;
@@ -267,6 +274,8 @@ std::vector<KonamiTMNT2Seq*> KonamiTMNT2Scanner::loadSeqTable(
   std::set<u16> seqPtrs;
   for (u32 i = seqTableAddr; !seqPtrs.contains(i); i += 2) {
     const u16 seqPtr = programRom->readShort(i);
+    if (fmtVer == VENDETTA && seqPtrs.contains(seqPtr))
+      break;
     seqPtrs.insert(seqPtr);
     seqTable->addChild(i, 2, "Sequence Pointer");
   }
