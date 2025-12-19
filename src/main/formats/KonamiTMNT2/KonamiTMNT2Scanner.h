@@ -11,6 +11,8 @@
 
 class KonamiTMNT2Seq;
 class MAMEGame;
+struct MAMERomGroup;
+struct konami_tmnt2_drum_info;
 
 enum KonamiTMNT2FormatVer: uint8_t {
   VERSION_UNDEFINED,
@@ -23,14 +25,33 @@ class KonamiTMNT2Scanner : public VGMScanner {
  public:
   explicit KonamiTMNT2Scanner(Format* format) : VGMScanner(format) {}
 
+  std::vector<std::vector<konami_tmnt2_drum_info>> loadDrumTables(
+    RawFile* programRom,
+    std::vector<u32> drumTablePtrs,
+    u32 minDrumPtr
+  );
+
   void scan(RawFile *file, void *info) override;
+
 private:
   std::vector<KonamiTMNT2Seq*> loadSeqTable(
     RawFile* programRom,
     u32 seqTableAddr,
     KonamiTMNT2FormatVer fmtVer,
     u8 defaultTickSkipInterval,
-    std::string& gameName
+    const std::string& gameName
+  );
+  void scanTMNT2(
+    MAMERomGroup* programRomGroup,
+    MAMERomGroup* sampsRomGroup,
+    KonamiTMNT2FormatVer fmtVer,
+    const std::string& name
+  );
+  void scanVendetta(
+    MAMERomGroup* programRomGroup,
+    MAMERomGroup* sampsRomGroup,
+    KonamiTMNT2FormatVer fmtVer,
+    const std::string& name
   );
 
   static BytePattern ptn_tmnt2_LoadSeqTable;
