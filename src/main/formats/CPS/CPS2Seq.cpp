@@ -26,6 +26,8 @@ CPS2Seq::CPS2Seq(RawFile *file, uint32_t offset, CPS2FormatVer fmtVersion, std::
   setAlwaysWriteInitialVol(127);
   setAlwaysWriteInitialMonoMode(true);
   setUseLinearAmplitudeScale(true);
+  if (fmt_version >= CPS2_V200)
+    setAlwaysWriteInitialPitchBendRange(12 * 100);
 }
 
 CPS2Seq::~CPS2Seq() {

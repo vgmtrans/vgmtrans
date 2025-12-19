@@ -3,7 +3,7 @@
 #include "VGMSamp.h"
 #include "PSXSPU.h"
 
-using namespace std;
+const float defaultFFTReverbPercent = 0.5;
 
 /****************************************************************/
 /*																*/
