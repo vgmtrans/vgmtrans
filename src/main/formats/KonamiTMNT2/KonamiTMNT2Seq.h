@@ -27,6 +27,7 @@ class KonamiTMNT2Seq : public VGMSeq {
                  std::vector<u32> ym2151TrackOffsets,
                  std::vector<u32> k053260TrackOffsets,
                  u8 defaultTickSkipInterval,
+                 u8 clkb,
                  const std::string &name = std::string("Konami TMNT2 Seq"));
 
   void resetVars() override;
@@ -49,19 +50,16 @@ class KonamiTMNT2Seq : public VGMSeq {
     return std::optional {m_collContext.instrInfos[idx]};
   }
   std::optional<konami_tmnt2_drum_info> drumInfo(int tableIdx, int keyIdx) {
-    if (m_collContext.drumTables.size() <= tableIdx)
+    u8 key = (tableIdx * 16) + keyIdx;
+    if (!m_collContext.drumKeyMap.contains(key))
       return std::nullopt;
-    auto table = m_collContext.drumTables[tableIdx];
-    if (table.size() <= keyIdx)
-      return std::nullopt;
-
-    return std::optional {table[keyIdx]};
+    return m_collContext.drumKeyMap[key];
   }
 
  private:
   struct CollContext {
     std::vector<konami_tmnt2_instr_info> instrInfos;
-    std::vector<std::vector<konami_tmnt2_drum_info>> drumTables;
+    std::unordered_map<u8, konami_tmnt2_drum_info> drumKeyMap;
   };
   CollContext m_collContext;
 
@@ -69,6 +67,7 @@ class KonamiTMNT2Seq : public VGMSeq {
   std::vector<u32> m_ym2151TrackOffsets;
   std::vector<u32> m_k053260TrackOffsets;
   u8 m_defaultTickSkipInterval;
+  u8 m_clkb;
 
   // state
   s8 m_globalTranspose;

@@ -56,12 +56,15 @@ KonamiTMNT2Seq::KonamiTMNT2Seq(RawFile *file,
                                std::vector<u32> ym2151TrackOffsets,
                                std::vector<u32> k053260TrackOffsets,
                                u8 defaultTickSkipInterval,
+                               u8 clkb,
                                const std::string &name)
     : VGMSeq(KonamiTMNT2Format::name, file, offset, 0, name),
       m_fmtVer(fmtVer),
       m_ym2151TrackOffsets(std::move(ym2151TrackOffsets)),
       m_k053260TrackOffsets(std::move(k053260TrackOffsets)),
-      m_defaultTickSkipInterval(defaultTickSkipInterval) {
+      m_defaultTickSkipInterval(defaultTickSkipInterval),
+      m_clkb(clkb)
+{
   bLoadTickByTick = true;
   setPPQN(PPQN);
   setAlwaysWriteInitialVol(127);
@@ -98,20 +101,63 @@ bool KonamiTMNT2Seq::parseTrackPointers() {
 
 void KonamiTMNT2Seq::useColl(const VGMColl* coll) {
   m_collContext.instrInfos.clear();
+  m_collContext.drumKeyMap.clear();
   if (!coll)
     return;
 
   KonamiTMNT2SampleInstrSet* sampledInstrSet = nullptr;
   for (auto instrSet : coll->instrSets()) {
     sampledInstrSet = dynamic_cast<KonamiTMNT2SampleInstrSet*>(instrSet);
-    if (sampledInstrSet)
-      break;
-  }
-  if (!sampledInstrSet)
-    return;
+    if (sampledInstrSet) {
+      m_collContext.instrInfos = sampledInstrSet->instrInfos();
+      for (int i = 0; i < sampledInstrSet->drumTables().size(); ++i) {
+        auto drumBank = sampledInstrSet->drumTables()[i];
+        for (int j = 0; j < drumBank.size(); ++j) {
+          m_collContext.drumKeyMap[(i * 16) + j] = drumBank[j];
+        }
+      }
+    }
+    else {
+      auto vendettaInstrSet = dynamic_cast<KonamiVendettaSampleInstrSet*>(instrSet);
+      if (vendettaInstrSet) {
+        for (auto instr : vendettaInstrSet->instrsK053260()) {
+          auto sampInfos = vendettaInstrSet->sampleInfos();
+          if (instr.samp_info_idx >= sampInfos.size())
+            continue;
+          auto sampInfo = vendettaInstrSet->sampleInfos()[instr.samp_info_idx];
+          konami_tmnt2_instr_info tmnt2Instr = {
+            0,
+            sampInfo.length_lo, sampInfo.length_hi,
+            sampInfo.start_lo, sampInfo.start_mid, sampInfo.start_hi,
+            static_cast<u8>(0x7F - instr.attenuation),
+            0, 0, 0
+          };
+          m_collContext.instrInfos.emplace_back(tmnt2Instr);
+        }
 
-  m_collContext.instrInfos = sampledInstrSet->instrInfos();
-  m_collContext.drumTables = sampledInstrSet->drumTables();
+        for (auto drumKeyPair : vendettaInstrSet->drumKeyMap()) {
+          const konami_vendetta_drum_info& venDrum = drumKeyPair.second;
+          auto sampInfos = vendettaInstrSet->sampleInfos();
+          auto sampInfoIdx = venDrum.instr.samp_info_idx;
+          if (sampInfoIdx >= sampInfos.size())
+            continue;
+          konami_vendetta_sample_info sampInfo = sampInfos[sampInfoIdx];
+          u8 pitchLo = venDrum.pitch & 0xFF;
+          u8 pitchHi = (venDrum.pitch >> 8) & 0xFF;
+          u8 pan = venDrum.pan == -1 ? 0 : venDrum.pan;
+          konami_tmnt2_drum_info tmnt2Drum = {
+            pitchLo, pitchHi,
+            0, 0,
+            sampInfo.length_lo, sampInfo.length_hi,
+            sampInfo.start_lo, sampInfo.start_mid, sampInfo.start_hi,
+            static_cast<u8>(0x7F - venDrum.instr.attenuation),
+            0, 0, 0, pan
+          };
+          m_collContext.drumKeyMap[drumKeyPair.first] = tmnt2Drum;
+        }
+      }
+    }
+  }
 }
 
 KonamiTMNT2Track::KonamiTMNT2Track(
@@ -201,8 +247,10 @@ u8 KonamiTMNT2Track::calculatePan() {
   }
   double leftPan = static_cast<double>(K053260_PAN_MUL[k053260Pan][0]) / K053260_PAN_SCALE;
   double rightPan = static_cast<double>(K053260_PAN_MUL[k053260Pan][1]) / K053260_PAN_SCALE;
-  u8 midiPan = convertVolumeBalanceToStdMidiPan(leftPan, rightPan);
-  return midiPan;
+  if (fmtVersion() == VENDETTA)
+    return convertVolumeBalanceToStdMidiPan(rightPan, leftPan);
+  else
+    return convertVolumeBalanceToStdMidiPan(leftPan, rightPan);
 }
 
 void KonamiTMNT2Track::updatePan() {
@@ -272,7 +320,7 @@ bool KonamiTMNT2Track::readEvent() {
 
   if (opcode < 0xD0) {
     // determine duration
-    u16 dur = opcode & 0xF;
+    u16 dur = opcode & 0x0F;
     if (dur == 0)
       dur = 0x10;
     dur += m_extendDur;
@@ -306,9 +354,6 @@ bool KonamiTMNT2Track::readEvent() {
         noteDur = dur * (m_noteDurPercent / 256.0);
       }
       noteDur = std::max(1u, noteDur);
-      // YM2151 requires time between notes, otherwise it strings them together portamento style.
-      if (noteDur == dur && noteDur > 1)
-        noteDur -= 1;
 
       u8 vel = calculateVol(0x7F) * 127.0;
       onNoteBegin(noteDur);
@@ -329,8 +374,15 @@ bool KonamiTMNT2Track::readEvent() {
         u8 finalAtten = 0x7F - (calculateVol(m_baseVol) * 127.0);
         u8 vel = K053260_BASE_VEL - finalAtten;
 
-        if (m_pan == 0)
+        if (fmtVersion() == VENDETTA) {
+          if (drum->default_pan) {
+            m_pan = drum->default_pan;
+            updatePan();
+          }
+        }
+        else if (m_pan == 0)
           updatePan();
+
         onNoteBegin(dur);
         addNoteByDur(beginOffset, curOffset - beginOffset, note, vel, dur);
       } else {
