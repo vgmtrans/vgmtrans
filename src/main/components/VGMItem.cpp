@@ -93,6 +93,7 @@ bool VGMItem::isValidOffset(uint32_t offset) const {
 }
 
 VGMItem* VGMItem::addChild(VGMItem *item) {
+  item->m_vgmfile = vgmFile();
   m_children.emplace_back(item);
   return item;
 }

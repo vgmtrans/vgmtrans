@@ -3414,7 +3414,11 @@
             "k053260_instr_table": "0x4600",
             "k053260_samp_info_table": "0x1461",
             "k053260_drum_banks": "0x3215",
-            "k053260_drums": "0x3275"
+            "k053260_drums": "0x3275",
+            "load_instr_sub": "0xA05",
+            "set_pan_sub": "0x2F29",
+            "set_pitch_sub": "0xB85",
+            "note_on_sub": "0xC18"
           },
           "roms": [
             "081b02"
