@@ -25,7 +25,7 @@ bool KonamiTMNT2OPMInstrSet::parseInstrPointers() {
     u16 instrPtr = readShort(offset);
     if (instrPtr < dwOffset || instrPtr > dwOffset + 0x2000)
       break;
-    instrTableItem->addChild(offset, 2, "Instrument Pointer");
+    instrTableItem->addChild(offset, 2, fmt::format("Instrument {} Pointer", i));
 
     std::string name = fmt::format("Instrument {:03d}", i);
     konami_tmnt2_ym2151_instr instrData{};

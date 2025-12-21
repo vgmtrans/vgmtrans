@@ -71,7 +71,7 @@ bool KonamiTMNT2SampleInstrSet::parseMelodicInstrs() {
     }
     minInstrOffset = std::min(minInstrOffset, readShort(m_instrTableAddr + i * 2));
     maxInstrOffset = std::max(maxInstrOffset, readShort(m_instrTableAddr + i * 2));
-    instrTableItem->addChild(m_instrTableAddr + (i * 2), 2, fmt::format("Instr Pointer {}", i));
+    instrTableItem->addChild(m_instrTableAddr + (i * 2), 2, fmt::format("Instrument {} Pointer", i));
   }
 
   auto instrInfosItem = addChild(
@@ -102,7 +102,7 @@ bool KonamiTMNT2SampleInstrSet::parseMelodicInstrs() {
     );
     VGMRgn* rgn = new VGMRgn(instr, offset, sizeof(konami_tmnt2_instr_info));
     rgn->sampOffset = instrInfo.start();
-    rgn->sampDataLength = (instrInfo.length_msb << 8) | instrInfo.length_lsb;
+    rgn->sampDataLength = (instrInfo.length_hi << 8) | instrInfo.length_lo;
 
     instr->addRgn(rgn);
     aInstrs.push_back(instr);
@@ -118,7 +118,7 @@ double k053260_pitch_cents(uint16_t pitch_word) {
 }
 
 bool KonamiTMNT2SampleInstrSet::parseDrums() {
-  auto drumOctaveTableItem = addChild(m_drumTableAddr, m_drumTables.size() * 2, "Drum Octave Table");
+  auto drumBankTableItem = addChild(m_drumTableAddr, m_drumTables.size() * 2, "Drum Bank Table");
   u16 minDrumOffset = -1;
   u16 maxDrumOffset = 0;
   for (int i = 0; i < m_drumTables.size(); ++i) {
@@ -126,13 +126,13 @@ bool KonamiTMNT2SampleInstrSet::parseDrums() {
     u16 ptr = readShort(ptrOffset);
     minDrumOffset = std::min(minDrumOffset, ptr);
     maxDrumOffset = std::max(maxDrumOffset, ptr);
-    drumOctaveTableItem->addChild(m_drumTableAddr + (i * 2), 2, fmt::format("Drum Table Pointer {}", i));
+    drumBankTableItem->addChild(m_drumTableAddr + (i * 2), 2, fmt::format("Drum Bank {} Pointer", i));
   }
 
-  auto drumTablesItem = addChild(
+  auto drumBanksItem = addChild(
     minDrumOffset,
     (maxDrumOffset + sizeof(konami_tmnt2_drum_info)) - minDrumOffset,
-    "Drum Octaves"
+    "Drum Banks"
   );
   auto drumsItem = addChild(
     0,
@@ -146,15 +146,15 @@ bool KonamiTMNT2SampleInstrSet::parseDrums() {
   maxDrumOffset = 0;
   int drumNum = 0;
   for (u32 i = 0; i < m_drumTables.size(); ++i) {
-    u16 drumOctaveTablePtr = readShort(m_drumTableAddr + i * 2);
-    auto drumOctaveTable = m_drumTables[i];
-    auto drumOctaveItem = drumTablesItem->addChild(drumOctaveTablePtr, drumOctaveTable.size() * 2, fmt::format("Drum Octave {}", i));
-    for (int j = 0; j < drumOctaveTable.size(); ++j) {
-      u32 ptrOffset = drumOctaveTablePtr + j * 2;
+    u16 drumBankTablePtr = readShort(m_drumTableAddr + i * 2);
+    auto drumBankTable = m_drumTables[i];
+    auto drumBankItem = drumBanksItem->addChild(drumBankTablePtr, drumBankTable.size() * 2, fmt::format("Drum Bank {}", i));
+    for (int j = 0; j < drumBankTable.size(); ++j) {
+      u32 ptrOffset = drumBankTablePtr + j * 2;
       u16 ptr = readShort(ptrOffset);
       minDrumOffset = std::min(minDrumOffset, ptr);
       maxDrumOffset = std::max(maxDrumOffset, ptr);
-      drumOctaveItem->addChild(ptrOffset, 2, "Drum Pointer");
+      drumBankItem->addChild(ptrOffset, 2, "Drum Pointer");
 
       u8 flagsByte = readByte(ptr + 3);
       std::string sampleTypeStr = (flagsByte & 0x10) ? "KADPCM" : "PCM 8";

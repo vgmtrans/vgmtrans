@@ -49,10 +49,10 @@ struct konami_vendetta_drum_info {
 };
 
 struct vendetta_sub_offsets {
-  u16 load_instr;
-  u16 set_pan;
-  u16 set_pitch;
-  u16 note_on;
+  u32 load_instr;
+  u32 set_pan;
+  u32 set_pitch;
+  u32 note_on;
 };
 
 
@@ -64,17 +64,19 @@ public:
                                u32 offset,
                                u32 instrTableOffsetYM2151,
                                u32 instrTableOffsetK053260,
-                               u32 sampInfoTableOffset,
+                               u32 sampInfosOffset,
                                u32 drumBanksOffset,
                                std::map<u16, int> drumOffsetToIdx,
                                const std::vector<konami_vendetta_instr_k053260>& instrs,
                                const std::vector<konami_vendetta_sample_info>& sampInfos,
                                const std::vector<konami_vendetta_drum_info>& drumInfos,
+                               VGMItem* drumsItem,
                                std::string name,
                                KonamiTMNT2FormatVer fmtVer);
   ~KonamiVendettaSampleInstrSet() override = default;
 
   void addInstrInfoChildren(VGMItem* instrInfoItem, u32 off);
+  void addSampleInfoItems();
   bool parseInstrPointers() override;
 
   bool parseMelodicInstrs();
@@ -89,7 +91,7 @@ public:
 private:
   u32 m_instrTableOffsetYM2151;
   u32 m_instrTableOffsetK053260;
-  u32 m_sampInfoTableOffset;
+  u32 m_sampInfosOffset;
   u32 m_drumBanksOffset;
   std::map<u16, int> m_drumOffsetToIdx;
   std::vector<konami_tmnt2_ym2151_instr> m_instrsYM2151;

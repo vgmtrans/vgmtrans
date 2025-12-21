@@ -48,7 +48,8 @@ private:
   konami_vendetta_drum_info parseVendettaDrum(
     RawFile* programRom,
     u16& offset,
-    const vendetta_sub_offsets& subOffsets
+    const vendetta_sub_offsets& subOffsets,
+    VGMItem* drumItem
   );
   void scanTMNT2(
     MAMERomGroup* programRomGroup,
