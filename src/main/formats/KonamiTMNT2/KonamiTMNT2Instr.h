@@ -16,25 +16,20 @@ struct konami_tmnt2_instr_info {
   u8 release_dur_and_rate;
   u8 default_pan;
 
-private:
-  static constexpr u8 mask_adpcm   = 0b0001'0000;  // bits 2-3
-  static constexpr u8 mask_reverse = 0b0000'1000;  // bit 5
-
-public:
-  [[nodiscard]] constexpr u32 start() const noexcept {
+  constexpr u32 start() const noexcept {
     return (start_hi << 16) + (start_mid << 8) + start_lo;
   }
 
-  [[nodiscard]] constexpr u32 length() const noexcept {
+  constexpr u32 length() const noexcept {
     return (length_hi << 8) | length_lo;
   }
 
-  [[nodiscard]] constexpr bool isAdpcm() const noexcept {
-    return (flags & mask_adpcm) > 0;
+  constexpr bool isAdpcm() const noexcept {
+    return (flags & 0b0001'0000) > 0;
   }
 
-  [[nodiscard]] constexpr bool isReverse() const noexcept {
-    return (flags & mask_reverse) != 0;
+  constexpr bool isReverse() const noexcept {
+    return (flags & 0b0000'1000) != 0;
   }
 };
 
@@ -54,27 +49,25 @@ struct konami_tmnt2_drum_info {
   u8 release_dur_and_rate;
   u8 default_pan;
 
-private:
-  static constexpr u8 mask_adpcm   = 0b0001'0000;  // bits 2-3
-  static constexpr u8 mask_reverse = 0b0000'1000;  // bit 5
-
-public:
-  [[nodiscard]] constexpr u32 start() const noexcept {
+  constexpr u32 start() const noexcept {
     return (start_hi << 16) + (start_mid << 8) + start_lo;
   }
 
-  [[nodiscard]] constexpr u32 length() const noexcept {
+  constexpr u32 length() const noexcept {
     return (length_hi << 8) | length_lo;
   }
 
-  [[nodiscard]] constexpr bool isAdpcm() const noexcept {
-    return (flags & mask_adpcm) > 0;
+  constexpr bool isAdpcm() const noexcept {
+    return (flags & 0b0001'0000) > 0;
   }
 
-  [[nodiscard]] constexpr bool isReverse() const noexcept {
-    return (flags & mask_reverse) != 0;
+  constexpr bool isReverse() const noexcept {
+    return (flags & 0b0000'1000) != 0;
   }
 };
+
+
+double k053260_pitch_cents(uint16_t pitch_word);
 
 class KonamiTMNT2SampleInstrSet
     : public VGMInstrSet {
@@ -123,7 +116,7 @@ public:
       return {
         x.length(),
         x.start(),
-        x.volume,
+        0,
         x.isAdpcm(),
         x.isReverse()
       };

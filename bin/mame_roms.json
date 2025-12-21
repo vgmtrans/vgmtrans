@@ -203,6 +203,9 @@
         {
           "type": "soundcpu",
           "load_method": "append",
+          "attributes": {
+            "CLKB": "0xF2"
+          },
           "roms": [
             "060j01.f3"
           ]
@@ -661,6 +664,9 @@
         {
           "type": "soundcpu",
           "load_method": "append",
+          "attributes": {
+            "CLKB": "0xF9"
+          },
           "roms": [
             "975f02"
           ]
@@ -1989,6 +1995,9 @@
         {
           "type": "soundcpu",
           "load_method": "append",
+          "attributes": {
+            "CLKB": "0xF9"
+          },
           "roms": [
             "907f01.e8"
           ]
@@ -3145,7 +3154,8 @@
           "type": "soundcpu",
           "load_method": "append",
           "attributes": {
-            "default_tick_skip_interval": "0x16"
+            "default_tick_skip_interval": "0x16",
+            "CLKB": "0xF2"
           },
           "roms": [
             "064e01.2f"
@@ -3273,6 +3283,9 @@
         {
           "type": "soundcpu",
           "load_method": "append",
+          "attributes": {
+            "CLKB": "0xF2"
+          },
           "roms": [
             "063b01.2f"
           ]
@@ -3396,10 +3409,12 @@
           "load_method": "append",
           "attributes": {
             "CLKB": "0xF9",
+            "seq_table": "0x466e",
             "ym2151_instr_table": "0x3499",
             "k053260_instr_table": "0x4600",
-            "k053260_instr_data_table": "0x1461",
-            "k053260_drum_banks": "0x3215"
+            "k053260_samp_info_table": "0x1461",
+            "k053260_drum_banks": "0x3215",
+            "k053260_drums": "0x3275"
           },
           "roms": [
             "081b02"
@@ -3635,6 +3650,37 @@
             "tk2_q2.rom",
             "tk2_q3.rom",
             "tk2_q4.rom"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "xexex",
+      "format": "KonamiTMNT2",
+      "fmt_version": "xexex",
+      "rom_groups": [
+        {
+          "type": "soundcpu",
+          "load_method": "append",
+          "attributes": {
+            "CLKB": "0xF9",
+            "seq_table": "0x4AC6",
+            "ym2151_instr_table": "0x260E",
+            "k053260_instr_table": "0x3DCA",
+            "k053260_samp_info_table": "0x0x3DF8",
+            "k053260_drum_banks": "0x3F51",
+            "k053260_drums": "0x3F57"
+          },
+          "roms": [
+            "067eaa05.4e"
+          ]
+        },
+        {
+          "type": "sound",
+          "load_method": "append",
+          "roms": [
+            "067b06.3e",
+            "067b07.1e"
           ]
         }
       ]

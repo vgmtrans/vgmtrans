@@ -7,6 +7,8 @@
 
 #include "Scanner.h"
 #include "BytePattern.h"
+#include "KonamiVendettaInstr.h"
+
 #include <vector>
 
 class KonamiTMNT2Seq;
@@ -19,13 +21,14 @@ enum KonamiTMNT2FormatVer: uint8_t {
   TMNT2,
   SSRIDERS,
   VENDETTA,
+  XEXEX,
 };
 
 class KonamiTMNT2Scanner : public VGMScanner {
  public:
   explicit KonamiTMNT2Scanner(Format* format) : VGMScanner(format) {}
 
-  std::vector<std::vector<konami_tmnt2_drum_info>> loadDrumTables(
+  std::vector<std::vector<konami_tmnt2_drum_info>> loadDrumTablesTMNT2(
     RawFile* programRom,
     std::vector<u32> drumTablePtrs,
     u32 minDrumPtr
@@ -39,7 +42,13 @@ private:
     u32 seqTableAddr,
     KonamiTMNT2FormatVer fmtVer,
     u8 defaultTickSkipInterval,
+    u8 clkb,
     const std::string& gameName
+  );
+  konami_vendetta_drum_info parseVendettaDrum(
+    RawFile* programRom,
+    u16& offset,
+    const vendetta_sub_offsets& subOffsets
   );
   void scanTMNT2(
     MAMERomGroup* programRomGroup,
