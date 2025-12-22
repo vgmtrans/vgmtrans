@@ -122,6 +122,8 @@ void KonamiTMNT2Seq::useColl(const VGMColl* coll) {
     }
     else if (auto vendettaInstrSet = dynamic_cast<KonamiVendettaSampleInstrSet*>(instrSet)) {
       for (auto instr : vendettaInstrSet->instrsK053260()) {
+        // Adapt the combination konami_vendetta_instr_k053260 and konami_vendetta_sample_info into
+        // a konami_tmnt2_instr_info, which is a superset of the data
         auto sampInfos = vendettaInstrSet->sampleInfos();
         if (instr.samp_info_idx >= sampInfos.size())
           continue;
@@ -136,6 +138,8 @@ void KonamiTMNT2Seq::useColl(const VGMColl* coll) {
         m_collContext.instrInfos.emplace_back(tmnt2Instr);
       }
 
+      // Adapt the konami_vendetta_drum_info and konami_vendetta_sample_info into a
+      // a konami_tmnt2_drum_info, which is a superset of the data
       for (auto drumKeyPair : vendettaInstrSet->drumKeyMap()) {
         const konami_vendetta_drum_info& venDrum = drumKeyPair.second;
         auto sampInfos = vendettaInstrSet->sampleInfos();
