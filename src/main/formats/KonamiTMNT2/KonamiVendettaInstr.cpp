@@ -18,11 +18,10 @@ KonamiVendettaSampleInstrSet::KonamiVendettaSampleInstrSet(
   u32 instrTableOffsetK053260,
   u32 sampInfosOffset,
   u32 drumBanksOffset,
-  std::map<u16, int> drumOffsetToIdx,
+  u32 drumsOffset,
+  vendetta_sub_offsets subOffsets,
   const std::vector<konami_vendetta_instr_k053260>& instrs,
   const std::vector<konami_vendetta_sample_info>& sampInfos,
-  const std::vector<konami_vendetta_drum_info>& drumInfos,
-  VGMItem* drumsItem,
   std::string name,
   KonamiTMNT2FormatVer fmtVer
   ) : VGMInstrSet(KonamiTMNT2Format::name, file, offset, 0, std::move(name)),
@@ -30,15 +29,13 @@ KonamiVendettaSampleInstrSet::KonamiVendettaSampleInstrSet(
       m_instrTableOffsetK053260(instrTableOffsetK053260),
       m_sampInfosOffset(sampInfosOffset),
       m_drumBanksOffset(drumBanksOffset),
-      m_drumOffsetToIdx(drumOffsetToIdx),
+      m_drumsOffset(drumsOffset),
+      m_subOffsets(subOffsets),
       m_instrsK053260(instrs),
       m_sampInfos(sampInfos),
-      m_drumInfos(drumInfos),
       m_fmtVer(fmtVer)
 {
-  addChild(drumsItem);
 }
-
 
 void KonamiVendettaSampleInstrSet::addInstrInfoChildren(VGMItem* instrInfoItem, u32 off) {
   std::string sampleTypeStr;
@@ -145,9 +142,31 @@ bool KonamiVendettaSampleInstrSet::parseMelodicInstrs() {
 }
 
 bool KonamiVendettaSampleInstrSet::parseDrums() {
-  if (m_drumInfos.size() == 0)
+
+  std::vector<konami_vendetta_drum_info> drumInfos;
+
+  // Load Drums. Drums end at YM2151 Instr Table
+  VGMItem* drumsItem = new VGMItem(nullptr, m_drumsOffset, 0, "Drums");
+
+  std::map<u16, int> drumOffsetToIdx;
+  int drumIdx = 0;
+  for (u16 i = m_drumsOffset; i < m_instrTableOffsetYM2151; ) {
+    VGMItem* drumItem = drumsItem->addChild(i, 0, fmt::format("Drum {}", drumIdx));
+    auto instrData = drumItem->addChild(i, 3, "Instrument Data");
+    instrData->addChild(i, 1, "Sample Info Index");
+    instrData->addChild(i + 1, 1, "Attenuation");
+    instrData->addUnknownChild(i + 2, 1);
+    // track the drum's code offset (+3) to its index as this is how each drum in a bank is referenced
+    drumOffsetToIdx[i + 3] = drumIdx++;
+    auto drumInfo = parseVendettaDrum(rawFile(), i, m_subOffsets, drumItem);
+    drumInfos.emplace_back(drumInfo);
+  }
+  auto lastDrum = drumsItem->children().back();
+  drumsItem->unLength = (lastDrum->dwOffset + lastDrum->unLength) - m_drumsOffset;
+
+  if (drumInfos.size() == 0)
     return false;
-  u16 drumsOffset = m_drumOffsetToIdx.begin()->first - 3;
+  u16 drumsOffset = drumOffsetToIdx.begin()->first - 3;
   int numDrumTables = (drumsOffset - m_drumBanksOffset) / 0x20;
 
   auto drumBanksItem = addChild(m_drumBanksOffset, numDrumTables * 0x20, "Drum Banks");
@@ -157,7 +176,6 @@ bool KonamiVendettaSampleInstrSet::parseDrums() {
   int drumNum = 0;
   for (u32 i = 0; i < numDrumTables; ++i) {
     u16 drumBankPtr = m_drumBanksOffset + (i * 0x20);
-    // auto drumOctaveTable = m_drumTables[i];
     auto drumBankItem = drumBanksItem->addChild(drumBankPtr, 0x20, fmt::format("Drum Bank {}", i));
     for (int j = 0; j < 16; ++j) {
       u32 ptrOffset = drumBankPtr + j * 2;
@@ -168,16 +186,16 @@ bool KonamiVendettaSampleInstrSet::parseDrums() {
 
       drumBankItem->addChild(ptrOffset, 2, "Drum Pointer");
 
-      int drumIdx = m_drumOffsetToIdx[ptr];
-      const konami_vendetta_drum_info& drumInfo = m_drumInfos[drumIdx];
+      int drumIdx = drumOffsetToIdx[ptr];
+      const konami_vendetta_drum_info& drumInfo = drumInfos[drumIdx];
       m_drumKeyMap[(i * 16) + j] = drumInfo;
 
-      VGMRgn* rgn = new VGMRgn(drumKit, ptr - 3, 3);//sizeof(konami_tmnt2_drum_info));
+      VGMRgn* rgn = new VGMRgn(drumKit, ptr - 3, 3);
       auto sampInfoIdx = drumInfo.instr.samp_info_idx;
       auto sampInfo = m_sampInfos[sampInfoIdx];
       rgn->sampOffset = sampInfo.start();
       rgn->sampDataLength = sampInfo.length();
-      u8 key = (i * 16) + j;      // drum tables use base 1
+      u8 key = (i * 16) + j;
       rgn->keyLow = key;
       rgn->keyHigh = key;
       rgn->unityKey = key;
@@ -193,4 +211,69 @@ bool KonamiVendettaSampleInstrSet::parseDrums() {
   }
   aInstrs.emplace_back(drumKit);
   return true;
+}
+
+konami_vendetta_drum_info KonamiVendettaSampleInstrSet::parseVendettaDrum(
+  RawFile* programRom,
+  u16& offset,
+  const vendetta_sub_offsets& subOffsets,
+  VGMItem* drumItem
+) {
+  // Each drum is defined by a 3 byte instrument data block, followed by actual Z80 instructions
+  // We will store the meaning of those instructions in a konami_vendetta_drum_info instance.
+  konami_vendetta_drum_info drumInfo;
+  offset += sizeof(konami_vendetta_instr_k053260);
+  u16 hl = 0;
+  u8 a = 0;
+  while (offset < programRom->size()) {
+    u8 opcode = programRom->readByte(offset);
+    switch (opcode) {
+      case 0x21:    // LD HL <data> - loads the instr table offset or the pitch
+        hl = programRom->readShort(offset + 1);
+        drumItem->addChild(offset, 3, fmt::format("Instruction - LD HL {:02X}", hl));
+        offset += 3;
+        break;
+
+      case 0x3E:    // LD A <data> - loads the pan value
+        a = programRom->readByte(offset + 1);
+        drumItem->addChild(offset, 2, fmt::format("Instruction - LD A {:X}", a));
+        offset += 2;
+        break;
+
+      case 0xCD: {
+        // CALL <addr> - calls a subroutine
+        u16 dest = programRom->readShort(offset + 1);
+        if (dest == subOffsets.load_instr) {
+          programRom->readBytes(hl, sizeof(konami_vendetta_instr_k053260), &drumInfo.instr);
+          drumItem->addChild(offset, 3, fmt::format("Instruction - CALL load_instrument"));
+        } else if (dest == subOffsets.set_pan) {
+          drumInfo.pan = a;
+          drumItem->addChild(offset, 3, fmt::format("Instruction - CALL set_pan"));
+        } else if (dest == subOffsets.set_pitch) {
+          drumInfo.pitch = hl;
+          drumItem->addChild(offset, 3, fmt::format("Instruction - CALL set_pitch"));
+        } else if (dest == subOffsets.note_on) {
+          drumItem->addChild(offset, 3, fmt::format("Instruction - CALL note_on"));
+        }
+        offset += 3;
+        break;
+      }
+
+      case 0xC3: {
+        // JP - sets the drum ptr to state and we're done
+        u16 dest = programRom->readShort(offset + 1);
+        drumItem->addChild(offset, 3, fmt::format("Instruction - JP {:02X}", dest));
+        offset += 3;
+        drumItem->unLength = offset - drumItem->dwOffset;
+        return drumInfo;
+      }
+      default: {
+        L_WARN("Unknown opcode {:02X} in KonamiTMNT2 drum table parse", opcode);
+        offset += 1;
+        break;
+      }
+    }
+  }
+  drumItem->unLength = offset - drumItem->dwOffset;
+  return drumInfo;
 }
