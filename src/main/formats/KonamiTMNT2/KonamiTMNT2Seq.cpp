@@ -643,16 +643,28 @@ bool KonamiTMNT2Track::readEvent() {
 
       // Set YM2151 LFO ramp rate and delay (channel). This determines how many ticks to process
       // before incrementing AMS and PMS (per channel amplitude/pitch modulation sensitivity)
-
-      m_lfoRampStepTicks = std::max(1, (waveformAndRampInterval & 0xF0) >> 3);
-      m_lfoDelay = std::max<int>(1, readByte(curOffset++));
+      if (fmtVersion() == VENDETTA) {
+        // The driver divides this value by 2, but we're ignoring the driver's doubling of durations,
+        // so this should be divided by 4.
+        m_lfoRampStepTicks = readByte(curOffset++) / 4;
+      } else {
+        m_lfoRampStepTicks = std::max(1, (waveformAndRampInterval & 0xF0) >> 3);
+        m_lfoDelay = std::max<int>(1, readByte(curOffset++));
+      }
       addGenericEvent(beginOffset, 6, "LFO Setup", "", Type::Lfo);
       break;
     }
     case 0xEA:
-      // Set LFO delay
-      m_lfoDelay = std::max<int>(1, readByte(curOffset++));
-      addGenericEvent(beginOffset, 2, "LFO Delay", "", Type::Lfo);
+      // Set LFO delay or LFO ramp interval (Vendetta)
+      if (fmtVersion() == VENDETTA) {
+        // The driver divides this value by 2, but we're ignoring the driver's doubling of durations,
+        // so this should be divided by 4.
+        m_lfoRampStepTicks = readByte(curOffset++) / 4;
+        addGenericEvent(beginOffset, 2, "LFO Ramp Interval", "", Type::Lfo);
+      } else {
+        m_lfoDelay = std::max<int>(1, readByte(curOffset++));
+        addGenericEvent(beginOffset, 2, "LFO Delay", "", Type::Lfo);
+      }
       break;
     case 0xEB: {
       // Portamento (at least for YM2151)
