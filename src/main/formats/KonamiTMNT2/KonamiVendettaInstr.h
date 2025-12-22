@@ -9,6 +9,7 @@
 #include "VGMInstrSet.h"
 #include "KonamiTMNT2Instr.h"
 #include "KonamiTMNT2OPMInstr.h"
+#include <unordered_map>
 
 class RawFile;
 class VGMItem;
