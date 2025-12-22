@@ -271,7 +271,8 @@ void KonamiTMNT2Track::handleProgramChangeK053260() {
   if (!percussionMode()) {
     std::optional<konami_tmnt2_instr_info> info = instrInfo(m_program);
     if (info) {
-      m_noteDurPercent = info->note_dur;
+      if (info->note_dur)
+        m_noteDurPercent = info->note_dur;
       m_instrPan = info->default_pan;
       m_baseVol = info->volume & 0x7F;
       // There is special behavior when volume > 0x7F, but we'll ignore it for now
