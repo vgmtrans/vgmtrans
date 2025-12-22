@@ -105,56 +105,51 @@ void KonamiTMNT2Seq::useColl(const VGMColl* coll) {
   if (!coll)
     return;
 
-  KonamiTMNT2SampleInstrSet* sampledInstrSet = nullptr;
   for (auto instrSet : coll->instrSets()) {
-    sampledInstrSet = dynamic_cast<KonamiTMNT2SampleInstrSet*>(instrSet);
-    if (sampledInstrSet) {
-      m_collContext.instrInfos = sampledInstrSet->instrInfos();
-      for (int i = 0; i < sampledInstrSet->drumTables().size(); ++i) {
-        auto drumBank = sampledInstrSet->drumTables()[i];
+    if (auto* tmnt2InstrSet = dynamic_cast<KonamiTMNT2SampleInstrSet*>(instrSet)) {
+      m_collContext.instrInfos = tmnt2InstrSet->instrInfos();
+      for (int i = 0; i < tmnt2InstrSet->drumTables().size(); ++i) {
+        auto drumBank = tmnt2InstrSet->drumTables()[i];
         for (int j = 0; j < drumBank.size(); ++j) {
           m_collContext.drumKeyMap[(i * 16) + j] = drumBank[j];
         }
       }
     }
-    else {
-      auto vendettaInstrSet = dynamic_cast<KonamiVendettaSampleInstrSet*>(instrSet);
-      if (vendettaInstrSet) {
-        for (auto instr : vendettaInstrSet->instrsK053260()) {
-          auto sampInfos = vendettaInstrSet->sampleInfos();
-          if (instr.samp_info_idx >= sampInfos.size())
-            continue;
-          auto sampInfo = vendettaInstrSet->sampleInfos()[instr.samp_info_idx];
-          konami_tmnt2_instr_info tmnt2Instr = {
-            0,
-            sampInfo.length_lo, sampInfo.length_hi,
-            sampInfo.start_lo, sampInfo.start_mid, sampInfo.start_hi,
-            static_cast<u8>(0x7F - instr.attenuation),
-            0, 0, 0
-          };
-          m_collContext.instrInfos.emplace_back(tmnt2Instr);
-        }
+    else if (auto vendettaInstrSet = dynamic_cast<KonamiVendettaSampleInstrSet*>(instrSet)) {
+      for (auto instr : vendettaInstrSet->instrsK053260()) {
+        auto sampInfos = vendettaInstrSet->sampleInfos();
+        if (instr.samp_info_idx >= sampInfos.size())
+          continue;
+        auto sampInfo = vendettaInstrSet->sampleInfos()[instr.samp_info_idx];
+        konami_tmnt2_instr_info tmnt2Instr = {
+          0,
+          sampInfo.length_lo, sampInfo.length_hi,
+          sampInfo.start_lo, sampInfo.start_mid, sampInfo.start_hi,
+          static_cast<u8>(0x7F - instr.attenuation),
+          0, 0, 0
+        };
+        m_collContext.instrInfos.emplace_back(tmnt2Instr);
+      }
 
-        for (auto drumKeyPair : vendettaInstrSet->drumKeyMap()) {
-          const konami_vendetta_drum_info& venDrum = drumKeyPair.second;
-          auto sampInfos = vendettaInstrSet->sampleInfos();
-          auto sampInfoIdx = venDrum.instr.samp_info_idx;
-          if (sampInfoIdx >= sampInfos.size())
-            continue;
-          konami_vendetta_sample_info sampInfo = sampInfos[sampInfoIdx];
-          u8 pitchLo = venDrum.pitch & 0xFF;
-          u8 pitchHi = (venDrum.pitch >> 8) & 0xFF;
-          u8 pan = venDrum.pan == -1 ? 0 : venDrum.pan;
-          konami_tmnt2_drum_info tmnt2Drum = {
-            pitchLo, pitchHi,
-            0, 0,
-            sampInfo.length_lo, sampInfo.length_hi,
-            sampInfo.start_lo, sampInfo.start_mid, sampInfo.start_hi,
-            static_cast<u8>(0x7F - venDrum.instr.attenuation),
-            0, 0, 0, pan
-          };
-          m_collContext.drumKeyMap[drumKeyPair.first] = tmnt2Drum;
-        }
+      for (auto drumKeyPair : vendettaInstrSet->drumKeyMap()) {
+        const konami_vendetta_drum_info& venDrum = drumKeyPair.second;
+        auto sampInfos = vendettaInstrSet->sampleInfos();
+        auto sampInfoIdx = venDrum.instr.samp_info_idx;
+        if (sampInfoIdx >= sampInfos.size())
+          continue;
+        konami_vendetta_sample_info sampInfo = sampInfos[sampInfoIdx];
+        u8 pitchLo = venDrum.pitch & 0xFF;
+        u8 pitchHi = (venDrum.pitch >> 8) & 0xFF;
+        u8 pan = venDrum.pan == -1 ? 0 : venDrum.pan;
+        konami_tmnt2_drum_info tmnt2Drum = {
+          pitchLo, pitchHi,
+          0, 0,
+          sampInfo.length_lo, sampInfo.length_hi,
+          sampInfo.start_lo, sampInfo.start_mid, sampInfo.start_hi,
+          static_cast<u8>(0x7F - venDrum.instr.attenuation),
+          0, 0, 0, pan
+        };
+        m_collContext.drumKeyMap[drumKeyPair.first] = tmnt2Drum;
       }
     }
   }
