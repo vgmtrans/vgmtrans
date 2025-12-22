@@ -39,12 +39,23 @@ constexpr std::array<std::array<int, 2>, 8> K053260_PAN_MUL = {{
 
 constexpr double K053260_PAN_SCALE = 65536.0;
 
-constexpr double calculateTempo(std::uint8_t clkb, double clockHz, int ppqn, int tickSkipInterval) {
+constexpr double calculateTempo(
+  std::uint8_t clkb,
+  double clockHz,
+  int ppqn,
+  int tickSkipInterval,
+  KonamiTMNT2FormatVer fmtVer
+) {
   // The driver uses YM2151's Timer B to send IRQs to the Z80. It sets CLKB at startup.
   const double ticks = 1024.0 * (256.0 - static_cast<double>(clkb));
   double tempo = (60.0 * clockHz) / (static_cast<double>(ppqn) * ticks);
   if (tickSkipInterval > 0)
     tempo *= (tickSkipInterval - 1) / static_cast<double>(tickSkipInterval);
+
+  // Note that the VENDETTA driver effective doubles duration, but it's easier to handle this by
+  // halving tempo, as it otherwise complicates our tick by tick handling
+  if (fmtVer == VENDETTA)
+    tempo /= 2.0;
   return tempo;
 }
 
@@ -69,7 +80,7 @@ KonamiTMNT2Seq::KonamiTMNT2Seq(RawFile *file,
   setPPQN(PPQN);
   setAlwaysWriteInitialVol(127);
   setAlwaysWriteInitialExpression(127);
-  double tempo = calculateTempo(m_clkb, YM2151_CLOCK_RATE, PPQN, m_defaultTickSkipInterval);
+  double tempo = calculateTempo(m_clkb, YM2151_CLOCK_RATE, PPQN, m_defaultTickSkipInterval, fmtVer);
   setAlwaysWriteInitialTempo(tempo);
   setAllowDiscontinuousTrackData(true);
 }
@@ -329,9 +340,11 @@ bool KonamiTMNT2Track::readEvent() {
       dur = 0x10;
     dur += m_extendDur;
     m_extendDur = 0;
+    // Note that the Vendetta driver effectively doubles duration in the sub at 0x2EDD, but it's
+    // easier to handle this by halving tempo as it would complicate tick by tick code
     if ((m_state & 0x20) != 0) {
       dur *= 3;
-      m_state |= 0x40;             // set bit 6
+      m_state |= 0x40;           // set bit 6
       m_state &= (0xFF ^ 0x20);    // reset bit 5
       m_durSubtract = dur;
       // TODO? stores duration value in chan_state[0x67]
@@ -498,7 +511,7 @@ bool KonamiTMNT2Track::readEvent() {
         m_state |= 4;
         if (val == 0) {
           u8 tickSkip = readByte(curOffset++);
-          double tempo = calculateTempo(clkb(), YM2151_CLOCK_RATE, PPQN, tickSkip);
+          double tempo = calculateTempo(clkb(), YM2151_CLOCK_RATE, PPQN, tickSkip, fmtVersion());
           addTempoBPMNoItem(tempo);
 
           // byte effectively sets ppqn / tempo. Still need to hammer this down
