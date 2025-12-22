@@ -657,30 +657,6 @@
       ]
     },
     {
-      "name": "esckids",
-      "format": "KonamiTMNT2",
-      "fmt_version": "tmnt2",
-      "rom_groups": [
-        {
-          "type": "soundcpu",
-          "load_method": "append",
-          "attributes": {
-            "CLKB": "0xF9"
-          },
-          "roms": [
-            "975f02"
-          ]
-        },
-        {
-          "type": "sound",
-          "load_method": "append",
-          "roms": [
-            "975c03"
-          ]
-        }
-      ]
-    },
-    {
       "name": "ffight",
       "format": "CPS1",
       "fmt_version": "CPS1_V2.00",
@@ -1983,30 +1959,6 @@
             "ps-q2.2k",
             "ps-q3.3k",
             "ps-q4.4k"
-          ]
-        }
-      ]
-    },
-    {
-      "name": "punkshot",
-      "format": "KonamiTMNT2",
-      "fmt_version": "tmnt2",
-      "rom_groups": [
-        {
-          "type": "soundcpu",
-          "load_method": "append",
-          "attributes": {
-            "CLKB": "0xF9"
-          },
-          "roms": [
-            "907f01.e8"
-          ]
-        },
-        {
-          "type": "sound",
-          "load_method": "append",
-          "roms": [
-            "907d04.d3"
           ]
         }
       ]
@@ -3654,37 +3606,6 @@
             "tk2_q2.rom",
             "tk2_q3.rom",
             "tk2_q4.rom"
-          ]
-        }
-      ]
-    },
-    {
-      "name": "xexex",
-      "format": "KonamiTMNT2",
-      "fmt_version": "xexex",
-      "rom_groups": [
-        {
-          "type": "soundcpu",
-          "load_method": "append",
-          "attributes": {
-            "CLKB": "0xF9",
-            "seq_table": "0x4AC6",
-            "ym2151_instr_table": "0x260E",
-            "k053260_instr_table": "0x3DCA",
-            "k053260_samp_info_table": "0x0x3DF8",
-            "k053260_drum_banks": "0x3F51",
-            "k053260_drums": "0x3F57"
-          },
-          "roms": [
-            "067eaa05.4e"
-          ]
-        },
-        {
-          "type": "sound",
-          "load_method": "append",
-          "roms": [
-            "067b06.3e",
-            "067b07.1e"
           ]
         }
       ]
