@@ -69,7 +69,7 @@ KonamiTMNT2Seq::KonamiTMNT2Seq(RawFile *file,
   setPPQN(PPQN);
   setAlwaysWriteInitialVol(127);
   setAlwaysWriteInitialExpression(127);
-  double tempo = calculateTempo(YM2151_CLKB, YM2151_CLOCK_RATE, PPQN, m_defaultTickSkipInterval);
+  double tempo = calculateTempo(m_clkb, YM2151_CLOCK_RATE, PPQN, m_defaultTickSkipInterval);
   setAlwaysWriteInitialTempo(tempo);
   setAllowDiscontinuousTrackData(true);
 }
@@ -498,7 +498,7 @@ bool KonamiTMNT2Track::readEvent() {
         m_state |= 4;
         if (val == 0) {
           u8 tickSkip = readByte(curOffset++);
-          double tempo = calculateTempo(YM2151_CLKB, YM2151_CLOCK_RATE, PPQN, tickSkip);
+          double tempo = calculateTempo(clkb(), YM2151_CLOCK_RATE, PPQN, tickSkip);
           addTempoBPMNoItem(tempo);
 
           // byte effectively sets ppqn / tempo. Still need to hammer this down

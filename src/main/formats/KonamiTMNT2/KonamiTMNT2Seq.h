@@ -34,6 +34,7 @@ class KonamiTMNT2Seq : public VGMSeq {
   bool parseTrackPointers() override;
   void useColl(const VGMColl* coll) override;
   KonamiTMNT2FormatVer fmtVersion() { return m_fmtVer; }
+  u8 clkb() { return m_clkb; }
 
   void setGlobalTranspose(s8 semitones) { m_globalTranspose = semitones; }
   s8 globalTranspose() { return m_globalTranspose; }
@@ -92,6 +93,9 @@ class KonamiTMNT2Track : public SeqTrack {
   void onNoteBegin(int noteDur);
   KonamiTMNT2FormatVer fmtVersion() {
     return static_cast<KonamiTMNT2Seq*>(parentSeq)->fmtVersion();
+  }
+  u8 clkb() {
+    return static_cast<KonamiTMNT2Seq*>(parentSeq)->clkb();
   }
 
   void resetVars() override;
