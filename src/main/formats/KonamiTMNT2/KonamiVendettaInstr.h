@@ -66,11 +66,10 @@ public:
                                u32 instrTableOffsetK053260,
                                u32 sampInfosOffset,
                                u32 drumBanksOffset,
-                               std::map<u16, int> drumOffsetToIdx,
+                               u32 drumsOffset,
+                               vendetta_sub_offsets subOffsets,
                                const std::vector<konami_vendetta_instr_k053260>& instrs,
                                const std::vector<konami_vendetta_sample_info>& sampInfos,
-                               const std::vector<konami_vendetta_drum_info>& drumInfos,
-                               VGMItem* drumsItem,
                                std::string name,
                                KonamiTMNT2FormatVer fmtVer);
   ~KonamiVendettaSampleInstrSet() override = default;
@@ -82,10 +81,16 @@ public:
   bool parseMelodicInstrs();
   bool parseDrums();
 
+  konami_vendetta_drum_info parseVendettaDrum(
+    RawFile* programRom,
+    u16& offset,
+    const vendetta_sub_offsets& subOffsets,
+    VGMItem* drumItem
+  );
+
   const std::vector<konami_vendetta_instr_k053260> instrsK053260() { return m_instrsK053260; }
   const std::vector<konami_tmnt2_ym2151_instr> instrsYM2151() { return m_instrsYM2151; }
   const std::vector<konami_vendetta_sample_info> sampleInfos() { return m_sampInfos; }
-  const std::vector<konami_vendetta_drum_info> drumInfos() { return m_drumInfos; }
   const std::unordered_map<u8, konami_vendetta_drum_info> drumKeyMap() { return m_drumKeyMap; }
 
 private:
@@ -93,11 +98,11 @@ private:
   u32 m_instrTableOffsetK053260;
   u32 m_sampInfosOffset;
   u32 m_drumBanksOffset;
-  std::map<u16, int> m_drumOffsetToIdx;
+  u32 m_drumsOffset;
+  vendetta_sub_offsets m_subOffsets;
   std::vector<konami_tmnt2_ym2151_instr> m_instrsYM2151;
   std::vector<konami_vendetta_instr_k053260> m_instrsK053260;
   std::vector<konami_vendetta_sample_info> m_sampInfos;
-  std::vector<konami_vendetta_drum_info> m_drumInfos;
   std::unordered_map<u8, konami_vendetta_drum_info> m_drumKeyMap;
 
   KonamiTMNT2FormatVer m_fmtVer;
