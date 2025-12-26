@@ -65,10 +65,6 @@ void KonamiTMNT2Seq::resetVars() {
 }
 
 bool KonamiTMNT2Seq::parseTrackPointers() {
-  // if (m_ym2151TrackOffsets.size() == 8) {
-  //   auto *track = new KonamiTMNT2Track(true, this, m_ym2151TrackOffsets[6], 0, "FM Track");
-  //   aTracks.push_back(track);
-  // } else {
   for (int i = 0; i < m_ym2151TrackOffsets.size(); ++i) {
     auto offset = m_ym2151TrackOffsets[i];
     auto name = fmt::format("FM Track {}", i);
@@ -81,7 +77,6 @@ bool KonamiTMNT2Seq::parseTrackPointers() {
     auto *track = new KonamiTMNT2Track(false, this, offset, 0, name);
     aTracks.push_back(track);
   }
-  // }
 
   nNumTracks = static_cast<uint32_t>(aTracks.size());
   return nNumTracks > 0;

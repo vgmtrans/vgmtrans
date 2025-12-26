@@ -103,7 +103,6 @@ bool KonamiTMNT2SampleInstrSet::parseMelodicInstrs() {
     VGMRgn* rgn = new VGMRgn(instr, offset, sizeof(konami_tmnt2_instr_info));
     rgn->sampOffset = instrInfo.start();
     rgn->sampDataLength = (instrInfo.length_msb << 8) | instrInfo.length_lsb;
-    // rgn->setVolume((instrInfo.volume & 0x7F) / 127.0);
 
     instr->addRgn(rgn);
     aInstrs.push_back(instr);
@@ -188,7 +187,6 @@ bool KonamiTMNT2SampleInstrSet::parseDrums() {
       double relativePitchCents = k053260_pitch_cents((drumInfo.pitch_hi << 8) + drumInfo.pitch_lo);
       rgn->coarseTune = relativePitchCents / 100;
       rgn->fineTune = static_cast<int>(relativePitchCents) % 100;
-      // rgn->setVolume((drumInfo.volume & 0x7F) / 127.0);
 
       drumKit->addRgn(rgn);
       drumNum += 1;
