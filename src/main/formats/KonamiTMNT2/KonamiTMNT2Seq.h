@@ -23,7 +23,8 @@ class KonamiTMNT2Seq : public VGMSeq {
 
   KonamiTMNT2Seq(RawFile *file,
                  KonamiTMNT2FormatVer fmtVer,
-                 uint32_t offset,
+                 u32 offset,
+                 u32 bankOffset,
                  std::vector<u32> ym2151TrackOffsets,
                  std::vector<u32> k053260TrackOffsets,
                  u8 defaultTickSkipInterval,
@@ -35,6 +36,7 @@ class KonamiTMNT2Seq : public VGMSeq {
   void useColl(const VGMColl* coll) override;
   KonamiTMNT2FormatVer fmtVersion() { return m_fmtVer; }
   u8 clkb() { return m_clkb; }
+  u32 bankOffset() { return m_bankOffset; }
 
   void setGlobalTranspose(s8 semitones) { m_globalTranspose = semitones; }
   s8 globalTranspose() { return m_globalTranspose; }
@@ -65,6 +67,7 @@ class KonamiTMNT2Seq : public VGMSeq {
   CollContext m_collContext;
 
   KonamiTMNT2FormatVer m_fmtVer;
+  u32 m_bankOffset;
   std::vector<u32> m_ym2151TrackOffsets;
   std::vector<u32> m_k053260TrackOffsets;
   u8 m_defaultTickSkipInterval;
@@ -97,6 +100,7 @@ class KonamiTMNT2Track : public SeqTrack {
   u8 clkb() {
     return static_cast<KonamiTMNT2Seq*>(parentSeq)->clkb();
   }
+  u32 bankOffset() { return static_cast<KonamiTMNT2Seq*>(parentSeq)->bankOffset(); }
 
   void resetVars() override;
   void onTickBegin() override;
@@ -162,9 +166,9 @@ private:
   u8 m_loopCounter[2];
   u32 m_loopStartOffset[2];
   u8 m_warpCounter = 0;
-  u16 m_warpOrigin = 0;
-  u16 m_warpDest = 0;
-  u16 m_callOrigin[2];
+  u32 m_warpOrigin = 0;
+  u32 m_warpDest = 0;
+  u32 m_callOrigin[2];
 
   int m_noteCountdown = 0;
 

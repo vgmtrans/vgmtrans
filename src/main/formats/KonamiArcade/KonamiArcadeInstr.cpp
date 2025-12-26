@@ -4,6 +4,8 @@
  * refer to the included LICENSE.txt file
  */
 #include "KonamiArcadeInstr.h"
+
+#include "K054539.h"
 #include "KonamiAdpcm.h"
 #include "LogManager.h"
 #include "VGMRgn.h"
@@ -39,13 +41,13 @@ void KonamiArcadeInstrSet::addSampleInfoChildren(VGMItem* sampInfoItem, u32 off)
   std::string sampleTypeStr;
   u8 flagsByte = readByte(off + 6);
   switch (flagsByte & 0xc) {
-    case static_cast<int>(konami_mw_sample_info::sample_type::PCM_8):
+    case static_cast<int>(k054539_sample_type::PCM_8):
       sampleTypeStr = "PCM 8";
       break;
-    case static_cast<int>(konami_mw_sample_info::sample_type::PCM_16):
+    case static_cast<int>(k054539_sample_type::PCM_16):
       sampleTypeStr = "PCM 16";
       break;
-    case static_cast<int>(konami_mw_sample_info::sample_type::ADPCM):
+    case static_cast<int>(k054539_sample_type::ADPCM):
       sampleTypeStr = "ADPCM";
       break;
   }
@@ -165,50 +167,6 @@ bool KonamiArcadeSampColl::parseHeader() {
   return true;
 }
 
-u32 KonamiArcadeSampColl::determineSampleSize(u32 startOffset,
-  konami_mw_sample_info::sample_type sampleType, bool reverse) {
-  // Each sample type uses a slightly different sentinel value.
-  // In practice, we find that each sample ends with multiple sample values. The smallest pattern
-  // being ADPCM with 4 0x88 bytes in a row.
-  u16 endMarker;
-  int inc = 1;
-  switch (sampleType) {
-    case konami_mw_sample_info::sample_type::PCM_8:
-      endMarker = 0x8080;
-      break;
-    case konami_mw_sample_info::sample_type::PCM_16:
-      endMarker = 0x8000;
-      inc = 2;
-      break;
-    case konami_mw_sample_info::sample_type::ADPCM:
-      endMarker = 0x8888;
-      break;
-    default:
-      L_ERROR("K054539 sample info has invalid type: {:d}. Expected 0, 4, or 8.  Sample offset: {:X}", static_cast<int>(type), startOffset);
-      endMarker = 0x8080;
-      break;
-  }
-
-  if (reverse) {
-    for (u32 off = startOffset-2; off >= dwOffset + 2; off -= inc) {
-      if (readShort(off) == endMarker) {
-        return startOffset - off;
-      }
-    }
-    return startOffset;
-  }
-  for (u32 off = startOffset; off < unLength + 2; off += inc) {
-    if (readShort(off) == endMarker) {
-      return off - startOffset;
-    }
-  }
-  if (reverse) {
-    return startOffset - dwOffset;
-  } else {
-    return unLength - startOffset;
-  }
-}
-
 bool KonamiArcadeSampColl::parseSampleInfo() {
 
   int sampNum = 0;
@@ -216,7 +174,7 @@ bool KonamiArcadeSampColl::parseSampleInfo() {
     u32 sampleOffset = sampInfo.start_msb << 16 | sampInfo.start_mid << 8 | sampInfo.start_lsb;
     u32 sampleLoopOffset = sampInfo.loop_msb << 16 | sampInfo.loop_mid << 8 | sampInfo.loop_lsb;
     s32 relativeLoopOffset = sampleLoopOffset - sampleOffset;
-    u32 sampleSize = determineSampleSize(sampleOffset, sampInfo.type(), sampInfo.reverse());
+    u32 sampleSize = determineK054539SampleSize(this, sampleOffset, sampInfo.type(), sampInfo.reverse());
     if (sampInfo.reverse()) {
       sampleOffset = sampleOffset - sampleSize;
       relativeLoopOffset = -relativeLoopOffset;
@@ -224,7 +182,7 @@ bool KonamiArcadeSampColl::parseSampleInfo() {
 
     auto name = fmt::format("Sample {:d}", sampNum++);
     VGMSamp* sample;
-    if (sampInfo.type() == konami_mw_sample_info::sample_type::ADPCM) {
+    if (sampInfo.type() == k054539_sample_type::ADPCM) {
       sample = new KonamiAdpcmSamp(
         this,
         sampleOffset,
@@ -236,7 +194,7 @@ bool KonamiArcadeSampColl::parseSampleInfo() {
       sample->setWaveType(WT_PCM16);
       samples.push_back(sample);
     } else {
-      u16 bps = sampInfo.type() == konami_mw_sample_info::sample_type::PCM_8 ? 8 : 16;
+      u16 bps = sampInfo.type() == k054539_sample_type::PCM_8 ? 8 : 16;
       sample = addSamp(sampleOffset,
                            sampleSize,
                            sampleOffset,

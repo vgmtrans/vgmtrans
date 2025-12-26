@@ -5,6 +5,7 @@
  */
 #include "KonamiTMNT2Seq.h"
 
+#include "K054539.h"
 #include "KonamiTMNT2Definitions.h"
 #include "KonamiTMNT2Instr.h"
 #include "ScaleConversion.h"
@@ -64,12 +65,14 @@ constexpr double calculateTempo(
 KonamiTMNT2Seq::KonamiTMNT2Seq(RawFile *file,
                                KonamiTMNT2FormatVer fmtVer,
                                u32 offset,
+                               u32 bankOffset,
                                std::vector<u32> ym2151TrackOffsets,
                                std::vector<u32> k053260TrackOffsets,
                                u8 defaultTickSkipInterval,
                                u8 clkb,
                                const std::string &name)
     : VGMSeq(KonamiTMNT2Format::name, file, offset, 0, name),
+      m_bankOffset(bankOffset),
       m_fmtVer(fmtVer),
       m_ym2151TrackOffsets(std::move(ym2151TrackOffsets)),
       m_k053260TrackOffsets(std::move(k053260TrackOffsets)),
@@ -178,8 +181,8 @@ void KonamiTMNT2Seq::useColl(const VGMColl* coll) {
 KonamiTMNT2Track::KonamiTMNT2Track(
   bool isFmTrack,
   KonamiTMNT2Seq *parentSeq,
-  uint32_t offset,
-  uint32_t length,
+  u32 offset,
+  u32 length,
   std::string name
 )
     : SeqTrack(parentSeq, offset, length, std::move(name)),
@@ -250,6 +253,10 @@ u8 KonamiTMNT2Track::calculatePan() {
     else if (m_pan == 2)
       pan = 127;
     return pan;
+  }
+
+  if (fmtVersion() == XEXEX) {
+    return calculateMidiPanForK054539(m_pan);
   }
 
   // If pan is 0, use instrument pan.
@@ -468,6 +475,10 @@ bool KonamiTMNT2Track::readEvent() {
 
     case 0xDA:
       m_pan = readByte(curOffset++);
+      if (fmtVersion() == XEXEX && m_pan == 0) {
+        m_pan = 4;
+      }
+
       addPan(beginOffset, 2, calculatePan());
       break;
     case 0xDB: {
@@ -724,6 +735,8 @@ bool KonamiTMNT2Track::readEvent() {
       break;
     case 0xEF: {
       // Master Volume
+      // TODO: XEXEX skips reading second byte when first is 0
+      //  Also, XEXEX k054539 track reads up to three bytes for this event
       s8 ym2151MasterAtten = -static_cast<s8>(readByte(curOffset++));
       s8 k053260MasterAtten = -static_cast<s8>(readByte(curOffset++));
       setMasterAttenuationYM2151(ym2151MasterAtten);
@@ -754,7 +767,7 @@ bool KonamiTMNT2Track::readEvent() {
       break;
     // JUMP
     case 0xF9: {
-      u16 dest = readShort(curOffset);
+      u32 dest = readShort(curOffset) + bankOffset();
       bool shouldContinue = true;
       if (dest < beginOffset) {
         shouldContinue = addLoopForever(beginOffset, 3);
@@ -805,7 +818,7 @@ bool KonamiTMNT2Track::readEvent() {
     callMarker: {
       if (m_callOrigin[callIdx] == 0) {
         m_callOrigin[callIdx] = curOffset + 2;
-        u16 dest = readShort(curOffset);
+        u32 dest = readShort(curOffset) + bankOffset();
         if (dest < parentSeq->dwOffset) {
           return false;
         }

@@ -5,6 +5,7 @@
  */
 #pragma once
 
+#include "K054539.h"
 #include "VGMSampColl.h"
 #include "VGMInstrSet.h"
 #include <array>
@@ -14,12 +15,6 @@
 enum KonamiArcadeFormatVer : uint8_t;
 
 struct konami_mw_sample_info {
-  enum class sample_type: u8 {
-    PCM_8 = 0,
-    PCM_16 = 4,
-    ADPCM = 8,
-  };
-
   u8 loop_lsb;
   u8 loop_mid;
   u8 loop_msb;
@@ -35,8 +30,8 @@ private:
   static constexpr u8 mask_reverse     = 0b0010'0000;  // bit 5
 
 public:
-  [[nodiscard]] constexpr sample_type type() const noexcept {
-    return static_cast<sample_type>(flags & mask_sample_type);
+  [[nodiscard]] constexpr k054539_sample_type type() const noexcept {
+    return static_cast<k054539_sample_type>(flags & mask_sample_type);
   }
 
   [[nodiscard]] constexpr bool reverse() const noexcept {
@@ -100,8 +95,6 @@ public:
   bool parseSampleInfo() override;
 
 private:
-  u32 determineSampleSize(u32 startOffset, konami_mw_sample_info::sample_type type, bool reverse);
-
   std::vector<VGMItem*> samplePointers;
   KonamiArcadeInstrSet *instrset;
   const std::vector<konami_mw_sample_info> sampInfos;

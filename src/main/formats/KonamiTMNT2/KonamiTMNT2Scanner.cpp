@@ -10,6 +10,7 @@
 #include "KonamiTMNT2Instr.h"
 #include "KonamiTMNT2OPMInstr.h"
 #include "KonamiVendettaInstr.h"
+#include "KonamiXexexInstrSet.h"
 #include "VGMColl.h"
 #include "VGMMiscFile.h"
 
@@ -117,6 +118,7 @@ void KonamiTMNT2Scanner::scan(RawFile * /*file*/, void *info) {
       scanVendetta(programRomGroup, sampsRomGroup, fmtVer, gameEntry->name);
       break;
     case XEXEX:
+      scanXexex(programRomGroup, sampsRomGroup, fmtVer, gameEntry->name);
       break;
   }
 }
@@ -145,6 +147,7 @@ std::vector<KonamiTMNT2Seq*> KonamiTMNT2Scanner::loadSeqTable(
     seqTable->addChild(i, 2, "Sequence Pointer");
   }
 
+  u32 bankOffset = 0;
   std::vector<KonamiTMNT2Seq*> seqs;
   int i = 0;
   for (u16 seqPtr : seqPtrs) {
@@ -161,6 +164,19 @@ std::vector<KonamiTMNT2Seq*> KonamiTMNT2Scanner::loadSeqTable(
           case 2: return std::pair{8, 3};
           case 3:
           default: return std::pair{8, 4};
+        }
+      }
+      if (version == XEXEX) {
+        switch ((seqType & 0x30) >> 4) {
+          case 0: bankOffset = 0; break;
+          case 1: bankOffset = 0x4000; break;
+          case 2: bankOffset = 0x8000; break;
+        }
+        switch (seqType & 0xF) {
+          case 0: return std::pair{6, 6};
+          case 1: return std::pair{8, 7};
+          case 2: return std::pair{8, 8};
+          default: return std::pair{8, 8};
         }
       }
 
@@ -180,16 +196,17 @@ std::vector<KonamiTMNT2Seq*> KonamiTMNT2Scanner::loadSeqTable(
     for (int i = 0; i < numYM3151Tracks; ++i) {
       u16 offset = seqPtr + seqTypeLength + (i * 2);
       trkList->addChild(offset, 2, "YM2151 Track Pointer");
-      ym2151TrkPtrs.push_back(programRom->readShort(offset));
+      ym2151TrkPtrs.push_back(programRom->readShort(offset) + bankOffset);
     }
     for (int i = 0; i < numK053260Tracks; ++i) {
       u16 offset = seqPtr + seqTypeLength + ((numYM3151Tracks + i) * 2);
       trkList->addChild(offset, 2, "K053260 Track Pointer");
-      k053260TrkPtrs.push_back(programRom->readShort(offset));
+      printf("offset: %X  bankOffset: %X  result: %X\n", offset, bankOffset, programRom->readShort(offset) + bankOffset);
+      k053260TrkPtrs.push_back(programRom->readShort(offset) + bankOffset);
     }
 
     const std::string sequenceName = fmt::format("{} seq {}", gameName, i++);
-    u16 start = std::min(
+    u32 start = std::min(
       std::ranges::min(ym2151TrkPtrs),
       std::ranges::min(k053260TrkPtrs)
     );
@@ -198,6 +215,7 @@ std::vector<KonamiTMNT2Seq*> KonamiTMNT2Scanner::loadSeqTable(
       programRom,
       fmtVer,
       start,
+      bankOffset,
       ym2151TrkPtrs,
       k053260TrkPtrs,
       defaultTickSkipInterval,
@@ -239,6 +257,37 @@ std::vector<std::vector<konami_tmnt2_drum_info>> KonamiTMNT2Scanner::loadDrumTab
       minDrumPtr = std::min(minDrumPtr, drumInfoPtr);
       konami_tmnt2_drum_info info;
       programRom->readBytes(drumInfoPtr, sizeof(konami_tmnt2_drum_info), &info);
+      drumInfos.push_back(info);
+      drumInfoPtrSet.insert(drumInfoPtr);
+      i += 2;
+    } while (!drumTablePtrSet.contains(i) && !drumInfoPtrSet.contains(i));
+    drumTables.push_back(drumInfos);
+  }
+  return drumTables;
+}
+
+template <class T>
+std::vector<std::vector<T>> KonamiTMNT2Scanner::loadDrumTables(
+  RawFile* programRom,
+  std::vector<u32> drumTablePtrs,
+  u32 minDrumPtr
+) {
+  std::vector<std::vector<T>> drumTables;
+  std::unordered_set drumTablePtrSet(drumTablePtrs.begin(), drumTablePtrs.end());
+  std::unordered_set<u32> drumInfoPtrSet {};
+  for (auto drumTablePtr : drumTablePtrs) {
+    std::vector<T> drumInfos;
+    minDrumPtr =  std::numeric_limits<u32>::max();
+    u32 i = drumTablePtr;
+    do {
+      u32 drumInfoPtr = programRom->readShort(i);
+      if (drumInfoPtr > i + 0x1000)
+        break;
+      if (i >= minDrumPtr)
+        break;
+      minDrumPtr = std::min(minDrumPtr, drumInfoPtr);
+      T info;
+      programRom->readBytes(drumInfoPtr, sizeof(T), &info);
       drumInfos.push_back(info);
       drumInfoPtrSet.insert(drumInfoPtr);
       i += 2;
@@ -354,14 +403,14 @@ void KonamiTMNT2Scanner::scanTMNT2(
 
 
   // Consolidate the melodic and drum instruments into a single sample_info vector
-  std::vector<KonamiTMNT2SampColl::sample_info> sampInfos;
+  std::vector<tmnt2_sample_info> sampInfos;
   for (auto const& instrInfo : instrInfos) {
-    sampInfos.emplace_back(KonamiTMNT2SampColl::sample_info::makeSampleInfo(instrInfo));
+    sampInfos.emplace_back(tmnt2_sample_info::makeSampleInfo(instrInfo));
   }
 
   for (auto const& inner : drumTables) {
     for (auto const& drumInfo : inner) {
-      sampInfos.emplace_back(KonamiTMNT2SampColl::sample_info::makeSampleInfo(drumInfo));
+      sampInfos.emplace_back(tmnt2_sample_info::makeSampleInfo(drumInfo));
     }
   }
 
@@ -511,9 +560,9 @@ void KonamiTMNT2Scanner::scanVendetta(
     instrSet = nullptr;
   }
 
-  std::vector<KonamiTMNT2SampColl::sample_info> commonSampInfos;
+  std::vector<tmnt2_sample_info> commonSampInfos;
   for (auto const& sampInfo : sampInfos) {
-    commonSampInfos.emplace_back(KonamiTMNT2SampColl::sample_info::makeSampleInfo(sampInfo));
+    commonSampInfos.emplace_back(tmnt2_sample_info::makeSampleInfo(sampInfo));
   }
   std::string sampCollName = fmt::format("{} Sample Collection", name);
 
@@ -547,6 +596,116 @@ void KonamiTMNT2Scanner::scanVendetta(
     coll->addInstrSet(opmInstrSet);
     coll->addInstrSet(instrSet);
     coll->addSampColl(sampcoll);
+    if (!coll->load()) {
+      delete coll;
+    }
+  }
+}
+
+void KonamiTMNT2Scanner::scanXexex(
+  MAMERomGroup* programRomGroup,
+  MAMERomGroup* sampsRomGroup,
+  KonamiTMNT2FormatVer fmtVer,
+  const std::string& name
+) {
+  RawFile* programRom = programRomGroup->file;
+  RawFile* samplesRom = sampsRomGroup->file;
+
+  u32 seqTableAddr = 0, instrTableOffsetK054539 = 0, sampInfoTableOffset = 0, drumBanksOffset = 0,
+      drumsOffset = 0, instrTableOffsetYM2151 = 0;
+  programRomGroup->getHexAttribute("seq_table", &seqTableAddr);
+  programRomGroup->getHexAttribute("ym2151_instr_table", &instrTableOffsetYM2151);
+  programRomGroup->getHexAttribute("k054539_instr_table", &instrTableOffsetK054539);
+  programRomGroup->getHexAttribute("k054539_samp_info_table", &sampInfoTableOffset);
+  programRomGroup->getHexAttribute("k054539_drum_banks", &drumBanksOffset);
+  programRomGroup->getHexAttribute("k054539_drums", &drumsOffset);
+
+  // if (!seqTableAddr || !instrTableOffsetYM2151 || !instrTableOffsetK053260 ||
+  //     !sampInfoTableOffset || !drumBanksOffset || !drumsOffset) {
+  //   return;
+  // }
+
+  u32 defaultTickSkipInterval = 0;
+  programRomGroup->getHexAttribute("default_tick_skip_interval", &defaultTickSkipInterval);
+  u32 clkb = 0xF9;
+  programRomGroup->getHexAttribute("CLKB", &clkb);
+
+  auto seqs = loadSeqTable(
+    programRom,
+    seqTableAddr,
+    fmtVer,
+    0,
+    clkb & 0xFF,
+    name
+  );
+
+
+  auto opmInstrSet = new KonamiTMNT2OPMInstrSet(
+    programRom,
+    fmtVer,
+    instrTableOffsetYM2151,
+    fmt::format("{} YM2151 Instrument Set", name)
+  );
+  if (!opmInstrSet->loadVGMFile()) {
+    delete opmInstrSet;
+    opmInstrSet = nullptr;
+  }
+
+  std::vector<u32> instrPtrs;
+  std::vector<u32> drumTablePtrs;
+  u32 minInstrPtr = std::numeric_limits<u32>::max();
+  u32 minDrumPtr =  std::numeric_limits<u32>::max();
+  for (int i = instrTableOffsetK054539; i < minInstrPtr && i < drumBanksOffset; i += 2) {
+    u32 instrInfoPtr = programRom->readShort(i);
+    minInstrPtr = std::min(minInstrPtr, instrInfoPtr);
+    instrPtrs.push_back(instrInfoPtr);
+  }
+
+
+  for (int i = drumBanksOffset;; i += 2) {
+    u32 drumInfoPtr = programRom->readShort(i);
+    minDrumPtr = std::min(minDrumPtr, drumInfoPtr);
+    if (i == minDrumPtr)
+      break;
+    drumTablePtrs.push_back(drumInfoPtr);
+  }
+
+  std::vector<konami_xexex_instr_info> instrInfos;
+  instrInfos.reserve(instrPtrs.size());
+  for (u32 instrInfoPtr : instrPtrs) {
+    konami_xexex_instr_info info;
+    programRom->readBytes(instrInfoPtr, sizeof(konami_xexex_instr_info), &info);
+    instrInfos.push_back(info);
+  }
+
+  std::vector<std::vector<konami_xexex_drum_info>> drumTables = loadDrumTables<konami_xexex_drum_info>(
+    programRom,
+    drumTablePtrs,
+    minDrumPtr
+  );
+
+  // auto instrSet = new KonamiTMNT2SampleInstrSet(
+  //   programRom,
+  //   instrTableAddrK053260,
+  //   instrTableAddrK053260,
+  //   drumTableAddr,
+  //   instrInfos,
+  //   drumTables,
+  //   fmt::format("{} K053260 Instrument Set", name),
+  //   fmtVer
+  // );
+  // if (!instrSet->loadVGMFile()) {
+  //   delete instrSet;
+  //   instrSet = nullptr;
+  // }
+
+  for (auto seq : seqs) {
+    VGMColl* coll = new VGMColl(seq->name());
+
+    coll->useSeq(seq);
+    coll->addInstrSet(opmInstrSet);
+    // coll->addInstrSet(instrSet);
+    // coll->addSampColl(sampcoll);
     if (!coll->load()) {
       delete coll;
     }

@@ -39,7 +39,10 @@ struct konami_vendetta_sample_info {
     return (length_hi << 8) | length_lo;
   }
 
-  constexpr bool isAdpcm() const noexcept { return is_kapdcm; }
+  constexpr k054539_sample_type type() const noexcept {
+    return is_kapdcm ? k054539_sample_type::ADPCM : k054539_sample_type::PCM_8;
+  }
+
   constexpr bool isReverse() const noexcept { return false; }
 };
 

@@ -3611,6 +3611,37 @@
       ]
     },
     {
+      "name": "xexex",
+      "format": "KonamiTMNT2",
+      "fmt_version": "xexex",
+      "rom_groups": [
+        {
+          "type": "soundcpu",
+          "load_method": "append",
+          "attributes": {
+            "CLKB": "0xF0",
+            "seq_table": "0x4AC6",
+            "ym2151_instr_table": "0x260E",
+            "k054539_instr_table": "0x3DCA",
+            "k054539_samp_info_table": "0x0x3DF8",
+            "k054539_drum_banks": "0x3F51",
+            "k054539_drums": "0x3F9D"
+          },
+          "roms": [
+            "067eaa05.4e"
+          ]
+        },
+        {
+          "type": "sound",
+          "load_method": "append",
+          "roms": [
+            "067b06.3e",
+            "067b07.1e"
+          ]
+        }
+      ]
+    },
+    {
       "name": "xmcota",
       "format": "CPS2",
       "fmt_version": "CPS2_V1.05",

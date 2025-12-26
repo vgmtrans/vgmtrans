@@ -25,7 +25,7 @@ enum KonamiTMNT2FormatVer: uint8_t {
 };
 
 class KonamiTMNT2Scanner : public VGMScanner {
- public:
+public:
   explicit KonamiTMNT2Scanner(Format* format) : VGMScanner(format) {}
 
   std::vector<std::vector<konami_tmnt2_drum_info>> loadDrumTablesTMNT2(
@@ -33,7 +33,12 @@ class KonamiTMNT2Scanner : public VGMScanner {
     std::vector<u32> drumTablePtrs,
     u32 minDrumPtr
   );
-
+  template <class T>
+  std::vector<std::vector<T>> loadDrumTables(
+    RawFile* programRom,
+    std::vector<u32> drumTablePtrs,
+    u32 minDrumPtr
+  );
   void scan(RawFile *file, void *info) override;
 
 private:
@@ -52,6 +57,12 @@ private:
     const std::string& name
   );
   void scanVendetta(
+    MAMERomGroup* programRomGroup,
+    MAMERomGroup* sampsRomGroup,
+    KonamiTMNT2FormatVer fmtVer,
+    const std::string& name
+  );
+  void scanXexex(
     MAMERomGroup* programRomGroup,
     MAMERomGroup* sampsRomGroup,
     KonamiTMNT2FormatVer fmtVer,

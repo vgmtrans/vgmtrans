@@ -1,9 +1,31 @@
 #pragma once
+#include "K054539.h"
 #include "VGMSampColl.h"
 #include "VGMInstrSet.h"
 
 enum KonamiTMNT2FormatVer : uint8_t;
 class RawFile;
+
+struct tmnt2_sample_info {
+  u32 length;
+  u32 offset;
+  u8 volume;
+  k054539_sample_type type;  // For k053260, the valid types are a subset: PCM8 or ADPCM
+  // bool isAdpcm;
+  bool isReverse;
+
+  template <class T>
+  static tmnt2_sample_info makeSampleInfo(const T& x) {
+    return {
+      x.length(),
+      x.start(),
+      0,
+      x.type(),
+      x.isReverse()
+    };
+  }
+};
+
 struct konami_tmnt2_instr_info {
   u8 flags;
   u8 length_lo;
@@ -24,8 +46,10 @@ struct konami_tmnt2_instr_info {
     return (length_hi << 8) | length_lo;
   }
 
-  constexpr bool isAdpcm() const noexcept {
-    return (flags & 0b0001'0000) > 0;
+  constexpr k054539_sample_type type() const noexcept {
+    return (flags & 0b0001'0000) > 0 ?
+            k054539_sample_type::ADPCM :
+            k054539_sample_type::PCM_8;
   }
 
   constexpr bool isReverse() const noexcept {
@@ -57,8 +81,11 @@ struct konami_tmnt2_drum_info {
     return (length_hi << 8) | length_lo;
   }
 
-  constexpr bool isAdpcm() const noexcept {
-    return (flags & 0b0001'0000) > 0;
+
+  constexpr k054539_sample_type type() const noexcept {
+    return (flags & 0b0001'0000) > 0 ?
+            k054539_sample_type::ADPCM :
+            k054539_sample_type::PCM_8;
   }
 
   constexpr bool isReverse() const noexcept {
@@ -104,28 +131,9 @@ private:
 class KonamiTMNT2SampColl
     : public VGMSampColl {
 public:
-  struct sample_info {
-    u32 length;
-    u32 offset;
-    u8 volume;
-    bool isAdpcm;
-    bool isReverse;
-
-    template <class T>
-    static sample_info makeSampleInfo(const T& x) {
-      return {
-        x.length(),
-        x.start(),
-        0,
-        x.isAdpcm(),
-        x.isReverse()
-      };
-    }
-  };
-
   KonamiTMNT2SampColl(
     RawFile* file,
-    const std::vector<sample_info>& sampInfos,
+    const std::vector<tmnt2_sample_info>& sampInfos,
     u32 offset,
     u32 length = 0,
     std::string name = std::string("Konami TMNT2 Sample Collection")
@@ -135,5 +143,5 @@ public:
 
 private:
   std::vector<VGMItem*> samplePointers;
-  const std::vector<sample_info> m_sampInfos;
+  const std::vector<tmnt2_sample_info> m_sampInfos;
 };

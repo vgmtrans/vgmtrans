@@ -4,6 +4,7 @@
  * refer to the included LICENSE.txt file
  */
 
+#include "K054539.h"
 #include "KonamiTMNT2Instr.h"
 #include "KonamiTMNT2Format.h"
 #include "KonamiAdpcm.h"
@@ -200,7 +201,7 @@ bool KonamiTMNT2SampleInstrSet::parseDrums() {
 
 KonamiTMNT2SampColl::KonamiTMNT2SampColl(
     RawFile* file,
-    const std::vector<sample_info>& sampInfos,
+    const std::vector<tmnt2_sample_info>& sampInfos,
     u32 offset,
     u32 length,
     std::string name)
@@ -235,7 +236,7 @@ bool KonamiTMNT2SampColl::parseSampleInfo() {
     if (sampleOffset + sampleSize > unLength) {
       sample = new EmptySamp(this);
     }
-    else if (sampInfo.isAdpcm) {
+    else if (sampInfo.type == k054539_sample_type::ADPCM) {
       sample = new KonamiAdpcmSamp(
         this,
         sampleOffset,
@@ -246,7 +247,7 @@ bool KonamiTMNT2SampColl::parseSampleInfo() {
       );
       sample->setWaveType(WT_PCM16);
       samples.push_back(sample);
-    } else {
+    } else if (sampInfo.type == k054539_sample_type::PCM_8) {
       sample = addSamp(sampleOffset,
                            sampleSize,
                            sampleOffset,
@@ -256,6 +257,17 @@ bool KonamiTMNT2SampColl::parseSampleInfo() {
                            K053260_BASE_PCM_RATE,
                            name);
       sample->setWaveType(WT_PCM8);
+      sample->setSignedness(Signedness::Signed);
+    } else if (sampInfo.type == k054539_sample_type::PCM_16) {
+      sample = addSamp(sampleOffset,
+                           sampleSize,
+                           sampleOffset,
+                           sampleSize,
+                           1,
+                           16,
+                           K053260_BASE_PCM_RATE,
+                           name);
+      sample->setWaveType(WT_PCM16);
       sample->setSignedness(Signedness::Signed);
     }
     sample->setLoopStatus(false);
