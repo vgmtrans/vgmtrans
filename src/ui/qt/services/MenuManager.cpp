@@ -10,6 +10,15 @@
 #include "services/commands/SaveCommands.h"
 
 MenuManager::MenuManager() {
+  // Order matters: most-derived types should be placed at the top
+  registerCommands<YM2151InstrSet, VGMItem>({
+    std::make_shared<OpenCommand>(),
+    std::make_shared<CommandSeparator>(),
+    std::make_shared<CloseVGMFileCommand>(),
+    std::make_shared<CommandSeparator>(),
+    std::make_shared<SaveAsOPMCommand>(),
+    std::make_shared<SaveAsOriginalFormatCommand<VGMFile>>(),
+  });
   registerCommands<VGMSeq, VGMItem>({
       std::make_shared<OpenCommand>(),
       std::make_shared<CommandSeparator>(),
@@ -26,14 +35,6 @@ MenuManager::MenuManager() {
       std::make_shared<SaveAsOriginalFormatCommand<VGMFile>>(),
       std::make_shared<CommandSeparator>(),
       std::make_shared<CloseVGMFileCommand>(),
-  });
-  registerCommands<CPS1OPMInstrSet, VGMItem>({
-      std::make_shared<OpenCommand>(),
-      std::make_shared<CommandSeparator>(),
-      std::make_shared<CloseVGMFileCommand>(),
-      std::make_shared<CommandSeparator>(),
-      std::make_shared<SaveAsOPMCommand>(),
-      std::make_shared<SaveAsOriginalFormatCommand<VGMFile>>(),
   });
   registerCommands<VGMSampColl, VGMItem>({
       std::make_shared<OpenCommand>(),

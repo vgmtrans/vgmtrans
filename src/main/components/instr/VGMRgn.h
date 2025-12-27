@@ -66,8 +66,9 @@ public:
 
   Loop loop;
 
-  u32 sampNum     {0};
-  s32 sampOffset  {-1};     //optional value. If a sample offset is provided, then find the sample
+  u32 sampNum        {0};
+  s32 sampOffset     {-1};  // optional value. If a sample offset is provided, then find the sample
+  s32 sampDataLength {-1};  // optional value. Refines sample matching in case of collisions.
   // number based on this offset. It will match a sample with an identical absolute offset, or
   // sample's offset relative to the beginning of sample data (VGMSampColl::sampDataOffset)
 
