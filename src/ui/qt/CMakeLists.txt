@@ -25,6 +25,7 @@ if(NOT Qt6_FOUND AND CMAKE_SYSTEM_NAME STREQUAL "Windows")
       SEND_ERROR
         "Did you forget to run `git submodule update --init --recursive`?")
   endif()
+  find_package(Qt6 REQUIRED COMPONENTS Core Gui Widgets Svg)
 endif()
 
 message(STATUS "Using Qt ${Qt6_VERSION}")
