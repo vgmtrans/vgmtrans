@@ -196,6 +196,27 @@
       ]
     },
     {
+      "name": "blswhstl",
+      "format": "KonamiTMNT2",
+      "fmt_version": "tmnt2",
+      "rom_groups": [
+        {
+          "type": "soundcpu",
+          "load_method": "append",
+          "roms": [
+            "060j01.f3"
+          ]
+        },
+        {
+          "type": "sound",
+          "load_method": "append",
+          "roms": [
+            "060e04.d1"
+          ]
+        }
+      ]
+    },
+    {
       "name": "cawing",
       "format": "CPS1",
       "fmt_version": "CPS1_V4.25",
@@ -3074,6 +3095,27 @@
       ]
     },
     {
+      "name": "ssriders",
+      "format": "KonamiTMNT2",
+      "fmt_version": "ssriders",
+      "rom_groups": [
+        {
+          "type": "soundcpu",
+          "load_method": "append",
+          "roms": [
+            "064e01.2f"
+          ]
+        },
+        {
+          "type": "sound",
+          "load_method": "append",
+          "roms": [
+            "064e06.1d"
+          ]
+        }
+      ]
+    },
+    {
       "name": "strider2",
       "format": "CPS2",
       "fmt_version": "CPS2_V2.10",
@@ -3179,6 +3221,27 @@
       ]
     },
     {
+      "name": "tmnt2",
+      "format": "KonamiTMNT2",
+      "fmt_version": "tmnt2",
+      "rom_groups": [
+        {
+          "type": "soundcpu",
+          "load_method": "append",
+          "roms": [
+            "063b01.2f"
+          ]
+        },
+        {
+          "type": "sound",
+          "load_method": "append",
+          "roms": [
+            "063b06.1d"
+          ]
+        }
+      ]
+    },
+    {
       "name": "tokkae",
       "format": "KonamiArcade",
       "fmt_version": "GX",
@@ -3274,6 +3337,27 @@
           "roms": [
             "va_18.11c",
             "va_19.12c"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "vendetta",
+      "format": "KonamiTMNT2",
+      "fmt_version": "vendetta",
+      "rom_groups": [
+        {
+          "type": "soundcpu",
+          "load_method": "append",
+          "roms": [
+            "081b02"
+          ]
+        },
+        {
+          "type": "sound",
+          "load_method": "append",
+          "roms": [
+            "081a03"
           ]
         }
       ]
