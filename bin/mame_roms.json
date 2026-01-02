@@ -203,6 +203,9 @@
         {
           "type": "soundcpu",
           "load_method": "append",
+          "attributes": {
+            "CLKB": "0xF2"
+          },
           "roms": [
             "060j01.f3"
           ]
@@ -3103,7 +3106,8 @@
           "type": "soundcpu",
           "load_method": "append",
           "attributes": {
-            "default_tick_skip_interval": "0x16"
+            "default_tick_skip_interval": "0x16",
+            "CLKB": "0xF2"
           },
           "roms": [
             "064e01.2f"
@@ -3231,6 +3235,9 @@
         {
           "type": "soundcpu",
           "load_method": "append",
+          "attributes": {
+            "CLKB": "0xF2"
+          },
           "roms": [
             "063b01.2f"
           ]
@@ -3352,6 +3359,19 @@
         {
           "type": "soundcpu",
           "load_method": "append",
+          "attributes": {
+            "CLKB": "0xF9",
+            "seq_table": "0x466e",
+            "ym2151_instr_table": "0x3499",
+            "k053260_instr_table": "0x4600",
+            "k053260_samp_info_table": "0x1461",
+            "k053260_drum_banks": "0x3215",
+            "k053260_drums": "0x3275",
+            "load_instr_sub": "0xA05",
+            "set_pan_sub": "0x2F29",
+            "set_pitch_sub": "0xB85",
+            "note_on_sub": "0xC18"
+          },
           "roms": [
             "081b02"
           ]

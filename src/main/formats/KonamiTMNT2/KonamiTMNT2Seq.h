@@ -27,12 +27,14 @@ class KonamiTMNT2Seq : public VGMSeq {
                  std::vector<u32> ym2151TrackOffsets,
                  std::vector<u32> k053260TrackOffsets,
                  u8 defaultTickSkipInterval,
+                 u8 clkb,
                  const std::string &name = std::string("Konami TMNT2 Seq"));
 
   void resetVars() override;
   bool parseTrackPointers() override;
   void useColl(const VGMColl* coll) override;
   KonamiTMNT2FormatVer fmtVersion() { return m_fmtVer; }
+  u8 clkb() { return m_clkb; }
 
   void setGlobalTranspose(s8 semitones) { m_globalTranspose = semitones; }
   s8 globalTranspose() { return m_globalTranspose; }
@@ -49,19 +51,16 @@ class KonamiTMNT2Seq : public VGMSeq {
     return std::optional {m_collContext.instrInfos[idx]};
   }
   std::optional<konami_tmnt2_drum_info> drumInfo(int tableIdx, int keyIdx) {
-    if (m_collContext.drumTables.size() <= tableIdx)
+    u8 key = (tableIdx * 16) + keyIdx;
+    if (!m_collContext.drumKeyMap.contains(key))
       return std::nullopt;
-    auto table = m_collContext.drumTables[tableIdx];
-    if (table.size() <= keyIdx)
-      return std::nullopt;
-
-    return std::optional {table[keyIdx]};
+    return m_collContext.drumKeyMap[key];
   }
 
  private:
   struct CollContext {
     std::vector<konami_tmnt2_instr_info> instrInfos;
-    std::vector<std::vector<konami_tmnt2_drum_info>> drumTables;
+    std::unordered_map<u8, konami_tmnt2_drum_info> drumKeyMap;
   };
   CollContext m_collContext;
 
@@ -69,6 +68,7 @@ class KonamiTMNT2Seq : public VGMSeq {
   std::vector<u32> m_ym2151TrackOffsets;
   std::vector<u32> m_k053260TrackOffsets;
   u8 m_defaultTickSkipInterval;
+  u8 m_clkb;
 
   // state
   s8 m_globalTranspose;
@@ -93,6 +93,9 @@ class KonamiTMNT2Track : public SeqTrack {
   void onNoteBegin(int noteDur);
   KonamiTMNT2FormatVer fmtVersion() {
     return static_cast<KonamiTMNT2Seq*>(parentSeq)->fmtVersion();
+  }
+  u8 clkb() {
+    return static_cast<KonamiTMNT2Seq*>(parentSeq)->clkb();
   }
 
   void resetVars() override;
@@ -152,9 +155,10 @@ private:
   u8 m_baseVol = 0;
   u8 m_dxAtten = 0;
   u8 m_dxAttenMultiplier = 1;
-  u8 m_octave = 0;
+  u8 m_noteOffset = 0;
   s8 m_transpose = 0;
   s8 m_addedToNote = 0;
+  u8 m_drumBank = 0;
   u8 m_loopCounter[2];
   u32 m_loopStartOffset[2];
   u8 m_warpCounter = 0;

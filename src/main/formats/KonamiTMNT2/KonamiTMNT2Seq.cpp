@@ -39,12 +39,23 @@ constexpr std::array<std::array<int, 2>, 8> K053260_PAN_MUL = {{
 
 constexpr double K053260_PAN_SCALE = 65536.0;
 
-constexpr double calculateTempo(std::uint8_t clkb, double clockHz, int ppqn, int tickSkipInterval) {
+constexpr double calculateTempo(
+  std::uint8_t clkb,
+  double clockHz,
+  int ppqn,
+  int tickSkipInterval,
+  KonamiTMNT2FormatVer fmtVer
+) {
   // The driver uses YM2151's Timer B to send IRQs to the Z80. It sets CLKB at startup.
   const double ticks = 1024.0 * (256.0 - static_cast<double>(clkb));
   double tempo = (60.0 * clockHz) / (static_cast<double>(ppqn) * ticks);
   if (tickSkipInterval > 0)
     tempo *= (tickSkipInterval - 1) / static_cast<double>(tickSkipInterval);
+
+  // Note that the VENDETTA driver effective doubles duration, but it's easier to handle this by
+  // halving tempo, as it otherwise complicates our tick by tick handling
+  if (fmtVer == VENDETTA)
+    tempo /= 2.0;
   return tempo;
 }
 
@@ -56,17 +67,20 @@ KonamiTMNT2Seq::KonamiTMNT2Seq(RawFile *file,
                                std::vector<u32> ym2151TrackOffsets,
                                std::vector<u32> k053260TrackOffsets,
                                u8 defaultTickSkipInterval,
+                               u8 clkb,
                                const std::string &name)
     : VGMSeq(KonamiTMNT2Format::name, file, offset, 0, name),
       m_fmtVer(fmtVer),
       m_ym2151TrackOffsets(std::move(ym2151TrackOffsets)),
       m_k053260TrackOffsets(std::move(k053260TrackOffsets)),
-      m_defaultTickSkipInterval(defaultTickSkipInterval) {
+      m_defaultTickSkipInterval(defaultTickSkipInterval),
+      m_clkb(clkb)
+{
   bLoadTickByTick = true;
   setPPQN(PPQN);
   setAlwaysWriteInitialVol(127);
   setAlwaysWriteInitialExpression(127);
-  double tempo = calculateTempo(YM2151_CLKB, YM2151_CLOCK_RATE, PPQN, m_defaultTickSkipInterval);
+  double tempo = calculateTempo(m_clkb, YM2151_CLOCK_RATE, PPQN, m_defaultTickSkipInterval, fmtVer);
   setAlwaysWriteInitialTempo(tempo);
   setAllowDiscontinuousTrackData(true);
 }
@@ -98,20 +112,62 @@ bool KonamiTMNT2Seq::parseTrackPointers() {
 
 void KonamiTMNT2Seq::useColl(const VGMColl* coll) {
   m_collContext.instrInfos.clear();
+  m_collContext.drumKeyMap.clear();
   if (!coll)
     return;
 
-  KonamiTMNT2SampleInstrSet* sampledInstrSet = nullptr;
   for (auto instrSet : coll->instrSets()) {
-    sampledInstrSet = dynamic_cast<KonamiTMNT2SampleInstrSet*>(instrSet);
-    if (sampledInstrSet)
-      break;
-  }
-  if (!sampledInstrSet)
-    return;
+    if (auto* tmnt2InstrSet = dynamic_cast<KonamiTMNT2SampleInstrSet*>(instrSet)) {
+      m_collContext.instrInfos = tmnt2InstrSet->instrInfos();
+      for (int i = 0; i < tmnt2InstrSet->drumTables().size(); ++i) {
+        auto drumBank = tmnt2InstrSet->drumTables()[i];
+        for (int j = 0; j < drumBank.size(); ++j) {
+          m_collContext.drumKeyMap[(i * 16) + j] = drumBank[j];
+        }
+      }
+    }
+    else if (auto vendettaInstrSet = dynamic_cast<KonamiVendettaSampleInstrSet*>(instrSet)) {
+      for (auto instr : vendettaInstrSet->instrsK053260()) {
+        // Adapt the combination konami_vendetta_instr_k053260 and konami_vendetta_sample_info into
+        // a konami_tmnt2_instr_info, which is a superset of the data
+        auto sampInfos = vendettaInstrSet->sampleInfos();
+        if (instr.samp_info_idx >= sampInfos.size())
+          continue;
+        auto sampInfo = vendettaInstrSet->sampleInfos()[instr.samp_info_idx];
+        konami_tmnt2_instr_info tmnt2Instr = {
+          0,
+          sampInfo.length_lo, sampInfo.length_hi,
+          sampInfo.start_lo, sampInfo.start_mid, sampInfo.start_hi,
+          static_cast<u8>(0x7F - instr.attenuation),
+          0, 0, 0
+        };
+        m_collContext.instrInfos.emplace_back(tmnt2Instr);
+      }
 
-  m_collContext.instrInfos = sampledInstrSet->instrInfos();
-  m_collContext.drumTables = sampledInstrSet->drumTables();
+      // Adapt the konami_vendetta_drum_info and konami_vendetta_sample_info into a
+      // a konami_tmnt2_drum_info, which is a superset of the data
+      for (auto drumKeyPair : vendettaInstrSet->drumKeyMap()) {
+        const konami_vendetta_drum_info& venDrum = drumKeyPair.second;
+        auto sampInfos = vendettaInstrSet->sampleInfos();
+        auto sampInfoIdx = venDrum.instr.samp_info_idx;
+        if (sampInfoIdx >= sampInfos.size())
+          continue;
+        konami_vendetta_sample_info sampInfo = sampInfos[sampInfoIdx];
+        u8 pitchLo = venDrum.pitch & 0xFF;
+        u8 pitchHi = (venDrum.pitch >> 8) & 0xFF;
+        u8 pan = venDrum.pan == -1 ? 0 : venDrum.pan;
+        konami_tmnt2_drum_info tmnt2Drum = {
+          pitchLo, pitchHi,
+          0, 0,
+          sampInfo.length_lo, sampInfo.length_hi,
+          sampInfo.start_lo, sampInfo.start_mid, sampInfo.start_hi,
+          static_cast<u8>(0x7F - venDrum.instr.attenuation),
+          0, 0, 0, pan
+        };
+        m_collContext.drumKeyMap[drumKeyPair.first] = tmnt2Drum;
+      }
+    }
+  }
 }
 
 KonamiTMNT2Track::KonamiTMNT2Track(
@@ -142,9 +198,10 @@ void KonamiTMNT2Track::resetVars() {
   m_pan = 0;
   m_instrPan = 0;
   m_attenuation = 0;
-  m_octave = 0;
+  m_noteOffset = 0;
   m_transpose = 0;
   m_addedToNote = 0;
+  m_drumBank = 0;
   m_dxAtten = 0;
   m_dxAttenMultiplier = 1;
   memset(m_loopCounter, 0, sizeof(m_loopCounter));
@@ -200,8 +257,10 @@ u8 KonamiTMNT2Track::calculatePan() {
   }
   double leftPan = static_cast<double>(K053260_PAN_MUL[k053260Pan][0]) / K053260_PAN_SCALE;
   double rightPan = static_cast<double>(K053260_PAN_MUL[k053260Pan][1]) / K053260_PAN_SCALE;
-  u8 midiPan = convertVolumeBalanceToStdMidiPan(leftPan, rightPan);
-  return midiPan;
+  if (fmtVersion() == VENDETTA)
+    return convertVolumeBalanceToStdMidiPan(rightPan, leftPan);
+  else
+    return convertVolumeBalanceToStdMidiPan(leftPan, rightPan);
 }
 
 void KonamiTMNT2Track::updatePan() {
@@ -212,7 +271,8 @@ void KonamiTMNT2Track::handleProgramChangeK053260() {
   if (!percussionMode()) {
     std::optional<konami_tmnt2_instr_info> info = instrInfo(m_program);
     if (info) {
-      m_noteDurPercent = info->note_dur;
+      if (info->note_dur)
+        m_noteDurPercent = info->note_dur;
       m_instrPan = info->default_pan;
       m_baseVol = info->volume & 0x7F;
       // There is special behavior when volume > 0x7F, but we'll ignore it for now
@@ -271,14 +331,16 @@ bool KonamiTMNT2Track::readEvent() {
 
   if (opcode < 0xD0) {
     // determine duration
-    u16 dur = opcode & 0xF;
+    u16 dur = opcode & 0x0F;
     if (dur == 0)
       dur = 0x10;
     dur += m_extendDur;
     m_extendDur = 0;
+    // Note that the Vendetta driver effectively doubles duration in the sub at 0x2EDD, but it's
+    // easier to handle this by halving tempo as it would complicate tick by tick code
     if ((m_state & 0x20) != 0) {
       dur *= 3;
-      m_state |= 0x40;             // set bit 6
+      m_state |= 0x40;           // set bit 6
       m_state &= (0xFF ^ 0x20);    // reset bit 5
       m_durSubtract = dur;
       // TODO? stores duration value in chan_state[0x67]
@@ -297,7 +359,7 @@ bool KonamiTMNT2Track::readEvent() {
     }
     if (m_isFmTrack) {
       u8 semitones = (opcode >> 4) - 1;
-      u8 note = semitones + m_addedToNote + m_transpose + globalTranspose();
+      u8 note = semitones + m_noteOffset + m_transpose + globalTranspose();
       note += 12;
 
       u32 noteDur = dur;
@@ -305,9 +367,6 @@ bool KonamiTMNT2Track::readEvent() {
         noteDur = dur * (m_noteDurPercent / 256.0);
       }
       noteDur = std::max(1u, noteDur);
-      // YM2151 requires time between notes, otherwise it strings them together portamento style.
-      if (noteDur == dur && noteDur > 1)
-        noteDur -= 1;
 
       u8 vel = calculateVol(0x7F) * 127.0;
       onNoteBegin(noteDur);
@@ -315,8 +374,8 @@ bool KonamiTMNT2Track::readEvent() {
     } else {
       if (percussionMode()) {
         u8 semitones = opcode >> 4;
-        s8 note = semitones + (m_addedToNote * 16);
-        auto drum = drumInfo(m_addedToNote, semitones);
+        s8 note = semitones + (m_drumBank * 16);
+        auto drum = drumInfo(m_drumBank, semitones);
         m_baseVol = drum ? drum->volume : 0x7F;
         if (m_baseVol > 0x7F) {
           // values greater than 7F have special unimplemented behavior
@@ -328,14 +387,21 @@ bool KonamiTMNT2Track::readEvent() {
         u8 finalAtten = 0x7F - (calculateVol(m_baseVol) * 127.0);
         u8 vel = K053260_BASE_VEL - finalAtten;
 
-        if (m_pan == 0)
+        if (fmtVersion() == VENDETTA) {
+          if (drum->default_pan) {
+            m_pan = drum->default_pan;
+            updatePan();
+          }
+        }
+        else if (m_pan == 0)
           updatePan();
+
         onNoteBegin(dur);
         addNoteByDur(beginOffset, curOffset - beginOffset, note, vel, dur);
       } else {
         // Melodic
         u8 semitones = (opcode >> 4) - 1;
-        u8 note = semitones + m_addedToNote + m_transpose + globalTranspose();
+        u8 note = semitones + m_noteOffset + m_transpose + globalTranspose();
 
         u32 noteDur = dur;
         if (m_noteDurPercent > 0) {
@@ -421,7 +487,7 @@ bool KonamiTMNT2Track::readEvent() {
       m_state |= 0x20;
       addGenericEvent(beginOffset, 1, "Set Duration-related flag", "", Type::DurationChange);
       break;
-    case 0xDF:
+    case 0xDF: {
       // Halve Base Duration Toggle
       if (m_baseDurHalveBackup == 0) {
         m_baseDurHalveBackup = m_baseDur;
@@ -430,8 +496,10 @@ bool KonamiTMNT2Track::readEvent() {
         m_baseDur = m_baseDurHalveBackup;
         m_baseDurHalveBackup = 0;
       }
-      addGenericEvent(beginOffset, 1, "Halve Duration", "", Type::DurationChange);
+      auto name = fmt::format("Halve Duration {}", m_baseDurHalveBackup == 0 ? "(on)" : "(off)");
+      addGenericEvent(beginOffset, 1, name, "", Type::DurationChange);
       break;
+    }
     case 0xE0: {
       u8 val = readByte(curOffset++);
 
@@ -439,7 +507,7 @@ bool KonamiTMNT2Track::readEvent() {
         m_state |= 4;
         if (val == 0) {
           u8 tickSkip = readByte(curOffset++);
-          double tempo = calculateTempo(YM2151_CLKB, YM2151_CLOCK_RATE, PPQN, tickSkip);
+          double tempo = calculateTempo(clkb(), YM2151_CLOCK_RATE, PPQN, tickSkip, fmtVersion());
           addTempoBPMNoItem(tempo);
 
           // byte effectively sets ppqn / tempo. Still need to hammer this down
@@ -472,7 +540,7 @@ bool KonamiTMNT2Track::readEvent() {
           addGenericEvent(beginOffset, curOffset - beginOffset, "Program Change / Base Dur / Attenuation / State / Note Dur", "", Type::ProgramChange);
         }
         else {
-          m_addedToNote = (val >> 4) - 1;
+          m_drumBank = (val >> 4) - 1;
           m_rawBaseDur = val & 0xF;
           m_baseDur = m_rawBaseDur * 3;
           m_attenuation = readByte(curOffset++);
@@ -493,7 +561,7 @@ bool KonamiTMNT2Track::readEvent() {
           addGenericEvent(beginOffset, 2, "Percussion Mode Off", "", Type::ChangeState);
           break;
         }
-        m_addedToNote = val;
+        m_drumBank = val;
         setPercussionModeOn();
         addGenericEvent(beginOffset, 2, "Percussion Mode On", "", Type::ChangeState);
       }
@@ -576,16 +644,28 @@ bool KonamiTMNT2Track::readEvent() {
 
       // Set YM2151 LFO ramp rate and delay (channel). This determines how many ticks to process
       // before incrementing AMS and PMS (per channel amplitude/pitch modulation sensitivity)
-
-      m_lfoRampStepTicks = std::max(1, (waveformAndRampInterval & 0xF0) >> 3);
-      m_lfoDelay = std::max<int>(1, readByte(curOffset++));
+      if (fmtVersion() == VENDETTA) {
+        // The driver divides this value by 2, but we're ignoring the driver's doubling of durations,
+        // so this should be divided by 4.
+        m_lfoRampStepTicks = readByte(curOffset++) / 4;
+      } else {
+        m_lfoRampStepTicks = std::max(1, (waveformAndRampInterval & 0xF0) >> 3);
+        m_lfoDelay = std::max<int>(1, readByte(curOffset++));
+      }
       addGenericEvent(beginOffset, 6, "LFO Setup", "", Type::Lfo);
       break;
     }
     case 0xEA:
-      // Set LFO delay
-      m_lfoDelay = std::max<int>(1, readByte(curOffset++));
-      addGenericEvent(beginOffset, 2, "LFO Delay", "", Type::Lfo);
+      // Set LFO delay or LFO ramp interval (Vendetta)
+      if (fmtVersion() == VENDETTA) {
+        // The driver divides this value by 2, but we're ignoring the driver's doubling of durations,
+        // so this should be divided by 4.
+        m_lfoRampStepTicks = readByte(curOffset++) / 4;
+        addGenericEvent(beginOffset, 2, "LFO Ramp Interval", "", Type::Lfo);
+      } else {
+        m_lfoDelay = std::max<int>(1, readByte(curOffset++));
+        addGenericEvent(beginOffset, 2, "LFO Delay", "", Type::Lfo);
+      }
       break;
     case 0xEB: {
       // Portamento (at least for YM2151)
@@ -657,10 +737,10 @@ bool KonamiTMNT2Track::readEvent() {
     case 0xF5:
     case 0xF6:
     case 0xF7: {
-      if (percussionMode()) {
-        m_addedToNote = (opcode & 0xF) - 1;
+      if (!m_isFmTrack && percussionMode()) {
+        m_drumBank = (opcode & 0xF) - 1;
       } else {
-        m_addedToNote = (opcode & 0xF) * 12;
+        m_noteOffset = (opcode & 0xF) * 12;
       }
       addGenericEvent(beginOffset, 1, "Set Octave", fmt::format("Octave - {}", opcode & 0xF), Type::Octave);
       break;
