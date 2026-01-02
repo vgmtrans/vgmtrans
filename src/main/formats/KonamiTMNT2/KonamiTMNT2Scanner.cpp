@@ -129,7 +129,16 @@ void KonamiTMNT2Scanner::scan(RawFile * /*file*/, void *info) {
     return;
   }
 
-  auto seqs = loadSeqTable(programRom, *seqTableAddr, fmtVer, gameEntry->name);
+  u32 defaultTickSkipInterval = 0;
+  programRomGroup->getHexAttribute("default_tick_skip_interval", &defaultTickSkipInterval);
+
+  auto seqs = loadSeqTable(
+    programRom,
+    *seqTableAddr,
+    fmtVer,
+    defaultTickSkipInterval,
+    gameEntry->name
+  );
 
   u16 instrTableAddrK053260 = readTableAddr(ptn_tmnt2_LoadInstrTable, 3).value_or(0);
   u16 drumTableAddr = readTableAddr(ptn_tmnt2_LoadDrumTable, 10).value_or(0);
@@ -245,6 +254,7 @@ std::vector<KonamiTMNT2Seq*> KonamiTMNT2Scanner::loadSeqTable(
   RawFile* programRom,
   u32 seqTableAddr,
   KonamiTMNT2FormatVer fmtVer,
+  u8 defaultTickSkipInterval,
   std::string& gameName
 ) {
   VGMMiscFile *seqTable = new VGMMiscFile(
@@ -311,7 +321,15 @@ std::vector<KonamiTMNT2Seq*> KonamiTMNT2Scanner::loadSeqTable(
       std::ranges::min(k053260TrkPtrs)
     );
 
-    auto *sequence = new KonamiTMNT2Seq(programRom, fmtVer, start, ym2151TrkPtrs, k053260TrkPtrs, sequenceName);
+    auto *sequence = new KonamiTMNT2Seq(
+      programRom,
+      fmtVer,
+      start,
+      ym2151TrkPtrs,
+      k053260TrkPtrs,
+      defaultTickSkipInterval,
+      sequenceName
+    );
     if (!sequence->loadVGMFile()) {
       delete sequence;
     } else {

@@ -5,6 +5,7 @@
  */
 #include "KonamiTMNT2Seq.h"
 
+#include "KonamiTMNT2Definitions.h"
 #include "KonamiTMNT2Instr.h"
 #include "ScaleConversion.h"
 #include "VGMColl.h"
@@ -17,6 +18,7 @@ DECLARE_FORMAT(KonamiTMNT2);
 
 namespace {
 
+constexpr int PPQN = 96;
 constexpr u8 K053260_BASE_VEL = 0x7F;
 constexpr double K053260_VOL_MUL = 1.3;
 
@@ -37,6 +39,15 @@ constexpr std::array<std::array<int, 2>, 8> K053260_PAN_MUL = {{
 
 constexpr double K053260_PAN_SCALE = 65536.0;
 
+constexpr double calculateTempo(std::uint8_t clkb, double clockHz, int ppqn, int tickSkipInterval) {
+  // The driver uses YM2151's Timer B to send IRQs to the Z80. It sets CLKB at startup.
+  const double ticks = 1024.0 * (256.0 - static_cast<double>(clkb));
+  double tempo = (60.0 * clockHz) / (static_cast<double>(ppqn) * ticks);
+  if (tickSkipInterval > 0)
+    tempo *= (tickSkipInterval - 1) / static_cast<double>(tickSkipInterval);
+  return tempo;
+}
+
 }  // namespace
 
 KonamiTMNT2Seq::KonamiTMNT2Seq(RawFile *file,
@@ -44,16 +55,19 @@ KonamiTMNT2Seq::KonamiTMNT2Seq(RawFile *file,
                                u32 offset,
                                std::vector<u32> ym2151TrackOffsets,
                                std::vector<u32> k053260TrackOffsets,
+                               u8 defaultTickSkipInterval,
                                const std::string &name)
     : VGMSeq(KonamiTMNT2Format::name, file, offset, 0, name),
       m_fmtVer(fmtVer),
       m_ym2151TrackOffsets(std::move(ym2151TrackOffsets)),
-      m_k053260TrackOffsets(std::move(k053260TrackOffsets)) {
+      m_k053260TrackOffsets(std::move(k053260TrackOffsets)),
+      m_defaultTickSkipInterval(defaultTickSkipInterval) {
   bLoadTickByTick = true;
-  setPPQN(240);
+  setPPQN(PPQN);
   setAlwaysWriteInitialVol(127);
   setAlwaysWriteInitialExpression(127);
-  setAlwaysWriteInitialTempo(110);
+  double tempo = calculateTempo(YM2151_CLKB, YM2151_CLOCK_RATE, PPQN, m_defaultTickSkipInterval);
+  setAlwaysWriteInitialTempo(tempo);
   setAllowDiscontinuousTrackData(true);
 }
 
@@ -116,6 +130,7 @@ KonamiTMNT2Track::KonamiTMNT2Track(
 void KonamiTMNT2Track::resetVars() {
   SeqTrack::resetVars();
 
+  m_program = 0;
   m_state = 0;
   m_rawBaseDur = 0;
   m_baseDur = 0;
@@ -138,6 +153,12 @@ void KonamiTMNT2Track::resetVars() {
   m_warpCounter = 0;
   m_warpOrigin = 0;
   m_warpDest = 0;
+
+  m_noteCountdown = 0;
+  m_lfoRampValue = 0;
+  m_lfoDelay = 0;
+  m_lfoDelayCountdown = 0;
+  m_lfoRampStepTicks = 0;
 }
 
 double KonamiTMNT2Track::calculateVol(u8 baseVol) {
@@ -200,6 +221,46 @@ void KonamiTMNT2Track::handleProgramChangeK053260() {
   }
 }
 
+void KonamiTMNT2Track::onTickBegin() {
+  if (m_noteCountdown > 0)
+    m_noteCountdown -= 1;
+
+  if (m_noteCountdown <= 0) {
+    // note not active
+    return;
+  }
+
+  if (m_lfoRampStepTicks == 0)
+    return;
+
+  if (m_lfoDelayCountdown > 0) {
+    m_lfoDelayCountdown -= 1;
+    return;
+  }
+
+  if (m_lfoRampValue >= 7)
+    return;
+
+  if (--m_lfoRampStepCountdown == 0) {
+    m_lfoRampStepCountdown = m_lfoRampStepTicks;
+    m_lfoRampValue += 1;
+
+    addControllerEventNoItem(77, m_lfoRampValue * 16);
+    addControllerEventNoItem(92, (m_lfoRampValue >> 1) * 32);
+  }
+}
+
+void KonamiTMNT2Track::onNoteBegin(int noteDur) {
+  m_noteCountdown = noteDur;
+  m_lfoDelayCountdown = m_lfoDelay;
+  m_lfoRampStepCountdown = m_lfoRampStepTicks;
+  if (m_lfoRampValue > 0) {
+    addControllerEventNoItem(77, 0);
+    addControllerEventNoItem(92, 0);
+  }
+  m_lfoRampValue = 0;
+}
+
 bool KonamiTMNT2Track::readEvent() {
   if (!isValidOffset(curOffset)) {
     return false;
@@ -249,6 +310,7 @@ bool KonamiTMNT2Track::readEvent() {
         noteDur -= 1;
 
       u8 vel = calculateVol(0x7F) * 127.0;
+      onNoteBegin(noteDur);
       addNoteByDur(beginOffset, curOffset - beginOffset, note, vel, noteDur);
     } else {
       if (percussionMode()) {
@@ -268,6 +330,7 @@ bool KonamiTMNT2Track::readEvent() {
 
         if (m_pan == 0)
           updatePan();
+        onNoteBegin(dur);
         addNoteByDur(beginOffset, curOffset - beginOffset, note, vel, dur);
       } else {
         // Melodic
@@ -283,6 +346,7 @@ bool KonamiTMNT2Track::readEvent() {
         u8 finalAtten = 0x7F - (calculateVol(m_baseVol) * 127.0);
         u8 vel = K053260_BASE_VEL - finalAtten;
 
+        onNoteBegin(noteDur);
         addNoteByDur(beginOffset, curOffset - beginOffset, note, vel, noteDur);
       }
     }
@@ -355,6 +419,7 @@ bool KonamiTMNT2Track::readEvent() {
       break;
     case 0xDE:
       m_state |= 0x20;
+      addGenericEvent(beginOffset, 1, "Set Duration-related flag", "", Type::DurationChange);
       break;
     case 0xDF:
       // Halve Base Duration Toggle
@@ -374,18 +439,21 @@ bool KonamiTMNT2Track::readEvent() {
         m_state |= 4;
         if (val == 0) {
           u8 tickSkip = readByte(curOffset++);
+          double tempo = calculateTempo(YM2151_CLKB, YM2151_CLOCK_RATE, PPQN, tickSkip);
+          addTempoBPMNoItem(tempo);
+
           // byte effectively sets ppqn / tempo. Still need to hammer this down
           val = readByte(curOffset++);
         }
         m_rawBaseDur = val;
-        // We multiply the raw base duration by two so we can cleanly halve durations (for event DF)
-        m_rawBaseDur *= 2;
         m_baseDur = m_rawBaseDur * 3;
         m_program = readByte(curOffset++);
         // TMNT2 is weird. It has 113 FM instruments, but code to handle > 128, however, it just
         // performs a simple &= 0x7F. Values over 127 are used in sequences.
-        m_program &= 0x7F;
-        addProgramChangeNoItem(m_program, false);
+        if (fmtVersion() == TMNT2)
+          m_program &= 0x7F;
+
+        addProgramChangeNoItem(m_program, true);
         u8 attenuation = std::min<u8>(readByte(curOffset++), 0x7F);
         addVolNoItem(0x7F - attenuation);
         m_noteDurPercent = readByte(curOffset++);
@@ -394,8 +462,6 @@ bool KonamiTMNT2Track::readEvent() {
         if ((val & 0xF0) == 0) {
           m_state = val & 0xF0;
           m_rawBaseDur = val;
-          // We multiply the raw base duration by two so we can cleanly halve durations for event DF
-          m_rawBaseDur *= 2;
           m_baseDur = m_rawBaseDur * 3;
           m_program = readByte(curOffset++);
           addProgramChangeNoItem(m_program, false);
@@ -408,8 +474,6 @@ bool KonamiTMNT2Track::readEvent() {
         else {
           m_addedToNote = (val >> 4) - 1;
           m_rawBaseDur = val & 0xF;
-          // We multiply the raw base duration by two so we can cleanly halve durations for event DF
-          m_rawBaseDur *= 2;
           m_baseDur = m_rawBaseDur * 3;
           m_attenuation = readByte(curOffset++);
           setPercussionModeOn();
@@ -438,8 +502,6 @@ bool KonamiTMNT2Track::readEvent() {
     case 0xE2: {
       // Set base duration
       m_rawBaseDur = readByte(curOffset++);
-      // We multiply the raw base duration by two so we can cleanly halve durations (for event DF)
-      m_rawBaseDur *= 2;
       m_baseDur = m_rawBaseDur * 3;
       auto desc = fmt::format("Base Duration - {}", m_baseDur);
       addGenericEvent(beginOffset, 2, "Set Base Duration", desc, Type::DurationChange);
@@ -455,7 +517,7 @@ bool KonamiTMNT2Track::readEvent() {
       } else {
         handleProgramChangeK053260();
       }
-      addProgramChange(beginOffset, 2, m_program);
+      addProgramChange(beginOffset, 2, m_program, true);
       break;
     case 0xE4: {
       m_attenuation = readByte(curOffset++) & 0x7F;
@@ -489,23 +551,41 @@ bool KonamiTMNT2Track::readEvent() {
     case 0xE8:    // NOP
       break;
     case 0xE9: {
-      // used in ssriders seq 11
-      // used in tmnt seq 16
-      // Sets up LFO
-      u8 data = readByte(curOffset++);
-      if (data == 0) {
-        // Sets some LFO state to 0
-        addGenericEvent(beginOffset, 2, "LFO Off?", "", Type::Unknown);
+      // Set up global and channel LFO params
+      u8 lfrq = readByte(curOffset++);
+      if (lfrq == 0) {
+        m_lfoRampStepTicks = 0;
+        addGenericEvent(beginOffset, 2, "LFO Effects Off", "", Type::Lfo);
         break;
       }
-      curOffset += 4;
-      addGenericEvent(beginOffset, 6, "LFO Setup?", "", Type::Unknown);
+      // Set YM2151 LFO Frequency (global)
+      addControllerEventNoItem(35, lfrq & 1);
+      addControllerEventNoItem(3, lfrq >> 1);
+
+      // Set YM2151 pulse modulation depth (global)
+      u8 pmd = readByte(curOffset++);
+      addBreathNoItem(pmd);
+
+      // Set YM2151 amplitude modulation depth (global)
+      u8 amd = readByte(curOffset++);
+      addModulationNoItem(amd);
+
+      // Set YM2151 LFO waveform (global)
+      u8 waveformAndRampInterval = readByte(curOffset++);
+      addControllerEventNoItem(79, waveformAndRampInterval & 3);
+
+      // Set YM2151 LFO ramp rate and delay (channel). This determines how many ticks to process
+      // before incrementing AMS and PMS (per channel amplitude/pitch modulation sensitivity)
+
+      m_lfoRampStepTicks = std::max(1, (waveformAndRampInterval & 0xF0) >> 3);
+      m_lfoDelay = std::max<int>(1, readByte(curOffset++));
+      addGenericEvent(beginOffset, 6, "LFO Setup", "", Type::Lfo);
       break;
     }
     case 0xEA:
-      // TODO: used in ssriders seq 11
-      curOffset += 1;
-      addUnknown(beginOffset, 2, fmt::format("Opcode {:02X}", opcode));
+      // Set LFO delay
+      m_lfoDelay = std::max<int>(1, readByte(curOffset++));
+      addGenericEvent(beginOffset, 2, "LFO Delay", "", Type::Lfo);
       break;
     case 0xEB: {
       // Portamento (at least for YM2151)
@@ -541,9 +621,13 @@ bool KonamiTMNT2Track::readEvent() {
     case 0xED: {
       // Pitch bend
       s8 val = static_cast<s8>(readByte(curOffset++));
+
       if (m_isFmTrack) {
-        double cents = val * (100/64.0);
-        addPitchBend(beginOffset, 2, cents);
+        int bend = val & 0x7F;
+        if (val & 0x80)
+          bend = -bend;
+        double cents = bend * (100/64.0);
+        addPitchBendAsPercent(beginOffset, 2, cents / 200.0);
       } else {
         addGenericEvent(beginOffset, 2, "Pitch Bend", "", Type::Unknown);
       }

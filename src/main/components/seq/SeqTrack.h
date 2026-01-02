@@ -187,8 +187,10 @@ protected:
   void addTranspose(uint32_t offset, uint32_t length, int8_t transpose, const std::string &sEventName = "Transpose");
   void addPitchBendMidiFormat(uint32_t offset, uint32_t length, uint8_t lo, uint8_t hi, const std::string &sEventName = "Pitch Bend");
   void addModulation(uint32_t offset, uint32_t length, uint8_t depth, const std::string &sEventName = "Modulation Depth");
+  void addModulationNoItem(uint8_t depth);
   void insertModulation(uint32_t offset, uint32_t length, uint8_t depth, uint32_t absTime, const std::string &sEventName = "Modulation Depth");
   void addBreath(uint32_t offset, uint32_t length, uint8_t depth, const std::string &sEventName = "Breath Depth");
+  void addBreathNoItem(uint8_t depth);
   void insertBreath(uint32_t offset, uint32_t length, uint8_t depth, uint32_t absTime, const std::string &sEventName = "Breath Depth");
 
   void addSustainEvent(uint32_t offset, uint32_t length, uint8_t depth, const std::string &sEventName = "Sustain");
