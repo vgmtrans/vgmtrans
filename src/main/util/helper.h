@@ -11,6 +11,10 @@
 #include <string>
 #include <filesystem>
 
+inline std::filesystem::path pathFromUtf8(const std::string& path) {
+  return { std::u8string(reinterpret_cast<const char8_t*>(path.c_str())) };
+}
+
 template <class T>
 void deleteVect(std::vector<T *> &vect) {
   for (auto p : vect) {

@@ -7,6 +7,7 @@
 #include <fstream>
 
 #include "VGMExport.h"
+#include "helper.h"
 #include "VGMInstrSet.h"
 #include "VGMSampColl.h"
 #include "VGMSamp.h"
@@ -78,7 +79,7 @@ void saveAllAsWav(const VGMSampColl &coll, const std::string &save_dir) {
 }
 
 bool saveDataToFile(const char* begin, uint32_t length, const std::string& filepath) {
-  std::ofstream out(filepath, std::ios::out | std::ios::binary);
+  std::ofstream out(pathFromUtf8(filepath), std::ios::out | std::ios::binary);
 
   if (!out) {
     return false;
