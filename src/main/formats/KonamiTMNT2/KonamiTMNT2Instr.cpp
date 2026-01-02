@@ -65,7 +65,7 @@ bool KonamiTMNT2SampleInstrSet::parseMelodicInstrs() {
   u16 minInstrOffset = -1;
   u16 maxInstrOffset = 0;
   for (int i = 0; i < m_instrInfos.size(); ++i) {
-    if (m_instrInfos[i].start_msb >= 0x20) {
+    if (m_instrInfos[i].start_hi >= 0x20) {
       instrTableItem->addChild(m_instrTableAddr + (i * 2), 2, "Bad Instr Pointer");
       continue;
     }
@@ -82,7 +82,7 @@ bool KonamiTMNT2SampleInstrSet::parseMelodicInstrs() {
   int instrNum = 0;
   for (auto& instrInfo : m_instrInfos) {
     u32 offset = readShort(m_instrTableAddr + instrNum * 2);
-    if (instrInfo.start_msb < 0x20) {     // Sanity check for TMNT2 mess
+    if (instrInfo.start_hi < 0x20) {     // Sanity check for TMNT2 mess
       auto instrInfoItem = instrInfosItem->addChild(
         offset,
         sizeof(konami_tmnt2_instr_info),
@@ -200,14 +200,12 @@ bool KonamiTMNT2SampleInstrSet::parseDrums() {
 
 KonamiTMNT2SampColl::KonamiTMNT2SampColl(
     RawFile* file,
-    KonamiTMNT2SampleInstrSet* instrset,
-    const std::vector<konami_tmnt2_instr_info>& instrInfos,
-    const std::vector<std::vector<konami_tmnt2_drum_info>>& drumTables,
+    const std::vector<sample_info>& sampInfos,
     u32 offset,
     u32 length,
     std::string name)
     : VGMSampColl(KonamiTMNT2Format::name, file, offset, length, std::move(name)),
-      instrset(instrset), instrInfos(instrInfos), drumTables(drumTables)
+      m_sampInfos(sampInfos)
 {
 }
 
@@ -217,38 +215,17 @@ bool KonamiTMNT2SampColl::parseHeader() {
 
 bool KonamiTMNT2SampColl::parseSampleInfo() {
   int sampNum = 0;
-
-  // We will consolidate all of the melodic and drum instrument data together into a single vector
-  // for the sake of iterating over all samples. We'll convert each konami_tmnt2_drum_info into a
-  // konami_tmnt2_instr_info - no relevant data will be lost.
-  std::vector<konami_tmnt2_instr_info> flatDrumInfos;
-  for (auto const& inner : drumTables) {
-    for (auto const& drumInfo : inner) {
-      konami_tmnt2_instr_info drumInstr = {
-        drumInfo.flags, drumInfo.length_lo, drumInfo.length_hi,
-        drumInfo.start_lo, drumInfo.start_mid, drumInfo.start_hi,
-        drumInfo.volume, drumInfo.note_dur_lo, drumInfo.release_dur_and_rate, drumInfo.default_pan
-      };
-      flatDrumInfos.emplace_back(drumInstr);
-    }
-  }
-
-  std::vector<konami_tmnt2_instr_info> allInstrInfos;
-  allInstrInfos.reserve(instrInfos.size() + flatDrumInfos.size());
-  allInstrInfos.insert(allInstrInfos.end(), instrInfos.begin(), instrInfos.end());
-  allInstrInfos.insert(allInstrInfos.end(), flatDrumInfos.begin(), flatDrumInfos.end());
-
   std::set<std::tuple<u32, u32, bool>> seenSamples;
 
-  for (auto instrInfo : allInstrInfos) {
-    u32 sampleOffset = instrInfo.start_msb << 16 | instrInfo.start_mid << 8 | instrInfo.start_lsb;
-    u32 sampleSize = instrInfo.length_msb << 8 | instrInfo.length_lsb;
+  for (auto sampInfo : m_sampInfos) {
+    u32 sampleOffset = sampInfo.offset;
+    u32 sampleSize = sampInfo.length;
 
-    if (instrInfo.reverse()) {
+    if (sampInfo.isReverse) {
       sampleOffset = sampleOffset - sampleSize;
     }
 
-    auto sampleKey = std::make_tuple(sampleOffset, sampleSize, instrInfo.reverse());
+    auto sampleKey = std::make_tuple(sampleOffset, sampleSize, sampInfo.isReverse);
     if (!seenSamples.insert(sampleKey).second) {
       continue;
     }
@@ -258,7 +235,7 @@ bool KonamiTMNT2SampColl::parseSampleInfo() {
     if (sampleOffset + sampleSize > unLength) {
       sample = new EmptySamp(this);
     }
-    else if (instrInfo.isAdpcm()) {
+    else if (sampInfo.isAdpcm) {
       sample = new KonamiAdpcmSamp(
         this,
         sampleOffset,
@@ -283,7 +260,7 @@ bool KonamiTMNT2SampColl::parseSampleInfo() {
     }
     sample->setLoopStatus(false);
     sample->unityKey = 0x3B;
-    sample->setReverse(instrInfo.reverse());
+    sample->setReverse(sampInfo.isReverse);
   }
   return true;
 }
