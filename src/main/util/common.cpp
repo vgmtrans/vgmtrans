@@ -17,7 +17,7 @@ std::string toLower(const std::string& input) {
   return output;
 }
 
-std::filesystem::path makeSafeFilePath(std::string_view s) {
+std::filesystem::path makeSafeFileName(std::string_view s) {
   std::string out;
   out.reserve(s.size());
 

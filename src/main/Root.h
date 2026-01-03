@@ -41,7 +41,7 @@ public:
   virtual ~VGMRoot() = default;
 
   virtual bool init();
-  virtual bool openRawFile(const std::filesystem::path &filePath);
+  virtual bool openRawFile(const std::filesystem::path& filePath);
   bool createVirtFile(const uint8_t* databuf, uint32_t fileSize, const std::string& filename,
                       const std::filesystem::path& parRawFileFullPath = {}, const VGMTag& tag = VGMTag());
   bool loadRawFile(RawFile* newRawFile);
@@ -88,10 +88,10 @@ public:
   virtual void UI_endRemoveVGMColls() {}
 
   virtual void UI_addItem(VGMItem *, VGMItem *, const std::string &, void *) {}
-  virtual std::filesystem::path UI_getSaveFilePath(const std::string &suggestedFilename,
+  virtual std::filesystem::path UI_getSaveFilePath(const std::string& suggestedFilename,
                                          const std::string &extension = "") = 0;
-  virtual std::filesystem::path UI_getSaveDirPath(const std::filesystem::path &suggestedDir = {}) = 0;
-  virtual bool UI_writeBufferToFile(const std::filesystem::path &filepath, uint8_t *buf, size_t size);
+  virtual std::filesystem::path UI_getSaveDirPath(const std::filesystem::path& suggestedDir = {}) = 0;
+  virtual bool UI_writeBufferToFile(const std::filesystem::path& filepath, uint8_t *buf, size_t size);
 
   virtual void UI_log(LogItem *) { }
   virtual void UI_toast(std::string_view message, ToastType type = ToastType::Info,

@@ -15,23 +15,13 @@
 QtVGMRoot qtVGMRoot;
 
 std::filesystem::path QtVGMRoot::UI_getResourceDirPath() {
-  auto toPath = [](const QString& qstr) {
-    auto utf8 = qstr.toUtf8();
-    std::u8string u8;
-    u8.reserve(utf8.size());
-    for (auto ch : utf8) {
-      u8.push_back(static_cast<char8_t>(ch));
-    }
-    return std::filesystem::path(u8);
-  };
-#if defined(Q_OS_WIN)
-  return toPath(QApplication::applicationDirPath() + "/");
-#elif defined(Q_OS_MACOS)
-  return toPath(QApplication::applicationDirPath() + "/../Resources/");
-#elif defined(Q_OS_LINUX)
-  return toPath(QApplication::applicationDirPath() + "/");
+  std::filesystem::path appDir = std::filesystem::path(QApplication::applicationDirPath().toStdWString());
+
+#if defined(Q_OS_MACOS)
+  // appDir is usually .../MyApp.app/Contents/MacOS
+  return (appDir / ".." / "Resources").lexically_normal();
 #else
-  return toPath(QApplication::applicationDirPath() + "/");
+  return appDir;
 #endif
 }
 
@@ -78,7 +68,7 @@ void QtVGMRoot::UI_addItem(VGMItem* item, VGMItem* parent, const std::string& it
 }
 
 std::filesystem::path QtVGMRoot::UI_getSaveFilePath(const std::string& suggested_filename,
-                                           const std::string& extension) {
+                                                    const std::string& extension) {
   return openSaveFileDialog(suggested_filename, extension);
 }
 

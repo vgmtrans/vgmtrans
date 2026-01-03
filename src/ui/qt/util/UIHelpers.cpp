@@ -42,8 +42,7 @@ void applyEffectToPixmap(QPixmap &src, QPixmap &tgt, QGraphicsEffect *effect, in
 }
 
 std::filesystem::path openSaveDirDialog() {
-  static QString selected_dir =
-      QStandardPaths::writableLocation(QStandardPaths::MusicLocation);
+  static QString selected_dir =QStandardPaths::writableLocation(QStandardPaths::MusicLocation);
 
   QFileDialog dialog(QApplication::activeWindow());
   dialog.setFileMode(QFileDialog::Directory);
@@ -53,7 +52,7 @@ std::filesystem::path openSaveDirDialog() {
   if (dialog.exec()) {
     selected_dir = dialog.directory().absolutePath();
     const QString chosen = dialog.selectedFiles().at(0);
-    return std::filesystem::path(chosen.toStdString()); // (Qt 6: UTF-8)
+    return std::filesystem::path(chosen.toStdWString());
   }
   return {};
 }
@@ -87,7 +86,7 @@ std::filesystem::path openSaveFileDialog(const std::filesystem::path& suggested_
     selected_dir = dialog.directory().absolutePath();
 
     const QString chosen = dialog.selectedFiles().at(0);
-    return std::filesystem::path(chosen.toStdString()); // keep it simple
+    return std::filesystem::path(chosen.toStdWString());
   }
 
   return {};

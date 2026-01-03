@@ -49,7 +49,7 @@ bool CLIVGMRoot::makeOutputDir() {
   return true;
 }
 
-bool CLIVGMRoot::openRawFile(const fs::path &filename) {
+bool CLIVGMRoot::openRawFile(const fs::path& filename) {
   cout << "Loading " << filename << endl;
   return VGMRoot::openRawFile(filename);
 }
@@ -221,10 +221,9 @@ void CLIVGMRoot::UI_log(LogItem* theLog) {
 }
 
 std::filesystem::path CLIVGMRoot::UI_getSaveFilePath(const string& suggestedFilename, const string& extension) {
-  std::u8string filename = makeSafeFilePath(suggestedFilename).u8string();
-  filename += u8".";
-  filename += std::u8string(extension.begin(), extension.end());
-  return outputDir / fs::path(filename);
+  auto filename = makeSafeFileName(suggestedFilename);
+  filename.replace_extension(extension);
+  return outputDir / filename;
 }
 
 std::filesystem::path CLIVGMRoot::UI_getSaveDirPath(const std::filesystem::path& suggestedDir) {

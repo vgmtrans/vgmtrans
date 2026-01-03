@@ -55,7 +55,7 @@ using VGMFileVariant = std::variant<VGMSeq*, VGMInstrSet*, VGMSampColl*, VGMMisc
 std::string toUpper(const std::string& input);
 std::string toLower(const std::string& input);
 
-std::filesystem::path makeSafeFilePath(std::string_view s);
+std::filesystem::path makeSafeFileName(std::string_view s);
 
 template<typename T, std::size_t N>
 constexpr std::size_t countof(T const (&)[N]) noexcept {

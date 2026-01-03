@@ -13,11 +13,6 @@
 #include "MainWindow.h"
 #include "QtVGMRoot.h"
 
-const auto toPath = [](const QString& str) {
-  auto encoded = str.toUtf8();
-  return std::filesystem::path(std::u8string(encoded.begin(), encoded.end()));
-};
-
 class VGMTransApplication final : public QApplication {
 public:
   using QApplication::QApplication;

@@ -211,10 +211,10 @@ public:
               } else {
                 std::string suggestedFileName;
                 if constexpr (has_getname<T>::value) {
-                  suggestedFileName = pathToUtf8(makeSafeFilePath((*items)[0]->name()));
+                  suggestedFileName = pathToUtf8(makeSafeFileName((*items)[0]->name()));
                 }
                 auto fileExtension = get<std::filesystem::path>(propSpec.defaultValue);
-                auto path = openSaveFileDialog(suggestedFileName, fileExtension.generic_string());
+                auto path = openSaveFileDialog(suggestedFileName, fileExtension);
                 if (path.empty()) {
                   return;
                 }

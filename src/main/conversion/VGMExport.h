@@ -40,7 +40,7 @@ bool saveAsOriginal(const RawFile& rawfile, const std::filesystem::path& filepat
 
 template <Target options>
 void saveAs(const VGMColl &coll, const std::filesystem::path &dir_path) {
-  auto filename = makeSafeFilePath(coll.name());
+  auto filename = makeSafeFileName(coll.name());
   auto filepath = dir_path / filename;
 
   if constexpr ((options & Target::MIDI) != 0) {

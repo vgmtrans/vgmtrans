@@ -75,8 +75,7 @@ bool VGMRoot::createVirtFile(const uint8_t *databuf, uint32_t fileSize, const st
                              const std::filesystem::path &parRawFileFullPath, const VGMTag& tag) {
   assert(fileSize != 0);
 
-  auto newVirtFile = new VirtFile(databuf, fileSize, filename,
-    parRawFileFullPath.u8string(), tag);
+  auto newVirtFile = new VirtFile(databuf, fileSize, filename, parRawFileFullPath, tag);
 
   if (!loadRawFile(newVirtFile)) {
     delete newVirtFile;

@@ -74,11 +74,11 @@ bool saveAsSF2(const VGMColl &coll, const fs::path &filepath) {
 }
 
 void saveAllAsWav(const VGMSampColl &coll, const fs::path &save_dir) {
-  const auto collName = makeSafeFilePath(coll.name()).u8string();
+  const auto collName = makeSafeFileName(coll.name()).u8string();
   for (auto &sample : coll.samples) {
     std::u8string filename = collName;
     filename += u8" - ";
-    filename += makeSafeFilePath(sample->name()).u8string();
+    filename += makeSafeFileName(sample->name()).u8string();
     filename += u8".wav";
     auto path = save_dir / fs::path(filename);
     sample->saveAsWav(path);
