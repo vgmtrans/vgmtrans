@@ -46,7 +46,7 @@ std::string YM2151InstrSet::generateOPMFile() const {
   return output.str();
 }
 
-bool YM2151InstrSet::saveAsOPMFile(const std::string &filepath) const {
+bool YM2151InstrSet::saveAsOPMFile(const std::filesystem::path &filepath) const {
   auto content = generateOPMFile();
   pRoot->UI_writeBufferToFile(filepath, reinterpret_cast<uint8_t*>(const_cast<char*>(content.data())), static_cast<uint32_t>(content.size()));
   return true;

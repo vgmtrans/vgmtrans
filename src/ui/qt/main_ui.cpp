@@ -9,8 +9,14 @@
 #include <QFileOpenEvent>
 #include <QFontDatabase>
 #include <QStyleFactory>
+#include <filesystem>
 #include "MainWindow.h"
 #include "QtVGMRoot.h"
+
+const auto toPath = [](const QString& str) {
+  auto encoded = str.toUtf8();
+  return std::filesystem::path(std::u8string(encoded.begin(), encoded.end()));
+};
 
 class VGMTransApplication final : public QApplication {
 public:
@@ -20,7 +26,8 @@ protected:
   bool event(QEvent* event) override {
     if (event->type() == QEvent::FileOpen) {
       auto* fileEvent = static_cast<QFileOpenEvent*>(event);
-      qtVGMRoot.openRawFile(fileEvent->file().toStdString());
+      qtVGMRoot.openRawFile(std::filesystem::path(fileEvent->file().toStdWString()));
+
       return true;
     }
     return QApplication::event(event);
@@ -46,8 +53,9 @@ int main(int argc, char *argv[]) {
   window.show();
 
   const QStringList args = app.arguments();
-  for (int i = 1; i < args.size(); i++) {
-    qtVGMRoot.openRawFile(args.at(i).toStdString());
+  for (int i = 1; i < args.size(); ++i) {
+    const QString& s = args.at(i);
+    qtVGMRoot.openRawFile(std::filesystem::path(s.toStdWString()));
   }
 
   return app.exec();

@@ -6,6 +6,7 @@
 
 #include <nlohmann/json.hpp>
 #include <spdlog/fmt/fmt.h>
+#include <filesystem>
 #include <cstdlib>
 #include <fstream>
 #include <ranges>
@@ -14,6 +15,7 @@
 #include "Format.h"
 #include "KabukiDecrypt.h"
 #include "CPS3Decrypt.h"
+#include "helper.h"
 #include "LoaderManager.h"
 #include "LogManager.h"
 #include "Root.h"
@@ -61,7 +63,7 @@ MAMELoader::~MAMELoader() {
 
 namespace {
 
-constexpr const char* kMameJsonFilename = "mame_roms.json";
+const std::filesystem::path kMameJsonFilename = "mame_roms.json";
 
 std::string jsonToString(const json& value) {
   if (value.is_string())
@@ -220,10 +222,10 @@ MAMEGame* loadGameEntry(const json& gameJson) {
 }  // namespace
 
 bool MAMELoader::loadJSON() {
-  const std::string jsonFilePath = pRoot->UI_getResourceDirPath() + kMameJsonFilename;
+  const auto jsonFilePath = pRoot->UI_getResourceDirPath() / kMameJsonFilename;
   std::ifstream jsonFile(jsonFilePath);
   if (!jsonFile.is_open()) {
-    L_ERROR("Failed to open MAME ROM definition JSON at {}", jsonFilePath);
+    L_ERROR("Failed to open MAME ROM definition JSON at {}", pathToUtf8(jsonFilePath));
     return false;
   }
 

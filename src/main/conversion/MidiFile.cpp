@@ -5,6 +5,7 @@
  */
 
 #include <ranges>
+#include <filesystem>
 #include <spdlog/fmt/fmt.h>
 #include "VGMSeq.h"
 #include "Root.h"
@@ -68,7 +69,7 @@ void MidiFile::sort() {
   }
 }
 
-bool MidiFile::saveMidiFile(const std::string &filepath) {
+bool MidiFile::saveMidiFile(const std::filesystem::path &filepath) {
   std::vector<uint8_t> midiBuf;
   writeMidiToBuffer(midiBuf);
   return pRoot->UI_writeBufferToFile(filepath, &midiBuf[0], midiBuf.size());

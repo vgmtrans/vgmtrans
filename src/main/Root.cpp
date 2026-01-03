@@ -15,6 +15,7 @@
 #include "VGMMiscFile.h"
 #include "Format.h"
 #include "Scanner.h"
+#include "helper.h"
 #include "Matcher.h"
 
 #include "FileLoader.h"
@@ -54,12 +55,12 @@ bool VGMRoot::init() {
 
 /* Opens up a file from the filesystem and scans it.
  * Returns bool indicating if VGMFiles were found. */
-bool VGMRoot::openRawFile(const std::string &filePath) {
+bool VGMRoot::openRawFile(const std::filesystem::path &filePath) {
   DiskFile* newFile = nullptr;
   try {
-    newFile = new DiskFile(filePath);
+    newFile = new DiskFile(pathToUtf8(filePath));
   } catch (...) {
-    UI_toast("Error opening file at path: " + filePath, ToastType::Error);
+    UI_toast(std::u8string(u8"Error opening file at path: ") + filePath.u8string(), ToastType::Error);
     return false;
   }
   size_t vgmFileCountBefore = vgmFiles().size();
@@ -71,11 +72,11 @@ bool VGMRoot::openRawFile(const std::string &filePath) {
 
 /* Creates a new file backed by RAM */
 bool VGMRoot::createVirtFile(const uint8_t *databuf, uint32_t fileSize, const std::string& filename,
-                             const std::string &parRawFileFullPath, const VGMTag& tag) {
+                             const std::filesystem::path &parRawFileFullPath, const VGMTag& tag) {
   assert(fileSize != 0);
 
   auto newVirtFile = new VirtFile(databuf, fileSize, filename,
-    parRawFileFullPath, tag);
+    parRawFileFullPath.u8string(), tag);
 
   if (!loadRawFile(newVirtFile)) {
     delete newVirtFile;
@@ -319,12 +320,12 @@ void VGMRoot::UI_addVGMFile(std::variant<VGMSeq *, VGMInstrSet *, VGMSampColl *,
 
 // Given a pointer to a buffer of data, size, and a filename, this function writes the data
 // into a file on the filesystem.
-bool VGMRoot::UI_writeBufferToFile(const std::string &filepath, uint8_t *buf, size_t size) {
-  std::ofstream outfile(pathFromUtf8(filepath), std::ios::out | std::ios::trunc | std::ios::binary);
+bool VGMRoot::UI_writeBufferToFile(const std::filesystem::path &filepath, uint8_t *buf, size_t size) {
+  std::ofstream outfile(filepath, std::ios::out | std::ios::trunc | std::ios::binary);
 
   if (!outfile.is_open()) {
-    L_ERROR(std::string("Error: could not open file " + filepath + " for writing").c_str());
-      return false;
+    L_ERROR("Error: could not open file {} for writing", pathToUtf8(filepath));
+    return false;
   }
 
   outfile.write(reinterpret_cast<char *>(buf), size);
@@ -337,6 +338,6 @@ void VGMRoot::log(LogItem *theLog) {
   UI_log(theLog);
 }
 
-std::string VGMRoot::UI_getResourceDirPath() {
-  return std::string(std::filesystem::current_path().generic_string());
+std::filesystem::path VGMRoot::UI_getResourceDirPath() {
+  return std::filesystem::current_path();
 }

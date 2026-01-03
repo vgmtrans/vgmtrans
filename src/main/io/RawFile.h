@@ -165,7 +165,7 @@ class VirtFile final : public RawFile {
     VirtFile() = default;
     VirtFile(const RawFile &, size_t offset = 0);
     VirtFile(const RawFile &, size_t offset, size_t limit);
-    VirtFile(const uint8_t *data, uint32_t size, std::string name, std::string parent_fullpath = "",
+    VirtFile(const uint8_t *data, uint32_t size, std::string name, std::filesystem::path parent_fullpath = "",
              const VGMTag& tag = VGMTag());
     ~VirtFile() override = default;
 

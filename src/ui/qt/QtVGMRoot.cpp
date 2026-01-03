@@ -4,24 +4,34 @@
  * refer to the included LICENSE.txt file
  */
 
+
+#include "VGMFileTreeView.h"
+#include "UIHelpers.h"
 #include <QApplication>
 #include <QFileDialog>
 #include <QString>
 #include "QtVGMRoot.h"
-#include "VGMFileTreeView.h"
-#include "UIHelpers.h"
 
 QtVGMRoot qtVGMRoot;
 
-std::string QtVGMRoot::UI_getResourceDirPath() {
+std::filesystem::path QtVGMRoot::UI_getResourceDirPath() {
+  auto toPath = [](const QString& qstr) {
+    auto utf8 = qstr.toUtf8();
+    std::u8string u8;
+    u8.reserve(utf8.size());
+    for (auto ch : utf8) {
+      u8.push_back(static_cast<char8_t>(ch));
+    }
+    return std::filesystem::path(u8);
+  };
 #if defined(Q_OS_WIN)
-  return (QApplication::applicationDirPath() + "/").toStdString();
+  return toPath(QApplication::applicationDirPath() + "/");
 #elif defined(Q_OS_MACOS)
-  return (QApplication::applicationDirPath() + "/../Resources/").toStdString();
+  return toPath(QApplication::applicationDirPath() + "/../Resources/");
 #elif defined(Q_OS_LINUX)
-  return (QApplication::applicationDirPath() + "/").toStdString();
+  return toPath(QApplication::applicationDirPath() + "/");
 #else
-  return (QApplication::applicationDirPath() + "/").toStdString();
+  return toPath(QApplication::applicationDirPath() + "/");
 #endif
 }
 
@@ -57,8 +67,9 @@ void QtVGMRoot::UI_addVGMColl(VGMColl*) {
   this->UI_addedVGMColl();
 }
 
-void QtVGMRoot::UI_toast(const std::string& message, ToastType type, int duration_ms) {
-  this->UI_toastRequested(QString::fromStdString(message), type, duration_ms);
+void QtVGMRoot::UI_toast(std::u8string_view message, ToastType type, int duration_ms) {
+  std::string utf8(message.begin(), message.end());
+  this->UI_toastRequested(QString::fromUtf8(utf8.c_str(), static_cast<int>(utf8.size())), type, duration_ms);
 }
 
 void QtVGMRoot::UI_addItem(VGMItem* item, VGMItem* parent, const std::string& itemName,
@@ -67,11 +78,11 @@ void QtVGMRoot::UI_addItem(VGMItem* item, VGMItem* parent, const std::string& it
   treeview->addVGMItem(item, parent, itemName);
 }
 
-std::string QtVGMRoot::UI_getSaveFilePath(const std::string& suggested_filename,
+std::filesystem::path QtVGMRoot::UI_getSaveFilePath(const std::string& suggested_filename,
                                            const std::string& extension) {
   return openSaveFileDialog(suggested_filename, extension);
 }
 
-std::string QtVGMRoot::UI_getSaveDirPath(const std::string&) {
+std::filesystem::path QtVGMRoot::UI_getSaveDirPath(const std::filesystem::path&) {
   return openSaveDirDialog();
 }

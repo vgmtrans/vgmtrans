@@ -251,7 +251,7 @@ void MenuBar::appendOptionsMenu() {
   act->setChecked(Settings::the()->conversion.skipChannel10());
   connect(act, &QAction::toggled, [](bool skip) {
     if (!skip) {
-      pRoot->UI_toast("Tracks using MIDI channel 10 will be silent during in-app playback.", ToastType::Info);
+      pRoot->UI_toast(u8"Tracks using MIDI channel 10 will be silent during in-app playback.", ToastType::Info);
     }
     Settings::the()->conversion.setSkipChannel10(skip);
   });

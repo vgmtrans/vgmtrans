@@ -82,13 +82,13 @@ void VGMSamp::setVolume(double volume) {
 }
 
 bool VGMSamp::onSaveAsWav() {
-  std::string filepath = pRoot->UI_getSaveFilePath(ConvertToSafeFileName(name()), "wav");
-  if (filepath.empty())
+  auto filepath = pRoot->UI_getSaveFilePath(makeSafeFilePath(name()), "wav");
+  if (!filepath.empty())
     return saveAsWav(filepath);
   return false;
 }
 
-bool VGMSamp::saveAsWav(const std::string &filepath) {
+bool VGMSamp::saveAsWav(const std::filesystem::path &filepath) {
   uint32_t bufSize;
   if (this->ulUncompressedSize)
     bufSize = this->ulUncompressedSize;

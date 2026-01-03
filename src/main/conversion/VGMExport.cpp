@@ -5,6 +5,7 @@
  */
 #include <spdlog/fmt/fmt.h>
 #include <fstream>
+#include <algorithm>
 
 #include "VGMExport.h"
 #include "helper.h"
@@ -14,9 +15,11 @@
 #include "VGMColl.h"
 #include "SynthFile.h"
 
+namespace fs = std::filesystem;
+
 namespace conversion {
 
-bool saveAsDLS(VGMInstrSet &set, const std::string &filepath) {
+bool saveAsDLS(VGMInstrSet &set, const fs::path &filepath) {
   VGMColl* coll = !set.assocColls.empty() ? set.assocColls.front() : nullptr;
   if (!coll && !set.sampColl)
     return false;
@@ -37,7 +40,7 @@ bool saveAsDLS(VGMInstrSet &set, const std::string &filepath) {
   return false;
 }
 
-bool saveAsSF2(VGMInstrSet &set, const std::string &filepath) {
+bool saveAsSF2(VGMInstrSet &set, const fs::path &filepath) {
   VGMColl* coll = !set.assocColls.empty() ? set.assocColls.front() : nullptr;
   if (!coll && !set.sampColl)
     return false;
@@ -60,7 +63,7 @@ bool saveAsSF2(VGMInstrSet &set, const std::string &filepath) {
   return false;
 }
 
-bool saveAsSF2(const VGMColl &coll, const std::string &filepath) {
+bool saveAsSF2(const VGMColl &coll, const fs::path &filepath) {
   if (auto sf2file = createSF2File(coll.instrSets(), coll.sampColls(), &coll); sf2file) {
     bool bResult = sf2file->saveSF2File(filepath);
     delete sf2file;
@@ -70,16 +73,20 @@ bool saveAsSF2(const VGMColl &coll, const std::string &filepath) {
   return false;
 }
 
-void saveAllAsWav(const VGMSampColl &coll, const std::string &save_dir) {
+void saveAllAsWav(const VGMSampColl &coll, const fs::path &save_dir) {
+  const auto collName = makeSafeFilePath(coll.name()).u8string();
   for (auto &sample : coll.samples) {
-    auto path = fmt::format("{}/{} - {}.wav",
-      save_dir, ConvertToSafeFileName(coll.name()), ConvertToSafeFileName(sample->name()));
+    std::u8string filename = collName;
+    filename += u8" - ";
+    filename += makeSafeFilePath(sample->name()).u8string();
+    filename += u8".wav";
+    auto path = save_dir / fs::path(filename);
     sample->saveAsWav(path);
   }
 }
 
-bool saveDataToFile(const char* begin, uint32_t length, const std::string& filepath) {
-  std::ofstream out(pathFromUtf8(filepath), std::ios::out | std::ios::binary);
+bool saveDataToFile(const char* begin, uint32_t length, const fs::path& filepath) {
+  std::ofstream out(filepath, std::ios::out | std::ios::binary);
 
   if (!out) {
     return false;
@@ -99,11 +106,11 @@ bool saveDataToFile(const char* begin, uint32_t length, const std::string& filep
   return true;
 }
 
-bool saveAsOriginal(const RawFile& rawfile, const std::string& filepath) {
+bool saveAsOriginal(const RawFile& rawfile, const fs::path& filepath) {
   return saveDataToFile(rawfile.begin(), rawfile.size(), filepath);
 }
 
-bool saveAsOriginal(const VGMFile& file, const std::string& filepath) {
+bool saveAsOriginal(const VGMFile& file, const fs::path& filepath) {
   return saveDataToFile(file.rawFile()->begin() + file.dwOffset, file.unLength, filepath);
 }
 }  // namespace conversion

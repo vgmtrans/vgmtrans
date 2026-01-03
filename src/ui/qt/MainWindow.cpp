@@ -17,6 +17,7 @@
 #include <QMessageBox>
 #include <QStatusBar>
 #include <QResizeEvent>
+#include <filesystem>
 #include <version.h>
 #include "ManualCollectionDialog.h"
 #include "MainWindow.h"
@@ -245,7 +246,13 @@ void MainWindow::openFileInternal(const QString& filename) {
     }
   }
 
-  if (qtVGMRoot.openRawFile(filename.toStdString())) {
+  const auto utf8 = filename.toUtf8();
+  std::u8string pathU8;
+  pathU8.reserve(utf8.size());
+  for (auto ch : utf8) {
+    pathU8.push_back(static_cast<char8_t>(ch));
+  }
+  if (qtVGMRoot.openRawFile(std::filesystem::path(pathU8))) {
     Settings::the()->recentFiles.add(filename);
     m_menu_bar->updateRecentFilesMenu();
   }

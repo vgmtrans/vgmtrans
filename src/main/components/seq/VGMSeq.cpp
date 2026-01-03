@@ -321,7 +321,7 @@ const std::set<uint16_t>& VGMSeq::referencedBanks() const {
   return m_referencedBanks;
 }
 
-bool VGMSeq::saveAsMidi(const std::string &filepath, const VGMColl* coll) {
+bool VGMSeq::saveAsMidi(const std::filesystem::path &filepath, const VGMColl* coll) {
   MidiFile *midi = this->convertToMidi(coll);
   if (!midi)
     return false;

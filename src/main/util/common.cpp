@@ -1,4 +1,4 @@
-#include <string.h>
+#include <string>
 #include <algorithm>
 #include <filesystem>
 #include "common.h"
@@ -17,26 +17,24 @@ std::string toLower(const std::string& input) {
   return output;
 }
 
-std::string ConvertToSafeFileName(const std::string &str) {
-  std::string filename;
-  filename.reserve(str.length());
+std::filesystem::path makeSafeFilePath(std::string_view s) {
+  std::string out;
+  out.reserve(s.size());
 
-  const char* forbiddenChars = "\\/:,;*?\"<>|";
-  size_t pos_begin = 0;
-  size_t pos_end;
-  while ((pos_end = str.find_first_of(forbiddenChars, pos_begin)) != std::string::npos) {
-    filename += str.substr(pos_begin, pos_end - pos_begin);
-    if (filename[filename.length() - 1] != L' ') {
-      filename += " ";
-    }
-    pos_begin = pos_end + 1;
+  for (unsigned char c : s) {
+#ifdef _WIN32
+    const bool bad = (c < 32) || (c=='<'||c=='>'||c==':'||c=='\"'||c=='/'||c=='\\'||c=='|'||c=='?'||c=='*');
+#else
+    const bool bad = (c=='/') || (c==0);
+#endif
+    out.push_back(bad ? '_' : char(c));
   }
-  filename += str.substr(pos_begin);
 
-  // right trim
-  filename.erase(filename.find_last_not_of(" \n\r\t") + 1);
-
-  return filename;
+#ifdef _WIN32
+  while (!out.empty() && (out.back() == ' ' || out.back() == '.')) out.pop_back();
+#endif
+  if (out.empty()) out = "unnamed";
+  return std::filesystem::path(out);
 }
 
 char* GetFileWithBase(const char* f, const char* newfile) {

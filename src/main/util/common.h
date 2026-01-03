@@ -7,9 +7,11 @@
 #pragma once
 
 #include <string>
+#include <string_view>
 #include <cassert>
 #include <cstdint>
 #include <variant>
+#include <filesystem>
 
 #ifdef __FILE_NAME__
 #define THIS_FILE_NAME __FILE_NAME__
@@ -53,7 +55,7 @@ using VGMFileVariant = std::variant<VGMSeq*, VGMInstrSet*, VGMSampColl*, VGMMisc
 std::string toUpper(const std::string& input);
 std::string toLower(const std::string& input);
 
-std::string ConvertToSafeFileName(const std::string &str);
+std::filesystem::path makeSafeFilePath(std::string_view s);
 
 template<typename T, std::size_t N>
 constexpr std::size_t countof(T const (&)[N]) noexcept {
