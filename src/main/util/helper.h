@@ -12,7 +12,7 @@
 #include <filesystem>
 
 inline std::filesystem::path pathFromUtf8(const std::string& path) {
-  return { std::u8string(reinterpret_cast<const char8_t*>(path.c_str())) };
+  return std::filesystem::u8path(path);
 }
 
 template <class T>
