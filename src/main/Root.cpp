@@ -320,7 +320,7 @@ void VGMRoot::UI_addVGMFile(std::variant<VGMSeq *, VGMInstrSet *, VGMSampColl *,
 // Given a pointer to a buffer of data, size, and a filename, this function writes the data
 // into a file on the filesystem.
 bool VGMRoot::UI_writeBufferToFile(const std::string &filepath, uint8_t *buf, size_t size) {
-  std::ofstream outfile(filepath, std::ios::out | std::ios::trunc | std::ios::binary);
+  std::ofstream outfile(pathFromUtf8(filepath), std::ios::out | std::ios::trunc | std::ios::binary);
 
   if (!outfile.is_open()) {
     L_ERROR(std::string("Error: could not open file " + filepath + " for writing").c_str());
