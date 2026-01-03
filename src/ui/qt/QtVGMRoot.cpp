@@ -67,9 +67,8 @@ void QtVGMRoot::UI_addVGMColl(VGMColl*) {
   this->UI_addedVGMColl();
 }
 
-void QtVGMRoot::UI_toast(std::u8string_view message, ToastType type, int duration_ms) {
-  std::string utf8(message.begin(), message.end());
-  this->UI_toastRequested(QString::fromUtf8(utf8.c_str(), static_cast<int>(utf8.size())), type, duration_ms);
+void QtVGMRoot::UI_toast(std::string_view message, ToastType type, int duration_ms) {
+  this->UI_toastRequested(QString::fromUtf8(message), type, duration_ms);
 }
 
 void QtVGMRoot::UI_addItem(VGMItem* item, VGMItem* parent, const std::string& itemName,

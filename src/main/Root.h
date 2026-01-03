@@ -94,7 +94,7 @@ public:
   virtual bool UI_writeBufferToFile(const std::filesystem::path &filepath, uint8_t *buf, size_t size);
 
   virtual void UI_log(LogItem *) { }
-  virtual void UI_toast(std::u8string_view message, ToastType type = ToastType::Info,
+  virtual void UI_toast(std::string_view message, ToastType type = ToastType::Info,
                         int duration_ms = DEFAULT_TOAST_DURATION) {}
 
   const std::vector<RawFile*>& rawFiles() { return m_rawfiles; }

@@ -169,7 +169,7 @@ public:
     int numAssocColls = seq->assocColls.size();
     if (numAssocColls > 0) {
       if (numAssocColls > 1 && seq->format()->usesCollectionDataForSeqConversion()) {
-        pRoot->UI_toast(u8"This sequence format uses collection data as context for "
+        pRoot->UI_toast("This sequence format uses collection data as context for "
           "conversion, however, more than one collection is associated with the sequence. The first "
           "associated collection was used.\n\nYou can resolve this by selecting a conversion action "
           "on a collection directly.",
@@ -178,7 +178,7 @@ public:
       seq->saveAsMidi(path, seq->assocColls[0]);
     } else {
       if (seq->format()->usesCollectionDataForSeqConversion()) {
-        pRoot->UI_toast(u8"This sequence format uses collection data as context for "
+        pRoot->UI_toast("This sequence format uses collection data as context for "
           "conversion, however, there is currently no collection containing the sequence. Conversion "
           "results may improve if the sequence is first grouped into a collection with an "
           "associated instrument set.",

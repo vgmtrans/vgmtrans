@@ -27,7 +27,7 @@ public:
   void UI_addVGMMisc(VGMMiscFile* theMiscFile) override;
   void UI_addVGMColl(VGMColl* theColl) override;
 
-  void UI_toast(std::u8string_view message, ToastType type, int duration_ms = DEFAULT_TOAST_DURATION) override;
+  void UI_toast(std::string_view message, ToastType type, int duration_ms = DEFAULT_TOAST_DURATION) override;
   void UI_addItem(VGMItem* item, VGMItem* parent, const std::string& itemName,
                   void* UI_specific) override;
   std::filesystem::path UI_getSaveFilePath(const std::string& suggestedFilename,

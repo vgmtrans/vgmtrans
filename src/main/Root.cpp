@@ -60,7 +60,7 @@ bool VGMRoot::openRawFile(const std::filesystem::path &filePath) {
   try {
     newFile = new DiskFile(pathToUtf8(filePath));
   } catch (...) {
-    UI_toast(std::u8string(u8"Error opening file at path: ") + filePath.u8string(), ToastType::Error);
+    UI_toast(fmt::format("Error opening file at path: {}", filePath.string()), ToastType::Error);
     return false;
   }
   size_t vgmFileCountBefore = vgmFiles().size();
