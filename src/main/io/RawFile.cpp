@@ -68,7 +68,7 @@ std::string RawFile::readNullTerminatedString(size_t offset, size_t maxLength) c
 
 /* DiskFile */
 
-DiskFile::DiskFile(const std::filesystem::path& path) : m_data(mio::mmap_source(path.wstring())), m_path(path) {}
+DiskFile::DiskFile(const std::filesystem::path& path) : m_data(mio::mmap_source(path.c_str())), m_path(path) {}
 
 /* VirtFile */
 
