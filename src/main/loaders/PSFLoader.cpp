@@ -128,8 +128,7 @@ void PSFLoader::psf_read_exe(const RawFile *file) {
     load_with_libs(psf, file->path().parent_path(), img);
     if (!img.data.empty()) {
       auto tag = PSFFile::tagFromPSFFile(psf);
-      auto virt = new VirtFile(img.data.data(), img.data.size(), file->name(),
-                               file->path().string(), tag);
+      auto virt = new VirtFile(img.data.data(), img.data.size(), file->name(), file->path(), tag);
       enqueue(virt);
     }
   } catch (std::exception &e) {

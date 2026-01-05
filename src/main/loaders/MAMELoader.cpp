@@ -25,7 +25,6 @@
 #include "LogManager.h"
 #include "Root.h"
 #include "Scanner.h"
-#include "helper.h"
 
 namespace vgmtrans::loaders {
 LoaderRegistration<MAMELoader> _mame("MAME");
@@ -510,8 +509,7 @@ VirtFile* MAMELoader::loadRomGroup(const MAMERomGroup& entry, const std::string&
     }
   }
 
-  VirtFile* newVirtFile =
-      new VirtFile(destFile, destFileSize, fmt::format("romgroup - {}", entry.type.c_str()));
+  VirtFile* newVirtFile = new VirtFile(destFile, destFileSize, fmt::format("romgroup - {}", entry.type.c_str()));
   newVirtFile->setUseLoaders(false);
   newVirtFile->setUseScanners(false);
   delete[] destFile;
