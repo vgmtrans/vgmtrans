@@ -82,7 +82,7 @@ void VGMSamp::setVolume(double volume) {
 }
 
 bool VGMSamp::onSaveAsWav() {
-  auto filepath = pRoot->UI_getSaveFilePath(makeSafeFileName(name()), "wav");
+  auto filepath = pRoot->UI_getSaveFilePath(makeSafeFileName(name()).string(), "wav");
   if (!filepath.empty())
     return saveAsWav(filepath);
   return false;

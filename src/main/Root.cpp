@@ -5,6 +5,8 @@
  */
 
 #include <fstream>
+#include <filesystem>
+#include "spdlog/fmt/std.h"
 
 #include "Root.h"
 #include "VGMColl.h"
@@ -17,14 +19,10 @@
 #include "Scanner.h"
 #include "helper.h"
 #include "Matcher.h"
-
 #include "FileLoader.h"
 #include "LoaderManager.h"
 #include "ScannerManager.h"
 #include "LogManager.h"
-#include "helper.h"
-
-#include <filesystem>
 
 VGMRoot *pRoot;
 
@@ -57,10 +55,11 @@ bool VGMRoot::init() {
  * Returns bool indicating if VGMFiles were found. */
 bool VGMRoot::openRawFile(const std::filesystem::path &filePath) {
   DiskFile* newFile = nullptr;
+
   try {
-    newFile = new DiskFile(pathToUtf8(filePath));
+    newFile = new DiskFile(filePath);
   } catch (...) {
-    UI_toast(fmt::format("Error opening file at path: {}", filePath.string()), ToastType::Error);
+    UI_toast(fmt::format("Error opening file at path: {}", filePath), ToastType::Error);
     return false;
   }
   size_t vgmFileCountBefore = vgmFiles().size();
@@ -323,7 +322,7 @@ bool VGMRoot::UI_writeBufferToFile(const std::filesystem::path &filepath, uint8_
   std::ofstream outfile(filepath, std::ios::out | std::ios::trunc | std::ios::binary);
 
   if (!outfile.is_open()) {
-    L_ERROR("Error: could not open file {} for writing", pathToUtf8(filepath));
+    L_ERROR("Error: could not open file {} for writing", filepath);
     return false;
   }
 

@@ -6,7 +6,6 @@
 
 #pragma once
 
-#include <string_view>
 #include <filesystem>
 #include <vector>
 #include <climits>
@@ -131,7 +130,7 @@ class RawFile {
 
 class DiskFile final : public RawFile {
    public:
-    DiskFile(const std::string &path);
+    DiskFile(const std::filesystem::path& path);
     ~DiskFile() override = default;
 
     [[nodiscard]] std::string name() const override { return m_path.filename().string(); };

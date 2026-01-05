@@ -17,7 +17,6 @@
 #include "VGMSeq.h"
 #include "SF2Conversion.h"
 #include "DLSConversion.h"
-#include "helper.h"
 
 using namespace std;
 namespace fs = std::filesystem;
@@ -164,7 +163,7 @@ bool CLIVGMRoot::saveMidi(const VGMColl* coll) {
       L_ERROR("Failed to save MIDI file");
       return false;
     }
-    cout << "\t" + pathToUtf8(filepath) << endl;
+    cout << "\t" << filepath << endl;
   }
   return true;
 }
@@ -181,7 +180,7 @@ bool CLIVGMRoot::saveSF2(VGMColl* coll) {
     delete sf2file;
   }
   if (success) {
-    cout << "\t" + pathToUtf8(filepath) << endl;
+    cout << "\t" << filepath << endl;
   }
   else {
     L_ERROR("Failed to save SF2 file");
@@ -200,7 +199,7 @@ bool CLIVGMRoot::saveDLS(VGMColl* coll) {
     }
   }
   if (success) {
-    cout << "\t" + pathToUtf8(filepath) << endl;
+    cout << "\t" << filepath << endl;
   }
   else {
     L_ERROR("Failed to save DLS file");

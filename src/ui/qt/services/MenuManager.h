@@ -204,17 +204,17 @@ public:
             case PropertySpecValueType::Path:
               if (isDirPath || items->size() > 1) {
                 fs::path dirpath = openSaveDirDialog();
-                if (dirpath.string().empty()) {
+                if (dirpath.empty()) {
                   return;
                 }
                 propMap.insert({ propSpec.key, dirpath });
               } else {
-                std::string suggestedFileName;
+                std::filesystem::path suggestedFileName;
                 if constexpr (has_getname<T>::value) {
-                  suggestedFileName = pathToUtf8(makeSafeFileName((*items)[0]->name()));
+                  suggestedFileName = makeSafeFileName((*items)[0]->name());
                 }
                 auto fileExtension = get<std::filesystem::path>(propSpec.defaultValue);
-                auto path = openSaveFileDialog(suggestedFileName, fileExtension);
+                auto path = openSaveFileDialog(suggestedFileName, fileExtension.string());
                 if (path.empty()) {
                   return;
                 }
