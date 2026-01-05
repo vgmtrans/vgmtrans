@@ -211,8 +211,7 @@ TriAcePS1Seq *TriAcePS1Scanner::decompressTriAceSLZFile(RawFile *file, uint32_t 
 
   // Create the new virtual file, and analyze the sequence
   std::string name = file->tag.hasTitle() ? file->tag.title : file->stem();
-  auto newVirtFile = new VirtFile(uf, ufOff, fmt::format("{} Sequence", name),
-                                  file->path().string());
+  auto newVirtFile = new VirtFile(uf, ufOff, fmt::format("{} Sequence", name), file->path());
 
   TriAcePS1Seq *newSeq = new TriAcePS1Seq(newVirtFile, 0, name);
   bool bLoadSucceed = newSeq->loadVGMFile();

@@ -41,9 +41,9 @@ public:
   virtual ~VGMRoot() = default;
 
   virtual bool init();
-  virtual bool openRawFile(const std::string &filePath);
+  virtual bool openRawFile(const std::filesystem::path& filePath);
   bool createVirtFile(const uint8_t* databuf, uint32_t fileSize, const std::string& filename,
-                      const std::string& parRawFileFullPath = "", const VGMTag& tag = VGMTag());
+                      const std::filesystem::path& parRawFileFullPath = {}, const VGMTag& tag = VGMTag());
   bool loadRawFile(RawFile* newRawFile);
   bool removeRawFile(RawFile *targFile);
   void addVGMFile(VGMFileVariant file);
@@ -65,7 +65,7 @@ public:
 
   void log(LogItem *theLog);
 
-  virtual std::string UI_getResourceDirPath();
+  virtual std::filesystem::path UI_getResourceDirPath();
   virtual void UI_setRootPtr(VGMRoot **theRoot) = 0;
   virtual void UI_loadRawFile(RawFile *) {}
   virtual void UI_beginLoadRawFile() {}
@@ -88,13 +88,13 @@ public:
   virtual void UI_endRemoveVGMColls() {}
 
   virtual void UI_addItem(VGMItem *, VGMItem *, const std::string &, void *) {}
-  virtual std::string UI_getSaveFilePath(const std::string &suggestedFilename,
+  virtual std::filesystem::path UI_getSaveFilePath(const std::string& suggestedFilename,
                                          const std::string &extension = "") = 0;
-  virtual std::string UI_getSaveDirPath(const std::string &suggestedDir = "") = 0;
-  virtual bool UI_writeBufferToFile(const std::string &filepath, uint8_t *buf, size_t size);
+  virtual std::filesystem::path UI_getSaveDirPath(const std::filesystem::path& suggestedDir = {}) = 0;
+  virtual bool UI_writeBufferToFile(const std::filesystem::path& filepath, uint8_t *buf, size_t size);
 
   virtual void UI_log(LogItem *) { }
-  virtual void UI_toast(const std::string& message, ToastType type = ToastType::Info,
+  virtual void UI_toast(std::string_view message, ToastType type = ToastType::Info,
                         int duration_ms = DEFAULT_TOAST_DURATION) {}
 
   const std::vector<RawFile*>& rawFiles() { return m_rawfiles; }

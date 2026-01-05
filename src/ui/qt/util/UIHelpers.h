@@ -6,6 +6,7 @@
 
 #pragma once
 
+#include <filesystem>
 #include <string>
 
 class QScrollArea;
@@ -15,7 +16,7 @@ class QGraphicsEffect;
 class VGMItem;
 
 QScrollArea* getContainingScrollArea(const QWidget* widget);
-void applyEffectToPixmap(QPixmap &src, QPixmap &tgt, QGraphicsEffect *effect, int extent = 0);
+void applyEffectToPixmap(QPixmap& src, QPixmap& tgt, QGraphicsEffect* effect, int extent = 0);
 
-std::string openSaveFileDialog(const std::string& suggested_filename, const std::string& extension);
-std::string openSaveDirDialog();
+std::filesystem::path openSaveDirDialog();
+std::filesystem::path openSaveFileDialog(const std::filesystem::path& suggested_filename, const std::string& extension);

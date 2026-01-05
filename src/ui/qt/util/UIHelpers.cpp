@@ -41,30 +41,31 @@ void applyEffectToPixmap(QPixmap &src, QPixmap &tgt, QGraphicsEffect *effect, in
   scene.render(&ptr, QRectF(), QRectF(-extent, -extent, src.width() + extent*2, src.height() + extent*2));
 }
 
+std::filesystem::path openSaveDirDialog() {
+  static QString selected_dir =QStandardPaths::writableLocation(QStandardPaths::MusicLocation);
 
-std::string openSaveDirDialog() {
-  static auto selected_dir = QStandardPaths::writableLocation(QStandardPaths::MusicLocation);
   QFileDialog dialog(QApplication::activeWindow());
-  dialog.setFileMode(QFileDialog::FileMode::Directory);
+  dialog.setFileMode(QFileDialog::Directory);
   dialog.setOption(QFileDialog::ShowDirsOnly, true);
   dialog.setDirectory(selected_dir);
 
   if (dialog.exec()) {
     selected_dir = dialog.directory().absolutePath();
-    return dialog.selectedFiles().at(0).toStdString();
-  } else {
-    return {};
+    const QString chosen = dialog.selectedFiles().at(0);
+    return std::filesystem::path(chosen.toStdWString());
   }
+  return {};
 }
 
+std::filesystem::path openSaveFileDialog(const std::filesystem::path& suggested_filename, const std::string& extension) {
+  static QString selected_dir = QStandardPaths::writableLocation(QStandardPaths::MusicLocation);
 
-std::string openSaveFileDialog(const std::string& suggested_filename, const std::string& extension) {
-  static auto selected_dir = QStandardPaths::writableLocation(QStandardPaths::MusicLocation);
   QFileDialog dialog(QApplication::activeWindow());
   dialog.setFileMode(QFileDialog::AnyFile);
-  dialog.selectFile(QString::fromStdString(suggested_filename));
-  dialog.setDirectory(selected_dir);
   dialog.setAcceptMode(QFileDialog::AcceptSave);
+  dialog.setDirectory(selected_dir);
+
+  dialog.selectFile(QString::fromStdString(suggested_filename.string()));
 
   if (extension == "mid") {
     dialog.setDefaultSuffix("mid");
@@ -81,8 +82,10 @@ std::string openSaveFileDialog(const std::string& suggested_filename, const std:
 
   if (dialog.exec()) {
     selected_dir = dialog.directory().absolutePath();
-    return dialog.selectedFiles().at(0).toStdString();
-  } else {
-    return {};
+
+    const QString chosen = dialog.selectedFiles().at(0);
+    return std::filesystem::path(chosen.toStdWString());
   }
+
+  return {};
 }

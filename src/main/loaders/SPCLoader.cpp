@@ -28,7 +28,7 @@ void SPCLoader::apply(const RawFile *file) {
 
     auto tag = SPCFile::tagFromSPCFile(spc);
     std::string name = fmt::format("{} - ram", file->name());
-    auto newfile = new VirtFile(spc.ram().data(), spc.ram().size(), name, file->path().string(), tag);
+    auto newfile = new VirtFile(spc.ram().data(), spc.ram().size(), name, file->path(), tag);
     enqueue(newfile);
   } catch (std::exception e) {
     L_ERROR(e.what());

@@ -38,7 +38,7 @@ public:
 
   bool saveDLS(VGMColl *coll);
 
-  bool openRawFile(const std::string &filename) override;
+  bool openRawFile(const std::filesystem::path &filename) override;
 
   bool init() override;
 
@@ -46,10 +46,10 @@ public:
 
   void UI_log(LogItem* theLog) override;
 
-  std::string UI_getSaveFilePath(const std::string& suggestedFilename,
-                                 const std::string& extension = "") override;
+  std::filesystem::path UI_getSaveFilePath(const std::string& suggestedFilename,
+                                           const std::string& extension = "") override;
 
-  std::string UI_getSaveDirPath(const std::string& suggestedDir = "") override;
+  std::filesystem::path UI_getSaveDirPath(const std::filesystem::path& suggestedDir = {}) override;
 
   std::set<fs::path> inputFiles = {};
   fs::path outputDir = fs::path(".");

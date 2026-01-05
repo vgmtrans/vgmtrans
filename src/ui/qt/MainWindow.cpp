@@ -17,6 +17,7 @@
 #include <QMessageBox>
 #include <QStatusBar>
 #include <QResizeEvent>
+#include <filesystem>
 #include <version.h>
 #include "ManualCollectionDialog.h"
 #include "MainWindow.h"
@@ -245,7 +246,7 @@ void MainWindow::openFileInternal(const QString& filename) {
     }
   }
 
-  if (qtVGMRoot.openRawFile(filename.toStdString())) {
+  if (qtVGMRoot.openRawFile(filename.toStdWString())) {
     Settings::the()->recentFiles.add(filename);
     m_menu_bar->updateRecentFilesMenu();
   }

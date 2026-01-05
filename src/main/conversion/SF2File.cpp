@@ -483,7 +483,7 @@ std::vector<uint8_t> SF2File::saveToMem() {
   return buf;
 }
 
-bool SF2File::saveSF2File(const std::string &filepath) {
+bool SF2File::saveSF2File(const std::filesystem::path &filepath) {
   auto buf = saveToMem();
   bool result = pRoot->UI_writeBufferToFile(filepath, buf.data(), buf.size());
   return result;

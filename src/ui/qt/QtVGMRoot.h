@@ -15,7 +15,7 @@ class QtVGMRoot final : public QObject, public VGMRoot {
 public:
   ~QtVGMRoot() override = default;
 
-  std::string UI_getResourceDirPath() override;
+  std::filesystem::path UI_getResourceDirPath() override;
   void UI_setRootPtr(VGMRoot** theRoot) override;
   void UI_loadRawFile(RawFile* newFile) override;
   void UI_removeRawFile(RawFile* targFile) override;
@@ -27,12 +27,12 @@ public:
   void UI_addVGMMisc(VGMMiscFile* theMiscFile) override;
   void UI_addVGMColl(VGMColl* theColl) override;
 
-  void UI_toast(const std::string& message, ToastType type, int duration_ms = DEFAULT_TOAST_DURATION) override;
+  void UI_toast(std::string_view message, ToastType type, int duration_ms = DEFAULT_TOAST_DURATION) override;
   void UI_addItem(VGMItem* item, VGMItem* parent, const std::string& itemName,
                   void* UI_specific) override;
-  std::string UI_getSaveFilePath(const std::string& suggestedFilename,
+  std::filesystem::path UI_getSaveFilePath(const std::string& suggestedFilename,
                                           const std::string& extension) override;
-  std::string UI_getSaveDirPath(const std::string& suggestedDir) override;
+  std::filesystem::path UI_getSaveDirPath(const std::filesystem::path& suggestedDir) override;
 
 signals:
   void UI_beginLoadRawFile() override;

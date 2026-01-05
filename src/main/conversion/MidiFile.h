@@ -8,6 +8,7 @@
 #include <vector>
 #include <list>
 #include <unordered_map>
+#include <filesystem>
 
 class VGMSeq;
 
@@ -217,7 +218,7 @@ class MidiFile {
   uint32_t ppqn() const;
   void writeMidiToBuffer(std::vector<uint8_t> &buf);
   void sort();
-  bool saveMidiFile(const std::string &filepath);
+  bool saveMidiFile(const std::filesystem::path &filepath);
 
  protected:
   //bool bAddedTempo;

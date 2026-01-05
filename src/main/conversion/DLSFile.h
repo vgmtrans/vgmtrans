@@ -8,6 +8,7 @@
 
 #include "common.h"
 #include "RiffFile.h"
+#include <filesystem>
 
 struct Loop;
 class VGMSamp;
@@ -105,7 +106,7 @@ public:
   uint32_t size() override;
 
   int writeDLSToBuffer(std::vector<uint8_t> &buf);
-  bool saveDLSFile(const std::string &filepath);
+  bool saveDLSFile(const std::filesystem::path &filepath);
 
 private:
   std::vector<std::unique_ptr<DLSInstr>> m_instrs;

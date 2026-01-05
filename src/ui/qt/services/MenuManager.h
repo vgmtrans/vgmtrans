@@ -13,6 +13,7 @@
 #include "Root.h"
 #include "UIHelpers.h"
 #include "LogManager.h"
+#include "helper.h"
 
 namespace fs = std::filesystem;
 
@@ -202,18 +203,18 @@ public:
               isDirPath = true;
             case PropertySpecValueType::Path:
               if (isDirPath || items->size() > 1) {
-                fs::path dirpath = fs::path(openSaveDirDialog());
-                if (dirpath.string().empty()) {
+                fs::path dirpath = openSaveDirDialog();
+                if (dirpath.empty()) {
                   return;
                 }
-                propMap.insert({ propSpec.key, dirpath.generic_string() });
+                propMap.insert({ propSpec.key, dirpath });
               } else {
-                std::string suggestedFileName;
+                std::filesystem::path suggestedFileName;
                 if constexpr (has_getname<T>::value) {
-                  suggestedFileName = ConvertToSafeFileName((*items)[0]->name());
+                  suggestedFileName = makeSafeFileName((*items)[0]->name());
                 }
-                auto fileExtension = get<std::string>(propSpec.defaultValue);
-                auto path = openSaveFileDialog(suggestedFileName, fileExtension);
+                auto fileExtension = get<std::filesystem::path>(propSpec.defaultValue);
+                auto path = openSaveFileDialog(suggestedFileName, fileExtension.string());
                 if (path.empty()) {
                   return;
                 }

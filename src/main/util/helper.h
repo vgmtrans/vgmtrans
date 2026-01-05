@@ -5,15 +5,11 @@
  */
 
 #pragma once
+
 #include <vector>
 #include <map>
 #include <list>
 #include <string>
-#include <filesystem>
-
-inline std::filesystem::path pathFromUtf8(const std::string& path) {
-  return std::filesystem::u8path(path);
-}
 
 template <class T>
 void deleteVect(std::vector<T *> &vect) {

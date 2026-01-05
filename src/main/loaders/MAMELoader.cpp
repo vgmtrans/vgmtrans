@@ -4,8 +4,14 @@
  * refer to the included LICENSE.txt file
  */
 
+#if defined(_WIN32) || defined(WIN32)
+  #include <ioapi.h>
+  #include <unzip.h>
+  #include "iowin32.h"
+#endif
 #include <nlohmann/json.hpp>
-#include <spdlog/fmt/fmt.h>
+#include <spdlog/fmt/std.h>
+#include <filesystem>
 #include <cstdlib>
 #include <fstream>
 #include <ranges>
@@ -61,7 +67,7 @@ MAMELoader::~MAMELoader() {
 
 namespace {
 
-constexpr const char* kMameJsonFilename = "mame_roms.json";
+const std::filesystem::path kMameJsonFilename = "mame_roms.json";
 
 std::string jsonToString(const json& value) {
   if (value.is_string())
@@ -220,7 +226,7 @@ MAMEGame* loadGameEntry(const json& gameJson) {
 }  // namespace
 
 bool MAMELoader::loadJSON() {
-  const std::string jsonFilePath = pRoot->UI_getResourceDirPath() + kMameJsonFilename;
+  const auto jsonFilePath = pRoot->UI_getResourceDirPath() / kMameJsonFilename;
   std::ifstream jsonFile(jsonFilePath);
   if (!jsonFile.is_open()) {
     L_ERROR("Failed to open MAME ROM definition JSON at {}", jsonFilePath);
@@ -287,7 +293,14 @@ void MAMELoader::apply(const RawFile* file) {
     return;
   }
 
-  unzFile cur_file = unzOpen(file->path().string().c_str());
+#if defined(_WIN32) || defined(WIN32)
+  zlib_filefunc64_def ffunc{};
+  fill_win32_filefunc64W(&ffunc);     // use CreateFileW-based open
+  unzFile cur_file = unzOpen2_64(file->path().c_str(), &ffunc);
+#else
+  unzFile cur_file = unzOpen(file->path().c_str());
+#endif
+
   if (!cur_file) {
     return;
   }
@@ -496,8 +509,7 @@ VirtFile* MAMELoader::loadRomGroup(const MAMERomGroup& entry, const std::string&
     }
   }
 
-  VirtFile* newVirtFile =
-      new VirtFile(destFile, destFileSize, fmt::format("romgroup - {}", entry.type.c_str()));
+  VirtFile* newVirtFile = new VirtFile(destFile, destFileSize, fmt::format("romgroup - {}", entry.type.c_str()));
   newVirtFile->setUseLoaders(false);
   newVirtFile->setUseScanners(false);
   delete[] destFile;

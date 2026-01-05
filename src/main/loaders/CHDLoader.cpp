@@ -99,6 +99,6 @@ void CHDLoader::apply(const RawFile *file) {
   chd_close(chd);
 
   auto virtFile = new VirtFile(data.data(), static_cast<uint32_t>(data.size()),
-                               file->name(), file->path().string(), file->tag);
+                               file->name(), file->path(), file->tag);
   enqueue(virtFile);
 }

@@ -48,9 +48,8 @@ bool CLIVGMRoot::makeOutputDir() {
   return true;
 }
 
-bool CLIVGMRoot::openRawFile(const string &filename) {
-  string fname = filename;
-  cout << "Loading " << fname << endl;
+bool CLIVGMRoot::openRawFile(const fs::path& filename) {
+  cout << "Loading " << filename << endl;
   return VGMRoot::openRawFile(filename);
 }
 
@@ -70,7 +69,7 @@ bool CLIVGMRoot::init() {
   // map for deconflicting identical collection names using input filenames
   map<string, vector<pair<size_t, fs::path>>> collNameMap {};
   for (fs::path infile : inputFiles) {
-    if (!openRawFile(infile.string())) {  // file not found
+    if (!openRawFile(infile)) {  // file not found
       return false;
     }
     size_t numCollsAdded = numCollections() - numColls;
@@ -159,19 +158,19 @@ bool CLIVGMRoot::exportCollection(VGMColl* coll) {
 bool CLIVGMRoot::saveMidi(const VGMColl* coll) {
   if (coll->seq() != nullptr) {
     string collName = coll->name();
-    string filepath = UI_getSaveFilePath(collName, "mid");
+    auto filepath = UI_getSaveFilePath(collName, "mid");
     if (!coll->seq()->saveAsMidi(filepath, coll)) {
       L_ERROR("Failed to save MIDI file");
       return false;
     }
-    cout << "\t" + filepath << endl;
+    cout << "\t" << filepath << endl;
   }
   return true;
 }
 
 bool CLIVGMRoot::saveSF2(VGMColl* coll) {
   string collName = coll->name();
-  string filepath = UI_getSaveFilePath(collName, "sf2");
+  auto filepath = UI_getSaveFilePath(collName, "sf2");
   SF2File *sf2file = conversion::createSF2File(*coll);
   bool success = false;
   if (sf2file != nullptr) {
@@ -181,7 +180,7 @@ bool CLIVGMRoot::saveSF2(VGMColl* coll) {
     delete sf2file;
   }
   if (success) {
-    cout << "\t" + filepath << endl;
+    cout << "\t" << filepath << endl;
   }
   else {
     L_ERROR("Failed to save SF2 file");
@@ -191,7 +190,7 @@ bool CLIVGMRoot::saveSF2(VGMColl* coll) {
 
 bool CLIVGMRoot::saveDLS(VGMColl* coll) {
   string collName = coll->name();
-  string filepath = UI_getSaveFilePath(collName, "dls");
+  auto filepath = UI_getSaveFilePath(collName, "dls");
   DLSFile dlsfile;
   bool success = false;
   if (conversion::createDLSFile(dlsfile, *coll)) {
@@ -200,7 +199,7 @@ bool CLIVGMRoot::saveDLS(VGMColl* coll) {
     }
   }
   if (success) {
-    cout << "\t" + filepath << endl;
+    cout << "\t" << filepath << endl;
   }
   else {
     L_ERROR("Failed to save DLS file");
@@ -220,11 +219,12 @@ void CLIVGMRoot::UI_log(LogItem* theLog) {
   }
 }
 
-string CLIVGMRoot::UI_getSaveFilePath(const string& suggestedFilename, const string& extension) {
-  fs::path savePath = outputDir / fs::path(ConvertToSafeFileName(suggestedFilename) + "." + extension);
-  return savePath.string();
+std::filesystem::path CLIVGMRoot::UI_getSaveFilePath(const string& suggestedFilename, const string& extension) {
+  auto filename = makeSafeFileName(suggestedFilename);
+  filename.replace_extension(extension);
+  return outputDir / filename;
 }
 
-string CLIVGMRoot::UI_getSaveDirPath(const std::string& suggestedDir) {
-  return this->outputDir.string();
+std::filesystem::path CLIVGMRoot::UI_getSaveDirPath(const std::filesystem::path& suggestedDir) {
+  return suggestedDir.empty() ? this->outputDir : suggestedDir;
 }

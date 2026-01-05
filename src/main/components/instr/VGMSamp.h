@@ -8,6 +8,7 @@
 #include "VGMItem.h"
 #include "Loop.h"
 #include <cstring>
+#include <filesystem>
 
 class VGMSampColl;
 
@@ -48,7 +49,7 @@ public:
   inline void setSignedness(Signedness s) { m_signedness = s; }
 
   bool onSaveAsWav();
-  bool saveAsWav(const std::string &filepath);
+  bool saveAsWav(const std::filesystem::path &filepath);
 
 public:
   WAVE_TYPE waveType = WT_UNDEFINED;

@@ -9,6 +9,7 @@
 #include "RawFile.h"
 #include "MidiFile.h"
 #include <set>
+#include <filesystem>
 
 class SeqTrack;
 class SeqEvent;
@@ -98,7 +99,7 @@ class VGMSeq : public VGMFile {
   void setShouldTrackControlFlowState(bool enable) { m_track_control_flow_state = enable; }
   [[nodiscard]] bool shouldTrackControlFlowState() const { return m_track_control_flow_state; }
 
-  bool saveAsMidi(const std::string &filepath, const VGMColl* coll = nullptr);
+  bool saveAsMidi(const std::filesystem::path &filepath, const VGMColl* coll = nullptr);
 
   void deactivateAllTracks();
 

@@ -7,6 +7,7 @@
 
 #include "VGMInstrSet.h"
 #include "YM2151.h"
+#include <filesystem>
 
 #include <cstdint>
 #include <string>
@@ -29,7 +30,7 @@ public:
                  std::string name);
 
   virtual std::string generateOPMFile() const;
-  bool saveAsOPMFile(const std::string& filepath) const;
+  bool saveAsOPMFile(const std::filesystem::path& filepath) const;
 
 protected:
   void addOPMInstrument(OPMInstrument instrument);

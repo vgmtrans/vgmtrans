@@ -6,7 +6,6 @@
 
 #pragma once
 
-#include <string_view>
 #include <filesystem>
 #include <vector>
 #include <climits>
@@ -131,20 +130,20 @@ class RawFile {
 
 class DiskFile final : public RawFile {
    public:
-    DiskFile(const std::string &path);
+    DiskFile(const std::filesystem::path& path);
     ~DiskFile() override = default;
 
-    [[nodiscard]] std::string name() const override { return m_path.filename().string(); };
+    [[nodiscard]] std::string name() const override { return pathToUtf8String(m_path.filename()); };
     [[nodiscard]] std::filesystem::path path() const override { return m_path; };
     [[nodiscard]] size_t size() const noexcept override { return m_data.length(); };
-    [[nodiscard]] std::string stem() const noexcept override { return m_path.stem().string(); };
+    [[nodiscard]] std::string stem() const noexcept override { return pathToUtf8String(m_path.stem()); };
     [[nodiscard]] std::string extension() const override {
-        auto tmp = m_path.extension().string();
-        if (!tmp.empty()) {
-            return toLower(tmp.substr(1, tmp.size() - 1));
-        }
+      auto pathExtension = pathToUtf8String(m_path.extension());
+      if (!pathExtension.empty()) {
+        return toLower(pathExtension.substr(1, pathExtension.size() - 1));
+      }
 
-        return tmp;
+      return pathExtension;
     }
 
     const char *data() const override { return m_data.data(); }
@@ -165,7 +164,7 @@ class VirtFile final : public RawFile {
     VirtFile() = default;
     VirtFile(const RawFile &, size_t offset = 0);
     VirtFile(const RawFile &, size_t offset, size_t limit);
-    VirtFile(const uint8_t *data, uint32_t size, std::string name, std::string parent_fullpath = "",
+    VirtFile(const uint8_t *data, uint32_t size, std::string name, std::filesystem::path parent_fullpath = "",
              const VGMTag& tag = VGMTag());
     ~VirtFile() override = default;
 
@@ -173,24 +172,24 @@ class VirtFile final : public RawFile {
     [[nodiscard]] std::filesystem::path path() const override { return m_lpath; };
     [[nodiscard]] size_t size() const noexcept override {return m_data.size(); };
     [[nodiscard]] std::string stem() const noexcept override {
-      auto tmp = m_lpath.stem();
-      if (tmp.empty()) {
-        std::filesystem::path tmp2(m_name);
-        if (tmp2.has_filename()) {
-          return tmp2.stem().string();
+      auto pathStem = m_lpath.stem();
+      if (pathStem.empty()) {
+        std::filesystem::path name(m_name);
+        if (name.has_filename()) {
+          return pathToUtf8String(name.stem());
         }
       }
 
-      return tmp.string();
+      return pathToUtf8String(pathStem);
     };
     [[nodiscard]] std::string extension() const override {
-      std::filesystem::path tmp2(m_name);
-      if (tmp2.has_extension()) {
-        return toLower(tmp2.extension().string().substr(1, tmp2.extension().string().size() - 1));
+      std::filesystem::path fileName(m_name);
+      if (fileName.has_extension()) {
+        return toLower(fileName.extension().string().substr(1, fileName.extension().string().size() - 1));
       }
-      auto tmp = m_lpath.extension().string();
-      if (!tmp.empty()) {
-        return toLower(tmp.substr(1, tmp.size() - 1));
+      auto extension = pathToUtf8String(m_lpath.extension());
+      if (!extension.empty()) {
+        return toLower(extension.substr(1, extension.size() - 1));
       }
       return "";
     }

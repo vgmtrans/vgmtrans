@@ -38,6 +38,7 @@ using PropertyValue = std::variant<
     int,
     float,
     std::string,
+    std::filesystem::path,
     std::shared_ptr<std::vector<VGMFile*>>,
     std::shared_ptr<std::vector<VGMSeq*>>,
     std::shared_ptr<std::vector<VGMInstrSet*>>,

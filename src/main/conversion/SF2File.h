@@ -2,6 +2,7 @@
 
 #include "common.h"
 #include "RiffFile.h"
+#include <filesystem>
 
 typedef enum: uint16_t {
   // Oscillator
@@ -282,5 +283,5 @@ class SF2File: public RiffFile {
   static int numOfGeneratorsForRgn(SynthRgn* rgn);
 
   std::vector<uint8_t> saveToMem();
-  bool saveSF2File(const std::string &filepath);
+  bool saveSF2File(const std::filesystem::path &filepath);
 };
