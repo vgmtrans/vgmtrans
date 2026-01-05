@@ -56,6 +56,7 @@ std::string toUpper(const std::string& input);
 std::string toLower(const std::string& input);
 
 std::filesystem::path makeSafeFileName(std::string_view s);
+std::string pathToUtf8String(const std::filesystem::path& path);
 
 template<typename T, std::size_t N>
 constexpr std::size_t countof(T const (&)[N]) noexcept {

@@ -7,6 +7,7 @@
 #pragma once
 
 #include "SimpleMatcher.h"
+#include "util/common.h"
 
 class FilenameMatcher : public SimpleMatcher<std::string> {
 public:
@@ -15,19 +16,19 @@ public:
 
   bool seqId(VGMSeq *seq, std::string &id) override {
     RawFile *rawfile = seq->rawFile();
-    id = rawfile->path().string();
+    id = pathToUtf8String(rawfile->path());
     return !id.empty();
   }
 
   bool instrSetId(VGMInstrSet *instrset, std::string &id) override {
     RawFile *rawfile = instrset->rawFile();
-    id = rawfile->path().string();
+    id = pathToUtf8String(rawfile->path());
     return !id.empty();
   }
 
   bool sampCollId(VGMSampColl *sampcoll, std::string &id) override {
     RawFile *rawfile = sampcoll->rawFile();
-    id = rawfile->path().string();
+    id = pathToUtf8String(rawfile->path());
     return !id.empty();
   }
 };

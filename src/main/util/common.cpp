@@ -17,6 +17,16 @@ std::string toLower(const std::string& input) {
   return output;
 }
 
+std::string pathToUtf8String(const std::filesystem::path& path) {
+#ifdef _WIN32
+  // Avoid locale-dependent narrow conversions on Windows.
+  const auto utf8 = path.u8string();
+  return std::string(utf8.begin(), utf8.end());
+#else
+  return path.string();
+#endif
+}
+
 std::filesystem::path makeSafeFileName(std::string_view s) {
 #ifdef _WIN32
   std::u8string out;

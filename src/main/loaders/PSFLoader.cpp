@@ -82,7 +82,7 @@ void load_with_libs(const PSFFile &psf, const std::filesystem::path &basepath, I
   if (lib) {
     auto newpath = basepath;
     newpath /= *lib;
-    DiskFile libfile(newpath.string());
+    DiskFile libfile(newpath);
     PSFFile libpsf(libfile);
     load_with_libs(libpsf, newpath.parent_path(), img, depth + 1);
   }
@@ -102,7 +102,7 @@ void load_with_libs(const PSFFile &psf, const std::filesystem::path &basepath, I
       break;
     auto newpath = basepath;
     newpath /= it->second;
-    DiskFile libfile(newpath.string());
+    DiskFile libfile(newpath);
     PSFFile libpsf(libfile);
     load_with_libs(libpsf, newpath.parent_path(), img, depth + 1);
   }
