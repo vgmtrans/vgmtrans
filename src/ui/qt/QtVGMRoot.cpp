@@ -4,7 +4,6 @@
  * refer to the included LICENSE.txt file
  */
 
-
 #include "VGMFileTreeView.h"
 #include "UIHelpers.h"
 #include <QApplication>
@@ -18,7 +17,6 @@ std::filesystem::path QtVGMRoot::UI_getResourceDirPath() {
   std::filesystem::path appDir = std::filesystem::path(QApplication::applicationDirPath().toStdWString());
 
 #if defined(Q_OS_MACOS)
-  // appDir is usually .../MyApp.app/Contents/MacOS
   return (appDir / ".." / "Resources").lexically_normal();
 #else
   return appDir;

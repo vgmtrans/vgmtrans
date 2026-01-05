@@ -65,10 +65,8 @@ std::filesystem::path openSaveFileDialog(const std::filesystem::path& suggested_
   dialog.setAcceptMode(QFileDialog::AcceptSave);
   dialog.setDirectory(selected_dir);
 
-  // Suggested filename -> QString
   dialog.selectFile(QString::fromStdString(suggested_filename.string()));
 
-  // Filters / suffixes
   if (extension == "mid") {
     dialog.setDefaultSuffix("mid");
     dialog.setNameFilter("Standard MIDI (*.mid)");
