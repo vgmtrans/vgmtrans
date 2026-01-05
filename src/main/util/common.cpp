@@ -18,23 +18,34 @@ std::string toLower(const std::string& input) {
 }
 
 std::filesystem::path makeSafeFileName(std::string_view s) {
+#ifdef _WIN32
+  std::u8string out;
+  out.reserve(s.size());
+
+  for (unsigned char c : s) {
+    const bool bad = (c < 32) ||
+      (c=='<'||c=='>'||c==':'||c=='"'||c=='/'||c=='\\'||c=='|'||c=='?'||c=='*');
+    out.push_back(static_cast<char8_t>(bad ? '_' : c));
+  }
+
+  while (!out.empty() && (out.back() == u8' ' || out.back() == u8'.')) out.pop_back();
+  if (out.empty()) out = u8"unnamed";
+
+  // Interprets out as UTF-8 and converts to the native wide path internally.
+  return std::filesystem::path(out);
+#else
+
   std::string out;
   out.reserve(s.size());
 
   for (unsigned char c : s) {
-#ifdef _WIN32
-    const bool bad = (c < 32) || (c=='<'||c=='>'||c==':'||c=='\"'||c=='/'||c=='\\'||c=='|'||c=='?'||c=='*');
-#else
     const bool bad = (c=='/') || (c==0);
-#endif
     out.push_back(bad ? '_' : char(c));
   }
 
-#ifdef _WIN32
-  while (!out.empty() && (out.back() == ' ' || out.back() == '.')) out.pop_back();
-#endif
   if (out.empty()) out = "unnamed";
   return std::filesystem::path(out);
+#endif
 }
 
 char* GetFileWithBase(const char* f, const char* newfile) {

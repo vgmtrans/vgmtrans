@@ -127,9 +127,9 @@ public:
       // If alwaysSaveToDir is not set and there are multiple files, the path given is to a directory
       // and the Save() function still expects a file path, so we construct file paths for each file using GetName()
       if (auto specificFile = dynamic_cast<TSavable*>(file)) {
-        std::u8string fileName(file->name().begin(), file->name().end());
-        std::u8string fileExtension = extension().empty() ? std::u8string() : std::u8string(u8".") + std::u8string(extension().begin(), extension().end());
-        fs::path filePath = path / fs::path(fileName + fileExtension);
+        auto filePath = path / makeSafeFileName(file->name());
+        if (!extension().empty())
+          filePath.replace_extension(extension());
         save(filePath, specificFile);
       }
     }
