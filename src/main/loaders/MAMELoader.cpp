@@ -20,11 +20,11 @@
 #include "Format.h"
 #include "KabukiDecrypt.h"
 #include "CPS3Decrypt.h"
-#include "helper.h"
 #include "LoaderManager.h"
 #include "LogManager.h"
 #include "Root.h"
 #include "Scanner.h"
+#include "helper.h"
 
 namespace vgmtrans::loaders {
 LoaderRegistration<MAMELoader> _mame("MAME");
