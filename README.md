@@ -1,16 +1,26 @@
-# VGMTrans - Video Game Music Translator &middot; ![Build status](https://github.com/vgmtrans/vgmtrans/actions/workflows/build.yml/badge.svg?branch=master)
+# VGMTrans - Video Game Music Translator · ![Build status](https://github.com/vgmtrans/vgmtrans/actions/workflows/build.yml/badge.svg?branch=master)
 
-VGMTrans is a cross-platform desktop application that converts sequenced video game music into standard formats.
+[![Audio demo](https://img.shields.io/badge/demo-audio-blue)](https://vgmtrans.github.io/audiodemo/)
+[![Nightly builds](https://img.shields.io/badge/download-nightly_builds-purple)](https://nightly.link/vgmtrans/vgmtrans/workflows/build/master)
+[![Releases](https://img.shields.io/badge/download-releases-238636)](https://github.com/vgmtrans/vgmtrans/releases)
 
-* Convert various formats into MIDI, SoundFont2, and DLS.
-* Preview conversion with built-in audio playback.
-* Inspect data with an interactive hex view.
+VGMTrans is a cross-platform desktop app for **detecting, inspecting, and converting sequenced video game music**
+into standard formats like **MIDI**, **SoundFont2 (SF2)**, and **DLS**.
 
-<img width="1155" alt="Screenshot 2025-06-20 at 12 20 01 PMb" src="https://github.com/user-attachments/assets/c6952d5a-924b-4004-9cb1-541b748b7609" />
-<sub>(data in screenshot is randomized)</sub>
+**Key features**
+- **Scan** files to find embedded music assets
+- **Inspect** file structure with an interactive hex view
+- **Preview** results with built-in playback
+- **Convert** formats to MIDI / SF2 / DLS
+
+**Audio demo:** https://vgmtrans.github.io/audiodemo/
+
+<img width="900" alt="VGMTrans main window showing detected music files, analysis view, and playback controls" src="https://github.com/user-attachments/assets/c6952d5a-924b-4004-9cb1-541b748b7609" />
+
+<p><em>Note: data in screenshot is randomized.</em></p>
 
 ## Download
-We have builds for macOS, Windows, and Linux.
+Prebuilt binaries for Windows, macOS, and Linux:
 
 * [Official releases](https://github.com/vgmtrans/vgmtrans/releases)
 * [Bleeding edge versions](https://nightly.link/vgmtrans/vgmtrans/workflows/build/master)
@@ -21,7 +31,9 @@ The following formats are supported with varying degrees of accuracy:
 
 #### *Arcade*
 
-* Capcom's sequence and sampled instrument formats used in CPS1/CPS2/CPS3 arcade games
+* Capcom's sequence and instrument formats used in CPS-1 / CPS-2 / CPS-3 titles
+* Konami's sequence and instrument formats used in Konami GX titles (and related hardware)
+* Konami's sequence and instrument formats used in *TMNT: Turtles in Time*–era titles (and related hardware)
 
 #### *Super Nintendo Entertainment System (SNES)*
 
@@ -43,7 +55,7 @@ The following formats are supported with varying degrees of accuracy:
 
 #### *Sega Saturn*
 
-* Sega's sequence format
+* Sega's sequence and instrument formats
 
 #### *PlayStation*
 
@@ -73,8 +85,8 @@ The following formats are supported with varying degrees of accuracy:
 Load files by dragging them into the application window or by choosing `Scan File` from the File menu. The program will scan a
 file for contained music files, which when found will appear under the "Detected Music Files" panel.
 
-VGMTrans is able to 
-unpack portable sound format files (`psf`) and related formats (`psf2`, `ssf`, etc). SNES formats generally must be loaded 
+VGMTrans is able to
+unpack portable sound format files (`psf`) and related formats (`psf2`, `ssf`, etc). SNES formats generally must be loaded
 from `spc` or `rsn` files. Arcade formats are loaded via mame rom set `zip` files, which are catalogued in `mame_roms.json`.
 
 #### *Scanned Files*
@@ -96,7 +108,7 @@ will attempt to play back the sequence using its associated instrument data.
 Conversion commands are available from the Convert menu or by right-clicking a collection.
 
 #### *Manual Collection Creation (advanced)*
-Sometimes VGMTrans cannot properly group detected files into Collections. In this event, the `Create collection manually` 
+Sometimes VGMTrans cannot properly group detected files into Collections. In this event, the `Create collection manually`
 button at the bottom of the Collection panel can be used. The button opens a dialog to select a set of detected files for
 which to create a new Collection.
 
@@ -147,5 +159,5 @@ for contributing effectively.
 ## License
 Licensed under the zlib License. See [`LICENSE`](LICENSE).
 
-This project bundles some third‑party components, each under its own license. You can review every license in the 
+This project bundles some third‑party components, each under its own license. You can review every license in the
 `licenses/` folder of the source tree or, in the compiled app, via **About → License**.
