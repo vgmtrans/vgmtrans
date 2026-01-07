@@ -10,6 +10,7 @@
 #include <map>
 #include <list>
 #include <string>
+#include <cstdint>
 
 template <class T>
 void deleteVect(std::vector<T *> &vect) {
