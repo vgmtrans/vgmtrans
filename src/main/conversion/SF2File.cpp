@@ -276,22 +276,19 @@ SF2File::SF2File(SynthFile *synthfile)
       SynthRgn *rgn = instr->vRgns[j];
 
       sfInstGenList instGenList;
-      // Key range - (if exists) this must be the first chunk
+      // Key range. This must be the first chunk
       instGenList.sfGenOper = keyRange;
       instGenList.genAmount.ranges.byLo = static_cast<uint8_t>(rgn->usKeyLow);
       instGenList.genAmount.ranges.byHi = static_cast<uint8_t>(rgn->usKeyHigh);
       memcpy(igenCk->data + dataPtr, &instGenList, sizeof(sfInstGenList));
       dataPtr += sizeof(sfInstGenList);
 
-      if (rgn->usVelHigh)    // 0 means 'not set', fixes TriAce instruments
-      {
-        // Velocity range (if exists) this must be the next chunk
-        instGenList.sfGenOper = velRange;
-        instGenList.genAmount.ranges.byLo = static_cast<uint8_t>(rgn->usVelLow);
-        instGenList.genAmount.ranges.byHi = static_cast<uint8_t>(rgn->usVelHigh);
-        memcpy(igenCk->data + dataPtr, &instGenList, sizeof(sfInstGenList));
-        dataPtr += sizeof(sfInstGenList);
-      }
+      // Velocity range. This must be the next chunk
+      instGenList.sfGenOper = velRange;
+      instGenList.genAmount.ranges.byLo = static_cast<uint8_t>(rgn->usVelLow);
+      instGenList.genAmount.ranges.byHi = static_cast<uint8_t>(rgn->usVelHigh);
+      memcpy(igenCk->data + dataPtr, &instGenList, sizeof(sfInstGenList));
+      dataPtr += sizeof(sfInstGenList);
 
       // initialAttenuation
       instGenList.sfGenOper = initialAttenuation;
