@@ -413,7 +413,7 @@ bool CPS2Instr::loadInstr() {
 
     uint16_t Ar = attack_rate_table[std::min<u8>(attack_rate, 63)];
     uint16_t Dr = decay_rate_table[std::min<u8>(decay_rate, 63)];
-    uint16_t Sl = sustain_level_table[std::min<u8>(sustain_level, 63)];
+    uint16_t Sl = sustain_level_table[std::min<u8>(sustain_level, 127)];
     uint16_t Sr = decay_rate_table[std::min<u8>(sustain_rate, 63)];
     uint16_t Rr = decay_rate_table[std::min<u8>(release_rate, 63)];
 
