@@ -411,11 +411,11 @@ bool CPS2Instr::loadInstr() {
     if (rgn->sampNum >= static_cast<CPS2InstrSet*>(parInstrSet)->sampInfoTable->numSamples)
       rgn->sampNum = 0;
 
-    uint16_t Ar = attack_rate_table[this->attack_rate];
-    uint16_t Dr = decay_rate_table[this->decay_rate];
-    uint16_t Sl = sustain_level_table[this->sustain_level];
-    uint16_t Sr = decay_rate_table[this->sustain_rate];
-    uint16_t Rr = decay_rate_table[this->release_rate];
+    uint16_t Ar = attack_rate_table[std::min<u8>(attack_rate, 63)];
+    uint16_t Dr = decay_rate_table[std::min<u8>(decay_rate, 63)];
+    uint16_t Sl = sustain_level_table[std::min<u8>(sustain_level, 63)];
+    uint16_t Sr = decay_rate_table[std::min<u8>(sustain_rate, 63)];
+    uint16_t Rr = decay_rate_table[std::min<u8>(release_rate, 63)];
 
     const double UPDATE_RATE_IN_HZ = formatVer == CPS3 ? CPS3_DRIVER_RATE_HZ : CPS2_DRIVER_RATE_HZ;
     // The rate values are all measured from max to min, as the SF2 and DLS specs call for.
