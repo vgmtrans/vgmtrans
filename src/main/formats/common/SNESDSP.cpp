@@ -8,6 +8,7 @@
 #include "SNESDSP.h"
 #include "VGMInstrSet.h"
 #include "LogManager.h"
+#include <span>
 
 // *************
 // SNES Envelope
@@ -422,11 +423,14 @@ uint32_t SNESSamp::getSampleLength(const RawFile *file, uint32_t offset, bool &l
   return (currOffset - offset);
 }
 
-double SNESSamp::compressionRatio() {
+double SNESSamp::compressionRatio() const {
   return ((16.0 / 9.0) * 2); //aka 3.55...;
 }
 
-void SNESSamp::convertToStdWave(uint8_t *buf) {
+std::vector<int16_t> SNESSamp::decodePcm16() {
+  const uint32_t sampleCount = uncompressedSize() / sizeof(int16_t);
+  std::vector<int16_t> samples(sampleCount);
+
   BRRBlk theBlock;
   int32_t prev1 = 0;
   int32_t prev2 = 0;
@@ -448,7 +452,8 @@ void SNESSamp::convertToStdWave(uint8_t *buf) {
     theBlock.flag.loop = (readByte(dwOffset + k) & 0x02) != 0;
 
     rawFile()->readBytes(dwOffset + k + 1, 8, theBlock.brr);
-    decompBRRBlk(reinterpret_cast<int16_t*>(&buf[k * 32 / 9]),
+    const size_t blockIndex = k / 9;
+    decompBRRBlk(samples.data() + blockIndex * 16,
                  &theBlock,
                  &prev1,
                  &prev2);    //each decompressed pcm block is 32 bytes
@@ -464,6 +469,16 @@ void SNESSamp::convertToStdWave(uint8_t *buf) {
       break;
     }
   }
+
+  return samples;
+}
+
+std::vector<uint8_t> SNESSamp::convertToWave(Signedness targetSignedness,
+                                             Endianness targetEndianness,
+                                             WAVE_TYPE targetWaveType) {
+  std::vector<int16_t> samples = decodePcm16();
+  std::span<const std::byte> srcBytes = std::as_bytes(std::span(samples));
+  return convertWaveBuffer(srcBytes, targetSignedness, targetEndianness, targetWaveType);
 }
 
 // static inline int32_t absolute(int32_t x) {

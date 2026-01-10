@@ -1,6 +1,7 @@
 #pragma once
 
 #include "RiffFile.h"
+#include <vector>
 
 struct Loop;
 class VGMSamp;
@@ -24,7 +25,8 @@ class SynthFile {
   SynthInstr *addInstr(uint32_t bank, uint32_t instrNum, float reverb);
   SynthInstr *addInstr(uint32_t bank, uint32_t instrNum, std::string Name, float reverb);
   SynthWave *addWave(uint16_t formatTag, uint16_t channels, int samplesPerSec, int aveBytesPerSec,
-                     uint16_t blockAlign, uint16_t bitsPerSample, uint32_t waveDataSize, uint8_t *waveData,
+                     uint16_t blockAlign, uint16_t bitsPerSample, uint32_t waveDataSize,
+                     std::vector<uint8_t> waveData,
                      std::string name = "Unnamed Wave");
 
   std::vector<SynthInstr *> vInstrs;
@@ -148,7 +150,8 @@ class SynthArt {
 class SynthWave {
  public:
   SynthWave(uint16_t formatTag, uint16_t channels, int samplesPerSec, int aveBytesPerSec, uint16_t blockAlign,
-            uint16_t bitsPerSample, uint32_t waveDataSize, uint8_t *waveData, std::string waveName = "Untitled Wave")
+            uint16_t bitsPerSample, uint32_t waveDataSize, std::vector<uint8_t> waveData,
+            std::string waveName = "Untitled Wave")
       : sampinfo(nullptr),
         wFormatTag(formatTag),
         wChannels(channels),
@@ -157,9 +160,10 @@ class SynthWave {
         wBlockAlign(blockAlign),
         wBitsPerSample(bitsPerSample),
         dataSize(waveDataSize),
-        data(waveData),
+        data(std::move(waveData)),
         name(std::move(waveName)) {
     RiffFile::alignName(name);
+    dataSize = static_cast<uint32_t>(data.size());
   }
   ~SynthWave();
 
@@ -178,7 +182,7 @@ class SynthWave {
   uint16_t wBitsPerSample;
 
   uint32_t dataSize;
-  uint8_t *data;
+  std::vector<uint8_t> data;
 
   std::string name;
 };

@@ -7,6 +7,7 @@
 //  https://github.com/mamedev/mame/blob/master/src/devices/sound/okiadpcm.cpp
 
 #include <cmath>
+#include <span>
 #include "OkiAdpcm.h"
 
 //**************************************************************************
@@ -140,16 +141,17 @@ DialogicAdpcmSamp::DialogicAdpcmSamp(VGMSampColl *sampColl, uint32_t offset, uin
 
 DialogicAdpcmSamp::~DialogicAdpcmSamp() {}
 
-double DialogicAdpcmSamp::compressionRatio() {
+double DialogicAdpcmSamp::compressionRatio() const {
   return (16.0 / 4); // 4 bit samples converted up to 16 bit samples
 }
 
-void DialogicAdpcmSamp::convertToStdWave(uint8_t *buf) {
-
+std::vector<int16_t> DialogicAdpcmSamp::decodePcm16() {
   const int16_t maxValue = std::numeric_limits<int16_t>::max();
   const int16_t minValue = std::numeric_limits<int16_t>::min();
 
-  auto* uncompBuf = reinterpret_cast<int16_t*>(buf);
+  const uint32_t sampleCount = uncompressedSize() / sizeof(int16_t);
+  std::vector<int16_t> samples(sampleCount);
+  auto* uncompBuf = samples.data();
 
   DialogicAdpcmSamp::okiAdpcmState.reset();
 
@@ -170,4 +172,14 @@ void DialogicAdpcmSamp::convertToStdWave(uint8_t *buf) {
       uncompBuf[sampleNum++] = sample;
     }
   }
+
+  return samples;
+}
+
+std::vector<uint8_t> DialogicAdpcmSamp::convertToWave(Signedness targetSignedness,
+                                                      Endianness targetEndianness,
+                                                      WAVE_TYPE targetWaveType) {
+  std::vector<int16_t> samples = decodePcm16();
+  std::span<const std::byte> srcBytes = std::as_bytes(std::span(samples));
+  return convertWaveBuffer(srcBytes, targetSignedness, targetEndianness, targetWaveType);
 }

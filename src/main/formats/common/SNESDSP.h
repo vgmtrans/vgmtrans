@@ -134,10 +134,13 @@ class SNESSamp
 
   static uint32_t getSampleLength(const RawFile *file, uint32_t offset, bool &loop);
 
-  double compressionRatio() override;
-  void convertToStdWave(uint8_t *buf) override;
+  double compressionRatio() const override;
+  std::vector<uint8_t> convertToWave(Signedness targetSignedness,
+                                     Endianness targetEndianness,
+                                     WAVE_TYPE targetWaveType) override;
 
  private:
+  std::vector<int16_t> decodePcm16();
   static void decompBRRBlk(int16_t *pSmp, const BRRBlk *pVBlk, int32_t *prev1, int32_t *prev2);
 
  private:

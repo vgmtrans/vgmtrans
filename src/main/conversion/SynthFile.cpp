@@ -40,7 +40,7 @@ SynthWave *SynthFile::addWave(uint16_t formatTag,
                               uint16_t blockAlign,
                               uint16_t bitsPerSample,
                               uint32_t waveDataSize,
-                              unsigned char *waveData,
+                              std::vector<uint8_t> waveData,
                               std::string name) {
   vWaves.insert(vWaves.end(),
                 new SynthWave(formatTag,
@@ -50,7 +50,7 @@ SynthWave *SynthFile::addWave(uint16_t formatTag,
                               blockAlign,
                               bitsPerSample,
                               waveDataSize,
-                              waveData,
+                              std::move(waveData),
                               std::move(name)));
   return vWaves.back();
 }
@@ -195,22 +195,24 @@ void SynthSampInfo::setPitchInfo(uint16_t unityNote, short fineTune, double atte
 
 void SynthWave::convertTo16bit() {
   if (wBitsPerSample == 8) {
-    this->wBitsPerSample = 16;
-    this->wBlockAlign = 16 / 8 * this->wChannels;
-    this->dwAveBytesPerSec *= 2;
+    wBitsPerSample = 16;
+    wBlockAlign = 16 / 8 * wChannels;
+    dwAveBytesPerSec *= 2;
 
-    int16_t *newData = new int16_t[this->dataSize];
-    for (unsigned int i = 0; i < this->dataSize; i++)
-      newData[i] = static_cast<int16_t>(this->data[i]) << 8;
-    delete[] this->data;
-    this->data = reinterpret_cast<uint8_t*>(newData);
-    this->dataSize *= 2;
+    std::vector<uint8_t> newData(dataSize * 2u);
+    for (uint32_t i = 0; i < dataSize; i++) {
+      const int16_t sample = static_cast<int16_t>(data[i]) << 8;
+      const uint16_t u = static_cast<uint16_t>(sample);
+      newData[i * 2] = static_cast<uint8_t>(u & 0xFF);
+      newData[i * 2 + 1] = static_cast<uint8_t>((u >> 8) & 0xFF);
+    }
+    data = std::move(newData);
+    dataSize *= 2;
   }
 }
 
 SynthWave::~SynthWave() {
   delete sampinfo;
-  delete[] data;
 }
 
 SynthSampInfo *SynthWave::addSampInfo() {

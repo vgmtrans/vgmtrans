@@ -23,10 +23,13 @@ public:
       std::string name
   );
 
-  double compressionRatio() override;
-  void convertToStdWave(u8* buf) override;
+  double compressionRatio() const override;
+  std::vector<uint8_t> convertToWave(Signedness targetSignedness,
+                                     Endianness targetEndianness,
+                                     WAVE_TYPE targetWaveType) override;
 
 private:
+  std::vector<int16_t> decodePcm16();
   KonamiAdpcmChip m_chip;
   const s16* m_stepTable;
 };

@@ -4,6 +4,7 @@
 
 #include "PSXSPU.h"
 #include "formats/PS1/PS1Format.h"
+#include <span>
 
 using namespace std;
 
@@ -402,12 +403,14 @@ PSXSamp::PSXSamp(VGMSampColl *sampColl, uint32_t offset, uint32_t length, uint32
 PSXSamp::~PSXSamp() {
 }
 
-double PSXSamp::compressionRatio() {
+double PSXSamp::compressionRatio() const {
   return ((28.0 / 16.0) * 2);
 }
 
-void PSXSamp::convertToStdWave(uint8_t *buf) {
-  s16 *uncompBuf = reinterpret_cast<s16*>(buf);
+std::vector<int16_t> PSXSamp::decodePcm16() {
+  const uint32_t sampleCount = uncompressedSize() / sizeof(int16_t);
+  std::vector<int16_t> samples(sampleCount);
+  s16 *uncompBuf = samples.data();
   VAGBlk theBlock;
   s32  prev[2] = {0, 0};
 
@@ -448,6 +451,16 @@ void PSXSamp::convertToStdWave(uint8_t *buf) {
     //each decompressed pcm block is 56 bytes (28 samples, 16-bit each)
     decompVAGBlk(uncompBuf + ((k / 16) * 28), &theBlock, prev);
   }
+
+  return samples;
+}
+
+std::vector<uint8_t> PSXSamp::convertToWave(Signedness targetSignedness,
+                                            Endianness targetEndianness,
+                                            WAVE_TYPE targetWaveType) {
+  std::vector<int16_t> samples = decodePcm16();
+  std::span<const std::byte> srcBytes = std::as_bytes(std::span(samples));
+  return convertWaveBuffer(srcBytes, targetSignedness, targetEndianness, targetWaveType);
 }
 
 uint32_t PSXSamp::getSampleLength(const RawFile *file, uint32_t offset, uint32_t endOffset, bool &loop) {
