@@ -104,8 +104,30 @@ double dbToAmp(double db) {
   return std::pow(10.0, -db / 20.0);
 }
 
-double secondsToTimecents(double secs) {
-  return log(secs) / log((double) 2) * 1200;
+int16_t secondsToSf2Timecents(double seconds) {
+  // SF2 convention: -32768 indicates instantaneous / no delay (depending on generator)
+  if (seconds <= 0.0 || !std::isfinite(seconds))
+    return std::numeric_limits<int16_t>::min(); // -32768
+
+  double tc = 1200.0 * std::log2(seconds);
+  double rounded = std::round(tc);
+  if (rounded > (double)std::numeric_limits<int16_t>::max())
+    return std::numeric_limits<int16_t>::max();
+
+  return (int16_t)rounded;
+}
+
+int32_t secondsToDlsTimecents(double seconds) {
+  // DLS "absolute zero" sentinel for 0 seconds
+  if (seconds <= 0.0 || !std::isfinite(seconds))
+    return std::numeric_limits<int32_t>::min();  // 0x80000000
+
+  double tc = 1200.0 * std::log2(seconds);
+  double rounded = std::round(tc * 65536.0);
+  if (rounded > (double)std::numeric_limits<int32_t>::max())
+    return std::numeric_limits<int32_t>::max();
+
+  return (int32_t)rounded;
 }
 
 // Convert percent pan to midi pan (with no scale conversion)
