@@ -6,6 +6,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <utility>
 #include "VGMSamp.h"
 #include "VGMSampColl.h"
 #include "Root.h"
@@ -28,10 +29,17 @@ double VGMSamp::compressionRatio() const {
   return 1.0;
 }
 
-std::vector<uint8_t> VGMSamp::convertWaveBuffer(std::span<const std::byte> src,
-                                                Signedness targetSignedness,
-                                                Endianness targetEndianness,
-                                                WAVE_TYPE targetWaveType) const {
+std::vector<uint8_t> VGMSamp::decode() {
+  std::vector<uint8_t> src(dataLength);
+  readBytes(dataOff, dataLength, src.data());
+  return src;
+}
+
+std::vector<uint8_t> VGMSamp::convertToWave(Signedness targetSignedness,
+                                            Endianness targetEndianness,
+                                            WAVE_TYPE targetWaveType) {
+  std::vector<uint8_t> src = decode();
+
   const WAVE_TYPE effectiveWaveType =
       (waveType == WT_UNDEFINED) ? (bps == 8 ? WT_PCM8 : WT_PCM16) : waveType;
 
@@ -39,8 +47,7 @@ std::vector<uint8_t> VGMSamp::convertWaveBuffer(std::span<const std::byte> src,
       effectiveWaveType == targetWaveType &&
       m_signedness == targetSignedness &&
       m_endianness == targetEndianness) {
-    const auto *bytes = reinterpret_cast<const uint8_t*>(src.data());
-    return std::vector<uint8_t>(bytes, bytes + src.size());
+    return src;
   }
 
   const bool isSrc16 = (effectiveWaveType == WT_PCM16);
@@ -63,8 +70,8 @@ std::vector<uint8_t> VGMSamp::convertWaveBuffer(std::span<const std::byte> src,
   auto readS16 = [&](std::size_t i) -> int32_t {
     if (isSrc16) {
       const std::size_t b = i * 2;
-      const uint16_t lo = std::to_integer<uint8_t>(src[b + 0]);
-      const uint16_t hi = std::to_integer<uint8_t>(src[b + 1]);
+      const uint16_t lo = src[b + 0];
+      const uint16_t hi = src[b + 1];
       const uint16_t u = (m_endianness == Endianness::Big)
                            ? uint16_t((lo << 8) | hi)
                            : uint16_t(lo | (hi << 8));
@@ -72,7 +79,7 @@ std::vector<uint8_t> VGMSamp::convertWaveBuffer(std::span<const std::byte> src,
                ? (int32_t(u) - 0x8000)
                : int32_t(int16_t(u));
     } else {
-      const uint8_t u = std::to_integer<uint8_t>(src[i]);
+      const uint8_t u = src[i];
       const int32_t s8 = (m_signedness == Signedness::Unsigned)
                            ? (int32_t(u) - 128)
                            : int32_t(int8_t(u));
@@ -101,25 +108,6 @@ std::vector<uint8_t> VGMSamp::convertWaveBuffer(std::span<const std::byte> src,
   }
 
   return out;
-}
-
-std::vector<uint8_t> VGMSamp::convertToWave(Signedness targetSignedness,
-                                            Endianness targetEndianness,
-                                            WAVE_TYPE targetWaveType) {
-  std::vector<uint8_t> src(dataLength);
-  readBytes(dataOff, dataLength, src.data());
-
-  // Fast path: exact match and no reverse
-  const WAVE_TYPE effectiveWaveType = (waveType == WT_UNDEFINED) ? (bps == 8 ? WT_PCM8 : WT_PCM16) : waveType;
-  if (!m_reverse &&
-      effectiveWaveType == targetWaveType &&
-      m_signedness == targetSignedness &&
-      m_endianness == targetEndianness) {
-    return src;
-  }
-
-  return convertWaveBuffer(std::as_bytes(std::span(src)),
-                           targetSignedness, targetEndianness, targetWaveType);
 }
 
 uint32_t VGMSamp::uncompressedSize() const {

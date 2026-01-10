@@ -8,7 +8,6 @@
 #include "SNESDSP.h"
 #include "VGMInstrSet.h"
 #include "LogManager.h"
-#include <span>
 
 // *************
 // SNES Envelope
@@ -427,9 +426,10 @@ double SNESSamp::compressionRatio() const {
   return ((16.0 / 9.0) * 2); //aka 3.55...;
 }
 
-std::vector<int16_t> SNESSamp::decodePcm16() {
+std::vector<uint8_t> SNESSamp::decode() {
   const uint32_t sampleCount = uncompressedSize() / sizeof(int16_t);
-  std::vector<int16_t> samples(sampleCount);
+  std::vector<uint8_t> samples(sampleCount * sizeof(int16_t));
+  auto *output = reinterpret_cast<int16_t*>(samples.data());
 
   BRRBlk theBlock;
   int32_t prev1 = 0;
@@ -453,7 +453,7 @@ std::vector<int16_t> SNESSamp::decodePcm16() {
 
     rawFile()->readBytes(dwOffset + k + 1, 8, theBlock.brr);
     const size_t blockIndex = k / 9;
-    decompBRRBlk(samples.data() + blockIndex * 16,
+    decompBRRBlk(output + blockIndex * 16,
                  &theBlock,
                  &prev1,
                  &prev2);    //each decompressed pcm block is 32 bytes
@@ -471,14 +471,6 @@ std::vector<int16_t> SNESSamp::decodePcm16() {
   }
 
   return samples;
-}
-
-std::vector<uint8_t> SNESSamp::convertToWave(Signedness targetSignedness,
-                                             Endianness targetEndianness,
-                                             WAVE_TYPE targetWaveType) {
-  std::vector<int16_t> samples = decodePcm16();
-  std::span<const std::byte> srcBytes = std::as_bytes(std::span(samples));
-  return convertWaveBuffer(srcBytes, targetSignedness, targetEndianness, targetWaveType);
 }
 
 // static inline int32_t absolute(int32_t x) {

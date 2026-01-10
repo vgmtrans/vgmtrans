@@ -9,7 +9,6 @@
 
 #include <cstring>
 #include <memory>
-#include <span>
 #include <spdlog/fmt/fmt.h>
 
 #include "MP2kFormat.h"
@@ -353,7 +352,7 @@ MP2kSamp::MP2kSamp(VGMSampColl *sampColl, MP2kWaveType type, uint32_t offset, ui
     : VGMSamp(sampColl, offset, length, dataOffset, dataLength, channels, bps, rate, name),
       m_type(type){};
 
-std::vector<uint8_t> MP2kSamp::decodePcm() {
+std::vector<uint8_t> MP2kSamp::decode() {
   std::vector<uint8_t> buf(uncompressedSize());
   switch (m_type) {
     case MP2kWaveType::PCM8: {
@@ -403,12 +402,4 @@ std::vector<uint8_t> MP2kSamp::decodePcm() {
   }
 
   return buf;
-}
-
-std::vector<uint8_t> MP2kSamp::convertToWave(Signedness targetSignedness,
-                                             Endianness targetEndianness,
-                                             WAVE_TYPE targetWaveType) {
-  std::vector<uint8_t> src = decodePcm();
-  std::span<const std::byte> srcBytes = std::as_bytes(std::span(src));
-  return convertWaveBuffer(srcBytes, targetSignedness, targetEndianness, targetWaveType);
 }
