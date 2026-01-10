@@ -4,7 +4,6 @@
 
 #include "PSXSPU.h"
 #include "formats/PS1/PS1Format.h"
-#include <span>
 
 using namespace std;
 
@@ -407,10 +406,10 @@ double PSXSamp::compressionRatio() const {
   return ((28.0 / 16.0) * 2);
 }
 
-std::vector<int16_t> PSXSamp::decodePcm16() {
+std::vector<uint8_t> PSXSamp::decode() {
   const uint32_t sampleCount = uncompressedSize() / sizeof(int16_t);
-  std::vector<int16_t> samples(sampleCount);
-  s16 *uncompBuf = samples.data();
+  std::vector<uint8_t> samples(sampleCount * sizeof(int16_t));
+  auto *uncompBuf = reinterpret_cast<s16 *>(samples.data());
   VAGBlk theBlock;
   s32  prev[2] = {0, 0};
 
@@ -453,14 +452,6 @@ std::vector<int16_t> PSXSamp::decodePcm16() {
   }
 
   return samples;
-}
-
-std::vector<uint8_t> PSXSamp::convertToWave(Signedness targetSignedness,
-                                            Endianness targetEndianness,
-                                            WAVE_TYPE targetWaveType) {
-  std::vector<int16_t> samples = decodePcm16();
-  std::span<const std::byte> srcBytes = std::as_bytes(std::span(samples));
-  return convertWaveBuffer(srcBytes, targetSignedness, targetEndianness, targetWaveType);
 }
 
 uint32_t PSXSamp::getSampleLength(const RawFile *file, uint32_t offset, uint32_t endOffset, bool &loop) {

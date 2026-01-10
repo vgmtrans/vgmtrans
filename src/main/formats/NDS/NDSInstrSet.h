@@ -100,11 +100,8 @@ public:
           uint8_t waveType = 0, std::string name = "Sample");
 
   double compressionRatio() const override;  // ratio of space conserved.  should generally be > 1
-  std::vector<uint8_t> convertToWave(Signedness targetSignedness,
-                                     Endianness targetEndianness,
-                                     WAVE_TYPE targetWaveType) override;
 
-  std::vector<int16_t> decodeImaAdpcm();
+  std::vector<uint8_t> decodeImaAdpcm();
   std::vector<uint8_t> decodePcm8();
 
   static inline void clamp_step_index(int &stepIndex);
@@ -114,18 +111,19 @@ public:
   enum { PCM8, PCM16, IMA_ADPCM };
 
   uint8_t waveType;
+
+private:
+  std::vector<uint8_t> decode() override;
 };
 
 class NDSPSGSamp : public VGMSamp {
 public:
   NDSPSGSamp(VGMSampColl *sampcoll, uint8_t duty_cycle);
   ~NDSPSGSamp() override = default;
-  std::vector<uint8_t> convertToWave(Signedness targetSignedness,
-                                     Endianness targetEndianness,
-                                     WAVE_TYPE targetWaveType) override;
 
 private:
-  std::vector<int16_t> decodePcm16();
+  std::vector<uint8_t> decode() override;
+  std::vector<uint8_t> decodePcm16();
 
   /* We use -1 to indicate noise */
   double m_duty_cycle{-1};

@@ -6,7 +6,6 @@
 #include "KonamiAdpcm.h"
 
 #include <algorithm>
-#include <span>
 
 static const s16 K054539_DPCM_TABLE[16] = {
     0,      256,    512,    1024,
@@ -48,10 +47,10 @@ double KonamiAdpcmSamp::compressionRatio() const {
   return (16.0 / 4); // 4 bit samples converted up to 16 bit samples
 }
 
-std::vector<int16_t> KonamiAdpcmSamp::decodePcm16() {
+std::vector<uint8_t> KonamiAdpcmSamp::decode() {
   const uint32_t sampleCount = uncompressedSize() / sizeof(int16_t);
-  std::vector<int16_t> samples(sampleCount);
-  auto* uncompBuf = samples.data();
+  std::vector<uint8_t> samples(sampleCount * sizeof(int16_t));
+  auto* uncompBuf = reinterpret_cast<s16*>(samples.data());
 
   size_t sampleNum = 0;          // write index in the PCM buffer
   s32 prevVal      = 0;          // “integrator” – same as the chip
@@ -82,12 +81,4 @@ std::vector<int16_t> KonamiAdpcmSamp::decodePcm16() {
   }
 
   return samples;
-}
-
-std::vector<uint8_t> KonamiAdpcmSamp::convertToWave(Signedness targetSignedness,
-                                                    Endianness targetEndianness,
-                                                    WAVE_TYPE targetWaveType) {
-  std::vector<int16_t> samples = decodePcm16();
-  std::span<const std::byte> srcBytes = std::as_bytes(std::span(samples));
-  return convertWaveBuffer(srcBytes, targetSignedness, targetEndianness, targetWaveType);
 }

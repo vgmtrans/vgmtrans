@@ -9,7 +9,6 @@
 #include "Loop.h"
 #include <cstddef>
 #include <filesystem>
-#include <span>
 #include <vector>
 
 class VGMSampColl;
@@ -24,9 +23,9 @@ public:
   ~VGMSamp() override = default;
 
   virtual double compressionRatio() const;  // ratio of space conserved.  should generally be > 1
-  virtual std::vector<uint8_t> convertToWave(Signedness targetSignedness,
-                                             Endianness targetEndianness,
-                                             WAVE_TYPE targetWaveType);
+  std::vector<uint8_t> convertToWave(Signedness targetSignedness,
+                                     Endianness targetEndianness,
+                                     WAVE_TYPE targetWaveType);
 
   inline void setWaveType(WAVE_TYPE type) { waveType = type; }
   inline void setBPS(uint16_t theBPS) { bps = theBPS; }
@@ -82,22 +81,15 @@ private:
   Signedness m_signedness = Signedness::Signed;
 
 protected:
-  std::vector<uint8_t> convertWaveBuffer(std::span<const std::byte> src,
-                                         Signedness targetSignedness,
-                                         Endianness targetEndianness,
-                                         WAVE_TYPE targetWaveType) const;
+  virtual std::vector<uint8_t> decode();
 };
 
 
 class EmptySamp : public VGMSamp {
 public:
   EmptySamp(VGMSampColl* sampColl): VGMSamp(sampColl, 0, 0, 0, 16) {}
-  std::vector<uint8_t> convertToWave(Signedness targetSignedness,
-                                     Endianness targetEndianness,
-                                     WAVE_TYPE targetWaveType) override {
-    (void)targetSignedness;
-    (void)targetEndianness;
-    (void)targetWaveType;
+protected:
+  std::vector<uint8_t> decode() override {
     return std::vector<uint8_t>(dataLength, 0);
   }
 };
