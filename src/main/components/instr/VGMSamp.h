@@ -9,6 +9,7 @@
 #include "Loop.h"
 #include <cstddef>
 #include <filesystem>
+#include <span>
 #include <vector>
 
 class VGMSampColl;
@@ -23,9 +24,9 @@ public:
   ~VGMSamp() override = default;
 
   virtual double compressionRatio() const;  // ratio of space conserved.  should generally be > 1
-  std::vector<uint8_t> toPcm(Signedness targetSignedness,
-                             Endianness targetEndianness,
-                             WAVE_TYPE targetWaveType);
+  virtual std::vector<uint8_t> convertToWave(Signedness targetSignedness,
+                                             Endianness targetEndianness,
+                                             WAVE_TYPE targetWaveType);
 
   inline void setWaveType(WAVE_TYPE type) { waveType = type; }
   inline void setBPS(uint16_t theBPS) { bps = theBPS; }
@@ -81,15 +82,22 @@ private:
   Signedness m_signedness = Signedness::Signed;
 
 protected:
-  virtual std::vector<uint8_t> decodeToNativePcm();
+  std::vector<uint8_t> convertWaveBuffer(std::span<const std::byte> src,
+                                         Signedness targetSignedness,
+                                         Endianness targetEndianness,
+                                         WAVE_TYPE targetWaveType) const;
 };
 
 
 class EmptySamp : public VGMSamp {
 public:
   EmptySamp(VGMSampColl* sampColl): VGMSamp(sampColl, 0, 0, 0, 16) {}
-protected:
-  std::vector<uint8_t> decodeToNativePcm() override {
+  std::vector<uint8_t> convertToWave(Signedness targetSignedness,
+                                     Endianness targetEndianness,
+                                     WAVE_TYPE targetWaveType) override {
+    (void)targetSignedness;
+    (void)targetEndianness;
+    (void)targetWaveType;
     return std::vector<uint8_t>(dataLength, 0);
   }
 };

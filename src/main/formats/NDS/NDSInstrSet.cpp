@@ -6,6 +6,7 @@
 
 #include <cmath>
 #include <numeric>
+#include <span>
 #include <string>
 #include <vector>
 #include <spdlog/fmt/fmt.h>
@@ -368,12 +369,31 @@ double NDSSamp::compressionRatio() const {
   return 1.0;
 }
 
-std::vector<uint8_t> NDSSamp::decodeToNativePcm() {
+std::vector<uint8_t> NDSSamp::decodePcm8() {
+  std::vector<uint8_t> src(dataLength);
+  readBytes(dataOff, dataLength, src.data());
+  return src;
+}
+
+std::vector<uint8_t> NDSSamp::convertToWave(Signedness targetSignedness,
+                                            Endianness targetEndianness,
+                                            WAVE_TYPE targetWaveType) {
   if (waveType == IMA_ADPCM) {
-    return decodeImaAdpcm();
+    std::vector<int16_t> samples = decodeImaAdpcm();
+    std::span<const std::byte> srcBytes = std::as_bytes(std::span(samples));
+    return convertWaveBuffer(srcBytes, targetSignedness, targetEndianness, targetWaveType);
   }
 
-  return VGMSamp::decodeToNativePcm();
+  std::vector<uint8_t> src = decodePcm8();
+  const WAVE_TYPE srcWaveType = (waveType == PCM8) ? WT_PCM8 : WT_PCM16;
+  if (!reverse() &&
+      signedness() == targetSignedness &&
+      endianness() == targetEndianness &&
+      srcWaveType == targetWaveType) {
+    return src;
+  }
+  std::span<const std::byte> srcBytes = std::as_bytes(std::span(src));
+  return convertWaveBuffer(srcBytes, targetSignedness, targetEndianness, targetWaveType);
 }
 
 // From nocash's site: The NDS data consist of a 32bit header, followed by 4bit values (so each byte
@@ -388,25 +408,24 @@ std::vector<uint8_t> NDSSamp::decodeToNativePcm() {
 // it clamps min (and max?) sample values differently (see below).  I really don't know how much of
 // a difference it makes, but this implementation is, to my knowledge, the proper way of doing
 // things for NDS.
-std::vector<uint8_t> NDSSamp::decodeImaAdpcm() {
+std::vector<int16_t> NDSSamp::decodeImaAdpcm() {
   const uint32_t sampleCount = uncompressedSize() / sizeof(int16_t);
-  std::vector<uint8_t> samples(sampleCount * sizeof(int16_t));
-  auto *output = reinterpret_cast<int16_t*>(samples.data());
+  std::vector<int16_t> samples(sampleCount);
   uint32_t destOff = 0;
   uint32_t sampHeader = getWord(dataOff - 4);
   int decompSample = sampHeader & 0xFFFF;
   int stepIndex = (sampHeader >> 16) & 0x7F;
 
   uint32_t curOffset = dataOff;
-  output[destOff++] = (int16_t)decompSample;
+  samples[destOff++] = (int16_t)decompSample;
 
   uint8_t compByte;
   while (curOffset < dataOff + dataLength) {
     compByte = readByte(curOffset++);
     process_nibble(compByte, stepIndex, decompSample);
-    output[destOff++] = (int16_t)decompSample;
+    samples[destOff++] = (int16_t)decompSample;
     process_nibble((compByte & 0xF0) >> 4, stepIndex, decompSample);
-    output[destOff++] = (int16_t)decompSample;
+    samples[destOff++] = (int16_t)decompSample;
   }
 
   return samples;
@@ -534,10 +553,10 @@ NDSPSGSamp::NDSPSGSamp(VGMSampColl *sampcoll, uint8_t duty_cycle) : VGMSamp(samp
   setName("PSG_duty_" + std::to_string(duty_cycle));
 }
 
-std::vector<uint8_t> NDSPSGSamp::decodeToNativePcm() {
+std::vector<int16_t> NDSPSGSamp::decodePcm16() {
   const uint32_t sampleCount = uncompressedSize() / sizeof(int16_t);
-  std::vector<uint8_t> samples(sampleCount * sizeof(int16_t));
-  auto *output = reinterpret_cast<int16_t*>(samples.data());
+  std::vector<int16_t> samples(sampleCount);
+  int16_t *output = samples.data();
 
   /* Noise mode */
   if (m_duty_cycle == -1) {
@@ -589,4 +608,12 @@ std::vector<uint8_t> NDSPSGSamp::decodeToNativePcm() {
   }
 
   return samples;
+}
+
+std::vector<uint8_t> NDSPSGSamp::convertToWave(Signedness targetSignedness,
+                                               Endianness targetEndianness,
+                                               WAVE_TYPE targetWaveType) {
+  std::vector<int16_t> samples = decodePcm16();
+  std::span<const std::byte> srcBytes = std::as_bytes(std::span(samples));
+  return convertWaveBuffer(srcBytes, targetSignedness, targetEndianness, targetWaveType);
 }

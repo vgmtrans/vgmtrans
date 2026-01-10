@@ -58,7 +58,11 @@ public:
            uint16_t bps = 16, uint32_t rate = 0, uint8_t waveType = 0, std::string name = "Sample");
   ~MP2kSamp() = default;
 
+  std::vector<uint8_t> convertToWave(Signedness targetSignedness,
+                                     Endianness targetEndianness,
+                                     WAVE_TYPE targetWaveType) override;
+
 private:
-  std::vector<uint8_t> decodeToNativePcm() override;
+  std::vector<uint8_t> decodePcm();
   MP2kWaveType m_type;
 };
