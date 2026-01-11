@@ -1,6 +1,7 @@
 #pragma once
 
 #include "VGMFile.h"
+#include "VGMSamp.h"
 
 class VGMInstrSet;
 class VGMSamp;
@@ -23,7 +24,7 @@ class VGMSampColl : public VGMFile {
   virtual bool parseSampleInfo();        // retrieve sample info, including pointers to data, # channels, rate, etc.
 
   VGMSamp *addSamp(uint32_t offset, uint32_t length, uint32_t dataOffset, uint32_t dataLength,
-                   uint8_t nChannels = 1, uint16_t bps = 16, uint32_t theRate = 0,
+                   uint8_t nChannels = 1, BPS bps = BPS::PCM16, uint32_t theRate = 0,
                    std::string name = "Sample");
 
   bool shouldLoadOnInstrSetMatch() const { return m_should_load_on_instr_set_match; }

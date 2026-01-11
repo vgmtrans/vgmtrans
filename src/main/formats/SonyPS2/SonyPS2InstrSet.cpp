@@ -415,7 +415,7 @@ bool SonyPS2SampColl::parseSampleInfo() {
 
     auto name = fmt::format("Sample {}", samples.size());
     PSXSamp *samp = new PSXSamp(this, offset, length, offset, length, 1,
-      16, sampleRate, name, true);
+      BPS::PCM16, sampleRate, name, true);
     samples.push_back(samp);
 
     // Determine loop information from VAGInfo Param

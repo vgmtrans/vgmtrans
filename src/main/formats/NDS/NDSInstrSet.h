@@ -96,7 +96,7 @@ private:
 class NDSSamp : public VGMSamp {
 public:
   NDSSamp(VGMSampColl *sampColl, uint32_t offset = 0, uint32_t length = 0, uint32_t dataOffset = 0,
-          uint32_t dataLength = 0, uint8_t channels = 1, uint16_t bps = 16, uint32_t rate = 0,
+          uint32_t dataLength = 0, uint8_t channels = 1, BPS bps = BPS::PCM16, uint32_t rate = 0,
           uint8_t waveType = 0, std::string name = "Sample");
 
   double compressionRatio() const override;  // ratio of space conserved.  should generally be > 1

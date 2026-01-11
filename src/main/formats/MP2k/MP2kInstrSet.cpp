@@ -78,7 +78,7 @@ int MP2kInstrSet::makeOrGetSample(size_t sample_pointer) {
   samp->fineTune = pitch_correction;
   samp->rate = m_operating_rate;
   samp->setAttenuation(0);
-  samp->bps = 8;
+  samp->setBPS(BPS::PCM8);
   samp->setName(fmt::format("{:#x}", sample_pointer));
 
   samp->setLoopStartMeasure(LM_SAMPLES);
@@ -347,7 +347,7 @@ void MP2kInstr::setADSR(VGMRgn *rgn, u32 adsr) {
 }
 
 MP2kSamp::MP2kSamp(VGMSampColl *sampColl, MP2kWaveType type, uint32_t offset, uint32_t length,
-                   uint32_t dataOffset, uint32_t dataLength, uint8_t channels, uint16_t bps,
+                   uint32_t dataOffset, uint32_t dataLength, uint8_t channels, BPS bps,
                    uint32_t rate, uint8_t waveType, std::string name)
     : VGMSamp(sampColl, offset, length, dataOffset, dataLength, channels, bps, rate, name),
       m_type(type){};

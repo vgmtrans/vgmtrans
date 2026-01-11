@@ -396,7 +396,7 @@ bool SNESSampColl::isValidSampleDir(const RawFile *file, uint32_t spcDirEntAddr,
 
 SNESSamp::SNESSamp(VGMSampColl *sampColl, uint32_t offset, uint32_t length, uint32_t dataOffset,
                    uint32_t dataLen, uint32_t loopOffset, std::string name)
-    : VGMSamp(sampColl, offset, length, dataOffset, dataLen, 1, 16, 32000, std::move(name)),
+    : VGMSamp(sampColl, offset, length, dataOffset, dataLen, 1, BPS::PCM16, 32000, std::move(name)),
       brrLoopOffset(loopOffset) {
 }
 

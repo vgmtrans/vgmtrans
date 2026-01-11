@@ -13,22 +13,24 @@
 
 class VGMSampColl;
 
-enum WAVE_TYPE { WT_UNDEFINED, WT_PCM8, WT_PCM16 };
+enum class BPS : int {
+  PCM8 = 8,
+  PCM16 = 16
+};
 
 class VGMSamp : public VGMItem {
 public:
   VGMSamp(VGMSampColl *sampColl, uint32_t offset = 0, uint32_t length = 0, uint32_t dataOffset = 0,
-          uint32_t dataLength = 0, uint8_t channels = 1, uint16_t bps = 16, uint32_t rate = 0,
+          uint32_t dataLength = 0, uint8_t channels = 1, BPS bps = BPS::PCM16, uint32_t rate = 0,
           std::string name = "Sample");
   ~VGMSamp() override = default;
 
   virtual double compressionRatio() const;  // ratio of space conserved.  should generally be > 1
   std::vector<uint8_t> toPcm(Signedness targetSignedness,
                              Endianness targetEndianness,
-                             WAVE_TYPE targetWaveType);
+                             BPS targetBps);
 
-  inline void setWaveType(WAVE_TYPE type) { waveType = type; }
-  inline void setBPS(uint16_t theBPS) { bps = theBPS; }
+  inline void setBPS(BPS theBps) { m_bps = theBps; }
   inline void setRate(uint32_t theRate) { rate = theRate; }
   inline void setNumChannels(uint8_t nChannels) { channels = nChannels; }
   inline void setDataOffset(uint32_t theDataOff) { dataOff = theDataOff; }
@@ -49,16 +51,17 @@ public:
   inline void setEndianness(Endianness e) { m_endianness = e; }
   inline Signedness signedness() const { return m_signedness; }
   inline void setSignedness(Signedness s) { m_signedness = s; }
+  inline BPS bps() const { return m_bps; }
+  inline int bitsPerSample() const { return static_cast<int>(m_bps); }
+  inline int bytesPerSample() const { return bitsPerSample() / 8; }
   uint32_t uncompressedSize() const;
 
   bool onSaveAsWav();
   bool saveAsWav(const std::filesystem::path &filepath);
 
 public:
-  WAVE_TYPE waveType = WT_UNDEFINED;
   uint32_t dataOff;  // offset of original sample data
   uint32_t dataLength;
-  uint16_t bps;      // bits per sample
   uint32_t rate;     // sample rate in herz (samples per second)
   uint8_t channels;  // mono or stereo?
   uint32_t ulUncompressedSize{0};
@@ -75,6 +78,7 @@ public:
   VGMSampColl *parSampColl;
 
 private:
+  BPS m_bps;      // bits per sample
   double m_attenDb {0};
   bool m_reverse = false;
   Endianness m_endianness = Endianness::Little;
@@ -87,7 +91,7 @@ protected:
 
 class EmptySamp : public VGMSamp {
 public:
-  EmptySamp(VGMSampColl* sampColl): VGMSamp(sampColl, 0, 0, 0, 16) {}
+  EmptySamp(VGMSampColl* sampColl): VGMSamp(sampColl, 0, 0, 0, 16, 1, BPS::PCM16) {}
 protected:
   std::vector<uint8_t> decodeToNativePcm() override {
     return std::vector<uint8_t>(dataLength, 0);

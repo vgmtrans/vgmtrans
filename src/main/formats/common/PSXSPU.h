@@ -342,7 +342,7 @@ class PSXSampColl : public VGMSampColl {
 class PSXSamp : public VGMSamp {
  public:
   PSXSamp(VGMSampColl *sampColl, uint32_t offset, uint32_t length, uint32_t dataOffset,
-          uint32_t dataLen, uint8_t nChannels, uint16_t theBPS,
+          uint32_t dataLen, uint8_t nChannels, BPS theBPS,
           uint32_t theRate, std::string name, bool bSetLoopOnConversion = true);
   ~PSXSamp() override;
 

@@ -233,10 +233,10 @@ bool KonamiArcadeSampColl::parseSampleInfo() {
         24000,
         name
       );
-      sample->setWaveType(WT_PCM16);
+      sample->setBPS(BPS::PCM16);
       samples.push_back(sample);
     } else {
-      u16 bps = sampInfo.type() == konami_mw_sample_info::sample_type::PCM_8 ? 8 : 16;
+      BPS bps = sampInfo.type() == konami_mw_sample_info::sample_type::PCM_8 ? BPS::PCM8 : BPS::PCM16;
       sample = addSamp(sampleOffset,
                            sampleSize,
                            sampleOffset,
@@ -245,7 +245,6 @@ bool KonamiArcadeSampColl::parseSampleInfo() {
                            bps,
                            24000,
                            name);
-      sample->setWaveType(bps == 8 ? WT_PCM8 : WT_PCM16);
     }
     sample->setLoopStatus(sampInfo.loops == 1);
     sample->setLoopOffset(relativeLoopOffset);
