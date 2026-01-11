@@ -406,7 +406,7 @@ double PSXSamp::compressionRatio() const {
   return ((28.0 / 16.0) * 2);
 }
 
-std::vector<uint8_t> PSXSamp::decode() {
+std::vector<uint8_t> PSXSamp::decodeToNativePcm() {
   const uint32_t sampleCount = uncompressedSize() / sizeof(int16_t);
   std::vector<uint8_t> samples(sampleCount * sizeof(int16_t));
   auto *uncompBuf = reinterpret_cast<s16 *>(samples.data());

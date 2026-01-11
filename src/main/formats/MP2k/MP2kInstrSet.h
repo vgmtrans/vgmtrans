@@ -59,6 +59,6 @@ public:
   ~MP2kSamp() = default;
 
 private:
-  std::vector<uint8_t> decode() override;
+  std::vector<uint8_t> decodeToNativePcm() override;
   MP2kWaveType m_type;
 };

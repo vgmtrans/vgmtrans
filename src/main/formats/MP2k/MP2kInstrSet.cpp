@@ -352,7 +352,7 @@ MP2kSamp::MP2kSamp(VGMSampColl *sampColl, MP2kWaveType type, uint32_t offset, ui
     : VGMSamp(sampColl, offset, length, dataOffset, dataLength, channels, bps, rate, name),
       m_type(type){};
 
-std::vector<uint8_t> MP2kSamp::decode() {
+std::vector<uint8_t> MP2kSamp::decodeToNativePcm() {
   std::vector<uint8_t> buf(uncompressedSize());
   switch (m_type) {
     case MP2kWaveType::PCM8: {

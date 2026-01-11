@@ -29,16 +29,16 @@ double VGMSamp::compressionRatio() const {
   return 1.0;
 }
 
-std::vector<uint8_t> VGMSamp::decode() {
+std::vector<uint8_t> VGMSamp::decodeToNativePcm() {
   std::vector<uint8_t> src(dataLength);
   readBytes(dataOff, dataLength, src.data());
   return src;
 }
 
-std::vector<uint8_t> VGMSamp::convertToWave(Signedness targetSignedness,
-                                            Endianness targetEndianness,
-                                            WAVE_TYPE targetWaveType) {
-  std::vector<uint8_t> src = decode();
+std::vector<uint8_t> VGMSamp::toPcm(Signedness targetSignedness,
+                                    Endianness targetEndianness,
+                                    WAVE_TYPE targetWaveType) {
+  std::vector<uint8_t> src = decodeToNativePcm();
 
   const WAVE_TYPE effectiveWaveType =
       (waveType == WT_UNDEFINED) ? (bps == 8 ? WT_PCM8 : WT_PCM16) : waveType;
@@ -130,8 +130,7 @@ bool VGMSamp::onSaveAsWav() {
 bool VGMSamp::saveAsWav(const std::filesystem::path &filepath) {
   uint32_t bufSize = uncompressedSize();
 
-  std::vector<uint8_t> uncompSampBuf =
-      convertToWave(Signedness::Signed, Endianness::Little, waveType);
+  std::vector<uint8_t> uncompSampBuf =toPcm(Signedness::Signed, Endianness::Little, waveType);
   bufSize = static_cast<uint32_t>(uncompSampBuf.size());
 
   uint16_t blockAlign = bps / 8 * channels;

@@ -113,7 +113,7 @@ public:
   uint8_t waveType;
 
 private:
-  std::vector<uint8_t> decode() override;
+  std::vector<uint8_t> decodeToNativePcm() override;
 };
 
 class NDSPSGSamp : public VGMSamp {
@@ -122,8 +122,7 @@ public:
   ~NDSPSGSamp() override = default;
 
 private:
-  std::vector<uint8_t> decode() override;
-  std::vector<uint8_t> decodePcm16();
+  std::vector<uint8_t> decodeToNativePcm() override;
 
   /* We use -1 to indicate noise */
   double m_duty_cycle{-1};

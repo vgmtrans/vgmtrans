@@ -144,7 +144,7 @@ double DialogicAdpcmSamp::compressionRatio() const {
   return (16.0 / 4); // 4 bit samples converted up to 16 bit samples
 }
 
-std::vector<uint8_t> DialogicAdpcmSamp::decode() {
+std::vector<uint8_t> DialogicAdpcmSamp::decodeToNativePcm() {
   const int16_t maxValue = std::numeric_limits<int16_t>::max();
   const int16_t minValue = std::numeric_limits<int16_t>::min();
 
