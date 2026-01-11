@@ -18,7 +18,8 @@ double convertLogScaleValToAtten(double percent);
 double ampToDb(double amp, double maxAtten = 100.0);
 double dbToAmp(double db);
 
-double secondsToTimecents(double secs);
+int16_t secondsToSf2Timecents(double seconds);
+int32_t secondsToDlsTimecents(double seconds);
 uint8_t convertPercentPanValToStdMidiVal(double percent);
 uint8_t convertLinearPercentPanValToStdMidiVal(double percent, double *ptrVolumeScale = nullptr);
 uint8_t convert7bitLinearPercentPanValToStdMidiVal(uint8_t percentVal, double *ptrVolumeScale = nullptr);

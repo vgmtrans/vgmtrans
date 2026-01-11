@@ -330,22 +330,19 @@ SF2File::SF2File(SynthFile *synthfile)
 
       // attackVolEnv
       instGenList.sfGenOper = attackVolEnv;
-      instGenList.genAmount.shAmount =
-          (rgn->art->attack_time == 0) ? -32768 : std::round(secondsToTimecents(rgn->art->attack_time));
+      instGenList.genAmount.shAmount = secondsToSf2Timecents(rgn->art->attack_time);
       memcpy(igenCk->data + dataPtr, &instGenList, sizeof(sfInstGenList));
       dataPtr += sizeof(sfInstGenList);
 
       // holdVolEnv
       instGenList.sfGenOper = holdVolEnv;
-      instGenList.genAmount.shAmount =
-          (rgn->art->hold_time == 0) ? -32768 : std::round(secondsToTimecents(rgn->art->hold_time));
+      instGenList.genAmount.shAmount = secondsToSf2Timecents(rgn->art->hold_time);
       memcpy(igenCk->data + dataPtr, &instGenList, sizeof(sfInstGenList));
       dataPtr += sizeof(sfInstGenList);
 
       // decayVolEnv
       instGenList.sfGenOper = decayVolEnv;
-      instGenList.genAmount.shAmount =
-          (rgn->art->decay_time == 0) ? -32768 : std::round(secondsToTimecents(rgn->art->decay_time));
+      instGenList.genAmount.shAmount = secondsToSf2Timecents(rgn->art->decay_time);
       memcpy(igenCk->data + dataPtr, &instGenList, sizeof(sfInstGenList));
       dataPtr += sizeof(sfInstGenList);
 
@@ -359,8 +356,7 @@ SF2File::SF2File(SynthFile *synthfile)
 
       // releaseVolEnv
       instGenList.sfGenOper = releaseVolEnv;
-      instGenList.genAmount.shAmount =
-          (rgn->art->release_time == 0) ? -32768 : std::round(secondsToTimecents(rgn->art->release_time));
+      instGenList.genAmount.shAmount = secondsToSf2Timecents(rgn->art->release_time);
       memcpy(igenCk->data + dataPtr, &instGenList, sizeof(sfInstGenList));
       dataPtr += sizeof(sfInstGenList);
 

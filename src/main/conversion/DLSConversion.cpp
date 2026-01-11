@@ -252,9 +252,9 @@ bool mainDLSCreation(
           realAttenuation = static_cast<long>(rgn->attenDb() * DLS_DECIBEL_UNIT * 10);
         }
 
-        long convAttack = static_cast<long>(std::round(secondsToTimecents(rgn->attack_time) * 65536));
-        long convHold = static_cast<long>(std::round(secondsToTimecents(rgn->hold_time) * 65536));
-        long convDecay = static_cast<long>(std::round(secondsToTimecents(rgn->decay_time) * 65536));
+        long convAttack = secondsToDlsTimecents(rgn->attack_time);
+        long convHold = secondsToDlsTimecents(rgn->hold_time);
+        long convDecay = secondsToDlsTimecents(rgn->decay_time);
         long convSustainLev;
         if (rgn->sustain_level == -1)
           convSustainLev = 0x03e80000;        //sustain at full if no sustain level provided
@@ -264,7 +264,7 @@ bool mainDLSCreation(
           convSustainLev = static_cast<long>(((96.0 - attenInDB) / 96.0) * 0x03e80000);
         }
 
-        long convRelease = static_cast<long>(std::round(secondsToTimecents(rgn->release_time) * 65536));
+        long convRelease = secondsToDlsTimecents(rgn->release_time);
 
         DLSArt *newArt = newRgn->addArt();
         newArt->addPan(convertPercentPanTo10thPercentUnits(rgn->pan) * 65536);
