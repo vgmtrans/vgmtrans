@@ -102,7 +102,6 @@ public:
   double compressionRatio() const override;  // ratio of space conserved.  should generally be > 1
 
   std::vector<uint8_t> decodeImaAdpcm();
-  std::vector<uint8_t> decodePcm8();
 
   static inline void clamp_step_index(int &stepIndex);
   static inline void clamp_sample(int &decompSample);
