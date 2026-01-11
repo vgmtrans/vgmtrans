@@ -426,7 +426,7 @@ double SNESSamp::compressionRatio() const {
   return ((16.0 / 9.0) * 2); //aka 3.55...;
 }
 
-std::vector<uint8_t> SNESSamp::decode() {
+std::vector<uint8_t> SNESSamp::decodeToNativePcm() {
   const uint32_t sampleCount = uncompressedSize() / sizeof(int16_t);
   std::vector<uint8_t> samples(sampleCount * sizeof(int16_t));
   auto *output = reinterpret_cast<int16_t*>(samples.data());

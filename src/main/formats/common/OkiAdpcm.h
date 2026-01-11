@@ -56,6 +56,6 @@ public:
   float gain;
 
 private:
-  std::vector<uint8_t> decode() override;
+  std::vector<uint8_t> decodeToNativePcm() override;
   static oki_adpcm_state okiAdpcmState;
 };

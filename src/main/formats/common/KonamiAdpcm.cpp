@@ -47,7 +47,7 @@ double KonamiAdpcmSamp::compressionRatio() const {
   return (16.0 / 4); // 4 bit samples converted up to 16 bit samples
 }
 
-std::vector<uint8_t> KonamiAdpcmSamp::decode() {
+std::vector<uint8_t> KonamiAdpcmSamp::decodeToNativePcm() {
   const uint32_t sampleCount = uncompressedSize() / sizeof(int16_t);
   std::vector<uint8_t> samples(sampleCount * sizeof(int16_t));
   auto* uncompBuf = reinterpret_cast<s16*>(samples.data());

@@ -26,7 +26,7 @@ public:
   double compressionRatio() const override;
 
 private:
-  std::vector<uint8_t> decode() override;
+  std::vector<uint8_t> decodeToNativePcm() override;
   KonamiAdpcmChip m_chip;
   const s16* m_stepTable;
 };

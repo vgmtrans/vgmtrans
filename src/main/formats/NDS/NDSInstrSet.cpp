@@ -374,7 +374,7 @@ std::vector<uint8_t> NDSSamp::decodePcm8() {
   return src;
 }
 
-std::vector<uint8_t> NDSSamp::decode() {
+std::vector<uint8_t> NDSSamp::decodeToNativePcm() {
   if (waveType == IMA_ADPCM) {
     return decodeImaAdpcm();
   }
@@ -540,7 +540,7 @@ NDSPSGSamp::NDSPSGSamp(VGMSampColl *sampcoll, uint8_t duty_cycle) : VGMSamp(samp
   setName("PSG_duty_" + std::to_string(duty_cycle));
 }
 
-std::vector<uint8_t> NDSPSGSamp::decodePcm16() {
+std::vector<uint8_t> NDSPSGSamp::decodeToNativePcm() {
   const uint32_t sampleCount = uncompressedSize() / sizeof(int16_t);
   std::vector<uint8_t> samples(sampleCount * sizeof(int16_t));
   auto *output = reinterpret_cast<int16_t*>(samples.data());
@@ -595,8 +595,4 @@ std::vector<uint8_t> NDSPSGSamp::decodePcm16() {
   }
 
   return samples;
-}
-
-std::vector<uint8_t> NDSPSGSamp::decode() {
-  return decodePcm16();
 }

@@ -137,7 +137,7 @@ class SNESSamp
   double compressionRatio() const override;
 
  private:
-  std::vector<uint8_t> decode() override;
+  std::vector<uint8_t> decodeToNativePcm() override;
   static void decompBRRBlk(int16_t *pSmp, const BRRBlk *pVBlk, int32_t *prev1, int32_t *prev2);
 
  private:

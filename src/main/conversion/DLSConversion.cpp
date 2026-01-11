@@ -25,7 +25,7 @@ void unpackSampColl(DLSFile &dls, const VGMSampColl *sampColl, std::vector<VGMSa
     VGMSamp *samp = sampColl->samples[i];
 
     WAVE_TYPE targetWaveType = samp->waveType != WT_UNDEFINED ? samp->waveType : (samp->bps == 8 ? WT_PCM8 : WT_PCM16);
-    std::vector<uint8_t> uncompSampBuf = samp->convertToWave(
+    std::vector<uint8_t> uncompSampBuf = samp->toPcm(
       targetWaveType == WT_PCM8 ? Signedness::Unsigned : Signedness::Signed,
       Endianness::Little,
       targetWaveType

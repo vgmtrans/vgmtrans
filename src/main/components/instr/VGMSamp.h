@@ -23,9 +23,9 @@ public:
   ~VGMSamp() override = default;
 
   virtual double compressionRatio() const;  // ratio of space conserved.  should generally be > 1
-  std::vector<uint8_t> convertToWave(Signedness targetSignedness,
-                                     Endianness targetEndianness,
-                                     WAVE_TYPE targetWaveType);
+  std::vector<uint8_t> toPcm(Signedness targetSignedness,
+                             Endianness targetEndianness,
+                             WAVE_TYPE targetWaveType);
 
   inline void setWaveType(WAVE_TYPE type) { waveType = type; }
   inline void setBPS(uint16_t theBPS) { bps = theBPS; }
@@ -81,7 +81,7 @@ private:
   Signedness m_signedness = Signedness::Signed;
 
 protected:
-  virtual std::vector<uint8_t> decode();
+  virtual std::vector<uint8_t> decodeToNativePcm();
 };
 
 
@@ -89,7 +89,7 @@ class EmptySamp : public VGMSamp {
 public:
   EmptySamp(VGMSampColl* sampColl): VGMSamp(sampColl, 0, 0, 0, 16) {}
 protected:
-  std::vector<uint8_t> decode() override {
+  std::vector<uint8_t> decodeToNativePcm() override {
     return std::vector<uint8_t>(dataLength, 0);
   }
 };

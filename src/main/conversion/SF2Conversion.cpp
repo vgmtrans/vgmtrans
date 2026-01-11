@@ -247,8 +247,7 @@ void unpackSampColl(SynthFile &synthfile, const VGMSampColl *sampColl, std::vect
   for (size_t i = 0; i < nSamples; i++) {
     VGMSamp *samp = sampColl->samples[i];
 
-    std::vector<uint8_t> uncompSampBuf =
-        samp->convertToWave(Signedness::Signed, Endianness::Little, WT_PCM16);
+    std::vector<uint8_t> uncompSampBuf = samp->toPcm(Signedness::Signed, Endianness::Little, WT_PCM16);
 
     uint16_t blockAlign = 2 * samp->channels;
     SynthWave *wave = synthfile.addWave(1, samp->channels, samp->rate, samp->rate * blockAlign, blockAlign,
