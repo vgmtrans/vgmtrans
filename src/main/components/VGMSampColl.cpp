@@ -100,7 +100,7 @@ bool VGMSampColl::parseSampleInfo() {
 }
 
 VGMSamp *VGMSampColl::addSamp(uint32_t offset, uint32_t length, uint32_t dataOffset,
-                              uint32_t dataLength, uint8_t nChannels, uint16_t bps,
+                              uint32_t dataLength, uint8_t nChannels, BPS bps,
                               uint32_t theRate, std::string name) {
   VGMSamp *newSamp = new VGMSamp(this, offset, length, dataOffset, dataLength, nChannels, bps, theRate, std::move(name));
   samples.push_back(newSamp);

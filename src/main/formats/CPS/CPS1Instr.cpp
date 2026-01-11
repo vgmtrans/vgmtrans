@@ -107,7 +107,7 @@ bool CPS1SampColl::parseSampleInfo() {
       sample = new DialogicAdpcmSamp(this, begin, end > begin ? end-begin : 0, CPS1_OKIMSM6295_SAMPLE_RATE, CPS1_OKI_GAIN, name);
     }
     i += 1;
-    sample->setWaveType(WT_PCM16);
+    sample->setBPS(BPS::PCM16);
     sample->setLoopStatus(false);
     sample->unityKey = 0x3C;
     samples.push_back(sample);
@@ -212,4 +212,3 @@ bool CPS1OPMInstrSet::parseInstrPointers() {
   }
   return true;
 }
-

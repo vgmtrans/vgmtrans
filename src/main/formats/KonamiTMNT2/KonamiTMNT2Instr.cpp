@@ -244,7 +244,7 @@ bool KonamiTMNT2SampColl::parseSampleInfo() {
         K053260_BASE_PCM_RATE,
         name
       );
-      sample->setWaveType(WT_PCM16);
+      sample->setBPS(BPS::PCM16);
       samples.push_back(sample);
     } else {
       sample = addSamp(sampleOffset,
@@ -252,10 +252,9 @@ bool KonamiTMNT2SampColl::parseSampleInfo() {
                            sampleOffset,
                            sampleSize,
                            1,
-                           8,
+                           BPS::PCM8,
                            K053260_BASE_PCM_RATE,
                            name);
-      sample->setWaveType(WT_PCM8);
       sample->setSignedness(Signedness::Signed);
     }
     sample->setLoopStatus(false);

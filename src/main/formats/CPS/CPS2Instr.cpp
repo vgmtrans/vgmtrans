@@ -530,10 +530,9 @@ bool CPS2SampColl::parseSampleInfo() {
                                sampOffset,
                                sampLength,
                                1,
-                               8,
+                               BPS::PCM8,
                                frequency,
                                fmt::format("Sample {:d}", i));
-    newSamp->setWaveType(WT_PCM8);
     if (sampLength - relativeLoopOffset < 40)
       newSamp->setLoopStatus(false);
     else {

@@ -165,7 +165,7 @@ void SynthArt::addPan(double thePan) {
 //  *************
 
 void SynthSampInfo::setLoopInfo(Loop &loop, VGMSamp *samp) {
-  const int origFormatBytesPerSamp = samp->bps / 8;
+  const int origFormatBytesPerSamp = samp->bytesPerSample();
   double compressionRatio = samp->compressionRatio();
 
   // If the sample loops, but the loop length is 0, then assume the length should

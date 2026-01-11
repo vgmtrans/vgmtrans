@@ -24,14 +24,14 @@ void unpackSampColl(DLSFile &dls, const VGMSampColl *sampColl, std::vector<VGMSa
   for (size_t i = 0; i < nSamples; i++) {
     VGMSamp *samp = sampColl->samples[i];
 
-    WAVE_TYPE targetWaveType = samp->waveType != WT_UNDEFINED ? samp->waveType : (samp->bps == 8 ? WT_PCM8 : WT_PCM16);
+    BPS targetBps = samp->bps();
     std::vector<uint8_t> uncompSampBuf = samp->toPcm(
-      targetWaveType == WT_PCM8 ? Signedness::Unsigned : Signedness::Signed,
+      targetBps == BPS::PCM8 ? Signedness::Unsigned : Signedness::Signed,
       Endianness::Little,
-      targetWaveType
+      targetBps
     );
 
-    uint16_t bitsPerSample = (targetWaveType == WT_PCM16) ? 16 : 8;
+    uint16_t bitsPerSample = static_cast<uint16_t>(samp->bpsInt());
     uint16_t blockAlign = bitsPerSample / 8 * samp->channels;
     dls.addWave(1, samp->channels, samp->rate, samp->rate * blockAlign, blockAlign,
                 bitsPerSample, static_cast<uint32_t>(uncompSampBuf.size()), uncompSampBuf.data(),

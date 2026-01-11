@@ -284,21 +284,21 @@ bool NDSWaveArch::parseSampleInfo() {
     uint8_t waveType = readByte(pSample);
     bool bLoops = (readByte(pSample + 1) != 0);
     uint16_t rate = readShort(pSample + 2);
-    uint16_t bps;
+    BPS bps;
     // uint8_t multiplier;
     switch (waveType) {
       case NDSSamp::PCM8:
-        bps = 8;
+        bps = BPS::PCM8;
         break;
       case NDSSamp::PCM16:
-        bps = 16;
+        bps = BPS::PCM16;
         break;
       case NDSSamp::IMA_ADPCM:
-        bps = 16;
+        bps = BPS::PCM16;
         break;
       default:
         L_ERROR("Parsed invalid wave type: {}", waveType);
-        bps = 16;
+        bps = BPS::PCM16;
         break;
     }
     uint32_t loopOff =
@@ -354,7 +354,7 @@ bool NDSPSG::parseSampleInfo() {
 // *******
 
 NDSSamp::NDSSamp(VGMSampColl *sampColl, uint32_t offset, uint32_t length, uint32_t dataOffset,
-                 uint32_t dataLen, uint8_t nChannels, uint16_t theBPS, uint32_t theRate,
+                 uint32_t dataLen, uint8_t nChannels, BPS theBPS, uint32_t theRate,
                  uint8_t theWaveType, std::string name)
     : VGMSamp(sampColl, offset, length, dataOffset, dataLen, nChannels, theBPS, theRate, std::move(name)),
       waveType(theWaveType) {
@@ -520,8 +520,7 @@ NDSPSGSamp::NDSPSGSamp(VGMSampColl *sampcoll, uint8_t duty_cycle) : VGMSamp(samp
   setNumChannels(1);
   /* This is the NDS mixer frequency */
   setRate(32768);
-  setBPS(16);
-  setWaveType(WT_PCM16);
+  setBPS(BPS::PCM16);
 
   setLoopStatus(true);
 
@@ -529,7 +528,7 @@ NDSPSGSamp::NDSPSGSamp(VGMSampColl *sampcoll, uint8_t duty_cycle) : VGMSamp(samp
   setLoopLength(32768);
   setLoopStartMeasure(LM_SAMPLES);
   setLoopLengthMeasure(LM_SAMPLES);
-  ulUncompressedSize = 32768 * bps / 8;
+  ulUncompressedSize = 32768 * bytesPerSample();
 
   setName("PSG_duty_" + std::to_string(duty_cycle));
 }

@@ -55,7 +55,7 @@ class MP2kSamp final : public VGMSamp {
 public:
   MP2kSamp(VGMSampColl *sampColl, MP2kWaveType type, uint32_t offset = 0, uint32_t length = 0,
            uint32_t dataOffset = 0, uint32_t dataLength = 0, uint8_t channels = 1,
-           uint16_t bps = 16, uint32_t rate = 0, uint8_t waveType = 0, std::string name = "Sample");
+           BPS bps = BPS::PCM16, uint32_t rate = 0, uint8_t waveType = 0, std::string name = "Sample");
   ~MP2kSamp() = default;
 
 private:

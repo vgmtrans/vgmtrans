@@ -135,7 +135,7 @@ oki_adpcm_state DialogicAdpcmSamp::okiAdpcmState;
 
 DialogicAdpcmSamp::DialogicAdpcmSamp(VGMSampColl *sampColl, uint32_t offset, uint32_t length,
                                      uint32_t theRate, float gain, std::string name)
-    : VGMSamp(sampColl, offset, length, offset, length, 1, 16, theRate,
+    : VGMSamp(sampColl, offset, length, offset, length, 1, BPS::PCM16, theRate,
          std::move(name)), gain(gain) {}
 
 DialogicAdpcmSamp::~DialogicAdpcmSamp() {}

@@ -18,10 +18,10 @@
 // *******
 
 VGMSamp::VGMSamp(VGMSampColl *sampColl, uint32_t offset, uint32_t length, uint32_t dataOffset,
-                 uint32_t dataLen, uint8_t nChannels, uint16_t bps, uint32_t rate,
+                 uint32_t dataLen, uint8_t nChannels, BPS bps, uint32_t rate,
                  std::string name)
     : VGMItem(sampColl->vgmFile(), offset, length, std::move(name), Type::Sample),
-      dataOff(dataOffset), dataLength(dataLen), bps(bps), rate(rate), channels(nChannels),
+      dataOff(dataOffset), dataLength(dataLen), m_bps(bps), rate(rate), channels(nChannels),
       parSampColl(sampColl) {
 }
 
@@ -37,21 +37,18 @@ std::vector<uint8_t> VGMSamp::decodeToNativePcm() {
 
 std::vector<uint8_t> VGMSamp::toPcm(Signedness targetSignedness,
                                     Endianness targetEndianness,
-                                    WAVE_TYPE targetWaveType) {
+                                    BPS targetBps) {
   std::vector<uint8_t> src = decodeToNativePcm();
 
-  const WAVE_TYPE effectiveWaveType =
-      (waveType == WT_UNDEFINED) ? (bps == 8 ? WT_PCM8 : WT_PCM16) : waveType;
-
   if (!m_reverse &&
-      effectiveWaveType == targetWaveType &&
+      m_bps == targetBps &&
       m_signedness == targetSignedness &&
       m_endianness == targetEndianness) {
     return src;
   }
 
-  const bool isSrc16 = (effectiveWaveType == WT_PCM16);
-  const bool isDst16 = (targetWaveType == WT_PCM16);
+  const bool isSrc16 = (m_bps == BPS::PCM16);
+  const bool isDst16 = (targetBps == BPS::PCM16);
 
   const std::size_t sampleCount = isSrc16 ? (src.size() / 2) : src.size();
   std::vector<uint8_t> out(sampleCount * (isDst16 ? 2u : 1u));
@@ -130,10 +127,10 @@ bool VGMSamp::onSaveAsWav() {
 bool VGMSamp::saveAsWav(const std::filesystem::path &filepath) {
   uint32_t bufSize = uncompressedSize();
 
-  std::vector<uint8_t> uncompSampBuf = toPcm(Signedness::Signed, Endianness::Little, waveType);
+  std::vector<uint8_t> uncompSampBuf = toPcm(Signedness::Signed, Endianness::Little, m_bps);
   bufSize = static_cast<uint32_t>(uncompSampBuf.size());
 
-  uint16_t blockAlign = bps / 8 * channels;
+  uint16_t blockAlign = bytesPerSample() * channels;
 
   bool hasLoop = (this->loop.loopStatus != -1 && this->loop.loopStatus != 0);
 
@@ -150,7 +147,7 @@ bool VGMSamp::saveAsWav(const std::filesystem::path &filepath) {
   pushTypeOnVect<uint32_t>(waveBuf, rate);               // dwSamplesPerSec
   pushTypeOnVect<uint32_t>(waveBuf, rate * blockAlign);  // dwAveBytesPerSec
   pushTypeOnVect<uint16_t>(waveBuf, blockAlign);         // wBlockAlign
-  pushTypeOnVect<uint16_t>(waveBuf, bps);                // wBitsPerSample
+  pushTypeOnVect<uint16_t>(waveBuf, bpsInt());    // wBitsPerSample
 
   pushTypeOnVectBE<uint32_t>(waveBuf, 0x64617461);                            //"data"
   pushTypeOnVect<uint32_t>(waveBuf, bufSize);                                 // size
@@ -159,8 +156,6 @@ bool VGMSamp::saveAsWav(const std::filesystem::path &filepath) {
     waveBuf.push_back(0);
 
   if (hasLoop) {
-    const int origFormatBytesPerSamp = bps / 8;
-
     // If the sample loops, but the loop length is 0, then assume the length should
     // extend to the end of the sample.
     uint32_t loopLength = loop.loopLength;
@@ -168,13 +163,11 @@ bool VGMSamp::saveAsWav(const std::filesystem::path &filepath) {
       loopLength = dataLength - loop.loopStart;
     }
 
-    uint32_t loopStart =
-        (loop.loopStartMeasure == LM_BYTES)
-            ? static_cast<uint32_t>((loop.loopStart * compressionRatio()) / origFormatBytesPerSamp)
+    uint32_t loopStart = (loop.loopStartMeasure == LM_BYTES)
+            ? static_cast<uint32_t>((loop.loopStart * compressionRatio()) / bytesPerSample())
             : loop.loopStart;
-    uint32_t loopLenInSamp =
-        (loop.loopLengthMeasure == LM_BYTES)
-            ? static_cast<uint32_t>((loopLength * compressionRatio()) / origFormatBytesPerSamp)
+    uint32_t loopLenInSamp = (loop.loopLengthMeasure == LM_BYTES)
+            ? static_cast<uint32_t>((loopLength * compressionRatio()) / bytesPerSample())
             : loopLength;
     uint32_t loopEnd = loopStart + loopLenInSamp;
 

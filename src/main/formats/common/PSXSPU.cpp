@@ -156,7 +156,7 @@ bool PSXSampColl::parseSampleInfo() {
                                   beginOffset,
                                   endLoopOffset - beginOffset - extraGunkLength,
                                   1,
-                                  16,
+                                  BPS::PCM16,
                                   44100,
                                   fmt::format("Sample {:d}", samples.size()));
       samples.push_back(samp);
@@ -195,7 +195,7 @@ bool PSXSampColl::parseSampleInfo() {
                                   dwOffset + it->offset,
                                   offSampEnd - offSampStart,
                                   1,
-                                  16,
+                                  BPS::PCM16,
                                   44100,
                                   fmt::format("Sample {:d}", sampleIndex));
 
@@ -392,7 +392,7 @@ std::vector<PSXSampColl*> PSXSampColl::searchForPSXADPCMs(RawFile* file, const s
 //  *******
 
 PSXSamp::PSXSamp(VGMSampColl *sampColl, uint32_t offset, uint32_t length, uint32_t dataOffset,
-                 uint32_t dataLen, uint8_t nChannels, uint16_t theBPS,
+                 uint32_t dataLen, uint8_t nChannels, BPS theBPS,
                  uint32_t theRate, string name, bool bSetloopOnConversion)
     : VGMSamp(sampColl, offset, length, dataOffset, dataLen, nChannels, theBPS, theRate, std::move(name)),
       bSetLoopOnConversion(bSetloopOnConversion) {

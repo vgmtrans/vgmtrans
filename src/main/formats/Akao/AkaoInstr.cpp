@@ -667,7 +667,7 @@ bool AkaoSampColl::parseSampleInfo() {
     }
 
     const uint32_t length = PSXSamp::getSampleLength(rawFile(), offset, sample_section_offset + sample_section_size, loop);
-    auto *samp = new PSXSamp(this, offset, length, offset, length, 1, 16, 44100,
+    auto *samp = new PSXSamp(this, offset, length, offset, length, 1, BPS::PCM16, 44100,
       fmt::format("Sample {}", samples.size()));
 
     samples.push_back(samp);

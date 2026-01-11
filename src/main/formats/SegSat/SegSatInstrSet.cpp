@@ -176,7 +176,7 @@ bool SegSatInstr::loadInstr() {
 
     // Add sample
     u32 sampLength = rgn->sampleLoopEnd();
-    u8 bps = rgn->sampleType() == SegSatRgn::SampleType::PCM16 ? 16 : 8;
+    BPS bps = rgn->sampleType() == SegSatRgn::SampleType::PCM16 ? BPS::PCM16 : BPS::PCM8;
     auto instrSet = static_cast<SegSatInstrSet*>(parInstrSet);
     // check if a sample at the offset was already added
     bool inserted = instrSet->sampleOffsets.insert(rgn->sampOffset).second;
@@ -193,7 +193,6 @@ bool SegSatInstr::loadInstr() {
        44100,
        fmt::format("Sample: 0x{:X}",  rgn->sampOffset)
       );
-      sample->setWaveType(bps == 16 ? WT_PCM16 : WT_PCM8);
       sample->setSignedness(Signedness::Signed);
       sample->loop = rgn->loop;
       sample->setEndianness(Endianness::Big);
