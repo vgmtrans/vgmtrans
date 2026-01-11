@@ -354,9 +354,9 @@ bool NDSPSG::parseSampleInfo() {
 // *******
 
 NDSSamp::NDSSamp(VGMSampColl *sampColl, uint32_t offset, uint32_t length, uint32_t dataOffset,
-                 uint32_t dataLen, uint8_t nChannels, BPS theBPS, uint32_t theRate,
+                 uint32_t dataLen, uint8_t nChannels, BPS bps, uint32_t theRate,
                  uint8_t theWaveType, std::string name)
-    : VGMSamp(sampColl, offset, length, dataOffset, dataLen, nChannels, theBPS, theRate, std::move(name)),
+    : VGMSamp(sampColl, offset, length, dataOffset, dataLen, nChannels, bps, theRate, std::move(name)),
       waveType(theWaveType) {
 }
 

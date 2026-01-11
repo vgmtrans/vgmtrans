@@ -147,7 +147,7 @@ bool VGMSamp::saveAsWav(const std::filesystem::path &filepath) {
   pushTypeOnVect<uint32_t>(waveBuf, rate);               // dwSamplesPerSec
   pushTypeOnVect<uint32_t>(waveBuf, rate * blockAlign);  // dwAveBytesPerSec
   pushTypeOnVect<uint16_t>(waveBuf, blockAlign);         // wBlockAlign
-  pushTypeOnVect<uint16_t>(waveBuf, bpsInt());    // wBitsPerSample
+  pushTypeOnVect<uint16_t>(waveBuf, bitsPerSample());    // wBitsPerSample
 
   pushTypeOnVectBE<uint32_t>(waveBuf, 0x64617461);                            //"data"
   pushTypeOnVect<uint32_t>(waveBuf, bufSize);                                 // size

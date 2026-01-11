@@ -31,7 +31,7 @@ void unpackSampColl(DLSFile &dls, const VGMSampColl *sampColl, std::vector<VGMSa
       targetBps
     );
 
-    uint16_t bitsPerSample = static_cast<uint16_t>(samp->bpsInt());
+    uint16_t bitsPerSample = static_cast<uint16_t>(samp->bitsPerSample());
     uint16_t blockAlign = bitsPerSample / 8 * samp->channels;
     dls.addWave(1, samp->channels, samp->rate, samp->rate * blockAlign, blockAlign,
                 bitsPerSample, static_cast<uint32_t>(uncompSampBuf.size()), uncompSampBuf.data(),

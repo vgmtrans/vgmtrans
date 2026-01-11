@@ -52,8 +52,8 @@ public:
   inline Signedness signedness() const { return m_signedness; }
   inline void setSignedness(Signedness s) { m_signedness = s; }
   inline BPS bps() const { return m_bps; }
-  inline int bpsInt() const { return static_cast<int>(m_bps); }
-  inline int bytesPerSample() const { return bpsInt() / 8; }
+  inline int bitsPerSample() const { return static_cast<int>(m_bps); }
+  inline int bytesPerSample() const { return bitsPerSample() / 8; }
   uint32_t uncompressedSize() const;
 
   bool onSaveAsWav();
