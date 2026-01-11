@@ -6,6 +6,7 @@
 
 #include <cmath>
 #include <algorithm>
+#include <limits>
 #include "common.h"
 #include "ScaleConversion.h"
 
