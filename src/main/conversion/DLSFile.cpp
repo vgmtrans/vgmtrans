@@ -317,6 +317,19 @@ void DLSArt::addPan(long pan) {
                                                              CONN_DST_PAN, CONN_TRN_NONE, pan));
 }
 
+void DLSArt::addVibrato(int32_t depth, int32_t frequency, int32_t delay) {
+  if (depth != 0) {
+    m_blocks.emplace_back(std::make_unique<ConnectionBlock>(
+        CONN_SRC_LFO, CONN_SRC_NONE, CONN_DST_PITCH, CONN_TRN_NONE, depth));
+  }
+
+  m_blocks.emplace_back(std::make_unique<ConnectionBlock>(
+      CONN_SRC_NONE, CONN_SRC_NONE, CONN_DST_LFO_FREQUENCY, CONN_TRN_NONE, frequency));
+
+  m_blocks.emplace_back(std::make_unique<ConnectionBlock>(
+      CONN_SRC_NONE, CONN_SRC_NONE, CONN_DST_LFO_STARTDELAY, CONN_TRN_NONE, delay));
+}
+
 //  ***************
 //  ConnectionBlock
 //  ***************

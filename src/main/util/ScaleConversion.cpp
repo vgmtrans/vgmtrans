@@ -131,6 +131,35 @@ int32_t secondsToDlsTimecents(double seconds) {
   return (int32_t)rounded;
 }
 
+int32_t centsToDlsPitchScale(double cents) {
+  if (!std::isfinite(cents))
+    return 0;
+
+  double scaled = std::round(cents * 65536.0);
+  if (scaled > (double)std::numeric_limits<int32_t>::max())
+    return std::numeric_limits<int32_t>::max();
+  if (scaled < (double)std::numeric_limits<int32_t>::min())
+    return std::numeric_limits<int32_t>::min();
+  return static_cast<int32_t>(scaled);
+}
+
+int32_t hertzToDlsPitch(double hz) {
+  if (hz <= 0.0 || !std::isfinite(hz))
+    return 0;
+
+  // Pitch = (1200*log2(hz/440) + 6900) * 65536
+  double v = (1200.0 * std::log2(hz / 440.0) + 6900.0) * 65536.0;
+
+  if (v > (double)std::numeric_limits<int32_t>::max())
+    return std::numeric_limits<int32_t>::max();
+
+  // Avoid accidentally producing the "absolute zero" sentinel by rounding
+  if (v <= (double)std::numeric_limits<int32_t>::min())
+    return std::numeric_limits<int32_t>::min() + 1;
+
+  return (int32_t)v;
+}
+
 // Convert percent pan to midi pan (with no scale conversion)
 uint8_t convertPercentPanValToStdMidiVal(double percent) {
   uint8_t midiPan = std::round(percent * 126.0);

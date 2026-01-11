@@ -269,6 +269,12 @@ bool mainDLSCreation(
         DLSArt *newArt = newRgn->addArt();
         newArt->addPan(convertPercentPanTo10thPercentUnits(rgn->pan) * 65536);
         newArt->addADSR(convAttack, 0, convHold, convDecay, convSustainLev, convRelease, 0);
+        if (rgn->lfoVibDepthCents() > 0 && rgn->lfoVibFreqHz() > 0) {
+          int32_t vibDepth = centsToDlsPitchScale(rgn->lfoVibDepthCents());
+          int32_t vibFreq = hertzToDlsPitch(rgn->lfoVibFreqHz());
+          int32_t vibDelay = secondsToDlsTimecents(rgn->lfoVibDelaySeconds());
+          newArt->addVibrato(vibDepth, vibFreq, vibDelay);
+        }
 
         newWsmp->setPitchInfo(realUnityKey, realFineTune, realAttenuation);
       }
