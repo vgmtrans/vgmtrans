@@ -58,8 +58,7 @@ public:
            uint16_t bps = 16, uint32_t rate = 0, uint8_t waveType = 0, std::string name = "Sample");
   ~MP2kSamp() = default;
 
-  void convertToStdWave(u8 *buf) override;
-
 private:
+  std::vector<uint8_t> decodeToNativePcm() override;
   MP2kWaveType m_type;
 };

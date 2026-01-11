@@ -7,6 +7,8 @@
 
 #include "MP2kInstrSet.h"
 
+#include <cstring>
+#include <memory>
 #include <spdlog/fmt/fmt.h>
 
 #include "MP2kFormat.h"
@@ -350,10 +352,11 @@ MP2kSamp::MP2kSamp(VGMSampColl *sampColl, MP2kWaveType type, uint32_t offset, ui
     : VGMSamp(sampColl, offset, length, dataOffset, dataLength, channels, bps, rate, name),
       m_type(type){};
 
-void MP2kSamp::convertToStdWave(u8 *buf) {
+std::vector<uint8_t> MP2kSamp::decodeToNativePcm() {
+  std::vector<uint8_t> buf(uncompressedSize());
   switch (m_type) {
     case MP2kWaveType::PCM8: {
-      readBytes(dataOff, dataLength, buf);
+      readBytes(dataOff, dataLength, buf.data());
       break;
     }
 
@@ -375,27 +378,28 @@ void MP2kSamp::convertToStdWave(u8 *buf) {
 
       unsigned int nblocks = dataLength / 64;  // 64 samples per block
 
-      char(*data)[33] = new char[nblocks][33];
-      readBytes(dataOff, dataLength, data);
+      auto data = std::make_unique<char[]>(dataLength);
+      readBytes(dataOff, dataLength, data.get());
+      auto blocks = reinterpret_cast<char(*)[33]>(data.get());
 
       for (unsigned int block = 0; block < nblocks; ++block) {
-        int8_t sample = data[block][0];
+        int8_t sample = blocks[block][0];
         buf[64 * block] = sample << 8;
-        sample += delta_lut[data[block][1] & 0xf];
+        sample += delta_lut[blocks[block][1] & 0xf];
         buf[64 * block + 1] = sample << 8;
         for (unsigned int j = 1; j < 32; ++j) {
-          uint8_t d = data[block][j + 1];
+          uint8_t d = blocks[block][j + 1];
           sample += delta_lut[d >> 4];
           buf[64 * block + 2 * j] = sample << 8;
           sample += delta_lut[d & 0xf];
           buf[64 * block + 2 * j + 1] = sample << 8;
         }
       }
-      memset(buf + 64 * nblocks, 0,
+      memset(buf.data() + 64 * nblocks, 0,
              dataLength - 64 * nblocks);  // Remaining samples are always 0
-
-      delete[] data;
       break;
     }
   }
+
+  return buf;
 }

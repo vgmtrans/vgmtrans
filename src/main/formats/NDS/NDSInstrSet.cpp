@@ -360,7 +360,7 @@ NDSSamp::NDSSamp(VGMSampColl *sampColl, uint32_t offset, uint32_t length, uint32
       waveType(theWaveType) {
 }
 
-double NDSSamp::compressionRatio() {
+double NDSSamp::compressionRatio() const {
   if (waveType == IMA_ADPCM) {
     return 4.0;
   }
@@ -368,14 +368,12 @@ double NDSSamp::compressionRatio() {
   return 1.0;
 }
 
-void NDSSamp::convertToStdWave(uint8_t *buf) {
+std::vector<uint8_t> NDSSamp::decodeToNativePcm() {
   if (waveType == IMA_ADPCM) {
-    convertImaAdpcm(buf);
-  } else if (waveType == PCM8) {
-    readBytes(dataOff, dataLength, buf);
-  } else {
-    readBytes(dataOff, dataLength, buf);
+    return decodeImaAdpcm();
   }
+
+  return VGMSamp::decodeToNativePcm();
 }
 
 // From nocash's site: The NDS data consist of a 32bit header, followed by 4bit values (so each byte
@@ -390,24 +388,28 @@ void NDSSamp::convertToStdWave(uint8_t *buf) {
 // it clamps min (and max?) sample values differently (see below).  I really don't know how much of
 // a difference it makes, but this implementation is, to my knowledge, the proper way of doing
 // things for NDS.
-void NDSSamp::convertImaAdpcm(uint8_t *buf) {
+std::vector<uint8_t> NDSSamp::decodeImaAdpcm() {
+  const uint32_t sampleCount = uncompressedSize() / sizeof(int16_t);
+  std::vector<uint8_t> samples(sampleCount * sizeof(int16_t));
+  auto *output = reinterpret_cast<int16_t*>(samples.data());
   uint32_t destOff = 0;
   uint32_t sampHeader = getWord(dataOff - 4);
   int decompSample = sampHeader & 0xFFFF;
   int stepIndex = (sampHeader >> 16) & 0x7F;
-  // int decompSample = GetShort(dataOff);
-  // int stepIndex = GetShort(dataOff+2);
+
   uint32_t curOffset = dataOff;
-  ((int16_t *)buf)[destOff++] = (int16_t)decompSample;
+  output[destOff++] = (int16_t)decompSample;
 
   uint8_t compByte;
   while (curOffset < dataOff + dataLength) {
     compByte = readByte(curOffset++);
     process_nibble(compByte, stepIndex, decompSample);
-    ((int16_t *)buf)[destOff++] = (int16_t)decompSample;
+    output[destOff++] = (int16_t)decompSample;
     process_nibble((compByte & 0xF0) >> 4, stepIndex, decompSample);
-    ((int16_t *)buf)[destOff++] = (int16_t)decompSample;
+    output[destOff++] = (int16_t)decompSample;
   }
+
+  return samples;
 }
 
 // I'm copying nocash's IMA-ADPCM conversion method verbatim.  Big thanks to him.
@@ -532,9 +534,10 @@ NDSPSGSamp::NDSPSGSamp(VGMSampColl *sampcoll, uint8_t duty_cycle) : VGMSamp(samp
   setName("PSG_duty_" + std::to_string(duty_cycle));
 }
 
-void NDSPSGSamp::convertToStdWave(uint8_t *buf) {
-  /* Give that the wave type is PCM-16, this is handy */
-  int16_t *output = reinterpret_cast<int16_t *>(buf);
+std::vector<uint8_t> NDSPSGSamp::decodeToNativePcm() {
+  const uint32_t sampleCount = uncompressedSize() / sizeof(int16_t);
+  std::vector<uint8_t> samples(sampleCount * sizeof(int16_t));
+  auto *output = reinterpret_cast<int16_t*>(samples.data());
 
   /* Noise mode */
   if (m_duty_cycle == -1) {
@@ -584,4 +587,6 @@ void NDSPSGSamp::convertToStdWave(uint8_t *buf) {
       output[i] = out_value;
     }
   }
+
+  return samples;
 }

@@ -402,12 +402,14 @@ PSXSamp::PSXSamp(VGMSampColl *sampColl, uint32_t offset, uint32_t length, uint32
 PSXSamp::~PSXSamp() {
 }
 
-double PSXSamp::compressionRatio() {
+double PSXSamp::compressionRatio() const {
   return ((28.0 / 16.0) * 2);
 }
 
-void PSXSamp::convertToStdWave(uint8_t *buf) {
-  s16 *uncompBuf = reinterpret_cast<s16*>(buf);
+std::vector<uint8_t> PSXSamp::decodeToNativePcm() {
+  const uint32_t sampleCount = uncompressedSize() / sizeof(int16_t);
+  std::vector<uint8_t> samples(sampleCount * sizeof(int16_t));
+  auto *uncompBuf = reinterpret_cast<s16 *>(samples.data());
   VAGBlk theBlock;
   s32  prev[2] = {0, 0};
 
@@ -448,6 +450,8 @@ void PSXSamp::convertToStdWave(uint8_t *buf) {
     //each decompressed pcm block is 56 bytes (28 samples, 16-bit each)
     decompVAGBlk(uncompBuf + ((k / 16) * 28), &theBlock, prev);
   }
+
+  return samples;
 }
 
 uint32_t PSXSamp::getSampleLength(const RawFile *file, uint32_t offset, uint32_t endOffset, bool &loop) {

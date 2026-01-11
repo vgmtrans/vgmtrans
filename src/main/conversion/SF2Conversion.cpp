@@ -247,18 +247,12 @@ void unpackSampColl(SynthFile &synthfile, const VGMSampColl *sampColl, std::vect
   for (size_t i = 0; i < nSamples; i++) {
     VGMSamp *samp = sampColl->samples[i];
 
-    uint32_t bufSize;
-    if (samp->ulUncompressedSize)
-      bufSize = samp->ulUncompressedSize;
-    else
-      bufSize = static_cast<uint32_t>(ceil(samp->dataLength * samp->compressionRatio()));
+    std::vector<uint8_t> uncompSampBuf = samp->toPcm(Signedness::Signed, Endianness::Little, WT_PCM16);
 
-    uint8_t *uncompSampBuf = new uint8_t[bufSize];    // create a new memory space for the uncompressed wave
-    samp->convertToStdWave(uncompSampBuf);            // and uncompress into that space
-
-    uint16_t blockAlign = samp->bps / 8 * samp->channels;
+    uint16_t blockAlign = 2 * samp->channels;
     SynthWave *wave = synthfile.addWave(1, samp->channels, samp->rate, samp->rate * blockAlign, blockAlign,
-                                        samp->bps, bufSize, uncompSampBuf, samp->name());
+                                        16, static_cast<uint32_t>(uncompSampBuf.size()),
+                                        std::move(uncompSampBuf), samp->name());
     finalSamps.push_back(samp);
 
     // If we don't have any loop information, then don't create a sampInfo structure for the Wave

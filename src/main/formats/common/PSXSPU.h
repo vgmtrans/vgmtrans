@@ -348,13 +348,13 @@ class PSXSamp : public VGMSamp {
 
   // ratio of space conserved.  should generally be > 1
   // used to calculate both uncompressed sample size and loopOff after conversion
-  double compressionRatio() override;
-  void convertToStdWave(uint8_t *buf) override;
+  double compressionRatio() const override;
   void SetLoopOnConversion(bool bDoIt) { bSetLoopOnConversion = bDoIt; }
 
   static uint32_t getSampleLength(const RawFile *file, uint32_t offset, uint32_t endOffset, bool &loop);
 
  private:
+  std::vector<uint8_t> decodeToNativePcm() override;
   static void decompVAGBlk(s16 *pSmp, const VAGBlk* pVBlk, s32 prev[2]);
 
  public:

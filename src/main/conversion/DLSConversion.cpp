@@ -24,18 +24,18 @@ void unpackSampColl(DLSFile &dls, const VGMSampColl *sampColl, std::vector<VGMSa
   for (size_t i = 0; i < nSamples; i++) {
     VGMSamp *samp = sampColl->samples[i];
 
-    uint32_t bufSize;
-    if (samp->ulUncompressedSize)
-      bufSize = samp->ulUncompressedSize;
-    else
-      bufSize = static_cast<uint32_t>(ceil(samp->dataLength * samp->compressionRatio()));
-    auto* uncompSampBuf = new uint8_t[bufSize];    // create a new memory space for the uncompressed wave
-    samp->convertToStdWave(uncompSampBuf);            // and uncompress into that space
+    WAVE_TYPE targetWaveType = samp->waveType != WT_UNDEFINED ? samp->waveType : (samp->bps == 8 ? WT_PCM8 : WT_PCM16);
+    std::vector<uint8_t> uncompSampBuf = samp->toPcm(
+      targetWaveType == WT_PCM8 ? Signedness::Unsigned : Signedness::Signed,
+      Endianness::Little,
+      targetWaveType
+    );
 
-    uint16_t blockAlign = samp->bps / 8 * samp->channels;
+    uint16_t bitsPerSample = (targetWaveType == WT_PCM16) ? 16 : 8;
+    uint16_t blockAlign = bitsPerSample / 8 * samp->channels;
     dls.addWave(1, samp->channels, samp->rate, samp->rate * blockAlign, blockAlign,
-                samp->bps, bufSize, uncompSampBuf, samp->name());
-    delete[] uncompSampBuf;
+                bitsPerSample, static_cast<uint32_t>(uncompSampBuf.size()), uncompSampBuf.data(),
+                samp->name());
     finalSamps.push_back(samp);
   }
 }

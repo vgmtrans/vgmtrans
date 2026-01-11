@@ -7,8 +7,9 @@
 #pragma once
 #include "VGMItem.h"
 #include "Loop.h"
-#include <cstring>
+#include <cstddef>
 #include <filesystem>
+#include <vector>
 
 class VGMSampColl;
 
@@ -21,9 +22,10 @@ public:
           std::string name = "Sample");
   ~VGMSamp() override = default;
 
-  virtual double compressionRatio();  // ratio of space conserved.  should generally be > 1
-  // used to calculate both uncompressed sample size and loopOff after conversion
-  virtual void convertToStdWave(uint8_t *buf);
+  virtual double compressionRatio() const;  // ratio of space conserved.  should generally be > 1
+  std::vector<uint8_t> toPcm(Signedness targetSignedness,
+                             Endianness targetEndianness,
+                             WAVE_TYPE targetWaveType);
 
   inline void setWaveType(WAVE_TYPE type) { waveType = type; }
   inline void setBPS(uint16_t theBPS) { bps = theBPS; }
@@ -47,6 +49,7 @@ public:
   inline void setEndianness(Endianness e) { m_endianness = e; }
   inline Signedness signedness() const { return m_signedness; }
   inline void setSignedness(Signedness s) { m_signedness = s; }
+  uint32_t uncompressedSize() const;
 
   bool onSaveAsWav();
   bool saveAsWav(const std::filesystem::path &filepath);
@@ -77,13 +80,16 @@ private:
   Endianness m_endianness = Endianness::Little;
   Signedness m_signedness = Signedness::Signed;
 
+protected:
+  virtual std::vector<uint8_t> decodeToNativePcm();
 };
 
 
 class EmptySamp : public VGMSamp {
 public:
   EmptySamp(VGMSampColl* sampColl): VGMSamp(sampColl, 0, 0, 0, 16) {}
-  void convertToStdWave(uint8_t *buf) override {
-    memset(buf, 0, 16);
+protected:
+  std::vector<uint8_t> decodeToNativePcm() override {
+    return std::vector<uint8_t>(dataLength, 0);
   }
 };

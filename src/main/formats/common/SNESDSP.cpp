@@ -422,11 +422,15 @@ uint32_t SNESSamp::getSampleLength(const RawFile *file, uint32_t offset, bool &l
   return (currOffset - offset);
 }
 
-double SNESSamp::compressionRatio() {
+double SNESSamp::compressionRatio() const {
   return ((16.0 / 9.0) * 2); //aka 3.55...;
 }
 
-void SNESSamp::convertToStdWave(uint8_t *buf) {
+std::vector<uint8_t> SNESSamp::decodeToNativePcm() {
+  const uint32_t sampleCount = uncompressedSize() / sizeof(int16_t);
+  std::vector<uint8_t> samples(sampleCount * sizeof(int16_t));
+  auto *output = reinterpret_cast<int16_t*>(samples.data());
+
   BRRBlk theBlock;
   int32_t prev1 = 0;
   int32_t prev2 = 0;
@@ -448,7 +452,8 @@ void SNESSamp::convertToStdWave(uint8_t *buf) {
     theBlock.flag.loop = (readByte(dwOffset + k) & 0x02) != 0;
 
     rawFile()->readBytes(dwOffset + k + 1, 8, theBlock.brr);
-    decompBRRBlk(reinterpret_cast<int16_t*>(&buf[k * 32 / 9]),
+    const size_t blockIndex = k / 9;
+    decompBRRBlk(output + blockIndex * 16,
                  &theBlock,
                  &prev1,
                  &prev2);    //each decompressed pcm block is 32 bytes
@@ -464,6 +469,8 @@ void SNESSamp::convertToStdWave(uint8_t *buf) {
       break;
     }
   }
+
+  return samples;
 }
 
 // static inline int32_t absolute(int32_t x) {

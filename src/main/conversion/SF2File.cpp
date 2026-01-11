@@ -63,7 +63,6 @@ SF2File::SF2File(SynthFile *synthfile)
   uint32_t smplCkSize = 0;
   for (size_t i = 0; i < numWaves; i++) {
     SynthWave *wave = synthfile->vWaves[i];
-    wave->convertTo16bit();
     smplCkSize += wave->dataSize + (46 * 2);    // plus the 46 padding samples required by sf2 spec
   }
   smplCk->setSize(smplCkSize);
@@ -72,7 +71,7 @@ SF2File::SF2File(SynthFile *synthfile)
   for (size_t i = 0; i < numWaves; i++) {
     SynthWave *wave = synthfile->vWaves[i];
 
-    memcpy(smplCk->data + bufPtr, wave->data, wave->dataSize);
+    memcpy(smplCk->data + bufPtr, wave->data.data(), wave->dataSize);
     memset(smplCk->data + bufPtr + wave->dataSize, 0, 46 * 2);
     bufPtr += wave->dataSize + (46 * 2);        // plus the 46 padding samples required by sf2 spec
   }

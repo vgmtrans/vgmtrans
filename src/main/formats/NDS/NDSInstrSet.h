@@ -99,11 +99,9 @@ public:
           uint32_t dataLength = 0, uint8_t channels = 1, uint16_t bps = 16, uint32_t rate = 0,
           uint8_t waveType = 0, std::string name = "Sample");
 
-  double compressionRatio() override;  // ratio of space conserved.  should generally be > 1
-  // used to calculate both uncompressed sample size and loopOff after conversion
-  void convertToStdWave(uint8_t *buf) override;
+  double compressionRatio() const override;  // ratio of space conserved.  should generally be > 1
 
-  void convertImaAdpcm(uint8_t *buf);
+  std::vector<uint8_t> decodeImaAdpcm();
 
   static inline void clamp_step_index(int &stepIndex);
   static inline void clamp_sample(int &decompSample);
@@ -112,6 +110,9 @@ public:
   enum { PCM8, PCM16, IMA_ADPCM };
 
   uint8_t waveType;
+
+private:
+  std::vector<uint8_t> decodeToNativePcm() override;
 };
 
 class NDSPSGSamp : public VGMSamp {
@@ -120,7 +121,7 @@ public:
   ~NDSPSGSamp() override = default;
 
 private:
-  void convertToStdWave(uint8_t *buf) override;
+  std::vector<uint8_t> decodeToNativePcm() override;
 
   /* We use -1 to indicate noise */
   double m_duty_cycle{-1};

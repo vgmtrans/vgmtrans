@@ -4,7 +4,9 @@
  * See the included LICENSE for more information
  */
 
+#include <algorithm>
 #include <cmath>
+#include <utility>
 #include "VGMSamp.h"
 #include "VGMSampColl.h"
 #include "Root.h"
@@ -23,58 +25,95 @@ VGMSamp::VGMSamp(VGMSampColl *sampColl, uint32_t offset, uint32_t length, uint32
       parSampColl(sampColl) {
 }
 
-double VGMSamp::compressionRatio() {
+double VGMSamp::compressionRatio() const {
   return 1.0;
 }
 
-void VGMSamp::convertToStdWave(std::uint8_t* buf) {
-  readBytes(dataOff, dataLength, buf);
+std::vector<uint8_t> VGMSamp::decodeToNativePcm() {
+  std::vector<uint8_t> src(dataLength);
+  readBytes(dataOff, dataLength, src.data());
+  return src;
+}
 
-  if (m_endianness == Endianness::Big && waveType == WT_PCM16) {
-    // Convert big-endian 16-bit PCM to little-endian by swapping each pair.
-    // Guard against odd lengths (shouldn't happen for PCM16, but safe).
-    for (std::size_t i = 0; i + 1 < dataLength; i += 2) {
-      std::swap(buf[i], buf[i + 1]);
+std::vector<uint8_t> VGMSamp::toPcm(Signedness targetSignedness,
+                                    Endianness targetEndianness,
+                                    WAVE_TYPE targetWaveType) {
+  std::vector<uint8_t> src = decodeToNativePcm();
+
+  const WAVE_TYPE effectiveWaveType =
+      (waveType == WT_UNDEFINED) ? (bps == 8 ? WT_PCM8 : WT_PCM16) : waveType;
+
+  if (!m_reverse &&
+      effectiveWaveType == targetWaveType &&
+      m_signedness == targetSignedness &&
+      m_endianness == targetEndianness) {
+    return src;
+  }
+
+  const bool isSrc16 = (effectiveWaveType == WT_PCM16);
+  const bool isDst16 = (targetWaveType == WT_PCM16);
+
+  const std::size_t sampleCount = isSrc16 ? (src.size() / 2) : src.size();
+  std::vector<uint8_t> out(sampleCount * (isDst16 ? 2u : 1u));
+
+  auto write16 = [&](std::size_t oi, uint16_t v) {
+    const std::size_t b = oi * 2;
+    if (targetEndianness == Endianness::Big) {
+      out[b + 0] = uint8_t(v >> 8);
+      out[b + 1] = uint8_t(v);
+    } else {
+      out[b + 0] = uint8_t(v);
+      out[b + 1] = uint8_t(v >> 8);
+    }
+  };
+
+  auto readS16 = [&](std::size_t i) -> int32_t {
+    if (isSrc16) {
+      const std::size_t b = i * 2;
+      const uint16_t lo = src[b + 0];
+      const uint16_t hi = src[b + 1];
+      const uint16_t u = (m_endianness == Endianness::Big)
+                           ? uint16_t((lo << 8) | hi)
+                           : uint16_t(lo | (hi << 8));
+      return (m_signedness == Signedness::Unsigned)
+               ? (int32_t(u) - 0x8000)
+               : int32_t(int16_t(u));
+    } else {
+      const uint8_t u = src[i];
+      const int32_t s8 = (m_signedness == Signedness::Unsigned)
+                           ? (int32_t(u) - 128)
+                           : int32_t(int8_t(u));
+      return s8 * 256;
+    }
+  };
+
+  for (std::size_t i = 0; i < sampleCount; ++i) {
+    const std::size_t oi = m_reverse ? (sampleCount - 1 - i) : i;
+
+    int32_t s16 = readS16(i);
+    s16 = std::clamp(s16, -32768, 32767);
+
+    if (isDst16) {
+      const uint16_t u = (targetSignedness == Signedness::Unsigned)
+                           ? uint16_t(s16 + 0x8000)
+                           : uint16_t(int16_t(s16));
+      write16(oi, u);
+    } else {
+      int32_t s8 = (s16 >> 8);                       // assumes arithmetic shift (typical)
+      s8 = std::clamp(s8, -128, 127);
+      out[oi] = (targetSignedness == Signedness::Unsigned)
+                  ? uint8_t(s8 + 128)
+                  : uint8_t(int8_t(s8));
     }
   }
 
-  if (m_reverse) {
-    switch (waveType) {
-      case WT_PCM16: {
-          // treat the buffer as an array of 16-bit little-endian words;
-          //   reversing the *words* keeps each sample’s byte order intact
-        auto samples = std::span<u16>(
-            reinterpret_cast<u16*>(buf),      // first element
-            dataLength / 2);            // # of 16-bit words
-        std::reverse(samples.begin(), samples.end());
-        break;
-      }
-      case WT_PCM8:
-      default:
-        std::reverse(buf, buf + dataLength);
-        break;
-    }
-  }
+  return out;
+}
 
-  if (m_signedness == Signedness::Unsigned) {
-    switch (waveType) {
-      case WT_PCM8:
-        // 0…255  →  −128…127
-        for (std::size_t i = 0; i < dataLength; ++i)
-          buf[i] ^= 0x80;
-        break;
-
-      case WT_PCM16: {
-        // 0…65535 → −32768…32767
-        auto samples = std::span<std::uint16_t>(
-            reinterpret_cast<std::uint16_t*>(buf),
-            dataLength / 2);
-        for (auto& s : samples)
-          s = static_cast<std::uint16_t>(s - 0x8000);
-        break;
-      }
-    }
-  }
+uint32_t VGMSamp::uncompressedSize() const {
+  if (ulUncompressedSize)
+    return ulUncompressedSize;
+  return static_cast<uint32_t>(std::ceil(dataLength * compressionRatio()));
 }
 
 void VGMSamp::setVolume(double volume) {
@@ -89,14 +128,10 @@ bool VGMSamp::onSaveAsWav() {
 }
 
 bool VGMSamp::saveAsWav(const std::filesystem::path &filepath) {
-  uint32_t bufSize;
-  if (this->ulUncompressedSize)
-    bufSize = this->ulUncompressedSize;
-  else
-    bufSize = static_cast<uint32_t>(ceil(dataLength * compressionRatio()));
+  uint32_t bufSize = uncompressedSize();
 
-  std::vector<uint8_t> uncompSampBuf(bufSize);
-  convertToStdWave(uncompSampBuf.data());
+  std::vector<uint8_t> uncompSampBuf = toPcm(Signedness::Signed, Endianness::Little, waveType);
+  bufSize = static_cast<uint32_t>(uncompSampBuf.size());
 
   uint16_t blockAlign = bps / 8 * channels;
 

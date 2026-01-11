@@ -51,11 +51,11 @@ public:
   );
   ~DialogicAdpcmSamp() override;
 
-  double compressionRatio() override;
-  void convertToStdWave(uint8_t *buf) override;
+  double compressionRatio() const override;
 
   float gain;
 
 private:
+  std::vector<uint8_t> decodeToNativePcm() override;
   static oki_adpcm_state okiAdpcmState;
 };
