@@ -237,20 +237,13 @@ bool mainDLSCreation(
         if (realUnityKey == -1)
           realUnityKey = 0x3C;
 
-        short realFineTune;
-        if (rgn->fineTune == 0)
-          realFineTune = samp->fineTune;
-        else
-          realFineTune = rgn->fineTune;
-
-        long realAttenuation;
-        if (rgn->attenDb() == 0 && samp->attenDb() == 0)
-          realAttenuation = 0;
-        else if (rgn->attenDb() == 0)
-          realAttenuation = static_cast<long>(samp->attenDb() * DLS_DECIBEL_UNIT * 10);
-        else {
-          realAttenuation = static_cast<long>(rgn->attenDb() * DLS_DECIBEL_UNIT * 10);
-        }
+        // With DLS2, we could make WSMP blocks on the waves, then apply extra finetune and
+        // gain/attenuation on the region articulation. For unity key, we would have to use the
+        // DLS2 "Tuning" connection SRC_NONE->DST_PITCH in the region articulation. Our current
+        // method just adds region and sample finetune / attenuation and puts it into a region WSMP
+        // block. This works and is DLS1 compatible.
+        short totalFineTune = samp->fineTune + rgn->fineTune;
+        long totalAttenuation = -static_cast<int32_t>((samp->attenDb() + rgn->attenDb()) * DLS_DECIBEL_UNIT * 10);
 
         long convAttack = secondsToDlsTimecents(rgn->attack_time);
         long convHold = secondsToDlsTimecents(rgn->hold_time);
@@ -269,8 +262,14 @@ bool mainDLSCreation(
         DLSArt *newArt = newRgn->addArt();
         newArt->addPan(convertPercentPanTo10thPercentUnits(rgn->pan) * 65536);
         newArt->addADSR(convAttack, 0, convHold, convDecay, convSustainLev, convRelease, 0);
+        if (rgn->lfoVibDepthCents() > 0 && rgn->lfoVibFreqHz() > 0) {
+          int32_t vibDepth = centsToDlsPitchScale(rgn->lfoVibDepthCents());
+          int32_t vibFreq = hertzToDlsPitch(rgn->lfoVibFreqHz());
+          int32_t vibDelay = secondsToDlsTimecents(rgn->lfoVibDelaySeconds());
+          newArt->addVibrato(vibDepth, vibFreq, vibDelay);
+        }
 
-        newWsmp->setPitchInfo(realUnityKey, realFineTune, realAttenuation);
+        newWsmp->setPitchInfo(realUnityKey, totalFineTune, totalAttenuation);
       }
     }
   }

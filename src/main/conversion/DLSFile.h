@@ -190,6 +190,7 @@ public:
   void addADSR(long attack_time, uint16_t atk_transform, long hold_time, long decay_time,
                long sustain_lev, long release_time, uint16_t rls_transform);
   void addPan(long pan);
+  void addVibrato(int32_t depth, int32_t frequency, int32_t delay);
 
   uint32_t GetSize() const;
   void Write(std::vector<uint8_t> &buf) const;
