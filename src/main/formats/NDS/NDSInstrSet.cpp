@@ -368,18 +368,12 @@ double NDSSamp::compressionRatio() const {
   return 1.0;
 }
 
-std::vector<uint8_t> NDSSamp::decodePcm8() {
-  std::vector<uint8_t> src(dataLength);
-  readBytes(dataOff, dataLength, src.data());
-  return src;
-}
-
 std::vector<uint8_t> NDSSamp::decodeToNativePcm() {
   if (waveType == IMA_ADPCM) {
     return decodeImaAdpcm();
   }
 
-  return decodePcm8();
+  return VGMSamp::decodeToNativePcm();
 }
 
 // From nocash's site: The NDS data consist of a 32bit header, followed by 4bit values (so each byte
