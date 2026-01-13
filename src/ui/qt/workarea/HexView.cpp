@@ -100,6 +100,13 @@ struct CachedLine {
   std::array<uint16_t, BYTES_PER_LINE> styles{};
 };
 
+struct LineRange {
+  uint32_t rectStart = 0;
+  uint32_t rectCount = 0;
+  uint32_t glyphStart = 0;
+  uint32_t glyphCount = 0;
+};
+
 QVector4D toVec4(const QColor& color) {
   return QVector4D(color.redF(), color.greenF(), color.blueF(), color.alphaF());
 }
@@ -262,8 +269,26 @@ protected:
     cb->setViewport(QRhiViewport(0, 0, renderTarget()->pixelSize().width(),
                                  renderTarget()->pixelSize().height()));
 
-    drawRectBuffer(cb, m_baseRectBuf, static_cast<int>(m_baseRectInstances.size()));
-    drawGlyphBuffer(cb, m_baseGlyphBuf, static_cast<int>(m_baseGlyphInstances.size()));
+    int baseRectFirst = 0;
+    int baseRectCount = 0;
+    int baseGlyphFirst = 0;
+    int baseGlyphCount = 0;
+    if (!m_lineRanges.empty()) {
+      const int maxIndex = static_cast<int>(m_lineRanges.size()) - 1;
+      const int visStart = std::clamp(startLine - m_cacheStartLine, 0, maxIndex);
+      const int visEnd = std::clamp(endLine - m_cacheStartLine, 0, maxIndex);
+      const LineRange& startRange = m_lineRanges[visStart];
+      const LineRange& endRange = m_lineRanges[visEnd];
+      baseRectFirst = static_cast<int>(startRange.rectStart);
+      const int baseRectLast = static_cast<int>(endRange.rectStart + endRange.rectCount);
+      baseRectCount = std::max(0, baseRectLast - baseRectFirst);
+      baseGlyphFirst = static_cast<int>(startRange.glyphStart);
+      const int baseGlyphLast = static_cast<int>(endRange.glyphStart + endRange.glyphCount);
+      baseGlyphCount = std::max(0, baseGlyphLast - baseGlyphFirst);
+    }
+
+    drawRectBuffer(cb, m_baseRectBuf, baseRectCount, baseRectFirst);
+    drawGlyphBuffer(cb, m_baseGlyphBuf, baseGlyphCount, baseGlyphFirst);
     drawRectBuffer(cb, m_overlayRectBuf, static_cast<int>(m_overlayRectInstances.size()));
     drawShadowBuffer(cb);
     drawRectBuffer(cb, m_selectionRectBuf, static_cast<int>(m_selectionRectInstances.size()));
@@ -550,7 +575,7 @@ private:
     m_selectionBufferDirty = false;
   }
 
-  void drawRectBuffer(QRhiCommandBuffer* cb, QRhiBuffer* buffer, int count) {
+  void drawRectBuffer(QRhiCommandBuffer* cb, QRhiBuffer* buffer, int count, int firstInstance = 0) {
     if (!buffer || count <= 0) {
       return;
     }
@@ -561,10 +586,10 @@ private:
       {buffer, 0}
     };
     cb->setVertexInput(0, 2, vbufBindings, m_ibuf, 0, QRhiCommandBuffer::IndexUInt16);
-    cb->drawIndexed(6, count);
+    cb->drawIndexed(6, count, 0, 0, firstInstance);
   }
 
-  void drawGlyphBuffer(QRhiCommandBuffer* cb, QRhiBuffer* buffer, int count) {
+  void drawGlyphBuffer(QRhiCommandBuffer* cb, QRhiBuffer* buffer, int count, int firstInstance = 0) {
     if (!buffer || count <= 0) {
       return;
     }
@@ -575,7 +600,7 @@ private:
       {buffer, 0}
     };
     cb->setVertexInput(0, 2, vbufBindings, m_ibuf, 0, QRhiCommandBuffer::IndexUInt16);
-    cb->drawIndexed(6, count);
+    cb->drawIndexed(6, count, 0, 0, firstInstance);
   }
 
   void drawShadowBuffer(QRhiCommandBuffer* cb) {
@@ -636,18 +661,21 @@ private:
   }
 
   void ensureCacheWindow(int startLine, int endLine, int totalLines) {
+    const bool needsWindow =
+        m_cachedLines.empty() ||
+        startLine < m_cacheStartLine ||
+        endLine > m_cacheEndLine;
+    if (!needsWindow) {
+      return;
+    }
+
     const int visibleCount = endLine - startLine + 1;
     const int margin = std::max(visibleCount * 2, 1);
-    const int desiredStart = std::max(0, startLine - margin);
-    const int desiredEnd = std::min(totalLines - 1, endLine + margin);
-
-    if (desiredStart != m_cacheStartLine || desiredEnd != m_cacheEndLine || m_cachedLines.empty()) {
-      m_cacheStartLine = desiredStart;
-      m_cacheEndLine = desiredEnd;
-      rebuildCacheWindow();
-      m_baseDirty = true;
-      m_selectionDirty = true;
-    }
+    m_cacheStartLine = std::max(0, startLine - margin);
+    m_cacheEndLine = std::min(totalLines - 1, endLine + margin);
+    rebuildCacheWindow();
+    m_baseDirty = true;
+    m_selectionDirty = true;
   }
 
   void rebuildCacheWindow() {
@@ -694,6 +722,7 @@ private:
   void buildBaseInstances() {
     m_baseRectInstances.clear();
     m_baseGlyphInstances.clear();
+    m_lineRanges.clear();
 
     if (m_cachedLines.empty()) {
       return;
@@ -701,6 +730,7 @@ private:
 
     m_baseRectInstances.reserve(m_cachedLines.size() * 4);
     m_baseGlyphInstances.reserve(m_cachedLines.size() * (m_view->m_shouldDrawAscii ? 80 : 64));
+    m_lineRanges.reserve(m_cachedLines.size());
 
     const QColor clearColor = m_view->palette().color(QPalette::Window);
     const QVector4D addressColor = toVec4(m_view->palette().color(QPalette::WindowText));
@@ -728,6 +758,9 @@ private:
     const QRectF spaceUv = glyphUv(QLatin1Char(' '));
 
     for (const auto& entry : m_cachedLines) {
+      LineRange range{};
+      range.rectStart = static_cast<uint32_t>(m_baseRectInstances.size());
+      range.glyphStart = static_cast<uint32_t>(m_baseGlyphInstances.size());
       const float y = entry.line * lineHeight;
 
       if (m_view->m_shouldDrawOffset) {
@@ -796,6 +829,10 @@ private:
                       glyphUv(QLatin1Char(asciiChar)), textColor);
         }
       }
+
+      range.rectCount = static_cast<uint32_t>(m_baseRectInstances.size()) - range.rectStart;
+      range.glyphCount = static_cast<uint32_t>(m_baseGlyphInstances.size()) - range.glyphStart;
+      m_lineRanges.push_back(range);
     }
   }
 
@@ -860,9 +897,11 @@ private:
     }
     const QRectF spaceUv = glyphUv(QLatin1Char(' '));
 
+    const bool doShadow = m_view->m_shadowBlur > 0.0f;
     const QVector4D shadowColor = toVec4(SHADOW_COLOR);
-    const float shadowPadBase = SHADOW_BLUR_RADIUS * 2.0f + SELECTION_PADDING +
-                                std::max(std::abs(SHADOW_OFFSET_X), std::abs(SHADOW_OFFSET_Y));
+    const float shadowPadBase = m_view->m_shadowBlur * 2.0f + SELECTION_PADDING +
+                                std::max(std::abs(m_view->m_shadowOffset.x()),
+                                         std::abs(m_view->m_shadowOffset.y()));
 
     const std::vector<HexView::SelectionRange>& selections =
         m_view->m_selections.empty() ? m_view->m_fadeSelections : m_view->m_selections;
@@ -908,14 +947,18 @@ private:
             const QRectF hexRect(hexX, y, spanLen * 3.0f * charWidth, lineHeight);
             appendRect(m_selectionRectInstances, hexRect.x(), hexRect.y(), hexRect.width(),
                        hexRect.height(), bgColor);
-            appendShadow(hexRect, shadowPadBase, shadowColor);
+            if (doShadow) {
+              appendShadow(hexRect, shadowPadBase, shadowColor);
+            }
 
             if (m_view->m_shouldDrawAscii) {
               const float asciiX = asciiStartX + spanStart * charWidth;
               const QRectF asciiRect(asciiX, y, spanLen * charWidth, lineHeight);
               appendRect(m_selectionRectInstances, asciiRect.x(), asciiRect.y(), asciiRect.width(),
                          asciiRect.height(), bgColor);
-              appendShadow(asciiRect, shadowPadBase, shadowColor);
+              if (doShadow) {
+                appendShadow(asciiRect, shadowPadBase, shadowColor);
+              }
             }
 
             if (i < startCol + length) {
@@ -972,6 +1015,7 @@ private:
   uint64_t m_glyphAtlasVersion = 0;
 
   std::vector<CachedLine> m_cachedLines;
+  std::vector<LineRange> m_lineRanges;
   std::vector<RectInstance> m_baseRectInstances;
   std::vector<GlyphInstance> m_baseGlyphInstances;
   std::vector<RectInstance> m_overlayRectInstances;
@@ -1570,6 +1614,7 @@ void HexView::setShadowBlur(qreal blur) {
   }
   m_shadowBlur = blur;
   if (m_rhiViewport) {
+    m_rhiViewport->markSelectionDirty();
     m_rhiViewport->update();
   }
 }
@@ -1584,6 +1629,7 @@ void HexView::setShadowOffset(const QPointF& offset) {
   }
   m_shadowOffset = offset;
   if (m_rhiViewport) {
+    m_rhiViewport->markSelectionDirty();
     m_rhiViewport->update();
   }
 }
