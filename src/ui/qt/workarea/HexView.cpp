@@ -1,29 +1,41 @@
 /*
-* VGMTrans (c) 2002-2023
+* VGMTrans (c) 2002-2024
 * Licensed under the zlib license,
 * refer to the included LICENSE.txt file
 */
 
 #include "HexView.h"
-#include "VGMFile.h"
 #include "Helpers.h"
-#include "UIHelpers.h"
-#include "LambdaEventFilter.h"
-#include "SeqTrack.h"
+#include "VGMFile.h"
 
-#include <QFontDatabase>
-#include <QPainter>
+#include <QRhiWidget>
+#include <rhi/qrhi.h>
+#include <rhi/qshader.h>
+
 #include <QApplication>
-#include <QPaintEvent>
-#include <QGraphicsDropShadowEffect>
-#include <QPropertyAnimation>
+#include <QFile>
+#include <QFontMetricsF>
+#include <QHash>
+#include <QHelpEvent>
+#include <QImage>
+#include <QKeyEvent>
+#include <QMatrix4x4>
+#include <QMouseEvent>
+#include <QPainter>
 #include <QParallelAnimationGroup>
-#include <QScrollArea>
+#include <QPropertyAnimation>
+#include <QResizeEvent>
 #include <QScrollBar>
 #include <QToolTip>
-#include <QStyle>
+#include <QVector4D>
 
-constexpr qsizetype NUM_CACHED_LINE_PIXMAPS = 600;
+#include <algorithm>
+#include <array>
+#include <cmath>
+#include <functional>
+#include <limits>
+
+namespace {
 constexpr int BYTES_PER_LINE = 16;
 constexpr int NUM_ADDRESS_NIBBLES = 8;
 constexpr int ADDRESS_SPACING_CHARS = 4;
@@ -32,931 +44,1435 @@ constexpr int SELECTION_PADDING = 18;
 constexpr int VIEWPORT_PADDING = 10;
 constexpr int DIM_DURATION_MS = 200;
 constexpr int OVERLAY_ALPHA = 80;
+constexpr float OVERLAY_ALPHA_F = OVERLAY_ALPHA / 255.0f;
 const QColor SHADOW_COLOR = Qt::black;
-constexpr int SHADOW_OFFSET_X = 1;
-constexpr int SHADOW_OFFSET_Y = 4;
-constexpr int SHADOW_BLUR_RADIUS = SELECTION_PADDING * 2;
-constexpr int OVERLAY_HEIGHT_IN_SCREENS = 5;
+constexpr float SHADOW_OFFSET_X = 1.0f;
+constexpr float SHADOW_OFFSET_Y = 4.0f;
+constexpr float SHADOW_BLUR_RADIUS = SELECTION_PADDING * 2.0f;
+constexpr float SHADOW_CORNER_RADIUS = 0.0f;
+constexpr uint16_t STYLE_UNASSIGNED = std::numeric_limits<uint16_t>::max();
 
-HexView::HexView(VGMFile* vgmfile, QWidget *parent) :
-      QWidget(parent), vgmfile(vgmfile), selectedItem(nullptr) {
+struct RectInstance {
+  float x;
+  float y;
+  float w;
+  float h;
+  float r;
+  float g;
+  float b;
+  float a;
+};
 
-  lineCache.setMaxCost(NUM_CACHED_LINE_PIXMAPS);
+struct GlyphInstance {
+  float x;
+  float y;
+  float w;
+  float h;
+  float u0;
+  float v0;
+  float u1;
+  float v1;
+  float r;
+  float g;
+  float b;
+  float a;
+};
 
-  double appFontPointSize = QApplication::font().pointSizeF();
-  QFont font("Roboto Mono", appFontPointSize + 1);
-  // Call setPointSizeF, as QFont() doesn't accept a float size value
-  font.setPointSizeF(appFontPointSize + 1.0);
+struct ShadowInstance {
+  float gx;
+  float gy;
+  float gw;
+  float gh;
+  float rx;
+  float ry;
+  float rw;
+  float rh;
+  float r;
+  float g;
+  float b;
+  float a;
+};
 
-  this->setFont(font);
-  this->setFocusPolicy(Qt::StrongFocus);
+struct LineData {
+  int line = 0;
+  int bytes = 0;
+  std::array<uint8_t, BYTES_PER_LINE> data{};
+  std::array<uint16_t, BYTES_PER_LINE> styles{};
+};
 
-  overlay = new QWidget(this);
-  overlay->setAttribute(Qt::WA_NoSystemBackground);
-  overlay->setAttribute(Qt::WA_TranslucentBackground);
-  overlay->hide();
+struct BatchRange {
+  int start = 0;
+  int count = 0;
+};
 
-  overlay->installEventFilter(
-      new LambdaEventFilter([this](QObject* obj, QEvent* event) -> bool {
-        if (event->type() == QEvent::Paint) {
-          return this->handleOverlayPaintEvent(obj, static_cast<QPaintEvent*>(event));
-        }
-        return false;
-      },
-      overlay)
-  );
-
-  overlayOpacityEffect = new QGraphicsOpacityEffect(this);
-  overlay->setGraphicsEffect(overlayOpacityEffect);
-
-  selectedItemShadowEffect = new QGraphicsDropShadowEffect();
-  selectedItemShadowEffect->setBlurRadius(SHADOW_BLUR_RADIUS);
-  selectedItemShadowEffect->setColor(SHADOW_COLOR);
-  selectedItemShadowEffect->setOffset(SHADOW_OFFSET_X, SHADOW_OFFSET_Y);
-
-  selectionView = new QWidget(this);
-  selectionView->setGraphicsEffect(selectedItemShadowEffect);
-
-  selectionView->installEventFilter(
-      new LambdaEventFilter([this](QObject* obj, QEvent* event) -> bool {
-        if (event->type() == QEvent::Paint) {
-          return handleSelectedItemPaintEvent(obj, static_cast<QPaintEvent*>(event));
-        }
-        return false;
-      },
-      selectionView)
-  );
-
-  initAnimations();
+QVector4D toVec4(const QColor& color) {
+  return QVector4D(color.redF(), color.greenF(), color.blueF(), color.alphaF());
 }
 
-void HexView::setFont(QFont& font) {
-  QFontMetricsF fontMetrics(font);
+bool isPrintable(uint8_t value) {
+  return value >= 0x20 && value <= 0x7E;
+}
 
-  // We need both charWidth and the actual font character width to be a whole number, otherwise,
-  // we run into a host of drawing problems. (alternatively we could draw one byte at a time in
-  // printHex). Qt isn't very flexible about fractional font sizing, but it is flexible about
-  // letter spacing. So here we find the letter spacing which results in the closest whole number
-  // character width. We could probably achieve the same with word spacing instead, since we
-  // render hex with actual ASCII spaces between bytes, but the visual difference is minimal.
-  auto originalCharWidth = fontMetrics.horizontalAdvance("A");
-  auto originalLetterSpacing = font.letterSpacing();
-  auto charWidthSansSpacing = originalCharWidth - originalLetterSpacing;
-  auto targetLetterSpacing = std::round(charWidthSansSpacing) - charWidthSansSpacing;
-  font.setLetterSpacing(QFont::SpacingType::AbsoluteSpacing, targetLetterSpacing);
+QShader loadShader(const char* path) {
+  QFile file(QString::fromUtf8(path));
+  if (!file.open(QIODevice::ReadOnly)) {
+    qWarning("Failed to load shader: %s", path);
+    return {};
+  }
+  return QShader::fromSerialized(file.readAll());
+}
+}  // namespace
 
-  fontMetrics = QFontMetrics(font);
-  // We need to use horizontalAdvance(), as averageCharWidth() doesn't capture letter spacing.
-  this->charWidth = static_cast<int>(std::round(fontMetrics.horizontalAdvance("A")));
-  this->charHalfWidth = static_cast<int>(std::round(fontMetrics.horizontalAdvance("A") / 2));
-  this->lineHeight = static_cast<int>(std::round(fontMetrics.height()));
-  this->lineHeight = static_cast<int>(std::round(fontMetrics.height()));
+class HexViewViewport final : public QRhiWidget {
+public:
+  explicit HexViewViewport(HexView* view)
+      : QRhiWidget(view), m_view(view) {
+    setFocusPolicy(Qt::NoFocus);
+  }
 
-  QWidget::setFont(font);
-  updateSize();
+protected:
+  void initialize(QRhiCommandBuffer* cb) override {
+    m_rhi = rhi();
+    if (!m_rhi) {
+      return;
+    }
 
-  // Force everything to redraw
-  selectionViewPixmap = QPixmap();
-  selectionViewPixmapWithShadow = QPixmap();
+    static const float kVertices[] = {
+      0.0f, 0.0f,
+      1.0f, 0.0f,
+      1.0f, 1.0f,
+      0.0f, 1.0f,
+    };
+    static const quint16 kIndices[] = {0, 1, 2, 0, 2, 3};
+
+    m_vbuf = m_rhi->newBuffer(QRhiBuffer::Immutable, QRhiBuffer::VertexBuffer, sizeof(kVertices));
+    m_vbuf->create();
+    m_ibuf = m_rhi->newBuffer(QRhiBuffer::Immutable, QRhiBuffer::IndexBuffer, sizeof(kIndices));
+    m_ibuf->create();
+
+    m_ubuf = m_rhi->newBuffer(QRhiBuffer::Dynamic, QRhiBuffer::UniformBuffer, sizeof(QMatrix4x4));
+    m_ubuf->create();
+
+    m_shadowUbuf = m_rhi->newBuffer(QRhiBuffer::Dynamic, QRhiBuffer::UniformBuffer,
+                                    sizeof(QMatrix4x4) + sizeof(QVector4D));
+    m_shadowUbuf->create();
+
+    m_glyphSampler = m_rhi->newSampler(QRhiSampler::Linear, QRhiSampler::Linear,
+                                       QRhiSampler::None, QRhiSampler::ClampToEdge,
+                                       QRhiSampler::ClampToEdge);
+    m_glyphSampler->create();
+
+    QRhiResourceUpdateBatch* u = m_rhi->nextResourceUpdateBatch();
+    u->uploadStaticBuffer(m_vbuf, kVertices);
+    u->uploadStaticBuffer(m_ibuf, kIndices);
+    cb->resourceUpdate(u);
+
+    m_sampleCount = 0;
+  }
+
+  void render(QRhiCommandBuffer* cb) override {
+    if (!m_rhi || !m_view || !m_view->m_vgmfile) {
+      return;
+    }
+
+    m_view->ensureGlyphAtlas(devicePixelRatioF());
+    buildFrameData();
+
+    QRhiResourceUpdateBatch* u = m_rhi->nextResourceUpdateBatch();
+    ensureGlyphTexture(u);
+    ensurePipelines();
+    updateUniforms(u);
+    updateInstanceBuffers(u);
+
+    cb->beginPass(renderTarget(), m_clearColor, {1.0f, 0}, u);
+    cb->setViewport(QRhiViewport(0, 0, renderTarget()->pixelSize().width(),
+                                 renderTarget()->pixelSize().height()));
+
+    drawRectBatch(cb, m_rectNormal);
+    drawGlyphBatch(cb, m_glyphNormal);
+    drawRectBatch(cb, m_rectOverlay);
+    drawShadowBatch(cb);
+    drawRectBatch(cb, m_rectSelection);
+    drawGlyphBatch(cb, m_glyphSelection);
+
+    cb->endPass();
+  }
+
+  void releaseResources() override {
+    delete m_rectPso;
+    m_rectPso = nullptr;
+    delete m_glyphPso;
+    m_glyphPso = nullptr;
+    delete m_shadowPso;
+    m_shadowPso = nullptr;
+
+    delete m_rectSrb;
+    m_rectSrb = nullptr;
+    delete m_glyphSrb;
+    m_glyphSrb = nullptr;
+    delete m_shadowSrb;
+    m_shadowSrb = nullptr;
+
+    delete m_glyphTex;
+    m_glyphTex = nullptr;
+    delete m_glyphSampler;
+    m_glyphSampler = nullptr;
+
+    delete m_vbuf;
+    m_vbuf = nullptr;
+    delete m_ibuf;
+    m_ibuf = nullptr;
+    delete m_rectBuf;
+    m_rectBuf = nullptr;
+    delete m_glyphBuf;
+    m_glyphBuf = nullptr;
+    delete m_shadowBuf;
+    m_shadowBuf = nullptr;
+    delete m_ubuf;
+    m_ubuf = nullptr;
+    delete m_shadowUbuf;
+    m_shadowUbuf = nullptr;
+  }
+
+private:
+  void ensurePipelines() {
+    const int sampleCount = renderTarget()->sampleCount();
+    if (m_rectPso && m_sampleCount == sampleCount) {
+      return;
+    }
+    m_sampleCount = sampleCount;
+
+    delete m_rectPso;
+    delete m_glyphPso;
+    delete m_shadowPso;
+    delete m_rectSrb;
+    delete m_glyphSrb;
+    delete m_shadowSrb;
+
+    m_rectSrb = m_rhi->newShaderResourceBindings();
+    m_rectSrb->setBindings({
+      QRhiShaderResourceBinding::uniformBuffer(0, QRhiShaderResourceBinding::VertexStage, m_ubuf)
+    });
+    m_rectSrb->create();
+
+    m_glyphSrb = m_rhi->newShaderResourceBindings();
+    m_glyphSrb->setBindings({
+      QRhiShaderResourceBinding::uniformBuffer(0, QRhiShaderResourceBinding::VertexStage, m_ubuf),
+      QRhiShaderResourceBinding::sampledTexture(1, QRhiShaderResourceBinding::FragmentStage,
+                                                m_glyphTex, m_glyphSampler)
+    });
+    m_glyphSrb->create();
+
+    m_shadowSrb = m_rhi->newShaderResourceBindings();
+    m_shadowSrb->setBindings({
+      QRhiShaderResourceBinding::uniformBuffer(0,
+                                               QRhiShaderResourceBinding::VertexStage | QRhiShaderResourceBinding::FragmentStage,
+                                               m_shadowUbuf)
+    });
+    m_shadowSrb->create();
+
+    QShader rectVert = loadShader(":/shaders/hexquad.vert.qsb");
+    QShader rectFrag = loadShader(":/shaders/hexquad.frag.qsb");
+    QShader glyphVert = loadShader(":/shaders/hexglyph.vert.qsb");
+    QShader glyphFrag = loadShader(":/shaders/hexglyph.frag.qsb");
+    QShader shadowVert = loadShader(":/shaders/hexshadow.vert.qsb");
+    QShader shadowFrag = loadShader(":/shaders/hexshadow.frag.qsb");
+
+    QRhiVertexInputLayout rectInputLayout;
+    rectInputLayout.setBindings({
+      {2 * sizeof(float)},
+      {sizeof(RectInstance), QRhiVertexInputBinding::PerInstance}
+    });
+    rectInputLayout.setAttributes({
+      {0, 0, QRhiVertexInputAttribute::Float2, 0},
+      {1, 1, QRhiVertexInputAttribute::Float4, 0},
+      {1, 2, QRhiVertexInputAttribute::Float4, 4 * sizeof(float)}
+    });
+
+    QRhiVertexInputLayout glyphInputLayout;
+    glyphInputLayout.setBindings({
+      {2 * sizeof(float)},
+      {sizeof(GlyphInstance), QRhiVertexInputBinding::PerInstance}
+    });
+    glyphInputLayout.setAttributes({
+      {0, 0, QRhiVertexInputAttribute::Float2, 0},
+      {1, 1, QRhiVertexInputAttribute::Float4, 0},
+      {1, 2, QRhiVertexInputAttribute::Float4, 4 * sizeof(float)},
+      {1, 3, QRhiVertexInputAttribute::Float4, 8 * sizeof(float)}
+    });
+
+    QRhiVertexInputLayout shadowInputLayout;
+    shadowInputLayout.setBindings({
+      {2 * sizeof(float)},
+      {sizeof(ShadowInstance), QRhiVertexInputBinding::PerInstance}
+    });
+    shadowInputLayout.setAttributes({
+      {0, 0, QRhiVertexInputAttribute::Float2, 0},
+      {1, 1, QRhiVertexInputAttribute::Float4, 0},
+      {1, 2, QRhiVertexInputAttribute::Float4, 4 * sizeof(float)},
+      {1, 3, QRhiVertexInputAttribute::Float4, 8 * sizeof(float)}
+    });
+
+    QRhiGraphicsPipeline::TargetBlend blend;
+    blend.enable = true;
+    blend.srcColor = QRhiGraphicsPipeline::SrcAlpha;
+    blend.dstColor = QRhiGraphicsPipeline::OneMinusSrcAlpha;
+    blend.srcAlpha = QRhiGraphicsPipeline::SrcAlpha;
+    blend.dstAlpha = QRhiGraphicsPipeline::OneMinusSrcAlpha;
+
+    m_rectPso = m_rhi->newGraphicsPipeline();
+    m_rectPso->setShaderStages({{QRhiShaderStage::Vertex, rectVert},
+                                {QRhiShaderStage::Fragment, rectFrag}});
+    m_rectPso->setVertexInputLayout(rectInputLayout);
+    m_rectPso->setShaderResourceBindings(m_rectSrb);
+    m_rectPso->setCullMode(QRhiGraphicsPipeline::None);
+    m_rectPso->setTargetBlends({blend});
+    m_rectPso->setSampleCount(m_sampleCount);
+    m_rectPso->setRenderPassDescriptor(renderTarget()->renderPassDescriptor());
+    m_rectPso->create();
+
+    m_glyphPso = m_rhi->newGraphicsPipeline();
+    m_glyphPso->setShaderStages({{QRhiShaderStage::Vertex, glyphVert},
+                                 {QRhiShaderStage::Fragment, glyphFrag}});
+    m_glyphPso->setVertexInputLayout(glyphInputLayout);
+    m_glyphPso->setShaderResourceBindings(m_glyphSrb);
+    m_glyphPso->setCullMode(QRhiGraphicsPipeline::None);
+    m_glyphPso->setTargetBlends({blend});
+    m_glyphPso->setSampleCount(m_sampleCount);
+    m_glyphPso->setRenderPassDescriptor(renderTarget()->renderPassDescriptor());
+    m_glyphPso->create();
+
+    m_shadowPso = m_rhi->newGraphicsPipeline();
+    m_shadowPso->setShaderStages({{QRhiShaderStage::Vertex, shadowVert},
+                                  {QRhiShaderStage::Fragment, shadowFrag}});
+    m_shadowPso->setVertexInputLayout(shadowInputLayout);
+    m_shadowPso->setShaderResourceBindings(m_shadowSrb);
+    m_shadowPso->setCullMode(QRhiGraphicsPipeline::None);
+    m_shadowPso->setTargetBlends({blend});
+    m_shadowPso->setSampleCount(m_sampleCount);
+    m_shadowPso->setRenderPassDescriptor(renderTarget()->renderPassDescriptor());
+    m_shadowPso->create();
+  }
+
+  void ensureGlyphTexture(QRhiResourceUpdateBatch* u) {
+    if (!m_view->m_glyphAtlas || m_view->m_glyphAtlas->image.isNull()) {
+      return;
+    }
+
+    const auto& atlas = *m_view->m_glyphAtlas;
+    if (m_glyphTex && m_glyphAtlasVersion == atlas.version) {
+      return;
+    }
+
+    delete m_glyphTex;
+    m_glyphTex = m_rhi->newTexture(QRhiTexture::RGBA8, atlas.image.size(), 1);
+                                   // QRhiTexture::UsedWithSampledTexture);
+    m_glyphTex->create();
+
+    u->uploadTexture(m_glyphTex, atlas.image);
+
+    m_glyphAtlasVersion = atlas.version;
+
+    if (m_glyphSrb) {
+      m_glyphSrb->setBindings({
+        QRhiShaderResourceBinding::uniformBuffer(0, QRhiShaderResourceBinding::VertexStage, m_ubuf),
+        QRhiShaderResourceBinding::sampledTexture(1, QRhiShaderResourceBinding::FragmentStage,
+                                                  m_glyphTex, m_glyphSampler)
+      });
+      m_glyphSrb->create();
+    }
+  }
+
+  void updateUniforms(QRhiResourceUpdateBatch* u) {
+    QSize viewportSize = m_view->viewport()->size();
+    QMatrix4x4 mvp;
+    mvp.ortho(0.0f, static_cast<float>(viewportSize.width()),
+              static_cast<float>(viewportSize.height()), 0.0f, -1.0f, 1.0f);
+
+    u->updateDynamicBuffer(m_ubuf, 0, sizeof(QMatrix4x4), &mvp);
+
+    QVector4D shadowParams(m_view->m_shadowOffset.x(), m_view->m_shadowOffset.y(),
+                           m_view->m_shadowBlur, SHADOW_CORNER_RADIUS);
+
+    u->updateDynamicBuffer(m_shadowUbuf, 0, sizeof(QMatrix4x4), &mvp);
+    u->updateDynamicBuffer(m_shadowUbuf, sizeof(QMatrix4x4), sizeof(QVector4D), &shadowParams);
+  }
+
+  void ensureInstanceBuffer(QRhiBuffer*& buffer, int bytes) {
+    if (bytes <= 0) {
+      bytes = 1;
+    }
+    if (!buffer || buffer->size() < bytes) {
+      delete buffer;
+      buffer = m_rhi->newBuffer(QRhiBuffer::Dynamic, QRhiBuffer::VertexBuffer, bytes);
+      buffer->create();
+    }
+  }
+
+  void updateInstanceBuffers(QRhiResourceUpdateBatch* u) {
+    ensureInstanceBuffer(m_rectBuf, static_cast<int>(m_rectInstances.size() * sizeof(RectInstance)));
+    if (!m_rectInstances.empty()) {
+      u->updateDynamicBuffer(m_rectBuf, 0,
+                             static_cast<int>(m_rectInstances.size() * sizeof(RectInstance)),
+                             m_rectInstances.data());
+    }
+
+    ensureInstanceBuffer(m_glyphBuf, static_cast<int>(m_glyphInstances.size() * sizeof(GlyphInstance)));
+    if (!m_glyphInstances.empty()) {
+      u->updateDynamicBuffer(m_glyphBuf, 0,
+                             static_cast<int>(m_glyphInstances.size() * sizeof(GlyphInstance)),
+                             m_glyphInstances.data());
+    }
+
+    ensureInstanceBuffer(m_shadowBuf, static_cast<int>(m_shadowInstances.size() * sizeof(ShadowInstance)));
+    if (!m_shadowInstances.empty()) {
+      u->updateDynamicBuffer(m_shadowBuf, 0,
+                             static_cast<int>(m_shadowInstances.size() * sizeof(ShadowInstance)),
+                             m_shadowInstances.data());
+    }
+  }
+
+  void drawRectBatch(QRhiCommandBuffer* cb, const BatchRange& batch) {
+    if (batch.count <= 0) {
+      return;
+    }
+    cb->setGraphicsPipeline(m_rectPso);
+    cb->setShaderResources(m_rectSrb);
+    const QRhiCommandBuffer::VertexInput vbufBindings[] = {
+      {m_vbuf, 0},
+      {m_rectBuf, 0}
+    };
+    cb->setVertexInput(0, 2, vbufBindings, m_ibuf, 0, QRhiCommandBuffer::IndexUInt16);
+    cb->drawIndexed(6, batch.count, 0, 0, batch.start);
+  }
+
+  void drawGlyphBatch(QRhiCommandBuffer* cb, const BatchRange& batch) {
+    if (batch.count <= 0) {
+      return;
+    }
+    cb->setGraphicsPipeline(m_glyphPso);
+    cb->setShaderResources(m_glyphSrb);
+    const QRhiCommandBuffer::VertexInput vbufBindings[] = {
+      {m_vbuf, 0},
+      {m_glyphBuf, 0}
+    };
+    cb->setVertexInput(0, 2, vbufBindings, m_ibuf, 0, QRhiCommandBuffer::IndexUInt16);
+    cb->drawIndexed(6, batch.count, 0, 0, batch.start);
+  }
+
+  void drawShadowBatch(QRhiCommandBuffer* cb) {
+    if (m_shadowInstances.empty() || m_view->m_shadowBlur <= 0.0f) {
+      return;
+    }
+    cb->setGraphicsPipeline(m_shadowPso);
+    cb->setShaderResources(m_shadowSrb);
+    const QRhiCommandBuffer::VertexInput vbufBindings[] = {
+      {m_vbuf, 0},
+      {m_shadowBuf, 0}
+    };
+    cb->setVertexInput(0, 2, vbufBindings, m_ibuf, 0, QRhiCommandBuffer::IndexUInt16);
+    cb->drawIndexed(6, static_cast<int>(m_shadowInstances.size()));
+  }
+
+  QRectF glyphUv(const QChar& ch) const {
+    if (!m_view->m_glyphAtlas) {
+      return {};
+    }
+    const auto& uvMap = m_view->m_glyphAtlas->uvMap;
+    auto it = uvMap.constFind(ch.unicode());
+    if (it != uvMap.constEnd()) {
+      return it.value();
+    }
+    auto fallback = uvMap.constFind(static_cast<ushort>('.'));
+    if (fallback != uvMap.constEnd()) {
+      return fallback.value();
+    }
+    return {};
+  }
+
+  void appendRect(std::vector<RectInstance>& rects, float x, float y, float w, float h,
+                  const QVector4D& color) {
+    rects.push_back({x, y, w, h, color.x(), color.y(), color.z(), color.w()});
+  }
+
+  void appendGlyph(std::vector<GlyphInstance>& glyphs, float x, float y, float w, float h,
+                   const QRectF& uv, const QVector4D& color) {
+    if (uv.isNull()) {
+      return;
+    }
+    glyphs.push_back({x, y, w, h,
+                      static_cast<float>(uv.left()), static_cast<float>(uv.top()),
+                      static_cast<float>(uv.right()), static_cast<float>(uv.bottom()),
+                      color.x(), color.y(), color.z(), color.w()});
+  }
+
+  void appendShadow(const QRectF& rect, float pad, const QVector4D& color) {
+    const float gx = static_cast<float>(rect.x() - pad);
+    const float gy = static_cast<float>(rect.y() - pad);
+    const float gw = static_cast<float>(rect.width() + pad * 2.0f);
+    const float gh = static_cast<float>(rect.height() + pad * 2.0f);
+    m_shadowInstances.push_back({gx, gy, gw, gh,
+                                 static_cast<float>(rect.x()), static_cast<float>(rect.y()),
+                                 static_cast<float>(rect.width()), static_cast<float>(rect.height()),
+                                 color.x(), color.y(), color.z(), color.w()});
+  }
+
+  void buildFrameData() {
+    m_rectInstances.clear();
+    m_glyphInstances.clear();
+    m_shadowInstances.clear();
+
+    m_rectNormal = {};
+    m_rectOverlay = {};
+    m_rectSelection = {};
+    m_glyphNormal = {};
+    m_glyphSelection = {};
+
+    const int viewportWidth = m_view->viewport()->width();
+    const int viewportHeight = m_view->viewport()->height();
+    const int scrollY = m_view->verticalScrollBar()->value();
+
+    m_clearColor = m_view->palette().color(QPalette::Window);
+
+    if (viewportWidth <= 0 || viewportHeight <= 0 || m_view->m_lineHeight <= 0) {
+      return;
+    }
+
+    const int totalLines = m_view->getTotalLines();
+    if (totalLines <= 0) {
+      return;
+    }
+
+    const int startLine = std::clamp(scrollY / m_view->m_lineHeight, 0, totalLines - 1);
+    const int endLine = std::clamp((scrollY + viewportHeight) / m_view->m_lineHeight, 0, totalLines - 1);
+
+    const int lineCount = endLine - startLine + 1;
+    m_lineData.clear();
+    m_lineData.reserve(lineCount);
+
+    const uint32_t fileLength = m_view->m_vgmfile->unLength;
+
+    for (int line = startLine; line <= endLine; ++line) {
+      LineData entry;
+      entry.line = line;
+      const int lineOffset = line * BYTES_PER_LINE;
+      if (lineOffset >= static_cast<int>(fileLength)) {
+        entry.bytes = 0;
+      } else {
+        entry.bytes = std::min(BYTES_PER_LINE, static_cast<int>(fileLength) - lineOffset);
+        if (entry.bytes > 0) {
+          m_view->m_vgmfile->readBytes(m_view->m_vgmfile->dwOffset + lineOffset,
+                                       static_cast<uint32_t>(entry.bytes), entry.data.data());
+          for (int i = 0; i < entry.bytes; ++i) {
+            const int idx = lineOffset + i;
+            if (idx >= 0 && idx < static_cast<int>(m_view->m_styleIds.size())) {
+              entry.styles[i] = m_view->m_styleIds[idx];
+            } else {
+              entry.styles[i] = 0;
+            }
+          }
+        }
+      }
+      m_lineData.push_back(entry);
+    }
+
+    const QVector4D addressColor = toVec4(m_view->palette().color(QPalette::WindowText));
+
+    const float charWidth = static_cast<float>(m_view->m_charWidth);
+    const float charHalfWidth = static_cast<float>(m_view->m_charHalfWidth);
+    const float lineHeight = static_cast<float>(m_view->m_lineHeight);
+
+    const float hexStartX = static_cast<float>(m_view->hexXOffset());
+    const float asciiStartX = hexStartX + (BYTES_PER_LINE * 3 + HEX_TO_ASCII_SPACING_CHARS) * charWidth;
+
+    const auto& styles = m_view->m_styles;
+
+    auto styleFor = [&](uint16_t styleId) -> const HexView::Style& {
+      if (styleId < styles.size()) {
+        return styles[styleId];
+      }
+      return styles.front();
+    };
+
+    static const char kHexDigits[] = "0123456789ABCDEF";
+
+    m_rectNormal.start = static_cast<int>(m_rectInstances.size());
+    for (const auto& entry : m_lineData) {
+      const float y = entry.line * lineHeight - static_cast<float>(scrollY);
+      if (m_view->m_shouldDrawOffset) {
+        const uint32_t address = m_view->m_vgmfile->dwOffset + (entry.line * BYTES_PER_LINE);
+        const QString addressText = QString("%1").arg(address, NUM_ADDRESS_NIBBLES,
+                                                     m_view->m_addressAsHex ? 16 : 10,
+                                                     QLatin1Char('0')).toUpper();
+        for (int i = 0; i < addressText.size(); ++i) {
+          appendGlyph(m_glyphInstances, i * charWidth, y, charWidth, lineHeight,
+                      glyphUv(addressText[i]), addressColor);
+        }
+      }
+
+      if (entry.bytes <= 0) {
+        continue;
+      }
+
+      int spanStart = 0;
+      uint16_t spanStyle = entry.styles[0];
+      for (int i = 1; i <= entry.bytes; ++i) {
+        if (i == entry.bytes || entry.styles[i] != spanStyle) {
+          const int spanLen = i - spanStart;
+          const auto& style = styleFor(spanStyle);
+          if (style.bg != m_clearColor) {
+            const QVector4D bgColor = toVec4(style.bg);
+            const float hexX = hexStartX + spanStart * 3.0f * charWidth - charHalfWidth;
+            appendRect(m_rectInstances, hexX, y, spanLen * 3.0f * charWidth, lineHeight, bgColor);
+            if (m_view->m_shouldDrawAscii) {
+              const float asciiX = asciiStartX + spanStart * charWidth;
+              appendRect(m_rectInstances, asciiX, y, spanLen * charWidth, lineHeight, bgColor);
+            }
+          }
+          if (i < entry.bytes) {
+            spanStart = i;
+            spanStyle = entry.styles[i];
+          }
+        }
+      }
+
+      for (int i = 0; i < entry.bytes; ++i) {
+        const auto& style = styleFor(entry.styles[i]);
+        const QVector4D textColor = toVec4(style.fg);
+
+        const uint8_t value = entry.data[i];
+        const char hi = kHexDigits[value >> 4];
+        const char lo = kHexDigits[value & 0x0F];
+
+        const float hexX = hexStartX + i * 3.0f * charWidth;
+        appendGlyph(m_glyphInstances, hexX, y, charWidth, lineHeight, glyphUv(QLatin1Char(hi)), textColor);
+        appendGlyph(m_glyphInstances, hexX + charWidth, y, charWidth, lineHeight, glyphUv(QLatin1Char(lo)), textColor);
+        appendGlyph(m_glyphInstances, hexX + 2.0f * charWidth, y, charWidth, lineHeight,
+                    glyphUv(QLatin1Char(' ')), textColor);
+
+        if (m_view->m_shouldDrawAscii) {
+          const char asciiChar = isPrintable(value) ? static_cast<char>(value) : '.';
+          const float asciiX = asciiStartX + i * charWidth;
+          appendGlyph(m_glyphInstances, asciiX, y, charWidth, lineHeight,
+                      glyphUv(QLatin1Char(asciiChar)), textColor);
+        }
+      }
+    }
+    m_rectNormal.count = static_cast<int>(m_rectInstances.size()) - m_rectNormal.start;
+
+    m_glyphNormal.start = 0;
+    m_glyphNormal.count = static_cast<int>(m_glyphInstances.size());
+
+    const bool hasSelection = !m_view->m_selections.empty() || !m_view->m_fadeSelections.empty();
+    if (!hasSelection) {
+      return;
+    }
+
+    if (m_view->m_overlayOpacity > 0.0f) {
+      m_rectOverlay.start = static_cast<int>(m_rectInstances.size());
+      const QVector4D overlayColor(0.0f, 0.0f, 0.0f, static_cast<float>(m_view->m_overlayOpacity));
+      const float hexX = hexStartX - charHalfWidth;
+      appendRect(m_rectInstances, hexX, 0.0f,
+                 BYTES_PER_LINE * 3.0f * charWidth, static_cast<float>(viewportHeight), overlayColor);
+      if (m_view->m_shouldDrawAscii) {
+        appendRect(m_rectInstances, asciiStartX, 0.0f,
+                   BYTES_PER_LINE * charWidth, static_cast<float>(viewportHeight), overlayColor);
+      }
+      m_rectOverlay.count = static_cast<int>(m_rectInstances.size()) - m_rectOverlay.start;
+    }
+
+    const std::vector<HexView::SelectionRange>& selections =
+        m_view->m_selections.empty() ? m_view->m_fadeSelections : m_view->m_selections;
+
+    m_rectSelection.start = static_cast<int>(m_rectInstances.size());
+    m_glyphSelection.start = static_cast<int>(m_glyphInstances.size());
+
+    const QVector4D shadowColor = toVec4(SHADOW_COLOR);
+    const float shadowPadBase = m_view->m_shadowBlur * 2.0f + SELECTION_PADDING +
+                                std::max(std::abs(m_view->m_shadowOffset.x()),
+                                         std::abs(m_view->m_shadowOffset.y()));
+
+    for (const auto& selection : selections) {
+      if (selection.length == 0) {
+        continue;
+      }
+      const int selectionStart = static_cast<int>(selection.offset - m_view->m_vgmfile->dwOffset);
+      const int selectionEnd = selectionStart + static_cast<int>(selection.length);
+      if (selectionEnd <= 0 || selectionStart >= static_cast<int>(fileLength)) {
+        continue;
+      }
+
+      const int selStartLine = std::max(startLine, selectionStart / BYTES_PER_LINE);
+      const int selEndLine = std::min(endLine, (selectionEnd - 1) / BYTES_PER_LINE);
+
+      for (int line = selStartLine; line <= selEndLine; ++line) {
+        const int lineIndex = line - startLine;
+        if (lineIndex < 0 || lineIndex >= static_cast<int>(m_lineData.size())) {
+          continue;
+        }
+        const auto& entry = m_lineData[static_cast<size_t>(lineIndex)];
+        const int lineOffset = line * BYTES_PER_LINE;
+        const int overlapStart = std::max(selectionStart, lineOffset);
+        const int overlapEnd = std::min(selectionEnd, lineOffset + entry.bytes);
+        if (overlapEnd <= overlapStart) {
+          continue;
+        }
+
+        const int startCol = overlapStart - lineOffset;
+        const int length = overlapEnd - overlapStart;
+        const float y = entry.line * lineHeight - static_cast<float>(scrollY);
+
+        int spanStart = startCol;
+        uint16_t spanStyle = entry.styles[spanStart];
+        for (int i = startCol + 1; i <= startCol + length; ++i) {
+          if (i == startCol + length || entry.styles[i] != spanStyle) {
+            const int spanLen = i - spanStart;
+            const auto& style = styleFor(spanStyle);
+            const QVector4D bgColor = toVec4(style.bg);
+            const float hexX = hexStartX + spanStart * 3.0f * charWidth - charHalfWidth;
+            const QRectF hexRect(hexX, y, spanLen * 3.0f * charWidth, lineHeight);
+            appendRect(m_rectInstances, hexRect.x(), hexRect.y(), hexRect.width(),
+                       hexRect.height(), bgColor);
+            if (m_view->m_shadowBlur > 0.0f) {
+              appendShadow(hexRect, shadowPadBase, shadowColor);
+            }
+
+            if (m_view->m_shouldDrawAscii) {
+              const float asciiX = asciiStartX + spanStart * charWidth;
+              const QRectF asciiRect(asciiX, y, spanLen * charWidth, lineHeight);
+              appendRect(m_rectInstances, asciiRect.x(), asciiRect.y(), asciiRect.width(),
+                         asciiRect.height(), bgColor);
+              if (m_view->m_shadowBlur > 0.0f) {
+                appendShadow(asciiRect, shadowPadBase, shadowColor);
+              }
+            }
+
+            if (i < startCol + length) {
+              spanStart = i;
+              spanStyle = entry.styles[i];
+            }
+          }
+        }
+
+        for (int i = startCol; i < startCol + length; ++i) {
+          const auto& style = styleFor(entry.styles[i]);
+          const QVector4D textColor = toVec4(style.fg);
+          const uint8_t value = entry.data[i];
+          const char hi = kHexDigits[value >> 4];
+          const char lo = kHexDigits[value & 0x0F];
+          const float hexX = hexStartX + i * 3.0f * charWidth;
+          appendGlyph(m_glyphInstances, hexX, y, charWidth, lineHeight, glyphUv(QLatin1Char(hi)), textColor);
+          appendGlyph(m_glyphInstances, hexX + charWidth, y, charWidth, lineHeight,
+                      glyphUv(QLatin1Char(lo)), textColor);
+          appendGlyph(m_glyphInstances, hexX + 2.0f * charWidth, y, charWidth, lineHeight,
+                      glyphUv(QLatin1Char(' ')), textColor);
+
+          if (m_view->m_shouldDrawAscii) {
+            const char asciiChar = isPrintable(value) ? static_cast<char>(value) : '.';
+            const float asciiX = asciiStartX + i * charWidth;
+            appendGlyph(m_glyphInstances, asciiX, y, charWidth, lineHeight,
+                        glyphUv(QLatin1Char(asciiChar)), textColor);
+          }
+        }
+      }
+    }
+
+    m_rectSelection.count = static_cast<int>(m_rectInstances.size()) - m_rectSelection.start;
+    m_glyphSelection.count = static_cast<int>(m_glyphInstances.size()) - m_glyphSelection.start;
+  }
+
+  HexView* m_view = nullptr;
+  QRhi* m_rhi = nullptr;
+  QRhiBuffer* m_vbuf = nullptr;
+  QRhiBuffer* m_ibuf = nullptr;
+  QRhiBuffer* m_rectBuf = nullptr;
+  QRhiBuffer* m_glyphBuf = nullptr;
+  QRhiBuffer* m_shadowBuf = nullptr;
+  QRhiBuffer* m_ubuf = nullptr;
+  QRhiBuffer* m_shadowUbuf = nullptr;
+  QRhiTexture* m_glyphTex = nullptr;
+  QRhiSampler* m_glyphSampler = nullptr;
+  QRhiShaderResourceBindings* m_rectSrb = nullptr;
+  QRhiShaderResourceBindings* m_glyphSrb = nullptr;
+  QRhiShaderResourceBindings* m_shadowSrb = nullptr;
+  QRhiGraphicsPipeline* m_rectPso = nullptr;
+  QRhiGraphicsPipeline* m_glyphPso = nullptr;
+  QRhiGraphicsPipeline* m_shadowPso = nullptr;
+  int m_sampleCount = 1;
+  uint64_t m_glyphAtlasVersion = 0;
+
+  std::vector<RectInstance> m_rectInstances;
+  std::vector<GlyphInstance> m_glyphInstances;
+  std::vector<ShadowInstance> m_shadowInstances;
+  std::vector<LineData> m_lineData;
+  BatchRange m_rectNormal;
+  BatchRange m_rectOverlay;
+  BatchRange m_rectSelection;
+  BatchRange m_glyphNormal;
+  BatchRange m_glyphSelection;
+  QColor m_clearColor;
+};
+
+HexView::HexView(VGMFile* vgmfile, QWidget* parent)
+    : QAbstractScrollArea(parent), m_vgmfile(vgmfile) {
+  setFocusPolicy(Qt::StrongFocus);
+  setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+  viewport()->setAutoFillBackground(false);
+
+  m_rhiViewport = new HexViewViewport(this);
+  m_rhiViewport->setAttribute(Qt::WA_TransparentForMouseEvents);
+  m_rhiViewport->setParent(viewport());
+  m_rhiViewport->setGeometry(viewport()->rect());
+  m_rhiViewport->show();
+
+  const double appFontPointSize = QApplication::font().pointSizeF();
+  QFont font("Roboto Mono", appFontPointSize + 1.0);
+  font.setPointSizeF(appFontPointSize + 1.0);
+
+  setFont(font);
+  rebuildStyleMap();
+  initAnimations();
+  updateLayout();
+}
+
+void HexView::setFont(const QFont& font) {
+  QFont adjustedFont = font;
+  QFontMetricsF fontMetrics(adjustedFont);
+
+  const qreal originalCharWidth = fontMetrics.horizontalAdvance("A");
+  const qreal originalLetterSpacing = adjustedFont.letterSpacing();
+  const qreal charWidthSansSpacing = originalCharWidth - originalLetterSpacing;
+  const qreal targetLetterSpacing = std::round(charWidthSansSpacing) - charWidthSansSpacing;
+  adjustedFont.setLetterSpacing(QFont::AbsoluteSpacing, targetLetterSpacing);
+
+  fontMetrics = QFontMetricsF(adjustedFont);
+  m_charWidth = static_cast<int>(std::round(fontMetrics.horizontalAdvance("A")));
+  m_charHalfWidth = static_cast<int>(std::round(fontMetrics.horizontalAdvance("A") / 2.0));
+  m_lineHeight = static_cast<int>(std::round(fontMetrics.height()));
+
+  QAbstractScrollArea::setFont(adjustedFont);
+
   m_virtual_full_width = -1;
   m_virtual_width_sans_ascii = -1;
   m_virtual_width_sans_ascii_and_address = -1;
-  lineCache.clear();
-  redrawOverlay();
-  drawSelectedItem();
+
+  if (m_glyphAtlas) {
+    m_glyphAtlas->dpr = 0.0;
+  }
+
+  updateLayout();
+  if (m_rhiViewport) {
+    m_rhiViewport->update();
+  }
 }
 
-// The x offset to print hexadecimal
 int HexView::hexXOffset() const {
-  if (shouldDrawOffset)
-    return ((NUM_ADDRESS_NIBBLES + ADDRESS_SPACING_CHARS) * charWidth);
-  else
-    return 0;
+  return m_shouldDrawOffset ? ((NUM_ADDRESS_NIBBLES + ADDRESS_SPACING_CHARS) * m_charWidth) : 0;
 }
 
 int HexView::getVirtualHeight() const {
-  return lineHeight * getTotalLines();
+  return m_lineHeight * getTotalLines();
 }
 
-int HexView::getVirtualFullWidth() {
+int HexView::getVirtualFullWidth() const {
   if (m_virtual_full_width == -1) {
     constexpr int numChars = NUM_ADDRESS_NIBBLES + ADDRESS_SPACING_CHARS + (BYTES_PER_LINE * 3) +
                              HEX_TO_ASCII_SPACING_CHARS + BYTES_PER_LINE;
-    m_virtual_full_width = (numChars * charWidth) + SELECTION_PADDING;
+    m_virtual_full_width = (numChars * m_charWidth) + SELECTION_PADDING;
   }
   return m_virtual_full_width;
 }
 
-int HexView::getVirtualWidthSansAscii() {
+int HexView::getVirtualWidthSansAscii() const {
   if (m_virtual_width_sans_ascii == -1) {
     constexpr int numChars = NUM_ADDRESS_NIBBLES + ADDRESS_SPACING_CHARS + (BYTES_PER_LINE * 3);
-    m_virtual_width_sans_ascii = (numChars * charWidth) + SELECTION_PADDING;
+    m_virtual_width_sans_ascii = (numChars * m_charWidth) + SELECTION_PADDING;
   }
   return m_virtual_width_sans_ascii;
 }
 
-int HexView::getVirtualWidthSansAsciiAndAddress() {
+int HexView::getVirtualWidthSansAsciiAndAddress() const {
   if (m_virtual_width_sans_ascii_and_address == -1) {
     constexpr int numChars = BYTES_PER_LINE * 3;
-    m_virtual_width_sans_ascii_and_address = (numChars * charWidth) + SELECTION_PADDING;
+    m_virtual_width_sans_ascii_and_address = (numChars * m_charWidth) + SELECTION_PADDING;
   }
   return m_virtual_width_sans_ascii_and_address;
 }
 
-int HexView::getActualVirtualWidth() {
-  if (shouldDrawAscii) {
+int HexView::getActualVirtualWidth() const {
+  if (m_shouldDrawAscii) {
     return getVirtualFullWidth();
   }
-  if (shouldDrawOffset) {
+  if (m_shouldDrawOffset) {
     return getVirtualWidthSansAscii();
   }
   return getVirtualWidthSansAsciiAndAddress();
 }
 
-int HexView::getViewportFullWidth() {
+int HexView::getViewportFullWidth() const {
   return getVirtualFullWidth() + VIEWPORT_PADDING;
 }
 
-int HexView::getViewportWidthSansAscii() {
+int HexView::getViewportWidthSansAscii() const {
   return getVirtualWidthSansAscii() + VIEWPORT_PADDING;
 }
 
-int HexView::getViewportWidthSansAsciiAndAddress() {
+int HexView::getViewportWidthSansAsciiAndAddress() const {
   return getVirtualWidthSansAsciiAndAddress() + VIEWPORT_PADDING;
 }
 
-void HexView::updateSize() {
-  const QScrollArea* scrollArea = getContainingScrollArea(this);
-  const int scrollBarThickness = style()->pixelMetric(QStyle::PM_ScrollBarExtent);
-  const int scrollAreaWidth = scrollArea ? scrollArea->width() : getVirtualFullWidth();
-  // It is important that the width is not greater than its container. If it is greater, scrolling
-  // will invalidate the entire viewport rather than just the area scrolled into view
-  const int hexViewWidth = scrollAreaWidth - scrollBarThickness - 2;
-  setFixedSize({hexViewWidth, getVirtualHeight()});
+void HexView::updateScrollBars() {
+  const int totalHeight = getVirtualHeight();
+  const int pageStep = viewport()->height();
+  verticalScrollBar()->setRange(0, std::max(0, totalHeight - pageStep));
+  verticalScrollBar()->setPageStep(pageStep);
+  verticalScrollBar()->setSingleStep(m_lineHeight);
+}
+
+void HexView::updateLayout() {
+  const int width = viewport()->width();
+  const int height = viewport()->height();
+  if (width == 0 || height == 0) {
+    return;
+  }
+
+  const bool newDrawOffset = width >= getViewportWidthSansAsciiAndAddress();
+  const bool newDrawAscii = width >= getViewportWidthSansAscii();
+  m_shouldDrawOffset = newDrawOffset;
+  m_shouldDrawAscii = newDrawAscii;
+
+  updateScrollBars();
+
+  if (m_rhiViewport) {
+    m_rhiViewport->setGeometry(viewport()->rect());
+    m_rhiViewport->update();
+  }
 }
 
 int HexView::getTotalLines() const {
-  return (vgmfile->unLength + BYTES_PER_LINE - 1) / BYTES_PER_LINE;
+  if (!m_vgmfile) {
+    return 0;
+  }
+  return static_cast<int>((m_vgmfile->unLength + BYTES_PER_LINE - 1) / BYTES_PER_LINE);
 }
 
-void HexView::setSelectedItem(VGMItem *item) {
-  selectedItem = item;
+void HexView::setSelectedItem(VGMItem* item) {
+  m_selectedItem = item;
 
-  if (selectedItem == nullptr) {
+  if (!m_selectedItem) {
+    if (!m_selections.empty()) {
+      m_fadeSelections = m_selections;
+    }
+    m_selections.clear();
     showSelectedItem(false, true);
+    if (m_rhiViewport) {
+      m_rhiViewport->update();
+    }
     return;
   }
-  // Invalidate the cached selected item pixmaps
-  selectionViewPixmap = QPixmap();
-  selectionViewPixmapWithShadow = QPixmap();
+
+  m_selectedOffset = m_selectedItem->dwOffset;
+  m_selections.clear();
+  m_selections.push_back({m_selectedItem->dwOffset, m_selectedItem->unLength});
+  m_fadeSelections.clear();
 
   showSelectedItem(true, true);
-  drawSelectedItem();
-  selectionView->show();
 
-  // Handle scrolling to the selected event
-  QScrollArea* scrollArea = getContainingScrollArea(this);
-  if (!scrollArea) return;
+  if (m_rhiViewport) {
+    m_rhiViewport->update();
+  }
 
-  auto itemBaseOffset = static_cast<int>(item->dwOffset - vgmfile->dwOffset);
-  int line = itemBaseOffset / BYTES_PER_LINE;
-  int endLine = static_cast<int>(item->dwOffset + item->unLength - vgmfile->dwOffset) / BYTES_PER_LINE;
-
-  int viewPortStartLine = scrollArea->verticalScrollBar()->value() / lineHeight;
-  int viewPortEndLine = viewPortStartLine + ((scrollArea->viewport()->height()) / lineHeight);
-
-  // If the item is already visible, don't scroll.
-  if (line <= viewPortEndLine && endLine > viewPortStartLine) {
+  if (!m_lineHeight) {
     return;
   }
 
-  if (line < viewPortStartLine) {
-    scrollArea->verticalScrollBar()->setValue(line * lineHeight);
-  } else if (endLine > viewPortEndLine) {
+  const int itemBaseOffset = static_cast<int>(m_selectedItem->dwOffset - m_vgmfile->dwOffset);
+  const int line = itemBaseOffset / BYTES_PER_LINE;
+  const int endLine = (itemBaseOffset + static_cast<int>(m_selectedItem->unLength)) / BYTES_PER_LINE;
 
-    if ((endLine - line) > (scrollArea->size().height() / lineHeight)) {
-      int y = (line * lineHeight);
-      scrollArea->verticalScrollBar()->setValue(y);
+  const int viewStartLine = verticalScrollBar()->value() / m_lineHeight;
+  const int viewEndLine = viewStartLine + (viewport()->height() / m_lineHeight);
+
+  if (line <= viewEndLine && endLine > viewStartLine) {
+    return;
+  }
+
+  if (line < viewStartLine) {
+    verticalScrollBar()->setValue(line * m_lineHeight);
+  } else if (endLine > viewEndLine) {
+    if ((endLine - line) > (viewport()->height() / m_lineHeight)) {
+      verticalScrollBar()->setValue(line * m_lineHeight);
     } else {
-      int y = ((endLine + 1) * lineHeight) + 1 - scrollArea->size().height();
-      scrollArea->verticalScrollBar()->setValue(y);
+      const int y = ((endLine + 1) * m_lineHeight) + 1 - viewport()->height();
+      verticalScrollBar()->setValue(y);
     }
   }
 }
 
-void HexView::resizeOverlays(int y, int viewportHeight) const {
-  const int overlayHeight = viewportHeight * OVERLAY_HEIGHT_IN_SCREENS;
-  overlay->setGeometry(
-      hexXOffset() - charHalfWidth,
-      std::max(0, y - ((overlayHeight - viewportHeight) / 2)),
-      width(),
-      overlayHeight
-  );
-}
+void HexView::rebuildStyleMap() {
+  m_styles.clear();
+  m_typeToStyleId.clear();
 
-void HexView::redrawOverlay() {
-  if (QScrollArea* scrollArea = getContainingScrollArea(this)) {
-    int y = scrollArea->verticalScrollBar()->value();
-    resizeOverlays(y, scrollArea->height());
+  Style defaultStyle;
+  defaultStyle.bg = palette().color(QPalette::Window);
+  defaultStyle.fg = palette().color(QPalette::WindowText);
+  m_styles.push_back(defaultStyle);
+
+  if (!m_vgmfile) {
+    return;
+  }
+
+  const uint32_t length = m_vgmfile->unLength;
+  m_styleIds.assign(length, STYLE_UNASSIGNED);
+
+  auto styleIdForType = [&](VGMItem::Type type) -> uint16_t {
+    const int key = static_cast<int>(type);
+    auto it = m_typeToStyleId.find(key);
+    if (it != m_typeToStyleId.end()) {
+      return it->second;
+    }
+    Style style;
+    style.bg = colorForItemType(type);
+    style.fg = textColorForItemType(type);
+    uint16_t id = static_cast<uint16_t>(m_styles.size());
+    m_styles.push_back(style);
+    m_typeToStyleId.emplace(key, id);
+    return id;
+  };
+
+  std::vector<VGMItem*> leaves;
+  std::function<void(VGMItem*)> walk = [&](VGMItem* item) {
+    auto& children = item->children();
+    if (children.empty()) {
+      leaves.push_back(item);
+      return;
+    }
+    for (auto* child : children) {
+      walk(child);
+    }
+  };
+
+  walk(m_vgmfile);
+
+  for (auto* item : leaves) {
+    if (!item || item->unLength == 0) {
+      continue;
+    }
+    if (item->dwOffset < m_vgmfile->dwOffset) {
+      continue;
+    }
+    const uint32_t start = item->dwOffset - m_vgmfile->dwOffset;
+    if (start >= length) {
+      continue;
+    }
+    const uint32_t end = std::min<uint32_t>(start + item->unLength, length);
+    const uint16_t styleId = styleIdForType(item->type);
+    for (uint32_t i = start; i < end; ++i) {
+      if (m_styleIds[i] == STYLE_UNASSIGNED) {
+        m_styleIds[i] = styleId;
+      }
+    }
+  }
+
+  for (auto& styleId : m_styleIds) {
+    if (styleId == STYLE_UNASSIGNED) {
+      styleId = 0;
+    }
   }
 }
 
-bool HexView::event(QEvent *e) {
-  if (e->type() == QEvent::ToolTip) {
-    auto *helpevent = dynamic_cast<QHelpEvent *>(e);
+void HexView::ensureGlyphAtlas(qreal dpr) {
+  if (!m_glyphAtlas) {
+    m_glyphAtlas = std::make_unique<GlyphAtlas>();
+  }
 
-    int offset = getOffsetFromPoint(helpevent->pos());
+  const bool needsRebuild =
+      m_glyphAtlas->dpr != dpr ||
+      m_glyphAtlas->glyphWidth != m_charWidth ||
+      m_glyphAtlas->glyphHeight != m_lineHeight ||
+      m_glyphAtlas->font != font();
+
+  if (!needsRebuild) {
+    return;
+  }
+
+  const int padding = 1;
+  const int glyphWidth = m_charWidth;
+  const int glyphHeight = m_lineHeight;
+  const int cellWidth = glyphWidth + padding * 2;
+  const int cellHeight = glyphHeight + padding * 2;
+
+  std::vector<QChar> glyphs;
+  glyphs.reserve(0x7E - 0x20 + 1);
+  for (ushort ch = 0x20; ch <= 0x7E; ++ch) {
+    glyphs.emplace_back(QChar(ch));
+  }
+
+  const int columns = 16;
+  const int rows = static_cast<int>((glyphs.size() + columns - 1) / columns);
+
+  const int imageWidth = static_cast<int>(std::ceil(cellWidth * dpr * columns));
+  const int imageHeight = static_cast<int>(std::ceil(cellHeight * dpr * rows));
+
+  QImage image(imageWidth, imageHeight, QImage::Format_ARGB32_Premultiplied);
+  image.fill(Qt::transparent);
+  image.setDevicePixelRatio(dpr);
+
+  QPainter painter(&image);
+  painter.setFont(font());
+  painter.setPen(Qt::white);
+  painter.setRenderHint(QPainter::TextAntialiasing, true);
+
+  const qreal baseline = QFontMetricsF(font()).ascent();
+
+  m_glyphAtlas->uvMap.clear();
+
+  for (size_t i = 0; i < glyphs.size(); ++i) {
+    const int col = static_cast<int>(i % columns);
+    const int row = static_cast<int>(i / columns);
+    const qreal cellX = col * cellWidth;
+    const qreal cellY = row * cellHeight;
+
+    painter.drawText(QPointF(cellX + padding, cellY + padding + baseline), QString(glyphs[i]));
+
+    const qreal u0 = (cellX + padding) * dpr / imageWidth;
+    const qreal v0 = (cellY + padding) * dpr / imageHeight;
+    const qreal u1 = (cellX + padding + glyphWidth) * dpr / imageWidth;
+    const qreal v1 = (cellY + padding + glyphHeight) * dpr / imageHeight;
+
+    m_glyphAtlas->uvMap.insert(glyphs[i].unicode(), QRectF(u0, v0, u1 - u0, v1 - v0));
+  }
+
+  m_glyphAtlas->image = std::move(image);
+  m_glyphAtlas->dpr = dpr;
+  m_glyphAtlas->glyphWidth = glyphWidth;
+  m_glyphAtlas->glyphHeight = glyphHeight;
+  m_glyphAtlas->cellWidth = cellWidth;
+  m_glyphAtlas->cellHeight = cellHeight;
+  m_glyphAtlas->font = font();
+  m_glyphAtlas->version++;
+}
+
+bool HexView::viewportEvent(QEvent* event) {
+  if (event->type() == QEvent::ToolTip) {
+    auto* helpEvent = static_cast<QHelpEvent*>(event);
+    const int offset = getOffsetFromPoint(helpEvent->pos());
     if (offset < 0) {
+      QToolTip::hideText();
       return true;
     }
-
-    if (VGMItem* item = vgmfile->getItemAtOffset(offset, false)) {
-      auto description = getFullDescriptionForTooltip(item);
+    if (VGMItem* item = m_vgmfile->getItemAtOffset(offset, false)) {
+      const QString description = getFullDescriptionForTooltip(item);
       if (!description.isEmpty()) {
-        QToolTip::showText(helpevent->globalPos(), description, this);
+        QToolTip::showText(helpEvent->globalPos(), description, this);
       }
     }
     return true;
   }
 
-  return QWidget::event(e);
+  return QAbstractScrollArea::viewportEvent(event);
 }
 
-void HexView::changeEvent(QEvent *event) {
-  if (event->type() == QEvent::ParentChange) {
-    QScrollArea* scrollArea = getContainingScrollArea(this);
-    if (!scrollArea) return;
+void HexView::resizeEvent(QResizeEvent* event) {
+  QAbstractScrollArea::resizeEvent(event);
+  updateLayout();
+}
 
-    scrollArea->installEventFilter(
-      new LambdaEventFilter([this]([[maybe_unused]] QObject* obj, const QEvent* event) -> bool {
-          if (event->type() == QEvent::Resize) {
-            QScrollArea* scrollArea = getContainingScrollArea(this);
-
-            int scrollAreaWidth = scrollArea->width();
-            int scrollAreaHeight = scrollArea->height();
-
-            updateSize();
-
-            if (scrollAreaHeight * (OVERLAY_HEIGHT_IN_SCREENS - 1) > overlay->height()) {
-              redrawOverlay();
-            }
-            prevHeight = scrollAreaHeight;
-
-            if (scrollAreaWidth == prevWidth ||
-                (scrollAreaWidth > getViewportWidthSansAsciiAndAddress() &&
-                scrollAreaWidth != getViewportWidthSansAscii() &&
-                scrollAreaWidth != getViewportFullWidth())) {
-
-              return false;
-            }
-            prevWidth = scrollAreaWidth;
-
-            bool prevShowOffset = shouldDrawOffset;
-            bool prevShouldDrawAscii = shouldDrawAscii;
-            shouldDrawOffset = scrollAreaWidth > getViewportWidthSansAsciiAndAddress();
-            shouldDrawAscii = scrollAreaWidth > getViewportWidthSansAscii();
-
-            if (prevShowOffset != shouldDrawOffset || prevShouldDrawAscii != shouldDrawAscii) {
-              selectionViewPixmap = QPixmap();
-              selectionViewPixmapWithShadow = QPixmap();
-              lineCache.clear();
-              drawSelectedItem();
-              redrawOverlay();
-            }
-
-            // For optimization, we hide/show the selection view on scroll based on whether it's in viewport, but
-            // scroll events don't trigger on resize, and the user could expand the viewport so that it's in view
-            if (selectedItem && selectionView) {
-              selectionView->show();
-            }
-
-            return false;
-          }
-          return false;
-        },
-        scrollArea)
-    );
-
-    connect(scrollArea->verticalScrollBar(), &QScrollBar::valueChanged, this, [this, scrollArea](int value) {
-      // If the overlay has moved out of frame, center it back into frame
-      if (value < overlay->geometry().top() || value + scrollArea->height() > overlay->geometry().bottom()) {
-        overlay->move(
-          overlay->x(),
-          std::max(0, value - ((overlay->height() - scrollArea->height()) / 2))
-        );
-      }
-
-      if (selectedItem != nullptr) {
-        int startLine = value / lineHeight;
-        int endLine = (value + scrollArea->height()) / lineHeight;
-
-        int selectedItemStartLine = ((selectedItem->dwOffset - vgmfile->dwOffset) / BYTES_PER_LINE) - 1;
-        int selectedItemEndLine = (((selectedItem->dwOffset - vgmfile->dwOffset) + selectedItem->unLength) / BYTES_PER_LINE) + 1;
-        bool selectionVisible = ((startLine <= selectedItemEndLine) && (selectedItemStartLine <= endLine));
-        selectionVisible ? selectionView->show() : selectionView->hide();
-      }
-    });
+void HexView::scrollContentsBy(int dx, int dy) {
+  QAbstractScrollArea::scrollContentsBy(dx, dy);
+  if (m_rhiViewport) {
+    m_rhiViewport->update();
   }
-  QWidget::changeEvent(event);
+}
+
+void HexView::changeEvent(QEvent* event) {
+  if (event->type() == QEvent::PaletteChange) {
+    if (!m_styles.empty()) {
+      m_styles[0].bg = palette().color(QPalette::Window);
+      m_styles[0].fg = palette().color(QPalette::WindowText);
+    }
+    if (m_rhiViewport) {
+      m_rhiViewport->update();
+    }
+  }
+  QAbstractScrollArea::changeEvent(event);
 }
 
 void HexView::keyPressEvent(QKeyEvent* event) {
-  if (! selectedItem) {
-    return QWidget::keyPressEvent(event);
+  if (!m_selectedItem) {
+    QAbstractScrollArea::keyPressEvent(event);
+    return;
   }
 
-  uint32_t newOffset;
+  uint32_t newOffset = 0;
   switch (event->key()) {
     case Qt::Key_Up:
-      newOffset = selectedOffset - BYTES_PER_LINE;
+      newOffset = m_selectedOffset - BYTES_PER_LINE;
       goto selectNewOffset;
 
     case Qt::Key_Down: {
-      int selectedCol = (selectedOffset - vgmfile->dwOffset) % BYTES_PER_LINE;
-      int endOffset = selectedItem->dwOffset - vgmfile->dwOffset + selectedItem->unLength;
-      int itemEndCol = endOffset % BYTES_PER_LINE;
-      int itemEndLine = endOffset / BYTES_PER_LINE;
-      newOffset = vgmfile->dwOffset + ((itemEndLine + (selectedCol > itemEndCol ? 0 : 1)) * BYTES_PER_LINE) + selectedCol;
+      const int selectedCol = (m_selectedOffset - m_vgmfile->dwOffset) % BYTES_PER_LINE;
+      const int endOffset = m_selectedItem->dwOffset - m_vgmfile->dwOffset + m_selectedItem->unLength;
+      const int itemEndCol = endOffset % BYTES_PER_LINE;
+      const int itemEndLine = endOffset / BYTES_PER_LINE;
+      newOffset = m_vgmfile->dwOffset +
+                  ((itemEndLine + (selectedCol > itemEndCol ? 0 : 1)) * BYTES_PER_LINE) +
+                  selectedCol;
       goto selectNewOffset;
     }
 
     case Qt::Key_Left:
-      newOffset = selectedItem->dwOffset - 1;
+      newOffset = m_selectedItem->dwOffset - 1;
       goto selectNewOffset;
 
     case Qt::Key_Right:
-      newOffset = selectedItem->dwOffset + selectedItem->unLength;
+      newOffset = m_selectedItem->dwOffset + m_selectedItem->unLength;
       goto selectNewOffset;
 
     case Qt::Key_Escape:
       selectionChanged(nullptr);
-      break;
+      return;
 
     selectNewOffset:
-      if (newOffset >= vgmfile->dwOffset && newOffset < (vgmfile->dwOffset + vgmfile->unLength)) {
-        selectedOffset = newOffset;
-        if (auto item = vgmfile->getItemAtOffset(newOffset, false)) {
+      if (newOffset >= m_vgmfile->dwOffset &&
+          newOffset < (m_vgmfile->dwOffset + m_vgmfile->unLength)) {
+        m_selectedOffset = newOffset;
+        if (auto* item = m_vgmfile->getItemAtOffset(newOffset, false)) {
           selectionChanged(item);
         }
       }
-      break;
+      return;
+
     default:
-      QWidget::keyPressEvent(event);  // Pass event up to base class, if not handled here
+      QAbstractScrollArea::keyPressEvent(event);
+      return;
   }
 }
 
-bool HexView::handleOverlayPaintEvent(QObject* obj, QPaintEvent* event) const {
-  auto overlay = qobject_cast<QWidget*>(obj);
-  auto scrollArea = getContainingScrollArea(overlay->parentWidget());
-  QPainter painter(static_cast<QWidget*>(obj));
-
-  auto eventRect = event->rect();
-  int drawHeight = eventRect.height();
-  int drawYPos = eventRect.y();
-
-  // Sometimes the entire view is invalidated. We only need to draw the portion inside the viewport.
-  if (eventRect.height() > scrollArea->viewport()->height()) {
-    drawHeight = scrollArea->viewport()->height();
-    drawYPos = scrollArea->verticalScrollBar()->value() - overlay->y();
+int HexView::getOffsetFromPoint(QPoint pos) const {
+  const int y = pos.y() + verticalScrollBar()->value();
+  const int line = m_lineHeight > 0 ? (y / m_lineHeight) : 0;
+  if (line < 0 || line >= getTotalLines()) {
+    return -1;
   }
 
-  painter.fillRect(QRect(0, drawYPos, BYTES_PER_LINE * 3 * charWidth, drawHeight),
-    QColor(0, 0, 0, OVERLAY_ALPHA));
+  const int hexStart = hexXOffset();
+  const int hexEnd = hexStart + (BYTES_PER_LINE * 3 * m_charWidth);
+  const int asciiStart = hexEnd + (HEX_TO_ASCII_SPACING_CHARS * m_charWidth);
+  const int asciiEnd = asciiStart + (BYTES_PER_LINE * m_charWidth);
 
-  if (shouldDrawAscii) {
-    painter.fillRect(
-        QRect(((BYTES_PER_LINE * 3) + HEX_TO_ASCII_SPACING_CHARS) * charWidth + charHalfWidth,
-              drawYPos,
-              BYTES_PER_LINE * charWidth, drawHeight),
-        QColor(0, 0, 0, OVERLAY_ALPHA));
+  int byteNum = -1;
+  if (pos.x() >= hexStart - m_charHalfWidth && pos.x() < hexEnd - m_charHalfWidth) {
+    byteNum = ((pos.x() - hexStart + m_charHalfWidth) / m_charWidth) / 3;
+  } else if (pos.x() >= asciiStart && pos.x() < asciiEnd) {
+    byteNum = (pos.x() - asciiStart) / m_charWidth;
+  }
+  if (byteNum == -1) {
+    return -1;
   }
 
-  return true;
+  const int offset = m_vgmfile->dwOffset + (line * BYTES_PER_LINE) + byteNum;
+  if (offset < static_cast<int>(m_vgmfile->dwOffset) ||
+      offset >= static_cast<int>(m_vgmfile->dwOffset + m_vgmfile->unLength)) {
+    return -1;
+  }
+  return offset;
 }
 
-bool HexView::handleSelectedItemPaintEvent(QObject* obj, QPaintEvent* event) {
-  auto widget = static_cast<QWidget*>(obj);
-
-  // When no item is selected, paint using the cached pixmap. This is necessary because the
-  // selected item is still visible during the deselection animation, after which it will be hidden
-  if (!selectedItem) {
-    QPainter painter(widget);
-    painter.drawPixmap(0, 0, selectionViewPixmap);
-    return true;
-  }
-
-  bool shouldDrawNonShadowedItem = selectionViewPixmap.isNull();
-  bool shouldDrawShadowedItem = selectionViewPixmapWithShadow.isNull() && !selectedItemShadowEffect->isEnabled();
-
-  qreal dpr = devicePixelRatioF();
-
-  if (shouldDrawNonShadowedItem) {
-    auto widgetSize = widget->size();
-    selectionViewPixmap = QPixmap(widgetSize.width() * dpr, widgetSize.height() * dpr);
-    selectionViewPixmap.setDevicePixelRatio(dpr);
-    selectionViewPixmap.fill(Qt::transparent);
-
-    QPainter pixmapPainter = QPainter(&selectionViewPixmap);
-
-    int baseOffset = static_cast<int>(selectedItem->dwOffset - vgmfile->dwOffset);
-    int startColumn = baseOffset % BYTES_PER_LINE;
-    int numLines = ((startColumn + static_cast<int>(selectedItem->unLength)) / BYTES_PER_LINE) + 1;
-
-    auto itemData = std::vector<uint8_t>(selectedItem->unLength);
-    vgmfile->readBytes(selectedItem->dwOffset, selectedItem->unLength, itemData.data());
-
-    QColor bgColor = colorForItemType(selectedItem->type);
-    QColor textColor = textColorForItemType(selectedItem->type);
-
-    pixmapPainter.setFont(this->font());
-    pixmapPainter.translate(SELECTION_PADDING, SELECTION_PADDING);
-
-    int startLine = baseOffset / BYTES_PER_LINE;
-
-    int col = startColumn;
-    int offsetIntoEvent = 0;
-    for (int line=0; line<numLines; line++) {
-      pixmapPainter.save();
-      pixmapPainter.translate(0, line * lineHeight);
-
-      int bytesToPrint = std::min(
-                    std::min(static_cast<int>(selectedItem->unLength) - offsetIntoEvent,BYTES_PER_LINE - col),
-                    BYTES_PER_LINE);
-
-      // If there is a cached pixmap of the line, copy portions of it to construct the selected item pixmap
-      if (auto linePixmap = lineCache.object(startLine + line)) {
-        // Hex segment
-        auto [hex_rect, ascii_rect] = calculateSelectionRectsForLine(col, bytesToPrint, dpr);
-        QRect targetRect((col * 3 * charWidth) - charHalfWidth, 0,
-          bytesToPrint * 3 * charWidth, lineHeight);
-        pixmapPainter.drawPixmap(targetRect, *linePixmap, hex_rect);
-
-        // ASCII segment
-        if (shouldDrawAscii) {
-          int ascii_start_in_chars = (BYTES_PER_LINE * 3) + HEX_TO_ASCII_SPACING_CHARS;
-          targetRect = { (ascii_start_in_chars + col) * charWidth, 0,
-            bytesToPrint * charWidth, lineHeight };
-          pixmapPainter.drawPixmap(targetRect, *linePixmap, ascii_rect);
-        }
-        offsetIntoEvent += bytesToPrint;
-        col = 0;
-      }
-      else {
-        // If the selected item has children, draw them.
-        if (!selectedItem->children().empty()) {
-          int startAddress = static_cast<int>(selectedItem->dwOffset + offsetIntoEvent);
-          int endAddress = static_cast<int>(selectedItem->dwOffset + selectedItem->unLength);
-          printData(pixmapPainter, startAddress, endAddress);
-          offsetIntoEvent += BYTES_PER_LINE - col;
-          col = 0;
-        } else {
-          translateAndPrintAscii(pixmapPainter, itemData.data() + offsetIntoEvent, col, bytesToPrint, bgColor, textColor);
-          translateAndPrintHex(pixmapPainter, itemData.data() + offsetIntoEvent, col, bytesToPrint, bgColor, textColor);
-
-          offsetIntoEvent += bytesToPrint;
-          col = 0;
-        }
-      }
-      pixmapPainter.restore();
-    }
-  }
-  if (shouldDrawShadowedItem) {
-    selectionViewPixmapWithShadow = QPixmap(selectionViewPixmap.width(), selectionViewPixmap.height());
-    selectionViewPixmapWithShadow.setDevicePixelRatio(dpr);
-
-    auto shadowEffect = new QGraphicsDropShadowEffect();
-    shadowEffect->setBlurRadius(SHADOW_BLUR_RADIUS);
-    shadowEffect->setColor(SHADOW_COLOR);
-    shadowEffect->setOffset(SHADOW_OFFSET_X, SHADOW_OFFSET_Y);
-
-    selectionViewPixmapWithShadow.fill(Qt::transparent);
-    applyEffectToPixmap(selectionViewPixmap, selectionViewPixmapWithShadow, shadowEffect, 0);
-  }
-
-  QPixmap* pixmapToDraw = selectedItemShadowEffect->isEnabled() ? &selectionViewPixmap : &selectionViewPixmapWithShadow;
-  QPainter painter(widget);
-
-  auto eventRect = event->rect();
-  QRect sourceRect = QRect(eventRect.topLeft() * dpr, eventRect.size() * dpr);
-  painter.drawPixmap(eventRect, *pixmapToDraw, sourceRect);
-
-  return true;
-}
-
-std::pair<QRect,QRect> HexView::calculateSelectionRectsForLine(int startColumn, int length, qreal dpr) const {
-  int hexCharsStartOffsetInChars = shouldDrawOffset ? NUM_ADDRESS_NIBBLES + ADDRESS_SPACING_CHARS : 0;
-  int asciiStartOffsetInChars = hexCharsStartOffsetInChars + (BYTES_PER_LINE * 3) + HEX_TO_ASCII_SPACING_CHARS;
-  int left = (hexCharsStartOffsetInChars + (startColumn * 3)) * charWidth - charHalfWidth;
-  int width = length * 3 * charWidth;
-  QRect hexRect = QRect(left * dpr, 0, width * dpr, lineHeight * dpr);
-
-  left = (asciiStartOffsetInChars + startColumn) * charWidth;
-  width = length * charWidth;
-  QRect asciiRect = QRect(left * dpr, 0, width * dpr, lineHeight * dpr);
-
-  return { hexRect, asciiRect };
-}
-
-void HexView::paintEvent(QPaintEvent *e) {
-  QPainter painter(this);
-  painter.setFont(this->font());
-
-  QRect paintRect = e->rect();
-
-#ifdef Q_OS_MAC
-  // On MacOS, the scrollbar appears only upon scrolling and extra paint events are sent to draw it.
-  // We want to ignore these paint events if they don't overlap with the drawn HexView area.
-  int scrollBarThickness = style()->pixelMetric(QStyle::PM_ScrollBarExtent);
-  if (paintRect.left() >= getActualVirtualWidth() - VIEWPORT_PADDING - scrollBarThickness + 2) {
-    return;
-  }
-#endif
-
-  int startLine = paintRect.top() / lineHeight;
-  int endLine = paintRect.bottom() / lineHeight;
-
-  qreal dpr = devicePixelRatioF();
-
-  painter.translate(0, startLine * lineHeight);
-  for (int line = startLine; line <= endLine; line++) {
-    // Skip drawing lines that are totally eclipsed by the selected item
-    if (selectedItem && selectedItem->unLength >= BYTES_PER_LINE) {
-      auto startAddress = vgmfile->dwOffset + (line * BYTES_PER_LINE);
-      auto endAddress = startAddress + BYTES_PER_LINE;
-      if (selectedItem->dwOffset <= startAddress && selectedItem->dwOffset + selectedItem->unLength >= endAddress) {
-        if (shouldDrawOffset)
-          printAddress(painter, line);
-        painter.translate(0, lineHeight);
-        continue;
-      }
+void HexView::mousePressEvent(QMouseEvent* event) {
+  if (event->button() == Qt::LeftButton) {
+    const int offset = getOffsetFromPoint(event->pos());
+    if (offset == -1) {
+      selectionChanged(nullptr);
+      return;
     }
 
-    auto cachedPixmap = lineCache.object(line);
-    if (!cachedPixmap) {
-      auto linePixmap = new QPixmap(static_cast<int>(getVirtualFullWidth() * dpr), static_cast<int>(lineHeight * dpr));
-      linePixmap->setDevicePixelRatio(dpr);
-      linePixmap->fill(Qt::transparent);
-
-      QPainter linePainter(linePixmap);
-      linePainter.setFont(this->font());
-      linePainter.setRenderHints(painter.renderHints());
-      linePainter.setPen(painter.pen());
-      linePainter.setBrush(painter.brush());
-
-      printLine(linePainter, line);
-      lineCache.insert(line, linePixmap);
-      painter.drawPixmap(0, 0, *linePixmap);
+    m_selectedOffset = offset;
+    auto* item = m_vgmfile->getItemAtOffset(offset, false);
+    if (item == m_selectedItem) {
+      selectionChanged(nullptr);
     } else {
-      painter.drawPixmap(0, 0, *cachedPixmap);
+      selectionChanged(item);
     }
-    painter.translate(0, lineHeight);
-  }
-}
-
-void HexView::printLine(QPainter& painter, int line) const {
-  painter.save();
-  if (shouldDrawOffset) {
-    printAddress(painter, line);
-  }
-  painter.translate(hexXOffset(), 0);
-
-  auto startAddress = vgmfile->dwOffset + (line * BYTES_PER_LINE);
-  auto endAddress = vgmfile->dwOffset + vgmfile->unLength;
-  printData(painter, startAddress, endAddress);
-  painter.restore();
-}
-
-void HexView::printAddress(QPainter& painter, int line) const {
-  auto fileOffset = vgmfile->dwOffset + (line * BYTES_PER_LINE);
-  QString hexString = QString("%1").arg(fileOffset, 8, addressAsHex ? 16 : 10, QChar('0')).toUpper();
-  painter.drawText(rect(), Qt::AlignLeft, hexString);
-}
-
-void HexView::printData(QPainter& painter, int startAddress, int endAddress) const {
-  if (endAddress > static_cast<int>(vgmfile->dwOffset + vgmfile->unLength) || (startAddress >= endAddress)) {
-    return;
+    m_isDragging = true;
   }
 
-  int startCol = static_cast<int>(startAddress - vgmfile->dwOffset) % BYTES_PER_LINE;
-  auto bytesToPrint = std::min(BYTES_PER_LINE - startCol, endAddress - startAddress);
+  QAbstractScrollArea::mousePressEvent(event);
+}
 
-  auto defaultTextColor = painter.pen().color();
-  QColor windowColor = this->palette().color(QPalette::Window);
+void HexView::mouseReleaseEvent(QMouseEvent* event) {
+  if (event->button() == Qt::LeftButton) {
+    m_isDragging = false;
+  }
+  QAbstractScrollArea::mouseReleaseEvent(event);
+}
 
-  uint8_t data[16];
-  vgmfile->readBytes(startAddress, bytesToPrint, data);
-  int emptyAddressBytes = 0;
-  auto offset = 0;
-  while (offset < bytesToPrint) {
-    if (auto item = vgmfile->getItemAtOffset(startAddress + offset, false)) {
-      if (emptyAddressBytes > 0) {
-        int dataOffset = offset - emptyAddressBytes;
-        int col = startCol + dataOffset;
-        translateAndPrintHex(painter, data+dataOffset, col, emptyAddressBytes, windowColor, defaultTextColor);
-        translateAndPrintAscii(painter, data + dataOffset, col, emptyAddressBytes, windowColor, defaultTextColor);
-        emptyAddressBytes = 0;
+void HexView::mouseMoveEvent(QMouseEvent* event) {
+  if (m_isDragging && event->buttons() & Qt::LeftButton) {
+    const int offset = getOffsetFromPoint(event->pos());
+    if (offset == -1) {
+      selectionChanged(nullptr);
+      return;
+    }
+    m_selectedOffset = offset;
+    if (m_selectedItem && (m_selectedOffset >= m_selectedItem->dwOffset) &&
+        (m_selectedOffset < (m_selectedItem->dwOffset + m_selectedItem->unLength))) {
+      return;
+    }
+    auto* item = m_vgmfile->getItemAtOffset(offset, false);
+    if (item != m_selectedItem) {
+      selectionChanged(item);
+    }
+  }
+  QAbstractScrollArea::mouseMoveEvent(event);
+}
+
+void HexView::mouseDoubleClickEvent(QMouseEvent* event) {
+  if (event->button() == Qt::LeftButton) {
+    if (m_shouldDrawOffset && event->pos().x() >= 0 &&
+        event->pos().x() < (NUM_ADDRESS_NIBBLES * m_charWidth)) {
+      m_addressAsHex = !m_addressAsHex;
+      if (m_rhiViewport) {
+        m_rhiViewport->update();
       }
-      QColor bgColor = colorForItemType(item->type);
-      QColor textColor = textColorForItemType(item->type);
-      int col = startCol + offset;
-
-      // In case the event spans multiple lines, account for how far into the event we are at this line
-      int offsetIntoEvent = std::max(0, startAddress - static_cast<int>(item->dwOffset));
-      auto numEventBytesToPrint = std::min(static_cast<int>(item->unLength - offsetIntoEvent), bytesToPrint - offset);
-      translateAndPrintHex(painter, data+offset, col, numEventBytesToPrint, bgColor, textColor);
-      translateAndPrintAscii(painter, data + offset, col, numEventBytesToPrint, bgColor, textColor);
-
-      offset += numEventBytesToPrint;
-    } else {
-      offset += 1;
-      emptyAddressBytes += 1;
     }
   }
-  if (emptyAddressBytes > 0) {
-    int dataOffset = offset - emptyAddressBytes;
-    int col = startCol + dataOffset;
-    translateAndPrintHex(painter, data+dataOffset, col, emptyAddressBytes, windowColor, defaultTextColor);
-    translateAndPrintAscii(painter, data + dataOffset, col, emptyAddressBytes, windowColor, defaultTextColor);
-  }
+  QAbstractScrollArea::mouseDoubleClickEvent(event);
 }
 
-void HexView::printHex(
-    QPainter& painter,
-    const uint8_t* data,
-    int length,
-    QColor bgColor,
-    QColor textColor
-) const {
-  // Draw background color
-  auto width = length * charWidth * 3;
-  int rectWidth = width;
-  int rectHeight = lineHeight;
-  painter.fillRect(-charHalfWidth, 0, rectWidth, rectHeight, bgColor);
-
-  // Draw bytes string
-  QString hexString;
-  hexString.reserve(length * 3); // 2 characters for hex and 1 for space
-
-  for (int i = 0; i < length; ++i) {
-    hexString += QString("%1 ").arg(data[i], 2, 16, QLatin1Char('0')).toUpper();
-  }
-
-  painter.setPen(textColor);
-  painter.drawText(rect(), Qt::AlignLeft, hexString);
-  painter.translate(width, 0);
+qreal HexView::overlayOpacity() const {
+  return m_overlayOpacity;
 }
 
-void HexView::translateAndPrintHex(
-    QPainter& painter,
-    const uint8_t* data,
-    int offset,
-    int length,
-    QColor bgColor,
-    QColor textColor
-) const {
-  painter.save();
-  painter.translate(offset * 3 * charWidth, 0);
-  printHex(painter, data, length, bgColor, textColor);
-  painter.restore();
-}
-
-void HexView::translateAndPrintAscii(
-    QPainter& painter,
-    const uint8_t* data,
-    int offset,
-    int length,
-    QColor bgColor,
-    QColor textColor
-) const {
-  if (!shouldDrawAscii)
+void HexView::setOverlayOpacity(qreal opacity) {
+  if (qFuzzyCompare(opacity, m_overlayOpacity)) {
     return;
-  painter.save();
-  painter.translate(((BYTES_PER_LINE * 3) + HEX_TO_ASCII_SPACING_CHARS + offset) * charWidth, 0);
-  printAscii(painter, data, length, bgColor, textColor);
-  painter.restore();
+  }
+  m_overlayOpacity = opacity;
+  if (m_rhiViewport) {
+    m_rhiViewport->update();
+  }
 }
 
-void HexView::printAscii(
-    QPainter& painter,
-    const uint8_t* data,
-    int length,
-    QColor bgColor,
-    QColor textColor
-) const {
-  // Draw background color
-  auto width = length * charWidth;
-  painter.fillRect(0, 0, width, lineHeight, bgColor);
+qreal HexView::shadowBlur() const {
+  return m_shadowBlur;
+}
 
-  // Draw ascii characters
-  QString asciiString;
-  asciiString.reserve(length);
-
-  for (int i = 0; i < length; ++i) {
-    asciiString.append((data[i] < 0x20 || data[i] > 0x7E) ? '.' : QChar(data[i]));
+void HexView::setShadowBlur(qreal blur) {
+  if (qFuzzyCompare(blur, m_shadowBlur)) {
+    return;
   }
-  painter.setPen(textColor);
-  painter.drawText(rect(), Qt::AlignLeft, asciiString);
+  m_shadowBlur = blur;
+  if (m_rhiViewport) {
+    m_rhiViewport->update();
+  }
+}
+
+QPointF HexView::shadowOffset() const {
+  return m_shadowOffset;
+}
+
+void HexView::setShadowOffset(const QPointF& offset) {
+  if (offset == m_shadowOffset) {
+    return;
+  }
+  m_shadowOffset = offset;
+  if (m_rhiViewport) {
+    m_rhiViewport->update();
+  }
 }
 
 void HexView::initAnimations() {
-  selectionAnimation = new QParallelAnimationGroup(this);
+  m_selectionAnimation = new QParallelAnimationGroup(this);
 
-  auto overlayOpacityAnimation = new QPropertyAnimation(overlayOpacityEffect, "opacity");
+  auto* overlayOpacityAnimation = new QPropertyAnimation(this, "overlayOpacity");
   overlayOpacityAnimation->setDuration(DIM_DURATION_MS);
-  overlayOpacityAnimation->setStartValue(0);
-  overlayOpacityAnimation->setEndValue(1.0);
+  overlayOpacityAnimation->setStartValue(0.0);
+  overlayOpacityAnimation->setEndValue(OVERLAY_ALPHA_F);
   overlayOpacityAnimation->setEasingCurve(QEasingCurve::OutQuad);
 
-  auto selectedItemShadowBlurAnimation = new QPropertyAnimation(selectedItemShadowEffect, "blurRadius");
-  selectedItemShadowBlurAnimation->setDuration(DIM_DURATION_MS);
-  selectedItemShadowBlurAnimation->setStartValue(0);
-  selectedItemShadowBlurAnimation->setEndValue(SHADOW_BLUR_RADIUS);
-  selectedItemShadowBlurAnimation->setEasingCurve(QEasingCurve::OutQuad);
+  auto* shadowBlurAnimation = new QPropertyAnimation(this, "shadowBlur");
+  shadowBlurAnimation->setDuration(DIM_DURATION_MS);
+  shadowBlurAnimation->setStartValue(0.0);
+  shadowBlurAnimation->setEndValue(SHADOW_BLUR_RADIUS);
+  shadowBlurAnimation->setEasingCurve(QEasingCurve::OutQuad);
 
-  auto selectedItemShadowOffsetAnimation = new QPropertyAnimation(selectedItemShadowEffect, "offset");
-  selectedItemShadowOffsetAnimation->setDuration(DIM_DURATION_MS);
-  selectedItemShadowOffsetAnimation->setStartValue(QPointF(0, 0));
-  selectedItemShadowOffsetAnimation->setEndValue(QPointF(SHADOW_OFFSET_X, SHADOW_OFFSET_Y));
-  selectedItemShadowOffsetAnimation->setEasingCurve(QEasingCurve::OutQuad);
+  auto* shadowOffsetAnimation = new QPropertyAnimation(this, "shadowOffset");
+  shadowOffsetAnimation->setDuration(DIM_DURATION_MS);
+  shadowOffsetAnimation->setStartValue(QPointF(0.0, 0.0));
+  shadowOffsetAnimation->setEndValue(QPointF(SHADOW_OFFSET_X, SHADOW_OFFSET_Y));
+  shadowOffsetAnimation->setEasingCurve(QEasingCurve::OutQuad);
 
-  selectionAnimation->addAnimation(overlayOpacityAnimation);
-  selectionAnimation->addAnimation(selectedItemShadowOffsetAnimation);
-  selectionAnimation->addAnimation(selectedItemShadowBlurAnimation);
+  m_selectionAnimation->addAnimation(overlayOpacityAnimation);
+  m_selectionAnimation->addAnimation(shadowBlurAnimation);
+  m_selectionAnimation->addAnimation(shadowOffsetAnimation);
 
-  QObject::connect(selectionAnimation, &QPropertyAnimation::finished,
-    [this, overlayOpacityAnimation, selectedItemShadowBlurAnimation, selectedItemShadowOffsetAnimation]() {
-    // After the animation has finished, we draw the final shadowed pixmap to cache so that the
-    // effect doesn't have to be redrawn on every subsequent draw pass
-    selectedItemShadowEffect->setEnabled(false);
-    if (selectionAnimation->direction() == QAbstractAnimation::Backward) {
-      overlay->hide();
-      selectionView->hide();
-      selectionViewPixmap = QPixmap();
-      selectionViewPixmapWithShadow = QPixmap();
-    }
-    auto quadCurve = selectionAnimation->direction() == QAbstractAnimation::Forward ? QEasingCurve::InQuad : QEasingCurve::OutQuad;
-    auto expoCurve = selectionAnimation->direction() == QAbstractAnimation::Forward ? QEasingCurve::InExpo : QEasingCurve::OutExpo;
-    overlayOpacityAnimation->setEasingCurve(quadCurve);
-    selectedItemShadowBlurAnimation->setEasingCurve(quadCurve);
-    selectedItemShadowOffsetAnimation->setEasingCurve(expoCurve);
-  });
-
+  connect(m_selectionAnimation, &QParallelAnimationGroup::finished, this,
+          [this, overlayOpacityAnimation, shadowBlurAnimation, shadowOffsetAnimation]() {
+            if (m_selectionAnimation->direction() == QAbstractAnimation::Backward) {
+              clearFadeSelection();
+            }
+            const auto quadCurve = m_selectionAnimation->direction() == QAbstractAnimation::Forward
+                                       ? QEasingCurve::InQuad
+                                       : QEasingCurve::OutQuad;
+            const auto expoCurve = m_selectionAnimation->direction() == QAbstractAnimation::Forward
+                                       ? QEasingCurve::InExpo
+                                       : QEasingCurve::OutExpo;
+            overlayOpacityAnimation->setEasingCurve(quadCurve);
+            shadowBlurAnimation->setEasingCurve(quadCurve);
+            shadowOffsetAnimation->setEasingCurve(expoCurve);
+          });
 }
 
 void HexView::showSelectedItem(bool show, bool animate) {
-  if (! animate) {
-    selectionAnimation->stop();
-    selectedItemShadowEffect->setEnabled(false);
+  if (!animate) {
+    m_selectionAnimation->stop();
     if (show) {
-      overlay->show();
+      setOverlayOpacity(OVERLAY_ALPHA_F);
+      setShadowBlur(SHADOW_BLUR_RADIUS);
+      setShadowOffset(QPointF(SHADOW_OFFSET_X, SHADOW_OFFSET_Y));
     } else {
-      overlay->hide();
+      setOverlayOpacity(0.0);
+      setShadowBlur(0.0);
+      setShadowOffset(QPointF(0.0, 0.0));
+      clearFadeSelection();
     }
     return;
   }
 
   if (show) {
-    if (selectionAnimation->state() == QAbstractAnimation::Stopped && !overlay->isHidden() ||
-        selectionAnimation->state() == QAbstractAnimation::Running && selectionAnimation->direction() == QAbstractAnimation::Forward) {
+    if (m_selectionAnimation->state() == QAbstractAnimation::Stopped && m_overlayOpacity > 0.0) {
       return;
     }
-
-    // If a current animation is running, stop it and delete it - we replace it with a new animation
-    if (selectionAnimation->state() == QAbstractAnimation::Running) {
-      selectionAnimation->pause();
+    if (m_selectionAnimation->state() == QAbstractAnimation::Running &&
+        m_selectionAnimation->direction() == QAbstractAnimation::Forward) {
+      return;
     }
-
-    selectionAnimation->setDirection(QAbstractAnimation::Forward);
-
-    if (selectionAnimation->state() == QAbstractAnimation::Paused) {
-      selectionAnimation->resume();
+    if (m_selectionAnimation->state() == QAbstractAnimation::Running) {
+      m_selectionAnimation->pause();
+    }
+    m_selectionAnimation->setDirection(QAbstractAnimation::Forward);
+    if (m_selectionAnimation->state() == QAbstractAnimation::Paused) {
+      m_selectionAnimation->resume();
     } else {
-      selectionAnimation->start();
+      m_selectionAnimation->start();
     }
-    overlay->show();
   } else {
-    if (selectionAnimation->state() == QAbstractAnimation::Running) {
-      selectionAnimation->pause();
+    if (m_selectionAnimation->state() == QAbstractAnimation::Running) {
+      m_selectionAnimation->pause();
     }
-
-    selectionAnimation->setDirection(QAbstractAnimation::Backward);
-    if (selectionAnimation->state() == QAbstractAnimation::Paused) {
-      selectionAnimation->resume();
+    m_selectionAnimation->setDirection(QAbstractAnimation::Backward);
+    if (m_selectionAnimation->state() == QAbstractAnimation::Paused) {
+      m_selectionAnimation->resume();
     } else {
-      selectionAnimation->start();
+      m_selectionAnimation->start();
     }
   }
-  selectedItemShadowEffect->setEnabled(true);
 }
 
-void HexView::drawSelectedItem() const {
-  if (!selectionView) {
-    return;
+void HexView::clearFadeSelection() {
+  m_fadeSelections.clear();
+  if (m_rhiViewport) {
+    m_rhiViewport->update();
   }
-  // Set a limit for selected item size, as it can halt the system to draw huge items
-  if (!selectedItem || selectedItem->unLength > 0x3000) {
-    selectionView->setGeometry(QRect(0, 0, 0, 0));
-    return;
-  }
-
-  int baseOffset = static_cast<int>(selectedItem->dwOffset - vgmfile->dwOffset);
-  int startLine = baseOffset / BYTES_PER_LINE;
-  int startColumn = baseOffset % BYTES_PER_LINE;
-  int numLines = ((startColumn + static_cast<int>(selectedItem->unLength)) / BYTES_PER_LINE) + 1;
-
-  int widgetX = hexXOffset() - SELECTION_PADDING;
-  int widgetY = (startLine * lineHeight) - SELECTION_PADDING;
-  int widgetWidth = (((BYTES_PER_LINE * 3) + HEX_TO_ASCII_SPACING_CHARS + BYTES_PER_LINE) *
-                     charWidth) + (SELECTION_PADDING * 2);
-  int widgetHeight = (numLines * lineHeight) + (SELECTION_PADDING * 2);
-
-  selectionView->setGeometry(QRect(widgetX, widgetY, widgetWidth, widgetHeight));
-  selectionView->update();
-}
-
-// Find the VGMFile offset represented at the given QPoint. Returns -1 for invalid points.
-int HexView::getOffsetFromPoint(QPoint pos) const {
-  auto hexStart = hexXOffset();
-  auto hexEnd = hexStart + (BYTES_PER_LINE * 3 * charWidth);
-
-  auto asciiStart = hexEnd + (HEX_TO_ASCII_SPACING_CHARS * charWidth);
-  auto asciiEnd = asciiStart + (BYTES_PER_LINE * charWidth);
-
-  int byteNum = -1;
-  if (pos.x() >= hexStart - charHalfWidth && pos.x() < hexEnd - charHalfWidth) {
-    byteNum = ((pos.x() - hexStart + charHalfWidth) / charWidth) / 3;
-  } else if (pos.x() >= asciiStart && pos.x() < asciiEnd) {
-    byteNum = (pos.x() - asciiStart) / charWidth;
-  }
-  if (byteNum == -1) {
-    return -1;
-  }
-  int line = pos.y() / lineHeight;
-  return vgmfile->dwOffset + (line * BYTES_PER_LINE) + byteNum;
-}
-
-void HexView::mousePressEvent(QMouseEvent *event) {
-  if (event->button() == Qt::LeftButton) {
-    QPoint pos = event->pos();
-
-    int offset = getOffsetFromPoint(pos);
-    if (offset == -1) {
-      selectionChanged(nullptr);
-      return;
-    }
-
-    this->selectedOffset = offset;
-    auto item = vgmfile->getItemAtOffset(offset, false);
-    if (item == selectedItem) {
-      selectionChanged(nullptr);
-    } else {
-      selectionChanged(item);
-    }
-    isDragging = true;
-  }
-
-  QWidget::mousePressEvent(event);
-}
-
-void HexView::mouseReleaseEvent(QMouseEvent *event) {
-  if (event->button() == Qt::LeftButton) {
-    isDragging = false;
-  }
-  QWidget::mouseReleaseEvent(event);
-}
-
-void HexView::mouseMoveEvent(QMouseEvent *event) {
-  if (isDragging && event->buttons() & Qt::LeftButton) {
-
-    QPoint pos = event->pos();
-    int offset = getOffsetFromPoint(pos);
-    if (offset == -1) {
-      selectionChanged(nullptr);
-      return;
-    }
-    this->selectedOffset = offset;
-    // If the new offset overlaps with the currently selected item, do nothing
-    if (selectedItem && (selectedOffset >= selectedItem->dwOffset) &&
-        (selectedOffset < (selectedItem->dwOffset + selectedItem->unLength))) {
-      return;
-    }
-    auto item = vgmfile->getItemAtOffset(offset, false);
-    if (item != selectedItem) {
-      selectionChanged(item);
-    }
-  }
-  QWidget::mouseMoveEvent(event);
-}
-
-void HexView::mouseDoubleClickEvent(QMouseEvent* event) {
-  if (event->button() == Qt::LeftButton) {
-    QPoint pos = event->pos();
-    if (pos.x() >= 0 && pos.x() < (NUM_ADDRESS_NIBBLES * charWidth)) {
-      addressAsHex = !addressAsHex;
-      lineCache.clear();
-      update();
-    }
-  }
-
-  QWidget::mouseDoubleClickEvent(event);
 }

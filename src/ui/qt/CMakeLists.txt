@@ -13,7 +13,7 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
   endif()
 endif()
 
-find_package(Qt6 COMPONENTS Core Gui Widgets Svg)
+find_package(Qt6 COMPONENTS Core Gui GuiPrivate ShaderTools Widgets Svg)
 if(NOT Qt6_FOUND AND CMAKE_SYSTEM_NAME STREQUAL "Windows")
   message(STATUS "Qt6 could not be found, falling back to vendored Qt6")
   set(Qt6_DIR
@@ -25,7 +25,7 @@ if(NOT Qt6_FOUND AND CMAKE_SYSTEM_NAME STREQUAL "Windows")
       SEND_ERROR
         "Did you forget to run `git submodule update --init --recursive`?")
   endif()
-  find_package(Qt6 REQUIRED COMPONENTS Core Gui Widgets Svg)
+  find_package(Qt6 REQUIRED COMPONENTS Core Gui GuiPrivate ShaderTools Widgets Svg)
 endif()
 
 message(STATUS "Using Qt ${Qt6_VERSION}")
@@ -113,14 +113,29 @@ target_include_directories(vgmtrans PRIVATE . ./util ./widgets ./workarea)
 target_link_libraries(
   vgmtrans
   PRIVATE vgmtranscore
-          Qt::Widgets
-          Qt::Svg
+          Qt6::Widgets
+          Qt6::GuiPrivate
+          Qt6::Svg
           BASS::MIDI)
+
+qt_add_shaders(
+  vgmtrans
+  "hexview_shaders"
+  PREFIX "/shaders"
+  BASE "workarea/shaders"
+  FILES
+    workarea/shaders/hexquad.vert
+    workarea/shaders/hexquad.frag
+    workarea/shaders/hexglyph.vert
+    workarea/shaders/hexglyph.frag
+    workarea/shaders/hexshadow.vert
+    workarea/shaders/hexshadow.frag
+)
 
 # Workaround macdeployqt not correctly deploying QtDbus
 if(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
   find_package(Qt6 REQUIRED COMPONENTS DBus)
-  target_link_libraries(vgmtrans PUBLIC Qt::DBus)
+  target_link_libraries(vgmtrans PUBLIC Qt6::DBus)
 endif()
 
 set_target_properties(vgmtrans PROPERTIES AUTOMOC ON)
