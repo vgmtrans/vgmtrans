@@ -13,7 +13,6 @@ class VGMFile;
 class HexView;
 class VGMFileTreeView;
 class VGMItem;
-class QScrollArea;
 
 class VGMFileView final : public QMdiSubWindow {
   Q_OBJECT
@@ -35,7 +34,6 @@ private:
 
   VGMFileTreeView* m_treeview{};
   VGMFile* m_vgmfile{};
-  QScrollArea* m_hexScrollArea;
   HexView* m_hexview{};
   SnappingSplitter* m_splitter;
   QFont m_defaultHexFont;

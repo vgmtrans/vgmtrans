@@ -6,8 +6,6 @@
 
 #include <QApplication>
 #include <QShortcut>
-#include <QScrollArea>
-#include <QScrollBar>
 #include <QtGlobal>
 #include <algorithm>
 #include <cmath>
@@ -30,20 +28,15 @@ VGMFileView::VGMFileView(VGMFile *vgmfile)
 
   m_treeview = new VGMFileTreeView(m_vgmfile, this);
 
-  m_hexScrollArea = new QScrollArea;
-  m_hexScrollArea->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
-  m_hexScrollArea->horizontalScrollBar()->setEnabled(false);
-  m_hexScrollArea->setWidgetResizable(true);
-  m_hexScrollArea->setWidget(m_hexview);
-
-  m_splitter->addWidget(m_hexScrollArea);
+  m_hexview->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+  m_splitter->addWidget(m_hexview);
   m_splitter->addWidget(m_treeview);
   m_splitter->setSizes(QList<int>{hexViewFullWidth(), treeViewMinimumWidth});
   m_splitter->setStretchFactor(0, 0);
   m_splitter->setStretchFactor(1, 1);
   m_splitter->persistState();
   resetSnapRanges();
-  m_hexScrollArea->setMaximumWidth(hexViewFullWidth());
+  m_hexview->setMaximumWidth(hexViewFullWidth());
   m_treeview->setMinimumWidth(treeViewMinimumWidth);
 
   m_defaultHexFont = m_hexview->font();
@@ -124,7 +117,7 @@ void VGMFileView::applyHexViewFont(QFont font) const {
   const int fullWidthBeforeResize = std::max(1, hexViewFullWidth());
 
   m_hexview->setFont(font);
-  m_hexScrollArea->setMaximumWidth(hexViewFullWidth());
+  m_hexview->setMaximumWidth(hexViewFullWidth());
 
   const float percentHexViewVisible = static_cast<float>(actualWidthBeforeResize) /
                                       static_cast<float>(fullWidthBeforeResize);
