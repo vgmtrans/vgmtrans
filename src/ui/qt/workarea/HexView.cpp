@@ -15,7 +15,6 @@
 #include <QApplication>
 #include <QFile>
 #include <QFontMetricsF>
-#include <QHash>
 #include <QHelpEvent>
 #include <QImage>
 #include <QKeyEvent>
@@ -24,6 +23,7 @@
 #include <QPainter>
 #include <QParallelAnimationGroup>
 #include <QPropertyAnimation>
+#include <QRectF>
 #include <QResizeEvent>
 #include <QScrollBar>
 #include <QToolTip>
@@ -93,16 +93,11 @@ struct ShadowInstance {
   float a;
 };
 
-struct LineData {
+struct CachedLine {
   int line = 0;
   int bytes = 0;
   std::array<uint8_t, BYTES_PER_LINE> data{};
   std::array<uint16_t, BYTES_PER_LINE> styles{};
-};
-
-struct BatchRange {
-  int start = 0;
-  int count = 0;
 };
 
 QVector4D toVec4(const QColor& color) {
@@ -123,11 +118,45 @@ QShader loadShader(const char* path) {
 }
 }  // namespace
 
+struct HexView::GlyphAtlas {
+  QImage image;
+  std::array<QRectF, 128> uvTable{};
+  qreal dpr = 0.0;
+  int glyphWidth = 0;
+  int glyphHeight = 0;
+  int cellWidth = 0;
+  int cellHeight = 0;
+  uint64_t version = 0;
+  QFont font;
+};
+
+HexView::~HexView() = default;
+
 class HexViewViewport final : public QRhiWidget {
 public:
   explicit HexViewViewport(HexView* view)
       : QRhiWidget(view), m_view(view) {
     setFocusPolicy(Qt::NoFocus);
+  }
+
+  void markBaseDirty() {
+    m_baseDirty = true;
+  }
+
+  void markSelectionDirty() {
+    m_selectionDirty = true;
+  }
+
+  void markOverlayDirty() {
+    m_overlayDirty = true;
+  }
+
+  void invalidateCache() {
+    m_cachedLines.clear();
+    m_cacheStartLine = 0;
+    m_cacheEndLine = -1;
+    m_baseDirty = true;
+    m_selectionDirty = true;
   }
 
 protected:
@@ -150,11 +179,12 @@ protected:
     m_ibuf = m_rhi->newBuffer(QRhiBuffer::Immutable, QRhiBuffer::IndexBuffer, sizeof(kIndices));
     m_ibuf->create();
 
-    m_ubuf = m_rhi->newBuffer(QRhiBuffer::Dynamic, QRhiBuffer::UniformBuffer, sizeof(QMatrix4x4));
+    m_ubuf = m_rhi->newBuffer(QRhiBuffer::Dynamic, QRhiBuffer::UniformBuffer,
+                              sizeof(QMatrix4x4) + sizeof(QVector4D));
     m_ubuf->create();
 
     m_shadowUbuf = m_rhi->newBuffer(QRhiBuffer::Dynamic, QRhiBuffer::UniformBuffer,
-                                    sizeof(QMatrix4x4) + sizeof(QVector4D));
+                                    sizeof(QMatrix4x4) + sizeof(QVector4D) + sizeof(QVector4D));
     m_shadowUbuf->create();
 
     m_glyphSampler = m_rhi->newSampler(QRhiSampler::Linear, QRhiSampler::Linear,
@@ -175,25 +205,69 @@ protected:
       return;
     }
 
+    const int viewportWidth = m_view->viewport()->width();
+    const int viewportHeight = m_view->viewport()->height();
+    if (viewportWidth <= 0 || viewportHeight <= 0 || m_view->m_lineHeight <= 0) {
+      return;
+    }
+
+    const int totalLines = m_view->getTotalLines();
+    if (totalLines <= 0) {
+      return;
+    }
+
+    const int scrollY = m_view->verticalScrollBar()->value();
+    const int startLine = std::clamp(scrollY / m_view->m_lineHeight, 0, totalLines - 1);
+    const int endLine = std::clamp((scrollY + viewportHeight) / m_view->m_lineHeight, 0, totalLines - 1);
+
+    if (startLine != m_lastStartLine || endLine != m_lastEndLine) {
+      m_lastStartLine = startLine;
+      m_lastEndLine = endLine;
+      m_selectionDirty = true;
+    }
+
     m_view->ensureGlyphAtlas(devicePixelRatioF());
-    buildFrameData();
+    ensureCacheWindow(startLine, endLine, totalLines);
+
+    if (m_baseDirty) {
+      buildBaseInstances();
+      m_baseDirty = false;
+      m_baseBufferDirty = true;
+    }
+
+    if (m_view->m_overlayOpacity > 0.0f && scrollY != m_lastOverlayScrollY) {
+      m_overlayDirty = true;
+    }
+
+    if (m_overlayDirty) {
+      buildOverlayInstances(scrollY, viewportHeight);
+      m_overlayDirty = false;
+      m_overlayBufferDirty = true;
+      m_lastOverlayScrollY = scrollY;
+    }
+
+    if (m_selectionDirty) {
+      buildSelectionInstances(startLine, endLine);
+      m_selectionDirty = false;
+      m_selectionBufferDirty = true;
+    }
 
     QRhiResourceUpdateBatch* u = m_rhi->nextResourceUpdateBatch();
     ensureGlyphTexture(u);
     ensurePipelines();
-    updateUniforms(u);
+    updateUniforms(u, static_cast<float>(scrollY));
     updateInstanceBuffers(u);
 
-    cb->beginPass(renderTarget(), m_clearColor, {1.0f, 0}, u);
+    cb->beginPass(renderTarget(), m_view->palette().color(QPalette::Window), {1.0f, 0}, u);
     cb->setViewport(QRhiViewport(0, 0, renderTarget()->pixelSize().width(),
                                  renderTarget()->pixelSize().height()));
 
-    drawRectBatch(cb, m_rectNormal);
-    drawGlyphBatch(cb, m_glyphNormal);
-    drawRectBatch(cb, m_rectOverlay);
-    drawShadowBatch(cb);
-    drawRectBatch(cb, m_rectSelection);
-    drawGlyphBatch(cb, m_glyphSelection);
+    drawRectBuffer(cb, m_baseRectBuf, static_cast<int>(m_baseRectInstances.size()));
+    drawGlyphBuffer(cb, m_baseGlyphBuf, static_cast<int>(m_baseGlyphInstances.size()));
+    drawRectBuffer(cb, m_overlayRectBuf, static_cast<int>(m_overlayRectInstances.size()));
+    drawShadowBuffer(cb);
+    drawRectBuffer(cb, m_selectionRectBuf, static_cast<int>(m_selectionRectInstances.size()));
+    drawGlyphBuffer(cb, m_selectionGlyphBuf, static_cast<int>(m_selectionGlyphInstances.size()));
 
     cb->endPass();
   }
@@ -222,10 +296,16 @@ protected:
     m_vbuf = nullptr;
     delete m_ibuf;
     m_ibuf = nullptr;
-    delete m_rectBuf;
-    m_rectBuf = nullptr;
-    delete m_glyphBuf;
-    m_glyphBuf = nullptr;
+    delete m_baseRectBuf;
+    m_baseRectBuf = nullptr;
+    delete m_baseGlyphBuf;
+    m_baseGlyphBuf = nullptr;
+    delete m_overlayRectBuf;
+    m_overlayRectBuf = nullptr;
+    delete m_selectionRectBuf;
+    m_selectionRectBuf = nullptr;
+    delete m_selectionGlyphBuf;
+    m_selectionGlyphBuf = nullptr;
     delete m_shadowBuf;
     m_shadowBuf = nullptr;
     delete m_ubuf;
@@ -383,85 +463,123 @@ private:
     }
   }
 
-  void updateUniforms(QRhiResourceUpdateBatch* u) {
+  void updateUniforms(QRhiResourceUpdateBatch* u, float scrollY) {
     QSize viewportSize = m_view->viewport()->size();
     QMatrix4x4 mvp;
     mvp.ortho(0.0f, static_cast<float>(viewportSize.width()),
               static_cast<float>(viewportSize.height()), 0.0f, -1.0f, 1.0f);
 
+    QVector4D params(scrollY, 0.0f, 0.0f, 0.0f);
     u->updateDynamicBuffer(m_ubuf, 0, sizeof(QMatrix4x4), &mvp);
+    u->updateDynamicBuffer(m_ubuf, sizeof(QMatrix4x4), sizeof(QVector4D), &params);
 
     QVector4D shadowParams(m_view->m_shadowOffset.x(), m_view->m_shadowOffset.y(),
                            m_view->m_shadowBlur, SHADOW_CORNER_RADIUS);
+    QVector4D scrollParams(scrollY, 0.0f, 0.0f, 0.0f);
 
     u->updateDynamicBuffer(m_shadowUbuf, 0, sizeof(QMatrix4x4), &mvp);
     u->updateDynamicBuffer(m_shadowUbuf, sizeof(QMatrix4x4), sizeof(QVector4D), &shadowParams);
+    u->updateDynamicBuffer(m_shadowUbuf, sizeof(QMatrix4x4) + sizeof(QVector4D),
+                           sizeof(QVector4D), &scrollParams);
   }
 
-  void ensureInstanceBuffer(QRhiBuffer*& buffer, int bytes) {
+  bool ensureInstanceBuffer(QRhiBuffer*& buffer, int bytes) {
     if (bytes <= 0) {
       bytes = 1;
     }
-    if (!buffer || buffer->size() < bytes) {
+    if (!buffer || buffer->size() < static_cast<quint32>(bytes)) {
       delete buffer;
       buffer = m_rhi->newBuffer(QRhiBuffer::Dynamic, QRhiBuffer::VertexBuffer, bytes);
       buffer->create();
+      return true;
     }
+    return false;
   }
 
   void updateInstanceBuffers(QRhiResourceUpdateBatch* u) {
-    ensureInstanceBuffer(m_rectBuf, static_cast<int>(m_rectInstances.size() * sizeof(RectInstance)));
-    if (!m_rectInstances.empty()) {
-      u->updateDynamicBuffer(m_rectBuf, 0,
-                             static_cast<int>(m_rectInstances.size() * sizeof(RectInstance)),
-                             m_rectInstances.data());
+    bool baseRectResized = ensureInstanceBuffer(
+        m_baseRectBuf, static_cast<int>(m_baseRectInstances.size() * sizeof(RectInstance)));
+    if ((m_baseBufferDirty || baseRectResized) && !m_baseRectInstances.empty()) {
+      u->updateDynamicBuffer(m_baseRectBuf, 0,
+                             static_cast<int>(m_baseRectInstances.size() * sizeof(RectInstance)),
+                             m_baseRectInstances.data());
     }
 
-    ensureInstanceBuffer(m_glyphBuf, static_cast<int>(m_glyphInstances.size() * sizeof(GlyphInstance)));
-    if (!m_glyphInstances.empty()) {
-      u->updateDynamicBuffer(m_glyphBuf, 0,
-                             static_cast<int>(m_glyphInstances.size() * sizeof(GlyphInstance)),
-                             m_glyphInstances.data());
+    bool baseGlyphResized = ensureInstanceBuffer(
+        m_baseGlyphBuf, static_cast<int>(m_baseGlyphInstances.size() * sizeof(GlyphInstance)));
+    if ((m_baseBufferDirty || baseGlyphResized) && !m_baseGlyphInstances.empty()) {
+      u->updateDynamicBuffer(m_baseGlyphBuf, 0,
+                             static_cast<int>(m_baseGlyphInstances.size() * sizeof(GlyphInstance)),
+                             m_baseGlyphInstances.data());
     }
 
-    ensureInstanceBuffer(m_shadowBuf, static_cast<int>(m_shadowInstances.size() * sizeof(ShadowInstance)));
-    if (!m_shadowInstances.empty()) {
+    bool overlayResized = ensureInstanceBuffer(
+        m_overlayRectBuf, static_cast<int>(m_overlayRectInstances.size() * sizeof(RectInstance)));
+    if ((m_overlayBufferDirty || overlayResized) && !m_overlayRectInstances.empty()) {
+      u->updateDynamicBuffer(m_overlayRectBuf, 0,
+                             static_cast<int>(m_overlayRectInstances.size() * sizeof(RectInstance)),
+                             m_overlayRectInstances.data());
+    }
+
+    bool selectionRectResized = ensureInstanceBuffer(
+        m_selectionRectBuf, static_cast<int>(m_selectionRectInstances.size() * sizeof(RectInstance)));
+    if ((m_selectionBufferDirty || selectionRectResized) && !m_selectionRectInstances.empty()) {
+      u->updateDynamicBuffer(m_selectionRectBuf, 0,
+                             static_cast<int>(m_selectionRectInstances.size() * sizeof(RectInstance)),
+                             m_selectionRectInstances.data());
+    }
+
+    bool selectionGlyphResized = ensureInstanceBuffer(
+        m_selectionGlyphBuf, static_cast<int>(m_selectionGlyphInstances.size() * sizeof(GlyphInstance)));
+    if ((m_selectionBufferDirty || selectionGlyphResized) && !m_selectionGlyphInstances.empty()) {
+      u->updateDynamicBuffer(m_selectionGlyphBuf, 0,
+                             static_cast<int>(m_selectionGlyphInstances.size() * sizeof(GlyphInstance)),
+                             m_selectionGlyphInstances.data());
+    }
+
+    bool shadowResized = ensureInstanceBuffer(
+        m_shadowBuf, static_cast<int>(m_shadowInstances.size() * sizeof(ShadowInstance)));
+    if ((m_selectionBufferDirty || shadowResized) && !m_shadowInstances.empty()) {
       u->updateDynamicBuffer(m_shadowBuf, 0,
                              static_cast<int>(m_shadowInstances.size() * sizeof(ShadowInstance)),
                              m_shadowInstances.data());
     }
+
+    m_baseBufferDirty = false;
+    m_overlayBufferDirty = false;
+    m_selectionBufferDirty = false;
   }
 
-  void drawRectBatch(QRhiCommandBuffer* cb, const BatchRange& batch) {
-    if (batch.count <= 0) {
+  void drawRectBuffer(QRhiCommandBuffer* cb, QRhiBuffer* buffer, int count) {
+    if (!buffer || count <= 0) {
       return;
     }
     cb->setGraphicsPipeline(m_rectPso);
     cb->setShaderResources(m_rectSrb);
     const QRhiCommandBuffer::VertexInput vbufBindings[] = {
       {m_vbuf, 0},
-      {m_rectBuf, 0}
+      {buffer, 0}
     };
     cb->setVertexInput(0, 2, vbufBindings, m_ibuf, 0, QRhiCommandBuffer::IndexUInt16);
-    cb->drawIndexed(6, batch.count, 0, 0, batch.start);
+    cb->drawIndexed(6, count);
   }
 
-  void drawGlyphBatch(QRhiCommandBuffer* cb, const BatchRange& batch) {
-    if (batch.count <= 0) {
+  void drawGlyphBuffer(QRhiCommandBuffer* cb, QRhiBuffer* buffer, int count) {
+    if (!buffer || count <= 0) {
       return;
     }
     cb->setGraphicsPipeline(m_glyphPso);
     cb->setShaderResources(m_glyphSrb);
     const QRhiCommandBuffer::VertexInput vbufBindings[] = {
       {m_vbuf, 0},
-      {m_glyphBuf, 0}
+      {buffer, 0}
     };
     cb->setVertexInput(0, 2, vbufBindings, m_ibuf, 0, QRhiCommandBuffer::IndexUInt16);
-    cb->drawIndexed(6, batch.count, 0, 0, batch.start);
+    cb->drawIndexed(6, count);
   }
 
-  void drawShadowBatch(QRhiCommandBuffer* cb) {
-    if (m_shadowInstances.empty() || m_view->m_shadowBlur <= 0.0f) {
+  void drawShadowBuffer(QRhiCommandBuffer* cb) {
+    if (!m_shadowBuf || m_shadowInstances.empty() || m_view->m_shadowBlur <= 0.0f) {
       return;
     }
     cb->setGraphicsPipeline(m_shadowPso);
@@ -478,14 +596,14 @@ private:
     if (!m_view->m_glyphAtlas) {
       return {};
     }
-    const auto& uvMap = m_view->m_glyphAtlas->uvMap;
-    auto it = uvMap.constFind(ch.unicode());
-    if (it != uvMap.constEnd()) {
-      return it.value();
+    const auto& uvTable = m_view->m_glyphAtlas->uvTable;
+    const ushort code = ch.unicode();
+    if (code < uvTable.size() && !uvTable[code].isNull()) {
+      return uvTable[code];
     }
-    auto fallback = uvMap.constFind(static_cast<ushort>('.'));
-    if (fallback != uvMap.constEnd()) {
-      return fallback.value();
+    const ushort fallback = static_cast<ushort>('.');
+    if (fallback < uvTable.size()) {
+      return uvTable[fallback];
     }
     return {};
   }
@@ -517,65 +635,74 @@ private:
                                  color.x(), color.y(), color.z(), color.w()});
   }
 
-  void buildFrameData() {
-    m_rectInstances.clear();
-    m_glyphInstances.clear();
-    m_shadowInstances.clear();
+  void ensureCacheWindow(int startLine, int endLine, int totalLines) {
+    const int visibleCount = endLine - startLine + 1;
+    const int margin = std::max(visibleCount * 2, 1);
+    const int desiredStart = std::max(0, startLine - margin);
+    const int desiredEnd = std::min(totalLines - 1, endLine + margin);
 
-    m_rectNormal = {};
-    m_rectOverlay = {};
-    m_rectSelection = {};
-    m_glyphNormal = {};
-    m_glyphSelection = {};
+    if (desiredStart != m_cacheStartLine || desiredEnd != m_cacheEndLine || m_cachedLines.empty()) {
+      m_cacheStartLine = desiredStart;
+      m_cacheEndLine = desiredEnd;
+      rebuildCacheWindow();
+      m_baseDirty = true;
+      m_selectionDirty = true;
+    }
+  }
 
-    const int viewportWidth = m_view->viewport()->width();
-    const int viewportHeight = m_view->viewport()->height();
-    const int scrollY = m_view->verticalScrollBar()->value();
-
-    m_clearColor = m_view->palette().color(QPalette::Window);
-
-    if (viewportWidth <= 0 || viewportHeight <= 0 || m_view->m_lineHeight <= 0) {
+  void rebuildCacheWindow() {
+    m_cachedLines.clear();
+    if (m_cacheEndLine < m_cacheStartLine) {
       return;
     }
-
-    const int totalLines = m_view->getTotalLines();
-    if (totalLines <= 0) {
-      return;
-    }
-
-    const int startLine = std::clamp(scrollY / m_view->m_lineHeight, 0, totalLines - 1);
-    const int endLine = std::clamp((scrollY + viewportHeight) / m_view->m_lineHeight, 0, totalLines - 1);
-
-    const int lineCount = endLine - startLine + 1;
-    m_lineData.clear();
-    m_lineData.reserve(lineCount);
 
     const uint32_t fileLength = m_view->m_vgmfile->unLength;
+    const auto* baseData = reinterpret_cast<const uint8_t*>(m_view->m_vgmfile->data());
+    const size_t count = static_cast<size_t>(m_cacheEndLine - m_cacheStartLine + 1);
+    m_cachedLines.reserve(count);
 
-    for (int line = startLine; line <= endLine; ++line) {
-      LineData entry;
+    for (int line = m_cacheStartLine; line <= m_cacheEndLine; ++line) {
+      CachedLine entry{};
       entry.line = line;
       const int lineOffset = line * BYTES_PER_LINE;
-      if (lineOffset >= static_cast<int>(fileLength)) {
-        entry.bytes = 0;
-      } else {
+      if (lineOffset < static_cast<int>(fileLength)) {
         entry.bytes = std::min(BYTES_PER_LINE, static_cast<int>(fileLength) - lineOffset);
         if (entry.bytes > 0) {
-          m_view->m_vgmfile->readBytes(m_view->m_vgmfile->dwOffset + lineOffset,
-                                       static_cast<uint32_t>(entry.bytes), entry.data.data());
+          std::copy_n(baseData + lineOffset, entry.bytes, entry.data.data());
           for (int i = 0; i < entry.bytes; ++i) {
             const int idx = lineOffset + i;
-            if (idx >= 0 && idx < static_cast<int>(m_view->m_styleIds.size())) {
-              entry.styles[i] = m_view->m_styleIds[idx];
-            } else {
-              entry.styles[i] = 0;
-            }
+            entry.styles[i] =
+                (idx >= 0 && idx < static_cast<int>(m_view->m_styleIds.size())) ? m_view->m_styleIds[idx] : 0;
           }
         }
       }
-      m_lineData.push_back(entry);
+      m_cachedLines.push_back(entry);
+    }
+  }
+
+  const CachedLine* cachedLineFor(int line) const {
+    if (line < m_cacheStartLine || line > m_cacheEndLine) {
+      return nullptr;
+    }
+    const size_t index = static_cast<size_t>(line - m_cacheStartLine);
+    if (index >= m_cachedLines.size()) {
+      return nullptr;
+    }
+    return &m_cachedLines[index];
+  }
+
+  void buildBaseInstances() {
+    m_baseRectInstances.clear();
+    m_baseGlyphInstances.clear();
+
+    if (m_cachedLines.empty()) {
+      return;
     }
 
+    m_baseRectInstances.reserve(m_cachedLines.size() * 4);
+    m_baseGlyphInstances.reserve(m_cachedLines.size() * (m_view->m_shouldDrawAscii ? 80 : 64));
+
+    const QColor clearColor = m_view->palette().color(QPalette::Window);
     const QVector4D addressColor = toVec4(m_view->palette().color(QPalette::WindowText));
 
     const float charWidth = static_cast<float>(m_view->m_charWidth);
@@ -586,7 +713,6 @@ private:
     const float asciiStartX = hexStartX + (BYTES_PER_LINE * 3 + HEX_TO_ASCII_SPACING_CHARS) * charWidth;
 
     const auto& styles = m_view->m_styles;
-
     auto styleFor = [&](uint16_t styleId) -> const HexView::Style& {
       if (styleId < styles.size()) {
         return styles[styleId];
@@ -595,18 +721,33 @@ private:
     };
 
     static const char kHexDigits[] = "0123456789ABCDEF";
+    std::array<QRectF, 16> hexUvs{};
+    for (int i = 0; i < 16; ++i) {
+      hexUvs[i] = glyphUv(QLatin1Char(kHexDigits[i]));
+    }
+    const QRectF spaceUv = glyphUv(QLatin1Char(' '));
 
-    m_rectNormal.start = static_cast<int>(m_rectInstances.size());
-    for (const auto& entry : m_lineData) {
-      const float y = entry.line * lineHeight - static_cast<float>(scrollY);
+    for (const auto& entry : m_cachedLines) {
+      const float y = entry.line * lineHeight;
+
       if (m_view->m_shouldDrawOffset) {
-        const uint32_t address = m_view->m_vgmfile->dwOffset + (entry.line * BYTES_PER_LINE);
-        const QString addressText = QString("%1").arg(address, NUM_ADDRESS_NIBBLES,
-                                                     m_view->m_addressAsHex ? 16 : 10,
-                                                     QLatin1Char('0')).toUpper();
-        for (int i = 0; i < addressText.size(); ++i) {
-          appendGlyph(m_glyphInstances, i * charWidth, y, charWidth, lineHeight,
-                      glyphUv(addressText[i]), addressColor);
+        uint32_t address = m_view->m_vgmfile->dwOffset + (entry.line * BYTES_PER_LINE);
+        if (m_view->m_addressAsHex) {
+          char buf[NUM_ADDRESS_NIBBLES];
+          for (int i = NUM_ADDRESS_NIBBLES - 1; i >= 0; --i) {
+            buf[i] = kHexDigits[address & 0xF];
+            address >>= 4;
+          }
+          for (int i = 0; i < NUM_ADDRESS_NIBBLES; ++i) {
+            appendGlyph(m_baseGlyphInstances, i * charWidth, y, charWidth, lineHeight,
+                        glyphUv(QLatin1Char(buf[i])), addressColor);
+          }
+        } else {
+          QString text = QString::number(address).rightJustified(NUM_ADDRESS_NIBBLES, QLatin1Char('0'));
+          for (int i = 0; i < text.size(); ++i) {
+            appendGlyph(m_baseGlyphInstances, i * charWidth, y, charWidth, lineHeight,
+                        glyphUv(text[i]), addressColor);
+          }
         }
       }
 
@@ -620,13 +761,13 @@ private:
         if (i == entry.bytes || entry.styles[i] != spanStyle) {
           const int spanLen = i - spanStart;
           const auto& style = styleFor(spanStyle);
-          if (style.bg != m_clearColor) {
+          if (style.bg != clearColor) {
             const QVector4D bgColor = toVec4(style.bg);
             const float hexX = hexStartX + spanStart * 3.0f * charWidth - charHalfWidth;
-            appendRect(m_rectInstances, hexX, y, spanLen * 3.0f * charWidth, lineHeight, bgColor);
+            appendRect(m_baseRectInstances, hexX, y, spanLen * 3.0f * charWidth, lineHeight, bgColor);
             if (m_view->m_shouldDrawAscii) {
               const float asciiX = asciiStartX + spanStart * charWidth;
-              appendRect(m_rectInstances, asciiX, y, spanLen * charWidth, lineHeight, bgColor);
+              appendRect(m_baseRectInstances, asciiX, y, spanLen * charWidth, lineHeight, bgColor);
             }
           }
           if (i < entry.bytes) {
@@ -641,56 +782,90 @@ private:
         const QVector4D textColor = toVec4(style.fg);
 
         const uint8_t value = entry.data[i];
-        const char hi = kHexDigits[value >> 4];
-        const char lo = kHexDigits[value & 0x0F];
-
         const float hexX = hexStartX + i * 3.0f * charWidth;
-        appendGlyph(m_glyphInstances, hexX, y, charWidth, lineHeight, glyphUv(QLatin1Char(hi)), textColor);
-        appendGlyph(m_glyphInstances, hexX + charWidth, y, charWidth, lineHeight, glyphUv(QLatin1Char(lo)), textColor);
-        appendGlyph(m_glyphInstances, hexX + 2.0f * charWidth, y, charWidth, lineHeight,
-                    glyphUv(QLatin1Char(' ')), textColor);
+        appendGlyph(m_baseGlyphInstances, hexX, y, charWidth, lineHeight, hexUvs[value >> 4], textColor);
+        appendGlyph(m_baseGlyphInstances, hexX + charWidth, y, charWidth, lineHeight,
+                    hexUvs[value & 0x0F], textColor);
+        appendGlyph(m_baseGlyphInstances, hexX + 2.0f * charWidth, y, charWidth, lineHeight,
+                    spaceUv, textColor);
 
         if (m_view->m_shouldDrawAscii) {
           const char asciiChar = isPrintable(value) ? static_cast<char>(value) : '.';
           const float asciiX = asciiStartX + i * charWidth;
-          appendGlyph(m_glyphInstances, asciiX, y, charWidth, lineHeight,
+          appendGlyph(m_baseGlyphInstances, asciiX, y, charWidth, lineHeight,
                       glyphUv(QLatin1Char(asciiChar)), textColor);
         }
       }
     }
-    m_rectNormal.count = static_cast<int>(m_rectInstances.size()) - m_rectNormal.start;
+  }
 
-    m_glyphNormal.start = 0;
-    m_glyphNormal.count = static_cast<int>(m_glyphInstances.size());
+  void buildOverlayInstances(int scrollY, int viewportHeight) {
+    m_overlayRectInstances.clear();
+    if (m_view->m_overlayOpacity <= 0.0f) {
+      return;
+    }
+
+    m_overlayRectInstances.reserve(2);
+    const float charWidth = static_cast<float>(m_view->m_charWidth);
+    const float charHalfWidth = static_cast<float>(m_view->m_charHalfWidth);
+    const float hexStartX = static_cast<float>(m_view->hexXOffset());
+    const float asciiStartX = hexStartX + (BYTES_PER_LINE * 3 + HEX_TO_ASCII_SPACING_CHARS) * charWidth;
+    const QVector4D overlayColor(0.0f, 0.0f, 0.0f, static_cast<float>(m_view->m_overlayOpacity));
+
+    const float y = static_cast<float>(scrollY);
+    appendRect(m_overlayRectInstances, hexStartX - charHalfWidth, y,
+               BYTES_PER_LINE * 3.0f * charWidth, static_cast<float>(viewportHeight), overlayColor);
+    if (m_view->m_shouldDrawAscii) {
+      appendRect(m_overlayRectInstances, asciiStartX, y,
+                 BYTES_PER_LINE * charWidth, static_cast<float>(viewportHeight), overlayColor);
+    }
+  }
+
+  void buildSelectionInstances(int startLine, int endLine) {
+    m_selectionRectInstances.clear();
+    m_selectionGlyphInstances.clear();
+    m_shadowInstances.clear();
 
     const bool hasSelection = !m_view->m_selections.empty() || !m_view->m_fadeSelections.empty();
     if (!hasSelection) {
       return;
     }
 
-    if (m_view->m_overlayOpacity > 0.0f) {
-      m_rectOverlay.start = static_cast<int>(m_rectInstances.size());
-      const QVector4D overlayColor(0.0f, 0.0f, 0.0f, static_cast<float>(m_view->m_overlayOpacity));
-      const float hexX = hexStartX - charHalfWidth;
-      appendRect(m_rectInstances, hexX, 0.0f,
-                 BYTES_PER_LINE * 3.0f * charWidth, static_cast<float>(viewportHeight), overlayColor);
-      if (m_view->m_shouldDrawAscii) {
-        appendRect(m_rectInstances, asciiStartX, 0.0f,
-                   BYTES_PER_LINE * charWidth, static_cast<float>(viewportHeight), overlayColor);
-      }
-      m_rectOverlay.count = static_cast<int>(m_rectInstances.size()) - m_rectOverlay.start;
+    const int visibleCount = endLine - startLine + 1;
+    if (visibleCount > 0) {
+      m_selectionRectInstances.reserve(static_cast<size_t>(visibleCount) * 4);
+      m_selectionGlyphInstances.reserve(static_cast<size_t>(visibleCount) * (m_view->m_shouldDrawAscii ? 80 : 64));
+      m_shadowInstances.reserve(static_cast<size_t>(visibleCount) * 2);
     }
+
+    const uint32_t fileLength = m_view->m_vgmfile->unLength;
+    const float charWidth = static_cast<float>(m_view->m_charWidth);
+    const float charHalfWidth = static_cast<float>(m_view->m_charHalfWidth);
+    const float lineHeight = static_cast<float>(m_view->m_lineHeight);
+    const float hexStartX = static_cast<float>(m_view->hexXOffset());
+    const float asciiStartX = hexStartX + (BYTES_PER_LINE * 3 + HEX_TO_ASCII_SPACING_CHARS) * charWidth;
+
+    const auto& styles = m_view->m_styles;
+    auto styleFor = [&](uint16_t styleId) -> const HexView::Style& {
+      if (styleId < styles.size()) {
+        return styles[styleId];
+      }
+      return styles.front();
+    };
+
+    static const char kHexDigits[] = "0123456789ABCDEF";
+    std::array<QRectF, 16> hexUvs{};
+    for (int i = 0; i < 16; ++i) {
+      hexUvs[i] = glyphUv(QLatin1Char(kHexDigits[i]));
+    }
+    const QRectF spaceUv = glyphUv(QLatin1Char(' '));
+
+    const QVector4D shadowColor = toVec4(SHADOW_COLOR);
+    const float shadowPadBase = SHADOW_BLUR_RADIUS * 2.0f + SELECTION_PADDING +
+                                std::max(std::abs(SHADOW_OFFSET_X), std::abs(SHADOW_OFFSET_Y));
 
     const std::vector<HexView::SelectionRange>& selections =
         m_view->m_selections.empty() ? m_view->m_fadeSelections : m_view->m_selections;
-
-    m_rectSelection.start = static_cast<int>(m_rectInstances.size());
-    m_glyphSelection.start = static_cast<int>(m_glyphInstances.size());
-
-    const QVector4D shadowColor = toVec4(SHADOW_COLOR);
-    const float shadowPadBase = m_view->m_shadowBlur * 2.0f + SELECTION_PADDING +
-                                std::max(std::abs(m_view->m_shadowOffset.x()),
-                                         std::abs(m_view->m_shadowOffset.y()));
 
     for (const auto& selection : selections) {
       if (selection.length == 0) {
@@ -706,87 +881,82 @@ private:
       const int selEndLine = std::min(endLine, (selectionEnd - 1) / BYTES_PER_LINE);
 
       for (int line = selStartLine; line <= selEndLine; ++line) {
-        const int lineIndex = line - startLine;
-        if (lineIndex < 0 || lineIndex >= static_cast<int>(m_lineData.size())) {
+        const CachedLine* entry = cachedLineFor(line);
+        if (!entry || entry->bytes <= 0) {
           continue;
         }
-        const auto& entry = m_lineData[static_cast<size_t>(lineIndex)];
+
         const int lineOffset = line * BYTES_PER_LINE;
         const int overlapStart = std::max(selectionStart, lineOffset);
-        const int overlapEnd = std::min(selectionEnd, lineOffset + entry.bytes);
+        const int overlapEnd = std::min(selectionEnd, lineOffset + entry->bytes);
         if (overlapEnd <= overlapStart) {
           continue;
         }
 
         const int startCol = overlapStart - lineOffset;
         const int length = overlapEnd - overlapStart;
-        const float y = entry.line * lineHeight - static_cast<float>(scrollY);
+        const float y = entry->line * lineHeight;
 
         int spanStart = startCol;
-        uint16_t spanStyle = entry.styles[spanStart];
+        uint16_t spanStyle = entry->styles[spanStart];
         for (int i = startCol + 1; i <= startCol + length; ++i) {
-          if (i == startCol + length || entry.styles[i] != spanStyle) {
+          if (i == startCol + length || entry->styles[i] != spanStyle) {
             const int spanLen = i - spanStart;
             const auto& style = styleFor(spanStyle);
             const QVector4D bgColor = toVec4(style.bg);
             const float hexX = hexStartX + spanStart * 3.0f * charWidth - charHalfWidth;
             const QRectF hexRect(hexX, y, spanLen * 3.0f * charWidth, lineHeight);
-            appendRect(m_rectInstances, hexRect.x(), hexRect.y(), hexRect.width(),
+            appendRect(m_selectionRectInstances, hexRect.x(), hexRect.y(), hexRect.width(),
                        hexRect.height(), bgColor);
-            if (m_view->m_shadowBlur > 0.0f) {
-              appendShadow(hexRect, shadowPadBase, shadowColor);
-            }
+            appendShadow(hexRect, shadowPadBase, shadowColor);
 
             if (m_view->m_shouldDrawAscii) {
               const float asciiX = asciiStartX + spanStart * charWidth;
               const QRectF asciiRect(asciiX, y, spanLen * charWidth, lineHeight);
-              appendRect(m_rectInstances, asciiRect.x(), asciiRect.y(), asciiRect.width(),
+              appendRect(m_selectionRectInstances, asciiRect.x(), asciiRect.y(), asciiRect.width(),
                          asciiRect.height(), bgColor);
-              if (m_view->m_shadowBlur > 0.0f) {
-                appendShadow(asciiRect, shadowPadBase, shadowColor);
-              }
+              appendShadow(asciiRect, shadowPadBase, shadowColor);
             }
 
             if (i < startCol + length) {
               spanStart = i;
-              spanStyle = entry.styles[i];
+              spanStyle = entry->styles[i];
             }
           }
         }
 
         for (int i = startCol; i < startCol + length; ++i) {
-          const auto& style = styleFor(entry.styles[i]);
+          const auto& style = styleFor(entry->styles[i]);
           const QVector4D textColor = toVec4(style.fg);
-          const uint8_t value = entry.data[i];
-          const char hi = kHexDigits[value >> 4];
-          const char lo = kHexDigits[value & 0x0F];
+          const uint8_t value = entry->data[i];
           const float hexX = hexStartX + i * 3.0f * charWidth;
-          appendGlyph(m_glyphInstances, hexX, y, charWidth, lineHeight, glyphUv(QLatin1Char(hi)), textColor);
-          appendGlyph(m_glyphInstances, hexX + charWidth, y, charWidth, lineHeight,
-                      glyphUv(QLatin1Char(lo)), textColor);
-          appendGlyph(m_glyphInstances, hexX + 2.0f * charWidth, y, charWidth, lineHeight,
-                      glyphUv(QLatin1Char(' ')), textColor);
+          appendGlyph(m_selectionGlyphInstances, hexX, y, charWidth, lineHeight,
+                      hexUvs[value >> 4], textColor);
+          appendGlyph(m_selectionGlyphInstances, hexX + charWidth, y, charWidth, lineHeight,
+                      hexUvs[value & 0x0F], textColor);
+          appendGlyph(m_selectionGlyphInstances, hexX + 2.0f * charWidth, y, charWidth, lineHeight,
+                      spaceUv, textColor);
 
           if (m_view->m_shouldDrawAscii) {
             const char asciiChar = isPrintable(value) ? static_cast<char>(value) : '.';
             const float asciiX = asciiStartX + i * charWidth;
-            appendGlyph(m_glyphInstances, asciiX, y, charWidth, lineHeight,
+            appendGlyph(m_selectionGlyphInstances, asciiX, y, charWidth, lineHeight,
                         glyphUv(QLatin1Char(asciiChar)), textColor);
           }
         }
       }
     }
-
-    m_rectSelection.count = static_cast<int>(m_rectInstances.size()) - m_rectSelection.start;
-    m_glyphSelection.count = static_cast<int>(m_glyphInstances.size()) - m_glyphSelection.start;
   }
 
   HexView* m_view = nullptr;
   QRhi* m_rhi = nullptr;
   QRhiBuffer* m_vbuf = nullptr;
   QRhiBuffer* m_ibuf = nullptr;
-  QRhiBuffer* m_rectBuf = nullptr;
-  QRhiBuffer* m_glyphBuf = nullptr;
+  QRhiBuffer* m_baseRectBuf = nullptr;
+  QRhiBuffer* m_baseGlyphBuf = nullptr;
+  QRhiBuffer* m_overlayRectBuf = nullptr;
+  QRhiBuffer* m_selectionRectBuf = nullptr;
+  QRhiBuffer* m_selectionGlyphBuf = nullptr;
   QRhiBuffer* m_shadowBuf = nullptr;
   QRhiBuffer* m_ubuf = nullptr;
   QRhiBuffer* m_shadowUbuf = nullptr;
@@ -801,16 +971,24 @@ private:
   int m_sampleCount = 1;
   uint64_t m_glyphAtlasVersion = 0;
 
-  std::vector<RectInstance> m_rectInstances;
-  std::vector<GlyphInstance> m_glyphInstances;
+  std::vector<CachedLine> m_cachedLines;
+  std::vector<RectInstance> m_baseRectInstances;
+  std::vector<GlyphInstance> m_baseGlyphInstances;
+  std::vector<RectInstance> m_overlayRectInstances;
+  std::vector<RectInstance> m_selectionRectInstances;
+  std::vector<GlyphInstance> m_selectionGlyphInstances;
   std::vector<ShadowInstance> m_shadowInstances;
-  std::vector<LineData> m_lineData;
-  BatchRange m_rectNormal;
-  BatchRange m_rectOverlay;
-  BatchRange m_rectSelection;
-  BatchRange m_glyphNormal;
-  BatchRange m_glyphSelection;
-  QColor m_clearColor;
+  int m_cacheStartLine = 0;
+  int m_cacheEndLine = -1;
+  int m_lastStartLine = -1;
+  int m_lastEndLine = -1;
+  int m_lastOverlayScrollY = std::numeric_limits<int>::min();
+  bool m_baseDirty = true;
+  bool m_selectionDirty = true;
+  bool m_overlayDirty = true;
+  bool m_baseBufferDirty = false;
+  bool m_selectionBufferDirty = false;
+  bool m_overlayBufferDirty = false;
 };
 
 HexView::HexView(VGMFile* vgmfile, QWidget* parent)
@@ -862,6 +1040,9 @@ void HexView::setFont(const QFont& font) {
 
   updateLayout();
   if (m_rhiViewport) {
+    m_rhiViewport->markBaseDirty();
+    m_rhiViewport->markSelectionDirty();
+    m_rhiViewport->markOverlayDirty();
     m_rhiViewport->update();
   }
 }
@@ -938,12 +1119,19 @@ void HexView::updateLayout() {
 
   const bool newDrawOffset = width >= getViewportWidthSansAsciiAndAddress();
   const bool newDrawAscii = width >= getViewportWidthSansAscii();
+  const bool offsetChanged = (newDrawOffset != m_shouldDrawOffset);
+  const bool asciiChanged = (newDrawAscii != m_shouldDrawAscii);
   m_shouldDrawOffset = newDrawOffset;
   m_shouldDrawAscii = newDrawAscii;
 
   updateScrollBars();
 
   if (m_rhiViewport) {
+    if (offsetChanged || asciiChanged) {
+      m_rhiViewport->markBaseDirty();
+      m_rhiViewport->markSelectionDirty();
+    }
+    m_rhiViewport->markOverlayDirty();
     m_rhiViewport->setGeometry(viewport()->rect());
     m_rhiViewport->update();
   }
@@ -966,6 +1154,7 @@ void HexView::setSelectedItem(VGMItem* item) {
     m_selections.clear();
     showSelectedItem(false, true);
     if (m_rhiViewport) {
+      m_rhiViewport->markSelectionDirty();
       m_rhiViewport->update();
     }
     return;
@@ -979,6 +1168,7 @@ void HexView::setSelectedItem(VGMItem* item) {
   showSelectedItem(true, true);
 
   if (m_rhiViewport) {
+    m_rhiViewport->markSelectionDirty();
     m_rhiViewport->update();
   }
 
@@ -1079,6 +1269,10 @@ void HexView::rebuildStyleMap() {
       styleId = 0;
     }
   }
+
+  if (m_rhiViewport) {
+    m_rhiViewport->invalidateCache();
+  }
 }
 
 void HexView::ensureGlyphAtlas(qreal dpr) {
@@ -1125,7 +1319,7 @@ void HexView::ensureGlyphAtlas(qreal dpr) {
 
   const qreal baseline = QFontMetricsF(font()).ascent();
 
-  m_glyphAtlas->uvMap.clear();
+  m_glyphAtlas->uvTable.fill(QRectF());
 
   for (size_t i = 0; i < glyphs.size(); ++i) {
     const int col = static_cast<int>(i % columns);
@@ -1140,7 +1334,10 @@ void HexView::ensureGlyphAtlas(qreal dpr) {
     const qreal u1 = (cellX + padding + glyphWidth) * dpr / imageWidth;
     const qreal v1 = (cellY + padding + glyphHeight) * dpr / imageHeight;
 
-    m_glyphAtlas->uvMap.insert(glyphs[i].unicode(), QRectF(u0, v0, u1 - u0, v1 - v0));
+    const ushort code = glyphs[i].unicode();
+    if (code < m_glyphAtlas->uvTable.size()) {
+      m_glyphAtlas->uvTable[code] = QRectF(u0, v0, u1 - u0, v1 - v0);
+    }
   }
 
   m_glyphAtlas->image = std::move(image);
@@ -1151,6 +1348,11 @@ void HexView::ensureGlyphAtlas(qreal dpr) {
   m_glyphAtlas->cellHeight = cellHeight;
   m_glyphAtlas->font = font();
   m_glyphAtlas->version++;
+
+  if (m_rhiViewport) {
+    m_rhiViewport->markBaseDirty();
+    m_rhiViewport->markSelectionDirty();
+  }
 }
 
 bool HexView::viewportEvent(QEvent* event) {
@@ -1192,6 +1394,8 @@ void HexView::changeEvent(QEvent* event) {
       m_styles[0].fg = palette().color(QPalette::WindowText);
     }
     if (m_rhiViewport) {
+      m_rhiViewport->markBaseDirty();
+      m_rhiViewport->markSelectionDirty();
       m_rhiViewport->update();
     }
   }
@@ -1333,6 +1537,7 @@ void HexView::mouseDoubleClickEvent(QMouseEvent* event) {
         event->pos().x() < (NUM_ADDRESS_NIBBLES * m_charWidth)) {
       m_addressAsHex = !m_addressAsHex;
       if (m_rhiViewport) {
+        m_rhiViewport->markBaseDirty();
         m_rhiViewport->update();
       }
     }
@@ -1350,6 +1555,7 @@ void HexView::setOverlayOpacity(qreal opacity) {
   }
   m_overlayOpacity = opacity;
   if (m_rhiViewport) {
+    m_rhiViewport->markOverlayDirty();
     m_rhiViewport->update();
   }
 }
@@ -1473,6 +1679,7 @@ void HexView::showSelectedItem(bool show, bool animate) {
 void HexView::clearFadeSelection() {
   m_fadeSelections.clear();
   if (m_rhiViewport) {
+    m_rhiViewport->markSelectionDirty();
     m_rhiViewport->update();
   }
 }

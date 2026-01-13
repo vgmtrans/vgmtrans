@@ -28,6 +28,7 @@ class HexView final : public QAbstractScrollArea {
 
 public:
   explicit HexView(VGMFile* vgmfile, QWidget* parent = nullptr);
+  ~HexView() override;
   void setSelectedItem(VGMItem* item);
   void setFont(const QFont& font);
   [[nodiscard]] int getVirtualFullWidth() const;
@@ -62,17 +63,7 @@ private:
     QColor bg;
     QColor fg;
   };
-  struct GlyphAtlas {
-    QImage image;
-    QHash<ushort, QRectF> uvMap;
-    qreal dpr = 0.0;
-    int glyphWidth = 0;
-    int glyphHeight = 0;
-    int cellWidth = 0;
-    int cellHeight = 0;
-    uint64_t version = 0;
-    QFont font;
-  };
+  struct GlyphAtlas;
 
   int hexXOffset() const;
   int getVirtualHeight() const;
