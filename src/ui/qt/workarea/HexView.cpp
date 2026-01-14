@@ -143,8 +143,8 @@ class HexViewViewport final : public QRhiWidget {
 public:
   explicit HexViewViewport(HexView* view)
       : QRhiWidget(view), m_view(view) {
-    setFocusPolicy(Qt::NoFocus);
-  }
+      setFocusPolicy(Qt::NoFocus);
+    }
 
   void markBaseDirty() {
     m_baseDirty = true;
@@ -173,6 +173,10 @@ protected:
       return;
     }
 
+    qDebug() << "QRhi backend:" << int(rhi()->backend())
+         << "BaseInstance:" << rhi()->isFeatureSupported(QRhi::BaseInstance);
+
+
     static const float kVertices[] = {
       0.0f, 0.0f,
       1.0f, 0.0f,
@@ -187,14 +191,14 @@ protected:
     m_ibuf->create();
 
     m_ubuf = m_rhi->newBuffer(QRhiBuffer::Dynamic, QRhiBuffer::UniformBuffer,
-                              sizeof(QMatrix4x4) + sizeof(QVector4D));
+                              sizeof(QMatrix4x4));
     m_ubuf->create();
     m_overlayUbuf = m_rhi->newBuffer(QRhiBuffer::Dynamic, QRhiBuffer::UniformBuffer,
-                                     sizeof(QMatrix4x4) + sizeof(QVector4D));
+                                     sizeof(QMatrix4x4));
     m_overlayUbuf->create();
 
     m_shadowUbuf = m_rhi->newBuffer(QRhiBuffer::Dynamic, QRhiBuffer::UniformBuffer,
-                                    sizeof(QMatrix4x4) + sizeof(QVector4D) + sizeof(QVector4D));
+                                    sizeof(QMatrix4x4) + sizeof(QVector4D));
     m_shadowUbuf->create();
 
     m_glyphSampler = m_rhi->newSampler(QRhiSampler::Linear, QRhiSampler::Linear,
@@ -498,27 +502,31 @@ private:
   }
 
   void updateUniforms(QRhiResourceUpdateBatch* u, float scrollY) {
-    QSize viewportSize = m_view->viewport()->size();
-    QMatrix4x4 mvp;
-    mvp.ortho(0.0f, static_cast<float>(viewportSize.width()),
-              static_cast<float>(viewportSize.height()), 0.0f, -1.0f, 1.0f);
+    const QSize sz = m_view->viewport()->size();
 
-    QVector4D params(scrollY, 0.0f, 0.0f, 0.0f);
+    QMatrix4x4 proj;
+    proj.ortho(0.f, float(sz.width()),
+               float(sz.height()), 0.f,
+               -1.f, 1.f);
+
+    // Make the projection portable across backends (Metal/Vulkan/D3D/GL)
+    QMatrix4x4 mvp = m_rhi->clipSpaceCorrMatrix() * proj;
+
+    // Scroll in document space (y-down)
+    mvp.translate(0.f, -scrollY, 0.f);
+
+    QVector4D params(0.f, 0.f, 0.f, 0.f); // no shader scroll needed
+
     u->updateDynamicBuffer(m_ubuf, 0, sizeof(QMatrix4x4), &mvp);
     u->updateDynamicBuffer(m_ubuf, sizeof(QMatrix4x4), sizeof(QVector4D), &params);
 
-    QVector4D overlayParams(0.0f, 0.0f, 0.0f, 0.0f);
-    u->updateDynamicBuffer(m_overlayUbuf, 0, sizeof(QMatrix4x4), &mvp);
-    u->updateDynamicBuffer(m_overlayUbuf, sizeof(QMatrix4x4), sizeof(QVector4D), &overlayParams);
-
-    QVector4D shadowParams(m_view->m_shadowOffset.x(), m_view->m_shadowOffset.y(),
-                           m_view->m_shadowBlur, SHADOW_CORNER_RADIUS);
-    QVector4D scrollParams(scrollY, 0.0f, 0.0f, 0.0f);
+    QMatrix4x4 overlayMvp = m_rhi->clipSpaceCorrMatrix() * proj;
+    u->updateDynamicBuffer(m_overlayUbuf, 0, sizeof(QMatrix4x4), &overlayMvp);
 
     u->updateDynamicBuffer(m_shadowUbuf, 0, sizeof(QMatrix4x4), &mvp);
+    QVector4D shadowParams(m_view->m_shadowOffset.x(), m_view->m_shadowOffset.y(),
+                           m_view->m_shadowBlur, SHADOW_CORNER_RADIUS);
     u->updateDynamicBuffer(m_shadowUbuf, sizeof(QMatrix4x4), sizeof(QVector4D), &shadowParams);
-    u->updateDynamicBuffer(m_shadowUbuf, sizeof(QMatrix4x4) + sizeof(QVector4D),
-                           sizeof(QVector4D), &scrollParams);
   }
 
   bool ensureInstanceBuffer(QRhiBuffer*& buffer, int bytes) {
