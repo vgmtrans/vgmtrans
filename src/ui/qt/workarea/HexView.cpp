@@ -190,8 +190,10 @@ protected:
     m_ibuf = m_rhi->newBuffer(QRhiBuffer::Immutable, QRhiBuffer::IndexBuffer, sizeof(kIndices));
     m_ibuf->create();
 
-    m_ubuf = m_rhi->newBuffer(QRhiBuffer::Dynamic, QRhiBuffer::UniformBuffer,
-                              sizeof(QMatrix4x4));
+    const int uboSize = m_rhi->ubufAligned(sizeof(QMatrix4x4));
+    m_ubuf = m_rhi->newBuffer(QRhiBuffer::Dynamic, QRhiBuffer::UniformBuffer, uboSize);
+    m_ubuf->create();
+
     m_ubuf->create();
     m_overlayUbuf = m_rhi->newBuffer(QRhiBuffer::Dynamic, QRhiBuffer::UniformBuffer,
                                      sizeof(QMatrix4x4));
@@ -518,7 +520,6 @@ private:
     QVector4D params(0.f, 0.f, 0.f, 0.f); // no shader scroll needed
 
     u->updateDynamicBuffer(m_ubuf, 0, sizeof(QMatrix4x4), &mvp);
-    u->updateDynamicBuffer(m_ubuf, sizeof(QMatrix4x4), sizeof(QVector4D), &params);
 
     QMatrix4x4 overlayMvp = m_rhi->clipSpaceCorrMatrix() * proj;
     u->updateDynamicBuffer(m_overlayUbuf, 0, sizeof(QMatrix4x4), &overlayMvp);
