@@ -189,6 +189,9 @@ protected:
     m_ubuf = m_rhi->newBuffer(QRhiBuffer::Dynamic, QRhiBuffer::UniformBuffer,
                               sizeof(QMatrix4x4) + sizeof(QVector4D));
     m_ubuf->create();
+    m_overlayUbuf = m_rhi->newBuffer(QRhiBuffer::Dynamic, QRhiBuffer::UniformBuffer,
+                                     sizeof(QMatrix4x4) + sizeof(QVector4D));
+    m_overlayUbuf->create();
 
     m_shadowUbuf = m_rhi->newBuffer(QRhiBuffer::Dynamic, QRhiBuffer::UniformBuffer,
                                     sizeof(QMatrix4x4) + sizeof(QVector4D) + sizeof(QVector4D));
@@ -242,15 +245,10 @@ protected:
       m_baseBufferDirty = true;
     }
 
-    if (m_view->m_overlayOpacity > 0.0f && scrollY != m_lastOverlayScrollY) {
-      m_overlayDirty = true;
-    }
-
     if (m_overlayDirty) {
-      buildOverlayInstances(scrollY, viewportHeight);
+      buildOverlayInstances(viewportHeight);
       m_overlayDirty = false;
       m_overlayBufferDirty = true;
-      m_lastOverlayScrollY = scrollY;
     }
 
     if (m_selectionDirty) {
@@ -289,7 +287,7 @@ protected:
 
     drawRectBuffer(cb, m_baseRectBuf, baseRectCount, baseRectFirst);
     drawGlyphBuffer(cb, m_baseGlyphBuf, baseGlyphCount, baseGlyphFirst);
-    drawRectBuffer(cb, m_overlayRectBuf, static_cast<int>(m_overlayRectInstances.size()));
+    drawRectBuffer(cb, m_overlayRectBuf, static_cast<int>(m_overlayRectInstances.size()), 0, m_overlaySrb);
     drawShadowBuffer(cb);
     drawRectBuffer(cb, m_selectionRectBuf, static_cast<int>(m_selectionRectInstances.size()));
     drawGlyphBuffer(cb, m_selectionGlyphBuf, static_cast<int>(m_selectionGlyphInstances.size()));
@@ -307,6 +305,8 @@ protected:
 
     delete m_rectSrb;
     m_rectSrb = nullptr;
+    delete m_overlaySrb;
+    m_overlaySrb = nullptr;
     delete m_glyphSrb;
     m_glyphSrb = nullptr;
     delete m_shadowSrb;
@@ -335,6 +335,8 @@ protected:
     m_shadowBuf = nullptr;
     delete m_ubuf;
     m_ubuf = nullptr;
+    delete m_overlayUbuf;
+    m_overlayUbuf = nullptr;
     delete m_shadowUbuf;
     m_shadowUbuf = nullptr;
   }
@@ -351,6 +353,7 @@ private:
     delete m_glyphPso;
     delete m_shadowPso;
     delete m_rectSrb;
+    delete m_overlaySrb;
     delete m_glyphSrb;
     delete m_shadowSrb;
 
@@ -359,6 +362,12 @@ private:
       QRhiShaderResourceBinding::uniformBuffer(0, QRhiShaderResourceBinding::VertexStage, m_ubuf)
     });
     m_rectSrb->create();
+
+    m_overlaySrb = m_rhi->newShaderResourceBindings();
+    m_overlaySrb->setBindings({
+      QRhiShaderResourceBinding::uniformBuffer(0, QRhiShaderResourceBinding::VertexStage, m_overlayUbuf)
+    });
+    m_overlaySrb->create();
 
     m_glyphSrb = m_rhi->newShaderResourceBindings();
     m_glyphSrb->setBindings({
@@ -498,6 +507,10 @@ private:
     u->updateDynamicBuffer(m_ubuf, 0, sizeof(QMatrix4x4), &mvp);
     u->updateDynamicBuffer(m_ubuf, sizeof(QMatrix4x4), sizeof(QVector4D), &params);
 
+    QVector4D overlayParams(0.0f, 0.0f, 0.0f, 0.0f);
+    u->updateDynamicBuffer(m_overlayUbuf, 0, sizeof(QMatrix4x4), &mvp);
+    u->updateDynamicBuffer(m_overlayUbuf, sizeof(QMatrix4x4), sizeof(QVector4D), &overlayParams);
+
     QVector4D shadowParams(m_view->m_shadowOffset.x(), m_view->m_shadowOffset.y(),
                            m_view->m_shadowBlur, SHADOW_CORNER_RADIUS);
     QVector4D scrollParams(scrollY, 0.0f, 0.0f, 0.0f);
@@ -575,12 +588,16 @@ private:
     m_selectionBufferDirty = false;
   }
 
-  void drawRectBuffer(QRhiCommandBuffer* cb, QRhiBuffer* buffer, int count, int firstInstance = 0) {
+  void drawRectBuffer(QRhiCommandBuffer* cb, QRhiBuffer* buffer, int count, int firstInstance = 0,
+                      QRhiShaderResourceBindings* srb = nullptr) {
     if (!buffer || count <= 0) {
       return;
     }
+    if (!srb) {
+      srb = m_rectSrb;
+    }
     cb->setGraphicsPipeline(m_rectPso);
-    cb->setShaderResources(m_rectSrb);
+    cb->setShaderResources(srb);
     const QRhiCommandBuffer::VertexInput vbufBindings[] = {
       {m_vbuf, 0},
       {buffer, 0}
@@ -836,7 +853,7 @@ private:
     }
   }
 
-  void buildOverlayInstances(int scrollY, int viewportHeight) {
+  void buildOverlayInstances(int viewportHeight) {
     m_overlayRectInstances.clear();
     if (m_view->m_overlayOpacity <= 0.0f) {
       return;
@@ -849,7 +866,7 @@ private:
     const float asciiStartX = hexStartX + (BYTES_PER_LINE * 3 + HEX_TO_ASCII_SPACING_CHARS) * charWidth;
     const QVector4D overlayColor(0.0f, 0.0f, 0.0f, static_cast<float>(m_view->m_overlayOpacity));
 
-    const float y = static_cast<float>(scrollY);
+    const float y = 0.0f;
     appendRect(m_overlayRectInstances, hexStartX - charHalfWidth, y,
                BYTES_PER_LINE * 3.0f * charWidth, static_cast<float>(viewportHeight), overlayColor);
     if (m_view->m_shouldDrawAscii) {
@@ -1002,10 +1019,12 @@ private:
   QRhiBuffer* m_selectionGlyphBuf = nullptr;
   QRhiBuffer* m_shadowBuf = nullptr;
   QRhiBuffer* m_ubuf = nullptr;
+  QRhiBuffer* m_overlayUbuf = nullptr;
   QRhiBuffer* m_shadowUbuf = nullptr;
   QRhiTexture* m_glyphTex = nullptr;
   QRhiSampler* m_glyphSampler = nullptr;
   QRhiShaderResourceBindings* m_rectSrb = nullptr;
+  QRhiShaderResourceBindings* m_overlaySrb = nullptr;
   QRhiShaderResourceBindings* m_glyphSrb = nullptr;
   QRhiShaderResourceBindings* m_shadowSrb = nullptr;
   QRhiGraphicsPipeline* m_rectPso = nullptr;
@@ -1026,7 +1045,6 @@ private:
   int m_cacheEndLine = -1;
   int m_lastStartLine = -1;
   int m_lastEndLine = -1;
-  int m_lastOverlayScrollY = std::numeric_limits<int>::min();
   bool m_baseDirty = true;
   bool m_selectionDirty = true;
   bool m_overlayDirty = true;
