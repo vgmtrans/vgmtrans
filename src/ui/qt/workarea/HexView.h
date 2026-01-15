@@ -9,16 +9,20 @@
 #include <QAbstractScrollArea>
 #include <QColor>
 #include <QFont>
+#include <QImage>
 #include <QPointF>
+#include <QRectF>
+#include <array>
 #include <cstdint>
 #include <memory>
 #include <unordered_map>
 #include <vector>
 
 class QParallelAnimationGroup;
+class QWidget;
 class VGMFile;
 class VGMItem;
-class HexViewViewport;
+class HexViewRhiWindow;
 
 class HexView final : public QAbstractScrollArea {
   Q_OBJECT
@@ -54,7 +58,7 @@ protected:
   void mouseDoubleClickEvent(QMouseEvent* event) override;
 
 private:
-  friend class HexViewViewport;
+  friend class HexViewRhiWindow;
   struct SelectionRange {
     uint32_t offset;
     uint32_t length;
@@ -63,7 +67,17 @@ private:
     QColor bg;
     QColor fg;
   };
-  struct GlyphAtlas;
+  struct GlyphAtlas {
+    QImage image;
+    std::array<QRectF, 128> uvTable{};
+    qreal dpr = 0.0;
+    int glyphWidth = 0;
+    int glyphHeight = 0;
+    int cellWidth = 0;
+    int cellHeight = 0;
+    uint64_t version = 0;
+    QFont font;
+  };
 
   int hexXOffset() const;
   int getVirtualHeight() const;
@@ -110,6 +124,7 @@ private:
   qreal m_shadowBlur = 0.0;
   QPointF m_shadowOffset{0.0, 0.0};
 
-  HexViewViewport* m_rhiViewport = nullptr;
+  HexViewRhiWindow* m_rhiWindow = nullptr;
+  QWidget* m_rhiContainer = nullptr;
   std::unique_ptr<GlyphAtlas> m_glyphAtlas;
 };
