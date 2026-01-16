@@ -578,9 +578,11 @@ void HexView::mouseReleaseEvent(QMouseEvent* event) {
   QAbstractScrollArea::mouseReleaseEvent(event);
 }
 
-void HexView::mouseMoveEvent(QMouseEvent* event) {
-  if (m_isDragging && event->buttons() & Qt::LeftButton) {
-    const int offset = getOffsetFromPoint(event->pos());
+void HexView::handleCoalescedMouseMove(const QPoint& pos,
+                              Qt::MouseButtons buttons,
+                              Qt::KeyboardModifiers mods) {
+  if (m_isDragging && buttons & Qt::LeftButton) {
+    const int offset = getOffsetFromPoint(pos);
     if (offset == -1) {
       selectionChanged(nullptr);
       return;
@@ -596,6 +598,10 @@ void HexView::mouseMoveEvent(QMouseEvent* event) {
       selectionChanged(item);
     }
   }
+}
+
+void HexView::mouseMoveEvent(QMouseEvent* event) {
+  handleCoalescedMouseMove(event->pos(), event->button(), event->modifiers());
   QAbstractScrollArea::mouseMoveEvent(event);
 }
 

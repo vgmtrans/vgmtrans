@@ -22,6 +22,7 @@
 #include <QScrollBar>
 #include <QString>
 #include <QVector4D>
+#include <QMouseEvent>
 
 #if QT_CONFIG(opengl)
 #include <QOffscreenSurface>
@@ -152,36 +153,121 @@ void HexViewRhiWindow::invalidateCache() {
 //   return QWindow::event(e);
 // }
 
+void HexViewRhiWindow::drainPendingMouseMove()
+{
+  if (!m_pendingMouseMove || !m_view || !m_view->viewport())
+    return;
+
+  m_pendingMouseMove = false;
+
+  // Map global -> viewport coordinates
+  const QPoint vp = m_view->viewport()->mapFromGlobal(m_pendingGlobalPos.toPoint());
+  const QPoint vpPos(vp);
+
+  // Update selection/hover/etc once per frame
+  m_view->handleCoalescedMouseMove(vpPos, m_pendingButtons, m_pendingMods);
+}
+
+void HexViewRhiWindow::drainPendingWheel()
+{
+  if (!m_pendingWheel || !m_view || !m_view->viewport())
+    return;
+
+  m_pendingWheel = false;
+
+  const QPoint vp = m_view->viewport()->mapFromGlobal(m_wheelGlobalPos.toPoint());
+  const QPointF vpPos(vp);
+
+  QWheelEvent ev(
+      vpPos,
+      m_wheelGlobalPos,
+      m_wheelPixelDelta,
+      m_wheelAngleDelta,
+      m_wheelButtons,
+      m_wheelMods,
+      m_wheelPhase,
+      /*inverted*/ false
+  );
+
+  QCoreApplication::sendEvent(m_view->viewport(), &ev);
+
+  m_wheelPixelDelta = {};
+  m_wheelAngleDelta = {};
+
+  // Trackpad inertia ends with ScrollEnd; if not available, use a timeout
+  if (m_wheelPhase == Qt::ScrollEnd)
+    m_scrolling = false;
+}
+
 bool HexViewRhiWindow::event(QEvent *e)
 {
-  // Keep your UpdateRequest/render handling first
   if (e->type() == QEvent::UpdateRequest) {
     renderFrame();
 
-    // const bool animating =
-    // m_view && m_view->m_selectionAnimation &&
-    // m_view->m_selectionAnimation->state() == QAbstractAnimation::Running;
-
-    // if (m_view && (m_view->m_isDragging || animating)) {
-    //   requestUpdate();
-    // }
-    return true;
+    // Keep pumping frames while dragging (or animating)
+    if (m_dragging || m_scrolling || m_pumpFrames > 0) {
+      if (m_pumpFrames > 0)
+        --m_pumpFrames;
+      requestUpdate();
+    }
+    // Let Qt do its internal handling too
+    return QWindow::event(e);
   }
 
   if (!m_view || !m_view->viewport())
     return QWindow::event(e);
 
   switch (e->type()) {
-    case QEvent::MouseButtonPress:
-      // Ensure HexView gets keyboard focus after click
+    case QEvent::MouseButtonPress: {
       m_view->setFocus(Qt::MouseFocusReason);
-      QCoreApplication::sendEvent(m_view->viewport(), e);
-      return true;
+      m_dragging = true;
 
-    case QEvent::MouseButtonRelease:
-    case QEvent::MouseMove:
+      // Press/release: keep synchronous so existing HexView logic stays correct.
+      QCoreApplication::sendEvent(m_view->viewport(), e);
+
+      requestUpdate();
+      return true;
+    }
+
+    case QEvent::MouseMove: {
+      auto *me = static_cast<QMouseEvent*>(e);
+
+      // Coalesce: keep only the latest move
+      m_pendingMouseMove = true;
+      m_pendingGlobalPos = me->globalPosition();
+      m_pendingButtons   = me->buttons();
+      m_pendingMods      = me->modifiers();
+
+      // Schedule a frame; Qt will coalesce multiple requestUpdate() calls anyway
+      requestUpdate();
+      return true;
+    }
+
+    case QEvent::MouseButtonRelease: {
+      QCoreApplication::sendEvent(m_view->viewport(), e);
+      m_dragging = false;
+      requestUpdate();
+      return true;
+    }
+
+    case QEvent::Wheel: {
+      auto *we = static_cast<QWheelEvent*>(e);
+      m_pendingWheel = true;
+      m_scrolling = true;
+
+      m_wheelGlobalPos = we->globalPosition();
+      m_wheelPixelDelta += we->pixelDelta();
+      m_wheelAngleDelta += we->angleDelta();
+      m_wheelMods = we->modifiers();
+      m_wheelButtons = we->buttons();
+      m_wheelPhase = we->phase();
+
+      m_lastScrollTick.restart();
+      requestUpdate();
+      return true;
+    }
+
     case QEvent::MouseButtonDblClick:
-    case QEvent::Wheel:
     case QEvent::KeyPress:
     case QEvent::KeyRelease:
     case QEvent::ToolTip:
@@ -195,6 +281,7 @@ bool HexViewRhiWindow::event(QEvent *e)
 
   return QWindow::event(e);
 }
+
 
 
 void HexViewRhiWindow::exposeEvent(QExposeEvent*) {
@@ -337,13 +424,16 @@ void HexViewRhiWindow::resizeSwapChain() {
 }
 
 void HexViewRhiWindow::renderFrame() {
-  if (!isExposed()) {
+  if (!isExposed())
     return;
-  }
+
   initIfNeeded();
-  if (!m_rhi || !m_sc || !m_view || !m_view->m_vgmfile) {
+  if (!m_rhi || !m_sc || !m_view || !m_view->m_vgmfile)
     return;
-  }
+
+  // Apply at most one mouse, wheel move per frame
+  drainPendingMouseMove();
+  drainPendingWheel();
 
   const int viewportWidth = m_view->viewport()->width();
   const int viewportHeight = m_view->viewport()->height();

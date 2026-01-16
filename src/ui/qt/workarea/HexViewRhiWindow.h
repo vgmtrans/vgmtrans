@@ -190,4 +190,27 @@ private:
   bool m_selectionBufferDirty = false;
   bool m_overlayBufferDirty = false;
   bool m_inited = false;
+
+  bool m_dragging = false;
+  bool m_pendingMouseMove = false;
+
+  // Mouse Move state
+  QPointF m_pendingGlobalPos;
+  Qt::MouseButtons m_pendingButtons = Qt::NoButton;
+  Qt::KeyboardModifiers m_pendingMods = Qt::NoModifier;
+
+  // Coalesced wheel state
+  bool m_pendingWheel = false;
+  QPointF m_wheelGlobalPos;
+  QPoint m_wheelPixelDelta;   // summed
+  QPoint m_wheelAngleDelta;   // summed
+  Qt::KeyboardModifiers m_wheelMods = Qt::NoModifier;
+  Qt::MouseButtons m_wheelButtons = Qt::NoButton;
+  Qt::ScrollPhase m_wheelPhase = Qt::NoScrollPhase;
+  void drainPendingMouseMove();
+
+  bool m_scrolling = false;
+  int m_pumpFrames = 0;        // generic "keep drawing for N frames"
+  QElapsedTimer m_lastScrollTick;
+  void drainPendingWheel();
 };
