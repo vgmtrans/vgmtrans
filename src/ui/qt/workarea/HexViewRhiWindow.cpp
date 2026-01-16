@@ -81,11 +81,11 @@ struct HexViewRhiWindow::BackendData {
   QRhiGles2InitParams glesParams;
   std::unique_ptr<QOffscreenSurface> fallbackSurface;
 #endif
-//
-// #if QT_CONFIG(vulkan)
-//   QRhiVulkanInitParams vkParams;
-//   std::unique_ptr<QVulkanInstance> vkInstance;
-// #endif
+
+#if QT_CONFIG(vulkan) && __has_include(<vulkan/vulkan.h>)
+  QRhiVulkanInitParams vkParams;
+  std::unique_ptr<QVulkanInstance> vkInstance;
+#endif
 
 #if QT_CONFIG(metal)
   QRhiMetalInitParams metalParams;
@@ -233,20 +233,20 @@ void HexViewRhiWindow::initIfNeeded() {
 #endif
         break;
       case QRhi::Vulkan:
-// #if QT_CONFIG(vulkan)
-//         m_backend->vkInstance = std::make_unique<QVulkanInstance>();
-//         m_backend->vkInstance->setExtensions(QRhiVulkanInitParams::preferredInstanceExtensions());
-//         if (!m_backend->vkInstance->create()) {
-//           qWarning("Failed to create QVulkanInstance for HexViewRhiWindow");
-//           return;
-//         }
-//         m_backend->vkParams.inst = m_backend->vkInstance.get();
-//         m_backend->vkParams.window = this;
-//         m_backend->initParams = &m_backend->vkParams;
-// #else
+#if QT_CONFIG(vulkan) && __has_include(<vulkan/vulkan.h>)
+        m_backend->vkInstance = std::make_unique<QVulkanInstance>();
+        m_backend->vkInstance->setExtensions(QRhiVulkanInitParams::preferredInstanceExtensions());
+        if (!m_backend->vkInstance->create()) {
+          qWarning("Failed to create QVulkanInstance for HexViewRhiWindow");
+          return;
+        }
+        m_backend->vkParams.inst = m_backend->vkInstance.get();
+        m_backend->vkParams.window = this;
+        m_backend->initParams = &m_backend->vkParams;
+#else
         m_backend->backend = QRhi::Null;
         m_backend->initParams = &m_backend->nullParams;
-// #endif
+#endif
         break;
       case QRhi::Metal:
 #if QT_CONFIG(metal)
