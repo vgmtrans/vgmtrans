@@ -130,8 +130,9 @@ qt_add_shaders(
     workarea/shaders/hexquad.frag
     workarea/shaders/hexglyph.vert
     workarea/shaders/hexglyph.frag
-    workarea/shaders/hexshadow.vert
-    workarea/shaders/hexshadow.frag
+    workarea/shaders/hexscreen.vert
+    workarea/shaders/hexblur.frag
+    workarea/shaders/hexcomposite.frag
 )
 
 # Workaround macdeployqt not correctly deploying QtDbus

@@ -19,6 +19,7 @@
 #include <QFile>
 #include <QMatrix4x4>
 #include <QPalette>
+#include <QSize>
 #include <QScrollBar>
 #include <QString>
 #include <QVector4D>
@@ -38,15 +39,14 @@
 #include <array>
 #include <cmath>
 #include <limits>
+#include <utility>
 #include <qabstractanimation.h>
 #include <qcoreapplication.h>
 
 namespace {
 constexpr int NUM_ADDRESS_NIBBLES = 8;
 constexpr int HEX_TO_ASCII_SPACING_CHARS = 4;
-constexpr int SELECTION_PADDING = 18;
 const QColor SHADOW_COLOR = Qt::black;
-constexpr float SHADOW_CORNER_RADIUS = 0.0f;
 
 static const float kVertices[] = {
   0.0f, 0.0f,
@@ -55,6 +55,9 @@ static const float kVertices[] = {
   0.0f, 1.0f,
 };
 static const quint16 kIndices[] = {0, 1, 2, 0, 2, 3};
+
+static constexpr int kMat4Bytes = 16 * sizeof(float);  // 64
+static constexpr int kVec4Bytes = 4 * sizeof(float);   // 16
 
 QVector4D toVec4(const QColor& color) {
   return QVector4D(color.redF(), color.greenF(), color.blueF(), color.alphaF());
@@ -133,10 +136,6 @@ void HexViewRhiWindow::markSelectionDirty() {
   m_selectionDirty = true;
 }
 
-void HexViewRhiWindow::markOverlayDirty() {
-  m_overlayDirty = true;
-}
-
 void HexViewRhiWindow::invalidateCache() {
   m_cachedLines.clear();
   m_cacheStartLine = 0;
@@ -211,7 +210,8 @@ bool HexViewRhiWindow::event(QEvent *e)
       requestUpdate();
     }
     // Let Qt do its internal handling too
-    return QWindow::event(e);
+    // return QWindow::event(e);
+    return true;
   }
 
   if (!m_view || !m_view->viewport())
@@ -380,22 +380,29 @@ void HexViewRhiWindow::initIfNeeded() {
   m_ibuf = m_rhi->newBuffer(QRhiBuffer::Immutable, QRhiBuffer::IndexBuffer, sizeof(kIndices));
   m_ibuf->create();
 
-  const int uboSize = m_rhi->ubufAligned(sizeof(QMatrix4x4) + sizeof(QVector4D));
-  m_ubuf = m_rhi->newBuffer(QRhiBuffer::Dynamic, QRhiBuffer::UniformBuffer, uboSize);
+  // const int baseUboSize = m_rhi->ubufAligned(sizeof(QMatrix4x4));
+  const int baseUboSize = m_rhi->ubufAligned(kMat4Bytes);
+  m_ubuf = m_rhi->newBuffer(QRhiBuffer::Dynamic, QRhiBuffer::UniformBuffer, baseUboSize);
   m_ubuf->create();
 
-  m_overlayUbuf = m_rhi->newBuffer(QRhiBuffer::Dynamic, QRhiBuffer::UniformBuffer,
-                                   sizeof(QMatrix4x4));
-  m_overlayUbuf->create();
-
-  m_shadowUbuf = m_rhi->newBuffer(QRhiBuffer::Dynamic, QRhiBuffer::UniformBuffer,
-                                  sizeof(QMatrix4x4) + sizeof(QVector4D));
-  m_shadowUbuf->create();
+  // const int screenUboSize = m_rhi->ubufAligned(sizeof(QMatrix4x4) + sizeof(QVector4D) * 4);
+  const int screenUboSize = m_rhi->ubufAligned(kMat4Bytes + kVec4Bytes * 4);
+  m_blurUbufH = m_rhi->newBuffer(QRhiBuffer::Dynamic, QRhiBuffer::UniformBuffer, screenUboSize);
+  m_blurUbufH->create();
+  m_blurUbufV = m_rhi->newBuffer(QRhiBuffer::Dynamic, QRhiBuffer::UniformBuffer, screenUboSize);
+  m_blurUbufV->create();
+  m_compositeUbuf = m_rhi->newBuffer(QRhiBuffer::Dynamic, QRhiBuffer::UniformBuffer, screenUboSize);
+  m_compositeUbuf->create();
 
   m_glyphSampler = m_rhi->newSampler(QRhiSampler::Linear, QRhiSampler::Linear,
                                      QRhiSampler::None, QRhiSampler::ClampToEdge,
                                      QRhiSampler::ClampToEdge);
   m_glyphSampler->create();
+
+  m_maskSampler = m_rhi->newSampler(QRhiSampler::Nearest, QRhiSampler::Nearest,
+                                    QRhiSampler::None, QRhiSampler::ClampToEdge,
+                                    QRhiSampler::ClampToEdge);
+  m_maskSampler->create();
 
   m_staticBuffersUploaded = false;
   m_sampleCount = 0;
@@ -483,12 +490,6 @@ void HexViewRhiWindow::renderFrame() {
     m_baseBufferDirty = true;
   }
 
-  if (m_overlayDirty) {
-    buildOverlayInstances(viewportHeight);
-    m_overlayDirty = false;
-    m_overlayBufferDirty = true;
-  }
-
   if (m_selectionDirty) {
     buildSelectionInstances(startLine, endLine);
     m_selectionDirty = false;
@@ -502,12 +503,11 @@ void HexViewRhiWindow::renderFrame() {
     m_staticBuffersUploaded = true;
   }
   ensureGlyphTexture(u);
+  const QSize pixelSize = m_sc->currentPixelSize();
+  ensureRenderTargets(pixelSize);
   ensurePipelines();
-  updateUniforms(u, static_cast<float>(scrollY));
+  updateUniforms(u, static_cast<float>(scrollY), pixelSize);
   updateInstanceBuffers(u);
-
-  m_cb->beginPass(rt, m_view->palette().color(QPalette::Window), {1.0f, 0}, u);
-  m_cb->setViewport(QRhiViewport(0, 0, rt->pixelSize().width(), rt->pixelSize().height()));
 
   int baseRectFirst = 0;
   int baseRectCount = 0;
@@ -527,14 +527,40 @@ void HexViewRhiWindow::renderFrame() {
     baseGlyphCount = std::max(0, baseGlyphLast - baseGlyphFirst);
   }
 
+  const QColor clearColor = m_view->palette().color(QPalette::Window);
+
+  m_cb->beginPass(m_contentRt, clearColor, {1.0f, 0}, u);
+  m_cb->setViewport(QRhiViewport(0, 0, pixelSize.width(), pixelSize.height()));
   drawRectBuffer(m_cb, m_baseRectBuf, baseRectCount, baseRectFirst);
   drawGlyphBuffer(m_cb, m_baseGlyphBuf, baseGlyphCount, baseGlyphFirst);
-  drawRectBuffer(m_cb, m_overlayRectBuf, static_cast<int>(m_overlayRectInstances.size()), 0,
-                 m_overlaySrb);
-  drawShadowBuffer(m_cb);
-  drawRectBuffer(m_cb, m_selectionRectBuf, static_cast<int>(m_selectionRectInstances.size()));
-  drawGlyphBuffer(m_cb, m_selectionGlyphBuf, static_cast<int>(m_selectionGlyphInstances.size()));
+  m_cb->endPass();
 
+  m_cb->beginPass(m_maskRt, QColor(0, 0, 0, 0), {1.0f, 0}, nullptr);
+  m_cb->setViewport(QRhiViewport(0, 0, pixelSize.width(), pixelSize.height()));
+  drawRectBuffer(m_cb, m_maskRectBuf, static_cast<int>(m_maskRectInstances.size()), 0, nullptr,
+                 m_maskPso);
+  m_cb->endPass();
+
+  const bool hasShadow = (m_view->m_shadowBlur > 0.0f) && !m_maskRectInstances.empty();
+  if (hasShadow) {
+    m_cb->beginPass(m_shadowRtA, QColor(0, 0, 0, 0), {1.0f, 0}, nullptr);
+    m_cb->setViewport(QRhiViewport(0, 0, pixelSize.width(), pixelSize.height()));
+    drawFullscreen(m_cb, m_blurPso, m_blurSrbH);
+    m_cb->endPass();
+
+    m_cb->beginPass(m_shadowRtB, QColor(0, 0, 0, 0), {1.0f, 0}, nullptr);
+    m_cb->setViewport(QRhiViewport(0, 0, pixelSize.width(), pixelSize.height()));
+    drawFullscreen(m_cb, m_blurPso, m_blurSrbV);
+    m_cb->endPass();
+  } else {
+    m_cb->beginPass(m_shadowRtB, QColor(0, 0, 0, 0), {1.0f, 0}, nullptr);
+    m_cb->setViewport(QRhiViewport(0, 0, pixelSize.width(), pixelSize.height()));
+    m_cb->endPass();
+  }
+
+  m_cb->beginPass(rt, clearColor, {1.0f, 0}, nullptr);
+  m_cb->setViewport(QRhiViewport(0, 0, rt->pixelSize().width(), rt->pixelSize().height()));
+  drawFullscreen(m_cb, m_compositePso, m_compositeSrb);
   m_cb->endPass();
   m_rhi->endFrame(m_sc);
 }
@@ -548,22 +574,32 @@ void HexViewRhiWindow::releaseResources() {
   m_rectPso = nullptr;
   delete m_glyphPso;
   m_glyphPso = nullptr;
-  delete m_shadowPso;
-  m_shadowPso = nullptr;
+  delete m_maskPso;
+  m_maskPso = nullptr;
+  delete m_blurPso;
+  m_blurPso = nullptr;
+  delete m_compositePso;
+  m_compositePso = nullptr;
 
   delete m_rectSrb;
   m_rectSrb = nullptr;
-  delete m_overlaySrb;
-  m_overlaySrb = nullptr;
   delete m_glyphSrb;
   m_glyphSrb = nullptr;
-  delete m_shadowSrb;
-  m_shadowSrb = nullptr;
+  delete m_blurSrbH;
+  m_blurSrbH = nullptr;
+  delete m_blurSrbV;
+  m_blurSrbV = nullptr;
+  delete m_compositeSrb;
+  m_compositeSrb = nullptr;
+
+  releaseRenderTargets();
 
   delete m_glyphTex;
   m_glyphTex = nullptr;
   delete m_glyphSampler;
   m_glyphSampler = nullptr;
+  delete m_maskSampler;
+  m_maskSampler = nullptr;
 
   delete m_vbuf;
   m_vbuf = nullptr;
@@ -573,20 +609,16 @@ void HexViewRhiWindow::releaseResources() {
   m_baseRectBuf = nullptr;
   delete m_baseGlyphBuf;
   m_baseGlyphBuf = nullptr;
-  delete m_overlayRectBuf;
-  m_overlayRectBuf = nullptr;
-  delete m_selectionRectBuf;
-  m_selectionRectBuf = nullptr;
-  delete m_selectionGlyphBuf;
-  m_selectionGlyphBuf = nullptr;
-  delete m_shadowBuf;
-  m_shadowBuf = nullptr;
+  delete m_maskRectBuf;
+  m_maskRectBuf = nullptr;
   delete m_ubuf;
   m_ubuf = nullptr;
-  delete m_overlayUbuf;
-  m_overlayUbuf = nullptr;
-  delete m_shadowUbuf;
-  m_shadowUbuf = nullptr;
+  delete m_blurUbufH;
+  m_blurUbufH = nullptr;
+  delete m_blurUbufV;
+  m_blurUbufV = nullptr;
+  delete m_compositeUbuf;
+  m_compositeUbuf = nullptr;
 
   delete m_rp;
   m_rp = nullptr;
@@ -598,39 +630,96 @@ void HexViewRhiWindow::releaseResources() {
   delete m_rhi;
   m_rhi = nullptr;
 
+  m_pipelinesDirty = true;
   m_inited = false;
 }
 
+void HexViewRhiWindow::ensureRenderTargets(const QSize& pixelSize) {
+  if (!m_rhi || pixelSize.isEmpty()) {
+    return;
+  }
+  if (m_contentTex && m_contentTex->pixelSize() == pixelSize) {
+    return;
+  }
+
+  releaseRenderTargets();
+
+  auto makeTarget = [&](QRhiTexture** tex, QRhiTextureRenderTarget** rt,
+                        QRhiRenderPassDescriptor** rp) {
+    *tex = m_rhi->newTexture(QRhiTexture::RGBA8, pixelSize, 1, QRhiTexture::RenderTarget);
+    (*tex)->create();
+    *rt = m_rhi->newTextureRenderTarget(QRhiTextureRenderTargetDescription(*tex));
+    *rp = (*rt)->newCompatibleRenderPassDescriptor();
+    (*rt)->setRenderPassDescriptor(*rp);
+    (*rt)->create();
+  };
+
+  makeTarget(&m_contentTex, &m_contentRt, &m_contentRp);
+  makeTarget(&m_maskTex, &m_maskRt, &m_maskRp);
+  makeTarget(&m_shadowTexA, &m_shadowRtA, &m_shadowRpA);
+  makeTarget(&m_shadowTexB, &m_shadowRtB, &m_shadowRpB);
+
+  m_pipelinesDirty = true;
+}
+
+void HexViewRhiWindow::releaseRenderTargets() {
+  delete m_contentRp;
+  m_contentRp = nullptr;
+  delete m_contentRt;
+  m_contentRt = nullptr;
+  delete m_contentTex;
+  m_contentTex = nullptr;
+
+  delete m_maskRp;
+  m_maskRp = nullptr;
+  delete m_maskRt;
+  m_maskRt = nullptr;
+  delete m_maskTex;
+  m_maskTex = nullptr;
+
+  delete m_shadowRpA;
+  m_shadowRpA = nullptr;
+  delete m_shadowRtA;
+  m_shadowRtA = nullptr;
+  delete m_shadowTexA;
+  m_shadowTexA = nullptr;
+
+  delete m_shadowRpB;
+  m_shadowRpB = nullptr;
+  delete m_shadowRtB;
+  m_shadowRtB = nullptr;
+  delete m_shadowTexB;
+  m_shadowTexB = nullptr;
+}
+
 void HexViewRhiWindow::ensurePipelines() {
-  if (!m_sc) {
+  if (!m_sc || !m_contentRp || !m_maskRp || !m_shadowRpA || !m_shadowRpB) {
     return;
   }
 
   const int sampleCount = m_sc->sampleCount();
-  if (m_rectPso && m_sampleCount == sampleCount) {
+  if (!m_pipelinesDirty && m_rectPso && m_sampleCount == sampleCount) {
     return;
   }
   m_sampleCount = sampleCount;
+  m_pipelinesDirty = false;
 
   delete m_rectPso;
   delete m_glyphPso;
-  delete m_shadowPso;
+  delete m_maskPso;
+  delete m_blurPso;
+  delete m_compositePso;
   delete m_rectSrb;
-  delete m_overlaySrb;
   delete m_glyphSrb;
-  delete m_shadowSrb;
+  delete m_blurSrbH;
+  delete m_blurSrbV;
+  delete m_compositeSrb;
 
   m_rectSrb = m_rhi->newShaderResourceBindings();
   m_rectSrb->setBindings({
     QRhiShaderResourceBinding::uniformBuffer(0, QRhiShaderResourceBinding::VertexStage, m_ubuf)
   });
   m_rectSrb->create();
-
-  m_overlaySrb = m_rhi->newShaderResourceBindings();
-  m_overlaySrb->setBindings({
-    QRhiShaderResourceBinding::uniformBuffer(0, QRhiShaderResourceBinding::VertexStage, m_overlayUbuf)
-  });
-  m_overlaySrb->create();
 
   m_glyphSrb = m_rhi->newShaderResourceBindings();
   m_glyphSrb->setBindings({
@@ -640,21 +729,50 @@ void HexViewRhiWindow::ensurePipelines() {
   });
   m_glyphSrb->create();
 
-  m_shadowSrb = m_rhi->newShaderResourceBindings();
-  m_shadowSrb->setBindings({
+  m_blurSrbH = m_rhi->newShaderResourceBindings();
+  m_blurSrbH->setBindings({
     QRhiShaderResourceBinding::uniformBuffer(0,
                                              QRhiShaderResourceBinding::VertexStage |
                                              QRhiShaderResourceBinding::FragmentStage,
-                                             m_shadowUbuf)
+                                             m_blurUbufH),
+    QRhiShaderResourceBinding::sampledTexture(1, QRhiShaderResourceBinding::FragmentStage,
+                                              m_maskTex, m_glyphSampler)
   });
-  m_shadowSrb->create();
+  m_blurSrbH->create();
+
+  m_blurSrbV = m_rhi->newShaderResourceBindings();
+  m_blurSrbV->setBindings({
+    QRhiShaderResourceBinding::uniformBuffer(0,
+                                             QRhiShaderResourceBinding::VertexStage |
+                                             QRhiShaderResourceBinding::FragmentStage,
+                                             m_blurUbufV),
+    QRhiShaderResourceBinding::sampledTexture(1, QRhiShaderResourceBinding::FragmentStage,
+                                              m_shadowTexA, m_glyphSampler)
+  });
+  m_blurSrbV->create();
+
+  m_compositeSrb = m_rhi->newShaderResourceBindings();
+  m_compositeSrb->setBindings({
+    QRhiShaderResourceBinding::uniformBuffer(0,
+                                             QRhiShaderResourceBinding::VertexStage |
+                                             QRhiShaderResourceBinding::FragmentStage,
+                                             m_compositeUbuf),
+    QRhiShaderResourceBinding::sampledTexture(1, QRhiShaderResourceBinding::FragmentStage,
+                                              m_contentTex, m_glyphSampler),
+    QRhiShaderResourceBinding::sampledTexture(2, QRhiShaderResourceBinding::FragmentStage,
+                                              m_maskTex, m_maskSampler),
+    QRhiShaderResourceBinding::sampledTexture(3, QRhiShaderResourceBinding::FragmentStage,
+                                              m_shadowTexB, m_glyphSampler)
+  });
+  m_compositeSrb->create();
 
   QShader rectVert = loadShader(":/shaders/hexquad.vert.qsb");
   QShader rectFrag = loadShader(":/shaders/hexquad.frag.qsb");
   QShader glyphVert = loadShader(":/shaders/hexglyph.vert.qsb");
   QShader glyphFrag = loadShader(":/shaders/hexglyph.frag.qsb");
-  QShader shadowVert = loadShader(":/shaders/hexshadow.vert.qsb");
-  QShader shadowFrag = loadShader(":/shaders/hexshadow.frag.qsb");
+  QShader screenVert = loadShader(":/shaders/hexscreen.vert.qsb");
+  QShader blurFrag = loadShader(":/shaders/hexblur.frag.qsb");
+  QShader compositeFrag = loadShader(":/shaders/hexcomposite.frag.qsb");
 
   QRhiVertexInputLayout rectInputLayout;
   rectInputLayout.setBindings({
@@ -679,16 +797,12 @@ void HexViewRhiWindow::ensurePipelines() {
     {1, 3, QRhiVertexInputAttribute::Float4, 8 * sizeof(float)}
   });
 
-  QRhiVertexInputLayout shadowInputLayout;
-  shadowInputLayout.setBindings({
-    {2 * sizeof(float)},
-    {sizeof(ShadowInstance), QRhiVertexInputBinding::PerInstance}
+  QRhiVertexInputLayout screenInputLayout;
+  screenInputLayout.setBindings({
+    {2 * sizeof(float)}
   });
-  shadowInputLayout.setAttributes({
-    {0, 0, QRhiVertexInputAttribute::Float2, 0},
-    {1, 1, QRhiVertexInputAttribute::Float4, 0},
-    {1, 2, QRhiVertexInputAttribute::Float4, 4 * sizeof(float)},
-    {1, 3, QRhiVertexInputAttribute::Float4, 8 * sizeof(float)}
+  screenInputLayout.setAttributes({
+    {0, 0, QRhiVertexInputAttribute::Float2, 0}
   });
 
   QRhiGraphicsPipeline::TargetBlend blend;
@@ -705,8 +819,8 @@ void HexViewRhiWindow::ensurePipelines() {
   m_rectPso->setShaderResourceBindings(m_rectSrb);
   m_rectPso->setCullMode(QRhiGraphicsPipeline::None);
   m_rectPso->setTargetBlends({blend});
-  m_rectPso->setSampleCount(m_sampleCount);
-  m_rectPso->setRenderPassDescriptor(m_sc->renderPassDescriptor());
+  m_rectPso->setSampleCount(1);
+  m_rectPso->setRenderPassDescriptor(m_contentRp);
   m_rectPso->create();
 
   m_glyphPso = m_rhi->newGraphicsPipeline();
@@ -716,20 +830,40 @@ void HexViewRhiWindow::ensurePipelines() {
   m_glyphPso->setShaderResourceBindings(m_glyphSrb);
   m_glyphPso->setCullMode(QRhiGraphicsPipeline::None);
   m_glyphPso->setTargetBlends({blend});
-  m_glyphPso->setSampleCount(m_sampleCount);
-  m_glyphPso->setRenderPassDescriptor(m_sc->renderPassDescriptor());
+  m_glyphPso->setSampleCount(1);
+  m_glyphPso->setRenderPassDescriptor(m_contentRp);
   m_glyphPso->create();
 
-  m_shadowPso = m_rhi->newGraphicsPipeline();
-  m_shadowPso->setShaderStages({{QRhiShaderStage::Vertex, shadowVert},
-                                {QRhiShaderStage::Fragment, shadowFrag}});
-  m_shadowPso->setVertexInputLayout(shadowInputLayout);
-  m_shadowPso->setShaderResourceBindings(m_shadowSrb);
-  m_shadowPso->setCullMode(QRhiGraphicsPipeline::None);
-  m_shadowPso->setTargetBlends({blend});
-  m_shadowPso->setSampleCount(m_sampleCount);
-  m_shadowPso->setRenderPassDescriptor(m_sc->renderPassDescriptor());
-  m_shadowPso->create();
+  m_maskPso = m_rhi->newGraphicsPipeline();
+  m_maskPso->setShaderStages({{QRhiShaderStage::Vertex, rectVert},
+                              {QRhiShaderStage::Fragment, rectFrag}});
+  m_maskPso->setVertexInputLayout(rectInputLayout);
+  m_maskPso->setShaderResourceBindings(m_rectSrb);
+  m_maskPso->setCullMode(QRhiGraphicsPipeline::None);
+  m_maskPso->setTargetBlends({blend});
+  m_maskPso->setSampleCount(1);
+  m_maskPso->setRenderPassDescriptor(m_maskRp);
+  m_maskPso->create();
+
+  m_blurPso = m_rhi->newGraphicsPipeline();
+  m_blurPso->setShaderStages({{QRhiShaderStage::Vertex, screenVert},
+                              {QRhiShaderStage::Fragment, blurFrag}});
+  m_blurPso->setVertexInputLayout(screenInputLayout);
+  m_blurPso->setShaderResourceBindings(m_blurSrbH);
+  m_blurPso->setCullMode(QRhiGraphicsPipeline::None);
+  m_blurPso->setSampleCount(1);
+  m_blurPso->setRenderPassDescriptor(m_shadowRpA);
+  m_blurPso->create();
+
+  m_compositePso = m_rhi->newGraphicsPipeline();
+  m_compositePso->setShaderStages({{QRhiShaderStage::Vertex, screenVert},
+                                   {QRhiShaderStage::Fragment, compositeFrag}});
+  m_compositePso->setVertexInputLayout(screenInputLayout);
+  m_compositePso->setShaderResourceBindings(m_compositeSrb);
+  m_compositePso->setCullMode(QRhiGraphicsPipeline::None);
+  m_compositePso->setSampleCount(m_sampleCount);
+  m_compositePso->setRenderPassDescriptor(m_sc->renderPassDescriptor());
+  m_compositePso->create();
 }
 
 void HexViewRhiWindow::ensureGlyphTexture(QRhiResourceUpdateBatch* u) {
@@ -760,27 +894,65 @@ void HexViewRhiWindow::ensureGlyphTexture(QRhiResourceUpdateBatch* u) {
   }
 }
 
-void HexViewRhiWindow::updateUniforms(QRhiResourceUpdateBatch* u, float scrollY) {
-  const QSize sz = m_view->viewport()->size();
+void HexViewRhiWindow::updateUniforms(QRhiResourceUpdateBatch* u, float scrollY,
+                                      const QSize& pixelSize) {
+  const QSize viewSize = m_view->viewport()->size();
+  const float uvFlipY = m_rhi->isYUpInFramebuffer() ? 0.0f : 1.0f;
 
   QMatrix4x4 proj;
-  proj.ortho(0.f, float(sz.width()), float(sz.height()), 0.f, -1.f, 1.f);
+  proj.ortho(0.f, float(viewSize.width()), float(viewSize.height()), 0.f, -1.f, 1.f);
 
   QMatrix4x4 mvp = m_rhi->clipSpaceCorrMatrix() * proj;
   mvp.translate(0.f, -scrollY, 0.f);
 
-  QVector4D params(0.f, 0.f, 0.f, 0.f);
+  u->updateDynamicBuffer(m_ubuf, 0, kMat4Bytes, mvp.constData());
 
-  u->updateDynamicBuffer(m_ubuf, 0, sizeof(QMatrix4x4), &mvp);
-  u->updateDynamicBuffer(m_ubuf, sizeof(QMatrix4x4), sizeof(QVector4D), &params);
+  QMatrix4x4 screenMvp = m_rhi->clipSpaceCorrMatrix();
+  const float invW = pixelSize.width() > 0 ? (1.0f / pixelSize.width()) : 0.0f;
+  const float invH = pixelSize.height() > 0 ? (1.0f / pixelSize.height()) : 0.0f;
+  const float dpr =
+      viewSize.width() > 0 ? (static_cast<float>(pixelSize.width()) / viewSize.width()) : 1.0f;
+  const float blurRadius = std::max(0.0f, static_cast<float>(m_view->m_shadowBlur) * dpr);
+  const QVector4D blurH(invW, 0.0f, blurRadius, 0.0f);
+  const QVector4D blurV(0.0f, invH, blurRadius, 0.0f);
 
-  QMatrix4x4 overlayMvp = m_rhi->clipSpaceCorrMatrix() * proj;
-  u->updateDynamicBuffer(m_overlayUbuf, 0, sizeof(QMatrix4x4), &overlayMvp);
+  u->updateDynamicBuffer(m_blurUbufH, 0, kMat4Bytes, screenMvp.constData());
+  u->updateDynamicBuffer(m_blurUbufH, kMat4Bytes, kVec4Bytes, &blurH);
+  u->updateDynamicBuffer(m_blurUbufV, 0, kMat4Bytes, screenMvp.constData());
+  u->updateDynamicBuffer(m_blurUbufV, kMat4Bytes, kVec4Bytes, &blurV);
 
-  u->updateDynamicBuffer(m_shadowUbuf, 0, sizeof(QMatrix4x4), &mvp);
-  QVector4D shadowParams(m_view->m_shadowOffset.x(), m_view->m_shadowOffset.y(),
-                         m_view->m_shadowBlur, SHADOW_CORNER_RADIUS);
-  u->updateDynamicBuffer(m_shadowUbuf, sizeof(QMatrix4x4), sizeof(QVector4D), &shadowParams);
+  const QVector4D screenP2(0.0f, 0.0f, uvFlipY, 0.0f);
+  u->updateDynamicBuffer(m_blurUbufH, kMat4Bytes + kVec4Bytes * 2, kVec4Bytes, &screenP2);
+  u->updateDynamicBuffer(m_blurUbufV, kMat4Bytes + kVec4Bytes * 2, kVec4Bytes, &screenP2);
+
+
+  const float viewW = static_cast<float>(viewSize.width());
+  const float viewH = static_cast<float>(viewSize.height());
+  const float shadowStrength = m_view->m_shadowBlur > 0.0f ? 1.0f : 0.0f;
+  const float shadowUvX = viewW > 0.0f ? (m_view->m_shadowOffset.x() / viewW) : 0.0f;
+  const float shadowUvY = viewH > 0.0f ? (m_view->m_shadowOffset.y() / viewH) : 0.0f;
+
+  const float charWidth = static_cast<float>(m_view->m_charWidth);
+  const float charHalfWidth = static_cast<float>(m_view->m_charHalfWidth);
+  const float hexStartX = static_cast<float>(m_view->hexXOffset()) - charHalfWidth;
+  const float hexWidth = kBytesPerLine * 3.0f * charWidth;
+  const float asciiStartX =
+      static_cast<float>(m_view->hexXOffset()) +
+      (kBytesPerLine * 3 + HEX_TO_ASCII_SPACING_CHARS) * charWidth;
+  const float asciiWidth =
+      m_view->m_shouldDrawAscii ? (kBytesPerLine * charWidth) : 0.0f;
+
+  const QVector4D p0(static_cast<float>(m_view->m_overlayOpacity), shadowStrength,
+                     shadowUvX, shadowUvY);
+  const QVector4D p1(hexStartX, hexWidth, asciiStartX, asciiWidth);
+  const QVector4D p2(viewW, viewH, uvFlipY, 0.0f);
+  const QVector4D p3 = toVec4(SHADOW_COLOR);
+
+  u->updateDynamicBuffer(m_compositeUbuf, 0, kMat4Bytes, screenMvp.constData());
+  u->updateDynamicBuffer(m_compositeUbuf, kMat4Bytes + kVec4Bytes * 0, kVec4Bytes, &p0);
+  u->updateDynamicBuffer(m_compositeUbuf, kMat4Bytes + kVec4Bytes * 1, kVec4Bytes, &p1);
+  u->updateDynamicBuffer(m_compositeUbuf, kMat4Bytes + kVec4Bytes * 2, kVec4Bytes, &p2);
+  u->updateDynamicBuffer(m_compositeUbuf, kMat4Bytes + kVec4Bytes * 3, kVec4Bytes, &p3);
 }
 
 bool HexViewRhiWindow::ensureInstanceBuffer(QRhiBuffer*& buffer, int bytes) {
@@ -813,52 +985,31 @@ void HexViewRhiWindow::updateInstanceBuffers(QRhiResourceUpdateBatch* u) {
                            m_baseGlyphInstances.data());
   }
 
-  bool overlayResized = ensureInstanceBuffer(
-      m_overlayRectBuf, static_cast<int>(m_overlayRectInstances.size() * sizeof(RectInstance)));
-  if ((m_overlayBufferDirty || overlayResized) && !m_overlayRectInstances.empty()) {
-    u->updateDynamicBuffer(m_overlayRectBuf, 0,
-                           static_cast<int>(m_overlayRectInstances.size() * sizeof(RectInstance)),
-                           m_overlayRectInstances.data());
-  }
-
-  bool selectionRectResized = ensureInstanceBuffer(
-      m_selectionRectBuf, static_cast<int>(m_selectionRectInstances.size() * sizeof(RectInstance)));
-  if ((m_selectionBufferDirty || selectionRectResized) && !m_selectionRectInstances.empty()) {
-    u->updateDynamicBuffer(m_selectionRectBuf, 0,
-                           static_cast<int>(m_selectionRectInstances.size() * sizeof(RectInstance)),
-                           m_selectionRectInstances.data());
-  }
-
-  bool selectionGlyphResized = ensureInstanceBuffer(
-      m_selectionGlyphBuf, static_cast<int>(m_selectionGlyphInstances.size() * sizeof(GlyphInstance)));
-  if ((m_selectionBufferDirty || selectionGlyphResized) && !m_selectionGlyphInstances.empty()) {
-    u->updateDynamicBuffer(m_selectionGlyphBuf, 0,
-                           static_cast<int>(m_selectionGlyphInstances.size() * sizeof(GlyphInstance)),
-                           m_selectionGlyphInstances.data());
-  }
-
-  bool shadowResized = ensureInstanceBuffer(
-      m_shadowBuf, static_cast<int>(m_shadowInstances.size() * sizeof(ShadowInstance)));
-  if ((m_selectionBufferDirty || shadowResized) && !m_shadowInstances.empty()) {
-    u->updateDynamicBuffer(m_shadowBuf, 0,
-                           static_cast<int>(m_shadowInstances.size() * sizeof(ShadowInstance)),
-                           m_shadowInstances.data());
+  bool maskRectResized = ensureInstanceBuffer(
+      m_maskRectBuf, static_cast<int>(m_maskRectInstances.size() * sizeof(RectInstance)));
+  if ((m_selectionBufferDirty || maskRectResized) && !m_maskRectInstances.empty()) {
+    u->updateDynamicBuffer(m_maskRectBuf, 0,
+                           static_cast<int>(m_maskRectInstances.size() * sizeof(RectInstance)),
+                           m_maskRectInstances.data());
   }
 
   m_baseBufferDirty = false;
-  m_overlayBufferDirty = false;
   m_selectionBufferDirty = false;
 }
 
 void HexViewRhiWindow::drawRectBuffer(QRhiCommandBuffer* cb, QRhiBuffer* buffer, int count,
-                                     int firstInstance, QRhiShaderResourceBindings* srb) {
+                                     int firstInstance, QRhiShaderResourceBindings* srb,
+                                     QRhiGraphicsPipeline* pso) {
   if (!buffer || count <= 0) {
     return;
   }
   if (!srb) {
     srb = m_rectSrb;
   }
-  cb->setGraphicsPipeline(m_rectPso);
+  if (!pso) {
+    pso = m_rectPso;
+  }
+  cb->setGraphicsPipeline(pso);
   cb->setShaderResources(srb);
   const QRhiCommandBuffer::VertexInput vbufBindings[] = {
     {m_vbuf, 0},
@@ -883,18 +1034,18 @@ void HexViewRhiWindow::drawGlyphBuffer(QRhiCommandBuffer* cb, QRhiBuffer* buffer
   cb->drawIndexed(6, count, 0, 0, firstInstance);
 }
 
-void HexViewRhiWindow::drawShadowBuffer(QRhiCommandBuffer* cb) {
-  if (!m_shadowBuf || m_shadowInstances.empty() || m_view->m_shadowBlur <= 0.0f) {
+void HexViewRhiWindow::drawFullscreen(QRhiCommandBuffer* cb, QRhiGraphicsPipeline* pso,
+                                      QRhiShaderResourceBindings* srb) {
+  if (!pso || !srb) {
     return;
   }
-  cb->setGraphicsPipeline(m_shadowPso);
-  cb->setShaderResources(m_shadowSrb);
+  cb->setGraphicsPipeline(pso);
+  cb->setShaderResources(srb);
   const QRhiCommandBuffer::VertexInput vbufBindings[] = {
-    {m_vbuf, 0},
-    {m_shadowBuf, 0}
+    {m_vbuf, 0}
   };
-  cb->setVertexInput(0, 2, vbufBindings, m_ibuf, 0, QRhiCommandBuffer::IndexUInt16);
-  cb->drawIndexed(6, static_cast<int>(m_shadowInstances.size()));
+  cb->setVertexInput(0, 1, vbufBindings, m_ibuf, 0, QRhiCommandBuffer::IndexUInt16);
+  cb->drawIndexed(6, 1, 0, 0, 0);
 }
 
 QRectF HexViewRhiWindow::glyphUv(const QChar& ch) const {
@@ -927,17 +1078,6 @@ void HexViewRhiWindow::appendGlyph(std::vector<GlyphInstance>& glyphs, float x, 
                     static_cast<float>(uv.left()), static_cast<float>(uv.top()),
                     static_cast<float>(uv.right()), static_cast<float>(uv.bottom()),
                     color.x(), color.y(), color.z(), color.w()});
-}
-
-void HexViewRhiWindow::appendShadow(const QRectF& rect, float pad, const QVector4D& color) {
-  const float gx = static_cast<float>(rect.x() - pad);
-  const float gy = static_cast<float>(rect.y() - pad);
-  const float gw = static_cast<float>(rect.width() + pad * 2.0f);
-  const float gh = static_cast<float>(rect.height() + pad * 2.0f);
-  m_shadowInstances.push_back({gx, gy, gw, gh,
-                               static_cast<float>(rect.x()), static_cast<float>(rect.y()),
-                               static_cast<float>(rect.width()), static_cast<float>(rect.height()),
-                               color.x(), color.y(), color.z(), color.w()});
 }
 
 void HexViewRhiWindow::ensureCacheWindow(int startLine, int endLine, int totalLines) {
@@ -1117,46 +1257,21 @@ void HexViewRhiWindow::buildBaseInstances() {
   }
 }
 
-void HexViewRhiWindow::buildOverlayInstances(int viewportHeight) {
-  m_overlayRectInstances.clear();
-  if (m_view->m_overlayOpacity <= 0.0f) {
-    return;
-  }
-
-  m_overlayRectInstances.reserve(2);
-  const float charWidth = static_cast<float>(m_view->m_charWidth);
-  const float charHalfWidth = static_cast<float>(m_view->m_charHalfWidth);
-  const float hexStartX = static_cast<float>(m_view->hexXOffset());
-  const float asciiStartX =
-      hexStartX + (kBytesPerLine * 3 + HEX_TO_ASCII_SPACING_CHARS) * charWidth;
-  const QVector4D overlayColor(0.0f, 0.0f, 0.0f, static_cast<float>(m_view->m_overlayOpacity));
-
-  const float y = 0.0f;
-  appendRect(m_overlayRectInstances, hexStartX - charHalfWidth, y,
-             kBytesPerLine * 3.0f * charWidth, static_cast<float>(viewportHeight), overlayColor);
-  if (m_view->m_shouldDrawAscii) {
-    appendRect(m_overlayRectInstances, asciiStartX, y,
-               kBytesPerLine * charWidth, static_cast<float>(viewportHeight), overlayColor);
-  }
-}
-
 void HexViewRhiWindow::buildSelectionInstances(int startLine, int endLine) {
-  m_selectionRectInstances.clear();
-  m_selectionGlyphInstances.clear();
-  m_shadowInstances.clear();
+  m_maskRectInstances.clear();
 
   const bool hasSelection = !m_view->m_selections.empty() || !m_view->m_fadeSelections.empty();
-  if (!hasSelection) {
+  if (!hasSelection || startLine > endLine) {
     return;
   }
 
   const int visibleCount = endLine - startLine + 1;
-  if (visibleCount > 0) {
-    m_selectionRectInstances.reserve(static_cast<size_t>(visibleCount) * 4);
-    m_selectionGlyphInstances.reserve(static_cast<size_t>(visibleCount) *
-                                      (m_view->m_shouldDrawAscii ? 80 : 64));
-    m_shadowInstances.reserve(static_cast<size_t>(visibleCount) * 2);
+  if (visibleCount <= 0) {
+    return;
   }
+
+  m_maskRectInstances.reserve(static_cast<size_t>(visibleCount) *
+                              (m_view->m_shouldDrawAscii ? 4 : 2));
 
   const uint32_t fileLength = m_view->m_vgmfile->unLength;
   const float charWidth = static_cast<float>(m_view->m_charWidth);
@@ -1165,27 +1280,15 @@ void HexViewRhiWindow::buildSelectionInstances(int startLine, int endLine) {
   const float hexStartX = static_cast<float>(m_view->hexXOffset());
   const float asciiStartX =
       hexStartX + (kBytesPerLine * 3 + HEX_TO_ASCII_SPACING_CHARS) * charWidth;
+  const QVector4D maskColor(1.0f, 1.0f, 1.0f, 1.0f);
 
-  const auto& styles = m_view->m_styles;
-  auto styleFor = [&](uint16_t styleId) -> const HexView::Style& {
-    if (styleId < styles.size()) {
-      return styles[styleId];
-    }
-    return styles.front();
+  struct Interval {
+    int start = 0;
+    int end = 0;
   };
 
-  static const char kHexDigits[] = "0123456789ABCDEF";
-  std::array<QRectF, 16> hexUvs{};
-  for (int i = 0; i < 16; ++i) {
-    hexUvs[i] = glyphUv(QLatin1Char(kHexDigits[i]));
-  }
-  const QRectF spaceUv = glyphUv(QLatin1Char(' '));
-
-  const bool doShadow = m_view->m_shadowBlur > 0.0f;
-  const QVector4D shadowColor = toVec4(SHADOW_COLOR);
-  const float shadowPadBase = m_view->m_shadowBlur * 2.0f + SELECTION_PADDING +
-                              std::max(std::abs(m_view->m_shadowOffset.x()),
-                                       std::abs(m_view->m_shadowOffset.y()));
+  std::vector<std::vector<Interval>> perLine;
+  perLine.resize(static_cast<size_t>(visibleCount));
 
   const std::vector<HexView::SelectionRange>& selections =
       m_view->m_selections.empty() ? m_view->m_fadeSelections : m_view->m_selections;
@@ -1194,83 +1297,78 @@ void HexViewRhiWindow::buildSelectionInstances(int startLine, int endLine) {
     if (selection.length == 0) {
       continue;
     }
-    const int selectionStart = static_cast<int>(selection.offset - m_view->m_vgmfile->dwOffset);
-    const int selectionEnd = selectionStart + static_cast<int>(selection.length);
+
+    int selectionStart = static_cast<int>(selection.offset - m_view->m_vgmfile->dwOffset);
+    int selectionEnd = selectionStart + static_cast<int>(selection.length);
     if (selectionEnd <= 0 || selectionStart >= static_cast<int>(fileLength)) {
       continue;
     }
+    selectionStart = std::max(selectionStart, 0);
+    selectionEnd = std::min(selectionEnd, static_cast<int>(fileLength));
+    if (selectionEnd <= selectionStart) {
+      continue;
+    }
 
-    const int selStartLine = std::max(startLine, selectionStart / kBytesPerLine);
-    const int selEndLine = std::min(endLine, (selectionEnd - 1) / kBytesPerLine);
+    const int selStartLine = selectionStart / kBytesPerLine;
+    const int selEndLine = (selectionEnd - 1) / kBytesPerLine;
+    const int lineStart = std::max(startLine, selStartLine);
+    const int lineEnd = std::min(endLine, selEndLine);
 
-    for (int line = selStartLine; line <= selEndLine; ++line) {
+    for (int line = lineStart; line <= lineEnd; ++line) {
       const CachedLine* entry = cachedLineFor(line);
       if (!entry || entry->bytes <= 0) {
         continue;
       }
 
       const int lineOffset = line * kBytesPerLine;
-      const int overlapStart = std::max(selectionStart, lineOffset);
-      const int overlapEnd = std::min(selectionEnd, lineOffset + entry->bytes);
-      if (overlapEnd <= overlapStart) {
+      const int startCol = (line == selStartLine) ? (selectionStart - lineOffset) : 0;
+      const int endCol = (line == selEndLine) ? (selectionEnd - lineOffset) : entry->bytes;
+
+      const int clampedStart = std::clamp(startCol, 0, entry->bytes);
+      const int clampedEnd = std::clamp(endCol, 0, entry->bytes);
+      if (clampedEnd <= clampedStart) {
         continue;
       }
 
-      const int startCol = overlapStart - lineOffset;
-      const int length = overlapEnd - overlapStart;
-      const float y = entry->line * lineHeight;
-
-      int spanStart = startCol;
-      uint16_t spanStyle = entry->styles[spanStart];
-      for (int i = startCol + 1; i <= startCol + length; ++i) {
-        if (i == startCol + length || entry->styles[i] != spanStyle) {
-          const int spanLen = i - spanStart;
-          const auto& style = styleFor(spanStyle);
-          const QVector4D bgColor = toVec4(style.bg);
-          const float hexX = hexStartX + spanStart * 3.0f * charWidth - charHalfWidth;
-          const QRectF hexRect(hexX, y, spanLen * 3.0f * charWidth, lineHeight);
-          appendRect(m_selectionRectInstances, hexRect.x(), hexRect.y(), hexRect.width(),
-                     hexRect.height(), bgColor);
-          if (doShadow) {
-            appendShadow(hexRect, shadowPadBase, shadowColor);
-          }
-
-          if (m_view->m_shouldDrawAscii) {
-            const float asciiX = asciiStartX + spanStart * charWidth;
-            const QRectF asciiRect(asciiX, y, spanLen * charWidth, lineHeight);
-            appendRect(m_selectionRectInstances, asciiRect.x(), asciiRect.y(), asciiRect.width(),
-                       asciiRect.height(), bgColor);
-            if (doShadow) {
-              appendShadow(asciiRect, shadowPadBase, shadowColor);
-            }
-          }
-
-          if (i < startCol + length) {
-            spanStart = i;
-            spanStyle = entry->styles[i];
-          }
-        }
-      }
-
-      for (int i = startCol; i < startCol + length; ++i) {
-        const auto& style = styleFor(entry->styles[i]);
-        const QVector4D textColor = toVec4(style.fg);
-        const uint8_t value = entry->data[i];
-        const float hexX = hexStartX + i * 3.0f * charWidth;
-        appendGlyph(m_selectionGlyphInstances, hexX, y, charWidth, lineHeight,
-                    hexUvs[value >> 4], textColor);
-        appendGlyph(m_selectionGlyphInstances, hexX + charWidth, y, charWidth, lineHeight,
-                    hexUvs[value & 0x0F], textColor);
-        appendGlyph(m_selectionGlyphInstances, hexX + 2.0f * charWidth, y, charWidth, lineHeight,
-                    spaceUv, textColor);
-
-        if (m_view->m_shouldDrawAscii) {
-          const char asciiChar = isPrintable(value) ? static_cast<char>(value) : '.';
-          const float asciiX = asciiStartX + i * charWidth;
-          appendGlyph(m_selectionGlyphInstances, asciiX, y, charWidth, lineHeight,
-                      glyphUv(QLatin1Char(asciiChar)), textColor);
-        }
-      }
+      perLine[static_cast<size_t>(line - startLine)].push_back(
+          {clampedStart, clampedEnd});
     }
+  }
+
+  for (int line = startLine; line <= endLine; ++line) {
+    auto& intervals = perLine[static_cast<size_t>(line - startLine)];
+    if (intervals.empty()) {
+      continue;
+    }
+    std::sort(intervals.begin(), intervals.end(),
+              [](const Interval& a, const Interval& b) { return a.start < b.start; });
+
+    int curStart = intervals.front().start;
+    int curEnd = intervals.front().end;
+    const float y = line * lineHeight;
+
+    auto emitRect = [&](int col0, int col1) {
+      const int length = col1 - col0;
+      if (length <= 0) {
+        return;
+      }
+      const float hexX = hexStartX + col0 * 3.0f * charWidth - charHalfWidth;
+      appendRect(m_maskRectInstances, hexX, y, length * 3.0f * charWidth, lineHeight, maskColor);
+      if (m_view->m_shouldDrawAscii) {
+        const float asciiX = asciiStartX + col0 * charWidth;
+        appendRect(m_maskRectInstances, asciiX, y, length * charWidth, lineHeight, maskColor);
+      }
+    };
+
+    for (size_t i = 1; i < intervals.size(); ++i) {
+      if (intervals[i].start <= curEnd) {
+        curEnd = std::max(curEnd, intervals[i].end);
+        continue;
+      }
+      emitRect(curStart, curEnd);
+      curStart = intervals[i].start;
+      curEnd = intervals[i].end;
+    }
+    emitRect(curStart, curEnd);
   }
 }
