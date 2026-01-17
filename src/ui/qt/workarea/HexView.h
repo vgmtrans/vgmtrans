@@ -58,24 +58,24 @@ private:
                             const uint8_t* data,
                             int offset,
                             int length,
-                            QColor bgColor,
-                            QColor textColor) const;
+                            const QColor& bgColor,
+                            const QColor& textColor) const;
   void printHex(QPainter& painter,
                 const uint8_t* data,
                 int length,
-                QColor bgColor,
-                QColor textColor) const;
+                const QColor& bgColor,
+                const QColor& textColor) const;
   void translateAndPrintAscii(QPainter& painter,
                   const uint8_t* data,
                   int offset,
                   int length,
-                  QColor bgColor,
-                  QColor textColor) const;
+                  const QColor& bgColor,
+                  const QColor& textColor) const;
   void printAscii(QPainter& painter,
                   const uint8_t* data,
                   int length,
-                  QColor bgColor,
-                  QColor textColor) const;
+                  const QColor& bgColor,
+                  const QColor& textColor) const;
   void initAnimations();
   void showSelectedItem(bool show, bool animate);
   void drawSelectedItem() const;
@@ -86,6 +86,7 @@ private:
   int charWidth;
   int charHalfWidth;
   int lineHeight;
+  int ascent;
   bool addressAsHex = true;
   bool isDragging = false;
   bool shouldDrawOffset = true;

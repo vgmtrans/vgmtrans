@@ -21,7 +21,10 @@
 #include <QScrollArea>
 #include <QScrollBar>
 #include <QToolTip>
+#include <QVarLengthArray>
 #include <QStyle>
+#include <array>
+#include <algorithm>
 
 constexpr qsizetype NUM_CACHED_LINE_PIXMAPS = 600;
 constexpr int BYTES_PER_LINE = 16;
@@ -37,6 +40,24 @@ constexpr int SHADOW_OFFSET_X = 1;
 constexpr int SHADOW_OFFSET_Y = 4;
 constexpr int SHADOW_BLUR_RADIUS = SELECTION_PADDING * 2;
 constexpr int OVERLAY_HEIGHT_IN_SCREENS = 5;
+
+namespace {
+const std::array<QChar, 256 * 3> HEX_LOOKUP_TABLE = []() {
+    constexpr char hexDigits[] = "0123456789ABCDEF";
+    
+    std::array<QChar, 256 * 3> data{};
+    for (int i = 0; i < 256; ++i) {
+        const int index = i * 3;
+        data[index]     = QChar(hexDigits[(i >> 4) & 0x0F]);
+        data[index + 1] = QChar(hexDigits[i & 0x0F]);
+        data[index + 2] = QChar(u' ');
+    }
+    return data;
+}();
+
+static constexpr std::array<QChar, 16> HEX_NIBBLE_TABLE =
+  {'0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'A', 'B', 'C', 'D', 'E', 'F'};
+}  // namespace
 
 HexView::HexView(VGMFile* vgmfile, QWidget *parent) :
       QWidget(parent), vgmfile(vgmfile), selectedItem(nullptr) {
@@ -111,6 +132,7 @@ void HexView::setFont(QFont& font) {
   this->charHalfWidth = static_cast<int>(std::round(fontMetrics.horizontalAdvance("A") / 2));
   this->lineHeight = static_cast<int>(std::round(fontMetrics.height()));
   this->lineHeight = static_cast<int>(std::round(fontMetrics.height()));
+  this->ascent = static_cast<int>(std::round(fontMetrics.ascent()));
 
   QWidget::setFont(font);
   updateSize();
@@ -593,7 +615,7 @@ void HexView::paintEvent(QPaintEvent *e) {
 
     auto cachedPixmap = lineCache.object(line);
     if (!cachedPixmap) {
-      auto linePixmap = new QPixmap(static_cast<int>(getVirtualFullWidth() * dpr), static_cast<int>(lineHeight * dpr));
+      auto linePixmap = new QPixmap(int(getActualVirtualWidth() * dpr), int(lineHeight * dpr));
       linePixmap->setDevicePixelRatio(dpr);
       linePixmap->fill(Qt::transparent);
 
@@ -626,10 +648,29 @@ void HexView::printLine(QPainter& painter, int line) const {
   painter.restore();
 }
 
+static inline QString formatAddressHex8(quint32 v) {
+  const auto& t = HEX_NIBBLE_TABLE;
+  QChar out[8];
+  // highest nibble first
+  out[0] = t[(v >> 28) & 0xF];
+  out[1] = t[(v >> 24) & 0xF];
+  out[2] = t[(v >> 20) & 0xF];
+  out[3] = t[(v >> 16) & 0xF];
+  out[4] = t[(v >> 12) & 0xF];
+  out[5] = t[(v >>  8) & 0xF];
+  out[6] = t[(v >>  4) & 0xF];
+  out[7] = t[(v >>  0) & 0xF];
+  return QString(out, 8);
+}
+
+static inline QString formatAddressDec8(quint32 v) {
+  return QString::number(v).rightJustified(8, QLatin1Char('0'));
+}
+
 void HexView::printAddress(QPainter& painter, int line) const {
-  auto fileOffset = vgmfile->dwOffset + (line * BYTES_PER_LINE);
-  QString hexString = QString("%1").arg(fileOffset, 8, addressAsHex ? 16 : 10, QChar('0')).toUpper();
-  painter.drawText(rect(), Qt::AlignLeft, hexString);
+  const quint32 fileOffset = quint32(vgmfile->dwOffset) + quint32(line * BYTES_PER_LINE);
+  const QString s = addressAsHex ? formatAddressHex8(fileOffset) : formatAddressDec8(fileOffset);
+  painter.drawText(QPoint(0, ascent), s);
 }
 
 void HexView::printData(QPainter& painter, int startAddress, int endAddress) const {
@@ -684,8 +725,8 @@ void HexView::printHex(
     QPainter& painter,
     const uint8_t* data,
     int length,
-    QColor bgColor,
-    QColor textColor
+    const QColor& bgColor,
+    const QColor& textColor
 ) const {
   // Draw background color
   auto width = length * charWidth * 3;
@@ -694,15 +735,22 @@ void HexView::printHex(
   painter.fillRect(-charHalfWidth, 0, rectWidth, rectHeight, bgColor);
 
   // Draw bytes string
-  QString hexString;
-  hexString.reserve(length * 3); // 2 characters for hex and 1 for space
-
+  const auto& table = HEX_LOOKUP_TABLE;
+  QVarLengthArray<QChar, 48> hexChars(length * 3);
+  QChar* out = hexChars.data();
   for (int i = 0; i < length; ++i) {
-    hexString += QString("%1 ").arg(data[i], 2, 16, QLatin1Char('0')).toUpper();
+    // const QChar* src = table.data() + (static_cast<int>(data[i]) * 3);
+    // std::copy_n(src, 3, out + (i * 3));
+    const QChar* src = table.data() + (int(data[i]) * 3);
+    QChar* dst = out + (i * 3);
+    dst[0] = src[0];
+    dst[1] = src[1];
+    dst[2] = src[2];
   }
+  const QString hexString(hexChars.constData(), hexChars.size());
 
   painter.setPen(textColor);
-  painter.drawText(rect(), Qt::AlignLeft, hexString);
+  painter.drawText(QPoint(0, ascent), hexString);
   painter.translate(width, 0);
 }
 
@@ -711,8 +759,8 @@ void HexView::translateAndPrintHex(
     const uint8_t* data,
     int offset,
     int length,
-    QColor bgColor,
-    QColor textColor
+    const QColor& bgColor,
+    const QColor& textColor
 ) const {
   painter.save();
   painter.translate(offset * 3 * charWidth, 0);
@@ -725,8 +773,8 @@ void HexView::translateAndPrintAscii(
     const uint8_t* data,
     int offset,
     int length,
-    QColor bgColor,
-    QColor textColor
+    const QColor& bgColor,
+    const QColor& textColor
 ) const {
   if (!shouldDrawAscii)
     return;
@@ -740,22 +788,23 @@ void HexView::printAscii(
     QPainter& painter,
     const uint8_t* data,
     int length,
-    QColor bgColor,
-    QColor textColor
+    const QColor& bgColor,
+    const QColor& textColor
 ) const {
   // Draw background color
   auto width = length * charWidth;
   painter.fillRect(0, 0, width, lineHeight, bgColor);
 
   // Draw ascii characters
-  QString asciiString;
-  asciiString.reserve(length);
-
+  QVarLengthArray<QChar, 16> asciiChars(length);
+  QChar* out = asciiChars.data();
   for (int i = 0; i < length; ++i) {
-    asciiString.append((data[i] < 0x20 || data[i] > 0x7E) ? '.' : QChar(data[i]));
+    const uint8_t value = data[i];
+    out[i] = (value < 0x20 || value > 0x7E) ? QChar('.') : QChar(value);
   }
+  const QString asciiString(asciiChars.constData(), asciiChars.size());
   painter.setPen(textColor);
-  painter.drawText(rect(), Qt::AlignLeft, asciiString);
+  painter.drawText(QPoint(0, ascent), asciiString);
 }
 
 void HexView::initAnimations() {
