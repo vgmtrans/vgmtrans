@@ -40,8 +40,8 @@ constexpr int VIEWPORT_PADDING = 10;
 constexpr int DIM_DURATION_MS = 200;
 constexpr int OVERLAY_ALPHA = 80;
 constexpr float OVERLAY_ALPHA_F = OVERLAY_ALPHA / 255.0f;
-constexpr float SHADOW_OFFSET_X = 1.0f;
-constexpr float SHADOW_OFFSET_Y = 4.0f;
+constexpr float SHADOW_OFFSET_X = 2.0f;
+constexpr float SHADOW_OFFSET_Y = 2.0f;
 constexpr float SHADOW_BLUR_RADIUS = SELECTION_PADDING * 2.0f;
 constexpr uint16_t STYLE_UNASSIGNED = std::numeric_limits<uint16_t>::max();
 }  // namespace
@@ -100,7 +100,6 @@ void HexView::setFont(const QFont& font) {
   if (m_rhiWindow) {
     m_rhiWindow->markBaseDirty();
     m_rhiWindow->markSelectionDirty();
-    m_rhiWindow->markOverlayDirty();
     m_rhiWindow->requestUpdate();
   }
 }
@@ -193,7 +192,6 @@ void HexView::updateLayout() {
       m_rhiWindow->markBaseDirty();
       m_rhiWindow->markSelectionDirty();
     }
-    m_rhiWindow->markOverlayDirty();
     m_rhiWindow->requestUpdate();
   }
 }
@@ -629,7 +627,6 @@ void HexView::setOverlayOpacity(qreal opacity) {
   }
   m_overlayOpacity = opacity;
   if (m_rhiWindow) {
-    m_rhiWindow->markOverlayDirty();
     m_rhiWindow->requestUpdate();
   }
 }
@@ -644,7 +641,6 @@ void HexView::setShadowBlur(qreal blur) {
   }
   m_shadowBlur = blur;
   if (m_rhiWindow) {
-    m_rhiWindow->markSelectionDirty();
     m_rhiWindow->requestUpdate();
   }
 }
@@ -659,7 +655,6 @@ void HexView::setShadowOffset(const QPointF& offset) {
   }
   m_shadowOffset = offset;
   if (m_rhiWindow) {
-    m_rhiWindow->markSelectionDirty();
     m_rhiWindow->requestUpdate();
   }
 }

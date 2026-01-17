@@ -17,6 +17,7 @@ class QEvent;
 class QExposeEvent;
 class QRectF;
 class QResizeEvent;
+class QSize;
 class QVector4D;
 class QRhi;
 class QRhiBuffer;
@@ -24,6 +25,7 @@ class QRhiCommandBuffer;
 class QRhiGraphicsPipeline;
 class QRhiRenderBuffer;
 class QRhiRenderPassDescriptor;
+class QRhiTextureRenderTarget;
 class QRhiResourceUpdateBatch;
 class QRhiSampler;
 class QRhiShaderResourceBindings;
@@ -40,7 +42,6 @@ public:
 
   void markBaseDirty();
   void markSelectionDirty();
-  void markOverlayDirty();
   void invalidateCache();
 
 protected:
@@ -77,21 +78,6 @@ private:
     float a;
   };
 
-  struct ShadowInstance {
-    float gx;
-    float gy;
-    float gw;
-    float gh;
-    float rx;
-    float ry;
-    float rw;
-    float rh;
-    float r;
-    float g;
-    float b;
-    float a;
-  };
-
   struct CachedLine {
     int line = 0;
     int bytes = 0;
@@ -112,29 +98,31 @@ private:
   void resizeSwapChain();
   void renderFrame();
   void releaseResources();
+  void ensureRenderTargets(const QSize& pixelSize);
+  void releaseRenderTargets();
 
   void ensurePipelines();
   void ensureGlyphTexture(QRhiResourceUpdateBatch* u);
-  void updateUniforms(QRhiResourceUpdateBatch* u, float scrollY);
+  void updateUniforms(QRhiResourceUpdateBatch* u, float scrollY, const QSize& pixelSize);
   bool ensureInstanceBuffer(QRhiBuffer*& buffer, int bytes);
   void updateInstanceBuffers(QRhiResourceUpdateBatch* u);
   void drawRectBuffer(QRhiCommandBuffer* cb, QRhiBuffer* buffer, int count,
-                      int firstInstance = 0, QRhiShaderResourceBindings* srb = nullptr);
+                      int firstInstance = 0, QRhiShaderResourceBindings* srb = nullptr,
+                      QRhiGraphicsPipeline* pso = nullptr);
   void drawGlyphBuffer(QRhiCommandBuffer* cb, QRhiBuffer* buffer, int count, int firstInstance = 0);
-  void drawShadowBuffer(QRhiCommandBuffer* cb);
+  void drawFullscreen(QRhiCommandBuffer* cb, QRhiGraphicsPipeline* pso,
+                      QRhiShaderResourceBindings* srb);
 
   QRectF glyphUv(const QChar& ch) const;
   void appendRect(std::vector<RectInstance>& rects, float x, float y, float w, float h,
                   const QVector4D& color);
   void appendGlyph(std::vector<GlyphInstance>& glyphs, float x, float y, float w, float h,
                    const QRectF& uv, const QVector4D& color);
-  void appendShadow(const QRectF& rect, float pad, const QVector4D& color);
 
   void ensureCacheWindow(int startLine, int endLine, int totalLines);
   void rebuildCacheWindow();
   const CachedLine* cachedLineFor(int line) const;
   void buildBaseInstances();
-  void buildOverlayInstances(int viewportHeight);
   void buildSelectionInstances(int startLine, int endLine);
 
   HexView* m_view = nullptr;
@@ -147,48 +135,59 @@ private:
   QRhiRenderPassDescriptor* m_rp = nullptr;
   QRhiCommandBuffer* m_cb = nullptr;
 
+  QRhiTexture* m_contentTex = nullptr;
+  QRhiTextureRenderTarget* m_contentRt = nullptr;
+  QRhiRenderPassDescriptor* m_contentRp = nullptr;
+  QRhiTexture* m_maskTex = nullptr;
+  QRhiTextureRenderTarget* m_maskRt = nullptr;
+  QRhiRenderPassDescriptor* m_maskRp = nullptr;
+  QRhiTexture* m_shadowTexA = nullptr;
+  QRhiTexture* m_shadowTexB = nullptr;
+  QRhiTextureRenderTarget* m_shadowRtA = nullptr;
+  QRhiTextureRenderTarget* m_shadowRtB = nullptr;
+  QRhiRenderPassDescriptor* m_shadowRpA = nullptr;
+  QRhiRenderPassDescriptor* m_shadowRpB = nullptr;
+
   QRhiBuffer* m_vbuf = nullptr;
   QRhiBuffer* m_ibuf = nullptr;
   QRhiBuffer* m_baseRectBuf = nullptr;
   QRhiBuffer* m_baseGlyphBuf = nullptr;
-  QRhiBuffer* m_overlayRectBuf = nullptr;
-  QRhiBuffer* m_selectionRectBuf = nullptr;
-  QRhiBuffer* m_selectionGlyphBuf = nullptr;
-  QRhiBuffer* m_shadowBuf = nullptr;
+  QRhiBuffer* m_maskRectBuf = nullptr;
   QRhiBuffer* m_ubuf = nullptr;
-  QRhiBuffer* m_overlayUbuf = nullptr;
-  QRhiBuffer* m_shadowUbuf = nullptr;
+  QRhiBuffer* m_blurUbufH = nullptr;
+  QRhiBuffer* m_blurUbufV = nullptr;
+  QRhiBuffer* m_compositeUbuf = nullptr;
   QRhiTexture* m_glyphTex = nullptr;
   QRhiSampler* m_glyphSampler = nullptr;
+  QRhiSampler* m_maskSampler = nullptr;
   QRhiShaderResourceBindings* m_rectSrb = nullptr;
-  QRhiShaderResourceBindings* m_overlaySrb = nullptr;
   QRhiShaderResourceBindings* m_glyphSrb = nullptr;
-  QRhiShaderResourceBindings* m_shadowSrb = nullptr;
+  QRhiShaderResourceBindings* m_blurSrbH = nullptr;
+  QRhiShaderResourceBindings* m_blurSrbV = nullptr;
+  QRhiShaderResourceBindings* m_compositeSrb = nullptr;
   QRhiGraphicsPipeline* m_rectPso = nullptr;
   QRhiGraphicsPipeline* m_glyphPso = nullptr;
-  QRhiGraphicsPipeline* m_shadowPso = nullptr;
+  QRhiGraphicsPipeline* m_maskPso = nullptr;
+  QRhiGraphicsPipeline* m_blurPso = nullptr;
+  QRhiGraphicsPipeline* m_compositePso = nullptr;
   int m_sampleCount = 1;
   uint64_t m_glyphAtlasVersion = 0;
   bool m_staticBuffersUploaded = false;
+  bool m_pipelinesDirty = true;
 
   std::vector<CachedLine> m_cachedLines;
   std::vector<LineRange> m_lineRanges;
   std::vector<RectInstance> m_baseRectInstances;
   std::vector<GlyphInstance> m_baseGlyphInstances;
-  std::vector<RectInstance> m_overlayRectInstances;
-  std::vector<RectInstance> m_selectionRectInstances;
-  std::vector<GlyphInstance> m_selectionGlyphInstances;
-  std::vector<ShadowInstance> m_shadowInstances;
+  std::vector<RectInstance> m_maskRectInstances;
   int m_cacheStartLine = 0;
   int m_cacheEndLine = -1;
   int m_lastStartLine = -1;
   int m_lastEndLine = -1;
   bool m_baseDirty = true;
   bool m_selectionDirty = true;
-  bool m_overlayDirty = true;
   bool m_baseBufferDirty = false;
   bool m_selectionBufferDirty = false;
-  bool m_overlayBufferDirty = false;
   bool m_inited = false;
 
   bool m_dragging = false;
