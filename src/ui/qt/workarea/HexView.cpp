@@ -42,8 +42,7 @@ constexpr int SHADOW_BLUR_RADIUS = SELECTION_PADDING * 2;
 constexpr int OVERLAY_HEIGHT_IN_SCREENS = 5;
 
 namespace {
-auto HEX_LOOKUP_TABLE = []() -> std::array<QChar, 256 * 3>
-{
+const std::array<QChar, 256 * 3> HEX_LOOKUP_TABLE = []() {
     constexpr char hexDigits[] = "0123456789ABCDEF";
     
     std::array<QChar, 256 * 3> data{};
@@ -56,15 +55,8 @@ auto HEX_LOOKUP_TABLE = []() -> std::array<QChar, 256 * 3>
     return data;
 }();
 
-static inline const std::array<QChar, 16>& hexNibbleTable() {
-  static const std::array<QChar, 16> t = [] {
-    std::array<QChar, 16> a{};
-    constexpr char d[] = "0123456789ABCDEF";
-    for (int i = 0; i < 16; ++i) a[i] = QChar(d[i]);
-    return a;
-  }();
-  return t;
-}
+static constexpr std::array<QChar, 16> HEX_NIBBLE_TABLE =
+  {'0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'A', 'B', 'C', 'D', 'E', 'F'};
 }  // namespace
 
 HexView::HexView(VGMFile* vgmfile, QWidget *parent) :
@@ -657,7 +649,7 @@ void HexView::printLine(QPainter& painter, int line) const {
 }
 
 static inline QString formatAddressHex8(quint32 v) {
-  const auto& t = hexNibbleTable();
+  const auto& t = HEX_NIBBLE_TABLE;
   QChar out[8];
   // highest nibble first
   out[0] = t[(v >> 28) & 0xF];
@@ -743,7 +735,7 @@ void HexView::printHex(
   painter.fillRect(-charHalfWidth, 0, rectWidth, rectHeight, bgColor);
 
   // Draw bytes string
-  const auto& table = hexLookupTable();
+  const auto& table = HEX_LOOKUP_TABLE;
   QVarLengthArray<QChar, 48> hexChars(length * 3);
   QChar* out = hexChars.data();
   for (int i = 0; i < length; ++i) {
