@@ -910,11 +910,11 @@ void HexViewRhiWindow::updateUniforms(QRhiResourceUpdateBatch* u, float scrollY,
   QMatrix4x4 screenMvp = m_rhi->clipSpaceCorrMatrix();
   const float invW = pixelSize.width() > 0 ? (1.0f / pixelSize.width()) : 0.0f;
   const float invH = pixelSize.height() > 0 ? (1.0f / pixelSize.height()) : 0.0f;
-  const float dpr =
-      viewSize.width() > 0 ? (static_cast<float>(pixelSize.width()) / viewSize.width()) : 1.0f;
-  const float blurRadius = std::max(0.0f, static_cast<float>(m_view->m_shadowBlur) * dpr);
-  const QVector4D blurH(invW, 0.0f, blurRadius, 0.0f);
-  const QVector4D blurV(0.0f, invH, blurRadius, 0.0f);
+  const float dpr = viewSize.width() > 0 ? (static_cast<float>(pixelSize.width()) / viewSize.width()) : 1.0f;
+  const float blurRadiusPx = std::max(0.0f, static_cast<float>(m_view->m_shadowBlur) * dpr);
+  const float sigmaPx = std::max(0.001f, blurRadiusPx / 3.0f);
+  const QVector4D blurH(invW, 0.0f, sigmaPx, 0.0f);
+  const QVector4D blurV(0.0f, invH, sigmaPx, 0.0f);
 
   u->updateDynamicBuffer(m_blurUbufH, 0, kMat4Bytes, screenMvp.constData());
   u->updateDynamicBuffer(m_blurUbufH, kMat4Bytes, kVec4Bytes, &blurH);
@@ -929,8 +929,8 @@ void HexViewRhiWindow::updateUniforms(QRhiResourceUpdateBatch* u, float scrollY,
   const float viewW = static_cast<float>(viewSize.width());
   const float viewH = static_cast<float>(viewSize.height());
   const float shadowStrength = m_view->m_shadowBlur > 0.0f ? 1.0f : 0.0f;
-  const float shadowUvX = viewW > 0.0f ? (m_view->m_shadowOffset.x() / viewW) : 0.0f;
-  const float shadowUvY = viewH > 0.0f ? (m_view->m_shadowOffset.y() / viewH) : 0.0f;
+  const float shadowUvX = pixelSize.width() > 0 ? (m_view->m_shadowOffset.x() * dpr / pixelSize.width()) : 0.0f;
+  const float shadowUvY = pixelSize.height() > 0 ? (m_view->m_shadowOffset.y() * dpr / pixelSize.height()) : 0.0f;
 
   const float charWidth = static_cast<float>(m_view->m_charWidth);
   const float charHalfWidth = static_cast<float>(m_view->m_charHalfWidth);
