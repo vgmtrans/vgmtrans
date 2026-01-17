@@ -45,6 +45,9 @@ void main() {
   float sh = texture(shadowTex, shadowUv).r;
   // remove the solid interior contribution; keep only the halo
   float halo = max(sh - sel, 0.0);
+  // curve it: >1 make shadow punchier near edges
+  // halo = pow(clamp(halo, 0.0, 1.0), 0.8); // 0.6..0.8 is a good range
+
   float shadowAlpha = halo * shadowStrength * shadowColor.a;
   vec3 withShadow = mix(restored, shadowColor.rgb, shadowAlpha);
 

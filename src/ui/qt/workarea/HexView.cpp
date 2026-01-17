@@ -40,9 +40,10 @@ constexpr int VIEWPORT_PADDING = 10;
 constexpr int DIM_DURATION_MS = 200;
 constexpr int OVERLAY_ALPHA = 80;
 constexpr float OVERLAY_ALPHA_F = OVERLAY_ALPHA / 255.0f;
-constexpr float SHADOW_OFFSET_X = 2.0f;
-constexpr float SHADOW_OFFSET_Y = 2.0f;
+constexpr float SHADOW_OFFSET_X = 0.0f;
+constexpr float SHADOW_OFFSET_Y = 0.0f;
 constexpr float SHADOW_BLUR_RADIUS = SELECTION_PADDING * 2.0f;
+constexpr float SHADOW_STRENGTH = 1.5;
 constexpr uint16_t STYLE_UNASSIGNED = std::numeric_limits<uint16_t>::max();
 }  // namespace
 
@@ -64,6 +65,7 @@ HexView::HexView(VGMFile* vgmfile, QWidget* parent)
   const double appFontPointSize = QApplication::font().pointSizeF();
   QFont font("Roboto Mono", appFontPointSize + 1.0);
   font.setPointSizeF(appFontPointSize + 1.0);
+  setShadowStrength(SHADOW_STRENGTH);
 
   setFont(font);
   rebuildStyleMap();
@@ -655,6 +657,18 @@ void HexView::setShadowOffset(const QPointF& offset) {
   }
   m_shadowOffset = offset;
   if (m_rhiWindow) {
+    m_rhiWindow->requestUpdate();
+  }
+}
+
+qreal HexView::shadowStrength() const { return m_shadowStrength; }
+
+void HexView::setShadowStrength(qreal s) {
+  s = std::max<qreal>(0.0, s);
+  if (qFuzzyCompare(s, m_shadowStrength)) return;
+  m_shadowStrength = s;
+  if (m_rhiWindow) {
+    m_rhiWindow->markSelectionDirty();
     m_rhiWindow->requestUpdate();
   }
 }

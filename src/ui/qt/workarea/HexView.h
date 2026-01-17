@@ -29,6 +29,7 @@ class HexView final : public QAbstractScrollArea {
   Q_PROPERTY(qreal overlayOpacity READ overlayOpacity WRITE setOverlayOpacity)
   Q_PROPERTY(qreal shadowBlur READ shadowBlur WRITE setShadowBlur)
   Q_PROPERTY(QPointF shadowOffset READ shadowOffset WRITE setShadowOffset)
+  Q_PROPERTY(qreal shadowStrength READ shadowStrength WRITE setShadowStrength)
 
 public:
   explicit HexView(VGMFile* vgmfile, QWidget* parent = nullptr);
@@ -98,6 +99,8 @@ private:
   void setShadowBlur(qreal blur);
   QPointF shadowOffset() const;
   void setShadowOffset(const QPointF& offset);
+  qreal shadowStrength() const;
+  void setShadowStrength(qreal s);
   void initAnimations();
   void showSelectedItem(bool show, bool animate);
   void clearFadeSelection();
@@ -128,6 +131,7 @@ private:
   qreal m_overlayOpacity = 0.0;
   qreal m_shadowBlur = 0.0;
   QPointF m_shadowOffset{0.0, 0.0};
+  qreal m_shadowStrength = 1.0;
 
   HexViewRhiWindow* m_rhiWindow = nullptr;
   QWidget* m_rhiContainer = nullptr;
