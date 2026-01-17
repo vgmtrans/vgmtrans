@@ -928,7 +928,7 @@ void HexViewRhiWindow::updateUniforms(QRhiResourceUpdateBatch* u, float scrollY,
 
   const float viewW = static_cast<float>(viewSize.width());
   const float viewH = static_cast<float>(viewSize.height());
-  const float shadowStrength = m_view->m_shadowBlur > 0.0f ? 1.0f : 0.0f;
+  const float shadowStrength = (m_view->m_shadowBlur > 0.0f) ? float(m_view->m_shadowStrength) : 0.0f;
   const float shadowUvX = pixelSize.width() > 0 ? (m_view->m_shadowOffset.x() * dpr / pixelSize.width()) : 0.0f;
   const float shadowUvY = pixelSize.height() > 0 ? (m_view->m_shadowOffset.y() * dpr / pixelSize.height()) : 0.0f;
 
