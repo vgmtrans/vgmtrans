@@ -43,7 +43,9 @@ void main() {
 
   vec2 shadowUv = vUv + shadowOffset;
   float sh = texture(shadowTex, shadowUv).r;
-  float shadowAlpha = sh * shadowStrength * (1.0 - sel) * shadowColor.a;
+  // remove the solid interior contribution; keep only the halo
+  float halo = max(sh - sel, 0.0);
+  float shadowAlpha = halo * shadowStrength * shadowColor.a;
   vec3 withShadow = mix(restored, shadowColor.rgb, shadowAlpha);
 
   fragColor = vec4(withShadow, base.a);
