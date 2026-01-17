@@ -42,20 +42,19 @@ constexpr int SHADOW_BLUR_RADIUS = SELECTION_PADDING * 2;
 constexpr int OVERLAY_HEIGHT_IN_SCREENS = 5;
 
 namespace {
-const std::array<QChar, 256 * 3>& hexLookupTable() {
-  static const std::array<QChar, 256 * 3> table = []() {
+auto HEX_LOOKUP_TABLE = []() -> std::array<QChar, 256 * 3>
+{
+    constexpr char hexDigits[] = "0123456789ABCDEF";
+    
     std::array<QChar, 256 * 3> data{};
-    const char hexDigits[] = "0123456789ABCDEF";
     for (int i = 0; i < 256; ++i) {
-      const int index = i * 3;
-      data[index] = QChar(hexDigits[(i >> 4) & 0x0F]);
-      data[index + 1] = QChar(hexDigits[i & 0x0F]);
-      data[index + 2] = QChar(' ');
+        const int index = i * 3;
+        data[index]     = QChar(hexDigits[(i >> 4) & 0x0F]);
+        data[index + 1] = QChar(hexDigits[i & 0x0F]);
+        data[index + 2] = QChar(u' ');
     }
     return data;
-  }();
-  return table;
-}
+}();
 
 static inline const std::array<QChar, 16>& hexNibbleTable() {
   static const std::array<QChar, 16> t = [] {
