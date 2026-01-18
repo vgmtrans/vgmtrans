@@ -210,6 +210,5 @@ private:
 
   bool m_scrolling = false;
   int m_pumpFrames = 0;        // generic "keep drawing for N frames"
-  QElapsedTimer m_lastScrollTick;
   void drainPendingWheel();
 };
