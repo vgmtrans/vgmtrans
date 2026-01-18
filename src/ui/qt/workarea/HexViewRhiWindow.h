@@ -100,6 +100,7 @@ private:
   void releaseResources();
   void ensureRenderTargets(const QSize& pixelSize);
   void releaseRenderTargets();
+  bool debugLoggingEnabled() const;
 
   void ensurePipelines();
   void ensureGlyphTexture(QRhiResourceUpdateBatch* u);
@@ -124,6 +125,8 @@ private:
   const CachedLine* cachedLineFor(int line) const;
   void buildBaseInstances();
   void buildSelectionInstances(int startLine, int endLine);
+
+  void releaseSwapChain();
 
   HexView* m_view = nullptr;
 
@@ -174,6 +177,9 @@ private:
   uint64_t m_glyphAtlasVersion = 0;
   bool m_staticBuffersUploaded = false;
   bool m_pipelinesDirty = true;
+  bool m_supportsBaseInstance = false;
+  bool m_loggedInit = false;
+  bool m_loggedFrame = false;
 
   std::vector<CachedLine> m_cachedLines;
   std::vector<LineRange> m_lineRanges;
@@ -211,4 +217,6 @@ private:
   bool m_scrolling = false;
   int m_pumpFrames = 0;        // generic "keep drawing for N frames"
   void drainPendingWheel();
+
+  bool m_hasSwapChain = false;
 };

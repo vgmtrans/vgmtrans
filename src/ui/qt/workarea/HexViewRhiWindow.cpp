@@ -42,6 +42,7 @@
 #include <utility>
 #include <qabstractanimation.h>
 #include <qcoreapplication.h>
+#include <qloggingcategory.h>
 
 namespace {
 constexpr int NUM_ADDRESS_NIBBLES = 8;
@@ -74,6 +75,11 @@ QShader loadShader(const char* path) {
     return {};
   }
   return QShader::fromSerialized(file.readAll());
+}
+
+bool isRhiDebugEnabled() {
+  // return qEnvironmentVariableIsSet("VGMTRANS_HEXVIEW_RHI_DEBUG");
+  return true;
 }
 }  // namespace
 
@@ -112,15 +118,30 @@ HexViewRhiWindow::HexViewRhiWindow(HexView* view)
 #elif defined(Q_OS_MACOS) || defined(Q_OS_IOS)
   setSurfaceType(QSurface::MetalSurface);
   m_backend->backend = QRhi::Metal;
-#elif QT_CONFIG(opengl)
-  setSurfaceType(QSurface::OpenGLSurface);
-  m_backend->backend = QRhi::OpenGLES2;
 #elif QT_CONFIG(vulkan)
   setSurfaceType(QSurface::VulkanSurface);
   m_backend->backend = QRhi::Vulkan;
+#elif QT_CONFIG(opengl)
+  setSurfaceType(QSurface::OpenGLSurface);
+  m_backend->backend = QRhi::OpenGLES2;
 #else
   setSurfaceType(QSurface::RasterSurface);
   m_backend->backend = QRhi::Null;
+#endif
+
+#if QT_CONFIG(vulkan) && __has_include(<vulkan/vulkan.h>)
+  if (m_backend->backend == QRhi::Vulkan) {
+    m_backend->vkInstance = std::make_unique<QVulkanInstance>();
+    m_backend->vkInstance->setExtensions(QRhiVulkanInitParams::preferredInstanceExtensions());
+    if (!m_backend->vkInstance->create()) {
+      qWarning("Failed to create QVulkanInstance for HexViewRhiWindow");
+      m_backend->vkInstance.reset();
+      setSurfaceType(QSurface::RasterSurface);
+      m_backend->backend = QRhi::Null;
+    } else {
+      setVulkanInstance(m_backend->vkInstance.get());
+    }
+  }
 #endif
 }
 
@@ -198,6 +219,14 @@ void HexViewRhiWindow::drainPendingWheel()
     m_scrolling = false;
 }
 
+void HexViewRhiWindow::releaseSwapChain()
+{
+  if (m_hasSwapChain) {
+    m_hasSwapChain = false;
+    m_sc->destroy();
+  }
+}
+
 bool HexViewRhiWindow::event(QEvent *e)
 {
   if (e->type() == QEvent::UpdateRequest) {
@@ -211,6 +240,12 @@ bool HexViewRhiWindow::event(QEvent *e)
     return QWindow::event(e);
 
   switch (e->type()) {
+    case QEvent::PlatformSurface:
+      // this is the proper time to tear down the swapchain (while the native window and surface are still around)
+      if (static_cast<QPlatformSurfaceEvent *>(e)->surfaceEventType() == QPlatformSurfaceEvent::SurfaceAboutToBeDestroyed)
+        releaseSwapChain();
+      break;
+
     case QEvent::MouseButtonPress: {
       m_view->setFocus(Qt::MouseFocusReason);
       m_dragging = true;
@@ -297,6 +332,7 @@ void HexViewRhiWindow::initIfNeeded() {
     return;
   }
 
+  const bool debug = debugLoggingEnabled();
   if (!m_rhi) {
     switch (m_backend->backend) {
       case QRhi::OpenGLES2:
@@ -314,11 +350,11 @@ void HexViewRhiWindow::initIfNeeded() {
         break;
       case QRhi::Vulkan:
 #if QT_CONFIG(vulkan) && __has_include(<vulkan/vulkan.h>)
-        m_backend->vkInstance = std::make_unique<QVulkanInstance>();
-        m_backend->vkInstance->setExtensions(QRhiVulkanInitParams::preferredInstanceExtensions());
-        if (!m_backend->vkInstance->create()) {
-          qWarning("Failed to create QVulkanInstance for HexViewRhiWindow");
-          return;
+        if (!m_backend->vkInstance) {
+          qWarning("Vulkan backend requested but QVulkanInstance is missing");
+          m_backend->backend = QRhi::Null;
+          m_backend->initParams = &m_backend->nullParams;
+          break;
         }
         m_backend->vkParams.inst = m_backend->vkInstance.get();
         m_backend->vkParams.window = this;
@@ -349,7 +385,6 @@ void HexViewRhiWindow::initIfNeeded() {
         m_backend->initParams = &m_backend->nullParams;
         break;
     }
-
     m_rhi = QRhi::create(m_backend->backend, m_backend->initParams);
     if (!m_rhi) {
       qWarning("Failed to create QRhi for HexViewRhiWindow");
@@ -357,8 +392,16 @@ void HexViewRhiWindow::initIfNeeded() {
     }
   }
 
-  qDebug() << "QRhi backend:" << int(m_rhi->backend())
-           << "BaseInstance:" << m_rhi->isFeatureSupported(QRhi::BaseInstance);
+  if (debug && !m_loggedInit) {
+    qDebug() << "HexViewRhiWindow init:"
+             << "backend=" << int(m_rhi->backend())
+             << "surface=" << int(surfaceType())
+             << "size=" << size()
+             << "dpr=" << devicePixelRatio()
+             << "baseInstance=" << m_rhi->isFeatureSupported(QRhi::BaseInstance);
+    m_loggedInit = true;
+  }
+  m_supportsBaseInstance = m_rhi->isFeatureSupported(QRhi::BaseInstance);
 
   m_sc = m_rhi->newSwapChain();
   m_sc->setWindow(this);
@@ -409,6 +452,11 @@ void HexViewRhiWindow::resizeSwapChain() {
 
   const QSize pixelSize = size() * devicePixelRatio();
   if (pixelSize.isEmpty()) {
+    if (debugLoggingEnabled()) {
+      qDebug() << "HexViewRhiWindow resizeSwapChain skipped: empty pixel size"
+               << "size=" << size()
+               << "dpr=" << devicePixelRatio();
+    }
     return;
   }
 
@@ -420,7 +468,12 @@ void HexViewRhiWindow::resizeSwapChain() {
     m_sc->setDepthStencil(m_ds);
   }
 
-  m_sc->createOrResize();
+  m_hasSwapChain = m_sc->createOrResize();
+  if (debugLoggingEnabled()) {
+    qDebug() << "HexViewRhiWindow swapchain resized"
+             << "pixelSize=" << pixelSize
+             << "sampleCount=" << m_sc->sampleCount();
+  }
 }
 
 void HexViewRhiWindow::renderFrame() {
@@ -446,18 +499,36 @@ void HexViewRhiWindow::renderFrame() {
     return;
   }
 
-  if (m_sc->currentPixelSize().isEmpty()) {
+  const QSize currentPixelSize = m_sc->currentPixelSize();
+  if (currentPixelSize.isEmpty()) {
+    if (debugLoggingEnabled()) {
+      qDebug() << "HexViewRhiWindow renderFrame skipped: swapchain pixel size empty";
+    }
     return;
   }
 
   const QRhi::FrameOpResult result = m_rhi->beginFrame(m_sc);
   if (result == QRhi::FrameOpSwapChainOutOfDate) {
+    if (debugLoggingEnabled()) {
+      qDebug() << "HexViewRhiWindow frame: swapchain out of date";
+    }
     resizeSwapChain();
+    if (!m_hasSwapChain)
+      return;
     requestUpdate();
     return;
   }
   if (result != QRhi::FrameOpSuccess) {
+    if (debugLoggingEnabled()) {
+      qDebug() << "HexViewRhiWindow frame: beginFrame failed" << int(result);
+    }
     return;
+  }
+  if (debugLoggingEnabled() && !m_loggedFrame) {
+    qDebug() << "HexViewRhiWindow frame started"
+             << "viewport=" << QSize(viewportWidth, viewportHeight)
+             << "pixelSize=" << currentPixelSize;
+    m_loggedFrame = true;
   }
 
   m_cb = m_sc->currentFrameCommandBuffer();
@@ -683,6 +754,10 @@ void HexViewRhiWindow::releaseRenderTargets() {
   m_shadowRtB = nullptr;
   delete m_shadowTexB;
   m_shadowTexB = nullptr;
+}
+
+bool HexViewRhiWindow::debugLoggingEnabled() const {
+  return isRhiDebugEnabled();
 }
 
 void HexViewRhiWindow::ensurePipelines() {
@@ -1002,14 +1077,20 @@ void HexViewRhiWindow::drawRectBuffer(QRhiCommandBuffer* cb, QRhiBuffer* buffer,
   if (!pso) {
     pso = m_rectPso;
   }
+  quint32 instanceOffset = 0;
+  int drawFirstInstance = firstInstance;
+  if (!m_supportsBaseInstance && firstInstance > 0) {
+    instanceOffset = static_cast<quint32>(firstInstance * sizeof(RectInstance));
+    drawFirstInstance = 0;
+  }
   cb->setGraphicsPipeline(pso);
   cb->setShaderResources(srb);
   const QRhiCommandBuffer::VertexInput vbufBindings[] = {
     {m_vbuf, 0},
-    {buffer, 0}
+    {buffer, instanceOffset}
   };
   cb->setVertexInput(0, 2, vbufBindings, m_ibuf, 0, QRhiCommandBuffer::IndexUInt16);
-  cb->drawIndexed(6, count, 0, 0, firstInstance);
+  cb->drawIndexed(6, count, 0, 0, drawFirstInstance);
 }
 
 void HexViewRhiWindow::drawGlyphBuffer(QRhiCommandBuffer* cb, QRhiBuffer* buffer, int count,
@@ -1017,14 +1098,20 @@ void HexViewRhiWindow::drawGlyphBuffer(QRhiCommandBuffer* cb, QRhiBuffer* buffer
   if (!buffer || count <= 0) {
     return;
   }
+  quint32 instanceOffset = 0;
+  int drawFirstInstance = firstInstance;
+  if (!m_supportsBaseInstance && firstInstance > 0) {
+    instanceOffset = static_cast<quint32>(firstInstance * sizeof(GlyphInstance));
+    drawFirstInstance = 0;
+  }
   cb->setGraphicsPipeline(m_glyphPso);
   cb->setShaderResources(m_glyphSrb);
   const QRhiCommandBuffer::VertexInput vbufBindings[] = {
     {m_vbuf, 0},
-    {buffer, 0}
+    {buffer, instanceOffset}
   };
   cb->setVertexInput(0, 2, vbufBindings, m_ibuf, 0, QRhiCommandBuffer::IndexUInt16);
-  cb->drawIndexed(6, count, 0, 0, firstInstance);
+  cb->drawIndexed(6, count, 0, 0, drawFirstInstance);
 }
 
 void HexViewRhiWindow::drawFullscreen(QRhiCommandBuffer* cb, QRhiGraphicsPipeline* pso,
