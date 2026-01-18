@@ -262,7 +262,6 @@ bool HexViewRhiWindow::event(QEvent *e)
       m_wheelButtons = we->buttons();
       m_wheelPhase = we->phase();
 
-      m_lastScrollTick.restart();
       requestUpdate();
       return true;
     }

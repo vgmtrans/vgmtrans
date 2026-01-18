@@ -601,7 +601,7 @@ void HexView::handleCoalescedMouseMove(const QPoint& pos,
 }
 
 void HexView::mouseMoveEvent(QMouseEvent* event) {
-  handleCoalescedMouseMove(event->pos(), event->button(), event->modifiers());
+  handleCoalescedMouseMove(event->pos(), event->buttons(), event->modifiers());
   QAbstractScrollArea::mouseMoveEvent(event);
 }
 
