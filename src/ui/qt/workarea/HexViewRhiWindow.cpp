@@ -203,13 +203,6 @@ bool HexViewRhiWindow::event(QEvent *e)
   if (e->type() == QEvent::UpdateRequest) {
     renderFrame();
 
-    // Keep pumping frames while dragging (or animating)
-    if (m_dragging || m_scrolling || m_pumpFrames > 0) {
-      if (m_pumpFrames > 0)
-        --m_pumpFrames;
-      requestUpdate();
-    }
-    // Let Qt do its internal handling too
     // return QWindow::event(e);
     return true;
   }
@@ -231,7 +224,8 @@ bool HexViewRhiWindow::event(QEvent *e)
 
     case QEvent::MouseMove: {
       auto *me = static_cast<QMouseEvent*>(e);
-
+      if (!m_dragging)
+        return true;
       // Coalesce: keep only the latest move
       m_pendingMouseMove = true;
       m_pendingGlobalPos = me->globalPosition();
