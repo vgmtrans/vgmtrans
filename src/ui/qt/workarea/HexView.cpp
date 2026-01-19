@@ -55,12 +55,11 @@ HexView::HexView(VGMFile* vgmfile, QWidget* parent)
   setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
   viewport()->setAutoFillBackground(false);
 
-  m_rhiWindow = new HexViewRhiWindow(this);
-  m_rhiContainer = QWidget::createWindowContainer(m_rhiWindow, viewport());
-  m_rhiContainer->setFocusPolicy(Qt::NoFocus);
-  // m_rhiContainer->setAttribute(Qt::WA_TransparentForMouseEvents);
-  m_rhiContainer->setGeometry(viewport()->rect());
-  m_rhiContainer->show();
+  m_rhiWindow = new HexViewRhiWindow(this, viewport());
+  m_rhiWindow->setFocusPolicy(Qt::NoFocus);
+  // m_rhiWindow->setAttribute(Qt::WA_TransparentForMouseEvents);
+  m_rhiWindow->setGeometry(viewport()->rect());
+  m_rhiWindow->show();
 
   const double appFontPointSize = QApplication::font().pointSizeF();
   QFont font("Roboto Mono", appFontPointSize + 1.0);
@@ -170,8 +169,8 @@ void HexView::updateScrollBars() {
 }
 
 void HexView::updateLayout() {
-  if (m_rhiContainer) {
-    m_rhiContainer->setGeometry(viewport()->rect());
+  if (m_rhiWindow) {
+    m_rhiWindow->setGeometry(viewport()->rect());
   }
 
   const int width = viewport()->width();
@@ -438,8 +437,8 @@ bool HexView::viewportEvent(QEvent* event) {
 
 void HexView::resizeEvent(QResizeEvent* event) {
   QAbstractScrollArea::resizeEvent(event);
-  if (m_rhiContainer) {
-    m_rhiContainer->setGeometry(viewport()->rect());
+  if (m_rhiWindow) {
+    m_rhiWindow->setGeometry(viewport()->rect());
   }
   updateLayout();
   if (m_rhiWindow) {
