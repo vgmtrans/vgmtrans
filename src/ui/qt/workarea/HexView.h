@@ -134,6 +134,5 @@ private:
   qreal m_shadowStrength = 1.0;
 
   HexViewRhiWindow* m_rhiWindow = nullptr;
-  QWidget* m_rhiContainer = nullptr;
   std::unique_ptr<GlyphAtlas> m_glyphAtlas;
 };
