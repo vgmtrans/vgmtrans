@@ -6,7 +6,8 @@
 
 #pragma once
 
-#include <QWindow>
+#include <QRhiWidget>
+#include <QPointF>
 #include <array>
 #include <cstdint>
 #include <memory>
@@ -14,7 +15,6 @@
 
 class QChar;
 class QEvent;
-class QExposeEvent;
 class QRectF;
 class QResizeEvent;
 class QSize;
@@ -23,30 +23,31 @@ class QRhi;
 class QRhiBuffer;
 class QRhiCommandBuffer;
 class QRhiGraphicsPipeline;
-class QRhiRenderBuffer;
 class QRhiRenderPassDescriptor;
 class QRhiTextureRenderTarget;
 class QRhiResourceUpdateBatch;
 class QRhiSampler;
 class QRhiShaderResourceBindings;
-class QRhiSwapChain;
 class QRhiTexture;
 class HexView;
 
-class HexViewRhiWindow final : public QWindow {
+class HexViewRhiWidget final : public QRhiWidget {
   Q_OBJECT
 
 public:
-  explicit HexViewRhiWindow(HexView* view);
-  ~HexViewRhiWindow() override;
+  explicit HexViewRhiWidget(HexView* view, QWidget* parent = nullptr);
+  ~HexViewRhiWidget() override;
 
   void markBaseDirty();
   void markSelectionDirty();
   void invalidateCache();
+  void requestUpdate();
 
 protected:
+  void initialize(QRhiCommandBuffer* cb) override;
+  void render(QRhiCommandBuffer* cb) override;
+  void releaseResources() override;
   bool event(QEvent* e) override;
-  void exposeEvent(QExposeEvent* event) override;
   void resizeEvent(QResizeEvent* event) override;
 
 private:
@@ -92,12 +93,8 @@ private:
     uint32_t glyphCount = 0;
   };
 
-  struct BackendData;
-
   void initIfNeeded();
-  void resizeSwapChain();
-  void renderFrame();
-  void releaseResources();
+  void renderFrame(QRhiCommandBuffer* cb);
   void ensureRenderTargets(const QSize& pixelSize);
   void releaseRenderTargets();
   bool debugLoggingEnabled() const;
@@ -126,21 +123,14 @@ private:
   void buildBaseInstances();
   void buildSelectionInstances(int startLine, int endLine);
 
-  void releaseSwapChain();
-
   HexView* m_view = nullptr;
 
-  std::unique_ptr<BackendData> m_backend;
-
   QRhi* m_rhi = nullptr;
-  QRhiSwapChain* m_sc = nullptr;
-  QRhiRenderBuffer* m_ds = nullptr;
-  QRhiRenderPassDescriptor* m_rp = nullptr;
-  QRhiCommandBuffer* m_cb = nullptr;
 
   QRhiTexture* m_contentTex = nullptr;
   QRhiTextureRenderTarget* m_contentRt = nullptr;
   QRhiRenderPassDescriptor* m_contentRp = nullptr;
+  QRhiRenderPassDescriptor* m_widgetRp = nullptr;
   QRhiTexture* m_maskTex = nullptr;
   QRhiTextureRenderTarget* m_maskRt = nullptr;
   QRhiRenderPassDescriptor* m_maskRp = nullptr;
@@ -217,6 +207,4 @@ private:
   bool m_scrolling = false;
   int m_pumpFrames = 0;        // generic "keep drawing for N frames"
   void drainPendingWheel();
-
-  bool m_hasSwapChain = false;
 };

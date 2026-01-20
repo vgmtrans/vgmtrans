@@ -4,13 +4,12 @@
 * refer to the included LICENSE.txt file
 */
 
-#include "HexViewRhiWindow.h"
+#include "HexViewRhiWidget.h"
 
 #include "HexView.h"
 #include "VGMFile.h"
 
 #include <rhi/qrhi.h>
-#include <rhi/qrhi_platform.h>
 #include <rhi/qshader.h>
 
 #include <QColor>
@@ -25,15 +24,6 @@
 #include <QVector4D>
 #include <QMouseEvent>
 
-#if QT_CONFIG(opengl)
-#include <QOffscreenSurface>
-#include <QSurfaceFormat>
-#endif
-
-#if QT_CONFIG(vulkan)
-#include <QVulkanInstance>
-#endif
-
 #include <QParallelAnimationGroup>
 #include <algorithm>
 #include <array>
@@ -42,7 +32,6 @@
 #include <utility>
 #include <qabstractanimation.h>
 #include <qcoreapplication.h>
-#include <qloggingcategory.h>
 
 namespace {
 constexpr int NUM_ADDRESS_NIBBLES = 8;
@@ -83,81 +72,34 @@ bool isRhiDebugEnabled() {
 }
 }  // namespace
 
-struct HexViewRhiWindow::BackendData {
-  QRhi::Implementation backend = QRhi::Null;
-  QRhiInitParams* initParams = nullptr;
-
-#if QT_CONFIG(opengl)
-  QRhiGles2InitParams glesParams;
-  std::unique_ptr<QOffscreenSurface> fallbackSurface;
-#endif
-
-#if QT_CONFIG(vulkan) && __has_include(<vulkan/vulkan.h>)
-  QRhiVulkanInitParams vkParams;
-  std::unique_ptr<QVulkanInstance> vkInstance;
-#endif
-
-#if QT_CONFIG(metal)
-  QRhiMetalInitParams metalParams;
-#endif
-
-#if defined(Q_OS_WIN)
-  QRhiD3D11InitParams d3d11Params;
-#endif
-
-  QRhiNullInitParams nullParams;
-};
-
-HexViewRhiWindow::HexViewRhiWindow(HexView* view)
-    : m_view(view), m_backend(std::make_unique<BackendData>()) {
-  setFlags(Qt::FramelessWindowHint);
-
-#if defined(Q_OS_WIN)
-  setSurfaceType(QSurface::Direct3DSurface);
-  m_backend->backend = QRhi::D3D11;
+HexViewRhiWidget::HexViewRhiWidget(HexView* view, QWidget* parent)
+    : QRhiWidget(parent), m_view(view) {
+#if defined(Q_OS_LINUX)
+  setApi(QRhiWidget::Api::OpenGL);
+#elif defined(Q_OS_WIN)
+  setApi(QRhiWidget::Api::Direct3D11);
 #elif defined(Q_OS_MACOS) || defined(Q_OS_IOS)
-  setSurfaceType(QSurface::MetalSurface);
-  m_backend->backend = QRhi::Metal;
-#elif QT_CONFIG(vulkan)
-  setSurfaceType(QSurface::VulkanSurface);
-  m_backend->backend = QRhi::Vulkan;
+  setApi(QRhiWidget::Api::Metal);
 #elif QT_CONFIG(opengl)
-  setSurfaceType(QSurface::OpenGLSurface);
-  m_backend->backend = QRhi::OpenGLES2;
+  setApi(QRhiWidget::Api::OpenGL);
 #else
-  setSurfaceType(QSurface::RasterSurface);
-  m_backend->backend = QRhi::Null;
-#endif
-
-#if QT_CONFIG(vulkan) && __has_include(<vulkan/vulkan.h>)
-  if (m_backend->backend == QRhi::Vulkan) {
-    m_backend->vkInstance = std::make_unique<QVulkanInstance>();
-    m_backend->vkInstance->setExtensions(QRhiVulkanInitParams::preferredInstanceExtensions());
-    if (!m_backend->vkInstance->create()) {
-      qWarning("Failed to create QVulkanInstance for HexViewRhiWindow");
-      m_backend->vkInstance.reset();
-      setSurfaceType(QSurface::RasterSurface);
-      m_backend->backend = QRhi::Null;
-    } else {
-      setVulkanInstance(m_backend->vkInstance.get());
-    }
-  }
+  setApi(QRhiWidget::Api::Null);
 #endif
 }
 
-HexViewRhiWindow::~HexViewRhiWindow() {
+HexViewRhiWidget::~HexViewRhiWidget() {
   releaseResources();
 }
 
-void HexViewRhiWindow::markBaseDirty() {
+void HexViewRhiWidget::markBaseDirty() {
   m_baseDirty = true;
 }
 
-void HexViewRhiWindow::markSelectionDirty() {
+void HexViewRhiWidget::markSelectionDirty() {
   m_selectionDirty = true;
 }
 
-void HexViewRhiWindow::invalidateCache() {
+void HexViewRhiWidget::invalidateCache() {
   m_cachedLines.clear();
   m_cacheStartLine = 0;
   m_cacheEndLine = -1;
@@ -165,15 +107,81 @@ void HexViewRhiWindow::invalidateCache() {
   m_selectionDirty = true;
 }
 
-// bool HexViewRhiWindow::event(QEvent* e) {
-//   if (e->type() == QEvent::UpdateRequest) {
-//     renderFrame();
-//     return true;
-//   }
-//   return QWindow::event(e);
-// }
+void HexViewRhiWidget::requestUpdate() {
+  update();
+}
 
-void HexViewRhiWindow::drainPendingMouseMove()
+void HexViewRhiWidget::initialize(QRhiCommandBuffer* cb) {
+  Q_UNUSED(cb);
+  initIfNeeded();
+}
+
+void HexViewRhiWidget::render(QRhiCommandBuffer* cb) {
+  renderFrame(cb);
+}
+
+void HexViewRhiWidget::releaseResources() {
+  if (m_rhi) {
+    m_rhi->makeThreadLocalNativeContextCurrent();
+  }
+
+  delete m_rectPso;
+  m_rectPso = nullptr;
+  delete m_glyphPso;
+  m_glyphPso = nullptr;
+  delete m_maskPso;
+  m_maskPso = nullptr;
+  delete m_blurPso;
+  m_blurPso = nullptr;
+  delete m_compositePso;
+  m_compositePso = nullptr;
+
+  delete m_rectSrb;
+  m_rectSrb = nullptr;
+  delete m_glyphSrb;
+  m_glyphSrb = nullptr;
+  delete m_blurSrbH;
+  m_blurSrbH = nullptr;
+  delete m_blurSrbV;
+  m_blurSrbV = nullptr;
+  delete m_compositeSrb;
+  m_compositeSrb = nullptr;
+
+  releaseRenderTargets();
+
+  delete m_glyphTex;
+  m_glyphTex = nullptr;
+  delete m_glyphSampler;
+  m_glyphSampler = nullptr;
+  delete m_maskSampler;
+  m_maskSampler = nullptr;
+
+  delete m_vbuf;
+  m_vbuf = nullptr;
+  delete m_ibuf;
+  m_ibuf = nullptr;
+  delete m_baseRectBuf;
+  m_baseRectBuf = nullptr;
+  delete m_baseGlyphBuf;
+  m_baseGlyphBuf = nullptr;
+  delete m_maskRectBuf;
+  m_maskRectBuf = nullptr;
+  delete m_ubuf;
+  m_ubuf = nullptr;
+  delete m_blurUbufH;
+  m_blurUbufH = nullptr;
+  delete m_blurUbufV;
+  m_blurUbufV = nullptr;
+  delete m_compositeUbuf;
+  m_compositeUbuf = nullptr;
+
+  m_pipelinesDirty = true;
+  m_inited = false;
+  m_rhi = nullptr;
+  m_widgetRp = nullptr;
+}
+
+void HexViewRhiWidget::drainPendingMouseMove()
 {
   if (!m_pendingMouseMove || !m_view || !m_view->viewport())
     return;
@@ -188,7 +196,7 @@ void HexViewRhiWindow::drainPendingMouseMove()
   m_view->handleCoalescedMouseMove(vpPos, m_pendingButtons, m_pendingMods);
 }
 
-void HexViewRhiWindow::drainPendingWheel()
+void HexViewRhiWidget::drainPendingWheel()
 {
   if (!m_pendingWheel || !m_view || !m_view->viewport())
     return;
@@ -219,33 +227,12 @@ void HexViewRhiWindow::drainPendingWheel()
     m_scrolling = false;
 }
 
-void HexViewRhiWindow::releaseSwapChain()
+bool HexViewRhiWidget::event(QEvent *e)
 {
-  if (m_hasSwapChain) {
-    m_hasSwapChain = false;
-    m_sc->destroy();
-  }
-}
-
-bool HexViewRhiWindow::event(QEvent *e)
-{
-  if (e->type() == QEvent::UpdateRequest) {
-    renderFrame();
-
-    // return QWindow::event(e);
-    return true;
-  }
-
   if (!m_view || !m_view->viewport())
-    return QWindow::event(e);
+    return QRhiWidget::event(e);
 
   switch (e->type()) {
-    case QEvent::PlatformSurface:
-      // this is the proper time to tear down the swapchain (while the native window and surface are still around)
-      if (static_cast<QPlatformSurfaceEvent *>(e)->surfaceEventType() == QPlatformSurfaceEvent::SurfaceAboutToBeDestroyed)
-        releaseSwapChain();
-      break;
-
     case QEvent::MouseButtonPress: {
       m_view->setFocus(Qt::MouseFocusReason);
       m_dragging = true;
@@ -307,109 +294,34 @@ bool HexViewRhiWindow::event(QEvent *e)
       break;
   }
 
-  return QWindow::event(e);
+  return QRhiWidget::event(e);
 }
 
+void HexViewRhiWidget::resizeEvent(QResizeEvent* event) {
+  QRhiWidget::resizeEvent(event);
+  requestUpdate();
+}
 
-
-void HexViewRhiWindow::exposeEvent(QExposeEvent*) {
-  if (!isExposed()) {
+void HexViewRhiWidget::initIfNeeded() {
+  if (m_inited) {
     return;
   }
-  initIfNeeded();
-  requestUpdate();
-}
 
-void HexViewRhiWindow::resizeEvent(QResizeEvent*) {
-  if (m_inited) {
-    resizeSwapChain();
-  }
-  requestUpdate();
-}
-
-void HexViewRhiWindow::initIfNeeded() {
-  if (m_inited || !m_backend) {
+  m_rhi = rhi();
+  if (!m_rhi) {
     return;
   }
 
   const bool debug = debugLoggingEnabled();
-  if (!m_rhi) {
-    switch (m_backend->backend) {
-      case QRhi::OpenGLES2:
-#if QT_CONFIG(opengl)
-        m_backend->glesParams.window = this;
-        m_backend->glesParams.format = QSurfaceFormat::defaultFormat();
-        m_backend->fallbackSurface.reset(
-            QRhiGles2InitParams::newFallbackSurface(m_backend->glesParams.format));
-        m_backend->glesParams.fallbackSurface = m_backend->fallbackSurface.get();
-        m_backend->initParams = &m_backend->glesParams;
-#else
-        m_backend->backend = QRhi::Null;
-        m_backend->initParams = &m_backend->nullParams;
-#endif
-        break;
-      case QRhi::Vulkan:
-#if QT_CONFIG(vulkan) && __has_include(<vulkan/vulkan.h>)
-        if (!m_backend->vkInstance) {
-          qWarning("Vulkan backend requested but QVulkanInstance is missing");
-          m_backend->backend = QRhi::Null;
-          m_backend->initParams = &m_backend->nullParams;
-          break;
-        }
-        m_backend->vkParams.inst = m_backend->vkInstance.get();
-        m_backend->vkParams.window = this;
-        m_backend->initParams = &m_backend->vkParams;
-#else
-        m_backend->backend = QRhi::Null;
-        m_backend->initParams = &m_backend->nullParams;
-#endif
-        break;
-      case QRhi::Metal:
-#if QT_CONFIG(metal)
-        m_backend->initParams = &m_backend->metalParams;
-#else
-        m_backend->backend = QRhi::Null;
-        m_backend->initParams = &m_backend->nullParams;
-#endif
-        break;
-      case QRhi::D3D11:
-#if defined(Q_OS_WIN)
-        m_backend->initParams = &m_backend->d3d11Params;
-#else
-        m_backend->backend = QRhi::Null;
-        m_backend->initParams = &m_backend->nullParams;
-#endif
-        break;
-      case QRhi::Null:
-      default:
-        m_backend->initParams = &m_backend->nullParams;
-        break;
-    }
-    m_rhi = QRhi::create(m_backend->backend, m_backend->initParams);
-    if (!m_rhi) {
-      qWarning("Failed to create QRhi for HexViewRhiWindow");
-      return;
-    }
-  }
-
   if (debug && !m_loggedInit) {
-    qDebug() << "HexViewRhiWindow init:"
+    qDebug() << "HexViewRhiWidget init:"
              << "backend=" << int(m_rhi->backend())
-             << "surface=" << int(surfaceType())
              << "size=" << size()
-             << "dpr=" << devicePixelRatio()
+             << "dpr=" << devicePixelRatioF()
              << "baseInstance=" << m_rhi->isFeatureSupported(QRhi::BaseInstance);
     m_loggedInit = true;
   }
   m_supportsBaseInstance = m_rhi->isFeatureSupported(QRhi::BaseInstance);
-
-  m_sc = m_rhi->newSwapChain();
-  m_sc->setWindow(this);
-  m_sc->setSampleCount(1);
-  m_rp = m_sc->newCompatibleRenderPassDescriptor();
-  m_sc->setRenderPassDescriptor(m_rp);
-  // m_rp->create();
-  resizeSwapChain();
 
   m_vbuf = m_rhi->newBuffer(QRhiBuffer::Immutable, QRhiBuffer::VertexBuffer, sizeof(kVertices));
   m_vbuf->create();
@@ -445,43 +357,13 @@ void HexViewRhiWindow::initIfNeeded() {
   m_inited = true;
 }
 
-void HexViewRhiWindow::resizeSwapChain() {
-  if (!m_rhi || !m_sc) {
-    return;
-  }
-
-  const QSize pixelSize = size() * devicePixelRatio();
-  if (pixelSize.isEmpty()) {
-    if (debugLoggingEnabled()) {
-      qDebug() << "HexViewRhiWindow resizeSwapChain skipped: empty pixel size"
-               << "size=" << size()
-               << "dpr=" << devicePixelRatio();
-    }
-    return;
-  }
-
-  if (!m_ds || m_ds->pixelSize() != pixelSize) {
-    delete m_ds;
-    m_ds = m_rhi->newRenderBuffer(QRhiRenderBuffer::DepthStencil, pixelSize, m_sc->sampleCount(),
-                                  QRhiRenderBuffer::UsedWithSwapChainOnly);
-    m_ds->create();
-    m_sc->setDepthStencil(m_ds);
-  }
-
-  m_hasSwapChain = m_sc->createOrResize();
-  if (debugLoggingEnabled()) {
-    qDebug() << "HexViewRhiWindow swapchain resized"
-             << "pixelSize=" << pixelSize
-             << "sampleCount=" << m_sc->sampleCount();
-  }
-}
-
-void HexViewRhiWindow::renderFrame() {
-  if (!isExposed())
-    return;
-
+void HexViewRhiWidget::renderFrame(QRhiCommandBuffer* cb) {
   initIfNeeded();
-  if (!m_rhi || !m_sc || !m_view || !m_view->m_vgmfile)
+  if (!m_rhi || !cb || !m_view || !m_view->m_vgmfile)
+    return;
+
+  QRhiRenderTarget* rt = renderTarget();
+  if (!rt)
     return;
 
   // Apply at most one mouse, wheel move per frame
@@ -499,40 +381,20 @@ void HexViewRhiWindow::renderFrame() {
     return;
   }
 
-  const QSize currentPixelSize = m_sc->currentPixelSize();
+  const QSize currentPixelSize = rt->pixelSize();
   if (currentPixelSize.isEmpty()) {
     if (debugLoggingEnabled()) {
-      qDebug() << "HexViewRhiWindow renderFrame skipped: swapchain pixel size empty";
+      qDebug() << "HexViewRhiWidget renderFrame skipped: render target pixel size empty";
     }
     return;
   }
 
-  const QRhi::FrameOpResult result = m_rhi->beginFrame(m_sc);
-  if (result == QRhi::FrameOpSwapChainOutOfDate) {
-    if (debugLoggingEnabled()) {
-      qDebug() << "HexViewRhiWindow frame: swapchain out of date";
-    }
-    resizeSwapChain();
-    if (!m_hasSwapChain)
-      return;
-    requestUpdate();
-    return;
-  }
-  if (result != QRhi::FrameOpSuccess) {
-    if (debugLoggingEnabled()) {
-      qDebug() << "HexViewRhiWindow frame: beginFrame failed" << int(result);
-    }
-    return;
-  }
   if (debugLoggingEnabled() && !m_loggedFrame) {
-    qDebug() << "HexViewRhiWindow frame started"
+    qDebug() << "HexViewRhiWidget frame started"
              << "viewport=" << QSize(viewportWidth, viewportHeight)
              << "pixelSize=" << currentPixelSize;
     m_loggedFrame = true;
   }
-
-  m_cb = m_sc->currentFrameCommandBuffer();
-  QRhiRenderTarget* rt = m_sc->currentFrameRenderTarget();
 
   const int scrollY = m_view->verticalScrollBar()->value();
   const int startLine = std::clamp(scrollY / m_view->m_lineHeight, 0, totalLines - 1);
@@ -545,7 +407,7 @@ void HexViewRhiWindow::renderFrame() {
     m_selectionDirty = true;
   }
 
-  m_view->ensureGlyphAtlas(devicePixelRatio());
+  m_view->ensureGlyphAtlas(rt->devicePixelRatio());
   ensureCacheWindow(startLine, endLine, totalLines);
 
   if (m_baseDirty) {
@@ -567,7 +429,7 @@ void HexViewRhiWindow::renderFrame() {
     m_staticBuffersUploaded = true;
   }
   ensureGlyphTexture(u);
-  const QSize pixelSize = m_sc->currentPixelSize();
+  const QSize pixelSize = currentPixelSize;
   ensureRenderTargets(pixelSize);
   ensurePipelines();
   updateUniforms(u, static_cast<float>(scrollY), pixelSize);
@@ -593,112 +455,43 @@ void HexViewRhiWindow::renderFrame() {
 
   const QColor clearColor = m_view->palette().color(QPalette::Window);
 
-  m_cb->beginPass(m_contentRt, clearColor, {1.0f, 0}, u);
-  m_cb->setViewport(QRhiViewport(0, 0, pixelSize.width(), pixelSize.height()));
-  drawRectBuffer(m_cb, m_baseRectBuf, baseRectCount, baseRectFirst);
-  drawGlyphBuffer(m_cb, m_baseGlyphBuf, baseGlyphCount, baseGlyphFirst);
-  m_cb->endPass();
+  cb->beginPass(m_contentRt, clearColor, {1.0f, 0}, u);
+  cb->setViewport(QRhiViewport(0, 0, pixelSize.width(), pixelSize.height()));
+  drawRectBuffer(cb, m_baseRectBuf, baseRectCount, baseRectFirst);
+  drawGlyphBuffer(cb, m_baseGlyphBuf, baseGlyphCount, baseGlyphFirst);
+  cb->endPass();
 
-  m_cb->beginPass(m_maskRt, QColor(0, 0, 0, 0), {1.0f, 0}, nullptr);
-  m_cb->setViewport(QRhiViewport(0, 0, pixelSize.width(), pixelSize.height()));
-  drawRectBuffer(m_cb, m_maskRectBuf, static_cast<int>(m_maskRectInstances.size()), 0, nullptr,
+  cb->beginPass(m_maskRt, QColor(0, 0, 0, 0), {1.0f, 0}, nullptr);
+  cb->setViewport(QRhiViewport(0, 0, pixelSize.width(), pixelSize.height()));
+  drawRectBuffer(cb, m_maskRectBuf, static_cast<int>(m_maskRectInstances.size()), 0, nullptr,
                  m_maskPso);
-  m_cb->endPass();
+  cb->endPass();
 
   const bool hasShadow = (m_view->m_shadowBlur > 0.0f) && !m_maskRectInstances.empty();
   if (hasShadow) {
-    m_cb->beginPass(m_shadowRtA, QColor(0, 0, 0, 0), {1.0f, 0}, nullptr);
-    m_cb->setViewport(QRhiViewport(0, 0, pixelSize.width(), pixelSize.height()));
-    drawFullscreen(m_cb, m_blurPso, m_blurSrbH);
-    m_cb->endPass();
+    cb->beginPass(m_shadowRtA, QColor(0, 0, 0, 0), {1.0f, 0}, nullptr);
+    cb->setViewport(QRhiViewport(0, 0, pixelSize.width(), pixelSize.height()));
+    drawFullscreen(cb, m_blurPso, m_blurSrbH);
+    cb->endPass();
 
-    m_cb->beginPass(m_shadowRtB, QColor(0, 0, 0, 0), {1.0f, 0}, nullptr);
-    m_cb->setViewport(QRhiViewport(0, 0, pixelSize.width(), pixelSize.height()));
-    drawFullscreen(m_cb, m_blurPso, m_blurSrbV);
-    m_cb->endPass();
+    cb->beginPass(m_shadowRtB, QColor(0, 0, 0, 0), {1.0f, 0}, nullptr);
+    cb->setViewport(QRhiViewport(0, 0, pixelSize.width(), pixelSize.height()));
+    drawFullscreen(cb, m_blurPso, m_blurSrbV);
+    cb->endPass();
   } else {
-    m_cb->beginPass(m_shadowRtB, QColor(0, 0, 0, 0), {1.0f, 0}, nullptr);
-    m_cb->setViewport(QRhiViewport(0, 0, pixelSize.width(), pixelSize.height()));
-    m_cb->endPass();
+    cb->beginPass(m_shadowRtB, QColor(0, 0, 0, 0), {1.0f, 0}, nullptr);
+    cb->setViewport(QRhiViewport(0, 0, pixelSize.width(), pixelSize.height()));
+    cb->endPass();
   }
 
-  m_cb->beginPass(rt, clearColor, {1.0f, 0}, nullptr);
-  m_cb->setViewport(QRhiViewport(0, 0, rt->pixelSize().width(), rt->pixelSize().height()));
-  drawFullscreen(m_cb, m_compositePso, m_compositeSrb);
-  m_cb->endPass();
-  m_rhi->endFrame(m_sc);
+  cb->beginPass(rt, clearColor, {1.0f, 0}, nullptr);
+  cb->setViewport(QRhiViewport(0, 0, rt->pixelSize().width(), rt->pixelSize().height()));
+  drawFullscreen(cb, m_compositePso, m_compositeSrb);
+  cb->endPass();
 }
 
-void HexViewRhiWindow::releaseResources() {
-  if (m_rhi) {
-    m_rhi->makeThreadLocalNativeContextCurrent();
-  }
 
-  delete m_rectPso;
-  m_rectPso = nullptr;
-  delete m_glyphPso;
-  m_glyphPso = nullptr;
-  delete m_maskPso;
-  m_maskPso = nullptr;
-  delete m_blurPso;
-  m_blurPso = nullptr;
-  delete m_compositePso;
-  m_compositePso = nullptr;
-
-  delete m_rectSrb;
-  m_rectSrb = nullptr;
-  delete m_glyphSrb;
-  m_glyphSrb = nullptr;
-  delete m_blurSrbH;
-  m_blurSrbH = nullptr;
-  delete m_blurSrbV;
-  m_blurSrbV = nullptr;
-  delete m_compositeSrb;
-  m_compositeSrb = nullptr;
-
-  releaseRenderTargets();
-
-  delete m_glyphTex;
-  m_glyphTex = nullptr;
-  delete m_glyphSampler;
-  m_glyphSampler = nullptr;
-  delete m_maskSampler;
-  m_maskSampler = nullptr;
-
-  delete m_vbuf;
-  m_vbuf = nullptr;
-  delete m_ibuf;
-  m_ibuf = nullptr;
-  delete m_baseRectBuf;
-  m_baseRectBuf = nullptr;
-  delete m_baseGlyphBuf;
-  m_baseGlyphBuf = nullptr;
-  delete m_maskRectBuf;
-  m_maskRectBuf = nullptr;
-  delete m_ubuf;
-  m_ubuf = nullptr;
-  delete m_blurUbufH;
-  m_blurUbufH = nullptr;
-  delete m_blurUbufV;
-  m_blurUbufV = nullptr;
-  delete m_compositeUbuf;
-  m_compositeUbuf = nullptr;
-
-  delete m_rp;
-  m_rp = nullptr;
-  delete m_ds;
-  m_ds = nullptr;
-  delete m_sc;
-  m_sc = nullptr;
-
-  delete m_rhi;
-  m_rhi = nullptr;
-
-  m_pipelinesDirty = true;
-  m_inited = false;
-}
-
-void HexViewRhiWindow::ensureRenderTargets(const QSize& pixelSize) {
+void HexViewRhiWidget::ensureRenderTargets(const QSize& pixelSize) {
   if (!m_rhi || pixelSize.isEmpty()) {
     return;
   }
@@ -726,7 +519,7 @@ void HexViewRhiWindow::ensureRenderTargets(const QSize& pixelSize) {
   m_pipelinesDirty = true;
 }
 
-void HexViewRhiWindow::releaseRenderTargets() {
+void HexViewRhiWidget::releaseRenderTargets() {
   delete m_contentRp;
   m_contentRp = nullptr;
   delete m_contentRt;
@@ -756,16 +549,23 @@ void HexViewRhiWindow::releaseRenderTargets() {
   m_shadowTexB = nullptr;
 }
 
-bool HexViewRhiWindow::debugLoggingEnabled() const {
+bool HexViewRhiWidget::debugLoggingEnabled() const {
   return isRhiDebugEnabled();
 }
 
-void HexViewRhiWindow::ensurePipelines() {
-  if (!m_sc || !m_contentRp || !m_maskRp || !m_shadowRpA || !m_shadowRpB) {
+void HexViewRhiWidget::ensurePipelines() {
+  QRhiRenderTarget* rt = renderTarget();
+  if (!rt || !m_contentRp || !m_maskRp || !m_shadowRpA || !m_shadowRpB) {
     return;
   }
 
-  const int sampleCount = m_sc->sampleCount();
+  QRhiRenderPassDescriptor* widgetRp = rt->renderPassDescriptor();
+  if (widgetRp != m_widgetRp) {
+    m_widgetRp = widgetRp;
+    m_pipelinesDirty = true;
+  }
+
+  const int sampleCount = rt->sampleCount();
   if (!m_pipelinesDirty && m_rectPso && m_sampleCount == sampleCount) {
     return;
   }
@@ -930,11 +730,11 @@ void HexViewRhiWindow::ensurePipelines() {
   m_compositePso->setShaderResourceBindings(m_compositeSrb);
   m_compositePso->setCullMode(QRhiGraphicsPipeline::None);
   m_compositePso->setSampleCount(m_sampleCount);
-  m_compositePso->setRenderPassDescriptor(m_sc->renderPassDescriptor());
+  m_compositePso->setRenderPassDescriptor(m_widgetRp);
   m_compositePso->create();
 }
 
-void HexViewRhiWindow::ensureGlyphTexture(QRhiResourceUpdateBatch* u) {
+void HexViewRhiWidget::ensureGlyphTexture(QRhiResourceUpdateBatch* u) {
   if (!m_view->m_glyphAtlas || m_view->m_glyphAtlas->image.isNull()) {
     return;
   }
@@ -962,7 +762,7 @@ void HexViewRhiWindow::ensureGlyphTexture(QRhiResourceUpdateBatch* u) {
   }
 }
 
-void HexViewRhiWindow::updateUniforms(QRhiResourceUpdateBatch* u, float scrollY,
+void HexViewRhiWidget::updateUniforms(QRhiResourceUpdateBatch* u, float scrollY,
                                       const QSize& pixelSize) {
   const QSize viewSize = m_view->viewport()->size();
   const float uvFlipY = m_rhi->isYUpInFramebuffer() ? 0.0f : 1.0f;
@@ -1023,7 +823,7 @@ void HexViewRhiWindow::updateUniforms(QRhiResourceUpdateBatch* u, float scrollY,
   u->updateDynamicBuffer(m_compositeUbuf, kMat4Bytes + kVec4Bytes * 3, kVec4Bytes, &p3);
 }
 
-bool HexViewRhiWindow::ensureInstanceBuffer(QRhiBuffer*& buffer, int bytes) {
+bool HexViewRhiWidget::ensureInstanceBuffer(QRhiBuffer*& buffer, int bytes) {
   if (bytes <= 0) {
     bytes = 1;
   }
@@ -1036,7 +836,7 @@ bool HexViewRhiWindow::ensureInstanceBuffer(QRhiBuffer*& buffer, int bytes) {
   return false;
 }
 
-void HexViewRhiWindow::updateInstanceBuffers(QRhiResourceUpdateBatch* u) {
+void HexViewRhiWidget::updateInstanceBuffers(QRhiResourceUpdateBatch* u) {
   bool baseRectResized = ensureInstanceBuffer(
       m_baseRectBuf, static_cast<int>(m_baseRectInstances.size() * sizeof(RectInstance)));
   if ((m_baseBufferDirty || baseRectResized) && !m_baseRectInstances.empty()) {
@@ -1065,7 +865,7 @@ void HexViewRhiWindow::updateInstanceBuffers(QRhiResourceUpdateBatch* u) {
   m_selectionBufferDirty = false;
 }
 
-void HexViewRhiWindow::drawRectBuffer(QRhiCommandBuffer* cb, QRhiBuffer* buffer, int count,
+void HexViewRhiWidget::drawRectBuffer(QRhiCommandBuffer* cb, QRhiBuffer* buffer, int count,
                                      int firstInstance, QRhiShaderResourceBindings* srb,
                                      QRhiGraphicsPipeline* pso) {
   if (!buffer || count <= 0) {
@@ -1093,7 +893,7 @@ void HexViewRhiWindow::drawRectBuffer(QRhiCommandBuffer* cb, QRhiBuffer* buffer,
   cb->drawIndexed(6, count, 0, 0, drawFirstInstance);
 }
 
-void HexViewRhiWindow::drawGlyphBuffer(QRhiCommandBuffer* cb, QRhiBuffer* buffer, int count,
+void HexViewRhiWidget::drawGlyphBuffer(QRhiCommandBuffer* cb, QRhiBuffer* buffer, int count,
                                       int firstInstance) {
   if (!buffer || count <= 0) {
     return;
@@ -1114,7 +914,7 @@ void HexViewRhiWindow::drawGlyphBuffer(QRhiCommandBuffer* cb, QRhiBuffer* buffer
   cb->drawIndexed(6, count, 0, 0, drawFirstInstance);
 }
 
-void HexViewRhiWindow::drawFullscreen(QRhiCommandBuffer* cb, QRhiGraphicsPipeline* pso,
+void HexViewRhiWidget::drawFullscreen(QRhiCommandBuffer* cb, QRhiGraphicsPipeline* pso,
                                       QRhiShaderResourceBindings* srb) {
   if (!pso || !srb) {
     return;
@@ -1128,7 +928,7 @@ void HexViewRhiWindow::drawFullscreen(QRhiCommandBuffer* cb, QRhiGraphicsPipelin
   cb->drawIndexed(6, 1, 0, 0, 0);
 }
 
-QRectF HexViewRhiWindow::glyphUv(const QChar& ch) const {
+QRectF HexViewRhiWidget::glyphUv(const QChar& ch) const {
   if (!m_view->m_glyphAtlas) {
     return {};
   }
@@ -1144,12 +944,12 @@ QRectF HexViewRhiWindow::glyphUv(const QChar& ch) const {
   return {};
 }
 
-void HexViewRhiWindow::appendRect(std::vector<RectInstance>& rects, float x, float y, float w, float h,
+void HexViewRhiWidget::appendRect(std::vector<RectInstance>& rects, float x, float y, float w, float h,
                                  const QVector4D& color) {
   rects.push_back({x, y, w, h, color.x(), color.y(), color.z(), color.w()});
 }
 
-void HexViewRhiWindow::appendGlyph(std::vector<GlyphInstance>& glyphs, float x, float y, float w, float h,
+void HexViewRhiWidget::appendGlyph(std::vector<GlyphInstance>& glyphs, float x, float y, float w, float h,
                                   const QRectF& uv, const QVector4D& color) {
   if (uv.isNull()) {
     return;
@@ -1160,7 +960,7 @@ void HexViewRhiWindow::appendGlyph(std::vector<GlyphInstance>& glyphs, float x, 
                     color.x(), color.y(), color.z(), color.w()});
 }
 
-void HexViewRhiWindow::ensureCacheWindow(int startLine, int endLine, int totalLines) {
+void HexViewRhiWidget::ensureCacheWindow(int startLine, int endLine, int totalLines) {
   const bool needsWindow =
       m_cachedLines.empty() || startLine < m_cacheStartLine || endLine > m_cacheEndLine;
   if (!needsWindow) {
@@ -1176,7 +976,7 @@ void HexViewRhiWindow::ensureCacheWindow(int startLine, int endLine, int totalLi
   m_selectionDirty = true;
 }
 
-void HexViewRhiWindow::rebuildCacheWindow() {
+void HexViewRhiWidget::rebuildCacheWindow() {
   m_cachedLines.clear();
   if (m_cacheEndLine < m_cacheStartLine) {
     return;
@@ -1208,7 +1008,7 @@ void HexViewRhiWindow::rebuildCacheWindow() {
   }
 }
 
-const HexViewRhiWindow::CachedLine* HexViewRhiWindow::cachedLineFor(int line) const {
+const HexViewRhiWidget::CachedLine* HexViewRhiWidget::cachedLineFor(int line) const {
   if (line < m_cacheStartLine || line > m_cacheEndLine) {
     return nullptr;
   }
@@ -1219,7 +1019,7 @@ const HexViewRhiWindow::CachedLine* HexViewRhiWindow::cachedLineFor(int line) co
   return &m_cachedLines[index];
 }
 
-void HexViewRhiWindow::buildBaseInstances() {
+void HexViewRhiWidget::buildBaseInstances() {
   m_baseRectInstances.clear();
   m_baseGlyphInstances.clear();
   m_lineRanges.clear();
@@ -1337,7 +1137,7 @@ void HexViewRhiWindow::buildBaseInstances() {
   }
 }
 
-void HexViewRhiWindow::buildSelectionInstances(int startLine, int endLine) {
+void HexViewRhiWidget::buildSelectionInstances(int startLine, int endLine) {
   m_maskRectInstances.clear();
 
   const bool hasSelection = !m_view->m_selections.empty() || !m_view->m_fadeSelections.empty();

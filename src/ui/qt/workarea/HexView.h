@@ -22,6 +22,7 @@ class QParallelAnimationGroup;
 class QWidget;
 class VGMFile;
 class VGMItem;
+class HexViewRhiWidget;
 class HexViewRhiWindow;
 
 class HexView final : public QAbstractScrollArea {
@@ -64,6 +65,7 @@ protected:
   void mouseDoubleClickEvent(QMouseEvent* event) override;
 
 private:
+  friend class HexViewRhiWidget;
   friend class HexViewRhiWindow;
   struct SelectionRange {
     uint32_t offset;
@@ -133,6 +135,11 @@ private:
   QPointF m_shadowOffset{0.0, 0.0};
   qreal m_shadowStrength = 1.0;
 
-  HexViewRhiWindow* m_rhiWindow = nullptr;
+#if defined(Q_OS_LINUX)
+  HexViewRhiWidget* m_rhiView = nullptr;
+#else
+  HexViewRhiWindow* m_rhiView = nullptr;
+  QWidget* m_rhiContainer = nullptr;
+#endif
   std::unique_ptr<GlyphAtlas> m_glyphAtlas;
 };
