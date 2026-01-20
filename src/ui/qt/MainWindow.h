@@ -24,7 +24,9 @@ class QDragMoveEvent;
 class QDragLeaveEvent;
 class QDropEvent;
 class QResizeEvent;
+#if defined(Q_OS_LINUX)
 class QRhiWidget;
+#endif
 
 class MainWindow final : public QMainWindow {
   Q_OBJECT
@@ -63,5 +65,7 @@ private:
   QPushButton *m_manual_creation_btn{};
   ToastHost *m_toastHost{};
   QWidget *m_dragOverlay{};
+#if defined(Q_OS_LINUX)
   QRhiWidget *m_rhiPrimer{};
+#endif
 };

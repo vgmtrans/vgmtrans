@@ -93,6 +93,8 @@ add_executable(
   widgets/TitleBar.h
   workarea/HexView.cpp
   workarea/HexView.h
+  workarea/HexViewRhiWidget.cpp
+  workarea/HexViewRhiWidget.h
   workarea/HexViewRhiWindow.cpp
   workarea/HexViewRhiWindow.h
   workarea/MdiArea.cpp

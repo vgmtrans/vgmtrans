@@ -14,7 +14,9 @@
 #include <QStandardPaths>
 #include <QGridLayout>
 #include <QPushButton>
+#if defined(Q_OS_LINUX)
 #include <QRhiWidget>
+#endif
 #include <QMessageBox>
 #include <QStatusBar>
 #include <QResizeEvent>
