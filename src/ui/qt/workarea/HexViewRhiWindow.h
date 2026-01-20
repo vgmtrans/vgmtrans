@@ -1,5 +1,5 @@
 /*
-* VGMTrans (c) 2002-2024
+* VGMTrans (c) 2002-2026
 * Licensed under the zlib license,
 * refer to the included LICENSE.txt file
 */
@@ -9,8 +9,6 @@
 #include <QWindow>
 #include <QPointF>
 #include <memory>
-
-#include "HexViewRhiTarget.h"
 
 class QEvent;
 class QExposeEvent;
@@ -23,17 +21,12 @@ class QRhiSwapChain;
 class HexView;
 class HexViewRhiRenderer;
 
-class HexViewRhiWindow final : public QWindow, public HexViewRhiTarget {
+class HexViewRhiWindow final : public QWindow {
   Q_OBJECT
 
 public:
-  explicit HexViewRhiWindow(HexView* view);
+  explicit HexViewRhiWindow(HexView* view, HexViewRhiRenderer* renderer);
   ~HexViewRhiWindow() override;
-
-  void markBaseDirty() override;
-  void markSelectionDirty() override;
-  void invalidateCache() override;
-  void requestUpdate() override;
 
 protected:
   bool event(QEvent* e) override;
@@ -54,9 +47,9 @@ private:
   void drainPendingWheel();
 
   HexView* m_view = nullptr;
+  HexViewRhiRenderer* m_renderer = nullptr;
 
   std::unique_ptr<BackendData> m_backend;
-  std::unique_ptr<HexViewRhiRenderer> m_renderer;
 
   QRhi* m_rhi = nullptr;
   QRhiSwapChain* m_sc = nullptr;

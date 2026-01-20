@@ -1,5 +1,5 @@
 /*
-* VGMTrans (c) 2002-2024
+* VGMTrans (c) 2002-2026
 * Licensed under the zlib license,
 * refer to the included LICENSE.txt file
 */
@@ -7,27 +7,19 @@
 #pragma once
 
 #include <QRhiWidget>
-#include <QPointF>
-#include <memory>
-
-#include "HexViewRhiTarget.h"
 
 class QEvent;
 class QResizeEvent;
 class HexView;
 class HexViewRhiRenderer;
 
-class HexViewRhiWidget final : public QRhiWidget, public HexViewRhiTarget {
+class HexViewRhiWidget final : public QRhiWidget {
   Q_OBJECT
 
 public:
-  explicit HexViewRhiWidget(HexView* view, QWidget* parent = nullptr);
+  explicit HexViewRhiWidget(HexView* view, HexViewRhiRenderer* renderer,
+                            QWidget* parent = nullptr);
   ~HexViewRhiWidget() override;
-
-  void markBaseDirty() override;
-  void markSelectionDirty() override;
-  void invalidateCache() override;
-  void requestUpdate() override;
 
 protected:
   void initialize(QRhiCommandBuffer* cb) override;
@@ -38,6 +30,6 @@ protected:
 
 private:
   HexView* m_view = nullptr;
-  std::unique_ptr<HexViewRhiRenderer> m_renderer;
+  HexViewRhiRenderer* m_renderer = nullptr;
   bool m_dragging = false;
 };

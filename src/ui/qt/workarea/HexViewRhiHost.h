@@ -7,17 +7,19 @@
 #pragma once
 
 #include <QWidget>
+#include <memory>
 
 class HexView;
-class HexViewRhiTarget;
+class HexViewRhiRenderer;
 class QResizeEvent;
+class QWindow;
 
 class HexViewRhiHost final : public QWidget {
   Q_OBJECT
 
 public:
   explicit HexViewRhiHost(HexView* view, QWidget* parent = nullptr);
-  ~HexViewRhiHost() override = default;
+  ~HexViewRhiHost() override;
 
   void markBaseDirty();
   void markSelectionDirty();
@@ -28,6 +30,7 @@ protected:
   void resizeEvent(QResizeEvent* event) override;
 
 private:
-  HexViewRhiTarget* m_target = nullptr;
+  std::unique_ptr<HexViewRhiRenderer> m_renderer;
   QWidget* m_surface = nullptr;
+  QWindow* m_window = nullptr;
 };
