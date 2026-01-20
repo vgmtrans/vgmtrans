@@ -122,6 +122,10 @@ void HexViewRhiWindow::invalidateCache() {
   }
 }
 
+void HexViewRhiWindow::requestUpdate() {
+  QWindow::requestUpdate();
+}
+
 void HexViewRhiWindow::drainPendingMouseMove()
 {
   if (!m_pendingMouseMove || !m_view || !m_view->viewport())
@@ -385,7 +389,7 @@ void HexViewRhiWindow::renderFrame() {
     return;
 
   initIfNeeded();
-  if (!m_rhi || !m_sc || !m_view || !m_view->viewport() || !m_view->m_vgmfile || !m_renderer)
+  if (!m_rhi || !m_sc || !m_view || !m_view->viewport() || !m_renderer)
     return;
 
   // Apply at most one mouse, wheel move per frame

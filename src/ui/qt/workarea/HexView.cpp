@@ -6,11 +6,7 @@
 
 #include "HexView.h"
 #include "Helpers.h"
-#if defined(Q_OS_LINUX)
-#include "HexViewRhiWidget.h"
-#else
-#include "HexViewRhiWindow.h"
-#endif
+#include "HexViewRhiHost.h"
 #include "VGMFile.h"
 
 #include <QApplication>
@@ -59,20 +55,9 @@ HexView::HexView(VGMFile* vgmfile, QWidget* parent)
   setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
   viewport()->setAutoFillBackground(false);
 
-#if defined(Q_OS_LINUX)
-  m_rhiView = new HexViewRhiWidget(this, viewport());
-  m_rhiView->setFocusPolicy(Qt::NoFocus);
-  // m_rhiView->setAttribute(Qt::WA_TransparentForMouseEvents);
-  m_rhiView->setGeometry(viewport()->rect());
-  m_rhiView->show();
-#else
-  m_rhiView = new HexViewRhiWindow(this);
-  m_rhiContainer = QWidget::createWindowContainer(m_rhiView, viewport());
-  m_rhiContainer->setFocusPolicy(Qt::NoFocus);
-  // m_rhiContainer->setAttribute(Qt::WA_TransparentForMouseEvents);
-  m_rhiContainer->setGeometry(viewport()->rect());
-  m_rhiContainer->show();
-#endif
+  m_rhiHost = new HexViewRhiHost(this, viewport());
+  m_rhiHost->setGeometry(viewport()->rect());
+  m_rhiHost->show();
 
   const double appFontPointSize = QApplication::font().pointSizeF();
   QFont font("Roboto Mono", appFontPointSize + 1.0);
@@ -111,10 +96,10 @@ void HexView::setFont(const QFont& font) {
   }
 
   updateLayout();
-  if (m_rhiView) {
-    m_rhiView->markBaseDirty();
-    m_rhiView->markSelectionDirty();
-    m_rhiView->requestUpdate();
+  if (m_rhiHost) {
+    m_rhiHost->markBaseDirty();
+    m_rhiHost->markSelectionDirty();
+    m_rhiHost->requestUpdate();
   }
 }
 
@@ -182,16 +167,6 @@ void HexView::updateScrollBars() {
 }
 
 void HexView::updateLayout() {
-#if defined(Q_OS_LINUX)
-  if (m_rhiView) {
-    m_rhiView->setGeometry(viewport()->rect());
-  }
-#else
-  if (m_rhiContainer) {
-    m_rhiContainer->setGeometry(viewport()->rect());
-  }
-#endif
-
   const int width = viewport()->width();
   const int height = viewport()->height();
   if (width == 0 || height == 0) {
@@ -207,12 +182,12 @@ void HexView::updateLayout() {
 
   updateScrollBars();
 
-  if (m_rhiView) {
+  if (m_rhiHost) {
     if (offsetChanged || asciiChanged) {
-      m_rhiView->markBaseDirty();
-      m_rhiView->markSelectionDirty();
+      m_rhiHost->markBaseDirty();
+      m_rhiHost->markSelectionDirty();
     }
-    m_rhiView->requestUpdate();
+    m_rhiHost->requestUpdate();
   }
 }
 
@@ -232,9 +207,9 @@ void HexView::setSelectedItem(VGMItem* item) {
     }
     m_selections.clear();
     showSelectedItem(false, true);
-    if (m_rhiView) {
-      m_rhiView->markSelectionDirty();
-      m_rhiView->requestUpdate();
+    if (m_rhiHost) {
+      m_rhiHost->markSelectionDirty();
+      m_rhiHost->requestUpdate();
     }
     return;
   }
@@ -246,9 +221,9 @@ void HexView::setSelectedItem(VGMItem* item) {
 
   showSelectedItem(true, true);
 
-  if (m_rhiView) {
-    m_rhiView->markSelectionDirty();
-    m_rhiView->requestUpdate();
+  if (m_rhiHost) {
+    m_rhiHost->markSelectionDirty();
+    m_rhiHost->requestUpdate();
   }
 
   if (!m_lineHeight) {
@@ -349,8 +324,8 @@ void HexView::rebuildStyleMap() {
     }
   }
 
-  if (m_rhiView) {
-    m_rhiView->invalidateCache();
+  if (m_rhiHost) {
+    m_rhiHost->invalidateCache();
   }
 }
 
@@ -428,9 +403,9 @@ void HexView::ensureGlyphAtlas(qreal dpr) {
   m_glyphAtlas->font = font();
   m_glyphAtlas->version++;
 
-  if (m_rhiView) {
-    m_rhiView->markBaseDirty();
-    m_rhiView->markSelectionDirty();
+  if (m_rhiHost) {
+    m_rhiHost->markBaseDirty();
+    m_rhiHost->markSelectionDirty();
   }
 }
 
@@ -456,25 +431,19 @@ bool HexView::viewportEvent(QEvent* event) {
 
 void HexView::resizeEvent(QResizeEvent* event) {
   QAbstractScrollArea::resizeEvent(event);
-#if defined(Q_OS_LINUX)
-  if (m_rhiView) {
-    m_rhiView->setGeometry(viewport()->rect());
+  if (m_rhiHost) {
+    m_rhiHost->setGeometry(viewport()->rect());
   }
-#else
-  if (m_rhiContainer) {
-    m_rhiContainer->setGeometry(viewport()->rect());
-  }
-#endif
   updateLayout();
-  if (m_rhiView) {
-    m_rhiView->requestUpdate();
+  if (m_rhiHost) {
+    m_rhiHost->requestUpdate();
   }
 }
 
 void HexView::scrollContentsBy(int dx, int dy) {
   QAbstractScrollArea::scrollContentsBy(dx, dy);
-  if (m_rhiView) {
-    m_rhiView->requestUpdate();
+  if (m_rhiHost) {
+    m_rhiHost->requestUpdate();
   }
 }
 
@@ -484,10 +453,10 @@ void HexView::changeEvent(QEvent* event) {
       m_styles[0].bg = palette().color(QPalette::Window);
       m_styles[0].fg = palette().color(QPalette::WindowText);
     }
-    if (m_rhiView) {
-      m_rhiView->markBaseDirty();
-      m_rhiView->markSelectionDirty();
-      m_rhiView->requestUpdate();
+    if (m_rhiHost) {
+      m_rhiHost->markBaseDirty();
+      m_rhiHost->markSelectionDirty();
+      m_rhiHost->requestUpdate();
     }
   }
   QAbstractScrollArea::changeEvent(event);
@@ -634,9 +603,9 @@ void HexView::mouseDoubleClickEvent(QMouseEvent* event) {
     if (m_shouldDrawOffset && event->pos().x() >= 0 &&
         event->pos().x() < (NUM_ADDRESS_NIBBLES * m_charWidth)) {
       m_addressAsHex = !m_addressAsHex;
-      if (m_rhiView) {
-        m_rhiView->markBaseDirty();
-        m_rhiView->requestUpdate();
+      if (m_rhiHost) {
+        m_rhiHost->markBaseDirty();
+        m_rhiHost->requestUpdate();
       }
     }
   }
@@ -652,8 +621,8 @@ void HexView::setOverlayOpacity(qreal opacity) {
     return;
   }
   m_overlayOpacity = opacity;
-  if (m_rhiView) {
-    m_rhiView->requestUpdate();
+  if (m_rhiHost) {
+    m_rhiHost->requestUpdate();
   }
 }
 
@@ -666,8 +635,8 @@ void HexView::setShadowBlur(qreal blur) {
     return;
   }
   m_shadowBlur = blur;
-  if (m_rhiView) {
-    m_rhiView->requestUpdate();
+  if (m_rhiHost) {
+    m_rhiHost->requestUpdate();
   }
 }
 
@@ -680,8 +649,8 @@ void HexView::setShadowOffset(const QPointF& offset) {
     return;
   }
   m_shadowOffset = offset;
-  if (m_rhiView) {
-    m_rhiView->requestUpdate();
+  if (m_rhiHost) {
+    m_rhiHost->requestUpdate();
   }
 }
 
@@ -691,9 +660,9 @@ void HexView::setShadowStrength(qreal s) {
   s = std::max<qreal>(0.0, s);
   if (qFuzzyCompare(s, m_shadowStrength)) return;
   m_shadowStrength = s;
-  if (m_rhiView) {
-    m_rhiView->markSelectionDirty();
-    m_rhiView->requestUpdate();
+  if (m_rhiHost) {
+    m_rhiHost->markSelectionDirty();
+    m_rhiHost->requestUpdate();
   }
 }
 
@@ -787,8 +756,8 @@ void HexView::showSelectedItem(bool show, bool animate) {
 
 void HexView::clearFadeSelection() {
   m_fadeSelections.clear();
-  if (m_rhiView) {
-    m_rhiView->markSelectionDirty();
-    m_rhiView->requestUpdate();
+  if (m_rhiHost) {
+    m_rhiHost->markSelectionDirty();
+    m_rhiHost->requestUpdate();
   }
 }

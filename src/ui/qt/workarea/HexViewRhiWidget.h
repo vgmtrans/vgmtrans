@@ -10,22 +10,24 @@
 #include <QPointF>
 #include <memory>
 
+#include "HexViewRhiTarget.h"
+
 class QEvent;
 class QResizeEvent;
 class HexView;
 class HexViewRhiRenderer;
 
-class HexViewRhiWidget final : public QRhiWidget {
+class HexViewRhiWidget final : public QRhiWidget, public HexViewRhiTarget {
   Q_OBJECT
 
 public:
   explicit HexViewRhiWidget(HexView* view, QWidget* parent = nullptr);
   ~HexViewRhiWidget() override;
 
-  void markBaseDirty();
-  void markSelectionDirty();
-  void invalidateCache();
-  void requestUpdate();
+  void markBaseDirty() override;
+  void markSelectionDirty() override;
+  void invalidateCache() override;
+  void requestUpdate() override;
 
 protected:
   void initialize(QRhiCommandBuffer* cb) override;
@@ -35,29 +37,7 @@ protected:
   void resizeEvent(QResizeEvent* event) override;
 
 private:
-  void drainPendingMouseMove();
-  void drainPendingWheel();
-
   HexView* m_view = nullptr;
   std::unique_ptr<HexViewRhiRenderer> m_renderer;
-
   bool m_dragging = false;
-  bool m_pendingMouseMove = false;
-
-  // Mouse Move state
-  QPointF m_pendingGlobalPos;
-  Qt::MouseButtons m_pendingButtons = Qt::NoButton;
-  Qt::KeyboardModifiers m_pendingMods = Qt::NoModifier;
-
-  // Coalesced wheel state
-  bool m_pendingWheel = false;
-  QPointF m_wheelGlobalPos;
-  QPoint m_wheelPixelDelta;   // summed
-  QPoint m_wheelAngleDelta;   // summed
-  Qt::KeyboardModifiers m_wheelMods = Qt::NoModifier;
-  Qt::MouseButtons m_wheelButtons = Qt::NoButton;
-  Qt::ScrollPhase m_wheelPhase = Qt::NoScrollPhase;
-
-  bool m_scrolling = false;
-  int m_pumpFrames = 0;        // generic "keep drawing for N frames"
 };

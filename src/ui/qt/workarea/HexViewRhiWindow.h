@@ -10,6 +10,8 @@
 #include <QPointF>
 #include <memory>
 
+#include "HexViewRhiTarget.h"
+
 class QEvent;
 class QExposeEvent;
 class QResizeEvent;
@@ -21,16 +23,17 @@ class QRhiSwapChain;
 class HexView;
 class HexViewRhiRenderer;
 
-class HexViewRhiWindow final : public QWindow {
+class HexViewRhiWindow final : public QWindow, public HexViewRhiTarget {
   Q_OBJECT
 
 public:
   explicit HexViewRhiWindow(HexView* view);
   ~HexViewRhiWindow() override;
 
-  void markBaseDirty();
-  void markSelectionDirty();
-  void invalidateCache();
+  void markBaseDirty() override;
+  void markSelectionDirty() override;
+  void invalidateCache() override;
+  void requestUpdate() override;
 
 protected:
   bool event(QEvent* e) override;
