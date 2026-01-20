@@ -1,5 +1,5 @@
 /*
-* VGMTrans (c) 2002-2024
+* VGMTrans (c) 2002-2026
 * Licensed under the zlib license,
 * refer to the included LICENSE.txt file
 */
@@ -13,14 +13,11 @@
 
 #include <QCoreApplication>
 #include <QEvent>
-#include <QMouseEvent>
 #include <QResizeEvent>
-#include <QWheelEvent>
 
-HexViewRhiWidget::HexViewRhiWidget(HexView* view, QWidget* parent)
-    : QRhiWidget(parent),
-      m_view(view),
-      m_renderer(std::make_unique<HexViewRhiRenderer>(view, "HexViewRhiWidget")) {
+HexViewRhiWidget::HexViewRhiWidget(HexView* view, HexViewRhiRenderer* renderer,
+                                   QWidget* parent)
+    : QRhiWidget(parent), m_view(view), m_renderer(renderer) {
 #if defined(Q_OS_LINUX)
   setApi(QRhiWidget::Api::OpenGL);
 #elif defined(Q_OS_WIN)
@@ -36,28 +33,6 @@ HexViewRhiWidget::HexViewRhiWidget(HexView* view, QWidget* parent)
 
 HexViewRhiWidget::~HexViewRhiWidget() {
   releaseResources();
-}
-
-void HexViewRhiWidget::markBaseDirty() {
-  if (m_renderer) {
-    m_renderer->markBaseDirty();
-  }
-}
-
-void HexViewRhiWidget::markSelectionDirty() {
-  if (m_renderer) {
-    m_renderer->markSelectionDirty();
-  }
-}
-
-void HexViewRhiWidget::invalidateCache() {
-  if (m_renderer) {
-    m_renderer->invalidateCache();
-  }
-}
-
-void HexViewRhiWidget::requestUpdate() {
-  update();
 }
 
 void HexViewRhiWidget::initialize(QRhiCommandBuffer* cb) {
@@ -111,7 +86,7 @@ bool HexViewRhiWidget::event(QEvent *e)
       // Press/release: keep synchronous so existing HexView logic stays correct.
       QCoreApplication::sendEvent(m_view->viewport(), e);
 
-      requestUpdate();
+      update();
       return true;
     }
 
@@ -119,16 +94,15 @@ bool HexViewRhiWidget::event(QEvent *e)
       if (!m_dragging)
         return true;
 
-      // Schedule a frame; Qt will coalesce multiple requestUpdate() calls anyway
       QCoreApplication::sendEvent(m_view->viewport(), e);
-      requestUpdate();
+      update();
       return true;
     }
 
     case QEvent::MouseButtonRelease: {
       QCoreApplication::sendEvent(m_view->viewport(), e);
       m_dragging = false;
-      requestUpdate();
+      update();
       return true;
     }
 
@@ -138,18 +112,17 @@ bool HexViewRhiWidget::event(QEvent *e)
     case QEvent::KeyRelease:
     case QEvent::ToolTip:
       QCoreApplication::sendEvent(m_view->viewport(), e);
-      requestUpdate();
+      update();
       return true;
 
     default:
       break;
-  }      auto *me = static_cast<QMouseEvent*>(e);
-
+  }
 
   return QRhiWidget::event(e);
 }
 
 void HexViewRhiWidget::resizeEvent(QResizeEvent* event) {
   QRhiWidget::resizeEvent(event);
-  requestUpdate();
+  update();
 }

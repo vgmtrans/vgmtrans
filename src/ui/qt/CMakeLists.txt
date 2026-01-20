@@ -97,7 +97,6 @@ add_executable(
   workarea/HexViewRhiHost.h
   workarea/HexViewRhiRenderer.cpp
   workarea/HexViewRhiRenderer.h
-  workarea/HexViewRhiTarget.h
   workarea/HexViewRhiWidget.cpp
   workarea/HexViewRhiWidget.h
   workarea/HexViewRhiWindow.cpp

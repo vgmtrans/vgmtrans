@@ -1,5 +1,5 @@
 /*
-* VGMTrans (c) 2002-2024
+* VGMTrans (c) 2002-2026
 * Licensed under the zlib license,
 * refer to the included LICENSE.txt file
 */
@@ -61,10 +61,8 @@ struct HexViewRhiWindow::BackendData {
   QRhiNullInitParams nullParams;
 };
 
-HexViewRhiWindow::HexViewRhiWindow(HexView* view)
-    : m_view(view),
-      m_backend(std::make_unique<BackendData>()),
-      m_renderer(std::make_unique<HexViewRhiRenderer>(view, "HexViewRhiWindow")) {
+HexViewRhiWindow::HexViewRhiWindow(HexView* view, HexViewRhiRenderer* renderer)
+    : m_view(view), m_renderer(renderer), m_backend(std::make_unique<BackendData>()) {
   setFlags(Qt::FramelessWindowHint);
 
 #if defined(Q_OS_WIN)
@@ -102,28 +100,6 @@ HexViewRhiWindow::HexViewRhiWindow(HexView* view)
 
 HexViewRhiWindow::~HexViewRhiWindow() {
   releaseResources();
-}
-
-void HexViewRhiWindow::markBaseDirty() {
-  if (m_renderer) {
-    m_renderer->markBaseDirty();
-  }
-}
-
-void HexViewRhiWindow::markSelectionDirty() {
-  if (m_renderer) {
-    m_renderer->markSelectionDirty();
-  }
-}
-
-void HexViewRhiWindow::invalidateCache() {
-  if (m_renderer) {
-    m_renderer->invalidateCache();
-  }
-}
-
-void HexViewRhiWindow::requestUpdate() {
-  QWindow::requestUpdate();
 }
 
 void HexViewRhiWindow::drainPendingMouseMove()

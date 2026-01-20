@@ -6,7 +6,8 @@
 
 #include "HexViewRhiHost.h"
 
-#include "HexViewRhiTarget.h"
+#include "HexView.h"
+#include "HexViewRhiRenderer.h"
 
 #if defined(Q_OS_LINUX)
 #include "HexViewRhiWidget.h"
@@ -14,6 +15,7 @@
 #include "HexViewRhiWindow.h"
 #endif
 
+#include <QWindow>
 #include <QResizeEvent>
 
 HexViewRhiHost::HexViewRhiHost(HexView* view, QWidget* parent)
@@ -21,12 +23,13 @@ HexViewRhiHost::HexViewRhiHost(HexView* view, QWidget* parent)
   setFocusPolicy(Qt::NoFocus);
 
 #if defined(Q_OS_LINUX)
-  auto* widget = new HexViewRhiWidget(view, this);
-  m_target = widget;
+  m_renderer = std::make_unique<HexViewRhiRenderer>(view, "HexViewRhiWidget");
+  auto* widget = new HexViewRhiWidget(view, m_renderer.get(), this);
   m_surface = widget;
 #else
-  auto* window = new HexViewRhiWindow(view);
-  m_target = window;
+  m_renderer = std::make_unique<HexViewRhiRenderer>(view, "HexViewRhiWindow");
+  auto* window = new HexViewRhiWindow(view, m_renderer.get());
+  m_window = window;
   m_surface = QWidget::createWindowContainer(window, this);
 #endif
 
@@ -37,27 +40,35 @@ HexViewRhiHost::HexViewRhiHost(HexView* view, QWidget* parent)
   }
 }
 
+HexViewRhiHost::~HexViewRhiHost() {
+  delete m_surface;
+  m_surface = nullptr;
+  m_window = nullptr;
+}
+
 void HexViewRhiHost::markBaseDirty() {
-  if (m_target) {
-    m_target->markBaseDirty();
+  if (m_renderer) {
+    m_renderer->markBaseDirty();
   }
 }
 
 void HexViewRhiHost::markSelectionDirty() {
-  if (m_target) {
-    m_target->markSelectionDirty();
+  if (m_renderer) {
+    m_renderer->markSelectionDirty();
   }
 }
 
 void HexViewRhiHost::invalidateCache() {
-  if (m_target) {
-    m_target->invalidateCache();
+  if (m_renderer) {
+    m_renderer->invalidateCache();
   }
 }
 
 void HexViewRhiHost::requestUpdate() {
-  if (m_target) {
-    m_target->requestUpdate();
+  if (m_window) {
+    m_window->requestUpdate();
+  } else if (m_surface) {
+    m_surface->update();
   }
 }
 
