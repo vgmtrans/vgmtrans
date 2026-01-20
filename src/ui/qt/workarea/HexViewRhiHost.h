@@ -8,9 +8,9 @@
 
 #include <QWidget>
 #include <memory>
+#include "HexViewRhiRenderer.h"
 
 class HexView;
-class HexViewRhiRenderer;
 class QResizeEvent;
 class QWindow;
 
@@ -19,7 +19,7 @@ class HexViewRhiHost final : public QWidget {
 
 public:
   explicit HexViewRhiHost(HexView* view, QWidget* parent = nullptr);
-  ~HexViewRhiHost() override;
+  ~HexViewRhiHost() override = default;
 
   void markBaseDirty();
   void markSelectionDirty();
