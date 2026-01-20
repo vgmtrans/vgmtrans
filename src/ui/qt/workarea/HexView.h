@@ -22,6 +22,7 @@ class QParallelAnimationGroup;
 class QWidget;
 class VGMFile;
 class VGMItem;
+class HexViewRhiRenderer;
 class HexViewRhiWidget;
 class HexViewRhiWindow;
 
@@ -65,6 +66,7 @@ protected:
   void mouseDoubleClickEvent(QMouseEvent* event) override;
 
 private:
+  friend class HexViewRhiRenderer;
   friend class HexViewRhiWidget;
   friend class HexViewRhiWindow;
   struct SelectionRange {
