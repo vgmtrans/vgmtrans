@@ -19,7 +19,7 @@ class HexViewRhiHost final : public QWidget {
 
 public:
   explicit HexViewRhiHost(HexView* view, QWidget* parent = nullptr);
-  ~HexViewRhiHost() override = default;
+  ~HexViewRhiHost() override;
 
   void markBaseDirty();
   void markSelectionDirty();

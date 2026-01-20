@@ -40,6 +40,12 @@ HexViewRhiHost::HexViewRhiHost(HexView* view, QWidget* parent)
   }
 }
 
+HexViewRhiHost::~HexViewRhiHost() {
+  delete m_surface;
+  m_surface = nullptr;
+  m_window = nullptr;
+}
+
 void HexViewRhiHost::markBaseDirty() {
   if (m_renderer) {
     m_renderer->markBaseDirty();
