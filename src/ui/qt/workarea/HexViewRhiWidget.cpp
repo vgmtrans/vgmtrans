@@ -13,6 +13,7 @@
 
 #include <QCoreApplication>
 #include <QEvent>
+#include <QMouseEvent>
 #include <QResizeEvent>
 
 HexViewRhiWidget::HexViewRhiWidget(HexView* view, HexViewRhiRenderer* renderer,
@@ -90,6 +91,27 @@ bool HexViewRhiWidget::event(QEvent *e)
       return true;
     }
 
+    case QEvent::MouseButtonDblClick: {
+      // the second of two quick clicks will be coalesced into a double click event,
+      // we want the second click to register as a normal MouseButtonPress to allow
+      // fast select / deselect
+      auto *me = static_cast<QMouseEvent*>(e);
+      if (!m_dragging && me->button() == Qt::LeftButton) {
+        QMouseEvent pressEvent(QEvent::MouseButtonPress,
+                               me->position(),
+                               me->globalPosition(),
+                               me->button(),
+                               me->buttons(),
+                               me->modifiers());
+        m_view->setFocus(Qt::MouseFocusReason);
+        m_dragging = true;
+        QCoreApplication::sendEvent(m_view->viewport(), &pressEvent);
+      }
+      QCoreApplication::sendEvent(m_view->viewport(), e);
+      update();
+      return true;
+    }
+
     case QEvent::MouseMove: {
       if (!m_dragging)
         return true;
@@ -106,7 +128,6 @@ bool HexViewRhiWidget::event(QEvent *e)
       return true;
     }
 
-    case QEvent::MouseButtonDblClick:
     case QEvent::Wheel:
     case QEvent::KeyPress:
     case QEvent::KeyRelease:
