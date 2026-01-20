@@ -83,10 +83,6 @@ void HexViewRhiWidget::render(QRhiCommandBuffer* cb) {
     return;
   }
 
-  // Apply at most one mouse, wheel move per frame
-  drainPendingMouseMove();
-  drainPendingWheel();
-
   HexViewRhiRenderer::RenderTargetInfo info;
   info.renderTarget = rt;
   info.renderPassDesc = rt->renderPassDescriptor();
@@ -100,52 +96,6 @@ void HexViewRhiWidget::releaseResources() {
   if (m_renderer) {
     m_renderer->releaseResources();
   }
-}
-
-void HexViewRhiWidget::drainPendingMouseMove()
-{
-  if (!m_pendingMouseMove || !m_view || !m_view->viewport())
-    return;
-
-  m_pendingMouseMove = false;
-
-  // Map global -> viewport coordinates
-  const QPoint vp = m_view->viewport()->mapFromGlobal(m_pendingGlobalPos.toPoint());
-  const QPoint vpPos(vp);
-
-  // Update selection/hover/etc once per frame
-  m_view->handleCoalescedMouseMove(vpPos, m_pendingButtons, m_pendingMods);
-}
-
-void HexViewRhiWidget::drainPendingWheel()
-{
-  if (!m_pendingWheel || !m_view || !m_view->viewport())
-    return;
-
-  m_pendingWheel = false;
-
-  const QPoint vp = m_view->viewport()->mapFromGlobal(m_wheelGlobalPos.toPoint());
-  const QPointF vpPos(vp);
-
-  QWheelEvent ev(
-      vpPos,
-      m_wheelGlobalPos,
-      m_wheelPixelDelta,
-      m_wheelAngleDelta,
-      m_wheelButtons,
-      m_wheelMods,
-      m_wheelPhase,
-      /*inverted*/ false
-  );
-
-  QCoreApplication::sendEvent(m_view->viewport(), &ev);
-
-  m_wheelPixelDelta = {};
-  m_wheelAngleDelta = {};
-
-  // Trackpad inertia ends with ScrollEnd; if not available, use a timeout
-  if (m_wheelPhase == Qt::ScrollEnd)
-    m_scrolling = false;
 }
 
 bool HexViewRhiWidget::event(QEvent *e)
@@ -166,16 +116,11 @@ bool HexViewRhiWidget::event(QEvent *e)
     }
 
     case QEvent::MouseMove: {
-      auto *me = static_cast<QMouseEvent*>(e);
       if (!m_dragging)
         return true;
-      // Coalesce: keep only the latest move
-      m_pendingMouseMove = true;
-      m_pendingGlobalPos = me->globalPosition();
-      m_pendingButtons   = me->buttons();
-      m_pendingMods      = me->modifiers();
 
       // Schedule a frame; Qt will coalesce multiple requestUpdate() calls anyway
+      QCoreApplication::sendEvent(m_view->viewport(), e);
       requestUpdate();
       return true;
     }
@@ -187,23 +132,8 @@ bool HexViewRhiWidget::event(QEvent *e)
       return true;
     }
 
-    case QEvent::Wheel: {
-      auto *we = static_cast<QWheelEvent*>(e);
-      m_pendingWheel = true;
-      m_scrolling = true;
-
-      m_wheelGlobalPos = we->globalPosition();
-      m_wheelPixelDelta += we->pixelDelta();
-      m_wheelAngleDelta += we->angleDelta();
-      m_wheelMods = we->modifiers();
-      m_wheelButtons = we->buttons();
-      m_wheelPhase = we->phase();
-
-      requestUpdate();
-      return true;
-    }
-
     case QEvent::MouseButtonDblClick:
+    case QEvent::Wheel:
     case QEvent::KeyPress:
     case QEvent::KeyRelease:
     case QEvent::ToolTip:
@@ -213,7 +143,8 @@ bool HexViewRhiWidget::event(QEvent *e)
 
     default:
       break;
-  }
+  }      auto *me = static_cast<QMouseEvent*>(e);
+
 
   return QRhiWidget::event(e);
 }

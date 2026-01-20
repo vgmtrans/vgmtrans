@@ -23,8 +23,7 @@ class QWidget;
 class VGMFile;
 class VGMItem;
 class HexViewRhiRenderer;
-class HexViewRhiWidget;
-class HexViewRhiWindow;
+class HexViewRhiHost;
 
 class HexView final : public QAbstractScrollArea {
   Q_OBJECT
@@ -67,8 +66,6 @@ protected:
 
 private:
   friend class HexViewRhiRenderer;
-  friend class HexViewRhiWidget;
-  friend class HexViewRhiWindow;
   struct SelectionRange {
     uint32_t offset;
     uint32_t length;
@@ -137,11 +134,6 @@ private:
   QPointF m_shadowOffset{0.0, 0.0};
   qreal m_shadowStrength = 1.0;
 
-#if defined(Q_OS_LINUX)
-  HexViewRhiWidget* m_rhiView = nullptr;
-#else
-  HexViewRhiWindow* m_rhiView = nullptr;
-  QWidget* m_rhiContainer = nullptr;
-#endif
+  HexViewRhiHost* m_rhiHost = nullptr;
   std::unique_ptr<GlyphAtlas> m_glyphAtlas;
 };
