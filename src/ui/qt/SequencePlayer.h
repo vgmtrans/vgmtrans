@@ -70,6 +70,7 @@ public:
    * @return true if data was loaded correctly
    */
   bool playCollection(const VGMColl *collection);
+  [[nodiscard]] const VGMColl* activeCollection() const;
 
 signals:
   void statusChange(bool playing);

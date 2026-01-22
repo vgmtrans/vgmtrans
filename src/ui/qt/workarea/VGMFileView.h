@@ -7,12 +7,14 @@
 #pragma once
 #include <QFont>
 #include <QMdiSubWindow>
+#include <vector>
 
 class SnappingSplitter;
 class VGMFile;
 class HexView;
 class VGMFileTreeView;
 class VGMItem;
+struct SeqTimedEvent;
 
 class VGMFileView final : public QMdiSubWindow {
   Q_OBJECT
@@ -37,9 +39,13 @@ private:
   HexView* m_hexview{};
   SnappingSplitter* m_splitter;
   QFont m_defaultHexFont;
+  std::vector<const SeqTimedEvent*> m_playbackTimedEvents;
+  std::vector<const VGMItem*> m_playbackItems;
+  std::vector<const VGMItem*> m_lastPlaybackItems;
 
 public slots:
   void onSelectionChange(VGMItem* item) const;
+  void onPlaybackPositionChanged(int current, int max);
   void resetHexViewFont();
   void increaseHexViewFont();
   void decreaseHexViewFont();

@@ -253,6 +253,24 @@ void HexView::setSelectedItem(VGMItem* item) {
   }
 }
 
+void HexView::setSelectionsForItems(const std::vector<const VGMItem*>& items) {
+  m_selections.clear();
+  m_fadeSelections.clear();
+
+  m_selections.reserve(items.size());
+  for (const auto* item : items) {
+    if (!item) {
+      continue;
+    }
+    m_selections.push_back({item->dwOffset, item->unLength});
+  }
+
+  if (m_rhiHost) {
+    m_rhiHost->markSelectionDirty();
+    m_rhiHost->requestUpdate();
+  }
+}
+
 void HexView::rebuildStyleMap() {
   m_styles.clear();
   m_typeToStyleId.clear();
