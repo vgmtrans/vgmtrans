@@ -17,6 +17,21 @@ layout(std140, binding = 0) uniform Ubuf {
 
 layout(location = 0) out vec4 fragColor;
 
+float hash2(vec2 p) {
+  return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453);
+}
+
+float noise2(vec2 p) {
+  vec2 i = floor(p);
+  vec2 f = fract(p);
+  vec2 u = f * f * (3.0 - 2.0 * f);
+  float a = hash2(i);
+  float b = hash2(i + vec2(1.0, 0.0));
+  float c = hash2(i + vec2(0.0, 1.0));
+  float d = hash2(i + vec2(1.0, 1.0));
+  return mix(mix(a, b, u.x), mix(c, d, u.x), u.y);
+}
+
 void main() {
   vec4 base = texture(contentTex, vUv);
 
@@ -60,25 +75,19 @@ void main() {
 
   float playHalo = max(sh.g - play, 0.0);
 
-  vec2 p = vUv * viewSize;
-  float t = time * 1.4;
-  vec2 warp = vec2(
-      sin(p.y * 0.05 + t * 2.7) + sin(p.x * 0.02 - t * 1.3),
-      sin(p.x * 0.04 - t * 2.1) + sin(p.y * 0.03 + t * 1.7)
-    ) * 2.0;
-  vec2 fp = p + warp;
+  vec2 p = vUv * viewSize * 0.055;
+  float t = time * 0.85;
 
-  float n1 = fract(sin(dot(fp * 0.12 + t, vec2(12.9898, 78.233))) * 43758.5453);
-  float n2 = fract(sin(dot(fp * 0.07 - t, vec2(93.9898, 67.345))) * 24634.6345);
-  float noise = mix(n1, n2, 0.55);
+  float n1 = noise2(p + vec2(0.0, t * 1.2));
+  float n2 = noise2(p * 1.7 + vec2(7.4, t * 1.6));
+  float n3 = noise2(p * 2.9 + vec2(-3.1, t * 2.2));
 
-  float w1 = sin(fp.x * 0.08 + t * 5.0);
-  float w2 = sin(fp.y * 0.10 - t * 4.3);
-  float lick = 0.7 + 0.3 * (w1 * w2);
-  float flicker = 0.6 + 0.4 * noise;
+  float flicker = mix(n1, n2, 0.6);
+  float lick = mix(n2, n3, 0.5);
+  float turbulence = 0.65 + 0.55 * mix(flicker, lick, 0.5);
 
-  float halo = pow(playHalo, 0.65);
-  float flame = clamp(halo * glowStrength * flicker * lick, 0.0, 1.0);
+  float halo = pow(playHalo, 0.55);
+  float flame = clamp(halo * glowStrength * turbulence, 0.0, 1.0);
 
   vec3 fireDeep = vec3(0.7, 0.08, 0.02);
   vec3 fireMid = vec3(1.0, 0.35, 0.05);
