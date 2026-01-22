@@ -8,19 +8,16 @@
 
 SeqEventTimeIndex::~SeqEventTimeIndex() = default;
 
-SeqEventTimeIndex::Index SeqEventTimeIndex::addEvent(std::unique_ptr<SeqEvent> event,
+SeqEventTimeIndex::Index SeqEventTimeIndex::addEvent(SeqEvent* event,
                                                      uint32_t startTick,
                                                      uint32_t duration) {
-  SeqEvent* raw = event.get();
-  m_ownedEvents.push_back(std::move(event));
-  m_events.push_back(SeqTimedEvent{startTick, duration, raw});
+  m_events.push_back(SeqTimedEvent{startTick, duration, event});
   m_finalized = false;
   return m_events.size() - 1;
 }
 
 void SeqEventTimeIndex::clear() {
   m_events.clear();
-  m_ownedEvents.clear();
   m_byStart.clear();
   m_byEnd.clear();
   m_finalized = false;

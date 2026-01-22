@@ -2,7 +2,6 @@
 
 #include <cstdint>
 #include <limits>
-#include <memory>
 #include <vector>
 
 class SeqEvent;
@@ -41,7 +40,7 @@ class SeqEventTimeIndex {
   SeqEventTimeIndex(SeqEventTimeIndex&&) = default;
   SeqEventTimeIndex& operator=(SeqEventTimeIndex&&) = default;
 
-  Index addEvent(std::unique_ptr<SeqEvent> event, uint32_t startTick, uint32_t duration);
+  Index addEvent(SeqEvent* event, uint32_t startTick, uint32_t duration);
   void clear();
   void finalize();
 
@@ -81,7 +80,6 @@ class SeqEventTimeIndex {
 
  private:
   std::vector<SeqTimedEvent> m_events;
-  std::vector<std::unique_ptr<SeqEvent>> m_ownedEvents;
   std::vector<Index> m_byStart;
   std::vector<Index> m_byEnd;
   bool m_finalized = false;

@@ -5,7 +5,6 @@
  */
 #pragma once
 
-#include <memory>
 #include <sstream>
 #include <unordered_set>
 #include <utility>
@@ -114,8 +113,9 @@ protected:
         addEvent(new EventType(this, std::forward<Args>(args)...));
       }
     } else if (readMode == READMODE_CONVERT_TO_MIDI) {
-      parentSeq->timedEventIndex().addEvent(
-        std::make_unique<EventType>(this, std::forward<Args>(args)...), startTick, duration);
+      if (SeqEvent* existing = findSeqEventAtOffset(m_lastEventOffset, m_lastEventLength)) {
+        parentSeq->timedEventIndex().addEvent(existing, startTick, duration);
+      }
     }
   }
 
@@ -131,8 +131,9 @@ protected:
       return SeqEventTimeIndex::kInvalidIndex;
     }
     if (readMode == READMODE_CONVERT_TO_MIDI) {
-      return parentSeq->timedEventIndex().addEvent(
-        std::make_unique<EventType>(this, std::forward<Args>(args)...), startTick, duration);
+      if (SeqEvent* existing = findSeqEventAtOffset(m_lastEventOffset, m_lastEventLength)) {
+        return parentSeq->timedEventIndex().addEvent(existing, startTick, duration);
+      }
     }
     return SeqEventTimeIndex::kInvalidIndex;
   }
@@ -142,6 +143,7 @@ protected:
   bool checkControlStateForInfiniteLoop(u32 offset);
   void pushReturnOffset(uint32_t returnOffset);
   bool popReturnOffset(uint32_t &returnOffset);
+  SeqEvent* findSeqEventAtOffset(uint32_t offset, uint32_t length);
 
 private:
   void addControllerSlide(u32 dur, u16 &prevVal, u16 targVal, uint8_t (*scalerFunc)(uint8_t), void (MidiTrack::*insertFunc)(uint8_t, uint8_t, uint32_t)) const;
@@ -324,6 +326,9 @@ private:
   std::vector<LoopState> loopStack;
   std::unordered_set<ControlFlowState, ControlFlowStateHasher> visitedControlFlowStates;
   std::vector<SeqEventTimeIndex::Index> prevDurEventIndices;
+
+  uint32_t m_lastEventOffset = 0;
+  uint32_t m_lastEventLength = 0;
 };
 
 template<typename... Args>
