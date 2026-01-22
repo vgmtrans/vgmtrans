@@ -99,7 +99,7 @@ void HexViewRhiRenderer::initIfNeeded(QRhi* rhi) {
   m_ubuf = m_rhi->newBuffer(QRhiBuffer::Dynamic, QRhiBuffer::UniformBuffer, baseUboSize);
   m_ubuf->create();
 
-  const int screenUboSize = m_rhi->ubufAligned(kMat4Bytes + kVec4Bytes * 4);
+  const int screenUboSize = m_rhi->ubufAligned(kMat4Bytes + kVec4Bytes * 5);
   m_blurUbufH = m_rhi->newBuffer(QRhiBuffer::Dynamic, QRhiBuffer::UniformBuffer, screenUboSize);
   m_blurUbufH->create();
   m_blurUbufV = m_rhi->newBuffer(QRhiBuffer::Dynamic, QRhiBuffer::UniformBuffer, screenUboSize);
@@ -119,6 +119,9 @@ void HexViewRhiRenderer::initIfNeeded(QRhi* rhi) {
 
   m_staticBuffersUploaded = false;
   m_sampleCount = 0;
+  if (!m_animTimer.isValid()) {
+    m_animTimer.start();
+  }
   m_inited = true;
 }
 
@@ -513,6 +516,13 @@ void HexViewRhiRenderer::ensurePipelines(QRhiRenderPassDescriptor* outputRp,
   blend.srcAlpha = QRhiGraphicsPipeline::SrcAlpha;
   blend.dstAlpha = QRhiGraphicsPipeline::OneMinusSrcAlpha;
 
+  QRhiGraphicsPipeline::TargetBlend maskBlend;
+  maskBlend.enable = true;
+  maskBlend.srcColor = QRhiGraphicsPipeline::One;
+  maskBlend.dstColor = QRhiGraphicsPipeline::One;
+  maskBlend.srcAlpha = QRhiGraphicsPipeline::One;
+  maskBlend.dstAlpha = QRhiGraphicsPipeline::One;
+
   m_rectPso = m_rhi->newGraphicsPipeline();
   m_rectPso->setShaderStages({{QRhiShaderStage::Vertex, rectVert},
                               {QRhiShaderStage::Fragment, rectFrag}});
@@ -541,7 +551,7 @@ void HexViewRhiRenderer::ensurePipelines(QRhiRenderPassDescriptor* outputRp,
   m_maskPso->setVertexInputLayout(rectInputLayout);
   m_maskPso->setShaderResourceBindings(m_rectSrb);
   m_maskPso->setCullMode(QRhiGraphicsPipeline::None);
-  m_maskPso->setTargetBlends({blend});
+  m_maskPso->setTargetBlends({maskBlend});
   m_maskPso->setSampleCount(1);
   m_maskPso->setRenderPassDescriptor(m_maskRp);
   m_maskPso->create();
@@ -599,6 +609,7 @@ void HexViewRhiRenderer::updateUniforms(QRhiResourceUpdateBatch* u, float scroll
                                        const QSize& pixelSize) {
   const QSize viewSize = m_view->viewport()->size();
   const float uvFlipY = m_rhi->isYUpInFramebuffer() ? 0.0f : 1.0f;
+  const float timeSeconds = m_animTimer.isValid() ? (m_animTimer.elapsed() / 1000.0f) : 0.0f;
 
   QMatrix4x4 proj;
   proj.ortho(0.f, float(viewSize.width()), float(viewSize.height()), 0.f, -1.f, 1.f);
@@ -645,14 +656,18 @@ void HexViewRhiRenderer::updateUniforms(QRhiResourceUpdateBatch* u, float scroll
   const QVector4D p0(static_cast<float>(m_view->m_overlayOpacity), shadowStrength,
                      shadowUvX, shadowUvY);
   const QVector4D p1(hexStartX, hexWidth, asciiStartX, asciiWidth);
-  const QVector4D p2(viewW, viewH, uvFlipY, 0.0f);
+  const QVector4D p2(viewW, viewH, uvFlipY, timeSeconds);
   const QVector4D p3 = toVec4(SHADOW_COLOR);
+  const QColor glowColor = m_view->m_playbackGlowColor;
+  const QVector4D p4(glowColor.redF(), glowColor.greenF(), glowColor.blueF(),
+                     static_cast<float>(m_view->m_playbackGlowStrength));
 
   u->updateDynamicBuffer(m_compositeUbuf, 0, kMat4Bytes, screenMvp.constData());
   u->updateDynamicBuffer(m_compositeUbuf, kMat4Bytes + kVec4Bytes * 0, kVec4Bytes, &p0);
   u->updateDynamicBuffer(m_compositeUbuf, kMat4Bytes + kVec4Bytes * 1, kVec4Bytes, &p1);
   u->updateDynamicBuffer(m_compositeUbuf, kMat4Bytes + kVec4Bytes * 2, kVec4Bytes, &p2);
   u->updateDynamicBuffer(m_compositeUbuf, kMat4Bytes + kVec4Bytes * 3, kVec4Bytes, &p3);
+  u->updateDynamicBuffer(m_compositeUbuf, kMat4Bytes + kVec4Bytes * 4, kVec4Bytes, &p4);
 }
 
 bool HexViewRhiRenderer::ensureInstanceBuffer(QRhiBuffer*& buffer, int bytes) {
@@ -973,7 +988,8 @@ void HexViewRhiRenderer::buildSelectionInstances(int startLine, int endLine) {
   m_maskRectInstances.clear();
 
   const bool hasSelection = !m_view->m_selections.empty() || !m_view->m_fadeSelections.empty();
-  if (!hasSelection || startLine > endLine) {
+  const bool hasPlayback = !m_view->m_playbackSelections.empty();
+  if ((!hasSelection && !hasPlayback) || startLine > endLine) {
     return;
   }
 
@@ -983,7 +999,7 @@ void HexViewRhiRenderer::buildSelectionInstances(int startLine, int endLine) {
   }
 
   m_maskRectInstances.reserve(static_cast<size_t>(visibleCount) *
-                              (m_view->m_shouldDrawAscii ? 4 : 2));
+                              (m_view->m_shouldDrawAscii ? 8 : 4));
 
   const uint32_t fileLength = m_view->m_vgmfile->unLength;
   const float charWidth = static_cast<float>(m_view->m_charWidth);
@@ -992,95 +1008,106 @@ void HexViewRhiRenderer::buildSelectionInstances(int startLine, int endLine) {
   const float hexStartX = static_cast<float>(m_view->hexXOffset());
   const float asciiStartX =
       hexStartX + (kBytesPerLine * 3 + HEX_TO_ASCII_SPACING_CHARS) * charWidth;
-  const QVector4D maskColor(1.0f, 1.0f, 1.0f, 1.0f);
+  const QVector4D selectionMaskColor(1.0f, 0.0f, 0.0f, 1.0f);
+  const QVector4D playbackMaskColor(0.0f, 1.0f, 0.0f, 1.0f);
 
   struct Interval {
     int start = 0;
     int end = 0;
   };
 
-  std::vector<std::vector<Interval>> perLine;
-  perLine.resize(static_cast<size_t>(visibleCount));
+  auto appendMaskForSelections = [&](const std::vector<HexView::SelectionRange>& selections,
+                                     const QVector4D& maskColor) {
+    std::vector<std::vector<Interval>> perLine;
+    perLine.resize(static_cast<size_t>(visibleCount));
 
-  const std::vector<HexView::SelectionRange>& selections =
-      m_view->m_selections.empty() ? m_view->m_fadeSelections : m_view->m_selections;
-
-  for (const auto& selection : selections) {
-    if (selection.length == 0) {
-      continue;
-    }
-
-    int selectionStart = static_cast<int>(selection.offset - m_view->m_vgmfile->dwOffset);
-    int selectionEnd = selectionStart + static_cast<int>(selection.length);
-    if (selectionEnd <= 0 || selectionStart >= static_cast<int>(fileLength)) {
-      continue;
-    }
-    selectionStart = std::max(selectionStart, 0);
-    selectionEnd = std::min(selectionEnd, static_cast<int>(fileLength));
-    if (selectionEnd <= selectionStart) {
-      continue;
-    }
-
-    const int selStartLine = selectionStart / kBytesPerLine;
-    const int selEndLine = (selectionEnd - 1) / kBytesPerLine;
-    const int lineStart = std::max(startLine, selStartLine);
-    const int lineEnd = std::min(endLine, selEndLine);
-
-    for (int line = lineStart; line <= lineEnd; ++line) {
-      const CachedLine* entry = cachedLineFor(line);
-      if (!entry || entry->bytes <= 0) {
+    for (const auto& selection : selections) {
+      if (selection.length == 0) {
         continue;
       }
 
-      const int lineOffset = line * kBytesPerLine;
-      const int startCol = (line == selStartLine) ? (selectionStart - lineOffset) : 0;
-      const int endCol = (line == selEndLine) ? (selectionEnd - lineOffset) : entry->bytes;
-
-      const int clampedStart = std::clamp(startCol, 0, entry->bytes);
-      const int clampedEnd = std::clamp(endCol, 0, entry->bytes);
-      if (clampedEnd <= clampedStart) {
+      int selectionStart = static_cast<int>(selection.offset - m_view->m_vgmfile->dwOffset);
+      int selectionEnd = selectionStart + static_cast<int>(selection.length);
+      if (selectionEnd <= 0 || selectionStart >= static_cast<int>(fileLength)) {
+        continue;
+      }
+      selectionStart = std::max(selectionStart, 0);
+      selectionEnd = std::min(selectionEnd, static_cast<int>(fileLength));
+      if (selectionEnd <= selectionStart) {
         continue;
       }
 
-      perLine[static_cast<size_t>(line - startLine)].push_back(
-          {clampedStart, clampedEnd});
-    }
-  }
+      const int selStartLine = selectionStart / kBytesPerLine;
+      const int selEndLine = (selectionEnd - 1) / kBytesPerLine;
+      const int lineStart = std::max(startLine, selStartLine);
+      const int lineEnd = std::min(endLine, selEndLine);
 
-  for (int line = startLine; line <= endLine; ++line) {
-    auto& intervals = perLine[static_cast<size_t>(line - startLine)];
-    if (intervals.empty()) {
-      continue;
-    }
-    std::sort(intervals.begin(), intervals.end(),
-              [](const Interval& a, const Interval& b) { return a.start < b.start; });
+      for (int line = lineStart; line <= lineEnd; ++line) {
+        const CachedLine* entry = cachedLineFor(line);
+        if (!entry || entry->bytes <= 0) {
+          continue;
+        }
 
-    int curStart = intervals.front().start;
-    int curEnd = intervals.front().end;
-    const float y = line * lineHeight;
+        const int lineOffset = line * kBytesPerLine;
+        const int startCol = (line == selStartLine) ? (selectionStart - lineOffset) : 0;
+        const int endCol = (line == selEndLine) ? (selectionEnd - lineOffset) : entry->bytes;
 
-    auto emitRect = [&](int col0, int col1) {
-      const int length = col1 - col0;
-      if (length <= 0) {
-        return;
+        const int clampedStart = std::clamp(startCol, 0, entry->bytes);
+        const int clampedEnd = std::clamp(endCol, 0, entry->bytes);
+        if (clampedEnd <= clampedStart) {
+          continue;
+        }
+
+        perLine[static_cast<size_t>(line - startLine)].push_back(
+            {clampedStart, clampedEnd});
       }
-      const float hexX = hexStartX + col0 * 3.0f * charWidth - charHalfWidth;
-      appendRect(m_maskRectInstances, hexX, y, length * 3.0f * charWidth, lineHeight, maskColor);
-      if (m_view->m_shouldDrawAscii) {
-        const float asciiX = asciiStartX + col0 * charWidth;
-        appendRect(m_maskRectInstances, asciiX, y, length * charWidth, lineHeight, maskColor);
-      }
-    };
+    }
 
-    for (size_t i = 1; i < intervals.size(); ++i) {
-      if (intervals[i].start <= curEnd) {
-        curEnd = std::max(curEnd, intervals[i].end);
+    for (int line = startLine; line <= endLine; ++line) {
+      auto& intervals = perLine[static_cast<size_t>(line - startLine)];
+      if (intervals.empty()) {
         continue;
+      }
+      std::sort(intervals.begin(), intervals.end(),
+                [](const Interval& a, const Interval& b) { return a.start < b.start; });
+
+      int curStart = intervals.front().start;
+      int curEnd = intervals.front().end;
+      const float y = line * lineHeight;
+
+      auto emitRect = [&](int col0, int col1) {
+        const int length = col1 - col0;
+        if (length <= 0) {
+          return;
+        }
+        const float hexX = hexStartX + col0 * 3.0f * charWidth - charHalfWidth;
+        appendRect(m_maskRectInstances, hexX, y, length * 3.0f * charWidth, lineHeight, maskColor);
+        if (m_view->m_shouldDrawAscii) {
+          const float asciiX = asciiStartX + col0 * charWidth;
+          appendRect(m_maskRectInstances, asciiX, y, length * charWidth, lineHeight, maskColor);
+        }
+      };
+
+      for (size_t i = 1; i < intervals.size(); ++i) {
+        if (intervals[i].start <= curEnd) {
+          curEnd = std::max(curEnd, intervals[i].end);
+          continue;
+        }
+        emitRect(curStart, curEnd);
+        curStart = intervals[i].start;
+        curEnd = intervals[i].end;
       }
       emitRect(curStart, curEnd);
-      curStart = intervals[i].start;
-      curEnd = intervals[i].end;
     }
-    emitRect(curStart, curEnd);
+  };
+
+  if (hasSelection) {
+    const std::vector<HexView::SelectionRange>& selections =
+        m_view->m_selections.empty() ? m_view->m_fadeSelections : m_view->m_selections;
+    appendMaskForSelections(selections, selectionMaskColor);
+  }
+
+  if (hasPlayback) {
+    appendMaskForSelections(m_view->m_playbackSelections, playbackMaskColor);
   }
 }

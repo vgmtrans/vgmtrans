@@ -44,6 +44,8 @@ constexpr float SHADOW_OFFSET_X = 0.0f;
 constexpr float SHADOW_OFFSET_Y = 0.0f;
 constexpr float SHADOW_BLUR_RADIUS = SELECTION_PADDING * 2.0f;
 constexpr float SHADOW_STRENGTH = 1.5;
+constexpr float PLAYBACK_GLOW_STRENGTH = 1.2f;
+const QColor PLAYBACK_GLOW_COLOR(255, 255, 255);
 constexpr uint16_t STYLE_UNASSIGNED = std::numeric_limits<uint16_t>::max();
 }  // namespace
 
@@ -63,6 +65,8 @@ HexView::HexView(VGMFile* vgmfile, QWidget* parent)
   QFont font("Roboto Mono", appFontPointSize + 1.0);
   font.setPointSizeF(appFontPointSize + 1.0);
   setShadowStrength(SHADOW_STRENGTH);
+  m_playbackGlowColor = PLAYBACK_GLOW_COLOR;
+  m_playbackGlowStrength = PLAYBACK_GLOW_STRENGTH;
 
   setFont(font);
   rebuildStyleMap();
@@ -202,11 +206,17 @@ void HexView::setSelectedItem(VGMItem* item) {
   m_selectedItem = item;
 
   if (!m_selectedItem) {
-    if (!m_selections.empty()) {
-      m_fadeSelections = m_selections;
+    if (m_playbackActive) {
+      m_selections.clear();
+      m_fadeSelections.clear();
+      updateHighlightState(false);
+    } else {
+      if (!m_selections.empty()) {
+        m_fadeSelections = m_selections;
+      }
+      m_selections.clear();
+      showSelectedItem(false, true);
     }
-    m_selections.clear();
-    showSelectedItem(false, true);
     if (m_rhiHost) {
       m_rhiHost->markSelectionDirty();
       m_rhiHost->requestUpdate();
@@ -218,8 +228,7 @@ void HexView::setSelectedItem(VGMItem* item) {
   m_selections.clear();
   m_selections.push_back({m_selectedItem->dwOffset, m_selectedItem->unLength});
   m_fadeSelections.clear();
-
-  showSelectedItem(true, true);
+  updateHighlightState(true);
 
   if (m_rhiHost) {
     m_rhiHost->markSelectionDirty();
@@ -253,20 +262,58 @@ void HexView::setSelectedItem(VGMItem* item) {
   }
 }
 
-void HexView::setSelectionsForItems(const std::vector<const VGMItem*>& items) {
-  m_selections.clear();
-  m_fadeSelections.clear();
-
-  m_selections.reserve(items.size());
+void HexView::setPlaybackSelectionsForItems(const std::vector<const VGMItem*>& items) {
+  m_playbackActive = true;
+  m_playbackSelections.clear();
+  m_playbackSelections.reserve(items.size());
   for (const auto* item : items) {
     if (!item) {
       continue;
     }
-    m_selections.push_back({item->dwOffset, item->unLength});
+    m_playbackSelections.push_back({item->dwOffset, item->unLength});
   }
+
+  updateHighlightState(false);
 
   if (m_rhiHost) {
     m_rhiHost->markSelectionDirty();
+    m_rhiHost->requestUpdate();
+  }
+}
+
+void HexView::clearPlaybackSelections() {
+  if (m_playbackSelections.empty()) {
+    return;
+  }
+  m_playbackSelections.clear();
+  updateHighlightState(false);
+
+  if (m_rhiHost) {
+    m_rhiHost->markSelectionDirty();
+    m_rhiHost->requestUpdate();
+  }
+}
+
+void HexView::setPlaybackActive(bool active) {
+  if (m_playbackActive == active) {
+    if (!active && !m_playbackSelections.empty()) {
+      clearPlaybackSelections();
+    }
+    return;
+  }
+  m_playbackActive = active;
+  if (!m_playbackActive && !m_playbackSelections.empty()) {
+    m_playbackSelections.clear();
+  }
+  updateHighlightState(false);
+  if (m_rhiHost) {
+    m_rhiHost->markSelectionDirty();
+    m_rhiHost->requestUpdate();
+  }
+}
+
+void HexView::requestPlaybackFrame() {
+  if (m_rhiHost) {
     m_rhiHost->requestUpdate();
   }
 }
@@ -778,4 +825,27 @@ void HexView::clearFadeSelection() {
     m_rhiHost->markSelectionDirty();
     m_rhiHost->requestUpdate();
   }
+}
+
+void HexView::updateHighlightState(bool animateSelection) {
+  const bool hasSelection = !m_selections.empty() || !m_fadeSelections.empty();
+  const bool hasPlayback = m_playbackActive;
+
+  if (!hasSelection && !hasPlayback) {
+    showSelectedItem(false, animateSelection);
+    return;
+  }
+
+  if (hasSelection && !hasPlayback) {
+    showSelectedItem(true, animateSelection);
+    return;
+  }
+
+  if (m_selectionAnimation && m_selectionAnimation->state() != QAbstractAnimation::Stopped) {
+    m_selectionAnimation->stop();
+  }
+  m_fadeSelections.clear();
+  setOverlayOpacity(OVERLAY_ALPHA_F);
+  setShadowBlur(SHADOW_BLUR_RADIUS);
+  setShadowOffset(QPointF(SHADOW_OFFSET_X, SHADOW_OFFSET_Y));
 }
