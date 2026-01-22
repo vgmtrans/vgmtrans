@@ -36,6 +36,7 @@ public:
   explicit HexView(VGMFile* vgmfile, QWidget* parent = nullptr);
   ~HexView() override;
   void setSelectedItem(VGMItem* item);
+  void setSelectionsForItems(const std::vector<const VGMItem*>& items);
   void setFont(const QFont& font);
   [[nodiscard]] int getVirtualFullWidth() const;
   [[nodiscard]] int getVirtualWidthSansAscii() const;

@@ -234,3 +234,7 @@ bool SequencePlayer::playCollection(const VGMColl *coll) {
 
   return true;
 }
+
+const VGMColl* SequencePlayer::activeCollection() const {
+  return m_active_vgmcoll;
+}

@@ -11,9 +11,13 @@
 #include <cmath>
 #include "VGMFileView.h"
 #include "VGMFile.h"
+#include "VGMSeq.h"
+#include "VGMColl.h"
+#include "SeqEvent.h"
 #include "HexView.h"
 #include "VGMFileTreeView.h"
 #include "MdiArea.h"
+#include "SequencePlayer.h"
 #include "SnappingSplitter.h"
 #include "Helpers.h"
 #include "Root.h"
@@ -65,6 +69,9 @@ VGMFileView::VGMFileView(VGMFile *vgmfile)
 
   connect(new QShortcut(QKeySequence(Qt::CTRL | Qt::Key_0), this), &QShortcut::activated,
           this, &VGMFileView::resetHexViewFont);
+
+  connect(&SequencePlayer::the(), &SequencePlayer::playbackPositionChanged,
+          this, &VGMFileView::onPlaybackPositionChanged);
 
   setWidget(m_splitter);
 }
@@ -157,4 +164,45 @@ void VGMFileView::onSelectionChange(VGMItem *item) const {
     m_treeview->setCurrentItem(nullptr);
     m_treeview->clearSelection();
   }
+}
+
+void VGMFileView::onPlaybackPositionChanged(int current, int /*max*/) {
+  if (!m_hexview || !isVisible() || !m_hexview->isVisible()) {
+    return;
+  }
+
+  auto* seq = dynamic_cast<VGMSeq*>(m_vgmfile);
+  if (!seq) {
+    return;
+  }
+
+  const auto* coll = SequencePlayer::the().activeCollection();
+  if (!coll || !coll->containsVGMFile(m_vgmfile)) {
+    return;
+  }
+
+  const auto& timeline = seq->timedEventIndex();
+  if (!timeline.finalized()) {
+    return;
+  }
+
+  const uint32_t tick = current > 0 ? static_cast<uint32_t>(current) : 0u;
+  m_playbackTimedEvents.clear();
+  timeline.getActiveAt(tick, m_playbackTimedEvents);
+
+  m_playbackItems.clear();
+  m_playbackItems.reserve(m_playbackTimedEvents.size());
+  for (const auto* timed : m_playbackTimedEvents) {
+    if (!timed || !timed->event) {
+      continue;
+    }
+    m_playbackItems.push_back(timed->event);
+  }
+
+  if (m_playbackItems == m_lastPlaybackItems) {
+    return;
+  }
+
+  m_lastPlaybackItems = m_playbackItems;
+  m_hexview->setSelectionsForItems(m_playbackItems);
 }
