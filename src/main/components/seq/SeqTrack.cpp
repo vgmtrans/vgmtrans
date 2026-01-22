@@ -860,7 +860,7 @@ void SeqTrack::addVolSlide(uint32_t offset,
                            const std::string &sEventName) {
   bool isNewOffset = onEvent(offset, length);
 
-  recordSeqEvent<VolSlideSeqEvent>(isNewOffset, getTime(), 0, targVol, dur, offset, length, sEventName);
+  recordSeqEvent<VolSlideSeqEvent>(isNewOffset, getTime(), dur, targVol, dur, offset, length, sEventName);
 
   if (readMode == READMODE_CONVERT_TO_MIDI)
     addControllerSlide(dur,
@@ -908,7 +908,7 @@ void SeqTrack::addExpressionSlide(uint32_t offset,
                                   const std::string &sEventName) {
   bool isNewOffset = onEvent(offset, length);
 
-  recordSeqEvent<ExpressionSlideSeqEvent>(isNewOffset, getTime(), 0, targExpr, dur, offset, length, sEventName);
+  recordSeqEvent<ExpressionSlideSeqEvent>(isNewOffset, getTime(), dur, targExpr, dur, offset, length, sEventName);
 
   if (readMode == READMODE_CONVERT_TO_MIDI)
     addControllerSlide(dur,
@@ -951,7 +951,7 @@ void SeqTrack::addMastVolSlide(uint32_t offset,
                                const std::string &sEventName) {
   bool isNewOffset = onEvent(offset, length);
 
-  recordSeqEvent<MastVolSlideSeqEvent>(isNewOffset, getTime(), 0, targVol, dur, offset, length, sEventName);
+  recordSeqEvent<MastVolSlideSeqEvent>(isNewOffset, getTime(), dur, targVol, dur, offset, length, sEventName);
 
   if (readMode == READMODE_CONVERT_TO_MIDI)
     addControllerSlide(dur,
@@ -998,7 +998,7 @@ void SeqTrack::addPanSlide(uint32_t offset,
                            const std::string &sEventName) {
   bool isNewOffset = onEvent(offset, length);
 
-  recordSeqEvent<PanSlideSeqEvent>(isNewOffset, getTime(), 0, targPan, dur, offset, length, sEventName);
+  recordSeqEvent<PanSlideSeqEvent>(isNewOffset, getTime(), dur, targPan, dur, offset, length, sEventName);
 
   if (readMode == READMODE_CONVERT_TO_MIDI)
     addControllerSlide(dur, prevPan, targPan, nullptr, &MidiTrack::insertPan);
@@ -1515,7 +1515,7 @@ void SeqTrack::addTempoBPMSlide(uint32_t offset,
                                 const std::string &sEventName) {
   bool isNewOffset = onEvent(offset, length);
 
-  recordSeqEvent<TempoSlideSeqEvent>(isNewOffset, getTime(), 0, targBPM, dur, offset, length, sEventName);
+  recordSeqEvent<TempoSlideSeqEvent>(isNewOffset, getTime(), dur, targBPM, dur, offset, length, sEventName);
 
   if (readMode == READMODE_CONVERT_TO_MIDI) {
     double tempoInc = (targBPM - parentSeq->tempoBPM) / dur;
