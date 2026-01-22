@@ -9,6 +9,7 @@ layout(std140, binding = 0) uniform Ubuf {
   vec4 p1;
   vec4 p2;  // we use p2.z as flip flag
   vec4 p3;
+  vec4 p4;
 };
 
 void main() {

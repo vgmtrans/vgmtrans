@@ -12,6 +12,7 @@ layout(std140, binding = 0) uniform Ubuf {
   vec4 p1;
   vec4 p2;
   vec4 p3;
+  vec4 p4;
 };
 
 layout(location = 0) out vec4 fragColor;
@@ -29,7 +30,10 @@ void main() {
   float asciiWidth = p1.w;
 
   vec2 viewSize = p2.xy;
+  float time = p2.w;
   vec4 shadowColor = p3;
+  vec3 glowColor = p4.rgb;
+  float glowStrength = p4.a;
 
   float x = vUv.x * viewSize.x;
   bool inHex = (x >= hexStart) && (x < hexStart + hexWidth);
@@ -38,18 +42,32 @@ void main() {
 
   vec3 dimmed = mix(base.rgb, vec3(0.0), overlayOpacity * inColumns);
 
-  float sel = texture(maskTex, vUv).r;
-  vec3 restored = mix(dimmed, base.rgb, sel);
+  vec4 mask = texture(maskTex, vUv);
+  float sel = mask.r;
+  float play = mask.g;
+  float highlight = max(sel, play);
+  vec3 restored = mix(dimmed, base.rgb, highlight);
 
   vec2 shadowUv = vUv + shadowOffset;
-  float sh = texture(shadowTex, shadowUv).r;
+  vec4 sh = texture(shadowTex, shadowUv);
   // remove the solid interior contribution; keep only the halo
-  float halo = max(sh - sel, 0.0);
+  float selHalo = max(sh.r - sel, 0.0);
   // curve it: >1 make shadow punchier near edges
   // halo = pow(clamp(halo, 0.0, 1.0), 0.8); // 0.6..0.8 is a good range
 
-  float shadowAlpha = halo * shadowStrength * shadowColor.a;
+  float shadowAlpha = selHalo * shadowStrength * shadowColor.a;
   vec3 withShadow = mix(restored, shadowColor.rgb, shadowAlpha);
 
-  fragColor = vec4(withShadow, base.a);
+  float playHalo = max(sh.g - play, 0.0);
+
+  float noise = fract(sin(dot(vUv * viewSize * 0.12 + time, vec2(12.9898, 78.233))) * 43758.5453);
+  float flicker = (0.7 + 0.3 * sin(time * 6.0 + (vUv.x + vUv.y) * 30.0)) * (0.9 + 0.2 * noise);
+  float waveX = sin((vUv.x * viewSize.x) * 0.08 - time * 3.4);
+  float waveY = sin((vUv.y * viewSize.y) * 0.10 + time * 4.1);
+  float undulate = 0.85 + 0.15 * (waveX * waveY);
+  float glowAlpha = clamp(playHalo * glowStrength * flicker * undulate, 0.0, 1.0);
+
+  vec3 withGlow = clamp(withShadow + glowColor * glowAlpha, 0.0, 1.0);
+
+  fragColor = vec4(withGlow, base.a);
 }

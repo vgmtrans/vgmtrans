@@ -6,6 +6,7 @@
 
 #pragma once
 
+#include <QElapsedTimer>
 #include <QSize>
 #include <array>
 #include <cstdint>
@@ -170,6 +171,7 @@ private:
   bool m_supportsBaseInstance = false;
   bool m_loggedInit = false;
   bool m_loggedFrame = false;
+  QElapsedTimer m_animTimer;
 
   std::vector<CachedLine> m_cachedLines;
   std::vector<LineRange> m_lineRanges;

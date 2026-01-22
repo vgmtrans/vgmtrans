@@ -176,13 +176,25 @@ void VGMFileView::onPlaybackPositionChanged(int current, int /*max*/) {
     return;
   }
 
-  const auto* coll = SequencePlayer::the().activeCollection();
-  if (!coll || !coll->containsVGMFile(m_vgmfile)) {
+  if (!SequencePlayer::the().playing()) {
+    m_hexview->setPlaybackActive(false);
+    m_hexview->clearPlaybackSelections();
     return;
   }
 
+  const auto* coll = SequencePlayer::the().activeCollection();
+  if (!coll || !coll->containsVGMFile(m_vgmfile)) {
+    m_hexview->setPlaybackActive(false);
+    m_hexview->clearPlaybackSelections();
+    return;
+  }
+
+  m_hexview->setPlaybackActive(true);
+
   const auto& timeline = seq->timedEventIndex();
   if (!timeline.finalized()) {
+    m_hexview->setPlaybackActive(false);
+    m_hexview->clearPlaybackSelections();
     return;
   }
 
@@ -200,9 +212,10 @@ void VGMFileView::onPlaybackPositionChanged(int current, int /*max*/) {
   }
 
   if (m_playbackItems == m_lastPlaybackItems) {
+    m_hexview->requestPlaybackFrame();
     return;
   }
 
   m_lastPlaybackItems = m_playbackItems;
-  m_hexview->setSelectionsForItems(m_playbackItems);
+  m_hexview->setPlaybackSelectionsForItems(m_playbackItems);
 }

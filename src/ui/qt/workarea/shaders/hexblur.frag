@@ -9,6 +9,7 @@ layout(std140, binding = 0) uniform Ubuf {
   vec4 p1;
   vec4 p2;
   vec4 p3;
+  vec4 p4;
 };
 
 layout(location = 0) out vec4 fragColor;
@@ -31,8 +32,8 @@ void main() {
 
   float invTwoSigma2 = 0.5 / (sigma * sigma);
 
-  float center = texture(srcTex, vUv).r;
-  float sum = center;
+  vec4 center = texture(srcTex, vUv);
+  vec4 sum = center;
   float wsum = 1.0;
 
   // Pair-sample offsets i and i+1 into one sample at a weighted offset.
@@ -54,13 +55,13 @@ void main() {
 
     vec2 d = texelStep * offset;
 
-    float a = texture(srcTex, vUv + d).r;
-    float b = texture(srcTex, vUv - d).r;
+    vec4 a = texture(srcTex, vUv + d);
+    vec4 b = texture(srcTex, vUv - d);
 
     sum += (a + b) * w;
     wsum += 2.0 * w;
   }
 
-  float v = sum / wsum;
-  fragColor = vec4(v, v, v, v);
+  vec4 v = sum / wsum;
+  fragColor = v;
 }

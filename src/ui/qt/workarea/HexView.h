@@ -36,7 +36,10 @@ public:
   explicit HexView(VGMFile* vgmfile, QWidget* parent = nullptr);
   ~HexView() override;
   void setSelectedItem(VGMItem* item);
-  void setSelectionsForItems(const std::vector<const VGMItem*>& items);
+  void setPlaybackSelectionsForItems(const std::vector<const VGMItem*>& items);
+  void clearPlaybackSelections();
+  void setPlaybackActive(bool active);
+  void requestPlaybackFrame();
   void setFont(const QFont& font);
   [[nodiscard]] int getVirtualFullWidth() const;
   [[nodiscard]] int getVirtualWidthSansAscii() const;
@@ -106,6 +109,7 @@ private:
   void initAnimations();
   void showSelectedItem(bool show, bool animate);
   void clearFadeSelection();
+  void updateHighlightState(bool animateSelection);
 
   VGMFile* m_vgmfile = nullptr;
   VGMItem* m_selectedItem = nullptr;
@@ -128,12 +132,16 @@ private:
 
   std::vector<SelectionRange> m_selections;
   std::vector<SelectionRange> m_fadeSelections;
+  std::vector<SelectionRange> m_playbackSelections;
+  bool m_playbackActive = false;
 
   QParallelAnimationGroup* m_selectionAnimation = nullptr;
   qreal m_overlayOpacity = 0.0;
   qreal m_shadowBlur = 0.0;
   QPointF m_shadowOffset{0.0, 0.0};
   qreal m_shadowStrength = 1.0;
+  QColor m_playbackGlowColor;
+  float m_playbackGlowStrength = 1.0f;
 
   HexViewRhiHost* m_rhiHost = nullptr;
   std::unique_ptr<GlyphAtlas> m_glyphAtlas;
