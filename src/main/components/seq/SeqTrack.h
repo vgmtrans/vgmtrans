@@ -5,8 +5,10 @@
  */
 #pragma once
 
+#include <memory>
 #include <sstream>
 #include <unordered_set>
+#include <utility>
 #include <vector>
 #include "VGMItem.h"
 #include "VGMSeq.h"
@@ -105,16 +107,48 @@ protected:
   virtual bool onEvent(uint32_t offset, uint32_t length);
   virtual void addEvent(SeqEvent *pSeqEvent);
 
+  template <typename EventType, typename... Args>
+  void recordSeqEvent(bool isNewOffset, uint32_t startTick, uint32_t duration, Args&&... args) {
+    if (readMode == READMODE_ADD_TO_UI) {
+      if (isNewOffset) {
+        addEvent(new EventType(this, std::forward<Args>(args)...));
+      }
+    } else if (readMode == READMODE_CONVERT_TO_MIDI) {
+      parentSeq->timedEventIndex().addEvent(
+        std::make_unique<EventType>(this, std::forward<Args>(args)...), startTick, duration);
+    }
+  }
+
+  template <typename EventType, typename... Args>
+  SeqEventTimeIndex::Index recordDurSeqEvent(bool isNewOffset,
+                                             uint32_t startTick,
+                                             uint32_t duration,
+                                             Args&&... args) {
+    if (readMode == READMODE_ADD_TO_UI) {
+      if (isNewOffset) {
+        addEvent(new EventType(this, std::forward<Args>(args)...));
+      }
+      return SeqEventTimeIndex::kInvalidIndex;
+    }
+    if (readMode == READMODE_CONVERT_TO_MIDI) {
+      return parentSeq->timedEventIndex().addEvent(
+        std::make_unique<EventType>(this, std::forward<Args>(args)...), startTick, duration);
+    }
+    return SeqEventTimeIndex::kInvalidIndex;
+  }
+
   bool shouldTrackControlFlowState() const;
   void addControlFlowState(uint32_t destinationOffset);
   bool checkControlStateForInfiniteLoop(u32 offset);
   void pushReturnOffset(uint32_t returnOffset);
   bool popReturnOffset(uint32_t &returnOffset);
 
- private:
+private:
   void addControllerSlide(u32 dur, u16 &prevVal, u16 targVal, uint8_t (*scalerFunc)(uint8_t), void (MidiTrack::*insertFunc)(uint8_t, uint8_t, uint32_t)) const;
   double applyLevelCorrection(double level, LevelController controller) const;
   void addLevelNoItem(double level, LevelController controller, Resolution res, int absTime = -1);
+  void purgePrevDurEvents(uint32_t absTime);
+  void clearPrevDurEvents();
 
  public:
   void addGenericEvent(uint32_t offset, uint32_t length, const std::string &sEventName, const std::string &sEventDesc, Type type);
@@ -289,6 +323,7 @@ protected:
   std::vector<uint32_t> returnOffsets;
   std::vector<LoopState> loopStack;
   std::unordered_set<ControlFlowState, ControlFlowStateHasher> visitedControlFlowStates;
+  std::vector<SeqEventTimeIndex::Index> prevDurEventIndices;
 };
 
 template<typename... Args>

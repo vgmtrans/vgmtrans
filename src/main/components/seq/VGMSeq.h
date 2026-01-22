@@ -8,6 +8,7 @@
 #include "VGMFile.h"
 #include "RawFile.h"
 #include "MidiFile.h"
+#include "SeqEventTimeIndex.h"
 #include <set>
 #include <filesystem>
 
@@ -101,6 +102,9 @@ class VGMSeq : public VGMFile {
 
   bool saveAsMidi(const std::filesystem::path &filepath, const VGMColl* coll = nullptr);
 
+  SeqEventTimeIndex& timedEventIndex() { return m_timedEvents; }
+  const SeqEventTimeIndex& timedEventIndex() const { return m_timedEvents; }
+
   void deactivateAllTracks();
 
   [[nodiscard]] uint8_t initialVolume() const { return m_initial_volume; }
@@ -154,6 +158,9 @@ private:
 
 private:
   std::set<uint16_t> m_referencedBanks;
+
+  // Timeline of sequence events emitted during MIDI conversion.
+  SeqEventTimeIndex m_timedEvents;
 
   uint16_t m_ppqn;
 
