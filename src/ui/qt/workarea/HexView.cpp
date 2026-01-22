@@ -44,8 +44,12 @@ constexpr float SHADOW_OFFSET_X = 0.0f;
 constexpr float SHADOW_OFFSET_Y = 0.0f;
 constexpr float SHADOW_BLUR_RADIUS = SELECTION_PADDING * 2.0f;
 constexpr float SHADOW_STRENGTH = 1.5;
-constexpr float PLAYBACK_GLOW_STRENGTH = 1.5f;
-const QColor PLAYBACK_GLOW_COLOR(255, 255, 255);
+constexpr float PLAYBACK_GLOW_STRENGTH = 2.4f;
+constexpr float PLAYBACK_GLOW_RADIUS = 0.7f;
+const QColor PLAYBACK_GLOW_DEEP(170, 20, 8);
+const QColor PLAYBACK_GLOW_MID(255, 90, 12);
+const QColor PLAYBACK_GLOW_HOT(255, 180, 40);
+const QColor PLAYBACK_GLOW_CORE(255, 245, 220);
 constexpr uint16_t STYLE_UNASSIGNED = std::numeric_limits<uint16_t>::max();
 }  // namespace
 
@@ -65,8 +69,12 @@ HexView::HexView(VGMFile* vgmfile, QWidget* parent)
   QFont font("Roboto Mono", appFontPointSize + 1.0);
   font.setPointSizeF(appFontPointSize + 1.0);
   setShadowStrength(SHADOW_STRENGTH);
-  m_playbackGlowColor = PLAYBACK_GLOW_COLOR;
+  m_playbackGlowDeep = PLAYBACK_GLOW_DEEP;
+  m_playbackGlowMid = PLAYBACK_GLOW_MID;
+  m_playbackGlowHot = PLAYBACK_GLOW_HOT;
+  m_playbackGlowCore = PLAYBACK_GLOW_CORE;
   m_playbackGlowStrength = PLAYBACK_GLOW_STRENGTH;
+  m_playbackGlowRadius = PLAYBACK_GLOW_RADIUS;
 
   setFont(font);
   rebuildStyleMap();

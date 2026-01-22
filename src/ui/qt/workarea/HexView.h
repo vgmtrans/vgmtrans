@@ -140,8 +140,12 @@ private:
   qreal m_shadowBlur = 0.0;
   QPointF m_shadowOffset{0.0, 0.0};
   qreal m_shadowStrength = 1.0;
-  QColor m_playbackGlowColor;
+  QColor m_playbackGlowDeep;
+  QColor m_playbackGlowMid;
+  QColor m_playbackGlowHot;
+  QColor m_playbackGlowCore;
   float m_playbackGlowStrength = 1.0f;
+  float m_playbackGlowRadius = 0.5f;
 
   HexViewRhiHost* m_rhiHost = nullptr;
   std::unique_ptr<GlyphAtlas> m_glyphAtlas;
