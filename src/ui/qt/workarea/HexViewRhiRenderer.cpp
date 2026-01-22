@@ -99,7 +99,7 @@ void HexViewRhiRenderer::initIfNeeded(QRhi* rhi) {
   m_ubuf = m_rhi->newBuffer(QRhiBuffer::Dynamic, QRhiBuffer::UniformBuffer, baseUboSize);
   m_ubuf->create();
 
-  const int screenUboSize = m_rhi->ubufAligned(kMat4Bytes + kVec4Bytes * 5);
+  const int screenUboSize = m_rhi->ubufAligned(kMat4Bytes + kVec4Bytes * 8);
   m_blurUbufH = m_rhi->newBuffer(QRhiBuffer::Dynamic, QRhiBuffer::UniformBuffer, screenUboSize);
   m_blurUbufH->create();
   m_blurUbufV = m_rhi->newBuffer(QRhiBuffer::Dynamic, QRhiBuffer::UniformBuffer, screenUboSize);
@@ -658,9 +658,16 @@ void HexViewRhiRenderer::updateUniforms(QRhiResourceUpdateBatch* u, float scroll
   const QVector4D p1(hexStartX, hexWidth, asciiStartX, asciiWidth);
   const QVector4D p2(viewW, viewH, uvFlipY, timeSeconds);
   const QVector4D p3 = toVec4(SHADOW_COLOR);
-  const QColor glowColor = m_view->m_playbackGlowColor;
-  const QVector4D p4(glowColor.redF(), glowColor.greenF(), glowColor.blueF(),
+  const QColor glowDeep = m_view->m_playbackGlowDeep;
+  const QColor glowMid = m_view->m_playbackGlowMid;
+  const QColor glowHot = m_view->m_playbackGlowHot;
+  const QColor glowCore = m_view->m_playbackGlowCore;
+  const QVector4D p4(glowDeep.redF(), glowDeep.greenF(), glowDeep.blueF(),
                      static_cast<float>(m_view->m_playbackGlowStrength));
+  const QVector4D p5(glowMid.redF(), glowMid.greenF(), glowMid.blueF(),
+                     static_cast<float>(m_view->m_playbackGlowRadius));
+  const QVector4D p6(glowHot.redF(), glowHot.greenF(), glowHot.blueF(), 0.0f);
+  const QVector4D p7(glowCore.redF(), glowCore.greenF(), glowCore.blueF(), 0.0f);
 
   u->updateDynamicBuffer(m_compositeUbuf, 0, kMat4Bytes, screenMvp.constData());
   u->updateDynamicBuffer(m_compositeUbuf, kMat4Bytes + kVec4Bytes * 0, kVec4Bytes, &p0);
@@ -668,6 +675,9 @@ void HexViewRhiRenderer::updateUniforms(QRhiResourceUpdateBatch* u, float scroll
   u->updateDynamicBuffer(m_compositeUbuf, kMat4Bytes + kVec4Bytes * 2, kVec4Bytes, &p2);
   u->updateDynamicBuffer(m_compositeUbuf, kMat4Bytes + kVec4Bytes * 3, kVec4Bytes, &p3);
   u->updateDynamicBuffer(m_compositeUbuf, kMat4Bytes + kVec4Bytes * 4, kVec4Bytes, &p4);
+  u->updateDynamicBuffer(m_compositeUbuf, kMat4Bytes + kVec4Bytes * 5, kVec4Bytes, &p5);
+  u->updateDynamicBuffer(m_compositeUbuf, kMat4Bytes + kVec4Bytes * 6, kVec4Bytes, &p6);
+  u->updateDynamicBuffer(m_compositeUbuf, kMat4Bytes + kVec4Bytes * 7, kVec4Bytes, &p7);
 }
 
 bool HexViewRhiRenderer::ensureInstanceBuffer(QRhiBuffer*& buffer, int bytes) {
