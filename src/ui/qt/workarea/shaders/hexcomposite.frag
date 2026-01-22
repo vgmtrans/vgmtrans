@@ -80,7 +80,7 @@ void main() {
   float shadowAlpha = selHalo * shadowStrength * shadowColor.a;
   vec3 withShadow = mix(restored, shadowColor.rgb, shadowAlpha);
 
-  float playHalo = max(sh.g - play, 0.0);
+  float playHalo = max(sh.b - play, 0.0);
 
   vec2 p = vUv * viewSize * 0.055;
   float t = time * 0.85;
@@ -104,7 +104,8 @@ void main() {
   flameColor = mix(flameColor, fireHot, t2);
   flameColor = mix(flameColor, fireCore, t3);
 
-  vec3 withGlow = clamp(withShadow + flameColor * flame, 0.0, 1.0);
+  vec3 withGlow = mix(withShadow, flameColor, clamp(flame, 0.0, 1.0));
+  withGlow = clamp(withGlow + flameColor * flame * 0.35, 0.0, 1.0);
 
   fragColor = vec4(withGlow, base.a);
 }

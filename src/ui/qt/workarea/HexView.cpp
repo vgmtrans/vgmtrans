@@ -44,7 +44,7 @@ constexpr float SHADOW_OFFSET_X = 0.0f;
 constexpr float SHADOW_OFFSET_Y = 0.0f;
 constexpr float SHADOW_BLUR_RADIUS = SELECTION_PADDING * 2.0f;
 constexpr float SHADOW_STRENGTH = 1.5;
-constexpr float PLAYBACK_GLOW_STRENGTH = 2.4f;
+constexpr float PLAYBACK_GLOW_STRENGTH = 1.4f;
 constexpr float PLAYBACK_GLOW_RADIUS = 0.7f;
 const QColor PLAYBACK_GLOW_DEEP(170, 20, 8);
 const QColor PLAYBACK_GLOW_MID(255, 90, 12);

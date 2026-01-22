@@ -1020,6 +1020,7 @@ void HexViewRhiRenderer::buildSelectionInstances(int startLine, int endLine) {
       hexStartX + (kBytesPerLine * 3 + HEX_TO_ASCII_SPACING_CHARS) * charWidth;
   const QVector4D selectionMaskColor(1.0f, 0.0f, 0.0f, 1.0f);
   const QVector4D playbackMaskColor(0.0f, 1.0f, 0.0f, 1.0f);
+  const QVector4D playbackOuterMaskColor(0.0f, 0.0f, 1.0f, 1.0f);
 
   struct Interval {
     int start = 0;
@@ -1027,7 +1028,9 @@ void HexViewRhiRenderer::buildSelectionInstances(int startLine, int endLine) {
   };
 
   auto appendMaskForSelections = [&](const std::vector<HexView::SelectionRange>& selections,
-                                     const QVector4D& maskColor) {
+                                     const QVector4D& maskColor,
+                                     float padX,
+                                     float padY) {
     std::vector<std::vector<Interval>> perLine;
     perLine.resize(static_cast<size_t>(visibleCount));
 
@@ -1090,11 +1093,13 @@ void HexViewRhiRenderer::buildSelectionInstances(int startLine, int endLine) {
         if (length <= 0) {
           return;
         }
-        const float hexX = hexStartX + col0 * 3.0f * charWidth - charHalfWidth;
-        appendRect(m_maskRectInstances, hexX, y, length * 3.0f * charWidth, lineHeight, maskColor);
+        const float hexX = hexStartX + col0 * 3.0f * charWidth - charHalfWidth - padX;
+        appendRect(m_maskRectInstances, hexX, y - padY,
+                   length * 3.0f * charWidth + padX * 2.0f, lineHeight + padY * 2.0f, maskColor);
         if (m_view->m_shouldDrawAscii) {
-          const float asciiX = asciiStartX + col0 * charWidth;
-          appendRect(m_maskRectInstances, asciiX, y, length * charWidth, lineHeight, maskColor);
+          const float asciiX = asciiStartX + col0 * charWidth - padX;
+          appendRect(m_maskRectInstances, asciiX, y - padY,
+                     length * charWidth + padX * 2.0f, lineHeight + padY * 2.0f, maskColor);
         }
       };
 
@@ -1114,10 +1119,13 @@ void HexViewRhiRenderer::buildSelectionInstances(int startLine, int endLine) {
   if (hasSelection) {
     const std::vector<HexView::SelectionRange>& selections =
         m_view->m_selections.empty() ? m_view->m_fadeSelections : m_view->m_selections;
-    appendMaskForSelections(selections, selectionMaskColor);
+    appendMaskForSelections(selections, selectionMaskColor, 0.0f, 0.0f);
   }
 
   if (hasPlayback) {
-    appendMaskForSelections(m_view->m_playbackSelections, playbackMaskColor);
+    const float padX = m_view->m_playbackGlowRadius * static_cast<float>(m_view->m_charWidth);
+    const float padY = m_view->m_playbackGlowRadius * static_cast<float>(m_view->m_lineHeight);
+    appendMaskForSelections(m_view->m_playbackSelections, playbackMaskColor, 0.0f, 0.0f);
+    appendMaskForSelections(m_view->m_playbackSelections, playbackOuterMaskColor, padX, padY);
   }
 }
