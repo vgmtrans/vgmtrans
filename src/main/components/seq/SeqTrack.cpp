@@ -266,6 +266,8 @@ bool SeqTrack::isOffsetUsed(uint32_t offset) {
 
 
 bool SeqTrack::onEvent(uint32_t offset, uint32_t length) {
+  m_lastEventOffset = offset;
+  m_lastEventLength = length;
   if (offset > visitedAddressMax) {
     visitedAddressMax = offset;
   }
@@ -293,6 +295,21 @@ void SeqTrack::addEvent(SeqEvent *pSeqEvent) {
     if (unLength < length)
       unLength = length;
   }
+}
+
+SeqEvent* SeqTrack::findSeqEventAtOffset(uint32_t offset, uint32_t length) {
+  auto* item = getItemAtOffset(offset, true);
+  if (item == nullptr) {
+    return nullptr;
+  }
+  auto* seqEvent = dynamic_cast<SeqEvent*>(item);
+  if (seqEvent == nullptr) {
+    return nullptr;
+  }
+  if (length != 0 && seqEvent->unLength != 0 && seqEvent->unLength != length) {
+    return nullptr;
+  }
+  return seqEvent;
 }
 
 void SeqTrack::addGenericEvent(uint32_t offset,
