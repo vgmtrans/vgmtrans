@@ -43,8 +43,8 @@ void main() {
   vec3 dimmed = mix(base.rgb, vec3(0.0), overlayOpacity * inColumns);
 
   vec4 mask = texture(maskTex, vUv);
-  float sel = mask.r;
-  float play = mask.g;
+  float sel = clamp(mask.r, 0.0, 1.0);
+  float play = clamp(mask.g, 0.0, 1.0);
   float highlight = max(sel, play);
   vec3 restored = mix(dimmed, base.rgb, highlight);
 
@@ -60,14 +60,40 @@ void main() {
 
   float playHalo = max(sh.g - play, 0.0);
 
-  float noise = fract(sin(dot(vUv * viewSize * 0.12 + time, vec2(12.9898, 78.233))) * 43758.5453);
-  float flicker = (0.7 + 0.3 * sin(time * 6.0 + (vUv.x + vUv.y) * 30.0)) * (0.9 + 0.2 * noise);
-  float waveX = sin((vUv.x * viewSize.x) * 0.08 - time * 3.4);
-  float waveY = sin((vUv.y * viewSize.y) * 0.10 + time * 4.1);
-  float undulate = 0.85 + 0.15 * (waveX * waveY);
-  float glowAlpha = clamp(playHalo * glowStrength * flicker * undulate, 0.0, 1.0);
+  vec2 p = vUv * viewSize;
+  float t = time * 1.4;
+  vec2 warp = vec2(
+      sin(p.y * 0.05 + t * 2.7) + sin(p.x * 0.02 - t * 1.3),
+      sin(p.x * 0.04 - t * 2.1) + sin(p.y * 0.03 + t * 1.7)
+    ) * 2.0;
+  vec2 fp = p + warp;
 
-  vec3 withGlow = clamp(withShadow + glowColor * glowAlpha, 0.0, 1.0);
+  float n1 = fract(sin(dot(fp * 0.12 + t, vec2(12.9898, 78.233))) * 43758.5453);
+  float n2 = fract(sin(dot(fp * 0.07 - t, vec2(93.9898, 67.345))) * 24634.6345);
+  float noise = mix(n1, n2, 0.55);
+
+  float w1 = sin(fp.x * 0.08 + t * 5.0);
+  float w2 = sin(fp.y * 0.10 - t * 4.3);
+  float lick = 0.7 + 0.3 * (w1 * w2);
+  float flicker = 0.6 + 0.4 * noise;
+
+  float halo = pow(playHalo, 0.65);
+  float flame = clamp(halo * glowStrength * flicker * lick, 0.0, 1.0);
+
+  vec3 fireDeep = vec3(0.7, 0.08, 0.02);
+  vec3 fireMid = vec3(1.0, 0.35, 0.05);
+  vec3 fireHot = vec3(1.0, 0.75, 0.15);
+  vec3 fireCore = vec3(1.0, 0.95, 0.8);
+
+  float t1 = smoothstep(0.0, 0.45, flame);
+  float t2 = smoothstep(0.35, 0.75, flame);
+  float t3 = smoothstep(0.65, 1.0, flame);
+  vec3 flameColor = mix(fireDeep, fireMid, t1);
+  flameColor = mix(flameColor, fireHot, t2);
+  flameColor = mix(flameColor, fireCore, t3);
+  flameColor = mix(flameColor, glowColor, 0.15);
+
+  vec3 withGlow = clamp(withShadow + flameColor * flame, 0.0, 1.0);
 
   fragColor = vec4(withGlow, base.a);
 }

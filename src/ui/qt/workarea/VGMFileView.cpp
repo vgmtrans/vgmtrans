@@ -176,12 +176,6 @@ void VGMFileView::onPlaybackPositionChanged(int current, int /*max*/) {
     return;
   }
 
-  if (!SequencePlayer::the().playing()) {
-    m_hexview->setPlaybackActive(false);
-    m_hexview->clearPlaybackSelections();
-    return;
-  }
-
   const auto* coll = SequencePlayer::the().activeCollection();
   if (!coll || !coll->containsVGMFile(m_vgmfile)) {
     m_hexview->setPlaybackActive(false);
@@ -189,7 +183,15 @@ void VGMFileView::onPlaybackPositionChanged(int current, int /*max*/) {
     return;
   }
 
-  m_hexview->setPlaybackActive(true);
+  const bool shouldHighlight = SequencePlayer::the().playing() || current > 0;
+  if (!shouldHighlight) {
+    m_hexview->setPlaybackActive(false);
+    m_hexview->clearPlaybackSelections();
+    return;
+  }
+
+  const bool playbackActive = current > 0;
+  m_hexview->setPlaybackActive(playbackActive);
 
   const auto& timeline = seq->timedEventIndex();
   if (!timeline.finalized()) {
