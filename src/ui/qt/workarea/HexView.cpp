@@ -44,7 +44,7 @@ constexpr float SHADOW_OFFSET_X = 0.0f;
 constexpr float SHADOW_OFFSET_Y = 0.0f;
 constexpr float SHADOW_BLUR_RADIUS = SELECTION_PADDING * 2.0f;
 constexpr float SHADOW_STRENGTH = 1.5;
-constexpr float PLAYBACK_GLOW_STRENGTH = 1.2f;
+constexpr float PLAYBACK_GLOW_STRENGTH = 1.8f;
 const QColor PLAYBACK_GLOW_COLOR(255, 255, 255);
 constexpr uint16_t STYLE_UNASSIGNED = std::numeric_limits<uint16_t>::max();
 }  // namespace
@@ -263,7 +263,6 @@ void HexView::setSelectedItem(VGMItem* item) {
 }
 
 void HexView::setPlaybackSelectionsForItems(const std::vector<const VGMItem*>& items) {
-  m_playbackActive = true;
   m_playbackSelections.clear();
   m_playbackSelections.reserve(items.size());
   for (const auto* item : items) {
