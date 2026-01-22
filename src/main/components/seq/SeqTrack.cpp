@@ -379,7 +379,7 @@ void SeqTrack::addRest(uint32_t offset, uint32_t length, uint32_t restTime, cons
   bool isNewOffset = onEvent(offset, length);
 
   uint32_t startTick = getTime();
-  recordSeqEvent<RestSeqEvent>(isNewOffset, startTick, 0, restTime, offset, length, sEventName);
+  recordSeqEvent<RestSeqEvent>(isNewOffset, startTick, restTime, restTime, offset, length, sEventName);
 
   if (readMode == READMODE_CONVERT_TO_MIDI) {
     pMidiTrack->purgePrevNoteOffs();
