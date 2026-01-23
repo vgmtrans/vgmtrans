@@ -311,7 +311,7 @@ int HexView::getTotalLines() const {
   if (!m_vgmfile) {
     return 0;
   }
-  return static_cast<int>((m_vgmfile->unLength + BYTES_PER_LINE - 1) / BYTES_PER_LINE);
+  return static_cast<int>((m_vgmfile->length() + BYTES_PER_LINE - 1) / BYTES_PER_LINE);
 }
 
 void HexView::setSelectedItem(VGMItem* item) {
@@ -336,9 +336,9 @@ void HexView::setSelectedItem(VGMItem* item) {
     return;
   }
 
-  m_selectedOffset = m_selectedItem->dwOffset;
+  m_selectedOffset = m_selectedItem->offset();
   m_selections.clear();
-  m_selections.push_back({m_selectedItem->dwOffset, m_selectedItem->unLength});
+  m_selections.push_back({m_selectedItem->offset(), m_selectedItem->length()});
   m_fadeSelections.clear();
   updateHighlightState(true);
 
@@ -351,9 +351,9 @@ void HexView::setSelectedItem(VGMItem* item) {
     return;
   }
 
-  const int itemBaseOffset = static_cast<int>(m_selectedItem->dwOffset - m_vgmfile->dwOffset);
+  const int itemBaseOffset = static_cast<int>(m_selectedItem->offset() - m_vgmfile->offset());
   const int line = itemBaseOffset / BYTES_PER_LINE;
-  const int endLine = (itemBaseOffset + static_cast<int>(m_selectedItem->unLength)) / BYTES_PER_LINE;
+  const int endLine = (itemBaseOffset + static_cast<int>(m_selectedItem->length())) / BYTES_PER_LINE;
 
   const int viewStartLine = verticalScrollBar()->value() / m_lineHeight;
   const int viewEndLine = viewStartLine + (viewport()->height() / m_lineHeight);
@@ -385,8 +385,8 @@ void HexView::setPlaybackSelectionsForItems(const std::vector<const VGMItem*>& i
     if (!item) {
       continue;
     }
-    const uint32_t length = item->unLength > 0 ? item->unLength : 1u;
-    next.push_back({item->dwOffset, length});
+    const uint32_t length = item->length() > 0 ? item->length() : 1u;
+    next.push_back({item->offset(), length});
   }
 
   std::unordered_set<uint64_t> nextKeys;
@@ -515,7 +515,7 @@ void HexView::rebuildStyleMap() {
     return;
   }
 
-  const uint32_t length = m_vgmfile->unLength;
+  const uint32_t length = m_vgmfile->length();
   m_styleIds.assign(length, STYLE_UNASSIGNED);
 
   auto styleIdForType = [&](VGMItem::Type type) -> uint16_t {
@@ -548,17 +548,17 @@ void HexView::rebuildStyleMap() {
   walk(m_vgmfile);
 
   for (auto* item : leaves) {
-    if (!item || item->unLength == 0) {
+    if (!item || item->length() == 0) {
       continue;
     }
-    if (item->dwOffset < m_vgmfile->dwOffset) {
+    if (item->offset() < m_vgmfile->offset()) {
       continue;
     }
-    const uint32_t start = item->dwOffset - m_vgmfile->dwOffset;
+    const uint32_t start = item->offset() - m_vgmfile->offset();
     if (start >= length) {
       continue;
     }
-    const uint32_t end = std::min<uint32_t>(start + item->unLength, length);
+    const uint32_t end = std::min<uint32_t>(start + item->length(), length);
     const uint16_t styleId = styleIdForType(item->type);
     for (uint32_t i = start; i < end; ++i) {
       if (m_styleIds[i] == STYLE_UNASSIGNED) {
@@ -734,22 +734,22 @@ void HexView::keyPressEvent(QKeyEvent* event) {
       goto selectNewOffset;
 
     case Qt::Key_Down: {
-      const int selectedCol = (m_selectedOffset - m_vgmfile->dwOffset) % BYTES_PER_LINE;
-      const int endOffset = m_selectedItem->dwOffset - m_vgmfile->dwOffset + m_selectedItem->unLength;
+      const int selectedCol = (m_selectedOffset - m_vgmfile->offset()) % BYTES_PER_LINE;
+      const int endOffset = m_selectedItem->offset() - m_vgmfile->offset() + m_selectedItem->length();
       const int itemEndCol = endOffset % BYTES_PER_LINE;
       const int itemEndLine = endOffset / BYTES_PER_LINE;
-      newOffset = m_vgmfile->dwOffset +
+      newOffset = m_vgmfile->offset() +
                   ((itemEndLine + (selectedCol > itemEndCol ? 0 : 1)) * BYTES_PER_LINE) +
                   selectedCol;
       goto selectNewOffset;
     }
 
     case Qt::Key_Left:
-      newOffset = m_selectedItem->dwOffset - 1;
+      newOffset = m_selectedItem->offset() - 1;
       goto selectNewOffset;
 
     case Qt::Key_Right:
-      newOffset = m_selectedItem->dwOffset + m_selectedItem->unLength;
+      newOffset = m_selectedItem->offset() + m_selectedItem->length();
       goto selectNewOffset;
 
     case Qt::Key_Escape:
@@ -757,8 +757,8 @@ void HexView::keyPressEvent(QKeyEvent* event) {
       return;
 
     selectNewOffset:
-      if (newOffset >= m_vgmfile->dwOffset &&
-          newOffset < (m_vgmfile->dwOffset + m_vgmfile->unLength)) {
+      if (newOffset >= m_vgmfile->offset() &&
+          newOffset < (m_vgmfile->offset() + m_vgmfile->length())) {
         m_selectedOffset = newOffset;
         if (auto* item = m_vgmfile->getItemAtOffset(newOffset, false)) {
           selectionChanged(item);
@@ -801,9 +801,9 @@ int HexView::getOffsetFromPoint(QPoint pos) const {
     return -1;
   }
 
-  const int offset = m_vgmfile->dwOffset + (line * BYTES_PER_LINE) + byteNum;
-  if (offset < static_cast<int>(m_vgmfile->dwOffset) ||
-      offset >= static_cast<int>(m_vgmfile->dwOffset + m_vgmfile->unLength)) {
+  const int offset = m_vgmfile->offset() + (line * BYTES_PER_LINE) + byteNum;
+  if (offset < static_cast<int>(m_vgmfile->offset()) ||
+      offset >= static_cast<int>(m_vgmfile->offset() + m_vgmfile->length())) {
     return -1;
   }
   return offset;
@@ -879,8 +879,8 @@ void HexView::handleCoalescedMouseMove(const QPoint& pos,
       return;
     }
     m_selectedOffset = offset;
-    if (m_selectedItem && (m_selectedOffset >= m_selectedItem->dwOffset) &&
-        (m_selectedOffset < (m_selectedItem->dwOffset + m_selectedItem->unLength))) {
+    if (m_selectedItem && (m_selectedOffset >= m_selectedItem->offset()) &&
+        (m_selectedOffset < (m_selectedItem->offset() + m_selectedItem->length()))) {
       hideTooltip();
       return;
     }
@@ -1181,7 +1181,7 @@ void HexView::showTooltip(VGMItem* item, const QPoint& pos) {
     hideTooltip();
     return;
   }
-  if (m_tooltipItem && item->dwOffset == m_tooltipItem->dwOffset) {
+  if (m_tooltipItem && item->offset() == m_tooltipItem->offset()) {
     return;
   }
   const QString description = tooltipHtmlWithIcon(item);

@@ -687,8 +687,8 @@ void HexViewRhiRenderer::ensureItemIdTexture(QRhiResourceUpdateBatch* u, int sta
   idMap.reserve(static_cast<size_t>(size.width() * size.height()));
   uint16_t nextId = 1;
 
-  const uint32_t baseOffset = m_view->m_vgmfile->dwOffset;
-  const uint32_t endOffset = m_view->m_vgmfile->dwOffset + m_view->m_vgmfile->unLength;
+  const uint32_t baseOffset = m_view->m_vgmfile->offset();
+  const uint32_t endOffset = m_view->m_vgmfile->offset() + m_view->m_vgmfile->length();
 
   for (int row = 0; row < size.height(); ++row) {
     const int lineIndex = padStart + row;
@@ -1015,7 +1015,7 @@ void HexViewRhiRenderer::rebuildCacheWindow() {
     return;
   }
 
-  const uint32_t fileLength = m_view->m_vgmfile->unLength;
+  const uint32_t fileLength = m_view->m_vgmfile->length();
   const auto* baseData = reinterpret_cast<const uint8_t*>(m_view->m_vgmfile->data());
   const size_t count = static_cast<size_t>(m_cacheEndLine - m_cacheStartLine + 1);
   m_cachedLines.reserve(count);
@@ -1098,7 +1098,7 @@ void HexViewRhiRenderer::buildBaseInstances() {
     const float y = entry.line * lineHeight;
 
     if (m_view->m_shouldDrawOffset) {
-      uint32_t address = m_view->m_vgmfile->dwOffset + (entry.line * kBytesPerLine);
+      uint32_t address = m_view->m_vgmfile->offset() + (entry.line * kBytesPerLine);
       if (m_view->m_addressAsHex) {
         char buf[NUM_ADDRESS_NIBBLES];
         for (int i = NUM_ADDRESS_NIBBLES - 1; i >= 0; --i) {
@@ -1191,7 +1191,7 @@ void HexViewRhiRenderer::buildSelectionInstances(int startLine, int endLine) {
   m_edgeRectInstances.reserve(static_cast<size_t>(visibleCount) *
                               (m_view->m_shouldDrawAscii ? 8 : 4));
 
-  const uint32_t fileLength = m_view->m_vgmfile->unLength;
+  const uint32_t fileLength = m_view->m_vgmfile->length();
   const float charWidth = static_cast<float>(m_view->m_charWidth);
   const float charHalfWidth = static_cast<float>(m_view->m_charHalfWidth);
   const float lineHeight = static_cast<float>(m_view->m_lineHeight);
@@ -1231,7 +1231,7 @@ void HexViewRhiRenderer::buildSelectionInstances(int startLine, int endLine) {
         continue;
       }
 
-      int selectionStart = static_cast<int>(selection.offset - m_view->m_vgmfile->dwOffset);
+      int selectionStart = static_cast<int>(selection.offset - m_view->m_vgmfile->offset());
       int selectionEnd = selectionStart + static_cast<int>(selection.length);
       if (selectionEnd <= 0 || selectionStart >= static_cast<int>(fileLength)) {
         continue;

@@ -312,7 +312,7 @@ SeqEvent* SeqTrack::findSeqEventAtOffset(uint32_t offset, uint32_t length) {
   if (seqEvent == nullptr) {
     return nullptr;
   }
-  if (length != 0 && seqEvent->unLength != 0 && seqEvent->unLength != length) {
+  if (length != 0 && seqEvent->length() != 0 && seqEvent->length() != length) {
     return nullptr;
   }
   return seqEvent;
