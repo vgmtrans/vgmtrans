@@ -609,7 +609,7 @@ bool AkaoTrack::readEvent() {
       makePrevDurNoteEnd(getTime() + dur);
       addTime(delta_time);
       auto desc = fmt::format("Length: {}  Duration: {}", delta_time, dur);
-      addGenericEvent(beginOffset, curOffset - beginOffset, "Tie", desc, Type::Tie);
+      addTie(beginOffset, curOffset - beginOffset, dur, "Tie", desc);
     }
     else // rest
     {

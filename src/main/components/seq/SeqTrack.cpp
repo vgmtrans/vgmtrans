@@ -388,10 +388,11 @@ void SeqTrack::addRest(uint32_t offset, uint32_t length, uint32_t restTime, cons
   addTime(restTime);
 }
 
-void SeqTrack::addHold(uint32_t offset, uint32_t length, const std::string &sEventName) {
+void SeqTrack::addTie(uint32_t offset, uint32_t length, uint32_t duration,
+                      const std::string &sEventName, const std::string &sEventDesc) {
   bool isNewOffset = onEvent(offset, length);
 
-  recordSeqEvent<SeqEvent>(isNewOffset, getTime(), 0, offset, length, sEventName, Type::Tie);
+  recordSeqEvent<SeqEvent>(isNewOffset, getTime(), duration, offset, length, sEventName, Type::Tie, sEventDesc);
 }
 
 void SeqTrack::addNoteOn(uint32_t offset, uint32_t length, int8_t key, int8_t vel, const std::string &sEventName) {

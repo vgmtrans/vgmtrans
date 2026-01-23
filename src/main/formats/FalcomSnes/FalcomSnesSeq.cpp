@@ -313,7 +313,7 @@ bool FalcomSnesTrack::readEvent() {
         if (prevNoteSlurred && key == prevNoteKey) {
           // tie
           makePrevDurNoteEnd(getTime() + dur);
-          addGenericEvent(beginOffset, curOffset - beginOffset, "Tie", desc, Type::Tie);
+          addTie(beginOffset, curOffset - beginOffset, dur, "Tie", desc);
         }
         else {
           // note

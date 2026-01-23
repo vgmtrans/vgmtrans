@@ -103,7 +103,7 @@ bool CPS1TrackV2::readEvent() {
           addNoteOn(beginOffset, curOffset - beginOffset, key, masterVol, "Note On (tied)");
         }
         else
-          addGenericEvent(beginOffset, curOffset - beginOffset, "Tie", "", Type::Tie);
+          addTie(beginOffset, curOffset - beginOffset, delta, "Tie");
         bPrevNoteTie = true;
         prevTieNote = key;
       }

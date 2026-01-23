@@ -159,10 +159,12 @@ bool FFTTrack::readEvent() {
       }
 
         //hold (Tie)
-      case 0x81:
-        addTime(readByte(curOffset++));
-        addHold(beginOffset, curOffset - beginOffset, "Tie");
+      case 0x81: {
+        uint8_t tieDur = readByte(curOffset++);
+        addTime(tieDur);
+        addTie(beginOffset, curOffset - beginOffset, tieDur, "Tie");
         break;
+      }
 
         //--------
         //Track Event
@@ -687,4 +689,3 @@ bool FFTTrack::readEvent() {
     }
   return true;
 }
-

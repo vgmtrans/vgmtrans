@@ -650,8 +650,7 @@ bool HudsonSnesTrack::readEvent() {
         if (prevNoteSlurred && key == prevNoteKey) {
           // tie
           makePrevDurNoteEnd(getTime() + dur);
-          addGenericEvent(beginOffset, curOffset - beginOffset, "Tie",
-                          describeUnknownEvent(statusByte), Type::Tie);
+          addTie(beginOffset, curOffset - beginOffset, dur, "Tie", describeUnknownEvent(statusByte));
         }
         else {
           // note

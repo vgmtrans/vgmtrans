@@ -158,7 +158,8 @@ private:
   void addIncrementOctave(uint32_t offset, uint32_t length, const std::string &sEventName = "Increment Octave");    // 1,Sep.2009 revise
   void addDecrementOctave(uint32_t offset, uint32_t length, const std::string &sEventName = "Decrement Octave");    // 1,Sep.2009 revise
   void addRest(uint32_t offset, uint32_t length, uint32_t restTime, const std::string &sEventName = "Rest");
-  void addHold(uint32_t offset, uint32_t length, const std::string &sEventName = "Hold");
+  void addTie(uint32_t offset, uint32_t length, uint32_t duration,
+              const std::string &sEventName = "Tie", const std::string &sEventDesc = "");
   void addUnknown(uint32_t offset, uint32_t length, const std::string &sEventName = "Unknown Event", const std::string &sEventDesc = "");
 
   void addNoteOn(uint32_t offset, uint32_t length, int8_t key, int8_t vel, const std::string &sEventName = "Note On");
