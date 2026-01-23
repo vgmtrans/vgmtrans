@@ -26,7 +26,8 @@ void main() {
   float glowCurve = max(edgeParams.w, 0.0001);
 
   float isShadow = step(0.5, vColor.r);
-  float isGlow = step(0.5, vColor.g);
+  float isGlowActive = step(0.5, vColor.g);
+  float isGlowFade = step(0.5, vColor.b);
 
   vec2 center = vRect.xy + vRect.zw * 0.5;
   vec2 halfSize = vRect.zw * 0.5;
@@ -37,8 +38,7 @@ void main() {
   float glowNorm = glowRadius > 0.0001 ? clamp(pow(outside / glowRadius, glowCurve), 0.0, 1.0) : 1.0;
 
   float r = mix(1.0, shadowNorm, isShadow);
-  float g = mix(1.0, glowNorm, isGlow);
-  float fade = clamp(vColor.a, 0.0, 1.0);
-  float b = mix(1.0, fade, isGlow);
+  float g = mix(1.0, glowNorm, isGlowActive);
+  float b = mix(1.0, glowNorm, isGlowFade);
   fragColor = vec4(r, g, b, 1.0);
 }

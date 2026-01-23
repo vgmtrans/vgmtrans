@@ -9,6 +9,8 @@
 #include <QAbstractScrollArea>
 #include <QColor>
 #include <QFont>
+#include <QBasicTimer>
+#include <QElapsedTimer>
 #include <QImage>
 #include <QPointF>
 #include <QRectF>
@@ -19,7 +21,6 @@
 #include <vector>
 
 class QParallelAnimationGroup;
-class QPropertyAnimation;
 class QWidget;
 class VGMFile;
 class VGMItem;
@@ -32,7 +33,6 @@ class HexView final : public QAbstractScrollArea {
   Q_PROPERTY(qreal shadowBlur READ shadowBlur WRITE setShadowBlur)
   Q_PROPERTY(QPointF shadowOffset READ shadowOffset WRITE setShadowOffset)
   Q_PROPERTY(qreal shadowStrength READ shadowStrength WRITE setShadowStrength)
-  Q_PROPERTY(qreal playbackFade READ playbackFade WRITE setPlaybackFade)
 
 public:
   explicit HexView(VGMFile* vgmfile, QWidget* parent = nullptr);
@@ -69,12 +69,18 @@ protected:
   void mouseMoveEvent(QMouseEvent* event) override;
   void mouseReleaseEvent(QMouseEvent* event) override;
   void mouseDoubleClickEvent(QMouseEvent* event) override;
+  void timerEvent(QTimerEvent* event) override;
 
 private:
   friend class HexViewRhiRenderer;
   struct SelectionRange {
     uint32_t offset;
     uint32_t length;
+  };
+  struct FadePlaybackSelection {
+    SelectionRange range;
+    qint64 startMs = 0;
+    float alpha = 0.0f;
   };
   struct Style {
     QColor bg;
@@ -108,12 +114,11 @@ private:
   void setShadowOffset(const QPointF& offset);
   qreal shadowStrength() const;
   void setShadowStrength(qreal s);
-  qreal playbackFade() const;
-  void setPlaybackFade(qreal fade);
   void initAnimations();
   void showSelectedItem(bool show, bool animate);
   void clearFadeSelection();
-  void clearFadePlaybackSelections();
+  void updatePlaybackFade();
+  void ensurePlaybackFadeTimer();
   void updateHighlightState(bool animateSelection);
 
   VGMFile* m_vgmfile = nullptr;
@@ -138,16 +143,16 @@ private:
   std::vector<SelectionRange> m_selections;
   std::vector<SelectionRange> m_fadeSelections;
   std::vector<SelectionRange> m_playbackSelections;
-  std::vector<SelectionRange> m_fadePlaybackSelections;
+  std::vector<FadePlaybackSelection> m_fadePlaybackSelections;
   bool m_playbackActive = false;
 
   QParallelAnimationGroup* m_selectionAnimation = nullptr;
-  QPropertyAnimation* m_playbackFadeAnimation = nullptr;
   qreal m_overlayOpacity = 0.0;
   qreal m_shadowBlur = 0.0;
   QPointF m_shadowOffset{0.0, 0.0};
   qreal m_shadowStrength = 1.0;
-  qreal m_playbackFade = 0.0;
+  QElapsedTimer m_playbackFadeClock;
+  QBasicTimer m_playbackFadeTimer;
   QColor m_playbackGlowDeep;
   QColor m_playbackGlowMid;
   QColor m_playbackGlowHot;
