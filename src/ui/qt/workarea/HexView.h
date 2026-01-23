@@ -118,6 +118,7 @@ private:
   void clearFadeSelection();
   void updatePlaybackFade();
   void ensurePlaybackFadeTimer();
+  qint64 playbackNowMs();
   void updateHighlightState(bool animateSelection);
 
   VGMFile* m_vgmfile = nullptr;

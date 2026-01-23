@@ -26,7 +26,6 @@
 #include <QWidget>
 
 #include <algorithm>
-#include <array>
 #include <cmath>
 #include <functional>
 #include <limits>
@@ -282,12 +281,6 @@ void HexView::setPlaybackSelectionsForItems(const std::vector<const VGMItem*>& i
   auto keyForFade = [](const FadePlaybackSelection& selection) -> uint64_t {
     return selectionKey(selection.range.offset, selection.range.length);
   };
-  auto nowMs = [&]() -> qint64 {
-    if (!m_playbackFadeClock.isValid()) {
-      m_playbackFadeClock.start();
-    }
-    return m_playbackFadeClock.elapsed();
-  };
 
   std::vector<SelectionRange> next;
   next.reserve(items.size());
@@ -323,7 +316,7 @@ void HexView::setPlaybackSelectionsForItems(const std::vector<const VGMItem*>& i
   const bool fadeEnabled = PLAYBACK_FADE_DURATION_MS > 0;
   bool addedFade = false;
   if (fadeEnabled) {
-    const qint64 now = nowMs();
+    const qint64 now = playbackNowMs();
     for (const auto& selection : m_playbackSelections) {
       const uint64_t key = selectionKey(selection.offset, selection.length);
       if (nextKeys.find(key) == nextKeys.end() && fadeKeys.insert(key).second) {
@@ -356,14 +349,8 @@ void HexView::clearPlaybackSelections() {
   if (m_playbackSelections.empty()) {
     return;
   }
-  auto nowMs = [&]() -> qint64 {
-    if (!m_playbackFadeClock.isValid()) {
-      m_playbackFadeClock.start();
-    }
-    return m_playbackFadeClock.elapsed();
-  };
   if (PLAYBACK_FADE_DURATION_MS > 0) {
-    const qint64 now = nowMs();
+    const qint64 now = playbackNowMs();
     std::unordered_set<uint64_t> fadeKeys;
     fadeKeys.reserve(m_fadePlaybackSelections.size() * 2 + 1);
     for (const auto& selection : m_fadePlaybackSelections) {
@@ -935,15 +922,18 @@ void HexView::ensurePlaybackFadeTimer() {
   }
 }
 
+qint64 HexView::playbackNowMs() {
+  if (!m_playbackFadeClock.isValid()) {
+    m_playbackFadeClock.start();
+  }
+  return m_playbackFadeClock.elapsed();
+}
+
 void HexView::updatePlaybackFade() {
   if (m_fadePlaybackSelections.empty()) {
     return;
   }
-  if (!m_playbackFadeClock.isValid()) {
-    m_playbackFadeClock.start();
-  }
-
-  const qint64 nowMs = m_playbackFadeClock.elapsed();
+  const qint64 nowMs = playbackNowMs();
   const float duration = static_cast<float>(PLAYBACK_FADE_DURATION_MS);
   const float curve = std::max(0.01f, PLAYBACK_FADE_CURVE);
 
