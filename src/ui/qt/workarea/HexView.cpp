@@ -810,13 +810,32 @@ void HexView::handleCoalescedMouseMove(const QPoint& pos,
     } else {
       hideAltTooltip();
     }
+  }
+}
+
+void HexView::handleAltHoverMove(const QPoint& pos, Qt::KeyboardModifiers mods) {
+  if (!mods.testFlag(Qt::AltModifier)) {
+    hideAltTooltip();
+    return;
+  }
+  const int offset = getOffsetFromPoint(pos);
+  if (offset < 0) {
+    hideAltTooltip();
+    return;
+  }
+  if (auto* item = m_vgmfile->getItemAtOffset(offset, false)) {
+    showAltTooltip(item, pos);
   } else {
     hideAltTooltip();
   }
 }
 
 void HexView::mouseMoveEvent(QMouseEvent* event) {
-  handleCoalescedMouseMove(event->pos(), event->buttons(), event->modifiers());
+  if (event->buttons() & Qt::LeftButton) {
+    handleCoalescedMouseMove(event->pos(), event->buttons(), event->modifiers());
+  } else {
+    handleAltHoverMove(event->pos(), event->modifiers());
+  }
   QAbstractScrollArea::mouseMoveEvent(event);
 }
 

@@ -113,9 +113,12 @@ bool HexViewRhiWidget::event(QEvent *e)
     }
 
     case QEvent::MouseMove: {
-      if (!m_dragging)
+      auto *me = static_cast<QMouseEvent*>(e);
+      if (!m_dragging) {
+        const QPoint vp = m_view->viewport()->mapFromGlobal(me->globalPosition().toPoint());
+        m_view->handleAltHoverMove(vp, me->modifiers());
         return true;
-
+      }
       QCoreApplication::sendEvent(m_view->viewport(), e);
       update();
       return true;
