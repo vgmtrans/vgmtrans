@@ -54,6 +54,7 @@ public:
   void handleCoalescedMouseMove(const QPoint& pos,
                                 Qt::MouseButtons buttons,
                                 Qt::KeyboardModifiers mods);
+  void handleAltHoverMove(const QPoint& pos, Qt::KeyboardModifiers mods);
 
 signals:
   void selectionChanged(VGMItem* item);
