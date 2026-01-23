@@ -1040,7 +1040,8 @@ void HexViewRhiRenderer::buildSelectionInstances(int startLine, int endLine) {
   m_edgeRectInstances.clear();
 
   const bool hasSelection = !m_view->m_selections.empty() || !m_view->m_fadeSelections.empty();
-  const bool hasPlayback = !m_view->m_playbackSelections.empty();
+  const bool hasPlayback = !m_view->m_playbackSelections.empty() ||
+                           !m_view->m_fadePlaybackSelections.empty();
   if ((!hasSelection && !hasPlayback) || startLine > endLine) {
     return;
   }
@@ -1062,7 +1063,7 @@ void HexViewRhiRenderer::buildSelectionInstances(int startLine, int endLine) {
   const float hexStartX = static_cast<float>(m_view->hexXOffset());
   const float asciiStartX =
       hexStartX + (kBytesPerLine * 3 + HEX_TO_ASCII_SPACING_CHARS) * charWidth;
-  const QVector4D selectionMaskColor(1.0f, 0.0f, 0.0f, 1.0f);
+  const QVector4D selectionMaskColor(1.0f, 0.0f, 0.0f, 0.0f);
   const QVector4D selectionEdgeColor(1.0f, 0.0f, 0.0f, 1.0f);
   const float shadowPad = std::max(0.0f, static_cast<float>(m_view->m_shadowBlur));
   const float glowBase = std::max(0.0f, static_cast<float>(m_view->m_playbackGlowRadius)) *
@@ -1243,10 +1244,18 @@ void HexViewRhiRenderer::buildSelectionInstances(int startLine, int endLine) {
                             selectionMaskColor, selectionEdgeColor);
   }
 
-  if (hasPlayback) {
+  if (!m_view->m_playbackSelections.empty()) {
     const QVector4D playbackMaskColor(0.0f, 1.0f, 0.0f, 1.0f);
     const QVector4D playbackEdgeColor(0.0f, 1.0f, 0.0f, 1.0f);
     appendMaskForSelections(m_view->m_playbackSelections, 0.0f, 0.0f, glowPad,
+                            playbackMaskColor, playbackEdgeColor);
+  }
+
+  if (!m_view->m_fadePlaybackSelections.empty()) {
+    const float playbackAlpha = static_cast<float>(m_view->m_playbackFade);
+    const QVector4D playbackMaskColor(0.0f, 1.0f, 0.0f, playbackAlpha);
+    const QVector4D playbackEdgeColor(0.0f, 1.0f, 0.0f, playbackAlpha);
+    appendMaskForSelections(m_view->m_fadePlaybackSelections, 0.0f, 0.0f, glowPad,
                             playbackMaskColor, playbackEdgeColor);
   }
 }

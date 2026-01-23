@@ -38,5 +38,7 @@ void main() {
 
   float r = mix(1.0, shadowNorm, isShadow);
   float g = mix(1.0, glowNorm, isGlow);
-  fragColor = vec4(r, g, 1.0, 1.0);
+  float fade = clamp(vColor.a, 0.0, 1.0);
+  float b = mix(1.0, fade, isGlow);
+  fragColor = vec4(r, g, b, 1.0);
 }
