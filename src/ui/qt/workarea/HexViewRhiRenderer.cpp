@@ -309,13 +309,13 @@ void HexViewRhiRenderer::renderFrame(QRhiCommandBuffer* cb, const RenderTargetIn
       ((m_view->m_shadowBlur > 0.0f && m_view->m_shadowStrength > 0.0f) ||
        (m_view->m_playbackGlowRadius > 0.0f && m_view->m_playbackGlowStrength > 0.0f));
   if (edgeEnabled) {
-    cb->beginPass(m_edgeRt, QColor(0, 0, 0, 0), {1.0f, 0}, nullptr);
+    cb->beginPass(m_edgeRt, QColor(255, 255, 255, 255), {1.0f, 0}, nullptr);
     cb->setViewport(QRhiViewport(0, 0, target.pixelSize.width(), target.pixelSize.height()));
     drawEdgeBuffer(cb, m_edgeRectBuf, static_cast<int>(m_edgeRectInstances.size()), 0,
                    m_edgeSrb, m_edgePso);
     cb->endPass();
   } else {
-    cb->beginPass(m_edgeRt, QColor(0, 0, 0, 0), {1.0f, 0}, nullptr);
+    cb->beginPass(m_edgeRt, QColor(255, 255, 255, 255), {1.0f, 0}, nullptr);
     cb->setViewport(QRhiViewport(0, 0, target.pixelSize.width(), target.pixelSize.height()));
     cb->endPass();
   }
@@ -517,10 +517,10 @@ void HexViewRhiRenderer::ensurePipelines(QRhiRenderPassDescriptor* outputRp,
   edgeBlend.enable = true;
   edgeBlend.srcColor = QRhiGraphicsPipeline::One;
   edgeBlend.dstColor = QRhiGraphicsPipeline::One;
-  edgeBlend.opColor = QRhiGraphicsPipeline::Max;
+  edgeBlend.opColor = QRhiGraphicsPipeline::Min;
   edgeBlend.srcAlpha = QRhiGraphicsPipeline::One;
   edgeBlend.dstAlpha = QRhiGraphicsPipeline::One;
-  edgeBlend.opAlpha = QRhiGraphicsPipeline::Max;
+  edgeBlend.opAlpha = QRhiGraphicsPipeline::Min;
 
   m_rectPso = m_rhi->newGraphicsPipeline();
   m_rectPso->setShaderStages({{QRhiShaderStage::Vertex, rectVert},
