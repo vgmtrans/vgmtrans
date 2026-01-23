@@ -10,12 +10,14 @@
 #include "VGMFile.h"
 
 #include <QApplication>
+#include <QBuffer>
 #include <QFontMetricsF>
-#include <QGuiApplication>
+#include <QHash>
 #include <QHelpEvent>
 #include <QImage>
 #include <QKeyEvent>
 #include <QMouseEvent>
+#include <QPixmap>
 #include <QPainter>
 #include <QParallelAnimationGroup>
 #include <QPropertyAnimation>
@@ -58,6 +60,51 @@ constexpr uint16_t STYLE_UNASSIGNED = std::numeric_limits<uint16_t>::max();
 
 inline uint64_t selectionKey(uint32_t offset, uint32_t length) {
   return (static_cast<uint64_t>(offset) << 32) | length;
+}
+
+QString tooltipIconDataUrl(VGMItem::Type type) {
+  static QHash<int, QString> cache;
+  const int key = static_cast<int>(type);
+  auto it = cache.find(key);
+  if (it != cache.end()) {
+    return it.value();
+  }
+  const QIcon& icon = iconForItemType(type);
+  const QPixmap pixmap = icon.pixmap(QSize(16, 16));
+  if (pixmap.isNull()) {
+    cache.insert(key, QString());
+    return {};
+  }
+  QByteArray bytes;
+  QBuffer buffer(&bytes);
+  buffer.open(QIODevice::WriteOnly);
+  pixmap.toImage().save(&buffer, "PNG");
+  const QString dataUrl =
+      QString("data:image/png;base64,%1").arg(QString::fromLatin1(bytes.toBase64()));
+  cache.insert(key, dataUrl);
+  return dataUrl;
+}
+
+QString tooltipHtmlWithIcon(VGMItem* item) {
+  if (!item) {
+    return {};
+  }
+  const QString iconData = tooltipIconDataUrl(item->type);
+  const QString description = getFullDescriptionForTooltip(item);
+  QString content = description;
+  if (!iconData.isEmpty()) {
+    content = QString("<table cellspacing=\"0\" cellpadding=\"0\">"
+                      "<tr>"
+                      "<td style=\"padding-right:6px; vertical-align:top;\">"
+                      "<img src=\"%1\" width=\"16\" height=\"16\">"
+                      "</td>"
+                      "<td>%2</td>"
+                      "</tr>"
+                      "</table>")
+                  .arg(iconData, description);
+  }
+  return QString("<table cellspacing=\"0\" cellpadding=\"6\"><tr><td>%1</td></tr></table>")
+      .arg(content);
 }
 }  // namespace
 
@@ -706,12 +753,7 @@ void HexView::mousePressEvent(QMouseEvent* event) {
 
     m_selectedOffset = offset;
     auto* item = m_vgmfile->getItemAtOffset(offset, false);
-    bool seekModifier = false;
-#if defined(Q_OS_MAC)
-    seekModifier = event->modifiers().testFlag(Qt::AltModifier);
-#else
-    seekModifier = event->modifiers().testFlag(Qt::ControlModifier);
-#endif
+    const bool seekModifier = event->modifiers().testFlag(Qt::AltModifier);
     if (item == m_selectedItem) {
       selectionChanged(nullptr);
     } else {
@@ -719,6 +761,9 @@ void HexView::mousePressEvent(QMouseEvent* event) {
     }
     if (seekModifier && item) {
       seekToEventRequested(item);
+      showAltTooltip(item, event->pos());
+    } else {
+      hideAltTooltip();
     }
     m_isDragging = true;
   }
@@ -729,6 +774,7 @@ void HexView::mousePressEvent(QMouseEvent* event) {
 void HexView::mouseReleaseEvent(QMouseEvent* event) {
   if (event->button() == Qt::LeftButton) {
     m_isDragging = false;
+    hideAltTooltip();
   }
   QAbstractScrollArea::mouseReleaseEvent(event);
 }
@@ -740,21 +786,32 @@ void HexView::handleCoalescedMouseMove(const QPoint& pos,
     const int offset = getOffsetFromPoint(pos);
     if (offset == -1) {
       selectionChanged(nullptr);
+      hideAltTooltip();
       return;
     }
     m_selectedOffset = offset;
     if (m_selectedItem && (m_selectedOffset >= m_selectedItem->dwOffset) &&
         (m_selectedOffset < (m_selectedItem->dwOffset + m_selectedItem->unLength))) {
+      if (mods.testFlag(Qt::AltModifier) && m_selectedItem) {
+        showAltTooltip(m_selectedItem, pos);
+      } else {
+        hideAltTooltip();
+      }
       return;
     }
     auto* item = m_vgmfile->getItemAtOffset(offset, false);
     if (item != m_selectedItem) {
       // setSelectedItem(item);
       selectionChanged(item);
-      if (mods.testFlag(Qt::AltModifier) && item) {
-        seekToEventRequested(item);
-      }
     }
+    if (mods.testFlag(Qt::AltModifier) && item) {
+      seekToEventRequested(item);
+      showAltTooltip(item, pos);
+    } else {
+      hideAltTooltip();
+    }
+  } else {
+    hideAltTooltip();
   }
 }
 
@@ -1005,4 +1062,29 @@ void HexView::updateHighlightState(bool animateSelection) {
   setOverlayOpacity(OVERLAY_ALPHA_F);
   setShadowBlur(SHADOW_BLUR_RADIUS);
   setShadowOffset(QPointF(SHADOW_OFFSET_X, SHADOW_OFFSET_Y));
+}
+
+void HexView::showAltTooltip(VGMItem* item, const QPoint& pos) {
+  if (!item) {
+    hideAltTooltip();
+    return;
+  }
+  if (item == m_altTooltipItem) {
+    return;
+  }
+  const QString description = tooltipHtmlWithIcon(item);
+  if (description.isEmpty()) {
+    hideAltTooltip();
+    return;
+  }
+  QToolTip::showText(viewport()->mapToGlobal(pos), description, this);
+  m_altTooltipItem = item;
+}
+
+void HexView::hideAltTooltip() {
+  if (!m_altTooltipItem) {
+    return;
+  }
+  QToolTip::hideText();
+  m_altTooltipItem = nullptr;
 }
