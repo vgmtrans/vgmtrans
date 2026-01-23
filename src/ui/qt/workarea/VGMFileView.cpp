@@ -200,9 +200,13 @@ void VGMFileView::onPlaybackPositionChanged(int current, int /*max*/) {
     return;
   }
 
-  const uint32_t tick = current > 0 ? static_cast<uint32_t>(current) : 0u;
+  const int tickDiff = current - m_lastPlaybackPosition;
   m_playbackTimedEvents.clear();
-  timeline.getActiveAt(tick, m_playbackTimedEvents);
+  if (tickDiff >= 0 && tickDiff <= 20)
+    timeline.getActiveInRange(m_lastPlaybackPosition, current, m_playbackTimedEvents);
+  else
+    timeline.getActiveAt(current, m_playbackTimedEvents);
+  m_lastPlaybackPosition = current;
 
   m_playbackItems.clear();
   m_playbackItems.reserve(m_playbackTimedEvents.size());

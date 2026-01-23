@@ -42,6 +42,7 @@ private:
   std::vector<const SeqTimedEvent*> m_playbackTimedEvents;
   std::vector<const VGMItem*> m_playbackItems;
   std::vector<const VGMItem*> m_lastPlaybackItems;
+  int m_lastPlaybackPosition = 0;
 
 public slots:
   void onSelectionChange(VGMItem* item) const;
