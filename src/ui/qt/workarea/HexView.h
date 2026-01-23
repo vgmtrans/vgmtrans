@@ -153,10 +153,8 @@ private:
   qreal m_shadowStrength = 1.0;
   QElapsedTimer m_playbackFadeClock;
   QBasicTimer m_playbackFadeTimer;
-  QColor m_playbackGlowDeep;
-  QColor m_playbackGlowMid;
-  QColor m_playbackGlowHot;
-  QColor m_playbackGlowCore;
+  QColor m_playbackGlowLow;
+  QColor m_playbackGlowHigh;
   float m_playbackGlowStrength = 1.0f;
   float m_playbackGlowRadius = 0.5f;
   float m_shadowEdgeCurve = 1.0f;

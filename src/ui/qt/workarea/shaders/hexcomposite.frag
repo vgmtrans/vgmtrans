@@ -14,8 +14,6 @@ layout(std140, binding = 0) uniform Ubuf {
   vec4 p3;
   vec4 p4;
   vec4 p5;
-  vec4 p6;
-  vec4 p7;
 };
 
 layout(location = 0) out vec4 fragColor;
@@ -50,11 +48,9 @@ void main() {
   vec2 viewSize = p2.xy;
   float time = p2.w;
   vec4 shadowColor = p3;
-  vec3 fireDeep = p4.rgb;
+  vec3 glowLow = p4.rgb;
   float glowStrength = p4.a;
-  vec3 fireMid = p5.rgb;
-  vec3 fireHot = p6.rgb;
-  vec3 fireCore = p7.rgb;
+  vec3 glowHigh = p5.rgb;
 
   float x = vUv.x * viewSize.x;
   bool inHex = (x >= hexStart) && (x < hexStart + hexWidth);
@@ -103,12 +99,8 @@ void main() {
 
   float flame = clamp(playHalo * glowStrength * turbulence, 0.0, 1.0);
 
-  float t1 = smoothstep(0.0, 0.45, flame);
-  float t2 = smoothstep(0.35, 0.75, flame);
-  float t3 = smoothstep(0.65, 1.0, flame);
-  vec3 flameColor = mix(fireDeep, fireMid, t1);
-  flameColor = mix(flameColor, fireHot, t2);
-  flameColor = mix(flameColor, fireCore, t3);
+  float flameRamp = smoothstep(0.0, 1.0, flame);
+  vec3 flameColor = mix(glowLow, glowHigh, flameRamp);
 
   vec3 withGlow = mix(withShadow, flameColor, clamp(flame, 0.0, 1.0));
   withGlow = clamp(withGlow + flameColor * flame * 0.35, 0.0, 1.0);
