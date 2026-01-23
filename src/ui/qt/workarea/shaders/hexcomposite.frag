@@ -65,7 +65,9 @@ void main() {
 
   vec4 mask = texture(maskTex, vUv);
   float sel = clamp(mask.r, 0.0, 1.0);
-  float play = clamp(mask.g, 0.0, 1.0);
+  float playMask = clamp(mask.g, 0.0, 1.0);
+  float playFade = clamp(mask.a, 0.0, 1.0);
+  float play = playMask * playFade;
   float highlight = max(sel, play);
   vec3 restored = mix(dimmed, base.rgb, highlight);
 
@@ -81,7 +83,9 @@ void main() {
 
   vec4 edgeGlow = texture(edgeTex, vUv);
   float playNorm = edgeGlow.g;
-  float playHalo = (1.0 - smoothstep(0.0, 1.0, playNorm)) * (1.0 - play);
+  float glowFade = clamp(edgeGlow.b, 0.0, 1.0);
+  float playHalo = (1.0 - smoothstep(0.0, 1.0, playNorm)) *
+                   (1.0 - playMask) * glowFade;
 
   vec2 p = vUv * viewSize * 0.055;
   float t = time * 0.85;

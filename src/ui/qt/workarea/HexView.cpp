@@ -29,6 +29,7 @@
 #include <cmath>
 #include <functional>
 #include <limits>
+#include <unordered_set>
 
 namespace {
 constexpr int BYTES_PER_LINE = 16;
@@ -38,6 +39,7 @@ constexpr int HEX_TO_ASCII_SPACING_CHARS = 4;
 constexpr int SELECTION_PADDING = 18;
 constexpr int VIEWPORT_PADDING = 10;
 constexpr int DIM_DURATION_MS = 200;
+constexpr int PLAYBACK_FADE_DURATION_MS = 1000;
 constexpr int OVERLAY_ALPHA = 80;
 constexpr float OVERLAY_ALPHA_F = OVERLAY_ALPHA / 255.0f;
 constexpr float SHADOW_OFFSET_X = 0.0f;
@@ -275,14 +277,57 @@ void HexView::setSelectedItem(VGMItem* item) {
 }
 
 void HexView::setPlaybackSelectionsForItems(const std::vector<const VGMItem*>& items) {
-  m_playbackSelections.clear();
-  m_playbackSelections.reserve(items.size());
+  auto keyFor = [](const SelectionRange& selection) -> uint64_t {
+    return (static_cast<uint64_t>(selection.offset) << 32) |
+           static_cast<uint64_t>(selection.length);
+  };
+
+  std::vector<SelectionRange> next;
+  next.reserve(items.size());
   for (const auto* item : items) {
     if (!item) {
       continue;
     }
-    m_playbackSelections.push_back({item->dwOffset, item->unLength});
+    const uint32_t length = item->unLength > 0 ? item->unLength : 1u;
+    next.push_back({item->dwOffset, length});
   }
+
+  std::unordered_set<uint64_t> nextKeys;
+  nextKeys.reserve(next.size() * 2 + 1);
+  for (const auto& selection : next) {
+    nextKeys.insert(keyFor(selection));
+  }
+
+  std::unordered_set<uint64_t> fadeKeys;
+  fadeKeys.reserve(m_fadePlaybackSelections.size() * 2 + 1);
+  for (const auto& selection : m_fadePlaybackSelections) {
+    fadeKeys.insert(keyFor(selection));
+  }
+
+  bool addedFade = false;
+  for (const auto& selection : m_playbackSelections) {
+    const uint64_t key = keyFor(selection);
+    if (nextKeys.find(key) == nextKeys.end() && fadeKeys.insert(key).second) {
+      m_fadePlaybackSelections.push_back(selection);
+      addedFade = true;
+    }
+  }
+
+  if (addedFade) {
+    if (m_playbackFadeAnimation) {
+      if (m_playbackFadeAnimation->state() != QAbstractAnimation::Running) {
+        setPlaybackFade(1.0);
+        m_playbackFadeAnimation->setStartValue(1.0);
+        m_playbackFadeAnimation->setEndValue(0.0);
+        m_playbackFadeAnimation->start();
+      }
+    } else {
+      setPlaybackFade(0.0);
+      clearFadePlaybackSelections();
+    }
+  }
+
+  m_playbackSelections = std::move(next);
 
   updateHighlightState(false);
 
@@ -296,7 +341,31 @@ void HexView::clearPlaybackSelections() {
   if (m_playbackSelections.empty()) {
     return;
   }
+  std::unordered_set<uint64_t> fadeKeys;
+  fadeKeys.reserve(m_fadePlaybackSelections.size() * 2 + 1);
+  for (const auto& selection : m_fadePlaybackSelections) {
+    fadeKeys.insert((static_cast<uint64_t>(selection.offset) << 32) |
+                    static_cast<uint64_t>(selection.length));
+  }
+  for (const auto& selection : m_playbackSelections) {
+    const uint64_t key = (static_cast<uint64_t>(selection.offset) << 32) |
+                         static_cast<uint64_t>(selection.length);
+    if (fadeKeys.insert(key).second) {
+      m_fadePlaybackSelections.push_back(selection);
+    }
+  }
   m_playbackSelections.clear();
+  if (m_playbackFadeAnimation) {
+    if (m_playbackFadeAnimation->state() != QAbstractAnimation::Running) {
+      setPlaybackFade(1.0);
+      m_playbackFadeAnimation->setStartValue(1.0);
+      m_playbackFadeAnimation->setEndValue(0.0);
+      m_playbackFadeAnimation->start();
+    }
+  } else {
+    setPlaybackFade(0.0);
+    clearFadePlaybackSelections();
+  }
   updateHighlightState(false);
 
   if (m_rhiHost) {
@@ -314,7 +383,8 @@ void HexView::setPlaybackActive(bool active) {
   }
   m_playbackActive = active;
   if (!m_playbackActive && !m_playbackSelections.empty()) {
-    m_playbackSelections.clear();
+    clearPlaybackSelections();
+    return;
   }
   updateHighlightState(false);
   if (m_rhiHost) {
@@ -743,6 +813,20 @@ void HexView::setShadowStrength(qreal s) {
   }
 }
 
+qreal HexView::playbackFade() const { return m_playbackFade; }
+
+void HexView::setPlaybackFade(qreal fade) {
+  fade = std::clamp<qreal>(fade, 0.0, 1.0);
+  if (qFuzzyCompare(fade, m_playbackFade)) {
+    return;
+  }
+  m_playbackFade = fade;
+  if (m_rhiHost) {
+    m_rhiHost->markSelectionDirty();
+    m_rhiHost->requestUpdate();
+  }
+}
+
 void HexView::initAnimations() {
   m_selectionAnimation = new QParallelAnimationGroup(this);
 
@@ -783,6 +867,15 @@ void HexView::initAnimations() {
             shadowBlurAnimation->setEasingCurve(quadCurve);
             shadowOffsetAnimation->setEasingCurve(expoCurve);
           });
+
+  m_playbackFadeAnimation = new QPropertyAnimation(this, "playbackFade");
+  m_playbackFadeAnimation->setDuration(PLAYBACK_FADE_DURATION_MS);
+  m_playbackFadeAnimation->setEasingCurve(QEasingCurve::OutCubic);
+  connect(m_playbackFadeAnimation, &QPropertyAnimation::finished, this, [this]() {
+    if (m_playbackFade <= 0.0) {
+      clearFadePlaybackSelections();
+    }
+  });
 }
 
 void HexView::showSelectedItem(bool show, bool animate) {
@@ -833,6 +926,14 @@ void HexView::showSelectedItem(bool show, bool animate) {
 
 void HexView::clearFadeSelection() {
   m_fadeSelections.clear();
+  if (m_rhiHost) {
+    m_rhiHost->markSelectionDirty();
+    m_rhiHost->requestUpdate();
+  }
+}
+
+void HexView::clearFadePlaybackSelections() {
+  m_fadePlaybackSelections.clear();
   if (m_rhiHost) {
     m_rhiHost->markSelectionDirty();
     m_rhiHost->requestUpdate();

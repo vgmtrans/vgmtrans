@@ -77,7 +77,7 @@ static void mem_close(void *handle) {
 static constexpr BASS_FILEPROCS memory_file_callbacks{MemFile::mem_close, MemFile::mem_tell,
                                                       MemFile::mem_read, MemFile::mem_seek};
 /* How often (in ms) the current ticks are polled */
-static constexpr auto TICK_POLL_INTERVAL_MS = 10;
+static constexpr auto TICK_POLL_INTERVAL_MS = 1000/60;
 
 SequencePlayer::SequencePlayer() {
   /* Use the system default output device.
