@@ -11,6 +11,7 @@
 
 #include <QApplication>
 #include <QFontMetricsF>
+#include <QGuiApplication>
 #include <QHelpEvent>
 #include <QImage>
 #include <QKeyEvent>
@@ -705,10 +706,19 @@ void HexView::mousePressEvent(QMouseEvent* event) {
 
     m_selectedOffset = offset;
     auto* item = m_vgmfile->getItemAtOffset(offset, false);
+    bool seekModifier = false;
+#if defined(Q_OS_MAC)
+    seekModifier = event->modifiers().testFlag(Qt::AltModifier);
+#else
+    seekModifier = event->modifiers().testFlag(Qt::ControlModifier);
+#endif
     if (item == m_selectedItem) {
       selectionChanged(nullptr);
     } else {
       selectionChanged(item);
+    }
+    if (seekModifier && item) {
+      seekToEventRequested(item);
     }
     m_isDragging = true;
   }

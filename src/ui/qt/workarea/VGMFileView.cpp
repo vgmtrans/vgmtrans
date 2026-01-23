@@ -13,6 +13,7 @@
 #include "VGMFile.h"
 #include "VGMSeq.h"
 #include "VGMColl.h"
+#include "SeqTrack.h"
 #include "SeqEvent.h"
 #include "HexView.h"
 #include "VGMFileTreeView.h"
@@ -46,6 +47,7 @@ VGMFileView::VGMFileView(VGMFile *vgmfile)
   m_defaultHexFont = m_hexview->font();
 
   connect(m_hexview, &HexView::selectionChanged, this, &VGMFileView::onSelectionChange);
+  connect(m_hexview, &HexView::seekToEventRequested, this, &VGMFileView::seekToEvent);
 
   connect(m_treeview, &VGMFileTreeView::currentItemChanged,
           [&](const QTreeWidgetItem *item, QTreeWidgetItem *) {
@@ -164,6 +166,22 @@ void VGMFileView::onSelectionChange(VGMItem *item) const {
     m_treeview->setCurrentItem(nullptr);
     m_treeview->clearSelection();
   }
+}
+
+void VGMFileView::seekToEvent(VGMItem* item) const {
+  auto* event = dynamic_cast<SeqEvent*>(item);
+  if (!event || !event->parentTrack || !event->parentTrack->parentSeq) {
+    return;
+  }
+  const auto& timeline = event->parentTrack->parentSeq->timedEventIndex();
+  if (!timeline.finalized()) {
+    return;
+  }
+  uint32_t tick = 0;
+  if (!timeline.firstStartTick(event, tick)) {
+    return;
+  }
+  SequencePlayer::the().seek(static_cast<int>(tick));
 }
 
 void VGMFileView::onPlaybackPositionChanged(int current, int /*max*/) {
