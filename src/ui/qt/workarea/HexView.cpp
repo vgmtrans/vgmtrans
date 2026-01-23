@@ -50,7 +50,7 @@ constexpr float SHADOW_BLUR_RADIUS = SELECTION_PADDING * 1.0f;
 constexpr float SHADOW_STRENGTH = 0.5;
 constexpr float SHADOW_EDGE_CURVE = 1.1f;
 constexpr float PLAYBACK_GLOW_STRENGTH = 0.55f;
-constexpr float PLAYBACK_GLOW_RADIUS = 1.4f;
+constexpr float PLAYBACK_GLOW_RADIUS = 1.8f;
 constexpr float PLAYBACK_GLOW_EDGE_CURVE = 0.85f;
 const QColor PLAYBACK_GLOW_DEEP(0, 0, 0);
 const QColor PLAYBACK_GLOW_MID(140, 140, 140);
