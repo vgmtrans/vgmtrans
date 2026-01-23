@@ -21,6 +21,7 @@
 #include <QRectF>
 #include <QResizeEvent>
 #include <QScrollBar>
+#include <QTimerEvent>
 #include <QToolTip>
 #include <QWidget>
 
@@ -39,7 +40,8 @@ constexpr int HEX_TO_ASCII_SPACING_CHARS = 4;
 constexpr int SELECTION_PADDING = 18;
 constexpr int VIEWPORT_PADDING = 10;
 constexpr int DIM_DURATION_MS = 200;
-constexpr int PLAYBACK_FADE_DURATION_MS = 1000;
+constexpr int PLAYBACK_FADE_DURATION_MS = 500;
+constexpr float PLAYBACK_FADE_CURVE = 3.0f;
 constexpr int OVERLAY_ALPHA = 80;
 constexpr float OVERLAY_ALPHA_F = OVERLAY_ALPHA / 255.0f;
 constexpr float SHADOW_OFFSET_X = 0.0f;
@@ -277,9 +279,12 @@ void HexView::setSelectedItem(VGMItem* item) {
 }
 
 void HexView::setPlaybackSelectionsForItems(const std::vector<const VGMItem*>& items) {
-  auto keyFor = [](const SelectionRange& selection) -> uint64_t {
+  auto keyForRange = [](const SelectionRange& selection) -> uint64_t {
     return (static_cast<uint64_t>(selection.offset) << 32) |
            static_cast<uint64_t>(selection.length);
+  };
+  auto keyForFade = [&](const FadePlaybackSelection& selection) -> uint64_t {
+    return keyForRange(selection.range);
   };
 
   std::vector<SelectionRange> next;
@@ -295,36 +300,47 @@ void HexView::setPlaybackSelectionsForItems(const std::vector<const VGMItem*>& i
   std::unordered_set<uint64_t> nextKeys;
   nextKeys.reserve(next.size() * 2 + 1);
   for (const auto& selection : next) {
-    nextKeys.insert(keyFor(selection));
+    nextKeys.insert(keyForRange(selection));
+  }
+
+  if (!m_fadePlaybackSelections.empty()) {
+    m_fadePlaybackSelections.erase(
+        std::remove_if(m_fadePlaybackSelections.begin(), m_fadePlaybackSelections.end(),
+                       [&](const FadePlaybackSelection& selection) {
+                         return nextKeys.find(keyForFade(selection)) != nextKeys.end();
+                       }),
+        m_fadePlaybackSelections.end());
   }
 
   std::unordered_set<uint64_t> fadeKeys;
   fadeKeys.reserve(m_fadePlaybackSelections.size() * 2 + 1);
   for (const auto& selection : m_fadePlaybackSelections) {
-    fadeKeys.insert(keyFor(selection));
+    fadeKeys.insert(keyForFade(selection));
   }
 
+  const bool fadeEnabled = PLAYBACK_FADE_DURATION_MS > 0;
   bool addedFade = false;
-  for (const auto& selection : m_playbackSelections) {
-    const uint64_t key = keyFor(selection);
-    if (nextKeys.find(key) == nextKeys.end() && fadeKeys.insert(key).second) {
-      m_fadePlaybackSelections.push_back(selection);
-      addedFade = true;
+  if (fadeEnabled) {
+    if (!m_playbackFadeClock.isValid()) {
+      m_playbackFadeClock.start();
     }
+    const qint64 nowMs = m_playbackFadeClock.elapsed();
+    for (const auto& selection : m_playbackSelections) {
+      const uint64_t key = keyForRange(selection);
+      if (nextKeys.find(key) == nextKeys.end() && fadeKeys.insert(key).second) {
+        m_fadePlaybackSelections.push_back({selection, nowMs, 1.0f});
+        addedFade = true;
+      }
+    }
+  } else {
+    m_fadePlaybackSelections.clear();
   }
 
-  if (addedFade) {
-    if (m_playbackFadeAnimation) {
-      if (m_playbackFadeAnimation->state() != QAbstractAnimation::Running) {
-        setPlaybackFade(1.0);
-        m_playbackFadeAnimation->setStartValue(1.0);
-        m_playbackFadeAnimation->setEndValue(0.0);
-        m_playbackFadeAnimation->start();
-      }
-    } else {
-      setPlaybackFade(0.0);
-      clearFadePlaybackSelections();
-    }
+  if (addedFade || !m_fadePlaybackSelections.empty()) {
+    ensurePlaybackFadeTimer();
+    updatePlaybackFade();
+  } else {
+    m_playbackFadeTimer.stop();
   }
 
   m_playbackSelections = std::move(next);
@@ -341,30 +357,33 @@ void HexView::clearPlaybackSelections() {
   if (m_playbackSelections.empty()) {
     return;
   }
-  std::unordered_set<uint64_t> fadeKeys;
-  fadeKeys.reserve(m_fadePlaybackSelections.size() * 2 + 1);
-  for (const auto& selection : m_fadePlaybackSelections) {
-    fadeKeys.insert((static_cast<uint64_t>(selection.offset) << 32) |
-                    static_cast<uint64_t>(selection.length));
-  }
-  for (const auto& selection : m_playbackSelections) {
-    const uint64_t key = (static_cast<uint64_t>(selection.offset) << 32) |
-                         static_cast<uint64_t>(selection.length);
-    if (fadeKeys.insert(key).second) {
-      m_fadePlaybackSelections.push_back(selection);
+  if (PLAYBACK_FADE_DURATION_MS > 0) {
+    if (!m_playbackFadeClock.isValid()) {
+      m_playbackFadeClock.start();
     }
-  }
-  m_playbackSelections.clear();
-  if (m_playbackFadeAnimation) {
-    if (m_playbackFadeAnimation->state() != QAbstractAnimation::Running) {
-      setPlaybackFade(1.0);
-      m_playbackFadeAnimation->setStartValue(1.0);
-      m_playbackFadeAnimation->setEndValue(0.0);
-      m_playbackFadeAnimation->start();
+    const qint64 nowMs = m_playbackFadeClock.elapsed();
+    std::unordered_set<uint64_t> fadeKeys;
+    fadeKeys.reserve(m_fadePlaybackSelections.size() * 2 + 1);
+    for (const auto& selection : m_fadePlaybackSelections) {
+      fadeKeys.insert((static_cast<uint64_t>(selection.range.offset) << 32) |
+                      static_cast<uint64_t>(selection.range.length));
+    }
+    for (const auto& selection : m_playbackSelections) {
+      const uint64_t key = (static_cast<uint64_t>(selection.offset) << 32) |
+                           static_cast<uint64_t>(selection.length);
+      if (fadeKeys.insert(key).second) {
+        m_fadePlaybackSelections.push_back({selection, nowMs, 1.0f});
+      }
     }
   } else {
-    setPlaybackFade(0.0);
-    clearFadePlaybackSelections();
+    m_fadePlaybackSelections.clear();
+  }
+  m_playbackSelections.clear();
+  if (!m_fadePlaybackSelections.empty()) {
+    ensurePlaybackFadeTimer();
+    updatePlaybackFade();
+  } else {
+    m_playbackFadeTimer.stop();
   }
   updateHighlightState(false);
 
@@ -813,20 +832,6 @@ void HexView::setShadowStrength(qreal s) {
   }
 }
 
-qreal HexView::playbackFade() const { return m_playbackFade; }
-
-void HexView::setPlaybackFade(qreal fade) {
-  fade = std::clamp<qreal>(fade, 0.0, 1.0);
-  if (qFuzzyCompare(fade, m_playbackFade)) {
-    return;
-  }
-  m_playbackFade = fade;
-  if (m_rhiHost) {
-    m_rhiHost->markSelectionDirty();
-    m_rhiHost->requestUpdate();
-  }
-}
-
 void HexView::initAnimations() {
   m_selectionAnimation = new QParallelAnimationGroup(this);
 
@@ -868,14 +873,6 @@ void HexView::initAnimations() {
             shadowOffsetAnimation->setEasingCurve(expoCurve);
           });
 
-  m_playbackFadeAnimation = new QPropertyAnimation(this, "playbackFade");
-  m_playbackFadeAnimation->setDuration(PLAYBACK_FADE_DURATION_MS);
-  m_playbackFadeAnimation->setEasingCurve(QEasingCurve::OutCubic);
-  connect(m_playbackFadeAnimation, &QPropertyAnimation::finished, this, [this]() {
-    if (m_playbackFade <= 0.0) {
-      clearFadePlaybackSelections();
-    }
-  });
 }
 
 void HexView::showSelectedItem(bool show, bool animate) {
@@ -932,12 +929,56 @@ void HexView::clearFadeSelection() {
   }
 }
 
-void HexView::clearFadePlaybackSelections() {
-  m_fadePlaybackSelections.clear();
-  if (m_rhiHost) {
-    m_rhiHost->markSelectionDirty();
-    m_rhiHost->requestUpdate();
+void HexView::ensurePlaybackFadeTimer() {
+  if (!m_playbackFadeTimer.isActive()) {
+    m_playbackFadeTimer.start(16, this);
   }
+}
+
+void HexView::updatePlaybackFade() {
+  if (m_fadePlaybackSelections.empty()) {
+    return;
+  }
+  if (!m_playbackFadeClock.isValid()) {
+    m_playbackFadeClock.start();
+  }
+
+  const qint64 nowMs = m_playbackFadeClock.elapsed();
+  const float duration = static_cast<float>(PLAYBACK_FADE_DURATION_MS);
+  const float curve = std::max(0.01f, PLAYBACK_FADE_CURVE);
+
+  for (auto& selection : m_fadePlaybackSelections) {
+    const qint64 elapsed = nowMs - selection.startMs;
+    const float t = duration > 0.0f ? std::clamp(elapsed / duration, 0.0f, 1.0f) : 1.0f;
+    const float inv = 1.0f - t;
+    selection.alpha = inv > 0.0f ? std::pow(inv, curve) : 0.0f;
+  }
+
+  m_fadePlaybackSelections.erase(
+      std::remove_if(m_fadePlaybackSelections.begin(), m_fadePlaybackSelections.end(),
+                     [](const FadePlaybackSelection& selection) {
+                       return selection.alpha <= 0.0f;
+                     }),
+      m_fadePlaybackSelections.end());
+
+  if (m_fadePlaybackSelections.empty() && m_playbackFadeTimer.isActive()) {
+    m_playbackFadeTimer.stop();
+  }
+}
+
+void HexView::timerEvent(QTimerEvent* event) {
+  if (event->timerId() == m_playbackFadeTimer.timerId()) {
+    updatePlaybackFade();
+    if (m_rhiHost) {
+      m_rhiHost->markSelectionDirty();
+      m_rhiHost->requestUpdate();
+    }
+    if (m_fadePlaybackSelections.empty()) {
+      m_playbackFadeTimer.stop();
+    }
+    return;
+  }
+  QAbstractScrollArea::timerEvent(event);
 }
 
 void HexView::updateHighlightState(bool animateSelection) {
