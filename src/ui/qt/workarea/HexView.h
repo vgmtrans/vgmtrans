@@ -33,16 +33,10 @@ class HexView final : public QAbstractScrollArea {
   Q_PROPERTY(qreal shadowStrength READ shadowStrength WRITE setShadowStrength)
 
 public:
-  struct PlaybackSelection {
-    uint32_t offset;
-    uint32_t length;
-    float intensity;
-  };
-
   explicit HexView(VGMFile* vgmfile, QWidget* parent = nullptr);
   ~HexView() override;
   void setSelectedItem(VGMItem* item);
-  void setPlaybackSelections(const std::vector<PlaybackSelection>& selections);
+  void setPlaybackSelectionsForItems(const std::vector<const VGMItem*>& items);
   void clearPlaybackSelections();
   void setPlaybackActive(bool active);
   void requestPlaybackFrame();
@@ -138,7 +132,7 @@ private:
 
   std::vector<SelectionRange> m_selections;
   std::vector<SelectionRange> m_fadeSelections;
-  std::vector<PlaybackSelection> m_playbackSelections;
+  std::vector<SelectionRange> m_playbackSelections;
   bool m_playbackActive = false;
 
   QParallelAnimationGroup* m_selectionAnimation = nullptr;

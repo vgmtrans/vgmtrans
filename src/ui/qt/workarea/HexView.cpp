@@ -274,9 +274,15 @@ void HexView::setSelectedItem(VGMItem* item) {
   }
 }
 
-void HexView::setPlaybackSelections(const std::vector<PlaybackSelection>& selections) {
+void HexView::setPlaybackSelectionsForItems(const std::vector<const VGMItem*>& items) {
   m_playbackSelections.clear();
-  m_playbackSelections = selections;
+  m_playbackSelections.reserve(items.size());
+  for (const auto* item : items) {
+    if (!item) {
+      continue;
+    }
+    m_playbackSelections.push_back({item->dwOffset, item->unLength});
+  }
 
   updateHighlightState(false);
 
