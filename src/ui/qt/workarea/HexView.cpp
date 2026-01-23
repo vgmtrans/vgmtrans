@@ -11,6 +11,7 @@
 
 #include <QApplication>
 #include <QBuffer>
+#include <QCursor>
 #include <QFontMetricsF>
 #include <QHash>
 #include <QHelpEvent>
@@ -663,6 +664,10 @@ void HexView::changeEvent(QEvent* event) {
 }
 
 void HexView::keyPressEvent(QKeyEvent* event) {
+  if (event->key() == Qt::Key_Alt) {
+    const QPoint vp = viewport()->mapFromGlobal(QCursor::pos());
+    handleAltHoverMove(vp, QApplication::keyboardModifiers());
+  }
   if (!m_selectedItem) {
     QAbstractScrollArea::keyPressEvent(event);
     return;
@@ -711,6 +716,13 @@ void HexView::keyPressEvent(QKeyEvent* event) {
       QAbstractScrollArea::keyPressEvent(event);
       return;
   }
+}
+
+void HexView::keyReleaseEvent(QKeyEvent* event) {
+  if (event->key() == Qt::Key_Alt) {
+    hideAltTooltip();
+  }
+  QAbstractScrollArea::keyReleaseEvent(event);
 }
 
 int HexView::getOffsetFromPoint(QPoint pos) const {
@@ -1088,7 +1100,7 @@ void HexView::showAltTooltip(VGMItem* item, const QPoint& pos) {
     hideAltTooltip();
     return;
   }
-  if (item == m_altTooltipItem) {
+  if (m_altTooltipItem && item->dwOffset == m_altTooltipItem->dwOffset) {
     return;
   }
   const QString description = tooltipHtmlWithIcon(item);
