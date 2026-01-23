@@ -78,7 +78,6 @@ void main() {
 
   vec4 edgeGlow = texture(edgeTex, vUv);
   float playHalo = edgeGlow.g;
-  float playIntensity = clamp(edgeGlow.b, 0.0, 1.0);
 
   vec2 p = vUv * viewSize * 0.055;
   float t = time * 0.85;
@@ -99,8 +98,6 @@ void main() {
   vec3 flameColor = mix(fireDeep, fireMid, t1);
   flameColor = mix(flameColor, fireHot, t2);
   flameColor = mix(flameColor, fireCore, t3);
-  flameColor = mix(flameColor, fireHot, playIntensity * 0.25);
-  flameColor = mix(flameColor, fireCore, playIntensity * 0.1);
 
   vec3 withGlow = mix(withShadow, flameColor, clamp(flame, 0.0, 1.0));
   withGlow = clamp(withGlow + flameColor * flame * 0.35, 0.0, 1.0);
