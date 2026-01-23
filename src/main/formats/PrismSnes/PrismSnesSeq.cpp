@@ -398,7 +398,7 @@ bool PrismSnesTrack::readEvent() {
       uint8_t dur = getDuration(curOffset, len, durDelta);
 
       desc = fmt::format("Length: {:d}  Duration: {:d}", len, dur);
-      addGenericEvent(beginOffset, curOffset - beginOffset, "Tie with Duration", desc, Type::Tie);
+      addTie(beginOffset, curOffset - beginOffset, dur, "Tie with Duration", desc);
       makePrevDurNoteEnd(getTime() + dur);
       addTime(len);
       break;
@@ -406,7 +406,7 @@ bool PrismSnesTrack::readEvent() {
 
     case EVENT_TIE: {
       prevNoteSlurred = true;
-      addGenericEvent(beginOffset, curOffset - beginOffset, "Tie", "", Type::Tie);
+      addTie(beginOffset, curOffset - beginOffset, 0, "Tie");
       break;
     }
 

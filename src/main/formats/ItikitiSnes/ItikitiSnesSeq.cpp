@@ -198,7 +198,7 @@ bool ItikitiSnesTrack::readEvent() {
         addRest(start, curOffset - start, len);
       } else if (tie) {
         makePrevDurNoteEnd(getTime() + dur);
-        addGenericEvent(start, curOffset - start, "Tie", desc, Type::Tie);
+        addTie(start, curOffset - start, dur, "Tie", desc);
         addTime(len);
       } else {
         const uint8_t key_index = command >> 3;

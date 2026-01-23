@@ -318,7 +318,7 @@ bool MoriSnesTrack::readEvent() {
       auto prevTiedNoteIter = std::find(tiedNoteKeys.begin(), tiedNoteKeys.end(), key);
       if (prevTiedNoteIter != tiedNoteKeys.end()) {
         makePrevDurNoteEnd(getTime() + dur);
-        addGenericEvent(beginOffset, curOffset - beginOffset, "Tie", desc, Type::Tie);
+        addTie(beginOffset, curOffset - beginOffset, dur, "Tie", desc);
 
         if (!tied) {
           // finish tied note
