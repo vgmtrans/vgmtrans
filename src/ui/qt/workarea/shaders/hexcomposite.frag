@@ -4,7 +4,7 @@ layout(location = 0) in vec2 vUv;
 
 layout(binding = 1) uniform sampler2D contentTex;
 layout(binding = 2) uniform sampler2D maskTex;
-layout(binding = 3) uniform sampler2D shadowTex;
+layout(binding = 3) uniform sampler2D edgeTex;
 
 layout(std140, binding = 0) uniform Ubuf {
   mat4 mvp;
@@ -53,7 +53,6 @@ void main() {
   vec3 fireDeep = p4.rgb;
   float glowStrength = p4.a;
   vec3 fireMid = p5.rgb;
-  float glowRadius = p5.a;
   vec3 fireHot = p6.rgb;
   vec3 fireCore = p7.rgb;
 
@@ -71,16 +70,15 @@ void main() {
   vec3 restored = mix(dimmed, base.rgb, highlight);
 
   vec2 shadowUv = vUv + shadowOffset;
-  vec4 sh = texture(shadowTex, shadowUv);
-  // remove the solid interior contribution; keep only the halo
-  float selHalo = max(sh.r - sel, 0.0);
-  // curve it: >1 make shadow punchier near edges
-  // halo = pow(clamp(halo, 0.0, 1.0), 0.8); // 0.6..0.8 is a good range
+  vec4 edgeShadow = texture(edgeTex, shadowUv);
+  float selHalo = edgeShadow.r;
 
   float shadowAlpha = selHalo * shadowStrength * shadowColor.a;
   vec3 withShadow = mix(restored, shadowColor.rgb, shadowAlpha);
 
-  float playHalo = max(sh.b - play, 0.0);
+  vec4 edgeGlow = texture(edgeTex, vUv);
+  float playHalo = edgeGlow.g;
+  float playIntensity = clamp(edgeGlow.b, 0.0, 1.0);
 
   vec2 p = vUv * viewSize * 0.055;
   float t = time * 0.85;
@@ -93,9 +91,7 @@ void main() {
   float lick = mix(n2, n3, 0.5);
   float turbulence = 0.65 + 0.55 * mix(flicker, lick, 0.5);
 
-  float radiusT = clamp(glowRadius, 0.0, 1.0);
-  float halo = pow(playHalo, mix(1.25, 0.4, radiusT));
-  float flame = clamp(halo * glowStrength * turbulence, 0.0, 1.0);
+  float flame = clamp(playHalo * glowStrength * turbulence, 0.0, 1.0);
 
   float t1 = smoothstep(0.0, 0.45, flame);
   float t2 = smoothstep(0.35, 0.75, flame);
@@ -103,6 +99,8 @@ void main() {
   vec3 flameColor = mix(fireDeep, fireMid, t1);
   flameColor = mix(flameColor, fireHot, t2);
   flameColor = mix(flameColor, fireCore, t3);
+  flameColor = mix(flameColor, fireHot, playIntensity * 0.25);
+  flameColor = mix(flameColor, fireCore, playIntensity * 0.1);
 
   vec3 withGlow = mix(withShadow, flameColor, clamp(flame, 0.0, 1.0));
   withGlow = clamp(withGlow + flameColor * flame * 0.35, 0.0, 1.0);

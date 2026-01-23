@@ -22,6 +22,28 @@
 #include "Helpers.h"
 #include "Root.h"
 
+namespace {
+float velocityToIntensity(uint8_t velocity) {
+  constexpr float kMin = 0.5f;
+  constexpr float kMax = 1.0f;
+  const float t = std::clamp(static_cast<float>(velocity) / 127.0f, 0.0f, 1.0f);
+  return kMin + (kMax - kMin) * t;
+}
+
+float playbackIntensityForEvent(const SeqEvent* event) {
+  if (!event) {
+    return 1.0f;
+  }
+  if (const auto* note = dynamic_cast<const NoteOnSeqEvent*>(event)) {
+    return velocityToIntensity(note->vel);
+  }
+  if (const auto* note = dynamic_cast<const DurNoteSeqEvent*>(event)) {
+    return velocityToIntensity(note->vel);
+  }
+  return 1.0f;
+}
+}  // namespace
+
 VGMFileView::VGMFileView(VGMFile *vgmfile)
     : QMdiSubWindow(), m_vgmfile(vgmfile), m_hexview(new HexView(vgmfile)) {
   m_splitter = new SnappingSplitter(Qt::Horizontal, this);
@@ -206,11 +228,15 @@ void VGMFileView::onPlaybackPositionChanged(int current, int /*max*/) {
 
   m_playbackItems.clear();
   m_playbackItems.reserve(m_playbackTimedEvents.size());
+  std::vector<HexView::PlaybackSelection> selections;
+  selections.reserve(m_playbackTimedEvents.size());
   for (const auto* timed : m_playbackTimedEvents) {
     if (!timed || !timed->event) {
       continue;
     }
-    m_playbackItems.push_back(timed->event);
+    auto* event = timed->event;
+    m_playbackItems.push_back(event);
+    selections.push_back({event->dwOffset, event->unLength, playbackIntensityForEvent(event)});
   }
 
   if (m_playbackItems == m_lastPlaybackItems) {
@@ -219,5 +245,5 @@ void VGMFileView::onPlaybackPositionChanged(int current, int /*max*/) {
   }
 
   m_lastPlaybackItems = m_playbackItems;
-  m_hexview->setPlaybackSelectionsForItems(m_playbackItems);
+  m_hexview->setPlaybackSelections(selections);
 }

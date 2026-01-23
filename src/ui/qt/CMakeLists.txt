@@ -137,7 +137,8 @@ qt_add_shaders(
     workarea/shaders/hexglyph.vert
     workarea/shaders/hexglyph.frag
     workarea/shaders/hexscreen.vert
-    workarea/shaders/hexblur.frag
+    workarea/shaders/hexedge.vert
+    workarea/shaders/hexedge.frag
     workarea/shaders/hexcomposite.frag
 )
 

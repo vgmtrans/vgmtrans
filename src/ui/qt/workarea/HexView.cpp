@@ -42,14 +42,16 @@ constexpr int OVERLAY_ALPHA = 80;
 constexpr float OVERLAY_ALPHA_F = OVERLAY_ALPHA / 255.0f;
 constexpr float SHADOW_OFFSET_X = 0.0f;
 constexpr float SHADOW_OFFSET_Y = 0.0f;
-constexpr float SHADOW_BLUR_RADIUS = SELECTION_PADDING * 2.0f;
-constexpr float SHADOW_STRENGTH = 1.5;
-constexpr float PLAYBACK_GLOW_STRENGTH = 1.4f;
-constexpr float PLAYBACK_GLOW_RADIUS = 0.7f;
-const QColor PLAYBACK_GLOW_DEEP(170, 20, 8);
-const QColor PLAYBACK_GLOW_MID(255, 90, 12);
-const QColor PLAYBACK_GLOW_HOT(255, 180, 40);
-const QColor PLAYBACK_GLOW_CORE(255, 245, 220);
+constexpr float SHADOW_BLUR_RADIUS = SELECTION_PADDING * 1.0f;
+constexpr float SHADOW_STRENGTH = 0.5;
+constexpr float SHADOW_EDGE_CURVE = 1.1f;
+constexpr float PLAYBACK_GLOW_STRENGTH = 0.55f;
+constexpr float PLAYBACK_GLOW_RADIUS = 1.4f;
+constexpr float PLAYBACK_GLOW_EDGE_CURVE = 0.85f;
+const QColor PLAYBACK_GLOW_DEEP(0, 0, 0);
+const QColor PLAYBACK_GLOW_MID(140, 140, 140);
+const QColor PLAYBACK_GLOW_HOT(192, 192, 192);
+const QColor PLAYBACK_GLOW_CORE(255, 255, 255);
 constexpr uint16_t STYLE_UNASSIGNED = std::numeric_limits<uint16_t>::max();
 }  // namespace
 
@@ -75,6 +77,8 @@ HexView::HexView(VGMFile* vgmfile, QWidget* parent)
   m_playbackGlowCore = PLAYBACK_GLOW_CORE;
   m_playbackGlowStrength = PLAYBACK_GLOW_STRENGTH;
   m_playbackGlowRadius = PLAYBACK_GLOW_RADIUS;
+  m_shadowEdgeCurve = SHADOW_EDGE_CURVE;
+  m_playbackGlowEdgeCurve = PLAYBACK_GLOW_EDGE_CURVE;
 
   setFont(font);
   rebuildStyleMap();
@@ -270,15 +274,9 @@ void HexView::setSelectedItem(VGMItem* item) {
   }
 }
 
-void HexView::setPlaybackSelectionsForItems(const std::vector<const VGMItem*>& items) {
+void HexView::setPlaybackSelections(const std::vector<PlaybackSelection>& selections) {
   m_playbackSelections.clear();
-  m_playbackSelections.reserve(items.size());
-  for (const auto* item : items) {
-    if (!item) {
-      continue;
-    }
-    m_playbackSelections.push_back({item->dwOffset, item->unLength});
-  }
+  m_playbackSelections = selections;
 
   updateHighlightState(false);
 
@@ -708,6 +706,7 @@ void HexView::setShadowBlur(qreal blur) {
   }
   m_shadowBlur = blur;
   if (m_rhiHost) {
+    m_rhiHost->markSelectionDirty();
     m_rhiHost->requestUpdate();
   }
 }

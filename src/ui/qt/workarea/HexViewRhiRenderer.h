@@ -66,6 +66,21 @@ private:
     float a;
   };
 
+  struct EdgeInstance {
+    float geomX;
+    float geomY;
+    float geomW;
+    float geomH;
+    float rectX;
+    float rectY;
+    float rectW;
+    float rectH;
+    float r;
+    float g;
+    float b;
+    float a;
+  };
+
   struct GlyphInstance {
     float x;
     float y;
@@ -107,6 +122,9 @@ private:
   void drawRectBuffer(QRhiCommandBuffer* cb, QRhiBuffer* buffer, int count,
                       int firstInstance = 0, QRhiShaderResourceBindings* srb = nullptr,
                       QRhiGraphicsPipeline* pso = nullptr);
+  void drawEdgeBuffer(QRhiCommandBuffer* cb, QRhiBuffer* buffer, int count,
+                      int firstInstance = 0, QRhiShaderResourceBindings* srb = nullptr,
+                      QRhiGraphicsPipeline* pso = nullptr);
   void drawGlyphBuffer(QRhiCommandBuffer* cb, QRhiBuffer* buffer, int count, int firstInstance = 0);
   void drawFullscreen(QRhiCommandBuffer* cb, QRhiGraphicsPipeline* pso,
                       QRhiShaderResourceBindings* srb);
@@ -114,6 +132,8 @@ private:
   QRectF glyphUv(const QChar& ch) const;
   void appendRect(std::vector<RectInstance>& rects, float x, float y, float w, float h,
                   const QVector4D& color);
+  void appendEdgeRect(std::vector<EdgeInstance>& rects, float x, float y, float w, float h,
+                      float pad, const QVector4D& color);
   void appendGlyph(std::vector<GlyphInstance>& glyphs, float x, float y, float w, float h,
                    const QRectF& uv, const QVector4D& color);
 
@@ -135,34 +155,30 @@ private:
   QRhiTexture* m_maskTex = nullptr;
   QRhiTextureRenderTarget* m_maskRt = nullptr;
   QRhiRenderPassDescriptor* m_maskRp = nullptr;
-  QRhiTexture* m_shadowTexA = nullptr;
-  QRhiTexture* m_shadowTexB = nullptr;
-  QRhiTextureRenderTarget* m_shadowRtA = nullptr;
-  QRhiTextureRenderTarget* m_shadowRtB = nullptr;
-  QRhiRenderPassDescriptor* m_shadowRpA = nullptr;
-  QRhiRenderPassDescriptor* m_shadowRpB = nullptr;
+  QRhiTexture* m_edgeTex = nullptr;
+  QRhiTextureRenderTarget* m_edgeRt = nullptr;
+  QRhiRenderPassDescriptor* m_edgeRp = nullptr;
 
   QRhiBuffer* m_vbuf = nullptr;
   QRhiBuffer* m_ibuf = nullptr;
   QRhiBuffer* m_baseRectBuf = nullptr;
   QRhiBuffer* m_baseGlyphBuf = nullptr;
   QRhiBuffer* m_maskRectBuf = nullptr;
+  QRhiBuffer* m_edgeRectBuf = nullptr;
   QRhiBuffer* m_ubuf = nullptr;
-  QRhiBuffer* m_blurUbufH = nullptr;
-  QRhiBuffer* m_blurUbufV = nullptr;
+  QRhiBuffer* m_edgeUbuf = nullptr;
   QRhiBuffer* m_compositeUbuf = nullptr;
   QRhiTexture* m_glyphTex = nullptr;
   QRhiSampler* m_glyphSampler = nullptr;
   QRhiSampler* m_maskSampler = nullptr;
   QRhiShaderResourceBindings* m_rectSrb = nullptr;
   QRhiShaderResourceBindings* m_glyphSrb = nullptr;
-  QRhiShaderResourceBindings* m_blurSrbH = nullptr;
-  QRhiShaderResourceBindings* m_blurSrbV = nullptr;
+  QRhiShaderResourceBindings* m_edgeSrb = nullptr;
   QRhiShaderResourceBindings* m_compositeSrb = nullptr;
   QRhiGraphicsPipeline* m_rectPso = nullptr;
   QRhiGraphicsPipeline* m_glyphPso = nullptr;
   QRhiGraphicsPipeline* m_maskPso = nullptr;
-  QRhiGraphicsPipeline* m_blurPso = nullptr;
+  QRhiGraphicsPipeline* m_edgePso = nullptr;
   QRhiGraphicsPipeline* m_compositePso = nullptr;
   int m_sampleCount = 1;
   uint64_t m_glyphAtlasVersion = 0;
@@ -178,6 +194,7 @@ private:
   std::vector<RectInstance> m_baseRectInstances;
   std::vector<GlyphInstance> m_baseGlyphInstances;
   std::vector<RectInstance> m_maskRectInstances;
+  std::vector<EdgeInstance> m_edgeRectInstances;
   int m_cacheStartLine = 0;
   int m_cacheEndLine = -1;
   int m_lastStartLine = -1;
