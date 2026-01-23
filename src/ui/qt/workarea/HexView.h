@@ -51,7 +51,6 @@ public:
   [[nodiscard]] int getViewportWidthSansAscii() const;
   [[nodiscard]] int getViewportWidthSansAsciiAndAddress() const;
 
-  // In HexView public API (you add this):
   void handleCoalescedMouseMove(const QPoint& pos,
                                 Qt::MouseButtons buttons,
                                 Qt::KeyboardModifiers mods);

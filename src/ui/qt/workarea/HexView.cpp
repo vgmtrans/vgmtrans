@@ -55,6 +55,10 @@ constexpr float PLAYBACK_GLOW_EDGE_CURVE = 0.85f;
 const QColor PLAYBACK_GLOW_LOW(40, 40, 40);
 const QColor PLAYBACK_GLOW_HIGH(230, 230, 230);
 constexpr uint16_t STYLE_UNASSIGNED = std::numeric_limits<uint16_t>::max();
+
+inline uint64_t selectionKey(uint32_t offset, uint32_t length) {
+  return (static_cast<uint64_t>(offset) << 32) | length;
+}
 }  // namespace
 
 HexView::~HexView() = default;
@@ -275,12 +279,14 @@ void HexView::setSelectedItem(VGMItem* item) {
 }
 
 void HexView::setPlaybackSelectionsForItems(const std::vector<const VGMItem*>& items) {
-  auto keyForRange = [](const SelectionRange& selection) -> uint64_t {
-    return (static_cast<uint64_t>(selection.offset) << 32) |
-           static_cast<uint64_t>(selection.length);
+  auto keyForFade = [](const FadePlaybackSelection& selection) -> uint64_t {
+    return selectionKey(selection.range.offset, selection.range.length);
   };
-  auto keyForFade = [&](const FadePlaybackSelection& selection) -> uint64_t {
-    return keyForRange(selection.range);
+  auto nowMs = [&]() -> qint64 {
+    if (!m_playbackFadeClock.isValid()) {
+      m_playbackFadeClock.start();
+    }
+    return m_playbackFadeClock.elapsed();
   };
 
   std::vector<SelectionRange> next;
@@ -296,7 +302,7 @@ void HexView::setPlaybackSelectionsForItems(const std::vector<const VGMItem*>& i
   std::unordered_set<uint64_t> nextKeys;
   nextKeys.reserve(next.size() * 2 + 1);
   for (const auto& selection : next) {
-    nextKeys.insert(keyForRange(selection));
+    nextKeys.insert(selectionKey(selection.offset, selection.length));
   }
 
   if (!m_fadePlaybackSelections.empty()) {
@@ -317,14 +323,11 @@ void HexView::setPlaybackSelectionsForItems(const std::vector<const VGMItem*>& i
   const bool fadeEnabled = PLAYBACK_FADE_DURATION_MS > 0;
   bool addedFade = false;
   if (fadeEnabled) {
-    if (!m_playbackFadeClock.isValid()) {
-      m_playbackFadeClock.start();
-    }
-    const qint64 nowMs = m_playbackFadeClock.elapsed();
+    const qint64 now = nowMs();
     for (const auto& selection : m_playbackSelections) {
-      const uint64_t key = keyForRange(selection);
+      const uint64_t key = selectionKey(selection.offset, selection.length);
       if (nextKeys.find(key) == nextKeys.end() && fadeKeys.insert(key).second) {
-        m_fadePlaybackSelections.push_back({selection, nowMs, 1.0f});
+        m_fadePlaybackSelections.push_back({selection, now, 1.0f});
         addedFade = true;
       }
     }
@@ -353,22 +356,23 @@ void HexView::clearPlaybackSelections() {
   if (m_playbackSelections.empty()) {
     return;
   }
-  if (PLAYBACK_FADE_DURATION_MS > 0) {
+  auto nowMs = [&]() -> qint64 {
     if (!m_playbackFadeClock.isValid()) {
       m_playbackFadeClock.start();
     }
-    const qint64 nowMs = m_playbackFadeClock.elapsed();
+    return m_playbackFadeClock.elapsed();
+  };
+  if (PLAYBACK_FADE_DURATION_MS > 0) {
+    const qint64 now = nowMs();
     std::unordered_set<uint64_t> fadeKeys;
     fadeKeys.reserve(m_fadePlaybackSelections.size() * 2 + 1);
     for (const auto& selection : m_fadePlaybackSelections) {
-      fadeKeys.insert((static_cast<uint64_t>(selection.range.offset) << 32) |
-                      static_cast<uint64_t>(selection.range.length));
+    fadeKeys.insert(selectionKey(selection.range.offset, selection.range.length));
     }
     for (const auto& selection : m_playbackSelections) {
-      const uint64_t key = (static_cast<uint64_t>(selection.offset) << 32) |
-                           static_cast<uint64_t>(selection.length);
+      const uint64_t key = selectionKey(selection.offset, selection.length);
       if (fadeKeys.insert(key).second) {
-        m_fadePlaybackSelections.push_back({selection, nowMs, 1.0f});
+        m_fadePlaybackSelections.push_back({selection, now, 1.0f});
       }
     }
   } else {

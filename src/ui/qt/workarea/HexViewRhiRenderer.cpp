@@ -1255,63 +1255,14 @@ void HexViewRhiRenderer::buildSelectionInstances(int startLine, int endLine) {
     const QVector4D playbackEdgeColor(0.0f, 0.0f, 1.0f, 0.0f);
     appendMaskForSelections(fadeRanges, 0.0f, 0.0f, glowPad,
                             playbackMaskColor, playbackEdgeColor);
-
-    auto appendMaskForSelection = [&](const HexView::SelectionRange& selection,
-                                      const QVector4D& maskColor) {
-      if (selection.length == 0) {
-        return;
-      }
-
-      int selectionStart = static_cast<int>(selection.offset - m_view->m_vgmfile->dwOffset);
-      int selectionEnd = selectionStart + static_cast<int>(selection.length);
-      if (selectionEnd <= 0 || selectionStart >= static_cast<int>(fileLength)) {
-        return;
-      }
-      selectionStart = std::max(selectionStart, 0);
-      selectionEnd = std::min(selectionEnd, static_cast<int>(fileLength));
-      if (selectionEnd <= selectionStart) {
-        return;
-      }
-
-      const int selStartLine = selectionStart / kBytesPerLine;
-      const int selEndLine = (selectionEnd - 1) / kBytesPerLine;
-      const int lineStart = std::max(startLine, selStartLine);
-      const int lineEnd = std::min(endLine, selEndLine);
-
-      for (int line = lineStart; line <= lineEnd; ++line) {
-        const CachedLine* entry = cachedLineFor(line);
-        if (!entry || entry->bytes <= 0) {
-          continue;
-        }
-        const int lineOffset = line * kBytesPerLine;
-        const int startCol = (line == selStartLine) ? (selectionStart - lineOffset) : 0;
-        const int endCol = (line == selEndLine) ? (selectionEnd - lineOffset) : entry->bytes;
-
-        const int clampedStart = std::clamp(startCol, 0, entry->bytes);
-        const int clampedEnd = std::clamp(endCol, 0, entry->bytes);
-        const int length = clampedEnd - clampedStart;
-        if (length <= 0) {
-          continue;
-        }
-
-        const float y = line * lineHeight;
-        const float hexX = hexStartX + clampedStart * 3.0f * charWidth - charHalfWidth;
-        appendRect(m_maskRectInstances, hexX, y,
-                   length * 3.0f * charWidth, lineHeight, maskColor);
-        if (m_view->m_shouldDrawAscii) {
-          const float asciiX = asciiStartX + clampedStart * charWidth;
-          appendRect(m_maskRectInstances, asciiX, y,
-                     length * charWidth, lineHeight, maskColor);
-        }
-      }
-    };
-
+    const QVector4D fadeEdgeColor(0.0f, 0.0f, 0.0f, 0.0f);
     for (const auto& selection : m_view->m_fadePlaybackSelections) {
       if (selection.alpha <= 0.0f) {
         continue;
       }
       const QVector4D fadeMaskColor(0.0f, 0.0f, 1.0f, selection.alpha);
-      appendMaskForSelection(selection.range, fadeMaskColor);
+      std::array<HexView::SelectionRange, 1> one{selection.range};
+      appendMaskForSelections(one, 0.0f, 0.0f, 0.0f, fadeMaskColor, fadeEdgeColor);
     }
   }
 }
