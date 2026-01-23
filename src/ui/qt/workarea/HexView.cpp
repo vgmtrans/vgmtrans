@@ -751,6 +751,9 @@ void HexView::handleCoalescedMouseMove(const QPoint& pos,
     if (item != m_selectedItem) {
       // setSelectedItem(item);
       selectionChanged(item);
+      if (mods.testFlag(Qt::AltModifier) && item) {
+        seekToEventRequested(item);
+      }
     }
   }
 }
