@@ -71,13 +71,17 @@ void main() {
 
   vec2 shadowUv = vUv + shadowOffset;
   vec4 edgeShadow = texture(edgeTex, shadowUv);
-  float selHalo = edgeShadow.r;
+  float selNorm = edgeShadow.r;
+  float selHalo = (shadowStrength > 0.0)
+      ? (1.0 - smoothstep(0.0, 1.0, selNorm)) * (1.0 - sel)
+      : 0.0;
 
   float shadowAlpha = selHalo * shadowStrength * shadowColor.a;
   vec3 withShadow = mix(restored, shadowColor.rgb, shadowAlpha);
 
   vec4 edgeGlow = texture(edgeTex, vUv);
-  float playHalo = edgeGlow.g;
+  float playNorm = edgeGlow.g;
+  float playHalo = (1.0 - smoothstep(0.0, 1.0, playNorm)) * (1.0 - play);
 
   vec2 p = vUv * viewSize * 0.055;
   float t = time * 0.85;
