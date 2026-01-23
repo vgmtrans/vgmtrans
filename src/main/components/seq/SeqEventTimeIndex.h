@@ -2,6 +2,7 @@
 
 #include <cstdint>
 #include <limits>
+#include <unordered_map>
 #include <vector>
 
 class SeqEvent;
@@ -50,6 +51,7 @@ class SeqEventTimeIndex {
   [[nodiscard]] const SeqTimedEvent& event(Index idx) const { return m_events.at(idx); }
   [[nodiscard]] SeqTimedEvent& event(Index idx) { return m_events.at(idx); }
   [[nodiscard]] uint32_t endTickExclusive(Index idx) const { return m_events.at(idx).endTickExclusive(); }
+  [[nodiscard]] bool firstStartTick(const SeqEvent* event, uint32_t& outTick) const noexcept;
 
   // Convenience queries. For repeated sequential queries, prefer Cursor.
   void getActiveAt(uint32_t tick, std::vector<const SeqTimedEvent*>& out) const;
@@ -82,5 +84,6 @@ class SeqEventTimeIndex {
   std::vector<SeqTimedEvent> m_events;
   std::vector<Index> m_byStart;
   std::vector<Index> m_byEnd;
+  std::unordered_map<const SeqEvent*, uint32_t> m_firstStart;
   bool m_finalized = false;
 };

@@ -57,6 +57,7 @@ public:
 
 signals:
   void selectionChanged(VGMItem* item);
+  void seekToEventRequested(VGMItem* item);
 
 protected:
   bool viewportEvent(QEvent* event) override;

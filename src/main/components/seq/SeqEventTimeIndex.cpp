@@ -12,6 +12,10 @@ SeqEventTimeIndex::Index SeqEventTimeIndex::addEvent(SeqEvent* event,
                                                      uint32_t startTick,
                                                      uint32_t duration) {
   m_events.push_back(SeqTimedEvent{startTick, duration, event});
+  auto it = m_firstStart.find(event);
+  if (it == m_firstStart.end() || startTick < it->second) {
+    m_firstStart[event] = startTick;
+  }
   m_finalized = false;
   return m_events.size() - 1;
 }
@@ -20,11 +24,20 @@ void SeqEventTimeIndex::clear() {
   m_events.clear();
   m_byStart.clear();
   m_byEnd.clear();
+  m_firstStart.clear();
   m_finalized = false;
 }
 
 void SeqEventTimeIndex::finalize() {
   const size_t count = m_events.size();
+  m_firstStart.clear();
+  m_firstStart.reserve(count);
+  for (const auto& evt : m_events) {
+    auto it = m_firstStart.find(evt.event);
+    if (it == m_firstStart.end() || evt.startTick < it->second) {
+      m_firstStart[evt.event] = evt.startTick;
+    }
+  }
   m_byStart.resize(count);
   m_byEnd.resize(count);
   std::iota(m_byStart.begin(), m_byStart.end(), 0);
@@ -49,6 +62,32 @@ void SeqEventTimeIndex::finalize() {
   });
 
   m_finalized = true;
+}
+
+bool SeqEventTimeIndex::firstStartTick(const SeqEvent* event, uint32_t& outTick) const noexcept {
+  if (!event) {
+    return false;
+  }
+  auto it = m_firstStart.find(event);
+  if (it != m_firstStart.end()) {
+    outTick = it->second;
+    return true;
+  }
+  bool found = false;
+  uint32_t minTick = 0;
+  for (const auto& timed : m_events) {
+    if (timed.event != event) {
+      continue;
+    }
+    if (!found || timed.startTick < minTick) {
+      minTick = timed.startTick;
+      found = true;
+    }
+  }
+  if (found) {
+    outTick = minTick;
+  }
+  return found;
 }
 
 void SeqEventTimeIndex::getActiveAt(uint32_t tick, std::vector<const SeqTimedEvent*>& out) const {
