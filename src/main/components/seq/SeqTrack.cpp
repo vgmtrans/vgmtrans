@@ -300,6 +300,11 @@ void SeqTrack::addEvent(SeqEvent *pSeqEvent) {
 SeqEvent* SeqTrack::findSeqEventAtOffset(uint32_t offset, uint32_t length) {
   auto* item = getItemAtOffset(offset, true);
   if (item == nullptr) {
+    if (auto* noTrks = dynamic_cast<VGMSeqNoTrks*>(parentSeq)) {
+      item = noTrks->VGMSeq::getItemAtOffset(offset, true);
+    }
+  }
+  if (item == nullptr) {
     return nullptr;
   }
   auto* seqEvent = dynamic_cast<SeqEvent*>(item);
