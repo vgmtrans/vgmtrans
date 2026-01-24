@@ -65,10 +65,10 @@ void IconBar::setupControls() {
   m_slider->setEnabled(false);
   m_slider->setToolTip("Seek");
   connect(m_slider, &QSlider::sliderMoved, [this](int value) {
-    seekingTo(value);
+    seekingTo(value, PositionChangeOrigin::SeekBar);
   });
   connect(m_slider, &QSlider::sliderReleased, [this]() {
-    seekingTo(m_slider->value());
+    seekingTo(m_slider->value(), PositionChangeOrigin::SeekBar);
   });
   layout()->addWidget(m_slider);
 
