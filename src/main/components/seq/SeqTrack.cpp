@@ -395,10 +395,46 @@ void SeqTrack::addTie(uint32_t offset, uint32_t length, uint32_t duration,
   recordSeqEvent<SeqEvent>(isNewOffset, getTime(), duration, offset, length, sEventName, Type::Tie, sEventDesc);
 }
 
+void SeqTrack::trackActiveNoteIndex(int8_t key, SeqEventTimeIndex::Index idx) {
+  if (readMode != READMODE_CONVERT_TO_MIDI || idx == SeqEventTimeIndex::kInvalidIndex) {
+    return;
+  }
+  m_activeNoteEventIndices[static_cast<int>(key)].push_back(idx);
+}
+
+void SeqTrack::endActiveNoteIndex(int8_t key, uint32_t endTick) {
+  if (readMode != READMODE_CONVERT_TO_MIDI) {
+    return;
+  }
+  auto it = m_activeNoteEventIndices.find(static_cast<int>(key));
+  if (it == m_activeNoteEventIndices.end() || it->second.empty()) {
+    return;
+  }
+  const auto idx = it->second.back();
+  it->second.pop_back();
+  if (it->second.empty()) {
+    m_activeNoteEventIndices.erase(it);
+  }
+  if (idx == SeqEventTimeIndex::kInvalidIndex) {
+    return;
+  }
+  auto& timeline = parentSeq->timedEventIndex();
+  if (idx >= timeline.size()) {
+    return;
+  }
+  auto& evt = timeline.event(idx);
+  if (endTick <= evt.startTick) {
+    evt.duration = 1;
+  } else {
+    evt.duration = endTick - evt.startTick;
+  }
+}
+
 void SeqTrack::addNoteOn(uint32_t offset, uint32_t length, int8_t key, int8_t vel, const std::string &sEventName) {
   bool isNewOffset = onEvent(offset, length);
 
-  recordSeqEvent<NoteOnSeqEvent>(isNewOffset, getTime(), 0, key, vel, offset, length, sEventName);
+  auto noteIndex = recordDurSeqEvent<NoteOnSeqEvent>(isNewOffset, getTime(), 0, key, vel, offset, length, sEventName);
+  trackActiveNoteIndex(key, noteIndex);
   addNoteOnNoItem(key, vel);
 }
 
@@ -457,7 +493,8 @@ void SeqTrack::insertNoteOn(uint32_t offset,
   if (usesLinearAmplitudeScale())
     finalVel = convert7bitPercentAmpToStdMidiVal(vel);
 
-  recordSeqEvent<NoteOnSeqEvent>(isNewOffset, absTime, 0, key, vel, offset, length, sEventName);
+  auto noteIndex = recordDurSeqEvent<NoteOnSeqEvent>(isNewOffset, absTime, 0, key, vel, offset, length, sEventName);
+  trackActiveNoteIndex(key, noteIndex);
 
   if (readMode == READMODE_CONVERT_TO_MIDI) {
     pMidiTrack->insertNoteOn(channel, key + cKeyCorrection + transpose, finalVel, absTime);
@@ -474,6 +511,7 @@ void SeqTrack::addNoteOff(uint32_t offset, uint32_t length, int8_t key, const st
 }
 
 void SeqTrack::addNoteOffNoItem(int8_t key) {
+  endActiveNoteIndex(key, getTime());
   if (readMode != READMODE_CONVERT_TO_MIDI)
     return;
 
@@ -520,6 +558,7 @@ void SeqTrack::insertNoteOff(uint32_t offset,
   bool isNewOffset = onEvent(offset, length);
 
   recordSeqEvent<NoteOffSeqEvent>(isNewOffset, absTime, 0, key, offset, length, sEventName);
+  endActiveNoteIndex(key, absTime);
   insertNoteOffNoItem(key, absTime);
 }
 

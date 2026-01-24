@@ -6,6 +6,7 @@
 #pragma once
 
 #include <sstream>
+#include <unordered_map>
 #include <unordered_set>
 #include <utility>
 #include <vector>
@@ -151,6 +152,8 @@ private:
   void addLevelNoItem(double level, LevelController controller, Resolution res, int absTime = -1);
   void purgePrevDurEvents(uint32_t absTime);
   void clearPrevDurEvents();
+  void trackActiveNoteIndex(int8_t key, SeqEventTimeIndex::Index idx);
+  void endActiveNoteIndex(int8_t key, uint32_t endTick);
 
  public:
   void addGenericEvent(uint32_t offset, uint32_t length, const std::string &sEventName, const std::string &sEventDesc, Type type);
@@ -327,6 +330,7 @@ private:
   std::vector<LoopState> loopStack;
   std::unordered_set<ControlFlowState, ControlFlowStateHasher> visitedControlFlowStates;
   std::vector<SeqEventTimeIndex::Index> prevDurEventIndices;
+  std::unordered_map<int, std::vector<SeqEventTimeIndex::Index>> m_activeNoteEventIndices;
 
   uint32_t m_lastEventOffset = 0;
   uint32_t m_lastEventLength = 0;
