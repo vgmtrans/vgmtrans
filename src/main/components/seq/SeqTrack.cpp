@@ -46,6 +46,7 @@ void SeqTrack::resetVars() {
   loopStack.clear();
   visitedControlFlowStates.clear();
   prevDurEventIndices.clear();
+  m_activeNoteEventIndices.clear();
 }
 
 void SeqTrack::resetVisitedAddresses() {
