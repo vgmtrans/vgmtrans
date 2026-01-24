@@ -44,6 +44,10 @@ bool VGMMultiSectionSeq::loadTracks(ReadMode readMode, uint32_t stopTime) {
   // Clear all track pointers to prevent delete, they must be aliases of section tracks
   aTracks.clear();
 
+  if (readMode == READMODE_CONVERT_TO_MIDI) {
+    timedEventIndex().clear();
+  }
+
   // reset variables
   resetVars();
 
@@ -75,6 +79,7 @@ bool VGMMultiSectionSeq::postLoad() {
     }
   } else if (readMode == READMODE_CONVERT_TO_MIDI) {
     midi->sort();
+    timedEventIndex().finalize();
   }
 
   return true;
