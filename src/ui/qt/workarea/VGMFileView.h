@@ -15,6 +15,7 @@ class HexView;
 class VGMFileTreeView;
 class VGMItem;
 struct SeqTimedEvent;
+enum class PositionChangeOrigin;
 
 class VGMFileView final : public QMdiSubWindow {
   Q_OBJECT
@@ -47,7 +48,7 @@ private:
 public slots:
   void onSelectionChange(VGMItem* item) const;
   void seekToEvent(VGMItem* item) const;
-  void onPlaybackPositionChanged(int current, int max);
+  void onPlaybackPositionChanged(int current, int max, PositionChangeOrigin origin);
   void resetHexViewFont();
   void increaseHexViewFont();
   void decreaseHexViewFont();

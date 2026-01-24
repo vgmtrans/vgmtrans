@@ -665,7 +665,7 @@ void HexView::changeEvent(QEvent* event) {
 
 void HexView::keyPressEvent(QKeyEvent* event) {
   if (event->key() == Qt::Key_Alt) {
-    const QPoint vp = viewport()->mapFromGlobal(QCursor::pos());
+    const QPoint vp = mapFromGlobal(QCursor::pos());
     handleAltHoverMove(vp, QApplication::keyboardModifiers());
   }
   if (!m_selectedItem) {

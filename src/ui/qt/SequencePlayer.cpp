@@ -92,7 +92,7 @@ SequencePlayer::SequencePlayer() {
   m_seekupdate_timer = new QTimer(this);
   connect(m_seekupdate_timer, &QTimer::timeout, [this]() {
     if (playing()) {
-      playbackPositionChanged(elapsedTicks(), totalTicks());
+      playbackPositionChanged(elapsedTicks(), totalTicks(), PositionChangeOrigin::Playback);
     }
   });
   m_seekupdate_timer->start(TICK_POLL_INTERVAL_MS);
@@ -124,7 +124,7 @@ void SequencePlayer::toggle() {
 
 void SequencePlayer::stop() {
   /* Stop polling seekbar, reset it, propagate that we're done */
-  playbackPositionChanged(0, 1);
+  playbackPositionChanged(0, 1, PositionChangeOrigin::Playback);
   statusChange(false);
 
   /* Stop the audio output */
@@ -138,9 +138,9 @@ void SequencePlayer::stop() {
   m_active_vgmcoll = nullptr;
 }
 
-void SequencePlayer::seek(int position) {
+void SequencePlayer::seek(int position, PositionChangeOrigin origin) {
   BASS_ChannelSetPosition(m_active_stream, position, BASS_POS_MIDI_TICK);
-  playbackPositionChanged(position, totalTicks());
+  playbackPositionChanged(position, totalTicks(), origin);
 }
 
 bool SequencePlayer::playing() const {

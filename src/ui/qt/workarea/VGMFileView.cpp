@@ -181,10 +181,10 @@ void VGMFileView::seekToEvent(VGMItem* item) const {
   if (!timeline.firstStartTick(event, tick)) {
     return;
   }
-  SequencePlayer::the().seek(static_cast<int>(tick));
+  SequencePlayer::the().seek(static_cast<int>(tick), PositionChangeOrigin::HexView);
 }
 
-void VGMFileView::onPlaybackPositionChanged(int current, int /*max*/) {
+void VGMFileView::onPlaybackPositionChanged(int current, int max, PositionChangeOrigin origin) {
   if (!m_hexview || !isVisible() || !m_hexview->isVisible()) {
     return;
   }
@@ -220,10 +220,33 @@ void VGMFileView::onPlaybackPositionChanged(int current, int /*max*/) {
 
   const int tickDiff = current - m_lastPlaybackPosition;
   m_playbackTimedEvents.clear();
-  if (tickDiff >= 0 && tickDiff <= 20)
-    timeline.getActiveInRange(m_lastPlaybackPosition, current, m_playbackTimedEvents);
-  else
-    timeline.getActiveAt(current, m_playbackTimedEvents);
+  switch (origin) {
+    case PositionChangeOrigin::Playback:
+      if (tickDiff <= 20)
+        timeline.getActiveInRange(m_lastPlaybackPosition, current, m_playbackTimedEvents);
+      else
+        timeline.getActiveAt(current, m_playbackTimedEvents);
+      break;
+    case PositionChangeOrigin::SeekBar:
+      // This intended to distinguish between a drag and a seek to a further position of a sequence.
+      // We want a drag to highlight passed through events.
+      if (tickDiff >= -300 && tickDiff <= 300) {
+        // Select all events passed through. We will fade the ones skipped past in the next step.
+        int lesser = std::min(m_lastPlaybackPosition, current);
+        int greater = std::max(m_lastPlaybackPosition, current);
+        timeline.getActiveInRange(lesser, greater, m_playbackTimedEvents);
+
+        // Select only the items at the current position to make the others fade - we accomplish
+        // this by calling this method with origin HexView, which will use a getActiveAt selection.
+        QTimer::singleShot(0, m_hexview, [this, current, max] {
+          onPlaybackPositionChanged(current, max, PositionChangeOrigin::HexView);
+        });
+      }
+      break;
+    case PositionChangeOrigin::HexView:
+      timeline.getActiveAt(current, m_playbackTimedEvents);
+      break;
+  }
   m_lastPlaybackPosition = current;
 
   m_playbackItems.clear();
