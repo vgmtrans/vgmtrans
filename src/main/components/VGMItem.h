@@ -116,6 +116,8 @@ public:
   requires std::convertible_to<std::ranges::range_value_t<Range>, VGMItem*>
   void addChildren(const Range& items) {
     std::ranges::copy(items, std::back_inserter(m_children));
+    m_childrenSorted = false;
+    m_childrenPrefixMaxEnd.clear();
   }
 
   void sortChildrenByOffset();
@@ -137,7 +139,13 @@ public:
 
 private:
   std::vector<VGMItem *> m_children;
+  // Maintains sort + prefix-max end cache for fast offset lookups.
+  bool m_childrenSorted = true;
+  std::vector<uint64_t> m_childrenPrefixMaxEnd;
   VGMFile *m_vgmfile;
+
+  void ensureChildrenSorted();
+  void rebuildChildPrefixMaxEnd();
   std::string m_name;
 };
 
