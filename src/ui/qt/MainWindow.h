@@ -6,7 +6,9 @@
 
 #pragma once
 
+#include <QList>
 #include <QMainWindow>
+#include <QUrl>
 #include "Root.h"
 
 class QWidget;
@@ -34,6 +36,9 @@ class MainWindow final : public QMainWindow {
 public:
   MainWindow();
   void showEvent(QShowEvent* event) override;
+  void showDragOverlay();
+  void hideDragOverlay();
+  void handleDroppedUrls(const QList<QUrl>& urls);
 
 protected:
   void dragEnterEvent(QDragEnterEvent *event) override;
