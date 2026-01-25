@@ -14,6 +14,10 @@
 
 #include <QCoreApplication>
 #include <QDebug>
+#include <QDragEnterEvent>
+#include <QDragLeaveEvent>
+#include <QDragMoveEvent>
+#include <QDropEvent>
 #include <QEvent>
 #include <QExposeEvent>
 #include <QMouseEvent>
@@ -226,6 +230,17 @@ bool HexViewRhiWindow::event(QEvent *e)
       QCoreApplication::sendEvent(m_view->viewport(), e);
       requestUpdate();
       return true;
+
+    case QEvent::DragEnter:
+    case QEvent::DragMove:
+    case QEvent::DragLeave:
+    case QEvent::Drop: {
+      if (auto* target = m_view ? m_view->window() : nullptr) {
+        QCoreApplication::sendEvent(target, e);
+      }
+      e->accept();
+      return true;
+    }
 
     default:
       break;
