@@ -14,6 +14,7 @@
 #include <QStandardPaths>
 #include <QGridLayout>
 #include <QPushButton>
+#include <QShortcut>
 #if defined(Q_OS_LINUX)
 #include <QRhiWidget>
 #endif
@@ -178,6 +179,10 @@ void MainWindow::routeSignals() {
     wiz.exec();
   });
   connect(&qtVGMRoot, &QtVGMRoot::UI_toastRequested, this, &MainWindow::showToast);
+
+  auto *playShortcut = new QShortcut(QKeySequence(Qt::Key_Space), this);
+  playShortcut->setContext(Qt::WindowShortcut);
+  connect(playShortcut, &QShortcut::activated, m_coll_listview, &VGMCollListView::handlePlaybackRequest);
 }
 
 void MainWindow::dragEnterEvent(QDragEnterEvent *event) {
