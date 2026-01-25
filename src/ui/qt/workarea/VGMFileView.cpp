@@ -175,6 +175,13 @@ void VGMFileView::seekToEvent(VGMItem* item) const {
   if (!event || !event->parentTrack || !event->parentTrack->parentSeq) {
     return;
   }
+  if (!m_vgmfile->assocColls.empty()) {
+    auto assocColl = m_vgmfile->assocColls.front();
+    if (SequencePlayer::the().activeCollection() != assocColl) {
+      SequencePlayer::the().playCollection(assocColl, true);
+    }
+  }
+
   const auto& timeline = event->parentTrack->parentSeq->timedEventIndex();
   if (!timeline.finalized()) {
     return;
@@ -183,6 +190,7 @@ void VGMFileView::seekToEvent(VGMItem* item) const {
   if (!timeline.firstStartTick(event, tick)) {
     return;
   }
+
   SequencePlayer::the().seek(static_cast<int>(tick), PositionChangeOrigin::HexView);
 }
 

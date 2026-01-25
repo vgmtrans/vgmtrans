@@ -75,7 +75,7 @@ public:
    * @param collection
    * @return true if data was loaded correctly
    */
-  bool playCollection(const VGMColl *collection);
+  bool playCollection(const VGMColl *collection, bool startPlaying = true);
   [[nodiscard]] const VGMColl* activeCollection() const;
 
 signals:

@@ -160,9 +160,11 @@ QString SequencePlayer::songTitle() const {
   return m_song_title;
 }
 
-bool SequencePlayer::playCollection(const VGMColl *coll) {
+bool SequencePlayer::playCollection(const VGMColl *coll, bool startPlaying) {
   if (coll == m_active_vgmcoll) {
-    toggle();
+    if (startPlaying || playing()) {
+      toggle();
+    }
     return false;
   }
 
@@ -238,7 +240,12 @@ bool SequencePlayer::playCollection(const VGMColl *coll) {
   m_active_stream = midi_stream;
   m_loaded_sf = sf2_handle;
   m_song_title = QString::fromStdString(m_active_vgmcoll->name());
-  toggle();
+  if (startPlaying) {
+    toggle();
+  } else {
+    BASS_ChannelPause(m_active_stream);
+    statusChange(false);
+  }
 
   return true;
 }
