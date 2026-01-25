@@ -182,6 +182,10 @@ void VGMCollListView::keyPressEvent(QKeyEvent *e) {
 void VGMCollListView::handlePlaybackRequest() {
   QModelIndexList list = this->selectionModel()->selectedIndexes();
   if (list.empty() || list[0].row() >= model()->rowCount()) {
+    if (SequencePlayer::the().activeCollection() != nullptr) {
+      SequencePlayer::the().toggle();
+      return;
+    }
     nothingToPlay();
     return;
   }
