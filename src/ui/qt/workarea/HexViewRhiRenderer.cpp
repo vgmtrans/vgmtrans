@@ -232,7 +232,7 @@ void HexViewRhiRenderer::renderFrame(QRhiCommandBuffer* cb, const RenderTargetIn
     m_loggedFrame = true;
   }
 
-  const int scrollY = m_view->verticalScrollBar()->value();
+  const int scrollY = m_view->scrollYForRender();
   const int startLine = std::clamp(scrollY / m_view->m_lineHeight, 0, totalLines - 1);
   const int endLine =
       std::clamp((scrollY + viewportHeight) / m_view->m_lineHeight, 0, totalLines - 1);
