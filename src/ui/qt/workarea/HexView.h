@@ -39,7 +39,7 @@ public:
   ~HexView() override;
   void setSelectedItem(VGMItem* item);
   void setPlaybackSelectionsForItems(const std::vector<const VGMItem*>& items);
-  void clearPlaybackSelections();
+  void clearPlaybackSelections(bool fade = true);
   void setPlaybackActive(bool active);
   void requestPlaybackFrame();
   void setFont(const QFont& font);

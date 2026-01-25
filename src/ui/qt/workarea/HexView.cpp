@@ -394,11 +394,11 @@ void HexView::setPlaybackSelectionsForItems(const std::vector<const VGMItem*>& i
   }
 }
 
-void HexView::clearPlaybackSelections() {
+void HexView::clearPlaybackSelections(bool fade) {
   if (m_playbackSelections.empty()) {
     return;
   }
-  if (PLAYBACK_FADE_DURATION_MS > 0) {
+  if (fade && PLAYBACK_FADE_DURATION_MS > 0) {
     const qint64 now = playbackNowMs();
     std::unordered_set<uint64_t> fadeKeys;
     fadeKeys.reserve(m_fadePlaybackSelections.size() * 2 + 1);
