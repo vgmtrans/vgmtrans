@@ -13,8 +13,10 @@
 #include "HexViewRhiWidget.h"
 #else
 #include "HexViewRhiWindow.h"
+#include "MainWindow.h"
 #endif
 
+#include <QApplication>
 #include <QWindow>
 #include <QResizeEvent>
 
@@ -31,6 +33,34 @@ HexViewRhiHost::HexViewRhiHost(HexView* view, QWidget* parent)
   auto* window = new HexViewRhiWindow(view, m_renderer.get());
   m_window = window;
   m_surface = QWidget::createWindowContainer(window, this);
+
+  auto* rhiWindow = qobject_cast<HexViewRhiWindow*>(m_window);
+  if (rhiWindow) {
+    MainWindow* mainWindow = nullptr;
+    for (QWidget* widget = this; widget; widget = widget->parentWidget()) {
+      mainWindow = qobject_cast<MainWindow*>(widget);
+      if (mainWindow) {
+        break;
+      }
+    }
+    if (!mainWindow) {
+      const auto topLevelWidgets = QApplication::topLevelWidgets();
+      for (QWidget* widget : topLevelWidgets) {
+        mainWindow = qobject_cast<MainWindow*>(widget);
+        if (mainWindow) {
+          break;
+        }
+      }
+    }
+    if (mainWindow) {
+      connect(rhiWindow, &HexViewRhiWindow::dragOverlayShowRequested,
+              mainWindow, &MainWindow::showDragOverlay);
+      connect(rhiWindow, &HexViewRhiWindow::dragOverlayHideRequested,
+              mainWindow, &MainWindow::hideDragOverlay);
+      connect(rhiWindow, &HexViewRhiWindow::dropUrlsRequested,
+              mainWindow, &MainWindow::handleDroppedUrls);
+    }
+  }
 #endif
 
   if (m_surface) {
