@@ -8,12 +8,10 @@
 
 #include "HexView.h"
 #include "HexViewRhiRenderer.h"
-#include "MainWindow.h"
 
 #include <rhi/qrhi.h>
 #include <rhi/qrhi_platform.h>
 
-#include <QApplication>
 #include <QCoreApplication>
 #include <QDebug>
 #include <QDragEnterEvent>
@@ -22,9 +20,9 @@
 #include <QDropEvent>
 #include <QEvent>
 #include <QExposeEvent>
+#include <QMimeData>
 #include <QMouseEvent>
 #include <QResizeEvent>
-#include <QWidget>
 #include <QWheelEvent>
 
 #if QT_CONFIG(opengl)
@@ -40,21 +38,6 @@ namespace {
 bool isRhiDebugEnabled() {
   // return qEnvironmentVariableIsSet("VGMTRANS_HEXVIEW_RHI_DEBUG");
   return true;
-}
-
-MainWindow* findMainWindow(QWidget* start) {
-  for (QWidget* widget = start; widget; widget = widget->parentWidget()) {
-    if (auto* mainWindow = qobject_cast<MainWindow*>(widget)) {
-      return mainWindow;
-    }
-  }
-  const auto topLevelWidgets = QApplication::topLevelWidgets();
-  for (QWidget* widget : topLevelWidgets) {
-    if (auto* mainWindow = qobject_cast<MainWindow*>(widget)) {
-      return mainWindow;
-    }
-  }
-  return nullptr;
 }
 }  // namespace
 
@@ -253,36 +236,32 @@ bool HexViewRhiWindow::event(QEvent *e)
     case QEvent::DragMove:
     case QEvent::DragLeave:
     case QEvent::Drop: {
-      if (auto* mainWindow = m_view ? findMainWindow(m_view) : nullptr) {
-        switch (e->type()) {
-          case QEvent::DragEnter: {
-            auto* dragEvent = static_cast<QDragEnterEvent*>(e);
-            mainWindow->showDragOverlay();
-            dragEvent->acceptProposedAction();
-            break;
-          }
-          case QEvent::DragMove: {
-            auto* dragEvent = static_cast<QDragMoveEvent*>(e);
-            mainWindow->showDragOverlay();
-            dragEvent->acceptProposedAction();
-            break;
-          }
-          case QEvent::DragLeave:
-            mainWindow->hideDragOverlay();
-            e->accept();
-            break;
-          case QEvent::Drop: {
-            auto* dropEvent = static_cast<QDropEvent*>(e);
-            mainWindow->handleDroppedUrls(dropEvent->mimeData()->urls());
-            dropEvent->acceptProposedAction();
-            break;
-          }
-          default:
-            break;
+      switch (e->type()) {
+        case QEvent::DragEnter: {
+          auto* dragEvent = static_cast<QDragEnterEvent*>(e);
+          emit dragOverlayShowRequested();
+          dragEvent->acceptProposedAction();
+          break;
         }
-        return true;
+        case QEvent::DragMove: {
+          auto* dragEvent = static_cast<QDragMoveEvent*>(e);
+          emit dragOverlayShowRequested();
+          dragEvent->acceptProposedAction();
+          break;
+        }
+        case QEvent::DragLeave:
+          emit dragOverlayHideRequested();
+          e->accept();
+          break;
+        case QEvent::Drop: {
+          auto* dropEvent = static_cast<QDropEvent*>(e);
+          emit dropUrlsRequested(dropEvent->mimeData()->urls());
+          dropEvent->acceptProposedAction();
+          break;
+        }
+        default:
+          break;
       }
-      e->ignore();
       return true;
     }
 

@@ -6,8 +6,10 @@
 
 #pragma once
 
+#include <QList>
 #include <QWindow>
 #include <QPointF>
+#include <QUrl>
 #include <memory>
 
 class QEvent;
@@ -32,6 +34,11 @@ protected:
   bool event(QEvent* e) override;
   void exposeEvent(QExposeEvent* event) override;
   void resizeEvent(QResizeEvent* event) override;
+
+signals:
+  void dragOverlayShowRequested();
+  void dragOverlayHideRequested();
+  void dropUrlsRequested(const QList<QUrl>& urls);
 
 private:
   struct BackendData;
