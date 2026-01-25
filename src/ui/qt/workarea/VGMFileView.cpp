@@ -74,6 +74,8 @@ VGMFileView::VGMFileView(VGMFile *vgmfile)
 
   connect(&SequencePlayer::the(), &SequencePlayer::playbackPositionChanged,
           this, &VGMFileView::onPlaybackPositionChanged);
+  connect(&SequencePlayer::the(), &SequencePlayer::statusChange,
+          this, &VGMFileView::onPlayerStatusChanged);
 
   setWidget(m_splitter);
 }
@@ -197,14 +199,14 @@ void VGMFileView::onPlaybackPositionChanged(int current, int max, PositionChange
   const auto* coll = SequencePlayer::the().activeCollection();
   if (!coll || !coll->containsVGMFile(m_vgmfile)) {
     m_hexview->setPlaybackActive(false);
-    m_hexview->clearPlaybackSelections();
+    m_hexview->clearPlaybackSelections(false);
     return;
   }
 
   const bool shouldHighlight = SequencePlayer::the().playing() || current > 0;
   if (!shouldHighlight) {
     m_hexview->setPlaybackActive(false);
-    m_hexview->clearPlaybackSelections();
+    m_hexview->clearPlaybackSelections(false);
     return;
   }
 
@@ -214,7 +216,7 @@ void VGMFileView::onPlaybackPositionChanged(int current, int max, PositionChange
   const auto& timeline = seq->timedEventIndex();
   if (!timeline.finalized()) {
     m_hexview->setPlaybackActive(false);
-    m_hexview->clearPlaybackSelections();
+    m_hexview->clearPlaybackSelections(false);
     return;
   }
 
@@ -266,4 +268,17 @@ void VGMFileView::onPlaybackPositionChanged(int current, int max, PositionChange
 
   m_lastPlaybackItems = m_playbackItems;
   m_hexview->setPlaybackSelectionsForItems(m_playbackItems);
+}
+
+void VGMFileView::onPlayerStatusChanged(bool playing) {
+  if (playing || !m_hexview)
+    return;
+  if (SequencePlayer::the().activeCollection() != nullptr)
+    return;
+  m_playbackTimedEvents.clear();
+  m_playbackItems.clear();
+  m_lastPlaybackItems.clear();
+  m_lastPlaybackPosition = 0;
+  m_hexview->setPlaybackActive(false);
+  m_hexview->clearPlaybackSelections(false);
 }

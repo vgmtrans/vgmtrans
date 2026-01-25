@@ -118,7 +118,6 @@ void SequencePlayer::toggle() {
 void SequencePlayer::stop() {
   /* Stop polling seekbar, reset it, propagate that we're done */
   playbackPositionChanged(0, 1, PositionChangeOrigin::Playback);
-  statusChange(false);
 
   /* Stop the audio output */
   BASS_ChannelStop(m_active_stream);
@@ -129,6 +128,8 @@ void SequencePlayer::stop() {
   BASS_StreamFree(m_active_stream);
   m_active_stream = 0;
   m_active_vgmcoll = nullptr;
+
+  statusChange(false);
 }
 
 void SequencePlayer::seek(int position, PositionChangeOrigin origin) {

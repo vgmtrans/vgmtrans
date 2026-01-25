@@ -49,6 +49,7 @@ public slots:
   void onSelectionChange(VGMItem* item) const;
   void seekToEvent(VGMItem* item) const;
   void onPlaybackPositionChanged(int current, int max, PositionChangeOrigin origin);
+  void onPlayerStatusChanged(bool playing);
   void resetHexViewFont();
   void increaseHexViewFont();
   void decreaseHexViewFont();
