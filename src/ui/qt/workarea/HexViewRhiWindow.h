@@ -10,6 +10,7 @@
 #include <QWindow>
 #include <QPointF>
 #include <QUrl>
+#include <QTimer>
 #include <memory>
 
 class QEvent;
@@ -83,6 +84,7 @@ private:
 
   bool m_scrolling = false;
   int m_pumpFrames = 0;        // generic "keep drawing for N frames"
+  QTimer m_scrollBarFrameTimer;
 
   bool m_hasSwapChain = false;
 };

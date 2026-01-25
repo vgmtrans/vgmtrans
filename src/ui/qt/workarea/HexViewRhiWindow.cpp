@@ -23,6 +23,7 @@
 #include <QMimeData>
 #include <QMouseEvent>
 #include <QResizeEvent>
+#include <QScrollBar>
 #include <QWheelEvent>
 
 #if QT_CONFIG(opengl)
@@ -39,6 +40,7 @@ bool isRhiDebugEnabled() {
   // return qEnvironmentVariableIsSet("VGMTRANS_HEXVIEW_RHI_DEBUG");
   return true;
 }
+constexpr int SCROLLBAR_FRAME_MS = 16;
 }  // namespace
 
 struct HexViewRhiWindow::BackendData {
@@ -101,6 +103,29 @@ HexViewRhiWindow::HexViewRhiWindow(HexView* view, HexViewRhiRenderer* renderer)
     }
   }
 #endif
+
+  m_scrollBarFrameTimer.setParent(this);
+  m_scrollBarFrameTimer.setInterval(SCROLLBAR_FRAME_MS);
+  m_scrollBarFrameTimer.setTimerType(Qt::PreciseTimer);
+  connect(&m_scrollBarFrameTimer, &QTimer::timeout, this, [this]() {
+    renderFrame();
+  });
+
+  if (m_view) {
+    if (auto* vbar = m_view->verticalScrollBar()) {
+      connect(vbar, &QScrollBar::sliderPressed, this, [this]() {
+        if (!m_scrollBarFrameTimer.isActive()) {
+          m_scrollBarFrameTimer.start();
+        }
+      });
+      connect(vbar, &QScrollBar::sliderReleased, this, [this]() {
+        if (m_scrollBarFrameTimer.isActive()) {
+          m_scrollBarFrameTimer.stop();
+        }
+        requestUpdate();
+      });
+    }
+  }
 }
 
 HexViewRhiWindow::~HexViewRhiWindow() {
@@ -164,6 +189,9 @@ void HexViewRhiWindow::releaseSwapChain()
 bool HexViewRhiWindow::event(QEvent *e)
 {
   if (e->type() == QEvent::UpdateRequest) {
+    if (m_scrollBarFrameTimer.isActive()) {
+      return true;
+    }
     renderFrame();
     return true;
   }

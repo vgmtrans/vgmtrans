@@ -136,6 +136,20 @@ HexView::HexView(VGMFile* vgmfile, QWidget* parent)
   rebuildStyleMap();
   initAnimations();
   updateLayout();
+
+  auto* vbar = verticalScrollBar();
+  m_pendingScrollY = vbar->value();
+  connect(vbar, &QScrollBar::sliderPressed, this, [this]() {
+    m_scrollBarDragging = true;
+    m_pendingScrollY = verticalScrollBar()->value();
+  });
+  connect(vbar, &QScrollBar::sliderMoved, this, [this](int pos) {
+    m_pendingScrollY = pos;
+  });
+  connect(vbar, &QScrollBar::sliderReleased, this, [this]() {
+    m_scrollBarDragging = false;
+    m_pendingScrollY = verticalScrollBar()->value();
+  });
 }
 
 void HexView::setFont(const QFont& font) {
@@ -646,6 +660,13 @@ void HexView::scrollContentsBy(int dx, int dy) {
   if (m_rhiHost) {
     m_rhiHost->requestUpdate();
   }
+}
+
+int HexView::scrollYForRender() const {
+  if (m_scrollBarDragging) {
+    return m_pendingScrollY;
+  }
+  return verticalScrollBar()->value();
 }
 
 void HexView::changeEvent(QEvent* event) {

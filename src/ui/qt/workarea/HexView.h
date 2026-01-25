@@ -42,6 +42,7 @@ public:
   void clearPlaybackSelections(bool fade = true);
   void setPlaybackActive(bool active);
   void requestPlaybackFrame();
+  int scrollYForRender() const;
   void setFont(const QFont& font);
   [[nodiscard]] int getVirtualFullWidth() const;
   [[nodiscard]] int getVirtualWidthSansAscii() const;
@@ -165,6 +166,8 @@ private:
   float m_playbackGlowRadius = 0.5f;
   float m_shadowEdgeCurve = 1.0f;
   float m_playbackGlowEdgeCurve = 1.0f;
+  bool m_scrollBarDragging = false;
+  int m_pendingScrollY = 0;
 
   HexViewRhiHost* m_rhiHost = nullptr;
   std::unique_ptr<GlyphAtlas> m_glyphAtlas;
