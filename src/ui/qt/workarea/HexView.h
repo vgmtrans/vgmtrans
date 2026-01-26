@@ -27,6 +27,8 @@ class VGMItem;
 class HexViewRhiRenderer;
 class HexViewRhiHost;
 
+static constexpr int OUTLINE_FADE_DURATION_MS = 150;
+
 class HexView final : public QAbstractScrollArea {
   Q_OBJECT
   Q_PROPERTY(qreal overlayOpacity READ overlayOpacity WRITE setOverlayOpacity)
