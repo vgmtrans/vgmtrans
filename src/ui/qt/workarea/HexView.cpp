@@ -811,25 +811,31 @@ int HexView::getOffsetFromPoint(QPoint pos) const {
 void HexView::mousePressEvent(QMouseEvent* event) {
   if (event->button() == Qt::LeftButton) {
     const int offset = getOffsetFromPoint(event->pos());
+    auto* item = m_vgmfile->getItemAtOffset(offset, false);
+    const bool seekModifier = event->modifiers().testFlag(Qt::ControlModifier);
+    if (seekModifier) {
+      if (item) {
+        seekToEventRequested(item);
+        showTooltip(item, event->pos());
+      } else {
+        hideTooltip();
+      }
+      m_isDragging = true;
+      QAbstractScrollArea::mousePressEvent(event);
+      return;
+    }
     if (offset == -1) {
       selectionChanged(nullptr);
       return;
     }
 
     m_selectedOffset = offset;
-    auto* item = m_vgmfile->getItemAtOffset(offset, false);
-    const bool seekModifier = event->modifiers().testFlag(Qt::ControlModifier);
     if (item == m_selectedItem) {
       selectionChanged(nullptr);
     } else {
       selectionChanged(item);
     }
-    if (seekModifier && item) {
-      seekToEventRequested(item);
-      showTooltip(item, event->pos());
-    } else {
-      hideTooltip();
-    }
+    hideTooltip();
     m_isDragging = true;
   }
 
@@ -851,7 +857,16 @@ void HexView::handleCoalescedMouseMove(const QPoint& pos,
   if (m_isDragging && buttons & Qt::LeftButton) {
     const int offset = getOffsetFromPoint(pos);
     if (offset == -1) {
-      selectionChanged(nullptr);
+      if (!mods.testFlag(Qt::ControlModifier)) {
+        selectionChanged(nullptr);
+      }
+      hideTooltip();
+      return;
+    }
+    if (mods.testFlag(Qt::ControlModifier)) {
+      if (auto* item = m_vgmfile->getItemAtOffset(offset, false)) {
+        seekToEventRequested(item);
+      }
       hideTooltip();
       return;
     }
@@ -865,9 +880,6 @@ void HexView::handleCoalescedMouseMove(const QPoint& pos,
     if (item != m_selectedItem) {
       // setSelectedItem(item);
       selectionChanged(item);
-    }
-    if (mods.testFlag(Qt::ControlModifier) && item) {
-      seekToEventRequested(item);
     }
     hideTooltip();
   }
