@@ -33,9 +33,10 @@ namespace {
 constexpr int NUM_ADDRESS_NIBBLES = 8;
 constexpr int HEX_TO_ASCII_SPACING_CHARS = 4;
 const QColor SHADOW_COLOR = Qt::black;
-const QColor OUTLINE_COLOR(100, 100, 100);
-constexpr float OUTLINE_ALPHA = 0.75f;
+const QColor OUTLINE_COLOR(35, 35, 35);
+constexpr float OUTLINE_ALPHA = 1.0f;
 constexpr float OUTLINE_MIN_CELL_PX = 6.0f;
+constexpr float OUTLINE_FADE_SPEED = 5.0f;
 
 static const float kVertices[] = {
   0.0f, 0.0f,
@@ -276,10 +277,30 @@ void HexViewRhiRenderer::renderFrame(QRhiCommandBuffer* cb, const RenderTargetIn
   }
   ensureGlyphTexture(u);
   const float minCell = std::min<float>(m_view->m_charWidth, m_view->m_lineHeight);
-  const bool outlineEnabled = minCell >= OUTLINE_MIN_CELL_PX;
+  const bool outlineAllowed = minCell >= OUTLINE_MIN_CELL_PX;
+  const float nowSeconds = m_animTimer.isValid() ? (m_animTimer.elapsed() / 1000.0f) : 0.0f;
+  float dt = (m_lastFrameSeconds > 0.0f) ? (nowSeconds - m_lastFrameSeconds) : 0.0f;
+  m_lastFrameSeconds = nowSeconds;
+  if (dt > 0.25f) {
+    dt = 0.25f;
+  }
+  const float targetOutline = (outlineAllowed && m_view->m_seekModifierActive) ? OUTLINE_ALPHA : 0.0f;
+  if (targetOutline != m_outlineTarget) {
+    m_outlineTarget = targetOutline;
+    dt = 0.0f;  // avoid a large first step after long idle periods
+  }
+  if (m_outlineAlpha < targetOutline) {
+    m_outlineAlpha = std::min(targetOutline, m_outlineAlpha + OUTLINE_FADE_SPEED * dt);
+  } else if (m_outlineAlpha > targetOutline) {
+    m_outlineAlpha = std::max(targetOutline, m_outlineAlpha - OUTLINE_FADE_SPEED * dt);
+  }
+  const bool outlineEnabled = outlineAllowed && (m_outlineAlpha > 0.001f || targetOutline > 0.0f);
   if (outlineEnabled != m_outlineEnabled) {
     m_outlineEnabled = outlineEnabled;
     m_itemIdDirty = true;
+  }
+  if (std::abs(m_outlineAlpha - targetOutline) > 0.001f) {
+    m_view->requestPlaybackFrame();
   }
   ensureItemIdTexture(u, startLine, endLine, totalLines);
   ensureRenderTargets(target.pixelSize);
@@ -769,7 +790,7 @@ void HexViewRhiRenderer::updateUniforms(QRhiResourceUpdateBatch* u, float scroll
   const QVector4D p4(glowLow.redF(), glowLow.greenF(), glowLow.blueF(),
                      static_cast<float>(m_view->m_playbackGlowStrength));
   const QVector4D p5(glowHigh.redF(), glowHigh.greenF(), glowHigh.blueF(), dpr);
-  const float outlineAlpha = m_outlineEnabled ? OUTLINE_ALPHA : 0.0f;
+  const float outlineAlpha = m_outlineAlpha;
   const QVector4D p6(OUTLINE_COLOR.redF(), OUTLINE_COLOR.greenF(), OUTLINE_COLOR.blueF(),
                      outlineAlpha);
   const QVector4D p7(lineHeight, scrollY,

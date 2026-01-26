@@ -8,6 +8,7 @@
 #include "Helpers.h"
 #include "HexViewRhiHost.h"
 #include "VGMFile.h"
+#include "services/NotificationCenter.h"
 
 #include <QApplication>
 #include <QBuffer>
@@ -45,6 +46,7 @@ constexpr int VIEWPORT_PADDING = 10;
 constexpr int DIM_DURATION_MS = 200;
 constexpr int PLAYBACK_FADE_DURATION_MS = 500;
 constexpr float PLAYBACK_FADE_CURVE = 3.0f;
+constexpr int OUTLINE_FADE_DURATION_MS = 500;
 constexpr int OVERLAY_ALPHA = 80;
 constexpr float OVERLAY_ALPHA_F = OVERLAY_ALPHA / 255.0f;
 constexpr float SHADOW_OFFSET_X = 0.0f;
@@ -59,15 +61,8 @@ const QColor PLAYBACK_GLOW_LOW(40, 40, 40);
 const QColor PLAYBACK_GLOW_HIGH(230, 230, 230);
 constexpr uint16_t STYLE_UNASSIGNED = std::numeric_limits<uint16_t>::max();
 
-constexpr Qt::KeyboardModifier SEEK_MODIFIER = Qt::ControlModifier;
-constexpr int SEEK_KEY = Qt::Key_Control;
-
 inline uint64_t selectionKey(uint32_t offset, uint32_t length) {
   return (static_cast<uint64_t>(offset) << 32) | length;
-}
-
-inline bool hasSeekModifier(Qt::KeyboardModifiers mods) {
-  return mods.testFlag(SEEK_MODIFIER);
 }
 
 QString tooltipIconDataUrl(VGMItem::Type type) {
@@ -157,6 +152,38 @@ HexView::HexView(VGMFile* vgmfile, QWidget* parent)
     m_scrollBarDragging = false;
     m_pendingScrollY = verticalScrollBar()->value();
   });
+
+  connect(NotificationCenter::the(), &NotificationCenter::seekModifierChanged, this,
+          [this](bool active) {
+            if (m_seekModifierActive == active) {
+              return;
+            }
+            m_seekModifierActive = active;
+            m_outlineFadeClock.restart();
+            if (!m_outlineFadeTimer.isActive()) {
+              m_outlineFadeTimer.start(16, this);
+            }
+            if (m_isDragging) {
+              hideTooltip();
+              if (m_rhiHost) {
+                m_rhiHost->requestUpdate();
+              }
+              return;
+            }
+            if (active) {
+              const QPoint vp = viewport()->mapFromGlobal(QCursor::pos());
+              if (viewport()->rect().contains(vp)) {
+                handleTooltipHoverMove(vp, Qt::KeyboardModifiers(Qt::ControlModifier));
+              } else {
+                hideTooltip();
+              }
+            } else {
+              hideTooltip();
+            }
+            if (m_rhiHost) {
+              m_rhiHost->requestUpdate();
+            }
+          });
 }
 
 void HexView::setFont(const QFont& font) {
@@ -699,7 +726,7 @@ void HexView::keyPressEvent(QKeyEvent* event) {
 
   uint32_t newOffset = 0;
   switch (event->key()) {
-    case SEEK_KEY:
+    case Qt::Key_Control:
       handleTooltipHoverMove(mapFromGlobal(QCursor::pos()), QApplication::keyboardModifiers());
       break;
     case Qt::Key_Up:
@@ -746,7 +773,7 @@ void HexView::keyPressEvent(QKeyEvent* event) {
 }
 
 void HexView::keyReleaseEvent(QKeyEvent* event) {
-  if (event->key() == SEEK_KEY) {
+  if (event->key() == Qt::Key_Control) {
     hideTooltip();
   }
   QAbstractScrollArea::keyReleaseEvent(event);
@@ -792,7 +819,7 @@ void HexView::mousePressEvent(QMouseEvent* event) {
 
     m_selectedOffset = offset;
     auto* item = m_vgmfile->getItemAtOffset(offset, false);
-    const bool seekModifier = hasSeekModifier(event->modifiers());
+    const bool seekModifier = event->modifiers().testFlag(Qt::ControlModifier);
     if (item == m_selectedItem) {
       selectionChanged(nullptr);
     } else {
@@ -840,7 +867,7 @@ void HexView::handleCoalescedMouseMove(const QPoint& pos,
       // setSelectedItem(item);
       selectionChanged(item);
     }
-    if (hasSeekModifier(mods) && item) {
+    if (mods.testFlag(Qt::ControlModifier) && item) {
       seekToEventRequested(item);
     }
     hideTooltip();
@@ -848,7 +875,7 @@ void HexView::handleCoalescedMouseMove(const QPoint& pos,
 }
 
 void HexView::handleTooltipHoverMove(const QPoint& pos, Qt::KeyboardModifiers mods) {
-  if (!hasSeekModifier(mods)) {
+  if (!mods.testFlag(Qt::ControlModifier)) {
     hideTooltip();
     return;
   }
@@ -1088,6 +1115,19 @@ void HexView::timerEvent(QTimerEvent* event) {
     }
     if (m_fadePlaybackSelections.empty()) {
       m_playbackFadeTimer.stop();
+    }
+    return;
+  }
+  if (event->timerId() == m_outlineFadeTimer.timerId()) {
+    if (!m_outlineFadeClock.isValid()) {
+      m_outlineFadeClock.start();
+    }
+    if (m_outlineFadeClock.elapsed() > OUTLINE_FADE_DURATION_MS) {
+      m_outlineFadeTimer.stop();
+      return;
+    }
+    if (m_rhiHost) {
+      m_rhiHost->requestUpdate();
     }
     return;
   }

@@ -135,6 +135,7 @@ private:
   int m_lineHeight = 0;
   bool m_addressAsHex = true;
   bool m_isDragging = false;
+  bool m_seekModifierActive = false;
   VGMItem* m_tooltipItem = nullptr;
   bool m_shouldDrawOffset = true;
   bool m_shouldDrawAscii = true;
@@ -160,6 +161,8 @@ private:
   qreal m_shadowStrength = 1.0;
   QElapsedTimer m_playbackFadeClock;
   QBasicTimer m_playbackFadeTimer;
+  QBasicTimer m_outlineFadeTimer;
+  QElapsedTimer m_outlineFadeClock;
   QColor m_playbackGlowLow;
   QColor m_playbackGlowHigh;
   float m_playbackGlowStrength = 1.0f;
