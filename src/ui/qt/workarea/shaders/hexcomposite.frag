@@ -49,6 +49,7 @@ void main() {
   float asciiWidth = p1.w;
 
   vec2 viewSize = p2.xy;
+  float dpr = max(p5.a, 1.0);
   float time = p2.w;
   vec4 shadowColor = p3;
   vec3 glowLow = p4.rgb;
@@ -98,10 +99,11 @@ void main() {
             outlineMask = 0.0;
           } else {
 
-          float leftEdge = step(localX, 1.0);
-          float rightEdge = step(cellW - 1.0, localX);
-          float topEdge = step(localY, 1.0);
-          float bottomEdge = step(lineHeight - 1.0, localY);
+          float edgePx = 1.0 / dpr;
+          float leftEdge = step(localX, edgePx);
+          float rightEdge = step(cellW - edgePx, localX);
+          float topEdge = step(localY, edgePx);
+          float bottomEdge = step(lineHeight - edgePx, localY);
 
           float leftId = id;
           if (byteIdx > 0.0) {
@@ -128,11 +130,15 @@ void main() {
             downId = drg.r + drg.g * 256.0;
           }
 
+          float drawLeft = (leftId < 0.5 || id < leftId) ? 1.0 : 0.0;
+          float drawRight = (rightId < 0.5 || id < rightId) ? 1.0 : 0.0;
+          float drawUp = (upId < 0.5 || id < upId) ? 1.0 : 0.0;
+          float drawDown = (downId < 0.5 || id < downId) ? 1.0 : 0.0;
           float edge =
-              leftEdge * step(0.5, abs(id - leftId)) +
-              rightEdge * step(0.5, abs(id - rightId)) +
-              topEdge * step(0.5, abs(id - upId)) +
-              bottomEdge * step(0.5, abs(id - downId));
+              leftEdge * drawLeft * step(0.5, abs(id - leftId)) +
+              rightEdge * drawRight * step(0.5, abs(id - rightId)) +
+              topEdge * drawUp * step(0.5, abs(id - upId)) +
+              bottomEdge * drawDown * step(0.5, abs(id - downId));
           outlineMask = clamp(edge, 0.0, 1.0);
           }
         }
