@@ -125,7 +125,7 @@ private:
   qint64 playbackNowMs();
   void updateHighlightState(bool animateSelection);
   void showAltTooltip(VGMItem* item, const QPoint& pos);
-  void hideAltTooltip();
+  void hideTooltip();
 
   VGMFile* m_vgmfile = nullptr;
   VGMItem* m_selectedItem = nullptr;
@@ -135,7 +135,7 @@ private:
   int m_lineHeight = 0;
   bool m_addressAsHex = true;
   bool m_isDragging = false;
-  VGMItem* m_altTooltipItem = nullptr;
+  VGMItem* m_tooltipItem = nullptr;
   bool m_shouldDrawOffset = true;
   bool m_shouldDrawAscii = true;
 

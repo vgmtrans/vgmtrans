@@ -59,8 +59,15 @@ const QColor PLAYBACK_GLOW_LOW(40, 40, 40);
 const QColor PLAYBACK_GLOW_HIGH(230, 230, 230);
 constexpr uint16_t STYLE_UNASSIGNED = std::numeric_limits<uint16_t>::max();
 
+constexpr Qt::KeyboardModifier SEEK_MODIFIER = Qt::ControlModifier;
+constexpr int SEEK_KEY = Qt::Key_Control;
+
 inline uint64_t selectionKey(uint32_t offset, uint32_t length) {
   return (static_cast<uint64_t>(offset) << 32) | length;
+}
+
+inline bool hasSeekModifier(Qt::KeyboardModifiers mods) {
+  return mods.testFlag(SEEK_MODIFIER);
 }
 
 QString tooltipIconDataUrl(VGMItem::Type type) {
@@ -685,7 +692,7 @@ void HexView::changeEvent(QEvent* event) {
 }
 
 void HexView::keyPressEvent(QKeyEvent* event) {
-  if (event->key() == Qt::Key_Alt) {
+  if (event->key() == SEEK_KEY) {
     const QPoint vp = mapFromGlobal(QCursor::pos());
     handleAltHoverMove(vp, QApplication::keyboardModifiers());
   }
@@ -740,8 +747,8 @@ void HexView::keyPressEvent(QKeyEvent* event) {
 }
 
 void HexView::keyReleaseEvent(QKeyEvent* event) {
-  if (event->key() == Qt::Key_Alt) {
-    hideAltTooltip();
+  if (event->key() == SEEK_KEY) {
+    hideTooltip();
   }
   QAbstractScrollArea::keyReleaseEvent(event);
 }
@@ -786,7 +793,7 @@ void HexView::mousePressEvent(QMouseEvent* event) {
 
     m_selectedOffset = offset;
     auto* item = m_vgmfile->getItemAtOffset(offset, false);
-    const bool seekModifier = event->modifiers().testFlag(Qt::AltModifier);
+    const bool seekModifier = hasSeekModifier(event->modifiers());
     if (item == m_selectedItem) {
       selectionChanged(nullptr);
     } else {
@@ -796,7 +803,7 @@ void HexView::mousePressEvent(QMouseEvent* event) {
       seekToEventRequested(item);
       showAltTooltip(item, event->pos());
     } else {
-      hideAltTooltip();
+      hideTooltip();
     }
     m_isDragging = true;
   }
@@ -807,7 +814,7 @@ void HexView::mousePressEvent(QMouseEvent* event) {
 void HexView::mouseReleaseEvent(QMouseEvent* event) {
   if (event->button() == Qt::LeftButton) {
     m_isDragging = false;
-    hideAltTooltip();
+    hideTooltip();
   }
   QAbstractScrollArea::mouseReleaseEvent(event);
 }
@@ -819,16 +826,16 @@ void HexView::handleCoalescedMouseMove(const QPoint& pos,
     const int offset = getOffsetFromPoint(pos);
     if (offset == -1) {
       selectionChanged(nullptr);
-      hideAltTooltip();
+      hideTooltip();
       return;
     }
     m_selectedOffset = offset;
     if (m_selectedItem && (m_selectedOffset >= m_selectedItem->dwOffset) &&
         (m_selectedOffset < (m_selectedItem->dwOffset + m_selectedItem->unLength))) {
-      if (mods.testFlag(Qt::AltModifier) && m_selectedItem) {
+      if (hasSeekModifier(mods) && m_selectedItem) {
         showAltTooltip(m_selectedItem, pos);
       } else {
-        hideAltTooltip();
+        hideTooltip();
       }
       return;
     }
@@ -837,29 +844,29 @@ void HexView::handleCoalescedMouseMove(const QPoint& pos,
       // setSelectedItem(item);
       selectionChanged(item);
     }
-    if (mods.testFlag(Qt::AltModifier) && item) {
+    if (hasSeekModifier(mods) && item) {
       seekToEventRequested(item);
       showAltTooltip(item, pos);
     } else {
-      hideAltTooltip();
+      hideTooltip();
     }
   }
 }
 
 void HexView::handleAltHoverMove(const QPoint& pos, Qt::KeyboardModifiers mods) {
-  if (!mods.testFlag(Qt::AltModifier)) {
-    hideAltTooltip();
+  if (!hasSeekModifier(mods)) {
+    hideTooltip();
     return;
   }
   const int offset = getOffsetFromPoint(pos);
   if (offset < 0) {
-    hideAltTooltip();
+    hideTooltip();
     return;
   }
   if (auto* item = m_vgmfile->getItemAtOffset(offset, false)) {
     showAltTooltip(item, pos);
   } else {
-    hideAltTooltip();
+    hideTooltip();
   }
 }
 
@@ -1118,25 +1125,25 @@ void HexView::updateHighlightState(bool animateSelection) {
 
 void HexView::showAltTooltip(VGMItem* item, const QPoint& pos) {
   if (!item) {
-    hideAltTooltip();
+    hideTooltip();
     return;
   }
-  if (m_altTooltipItem && item->dwOffset == m_altTooltipItem->dwOffset) {
+  if (m_tooltipItem && item->dwOffset == m_tooltipItem->dwOffset) {
     return;
   }
   const QString description = tooltipHtmlWithIcon(item);
   if (description.isEmpty()) {
-    hideAltTooltip();
+    hideTooltip();
     return;
   }
   QToolTip::showText(viewport()->mapToGlobal(pos), description, this);
-  m_altTooltipItem = item;
+  m_tooltipItem = item;
 }
 
-void HexView::hideAltTooltip() {
-  if (!m_altTooltipItem) {
+void HexView::hideTooltip() {
+  if (!m_tooltipItem) {
     return;
   }
   QToolTip::hideText();
-  m_altTooltipItem = nullptr;
+  m_tooltipItem = nullptr;
 }
