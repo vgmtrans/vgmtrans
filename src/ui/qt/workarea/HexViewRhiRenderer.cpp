@@ -34,7 +34,7 @@ constexpr int NUM_ADDRESS_NIBBLES = 8;
 constexpr int HEX_TO_ASCII_SPACING_CHARS = 4;
 const QColor SHADOW_COLOR = Qt::black;
 const QColor OUTLINE_COLOR(70, 70, 70);
-constexpr float OUTLINE_ALPHA = 0.35f;
+constexpr float OUTLINE_ALPHA = 0.5f;
 constexpr float OUTLINE_MIN_CELL_PX = 6.0f;
 
 static const float kVertices[] = {
@@ -768,7 +768,7 @@ void HexViewRhiRenderer::updateUniforms(QRhiResourceUpdateBatch* u, float scroll
   const QColor glowHigh = m_view->m_playbackGlowHigh;
   const QVector4D p4(glowLow.redF(), glowLow.greenF(), glowLow.blueF(),
                      static_cast<float>(m_view->m_playbackGlowStrength));
-  const QVector4D p5(glowHigh.redF(), glowHigh.greenF(), glowHigh.blueF(), 0.0f);
+  const QVector4D p5(glowHigh.redF(), glowHigh.greenF(), glowHigh.blueF(), dpr);
   const float outlineAlpha = m_outlineEnabled ? OUTLINE_ALPHA : 0.0f;
   const QVector4D p6(OUTLINE_COLOR.redF(), OUTLINE_COLOR.greenF(), OUTLINE_COLOR.blueF(),
                      outlineAlpha);
