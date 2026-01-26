@@ -153,6 +153,7 @@ void HexViewRhiRenderer::releaseResources() {
   m_edgeSrb = nullptr;
   delete m_compositeSrb;
   m_compositeSrb = nullptr;
+  m_compositeSrbDirty = false;
 
   releaseRenderTargets();
 
@@ -284,6 +285,10 @@ void HexViewRhiRenderer::renderFrame(QRhiCommandBuffer* cb, const RenderTargetIn
   ensureRenderTargets(target.pixelSize);
   const int sampleCount = std::max(1, target.sampleCount);
   ensurePipelines(target.renderPassDesc, sampleCount);
+  if (m_compositeSrbDirty && m_compositeSrb) {
+    updateCompositeSrb();
+    m_compositeSrbDirty = false;
+  }
   updateUniforms(u, static_cast<float>(scrollY), target.pixelSize);
   updateInstanceBuffers(u);
 
@@ -445,21 +450,7 @@ void HexViewRhiRenderer::ensurePipelines(QRhiRenderPassDescriptor* outputRp,
   m_edgeSrb->create();
 
   m_compositeSrb = m_rhi->newShaderResourceBindings();
-  m_compositeSrb->setBindings({
-    QRhiShaderResourceBinding::uniformBuffer(0,
-                                             QRhiShaderResourceBinding::VertexStage |
-                                             QRhiShaderResourceBinding::FragmentStage,
-                                             m_compositeUbuf),
-    QRhiShaderResourceBinding::sampledTexture(1, QRhiShaderResourceBinding::FragmentStage,
-                                              m_contentTex, m_glyphSampler),
-    QRhiShaderResourceBinding::sampledTexture(2, QRhiShaderResourceBinding::FragmentStage,
-                                              m_maskTex, m_maskSampler),
-    QRhiShaderResourceBinding::sampledTexture(3, QRhiShaderResourceBinding::FragmentStage,
-                                              m_edgeTex, m_glyphSampler),
-    QRhiShaderResourceBinding::sampledTexture(4, QRhiShaderResourceBinding::FragmentStage,
-                                              m_itemIdTex, m_maskSampler)
-  });
-  m_compositeSrb->create();
+  updateCompositeSrb();
 
   QShader rectVert = loadShader(":/shaders/hexquad.vert.qsb");
   QShader rectFrag = loadShader(":/shaders/hexquad.frag.qsb");
@@ -634,6 +625,7 @@ void HexViewRhiRenderer::ensureItemIdTexture(QRhiResourceUpdateBatch* u, int sta
       m_itemIdTex = m_rhi->newTexture(QRhiTexture::RGBA8, size, 1);
       m_itemIdTex->create();
       m_itemIdSize = size;
+      m_compositeSrbDirty = true;
     }
     if (m_itemIdDirty) {
       QImage img(1, 1, QImage::Format_RGBA8888);
@@ -655,6 +647,7 @@ void HexViewRhiRenderer::ensureItemIdTexture(QRhiResourceUpdateBatch* u, int sta
     m_itemIdTex->create();
     m_itemIdSize = size;
     m_itemIdDirty = true;
+    m_compositeSrbDirty = true;
   }
 
   if (!m_itemIdDirty && m_itemIdStartLine == padStart) {
@@ -700,6 +693,27 @@ void HexViewRhiRenderer::ensureItemIdTexture(QRhiResourceUpdateBatch* u, int sta
   }
 
   u->uploadTexture(m_itemIdTex, img);
+}
+
+void HexViewRhiRenderer::updateCompositeSrb() {
+  if (!m_compositeSrb) {
+    return;
+  }
+  m_compositeSrb->setBindings({
+    QRhiShaderResourceBinding::uniformBuffer(0,
+                                             QRhiShaderResourceBinding::VertexStage |
+                                             QRhiShaderResourceBinding::FragmentStage,
+                                             m_compositeUbuf),
+    QRhiShaderResourceBinding::sampledTexture(1, QRhiShaderResourceBinding::FragmentStage,
+                                              m_contentTex, m_glyphSampler),
+    QRhiShaderResourceBinding::sampledTexture(2, QRhiShaderResourceBinding::FragmentStage,
+                                              m_maskTex, m_maskSampler),
+    QRhiShaderResourceBinding::sampledTexture(3, QRhiShaderResourceBinding::FragmentStage,
+                                              m_edgeTex, m_glyphSampler),
+    QRhiShaderResourceBinding::sampledTexture(4, QRhiShaderResourceBinding::FragmentStage,
+                                              m_itemIdTex, m_maskSampler)
+  });
+  m_compositeSrb->create();
 }
 
 void HexViewRhiRenderer::updateUniforms(QRhiResourceUpdateBatch* u, float scrollY,

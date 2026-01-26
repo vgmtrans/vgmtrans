@@ -117,6 +117,7 @@ private:
   void ensurePipelines(QRhiRenderPassDescriptor* outputRp, int outputSampleCount);
   void ensureGlyphTexture(QRhiResourceUpdateBatch* u);
   void ensureItemIdTexture(QRhiResourceUpdateBatch* u, int startLine, int endLine, int totalLines);
+  void updateCompositeSrb();
   void updateUniforms(QRhiResourceUpdateBatch* u, float scrollY, const QSize& pixelSize);
   bool ensureInstanceBuffer(QRhiBuffer*& buffer, int bytes);
   void updateInstanceBuffers(QRhiResourceUpdateBatch* u);
@@ -209,5 +210,6 @@ private:
   bool m_outlineEnabled = false;
   int m_itemIdStartLine = 0;
   QSize m_itemIdSize;
+  bool m_compositeSrbDirty = false;
   bool m_inited = false;
 };
