@@ -15,6 +15,7 @@
 #include <QColor>
 #include <QDebug>
 #include <QFile>
+#include <QImage>
 #include <QMatrix4x4>
 #include <QPalette>
 #include <QRectF>
@@ -32,6 +33,9 @@ namespace {
 constexpr int NUM_ADDRESS_NIBBLES = 8;
 constexpr int HEX_TO_ASCII_SPACING_CHARS = 4;
 const QColor SHADOW_COLOR = Qt::black;
+const QColor OUTLINE_COLOR(70, 70, 70);
+constexpr float OUTLINE_ALPHA = 0.35f;
+constexpr float OUTLINE_MIN_CELL_PX = 6.0f;
 
 static const float kVertices[] = {
   0.0f, 0.0f,
@@ -103,7 +107,7 @@ void HexViewRhiRenderer::initIfNeeded(QRhi* rhi) {
   m_edgeUbuf = m_rhi->newBuffer(QRhiBuffer::Dynamic, QRhiBuffer::UniformBuffer, edgeUboSize);
   m_edgeUbuf->create();
 
-  const int screenUboSize = m_rhi->ubufAligned(kMat4Bytes + kVec4Bytes * 6);
+  const int screenUboSize = m_rhi->ubufAligned(kMat4Bytes + kVec4Bytes * 8);
   m_compositeUbuf = m_rhi->newBuffer(QRhiBuffer::Dynamic, QRhiBuffer::UniformBuffer, screenUboSize);
   m_compositeUbuf->create();
 
@@ -154,6 +158,8 @@ void HexViewRhiRenderer::releaseResources() {
 
   delete m_glyphTex;
   m_glyphTex = nullptr;
+  delete m_itemIdTex;
+  m_itemIdTex = nullptr;
   delete m_glyphSampler;
   m_glyphSampler = nullptr;
   delete m_maskSampler;
@@ -186,6 +192,7 @@ void HexViewRhiRenderer::releaseResources() {
 
 void HexViewRhiRenderer::markBaseDirty() {
   m_baseDirty = true;
+  m_itemIdDirty = true;
 }
 
 void HexViewRhiRenderer::markSelectionDirty() {
@@ -198,6 +205,7 @@ void HexViewRhiRenderer::invalidateCache() {
   m_cacheEndLine = -1;
   m_baseDirty = true;
   m_selectionDirty = true;
+  m_itemIdDirty = true;
 }
 
 void HexViewRhiRenderer::renderFrame(QRhiCommandBuffer* cb, const RenderTargetInfo& target) {
@@ -266,6 +274,13 @@ void HexViewRhiRenderer::renderFrame(QRhiCommandBuffer* cb, const RenderTargetIn
     m_staticBuffersUploaded = true;
   }
   ensureGlyphTexture(u);
+  const float minCell = std::min<float>(m_view->m_charWidth, m_view->m_lineHeight);
+  const bool outlineEnabled = minCell >= OUTLINE_MIN_CELL_PX;
+  if (outlineEnabled != m_outlineEnabled) {
+    m_outlineEnabled = outlineEnabled;
+    m_itemIdDirty = true;
+  }
+  ensureItemIdTexture(u, startLine, endLine, totalLines);
   ensureRenderTargets(target.pixelSize);
   const int sampleCount = std::max(1, target.sampleCount);
   ensurePipelines(target.renderPassDesc, sampleCount);
@@ -440,7 +455,9 @@ void HexViewRhiRenderer::ensurePipelines(QRhiRenderPassDescriptor* outputRp,
     QRhiShaderResourceBinding::sampledTexture(2, QRhiShaderResourceBinding::FragmentStage,
                                               m_maskTex, m_maskSampler),
     QRhiShaderResourceBinding::sampledTexture(3, QRhiShaderResourceBinding::FragmentStage,
-                                              m_edgeTex, m_glyphSampler)
+                                              m_edgeTex, m_glyphSampler),
+    QRhiShaderResourceBinding::sampledTexture(4, QRhiShaderResourceBinding::FragmentStage,
+                                              m_itemIdTex, m_maskSampler)
   });
   m_compositeSrb->create();
 
@@ -604,6 +621,87 @@ void HexViewRhiRenderer::ensureGlyphTexture(QRhiResourceUpdateBatch* u) {
   }
 }
 
+void HexViewRhiRenderer::ensureItemIdTexture(QRhiResourceUpdateBatch* u, int startLine,
+                                             int endLine, int totalLines) {
+  if (!m_rhi || !u) {
+    return;
+  }
+
+  if (!m_outlineEnabled) {
+    const QSize size(1, 1);
+    if (!m_itemIdTex || m_itemIdSize != size) {
+      delete m_itemIdTex;
+      m_itemIdTex = m_rhi->newTexture(QRhiTexture::RGBA8, size, 1);
+      m_itemIdTex->create();
+      m_itemIdSize = size;
+    }
+    if (m_itemIdDirty) {
+      QImage img(1, 1, QImage::Format_RGBA8888);
+      img.fill(Qt::transparent);
+      u->uploadTexture(m_itemIdTex, img);
+      m_itemIdDirty = false;
+      m_itemIdStartLine = 0;
+    }
+    return;
+  }
+
+  const int padStart = std::max(0, startLine - 1);
+  const int padEnd = std::min(totalLines - 1, endLine + 1);
+  const QSize size(kBytesPerLine, std::max(1, padEnd - padStart + 1));
+  const bool needsResize = !m_itemIdTex || m_itemIdSize != size;
+  if (needsResize) {
+    delete m_itemIdTex;
+    m_itemIdTex = m_rhi->newTexture(QRhiTexture::RGBA8, size, 1);
+    m_itemIdTex->create();
+    m_itemIdSize = size;
+    m_itemIdDirty = true;
+  }
+
+  if (!m_itemIdDirty && m_itemIdStartLine == padStart) {
+    return;
+  }
+
+  m_itemIdStartLine = padStart;
+  m_itemIdDirty = false;
+
+  QImage img(size, QImage::Format_RGBA8888);
+  img.fill(Qt::transparent);
+
+  std::unordered_map<const VGMItem*, uint16_t> idMap;
+  idMap.reserve(static_cast<size_t>(size.width() * size.height()));
+  uint16_t nextId = 1;
+
+  const uint32_t baseOffset = m_view->m_vgmfile->dwOffset;
+  const uint32_t endOffset = m_view->m_vgmfile->dwOffset + m_view->m_vgmfile->unLength;
+
+  for (int row = 0; row < size.height(); ++row) {
+    const int lineIndex = padStart + row;
+    uchar* dst = img.scanLine(row);
+    for (int byte = 0; byte < kBytesPerLine; ++byte) {
+      const uint32_t offset = baseOffset + static_cast<uint32_t>(lineIndex * kBytesPerLine + byte);
+      uint16_t id = 0;
+      if (offset < endOffset) {
+        if (VGMItem* item = m_view->m_vgmfile->getItemAtOffset(offset, false)) {
+          if (item->children().empty()) {
+            auto [it, inserted] = idMap.emplace(item, nextId);
+            if (inserted) {
+              ++nextId;
+            }
+            id = it->second;
+          }
+        }
+      }
+      const int px = byte * 4;
+      dst[px + 0] = static_cast<uchar>(id & 0xFF);
+      dst[px + 1] = static_cast<uchar>((id >> 8) & 0xFF);
+      dst[px + 2] = 0;
+      dst[px + 3] = 255;
+    }
+  }
+
+  u->uploadTexture(m_itemIdTex, img);
+}
+
 void HexViewRhiRenderer::updateUniforms(QRhiResourceUpdateBatch* u, float scrollY,
                                        const QSize& pixelSize) {
   const QSize viewSize = m_view->viewport()->size();
@@ -657,6 +755,12 @@ void HexViewRhiRenderer::updateUniforms(QRhiResourceUpdateBatch* u, float scroll
   const QVector4D p4(glowLow.redF(), glowLow.greenF(), glowLow.blueF(),
                      static_cast<float>(m_view->m_playbackGlowStrength));
   const QVector4D p5(glowHigh.redF(), glowHigh.greenF(), glowHigh.blueF(), 0.0f);
+  const float outlineAlpha = m_outlineEnabled ? OUTLINE_ALPHA : 0.0f;
+  const QVector4D p6(OUTLINE_COLOR.redF(), OUTLINE_COLOR.greenF(), OUTLINE_COLOR.blueF(),
+                     outlineAlpha);
+  const QVector4D p7(lineHeight, scrollY,
+                     static_cast<float>(m_itemIdStartLine),
+                     static_cast<float>(std::max(1, m_itemIdSize.height())));
 
   u->updateDynamicBuffer(m_compositeUbuf, 0, kMat4Bytes, screenMvp.constData());
   u->updateDynamicBuffer(m_compositeUbuf, kMat4Bytes + kVec4Bytes * 0, kVec4Bytes, &p0);
@@ -665,6 +769,8 @@ void HexViewRhiRenderer::updateUniforms(QRhiResourceUpdateBatch* u, float scroll
   u->updateDynamicBuffer(m_compositeUbuf, kMat4Bytes + kVec4Bytes * 3, kVec4Bytes, &p3);
   u->updateDynamicBuffer(m_compositeUbuf, kMat4Bytes + kVec4Bytes * 4, kVec4Bytes, &p4);
   u->updateDynamicBuffer(m_compositeUbuf, kMat4Bytes + kVec4Bytes * 5, kVec4Bytes, &p5);
+  u->updateDynamicBuffer(m_compositeUbuf, kMat4Bytes + kVec4Bytes * 6, kVec4Bytes, &p6);
+  u->updateDynamicBuffer(m_compositeUbuf, kMat4Bytes + kVec4Bytes * 7, kVec4Bytes, &p7);
 }
 
 bool HexViewRhiRenderer::ensureInstanceBuffer(QRhiBuffer*& buffer, int bytes) {

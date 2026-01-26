@@ -116,6 +116,7 @@ private:
 
   void ensurePipelines(QRhiRenderPassDescriptor* outputRp, int outputSampleCount);
   void ensureGlyphTexture(QRhiResourceUpdateBatch* u);
+  void ensureItemIdTexture(QRhiResourceUpdateBatch* u, int startLine, int endLine, int totalLines);
   void updateUniforms(QRhiResourceUpdateBatch* u, float scrollY, const QSize& pixelSize);
   bool ensureInstanceBuffer(QRhiBuffer*& buffer, int bytes);
   void updateInstanceBuffers(QRhiResourceUpdateBatch* u);
@@ -169,6 +170,7 @@ private:
   QRhiBuffer* m_edgeUbuf = nullptr;
   QRhiBuffer* m_compositeUbuf = nullptr;
   QRhiTexture* m_glyphTex = nullptr;
+  QRhiTexture* m_itemIdTex = nullptr;
   QRhiSampler* m_glyphSampler = nullptr;
   QRhiSampler* m_maskSampler = nullptr;
   QRhiShaderResourceBindings* m_rectSrb = nullptr;
@@ -203,5 +205,9 @@ private:
   bool m_selectionDirty = true;
   bool m_baseBufferDirty = false;
   bool m_selectionBufferDirty = false;
+  bool m_itemIdDirty = true;
+  bool m_outlineEnabled = false;
+  int m_itemIdStartLine = 0;
+  QSize m_itemIdSize;
   bool m_inited = false;
 };
