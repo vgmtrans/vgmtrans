@@ -55,7 +55,7 @@ public:
   void handleCoalescedMouseMove(const QPoint& pos,
                                 Qt::MouseButtons buttons,
                                 Qt::KeyboardModifiers mods);
-  void handleAltHoverMove(const QPoint& pos, Qt::KeyboardModifiers mods);
+  void handleTooltipHoverMove(const QPoint& pos, Qt::KeyboardModifiers mods);
 
 signals:
   void selectionChanged(VGMItem* item);
@@ -124,7 +124,7 @@ private:
   void ensurePlaybackFadeTimer();
   qint64 playbackNowMs();
   void updateHighlightState(bool animateSelection);
-  void showAltTooltip(VGMItem* item, const QPoint& pos);
+  void showTooltip(VGMItem* item, const QPoint& pos);
   void hideTooltip();
 
   VGMFile* m_vgmfile = nullptr;

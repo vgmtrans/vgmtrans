@@ -215,7 +215,7 @@ bool HexViewRhiWindow::event(QEvent *e)
       auto *me = static_cast<QMouseEvent*>(e);
       if (!m_dragging) {
         const QPoint vp = m_view->viewport()->mapFromGlobal(me->globalPosition().toPoint());
-        m_view->handleAltHoverMove(vp, me->modifiers());
+        m_view->handleTooltipHoverMove(vp, me->modifiers());
         return true;
       }
       // Coalesce: keep only the latest move
