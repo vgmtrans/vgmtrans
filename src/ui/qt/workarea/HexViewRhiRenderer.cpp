@@ -34,7 +34,7 @@ constexpr int NUM_ADDRESS_NIBBLES = 8;
 constexpr int HEX_TO_ASCII_SPACING_CHARS = 4;
 const QColor SHADOW_COLOR = Qt::black;
 const QColor OUTLINE_COLOR(70, 70, 70);
-constexpr float OUTLINE_ALPHA = 0.5f;
+constexpr float OUTLINE_ALPHA = 0.75f;
 constexpr float OUTLINE_MIN_CELL_PX = 6.0f;
 
 static const float kVertices[] = {

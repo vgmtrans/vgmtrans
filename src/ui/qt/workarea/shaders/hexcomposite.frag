@@ -99,11 +99,16 @@ void main() {
             outlineMask = 0.0;
           } else {
 
-          float edgePx = 1.0 / dpr;
+          float edgePx = 2.0 / dpr;
           float leftEdge = step(localX, edgePx);
           float rightEdge = step(cellW - edgePx, localX);
           float topEdge = step(localY, edgePx);
           float bottomEdge = step(lineHeight - edgePx, localY);
+
+          float worldX = x;
+          float worldY = y + scrollY;
+          float dashV = 1.0 - step(3.5, mod(floor(worldY / edgePx), 6.0));
+          float dashH = 1.0 - step(3.5, mod(floor(worldX / edgePx), 6.0));
 
           float leftId = id;
           if (byteIdx > 0.0) {
@@ -130,10 +135,10 @@ void main() {
             downId = drg.r + drg.g * 256.0;
           }
 
-          float drawLeft = (leftId < 0.5 || id < leftId) ? 1.0 : 0.0;
-          float drawRight = (rightId < 0.5 || id < rightId) ? 1.0 : 0.0;
-          float drawUp = (upId < 0.5 || id < upId) ? 1.0 : 0.0;
-          float drawDown = (downId < 0.5 || id < downId) ? 1.0 : 0.0;
+          float drawLeft = ((leftId < 0.5 || id < leftId) ? 1.0 : 0.0) * dashV;
+          float drawRight = ((rightId < 0.5 || id < rightId) ? 1.0 : 0.0) * dashV;
+          float drawUp = ((upId < 0.5 || id < upId) ? 1.0 : 0.0) * dashH;
+          float drawDown = ((downId < 0.5 || id < downId) ? 1.0 : 0.0) * dashH;
           float edge =
               leftEdge * drawLeft * step(0.5, abs(id - leftId)) +
               rightEdge * drawRight * step(0.5, abs(id - rightId)) +
