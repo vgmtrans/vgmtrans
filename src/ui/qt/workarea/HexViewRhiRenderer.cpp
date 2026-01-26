@@ -36,7 +36,9 @@ const QColor SHADOW_COLOR = Qt::black;
 const QColor OUTLINE_COLOR(35, 35, 35);
 constexpr float OUTLINE_ALPHA = 1.0f;
 constexpr float OUTLINE_MIN_CELL_PX = 6.0f;
-constexpr float OUTLINE_FADE_SPEED = 5.0f;
+constexpr float OUTLINE_FADE_SPEED = (OUTLINE_FADE_DURATION_MS > 0)
+        ? (1000.0f / static_cast<float>(OUTLINE_FADE_DURATION_MS))
+        : 1000.0f;
 
 static const float kVertices[] = {
   0.0f, 0.0f,

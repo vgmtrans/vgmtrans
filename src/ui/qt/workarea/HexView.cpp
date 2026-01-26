@@ -46,7 +46,6 @@ constexpr int VIEWPORT_PADDING = 10;
 constexpr int DIM_DURATION_MS = 200;
 constexpr int PLAYBACK_FADE_DURATION_MS = 500;
 constexpr float PLAYBACK_FADE_CURVE = 3.0f;
-constexpr int OUTLINE_FADE_DURATION_MS = 500;
 constexpr int OVERLAY_ALPHA = 80;
 constexpr float OVERLAY_ALPHA_F = OVERLAY_ALPHA / 255.0f;
 constexpr float SHADOW_OFFSET_X = 0.0f;
