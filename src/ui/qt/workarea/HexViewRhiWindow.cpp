@@ -69,7 +69,10 @@ struct HexViewRhiWindow::BackendData {
 };
 
 HexViewRhiWindow::HexViewRhiWindow(HexView* view, HexViewRhiRenderer* renderer)
-    : m_view(view), m_renderer(renderer), m_backend(std::make_unique<BackendData>()) {
+    : m_view(view),
+      m_renderer(renderer),
+      m_input(view),
+      m_backend(std::make_unique<BackendData>()) {
   setFlags(Qt::FramelessWindowHint);
 
 #if defined(Q_OS_WIN)
@@ -132,52 +135,6 @@ HexViewRhiWindow::~HexViewRhiWindow() {
   releaseResources();
 }
 
-void HexViewRhiWindow::drainPendingMouseMove()
-{
-  if (!m_pendingMouseMove || !m_view || !m_view->viewport())
-    return;
-
-  m_pendingMouseMove = false;
-
-  // Map global -> viewport coordinates
-  const QPoint vp = m_view->viewport()->mapFromGlobal(m_pendingGlobalPos.toPoint());
-  const QPoint vpPos(vp);
-
-  // Update selection/hover/etc once per frame
-  m_view->handleCoalescedMouseMove(vpPos, m_pendingButtons, m_pendingMods);
-}
-
-void HexViewRhiWindow::drainPendingWheel()
-{
-  if (!m_pendingWheel || !m_view || !m_view->viewport())
-    return;
-
-  m_pendingWheel = false;
-
-  const QPoint vp = m_view->viewport()->mapFromGlobal(m_wheelGlobalPos.toPoint());
-  const QPointF vpPos(vp);
-
-  QWheelEvent ev(
-      vpPos,
-      m_wheelGlobalPos,
-      m_wheelPixelDelta,
-      m_wheelAngleDelta,
-      m_wheelButtons,
-      m_wheelMods,
-      m_wheelPhase,
-      /*inverted*/ false
-  );
-
-  QCoreApplication::sendEvent(m_view->viewport(), &ev);
-
-  m_wheelPixelDelta = {};
-  m_wheelAngleDelta = {};
-
-  // Trackpad inertia ends with ScrollEnd; if not available, use a timeout
-  if (m_wheelPhase == Qt::ScrollEnd)
-    m_scrolling = false;
-}
-
 void HexViewRhiWindow::releaseSwapChain()
 {
   if (m_hasSwapChain && m_sc) {
@@ -219,10 +176,7 @@ bool HexViewRhiWindow::event(QEvent *e)
         return true;
       }
       // Coalesce: keep only the latest move
-      m_pendingMouseMove = true;
-      m_pendingGlobalPos = me->globalPosition();
-      m_pendingButtons   = me->buttons();
-      m_pendingMods      = me->modifiers();
+      m_input.queueMouseMove(me);
 
       // Schedule a frame; Qt will coalesce multiple requestUpdate() calls anyway
       requestUpdate();
@@ -238,30 +192,7 @@ bool HexViewRhiWindow::event(QEvent *e)
 
     case QEvent::Wheel: {
       auto *we = static_cast<QWheelEvent*>(e);
-      m_pendingWheel = true;
-      m_scrolling = true;
-
-      QPoint pixel = we->pixelDelta();
-      QPoint angle = we->angleDelta();
-
-#ifdef Q_OS_WIN
-      // On Windows, while alt is pressed, vertical wheel events are interpreted as horizontal. We must correct that.
-      // Avoid messing with trackpads / kinetic scrolling gestures
-      if ((we->modifiers() & Qt::AltModifier) && angle.y() == 0 && angle.x() != 0) {
-        // Treat horizontal delta as vertical
-        angle = QPoint(0, angle.x());
-        if (pixel.y() == 0 && pixel.x() != 0)
-          pixel = QPoint(0, pixel.x());
-      }
-#endif
-
-
-      m_wheelGlobalPos  = we->globalPosition();
-      m_wheelPixelDelta += pixel;
-      m_wheelAngleDelta += angle;
-      m_wheelMods       = we->modifiers();
-      m_wheelButtons    = we->buttons();
-      m_wheelPhase      = we->phase();
+      m_input.queueWheel(we);
 
       requestUpdate();
       return true;
@@ -453,8 +384,8 @@ void HexViewRhiWindow::renderFrame() {
     return;
 
   // Apply at most one mouse, wheel move per frame
-  drainPendingMouseMove();
-  drainPendingWheel();
+  m_input.drainPendingMouseMove();
+  m_input.drainPendingWheel();
 
   const QSize currentPixelSize = m_sc->currentPixelSize();
   if (currentPixelSize.isEmpty()) {

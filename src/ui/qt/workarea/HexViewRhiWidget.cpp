@@ -18,7 +18,7 @@
 
 HexViewRhiWidget::HexViewRhiWidget(HexView* view, HexViewRhiRenderer* renderer,
                                    QWidget* parent)
-    : QRhiWidget(parent), m_view(view), m_renderer(renderer) {
+    : QRhiWidget(parent), m_view(view), m_renderer(renderer), m_input(view) {
 #if defined(Q_OS_LINUX)
   setApi(QRhiWidget::Api::OpenGL);
 #elif defined(Q_OS_WIN)
@@ -44,6 +44,9 @@ void HexViewRhiWidget::initialize(QRhiCommandBuffer* cb) {
 }
 
 void HexViewRhiWidget::render(QRhiCommandBuffer* cb) {
+  m_input.drainPendingMouseMove();
+  m_input.drainPendingWheel();
+
   if (!cb || !m_renderer) {
     return;
   }
@@ -119,7 +122,7 @@ bool HexViewRhiWidget::event(QEvent *e)
         m_view->handleTooltipHoverMove(vp, me->modifiers());
         return true;
       }
-      QCoreApplication::sendEvent(m_view->viewport(), e);
+      m_input.queueMouseMove(me);
       update();
       return true;
     }
@@ -132,6 +135,10 @@ bool HexViewRhiWidget::event(QEvent *e)
     }
 
     case QEvent::Wheel:
+      m_input.queueWheel(static_cast<QWheelEvent*>(e));
+      update();
+      return true;
+
     case QEvent::KeyPress:
     case QEvent::KeyRelease:
     case QEvent::ToolTip:
