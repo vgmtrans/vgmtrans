@@ -10,8 +10,11 @@
 #include <QTreeWidgetItem>
 #include <QStyledItemDelegate>
 #include <QHeaderView>
+#include <QBrush>
 #include <unordered_map>
+#include <unordered_set>
 #include <utility>
+#include <vector>
 #include "VGMFile.h"
 
 class VGMFile;
@@ -87,6 +90,7 @@ public:
   void addVGMItem(VGMItem *item, VGMItem *parent, const std::string &name);
   auto getTreeWidgetItem(const VGMItem *vgm_item) const { return m_items.at(vgm_item); };
   void updateStatusBar();
+  void setPlaybackItems(const std::vector<const VGMItem*>& items);
 
 protected:
   void focusInEvent(QFocusEvent* event) override;
@@ -109,4 +113,6 @@ private:
   std::unordered_map<const VGMItem*, QTreeWidgetItem*> m_items{};
   std::unordered_map<QTreeWidgetItem*, VGMItem*> m_treeItemToVGMItem{};
   QTreeWidgetItem* m_lastSeekItem{};
+  std::unordered_set<QTreeWidgetItem*> m_playbackTreeItems{};
+  QBrush m_playbackBrush{};
 };

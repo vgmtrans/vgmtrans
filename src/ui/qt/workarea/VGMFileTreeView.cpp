@@ -140,6 +140,8 @@ VGMFileTreeView::VGMFileTreeView(VGMFile *file, QWidget *parent) : QTreeWidget(p
   this->setHeader(headerView);
 
   setItemDelegate(new VGMTreeDisplayItem(this));
+  QColor playbackColor = palette().color(QPalette::Highlight);
+  m_playbackBrush = QBrush(playbackColor);
 
   connect(NotificationCenter::the(), &NotificationCenter::vgmfiletree_showDetailsChanged,
           this, &VGMFileTreeView::onShowDetailsChanged);
@@ -247,6 +249,39 @@ void VGMFileTreeView::updateStatusBar() {
   }
 
   NotificationCenter::the()->updateStatusForItem(vgmItem);
+}
+
+void VGMFileTreeView::setPlaybackItems(const std::vector<const VGMItem*>& items) {
+  std::unordered_set<QTreeWidgetItem*> next;
+  next.reserve(items.size());
+  for (const auto* item : items) {
+    if (!item) {
+      continue;
+    }
+    auto it = m_items.find(item);
+    if (it == m_items.end()) {
+      continue;
+    }
+    if (it->second) {
+      next.insert(it->second);
+    }
+  }
+
+  for (auto* treeItem : m_playbackTreeItems) {
+    if (!treeItem || next.find(treeItem) != next.end()) {
+      continue;
+    }
+    treeItem->setBackground(0, QBrush());
+  }
+
+  for (auto* treeItem : next) {
+    if (!treeItem || m_playbackTreeItems.find(treeItem) != m_playbackTreeItems.end()) {
+      continue;
+    }
+    treeItem->setBackground(0, m_playbackBrush);
+  }
+
+  m_playbackTreeItems.swap(next);
 }
 
 void VGMFileTreeView::seekToTreeItem(QTreeWidgetItem* item, bool allowRepeat) {

@@ -196,7 +196,12 @@ void VGMFileView::seekToEvent(VGMItem* item) const {
 }
 
 void VGMFileView::onPlaybackPositionChanged(int current, int max, PositionChangeOrigin origin) {
-  if (!m_hexview || !isVisible() || !m_hexview->isVisible()) {
+  if (!isVisible()) {
+    return;
+  }
+  const bool hexVisible = m_hexview && m_hexview->isVisible();
+  const bool treeVisible = m_treeview && m_treeview->isVisible();
+  if (!hexVisible && !treeVisible) {
     return;
   }
 
@@ -207,25 +212,42 @@ void VGMFileView::onPlaybackPositionChanged(int current, int max, PositionChange
 
   const auto* coll = SequencePlayer::the().activeCollection();
   if (!coll || !coll->containsVGMFile(m_vgmfile)) {
-    m_hexview->setPlaybackActive(false);
-    m_hexview->clearPlaybackSelections(false);
+    if (hexVisible) {
+      m_hexview->setPlaybackActive(false);
+      m_hexview->clearPlaybackSelections(false);
+    }
+    if (treeVisible) {
+      m_treeview->setPlaybackItems({});
+    }
     return;
   }
 
   const bool shouldHighlight = SequencePlayer::the().playing() || current > 0;
   if (!shouldHighlight) {
-    m_hexview->setPlaybackActive(false);
-    m_hexview->clearPlaybackSelections(false);
+    if (hexVisible) {
+      m_hexview->setPlaybackActive(false);
+      m_hexview->clearPlaybackSelections(false);
+    }
+    if (treeVisible) {
+      m_treeview->setPlaybackItems({});
+    }
     return;
   }
 
   const bool playbackActive = current > 0;
-  m_hexview->setPlaybackActive(playbackActive);
+  if (hexVisible) {
+    m_hexview->setPlaybackActive(playbackActive);
+  }
 
   const auto& timeline = seq->timedEventIndex();
   if (!timeline.finalized()) {
-    m_hexview->setPlaybackActive(false);
-    m_hexview->clearPlaybackSelections(false);
+    if (hexVisible) {
+      m_hexview->setPlaybackActive(false);
+      m_hexview->clearPlaybackSelections(false);
+    }
+    if (treeVisible) {
+      m_treeview->setPlaybackItems({});
+    }
     return;
   }
 
@@ -270,13 +292,21 @@ void VGMFileView::onPlaybackPositionChanged(int current, int max, PositionChange
     m_playbackItems.push_back(event);
   }
 
+  if (treeVisible) {
+    m_treeview->setPlaybackItems(m_playbackItems);
+  }
+
   if (m_playbackItems == m_lastPlaybackItems) {
-    m_hexview->requestPlaybackFrame();
+    if (hexVisible) {
+      m_hexview->requestPlaybackFrame();
+    }
     return;
   }
 
   m_lastPlaybackItems = m_playbackItems;
-  m_hexview->setPlaybackSelectionsForItems(m_playbackItems);
+  if (hexVisible) {
+    m_hexview->setPlaybackSelectionsForItems(m_playbackItems);
+  }
 }
 
 void VGMFileView::onPlayerStatusChanged(bool playing) {
@@ -290,4 +320,7 @@ void VGMFileView::onPlayerStatusChanged(bool playing) {
   m_lastPlaybackPosition = 0;
   m_hexview->setPlaybackActive(false);
   m_hexview->clearPlaybackSelections(false);
+  if (m_treeview) {
+    m_treeview->setPlaybackItems({});
+  }
 }
