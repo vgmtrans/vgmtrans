@@ -5,6 +5,7 @@
 */
 
 #include "HexView.h"
+#include "HexViewInput.h"
 #include "Helpers.h"
 #include "HexViewRhiHost.h"
 #include "VGMFile.h"
@@ -172,7 +173,7 @@ HexView::HexView(VGMFile* vgmfile, QWidget* parent)
             if (active) {
               const QPoint vp = viewport()->mapFromGlobal(QCursor::pos());
               if (viewport()->rect().contains(vp)) {
-                handleTooltipHoverMove(vp, Qt::KeyboardModifiers(Qt::ControlModifier));
+                handleTooltipHoverMove(vp, Qt::KeyboardModifiers(HexViewInput::kModifier));
               } else {
                 hideTooltip();
               }
@@ -725,7 +726,7 @@ void HexView::keyPressEvent(QKeyEvent* event) {
 
   uint32_t newOffset = 0;
   switch (event->key()) {
-    case Qt::Key_Control:
+    case HexViewInput::kModifierKey:
       handleTooltipHoverMove(mapFromGlobal(QCursor::pos()), QApplication::keyboardModifiers());
       break;
     case Qt::Key_Up:
@@ -772,7 +773,7 @@ void HexView::keyPressEvent(QKeyEvent* event) {
 }
 
 void HexView::keyReleaseEvent(QKeyEvent* event) {
-  if (event->key() == Qt::Key_Control) {
+  if (event->key() == HexViewInput::kModifierKey) {
     hideTooltip();
   }
   QAbstractScrollArea::keyReleaseEvent(event);
@@ -812,7 +813,7 @@ void HexView::mousePressEvent(QMouseEvent* event) {
   if (event->button() == Qt::LeftButton) {
     const int offset = getOffsetFromPoint(event->pos());
     auto* item = m_vgmfile->getItemAtOffset(offset, false);
-    const bool seekModifier = event->modifiers().testFlag(Qt::ControlModifier);
+    const bool seekModifier = event->modifiers().testFlag(HexViewInput::kModifier);
     if (seekModifier) {
       if (item) {
         seekToEventRequested(item);
@@ -857,13 +858,13 @@ void HexView::handleCoalescedMouseMove(const QPoint& pos,
   if (m_isDragging && buttons & Qt::LeftButton) {
     const int offset = getOffsetFromPoint(pos);
     if (offset == -1) {
-      if (!mods.testFlag(Qt::ControlModifier)) {
+      if (!mods.testFlag(HexViewInput::kModifier)) {
         selectionChanged(nullptr);
       }
       hideTooltip();
       return;
     }
-    if (mods.testFlag(Qt::ControlModifier)) {
+    if (mods.testFlag(HexViewInput::kModifier)) {
       if (auto* item = m_vgmfile->getItemAtOffset(offset, false)) {
         seekToEventRequested(item);
       }
@@ -886,7 +887,7 @@ void HexView::handleCoalescedMouseMove(const QPoint& pos,
 }
 
 void HexView::handleTooltipHoverMove(const QPoint& pos, Qt::KeyboardModifiers mods) {
-  if (!mods.testFlag(Qt::ControlModifier)) {
+  if (!mods.testFlag(HexViewInput::kModifier)) {
     hideTooltip();
     return;
   }

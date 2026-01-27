@@ -39,6 +39,7 @@
 #include "workarea/VGMFileListView.h"
 #include "workarea/VGMCollListView.h"
 #include "workarea/VGMCollView.h"
+#include "workarea/HexViewInput.h"
 #include "workarea/MdiArea.h"
 #include "TitleBar.h"
 #include "StatusBarContent.h"
@@ -194,7 +195,7 @@ bool MainWindow::eventFilter(QObject* obj, QEvent* event) {
   Q_UNUSED(obj);
   if (event->type() == QEvent::KeyPress || event->type() == QEvent::KeyRelease) {
     auto* ke = static_cast<QKeyEvent*>(event);
-    if (!ke->isAutoRepeat() && ke->key() == Qt::Key_Control) {
+    if (!ke->isAutoRepeat() && ke->key() == HexViewInput::kModifierKey) {
       const bool active = event->type() == QEvent::KeyPress;
       NotificationCenter::the()->setSeekModifierActive(active);
     }
