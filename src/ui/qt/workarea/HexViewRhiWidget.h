@@ -8,6 +8,8 @@
 
 #include <QRhiWidget>
 
+#include "HexViewRhiInputCoalescer.h"
+
 class QEvent;
 class QResizeEvent;
 class HexView;
@@ -32,4 +34,5 @@ private:
   HexView* m_view = nullptr;
   HexViewRhiRenderer* m_renderer = nullptr;
   bool m_dragging = false;
+  HexViewRhiInputCoalescer m_input;
 };
