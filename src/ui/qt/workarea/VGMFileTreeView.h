@@ -94,16 +94,19 @@ protected:
   void mousePressEvent(QMouseEvent *event) override;
   void mouseDoubleClickEvent(QMouseEvent *event) override;
   void keyPressEvent(QKeyEvent *event) override;
+  void mouseMoveEvent(QMouseEvent *event) override;
 
 private:
   static int getSortedIndex(const QTreeWidgetItem* parent, const VGMTreeItem* item);
   void setItemText(VGMItem* item, VGMTreeItem* treeItem) const;
   void onShowDetailsChanged(bool showDetails);
   void updateItemTextRecursively(QTreeWidgetItem* item);
+  void seekToTreeItem(QTreeWidgetItem* item, bool allowRepeat = false);
 
   bool showDetails = false;
   QTreeWidgetItem *parent_item_cached{};
   VGMItem *parent_cached{};
   std::unordered_map<const VGMItem*, QTreeWidgetItem*> m_items{};
   std::unordered_map<QTreeWidgetItem*, VGMItem*> m_treeItemToVGMItem{};
+  QTreeWidgetItem* m_lastSeekItem{};
 };
