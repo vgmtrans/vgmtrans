@@ -241,12 +241,27 @@ bool HexViewRhiWindow::event(QEvent *e)
       m_pendingWheel = true;
       m_scrolling = true;
 
-      m_wheelGlobalPos = we->globalPosition();
-      m_wheelPixelDelta += we->pixelDelta();
-      m_wheelAngleDelta += we->angleDelta();
-      m_wheelMods = we->modifiers();
-      m_wheelButtons = we->buttons();
-      m_wheelPhase = we->phase();
+      QPoint pixel = we->pixelDelta();
+      QPoint angle = we->angleDelta();
+
+#ifdef Q_OS_WIN
+      // On Windows, while alt is pressed, vertical wheel events are interpreted as horizontal. We must correct that.
+      // Avoid messing with trackpads / kinetic scrolling gestures
+      if ((we->modifiers() & Qt::AltModifier) && angle.y() == 0 && angle.x() != 0) {
+        // Treat horizontal delta as vertical
+        angle = QPoint(0, angle.x());
+        if (pixel.y() == 0 && pixel.x() != 0)
+          pixel = QPoint(0, pixel.x());
+      }
+#endif
+
+
+      m_wheelGlobalPos  = we->globalPosition();
+      m_wheelPixelDelta += pixel;
+      m_wheelAngleDelta += angle;
+      m_wheelMods       = we->modifiers();
+      m_wheelButtons    = we->buttons();
+      m_wheelPhase      = we->phase();
 
       requestUpdate();
       return true;
