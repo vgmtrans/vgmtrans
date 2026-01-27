@@ -140,7 +140,7 @@ VGMFileTreeView::VGMFileTreeView(VGMFile *file, QWidget *parent) : QTreeWidget(p
   this->setHeader(headerView);
 
   setItemDelegate(new VGMTreeDisplayItem(this));
-  QColor playbackColor = palette().color(QPalette::Highlight);
+  QColor playbackColor = palette().color(QPalette::Accent);
   m_playbackBrush = QBrush(playbackColor);
 
   connect(NotificationCenter::the(), &NotificationCenter::vgmfiletree_showDetailsChanged,
