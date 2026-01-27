@@ -49,6 +49,7 @@ void main() {
   float asciiWidth = p1.w;
 
   vec2 viewSize = p2.xy;
+  float flipY = p2.z;
   float dpr = max(p5.a, 1.0);
   float time = p2.w;
   vec4 shadowColor = p3;
@@ -78,7 +79,8 @@ void main() {
   float outlineMask = 0.0;
   if (outlineAlpha > 0.0 && inColumns > 0.0 && lineHeight > 0.0 && idHeight > 0.0) {
     const float bytesPerLine = 16.0;
-    float y = vUv.y * viewSize.y;
+    float logicalY = mix(1.0 - vUv.y, vUv.y, flipY);
+    float y = logicalY * viewSize.y;
     float lineF = floor((y + scrollY) / lineHeight);
     float lineIdx = lineF - idStartLine;
     if (lineIdx >= 0.0 && lineIdx < idHeight) {
