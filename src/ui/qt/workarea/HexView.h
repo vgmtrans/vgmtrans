@@ -139,6 +139,7 @@ private:
   bool m_isDragging = false;
   bool m_seekModifierActive = false;
   VGMItem* m_tooltipItem = nullptr;
+  VGMItem* m_lastSeekItem = nullptr;
   bool m_shouldDrawOffset = true;
   bool m_shouldDrawAscii = true;
 
