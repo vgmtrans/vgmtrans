@@ -816,7 +816,10 @@ void HexView::mousePressEvent(QMouseEvent* event) {
     const bool seekModifier = event->modifiers().testFlag(HexViewInput::kModifier);
     if (seekModifier) {
       if (item) {
-        seekToEventRequested(item);
+        if (item != m_lastSeekItem) {
+          m_lastSeekItem = item;
+          seekToEventRequested(item);
+        }
         showTooltip(item, event->pos());
       } else {
         hideTooltip();
@@ -846,6 +849,7 @@ void HexView::mousePressEvent(QMouseEvent* event) {
 void HexView::mouseReleaseEvent(QMouseEvent* event) {
   if (event->button() == Qt::LeftButton) {
     m_isDragging = false;
+    m_lastSeekItem = nullptr;
     const QPoint vp = mapFromGlobal(QCursor::pos());
     handleTooltipHoverMove(vp, QApplication::keyboardModifiers());
   }
@@ -866,7 +870,10 @@ void HexView::handleCoalescedMouseMove(const QPoint& pos,
     }
     if (mods.testFlag(HexViewInput::kModifier)) {
       if (auto* item = m_vgmfile->getItemAtOffset(offset, false)) {
-        seekToEventRequested(item);
+        if (item != m_lastSeekItem) {
+          m_lastSeekItem = item;
+          seekToEventRequested(item);
+        }
       }
       hideTooltip();
       return;

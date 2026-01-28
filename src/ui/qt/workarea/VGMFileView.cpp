@@ -263,7 +263,7 @@ void VGMFileView::onPlaybackPositionChanged(int current, int max, PositionChange
     case PositionChangeOrigin::SeekBar:
       // This intended to distinguish between a drag and a seek to a further position of a sequence.
       // We want a drag to highlight passed through events.
-      if (tickDiff >= -300 && tickDiff <= 300) {
+      if (tickDiff >= -500 && tickDiff <= 500) {
         // Select all events passed through. We will fade the ones skipped past in the next step.
         int lesser = std::min(m_lastPlaybackPosition, current);
         int greater = std::max(m_lastPlaybackPosition, current);
