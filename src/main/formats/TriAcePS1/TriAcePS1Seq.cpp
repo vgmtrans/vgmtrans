@@ -21,27 +21,27 @@ TriAcePS1Seq::TriAcePS1Seq(RawFile *file, uint32_t offset, const std::string &na
 bool TriAcePS1Seq::parseHeader() {
   setPPQN(0x30);
 
-  header = addHeader(dwOffset, 0xD5);
-  header->addChild(dwOffset + 2, 2, "Size");
-  header->addChild(dwOffset + 0xB, 4, "Song title");
-  header->addChild(dwOffset + 0xF, 1, "BPM");
-  header->addChild(dwOffset + 0x10, 2, "Time Signature");
+  header = addHeader(offset(), 0xD5);
+  header->addChild(offset() + 2, 2, "Size");
+  header->addChild(offset() + 0xB, 4, "Song title");
+  header->addChild(offset() + 0xF, 1, "BPM");
+  header->addChild(offset() + 0x10, 2, "Time Signature");
 
-  unLength = readShort(dwOffset + 2);
-  setAlwaysWriteInitialTempo(readByte(dwOffset + 0xF));
+  setLength(readShort(offset() + 2));
+  setAlwaysWriteInitialTempo(readByte(offset() + 0xF));
   return true;
 }
 
 bool TriAcePS1Seq::parseTrackPointers() {
-  VGMHeader *TrkInfoHeader = header->addHeader(dwOffset + 0x16, 6 * 32, "Track Info Blocks");
+  VGMHeader *TrkInfoHeader = header->addHeader(offset() + 0x16, 6 * 32, "Track Info Blocks");
 
 
-  readBytes(dwOffset + 0x16, 6 * 32, &TrkInfos);
+  readBytes(offset() + 0x16, 6 * 32, &TrkInfos);
   for (int i = 0; i < 32; i++)
     if (TrkInfos[i].trkOffset != 0) {
       aTracks.push_back(new TriAcePS1Track(this, TrkInfos[i].trkOffset, 0));
 
-      VGMHeader *TrkInfoBlock = TrkInfoHeader->addHeader(dwOffset + 0x16 + 6 * i, 6, "Track Info");
+      VGMHeader *TrkInfoBlock = TrkInfoHeader->addHeader(offset() + 0x16 + 6 * i, 6, "Track Info");
     }
   return true;
 }
@@ -68,7 +68,7 @@ TriAcePS1Track::TriAcePS1Track(TriAcePS1Seq *parentSeq, uint32_t offset, uint32_
 
 void TriAcePS1Track::loadTrackMainLoop(uint32_t stopOffset, int32_t stopTime) {
   TriAcePS1Seq *seq = (TriAcePS1Seq *) parentSeq;
-  uint32_t scorePatternPtrOffset = dwOffset;
+  uint32_t scorePatternPtrOffset = offset();
   uint16_t scorePatternOffset = readShort(scorePatternPtrOffset);
   while (scorePatternOffset != 0xFFFF) {
     if (seq->patternMap[scorePatternOffset])
@@ -81,13 +81,13 @@ void TriAcePS1Track::loadTrackMainLoop(uint32_t stopOffset, int32_t stopTime) {
     }
     uint32_t endOffset = readScorePattern(scorePatternOffset);
     if (seq->curScorePattern)
-      seq->curScorePattern->unLength = endOffset - seq->curScorePattern->dwOffset;
+      seq->curScorePattern->setLength(endOffset - seq->curScorePattern->offset());
     addChild(scorePatternPtrOffset, 2, "Score Pattern Ptr");
     scorePatternPtrOffset += 2;
     scorePatternOffset = readShort(scorePatternPtrOffset);
   }
   addEndOfTrack(scorePatternPtrOffset, 2);
-  unLength = scorePatternPtrOffset + 2 - dwOffset;
+  setLength(scorePatternPtrOffset + 2 - offset());
 }
 
 

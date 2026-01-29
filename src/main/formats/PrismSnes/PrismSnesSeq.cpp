@@ -48,11 +48,11 @@ void PrismSnesSeq::demandEnvelopeContainer(uint32_t offset) {
     envContainer = addHeader(offset, 0, "Envelopes");
   }
 
-  if (offset < envContainer->dwOffset) {
-    if (envContainer->unLength != 0) {
-      envContainer->unLength += envContainer->dwOffset - offset;
+  if (offset < envContainer->offset()) {
+    if (envContainer->length() != 0) {
+      envContainer->setLength(envContainer->length() + (envContainer->offset() - offset));
     }
-    envContainer->dwOffset = offset;
+    envContainer->setOffset(offset);
   }
 }
 
@@ -65,9 +65,9 @@ void PrismSnesSeq::resetVars() {
 bool PrismSnesSeq::parseHeader() {
   setPPQN(SEQ_PPQN);
 
-  VGMHeader *header = addHeader(dwOffset, 0);
+  VGMHeader *header = addHeader(offset(), 0);
 
-  uint32_t curOffset = dwOffset;
+  uint32_t curOffset = offset();
   for (uint8_t trackIndex = 0; trackIndex < MAX_TRACKS + 1; trackIndex++) {
     if (curOffset + 1 > 0x10000) {
       return false;
@@ -674,8 +674,8 @@ bool PrismSnesTrack::readEvent() {
         bContinue = addLoopForever(beginOffset, length, "Jump");
       }
 
-      if (curOffset < dwOffset) {
-        dwOffset = curOffset;
+      if (curOffset < offset()) {
+        setOffset(curOffset);
       }
 
       break;
@@ -890,7 +890,7 @@ bool PrismSnesTrack::readEvent() {
     }
   }
 
-  //assert(curOffset >= parentSeq->dwOffset);
+  //assert(curOffset >= parentSeq->offset());
 
   //std::ostringstream ssTrace;
   //ssTrace << "" << std::hex << std::setfill('0') << std::setw(8) << std::uppercase << beginOffset << ": " << std::setw(2) << (int)statusByte  << " -> " << std::setw(8) << curOffset << std::endl;
@@ -988,7 +988,7 @@ void PrismSnesTrack::addVolumeEnvelope(uint16_t envelopeAddress) {
       break;
     }
 
-    envHeader->unLength = envOffset;
+    envHeader->setLength(envOffset);
   }
 }
 
@@ -1023,7 +1023,7 @@ void PrismSnesTrack::addPanEnvelope(uint16_t envelopeAddress) {
       break;
     }
 
-    envHeader->unLength = envOffset;
+    envHeader->setLength(envOffset);
   }
 }
 
@@ -1063,7 +1063,7 @@ void PrismSnesTrack::addEchoVolumeEnvelope(uint16_t envelopeAddress) {
       break;
     }
 
-    envHeader->unLength = envOffset;
+    envHeader->setLength(envOffset);
   }
 }
 
@@ -1099,7 +1099,7 @@ void PrismSnesTrack::addGAINEnvelope(uint16_t envelopeAddress) {
       break;
     }
 
-    envHeader->unLength = envOffset;
+    envHeader->setLength(envOffset);
   }
 }
 

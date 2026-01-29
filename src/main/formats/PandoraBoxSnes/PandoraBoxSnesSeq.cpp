@@ -37,25 +37,25 @@ PandoraBoxSnesSeq::~PandoraBoxSnesSeq() {
 void PandoraBoxSnesSeq::resetVars() {
   VGMSeq::resetVars();
 
-  setAlwaysWriteInitialTempo(readByte(dwOffset + 6));
+  setAlwaysWriteInitialTempo(readByte(offset() + 6));
 }
 
 bool PandoraBoxSnesSeq::parseHeader() {
   uint32_t curOffset;
 
-  VGMHeader *header = addHeader(dwOffset, 0);
-  if (dwOffset + 0x20 > 0x10000) {
+  VGMHeader *header = addHeader(offset(), 0);
+  if (offset() + 0x20 > 0x10000) {
     return false;
   }
 
-  addChild(dwOffset + 6, 1, "Tempo");
-  addChild(dwOffset + 7, 1, "Timebase");
+  addChild(offset() + 6, 1, "Tempo");
+  addChild(offset() + 7, 1, "Timebase");
 
-  uint8_t timebase = readByte(dwOffset + 7);
+  uint8_t timebase = readByte(offset() + 7);
   assert((timebase % 4) == 0);
   setPPQN(timebase / 4);
 
-  curOffset = dwOffset + 0x10;
+  curOffset = offset() + 0x10;
   for (uint8_t trackIndex = 0; trackIndex < MAX_TRACKS; trackIndex++) {
     uint16_t ofsTrackStart = readShort(curOffset);
     if (ofsTrackStart != 0xffff) {
@@ -72,12 +72,12 @@ bool PandoraBoxSnesSeq::parseHeader() {
 }
 
 bool PandoraBoxSnesSeq::parseTrackPointers() {
-  uint32_t curOffset = dwOffset + 0x10;
+  uint32_t curOffset = offset() + 0x10;
   for (uint8_t trackIndex = 0; trackIndex < MAX_TRACKS; trackIndex++) {
     uint16_t ofsTrackStart = readShort(curOffset);
     curOffset += 2;
     if (ofsTrackStart != 0xffff) {
-      uint16_t addrTrackStart = dwOffset + ofsTrackStart;
+      uint16_t addrTrackStart = offset() + ofsTrackStart;
       PandoraBoxSnesTrack *track = new PandoraBoxSnesTrack(this, addrTrackStart);
       aTracks.push_back(track);
     }

@@ -40,11 +40,12 @@ bool PSXSampColl::parseSampleInfo() {
     //We do this by searching for series of 16 0x00 value bytes.  These indicate the beginning of a sample,
     //and they will never be found at any other point within the adpcm sample data.
 
-    u32 nEndOffset = dwOffset + unLength;
-    if (unLength == 0)
+    u32 nEndOffset = offset() + length();
+    if (length() == 0) {
       nEndOffset = endOffset();
+    }
 
-    u32 i = dwOffset;
+    u32 i = offset();
     while (i + 32 <= nEndOffset) {
       bool isSample = false;
 
@@ -161,19 +162,19 @@ bool PSXSampColl::parseSampleInfo() {
                                   fmt::format("Sample {:d}", samples.size()));
       samples.push_back(samp);
     }
-    unLength = i - dwOffset;
+    setLength(i - offset());
   }
   else {
     uint32_t sampleIndex = 0;
 
-    if (!isValidSampleStart(rawFile(), dwOffset, true))
+    if (!isValidSampleStart(rawFile(), offset(), true))
       return false;
 
     for (std::vector<SizeOffsetPair>::iterator it = vagLocations.begin(); it != vagLocations.end(); ++it) {
       if (it->offset == 0 && it->size == 0)
         continue;
 
-      uint32_t offSampStart = dwOffset + it->offset;
+      uint32_t offSampStart = offset() + it->offset;
       uint32_t offDataEnd = offSampStart + it->size;
       uint32_t offSampEnd = offSampStart;
 
@@ -190,9 +191,9 @@ bool PSXSampColl::parseSampleInfo() {
       } while (!lastBlock);
 
       PSXSamp *samp = new PSXSamp(this,
-                                  dwOffset + it->offset,
+                                  offset() + it->offset,
                                   it->size,
-                                  dwOffset + it->offset,
+                                  offset() + it->offset,
                                   offSampEnd - offSampStart,
                                   1,
                                   BPS::PCM16,
@@ -203,7 +204,7 @@ bool PSXSampColl::parseSampleInfo() {
       sampleIndex++;
     }
   }
-  return unLength > 0x20;
+  return length() > 0x20;
 }
 
 constexpr u32 NUM_CHUNKS_READAHEAD      = 10;
@@ -378,10 +379,10 @@ std::vector<PSXSampColl*> PSXSampColl::searchForPSXADPCMs(RawFile* file, const s
     sampColls.push_back(coll);
 
     // Sanity check that the detected sampcoll isn't smaller than the back scanned distance
-    if ((start + coll->unLength - 1) < origOffset) {
+    if ((start + coll->length() - 1) < origOffset) {
       i = origOffset + 32;
     } else {
-      i = start + coll->unLength - 1;                      // skip parsed area
+      i = start + coll->length() - 1;                      // skip parsed area
     }
   }
   return sampColls;
@@ -419,22 +420,22 @@ std::vector<uint8_t> PSXSamp::decodeToNativePcm() {
   bool addrOutOfVirtFile = false;
   for (u32 k = 0; k < dataLength; k += 0x10)                //for every adpcm chunk
   {
-    if (dwOffset + k + 16 > vgmFile()->endOffset()) {
+    if (offset() + k + 16 > vgmFile()->endOffset()) {
       L_WARN("\"{}\" unexpected EOF.", name());
       break;
     }
-    else if (!addrOutOfVirtFile && k + 16 > unLength) {
+    else if (!addrOutOfVirtFile && k + 16 > length()) {
       L_WARN("\"{}\" unexpected end of PSXSamp.", name());
       addrOutOfVirtFile = true;
     }
 
-    theBlock.range = readByte(dwOffset + k) & 0xF;
-    theBlock.filter = (readByte(dwOffset + k) & 0xF0) >> 4;
-    theBlock.flag.end = readByte(dwOffset + k + 1) & 1;
-    theBlock.flag.looping = (readByte(dwOffset + k + 1) & 2) > 0;
+    theBlock.range = readByte(offset() + k) & 0xF;
+    theBlock.filter = (readByte(offset() + k) & 0xF0) >> 4;
+    theBlock.flag.end = readByte(offset() + k + 1) & 1;
+    theBlock.flag.looping = (readByte(offset() + k + 1) & 2) > 0;
 
     //this can be the loop point, but in wd, this info is stored in the instrset
-    theBlock.flag.loop = (readByte(dwOffset + k + 1) & 4) > 0;
+    theBlock.flag.loop = (readByte(offset() + k + 1) & 4) > 0;
     if (this->bSetLoopOnConversion) {
       if (theBlock.flag.loop) {
         this->setLoopOffset(k);
@@ -445,7 +446,7 @@ std::vector<uint8_t> PSXSamp::decodeToNativePcm() {
       }
     }
 
-    rawFile()->readBytes(dwOffset + k + 2, 14, theBlock.brr);
+    rawFile()->readBytes(offset() + k + 2, 14, theBlock.brr);
 
     //each decompressed pcm block is 56 bytes (28 samples, 16-bit each)
     decompVAGBlk(uncompBuf + ((k / 16) * 28), &theBlock, prev);

@@ -43,12 +43,12 @@ void GraphResSnesSeq::resetVars() {
 bool GraphResSnesSeq::parseHeader() {
   setPPQN(SEQ_PPQN);
 
-  VGMHeader *header = addHeader(dwOffset, 3 * MAX_TRACKS);
-  if (dwOffset + header->unLength > 0x10000) {
+  VGMHeader *header = addHeader(offset(), 3 * MAX_TRACKS);
+  if (offset() + header->length() > 0x10000) {
     return false;
   }
 
-  uint32_t curOffset = dwOffset;
+  uint32_t curOffset = offset();
   for (uint8_t trackIndex = 0; trackIndex < MAX_TRACKS; trackIndex++) {
     auto trackName = fmt::format("Track Pointer {}", trackIndex + 1);
 
@@ -68,13 +68,13 @@ bool GraphResSnesSeq::parseHeader() {
 
 
 bool GraphResSnesSeq::parseTrackPointers(void) {
-  uint32_t curOffset = dwOffset;
-  uint16_t addrTrackBase = readShort(dwOffset + 1);
+  uint32_t curOffset = offset();
+  uint16_t addrTrackBase = readShort(offset() + 1);
   for (uint8_t trackIndex = 0; trackIndex < MAX_TRACKS; trackIndex++) {
     bool trackUsed = (readByte(curOffset++) != 0);
     uint16_t addrTrackStartVirt = readShort(curOffset);
     curOffset += 2;
-    uint16_t addrTrackStart = 24 + addrTrackStartVirt - addrTrackBase + dwOffset;
+    uint16_t addrTrackStart = 24 + addrTrackStartVirt - addrTrackBase + offset();
 
     if (trackUsed) {
       GraphResSnesTrack *track = new GraphResSnesTrack(this, addrTrackStart);

@@ -103,7 +103,7 @@ bool CompileSnesInstr::loadInstr() {
 
   uint16_t addrSampStart = readShort(offDirEnt);
 
-  CompileSnesRgn *rgn = new CompileSnesRgn(this, version, dwOffset, addrPitchTablePtrs);
+  CompileSnesRgn *rgn = new CompileSnesRgn(this, version, offset(), addrPitchTablePtrs);
   rgn->sampOffset = addrSampStart - spcDirAddr;
   addRgn(rgn);
 
@@ -157,7 +157,7 @@ CompileSnesRgn::CompileSnesRgn(CompileSnesInstr *instr,
   }
   else {
     uint8_t pitchTableIndex = readByte(addrTuningTableItem + 1);
-    addChild(dwOffset + 1, 1, "Pitch Table Index");
+    addChild(offset() + 1, 1, "Pitch Table Index");
 
     if (pitchTableIndex == 0) {
       pitchTable.assign(std::begin(REGULAR_PITCH_TABLE), std::end(REGULAR_PITCH_TABLE));

@@ -36,7 +36,7 @@ bool FalcomSnesInstrSet::parseInstrPointers() {
 
   usedSRCNs.clear();
   for (int instr = 0; instr < 255 / kInstrItemSize; instr++) {
-    uint32_t addrInstrHeader = dwOffset + (kInstrItemSize * instr);
+    uint32_t addrInstrHeader = offset() + (kInstrItemSize * instr);
     if (addrInstrHeader + kInstrItemSize > 0x10000) {
       break;
     }
@@ -125,7 +125,7 @@ bool FalcomSnesInstr::loadInstr() {
 
   uint16_t addrSampStart = readShort(offDirEnt);
 
-  FalcomSnesRgn *rgn = new FalcomSnesRgn(this, version, dwOffset, srcn);
+  FalcomSnesRgn *rgn = new FalcomSnesRgn(this, version, offset(), srcn);
   rgn->sampOffset = addrSampStart - spcDirAddr;
   addRgn(rgn);
 

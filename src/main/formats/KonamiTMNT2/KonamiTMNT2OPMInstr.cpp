@@ -19,13 +19,13 @@ KonamiTMNT2OPMInstrSet::KonamiTMNT2OPMInstrSet(
 }
 
 bool KonamiTMNT2OPMInstrSet::parseInstrPointers() {
-  auto instrTableItem = addChild(dwOffset, 0, "Instrument Table");
+  auto instrTableItem = addChild(offset(), 0, "Instrument Table");
   for (int i = 0; ; ++i) {
-    u32 offset = dwOffset + (i * 2);
-    u16 instrPtr = readShort(offset);
-    if (instrPtr < dwOffset || instrPtr > dwOffset + 0x2000)
+    u32 instrPtrOff = offset() + (i * 2);
+    u16 instrPtr = readShort(instrPtrOff);
+    if (instrPtr < offset() || instrPtr > offset() + 0x2000)
       break;
-    instrTableItem->addChild(offset, 2, fmt::format("Instrument {} Pointer", i));
+    instrTableItem->addChild(instrPtrOff, 2, fmt::format("Instrument {} Pointer", i));
 
     std::string name = fmt::format("Instrument {:03d}", i);
     konami_tmnt2_ym2151_instr instrData{};

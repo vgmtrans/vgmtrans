@@ -117,8 +117,8 @@ SynthFile* createSynthFile(
           bool bFoundIt = false;
           for (uint32_t s = 0; s < sampColl->samples.size(); s++) {  //for every sample
             auto sample = sampColl->samples[s];
-            if (rgn->sampOffset == sample->dwOffset ||
-                rgn->sampOffset == sample->dwOffset - sampColl->dwOffset - sampColl->sampDataOffset) {
+            if (rgn->sampOffset == sample->offset() ||
+                rgn->sampOffset == sample->offset() - sampColl->offset() - sampColl->sampDataOffset) {
               if (rgn->sampDataLength != -1 && rgn->sampDataLength != sample->dataLength) {
                 continue;
               }

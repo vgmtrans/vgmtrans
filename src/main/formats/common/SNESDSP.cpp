@@ -441,17 +441,17 @@ std::vector<uint8_t> SNESSamp::decodeToNativePcm() {
   assert(dataLength % 9 == 0);
   for (uint32_t k = 0; k + 9 <= dataLength; k += 9)  //for every adpcm chunk
   {
-    if (dwOffset + k + 9 > rawFile()->size()) {
+    if (offset() + k + 9 > rawFile()->size()) {
       L_WARN("Unexpected EOF ({})", (name()));
       break;
     }
 
-    theBlock.flag.range = (readByte(dwOffset + k) & 0xf0) >> 4;
-    theBlock.flag.filter = (readByte(dwOffset + k) & 0x0c) >> 2;
-    theBlock.flag.end = (readByte(dwOffset + k) & 0x01) != 0;
-    theBlock.flag.loop = (readByte(dwOffset + k) & 0x02) != 0;
+    theBlock.flag.range = (readByte(offset() + k) & 0xf0) >> 4;
+    theBlock.flag.filter = (readByte(offset() + k) & 0x0c) >> 2;
+    theBlock.flag.end = (readByte(offset() + k) & 0x01) != 0;
+    theBlock.flag.loop = (readByte(offset() + k) & 0x02) != 0;
 
-    rawFile()->readBytes(dwOffset + k + 1, 8, theBlock.brr);
+    rawFile()->readBytes(offset() + k + 1, 8, theBlock.brr);
     const size_t blockIndex = k / 9;
     decompBRRBlk(output + blockIndex * 16,
                  &theBlock,
@@ -460,9 +460,9 @@ std::vector<uint8_t> SNESSamp::decodeToNativePcm() {
 
     if (theBlock.flag.end) {
       if (theBlock.flag.loop) {
-        if (brrLoopOffset <= dwOffset + k) {
-          setLoopOffset(brrLoopOffset - dwOffset);
-          setLoopLength((k + 9) - (brrLoopOffset - dwOffset));
+        if (brrLoopOffset <= offset() + k) {
+          setLoopOffset(brrLoopOffset - offset());
+          setLoopLength((k + 9) - (brrLoopOffset - offset()));
           setLoopStatus(1);
         }
       }

@@ -105,6 +105,11 @@ public:
   virtual void addToUI(VGMItem *parent, void *UI_specific);
 
   const std::vector<VGMItem*>& children() { return m_children; }
+  [[nodiscard]] uint32_t offset() const noexcept { return m_offset; }
+  [[nodiscard]] uint32_t length() const noexcept { return m_length; }
+  void setOffset(uint32_t offset);
+  void setLength(uint32_t length);
+  void setRange(uint32_t offset, uint32_t length);
   VGMItem* addChild(VGMItem* child);
   VGMItem* addChild(uint32_t offset, uint32_t length, const std::string &name);
   VGMItem* addUnknownChild(uint32_t offset, uint32_t length);
@@ -116,6 +121,9 @@ public:
   requires std::convertible_to<std::ranges::range_value_t<Range>, VGMItem*>
   void addChildren(const Range& items) {
     std::ranges::copy(items, std::back_inserter(m_children));
+    for (auto *child : m_children) {
+      child->m_parent = this;
+    }
   }
 
   void sortChildrenByOffset();
@@ -131,16 +139,17 @@ protected:
   // FIXME: clearChildren() is a workaround for VGMSeqNoTrks' multiple inheritance diamond problem
 
 public:
-  uint32_t dwOffset;  // offset in the pDoc data buffer
-  uint32_t unLength;  // num of bytes the event engulfs
   const Type type;
 
 private:
   std::vector<VGMItem *> m_children;
   VGMFile *m_vgmfile;
+  VGMItem *m_parent = nullptr;
+  uint32_t m_offset;  // offset in the pDoc data buffer
+  uint32_t m_length;  // num of bytes the event engulfs
   std::string m_name;
 };
 
 struct ItemPtrOffsetCmp {
-  bool operator()(const VGMItem *a, const VGMItem *b) const { return (a->dwOffset < b->dwOffset); }
+  bool operator()(const VGMItem *a, const VGMItem *b) const { return (a->offset() < b->offset()); }
 };

@@ -47,7 +47,7 @@ bool KonamiSnesInstrSet::parseInstrPointers() {
     uint32_t addrInstrHeader;
     if (instr < firstBankedInstr) {
       // common samples
-      addrInstrHeader = dwOffset + (instrItemSize * instr);
+      addrInstrHeader = offset() + (instrItemSize * instr);
     }
     else {
       // switchable samples
@@ -132,7 +132,7 @@ bool KonamiSnesInstr::loadInstr() {
     return true;
   }
 
-  uint8_t srcn = readByte(dwOffset);
+  uint8_t srcn = readByte(offset());
   uint32_t offDirEnt = spcDirAddr + (srcn * 4);
   if (offDirEnt + 4 > 0x10000) {
     return false;
@@ -140,7 +140,7 @@ bool KonamiSnesInstr::loadInstr() {
 
   uint16_t addrSampStart = readShort(offDirEnt);
 
-  KonamiSnesRgn *rgn = new KonamiSnesRgn(this, version, dwOffset, percussion);
+  KonamiSnesRgn *rgn = new KonamiSnesRgn(this, version, offset(), percussion);
   rgn->sampOffset = addrSampStart - spcDirAddr;
   addRgn(rgn);
 

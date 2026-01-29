@@ -38,7 +38,7 @@ bool NinSnesInstrSet::parseInstrPointers() {
   usedSRCNs.clear();
   for (int instr = 0; instr <= instr_max; instr++) {
     uint32_t instrItemSize = NinSnesInstr::expectedSize(version);
-    uint32_t addrInstrHeader = dwOffset + (instrItemSize * instr);
+    uint32_t addrInstrHeader = offset() + (instrItemSize * instr);
     if (addrInstrHeader + instrItemSize > 0x10000) {
       return false;
     }
@@ -138,7 +138,7 @@ NinSnesInstr::~NinSnesInstr() {
 }
 
 bool NinSnesInstr::loadInstr() {
-  uint8_t srcn = readByte(dwOffset);
+  uint8_t srcn = readByte(offset());
   uint32_t offDirEnt = spcDirAddr + (srcn * 4);
   if (offDirEnt + 4 > 0x10000) {
     return false;
@@ -146,7 +146,7 @@ bool NinSnesInstr::loadInstr() {
 
   uint16_t addrSampStart = readShort(offDirEnt);
 
-  NinSnesRgn *rgn = new NinSnesRgn(this, version, dwOffset, konamiTuningTableAddress, konamiTuningTableSize);
+  NinSnesRgn *rgn = new NinSnesRgn(this, version, offset(), konamiTuningTableAddress, konamiTuningTableSize);
   rgn->sampOffset = addrSampStart - spcDirAddr;
   addRgn(rgn);
 

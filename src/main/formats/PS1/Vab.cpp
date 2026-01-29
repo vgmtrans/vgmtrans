@@ -15,28 +15,28 @@ Vab::~Vab() {
 
 bool Vab::parseHeader() {
   uint32_t nEndOffset = endOffset();
-  uint32_t nMaxLength = nEndOffset - dwOffset;
+  uint32_t nMaxLength = nEndOffset - offset();
 
   if (nMaxLength < 0x20) {
     return false;
   }
 
-  VGMHeader *vabHdr = addHeader(dwOffset, 0x20, "VAB Header");
-  vabHdr->addChild(dwOffset + 0x00, 4, "ID");
-  vabHdr->addChild(dwOffset + 0x04, 4, "Version");
-  vabHdr->addChild(dwOffset + 0x08, 4, "VAB ID");
-  vabHdr->addChild(dwOffset + 0x0c, 4, "Total Size");
-  vabHdr->addChild(dwOffset + 0x10, 2, "Reserved");
-  vabHdr->addChild(dwOffset + 0x12, 2, "Number of Programs");
-  vabHdr->addChild(dwOffset + 0x14, 2, "Number of Tones");
-  vabHdr->addChild(dwOffset + 0x16, 2, "Number of VAGs");
-  vabHdr->addChild(dwOffset + 0x18, 1, "Master Volume");
-  vabHdr->addChild(dwOffset + 0x19, 1, "Master Pan");
-  vabHdr->addChild(dwOffset + 0x1a, 1, "Bank Attributes 1");
-  vabHdr->addChild(dwOffset + 0x1b, 1, "Bank Attributes 2");
-  vabHdr->addChild(dwOffset + 0x1c, 4, "Reserved");
+  VGMHeader *vabHdr = addHeader(offset(), 0x20, "VAB Header");
+  vabHdr->addChild(offset() + 0x00, 4, "ID");
+  vabHdr->addChild(offset() + 0x04, 4, "Version");
+  vabHdr->addChild(offset() + 0x08, 4, "VAB ID");
+  vabHdr->addChild(offset() + 0x0c, 4, "Total Size");
+  vabHdr->addChild(offset() + 0x10, 2, "Reserved");
+  vabHdr->addChild(offset() + 0x12, 2, "Number of Programs");
+  vabHdr->addChild(offset() + 0x14, 2, "Number of Tones");
+  vabHdr->addChild(offset() + 0x16, 2, "Number of VAGs");
+  vabHdr->addChild(offset() + 0x18, 1, "Master Volume");
+  vabHdr->addChild(offset() + 0x19, 1, "Master Pan");
+  vabHdr->addChild(offset() + 0x1a, 1, "Bank Attributes 1");
+  vabHdr->addChild(offset() + 0x1b, 1, "Bank Attributes 2");
+  vabHdr->addChild(offset() + 0x1c, 4, "Reserved");
 
-  readBytes(dwOffset, 0x20, &hdr);
+  readBytes(offset(), 0x20, &hdr);
 
   return true;
 }
@@ -44,12 +44,12 @@ bool Vab::parseHeader() {
 bool Vab::parseInstrPointers() {
   uint32_t nEndOffset = endOffset();
 
-  uint32_t offProgs = dwOffset + 0x20;
+  uint32_t offProgs = offset() + 0x20;
   uint32_t offToneAttrs = offProgs + (16 * 128);
 
-  uint16_t numPrograms = readShort(dwOffset + 0x12);
-  uint16_t numTones = readShort(dwOffset + 0x14);
-  uint16_t numVAGs = readShort(dwOffset + 0x16);
+  uint16_t numPrograms = readShort(offset() + 0x12);
+  uint16_t numTones = readShort(offset() + 0x14);
+  uint16_t numVAGs = readShort(offset() + 0x16);
 
   uint32_t offVAGOffsets = offToneAttrs + (32 * 16 * numPrograms);
 
@@ -57,11 +57,11 @@ bool Vab::parseInstrPointers() {
   VGMHeader *toneAttrsHdr = addHeader(offToneAttrs, 32 * 16, "Tone Attributes Table");
 
   if (numPrograms > 128) {
-    L_ERROR("Too many programs {}  Offset: 0x{:X}", numPrograms,  dwOffset);
+    L_ERROR("Too many programs {}  Offset: 0x{:X}", numPrograms,  offset());
     return false;
   }
   if (numVAGs > 255) {
-    L_ERROR("Too many VAGs {}  Offset: 0x{:X}", numVAGs,  dwOffset);
+    L_ERROR("Too many VAGs {}  Offset: 0x{:X}", numVAGs,  offset());
     return false;
   }
 
@@ -107,7 +107,7 @@ bool Vab::parseInstrPointers() {
 
       newInstr->masterVol = readByte(offCurrProg + 0x01);
 
-      toneAttrsHdr->unLength = offCurrToneAttrs + (32 * 16) - offToneAttrs;
+      toneAttrsHdr->setLength(offCurrToneAttrs + (32 * 16) - offToneAttrs);
 
       numProgramsLoaded++;
     }
@@ -138,7 +138,7 @@ bool Vab::parseInstrPointers() {
 
       vagOffset += vagSize;
     }
-    unLength = vagStartOffset - dwOffset;
+    setLength(vagStartOffset - offset());
   }
 
   return true;
@@ -146,7 +146,7 @@ bool Vab::parseInstrPointers() {
 
 bool Vab::isViableSampCollMatch(VGMSampColl* sampColl) {
   int sampleIndex = 0;
-  auto sampCollOffset = sampColl->dwOffset;
+  auto sampCollOffset = sampColl->offset();
   for (auto& vagLoc : m_vagLocations) {
     if (vagLoc.offset == 0 && vagLoc.size == 0)
       continue;
@@ -155,9 +155,9 @@ bool Vab::isViableSampCollMatch(VGMSampColl* sampColl) {
       return false;
 
     auto sample = sampColl->samples[sampleIndex++];
-    auto sampleRelOffset = sample->dwOffset - sampCollOffset;
+    auto sampleRelOffset = sample->offset() - sampCollOffset;
     if (sampleRelOffset != vagLoc.offset ||
-      (sample->unLength > vagLoc.size + 32 || sample->unLength < vagLoc.size))
+      (sample->length() > vagLoc.size + 32 || sample->length() < vagLoc.size))
       return false;
   }
   return true;
@@ -184,7 +184,7 @@ VabInstr::~VabInstr() {
 bool VabInstr::loadInstr() {
   int8_t numRgns = attr.tones;
   for (int i = 0; i < numRgns; i++) {
-    VabRgn *rgn = new VabRgn(this, dwOffset + i * 0x20);
+    VabRgn *rgn = new VabRgn(this, offset() + i * 0x20);
     if (!rgn->loadRgn()) {
       delete rgn;
       continue;
@@ -204,33 +204,33 @@ VabRgn::VabRgn(VabInstr *instr, uint32_t offset)
 
 bool VabRgn::loadRgn() {
   VabInstr *instr = (VabInstr *) parInstr;
-  unLength = 0x20;
-  readBytes(dwOffset, 0x20, &attr);
+  setLength(0x20);
+  readBytes(offset(), 0x20, &attr);
 
-  addGeneralItem(dwOffset, 1, "Priority");
-  addGeneralItem(dwOffset + 1, 1, "Mode (use reverb?)");
-  addVolume((readByte(dwOffset + 2) * instr->masterVol) / (127.0 * 127.0), dwOffset + 2, 1);
-  addPan(readByte(dwOffset + 3), dwOffset + 3);
-  addUnityKey(readByte(dwOffset + 4), dwOffset + 4);
-  addGeneralItem(dwOffset + 5, 1, "Pitch Tune");
-  addKeyLow(readByte(dwOffset + 6), dwOffset + 6);
-  addKeyHigh(readByte(dwOffset + 7), dwOffset + 7);
-  addGeneralItem(dwOffset + 8, 1, "Vibrato Width");
-  addGeneralItem(dwOffset + 9, 1, "Vibrato Time");
-  addGeneralItem(dwOffset + 10, 1, "Portamento Width");
-  addGeneralItem(dwOffset + 11, 1, "Portamento Holding Time");
-  addGeneralItem(dwOffset + 12, 1, "Pitch Bend Min");
-  addGeneralItem(dwOffset + 13, 1, "Pitch Bend Max");
-  addGeneralItem(dwOffset + 14, 1, "Reserved");
-  addGeneralItem(dwOffset + 15, 1, "Reserved");
-  addADSRValue(dwOffset + 16, 2, "ADSR1");
-  addADSRValue(dwOffset + 18, 2, "ADSR2");
-  addGeneralItem(dwOffset + 20, 2, "Parent Program");
-  addSampNum(readShort(dwOffset + 22) - 1, dwOffset + 22, 2);
-  addGeneralItem(dwOffset + 24, 2, "Reserved");
-  addGeneralItem(dwOffset + 26, 2, "Reserved");
-  addGeneralItem(dwOffset + 28, 2, "Reserved");
-  addGeneralItem(dwOffset + 30, 2, "Reserved");
+  addGeneralItem(offset(), 1, "Priority");
+  addGeneralItem(offset() + 1, 1, "Mode (use reverb?)");
+  addVolume((readByte(offset() + 2) * instr->masterVol) / (127.0 * 127.0), offset() + 2, 1);
+  addPan(readByte(offset() + 3), offset() + 3);
+  addUnityKey(readByte(offset() + 4), offset() + 4);
+  addGeneralItem(offset() + 5, 1, "Pitch Tune");
+  addKeyLow(readByte(offset() + 6), offset() + 6);
+  addKeyHigh(readByte(offset() + 7), offset() + 7);
+  addGeneralItem(offset() + 8, 1, "Vibrato Width");
+  addGeneralItem(offset() + 9, 1, "Vibrato Time");
+  addGeneralItem(offset() + 10, 1, "Portamento Width");
+  addGeneralItem(offset() + 11, 1, "Portamento Holding Time");
+  addGeneralItem(offset() + 12, 1, "Pitch Bend Min");
+  addGeneralItem(offset() + 13, 1, "Pitch Bend Max");
+  addGeneralItem(offset() + 14, 1, "Reserved");
+  addGeneralItem(offset() + 15, 1, "Reserved");
+  addADSRValue(offset() + 16, 2, "ADSR1");
+  addADSRValue(offset() + 18, 2, "ADSR2");
+  addGeneralItem(offset() + 20, 2, "Parent Program");
+  addSampNum(readShort(offset() + 22) - 1, offset() + 22, 2);
+  addGeneralItem(offset() + 24, 2, "Reserved");
+  addGeneralItem(offset() + 26, 2, "Reserved");
+  addGeneralItem(offset() + 28, 2, "Reserved");
+  addGeneralItem(offset() + 30, 2, "Reserved");
   ADSR1 = attr.adsr1;
   ADSR2 = attr.adsr2;
   if ((int) sampNum < 0)
@@ -238,7 +238,7 @@ bool VabRgn::loadRgn() {
 
   if (keyLow > keyHigh) {
     // This error may be present in actual game data. Example: Final Fantasy Origins: Chaos' Temple
-    L_ERROR("Low Key ({}) is higher than High Key ({})  Offset: 0x{:X}", keyLow, keyHigh, dwOffset);
+    L_ERROR("Low Key ({}) is higher than High Key ({})  Offset: 0x{:X}", keyLow, keyHigh, offset());
     return false;
   }
 
@@ -246,7 +246,7 @@ bool VabRgn::loadRgn() {
   // gocha: AFAIK, the valid range of pitch is 0-127. It must not be negative.
   // If it exceeds 127, driver clips the value and it will become 127. (In Hokuto no Ken, at least)
   // I am not sure if the interpretation of this value depends on a driver or VAB version.
-  uint8_t ft = readByte(dwOffset + 5);
+  uint8_t ft = readByte(offset() + 5);
   ft = std::min(ft, static_cast<u8>(127));
   double cents = ft * 100.0 / 128.0;
   setFineTune((int16_t) cents);

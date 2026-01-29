@@ -33,11 +33,11 @@ NDSInstrSet::NDSInstrSet(RawFile *file, uint32_t offset, uint32_t length, VGMSam
       m_psg_samples(psg_samples) {}
 
 bool NDSInstrSet::parseInstrPointers() {
-  uint32_t nInstruments = readWord(dwOffset + 0x38);
-  VGMHeader *instrptrHdr = addHeader(dwOffset + 0x38, nInstruments * 4 + 4, "Instrument Pointers");
+  uint32_t nInstruments = readWord(offset() + 0x38);
+  VGMHeader *instrptrHdr = addHeader(offset() + 0x38, nInstruments * 4 + 4, "Instrument Pointers");
 
   for (uint32_t i = 0; i < nInstruments; i++) {
-    uint32_t instrPtrOff = dwOffset + 0x3C + i * 4;
+    uint32_t instrPtrOff = offset() + 0x3C + i * 4;
     uint32_t temp = readWord(instrPtrOff);
     if (temp == 0) {
       continue;
@@ -45,7 +45,7 @@ bool NDSInstrSet::parseInstrPointers() {
 
     uint8_t instrType = temp & 0xFF;
     uint32_t pInstr = temp >> 8;
-    aInstrs.push_back(new NDSInstr(this, pInstr + dwOffset, 0, 0, i, instrType));
+    aInstrs.push_back(new NDSInstr(this, pInstr + offset(), 0, 0, i, instrType));
 
     VGMHeader *hdr = instrptrHdr->addHeader(instrPtrOff, 4, "Pointer");
     hdr->addChild(instrPtrOff, 1, "Type");
@@ -69,25 +69,25 @@ bool NDSInstr::loadInstr() {
   switch (instrType) {
     case 0x01: {
       setName("Single-Region Instrument");
-      unLength = 10;
+      setLength(10);
 
-      VGMRgn *rgn = addRgn(dwOffset, 10, readShort(dwOffset));
-      getSampCollPtr(rgn, readShort(dwOffset + 2));
-      getArticData(rgn, dwOffset + 4);
-      rgn->addChild(dwOffset + 2, 2, "Sample Collection Index");
+      VGMRgn *rgn = addRgn(offset(), 10, readShort(offset()));
+      getSampCollPtr(rgn, readShort(offset() + 2));
+      getArticData(rgn, offset() + 4);
+      rgn->addChild(offset() + 2, 2, "Sample Collection Index");
       break;
     }
 
     case 0x02: {
       /* PSG Tone */
-      uint8_t dutyCycle = readByte(dwOffset) & 0x07;
+      uint8_t dutyCycle = readByte(offset()) & 0x07;
       std::string dutyCycles[8] = {"12.5%", "25%", "37.5%", "50%",
                                     "62.5%", "75%", "87.5%", "0%"};
       setName("PSG Wave (" + dutyCycles[dutyCycle] + ")");
-      unLength = 10;
+      setLength(10);
 
-      VGMRgn *rgn = addRgn(dwOffset, 10, dutyCycle);
-      getArticData(rgn, dwOffset + 4);
+      VGMRgn *rgn = addRgn(offset(), 10, dutyCycle);
+      getArticData(rgn, offset() + 4);
 
       rgn->sampCollPtr = static_cast<NDSInstrSet*>(parInstrSet)->m_psg_samples;
       /* We have to set this manually as all of our samples are generated at 440Hz (69 = A4) */
@@ -97,11 +97,11 @@ bool NDSInstr::loadInstr() {
 
     case 0x03: {
       setName("PSG Noise");
-      unLength = 10;
+      setLength(10);
 
       /* The noise sample is the 8th in our PSG sample collection */
-      VGMRgn *rgn = addRgn(dwOffset, 10, 8);
-      getArticData(rgn, dwOffset + 4);
+      VGMRgn *rgn = addRgn(offset(), 10, 8);
+      getArticData(rgn, offset() + 4);
 
       rgn->sampCollPtr = static_cast<NDSInstrSet*>(parInstrSet)->m_psg_samples;
       rgn->setUnityKey(45);
@@ -112,11 +112,11 @@ bool NDSInstr::loadInstr() {
     case 0x10: {
       setName("Drumset");
 
-      uint8_t lowKey = readByte(dwOffset);
-      uint8_t highKey = readByte(dwOffset + 1);
+      uint8_t lowKey = readByte(offset());
+      uint8_t highKey = readByte(offset() + 1);
       uint8_t nRgns = (highKey - lowKey) + 1;
       for (uint8_t i = 0; i < nRgns; i++) {
-        u32 rgnOff = dwOffset + 2 + i * 12;
+        u32 rgnOff = offset() + 2 + i * 12;
         VGMRgn *rgn = addRgn(rgnOff, 12, readShort(rgnOff + 2),
                              lowKey + i, lowKey + i);
         getSampCollPtr(rgn, readShort(rgnOff + 4));
@@ -124,7 +124,7 @@ bool NDSInstr::loadInstr() {
         rgn->addChild(rgnOff + 2, 2, "Sample Num");
         rgn->addChild(rgnOff + 4, 2, "Sample Collection Index");
       }
-      unLength = 2 + nRgns * 12;
+      setLength(2 + nRgns * 12);
 
       break;
     }
@@ -134,24 +134,24 @@ bool NDSInstr::loadInstr() {
       uint8_t keyRanges[8];
       uint8_t nRgns = 0;
       for (int i = 0; i < 8; i++) {
-        keyRanges[i] = readByte(dwOffset + i);
+        keyRanges[i] = readByte(offset() + i);
         if (keyRanges[i] != 0) {
           nRgns++;
         } else {
           break;
         }
-        addChild(dwOffset + i, 1, "Key Range");
+        addChild(offset() + i, 1, "Key Range");
       }
 
       for (int i = 0; i < nRgns; i++) {
-        u32 rgnOff = dwOffset + 8 + i * 12;
+        u32 rgnOff = offset() + 8 + i * 12;
         VGMRgn *rgn = addRgn(rgnOff, 12, readShort(rgnOff + 2),
                              (i == 0) ? 0 : keyRanges[i - 1] + 1, keyRanges[i]);
         getSampCollPtr(rgn, readShort(rgnOff + 4));
         getArticData(rgn, rgnOff + 6);
         addChild(rgnOff + 4, 2, "Sample Collection Index");
       }
-      unLength = nRgns * 12 + 8;
+      setLength(nRgns * 12 + 8);
 
       break;
     }
@@ -272,14 +272,14 @@ NDSWaveArch::NDSWaveArch(RawFile *file, uint32_t offset, uint32_t length, std::s
 }
 
 bool NDSWaveArch::parseHeader() {
-  unLength = readWord(dwOffset + 8);
+  setLength(readWord(offset() + 8));
   return true;
 }
 
 bool NDSWaveArch::parseSampleInfo() {
-  uint32_t nSamples = readWord(dwOffset + 0x38);
+  uint32_t nSamples = readWord(offset() + 0x38);
   for (uint32_t i = 0; i < nSamples; i++) {
-    uint32_t pSample = readWord(dwOffset + 0x3C + i * 4) + dwOffset;
+    uint32_t pSample = readWord(offset() + 0x3C + i * 4) + offset();
     int nChannels = 1;
     uint8_t waveType = readByte(pSample);
     bool bLoops = (readByte(pSample + 1) != 0);

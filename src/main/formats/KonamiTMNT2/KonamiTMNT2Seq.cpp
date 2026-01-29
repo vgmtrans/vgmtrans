@@ -757,7 +757,7 @@ bool KonamiTMNT2Track::readEvent() {
         auto desc = fmt::format("Destination: {:X}", dest);
         addGenericEvent(beginOffset, 3, "Jump", desc, Type::Loop);
       }
-      if (dest < parentSeq->dwOffset) {
+      if (dest < parentSeq->offset()) {
         L_ERROR("KonamiArcadeEvent FD attempted jump to offset outside the sequence at {:X}.  Jump offset: {:X}", beginOffset, dest);
         return false;
       }
@@ -801,7 +801,7 @@ bool KonamiTMNT2Track::readEvent() {
       if (m_callOrigin[callIdx] == 0) {
         m_callOrigin[callIdx] = curOffset + 2;
         u16 dest = readShort(curOffset);
-        if (dest < parentSeq->dwOffset) {
+        if (dest < parentSeq->offset()) {
           return false;
         }
         auto desc = fmt::format("Call - destination: {:X}", dest);

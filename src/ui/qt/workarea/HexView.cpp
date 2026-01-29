@@ -218,7 +218,7 @@ void HexView::updateSize() {
 }
 
 int HexView::getTotalLines() const {
-  return (vgmfile->unLength + BYTES_PER_LINE - 1) / BYTES_PER_LINE;
+  return (vgmfile->length() + BYTES_PER_LINE - 1) / BYTES_PER_LINE;
 }
 
 void HexView::setSelectedItem(VGMItem *item) {
@@ -240,9 +240,9 @@ void HexView::setSelectedItem(VGMItem *item) {
   QScrollArea* scrollArea = getContainingScrollArea(this);
   if (!scrollArea) return;
 
-  auto itemBaseOffset = static_cast<int>(item->dwOffset - vgmfile->dwOffset);
+  auto itemBaseOffset = static_cast<int>(item->offset() - vgmfile->offset());
   int line = itemBaseOffset / BYTES_PER_LINE;
-  int endLine = static_cast<int>(item->dwOffset + item->unLength - vgmfile->dwOffset) / BYTES_PER_LINE;
+  int endLine = static_cast<int>(item->offset() + item->length() - vgmfile->offset()) / BYTES_PER_LINE;
 
   int viewPortStartLine = scrollArea->verticalScrollBar()->value() / lineHeight;
   int viewPortEndLine = viewPortStartLine + ((scrollArea->viewport()->height()) / lineHeight);
@@ -372,8 +372,8 @@ void HexView::changeEvent(QEvent *event) {
         int startLine = value / lineHeight;
         int endLine = (value + scrollArea->height()) / lineHeight;
 
-        int selectedItemStartLine = ((selectedItem->dwOffset - vgmfile->dwOffset) / BYTES_PER_LINE) - 1;
-        int selectedItemEndLine = (((selectedItem->dwOffset - vgmfile->dwOffset) + selectedItem->unLength) / BYTES_PER_LINE) + 1;
+        int selectedItemStartLine = ((selectedItem->offset() - vgmfile->offset()) / BYTES_PER_LINE) - 1;
+        int selectedItemEndLine = (((selectedItem->offset() - vgmfile->offset()) + selectedItem->length()) / BYTES_PER_LINE) + 1;
         bool selectionVisible = ((startLine <= selectedItemEndLine) && (selectedItemStartLine <= endLine));
         selectionVisible ? selectionView->show() : selectionView->hide();
       }
@@ -394,20 +394,20 @@ void HexView::keyPressEvent(QKeyEvent* event) {
       goto selectNewOffset;
 
     case Qt::Key_Down: {
-      int selectedCol = (selectedOffset - vgmfile->dwOffset) % BYTES_PER_LINE;
-      int endOffset = selectedItem->dwOffset - vgmfile->dwOffset + selectedItem->unLength;
+      int selectedCol = (selectedOffset - vgmfile->offset()) % BYTES_PER_LINE;
+      int endOffset = selectedItem->offset() - vgmfile->offset() + selectedItem->length();
       int itemEndCol = endOffset % BYTES_PER_LINE;
       int itemEndLine = endOffset / BYTES_PER_LINE;
-      newOffset = vgmfile->dwOffset + ((itemEndLine + (selectedCol > itemEndCol ? 0 : 1)) * BYTES_PER_LINE) + selectedCol;
+      newOffset = vgmfile->offset() + ((itemEndLine + (selectedCol > itemEndCol ? 0 : 1)) * BYTES_PER_LINE) + selectedCol;
       goto selectNewOffset;
     }
 
     case Qt::Key_Left:
-      newOffset = selectedItem->dwOffset - 1;
+      newOffset = selectedItem->offset() - 1;
       goto selectNewOffset;
 
     case Qt::Key_Right:
-      newOffset = selectedItem->dwOffset + selectedItem->unLength;
+      newOffset = selectedItem->offset() + selectedItem->length();
       goto selectNewOffset;
 
     case Qt::Key_Escape:
@@ -415,7 +415,7 @@ void HexView::keyPressEvent(QKeyEvent* event) {
       break;
 
     selectNewOffset:
-      if (newOffset >= vgmfile->dwOffset && newOffset < (vgmfile->dwOffset + vgmfile->unLength)) {
+      if (newOffset >= vgmfile->offset() && newOffset < (vgmfile->offset() + vgmfile->length())) {
         selectedOffset = newOffset;
         if (auto item = vgmfile->getItemAtOffset(newOffset, false)) {
           selectionChanged(item);
@@ -480,12 +480,12 @@ bool HexView::handleSelectedItemPaintEvent(QObject* obj, QPaintEvent* event) {
 
     QPainter pixmapPainter = QPainter(&selectionViewPixmap);
 
-    int baseOffset = static_cast<int>(selectedItem->dwOffset - vgmfile->dwOffset);
+    int baseOffset = static_cast<int>(selectedItem->offset() - vgmfile->offset());
     int startColumn = baseOffset % BYTES_PER_LINE;
-    int numLines = ((startColumn + static_cast<int>(selectedItem->unLength)) / BYTES_PER_LINE) + 1;
+    int numLines = ((startColumn + static_cast<int>(selectedItem->length())) / BYTES_PER_LINE) + 1;
 
-    auto itemData = std::vector<uint8_t>(selectedItem->unLength);
-    vgmfile->readBytes(selectedItem->dwOffset, selectedItem->unLength, itemData.data());
+    auto itemData = std::vector<uint8_t>(selectedItem->length());
+    vgmfile->readBytes(selectedItem->offset(), selectedItem->length(), itemData.data());
 
     QColor bgColor = colorForItemType(selectedItem->type);
     QColor textColor = textColorForItemType(selectedItem->type);
@@ -502,7 +502,7 @@ bool HexView::handleSelectedItemPaintEvent(QObject* obj, QPaintEvent* event) {
       pixmapPainter.translate(0, line * lineHeight);
 
       int bytesToPrint = std::min(
-                    std::min(static_cast<int>(selectedItem->unLength) - offsetIntoEvent,BYTES_PER_LINE - col),
+                    std::min(static_cast<int>(selectedItem->length()) - offsetIntoEvent,BYTES_PER_LINE - col),
                     BYTES_PER_LINE);
 
       // If there is a cached pixmap of the line, copy portions of it to construct the selected item pixmap
@@ -526,8 +526,8 @@ bool HexView::handleSelectedItemPaintEvent(QObject* obj, QPaintEvent* event) {
       else {
         // If the selected item has children, draw them.
         if (!selectedItem->children().empty()) {
-          int startAddress = static_cast<int>(selectedItem->dwOffset + offsetIntoEvent);
-          int endAddress = static_cast<int>(selectedItem->dwOffset + selectedItem->unLength);
+          int startAddress = static_cast<int>(selectedItem->offset() + offsetIntoEvent);
+          int endAddress = static_cast<int>(selectedItem->offset() + selectedItem->length());
           printData(pixmapPainter, startAddress, endAddress);
           offsetIntoEvent += BYTES_PER_LINE - col;
           col = 0;
@@ -602,10 +602,10 @@ void HexView::paintEvent(QPaintEvent *e) {
   painter.translate(0, startLine * lineHeight);
   for (int line = startLine; line <= endLine; line++) {
     // Skip drawing lines that are totally eclipsed by the selected item
-    if (selectedItem && selectedItem->unLength >= BYTES_PER_LINE) {
-      auto startAddress = vgmfile->dwOffset + (line * BYTES_PER_LINE);
+    if (selectedItem && selectedItem->length() >= BYTES_PER_LINE) {
+      auto startAddress = vgmfile->offset() + (line * BYTES_PER_LINE);
       auto endAddress = startAddress + BYTES_PER_LINE;
-      if (selectedItem->dwOffset <= startAddress && selectedItem->dwOffset + selectedItem->unLength >= endAddress) {
+      if (selectedItem->offset() <= startAddress && selectedItem->offset() + selectedItem->length() >= endAddress) {
         if (shouldDrawOffset)
           printAddress(painter, line);
         painter.translate(0, lineHeight);
@@ -642,8 +642,8 @@ void HexView::printLine(QPainter& painter, int line) const {
   }
   painter.translate(hexXOffset(), 0);
 
-  auto startAddress = vgmfile->dwOffset + (line * BYTES_PER_LINE);
-  auto endAddress = vgmfile->dwOffset + vgmfile->unLength;
+  auto startAddress = vgmfile->offset() + (line * BYTES_PER_LINE);
+  auto endAddress = vgmfile->offset() + vgmfile->length();
   printData(painter, startAddress, endAddress);
   painter.restore();
 }
@@ -668,17 +668,17 @@ static inline QString formatAddressDec8(quint32 v) {
 }
 
 void HexView::printAddress(QPainter& painter, int line) const {
-  const quint32 fileOffset = quint32(vgmfile->dwOffset) + quint32(line * BYTES_PER_LINE);
+  const quint32 fileOffset = quint32(vgmfile->offset()) + quint32(line * BYTES_PER_LINE);
   const QString s = addressAsHex ? formatAddressHex8(fileOffset) : formatAddressDec8(fileOffset);
   painter.drawText(QPoint(0, ascent), s);
 }
 
 void HexView::printData(QPainter& painter, int startAddress, int endAddress) const {
-  if (endAddress > static_cast<int>(vgmfile->dwOffset + vgmfile->unLength) || (startAddress >= endAddress)) {
+  if (endAddress > static_cast<int>(vgmfile->offset() + vgmfile->length()) || (startAddress >= endAddress)) {
     return;
   }
 
-  int startCol = static_cast<int>(startAddress - vgmfile->dwOffset) % BYTES_PER_LINE;
+  int startCol = static_cast<int>(startAddress - vgmfile->offset()) % BYTES_PER_LINE;
   auto bytesToPrint = std::min(BYTES_PER_LINE - startCol, endAddress - startAddress);
 
   auto defaultTextColor = painter.pen().color();
@@ -702,8 +702,8 @@ void HexView::printData(QPainter& painter, int startAddress, int endAddress) con
       int col = startCol + offset;
 
       // In case the event spans multiple lines, account for how far into the event we are at this line
-      int offsetIntoEvent = std::max(0, startAddress - static_cast<int>(item->dwOffset));
-      auto numEventBytesToPrint = std::min(static_cast<int>(item->unLength - offsetIntoEvent), bytesToPrint - offset);
+      int offsetIntoEvent = std::max(0, startAddress - static_cast<int>(item->offset()));
+      auto numEventBytesToPrint = std::min(static_cast<int>(item->length() - offsetIntoEvent), bytesToPrint - offset);
       translateAndPrintHex(painter, data+offset, col, numEventBytesToPrint, bgColor, textColor);
       translateAndPrintAscii(painter, data + offset, col, numEventBytesToPrint, bgColor, textColor);
 
@@ -903,15 +903,15 @@ void HexView::drawSelectedItem() const {
     return;
   }
   // Set a limit for selected item size, as it can halt the system to draw huge items
-  if (!selectedItem || selectedItem->unLength > 0x3000) {
+  if (!selectedItem || selectedItem->length() > 0x3000) {
     selectionView->setGeometry(QRect(0, 0, 0, 0));
     return;
   }
 
-  int baseOffset = static_cast<int>(selectedItem->dwOffset - vgmfile->dwOffset);
+  int baseOffset = static_cast<int>(selectedItem->offset() - vgmfile->offset());
   int startLine = baseOffset / BYTES_PER_LINE;
   int startColumn = baseOffset % BYTES_PER_LINE;
-  int numLines = ((startColumn + static_cast<int>(selectedItem->unLength)) / BYTES_PER_LINE) + 1;
+  int numLines = ((startColumn + static_cast<int>(selectedItem->length())) / BYTES_PER_LINE) + 1;
 
   int widgetX = hexXOffset() - SELECTION_PADDING;
   int widgetY = (startLine * lineHeight) - SELECTION_PADDING;
@@ -941,7 +941,7 @@ int HexView::getOffsetFromPoint(QPoint pos) const {
     return -1;
   }
   int line = pos.y() / lineHeight;
-  return vgmfile->dwOffset + (line * BYTES_PER_LINE) + byteNum;
+  return vgmfile->offset() + (line * BYTES_PER_LINE) + byteNum;
 }
 
 void HexView::mousePressEvent(QMouseEvent *event) {
@@ -985,8 +985,8 @@ void HexView::mouseMoveEvent(QMouseEvent *event) {
     }
     this->selectedOffset = offset;
     // If the new offset overlaps with the currently selected item, do nothing
-    if (selectedItem && (selectedOffset >= selectedItem->dwOffset) &&
-        (selectedOffset < (selectedItem->dwOffset + selectedItem->unLength))) {
+    if (selectedItem && (selectedOffset >= selectedItem->offset()) &&
+        (selectedOffset < (selectedItem->offset() + selectedItem->length()))) {
       return;
     }
     auto item = vgmfile->getItemAtOffset(offset, false);

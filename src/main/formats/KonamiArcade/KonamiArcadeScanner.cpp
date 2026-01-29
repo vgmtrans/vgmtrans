@@ -281,7 +281,7 @@ const std::vector<KonamiArcadeSeq*> KonamiArcadeScanner::loadSeqTable(
     }
   }
 
-  seqTable->unLength = offset - seqTable->startOffset();
+  seqTable->setLength(offset - seqTable->startOffset());
 
   return seqs;
 }

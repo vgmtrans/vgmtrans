@@ -40,7 +40,7 @@ bool VGMMiscFile::load() {
   if (!loadMain()) {
     return false;
   }
-  if (unLength == 0) {
+  if (length() == 0) {
     return false;
   }
 

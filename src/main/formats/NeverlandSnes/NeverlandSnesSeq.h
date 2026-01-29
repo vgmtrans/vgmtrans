@@ -26,7 +26,7 @@ class NeverlandSnesSeq
   NeverlandSnesVersion version;
   std::map<uint8_t, NeverlandSnesSeqEventType> EventMap;
 
-  uint16_t convertToApuAddress(uint16_t offset);
+  uint16_t convertToApuAddress(uint16_t off);
   uint16_t getShortAddress(uint32_t offset);
 
  private:

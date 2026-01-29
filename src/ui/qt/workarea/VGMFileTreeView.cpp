@@ -258,14 +258,14 @@ void VGMFileTreeView::setItemText(VGMItem* item, VGMTreeItem* treeItem) const {
     if (item->description().empty()) {
       treeItem->setText(0, QString{"<b>%1</b><br>Offset: 0x%2 | Length: 0x%3"}
                                .arg(name,
-                                    QString::number(item->dwOffset, 16),
-                                    QString::number(item->unLength, 16)));
+                                    QString::number(item->offset(), 16),
+                                    QString::number(item->length(), 16)));
     } else {
       treeItem->setText(0, QString{"<b>%1</b><br>%2<br>Offset: 0x%3 | Length: 0x%4"}
                                .arg(name,
                                     QString::fromStdString(item->description()),
-                                    QString::number(item->dwOffset, 16),
-                                    QString::number(item->unLength, 16)));
+                                    QString::number(item->offset(), 16),
+                                    QString::number(item->length(), 16)));
     }
   } else {
     treeItem->setText(0, name);

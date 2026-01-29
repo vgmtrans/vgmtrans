@@ -24,7 +24,7 @@ void KonamiPS1Scanner::scan(RawFile *file, void *info) {
 
       KonamiPS1Seq *newSeq = new KonamiPS1Seq(file, offset, name);
       if (newSeq->loadVGMFile()) {
-        offset += newSeq->unLength;
+        offset += newSeq->length();
         numSeqFiles++;
         continue;
       } else {

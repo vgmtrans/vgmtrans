@@ -27,7 +27,7 @@ bool CapcomSnesInstrSet::parseHeader() {
 bool CapcomSnesInstrSet::parseInstrPointers() {
   usedSRCNs.clear();
   for (int instr = 0; instr <= 0xff; instr++) {
-    uint32_t addrInstrHeader = dwOffset + (6 * instr);
+    uint32_t addrInstrHeader = offset() + (6 * instr);
     if (addrInstrHeader + 6 > 0x10000) {
       return false;
     }
@@ -94,7 +94,7 @@ CapcomSnesInstr::CapcomSnesInstr(VGMInstrSet *instrSet,
 CapcomSnesInstr::~CapcomSnesInstr() {}
 
 bool CapcomSnesInstr::loadInstr() {
-  uint8_t srcn = readByte(dwOffset);
+  uint8_t srcn = readByte(offset());
   uint32_t offDirEnt = spcDirAddr + (srcn * 4);
   if (offDirEnt + 4 > 0x10000) {
     return false;
@@ -102,7 +102,7 @@ bool CapcomSnesInstr::loadInstr() {
 
   uint16_t addrSampStart = readShort(offDirEnt);
 
-  CapcomSnesRgn *rgn = new CapcomSnesRgn(this, dwOffset);
+  CapcomSnesRgn *rgn = new CapcomSnesRgn(this, offset());
   rgn->sampOffset = addrSampStart - spcDirAddr;
   addRgn(rgn);
 

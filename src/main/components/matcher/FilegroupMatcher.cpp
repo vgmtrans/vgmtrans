@@ -70,7 +70,7 @@ bool FilegroupMatcher::onCloseSampColl(VGMSampColl *sampcoll) {
 
 void FilegroupMatcher::lookForMatch() {
   // 1. Sort all three containers by descending file‑offset
-  auto byOffsetDesc = [](auto* a, auto* b) { return a->dwOffset > b->dwOffset; };
+  auto byOffsetDesc = [](auto* a, auto* b) { return a->offset() > b->offset(); };
   seqs.sort(byOffsetDesc);
   instrsets.sort(byOffsetDesc);
   sampcolls.sort(byOffsetDesc);

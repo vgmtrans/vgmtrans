@@ -61,23 +61,23 @@ bool VGMSampColl::load() {
 
   addChildren(samples);
 
-  if (unLength == 0) {
+  if (length() == 0) {
     for (std::vector<VGMSamp *>::iterator itr = samples.begin(); itr != samples.end(); ++itr) {
       VGMSamp *samp = *itr;
 
       // Some formats can have negative sample offset
       // For example, Konami's SNES format and Hudson's SNES format
       // TODO: Fix negative sample offset without breaking instrument
-      //assert(dwOffset <= samp->dwOffset);
+      //assert(offset() <= samp->offset());
 
-      //if (dwOffset > samp->dwOffset)
+      //if (offset() > samp->offset())
       //{
-      //	unLength += samp->dwOffset - dwOffset;
-      //	dwOffset = samp->dwOffset;
+      //	setLength(length() + (samp->offset() - offset()));
+      //	setOffset(samp->offset());
       //}
 
-      if (dwOffset + unLength < samp->dwOffset + samp->unLength) {
-        unLength = (samp->dwOffset + samp->unLength) - dwOffset;
+      if (offset() + length() < samp->offset() + samp->length()) {
+        setLength((samp->offset() + samp->length()) - offset());
       }
     }
   }

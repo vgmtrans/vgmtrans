@@ -155,7 +155,7 @@ std::vector<uint8_t> DialogicAdpcmSamp::decodeToNativePcm() {
   DialogicAdpcmSamp::okiAdpcmState.reset();
 
   int sampleNum = 0;
-  for (uint32_t off = dwOffset; off < (dwOffset + unLength); ++off) {
+  for (uint32_t off = offset(); off < (offset() + length()); ++off) {
     uint8_t byte = readByte(off);
 
     for (int n = 0; n < 2; ++n) {

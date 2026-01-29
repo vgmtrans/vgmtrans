@@ -57,8 +57,8 @@ void HeartBeatSnesSeq::resetVars() {
 bool HeartBeatSnesSeq::parseHeader() {
   setPPQN(SEQ_PPQN);
 
-  VGMHeader *header = addHeader(dwOffset, 0);
-  uint32_t curOffset = dwOffset;
+  VGMHeader *header = addHeader(offset(), 0);
+  uint32_t curOffset = offset();
   if (curOffset + 2 > 0x10000) {
     return false;
   }
@@ -85,7 +85,7 @@ bool HeartBeatSnesSeq::parseHeader() {
 }
 
 bool HeartBeatSnesSeq::parseTrackPointers(void) {
-  uint32_t curOffset = dwOffset;
+  uint32_t curOffset = offset();
 
   curOffset += 2;
 
@@ -96,8 +96,8 @@ bool HeartBeatSnesSeq::parseTrackPointers(void) {
       break;
     }
 
-    uint16_t addrTrackStart = dwOffset + ofsTrackStart;
-    if (addrTrackStart < dwOffset) {
+    uint16_t addrTrackStart = offset() + ofsTrackStart;
+    if (addrTrackStart < offset()) {
       return false;
     }
 
@@ -599,7 +599,7 @@ bool HeartBeatSnesTrack::readEvent() {
     case EVENT_GOTO: {
       int16_t destOffset = readShort(curOffset);
       curOffset += 2;
-      uint16_t dest = parentSeq->dwOffset + destOffset;
+      uint16_t dest = parentSeq->offset() + destOffset;
       desc = fmt::format("Destination: ${:04X}", dest);
       uint32_t length = curOffset - beginOffset;
 
@@ -616,7 +616,7 @@ bool HeartBeatSnesTrack::readEvent() {
     case EVENT_CALL: {
       int16_t destOffset = readShort(curOffset);
       curOffset += 2;
-      uint16_t dest = parentSeq->dwOffset + destOffset;
+      uint16_t dest = parentSeq->offset() + destOffset;
       desc = fmt::format("Destination: ${:04X}", dest);
       addGenericEvent(beginOffset,
                       curOffset - beginOffset,
@@ -624,7 +624,7 @@ bool HeartBeatSnesTrack::readEvent() {
                       desc,
                       Type::RepeatStart);
 
-      subReturnOffset = curOffset - parentSeq->dwOffset;
+      subReturnOffset = curOffset - parentSeq->offset();
 
       curOffset = dest;
       break;
@@ -632,7 +632,7 @@ bool HeartBeatSnesTrack::readEvent() {
 
     case EVENT_RET: {
       addGenericEvent(beginOffset, curOffset - beginOffset, "Pattern End", desc, Type::RepeatEnd);
-      curOffset = parentSeq->dwOffset + subReturnOffset;
+      curOffset = parentSeq->offset() + subReturnOffset;
       break;
     }
 
@@ -728,7 +728,7 @@ bool HeartBeatSnesTrack::readEvent() {
         case SUBEVENT_LOOP_AGAIN: {
           int16_t destOffset = readShort(curOffset);
           curOffset += 2;
-          uint16_t dest = parentSeq->dwOffset + destOffset;
+          uint16_t dest = parentSeq->offset() + destOffset;
           desc = fmt::format("Destination: ${:04X}", dest);
           addGenericEvent(beginOffset,
                           curOffset - beginOffset,

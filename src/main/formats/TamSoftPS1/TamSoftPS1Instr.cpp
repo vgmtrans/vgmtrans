@@ -13,15 +13,15 @@ TamSoftPS1InstrSet::~TamSoftPS1InstrSet() {
 }
 
 bool TamSoftPS1InstrSet::parseHeader() {
-  if (dwOffset + 0x800 > vgmFile()->endOffset()) {
+  if (offset() + 0x800 > vgmFile()->endOffset()) {
     return false;
   }
 
   uint32_t sampCollSize = readWord(0x3fc);
-  if (dwOffset + 0x800 + sampCollSize > vgmFile()->endOffset()) {
+  if (offset() + 0x800 + sampCollSize > vgmFile()->endOffset()) {
     return false;
   }
-  unLength = 0x800 + sampCollSize;
+  setLength(0x800 + sampCollSize);
 
   return true;
 }
@@ -31,9 +31,9 @@ bool TamSoftPS1InstrSet::parseInstrPointers() {
 
   for (uint32_t instrNum = 0; instrNum < 256; instrNum++) {
     bool vagLoop;
-    uint32_t vagOffset = 0x800 + readWord(dwOffset + 4 * instrNum);
-    if (vagOffset < unLength) {
-      SizeOffsetPair vagLocation(vagOffset - 0x800, PSXSamp::getSampleLength(rawFile(), vagOffset, dwOffset + unLength, vagLoop));
+    uint32_t vagOffset = 0x800 + readWord(offset() + 4 * instrNum);
+    if (vagOffset < length()) {
+      SizeOffsetPair vagLocation(vagOffset - 0x800, PSXSamp::getSampleLength(rawFile(), vagOffset, offset() + length(), vagLoop));
       vagLocations.push_back(vagLocation);
 
       TamSoftPS1Instr *newInstr = new TamSoftPS1Instr(this, instrNum,
@@ -46,7 +46,7 @@ bool TamSoftPS1InstrSet::parseInstrPointers() {
     return false;
   }
 
-  sampColl = new PSXSampColl(TamSoftPS1Format::name, this, dwOffset + 0x800, unLength - 0x800, vagLocations);
+  sampColl = new PSXSampColl(TamSoftPS1Format::name, this, offset() + 0x800, length() - 0x800, vagLocations);
   return true;
 }
 
@@ -55,7 +55,7 @@ bool TamSoftPS1InstrSet::parseInstrPointers() {
 // ***************
 
 TamSoftPS1Instr::TamSoftPS1Instr(TamSoftPS1InstrSet *instrSet, uint8_t instrNum, const std::string &name) :
-    VGMInstr(instrSet, instrSet->dwOffset + 4 * instrNum, 0x400 + 4, 0, instrNum, name) {
+    VGMInstr(instrSet, instrSet->offset() + 4 * instrNum, 0x400 + 4, 0, instrNum, name) {
 }
 
 TamSoftPS1Instr::~TamSoftPS1Instr() {
@@ -64,9 +64,9 @@ TamSoftPS1Instr::~TamSoftPS1Instr() {
 bool TamSoftPS1Instr::loadInstr() {
   TamSoftPS1InstrSet *parInstrSet = (TamSoftPS1InstrSet *) this->parInstrSet;
 
-  addChild(dwOffset, 4, "Sample Offset");
+  addChild(offset(), 4, "Sample Offset");
 
-  TamSoftPS1Rgn *rgn = new TamSoftPS1Rgn(this, dwOffset + 0x400, parInstrSet->ps2);
+  TamSoftPS1Rgn *rgn = new TamSoftPS1Rgn(this, offset() + 0x400, parInstrSet->ps2);
   rgn->sampNum = instrNum;
   addRgn(rgn);
   return true;

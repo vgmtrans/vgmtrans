@@ -4,11 +4,15 @@
 #include "Root.h"
 #include "helper.h"
 
-VGMItem::VGMItem() : m_vgmfile(nullptr), dwOffset(0), unLength(0), type(Type::Unknown) {
+VGMItem::VGMItem() : type(Type::Unknown), m_vgmfile(nullptr), m_offset(0), m_length(0) {
 }
 
 VGMItem::VGMItem(VGMFile *vgmfile, uint32_t offset, uint32_t length, std::string name, Type type)
-    : m_vgmfile(vgmfile), m_name(std::move(name)), dwOffset(offset), unLength(length), type(type) {
+    : type(type),
+      m_vgmfile(vgmfile),
+      m_offset(offset),
+      m_length(length),
+      m_name(std::move(name)) {
 }
 
 VGMItem::~VGMItem() {
@@ -16,19 +20,19 @@ VGMItem::~VGMItem() {
 }
 
 bool operator>(const VGMItem &item1, const VGMItem &item2) {
-  return item1.dwOffset > item2.dwOffset;
+  return item1.offset() > item2.offset();
 }
 
 bool operator<=(const VGMItem &item1, const VGMItem &item2) {
-  return item1.dwOffset <= item2.dwOffset;
+  return item1.offset() <= item2.offset();
 }
 
 bool operator<(const VGMItem &item1, const VGMItem &item2) {
-  return item1.dwOffset < item2.dwOffset;
+  return item1.offset() < item2.offset();
 }
 
 bool operator>=(const VGMItem &item1, const VGMItem &item2) {
-  return item1.dwOffset >= item2.dwOffset;
+  return item1.offset() >= item2.offset();
 }
 
 RawFile *VGMItem::rawFile() const {
@@ -41,7 +45,7 @@ bool VGMItem::isItemAtOffset(uint32_t offset, bool matchStartOffset) {
 
 VGMItem* VGMItem::getItemAtOffset(uint32_t offset, bool matchStartOffset) {
   if (m_children.empty()) {
-    if ((matchStartOffset ? offset == dwOffset : offset >= dwOffset) && (offset < dwOffset + unLength)) {
+    if ((matchStartOffset ? offset == m_offset : offset >= m_offset) && (offset < m_offset + m_length)) {
       return this;
     }
   }
@@ -52,6 +56,30 @@ VGMItem* VGMItem::getItemAtOffset(uint32_t offset, bool matchStartOffset) {
   }
 
   return nullptr;
+}
+
+void VGMItem::setOffset(uint32_t offset) {
+  if (m_offset == offset) {
+    return;
+  }
+  m_offset = offset;
+}
+
+void VGMItem::setLength(uint32_t length) {
+  if (m_length == length) {
+    return;
+  }
+  m_length = length;
+}
+
+void VGMItem::setRange(uint32_t offset, uint32_t length) {
+  const bool offsetChanged = (m_offset != offset);
+  const bool lengthChanged = (m_length != length);
+  if (!offsetChanged && !lengthChanged) {
+    return;
+  }
+  m_offset = offset;
+  m_length = length;
 }
 
 void VGMItem::addToUI(VGMItem *parent, void *UI_specific) {
@@ -94,29 +122,36 @@ bool VGMItem::isValidOffset(uint32_t offset) const {
 
 VGMItem* VGMItem::addChild(VGMItem *item) {
   item->m_vgmfile = vgmFile();
+  item->m_parent = this;
   m_children.emplace_back(item);
   return item;
 }
 
 VGMItem* VGMItem::addChild(uint32_t offset, uint32_t length, const std::string &name) {
   auto child = new VGMItem(vgmFile(), offset, length, name, Type::Header);
+  child->m_parent = this;
   m_children.emplace_back(child);
   return child;
 }
 
 VGMItem* VGMItem::addUnknownChild(uint32_t offset, uint32_t length) {
   auto child = new VGMItem(vgmFile(), offset, length, "Unknown");
+  child->m_parent = this;
   m_children.emplace_back(child);
   return child;
 }
 
 VGMHeader* VGMItem::addHeader(uint32_t offset, uint32_t length, const std::string &name) {
   auto *header = new VGMHeader(this, offset, length, name);
+  header->m_parent = this;
   m_children.emplace_back(header);
   return header;
 }
 
 void VGMItem::removeChildren() {
+  for (auto *child : m_children) {
+    child->m_parent = nullptr;
+  }
   m_children.clear();
 }
 
@@ -127,7 +162,7 @@ void VGMItem::transferChildren(VGMItem* destination) {
 
 void VGMItem::sortChildrenByOffset() {
   std::ranges::sort(m_children, [](const VGMItem *a, const VGMItem *b) {
-    return a->dwOffset < b->dwOffset;
+    return a->offset() < b->offset();
   });
 
   // Recursively sort the children of each child, if they have any children
@@ -141,19 +176,19 @@ void VGMItem::sortChildrenByOffset() {
 // Guess length of a container from its descendants
 uint32_t VGMItem::guessLength() {
   if (m_children.empty()) {
-    return unLength;
+    return m_length;
   }
   // NOTE: child items can sometimes overlap each other
   uint32_t guessedLength = 0;
   for (const auto child : m_children) {
-    assert(dwOffset <= child->dwOffset);
+    assert(m_offset <= child->offset());
 
-    uint32_t itemLength = child->unLength;
-    if (unLength == 0) {
+    uint32_t itemLength = child->length();
+    if (m_length == 0) {
       itemLength = child->guessLength();
     }
 
-    uint32_t expectedLength = child->dwOffset + itemLength - dwOffset;
+    uint32_t expectedLength = child->offset() + itemLength - m_offset;
     if (guessedLength < expectedLength) {
       guessedLength = expectedLength;
     }
@@ -165,7 +200,7 @@ void VGMItem::setGuessedLength() {
   for (const auto child : m_children) {
     child->setGuessedLength();
   }
-  if (unLength == 0) {
-    unLength = guessLength();
+  if (m_length == 0) {
+    setLength(guessLength());
   }
 }

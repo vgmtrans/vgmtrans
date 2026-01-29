@@ -54,11 +54,11 @@ RawFile *VGMFile::rawFile() const {
 }
 
 uint32_t VGMFile::readBytes(uint32_t nIndex, uint32_t nCount, void *pBuffer) const {
-  // if unLength != 0, verify that we're within the bounds of the file, and truncate num read
+  // if length() != 0, verify that we're within the bounds of the file, and truncate num read
   // bytes to end of file
-  if (unLength != 0) {
-    uint32_t endOff = dwOffset + unLength;
-    assert(nIndex >= dwOffset && nIndex < endOff);
+  if (length() != 0) {
+    uint32_t endOff = offset() + length();
+    assert(nIndex >= offset() && nIndex < endOff);
     if (nIndex + nCount > endOff)
       nCount = endOff - nIndex;
   }

@@ -49,32 +49,32 @@ WDInstrSet::WDInstrSet(RawFile *file, uint32_t offset)
     : VGMInstrSet(SquarePS2Format::name, file, offset) {}
 
 bool WDInstrSet::parseHeader() {
-  VGMHeader *header = addHeader(dwOffset, 0x10, "Header");
-  header->addChild(dwOffset + 0x2, 2, "ID");
-  header->addChild(dwOffset + 0x4, 4, "Sample Section Size");
-  header->addChild(dwOffset + 0x8, 4, "Number of Instruments");
-  header->addChild(dwOffset + 0xC, 4, "Number of Regions");
+  VGMHeader *header = addHeader(offset(), 0x10, "Header");
+  header->addChild(offset() + 0x2, 2, "ID");
+  header->addChild(offset() + 0x4, 4, "Sample Section Size");
+  header->addChild(offset() + 0x8, 4, "Number of Instruments");
+  header->addChild(offset() + 0xC, 4, "Number of Regions");
 
-  setId(readShort(0x2 + dwOffset));
-  dwSampSectSize = readWord(0x4 + dwOffset);
-  dwNumInstrs = readWord(0x8 + dwOffset);
-  dwTotalRegions = readWord(0xC + dwOffset);
+  setId(readShort(0x2 + offset()));
+  dwSampSectSize = readWord(0x4 + offset());
+  dwNumInstrs = readWord(0x8 + offset());
+  dwTotalRegions = readWord(0xC + offset());
 
   if (dwSampSectSize < 0x40)  // Some songs in the Bouncer have bizarre values here
     dwSampSectSize = 0;
 
   setName(fmt::format("WD {}", id()));
 
-  uint32_t sampCollOff = dwOffset + readWord(dwOffset + 0x20) + (dwTotalRegions * 0x20);
+  uint32_t sampCollOff = offset() + readWord(offset() + 0x20) + (dwTotalRegions * 0x20);
 
   sampColl = new PSXSampColl(SquarePS2Format::name, this, sampCollOff, dwSampSectSize);
-  unLength = sampCollOff + dwSampSectSize - dwOffset;
+  setLength(sampCollOff + dwSampSectSize - offset());
 
   return true;
 }
 
 bool WDInstrSet::parseInstrPointers() {
-  uint32_t j = 0x20 + dwOffset;
+  uint32_t j = 0x20 + offset();
 
   // check for bouncer WDs with 0xFFFFFFFF as the last instr pointer.  If it's there ignore it
   for (uint32_t i = 0; i < dwNumInstrs; i++) {
@@ -87,9 +87,9 @@ bool WDInstrSet::parseInstrPointers() {
     if (i != dwNumInstrs - 1)  // while not the last instr
       instrLength = readWord(j + ((i + 1) * 4)) - readWord(j + (i * 4));
     else
-      instrLength = sampColl->dwOffset - (readWord(j + (i * 4)) + dwOffset);
+      instrLength = sampColl->offset() - (readWord(j + (i * 4)) + offset());
 
-    auto *newWDInstr = new WDInstr(this, dwOffset + readWord(j + (i * 4)), instrLength,
+    auto *newWDInstr = new WDInstr(this, offset() + readWord(j + (i * 4)), instrLength,
       0, i, fmt::format("Instrument {}", i));
     aInstrs.push_back(newWDInstr);
   }
@@ -107,40 +107,40 @@ WDInstr::WDInstr(VGMInstrSet *instrSet, uint32_t offset, uint32_t length, uint32
 
 bool WDInstr::loadInstr() {
   unsigned int k = 0;
-  while (k * 0x20 < unLength) {
-    auto *rgn = new WDRgn(this, k * 0x20 + dwOffset);
+  while (k * 0x20 < length()) {
+    auto *rgn = new WDRgn(this, k * 0x20 + offset());
     addRgn(rgn);
 
-    rgn->addChild(k * 0x20 + dwOffset, 1, "Stereo Region Flag");
-    rgn->addChild(k * 0x20 + 1 + dwOffset, 1, "First/Last Region Flags");
-    rgn->addChild(k * 0x20 + 2 + dwOffset, 2, "Unknown Flag");
-    rgn->addChild(k * 0x20 + 0x4 + dwOffset, 4, "Sample Offset");
-    rgn->addChild(k * 0x20 + 0x8 + dwOffset, 4, "Loop Start");
-    rgn->addChild(k * 0x20 + 0xC + dwOffset, 2, "ADSR1");
-    rgn->addChild(k * 0x20 + 0xE + dwOffset, 2, "ADSR2");
-    rgn->addChild(k * 0x20 + 0x12 + dwOffset, 1, "Finetune");
-    rgn->addChild(k * 0x20 + 0x13 + dwOffset, 1, "UnityKey");
-    rgn->addChild(k * 0x20 + 0x14 + dwOffset, 1, "Key High");
-    rgn->addChild(k * 0x20 + 0x15 + dwOffset, 1, "Unknown");
-    rgn->addChild(k * 0x20 + 0x16 + dwOffset, 1, "Attenuation");
-    rgn->addChild(k * 0x20 + 0x17 + dwOffset, 1, "Pan");
+    rgn->addChild(k * 0x20 + offset(), 1, "Stereo Region Flag");
+    rgn->addChild(k * 0x20 + 1 + offset(), 1, "First/Last Region Flags");
+    rgn->addChild(k * 0x20 + 2 + offset(), 2, "Unknown Flag");
+    rgn->addChild(k * 0x20 + 0x4 + offset(), 4, "Sample Offset");
+    rgn->addChild(k * 0x20 + 0x8 + offset(), 4, "Loop Start");
+    rgn->addChild(k * 0x20 + 0xC + offset(), 2, "ADSR1");
+    rgn->addChild(k * 0x20 + 0xE + offset(), 2, "ADSR2");
+    rgn->addChild(k * 0x20 + 0x12 + offset(), 1, "Finetune");
+    rgn->addChild(k * 0x20 + 0x13 + offset(), 1, "UnityKey");
+    rgn->addChild(k * 0x20 + 0x14 + offset(), 1, "Key High");
+    rgn->addChild(k * 0x20 + 0x15 + offset(), 1, "Unknown");
+    rgn->addChild(k * 0x20 + 0x16 + offset(), 1, "Attenuation");
+    rgn->addChild(k * 0x20 + 0x17 + offset(), 1, "Pan");
 
-    rgn->bStereoRegion = readByte(k * 0x20 + dwOffset) & 0x1u;
-    rgn->bUnknownFlag2 = readByte(k * 0x20 + 2 + dwOffset) & 0x1u;
-    rgn->bFirstRegion = readByte(k * 0x20 + 1 + dwOffset) & 0x1u;
-    rgn->bLastRegion = (readByte(k * 0x20 + 1 + dwOffset) & 0x2u) >> 1u;
-    rgn->sampOffset = getWord(k * 0x20 + 0x4 + dwOffset) & 0xFFFFFFF0;  // The & is there because FFX points to 0x----C offsets for some very odd reason
-    rgn->loop.loopStart = getWord(k * 0x20 + 0x8 + dwOffset);
-    rgn->ADSR1 = readShort(k * 0x20 + 0xC + dwOffset);
-    rgn->ADSR2 = readShort(k * 0x20 + 0xE + dwOffset);
-    rgn->fineTune = readByte(k * 0x20 + 0x12 + dwOffset);
-    rgn->unityKey = 0x3A - readByte(k * 0x20 + 0x13 + dwOffset);
-    rgn->keyHigh = readByte(k * 0x20 + 0x14 + dwOffset);
+    rgn->bStereoRegion = readByte(k * 0x20 + offset()) & 0x1u;
+    rgn->bUnknownFlag2 = readByte(k * 0x20 + 2 + offset()) & 0x1u;
+    rgn->bFirstRegion = readByte(k * 0x20 + 1 + offset()) & 0x1u;
+    rgn->bLastRegion = (readByte(k * 0x20 + 1 + offset()) & 0x2u) >> 1u;
+    rgn->sampOffset = getWord(k * 0x20 + 0x4 + offset()) & 0xFFFFFFF0;  // The & is there because FFX points to 0x----C offsets for some very odd reason
+    rgn->loop.loopStart = getWord(k * 0x20 + 0x8 + offset());
+    rgn->ADSR1 = readShort(k * 0x20 + 0xC + offset());
+    rgn->ADSR2 = readShort(k * 0x20 + 0xE + offset());
+    rgn->fineTune = readByte(k * 0x20 + 0x12 + offset());
+    rgn->unityKey = 0x3A - readByte(k * 0x20 + 0x13 + offset());
+    rgn->keyHigh = readByte(k * 0x20 + 0x14 + offset());
 
-    uint8_t vol = readByte(k * 0x20 + 0x16 + dwOffset);
+    uint8_t vol = readByte(k * 0x20 + 0x16 + offset());
     rgn->setVolume(vol / 127.0);
 
-    rgn->pan = (double) readByte(k * 0x20 + 0x17 + dwOffset);        //need to convert
+    rgn->pan = (double) readByte(k * 0x20 + 0x17 + offset());        //need to convert
 
     if (rgn->pan == 255)
       rgn->pan = 1.0;

@@ -36,13 +36,13 @@ bool HeartBeatSnesInstrSet::parseHeader() {
 bool HeartBeatSnesInstrSet::parseInstrPointers() {
   usedSRCNs.clear();
 
-  uint8_t nNumInstrs = unLength / 6;
+  uint8_t nNumInstrs = length() / 6;
   if (nNumInstrs == 0) {
     return false;
   }
 
   for (uint8_t instrNum = 0; instrNum < nNumInstrs; instrNum++) {
-    uint32_t addrInstrHeader = dwOffset + (instrNum * 6);
+    uint32_t addrInstrHeader = offset() + (instrNum * 6);
     if (addrInstrHeader + 6 > 0x10000) {
       break;
     }
@@ -62,7 +62,7 @@ bool HeartBeatSnesInstrSet::parseInstrPointers() {
 
     if (!SNESSampColl::isValidSampleDir(rawFile(), offDirEnt, true)) {
       // safety logic
-      unLength = instrNum * 6;
+      setLength(instrNum * 6);
       break;
     }
 
@@ -114,7 +114,7 @@ HeartBeatSnesInstr::~HeartBeatSnesInstr() {
 }
 
 bool HeartBeatSnesInstr::loadInstr() {
-  uint8_t sampleIndex = readByte(dwOffset) + (songIndex * 0x10);
+  uint8_t sampleIndex = readByte(offset()) + (songIndex * 0x10);
   if (addrSRCNTable + sampleIndex + 1 > 0x10000) {
     return false;
   }
@@ -128,7 +128,7 @@ bool HeartBeatSnesInstr::loadInstr() {
 
   uint16_t addrSampStart = readShort(offDirEnt);
 
-  HeartBeatSnesRgn *rgn = new HeartBeatSnesRgn(this, version, dwOffset);
+  HeartBeatSnesRgn *rgn = new HeartBeatSnesRgn(this, version, offset());
   rgn->sampOffset = addrSampStart - spcDirAddr;
   addRgn(rgn);
 

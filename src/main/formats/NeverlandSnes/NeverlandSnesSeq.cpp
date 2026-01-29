@@ -31,25 +31,25 @@ void NeverlandSnesSeq::resetVars(void) {
 bool NeverlandSnesSeq::parseHeader(void) {
   setPPQN(SEQ_PPQN);
 
-  VGMHeader *header = addHeader(dwOffset, 0);
+  VGMHeader *header = addHeader(offset(), 0);
   if (version == NEVERLANDSNES_SFC) {
-    header->unLength = 0x40;
+    header->setLength(0x40);
   }
   else if (version == NEVERLANDSNES_S2C) {
-    header->unLength = 0x50;
+    header->setLength(0x50);
   }
 
-  if (dwOffset + header->unLength >= 0x10000) {
+  if (offset() + header->length() >= 0x10000) {
     return false;
   }
 
-  header->addChild(dwOffset, 3, "Signature");
-  header->addUnknownChild(dwOffset + 3, 1);
+  header->addChild(offset(), 3, "Signature");
+  header->addUnknownChild(offset() + 3, 1);
 
   const size_t NAME_SIZE = 12;
   char rawName[NAME_SIZE + 1] = {0};
-  readBytes(dwOffset + 4, NAME_SIZE, rawName);
-  header->addChild(dwOffset + 4, 12, "Song Name");
+  readBytes(offset() + 4, NAME_SIZE, rawName);
+  header->addChild(offset() + 4, 12, "Song Name");
 
   // trim name text
   for (int i = NAME_SIZE - 1; i >= 0; i--) {
@@ -68,13 +68,13 @@ bool NeverlandSnesSeq::parseHeader(void) {
   }
 
   for (uint8_t trackIndex = 0; trackIndex < MAX_TRACKS; trackIndex++) {
-    uint16_t trackSignPtr = dwOffset + 0x10 + trackIndex;
+    uint16_t trackSignPtr = offset() + 0x10 + trackIndex;
     uint8_t trackSign = readByte(trackSignPtr);
 
     auto trackSignName = fmt::format("Track {:d} Entry", trackIndex + 1);
     header->addChild(trackSignPtr, 1, trackSignName);
 
-    uint16_t sectionListOffsetPtr = dwOffset + 0x20 + (trackIndex * 2);
+    uint16_t sectionListOffsetPtr = offset() + 0x20 + (trackIndex * 2);
     if (trackSign != 0xff) {
       uint16_t sectionListAddress = getShortAddress(sectionListOffsetPtr);
 
@@ -100,12 +100,12 @@ void NeverlandSnesSeq::loadEventMap() {
   // TODO: NeverlandSnesSeq::LoadEventMap
 }
 
-uint16_t NeverlandSnesSeq::convertToApuAddress(uint16_t offset) {
+uint16_t NeverlandSnesSeq::convertToApuAddress(uint16_t off) {
   if (version == NEVERLANDSNES_S2C) {
-    return dwOffset + offset;
+    return offset() + off;
   }
   else {
-    return offset;
+    return off;
   }
 }
 

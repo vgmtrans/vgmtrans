@@ -162,7 +162,7 @@ bool KonamiVendettaSampleInstrSet::parseDrums() {
     drumInfos.emplace_back(drumInfo);
   }
   auto lastDrum = drumsItem->children().back();
-  drumsItem->unLength = (lastDrum->dwOffset + lastDrum->unLength) - m_drumsOffset;
+  drumsItem->setLength((lastDrum->offset() + lastDrum->length()) - m_drumsOffset);
 
   if (drumInfos.size() == 0)
     return false;
@@ -171,7 +171,7 @@ bool KonamiVendettaSampleInstrSet::parseDrums() {
 
   auto drumBanksItem = addChild(m_drumBanksOffset, numDrumTables * 0x20, "Drum Banks");
 
-  VGMInstr* drumKit = new VGMInstr(this, dwOffset, unLength, 1, 0, "Drum Kit");
+  VGMInstr* drumKit = new VGMInstr(this, offset(), length(), 1, 0, "Drum Kit");
 
   int drumNum = 0;
   for (u32 i = 0; i < numDrumTables; ++i) {
@@ -264,7 +264,7 @@ konami_vendetta_drum_info KonamiVendettaSampleInstrSet::parseVendettaDrum(
         u16 dest = programRom->readShort(offset + 1);
         drumItem->addChild(offset, 3, fmt::format("Instruction - JP {:02X}", dest));
         offset += 3;
-        drumItem->unLength = offset - drumItem->dwOffset;
+        drumItem->setLength(offset - drumItem->offset());
         return drumInfo;
       }
       default: {
@@ -274,6 +274,6 @@ konami_vendetta_drum_info KonamiVendettaSampleInstrSet::parseVendettaDrum(
       }
     }
   }
-  drumItem->unLength = offset - drumItem->dwOffset;
+  drumItem->setLength(offset - drumItem->offset());
   return drumInfo;
 }

@@ -34,22 +34,22 @@ void ItikitiSnesSeq::resetVars() {
 bool ItikitiSnesSeq::parseHeader() {
   setPPQN(kItikitiSnesSeqTimebase);
 
-  VGMHeader *header = addHeader(dwOffset, 0);
-  header->addUnknownChild(dwOffset, 1);
-  header->addChild(dwOffset + 1, 1, "Number of Tracks");
+  VGMHeader *header = addHeader(offset(), 0);
+  header->addUnknownChild(offset(), 1);
+  header->addChild(offset() + 1, 1, "Number of Tracks");
 
-  nNumTracks = readByte(dwOffset + 1);
+  nNumTracks = readByte(offset() + 1);
   if (nNumTracks == 0 || nNumTracks > 8)
     return false;
 
-  const uint16_t first_offset = readShort(dwOffset + 2);
-  const auto first_address = dwOffset + 2 + (2 * nNumTracks);
+  const uint16_t first_offset = readShort(offset() + 2);
+  const auto first_address = offset() + 2 + (2 * nNumTracks);
   m_base_offset = static_cast<uint16_t>(first_address) - first_offset;
 
   for (unsigned int track_index = 0; track_index < nNumTracks; track_index++) {
     std::string track_name = fmt::format("Track {}", track_index + 1);
 
-    const uint32_t offset_to_pointer = dwOffset + 2 + (2 * track_index);
+    const uint32_t offset_to_pointer = offset() + 2 + (2 * track_index);
     header->addChild(offset_to_pointer, 2, track_name);
   }
 
@@ -60,7 +60,7 @@ bool ItikitiSnesSeq::parseHeader() {
 
 bool ItikitiSnesSeq::parseTrackPointers() {
   for (unsigned int track_index = 0; track_index < nNumTracks; track_index++) {
-    const uint32_t offset_to_pointer = dwOffset + 2 + (2 * track_index);
+    const uint32_t offset_to_pointer = offset() + 2 + (2 * track_index);
     const uint32_t offset = readDecodedOffset(offset_to_pointer);
     auto track = std::make_unique<ItikitiSnesTrack>(this, offset);
     aTracks.push_back(track.release());

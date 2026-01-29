@@ -49,8 +49,8 @@ void ChunSnesSeq::resetVars() {
 bool ChunSnesSeq::parseHeader() {
   setPPQN(SEQ_PPQN);
 
-  VGMHeader *header = addHeader(dwOffset, 0);
-  uint32_t curOffset = dwOffset;
+  VGMHeader *header = addHeader(offset(), 0);
+  uint32_t curOffset = offset();
   if (curOffset + 2 > 0x10000) {
     return false;
   }
@@ -73,7 +73,7 @@ bool ChunSnesSeq::parseHeader() {
       addrTrackStart = ofsTrackStart;
     }
     else {
-      addrTrackStart = dwOffset + ofsTrackStart;
+      addrTrackStart = offset() + ofsTrackStart;
     }
 
     auto trackName = fmt::format("Track Pointer {}", trackIndex + 1);

@@ -211,7 +211,7 @@ std::vector<KonamiTMNT2Seq*> KonamiTMNT2Scanner::loadSeqTable(
     }
   }
   auto lastSeq = seqTable->children().back();
-  seqTable->unLength = (lastSeq->dwOffset + lastSeq->unLength) - seqTable->dwOffset;
+  seqTable->setLength((lastSeq->offset() + lastSeq->length()) - seqTable->offset());
   if (!seqTable->loadVGMFile()) {
     delete seqTable;
   }

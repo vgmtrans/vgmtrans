@@ -101,7 +101,7 @@ HOSAInstrSet *HOSAScanner::searchForHOSAInstrSet(RawFile *file, const PSXSampCol
 
   uint32_t *sampOffsets = new uint32_t[numSamples];
   for (int i = 0; i < numSamples; i++)
-    sampOffsets[i] = sampcoll->samples[i]->dwOffset - sampcoll->dwOffset;
+    sampOffsets[i] = sampcoll->samples[i]->offset() - sampcoll->offset();
 
   size_t nFileLength = file->size();
   for (uint32_t i = 0x20; i + 0x14 < nFileLength; i++) {

@@ -48,8 +48,8 @@ void HudsonSnesSeq::resetVars() {
 bool HudsonSnesSeq::parseHeader() {
   setPPQN(SEQ_PPQN);
 
-  VGMHeader *header = addHeader(dwOffset, 0);
-  uint32_t curOffset = dwOffset;
+  VGMHeader *header = addHeader(offset(), 0);
+  uint32_t curOffset = offset();
 
   // track addresses
   if (version == HUDSONSNES_V0 || version == HUDSONSNES_V1) {
@@ -89,7 +89,7 @@ bool HudsonSnesSeq::parseHeader() {
         aHeader->addChild(curOffset, 1, "Timebase");
         TimebaseShift = readByte(curOffset++) & 3;
 
-        aHeader->unLength = curOffset - beginOffset;
+        aHeader->setLength(curOffset - beginOffset);
         break;
       }
 
@@ -99,7 +99,7 @@ bool HudsonSnesSeq::parseHeader() {
         if (!parseTrackPointersInHeader(trackPtrHeader, curOffset)) {
           return false;
         }
-        trackPtrHeader->unLength = curOffset - beginOffset;
+        trackPtrHeader->setLength(curOffset - beginOffset);
         break;
       }
 
@@ -129,7 +129,7 @@ bool HudsonSnesSeq::parseHeader() {
         }
         curOffset += tableSize;
 
-        instrHeader->unLength = curOffset - beginOffset;
+        instrHeader->setLength(curOffset - beginOffset);
         break;
       }
 
@@ -158,7 +158,7 @@ bool HudsonSnesSeq::parseHeader() {
         }
         curOffset += tableSize;
 
-        percHeader->unLength = curOffset - beginOffset;
+        percHeader->setLength(curOffset - beginOffset);
         break;
       }
 
@@ -188,7 +188,7 @@ bool HudsonSnesSeq::parseHeader() {
         }
         curOffset += tableSize;
 
-        instrHeader->unLength = curOffset - beginOffset;
+        instrHeader->setLength(curOffset - beginOffset);
         break;
       }
 
@@ -217,7 +217,7 @@ bool HudsonSnesSeq::parseHeader() {
         }
         curOffset += tableSize;
 
-        percHeader->unLength = curOffset - beginOffset;
+        percHeader->setLength(curOffset - beginOffset);
         break;
       }
 
@@ -234,7 +234,7 @@ bool HudsonSnesSeq::parseHeader() {
         aHeader->addUnknownChild(curOffset, tableSize);
         curOffset += tableSize;
 
-        aHeader->unLength = curOffset - beginOffset;
+        aHeader->setLength(curOffset - beginOffset);
         break;
       }
 
@@ -251,7 +251,7 @@ bool HudsonSnesSeq::parseHeader() {
         aHeader->addUnknownChild(curOffset, tableSize);
         curOffset += tableSize;
 
-        aHeader->unLength = curOffset - beginOffset;
+        aHeader->setLength(curOffset - beginOffset);
         break;
       }
 
@@ -277,7 +277,7 @@ bool HudsonSnesSeq::parseHeader() {
           curOffset++;
         }
 
-        aHeader->unLength = curOffset - beginOffset;
+        aHeader->setLength(curOffset - beginOffset);
         break;
       }
 
@@ -291,7 +291,7 @@ bool HudsonSnesSeq::parseHeader() {
           NoteEventHasVelocity = true;
         }
 
-        aHeader->unLength = curOffset - beginOffset;
+        aHeader->setLength(curOffset - beginOffset);
         break;
       }
 
@@ -308,7 +308,7 @@ bool HudsonSnesSeq::parseHeader() {
         aHeader->addUnknownChild(curOffset, tableSize);
         curOffset += tableSize;
 
-        aHeader->unLength = curOffset - beginOffset;
+        aHeader->setLength(curOffset - beginOffset);
         break;
       }
 

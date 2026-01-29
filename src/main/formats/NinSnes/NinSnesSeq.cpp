@@ -104,11 +104,11 @@ bool NinSnesSeq::readEvent(long stopTime) {
     return false;
   }
 
-  if (curOffset < header->dwOffset) {
-    uint32_t distance = header->dwOffset - curOffset;
-    header->dwOffset = curOffset;
-    if (header->unLength != 0) {
-      header->unLength += distance;
+  if (curOffset < header->offset()) {
+    uint32_t distance = header->offset() - curOffset;
+    header->setOffset(curOffset);
+    if (header->length() != 0) {
+      header->setLength(header->length() + distance);
     }
   }
 
@@ -200,11 +200,11 @@ bool NinSnesSeq::readEvent(long stopTime) {
     if (doJump) {
       curOffset = dest;
 
-      if (curOffset < dwOffset) {
-        uint32_t distance = dwOffset - curOffset;
-        dwOffset = curOffset;
-        if (unLength != 0) {
-          unLength += distance;
+      if (curOffset < offset()) {
+        uint32_t distance = offset() - curOffset;
+        setOffset(curOffset);
+        if (length() != 0) {
+          setLength(length() + (distance));
         }
       }
     }
@@ -630,7 +630,7 @@ NinSnesSection::NinSnesSection(NinSnesSeq *parentFile, uint32_t offset, uint32_t
 
 bool NinSnesSection::parseTrackPointers() {
   NinSnesSeq *parentSeq = (NinSnesSeq *) this->parentSeq;
-  uint32_t curOffset = dwOffset;
+  uint32_t curOffset = offset();
 
   VGMHeader *header = addHeader(curOffset, 16);
   uint8_t numActiveTracks = 0;
@@ -648,11 +648,11 @@ bool NinSnesSection::parseTrackPointers() {
 
       // correct sequence address
       // probably it's not necessary for regular case, but just in case...
-      if (startAddress < dwOffset) {
-        uint32_t distance = dwOffset - startAddress;
-        dwOffset = startAddress;
-        if (unLength != 0) {
-          unLength += distance;
+      if (startAddress < offset()) {
+        uint32_t distance = offset() - startAddress;
+        setOffset(startAddress);
+        if (length() != 0) {
+          setLength(length() + (distance));
         }
       }
 

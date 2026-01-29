@@ -34,16 +34,16 @@ HOSASeq::~HOSASeq(void) {
 //		VGMSeq::LoadMain() から call される。
 //==============================================================
 bool HOSASeq::parseHeader(void) {
-//	About the unLength, if (unLength==0), 
-//	"VGMSeq::LoadMain()" will calculate the unLength after "SeqTrack::LoadTrack()".
-  nNumTracks = readByte(dwOffset + 0x06);    //uint8_t (8bit)
+//	About the length(), if (length() == 0, 
+//	"VGMSeq::LoadMain()" will calculate the length() after "SeqTrack::LoadTrack()".
+  nNumTracks = readByte(offset() + 0x06);    //uint8_t (8bit)
   assocHOSA_ID = 0x00;
 
 //	Add the new object "VGMHeader" in this object "HOSASeq"（Super class："VGMContainerItem")
 //	Delect object is in "VGMContainerItem::~VGMContainerItem()"
-  VGMHeader *hdr = addHeader(dwOffset, 0x0050);
-  hdr->addSig(dwOffset, 4);
-  hdr->addChild(dwOffset + 0x06, 1, "Quantity of Tracks");
+  VGMHeader *hdr = addHeader(offset(), 0x0050);
+  hdr->addSig(offset(), 4);
+  hdr->addChild(offset() + 0x06, 1, "Quantity of Tracks");
 
   setPPQN(0x30);                                //Timebase
 
@@ -62,7 +62,7 @@ bool HOSASeq::parseHeader(void) {
 //==============================================================
 bool HOSASeq::parseTrackPointers(void) {
   for (unsigned int i = 0; i < nNumTracks; i++)
-    aTracks.push_back(new HOSATrack(this, readShort(dwOffset + 0x50 + (i * 2)) + dwOffset));
+    aTracks.push_back(new HOSATrack(this, readShort(offset() + 0x50 + (i * 2)) + offset()));
   //delect object is in "VGMSeq::~VGMSeq()"
   return true;
 }
@@ -179,7 +179,7 @@ bool HOSATrack::readEvent(void) {
 
     //--------
     //[4]Update the default Length
-    iLengthTimeNote = readShort(parentSeq->dwOffset + 0x10 + cCom_bit0 * 2);
+    iLengthTimeNote = readShort(parentSeq->offset() + 0x10 + cCom_bit0 * 2);
     if (iLengthTimeNote == 0) {
 //      iLengthTimeNote = ReadVarLen(curOffset);		//No count curOffset
       iLengthTimeNote = decodeVariable();
@@ -345,7 +345,7 @@ void    HOSATrack::ReadDeltaTime(unsigned char cCom_bit5, unsigned int *iVariabl
       break;
       //----
     case (3):    //	3 : From header
-      *iVariable = readShort(parentSeq->dwOffset + 0x10 + (readByte(curOffset++) & 0x1f) * 2);
+      *iVariable = readShort(parentSeq->offset() + 0x10 + (readByte(curOffset++) & 0x1f) * 2);
       break;
       //----
     default:

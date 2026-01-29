@@ -10,69 +10,69 @@ NDSSeq::NDSSeq(RawFile *file, uint32_t offset, uint32_t length, string name)
 }
 
 bool NDSSeq::parseHeader(void) {
-  VGMHeader *SSEQHdr = addHeader(dwOffset, 0x10, "SSEQ Chunk Header");
-  SSEQHdr->addSig(dwOffset, 8);
-  SSEQHdr->addChild(dwOffset + 8, 4, "Size");
-  SSEQHdr->addChild(dwOffset + 12, 2, "Header Size");
-  SSEQHdr->addUnknownChild(dwOffset + 14, 2);
-  //SeqChunkHdr->addSimpleChild(dwOffset, 4, "Blah");
-  unLength = readWord(dwOffset + 8);
+  VGMHeader *SSEQHdr = addHeader(offset(), 0x10, "SSEQ Chunk Header");
+  SSEQHdr->addSig(offset(), 8);
+  SSEQHdr->addChild(offset() + 8, 4, "Size");
+  SSEQHdr->addChild(offset() + 12, 2, "Header Size");
+  SSEQHdr->addUnknownChild(offset() + 14, 2);
+  //SeqChunkHdr->addSimpleChild(offset(), 4, "Blah");
+  setLength(readWord(offset() + 8));
   setPPQN(0x30);
   return true;        //successful
 }
 
 bool NDSSeq::parseTrackPointers(void) {
-  VGMHeader *DATAHdr = addHeader(dwOffset + 0x10, 0xC, "DATA Chunk Header");
-  DATAHdr->addSig(dwOffset + 0x10, 4);
-  DATAHdr->addChild(dwOffset + 0x10 + 4, 4, "Size");
-  DATAHdr->addChild(dwOffset + 0x10 + 8, 4, "Data Pointer");
-  uint32_t offset = dwOffset + 0x1C;
-  uint8_t b = readByte(offset);
+  VGMHeader *DATAHdr = addHeader(offset() + 0x10, 0xC, "DATA Chunk Header");
+  DATAHdr->addSig(offset() + 0x10, 4);
+  DATAHdr->addChild(offset() + 0x10 + 4, 4, "Size");
+  DATAHdr->addChild(offset() + 0x10 + 8, 4, "Data Pointer");
+  uint32_t off = offset() + 0x1C;
+  uint8_t b = readByte(off);
   aTracks.push_back(new NDSTrack(this));
 
   //FE XX XX signifies multiple tracks, each true bit in the XX values signifies there is a track for that channel
   if (b == 0xFE)
   {
-    VGMHeader *TrkPtrs = addHeader(offset, 0, "Track Pointers");
-    TrkPtrs->addChild(offset, 3, "Valid Tracks");
-    offset += 3;    //but all we need to do is check for subsequent 0x93 track pointer events
-    b = readByte(offset);
+    VGMHeader *TrkPtrs = addHeader(off, 0, "Track Pointers");
+    TrkPtrs->addChild(off, 3, "Valid Tracks");
+    off += 3;    //but all we need to do is check for subsequent 0x93 track pointer events
+    b = readByte(off);
     uint32_t songDelay = 0;
 
     while (b == 0x80) {
       uint32_t value;
       uint8_t c;
-      uint32_t beginOffset = offset;
-      offset++;
-      if ((value = readByte(offset++)) & 0x80) {
+      uint32_t beginOffset = off;
+      off++;
+      if ((value = readByte(off++)) & 0x80) {
         value &= 0x7F;
         do {
-          value = (value << 7) + ((c = readByte(offset++)) & 0x7F);
+          value = (value << 7) + ((c = readByte(off++)) & 0x7F);
         } while (c & 0x80);
       }
       songDelay += value;
-      TrkPtrs->addChild(beginOffset, offset - beginOffset, "Delay");
+      TrkPtrs->addChild(beginOffset, off - beginOffset, "Delay");
       //songDelay += SeqTrack::ReadVarLen(++offset);
-      b = readByte(offset);
+      b = readByte(off);
       break;
     }
 
     //Track/Channel assignment and pointer.  Channel # is irrelevant
     while (b == 0x93)
     {
-      TrkPtrs->addChild(offset, 5, "Track Pointer");
-      uint32_t trkOffset = readByte(offset + 2) + (readByte(offset + 3) << 8) +
-          (readByte(offset + 4) << 16) + dwOffset + 0x1C;
+      TrkPtrs->addChild(off, 5, "Track Pointer");
+      uint32_t trkOffset = readByte(off + 2) + (readByte(off + 3) << 8) +
+          (readByte(off + 4) << 16) + offset() + 0x1C;
       NDSTrack *newTrack = new NDSTrack(this, trkOffset);
       aTracks.push_back(newTrack);
       //newTrack->
-      offset += 5;
-      b = readByte(offset);
+      off += 5;
+      b = readByte(off);
     }
-    TrkPtrs->unLength = offset - TrkPtrs->dwOffset;
+    TrkPtrs->setLength(off - TrkPtrs->offset());
   }
-  aTracks[0]->dwOffset = offset;
-  aTracks[0]->dwStartOffset = offset;
+  aTracks[0]->setOffset(off);
+  aTracks[0]->dwStartOffset = off;
   return true;
 }
 
@@ -125,7 +125,7 @@ bool NDSTrack::readEvent(void) {
 
       case 0x94: {
         u32 jumpAddr = readByte(curOffset) + (readByte(curOffset + 1) << 8)
-            + (readByte(curOffset + 2) << 16) + parentSeq->dwOffset + 0x1C;
+            + (readByte(curOffset + 2) << 16) + parentSeq->offset() + 0x1C;
         curOffset += 3;
 
         return addJump(beginOffset, curOffset - beginOffset, jumpAddr);
@@ -133,7 +133,7 @@ bool NDSTrack::readEvent(void) {
 
       case 0x95: {
         u32 destination = readByte(curOffset) + (readByte(curOffset + 1) << 8)
-            + (readByte(curOffset + 2) << 16) + parentSeq->dwOffset + 0x1C;
+            + (readByte(curOffset + 2) << 16) + parentSeq->offset() + 0x1C;
         curOffset += 3;
         u32 returnOffset = curOffset;
         return addCall(beginOffset, curOffset - beginOffset, destination, returnOffset, "Call");

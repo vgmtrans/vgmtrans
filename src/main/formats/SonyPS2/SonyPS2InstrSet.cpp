@@ -21,7 +21,7 @@ SonyPS2InstrSet::~SonyPS2InstrSet() {
 
 bool SonyPS2InstrSet::parseHeader() {
   // VERSION CHUNK
-  uint32_t curOffset = dwOffset;
+  uint32_t curOffset = offset();
   readBytes(curOffset, 16, &versCk);
   VGMHeader *versCkHdr = addHeader(curOffset, versCk.chunkSize, "Version Chunk");
   versCkHdr->addChild(curOffset, 4, "Creator");
@@ -34,7 +34,7 @@ bool SonyPS2InstrSet::parseHeader() {
   // HEADER CHUNK
   curOffset += versCk.chunkSize;
   readBytes(curOffset, 64, &hdrCk);
-  unLength = hdrCk.fileSize;
+  setLength(hdrCk.fileSize);
 
   VGMHeader *hdrCkHdr = addHeader(curOffset, hdrCk.chunkSize, "Header Chunk");
   hdrCkHdr->addChild(curOffset, 4, "Creator");
@@ -52,7 +52,7 @@ bool SonyPS2InstrSet::parseHeader() {
   // this is handled in GetInstrPointers()
 
   // SAMPLESET CHUNK
-  curOffset = dwOffset + hdrCk.samplesetChunkAddr;
+  curOffset = offset() + hdrCk.samplesetChunkAddr;
   readBytes(curOffset, 16, &sampSetCk);
   sampSetCk.sampleSetOffsetAddr = new uint32_t[sampSetCk.maxSampleSetNumber + 1];
   sampSetCk.sampleSetParam = new SampSetParam[sampSetCk.maxSampleSetNumber + 1];
@@ -90,7 +90,7 @@ bool SonyPS2InstrSet::parseHeader() {
   }
 
   // SAMPLE CHUNK
-  curOffset = dwOffset + hdrCk.sampleChunkAddr;
+  curOffset = offset() + hdrCk.sampleChunkAddr;
   readBytes(curOffset, 16, &sampCk);
   sampCk.sampleOffsetAddr = new uint32_t[sampCk.maxSampleNumber + 1];
   sampCk.sampleParam = new SampleParam[sampCk.maxSampleNumber + 1];
@@ -151,7 +151,7 @@ bool SonyPS2InstrSet::parseHeader() {
   }
 
   // VAGInfo CHUNK
-  curOffset = dwOffset + hdrCk.vagInfoChunkAddr;
+  curOffset = offset() + hdrCk.vagInfoChunkAddr;
   readBytes(curOffset, 16, &vagInfoCk);
   vagInfoCk.vagInfoOffsetAddr = new uint32_t[vagInfoCk.maxVagInfoNumber + 1];
   vagInfoCk.vagInfoParam = new VAGInfoParam[vagInfoCk.maxVagInfoNumber + 1];
@@ -183,7 +183,7 @@ bool SonyPS2InstrSet::parseHeader() {
 }
 
 bool SonyPS2InstrSet::parseInstrPointers() {
-  uint32_t curOffset = dwOffset + hdrCk.programChunkAddr;
+  uint32_t curOffset = offset() + hdrCk.programChunkAddr;
   //Now we're at the Program chunk, which starts with the sig "SCEIProg" (in 32bit little endian)
   //read in the first 4 values.  The programs will be read within GetInstrPointers()
   readBytes(curOffset, 16, &progCk);
@@ -247,7 +247,7 @@ bool SonyPS2InstrSet::parseInstrPointers() {
 
     assert(progCk.progParamBlock[i].sizeSplitBlock == 20);    //make sure the size of a split block is indeed 20
     uint8_t nSplits = progCk.progParamBlock[i].nSplit;
-    instr->unLength += nSplits * sizeof(SonyPS2Instr::SplitBlock);
+    instr->setLength(instr->length() + nSplits * sizeof(SonyPS2Instr::SplitBlock));
     uint32_t absSplitBlocksAddr = curOffset + progCk.programOffsetAddr[i] + progCk.progParamBlock[i].splitBlockAddr;
     instr->splitBlocks = new SonyPS2Instr::SplitBlock[nSplits];
     readBytes(absSplitBlocksAddr, nSplits * sizeof(SonyPS2Instr::SplitBlock), instr->splitBlocks);
@@ -280,8 +280,8 @@ bool SonyPS2InstrSet::parseInstrPointers() {
   progParamsHdr->addChildren(aInstrs);
 
   uint32_t maxProgNum = progCk.maxProgramNumber;
-  progParamsHdr->unLength = (curOffset + progCk.programOffsetAddr[maxProgNum]) + sizeof(SonyPS2Instr::ProgParam) +
-      progCk.progParamBlock[maxProgNum].nSplit * sizeof(SonyPS2Instr::SplitBlock) - progParamsHdr->dwOffset;
+  progParamsHdr->setLength((curOffset + progCk.programOffsetAddr[maxProgNum]) + sizeof(SonyPS2Instr::ProgParam) +
+      progCk.progParamBlock[maxProgNum].nSplit * sizeof(SonyPS2Instr::SplitBlock) - progParamsHdr->offset());
 
   return true;
 }

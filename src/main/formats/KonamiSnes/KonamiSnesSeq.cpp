@@ -75,9 +75,9 @@ bool KonamiSnesSeq::parseHeader(void) {
   // For instance: Ganbare Goemon 3 - Title
   nNumTracks = MAX_TRACKS;
 
-  VGMHeader *seqHeader = addHeader(dwOffset, nNumTracks * 2, "Sequence Header");
+  VGMHeader *seqHeader = addHeader(offset(), nNumTracks * 2, "Sequence Header");
   for (uint32_t trackNumber = 0; trackNumber < nNumTracks; trackNumber++) {
-    uint32_t trackPointerOffset = dwOffset + (trackNumber * 2);
+    uint32_t trackPointerOffset = offset() + (trackNumber * 2);
     if (trackPointerOffset + 2 > 0x10000) {
       return false;
     }
@@ -85,13 +85,13 @@ bool KonamiSnesSeq::parseHeader(void) {
     uint16_t trkOff = readShort(trackPointerOffset);
     seqHeader->addPointer(trackPointerOffset, 2, trkOff, true, "Track Pointer");
 
-    assert(trkOff >= dwOffset);
+    assert(trkOff >= offset());
 
-    if (trkOff - dwOffset < nNumTracks * 2) {
-      nNumTracks = (trkOff - dwOffset) / 2;
+    if (trkOff - offset() < nNumTracks * 2) {
+      nNumTracks = (trkOff - offset()) / 2;
     }
   }
-  seqHeader->unLength = nNumTracks * 2;
+  seqHeader->setLength(nNumTracks * 2);
 
   return true;
 }
@@ -99,7 +99,7 @@ bool KonamiSnesSeq::parseHeader(void) {
 
 bool KonamiSnesSeq::parseTrackPointers(void) {
   for (uint32_t trackNumber = 0; trackNumber < nNumTracks; trackNumber++) {
-    uint16_t trkOff = readShort(dwOffset + trackNumber * 2);
+    uint16_t trkOff = readShort(offset() + trackNumber * 2);
     aTracks.push_back(new KonamiSnesTrack(this, trkOff));
   }
   return true;
@@ -946,7 +946,7 @@ bool KonamiSnesTrack::readEvent(void) {
       desc = fmt::format("Destination: ${:04X}", dest);
       uint32_t length = curOffset - beginOffset;
 
-      assert(dest >= dwOffset);
+      assert(dest >= offset());
 
       if (curOffset < 0x10000 && readByte(curOffset) == 0xff) {
         addGenericEvent(curOffset, 1, "End of Track", "", Type::TrackEnd);
@@ -970,7 +970,7 @@ bool KonamiSnesTrack::readEvent(void) {
       addGenericEvent(beginOffset, curOffset - beginOffset, "Pattern Play", desc,
                       Type::RepeatStart);
 
-      assert(dest >= dwOffset);
+      assert(dest >= offset());
 
       subReturnAddr = curOffset;
       inSubroutine = true;

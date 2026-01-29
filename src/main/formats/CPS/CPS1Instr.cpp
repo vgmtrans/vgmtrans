@@ -37,17 +37,17 @@ bool CPS1SampleInstrSet::parseInstrPointers() {
 
     case CPS1_V425:
       for (int i = 0; i < 128; ++i) {
-        auto offset = dwOffset + (i * 4);
-        if (!(readByte(offset) & 0x80)) {
+        auto instrOff = offset() + (i * 4);
+        if (!(readByte(instrOff) & 0x80)) {
           break;
         }
         std::string name = fmt::format("Instrument {}", i);
-        VGMInstr* instr = new VGMInstr(this, offset, 4, 0, i, name, 0);
-        VGMRgn* rgn = new VGMRgn(instr, offset);
-        instr->unLength = 4;
-        rgn->unLength = 4;
+        VGMInstr* instr = new VGMInstr(this, instrOff, 4, 0, i, name, 0);
+        VGMRgn* rgn = new VGMRgn(instr, instrOff);
+        instr->setLength(4);
+        rgn->setLength(4);
         // subtract 1 to account for the first OKIM6295 sample ptr always being null
-        rgn->sampNum = readByte(offset+1) - 1;
+        rgn->sampNum = readByte(instrOff+1) - 1;
         rgn->release_time = 10;
         instr->addRgn(rgn);
         aInstrs.push_back(instr);
@@ -146,11 +146,11 @@ bool CPS1OPMInstrSet::parseInstrPointers() {
       instrSize = sizeof(CPS1OPMInstrDataV4_25);
       break;
   }
-  numInstrs = std::min(unLength / static_cast<u32>(instrSize), 128U);
+  numInstrs = std::min(length() / static_cast<u32>(instrSize), 128U);
 
   for (int i = 0; i < numInstrs; ++i) {
-    auto offset = dwOffset + (i * instrSize);
-    if (readWord(offset) == 0 && readWord(offset+4) == 0) {
+    auto instrOff = offset() + (i * instrSize);
+    if (readWord(instrOff) == 0 && readWord(instrOff+4) == 0) {
       break;
     }
 
@@ -159,8 +159,8 @@ bool CPS1OPMInstrSet::parseInstrPointers() {
     switch (fmt_version) {
       case CPS1_V200: {
         CPS1OPMInstrDataV2_00 instrData{};
-        readBytes(offset, static_cast<uint32_t>(instrSize), &instrData);
-        auto instr = new CPS1OPMInstr<CPS1OPMInstrDataV2_00>(this, masterVol, offset, instrSize, 0, i, name);
+        readBytes(instrOff, static_cast<uint32_t>(instrSize), &instrData);
+        auto instr = new CPS1OPMInstr<CPS1OPMInstrDataV2_00>(this, masterVol, instrOff, instrSize, 0, i, name);
         aInstrs.push_back(instr);
         addOPMInstrument(instrData.convertToOPMData(masterVol, name));
         break;
@@ -168,8 +168,8 @@ bool CPS1OPMInstrSet::parseInstrPointers() {
       case CPS1_V500:
       case CPS1_V502: {
         CPS1OPMInstrDataV5_02 instrData{};
-        readBytes(offset, static_cast<uint32_t>(instrSize), &instrData);
-        auto instr = new CPS1OPMInstr<CPS1OPMInstrDataV5_02>(this, masterVol, offset, instrSize, 0, i, name);
+        readBytes(instrOff, static_cast<uint32_t>(instrSize), &instrData);
+        auto instr = new CPS1OPMInstr<CPS1OPMInstrDataV5_02>(this, masterVol, instrOff, instrSize, 0, i, name);
         aInstrs.push_back(instr);
         addOPMInstrument(instrData.convertToOPMData(masterVol, name));
         break;
@@ -178,8 +178,8 @@ bool CPS1OPMInstrSet::parseInstrPointers() {
       case CPS1_V350:
       case CPS1_V425: {
         CPS1OPMInstrDataV4_25 instrData{};
-        readBytes(offset, static_cast<uint32_t>(instrSize), &instrData);
-        auto instr = new CPS1OPMInstr<CPS1OPMInstrDataV4_25>(this, masterVol, offset, instrSize, 0, i, name);
+        readBytes(instrOff, static_cast<uint32_t>(instrSize), &instrData);
+        auto instr = new CPS1OPMInstr<CPS1OPMInstrDataV4_25>(this, masterVol, instrOff, instrSize, 0, i, name);
         aInstrs.push_back(instr);
         std::vector<uint8_t> driverData;
         uint8_t enableLfo = instrData.LFO_ENABLE_AND_WF >> 7;
@@ -192,20 +192,20 @@ bool CPS1OPMInstrSet::parseInstrPointers() {
         }
 
         addOPMInstrument(instrData.convertToOPMData(masterVol, name), "cps", std::move(driverData));
-        instr->addChild(new VGMItem(this, offset, 1, "Transpose"));
-        instr->addChild(new VGMItem(this, offset+1, 1, "LFO_ENABLE_AND_WF"));
-        instr->addChild(new VGMItem(this, offset+2, 1, "LFRQ"));
-        instr->addChild(new VGMItem(this, offset+3, 1, "PMD"));
-        instr->addChild(new VGMItem(this, offset+4, 1, "AMD"));
-        instr->addChild(new VGMItem(this, offset+5, 1, "FL_CON"));
-        instr->addChild(new VGMItem(this, offset+6, 1, "PMS_AMS"));
-        instr->addChild(new VGMItem(this, offset+7, 1, "SLOT_MASK"));
-        instr->addChild(new VGMItem(this, offset+8, 12, "Driver-specific Volume Params"));
-        instr->addChild(new VGMItem(this, offset+20, 4, "DT1_MUL"));
-        instr->addChild(new VGMItem(this, offset+24, 4, "KS_AR"));
-        instr->addChild(new VGMItem(this, offset+28, 4, "AMSEN_D1R"));
-        instr->addChild(new VGMItem(this, offset+32, 4, "DT2_D2R"));
-        instr->addChild(new VGMItem(this, offset+36, 4, "D1L_RR"));
+        instr->addChild(new VGMItem(this, instrOff, 1, "Transpose"));
+        instr->addChild(new VGMItem(this, instrOff+1, 1, "LFO_ENABLE_AND_WF"));
+        instr->addChild(new VGMItem(this, instrOff+2, 1, "LFRQ"));
+        instr->addChild(new VGMItem(this, instrOff+3, 1, "PMD"));
+        instr->addChild(new VGMItem(this, instrOff+4, 1, "AMD"));
+        instr->addChild(new VGMItem(this, instrOff+5, 1, "FL_CON"));
+        instr->addChild(new VGMItem(this, instrOff+6, 1, "PMS_AMS"));
+        instr->addChild(new VGMItem(this, instrOff+7, 1, "SLOT_MASK"));
+        instr->addChild(new VGMItem(this, instrOff+8, 12, "Driver-specific Volume Params"));
+        instr->addChild(new VGMItem(this, instrOff+20, 4, "DT1_MUL"));
+        instr->addChild(new VGMItem(this, instrOff+24, 4, "KS_AR"));
+        instr->addChild(new VGMItem(this, instrOff+28, 4, "AMSEN_D1R"));
+        instr->addChild(new VGMItem(this, instrOff+32, 4, "DT2_D2R"));
+        instr->addChild(new VGMItem(this, instrOff+36, 4, "D1L_RR"));
         break;
       }
     }

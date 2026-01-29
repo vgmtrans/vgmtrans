@@ -48,8 +48,8 @@ void AsciiShuichiSnesSeq::resetVars() {
 bool AsciiShuichiSnesSeq::parseHeader() {
   setPPQN(SEQ_PPQN);
 
-  VGMHeader *header = addHeader(dwOffset, 2 * MAX_TRACKS);
-  if (dwOffset + header->unLength > 0x10000) {
+  VGMHeader *header = addHeader(offset(), 2 * MAX_TRACKS);
+  if (offset() + header->length() > 0x10000) {
     return false;
   }
 
@@ -57,8 +57,8 @@ bool AsciiShuichiSnesSeq::parseHeader() {
     string trackNameLow = fmt::format("Track Pointer {:d} (Low)", trackIndex + 1);
     string trackNameHigh = fmt::format("Track Pointer {:d} (High)", trackIndex + 1);
 
-    header->addChild(dwOffset + trackIndex, 1, trackNameLow);
-    header->addChild(dwOffset + MAX_TRACKS + trackIndex, 1, trackNameHigh);
+    header->addChild(offset() + trackIndex, 1, trackNameLow);
+    header->addChild(offset() + MAX_TRACKS + trackIndex, 1, trackNameHigh);
   }
 
   return true;
@@ -67,8 +67,8 @@ bool AsciiShuichiSnesSeq::parseHeader() {
 
 bool AsciiShuichiSnesSeq::parseTrackPointers() {
   for (uint8_t trackIndex = 0; trackIndex < MAX_TRACKS; trackIndex++) {
-    const uint8_t lo = readByte(dwOffset + trackIndex);
-    const uint8_t hi = readByte(dwOffset + MAX_TRACKS + trackIndex);
+    const uint8_t lo = readByte(offset() + trackIndex);
+    const uint8_t hi = readByte(offset() + MAX_TRACKS + trackIndex);
     const auto trackStartAddress = static_cast<uint16_t>(lo | (hi << 8));
 
     const auto track = new AsciiShuichiSnesTrack(this, trackStartAddress);

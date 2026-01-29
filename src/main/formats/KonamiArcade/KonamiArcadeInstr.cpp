@@ -59,8 +59,8 @@ void KonamiArcadeInstrSet::addSampleInfoChildren(VGMItem* sampInfoItem, u32 off)
 
 bool KonamiArcadeInstrSet::parseInstrPointers() {
 
-  u32 instrSampleTableOffset = m_fmtVer == MysticWarrior ? readShort(dwOffset) : readWordBE(dwOffset);
-  u32 sfxSampleTableOffset = m_fmtVer == MysticWarrior ? readShort(dwOffset + 2) : readWordBE(dwOffset + 4);
+  u32 instrSampleTableOffset = m_fmtVer == MysticWarrior ? readShort(offset()) : readWordBE(offset());
+  u32 sfxSampleTableOffset = m_fmtVer == MysticWarrior ? readShort(offset() + 2) : readWordBE(offset() + 4);
 
   disableAutoAddInstrumentsAsChildren();
 
@@ -190,22 +190,22 @@ u32 KonamiArcadeSampColl::determineSampleSize(u32 startOffset,
   }
 
   if (reverse) {
-    for (u32 off = startOffset-2; off >= dwOffset + 2; off -= inc) {
+    for (u32 off = startOffset-2; off >= offset() + 2; off -= inc) {
       if (readShort(off) == endMarker) {
         return startOffset - off;
       }
     }
     return startOffset;
   }
-  for (u32 off = startOffset; off < unLength + 2; off += inc) {
+  for (u32 off = startOffset; off < length() + 2; off += inc) {
     if (readShort(off) == endMarker) {
       return off - startOffset;
     }
   }
   if (reverse) {
-    return startOffset - dwOffset;
+    return startOffset - offset();
   } else {
-    return unLength - startOffset;
+    return length() - startOffset;
   }
 }
 

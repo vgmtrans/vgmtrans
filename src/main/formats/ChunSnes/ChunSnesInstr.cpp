@@ -30,7 +30,7 @@ ChunSnesInstrSet::~ChunSnesInstrSet() {
 }
 
 bool ChunSnesInstrSet::parseHeader() {
-  uint32_t curOffset = dwOffset;
+  uint32_t curOffset = offset();
   if (curOffset + 2 > 0x10000) {
     return false;
   }
@@ -54,7 +54,7 @@ bool ChunSnesInstrSet::parseHeader() {
 bool ChunSnesInstrSet::parseInstrPointers() {
   usedSRCNs.clear();
 
-  uint32_t curOffset = dwOffset;
+  uint32_t curOffset = offset();
   unsigned int nNumInstrs = readByte(curOffset);
   if (version == CHUNSNES_SUMMER) {
     curOffset += 1;
@@ -81,8 +81,8 @@ bool ChunSnesInstrSet::parseInstrPointers() {
         usedSRCNs.push_back(srcn);
       }
 
-      if (addrInstr < dwOffset) {
-        dwOffset = addrInstr;
+      if (addrInstr < offset()) {
+        setOffset(addrInstr);
       }
 
       ChunSnesInstr *newInstr = new ChunSnesInstr(this, version, instrNum, addrInstr,
@@ -123,8 +123,8 @@ ChunSnesInstr::ChunSnesInstr(VGMInstrSet *instrSet,
 ChunSnesInstr::~ChunSnesInstr() {}
 
 bool ChunSnesInstr::loadInstr() {
-  uint8_t srcn = readByte(dwOffset);
-  addChild(dwOffset, 1, "Sample Number");
+  uint8_t srcn = readByte(offset());
+  addChild(offset(), 1, "Sample Number");
   if (srcn == 0xff) {
     return false;
   }
@@ -156,17 +156,17 @@ bool ChunSnesInstr::loadInstr() {
 ChunSnesRgn::ChunSnesRgn(ChunSnesInstr *instr, ChunSnesVersion ver, uint8_t srcn, uint16_t addrRgn, uint32_t spcDirAddr) :
     VGMRgn(instr, addrRgn, 8),
     version(ver) {
-  addUnknown(dwOffset, 2);
-  addChild(dwOffset + 2, 1, "ADSR(1)");
-  addChild(dwOffset + 3, 1, "ADSR(2)");
-  addChild(dwOffset + 4, 1, "GAIN");
-  addChild(dwOffset + 5, 2, "Tuning");
-  addUnknown(dwOffset + 7, 1);
+  addUnknown(offset(), 2);
+  addChild(offset() + 2, 1, "ADSR(1)");
+  addChild(offset() + 3, 1, "ADSR(2)");
+  addChild(offset() + 4, 1, "GAIN");
+  addChild(offset() + 5, 2, "Tuning");
+  addUnknown(offset() + 7, 1);
 
-  const uint8_t adsr1 = readByte(dwOffset + 2);
-  const uint8_t adsr2 = readByte(dwOffset + 3);
-  const uint8_t gain = readByte(dwOffset + 4);
-  const int16_t pitch_scale = getShortBE(dwOffset + 5);
+  const uint8_t adsr1 = readByte(offset() + 2);
+  const uint8_t adsr2 = readByte(offset() + 3);
+  const uint8_t gain = readByte(offset() + 4);
+  const int16_t pitch_scale = getShortBE(offset() + 5);
 
   const double pitch_fixer = (version == CHUNSNES_SUMMER) ? (7902.0 / 8192.0) : (7938.0 / 8192.0); // from pitch table
   double coarse_tuning;

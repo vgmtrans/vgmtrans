@@ -51,16 +51,16 @@ SegSatInstrSet::SegSatInstrSet(RawFile* file, uint32_t offset, int numInstrs, Se
 }
 
 bool SegSatInstrSet::parseHeader() {
-  addChild(dwOffset + 0, 2, "Mixer Tables Pointer");
-  addChild(dwOffset + 2, 2, "Velocity Tables Pointer");
-  addChild(dwOffset + 4, 2, "PEG Tables Pointer");
-  addChild(dwOffset + 6, 2, "PLFO Tables Pointer");
+  addChild(offset() + 0, 2, "Mixer Tables Pointer");
+  addChild(offset() + 2, 2, "Velocity Tables Pointer");
+  addChild(offset() + 4, 2, "PEG Tables Pointer");
+  addChild(offset() + 6, 2, "PLFO Tables Pointer");
 
-  u32 mixerTablesOffset = readShortBE(dwOffset) + dwOffset;
-  u32 vlTablesOffset = readShortBE(dwOffset + 2) + dwOffset;
-  u32 pegTablesOffset = readShortBE(dwOffset + 4) + dwOffset;
-  u32 plfoTablesOffset = readShortBE(dwOffset + 6) + dwOffset;
-  u32 firstInstrOffset = readShortBE(dwOffset + 8) + dwOffset;
+  u32 mixerTablesOffset = readShortBE(offset()) + offset();
+  u32 vlTablesOffset = readShortBE(offset() + 2) + offset();
+  u32 pegTablesOffset = readShortBE(offset() + 4) + offset();
+  u32 plfoTablesOffset = readShortBE(offset() + 6) + offset();
+  u32 firstInstrOffset = readShortBE(offset() + 8) + offset();
 
   // Parse Mixer Tables
   u32 offset = mixerTablesOffset;
@@ -124,10 +124,10 @@ bool SegSatInstrSet::parseHeader() {
 }
 
 bool SegSatInstrSet::parseInstrPointers() {
-  size_t off = dwOffset + 8;
+  size_t off = offset() + 8;
   auto instrList = addChild(off, m_numInstrs * 2, "Instrument Pointers");
   for (int i = 0; i < m_numInstrs; i++) {
-    u32 instrOff = rawFile()->getBE<u16>(off + (i * 2)) + dwOffset;
+    u32 instrOff = rawFile()->getBE<u16>(off + (i * 2)) + offset();
     u8 numRgns = rawFile()->readByte(instrOff + 2) + 1;
     size_t instrSize = 4 + numRgns * 0x20;
     auto name = fmt::format("Instrument {:d}", i);
@@ -154,18 +154,18 @@ SegSatInstr::SegSatInstr(SegSatInstrSet* set, size_t offset, size_t length, u32 
 }
 
 bool SegSatInstr::loadInstr() {
-  addChild(dwOffset, 1, "Pitchbend Range");
-  addChild(dwOffset+1, 1, "Portamento");
-  addChild(dwOffset+2, 1, "Region Count");
-  addChild(dwOffset+3, 1, "Volume Bias");
-  m_pitchBendRange = rawFile()->readByte(dwOffset);
-  m_portamento = rawFile()->readByte(dwOffset + 1);
-  u8 numRgns = rawFile()->readByte(dwOffset + 2) + 1;
-  m_volBias = rawFile()->readByte(dwOffset + 3);
+  addChild(offset(), 1, "Pitchbend Range");
+  addChild(offset()+1, 1, "Portamento");
+  addChild(offset()+2, 1, "Region Count");
+  addChild(offset()+3, 1, "Volume Bias");
+  m_pitchBendRange = rawFile()->readByte(offset());
+  m_portamento = rawFile()->readByte(offset() + 1);
+  u8 numRgns = rawFile()->readByte(offset() + 2) + 1;
+  m_volBias = rawFile()->readByte(offset() + 3);
 
   auto sampColl = parInstrSet->sampColl;
   for (int i = 0; i < numRgns; ++i) {
-    u32 rgnOff = dwOffset + 4 + (i * 0x20);
+    u32 rgnOff = offset() + 4 + (i * 0x20);
     auto name = fmt::format("Region {:d}", i);
     auto rgn = new SegSatRgn(this, rgnOff, name);
     if (!rgn->isRegionValid()) {
@@ -200,12 +200,12 @@ bool SegSatInstr::loadInstr() {
       if (rgn->loopType() == SegSatRgn::LoopType::Reverse)
         sample->setReverse(true);
 
-      size_t newLength = sampOffset + sampLength - instrSet->dwOffset;
-      if (sampColl->unLength < newLength) {
-        sampColl->unLength = newLength;
+      size_t newLength = sampOffset + sampLength - instrSet->offset();
+      if (sampColl->length() < newLength) {
+        sampColl->setLength(newLength);
       }
-      if (instrSet->unLength < newLength) {
-        instrSet->unLength = newLength;
+      if (instrSet->length() < newLength) {
+        instrSet->setLength(newLength);
       }
     }
   }
@@ -278,7 +278,7 @@ SegSatRgn::SegSatRgn(SegSatInstr* instr, uint32_t offset, const std::string& nam
 
   u8 bytesPerSamp = m_sampleType == SampleType::PCM16 ? 2 : 1;
 
-  u32 instrSetOffset = parInstr->parInstrSet->dwOffset;
+  u32 instrSetOffset = parInstr->parInstrSet->offset();
   sampOffset = (getWordBE(offset + 2) & 0x7FFFF);
   if (m_sampleType == SampleType::PCM16)
     sampOffset = sampOffset & ~1;
@@ -435,7 +435,7 @@ SegSatRgn::SegSatRgn(SegSatInstr* instr, uint32_t offset, const std::string& nam
 bool SegSatRgn::isRegionValid() {
   if (keyLow == 0xFF) return false;
   if (keyLow > keyHigh) return false;
-  u32 instrSetOffset = parInstr->parInstrSet->dwOffset;
+  u32 instrSetOffset = parInstr->parInstrSet->offset();
   if (sampOffset == instrSetOffset) return false;
   if (sampOffset >= instrSetOffset + 0x7FFFE) return false;
   return true;

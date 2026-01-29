@@ -30,7 +30,7 @@ bool AsciiShuichiSnesInstrSet::parseHeader() {
 bool AsciiShuichiSnesInstrSet::parseInstrPointers() {
   usedSRCNs.clear();
   for (int instr = 0; instr < 0x40; instr++) {
-    const uint32_t instrHeaderAddress = dwOffset + (4 * instr);
+    const uint32_t instrHeaderAddress = offset() + (4 * instr);
     if (instrHeaderAddress + 4 > 0x10000) {
       return false;
     }
@@ -81,7 +81,7 @@ AsciiShuichiSnesInstr::AsciiShuichiSnesInstr(VGMInstrSet *instrSet,
 }
 
 bool AsciiShuichiSnesInstr::loadInstr() {
-  const uint8_t srcn = readByte(dwOffset);
+  const uint8_t srcn = readByte(offset());
   const uint32_t dirEntryOffset = spcDirAddress + (srcn * 4);
   if (dirEntryOffset + 4 > 0x10000) {
     return false;
@@ -94,7 +94,7 @@ bool AsciiShuichiSnesInstr::loadInstr() {
   }
   const auto spcFineTuning = static_cast<int8_t>(readByte(fineTuningTableAddress + srcn));
 
-  const auto rgn = new AsciiShuichiSnesRgn(this, dwOffset, spcFineTuning);
+  const auto rgn = new AsciiShuichiSnesRgn(this, offset(), spcFineTuning);
   rgn->sampOffset = sampleStartAddress - spcDirAddress;
   addRgn(rgn);
 

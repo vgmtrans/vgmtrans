@@ -16,19 +16,19 @@ BGMSeq::BGMSeq(RawFile *file, uint32_t offset)
 }
 
 bool BGMSeq::parseHeader() {
-  VGMHeader *header = addHeader(dwOffset, 0x20, "Header");
-  header->addChild(dwOffset, 4, "Signature");
-  header->addChild(dwOffset + 0x4, 2, "ID");
-  header->addChild(dwOffset + 0x6, 2, "Associated WD ID");
-  header->addChild(dwOffset + 0x8, 1, "Number of Tracks");
-  header->addChild(dwOffset + 0xE, 2, "PPQN");
-  header->addChild(dwOffset + 0x10, 4, "File length");
+  VGMHeader *header = addHeader(offset(), 0x20, "Header");
+  header->addChild(offset(), 4, "Signature");
+  header->addChild(offset() + 0x4, 2, "ID");
+  header->addChild(offset() + 0x6, 2, "Associated WD ID");
+  header->addChild(offset() + 0x8, 1, "Number of Tracks");
+  header->addChild(offset() + 0xE, 2, "PPQN");
+  header->addChild(offset() + 0x10, 4, "File length");
 
-  nNumTracks = readByte(dwOffset + 8);
-  seqID = readShort(dwOffset + 4);
-  assocWDID = readShort(dwOffset + 6);
-  setPPQN(readShort(dwOffset + 0xE));
-  unLength = readWord(dwOffset + 0x10);
+  nNumTracks = readByte(offset() + 8);
+  seqID = readShort(offset() + 4);
+  assocWDID = readShort(offset() + 6);
+  setPPQN(readShort(offset() + 0xE));
+  setLength(readWord(offset() + 0x10));
 
   ostringstream theName;
   theName << "BGM " << seqID;
@@ -39,7 +39,7 @@ bool BGMSeq::parseHeader() {
 }
 
 bool BGMSeq::parseTrackPointers() {
-  uint32_t pos = dwOffset + 0x20;    //start at first track (fixed offset)
+  uint32_t pos = offset() + 0x20;    //start at first track (fixed offset)
   for (unsigned int i = 0; i < nNumTracks; i++) {
     //HACK FOR TRUNCATED BGMS (ex. FFXII 113 Eastersand.psf2)
     if (pos >= rawFile()->size())

@@ -14,7 +14,7 @@ DECLARE_FORMAT(HeartBeatPS1)
 
 HeartBeatPS1Seq::HeartBeatPS1Seq(RawFile *file, uint32_t offset, uint32_t length, const std::string &name)
     : VGMSeqNoTrks(HeartBeatPS1Format::name, file, offset, name) {
-  this->length() = length;
+  setLength(length);
 
   useReverb();
 }
@@ -69,7 +69,7 @@ bool HeartBeatPS1Seq::parseHeader() {
 
   // set file length if not specified
   if (length() == 0) {
-    length() = total_size;
+    setLength(total_size);
   }
 
   // save sequence data offset
