@@ -1,4 +1,5 @@
 #include "VGMItem.h"
+#include "LogManager.h"
 #include "RawFile.h"
 #include "VGMFile.h"
 #include "Root.h"
@@ -210,6 +211,11 @@ void VGMItem::rebuildChildPrefixMaxEnd() {
   m_childrenPrefixMaxEnd.reserve(m_children.size());
   uint64_t maxEnd = 0;
   for (const auto* child : m_children) {
+    assert(child->length() != 0);
+    if (child->length() == 0) {
+      L_WARN("getItemAtOffset() called on an item with a child of length 0 - could screw up prefix max cache. "
+             "Item: {}. Child: {} at offset: {:X}", name(), child->name(), child->offset());
+    }
     const uint32_t span = (child->length() != 0) ? child->length() : child->guessLength();
     const uint64_t end = static_cast<uint64_t>(child->offset()) + span;
     maxEnd = std::max(maxEnd, end);
