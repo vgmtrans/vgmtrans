@@ -99,7 +99,7 @@ public:
   virtual bool isItemAtOffset(uint32_t offset, bool matchStartOffset = false);
   VGMItem* getItemAtOffset(uint32_t offset, bool matchStartOffset = false);
 
-  virtual uint32_t guessLength();
+  virtual uint32_t guessLength() const;
   virtual void setGuessedLength();
   virtual std::string description() { return ""; }
   virtual void addToUI(VGMItem *parent, void *UI_specific);

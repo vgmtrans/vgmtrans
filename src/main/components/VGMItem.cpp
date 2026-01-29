@@ -210,7 +210,8 @@ void VGMItem::rebuildChildPrefixMaxEnd() {
   m_childrenPrefixMaxEnd.reserve(m_children.size());
   uint64_t maxEnd = 0;
   for (const auto* child : m_children) {
-    const uint64_t end = static_cast<uint64_t>(child->offset()) + child->length();
+    const uint32_t span = (child->length() != 0) ? child->length() : child->guessLength();
+    const uint64_t end = static_cast<uint64_t>(child->offset()) + span;
     maxEnd = std::max(maxEnd, end);
     m_childrenPrefixMaxEnd.push_back(maxEnd);
   }
@@ -242,7 +243,7 @@ void VGMItem::sortChildrenByOffset() {
 }
 
 // Guess length of a container from its descendants
-uint32_t VGMItem::guessLength() {
+uint32_t VGMItem::guessLength() const {
   if (m_children.empty()) {
     return m_length;
   }
