@@ -124,6 +124,8 @@ public:
     for (auto *child : m_children) {
       child->m_parent = this;
     }
+    m_childrenSorted = false;
+    m_childrenPrefixMaxEnd.clear();
   }
 
   void sortChildrenByOffset();
@@ -143,10 +145,17 @@ public:
 
 private:
   std::vector<VGMItem *> m_children;
+  // Maintains sort + prefix-max end cache for fast offset lookups.
+  bool m_childrenSorted = true;
+  std::vector<uint64_t> m_childrenPrefixMaxEnd;
   VGMFile *m_vgmfile;
   VGMItem *m_parent = nullptr;
   uint32_t m_offset;  // offset in the pDoc data buffer
   uint32_t m_length;  // num of bytes the event engulfs
+
+  void ensureChildrenSorted();
+  void rebuildChildPrefixMaxEnd();
+  void invalidateParentCache(bool offsetChanged);
   std::string m_name;
 };
 
