@@ -15,6 +15,7 @@
 #include "VGMSeq.h"
 #include "LogManager.h"
 #include "SF2Conversion.h"
+#include "QtVGMRoot.h"
 
 /**
  * @brief Routines to read file data from memory.
@@ -95,6 +96,12 @@ SequencePlayer::SequencePlayer() {
     }
   });
   m_seekupdate_timer->start(TICK_POLL_INTERVAL_MS);
+
+  connect(&qtVGMRoot, &QtVGMRoot::UI_removeVGMColl, this, [this](VGMColl* coll) {
+    if (m_active_vgmcoll == coll) {
+      stop();
+    }
+  });
 }
 
 SequencePlayer::~SequencePlayer() {
