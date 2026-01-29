@@ -229,7 +229,7 @@ bool AkaoSnesRgn::initializeRegion(uint8_t srcn,
                                    uint32_t /*spcDirAddr*/,
                                    uint16_t addrADSRTable)
 {
-  uint16_t addrTuningTable = dwOffset;
+  uint16_t addrTuningTable = offset();
   uint8_t adsr1;
   uint8_t adsr2;
   if (version == AKAOSNES_V1) {

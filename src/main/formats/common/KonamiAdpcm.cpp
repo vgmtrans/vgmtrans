@@ -74,14 +74,14 @@ std::vector<uint8_t> KonamiAdpcmSamp::decodeToNativePcm() {
      //   - step the address backwards one byte at a time
      //   - still decode low nibble first, then high nibble
   if (reverse()) {
-    for (u32 off = dwOffset + unLength;  off-- > dwOffset; ) {
+    for (u32 off = offset() + length();  off-- > offset(); ) {
       u8 b = readByte(off);
       emit( b & 0x0F );
       emit( (b >> 4) & 0x0F );
     }
   }
   else {
-    for (u32 off = dwOffset; off < dwOffset + unLength; ++off) {
+    for (u32 off = offset(); off < offset() + length(); ++off) {
       u8 b = readByte(off);
       emit( b & 0x0F );
       emit( (b >> 4) & 0x0F );

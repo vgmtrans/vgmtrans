@@ -27,7 +27,7 @@ void NotificationCenter::updateStatusForItem(VGMItem* item) {
   QString formattedName = QString{"<b>%1</b>"}.arg(name);
   QIcon icon = iconForItemType(item->type);
 
-  emit statusUpdated(formattedName, description, &icon, item->dwOffset, item->unLength);
+  emit statusUpdated(formattedName, description, &icon, item->offset(), item->length());
 }
 
 void NotificationCenter::selectVGMFile(VGMFile* vgmfile, QWidget* caller) {

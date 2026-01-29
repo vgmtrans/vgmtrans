@@ -39,31 +39,31 @@ MP2kSeq::MP2kSeq(RawFile *file, uint32_t offset, std::string name)
 }
 
 bool MP2kSeq::parseHeader() {
-  if (dwOffset + 2 > vgmFile()->endOffset()) {
+  if (offset() + 2 > vgmFile()->endOffset()) {
     return false;
   }
 
-  nNumTracks = readShort(dwOffset);
+  nNumTracks = readShort(offset());
 
   // if there are no tracks or there are more tracks than allowed
   // return an error; the sequence shall be deleted
   if (nNumTracks == 0 || nNumTracks > 24) {
     return false;
   }
-  if (dwOffset + 8 + nNumTracks * 4 > vgmFile()->endOffset()) {
+  if (offset() + 8 + nNumTracks * 4 > vgmFile()->endOffset()) {
     return false;
   }
 
-  VGMHeader *seqHdr = addHeader(dwOffset, 8 + nNumTracks * 4, "Sequence header");
-  seqHdr->addChild(dwOffset, 1, "Number of tracks");
-  seqHdr->addChild(dwOffset + 1, 1, "Unknown");
-  seqHdr->addChild(dwOffset + 2, 1, "Priority");
-  seqHdr->addChild(dwOffset + 3, 1, "Reverb");
+  VGMHeader *seqHdr = addHeader(offset(), 8 + nNumTracks * 4, "Sequence header");
+  seqHdr->addChild(offset(), 1, "Number of tracks");
+  seqHdr->addChild(offset() + 1, 1, "Unknown");
+  seqHdr->addChild(offset() + 2, 1, "Priority");
+  seqHdr->addChild(offset() + 3, 1, "Reverb");
 
-  uint32_t dwInstPtr = readWord(dwOffset + 4);
-  seqHdr->addPointer(dwOffset + 4, 4, dwInstPtr - 0x8000000, true, "Instrument pointer");
+  uint32_t dwInstPtr = readWord(offset() + 4);
+  seqHdr->addPointer(offset() + 4, 4, dwInstPtr - 0x8000000, true, "Instrument pointer");
   for (u32 i = 0; i < nNumTracks; i++) {
-    uint32_t dwTrackPtrOffset = dwOffset + 8 + i * 4;
+    uint32_t dwTrackPtrOffset = offset() + 8 + i * 4;
     uint32_t dwTrackPtr = readWord(dwTrackPtrOffset);
     seqHdr->addPointer(dwTrackPtrOffset, 4, dwTrackPtr - 0x8000000, true, "Track pointer");
   }
@@ -76,7 +76,7 @@ bool MP2kSeq::parseHeader() {
 bool MP2kSeq::parseTrackPointers(void) {
   // Add each tracks
   for (unsigned int i = 0; i < nNumTracks; i++) {
-    uint32_t dwTrackPtrOffset = dwOffset + 8 + i * 4;
+    uint32_t dwTrackPtrOffset = offset() + 8 + i * 4;
     uint32_t dwTrackPtr = readWord(dwTrackPtrOffset);
     aTracks.push_back(new MP2kTrack(this, dwTrackPtr - 0x8000000));
   }
@@ -84,11 +84,11 @@ bool MP2kSeq::parseTrackPointers(void) {
   // Make seq offset the first track offset
   for (auto itr = aTracks.begin(); itr != aTracks.end(); ++itr) {
     SeqTrack *track = (*itr);
-    if (track->dwOffset < dwOffset) {
-      if (unLength != 0) {
-        unLength += (dwOffset - track->dwOffset);
+    if (track->offset() < offset()) {
+      if (length() != 0) {
+        setLength(length() + ((offset() - track->offset())));
       }
-      dwOffset = track->dwOffset;
+      setOffset(track->offset());
     }
   }
 

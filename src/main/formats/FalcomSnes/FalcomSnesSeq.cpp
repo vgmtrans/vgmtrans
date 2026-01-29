@@ -60,12 +60,12 @@ void FalcomSnesSeq::resetVars() {
 bool FalcomSnesSeq::parseHeader() {
   setPPQN(SEQ_PPQN);
 
-  VGMHeader *header = addHeader(dwOffset, 0);
-  if (dwOffset + 0x20 > 0x10000) {
+  VGMHeader *header = addHeader(offset(), 0);
+  if (offset() + 0x20 > 0x10000) {
     return false;
   }
 
-  uint32_t curOffset = dwOffset;
+  uint32_t curOffset = offset();
   for (uint8_t trackIndex = 0; trackIndex < MAX_TRACKS; trackIndex++) {
     uint16_t ofsTrackStart = readShort(curOffset);
     if (ofsTrackStart != 0) {
@@ -78,21 +78,21 @@ bool FalcomSnesSeq::parseHeader() {
     curOffset += 2;
   }
 
-  header->addChild(dwOffset + 0x18, 7, "Duration Table");
-  for (uint8_t offset = 0; offset < 7; offset++) {
-    NoteDurTable.push_back(readByte(dwOffset + 0x18 + offset));
+  header->addChild(offset() + 0x18, 7, "Duration Table");
+  for (uint8_t off = 0; off < 7; off++) {
+    NoteDurTable.push_back(readByte(offset() + 0x18 + off));
   }
 
   return true;
 }
 
 bool FalcomSnesSeq::parseTrackPointers() {
-  uint32_t curOffset = dwOffset;
+  uint32_t curOffset = offset();
   for (uint8_t trackIndex = 0; trackIndex < MAX_TRACKS; trackIndex++) {
     uint16_t ofsTrackStart = readShort(curOffset);
     curOffset += 2;
     if (ofsTrackStart != 0) {
-      uint16_t addrTrackStart = dwOffset + ofsTrackStart;
+      uint16_t addrTrackStart = offset() + ofsTrackStart;
       FalcomSnesTrack *track = new FalcomSnesTrack(this, addrTrackStart);
       aTracks.push_back(track);
     }

@@ -41,8 +41,8 @@ void SuzukiSnesSeq::resetVars() {
 bool SuzukiSnesSeq::parseHeader() {
   setPPQN(SEQ_PPQN);
 
-  VGMHeader *header = addHeader(dwOffset, 0);
-  uint32_t curOffset = dwOffset;
+  VGMHeader *header = addHeader(offset(), 0);
+  uint32_t curOffset = offset();
 
   // skip unknown stream
   if (version != SUZUKISNES_SD3) {

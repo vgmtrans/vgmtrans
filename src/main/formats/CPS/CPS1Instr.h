@@ -335,7 +335,7 @@ public:
   ~CPS1OPMInstr() override = default;
 
   bool loadInstr() override {
-    this->readBytes(dwOffset, sizeof(OPMType), &opmData);
+    this->readBytes(offset(), sizeof(OPMType), &opmData);
     return true;
   }
 

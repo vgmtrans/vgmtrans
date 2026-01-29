@@ -26,32 +26,32 @@ void KonamiPS1Seq::resetVars() {
 }
 
 bool KonamiPS1Seq::parseHeader() {
-  if (!isKDT1Seq(rawFile(), dwOffset)) {
+  if (!isKDT1Seq(rawFile(), offset())) {
     return false;
   }
 
-  VGMHeader *header = addHeader(dwOffset, kHeaderSize);
-  header->addSig(dwOffset, 4);
-  header->addChild(dwOffset + kOffsetToFileSize, 4, "Size");
-  header->addChild(dwOffset + kOffsetToTimebase, 4, "Timebase");
-  setPPQN(readWord(dwOffset + kOffsetToTimebase));
-  header->addChild(dwOffset + kOffsetToTrackCount, 4, "Number Of Tracks");
+  VGMHeader *header = addHeader(offset(), kHeaderSize);
+  header->addSig(offset(), 4);
+  header->addChild(offset() + kOffsetToFileSize, 4, "Size");
+  header->addChild(offset() + kOffsetToTimebase, 4, "Timebase");
+  setPPQN(readWord(offset() + kOffsetToTimebase));
+  header->addChild(offset() + kOffsetToTrackCount, 4, "Number Of Tracks");
 
-  uint32_t numTracks = readWord(dwOffset + kOffsetToTrackCount);
-  VGMHeader *trackSizeHeader = addHeader(dwOffset + kHeaderSize, 2 * numTracks, "Track Size");
+  uint32_t numTracks = readWord(offset() + kOffsetToTrackCount);
+  VGMHeader *trackSizeHeader = addHeader(offset() + kHeaderSize, 2 * numTracks, "Track Size");
   for (uint32_t trackIndex = 0; trackIndex < numTracks; trackIndex++) {
     std::string itemName = fmt::format("Track {} size", trackIndex + 1);
-    trackSizeHeader->addChild(trackSizeHeader->dwOffset + (trackIndex * 2), 2, itemName);
+    trackSizeHeader->addChild(trackSizeHeader->offset() + (trackIndex * 2), 2, itemName);
   }
 
   return true;
 }
 
 bool KonamiPS1Seq::parseTrackPointers() {
-  uint32_t numTracks = readWord(dwOffset + kOffsetToTrackCount);
-  uint32_t trackStart = dwOffset + kHeaderSize + (numTracks * 2);
+  uint32_t numTracks = readWord(offset() + kOffsetToTrackCount);
+  uint32_t trackStart = offset() + kHeaderSize + (numTracks * 2);
   for (uint32_t trackIndex = 0; trackIndex < numTracks; trackIndex++) {
-    uint16_t trackSize = readShort(dwOffset + kHeaderSize + (trackIndex * 2));
+    uint16_t trackSize = readShort(offset() + kHeaderSize + (trackIndex * 2));
     KonamiPS1Track *track = new KonamiPS1Track(this, trackStart, trackSize);
     aTracks.push_back(track);
     trackStart += trackSize;

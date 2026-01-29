@@ -48,7 +48,7 @@ bool NamcoSnesSeq::parseHeader() {
   setPPQN(SEQ_PPQN);
   nNumTracks = MAX_TRACKS;
 
-  setEventsOffset(VGMSeq::dwOffset);
+  setEventsOffset(offset());
   return true;
 }
 

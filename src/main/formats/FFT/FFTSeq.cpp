@@ -32,35 +32,35 @@ bool FFTSeq::parseHeader(void) {
 //	2009. 6.17 (Wed.)
 //	2009. 6.30 (Thu.)
 //-----------------------------------------------------------
-  unLength = readShort(dwOffset + 0x08);
-  nNumTracks = readByte(dwOffset + 0x14);    //uint8_t (8bit)		GetWord() から修正
-  // uint8_t cNumPercussion = GetByte(dwOffset + 0x15);    //uint8_t (8bit)	Quantity of Percussion struct
-  assocWdsID = readShort(dwOffset + 0x16);    //uint16_t (16bit)	Default program bank No.
-  uint16_t ptSongTitle = readShort(dwOffset + 0x1E);    //uint16_t (16bit)	Pointer of music title (AscII strings)
-  uint16_t ptPercussionTbl = readShort(dwOffset + 0x20);    //uint16_t (16bit)	Pointer of Percussion struct
+  setLength(readShort(offset() + 0x08));
+  nNumTracks = readByte(offset() + 0x14);    //uint8_t (8bit)		GetWord() から修正
+  // uint8_t cNumPercussion = GetByte(offset() + 0x15);    //uint8_t (8bit)	Quantity of Percussion struct
+  assocWdsID = readShort(offset() + 0x16);    //uint16_t (16bit)	Default program bank No.
+  uint16_t ptSongTitle = readShort(offset() + 0x1E);    //uint16_t (16bit)	Pointer of music title (AscII strings)
+  uint16_t ptPercussionTbl = readShort(offset() + 0x20);    //uint16_t (16bit)	Pointer of Percussion struct
 
   int titleLength = ptPercussionTbl - ptSongTitle;
   char *songtitle = new char[titleLength];
-  readBytes(dwOffset + ptSongTitle, titleLength, songtitle);
+  readBytes(offset() + ptSongTitle, titleLength, songtitle);
   setName(std::string(songtitle, songtitle + titleLength - 1));
   delete[] songtitle;
 
-  VGMHeader *hdr = addHeader(dwOffset, 0x22);
-  hdr->addSig(dwOffset, 4);
-  hdr->addChild(dwOffset + 0x08, 2, "Size");
-  hdr->addChild(dwOffset + 0x14, 1, "Track count");
-  hdr->addChild(dwOffset + 0x15, 1, "Drum instrument count");
-  hdr->addChild(dwOffset + 0x16, 1, "Associated Sample Set ID");
-  hdr->addChild(dwOffset + 0x1E, 2, "Song title Pointer");
-  hdr->addChild(dwOffset + 0x20, 2, "Drumkit Data Pointer");
+  VGMHeader *hdr = addHeader(offset(), 0x22);
+  hdr->addSig(offset(), 4);
+  hdr->addChild(offset() + 0x08, 2, "Size");
+  hdr->addChild(offset() + 0x14, 1, "Track count");
+  hdr->addChild(offset() + 0x15, 1, "Drum instrument count");
+  hdr->addChild(offset() + 0x16, 1, "Associated Sample Set ID");
+  hdr->addChild(offset() + 0x1E, 2, "Song title Pointer");
+  hdr->addChild(offset() + 0x20, 2, "Drumkit Data Pointer");
 
-  VGMHeader *trackPtrs = addHeader(dwOffset + 0x22, nNumTracks * 2, "Track Pointers");
+  VGMHeader *trackPtrs = addHeader(offset() + 0x22, nNumTracks * 2, "Track Pointers");
   for (unsigned int i = 0; i < nNumTracks; i++)
-    trackPtrs->addChild(dwOffset + 0x22 + i * 2, 2, "Track Pointer");
-  addHeader(dwOffset + ptSongTitle, titleLength, "Song Name");
+    trackPtrs->addChild(offset() + 0x22 + i * 2, 2, "Track Pointer");
+  addHeader(offset() + ptSongTitle, titleLength, "Song Name");
 
 //	if(cNumPercussion!=0){										//これ、やっぱ、いらない。
-//		hdr->addSimpleChild(dwOffset+ptPercussionTbl, cNumPercussion*5, "Drumkit Struct");
+//		hdr->addSimpleChild(offset()+ptPercussionTbl, cNumPercussion*5, "Drumkit Struct");
 //	}
 //-----------------------------------------------------------
 
@@ -68,13 +68,13 @@ bool FFTSeq::parseHeader(void) {
 
 //	while (j && j != '.')
 //	{
-////		j = GetByte(dwOffset+0x22+nNumTracks*2+2 + i++);		//修正
-//		j = GetByte(dwOffset + ptSongTitle + (i++));
+////		j = GetByte(offset()+0x22+nNumTracks*2+2 + i++);		//修正
+//		j = GetByte(offset() + ptSongTitle + (i++));
 //		name += (char)j;
 //	}
 
 
-//	hdr->addSimpleChild(dwOffset + ptMusicTile, i, "Music title");		//やっぱ書かないでいいや。
+//	hdr->addSimpleChild(offset() + ptMusicTile, i, "Music title");		//やっぱ書かないでいいや。
 
 
   return true;
@@ -83,7 +83,7 @@ bool FFTSeq::parseHeader(void) {
 
 bool FFTSeq::parseTrackPointers(void) {
   for (unsigned int i = 0; i < nNumTracks; i++)
-    aTracks.push_back(new FFTTrack(this, readShort(dwOffset + 0x22 + (i * 2)) + dwOffset));
+    aTracks.push_back(new FFTTrack(this, readShort(offset() + 0x22 + (i * 2)) + offset()));
   return true;
 }
 

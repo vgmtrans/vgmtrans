@@ -23,7 +23,7 @@ bool CPS1Seq::parseHeader() {
 
 bool CPS1Seq::parseTrackPointers() {
   // CPS1 games sometimes have this set. Perhaps flag for trivial sound effect sequence?
-  if ((readByte(dwOffset) & 0x80) > 0)
+  if ((readByte(offset()) & 0x80) > 0)
     return false;
 
   std::function<u16(u32)> read16;
@@ -33,15 +33,15 @@ bool CPS1Seq::parseTrackPointers() {
     read16 = [this](uint32_t offset) { return this->readShortBE(offset); };
   }
 
-  this->addHeader(dwOffset, 1, "Sequence Flags");
-  VGMHeader *header = this->addHeader(dwOffset + 1, read16(dwOffset + 1) - 1, "Track Pointers");
+  this->addHeader(offset(), 1, "Sequence Flags");
+  VGMHeader *header = this->addHeader(offset() + 1, read16(offset() + 1) - 1, "Track Pointers");
 
   const int maxTracks = fmtVersion == CPS1_V100 ? 8 : 12;
 
   for (int i = 0; i < maxTracks; i++) {
-    uint32_t offset = read16(dwOffset + 1 + i * 2);
-    if (offset == 0) {
-      header->addChild(dwOffset + 1 + (i * 2), 2, "No Track");
+    uint32_t trkOff = read16(offset() + 1 + i * 2);
+    if (trkOff == 0) {
+      header->addChild(offset() + 1 + (i * 2), 2, "No Track");
       continue;
     }
 
@@ -50,20 +50,20 @@ bool CPS1Seq::parseTrackPointers() {
       case CPS1_VERSION_UNDEFINED:
         return false;
       case CPS1_V100:
-        newTrack = new CPS1TrackV1(this, CPSSynth::YM2151, offset);
+        newTrack = new CPS1TrackV1(this, CPSSynth::YM2151, trkOff);
         break;
       case CPS1_V200:
       case CPS1_V350:
       case CPS1_V425:
-        newTrack = new CPS1TrackV2(this, i < 8 ? CPSSynth::YM2151 : CPSSynth::OKIM6295, offset);
+        newTrack = new CPS1TrackV2(this, i < 8 ? CPSSynth::YM2151 : CPSSynth::OKIM6295, trkOff);
         break;
       case CPS1_V500:
       case CPS1_V502:
-        newTrack = new CPS1TrackV2(this, i < 8 ? CPSSynth::YM2151 : CPSSynth::OKIM6295, offset + dwOffset);
+        newTrack = new CPS1TrackV2(this, i < 8 ? CPSSynth::YM2151 : CPSSynth::OKIM6295, trkOff + offset());
         break;
     }
     aTracks.push_back(newTrack);
-    header->addChild(dwOffset + 1 + (i * 2), 2, "Track Pointer");
+    header->addChild(offset() + 1 + (i * 2), 2, "Track Pointer");
   }
   if (aTracks.size() == 0)
     return false;

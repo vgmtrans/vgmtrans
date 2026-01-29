@@ -35,13 +35,13 @@ HOSAInstrSet::~HOSAInstrSet(void) {
 bool HOSAInstrSet::parseHeader() {
 
   //"hdr"構造体へそのまま転送
-  readBytes(dwOffset, sizeof(InstrHeader), &instrheader);
+  readBytes(offset(), sizeof(InstrHeader), &instrheader);
   setId(0);                        //Bank number.
 
   //ヘッダーobjectの生成
-  VGMHeader *wdsHeader = addHeader(dwOffset, sizeof(InstrHeader));
-  wdsHeader->addSig(dwOffset, 8);
-  wdsHeader->addChild(dwOffset + 8, sizeof(uint32_t), "Number of Instruments");
+  VGMHeader *wdsHeader = addHeader(offset(), sizeof(InstrHeader));
+  wdsHeader->addSig(offset(), 8);
+  wdsHeader->addChild(offset() + 8, sizeof(uint32_t), "Number of Instruments");
 
   //波形objectの生成
 //	sampColl = new PSXSampColl(HOSAFormat::name, this, 0x00160800); // moved to HOSAScanner
@@ -59,11 +59,11 @@ bool HOSAInstrSet::parseHeader() {
 //==============================================================
 bool HOSAInstrSet::parseInstrPointers() {
 
-  uint32_t iOffset = dwOffset + sizeof(InstrHeader);    //pointer of attribute table
+  uint32_t iOffset = offset() + sizeof(InstrHeader);    //pointer of attribute table
 
   //音色数だけ繰り返す。
   for (unsigned int i = 0; i < instrheader.numInstr; i++) {
-    HOSAInstr *newInstr = new HOSAInstr(this, dwOffset + readWord(iOffset), 0, i / 0x80, i % 0x80);
+    HOSAInstr *newInstr = new HOSAInstr(this, offset() + readWord(iOffset), 0, i / 0x80, i % 0x80);
     aInstrs.push_back(newInstr);
     iOffset += 4;
   }
@@ -90,37 +90,37 @@ HOSAInstr::HOSAInstr(VGMInstrSet *instrSet, uint32_t offset, uint32_t length, ui
 //		Make the Object "WdsRgn" (Attribute table)
 //--------------------------------------------------------------
 bool HOSAInstr::loadInstr() {
-  if (dwOffset + sizeof(InstrInfo) > vgmFile()->endOffset()) {
+  if (offset() + sizeof(InstrInfo) > vgmFile()->endOffset()) {
     return false;
   }
 
   // Get the instr data
-  readBytes(dwOffset, sizeof(InstrInfo), &instrinfo);
-  unLength = sizeof(InstrInfo) + sizeof(RgnInfo) * instrinfo.numRgns;
-  addChild(dwOffset, sizeof(uint32_t), "Number of Rgns");
+  readBytes(offset(), sizeof(InstrInfo), &instrinfo);
+  setLength(sizeof(InstrInfo) + sizeof(RgnInfo) * instrinfo.numRgns);
+  addChild(offset(), sizeof(uint32_t), "Number of Rgns");
 
   // Get the rgn data
   rgns = new RgnInfo[instrinfo.numRgns];
-  readBytes((dwOffset + sizeof(InstrInfo)), (sizeof(RgnInfo) * instrinfo.numRgns), rgns);
+  readBytes((offset() + sizeof(InstrInfo)), (sizeof(RgnInfo) * instrinfo.numRgns), rgns);
 
   //ATLTRACE("LOADED INSTR   ProgNum: %X    BankNum: %X\n", instrinfo.progNum, instrinfo.bankNum);
 
   uint8_t cKeyLow = 0x00;
   for (unsigned int i = 0; i < instrinfo.numRgns; i++) {
     RgnInfo *rgninfo = &rgns[i];
-    VGMRgn *rgn = new VGMRgn(this, dwOffset + sizeof(InstrInfo) + sizeof(RgnInfo) * i, sizeof(RgnInfo));
+    VGMRgn *rgn = new VGMRgn(this, offset() + sizeof(InstrInfo) + sizeof(RgnInfo) * i, sizeof(RgnInfo));
 
-    rgn->addChild(rgn->dwOffset, 4, "Sample Offset");
-    rgn->sampOffset = rgninfo->sampOffset; //+ ((VGMInstrSet*)this->vgmfile)->sampColl->dwOffset;
+    rgn->addChild(rgn->offset(), 4, "Sample Offset");
+    rgn->sampOffset = rgninfo->sampOffset; //+ ((VGMInstrSet*)this->vgmfile)->sampColl->offset();
 
     rgn->velLow = 0x00;
     rgn->velHigh = 0x7F;
     rgn->keyLow = cKeyLow;
-    rgn->addKeyHigh(rgninfo->note_range_high, rgn->dwOffset + 0x05);
+    rgn->addKeyHigh(rgninfo->note_range_high, rgn->offset() + 0x05);
     cKeyLow = (rgninfo->note_range_high) + 1;
 
-    rgn->addUnityKey(static_cast<int8_t>(0x3C)+ 0x3C - rgninfo->iSemiToneTune, rgn->dwOffset + 0x06);
-    rgn->addChild(rgn->dwOffset + 0x07, 1, "Semi Tone Tune");
+    rgn->addUnityKey(static_cast<int8_t>(0x3C)+ 0x3C - rgninfo->iSemiToneTune, rgn->offset() + 0x06);
+    rgn->addChild(rgn->offset() + 0x07, 1, "Semi Tone Tune");
     rgn->fineTune = static_cast<int16_t>(rgninfo->iFineTune * (100.0 / 256.0));
 
     // Might want to simplify the code below.  I'm being nitpicky.
@@ -132,7 +132,7 @@ bool HOSAInstr::loadInstr() {
     else rgn->pan = static_cast<double>(rgninfo->iPan - 0x80) / 0x7F;
 
     // The ADSR value ordering is all messed up for the hell of it.  This was a bitch to reverse-engineer.
-    rgn->addChild(rgn->dwOffset + 0x0C, 4, "ADSR Values (non-standard ordering)");
+    rgn->addChild(rgn->offset() + 0x0C, 4, "ADSR Values (non-standard ordering)");
     uint8_t Ar = (rgninfo->ADSR_vals >> 20) & 0x7F;
     uint8_t Dr = (rgninfo->ADSR_vals >> 16) & 0xF;
     uint8_t Sr = ((rgninfo->ADSR_vals >> 8) & 0xFF) >> 1;

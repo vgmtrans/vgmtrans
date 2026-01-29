@@ -43,8 +43,8 @@ void MoriSnesSeq::resetVars() {
 bool MoriSnesSeq::parseHeader() {
   setPPQN(SEQ_PPQN);
 
-  uint32_t curOffset = dwOffset;
-  VGMHeader *header = addHeader(dwOffset, 0);
+  uint32_t curOffset = offset();
+  VGMHeader *header = addHeader(offset(), 0);
 
   // reset track start addresses
   for (uint8_t trackIndex = 0; trackIndex < MAX_TRACKS; trackIndex++) {
@@ -650,7 +650,7 @@ bool MoriSnesTrack::readEvent() {
     }
   }
 
-  //assert(curOffset >= dwOffset);
+  //assert(curOffset >= offset());
 
   //ostringstream ssTrace;
   //ssTrace << "" << std::hex << std::setfill('0') << std::setw(8) << std::uppercase << beginOffset << ": " << std::setw(2) << (int)statusByte  << " -> " << std::setw(8) << curOffset << std::endl;

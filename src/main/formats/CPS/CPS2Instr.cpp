@@ -23,8 +23,8 @@ CPSArticTable::~CPSArticTable() {
 }
 
 bool CPSArticTable::loadMain() {
-  uint32_t off = dwOffset;
-  for (int i = 0; off < dwOffset + unLength; i++, off += sizeof(qs_artic_info)) {
+  uint32_t off = offset();
+  for (int i = 0; off < offset() + length(); i++, off += sizeof(qs_artic_info)) {
     uint32_t test1 = readWord(off);
     uint32_t test2 = readWord(off + 4);
     if ((test1 == 0 && test2 == 0) || (test1 == 0xFFFFFFFF && test2 == 0xFFFFFFFF))
@@ -40,10 +40,10 @@ bool CPSArticTable::loadMain() {
     containerItem->addChild(off + 5, 3, "Unknown");
     addChild(containerItem);
   }
-  //unLength = off - dwOffset;
-  int numArtics = unLength / sizeof(qs_artic_info);
+  //setLength(off - offset());
+  int numArtics = length() / sizeof(qs_artic_info);
   artics = new qs_artic_info[numArtics];
-  readBytes(dwOffset, unLength, artics);
+  readBytes(offset(), length(), artics);
 
   return true;
 }
@@ -75,11 +75,12 @@ CPS2SampleInfoTable::CPS2SampleInfoTable(RawFile *file,
 }
 
 bool CPS2SampleInfoTable::loadMain() {
-  uint32_t off = dwOffset;
+  uint32_t off = offset();
   uint32_t test1 = 1, test2 = 1;
-  if (unLength == 0)
-    unLength = 0xFFFFFFFF - dwOffset;
-  for (int i = 0; (test1 || test2) && ((test1 != 0xFFFFFFFF) || (test2 != 0xFFFFFFFF)) && off < dwOffset + unLength;
+  if (length() == 0) {
+    setLength(0xFFFFFFFF - offset());
+  }
+  for (int i = 0; (test1 || test2) && ((test1 != 0xFFFFFFFF) || (test2 != 0xFFFFFFFF)) && off < offset() + length();
        i++, off += 8) {
     test1 = readWord(off + 8);
     test2 = readWord(off + 12);
@@ -94,18 +95,18 @@ bool CPS2SampleInfoTable::loadMain() {
     containerItem->addChild(off + 7, 1, "Unity Key");
     addChild(containerItem);
   }
-  unLength = off - 8 - dwOffset;
-  this->numSamples = unLength / 8;
+  setLength(off - 8 - offset());
+  this->numSamples = length() / 8;
 
   infos = new sample_info[numSamples];
 
   for (off = 0; off < numSamples * 8; off += 8) {
 
-    uint8_t bank = readByte(dwOffset + off + 0);
-    uint16_t start_addr = readShort(dwOffset + off + 1);
-    uint16_t loop_offset= readShort(dwOffset + off + 3);
-    uint16_t end_addr = readShort(dwOffset + off + 5);
-    uint8_t unity_key = readByte(dwOffset + off + 7);
+    uint8_t bank = readByte(offset() + off + 0);
+    uint16_t start_addr = readShort(offset() + off + 1);
+    uint16_t loop_offset= readShort(offset() + off + 3);
+    uint16_t end_addr = readShort(offset() + off + 5);
+    uint8_t unity_key = readByte(offset() + off + 7);
 
     sample_info& info = infos[off/8];
     info.start_addr = (bank << 16) | (start_addr);
@@ -136,12 +137,12 @@ CPS3SampleInfoTable::CPS3SampleInfoTable(RawFile *file,
 
 bool CPS3SampleInfoTable::loadMain() {
 
-  this->numSamples = unLength / 16;
+  this->numSamples = length() / 16;
 
   infos = new sample_info[numSamples];
 
   int i=0;
-  for (uint32_t off = dwOffset; off < dwOffset + unLength; off += 16) {
+  for (uint32_t off = offset(); off < offset() + length(); off += 16) {
 
     auto name = fmt::format("Sample Info: {:d}", i);
 
@@ -193,13 +194,13 @@ bool CPS2InstrSet::parseInstrPointers() {
     // There are two possible instr_info banks stored next to each other with 256 entries in each,
     // unlike higher versions, where the number of instr_infos in each bank is variable and less than 0x7F.
 
-    //dwOffset is the offset to the instr_info_table
+    //offset() is the offset to the instr_info_table
 
     for (uint32_t bank = 0; bank < num_instr_banks; bank++)
       for (uint32_t i = 0; i < 256; i++) {
         auto name = fmt::format("Instrument: bank {:d}  num {:d}", bank * 256, i);
         aInstrs.push_back(new CPS2Instr(this,
-                                       dwOffset + i * 8 + (bank * 256 * 8),
+                                       offset() + i * 8 + (bank * 256 * 8),
                                        8,
                                        (bank * 2) + (i / 128),
                                        i % 128,
@@ -218,10 +219,10 @@ bool CPS2InstrSet::parseInstrPointers() {
     std::vector<uint32_t> instr_table_ptrs;
     for (unsigned int i = 0; i < num_instr_banks; i++) {
       if (fmt_version == CPS3) {
-        instr_table_ptrs.push_back(readWordBE(dwOffset + i * 4));    //get the instr table ptrs
+        instr_table_ptrs.push_back(readWordBE(offset() + i * 4));    //get the instr table ptrs
       }
       else {
-        instr_table_ptrs.push_back(readShort(dwOffset + i * 2));    //get the instr table ptrs
+        instr_table_ptrs.push_back(readShort(offset() + i * 2));    //get the instr table ptrs
       }
     }
     int totalInstrs = 0;
@@ -296,19 +297,19 @@ bool CPS2Instr::loadInstr() {
   std::vector<VGMRgn*> rgns;
   const CPS2FormatVer formatVer = formatVersion();
   if (formatVer < CPS2_V103) {
-    VGMRgn* rgn = new VGMRgn(this, dwOffset, unLength);
+    VGMRgn* rgn = new VGMRgn(this, offset(), length());
     rgns.push_back(rgn);
-    rgn->addChild(this->dwOffset,     1, "Sample Info Index");
-    rgn->addChild(this->dwOffset + 1, 1, "Unknown / Ignored");
-    rgn->addChild(this->dwOffset + 2, 1, "Attack Rate");
-    rgn->addChild(this->dwOffset + 3, 1, "Decay Rate");
-    rgn->addChild(this->dwOffset + 4, 1, "Sustain Level");
-    rgn->addChild(this->dwOffset + 5, 1, "Sustain Rate");
-    rgn->addChild(this->dwOffset + 6, 1, "Release Rate");
-    rgn->addChild(this->dwOffset + 7, 1, "Unknown");
+    rgn->addChild(this->offset(),     1, "Sample Info Index");
+    rgn->addChild(this->offset() + 1, 1, "Unknown / Ignored");
+    rgn->addChild(this->offset() + 2, 1, "Attack Rate");
+    rgn->addChild(this->offset() + 3, 1, "Decay Rate");
+    rgn->addChild(this->offset() + 4, 1, "Sustain Level");
+    rgn->addChild(this->offset() + 5, 1, "Sustain Rate");
+    rgn->addChild(this->offset() + 6, 1, "Release Rate");
+    rgn->addChild(this->offset() + 7, 1, "Unknown");
 
     qs_prog_info_ver_101 progInfo;
-    readBytes(dwOffset, sizeof(qs_prog_info_ver_101), &progInfo);
+    readBytes(offset(), sizeof(qs_prog_info_ver_101), &progInfo);
     rgn->sampNum = progInfo.sample_index;
     this->attack_rate = progInfo.attack_rate;
     this->decay_rate = progInfo.decay_rate;
@@ -317,18 +318,18 @@ bool CPS2Instr::loadInstr() {
     this->release_rate = progInfo.release_rate;
   }
   else if (formatVer < CPS2_V130 || formatVer == CPS2_V200 || formatVer == CPS2_V201B) {
-    VGMRgn* rgn = new VGMRgn(this, dwOffset, unLength);
+    VGMRgn* rgn = new VGMRgn(this, offset(), length());
     rgns.push_back(rgn);
     qs_prog_info_ver_103 progInfo;
-    readBytes(dwOffset, sizeof(qs_prog_info_ver_103), &progInfo);
+    readBytes(offset(), sizeof(qs_prog_info_ver_103), &progInfo);
 
-    rgn->addSampNum(progInfo.sample_index, this->dwOffset, 2);
-    rgn->addFineTune( static_cast<int16_t>((progInfo.fine_tune / 256.0) * 100), this->dwOffset + 2, 1);
-    rgn->addChild(this->dwOffset + 3, 1, "Attack Rate");
-    rgn->addChild(this->dwOffset + 4, 1, "Decay Rate");
-    rgn->addChild(this->dwOffset + 5, 1, "Sustain Level");
-    rgn->addChild(this->dwOffset + 6, 1, "Sustain Rate");
-    rgn->addChild(this->dwOffset + 7, 1, "Release Rate");
+    rgn->addSampNum(progInfo.sample_index, this->offset(), 2);
+    rgn->addFineTune( static_cast<int16_t>((progInfo.fine_tune / 256.0) * 100), this->offset() + 2, 1);
+    rgn->addChild(this->offset() + 3, 1, "Attack Rate");
+    rgn->addChild(this->offset() + 4, 1, "Decay Rate");
+    rgn->addChild(this->offset() + 5, 1, "Sustain Level");
+    rgn->addChild(this->offset() + 6, 1, "Sustain Rate");
+    rgn->addChild(this->offset() + 7, 1, "Release Rate");
 
     this->attack_rate = progInfo.attack_rate;
     this->decay_rate = progInfo.decay_rate;
@@ -339,8 +340,8 @@ bool CPS2Instr::loadInstr() {
   else if (formatVer == CPS3) {
     uint8_t prevKeyHigh = 0;
     uint32_t off;
-    for (off = dwOffset; readShort(off) != 0xFFFF; off += 12) {
-      if (unLength != 0 && off >= dwOffset + unLength)
+    for (off = offset(); readShort(off) != 0xFFFF; off += 12) {
+      if (length() != 0 && off >= offset() + length())
         break;
 
       VGMRgn* rgn = new VGMRgn(this, off, 12);
@@ -349,7 +350,7 @@ bool CPS2Instr::loadInstr() {
       qs_prog_info_ver_cps3 progInfo;
       readBytes(off, sizeof(qs_prog_info_ver_cps3), &progInfo);
 
-      //    rgn->AddFineTune( (int16_t)((progInfo.fine_tune / 256.0) * 100), this->dwOffset + 2, 1);
+      //    rgn->AddFineTune( (int16_t)((progInfo.fine_tune / 256.0) * 100), this->offset() + 2, 1);
       rgn->addKeyHigh(progInfo.key_high, off + 0, 1);
       rgn->keyLow = prevKeyHigh + 1;
       prevKeyHigh = progInfo.key_high;
@@ -380,17 +381,17 @@ bool CPS2Instr::loadInstr() {
       this->sustain_rate = progInfo.sustain_rate;
       this->release_rate = progInfo.release_rate;
     }
-    unLength = off - dwOffset;
+    setLength(off - offset());
   }
   else {
-    VGMRgn* rgn = new VGMRgn(this, dwOffset, unLength, "Region");
+    VGMRgn* rgn = new VGMRgn(this, offset(), length(), "Region");
     rgns.push_back(rgn);
     qs_prog_info_ver_130 progInfo;
-    readBytes(dwOffset, sizeof(qs_prog_info_ver_130), &progInfo);
+    readBytes(offset(), sizeof(qs_prog_info_ver_130), &progInfo);
 
-    rgn->addChild(this->dwOffset,     2, "Sample Info Index");
-    rgn->addFineTune( static_cast<int16_t>((progInfo.fine_tune / 256.0) * 100), this->dwOffset + 2, 1);
-    rgn->addChild(this->dwOffset + 3, 1, "Articulation Index");
+    rgn->addChild(this->offset(),     2, "Sample Info Index");
+    rgn->addFineTune( static_cast<int16_t>((progInfo.fine_tune / 256.0) * 100), this->offset() + 2, 1);
+    rgn->addChild(this->offset() + 3, 1, "Articulation Index");
 
     const CPSArticTable* articTable = static_cast<CPS2InstrSet*>(this->parInstrSet)->articTable;
     const qs_artic_info* artic = &articTable->artics[progInfo.artic_index];
@@ -488,7 +489,7 @@ CPS2SampColl::CPS2SampColl(RawFile *file, CPS2InstrSet *theinstrset,
 
 
 bool CPS2SampColl::parseHeader() {
-  unLength = static_cast<uint32_t>(this->rawFile()->size());
+  setLength(static_cast<uint32_t>(this->rawFile()->size()));
   return true;
 }
 
@@ -508,7 +509,7 @@ bool CPS2SampColl::parseSampleInfo() {
     uint32_t sampLength = end_addr - start_addr;
 
     // Sanity check
-    if (sampOffset > unLength)
+    if (sampOffset > length())
       break;
 
     // Sanity check for mshvsf, which has samples of size 2. Fluidsynth does not like this (perhaps violates sf2 spec?)

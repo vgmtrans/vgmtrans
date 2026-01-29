@@ -49,8 +49,8 @@ void AkaoSnesSeq::resetVars() {
 bool AkaoSnesSeq::parseHeader() {
   setPPQN(SEQ_PPQN);
 
-  VGMHeader *header = addHeader(dwOffset, 0);
-  uint32_t curOffset = dwOffset;
+  VGMHeader *header = addHeader(offset(), 0);
+  uint32_t curOffset = offset();
   if (version == AKAOSNES_V1 || version == AKAOSNES_V2) {
     // Earlier versions are not relocatable
     // All addresses are plain APU addresses
@@ -80,10 +80,10 @@ bool AkaoSnesSeq::parseHeader() {
     }
 
     // calculate sequence length
-    if (addrSequenceEnd < dwOffset) {
+    if (addrSequenceEnd < offset()) {
       return false;
     }
-    unLength = addrSequenceEnd - dwOffset;
+    setLength(addrSequenceEnd - offset());
   }
 
   for (uint8_t trackIndex = 0; trackIndex < MAX_TRACKS; trackIndex++) {
@@ -104,7 +104,7 @@ bool AkaoSnesSeq::parseHeader() {
 
 
 bool AkaoSnesSeq::parseTrackPointers(void) {
-  uint32_t curOffset = dwOffset;
+  uint32_t curOffset = offset();
   if (version == AKAOSNES_V3) {
     if (minorVersion != AKAOSNES_V3_FFMQ) {
       curOffset += 2;

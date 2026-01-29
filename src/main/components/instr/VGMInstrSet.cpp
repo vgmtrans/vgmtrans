@@ -68,7 +68,7 @@ bool VGMInstrSet::load() {
   if (m_auto_add_instruments_as_children)
     addChildren(aInstrs);
 
-  if (unLength == 0) {
+  if (length() == 0) {
     setGuessedLength();
   }
 

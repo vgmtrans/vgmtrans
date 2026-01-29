@@ -70,7 +70,7 @@ bool VGMMultiSectionSeq::postLoad() {
     }
     addChildren(aSections);
     setGuessedLength();
-    if (unLength == 0) {
+    if (length() == 0) {
       return false;
     }
   } else if (readMode == READMODE_CONVERT_TO_MIDI) {
@@ -117,11 +117,11 @@ bool VGMMultiSectionSeq::readEvent(long /*stopTime*/) {
 }
 
 void VGMMultiSectionSeq::addSection(VGMSeqSection *section) {
-  if (dwOffset > section->dwOffset) {
-    uint32_t distance = dwOffset - section->dwOffset;
-    dwOffset = section->dwOffset;
-    if (unLength != 0) {
-      unLength += distance;
+  if (offset() > section->offset()) {
+    uint32_t distance = offset() - section->offset();
+    setOffset(section->offset());
+    if (length() != 0) {
+      setLength(length() + (distance));
     }
   }
   aSections.push_back(section);
@@ -141,7 +141,7 @@ bool VGMMultiSectionSeq::addLoopForeverNoItem() {
 VGMSeqSection *VGMMultiSectionSeq::getSectionAtOffset(uint32_t offset) {
   for (size_t sectionIndex = 0; sectionIndex < aSections.size(); sectionIndex++) {
     VGMSeqSection *section = aSections[sectionIndex];
-    if (section->dwOffset == offset) {
+    if (section->offset() == offset) {
       return section;
     }
   }

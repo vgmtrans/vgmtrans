@@ -24,8 +24,10 @@ public:
   using VGMSeq::readWord;
   using VGMSeq::readShortBE;
   using VGMSeq::readWordBE;
-  [[nodiscard]] inline uint32_t &offset() { return VGMSeq::dwOffset; }
-  [[nodiscard]] inline uint32_t &length() { return VGMSeq::unLength; }
+  [[nodiscard]] inline uint32_t offset() const { return VGMSeq::offset(); }
+  [[nodiscard]] inline uint32_t length() const { return VGMSeq::length(); }
+  inline void setOffset(uint32_t offset) { VGMSeq::setOffset(offset); }
+  inline void setLength(uint32_t length) { VGMSeq::setLength(length); }
   [[nodiscard]] inline std::string name() { return VGMSeq::name(); }
 
   [[nodiscard]] inline RawFile* rawFile() { return VGMSeq::rawFile(); }
@@ -36,7 +38,7 @@ public:
   inline void setEventsOffset(uint32_t offset) {
     dwEventsOffset = offset;
     if (SeqTrack::readMode == READMODE_ADD_TO_UI) {
-      SeqTrack::dwOffset = offset;
+      SeqTrack::setOffset(offset);
     }
   }
 

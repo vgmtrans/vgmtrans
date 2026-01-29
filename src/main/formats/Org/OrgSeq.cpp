@@ -10,28 +10,28 @@ OrgSeq::~OrgSeq(void) {
 }
 
 bool OrgSeq::parseHeader(void) {
-  waitTime = readShort(dwOffset + 6);
-  beatsPerMeasure = readByte(dwOffset + 8);
-  setPPQN(readByte(dwOffset + 9));
+  waitTime = readShort(offset() + 6);
+  beatsPerMeasure = readByte(offset() + 8);
+  setPPQN(readByte(offset() + 9));
 
   uint32_t notesSoFar = 0;        //this must be used to determine the length of the entire seq
 
   for (int i = 0; i < 16; i++) {
-    if (readShort(dwOffset + 0x16 + i * 6))            //if there are notes in this track
+    if (readShort(offset() + 0x16 + i * 6))            //if there are notes in this track
     {
       nNumTracks++;                    //well then, we might as well say it exists
       OrgTrack
-          *newOrgTrack = new OrgTrack(this, dwOffset + 0x12 + 16 * 6 + notesSoFar * 8, readShort(0x16 + i * 6) * 8, i);
-      newOrgTrack->numNotes = readShort(dwOffset + 0x16 + i * 6);
-      newOrgTrack->freq = readShort(dwOffset + 0x12 + i * 6);
-      newOrgTrack->waveNum = readByte(dwOffset + 0x14 + i * 6);
-      newOrgTrack->numNotes = readShort(dwOffset + 0x16 + i * 6);
+          *newOrgTrack = new OrgTrack(this, offset() + 0x12 + 16 * 6 + notesSoFar * 8, readShort(0x16 + i * 6) * 8, i);
+      newOrgTrack->numNotes = readShort(offset() + 0x16 + i * 6);
+      newOrgTrack->freq = readShort(offset() + 0x12 + i * 6);
+      newOrgTrack->waveNum = readByte(offset() + 0x14 + i * 6);
+      newOrgTrack->numNotes = readShort(offset() + 0x16 + i * 6);
       aTracks.push_back(newOrgTrack);
 
       notesSoFar += newOrgTrack->numNotes;
     }
   }
-  unLength = 0x12 + 6 * 16 + notesSoFar * 8;
+  setLength(0x12 + 6 * 16 + notesSoFar * 8);
 
   return true;        //successful
 }
@@ -59,7 +59,7 @@ bool OrgTrack::loadTrack(uint32_t trackNum, uint32_t stopOffset, long stopDelta)
     addProgramChange(0, 0, waveNum);
 
   bInLoop = false;
-  curOffset = dwOffset;    //start at beginning of track
+  curOffset = offset();    //start at beginning of track
   curNote = 0;
   for (uint16_t i = 0; i < numNotes; i++)
     readEvent();

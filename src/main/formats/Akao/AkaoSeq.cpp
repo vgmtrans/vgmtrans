@@ -77,48 +77,48 @@ bool AkaoSeq::parseHeader() {
     return false;
 
   const uint32_t track_bits = (version() >= AkaoPs1Version::VERSION_3_0)
-    ? readWord(dwOffset + 0x20)
-    : readWord(dwOffset + 0x10);
+    ? readWord(offset() + 0x20)
+    : readWord(offset() + 0x10);
   nNumTracks = static_cast<uint32_t>(std::bitset<32>(track_bits).count()); // popcount
 
   uint32_t track_header_offset;
   if (version() >= AkaoPs1Version::VERSION_3_0) {
-    VGMHeader *hdr = addHeader(dwOffset, 0x40);
-    hdr->addSig(dwOffset, 4);
-    hdr->addChild(dwOffset + 0x4, 2, "ID");
-    hdr->addChild(dwOffset + 0x6, 2, "Size");
-    hdr->addChild(dwOffset + 0x8, 2, "Reverb Type");
-    hdr->addChild(dwOffset + 0x14, 2, "Associated Sample Set ID");
-    hdr->addChild(dwOffset + 0x20, 4, "Number of Tracks (# of true bits)");
-    hdr->addChild(dwOffset + 0x30, 4, "Instrument Data Pointer");
-    hdr->addChild(dwOffset + 0x34, 4, "Drumkit Data Pointer");
+    VGMHeader *hdr = addHeader(offset(), 0x40);
+    hdr->addSig(offset(), 4);
+    hdr->addChild(offset() + 0x4, 2, "ID");
+    hdr->addChild(offset() + 0x6, 2, "Size");
+    hdr->addChild(offset() + 0x8, 2, "Reverb Type");
+    hdr->addChild(offset() + 0x14, 2, "Associated Sample Set ID");
+    hdr->addChild(offset() + 0x20, 4, "Number of Tracks (# of true bits)");
+    hdr->addChild(offset() + 0x30, 4, "Instrument Data Pointer");
+    hdr->addChild(offset() + 0x34, 4, "Drumkit Data Pointer");
 
-    unLength = readShort(dwOffset + 6);
-    setId(readShort(dwOffset + 0x14));
+    setLength(readShort(offset() + 6));
+    setId(readShort(offset() + 0x14));
     track_header_offset = 0x40;
   }
   else if (version() == AkaoPs1Version::VERSION_2) {
-    VGMHeader *hdr = addHeader(dwOffset, 0x20);
-    hdr->addSig(dwOffset, 4);
-    hdr->addChild(dwOffset + 0x4, 2, "ID");
-    hdr->addChild(dwOffset + 0x6, 2, "Size (Excluding first 16 bytes)");
-    hdr->addChild(dwOffset + 0x8, 2, "Reverb Type");
-    hdr->addChild(dwOffset + 0x10, 4, "Number of Tracks (# of true bits)");
+    VGMHeader *hdr = addHeader(offset(), 0x20);
+    hdr->addSig(offset(), 4);
+    hdr->addChild(offset() + 0x4, 2, "ID");
+    hdr->addChild(offset() + 0x6, 2, "Size (Excluding first 16 bytes)");
+    hdr->addChild(offset() + 0x8, 2, "Reverb Type");
+    hdr->addChild(offset() + 0x10, 4, "Number of Tracks (# of true bits)");
 
-    unLength = 0x10 + readShort(dwOffset + 6);
+    setLength(0x10 + readShort(offset() + 6));
     track_header_offset = 0x20;
   }
   else if (version() < AkaoPs1Version::VERSION_2) {
-    VGMHeader *hdr = addHeader(dwOffset, 0x14);
-    hdr->addSig(dwOffset, 4);
-    hdr->addChild(dwOffset + 0x4, 2, "ID");
-    hdr->addChild(dwOffset + 0x6, 2, "Size (Excluding first 16 bytes)");
-    hdr->addChild(dwOffset + 0x8, 2, "Reverb Type");
+    VGMHeader *hdr = addHeader(offset(), 0x14);
+    hdr->addSig(offset(), 4);
+    hdr->addChild(offset() + 0x4, 2, "ID");
+    hdr->addChild(offset() + 0x6, 2, "Size (Excluding first 16 bytes)");
+    hdr->addChild(offset() + 0x8, 2, "Reverb Type");
     auto timestamp_text = fmt::format("Timestamp ({})", readTimestampAsText());
-    hdr->addChild(dwOffset + 0xA, 6, timestamp_text);
-    hdr->addChild(dwOffset + 0x10, 4, "Number of Tracks (# of true bits)");
+    hdr->addChild(offset() + 0xA, 6, timestamp_text);
+    hdr->addChild(offset() + 0x10, 4, "Number of Tracks (# of true bits)");
 
-    unLength = 0x10 + readShort(dwOffset + 6);
+    setLength(0x10 + readShort(offset() + 6));
     track_header_offset = 0x14;
   }
   else {
@@ -126,7 +126,7 @@ bool AkaoSeq::parseHeader() {
   }
 
   setPPQN(0x30);
-  seq_id = readShort(dwOffset + 4);
+  seq_id = readShort(offset() + 4);
 
   LoadEventMap();
 
@@ -134,18 +134,18 @@ bool AkaoSeq::parseHeader() {
   {
     //There must be either a melodic instrument section, a drumkit, or both.  We determine
     //the start of the InstrSet based on whether a melodic instrument section is given.
-    const uint32_t instrOff = readWord(dwOffset + 0x30);
-    const uint32_t drumkitOff = readWord(dwOffset + 0x34);
+    const uint32_t instrOff = readWord(offset() + 0x30);
+    const uint32_t drumkitOff = readWord(offset() + 0x34);
     if (instrOff != 0)
-      set_instrument_set_offset(dwOffset + 0x30 + instrOff);
+      set_instrument_set_offset(offset() + 0x30 + instrOff);
     if (drumkitOff != 0)
-      set_drum_set_offset(dwOffset + 0x34 + drumkitOff);
+      set_drum_set_offset(offset() + 0x34 + drumkitOff);
   }
 
-  VGMHeader *track_pointer_header = addHeader(dwOffset + track_header_offset, nNumTracks * 2);
+  VGMHeader *track_pointer_header = addHeader(offset() + track_header_offset, nNumTracks * 2);
   for (unsigned int i = 0; i < nNumTracks; i++) {
     auto name = fmt::format("Offset: Track {}", i + 1);
-    track_pointer_header->addChild(dwOffset + track_header_offset + (i * 2), 2, name);
+    track_pointer_header->addChild(offset() + track_header_offset + (i * 2), 2, name);
   }
 
   return true;
@@ -177,20 +177,20 @@ bool AkaoSeq::parseTrackPointers() {
   for (unsigned int i = 0; i < nNumTracks; i++) {
     const uint32_t p = track_header_offset + (i * 2);
     const uint32_t base = p + (version() >= AkaoPs1Version::VERSION_3_0 ? 0 : 2);
-    const uint32_t relative_offset = readShort(dwOffset + p);
+    const uint32_t relative_offset = readShort(offset() + p);
     const uint32_t track_offset = base + relative_offset;
-    aTracks.push_back(new AkaoTrack(this, dwOffset + track_offset));
+    aTracks.push_back(new AkaoTrack(this, offset() + track_offset));
   }
   return true;
 }
 
 std::string AkaoSeq::readTimestampAsText() const {
-  const uint8_t year_bcd = readByte(dwOffset + 0xA);
-  const uint8_t month_bcd = readByte(dwOffset + 0xB);
-  const uint8_t day_bcd = readByte(dwOffset + 0xC);
-  const uint8_t hour_bcd = readByte(dwOffset + 0xD);
-  const uint8_t minute_bcd = readByte(dwOffset + 0xE);
-  const uint8_t second_bcd = readByte(dwOffset + 0xF);
+  const uint8_t year_bcd = readByte(offset() + 0xA);
+  const uint8_t month_bcd = readByte(offset() + 0xB);
+  const uint8_t day_bcd = readByte(offset() + 0xC);
+  const uint8_t hour_bcd = readByte(offset() + 0xD);
+  const uint8_t minute_bcd = readByte(offset() + 0xE);
+  const uint8_t second_bcd = readByte(offset() + 0xF);
 
   // Should we solve the year 2000 problem?
   const unsigned int year_bcd_full = 0x1900 + year_bcd;
@@ -217,17 +217,17 @@ double AkaoSeq::getTempoInBPM(uint16_t tempo) const {
 
 AkaoInstrSet* AkaoSeq::newInstrSet() const {
   if (version() >= AkaoPs1Version::VERSION_3_0) {
-    uint32_t length = 0;
+    uint32_t instrSetLen = 0;
     if (has_instrument_set_offset())
-      length = unLength - (instrument_set_offset() - dwOffset);
+      instrSetLen = length() - (instrument_set_offset() - offset());
     else if (has_drum_set_offset())
-      length = unLength - (drum_set_offset() - dwOffset);
+      instrSetLen = length() - (drum_set_offset() - offset());
 
-    return length != 0
-      ? new AkaoInstrSet(rawFile(), length, version(), instrument_set_offset(), drum_set_offset(), seq_id, "Akao Instr Set")
-      : new AkaoInstrSet(rawFile(), dwOffset, dwOffset + unLength, version(), seq_id);
+    return instrSetLen != 0
+      ? new AkaoInstrSet(rawFile(), instrSetLen, version(), instrument_set_offset(), drum_set_offset(), seq_id, "Akao Instr Set")
+      : new AkaoInstrSet(rawFile(), offset(), offset() + length(), version(), seq_id);
   } else {
-    return new AkaoInstrSet(rawFile(), dwOffset + unLength, version(), custom_instrument_addresses, drum_instrument_addresses, seq_id);
+    return new AkaoInstrSet(rawFile(), offset() + length(), version(), custom_instrument_addresses, drum_instrument_addresses, seq_id);
   }
 }
 

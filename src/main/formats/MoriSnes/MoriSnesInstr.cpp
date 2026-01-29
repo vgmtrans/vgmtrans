@@ -74,8 +74,8 @@ bool MoriSnesInstrSet::parseInstrPointers() {
       instrSetEndAddress = instrEndAddress;
     }
   }
-  dwOffset = instrSetStartAddress;
-  unLength = instrSetEndAddress - instrSetStartAddress;
+  setOffset(instrSetStartAddress);
+  setLength(instrSetEndAddress - instrSetStartAddress);
 
   // load each instruments
   for (uint8_t instrNum = 0; instrNum < instrumentAddresses.size(); instrNum++) {
@@ -151,7 +151,7 @@ MoriSnesInstr::~MoriSnesInstr() {
 }
 
 bool MoriSnesInstr::loadInstr() {
-  addChild(dwOffset, 1, "Melody/Percussion");
+  addChild(offset(), 1, "Melody/Percussion");
 
   if (!instrHintDir.percussion) {
     MoriSnesInstrHint *instrHint = &instrHintDir.instrHint;
@@ -180,7 +180,7 @@ bool MoriSnesInstr::loadInstr() {
       }
 
       auto seqOffsetName = fmt::format("Sequence Offset {}", percNoteKey);
-      addChild(dwOffset + 1 + (percNoteKey * 2), 2, seqOffsetName);
+      addChild(offset() + 1 + (percNoteKey * 2), 2, seqOffsetName);
 
       auto seqName = fmt::format("Envelope Sequence {}", percNoteKey);
       addChild(instrHint->seqAddress, instrHint->seqSize, seqName);

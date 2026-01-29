@@ -66,8 +66,8 @@ void RareSnesSeq::resetVars(void) {
 bool RareSnesSeq::parseHeader(void) {
   setPPQN(SEQ_PPQN);
 
-  VGMHeader *seqHeader = addHeader(dwOffset, MAX_TRACKS * 2 + 2, "Sequence Header");
-  uint32_t curHeaderOffset = dwOffset;
+  VGMHeader *seqHeader = addHeader(offset(), MAX_TRACKS * 2 + 2, "Sequence Header");
+  uint32_t curHeaderOffset = offset();
   for (int i = 0; i < MAX_TRACKS; i++) {
     uint16_t trkOff = readShort(curHeaderOffset);
     seqHeader->addPointer(curHeaderOffset, 2, trkOff, (trkOff != 0), "Track Pointer");
@@ -83,7 +83,7 @@ bool RareSnesSeq::parseHeader(void) {
 
 bool RareSnesSeq::parseTrackPointers(void) {
   for (int i = 0; i < MAX_TRACKS; i++) {
-    uint16_t trkOff = readShort(dwOffset + i * 2);
+    uint16_t trkOff = readShort(offset() + i * 2);
     if (trkOff != 0)
       aTracks.push_back(new RareSnesTrack(this, trkOff));
   }

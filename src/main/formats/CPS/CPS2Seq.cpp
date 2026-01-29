@@ -42,19 +42,19 @@ bool CPS2Seq::parseHeader() {
 bool CPS2Seq::parseTrackPointers() {
   // CPS1 games sometimes have this set. Suggests 4 byte seq.
   // Oddly, some tracks have first byte set to 0x92 in D&D Shadow Over Mystara
-  if ((readByte(dwOffset) & 0x80) > 0)
+  if ((readByte(offset()) & 0x80) > 0)
     return false;
 
-  this->addHeader(dwOffset, 1, "Sequence Flags");
-  VGMHeader *header = this->addHeader(dwOffset + 1, readShortBE(dwOffset + 1) - 1, "Track Pointers");
+  this->addHeader(offset(), 1, "Sequence Flags");
+  VGMHeader *header = this->addHeader(offset() + 1, readShortBE(offset() + 1) - 1, "Track Pointers");
 
   for (int i = 0; i < 16; i++) {
-    uint32_t offset = readShortBE(dwOffset + 1 + i * 2);
-    if (offset == 0) {
-      header->addChild(dwOffset + 1 + (i * 2), 2, "No Track");
+    uint32_t trkOff = readShortBE(offset() + 1 + i * 2);
+    if (trkOff == 0) {
+      header->addChild(offset() + 1 + (i * 2), 2, "No Track");
       continue;
     }
-    //if (GetShortBE(offset+dwOffset) == 0xE017)	//Rest, EndTrack (used by empty tracks)
+    //if (GetShortBE(offset+offset()) == 0xE017)	//Rest, EndTrack (used by empty tracks)
     //	continue;
 
     SeqTrack *newTrack;
@@ -65,13 +65,13 @@ bool CPS2Seq::parseTrackPointers() {
       case CPS2_V210:
       case CPS2_V211:
       case CPS3:
-        newTrack = new CPS2TrackV2(this, offset + dwOffset);
+        newTrack = new CPS2TrackV2(this, trkOff + offset());
         break;
       default:
-        newTrack = new CPS2TrackV1(this, offset + dwOffset);
+        newTrack = new CPS2TrackV1(this, trkOff + offset());
     }
     aTracks.push_back(newTrack);
-    header->addChild(dwOffset + 1 + (i * 2), 2, "Track Pointer");
+    header->addChild(offset() + 1 + (i * 2), 2, "Track Pointer");
   }
   if (aTracks.size() == 0)
     return false;

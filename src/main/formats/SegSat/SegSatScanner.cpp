@@ -102,7 +102,7 @@ void SegSatScanner::handleSsfFile(RawFile* file) {
         continue;
 
       for (const auto instrSet : instrSets) {
-        if (instrSet->dwOffset == bankPtr) {
+        if (instrSet->offset() == bankPtr) {
           instrSet->assignBankNumber(bankNum);
           banks[bankNum] = instrSet;
         }
@@ -346,7 +346,7 @@ std::vector<SegSatInstrSet*> SegSatScanner::searchForInstrSets(RawFile* file, Se
 
       // We can safely skip ahead: the instrument table runs until base + ptrMixes
       // Jumping avoids re-scanning in the middle of a confirmed bank.
-      base = std::min(base + instrSet->unLength, fileLength - 8);
+      base = std::min(base + instrSet->length(), fileLength - 8);
     } else {
       ++base;
     }

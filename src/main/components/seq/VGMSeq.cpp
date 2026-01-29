@@ -118,7 +118,7 @@ bool VGMSeq::postLoad() {
     addChildren(aTracks);
 
     setGuessedLength();
-    if (unLength == 0) {
+    if (length() == 0) {
       return false;
     }
   } else if (readMode == READMODE_CONVERT_TO_MIDI) {
@@ -153,21 +153,21 @@ void VGMSeq::loadTracksMain(uint32_t stopTime) {
   for (uint32_t trackNum = 0; trackNum < nNumTracks; trackNum++) {
     if (readMode == READMODE_ADD_TO_UI) {
       aStopOffset[trackNum] = endOffset();
-      if (unLength != 0) {
-        aStopOffset[trackNum] = dwOffset + unLength;
+      if (length() != 0) {
+        aStopOffset[trackNum] = offset() + length();
       } else {
         if (!m_allow_discontinuous_track_data) {
           // set length from the next track by offset
           for (uint32_t j = 0; j < nNumTracks; j++) {
-            if (aTracks[j]->dwOffset > aTracks[trackNum]->dwOffset &&
-                aTracks[j]->dwOffset < aStopOffset[trackNum]) {
-              aStopOffset[trackNum] = aTracks[j]->dwOffset;
+            if (aTracks[j]->offset() > aTracks[trackNum]->offset() &&
+                aTracks[j]->offset() < aStopOffset[trackNum]) {
+              aStopOffset[trackNum] = aTracks[j]->offset();
             }
           }
         }
       }
     } else {
-      aStopOffset[trackNum] = aTracks[trackNum]->dwOffset + aTracks[trackNum]->unLength;
+      aStopOffset[trackNum] = aTracks[trackNum]->offset() + aTracks[trackNum]->length();
     }
   }
 

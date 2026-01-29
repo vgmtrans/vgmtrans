@@ -36,13 +36,13 @@ void SoftCreatSnesSeq::resetVars(void) {
 bool SoftCreatSnesSeq::parseHeader(void) {
   setPPQN(SEQ_PPQN);
 
-  VGMHeader *header = addHeader(dwOffset, headerAlignSize * MAX_TRACKS);
-  if (dwOffset + headerAlignSize * MAX_TRACKS > 0x10000) {
+  VGMHeader *header = addHeader(offset(), headerAlignSize * MAX_TRACKS);
+  if (offset() + headerAlignSize * MAX_TRACKS > 0x10000) {
     return false;
   }
 
   for (uint8_t trackIndex = 0; trackIndex < MAX_TRACKS; trackIndex++) {
-    uint32_t addrTrackLowPtr = dwOffset + (trackIndex * 2 * headerAlignSize);
+    uint32_t addrTrackLowPtr = offset() + (trackIndex * 2 * headerAlignSize);
     uint32_t addrTrackHighPtr = addrTrackLowPtr + headerAlignSize;
     if (addrTrackLowPtr + 1 > 0x10000 || addrTrackHighPtr + 1 > 0x10000) {
       return false;

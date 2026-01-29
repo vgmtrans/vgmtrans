@@ -30,7 +30,7 @@ bool MP2kInstrSet::loadInstrs() {
 
 bool MP2kInstrSet::parseInstrPointers() {
   for (int i = 0; i < m_count; i++) {
-    size_t cur_ofs = dwOffset + i * 12;
+    size_t cur_ofs = offset() + i * 12;
     MP2kInstrData data{rawFile()->get<u32>(cur_ofs), rawFile()->get<u32>(cur_ofs + 4),
                        rawFile()->get<u32>(cur_ofs + 8)};
     aInstrs.push_back(new MP2kInstr(this, cur_ofs, 0, 0, i, data));
@@ -136,7 +136,7 @@ bool MP2kInstr::loadInstr() {
       [[fallthrough]];
     case 0x38: {
       setName("Single-region instrument");
-      unLength = 12;
+      setLength(12);
 
       bool no_resampling = (m_type & 0xFF) == 0x08;
       if (no_resampling) {
@@ -146,7 +146,7 @@ bool MP2kInstr::loadInstr() {
       size_t sample_pointer = m_data.w1 & 0x3FFFFFF;
       if (sample_pointer == 0) {
         /* Sometimes the instrument table can have weird values */
-        L_INFO("Tried to load a sample that pointed to nothing for instr @{:#x}", dwOffset);
+        L_INFO("Tried to load a sample that pointed to nothing for instr @{:#x}", offset());
         setName(name() + " (invalid)");
         break;
       }
@@ -154,7 +154,7 @@ bool MP2kInstr::loadInstr() {
       if (auto sample_id =
               static_cast<MP2kInstrSet *>(parInstrSet)->makeOrGetSample(sample_pointer);
           sample_id != -1) {
-        VGMRgn *rgn = addRgn(dwOffset, unLength, sample_id);
+        VGMRgn *rgn = addRgn(offset(), length(), sample_id);
         // rgn->sampCollPtr = static_cast<MP2kInstrSet *>(parInstrSet)->sampColl;
         setADSR(rgn, m_data.w2);
       } else {
@@ -175,7 +175,7 @@ bool MP2kInstr::loadInstr() {
     case 0x0a: {
       static constexpr const char *cycles[] = {"12,5%", "25%", "50%", "75%"};
       setName(fmt::format("PSG square {}", m_data.w1 < 4 ? cycles[m_data.w1] : "???"));
-      unLength = 12;
+      setLength(12);
       break;
     }
 
@@ -184,7 +184,7 @@ bool MP2kInstr::loadInstr() {
       [[fallthrough]];
     case 0x0b: {
       setName("PSG programmable waveform");
-      unLength = 12;
+      setLength(12);
       break;
     }
 
@@ -193,14 +193,14 @@ bool MP2kInstr::loadInstr() {
       [[fallthrough]];
     case 0x0c: {
       setName("PSG noise");
-      unLength = 12;
+      setLength(12);
       break;
     }
 
     /* Multi-region instrument */
     case 0x40: {
       setName("Multi-region instrument");
-      unLength = 12;
+      setLength(12);
 
       u32 base_pointer = m_data.w1 & 0x3ffffff;
       u32 region_table = m_data.w2 & 0x3ffffff;
@@ -226,26 +226,25 @@ bool MP2kInstr::loadInstr() {
       split_list.push_back(0x80);
 
       for (int i = 0; i < index_list.size(); i++) {
-        u32 offset = base_pointer + 12 * index_list[i];
+        u32 off = base_pointer + 12 * index_list[i];
 
-        auto type = rawFile()->get<u8>(offset);
+        auto type = rawFile()->get<u8>(off);
         if (type & 0x07) {
           L_WARN("GameBoy instrument in key-split (what game is this?!)");
           continue;
         }
 
-        u32 sample_pointer = rawFile()->get<u32>(offset + 4) & 0x3ffffff;
+        u32 sample_pointer = rawFile()->get<u32>(off + 4) & 0x3ffffff;
         if (sample_pointer == 0) {
           continue;
         }
 
-        if (auto sample_id =
-                static_cast<MP2kInstrSet *>(parInstrSet)->makeOrGetSample(sample_pointer);
+        if (auto sample_id = static_cast<MP2kInstrSet *>(parInstrSet)->makeOrGetSample(sample_pointer);
             sample_id != -1) {
-          VGMRgn *rgn = addRgn(dwOffset, unLength, sample_id, split_list[i], split_list[i + 1] - 1);
+          VGMRgn *rgn = addRgn(offset(), length(), sample_id, split_list[i], split_list[i + 1] - 1);
 
           // rgn->sampCollPtr = static_cast<MP2kInstrSet *>(parInstrSet)->sampColl;
-          setADSR(rgn, rawFile()->get<u32>(offset + 8));
+          setADSR(rgn, rawFile()->get<u32>(off + 8));
         } else {
           continue;
         }
@@ -257,18 +256,18 @@ bool MP2kInstr::loadInstr() {
     /* Full-keyboard instrument */
     case 0x80: {
       setName("Full-keyboard instrument");
-      unLength = 12;
+      setLength(12);
 
       u32 base_pointer = m_data.w1 & 0x3ffffff;
 
       for (int key = 0; key < 128; key++) {
-        u32 offset = base_pointer + 12 * key;
+        u32 off = base_pointer + 12 * key;
 
-        u32 type = rawFile()->get<u8>(offset);
-        u32 keynum = rawFile()->get<u8>(offset + 1);
-        u32 pan = rawFile()->get<u8>(offset + 3);
+        u32 type = rawFile()->get<u8>(off);
+        u32 keynum = rawFile()->get<u8>(off + 1);
+        u32 pan = rawFile()->get<u8>(off + 3);
 
-        u32 sample_pointer = rawFile()->get<u32>(offset + 4) & 0x3ffffff;
+        u32 sample_pointer = rawFile()->get<u32>(off + 4) & 0x3ffffff;
         if (sample_pointer == 0) {
           continue;
         }
@@ -277,7 +276,7 @@ bool MP2kInstr::loadInstr() {
           if (auto sample_id =
                   static_cast<MP2kInstrSet *>(parInstrSet)->makeOrGetSample(sample_pointer);
               sample_id != -1) {
-            VGMRgn *rgn = addRgn(dwOffset, unLength, sample_id, key, key);
+            VGMRgn *rgn = addRgn(offset(), length(), sample_id, key, key);
             // rgn->sampCollPtr = static_cast<MP2kInstrSet *>(parInstrSet)->sampColl;
             rgn->setPan(pan);
 
@@ -287,7 +286,7 @@ bool MP2kInstr::loadInstr() {
             int rootkey = 60 + int(round(delta_note));
 
             rgn->setUnityKey(rootkey - keynum + key);
-            setADSR(rgn, rawFile()->get<u32>(offset + 8));
+            setADSR(rgn, rawFile()->get<u32>(off + 8));
           }
         } else if ((type & 0x0f) == 4 || (type & 0x0f) == 12) {
           /* Make noise sample here... */
@@ -317,7 +316,7 @@ void MP2kInstr::setADSR(VGMRgn *rgn, u32 adsr) {
 
     rgn->attack_time = att_time;
   } else {
-    L_INFO("Attack disabled {:#x}", this->dwOffset);
+    L_INFO("Attack disabled {:#x}", this->offset());
   }
 
   if (sustain != 0xFF) {
@@ -334,7 +333,7 @@ void MP2kInstr::setADSR(VGMRgn *rgn, u32 adsr) {
     double dec = 1200 * log2(dec_time);
     rgn->decay_time = dec;
   } else {
-    L_INFO("Sustain disabled {:#x}", this->dwOffset);
+    L_INFO("Sustain disabled {:#x}", this->offset());
   }
 
   if (release != 0x00) {
@@ -342,7 +341,7 @@ void MP2kInstr::setADSR(VGMRgn *rgn, u32 adsr) {
     double rel = 1200 * log2(rel_time);
     rgn->release_time = rel;
   } else {
-    L_INFO("Release disabled {:#x}", this->dwOffset);
+    L_INFO("Release disabled {:#x}", this->offset());
   }
 }
 

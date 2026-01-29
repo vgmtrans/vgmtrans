@@ -58,8 +58,8 @@ void CapcomSnesSeq::resetVars() {
 bool CapcomSnesSeq::parseHeader() {
   setPPQN(SEQ_PPQN);
 
-  VGMHeader *seqHeader = addHeader(dwOffset, (priorityInHeader ? 1 : 0) + MAX_TRACKS * 2, "Sequence Header");
-  uint32_t curHeaderOffset = dwOffset;
+  VGMHeader *seqHeader = addHeader(offset(), (priorityInHeader ? 1 : 0) + MAX_TRACKS * 2, "Sequence Header");
+  uint32_t curHeaderOffset = offset();
 
   if (priorityInHeader) {
     seqHeader->addChild(curHeaderOffset, 1, "Priority");
@@ -77,7 +77,7 @@ bool CapcomSnesSeq::parseHeader() {
 
 bool CapcomSnesSeq::parseTrackPointers() {
   for (int i = MAX_TRACKS - 1; i >= 0; i--) {
-    uint16_t trkOff = readShortBE(dwOffset + (priorityInHeader ? 1 : 0) + i * 2);
+    uint16_t trkOff = readShortBE(offset() + (priorityInHeader ? 1 : 0) + i * 2);
     if (trkOff != 0)
       aTracks.push_back(new CapcomSnesTrack(this, trkOff));
   }

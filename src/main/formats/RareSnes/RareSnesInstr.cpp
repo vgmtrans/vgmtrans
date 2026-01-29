@@ -52,9 +52,9 @@ void RareSnesInstrSet::Initialize() {
     }
   }
 
-  unLength = 0x100;
-  if (dwOffset + unLength > rawFile()->size()) {
-    unLength = rawFile()->size() - dwOffset;
+  setLength(0x100);
+  if (offset() + length() > rawFile()->size()) {
+    setLength(rawFile()->size() - offset());
   }
   ScanAvailableInstruments();
 }
@@ -63,8 +63,8 @@ void RareSnesInstrSet::ScanAvailableInstruments() {
   availInstruments.clear();
 
   bool firstZero = true;
-  for (uint32_t inst = 0; inst < unLength; inst++) {
-    uint8_t srcn = readByte(dwOffset + inst);
+  for (uint32_t inst = 0; inst < length(); inst++) {
+    uint8_t srcn = readByte(offset() + inst);
 
     if (srcn == 0) {
       if (firstZero) {
@@ -117,7 +117,7 @@ bool RareSnesInstrSet::parseInstrPointers() {
   std::map<uint16_t, uint8_t> addrToInstrLookups;
   for (auto itr = instrUnityKeyHints.begin(); itr != instrUnityKeyHints.end(); ++itr) {
     uint8_t inst = (*itr).first;
-    uint8_t srcn = readByte(dwOffset + inst);
+    uint8_t srcn = readByte(offset() + inst);
 
     uint32_t offDirEnt = spcDirAddr + (srcn * 4);
     if (addrToInstrLookups.count(offDirEnt) == 0) {
@@ -127,7 +127,7 @@ bool RareSnesInstrSet::parseInstrPointers() {
 
   for (std::vector<uint8_t>::iterator itr = availInstruments.begin(); itr != availInstruments.end(); ++itr) {
     uint8_t inst = (*itr);
-    uint8_t srcn = readByte(dwOffset + inst);
+    uint8_t srcn = readByte(offset() + inst);
 
     uint8_t inst_remapped = inst;
     uint32_t offDirEnt = spcDirAddr + (srcn * 4);
@@ -157,7 +157,7 @@ bool RareSnesInstrSet::parseInstrPointers() {
     }
 
     RareSnesInstr *newInstr = new RareSnesInstr(
-      this, dwOffset + inst, inst >> 7, inst & 0x7f, spcDirAddr, transpose,
+      this, offset() + inst, inst >> 7, inst & 0x7f, spcDirAddr, transpose,
       pitch, adsr, fmt::format("Instrument: {:#x}", inst));
     aInstrs.push_back(newInstr);
   }
@@ -192,7 +192,7 @@ RareSnesInstr::~RareSnesInstr() {
 }
 
 bool RareSnesInstr::loadInstr() {
-  uint8_t srcn = readByte(dwOffset);
+  uint8_t srcn = readByte(offset());
   uint32_t offDirEnt = spcDirAddr + (srcn * 4);
   if (offDirEnt + 4 > 0x10000) {
     return false;
@@ -200,7 +200,7 @@ bool RareSnesInstr::loadInstr() {
 
   uint16_t addrSampStart = readShort(offDirEnt);
 
-  RareSnesRgn *rgn = new RareSnesRgn(this, dwOffset, transpose, pitch, adsr);
+  RareSnesRgn *rgn = new RareSnesRgn(this, offset(), transpose, pitch, adsr);
   rgn->sampOffset = addrSampStart - spcDirAddr;
   addRgn(rgn);
   return true;

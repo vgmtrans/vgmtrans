@@ -33,7 +33,7 @@ public:
   void removeCollAssoc(VGMColl *coll);
   [[nodiscard]] RawFile *rawFile() const;
 
-  [[nodiscard]] size_t size() const noexcept { return unLength; }
+  [[nodiscard]] size_t size() const noexcept { return length(); }
 
   uint32_t readBytes(uint32_t nIndex, uint32_t nCount, void *pBuffer) const;
 
@@ -44,7 +44,7 @@ public:
   inline uint32_t readWordBE(uint32_t offset) const { return m_rawfile->readWordBE(offset); }
   inline bool isValidOffset(uint32_t offset) const { return m_rawfile->isValidOffset(offset); }
 
-  uint32_t startOffset() const { return dwOffset; }
+  uint32_t startOffset() const { return offset(); }
   /*
    * For whatever reason, you can create null-length VGMItems.
    * The only safe way for now is to
@@ -52,7 +52,7 @@ public:
    */
   uint32_t endOffset() const { return static_cast<uint32_t>(m_rawfile->size()); }
 
-  [[nodiscard]] const char *data() const { return m_rawfile->data() + dwOffset; }
+  [[nodiscard]] const char *data() const { return m_rawfile->data() + offset(); }
 
   std::vector<VGMColl*> assocColls;
 

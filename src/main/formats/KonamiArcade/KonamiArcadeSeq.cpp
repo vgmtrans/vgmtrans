@@ -41,16 +41,16 @@ bool KonamiArcadeSeq::parseHeader() {
 }
 
 bool KonamiArcadeSeq::parseTrackPointers() {
-  u32 pos = dwOffset;
+  u32 pos = offset();
   int numTracks = 16;
 
-  auto trackPtrTableItem = addChild(dwOffset, numTracks * 2, "Track Pointer Table");
+  auto trackPtrTableItem = addChild(offset(), numTracks * 2, "Track Pointer Table");
 
   if (fmtVer == MysticWarrior) {
     // Check to see if this sequence uses 16 tracks or 8 tracks for games with only 1 K054539.
     // We'll check for any pattern of 0x0000 where the second set of track pointers would be, as this
     // is typically present.
-    for (int pos = dwOffset + 16; pos < dwOffset + 32; pos += 2) {
+    for (int pos = offset() + 16; pos < offset() + 32; pos += 2) {
       if (readWord(pos) == 0) {
         numTracks = 8;
         break;
@@ -61,7 +61,7 @@ bool KonamiArcadeSeq::parseTrackPointers() {
       u16 memTrackOffset = readShort(pos);
       if (memTrackOffset == 0) continue;
 
-      u32 romTrackOffset = dwOffset + (memTrackOffset - m_memOffset);
+      u32 romTrackOffset = offset() + (memTrackOffset - m_memOffset);
 
       trackPtrTableItem->addChild(pos, 2, fmt::format("Track {} Pointer", i));
 
@@ -74,8 +74,8 @@ bool KonamiArcadeSeq::parseTrackPointers() {
       if (trackOffset == 0) continue;
 
       // Racin' Force has jumps to sequence data that precede the start of the sequence
-      if (trackOffset < dwOffset) {
-        dwOffset = trackOffset;
+      if (trackOffset < offset()) {
+        setOffset(trackOffset);
       }
 
       trackPtrTableItem->addChild(pos, 4, fmt::format("Track {} Pointer", i));
@@ -617,7 +617,7 @@ bool KonamiArcadeTrack::readEvent() {
           initialLoopAtten, initialLoopTranspose);
         addGenericEvent(beginOffset, curOffset - beginOffset, "Loop", desc, Type::RepeatEnd);
       }
-      if (m_loopMarker[loopNum] < parentSeq->dwOffset) {
+      if (m_loopMarker[loopNum] < parentSeq->offset()) {
         L_ERROR("KonamiArcadeSeq wants to loopMarker outside bounds of sequence. Loop at %X", beginOffset);
         return false;
       }
@@ -815,7 +815,7 @@ bool KonamiArcadeTrack::readEvent() {
       int eventLength = seq->fmtVer == MysticWarrior ? 3 : 5;
       if (seq->fmtVer == MysticWarrior) {
         u16 memJumpOffset = readShort(curOffset);
-        dest = seq->dwOffset + (memJumpOffset - seq->memOffset());
+        dest = seq->offset() + (memJumpOffset - seq->memOffset());
       } else {
         dest = getWordBE(curOffset);
       }
@@ -826,7 +826,7 @@ bool KonamiArcadeTrack::readEvent() {
         auto desc = fmt::format("Destination: ${:X}", dest);
         addGenericEvent(beginOffset, eventLength, "Jump", desc, Type::Loop);
       }
-      if (dest < seq->dwOffset) {
+      if (dest < seq->offset()) {
         L_ERROR("KonamiArcadeEvent FD attempted jump to offset outside the sequence at {:X}.  Jump offset: {:X}", beginOffset, dest);
         return false;
       }
@@ -842,12 +842,12 @@ bool KonamiArcadeTrack::readEvent() {
       if (seq->fmtVer == MysticWarrior) {
         m_jumpReturnOffset = curOffset + 2;
         u16 memJumpOffset = readShort(curOffset);
-        dest = seq->dwOffset + (memJumpOffset - seq->memOffset());
+        dest = seq->offset() + (memJumpOffset - seq->memOffset());
       } else {
         m_jumpReturnOffset = curOffset + 4;
         dest = getWordBE(curOffset);
       }
-      if (dest < seq->dwOffset) {
+      if (dest < seq->offset()) {
         L_ERROR("KonamiArcade Event FE attempted jump to offset outside the sequence at {:X}.  Jump offset: {:X}", beginOffset, dest);
         return false;
       }

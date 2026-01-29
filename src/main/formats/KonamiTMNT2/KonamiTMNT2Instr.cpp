@@ -136,11 +136,11 @@ bool KonamiTMNT2SampleInstrSet::parseDrums() {
   );
   auto drumsItem = addChild(
     0,
-    unLength,
+    length(),
     "Drums"
   );
 
-  VGMInstr* drumKit = new VGMInstr(this, dwOffset, unLength, 1, 0, "Drum Kit");
+  VGMInstr* drumKit = new VGMInstr(this, offset(), length(), 1, 0, "Drum Kit");
 
   minDrumOffset = -1;
   maxDrumOffset = 0;
@@ -193,8 +193,8 @@ bool KonamiTMNT2SampleInstrSet::parseDrums() {
     }
   }
   aInstrs.emplace_back(drumKit);
-  drumsItem->dwOffset = minDrumOffset;
-  drumsItem->unLength = (maxDrumOffset + sizeof(konami_tmnt2_drum_info)) - minDrumOffset;
+  drumsItem->setOffset(minDrumOffset);
+  drumsItem->setLength((maxDrumOffset + sizeof(konami_tmnt2_drum_info)) - minDrumOffset);
   return true;
 }
 
@@ -232,7 +232,7 @@ bool KonamiTMNT2SampColl::parseSampleInfo() {
 
     auto name = fmt::format("Sample {:d}", sampNum++);
     VGMSamp* sample;
-    if (sampleOffset + sampleSize > unLength) {
+    if (sampleOffset + sampleSize > length()) {
       sample = new EmptySamp(this);
     }
     else if (sampInfo.isAdpcm) {

@@ -60,7 +60,7 @@ void TamSoftPS1Seq::resetVars() {
 bool TamSoftPS1Seq::parseHeader() {
   setPPQN(SEQ_PPQN);
 
-  uint32_t dwSongItemOffset = dwOffset + 4 * song;
+  uint32_t dwSongItemOffset = offset() + 4 * song;
   if (dwSongItemOffset + 4 > vgmFile()->endOffset()) {
     return false;
   }
@@ -79,7 +79,7 @@ bool TamSoftPS1Seq::parseHeader() {
 
   if (type == 0) {
     // BGM
-    uint32_t dwHeaderOffset = dwOffset + seqHeaderRelOffset;
+    uint32_t dwHeaderOffset = offset() + seqHeaderRelOffset;
 
     // ignore (corrupted) silence sequence
     if (readWord(dwHeaderOffset) != 0xfffff0) {
@@ -142,7 +142,7 @@ bool TamSoftPS1Seq::parseHeader() {
   }
   else {
     // SFX (single track)
-    uint32_t dwTrackOffset = dwOffset + seqHeaderRelOffset;
+    uint32_t dwTrackOffset = offset() + seqHeaderRelOffset;
 
     // ignore silence sequence
     if (readShort(dwTrackOffset) != 0xfff0) {

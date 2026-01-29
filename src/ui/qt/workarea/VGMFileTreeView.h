@@ -50,7 +50,7 @@ public:
   ~VGMTreeItem() override = default;
 
   [[nodiscard]] inline auto item_parent() const noexcept { return m_parent; }
-  [[nodiscard]] inline auto item_offset() const noexcept { return m_item->dwOffset; }
+  [[nodiscard]] inline auto item_offset() const noexcept { return m_item->offset(); }
   [[nodiscard]] inline auto item() const noexcept { return m_item; }
 
 private:

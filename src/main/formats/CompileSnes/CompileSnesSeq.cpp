@@ -47,15 +47,15 @@ void CompileSnesSeq::resetVars() {
 bool CompileSnesSeq::parseHeader() {
   setPPQN(SEQ_PPQN);
 
-  VGMHeader *header = addHeader(dwOffset, 0);
+  VGMHeader *header = addHeader(offset(), 0);
 
-  header->addChild(dwOffset, 1, "Number of Tracks");
-  nNumTracks = readByte(dwOffset);
+  header->addChild(offset(), 1, "Number of Tracks");
+  nNumTracks = readByte(offset());
   if (nNumTracks == 0 || nNumTracks > 8) {
     return false;
   }
 
-  uint32_t curOffset = dwOffset + 1;
+  uint32_t curOffset = offset() + 1;
   for (uint8_t trackIndex = 0; trackIndex < nNumTracks; trackIndex++) {
     auto trackName = fmt::format("Track {}", trackIndex + 1);
 
@@ -81,7 +81,7 @@ bool CompileSnesSeq::parseHeader() {
 
 
 bool CompileSnesSeq::parseTrackPointers(void) {
-  uint32_t curOffset = dwOffset + 1;
+  uint32_t curOffset = offset() + 1;
   for (uint8_t trackIndex = 0; trackIndex < nNumTracks; trackIndex++) {
     uint16_t ofsTrackStart = readShort(curOffset + 8);
 
