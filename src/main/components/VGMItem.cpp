@@ -49,6 +49,9 @@ VGMItem* VGMItem::getItemAtOffset(uint32_t offset, bool matchStartOffset) {
       return this;
     }
   }
+  if (m_children.size() == 1) {
+    return m_children[0]->getItemAtOffset(offset, matchStartOffset);
+  }
 
   ensureChildrenSorted();
   // Binary search by start offset, then scan backwards only across potentially overlapping items.
@@ -189,10 +192,7 @@ void VGMItem::transferChildren(VGMItem* destination) {
 }
 
 void VGMItem::ensureChildrenSorted() {
-  // Lazy path: only sort/rebuild when a lookup needs it.
-  if (m_children.size() < 2) {
-    m_childrenSorted = true;
-  }
+  // Lazy path: only sort/rebuild when a lookup needs it (single-child handled in caller).
   if (!m_childrenSorted) {
     std::sort(m_children.begin(), m_children.end(),
               [](const VGMItem* a, const VGMItem* b) { return a->offset() < b->offset(); });
