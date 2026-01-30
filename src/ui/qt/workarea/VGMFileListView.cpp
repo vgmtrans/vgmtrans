@@ -6,8 +6,10 @@
 
 #include <algorithm>
 
+#include <QAbstractItemView>
 #include <QComboBox>
 #include <QEvent>
+#include <QFontMetrics>
 #include <QHeaderView>
 #include <QHBoxLayout>
 #include <QLabel>
@@ -247,7 +249,7 @@ VGMFileListView::VGMFileListView(QWidget *parent) : QWidget(parent) {
 
   auto *header = new QWidget(this);
   auto *header_layout = new QHBoxLayout();
-  header_layout->setContentsMargins(4, 1, 4, 0);
+  header_layout->setContentsMargins(7, 1, 7, 0);
   header_layout->setSpacing(4);
 
   QFont compactFont = font();
@@ -263,7 +265,8 @@ VGMFileListView::VGMFileListView(QWidget *parent) : QWidget(parent) {
   sort_label->setFont(compactFont);
   m_sortCombo = new QComboBox();
   m_sortCombo->setFont(compactFont);
-  m_sortCombo->addItems({"Added", "Type", "Format", "Name"});
+  const QStringList sortOptions{"Added", "Type", "Format", "Name"};
+  m_sortCombo->addItems(sortOptions);
   m_sortCombo->setCurrentIndex(0);
   m_sortCombo->setSizeAdjustPolicy(QComboBox::AdjustToContents);
   m_sortCombo->setFixedHeight(controlHeight);
@@ -272,6 +275,15 @@ VGMFileListView::VGMFileListView(QWidget *parent) : QWidget(parent) {
       "border-bottom-right-radius: 0px; }"
       "QComboBox::drop-down { width: 0px; border: 0px; }"
       "QComboBox::down-arrow { image: none; width: 0px; height: 0px; }");
+  {
+    QFontMetrics fm(compactFont);
+    int maxTextWidth = 0;
+    for (const auto &text : sortOptions) {
+      maxTextWidth = std::max(maxTextWidth, fm.horizontalAdvance(text));
+    }
+    const int popupWidth = maxTextWidth + 24;
+    m_sortCombo->view()->setMinimumWidth(popupWidth);
+  }
 
   m_sortOrderButton = new QPushButton();
   m_sortOrderButton->setFont(compactFont);
