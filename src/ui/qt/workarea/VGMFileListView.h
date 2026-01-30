@@ -14,7 +14,6 @@
 #include "VGMFile.h"
 
 class QItemSelection;
-class RawFile;
 class VGMFileListModel : public QAbstractTableModel {
 public:
   enum Property : uint8_t { Name = 0, Format = 1, Type = 2 };
@@ -30,19 +29,12 @@ public:
 
   [[nodiscard]] VGMFile *fileFromIndex(const QModelIndex &index) const;
   [[nodiscard]] QModelIndex indexFromFile(const VGMFile *file) const;
-  [[nodiscard]] bool isHeaderRow(const QModelIndex &index) const;
 
 private:
-  struct RowEntry {
-    bool isHeader = false;
-    RawFile *raw = nullptr;
-    VGMFile *file = nullptr;
-  };
-
   void rebuildRows();
   int sortColumn = -1;
   Qt::SortOrder sortOrder = Qt::AscendingOrder;
-  std::vector<RowEntry> rows;
+  std::vector<VGMFile *> rows;
 };
 
 class VGMFileListView final : public TableView {

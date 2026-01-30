@@ -118,6 +118,7 @@ void MainWindow::createElements() {
   m_logger = new Logger();
   addDockWidget(Qt::BottomDockWidgetArea, m_logger);
   m_logger->setTitleBarWidget(new QWidget());
+  m_logger->hide();
 
 
   QList<QDockWidget *> docks = findChildren<QDockWidget *>(QString(), Qt::FindDirectChildrenOnly);

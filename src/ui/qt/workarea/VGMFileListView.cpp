@@ -6,7 +6,6 @@
 
 #include <algorithm>
 
-#include <QFont>
 #include <QHeaderView>
 
 #include "VGMFileListView.h"
@@ -22,7 +21,6 @@
 #include "VGMMiscFile.h"
 #include "VGMSampColl.h"
 #include "services/MenuManager.h"
-#include "RawFile.h"
 
 namespace {
 const QIcon &sequenceInCollectionIcon() {
@@ -94,20 +92,7 @@ QVariant VGMFileListModel::data(const QModelIndex &index, int role) const {
     return QVariant();
   }
 
-  const auto &row = rows[static_cast<size_t>(index.row())];
-  if (row.isHeader) {
-    if (role == Qt::DisplayRole && index.column() == Property::Name && row.raw) {
-      return QString::fromStdString(row.raw->name());
-    }
-    if (role == Qt::FontRole) {
-      QFont font;
-      font.setBold(true);
-      return font;
-    }
-    return {};
-  }
-
-  VGMFile *vgmfile = row.file;
+  VGMFile *vgmfile = rows[static_cast<size_t>(index.row())];
 
   switch (index.column()) {
     case Property::Name: {
@@ -190,11 +175,6 @@ Qt::ItemFlags VGMFileListModel::flags(const QModelIndex &index) const {
     return Qt::ItemIsEnabled;
   }
 
-  const auto &row = rows[static_cast<size_t>(index.row())];
-  if (row.isHeader) {
-    return Qt::ItemIsEnabled;
-  }
-
   return QAbstractTableModel::flags(index);
 }
 
@@ -215,12 +195,7 @@ VGMFile *VGMFileListModel::fileFromIndex(const QModelIndex &index) const {
     return nullptr;
   }
 
-  const auto &row = rows[static_cast<size_t>(index.row())];
-  if (row.isHeader) {
-    return nullptr;
-  }
-
-  return row.file;
+  return rows[static_cast<size_t>(index.row())];
 }
 
 QModelIndex VGMFileListModel::indexFromFile(const VGMFile *file) const {
@@ -229,7 +204,7 @@ QModelIndex VGMFileListModel::indexFromFile(const VGMFile *file) const {
   }
 
   for (size_t row = 0; row < rows.size(); ++row) {
-    if (!rows[row].isHeader && rows[row].file == file) {
+    if (rows[row] == file) {
       return createIndex(static_cast<int>(row), 0);
     }
   }
@@ -237,61 +212,25 @@ QModelIndex VGMFileListModel::indexFromFile(const VGMFile *file) const {
   return {};
 }
 
-bool VGMFileListModel::isHeaderRow(const QModelIndex &index) const {
-  if (!index.isValid()) {
-    return false;
-  }
-
-  return rows[static_cast<size_t>(index.row())].isHeader;
-}
-
 void VGMFileListModel::rebuildRows() {
   rows.clear();
 
-  struct Group {
-    RawFile *raw = nullptr;
-    std::vector<VGMFile *> files;
-  };
-  std::vector<Group> groups;
-
   for (const auto &variant : qtVGMRoot.vgmFiles()) {
-    VGMFile *file = variantToVGMFile(variant);
-    if (!file) {
-      continue;
+    if (auto *file = variantToVGMFile(variant)) {
+      rows.push_back(file);
     }
-    RawFile *raw = file->rawFile();
-    auto it = std::find_if(groups.begin(), groups.end(), [raw](const Group &group) {
-      return group.raw == raw;
-    });
-    if (it == groups.end()) {
-      groups.push_back({raw, {}});
-      it = groups.end() - 1;
-    }
-    it->files.push_back(file);
   }
 
   if (sortColumn >= 0) {
-    for (auto &group : groups) {
-      std::stable_sort(group.files.begin(), group.files.end(),
-                       [this](VGMFile *lhs, VGMFile *rhs) {
-                         const QString left = sortKeyForColumn(lhs, sortColumn);
-                         const QString right = sortKeyForColumn(rhs, sortColumn);
-                         if (sortOrder == Qt::AscendingOrder) {
-                           return left < right;
-                         }
-                         return left > right;
-                       });
-    }
-  }
-
-  for (const auto &group : groups) {
-    if (!group.raw) {
-      continue;
-    }
-    rows.push_back({true, group.raw, nullptr});
-    for (auto *file : group.files) {
-      rows.push_back({false, group.raw, file});
-    }
+    std::stable_sort(rows.begin(), rows.end(),
+                     [this](VGMFile *lhs, VGMFile *rhs) {
+                       const QString left = sortKeyForColumn(lhs, sortColumn);
+                       const QString right = sortKeyForColumn(rhs, sortColumn);
+                       if (sortOrder == Qt::AscendingOrder) {
+                         return left < right;
+                       }
+                       return left > right;
+                     });
   }
 }
 
@@ -311,8 +250,8 @@ VGMFileListView::VGMFileListView(QWidget *parent) : TableView(parent) {
 
   setContextMenuPolicy(Qt::CustomContextMenu);
 
-  setColumnWidth(1, 140);
-  setColumnWidth(2, 90);
+  setColumnWidth(1, 90);
+  setColumnWidth(2, 60);
 
   connect(this, &QAbstractItemView::customContextMenuRequested, this, &VGMFileListView::itemMenu);
   connect(this, &QAbstractItemView::doubleClicked, this, &VGMFileListView::requestVGMFileView);
