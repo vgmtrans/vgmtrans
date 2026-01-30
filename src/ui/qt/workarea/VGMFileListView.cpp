@@ -5,6 +5,7 @@
  */
 
 #include <algorithm>
+#include <unordered_map>
 
 #include <QAbstractItemView>
 #include <QComboBox>
@@ -15,6 +16,7 @@
 #include <QLabel>
 #include <QPainter>
 #include <QPalette>
+#include <QSignalBlocker>
 #include <QShortcut>
 #include <QVBoxLayout>
 
@@ -22,8 +24,7 @@
 #include "Helpers.h"
 #include "QtVGMRoot.h"
 #include "MdiArea.h"
-#include "Colors.h"
-#include "TintableSvgIconEngine.h"
+#include "services/Settings.h"
 #include "TableView.h"
 #include "services/NotificationCenter.h"
 #include "VGMFile.h"
@@ -36,11 +37,6 @@
 #include <QPushButton>
 
 namespace {
-const QIcon &sequenceInCollectionIcon() {
-  static QIcon icon(new TintableSvgIconEngine(":/icons/sequence.svg", EventColors::CLR_GREEN));
-  return icon;
-}
-
 QString typeLabelForFile(const VGMFile *file) {
   if (dynamic_cast<const VGMSeq *>(file)) {
     return "Seq";
@@ -113,11 +109,6 @@ QVariant VGMFileListModel::data(const QModelIndex &index, int role) const {
       if (role == Qt::DisplayRole) {
         return QString::fromStdString(vgmfile->name());
       } else if (role == Qt::DecorationRole) {
-        if (auto *seq = dynamic_cast<VGMSeq *>(vgmfile)) {
-          if (!seq->assocColls.empty()) {
-            return sequenceInCollectionIcon();
-          }
-        }
         return iconForFile(vgmFileToVariant(vgmfile));
       }
       break;
@@ -214,23 +205,37 @@ void VGMFileListModel::setSort(SortKey key, Qt::SortOrder order) {
 void VGMFileListModel::rebuildRows() {
   rows.clear();
 
+  std::unordered_map<VGMFile *, int> addedIndex;
+  int index = 0;
   for (const auto &variant : qtVGMRoot.vgmFiles()) {
     if (auto *file = variantToVGMFile(variant)) {
       rows.push_back(file);
+      addedIndex[file] = index++;
     }
   }
 
+  auto addedAsc = [&addedIndex](VGMFile *lhs, VGMFile *rhs) {
+    return addedIndex[lhs] < addedIndex[rhs];
+  };
+
   if (sortKey == SortKey::Added) {
-    if (sortOrder == Qt::DescendingOrder) {
-      std::reverse(rows.begin(), rows.end());
-    }
+    std::stable_sort(rows.begin(), rows.end(),
+                     [this, &addedIndex](VGMFile *lhs, VGMFile *rhs) {
+                       if (sortOrder == Qt::AscendingOrder) {
+                         return addedIndex[lhs] < addedIndex[rhs];
+                       }
+                       return addedIndex[lhs] > addedIndex[rhs];
+                     });
     return;
   }
 
   std::stable_sort(rows.begin(), rows.end(),
-                   [this](VGMFile *lhs, VGMFile *rhs) {
+                   [this, &addedIndex, &addedAsc](VGMFile *lhs, VGMFile *rhs) {
                      const QString left = sortKeyForSort(lhs, sortKey);
                      const QString right = sortKeyForSort(rhs, sortKey);
+                     if (left == right) {
+                       return addedAsc(lhs, rhs);
+                     }
                      if (sortOrder == Qt::AscendingOrder) {
                        return left < right;
                      }
@@ -267,7 +272,6 @@ VGMFileListView::VGMFileListView(QWidget *parent) : QWidget(parent) {
   m_sortCombo->setFont(compactFont);
   const QStringList sortOptions{"Added", "Type", "Format", "Name"};
   m_sortCombo->addItems(sortOptions);
-  m_sortCombo->setCurrentIndex(0);
   m_sortCombo->setSizeAdjustPolicy(QComboBox::AdjustToContents);
   m_sortCombo->setFixedHeight(controlHeight);
   m_sortCombo->setStyleSheet(
@@ -355,6 +359,22 @@ VGMFileListView::VGMFileListView(QWidget *parent) : QWidget(parent) {
   });
 
   m_table->installEventFilter(this);
+
+  int storedOrder = Settings::the()->VGMFileListView.sortOrder();
+  if (storedOrder != Qt::AscendingOrder && storedOrder != Qt::DescendingOrder) {
+    storedOrder = Qt::DescendingOrder;
+  }
+  m_sortOrder = static_cast<Qt::SortOrder>(storedOrder);
+  updateSortButtonIcon();
+
+  int storedKey = Settings::the()->VGMFileListView.sortKey();
+  if (storedKey < 0 || storedKey >= m_sortCombo->count()) {
+    storedKey = static_cast<int>(VGMFileListModel::SortKey::Type);
+  }
+  {
+    const QSignalBlocker blocker(m_sortCombo);
+    m_sortCombo->setCurrentIndex(storedKey);
+  }
   applySort();
 }
 
@@ -493,6 +513,8 @@ void VGMFileListView::applySort() {
       break;
   }
   view_model->setSort(key, m_sortOrder);
+  Settings::the()->VGMFileListView.setSortKey(static_cast<int>(key));
+  Settings::the()->VGMFileListView.setSortOrder(static_cast<int>(m_sortOrder));
 }
 
 void VGMFileListView::updateSortButtonIcon() {

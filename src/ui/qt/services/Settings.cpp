@@ -13,6 +13,7 @@ SettingsGroup::SettingsGroup(Settings* parent) : parent(parent), settings(parent
 Settings::Settings(QObject *parent)
   : QObject(parent),
     VGMFileTreeView(this),
+    VGMFileListView(this),
     conversion(this),
     recentFiles(this)
 {
@@ -32,6 +33,32 @@ bool Settings::VGMFileTreeViewSettings::showDetails() const {
   settings.endGroup();
 
   return showDetails;
+}
+
+int Settings::VGMFileListViewSettings::sortKey() const {
+  settings.beginGroup("VGMFileListView");
+  int key = settings.value("sortKey", 1).toInt();
+  settings.endGroup();
+  return key;
+}
+
+void Settings::VGMFileListViewSettings::setSortKey(int key) const {
+  settings.beginGroup("VGMFileListView");
+  settings.setValue("sortKey", key);
+  settings.endGroup();
+}
+
+int Settings::VGMFileListViewSettings::sortOrder() const {
+  settings.beginGroup("VGMFileListView");
+  int order = settings.value("sortOrder", static_cast<int>(Qt::DescendingOrder)).toInt();
+  settings.endGroup();
+  return order;
+}
+
+void Settings::VGMFileListViewSettings::setSortOrder(int order) const {
+  settings.beginGroup("VGMFileListView");
+  settings.setValue("sortOrder", order);
+  settings.endGroup();
 }
 
 /// Put settings into an OptionStore and have ConversionOptions load from it
@@ -85,4 +112,3 @@ void Settings::RecentFilesSettings::clear() const {
   settings.remove("files");
   settings.endGroup();
 }
-

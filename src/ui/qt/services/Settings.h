@@ -77,6 +77,16 @@ public:
   };
   VGMFileTreeViewSettings VGMFileTreeView;
 
+  struct VGMFileListViewSettings : public SettingsGroup {
+    VGMFileListViewSettings(Settings* parent): SettingsGroup(parent) {}
+
+    int sortKey() const;
+    void setSortKey(int key) const;
+    int sortOrder() const;
+    void setSortOrder(int order) const;
+  };
+  VGMFileListViewSettings VGMFileListView;
+
   struct ConversionSettings : public SettingsGroup {
     using SettingsGroup::SettingsGroup;
 
@@ -113,4 +123,3 @@ private:
   explicit Settings(QObject *parent = nullptr);
   QSettings settings;
 };
-
