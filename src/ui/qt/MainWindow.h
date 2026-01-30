@@ -16,9 +16,7 @@ class QDockWidget;
 class MenuBar;
 class IconBar;
 class Logger;
-class VGMCollListView;
-class VGMCollView;
-class QPushButton;
+class PropertyView;
 class StatusBarContent;
 class ToastHost;
 class QDragEnterEvent;
@@ -61,14 +59,12 @@ private:
 
   QDockWidget *m_rawfile_dock{};
   QDockWidget *m_vgmfile_dock{};
-  QDockWidget *m_coll_dock{};
+  QDockWidget *m_property_dock{};
   MenuBar *m_menu_bar{};
   IconBar *m_icon_bar{};
   StatusBarContent *statusBarContent{};
   Logger *m_logger{};
-  VGMCollListView *m_coll_listview{};
-  VGMCollView *m_coll_view{};
-  QPushButton *m_manual_creation_btn{};
+  PropertyView *m_property_view{};
   ToastHost *m_toastHost{};
   QWidget *m_dragOverlay{};
 #if defined(Q_OS_LINUX)

@@ -5,6 +5,7 @@
  */
 
 #include <ranges>
+#include <variant>
 
 #include <QHeaderView>
 
@@ -12,6 +13,8 @@
 #include "Helpers.h"
 #include "QtVGMRoot.h"
 #include "MdiArea.h"
+#include "Colors.h"
+#include "TintableSvgIconEngine.h"
 #include "services/NotificationCenter.h"
 #include "VGMFile.h"
 #include "VGMInstrSet.h"
@@ -19,6 +22,13 @@
 #include "VGMMiscFile.h"
 #include "VGMSampColl.h"
 #include "services/MenuManager.h"
+
+namespace {
+const QIcon &sequenceInCollectionIcon() {
+  static QIcon icon(new TintableSvgIconEngine(":/icons/sequence.svg", EventColors::CLR_GREEN));
+  return icon;
+}
+}
 
 /*
  *  VGMFileListModel
@@ -46,6 +56,15 @@ VGMFileListModel::VGMFileListModel(QObject *parent) : QAbstractTableModel(parent
   connect(&qtVGMRoot, &QtVGMRoot::UI_endLoadRawFile, endLoad);
   connect(&qtVGMRoot, &QtVGMRoot::UI_beginRemoveVGMFiles, startResettingModel);
   connect(&qtVGMRoot, &QtVGMRoot::UI_endRemoveVGMFiles, endResettingModel);
+  auto refreshIcons = [this]() {
+    const int rows = rowCount();
+    if (rows <= 0) {
+      return;
+    }
+    emit dataChanged(index(0, 0), index(rows - 1, 0), {Qt::DecorationRole});
+  };
+  connect(&qtVGMRoot, &QtVGMRoot::UI_addedVGMColl, refreshIcons);
+  connect(&qtVGMRoot, &QtVGMRoot::UI_removedVGMColl, refreshIcons);
 }
 
 QVariant VGMFileListModel::data(const QModelIndex &index, int role) const {
@@ -61,6 +80,11 @@ QVariant VGMFileListModel::data(const QModelIndex &index, int role) const {
       if (role == Qt::DisplayRole) {
         return QString::fromStdString(vgmfile->name());
       } else if (role == Qt::DecorationRole) {
+        if (auto seq = std::get_if<VGMSeq *>(&vgmfilevariant)) {
+          if (*seq && !(*seq)->assocColls.empty()) {
+            return sequenceInCollectionIcon();
+          }
+        }
         return iconForFile(vgmfilevariant);
       }
       break;

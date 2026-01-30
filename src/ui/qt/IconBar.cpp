@@ -27,22 +27,13 @@ void IconBar::setupControls() {
   s_playicon = QIcon(":/icons/player_play.svg");
   s_pauseicon = QIcon(":/icons/player_pause.svg");
 
-  m_create = new QPushButton("Create collection manually");
-  m_create->setAutoDefault(false);
-  connect(m_create, &QPushButton::pressed, this, &IconBar::createPressed);
-  layout()->addWidget(m_create);
-
-  QFrame* line = new QFrame(this);
-  line->setFrameShape(QFrame::VLine);
-  line->setFrameShadow(QFrame::Sunken);
-  layout()->addWidget(line);
-
   m_play = new QPushButton();
   m_play->setIcon(s_playicon);
-  m_play->setToolTip("Play selected collection (Space)");
-  m_play->setWhatsThis("Select a collection in the panel above and click this \u25b6 button or press 'Space' to play it.\n"
-                       "Clicking the button again will pause playback or play a different collection "
-                       "if you have changed the selection.");
+  m_play->setToolTip("Play selected sequence (Space)");
+  m_play->setWhatsThis("Select a sequence in the file list and click this \u25b6 button or press "
+                       "'Space' to play its collection.\n"
+                       "Clicking the button again will pause playback or play a different "
+                       "sequence if you have changed the selection.");
   connect(m_play, &QPushButton::pressed, this, &IconBar::playToggle);
   layout()->addWidget(m_play);
 

@@ -10,6 +10,7 @@
 #include "VGMSampColl.h"
 #include "Root.h"
 #include "VGMMiscFile.h"
+#include <algorithm>
 
 VGMColl::VGMColl(std::string theName) : m_name(std::move(theName)) {}
 
@@ -43,10 +44,28 @@ VGMSeq *VGMColl::seq() const {
 }
 
 void VGMColl::useSeq(VGMSeq *theSeq) {
-  if (theSeq != nullptr)
+  if (theSeq == m_seq) {
+    if (theSeq != nullptr) {
+      auto existing = std::find(theSeq->assocColls.begin(), theSeq->assocColls.end(), this);
+      if (existing == theSeq->assocColls.end()) {
+        theSeq->addCollAssoc(this);
+      }
+    }
+    return;
+  }
+
+  if (theSeq != nullptr) {
+    auto existing_coll_assoc = theSeq->assocColls;
+    for (auto *coll : existing_coll_assoc) {
+      if (coll && coll != this) {
+        coll->useSeq(nullptr);
+      }
+    }
     theSeq->addCollAssoc(this);
-  if (m_seq && (theSeq != m_seq))  // if we associated with a previous sequence
+  }
+  if (m_seq && (theSeq != m_seq)) {  // if we associated with a previous sequence
     m_seq->removeCollAssoc(this);
+  }
   m_seq = theSeq;
 }
 
