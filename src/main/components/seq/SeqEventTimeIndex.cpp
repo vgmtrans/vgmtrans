@@ -30,6 +30,7 @@ void SeqEventTimeIndex::clear() {
 
 void SeqEventTimeIndex::finalize() {
   const size_t count = m_events.size();
+  // Rebuild earliest-start cache to match current m_events contents.
   m_firstStart.clear();
   m_firstStart.reserve(count);
   for (const auto& evt : m_events) {
@@ -49,6 +50,7 @@ void SeqEventTimeIndex::finalize() {
     if (evA.startTick != evB.startTick) {
       return evA.startTick < evB.startTick;
     }
+    // Tie-break by index for stable, deterministic ordering.
     return a < b;
   });
 
@@ -58,6 +60,7 @@ void SeqEventTimeIndex::finalize() {
     if (endA != endB) {
       return endA < endB;
     }
+    // Tie-break by index for stable, deterministic ordering.
     return a < b;
   });
 
@@ -156,6 +159,7 @@ void SeqEventTimeIndex::Cursor::getActiveInRange(uint32_t startTick,
 
   seek(startTick);
 
+  // Include already-active events at startTick, then scan new starts up to endTick.
   out.reserve(m_active.size());
   for (Index idx : m_active) {
     out.push_back(&m_index->event(idx));
@@ -191,6 +195,7 @@ void SeqEventTimeIndex::Cursor::advanceTo(uint32_t tick) {
     return;
   }
 
+  // Merge-like advance: add events whose start <= tick, drop events whose end <= tick.
   const auto& events = m_index->m_events;
   const auto& byStart = m_index->m_byStart;
   const auto& byEnd = m_index->m_byEnd;

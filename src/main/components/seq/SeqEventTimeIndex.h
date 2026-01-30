@@ -13,6 +13,7 @@ struct SeqTimedEvent {
   uint32_t duration;
   SeqEvent* event;
 
+  // Zero duration is treated as a 1-tick event for range math.
   [[nodiscard]] uint32_t endTickExclusive() const noexcept {
     return startTick + (duration == 0 ? 1u : duration);
   }
@@ -72,17 +73,17 @@ class SeqEventTimeIndex {
     [[nodiscard]] bool isReady() const noexcept;
 
     const SeqEventTimeIndex* m_index = nullptr;
-    size_t m_nextStart = 0;
-    size_t m_nextEnd = 0;
+    size_t m_nextStart = 0;  // Next candidate in m_byStart.
+    size_t m_nextEnd = 0;    // Next candidate in m_byEnd.
     uint32_t m_currentTick = 0;
     std::vector<Index> m_active;
-    std::vector<int32_t> m_activePositions;
+    std::vector<int32_t> m_activePositions;  // Index -> position in m_active (or -1).
   };
 
  private:
   std::vector<SeqTimedEvent> m_events;
-  std::vector<Index> m_byStart;
-  std::vector<Index> m_byEnd;
-  std::unordered_map<const SeqEvent*, uint32_t> m_firstStart;
+  std::vector<Index> m_byStart;  // Event indices sorted by start tick.
+  std::vector<Index> m_byEnd;    // Event indices sorted by end tick.
+  std::unordered_map<const SeqEvent*, uint32_t> m_firstStart;  // Earliest start per event.
   bool m_finalized = false;
 };
