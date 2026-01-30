@@ -11,8 +11,9 @@
 #include <QHeaderView>
 #include <QHBoxLayout>
 #include <QLabel>
+#include <QPainter>
+#include <QPalette>
 #include <QShortcut>
-#include <QStyle>
 #include <QVBoxLayout>
 
 #include "VGMFileListView.h"
@@ -242,30 +243,59 @@ void VGMFileListModel::rebuildRows() {
 VGMFileListView::VGMFileListView(QWidget *parent) : QWidget(parent) {
   auto *layout = new QVBoxLayout();
   layout->setContentsMargins(0, 0, 0, 0);
-  layout->setSpacing(6);
+  layout->setSpacing(1);
 
   auto *header = new QWidget(this);
   auto *header_layout = new QHBoxLayout();
-  header_layout->setContentsMargins(6, 4, 6, 0);
-  header_layout->setSpacing(6);
+  header_layout->setContentsMargins(4, 1, 4, 0);
+  header_layout->setSpacing(4);
+
+  QFont compactFont = font();
+  if (compactFont.pointSizeF() > 0) {
+    compactFont.setPointSizeF(std::max(8.0, compactFont.pointSizeF() - 2.0));
+  } else if (compactFont.pixelSize() > 0) {
+    compactFont.setPixelSize(std::max(10, compactFont.pixelSize() - 2));
+  }
+
+  const int controlHeight = 18;
 
   auto *sort_label = new QLabel("Sort by:");
+  sort_label->setFont(compactFont);
   m_sortCombo = new QComboBox();
+  m_sortCombo->setFont(compactFont);
   m_sortCombo->addItems({"Added", "Type", "Format", "Name"});
   m_sortCombo->setCurrentIndex(0);
   m_sortCombo->setSizeAdjustPolicy(QComboBox::AdjustToContents);
+  m_sortCombo->setFixedHeight(controlHeight);
+  m_sortCombo->setStyleSheet(
+      "QComboBox { padding: 0px 6px 0px 6px; border-top-right-radius: 0px; "
+      "border-bottom-right-radius: 0px; }"
+      "QComboBox::drop-down { width: 0px; border: 0px; }"
+      "QComboBox::down-arrow { image: none; width: 0px; height: 0px; }");
 
   m_sortOrderButton = new QPushButton();
-  m_sortOrderButton->setFixedSize(22, 22);
+  m_sortOrderButton->setFont(compactFont);
+  m_sortOrderButton->setFixedSize(controlHeight, controlHeight);
   m_sortOrderButton->setAutoDefault(false);
   m_sortOrderButton->setFocusPolicy(Qt::NoFocus);
+  m_sortOrderButton->setStyleSheet(
+      "QPushButton { padding: 0px; border-top-left-radius: 0px; "
+      "border-bottom-left-radius: 0px; }");
   updateSortButtonIcon();
 
+  auto *sort_controls = new QWidget(header);
+  auto *sort_controls_layout = new QHBoxLayout();
+  sort_controls_layout->setContentsMargins(0, 0, 0, 0);
+  sort_controls_layout->setSpacing(0);
+  sort_controls_layout->addWidget(m_sortCombo);
+  sort_controls_layout->addWidget(m_sortOrderButton);
+  sort_controls->setLayout(sort_controls_layout);
+
   header_layout->addWidget(sort_label);
-  header_layout->addWidget(m_sortCombo);
-  header_layout->addWidget(m_sortOrderButton);
+  header_layout->addWidget(sort_controls);
   header_layout->addStretch(1);
   header->setLayout(header_layout);
+  header->setFixedHeight(controlHeight + 2);
   layout->addWidget(header);
 
   m_table = new TableView(this);
@@ -454,8 +484,27 @@ void VGMFileListView::applySort() {
 }
 
 void VGMFileListView::updateSortButtonIcon() {
-  const auto icon = style()->standardIcon(
-      (m_sortOrder == Qt::AscendingOrder) ? QStyle::SP_ArrowUp : QStyle::SP_ArrowDown);
-  m_sortOrderButton->setIcon(icon);
-  m_sortOrderButton->setIconSize(QSize(12, 12));
+  const int iconSize = 10;
+  QPixmap pixmap(iconSize, iconSize);
+  pixmap.fill(Qt::transparent);
+
+  QPainter painter(&pixmap);
+  painter.setRenderHint(QPainter::Antialiasing, true);
+  const QColor arrowColor = m_sortCombo->palette().color(QPalette::Text);
+  painter.setPen(Qt::NoPen);
+  painter.setBrush(arrowColor);
+
+  QPolygon triangle;
+  if (m_sortOrder == Qt::AscendingOrder) {
+    triangle << QPoint(iconSize / 2, 1) << QPoint(iconSize - 1, iconSize - 2)
+             << QPoint(1, iconSize - 2);
+  } else {
+    triangle << QPoint(1, 1) << QPoint(iconSize - 1, 1)
+             << QPoint(iconSize / 2, iconSize - 2);
+  }
+  painter.drawPolygon(triangle);
+  painter.end();
+
+  m_sortOrderButton->setIcon(QIcon(pixmap));
+  m_sortOrderButton->setIconSize(QSize(iconSize, iconSize));
 }
