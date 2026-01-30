@@ -6,7 +6,14 @@
 
 #include <algorithm>
 
+#include <QComboBox>
+#include <QEvent>
 #include <QHeaderView>
+#include <QHBoxLayout>
+#include <QLabel>
+#include <QShortcut>
+#include <QStyle>
+#include <QVBoxLayout>
 
 #include "VGMFileListView.h"
 #include "Helpers.h"
@@ -14,6 +21,7 @@
 #include "MdiArea.h"
 #include "Colors.h"
 #include "TintableSvgIconEngine.h"
+#include "TableView.h"
 #include "services/NotificationCenter.h"
 #include "VGMFile.h"
 #include "VGMInstrSet.h"
@@ -21,6 +29,8 @@
 #include "VGMMiscFile.h"
 #include "VGMSampColl.h"
 #include "services/MenuManager.h"
+
+#include <QPushButton>
 
 namespace {
 const QIcon &sequenceInCollectionIcon() {
@@ -41,20 +51,21 @@ QString typeLabelForFile(const VGMFile *file) {
   return "Misc";
 }
 
-QString sortKeyForColumn(VGMFile *file, int column) {
+QString sortKeyForSort(VGMFile *file, VGMFileListModel::SortKey key) {
   if (!file) {
     return {};
   }
-  switch (column) {
-    case VGMFileListModel::Property::Name:
+  switch (key) {
+    case VGMFileListModel::SortKey::Name:
       return QString::fromStdString(file->name()).toLower();
-    case VGMFileListModel::Property::Format:
+    case VGMFileListModel::SortKey::Format:
       return QString::fromStdString(file->formatName()).toLower();
-    case VGMFileListModel::Property::Type:
+    case VGMFileListModel::SortKey::Type:
       return typeLabelForFile(file).toLower();
-    default:
+    case VGMFileListModel::SortKey::Added:
       return {};
   }
+  return {};
 }
 }
 
@@ -116,12 +127,6 @@ QVariant VGMFileListModel::data(const QModelIndex &index, int role) const {
       break;
     }
 
-    case Property::Type: {
-      if (role == Qt::DisplayRole) {
-        return typeLabelForFile(vgmfile);
-      }
-      break;
-    }
     default:
       L_WARN("requested data for unexpected column index: {}", index.column());
       break;
@@ -143,11 +148,6 @@ QVariant VGMFileListModel::headerData(int column, Qt::Orientation orientation, i
     case Property::Format: {
       return "Format";
     }
-
-    case Property::Type: {
-      return "Type";
-    }
-
     default: {
       return {};
     }
@@ -167,7 +167,7 @@ int VGMFileListModel::columnCount(const QModelIndex &parent) const {
     return 0;
   }
 
-  return 3;
+  return 2;
 }
 
 Qt::ItemFlags VGMFileListModel::flags(const QModelIndex &index) const {
@@ -176,18 +176,6 @@ Qt::ItemFlags VGMFileListModel::flags(const QModelIndex &index) const {
   }
 
   return QAbstractTableModel::flags(index);
-}
-
-void VGMFileListModel::sort(int column, Qt::SortOrder order) {
-  if (column < 0 || column >= columnCount(QModelIndex())) {
-    return;
-  }
-
-  beginResetModel();
-  sortColumn = column;
-  sortOrder = order;
-  rebuildRows();
-  endResetModel();
 }
 
 VGMFile *VGMFileListModel::fileFromIndex(const QModelIndex &index) const {
@@ -212,6 +200,14 @@ QModelIndex VGMFileListModel::indexFromFile(const VGMFile *file) const {
   return {};
 }
 
+void VGMFileListModel::setSort(SortKey key, Qt::SortOrder order) {
+  beginResetModel();
+  sortKey = key;
+  sortOrder = order;
+  rebuildRows();
+  endResetModel();
+}
+
 void VGMFileListModel::rebuildRows() {
   rows.clear();
 
@@ -221,50 +217,111 @@ void VGMFileListModel::rebuildRows() {
     }
   }
 
-  if (sortColumn >= 0) {
-    std::stable_sort(rows.begin(), rows.end(),
-                     [this](VGMFile *lhs, VGMFile *rhs) {
-                       const QString left = sortKeyForColumn(lhs, sortColumn);
-                       const QString right = sortKeyForColumn(rhs, sortColumn);
-                       if (sortOrder == Qt::AscendingOrder) {
-                         return left < right;
-                       }
-                       return left > right;
-                     });
+  if (sortKey == SortKey::Added) {
+    if (sortOrder == Qt::DescendingOrder) {
+      std::reverse(rows.begin(), rows.end());
+    }
+    return;
   }
+
+  std::stable_sort(rows.begin(), rows.end(),
+                   [this](VGMFile *lhs, VGMFile *rhs) {
+                     const QString left = sortKeyForSort(lhs, sortKey);
+                     const QString right = sortKeyForSort(rhs, sortKey);
+                     if (sortOrder == Qt::AscendingOrder) {
+                       return left < right;
+                     }
+                     return left > right;
+                   });
 }
 
 /*
  *  VGMFileListView
  */
 
-VGMFileListView::VGMFileListView(QWidget *parent) : TableView(parent) {
-  view_model = new VGMFileListModel();
-  VGMFileListView::setModel(view_model);
+VGMFileListView::VGMFileListView(QWidget *parent) : QWidget(parent) {
+  auto *layout = new QVBoxLayout();
+  layout->setContentsMargins(0, 0, 0, 0);
+  layout->setSpacing(6);
 
-  setSortingEnabled(true);
-  horizontalHeader()->setSortIndicatorShown(true);
+  auto *header = new QWidget(this);
+  auto *header_layout = new QHBoxLayout();
+  header_layout->setContentsMargins(6, 4, 6, 0);
+  header_layout->setSpacing(6);
 
-  setSelectionMode(QAbstractItemView::ExtendedSelection);
-  setSelectionBehavior(QAbstractItemView::SelectRows);
+  auto *sort_label = new QLabel("Sort by:");
+  m_sortCombo = new QComboBox();
+  m_sortCombo->addItems({"Added", "Type", "Format", "Name"});
+  m_sortCombo->setCurrentIndex(0);
+  m_sortCombo->setSizeAdjustPolicy(QComboBox::AdjustToContents);
 
-  setContextMenuPolicy(Qt::CustomContextMenu);
+  m_sortOrderButton = new QPushButton();
+  m_sortOrderButton->setFixedSize(22, 22);
+  m_sortOrderButton->setAutoDefault(false);
+  m_sortOrderButton->setFocusPolicy(Qt::NoFocus);
+  updateSortButtonIcon();
 
-  setColumnWidth(1, 90);
-  setColumnWidth(2, 60);
+  header_layout->addWidget(sort_label);
+  header_layout->addWidget(m_sortCombo);
+  header_layout->addWidget(m_sortOrderButton);
+  header_layout->addStretch(1);
+  header->setLayout(header_layout);
+  layout->addWidget(header);
 
-  connect(this, &QAbstractItemView::customContextMenuRequested, this, &VGMFileListView::itemMenu);
-  connect(this, &QAbstractItemView::doubleClicked, this, &VGMFileListView::requestVGMFileView);
+  m_table = new TableView(this);
+  view_model = new VGMFileListModel(m_table);
+  m_table->setModel(view_model);
+  m_table->setSortingEnabled(false);
+  m_table->horizontalHeader()->setSortIndicatorShown(false);
+  m_table->horizontalHeader()->setSectionsClickable(false);
+  m_table->setSelectionMode(QAbstractItemView::ExtendedSelection);
+  m_table->setSelectionBehavior(QAbstractItemView::SelectRows);
+  m_table->setContextMenuPolicy(Qt::CustomContextMenu);
+  m_table->setColumnWidth(1, 80);
+
+  layout->addWidget(m_table, 1);
+  setLayout(layout);
+
+  connect(m_table, &QAbstractItemView::customContextMenuRequested, this, &VGMFileListView::itemMenu);
+  connect(m_table, &QAbstractItemView::doubleClicked, this, &VGMFileListView::requestVGMFileView);
   connect(NotificationCenter::the(), &NotificationCenter::vgmFileSelected, this, &VGMFileListView::onVGMFileSelected);
-  connect(selectionModel(), &QItemSelectionModel::selectionChanged, this, &VGMFileListView::onSelectionChanged);
+  connect(m_table->selectionModel(), &QItemSelectionModel::selectionChanged, this, &VGMFileListView::onSelectionChanged);
+  connect(m_table->selectionModel(), &QItemSelectionModel::currentChanged, this, &VGMFileListView::handleCurrentChanged);
+
+  connect(m_sortCombo, &QComboBox::currentIndexChanged, this, &VGMFileListView::applySort);
+  connect(m_sortOrderButton, &QPushButton::clicked, this, [this]() {
+    m_sortOrder = (m_sortOrder == Qt::AscendingOrder) ? Qt::DescendingOrder : Qt::AscendingOrder;
+    updateSortButtonIcon();
+    applySort();
+  });
+
+  auto *returnShortcut = new QShortcut(QKeySequence(Qt::Key_Return), m_table);
+  returnShortcut->setContext(Qt::WidgetShortcut);
+  connect(returnShortcut, &QShortcut::activated, this, [this]() {
+    const auto current = m_table->currentIndex();
+    if (current.isValid()) {
+      requestVGMFileView(current);
+    }
+  });
+  auto *enterShortcut = new QShortcut(QKeySequence(Qt::Key_Enter), m_table);
+  enterShortcut->setContext(Qt::WidgetShortcut);
+  connect(enterShortcut, &QShortcut::activated, this, [this]() {
+    const auto current = m_table->currentIndex();
+    if (current.isValid()) {
+      requestVGMFileView(current);
+    }
+  });
+
+  m_table->installEventFilter(this);
+  applySort();
 }
 
 void VGMFileListView::itemMenu(const QPoint &pos) {
-  if (!selectionModel()->hasSelection()) {
+  if (!m_table->selectionModel()->hasSelection()) {
     return;
   }
 
-  QModelIndexList list = selectionModel()->selectedRows();
+  QModelIndexList list = m_table->selectionModel()->selectedRows();
 
   auto selectedFiles = std::make_shared<std::vector<VGMFile*>>();
   selectedFiles->reserve(list.size());
@@ -279,7 +336,7 @@ void VGMFileListView::itemMenu(const QPoint &pos) {
     return;
   }
   auto menu = MenuManager::the()->createMenuForItems<VGMItem>(selectedFiles);
-  menu->exec(mapToGlobal(pos));
+  menu->exec(m_table->mapToGlobal(pos));
   menu->deleteLater();
 }
 
@@ -288,12 +345,12 @@ void VGMFileListView::onSelectionChanged(const QItemSelection&, const QItemSelec
 }
 
 void VGMFileListView::updateContextualMenus() const {
-  if (!selectionModel()) {
+  if (!m_table->selectionModel()) {
     NotificationCenter::the()->updateContextualMenusForVGMFiles({});
     return;
   }
 
-  QModelIndexList list = selectionModel()->selectedRows();
+  QModelIndexList list = m_table->selectionModel()->selectedRows();
   QList<VGMFile*> files;
   files.reserve(list.size());
 
@@ -308,20 +365,6 @@ void VGMFileListView::updateContextualMenus() const {
   NotificationCenter::the()->updateContextualMenusForVGMFiles(files);
 }
 
-void VGMFileListView::keyPressEvent(QKeyEvent *input) {
-  switch (input->key()) {
-    case Qt::Key_Enter:
-    case Qt::Key_Return:
-      if (currentIndex().isValid())
-        requestVGMFileView(currentIndex());
-      break;
-
-    // Pass the event back to the base class, needed for keyboard navigation
-    default:
-      QTableView::keyPressEvent(input);
-  }
-}
-
 void VGMFileListView::requestVGMFileView(const QModelIndex& index) {
   if (auto *file = view_model->fileFromIndex(index)) {
     MdiArea::the()->newView(file);
@@ -330,23 +373,16 @@ void VGMFileListView::requestVGMFileView(const QModelIndex& index) {
 
 // Update the status bar for the current selection
 void VGMFileListView::updateStatusBar() const {
-  if (!currentIndex().isValid()) {
+  if (!m_table->currentIndex().isValid()) {
     NotificationCenter::the()->updateStatusForItem(nullptr);
     return;
   }
-  VGMFile* file = view_model->fileFromIndex(currentIndex());
+  VGMFile* file = view_model->fileFromIndex(m_table->currentIndex());
   NotificationCenter::the()->updateStatusForItem(file);
 }
 
-// Update the status bar on focus
-void VGMFileListView::focusInEvent(QFocusEvent *event) {
-  TableView::focusInEvent(event);
-  updateStatusBar();
-}
-
-void VGMFileListView::currentChanged(const QModelIndex &current, const QModelIndex &previous) {
-  TableView::currentChanged(current, previous);
-
+void VGMFileListView::handleCurrentChanged(const QModelIndex &current, const QModelIndex &previous) {
+  Q_UNUSED(previous);
   if (!current.isValid()) {
     NotificationCenter::the()->selectVGMFile(nullptr, this);
     return;
@@ -355,7 +391,7 @@ void VGMFileListView::currentChanged(const QModelIndex &current, const QModelInd
   VGMFile *file = view_model->fileFromIndex(current);
   NotificationCenter::the()->selectVGMFile(file, this);
 
-  if (this->hasFocus())
+  if (m_table->hasFocus())
     updateStatusBar();
 }
 
@@ -364,7 +400,7 @@ void VGMFileListView::onVGMFileSelected(VGMFile* file, const QWidget* caller) {
     return;
 
   if (file == nullptr) {
-    this->clearSelection();
+    m_table->clearSelection();
     return;
   }
 
@@ -374,18 +410,52 @@ void VGMFileListView::onVGMFileSelected(VGMFile* file, const QWidget* caller) {
   }
 
   // Select the row corresponding to the file
-  QModelIndex lastIndex = model()->index(firstIndex.row(), model()->columnCount() - 1); // Last column of the row
+  QModelIndex lastIndex =
+      m_table->model()->index(firstIndex.row(), m_table->model()->columnCount() - 1); // Last column of the row
 
-  if (firstIndex == currentIndex())
+  if (firstIndex == m_table->currentIndex())
     return;
 
   QItemSelection selection(firstIndex, lastIndex);
-  selectionModel()->select(selection, QItemSelectionModel::ClearAndSelect | QItemSelectionModel::Rows);
+  m_table->selectionModel()->select(selection, QItemSelectionModel::ClearAndSelect | QItemSelectionModel::Rows);
   // Prevent the currentChanged callback from triggering so that we don't recursively
   // call NotificationCenter::selectVGMFile()
-  selectionModel()->blockSignals(true);
-  setCurrentIndex(firstIndex);
-  selectionModel()->blockSignals(false);
+  m_table->selectionModel()->blockSignals(true);
+  m_table->setCurrentIndex(firstIndex);
+  m_table->selectionModel()->blockSignals(false);
 
-  scrollTo(firstIndex, QAbstractItemView::EnsureVisible);
+  m_table->scrollTo(firstIndex, QAbstractItemView::EnsureVisible);
+}
+
+bool VGMFileListView::eventFilter(QObject *obj, QEvent *event) {
+  if (obj == m_table && event->type() == QEvent::FocusIn) {
+    updateStatusBar();
+  }
+  return QWidget::eventFilter(obj, event);
+}
+
+void VGMFileListView::applySort() {
+  VGMFileListModel::SortKey key = VGMFileListModel::SortKey::Added;
+  switch (m_sortCombo->currentIndex()) {
+    case 1:
+      key = VGMFileListModel::SortKey::Type;
+      break;
+    case 2:
+      key = VGMFileListModel::SortKey::Format;
+      break;
+    case 3:
+      key = VGMFileListModel::SortKey::Name;
+      break;
+    default:
+      key = VGMFileListModel::SortKey::Added;
+      break;
+  }
+  view_model->setSort(key, m_sortOrder);
+}
+
+void VGMFileListView::updateSortButtonIcon() {
+  const auto icon = style()->standardIcon(
+      (m_sortOrder == Qt::AscendingOrder) ? QStyle::SP_ArrowUp : QStyle::SP_ArrowDown);
+  m_sortOrderButton->setIcon(icon);
+  m_sortOrderButton->setIconSize(QSize(12, 12));
 }

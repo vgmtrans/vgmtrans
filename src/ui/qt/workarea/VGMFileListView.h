@@ -7,16 +7,19 @@
 #pragma once
 
 #include <QAbstractTableModel>
-#include <QKeyEvent>
+#include <QWidget>
 #include <vector>
-#include "TableView.h"
 
 #include "VGMFile.h"
 
+class QComboBox;
 class QItemSelection;
+class QPushButton;
+class TableView;
 class VGMFileListModel : public QAbstractTableModel {
 public:
-  enum Property : uint8_t { Name = 0, Format = 1, Type = 2 };
+  enum Property : uint8_t { Name = 0, Format = 1 };
+  enum class SortKey { Added, Type, Format, Name };
 
   explicit VGMFileListModel(QObject *parent = nullptr);
 
@@ -25,19 +28,19 @@ public:
   int rowCount(const QModelIndex &parent = QModelIndex()) const override;
   int columnCount(const QModelIndex &parent) const override;
   Qt::ItemFlags flags(const QModelIndex &index) const override;
-  void sort(int column, Qt::SortOrder order = Qt::AscendingOrder) override;
 
   [[nodiscard]] VGMFile *fileFromIndex(const QModelIndex &index) const;
   [[nodiscard]] QModelIndex indexFromFile(const VGMFile *file) const;
+  void setSort(SortKey key, Qt::SortOrder order);
 
 private:
   void rebuildRows();
-  int sortColumn = -1;
+  SortKey sortKey = SortKey::Added;
   Qt::SortOrder sortOrder = Qt::AscendingOrder;
   std::vector<VGMFile *> rows;
 };
 
-class VGMFileListView final : public TableView {
+class VGMFileListView final : public QWidget {
   Q_OBJECT
 
 public:
@@ -48,13 +51,18 @@ public slots:
   void onVGMFileSelected(VGMFile *file, const QWidget* caller);
 
 private:
+  bool eventFilter(QObject *obj, QEvent *event) override;
   void updateStatusBar() const;
-  void focusInEvent(QFocusEvent *event) override;
-  void currentChanged(const QModelIndex &current, const QModelIndex &previous) override;
-  void keyPressEvent(QKeyEvent *input) override;
+  void handleCurrentChanged(const QModelIndex &current, const QModelIndex &previous);
   void itemMenu(const QPoint &pos);
   void onSelectionChanged(const QItemSelection &selected, const QItemSelection &deselected);
   void updateContextualMenus() const;
+  void applySort();
+  void updateSortButtonIcon();
 
+  TableView *m_table;
+  QComboBox *m_sortCombo;
+  QPushButton *m_sortOrderButton;
   VGMFileListModel *view_model;
+  Qt::SortOrder m_sortOrder = Qt::AscendingOrder;
 };
