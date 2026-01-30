@@ -22,9 +22,6 @@ struct SeqTimedEvent {
   }
 
   [[nodiscard]] bool overlapsRange(uint32_t rangeStart, uint32_t rangeEnd) const noexcept {
-    if (duration == 0) {
-      return startTick >= rangeStart && startTick <= rangeEnd;
-    }
     return startTick <= rangeEnd && endTickExclusive() > rangeStart;
   }
 };
@@ -72,6 +69,7 @@ class SeqEventTimeIndex {
     void advanceTo(uint32_t tick);
     void addActive(Index idx);
     void removeActive(Index idx);
+    [[nodiscard]] bool isReady() const noexcept;
 
     const SeqEventTimeIndex* m_index = nullptr;
     size_t m_nextStart = 0;

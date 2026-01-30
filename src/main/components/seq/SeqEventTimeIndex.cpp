@@ -111,13 +111,13 @@ void SeqEventTimeIndex::Cursor::reset(uint32_t tick) {
   m_nextEnd = 0;
   m_currentTick = 0;
   rebuildActiveIndex();
-  if (m_index != nullptr && m_index->finalized()) {
+  if (isReady()) {
     advanceTo(tick);
   }
 }
 
 void SeqEventTimeIndex::Cursor::seek(uint32_t tick) {
-  if (m_index == nullptr || !m_index->finalized()) {
+  if (!isReady()) {
     return;
   }
 
@@ -131,7 +131,7 @@ void SeqEventTimeIndex::Cursor::seek(uint32_t tick) {
 
 void SeqEventTimeIndex::Cursor::getActiveAt(uint32_t tick, std::vector<const SeqTimedEvent*>& out) {
   out.clear();
-  if (m_index == nullptr || !m_index->finalized()) {
+  if (!isReady()) {
     return;
   }
 
@@ -146,7 +146,7 @@ void SeqEventTimeIndex::Cursor::getActiveInRange(uint32_t startTick,
                                                  uint32_t endTick,
                                                  std::vector<const SeqTimedEvent*>& out) {
   out.clear();
-  if (m_index == nullptr || !m_index->finalized()) {
+  if (!isReady()) {
     return;
   }
 
@@ -237,4 +237,8 @@ void SeqEventTimeIndex::Cursor::removeActive(Index idx) {
   m_activePositions[lastIdx] = pos;
   m_active.pop_back();
   m_activePositions[idx] = -1;
+}
+
+bool SeqEventTimeIndex::Cursor::isReady() const noexcept {
+  return m_index != nullptr && m_index->finalized();
 }
