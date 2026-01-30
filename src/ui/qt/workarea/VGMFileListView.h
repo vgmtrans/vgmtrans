@@ -8,14 +8,14 @@
 
 #include <QAbstractTableModel>
 #include <QWidget>
-#include <vector>
-
 #include "VGMFile.h"
 
+class QSortFilterProxyModel;
 class QComboBox;
 class QItemSelection;
 class QPushButton;
 class TableView;
+
 class VGMFileListModel : public QAbstractTableModel {
 public:
   enum Property : uint8_t { Name = 0, Format = 1 };
@@ -31,13 +31,9 @@ public:
 
   [[nodiscard]] VGMFile *fileFromIndex(const QModelIndex &index) const;
   [[nodiscard]] QModelIndex indexFromFile(const VGMFile *file) const;
-  void setSort(SortKey key, Qt::SortOrder order);
 
 private:
-  void rebuildRows();
-  SortKey sortKey = SortKey::Added;
-  Qt::SortOrder sortOrder = Qt::AscendingOrder;
-  std::vector<VGMFile *> rows;
+  size_t filesBeforeLoad{};
 };
 
 class VGMFileListView final : public QWidget {
@@ -63,6 +59,7 @@ private:
   TableView *m_table;
   QComboBox *m_sortCombo;
   QPushButton *m_sortOrderButton;
-  VGMFileListModel *view_model;
+  VGMFileListModel *m_source_model;
+  QSortFilterProxyModel *m_sort_proxy;
   Qt::SortOrder m_sortOrder = Qt::AscendingOrder;
 };
