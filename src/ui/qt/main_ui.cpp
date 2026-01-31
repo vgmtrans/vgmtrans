@@ -35,6 +35,7 @@ int main(int argc, char *argv[]) {
   QCoreApplication::setApplicationName("VGMTrans");
 
   QGuiApplication::setHighDpiScaleFactorRoundingPolicy(Qt::HighDpiScaleFactorRoundingPolicy::Round);
+  QCoreApplication::setAttribute(Qt::AA_DontCreateNativeWidgetSiblings);
 
   VGMTransApplication app(argc, argv);
   #ifdef _WIN32

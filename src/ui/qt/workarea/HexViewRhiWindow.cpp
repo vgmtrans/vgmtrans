@@ -73,7 +73,7 @@ HexViewRhiWindow::HexViewRhiWindow(HexView* view, HexViewRhiRenderer* renderer)
       m_renderer(renderer),
       m_input(view),
       m_backend(std::make_unique<BackendData>()) {
-  setFlags(Qt::FramelessWindowHint);
+  setFlags(Qt::SubWindow | Qt::FramelessWindowHint);
 
 #if defined(Q_OS_WIN)
   setSurfaceType(QSurface::Direct3DSurface);
