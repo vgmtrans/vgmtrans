@@ -33,6 +33,6 @@ SpaceBeforeParens: ControlStatements
 SpaceInEmptyParentheses: false
 SpacesBeforeTrailingComments: 2
 SpacesInContainerLiterals: true
-Standard:        "c++17"
+Standard:        "c++20"
 TabWidth:        2
 UseTab:          Never

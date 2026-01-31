@@ -1,0 +1,3 @@
+# Ignore formatting third-party code (reduces noise in git diffs)
+linenoise.*
+lib/*
