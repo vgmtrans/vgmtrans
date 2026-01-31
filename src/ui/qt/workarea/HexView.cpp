@@ -21,6 +21,7 @@
 #include <QKeyEvent>
 #include <QMouseEvent>
 #include <QPixmap>
+#include <QProxyStyle>
 #include <QPainter>
 #include <QParallelAnimationGroup>
 #include <QPropertyAnimation>
@@ -60,6 +61,22 @@ constexpr float PLAYBACK_GLOW_EDGE_CURVE = 0.85f;
 const QColor PLAYBACK_GLOW_LOW(40, 40, 40);
 const QColor PLAYBACK_GLOW_HIGH(230, 230, 230);
 constexpr uint16_t STYLE_UNASSIGNED = std::numeric_limits<uint16_t>::max();
+
+#ifdef Q_OS_MAC
+class NonTransientScrollBarStyle final : public QProxyStyle {
+public:
+  using QProxyStyle::QProxyStyle;
+
+  int styleHint(StyleHint hint, const QStyleOption* option = nullptr,
+                const QWidget* widget = nullptr,
+                QStyleHintReturn* returnData = nullptr) const override {
+    if (hint == QStyle::SH_ScrollBar_Transient) {
+      return 0;
+    }
+    return QProxyStyle::styleHint(hint, option, widget, returnData);
+  }
+};
+#endif
 
 inline uint64_t selectionKey(uint32_t offset, uint32_t length) {
   return (static_cast<uint64_t>(offset) << 32) | length;
@@ -118,6 +135,15 @@ HexView::HexView(VGMFile* vgmfile, QWidget* parent)
   setFocusPolicy(Qt::StrongFocus);
   setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
   viewport()->setAutoFillBackground(false);
+
+#ifdef Q_OS_MAC
+  // With AA_DontCreateNativeWidgetSiblings, the RHI QWindow can cover transient (overlay)
+  // scrollbars, so keep HexView's scrollbars non-transient on macOS.
+  auto* scrollStyle = new NonTransientScrollBarStyle(style());
+  scrollStyle->setParent(this);
+  verticalScrollBar()->setStyle(scrollStyle);
+  horizontalScrollBar()->setStyle(scrollStyle);
+#endif
 
   m_rhiHost = new HexViewRhiHost(this, viewport());
   m_rhiHost->setGeometry(viewport()->rect());
