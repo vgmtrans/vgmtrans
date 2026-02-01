@@ -15,6 +15,7 @@
 #include "DBGVGMRoot.h"
 #include "RawFile.h"
 #include "SeqTrack.h"
+#include "MidiFile.h"
 #include "VGMColl.h"
 #include "VGMFile.h"
 #include "VGMInstrSet.h"
@@ -403,17 +404,52 @@ void instrumentset_inspect(const std::vector<std::string>& args) {
       const auto& regions = instr->regions();
       for (size_t i = 0; i < regions.size(); ++i) {
         VGMRgn* rgn = regions[i];
-        fmt::print("  [Rgn #{}] [0x{:x}:0x{:x}] Key {}-{} Vel {}-{} Samp {} Unity {}\n"
+        fmt::print("  [Rgn #{}] [0x{:x}:0x{:x}] Key {}-{} Vel {}-{} Samp {} Unity {} ({})\n"
                    "    ADSR: A {:.3f}s D {:.3f}s S {:.1f}% R {:.3f}s\n",
                    i, rgn->offset(), rgn->length(), rgn->keyLow, rgn->keyHigh, rgn->velLow,
-                   rgn->velHigh, rgn->sampNum, static_cast<int>(rgn->unityKey), rgn->attack_time,
-                   rgn->decay_time, rgn->sustain_level * 100.0, rgn->release_time);
+                   rgn->velHigh, rgn->sampNum, static_cast<int>(rgn->unityKey),
+                   MidiEvent::getNoteName(rgn->unityKey), rgn->attack_time, rgn->decay_time,
+                   rgn->sustain_level * 100.0, rgn->release_time);
       }
     } else {
       fmt::println("Instrument index out of bounds");
     }
   } catch (...) {
     fmt::println("Invalid instrument index");
+  }
+}
+
+void instrumentset_export(const std::vector<std::string>& args) {
+  VGMFile* file = getVGMFile(args[2]);
+  if (!file)
+    return;
+
+  VGMInstrSet* instrSet = dynamic_cast<VGMInstrSet*>(file);
+  if (!instrSet) {
+    fmt::println("Not an instrument set.");
+    return;
+  }
+
+  std::filesystem::path path = args[3];
+  std::string ext = path.extension().string();
+  std::transform(ext.begin(), ext.end(), ext.begin(), ::tolower);
+
+  if (ext == ".dls") {
+    fmt::println("Exporting instrument set '{}' to {}...", instrSet->name(), path.string());
+    if (conversion::saveAsDLS(*instrSet, path)) {
+      fmt::println("Done.");
+    } else {
+      fmt::println("Failed to export DLS.");
+    }
+  } else if (ext == ".sf2") {
+    fmt::println("Exporting instrument set '{}' to {}...", instrSet->name(), path.string());
+    if (conversion::saveAsSF2(*instrSet, path)) {
+      fmt::println("Done.");
+    } else {
+      fmt::println("Failed to export SF2.");
+    }
+  } else {
+    fmt::println("Unsupported extension: {}. Use .dls or .sf2", ext);
   }
 }
 
@@ -437,7 +473,12 @@ void samplecollection_info(const std::vector<std::string>& args) {
   fmt::println("Samples ({}):", sampColl->samples.size());
   for (size_t i = 0; i < sampColl->samples.size(); ++i) {
     VGMSamp* samp = sampColl->samples[i];
-    fmt::print("  [#{}] [0x{:x}:0x{:x}] {} ({} Hz)\n", i, samp->offset(), samp->length(),
+    fmt::print("  [{}] Def [{}:{}] Data [{}:{}] {} ({} Hz)\n",
+               fmt::styled(fmt::format("#{}", i), fmt::fg(fmt::color::cyan)),
+               fmt::styled(fmt::format("0x{:x}", samp->offset()), fmt::fg(fmt::color::yellow)),
+               fmt::styled(fmt::format("0x{:x}", samp->length()), fmt::fg(fmt::color::yellow)),
+               fmt::styled(fmt::format("0x{:x}", samp->dataOff), fmt::fg(fmt::color::yellow)),
+               fmt::styled(fmt::format("0x{:x}", samp->dataLength), fmt::fg(fmt::color::yellow)),
                samp->name(), samp->rate);
   }
 }
@@ -457,18 +498,35 @@ void samplecollection_inspect(const std::vector<std::string>& args) {
     int sampIdx = std::stoi(args[3]);
     if (sampIdx >= 0 && static_cast<size_t>(sampIdx) < sampColl->samples.size()) {
       VGMSamp* samp = sampColl->samples[sampIdx];
-      fmt::println("Sample #{} Information:", sampIdx);
-      fmt::print("  Name: {}\n", samp->name());
-      fmt::print("  [0x{:x}:0x{:x}]\n", samp->offset(), samp->length());
-      fmt::print("  Rate: {} Hz  Channels: {}  BPS: {}\n", samp->rate, samp->channels,
+      fmt::print("{}\n",
+                 fmt::styled(fmt::format("Sample #{} Information:", sampIdx), fmt::emphasis::bold));
+      fmt::print("  {:<12} {}\n", "Name:", samp->name());
+      fmt::print("  {:<12} [{}:{}]\n", "Definition:",
+                 fmt::styled(fmt::format("0x{:x}", samp->offset()), fmt::fg(fmt::color::yellow)),
+                 fmt::styled(fmt::format("0x{:x}", samp->length()), fmt::fg(fmt::color::yellow)));
+      fmt::print("  {:<12} [{}:{}] ({} bytes)\n", "Data:",
+                 fmt::styled(fmt::format("0x{:x}", samp->dataOff), fmt::fg(fmt::color::yellow)),
+                 fmt::styled(fmt::format("0x{:x}", samp->dataLength), fmt::fg(fmt::color::yellow)),
+                 fmt::styled(std::to_string(samp->dataLength), fmt::fg(fmt::color::yellow)));
+
+      uint32_t totalSamples = 0;
+      if (samp->bytesPerSample() > 0) {
+        totalSamples = samp->uncompressedSize() / samp->bytesPerSample();
+      }
+      fmt::print("  {:<12} {} samples\n",
+                 "Size:", fmt::styled(std::to_string(totalSamples), fmt::fg(fmt::color::yellow)));
+      fmt::print("  {:<12} {} Hz  Channels: {}  BPS: {}\n", "Format:", samp->rate, samp->channels,
                  samp->bitsPerSample());
-      fmt::print("  Unity Key: {}  Fine Tune: {}\n", static_cast<int>(samp->unityKey),
+      fmt::print("  {:<12} Unity Key: {} ({})  Fine Tune: {}\n", "",
+                 static_cast<int>(samp->unityKey), MidiEvent::getNoteName(samp->unityKey),
                  samp->fineTune);
+
       if (samp->loopStatus() != 0) {
-        fmt::print("  Loop: Start 0x{:x}  Length 0x{:x}  Measure: {}\n", samp->loop.loopStart,
-                   samp->loop.loopLength, static_cast<int>(samp->loop.loopStartMeasure));
+        fmt::print("  {:<12} Start 0x{:x}  Length 0x{:x}  Measure: {}\n",
+                   "Loop:", samp->loop.loopStart, samp->loop.loopLength,
+                   static_cast<int>(samp->loop.loopStartMeasure));
       } else {
-        fmt::println("  Loop: None");
+        fmt::print("  {:<12} None\n", "Loop:");
       }
     } else {
       fmt::println("Sample index out of bounds");
@@ -549,6 +607,26 @@ void sequence_events(const std::vector<std::string>& args) {
     }
   } catch (...) {
     fmt::println("Invalid track index");
+  }
+}
+
+void sequence_export(const std::vector<std::string>& args) {
+  VGMFile* file = getVGMFile(args[2]);
+  if (!file)
+    return;
+
+  VGMSeq* seq = dynamic_cast<VGMSeq*>(file);
+  if (!seq) {
+    fmt::println("Not a sequence file.");
+    return;
+  }
+
+  std::filesystem::path path = args[3];
+  fmt::println("Exporting sequence '{}' to {}...", seq->name(), path.string());
+  if (seq->saveAsMidi(path)) {
+    fmt::println("Done.");
+  } else {
+    fmt::println("Failed to export MIDI.");
   }
 }
 
@@ -654,7 +732,9 @@ void registerCommands() {
       {{"list", "", "List all instrument sets", 2, instrumentset_list},
        {"info", "<index>", "Show information about an instrument set", 3, instrumentset_info},
        {"inspect", "<index> <instr_idx>", "Inspect an instrument's regions", 4,
-        instrumentset_inspect}}};
+        instrumentset_inspect},
+       {"export", "<index> <path>", "Export instrument set as DLS or SF2", 4,
+        instrumentset_export}}};
 
   commandRegistry["samplecollection"] = {
       "samplecollection",
@@ -669,7 +749,8 @@ void registerCommands() {
       "sequence",
       "Operate on sequences",
       {{"list", "", "List all sequences", 2, sequence_list},
-       {"events", "<index> <track_idx>", "List events in a sequence track", 4, sequence_events}}};
+       {"events", "<index> <track_idx>", "List events in a sequence track", 4, sequence_events},
+       {"export", "<index> <path>", "Export sequence as MIDI", 4, sequence_export}}};
 
   commandRegistry["help"] = {"help", "Show this help", {}};
   commandRegistry["exit"] = {"exit", "Exit the shell", {}};
