@@ -204,3 +204,7 @@ cmake-build-*
 # Visual Studio Code
 .vscode
 compile_commands.json
+
+# Python environment
+.venv/
+__pycache__/
