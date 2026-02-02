@@ -757,6 +757,25 @@ void SeqTrack::limitPrevDurNoteEnd(uint32_t absTime) const {
   }
 }
 
+void SeqTrack::purgePrevDurEvents(uint32_t absTime) {
+  if (readMode != READMODE_CONVERT_TO_MIDI) {
+    return;
+  }
+  if (prevDurEventIndices.empty()) {
+    return;
+  }
+  auto& timeline = parentSeq->timedEventIndex();
+  prevDurEventIndices.erase(
+    std::remove_if(prevDurEventIndices.begin(), prevDurEventIndices.end(),
+      [&timeline, absTime](SeqEventTimeIndex::Index idx) {
+        return timeline.endTickExclusive(idx) <= absTime;
+      }),
+    prevDurEventIndices.end());
+}
+
+void SeqTrack::clearPrevDurEvents() {
+  prevDurEventIndices.clear();
+}
 
 double SeqTrack::applyLevelCorrection(double level, LevelController controller) const {
   if (controller != LevelController::MasterVolume) {
@@ -860,26 +879,6 @@ void SeqTrack::addLevelNoItem(double level, LevelController controller, Resoluti
       break;
     }
   }
-}
-
-void SeqTrack::purgePrevDurEvents(uint32_t absTime) {
-  if (readMode != READMODE_CONVERT_TO_MIDI) {
-    return;
-  }
-  if (prevDurEventIndices.empty()) {
-    return;
-  }
-  auto& timeline = parentSeq->timedEventIndex();
-  prevDurEventIndices.erase(
-    std::remove_if(prevDurEventIndices.begin(), prevDurEventIndices.end(),
-      [&timeline, absTime](SeqEventTimeIndex::Index idx) {
-        return timeline.endTickExclusive(idx) <= absTime;
-      }),
-    prevDurEventIndices.end());
-}
-
-void SeqTrack::clearPrevDurEvents() {
-  prevDurEventIndices.clear();
 }
 
 void SeqTrack::addVol(u32 offset, u32 length, double volPercent, Resolution res, const std::string &sEventName) {

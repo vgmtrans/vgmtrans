@@ -102,9 +102,6 @@ class VGMSeq : public VGMFile {
 
   bool saveAsMidi(const std::filesystem::path &filepath, const VGMColl* coll = nullptr);
 
-  SeqEventTimeIndex& timedEventIndex() { return m_timedEvents; }
-  const SeqEventTimeIndex& timedEventIndex() const { return m_timedEvents; }
-
   void deactivateAllTracks();
 
   [[nodiscard]] uint8_t initialVolume() const { return m_initial_volume; }
@@ -115,6 +112,8 @@ class VGMSeq : public VGMFile {
   void setInitialReverbLevel(uint8_t reverb_level) { m_initial_reverb_level = reverb_level; }
   [[nodiscard]] uint16_t initialPitchBendRange() const { return m_initial_pitch_bend_range_cents; }
   void setInitialPitchBendRange(uint16_t cents) { m_initial_pitch_bend_range_cents = cents; }
+
+  SeqEventTimeIndex& timedEventIndex() { return m_timedEvents; }
 
  protected:
   virtual bool loadTracks(ReadMode readMode, uint32_t stopTime = 1000000);
