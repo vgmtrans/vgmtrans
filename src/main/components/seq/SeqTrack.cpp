@@ -312,6 +312,7 @@ SeqEvent* SeqTrack::findSeqEventAtOffset(uint32_t offset, uint32_t length) {
   if (seqEvent == nullptr) {
     return nullptr;
   }
+  // Check for an exact length match (unless a length value is 0)
   if (length != 0 && seqEvent->length() != 0 && seqEvent->length() != length) {
     return nullptr;
   }
