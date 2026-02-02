@@ -241,6 +241,8 @@ void VGMFileView::onPlaybackPositionChanged(int current, int max, PositionChange
 
   const auto& timeline = seq->timedEventIndex();
   if (!timeline.finalized()) {
+    m_playbackCursor.reset();
+    m_playbackTimeline = nullptr;
     if (hexVisible) {
       m_hexview->setPlaybackActive(false);
       m_hexview->clearPlaybackSelections(false);
@@ -251,14 +253,19 @@ void VGMFileView::onPlaybackPositionChanged(int current, int max, PositionChange
     return;
   }
 
+  if (m_playbackTimeline != &timeline || !m_playbackCursor) {
+    m_playbackTimeline = &timeline;
+    m_playbackCursor = std::make_unique<SeqEventTimeIndex::Cursor>(timeline);
+  }
+
   const int tickDiff = current - m_lastPlaybackPosition;
   m_playbackTimedEvents.clear();
   switch (origin) {
     case PositionChangeOrigin::Playback:
       if (tickDiff <= 20)
-        timeline.getActiveInRange(m_lastPlaybackPosition, current, m_playbackTimedEvents);
+        m_playbackCursor->getActiveInRange(m_lastPlaybackPosition, current, m_playbackTimedEvents);
       else
-        timeline.getActiveAt(current, m_playbackTimedEvents);
+        m_playbackCursor->getActiveAt(current, m_playbackTimedEvents);
       break;
     case PositionChangeOrigin::SeekBar:
       // This intended to distinguish between a drag and a seek to a further position of a sequence.
@@ -267,7 +274,7 @@ void VGMFileView::onPlaybackPositionChanged(int current, int max, PositionChange
         // Select all events passed through. We will fade the ones skipped past in the next step.
         int lesser = std::min(m_lastPlaybackPosition, current);
         int greater = std::max(m_lastPlaybackPosition, current);
-        timeline.getActiveInRange(lesser, greater, m_playbackTimedEvents);
+        m_playbackCursor->getActiveInRange(lesser, greater, m_playbackTimedEvents);
 
         // Select only the items at the current position to make the others fade - we accomplish
         // this by calling this method with origin HexView, which will use a getActiveAt selection.
@@ -277,7 +284,7 @@ void VGMFileView::onPlaybackPositionChanged(int current, int max, PositionChange
       }
       break;
     case PositionChangeOrigin::HexView:
-      timeline.getActiveAt(current, m_playbackTimedEvents);
+      m_playbackCursor->getActiveAt(current, m_playbackTimedEvents);
       break;
   }
   m_lastPlaybackPosition = current;
@@ -318,6 +325,8 @@ void VGMFileView::onPlayerStatusChanged(bool playing) {
   m_playbackItems.clear();
   m_lastPlaybackItems.clear();
   m_lastPlaybackPosition = 0;
+  m_playbackCursor.reset();
+  m_playbackTimeline = nullptr;
   m_hexview->setPlaybackActive(false);
   m_hexview->clearPlaybackSelections(false);
   if (m_treeview) {

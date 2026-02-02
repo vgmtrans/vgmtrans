@@ -1,3 +1,9 @@
+/*
+ * VGMTrans (c) 2002-2026
+ * Licensed under the zlib license,
+ * refer to the included LICENSE.txt file
+ */
+
 #pragma once
 
 #include <cstdint>
@@ -13,7 +19,7 @@ struct SeqTimedEvent {
   uint32_t duration;
   SeqEvent* event;
 
-  // Zero duration is treated as a 1-tick event for range math.
+  // Zero duration is treated as a 1-tick event for range math
   [[nodiscard]] uint32_t endTickExclusive() const noexcept {
     return startTick + (duration == 0 ? 1u : duration);
   }
@@ -52,7 +58,7 @@ class SeqEventTimeIndex {
   [[nodiscard]] uint32_t endTickExclusive(Index idx) const { return m_events.at(idx).endTickExclusive(); }
   [[nodiscard]] bool firstStartTick(const SeqEvent* event, uint32_t& outTick) const noexcept;
 
-  // Convenience queries. For repeated sequential queries, prefer Cursor.
+  // Convenience queries. For repeated sequential queries, prefer Cursor
   void getActiveAt(uint32_t tick, std::vector<const SeqTimedEvent*>& out) const;
   void getActiveInRange(uint32_t startTick, uint32_t endTick, std::vector<const SeqTimedEvent*>& out) const;
 
@@ -73,17 +79,21 @@ class SeqEventTimeIndex {
     [[nodiscard]] bool isReady() const noexcept;
 
     const SeqEventTimeIndex* m_index = nullptr;
-    size_t m_nextStart = 0;  // Next candidate in m_byStart.
-    size_t m_nextEnd = 0;    // Next candidate in m_byEnd.
+    size_t m_nextStart = 0;  // Next candidate in m_byStart
+    size_t m_nextEnd = 0;    // Next candidate in m_byEnd
     uint32_t m_currentTick = 0;
-    std::vector<Index> m_active;
-    std::vector<int32_t> m_activePositions;  // Index -> position in m_active (or -1).
+
+    std::vector<Index> m_active;  // the compact list of currently active event indices
+
+    // m_activePositions is a reverse index: for each event index idx, it stores the position of
+    // idx in m_active, or -1 if the event is not active.
+    std::vector<int32_t> m_activePositions;
   };
 
  private:
   std::vector<SeqTimedEvent> m_events;
-  std::vector<Index> m_byStart;  // Event indices sorted by start tick.
-  std::vector<Index> m_byEnd;    // Event indices sorted by end tick.
-  std::unordered_map<const SeqEvent*, uint32_t> m_firstStart;  // Earliest start per event.
+  std::vector<Index> m_byStart;  // Event indices sorted by start tick
+  std::vector<Index> m_byEnd;    // Event indices sorted by end tick
+  std::unordered_map<const SeqEvent*, uint32_t> m_firstStart;  // Earliest start per event
   bool m_finalized = false;
 };

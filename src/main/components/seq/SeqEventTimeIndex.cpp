@@ -1,10 +1,14 @@
-#include "SeqEventTimeIndex.h"
+/*
+ * VGMTrans (c) 2002-2026
+ * Licensed under the zlib license,
+ * refer to the included LICENSE.txt file
+ */
 
+#include "SeqEventTimeIndex.h"
+#include "SeqEvent.h"
 #include <algorithm>
 #include <numeric>
 #include <utility>
-
-#include "SeqEvent.h"
 
 SeqEventTimeIndex::~SeqEventTimeIndex() = default;
 
@@ -200,6 +204,7 @@ void SeqEventTimeIndex::Cursor::advanceTo(uint32_t tick) {
   const auto& byStart = m_index->m_byStart;
   const auto& byEnd = m_index->m_byEnd;
 
+  // Add every event that starts at or before tick
   while (m_nextStart < byStart.size()) {
     Index idx = byStart[m_nextStart];
     if (events[idx].startTick > tick) {
@@ -209,6 +214,7 @@ void SeqEventTimeIndex::Cursor::advanceTo(uint32_t tick) {
     m_nextStart++;
   }
 
+  // Remove every event that ends at or before tick
   while (m_nextEnd < byEnd.size()) {
     Index idx = byEnd[m_nextEnd];
     if (events[idx].endTickExclusive() > tick) {
@@ -222,6 +228,7 @@ void SeqEventTimeIndex::Cursor::advanceTo(uint32_t tick) {
 }
 
 void SeqEventTimeIndex::Cursor::addActive(Index idx) {
+  // If the index is out of bounds, or is already active, skip
   if (idx >= m_activePositions.size() || m_activePositions[idx] >= 0) {
     return;
   }
@@ -237,6 +244,9 @@ void SeqEventTimeIndex::Cursor::removeActive(Index idx) {
   if (pos < 0) {
     return;
   }
+
+  // Swap the last entry in m_active with the one holding the idx to be removed. Then remove the
+  // last entry
   Index lastIdx = m_active.back();
   m_active[static_cast<size_t>(pos)] = lastIdx;
   m_activePositions[lastIdx] = pos;

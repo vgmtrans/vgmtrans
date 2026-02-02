@@ -5,9 +5,11 @@
  */
 
 #pragma once
+#include <memory>
 #include <QFont>
 #include <QMdiSubWindow>
 #include <vector>
+#include "SeqEventTimeIndex.h"
 
 class SnappingSplitter;
 class VGMFile;
@@ -44,6 +46,8 @@ private:
   std::vector<const VGMItem*> m_playbackItems;
   std::vector<const VGMItem*> m_lastPlaybackItems;
   int m_lastPlaybackPosition = 0;
+  const SeqEventTimeIndex* m_playbackTimeline = nullptr;
+  std::unique_ptr<SeqEventTimeIndex::Cursor> m_playbackCursor;
 
 public slots:
   void onSelectionChange(VGMItem* item) const;
