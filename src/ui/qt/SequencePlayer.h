@@ -13,6 +13,12 @@
 
 class VGMColl;
 
+enum class PositionChangeOrigin {
+  Playback,
+  SeekBar,
+  HexView
+};
+
 class SequencePlayer : public QObject {
   Q_OBJECT
 public:
@@ -40,7 +46,7 @@ public:
    * Moves the player position
    * @param position relative to song start
    */
-  void seek(int position);
+  void seek(int position, PositionChangeOrigin origin);
 
   /**
    * Checks whether the player is playing
@@ -69,11 +75,12 @@ public:
    * @param collection
    * @return true if data was loaded correctly
    */
-  bool playCollection(const VGMColl *collection);
+  bool playCollection(const VGMColl *collection, bool startPlaying = true);
+  [[nodiscard]] const VGMColl* activeCollection() const;
 
 signals:
   void statusChange(bool playing);
-  void playbackPositionChanged(int current, int max);
+  void playbackPositionChanged(int current, int max, PositionChangeOrigin origin);
 
 private:
   SequencePlayer();

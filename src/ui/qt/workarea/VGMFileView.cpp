@@ -13,9 +13,14 @@
 #include <cmath>
 #include "VGMFileView.h"
 #include "VGMFile.h"
+#include "VGMSeq.h"
+#include "VGMColl.h"
+#include "SeqTrack.h"
+#include "SeqEvent.h"
 #include "HexView.h"
 #include "VGMFileTreeView.h"
 #include "MdiArea.h"
+#include "SequencePlayer.h"
 #include "SnappingSplitter.h"
 #include "Helpers.h"
 #include "Root.h"
@@ -72,6 +77,11 @@ VGMFileView::VGMFileView(VGMFile *vgmfile)
 
   connect(new QShortcut(QKeySequence(Qt::CTRL | Qt::Key_0), this), &QShortcut::activated,
           this, &VGMFileView::resetHexViewFont);
+
+  connect(&SequencePlayer::the(), &SequencePlayer::playbackPositionChanged,
+          this, &VGMFileView::onPlaybackPositionChanged);
+  connect(&SequencePlayer::the(), &SequencePlayer::statusChange,
+          this, &VGMFileView::onPlayerStatusChanged);
 
   setWidget(m_splitter);
 }
@@ -163,5 +173,144 @@ void VGMFileView::onSelectionChange(VGMItem *item) const {
   } else {
     m_treeview->setCurrentItem(nullptr);
     m_treeview->clearSelection();
+  }
+}
+
+void VGMFileView::seekToEvent(VGMItem* item) const {
+  auto* event = dynamic_cast<SeqEvent*>(item);
+  if (!event || !event->parentTrack || !event->parentTrack->parentSeq) {
+    return;
+  }
+  if (!m_vgmfile->assocColls.empty()) {
+    auto assocColl = m_vgmfile->assocColls.front();
+    if (SequencePlayer::the().activeCollection() != assocColl) {
+      auto& seqPlayer = SequencePlayer::the();
+      seqPlayer.playCollection(assocColl, seqPlayer.playing());
+    }
+  }
+
+  const auto& timeline = event->parentTrack->parentSeq->timedEventIndex();
+  if (!timeline.finalized()) {
+    return;
+  }
+  uint32_t tick = 0;
+  if (!timeline.firstStartTick(event, tick)) {
+    return;
+  }
+
+  SequencePlayer::the().seek(static_cast<int>(tick), PositionChangeOrigin::HexView);
+}
+
+void VGMFileView::onPlaybackPositionChanged(int current, int max, PositionChangeOrigin origin) {
+  if (!isVisible()) {
+    return;
+  }
+  const bool hexVisible = m_hexview && m_hexview->isVisible();
+  const bool treeVisible = m_treeview && m_treeview->isVisible();
+  if (!hexVisible && !treeVisible) {
+    return;
+  }
+
+  auto* seq = dynamic_cast<VGMSeq*>(m_vgmfile);
+  if (!seq) {
+    return;
+  }
+
+  const auto* coll = SequencePlayer::the().activeCollection();
+  if (!coll || !coll->containsVGMFile(m_vgmfile)) {
+    if (treeVisible) {
+      m_treeview->setPlaybackItems({});
+    }
+    return;
+  }
+
+  const bool shouldHighlight = SequencePlayer::the().playing() || current > 0;
+  if (!shouldHighlight) {
+    if (treeVisible) {
+      m_treeview->setPlaybackItems({});
+    }
+    return;
+  }
+
+  const auto& timeline = seq->timedEventIndex();
+  if (!timeline.finalized()) {
+    m_playbackCursor.reset();
+    m_playbackTimeline = nullptr;
+    if (treeVisible) {
+      m_treeview->setPlaybackItems({});
+    }
+    return;
+  }
+
+  if (m_playbackTimeline != &timeline || !m_playbackCursor) {
+    m_playbackTimeline = &timeline;
+    m_playbackCursor = std::make_unique<SeqEventTimeIndex::Cursor>(timeline);
+  }
+
+  const int tickDiff = current - m_lastPlaybackPosition;
+  m_playbackTimedEvents.clear();
+  switch (origin) {
+    case PositionChangeOrigin::Playback:
+      if (tickDiff <= 20)
+        m_playbackCursor->getActiveInRange(m_lastPlaybackPosition, current, m_playbackTimedEvents);
+      else
+        m_playbackCursor->getActiveAt(current, m_playbackTimedEvents);
+      break;
+    case PositionChangeOrigin::SeekBar:
+      // This intended to distinguish between a drag and a seek to a further position of a sequence.
+      // We want a drag to highlight passed through events.
+      if (tickDiff >= -500 && tickDiff <= 500) {
+        // Select all events passed through. We will fade the ones skipped past in the next step.
+        int lesser = std::min(m_lastPlaybackPosition, current);
+        int greater = std::max(m_lastPlaybackPosition, current);
+        m_playbackCursor->getActiveInRange(lesser, greater, m_playbackTimedEvents);
+
+        // Select only the items at the current position to make the others fade - we accomplish
+        // this by calling this method with origin HexView, which will use a getActiveAt selection.
+        QTimer::singleShot(0, m_hexview, [this, current, max] {
+          onPlaybackPositionChanged(current, max, PositionChangeOrigin::HexView);
+        });
+      }
+      break;
+    case PositionChangeOrigin::HexView:
+      m_playbackCursor->getActiveAt(current, m_playbackTimedEvents);
+      break;
+  }
+  m_lastPlaybackPosition = current;
+
+  m_playbackItems.clear();
+  m_playbackItems.reserve(m_playbackTimedEvents.size());
+  for (const auto* timed : m_playbackTimedEvents) {
+    if (!timed || !timed->event) {
+      continue;
+    }
+    auto* event = timed->event;
+    m_playbackItems.push_back(event);
+  }
+
+  if (treeVisible) {
+    m_treeview->setPlaybackItems(m_playbackItems);
+  }
+
+  if (m_playbackItems == m_lastPlaybackItems) {
+    return;
+  }
+
+  m_lastPlaybackItems = m_playbackItems;
+}
+
+void VGMFileView::onPlayerStatusChanged(bool playing) {
+  if (playing || !m_hexview)
+    return;
+  if (SequencePlayer::the().activeCollection() != nullptr)
+    return;
+  m_playbackTimedEvents.clear();
+  m_playbackItems.clear();
+  m_lastPlaybackItems.clear();
+  m_lastPlaybackPosition = 0;
+  m_playbackCursor.reset();
+  m_playbackTimeline = nullptr;
+  if (m_treeview) {
+    m_treeview->setPlaybackItems({});
   }
 }
