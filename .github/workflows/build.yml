@@ -43,7 +43,7 @@ jobs:
 
       - name: "Build project"
         run: cmake --build --preset "macos-${{ matrix.target }}-release" \
-          --target vgmtrans
+          --target vgmtrans vgmtrans-shell
 
       - name: "Package DMG (macOS)"
         working-directory: "build/macos-${{ matrix.target }}/"
@@ -230,7 +230,7 @@ jobs:
           cmake --preset win-${{ matrix.target }}
 
        - name: "Build project"
-         run: cmake --build --preset win-${{ matrix.target }}-release --target vgmtrans
+         run: cmake --build --preset win-${{ matrix.target }}-release --target vgmtrans vgmtrans-shell
 
        - name: "Delete empty directories"
          run: Get-ChildItem -Directory -Recurse | Where-Object { $_.GetFileSystemInfos().Count -eq 0 } | Remove-Item -Force -Recurse
