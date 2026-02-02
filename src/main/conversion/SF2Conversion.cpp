@@ -2,7 +2,7 @@
  * VGMTrans (c) 2002-2024
  * Licensed under the zlib license,
  * refer to the included LICENSE.txt file
-*/
+ */
 #include "SF2Conversion.h"
 #include "SF2File.h"
 #include "SynthFile.h"
@@ -18,59 +18,56 @@ namespace conversion {
 
 SF2File* createSF2File(const VGMColl& coll) {
   coll.preSynthFileCreation();
-  SynthFile *synthfile = createSynthFile(coll.instrSets(), coll.sampColls());
+  SynthFile* synthfile = createSynthFile(coll.instrSets(), coll.sampColls());
   coll.postSynthFileCreation();
   if (!synthfile) {
     L_ERROR("SF2 conversion for aborted");
     return nullptr;
   }
-  SF2File *sf2file = new SF2File(synthfile);
+  SF2File* sf2file = new SF2File(synthfile);
   delete synthfile;
   return sf2file;
 }
 
-SF2File* createSF2File(
-  const std::vector<VGMInstrSet*>& instrsets,
-  const std::vector<VGMSampColl*>& sampcolls,
-  const VGMColl* coll
-) {
+SF2File* createSF2File(const std::vector<VGMInstrSet*>& instrsets,
+                       const std::vector<VGMSampColl*>& sampcolls, const VGMColl* coll) {
   if (coll)
     coll->preSynthFileCreation();
-  SynthFile *synthfile = createSynthFile(instrsets, sampcolls);
+  SynthFile* synthfile = createSynthFile(instrsets, sampcolls);
   if (coll)
     coll->postSynthFileCreation();
   if (!synthfile) {
     L_ERROR("SF2 conversion failed");
+    fprintf(stderr, "DEBUG: SF2 conversion failed - synthfile is null\n");
     return nullptr;
   }
-  SF2File *sf2file = new SF2File(synthfile);
+  SF2File* sf2file = new SF2File(synthfile);
   delete synthfile;
   return sf2file;
 }
 
-SynthFile* createSynthFile(
-  const std::vector<VGMInstrSet*>& m_instrsets,
-  const std::vector<VGMSampColl*>& m_sampcolls
-) {
+SynthFile* createSynthFile(const std::vector<VGMInstrSet*>& m_instrsets,
+                           const std::vector<VGMSampColl*>& m_sampcolls) {
   if (m_instrsets.empty()) {
     L_ERROR("No instrument sets available to create a SynthFile.");
+    fprintf(stderr, "DEBUG: No instrument sets available\n");
     return nullptr;
   }
 
   /* FIXME: shared_ptr eventually */
-  SynthFile *synthfile = new SynthFile("SynthFile");
+  SynthFile* synthfile = new SynthFile("SynthFile");
 
-  std::vector<VGMSamp *> finalSamps;
-  std::vector<const VGMSampColl *> finalSampColls;
+  std::vector<VGMSamp*> finalSamps;
+  std::vector<const VGMSampColl*> finalSampColls;
 
   /* Grab samples either from the local sampcolls or from the instrument sets */
   if (!m_sampcolls.empty()) {
-    for (auto & sampcoll : m_sampcolls) {
+    for (auto& sampcoll : m_sampcolls) {
       finalSampColls.push_back(sampcoll);
       unpackSampColl(*synthfile, sampcoll, finalSamps);
     }
   } else {
-    for (auto & instrset : m_instrsets) {
+    for (auto& instrset : m_instrsets) {
       if (auto instrset_sampcoll = instrset->sampColl) {
         finalSampColls.push_back(instrset_sampcoll);
         unpackSampColl(*synthfile, instrset_sampcoll, finalSamps);
@@ -80,6 +77,7 @@ SynthFile* createSynthFile(
 
   if (finalSamps.empty()) {
     L_ERROR("No sample collection available to create a SynthFile.");
+    fprintf(stderr, "DEBUG: No sample collection available (finalSamps empty)\n");
     delete synthfile;
     return nullptr;
   }
@@ -92,13 +90,15 @@ SynthFile* createSynthFile(
       size_t nRgns = vgminstr->regions().size();
       if (nRgns == 0)  // do not write an instrument if it has no regions
         continue;
-      SynthInstr* newInstr = synthfile->addInstr(vgminstr->bank, vgminstr->instrNum, vgminstr->reverb);
+      SynthInstr* newInstr =
+          synthfile->addInstr(vgminstr->bank, vgminstr->instrNum, vgminstr->reverb);
       for (uint32_t j = 0; j < nRgns; j++) {
         VGMRgn* rgn = vgminstr->regions()[j];
         //				if (rgn->sampNum+1 > sampColl->samples.size())	//does thereferenced sample exist?
         //					continue;
 
-        // Determine the SampColl associated with this rgn.  If there's an explicit pointer to it, use that.
+        // Determine the SampColl associated with this rgn.  If there's an explicit pointer to it,
+        // use that.
         const VGMSampColl* sampColl = rgn->sampCollPtr;
         if (!sampColl) {
           // If rgn is of an InstrSet with an embedded SampColl, use that SampColl.
@@ -115,25 +115,30 @@ SynthFile* createSynthFile(
         // see sampOffset declaration in header file for more info.
         if (rgn->sampOffset != -1) {
           bool bFoundIt = false;
-          for (uint32_t s = 0; s < sampColl->samples.size(); s++) {  //for every sample
+          for (uint32_t s = 0; s < sampColl->samples.size(); s++) {  // for every sample
             auto sample = sampColl->samples[s];
             if (rgn->sampOffset == sample->offset() ||
-                rgn->sampOffset == sample->offset() - sampColl->offset() - sampColl->sampDataOffset) {
+                rgn->sampOffset ==
+                    sample->offset() - sampColl->offset() - sampColl->sampDataOffset) {
               if (rgn->sampDataLength != -1 && rgn->sampDataLength != sample->dataLength) {
                 continue;
               }
 
               realSampNum = s;
 
-              //samples[m]->loop.loopStart = parInstrSet->aInstrs[i]->aRgns[k]->loop.loopStart;
-              //samples[m]->loop.loopLength = (samples[m]->dataLength) - (parInstrSet->aInstrs[i]->aRgns[k]->loop.loopStart); //[aInstrs[i]->aRegions[k]->sample_num]->dwUncompSize/2) - ((aInstrs[i]->aRegions[k]->loop_point*28)/16); //to end of sample
+              // samples[m]->loop.loopStart = parInstrSet->aInstrs[i]->aRgns[k]->loop.loopStart;
+              // samples[m]->loop.loopLength = (samples[m]->dataLength) -
+              // (parInstrSet->aInstrs[i]->aRgns[k]->loop.loopStart);
+              // //[aInstrs[i]->aRegions[k]->sample_num]->dwUncompSize/2) -
+              // ((aInstrs[i]->aRegions[k]->loop_point*28)/16); //to end of sample
               bFoundIt = true;
               break;
             }
           }
           if (!bFoundIt) {
             L_ERROR("Failed matching region to a sample with offset {:#x} (Instrset "
-                    "{}, Instr {}, Region {})", rgn->sampOffset, inst, i, j);
+                    "{}, Instr {}, Region {})",
+                    rgn->sampOffset, inst, i, j);
             realSampNum = 0;
           }
         }
@@ -150,6 +155,7 @@ SynthFile* createSynthFile(
         }
         if (sampCollNum == finalSampColls.size()) {
           L_ERROR("SampColl does not exist");
+          fprintf(stderr, "DEBUG: SampColl does not exist for rgn with sampCollPtr\n");
           return nullptr;
         }
         // now we add the number of samples from the preceding SampColls to the value to
@@ -158,12 +164,14 @@ SynthFile* createSynthFile(
           realSampNum += finalSampColls[k]->samples.size();
 
         if (realSampNum >= finalSamps.size()) {
-          L_ERROR("Region has an explicit sample number that exceeds sample count. Sample Num: {:d} (Instrset "
-                  "{}, Instr {}, Region {})", realSampNum, inst, i, j);
+          L_ERROR("Region has an explicit sample number that exceeds sample count. Sample Num: "
+                  "{:d} (Instrset "
+                  "{}, Instr {}, Region {})",
+                  realSampNum, inst, i, j);
           realSampNum = 0;
         }
 
-        SynthRgn *newRgn = newInstr->addRgn();
+        SynthRgn* newRgn = newInstr->addRgn();
         newRgn->setRanges(rgn->keyLow, rgn->keyHigh, rgn->velLow, rgn->velHigh);
         newRgn->setWaveLinkInfo(0, 0, 1, static_cast<uint32_t>(realSampNum));
         newRgn->setFineTune(rgn->coarseTune, rgn->fineTune);
@@ -173,17 +181,20 @@ SynthFile* createSynthFile(
         newRgn->setLfoVibDelaySeconds(rgn->lfoVibDelaySeconds());
 
         if (realSampNum >= finalSamps.size()) {
-          L_ERROR("Sample {} does not exist. Instr index: {:d}, Instr num: {:d}, Region index: {:d}", realSampNum, i, vgminstr->instrNum, j);
+          L_ERROR(
+              "Sample {} does not exist. Instr index: {:d}, Instr num: {:d}, Region index: {:d}",
+              realSampNum, i, vgminstr->instrNum, j);
           realSampNum = finalSamps.size() - 1;
         }
 
         VGMSamp* samp = finalSamps[realSampNum];  // sampColl->samples[rgn->sampNum];
         SynthSampInfo* sampInfo = newRgn->addSampInfo();
 
-        // This is a really loopy way of determining the loop information, pardon the pun.  However, it works.
-        // There might be a way to simplify this, but I don't want to test out whether another method breaks anything just yet
-        // Use the sample's loopStatus to determine if a loop occurs.  If it does, see if the sample provides loop info
-        // (gathered during ADPCM > PCM conversion.  If the sample doesn't provide loop offset info, then use the region's
+        // This is a really loopy way of determining the loop information, pardon the pun.  However,
+        // it works. There might be a way to simplify this, but I don't want to test out whether
+        // another method breaks anything just yet Use the sample's loopStatus to determine if a
+        // loop occurs.  If it does, see if the sample provides loop info (gathered during ADPCM >
+        // PCM conversion.  If the sample doesn't provide loop offset info, then use the region's
         // loop info.
         if (samp->bPSXLoopInfoPrioritizing) {
           if (samp->loop.loopStatus != -1) {
@@ -194,6 +205,7 @@ SynthFile* createSynthFile(
               sampInfo->setLoopInfo(rgn->loop, samp);
             }
           } else {
+            fprintf(stderr, "DEBUG: Loop info failure (PSX priority)\n");
             delete synthfile;
             throw;
           }
@@ -204,6 +216,8 @@ SynthFile* createSynthFile(
           if (samp->loop.loopStatus != -1)
             sampInfo->setLoopInfo(samp->loop, samp);
           else {
+            fprintf(stderr, "DEBUG: Loop info failure (missing loop info for sample %s)\n",
+                    samp->name().c_str());
             delete synthfile;
             throw;
           }
@@ -229,29 +243,31 @@ SynthFile* createSynthFile(
         else
           sustainLevAttenDb = ampToDb(rgn->sustain_level, 100.0);
 
-        SynthArt *newArt = newRgn->addArt();
+        SynthArt* newArt = newRgn->addArt();
         newArt->addPan(rgn->pan);
         newArt->addADSR(rgn->attack_time, static_cast<Transform>(rgn->attack_transform),
-          rgn->hold_time, rgn->decay_time, sustainLevAttenDb, rgn->sustain_time, rgn->release_time,
-          static_cast<Transform>(rgn->release_transform));
+                        rgn->hold_time, rgn->decay_time, sustainLevAttenDb, rgn->sustain_time,
+                        rgn->release_time, static_cast<Transform>(rgn->release_transform));
       }
     }
   }
   return synthfile;
 }
 
-void unpackSampColl(SynthFile &synthfile, const VGMSampColl *sampColl, std::vector<VGMSamp *> &finalSamps) {
+void unpackSampColl(SynthFile& synthfile, const VGMSampColl* sampColl,
+                    std::vector<VGMSamp*>& finalSamps) {
   assert(sampColl != nullptr);
 
   size_t nSamples = sampColl->samples.size();
   for (size_t i = 0; i < nSamples; i++) {
-    VGMSamp *samp = sampColl->samples[i];
+    VGMSamp* samp = sampColl->samples[i];
 
-    std::vector<uint8_t> uncompSampBuf = samp->toPcm(Signedness::Signed, Endianness::Little, BPS::PCM16);
+    std::vector<uint8_t> uncompSampBuf =
+        samp->toPcm(Signedness::Signed, Endianness::Little, BPS::PCM16);
 
     uint16_t blockAlign = 2 * samp->channels;
-    SynthWave *wave = synthfile.addWave(1, samp->channels, samp->rate, samp->rate * blockAlign, blockAlign,
-                                        16, static_cast<uint32_t>(uncompSampBuf.size()),
+    SynthWave* wave = synthfile.addWave(1, samp->channels, samp->rate, samp->rate * blockAlign,
+                                        blockAlign, 16, static_cast<uint32_t>(uncompSampBuf.size()),
                                         std::move(uncompSampBuf), samp->name());
     finalSamps.push_back(samp);
 
@@ -261,7 +277,7 @@ void unpackSampColl(SynthFile &synthfile, const VGMSampColl *sampColl, std::vect
       return;
     }
 
-    SynthSampInfo *sampInfo = wave->addSampInfo();
+    SynthSampInfo* sampInfo = wave->addSampInfo();
     if (samp->bPSXLoopInfoPrioritizing) {
       if (samp->loop.loopStart != 0 || samp->loop.loopLength != 0)
         sampInfo->setLoopInfo(samp->loop, samp);
@@ -273,4 +289,4 @@ void unpackSampColl(SynthFile &synthfile, const VGMSampColl *sampColl, std::vect
   }
 }
 
-} // conversion
+}  // namespace conversion
