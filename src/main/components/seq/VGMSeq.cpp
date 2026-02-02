@@ -84,6 +84,7 @@ MidiFile *VGMSeq::convertToMidi(const VGMColl* coll) {
   if (!loadTracks(READMODE_CONVERT_TO_MIDI, stopTime)) {
     delete midi;
     this->midi = nullptr;
+    m_timedEvents.clear();
     return nullptr;
   }
   this->midi = nullptr;
@@ -123,6 +124,7 @@ bool VGMSeq::postLoad() {
     }
   } else if (readMode == READMODE_CONVERT_TO_MIDI) {
     midi->sort();
+    m_timedEvents.finalize();
   }
 
   return true;
@@ -133,6 +135,10 @@ bool VGMSeq::loadTracks(ReadMode readMode, uint32_t stopTime) {
   this->readMode = readMode;
   for (uint32_t trackNum = 0; trackNum < nNumTracks; trackNum++) {
     aTracks[trackNum]->readMode = readMode;
+  }
+
+  if (readMode == READMODE_CONVERT_TO_MIDI) {
+    m_timedEvents.clear();
   }
 
   // reset variables

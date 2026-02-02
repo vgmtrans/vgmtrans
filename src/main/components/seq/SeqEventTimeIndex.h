@@ -47,7 +47,10 @@ class SeqEventTimeIndex {
   SeqEventTimeIndex& operator=(SeqEventTimeIndex&&) = default;
 
   Index addEvent(SeqEvent* event, uint32_t startTick, uint32_t duration);
-  void clear();
+  void clear();     // clears all events and data structures
+
+  // finalize() builds the data structures needed for Cursor::advanceTo(). It should be called
+  // after all events have been added.
   void finalize();
 
   [[nodiscard]] bool finalized() const noexcept { return m_finalized; }
@@ -94,6 +97,8 @@ class SeqEventTimeIndex {
   std::vector<SeqTimedEvent> m_events;
   std::vector<Index> m_byStart;  // Event indices sorted by start tick
   std::vector<Index> m_byEnd;    // Event indices sorted by end tick
-  std::unordered_map<const SeqEvent*, uint32_t> m_firstStart;  // Earliest start per event
+  // m_firstStart maps the earliest start time per event. Events may run multiple times due to
+  // looping, so we only concern ourselves with the first time of execution for simplicity.
+  std::unordered_map<const SeqEvent*, uint32_t> m_firstStart;
   bool m_finalized = false;
 };
