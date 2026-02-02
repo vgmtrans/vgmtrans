@@ -4,6 +4,11 @@
  * See the included LICENSE for more information
  */
 
+#include <cstdio>
+#ifndef  _WIN32
+#include <signal.h>
+#endif
+
 #include <csignal>
 #include <cstdlib>
 #include <iostream>
@@ -117,12 +122,13 @@ int main(int argc, char* argv[]) {
     return 1;
   }
 
-  // Setup signal handler
+#ifndef _WIN32
   struct sigaction sa;
   sa.sa_handler = sigintHandler;
   sigemptyset(&sa.sa_mask);
-  sa.sa_flags = 0;  // No SA_RESTART: we want read() to be interrupted
+  sa.sa_flags = 0;
   sigaction(SIGINT, &sa, nullptr);
+#endif
 
   registerCommands();
   linenoiseSetCompletionCallback(completionHook);
@@ -130,7 +136,7 @@ int main(int argc, char* argv[]) {
 
   auto historyFile = configDirectory("vgmtrans-shell") / ".vgmtrans-history";
   std::filesystem::create_directories(historyFile.parent_path());
-  linenoiseHistoryLoad(historyFile.c_str());
+  linenoiseHistoryLoad(historyFile.string().c_str());
 
   std::cout << "Welcome to the VGMTrans shell. Type 'help' for commands." << std::endl;
 
@@ -155,7 +161,7 @@ int main(int argc, char* argv[]) {
     if (!line.empty()) {
       linenoiseHistoryAdd(result);
       if (!historyFile.empty()) {
-        linenoiseHistorySave(historyFile.c_str());
+        linenoiseHistorySave(historyFile.string().c_str());
       }
     }
 

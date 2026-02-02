@@ -1,14 +1,12 @@
-/* linenoise.c -- guerrilla line editing library against the idea that a
+/* A linenoise.c edited to compile on Windows, for use in vgmtrans-shell.
+ * Original preamble follows
+ * ------------------------------------------------------------------------
+ * linenoise.c -- guerrilla line editing library against the idea that a
  * line editing lib needs to be 20,000 lines of C code.
  *
  * You can find the latest source code at:
  *
  *   http://github.com/antirez/linenoise
- *
- * Does a number of crazy assumptions that happen to be true in 99.9999% of
- * the 2010 UNIX computers around.
- *
- * ------------------------------------------------------------------------
  *
  * Copyright (c) 2010-2023, Salvatore Sanfilippo <antirez at gmail dot com>
  * Copyright (c) 2010-2013, Pieter Noordhuis <pcnoordhuis at gmail dot com>
@@ -103,8 +101,23 @@
  *
  */
 
+#ifdef _WIN32
+#include <windows.h>
+#include <io.h>
+#include <fcntl.h>
+
+#define strcasecmp _stricmp
+#define STDIN_FILENO (_fileno(stdin))
+#define STDOUT_FILENO (_fileno(stdout))
+
+HANDLE hOut;
+HANDLE hIn;
+DWORD consolemode;
+#else
 #include <termios.h>
 #include <unistd.h>
+#include <sys/ioctl.h>
+#endif
 #include <stdlib.h>
 #include <stdio.h>
 #include <errno.h>
@@ -113,8 +126,6 @@
 #include <ctype.h>
 #include <sys/stat.h>
 #include <sys/types.h>
-#include <sys/ioctl.h>
-#include <unistd.h>
 #include <stdint.h>
 #include "linenoise.h"
 
@@ -128,7 +139,9 @@ static char *linenoiseNoTTY(void);
 static void refreshLineWithCompletion(struct linenoiseState *ls, linenoiseCompletions *lc, int flags);
 static void refreshLineWithFlags(struct linenoiseState *l, int flags);
 
+#ifndef _WIN32
 static struct termios orig_termios; /* In order to restore at exit.*/
+#endif
 static int maskmode = 0; /* Show "***" instead of input. For passwords. */
 static int rawmode = 0; /* For atexit() function to check if restore is needed*/
 static int mlmode = 0;  /* Multi line mode. Default is single line. */
@@ -528,6 +541,7 @@ static int isUnsupportedTerm(void) {
 
 /* Raw mode: 1960 magic shit. */
 static int enableRawMode(int fd) {
+#ifndef _WIN32
     struct termios raw;
 
     /* Test mode: when LINENOISE_ASSUME_TTY is set, skip terminal setup.
@@ -561,6 +575,34 @@ static int enableRawMode(int fd) {
 
     /* put terminal in raw mode after flushing */
     if (tcsetattr(fd,TCSAFLUSH,&raw) < 0) goto fatal;
+#else
+    if (!atexit_registered) {
+        /* Init windows console handles only once */
+        hOut = GetStdHandle(STD_OUTPUT_HANDLE);
+        if (hOut==INVALID_HANDLE_VALUE) goto fatal;
+
+        if (!GetConsoleMode(hOut, &consolemode)) {
+            CloseHandle(hOut);
+            errno = ENOTTY;
+            return -1;
+        };
+
+        hIn = GetStdHandle(STD_INPUT_HANDLE);
+        if (hIn == INVALID_HANDLE_VALUE) {
+            CloseHandle(hOut);
+            errno = ENOTTY;
+            return -1;
+        }
+
+        GetConsoleMode(hIn, &consolemode);
+        /* Don't leave CTRL-C in the input buffer */
+        SetConsoleMode(hIn, ENABLE_PROCESSED_INPUT);
+
+        /* Cleanup them at exit */
+        atexit(linenoiseAtExit);
+        atexit_registered = 1;
+    }
+#endif
     rawmode = 1;
     return 0;
 
@@ -570,6 +612,7 @@ fatal:
 }
 
 static void disableRawMode(int fd) {
+#ifndef _WIN32
     /* Test mode: nothing to restore. */
     if (getenv("LINENOISE_ASSUME_TTY")) {
         rawmode = 0;
@@ -578,6 +621,7 @@ static void disableRawMode(int fd) {
     /* Don't even check the return value as it's too late. */
     if (rawmode && tcsetattr(fd,TCSAFLUSH,&orig_termios) != -1)
         rawmode = 0;
+#endif
 }
 
 /* Use the ESC [6n escape sequence to query the horizontal cursor position
@@ -608,6 +652,12 @@ static int getCursorPosition(int ifd, int ofd) {
 /* Try to get the number of columns in the current terminal, or assume 80
  * if it fails. */
 static int getColumns(int ifd, int ofd) {
+#ifdef _WIN32
+    CONSOLE_SCREEN_BUFFER_INFO b;
+
+    if (!GetConsoleScreenBufferInfo(hOut, &b)) goto failed;
+    return b.srWindow.Right - b.srWindow.Left;
+#else
     struct winsize ws;
 
     /* Test mode: use LINENOISE_COLS env var for fixed width. */
@@ -639,6 +689,7 @@ static int getColumns(int ifd, int ofd) {
     } else {
         return ws.ws_col;
     }
+#endif
 
 failed:
     return 80;
@@ -1600,6 +1651,11 @@ static char *linenoiseNoTTY(void) {
  * editing function or uses dummy fgets() so that you will be able to type
  * something even in the most desperate of the conditions. */
 char *linenoise(const char *prompt) {
+#ifdef _WIN32
+    /* Switch newlines to \n (lets us benefit from the various buffered read functions)*/
+    _setmode(STDIN_FILENO, _O_BINARY);
+#endif
+
     char buf[LINENOISE_MAX_LINE];
 
     if (!isatty(STDIN_FILENO) && !getenv("LINENOISE_ASSUME_TTY")) {
@@ -1724,14 +1780,22 @@ int linenoiseHistorySetMaxLen(int len) {
 /* Save the history in the specified file. On success 0 is returned
  * otherwise -1 is returned. */
 int linenoiseHistorySave(const char *filename) {
+#ifndef _WIN32
     mode_t old_umask = umask(S_IXUSR|S_IRWXG|S_IRWXO);
+#endif
     FILE *fp;
     int j;
 
+#ifndef _WIN32
     fp = fopen(filename,"w");
     umask(old_umask);
+#else
+    fp = fopen(filename,"wb");
+#endif
     if (fp == NULL) return -1;
+#ifndef _WIN32
     fchmod(fileno(fp),S_IRUSR|S_IWUSR);
+#endif
     for (j = 0; j < history_len; j++)
         fprintf(fp,"%s\n",history[j]);
     fclose(fp);
@@ -1744,7 +1808,11 @@ int linenoiseHistorySave(const char *filename) {
  * If the file exists and the operation succeeded 0 is returned, otherwise
  * on error -1 is returned. */
 int linenoiseHistoryLoad(const char *filename) {
+#ifdef _WIN32
+    FILE *fp = fopen(filename,"rb");
+#else
     FILE *fp = fopen(filename,"r");
+#endif
     char buf[LINENOISE_MAX_LINE];
 
     if (fp == NULL) return -1;
