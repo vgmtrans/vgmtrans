@@ -116,7 +116,7 @@ SeqEventTimeIndex::Cursor::Cursor(const SeqEventTimeIndex& index) : m_index(&ind
 void SeqEventTimeIndex::Cursor::reset(uint32_t tick) {
   m_nextStart = 0;
   m_nextEnd = 0;
-  m_currentTick = 0;
+  m_currentTick = std::numeric_limits<uint32_t>::max();
   rebuildActiveIndex();
   if (isReady()) {
     advanceTo(tick);
