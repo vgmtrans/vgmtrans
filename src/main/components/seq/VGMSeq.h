@@ -8,6 +8,7 @@
 #include "VGMFile.h"
 #include "RawFile.h"
 #include "MidiFile.h"
+#include "SeqEventTimeIndex.h"
 #include <set>
 #include <filesystem>
 
@@ -112,6 +113,8 @@ class VGMSeq : public VGMFile {
   [[nodiscard]] uint16_t initialPitchBendRange() const { return m_initial_pitch_bend_range_cents; }
   void setInitialPitchBendRange(uint16_t cents) { m_initial_pitch_bend_range_cents = cents; }
 
+  SeqEventTimeIndex& timedEventIndex() { return m_timedEvents; }
+
  protected:
   virtual bool loadTracks(ReadMode readMode, uint32_t stopTime = 1000000);
   virtual void loadTracksMain(uint32_t stopTime);
@@ -154,6 +157,9 @@ private:
 
 private:
   std::set<uint16_t> m_referencedBanks;
+
+  // Timeline of sequence events emitted during MIDI conversion.
+  SeqEventTimeIndex m_timedEvents;
 
   uint16_t m_ppqn;
 
