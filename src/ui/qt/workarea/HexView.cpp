@@ -22,6 +22,7 @@
 #include <QMouseEvent>
 #include <QPixmap>
 #include <QProxyStyle>
+#include <QStyleFactory>
 #include <QPainter>
 #include <QParallelAnimationGroup>
 #include <QPropertyAnimation>
@@ -139,10 +140,16 @@ HexView::HexView(VGMFile* vgmfile, QWidget* parent)
 #ifdef Q_OS_MAC
   // With AA_DontCreateNativeWidgetSiblings, the RHI QWindow can cover transient (overlay)
   // scrollbars, so keep HexView's scrollbars non-transient on macOS.
-  auto* scrollStyle = new NonTransientScrollBarStyle(style());
-  scrollStyle->setParent(this);
+  QStyle* baseStyle = QStyleFactory::create(QStringLiteral("macos"));
+  if (!baseStyle)
+    baseStyle = QStyleFactory::create(QStringLiteral("macintosh"));
+  if (!baseStyle)
+    baseStyle = QStyleFactory::create(QStringLiteral("Fusion"));
+  auto* scrollStyle = baseStyle ? new NonTransientScrollBarStyle(baseStyle)
+                                : new NonTransientScrollBarStyle();
   verticalScrollBar()->setStyle(scrollStyle);
-  horizontalScrollBar()->setStyle(scrollStyle);
+  if (!scrollStyle->parent())
+    scrollStyle->setParent(verticalScrollBar());
 #endif
 
   m_rhiHost = new HexViewRhiHost(this, viewport());
