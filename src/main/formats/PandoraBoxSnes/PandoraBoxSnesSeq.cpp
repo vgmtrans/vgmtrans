@@ -260,7 +260,7 @@ bool PandoraBoxSnesTrack::readEvent() {
         if (prevNoteSlurred && key == prevNoteKey) {
           // tie
           makePrevDurNoteEnd(getTime() + dur);
-          addGenericEvent(beginOffset, curOffset - beginOffset, "Tie", "", Type::Tie);
+          addTie(beginOffset, curOffset - beginOffset, dur, "Tie");
         }
         else {
           // note

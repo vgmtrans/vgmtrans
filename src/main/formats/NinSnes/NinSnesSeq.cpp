@@ -893,7 +893,7 @@ bool NinSnesTrack::readEvent(void) {
       duration = std::min(std::max(duration, (uint8_t) 1), (uint8_t) (shared->spcNoteDuration - 2));
       desc = fmt::format("Duration: {:d}", duration);
       makePrevDurNoteEnd(getTime() + duration);
-      addGenericEvent(beginOffset, curOffset - beginOffset, "Tie", desc, Type::Tie);
+      addTie(beginOffset, curOffset - beginOffset, duration, "Tie", desc);
       addTime(shared->spcNoteDuration);
       break;
     }

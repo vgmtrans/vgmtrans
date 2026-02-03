@@ -399,7 +399,7 @@ bool KonamiArcadeTrack::readEvent() {
         makePrevDurNoteEnd(getTime() + actualDuration);
         auto desc = fmt::format("Note with Duration (tied) - abs key: {} ({}), velocity: {}, duration: {}",
           static_cast<int>(prevKey), MidiEvent::getNoteName(prevKey), static_cast<int>(linearVel), actualDuration);
-        addGenericEvent(beginOffset, curOffset - beginOffset, "Note with Duration (tied)", desc, Type::Tie);
+        addTie(beginOffset, curOffset - beginOffset, actualDuration, "Note with Duration (tied)", desc);
       } else {
         addNoteByDur(beginOffset, curOffset - beginOffset, note, linearVel, actualDuration);
       }
@@ -523,7 +523,7 @@ bool KonamiArcadeTrack::readEvent() {
       makePrevDurNoteEnd();
       addTime(delta - newdur);
       auto desc = fmt::format("total delta: {:d} ticks  additional duration: {:d} ticks", delta, newdur);
-      addGenericEvent(beginOffset, curOffset - beginOffset, "Hold", desc, Type::Tie);
+      addTie(beginOffset, curOffset - beginOffset, newdur, "Hold", desc);
       m_prevNoteDur += newdur;
       m_prevNoteDelta += delta;
       m_prevDelta = delta;

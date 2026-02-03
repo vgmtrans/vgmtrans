@@ -262,7 +262,7 @@ bool GraphResSnesTrack::readEvent(void) {
         int8_t midiKey = (octave * 12) + NOTE_KEY_TABLE[key];
         if (prevNoteSlurred && midiKey == prevNoteKey) {
           desc = fmt::format("Duration: {:d}", dur);
-          addGenericEvent(beginOffset, curOffset - beginOffset, "Tie", desc, Type::Tie);
+          addTie(beginOffset, curOffset - beginOffset, dur, "Tie", desc);
           makePrevDurNoteEnd(getTime() + dur);
           addTime(len);
         }

@@ -337,7 +337,7 @@ bool ChunSnesTrack::readEvent() {
       }
       else if (tie) {
         // update note duration without changing note pitch
-        addGenericEvent(beginOffset, curOffset - beginOffset, "Tie", desc, Type::Tie);
+        addTie(beginOffset, curOffset - beginOffset, dur, "Tie", desc);
         makePrevDurNoteEnd(getTime() + dur);
         addTime(noteLength);
       }
@@ -346,7 +346,7 @@ bool ChunSnesTrack::readEvent() {
           // slurred note with same key works as tie
           makePrevDurNoteEnd(getTime() + dur);
           desc = fmt::format("Abs Key: {} ({})   Duration: {}", key, MidiEvent::getNoteName(key), dur);
-          addGenericEvent(beginOffset, curOffset - beginOffset, "Note with Duration", desc, Type::Tie);
+          addTie(beginOffset, curOffset - beginOffset, dur, "Note with Duration", desc);
         }
         else {
           addNoteByDur(beginOffset, curOffset - beginOffset, key, NOTE_VELOCITY, dur);

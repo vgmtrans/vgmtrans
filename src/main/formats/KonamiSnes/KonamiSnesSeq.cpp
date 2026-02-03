@@ -437,7 +437,7 @@ bool KonamiSnesTrack::readEvent(void) {
         // TODO: Note volume can be changed during a tied note
         // See the end of Konami Logo sequence for example
         makePrevDurNoteEnd(getTime() + dur);
-        addGenericEvent(beginOffset, curOffset - beginOffset, "Tie", desc, Type::Tie);
+        addTie(beginOffset, curOffset - beginOffset, dur, "Tie", desc);
       }
       else {
         addNoteByDur(beginOffset, curOffset - beginOffset, key, vel, dur);
@@ -515,12 +515,12 @@ bool KonamiSnesTrack::readEvent(void) {
         }
 
         makePrevDurNoteEnd(getTime() + dur);
-        addGenericEvent(beginOffset, curOffset - beginOffset, "Tie", desc, Type::Tie);
+        addTie(beginOffset, curOffset - beginOffset, dur, "Tie", desc);
         addTime(noteLength);
         prevNoteSlurred = (noteDurationRate == parentSeq->NOTE_DUR_RATE_MAX);
       }
       else {
-        addGenericEvent(beginOffset, curOffset - beginOffset, "Tie", desc, Type::Tie);
+        addTie(beginOffset, curOffset - beginOffset, noteLength, "Tie", desc);
         addTime(noteLength);
       }
       break;

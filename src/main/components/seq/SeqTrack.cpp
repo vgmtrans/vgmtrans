@@ -395,11 +395,11 @@ void SeqTrack::addRest(uint32_t offset, uint32_t length, uint32_t restTime, cons
   addTime(restTime);
 }
 
-void SeqTrack::addHold(uint32_t offset, uint32_t length, const std::string &sEventName) {
+void SeqTrack::addTie(uint32_t offset, uint32_t length, uint32_t duration,
+                      const std::string &sEventName, const std::string &sEventDesc) {
   bool isNewOffset = onEvent(offset, length);
 
-  if (readMode == READMODE_ADD_TO_UI && isNewOffset)
-    addEvent(new SeqEvent(this, offset, length, sEventName, Type::Tie));
+  recordDurSeqEvent<SeqEvent>(isNewOffset, getTime(), duration, offset, length, sEventName, Type::Tie, sEventDesc);
 }
 
 void SeqTrack::trackActiveNoteIndex(int8_t key, SeqEventTimeIndex::Index idx) {
