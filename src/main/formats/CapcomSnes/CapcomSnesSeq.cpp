@@ -303,7 +303,7 @@ bool CapcomSnesTrack::readEvent() {
         addTime(dur);
         makePrevDurNoteEnd();
         addTime(len - dur);
-        addGenericEvent(beginOffset, curOffset - beginOffset, "Tie", desc, Type::Tie);
+        addTie(beginOffset, curOffset - beginOffset, dur, "Tie", desc);
       }
       else {
         addNoteByDur(beginOffset, curOffset - beginOffset, key, vel, dur);

@@ -316,7 +316,7 @@ bool HeartBeatSnesTrack::readEvent() {
 
       desc = fmt::format("Duration: {:d}", dur);
       makePrevDurNoteEnd(getTime() + dur);
-      addGenericEvent(beginOffset, curOffset - beginOffset, "Tie", desc, Type::Tie);
+      addTie(beginOffset, curOffset - beginOffset, dur, "Tie", desc);
       addTime(spcNoteDuration);
       break;
     }
