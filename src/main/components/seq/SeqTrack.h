@@ -108,16 +108,8 @@ protected:
   virtual void addEvent(SeqEvent *pSeqEvent);
 
   template <typename EventType, typename... Args>
-  void recordSeqEvent(bool isNewOffset, uint32_t startTick, uint32_t duration, Args&&... args) {
-    if (readMode == READMODE_ADD_TO_UI) {
-      if (isNewOffset) {
-        addEvent(new EventType(this, std::forward<Args>(args)...));
-      }
-    } else if (readMode == READMODE_CONVERT_TO_MIDI) {
-      if (SeqEvent* existing = findSeqEventAtOffset(m_lastEventOffset, m_lastEventLength)) {
-        parentSeq->timedEventIndex().addEvent(existing, startTick, duration);
-      }
-    }
+  void recordSeqEvent(bool isNewOffset, uint32_t startTick, Args&&... args) {
+    recordDurSeqEvent<EventType>(isNewOffset, startTick, 0, std::forward<Args>(args)...);
   }
 
   template <typename EventType, typename... Args>
