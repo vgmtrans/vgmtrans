@@ -399,7 +399,7 @@ void SeqTrack::addTie(uint32_t offset, uint32_t length, uint32_t duration,
                       const std::string &sEventName, const std::string &sEventDesc) {
   bool isNewOffset = onEvent(offset, length);
 
-  recordSeqEvent<SeqEvent>(isNewOffset, getTime(), duration, offset, length, sEventName, Type::Tie, sEventDesc);
+  recordDurSeqEvent<SeqEvent>(isNewOffset, getTime(), duration, offset, length, sEventName, Type::Tie, sEventDesc);
 }
 
 void SeqTrack::trackActiveNoteIndex(int8_t key, SeqEventTimeIndex::Index idx) {
