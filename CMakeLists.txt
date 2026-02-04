@@ -12,6 +12,8 @@ add_compile_definitions($<$<NOT:$<CONFIG:Debug>>:NDEBUG>)
 # Use ccache if present on the system
 find_program(CCACHE ccache)
 if(CCACHE)
+  message(STATUS "Using ccache: ${CCACHE}")
+  set(CMAKE_C_COMPILER_LAUNCHER ${CCACHE})
   set(CMAKE_CXX_COMPILER_LAUNCHER ${CCACHE})
 endif()
 
@@ -70,7 +72,10 @@ endif()
 
 option(ENABLE_UI_QT "Build the UI (Qt)" ON)
 option(ENABLE_CLI "Build the CLI application" ON)
+option(ENABLE_SHELL "Build the shell application" ON)
 
+add_subdirectory("${PROJECT_SOURCE_DIR}/lib/fmt")
+set(SPDLOG_FMT_EXTERNAL ON CACHE BOOL "Use external fmt library")
 add_subdirectory("${PROJECT_SOURCE_DIR}/lib/spdlog")
 add_subdirectory("${PROJECT_SOURCE_DIR}/lib/mio")
 
