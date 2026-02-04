@@ -160,13 +160,25 @@ QString SequencePlayer::songTitle() const {
   return m_song_title;
 }
 
-bool SequencePlayer::playCollection(const VGMColl *coll, bool startPlaying) {
+bool SequencePlayer::playCollection(const VGMColl *coll) {
   if (coll == m_active_vgmcoll) {
-    if (startPlaying || playing()) {
-      toggle();
-    }
+    toggle();
     return false;
   }
+
+  return loadCollection(coll, true);
+}
+
+bool SequencePlayer::setActiveCollection(const VGMColl *coll) {
+  if (coll == m_active_vgmcoll) {
+    return false;
+  }
+
+  const bool wasPlaying = playing();
+  return loadCollection(coll, wasPlaying);
+}
+
+bool SequencePlayer::loadCollection(const VGMColl *coll, bool startPlaying) {
 
   VGMSeq *seq = coll->seq();
   if (!seq) {

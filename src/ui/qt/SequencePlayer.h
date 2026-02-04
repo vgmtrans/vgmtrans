@@ -71,11 +71,18 @@ public:
   [[nodiscard]] QString songTitle() const;
 
   /**
-   * Loads a VGMColl for playback
+   * Loads a VGMColl for playback and starts playing.
+   * If the collection is already active, toggles play/pause.
    * @param collection
    * @return true if data was loaded correctly
    */
-  bool playCollection(const VGMColl *collection, bool startPlaying = true);
+  bool playCollection(const VGMColl *collection);
+  /**
+   * Loads a VGMColl and makes it active without changing play/pause state.
+   * @param collection
+   * @return true if data was loaded correctly
+   */
+  bool setActiveCollection(const VGMColl *collection);
   [[nodiscard]] const VGMColl* activeCollection() const;
 
 signals:
@@ -84,6 +91,7 @@ signals:
 
 private:
   SequencePlayer();
+  bool loadCollection(const VGMColl *collection, bool startPlaying);
 
   const VGMColl *m_active_vgmcoll{};
   HSTREAM m_active_stream{};
