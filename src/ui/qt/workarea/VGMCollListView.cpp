@@ -174,7 +174,6 @@ void VGMCollListView::keyPressEvent(QKeyEvent *e) {
   switch (e->key()) {
     case Qt::Key_Enter:
     case Qt::Key_Return:
-    case Qt::Key_Space:
       handlePlaybackRequest();
       break;
     case Qt::Key_Escape:
@@ -188,6 +187,10 @@ void VGMCollListView::keyPressEvent(QKeyEvent *e) {
 void VGMCollListView::handlePlaybackRequest() {
   QModelIndexList list = this->selectionModel()->selectedIndexes();
   if (list.empty() || list[0].row() >= model()->rowCount()) {
+    if (SequencePlayer::the().activeCollection() != nullptr) {
+      SequencePlayer::the().toggle();
+      return;
+    }
     nothingToPlay();
     return;
   }
