@@ -160,11 +160,9 @@ QString SequencePlayer::songTitle() const {
   return m_song_title;
 }
 
-bool SequencePlayer::playCollection(const VGMColl *coll, bool startPlaying) {
+bool SequencePlayer::playCollection(const VGMColl *coll) {
   if (coll == m_active_vgmcoll) {
-    if (startPlaying || playing()) {
-      toggle();
-    }
+    toggle();
     return false;
   }
 

@@ -179,7 +179,7 @@ void VGMFileView::seekToEvent(VGMItem* item) const {
     auto assocColl = m_vgmfile->assocColls.front();
     if (SequencePlayer::the().activeCollection() != assocColl) {
       auto& seqPlayer = SequencePlayer::the();
-      seqPlayer.playCollection(assocColl, seqPlayer.playing());
+      seqPlayer.setActiveCollection(assocColl);
     }
   }
 
