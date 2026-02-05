@@ -30,6 +30,8 @@ VGMFileView::VGMFileView(VGMFile *vgmfile)
   setWindowTitle(QString::fromStdString(m_vgmfile->name()));
   setWindowIcon(iconForFile(vgmFileToVariant(vgmfile)));
   setAttribute(Qt::WA_DeleteOnClose);
+  // Keep a stable default cursor across MDI tabs; embedded RHI windows can leak resize cursors.
+  setCursor(Qt::ArrowCursor);
 
   m_treeview = new VGMFileTreeView(m_vgmfile, this);
 
