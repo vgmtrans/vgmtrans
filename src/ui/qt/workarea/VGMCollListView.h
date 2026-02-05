@@ -11,6 +11,7 @@
 #include <QKeyEvent>
 
 class VGMColl;
+class VGMFile;
 class VGMCollListView;
 class QItemSelection;
 
@@ -49,5 +50,6 @@ private:
   void collectionMenu(const QPoint &pos) const;
   void keyPressEvent(QKeyEvent *e) override;
   void onSelectionChanged(const QItemSelection &selected, const QItemSelection &deselected);
+  void onVGMFileSelected(VGMFile* file, const QWidget* caller);
   void updateContextualMenus() const;
 };

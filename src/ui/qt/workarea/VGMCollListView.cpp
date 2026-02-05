@@ -6,10 +6,13 @@
 
 #include "VGMCollListView.h"
 
+#include <algorithm>
 #include <QLineEdit>
 #include <VGMColl.h>
 #include <VGMExport.h>
+#include <VGMSeq.h>
 #include "SequencePlayer.h"
+#include "workarea/MdiArea.h"
 #include "QtVGMRoot.h"
 #include "services/MenuManager.h"
 #include "services/NotificationCenter.h"
@@ -140,6 +143,8 @@ VGMCollListView::VGMCollListView(QWidget *parent) : QListView(parent) {
     }
   });
   connect(selectionModel(), &QItemSelectionModel::selectionChanged, this, &VGMCollListView::onSelectionChanged);
+  connect(NotificationCenter::the(), &NotificationCenter::vgmFileSelected, this,
+          &VGMCollListView::onVGMFileSelected);
 }
 
 void VGMCollListView::collectionMenu(const QPoint &pos) const {
@@ -169,7 +174,6 @@ void VGMCollListView::keyPressEvent(QKeyEvent *e) {
   switch (e->key()) {
     case Qt::Key_Enter:
     case Qt::Key_Return:
-    case Qt::Key_Space:
       handlePlaybackRequest();
       break;
     case Qt::Key_Escape:
@@ -183,6 +187,10 @@ void VGMCollListView::keyPressEvent(QKeyEvent *e) {
 void VGMCollListView::handlePlaybackRequest() {
   QModelIndexList list = this->selectionModel()->selectedIndexes();
   if (list.empty() || list[0].row() >= model()->rowCount()) {
+    if (SequencePlayer::the().activeCollection() != nullptr) {
+      SequencePlayer::the().toggle();
+      return;
+    }
     nothingToPlay();
     return;
   }
@@ -197,6 +205,35 @@ void VGMCollListView::handleStopRequest() {
 
 void VGMCollListView::onSelectionChanged(const QItemSelection&, const QItemSelection&) {
   updateContextualMenus();
+}
+
+void VGMCollListView::onVGMFileSelected(VGMFile* file, const QWidget* caller) {
+  if (caller == this) {
+    return;
+  }
+
+  auto *seq = dynamic_cast<VGMSeq *>(file);
+  if (!seq || seq->assocColls.empty()) {
+    return;
+  }
+
+  VGMColl *coll = seq->assocColls.front();
+  const auto& colls = qtVGMRoot.vgmColls();
+  auto it = std::find(colls.begin(), colls.end(), coll);
+  if (it == colls.end()) {
+    return;
+  }
+
+  const int row = static_cast<int>(std::distance(colls.begin(), it));
+  const auto index = model()->index(row, 0);
+  if (!index.isValid()) {
+    return;
+  }
+
+  blockSignals(true);
+  selectionModel()->setCurrentIndex(index, QItemSelectionModel::ClearAndSelect);
+  blockSignals(false);
+  scrollTo(index, QAbstractItemView::EnsureVisible);
 }
 
 void VGMCollListView::updateContextualMenus() const {
