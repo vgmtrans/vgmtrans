@@ -12,6 +12,8 @@
 #include <cstdint>
 #include <vector>
 
+#include "HexView.h"
+
 class QChar;
 class QRectF;
 class QVector4D;
@@ -26,7 +28,6 @@ class QRhiResourceUpdateBatch;
 class QRhiSampler;
 class QRhiShaderResourceBindings;
 class QRhiTexture;
-class HexView;
 
 class HexViewRhiRenderer {
 public:
@@ -109,6 +110,27 @@ private:
     uint32_t glyphStart = 0;
     uint32_t glyphCount = 0;
   };
+  struct Interval {
+    int start = 0;
+    int end = 0;
+  };
+  struct EdgeRun {
+    int startCol = 0;
+    int endCol = 0;
+    int startLine = 0;
+    int endLine = 0;
+  };
+  struct SelectionBuildContext {
+    int startLine = 0;
+    int endLine = -1;
+    int visibleCount = 0;
+    uint32_t fileLength = 0;
+    float lineHeight = 0.0f;
+    float charWidth = 0.0f;
+    float charHalfWidth = 0.0f;
+    float hexStartX = 0.0f;
+    float asciiStartX = 0.0f;
+  };
 
   void ensureRenderTargets(const QSize& pixelSize);
   void releaseRenderTargets();
@@ -142,6 +164,27 @@ private:
   void ensureCacheWindow(int startLine, int endLine, int totalLines);
   void rebuildCacheWindow();
   const CachedLine* cachedLineFor(int line) const;
+  void collectIntervalsForSelections(const std::vector<HexView::SelectionRange>& selections,
+                                     const SelectionBuildContext& ctx,
+                                     std::vector<std::vector<Interval>>& perLine) const;
+  static std::vector<Interval> mergeIntervals(std::vector<Interval>& intervals);
+  void appendMaskRectsForIntervals(const std::vector<Interval>& intervals,
+                                   int line,
+                                   const SelectionBuildContext& ctx,
+                                   float padX,
+                                   float padY,
+                                   const QVector4D& maskColor);
+  void emitEdgeRuns(const std::unordered_map<uint32_t, EdgeRun>& runs,
+                    const SelectionBuildContext& ctx,
+                    float edgePad,
+                    const QVector4D& edgeColor);
+  void appendMaskForSelections(const std::vector<HexView::SelectionRange>& selections,
+                               const SelectionBuildContext& ctx,
+                               float padX,
+                               float padY,
+                               float edgePad,
+                               const QVector4D& maskColor,
+                               const QVector4D& edgeColor);
   void buildBaseInstances();
   void buildSelectionInstances(int startLine, int endLine);
 
