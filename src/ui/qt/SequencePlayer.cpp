@@ -77,7 +77,7 @@ static void mem_close(void *handle) {
 static constexpr BASS_FILEPROCS memory_file_callbacks{MemFile::mem_close, MemFile::mem_tell,
                                                       MemFile::mem_read, MemFile::mem_seek};
 /* How often (in ms) the current ticks are polled */
-static constexpr auto TICK_POLL_INTERVAL_MS = 10;
+static constexpr auto TICK_POLL_INTERVAL_MS = 1000/60;
 
 SequencePlayer::SequencePlayer() {
   /* Use the system default output device.
@@ -92,7 +92,7 @@ SequencePlayer::SequencePlayer() {
   m_seekupdate_timer = new QTimer(this);
   connect(m_seekupdate_timer, &QTimer::timeout, [this]() {
     if (playing()) {
-      playbackPositionChanged(elapsedTicks(), totalTicks());
+      playbackPositionChanged(elapsedTicks(), totalTicks(), PositionChangeOrigin::Playback);
     }
   });
   m_seekupdate_timer->start(TICK_POLL_INTERVAL_MS);
@@ -124,8 +124,7 @@ void SequencePlayer::toggle() {
 
 void SequencePlayer::stop() {
   /* Stop polling seekbar, reset it, propagate that we're done */
-  playbackPositionChanged(0, 1);
-  statusChange(false);
+  playbackPositionChanged(0, 1, PositionChangeOrigin::Playback);
 
   /* Stop the audio output */
   BASS_ChannelStop(m_active_stream);
@@ -136,11 +135,13 @@ void SequencePlayer::stop() {
   BASS_StreamFree(m_active_stream);
   m_active_stream = 0;
   m_active_vgmcoll = nullptr;
+
+  statusChange(false);
 }
 
-void SequencePlayer::seek(int position) {
+void SequencePlayer::seek(int position, PositionChangeOrigin origin) {
   BASS_ChannelSetPosition(m_active_stream, position, BASS_POS_MIDI_TICK);
-  playbackPositionChanged(position, totalTicks());
+  playbackPositionChanged(position, totalTicks(), origin);
 }
 
 bool SequencePlayer::playing() const {
@@ -164,6 +165,20 @@ bool SequencePlayer::playCollection(const VGMColl *coll) {
     toggle();
     return false;
   }
+
+  return loadCollection(coll, true);
+}
+
+bool SequencePlayer::setActiveCollection(const VGMColl *coll) {
+  if (coll == m_active_vgmcoll) {
+    return false;
+  }
+
+  const bool wasPlaying = playing();
+  return loadCollection(coll, wasPlaying);
+}
+
+bool SequencePlayer::loadCollection(const VGMColl *coll, bool startPlaying) {
 
   VGMSeq *seq = coll->seq();
   if (!seq) {
@@ -237,7 +252,16 @@ bool SequencePlayer::playCollection(const VGMColl *coll) {
   m_active_stream = midi_stream;
   m_loaded_sf = sf2_handle;
   m_song_title = QString::fromStdString(m_active_vgmcoll->name());
-  toggle();
+  if (startPlaying) {
+    toggle();
+  } else {
+    BASS_ChannelPause(m_active_stream);
+    statusChange(false);
+  }
 
   return true;
+}
+
+const VGMColl* SequencePlayer::activeCollection() const {
+  return m_active_vgmcoll;
 }

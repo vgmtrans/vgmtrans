@@ -13,6 +13,7 @@ class QPushButton;
 class QLabel;
 class MarqueeLabel;
 class ClickJumpSlider;
+enum class PositionChangeOrigin;
 
 class IconBar final : public QWidget {
   Q_OBJECT
@@ -24,7 +25,7 @@ public:
 signals:
   void playToggle();
   void stopPressed();
-  void seekingTo(int position);
+  void seekingTo(int position, PositionChangeOrigin origin);
   void createPressed();
 
 private slots:

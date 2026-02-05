@@ -5,8 +5,11 @@
  */
 
 #pragma once
+#include <memory>
 #include <QFont>
 #include <QMdiSubWindow>
+#include <vector>
+#include "SeqEventTimeIndex.h"
 
 class SnappingSplitter;
 class VGMFile;
@@ -14,6 +17,8 @@ class HexView;
 class VGMFileTreeView;
 class VGMItem;
 class QScrollArea;
+struct SeqTimedEvent;
+enum class PositionChangeOrigin;
 
 class VGMFileView final : public QMdiSubWindow {
   Q_OBJECT
@@ -39,9 +44,18 @@ private:
   HexView* m_hexview{};
   SnappingSplitter* m_splitter;
   QFont m_defaultHexFont;
+  std::vector<const SeqTimedEvent*> m_playbackTimedEvents;
+  std::vector<const VGMItem*> m_playbackItems;
+  std::vector<const VGMItem*> m_lastPlaybackItems;
+  int m_lastPlaybackPosition = 0;
+  const SeqEventTimeIndex* m_playbackTimeline = nullptr;
+  std::unique_ptr<SeqEventTimeIndex::Cursor> m_playbackCursor;
 
 public slots:
   void onSelectionChange(VGMItem* item) const;
+  void seekToEvent(VGMItem* item) const;
+  void onPlaybackPositionChanged(int current, int max, PositionChangeOrigin origin);
+  void onPlayerStatusChanged(bool playing);
   void resetHexViewFont();
   void increaseHexViewFont();
   void decreaseHexViewFont();

@@ -4,6 +4,8 @@
  * refer to the included LICENSE.txt file
  */
 #include "VGMFileTreeView.h"
+#include "HexViewInput.h"
+#include "VGMFileView.h"
 
 #include <QTextDocument>
 #include <QPainter>
@@ -138,6 +140,8 @@ VGMFileTreeView::VGMFileTreeView(VGMFile *file, QWidget *parent) : QTreeWidget(p
   this->setHeader(headerView);
 
   setItemDelegate(new VGMTreeDisplayItem(this));
+  QColor playbackColor = palette().color(QPalette::Accent);
+  m_playbackBrush = QBrush(playbackColor);
 
   connect(NotificationCenter::the(), &NotificationCenter::vgmfiletree_showDetailsChanged,
           this, &VGMFileTreeView::onShowDetailsChanged);
@@ -170,11 +174,19 @@ void VGMFileTreeView::currentChanged(const QModelIndex &current, const QModelInd
   QTreeView::currentChanged(current, previous);
 
   updateStatusBar();
+  if (QApplication::keyboardModifiers().testFlag(HexViewInput::kModifier)) {
+    seekToTreeItem(currentItem());
+  }
 }
 
 void VGMFileTreeView::mousePressEvent(QMouseEvent *event) {
   // Get the item at the current mouse position
   QTreeWidgetItem *itemAtPoint = itemAt(event->pos());
+
+  if (event->modifiers().testFlag(HexViewInput::kModifier)) {
+    seekToTreeItem(itemAtPoint, true);
+    return;
+  }
 
   // If the item at the mouse position is already selected
   if (itemAtPoint && itemAtPoint->isSelected()) {
@@ -214,6 +226,14 @@ void VGMFileTreeView::keyPressEvent(QKeyEvent *event) {
   QTreeWidget::keyPressEvent(event);
 }
 
+void VGMFileTreeView::mouseMoveEvent(QMouseEvent *event) {
+  if ((event->buttons() & Qt::LeftButton) && event->modifiers().testFlag(HexViewInput::kModifier)) {
+    seekToTreeItem(itemAt(event->pos()));
+    return;
+  }
+  QTreeWidget::mouseMoveEvent(event);
+}
+
 // Update the status bar for the current selection
 void VGMFileTreeView::updateStatusBar() {
   QTreeWidgetItem *treeItem = currentItem();
@@ -229,6 +249,58 @@ void VGMFileTreeView::updateStatusBar() {
   }
 
   NotificationCenter::the()->updateStatusForItem(vgmItem);
+}
+
+void VGMFileTreeView::setPlaybackItems(const std::vector<const VGMItem*>& items) {
+  std::unordered_set<QTreeWidgetItem*> next;
+  next.reserve(items.size());
+  for (const auto* item : items) {
+    if (!item) {
+      continue;
+    }
+    auto it = m_items.find(item);
+    if (it == m_items.end()) {
+      continue;
+    }
+    if (it->second) {
+      next.insert(it->second);
+    }
+  }
+
+  for (auto* treeItem : m_playbackTreeItems) {
+    if (!treeItem || next.find(treeItem) != next.end()) {
+      continue;
+    }
+    treeItem->setBackground(0, QBrush());
+  }
+
+  for (auto* treeItem : next) {
+    if (!treeItem || m_playbackTreeItems.find(treeItem) != m_playbackTreeItems.end()) {
+      continue;
+    }
+    treeItem->setBackground(0, m_playbackBrush);
+  }
+
+  m_playbackTreeItems.swap(next);
+}
+
+void VGMFileTreeView::seekToTreeItem(QTreeWidgetItem* item, bool allowRepeat) {
+  if (!item || (!allowRepeat && item == m_lastSeekItem)) {
+    return;
+  }
+  auto it = m_treeItemToVGMItem.find(item);
+  if (it == m_treeItemToVGMItem.end()) {
+    return;
+  }
+  QWidget* widget = parentWidget();
+  while (widget) {
+    if (auto* view = qobject_cast<VGMFileView*>(widget)) {
+      view->seekToEvent(it->second);
+      m_lastSeekItem = item;
+      return;
+    }
+    widget = widget->parentWidget();
+  }
 }
 
 // Find the index to insert a child item, sorted by offset, using binary search

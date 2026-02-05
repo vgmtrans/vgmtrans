@@ -10,8 +10,11 @@
 #include <QTreeWidgetItem>
 #include <QStyledItemDelegate>
 #include <QHeaderView>
+#include <QBrush>
 #include <unordered_map>
+#include <unordered_set>
 #include <utility>
+#include <vector>
 #include "VGMFile.h"
 
 class VGMFile;
@@ -87,6 +90,7 @@ public:
   void addVGMItem(VGMItem *item, VGMItem *parent, const std::string &name);
   auto getTreeWidgetItem(const VGMItem *vgm_item) const { return m_items.at(vgm_item); };
   void updateStatusBar();
+  void setPlaybackItems(const std::vector<const VGMItem*>& items);
 
 protected:
   void focusInEvent(QFocusEvent* event) override;
@@ -94,16 +98,21 @@ protected:
   void mousePressEvent(QMouseEvent *event) override;
   void mouseDoubleClickEvent(QMouseEvent *event) override;
   void keyPressEvent(QKeyEvent *event) override;
+  void mouseMoveEvent(QMouseEvent *event) override;
 
 private:
   static int getSortedIndex(const QTreeWidgetItem* parent, const VGMTreeItem* item);
   void setItemText(VGMItem* item, VGMTreeItem* treeItem) const;
   void onShowDetailsChanged(bool showDetails);
   void updateItemTextRecursively(QTreeWidgetItem* item);
+  void seekToTreeItem(QTreeWidgetItem* item, bool allowRepeat = false);
 
   bool showDetails = false;
   QTreeWidgetItem *parent_item_cached{};
   VGMItem *parent_cached{};
   std::unordered_map<const VGMItem*, QTreeWidgetItem*> m_items{};
   std::unordered_map<QTreeWidgetItem*, VGMItem*> m_treeItemToVGMItem{};
+  QTreeWidgetItem* m_lastSeekItem{};
+  std::unordered_set<QTreeWidgetItem*> m_playbackTreeItems{};
+  QBrush m_playbackBrush{};
 };

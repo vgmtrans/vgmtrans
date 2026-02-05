@@ -13,6 +13,12 @@
 
 class VGMColl;
 
+enum class PositionChangeOrigin {
+  Playback,
+  SeekBar,
+  HexView
+};
+
 class SequencePlayer : public QObject {
   Q_OBJECT
 public:
@@ -40,7 +46,7 @@ public:
    * Moves the player position
    * @param position relative to song start
    */
-  void seek(int position);
+  void seek(int position, PositionChangeOrigin origin);
 
   /**
    * Checks whether the player is playing
@@ -65,18 +71,27 @@ public:
   [[nodiscard]] QString songTitle() const;
 
   /**
-   * Loads a VGMColl for playback
+   * Loads a VGMColl for playback and starts playing.
+   * If the collection is already active, toggles play/pause.
    * @param collection
    * @return true if data was loaded correctly
    */
   bool playCollection(const VGMColl *collection);
+  /**
+   * Loads a VGMColl and makes it active without changing play/pause state.
+   * @param collection
+   * @return true if data was loaded correctly
+   */
+  bool setActiveCollection(const VGMColl *collection);
+  [[nodiscard]] const VGMColl* activeCollection() const;
 
 signals:
   void statusChange(bool playing);
-  void playbackPositionChanged(int current, int max);
+  void playbackPositionChanged(int current, int max, PositionChangeOrigin origin);
 
 private:
   SequencePlayer();
+  bool loadCollection(const VGMColl *collection, bool startPlaying);
 
   const VGMColl *m_active_vgmcoll{};
   HSTREAM m_active_stream{};
