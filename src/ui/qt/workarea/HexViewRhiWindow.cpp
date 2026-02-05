@@ -12,7 +12,6 @@
 #include <rhi/qrhi.h>
 #include <rhi/qrhi_platform.h>
 
-#include <QCoreApplication>
 #include <QDebug>
 #include <QDragEnterEvent>
 #include <QDragLeaveEvent>
@@ -21,10 +20,8 @@
 #include <QEvent>
 #include <QExposeEvent>
 #include <QMimeData>
-#include <QMouseEvent>
 #include <QResizeEvent>
 #include <QScrollBar>
-#include <QWheelEvent>
 
 #if QT_CONFIG(opengl)
 #include <QOffscreenSurface>
@@ -71,7 +68,7 @@ struct HexViewRhiWindow::BackendData {
 HexViewRhiWindow::HexViewRhiWindow(HexView* view, HexViewRhiRenderer* renderer)
     : m_view(view),
       m_renderer(renderer),
-      m_input(view),
+      m_eventForwarder(view, [this]() { requestUpdate(); }),
       m_backend(std::make_unique<BackendData>()) {
   setFlags(Qt::SubWindow | Qt::FramelessWindowHint);
 
@@ -153,59 +150,15 @@ bool HexViewRhiWindow::event(QEvent *e)
     return true;
   }
 
-  if (!m_view || !m_view->viewport())
+  if (m_eventForwarder.handleEvent(e, m_dragging)) {
+    return true;
+  }
+
+  if (!m_view || !m_view->viewport()) {
     return QWindow::event(e);
+  }
 
   switch (e->type()) {
-    case QEvent::MouseButtonPress: {
-      m_view->setFocus(Qt::MouseFocusReason);
-      m_dragging = true;
-
-      // Press/release: keep synchronous so existing HexView logic stays correct.
-      QCoreApplication::sendEvent(m_view->viewport(), e);
-
-      requestUpdate();
-      return true;
-    }
-
-    case QEvent::MouseMove: {
-      auto *me = static_cast<QMouseEvent*>(e);
-      if (!m_dragging) {
-        const QPoint vp = m_view->viewport()->mapFromGlobal(me->globalPosition().toPoint());
-        m_view->handleTooltipHoverMove(vp, me->modifiers());
-        return true;
-      }
-      // Coalesce: keep only the latest move
-      m_input.queueMouseMove(me);
-
-      // Schedule a frame; Qt will coalesce multiple requestUpdate() calls anyway
-      requestUpdate();
-      return true;
-    }
-
-    case QEvent::MouseButtonRelease: {
-      QCoreApplication::sendEvent(m_view->viewport(), e);
-      m_dragging = false;
-      requestUpdate();
-      return true;
-    }
-
-    case QEvent::Wheel: {
-      auto *we = static_cast<QWheelEvent*>(e);
-      m_input.queueWheel(we);
-
-      requestUpdate();
-      return true;
-    }
-
-    case QEvent::MouseButtonDblClick:
-    case QEvent::KeyPress:
-    case QEvent::KeyRelease:
-    case QEvent::ToolTip:
-      QCoreApplication::sendEvent(m_view->viewport(), e);
-      requestUpdate();
-      return true;
-
     case QEvent::DragEnter:
     case QEvent::DragMove:
     case QEvent::DragLeave:
@@ -384,8 +337,7 @@ void HexViewRhiWindow::renderFrame() {
     return;
 
   // Apply at most one mouse, wheel move per frame
-  m_input.drainPendingMouseMove();
-  m_input.drainPendingWheel();
+  m_eventForwarder.drainPendingInput();
 
   const QSize currentPixelSize = m_sc->currentPixelSize();
   if (currentPixelSize.isEmpty()) {

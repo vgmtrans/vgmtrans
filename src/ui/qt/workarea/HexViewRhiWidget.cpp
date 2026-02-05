@@ -6,19 +6,19 @@
 
 #include "HexViewRhiWidget.h"
 
-#include "HexView.h"
 #include "HexViewRhiRenderer.h"
 
 #include <rhi/qrhi.h>
 
-#include <QCoreApplication>
 #include <QEvent>
-#include <QMouseEvent>
 #include <QResizeEvent>
 
 HexViewRhiWidget::HexViewRhiWidget(HexView* view, HexViewRhiRenderer* renderer,
                                    QWidget* parent)
-    : QRhiWidget(parent), m_view(view), m_renderer(renderer), m_input(view) {
+    : QRhiWidget(parent),
+      m_view(view),
+      m_renderer(renderer),
+      m_eventForwarder(view, [this]() { update(); }) {
 #if defined(Q_OS_LINUX)
   setApi(QRhiWidget::Api::OpenGL);
 #elif defined(Q_OS_WIN)
@@ -44,8 +44,7 @@ void HexViewRhiWidget::initialize(QRhiCommandBuffer* cb) {
 }
 
 void HexViewRhiWidget::render(QRhiCommandBuffer* cb) {
-  m_input.drainPendingMouseMove();
-  m_input.drainPendingWheel();
+  m_eventForwarder.drainPendingInput();
 
   if (!cb || !m_renderer) {
     return;
@@ -77,79 +76,10 @@ void HexViewRhiWidget::releaseResources() {
   }
 }
 
-bool HexViewRhiWidget::event(QEvent *e)
-{
-  if (!m_view || !m_view->viewport())
-    return QRhiWidget::event(e);
-
-  switch (e->type()) {
-    case QEvent::MouseButtonPress: {
-      m_view->setFocus(Qt::MouseFocusReason);
-      m_dragging = true;
-
-      // Press/release: keep synchronous so existing HexView logic stays correct.
-      QCoreApplication::sendEvent(m_view->viewport(), e);
-
-      update();
-      return true;
-    }
-
-    case QEvent::MouseButtonDblClick: {
-      // the second of two quick clicks will be coalesced into a double click event,
-      // we want the second click to register as a normal MouseButtonPress to allow
-      // fast select / deselect
-      auto *me = static_cast<QMouseEvent*>(e);
-      if (!m_dragging && me->button() == Qt::LeftButton) {
-        QMouseEvent pressEvent(QEvent::MouseButtonPress,
-                               me->position(),
-                               me->globalPosition(),
-                               me->button(),
-                               me->buttons(),
-                               me->modifiers());
-        m_view->setFocus(Qt::MouseFocusReason);
-        m_dragging = true;
-        QCoreApplication::sendEvent(m_view->viewport(), &pressEvent);
-      }
-      QCoreApplication::sendEvent(m_view->viewport(), e);
-      update();
-      return true;
-    }
-
-    case QEvent::MouseMove: {
-      auto *me = static_cast<QMouseEvent*>(e);
-      if (!m_dragging) {
-        const QPoint vp = m_view->viewport()->mapFromGlobal(me->globalPosition().toPoint());
-        m_view->handleTooltipHoverMove(vp, me->modifiers());
-        return true;
-      }
-      m_input.queueMouseMove(me);
-      update();
-      return true;
-    }
-
-    case QEvent::MouseButtonRelease: {
-      QCoreApplication::sendEvent(m_view->viewport(), e);
-      m_dragging = false;
-      update();
-      return true;
-    }
-
-    case QEvent::Wheel:
-      m_input.queueWheel(static_cast<QWheelEvent*>(e));
-      update();
-      return true;
-
-    case QEvent::KeyPress:
-    case QEvent::KeyRelease:
-    case QEvent::ToolTip:
-      QCoreApplication::sendEvent(m_view->viewport(), e);
-      update();
-      return true;
-
-    default:
-      break;
+bool HexViewRhiWidget::event(QEvent* e) {
+  if (m_eventForwarder.handleEvent(e, m_dragging)) {
+    return true;
   }
-
   return QRhiWidget::event(e);
 }
 

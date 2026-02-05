@@ -13,7 +13,7 @@
 #include <QPointF>
 #include <memory>
 
-#include "HexViewRhiInputCoalescer.h"
+#include "HexViewRhiEventForwarder.h"
 
 class QEvent;
 class QExposeEvent;
@@ -65,7 +65,7 @@ private:
   QRhiCommandBuffer* m_cb = nullptr;
 
   bool m_dragging = false;
-  HexViewRhiInputCoalescer m_input;
+  HexViewRhiEventForwarder m_eventForwarder;
   int m_pumpFrames = 0;        // generic "keep drawing for N frames"
   QTimer m_scrollBarFrameTimer;
 
