@@ -168,6 +168,20 @@ bool SequencePlayer::playCollection(const VGMColl *coll, bool startPlaying) {
     return false;
   }
 
+  return loadCollection(coll, true);
+}
+
+bool SequencePlayer::setActiveCollection(const VGMColl *coll) {
+  if (coll == m_active_vgmcoll) {
+    return false;
+  }
+
+  const bool wasPlaying = playing();
+  return loadCollection(coll, wasPlaying);
+}
+
+bool SequencePlayer::loadCollection(const VGMColl *coll, bool startPlaying) {
+
   VGMSeq *seq = coll->seq();
   if (!seq) {
     L_ERROR("Failed to play collection as it lacks sequence data.");
