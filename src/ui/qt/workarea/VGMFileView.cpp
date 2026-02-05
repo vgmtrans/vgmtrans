@@ -270,6 +270,8 @@ void VGMFileView::onPlaybackPositionChanged(int current, int max, PositionChange
         QTimer::singleShot(0, m_hexview, [this, current, max] {
           onPlaybackPositionChanged(current, max, PositionChangeOrigin::HexView);
         });
+      } else {
+        m_playbackCursor->getActiveAt(current, m_playbackTimedEvents);
       }
       break;
     case PositionChangeOrigin::HexView:
