@@ -13,7 +13,7 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
   endif()
 endif()
 
-find_package(Qt6 COMPONENTS Core Gui ShaderTools Widgets Svg)
+find_package(Qt6 COMPONENTS Core Gui ShaderTools Widgets Svg GuiPrivate)
 if(NOT Qt6_FOUND AND CMAKE_SYSTEM_NAME STREQUAL "Windows")
   message(STATUS "Qt6 could not be found, falling back to vendored Qt6")
   set(Qt6_DIR
@@ -25,7 +25,7 @@ if(NOT Qt6_FOUND AND CMAKE_SYSTEM_NAME STREQUAL "Windows")
       SEND_ERROR
         "Did you forget to run `git submodule update --init --recursive`?")
   endif()
-  find_package(Qt6 REQUIRED COMPONENTS Core Gui ShaderTools Widgets Svg)
+  find_package(Qt6 COMPONENTS Core Gui ShaderTools Widgets Svg GuiPrivate)
 endif()
 
 message(STATUS "Using Qt ${Qt6_VERSION}")
