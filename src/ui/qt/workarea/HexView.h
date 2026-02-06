@@ -87,19 +87,6 @@ private:
     qint64 startMs = 0;
     float alpha = 0.0f;
   };
-  struct InteractionState {
-    VGMItem* selectedItem = nullptr;
-    uint32_t selectedOffset = 0;
-    bool isDragging = false;
-    bool seekModifierActive = false;
-    VGMItem* tooltipItem = nullptr;
-    VGMItem* lastSeekItem = nullptr;
-    std::vector<SelectionRange> selections;
-    std::vector<SelectionRange> fadeSelections;
-    std::vector<SelectionRange> playbackSelections;
-    std::vector<FadePlaybackSelection> fadePlaybackSelections;
-    bool playbackActive = false;
-  };
   struct Style {
     QColor bg;
     QColor fg;
@@ -147,7 +134,19 @@ private:
   void hideTooltip();
 
   VGMFile* m_vgmfile = nullptr;
-  InteractionState m_interaction;
+  // Interaction state.
+  VGMItem* m_selectedItem = nullptr;
+  uint32_t m_selectedOffset = 0;
+  bool m_isDragging = false;
+  bool m_seekModifierActive = false;
+  VGMItem* m_tooltipItem = nullptr;
+  VGMItem* m_lastSeekItem = nullptr;
+  std::vector<SelectionRange> m_selections;
+  std::vector<SelectionRange> m_fadeSelections;
+  std::vector<SelectionRange> m_playbackSelections;
+  std::vector<FadePlaybackSelection> m_fadePlaybackSelections;
+  bool m_playbackActive = false;
+
   int m_charWidth = 0;
   int m_charHalfWidth = 0;
   int m_lineHeight = 0;
