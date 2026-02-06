@@ -91,16 +91,16 @@ add_executable(
   widgets/TableView.h
   widgets/TitleBar.cpp
   widgets/TitleBar.h
-  workarea/HexView.cpp
-  workarea/HexView.h
-  workarea/HexViewRhiHost.cpp
-  workarea/HexViewRhiHost.h
-  workarea/HexViewRhiRenderer.cpp
-  workarea/HexViewRhiRenderer.h
-  workarea/HexViewRhiWidget.cpp
-  workarea/HexViewRhiWidget.h
-  workarea/HexViewRhiWindow.cpp
-  workarea/HexViewRhiWindow.h
+  workarea/hexview/HexView.cpp
+  workarea/hexview/HexView.h
+  workarea/hexview/HexViewRhiHost.cpp
+  workarea/hexview/HexViewRhiHost.h
+  workarea/hexview/HexViewRhiRenderer.cpp
+  workarea/hexview/HexViewRhiRenderer.h
+  workarea/hexview/HexViewRhiWidget.cpp
+  workarea/hexview/HexViewRhiWidget.h
+  workarea/hexview/HexViewRhiWindow.cpp
+  workarea/hexview/HexViewRhiWindow.h
   workarea/MdiArea.cpp
   workarea/MdiArea.h
   workarea/RawFileListView.cpp
@@ -130,16 +130,16 @@ qt_add_shaders(
   vgmtrans
   "hexview_shaders"
   PREFIX "/shaders"
-  BASE "workarea/shaders"
+  BASE "workarea/hexview/shaders"
   FILES
-    workarea/shaders/hexquad.vert
-    workarea/shaders/hexquad.frag
-    workarea/shaders/hexglyph.vert
-    workarea/shaders/hexglyph.frag
-    workarea/shaders/hexscreen.vert
-    workarea/shaders/hexedge.vert
-    workarea/shaders/hexedge.frag
-    workarea/shaders/hexcomposite.frag
+    workarea/hexview/shaders/hexquad.vert
+    workarea/hexview/shaders/hexquad.frag
+    workarea/hexview/shaders/hexglyph.vert
+    workarea/hexview/shaders/hexglyph.frag
+    workarea/hexview/shaders/hexscreen.vert
+    workarea/hexview/shaders/hexedge.vert
+    workarea/hexview/shaders/hexedge.frag
+    workarea/hexview/shaders/hexcomposite.frag
 )
 
 # Workaround macdeployqt not correctly deploying QtDbus

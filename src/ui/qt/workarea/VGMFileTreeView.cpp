@@ -4,7 +4,7 @@
  * refer to the included LICENSE.txt file
  */
 #include "VGMFileTreeView.h"
-#include "HexViewInput.h"
+#include "hexview/HexViewInput.h"
 #include "VGMFileView.h"
 
 #include <QTextDocument>

@@ -39,7 +39,7 @@
 #include "workarea/VGMFileListView.h"
 #include "workarea/VGMCollListView.h"
 #include "workarea/VGMCollView.h"
-#include "workarea/HexViewInput.h"
+#include "workarea/hexview/HexViewInput.h"
 #include "workarea/MdiArea.h"
 #include "TitleBar.h"
 #include "StatusBarContent.h"
