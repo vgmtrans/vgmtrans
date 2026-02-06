@@ -49,13 +49,17 @@ public:
     }
   }
 
+  void setLogLevel(spdlog::level::level_enum level) const {
+    logger_->set_level(level);
+  }
+
 private:
   std::shared_ptr<spdlog::logger> logger_;
 
   LogManager() {
     auto ui_sink = std::make_shared<UISink<std::mutex>>();
     logger_ = std::make_shared<spdlog::logger>("ui_logger", ui_sink);
-    logger_->set_level(spdlog::level::trace);
+    logger_->set_level(spdlog::level::info);
     logger_->flush_on(spdlog::level::trace);
   }
 

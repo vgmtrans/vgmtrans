@@ -19,12 +19,19 @@
 #include <QTimer>
 #include <QPalette>
 #include <LogItem.h>
+#include "LogManager.h"
 #include "QtVGMRoot.h"
 
 namespace {
 
 constexpr int FLUSH_INTERVAL_MS = 500;
 constexpr int FLUSH_MESSAGE_THRESHOLD = 5000;
+constexpr spdlog::level::level_enum kFilterToSpdlog[] = {
+  spdlog::level::err,
+  spdlog::level::warn,
+  spdlog::level::info,
+  spdlog::level::debug
+};
 
 QString levelPrefix(LogLevel level) {
   switch (level) {
@@ -61,6 +68,7 @@ Logger::Logger(QWidget *parent)
   setAllowedAreas(Qt::AllDockWidgetAreas);
 
   createElements();
+  LogManager::the().setLogLevel(kFilterToSpdlog[m_level]);
   connectElements();
 }
 
@@ -98,7 +106,13 @@ void Logger::createElements() {
 void Logger::connectElements() {
   connect(logger_clear, &QPushButton::pressed, this, &Logger::clearLog);
   connect(logger_filter, QOverload<int>::of(&QComboBox::currentIndexChanged),
-          [this](int level) { m_level = level; });
+          [this](int level) {
+            if (level < LOG_LEVEL_ERR || level > LOG_LEVEL_DEBUG) {
+              level = LOG_LEVEL_INFO;
+            }
+            m_level = level;
+            LogManager::the().setLogLevel(kFilterToSpdlog[level]);
+          });
   connect(logger_save, &QPushButton::pressed, this, &Logger::exportLog);
   connect(&qtVGMRoot, &QtVGMRoot::UI_log, this, &Logger::push);
 }
