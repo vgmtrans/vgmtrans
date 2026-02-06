@@ -770,32 +770,40 @@ void HexViewRhiRenderer::updateUniforms(QRhiResourceUpdateBatch* u, float scroll
   u->updateDynamicBuffer(m_edgeUbuf, 0, kMat4Bytes, mvp.constData());
   u->updateDynamicBuffer(m_edgeUbuf, kMat4Bytes, kVec4Bytes, &edgeParams);
 
-  const QVector4D p0(static_cast<float>(m_view->m_overlayOpacity), shadowStrength,
-                     shadowUvX, shadowUvY);
-  const QVector4D p1(hexStartX, hexWidth, asciiStartX, asciiWidth);
-  const QVector4D p2(viewW, viewH, uvFlipY, timeSeconds);
-  const QVector4D p3 = toVec4(SHADOW_COLOR);
+  const QVector4D overlayAndShadow(static_cast<float>(m_view->m_overlayOpacity),
+                                   shadowStrength, shadowUvX, shadowUvY);
+  const QVector4D columnLayout(hexStartX, hexWidth, asciiStartX, asciiWidth);
+  const QVector4D viewAndTime(viewW, viewH, uvFlipY, timeSeconds);
+  const QVector4D shadowColor = toVec4(SHADOW_COLOR);
   const QColor glowLow = m_view->m_playbackGlowLow;
   const QColor glowHigh = m_view->m_playbackGlowHigh;
-  const QVector4D p4(glowLow.redF(), glowLow.greenF(), glowLow.blueF(),
-                     static_cast<float>(m_view->m_playbackGlowStrength));
-  const QVector4D p5(glowHigh.redF(), glowHigh.greenF(), glowHigh.blueF(), dpr);
+  const QVector4D glowLowAndStrength(glowLow.redF(), glowLow.greenF(), glowLow.blueF(),
+                                     static_cast<float>(m_view->m_playbackGlowStrength));
+  const QVector4D glowHighAndDpr(glowHigh.redF(), glowHigh.greenF(), glowHigh.blueF(), dpr);
   const float outlineAlpha = m_outlineAlpha;
-  const QVector4D p6(OUTLINE_COLOR.redF(), OUTLINE_COLOR.greenF(), OUTLINE_COLOR.blueF(),
-                     outlineAlpha);
-  const QVector4D p7(lineHeight, scrollY,
-                     static_cast<float>(m_itemIdStartLine),
-                     static_cast<float>(std::max(1, m_itemIdSize.height())));
+  const QVector4D outlineColor(OUTLINE_COLOR.redF(), OUTLINE_COLOR.greenF(),
+                               OUTLINE_COLOR.blueF(), outlineAlpha);
+  const QVector4D itemIdWindow(lineHeight, scrollY,
+                               static_cast<float>(m_itemIdStartLine),
+                               static_cast<float>(std::max(1, m_itemIdSize.height())));
 
   u->updateDynamicBuffer(m_compositeUbuf, 0, kMat4Bytes, screenMvp.constData());
-  u->updateDynamicBuffer(m_compositeUbuf, kMat4Bytes + kVec4Bytes * 0, kVec4Bytes, &p0);
-  u->updateDynamicBuffer(m_compositeUbuf, kMat4Bytes + kVec4Bytes * 1, kVec4Bytes, &p1);
-  u->updateDynamicBuffer(m_compositeUbuf, kMat4Bytes + kVec4Bytes * 2, kVec4Bytes, &p2);
-  u->updateDynamicBuffer(m_compositeUbuf, kMat4Bytes + kVec4Bytes * 3, kVec4Bytes, &p3);
-  u->updateDynamicBuffer(m_compositeUbuf, kMat4Bytes + kVec4Bytes * 4, kVec4Bytes, &p4);
-  u->updateDynamicBuffer(m_compositeUbuf, kMat4Bytes + kVec4Bytes * 5, kVec4Bytes, &p5);
-  u->updateDynamicBuffer(m_compositeUbuf, kMat4Bytes + kVec4Bytes * 6, kVec4Bytes, &p6);
-  u->updateDynamicBuffer(m_compositeUbuf, kMat4Bytes + kVec4Bytes * 7, kVec4Bytes, &p7);
+  u->updateDynamicBuffer(m_compositeUbuf, kMat4Bytes + kVec4Bytes * 0, kVec4Bytes,
+                         &overlayAndShadow);
+  u->updateDynamicBuffer(m_compositeUbuf, kMat4Bytes + kVec4Bytes * 1, kVec4Bytes,
+                         &columnLayout);
+  u->updateDynamicBuffer(m_compositeUbuf, kMat4Bytes + kVec4Bytes * 2, kVec4Bytes,
+                         &viewAndTime);
+  u->updateDynamicBuffer(m_compositeUbuf, kMat4Bytes + kVec4Bytes * 3, kVec4Bytes,
+                         &shadowColor);
+  u->updateDynamicBuffer(m_compositeUbuf, kMat4Bytes + kVec4Bytes * 4, kVec4Bytes,
+                         &glowLowAndStrength);
+  u->updateDynamicBuffer(m_compositeUbuf, kMat4Bytes + kVec4Bytes * 5, kVec4Bytes,
+                         &glowHighAndDpr);
+  u->updateDynamicBuffer(m_compositeUbuf, kMat4Bytes + kVec4Bytes * 6, kVec4Bytes,
+                         &outlineColor);
+  u->updateDynamicBuffer(m_compositeUbuf, kMat4Bytes + kVec4Bytes * 7, kVec4Bytes,
+                         &itemIdWindow);
 }
 
 bool HexViewRhiRenderer::ensureInstanceBuffer(QRhiBuffer*& buffer, int bytes) {

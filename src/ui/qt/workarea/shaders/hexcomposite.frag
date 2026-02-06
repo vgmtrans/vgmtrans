@@ -9,14 +9,14 @@ layout(binding = 4) uniform sampler2D itemIdTex;
 
 layout(std140, binding = 0) uniform Ubuf {
   mat4 mvp;
-  vec4 p0;
-  vec4 p1;
-  vec4 p2;
-  vec4 p3;
-  vec4 p4;
-  vec4 p5;
-  vec4 p6;
-  vec4 p7;
+  vec4 overlayAndShadow;   // x=overlayOpacity, y=shadowStrength, z=shadowOffsetX, w=shadowOffsetY
+  vec4 columnLayout;       // x=hexStart, y=hexWidth, z=asciiStart, w=asciiWidth
+  vec4 viewAndTime;        // x=viewWidth, y=viewHeight, z=flipY, w=timeSeconds
+  vec4 shadowColor;
+  vec4 glowLowAndStrength; // rgb=glowLow, a=glowStrength
+  vec4 glowHighAndDpr;     // rgb=glowHigh, a=devicePixelRatio
+  vec4 outlineColor;       // rgba
+  vec4 itemIdWindow;       // x=lineHeight, y=scrollY, z=itemIdStartLine, w=itemIdHeight
 };
 
 layout(location = 0) out vec4 fragColor;
@@ -39,28 +39,26 @@ float noise2(vec2 p) {
 void main() {
   vec4 base = texture(contentTex, vUv);
 
-  float overlayOpacity = p0.x;
-  float shadowStrength = p0.y;
-  vec2 shadowOffset = p0.zw;
+  float overlayOpacity = overlayAndShadow.x;
+  float shadowStrength = overlayAndShadow.y;
+  vec2 shadowOffset = overlayAndShadow.zw;
 
-  float hexStart = p1.x;
-  float hexWidth = p1.y;
-  float asciiStart = p1.z;
-  float asciiWidth = p1.w;
+  float hexStart = columnLayout.x;
+  float hexWidth = columnLayout.y;
+  float asciiStart = columnLayout.z;
+  float asciiWidth = columnLayout.w;
 
-  vec2 viewSize = p2.xy;
-  float flipY = p2.z;
-  float dpr = max(p5.a, 1.0);
-  float time = p2.w;
-  vec4 shadowColor = p3;
-  vec3 glowLow = p4.rgb;
-  float glowStrength = p4.a;
-  vec3 glowHigh = p5.rgb;
-  vec4 outlineColor = p6;
-  float lineHeight = p7.x;
-  float scrollY = p7.y;
-  float idStartLine = p7.z;
-  float idHeight = p7.w;
+  vec2 viewSize = viewAndTime.xy;
+  float flipY = viewAndTime.z;
+  float dpr = max(glowHighAndDpr.a, 1.0);
+  float time = viewAndTime.w;
+  vec3 glowLow = glowLowAndStrength.rgb;
+  float glowStrength = glowLowAndStrength.a;
+  vec3 glowHigh = glowHighAndDpr.rgb;
+  float lineHeight = itemIdWindow.x;
+  float scrollY = itemIdWindow.y;
+  float idStartLine = itemIdWindow.z;
+  float idHeight = itemIdWindow.w;
 
   float x = vUv.x * viewSize.x;
   bool inHex = (x >= hexStart) && (x < hexStart + hexWidth);
