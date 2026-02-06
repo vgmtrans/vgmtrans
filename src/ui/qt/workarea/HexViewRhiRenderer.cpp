@@ -1336,9 +1336,10 @@ void HexViewRhiRenderer::buildSelectionInstances(int startLine, int endLine) {
   m_maskRectInstances.clear();
   m_edgeRectInstances.clear();
 
-  const bool hasSelection = !m_view->m_interaction.selections.empty() || !m_view->m_interaction.fadeSelections.empty();
-  const bool hasPlayback = !m_view->m_interaction.playbackSelections.empty() ||
-                           !m_view->m_interaction.fadePlaybackSelections.empty();
+  const auto& interaction = m_view->m_interaction;
+  const bool hasSelection = !interaction.selections.empty() || !interaction.fadeSelections.empty();
+  const bool hasPlayback = !interaction.playbackSelections.empty() ||
+                           !interaction.fadePlaybackSelections.empty();
   if ((!hasSelection && !hasPlayback) || startLine > endLine) {
     return;
   }
@@ -1373,22 +1374,22 @@ void HexViewRhiRenderer::buildSelectionInstances(int startLine, int endLine) {
 
   if (hasSelection) {
     const std::vector<HexView::SelectionRange>& selections =
-        m_view->m_interaction.selections.empty() ? m_view->m_interaction.fadeSelections : m_view->m_interaction.selections;
+        interaction.selections.empty() ? interaction.fadeSelections : interaction.selections;
     appendMaskForSelections(selections, ctx, 0.0f, 0.0f, shadowPad, selectionMaskColor,
                             selectionEdgeColor);
   }
 
-  if (!m_view->m_interaction.playbackSelections.empty()) {
+  if (!interaction.playbackSelections.empty()) {
     const QVector4D playbackMaskColor(0.0f, 1.0f, 0.0f, 0.0f);
     const QVector4D playbackEdgeColor(0.0f, 1.0f, 0.0f, 0.0f);
-    appendMaskForSelections(m_view->m_interaction.playbackSelections, ctx, 0.0f, 0.0f, glowPad,
+    appendMaskForSelections(interaction.playbackSelections, ctx, 0.0f, 0.0f, glowPad,
                             playbackMaskColor, playbackEdgeColor);
   }
 
-  if (!m_view->m_interaction.fadePlaybackSelections.empty()) {
+  if (!interaction.fadePlaybackSelections.empty()) {
     std::vector<HexView::SelectionRange> fadeRanges;
-    fadeRanges.reserve(m_view->m_interaction.fadePlaybackSelections.size());
-    for (const auto& selection : m_view->m_interaction.fadePlaybackSelections) {
+    fadeRanges.reserve(interaction.fadePlaybackSelections.size());
+    for (const auto& selection : interaction.fadePlaybackSelections) {
       fadeRanges.push_back(selection.range);
     }
 
@@ -1397,7 +1398,7 @@ void HexViewRhiRenderer::buildSelectionInstances(int startLine, int endLine) {
     appendMaskForSelections(fadeRanges, ctx, 0.0f, 0.0f, glowPad, playbackMaskColor,
                             playbackEdgeColor);
     const QVector4D fadeEdgeColor(0.0f, 0.0f, 0.0f, 0.0f);
-    for (const auto& selection : m_view->m_interaction.fadePlaybackSelections) {
+    for (const auto& selection : interaction.fadePlaybackSelections) {
       if (selection.alpha <= 0.0f) {
         continue;
       }

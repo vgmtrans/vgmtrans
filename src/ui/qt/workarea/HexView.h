@@ -120,6 +120,10 @@ private:
   int getVirtualHeight() const;
   int getTotalLines() const;
   int getOffsetFromPoint(QPoint pos) const;
+  void requestRhiUpdate(bool markBaseDirty = false, bool markSelectionDirty = false);
+  void clearCurrentSelection(bool animateSelection);
+  void selectCurrentItem(bool animateSelection);
+  void refreshSelectionVisuals(bool animateSelection);
   void updateLayout();
   void updateScrollBars();
   void rebuildStyleMap();
