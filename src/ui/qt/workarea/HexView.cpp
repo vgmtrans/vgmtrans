@@ -744,7 +744,8 @@ void HexView::keyPressEvent(QKeyEvent* event) {
   uint32_t newOffset = 0;
   switch (event->key()) {
     case HexViewInput::kModifierKey:
-      handleTooltipHoverMove(mapFromGlobal(QCursor::pos()), QApplication::keyboardModifiers());
+      handleTooltipHoverMove(viewport()->mapFromGlobal(QCursor::pos()),
+                             QApplication::keyboardModifiers());
       break;
     case Qt::Key_Up:
       newOffset = m_selectedOffset - BYTES_PER_LINE;
@@ -867,7 +868,7 @@ void HexView::mouseReleaseEvent(QMouseEvent* event) {
   if (event->button() == Qt::LeftButton) {
     m_isDragging = false;
     m_lastSeekItem = nullptr;
-    const QPoint vp = mapFromGlobal(QCursor::pos());
+    const QPoint vp = viewport()->mapFromGlobal(QCursor::pos());
     handleTooltipHoverMove(vp, QApplication::keyboardModifiers());
   }
   QAbstractScrollArea::mouseReleaseEvent(event);
