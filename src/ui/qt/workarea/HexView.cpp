@@ -188,16 +188,15 @@ HexView::HexView(VGMFile* vgmfile, QWidget* parent)
 
   connect(NotificationCenter::the(), &NotificationCenter::seekModifierChanged, this,
           [this](bool active) {
-            auto& interaction = m_interaction;
-            if (interaction.seekModifierActive == active) {
+            if (m_interaction.seekModifierActive == active) {
               return;
             }
-            interaction.seekModifierActive = active;
+            m_interaction.seekModifierActive = active;
             m_outlineFadeClock.restart();
             if (!m_outlineFadeTimer.isActive()) {
               m_outlineFadeTimer.start(16, this);
             }
-            if (interaction.isDragging) {
+            if (m_interaction.isDragging) {
               hideTooltip();
               requestRhiUpdate();
               return;
@@ -348,31 +347,29 @@ int HexView::getTotalLines() const {
 }
 
 void HexView::clearCurrentSelection(bool animateSelection) {
-  auto& interaction = m_interaction;
-  if (interaction.playbackActive) {
-    interaction.selections.clear();
-    interaction.fadeSelections.clear();
+  if (m_interaction.playbackActive) {
+    m_interaction.selections.clear();
+    m_interaction.fadeSelections.clear();
     updateHighlightState(false);
   } else {
-    if (!interaction.selections.empty()) {
-      interaction.fadeSelections = interaction.selections;
+    if (!m_interaction.selections.empty()) {
+      m_interaction.fadeSelections = m_interaction.selections;
     }
-    interaction.selections.clear();
+    m_interaction.selections.clear();
     showSelectedItem(false, animateSelection);
   }
   requestRhiUpdate(false, true);
 }
 
 void HexView::selectCurrentItem(bool animateSelection) {
-  auto& interaction = m_interaction;
-  if (!interaction.selectedItem) {
+  if (!m_interaction.selectedItem) {
     return;
   }
-  interaction.selectedOffset = interaction.selectedItem->offset();
-  interaction.selections.clear();
-  interaction.selections.push_back(
-      {interaction.selectedItem->offset(), interaction.selectedItem->length()});
-  interaction.fadeSelections.clear();
+  m_interaction.selectedOffset = m_interaction.selectedItem->offset();
+  m_interaction.selections.clear();
+  m_interaction.selections.push_back(
+      {m_interaction.selectedItem->offset(), m_interaction.selectedItem->length()});
+  m_interaction.fadeSelections.clear();
   updateHighlightState(animateSelection);
   requestRhiUpdate(false, true);
 }
@@ -383,10 +380,9 @@ void HexView::refreshSelectionVisuals(bool animateSelection) {
 }
 
 void HexView::setSelectedItem(VGMItem* item) {
-  auto& interaction = m_interaction;
-  interaction.selectedItem = item;
+  m_interaction.selectedItem = item;
 
-  if (!interaction.selectedItem) {
+  if (!m_interaction.selectedItem) {
     clearCurrentSelection(true);
     return;
   }
@@ -397,9 +393,9 @@ void HexView::setSelectedItem(VGMItem* item) {
     return;
   }
 
-  const int itemBaseOffset = static_cast<int>(interaction.selectedItem->offset() - m_vgmfile->offset());
+  const int itemBaseOffset = static_cast<int>(m_interaction.selectedItem->offset() - m_vgmfile->offset());
   const int line = itemBaseOffset / BYTES_PER_LINE;
-  const int endLine = (itemBaseOffset + static_cast<int>(interaction.selectedItem->length())) / BYTES_PER_LINE;
+  const int endLine = (itemBaseOffset + static_cast<int>(m_interaction.selectedItem->length())) / BYTES_PER_LINE;
 
   const int viewStartLine = verticalScrollBar()->value() / m_lineHeight;
   const int viewEndLine = viewStartLine + (viewport()->height() / m_lineHeight);
@@ -421,7 +417,6 @@ void HexView::setSelectedItem(VGMItem* item) {
 }
 
 void HexView::setPlaybackSelectionsForItems(const std::vector<const VGMItem*>& items) {
-  auto& interaction = m_interaction;
   auto keyForFade = [](const FadePlaybackSelection& selection) -> uint64_t {
     return selectionKey(selection.range.offset, selection.range.length);
   };
@@ -442,18 +437,18 @@ void HexView::setPlaybackSelectionsForItems(const std::vector<const VGMItem*>& i
     nextKeys.insert(selectionKey(selection.offset, selection.length));
   }
 
-  if (!interaction.fadePlaybackSelections.empty()) {
-    interaction.fadePlaybackSelections.erase(
-        std::remove_if(interaction.fadePlaybackSelections.begin(), interaction.fadePlaybackSelections.end(),
+  if (!m_interaction.fadePlaybackSelections.empty()) {
+    m_interaction.fadePlaybackSelections.erase(
+        std::remove_if(m_interaction.fadePlaybackSelections.begin(), m_interaction.fadePlaybackSelections.end(),
                        [&](const FadePlaybackSelection& selection) {
                          return nextKeys.find(keyForFade(selection)) != nextKeys.end();
                        }),
-        interaction.fadePlaybackSelections.end());
+        m_interaction.fadePlaybackSelections.end());
   }
 
   std::unordered_set<uint64_t> fadeKeys;
-  fadeKeys.reserve(interaction.fadePlaybackSelections.size() * 2 + 1);
-  for (const auto& selection : interaction.fadePlaybackSelections) {
+  fadeKeys.reserve(m_interaction.fadePlaybackSelections.size() * 2 + 1);
+  for (const auto& selection : m_interaction.fadePlaybackSelections) {
     fadeKeys.insert(keyForFade(selection));
   }
 
@@ -461,51 +456,50 @@ void HexView::setPlaybackSelectionsForItems(const std::vector<const VGMItem*>& i
   bool addedFade = false;
   if (fadeEnabled) {
     const qint64 now = playbackNowMs();
-    for (const auto& selection : interaction.playbackSelections) {
+    for (const auto& selection : m_interaction.playbackSelections) {
       const uint64_t key = selectionKey(selection.offset, selection.length);
       if (nextKeys.find(key) == nextKeys.end() && fadeKeys.insert(key).second) {
-        interaction.fadePlaybackSelections.push_back({selection, now, 1.0f});
+        m_interaction.fadePlaybackSelections.push_back({selection, now, 1.0f});
         addedFade = true;
       }
     }
   } else {
-    interaction.fadePlaybackSelections.clear();
+    m_interaction.fadePlaybackSelections.clear();
   }
 
-  if (addedFade || !interaction.fadePlaybackSelections.empty()) {
+  if (addedFade || !m_interaction.fadePlaybackSelections.empty()) {
     ensurePlaybackFadeTimer();
     updatePlaybackFade();
   } else {
     m_playbackFadeTimer.stop();
   }
 
-  interaction.playbackSelections = std::move(next);
+  m_interaction.playbackSelections = std::move(next);
   refreshSelectionVisuals(false);
 }
 
 void HexView::clearPlaybackSelections(bool fade) {
-  auto& interaction = m_interaction;
-  if (interaction.playbackSelections.empty()) {
+  if (m_interaction.playbackSelections.empty()) {
     return;
   }
   if (fade && PLAYBACK_FADE_DURATION_MS > 0) {
     const qint64 now = playbackNowMs();
     std::unordered_set<uint64_t> fadeKeys;
-    fadeKeys.reserve(interaction.fadePlaybackSelections.size() * 2 + 1);
-    for (const auto& selection : interaction.fadePlaybackSelections) {
+    fadeKeys.reserve(m_interaction.fadePlaybackSelections.size() * 2 + 1);
+    for (const auto& selection : m_interaction.fadePlaybackSelections) {
       fadeKeys.insert(selectionKey(selection.range.offset, selection.range.length));
     }
-    for (const auto& selection : interaction.playbackSelections) {
+    for (const auto& selection : m_interaction.playbackSelections) {
       const uint64_t key = selectionKey(selection.offset, selection.length);
       if (fadeKeys.insert(key).second) {
-        interaction.fadePlaybackSelections.push_back({selection, now, 1.0f});
+        m_interaction.fadePlaybackSelections.push_back({selection, now, 1.0f});
       }
     }
   } else {
-    interaction.fadePlaybackSelections.clear();
+    m_interaction.fadePlaybackSelections.clear();
   }
-  interaction.playbackSelections.clear();
-  if (!interaction.fadePlaybackSelections.empty()) {
+  m_interaction.playbackSelections.clear();
+  if (!m_interaction.fadePlaybackSelections.empty()) {
     ensurePlaybackFadeTimer();
     updatePlaybackFade();
   } else {
@@ -515,15 +509,14 @@ void HexView::clearPlaybackSelections(bool fade) {
 }
 
 void HexView::setPlaybackActive(bool active) {
-  auto& interaction = m_interaction;
-  if (interaction.playbackActive == active) {
-    if (!active && !interaction.playbackSelections.empty()) {
+  if (m_interaction.playbackActive == active) {
+    if (!active && !m_interaction.playbackSelections.empty()) {
       clearPlaybackSelections();
     }
     return;
   }
-  interaction.playbackActive = active;
-  if (!interaction.playbackActive && !interaction.playbackSelections.empty()) {
+  m_interaction.playbackActive = active;
+  if (!m_interaction.playbackActive && !m_interaction.playbackSelections.empty()) {
     clearPlaybackSelections();
     return;
   }
@@ -743,8 +736,7 @@ void HexView::changeEvent(QEvent* event) {
 }
 
 void HexView::keyPressEvent(QKeyEvent* event) {
-  auto& interaction = m_interaction;
-  if (!interaction.selectedItem) {
+  if (!m_interaction.selectedItem) {
     QAbstractScrollArea::keyPressEvent(event);
     return;
   }
@@ -755,12 +747,12 @@ void HexView::keyPressEvent(QKeyEvent* event) {
       handleTooltipHoverMove(mapFromGlobal(QCursor::pos()), QApplication::keyboardModifiers());
       break;
     case Qt::Key_Up:
-      newOffset = interaction.selectedOffset - BYTES_PER_LINE;
+      newOffset = m_interaction.selectedOffset - BYTES_PER_LINE;
       goto selectNewOffset;
 
     case Qt::Key_Down: {
-      const int selectedCol = (interaction.selectedOffset - m_vgmfile->offset()) % BYTES_PER_LINE;
-      const int endOffset = interaction.selectedItem->offset() - m_vgmfile->offset() + interaction.selectedItem->length();
+      const int selectedCol = (m_interaction.selectedOffset - m_vgmfile->offset()) % BYTES_PER_LINE;
+      const int endOffset = m_interaction.selectedItem->offset() - m_vgmfile->offset() + m_interaction.selectedItem->length();
       const int itemEndCol = endOffset % BYTES_PER_LINE;
       const int itemEndLine = endOffset / BYTES_PER_LINE;
       newOffset = m_vgmfile->offset() +
@@ -770,11 +762,11 @@ void HexView::keyPressEvent(QKeyEvent* event) {
     }
 
     case Qt::Key_Left:
-      newOffset = interaction.selectedItem->offset() - 1;
+      newOffset = m_interaction.selectedItem->offset() - 1;
       goto selectNewOffset;
 
     case Qt::Key_Right:
-      newOffset = interaction.selectedItem->offset() + interaction.selectedItem->length();
+      newOffset = m_interaction.selectedItem->offset() + m_interaction.selectedItem->length();
       goto selectNewOffset;
 
     case Qt::Key_Escape:
@@ -784,7 +776,7 @@ void HexView::keyPressEvent(QKeyEvent* event) {
     selectNewOffset:
       if (newOffset >= m_vgmfile->offset() &&
           newOffset < (m_vgmfile->offset() + m_vgmfile->length())) {
-        interaction.selectedOffset = newOffset;
+        m_interaction.selectedOffset = newOffset;
         if (auto* item = m_vgmfile->getItemAtOffset(newOffset, false)) {
           selectionChanged(item);
         }
@@ -836,21 +828,20 @@ int HexView::getOffsetFromPoint(QPoint pos) const {
 
 void HexView::mousePressEvent(QMouseEvent* event) {
   if (event->button() == Qt::LeftButton) {
-    auto& interaction = m_interaction;
     const int offset = getOffsetFromPoint(event->pos());
     auto* item = m_vgmfile->getItemAtOffset(offset, false);
     const bool seekModifier = event->modifiers().testFlag(HexViewInput::kModifier);
     if (seekModifier) {
       if (item) {
-        if (item != interaction.lastSeekItem) {
-          interaction.lastSeekItem = item;
+        if (item != m_interaction.lastSeekItem) {
+          m_interaction.lastSeekItem = item;
           seekToEventRequested(item);
         }
         showTooltip(item, event->pos());
       } else {
         hideTooltip();
       }
-      interaction.isDragging = true;
+      m_interaction.isDragging = true;
       QAbstractScrollArea::mousePressEvent(event);
       return;
     }
@@ -859,14 +850,14 @@ void HexView::mousePressEvent(QMouseEvent* event) {
       return;
     }
 
-    interaction.selectedOffset = offset;
-    if (item == interaction.selectedItem) {
+    m_interaction.selectedOffset = offset;
+    if (item == m_interaction.selectedItem) {
       selectionChanged(nullptr);
     } else {
       selectionChanged(item);
     }
     hideTooltip();
-    interaction.isDragging = true;
+    m_interaction.isDragging = true;
   }
 
   QAbstractScrollArea::mousePressEvent(event);
@@ -874,9 +865,8 @@ void HexView::mousePressEvent(QMouseEvent* event) {
 
 void HexView::mouseReleaseEvent(QMouseEvent* event) {
   if (event->button() == Qt::LeftButton) {
-    auto& interaction = m_interaction;
-    interaction.isDragging = false;
-    interaction.lastSeekItem = nullptr;
+    m_interaction.isDragging = false;
+    m_interaction.lastSeekItem = nullptr;
     const QPoint vp = mapFromGlobal(QCursor::pos());
     handleTooltipHoverMove(vp, QApplication::keyboardModifiers());
   }
@@ -886,8 +876,7 @@ void HexView::mouseReleaseEvent(QMouseEvent* event) {
 void HexView::handleCoalescedMouseMove(const QPoint& pos,
                               Qt::MouseButtons buttons,
                               Qt::KeyboardModifiers mods) {
-  auto& interaction = m_interaction;
-  if (interaction.isDragging && buttons & Qt::LeftButton) {
+  if (m_interaction.isDragging && buttons & Qt::LeftButton) {
     const int offset = getOffsetFromPoint(pos);
     if (offset == -1) {
       if (!mods.testFlag(HexViewInput::kModifier)) {
@@ -898,22 +887,22 @@ void HexView::handleCoalescedMouseMove(const QPoint& pos,
     }
     if (mods.testFlag(HexViewInput::kModifier)) {
       if (auto* item = m_vgmfile->getItemAtOffset(offset, false)) {
-        if (item != interaction.lastSeekItem) {
-          interaction.lastSeekItem = item;
+        if (item != m_interaction.lastSeekItem) {
+          m_interaction.lastSeekItem = item;
           seekToEventRequested(item);
         }
       }
       hideTooltip();
       return;
     }
-    interaction.selectedOffset = offset;
-    if (interaction.selectedItem && (interaction.selectedOffset >= interaction.selectedItem->offset()) &&
-        (interaction.selectedOffset < (interaction.selectedItem->offset() + interaction.selectedItem->length()))) {
+    m_interaction.selectedOffset = offset;
+    if (m_interaction.selectedItem && (m_interaction.selectedOffset >= m_interaction.selectedItem->offset()) &&
+        (m_interaction.selectedOffset < (m_interaction.selectedItem->offset() + m_interaction.selectedItem->length()))) {
       hideTooltip();
       return;
     }
     auto* item = m_vgmfile->getItemAtOffset(offset, false);
-    if (item != interaction.selectedItem) {
+    if (item != m_interaction.selectedItem) {
       // setSelectedItem(item);
       selectionChanged(item);
     }
@@ -1093,8 +1082,7 @@ void HexView::showSelectedItem(bool show, bool animate) {
 }
 
 void HexView::clearFadeSelection() {
-  auto& interaction = m_interaction;
-  interaction.fadeSelections.clear();
+  m_interaction.fadeSelections.clear();
   requestRhiUpdate(false, true);
 }
 
@@ -1112,39 +1100,37 @@ qint64 HexView::playbackNowMs() {
 }
 
 void HexView::updatePlaybackFade() {
-  auto& interaction = m_interaction;
-  if (interaction.fadePlaybackSelections.empty()) {
+  if (m_interaction.fadePlaybackSelections.empty()) {
     return;
   }
   const qint64 nowMs = playbackNowMs();
   const float duration = static_cast<float>(PLAYBACK_FADE_DURATION_MS);
   const float curve = std::max(0.01f, PLAYBACK_FADE_CURVE);
 
-  for (auto& selection : interaction.fadePlaybackSelections) {
+  for (auto& selection : m_interaction.fadePlaybackSelections) {
     const qint64 elapsed = nowMs - selection.startMs;
     const float t = duration > 0.0f ? std::clamp(elapsed / duration, 0.0f, 1.0f) : 1.0f;
     const float inv = 1.0f - t;
     selection.alpha = inv > 0.0f ? std::pow(inv, curve) : 0.0f;
   }
 
-  interaction.fadePlaybackSelections.erase(
-      std::remove_if(interaction.fadePlaybackSelections.begin(), interaction.fadePlaybackSelections.end(),
+  m_interaction.fadePlaybackSelections.erase(
+      std::remove_if(m_interaction.fadePlaybackSelections.begin(), m_interaction.fadePlaybackSelections.end(),
                      [](const FadePlaybackSelection& selection) {
                        return selection.alpha <= 0.0f;
                      }),
-      interaction.fadePlaybackSelections.end());
+      m_interaction.fadePlaybackSelections.end());
 
-  if (interaction.fadePlaybackSelections.empty() && m_playbackFadeTimer.isActive()) {
+  if (m_interaction.fadePlaybackSelections.empty() && m_playbackFadeTimer.isActive()) {
     m_playbackFadeTimer.stop();
   }
 }
 
 void HexView::timerEvent(QTimerEvent* event) {
-  auto& interaction = m_interaction;
   if (event->timerId() == m_playbackFadeTimer.timerId()) {
     updatePlaybackFade();
     requestRhiUpdate(false, true);
-    if (interaction.fadePlaybackSelections.empty()) {
+    if (m_interaction.fadePlaybackSelections.empty()) {
       m_playbackFadeTimer.stop();
     }
     return;
@@ -1164,9 +1150,8 @@ void HexView::timerEvent(QTimerEvent* event) {
 }
 
 void HexView::updateHighlightState(bool animateSelection) {
-  auto& interaction = m_interaction;
-  const bool hasSelection = !interaction.selections.empty() || !interaction.fadeSelections.empty();
-  const bool hasPlayback = interaction.playbackActive;
+  const bool hasSelection = !m_interaction.selections.empty() || !m_interaction.fadeSelections.empty();
+  const bool hasPlayback = m_interaction.playbackActive;
 
   if (!hasSelection && !hasPlayback) {
     showSelectedItem(false, animateSelection);
@@ -1181,19 +1166,18 @@ void HexView::updateHighlightState(bool animateSelection) {
   if (m_selectionAnimation && m_selectionAnimation->state() != QAbstractAnimation::Stopped) {
     m_selectionAnimation->stop();
   }
-  interaction.fadeSelections.clear();
+  m_interaction.fadeSelections.clear();
   setOverlayOpacity(OVERLAY_ALPHA_F);
   setShadowBlur(SHADOW_BLUR_RADIUS);
   setShadowOffset(QPointF(SHADOW_OFFSET_X, SHADOW_OFFSET_Y));
 }
 
 void HexView::showTooltip(VGMItem* item, const QPoint& pos) {
-  auto& interaction = m_interaction;
   if (!item) {
     hideTooltip();
     return;
   }
-  if (interaction.tooltipItem && item->offset() == interaction.tooltipItem->offset()) {
+  if (m_interaction.tooltipItem && item->offset() == m_interaction.tooltipItem->offset()) {
     return;
   }
   const QString description = tooltipHtmlWithIcon(item);
@@ -1202,14 +1186,13 @@ void HexView::showTooltip(VGMItem* item, const QPoint& pos) {
     return;
   }
   QToolTip::showText(viewport()->mapToGlobal(pos), description, this);
-  interaction.tooltipItem = item;
+  m_interaction.tooltipItem = item;
 }
 
 void HexView::hideTooltip() {
-  auto& interaction = m_interaction;
-  if (!interaction.tooltipItem) {
+  if (!m_interaction.tooltipItem) {
     return;
   }
   QToolTip::hideText();
-  interaction.tooltipItem = nullptr;
+  m_interaction.tooltipItem = nullptr;
 }
