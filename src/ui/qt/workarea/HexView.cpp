@@ -724,8 +724,8 @@ int HexView::scrollYForRender() const {
   return verticalScrollBar()->value();
 }
 
-HexView::RhiFrameData HexView::captureRhiFrameData(float dpr) {
-  RhiFrameData frame;
+HexViewFrame::Data HexView::captureRhiFrameData(float dpr) {
+  HexViewFrame::Data frame;
   frame.vgmfile = m_vgmfile;
   frame.viewportSize = viewport()->size();
   frame.totalLines = getTotalLines();
