@@ -724,6 +724,72 @@ int HexView::scrollYForRender() const {
   return verticalScrollBar()->value();
 }
 
+HexView::RhiFrameData HexView::captureRhiFrameData(float dpr) {
+  RhiFrameData frame;
+  frame.vgmfile = m_vgmfile;
+  frame.viewportSize = viewport()->size();
+  frame.totalLines = getTotalLines();
+  frame.scrollY = scrollYForRender();
+  frame.lineHeight = m_lineHeight;
+  frame.charWidth = m_charWidth;
+  frame.charHalfWidth = m_charHalfWidth;
+  frame.hexStartX = hexXOffset();
+  frame.shouldDrawOffset = m_shouldDrawOffset;
+  frame.shouldDrawAscii = m_shouldDrawAscii;
+  frame.addressAsHex = m_addressAsHex;
+  frame.seekModifierActive = m_seekModifierActive;
+
+  frame.overlayOpacity = m_overlayOpacity;
+  frame.shadowBlur = m_shadowBlur;
+  frame.shadowStrength = m_shadowStrength;
+  frame.shadowOffset = m_shadowOffset;
+  frame.playbackGlowLow = m_playbackGlowLow;
+  frame.playbackGlowHigh = m_playbackGlowHigh;
+  frame.playbackGlowStrength = m_playbackGlowStrength;
+  frame.playbackGlowRadius = m_playbackGlowRadius;
+  frame.shadowEdgeCurve = m_shadowEdgeCurve;
+  frame.playbackGlowEdgeCurve = m_playbackGlowEdgeCurve;
+
+  frame.windowColor = palette().color(QPalette::Window);
+  frame.windowTextColor = palette().color(QPalette::WindowText);
+
+  frame.styleIds = &m_styleIds;
+  frame.styles.reserve(m_styles.size());
+  for (const auto& style : m_styles) {
+    frame.styles.push_back({style.bg, style.fg});
+  }
+
+  frame.selections.reserve(m_selections.size());
+  for (const auto& range : m_selections) {
+    frame.selections.push_back({range.offset, range.length});
+  }
+
+  frame.fadeSelections.reserve(m_fadeSelections.size());
+  for (const auto& range : m_fadeSelections) {
+    frame.fadeSelections.push_back({range.offset, range.length});
+  }
+
+  frame.playbackSelections.reserve(m_playbackSelections.size());
+  for (const auto& range : m_playbackSelections) {
+    frame.playbackSelections.push_back({range.offset, range.length});
+  }
+
+  frame.fadePlaybackSelections.reserve(m_fadePlaybackSelections.size());
+  for (const auto& fade : m_fadePlaybackSelections) {
+    frame.fadePlaybackSelections.push_back(
+        {{fade.range.offset, fade.range.length}, fade.alpha});
+  }
+
+  ensureGlyphAtlas(dpr);
+  if (m_glyphAtlas) {
+    frame.glyphAtlas.image = &m_glyphAtlas->image;
+    frame.glyphAtlas.uvTable = &m_glyphAtlas->uvTable;
+    frame.glyphAtlas.version = m_glyphAtlas->version;
+  }
+
+  return frame;
+}
+
 void HexView::changeEvent(QEvent* event) {
   if (event->type() == QEvent::PaletteChange) {
     if (!m_styles.empty()) {

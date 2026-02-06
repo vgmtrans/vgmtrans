@@ -124,22 +124,26 @@ private:
     int startLine = 0;
     int endLine = -1;
     int visibleCount = 0;
+    uint32_t fileBaseOffset = 0;
     uint32_t fileLength = 0;
     float lineHeight = 0.0f;
     float charWidth = 0.0f;
     float charHalfWidth = 0.0f;
     float hexStartX = 0.0f;
     float asciiStartX = 0.0f;
+    bool shouldDrawAscii = false;
   };
 
   void ensureRenderTargets(const QSize& pixelSize);
   void releaseRenderTargets();
 
   void ensurePipelines(QRhiRenderPassDescriptor* outputRp, int outputSampleCount);
-  void ensureGlyphTexture(QRhiResourceUpdateBatch* u);
-  void ensureItemIdTexture(QRhiResourceUpdateBatch* u, int startLine, int endLine, int totalLines);
+  void ensureGlyphTexture(QRhiResourceUpdateBatch* u, const HexView::RhiFrameData& frame);
+  void ensureItemIdTexture(QRhiResourceUpdateBatch* u, int startLine, int endLine, int totalLines,
+                           const HexView::RhiFrameData& frame);
   void updateCompositeSrb();
-  void updateUniforms(QRhiResourceUpdateBatch* u, float scrollY, const QSize& pixelSize);
+  void updateUniforms(QRhiResourceUpdateBatch* u, float scrollY, const QSize& pixelSize,
+                      const HexView::RhiFrameData& frame);
   bool ensureInstanceBuffer(QRhiBuffer*& buffer, int bytes);
   void updateInstanceBuffers(QRhiResourceUpdateBatch* u);
   void drawRectBuffer(QRhiCommandBuffer* cb, QRhiBuffer* buffer, int count,
@@ -152,7 +156,7 @@ private:
   void drawFullscreen(QRhiCommandBuffer* cb, QRhiGraphicsPipeline* pso,
                       QRhiShaderResourceBindings* srb);
 
-  QRectF glyphUv(const QChar& ch) const;
+  QRectF glyphUv(const QChar& ch, const HexView::RhiFrameData& frame) const;
   void appendRect(std::vector<RectInstance>& rects, float x, float y, float w, float h,
                   const QVector4D& color);
   void appendEdgeRect(std::vector<EdgeInstance>& rects, float x, float y, float w, float h,
@@ -160,10 +164,11 @@ private:
   void appendGlyph(std::vector<GlyphInstance>& glyphs, float x, float y, float w, float h,
                    const QRectF& uv, const QVector4D& color);
 
-  void ensureCacheWindow(int startLine, int endLine, int totalLines);
-  void rebuildCacheWindow();
+  void ensureCacheWindow(int startLine, int endLine, int totalLines,
+                         const HexView::RhiFrameData& frame);
+  void rebuildCacheWindow(const HexView::RhiFrameData& frame);
   const CachedLine* cachedLineFor(int line) const;
-  void collectIntervalsForSelections(const std::vector<HexView::SelectionRange>& selections,
+  void collectIntervalsForSelections(const std::vector<HexView::RhiSelectionRange>& selections,
                                      const SelectionBuildContext& ctx,
                                      std::vector<std::vector<Interval>>& perLine) const;
   static std::vector<Interval> mergeIntervals(std::vector<Interval>& intervals);
@@ -177,15 +182,15 @@ private:
                     const SelectionBuildContext& ctx,
                     float edgePad,
                     const QVector4D& edgeColor);
-  void appendMaskForSelections(const std::vector<HexView::SelectionRange>& selections,
+  void appendMaskForSelections(const std::vector<HexView::RhiSelectionRange>& selections,
                                const SelectionBuildContext& ctx,
                                float padX,
                                float padY,
                                float edgePad,
                                const QVector4D& maskColor,
                                const QVector4D& edgeColor);
-  void buildBaseInstances();
-  void buildSelectionInstances(int startLine, int endLine);
+  void buildBaseInstances(const HexView::RhiFrameData& frame);
+  void buildSelectionInstances(int startLine, int endLine, const HexView::RhiFrameData& frame);
 
   HexView* m_view = nullptr;
   const char* m_logLabel = "HexViewRhi";

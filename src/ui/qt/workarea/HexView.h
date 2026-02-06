@@ -12,6 +12,7 @@
 #include <QBasicTimer>
 #include <QElapsedTimer>
 #include <QImage>
+#include <QSize>
 #include <QPointF>
 #include <QRectF>
 #include <array>
@@ -37,6 +38,59 @@ class HexView final : public QAbstractScrollArea {
   Q_PROPERTY(qreal shadowStrength READ shadowStrength WRITE setShadowStrength)
 
 public:
+  struct RhiSelectionRange {
+    uint32_t offset = 0;
+    uint32_t length = 0;
+  };
+  struct RhiFadePlaybackSelection {
+    RhiSelectionRange range;
+    float alpha = 0.0f;
+  };
+  struct RhiStyle {
+    QColor bg;
+    QColor fg;
+  };
+  struct RhiGlyphAtlasView {
+    const QImage* image = nullptr;
+    const std::array<QRectF, 128>* uvTable = nullptr;
+    uint64_t version = 0;
+  };
+  struct RhiFrameData {
+    VGMFile* vgmfile = nullptr;
+    QSize viewportSize;
+    int totalLines = 0;
+    int scrollY = 0;
+    int lineHeight = 0;
+    int charWidth = 0;
+    int charHalfWidth = 0;
+    int hexStartX = 0;
+    bool shouldDrawOffset = true;
+    bool shouldDrawAscii = true;
+    bool addressAsHex = true;
+    bool seekModifierActive = false;
+
+    qreal overlayOpacity = 0.0;
+    qreal shadowBlur = 0.0;
+    qreal shadowStrength = 0.0;
+    QPointF shadowOffset{0.0, 0.0};
+    QColor playbackGlowLow;
+    QColor playbackGlowHigh;
+    float playbackGlowStrength = 1.0f;
+    float playbackGlowRadius = 0.5f;
+    float shadowEdgeCurve = 1.0f;
+    float playbackGlowEdgeCurve = 1.0f;
+
+    QColor windowColor;
+    QColor windowTextColor;
+    const std::vector<uint16_t>* styleIds = nullptr;
+    std::vector<RhiStyle> styles;
+    std::vector<RhiSelectionRange> selections;
+    std::vector<RhiSelectionRange> fadeSelections;
+    std::vector<RhiSelectionRange> playbackSelections;
+    std::vector<RhiFadePlaybackSelection> fadePlaybackSelections;
+    RhiGlyphAtlasView glyphAtlas;
+  };
+
   explicit HexView(VGMFile* vgmfile, QWidget* parent = nullptr);
   ~HexView() override;
   void setSelectedItem(VGMItem* item);
@@ -53,6 +107,7 @@ public:
   [[nodiscard]] int getViewportFullWidth() const;
   [[nodiscard]] int getViewportWidthSansAscii() const;
   [[nodiscard]] int getViewportWidthSansAsciiAndAddress() const;
+  RhiFrameData captureRhiFrameData(float dpr);
 
   void handleCoalescedMouseMove(const QPoint& pos,
                                 Qt::MouseButtons buttons,
@@ -77,7 +132,6 @@ protected:
   void timerEvent(QTimerEvent* event) override;
 
 private:
-  friend class HexViewRhiRenderer;
   struct SelectionRange {
     uint32_t offset;
     uint32_t length;

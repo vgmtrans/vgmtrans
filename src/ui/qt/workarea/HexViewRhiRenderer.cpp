@@ -211,7 +211,7 @@ void HexViewRhiRenderer::renderFrame(QRhiCommandBuffer* cb, const RenderTargetIn
   if (!m_inited) {
     initIfNeeded(m_rhi);
   }
-  if (!m_rhi || !cb || !m_view || !m_view->viewport() || !m_view->m_vgmfile) {
+  if (!m_rhi || !cb || !m_view) {
     return;
   }
   if (!target.renderTarget || target.pixelSize.isEmpty()) {
@@ -219,13 +219,18 @@ void HexViewRhiRenderer::renderFrame(QRhiCommandBuffer* cb, const RenderTargetIn
     return;
   }
 
-  const int viewportWidth = m_view->viewport()->width();
-  const int viewportHeight = m_view->viewport()->height();
-  if (viewportWidth <= 0 || viewportHeight <= 0 || m_view->m_lineHeight <= 0) {
+  const float dpr = target.dpr > 0.0f ? target.dpr : 1.0f;
+  const HexView::RhiFrameData frame = m_view->captureRhiFrameData(dpr);
+  if (!frame.vgmfile) {
+    return;
+  }
+  const int viewportWidth = frame.viewportSize.width();
+  const int viewportHeight = frame.viewportSize.height();
+  if (viewportWidth <= 0 || viewportHeight <= 0 || frame.lineHeight <= 0) {
     return;
   }
 
-  const int totalLines = m_view->getTotalLines();
+  const int totalLines = frame.totalLines;
   if (totalLines <= 0) {
     return;
   }
@@ -236,10 +241,10 @@ void HexViewRhiRenderer::renderFrame(QRhiCommandBuffer* cb, const RenderTargetIn
     m_loggedFrame = true;
   }
 
-  const int scrollY = m_view->scrollYForRender();
-  const int startLine = std::clamp(scrollY / m_view->m_lineHeight, 0, totalLines - 1);
+  const int scrollY = frame.scrollY;
+  const int startLine = std::clamp(scrollY / frame.lineHeight, 0, totalLines - 1);
   const int endLine =
-      std::clamp((scrollY + viewportHeight) / m_view->m_lineHeight, 0, totalLines - 1);
+      std::clamp((scrollY + viewportHeight) / frame.lineHeight, 0, totalLines - 1);
 
   if (startLine != m_lastStartLine || endLine != m_lastEndLine) {
     m_lastStartLine = startLine;
@@ -247,18 +252,16 @@ void HexViewRhiRenderer::renderFrame(QRhiCommandBuffer* cb, const RenderTargetIn
     m_selectionDirty = true;
   }
 
-  const float dpr = target.dpr > 0.0f ? target.dpr : 1.0f;
-  m_view->ensureGlyphAtlas(dpr);
-  ensureCacheWindow(startLine, endLine, totalLines);
+  ensureCacheWindow(startLine, endLine, totalLines, frame);
 
   if (m_baseDirty) {
-    buildBaseInstances();
+    buildBaseInstances(frame);
     m_baseDirty = false;
     m_baseBufferDirty = true;
   }
 
   if (m_selectionDirty) {
-    buildSelectionInstances(startLine, endLine);
+    buildSelectionInstances(startLine, endLine, frame);
     m_selectionDirty = false;
     m_selectionBufferDirty = true;
   }
@@ -269,8 +272,8 @@ void HexViewRhiRenderer::renderFrame(QRhiCommandBuffer* cb, const RenderTargetIn
     u->uploadStaticBuffer(m_ibuf, kIndices);
     m_staticBuffersUploaded = true;
   }
-  ensureGlyphTexture(u);
-  const float minCell = std::min<float>(m_view->m_charWidth, m_view->m_lineHeight);
+  ensureGlyphTexture(u, frame);
+  const float minCell = std::min<float>(frame.charWidth, frame.lineHeight);
   const bool outlineAllowed = minCell >= OUTLINE_MIN_CELL_PX;
   const float nowSeconds = m_animTimer.isValid() ? (m_animTimer.elapsed() / 1000.0f) : 0.0f;
   float dt = (m_lastFrameSeconds > 0.0f) ? (nowSeconds - m_lastFrameSeconds) : 0.0f;
@@ -278,7 +281,8 @@ void HexViewRhiRenderer::renderFrame(QRhiCommandBuffer* cb, const RenderTargetIn
   if (dt > 0.25f) {
     dt = 0.25f;
   }
-  const float targetOutline = (outlineAllowed && m_view->m_seekModifierActive) ? OUTLINE_ALPHA : 0.0f;
+  const float targetOutline =
+      (outlineAllowed && frame.seekModifierActive) ? OUTLINE_ALPHA : 0.0f;
   if (targetOutline != m_outlineTarget) {
     m_outlineTarget = targetOutline;
     dt = 0.0f;  // avoid a large first step after long idle periods
@@ -296,7 +300,7 @@ void HexViewRhiRenderer::renderFrame(QRhiCommandBuffer* cb, const RenderTargetIn
   if (std::abs(m_outlineAlpha - targetOutline) > 0.001f) {
     m_view->requestPlaybackFrame();
   }
-  ensureItemIdTexture(u, startLine, endLine, totalLines);
+  ensureItemIdTexture(u, startLine, endLine, totalLines, frame);
   ensureRenderTargets(target.pixelSize);
   const int sampleCount = std::max(1, target.sampleCount);
   ensurePipelines(target.renderPassDesc, sampleCount);
@@ -304,7 +308,7 @@ void HexViewRhiRenderer::renderFrame(QRhiCommandBuffer* cb, const RenderTargetIn
     updateCompositeSrb();
     m_compositeSrbDirty = false;
   }
-  updateUniforms(u, static_cast<float>(scrollY), target.pixelSize);
+  updateUniforms(u, static_cast<float>(scrollY), target.pixelSize, frame);
   updateInstanceBuffers(u);
 
   int baseRectFirst = 0;
@@ -325,7 +329,7 @@ void HexViewRhiRenderer::renderFrame(QRhiCommandBuffer* cb, const RenderTargetIn
     baseGlyphCount = std::max(0, baseGlyphLast - baseGlyphFirst);
   }
 
-  const QColor clearColor = m_view->palette().color(QPalette::Window);
+  const QColor clearColor = frame.windowColor;
 
   cb->beginPass(m_contentRt, clearColor, {1.0f, 0}, u);
   cb->setViewport(QRhiViewport(0, 0, target.pixelSize.width(), target.pixelSize.height()));
@@ -340,8 +344,8 @@ void HexViewRhiRenderer::renderFrame(QRhiCommandBuffer* cb, const RenderTargetIn
   cb->endPass();
 
   const bool edgeEnabled = !m_edgeRectInstances.empty() &&
-      ((m_view->m_shadowBlur > 0.0f && m_view->m_shadowStrength > 0.0f) ||
-       (m_view->m_playbackGlowRadius > 0.0f && m_view->m_playbackGlowStrength > 0.0f));
+      ((frame.shadowBlur > 0.0 && frame.shadowStrength > 0.0) ||
+       (frame.playbackGlowRadius > 0.0f && frame.playbackGlowStrength > 0.0f));
   if (edgeEnabled) {
     cb->beginPass(m_edgeRt, QColor(255, 255, 255, 255), {1.0f, 0}, nullptr);
     cb->setViewport(QRhiViewport(0, 0, target.pixelSize.width(), target.pixelSize.height()));
@@ -595,23 +599,25 @@ void HexViewRhiRenderer::ensurePipelines(QRhiRenderPassDescriptor* outputRp,
   m_compositePso->create();
 }
 
-void HexViewRhiRenderer::ensureGlyphTexture(QRhiResourceUpdateBatch* u) {
-  if (!m_view->m_glyphAtlas || m_view->m_glyphAtlas->image.isNull()) {
+void HexViewRhiRenderer::ensureGlyphTexture(QRhiResourceUpdateBatch* u,
+                                            const HexView::RhiFrameData& frame) {
+  if (!frame.glyphAtlas.image || !frame.glyphAtlas.uvTable ||
+      frame.glyphAtlas.image->isNull()) {
     return;
   }
 
-  const auto& atlas = *m_view->m_glyphAtlas;
-  if (m_glyphTex && m_glyphAtlasVersion == atlas.version) {
+  if (m_glyphTex && m_glyphAtlasVersion == frame.glyphAtlas.version) {
     return;
   }
 
   delete m_glyphTex;
-  m_glyphTex = m_rhi->newTexture(QRhiTexture::RGBA8, atlas.image.size(), 1);
+  m_glyphTex =
+      m_rhi->newTexture(QRhiTexture::RGBA8, frame.glyphAtlas.image->size(), 1);
   m_glyphTex->create();
 
-  u->uploadTexture(m_glyphTex, atlas.image);
+  u->uploadTexture(m_glyphTex, *frame.glyphAtlas.image);
 
-  m_glyphAtlasVersion = atlas.version;
+  m_glyphAtlasVersion = frame.glyphAtlas.version;
 
   if (m_glyphSrb) {
     m_glyphSrb->setBindings({
@@ -624,8 +630,9 @@ void HexViewRhiRenderer::ensureGlyphTexture(QRhiResourceUpdateBatch* u) {
 }
 
 void HexViewRhiRenderer::ensureItemIdTexture(QRhiResourceUpdateBatch* u, int startLine,
-                                             int endLine, int totalLines) {
-  if (!m_rhi || !u) {
+                                             int endLine, int totalLines,
+                                             const HexView::RhiFrameData& frame) {
+  if (!m_rhi || !u || !frame.vgmfile) {
     return;
   }
 
@@ -675,8 +682,8 @@ void HexViewRhiRenderer::ensureItemIdTexture(QRhiResourceUpdateBatch* u, int sta
   idMap.reserve(static_cast<size_t>(size.width() * size.height()));
   uint16_t nextId = 1;
 
-  const uint32_t baseOffset = m_view->m_vgmfile->offset();
-  const uint32_t endOffset = m_view->m_vgmfile->offset() + m_view->m_vgmfile->length();
+  const uint32_t baseOffset = frame.vgmfile->offset();
+  const uint32_t endOffset = frame.vgmfile->offset() + frame.vgmfile->length();
 
   for (int row = 0; row < size.height(); ++row) {
     const int lineIndex = padStart + row;
@@ -685,7 +692,7 @@ void HexViewRhiRenderer::ensureItemIdTexture(QRhiResourceUpdateBatch* u, int sta
       const uint32_t offset = baseOffset + static_cast<uint32_t>(lineIndex * kBytesPerLine + byte);
       uint16_t id = 0;
       if (offset < endOffset) {
-        if (VGMItem* item = m_view->m_vgmfile->getItemAtOffset(offset, false)) {
+        if (VGMItem* item = frame.vgmfile->getItemAtOffset(offset, false)) {
           if (item->children().empty()) {
             auto [it, inserted] = idMap.emplace(item, nextId);
             if (inserted) {
@@ -728,8 +735,9 @@ void HexViewRhiRenderer::updateCompositeSrb() {
 }
 
 void HexViewRhiRenderer::updateUniforms(QRhiResourceUpdateBatch* u, float scrollY,
-                                       const QSize& pixelSize) {
-  const QSize viewSize = m_view->viewport()->size();
+                                        const QSize& pixelSize,
+                                        const HexView::RhiFrameData& frame) {
+  const QSize viewSize = frame.viewportSize;
   const float uvFlipY = m_rhi->isYUpInFramebuffer() ? 0.0f : 1.0f;
   const float timeSeconds = m_animTimer.isValid() ? (m_animTimer.elapsed() / 1000.0f) : 0.0f;
 
@@ -746,39 +754,44 @@ void HexViewRhiRenderer::updateUniforms(QRhiResourceUpdateBatch* u, float scroll
 
   const float viewW = static_cast<float>(viewSize.width());
   const float viewH = static_cast<float>(viewSize.height());
-  const float shadowStrength = (m_view->m_shadowBlur > 0.0f) ? float(m_view->m_shadowStrength) : 0.0f;
-  const float shadowUvX = pixelSize.width() > 0 ? (m_view->m_shadowOffset.x() * dpr / pixelSize.width()) : 0.0f;
-  const float shadowUvY = pixelSize.height() > 0 ? (m_view->m_shadowOffset.y() * dpr / pixelSize.height()) : 0.0f;
+  const float shadowStrength =
+      (frame.shadowBlur > 0.0) ? static_cast<float>(frame.shadowStrength) : 0.0f;
+  const float shadowUvX =
+      pixelSize.width() > 0
+          ? (static_cast<float>(frame.shadowOffset.x()) * dpr / pixelSize.width())
+          : 0.0f;
+  const float shadowUvY =
+      pixelSize.height() > 0
+          ? (static_cast<float>(frame.shadowOffset.y()) * dpr / pixelSize.height())
+          : 0.0f;
 
-  const float charWidth = static_cast<float>(m_view->m_charWidth);
-  const float charHalfWidth = static_cast<float>(m_view->m_charHalfWidth);
-  const float lineHeight = static_cast<float>(m_view->m_lineHeight);
-  const float hexStartX = static_cast<float>(m_view->hexXOffset()) - charHalfWidth;
+  const float charWidth = static_cast<float>(frame.charWidth);
+  const float charHalfWidth = static_cast<float>(frame.charHalfWidth);
+  const float lineHeight = static_cast<float>(frame.lineHeight);
+  const float hexStartX = static_cast<float>(frame.hexStartX) - charHalfWidth;
   const float hexWidth = kBytesPerLine * 3.0f * charWidth;
-  const float asciiStartX =
-      static_cast<float>(m_view->hexXOffset()) +
-      (kBytesPerLine * 3 + HEX_TO_ASCII_SPACING_CHARS) * charWidth;
-  const float asciiWidth =
-      m_view->m_shouldDrawAscii ? (kBytesPerLine * charWidth) : 0.0f;
+  const float asciiStartX = static_cast<float>(frame.hexStartX) +
+                            (kBytesPerLine * 3 + HEX_TO_ASCII_SPACING_CHARS) * charWidth;
+  const float asciiWidth = frame.shouldDrawAscii ? (kBytesPerLine * charWidth) : 0.0f;
 
-  const float shadowRadius = std::max(0.0f, static_cast<float>(m_view->m_shadowBlur));
-  const float glowRadius = std::max(0.0f, static_cast<float>(m_view->m_playbackGlowRadius)) *
+  const float shadowRadius = std::max(0.0f, static_cast<float>(frame.shadowBlur));
+  const float glowRadius = std::max(0.0f, static_cast<float>(frame.playbackGlowRadius)) *
                            std::max(1.0f, std::min(charWidth, lineHeight));
-  const QVector4D edgeParams(shadowRadius, glowRadius, m_view->m_shadowEdgeCurve,
-                             m_view->m_playbackGlowEdgeCurve);
+  const QVector4D edgeParams(shadowRadius, glowRadius, frame.shadowEdgeCurve,
+                             frame.playbackGlowEdgeCurve);
 
   u->updateDynamicBuffer(m_edgeUbuf, 0, kMat4Bytes, mvp.constData());
   u->updateDynamicBuffer(m_edgeUbuf, kMat4Bytes, kVec4Bytes, &edgeParams);
 
-  const QVector4D overlayAndShadow(static_cast<float>(m_view->m_overlayOpacity),
-                                   shadowStrength, shadowUvX, shadowUvY);
+  const QVector4D overlayAndShadow(static_cast<float>(frame.overlayOpacity), shadowStrength,
+                                   shadowUvX, shadowUvY);
   const QVector4D columnLayout(hexStartX, hexWidth, asciiStartX, asciiWidth);
   const QVector4D viewAndTime(viewW, viewH, uvFlipY, timeSeconds);
   const QVector4D shadowColor = toVec4(SHADOW_COLOR);
-  const QColor glowLow = m_view->m_playbackGlowLow;
-  const QColor glowHigh = m_view->m_playbackGlowHigh;
+  const QColor glowLow = frame.playbackGlowLow;
+  const QColor glowHigh = frame.playbackGlowHigh;
   const QVector4D glowLowAndStrength(glowLow.redF(), glowLow.greenF(), glowLow.blueF(),
-                                     static_cast<float>(m_view->m_playbackGlowStrength));
+                                     frame.playbackGlowStrength);
   const QVector4D glowHighAndDpr(glowHigh.redF(), glowHigh.greenF(), glowHigh.blueF(), dpr);
   const float outlineAlpha = m_outlineAlpha;
   const QVector4D outlineColor(OUTLINE_COLOR.redF(), OUTLINE_COLOR.greenF(),
@@ -946,11 +959,12 @@ void HexViewRhiRenderer::drawFullscreen(QRhiCommandBuffer* cb, QRhiGraphicsPipel
   cb->drawIndexed(6, 1, 0, 0, 0);
 }
 
-QRectF HexViewRhiRenderer::glyphUv(const QChar& ch) const {
-  if (!m_view->m_glyphAtlas) {
+QRectF HexViewRhiRenderer::glyphUv(const QChar& ch,
+                                   const HexView::RhiFrameData& frame) const {
+  if (!frame.glyphAtlas.uvTable) {
     return {};
   }
-  const auto& uvTable = m_view->m_glyphAtlas->uvTable;
+  const auto& uvTable = *frame.glyphAtlas.uvTable;
   const ushort code = ch.unicode();
   if (code < uvTable.size() && !uvTable[code].isNull()) {
     return uvTable[code];
@@ -989,7 +1003,8 @@ void HexViewRhiRenderer::appendGlyph(std::vector<GlyphInstance>& glyphs, float x
                     color.x(), color.y(), color.z(), color.w()});
 }
 
-void HexViewRhiRenderer::ensureCacheWindow(int startLine, int endLine, int totalLines) {
+void HexViewRhiRenderer::ensureCacheWindow(int startLine, int endLine, int totalLines,
+                                           const HexView::RhiFrameData& frame) {
   const bool needsWindow =
       m_cachedLines.empty() || startLine < m_cacheStartLine || endLine > m_cacheEndLine;
   if (!needsWindow) {
@@ -1000,19 +1015,20 @@ void HexViewRhiRenderer::ensureCacheWindow(int startLine, int endLine, int total
   const int margin = std::max(visibleCount * 2, 1);
   m_cacheStartLine = std::max(0, startLine - margin);
   m_cacheEndLine = std::min(totalLines - 1, endLine + margin);
-  rebuildCacheWindow();
+  rebuildCacheWindow(frame);
   m_baseDirty = true;
   m_selectionDirty = true;
 }
 
-void HexViewRhiRenderer::rebuildCacheWindow() {
+void HexViewRhiRenderer::rebuildCacheWindow(const HexView::RhiFrameData& frame) {
   m_cachedLines.clear();
-  if (m_cacheEndLine < m_cacheStartLine) {
+  if (m_cacheEndLine < m_cacheStartLine || !frame.vgmfile) {
     return;
   }
 
-  const uint32_t fileLength = m_view->m_vgmfile->length();
-  const auto* baseData = reinterpret_cast<const uint8_t*>(m_view->m_vgmfile->data());
+  const uint32_t fileLength = frame.vgmfile->length();
+  const auto* baseData = reinterpret_cast<const uint8_t*>(frame.vgmfile->data());
+  const auto* styleIds = frame.styleIds;
   const size_t count = static_cast<size_t>(m_cacheEndLine - m_cacheStartLine + 1);
   m_cachedLines.reserve(count);
 
@@ -1026,10 +1042,9 @@ void HexViewRhiRenderer::rebuildCacheWindow() {
         std::copy_n(baseData + lineOffset, entry.bytes, entry.data.data());
         for (int i = 0; i < entry.bytes; ++i) {
           const int idx = lineOffset + i;
-          entry.styles[i] =
-              (idx >= 0 && idx < static_cast<int>(m_view->m_styleIds.size()))
-                  ? m_view->m_styleIds[idx]
-                  : 0;
+          entry.styles[i] = (styleIds && idx >= 0 && idx < static_cast<int>(styleIds->size()))
+                                ? (*styleIds)[idx]
+                                : 0;
         }
       }
     }
@@ -1048,7 +1063,7 @@ const HexViewRhiRenderer::CachedLine* HexViewRhiRenderer::cachedLineFor(int line
   return &m_cachedLines[index];
 }
 
-void HexViewRhiRenderer::buildBaseInstances() {
+void HexViewRhiRenderer::buildBaseInstances(const HexView::RhiFrameData& frame) {
   m_baseRectInstances.clear();
   m_baseGlyphInstances.clear();
   m_lineRanges.clear();
@@ -1058,22 +1073,22 @@ void HexViewRhiRenderer::buildBaseInstances() {
   }
 
   m_baseRectInstances.reserve(m_cachedLines.size() * 4);
-  m_baseGlyphInstances.reserve(m_cachedLines.size() * (m_view->m_shouldDrawAscii ? 80 : 64));
+  m_baseGlyphInstances.reserve(m_cachedLines.size() * (frame.shouldDrawAscii ? 80 : 64));
   m_lineRanges.reserve(m_cachedLines.size());
 
-  const QColor clearColor = m_view->palette().color(QPalette::Window);
-  const QVector4D addressColor = toVec4(m_view->palette().color(QPalette::WindowText));
+  const QColor clearColor = frame.windowColor;
+  const QVector4D addressColor = toVec4(frame.windowTextColor);
 
-  const float charWidth = static_cast<float>(m_view->m_charWidth);
-  const float charHalfWidth = static_cast<float>(m_view->m_charHalfWidth);
-  const float lineHeight = static_cast<float>(m_view->m_lineHeight);
+  const float charWidth = static_cast<float>(frame.charWidth);
+  const float charHalfWidth = static_cast<float>(frame.charHalfWidth);
+  const float lineHeight = static_cast<float>(frame.lineHeight);
 
-  const float hexStartX = static_cast<float>(m_view->hexXOffset());
+  const float hexStartX = static_cast<float>(frame.hexStartX);
   const float asciiStartX =
       hexStartX + (kBytesPerLine * 3 + HEX_TO_ASCII_SPACING_CHARS) * charWidth;
 
-  const auto& styles = m_view->m_styles;
-  auto styleFor = [&](uint16_t styleId) -> const HexView::Style& {
+  const auto& styles = frame.styles;
+  auto styleFor = [&](uint16_t styleId) -> const HexView::RhiStyle& {
     if (styleId < styles.size()) {
       return styles[styleId];
     }
@@ -1083,9 +1098,9 @@ void HexViewRhiRenderer::buildBaseInstances() {
   static const char kHexDigits[] = "0123456789ABCDEF";
   std::array<QRectF, 16> hexUvs{};
   for (int i = 0; i < 16; ++i) {
-    hexUvs[i] = glyphUv(QLatin1Char(kHexDigits[i]));
+    hexUvs[i] = glyphUv(QLatin1Char(kHexDigits[i]), frame);
   }
-  const QRectF spaceUv = glyphUv(QLatin1Char(' '));
+  const QRectF spaceUv = glyphUv(QLatin1Char(' '), frame);
 
   for (const auto& entry : m_cachedLines) {
     LineRange range{};
@@ -1093,9 +1108,9 @@ void HexViewRhiRenderer::buildBaseInstances() {
     range.glyphStart = static_cast<uint32_t>(m_baseGlyphInstances.size());
     const float y = entry.line * lineHeight;
 
-    if (m_view->m_shouldDrawOffset) {
-      uint32_t address = m_view->m_vgmfile->offset() + (entry.line * kBytesPerLine);
-      if (m_view->m_addressAsHex) {
+    if (frame.shouldDrawOffset) {
+      uint32_t address = frame.vgmfile->offset() + (entry.line * kBytesPerLine);
+      if (frame.addressAsHex) {
         char buf[NUM_ADDRESS_NIBBLES];
         for (int i = NUM_ADDRESS_NIBBLES - 1; i >= 0; --i) {
           buf[i] = kHexDigits[address & 0xF];
@@ -1103,13 +1118,13 @@ void HexViewRhiRenderer::buildBaseInstances() {
         }
         for (int i = 0; i < NUM_ADDRESS_NIBBLES; ++i) {
           appendGlyph(m_baseGlyphInstances, i * charWidth, y, charWidth, lineHeight,
-                      glyphUv(QLatin1Char(buf[i])), addressColor);
+                      glyphUv(QLatin1Char(buf[i]), frame), addressColor);
         }
       } else {
         QString text = QString::number(address).rightJustified(NUM_ADDRESS_NIBBLES, QLatin1Char('0'));
         for (int i = 0; i < text.size(); ++i) {
           appendGlyph(m_baseGlyphInstances, i * charWidth, y, charWidth, lineHeight,
-                      glyphUv(text[i]), addressColor);
+                      glyphUv(text[i], frame), addressColor);
         }
       }
     }
@@ -1128,7 +1143,7 @@ void HexViewRhiRenderer::buildBaseInstances() {
           const QVector4D bgColor = toVec4(style.bg);
           const float hexX = hexStartX + spanStart * 3.0f * charWidth - charHalfWidth;
           appendRect(m_baseRectInstances, hexX, y, spanLen * 3.0f * charWidth, lineHeight, bgColor);
-          if (m_view->m_shouldDrawAscii) {
+          if (frame.shouldDrawAscii) {
             const float asciiX = asciiStartX + spanStart * charWidth;
             appendRect(m_baseRectInstances, asciiX, y, spanLen * charWidth, lineHeight, bgColor);
           }
@@ -1152,11 +1167,11 @@ void HexViewRhiRenderer::buildBaseInstances() {
       appendGlyph(m_baseGlyphInstances, hexX + 2.0f * charWidth, y, charWidth, lineHeight,
                   spaceUv, textColor);
 
-      if (m_view->m_shouldDrawAscii) {
+      if (frame.shouldDrawAscii) {
         const char asciiChar = isPrintable(value) ? static_cast<char>(value) : '.';
         const float asciiX = asciiStartX + i * charWidth;
         appendGlyph(m_baseGlyphInstances, asciiX, y, charWidth, lineHeight,
-                    glyphUv(QLatin1Char(asciiChar)), textColor);
+                    glyphUv(QLatin1Char(asciiChar), frame), textColor);
       }
     }
 
@@ -1167,7 +1182,7 @@ void HexViewRhiRenderer::buildBaseInstances() {
 }
 
 void HexViewRhiRenderer::collectIntervalsForSelections(
-    const std::vector<HexView::SelectionRange>& selections,
+    const std::vector<HexView::RhiSelectionRange>& selections,
     const SelectionBuildContext& ctx,
     std::vector<std::vector<Interval>>& perLine) const {
   perLine.assign(static_cast<size_t>(ctx.visibleCount), {});
@@ -1177,7 +1192,7 @@ void HexViewRhiRenderer::collectIntervalsForSelections(
       continue;
     }
 
-    int selectionStart = static_cast<int>(selection.offset - m_view->m_vgmfile->offset());
+    int selectionStart = static_cast<int>(selection.offset - ctx.fileBaseOffset);
     int selectionEnd = selectionStart + static_cast<int>(selection.length);
     if (selectionEnd <= 0 || selectionStart >= static_cast<int>(ctx.fileLength)) {
       continue;
@@ -1251,7 +1266,7 @@ void HexViewRhiRenderer::appendMaskRectsForIntervals(const std::vector<Interval>
     appendRect(m_maskRectInstances, hexX, y - padY,
                length * 3.0f * ctx.charWidth + padX * 2.0f,
                ctx.lineHeight + padY * 2.0f, maskColor);
-    if (m_view->m_shouldDrawAscii) {
+    if (ctx.shouldDrawAscii) {
       const float asciiX = ctx.asciiStartX + interval.start * ctx.charWidth - padX;
       appendRect(m_maskRectInstances, asciiX, y - padY,
                  length * ctx.charWidth + padX * 2.0f,
@@ -1276,7 +1291,7 @@ void HexViewRhiRenderer::emitEdgeRuns(const std::unordered_map<uint32_t, EdgeRun
     const float hexX = ctx.hexStartX + run.startCol * 3.0f * ctx.charWidth - ctx.charHalfWidth;
     appendEdgeRect(m_edgeRectInstances, hexX, runY, length * 3.0f * ctx.charWidth, runH,
                    edgePad, edgeColor);
-    if (m_view->m_shouldDrawAscii) {
+    if (ctx.shouldDrawAscii) {
       const float asciiX = ctx.asciiStartX + run.startCol * ctx.charWidth;
       appendEdgeRect(m_edgeRectInstances, asciiX, runY, length * ctx.charWidth, runH,
                      edgePad, edgeColor);
@@ -1284,7 +1299,8 @@ void HexViewRhiRenderer::emitEdgeRuns(const std::unordered_map<uint32_t, EdgeRun
   }
 }
 
-void HexViewRhiRenderer::appendMaskForSelections(const std::vector<HexView::SelectionRange>& selections,
+void HexViewRhiRenderer::appendMaskForSelections(
+    const std::vector<HexView::RhiSelectionRange>& selections,
                                                  const SelectionBuildContext& ctx,
                                                  float padX,
                                                  float padY,
@@ -1328,13 +1344,14 @@ void HexViewRhiRenderer::appendMaskForSelections(const std::vector<HexView::Sele
   }
 }
 
-void HexViewRhiRenderer::buildSelectionInstances(int startLine, int endLine) {
+void HexViewRhiRenderer::buildSelectionInstances(int startLine, int endLine,
+                                                 const HexView::RhiFrameData& frame) {
   m_maskRectInstances.clear();
   m_edgeRectInstances.clear();
 
-  const bool hasSelection = !m_view->m_selections.empty() || !m_view->m_fadeSelections.empty();
-  const bool hasPlayback = !m_view->m_playbackSelections.empty() ||
-                           !m_view->m_fadePlaybackSelections.empty();
+  const bool hasSelection = !frame.selections.empty() || !frame.fadeSelections.empty();
+  const bool hasPlayback = !frame.playbackSelections.empty() ||
+                           !frame.fadePlaybackSelections.empty();
   if ((!hasSelection && !hasPlayback) || startLine > endLine) {
     return;
   }
@@ -1344,47 +1361,49 @@ void HexViewRhiRenderer::buildSelectionInstances(int startLine, int endLine) {
     return;
   }
 
-  m_maskRectInstances.reserve(static_cast<size_t>(visibleCount) * (m_view->m_shouldDrawAscii ? 8 : 4));
-  m_edgeRectInstances.reserve(static_cast<size_t>(visibleCount) * (m_view->m_shouldDrawAscii ? 8 : 4));
+  m_maskRectInstances.reserve(static_cast<size_t>(visibleCount) * (frame.shouldDrawAscii ? 8 : 4));
+  m_edgeRectInstances.reserve(static_cast<size_t>(visibleCount) * (frame.shouldDrawAscii ? 8 : 4));
 
-  const float charWidth = static_cast<float>(m_view->m_charWidth);
-  const float lineHeight = static_cast<float>(m_view->m_lineHeight);
+  const float charWidth = static_cast<float>(frame.charWidth);
+  const float lineHeight = static_cast<float>(frame.lineHeight);
   SelectionBuildContext ctx;
   ctx.startLine = startLine;
   ctx.endLine = endLine;
   ctx.visibleCount = visibleCount;
-  ctx.fileLength = m_view->m_vgmfile->length();
+  ctx.fileBaseOffset = frame.vgmfile ? frame.vgmfile->offset() : 0;
+  ctx.fileLength = frame.vgmfile ? frame.vgmfile->length() : 0;
   ctx.charWidth = charWidth;
-  ctx.charHalfWidth = static_cast<float>(m_view->m_charHalfWidth);
+  ctx.charHalfWidth = static_cast<float>(frame.charHalfWidth);
   ctx.lineHeight = lineHeight;
-  ctx.hexStartX = static_cast<float>(m_view->hexXOffset());
+  ctx.hexStartX = static_cast<float>(frame.hexStartX);
   ctx.asciiStartX = ctx.hexStartX + (kBytesPerLine * 3 + HEX_TO_ASCII_SPACING_CHARS) * ctx.charWidth;
+  ctx.shouldDrawAscii = frame.shouldDrawAscii;
 
   const QVector4D selectionMaskColor(1.0f, 0.0f, 0.0f, 0.0f);
   const QVector4D selectionEdgeColor(1.0f, 0.0f, 0.0f, 1.0f);
-  const float shadowPad = std::max(0.0f, static_cast<float>(m_view->m_shadowBlur));
-  const float glowBase = std::max(0.0f, static_cast<float>(m_view->m_playbackGlowRadius)) *
+  const float shadowPad = std::max(0.0f, static_cast<float>(frame.shadowBlur));
+  const float glowBase = std::max(0.0f, static_cast<float>(frame.playbackGlowRadius)) *
                          std::max(1.0f, std::min(charWidth, lineHeight));
   const float glowPad = glowBase * 1.35f;
 
   if (hasSelection) {
-    const std::vector<HexView::SelectionRange>& selections =
-        m_view->m_selections.empty() ? m_view->m_fadeSelections : m_view->m_selections;
+    const std::vector<HexView::RhiSelectionRange>& selections =
+        frame.selections.empty() ? frame.fadeSelections : frame.selections;
     appendMaskForSelections(selections, ctx, 0.0f, 0.0f, shadowPad, selectionMaskColor,
                             selectionEdgeColor);
   }
 
-  if (!m_view->m_playbackSelections.empty()) {
+  if (!frame.playbackSelections.empty()) {
     const QVector4D playbackMaskColor(0.0f, 1.0f, 0.0f, 0.0f);
     const QVector4D playbackEdgeColor(0.0f, 1.0f, 0.0f, 0.0f);
-    appendMaskForSelections(m_view->m_playbackSelections, ctx, 0.0f, 0.0f, glowPad,
+    appendMaskForSelections(frame.playbackSelections, ctx, 0.0f, 0.0f, glowPad,
                             playbackMaskColor, playbackEdgeColor);
   }
 
-  if (!m_view->m_fadePlaybackSelections.empty()) {
-    std::vector<HexView::SelectionRange> fadeRanges;
-    fadeRanges.reserve(m_view->m_fadePlaybackSelections.size());
-    for (const auto& selection : m_view->m_fadePlaybackSelections) {
+  if (!frame.fadePlaybackSelections.empty()) {
+    std::vector<HexView::RhiSelectionRange> fadeRanges;
+    fadeRanges.reserve(frame.fadePlaybackSelections.size());
+    for (const auto& selection : frame.fadePlaybackSelections) {
       fadeRanges.push_back(selection.range);
     }
 
@@ -1393,12 +1412,12 @@ void HexViewRhiRenderer::buildSelectionInstances(int startLine, int endLine) {
     appendMaskForSelections(fadeRanges, ctx, 0.0f, 0.0f, glowPad, playbackMaskColor,
                             playbackEdgeColor);
     const QVector4D fadeEdgeColor(0.0f, 0.0f, 0.0f, 0.0f);
-    for (const auto& selection : m_view->m_fadePlaybackSelections) {
+    for (const auto& selection : frame.fadePlaybackSelections) {
       if (selection.alpha <= 0.0f) {
         continue;
       }
       const QVector4D fadeMaskColor(0.0f, 0.0f, 1.0f, selection.alpha);
-      const std::vector<HexView::SelectionRange> one{selection.range};
+      const std::vector<HexView::RhiSelectionRange> one{selection.range};
       appendMaskForSelections(one, ctx, 0.0f, 0.0f, 0.0f, fadeMaskColor, fadeEdgeColor);
     }
   }
