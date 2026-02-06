@@ -31,6 +31,10 @@ class QRhiSampler;
 class QRhiShaderResourceBindings;
 class QRhiTexture;
 
+// HexViewRhiRenderer builds GPU instance streams from an immutable HexView snapshot
+// and renders in four passes:
+// 1) content (text + backgrounds), 2) mask (selection ids/channels),
+// 3) edge field (for shadow/glow falloff), 4) composite (final shading).
 class HexViewRhiRenderer {
 public:
   struct RenderTargetInfo {
@@ -102,6 +106,7 @@ private:
   struct CachedLine {
     int line = 0;
     int bytes = 0;
+    // Cached copy of file bytes/styles for one logical line in the cache window.
     std::array<uint8_t, kBytesPerLine> data{};
     std::array<uint16_t, kBytesPerLine> styles{};
   };
@@ -123,6 +128,8 @@ private:
     int endLine = 0;
   };
   struct SelectionBuildContext {
+    // Visible range and geometry needed when converting byte selections into
+    // GPU rect instances for both hex and ASCII columns.
     int startLine = 0;
     int endLine = -1;
     int visibleCount = 0;
