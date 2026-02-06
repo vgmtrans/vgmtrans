@@ -7,6 +7,7 @@
 #include "HexViewRhiRenderer.h"
 
 #include "HexView.h"
+#include "LogManager.h"
 #include "VGMFile.h"
 
 #include <rhi/qrhi.h>
@@ -68,10 +69,6 @@ QShader loadShader(const char* path) {
   return QShader::fromSerialized(file.readAll());
 }
 
-bool isRhiDebugEnabled() {
-  // return qEnvironmentVariableIsSet("VGMTRANS_HEXVIEW_RHI_DEBUG");
-  return true;
-}
 }  // namespace
 
 HexViewRhiRenderer::HexViewRhiRenderer(HexView* view, const char* logLabel)
@@ -88,11 +85,9 @@ void HexViewRhiRenderer::initIfNeeded(QRhi* rhi) {
 
   m_rhi = rhi;
 
-  const bool debug = debugLoggingEnabled();
-  if (debug && !m_loggedInit) {
-    qDebug() << m_logLabel << "init:"
-             << "backend=" << int(m_rhi->backend())
-             << "baseInstance=" << m_rhi->isFeatureSupported(QRhi::BaseInstance);
+  if (!m_loggedInit) {
+    L_DEBUG("{} init: backend={} baseInstance={}", m_logLabel, int(m_rhi->backend()),
+            m_rhi->isFeatureSupported(QRhi::BaseInstance));
     m_loggedInit = true;
   }
   m_supportsBaseInstance = m_rhi->isFeatureSupported(QRhi::BaseInstance);
@@ -220,9 +215,7 @@ void HexViewRhiRenderer::renderFrame(QRhiCommandBuffer* cb, const RenderTargetIn
     return;
   }
   if (!target.renderTarget || target.pixelSize.isEmpty()) {
-    if (debugLoggingEnabled()) {
-      qDebug() << m_logLabel << "renderFrame skipped: render target pixel size empty";
-    }
+    L_DEBUG("{} renderFrame skipped: render target pixel size empty", m_logLabel);
     return;
   }
 
@@ -237,10 +230,9 @@ void HexViewRhiRenderer::renderFrame(QRhiCommandBuffer* cb, const RenderTargetIn
     return;
   }
 
-  if (debugLoggingEnabled() && !m_loggedFrame) {
-    qDebug() << m_logLabel << "frame started"
-             << "viewport=" << QSize(viewportWidth, viewportHeight)
-             << "pixelSize=" << target.pixelSize;
+  if (!m_loggedFrame) {
+    L_DEBUG("{} frame started viewport={}x{} pixelSize={}x{}", m_logLabel, viewportWidth,
+            viewportHeight, target.pixelSize.width(), target.pixelSize.height());
     m_loggedFrame = true;
   }
 
@@ -416,10 +408,6 @@ void HexViewRhiRenderer::releaseRenderTargets() {
   m_edgeRt = nullptr;
   delete m_edgeTex;
   m_edgeTex = nullptr;
-}
-
-bool HexViewRhiRenderer::debugLoggingEnabled() const {
-  return isRhiDebugEnabled();
 }
 
 void HexViewRhiRenderer::ensurePipelines(QRhiRenderPassDescriptor* outputRp,

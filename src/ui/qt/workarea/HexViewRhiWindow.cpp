@@ -8,6 +8,7 @@
 
 #include "HexView.h"
 #include "HexViewRhiRenderer.h"
+#include "LogManager.h"
 
 #include <rhi/qrhi.h>
 #include <rhi/qrhi_platform.h>
@@ -33,10 +34,6 @@
 #endif
 
 namespace {
-bool isRhiDebugEnabled() {
-  // return qEnvironmentVariableIsSet("VGMTRANS_HEXVIEW_RHI_DEBUG");
-  return true;
-}
 constexpr int SCROLLBAR_FRAME_MS = 16;
 }  // namespace
 
@@ -219,7 +216,6 @@ void HexViewRhiWindow::initIfNeeded() {
     return;
   }
 
-  const bool debug = debugLoggingEnabled();
   switch (m_backend->backend) {
     case QRhi::OpenGLES2:
 #if QT_CONFIG(opengl)
@@ -277,13 +273,9 @@ void HexViewRhiWindow::initIfNeeded() {
     return;
   }
 
-  if (debug) {
-    qDebug() << "HexViewRhiWindow init:"
-             << "backend=" << int(m_rhi->backend())
-             << "surface=" << int(surfaceType())
-             << "size=" << size()
-             << "dpr=" << devicePixelRatio();
-  }
+  L_DEBUG("HexViewRhiWindow init: backend={} surface={} size={}x{} dpr={}",
+          int(m_rhi->backend()), int(surfaceType()), size().width(), size().height(),
+          devicePixelRatio());
 
   if (m_renderer) {
     m_renderer->initIfNeeded(m_rhi);
@@ -304,11 +296,8 @@ void HexViewRhiWindow::resizeSwapChain() {
 
   const QSize pixelSize = size() * devicePixelRatio();
   if (pixelSize.isEmpty()) {
-    if (debugLoggingEnabled()) {
-      qDebug() << "HexViewRhiWindow resizeSwapChain skipped: empty pixel size"
-               << "size=" << size()
-               << "dpr=" << devicePixelRatio();
-    }
+    L_DEBUG("HexViewRhiWindow resizeSwapChain skipped: empty pixel size size={}x{} dpr={}",
+            size().width(), size().height(), devicePixelRatio());
     return;
   }
 
@@ -321,11 +310,8 @@ void HexViewRhiWindow::resizeSwapChain() {
   }
 
   m_hasSwapChain = m_sc->createOrResize();
-  if (debugLoggingEnabled()) {
-    qDebug() << "HexViewRhiWindow swapchain resized"
-             << "pixelSize=" << pixelSize
-             << "sampleCount=" << m_sc->sampleCount();
-  }
+  L_DEBUG("HexViewRhiWindow swapchain resized pixelSize={}x{} sampleCount={}",
+          pixelSize.width(), pixelSize.height(), m_sc->sampleCount());
 }
 
 void HexViewRhiWindow::renderFrame() {
@@ -341,17 +327,13 @@ void HexViewRhiWindow::renderFrame() {
 
   const QSize currentPixelSize = m_sc->currentPixelSize();
   if (currentPixelSize.isEmpty()) {
-    if (debugLoggingEnabled()) {
-      qDebug() << "HexViewRhiWindow renderFrame skipped: swapchain pixel size empty";
-    }
+    L_DEBUG("HexViewRhiWindow renderFrame skipped: swapchain pixel size empty");
     return;
   }
 
   const QRhi::FrameOpResult result = m_rhi->beginFrame(m_sc);
   if (result == QRhi::FrameOpSwapChainOutOfDate) {
-    if (debugLoggingEnabled()) {
-      qDebug() << "HexViewRhiWindow frame: swapchain out of date";
-    }
+    L_DEBUG("HexViewRhiWindow frame: swapchain out of date");
     resizeSwapChain();
     if (!m_hasSwapChain)
       return;
@@ -359,9 +341,7 @@ void HexViewRhiWindow::renderFrame() {
     return;
   }
   if (result != QRhi::FrameOpSuccess) {
-    if (debugLoggingEnabled()) {
-      qDebug() << "HexViewRhiWindow frame: beginFrame failed" << int(result);
-    }
+    L_DEBUG("HexViewRhiWindow frame: beginFrame failed {}", int(result));
     return;
   }
 
@@ -395,8 +375,4 @@ void HexViewRhiWindow::releaseResources() {
 
   delete m_rhi;
   m_rhi = nullptr;
-}
-
-bool HexViewRhiWindow::debugLoggingEnabled() const {
-  return isRhiDebugEnabled();
 }

@@ -51,7 +51,6 @@ private:
   void renderFrame();
   void releaseResources();
   void releaseSwapChain();
-  bool debugLoggingEnabled() const;
 
   HexView* m_view = nullptr;
   HexViewRhiRenderer* m_renderer = nullptr;

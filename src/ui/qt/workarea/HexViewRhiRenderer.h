@@ -134,7 +134,6 @@ private:
 
   void ensureRenderTargets(const QSize& pixelSize);
   void releaseRenderTargets();
-  bool debugLoggingEnabled() const;
 
   void ensurePipelines(QRhiRenderPassDescriptor* outputRp, int outputSampleCount);
   void ensureGlyphTexture(QRhiResourceUpdateBatch* u);
