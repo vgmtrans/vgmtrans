@@ -12,6 +12,7 @@
 
 class HexView;
 class QResizeEvent;
+class QWindow;
 
 class HexViewRhiHost final : public QWidget {
   Q_OBJECT
@@ -31,4 +32,5 @@ protected:
 private:
   std::unique_ptr<HexViewRhiRenderer> m_renderer;
   QWidget* m_surface = nullptr;
+  QWindow* m_window = nullptr;
 };

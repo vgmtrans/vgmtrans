@@ -99,6 +99,8 @@ add_executable(
   workarea/hexview/HexViewRhiRenderer.h
   workarea/hexview/HexViewRhiWidget.cpp
   workarea/hexview/HexViewRhiWidget.h
+  workarea/hexview/HexViewRhiWindow.cpp
+  workarea/hexview/HexViewRhiWindow.h
   workarea/MdiArea.cpp
   workarea/MdiArea.h
   workarea/RawFileListView.cpp

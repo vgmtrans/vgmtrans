@@ -8,17 +8,60 @@
 
 #include "HexView.h"
 #include "HexViewRhiRenderer.h"
-#include "HexViewRhiWidget.h"
 
+#if defined(Q_OS_LINUX)
+#include "HexViewRhiWidget.h"
+#else
+#include "HexViewRhiWindow.h"
+#include "MainWindow.h"
+#endif
+
+#include <QApplication>
+#include <QWindow>
 #include <QResizeEvent>
 
 HexViewRhiHost::HexViewRhiHost(HexView* view, QWidget* parent)
     : QWidget(parent) {
   setFocusPolicy(Qt::NoFocus);
 
+#if defined(Q_OS_LINUX)
   m_renderer = std::make_unique<HexViewRhiRenderer>(view, "HexViewRhiWidget");
   auto* widget = new HexViewRhiWidget(view, m_renderer.get(), this);
   m_surface = widget;
+#else
+  m_renderer = std::make_unique<HexViewRhiRenderer>(view, "HexViewRhiWindow");
+  auto* window = new HexViewRhiWindow(view, m_renderer.get());
+  m_window = window;
+  m_surface = QWidget::createWindowContainer(window, this);
+
+  auto* rhiWindow = qobject_cast<HexViewRhiWindow*>(m_window);
+  if (rhiWindow) {
+    MainWindow* mainWindow = nullptr;
+    for (QWidget* widget = this; widget; widget = widget->parentWidget()) {
+      mainWindow = qobject_cast<MainWindow*>(widget);
+      if (mainWindow) {
+        break;
+      }
+    }
+    if (!mainWindow) {
+      const auto topLevelWidgets = QApplication::topLevelWidgets();
+      for (QWidget* widget : topLevelWidgets) {
+        mainWindow = qobject_cast<MainWindow*>(widget);
+        if (mainWindow) {
+          break;
+        }
+      }
+    }
+    if (mainWindow) {
+      connect(rhiWindow, &HexViewRhiWindow::dragOverlayShowRequested,
+              mainWindow, &MainWindow::showDragOverlay);
+      connect(rhiWindow, &HexViewRhiWindow::dragOverlayHideRequested,
+              mainWindow, &MainWindow::hideDragOverlay);
+      connect(rhiWindow, &HexViewRhiWindow::dropUrlsRequested,
+              mainWindow, &MainWindow::handleDroppedUrls);
+    }
+  }
+#endif
 
   if (m_surface) {
     m_surface->setFocusPolicy(Qt::NoFocus);
@@ -30,6 +73,7 @@ HexViewRhiHost::HexViewRhiHost(HexView* view, QWidget* parent)
 HexViewRhiHost::~HexViewRhiHost() {
   delete m_surface;
   m_surface = nullptr;
+  m_window = nullptr;
 }
 
 void HexViewRhiHost::markBaseDirty() {
@@ -51,7 +95,9 @@ void HexViewRhiHost::invalidateCache() {
 }
 
 void HexViewRhiHost::requestUpdate() {
-  if (m_surface) {
+  if (m_window) {
+    m_window->requestUpdate();
+  } else if (m_surface) {
     m_surface->update();
   }
 }
