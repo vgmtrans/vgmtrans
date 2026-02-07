@@ -1,112 +1,154 @@
 /*
-* VGMTrans (c) 2002-2023
+* VGMTrans (c) 2002-2026
 * Licensed under the zlib license,
 * refer to the included LICENSE.txt file
 */
 
 #pragma once
 
-#include <QWidget>
-#include <QCache>
+#include <QAbstractScrollArea>
+#include <QColor>
+#include <QFont>
+#include <QImage>
+#include <QSize>
+#include <QPointF>
+#include <QRectF>
+#include <array>
+#include <cstdint>
+#include <memory>
+#include <unordered_map>
+#include <vector>
+#include "HexViewFrameData.h"
 
 class QParallelAnimationGroup;
-class QGraphicsDropShadowEffect;
+class QWidget;
 class VGMFile;
 class VGMItem;
-class QGraphicsOpacityEffect;
-class QPropertyAnimation;
+class HexViewRhiHost;
 
-class HexView : public QWidget {
+class HexView final : public QAbstractScrollArea {
   Q_OBJECT
+  Q_PROPERTY(qreal overlayOpacity READ overlayOpacity WRITE setOverlayOpacity)
+  Q_PROPERTY(qreal shadowBlur READ shadowBlur WRITE setShadowBlur)
+  Q_PROPERTY(QPointF shadowOffset READ shadowOffset WRITE setShadowOffset)
+  Q_PROPERTY(qreal shadowStrength READ shadowStrength WRITE setShadowStrength)
+
 public:
-  explicit HexView(VGMFile* vgmfile, QWidget *parent = nullptr);
+  explicit HexView(VGMFile* vgmfile, QWidget* parent = nullptr);
+  ~HexView() override;
   void setSelectedItem(VGMItem* item);
-  void setFont(QFont& font);
-  [[nodiscard]] int getVirtualFullWidth();
-  [[nodiscard]] int getVirtualWidthSansAscii();
-  [[nodiscard]] int getVirtualWidthSansAsciiAndAddress();
-  [[nodiscard]] int getActualVirtualWidth();
-  [[nodiscard]] int getViewportFullWidth();
-  [[nodiscard]] int getViewportWidthSansAscii();
-  [[nodiscard]] int getViewportWidthSansAsciiAndAddress();
+  int scrollYForRender() const;
+  void setFont(const QFont& font);
+  [[nodiscard]] int getVirtualFullWidth() const;
+  [[nodiscard]] int getVirtualWidthSansAscii() const;
+  [[nodiscard]] int getVirtualWidthSansAsciiAndAddress() const;
+  [[nodiscard]] int getActualVirtualWidth() const;
+  [[nodiscard]] int getViewportFullWidth() const;
+  [[nodiscard]] int getViewportWidthSansAscii() const;
+  [[nodiscard]] int getViewportWidthSansAsciiAndAddress() const;
+  HexViewFrame::Data captureRhiFrameData(float dpr);
 
-protected:
-  bool event(QEvent *event) override;
-  void changeEvent(QEvent *event) override;
-  void keyPressEvent(QKeyEvent *event) override;
-  bool handleOverlayPaintEvent(QObject* obj, QPaintEvent* event) const;
-  bool handleSelectedItemPaintEvent(QObject* obj, QPaintEvent* event);
-  void paintEvent(QPaintEvent *event) override;
-  void mousePressEvent(QMouseEvent *event) override;
-  void mouseMoveEvent(QMouseEvent *event) override;
-  void mouseReleaseEvent(QMouseEvent *event) override;
-  void mouseDoubleClickEvent(QMouseEvent* event) override;
-
-private:
-  int hexXOffset() const;
-  int getVirtualHeight() const;
-  void updateSize();
-  int getTotalLines() const;
-  int getOffsetFromPoint(QPoint pos) const;
-  std::pair<QRect,QRect> calculateSelectionRectsForLine(int startColumn, int length, qreal dpr) const;
-  void resizeOverlays(int y, int viewportHeight) const;
-  void redrawOverlay();
-  void printLine(QPainter& painter, int line) const;
-  void printAddress(QPainter& painter, int line) const;
-  void printData(QPainter& painter, int startAddress, int endAddress) const;
-  void translateAndPrintHex(QPainter& painter,
-                            const uint8_t* data,
-                            int offset,
-                            int length,
-                            const QColor& bgColor,
-                            const QColor& textColor) const;
-  void printHex(QPainter& painter,
-                const uint8_t* data,
-                int length,
-                const QColor& bgColor,
-                const QColor& textColor) const;
-  void translateAndPrintAscii(QPainter& painter,
-                  const uint8_t* data,
-                  int offset,
-                  int length,
-                  const QColor& bgColor,
-                  const QColor& textColor) const;
-  void printAscii(QPainter& painter,
-                  const uint8_t* data,
-                  int length,
-                  const QColor& bgColor,
-                  const QColor& textColor) const;
-  void initAnimations();
-  void showSelectedItem(bool show, bool animate);
-  void drawSelectedItem() const;
-
-  VGMFile* vgmfile;
-  VGMItem* selectedItem;
-  int selectedOffset;
-  int charWidth;
-  int charHalfWidth;
-  int lineHeight;
-  int ascent;
-  bool addressAsHex = true;
-  bool isDragging = false;
-  bool shouldDrawOffset = true;
-  bool shouldDrawAscii = true;
-  int prevWidth = 0;
-  int prevHeight = 0;
-
-  int m_virtual_full_width{-1};
-  int m_virtual_width_sans_ascii{-1};
-  int m_virtual_width_sans_ascii_and_address{-1};
-
-  QCache<int, QPixmap> lineCache;
-  QGraphicsOpacityEffect* overlayOpacityEffect = nullptr;
-  QGraphicsDropShadowEffect* selectedItemShadowEffect = nullptr;
-  QParallelAnimationGroup* selectionAnimation = nullptr;
-  QWidget* overlay;
-  QWidget* selectionView = nullptr;
-  QPixmap selectionViewPixmap;
-  QPixmap selectionViewPixmapWithShadow;
+  void handleCoalescedMouseMove(const QPoint& pos,
+                                Qt::MouseButtons buttons,
+                                Qt::KeyboardModifiers mods);
 
 signals:
   void selectionChanged(VGMItem* item);
+
+protected:
+  bool viewportEvent(QEvent* event) override;
+  void resizeEvent(QResizeEvent* event) override;
+  void scrollContentsBy(int dx, int dy) override;
+  void changeEvent(QEvent* event) override;
+  void keyPressEvent(QKeyEvent* event) override;
+  void mousePressEvent(QMouseEvent* event) override;
+  void mouseMoveEvent(QMouseEvent* event) override;
+  void mouseReleaseEvent(QMouseEvent* event) override;
+  void mouseDoubleClickEvent(QMouseEvent* event) override;
+
+private:
+  struct SelectionRange {
+    uint32_t offset;
+    uint32_t length;
+  };
+  struct Style {
+    QColor bg;
+    QColor fg;
+  };
+  struct GlyphAtlas {
+    QImage image;
+    std::array<QRectF, 128> uvTable{};
+    qreal dpr = 0.0;
+    int glyphWidth = 0;
+    int glyphHeight = 0;
+    int cellWidth = 0;
+    int cellHeight = 0;
+    uint64_t version = 0;
+    QFont font;
+  };
+
+  static uint64_t selectionKey(uint32_t offset, uint32_t length);
+  static uint64_t selectionKey(const SelectionRange& range);
+
+  int hexXOffset() const;
+  int getVirtualHeight() const;
+  int getTotalLines() const;
+  int getOffsetFromPoint(QPoint pos) const;
+  void requestRhiUpdate(bool markBaseDirty = false, bool markSelectionDirty = false);
+  void clearCurrentSelection(bool animateSelection);
+  void selectCurrentItem(bool animateSelection);
+  void refreshSelectionVisuals(bool animateSelection);
+  void updateLayout();
+  void updateScrollBars();
+  void rebuildStyleMap();
+  void ensureGlyphAtlas(qreal dpr);
+  qreal overlayOpacity() const;
+  void setOverlayOpacity(qreal opacity);
+  qreal shadowBlur() const;
+  void setShadowBlur(qreal blur);
+  QPointF shadowOffset() const;
+  void setShadowOffset(const QPointF& offset);
+  qreal shadowStrength() const;
+  void setShadowStrength(qreal s);
+  void initAnimations();
+  void showSelectedItem(bool show, bool animate);
+  void clearFadeSelection();
+  void updateHighlightState(bool animateSelection);
+
+  VGMFile* m_vgmfile = nullptr;
+  // Interaction state.
+  VGMItem* m_selectedItem = nullptr;
+  uint32_t m_selectedOffset = 0;
+  bool m_isDragging = false;
+  std::vector<SelectionRange> m_selections;
+  std::vector<SelectionRange> m_fadeSelections;
+
+  int m_charWidth = 0;
+  int m_charHalfWidth = 0;
+  int m_lineHeight = 0;
+  bool m_addressAsHex = true;
+  bool m_shouldDrawOffset = true;
+  bool m_shouldDrawAscii = true;
+
+  mutable int m_virtual_full_width = -1;
+  mutable int m_virtual_width_sans_ascii = -1;
+  mutable int m_virtual_width_sans_ascii_and_address = -1;
+
+  // Compact style table used by renderer; index 0 is the default/fallback style.
+  std::vector<Style> m_styles;
+  // Style id for each byte in the current file data; each entry indexes into m_styles.
+  std::vector<uint16_t> m_styleIds;
+  std::unordered_map<int, uint16_t> m_typeToStyleId;
+
+  QParallelAnimationGroup* m_selectionAnimation = nullptr;
+  qreal m_overlayOpacity = 0.0;
+  qreal m_shadowBlur = 0.0;
+  QPointF m_shadowOffset{0.0, 0.0};
+  qreal m_shadowStrength = 1.0;
+  float m_shadowEdgeCurve = 1.0f;
+  bool m_scrollBarDragging = false;
+  int m_pendingScrollY = 0;
+
+  HexViewRhiHost* m_rhiHost = nullptr;
+  std::unique_ptr<GlyphAtlas> m_glyphAtlas;
 };
