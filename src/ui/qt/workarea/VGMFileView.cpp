@@ -17,7 +17,7 @@
 #include "VGMColl.h"
 #include "SeqTrack.h"
 #include "SeqEvent.h"
-#include "HexView.h"
+#include "hexview/HexView.h"
 #include "VGMFileTreeView.h"
 #include "MdiArea.h"
 #include "SequencePlayer.h"

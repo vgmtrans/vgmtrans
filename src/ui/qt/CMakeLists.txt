@@ -91,8 +91,8 @@ add_executable(
   widgets/TableView.h
   widgets/TitleBar.cpp
   widgets/TitleBar.h
-  workarea/HexView.cpp
-  workarea/HexView.h
+  workarea/hexview/HexView.cpp
+  workarea/hexview/HexView.h
   workarea/MdiArea.cpp
   workarea/MdiArea.h
   workarea/RawFileListView.cpp
