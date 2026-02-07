@@ -35,11 +35,13 @@ int main(int argc, char *argv[]) {
   QCoreApplication::setApplicationName("VGMTrans");
 
   QGuiApplication::setHighDpiScaleFactorRoundingPolicy(Qt::HighDpiScaleFactorRoundingPolicy::Round);
+  // Keep dock splitter/input behavior stable when embedding RHI QWindow containers.
+  QCoreApplication::setAttribute(Qt::AA_DontCreateNativeWidgetSiblings);
 
   VGMTransApplication app(argc, argv);
-  #ifdef _WIN32
+#ifdef _WIN32
   app.setStyle(QStyleFactory::create("fusion"));
-  #endif
+#endif
   qtVGMRoot.init();
 
   QFontDatabase::addApplicationFont(":/fonts/Roboto_Mono/RobotoMono-VariableFont_wght.ttf");
