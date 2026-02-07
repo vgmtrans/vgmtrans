@@ -159,7 +159,9 @@ private:
   mutable int m_virtual_width_sans_ascii = -1;
   mutable int m_virtual_width_sans_ascii_and_address = -1;
 
+  // Compact style table used by renderer; index 0 is the default/fallback style.
   std::vector<Style> m_styles;
+  // Style id for each byte in the current file data; each entry indexes into m_styles.
   std::vector<uint16_t> m_styleIds;
   std::unordered_map<int, uint16_t> m_typeToStyleId;
 
