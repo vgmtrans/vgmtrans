@@ -6,6 +6,7 @@
 
 #include "HexView.h"
 #include "Helpers.h"
+#include "HexViewInput.h"
 #include "HexViewRhiHost.h"
 #include "VGMFile.h"
 
@@ -705,6 +706,18 @@ void HexView::mousePressEvent(QMouseEvent* event) {
   if (event->button() == Qt::LeftButton) {
     const int offset = getOffsetFromPoint(event->pos());
     auto* item = m_vgmfile->getItemAtOffset(offset, false);
+    const bool seekModifier = event->modifiers().testFlag(HexViewInput::kModifier);
+    if (seekModifier) {
+      if (item && item != m_lastSeekItem) {
+        m_lastSeekItem = item;
+        seekToEventRequested(item);
+      }
+      m_isDragging = true;
+      QAbstractScrollArea::mousePressEvent(event);
+      return;
+    }
+
+    m_lastSeekItem = nullptr;
     if (offset == -1) {
       selectionChanged(nullptr);
       return;
@@ -726,6 +739,7 @@ void HexView::mousePressEvent(QMouseEvent* event) {
 void HexView::mouseReleaseEvent(QMouseEvent* event) {
   if (event->button() == Qt::LeftButton) {
     m_isDragging = false;
+    m_lastSeekItem = nullptr;
   }
   QAbstractScrollArea::mouseReleaseEvent(event);
 }
@@ -734,13 +748,26 @@ void HexView::mouseReleaseEvent(QMouseEvent* event) {
 void HexView::handleCoalescedMouseMove(const QPoint& pos,
                               Qt::MouseButtons buttons,
                               Qt::KeyboardModifiers mods) {
-  Q_UNUSED(mods);
   if (m_isDragging && buttons & Qt::LeftButton) {
     const int offset = getOffsetFromPoint(pos);
     if (offset == -1) {
-      selectionChanged(nullptr);
+      if (!mods.testFlag(HexViewInput::kModifier)) {
+        selectionChanged(nullptr);
+      }
+      m_lastSeekItem = nullptr;
       return;
     }
+
+    if (mods.testFlag(HexViewInput::kModifier)) {
+      if (auto* item = m_vgmfile->getItemAtOffset(offset, false);
+          item && item != m_lastSeekItem) {
+        m_lastSeekItem = item;
+        seekToEventRequested(item);
+      }
+      return;
+    }
+
+    m_lastSeekItem = nullptr;
     m_selectedOffset = offset;
     if (m_selectedItem && (m_selectedOffset >= m_selectedItem->offset()) &&
         (m_selectedOffset < (m_selectedItem->offset() + m_selectedItem->length()))) {

@@ -54,6 +54,7 @@ public:
 
 signals:
   void selectionChanged(VGMItem* item);
+  void seekToEventRequested(VGMItem* item);
 
 protected:
   bool viewportEvent(QEvent* event) override;
@@ -120,6 +121,7 @@ private:
   VGMItem* m_selectedItem = nullptr;
   uint32_t m_selectedOffset = 0;
   bool m_isDragging = false;
+  VGMItem* m_lastSeekItem = nullptr;
   std::vector<SelectionRange> m_selections;
   std::vector<SelectionRange> m_fadeSelections;
 
