@@ -104,6 +104,10 @@ private:
     QFont font;
   };
 
+  static uint64_t selectionKey(uint32_t offset, uint32_t length);
+  static uint64_t selectionKey(const SelectionRange& range);
+  static uint64_t selectionKey(const FadePlaybackSelection& selection);
+
   int hexXOffset() const;
   int getVirtualHeight() const;
   int getTotalLines() const;

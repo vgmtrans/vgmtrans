@@ -79,10 +79,6 @@ public:
 };
 #endif
 
-inline uint64_t selectionKey(uint32_t offset, uint32_t length) {
-  return (static_cast<uint64_t>(offset) << 32) | length;
-}
-
 QString tooltipIconDataUrl(VGMItem::Type type) {
   static QHash<int, QString> cache;
   const int key = static_cast<int>(type);
@@ -129,8 +125,25 @@ QString tooltipHtmlWithIcon(VGMItem* item) {
 }
 }  // namespace
 
+// Pack selection offset/length into a stable 64-bit key for set membership checks.
+uint64_t HexView::selectionKey(uint32_t offset, uint32_t length) {
+  return (static_cast<uint64_t>(offset) << 32) | length;
+}
+
+// Overload for plain selection ranges.
+uint64_t HexView::selectionKey(const SelectionRange& range) {
+  return selectionKey(range.offset, range.length);
+}
+
+// Overload for fade playback selections (keyed by underlying range).
+uint64_t HexView::selectionKey(const FadePlaybackSelection& selection) {
+  return selectionKey(selection.range);
+}
+
+// Trivial destructor; QObject ownership handles child cleanup.
 HexView::~HexView() = default;
 
+// Initialize HexView UI state, RHI host, typography, animations, and signal wiring.
 HexView::HexView(VGMFile* vgmfile, QWidget* parent)
     : QAbstractScrollArea(parent), m_vgmfile(vgmfile) {
   setFocusPolicy(Qt::StrongFocus);
@@ -435,10 +448,6 @@ void HexView::setSelectedItem(VGMItem* item) {
 
 // Update playback selections from active items and seed fade-out entries for removed ones.
 void HexView::setPlaybackSelectionsForItems(const std::vector<const VGMItem*>& items) {
-  auto keyForFade = [](const FadePlaybackSelection& selection) -> uint64_t {
-    return selectionKey(selection.range.offset, selection.range.length);
-  };
-
   std::vector<SelectionRange> next;
   next.reserve(items.size());
   for (const auto* item : items) {
@@ -452,14 +461,14 @@ void HexView::setPlaybackSelectionsForItems(const std::vector<const VGMItem*>& i
   std::unordered_set<uint64_t> nextKeys;
   nextKeys.reserve(next.size() * 2 + 1);
   for (const auto& selection : next) {
-    nextKeys.insert(selectionKey(selection.offset, selection.length));
+    nextKeys.insert(selectionKey(selection));
   }
 
   if (!m_fadePlaybackSelections.empty()) {
     m_fadePlaybackSelections.erase(
         std::remove_if(m_fadePlaybackSelections.begin(), m_fadePlaybackSelections.end(),
                        [&](const FadePlaybackSelection& selection) {
-                         return nextKeys.find(keyForFade(selection)) != nextKeys.end();
+                         return nextKeys.find(selectionKey(selection)) != nextKeys.end();
                        }),
         m_fadePlaybackSelections.end());
   }
@@ -467,7 +476,7 @@ void HexView::setPlaybackSelectionsForItems(const std::vector<const VGMItem*>& i
   std::unordered_set<uint64_t> fadeKeys;
   fadeKeys.reserve(m_fadePlaybackSelections.size() * 2 + 1);
   for (const auto& selection : m_fadePlaybackSelections) {
-    fadeKeys.insert(keyForFade(selection));
+    fadeKeys.insert(selectionKey(selection));
   }
 
   const bool fadeEnabled = PLAYBACK_FADE_DURATION_MS > 0;
@@ -475,7 +484,7 @@ void HexView::setPlaybackSelectionsForItems(const std::vector<const VGMItem*>& i
   if (fadeEnabled) {
     const qint64 now = playbackNowMs();
     for (const auto& selection : m_playbackSelections) {
-      const uint64_t key = selectionKey(selection.offset, selection.length);
+      const uint64_t key = selectionKey(selection);
       if (nextKeys.find(key) == nextKeys.end() && fadeKeys.insert(key).second) {
         m_fadePlaybackSelections.push_back({selection, now, 1.0f});
         addedFade = true;
@@ -506,10 +515,10 @@ void HexView::clearPlaybackSelections(bool fade) {
     std::unordered_set<uint64_t> fadeKeys;
     fadeKeys.reserve(m_fadePlaybackSelections.size() * 2 + 1);
     for (const auto& selection : m_fadePlaybackSelections) {
-      fadeKeys.insert(selectionKey(selection.range.offset, selection.range.length));
+      fadeKeys.insert(selectionKey(selection));
     }
     for (const auto& selection : m_playbackSelections) {
-      const uint64_t key = selectionKey(selection.offset, selection.length);
+      const uint64_t key = selectionKey(selection);
       if (fadeKeys.insert(key).second) {
         m_fadePlaybackSelections.push_back({selection, now, 1.0f});
       }
