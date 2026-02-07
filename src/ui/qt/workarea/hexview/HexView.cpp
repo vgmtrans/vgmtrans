@@ -215,6 +215,7 @@ HexView::HexView(VGMFile* vgmfile, QWidget* parent)
           });
 }
 
+// Apply a monospaced font, normalize glyph metrics, and invalidate layout/glyph cache.
 void HexView::setFont(const QFont& font) {
   QFont adjustedFont = font;
   QFontMetricsF fontMetrics(adjustedFont);
@@ -244,14 +245,17 @@ void HexView::setFont(const QFont& font) {
   requestRhiUpdate(true, true);
 }
 
+// Return X origin of the hex byte columns (accounting for optional address column).
 int HexView::hexXOffset() const {
   return m_shouldDrawOffset ? ((NUM_ADDRESS_NIBBLES + ADDRESS_SPACING_CHARS) * m_charWidth) : 0;
 }
 
+// Compute total virtual content height in pixels.
 int HexView::getVirtualHeight() const {
   return m_lineHeight * getTotalLines();
 }
 
+// Compute full virtual content width (address + hex + ascii).
 int HexView::getVirtualFullWidth() const {
   if (m_virtual_full_width == -1) {
     constexpr int numChars = NUM_ADDRESS_NIBBLES + ADDRESS_SPACING_CHARS + (BYTES_PER_LINE * 3) +
@@ -261,6 +265,7 @@ int HexView::getVirtualFullWidth() const {
   return m_virtual_full_width;
 }
 
+// Compute virtual width when ASCII column is hidden.
 int HexView::getVirtualWidthSansAscii() const {
   if (m_virtual_width_sans_ascii == -1) {
     constexpr int numChars = NUM_ADDRESS_NIBBLES + ADDRESS_SPACING_CHARS + (BYTES_PER_LINE * 3);
@@ -269,6 +274,7 @@ int HexView::getVirtualWidthSansAscii() const {
   return m_virtual_width_sans_ascii;
 }
 
+// Compute virtual width when both ASCII and address columns are hidden.
 int HexView::getVirtualWidthSansAsciiAndAddress() const {
   if (m_virtual_width_sans_ascii_and_address == -1) {
     constexpr int numChars = BYTES_PER_LINE * 3;
@@ -277,6 +283,7 @@ int HexView::getVirtualWidthSansAsciiAndAddress() const {
   return m_virtual_width_sans_ascii_and_address;
 }
 
+// Return active virtual width for the current column-visibility mode.
 int HexView::getActualVirtualWidth() const {
   if (m_shouldDrawAscii) {
     return getVirtualFullWidth();
@@ -287,18 +294,22 @@ int HexView::getActualVirtualWidth() const {
   return getVirtualWidthSansAsciiAndAddress();
 }
 
+// Return minimum viewport width needed to render full columns plus padding.
 int HexView::getViewportFullWidth() const {
   return getVirtualFullWidth() + VIEWPORT_PADDING;
 }
 
+// Return minimum viewport width needed for address + hex columns plus padding.
 int HexView::getViewportWidthSansAscii() const {
   return getVirtualWidthSansAscii() + VIEWPORT_PADDING;
 }
 
+// Return minimum viewport width needed for hex-only columns plus padding.
 int HexView::getViewportWidthSansAsciiAndAddress() const {
   return getVirtualWidthSansAsciiAndAddress() + VIEWPORT_PADDING;
 }
 
+// Sync vertical scrollbar range/steps with current content and viewport dimensions.
 void HexView::updateScrollBars() {
   const int totalHeight = getVirtualHeight();
   const int pageStep = viewport()->height();
@@ -307,6 +318,7 @@ void HexView::updateScrollBars() {
   verticalScrollBar()->setSingleStep(m_lineHeight);
 }
 
+// Forward dirty/update requests to the active RHI host.
 void HexView::requestRhiUpdate(bool markBaseDirty, bool markSelectionDirty) {
   if (!m_rhiHost) {
     return;
@@ -320,6 +332,7 @@ void HexView::requestRhiUpdate(bool markBaseDirty, bool markSelectionDirty) {
   m_rhiHost->requestUpdate();
 }
 
+// Recompute responsive column visibility from viewport width and refresh rendering state.
 void HexView::updateLayout() {
   const int width = viewport()->width();
   const int height = viewport()->height();
@@ -339,6 +352,7 @@ void HexView::updateLayout() {
   requestRhiUpdate(offsetChanged || asciiChanged, offsetChanged || asciiChanged);
 }
 
+// Return total line count required to display file bytes at 16 bytes per line.
 int HexView::getTotalLines() const {
   if (!m_vgmfile) {
     return 0;
@@ -346,6 +360,7 @@ int HexView::getTotalLines() const {
   return static_cast<int>((m_vgmfile->length() + BYTES_PER_LINE - 1) / BYTES_PER_LINE);
 }
 
+// Clear current manual selection, optionally preserving/animating fade semantics.
 void HexView::clearCurrentSelection(bool animateSelection) {
   if (m_playbackActive) {
     m_selections.clear();
@@ -361,24 +376,26 @@ void HexView::clearCurrentSelection(bool animateSelection) {
   requestRhiUpdate(false, true);
 }
 
+// Select the current item's byte range and refresh highlight visuals.
 void HexView::selectCurrentItem(bool animateSelection) {
   if (!m_selectedItem) {
     return;
   }
   m_selectedOffset = m_selectedItem->offset();
   m_selections.clear();
-  m_selections.push_back(
-      {m_selectedItem->offset(), m_selectedItem->length()});
+  m_selections.push_back({m_selectedItem->offset(), m_selectedItem->length()});
   m_fadeSelections.clear();
   updateHighlightState(animateSelection);
   requestRhiUpdate(false, true);
 }
 
+// Refresh overlay/shadow animation state for current selection/playback state.
 void HexView::refreshSelectionVisuals(bool animateSelection) {
   updateHighlightState(animateSelection);
   requestRhiUpdate(false, true);
 }
 
+// Set selected item, update selection, and scroll it into view when needed.
 void HexView::setSelectedItem(VGMItem* item) {
   m_selectedItem = item;
 
@@ -416,6 +433,7 @@ void HexView::setSelectedItem(VGMItem* item) {
   }
 }
 
+// Update playback selections from active items and seed fade-out entries for removed ones.
 void HexView::setPlaybackSelectionsForItems(const std::vector<const VGMItem*>& items) {
   auto keyForFade = [](const FadePlaybackSelection& selection) -> uint64_t {
     return selectionKey(selection.range.offset, selection.range.length);
@@ -478,6 +496,7 @@ void HexView::setPlaybackSelectionsForItems(const std::vector<const VGMItem*>& i
   refreshSelectionVisuals(false);
 }
 
+// Clear playback selection set immediately or convert it into fading playback highlights.
 void HexView::clearPlaybackSelections(bool fade) {
   if (m_playbackSelections.empty()) {
     return;
@@ -508,6 +527,7 @@ void HexView::clearPlaybackSelections(bool fade) {
   refreshSelectionVisuals(false);
 }
 
+// Toggle playback-highlight mode and reconcile existing playback selection state.
 void HexView::setPlaybackActive(bool active) {
   if (m_playbackActive == active) {
     if (!active && !m_playbackSelections.empty()) {
@@ -523,10 +543,12 @@ void HexView::setPlaybackActive(bool active) {
   refreshSelectionVisuals(false);
 }
 
+// Request another frame while playback/outline effects are animating.
 void HexView::requestPlaybackFrame() {
   requestRhiUpdate();
 }
 
+// Build byte-level style-id lookup from VGM leaf items for renderer consumption.
 void HexView::rebuildStyleMap() {
   m_styles.clear();
   m_typeToStyleId.clear();
@@ -603,6 +625,7 @@ void HexView::rebuildStyleMap() {
   }
 }
 
+// Lazily rebuild glyph atlas texture and UV table when DPR/font/metrics change.
 void HexView::ensureGlyphAtlas(qreal dpr) {
   if (!m_glyphAtlas) {
     m_glyphAtlas = std::make_unique<GlyphAtlas>();
@@ -683,6 +706,7 @@ void HexView::ensureGlyphAtlas(qreal dpr) {
   }
 }
 
+// Handle tooltip events on the viewport and fall back to default viewport processing.
 bool HexView::viewportEvent(QEvent* event) {
   if (event->type() == QEvent::ToolTip) {
     auto* helpEvent = static_cast<QHelpEvent*>(event);
@@ -703,6 +727,7 @@ bool HexView::viewportEvent(QEvent* event) {
   return QAbstractScrollArea::viewportEvent(event);
 }
 
+// Keep RHI host geometry and layout in sync with viewport resize.
 void HexView::resizeEvent(QResizeEvent* event) {
   QAbstractScrollArea::resizeEvent(event);
   if (m_rhiHost) {
@@ -712,11 +737,13 @@ void HexView::resizeEvent(QResizeEvent* event) {
   requestRhiUpdate();
 }
 
+// Trigger rerender on scroll changes (content is rendered from absolute scroll offset).
 void HexView::scrollContentsBy(int dx, int dy) {
   QAbstractScrollArea::scrollContentsBy(dx, dy);
   requestRhiUpdate();
 }
 
+// Provide render-time scroll offset, including live scrollbar drag position.
 int HexView::scrollYForRender() const {
   if (m_scrollBarDragging) {
     return m_pendingScrollY;
@@ -724,6 +751,7 @@ int HexView::scrollYForRender() const {
   return verticalScrollBar()->value();
 }
 
+// Capture immutable frame snapshot consumed by the RHI renderer this frame.
 HexViewFrame::Data HexView::captureRhiFrameData(float dpr) {
   HexViewFrame::Data frame;
   frame.vgmfile = m_vgmfile;
@@ -790,6 +818,7 @@ HexViewFrame::Data HexView::captureRhiFrameData(float dpr) {
   return frame;
 }
 
+// React to palette updates so default style colors stay synchronized with theme changes.
 void HexView::changeEvent(QEvent* event) {
   if (event->type() == QEvent::PaletteChange) {
     if (!m_styles.empty()) {
@@ -801,6 +830,7 @@ void HexView::changeEvent(QEvent* event) {
   QAbstractScrollArea::changeEvent(event);
 }
 
+// Handle keyboard navigation between adjacent items and modifier-driven tooltip refresh.
 void HexView::keyPressEvent(QKeyEvent* event) {
   if (!m_selectedItem) {
     QAbstractScrollArea::keyPressEvent(event);
@@ -856,6 +886,7 @@ void HexView::keyPressEvent(QKeyEvent* event) {
   }
 }
 
+// Hide modifier tooltip affordance when seek modifier key is released.
 void HexView::keyReleaseEvent(QKeyEvent* event) {
   if (event->key() == HexViewInput::kModifierKey) {
     hideTooltip();
@@ -863,6 +894,7 @@ void HexView::keyReleaseEvent(QKeyEvent* event) {
   QAbstractScrollArea::keyReleaseEvent(event);
 }
 
+// Map viewport position to file byte offset across hex/ascii columns; return -1 if invalid.
 int HexView::getOffsetFromPoint(QPoint pos) const {
   const int y = pos.y() + verticalScrollBar()->value();
   const int line = m_lineHeight > 0 ? (y / m_lineHeight) : 0;
@@ -893,6 +925,7 @@ int HexView::getOffsetFromPoint(QPoint pos) const {
   return offset;
 }
 
+// Handle click-to-select and modifier-drag seek behavior.
 void HexView::mousePressEvent(QMouseEvent* event) {
   if (event->button() == Qt::LeftButton) {
     const int offset = getOffsetFromPoint(event->pos());
@@ -930,6 +963,7 @@ void HexView::mousePressEvent(QMouseEvent* event) {
   QAbstractScrollArea::mousePressEvent(event);
 }
 
+// End drag interactions and refresh hover tooltip state.
 void HexView::mouseReleaseEvent(QMouseEvent* event) {
   if (event->button() == Qt::LeftButton) {
     m_isDragging = false;
@@ -940,6 +974,7 @@ void HexView::mouseReleaseEvent(QMouseEvent* event) {
   QAbstractScrollArea::mouseReleaseEvent(event);
 }
 
+// Process drag-move updates for selection changes or modifier-based seek scrubbing.
 void HexView::handleCoalescedMouseMove(const QPoint& pos,
                               Qt::MouseButtons buttons,
                               Qt::KeyboardModifiers mods) {
@@ -970,13 +1005,13 @@ void HexView::handleCoalescedMouseMove(const QPoint& pos,
     }
     auto* item = m_vgmfile->getItemAtOffset(offset, false);
     if (item != m_selectedItem) {
-      // setSelectedItem(item);
       selectionChanged(item);
     }
     hideTooltip();
   }
 }
 
+// Show/hide tooltip while hovering with the seek modifier held.
 void HexView::handleTooltipHoverMove(const QPoint& pos, Qt::KeyboardModifiers mods) {
   if (!mods.testFlag(HexViewInput::kModifier)) {
     hideTooltip();
@@ -994,6 +1029,7 @@ void HexView::handleTooltipHoverMove(const QPoint& pos, Qt::KeyboardModifiers mo
   }
 }
 
+// Route mouse movement to drag-selection logic or modifier hover tooltip logic.
 void HexView::mouseMoveEvent(QMouseEvent* event) {
   if (event->buttons() & Qt::LeftButton) {
     handleCoalescedMouseMove(event->pos(), event->buttons(), event->modifiers());
@@ -1003,6 +1039,7 @@ void HexView::mouseMoveEvent(QMouseEvent* event) {
   QAbstractScrollArea::mouseMoveEvent(event);
 }
 
+// Toggle address display radix when double-clicking in the address column.
 void HexView::mouseDoubleClickEvent(QMouseEvent* event) {
   if (event->button() == Qt::LeftButton) {
     if (m_shouldDrawOffset && event->pos().x() >= 0 &&
@@ -1014,10 +1051,12 @@ void HexView::mouseDoubleClickEvent(QMouseEvent* event) {
   QAbstractScrollArea::mouseDoubleClickEvent(event);
 }
 
+// Property accessor used by selection dim animation.
 qreal HexView::overlayOpacity() const {
   return m_overlayOpacity;
 }
 
+// Property mutator for dim overlay opacity; requests rerender on change.
 void HexView::setOverlayOpacity(qreal opacity) {
   if (qFuzzyCompare(opacity, m_overlayOpacity)) {
     return;
@@ -1026,10 +1065,12 @@ void HexView::setOverlayOpacity(qreal opacity) {
   requestRhiUpdate();
 }
 
+// Property accessor for selection shadow blur amount.
 qreal HexView::shadowBlur() const {
   return m_shadowBlur;
 }
 
+// Property mutator for selection shadow blur; selection pass needs refresh.
 void HexView::setShadowBlur(qreal blur) {
   if (qFuzzyCompare(blur, m_shadowBlur)) {
     return;
@@ -1038,10 +1079,12 @@ void HexView::setShadowBlur(qreal blur) {
   requestRhiUpdate(false, true);
 }
 
+// Property accessor for selection shadow offset.
 QPointF HexView::shadowOffset() const {
   return m_shadowOffset;
 }
 
+// Property mutator for selection shadow offset; requests rerender on change.
 void HexView::setShadowOffset(const QPointF& offset) {
   if (offset == m_shadowOffset) {
     return;
@@ -1050,8 +1093,10 @@ void HexView::setShadowOffset(const QPointF& offset) {
   requestRhiUpdate();
 }
 
+// Property accessor for selection shadow strength.
 qreal HexView::shadowStrength() const { return m_shadowStrength; }
 
+// Property mutator for shadow strength with clamping and selection refresh.
 void HexView::setShadowStrength(qreal s) {
   s = std::max<qreal>(0.0, s);
   if (qFuzzyCompare(s, m_shadowStrength)) return;
@@ -1059,6 +1104,7 @@ void HexView::setShadowStrength(qreal s) {
   requestRhiUpdate(false, true);
 }
 
+// Configure highlight animation timeline for overlay, blur, and offset channels.
 void HexView::initAnimations() {
   m_selectionAnimation = new QParallelAnimationGroup(this);
 
@@ -1102,6 +1148,7 @@ void HexView::initAnimations() {
 
 }
 
+// Transition selection highlight visuals in/out, animated or immediate.
 void HexView::showSelectedItem(bool show, bool animate) {
   if (!animate) {
     m_selectionAnimation->stop();
@@ -1148,17 +1195,20 @@ void HexView::showSelectedItem(bool show, bool animate) {
   }
 }
 
+// Drop lingering fade-selection state after highlight animation completes.
 void HexView::clearFadeSelection() {
   m_fadeSelections.clear();
   requestRhiUpdate(false, true);
 }
 
+// Ensure fade timer is running while playback fade-outs are active.
 void HexView::ensurePlaybackFadeTimer() {
   if (!m_playbackFadeTimer.isActive()) {
     m_playbackFadeTimer.start(16, this);
   }
 }
 
+// Return monotonically increasing playback-fade clock in milliseconds.
 qint64 HexView::playbackNowMs() {
   if (!m_playbackFadeClock.isValid()) {
     m_playbackFadeClock.start();
@@ -1166,6 +1216,7 @@ qint64 HexView::playbackNowMs() {
   return m_playbackFadeClock.elapsed();
 }
 
+// Advance playback fade-out alphas and prune completed fade entries.
 void HexView::updatePlaybackFade() {
   if (m_fadePlaybackSelections.empty()) {
     return;
@@ -1193,6 +1244,7 @@ void HexView::updatePlaybackFade() {
   }
 }
 
+// Dispatch timer ticks for playback fade and outline-fade redraw scheduling.
 void HexView::timerEvent(QTimerEvent* event) {
   if (event->timerId() == m_playbackFadeTimer.timerId()) {
     updatePlaybackFade();
@@ -1216,6 +1268,7 @@ void HexView::timerEvent(QTimerEvent* event) {
   QAbstractScrollArea::timerEvent(event);
 }
 
+// Resolve whether to show dim/shadow highlight based on selection and playback state.
 void HexView::updateHighlightState(bool animateSelection) {
   const bool hasSelection = !m_selections.empty() || !m_fadeSelections.empty();
   const bool hasPlayback = m_playbackActive;
@@ -1239,6 +1292,7 @@ void HexView::updateHighlightState(bool animateSelection) {
   setShadowOffset(QPointF(SHADOW_OFFSET_X, SHADOW_OFFSET_Y));
 }
 
+// Show rich HTML tooltip for a hovered item, avoiding redundant re-show for same item.
 void HexView::showTooltip(VGMItem* item, const QPoint& pos) {
   if (!item) {
     hideTooltip();
@@ -1256,6 +1310,7 @@ void HexView::showTooltip(VGMItem* item, const QPoint& pos) {
   m_tooltipItem = item;
 }
 
+// Hide active tooltip and clear tracked tooltip item.
 void HexView::hideTooltip() {
   if (!m_tooltipItem) {
     return;
