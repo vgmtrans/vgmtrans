@@ -553,6 +553,7 @@ void HexView::rebuildStyleMap() {
   m_styles.clear();
   m_typeToStyleId.clear();
 
+  // Slot 0 is the fallback/default style used for unassigned bytes.
   Style defaultStyle;
   defaultStyle.bg = palette().color(QPalette::Window);
   defaultStyle.fg = palette().color(QPalette::WindowText);
@@ -563,8 +564,10 @@ void HexView::rebuildStyleMap() {
   }
 
   const uint32_t length = m_vgmfile->length();
+  // Start with "unassigned" markers so we can preserve first-write wins below.
   m_styleIds.assign(length, STYLE_UNASSIGNED);
 
+  // Deduplicate styles by item type and keep a compact style table for the renderer.
   auto styleIdForType = [&](VGMItem::Type type) -> uint16_t {
     const int key = static_cast<int>(type);
     auto it = m_typeToStyleId.find(key);
@@ -580,6 +583,7 @@ void HexView::rebuildStyleMap() {
     return id;
   };
 
+  // Flatten the item tree to leaf items; leaf ranges represent final semantic regions.
   std::vector<VGMItem*> leaves;
   std::function<void(VGMItem*)> walk = [&](VGMItem* item) {
     auto& children = item->children();
@@ -594,6 +598,8 @@ void HexView::rebuildStyleMap() {
 
   walk(m_vgmfile);
 
+  // Paint style ids into byte slots. First assignment wins to avoid later overlaps
+  // from replacing an already chosen leaf style.
   for (auto* item : leaves) {
     if (!item || item->length() == 0) {
       continue;
@@ -614,12 +620,14 @@ void HexView::rebuildStyleMap() {
     }
   }
 
+  // Any bytes still unassigned fall back to default style (slot 0).
   for (auto& styleId : m_styleIds) {
     if (styleId == STYLE_UNASSIGNED) {
       styleId = 0;
     }
   }
 
+  // Style-id changes invalidate renderer cache line snapshots.
   if (m_rhiHost) {
     m_rhiHost->invalidateCache();
   }
