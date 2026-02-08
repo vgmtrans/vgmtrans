@@ -85,10 +85,18 @@ float computeOutlineMask(float xPx, float yPx, bool inHex, bool inAscii, float d
   return clamp(edge, 0.0, 1.0);
 }
 
+float computeSelectionHighlight(vec4 mask) {
+  float selected = clamp(mask.r, 0.0, 1.0);
+  float playback = clamp(mask.g, 0.0, 1.0);
+  float fadingPlayback = clamp(mask.b, 0.0, 1.0) * clamp(mask.a, 0.0, 1.0);
+  return max(selected, max(playback, fadingPlayback));
+}
+
 void main() {
-  // Base pass result and selection mask produced by earlier render passes.
+  // Base pass result and mask channels produced by earlier render passes.
+  // mask.r = manual selection, mask.g = active playback, mask.b * mask.a = fading playback.
   vec4 base = texture(contentTex, vUv);
-  float selected = clamp(texture(maskTex, vUv).r, 0.0, 1.0);
+  float highlight = computeSelectionHighlight(texture(maskTex, vUv));
 
   float x = vUv.x * viewInfo.x;
   float logicalY = mix(1.0 - vUv.y, vUv.y, viewInfo.z);
@@ -101,6 +109,6 @@ void main() {
   // Composite order: dim columns, add modifier outline, then restore selected pixels.
   vec3 dimmed = mix(base.rgb, vec3(0.0), overlayAndShadow.x * inColumns);
   vec3 withOutline = mix(dimmed, outlineColor.rgb, outlineMask * outlineColor.a);
-  vec3 restored = mix(withOutline, base.rgb, selected);
+  vec3 restored = mix(withOutline, base.rgb, highlight);
   fragColor = vec4(restored, base.a);
 }
