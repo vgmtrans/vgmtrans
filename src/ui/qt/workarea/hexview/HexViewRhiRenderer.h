@@ -265,6 +265,8 @@ private:
   bool m_itemIdDirty = true;
   bool m_outlineEnabled = false;
   float m_outlineAlpha = 0.0f;
+  float m_lastFrameSeconds = 0.0f;
+  float m_outlineTarget = 0.0f;
   int m_itemIdStartLine = 0;
   QSize m_itemIdSize;
   bool m_compositeSrbDirty = false;
