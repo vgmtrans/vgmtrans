@@ -214,6 +214,10 @@ void VGMFileView::onPlaybackPositionChanged(int current, int max, PositionChange
 
   const auto* coll = SequencePlayer::the().activeCollection();
   if (!coll || !coll->containsVGMFile(m_vgmfile)) {
+    if (hexVisible) {
+      m_hexview->setPlaybackActive(false);
+      m_hexview->clearPlaybackSelections(false);
+    }
     if (treeVisible) {
       m_treeview->setPlaybackItems({});
     }
@@ -222,16 +226,29 @@ void VGMFileView::onPlaybackPositionChanged(int current, int max, PositionChange
 
   const bool shouldHighlight = SequencePlayer::the().playing() || current > 0;
   if (!shouldHighlight) {
+    if (hexVisible) {
+      m_hexview->setPlaybackActive(false);
+      m_hexview->clearPlaybackSelections(false);
+    }
     if (treeVisible) {
       m_treeview->setPlaybackItems({});
     }
     return;
   }
 
+  const bool playbackActive = current > 0;
+  if (hexVisible) {
+    m_hexview->setPlaybackActive(playbackActive);
+  }
+
   const auto& timeline = seq->timedEventIndex();
   if (!timeline.finalized()) {
     m_playbackCursor.reset();
     m_playbackTimeline = nullptr;
+    if (hexVisible) {
+      m_hexview->setPlaybackActive(false);
+      m_hexview->clearPlaybackSelections(false);
+    }
     if (treeVisible) {
       m_treeview->setPlaybackItems({});
     }
@@ -295,6 +312,9 @@ void VGMFileView::onPlaybackPositionChanged(int current, int max, PositionChange
   }
 
   m_lastPlaybackItems = m_playbackItems;
+  if (hexVisible) {
+    m_hexview->setPlaybackSelectionsForItems(m_playbackItems);
+  }
 }
 
 void VGMFileView::onPlayerStatusChanged(bool playing) {
@@ -308,6 +328,8 @@ void VGMFileView::onPlayerStatusChanged(bool playing) {
   m_lastPlaybackPosition = 0;
   m_playbackCursor.reset();
   m_playbackTimeline = nullptr;
+  m_hexview->setPlaybackActive(false);
+  m_hexview->clearPlaybackSelections(false);
   if (m_treeview) {
     m_treeview->setPlaybackItems({});
   }
