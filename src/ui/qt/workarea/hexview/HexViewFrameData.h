@@ -59,7 +59,12 @@ struct Data {
   qreal shadowBlur = 0.0;
   qreal shadowStrength = 0.0;
   QPointF shadowOffset{0.0, 0.0};
+  QColor playbackGlowLow;
+  QColor playbackGlowHigh;
+  float playbackGlowStrength = 1.0f;
+  float playbackGlowRadius = 0.5f;
   float shadowEdgeCurve = 1.0f;
+  float playbackGlowEdgeCurve = 1.0f;
 
   QColor windowColor;
   QColor windowTextColor;

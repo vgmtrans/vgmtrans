@@ -6,9 +6,11 @@
 
 #pragma once
 
+#include <QElapsedTimer>
 #include <QSize>
 #include <array>
 #include <cstdint>
+#include <unordered_map>
 #include <vector>
 
 #include "HexViewFrameData.h"
@@ -30,8 +32,9 @@ class QRhiShaderResourceBindings;
 class QRhiTexture;
 
 // HexViewRhiRenderer builds GPU instance streams from an immutable HexView snapshot
-// and renders in three passes:
-// 1) content (text + backgrounds), 2) mask (selection), 3) composite (final shading).
+// and renders in four passes:
+// 1) content (text + backgrounds), 2) mask (selection ids/channels),
+// 3) edge field (for shadow/glow falloff), 4) composite (final shading).
 class HexViewRhiRenderer {
 public:
   struct RenderTargetInfo {
@@ -70,6 +73,21 @@ private:
     float a;
   };
 
+  struct EdgeInstance {
+    float geomX;
+    float geomY;
+    float geomW;
+    float geomH;
+    float rectX;
+    float rectY;
+    float rectW;
+    float rectH;
+    float r;
+    float g;
+    float b;
+    float a;
+  };
+
   struct GlyphInstance {
     float x;
     float y;
@@ -99,12 +117,16 @@ private:
     uint32_t glyphStart = 0;
     uint32_t glyphCount = 0;
   };
-
   struct Interval {
     int start = 0;
     int end = 0;
   };
-
+  struct EdgeRun {
+    int startCol = 0;
+    int endCol = 0;
+    int startLine = 0;
+    int endLine = 0;
+  };
   struct SelectionBuildContext {
     // Visible range and geometry needed when converting byte selections into
     // GPU rect instances for both hex and ASCII columns.
@@ -136,6 +158,9 @@ private:
   void drawRectBuffer(QRhiCommandBuffer* cb, QRhiBuffer* buffer, int count,
                       int firstInstance = 0, QRhiShaderResourceBindings* srb = nullptr,
                       QRhiGraphicsPipeline* pso = nullptr);
+  void drawEdgeBuffer(QRhiCommandBuffer* cb, QRhiBuffer* buffer, int count,
+                      int firstInstance = 0, QRhiShaderResourceBindings* srb = nullptr,
+                      QRhiGraphicsPipeline* pso = nullptr);
   void drawGlyphBuffer(QRhiCommandBuffer* cb, QRhiBuffer* buffer, int count, int firstInstance = 0);
   void drawFullscreen(QRhiCommandBuffer* cb, QRhiGraphicsPipeline* pso,
                       QRhiShaderResourceBindings* srb);
@@ -143,6 +168,8 @@ private:
   QRectF glyphUv(const QChar& ch, const HexViewFrame::Data& frame) const;
   void appendRect(std::vector<RectInstance>& rects, float x, float y, float w, float h,
                   const QVector4D& color);
+  void appendEdgeRect(std::vector<EdgeInstance>& rects, float x, float y, float w, float h,
+                      float pad, const QVector4D& color);
   void appendGlyph(std::vector<GlyphInstance>& glyphs, float x, float y, float w, float h,
                    const QRectF& uv, const QVector4D& color);
 
@@ -157,10 +184,20 @@ private:
   void appendMaskRectsForIntervals(const std::vector<Interval>& intervals,
                                    int line,
                                    const SelectionBuildContext& ctx,
+                                   float padX,
+                                   float padY,
                                    const QVector4D& maskColor);
+  void emitEdgeRuns(const std::unordered_map<uint32_t, EdgeRun>& runs,
+                    const SelectionBuildContext& ctx,
+                    float edgePad,
+                    const QVector4D& edgeColor);
   void appendMaskForSelections(const std::vector<HexViewFrame::SelectionRange>& selections,
                                const SelectionBuildContext& ctx,
-                               const QVector4D& maskColor);
+                               float padX,
+                               float padY,
+                               float edgePad,
+                               const QVector4D& maskColor,
+                               const QVector4D& edgeColor);
   void buildBaseInstances(const HexViewFrame::Data& frame);
   void buildSelectionInstances(int startLine, int endLine, const HexViewFrame::Data& frame);
 
@@ -176,13 +213,18 @@ private:
   QRhiTexture* m_maskTex = nullptr;
   QRhiTextureRenderTarget* m_maskRt = nullptr;
   QRhiRenderPassDescriptor* m_maskRp = nullptr;
+  QRhiTexture* m_edgeTex = nullptr;
+  QRhiTextureRenderTarget* m_edgeRt = nullptr;
+  QRhiRenderPassDescriptor* m_edgeRp = nullptr;
 
   QRhiBuffer* m_vbuf = nullptr;
   QRhiBuffer* m_ibuf = nullptr;
   QRhiBuffer* m_baseRectBuf = nullptr;
   QRhiBuffer* m_baseGlyphBuf = nullptr;
   QRhiBuffer* m_maskRectBuf = nullptr;
+  QRhiBuffer* m_edgeRectBuf = nullptr;
   QRhiBuffer* m_ubuf = nullptr;
+  QRhiBuffer* m_edgeUbuf = nullptr;
   QRhiBuffer* m_compositeUbuf = nullptr;
   QRhiTexture* m_glyphTex = nullptr;
   QRhiTexture* m_itemIdTex = nullptr;
@@ -190,10 +232,12 @@ private:
   QRhiSampler* m_maskSampler = nullptr;
   QRhiShaderResourceBindings* m_rectSrb = nullptr;
   QRhiShaderResourceBindings* m_glyphSrb = nullptr;
+  QRhiShaderResourceBindings* m_edgeSrb = nullptr;
   QRhiShaderResourceBindings* m_compositeSrb = nullptr;
   QRhiGraphicsPipeline* m_rectPso = nullptr;
   QRhiGraphicsPipeline* m_glyphPso = nullptr;
   QRhiGraphicsPipeline* m_maskPso = nullptr;
+  QRhiGraphicsPipeline* m_edgePso = nullptr;
   QRhiGraphicsPipeline* m_compositePso = nullptr;
   int m_sampleCount = 1;
   uint64_t m_glyphAtlasVersion = 0;
@@ -202,12 +246,14 @@ private:
   bool m_supportsBaseInstance = false;
   bool m_loggedInit = false;
   bool m_loggedFrame = false;
+  QElapsedTimer m_animTimer;
 
   std::vector<CachedLine> m_cachedLines;
   std::vector<LineRange> m_lineRanges;
   std::vector<RectInstance> m_baseRectInstances;
   std::vector<GlyphInstance> m_baseGlyphInstances;
   std::vector<RectInstance> m_maskRectInstances;
+  std::vector<EdgeInstance> m_edgeRectInstances;
   int m_cacheStartLine = 0;
   int m_cacheEndLine = -1;
   int m_lastStartLine = -1;
