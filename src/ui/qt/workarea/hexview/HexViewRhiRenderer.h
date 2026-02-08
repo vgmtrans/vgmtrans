@@ -126,6 +126,8 @@ private:
 
   void ensurePipelines(QRhiRenderPassDescriptor* outputRp, int outputSampleCount);
   void ensureGlyphTexture(QRhiResourceUpdateBatch* u, const HexViewFrame::Data& frame);
+  void ensureItemIdTexture(QRhiResourceUpdateBatch* u, int startLine, int endLine, int totalLines,
+                           const HexViewFrame::Data& frame);
   void updateCompositeSrb();
   void updateUniforms(QRhiResourceUpdateBatch* u, float scrollY, const QSize& pixelSize,
                       const HexViewFrame::Data& frame);
@@ -183,6 +185,7 @@ private:
   QRhiBuffer* m_ubuf = nullptr;
   QRhiBuffer* m_compositeUbuf = nullptr;
   QRhiTexture* m_glyphTex = nullptr;
+  QRhiTexture* m_itemIdTex = nullptr;
   QRhiSampler* m_glyphSampler = nullptr;
   QRhiSampler* m_maskSampler = nullptr;
   QRhiShaderResourceBindings* m_rectSrb = nullptr;
@@ -213,6 +216,11 @@ private:
   bool m_selectionDirty = true;
   bool m_baseBufferDirty = false;
   bool m_selectionBufferDirty = false;
+  bool m_itemIdDirty = true;
+  bool m_outlineEnabled = false;
+  float m_outlineAlpha = 0.0f;
+  int m_itemIdStartLine = 0;
+  QSize m_itemIdSize;
   bool m_compositeSrbDirty = false;
   bool m_inited = false;
 };
