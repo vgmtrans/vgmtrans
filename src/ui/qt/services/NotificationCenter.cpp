@@ -34,6 +34,10 @@ void NotificationCenter::selectVGMFile(VGMFile* vgmfile, QWidget* caller) {
   emit vgmFileSelected(vgmfile, caller);
 }
 
+void NotificationCenter::setSeekModifierActive(bool active) {
+  emit seekModifierChanged(active);
+}
+
 void NotificationCenter::updateContextualMenusForVGMFiles(const QList<VGMFile*>& files) {
   emit vgmFileContextCommandsChanged(files);
 }

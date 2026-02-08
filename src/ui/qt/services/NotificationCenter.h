@@ -35,6 +35,7 @@ public:
                     uint32_t size = -1);
   void updateStatusForItem(VGMItem* item);
   void selectVGMFile(VGMFile* vgmfile, QWidget* caller);
+  void setSeekModifierActive(bool active);
   void updateContextualMenusForVGMFiles(const QList<VGMFile*>& files);
   void updateContextualMenusForVGMColls(const QList<VGMColl*>& colls);
   void updateContextualMenusForRawFiles(const QList<RawFile*>& files);
@@ -47,6 +48,7 @@ private:
 signals:
   void statusUpdated(const QString& name, const QString& description, const QIcon* icon, int offset, int size);
   void vgmFileSelected(VGMFile *file, QWidget* caller);
+  void seekModifierChanged(bool active);
   void vgmFileContextCommandsChanged(const QList<VGMFile*>& files);
   void vgmCollContextCommandsChanged(const QList<VGMColl*>& colls);
   void rawFileContextCommandsChanged(const QList<RawFile*>& files);

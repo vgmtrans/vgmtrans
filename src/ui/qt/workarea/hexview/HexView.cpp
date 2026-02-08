@@ -8,6 +8,7 @@
 #include "Helpers.h"
 #include "HexViewInput.h"
 #include "HexViewRhiHost.h"
+#include "services/NotificationCenter.h"
 #include "VGMFile.h"
 
 #include <QApplication>
@@ -130,6 +131,15 @@ HexView::HexView(VGMFile* vgmfile, QWidget* parent)
     m_scrollBarDragging = false;
     m_pendingScrollY = verticalScrollBar()->value();
   });
+
+  connect(NotificationCenter::the(), &NotificationCenter::seekModifierChanged, this,
+          [this](bool active) {
+            if (m_seekModifierActive == active) {
+              return;
+            }
+            m_seekModifierActive = active;
+            requestRhiUpdate();
+          });
 
 }
 
@@ -570,6 +580,7 @@ HexViewFrame::Data HexView::captureRhiFrameData(float dpr) {
   frame.shouldDrawOffset = m_shouldDrawOffset;
   frame.shouldDrawAscii = m_shouldDrawAscii;
   frame.addressAsHex = m_addressAsHex;
+  frame.seekModifierActive = m_seekModifierActive;
 
   frame.overlayOpacity = m_overlayOpacity;
   frame.shadowBlur = m_shadowBlur;

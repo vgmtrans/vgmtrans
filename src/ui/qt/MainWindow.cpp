@@ -18,6 +18,8 @@
 #include <QMessageBox>
 #include <QStatusBar>
 #include <QResizeEvent>
+#include <QApplication>
+#include <QKeyEvent>
 #include <filesystem>
 #include <version.h>
 #include "ManualCollectionDialog.h"
@@ -28,11 +30,13 @@
 #include "About.h"
 #include "Logger.h"
 #include "SequencePlayer.h"
+#include "services/NotificationCenter.h"
 #include "services/Settings.h"
 #include "workarea/RawFileListView.h"
 #include "workarea/VGMFileListView.h"
 #include "workarea/VGMCollListView.h"
 #include "workarea/VGMCollView.h"
+#include "workarea/hexview/HexViewInput.h"
 #include "workarea/MdiArea.h"
 #include "TitleBar.h"
 #include "StatusBarContent.h"
@@ -49,6 +53,7 @@ MainWindow::MainWindow() : QMainWindow(nullptr) {
 
   createElements();
   routeSignals();
+  qApp->installEventFilter(this);
 
   m_dragOverlay = new QWidget(this);
   m_dragOverlay->setObjectName(QStringLiteral("dragOverlay"));
@@ -171,6 +176,20 @@ void MainWindow::routeSignals() {
   auto *playShortcut = new QShortcut(QKeySequence(Qt::Key_Space), this);
   playShortcut->setContext(Qt::WindowShortcut);
   connect(playShortcut, &QShortcut::activated, m_coll_listview, &VGMCollListView::handlePlaybackRequest);
+}
+
+bool MainWindow::eventFilter(QObject* obj, QEvent* event) {
+  Q_UNUSED(obj);
+  if (event->type() == QEvent::KeyPress || event->type() == QEvent::KeyRelease) {
+    auto* keyEvent = static_cast<QKeyEvent*>(event);
+    if (!keyEvent->isAutoRepeat() && keyEvent->key() == HexViewInput::kModifierKey) {
+      const bool active = event->type() == QEvent::KeyPress;
+      NotificationCenter::the()->setSeekModifierActive(active);
+    }
+  } else if (event->type() == QEvent::ApplicationDeactivate) {
+    NotificationCenter::the()->setSeekModifierActive(false);
+  }
+  return QMainWindow::eventFilter(obj, event);
 }
 
 void MainWindow::dragEnterEvent(QDragEnterEvent *event) {
