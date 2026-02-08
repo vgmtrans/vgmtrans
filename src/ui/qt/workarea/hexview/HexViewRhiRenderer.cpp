@@ -1159,7 +1159,8 @@ void HexViewRhiRenderer::buildSelectionInstances(int startLine, int endLine,
   m_maskRectInstances.clear();
 
   const bool hasSelection = !frame.selections.empty() || !frame.fadeSelections.empty();
-  const bool hasPlayback = !frame.playbackSelections.empty();
+  const bool hasPlayback = !frame.playbackSelections.empty() ||
+                           !frame.fadePlaybackSelections.empty();
   if ((!hasSelection && !hasPlayback) || startLine > endLine) {
     return;
   }
@@ -1191,8 +1192,31 @@ void HexViewRhiRenderer::buildSelectionInstances(int startLine, int endLine,
     appendMaskForSelections(selections, ctx, selectionMaskColor);
   }
 
-  // For this PR, playback uses the same visible mask channel as manual selection.
-  if (hasPlayback) {
-    appendMaskForSelections(frame.playbackSelections, ctx, selectionMaskColor);
+  if (!frame.playbackSelections.empty()) {
+    // Active playback in green channel.
+    const QVector4D playbackMaskColor(0.0f, 1.0f, 0.0f, 0.0f);
+    appendMaskForSelections(frame.playbackSelections, ctx, playbackMaskColor);
+  }
+
+  if (!frame.fadePlaybackSelections.empty()) {
+    // Fading playback uses blue for membership and alpha for fade amount.
+    std::vector<HexViewFrame::SelectionRange> fadeRanges;
+    fadeRanges.reserve(frame.fadePlaybackSelections.size());
+    for (const auto& selection : frame.fadePlaybackSelections) {
+      fadeRanges.push_back(selection.range);
+    }
+
+    const QVector4D playbackMaskColor(0.0f, 0.0f, 1.0f, 0.0f);
+    appendMaskForSelections(fadeRanges, ctx, playbackMaskColor);
+
+    // Re-emit each range with alpha in channel A so the shader can apply per-range fade.
+    for (const auto& selection : frame.fadePlaybackSelections) {
+      if (selection.alpha <= 0.0f) {
+        continue;
+      }
+      const QVector4D fadeMaskColor(0.0f, 0.0f, 1.0f, selection.alpha);
+      const std::vector<HexViewFrame::SelectionRange> one{selection.range};
+      appendMaskForSelections(one, ctx, fadeMaskColor);
+    }
   }
 }

@@ -25,6 +25,11 @@ struct SelectionRange {
   uint32_t length = 0;
 };
 
+struct FadePlaybackSelection {
+  SelectionRange range;
+  float alpha = 0.0f;
+};
+
 struct Style {
   QColor bg;
   QColor fg;
@@ -63,6 +68,7 @@ struct Data {
   std::vector<SelectionRange> selections;
   std::vector<SelectionRange> fadeSelections;
   std::vector<SelectionRange> playbackSelections;
+  std::vector<FadePlaybackSelection> fadePlaybackSelections;
   GlyphAtlasView glyphAtlas;
 };
 

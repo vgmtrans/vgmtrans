@@ -7,7 +7,9 @@
 #pragma once
 
 #include <QAbstractScrollArea>
+#include <QBasicTimer>
 #include <QColor>
+#include <QElapsedTimer>
 #include <QFont>
 #include <QImage>
 #include <QSize>
@@ -69,11 +71,17 @@ protected:
   void mouseMoveEvent(QMouseEvent* event) override;
   void mouseReleaseEvent(QMouseEvent* event) override;
   void mouseDoubleClickEvent(QMouseEvent* event) override;
+  void timerEvent(QTimerEvent* event) override;
 
 private:
   struct SelectionRange {
     uint32_t offset;
     uint32_t length;
+  };
+  struct FadePlaybackSelection {
+    SelectionRange range;
+    qint64 startMs = 0;
+    float alpha = 0.0f;
   };
   struct Style {
     QColor bg;
@@ -93,6 +101,7 @@ private:
 
   static uint64_t selectionKey(uint32_t offset, uint32_t length);
   static uint64_t selectionKey(const SelectionRange& range);
+  static uint64_t selectionKey(const FadePlaybackSelection& selection);
 
   int hexXOffset() const;
   int getVirtualHeight() const;
@@ -117,6 +126,9 @@ private:
   void initAnimations();
   void showSelectedItem(bool show, bool animate);
   void clearFadeSelection();
+  void updatePlaybackFade();
+  void ensurePlaybackFadeTimer();
+  qint64 playbackNowMs();
   void updateHighlightState(bool animateSelection);
 
   VGMFile* m_vgmfile = nullptr;
@@ -129,6 +141,7 @@ private:
   std::vector<SelectionRange> m_selections;
   std::vector<SelectionRange> m_fadeSelections;
   std::vector<SelectionRange> m_playbackSelections;
+  std::vector<FadePlaybackSelection> m_fadePlaybackSelections;
   bool m_playbackActive = false;
 
   int m_charWidth = 0;
@@ -153,6 +166,8 @@ private:
   qreal m_shadowBlur = 0.0;
   QPointF m_shadowOffset{0.0, 0.0};
   qreal m_shadowStrength = 1.0;
+  QElapsedTimer m_playbackFadeClock;
+  QBasicTimer m_playbackFadeTimer;
   float m_shadowEdgeCurve = 1.0f;
   bool m_scrollBarDragging = false;
   int m_pendingScrollY = 0;
