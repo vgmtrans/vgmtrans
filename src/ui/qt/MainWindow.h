@@ -31,6 +31,9 @@ class QResizeEvent;
 namespace QWK {
 class WidgetWindowAgent;
 }
+#if defined(Q_OS_LINUX)
+class QRhiWidget;
+#endif
 
 class MainWindow final : public QMainWindow {
   Q_OBJECT
@@ -78,4 +81,7 @@ private:
   QWidget *m_dragOverlay{};
   QWK::WidgetWindowAgent *m_windowAgent{};
   MainWindowDockLayout *m_dockLayout{};
+#if defined(Q_OS_LINUX)
+  QRhiWidget *m_rhiPrimer{};
+#endif
 };
