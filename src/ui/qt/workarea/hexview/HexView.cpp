@@ -52,6 +52,11 @@ constexpr float SHADOW_OFFSET_Y = 0.0f;
 constexpr float SHADOW_BLUR_RADIUS = SELECTION_PADDING * 1.0f;
 constexpr float SHADOW_STRENGTH = 0.5;
 constexpr float SHADOW_EDGE_CURVE = 1.1f;
+constexpr float PLAYBACK_GLOW_STRENGTH = 0.55f;
+constexpr float PLAYBACK_GLOW_RADIUS = 1.8f;
+constexpr float PLAYBACK_GLOW_EDGE_CURVE = 0.85f;
+const QColor PLAYBACK_GLOW_LOW(40, 40, 40);
+const QColor PLAYBACK_GLOW_HIGH(230, 230, 230);
 constexpr uint16_t STYLE_UNASSIGNED = std::numeric_limits<uint16_t>::max();
 
 #ifdef Q_OS_MAC
@@ -120,7 +125,12 @@ HexView::HexView(VGMFile* vgmfile, QWidget* parent)
   QFont font("Roboto Mono", appFontPointSize + 1.0);
   font.setPointSizeF(appFontPointSize + 1.0);
   setShadowStrength(SHADOW_STRENGTH);
+  m_playbackGlowLow = PLAYBACK_GLOW_LOW;
+  m_playbackGlowHigh = PLAYBACK_GLOW_HIGH;
+  m_playbackGlowStrength = PLAYBACK_GLOW_STRENGTH;
+  m_playbackGlowRadius = PLAYBACK_GLOW_RADIUS;
   m_shadowEdgeCurve = SHADOW_EDGE_CURVE;
+  m_playbackGlowEdgeCurve = PLAYBACK_GLOW_EDGE_CURVE;
 
   setFont(font);
   rebuildStyleMap();
@@ -711,7 +721,12 @@ HexViewFrame::Data HexView::captureRhiFrameData(float dpr) {
   frame.shadowBlur = m_shadowBlur;
   frame.shadowStrength = m_shadowStrength;
   frame.shadowOffset = m_shadowOffset;
+  frame.playbackGlowLow = m_playbackGlowLow;
+  frame.playbackGlowHigh = m_playbackGlowHigh;
+  frame.playbackGlowStrength = m_playbackGlowStrength;
+  frame.playbackGlowRadius = m_playbackGlowRadius;
   frame.shadowEdgeCurve = m_shadowEdgeCurve;
+  frame.playbackGlowEdgeCurve = m_playbackGlowEdgeCurve;
 
   frame.windowColor = palette().color(QPalette::Window);
   frame.windowTextColor = palette().color(QPalette::WindowText);
