@@ -62,6 +62,7 @@ struct Data {
   std::vector<Style> styles;
   std::vector<SelectionRange> selections;
   std::vector<SelectionRange> fadeSelections;
+  std::vector<SelectionRange> playbackSelections;
   GlyphAtlasView glyphAtlas;
 };
 

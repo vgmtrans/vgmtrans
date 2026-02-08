@@ -290,11 +290,17 @@ int HexView::getTotalLines() const {
 
 // Clear current manual selection, optionally preserving/animating fade semantics.
 void HexView::clearCurrentSelection(bool animateSelection) {
-  if (!m_selections.empty()) {
-    m_fadeSelections = m_selections;
+  if (m_playbackActive) {
+    m_selections.clear();
+    m_fadeSelections.clear();
+    updateHighlightState(false);
+  } else {
+    if (!m_selections.empty()) {
+      m_fadeSelections = m_selections;
+    }
+    m_selections.clear();
+    showSelectedItem(false, animateSelection);
   }
-  m_selections.clear();
-  showSelectedItem(false, animateSelection);
   requestRhiUpdate(false, true);
 }
 
@@ -311,7 +317,7 @@ void HexView::selectCurrentItem(bool animateSelection) {
   requestRhiUpdate(false, true);
 }
 
-// Refresh overlay/shadow animation state for current selection state.
+// Refresh overlay/shadow animation state for current selection/playback state.
 void HexView::refreshSelectionVisuals(bool animateSelection) {
   updateHighlightState(animateSelection);
   requestRhiUpdate(false, true);
@@ -353,6 +359,47 @@ void HexView::setSelectedItem(VGMItem* item) {
       verticalScrollBar()->setValue(y);
     }
   }
+}
+
+// Update active playback selections from timed events.
+void HexView::setPlaybackSelectionsForItems(const std::vector<const VGMItem*>& items) {
+  std::vector<SelectionRange> next;
+  next.reserve(items.size());
+  for (const auto* item : items) {
+    if (!item) {
+      continue;
+    }
+    const uint32_t length = item->length() > 0 ? item->length() : 1u;
+    next.push_back({item->offset(), length});
+  }
+
+  m_playbackSelections = std::move(next);
+  refreshSelectionVisuals(false);
+}
+
+// Clear active playback selection set.
+void HexView::clearPlaybackSelections(bool /*fade*/) {
+  if (m_playbackSelections.empty()) {
+    return;
+  }
+  m_playbackSelections.clear();
+  refreshSelectionVisuals(false);
+}
+
+// Toggle playback-highlight mode and reconcile current playback selection state.
+void HexView::setPlaybackActive(bool active) {
+  if (m_playbackActive == active) {
+    if (!active && !m_playbackSelections.empty()) {
+      clearPlaybackSelections(false);
+    }
+    return;
+  }
+  m_playbackActive = active;
+  if (!m_playbackActive && !m_playbackSelections.empty()) {
+    clearPlaybackSelections(false);
+    return;
+  }
+  refreshSelectionVisuals(false);
 }
 
 // Build byte-level style-id lookup from VGM leaf items for renderer consumption.
@@ -605,6 +652,11 @@ HexViewFrame::Data HexView::captureRhiFrameData(float dpr) {
   frame.fadeSelections.reserve(m_fadeSelections.size());
   for (const auto& range : m_fadeSelections) {
     frame.fadeSelections.push_back({range.offset, range.length});
+  }
+
+  frame.playbackSelections.reserve(m_playbackSelections.size());
+  for (const auto& range : m_playbackSelections) {
+    frame.playbackSelections.push_back({range.offset, range.length});
   }
 
   ensureGlyphAtlas(dpr);
@@ -961,8 +1013,26 @@ void HexView::clearFadeSelection() {
   requestRhiUpdate(false, true);
 }
 
-// Resolve whether to show dim/shadow highlight based on selection state.
+// Resolve whether to show dim/shadow highlight based on selection/playback state.
 void HexView::updateHighlightState(bool animateSelection) {
   const bool hasSelection = !m_selections.empty() || !m_fadeSelections.empty();
-  showSelectedItem(hasSelection, animateSelection);
+  const bool hasPlayback = m_playbackActive;
+
+  if (!hasSelection && !hasPlayback) {
+    showSelectedItem(false, animateSelection);
+    return;
+  }
+
+  if (hasSelection && !hasPlayback) {
+    showSelectedItem(true, animateSelection);
+    return;
+  }
+
+  if (m_selectionAnimation && m_selectionAnimation->state() != QAbstractAnimation::Stopped) {
+    m_selectionAnimation->stop();
+  }
+  m_fadeSelections.clear();
+  setOverlayOpacity(OVERLAY_ALPHA_F);
+  setShadowBlur(SHADOW_BLUR_RADIUS);
+  setShadowOffset(QPointF(SHADOW_OFFSET_X, SHADOW_OFFSET_Y));
 }
