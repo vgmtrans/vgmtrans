@@ -64,7 +64,8 @@ public:
       case QEvent::MouseMove: {
         auto* me = static_cast<QMouseEvent*>(event);
         if (!dragging) {
-          QCoreApplication::sendEvent(m_view->viewport(), me);
+          const QPoint vp = m_view->viewport()->mapFromGlobal(me->globalPosition().toPoint());
+          m_view->handleTooltipHoverMove(vp, me->modifiers());
           return true;
         }
         m_input.queueMouseMove(me);

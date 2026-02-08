@@ -12,11 +12,15 @@
 #include "VGMFile.h"
 
 #include <QApplication>
+#include <QBuffer>
+#include <QCursor>
 #include <QFontMetricsF>
+#include <QHash>
 #include <QHelpEvent>
 #include <QImage>
 #include <QKeyEvent>
 #include <QMouseEvent>
+#include <QPixmap>
 #include <QProxyStyle>
 #include <QStyleFactory>
 #include <QPainter>
@@ -74,6 +78,51 @@ public:
   }
 };
 #endif
+
+QString tooltipIconDataUrl(VGMItem::Type type) {
+  static QHash<int, QString> cache;
+  const int key = static_cast<int>(type);
+  auto it = cache.find(key);
+  if (it != cache.end()) {
+    return it.value();
+  }
+  const QIcon& icon = iconForItemType(type);
+  const QPixmap pixmap = icon.pixmap(QSize(16, 16));
+  if (pixmap.isNull()) {
+    cache.insert(key, QString());
+    return {};
+  }
+  QByteArray bytes;
+  QBuffer buffer(&bytes);
+  buffer.open(QIODevice::WriteOnly);
+  pixmap.toImage().save(&buffer, "PNG");
+  const QString dataUrl =
+      QString("data:image/png;base64,%1").arg(QString::fromLatin1(bytes.toBase64()));
+  cache.insert(key, dataUrl);
+  return dataUrl;
+}
+
+QString tooltipHtmlWithIcon(VGMItem* item) {
+  if (!item) {
+    return {};
+  }
+  const QString iconData = tooltipIconDataUrl(item->type);
+  const QString description = getFullDescriptionForTooltip(item);
+  QString content = description;
+  if (!iconData.isEmpty()) {
+    content = QString("<table cellspacing=\"0\" cellpadding=\"0\">"
+                      "<tr>"
+                      "<td style=\"padding-right:6px; vertical-align:top;\">"
+                      "<img src=\"%1\" width=\"16\" height=\"16\">"
+                      "</td>"
+                      "<td>%2</td>"
+                      "</tr>"
+                      "</table>")
+                  .arg(iconData, description);
+  }
+  return QString("<table cellspacing=\"0\" cellpadding=\"6\"><tr><td>%1</td></tr></table>")
+      .arg(content);
+}
 
 }  // namespace
 
@@ -157,9 +206,27 @@ HexView::HexView(VGMFile* vgmfile, QWidget* parent)
               return;
             }
             m_seekModifierActive = active;
+            m_outlineFadeClock.restart();
+            if (!m_outlineFadeTimer.isActive()) {
+              m_outlineFadeTimer.start(16, this);
+            }
+            if (m_isDragging) {
+              hideTooltip();
+              requestRhiUpdate();
+              return;
+            }
+            if (active) {
+              const QPoint vp = viewport()->mapFromGlobal(QCursor::pos());
+              if (viewport()->rect().contains(vp)) {
+                handleTooltipHoverMove(vp, Qt::KeyboardModifiers(HexViewInput::kModifier));
+              } else {
+                hideTooltip();
+              }
+            } else {
+              hideTooltip();
+            }
             requestRhiUpdate();
           });
-
 }
 
 // Apply a monospaced font, normalize glyph metrics, and invalidate layout/glyph cache.
@@ -490,6 +557,11 @@ void HexView::setPlaybackActive(bool active) {
   refreshSelectionVisuals(false);
 }
 
+// Request another frame while playback/outline effects are animating.
+void HexView::requestPlaybackFrame() {
+  requestRhiUpdate();
+}
+
 // Build byte-level style-id lookup from VGM leaf items for renderer consumption.
 void HexView::rebuildStyleMap() {
   m_styles.clear();
@@ -780,7 +852,7 @@ void HexView::changeEvent(QEvent* event) {
   QAbstractScrollArea::changeEvent(event);
 }
 
-// Handle keyboard navigation between adjacent items.
+// Handle keyboard navigation between adjacent items and modifier-driven tooltip refresh.
 void HexView::keyPressEvent(QKeyEvent* event) {
   if (!m_selectedItem) {
     QAbstractScrollArea::keyPressEvent(event);
@@ -789,6 +861,10 @@ void HexView::keyPressEvent(QKeyEvent* event) {
 
   uint32_t newOffset = 0;
   switch (event->key()) {
+    case HexViewInput::kModifierKey:
+      handleTooltipHoverMove(viewport()->mapFromGlobal(QCursor::pos()),
+                             QApplication::keyboardModifiers());
+      break;
     case Qt::Key_Up:
       newOffset = m_selectedOffset - BYTES_PER_LINE;
       goto selectNewOffset;
@@ -832,6 +908,14 @@ void HexView::keyPressEvent(QKeyEvent* event) {
   }
 }
 
+// Hide modifier tooltip affordance when seek modifier key is released.
+void HexView::keyReleaseEvent(QKeyEvent* event) {
+  if (event->key() == HexViewInput::kModifierKey) {
+    hideTooltip();
+  }
+  QAbstractScrollArea::keyReleaseEvent(event);
+}
+
 // Map viewport position to file byte offset across hex/ascii columns; return -1 if invalid.
 int HexView::getOffsetFromPoint(QPoint pos) const {
   const int y = pos.y() + verticalScrollBar()->value();
@@ -863,23 +947,26 @@ int HexView::getOffsetFromPoint(QPoint pos) const {
   return offset;
 }
 
-// Handle click-to-select and drag-selection behavior.
+// Handle click-to-select and modifier-drag seek behavior.
 void HexView::mousePressEvent(QMouseEvent* event) {
   if (event->button() == Qt::LeftButton) {
     const int offset = getOffsetFromPoint(event->pos());
     auto* item = m_vgmfile->getItemAtOffset(offset, false);
     const bool seekModifier = event->modifiers().testFlag(HexViewInput::kModifier);
     if (seekModifier) {
-      if (item && item != m_lastSeekItem) {
-        m_lastSeekItem = item;
-        seekToEventRequested(item);
+      if (item) {
+        if (item != m_lastSeekItem) {
+          m_lastSeekItem = item;
+          seekToEventRequested(item);
+        }
+        showTooltip(item, event->pos());
+      } else {
+        hideTooltip();
       }
       m_isDragging = true;
       QAbstractScrollArea::mousePressEvent(event);
       return;
     }
-
-    m_lastSeekItem = nullptr;
     if (offset == -1) {
       selectionChanged(nullptr);
       return;
@@ -891,22 +978,25 @@ void HexView::mousePressEvent(QMouseEvent* event) {
     } else {
       selectionChanged(item);
     }
+    hideTooltip();
     m_isDragging = true;
   }
 
   QAbstractScrollArea::mousePressEvent(event);
 }
 
-// End drag interactions.
+// End drag interactions and refresh hover tooltip state.
 void HexView::mouseReleaseEvent(QMouseEvent* event) {
   if (event->button() == Qt::LeftButton) {
     m_isDragging = false;
     m_lastSeekItem = nullptr;
+    const QPoint vp = viewport()->mapFromGlobal(QCursor::pos());
+    handleTooltipHoverMove(vp, QApplication::keyboardModifiers());
   }
   QAbstractScrollArea::mouseReleaseEvent(event);
 }
 
-// Process drag-move updates for selection changes.
+// Process drag-move updates for selection changes or modifier-based seek scrubbing.
 void HexView::handleCoalescedMouseMove(const QPoint& pos,
                               Qt::MouseButtons buttons,
                               Qt::KeyboardModifiers mods) {
@@ -916,36 +1006,58 @@ void HexView::handleCoalescedMouseMove(const QPoint& pos,
       if (!mods.testFlag(HexViewInput::kModifier)) {
         selectionChanged(nullptr);
       }
-      m_lastSeekItem = nullptr;
+      hideTooltip();
       return;
     }
 
     if (mods.testFlag(HexViewInput::kModifier)) {
-      if (auto* item = m_vgmfile->getItemAtOffset(offset, false);
-          item && item != m_lastSeekItem) {
-        m_lastSeekItem = item;
-        seekToEventRequested(item);
+      if (auto* item = m_vgmfile->getItemAtOffset(offset, false)) {
+        if (item != m_lastSeekItem) {
+          m_lastSeekItem = item;
+          seekToEventRequested(item);
+        }
       }
+      hideTooltip();
       return;
     }
-
-    m_lastSeekItem = nullptr;
     m_selectedOffset = offset;
     if (m_selectedItem && (m_selectedOffset >= m_selectedItem->offset()) &&
         (m_selectedOffset < (m_selectedItem->offset() + m_selectedItem->length()))) {
+      hideTooltip();
       return;
     }
     auto* item = m_vgmfile->getItemAtOffset(offset, false);
     if (item != m_selectedItem) {
       selectionChanged(item);
     }
+    hideTooltip();
   }
 }
 
-// Route mouse movement to drag-selection logic.
+// Show/hide tooltip while hovering with the seek modifier held.
+void HexView::handleTooltipHoverMove(const QPoint& pos, Qt::KeyboardModifiers mods) {
+  if (!mods.testFlag(HexViewInput::kModifier)) {
+    hideTooltip();
+    return;
+  }
+  const int offset = getOffsetFromPoint(pos);
+  if (offset < 0) {
+    hideTooltip();
+    return;
+  }
+  if (auto* item = m_vgmfile->getItemAtOffset(offset, false)) {
+    showTooltip(item, pos);
+  } else {
+    hideTooltip();
+  }
+}
+
+// Route mouse movement to drag-selection logic or modifier hover tooltip logic.
 void HexView::mouseMoveEvent(QMouseEvent* event) {
   if (event->buttons() & Qt::LeftButton) {
     handleCoalescedMouseMove(event->pos(), event->buttons(), event->modifiers());
+  } else {
+    handleTooltipHoverMove(event->pos(), event->modifiers());
   }
   QAbstractScrollArea::mouseMoveEvent(event);
 }
@@ -1157,7 +1269,7 @@ void HexView::updatePlaybackFade() {
   }
 }
 
-// Dispatch timer ticks for playback fade redraw scheduling.
+// Dispatch timer ticks for playback fade and outline-fade redraw scheduling.
 void HexView::timerEvent(QTimerEvent* event) {
   if (event->timerId() == m_playbackFadeTimer.timerId()) {
     updatePlaybackFade();
@@ -1167,10 +1279,21 @@ void HexView::timerEvent(QTimerEvent* event) {
     }
     return;
   }
+  if (event->timerId() == m_outlineFadeTimer.timerId()) {
+    if (!m_outlineFadeClock.isValid()) {
+      m_outlineFadeClock.start();
+    }
+    if (m_outlineFadeClock.elapsed() > OUTLINE_FADE_DURATION_MS) {
+      m_outlineFadeTimer.stop();
+      return;
+    }
+    requestRhiUpdate();
+    return;
+  }
   QAbstractScrollArea::timerEvent(event);
 }
 
-// Resolve whether to show dim/shadow highlight based on selection/playback state.
+// Resolve whether to show dim/shadow highlight based on selection and playback state.
 void HexView::updateHighlightState(bool animateSelection) {
   const bool hasSelection = !m_selections.empty() || !m_fadeSelections.empty();
   const bool hasPlayback = m_playbackActive;
@@ -1192,4 +1315,31 @@ void HexView::updateHighlightState(bool animateSelection) {
   setOverlayOpacity(OVERLAY_ALPHA_F);
   setShadowBlur(SHADOW_BLUR_RADIUS);
   setShadowOffset(QPointF(SHADOW_OFFSET_X, SHADOW_OFFSET_Y));
+}
+
+// Show rich HTML tooltip for a hovered item, avoiding redundant re-show for same item.
+void HexView::showTooltip(VGMItem* item, const QPoint& pos) {
+  if (!item) {
+    hideTooltip();
+    return;
+  }
+  if (m_tooltipItem && item->offset() == m_tooltipItem->offset()) {
+    return;
+  }
+  const QString description = tooltipHtmlWithIcon(item);
+  if (description.isEmpty()) {
+    hideTooltip();
+    return;
+  }
+  QToolTip::showText(viewport()->mapToGlobal(pos), description, this);
+  m_tooltipItem = item;
+}
+
+// Hide active tooltip and clear tracked tooltip item.
+void HexView::hideTooltip() {
+  if (!m_tooltipItem) {
+    return;
+  }
+  QToolTip::hideText();
+  m_tooltipItem = nullptr;
 }

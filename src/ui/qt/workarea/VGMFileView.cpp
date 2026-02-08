@@ -310,6 +310,9 @@ void VGMFileView::onPlaybackPositionChanged(int current, int max, PositionChange
   }
 
   if (m_playbackItems == m_lastPlaybackItems) {
+    if (hexVisible) {
+      m_hexview->requestPlaybackFrame();
+    }
     return;
   }
 
