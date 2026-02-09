@@ -15,6 +15,7 @@
 #include <QFile>
 #include <QMatrix4x4>
 
+#include <array>
 #include <algorithm>
 #include <iterator>
 
@@ -263,66 +264,248 @@ void ActiveNoteRhiRenderer::buildInstances(const ActiveNoteFrame::Data& frame) {
 
   const int viewWidth = frame.viewportSize.width();
   const int viewHeight = frame.viewportSize.height();
-  if (viewWidth <= 0 || viewHeight <= 0 || frame.trackCount <= 0 || frame.rowHeight <= 0) {
+  if (viewWidth <= 0 || viewHeight <= 0 || frame.trackCount <= 0) {
     return;
   }
 
-  const float keyAreaX = static_cast<float>(frame.leftGutter);
-  const float keyAreaWidth = std::max(1.0f, static_cast<float>(viewWidth - frame.leftGutter - frame.rightPadding));
-  const float keyWidth = keyAreaWidth / 128.0f;
+  struct KeyGeometry {
+    float x = 0.0f;
+    float width = 0.0f;
+    bool valid = false;
+  };
 
-  const int firstTrack = std::max(0, (frame.scrollY - frame.topPadding) / frame.rowHeight);
-  const int lastTrack = std::min(frame.trackCount - 1,
-                                 ((frame.scrollY + viewHeight) - frame.topPadding) / frame.rowHeight + 1);
+  std::array<KeyGeometry, 128> keyGeometry{};
+  int whiteCount = 0;
+  for (int key = 0; key < 128; ++key) {
+    if (!isBlackKey(key)) {
+      ++whiteCount;
+    }
+  }
+  if (whiteCount <= 0) {
+    return;
+  }
 
-  for (int track = firstTrack; track <= lastTrack; ++track) {
-    const float y = static_cast<float>(frame.topPadding + (track * frame.rowHeight) - frame.scrollY);
-    const float rowHeight = static_cast<float>(frame.rowHeight);
+  const float keyboardWidth = static_cast<float>(viewWidth);
+  const float whiteWidth = keyboardWidth / static_cast<float>(whiteCount);
+
+  int whiteIndex = 0;
+  for (int key = 0; key < 128; ++key) {
+    if (!isBlackKey(key)) {
+      keyGeometry[static_cast<size_t>(key)] = KeyGeometry{
+          static_cast<float>(whiteIndex) * whiteWidth,
+          whiteWidth,
+          true,
+      };
+      ++whiteIndex;
+    }
+  }
+
+  const float blackWidth = std::max(2.0f, whiteWidth * 0.62f);
+  for (int key = 0; key < 128; ++key) {
+    if (!isBlackKey(key)) {
+      continue;
+    }
+
+    int prevWhite = key - 1;
+    while (prevWhite >= 0 && isBlackKey(prevWhite)) {
+      --prevWhite;
+    }
+    int nextWhite = key + 1;
+    while (nextWhite < 128 && isBlackKey(nextWhite)) {
+      ++nextWhite;
+    }
+    if (prevWhite < 0 || nextWhite >= 128) {
+      continue;
+    }
+    if (!keyGeometry[static_cast<size_t>(prevWhite)].valid ||
+        !keyGeometry[static_cast<size_t>(nextWhite)].valid) {
+      continue;
+    }
+
+    const float splitX =
+        keyGeometry[static_cast<size_t>(prevWhite)].x +
+        keyGeometry[static_cast<size_t>(prevWhite)].width;
+    float x = splitX - (blackWidth * 0.5f);
+    x = std::clamp(x, 0.0f, keyboardWidth - blackWidth);
+    keyGeometry[static_cast<size_t>(key)] = KeyGeometry{x, blackWidth, true};
+  }
+
+  const float rowGap = (frame.trackCount > 1)
+      ? std::max(1.0f, std::min(4.0f, static_cast<float>(viewHeight) * 0.015f))
+      : 0.0f;
+  const float totalGaps = rowGap * static_cast<float>(frame.trackCount - 1);
+  const float keyboardHeight =
+      (static_cast<float>(viewHeight) - totalGaps) / static_cast<float>(frame.trackCount);
+  if (keyboardHeight <= 1.0f) {
+    return;
+  }
+
+  const float blackHeight = std::max(2.0f, keyboardHeight * 0.62f);
+  const float whiteTopHeight = std::min(keyboardHeight - 1.0f, blackHeight);
+  const float notchWidth = std::min(whiteWidth * 0.35f, std::max(1.0f, whiteWidth * 0.22f));
+
+  for (int track = 0; track < frame.trackCount; ++track) {
+    const float y = static_cast<float>(track) * (keyboardHeight + rowGap);
 
     QColor trackColor = (track < static_cast<int>(frame.trackColors.size()))
-      ? frame.trackColors[static_cast<size_t>(track)]
-      : QColor::fromHsv((track * 43) % 360, 190, 235);
+        ? frame.trackColors[static_cast<size_t>(track)]
+        : QColor::fromHsv((track * 43) % 360, 190, 235);
 
-    QColor leftStrip = trackColor;
-    leftStrip.setAlpha(190);
-    appendRect(1.0f, y + 1.0f, std::max(1.0f, keyAreaX - 3.0f), std::max(1.0f, rowHeight - 2.0f), leftStrip);
-
-    QColor rowSeparator = frame.separatorColor;
-    rowSeparator.setAlpha(100);
-    appendRect(0.0f, y + rowHeight - 1.0f, static_cast<float>(viewWidth), 1.0f, rowSeparator);
+    QColor rowBackground = trackColor;
+    rowBackground.setAlpha(26);
+    appendRect(0.0f, y, keyboardWidth, keyboardHeight, rowBackground);
 
     for (int key = 0; key < 128; ++key) {
-      const float x = keyAreaX + static_cast<float>(key) * keyWidth;
-      const bool blackKey = isBlackKey(key);
-      QColor keyColor = blackKey ? frame.blackKeyColor : frame.whiteKeyColor;
-      keyColor.setAlpha(blackKey ? 175 : 220);
-      appendRect(x + 0.5f,
-                 y + 1.0f,
-                 std::max(0.75f, keyWidth - 1.0f),
-                 std::max(1.0f, rowHeight - 2.0f),
-                 keyColor);
-
-      if (key % 12 == 0) {
-        QColor octaveLine = frame.separatorColor;
-        octaveLine.setAlpha(120);
-        appendRect(x, y + 1.0f, 1.0f, std::max(1.0f, rowHeight - 2.0f), octaveLine);
+      if (isBlackKey(key)) {
+        continue;
       }
-
-      const bool active = frame.playbackActive &&
-                          track < static_cast<int>(frame.activeKeysByTrack.size()) &&
-                          frame.activeKeysByTrack[static_cast<size_t>(track)].test(static_cast<size_t>(key));
-      if (!active) {
+      const KeyGeometry& geom = keyGeometry[static_cast<size_t>(key)];
+      if (!geom.valid) {
         continue;
       }
 
-      QColor activeColor = trackColor;
-      activeColor.setAlpha(235);
-      appendRect(x + 1.0f,
-                 y + 2.0f,
-                 std::max(0.5f, keyWidth - 2.0f),
-                 std::max(1.0f, rowHeight - 4.0f),
-                 activeColor);
+      const bool hasLeftBlack = key > 0 && isBlackKey(key - 1);
+      const bool hasRightBlack = key < 127 && isBlackKey(key + 1);
+
+      QColor whiteKeyColor = frame.whiteKeyColor;
+      whiteKeyColor.setAlpha(255);
+      appendWhiteKeyShape(geom.x,
+                          y,
+                          geom.width,
+                          keyboardHeight,
+                          whiteTopHeight,
+                          hasLeftBlack,
+                          hasRightBlack,
+                          notchWidth,
+                          whiteKeyColor);
     }
+
+    if (frame.playbackActive && track < static_cast<int>(frame.activeKeysByTrack.size())) {
+      const auto& activeMask = frame.activeKeysByTrack[static_cast<size_t>(track)];
+      for (int key = 0; key < 128; ++key) {
+        if (isBlackKey(key)) {
+          continue;
+        }
+        if (!activeMask.test(static_cast<size_t>(key))) {
+          continue;
+        }
+        const KeyGeometry& geom = keyGeometry[static_cast<size_t>(key)];
+        if (!geom.valid) {
+          continue;
+        }
+
+        const bool hasLeftBlack = key > 0 && isBlackKey(key - 1);
+        const bool hasRightBlack = key < 127 && isBlackKey(key + 1);
+        QColor activeWhite = trackColor;
+        activeWhite.setAlpha(150);
+        appendWhiteKeyShape(geom.x,
+                            y,
+                            geom.width,
+                            keyboardHeight,
+                            whiteTopHeight,
+                            hasLeftBlack,
+                            hasRightBlack,
+                            notchWidth,
+                            activeWhite);
+      }
+    }
+
+    QColor keyEdge = frame.separatorColor;
+    keyEdge.setAlpha(170);
+    for (int key = 0; key < 128; ++key) {
+      if (isBlackKey(key)) {
+        continue;
+      }
+      const KeyGeometry& geom = keyGeometry[static_cast<size_t>(key)];
+      if (!geom.valid) {
+        continue;
+      }
+      appendRect(geom.x, y, 1.0f, keyboardHeight, keyEdge);
+    }
+    appendRect(keyboardWidth - 1.0f, y, 1.0f, keyboardHeight, keyEdge);
+    appendRect(0.0f, y + keyboardHeight - 1.0f, keyboardWidth, 1.0f, keyEdge);
+
+    for (int key = 0; key < 128; ++key) {
+      if (!isBlackKey(key)) {
+        continue;
+      }
+
+      const KeyGeometry& geom = keyGeometry[static_cast<size_t>(key)];
+      if (!geom.valid) {
+        continue;
+      }
+
+      QColor blackKeyColor = frame.blackKeyColor;
+      blackKeyColor.setAlpha(255);
+      appendRect(geom.x, y, geom.width, blackHeight, blackKeyColor);
+
+      const bool active = frame.playbackActive &&
+                          track < static_cast<int>(frame.activeKeysByTrack.size()) &&
+                          frame.activeKeysByTrack[static_cast<size_t>(track)].test(
+                              static_cast<size_t>(key));
+      if (active) {
+        QColor activeBlack = trackColor.lighter(118);
+        activeBlack.setAlpha(230);
+        appendRect(geom.x + 1.0f,
+                   y + 1.0f,
+                   std::max(0.0f, geom.width - 2.0f),
+                   std::max(0.0f, blackHeight - 2.0f),
+                   activeBlack);
+      }
+
+      QColor blackEdge = frame.separatorColor;
+      blackEdge.setAlpha(130);
+      appendRect(geom.x, y + blackHeight - 1.0f, geom.width, 1.0f, blackEdge);
+    }
+
+    if (track < frame.trackCount - 1 && rowGap > 0.0f) {
+      QColor rowGapColor = frame.separatorColor;
+      rowGapColor.setAlpha(70);
+      appendRect(0.0f, y + keyboardHeight, keyboardWidth, rowGap, rowGapColor);
+    }
+  }
+}
+
+void ActiveNoteRhiRenderer::appendWhiteKeyShape(float x,
+                                                float y,
+                                                float width,
+                                                float fullHeight,
+                                                float topHeight,
+                                                bool hasLeftBlack,
+                                                bool hasRightBlack,
+                                                float notchWidth,
+                                                const QColor& color) {
+  if (width <= 0.0f || fullHeight <= 0.0f || color.alpha() <= 0) {
+    return;
+  }
+
+  const float clampedTop = std::clamp(topHeight, 0.0f, fullHeight);
+  const float lowerHeight = fullHeight - clampedTop;
+  if (lowerHeight > 0.0f) {
+    appendRect(x, y + clampedTop, width, lowerHeight, color);
+  }
+
+  if (clampedTop <= 0.0f) {
+    return;
+  }
+
+  const float clampedNotch = std::clamp(notchWidth, 0.0f, width * 0.5f);
+  if (hasLeftBlack && hasRightBlack) {
+    appendRect(x + clampedNotch,
+               y,
+               std::max(0.0f, width - (2.0f * clampedNotch)),
+               clampedTop,
+               color);
+  } else if (hasLeftBlack) {
+    appendRect(x + clampedNotch,
+               y,
+               std::max(0.0f, width - clampedNotch),
+               clampedTop,
+               color);
+  } else if (hasRightBlack) {
+    appendRect(x, y, std::max(0.0f, width - clampedNotch), clampedTop, color);
+  } else {
+    appendRect(x, y, width, clampedTop, color);
   }
 }
 

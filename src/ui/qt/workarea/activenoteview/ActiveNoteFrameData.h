@@ -16,13 +16,7 @@ namespace ActiveNoteFrame {
 
 struct Data {
   QSize viewportSize;
-  int scrollY = 0;
   int trackCount = 0;
-  int rowHeight = 0;
-  int leftGutter = 0;
-  int topPadding = 0;
-  int bottomPadding = 0;
-  int rightPadding = 0;
   QColor backgroundColor;
   QColor separatorColor;
   QColor whiteKeyColor;
