@@ -56,7 +56,7 @@ private:
 
   void ensurePipeline(QRhiRenderPassDescriptor* renderPassDesc, int sampleCount);
   bool ensureInstanceBuffer(int bytes);
-  void buildInstances(const ActiveNoteFrame::Data& frame);
+  void buildInstances(const ActiveNoteFrame::Data& frame, const QSize& pixelSize);
   void appendRect(float x, float y, float w, float h, const QColor& color);
   void appendWhiteKeyShape(float x,
                            float y,
