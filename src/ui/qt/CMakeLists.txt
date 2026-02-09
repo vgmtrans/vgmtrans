@@ -93,6 +93,13 @@ add_executable(
   widgets/TableView.h
   widgets/TitleBar.cpp
   widgets/TitleBar.h
+  workarea/activenoteview/ActiveNoteFrameData.h
+  workarea/activenoteview/ActiveNoteRhiRenderer.cpp
+  workarea/activenoteview/ActiveNoteRhiRenderer.h
+  workarea/activenoteview/ActiveNoteRhiWidget.cpp
+  workarea/activenoteview/ActiveNoteRhiWidget.h
+  workarea/activenoteview/ActiveNoteView.cpp
+  workarea/activenoteview/ActiveNoteView.h
   workarea/hexview/HexView.cpp
   workarea/hexview/HexView.h
   workarea/hexview/HexViewRhiHost.cpp

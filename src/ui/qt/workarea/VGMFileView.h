@@ -5,49 +5,102 @@
  */
 
 #pragma once
+
+#include <array>
+#include <cstdint>
 #include <memory>
+#include <unordered_map>
+#include <vector>
+
 #include <QFont>
 #include <QMdiSubWindow>
-#include <vector>
+
 #include "SeqEventTimeIndex.h"
 
+class QButtonGroup;
+class QStackedWidget;
+class QToolButton;
+class QWidget;
 class SnappingSplitter;
 class VGMFile;
+class VGMSeq;
+class SeqTrack;
 class HexView;
 class VGMFileTreeView;
+class ActiveNoteView;
 class VGMItem;
+class SeqEvent;
 struct SeqTimedEvent;
 enum class PositionChangeOrigin;
+
+enum class PanelSide : uint8_t {
+  Left = 0,
+  Right = 1,
+};
+
+enum class PanelViewKind : uint8_t {
+  Hex = 0,
+  Tree = 1,
+  ActiveNotes = 2,
+};
 
 class VGMFileView final : public QMdiSubWindow {
   Q_OBJECT
 
 public:
-  explicit VGMFileView(VGMFile *vgmFile);
+  explicit VGMFileView(VGMFile* vgmFile);
 
 private:
+  struct PanelUi {
+    QWidget* container = nullptr;
+    QToolButton* singlePaneToggle = nullptr;
+    QButtonGroup* viewButtons = nullptr;
+    QStackedWidget* stack = nullptr;
+    HexView* hexView = nullptr;
+    VGMFileTreeView* treeView = nullptr;
+    ActiveNoteView* activeNoteView = nullptr;
+    PanelViewKind currentKind = PanelViewKind::Hex;
+  };
+
   static constexpr int treeViewMinimumWidth = 220;
 
-  void resetSnapRanges() const;
   void focusInEvent(QFocusEvent* event) override;
-  void closeEvent(QCloseEvent *closeEvent) override;
-  int hexViewFullWidth() const;
-  int hexViewWidthSansAscii() const;
-  int hexViewWidthSansAsciiAndAddress() const;
+  void closeEvent(QCloseEvent* closeEvent) override;
+
+  PanelUi createPanel(PanelSide side, bool isSeqFile);
+  void setPanelView(PanelSide side, PanelViewKind viewKind);
+  void setSinglePaneMode(bool singlePane);
+
+  void resetSnapRanges() const;
+  [[nodiscard]] int hexViewFullWidth() const;
+  [[nodiscard]] int hexViewWidthSansAscii() const;
+  [[nodiscard]] int hexViewWidthSansAsciiAndAddress() const;
   void updateHexViewFont(qreal sizeIncrement) const;
   void applyHexViewFont(QFont font) const;
 
-  VGMFileTreeView* m_treeview{};
+  void clearPlaybackVisuals();
+  void ensureTrackIndexMap(VGMSeq* seq);
+  static int noteKeyForEvent(const SeqEvent* event);
+
+  PanelUi& panel(PanelSide side) { return m_panels[static_cast<size_t>(side)]; }
+  const PanelUi& panel(PanelSide side) const { return m_panels[static_cast<size_t>(side)]; }
+
   VGMFile* m_vgmfile{};
-  HexView* m_hexview{};
-  SnappingSplitter* m_splitter;
+  SnappingSplitter* m_splitter = nullptr;
+  std::array<PanelUi, 2> m_panels{};
+  int m_defaultSplitterHandleWidth = 0;
+  QList<int> m_lastSplitSizes;
   QFont m_defaultHexFont;
+
   std::vector<const SeqTimedEvent*> m_playbackTimedEvents;
+  std::vector<const SeqTimedEvent*> m_activeTimedEvents;
   std::vector<const VGMItem*> m_playbackItems;
   std::vector<const VGMItem*> m_lastPlaybackItems;
   int m_lastPlaybackPosition = 0;
   const SeqEventTimeIndex* m_playbackTimeline = nullptr;
   std::unique_ptr<SeqEventTimeIndex::Cursor> m_playbackCursor;
+  VGMSeq* m_trackIndexSeq = nullptr;
+  std::unordered_map<const SeqTrack*, int> m_trackIndexByPtr;
 
 public slots:
   void onSelectionChange(VGMItem* item) const;
