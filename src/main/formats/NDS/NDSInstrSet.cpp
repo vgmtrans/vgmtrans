@@ -27,14 +27,15 @@ constexpr double INTR_FREQUENCY = 64 * 2728.0 / 33e6;
 // NDSInstrSet
 // ***********
 
-NDSInstrSet::NDSInstrSet(RawFile *file, uint32_t offset, uint32_t length, VGMSampColl *psg_samples,
+NDSInstrSet::NDSInstrSet(RawFile* file, uint32_t offset, uint32_t length, VGMSampColl* psg_samples,
                          std::string name)
     : VGMInstrSet(NDSFormat::name, file, offset, length, std::move(name)),
-      m_psg_samples(psg_samples) {}
+      m_psg_samples(psg_samples) {
+}
 
 bool NDSInstrSet::parseInstrPointers() {
   uint32_t nInstruments = readWord(offset() + 0x38);
-  VGMHeader *instrptrHdr = addHeader(offset() + 0x38, nInstruments * 4 + 4, "Instrument Pointers");
+  VGMHeader* instrptrHdr = addHeader(offset() + 0x38, nInstruments * 4 + 4, "Instrument Pointers");
 
   for (uint32_t i = 0; i < nInstruments; i++) {
     uint32_t instrPtrOff = offset() + 0x3C + i * 4;
@@ -47,7 +48,7 @@ bool NDSInstrSet::parseInstrPointers() {
     uint32_t pInstr = temp >> 8;
     aInstrs.push_back(new NDSInstr(this, pInstr + offset(), 0, 0, i, instrType));
 
-    VGMHeader *hdr = instrptrHdr->addHeader(instrPtrOff, 4, "Pointer");
+    VGMHeader* hdr = instrptrHdr->addHeader(instrPtrOff, 4, "Pointer");
     hdr->addChild(instrPtrOff, 1, "Type");
     hdr->addChild(instrPtrOff + 1, 3, "Offset");
   }
@@ -59,9 +60,10 @@ bool NDSInstrSet::parseInstrPointers() {
 // NDSInstr
 // ********
 
-NDSInstr::NDSInstr(NDSInstrSet *instrSet, uint32_t offset, uint32_t length, uint32_t theBank,
+NDSInstr::NDSInstr(NDSInstrSet* instrSet, uint32_t offset, uint32_t length, uint32_t theBank,
                    uint32_t theInstrNum, uint8_t theInstrType)
-    : VGMInstr(instrSet, offset, length, theBank, theInstrNum, "Instrument", 0), instrType(theInstrType) {
+    : VGMInstr(instrSet, offset, length, theBank, theInstrNum, "Instrument", 0),
+      instrType(theInstrType) {
 }
 
 bool NDSInstr::loadInstr() {
@@ -71,7 +73,7 @@ bool NDSInstr::loadInstr() {
       setName("Single-Region Instrument");
       setLength(10);
 
-      VGMRgn *rgn = addRgn(offset(), 10, readShort(offset()));
+      VGMRgn* rgn = addRgn(offset(), 10, readShort(offset()));
       getSampCollPtr(rgn, readShort(offset() + 2));
       getArticData(rgn, offset() + 4);
       rgn->addChild(offset() + 2, 2, "Sample Collection Index");
@@ -81,12 +83,11 @@ bool NDSInstr::loadInstr() {
     case 0x02: {
       /* PSG Tone */
       uint8_t dutyCycle = readByte(offset()) & 0x07;
-      std::string dutyCycles[8] = {"12.5%", "25%", "37.5%", "50%",
-                                    "62.5%", "75%", "87.5%", "0%"};
+      std::string dutyCycles[8] = {"12.5%", "25%", "37.5%", "50%", "62.5%", "75%", "87.5%", "0%"};
       setName("PSG Wave (" + dutyCycles[dutyCycle] + ")");
       setLength(10);
 
-      VGMRgn *rgn = addRgn(offset(), 10, dutyCycle);
+      VGMRgn* rgn = addRgn(offset(), 10, dutyCycle);
       getArticData(rgn, offset() + 4);
 
       rgn->sampCollPtr = static_cast<NDSInstrSet*>(parInstrSet)->m_psg_samples;
@@ -100,7 +101,7 @@ bool NDSInstr::loadInstr() {
       setLength(10);
 
       /* The noise sample is the 8th in our PSG sample collection */
-      VGMRgn *rgn = addRgn(offset(), 10, 8);
+      VGMRgn* rgn = addRgn(offset(), 10, 8);
       getArticData(rgn, offset() + 4);
 
       rgn->sampCollPtr = static_cast<NDSInstrSet*>(parInstrSet)->m_psg_samples;
@@ -117,8 +118,7 @@ bool NDSInstr::loadInstr() {
       uint8_t nRgns = (highKey - lowKey) + 1;
       for (uint8_t i = 0; i < nRgns; i++) {
         u32 rgnOff = offset() + 2 + i * 12;
-        VGMRgn *rgn = addRgn(rgnOff, 12, readShort(rgnOff + 2),
-                             lowKey + i, lowKey + i);
+        VGMRgn* rgn = addRgn(rgnOff, 12, readShort(rgnOff + 2), lowKey + i, lowKey + i);
         getSampCollPtr(rgn, readShort(rgnOff + 4));
         getArticData(rgn, rgnOff + 6);
         rgn->addChild(rgnOff + 2, 2, "Sample Num");
@@ -145,8 +145,8 @@ bool NDSInstr::loadInstr() {
 
       for (int i = 0; i < nRgns; i++) {
         u32 rgnOff = offset() + 8 + i * 12;
-        VGMRgn *rgn = addRgn(rgnOff, 12, readShort(rgnOff + 2),
-                             (i == 0) ? 0 : keyRanges[i - 1] + 1, keyRanges[i]);
+        VGMRgn* rgn = addRgn(rgnOff, 12, readShort(rgnOff + 2), (i == 0) ? 0 : keyRanges[i - 1] + 1,
+                             keyRanges[i]);
         getSampCollPtr(rgn, readShort(rgnOff + 4));
         getArticData(rgn, rgnOff + 6);
         addChild(rgnOff + 4, 2, "Sample Collection Index");
@@ -161,11 +161,11 @@ bool NDSInstr::loadInstr() {
   return true;
 }
 
-void NDSInstr::getSampCollPtr(VGMRgn *rgn, int waNum) const {
+void NDSInstr::getSampCollPtr(VGMRgn* rgn, int waNum) const {
   rgn->sampCollPtr = static_cast<NDSInstrSet*>(parInstrSet)->sampCollWAList[waNum];
 }
 
-void NDSInstr::getArticData(VGMRgn *rgn, uint32_t offset) const {
+void NDSInstr::getArticData(VGMRgn* rgn, uint32_t offset) const {
   uint8_t realAttack;
   long realSustainLev;
   const uint8_t AttackTimeTable[] = {0x00, 0x01, 0x05, 0x0E, 0x1A, 0x26, 0x33, 0x3F, 0x49, 0x54,
@@ -184,7 +184,6 @@ void NDSInstr::getArticData(VGMRgn *rgn, uint32_t offset) const {
       0xFFD5, 0xFFD6, 0xFFD8, 0xFFDA, 0xFFDC, 0xFFDD, 0xFFDF, 0xFFE1, 0xFFE2, 0xFFE4, 0xFFE5,
       0xFFE7, 0xFFE9, 0xFFEA, 0xFFEC, 0xFFED, 0xFFEF, 0xFFF0, 0xFFF2, 0xFFF3, 0xFFF5, 0xFFF6,
       0xFFF8, 0xFFF9, 0xFFFA, 0xFFFC, 0xFFFD, 0xFFFF, 0x0000};
-
 
   rgn->addUnityKey(readByte(offset), offset, 1);
   uint8_t AttackTime = readByte(offset + 1);
@@ -267,7 +266,7 @@ uint16_t NDSInstr::getFallingRate(uint8_t DecayTime) const {
 // NDSWaveArch
 // ***********
 
-NDSWaveArch::NDSWaveArch(RawFile *file, uint32_t offset, uint32_t length, std::string name)
+NDSWaveArch::NDSWaveArch(RawFile* file, uint32_t offset, uint32_t length, std::string name)
     : VGMSampColl(NDSFormat::name, file, offset, length, std::move(name)) {
 }
 
@@ -283,7 +282,15 @@ bool NDSWaveArch::parseSampleInfo() {
     int nChannels = 1;
     uint8_t waveType = readByte(pSample);
     bool bLoops = (readByte(pSample + 1) != 0);
-    uint16_t rate = readShort(pSample + 2);
+    uint32_t rate = readShort(pSample + 2);
+
+    // Use the Period (Time) field (offset 0x04) to determine the hardware playback rate.
+    // This field represents the ARM7 clock divisor: Time = (ARM7_CLOCK / 2) / SampleRate
+    // ARM7_CLOCK / 2 is approximately 16,756,991 Hz.
+    uint16_t timerVal = readShort(pSample + 4);
+    if (timerVal > 0) {
+      rate = 16756991 / timerVal;
+    }
     BPS bps;
     // uint8_t multiplier;
     switch (waveType) {
@@ -317,7 +324,7 @@ bool NDSWaveArch::parseSampleInfo() {
     }
 
     auto name = fmt::format("Sample {}", samples.size());
-    NDSSamp *samp = new NDSSamp(this, pSample, dataStart + dataLength - pSample, dataStart,
+    NDSSamp* samp = new NDSSamp(this, pSample, dataStart + dataLength - pSample, dataStart,
                                 dataLength, nChannels, bps, rate, waveType, name);
 
     if (waveType == NDSSamp::IMA_ADPCM) {
@@ -337,7 +344,7 @@ bool NDSWaveArch::parseSampleInfo() {
   return true;
 }
 
-NDSPSG::NDSPSG(RawFile *file) : VGMSampColl(NDSFormat::name, file, 0, 0, "NDS PSG samples") {
+NDSPSG::NDSPSG(RawFile* file) : VGMSampColl(NDSFormat::name, file, 0, 0, "NDS PSG samples") {
 }
 
 bool NDSPSG::parseSampleInfo() {
@@ -353,10 +360,11 @@ bool NDSPSG::parseSampleInfo() {
 // NDSSamp
 // *******
 
-NDSSamp::NDSSamp(VGMSampColl *sampColl, uint32_t offset, uint32_t length, uint32_t dataOffset,
+NDSSamp::NDSSamp(VGMSampColl* sampColl, uint32_t offset, uint32_t length, uint32_t dataOffset,
                  uint32_t dataLen, uint8_t nChannels, BPS bps, uint32_t theRate,
                  uint8_t theWaveType, std::string name)
-    : VGMSamp(sampColl, offset, length, dataOffset, dataLen, nChannels, bps, theRate, std::move(name)),
+    : VGMSamp(sampColl, offset, length, dataOffset, dataLen, nChannels, bps, theRate,
+              std::move(name)),
       waveType(theWaveType) {
 }
 
@@ -391,7 +399,7 @@ std::vector<uint8_t> NDSSamp::decodeToNativePcm() {
 std::vector<uint8_t> NDSSamp::decodeImaAdpcm() {
   const uint32_t sampleCount = uncompressedSize() / sizeof(int16_t);
   std::vector<uint8_t> samples(sampleCount * sizeof(int16_t));
-  auto *output = reinterpret_cast<int16_t*>(samples.data());
+  auto* output = reinterpret_cast<int16_t*>(samples.data());
   uint32_t destOff = 0;
   uint32_t sampHeader = getWord(dataOff - 4);
   int decompSample = sampHeader & 0xFFFF;
@@ -446,7 +454,7 @@ std::vector<uint8_t> NDSSamp::decodeImaAdpcm() {
 #define IMAMin(samp) (samp < -0x7FFF) ? ((short)-0x7FFF) : samp
 #define IMAIndexMinMax(index, min, max) (index > max) ? max : ((index < min) ? min : index)
 
-void NDSSamp::process_nibble(unsigned char data4bit, int &Index, int &Pcm16bit) {
+void NDSSamp::process_nibble(unsigned char data4bit, int& Index, int& Pcm16bit) {
   // int Diff = ((Data4bit & 7)*2+1)*AdpcmTable[Index]/8;
   int Diff = AdpcmTable[Index] / 8;
   if (data4bit & 1)
@@ -463,21 +471,21 @@ void NDSSamp::process_nibble(unsigned char data4bit, int &Index, int &Pcm16bit) 
   Index = IMAIndexMinMax(Index + IMA_IndexTable[data4bit & 7], 0, 88);
 }
 
-void NDSSamp::clamp_step_index(int &stepIndex) {
+void NDSSamp::clamp_step_index(int& stepIndex) {
   if (stepIndex < 0)
     stepIndex = 0;
   if (stepIndex > 88)
     stepIndex = 88;
 }
 
-void NDSSamp::clamp_sample(int &decompSample) {
+void NDSSamp::clamp_sample(int& decompSample) {
   if (decompSample < -32768)
     decompSample = -32768;
   if (decompSample > 32767)
     decompSample = 32767;
 }
 
-NDSPSGSamp::NDSPSGSamp(VGMSampColl *sampcoll, uint8_t duty_cycle) : VGMSamp(sampcoll) {
+NDSPSGSamp::NDSPSGSamp(VGMSampColl* sampcoll, uint8_t duty_cycle) : VGMSamp(sampcoll) {
   switch (duty_cycle) {
     case 7: {
       m_duty_cycle = 0;
@@ -536,7 +544,7 @@ NDSPSGSamp::NDSPSGSamp(VGMSampColl *sampcoll, uint8_t duty_cycle) : VGMSamp(samp
 std::vector<uint8_t> NDSPSGSamp::decodeToNativePcm() {
   const uint32_t sampleCount = uncompressedSize() / sizeof(int16_t);
   std::vector<uint8_t> samples(sampleCount * sizeof(int16_t));
-  auto *output = reinterpret_cast<int16_t*>(samples.data());
+  auto* output = reinterpret_cast<int16_t*>(samples.data());
 
   /* Noise mode */
   if (m_duty_cycle == -1) {
