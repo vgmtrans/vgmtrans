@@ -79,6 +79,7 @@ ActiveNoteFrame::Data ActiveNoteView::captureRhiFrameData(float dpr) const {
 
   ActiveNoteFrame::Data frame;
   frame.viewportSize = viewport()->size();
+  frame.dpr = std::max(1.0f, dpr);
   frame.trackCount = m_trackCount;
 
   const QPalette pal = palette();
