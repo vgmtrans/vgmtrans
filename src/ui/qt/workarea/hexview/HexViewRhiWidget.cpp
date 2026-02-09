@@ -66,7 +66,8 @@ void HexViewRhiWidget::render(QRhiCommandBuffer* cb) {
   info.renderPassDesc = rt->renderPassDescriptor();
   info.pixelSize = rt->pixelSize();
   info.sampleCount = rt->sampleCount();
-  info.dpr = rt->devicePixelRatio();
+  // Use the widget's DPR as reported by the windowing system. This is important on some hi-dpi systems (notably Retina screens)
+  info.dpr = devicePixelRatio();
   m_renderer->renderFrame(cb, info);
 }
 
