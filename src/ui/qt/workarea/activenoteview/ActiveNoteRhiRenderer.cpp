@@ -17,7 +17,6 @@
 
 #include <array>
 #include <algorithm>
-#include <cmath>
 #include <iterator>
 
 namespace {
@@ -119,7 +118,7 @@ void ActiveNoteRhiRenderer::renderFrame(QRhiCommandBuffer* cb, const RenderTarge
     return;
   }
 
-  buildInstances(frame);
+  buildInstances(frame, target.pixelSize);
   ensurePipeline(target.renderPassDesc, std::max(1, target.sampleCount));
 
   QRhiResourceUpdateBatch* updates = m_rhi->nextResourceUpdateBatch();
@@ -260,12 +259,11 @@ bool ActiveNoteRhiRenderer::ensureInstanceBuffer(int bytes) {
   return m_instanceBuffer->create();
 }
 
-void ActiveNoteRhiRenderer::buildInstances(const ActiveNoteFrame::Data& frame) {
+void ActiveNoteRhiRenderer::buildInstances(const ActiveNoteFrame::Data& frame, const QSize& pixelSize) {
   m_instances.clear();
 
-  const float dpr = std::max(1.0f, frame.dpr);
-  const int viewWidth = static_cast<int>(std::round(static_cast<float>(frame.viewportSize.width()) * dpr));
-  const int viewHeight = static_cast<int>(std::round(static_cast<float>(frame.viewportSize.height()) * dpr));
+  const int viewWidth = pixelSize.width();
+  const int viewHeight = pixelSize.height();
   if (viewWidth <= 0 || viewHeight <= 0 || frame.trackCount <= 0) {
     return;
   }
