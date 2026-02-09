@@ -63,6 +63,9 @@ target_sources(vgmtrans
     widgets/TitleBar.cpp
     widgets/Windows11ProxyStyle.cpp
     widgets/WindowBar.cpp
+    workarea/activenoteview/ActiveNoteRhiRenderer.cpp
+    workarea/activenoteview/ActiveNoteRhiWidget.cpp
+    workarea/activenoteview/ActiveNoteView.cpp
     workarea/hexview/HexView.cpp
     workarea/hexview/HexViewRhiHost.cpp
     workarea/hexview/HexViewRhiRenderer.cpp
@@ -131,6 +134,13 @@ target_sources(vgmtrans
       workarea/VGMFileListView.h
       workarea/VGMFileTreeView.h
       workarea/VGMFileView.h
+      workarea/activenoteview/ActiveNoteFrameData.h
+      workarea/activenoteview/ActiveNoteRhiRenderer.cpp
+      workarea/activenoteview/ActiveNoteRhiRenderer.h
+      workarea/activenoteview/ActiveNoteRhiWidget.cpp
+      workarea/activenoteview/ActiveNoteRhiWidget.h
+      workarea/activenoteview/ActiveNoteView.cpp
+      workarea/activenoteview/ActiveNoteView.h
       workarea/hexview/HexView.h
       workarea/hexview/HexViewFrameData.h
       workarea/hexview/HexViewInput.h
@@ -269,7 +279,7 @@ if(CMAKE_SYSTEM_NAME MATCHES "Darwin")
   target_sources(vgmtrans
                  PRIVATE "${CMAKE_CURRENT_LIST_DIR}/resources/appicon.icns"
                          "${PROJECT_SOURCE_DIR}/bin/mame_roms.json")
-                         
+
   set_source_files_properties(
     "${CMAKE_CURRENT_LIST_DIR}/resources/appicon.icns"
     "${PROJECT_SOURCE_DIR}/bin/mame_roms.json"
@@ -289,7 +299,7 @@ if(CMAKE_SYSTEM_NAME MATCHES "Darwin")
 elseif(CMAKE_SYSTEM_NAME MATCHES "Windows")
   target_sources(vgmtrans
                  PRIVATE "${CMAKE_CURRENT_LIST_DIR}/resources/VGMTrans.rc")
-                 
+
   install(FILES "${PROJECT_SOURCE_DIR}/bin/mame_roms.json"
           DESTINATION "${CMAKE_INSTALL_BINDIR}")
   install(FILES $<TARGET_RUNTIME_DLLS:vgmtrans>
@@ -362,7 +372,7 @@ set(CPACK_PACKAGE_DESCRIPTION_SUMMARY
 # and storing it in the repo has all kind of issues. CI can use a fancy DMG
 # creation method, for local testing this is fine
 if("DragNDrop" IN_LIST CPACK_GENERATOR)
-  set(CPACK_DMG_VOLUME_NAME "VGMTrans")  
+  set(CPACK_DMG_VOLUME_NAME "VGMTrans")
 
   install(FILES "${PROJECT_SOURCE_DIR}/bin/dmg/README.txt" DESTINATION "." COMPONENT Runtime)
   install(PROGRAMS "${PROJECT_SOURCE_DIR}/bin/dmg/selfsign" DESTINATION "." RENAME "Unblock & Sign" COMPONENT Runtime)
