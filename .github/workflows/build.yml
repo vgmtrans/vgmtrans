@@ -32,6 +32,7 @@ jobs:
             host: 'mac'
             target: 'desktop'
             arch: 'clang_64'
+            modules: 'qtshadertools'
 
       - name: "Set environment variables"
         run: |
@@ -117,6 +118,7 @@ jobs:
           host: 'linux'
           target: 'desktop'
           arch: 'linux_gcc_64'
+          modules: 'qtshadertools'
 
       - name: "Install dependencies"
         run: |
@@ -223,7 +225,8 @@ jobs:
            host: 'windows'
            target: 'desktop'
            arch: 'win64_msvc2022_64'
-           
+           modules: 'qtshadertools'
+
        - name: "Prepare build"
          run: |
           echo "BRANCH=$(git rev-parse --abbrev-ref HEAD)" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
