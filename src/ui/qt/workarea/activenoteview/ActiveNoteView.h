@@ -37,15 +37,8 @@ protected:
 
 private:
   static constexpr int kPianoKeyCount = 128;
-  static constexpr int kRowHeight = 20;
-  static constexpr int kTopPadding = 8;
-  static constexpr int kBottomPadding = 8;
-  static constexpr int kLeftGutter = 24;
-  static constexpr int kRightPadding = 8;
 
   [[nodiscard]] QColor colorForTrack(int trackIndex) const;
-  [[nodiscard]] int contentHeight() const;
-  void updateScrollBars();
   void requestRender();
 
   ActiveNoteRhiWidget* m_rhiWidget = nullptr;

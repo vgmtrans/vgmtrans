@@ -58,6 +58,15 @@ private:
   bool ensureInstanceBuffer(int bytes);
   void buildInstances(const ActiveNoteFrame::Data& frame);
   void appendRect(float x, float y, float w, float h, const QColor& color);
+  void appendWhiteKeyShape(float x,
+                           float y,
+                           float width,
+                           float fullHeight,
+                           float topHeight,
+                           bool hasLeftBlack,
+                           bool hasRightBlack,
+                           float notchWidth,
+                           const QColor& color);
 
   ActiveNoteView* m_view = nullptr;
 
