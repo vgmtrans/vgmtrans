@@ -17,6 +17,7 @@
 
 #include <array>
 #include <algorithm>
+#include <cmath>
 #include <iterator>
 
 namespace {
@@ -262,8 +263,9 @@ bool ActiveNoteRhiRenderer::ensureInstanceBuffer(int bytes) {
 void ActiveNoteRhiRenderer::buildInstances(const ActiveNoteFrame::Data& frame) {
   m_instances.clear();
 
-  const int viewWidth = frame.viewportSize.width();
-  const int viewHeight = frame.viewportSize.height();
+  const float dpr = std::max(1.0f, frame.dpr);
+  const int viewWidth = static_cast<int>(std::round(static_cast<float>(frame.viewportSize.width()) * dpr));
+  const int viewHeight = static_cast<int>(std::round(static_cast<float>(frame.viewportSize.height()) * dpr));
   if (viewWidth <= 0 || viewHeight <= 0 || frame.trackCount <= 0) {
     return;
   }

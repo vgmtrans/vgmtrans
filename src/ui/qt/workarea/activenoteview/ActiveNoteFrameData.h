@@ -16,6 +16,7 @@ namespace ActiveNoteFrame {
 
 struct Data {
   QSize viewportSize;
+  float dpr = 1.0f;
   int trackCount = 0;
   QColor backgroundColor;
   QColor separatorColor;
