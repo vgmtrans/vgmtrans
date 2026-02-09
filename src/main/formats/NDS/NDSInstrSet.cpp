@@ -23,6 +23,17 @@
 // exact accuracy.
 constexpr double INTR_FREQUENCY = 64 * 2728.0 / 33e6;
 
+// Maps 0-127 sustain value to dB attenuation (in 10ths of dB)
+static const int16_t DECIBEL_SQUARE_TABLE[128] = {
+    -481, -480, -480, -480, -480, -480, -480, -480, -480, -460, -442, -425, -410, -396, -383, -371,
+    -360, -349, -339, -330, -321, -313, -305, -297, -289, -282, -276, -269, -263, -257, -251, -245,
+    -239, -234, -229, -224, -219, -214, -210, -205, -201, -196, -192, -188, -184, -180, -176, -173,
+    -169, -165, -162, -158, -155, -152, -149, -145, -142, -139, -136, -133, -130, -127, -125, -122,
+    -119, -116, -114, -111, -109, -106, -103, -101, -99,  -96,  -94,  -91,  -89,  -87,  -85,  -82,
+    -80,  -78,  -76,  -74,  -72,  -70,  -68,  -66,  -64,  -62,  -60,  -58,  -56,  -54,  -52,  -50,
+    -49,  -47,  -45,  -43,  -42,  -40,  -38,  -36,  -35,  -33,  -31,  -30,  -28,  -27,  -25,  -23,
+    -22,  -20,  -19,  -17,  -16,  -14,  -13,  -11,  -10,  -8,   -7,   -6,   -4,   -3,   -1,   0};
+
 // ***********
 // NDSInstrSet
 // ***********
@@ -167,23 +178,8 @@ void NDSInstr::getSampCollPtr(VGMRgn* rgn, int waNum) const {
 
 void NDSInstr::getArticData(VGMRgn* rgn, uint32_t offset) const {
   uint8_t realAttack;
-  long realSustainLev;
   const uint8_t AttackTimeTable[] = {0x00, 0x01, 0x05, 0x0E, 0x1A, 0x26, 0x33, 0x3F, 0x49, 0x54,
                                      0x5C, 0x64, 0x6D, 0x74, 0x7B, 0x7F, 0x84, 0x89, 0x8F};
-
-  const uint16_t sustainLevTable[] = {
-      0xFD2D, 0xFD2E, 0xFD2F, 0xFD75, 0xFDA7, 0xFDCE, 0xFDEE, 0xFE09, 0xFE20, 0xFE34, 0xFE46,
-      0xFE57, 0xFE66, 0xFE74, 0xFE81, 0xFE8D, 0xFE98, 0xFEA3, 0xFEAD, 0xFEB6, 0xFEBF, 0xFEC7,
-      0xFECF, 0xFED7, 0xFEDF, 0xFEE6, 0xFEEC, 0xFEF3, 0xFEF9, 0xFEFF, 0xFF05, 0xFF0B, 0xFF11,
-      0xFF16, 0xFF1B, 0xFF20, 0xFF25, 0xFF2A, 0xFF2E, 0xFF33, 0xFF37, 0xFF3C, 0xFF40, 0xFF44,
-      0xFF48, 0xFF4C, 0xFF50, 0xFF53, 0xFF57, 0xFF5B, 0xFF5E, 0xFF62, 0xFF65, 0xFF68, 0xFF6B,
-      0xFF6F, 0xFF72, 0xFF75, 0xFF78, 0xFF7B, 0xFF7E, 0xFF81, 0xFF83, 0xFF86, 0xFF89, 0xFF8C,
-      0xFF8E, 0xFF91, 0xFF93, 0xFF96, 0xFF99, 0xFF9B, 0xFF9D, 0xFFA0, 0xFFA2, 0xFFA5, 0xFFA7,
-      0xFFA9, 0xFFAB, 0xFFAE, 0xFFB0, 0xFFB2, 0xFFB4, 0xFFB6, 0xFFB8, 0xFFBA, 0xFFBC, 0xFFBE,
-      0xFFC0, 0xFFC2, 0xFFC4, 0xFFC6, 0xFFC8, 0xFFCA, 0xFFCC, 0xFFCE, 0xFFCF, 0xFFD1, 0xFFD3,
-      0xFFD5, 0xFFD6, 0xFFD8, 0xFFDA, 0xFFDC, 0xFFDD, 0xFFDF, 0xFFE1, 0xFFE2, 0xFFE4, 0xFFE5,
-      0xFFE7, 0xFFE9, 0xFFEA, 0xFFEC, 0xFFED, 0xFFEF, 0xFFF0, 0xFFF2, 0xFFF3, 0xFFF5, 0xFFF6,
-      0xFFF8, 0xFFF9, 0xFFFA, 0xFFFC, 0xFFFD, 0xFFFF, 0x0000};
 
   rgn->addUnityKey(readByte(offset), offset, 1);
   uint8_t AttackTime = readByte(offset + 1);
@@ -212,21 +208,21 @@ void NDSInstr::getArticData(VGMRgn* rgn, uint32_t offset) const {
   rgn->attack_time = count * INTR_FREQUENCY;
 
   if (SustainLev == 0x7F)
-    realSustainLev = 0;
-  else
-    realSustainLev = (0x10000 - sustainLevTable[SustainLev]) << 7;
+    rgn->sustain_level = 1.0;
+  else if (SustainLev == 0)
+    rgn->sustain_level = 0.0;
+  else {
+    // Convert from squared dB table (in 10ths) to linear amplitude
+    double dB = DECIBEL_SQUARE_TABLE[SustainLev] / 10.0;
+    rgn->sustain_level = std::pow(10.0, dB / 20.0);
+  }
+
   if (DecayTime == 0x7F)
     rgn->decay_time = 0.001;
   else {
-    count = 0x16980 / realDecay;  // realSustainLev / realDecay;
+    count = 0x16980 / realDecay;
     rgn->decay_time = count * INTR_FREQUENCY;
   }
-
-  if (realSustainLev == 0)
-    rgn->sustain_level = 1.0;
-  else
-    // rgn->sustain_level = 20 * log10 ((92544.0-realSustainLev) / 92544.0);
-    rgn->sustain_level = static_cast<double>(0x16980 - realSustainLev) / 0x16980;
 
   // we express release rate as time from maximum volume, not sustain level
   count = 0x16980 / realRelease;
