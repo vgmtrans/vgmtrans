@@ -29,6 +29,7 @@
 #include "VGMSeq.h"
 #include "activenoteview/ActiveNoteView.h"
 #include "hexview/HexView.h"
+#include "pianorollview/PianoRollView.h"
 #include "Helpers.h"
 #include "Root.h"
 #include "SeqEvent.h"
@@ -158,21 +159,26 @@ VGMFileView::PanelUi VGMFileView::createPanel(PanelSide side, bool isSeqFile) {
   auto* hexButton = createPanelButton("Hex", toolbar);
   auto* treeButton = createPanelButton("Tree", toolbar);
   auto* activeButton = createPanelButton("Active", toolbar);
+  auto* pianoButton = createPanelButton("Piano", toolbar);
   activeButton->setEnabled(isSeqFile);
+  pianoButton->setEnabled(isSeqFile);
 
   panelUi.viewButtons->addButton(hexButton, static_cast<int>(PanelViewKind::Hex));
   panelUi.viewButtons->addButton(treeButton, static_cast<int>(PanelViewKind::Tree));
   panelUi.viewButtons->addButton(activeButton, static_cast<int>(PanelViewKind::ActiveNotes));
+  panelUi.viewButtons->addButton(pianoButton, static_cast<int>(PanelViewKind::PianoRoll));
 
   toolbarLayout->addWidget(hexButton);
   toolbarLayout->addWidget(treeButton);
   toolbarLayout->addWidget(activeButton);
+  toolbarLayout->addWidget(pianoButton);
   toolbarLayout->addStretch(1);
 
   panelUi.stack = new QStackedWidget(panelUi.container);
   panelUi.hexView = new HexView(m_vgmfile, panelUi.stack);
   panelUi.treeView = new VGMFileTreeView(m_vgmfile, panelUi.stack);
   panelUi.activeNoteView = new ActiveNoteView(panelUi.stack);
+  panelUi.pianoRollView = new PianoRollView(panelUi.stack);
 
   panelUi.hexView->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
   panelUi.treeView->setMinimumWidth(treeViewMinimumWidth);
@@ -180,11 +186,36 @@ VGMFileView::PanelUi VGMFileView::createPanel(PanelSide side, bool isSeqFile) {
   if (isSeqFile) {
     auto* seq = dynamic_cast<VGMSeq*>(m_vgmfile);
     panelUi.activeNoteView->setTrackCount(seq ? static_cast<int>(seq->aTracks.size()) : 0);
+    panelUi.pianoRollView->setTrackCount(seq ? static_cast<int>(seq->aTracks.size()) : 0);
+    panelUi.pianoRollView->setSequence(seq);
+  }
+
+  if (panelUi.pianoRollView) {
+    connect(panelUi.pianoRollView, &PianoRollView::seekRequested, this, [this](int tick) {
+      if (tick < 0) {
+        return;
+      }
+
+      if (m_vgmfile->assocColls.empty()) {
+        return;
+      }
+
+      auto* assocColl = m_vgmfile->assocColls.front();
+      auto& seqPlayer = SequencePlayer::the();
+      if (seqPlayer.activeCollection() != assocColl) {
+        seqPlayer.setActiveCollection(assocColl);
+      }
+
+      if (seqPlayer.activeCollection() == assocColl) {
+        seqPlayer.seek(tick, PositionChangeOrigin::SeekBar);
+      }
+    });
   }
 
   panelUi.stack->addWidget(panelUi.hexView);
   panelUi.stack->addWidget(panelUi.treeView);
   panelUi.stack->addWidget(panelUi.activeNoteView);
+  panelUi.stack->addWidget(panelUi.pianoRollView);
 
   if (side == PanelSide::Left) {
     panelUi.currentKind = PanelViewKind::Hex;
@@ -229,6 +260,8 @@ void VGMFileView::setPanelView(PanelSide side, PanelViewKind viewKind) {
 
   if (viewKind == PanelViewKind::Tree && panelUi.treeView) {
     panelUi.treeView->updateStatusBar();
+  } else if (viewKind == PanelViewKind::PianoRoll && panelUi.pianoRollView) {
+    panelUi.pianoRollView->refreshSequenceData(true);
   }
 }
 
@@ -397,6 +430,9 @@ void VGMFileView::clearPlaybackVisuals() {
     }
     if (auto* active = panel(side).activeNoteView) {
       active->clearPlaybackState();
+    }
+    if (auto* piano = panel(side).pianoRollView) {
+      piano->clearPlaybackState();
     }
   }
 }
@@ -596,6 +632,12 @@ void VGMFileView::onPlaybackPositionChanged(int current, int max, PositionChange
     if (panelUi.activeNoteView) {
       panelUi.activeNoteView->setTrackCount(static_cast<int>(seq->aTracks.size()));
       panelUi.activeNoteView->setActiveNotes(activeKeys, playbackActive);
+    }
+    if (panelUi.pianoRollView) {
+      panelUi.pianoRollView->setTrackCount(static_cast<int>(seq->aTracks.size()));
+      panelUi.pianoRollView->setSequence(seq);
+      panelUi.pianoRollView->refreshSequenceData(false);
+      panelUi.pianoRollView->setPlaybackTick(current, playbackActive);
     }
   }
 }
