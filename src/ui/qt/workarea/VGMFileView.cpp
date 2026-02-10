@@ -78,6 +78,7 @@ VGMFileView::VGMFileView(VGMFile* vgmfile)
 
     connect(panelUi.hexView, &HexView::selectionChanged, this, &VGMFileView::onSelectionChange);
     connect(panelUi.hexView, &HexView::seekToEventRequested, this, &VGMFileView::seekToEvent);
+    connect(panelUi.pianoRollView, &PianoRollView::selectionChanged, this, &VGMFileView::onSelectionChange);
 
     connect(panelUi.treeView, &VGMFileTreeView::currentItemChanged,
             this,

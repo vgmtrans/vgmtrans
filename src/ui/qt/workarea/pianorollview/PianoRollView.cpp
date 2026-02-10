@@ -388,18 +388,24 @@ bool PianoRollView::handleViewportMousePress(QMouseEvent* event) {
   }
 
   const QPoint pos = event->position().toPoint();
-  if (pos.y() >= kTopBarHeight || pos.x() < kKeyboardWidth) {
-    return false;
+  if (pos.y() < kTopBarHeight && pos.x() >= kKeyboardWidth) {
+    m_seekDragActive = true;
+    m_currentTick = tickFromViewportX(pos.x());
+    updateActiveKeyStates();
+    requestRender();
+    emit seekRequested(m_currentTick);
+
+    event->accept();
+    return true;
   }
 
-  m_seekDragActive = true;
-  m_currentTick = tickFromViewportX(pos.x());
-  updateActiveKeyStates();
-  requestRender();
-  emit seekRequested(m_currentTick);
+  if (pos.y() >= kTopBarHeight && pos.x() >= kKeyboardWidth) {
+    emit selectionChanged(noteAtViewportPoint(pos));
+    event->accept();
+    return true;
+  }
 
-  event->accept();
-  return true;
+  return false;
 }
 
 bool PianoRollView::handleViewportMouseMove(QMouseEvent* event) {
@@ -502,6 +508,7 @@ void PianoRollView::rebuildTrackColors() {
 void PianoRollView::rebuildSequenceCache() {
   m_ppqn = (m_seq && m_seq->ppqn() > 0) ? m_seq->ppqn() : 48;
   m_maxNoteDurationTicks = 1;
+  m_selectableNotes.clear();
 
   auto notes = std::make_shared<std::vector<PianoRollFrame::Note>>();
   auto signatures = std::make_shared<std::vector<PianoRollFrame::TimeSignature>>();
@@ -530,6 +537,7 @@ void PianoRollView::rebuildSequenceCache() {
     m_notes = notes;
     signatures->push_back({0, 4, 4});
     m_timeSignatures = signatures;
+    m_selectableNotes.clear();
     return;
   }
 
@@ -538,6 +546,7 @@ void PianoRollView::rebuildSequenceCache() {
   uint64_t maxEndTick = 1;
   uint32_t maxDurationTicks = 1;
   notes->reserve(timeline.size());
+  m_selectableNotes.reserve(timeline.size());
   for (size_t i = 0; i < timeline.size(); ++i) {
     const auto& timed = timeline.event(i);
     maxEndTick = std::max<uint64_t>(maxEndTick, timed.endTickExclusive());
@@ -556,16 +565,37 @@ void PianoRollView::rebuildSequenceCache() {
       continue;
     }
 
+    const uint32_t noteDuration = std::max<uint32_t>(1, timed.duration);
     PianoRollFrame::Note note;
     note.startTick = timed.startTick;
-    note.duration = std::max<uint32_t>(1, timed.duration);
+    note.duration = noteDuration;
     note.key = static_cast<uint8_t>(noteKey);
     note.trackIndex = static_cast<int16_t>(trackIndex);
     notes->push_back(note);
+    m_selectableNotes.push_back({
+        timed.startTick,
+        noteDuration,
+        static_cast<uint8_t>(noteKey),
+        static_cast<int16_t>(trackIndex),
+        timed.event,
+    });
     maxDurationTicks = std::max<uint32_t>(maxDurationTicks, note.duration);
   }
 
   std::sort(notes->begin(), notes->end(), [](const auto& a, const auto& b) {
+    if (a.startTick != b.startTick) {
+      return a.startTick < b.startTick;
+    }
+    if (a.key != b.key) {
+      return a.key < b.key;
+    }
+    if (a.trackIndex != b.trackIndex) {
+      return a.trackIndex < b.trackIndex;
+    }
+    return a.duration < b.duration;
+  });
+
+  std::sort(m_selectableNotes.begin(), m_selectableNotes.end(), [](const auto& a, const auto& b) {
     if (a.startTick != b.startTick) {
       return a.startTick < b.startTick;
     }
@@ -796,6 +826,94 @@ int PianoRollView::scanlinePixelX(int tick) const {
   const float absoluteX = static_cast<float>(clampTick(tick)) * std::max(0.0001f, m_pixelsPerTick);
   const float viewX = absoluteX - static_cast<float>(horizontalScrollBar()->value());
   return static_cast<int>(std::lround(viewX));
+}
+
+VGMItem* PianoRollView::noteAtViewportPoint(const QPoint& pos) const {
+  if (pos.x() < kKeyboardWidth || pos.y() < kTopBarHeight || m_selectableNotes.empty()) {
+    return nullptr;
+  }
+
+  if (m_pixelsPerTick <= 0.0f || m_pixelsPerKey <= 0.0f) {
+    return nullptr;
+  }
+
+  const int noteViewportWidth = std::max(0, viewport()->width() - kKeyboardWidth);
+  const int noteViewportHeight = std::max(0, viewport()->height() - kTopBarHeight);
+  const int localX = pos.x() - kKeyboardWidth;
+  const int localY = pos.y() - kTopBarHeight;
+  if (localX < 0 || localY < 0 || localX >= noteViewportWidth || localY >= noteViewportHeight) {
+    return nullptr;
+  }
+
+  const float worldX = static_cast<float>(horizontalScrollBar()->value() + localX);
+  const float worldY = static_cast<float>(verticalScrollBar()->value() + localY);
+  const float pixelsPerKey = std::max(0.0001f, m_pixelsPerKey);
+  const int rowFromTop = static_cast<int>(std::floor(worldY / pixelsPerKey));
+  if (rowFromTop < 0 || rowFromTop >= kMidiKeyCount) {
+    return nullptr;
+  }
+
+  const float rowTopY = static_cast<float>(rowFromTop) * pixelsPerKey;
+  const float rowBodyHeight = std::max(1.0f, pixelsPerKey - 1.0f);
+  if (worldY < rowTopY || worldY >= (rowTopY + rowBodyHeight)) {
+    return nullptr;
+  }
+
+  const int key = 127 - rowFromTop;
+  const float worldTick = worldX / std::max(0.0001f, m_pixelsPerTick);
+  const uint64_t tickFloor = (worldTick <= 0.0f)
+                                 ? 0u
+                                 : static_cast<uint64_t>(std::floor(worldTick));
+  const uint64_t maxDurationTicks = std::max<uint64_t>(1u, m_maxNoteDurationTicks);
+  const uint64_t searchStartTick = (tickFloor > maxDurationTicks)
+                                       ? (tickFloor - maxDurationTicks)
+                                       : 0u;
+  const uint64_t searchEndTickExclusive = std::min<uint64_t>(
+      tickFloor + 2u, static_cast<uint64_t>(std::numeric_limits<uint32_t>::max()) + 1u);
+
+  const auto beginIt = std::lower_bound(
+      m_selectableNotes.begin(),
+      m_selectableNotes.end(),
+      searchStartTick,
+      [](const SelectableNote& note, uint64_t tick) {
+        return static_cast<uint64_t>(note.startTick) < tick;
+      });
+  const auto endIt = std::lower_bound(
+      m_selectableNotes.begin(),
+      m_selectableNotes.end(),
+      searchEndTickExclusive,
+      [](const SelectableNote& note, uint64_t tick) {
+        return static_cast<uint64_t>(note.startTick) < tick;
+      });
+
+  VGMItem* bestItem = nullptr;
+  uint32_t bestStartTick = 0;
+  int bestTrackIndex = std::numeric_limits<int>::min();
+
+  for (auto it = beginIt; it != endIt; ++it) {
+    if (it->key != key || !it->item) {
+      continue;
+    }
+
+    const float noteStartTick = static_cast<float>(it->startTick);
+    const float noteEndTick =
+        noteStartTick + static_cast<float>(std::max<uint32_t>(1u, it->duration));
+    if (worldTick < noteStartTick || worldTick >= noteEndTick) {
+      continue;
+    }
+
+    const bool betterMatch =
+        (bestItem == nullptr) ||
+        (it->startTick > bestStartTick) ||
+        (it->startTick == bestStartTick && it->trackIndex >= bestTrackIndex);
+    if (betterMatch) {
+      bestItem = it->item;
+      bestStartTick = it->startTick;
+      bestTrackIndex = it->trackIndex;
+    }
+  }
+
+  return bestItem;
 }
 
 void PianoRollView::zoomHorizontal(int steps, int anchorX, bool animated, int durationMs) {
