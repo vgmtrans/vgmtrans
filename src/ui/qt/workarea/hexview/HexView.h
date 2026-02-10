@@ -41,6 +41,8 @@ public:
   explicit HexView(VGMFile* vgmfile, QWidget* parent = nullptr);
   ~HexView() override;
   void setSelectedItem(VGMItem* item);
+  void setSelectedItems(const std::vector<const VGMItem*>& items,
+                        const VGMItem* primaryItem = nullptr);
   void setPlaybackSelectionsForItems(const std::vector<const VGMItem*>& items);
   void clearPlaybackSelections(bool fade = true);
   void setPlaybackActive(bool active);

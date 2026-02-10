@@ -17,6 +17,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <unordered_set>
 #include <utility>
 
 #include "VGMFileView.h"
@@ -78,7 +79,7 @@ VGMFileView::VGMFileView(VGMFile* vgmfile)
 
     connect(panelUi.hexView, &HexView::selectionChanged, this, &VGMFileView::onSelectionChange);
     connect(panelUi.hexView, &HexView::seekToEventRequested, this, &VGMFileView::seekToEvent);
-    connect(panelUi.pianoRollView, &PianoRollView::selectionChanged, this, &VGMFileView::onSelectionChange);
+    connect(panelUi.pianoRollView, &PianoRollView::selectionSetChanged, this, &VGMFileView::onSelectionSetChange);
 
     connect(panelUi.treeView, &VGMFileTreeView::currentItemChanged,
             this,
@@ -372,9 +373,38 @@ void VGMFileView::closeEvent(QCloseEvent*) {
 }
 
 void VGMFileView::onSelectionChange(VGMItem* item) const {
+  std::vector<VGMItem*> selectionItems;
+  if (item) {
+    selectionItems.push_back(item);
+  }
+  onSelectionSetChange(selectionItems, item);
+}
+
+void VGMFileView::onSelectionSetChange(const std::vector<VGMItem*>& items, VGMItem* primaryItem) const {
+  std::vector<const VGMItem*> normalizedItems;
+  normalizedItems.reserve(items.size());
+  std::unordered_set<const VGMItem*> itemSet;
+  itemSet.reserve(items.size() * 2 + 1);
+  for (const auto* item : items) {
+    if (!item || !itemSet.insert(item).second) {
+      continue;
+    }
+    normalizedItems.push_back(item);
+  }
+
+  const VGMItem* normalizedPrimary = nullptr;
+  if (primaryItem && itemSet.find(primaryItem) != itemSet.end()) {
+    normalizedPrimary = primaryItem;
+  } else if (!normalizedItems.empty()) {
+    normalizedPrimary = normalizedItems.front();
+  }
+
   for (PanelSide side : {PanelSide::Left, PanelSide::Right}) {
     if (auto* hex = panel(side).hexView) {
-      hex->setSelectedItem(item);
+      hex->setSelectedItems(normalizedItems, normalizedPrimary);
+    }
+    if (auto* piano = panel(side).pianoRollView) {
+      piano->setSelectedItems(normalizedItems, normalizedPrimary);
     }
   }
 
@@ -383,15 +413,7 @@ void VGMFileView::onSelectionChange(VGMItem* item) const {
     if (!tree) {
       continue;
     }
-    if (item) {
-      auto* widgetItem = tree->getTreeWidgetItem(item);
-      tree->blockSignals(true);
-      tree->setCurrentItem(widgetItem);
-      tree->blockSignals(false);
-    } else {
-      tree->setCurrentItem(nullptr);
-      tree->clearSelection();
-    }
+    tree->setSelectedItems(normalizedItems, normalizedPrimary);
   }
 }
 

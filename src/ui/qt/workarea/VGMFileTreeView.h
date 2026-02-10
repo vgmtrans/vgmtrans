@@ -90,6 +90,8 @@ public:
   void addVGMItem(VGMItem *item, VGMItem *parent, const std::string &name);
   auto getTreeWidgetItem(const VGMItem *vgm_item) const { return m_items.at(vgm_item); };
   void updateStatusBar();
+  void setSelectedItems(const std::vector<const VGMItem*>& items,
+                        const VGMItem* primaryItem = nullptr);
   void setPlaybackItems(const std::vector<const VGMItem*>& items);
 
 protected:
