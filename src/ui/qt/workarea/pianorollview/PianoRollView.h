@@ -8,6 +8,7 @@
 
 #include <QAbstractScrollArea>
 #include <QElapsedTimer>
+#include <QPoint>
 #include <QtGlobal>
 
 #include <array>
@@ -21,7 +22,8 @@
 #include "SeqEventTimeIndex.h"
 
 class QEvent;
-class QPoint;
+class QRect;
+class QRectF;
 class QMouseEvent;
 class QNativeGestureEvent;
 class QResizeEvent;
@@ -116,7 +118,14 @@ private:
   int clampTick(int tick) const;
   int tickFromViewportX(int x) const;
   int scanlinePixelX(int tick) const;
+  [[nodiscard]] int noteIndexAtViewportPoint(const QPoint& pos) const;
   [[nodiscard]] VGMItem* noteAtViewportPoint(const QPoint& pos) const;
+  [[nodiscard]] QRect graphRectInViewport() const;
+  [[nodiscard]] QRectF graphSelectionRectInViewport() const;
+  void applySelectedNoteIndices(std::vector<size_t> indices,
+                                bool emitSelectionSignal,
+                                VGMItem* preferredPrimary = nullptr);
+  void updateMarqueeSelection(bool emitSelectionSignal);
 
   void zoomHorizontal(int steps, int anchorX, bool animated = false, int durationMs = 0);
   void zoomVertical(int steps, int anchorY, bool animated = false, int durationMs = 0);
@@ -145,6 +154,8 @@ private:
   bool m_playbackActive = false;
   int m_currentTick = 0;
   bool m_seekDragActive = false;
+  bool m_noteSelectionPressActive = false;
+  bool m_noteSelectionDragging = false;
   bool m_attemptedTimelineBuild = false;
   // Initial centering waits for a real viewport size (stacked views can report tiny pre-layout sizes).
   bool m_initialViewportPositioned = false;
@@ -165,6 +176,10 @@ private:
   size_t m_cachedTimelineSize = 0;
   bool m_cachedTimelineFinalized = false;
 
+  QPoint m_noteSelectionAnchor;
+  QPoint m_noteSelectionCurrent;
+  VGMItem* m_primarySelectedItem = nullptr;
+
   // Primary map for regular sequences.
   std::unordered_map<const SeqTrack*, int> m_trackIndexByPtr;
   // Fallback map for multi-section sequences that swap SeqTrack objects.
@@ -172,8 +187,10 @@ private:
   std::vector<QColor> m_trackColors;
 
   std::shared_ptr<const std::vector<PianoRollFrame::Note>> m_notes;
+  std::shared_ptr<const std::vector<PianoRollFrame::Note>> m_selectedNotes;
   std::shared_ptr<const std::vector<PianoRollFrame::TimeSignature>> m_timeSignatures;
   std::vector<SelectableNote> m_selectableNotes;
+  std::vector<size_t> m_selectedNoteIndices;
 
   std::array<ActiveKeyState, kMidiKeyCount> m_activeKeys{};
 };
