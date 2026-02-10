@@ -169,7 +169,8 @@ private:
   QRhiBuffer* m_vertexBuffer = nullptr;
   QRhiBuffer* m_indexBuffer = nullptr;
   QRhiBuffer* m_uniformBuffer = nullptr;
-  QRhiBuffer* m_staticInstanceBuffer = nullptr;
+  QRhiBuffer* m_staticBackInstanceBuffer = nullptr;
+  QRhiBuffer* m_staticFrontInstanceBuffer = nullptr;
   QRhiBuffer* m_dynamicInstanceBuffer = nullptr;
   QRhiShaderResourceBindings* m_shaderBindings = nullptr;
   QRhiGraphicsPipeline* m_pipeline = nullptr;
@@ -179,6 +180,8 @@ private:
   bool m_staticBuffersUploaded = false;
   bool m_inited = false;
   StaticCacheKey m_staticCacheKey;
-  std::vector<RectInstance> m_staticInstances;
+  std::vector<RectInstance> m_staticBackInstances;
+  std::vector<RectInstance> m_staticFrontInstances;
   std::vector<RectInstance> m_dynamicInstances;
+  int m_dynamicFrontStart = 0;
 };
