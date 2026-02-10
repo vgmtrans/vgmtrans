@@ -6,6 +6,7 @@
 
 #pragma once
 
+#include <QNativeGestureEvent>
 #include <QPoint>
 #include <QWheelEvent>
 
@@ -19,6 +20,12 @@ public:
     Qt::MouseButtons buttons = Qt::NoButton;
     Qt::ScrollPhase phase = Qt::NoScrollPhase;
     bool inverted = false;
+  };
+
+  struct ZoomBatch {
+    QPointF globalPos;
+    float rawDelta = 0.0f;
+    Qt::KeyboardModifiers modifiers = Qt::NoModifier;
   };
 
   void queueWheel(const QWheelEvent* event) {
@@ -53,6 +60,28 @@ public:
     return true;
   }
 
+  void queueNativeZoomGesture(const QNativeGestureEvent* event) {
+    if (!event || event->gestureType() != Qt::ZoomNativeGesture) {
+      return;
+    }
+
+    m_pendingZoomGesture = true;
+    m_zoom.globalPos = event->globalPosition();
+    m_zoom.rawDelta += static_cast<float>(event->value());
+    m_zoom.modifiers = event->modifiers();
+  }
+
+  bool takePendingZoomGesture(ZoomBatch& out) {
+    if (!m_pendingZoomGesture) {
+      return false;
+    }
+
+    m_pendingZoomGesture = false;
+    out = m_zoom;
+    m_zoom.rawDelta = 0.0f;
+    return true;
+  }
+
 private:
   static void applyAltWheelFix(Qt::KeyboardModifiers mods, QPoint& pixel, QPoint& angle) {
 #if defined(Q_OS_WIN) || defined(Q_OS_LINUX)
@@ -72,4 +101,6 @@ private:
 
   bool m_pendingWheel = false;
   WheelBatch m_wheel;
+  bool m_pendingZoomGesture = false;
+  ZoomBatch m_zoom;
 };
