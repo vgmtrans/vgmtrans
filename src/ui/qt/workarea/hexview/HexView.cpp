@@ -8,6 +8,7 @@
 #include "Helpers.h"
 #include "HexViewInput.h"
 #include "HexViewRhiHost.h"
+#include "util/NonTransientScrollBarStyle.h"
 #include "services/NotificationCenter.h"
 #include "VGMFile.h"
 
@@ -21,8 +22,6 @@
 #include <QKeyEvent>
 #include <QMouseEvent>
 #include <QPixmap>
-#include <QProxyStyle>
-#include <QStyleFactory>
 #include <QPainter>
 #include <QParallelAnimationGroup>
 #include <QPropertyAnimation>
@@ -62,22 +61,6 @@ constexpr float PLAYBACK_GLOW_EDGE_CURVE = 0.85f;
 const QColor PLAYBACK_GLOW_LOW(40, 40, 40);
 const QColor PLAYBACK_GLOW_HIGH(230, 230, 230);
 constexpr uint16_t STYLE_UNASSIGNED = std::numeric_limits<uint16_t>::max();
-
-#ifdef Q_OS_MAC
-class NonTransientScrollBarStyle final : public QProxyStyle {
-public:
-  using QProxyStyle::QProxyStyle;
-
-  int styleHint(StyleHint hint, const QStyleOption* option = nullptr,
-                const QWidget* widget = nullptr,
-                QStyleHintReturn* returnData = nullptr) const override {
-    if (hint == QStyle::SH_ScrollBar_Transient) {
-      return 0;
-    }
-    return QProxyStyle::styleHint(hint, option, widget, returnData);
-  }
-};
-#endif
 
 QString tooltipIconDataUrl(VGMItem::Type type) {
   static QHash<int, QString> cache;
@@ -154,16 +137,7 @@ HexView::HexView(VGMFile* vgmfile, QWidget* parent)
 #ifdef Q_OS_MAC
   // With AA_DontCreateNativeWidgetSiblings, the RHI QWindow can cover transient (overlay)
   // scrollbars, so keep HexView's scrollbars non-transient on macOS.
-  QStyle* baseStyle = QStyleFactory::create(QStringLiteral("macos"));
-  if (!baseStyle)
-    baseStyle = QStyleFactory::create(QStringLiteral("macintosh"));
-  if (!baseStyle)
-    baseStyle = QStyleFactory::create(QStringLiteral("Fusion"));
-  auto* scrollStyle = baseStyle ? new NonTransientScrollBarStyle(baseStyle)
-                                : new NonTransientScrollBarStyle();
-  verticalScrollBar()->setStyle(scrollStyle);
-  if (!scrollStyle->parent())
-    scrollStyle->setParent(verticalScrollBar());
+  QtUi::applyNonTransientScrollBarStyle(verticalScrollBar());
 #endif
 
   m_rhiHost = new HexViewRhiHost(this, viewport());
