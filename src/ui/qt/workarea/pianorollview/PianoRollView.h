@@ -10,6 +10,7 @@
 #include <QElapsedTimer>
 
 #include <array>
+#include <cstdint>
 #include <limits>
 #include <memory>
 #include <unordered_map>
@@ -116,6 +117,7 @@ private:
   int m_trackCount = 0;
   int m_ppqn = 48;
   int m_totalTicks = 1;
+  uint32_t m_maxNoteDurationTicks = 1;
 
   float m_pixelsPerTick = kDefaultPixelsPerTick;
   float m_pixelsPerKey = kDefaultPixelsPerKey;
