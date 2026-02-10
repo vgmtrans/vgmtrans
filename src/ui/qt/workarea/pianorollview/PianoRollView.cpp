@@ -17,6 +17,7 @@
 #include <QAbstractAnimation>
 #include <QEvent>
 #include <QEasingCurve>
+#include <QGuiApplication>
 #include <QMouseEvent>
 #include <QNativeGestureEvent>
 #include <QPalette>
@@ -368,7 +369,8 @@ bool PianoRollView::handleViewportNativeGesture(QNativeGestureEvent* event) {
     anchor = viewport()->mapFromGlobal(anchor);
   }
 
-  if (event->modifiers().testFlag(Qt::AltModifier)) {
+  const Qt::KeyboardModifiers mods = event->modifiers() | QGuiApplication::keyboardModifiers();
+  if (mods.testFlag(Qt::AltModifier)) {
     zoomVerticalFactor(factor, anchor.y(), true, 150);
   } else {
     zoomHorizontalFactor(factor, anchor.x(), true, 150);
@@ -800,7 +802,12 @@ void PianoRollView::zoomHorizontalFactor(float factor, int anchorX, bool animate
 
 void PianoRollView::zoomVerticalFactor(float factor, int anchorY, bool animated, int durationMs) {
   const float clampedFactor = std::clamp(factor, 0.05f, 20.0f);
-  const float targetScale = std::clamp(m_pixelsPerKey * clampedFactor, kMinPixelsPerKey, kMaxPixelsPerKey);
+  const int noteViewportHeight = std::max(0, viewport()->height() - kTopBarHeight);
+  const float fitScale = (noteViewportHeight > 0)
+                             ? (static_cast<float>(noteViewportHeight) / static_cast<float>(kMidiKeyCount))
+                             : 0.0f;
+  const float zoomOutLimit = std::max(kMinPixelsPerKey, std::min(fitScale, m_pixelsPerKey));
+  const float targetScale = std::clamp(m_pixelsPerKey * clampedFactor, zoomOutLimit, kMaxPixelsPerKey);
   if (std::abs(targetScale - m_pixelsPerKey) < 0.0001f) {
     return;
   }
@@ -808,8 +815,8 @@ void PianoRollView::zoomVerticalFactor(float factor, int anchorY, bool animated,
   if (animated) {
     animateVerticalScale(targetScale, anchorY, durationMs);
   } else {
-    const int noteViewportHeight = std::max(0, viewport()->height() - kTopBarHeight);
-    const int anchorInNotes = std::clamp(anchorY - kTopBarHeight, 0, noteViewportHeight);
+    const int anchorViewportHeight = std::max(0, viewport()->height() - kTopBarHeight);
+    const int anchorInNotes = std::clamp(anchorY - kTopBarHeight, 0, anchorViewportHeight);
     const float worldYAtAnchor = static_cast<float>(verticalScrollBar()->value() + anchorInNotes) /
                                  std::max(0.0001f, m_pixelsPerKey);
     applyVerticalScale(targetScale, anchorInNotes, worldYAtAnchor);
@@ -828,7 +835,12 @@ void PianoRollView::applyHorizontalScale(float scale, int anchorInNotes, float w
 }
 
 void PianoRollView::applyVerticalScale(float scale, int anchorInNotes, float worldYAtAnchor) {
-  m_pixelsPerKey = std::clamp(scale, kMinPixelsPerKey, kMaxPixelsPerKey);
+  const int noteViewportHeight = std::max(0, viewport()->height() - kTopBarHeight);
+  const float fitScale = (noteViewportHeight > 0)
+                             ? (static_cast<float>(noteViewportHeight) / static_cast<float>(kMidiKeyCount))
+                             : 0.0f;
+  const float zoomOutLimit = std::max(kMinPixelsPerKey, std::min(fitScale, m_pixelsPerKey));
+  m_pixelsPerKey = std::clamp(scale, zoomOutLimit, kMaxPixelsPerKey);
   updateScrollBars();
 
   const int newValue = static_cast<int>(std::llround(worldYAtAnchor * m_pixelsPerKey - anchorInNotes));
