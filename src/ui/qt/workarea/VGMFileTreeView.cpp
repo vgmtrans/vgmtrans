@@ -126,6 +126,7 @@ QSize VGMTreeDisplayItem::sizeHint(const QStyleOptionViewItem &option,
 
 VGMFileTreeView::VGMFileTreeView(VGMFile *file, QWidget *parent) : QTreeWidget(parent) {
   setHeaderLabel("File structure");
+  setSelectionMode(QAbstractItemView::ExtendedSelection);
 
   // Load persistent settings
   showDetails = Settings::the()->VGMFileTreeView.showDetails();
@@ -249,6 +250,49 @@ void VGMFileTreeView::updateStatusBar() {
   }
 
   NotificationCenter::the()->updateStatusForItem(vgmItem);
+}
+
+void VGMFileTreeView::setSelectedItems(const std::vector<const VGMItem*>& items,
+                                       const VGMItem* primaryItem) {
+  blockSignals(true);
+  clearSelection();
+  setCurrentItem(nullptr);
+
+  std::unordered_set<QTreeWidgetItem*> selectedTreeItems;
+  selectedTreeItems.reserve(items.size() * 2 + 1);
+  QTreeWidgetItem* firstSelected = nullptr;
+  QTreeWidgetItem* primarySelected = nullptr;
+
+  for (const auto* item : items) {
+    if (!item) {
+      continue;
+    }
+
+    auto mapIt = m_items.find(item);
+    if (mapIt == m_items.end() || !mapIt->second) {
+      continue;
+    }
+
+    QTreeWidgetItem* treeItem = mapIt->second;
+    if (!selectedTreeItems.insert(treeItem).second) {
+      continue;
+    }
+
+    treeItem->setSelected(true);
+    if (!firstSelected) {
+      firstSelected = treeItem;
+    }
+    if (item == primaryItem) {
+      primarySelected = treeItem;
+    }
+  }
+
+  QTreeWidgetItem* current = primarySelected ? primarySelected : firstSelected;
+  if (current) {
+    setCurrentItem(current);
+  }
+  blockSignals(false);
+  updateStatusBar();
 }
 
 void VGMFileTreeView::setPlaybackItems(const std::vector<const VGMItem*>& items) {

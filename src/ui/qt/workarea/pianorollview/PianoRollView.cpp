@@ -31,6 +31,7 @@
 #include <algorithm>
 #include <cmath>
 #include <limits>
+#include <unordered_set>
 #include <utility>
 
 PianoRollView::PianoRollView(QWidget* parent)
@@ -167,6 +168,32 @@ void PianoRollView::refreshSequenceData(bool allowTimelineBuild) {
   updateScrollBars();
   m_lastRenderedScanlineX = std::numeric_limits<int>::min();
   requestRender();
+}
+
+void PianoRollView::setSelectedItems(const std::vector<const VGMItem*>& items,
+                                     const VGMItem* primaryItem) {
+  if (m_selectableNotes.empty()) {
+    applySelectedNoteIndices({}, false, nullptr);
+    return;
+  }
+
+  std::unordered_set<const VGMItem*> selectedItemSet;
+  selectedItemSet.reserve(items.size() * 2 + 1);
+  for (const auto* item : items) {
+    if (item) {
+      selectedItemSet.insert(item);
+    }
+  }
+
+  std::vector<size_t> indices;
+  indices.reserve(m_selectableNotes.size());
+  for (size_t i = 0; i < m_selectableNotes.size(); ++i) {
+    if (selectedItemSet.find(m_selectableNotes[i].item) != selectedItemSet.end()) {
+      indices.push_back(i);
+    }
+  }
+
+  applySelectedNoteIndices(std::move(indices), false, const_cast<VGMItem*>(primaryItem));
 }
 
 void PianoRollView::setPlaybackTick(int tick, bool playbackActive) {
@@ -954,7 +981,7 @@ void PianoRollView::applySelectedNoteIndices(std::vector<size_t> indices,
   std::sort(indices.begin(), indices.end());
   indices.erase(std::unique(indices.begin(), indices.end()), indices.end());
 
-  const bool selectionSetChanged = (indices != m_selectedNoteIndices);
+  const bool selectionSetWasChanged = (indices != m_selectedNoteIndices);
   m_selectedNoteIndices = std::move(indices);
 
   std::vector<PianoRollFrame::Note> selectedNotes;
@@ -994,12 +1021,24 @@ void PianoRollView::applySelectedNoteIndices(std::vector<size_t> indices,
   const bool primaryChanged = (nextPrimary != m_primarySelectedItem);
   m_primarySelectedItem = nextPrimary;
 
-  if (selectionSetChanged) {
+  if (selectionSetWasChanged) {
     requestRender();
   }
 
-  if (emitSelectionSignal && (selectionSetChanged || primaryChanged)) {
+  if (emitSelectionSignal && (selectionSetWasChanged || primaryChanged)) {
     emit selectionChanged(m_primarySelectedItem);
+    std::vector<VGMItem*> selectedItems;
+    selectedItems.reserve(m_selectedNoteIndices.size());
+    std::unordered_set<VGMItem*> selectedItemSet;
+    selectedItemSet.reserve(m_selectedNoteIndices.size() * 2 + 1);
+    for (size_t selectedIndex : m_selectedNoteIndices) {
+      VGMItem* selectedItem = m_selectableNotes[selectedIndex].item;
+      if (!selectedItem || !selectedItemSet.insert(selectedItem).second) {
+        continue;
+      }
+      selectedItems.push_back(selectedItem);
+    }
+    emit selectionSetChanged(selectedItems, m_primarySelectedItem);
   }
 }
 
