@@ -78,6 +78,8 @@ private:
     int pixelsPerKeyQ = 0;
     int keyboardWidth = 0;
     int topBarHeight = 0;
+    uint64_t staticTickStart = 0;
+    uint64_t staticTickEnd = 0;
     uint64_t notesPtr = 0;
     uint64_t timeSigPtr = 0;
     uint64_t trackColorsHash = 0;
@@ -132,9 +134,16 @@ private:
 
   void buildStaticInstances(const PianoRollFrame::Data& frame,
                             const Layout& layout,
-                            uint64_t trackColorsHash);
+                            uint64_t trackColorsHash,
+                            const StaticCacheKey& key);
   // Dynamic pass is rebuilt every frame (scanline, active highlights, glow).
   void buildDynamicInstances(const PianoRollFrame::Data& frame, const Layout& layout);
+
+  template <typename Fn>
+  void forEachNoteInRange(const PianoRollFrame::Data& frame,
+                          uint64_t startTick,
+                          uint64_t endTick,
+                          Fn&& fn) const;
 
   template <typename Fn>
   void forEachVisibleNote(const PianoRollFrame::Data& frame, const Layout& layout, Fn&& fn) const;
