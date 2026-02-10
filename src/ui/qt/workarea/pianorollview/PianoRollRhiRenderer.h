@@ -10,6 +10,7 @@
 
 #include <array>
 #include <cstdint>
+#include <unordered_map>
 #include <vector>
 
 #include "PianoRollFrameData.h"
@@ -115,6 +116,12 @@ private:
     float scrollMulY;
   };
 
+  struct CachedStaticBucket {
+    std::vector<RectInstance> backInstances;
+    std::vector<RectInstance> frontInstances;
+    uint64_t lastUsedFrame = 0;
+  };
+
   enum class LineStyle : int {
     Solid = 0,
     DottedVertical = 1,
@@ -130,7 +137,10 @@ private:
   StaticCacheKey makeStaticCacheKey(const PianoRollFrame::Data& frame,
                                     const Layout& layout,
                                     uint64_t trackColorsHash) const;
-  bool staticCacheKeyEquals(const StaticCacheKey& a, const StaticCacheKey& b) const;
+  uint64_t staticBucketStyleHash(const StaticCacheKey& key) const;
+  uint64_t staticBucketId(const StaticCacheKey& key) const;
+  void trimStaticBucketCache();
+  void clearStaticBucketCache();
 
   void buildStaticInstances(const PianoRollFrame::Data& frame,
                             const Layout& layout,
@@ -179,9 +189,15 @@ private:
   int m_sampleCount = 1;
   bool m_staticBuffersUploaded = false;
   bool m_inited = false;
-  StaticCacheKey m_staticCacheKey;
   std::vector<RectInstance> m_staticBackInstances;
   std::vector<RectInstance> m_staticFrontInstances;
   std::vector<RectInstance> m_dynamicInstances;
   int m_dynamicFrontStart = 0;
+
+  std::unordered_map<uint64_t, CachedStaticBucket> m_staticBucketCache;
+  uint64_t m_staticBucketStyleHash = 0;
+  uint64_t m_activeStaticBucketId = 0;
+  uint64_t m_frameSerial = 0;
+  bool m_hasActiveStaticBucket = false;
+  bool m_staticDataDirty = true;
 };

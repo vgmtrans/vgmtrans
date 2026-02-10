@@ -117,11 +117,16 @@ void PianoRollRhiRenderer::releaseResources() {
   m_sampleCount = 1;
   m_staticBuffersUploaded = false;
   m_inited = false;
-  m_staticCacheKey = {};
   m_staticBackInstances.clear();
   m_staticFrontInstances.clear();
   m_dynamicInstances.clear();
   m_dynamicFrontStart = 0;
+  clearStaticBucketCache();
+  m_staticBucketStyleHash = 0;
+  m_activeStaticBucketId = 0;
+  m_frameSerial = 0;
+  m_hasActiveStaticBucket = false;
+  m_staticDataDirty = true;
   m_rhi = nullptr;
 }
 
@@ -146,10 +151,34 @@ void PianoRollRhiRenderer::renderFrame(QRhiCommandBuffer* cb, const RenderTarget
   const Layout layout = computeLayout(frame, logicalSize);
   const uint64_t trackColorsHash = hashTrackColors(frame.trackColors);
   const StaticCacheKey key = makeStaticCacheKey(frame, layout, trackColorsHash);
-  // Rebuild static geometry only when data/layout/style changed.
-  if (!m_staticCacheKey.valid || !staticCacheKeyEquals(m_staticCacheKey, key)) {
+  const uint64_t styleHash = staticBucketStyleHash(key);
+  const uint64_t bucketId = staticBucketId(key);
+
+  if (m_staticBucketStyleHash != styleHash) {
+    clearStaticBucketCache();
+    m_staticBucketStyleHash = styleHash;
+  }
+
+  auto bucketIt = m_staticBucketCache.find(bucketId);
+  if (bucketIt == m_staticBucketCache.end()) {
     buildStaticInstances(frame, layout, trackColorsHash, key);
-    m_staticCacheKey = key;
+
+    CachedStaticBucket bucket;
+    bucket.backInstances = m_staticBackInstances;
+    bucket.frontInstances = m_staticFrontInstances;
+    bucket.lastUsedFrame = ++m_frameSerial;
+    bucketIt = m_staticBucketCache.emplace(bucketId, std::move(bucket)).first;
+    trimStaticBucketCache();
+  } else {
+    bucketIt->second.lastUsedFrame = ++m_frameSerial;
+  }
+
+  if (!m_hasActiveStaticBucket || m_activeStaticBucketId != bucketId) {
+    m_staticBackInstances = bucketIt->second.backInstances;
+    m_staticFrontInstances = bucketIt->second.frontInstances;
+    m_activeStaticBucketId = bucketId;
+    m_hasActiveStaticBucket = true;
+    m_staticDataDirty = true;
   }
   // Dynamic overlays (active notes, scanline, progress) update every frame.
   buildDynamicInstances(frame, layout);
@@ -179,18 +208,21 @@ void PianoRollRhiRenderer::renderFrame(QRhiCommandBuffer* cb, const RenderTarget
   ubo[19] = 0.0f;
   updates->updateDynamicBuffer(m_uniformBuffer, 0, kUniformBytes, ubo.data());
 
-  if (!m_staticBackInstances.empty()) {
-    const int staticBackBytes = static_cast<int>(m_staticBackInstances.size() * sizeof(RectInstance));
-    if (ensureInstanceBuffer(m_staticBackInstanceBuffer, staticBackBytes, 16384)) {
-      updates->updateDynamicBuffer(m_staticBackInstanceBuffer, 0, staticBackBytes, m_staticBackInstances.data());
+  if (m_staticDataDirty) {
+    if (!m_staticBackInstances.empty()) {
+      const int staticBackBytes = static_cast<int>(m_staticBackInstances.size() * sizeof(RectInstance));
+      if (ensureInstanceBuffer(m_staticBackInstanceBuffer, staticBackBytes, 16384)) {
+        updates->updateDynamicBuffer(m_staticBackInstanceBuffer, 0, staticBackBytes, m_staticBackInstances.data());
+      }
     }
-  }
 
-  if (!m_staticFrontInstances.empty()) {
-    const int staticFrontBytes = static_cast<int>(m_staticFrontInstances.size() * sizeof(RectInstance));
-    if (ensureInstanceBuffer(m_staticFrontInstanceBuffer, staticFrontBytes, 4096)) {
-      updates->updateDynamicBuffer(m_staticFrontInstanceBuffer, 0, staticFrontBytes, m_staticFrontInstances.data());
+    if (!m_staticFrontInstances.empty()) {
+      const int staticFrontBytes = static_cast<int>(m_staticFrontInstances.size() * sizeof(RectInstance));
+      if (ensureInstanceBuffer(m_staticFrontInstanceBuffer, staticFrontBytes, 4096)) {
+        updates->updateDynamicBuffer(m_staticFrontInstanceBuffer, 0, staticFrontBytes, m_staticFrontInstances.data());
+      }
     }
+    m_staticDataDirty = false;
   }
 
   if (!m_dynamicInstances.empty()) {
@@ -422,32 +454,72 @@ PianoRollRhiRenderer::StaticCacheKey PianoRollRhiRenderer::makeStaticCacheKey(co
   return key;
 }
 
-bool PianoRollRhiRenderer::staticCacheKeyEquals(const StaticCacheKey& a, const StaticCacheKey& b) const {
-  return a.valid == b.valid &&
-         a.viewSize == b.viewSize &&
-         a.totalTicks == b.totalTicks &&
-         a.ppqn == b.ppqn &&
-         a.pixelsPerTickQ == b.pixelsPerTickQ &&
-         a.pixelsPerKeyQ == b.pixelsPerKeyQ &&
-         a.keyboardWidth == b.keyboardWidth &&
-         a.topBarHeight == b.topBarHeight &&
-         a.staticTickStart == b.staticTickStart &&
-         a.staticTickEnd == b.staticTickEnd &&
-         a.notesPtr == b.notesPtr &&
-         a.timeSigPtr == b.timeSigPtr &&
-         a.trackColorsHash == b.trackColorsHash &&
-         a.noteBackgroundColor == b.noteBackgroundColor &&
-         a.keyboardBackgroundColor == b.keyboardBackgroundColor &&
-         a.topBarBackgroundColor == b.topBarBackgroundColor &&
-         a.measureLineColor == b.measureLineColor &&
-         a.beatLineColor == b.beatLineColor &&
-         a.keySeparatorColor == b.keySeparatorColor &&
-         a.noteOutlineColor == b.noteOutlineColor &&
-         a.whiteKeyColor == b.whiteKeyColor &&
-         a.blackKeyColor == b.blackKeyColor &&
-         a.whiteKeyRowColor == b.whiteKeyRowColor &&
-         a.blackKeyRowColor == b.blackKeyRowColor &&
-         a.dividerColor == b.dividerColor;
+uint64_t PianoRollRhiRenderer::staticBucketStyleHash(const StaticCacheKey& key) const {
+  uint64_t hash = 1469598103934665603ULL;
+  auto hashMix = [&hash](uint64_t value) {
+    hash ^= value;
+    hash *= 1099511628211ULL;
+  };
+
+  hashMix(static_cast<uint64_t>(key.viewSize.width()));
+  hashMix(static_cast<uint64_t>(key.viewSize.height()));
+  hashMix(static_cast<uint64_t>(key.totalTicks));
+  hashMix(static_cast<uint64_t>(key.ppqn));
+  hashMix(static_cast<uint64_t>(key.pixelsPerTickQ));
+  hashMix(static_cast<uint64_t>(key.pixelsPerKeyQ));
+  hashMix(static_cast<uint64_t>(key.keyboardWidth));
+  hashMix(static_cast<uint64_t>(key.topBarHeight));
+  hashMix(key.notesPtr);
+  hashMix(key.timeSigPtr);
+  hashMix(key.trackColorsHash);
+  hashMix(key.noteBackgroundColor);
+  hashMix(key.keyboardBackgroundColor);
+  hashMix(key.topBarBackgroundColor);
+  hashMix(key.measureLineColor);
+  hashMix(key.beatLineColor);
+  hashMix(key.keySeparatorColor);
+  hashMix(key.noteOutlineColor);
+  hashMix(key.whiteKeyColor);
+  hashMix(key.blackKeyColor);
+  hashMix(key.whiteKeyRowColor);
+  hashMix(key.blackKeyRowColor);
+  hashMix(key.dividerColor);
+  return hash;
+}
+
+uint64_t PianoRollRhiRenderer::staticBucketId(const StaticCacheKey& key) const {
+  uint64_t hash = 1469598103934665603ULL;
+  hash ^= key.staticTickStart;
+  hash *= 1099511628211ULL;
+  hash ^= key.staticTickEnd;
+  hash *= 1099511628211ULL;
+  return hash;
+}
+
+void PianoRollRhiRenderer::trimStaticBucketCache() {
+  static constexpr size_t kMaxCachedBuckets = 10;
+  while (m_staticBucketCache.size() > kMaxCachedBuckets) {
+    auto lruIt = m_staticBucketCache.end();
+    for (auto it = m_staticBucketCache.begin(); it != m_staticBucketCache.end(); ++it) {
+      if (m_hasActiveStaticBucket && it->first == m_activeStaticBucketId) {
+        continue;
+      }
+      if (lruIt == m_staticBucketCache.end() || it->second.lastUsedFrame < lruIt->second.lastUsedFrame) {
+        lruIt = it;
+      }
+    }
+    if (lruIt == m_staticBucketCache.end()) {
+      break;
+    }
+    m_staticBucketCache.erase(lruIt);
+  }
+}
+
+void PianoRollRhiRenderer::clearStaticBucketCache() {
+  m_staticBucketCache.clear();
+  m_hasActiveStaticBucket = false;
+  m_activeStaticBucketId = 0;
+  m_staticDataDirty = true;
 }
 
 void PianoRollRhiRenderer::buildStaticInstances(const PianoRollFrame::Data& frame,
