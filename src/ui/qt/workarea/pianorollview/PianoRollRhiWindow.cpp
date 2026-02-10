@@ -13,7 +13,10 @@
 
 #include <QMouseEvent>
 #include <QNativeGestureEvent>
+#include <QScrollBar>
 #include <QWheelEvent>
+
+#include <algorithm>
 
 PianoRollRhiWindow::PianoRollRhiWindow(PianoRollView* view, PianoRollRhiRenderer* renderer)
     : m_view(view),
@@ -28,8 +31,56 @@ bool PianoRollRhiWindow::handleWindowEvent(QEvent* e) {
   switch (e->type()) {
     case QEvent::NativeGesture:
       return m_view->handleViewportNativeGesture(static_cast<QNativeGestureEvent*>(e));
-    case QEvent::Wheel:
-      return m_view->handleViewportWheel(static_cast<QWheelEvent*>(e));
+    case QEvent::Wheel: {
+      auto* wheel = static_cast<QWheelEvent*>(e);
+      if (m_view->handleViewportWheel(wheel)) {
+        return true;
+      }
+
+      QScrollBar* hbar = m_view->horizontalScrollBar();
+      QScrollBar* vbar = m_view->verticalScrollBar();
+      if (!hbar || !vbar) {
+        return false;
+      }
+
+      int dx = 0;
+      int dy = 0;
+      const QPoint pixelDelta = wheel->pixelDelta();
+      if (!pixelDelta.isNull()) {
+        dx = pixelDelta.x();
+        dy = pixelDelta.y();
+      } else {
+        const QPoint angleDelta = wheel->angleDelta();
+        const int hStep = std::max(1, hbar->singleStep());
+        const int vStep = std::max(1, vbar->singleStep());
+        dx = (angleDelta.x() * hStep) / 120;
+        dy = (angleDelta.y() * vStep) / 120;
+        if (dx == 0 && angleDelta.x() != 0) {
+          dx = (angleDelta.x() > 0) ? hStep : -hStep;
+        }
+        if (dy == 0 && angleDelta.y() != 0) {
+          dy = (angleDelta.y() > 0) ? vStep : -vStep;
+        }
+      }
+
+      if (wheel->modifiers().testFlag(Qt::ShiftModifier) && dx == 0 && dy != 0) {
+        dx = dy;
+        dy = 0;
+      }
+
+      if (dx == 0 && dy == 0) {
+        return false;
+      }
+
+      if (dx != 0) {
+        hbar->setValue(std::clamp(hbar->value() - dx, hbar->minimum(), hbar->maximum()));
+      }
+      if (dy != 0) {
+        vbar->setValue(std::clamp(vbar->value() - dy, vbar->minimum(), vbar->maximum()));
+      }
+      wheel->accept();
+      return true;
+    }
     case QEvent::MouseButtonPress:
       return m_view->handleViewportMousePress(static_cast<QMouseEvent*>(e));
     case QEvent::MouseMove:
