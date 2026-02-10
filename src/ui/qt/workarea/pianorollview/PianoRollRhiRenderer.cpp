@@ -21,6 +21,8 @@
 #include <cstring>
 #include <cstdint>
 #include <iterator>
+#include <limits>
+#include <utility>
 
 namespace {
 
@@ -141,7 +143,7 @@ void PianoRollRhiRenderer::renderFrame(QRhiCommandBuffer* cb, const RenderTarget
   const StaticCacheKey key = makeStaticCacheKey(frame, layout, trackColorsHash);
   // Rebuild static geometry only when data/layout/style changed.
   if (!m_staticCacheKey.valid || !staticCacheKeyEquals(m_staticCacheKey, key)) {
-    buildStaticInstances(frame, layout, trackColorsHash);
+    buildStaticInstances(frame, layout, trackColorsHash, key);
     m_staticCacheKey = key;
   }
   // Dynamic overlays (active notes, scanline, progress) update every frame.
@@ -375,6 +377,17 @@ PianoRollRhiRenderer::StaticCacheKey PianoRollRhiRenderer::makeStaticCacheKey(co
   key.pixelsPerKeyQ = static_cast<int>(std::lround(frame.pixelsPerKey * 10000.0f));
   key.keyboardWidth = frame.keyboardWidth;
   key.topBarHeight = frame.topBarHeight;
+  {
+    const uint64_t totalTickEnd = static_cast<uint64_t>(std::max(1, frame.totalTicks)) + 1;
+    const uint64_t viewportTicks =
+        std::max<uint64_t>(1, static_cast<uint64_t>(std::ceil(layout.noteAreaWidth / layout.pixelsPerTick)));
+    const uint64_t bucketTicks = std::max<uint64_t>(64, viewportTicks / 2);
+    const uint64_t bucketStart = (layout.visibleStartTick / bucketTicks) * bucketTicks;
+    const uint64_t prePad = viewportTicks;
+    const uint64_t postPad = viewportTicks * 2;
+    key.staticTickStart = (bucketStart > prePad) ? (bucketStart - prePad) : 0;
+    key.staticTickEnd = std::min<uint64_t>(totalTickEnd, bucketStart + bucketTicks + postPad);
+  }
   key.notesPtr = reinterpret_cast<uint64_t>(frame.notes.get());
   key.timeSigPtr = reinterpret_cast<uint64_t>(frame.timeSignatures.get());
   key.trackColorsHash = trackColorsHash;
@@ -402,6 +415,8 @@ bool PianoRollRhiRenderer::staticCacheKeyEquals(const StaticCacheKey& a, const S
          a.pixelsPerKeyQ == b.pixelsPerKeyQ &&
          a.keyboardWidth == b.keyboardWidth &&
          a.topBarHeight == b.topBarHeight &&
+         a.staticTickStart == b.staticTickStart &&
+         a.staticTickEnd == b.staticTickEnd &&
          a.notesPtr == b.notesPtr &&
          a.timeSigPtr == b.timeSigPtr &&
          a.trackColorsHash == b.trackColorsHash &&
@@ -421,7 +436,8 @@ bool PianoRollRhiRenderer::staticCacheKeyEquals(const StaticCacheKey& a, const S
 
 void PianoRollRhiRenderer::buildStaticInstances(const PianoRollFrame::Data& frame,
                                                 const Layout& layout,
-                                                uint64_t trackColorsHash) {
+                                                uint64_t trackColorsHash,
+                                                const StaticCacheKey& cacheKey) {
   Q_UNUSED(trackColorsHash);
   m_staticInstances.clear();
 
@@ -464,6 +480,9 @@ void PianoRollRhiRenderer::buildStaticInstances(const PianoRollFrame::Data& fram
              layout.keyboardWidth,
              layout.noteAreaHeight,
              frame.keyboardBackgroundColor);
+
+  const uint64_t staticTickStart = cacheKey.staticTickStart;
+  const uint64_t staticTickEnd = std::max<uint64_t>(staticTickStart + 1, cacheKey.staticTickEnd);
 
   for (int key = 0; key < PianoRollFrame::kMidiKeyCount; ++key) {
     const float keyY = layout.noteAreaTop + ((127.0f - static_cast<float>(key)) * layout.pixelsPerKey);
@@ -513,8 +532,27 @@ void PianoRollRhiRenderer::buildStaticInstances(const PianoRollFrame::Data& fram
   // Hard caps keep pathological signatures/lengths from exploding CPU time.
   static constexpr uint64_t kMaxMeasureLines = 60000;
   static constexpr uint64_t kMaxBeatLines = 220000;
+  static constexpr float kMinMeasureLineSpacingPx = 24.0f;
+  static constexpr float kMinBeatLineSpacingPx = 8.0f;
   uint64_t emittedMeasureLines = 0;
   uint64_t emittedBeatLines = 0;
+  auto alignTick = [](uint64_t value, uint64_t origin, uint64_t step) -> uint64_t {
+    if (step == 0 || value <= origin) {
+      return origin;
+    }
+    const uint64_t delta = value - origin;
+    const uint64_t remainder = delta % step;
+    return (remainder == 0) ? value : (value + (step - remainder));
+  };
+  auto mulSaturated = [](uint64_t a, uint64_t b) -> uint64_t {
+    if (a == 0 || b == 0) {
+      return 0;
+    }
+    if (a > (std::numeric_limits<uint64_t>::max() / b)) {
+      return std::numeric_limits<uint64_t>::max();
+    }
+    return a * b;
+  };
 
   for (size_t i = 0; i < signatures.size(); ++i) {
     const auto& sig = signatures[i];
@@ -534,83 +572,118 @@ void PianoRollRhiRenderer::buildStaticInstances(const PianoRollFrame::Data& fram
     if (segEnd <= segStart) {
       continue;
     }
+    const uint64_t drawStart = std::max<uint64_t>(segStart, staticTickStart);
+    const uint64_t drawEnd = std::min<uint64_t>(segEnd, staticTickEnd);
+    if (drawEnd <= drawStart) {
+      continue;
+    }
 
     if (measureTicks > 0) {
-      for (uint64_t tick = segStart; tick < segEnd; tick += measureTicks) {
-        if (emittedMeasureLines >= kMaxMeasureLines) {
-          break;
+      const float measureSpacingPx = static_cast<float>(measureTicks) * layout.pixelsPerTick;
+      const uint64_t measureStride = (measureSpacingPx >= kMinMeasureLineSpacingPx)
+                                         ? 1
+                                         : std::max<uint64_t>(
+                                               1,
+                                               static_cast<uint64_t>(
+                                                   std::ceil(kMinMeasureLineSpacingPx /
+                                                             std::max(0.0001f, measureSpacingPx))));
+      const uint64_t measureStep = mulSaturated(measureTicks, measureStride);
+      if (measureStep > 0) {
+        for (uint64_t tick = alignTick(drawStart, segStart, measureStep); tick < drawEnd;) {
+          if (emittedMeasureLines >= kMaxMeasureLines) {
+            break;
+          }
+          const float x = layout.noteAreaLeft + (static_cast<float>(tick) * layout.pixelsPerTick);
+          appendRect(m_staticInstances,
+                     x,
+                     layout.noteAreaTop,
+                     1.0f,
+                     layout.noteAreaHeight,
+                     frame.measureLineColor,
+                     LineStyle::Solid,
+                     0.0f,
+                     0.0f,
+                     0.0f,
+                     1.0f,
+                     0.0f);
+          QColor topMeasure = frame.measureLineColor;
+          topMeasure.setAlpha(std::min(255, topMeasure.alpha() + 30));
+          appendRect(m_staticInstances,
+                     x,
+                     0.0f,
+                     1.0f,
+                     layout.topBarHeight,
+                     topMeasure,
+                     LineStyle::Solid,
+                     0.0f,
+                     0.0f,
+                     0.0f,
+                     1.0f,
+                     0.0f);
+          ++emittedMeasureLines;
+
+          const uint64_t nextTick = tick + measureStep;
+          if (nextTick <= tick) {
+            break;
+          }
+          tick = nextTick;
         }
-        const float x = layout.noteAreaLeft + (static_cast<float>(tick) * layout.pixelsPerTick);
-        appendRect(m_staticInstances,
-                   x,
-                   layout.noteAreaTop,
-                   1.0f,
-                   layout.noteAreaHeight,
-                   frame.measureLineColor,
-                   LineStyle::Solid,
-                   0.0f,
-                   0.0f,
-                   0.0f,
-                   1.0f,
-                   0.0f);
-        QColor topMeasure = frame.measureLineColor;
-        topMeasure.setAlpha(std::min(255, topMeasure.alpha() + 30));
-        appendRect(m_staticInstances,
-                   x,
-                   0.0f,
-                   1.0f,
-                   layout.topBarHeight,
-                   topMeasure,
-                   LineStyle::Solid,
-                   0.0f,
-                   0.0f,
-                   0.0f,
-                   1.0f,
-                   0.0f);
-        ++emittedMeasureLines;
       }
     }
 
-    for (uint64_t tick = segStart; tick < segEnd; tick += beatTicks) {
-      if (emittedBeatLines >= kMaxBeatLines) {
-        break;
-      }
-      const bool isMeasure = (measureTicks > 0) && (((tick - segStart) % measureTicks) == 0);
-      if (isMeasure) {
-        continue;
-      }
+    if (beatTicks > 0) {
+      const float beatSpacingPx = static_cast<float>(beatTicks) * layout.pixelsPerTick;
+      const uint64_t beatStride = (beatSpacingPx >= kMinBeatLineSpacingPx)
+                                      ? 1
+                                      : std::max<uint64_t>(
+                                            1,
+                                            static_cast<uint64_t>(
+                                                std::ceil(kMinBeatLineSpacingPx /
+                                                          std::max(0.0001f, beatSpacingPx))));
+      const uint64_t beatStep = mulSaturated(beatTicks, beatStride);
+      if (beatStep > 0) {
+        for (uint64_t tick = alignTick(drawStart, segStart, beatStep); tick < drawEnd;) {
+          if (emittedBeatLines >= kMaxBeatLines) {
+            break;
+          }
+          const bool isMeasure = (measureTicks > 0) && (((tick - segStart) % measureTicks) == 0);
+          if (!isMeasure) {
+            const float x = layout.noteAreaLeft + (static_cast<float>(tick) * layout.pixelsPerTick);
+            appendRect(m_staticInstances,
+                       x,
+                       layout.noteAreaTop,
+                       1.0f,
+                       layout.noteAreaHeight,
+                       frame.beatLineColor,
+                       LineStyle::DottedVertical,
+                       kDashSegmentPx,
+                       kDashGapPx,
+                       0.0f,
+                       1.0f,
+                       0.0f);
+            QColor topBeat = frame.beatLineColor;
+            topBeat.setAlpha(std::max(20, topBeat.alpha() / 2));
+            appendRect(m_staticInstances,
+                       x,
+                       0.0f,
+                       1.0f,
+                       layout.topBarHeight,
+                       topBeat,
+                       LineStyle::Solid,
+                       0.0f,
+                       0.0f,
+                       0.0f,
+                       1.0f,
+                       0.0f);
+            ++emittedBeatLines;
+          }
 
-      const float x = layout.noteAreaLeft + (static_cast<float>(tick) * layout.pixelsPerTick);
-      appendRect(m_staticInstances,
-                 x,
-                 layout.noteAreaTop,
-                 1.0f,
-                 layout.noteAreaHeight,
-                 frame.beatLineColor,
-                 LineStyle::DottedVertical,
-                 kDashSegmentPx,
-                 kDashGapPx,
-                 0.0f,
-                 1.0f,
-                 0.0f);
-      QColor topBeat = frame.beatLineColor;
-      topBeat.setAlpha(std::max(20, topBeat.alpha() / 2));
-      appendRect(m_staticInstances,
-                 x,
-                 0.0f,
-                 1.0f,
-                 layout.topBarHeight,
-                 topBeat,
-                 LineStyle::Solid,
-                 0.0f,
-                 0.0f,
-                 0.0f,
-                 1.0f,
-                 0.0f);
-      ++emittedBeatLines;
-
-      if (beatTicks == 0) {
-        break;
+          const uint64_t nextTick = tick + beatStep;
+          if (nextTick <= tick) {
+            break;
+          }
+          tick = nextTick;
+        }
       }
     }
   }
@@ -622,64 +695,61 @@ void PianoRollRhiRenderer::buildStaticInstances(const PianoRollFrame::Data& fram
     return QColor::fromHsv((trackIndex * 43) % 360, 190, 235);
   };
 
-  if (frame.notes) {
-    for (const auto& note : *frame.notes) {
-      if (note.key >= PianoRollFrame::kMidiKeyCount) {
-        continue;
-      }
-      const uint64_t noteDuration = std::max<uint64_t>(1, note.duration);
-      const uint64_t noteEndTick = static_cast<uint64_t>(note.startTick) + noteDuration;
-      const float x = layout.noteAreaLeft + (static_cast<float>(note.startTick) * layout.pixelsPerTick);
-      const float x2 = layout.noteAreaLeft + (static_cast<float>(noteEndTick) * layout.pixelsPerTick);
-      const float y = layout.noteAreaTop + ((127.0f - static_cast<float>(note.key)) * layout.pixelsPerKey);
-      const float h = std::max(1.0f, layout.pixelsPerKey - 1.0f);
-      const float w = std::max(0.0f, x2 - x);
-      if (w <= 0.5f || h <= 0.5f) {
-        continue;
-      }
-
-      QColor noteColor = colorForTrack(note.trackIndex);
-      noteColor.setAlpha(188);
-      appendRect(m_staticInstances,
-                 x,
-                 y,
-                 w,
-                 h,
-                 noteColor,
-                 LineStyle::Solid,
-                 0.0f,
-                 0.0f,
-                 0.0f,
-                 1.0f,
-                 1.0f);
-
-      const float edgeThickness = 1.0f;
-      appendRect(m_staticInstances,
-                 x,
-                 y,
-                 w,
-                 edgeThickness,
-                 frame.noteOutlineColor,
-                 LineStyle::Solid,
-                 0.0f,
-                 0.0f,
-                 0.0f,
-                 1.0f,
-                 1.0f);
-      appendRect(m_staticInstances,
-                 x,
-                 y + h - edgeThickness,
-                 w,
-                 edgeThickness,
-                 frame.noteOutlineColor,
-                 LineStyle::Solid,
-                 0.0f,
-                 0.0f,
-                 0.0f,
-                 1.0f,
-                 1.0f);
+  forEachNoteInRange(frame, staticTickStart, staticTickEnd, [&](const PianoRollFrame::Note& note, uint64_t noteEndTick) {
+    if (note.key >= PianoRollFrame::kMidiKeyCount) {
+      return;
     }
-  }
+
+    const float x = layout.noteAreaLeft + (static_cast<float>(note.startTick) * layout.pixelsPerTick);
+    const float x2 = layout.noteAreaLeft + (static_cast<float>(noteEndTick) * layout.pixelsPerTick);
+    const float y = layout.noteAreaTop + ((127.0f - static_cast<float>(note.key)) * layout.pixelsPerKey);
+    const float h = std::max(1.0f, layout.pixelsPerKey - 1.0f);
+    const float w = std::max(0.0f, x2 - x);
+    if (w <= 0.5f || h <= 0.5f) {
+      return;
+    }
+
+    QColor noteColor = colorForTrack(note.trackIndex);
+    noteColor.setAlpha(188);
+    appendRect(m_staticInstances,
+               x,
+               y,
+               w,
+               h,
+               noteColor,
+               LineStyle::Solid,
+               0.0f,
+               0.0f,
+               0.0f,
+               1.0f,
+               1.0f);
+
+    const float edgeThickness = 1.0f;
+    appendRect(m_staticInstances,
+               x,
+               y,
+               w,
+               edgeThickness,
+               frame.noteOutlineColor,
+               LineStyle::Solid,
+               0.0f,
+               0.0f,
+               0.0f,
+               1.0f,
+               1.0f);
+    appendRect(m_staticInstances,
+               x,
+               y + h - edgeThickness,
+               w,
+               edgeThickness,
+               frame.noteOutlineColor,
+               LineStyle::Solid,
+               0.0f,
+               0.0f,
+               0.0f,
+               1.0f,
+               1.0f);
+  });
 
   const float blackKeyWidth = std::max(10.0f, layout.keyboardWidth * 0.63f);
   const float blackKeyHeight = std::max(2.0f, layout.pixelsPerKey);
@@ -1061,18 +1131,18 @@ void PianoRollRhiRenderer::buildDynamicInstances(const PianoRollFrame::Data& fra
 }
 
 template <typename Fn>
-void PianoRollRhiRenderer::forEachVisibleNote(const PianoRollFrame::Data& frame,
-                                              const Layout& layout,
+void PianoRollRhiRenderer::forEachNoteInRange(const PianoRollFrame::Data& frame,
+                                              uint64_t startTick,
+                                              uint64_t endTick,
                                               Fn&& fn) const {
   if (!frame.notes || frame.notes->empty()) {
     return;
   }
 
   const auto& notes = *frame.notes;
-  // Start search a bit before the viewport so long notes crossing into view are included.
   const uint64_t maxDuration = std::max<uint64_t>(1, frame.maxNoteDurationTicks);
-  const uint64_t searchStart = (layout.visibleStartTick > maxDuration)
-                                   ? (layout.visibleStartTick - maxDuration)
+  const uint64_t searchStart = (startTick > maxDuration)
+                                   ? (startTick - maxDuration)
                                    : 0;
 
   auto it = std::lower_bound(notes.begin(),
@@ -1083,18 +1153,26 @@ void PianoRollRhiRenderer::forEachVisibleNote(const PianoRollFrame::Data& frame,
                              });
 
   for (; it != notes.end(); ++it) {
-    if (it->startTick > layout.visibleEndTick) {
+    if (it->startTick > endTick) {
       break;
     }
 
     const uint64_t noteDuration = std::max<uint64_t>(1, it->duration);
     const uint64_t noteEndTick = static_cast<uint64_t>(it->startTick) + noteDuration;
-    if (noteEndTick < layout.visibleStartTick) {
+    if (noteEndTick < startTick) {
       continue;
     }
 
     fn(*it, noteEndTick);
   }
+}
+
+template <typename Fn>
+void PianoRollRhiRenderer::forEachVisibleNote(const PianoRollFrame::Data& frame,
+                                              const Layout& layout,
+                                              Fn&& fn) const {
+  // Start search a bit before the viewport so long notes crossing into view are included.
+  forEachNoteInRange(frame, layout.visibleStartTick, layout.visibleEndTick, std::forward<Fn>(fn));
 }
 
 PianoRollRhiRenderer::NoteGeometry PianoRollRhiRenderer::computeNoteGeometry(const PianoRollFrame::Note& note,
