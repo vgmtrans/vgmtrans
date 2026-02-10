@@ -12,10 +12,13 @@
 
 class QResizeEvent;
 class ActiveNoteView;
+class ActiveNoteRhiRenderer;
 
 class ActiveNoteRhiWidget final : public QRhiWidget {
 public:
-  explicit ActiveNoteRhiWidget(ActiveNoteView* view, QWidget* parent = nullptr);
+  explicit ActiveNoteRhiWidget(ActiveNoteView* view,
+                               ActiveNoteRhiRenderer* renderer,
+                               QWidget* parent = nullptr);
   ~ActiveNoteRhiWidget() override;
 
 protected:
@@ -25,5 +28,5 @@ protected:
   void resizeEvent(QResizeEvent* event) override;
 
 private:
-  ActiveNoteRhiRenderer m_renderer;
+  ActiveNoteRhiRenderer* m_renderer = nullptr;
 };

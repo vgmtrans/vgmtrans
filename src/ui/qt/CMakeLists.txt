@@ -47,18 +47,23 @@ target_sources(vgmtrans
     widgets/ToastHost.cpp
     widgets/TableView.cpp
     widgets/TitleBar.cpp
+    workarea/activenoteview/ActiveNoteRhiHost.cpp
     workarea/activenoteview/ActiveNoteRhiRenderer.cpp
     workarea/activenoteview/ActiveNoteRhiWidget.cpp
+    workarea/activenoteview/ActiveNoteRhiWindow.cpp
     workarea/activenoteview/ActiveNoteView.cpp
     workarea/hexview/HexView.cpp
     workarea/hexview/HexViewRhiHost.cpp
     workarea/hexview/HexViewRhiRenderer.cpp
     workarea/hexview/HexViewRhiWidget.cpp
     workarea/hexview/HexViewRhiWindow.cpp
+    workarea/pianorollview/PianoRollRhiHost.cpp
     workarea/pianorollview/PianoRollRhiRenderer.cpp
     workarea/pianorollview/PianoRollRhiWidget.cpp
+    workarea/pianorollview/PianoRollRhiWindow.cpp
     workarea/pianorollview/PianoRollView.cpp
     workarea/pianorollview/PianoRollZoomScrollBar.cpp
+    workarea/rhi/SimpleRhiWindow.cpp
     workarea/MdiArea.cpp
     workarea/RawFileListView.cpp
     workarea/VGMCollListView.cpp
@@ -117,11 +122,10 @@ target_sources(vgmtrans
       workarea/VGMFileTreeView.h
       workarea/VGMFileView.h
       workarea/activenoteview/ActiveNoteFrameData.h
-      workarea/activenoteview/ActiveNoteRhiRenderer.cpp
+      workarea/activenoteview/ActiveNoteRhiHost.h
       workarea/activenoteview/ActiveNoteRhiRenderer.h
-      workarea/activenoteview/ActiveNoteRhiWidget.cpp
       workarea/activenoteview/ActiveNoteRhiWidget.h
-      workarea/activenoteview/ActiveNoteView.cpp
+      workarea/activenoteview/ActiveNoteRhiWindow.h
       workarea/activenoteview/ActiveNoteView.h
       workarea/hexview/HexView.h
       workarea/hexview/HexViewFrameData.h
@@ -133,10 +137,13 @@ target_sources(vgmtrans
       workarea/hexview/HexViewRhiWidget.h
       workarea/hexview/HexViewRhiWindow.h
       workarea/pianorollview/PianoRollFrameData.h
+      workarea/pianorollview/PianoRollRhiHost.h
       workarea/pianorollview/PianoRollRhiRenderer.h
       workarea/pianorollview/PianoRollRhiWidget.h
+      workarea/pianorollview/PianoRollRhiWindow.h
       workarea/pianorollview/PianoRollView.h
       workarea/pianorollview/PianoRollZoomScrollBar.h
+      workarea/rhi/SimpleRhiWindow.h
 )
 
 if(APPLE)
