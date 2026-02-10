@@ -172,6 +172,8 @@ qt_add_shaders(
   FILES
     workarea/pianorollview/shaders/pianorollquad.vert
     workarea/pianorollview/shaders/pianorollquad.frag
+    workarea/pianorollview/shaders/pianorolltile.vert
+    workarea/pianorollview/shaders/pianorolltile.frag
 )
 
 # Workaround macdeployqt not correctly deploying QtDbus

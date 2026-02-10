@@ -37,6 +37,9 @@ static constexpr int kMat4Bytes = 16 * sizeof(float);
 static constexpr int kUniformBytes = (16 + 4) * sizeof(float);
 static constexpr float kDashSegmentPx = 4.0f;
 static constexpr float kDashGapPx = 4.0f;
+static constexpr int kTileLogicalWidth = 1024;
+static constexpr int kTileLogicalHeight = 512;
+static constexpr int kTilePrefetchMargin = 1;
 
 QShader loadShader(const char* path) {
   QFile file(QString::fromUtf8(path));
@@ -77,8 +80,12 @@ void PianoRollRhiRenderer::initIfNeeded(QRhi* rhi) {
   const int ubufSize = m_rhi->ubufAligned(kUniformBytes);
   m_uniformBuffer = m_rhi->newBuffer(QRhiBuffer::Dynamic, QRhiBuffer::UniformBuffer, ubufSize);
   m_uniformBuffer->create();
+  m_tileUniformBuffer = m_rhi->newBuffer(QRhiBuffer::Dynamic, QRhiBuffer::UniformBuffer, ubufSize);
+  m_tileUniformBuffer->create();
 
-  m_staticBuffersUploaded = false;
+  m_geometryUploaded = false;
+  m_staticInstanceBuffersDirty = true;
+  m_staticGeneration = 1;
   m_inited = true;
 }
 
@@ -87,20 +94,45 @@ void PianoRollRhiRenderer::releaseResources() {
     m_rhi->makeThreadLocalNativeContextCurrent();
   }
 
-  delete m_pipeline;
-  m_pipeline = nullptr;
+  delete m_outputRectPipeline;
+  m_outputRectPipeline = nullptr;
+  delete m_tileRectPipeline;
+  m_tileRectPipeline = nullptr;
+  delete m_tileCompositePipeline;
+  m_tileCompositePipeline = nullptr;
 
-  delete m_shaderBindings;
-  m_shaderBindings = nullptr;
+  delete m_outputRectSrb;
+  m_outputRectSrb = nullptr;
+  delete m_tileRectSrb;
+  m_tileRectSrb = nullptr;
+  delete m_tileCompositeLayoutSrb;
+  m_tileCompositeLayoutSrb = nullptr;
 
-  delete m_staticInstanceBuffer;
-  m_staticInstanceBuffer = nullptr;
+  releaseTileCaches();
+
+  delete m_tileDummyTexture;
+  m_tileDummyTexture = nullptr;
+  delete m_tileSampler;
+  m_tileSampler = nullptr;
+
+  delete m_staticFixedInstanceBuffer;
+  m_staticFixedInstanceBuffer = nullptr;
+  delete m_staticXyInstanceBuffer;
+  m_staticXyInstanceBuffer = nullptr;
+  delete m_staticXInstanceBuffer;
+  m_staticXInstanceBuffer = nullptr;
+  delete m_staticYInstanceBuffer;
+  m_staticYInstanceBuffer = nullptr;
 
   delete m_dynamicInstanceBuffer;
   m_dynamicInstanceBuffer = nullptr;
+  delete m_tileInstanceBuffer;
+  m_tileInstanceBuffer = nullptr;
 
   delete m_uniformBuffer;
   m_uniformBuffer = nullptr;
+  delete m_tileUniformBuffer;
+  m_tileUniformBuffer = nullptr;
 
   delete m_indexBuffer;
   m_indexBuffer = nullptr;
@@ -109,12 +141,21 @@ void PianoRollRhiRenderer::releaseResources() {
   m_vertexBuffer = nullptr;
 
   m_outputRenderPass = nullptr;
+  m_tileRenderPass = nullptr;
   m_sampleCount = 1;
-  m_staticBuffersUploaded = false;
+  m_tilePixelSize = {};
+  m_staticGeneration = 0;
+  m_geometryUploaded = false;
+  m_staticInstanceBuffersDirty = true;
   m_inited = false;
   m_staticCacheKey = {};
-  m_staticInstances.clear();
+  m_staticFixedInstances.clear();
+  for (auto& instances : m_staticPlaneInstanceData) {
+    instances.clear();
+  }
   m_dynamicInstances.clear();
+  m_visibleTileInstances.clear();
+  m_visibleTileSrbs.clear();
   m_rhi = nullptr;
 }
 
@@ -141,38 +182,39 @@ void PianoRollRhiRenderer::renderFrame(QRhiCommandBuffer* cb, const RenderTarget
   if (!m_staticCacheKey.valid || !staticCacheKeyEquals(m_staticCacheKey, key)) {
     buildStaticInstances(frame, layout, trackColorsHash);
     m_staticCacheKey = key;
+    m_staticInstanceBuffersDirty = true;
+    ++m_staticGeneration;
+    releaseTileCaches();
   }
   buildDynamicInstances(frame, layout);
 
-  ensurePipeline(target.renderPassDesc, std::max(1, target.sampleCount));
+  updateVisibleTiles(layout, target.dpr);
+  ensurePipelines(target.renderPassDesc, std::max(1, target.sampleCount));
 
   QRhiResourceUpdateBatch* updates = m_rhi->nextResourceUpdateBatch();
-  if (!m_staticBuffersUploaded) {
+  if (!m_geometryUploaded) {
     updates->uploadStaticBuffer(m_vertexBuffer, kVertices);
     updates->uploadStaticBuffer(m_indexBuffer, kIndices);
-    m_staticBuffersUploaded = true;
+    m_geometryUploaded = true;
   }
 
-  QMatrix4x4 mvp;
-  mvp.ortho(0.0f,
-            static_cast<float>(logicalSize.width()),
-            static_cast<float>(logicalSize.height()),
-            0.0f,
-            -1.0f,
-            1.0f);
-  std::array<float, 20> ubo{};
-  std::memcpy(ubo.data(), mvp.constData(), kMat4Bytes);
-  ubo[16] = layout.scrollX;
-  ubo[17] = layout.scrollY;
-  ubo[18] = 0.0f;
-  ubo[19] = 0.0f;
-  updates->updateDynamicBuffer(m_uniformBuffer, 0, kUniformBytes, ubo.data());
-
-  if (!m_staticInstances.empty()) {
-    const int staticBytes = static_cast<int>(m_staticInstances.size() * sizeof(RectInstance));
-    if (ensureInstanceBuffer(m_staticInstanceBuffer, staticBytes, 16384)) {
-      updates->updateDynamicBuffer(m_staticInstanceBuffer, 0, staticBytes, m_staticInstances.data());
+  if (m_staticInstanceBuffersDirty) {
+    const int fixedBytes = static_cast<int>(m_staticFixedInstances.size() * sizeof(RectInstance));
+    if (fixedBytes > 0 && ensureInstanceBuffer(m_staticFixedInstanceBuffer, fixedBytes, 8192)) {
+      updates->updateDynamicBuffer(m_staticFixedInstanceBuffer, 0, fixedBytes, m_staticFixedInstances.data());
     }
+
+    for (int i = 0; i < static_cast<int>(StaticPlane::Count); ++i) {
+      const auto plane = static_cast<StaticPlane>(i);
+      auto& instances = m_staticPlaneInstanceData[static_cast<size_t>(i)];
+      QRhiBuffer*& planeBuffer = staticPlaneBuffer(plane);
+      const int bytes = static_cast<int>(instances.size() * sizeof(RectInstance));
+      if (bytes > 0 && ensureInstanceBuffer(planeBuffer, bytes, 16384)) {
+        updates->updateDynamicBuffer(planeBuffer, 0, bytes, instances.data());
+      }
+    }
+
+    m_staticInstanceBuffersDirty = false;
   }
 
   if (!m_dynamicInstances.empty()) {
@@ -182,21 +224,40 @@ void PianoRollRhiRenderer::renderFrame(QRhiCommandBuffer* cb, const RenderTarget
     }
   }
 
+  if (!m_visibleTileInstances.empty()) {
+    const int tileBytes = static_cast<int>(m_visibleTileInstances.size() * sizeof(TileInstance));
+    if (ensureInstanceBuffer(m_tileInstanceBuffer, tileBytes, 4096)) {
+      updates->updateDynamicBuffer(m_tileInstanceBuffer, 0, tileBytes, m_visibleTileInstances.data());
+    }
+  }
+
+  QMatrix4x4 outputMvp;
+  outputMvp.ortho(0.0f,
+                  static_cast<float>(logicalSize.width()),
+                  static_cast<float>(logicalSize.height()),
+                  0.0f,
+                  -1.0f,
+                  1.0f);
+  std::array<float, 20> outputUbo{};
+  fillUniformData(outputUbo, outputMvp, layout.scrollX, layout.scrollY);
+  updates->updateDynamicBuffer(m_uniformBuffer, 0, kUniformBytes, outputUbo.data());
+
+  renderMissingTiles(cb, updates);
+
   cb->beginPass(target.renderTarget, frame.backgroundColor, {1.0f, 0}, updates);
   cb->setViewport(QRhiViewport(0,
                                0,
                                static_cast<float>(target.pixelSize.width()),
                                static_cast<float>(target.pixelSize.height())));
 
-  if (m_pipeline && m_shaderBindings) {
-    cb->setGraphicsPipeline(m_pipeline);
-    cb->setShaderResources(m_shaderBindings);
+  if (m_outputRectPipeline && m_outputRectSrb) {
+    cb->setGraphicsPipeline(m_outputRectPipeline);
+    cb->setShaderResources(m_outputRectSrb);
 
     auto drawInstances = [&](QRhiBuffer* buffer, int count) {
       if (!buffer || count <= 0) {
         return;
       }
-
       const QRhiCommandBuffer::VertexInput bindings[] = {
           {m_vertexBuffer, 0},
           {buffer, 0},
@@ -210,7 +271,35 @@ void PianoRollRhiRenderer::renderFrame(QRhiCommandBuffer* cb, const RenderTarget
       cb->drawIndexed(6, count, 0, 0, 0);
     };
 
-    drawInstances(m_staticInstanceBuffer, static_cast<int>(m_staticInstances.size()));
+    drawInstances(m_staticFixedInstanceBuffer, static_cast<int>(m_staticFixedInstances.size()));
+
+    if (m_tileCompositePipeline && m_tileInstanceBuffer && !m_visibleTileInstances.empty()) {
+      cb->setGraphicsPipeline(m_tileCompositePipeline);
+
+      const QRhiCommandBuffer::VertexInput tileBindings[] = {
+          {m_vertexBuffer, 0},
+          {m_tileInstanceBuffer, 0},
+      };
+      cb->setVertexInput(0,
+                         static_cast<int>(std::size(tileBindings)),
+                         tileBindings,
+                         m_indexBuffer,
+                         0,
+                         QRhiCommandBuffer::IndexUInt16);
+
+      for (size_t i = 0; i < m_visibleTileSrbs.size(); ++i) {
+        QRhiShaderResourceBindings* srb = m_visibleTileSrbs[i];
+        if (!srb) {
+          continue;
+        }
+        cb->setShaderResources(srb);
+        cb->drawIndexed(6, 1, 0, 0, static_cast<int>(i));
+      }
+
+      cb->setGraphicsPipeline(m_outputRectPipeline);
+      cb->setShaderResources(m_outputRectSrb);
+    }
+
     drawInstances(m_dynamicInstanceBuffer, static_cast<int>(m_dynamicInstances.size()));
   }
 
@@ -245,31 +334,172 @@ uint32_t PianoRollRhiRenderer::colorKey(const QColor& color) {
   return color.rgba();
 }
 
-void PianoRollRhiRenderer::ensurePipeline(QRhiRenderPassDescriptor* renderPassDesc, int sampleCount) {
+int PianoRollRhiRenderer::planeIndex(StaticPlane plane) {
+  return static_cast<int>(plane);
+}
+
+uint64_t PianoRollRhiRenderer::makeTileKey(int tileX, int tileY) {
+  return (static_cast<uint64_t>(static_cast<uint32_t>(tileY)) << 32) |
+         static_cast<uint64_t>(static_cast<uint32_t>(tileX));
+}
+
+void PianoRollRhiRenderer::fillUniformData(std::array<float, 20>& ubo,
+                                           const QMatrix4x4& mvp,
+                                           float cameraX,
+                                           float cameraY) {
+  std::memcpy(ubo.data(), mvp.constData(), kMat4Bytes);
+  ubo[16] = cameraX;
+  ubo[17] = cameraY;
+  ubo[18] = 0.0f;
+  ubo[19] = 0.0f;
+}
+
+void PianoRollRhiRenderer::ensurePipelines(QRhiRenderPassDescriptor* renderPassDesc, int sampleCount) {
   if (!renderPassDesc) {
     return;
   }
 
-  if (m_pipeline && m_shaderBindings && m_outputRenderPass == renderPassDesc && m_sampleCount == sampleCount) {
-    return;
+  const bool needCompositePipeline = !m_visibleTileSrbs.empty();
+  const bool outputConfigChanged = (m_outputRenderPass != renderPassDesc) || (m_sampleCount != sampleCount);
+  if (outputConfigChanged) {
+    delete m_outputRectPipeline;
+    m_outputRectPipeline = nullptr;
+    delete m_tileCompositePipeline;
+    m_tileCompositePipeline = nullptr;
+    delete m_outputRectSrb;
+    m_outputRectSrb = nullptr;
+    m_outputRenderPass = renderPassDesc;
+    m_sampleCount = sampleCount;
   }
 
-  delete m_pipeline;
-  m_pipeline = nullptr;
+  if (!m_outputRectSrb) {
+    m_outputRectSrb = m_rhi->newShaderResourceBindings();
+    m_outputRectSrb->setBindings({
+        QRhiShaderResourceBinding::uniformBuffer(0,
+                                                 QRhiShaderResourceBinding::VertexStage,
+                                                 m_uniformBuffer),
+    });
+    m_outputRectSrb->create();
+  }
 
-  delete m_shaderBindings;
-  m_shaderBindings = nullptr;
+  if (!m_tileRectSrb) {
+    m_tileRectSrb = m_rhi->newShaderResourceBindings();
+    m_tileRectSrb->setBindings({
+        QRhiShaderResourceBinding::uniformBuffer(0,
+                                                 QRhiShaderResourceBinding::VertexStage,
+                                                 m_tileUniformBuffer),
+    });
+    m_tileRectSrb->create();
+  }
 
-  m_outputRenderPass = renderPassDesc;
-  m_sampleCount = sampleCount;
+  if (!m_outputRectPipeline) {
+    QShader vertexShader = loadShader(":/shaders/pianorollquad.vert.qsb");
+    QShader fragmentShader = loadShader(":/shaders/pianorollquad.frag.qsb");
 
-  m_shaderBindings = m_rhi->newShaderResourceBindings();
-  m_shaderBindings->setBindings({
-      QRhiShaderResourceBinding::uniformBuffer(0,
-                                               QRhiShaderResourceBinding::VertexStage,
-                                               m_uniformBuffer),
-  });
-  m_shaderBindings->create();
+    QRhiVertexInputLayout rectInputLayout;
+    rectInputLayout.setBindings({
+        {2 * static_cast<int>(sizeof(float))},
+        {static_cast<int>(sizeof(RectInstance)), QRhiVertexInputBinding::PerInstance},
+    });
+    rectInputLayout.setAttributes({
+        {0, 0, QRhiVertexInputAttribute::Float2, 0},
+        {1, 1, QRhiVertexInputAttribute::Float4, 0},
+        {1, 2, QRhiVertexInputAttribute::Float4, 4 * static_cast<int>(sizeof(float))},
+        {1, 3, QRhiVertexInputAttribute::Float4, 8 * static_cast<int>(sizeof(float))},
+        {1, 4, QRhiVertexInputAttribute::Float2, 12 * static_cast<int>(sizeof(float))},
+    });
+
+    m_outputRectPipeline = m_rhi->newGraphicsPipeline();
+    m_outputRectPipeline->setTopology(QRhiGraphicsPipeline::Triangles);
+    m_outputRectPipeline->setSampleCount(m_sampleCount);
+    m_outputRectPipeline->setShaderStages({
+        {QRhiShaderStage::Vertex, vertexShader},
+        {QRhiShaderStage::Fragment, fragmentShader},
+    });
+    m_outputRectPipeline->setShaderResourceBindings(m_outputRectSrb);
+    m_outputRectPipeline->setVertexInputLayout(rectInputLayout);
+
+    QRhiGraphicsPipeline::TargetBlend blend;
+    blend.enable = true;
+    blend.srcColor = QRhiGraphicsPipeline::SrcAlpha;
+    blend.dstColor = QRhiGraphicsPipeline::OneMinusSrcAlpha;
+    blend.srcAlpha = QRhiGraphicsPipeline::One;
+    blend.dstAlpha = QRhiGraphicsPipeline::OneMinusSrcAlpha;
+    m_outputRectPipeline->setTargetBlends({blend});
+    m_outputRectPipeline->setRenderPassDescriptor(renderPassDesc);
+    m_outputRectPipeline->create();
+  }
+
+  if (needCompositePipeline && !m_tileCompositePipeline) {
+    if (!m_tileSampler) {
+      m_tileSampler = m_rhi->newSampler(QRhiSampler::Linear,
+                                        QRhiSampler::Linear,
+                                        QRhiSampler::None,
+                                        QRhiSampler::ClampToEdge,
+                                        QRhiSampler::ClampToEdge);
+      m_tileSampler->create();
+    }
+    if (!m_tileDummyTexture) {
+      m_tileDummyTexture = m_rhi->newTexture(QRhiTexture::RGBA8, QSize(1, 1), 1);
+      m_tileDummyTexture->create();
+    }
+    if (!m_tileCompositeLayoutSrb) {
+      m_tileCompositeLayoutSrb = m_rhi->newShaderResourceBindings();
+      m_tileCompositeLayoutSrb->setBindings({
+          QRhiShaderResourceBinding::uniformBuffer(0,
+                                                   QRhiShaderResourceBinding::VertexStage,
+                                                   m_uniformBuffer),
+          QRhiShaderResourceBinding::sampledTexture(1,
+                                                    QRhiShaderResourceBinding::FragmentStage,
+                                                    m_tileDummyTexture,
+                                                    m_tileSampler),
+      });
+      m_tileCompositeLayoutSrb->create();
+    }
+
+    QShader tileVertexShader = loadShader(":/shaders/pianorolltile.vert.qsb");
+    QShader tileFragmentShader = loadShader(":/shaders/pianorolltile.frag.qsb");
+
+    QRhiVertexInputLayout tileInputLayout;
+    tileInputLayout.setBindings({
+        {2 * static_cast<int>(sizeof(float))},
+        {static_cast<int>(sizeof(TileInstance)), QRhiVertexInputBinding::PerInstance},
+    });
+    tileInputLayout.setAttributes({
+        {0, 0, QRhiVertexInputAttribute::Float2, 0},
+        {1, 1, QRhiVertexInputAttribute::Float4, 0},
+        {1, 2, QRhiVertexInputAttribute::Float4, 4 * static_cast<int>(sizeof(float))},
+    });
+
+    QRhiGraphicsPipeline::TargetBlend blend;
+    blend.enable = true;
+    blend.srcColor = QRhiGraphicsPipeline::SrcAlpha;
+    blend.dstColor = QRhiGraphicsPipeline::OneMinusSrcAlpha;
+    blend.srcAlpha = QRhiGraphicsPipeline::One;
+    blend.dstAlpha = QRhiGraphicsPipeline::OneMinusSrcAlpha;
+
+    m_tileCompositePipeline = m_rhi->newGraphicsPipeline();
+    m_tileCompositePipeline->setTopology(QRhiGraphicsPipeline::Triangles);
+    m_tileCompositePipeline->setSampleCount(m_sampleCount);
+    m_tileCompositePipeline->setShaderStages({
+        {QRhiShaderStage::Vertex, tileVertexShader},
+        {QRhiShaderStage::Fragment, tileFragmentShader},
+    });
+    m_tileCompositePipeline->setShaderResourceBindings(m_tileCompositeLayoutSrb);
+    m_tileCompositePipeline->setVertexInputLayout(tileInputLayout);
+    m_tileCompositePipeline->setTargetBlends({blend});
+    m_tileCompositePipeline->setRenderPassDescriptor(renderPassDesc);
+    m_tileCompositePipeline->create();
+  }
+}
+
+void PianoRollRhiRenderer::ensureTilePipeline() {
+  if (!m_tileRenderPass || !m_tileRectSrb) {
+    return;
+  }
+  if (m_tileRectPipeline) {
+    return;
+  }
 
   QShader vertexShader = loadShader(":/shaders/pianorollquad.vert.qsb");
   QShader fragmentShader = loadShader(":/shaders/pianorollquad.frag.qsb");
@@ -287,15 +517,15 @@ void PianoRollRhiRenderer::ensurePipeline(QRhiRenderPassDescriptor* renderPassDe
       {1, 4, QRhiVertexInputAttribute::Float2, 12 * static_cast<int>(sizeof(float))},
   });
 
-  m_pipeline = m_rhi->newGraphicsPipeline();
-  m_pipeline->setTopology(QRhiGraphicsPipeline::Triangles);
-  m_pipeline->setSampleCount(m_sampleCount);
-  m_pipeline->setShaderStages({
+  m_tileRectPipeline = m_rhi->newGraphicsPipeline();
+  m_tileRectPipeline->setTopology(QRhiGraphicsPipeline::Triangles);
+  m_tileRectPipeline->setSampleCount(1);
+  m_tileRectPipeline->setShaderStages({
       {QRhiShaderStage::Vertex, vertexShader},
       {QRhiShaderStage::Fragment, fragmentShader},
   });
-  m_pipeline->setShaderResourceBindings(m_shaderBindings);
-  m_pipeline->setVertexInputLayout(inputLayout);
+  m_tileRectPipeline->setShaderResourceBindings(m_tileRectSrb);
+  m_tileRectPipeline->setVertexInputLayout(inputLayout);
 
   QRhiGraphicsPipeline::TargetBlend blend;
   blend.enable = true;
@@ -303,10 +533,9 @@ void PianoRollRhiRenderer::ensurePipeline(QRhiRenderPassDescriptor* renderPassDe
   blend.dstColor = QRhiGraphicsPipeline::OneMinusSrcAlpha;
   blend.srcAlpha = QRhiGraphicsPipeline::One;
   blend.dstAlpha = QRhiGraphicsPipeline::OneMinusSrcAlpha;
-  m_pipeline->setTargetBlends({blend});
-
-  m_pipeline->setRenderPassDescriptor(renderPassDesc);
-  m_pipeline->create();
+  m_tileRectPipeline->setTargetBlends({blend});
+  m_tileRectPipeline->setRenderPassDescriptor(m_tileRenderPass);
+  m_tileRectPipeline->create();
 }
 
 bool PianoRollRhiRenderer::ensureInstanceBuffer(QRhiBuffer*& buffer, int bytes, int minBytes) {
@@ -322,6 +551,352 @@ bool PianoRollRhiRenderer::ensureInstanceBuffer(QRhiBuffer*& buffer, int bytes, 
   delete buffer;
   buffer = m_rhi->newBuffer(QRhiBuffer::Dynamic, QRhiBuffer::VertexBuffer, targetSize);
   return buffer->create();
+}
+
+QSize PianoRollRhiRenderer::tilePixelSizeForDpr(float dpr) const {
+  const float clampedDpr = std::max(1.0f, dpr);
+  return QSize(
+      std::max(1, static_cast<int>(std::lround(static_cast<float>(kTileLogicalWidth) * clampedDpr))),
+      std::max(1, static_cast<int>(std::lround(static_cast<float>(kTileLogicalHeight) * clampedDpr))));
+}
+
+PianoRollRhiRenderer::TileRange PianoRollRhiRenderer::tileRangeForPlane(const Layout& layout,
+                                                                        StaticPlane plane,
+                                                                        int margin) const {
+  TileRange range;
+  if (layout.viewWidth <= 0 || layout.viewHeight <= 0) {
+    return range;
+  }
+
+  const bool scrollX = (plane == StaticPlane::XY || plane == StaticPlane::X);
+  const bool scrollY = (plane == StaticPlane::XY || plane == StaticPlane::Y);
+
+  const float x0 = scrollX ? layout.scrollX : 0.0f;
+  const float y0 = scrollY ? layout.scrollY : 0.0f;
+  const float x1 = x0 + static_cast<float>(layout.viewWidth);
+  const float y1 = y0 + static_cast<float>(layout.viewHeight);
+
+  range.minX = std::max(0, static_cast<int>(std::floor(x0 / static_cast<float>(kTileLogicalWidth))) - (scrollX ? margin : 0));
+  range.maxX = std::max(range.minX, static_cast<int>(std::floor((x1 - 1.0f) / static_cast<float>(kTileLogicalWidth))) + (scrollX ? margin : 0));
+  range.minY = std::max(0, static_cast<int>(std::floor(y0 / static_cast<float>(kTileLogicalHeight))) - (scrollY ? margin : 0));
+  range.maxY = std::max(range.minY, static_cast<int>(std::floor((y1 - 1.0f) / static_cast<float>(kTileLogicalHeight))) + (scrollY ? margin : 0));
+  range.valid = (range.maxX >= range.minX) && (range.maxY >= range.minY);
+  return range;
+}
+
+void PianoRollRhiRenderer::updateVisibleTiles(const Layout& layout, float dpr) {
+  m_visibleTileInstances.clear();
+  m_visibleTileSrbs.clear();
+
+  if (!m_rhi || layout.viewWidth <= 0 || layout.viewHeight <= 0) {
+    return;
+  }
+
+  const QSize targetTilePixelSize = tilePixelSizeForDpr(dpr);
+  if (m_tilePixelSize != targetTilePixelSize) {
+    releaseTileCaches();
+    m_tilePixelSize = targetTilePixelSize;
+  }
+
+  if (!m_tileSampler) {
+    m_tileSampler = m_rhi->newSampler(QRhiSampler::Linear,
+                                      QRhiSampler::Linear,
+                                      QRhiSampler::None,
+                                      QRhiSampler::ClampToEdge,
+                                      QRhiSampler::ClampToEdge);
+    m_tileSampler->create();
+  }
+
+  static constexpr std::array<StaticPlane, 3> kPlaneDrawOrder = {
+      StaticPlane::Y,
+      StaticPlane::X,
+      StaticPlane::XY,
+  };
+
+  for (StaticPlane plane : kPlaneDrawOrder) {
+    const int idx = planeIndex(plane);
+    TilePlaneCache& cache = m_tilePlaneCaches[static_cast<size_t>(idx)];
+    cache.visibleKeys.clear();
+    if (staticPlaneInstances(plane).empty()) {
+      cache.keepRange = {};
+      continue;
+    }
+    cache.keepRange = tileRangeForPlane(layout, plane, kTilePrefetchMargin + 1);
+    const TileRange visibleRange = tileRangeForPlane(layout, plane, kTilePrefetchMargin);
+    if (!visibleRange.valid) {
+      continue;
+    }
+
+    const bool scrollX = (plane == StaticPlane::XY || plane == StaticPlane::X);
+    const bool scrollY = (plane == StaticPlane::XY || plane == StaticPlane::Y);
+    for (int tileY = visibleRange.minY; tileY <= visibleRange.maxY; ++tileY) {
+      for (int tileX = visibleRange.minX; tileX <= visibleRange.maxX; ++tileX) {
+        if (!ensureTile(plane, tileX, tileY, dpr)) {
+          continue;
+        }
+
+        const uint64_t key = makeTileKey(tileX, tileY);
+        auto it = cache.tiles.find(key);
+        if (it == cache.tiles.end() || !it->second.compositeSrb) {
+          continue;
+        }
+
+        cache.visibleKeys.push_back(key);
+        const float worldX = static_cast<float>(tileX * kTileLogicalWidth);
+        const float worldY = static_cast<float>(tileY * kTileLogicalHeight);
+        const float screenX = worldX - (scrollX ? layout.scrollX : 0.0f);
+        const float screenY = worldY - (scrollY ? layout.scrollY : 0.0f);
+        m_visibleTileInstances.push_back(TileInstance{
+            screenX,
+            screenY,
+            static_cast<float>(kTileLogicalWidth),
+            static_cast<float>(kTileLogicalHeight),
+            0.0f,
+            0.0f,
+            1.0f,
+            1.0f,
+        });
+        m_visibleTileSrbs.push_back(it->second.compositeSrb);
+      }
+    }
+  }
+
+  pruneTileCaches();
+}
+
+void PianoRollRhiRenderer::pruneTileCaches() {
+  for (int i = 0; i < static_cast<int>(StaticPlane::Count); ++i) {
+    TilePlaneCache& cache = m_tilePlaneCaches[static_cast<size_t>(i)];
+    const TileRange keep = cache.keepRange;
+    if (!keep.valid) {
+      for (auto& [_, tile] : cache.tiles) {
+        delete tile.compositeSrb;
+        delete tile.renderTarget;
+        delete tile.texture;
+      }
+      cache.tiles.clear();
+      continue;
+    }
+
+    for (auto it = cache.tiles.begin(); it != cache.tiles.end();) {
+      const StaticTile& tile = it->second;
+      const bool keepTile =
+          (tile.tileX >= keep.minX && tile.tileX <= keep.maxX &&
+           tile.tileY >= keep.minY && tile.tileY <= keep.maxY);
+      if (keepTile) {
+        ++it;
+        continue;
+      }
+      delete it->second.compositeSrb;
+      delete it->second.renderTarget;
+      delete it->second.texture;
+      it = cache.tiles.erase(it);
+    }
+  }
+}
+
+bool PianoRollRhiRenderer::ensureTile(StaticPlane plane, int tileX, int tileY, float dpr) {
+  if (!m_rhi || !m_uniformBuffer) {
+    return false;
+  }
+
+  const int idx = planeIndex(plane);
+  TilePlaneCache& cache = m_tilePlaneCaches[static_cast<size_t>(idx)];
+  const uint64_t key = makeTileKey(tileX, tileY);
+  if (cache.tiles.find(key) != cache.tiles.end()) {
+    return true;
+  }
+
+  const QSize requiredPixelSize = tilePixelSizeForDpr(dpr);
+  if (requiredPixelSize != m_tilePixelSize) {
+    releaseTileCaches();
+    m_tilePixelSize = requiredPixelSize;
+  }
+  if (!m_tileSampler) {
+    m_tileSampler = m_rhi->newSampler(QRhiSampler::Linear,
+                                      QRhiSampler::Linear,
+                                      QRhiSampler::None,
+                                      QRhiSampler::ClampToEdge,
+                                      QRhiSampler::ClampToEdge);
+    m_tileSampler->create();
+  }
+
+  StaticTile tile;
+  tile.tileX = tileX;
+  tile.tileY = tileY;
+
+  tile.texture = m_rhi->newTexture(QRhiTexture::RGBA8, m_tilePixelSize, 1, QRhiTexture::RenderTarget);
+  if (!tile.texture->create()) {
+    delete tile.texture;
+    tile.texture = nullptr;
+    return false;
+  }
+
+  tile.renderTarget = m_rhi->newTextureRenderTarget(QRhiTextureRenderTargetDescription(tile.texture));
+  if (!m_tileRenderPass) {
+    m_tileRenderPass = tile.renderTarget->newCompatibleRenderPassDescriptor();
+    if (!m_tileRenderPass) {
+      delete tile.renderTarget;
+      delete tile.texture;
+      tile.renderTarget = nullptr;
+      tile.texture = nullptr;
+      return false;
+    }
+  }
+  tile.renderTarget->setRenderPassDescriptor(m_tileRenderPass);
+  if (!tile.renderTarget->create()) {
+    delete tile.renderTarget;
+    delete tile.texture;
+    tile.renderTarget = nullptr;
+    tile.texture = nullptr;
+    return false;
+  }
+
+  tile.compositeSrb = m_rhi->newShaderResourceBindings();
+  tile.compositeSrb->setBindings({
+      QRhiShaderResourceBinding::uniformBuffer(0,
+                                               QRhiShaderResourceBinding::VertexStage,
+                                               m_uniformBuffer),
+      QRhiShaderResourceBinding::sampledTexture(1,
+                                                QRhiShaderResourceBinding::FragmentStage,
+                                                tile.texture,
+                                                m_tileSampler),
+  });
+  tile.compositeSrb->create();
+
+  tile.ready = false;
+  tile.generation = 0;
+  cache.tiles.emplace(key, tile);
+  return true;
+}
+
+void PianoRollRhiRenderer::renderMissingTiles(QRhiCommandBuffer* cb, QRhiResourceUpdateBatch*& initialUpdates) {
+  if (!cb || !m_rhi || !m_tileUniformBuffer) {
+    return;
+  }
+  if (!m_tileRenderPass) {
+    return;
+  }
+
+  ensureTilePipeline();
+  if (!m_tileRectPipeline || !m_tileRectSrb) {
+    return;
+  }
+
+  auto drawPlaneInstances = [&](StaticPlane plane) {
+    const auto& instances = staticPlaneInstances(plane);
+    if (instances.empty()) {
+      return;
+    }
+    QRhiBuffer* planeBuffer = staticPlaneBuffer(plane);
+    if (!planeBuffer) {
+      return;
+    }
+    const QRhiCommandBuffer::VertexInput bindings[] = {
+        {m_vertexBuffer, 0},
+        {planeBuffer, 0},
+    };
+    cb->setVertexInput(0,
+                       static_cast<int>(std::size(bindings)),
+                       bindings,
+                       m_indexBuffer,
+                       0,
+                       QRhiCommandBuffer::IndexUInt16);
+    cb->drawIndexed(6, static_cast<int>(instances.size()), 0, 0, 0);
+  };
+
+  for (int i = 0; i < static_cast<int>(StaticPlane::Count); ++i) {
+    const StaticPlane plane = static_cast<StaticPlane>(i);
+    TilePlaneCache& cache = m_tilePlaneCaches[static_cast<size_t>(i)];
+
+    for (uint64_t key : cache.visibleKeys) {
+      auto tileIt = cache.tiles.find(key);
+      if (tileIt == cache.tiles.end()) {
+        continue;
+      }
+
+      StaticTile& tile = tileIt->second;
+      if (tile.ready && tile.generation == m_staticGeneration) {
+        continue;
+      }
+      if (!tile.renderTarget) {
+        continue;
+      }
+
+      QMatrix4x4 mvp;
+      mvp.ortho(0.0f,
+                static_cast<float>(kTileLogicalWidth),
+                static_cast<float>(kTileLogicalHeight),
+                0.0f,
+                -1.0f,
+                1.0f);
+
+      std::array<float, 20> ubo{};
+      const float cameraX = static_cast<float>(tile.tileX * kTileLogicalWidth);
+      const float cameraY = static_cast<float>(tile.tileY * kTileLogicalHeight);
+      fillUniformData(ubo, mvp, cameraX, cameraY);
+
+      QRhiResourceUpdateBatch* tileUpdates = initialUpdates ? initialUpdates : m_rhi->nextResourceUpdateBatch();
+      tileUpdates->updateDynamicBuffer(m_tileUniformBuffer, 0, kUniformBytes, ubo.data());
+      cb->beginPass(tile.renderTarget, QColor(0, 0, 0, 0), {1.0f, 0}, tileUpdates);
+      cb->setViewport(QRhiViewport(0,
+                                   0,
+                                   static_cast<float>(m_tilePixelSize.width()),
+                                   static_cast<float>(m_tilePixelSize.height())));
+      cb->setGraphicsPipeline(m_tileRectPipeline);
+      cb->setShaderResources(m_tileRectSrb);
+      drawPlaneInstances(plane);
+      cb->endPass();
+
+      initialUpdates = nullptr;
+      tile.ready = true;
+      tile.generation = m_staticGeneration;
+    }
+  }
+}
+
+void PianoRollRhiRenderer::releaseTileCaches() {
+  for (auto& cache : m_tilePlaneCaches) {
+    for (auto& [_, tile] : cache.tiles) {
+      delete tile.compositeSrb;
+      tile.compositeSrb = nullptr;
+      delete tile.renderTarget;
+      tile.renderTarget = nullptr;
+      delete tile.texture;
+      tile.texture = nullptr;
+    }
+    cache.tiles.clear();
+    cache.visibleKeys.clear();
+    cache.keepRange = {};
+  }
+
+  delete m_tileRenderPass;
+  m_tileRenderPass = nullptr;
+
+  delete m_tileRectPipeline;
+  m_tileRectPipeline = nullptr;
+}
+
+std::vector<PianoRollRhiRenderer::RectInstance>& PianoRollRhiRenderer::staticPlaneInstances(StaticPlane plane) {
+  return m_staticPlaneInstanceData[static_cast<size_t>(planeIndex(plane))];
+}
+
+const std::vector<PianoRollRhiRenderer::RectInstance>& PianoRollRhiRenderer::staticPlaneInstances(StaticPlane plane) const {
+  return m_staticPlaneInstanceData[static_cast<size_t>(planeIndex(plane))];
+}
+
+QRhiBuffer*& PianoRollRhiRenderer::staticPlaneBuffer(StaticPlane plane) {
+  switch (plane) {
+    case StaticPlane::XY:
+      return m_staticXyInstanceBuffer;
+    case StaticPlane::X:
+      return m_staticXInstanceBuffer;
+    case StaticPlane::Y:
+      return m_staticYInstanceBuffer;
+    case StaticPlane::Count:
+      break;
+  }
+  return m_staticXyInstanceBuffer;
 }
 
 PianoRollRhiRenderer::Layout PianoRollRhiRenderer::computeLayout(const PianoRollFrame::Data& frame,
@@ -418,13 +993,21 @@ void PianoRollRhiRenderer::buildStaticInstances(const PianoRollFrame::Data& fram
                                                 const Layout& layout,
                                                 uint64_t trackColorsHash) {
   Q_UNUSED(trackColorsHash);
-  m_staticInstances.clear();
+  m_staticFixedInstances.clear();
+  for (auto& instances : m_staticPlaneInstanceData) {
+    instances.clear();
+  }
+
+  auto& fixedInstances = m_staticFixedInstances;
+  auto& xyInstances = staticPlaneInstances(StaticPlane::XY);
+  auto& xInstances = staticPlaneInstances(StaticPlane::X);
+  auto& yInstances = staticPlaneInstances(StaticPlane::Y);
 
   if (layout.viewWidth <= 0 || layout.viewHeight <= 0) {
     return;
   }
 
-  appendRect(m_staticInstances,
+  appendRect(fixedInstances,
              0.0f,
              0.0f,
              layout.keyboardWidth,
@@ -432,7 +1015,7 @@ void PianoRollRhiRenderer::buildStaticInstances(const PianoRollFrame::Data& fram
              frame.keyboardBackgroundColor.darker(108));
 
   if (layout.noteAreaWidth <= 0.0f || layout.noteAreaHeight <= 0.0f) {
-    appendRect(m_staticInstances,
+    appendRect(fixedInstances,
                layout.keyboardWidth - 1.0f,
                0.0f,
                1.0f,
@@ -441,19 +1024,19 @@ void PianoRollRhiRenderer::buildStaticInstances(const PianoRollFrame::Data& fram
     return;
   }
 
-  appendRect(m_staticInstances,
+  appendRect(fixedInstances,
              layout.noteAreaLeft,
              0.0f,
              layout.noteAreaWidth,
              layout.topBarHeight,
              frame.topBarBackgroundColor);
-  appendRect(m_staticInstances,
+  appendRect(fixedInstances,
              layout.noteAreaLeft,
              layout.noteAreaTop,
              layout.noteAreaWidth,
              layout.noteAreaHeight,
              frame.noteBackgroundColor);
-  appendRect(m_staticInstances,
+  appendRect(fixedInstances,
              0.0f,
              layout.noteAreaTop,
              layout.keyboardWidth,
@@ -465,7 +1048,7 @@ void PianoRollRhiRenderer::buildStaticInstances(const PianoRollFrame::Data& fram
     const float keyH = std::max(1.0f, layout.pixelsPerKey);
 
     const QColor rowColor = isBlackKey(key) ? frame.blackKeyRowColor : frame.whiteKeyRowColor;
-    appendRect(m_staticInstances,
+    appendRect(yInstances,
                layout.noteAreaLeft,
                keyY,
                layout.noteAreaWidth,
@@ -475,12 +1058,12 @@ void PianoRollRhiRenderer::buildStaticInstances(const PianoRollFrame::Data& fram
                0.0f,
                0.0f,
                0.0f,
-               0.0f,
+               1.0f,
                1.0f);
 
     QColor rowSep = frame.keySeparatorColor;
     rowSep.setAlpha(std::max(24, rowSep.alpha()));
-    appendRect(m_staticInstances,
+    appendRect(yInstances,
                layout.noteAreaLeft,
                keyY,
                layout.noteAreaWidth,
@@ -490,7 +1073,7 @@ void PianoRollRhiRenderer::buildStaticInstances(const PianoRollFrame::Data& fram
                0.0f,
                0.0f,
                0.0f,
-               0.0f,
+               1.0f,
                1.0f);
   }
 
@@ -535,7 +1118,7 @@ void PianoRollRhiRenderer::buildStaticInstances(const PianoRollFrame::Data& fram
           break;
         }
         const float x = layout.noteAreaLeft + (static_cast<float>(tick) * layout.pixelsPerTick);
-        appendRect(m_staticInstances,
+        appendRect(xInstances,
                    x,
                    layout.noteAreaTop,
                    1.0f,
@@ -546,10 +1129,10 @@ void PianoRollRhiRenderer::buildStaticInstances(const PianoRollFrame::Data& fram
                    0.0f,
                    0.0f,
                    1.0f,
-                   0.0f);
+                   1.0f);
         QColor topMeasure = frame.measureLineColor;
         topMeasure.setAlpha(std::min(255, topMeasure.alpha() + 30));
-        appendRect(m_staticInstances,
+        appendRect(xInstances,
                    x,
                    0.0f,
                    1.0f,
@@ -560,7 +1143,7 @@ void PianoRollRhiRenderer::buildStaticInstances(const PianoRollFrame::Data& fram
                    0.0f,
                    0.0f,
                    1.0f,
-                   0.0f);
+                   1.0f);
         ++emittedMeasureLines;
       }
     }
@@ -575,7 +1158,7 @@ void PianoRollRhiRenderer::buildStaticInstances(const PianoRollFrame::Data& fram
       }
 
       const float x = layout.noteAreaLeft + (static_cast<float>(tick) * layout.pixelsPerTick);
-      appendRect(m_staticInstances,
+      appendRect(xInstances,
                  x,
                  layout.noteAreaTop,
                  1.0f,
@@ -586,10 +1169,10 @@ void PianoRollRhiRenderer::buildStaticInstances(const PianoRollFrame::Data& fram
                  kDashGapPx,
                  0.0f,
                  1.0f,
-                 0.0f);
+                 1.0f);
       QColor topBeat = frame.beatLineColor;
       topBeat.setAlpha(std::max(20, topBeat.alpha() / 2));
-      appendRect(m_staticInstances,
+      appendRect(xInstances,
                  x,
                  0.0f,
                  1.0f,
@@ -600,7 +1183,7 @@ void PianoRollRhiRenderer::buildStaticInstances(const PianoRollFrame::Data& fram
                  0.0f,
                  0.0f,
                  1.0f,
-                 0.0f);
+                 1.0f);
       ++emittedBeatLines;
 
       if (beatTicks == 0) {
@@ -634,7 +1217,7 @@ void PianoRollRhiRenderer::buildStaticInstances(const PianoRollFrame::Data& fram
 
       QColor noteColor = colorForTrack(note.trackIndex);
       noteColor.setAlpha(188);
-      appendRect(m_staticInstances,
+      appendRect(xyInstances,
                  x,
                  y,
                  w,
@@ -648,7 +1231,7 @@ void PianoRollRhiRenderer::buildStaticInstances(const PianoRollFrame::Data& fram
                  1.0f);
 
       const float edgeThickness = 1.0f;
-      appendRect(m_staticInstances,
+      appendRect(xyInstances,
                  x,
                  y,
                  w,
@@ -660,7 +1243,7 @@ void PianoRollRhiRenderer::buildStaticInstances(const PianoRollFrame::Data& fram
                  0.0f,
                  1.0f,
                  1.0f);
-      appendRect(m_staticInstances,
+      appendRect(xyInstances,
                  x,
                  y + h - edgeThickness,
                  w,
@@ -695,7 +1278,7 @@ void PianoRollRhiRenderer::buildStaticInstances(const PianoRollFrame::Data& fram
 
     QColor keySep = frame.keySeparatorColor;
     keySep.setAlpha(std::max(56, keySep.alpha()));
-    appendRect(m_staticInstances,
+    appendRect(yInstances,
                0.0f,
                seamY,
                layout.keyboardWidth,
@@ -705,7 +1288,7 @@ void PianoRollRhiRenderer::buildStaticInstances(const PianoRollFrame::Data& fram
                0.0f,
                0.0f,
                0.0f,
-               0.0f,
+               1.0f,
                1.0f);
   };
 
@@ -748,7 +1331,7 @@ void PianoRollRhiRenderer::buildStaticInstances(const PianoRollFrame::Data& fram
       continue;
     }
 
-    appendRect(m_staticInstances,
+    appendRect(yInstances,
                0.0f,
                keyTop,
                layout.keyboardWidth,
@@ -758,7 +1341,7 @@ void PianoRollRhiRenderer::buildStaticInstances(const PianoRollFrame::Data& fram
                0.0f,
                0.0f,
                0.0f,
-               0.0f,
+               1.0f,
                1.0f);
 
     drawSeamAtUnit(topSeamUnit);
@@ -778,7 +1361,7 @@ void PianoRollRhiRenderer::buildStaticInstances(const PianoRollFrame::Data& fram
       continue;
     }
 
-    appendRect(m_staticInstances,
+    appendRect(yInstances,
                0.0f,
                clippedTop,
                blackKeyWidth,
@@ -788,7 +1371,7 @@ void PianoRollRhiRenderer::buildStaticInstances(const PianoRollFrame::Data& fram
                0.0f,
                0.0f,
                0.0f,
-               0.0f,
+               1.0f,
                1.0f);
 
     QColor blackFace = frame.blackKeyColor.darker(116);
@@ -797,7 +1380,7 @@ void PianoRollRhiRenderer::buildStaticInstances(const PianoRollFrame::Data& fram
     const float innerH = (clippedBottom - clippedTop) * blackInnerHeightRatio;
     const float innerX = (blackKeyWidth - innerW) * 0.5f;
     const float innerY = clippedTop + 0.6f;
-    appendRect(m_staticInstances,
+    appendRect(yInstances,
                innerX,
                innerY,
                innerW,
@@ -807,12 +1390,12 @@ void PianoRollRhiRenderer::buildStaticInstances(const PianoRollFrame::Data& fram
                0.0f,
                0.0f,
                0.0f,
-               0.0f,
+               1.0f,
                1.0f);
 
     QColor blackHighlight = frame.blackKeyColor.lighter(128);
     blackHighlight.setAlpha(84);
-    appendRect(m_staticInstances,
+    appendRect(yInstances,
                0.0f,
                clippedTop,
                blackKeyWidth,
@@ -822,17 +1405,17 @@ void PianoRollRhiRenderer::buildStaticInstances(const PianoRollFrame::Data& fram
                0.0f,
                0.0f,
                0.0f,
-               0.0f,
+               1.0f,
                1.0f);
   }
 
-  appendRect(m_staticInstances,
+  appendRect(fixedInstances,
              layout.noteAreaLeft,
              layout.topBarHeight - 1.0f,
              layout.noteAreaWidth,
              1.0f,
              frame.dividerColor);
-  appendRect(m_staticInstances,
+  appendRect(fixedInstances,
              layout.noteAreaLeft - 1.0f,
              0.0f,
              1.0f,
