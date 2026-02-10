@@ -39,6 +39,7 @@ struct Data {
   int currentTick = 0;
   int trackCount = 0;
   int ppqn = 48;
+  uint32_t maxNoteDurationTicks = 1;
 
   int scrollX = 0;
   int scrollY = 0;
