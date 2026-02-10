@@ -492,7 +492,7 @@ void PianoRollRhiRenderer::buildInstances(const PianoRollFrame::Data& frame, con
     }
   }
 
-  const float blackKeyWidth = std::max(10.0f, keyboardWidth * 0.63f);
+  const float blackKeyWidth = std::max(10.0f, keyboardWidth * 0.63f) + 6.0f;
   const float blackKeyHeight = std::max(2.0f, pixelsPerKey * 0.82f);
   const float blackInnerHeightRatio = 0.62f;
   const float blackInnerWidthRatio = 0.86f;
