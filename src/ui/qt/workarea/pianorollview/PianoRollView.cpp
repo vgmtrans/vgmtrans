@@ -15,7 +15,6 @@
 #include "VGMSeq.h"
 
 #include <QAbstractAnimation>
-#include <QCursor>
 #include <QEvent>
 #include <QEasingCurve>
 #include <QMouseEvent>
@@ -333,10 +332,7 @@ bool PianoRollView::handleViewportNativeGesture(QNativeGestureEvent* event) {
   }
 
   const float factor = std::clamp(std::exp(rawDelta), 0.55f, 1.85f);
-  QPoint anchor = event->position().toPoint();
-  if (m_rhiWidget) {
-    anchor = m_rhiWidget->mapFromGlobal(QCursor::pos());
-  }
+  const QPoint anchor = event->position().toPoint();
 
   if (event->modifiers().testFlag(Qt::AltModifier)) {
     zoomVerticalFactor(factor, anchor.y(), true, 150);
