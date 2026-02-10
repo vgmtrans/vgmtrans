@@ -137,6 +137,7 @@ target_sources(vgmtrans
       workarea/hexview/HexViewRhiWidget.h
       workarea/hexview/HexViewRhiWindow.h
       workarea/pianorollview/PianoRollFrameData.h
+      workarea/pianorollview/PianoRollRhiInputCoalescer.h
       workarea/pianorollview/PianoRollRhiHost.h
       workarea/pianorollview/PianoRollRhiRenderer.h
       workarea/pianorollview/PianoRollRhiWidget.h
