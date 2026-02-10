@@ -1079,6 +1079,48 @@ void PianoRollRhiRenderer::buildDynamicInstances(const PianoRollFrame::Data& fra
                noteEdge);
   });
 
+  if (frame.selectedNotes && !frame.selectedNotes->empty()) {
+    const float edgeThickness = 1.0f;
+    for (const PianoRollFrame::Note& selected : *frame.selectedNotes) {
+      const NoteGeometry geometry = computeNoteGeometry(selected, layout);
+      if (!geometry.valid) {
+        continue;
+      }
+
+      appendRect(m_dynamicInstances,
+                 geometry.x,
+                 geometry.y,
+                 geometry.w,
+                 geometry.h,
+                 frame.selectedNoteFillColor);
+
+      appendRect(m_dynamicInstances,
+                 geometry.x,
+                 geometry.y,
+                 geometry.w,
+                 edgeThickness,
+                 frame.selectedNoteOutlineColor);
+      appendRect(m_dynamicInstances,
+                 geometry.x,
+                 geometry.y + geometry.h - edgeThickness,
+                 geometry.w,
+                 edgeThickness,
+                 frame.selectedNoteOutlineColor);
+      appendRect(m_dynamicInstances,
+                 geometry.x,
+                 geometry.y,
+                 edgeThickness,
+                 geometry.h,
+                 frame.selectedNoteOutlineColor);
+      appendRect(m_dynamicInstances,
+                 geometry.x + geometry.w - edgeThickness,
+                 geometry.y,
+                 edgeThickness,
+                 geometry.h,
+                 frame.selectedNoteOutlineColor);
+    }
+  }
+
   const float currentX = layout.noteAreaLeft + (static_cast<float>(frame.currentTick) * layout.pixelsPerTick) - layout.scrollX;
   if (currentX >= layout.noteAreaLeft - 2.0f && currentX <= layout.noteAreaLeft + layout.noteAreaWidth + 2.0f) {
     QColor scanColor = frame.scanLineColor;
@@ -1096,6 +1138,41 @@ void PianoRollRhiRenderer::buildDynamicInstances(const PianoRollFrame::Data& fra
     if (progressWidth > 0.5f) {
       appendRect(m_dynamicInstances, layout.noteAreaLeft, 0.0f, progressWidth, layout.topBarHeight, progress);
     }
+  }
+
+  if (frame.selectionRectVisible && frame.selectionRectW > 0.5f && frame.selectionRectH > 0.5f) {
+    appendRect(m_dynamicInstances,
+               frame.selectionRectX,
+               frame.selectionRectY,
+               frame.selectionRectW,
+               frame.selectionRectH,
+               frame.selectionRectFillColor);
+
+    const float edge = 1.0f;
+    appendRect(m_dynamicInstances,
+               frame.selectionRectX,
+               frame.selectionRectY,
+               frame.selectionRectW,
+               edge,
+               frame.selectionRectOutlineColor);
+    appendRect(m_dynamicInstances,
+               frame.selectionRectX,
+               frame.selectionRectY + frame.selectionRectH - edge,
+               frame.selectionRectW,
+               edge,
+               frame.selectionRectOutlineColor);
+    appendRect(m_dynamicInstances,
+               frame.selectionRectX,
+               frame.selectionRectY,
+               edge,
+               frame.selectionRectH,
+               frame.selectionRectOutlineColor);
+    appendRect(m_dynamicInstances,
+               frame.selectionRectX + frame.selectionRectW - edge,
+               frame.selectionRectY,
+               edge,
+               frame.selectionRectH,
+               frame.selectionRectOutlineColor);
   }
 
   const float blackKeyWidth = std::max(10.0f, layout.keyboardWidth * 0.63f);
