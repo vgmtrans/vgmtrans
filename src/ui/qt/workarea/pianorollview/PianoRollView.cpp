@@ -17,7 +17,6 @@
 #include <QAbstractAnimation>
 #include <QEvent>
 #include <QEasingCurve>
-#include <QGuiApplication>
 #include <QMouseEvent>
 #include <QNativeGestureEvent>
 #include <QPalette>
@@ -369,8 +368,7 @@ bool PianoRollView::handleViewportNativeGesture(QNativeGestureEvent* event) {
     anchor = viewport()->mapFromGlobal(anchor);
   }
 
-  const Qt::KeyboardModifiers mods = event->modifiers() | QGuiApplication::keyboardModifiers();
-  if (mods.testFlag(Qt::AltModifier)) {
+  if (event->modifiers().testFlag(Qt::AltModifier)) {
     zoomVerticalFactor(factor, anchor.y(), true, 150);
   } else {
     zoomHorizontalFactor(factor, anchor.x(), true, 150);
@@ -450,6 +448,7 @@ void PianoRollView::maybeBuildTimelineFromSequence() {
 
 void PianoRollView::rebuildTrackIndexMap() {
   m_trackIndexByPtr.clear();
+  m_trackIndexByMidiPtr.clear();
 
   if (!m_seq) {
     return;
@@ -457,9 +456,33 @@ void PianoRollView::rebuildTrackIndexMap() {
 
   for (size_t i = 0; i < m_seq->aTracks.size(); ++i) {
     if (auto* track = m_seq->aTracks[i]) {
-      m_trackIndexByPtr[track] = static_cast<int>(i);
+      const int trackIndex = static_cast<int>(i);
+      m_trackIndexByPtr[track] = trackIndex;
+      if (track->pMidiTrack) {
+        m_trackIndexByMidiPtr.emplace(track->pMidiTrack, trackIndex);
+      }
     }
   }
+}
+
+int PianoRollView::trackIndexForTrack(const SeqTrack* track) const {
+  if (!track) {
+    return -1;
+  }
+
+  const auto trackIt = m_trackIndexByPtr.find(track);
+  if (trackIt != m_trackIndexByPtr.end()) {
+    return trackIt->second;
+  }
+
+  if (track->pMidiTrack) {
+    const auto midiTrackIt = m_trackIndexByMidiPtr.find(track->pMidiTrack);
+    if (midiTrackIt != m_trackIndexByMidiPtr.end()) {
+      return midiTrackIt->second;
+    }
+  }
+
+  return -1;
 }
 
 void PianoRollView::rebuildTrackColors() {
@@ -520,8 +543,8 @@ void PianoRollView::rebuildSequenceCache() {
       continue;
     }
 
-    const auto trackIt = m_trackIndexByPtr.find(timed.event->parentTrack);
-    if (trackIt == m_trackIndexByPtr.end()) {
+    const int trackIndex = trackIndexForTrack(timed.event->parentTrack);
+    if (trackIndex < 0) {
       continue;
     }
 
@@ -529,7 +552,7 @@ void PianoRollView::rebuildSequenceCache() {
     note.startTick = timed.startTick;
     note.duration = std::max<uint32_t>(1, timed.duration);
     note.key = static_cast<uint8_t>(noteKey);
-    note.trackIndex = static_cast<int16_t>(trackIt->second);
+    note.trackIndex = static_cast<int16_t>(trackIndex);
     notes->push_back(note);
     maxDurationTicks = std::max<uint32_t>(maxDurationTicks, note.duration);
   }
@@ -626,14 +649,14 @@ bool PianoRollView::updateActiveKeyStates() {
         continue;
       }
 
-      const auto trackIt = m_trackIndexByPtr.find(timed->event->parentTrack);
-      if (trackIt == m_trackIndexByPtr.end()) {
+      const int trackIndex = trackIndexForTrack(timed->event->parentTrack);
+      if (trackIndex < 0) {
         continue;
       }
 
       auto& state = nextActiveKeys[static_cast<size_t>(key)];
       if (state.trackIndex < 0 || timed->startTick >= state.startTick) {
-        state.trackIndex = trackIt->second;
+        state.trackIndex = trackIndex;
         state.startTick = timed->startTick;
       }
     }
@@ -802,12 +825,7 @@ void PianoRollView::zoomHorizontalFactor(float factor, int anchorX, bool animate
 
 void PianoRollView::zoomVerticalFactor(float factor, int anchorY, bool animated, int durationMs) {
   const float clampedFactor = std::clamp(factor, 0.05f, 20.0f);
-  const int noteViewportHeight = std::max(0, viewport()->height() - kTopBarHeight);
-  const float fitScale = (noteViewportHeight > 0)
-                             ? (static_cast<float>(noteViewportHeight) / static_cast<float>(kMidiKeyCount))
-                             : 0.0f;
-  const float zoomOutLimit = std::max(kMinPixelsPerKey, std::min(fitScale, m_pixelsPerKey));
-  const float targetScale = std::clamp(m_pixelsPerKey * clampedFactor, zoomOutLimit, kMaxPixelsPerKey);
+  const float targetScale = std::clamp(m_pixelsPerKey * clampedFactor, kMinPixelsPerKey, kMaxPixelsPerKey);
   if (std::abs(targetScale - m_pixelsPerKey) < 0.0001f) {
     return;
   }
@@ -815,8 +833,8 @@ void PianoRollView::zoomVerticalFactor(float factor, int anchorY, bool animated,
   if (animated) {
     animateVerticalScale(targetScale, anchorY, durationMs);
   } else {
-    const int anchorViewportHeight = std::max(0, viewport()->height() - kTopBarHeight);
-    const int anchorInNotes = std::clamp(anchorY - kTopBarHeight, 0, anchorViewportHeight);
+    const int noteViewportHeight = std::max(0, viewport()->height() - kTopBarHeight);
+    const int anchorInNotes = std::clamp(anchorY - kTopBarHeight, 0, noteViewportHeight);
     const float worldYAtAnchor = static_cast<float>(verticalScrollBar()->value() + anchorInNotes) /
                                  std::max(0.0001f, m_pixelsPerKey);
     applyVerticalScale(targetScale, anchorInNotes, worldYAtAnchor);
@@ -835,12 +853,7 @@ void PianoRollView::applyHorizontalScale(float scale, int anchorInNotes, float w
 }
 
 void PianoRollView::applyVerticalScale(float scale, int anchorInNotes, float worldYAtAnchor) {
-  const int noteViewportHeight = std::max(0, viewport()->height() - kTopBarHeight);
-  const float fitScale = (noteViewportHeight > 0)
-                             ? (static_cast<float>(noteViewportHeight) / static_cast<float>(kMidiKeyCount))
-                             : 0.0f;
-  const float zoomOutLimit = std::max(kMinPixelsPerKey, std::min(fitScale, m_pixelsPerKey));
-  m_pixelsPerKey = std::clamp(scale, zoomOutLimit, kMaxPixelsPerKey);
+  m_pixelsPerKey = std::clamp(scale, kMinPixelsPerKey, kMaxPixelsPerKey);
   updateScrollBars();
 
   const int newValue = static_cast<int>(std::llround(worldYAtAnchor * m_pixelsPerKey - anchorInNotes));
