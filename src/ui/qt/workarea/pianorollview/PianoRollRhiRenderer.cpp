@@ -95,8 +95,11 @@ void PianoRollRhiRenderer::releaseResources() {
   delete m_shaderBindings;
   m_shaderBindings = nullptr;
 
-  delete m_staticInstanceBuffer;
-  m_staticInstanceBuffer = nullptr;
+  delete m_staticBackInstanceBuffer;
+  m_staticBackInstanceBuffer = nullptr;
+
+  delete m_staticFrontInstanceBuffer;
+  m_staticFrontInstanceBuffer = nullptr;
 
   delete m_dynamicInstanceBuffer;
   m_dynamicInstanceBuffer = nullptr;
@@ -115,8 +118,10 @@ void PianoRollRhiRenderer::releaseResources() {
   m_staticBuffersUploaded = false;
   m_inited = false;
   m_staticCacheKey = {};
-  m_staticInstances.clear();
+  m_staticBackInstances.clear();
+  m_staticFrontInstances.clear();
   m_dynamicInstances.clear();
+  m_dynamicFrontStart = 0;
   m_rhi = nullptr;
 }
 
@@ -174,10 +179,17 @@ void PianoRollRhiRenderer::renderFrame(QRhiCommandBuffer* cb, const RenderTarget
   ubo[19] = 0.0f;
   updates->updateDynamicBuffer(m_uniformBuffer, 0, kUniformBytes, ubo.data());
 
-  if (!m_staticInstances.empty()) {
-    const int staticBytes = static_cast<int>(m_staticInstances.size() * sizeof(RectInstance));
-    if (ensureInstanceBuffer(m_staticInstanceBuffer, staticBytes, 16384)) {
-      updates->updateDynamicBuffer(m_staticInstanceBuffer, 0, staticBytes, m_staticInstances.data());
+  if (!m_staticBackInstances.empty()) {
+    const int staticBackBytes = static_cast<int>(m_staticBackInstances.size() * sizeof(RectInstance));
+    if (ensureInstanceBuffer(m_staticBackInstanceBuffer, staticBackBytes, 16384)) {
+      updates->updateDynamicBuffer(m_staticBackInstanceBuffer, 0, staticBackBytes, m_staticBackInstances.data());
+    }
+  }
+
+  if (!m_staticFrontInstances.empty()) {
+    const int staticFrontBytes = static_cast<int>(m_staticFrontInstances.size() * sizeof(RectInstance));
+    if (ensureInstanceBuffer(m_staticFrontInstanceBuffer, staticFrontBytes, 4096)) {
+      updates->updateDynamicBuffer(m_staticFrontInstanceBuffer, 0, staticFrontBytes, m_staticFrontInstances.data());
     }
   }
 
@@ -198,7 +210,7 @@ void PianoRollRhiRenderer::renderFrame(QRhiCommandBuffer* cb, const RenderTarget
     cb->setGraphicsPipeline(m_pipeline);
     cb->setShaderResources(m_shaderBindings);
 
-    auto drawInstances = [&](QRhiBuffer* buffer, int count) {
+    auto drawInstances = [&](QRhiBuffer* buffer, int count, int firstInstance = 0) {
       if (!buffer || count <= 0) {
         return;
       }
@@ -213,11 +225,15 @@ void PianoRollRhiRenderer::renderFrame(QRhiCommandBuffer* cb, const RenderTarget
                          m_indexBuffer,
                          0,
                          QRhiCommandBuffer::IndexUInt16);
-      cb->drawIndexed(6, count, 0, 0, 0);
+      cb->drawIndexed(6, count, 0, 0, firstInstance);
     };
 
-    drawInstances(m_staticInstanceBuffer, static_cast<int>(m_staticInstances.size()));
-    drawInstances(m_dynamicInstanceBuffer, static_cast<int>(m_dynamicInstances.size()));
+    const int dynamicCount = static_cast<int>(m_dynamicInstances.size());
+    const int dynamicFrontStart = std::clamp(m_dynamicFrontStart, 0, dynamicCount);
+    drawInstances(m_staticBackInstanceBuffer, static_cast<int>(m_staticBackInstances.size()));
+    drawInstances(m_dynamicInstanceBuffer, dynamicFrontStart, 0);
+    drawInstances(m_staticFrontInstanceBuffer, static_cast<int>(m_staticFrontInstances.size()));
+    drawInstances(m_dynamicInstanceBuffer, dynamicCount - dynamicFrontStart, dynamicFrontStart);
   }
 
   cb->endPass();
@@ -439,13 +455,14 @@ void PianoRollRhiRenderer::buildStaticInstances(const PianoRollFrame::Data& fram
                                                 uint64_t trackColorsHash,
                                                 const StaticCacheKey& cacheKey) {
   Q_UNUSED(trackColorsHash);
-  m_staticInstances.clear();
+  m_staticBackInstances.clear();
+  m_staticFrontInstances.clear();
 
   if (layout.viewWidth <= 0 || layout.viewHeight <= 0) {
     return;
   }
 
-  appendRect(m_staticInstances,
+  appendRect(m_staticBackInstances,
              0.0f,
              0.0f,
              layout.keyboardWidth,
@@ -453,7 +470,7 @@ void PianoRollRhiRenderer::buildStaticInstances(const PianoRollFrame::Data& fram
              frame.keyboardBackgroundColor.darker(108));
 
   if (layout.noteAreaWidth <= 0.0f || layout.noteAreaHeight <= 0.0f) {
-    appendRect(m_staticInstances,
+    appendRect(m_staticBackInstances,
                layout.keyboardWidth - 1.0f,
                0.0f,
                1.0f,
@@ -462,19 +479,19 @@ void PianoRollRhiRenderer::buildStaticInstances(const PianoRollFrame::Data& fram
     return;
   }
 
-  appendRect(m_staticInstances,
+  appendRect(m_staticBackInstances,
              layout.noteAreaLeft,
              0.0f,
              layout.noteAreaWidth,
              layout.topBarHeight,
              frame.topBarBackgroundColor);
-  appendRect(m_staticInstances,
+  appendRect(m_staticBackInstances,
              layout.noteAreaLeft,
              layout.noteAreaTop,
              layout.noteAreaWidth,
              layout.noteAreaHeight,
              frame.noteBackgroundColor);
-  appendRect(m_staticInstances,
+  appendRect(m_staticBackInstances,
              0.0f,
              layout.noteAreaTop,
              layout.keyboardWidth,
@@ -489,7 +506,7 @@ void PianoRollRhiRenderer::buildStaticInstances(const PianoRollFrame::Data& fram
     const float keyH = std::max(1.0f, layout.pixelsPerKey);
 
     const QColor rowColor = isBlackKey(key) ? frame.blackKeyRowColor : frame.whiteKeyRowColor;
-    appendRect(m_staticInstances,
+    appendRect(m_staticBackInstances,
                layout.noteAreaLeft,
                keyY,
                layout.noteAreaWidth,
@@ -504,7 +521,7 @@ void PianoRollRhiRenderer::buildStaticInstances(const PianoRollFrame::Data& fram
 
     QColor rowSep = frame.keySeparatorColor;
     rowSep.setAlpha(std::max(24, rowSep.alpha()));
-    appendRect(m_staticInstances,
+    appendRect(m_staticBackInstances,
                layout.noteAreaLeft,
                keyY,
                layout.noteAreaWidth,
@@ -594,7 +611,7 @@ void PianoRollRhiRenderer::buildStaticInstances(const PianoRollFrame::Data& fram
             break;
           }
           const float x = layout.noteAreaLeft + (static_cast<float>(tick) * layout.pixelsPerTick);
-          appendRect(m_staticInstances,
+          appendRect(m_staticBackInstances,
                      x,
                      layout.noteAreaTop,
                      1.0f,
@@ -608,7 +625,7 @@ void PianoRollRhiRenderer::buildStaticInstances(const PianoRollFrame::Data& fram
                      0.0f);
           QColor topMeasure = frame.measureLineColor;
           topMeasure.setAlpha(std::min(255, topMeasure.alpha() + 30));
-          appendRect(m_staticInstances,
+          appendRect(m_staticBackInstances,
                      x,
                      0.0f,
                      1.0f,
@@ -649,7 +666,7 @@ void PianoRollRhiRenderer::buildStaticInstances(const PianoRollFrame::Data& fram
           const bool isMeasure = (measureTicks > 0) && (((tick - segStart) % measureTicks) == 0);
           if (!isMeasure) {
             const float x = layout.noteAreaLeft + (static_cast<float>(tick) * layout.pixelsPerTick);
-            appendRect(m_staticInstances,
+            appendRect(m_staticBackInstances,
                        x,
                        layout.noteAreaTop,
                        1.0f,
@@ -663,7 +680,7 @@ void PianoRollRhiRenderer::buildStaticInstances(const PianoRollFrame::Data& fram
                        0.0f);
             QColor topBeat = frame.beatLineColor;
             topBeat.setAlpha(std::max(20, topBeat.alpha() / 2));
-            appendRect(m_staticInstances,
+            appendRect(m_staticBackInstances,
                        x,
                        0.0f,
                        1.0f,
@@ -711,7 +728,7 @@ void PianoRollRhiRenderer::buildStaticInstances(const PianoRollFrame::Data& fram
 
     QColor noteColor = colorForTrack(note.trackIndex);
     noteColor.setAlpha(188);
-    appendRect(m_staticInstances,
+    appendRect(m_staticBackInstances,
                x,
                y,
                w,
@@ -725,7 +742,7 @@ void PianoRollRhiRenderer::buildStaticInstances(const PianoRollFrame::Data& fram
                1.0f);
 
     const float edgeThickness = 1.0f;
-    appendRect(m_staticInstances,
+    appendRect(m_staticBackInstances,
                x,
                y,
                w,
@@ -737,7 +754,7 @@ void PianoRollRhiRenderer::buildStaticInstances(const PianoRollFrame::Data& fram
                0.0f,
                1.0f,
                1.0f);
-    appendRect(m_staticInstances,
+    appendRect(m_staticBackInstances,
                x,
                y + h - edgeThickness,
                w,
@@ -773,7 +790,7 @@ void PianoRollRhiRenderer::buildStaticInstances(const PianoRollFrame::Data& fram
 
     QColor keySep = frame.keySeparatorColor;
     keySep.setAlpha(std::max(56, keySep.alpha()));
-    appendRect(m_staticInstances,
+    appendRect(m_staticBackInstances,
                0.0f,
                seamY,
                layout.keyboardWidth,
@@ -826,7 +843,7 @@ void PianoRollRhiRenderer::buildStaticInstances(const PianoRollFrame::Data& fram
       continue;
     }
 
-    appendRect(m_staticInstances,
+    appendRect(m_staticBackInstances,
                0.0f,
                keyTop,
                layout.keyboardWidth,
@@ -856,7 +873,7 @@ void PianoRollRhiRenderer::buildStaticInstances(const PianoRollFrame::Data& fram
       continue;
     }
 
-    appendRect(m_staticInstances,
+    appendRect(m_staticFrontInstances,
                0.0f,
                clippedTop,
                blackKeyWidth,
@@ -875,7 +892,7 @@ void PianoRollRhiRenderer::buildStaticInstances(const PianoRollFrame::Data& fram
     const float innerH = (clippedBottom - clippedTop) * blackInnerHeightRatio;
     const float innerX = (blackKeyWidth - innerW) * 0.5f;
     const float innerY = clippedTop + 0.6f;
-    appendRect(m_staticInstances,
+    appendRect(m_staticFrontInstances,
                innerX,
                innerY,
                innerW,
@@ -890,7 +907,7 @@ void PianoRollRhiRenderer::buildStaticInstances(const PianoRollFrame::Data& fram
 
     QColor blackHighlight = frame.blackKeyColor.lighter(128);
     blackHighlight.setAlpha(84);
-    appendRect(m_staticInstances,
+    appendRect(m_staticFrontInstances,
                0.0f,
                clippedTop,
                blackKeyWidth,
@@ -904,13 +921,13 @@ void PianoRollRhiRenderer::buildStaticInstances(const PianoRollFrame::Data& fram
                1.0f);
   }
 
-  appendRect(m_staticInstances,
+  appendRect(m_staticBackInstances,
              layout.noteAreaLeft,
              layout.topBarHeight - 1.0f,
              layout.noteAreaWidth,
              1.0f,
              frame.dividerColor);
-  appendRect(m_staticInstances,
+  appendRect(m_staticBackInstances,
              layout.noteAreaLeft - 1.0f,
              0.0f,
              1.0f,
@@ -920,6 +937,7 @@ void PianoRollRhiRenderer::buildStaticInstances(const PianoRollFrame::Data& fram
 
 void PianoRollRhiRenderer::buildDynamicInstances(const PianoRollFrame::Data& frame, const Layout& layout) {
   m_dynamicInstances.clear();
+  m_dynamicFrontStart = 0;
 
   if (layout.viewWidth <= 0 || layout.viewHeight <= 0 || layout.noteAreaWidth <= 0.0f || layout.noteAreaHeight <= 0.0f) {
     return;
@@ -1070,6 +1088,8 @@ void PianoRollRhiRenderer::buildDynamicInstances(const PianoRollFrame::Data& fra
                active);
   }
 
+  // Black-key highlights must render above the static black key faces.
+  m_dynamicFrontStart = static_cast<int>(m_dynamicInstances.size());
   for (int key = 0; key < PianoRollFrame::kMidiKeyCount; ++key) {
     if (!isBlackKey(key)) {
       continue;
@@ -1082,37 +1102,6 @@ void PianoRollRhiRenderer::buildDynamicInstances(const PianoRollFrame::Data& fra
     if (clippedBottom - clippedTop <= 0.5f) {
       continue;
     }
-
-    // Repaint black keys in the dynamic layer so white-key highlights never
-    // appear on top of them.
-    appendRect(m_dynamicInstances,
-               0.0f,
-               clippedTop,
-               blackKeyWidth,
-               clippedBottom - clippedTop,
-               frame.blackKeyColor);
-
-    QColor blackFace = frame.blackKeyColor.darker(116);
-    blackFace.setAlpha(230);
-    const float innerW = blackKeyWidth * 0.86f;
-    const float innerH = (clippedBottom - clippedTop) * 0.62f;
-    const float innerX = (blackKeyWidth - innerW) * 0.5f;
-    const float innerY = clippedTop + 0.6f;
-    appendRect(m_dynamicInstances,
-               innerX,
-               innerY,
-               innerW,
-               std::max(0.0f, innerH - 0.6f),
-               blackFace);
-
-    QColor blackHighlight = frame.blackKeyColor.lighter(128);
-    blackHighlight.setAlpha(84);
-    appendRect(m_dynamicInstances,
-               0.0f,
-               clippedTop,
-               blackKeyWidth,
-               1.0f,
-               blackHighlight);
 
     const int activeTrack = frame.activeKeyTrack[static_cast<size_t>(key)];
     if (activeTrack < 0) {
