@@ -8,6 +8,7 @@
 
 #include <QAbstractScrollArea>
 #include <QElapsedTimer>
+#include <QtGlobal>
 
 #include <array>
 #include <cstdint>
@@ -93,6 +94,8 @@ private:
   void updateScrollBars();
   void scheduleViewportSync();
   void requestRender();
+  void requestRenderCoalesced();
+  void scheduleCoalescedRender(int delayMs);
 
   int clampTick(int tick) const;
   int tickFromViewportX(int x) const;
@@ -128,14 +131,17 @@ private:
   bool m_attemptedTimelineBuild = false;
   bool m_initialViewportPositioned = false;
   bool m_viewportSyncQueued = false;
+  bool m_coalescedRenderPending = false;
 
   QElapsedTimer m_animClock;
+  QElapsedTimer m_renderClock;
   QVariantAnimation* m_horizontalZoomAnimation = nullptr;
   QVariantAnimation* m_verticalZoomAnimation = nullptr;
   float m_horizontalZoomWorldTick = 0.0f;
   int m_horizontalZoomAnchor = 0;
   float m_verticalZoomWorldY = 0.0f;
   int m_verticalZoomAnchor = 0;
+  qint64 m_lastRenderMs = std::numeric_limits<qint64>::min() / 4;
   int m_lastRenderedScanlineX = std::numeric_limits<int>::min();
 
   size_t m_cachedTimelineSize = 0;
