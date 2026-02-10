@@ -993,10 +993,10 @@ void PianoRollRhiRenderer::buildDynamicInstances(const PianoRollFrame::Data& fra
     QColor active = colorForTrack(activeTrack).lighter(112);
     active.setAlpha(172);
     appendRect(m_dynamicInstances,
-               1.0f,
+               0.0f,
                clippedTop + 1.0f,
-               std::max(0.0f, layout.keyboardWidth - 2.0f),
-               std::max(0.0f, clippedBottom - clippedTop - 2.0f),
+               std::max(0.0f, layout.keyboardWidth),
+               std::max(0.0f, clippedBottom - clippedTop - 1.0f),
                active);
   }
 
@@ -1012,6 +1012,37 @@ void PianoRollRhiRenderer::buildDynamicInstances(const PianoRollFrame::Data& fra
     if (clippedBottom - clippedTop <= 0.5f) {
       continue;
     }
+
+    // Repaint black keys in the dynamic layer so white-key highlights never
+    // appear on top of them.
+    appendRect(m_dynamicInstances,
+               0.0f,
+               clippedTop,
+               blackKeyWidth,
+               clippedBottom - clippedTop,
+               frame.blackKeyColor);
+
+    QColor blackFace = frame.blackKeyColor.darker(116);
+    blackFace.setAlpha(230);
+    const float innerW = blackKeyWidth * 0.86f;
+    const float innerH = (clippedBottom - clippedTop) * 0.62f;
+    const float innerX = (blackKeyWidth - innerW) * 0.5f;
+    const float innerY = clippedTop + 0.6f;
+    appendRect(m_dynamicInstances,
+               innerX,
+               innerY,
+               innerW,
+               std::max(0.0f, innerH - 0.6f),
+               blackFace);
+
+    QColor blackHighlight = frame.blackKeyColor.lighter(128);
+    blackHighlight.setAlpha(84);
+    appendRect(m_dynamicInstances,
+               0.0f,
+               clippedTop,
+               blackKeyWidth,
+               1.0f,
+               blackHighlight);
 
     const int activeTrack = frame.activeKeyTrack[static_cast<size_t>(key)];
     if (activeTrack < 0) {
