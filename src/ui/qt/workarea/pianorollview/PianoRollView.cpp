@@ -87,6 +87,7 @@ PianoRollView::PianoRollView(QWidget* parent)
   }
 
   m_animClock.start();
+  m_renderClock.start();
   updateScrollBars();
 }
 
@@ -267,7 +268,7 @@ void PianoRollView::scrollContentsBy(int dx, int dy) {
   QAbstractScrollArea::scrollContentsBy(dx, dy);
   Q_UNUSED(dx);
   Q_UNUSED(dy);
-  requestRender();
+  requestRenderCoalesced();
 }
 
 void PianoRollView::changeEvent(QEvent* event) {
@@ -703,7 +704,41 @@ void PianoRollView::scheduleViewportSync() {
 void PianoRollView::requestRender() {
   if (m_rhiWidget) {
     m_rhiWidget->update();
+    if (!m_renderClock.isValid()) {
+      m_renderClock.start();
+    }
+    m_lastRenderMs = m_renderClock.elapsed();
   }
+}
+
+void PianoRollView::requestRenderCoalesced() {
+  if (!m_rhiWidget) {
+    return;
+  }
+
+  if (!m_renderClock.isValid()) {
+    m_renderClock.start();
+  }
+
+  static constexpr qint64 kMinRenderIntervalMs = 16;
+  const qint64 nowMs = m_renderClock.elapsed();
+  const qint64 sinceLastRender = nowMs - m_lastRenderMs;
+  const int delayMs = (sinceLastRender >= kMinRenderIntervalMs)
+                          ? 0
+                          : static_cast<int>(kMinRenderIntervalMs - sinceLastRender);
+  scheduleCoalescedRender(delayMs);
+}
+
+void PianoRollView::scheduleCoalescedRender(int delayMs) {
+  if (m_coalescedRenderPending) {
+    return;
+  }
+
+  m_coalescedRenderPending = true;
+  QTimer::singleShot(std::max(0, delayMs), this, [this]() {
+    m_coalescedRenderPending = false;
+    requestRender();
+  });
 }
 
 int PianoRollView::clampTick(int tick) const {
