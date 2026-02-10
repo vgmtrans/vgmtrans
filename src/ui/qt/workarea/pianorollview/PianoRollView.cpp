@@ -48,6 +48,7 @@ PianoRollView::PianoRollView(QWidget* parent)
   setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOn);
 
   connect(hbar, &PianoRollZoomScrollBar::zoomInRequested, this, [this]() {
+    // Zoom from viewport center when using scrollbar +/- buttons.
     zoomHorizontal(+1, viewport()->width() / 2, true, 150);
   });
   connect(hbar, &PianoRollZoomScrollBar::zoomOutRequested, this, [this]() {
@@ -74,6 +75,7 @@ PianoRollView::PianoRollView(QWidget* parent)
   });
 
   m_rhiHost = new PianoRollRhiHost(this, viewport());
+  // Host owns whichever render surface backend is active on this platform.
   m_rhiHost->setGeometry(viewport()->rect());
   m_rhiHost->setFocusPolicy(Qt::NoFocus);
   m_rhiHost->setMouseTracking(true);
@@ -149,6 +151,7 @@ void PianoRollView::refreshSequenceData(bool allowTimelineBuild) {
   if (m_timeline == &timeline &&
       m_cachedTimelineFinalized == timelineFinalized &&
       m_cachedTimelineSize == timelineSize) {
+    // Timeline identity + size/finalized status unchanged -> cached notes still valid.
     return;
   }
 
@@ -363,6 +366,7 @@ bool PianoRollView::handleViewportNativeGesture(QNativeGestureEvent* event) {
 
   QPoint anchor = event->globalPosition().toPoint();
   if (m_rhiHost) {
+    // Gestures arrive in global space from the render surface.
     anchor = m_rhiHost->mapFromGlobal(anchor);
   } else {
     anchor = viewport()->mapFromGlobal(anchor);
@@ -441,6 +445,7 @@ void PianoRollView::maybeBuildTimelineFromSequence() {
 
   m_attemptedTimelineBuild = true;
 
+  // Converting to MIDI finalizes timedEventIndex for views that need absolute note timing.
   const VGMColl* coll = m_seq->assocColls.empty() ? nullptr : m_seq->assocColls.front();
   MidiFile* midi = m_seq->convertToMidi(coll);
   delete midi;
@@ -475,6 +480,8 @@ int PianoRollView::trackIndexForTrack(const SeqTrack* track) const {
     return trackIt->second;
   }
 
+  // Multi-section sequences can emit events from section track instances no longer
+  // present in aTracks. Resolve by shared MidiTrack when available.
   if (track->pMidiTrack) {
     const auto midiTrackIt = m_trackIndexByMidiPtr.find(track->pMidiTrack);
     if (midiTrackIt != m_trackIndexByMidiPtr.end()) {
@@ -519,6 +526,7 @@ void PianoRollView::rebuildSequenceCache() {
   m_cachedTimelineSize = timeline.size();
 
   if (!timeline.finalized()) {
+    // Rendering proceeds with empty notes until the timeline is finalized.
     m_notes = notes;
     signatures->push_back({0, 4, 4});
     m_timeSignatures = signatures;
@@ -655,6 +663,7 @@ bool PianoRollView::updateActiveKeyStates() {
       }
 
       auto& state = nextActiveKeys[static_cast<size_t>(key)];
+      // If multiple tracks hold the same key, use the most recent note start.
       if (state.trackIndex < 0 || timed->startTick >= state.startTick) {
         state.trackIndex = trackIndex;
         state.startTick = timed->startTick;
@@ -700,6 +709,7 @@ void PianoRollView::updateScrollBars() {
     // Defer initial centering until dimensions are actually usable.
     const bool usableViewport = noteViewportWidth >= 64 && noteViewportHeight >= 64;
     if (usableViewport) {
+      // Default initial focus: center of the keyboard range.
       verticalScrollBar()->setValue(verticalScrollBar()->maximum() / 2);
       m_initialViewportPositioned = true;
     } else {
@@ -748,6 +758,7 @@ void PianoRollView::requestRenderCoalesced() {
   static constexpr qint64 kMinRenderIntervalMs = 16;
   const qint64 nowMs = m_renderClock.elapsed();
   const qint64 sinceLastRender = nowMs - m_lastRenderMs;
+  // Clamp high-frequency scroll updates to roughly one render per refresh interval.
   const int delayMs = (sinceLastRender >= kMinRenderIntervalMs)
                           ? 0
                           : static_cast<int>(kMinRenderIntervalMs - sinceLastRender);
@@ -815,6 +826,7 @@ void PianoRollView::zoomHorizontalFactor(float factor, int anchorX, bool animate
   if (animated) {
     animateHorizontalScale(targetScale, anchorX, durationMs);
   } else {
+    // Keep the world position under the cursor fixed while changing scale.
     const int noteViewportWidth = std::max(0, viewport()->width() - kKeyboardWidth);
     const int anchorInNotes = std::clamp(anchorX - kKeyboardWidth, 0, noteViewportWidth);
     const float worldTickAtAnchor = static_cast<float>(horizontalScrollBar()->value() + anchorInNotes) /
@@ -833,6 +845,7 @@ void PianoRollView::zoomVerticalFactor(float factor, int anchorY, bool animated,
   if (animated) {
     animateVerticalScale(targetScale, anchorY, durationMs);
   } else {
+    // Keep the world Y under the cursor fixed while changing vertical scale.
     const int noteViewportHeight = std::max(0, viewport()->height() - kTopBarHeight);
     const int anchorInNotes = std::clamp(anchorY - kTopBarHeight, 0, noteViewportHeight);
     const float worldYAtAnchor = static_cast<float>(verticalScrollBar()->value() + anchorInNotes) /

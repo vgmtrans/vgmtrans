@@ -68,6 +68,8 @@ private:
   };
 
   struct StaticCacheKey {
+    // Key for CPU-generated static geometry. If any field changes, static
+    // instances are rebuilt and re-uploaded.
     bool valid = false;
     QSize viewSize;
     int totalTicks = 0;
@@ -94,6 +96,7 @@ private:
   };
 
   struct RectInstance {
+    // Per-instance payload consumed by pianorollquad shaders.
     float x;
     float y;
     float w;
@@ -130,6 +133,7 @@ private:
   void buildStaticInstances(const PianoRollFrame::Data& frame,
                             const Layout& layout,
                             uint64_t trackColorsHash);
+  // Dynamic pass is rebuilt every frame (scanline, active highlights, glow).
   void buildDynamicInstances(const PianoRollFrame::Data& frame, const Layout& layout);
 
   template <typename Fn>

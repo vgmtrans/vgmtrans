@@ -38,6 +38,7 @@ protected:
   void mouseReleaseEvent(QMouseEvent* event) override;
 
 private:
+  // Non-owning pointers; host controls their lifetime.
   PianoRollView* m_view = nullptr;
   PianoRollRhiRenderer* m_renderer = nullptr;
 };

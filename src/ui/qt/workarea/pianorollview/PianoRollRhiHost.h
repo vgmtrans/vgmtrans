@@ -26,6 +26,8 @@ protected:
   void resizeEvent(QResizeEvent* event) override;
 
 private:
+  // Shared renderer instance used by either the QRhiWidget path (Linux)
+  // or the native window path (macOS/Windows).
   std::unique_ptr<PianoRollRhiRenderer> m_renderer;
   QWidget* m_surface = nullptr;
   QWindow* m_window = nullptr;

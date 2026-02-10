@@ -29,6 +29,7 @@ protected:
                       float dpr) override;
 
 private:
+  // Non-owning pointers; lifetime is managed by PianoRollRhiHost.
   PianoRollView* m_view = nullptr;
   PianoRollRhiRenderer* m_renderer = nullptr;
 };
