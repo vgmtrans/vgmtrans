@@ -47,6 +47,8 @@ public:
   void setSequence(VGMSeq* seq);
   void setTrackCount(int trackCount);
   void refreshSequenceData(bool allowTimelineBuild);
+  void setSelectedItems(const std::vector<const VGMItem*>& items,
+                        const VGMItem* primaryItem = nullptr);
 
   void setPlaybackTick(int tick, bool playbackActive);
   void clearPlaybackState();
@@ -56,6 +58,7 @@ public:
 signals:
   void seekRequested(int tick);
   void selectionChanged(VGMItem* item);
+  void selectionSetChanged(const std::vector<VGMItem*>& items, VGMItem* primaryItem);
 
 protected:
   void resizeEvent(QResizeEvent* event) override;

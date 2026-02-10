@@ -451,6 +451,91 @@ void HexView::setSelectedItem(VGMItem* item) {
   }
 }
 
+void HexView::setSelectedItems(const std::vector<const VGMItem*>& items,
+                               const VGMItem* primaryItem) {
+  if (items.empty()) {
+    setSelectedItem(nullptr);
+    return;
+  }
+
+  VGMItem* resolvedPrimary = const_cast<VGMItem*>(primaryItem);
+  if (!resolvedPrimary) {
+    for (const auto* item : items) {
+      if (item) {
+        resolvedPrimary = const_cast<VGMItem*>(item);
+        break;
+      }
+    }
+  }
+
+  if (!resolvedPrimary) {
+    setSelectedItem(nullptr);
+    return;
+  }
+
+  m_selectedItem = resolvedPrimary;
+  m_selectedOffset = m_selectedItem->offset();
+
+  std::vector<SelectionRange> selections;
+  selections.reserve(items.size());
+  std::unordered_set<uint64_t> keys;
+  keys.reserve(items.size() * 2 + 1);
+
+  for (const auto* item : items) {
+    if (!item) {
+      continue;
+    }
+    const uint32_t length = item->length() > 0 ? item->length() : 1u;
+    const SelectionRange range{item->offset(), length};
+    if (keys.insert(selectionKey(range)).second) {
+      selections.push_back(range);
+    }
+  }
+
+  if (selections.empty()) {
+    setSelectedItem(nullptr);
+    return;
+  }
+
+  std::sort(selections.begin(), selections.end(), [](const SelectionRange& a, const SelectionRange& b) {
+    if (a.offset != b.offset) {
+      return a.offset < b.offset;
+    }
+    return a.length < b.length;
+  });
+
+  m_selections = std::move(selections);
+  m_fadeSelections.clear();
+  updateHighlightState(true);
+  requestRhiUpdate(false, true);
+
+  if (!m_lineHeight) {
+    return;
+  }
+
+  const int itemBaseOffset = static_cast<int>(m_selectedItem->offset() - m_vgmfile->offset());
+  const int line = itemBaseOffset / BYTES_PER_LINE;
+  const int endLine = (itemBaseOffset + static_cast<int>(m_selectedItem->length())) / BYTES_PER_LINE;
+
+  const int viewStartLine = verticalScrollBar()->value() / m_lineHeight;
+  const int viewEndLine = viewStartLine + (viewport()->height() / m_lineHeight);
+
+  if (line <= viewEndLine && endLine > viewStartLine) {
+    return;
+  }
+
+  if (line < viewStartLine) {
+    verticalScrollBar()->setValue(line * m_lineHeight);
+  } else if (endLine > viewEndLine) {
+    if ((endLine - line) > (viewport()->height() / m_lineHeight)) {
+      verticalScrollBar()->setValue(line * m_lineHeight);
+    } else {
+      const int y = ((endLine + 1) * m_lineHeight) + 1 - viewport()->height();
+      verticalScrollBar()->setValue(y);
+    }
+  }
+}
+
 // Update playback selections from active items and seed fade-out entries for removed ones.
 void HexView::setPlaybackSelectionsForItems(const std::vector<const VGMItem*>& items) {
   std::vector<SelectionRange> next;
