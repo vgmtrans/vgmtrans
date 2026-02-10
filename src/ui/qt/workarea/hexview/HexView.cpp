@@ -8,6 +8,7 @@
 #include "Helpers.h"
 #include "HexViewInput.h"
 #include "HexViewRhiHost.h"
+#include "util/NonTransientScrollBarStyle.h"
 #include "services/NotificationCenter.h"
 #include "VGMFile.h"
 
@@ -21,9 +22,6 @@
 #include <QKeyEvent>
 #include <QMouseEvent>
 #include <QPixmap>
-#include <QProxyStyle>
-#include <QRawFont>
-#include <QStyleFactory>
 #include <QPainter>
 #include <QParallelAnimationGroup>
 #include <QPropertyAnimation>
@@ -63,57 +61,6 @@ constexpr float PLAYBACK_GLOW_EDGE_CURVE = 0.85f;
 const QColor PLAYBACK_GLOW_LOW(40, 40, 40);
 const QColor PLAYBACK_GLOW_HIGH(230, 230, 230);
 constexpr uint16_t STYLE_UNASSIGNED = std::numeric_limits<uint16_t>::max();
-
-struct WidgetLayoutMetrics {
-  qreal dpr = 1.0;
-  int charWidthPx = 0;
-  int addressEndPx = 0;
-  int hexStartPx = 0;
-  int hexEndPx = 0;
-  int asciiStartPx = 0;
-  int asciiEndPx = 0;
-};
-
-int devicePxToLogicalCeil(int px, qreal dpr) {
-  return dpr > 0.0 ? static_cast<int>(std::ceil(static_cast<qreal>(px) / dpr)) : px;
-}
-
-int logicalToDevicePx(int logicalPx, qreal dpr) {
-  return static_cast<int>(std::lround(static_cast<qreal>(logicalPx) * dpr));
-}
-
-WidgetLayoutMetrics computeWidgetLayoutMetrics(const QWidget* widget, int charWidth,
-                                               bool shouldDrawOffset) {
-  WidgetLayoutMetrics layout;
-  layout.dpr = widget ? std::max<qreal>(widget->devicePixelRatioF(), 1.0) : 1.0;
-  layout.charWidthPx = std::max(1, static_cast<int>(std::round(charWidth * layout.dpr)));
-  const int charHalfWidthPx = layout.charWidthPx / 2;
-  layout.addressEndPx = NUM_ADDRESS_NIBBLES * layout.charWidthPx;
-  layout.hexStartPx = shouldDrawOffset
-                          ? ((NUM_ADDRESS_NIBBLES + ADDRESS_SPACING_CHARS) * layout.charWidthPx)
-                          : charHalfWidthPx;
-  layout.hexEndPx = layout.hexStartPx + (BYTES_PER_LINE * 3 * layout.charWidthPx);
-  layout.asciiStartPx =
-      layout.hexEndPx + (HEX_TO_ASCII_SPACING_CHARS * layout.charWidthPx) + charHalfWidthPx;
-  layout.asciiEndPx = layout.asciiStartPx + (BYTES_PER_LINE * layout.charWidthPx);
-  return layout;
-}
-
-#ifdef Q_OS_MAC
-class NonTransientScrollBarStyle final : public QProxyStyle {
-public:
-  using QProxyStyle::QProxyStyle;
-
-  int styleHint(StyleHint hint, const QStyleOption* option = nullptr,
-                const QWidget* widget = nullptr,
-                QStyleHintReturn* returnData = nullptr) const override {
-    if (hint == QStyle::SH_ScrollBar_Transient) {
-      return 0;
-    }
-    return QProxyStyle::styleHint(hint, option, widget, returnData);
-  }
-};
-#endif
 
 QString tooltipIconDataUrl(VGMItem::Type type) {
   static QHash<int, QString> cache;
@@ -160,179 +107,6 @@ QString tooltipHtmlWithIcon(VGMItem* item) {
       .arg(content);
 }
 
-#ifdef Q_OS_WIN
-constexpr int HEX_GLYPH_VERTICAL_ALPHA_THRESHOLD = 196;
-
-struct GlyphVerticalBounds {
-  int top = -1;
-  int bottom = -1;
-};
-
-// Read one coverage sample from a glyph bitmap row returned by Qt.
-// `line` is the raw byte pointer for a single scanline from `image.constScanLine(y)`.
-// We need this helper because `QRawFont::alphaMapForGlyph()` can return different
-// image formats depending on the backend, so the alpha byte is not always laid out
-// the same way in memory.
-int alphaAt(const QImage& image, const uchar* line, int x) {
-  switch (image.format()) {
-    case QImage::Format_Alpha8:
-    case QImage::Format_Grayscale8:
-    case QImage::Format_Indexed8:
-      return line[x];
-    default:
-      return qAlpha(reinterpret_cast<const QRgb*>(line)[x]);
-  }
-}
-
-// Ask Qt to draw one glyph into a temporary cell-sized image, then find the first
-// non-transparent pixel. That gives us the top-left bitmap origin Qt used for this
-// glyph inside the cell, which we reuse when copying the raw glyph mask into the atlas.
-QPoint probeGlyphTopLeft(const QFont& font, qreal dpr, int cellWidthPx, int cellHeightPx,
-                         qreal padding, qreal baseline, QChar glyph) {
-  QImage probe(cellWidthPx, cellHeightPx, QImage::Format_ARGB32_Premultiplied);
-  probe.fill(Qt::transparent);
-  probe.setDevicePixelRatio(dpr);
-
-  QPainter painter(&probe);
-  painter.setFont(font);
-  painter.setPen(Qt::white);
-  painter.setRenderHint(QPainter::TextAntialiasing, true);
-  painter.drawText(QPointF(padding, padding + baseline), QString(glyph));
-  painter.end();
-
-  int minX = probe.width();
-  int minY = probe.height();
-  bool found = false;
-  for (int y = 0; y < probe.height(); ++y) {
-    // line is a row of pixels from the temporary probe image.
-    const QRgb* line = reinterpret_cast<const QRgb*>(probe.constScanLine(y));
-    for (int x = 0; x < probe.width(); ++x) {
-      if (qAlpha(line[x]) != 0) {
-        minX = std::min(minX, x);
-        minY = std::min(minY, y);
-        found = true;
-      }
-    }
-  }
-
-  return found ? QPoint(minX, minY) : QPoint(-1, -1);
-}
-
-// Return true for hex glyphs: 0-9 and A-F.
-bool isHexColumnGlyph(QChar glyph) {
-  const ushort code = glyph.unicode();
-  return (code >= '0' && code <= '9') || (code >= 'A' && code <= 'F');
-}
-
-// Look up one character in the raw font and return its grayscale glyph mask.
-QImage rawGlyphAlphaMap(const QRawFont& rawFont, QChar glyph) {
-  const auto glyphIndexes = rawFont.glyphIndexesForString(QString(glyph));
-  if (glyphIndexes.empty() || glyphIndexes.front() == 0) {
-    return {};
-  }
-
-  return rawFont.alphaMapForGlyph(glyphIndexes.front(), QRawFont::PixelAntialiasing);
-}
-
-// Find the visible top/bottom rows in the raw glyph mask, ignoring faint pixels
-// so we can place the visible body of hex glyphs while ignoring AA fringe.
-GlyphVerticalBounds visibleVerticalBounds(const QImage& image, int alphaThreshold) {
-  GlyphVerticalBounds bounds;
-
-  for (int y = 0; y < image.height(); ++y) {
-    const uchar* line = image.constScanLine(y);
-    bool rowHasVisibleCoverage = false;
-    for (int x = 0; x < image.width(); ++x) {
-      if (alphaAt(image, line, x) >= alphaThreshold) {
-        rowHasVisibleCoverage = true;
-        break;
-      }
-    }
-    if (!rowHasVisibleCoverage) {
-      continue;
-    }
-    if (bounds.top < 0) {
-      bounds.top = y;
-    }
-    bounds.bottom = y;
-  }
-
-  return bounds;
-}
-
-// Center the tallest threshold-visible hex glyph body inside the cell, then use
-// its bottom row as the shared alignment target for 0-9/A-F.
-int centeredHexGlyphBottomY(QRawFont& rawFont, int glyphHeightPx, int paddingPx,
-                            int alphaThreshold) {
-  static constexpr char kHexGlyphs[] = "0123456789ABCDEF";
-  int maxBodyHeightPx = 0;
-
-  for (char glyph : kHexGlyphs) {
-    if (glyph == '\0') {
-      break;
-    }
-
-    const QImage alphaMap = rawGlyphAlphaMap(rawFont, QLatin1Char(glyph));
-    if (alphaMap.isNull()) {
-      continue;
-    }
-
-    const GlyphVerticalBounds bounds = visibleVerticalBounds(alphaMap, alphaThreshold);
-    if (bounds.top < 0 || bounds.bottom < bounds.top) {
-      continue;
-    }
-
-    maxBodyHeightPx = std::max(maxBodyHeightPx, bounds.bottom - bounds.top + 1);
-  }
-
-  if (maxBodyHeightPx <= 0 || maxBodyHeightPx > glyphHeightPx) {
-    return -1;
-  }
-
-  const int centeredTopY =
-      paddingPx + static_cast<int>(std::lround((glyphHeightPx - maxBodyHeightPx) / 2.0));
-  return centeredTopY + maxBodyHeightPx - 1;
-}
-
-// Copy the glyph coverage image from `src` into the atlas image `dst`.
-// `src` is the per-glyph mask returned by `QRawFont::alphaMapForGlyph()`;
-// `dstX`/`dstY` are the atlas pixel coordinates where that glyph should start.
-// The atlas stores white premultiplied-alpha glyphs because the renderer tints
-// them later with the final text color in the glyph shader.
-void blitGlyphAlpha(QImage& dst, int dstX, int dstY, const QImage& src) {
-  if (src.isNull()) {
-    return;
-  }
-
-  for (int y = 0; y < src.height(); ++y) {
-    const int outY = dstY + y;
-    if (outY < 0 || outY >= dst.height()) {
-      continue;
-    }
-
-    // `srcLine` and `dstLine` are raw pointers to a single row in the source glyph
-    // bitmap and destination atlas image. Walking row-by-row is much cheaper than
-    // going through `QPainter` for every glyph copy.
-    const uchar* srcLine = src.constScanLine(y);
-    QRgb* dstLine = reinterpret_cast<QRgb*>(dst.scanLine(outY));
-    for (int x = 0; x < src.width(); ++x) {
-      const int outX = dstX + x;
-      if (outX < 0 || outX >= dst.width()) {
-        continue;
-      }
-
-      // Pull the per-pixel alpha out of whatever Qt image format `src` uses.
-      const int alpha = alphaAt(src, srcLine, x);
-      if (alpha == 0) {
-        continue;
-      }
-      // Store a white glyph with premultiplied alpha
-      dstLine[outX] = qPremultiply(qRgba(255, 255, 255, alpha));
-    }
-  }
-}
-#endif
-
 }  // namespace
 
 // Pack selection offset/length into a stable 64-bit key for set membership checks.
@@ -363,16 +137,7 @@ HexView::HexView(VGMFile* vgmfile, QWidget* parent)
 #ifdef Q_OS_MAC
   // With AA_DontCreateNativeWidgetSiblings, the RHI QWindow can cover transient (overlay)
   // scrollbars, so keep HexView's scrollbars non-transient on macOS.
-  QStyle* baseStyle = QStyleFactory::create(QStringLiteral("macos"));
-  if (!baseStyle)
-    baseStyle = QStyleFactory::create(QStringLiteral("macintosh"));
-  if (!baseStyle)
-    baseStyle = QStyleFactory::create(QStringLiteral("Fusion"));
-  auto* scrollStyle = baseStyle ? new NonTransientScrollBarStyle(baseStyle)
-                                : new NonTransientScrollBarStyle();
-  verticalScrollBar()->setStyle(scrollStyle);
-  if (!scrollStyle->parent())
-    scrollStyle->setParent(verticalScrollBar());
+  QtUi::applyNonTransientScrollBarStyle(verticalScrollBar());
 #endif
 
   m_rhiHost = new HexViewRhiHost(this, viewport());
@@ -451,9 +216,14 @@ void HexView::setFont(const QFont& font) {
 
   fontMetrics = QFontMetricsF(adjustedFont);
   m_charWidth = static_cast<int>(std::round(fontMetrics.horizontalAdvance("A")));
+  m_charHalfWidth = static_cast<int>(std::round(fontMetrics.horizontalAdvance("A") / 2.0));
   m_lineHeight = static_cast<int>(std::round(fontMetrics.height()));
 
   QAbstractScrollArea::setFont(adjustedFont);
+
+  m_virtual_full_width = -1;
+  m_virtual_width_sans_ascii = -1;
+  m_virtual_width_sans_ascii_and_address = -1;
 
   if (m_glyphAtlas) {
     m_glyphAtlas->dpr = 0.0;
@@ -465,9 +235,7 @@ void HexView::setFont(const QFont& font) {
 
 // Return X origin of the hex byte columns (accounting for optional address column).
 int HexView::hexXOffset() const {
-  const WidgetLayoutMetrics layout =
-      computeWidgetLayoutMetrics(viewport(), m_charWidth, m_shouldDrawOffset);
-  return devicePxToLogicalCeil(layout.hexStartPx, layout.dpr);
+  return m_shouldDrawOffset ? ((NUM_ADDRESS_NIBBLES + ADDRESS_SPACING_CHARS) * m_charWidth) : m_charHalfWidth;
 }
 
 HexView::DragMode HexView::dragModeForModifiers(Qt::KeyboardModifiers mods) {
@@ -481,27 +249,30 @@ int HexView::getVirtualHeight() const {
 
 // Compute full virtual content width (address + hex + ascii).
 int HexView::getVirtualFullWidth() const {
-  constexpr int numChars = NUM_ADDRESS_NIBBLES + ADDRESS_SPACING_CHARS + (BYTES_PER_LINE * 3) +
-                           HEX_TO_ASCII_SPACING_CHARS + BYTES_PER_LINE;
-  const WidgetLayoutMetrics layout =
-      computeWidgetLayoutMetrics(viewport(), m_charWidth, m_shouldDrawOffset);
-  return devicePxToLogicalCeil(numChars * layout.charWidthPx, layout.dpr) + SELECTION_PADDING;
+  if (m_virtual_full_width == -1) {
+    constexpr int numChars = NUM_ADDRESS_NIBBLES + ADDRESS_SPACING_CHARS + (BYTES_PER_LINE * 3) +
+                             HEX_TO_ASCII_SPACING_CHARS + BYTES_PER_LINE;
+    m_virtual_full_width = (numChars * m_charWidth) + SELECTION_PADDING;
+  }
+  return m_virtual_full_width;
 }
 
 // Compute virtual width when ASCII column is hidden.
 int HexView::getVirtualWidthSansAscii() const {
-  constexpr int numChars = NUM_ADDRESS_NIBBLES + ADDRESS_SPACING_CHARS + (BYTES_PER_LINE * 3);
-  const WidgetLayoutMetrics layout =
-      computeWidgetLayoutMetrics(viewport(), m_charWidth, m_shouldDrawOffset);
-  return devicePxToLogicalCeil(numChars * layout.charWidthPx, layout.dpr) + SELECTION_PADDING;
+  if (m_virtual_width_sans_ascii == -1) {
+    constexpr int numChars = NUM_ADDRESS_NIBBLES + ADDRESS_SPACING_CHARS + (BYTES_PER_LINE * 3);
+    m_virtual_width_sans_ascii = (numChars * m_charWidth) + SELECTION_PADDING;
+  }
+  return m_virtual_width_sans_ascii;
 }
 
 // Compute virtual width when both ASCII and address columns are hidden.
 int HexView::getVirtualWidthSansAsciiAndAddress() const {
-  constexpr int numChars = (BYTES_PER_LINE * 3) + 2;
-  const WidgetLayoutMetrics layout =
-      computeWidgetLayoutMetrics(viewport(), m_charWidth, m_shouldDrawOffset);
-  return devicePxToLogicalCeil(numChars * layout.charWidthPx, layout.dpr);
+  if (m_virtual_width_sans_ascii_and_address == -1) {
+    constexpr int numChars = BYTES_PER_LINE * 3;
+    m_virtual_width_sans_ascii_and_address = (numChars * m_charWidth) + (m_charWidth * 2);
+  }
+  return m_virtual_width_sans_ascii_and_address;
 }
 
 // Return active virtual width for the current column-visibility mode.
@@ -955,16 +726,11 @@ void HexView::ensureGlyphAtlas(qreal dpr) {
     return;
   }
 
-  const int paddingPx = 1;
-  const int glyphWidthPx = std::max(1, static_cast<int>(std::round(m_charWidth * dpr)));
-  const int glyphHeightPx = std::max(1, static_cast<int>(std::round(m_lineHeight * dpr)));
-  const int cellWidthPx = glyphWidthPx + paddingPx * 2;
-  const int cellHeightPx = glyphHeightPx + paddingPx * 2;
-  const qreal padding = static_cast<qreal>(paddingPx) / dpr;
-  const qreal cellWidth = static_cast<qreal>(cellWidthPx) / dpr;
-  const qreal cellHeight = static_cast<qreal>(cellHeightPx) / dpr;
-  const qreal baseline =
-      static_cast<qreal>(std::round(QFontMetricsF(font()).ascent() * dpr)) / dpr;
+  const int padding = 1;
+  const int glyphWidth = m_charWidth;
+  const int glyphHeight = m_lineHeight;
+  const int cellWidth = glyphWidth + padding * 2;
+  const int cellHeight = glyphHeight + padding * 2;
 
   std::vector<QChar> glyphs;
   glyphs.reserve(0x7E - 0x20 + 1);
@@ -975,8 +741,8 @@ void HexView::ensureGlyphAtlas(qreal dpr) {
   const int columns = 16;
   const int rows = static_cast<int>((glyphs.size() + columns - 1) / columns);
 
-  const int imageWidth = cellWidthPx * columns;
-  const int imageHeight = cellHeightPx * rows;
+  const int imageWidth = static_cast<int>(std::ceil(cellWidth * dpr * columns));
+  const int imageHeight = static_cast<int>(std::ceil(cellHeight * dpr * rows));
 
   QImage image(imageWidth, imageHeight, QImage::Format_ARGB32_Premultiplied);
   image.fill(Qt::transparent);
@@ -987,23 +753,7 @@ void HexView::ensureGlyphAtlas(qreal dpr) {
   painter.setPen(Qt::white);
   painter.setRenderHint(QPainter::TextAntialiasing, true);
 
-#ifdef Q_OS_WIN
-  // On Windows, atlas glyphs built with QPainter::drawText() comes out aliased at fractional DPR.
-  // Build the atlas from QRawFont's grayscale bitmap instead.
-  QRawFont rawFont = QRawFont::fromFont(font());
-  bool useRawAtlas = rawFont.isValid() && rawFont.pixelSize() > 0.0;
-  int hexGlyphBottomY = -1;
-  if (useRawAtlas) {
-    rawFont.setPixelSize(rawFont.pixelSize() * dpr);
-    useRawAtlas = rawFont.isValid();
-    if (useRawAtlas) {
-      // Compute one shared visible-bottom target for 0-9/A-F so the hex column stays
-      // level while still appearing vertically centered as a group in the cell.
-      hexGlyphBottomY = centeredHexGlyphBottomY(rawFont, glyphHeightPx, paddingPx,
-                                                HEX_GLYPH_VERTICAL_ALPHA_THRESHOLD);
-    }
-  }
-#endif
+  const qreal baseline = QFontMetricsF(font()).ascent();
 
   m_glyphAtlas->uvTable.fill(QRectF());
 
@@ -1012,48 +762,13 @@ void HexView::ensureGlyphAtlas(qreal dpr) {
     const int row = static_cast<int>(i / columns);
     const qreal cellX = col * cellWidth;
     const qreal cellY = row * cellHeight;
-    const int cellXPx = col * cellWidthPx;
-    const int cellYPx = row * cellHeightPx;
 
-    bool drewGlyph = false;
-#ifdef Q_OS_WIN
-    if (useRawAtlas && glyphs[i] != QLatin1Char(' ')) {
-      const QImage alphaMap = rawGlyphAlphaMap(rawFont, glyphs[i]);
-      if (!alphaMap.isNull()) {
-        // QRawFont gives us the glyph bitmap, but not the cell-local origin Qt would
-        // have used for drawText(), so probe that origin once and reuse it here.
-        const QPoint topLeft =
-            probeGlyphTopLeft(font(), dpr, cellWidthPx, cellHeightPx, padding, baseline,
-                              glyphs[i]);
-        if (topLeft.x() >= 0 && topLeft.y() >= 0) {
-          int glyphTopY = topLeft.y();
-          if (isHexColumnGlyph(glyphs[i])) {
-            const GlyphVerticalBounds bounds =
-                visibleVerticalBounds(alphaMap, HEX_GLYPH_VERTICAL_ALPHA_THRESHOLD);
-            if (hexGlyphBottomY >= 0 && bounds.top >= 0 && bounds.bottom >= bounds.top) {
-              // Keep the probed X placement, but override Y so every hex glyph lands
-              // on the same visible bottom row.
-              glyphTopY = hexGlyphBottomY - bounds.bottom;
-            }
-          }
+    painter.drawText(QPointF(cellX + padding, cellY + padding + baseline), QString(glyphs[i]));
 
-          blitGlyphAlpha(image, cellXPx + topLeft.x(), cellYPx + glyphTopY, alphaMap);
-          drewGlyph = true;
-        }
-      }
-    } else if (useRawAtlas) {
-      drewGlyph = true;
-    }
-#endif
-    if (!drewGlyph) {
-      painter.drawText(QPointF(cellX + padding, cellY + padding + baseline),
-                       QString(glyphs[i]));
-    }
-
-    const qreal u0 = static_cast<qreal>(cellXPx + paddingPx) / imageWidth;
-    const qreal v0 = static_cast<qreal>(cellYPx + paddingPx) / imageHeight;
-    const qreal u1 = static_cast<qreal>(cellXPx + paddingPx + glyphWidthPx) / imageWidth;
-    const qreal v1 = static_cast<qreal>(cellYPx + paddingPx + glyphHeightPx) / imageHeight;
+    const qreal u0 = (cellX + padding) * dpr / imageWidth;
+    const qreal v0 = (cellY + padding) * dpr / imageHeight;
+    const qreal u1 = (cellX + padding + glyphWidth) * dpr / imageWidth;
+    const qreal v1 = (cellY + padding + glyphHeight) * dpr / imageHeight;
 
     const ushort code = glyphs[i].unicode();
     if (code < m_glyphAtlas->uvTable.size()) {
@@ -1063,8 +778,10 @@ void HexView::ensureGlyphAtlas(qreal dpr) {
 
   m_glyphAtlas->image = std::move(image);
   m_glyphAtlas->dpr = dpr;
-  m_glyphAtlas->glyphWidth = m_charWidth;
-  m_glyphAtlas->glyphHeight = m_lineHeight;
+  m_glyphAtlas->glyphWidth = glyphWidth;
+  m_glyphAtlas->glyphHeight = glyphHeight;
+  m_glyphAtlas->cellWidth = cellWidth;
+  m_glyphAtlas->cellHeight = cellHeight;
   m_glyphAtlas->font = font();
   m_glyphAtlas->version++;
 
@@ -1123,11 +840,12 @@ HexViewFrame::Data HexView::captureRhiFrameData(float dpr) {
   HexViewFrame::Data frame;
   frame.vgmfile = m_vgmfile;
   frame.viewportSize = viewport()->size();
-  frame.dpr = dpr;
   frame.totalLines = getTotalLines();
   frame.scrollY = scrollYForRender();
   frame.lineHeight = m_lineHeight;
   frame.charWidth = m_charWidth;
+  frame.charHalfWidth = m_charHalfWidth;
+  frame.hexStartX = hexXOffset();
   frame.shouldDrawOffset = m_shouldDrawOffset;
   frame.shouldDrawAscii = m_shouldDrawAscii;
   frame.addressAsHex = m_addressAsHex;
@@ -1256,15 +974,16 @@ int HexView::getOffsetFromPoint(QPoint pos) const {
     return -1;
   }
 
-  const WidgetLayoutMetrics layout =
-      computeWidgetLayoutMetrics(viewport(), m_charWidth, m_shouldDrawOffset);
-  const int xPx = logicalToDevicePx(pos.x(), layout.dpr);
+  const int hexStart = hexXOffset();
+  const int hexEnd = hexStart + (BYTES_PER_LINE * 3 * m_charWidth);
+  const int asciiStart = hexEnd + (HEX_TO_ASCII_SPACING_CHARS * m_charWidth) + m_charHalfWidth;
+  const int asciiEnd = asciiStart + (BYTES_PER_LINE * m_charWidth);
 
   int byteNum = -1;
-  if (xPx >= layout.hexStartPx && xPx < layout.hexEndPx) {
-    byteNum = ((xPx - layout.hexStartPx) / layout.charWidthPx) / 3;
-  } else if (xPx >= layout.asciiStartPx && xPx < layout.asciiEndPx) {
-    byteNum = (xPx - layout.asciiStartPx) / layout.charWidthPx;
+  if (pos.x() >= hexStart && pos.x() < hexEnd) {
+    byteNum = ((pos.x() - hexStart) / m_charWidth) / 3;
+  } else if (pos.x() >= asciiStart && pos.x() < asciiEnd) {
+    byteNum = (pos.x() - asciiStart) / m_charWidth;
   }
   if (byteNum == -1) {
     return -1;
@@ -1421,10 +1140,8 @@ void HexView::mouseMoveEvent(QMouseEvent* event) {
 // Toggle address display radix when double-clicking in the address column.
 void HexView::mouseDoubleClickEvent(QMouseEvent* event) {
   if (event->button() == Qt::LeftButton) {
-    const WidgetLayoutMetrics layout =
-        computeWidgetLayoutMetrics(viewport(), m_charWidth, m_shouldDrawOffset);
-    const int xPx = logicalToDevicePx(event->pos().x(), layout.dpr);
-    if (m_shouldDrawOffset && xPx >= 0 && xPx < layout.addressEndPx) {
+    if (m_shouldDrawOffset && event->pos().x() >= 0 &&
+        event->pos().x() < (NUM_ADDRESS_NIBBLES * m_charWidth)) {
       m_addressAsHex = !m_addressAsHex;
       requestRhiUpdate(true);
     }

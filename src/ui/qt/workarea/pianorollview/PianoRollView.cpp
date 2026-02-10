@@ -13,6 +13,7 @@
 #include "SeqEventTimeIndex.h"
 #include "SeqTrack.h"
 #include "VGMSeq.h"
+#include "util/NonTransientScrollBarStyle.h"
 
 #include <QAbstractAnimation>
 #include <QEvent>
@@ -48,6 +49,12 @@ PianoRollView::PianoRollView(QWidget* parent)
 
   setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOn);
   setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOn);
+
+#ifdef Q_OS_MAC
+  // Match HexView behavior so scrollbars remain visible above native RHI windows.
+  QtUi::applyNonTransientScrollBarStyle(hbar);
+  QtUi::applyNonTransientScrollBarStyle(vbar);
+#endif
 
   connect(hbar, &PianoRollZoomScrollBar::zoomInRequested, this, [this]() {
     // Zoom from viewport center when using scrollbar +/- buttons.
