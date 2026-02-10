@@ -70,8 +70,6 @@ private:
   struct StaticCacheKey {
     bool valid = false;
     QSize viewSize;
-    int scrollX = 0;
-    int scrollY = 0;
     int totalTicks = 0;
     int ppqn = 0;
     int pixelsPerTickQ = 0;
@@ -108,6 +106,8 @@ private:
     float segment;
     float gap;
     float phase;
+    float scrollMulX;
+    float scrollMulY;
   };
 
   enum class LineStyle : int {
@@ -146,7 +146,9 @@ private:
                   LineStyle style = LineStyle::Solid,
                   float segment = 0.0f,
                   float gap = 0.0f,
-                  float phase = 0.0f);
+                  float phase = 0.0f,
+                  float scrollMulX = 0.0f,
+                  float scrollMulY = 0.0f);
 
   PianoRollView* m_view = nullptr;
 
