@@ -17,11 +17,8 @@
 #include "LogManager.h"
 
 // INTR_FREQUENCY is the interval in seconds between updates to the vol for articulation.
-// In the original software, this is done via an interrupt timer.
-// The value was copied from the nocash docs.
-// We can multiply the count  by this frequency to find the duration of the articulation phases with
-// exact accuracy.
-constexpr double INTR_FREQUENCY = 64 * 2728.0 / 33e6;
+// 2728 ticks = 5.2095ms (~192Hz).
+constexpr double INTR_FREQUENCY = 0.0052095;
 
 // Maps 0-127 sustain value to dB attenuation (in 10ths of dB)
 static const int16_t DECIBEL_SQUARE_TABLE[128] = {
@@ -33,6 +30,10 @@ static const int16_t DECIBEL_SQUARE_TABLE[128] = {
     -80,  -78,  -76,  -74,  -72,  -70,  -68,  -66,  -64,  -62,  -60,  -58,  -56,  -54,  -52,  -50,
     -49,  -47,  -45,  -43,  -42,  -40,  -38,  -36,  -35,  -33,  -31,  -30,  -28,  -27,  -25,  -23,
     -22,  -20,  -19,  -17,  -16,  -14,  -13,  -11,  -10,  -8,   -7,   -6,   -4,   -3,   -1,   0};
+
+static const uint8_t ATTACK_TIME_TABLE[19] = {0x00, 0x01, 0x05, 0x0E, 0x1A, 0x26, 0x33,
+                                              0x3F, 0x49, 0x54, 0x5C, 0x64, 0x6D, 0x74,
+                                              0x7B, 0x7F, 0x84, 0x89, 0x8F};
 
 // ***********
 // NDSInstrSet
@@ -177,10 +178,6 @@ void NDSInstr::getSampCollPtr(VGMRgn* rgn, int waNum) const {
 }
 
 void NDSInstr::getArticData(VGMRgn* rgn, uint32_t offset) const {
-  uint8_t realAttack;
-  const uint8_t AttackTimeTable[] = {0x00, 0x01, 0x05, 0x0E, 0x1A, 0x26, 0x33, 0x3F, 0x49, 0x54,
-                                     0x5C, 0x64, 0x6D, 0x74, 0x7B, 0x7F, 0x84, 0x89, 0x8F};
-
   rgn->addUnityKey(readByte(offset), offset, 1);
   uint8_t AttackTime = readByte(offset + 1);
   uint8_t DecayTime = readByte(offset + 2);
@@ -194,16 +191,25 @@ void NDSInstr::getArticData(VGMRgn* rgn, uint32_t offset) const {
   rgn->addADSRValue(offset + 4, 1, "Release Time");
   rgn->addChild(offset + 5, 1, "Pan");
 
-  if (AttackTime >= 0x6D)
-    realAttack = AttackTimeTable[0x7F - AttackTime];
-  else
-    realAttack = 0xFF - AttackTime;
+  uint8_t realAttack = 0xFF - AttackTime;
+  if (AttackTime >= 0x6D) {
+    realAttack = ATTACK_TIME_TABLE[0x7F - AttackTime];
+  }
 
   short realDecay = getFallingRate(DecayTime);
   short realRelease = getFallingRate(ReleaseTime);
 
+  // The NDS attack is exponential: |env_decay| *= (attack/256) each frame.
+  // It reaches audible volume very quickly but takes much longer to reach
+  // mathematical zero. Both DLS2 (§1.7.2.2: "the Attack segment affects the
+  // output of the oscillator in a linear fashion with respect to amplitude") and
+  // SF2 (§8.1.3, generator 34 attackVolEnv: "the attack is convex; the curve is
+  // nominally such that when applied to a decibel parameter, the result is linear
+  // in amplitude") define linear amplitude attack ramps. We stop at a perceptual
+  // threshold to approximate the time to audible volume on hardware.
+  constexpr long ATTACK_THRESHOLD = 0x16980 / 10;
   int count = 0;
-  for (long i = 0x16980; i != 0; i = (i * realAttack) >> 8)
+  for (long i = 0x16980; i > ATTACK_THRESHOLD; i = (i * realAttack) >> 8)
     count++;
   rgn->attack_time = count * INTR_FREQUENCY;
 
