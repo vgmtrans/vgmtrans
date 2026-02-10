@@ -162,6 +162,8 @@ qt_add_shaders(
     workarea/hexview/shaders/hexedge.vert
     workarea/hexview/shaders/hexedge.frag
     workarea/hexview/shaders/hexcomposite.frag
+    workarea/pianorollview/shaders/pianorollquad.vert
+    workarea/pianorollview/shaders/pianorollquad.frag
 )
 
 # Workaround macdeployqt not correctly deploying QtDbus
