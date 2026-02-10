@@ -112,6 +112,15 @@ add_executable(
   workarea/hexview/HexViewRhiWindow.h
   workarea/MdiArea.cpp
   workarea/MdiArea.h
+  workarea/pianorollview/PianoRollFrameData.h
+  workarea/pianorollview/PianoRollRhiRenderer.cpp
+  workarea/pianorollview/PianoRollRhiRenderer.h
+  workarea/pianorollview/PianoRollRhiWidget.cpp
+  workarea/pianorollview/PianoRollRhiWidget.h
+  workarea/pianorollview/PianoRollView.cpp
+  workarea/pianorollview/PianoRollView.h
+  workarea/pianorollview/PianoRollZoomScrollBar.cpp
+  workarea/pianorollview/PianoRollZoomScrollBar.h
   workarea/RawFileListView.cpp
   workarea/RawFileListView.h
   workarea/VGMCollListView.cpp
