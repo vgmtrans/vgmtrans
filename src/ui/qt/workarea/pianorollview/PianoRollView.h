@@ -21,6 +21,7 @@
 #include "SeqEventTimeIndex.h"
 
 class QEvent;
+class QPoint;
 class QMouseEvent;
 class QNativeGestureEvent;
 class QResizeEvent;
@@ -30,6 +31,7 @@ class QWheelEvent;
 class MidiTrack;
 class SeqTrack;
 class VGMSeq;
+class VGMItem;
 class PianoRollRhiHost;
 class PianoRollRhiWindow;
 
@@ -51,6 +53,7 @@ public:
 
 signals:
   void seekRequested(int tick);
+  void selectionChanged(VGMItem* item);
 
 protected:
   void resizeEvent(QResizeEvent* event) override;
@@ -65,6 +68,14 @@ private:
   struct ActiveKeyState {
     int trackIndex = -1;
     uint32_t startTick = 0;
+  };
+
+  struct SelectableNote {
+    uint32_t startTick = 0;
+    uint32_t duration = 0;
+    uint8_t key = 0;
+    int16_t trackIndex = -1;
+    VGMItem* item = nullptr;
   };
 
   static constexpr int kMidiKeyCount = PianoRollFrame::kMidiKeyCount;
@@ -105,6 +116,7 @@ private:
   int clampTick(int tick) const;
   int tickFromViewportX(int x) const;
   int scanlinePixelX(int tick) const;
+  [[nodiscard]] VGMItem* noteAtViewportPoint(const QPoint& pos) const;
 
   void zoomHorizontal(int steps, int anchorX, bool animated = false, int durationMs = 0);
   void zoomVertical(int steps, int anchorY, bool animated = false, int durationMs = 0);
@@ -161,6 +173,7 @@ private:
 
   std::shared_ptr<const std::vector<PianoRollFrame::Note>> m_notes;
   std::shared_ptr<const std::vector<PianoRollFrame::TimeSignature>> m_timeSignatures;
+  std::vector<SelectableNote> m_selectableNotes;
 
   std::array<ActiveKeyState, kMidiKeyCount> m_activeKeys{};
 };
