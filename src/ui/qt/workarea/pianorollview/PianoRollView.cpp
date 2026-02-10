@@ -90,6 +90,7 @@ PianoRollView::PianoRollView(QWidget* parent)
   m_rhiHost->setMouseTracking(true);
 
   m_notes = std::make_shared<std::vector<PianoRollFrame::Note>>();
+  m_activeNotes = std::make_shared<std::vector<PianoRollFrame::Note>>();
   m_selectedNotes = std::make_shared<std::vector<PianoRollFrame::Note>>();
   m_timeSignatures = std::make_shared<std::vector<PianoRollFrame::TimeSignature>>();
 
@@ -118,6 +119,7 @@ void PianoRollView::setSequence(VGMSeq* seq) {
   m_cachedTimelineFinalized = false;
   m_primarySelectedItem = nullptr;
   m_selectedNoteIndices.clear();
+  m_activeNotes = std::make_shared<std::vector<PianoRollFrame::Note>>();
   m_selectedNotes = std::make_shared<std::vector<PianoRollFrame::Note>>();
 
   m_trackCount = m_seq ? static_cast<int>(m_seq->aTracks.size()) : 0;
@@ -253,6 +255,7 @@ PianoRollFrame::Data PianoRollView::captureRhiFrameData(float dpr) const {
 
   frame.trackColors = m_trackColors;
   frame.notes = m_notes;
+  frame.activeNotes = m_activeNotes;
   frame.selectedNotes = m_selectedNotes;
   frame.timeSignatures = m_timeSignatures;
 
@@ -627,6 +630,7 @@ void PianoRollView::rebuildSequenceCache() {
   m_selectableNotes.clear();
   m_selectedNoteIndices.clear();
   m_primarySelectedItem = nullptr;
+  m_activeNotes = std::make_shared<std::vector<PianoRollFrame::Note>>();
   m_selectedNotes = std::make_shared<std::vector<PianoRollFrame::Note>>();
 
   auto notes = std::make_shared<std::vector<PianoRollFrame::Note>>();
@@ -791,10 +795,12 @@ bool PianoRollView::updateActiveKeyStates() {
     state.trackIndex = -1;
     state.startTick = 0;
   }
+  std::vector<PianoRollFrame::Note> nextActiveNotes;
 
   if (m_timeline && m_timelineCursor && m_timeline->finalized()) {
     std::vector<const SeqTimedEvent*> active;
     m_timelineCursor->getActiveAt(static_cast<uint32_t>(std::max(0, m_currentTick)), active);
+    nextActiveNotes.reserve(active.size());
 
     for (const auto* timed : active) {
       if (!timed || !timed->event || !timed->event->parentTrack) {
@@ -817,21 +823,60 @@ bool PianoRollView::updateActiveKeyStates() {
         state.trackIndex = trackIndex;
         state.startTick = timed->startTick;
       }
+
+      nextActiveNotes.push_back({
+          timed->startTick,
+          std::max<uint32_t>(1, timed->duration),
+          static_cast<uint8_t>(key),
+          static_cast<int16_t>(trackIndex),
+      });
     }
   }
 
-  bool changed = false;
+  std::sort(nextActiveNotes.begin(), nextActiveNotes.end(), [](const auto& a, const auto& b) {
+    if (a.startTick != b.startTick) {
+      return a.startTick < b.startTick;
+    }
+    if (a.key != b.key) {
+      return a.key < b.key;
+    }
+    if (a.trackIndex != b.trackIndex) {
+      return a.trackIndex < b.trackIndex;
+    }
+    return a.duration < b.duration;
+  });
+
+  bool activeKeysChanged = false;
   for (int key = 0; key < kMidiKeyCount; ++key) {
     const auto& oldState = m_activeKeys[static_cast<size_t>(key)];
     const auto& newState = nextActiveKeys[static_cast<size_t>(key)];
     if (oldState.trackIndex != newState.trackIndex || oldState.startTick != newState.startTick) {
-      changed = true;
+      activeKeysChanged = true;
       break;
     }
   }
 
+  bool activeNotesChanged = true;
+  if (m_activeNotes && m_activeNotes->size() == nextActiveNotes.size()) {
+    activeNotesChanged = false;
+    for (size_t i = 0; i < nextActiveNotes.size(); ++i) {
+      const auto& oldNote = (*m_activeNotes)[i];
+      const auto& newNote = nextActiveNotes[i];
+      if (oldNote.startTick != newNote.startTick ||
+          oldNote.duration != newNote.duration ||
+          oldNote.key != newNote.key ||
+          oldNote.trackIndex != newNote.trackIndex) {
+        activeNotesChanged = true;
+        break;
+      }
+    }
+  }
+  if (activeNotesChanged || !m_activeNotes) {
+    m_activeNotes = std::make_shared<std::vector<PianoRollFrame::Note>>(std::move(nextActiveNotes));
+  }
+
   m_activeKeys = std::move(nextActiveKeys);
-  return changed;
+  return activeKeysChanged || activeNotesChanged;
 }
 
 void PianoRollView::updateScrollBars() {
