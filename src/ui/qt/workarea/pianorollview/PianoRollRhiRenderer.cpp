@@ -269,8 +269,13 @@ void PianoRollRhiRenderer::buildInstances(const PianoRollFrame::Data& frame, con
     return;
   }
 
-  const float keyboardWidth = std::clamp(static_cast<float>(frame.keyboardWidth), 36.0f, static_cast<float>(viewWidth));
-  const float topBarHeight = std::clamp(static_cast<float>(frame.topBarHeight), 14.0f, static_cast<float>(viewHeight));
+  const float dprScale = std::max(1.0f, frame.dpr);
+  const float keyboardWidth = std::clamp(static_cast<float>(frame.keyboardWidth) * dprScale,
+                                         36.0f * dprScale,
+                                         static_cast<float>(viewWidth));
+  const float topBarHeight = std::clamp(static_cast<float>(frame.topBarHeight) * dprScale,
+                                        14.0f * dprScale,
+                                        static_cast<float>(viewHeight));
 
   const float noteAreaLeft = keyboardWidth;
   const float noteAreaTop = topBarHeight;
@@ -289,10 +294,10 @@ void PianoRollRhiRenderer::buildInstances(const PianoRollFrame::Data& frame, con
   appendRect(noteAreaLeft, noteAreaTop, noteAreaWidth, noteAreaHeight, frame.noteBackgroundColor);
   appendRect(0.0f, noteAreaTop, keyboardWidth, noteAreaHeight, frame.keyboardBackgroundColor);
 
-  const float pixelsPerTick = std::max(0.0001f, frame.pixelsPerTick);
-  const float pixelsPerKey = std::max(1.0f, frame.pixelsPerKey);
-  const float scrollX = static_cast<float>(std::max(0, frame.scrollX));
-  const float scrollY = static_cast<float>(std::max(0, frame.scrollY));
+  const float pixelsPerTick = std::max(0.0001f, frame.pixelsPerTick * dprScale);
+  const float pixelsPerKey = std::max(1.0f, frame.pixelsPerKey * dprScale);
+  const float scrollX = static_cast<float>(std::max(0, frame.scrollX)) * dprScale;
+  const float scrollY = static_cast<float>(std::max(0, frame.scrollY)) * dprScale;
 
   const float visibleStartTickF = scrollX / pixelsPerTick;
   const float visibleEndTickF = (scrollX + noteAreaWidth) / pixelsPerTick;
@@ -420,7 +425,7 @@ void PianoRollRhiRenderer::buildInstances(const PianoRollFrame::Data& frame, con
                           frame.currentTick < static_cast<int>(noteEndTick);
 
       if (active) {
-        noteColor = noteColor.lighter(132);
+        noteColor = noteColor.lighter(148);
         noteColor.setAlpha(245);
       } else {
         noteColor.setAlpha(188);
@@ -428,12 +433,37 @@ void PianoRollRhiRenderer::buildInstances(const PianoRollFrame::Data& frame, con
 
       appendRect(clippedX, clippedY, w, hh, noteColor);
 
+      if (active) {
+        const float basePhase = frame.elapsedSeconds * 2.5f + static_cast<float>(note.startTick) * 0.009f;
+        for (int ring = 0; ring < 3; ++ring) {
+          const float ringPhase = std::fmod(basePhase + (static_cast<float>(ring) * 0.33f), 1.0f);
+          const float expand = (1.5f + (ringPhase * 13.0f) + (ring * 1.5f)) * dprScale;
+          const float intensity = (1.0f - ringPhase) * (0.62f - (ring * 0.14f));
+          if (intensity <= 0.0f) {
+            continue;
+          }
+
+          const float gx = std::max(noteAreaLeft, clippedX - expand);
+          const float gy = std::max(noteAreaTop, clippedY - expand);
+          const float gx2 = std::min(noteAreaLeft + noteAreaWidth, clippedX + w + expand);
+          const float gy2 = std::min(noteAreaTop + noteAreaHeight, clippedY + hh + expand);
+          if (gx2 - gx <= 0.5f || gy2 - gy <= 0.5f) {
+            continue;
+          }
+
+          QColor glow = noteColor;
+          glow.setAlpha(std::clamp(static_cast<int>(std::lround(255.0f * intensity)), 0, 255));
+          appendRect(gx, gy, gx2 - gx, gy2 - gy, glow);
+        }
+      }
+
       QColor noteEdge = frame.noteOutlineColor;
       if (active) {
-        noteEdge.setAlpha(std::min(255, noteEdge.alpha() + 70));
+        noteEdge.setAlpha(std::min(255, noteEdge.alpha() + 95));
       }
-      appendRect(clippedX, clippedY, w, 1.0f, noteEdge);
-      appendRect(clippedX, clippedY + hh - 1.0f, w, 1.0f, noteEdge);
+      const float edgeThickness = std::max(1.0f, dprScale);
+      appendRect(clippedX, clippedY, w, edgeThickness, noteEdge);
+      appendRect(clippedX, clippedY + hh - edgeThickness, w, edgeThickness, noteEdge);
     }
   }
 
@@ -456,7 +486,10 @@ void PianoRollRhiRenderer::buildInstances(const PianoRollFrame::Data& frame, con
     }
   }
 
-  const float blackKeyWidth = std::max(8.0f, keyboardWidth * 0.68f);
+  const float blackKeyWidth = std::max(10.0f * dprScale, keyboardWidth * 0.62f);
+  const float blackKeyHeightRatio = 0.62f;
+  const float blackInnerHeightRatio = 0.58f;
+  const float blackInnerWidthRatio = 0.86f;
   for (int key = 0; key < PianoRollFrame::kMidiKeyCount; ++key) {
     const float keyY = noteAreaTop + ((127.0f - static_cast<float>(key)) * pixelsPerKey) - scrollY;
     const float keyH = std::max(1.0f, pixelsPerKey);
@@ -464,40 +497,58 @@ void PianoRollRhiRenderer::buildInstances(const PianoRollFrame::Data& frame, con
       continue;
     }
 
-    if (isBlackKey(key)) {
-      appendRect(0.0f, keyY, blackKeyWidth, keyH, frame.blackKeyColor);
-    } else {
+    const bool black = isBlackKey(key);
+    if (!black) {
       appendRect(0.0f, keyY, keyboardWidth, keyH, frame.whiteKeyColor);
+    } else {
+      const float blackH = std::max(2.0f * dprScale, keyH * blackKeyHeightRatio);
+      appendRect(0.0f, keyY, blackKeyWidth, blackH, frame.blackKeyColor);
+
+      QColor blackFace = frame.blackKeyColor.darker(116);
+      blackFace.setAlpha(230);
+      const float innerW = blackKeyWidth * blackInnerWidthRatio;
+      const float innerH = blackH * blackInnerHeightRatio;
+      const float innerX = (blackKeyWidth - innerW) * 0.5f;
+      const float innerY = keyY + (0.6f * dprScale);
+      appendRect(innerX, innerY, innerW, std::max(0.0f, innerH - (0.6f * dprScale)), blackFace);
+
+      QColor blackHighlight = frame.blackKeyColor.lighter(128);
+      blackHighlight.setAlpha(84);
+      appendRect(0.0f, keyY, blackKeyWidth, std::max(1.0f, 1.0f * dprScale), blackHighlight);
     }
 
     const int activeTrack = frame.activeKeyTrack[static_cast<size_t>(key)];
     if (activeTrack >= 0) {
       QColor active = colorForTrack(activeTrack);
-      if (isBlackKey(key)) {
-        active = active.lighter(125);
-        active.setAlpha(230);
-        appendRect(1.0f,
-                   keyY + 1.0f,
-                   std::max(0.0f, blackKeyWidth - 2.0f),
-                   std::max(0.0f, keyH - 2.0f),
+      if (black) {
+        const float blackH = std::max(2.0f * dprScale, keyH * blackKeyHeightRatio);
+        active = active.lighter(133);
+        active.setAlpha(238);
+        const float inset = 1.0f * dprScale;
+        appendRect(inset,
+                   keyY + inset,
+                   std::max(0.0f, blackKeyWidth - (2.0f * inset)),
+                   std::max(0.0f, blackH - (2.0f * inset)),
                    active);
       } else {
-        active.setAlpha(160);
-        appendRect(1.0f,
-                   keyY + 1.0f,
-                   std::max(0.0f, keyboardWidth - 2.0f),
-                   std::max(0.0f, keyH - 2.0f),
+        active = active.lighter(112);
+        active.setAlpha(172);
+        const float inset = 1.0f * dprScale;
+        appendRect(inset,
+                   keyY + inset,
+                   std::max(0.0f, keyboardWidth - (2.0f * inset)),
+                   std::max(0.0f, keyH - (2.0f * inset)),
                    active);
       }
     }
 
     QColor keySep = frame.keySeparatorColor;
     keySep.setAlpha(std::max(56, keySep.alpha()));
-    appendRect(0.0f, keyY, keyboardWidth, 1.0f, keySep);
+    appendRect(0.0f, keyY, keyboardWidth, std::max(1.0f, dprScale), keySep);
   }
 
-  appendRect(noteAreaLeft, topBarHeight - 1.0f, noteAreaWidth, 1.0f, frame.dividerColor);
-  appendRect(noteAreaLeft - 1.0f, 0.0f, 1.0f, static_cast<float>(viewHeight), frame.dividerColor);
+  appendRect(noteAreaLeft, topBarHeight - std::max(1.0f, dprScale), noteAreaWidth, std::max(1.0f, dprScale), frame.dividerColor);
+  appendRect(noteAreaLeft - std::max(1.0f, dprScale), 0.0f, std::max(1.0f, dprScale), static_cast<float>(viewHeight), frame.dividerColor);
 }
 
 void PianoRollRhiRenderer::appendRect(float x, float y, float w, float h, const QColor& color) {

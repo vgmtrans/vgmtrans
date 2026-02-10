@@ -14,11 +14,16 @@
 #include "SeqTrack.h"
 #include "VGMSeq.h"
 
+#include <QAbstractAnimation>
+#include <QCursor>
 #include <QEvent>
+#include <QEasingCurve>
 #include <QMouseEvent>
+#include <QNativeGestureEvent>
 #include <QPalette>
 #include <QResizeEvent>
 #include <QScrollBar>
+#include <QVariantAnimation>
 #include <QWheelEvent>
 
 #include <algorithm>
@@ -41,17 +46,29 @@ PianoRollView::PianoRollView(QWidget* parent)
   setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOn);
 
   connect(hbar, &PianoRollZoomScrollBar::zoomInRequested, this, [this]() {
-    zoomHorizontal(+1, viewport()->width() / 2);
+    zoomHorizontal(+1, viewport()->width() / 2, true, 150);
   });
   connect(hbar, &PianoRollZoomScrollBar::zoomOutRequested, this, [this]() {
-    zoomHorizontal(-1, viewport()->width() / 2);
+    zoomHorizontal(-1, viewport()->width() / 2, true, 150);
   });
 
   connect(vbar, &PianoRollZoomScrollBar::zoomInRequested, this, [this]() {
-    zoomVertical(+1, viewport()->height() / 2);
+    zoomVertical(+1, viewport()->height() / 2, true, 150);
   });
   connect(vbar, &PianoRollZoomScrollBar::zoomOutRequested, this, [this]() {
-    zoomVertical(-1, viewport()->height() / 2);
+    zoomVertical(-1, viewport()->height() / 2, true, 150);
+  });
+
+  m_horizontalZoomAnimation = new QVariantAnimation(this);
+  m_horizontalZoomAnimation->setEasingCurve(QEasingCurve::OutCubic);
+  connect(m_horizontalZoomAnimation, &QVariantAnimation::valueChanged, this, [this](const QVariant& value) {
+    applyHorizontalScale(value.toFloat(), m_horizontalZoomAnchor, m_horizontalZoomWorldTick);
+  });
+
+  m_verticalZoomAnimation = new QVariantAnimation(this);
+  m_verticalZoomAnimation->setEasingCurve(QEasingCurve::OutCubic);
+  connect(m_verticalZoomAnimation, &QVariantAnimation::valueChanged, this, [this](const QVariant& value) {
+    applyVerticalScale(value.toFloat(), m_verticalZoomAnchor, m_verticalZoomWorldY);
   });
 
   m_rhiWidget = new PianoRollRhiWidget(this, viewport());
@@ -67,6 +84,7 @@ PianoRollView::PianoRollView(QWidget* parent)
     state.startTick = 0;
   }
 
+  m_animClock.start();
   updateScrollBars();
 }
 
@@ -172,6 +190,7 @@ PianoRollFrame::Data PianoRollView::captureRhiFrameData(float dpr) const {
   frame.topBarHeight = kTopBarHeight;
   frame.pixelsPerTick = m_pixelsPerTick;
   frame.pixelsPerKey = m_pixelsPerKey;
+  frame.elapsedSeconds = static_cast<float>(m_animClock.elapsed()) / 1000.0f;
   frame.playbackActive = m_playbackActive;
 
   frame.trackColors = m_trackColors;
@@ -292,10 +311,37 @@ bool PianoRollView::handleViewportWheel(QWheelEvent* event) {
 
   const QPoint pos = event->position().toPoint();
   if (zoomHorizontalOnly) {
-    zoomHorizontal(steps, pos.x());
+    zoomHorizontal(steps, pos.x(), false, 0);
   }
   if (zoomVerticalOnly) {
-    zoomVertical(steps, pos.y());
+    zoomVertical(steps, pos.y(), false, 0);
+  }
+
+  event->accept();
+  return true;
+}
+
+bool PianoRollView::handleViewportNativeGesture(QNativeGestureEvent* event) {
+  if (!event || event->gestureType() != Qt::ZoomNativeGesture) {
+    return false;
+  }
+
+  const float rawDelta = static_cast<float>(event->value());
+  if (std::abs(rawDelta) < 0.0001f) {
+    event->accept();
+    return true;
+  }
+
+  const float factor = std::clamp(std::exp(rawDelta), 0.55f, 1.85f);
+  QPoint anchor = event->position().toPoint();
+  if (m_rhiWidget) {
+    anchor = m_rhiWidget->mapFromGlobal(QCursor::pos());
+  }
+
+  if (event->modifiers().testFlag(Qt::AltModifier)) {
+    zoomVerticalFactor(factor, anchor.y(), true, 150);
+  } else {
+    zoomHorizontalFactor(factor, anchor.x(), true, 150);
   }
 
   event->accept();
@@ -602,56 +648,118 @@ int PianoRollView::tickFromViewportX(int x) const {
   return clampTick(tick);
 }
 
-void PianoRollView::zoomHorizontal(int steps, int anchorX) {
+void PianoRollView::zoomHorizontal(int steps, int anchorX, bool animated, int durationMs) {
   if (steps == 0) {
     return;
   }
 
-  const int noteViewportWidth = std::max(0, viewport()->width() - kKeyboardWidth);
-  const int anchorInNotes = std::clamp(anchorX - kKeyboardWidth, 0, noteViewportWidth);
+  const float factor = std::pow(1.15f, static_cast<float>(steps));
+  zoomHorizontalFactor(factor, anchorX, animated, durationMs);
+}
 
-  const float oldScale = m_pixelsPerTick;
-  const float worldTickAtAnchor = static_cast<float>(horizontalScrollBar()->value() + anchorInNotes) / oldScale;
-
-  const float zoomFactor = std::pow(1.15f, static_cast<float>(steps));
-  const float newScale = std::clamp(oldScale * zoomFactor, kMinPixelsPerTick, kMaxPixelsPerTick);
-  if (std::abs(newScale - oldScale) < 0.0001f) {
+void PianoRollView::zoomVertical(int steps, int anchorY, bool animated, int durationMs) {
+  if (steps == 0) {
     return;
   }
 
-  m_pixelsPerTick = newScale;
+  const float factor = std::pow(1.15f, static_cast<float>(steps));
+  zoomVerticalFactor(factor, anchorY, animated, durationMs);
+}
+
+void PianoRollView::zoomHorizontalFactor(float factor, int anchorX, bool animated, int durationMs) {
+  const float clampedFactor = std::clamp(factor, 0.05f, 20.0f);
+  const float targetScale = std::clamp(m_pixelsPerTick * clampedFactor, kMinPixelsPerTick, kMaxPixelsPerTick);
+  if (std::abs(targetScale - m_pixelsPerTick) < 0.0001f) {
+    return;
+  }
+
+  if (animated) {
+    animateHorizontalScale(targetScale, anchorX, durationMs);
+  } else {
+    const int noteViewportWidth = std::max(0, viewport()->width() - kKeyboardWidth);
+    const int anchorInNotes = std::clamp(anchorX - kKeyboardWidth, 0, noteViewportWidth);
+    const float worldTickAtAnchor = static_cast<float>(horizontalScrollBar()->value() + anchorInNotes) /
+                                    std::max(0.0001f, m_pixelsPerTick);
+    applyHorizontalScale(targetScale, anchorInNotes, worldTickAtAnchor);
+  }
+}
+
+void PianoRollView::zoomVerticalFactor(float factor, int anchorY, bool animated, int durationMs) {
+  const float clampedFactor = std::clamp(factor, 0.05f, 20.0f);
+  const float targetScale = std::clamp(m_pixelsPerKey * clampedFactor, kMinPixelsPerKey, kMaxPixelsPerKey);
+  if (std::abs(targetScale - m_pixelsPerKey) < 0.0001f) {
+    return;
+  }
+
+  if (animated) {
+    animateVerticalScale(targetScale, anchorY, durationMs);
+  } else {
+    const int noteViewportHeight = std::max(0, viewport()->height() - kTopBarHeight);
+    const int anchorInNotes = std::clamp(anchorY - kTopBarHeight, 0, noteViewportHeight);
+    const float worldYAtAnchor = static_cast<float>(verticalScrollBar()->value() + anchorInNotes) /
+                                 std::max(0.0001f, m_pixelsPerKey);
+    applyVerticalScale(targetScale, anchorInNotes, worldYAtAnchor);
+  }
+}
+
+void PianoRollView::applyHorizontalScale(float scale, int anchorInNotes, float worldTickAtAnchor) {
+  m_pixelsPerTick = std::clamp(scale, kMinPixelsPerTick, kMaxPixelsPerTick);
   updateScrollBars();
 
-  const int newValue = static_cast<int>(std::llround(worldTickAtAnchor * newScale - anchorInNotes));
+  const int newValue = static_cast<int>(std::llround(worldTickAtAnchor * m_pixelsPerTick - anchorInNotes));
   horizontalScrollBar()->setValue(std::clamp(newValue,
                                              horizontalScrollBar()->minimum(),
                                              horizontalScrollBar()->maximum()));
   requestRender();
 }
 
-void PianoRollView::zoomVertical(int steps, int anchorY) {
-  if (steps == 0) {
-    return;
-  }
-
-  const int noteViewportHeight = std::max(0, viewport()->height() - kTopBarHeight);
-  const int anchorInNotes = std::clamp(anchorY - kTopBarHeight, 0, noteViewportHeight);
-
-  const float oldScale = m_pixelsPerKey;
-  const float worldYAtAnchor = static_cast<float>(verticalScrollBar()->value() + anchorInNotes) / oldScale;
-
-  const float zoomFactor = std::pow(1.15f, static_cast<float>(steps));
-  const float newScale = std::clamp(oldScale * zoomFactor, kMinPixelsPerKey, kMaxPixelsPerKey);
-  if (std::abs(newScale - oldScale) < 0.0001f) {
-    return;
-  }
-
-  m_pixelsPerKey = newScale;
+void PianoRollView::applyVerticalScale(float scale, int anchorInNotes, float worldYAtAnchor) {
+  m_pixelsPerKey = std::clamp(scale, kMinPixelsPerKey, kMaxPixelsPerKey);
   updateScrollBars();
 
-  const int newValue = static_cast<int>(std::llround(worldYAtAnchor * newScale - anchorInNotes));
+  const int newValue = static_cast<int>(std::llround(worldYAtAnchor * m_pixelsPerKey - anchorInNotes));
   verticalScrollBar()->setValue(std::clamp(newValue,
                                            verticalScrollBar()->minimum(),
                                            verticalScrollBar()->maximum()));
   requestRender();
+}
+
+void PianoRollView::animateHorizontalScale(float targetScale, int anchorX, int durationMs) {
+  if (!m_horizontalZoomAnimation) {
+    return;
+  }
+
+  const int noteViewportWidth = std::max(0, viewport()->width() - kKeyboardWidth);
+  m_horizontalZoomAnchor = std::clamp(anchorX - kKeyboardWidth, 0, noteViewportWidth);
+  m_horizontalZoomWorldTick = static_cast<float>(horizontalScrollBar()->value() + m_horizontalZoomAnchor) /
+                              std::max(0.0001f, m_pixelsPerTick);
+
+  if (m_horizontalZoomAnimation->state() == QAbstractAnimation::Running) {
+    m_horizontalZoomAnimation->stop();
+  }
+
+  m_horizontalZoomAnimation->setDuration(std::max(1, durationMs));
+  m_horizontalZoomAnimation->setStartValue(m_pixelsPerTick);
+  m_horizontalZoomAnimation->setEndValue(targetScale);
+  m_horizontalZoomAnimation->start();
+}
+
+void PianoRollView::animateVerticalScale(float targetScale, int anchorY, int durationMs) {
+  if (!m_verticalZoomAnimation) {
+    return;
+  }
+
+  const int noteViewportHeight = std::max(0, viewport()->height() - kTopBarHeight);
+  m_verticalZoomAnchor = std::clamp(anchorY - kTopBarHeight, 0, noteViewportHeight);
+  m_verticalZoomWorldY = static_cast<float>(verticalScrollBar()->value() + m_verticalZoomAnchor) /
+                         std::max(0.0001f, m_pixelsPerKey);
+
+  if (m_verticalZoomAnimation->state() == QAbstractAnimation::Running) {
+    m_verticalZoomAnimation->stop();
+  }
+
+  m_verticalZoomAnimation->setDuration(std::max(1, durationMs));
+  m_verticalZoomAnimation->setStartValue(m_pixelsPerKey);
+  m_verticalZoomAnimation->setEndValue(targetScale);
+  m_verticalZoomAnimation->start();
 }

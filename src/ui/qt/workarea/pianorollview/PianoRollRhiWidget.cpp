@@ -11,6 +11,7 @@
 #include <rhi/qrhi.h>
 
 #include <QMouseEvent>
+#include <QNativeGestureEvent>
 #include <QResizeEvent>
 #include <QWheelEvent>
 
@@ -31,6 +32,7 @@ PianoRollRhiWidget::PianoRollRhiWidget(PianoRollView* view, QWidget* parent)
 #endif
 
   setMouseTracking(true);
+  setAttribute(Qt::WA_AcceptTouchEvents, true);
 }
 
 PianoRollRhiWidget::~PianoRollRhiWidget() {
@@ -75,6 +77,16 @@ void PianoRollRhiWidget::releaseResources() {
 void PianoRollRhiWidget::resizeEvent(QResizeEvent* event) {
   QRhiWidget::resizeEvent(event);
   update();
+}
+
+bool PianoRollRhiWidget::event(QEvent* event) {
+  if (event && event->type() == QEvent::NativeGesture) {
+    if (m_view && m_view->handleViewportNativeGesture(static_cast<QNativeGestureEvent*>(event))) {
+      return true;
+    }
+  }
+
+  return QRhiWidget::event(event);
 }
 
 void PianoRollRhiWidget::wheelEvent(QWheelEvent* event) {
