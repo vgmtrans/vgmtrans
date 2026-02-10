@@ -30,6 +30,7 @@
 #include <algorithm>
 #include <cmath>
 #include <limits>
+#include <utility>
 
 PianoRollView::PianoRollView(QWidget* parent)
     : QAbstractScrollArea(parent) {
@@ -107,6 +108,7 @@ void PianoRollView::setSequence(VGMSeq* seq) {
   rebuildSequenceCache();
   updateActiveKeyStates();
   updateScrollBars();
+  m_lastRenderedScanlineX = std::numeric_limits<int>::min();
   requestRender();
 }
 
@@ -119,6 +121,7 @@ void PianoRollView::setTrackCount(int trackCount) {
   m_trackCount = trackCount;
   rebuildTrackColors();
   updateActiveKeyStates();
+  m_lastRenderedScanlineX = std::numeric_limits<int>::min();
   requestRender();
 }
 
@@ -151,19 +154,26 @@ void PianoRollView::refreshSequenceData(bool allowTimelineBuild) {
   rebuildSequenceCache();
   updateActiveKeyStates();
   updateScrollBars();
+  m_lastRenderedScanlineX = std::numeric_limits<int>::min();
   requestRender();
 }
 
 void PianoRollView::setPlaybackTick(int tick, bool playbackActive) {
-  refreshSequenceData(false);
-
   tick = clampTick(tick);
-  const bool changed = (tick != m_currentTick) || (playbackActive != m_playbackActive);
+  const bool tickChanged = (tick != m_currentTick);
+  const bool playbackStateChanged = (playbackActive != m_playbackActive);
+  if (!tickChanged && !playbackStateChanged) {
+    return;
+  }
+
   m_currentTick = tick;
   m_playbackActive = playbackActive;
 
-  updateActiveKeyStates();
-  if (changed) {
+  const bool activeKeysChanged = updateActiveKeyStates();
+  const int scanX = scanlinePixelX(tick);
+  const bool scanlineChanged = (scanX != m_lastRenderedScanlineX);
+  if (playbackStateChanged || activeKeysChanged || scanlineChanged) {
+    m_lastRenderedScanlineX = scanX;
     requestRender();
   }
 }
@@ -172,6 +182,7 @@ void PianoRollView::clearPlaybackState() {
   m_playbackActive = false;
   m_currentTick = 0;
   updateActiveKeyStates();
+  m_lastRenderedScanlineX = std::numeric_limits<int>::min();
   requestRender();
 }
 
@@ -586,40 +597,52 @@ void PianoRollView::rebuildSequenceCache() {
   m_currentTick = clampTick(m_currentTick);
 }
 
-void PianoRollView::updateActiveKeyStates() {
-  for (auto& state : m_activeKeys) {
+bool PianoRollView::updateActiveKeyStates() {
+  std::array<ActiveKeyState, kMidiKeyCount> nextActiveKeys{};
+  for (auto& state : nextActiveKeys) {
     state.trackIndex = -1;
     state.startTick = 0;
   }
 
-  if (!m_timeline || !m_timelineCursor || !m_timeline->finalized()) {
-    return;
-  }
+  if (m_timeline && m_timelineCursor && m_timeline->finalized()) {
+    std::vector<const SeqTimedEvent*> active;
+    m_timelineCursor->getActiveAt(static_cast<uint32_t>(std::max(0, m_currentTick)), active);
 
-  std::vector<const SeqTimedEvent*> active;
-  m_timelineCursor->getActiveAt(static_cast<uint32_t>(std::max(0, m_currentTick)), active);
+    for (const auto* timed : active) {
+      if (!timed || !timed->event || !timed->event->parentTrack) {
+        continue;
+      }
 
-  for (const auto* timed : active) {
-    if (!timed || !timed->event || !timed->event->parentTrack) {
-      continue;
-    }
+      const int key = noteKeyForEvent(timed->event);
+      if (key < 0 || key >= kMidiKeyCount) {
+        continue;
+      }
 
-    const int key = noteKeyForEvent(timed->event);
-    if (key < 0 || key >= kMidiKeyCount) {
-      continue;
-    }
+      const auto trackIt = m_trackIndexByPtr.find(timed->event->parentTrack);
+      if (trackIt == m_trackIndexByPtr.end()) {
+        continue;
+      }
 
-    const auto trackIt = m_trackIndexByPtr.find(timed->event->parentTrack);
-    if (trackIt == m_trackIndexByPtr.end()) {
-      continue;
-    }
-
-    auto& state = m_activeKeys[static_cast<size_t>(key)];
-    if (state.trackIndex < 0 || timed->startTick >= state.startTick) {
-      state.trackIndex = trackIt->second;
-      state.startTick = timed->startTick;
+      auto& state = nextActiveKeys[static_cast<size_t>(key)];
+      if (state.trackIndex < 0 || timed->startTick >= state.startTick) {
+        state.trackIndex = trackIt->second;
+        state.startTick = timed->startTick;
+      }
     }
   }
+
+  bool changed = false;
+  for (int key = 0; key < kMidiKeyCount; ++key) {
+    const auto& oldState = m_activeKeys[static_cast<size_t>(key)];
+    const auto& newState = nextActiveKeys[static_cast<size_t>(key)];
+    if (oldState.trackIndex != newState.trackIndex || oldState.startTick != newState.startTick) {
+      changed = true;
+      break;
+    }
+  }
+
+  m_activeKeys = std::move(nextActiveKeys);
+  return changed;
 }
 
 void PianoRollView::updateScrollBars() {
@@ -691,6 +714,12 @@ int PianoRollView::tickFromViewportX(int x) const {
   const float absoluteX = static_cast<float>(horizontalScrollBar()->value() + localX);
   const int tick = static_cast<int>(std::llround(absoluteX / m_pixelsPerTick));
   return clampTick(tick);
+}
+
+int PianoRollView::scanlinePixelX(int tick) const {
+  const float absoluteX = static_cast<float>(clampTick(tick)) * std::max(0.0001f, m_pixelsPerTick);
+  const float viewX = absoluteX - static_cast<float>(horizontalScrollBar()->value());
+  return static_cast<int>(std::lround(viewX));
 }
 
 void PianoRollView::zoomHorizontal(int steps, int anchorX, bool animated, int durationMs) {

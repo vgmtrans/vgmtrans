@@ -633,7 +633,7 @@ void VGMFileView::onPlaybackPositionChanged(int current, int max, PositionChange
       panelUi.activeNoteView->setTrackCount(static_cast<int>(seq->aTracks.size()));
       panelUi.activeNoteView->setActiveNotes(activeKeys, playbackActive);
     }
-    if (panelUi.pianoRollView) {
+    if (panelUi.pianoRollView && panelUi.pianoRollView->isVisible()) {
       panelUi.pianoRollView->setTrackCount(static_cast<int>(seq->aTracks.size()));
       panelUi.pianoRollView->setSequence(seq);
       panelUi.pianoRollView->refreshSequenceData(false);
