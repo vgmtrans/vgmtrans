@@ -117,6 +117,7 @@ add_executable(
   workarea/MdiArea.cpp
   workarea/MdiArea.h
   workarea/pianorollview/PianoRollFrameData.h
+  workarea/pianorollview/PianoRollRhiInputCoalescer.h
   workarea/pianorollview/PianoRollRhiHost.cpp
   workarea/pianorollview/PianoRollRhiHost.h
   workarea/pianorollview/PianoRollRhiRenderer.cpp
