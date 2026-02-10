@@ -63,9 +63,9 @@ VGMFileView::VGMFileView(VGMFile* vgmfile)
 
   m_splitter->addWidget(panel(PanelSide::Left).container);
   m_splitter->addWidget(panel(PanelSide::Right).container);
-  m_splitter->setStretchFactor(0, 0);
+  m_splitter->setStretchFactor(0, 1);
   m_splitter->setStretchFactor(1, 1);
-  m_splitter->setSizes(QList<int>{hexViewFullWidth(), treeViewMinimumWidth});
+  m_splitter->setSizes(QList<int>{1, 1});
   m_splitter->persistState();
   m_defaultSplitterHandleWidth = m_splitter->handleWidth();
   resetSnapRanges();
@@ -282,7 +282,7 @@ void VGMFileView::setSinglePaneMode(bool singlePane) {
     if (!m_lastSplitSizes.isEmpty() && m_lastSplitSizes.size() == 2) {
       m_splitter->setSizes(m_lastSplitSizes);
     } else {
-      m_splitter->setSizes(QList<int>{hexViewFullWidth(), treeViewMinimumWidth});
+      m_splitter->setSizes(QList<int>{1, 1});
     }
   }
   m_splitter->persistState();
