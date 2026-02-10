@@ -66,11 +66,22 @@ struct Data {
   QColor whiteKeyRowColor;
   QColor blackKeyRowColor;
   QColor dividerColor;
+  QColor selectedNoteFillColor;
+  QColor selectedNoteOutlineColor;
+  QColor selectionRectFillColor;
+  QColor selectionRectOutlineColor;
 
   std::vector<QColor> trackColors;
   std::shared_ptr<const std::vector<Note>> notes;
+  std::shared_ptr<const std::vector<Note>> selectedNotes;
   std::shared_ptr<const std::vector<TimeSignature>> timeSignatures;
   std::array<int, kMidiKeyCount> activeKeyTrack{};
+
+  bool selectionRectVisible = false;
+  float selectionRectX = 0.0f;
+  float selectionRectY = 0.0f;
+  float selectionRectW = 0.0f;
+  float selectionRectH = 0.0f;
 };
 
 }  // namespace PianoRollFrame
