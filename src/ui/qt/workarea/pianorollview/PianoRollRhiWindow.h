@@ -13,6 +13,7 @@
 class PianoRollRhiRenderer;
 class PianoRollView;
 class QRhi;
+class QNativeGestureEvent;
 class QWheelEvent;
 
 class PianoRollRhiWindow final : public SimpleRhiWindow {
@@ -32,8 +33,9 @@ protected:
                       float dpr) override;
 
 private:
+  bool handleNativeGestureEvent(QNativeGestureEvent* gesture);
   bool handleWheelEvent(QWheelEvent* wheel);
-  void drainPendingWheelInput();
+  void drainPendingInput();
 
   // Non-owning pointers; lifetime is managed by PianoRollRhiHost.
   PianoRollView* m_view = nullptr;
