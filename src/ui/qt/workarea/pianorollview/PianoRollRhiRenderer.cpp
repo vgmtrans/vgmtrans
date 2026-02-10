@@ -128,6 +128,7 @@ void PianoRollRhiRenderer::renderFrame(QRhiCommandBuffer* cb, const RenderTarget
     return;
   }
 
+  // Work in logical coordinates; shaders/projector handle device pixels via viewport.
   QSize logicalSize = frame.viewportSize;
   if (logicalSize.isEmpty()) {
     const float dpr = std::max(1.0f, target.dpr);
@@ -138,10 +139,12 @@ void PianoRollRhiRenderer::renderFrame(QRhiCommandBuffer* cb, const RenderTarget
   const Layout layout = computeLayout(frame, logicalSize);
   const uint64_t trackColorsHash = hashTrackColors(frame.trackColors);
   const StaticCacheKey key = makeStaticCacheKey(frame, layout, trackColorsHash);
+  // Rebuild static geometry only when data/layout/style changed.
   if (!m_staticCacheKey.valid || !staticCacheKeyEquals(m_staticCacheKey, key)) {
     buildStaticInstances(frame, layout, trackColorsHash);
     m_staticCacheKey = key;
   }
+  // Dynamic overlays (active notes, scanline, progress) update every frame.
   buildDynamicInstances(frame, layout);
 
   ensurePipeline(target.renderPassDesc, std::max(1, target.sampleCount));
@@ -162,6 +165,7 @@ void PianoRollRhiRenderer::renderFrame(QRhiCommandBuffer* cb, const RenderTarget
             1.0f);
   std::array<float, 20> ubo{};
   std::memcpy(ubo.data(), mvp.constData(), kMat4Bytes);
+  // Scroll values are consumed by shader fields that opt into world scrolling.
   ubo[16] = layout.scrollX;
   ubo[17] = layout.scrollY;
   ubo[18] = 0.0f;
@@ -254,6 +258,7 @@ void PianoRollRhiRenderer::ensurePipeline(QRhiRenderPassDescriptor* renderPassDe
     return;
   }
 
+  // Render pass/sample count changes require a fresh pipeline.
   delete m_pipeline;
   m_pipeline = nullptr;
 
@@ -505,6 +510,7 @@ void PianoRollRhiRenderer::buildStaticInstances(const PianoRollFrame::Data& fram
     return a.tick < b.tick;
   });
 
+  // Hard caps keep pathological signatures/lengths from exploding CPU time.
   static constexpr uint64_t kMaxMeasureLines = 60000;
   static constexpr uint64_t kMaxBeatLines = 220000;
   uint64_t emittedMeasureLines = 0;
@@ -679,6 +685,8 @@ void PianoRollRhiRenderer::buildStaticInstances(const PianoRollFrame::Data& fram
   const float blackKeyHeight = std::max(2.0f, layout.pixelsPerKey);
   const float blackInnerHeightRatio = 0.62f;
   const float blackInnerWidthRatio = 0.86f;
+  // Keys are aligned to 12 equal note lanes, then white-key seams are derived
+  // from neighboring white notes to mimic a real keyboard silhouette.
   auto centerUnitForKey = [](int key) -> float {
     return static_cast<float>(127 - key) + 0.5f;
   };
@@ -872,6 +880,7 @@ void PianoRollRhiRenderer::buildDynamicInstances(const PianoRollFrame::Data& fra
     appendRect(m_dynamicInstances, geometry.x, geometry.y, geometry.w, geometry.h, noteColor);
 
     const float basePhase = frame.elapsedSeconds * 2.5f + static_cast<float>(note.startTick) * 0.009f;
+    // Layered expanding rings approximate a subtle pulse/glow without extra passes.
     for (int ring = 0; ring < 3; ++ring) {
       const float ringPhase = std::fmod(basePhase + (static_cast<float>(ring) * 0.33f), 1.0f);
       const float expand = (1.5f + (ringPhase * 13.0f) + (ring * 1.5f));
@@ -1029,6 +1038,7 @@ void PianoRollRhiRenderer::forEachVisibleNote(const PianoRollFrame::Data& frame,
   }
 
   const auto& notes = *frame.notes;
+  // Start search a bit before the viewport so long notes crossing into view are included.
   const uint64_t maxDuration = std::max<uint64_t>(1, frame.maxNoteDurationTicks);
   const uint64_t searchStart = (layout.visibleStartTick > maxDuration)
                                    ? (layout.visibleStartTick - maxDuration)
