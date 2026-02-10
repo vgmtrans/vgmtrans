@@ -16,6 +16,10 @@ ActiveNoteRhiWindow::ActiveNoteRhiWindow(ActiveNoteView* view, ActiveNoteRhiRend
       m_renderer(renderer) {
 }
 
+ActiveNoteRhiWindow::~ActiveNoteRhiWindow() {
+  releaseRhiResources();
+}
+
 void ActiveNoteRhiWindow::onRhiInitialized(QRhi* rhi) {
   if (m_renderer) {
     m_renderer->initIfNeeded(rhi);
