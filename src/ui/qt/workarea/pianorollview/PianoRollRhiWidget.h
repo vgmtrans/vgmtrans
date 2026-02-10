@@ -16,10 +16,13 @@ class QResizeEvent;
 class QWheelEvent;
 class QEvent;
 class PianoRollView;
+class PianoRollRhiRenderer;
 
 class PianoRollRhiWidget final : public QRhiWidget {
 public:
-  explicit PianoRollRhiWidget(PianoRollView* view, QWidget* parent = nullptr);
+  explicit PianoRollRhiWidget(PianoRollView* view,
+                              PianoRollRhiRenderer* renderer,
+                              QWidget* parent = nullptr);
   ~PianoRollRhiWidget() override;
 
 protected:
@@ -36,5 +39,5 @@ protected:
 
 private:
   PianoRollView* m_view = nullptr;
-  PianoRollRhiRenderer m_renderer;
+  PianoRollRhiRenderer* m_renderer = nullptr;
 };

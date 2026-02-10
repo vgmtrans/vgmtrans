@@ -12,9 +12,12 @@
 
 #include <QResizeEvent>
 
-ActiveNoteRhiWidget::ActiveNoteRhiWidget(ActiveNoteView* view, QWidget* parent)
+ActiveNoteRhiWidget::ActiveNoteRhiWidget(ActiveNoteView* view,
+                                         ActiveNoteRhiRenderer* renderer,
+                                         QWidget* parent)
     : QRhiWidget(parent),
-      m_renderer(view) {
+      m_renderer(renderer) {
+  Q_UNUSED(view);
 #if defined(Q_OS_LINUX)
   setApi(QRhiWidget::Api::OpenGL);
 #elif defined(Q_OS_WIN)
@@ -34,7 +37,9 @@ ActiveNoteRhiWidget::~ActiveNoteRhiWidget() {
 
 void ActiveNoteRhiWidget::initialize(QRhiCommandBuffer* cb) {
   Q_UNUSED(cb);
-  m_renderer.initIfNeeded(rhi());
+  if (m_renderer) {
+    m_renderer->initIfNeeded(rhi());
+  }
 }
 
 void ActiveNoteRhiWidget::render(QRhiCommandBuffer* cb) {
@@ -47,7 +52,10 @@ void ActiveNoteRhiWidget::render(QRhiCommandBuffer* cb) {
     return;
   }
 
-  m_renderer.initIfNeeded(widgetRhi);
+  if (!m_renderer) {
+    return;
+  }
+  m_renderer->initIfNeeded(widgetRhi);
 
   QRhiRenderTarget* rt = renderTarget();
   if (!rt) {
@@ -60,11 +68,13 @@ void ActiveNoteRhiWidget::render(QRhiCommandBuffer* cb) {
   info.pixelSize = rt->pixelSize();
   info.sampleCount = rt->sampleCount();
   info.dpr = rt->devicePixelRatio();
-  m_renderer.renderFrame(cb, info);
+  m_renderer->renderFrame(cb, info);
 }
 
 void ActiveNoteRhiWidget::releaseResources() {
-  m_renderer.releaseResources();
+  if (m_renderer) {
+    m_renderer->releaseResources();
+  }
 }
 
 void ActiveNoteRhiWidget::resizeEvent(QResizeEvent* event) {

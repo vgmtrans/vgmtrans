@@ -6,7 +6,7 @@
 
 #include "ActiveNoteView.h"
 
-#include "ActiveNoteRhiWidget.h"
+#include "ActiveNoteRhiHost.h"
 
 #include <QColor>
 #include <QPalette>
@@ -21,9 +21,9 @@ ActiveNoteView::ActiveNoteView(QWidget* parent)
   setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
   setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
 
-  m_rhiWidget = new ActiveNoteRhiWidget(this, viewport());
-  m_rhiWidget->setGeometry(viewport()->rect());
-  m_rhiWidget->setFocusPolicy(Qt::NoFocus);
+  m_rhiHost = new ActiveNoteRhiHost(this, viewport());
+  m_rhiHost->setGeometry(viewport()->rect());
+  m_rhiHost->setFocusPolicy(Qt::NoFocus);
 }
 
 void ActiveNoteView::setTrackCount(int trackCount) {
@@ -96,8 +96,8 @@ ActiveNoteFrame::Data ActiveNoteView::captureRhiFrameData(float dpr) const {
 
 void ActiveNoteView::resizeEvent(QResizeEvent* event) {
   QAbstractScrollArea::resizeEvent(event);
-  if (m_rhiWidget) {
-    m_rhiWidget->setGeometry(viewport()->rect());
+  if (m_rhiHost) {
+    m_rhiHost->setGeometry(viewport()->rect());
   }
   requestRender();
 }
@@ -109,7 +109,7 @@ QColor ActiveNoteView::colorForTrack(int trackIndex) const {
 }
 
 void ActiveNoteView::requestRender() {
-  if (m_rhiWidget) {
-    m_rhiWidget->update();
+  if (m_rhiHost) {
+    m_rhiHost->requestUpdate();
   }
 }

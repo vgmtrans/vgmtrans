@@ -14,7 +14,7 @@
 #include "ActiveNoteFrameData.h"
 
 class QResizeEvent;
-class ActiveNoteRhiWidget;
+class ActiveNoteRhiHost;
 
 class ActiveNoteView final : public QAbstractScrollArea {
 public:
@@ -41,7 +41,7 @@ private:
   [[nodiscard]] QColor colorForTrack(int trackIndex) const;
   void requestRender();
 
-  ActiveNoteRhiWidget* m_rhiWidget = nullptr;
+  ActiveNoteRhiHost* m_rhiHost = nullptr;
   int m_trackCount = 0;
   bool m_playbackActive = false;
   std::vector<QColor> m_trackColors;

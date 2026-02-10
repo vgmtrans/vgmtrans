@@ -6,7 +6,7 @@
 
 #include "PianoRollView.h"
 
-#include "PianoRollRhiWidget.h"
+#include "PianoRollRhiHost.h"
 #include "PianoRollZoomScrollBar.h"
 
 #include "SeqEvent.h"
@@ -73,10 +73,10 @@ PianoRollView::PianoRollView(QWidget* parent)
     applyVerticalScale(value.toFloat(), m_verticalZoomAnchor, m_verticalZoomWorldY);
   });
 
-  m_rhiWidget = new PianoRollRhiWidget(this, viewport());
-  m_rhiWidget->setGeometry(viewport()->rect());
-  m_rhiWidget->setFocusPolicy(Qt::NoFocus);
-  m_rhiWidget->setMouseTracking(true);
+  m_rhiHost = new PianoRollRhiHost(this, viewport());
+  m_rhiHost->setGeometry(viewport()->rect());
+  m_rhiHost->setFocusPolicy(Qt::NoFocus);
+  m_rhiHost->setMouseTracking(true);
 
   m_notes = std::make_shared<std::vector<PianoRollFrame::Note>>();
   m_timeSignatures = std::make_shared<std::vector<PianoRollFrame::TimeSignature>>();
@@ -244,8 +244,8 @@ PianoRollFrame::Data PianoRollView::captureRhiFrameData(float dpr) const {
 
 void PianoRollView::resizeEvent(QResizeEvent* event) {
   QAbstractScrollArea::resizeEvent(event);
-  if (m_rhiWidget) {
-    m_rhiWidget->setGeometry(viewport()->rect());
+  if (m_rhiHost) {
+    m_rhiHost->setGeometry(viewport()->rect());
   }
   updateScrollBars();
   if (!m_initialViewportPositioned) {
@@ -362,8 +362,8 @@ bool PianoRollView::handleViewportNativeGesture(QNativeGestureEvent* event) {
   const float factor = std::clamp(std::exp(rawDelta), 0.55f, 1.85f);
 
   QPoint anchor = event->globalPosition().toPoint();
-  if (m_rhiWidget) {
-    anchor = m_rhiWidget->mapFromGlobal(anchor);
+  if (m_rhiHost) {
+    anchor = m_rhiHost->mapFromGlobal(anchor);
   } else {
     anchor = viewport()->mapFromGlobal(anchor);
   }
@@ -702,8 +702,8 @@ void PianoRollView::scheduleViewportSync() {
 }
 
 void PianoRollView::requestRender() {
-  if (m_rhiWidget) {
-    m_rhiWidget->update();
+  if (m_rhiHost) {
+    m_rhiHost->requestUpdate();
     if (!m_renderClock.isValid()) {
       m_renderClock.start();
     }
@@ -712,7 +712,7 @@ void PianoRollView::requestRender() {
 }
 
 void PianoRollView::requestRenderCoalesced() {
-  if (!m_rhiWidget) {
+  if (!m_rhiHost) {
     return;
   }
 

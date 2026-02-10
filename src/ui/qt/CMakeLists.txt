@@ -94,10 +94,14 @@ add_executable(
   widgets/TitleBar.cpp
   widgets/TitleBar.h
   workarea/activenoteview/ActiveNoteFrameData.h
+  workarea/activenoteview/ActiveNoteRhiHost.cpp
+  workarea/activenoteview/ActiveNoteRhiHost.h
   workarea/activenoteview/ActiveNoteRhiRenderer.cpp
   workarea/activenoteview/ActiveNoteRhiRenderer.h
   workarea/activenoteview/ActiveNoteRhiWidget.cpp
   workarea/activenoteview/ActiveNoteRhiWidget.h
+  workarea/activenoteview/ActiveNoteRhiWindow.cpp
+  workarea/activenoteview/ActiveNoteRhiWindow.h
   workarea/activenoteview/ActiveNoteView.cpp
   workarea/activenoteview/ActiveNoteView.h
   workarea/hexview/HexView.cpp
@@ -113,14 +117,20 @@ add_executable(
   workarea/MdiArea.cpp
   workarea/MdiArea.h
   workarea/pianorollview/PianoRollFrameData.h
+  workarea/pianorollview/PianoRollRhiHost.cpp
+  workarea/pianorollview/PianoRollRhiHost.h
   workarea/pianorollview/PianoRollRhiRenderer.cpp
   workarea/pianorollview/PianoRollRhiRenderer.h
   workarea/pianorollview/PianoRollRhiWidget.cpp
   workarea/pianorollview/PianoRollRhiWidget.h
+  workarea/pianorollview/PianoRollRhiWindow.cpp
+  workarea/pianorollview/PianoRollRhiWindow.h
   workarea/pianorollview/PianoRollView.cpp
   workarea/pianorollview/PianoRollView.h
   workarea/pianorollview/PianoRollZoomScrollBar.cpp
   workarea/pianorollview/PianoRollZoomScrollBar.h
+  workarea/rhi/SimpleRhiWindow.cpp
+  workarea/rhi/SimpleRhiWindow.h
   workarea/RawFileListView.cpp
   workarea/RawFileListView.h
   workarea/VGMCollListView.cpp
