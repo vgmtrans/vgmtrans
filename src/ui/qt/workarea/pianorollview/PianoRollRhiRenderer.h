@@ -10,13 +10,11 @@
 
 #include <array>
 #include <cstdint>
-#include <unordered_map>
 #include <vector>
 
 #include "PianoRollFrameData.h"
 
 class QColor;
-class QMatrix4x4;
 class PianoRollView;
 class QRhi;
 class QRhiBuffer;
@@ -24,11 +22,7 @@ class QRhiCommandBuffer;
 class QRhiGraphicsPipeline;
 class QRhiRenderPassDescriptor;
 class QRhiRenderTarget;
-class QRhiResourceUpdateBatch;
-class QRhiSampler;
 class QRhiShaderResourceBindings;
-class QRhiTexture;
-class QRhiTextureRenderTarget;
 
 class PianoRollRhiRenderer {
 public:
@@ -116,48 +110,6 @@ private:
     float scrollMulY;
   };
 
-  struct TileInstance {
-    float x;
-    float y;
-    float w;
-    float h;
-    float u;
-    float v;
-    float uw;
-    float vh;
-  };
-
-  enum class StaticPlane : int {
-    XY = 0,
-    X = 1,
-    Y = 2,
-    Count = 3,
-  };
-
-  struct TileRange {
-    bool valid = false;
-    int minX = 0;
-    int maxX = -1;
-    int minY = 0;
-    int maxY = -1;
-  };
-
-  struct StaticTile {
-    int tileX = 0;
-    int tileY = 0;
-    QRhiTexture* texture = nullptr;
-    QRhiTextureRenderTarget* renderTarget = nullptr;
-    QRhiShaderResourceBindings* compositeSrb = nullptr;
-    bool ready = false;
-    uint64_t generation = 0;
-  };
-
-  struct TilePlaneCache {
-    std::unordered_map<uint64_t, StaticTile> tiles;
-    std::vector<uint64_t> visibleKeys;
-    TileRange keepRange;
-  };
-
   enum class LineStyle : int {
     Solid = 0,
     DottedVertical = 1,
@@ -167,28 +119,9 @@ private:
   static uint64_t hashTrackColors(const std::vector<QColor>& colors);
   static uint32_t colorKey(const QColor& color);
 
-  static int planeIndex(StaticPlane plane);
-  static uint64_t makeTileKey(int tileX, int tileY);
-  static void fillUniformData(std::array<float, 20>& ubo,
-                              const QMatrix4x4& mvp,
-                              float cameraX,
-                              float cameraY);
-
-  void ensurePipelines(QRhiRenderPassDescriptor* renderPassDesc, int sampleCount);
-  void ensureTilePipeline();
+  void ensurePipeline(QRhiRenderPassDescriptor* renderPassDesc, int sampleCount);
   bool ensureInstanceBuffer(QRhiBuffer*& buffer, int bytes, int minBytes);
   Layout computeLayout(const PianoRollFrame::Data& frame, const QSize& pixelSize) const;
-  QSize tilePixelSizeForDpr(float dpr) const;
-  TileRange tileRangeForPlane(const Layout& layout, StaticPlane plane, int margin) const;
-  void updateVisibleTiles(const Layout& layout, float dpr);
-  void pruneTileCaches();
-  bool ensureTile(StaticPlane plane, int tileX, int tileY, float dpr);
-  void renderMissingTiles(QRhiCommandBuffer* cb, QRhiResourceUpdateBatch*& initialUpdates);
-  void releaseTileCaches();
-  std::vector<RectInstance>& staticPlaneInstances(StaticPlane plane);
-  const std::vector<RectInstance>& staticPlaneInstances(StaticPlane plane) const;
-  QRhiBuffer*& staticPlaneBuffer(StaticPlane plane);
-
   StaticCacheKey makeStaticCacheKey(const PianoRollFrame::Data& frame,
                                     const Layout& layout,
                                     uint64_t trackColorsHash) const;
@@ -223,37 +156,16 @@ private:
   QRhiBuffer* m_vertexBuffer = nullptr;
   QRhiBuffer* m_indexBuffer = nullptr;
   QRhiBuffer* m_uniformBuffer = nullptr;
-  QRhiBuffer* m_tileUniformBuffer = nullptr;
-  QRhiBuffer* m_staticFixedInstanceBuffer = nullptr;
-  QRhiBuffer* m_staticXyInstanceBuffer = nullptr;
-  QRhiBuffer* m_staticXInstanceBuffer = nullptr;
-  QRhiBuffer* m_staticYInstanceBuffer = nullptr;
+  QRhiBuffer* m_staticInstanceBuffer = nullptr;
   QRhiBuffer* m_dynamicInstanceBuffer = nullptr;
-  QRhiBuffer* m_tileInstanceBuffer = nullptr;
-
-  QRhiShaderResourceBindings* m_outputRectSrb = nullptr;
-  QRhiShaderResourceBindings* m_tileRectSrb = nullptr;
-  QRhiShaderResourceBindings* m_tileCompositeLayoutSrb = nullptr;
-  QRhiGraphicsPipeline* m_outputRectPipeline = nullptr;
-  QRhiGraphicsPipeline* m_tileRectPipeline = nullptr;
-  QRhiGraphicsPipeline* m_tileCompositePipeline = nullptr;
-  QRhiSampler* m_tileSampler = nullptr;
-  QRhiTexture* m_tileDummyTexture = nullptr;
-  QRhiRenderPassDescriptor* m_tileRenderPass = nullptr;
+  QRhiShaderResourceBindings* m_shaderBindings = nullptr;
+  QRhiGraphicsPipeline* m_pipeline = nullptr;
 
   QRhiRenderPassDescriptor* m_outputRenderPass = nullptr;
   int m_sampleCount = 1;
-  QSize m_tilePixelSize;
-  uint64_t m_staticGeneration = 0;
-  bool m_geometryUploaded = false;
-  bool m_staticInstanceBuffersDirty = true;
+  bool m_staticBuffersUploaded = false;
   bool m_inited = false;
   StaticCacheKey m_staticCacheKey;
-
-  std::vector<RectInstance> m_staticFixedInstances;
-  std::array<std::vector<RectInstance>, static_cast<int>(StaticPlane::Count)> m_staticPlaneInstanceData;
+  std::vector<RectInstance> m_staticInstances;
   std::vector<RectInstance> m_dynamicInstances;
-  std::array<TilePlaneCache, static_cast<int>(StaticPlane::Count)> m_tilePlaneCaches;
-  std::vector<TileInstance> m_visibleTileInstances;
-  std::vector<QRhiShaderResourceBindings*> m_visibleTileSrbs;
 };
