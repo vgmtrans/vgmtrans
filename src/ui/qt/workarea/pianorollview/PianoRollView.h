@@ -29,7 +29,8 @@ class QVariantAnimation;
 class QWheelEvent;
 class SeqTrack;
 class VGMSeq;
-class PianoRollRhiWidget;
+class PianoRollRhiHost;
+class PianoRollRhiWindow;
 
 class PianoRollView final : public QAbstractScrollArea {
   Q_OBJECT
@@ -58,6 +59,7 @@ protected:
 
 private:
   friend class PianoRollRhiWidget;
+  friend class PianoRollRhiWindow;
 
   struct ActiveKeyState {
     int trackIndex = -1;
@@ -111,7 +113,7 @@ private:
   void animateHorizontalScale(float targetScale, int anchorX, int durationMs);
   void animateVerticalScale(float targetScale, int anchorY, int durationMs);
 
-  PianoRollRhiWidget* m_rhiWidget = nullptr;
+  PianoRollRhiHost* m_rhiHost = nullptr;
 
   VGMSeq* m_seq = nullptr;
   const SeqEventTimeIndex* m_timeline = nullptr;
