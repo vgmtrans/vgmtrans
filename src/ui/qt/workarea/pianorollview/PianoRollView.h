@@ -90,6 +90,7 @@ private:
 
   void maybeBuildTimelineFromSequence();
   void rebuildTrackIndexMap();
+  // Resolves section-local track pointers back to logical track indices.
   int trackIndexForTrack(const SeqTrack* track) const;
   void rebuildTrackColors();
   void rebuildSequenceCache();
@@ -133,6 +134,7 @@ private:
   int m_currentTick = 0;
   bool m_seekDragActive = false;
   bool m_attemptedTimelineBuild = false;
+  // Initial centering waits for a real viewport size (stacked views can report tiny pre-layout sizes).
   bool m_initialViewportPositioned = false;
   bool m_viewportSyncQueued = false;
   bool m_coalescedRenderPending = false;
@@ -151,7 +153,9 @@ private:
   size_t m_cachedTimelineSize = 0;
   bool m_cachedTimelineFinalized = false;
 
+  // Primary map for regular sequences.
   std::unordered_map<const SeqTrack*, int> m_trackIndexByPtr;
+  // Fallback map for multi-section sequences that swap SeqTrack objects.
   std::unordered_map<const MidiTrack*, int> m_trackIndexByMidiPtr;
   std::vector<QColor> m_trackColors;
 

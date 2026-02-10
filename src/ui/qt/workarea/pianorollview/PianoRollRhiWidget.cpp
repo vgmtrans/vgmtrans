@@ -21,6 +21,7 @@ PianoRollRhiWidget::PianoRollRhiWidget(PianoRollView* view,
     : QRhiWidget(parent),
       m_view(view),
       m_renderer(renderer) {
+  // Match the platform's preferred graphics backend for QRhiWidget.
 #if defined(Q_OS_LINUX)
   setApi(QRhiWidget::Api::OpenGL);
 #elif defined(Q_OS_WIN)
@@ -90,6 +91,7 @@ void PianoRollRhiWidget::resizeEvent(QResizeEvent* event) {
 
 bool PianoRollRhiWidget::event(QEvent* event) {
   if (event && event->type() == QEvent::NativeGesture) {
+    // Keep pinch/gesture handling centralized in PianoRollView.
     if (m_view && m_view->handleViewportNativeGesture(static_cast<QNativeGestureEvent*>(event))) {
       return true;
     }

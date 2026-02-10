@@ -25,9 +25,12 @@ PianoRollRhiHost::PianoRollRhiHost(PianoRollView* view, QWidget* parent)
   m_renderer = std::make_unique<PianoRollRhiRenderer>(view);
 
 #if defined(Q_OS_LINUX)
+  // QRhiWidget backend is stable on Linux.
   auto* widget = new PianoRollRhiWidget(view, m_renderer.get(), this);
   m_surface = widget;
 #else
+  // Native RHI window backend avoids QRhiWidget performance issues seen on
+  // macOS/Windows with multiple active views.
   auto* window = new PianoRollRhiWindow(view, m_renderer.get());
   m_window = window;
   m_surface = QWidget::createWindowContainer(window, this);
@@ -43,6 +46,8 @@ PianoRollRhiHost::PianoRollRhiHost(PianoRollView* view, QWidget* parent)
 }
 
 PianoRollRhiHost::~PianoRollRhiHost() {
+  // Destroy the container/window first; renderer resources are owned and
+  // released by the concrete surface implementation.
   delete m_surface;
   m_surface = nullptr;
   m_window = nullptr;
@@ -59,6 +64,7 @@ void PianoRollRhiHost::requestUpdate() {
 void PianoRollRhiHost::resizeEvent(QResizeEvent* event) {
   QWidget::resizeEvent(event);
   if (m_surface) {
+    // Keep the rendering surface perfectly aligned with the host viewport.
     m_surface->setGeometry(rect());
   }
 }

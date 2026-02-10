@@ -28,6 +28,8 @@ bool PianoRollRhiWindow::handleWindowEvent(QEvent* e) {
     return false;
   }
 
+  // Forward all user interaction to PianoRollView so both the window-backed
+  // and widget-backed surfaces share identical behavior.
   switch (e->type()) {
     case QEvent::NativeGesture:
       return m_view->handleViewportNativeGesture(static_cast<QNativeGestureEvent*>(e));
@@ -37,6 +39,8 @@ bool PianoRollRhiWindow::handleWindowEvent(QEvent* e) {
         return true;
       }
 
+      // Plain scrolling path (no zoom modifiers). This mirrors scroll-area
+      // semantics while staying in the RHI window input path.
       QScrollBar* hbar = m_view->horizontalScrollBar();
       QScrollBar* vbar = m_view->verticalScrollBar();
       if (!hbar || !vbar) {
@@ -64,6 +68,7 @@ bool PianoRollRhiWindow::handleWindowEvent(QEvent* e) {
       }
 
       if (wheel->modifiers().testFlag(Qt::ShiftModifier) && dx == 0 && dy != 0) {
+        // Shift+wheel convention: vertical wheel drives horizontal scroll.
         dx = dy;
         dy = 0;
       }
@@ -116,6 +121,7 @@ void PianoRollRhiWindow::renderRhiFrame(QRhiCommandBuffer* cb,
     return;
   }
 
+  // Repackage swapchain/window target details into renderer-neutral frame info.
   PianoRollRhiRenderer::RenderTargetInfo info;
   info.renderTarget = renderTarget;
   info.renderPassDesc = renderPassDesc;
