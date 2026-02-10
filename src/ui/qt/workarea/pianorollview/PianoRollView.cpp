@@ -22,6 +22,8 @@
 #include <QPalette>
 #include <QResizeEvent>
 #include <QScrollBar>
+#include <QShowEvent>
+#include <QTimer>
 #include <QVariantAnimation>
 #include <QWheelEvent>
 
@@ -233,7 +235,20 @@ void PianoRollView::resizeEvent(QResizeEvent* event) {
     m_rhiWidget->setGeometry(viewport()->rect());
   }
   updateScrollBars();
+  if (!m_initialViewportPositioned) {
+    scheduleViewportSync();
+  }
   requestRender();
+}
+
+void PianoRollView::showEvent(QShowEvent* event) {
+  QAbstractScrollArea::showEvent(event);
+  if (!m_initialViewportPositioned) {
+    scheduleViewportSync();
+  } else {
+    updateScrollBars();
+    requestRender();
+  }
 }
 
 void PianoRollView::scrollContentsBy(int dx, int dy) {
@@ -626,12 +641,35 @@ void PianoRollView::updateScrollBars() {
   verticalScrollBar()->setPageStep(noteViewportHeight);
   verticalScrollBar()->setSingleStep(std::max(1, static_cast<int>(std::round(m_pixelsPerKey * 2.0f))));
 
-  if (!m_initialViewportPositioned && viewport()->width() > 0 && viewport()->height() > 0) {
-    verticalScrollBar()->setValue(verticalScrollBar()->maximum() / 2);
-    m_initialViewportPositioned = true;
+  if (!m_initialViewportPositioned) {
+    // QStackedWidget can report a tiny pre-layout viewport (e.g. ~28px) when hidden.
+    // Defer initial centering until dimensions are actually usable.
+    const bool usableViewport = noteViewportWidth >= 64 && noteViewportHeight >= 64;
+    if (usableViewport) {
+      verticalScrollBar()->setValue(verticalScrollBar()->maximum() / 2);
+      m_initialViewportPositioned = true;
+    } else {
+      scheduleViewportSync();
+    }
   }
 
   m_currentTick = clampTick(m_currentTick);
+}
+
+void PianoRollView::scheduleViewportSync() {
+  if (m_viewportSyncQueued) {
+    return;
+  }
+
+  m_viewportSyncQueued = true;
+  QTimer::singleShot(0, this, [this]() {
+    m_viewportSyncQueued = false;
+    if (!isVisible()) {
+      return;
+    }
+    updateScrollBars();
+    requestRender();
+  });
 }
 
 void PianoRollView::requestRender() {
