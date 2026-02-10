@@ -426,7 +426,8 @@ bool PianoRollView::handleViewportNativeGesture(QNativeGestureEvent* event) {
 bool PianoRollView::handleViewportCoalescedZoomGesture(float rawDelta,
                                                        const QPointF& globalPos,
                                                        Qt::KeyboardModifiers modifiers) {
-  if (std::abs(rawDelta) < 0.0001f) {
+  // Ignore tiny gesture noise to avoid constant micro-updates while fingers rest.
+  if (std::abs(rawDelta) < 0.01f) {
     return true;
   }
 
@@ -441,9 +442,9 @@ bool PianoRollView::handleViewportCoalescedZoomGesture(float rawDelta,
   }
 
   if (modifiers.testFlag(Qt::AltModifier)) {
-    zoomVerticalFactor(factor, anchor.y(), true, 150);
+    zoomVerticalFactor(factor, anchor.y(), false, 0);
   } else {
-    zoomHorizontalFactor(factor, anchor.x(), true, 150);
+    zoomHorizontalFactor(factor, anchor.x(), false, 0);
   }
 
   return true;
