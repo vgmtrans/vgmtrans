@@ -11,8 +11,10 @@
 #include "PianoRollRhiRenderer.h"
 
 class QMouseEvent;
+class QNativeGestureEvent;
 class QResizeEvent;
 class QWheelEvent;
+class QEvent;
 class PianoRollView;
 
 class PianoRollRhiWidget final : public QRhiWidget {
@@ -25,6 +27,7 @@ protected:
   void render(QRhiCommandBuffer* cb) override;
   void releaseResources() override;
   void resizeEvent(QResizeEvent* event) override;
+  bool event(QEvent* event) override;
 
   void wheelEvent(QWheelEvent* event) override;
   void mousePressEvent(QMouseEvent* event) override;

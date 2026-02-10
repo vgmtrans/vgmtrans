@@ -46,6 +46,7 @@ struct Data {
   int topBarHeight = 22;
   float pixelsPerTick = 0.10f;
   float pixelsPerKey = 12.0f;
+  float elapsedSeconds = 0.0f;
 
   bool playbackActive = false;
 

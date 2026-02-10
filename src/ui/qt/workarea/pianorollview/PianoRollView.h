@@ -7,6 +7,7 @@
 #pragma once
 
 #include <QAbstractScrollArea>
+#include <QElapsedTimer>
 
 #include <array>
 #include <memory>
@@ -18,7 +19,9 @@
 
 class QEvent;
 class QMouseEvent;
+class QNativeGestureEvent;
 class QResizeEvent;
+class QVariantAnimation;
 class QWheelEvent;
 class SeqTrack;
 class VGMSeq;
@@ -57,7 +60,7 @@ private:
   };
 
   static constexpr int kMidiKeyCount = PianoRollFrame::kMidiKeyCount;
-  static constexpr int kKeyboardWidth = 72;
+  static constexpr int kKeyboardWidth = 96;
   static constexpr int kTopBarHeight = 22;
 
   static constexpr float kDefaultPixelsPerTick = 0.10f;
@@ -72,6 +75,7 @@ private:
   [[nodiscard]] QColor colorForTrack(int trackIndex) const;
 
   bool handleViewportWheel(QWheelEvent* event);
+  bool handleViewportNativeGesture(QNativeGestureEvent* event);
   bool handleViewportMousePress(QMouseEvent* event);
   bool handleViewportMouseMove(QMouseEvent* event);
   bool handleViewportMouseRelease(QMouseEvent* event);
@@ -88,8 +92,15 @@ private:
   int clampTick(int tick) const;
   int tickFromViewportX(int x) const;
 
-  void zoomHorizontal(int steps, int anchorX);
-  void zoomVertical(int steps, int anchorY);
+  void zoomHorizontal(int steps, int anchorX, bool animated = false, int durationMs = 0);
+  void zoomVertical(int steps, int anchorY, bool animated = false, int durationMs = 0);
+  void zoomHorizontalFactor(float factor, int anchorX, bool animated, int durationMs);
+  void zoomVerticalFactor(float factor, int anchorY, bool animated, int durationMs);
+
+  void applyHorizontalScale(float scale, int anchorInNotes, float worldTickAtAnchor);
+  void applyVerticalScale(float scale, int anchorInNotes, float worldYAtAnchor);
+  void animateHorizontalScale(float targetScale, int anchorX, int durationMs);
+  void animateVerticalScale(float targetScale, int anchorY, int durationMs);
 
   PianoRollRhiWidget* m_rhiWidget = nullptr;
 
@@ -108,6 +119,14 @@ private:
   int m_currentTick = 0;
   bool m_seekDragActive = false;
   bool m_attemptedTimelineBuild = false;
+
+  QElapsedTimer m_animClock;
+  QVariantAnimation* m_horizontalZoomAnimation = nullptr;
+  QVariantAnimation* m_verticalZoomAnimation = nullptr;
+  float m_horizontalZoomWorldTick = 0.0f;
+  int m_horizontalZoomAnchor = 0;
+  float m_verticalZoomWorldY = 0.0f;
+  int m_verticalZoomAnchor = 0;
 
   size_t m_cachedTimelineSize = 0;
   bool m_cachedTimelineFinalized = false;
