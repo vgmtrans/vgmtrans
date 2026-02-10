@@ -21,6 +21,7 @@ class QEvent;
 class QMouseEvent;
 class QNativeGestureEvent;
 class QResizeEvent;
+class QShowEvent;
 class QVariantAnimation;
 class QWheelEvent;
 class SeqTrack;
@@ -48,6 +49,7 @@ signals:
 
 protected:
   void resizeEvent(QResizeEvent* event) override;
+  void showEvent(QShowEvent* event) override;
   void scrollContentsBy(int dx, int dy) override;
   void changeEvent(QEvent* event) override;
 
@@ -87,6 +89,7 @@ private:
   void updateActiveKeyStates();
 
   void updateScrollBars();
+  void scheduleViewportSync();
   void requestRender();
 
   int clampTick(int tick) const;
@@ -120,6 +123,7 @@ private:
   bool m_seekDragActive = false;
   bool m_attemptedTimelineBuild = false;
   bool m_initialViewportPositioned = false;
+  bool m_viewportSyncQueued = false;
 
   QElapsedTimer m_animClock;
   QVariantAnimation* m_horizontalZoomAnimation = nullptr;
