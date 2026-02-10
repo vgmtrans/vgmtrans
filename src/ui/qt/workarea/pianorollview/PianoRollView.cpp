@@ -524,7 +524,8 @@ bool PianoRollView::handleViewportMouseRelease(QMouseEvent* event) {
   const QPoint pos = event->position().toPoint();
   m_noteSelectionCurrent = pos;
   if (m_noteSelectionDragging) {
-    updateMarqueeSelection(true);
+    updateMarqueeSelection(false);
+    emitCurrentSelectionSignals();
   } else {
     const int noteIndex = noteIndexAtViewportPoint(pos);
     if (noteIndex >= 0) {
@@ -1026,20 +1027,25 @@ void PianoRollView::applySelectedNoteIndices(std::vector<size_t> indices,
   }
 
   if (emitSelectionSignal && (selectionSetWasChanged || primaryChanged)) {
-    emit selectionChanged(m_primarySelectedItem);
-    std::vector<VGMItem*> selectedItems;
-    selectedItems.reserve(m_selectedNoteIndices.size());
-    std::unordered_set<VGMItem*> selectedItemSet;
-    selectedItemSet.reserve(m_selectedNoteIndices.size() * 2 + 1);
-    for (size_t selectedIndex : m_selectedNoteIndices) {
-      VGMItem* selectedItem = m_selectableNotes[selectedIndex].item;
-      if (!selectedItem || !selectedItemSet.insert(selectedItem).second) {
-        continue;
-      }
-      selectedItems.push_back(selectedItem);
-    }
-    emit selectionSetChanged(selectedItems, m_primarySelectedItem);
+    emitCurrentSelectionSignals();
   }
+}
+
+void PianoRollView::emitCurrentSelectionSignals() {
+  emit selectionChanged(m_primarySelectedItem);
+
+  std::vector<VGMItem*> selectedItems;
+  selectedItems.reserve(m_selectedNoteIndices.size());
+  std::unordered_set<VGMItem*> selectedItemSet;
+  selectedItemSet.reserve(m_selectedNoteIndices.size() * 2 + 1);
+  for (size_t selectedIndex : m_selectedNoteIndices) {
+    VGMItem* selectedItem = m_selectableNotes[selectedIndex].item;
+    if (!selectedItem || !selectedItemSet.insert(selectedItem).second) {
+      continue;
+    }
+    selectedItems.push_back(selectedItem);
+  }
+  emit selectionSetChanged(selectedItems, m_primarySelectedItem);
 }
 
 void PianoRollView::updateMarqueeSelection(bool emitSelectionSignal) {

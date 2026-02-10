@@ -128,6 +128,7 @@ private:
   void applySelectedNoteIndices(std::vector<size_t> indices,
                                 bool emitSelectionSignal,
                                 VGMItem* preferredPrimary = nullptr);
+  void emitCurrentSelectionSignals();
   void updateMarqueeSelection(bool emitSelectionSignal);
 
   void zoomHorizontal(int steps, int anchorX, bool animated = false, int durationMs = 0);
