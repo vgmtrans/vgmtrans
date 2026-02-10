@@ -629,7 +629,7 @@ void VGMFileView::onPlaybackPositionChanged(int current, int max, PositionChange
     if (!panelUi.container || !panelUi.container->isVisible()) {
       continue;
     }
-    if (panelUi.activeNoteView) {
+    if (panelUi.activeNoteView && panelUi.activeNoteView->isVisible()) {
       panelUi.activeNoteView->setTrackCount(static_cast<int>(seq->aTracks.size()));
       panelUi.activeNoteView->setActiveNotes(activeKeys, playbackActive);
     }
