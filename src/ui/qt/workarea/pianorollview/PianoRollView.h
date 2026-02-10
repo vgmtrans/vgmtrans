@@ -191,6 +191,7 @@ private:
   std::vector<QColor> m_trackColors;
 
   std::shared_ptr<const std::vector<PianoRollFrame::Note>> m_notes;
+  std::shared_ptr<const std::vector<PianoRollFrame::Note>> m_activeNotes;
   std::shared_ptr<const std::vector<PianoRollFrame::Note>> m_selectedNotes;
   std::shared_ptr<const std::vector<PianoRollFrame::TimeSignature>> m_timeSignatures;
   std::vector<SelectableNote> m_selectableNotes;

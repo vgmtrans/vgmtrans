@@ -1022,62 +1022,58 @@ void PianoRollRhiRenderer::buildDynamicInstances(const PianoRollFrame::Data& fra
     return QColor::fromHsv((trackIndex * 43) % 360, 190, 235);
   };
 
-  forEachVisibleNote(frame, layout, [&](const PianoRollFrame::Note& note, uint64_t noteEndTick) {
-    const bool active = frame.currentTick >= static_cast<int>(note.startTick) &&
-                        frame.currentTick < static_cast<int>(noteEndTick);
-    if (!active) {
-      return;
-    }
-
-    const NoteGeometry geometry = computeNoteGeometry(note, layout);
-    if (!geometry.valid) {
-      return;
-    }
-
-    QColor noteColor = colorForTrack(note.trackIndex);
-    noteColor = noteColor.lighter(148);
-    noteColor.setAlpha(245);
-    appendRect(m_dynamicInstances, geometry.x, geometry.y, geometry.w, geometry.h, noteColor);
-
-    const float basePhase = frame.elapsedSeconds * 2.5f + static_cast<float>(note.startTick) * 0.009f;
-    // Layered expanding rings approximate a subtle pulse/glow without extra passes.
-    for (int ring = 0; ring < 3; ++ring) {
-      const float ringPhase = std::fmod(basePhase + (static_cast<float>(ring) * 0.33f), 1.0f);
-      const float expand = (1.5f + (ringPhase * 13.0f) + (ring * 1.5f));
-      const float intensity = (1.0f - ringPhase) * (0.62f - (ring * 0.14f));
-      if (intensity <= 0.0f) {
+  if (frame.activeNotes && !frame.activeNotes->empty()) {
+    for (const PianoRollFrame::Note& note : *frame.activeNotes) {
+      const NoteGeometry geometry = computeNoteGeometry(note, layout);
+      if (!geometry.valid) {
         continue;
       }
 
-      const float gx = std::max(layout.noteAreaLeft, geometry.x - expand);
-      const float gy = std::max(layout.noteAreaTop, geometry.y - expand);
-      const float gx2 = std::min(layout.noteAreaLeft + layout.noteAreaWidth, geometry.x + geometry.w + expand);
-      const float gy2 = std::min(layout.noteAreaTop + layout.noteAreaHeight, geometry.y + geometry.h + expand);
-      if (gx2 - gx <= 0.5f || gy2 - gy <= 0.5f) {
-        continue;
+      QColor noteColor = colorForTrack(note.trackIndex);
+      noteColor = noteColor.lighter(148);
+      noteColor.setAlpha(245);
+      appendRect(m_dynamicInstances, geometry.x, geometry.y, geometry.w, geometry.h, noteColor);
+
+      const float basePhase = frame.elapsedSeconds * 2.5f + static_cast<float>(note.startTick) * 0.009f;
+      // Layered expanding rings approximate a subtle pulse/glow without extra passes.
+      for (int ring = 0; ring < 3; ++ring) {
+        const float ringPhase = std::fmod(basePhase + (static_cast<float>(ring) * 0.33f), 1.0f);
+        const float expand = (1.5f + (ringPhase * 13.0f) + (ring * 1.5f));
+        const float intensity = (1.0f - ringPhase) * (0.62f - (ring * 0.14f));
+        if (intensity <= 0.0f) {
+          continue;
+        }
+
+        const float gx = std::max(layout.noteAreaLeft, geometry.x - expand);
+        const float gy = std::max(layout.noteAreaTop, geometry.y - expand);
+        const float gx2 = std::min(layout.noteAreaLeft + layout.noteAreaWidth, geometry.x + geometry.w + expand);
+        const float gy2 = std::min(layout.noteAreaTop + layout.noteAreaHeight, geometry.y + geometry.h + expand);
+        if (gx2 - gx <= 0.5f || gy2 - gy <= 0.5f) {
+          continue;
+        }
+
+        QColor glow = noteColor;
+        glow.setAlpha(std::clamp(static_cast<int>(std::lround(255.0f * intensity)), 0, 255));
+        appendRect(m_dynamicInstances, gx, gy, gx2 - gx, gy2 - gy, glow);
       }
 
-      QColor glow = noteColor;
-      glow.setAlpha(std::clamp(static_cast<int>(std::lround(255.0f * intensity)), 0, 255));
-      appendRect(m_dynamicInstances, gx, gy, gx2 - gx, gy2 - gy, glow);
+      QColor noteEdge = frame.noteOutlineColor;
+      noteEdge.setAlpha(std::min(255, noteEdge.alpha() + 95));
+      const float edgeThickness = 1.0f;
+      appendRect(m_dynamicInstances,
+                 geometry.x,
+                 geometry.y,
+                 geometry.w,
+                 edgeThickness,
+                 noteEdge);
+      appendRect(m_dynamicInstances,
+                 geometry.x,
+                 geometry.y + geometry.h - edgeThickness,
+                 geometry.w,
+                 edgeThickness,
+                 noteEdge);
     }
-
-    QColor noteEdge = frame.noteOutlineColor;
-    noteEdge.setAlpha(std::min(255, noteEdge.alpha() + 95));
-    const float edgeThickness = 1.0f;
-    appendRect(m_dynamicInstances,
-               geometry.x,
-               geometry.y,
-               geometry.w,
-               edgeThickness,
-               noteEdge);
-    appendRect(m_dynamicInstances,
-               geometry.x,
-               geometry.y + geometry.h - edgeThickness,
-               geometry.w,
-               edgeThickness,
-               noteEdge);
-  });
+  }
 
   if (frame.selectedNotes && !frame.selectedNotes->empty()) {
     const float edgeThickness = 1.0f;
