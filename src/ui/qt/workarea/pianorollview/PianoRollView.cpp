@@ -195,6 +195,7 @@ PianoRollFrame::Data PianoRollView::captureRhiFrameData(float dpr) const {
   frame.currentTick = clampTick(m_currentTick);
   frame.trackCount = m_trackCount;
   frame.ppqn = std::max(1, m_ppqn);
+  frame.maxNoteDurationTicks = std::max<uint32_t>(1, m_maxNoteDurationTicks);
 
   frame.scrollX = horizontalScrollBar()->value();
   frame.scrollY = verticalScrollBar()->value();
@@ -467,6 +468,7 @@ void PianoRollView::rebuildTrackColors() {
 
 void PianoRollView::rebuildSequenceCache() {
   m_ppqn = (m_seq && m_seq->ppqn() > 0) ? m_seq->ppqn() : 48;
+  m_maxNoteDurationTicks = 1;
 
   auto notes = std::make_shared<std::vector<PianoRollFrame::Note>>();
   auto signatures = std::make_shared<std::vector<PianoRollFrame::TimeSignature>>();
@@ -500,6 +502,7 @@ void PianoRollView::rebuildSequenceCache() {
   m_timelineCursor = std::make_unique<SeqEventTimeIndex::Cursor>(timeline);
 
   uint64_t maxEndTick = 1;
+  uint32_t maxDurationTicks = 1;
   notes->reserve(timeline.size());
   for (size_t i = 0; i < timeline.size(); ++i) {
     const auto& timed = timeline.event(i);
@@ -525,6 +528,7 @@ void PianoRollView::rebuildSequenceCache() {
     note.key = static_cast<uint8_t>(noteKey);
     note.trackIndex = static_cast<int16_t>(trackIt->second);
     notes->push_back(note);
+    maxDurationTicks = std::max<uint32_t>(maxDurationTicks, note.duration);
   }
 
   std::sort(notes->begin(), notes->end(), [](const auto& a, const auto& b) {
@@ -591,6 +595,7 @@ void PianoRollView::rebuildSequenceCache() {
 
   maxEndTick = std::min<uint64_t>(maxEndTick, static_cast<uint64_t>(std::numeric_limits<int>::max()));
   m_totalTicks = std::max(1, static_cast<int>(maxEndTick));
+  m_maxNoteDurationTicks = std::max<uint32_t>(1, maxDurationTicks);
 
   m_notes = notes;
   m_timeSignatures = signatures;
