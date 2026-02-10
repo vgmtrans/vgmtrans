@@ -31,6 +31,9 @@ protected:
   void exposeEvent(QExposeEvent* event) override;
   void resizeEvent(QResizeEvent* event) override;
 
+  // Must be called by derived destructors while dynamic dispatch is valid.
+  void releaseRhiResources();
+
   virtual bool handleWindowEvent(QEvent* e);
   virtual void onRhiInitialized(QRhi* rhi) = 0;
   virtual void onRhiReleased() = 0;
@@ -47,7 +50,7 @@ private:
   void initIfNeeded();
   void resizeSwapChain();
   void renderFrame();
-  void releaseResources();
+  void releaseResources(bool notifyDerived);
   void releaseSwapChain();
 
   std::unique_ptr<BackendData> m_backend;
@@ -58,4 +61,5 @@ private:
   QRhiRenderPassDescriptor* m_rp = nullptr;
 
   bool m_hasSwapChain = false;
+  bool m_resourcesReleased = false;
 };
