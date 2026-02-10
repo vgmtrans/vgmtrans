@@ -27,6 +27,7 @@ class QResizeEvent;
 class QShowEvent;
 class QVariantAnimation;
 class QWheelEvent;
+class MidiTrack;
 class SeqTrack;
 class VGMSeq;
 class PianoRollRhiHost;
@@ -89,6 +90,7 @@ private:
 
   void maybeBuildTimelineFromSequence();
   void rebuildTrackIndexMap();
+  int trackIndexForTrack(const SeqTrack* track) const;
   void rebuildTrackColors();
   void rebuildSequenceCache();
   bool updateActiveKeyStates();
@@ -150,6 +152,7 @@ private:
   bool m_cachedTimelineFinalized = false;
 
   std::unordered_map<const SeqTrack*, int> m_trackIndexByPtr;
+  std::unordered_map<const MidiTrack*, int> m_trackIndexByMidiPtr;
   std::vector<QColor> m_trackColors;
 
   std::shared_ptr<const std::vector<PianoRollFrame::Note>> m_notes;
