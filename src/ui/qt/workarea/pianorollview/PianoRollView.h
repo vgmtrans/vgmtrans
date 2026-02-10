@@ -22,6 +22,7 @@
 #include "SeqEventTimeIndex.h"
 
 class QEvent;
+class QPointF;
 class QRect;
 class QRectF;
 class QMouseEvent;
@@ -100,6 +101,9 @@ private:
 
   bool handleViewportWheel(QWheelEvent* event);
   bool handleViewportNativeGesture(QNativeGestureEvent* event);
+  bool handleViewportCoalescedZoomGesture(float rawDelta,
+                                          const QPointF& globalPos,
+                                          Qt::KeyboardModifiers modifiers);
   bool handleViewportMousePress(QMouseEvent* event);
   bool handleViewportMouseMove(QMouseEvent* event);
   bool handleViewportMouseRelease(QMouseEvent* event);

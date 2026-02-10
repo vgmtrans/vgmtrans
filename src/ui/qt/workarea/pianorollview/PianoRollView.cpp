@@ -417,14 +417,22 @@ bool PianoRollView::handleViewportNativeGesture(QNativeGestureEvent* event) {
   }
 
   const float rawDelta = static_cast<float>(event->value());
+  const bool handled =
+      handleViewportCoalescedZoomGesture(rawDelta, event->globalPosition(), event->modifiers());
+  event->accept();
+  return handled;
+}
+
+bool PianoRollView::handleViewportCoalescedZoomGesture(float rawDelta,
+                                                       const QPointF& globalPos,
+                                                       Qt::KeyboardModifiers modifiers) {
   if (std::abs(rawDelta) < 0.0001f) {
-    event->accept();
     return true;
   }
 
   const float factor = std::clamp(std::exp(rawDelta), 0.55f, 1.85f);
 
-  QPoint anchor = event->globalPosition().toPoint();
+  QPoint anchor = globalPos.toPoint();
   if (m_rhiHost) {
     // Gestures arrive in global space from the render surface.
     anchor = m_rhiHost->mapFromGlobal(anchor);
@@ -432,13 +440,12 @@ bool PianoRollView::handleViewportNativeGesture(QNativeGestureEvent* event) {
     anchor = viewport()->mapFromGlobal(anchor);
   }
 
-  if (event->modifiers().testFlag(Qt::AltModifier)) {
+  if (modifiers.testFlag(Qt::AltModifier)) {
     zoomVerticalFactor(factor, anchor.y(), true, 150);
   } else {
     zoomHorizontalFactor(factor, anchor.x(), true, 150);
   }
 
-  event->accept();
   return true;
 }
 

@@ -36,7 +36,7 @@ bool PianoRollRhiWindow::handleWindowEvent(QEvent* e) {
   // and widget-backed surfaces share identical behavior.
   switch (e->type()) {
     case QEvent::NativeGesture:
-      return m_view->handleViewportNativeGesture(static_cast<QNativeGestureEvent*>(e));
+      return handleNativeGestureEvent(static_cast<QNativeGestureEvent*>(e));
     case QEvent::Wheel:
       m_inputCoalescer.queueWheel(static_cast<QWheelEvent*>(e));
       requestUpdate();
@@ -53,6 +53,21 @@ bool PianoRollRhiWindow::handleWindowEvent(QEvent* e) {
   }
 
   return false;
+}
+
+bool PianoRollRhiWindow::handleNativeGestureEvent(QNativeGestureEvent* gesture) {
+  if (!gesture || !m_view) {
+    return false;
+  }
+
+  if (gesture->gestureType() != Qt::ZoomNativeGesture) {
+    return m_view->handleViewportNativeGesture(gesture);
+  }
+
+  m_inputCoalescer.queueNativeZoomGesture(gesture);
+  requestUpdate();
+  gesture->accept();
+  return true;
 }
 
 bool PianoRollRhiWindow::handleWheelEvent(QWheelEvent* wheel) {
@@ -111,9 +126,16 @@ bool PianoRollRhiWindow::handleWheelEvent(QWheelEvent* wheel) {
   return true;
 }
 
-void PianoRollRhiWindow::drainPendingWheelInput() {
+void PianoRollRhiWindow::drainPendingInput() {
   if (!m_view || !m_view->viewport()) {
     return;
+  }
+
+  PianoRollRhiInputCoalescer::ZoomBatch zoomBatch;
+  if (m_inputCoalescer.takePendingZoomGesture(zoomBatch)) {
+    m_view->handleViewportCoalescedZoomGesture(zoomBatch.rawDelta,
+                                               zoomBatch.globalPos,
+                                               zoomBatch.modifiers);
   }
 
   PianoRollRhiInputCoalescer::WheelBatch wheelBatch;
@@ -155,9 +177,9 @@ void PianoRollRhiWindow::renderRhiFrame(QRhiCommandBuffer* cb,
     return;
   }
 
-  // Match HexView's frame-coalesced input model: consume one merged wheel
-  // payload per rendered frame.
-  drainPendingWheelInput();
+  // Match HexView's frame-coalesced input model: consume merged input payloads
+  // once per rendered frame.
+  drainPendingInput();
 
   // Repackage swapchain/window target details into renderer-neutral frame info.
   PianoRollRhiRenderer::RenderTargetInfo info;
