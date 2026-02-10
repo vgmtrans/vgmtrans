@@ -63,7 +63,7 @@ private:
   static constexpr int kKeyboardWidth = 78;
   static constexpr int kTopBarHeight = 22;
 
-  static constexpr float kDefaultPixelsPerTick = 0.10f;
+  static constexpr float kDefaultPixelsPerTick = 0.20f;
   static constexpr float kDefaultPixelsPerKey = 12.0f;
   static constexpr float kMinPixelsPerTick = 0.0125f;
   static constexpr float kMaxPixelsPerTick = 6.0f;
@@ -119,6 +119,7 @@ private:
   int m_currentTick = 0;
   bool m_seekDragActive = false;
   bool m_attemptedTimelineBuild = false;
+  bool m_initialViewportPositioned = false;
 
   QElapsedTimer m_animClock;
   QVariantAnimation* m_horizontalZoomAnimation = nullptr;

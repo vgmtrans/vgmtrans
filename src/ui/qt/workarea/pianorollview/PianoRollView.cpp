@@ -332,7 +332,13 @@ bool PianoRollView::handleViewportNativeGesture(QNativeGestureEvent* event) {
   }
 
   const float factor = std::clamp(std::exp(rawDelta), 0.55f, 1.85f);
-  const QPoint anchor = event->position().toPoint();
+
+  QPoint anchor = event->globalPosition().toPoint();
+  if (m_rhiWidget) {
+    anchor = m_rhiWidget->mapFromGlobal(anchor);
+  } else {
+    anchor = viewport()->mapFromGlobal(anchor);
+  }
 
   if (event->modifiers().testFlag(Qt::AltModifier)) {
     zoomVerticalFactor(factor, anchor.y(), true, 150);
@@ -619,6 +625,11 @@ void PianoRollView::updateScrollBars() {
   verticalScrollBar()->setRange(0, std::max(0, contentHeight - noteViewportHeight));
   verticalScrollBar()->setPageStep(noteViewportHeight);
   verticalScrollBar()->setSingleStep(std::max(1, static_cast<int>(std::round(m_pixelsPerKey * 2.0f))));
+
+  if (!m_initialViewportPositioned && viewport()->width() > 0 && viewport()->height() > 0) {
+    verticalScrollBar()->setValue(verticalScrollBar()->maximum() / 2);
+    m_initialViewportPositioned = true;
+  }
 
   m_currentTick = clampTick(m_currentTick);
 }
