@@ -73,6 +73,7 @@ struct Data {
 
   std::vector<QColor> trackColors;
   std::shared_ptr<const std::vector<Note>> notes;
+  std::shared_ptr<const std::vector<Note>> activeNotes;
   std::shared_ptr<const std::vector<Note>> selectedNotes;
   std::shared_ptr<const std::vector<TimeSignature>> timeSignatures;
   std::array<int, kMidiKeyCount> activeKeyTrack{};
