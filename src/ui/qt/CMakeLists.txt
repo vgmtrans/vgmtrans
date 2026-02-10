@@ -55,6 +55,10 @@ target_sources(vgmtrans
     workarea/hexview/HexViewRhiRenderer.cpp
     workarea/hexview/HexViewRhiWidget.cpp
     workarea/hexview/HexViewRhiWindow.cpp
+    workarea/pianorollview/PianoRollRhiRenderer.cpp
+    workarea/pianorollview/PianoRollRhiWidget.cpp
+    workarea/pianorollview/PianoRollView.cpp
+    workarea/pianorollview/PianoRollZoomScrollBar.cpp
     workarea/MdiArea.cpp
     workarea/RawFileListView.cpp
     workarea/VGMCollListView.cpp
@@ -128,6 +132,11 @@ target_sources(vgmtrans
       workarea/hexview/HexViewRhiRenderer.h
       workarea/hexview/HexViewRhiWidget.h
       workarea/hexview/HexViewRhiWindow.h
+      workarea/pianorollview/PianoRollFrameData.h
+      workarea/pianorollview/PianoRollRhiRenderer.h
+      workarea/pianorollview/PianoRollRhiWidget.h
+      workarea/pianorollview/PianoRollView.h
+      workarea/pianorollview/PianoRollZoomScrollBar.h
 )
 
 if(APPLE)

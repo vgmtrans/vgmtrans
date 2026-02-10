@@ -28,6 +28,7 @@ class SeqTrack;
 class HexView;
 class VGMFileTreeView;
 class ActiveNoteView;
+class PianoRollView;
 class VGMItem;
 class SeqEvent;
 struct SeqTimedEvent;
@@ -42,6 +43,7 @@ enum class PanelViewKind : uint8_t {
   Hex = 0,
   Tree = 1,
   ActiveNotes = 2,
+  PianoRoll = 3,
 };
 
 class VGMFileView final : public QMdiSubWindow {
@@ -59,6 +61,7 @@ private:
     HexView* hexView = nullptr;
     VGMFileTreeView* treeView = nullptr;
     ActiveNoteView* activeNoteView = nullptr;
+    PianoRollView* pianoRollView = nullptr;
     PanelViewKind currentKind = PanelViewKind::Hex;
   };
 
