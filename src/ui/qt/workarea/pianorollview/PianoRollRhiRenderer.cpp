@@ -492,12 +492,10 @@ void PianoRollRhiRenderer::buildInstances(const PianoRollFrame::Data& frame, con
     }
   }
 
-  const float blackKeyWidth = std::max(12.0f, keyboardWidth * 0.58f);
-  const float blackKeyHeightRatio = 1.55f;
+  const float blackKeyWidth = std::max(10.0f, keyboardWidth * 0.64f);
+  const float blackKeyHeightRatio = 0.62f;
   const float blackInnerHeightRatio = 0.62f;
   const float blackInnerWidthRatio = 0.86f;
-  const float whiteLipStart = std::clamp(blackKeyWidth - 1.0f, 8.0f, keyboardWidth - 4.0f);
-  const float whiteTipInset = std::max(1.0f, pixelsPerKey * 0.24f);
   for (int key = 0; key < PianoRollFrame::kMidiKeyCount; ++key) {
     const float keyY = noteAreaTop + ((127.0f - static_cast<float>(key)) * pixelsPerKey) - scrollY;
     const float keyH = std::max(1.0f, pixelsPerKey);
@@ -506,20 +504,11 @@ void PianoRollRhiRenderer::buildInstances(const PianoRollFrame::Data& frame, con
     }
 
     const bool black = isBlackKey(key);
-    if (!black) {
-      // White keys extend farther than black keys and taper around adjacent black notes.
-      const bool hasLowerBlack = key > 0 && isBlackKey(key - 1);
-      const bool hasUpperBlack = key < (PianoRollFrame::kMidiKeyCount - 1) && isBlackKey(key + 1);
-      const float frontY = keyY + (hasUpperBlack ? whiteTipInset : 0.0f);
-      const float frontH = std::max(0.0f, keyH - (hasUpperBlack ? whiteTipInset : 0.0f) -
-                                               (hasLowerBlack ? whiteTipInset : 0.0f));
+    // White key bed: gives the visual wrap-around past black key tips.
+    appendRect(0.0f, keyY, keyboardWidth, keyH, frame.whiteKeyColor);
 
-      appendRect(0.0f, keyY, whiteLipStart, keyH, frame.whiteKeyColor);
-      if (frontH > 0.0f) {
-        appendRect(whiteLipStart, frontY, keyboardWidth - whiteLipStart, frontH, frame.whiteKeyColor);
-      }
-    } else {
-      const float blackH = std::max(3.0f, keyH * blackKeyHeightRatio);
+    if (black) {
+      const float blackH = std::max(2.0f, keyH * blackKeyHeightRatio);
       const float blackY = keyY + ((keyH - blackH) * 0.5f);
       appendRect(0.0f, blackY, blackKeyWidth, blackH, frame.blackKeyColor);
 
@@ -540,7 +529,7 @@ void PianoRollRhiRenderer::buildInstances(const PianoRollFrame::Data& frame, con
     if (activeTrack >= 0) {
       QColor active = colorForTrack(activeTrack);
       if (black) {
-        const float blackH = std::max(3.0f, keyH * blackKeyHeightRatio);
+        const float blackH = std::max(2.0f, keyH * blackKeyHeightRatio);
         const float blackY = keyY + ((keyH - blackH) * 0.5f);
         active = active.lighter(133);
         active.setAlpha(238);

@@ -60,7 +60,7 @@ private:
   };
 
   static constexpr int kMidiKeyCount = PianoRollFrame::kMidiKeyCount;
-  static constexpr int kKeyboardWidth = 96;
+  static constexpr int kKeyboardWidth = 78;
   static constexpr int kTopBarHeight = 22;
 
   static constexpr float kDefaultPixelsPerTick = 0.10f;
