@@ -10,6 +10,7 @@
 #include <QElapsedTimer>
 
 #include <array>
+#include <limits>
 #include <memory>
 #include <unordered_map>
 #include <vector>
@@ -86,7 +87,7 @@ private:
   void rebuildTrackIndexMap();
   void rebuildTrackColors();
   void rebuildSequenceCache();
-  void updateActiveKeyStates();
+  bool updateActiveKeyStates();
 
   void updateScrollBars();
   void scheduleViewportSync();
@@ -94,6 +95,7 @@ private:
 
   int clampTick(int tick) const;
   int tickFromViewportX(int x) const;
+  int scanlinePixelX(int tick) const;
 
   void zoomHorizontal(int steps, int anchorX, bool animated = false, int durationMs = 0);
   void zoomVertical(int steps, int anchorY, bool animated = false, int durationMs = 0);
@@ -132,6 +134,7 @@ private:
   int m_horizontalZoomAnchor = 0;
   float m_verticalZoomWorldY = 0.0f;
   int m_verticalZoomAnchor = 0;
+  int m_lastRenderedScanlineX = std::numeric_limits<int>::min();
 
   size_t m_cachedTimelineSize = 0;
   bool m_cachedTimelineFinalized = false;
