@@ -492,68 +492,129 @@ void PianoRollRhiRenderer::buildInstances(const PianoRollFrame::Data& frame, con
     }
   }
 
-  const float blackKeyWidth = std::max(10.0f, keyboardWidth * 0.64f);
-  const float blackKeyHeightRatio = 0.62f;
+  const float blackKeyWidth = std::max(10.0f, keyboardWidth * 0.63f);
+  const float blackKeyHeight = std::max(2.0f, pixelsPerKey * 0.82f);
   const float blackInnerHeightRatio = 0.62f;
   const float blackInnerWidthRatio = 0.86f;
-  for (int key = 0; key < PianoRollFrame::kMidiKeyCount; ++key) {
-    const float keyY = noteAreaTop + ((127.0f - static_cast<float>(key)) * pixelsPerKey) - scrollY;
-    const float keyH = std::max(1.0f, pixelsPerKey);
-    if (keyY >= static_cast<float>(viewHeight) || keyY + keyH <= noteAreaTop) {
-      continue;
+  auto centerUnitForKey = [](int key) -> float {
+    return static_cast<float>(127 - key) + 0.5f;
+  };
+
+  std::array<bool, 257> seamDrawn{};
+  auto drawSeamAtUnit = [&](float seamUnit) {
+    const int seamId = std::clamp(static_cast<int>(std::lround(seamUnit * 2.0f)), 0, 256);
+    if (seamDrawn[static_cast<size_t>(seamId)]) {
+      return;
     }
+    seamDrawn[static_cast<size_t>(seamId)] = true;
 
-    const bool black = isBlackKey(key);
-    // White key bed: gives the visual wrap-around past black key tips.
-    appendRect(0.0f, keyY, keyboardWidth, keyH, frame.whiteKeyColor);
-
-    if (black) {
-      const float blackH = std::max(2.0f, keyH * blackKeyHeightRatio);
-      const float blackY = keyY + ((keyH - blackH) * 0.5f);
-      appendRect(0.0f, blackY, blackKeyWidth, blackH, frame.blackKeyColor);
-
-      QColor blackFace = frame.blackKeyColor.darker(116);
-      blackFace.setAlpha(230);
-      const float innerW = blackKeyWidth * blackInnerWidthRatio;
-      const float innerH = blackH * blackInnerHeightRatio;
-      const float innerX = (blackKeyWidth - innerW) * 0.5f;
-      const float innerY = blackY + 0.6f;
-      appendRect(innerX, innerY, innerW, std::max(0.0f, innerH - 0.6f), blackFace);
-
-      QColor blackHighlight = frame.blackKeyColor.lighter(128);
-      blackHighlight.setAlpha(84);
-      appendRect(0.0f, blackY, blackKeyWidth, 1.0f, blackHighlight);
-    }
-
-    const int activeTrack = frame.activeKeyTrack[static_cast<size_t>(key)];
-    if (activeTrack >= 0) {
-      QColor active = colorForTrack(activeTrack);
-      if (black) {
-        const float blackH = std::max(2.0f, keyH * blackKeyHeightRatio);
-        const float blackY = keyY + ((keyH - blackH) * 0.5f);
-        active = active.lighter(133);
-        active.setAlpha(238);
-        const float inset = 1.0f;
-        appendRect(inset,
-                   blackY + inset,
-                   std::max(0.0f, blackKeyWidth - (2.0f * inset)),
-                   std::max(0.0f, blackH - (2.0f * inset)),
-                   active);
-      } else {
-        active = active.lighter(112);
-        active.setAlpha(172);
-        const float inset = 1.0f;
-        appendRect(inset,
-                   keyY + inset,
-                   std::max(0.0f, keyboardWidth - (2.0f * inset)),
-                   std::max(0.0f, keyH - (2.0f * inset)),
-                   active);
-      }
+    const float seamY = noteAreaTop + (seamUnit * pixelsPerKey) - scrollY;
+    if (seamY < noteAreaTop - 1.0f || seamY > noteAreaTop + noteAreaHeight + 1.0f) {
+      return;
     }
 
     QColor keySep = frame.keySeparatorColor;
     keySep.setAlpha(std::max(56, keySep.alpha()));
-    appendRect(0.0f, keyY, keyboardWidth, 1.0f, keySep);
+    appendRect(0.0f, seamY, keyboardWidth, 1.0f, keySep);
+  };
+
+  // White keys are drawn from seam-to-seam so black-key seams align to black-note centers.
+  for (int key = 0; key < PianoRollFrame::kMidiKeyCount; ++key) {
+    if (isBlackKey(key)) {
+      continue;
+    }
+
+    int higherWhite = key + 1;
+    while (higherWhite < PianoRollFrame::kMidiKeyCount && isBlackKey(higherWhite)) {
+      ++higherWhite;
+    }
+    int lowerWhite = key - 1;
+    while (lowerWhite >= 0 && isBlackKey(lowerWhite)) {
+      --lowerWhite;
+    }
+
+    const float keyCenterUnit = centerUnitForKey(key);
+    float topSeamUnit = keyCenterUnit - 0.5f;
+    if (higherWhite < PianoRollFrame::kMidiKeyCount) {
+      if (higherWhite == key + 1) {
+        topSeamUnit = (keyCenterUnit + centerUnitForKey(higherWhite)) * 0.5f;
+      } else {
+        topSeamUnit = centerUnitForKey(key + 1);
+      }
+    }
+
+    float bottomSeamUnit = keyCenterUnit + 0.5f;
+    if (lowerWhite >= 0) {
+      if (lowerWhite == key - 1) {
+        bottomSeamUnit = (keyCenterUnit + centerUnitForKey(lowerWhite)) * 0.5f;
+      } else {
+        bottomSeamUnit = centerUnitForKey(key - 1);
+      }
+    }
+
+    const float keyTop = noteAreaTop + (topSeamUnit * pixelsPerKey) - scrollY;
+    const float keyBottom = noteAreaTop + (bottomSeamUnit * pixelsPerKey) - scrollY;
+    const float clippedTop = std::max(noteAreaTop, keyTop);
+    const float clippedBottom = std::min(noteAreaTop + noteAreaHeight, keyBottom);
+    if (clippedBottom - clippedTop <= 0.5f) {
+      continue;
+    }
+
+    appendRect(0.0f, clippedTop, keyboardWidth, clippedBottom - clippedTop, frame.whiteKeyColor);
+
+    const int activeTrack = frame.activeKeyTrack[static_cast<size_t>(key)];
+    if (activeTrack >= 0) {
+      QColor active = colorForTrack(activeTrack).lighter(112);
+      active.setAlpha(172);
+      appendRect(1.0f,
+                 clippedTop + 1.0f,
+                 std::max(0.0f, keyboardWidth - 2.0f),
+                 std::max(0.0f, clippedBottom - clippedTop - 2.0f),
+                 active);
+    }
+
+    drawSeamAtUnit(topSeamUnit);
+    drawSeamAtUnit(bottomSeamUnit);
+  }
+
+  // Black keys are centered on black-note rows and overlay the shorter key section.
+  for (int key = 0; key < PianoRollFrame::kMidiKeyCount; ++key) {
+    if (!isBlackKey(key)) {
+      continue;
+    }
+
+    const float centerY = noteAreaTop + (centerUnitForKey(key) * pixelsPerKey) - scrollY;
+    const float blackY = centerY - (blackKeyHeight * 0.5f);
+    const float clippedTop = std::max(noteAreaTop, blackY);
+    const float clippedBottom = std::min(noteAreaTop + noteAreaHeight, blackY + blackKeyHeight);
+    if (clippedBottom - clippedTop <= 0.5f) {
+      continue;
+    }
+
+    appendRect(0.0f, clippedTop, blackKeyWidth, clippedBottom - clippedTop, frame.blackKeyColor);
+
+    QColor blackFace = frame.blackKeyColor.darker(116);
+    blackFace.setAlpha(230);
+    const float innerW = blackKeyWidth * blackInnerWidthRatio;
+    const float innerH = (clippedBottom - clippedTop) * blackInnerHeightRatio;
+    const float innerX = (blackKeyWidth - innerW) * 0.5f;
+    const float innerY = clippedTop + 0.6f;
+    appendRect(innerX, innerY, innerW, std::max(0.0f, innerH - 0.6f), blackFace);
+
+    QColor blackHighlight = frame.blackKeyColor.lighter(128);
+    blackHighlight.setAlpha(84);
+    appendRect(0.0f, clippedTop, blackKeyWidth, 1.0f, blackHighlight);
+
+    const int activeTrack = frame.activeKeyTrack[static_cast<size_t>(key)];
+    if (activeTrack >= 0) {
+      QColor active = colorForTrack(activeTrack).lighter(133);
+      active.setAlpha(238);
+      appendRect(1.0f,
+                 clippedTop + 1.0f,
+                 std::max(0.0f, blackKeyWidth - 2.0f),
+                 std::max(0.0f, clippedBottom - clippedTop - 2.0f),
+                 active);
+    }
   }
 
   appendRect(noteAreaLeft, topBarHeight - 1.0f, noteAreaWidth, 1.0f, frame.dividerColor);
