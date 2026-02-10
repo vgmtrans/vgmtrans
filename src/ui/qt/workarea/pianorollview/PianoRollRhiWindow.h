@@ -8,9 +8,12 @@
 
 #include "workarea/rhi/SimpleRhiWindow.h"
 
+#include "PianoRollRhiInputCoalescer.h"
+
 class PianoRollRhiRenderer;
 class PianoRollView;
 class QRhi;
+class QWheelEvent;
 
 class PianoRollRhiWindow final : public SimpleRhiWindow {
 public:
@@ -29,7 +32,11 @@ protected:
                       float dpr) override;
 
 private:
+  bool handleWheelEvent(QWheelEvent* wheel);
+  void drainPendingWheelInput();
+
   // Non-owning pointers; lifetime is managed by PianoRollRhiHost.
   PianoRollView* m_view = nullptr;
   PianoRollRhiRenderer* m_renderer = nullptr;
+  PianoRollRhiInputCoalescer m_inputCoalescer;
 };
