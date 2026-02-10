@@ -15,10 +15,12 @@
 #include <QResizeEvent>
 #include <QWheelEvent>
 
-PianoRollRhiWidget::PianoRollRhiWidget(PianoRollView* view, QWidget* parent)
+PianoRollRhiWidget::PianoRollRhiWidget(PianoRollView* view,
+                                       PianoRollRhiRenderer* renderer,
+                                       QWidget* parent)
     : QRhiWidget(parent),
       m_view(view),
-      m_renderer(view) {
+      m_renderer(renderer) {
 #if defined(Q_OS_LINUX)
   setApi(QRhiWidget::Api::OpenGL);
 #elif defined(Q_OS_WIN)
@@ -41,7 +43,9 @@ PianoRollRhiWidget::~PianoRollRhiWidget() {
 
 void PianoRollRhiWidget::initialize(QRhiCommandBuffer* cb) {
   Q_UNUSED(cb);
-  m_renderer.initIfNeeded(rhi());
+  if (m_renderer) {
+    m_renderer->initIfNeeded(rhi());
+  }
 }
 
 void PianoRollRhiWidget::render(QRhiCommandBuffer* cb) {
@@ -54,7 +58,10 @@ void PianoRollRhiWidget::render(QRhiCommandBuffer* cb) {
     return;
   }
 
-  m_renderer.initIfNeeded(widgetRhi);
+  if (!m_renderer) {
+    return;
+  }
+  m_renderer->initIfNeeded(widgetRhi);
 
   QRhiRenderTarget* rt = renderTarget();
   if (!rt) {
@@ -67,11 +74,13 @@ void PianoRollRhiWidget::render(QRhiCommandBuffer* cb) {
   info.pixelSize = rt->pixelSize();
   info.sampleCount = rt->sampleCount();
   info.dpr = rt->devicePixelRatio();
-  m_renderer.renderFrame(cb, info);
+  m_renderer->renderFrame(cb, info);
 }
 
 void PianoRollRhiWidget::releaseResources() {
-  m_renderer.releaseResources();
+  if (m_renderer) {
+    m_renderer->releaseResources();
+  }
 }
 
 void PianoRollRhiWidget::resizeEvent(QResizeEvent* event) {
