@@ -85,7 +85,9 @@ SimpleRhiWindow::SimpleRhiWindow()
 }
 
 SimpleRhiWindow::~SimpleRhiWindow() {
-  releaseResources();
+  // Base destructor must avoid virtual callbacks; derived destructors call
+  // releaseRhiResources() first while dynamic dispatch is still valid.
+  releaseResources(false);
 }
 
 bool SimpleRhiWindow::event(QEvent* e) {
@@ -266,8 +268,16 @@ void SimpleRhiWindow::releaseSwapChain() {
   }
 }
 
-void SimpleRhiWindow::releaseResources() {
-  if (m_rhi) {
+void SimpleRhiWindow::releaseRhiResources() {
+  releaseResources(true);
+}
+
+void SimpleRhiWindow::releaseResources(bool notifyDerived) {
+  if (m_resourcesReleased) {
+    return;
+  }
+
+  if (notifyDerived && m_rhi) {
     onRhiReleased();
   }
 
@@ -282,4 +292,5 @@ void SimpleRhiWindow::releaseResources() {
 
   delete m_rhi;
   m_rhi = nullptr;
+  m_resourcesReleased = true;
 }
