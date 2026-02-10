@@ -15,7 +15,7 @@ class QRhi;
 class ActiveNoteRhiWindow final : public SimpleRhiWindow {
 public:
   explicit ActiveNoteRhiWindow(ActiveNoteView* view, ActiveNoteRhiRenderer* renderer);
-  ~ActiveNoteRhiWindow() override = default;
+  ~ActiveNoteRhiWindow() override;
 
 protected:
   void onRhiInitialized(QRhi* rhi) override;

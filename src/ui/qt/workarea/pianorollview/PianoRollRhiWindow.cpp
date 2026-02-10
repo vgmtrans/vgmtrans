@@ -23,6 +23,10 @@ PianoRollRhiWindow::PianoRollRhiWindow(PianoRollView* view, PianoRollRhiRenderer
       m_renderer(renderer) {
 }
 
+PianoRollRhiWindow::~PianoRollRhiWindow() {
+  releaseRhiResources();
+}
+
 bool PianoRollRhiWindow::handleWindowEvent(QEvent* e) {
   if (!e || !m_view) {
     return false;

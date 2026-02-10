@@ -15,7 +15,7 @@ class QRhi;
 class PianoRollRhiWindow final : public SimpleRhiWindow {
 public:
   explicit PianoRollRhiWindow(PianoRollView* view, PianoRollRhiRenderer* renderer);
-  ~PianoRollRhiWindow() override = default;
+  ~PianoRollRhiWindow() override;
 
 protected:
   bool handleWindowEvent(QEvent* e) override;
