@@ -49,6 +49,7 @@ VGMFileView::VGMFileView(VGMFile *vgmfile)
   m_defaultHexFont = m_hexview->font();
 
   connect(m_hexview, &HexView::selectionChanged, this, &VGMFileView::onSelectionChange);
+  connect(m_hexview, &HexView::seekToEventRequested, this, &VGMFileView::seekToEvent);
 
   connect(m_treeview, &VGMFileTreeView::currentItemChanged,
           [&](const QTreeWidgetItem *item, QTreeWidgetItem *) {
