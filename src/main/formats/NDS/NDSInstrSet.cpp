@@ -16,9 +16,11 @@
 #include "VGMRgn.h"
 #include "LogManager.h"
 
-// INTR_FREQUENCY is the interval in seconds between updates to the vol for articulation.
-// 2728 ticks = 5.2095ms (~192Hz).
-constexpr double INTR_FREQUENCY = 0.0052095;
+// INTR_FREQUENCY is the interval in seconds between updates to the volume envelope.
+// The NDS sound engine updates envelopes every 64 sound timer intervals.
+// Each sound timer interval is 2728 ARM7 clock cycles.
+// (2728 * 64) / 33,513,982 Hz = ~0.0052095 seconds (approx. 191.95 Hz).
+constexpr double INTR_FREQUENCY = (2728.0 * 64.0) / 33513982.0;
 
 // Maps 0-127 sustain value to dB attenuation (in 10ths of dB)
 static const int16_t DECIBEL_SQUARE_TABLE[128] = {
