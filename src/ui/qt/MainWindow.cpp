@@ -175,43 +175,51 @@ void MainWindow::routeSignals() {
 
 void MainWindow::dragEnterEvent(QDragEnterEvent *event) {
   event->acceptProposedAction();
-  if (m_dragOverlay) {
-    updateDragOverlayGeometry();
-    m_dragOverlay->show();
-    m_dragOverlay->raise();
-  }
+  showDragOverlay();
 }
 
 void MainWindow::dragMoveEvent(QDragMoveEvent *event) {
   event->acceptProposedAction();
-  if (m_dragOverlay && !m_dragOverlay->isVisible()) {
-    m_dragOverlay->show();
-    m_dragOverlay->raise();
-  }
+  showDragOverlay();
 }
 
 void MainWindow::dragLeaveEvent(QDragLeaveEvent *event) {
   event->accept();
+  hideDragOverlay();
+}
+
+void MainWindow::dropEvent(QDropEvent *event) {
+  handleDroppedUrls(event->mimeData()->urls());
+  event->acceptProposedAction();
+}
+
+void MainWindow::showDragOverlay() {
+  if (!m_dragOverlay) {
+    return;
+  }
+  updateDragOverlayGeometry();
+  if (!m_dragOverlay->isVisible()) {
+    m_dragOverlay->show();
+  }
+  m_dragOverlay->raise();
+}
+
+void MainWindow::hideDragOverlay() {
   if (m_dragOverlay) {
     m_dragOverlay->hide();
   }
 }
 
-void MainWindow::dropEvent(QDropEvent *event) {
-  const auto &files = event->mimeData()->urls();
+void MainWindow::handleDroppedUrls(const QList<QUrl>& urls) {
+  hideDragOverlay();
 
-  if (m_dragOverlay) {
-    m_dragOverlay->hide();
-  }
-
-  if (files.isEmpty())
+  if (urls.isEmpty()) {
     return;
-
-  for (const auto &file : files) {
-    openFileInternal(file.toLocalFile());
   }
 
-  event->acceptProposedAction();
+  for (const auto &url : urls) {
+    openFileInternal(url.toLocalFile());
+  }
 }
 
 void MainWindow::openFile() {
