@@ -1,14 +1,12 @@
 /**
- * VGMTrans (c) - 2002-2024
+ * VGMTrans (c) - 2002-2026
  * Licensed under the zlib license
  * See the included LICENSE for more information
  */
 
-#include <cmath>
 #include <numeric>
 #include <string>
 #include <vector>
-#include <spdlog/fmt/fmt.h>
 #include "Loop.h"
 #include "NDSFormat.h"
 #include "VGMSampColl.h"
@@ -244,6 +242,14 @@ void NDSInstr::getArticData(VGMRgn* rgn, uint32_t offset) const {
     rgn->pan = 0.5;
   else
     rgn->pan = static_cast<double>(Pan) / 127;
+
+
+  // Real time controllers used by ADSR commands
+  rgn->addModulator({ModSource::CC(72), ModDest::VolRelease, 1200});
+  rgn->addModulator({ModSource::CC(73), ModDest::VolAttack, 1200});
+  rgn->addModulator({ModSource::CC(75), ModDest::VolDecay, 1200});
+  rgn->addModulator({ModSource::CC(79, ModSourceFlag::DirectionNegative), ModDest::VolSustain, 1440});
+  rgn->addModulator({ModSource::CC(91), ModDest::ReverbSend, 200});
 }
 
 uint16_t NDSInstr::getFallingRate(uint8_t DecayTime) const {
@@ -542,7 +548,7 @@ NDSPSGSamp::NDSPSGSamp(VGMSampColl* sampcoll, uint8_t duty_cycle) : VGMSamp(samp
   setLoopLengthMeasure(LM_SAMPLES);
   ulUncompressedSize = 32768 * bytesPerSample();
 
-  setName("PSG_duty_" + std::to_string(duty_cycle));
+  setName("PSG_duty_" + std::to_string(m_duty_cycle));
 }
 
 std::vector<uint8_t> NDSPSGSamp::decodeToNativePcm() {

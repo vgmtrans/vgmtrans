@@ -11,14 +11,17 @@ NDSSeq::NDSSeq(RawFile *file, uint32_t offset, uint32_t length, string name)
 
 bool NDSSeq::parseHeader(void) {
   VGMHeader *SSEQHdr = addHeader(offset(), 0x10, "SSEQ Chunk Header");
-  SSEQHdr->addSig(offset(), 8);
+  SSEQHdr->addSig(offset(), 4);
+  SSEQHdr->addChild(offset() + 4, 2, "Endianness");
+  SSEQHdr->addChild(offset() + 6, 2, "Version");
   SSEQHdr->addChild(offset() + 8, 4, "Size");
   SSEQHdr->addChild(offset() + 12, 2, "Header Size");
-  SSEQHdr->addUnknownChild(offset() + 14, 2);
-  //SeqChunkHdr->addSimpleChild(offset(), 4, "Blah");
+  SSEQHdr->addChild(offset() + 14, 2, "Block Count");
+
   setLength(readWord(offset() + 8));
   setPPQN(0x30);
-  return true;        //successful
+
+  return true;
 }
 
 bool NDSSeq::parseTrackPointers(void) {
@@ -30,12 +33,12 @@ bool NDSSeq::parseTrackPointers(void) {
   uint8_t b = readByte(off);
   aTracks.push_back(new NDSTrack(this));
 
-  //FE XX XX signifies multiple tracks, each true bit in the XX values signifies there is a track for that channel
-  if (b == 0xFE)
-  {
+  // FE XX XX signifies multiple tracks, each true bit in the XX values signifies there is a track
+  // for that channel
+  if (b == 0xFE) {
     VGMHeader *TrkPtrs = addHeader(off, 0, "Track Pointers");
     TrkPtrs->addChild(off, 3, "Valid Tracks");
-    off += 3;    //but all we need to do is check for subsequent 0x93 track pointer events
+    off += 3;  // but all we need to do is check for subsequent 0x93 track pointer events
     b = readByte(off);
     uint32_t songDelay = 0;
 
@@ -52,20 +55,19 @@ bool NDSSeq::parseTrackPointers(void) {
       }
       songDelay += value;
       TrkPtrs->addChild(beginOffset, off - beginOffset, "Delay");
-      //songDelay += SeqTrack::ReadVarLen(++offset);
+      // songDelay += SeqTrack::ReadVarLen(++offset);
       b = readByte(off);
       break;
     }
 
-    //Track/Channel assignment and pointer.  Channel # is irrelevant
-    while (b == 0x93)
-    {
+    // Track/Channel assignment and pointer.  Channel # is irrelevant
+    while (b == 0x93) {
       TrkPtrs->addChild(off, 5, "Track Pointer");
       uint32_t trkOffset = readByte(off + 2) + (readByte(off + 3) << 8) +
-          (readByte(off + 4) << 16) + offset() + 0x1C;
+                           (readByte(off + 4) << 16) + offset() + 0x1C;
       NDSTrack *newTrack = new NDSTrack(this, trkOffset);
       aTracks.push_back(newTrack);
-      //newTrack->
+      // newTrack->
       off += 5;
       b = readByte(off);
     }
@@ -95,16 +97,15 @@ bool NDSTrack::readEvent(void) {
   uint32_t beginOffset = curOffset;
   uint8_t status_byte = readByte(curOffset++);
 
-  if (status_byte < 0x80) //then it's a note on event
+  if (status_byte < 0x80)  // then it's a note on event
   {
     uint8_t vel = readByte(curOffset++);
-    dur = readVarLen(curOffset);//GetByte(curOffset++);
+    dur = readVarLen(curOffset);  // GetByte(curOffset++);
     addNoteByDur(beginOffset, curOffset - beginOffset, status_byte, vel, dur);
     if (noteWithDelta) {
       addTime(dur);
     }
-  }
-  else
+  } else
     switch (status_byte) {
       case 0x80:
         dur = readVarLen(curOffset);
@@ -112,7 +113,7 @@ bool NDSTrack::readEvent(void) {
         break;
 
       case 0x81: {
-        uint8_t newProg = (uint8_t) readVarLen(curOffset);
+        uint8_t newProg = (uint8_t)readVarLen(curOffset);
         addProgramChange(beginOffset, curOffset - beginOffset, newProg);
         break;
       }
@@ -124,31 +125,32 @@ bool NDSTrack::readEvent(void) {
         break;
 
       case 0x94: {
-        u32 jumpAddr = readByte(curOffset) + (readByte(curOffset + 1) << 8)
-            + (readByte(curOffset + 2) << 16) + parentSeq->offset() + 0x1C;
+        u32 jumpAddr = readByte(curOffset) + (readByte(curOffset + 1) << 8) +
+                       (readByte(curOffset + 2) << 16) + parentSeq->offset() + 0x1C;
         curOffset += 3;
 
         return addJump(beginOffset, curOffset - beginOffset, jumpAddr);
       }
 
       case 0x95: {
-        u32 destination = readByte(curOffset) + (readByte(curOffset + 1) << 8)
-            + (readByte(curOffset + 2) << 16) + parentSeq->offset() + 0x1C;
+        u32 destination = readByte(curOffset) + (readByte(curOffset + 1) << 8) +
+                          (readByte(curOffset + 2) << 16) + parentSeq->offset() + 0x1C;
         curOffset += 3;
         u32 returnOffset = curOffset;
         return addCall(beginOffset, curOffset - beginOffset, destination, returnOffset, "Call");
       }
 
-      // [loveemu] (ex: Hanjuku Hero DS: NSE_45, New Mario Bros: BGM_AMB_CHIKA, Slime Morimori Dragon Quest 2: SE_187, SE_210, Advance Wars)
+      // [loveemu] (ex: Hanjuku Hero DS: NSE_45, New Mario Bros: BGM_AMB_CHIKA, Slime Morimori
+      // Dragon Quest 2: SE_187, SE_210, Advance Wars)
       case 0xA0: {
         uint8_t subStatusByte;
         int16_t randMin;
         int16_t randMax;
 
         subStatusByte = readByte(curOffset++);
-        randMin = (signed) readShort(curOffset);
+        randMin = (signed)readShort(curOffset);
         curOffset += 2;
-        randMax = (signed) readShort(curOffset);
+        randMax = (signed)readShort(curOffset);
         curOffset += 2;
 
         addUnknown(beginOffset, curOffset - beginOffset, "Cmd with Random Value");
@@ -169,26 +171,26 @@ bool NDSTrack::readEvent(void) {
         break;
       }
 
-      case 0xB0: // [loveemu] (ex: Children of Mana: SEQ_BGM001)
-      case 0xB1: // [loveemu] (ex: Advance Wars - Dual Strike: SE_TAGPT_COUNT01)
-      case 0xB2: // [loveemu]
-      case 0xB3: // [loveemu]
-      case 0xB4: // [loveemu]
-      case 0xB5: // [loveemu]
-      case 0xB6: // [loveemu] (ex: Mario Kart DS: 76th sequence)
-      case 0xB8: // [loveemu] (ex: Tottoko Hamutaro: MUS_ENDROOL, Nintendogs)
-      case 0xB9: // [loveemu]
-      case 0xBA: // [loveemu]
-      case 0xBB: // [loveemu]
-      case 0xBC: // [loveemu]
+      case 0xB0:  // [loveemu] (ex: Children of Mana: SEQ_BGM001)
+      case 0xB1:  // [loveemu] (ex: Advance Wars - Dual Strike: SE_TAGPT_COUNT01)
+      case 0xB2:  // [loveemu]
+      case 0xB3:  // [loveemu]
+      case 0xB4:  // [loveemu]
+      case 0xB5:  // [loveemu]
+      case 0xB6:  // [loveemu] (ex: Mario Kart DS: 76th sequence)
+      case 0xB8:  // [loveemu] (ex: Tottoko Hamutaro: MUS_ENDROOL, Nintendogs)
+      case 0xB9:  // [loveemu]
+      case 0xBA:  // [loveemu]
+      case 0xBB:  // [loveemu]
+      case 0xBC:  // [loveemu]
       case 0xBD: {
         uint8_t varNumber;
         int16_t val;
-        const char* eventName[] = {
-            "Set Variable", "Add Variable", "Sub Variable", "Mul Variable", "Div Variable",
-            "Shift Vabiable", "Rand Variable", "", "If Variable ==", "If Variable >=",
-            "If Variable >", "If Variable <=", "If Variable <", "If Variable !="
-        };
+        const char *eventName[] = {
+            "Set Variable",   "Add Variable",   "Sub Variable",  "Mul Variable",
+            "Div Variable",   "Shift Vabiable", "Rand Variable", "",
+            "If Variable ==", "If Variable >=", "If Variable >", "If Variable <=",
+            "If Variable <",  "If Variable !="};
 
         varNumber = readByte(curOffset++);
         val = readShort(curOffset);
@@ -218,15 +220,14 @@ bool NDSTrack::readEvent(void) {
 
       // [loveemu] (ex: Puyo Pop Fever 2: BGM00)
       case 0xC3: {
-        int8_t transpose = (signed) readByte(curOffset++);
+        int8_t transpose = (signed)readByte(curOffset++);
         addTranspose(beginOffset, curOffset - beginOffset, transpose);
-//			AddGenericEvent(beginOffset, curOffset-beginOffset, "Transpose", NULL, BG_CLR_GREEN);
         break;
       }
 
       // [loveemu] pitch bend (ex: Castlevania Dawn of Sorrow: BGM_BOSS2)
       case 0xC4: {
-        int16_t bend = (signed) readByte(curOffset++) * 64;
+        int16_t bend = (signed)readByte(curOffset++) * 64;
         addPitchBend(beginOffset, curOffset - beginOffset, bend);
         break;
       }
@@ -304,28 +305,36 @@ bool NDSTrack::readEvent(void) {
       }
 
       // [loveemu] (ex: Castlevania Dawn of Sorrow: SDL_BGM_WIND_)
-      case 0xD0:
-        curOffset++;
-        addUnknown(beginOffset, curOffset - beginOffset, "Attack Rate");
+      case 0xD0: {
+        uint8_t val = readByte(curOffset++);
+        addGenericEvent(beginOffset, curOffset - beginOffset, "Attack Rate", "", Type::Unknown);
+        addControllerEventNoItem(73, 127 - val);
         break;
+      }
 
       // [loveemu] (ex: Castlevania Dawn of Sorrow: SDL_BGM_WIND_)
-      case 0xD1:
-        curOffset++;
-        addUnknown(beginOffset, curOffset - beginOffset, "Decay Rate");
+      case 0xD1: {
+        uint8_t val = readByte(curOffset++);
+        addGenericEvent(beginOffset, curOffset - beginOffset, "Decay Rate", "", Type::Unknown);
+        addControllerEventNoItem(75, 127 - val);
         break;
+      }
 
       // [loveemu] (ex: Castlevania Dawn of Sorrow: SDL_BGM_WIND_)
-      case 0xD2:
-        curOffset++;
-        addUnknown(beginOffset, curOffset - beginOffset, "Sustain Level");
+      case 0xD2: {
+        uint8_t val = readByte(curOffset++);
+        addGenericEvent(beginOffset, curOffset - beginOffset, "Sustain Level", "", Type::Unknown);
+        addControllerEventNoItem(79, val);
         break;
+      }
 
       // [loveemu] (ex: Castlevania Dawn of Sorrow: SDL_BGM_WIND_)
-      case 0xD3:
-        curOffset++;
-        addUnknown(beginOffset, curOffset - beginOffset, "Release Rate");
+      case 0xD3: {
+        uint8_t val = readByte(curOffset++);
+        addGenericEvent(beginOffset, curOffset - beginOffset, "Release Rate", "", Type::Unknown);
+        addControllerEventNoItem(72, 127 - val);
         break;
+      }
 
       // [loveemu] (ex: Castlevania Dawn of Sorrow: SDL_BGM_WIND_)
       case 0xD4:
