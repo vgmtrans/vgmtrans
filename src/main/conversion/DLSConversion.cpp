@@ -280,18 +280,23 @@ bool mainDLSCreation(
             case ModSourceType::CC: {
               uint8_t cc = mod.source.index;
               switch (cc) {
+                default:
+                  L_WARN("Converting {}: modulator with unsupported CC {} (DLS limitation). Some players may not support this modulator.",
+                         set->name(), cc);
+                  [[fallthrough]];
                 case 1:  // Mod Wheel
+                  [[fallthrough]];
                 case 7:  // Volume
+                  [[fallthrough]];
                 case 10: // Pan
+                  [[fallthrough]];
                 case 11: // Expression
+                  [[fallthrough]];
                 case 91: // Reverb
+                  [[fallthrough]];
                 case 93: // Chorus
                   src = 0x0080 | cc;
                   break;
-                default:
-                  L_WARN("Converting {}: skipping modulator with unsupported CC {} (DLS limitation).",
-                         set->name(), cc);
-                  continue;
               }
               break;
             }
@@ -394,7 +399,7 @@ bool mainDLSCreation(
 
           int32_t scale = static_cast<int32_t>(mod.amount * 65536.0 * scaleFactor);
           if (src != CONN_SRC_NONE && dest != CONN_DST_NONE) {
-             newArt->addConnectionBlock(src, CONN_SRC_NONE, dest, transform, scale);
+             newArt->addConnectionBlock(src, control, dest, transform, scale);
           }
         }
 
