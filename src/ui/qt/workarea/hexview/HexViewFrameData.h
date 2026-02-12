@@ -48,6 +48,7 @@ struct Data {
   bool shouldDrawOffset = true;
   bool shouldDrawAscii = true;
   bool addressAsHex = true;
+  bool seekModifierActive = false;
 
   qreal overlayOpacity = 0.0;
   qreal shadowBlur = 0.0;
