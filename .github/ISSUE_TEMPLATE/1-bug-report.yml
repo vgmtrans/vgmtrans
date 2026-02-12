@@ -50,7 +50,9 @@ body:
     id: affected_files
     attributes:
       label: Affected input files
-      description: Bugs without sample file information are difficult to investigate!
+      description: |
+        Bugs without sample file information are difficult to investigate.
+        Does this involve a specific game music format (SPC, PSF, etc.)?
       value: |
         Game / file name:
         SHA-256 of the original file:
@@ -118,7 +120,11 @@ body:
     id: logs
     attributes:
       label: Logs
-      description: Attach logs here.
+      description: |
+        Zip logs and attach (drag and drop) them here.
+        You can also paste them, but it might be too much data for Github to handle.
+        Redact any personal information (e.g. usernames in file paths).
+        Do NOT paste screenshots.
     validations:
       required: false
 

@@ -38,6 +38,20 @@ body:
       required: true
 
   - type: textarea
+    id: toolchain
+    attributes:
+      label: Operating system, toolchain
+      description: Exact version of your compiler and environment.
+      placeholder: |
+        Be specific.
+        Bad: clang
+        Good: clang 21.0.0 on macOS 26.0.0, installed via homebrew
+        Bad: Visual Studio 2022
+        Good: Visual Studio 2022 17.14 x64, MSVC 14.44.35207
+    validations:
+      required: true
+
+  - type: textarea
     id: cmake_command
     attributes:
       label: Exact CMake command used
@@ -63,8 +77,9 @@ body:
     attributes:
       label: Full build output logs
       description: |
-        Zip logs and attach them here.
+        Zip logs and attach (drag and drop) them here.
         You can also paste them, but it might be too much data for Github to handle.
+        Redact any personal information (e.g. usernames in file paths).
         Do NOT paste screenshots.
     validations:
       required: true
