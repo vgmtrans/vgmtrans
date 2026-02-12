@@ -217,6 +217,7 @@ void VGMFileView::onPlaybackPositionChanged(int current, int max, PositionChange
     if (hexVisible) {
       m_hexview->setPlaybackActive(false);
       m_hexview->clearPlaybackSelections(false);
+      m_lastPlaybackItems.clear();
     }
     if (treeVisible) {
       m_treeview->setPlaybackItems({});
@@ -229,6 +230,7 @@ void VGMFileView::onPlaybackPositionChanged(int current, int max, PositionChange
     if (hexVisible) {
       m_hexview->setPlaybackActive(false);
       m_hexview->clearPlaybackSelections(false);
+      m_lastPlaybackItems.clear();
     }
     if (treeVisible) {
       m_treeview->setPlaybackItems({});
@@ -248,6 +250,7 @@ void VGMFileView::onPlaybackPositionChanged(int current, int max, PositionChange
     if (hexVisible) {
       m_hexview->setPlaybackActive(false);
       m_hexview->clearPlaybackSelections(false);
+      m_lastPlaybackItems.clear();
     }
     if (treeVisible) {
       m_treeview->setPlaybackItems({});
