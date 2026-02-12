@@ -1199,17 +1199,7 @@ void HexViewRhiRenderer::buildSelectionInstances(int startLine, int endLine,
   }
 
   if (!frame.fadePlaybackSelections.empty()) {
-    // Fading playback uses blue for membership and alpha for fade amount.
-    std::vector<HexViewFrame::SelectionRange> fadeRanges;
-    fadeRanges.reserve(frame.fadePlaybackSelections.size());
-    for (const auto& selection : frame.fadePlaybackSelections) {
-      fadeRanges.push_back(selection.range);
-    }
-
-    const QVector4D playbackMaskColor(0.0f, 0.0f, 1.0f, 0.0f);
-    appendMaskForSelections(fadeRanges, ctx, playbackMaskColor);
-
-    // Re-emit each range with alpha in channel A so the shader can apply per-range fade.
+    // Emit each range with alpha in channel A so the shader can apply per-range fade.
     for (const auto& selection : frame.fadePlaybackSelections) {
       if (selection.alpha <= 0.0f) {
         continue;
