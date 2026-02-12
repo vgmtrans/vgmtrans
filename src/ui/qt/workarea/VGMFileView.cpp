@@ -238,11 +238,6 @@ void VGMFileView::onPlaybackPositionChanged(int current, int max, PositionChange
     return;
   }
 
-  const bool playbackActive = current > 0;
-  if (hexVisible) {
-    m_hexview->setPlaybackActive(playbackActive);
-  }
-
   const auto& timeline = seq->timedEventIndex();
   if (!timeline.finalized()) {
     m_playbackCursor.reset();
@@ -308,6 +303,11 @@ void VGMFileView::onPlaybackPositionChanged(int current, int max, PositionChange
 
   if (treeVisible) {
     m_treeview->setPlaybackItems(m_playbackItems);
+  }
+
+  const bool playbackActive = shouldHighlight && !m_playbackItems.empty();
+  if (hexVisible) {
+    m_hexview->setPlaybackActive(playbackActive);
   }
 
   if (m_playbackItems == m_lastPlaybackItems) {
