@@ -18,6 +18,7 @@ layout(std140, binding = 0) uniform Ubuf {
 layout(location = 0) out vec4 fragColor;
 
 float decodeItemId(vec2 uv) {
+  // Item ids are packed into RG8 (little-endian) by the renderer.
   vec2 rg = texture(itemIdTex, uv).rg * 255.0 + 0.5;
   return rg.r + rg.g * 256.0;
 }
@@ -64,12 +65,14 @@ float computeOutlineMask(float xPx, float yPx, bool inHex, bool inAscii, float d
   float upId = (lineIdx > 0.0) ? decodeItemId(centerUv - vec2(0.0, texel.y)) : id;
   float downId = (lineIdx < itemIdWindow.w - 1.0) ? decodeItemId(centerUv + vec2(0.0, texel.y)) : id;
 
+  // Keep border thickness visually consistent across scale factors.
   float edgePx = 2.0 / max(dpr, 1.0);
   float leftEdge = step(localX, edgePx);
   float rightEdge = step(cellW - edgePx, localX);
   float topEdge = step(localY, edgePx);
   float bottomEdge = step(lineHeightPx - edgePx, localY);
 
+  // Ownership rule: draw each shared boundary from one side only to avoid doubled seams.
   float drawLeft = (leftId < 0.5 || id < leftId) ? 1.0 : 0.0;
   float drawRight = (rightId < 0.5 || id < rightId) ? 1.0 : 0.0;
   float drawUp = (upId < 0.5 || id < upId) ? 1.0 : 0.0;
@@ -83,6 +86,7 @@ float computeOutlineMask(float xPx, float yPx, bool inHex, bool inAscii, float d
 }
 
 void main() {
+  // Base pass result and selection mask produced by earlier render passes.
   vec4 base = texture(contentTex, vUv);
   float selected = clamp(texture(maskTex, vUv).r, 0.0, 1.0);
 
@@ -94,6 +98,7 @@ void main() {
   float inColumns = (inHex || inAscii) ? 1.0 : 0.0;
   float outlineMask = computeOutlineMask(x, y, inHex, inAscii, viewInfo.w);
 
+  // Composite order: dim columns, add modifier outline, then restore selected pixels.
   vec3 dimmed = mix(base.rgb, vec3(0.0), overlayAndShadow.x * inColumns);
   vec3 withOutline = mix(dimmed, outlineColor.rgb, outlineMask * outlineColor.a);
   vec3 restored = mix(withOutline, base.rgb, selected);

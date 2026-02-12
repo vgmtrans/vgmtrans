@@ -37,6 +37,9 @@ public:
   explicit HexView(VGMFile* vgmfile, QWidget* parent = nullptr);
   ~HexView() override;
   void setSelectedItem(VGMItem* item);
+  void setPlaybackSelectionsForItems(const std::vector<const VGMItem*>& items);
+  void clearPlaybackSelections(bool fade = true);
+  void setPlaybackActive(bool active);
   int scrollYForRender() const;
   void setFont(const QFont& font);
   [[nodiscard]] int getVirtualFullWidth() const;
@@ -125,6 +128,8 @@ private:
   VGMItem* m_lastSeekItem = nullptr;
   std::vector<SelectionRange> m_selections;
   std::vector<SelectionRange> m_fadeSelections;
+  std::vector<SelectionRange> m_playbackSelections;
+  bool m_playbackActive = false;
 
   int m_charWidth = 0;
   int m_charHalfWidth = 0;

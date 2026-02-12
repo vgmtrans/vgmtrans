@@ -1153,13 +1153,14 @@ void HexViewRhiRenderer::appendMaskForSelections(
   }
 }
 
-// Build all selection mask instances for the current viewport.
+// Build all selection/playback mask instances for the current viewport.
 void HexViewRhiRenderer::buildSelectionInstances(int startLine, int endLine,
                                                  const HexViewFrame::Data& frame) {
   m_maskRectInstances.clear();
 
   const bool hasSelection = !frame.selections.empty() || !frame.fadeSelections.empty();
-  if (!hasSelection || startLine > endLine) {
+  const bool hasPlayback = !frame.playbackSelections.empty();
+  if ((!hasSelection && !hasPlayback) || startLine > endLine) {
     return;
   }
 
@@ -1186,5 +1187,12 @@ void HexViewRhiRenderer::buildSelectionInstances(int startLine, int endLine,
   const QVector4D selectionMaskColor(1.0f, 0.0f, 0.0f, 0.0f);
   const std::vector<HexViewFrame::SelectionRange>& selections =
       frame.selections.empty() ? frame.fadeSelections : frame.selections;
-  appendMaskForSelections(selections, ctx, selectionMaskColor);
+  if (!selections.empty()) {
+    appendMaskForSelections(selections, ctx, selectionMaskColor);
+  }
+
+  // For this PR, playback uses the same visible mask channel as manual selection.
+  if (hasPlayback) {
+    appendMaskForSelections(frame.playbackSelections, ctx, selectionMaskColor);
+  }
 }
