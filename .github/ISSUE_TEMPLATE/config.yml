@@ -1,0 +1,5 @@
+blank_issues_enabled: true
+contact_links:
+  - name: VGMTrans Github Discussions
+    url: https://github.com/VGMTrans/vgmtrans/discussions
+    about: Ask questions, request features, or discuss VGMTrans development
