@@ -21,6 +21,8 @@
 #include <LogItem.h>
 #include "QtVGMRoot.h"
 
+static Logger *s_instance = nullptr;
+
 namespace {
 
 constexpr int FLUSH_INTERVAL_MS = 500;
@@ -58,6 +60,7 @@ QColor levelColor(LogLevel level) {
 
 Logger::Logger(QWidget *parent)
     : QDockWidget("Log", parent), m_level(LOG_LEVEL_INFO), m_flushTimer(new QTimer(this)) {
+  s_instance = this;
   setAllowedAreas(Qt::AllDockWidgetAreas);
 
   createElements();
@@ -101,6 +104,14 @@ void Logger::connectElements() {
           [this](int level) { m_level = level; });
   connect(logger_save, &QPushButton::pressed, this, &Logger::exportLog);
   connect(&qtVGMRoot, &QtVGMRoot::UI_log, this, &Logger::push);
+}
+
+QString Logger::getLogText() {
+  if (s_instance) {
+    s_instance->flushPending();
+    return s_instance->logger_textarea->toPlainText();
+  }
+  return {};
 }
 
 void Logger::exportLog() {
