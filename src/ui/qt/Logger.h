@@ -21,6 +21,7 @@ class Logger : public QDockWidget {
 
 public:
   explicit Logger(QWidget *parent = nullptr);
+  static QString getLogText();
 
   void push(const LogItem *item);
 

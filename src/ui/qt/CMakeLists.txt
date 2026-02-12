@@ -57,6 +57,8 @@ add_executable(
   MenuBar.h
   QtVGMRoot.cpp
   QtVGMRoot.h
+  ReportDialog.cpp
+  ReportDialog.h
   SequencePlayer.cpp
   SequencePlayer.h
   main_ui.cpp

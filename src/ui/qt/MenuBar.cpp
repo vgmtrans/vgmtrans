@@ -8,10 +8,15 @@
 
 #include <array>
 #include <QDockWidget>
+#include <QDesktopServices>
+#include <QUrl>
+#include <QUrlQuery>
 #include <QtGlobal>
 #include <QInputDialog>
 #include <QSignalBlocker>
 #include <QDir>
+#include <version.h>
+#include "ReportDialog.h"
 #include "Options.h"
 #include "Root.h"
 #include "LogManager.h"
@@ -156,8 +161,20 @@ void MenuBar::updateHexFontActions() {
 void MenuBar::appendInfoMenu() {
   m_helpMenu = addMenu("Help");
   m_topLevelMenus.insert("Help", m_helpMenu);
+
+  auto* report_bug = m_helpMenu->addAction("Report a Bug");
+  connect(report_bug, &QAction::triggered, this, &MenuBar::reportBug);
+
+  m_helpMenu->addSeparator();
+
   menu_about_dlg = m_helpMenu->addAction("About VGMTrans");
+  menu_about_dlg->setMenuRole(QAction::AboutRole);
   connect(menu_about_dlg, &QAction::triggered, this, &MenuBar::showAbout);
+}
+
+void MenuBar::reportBug() {
+  ReportDialog dialog(this);
+  dialog.exec();
 }
 
 void MenuBar::appendOptionsMenu() {

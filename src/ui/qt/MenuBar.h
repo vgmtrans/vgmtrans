@@ -43,6 +43,7 @@ private slots:
   void handleVGMFileContextChange(const QList<VGMFile*>& files);
   void handleVGMCollContextChange(const QList<VGMColl*>& colls);
   void handleRawFileContextChange(const QList<RawFile*>& files);
+  void reportBug();
 
 private:
   void appendFileMenu();
