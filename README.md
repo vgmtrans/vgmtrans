@@ -130,7 +130,7 @@ selecting multiple.
 
 ## Building
 
-Please refer to [the wiki](https://github.com/vgmtrans/vgmtrans/wiki) for compilation instructions.
+Please refer to [BUILDING.md](BUILDING.md) for compilation instructions.
 
 ## Contributing
 

@@ -1,0 +1,137 @@
+name: "Bug Report"
+description: "Report a reproducible problem in VGMTrans"
+title: "Type a very short description of the problem here"
+labels: bug
+
+body:
+  - type: markdown
+    id: before_submitting_notice
+    attributes:
+      value: |
+        ## Before submitting
+
+        - Please use **Help → Report a bug** inside VGMTrans when possible.
+        - Make sure you are using the **latest version**.
+        - If the issue only happens in a third-party program (MIDI player, DAW, etc.), clearly state that below.
+
+        We cannot see your screen. We cannot hear your speakers.
+        So please, give us all the details you can!
+
+        Low-effort or incomplete reports may be closed.
+
+  - type: dropdown
+    id: bug_location
+    attributes:
+      label: Where does the problem occur?
+      description: Select all that apply.
+      multiple: true
+      options:
+        - Inside VGMTrans (UI, detection, playback, etc.)
+        - With exported MIDI (in another program)
+        - With exported SF2 (in another program)
+        - With exported DLS (in another program)
+        - Not sure
+    validations:
+      required: true
+
+  - type: textarea
+    id: system_details
+    attributes:
+      label: System details
+      description: Exact versions only. Do not write "latest".
+      value: |
+        VGMTrans version:
+        Operating system & version:
+        If building from source: commit hash:
+    validations:
+      required: true
+
+  - type: textarea
+    id: affected_files
+    attributes:
+      label: Affected input files
+      description: |
+        Bugs without sample file information are difficult to investigate.
+        Does this involve a specific game music format (SPC, PSF, etc.)?
+      value: |
+        Game / file name:
+        SHA-256 of the original file:
+        Internal file name detected by VGMTrans (if shown):
+    validations:
+      required: false
+
+  - type: textarea
+    id: description
+    attributes:
+      label: Describe the problem
+      description: Be as specific and technical as you can. If you don't know, it's okay.
+      placeholder: |
+        Instead of:
+        "MIDI is broken"
+
+        Write:
+        "Track 3 is missing percussion after 00:12.
+        The original game playback includes drums at that timestamp."
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: Provide exact steps so we can reproduce the issue.
+      value: |
+        1.
+        2.
+        3.
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior (technical description required)
+      description: Describe the expected behavior in concrete, technical terms. No sarcasm, please :)
+      placeholder: |
+        Actual:
+        Track 2 is silent after 00:15.
+
+        Expected:
+        Track 2 should contain the melody heard in-game.
+    validations:
+      required: true
+
+  - type: textarea
+    id: comparison
+    attributes:
+      label: If this involves exported files
+      description: |
+        If the issue happens in another program (MIDI player, DAW, etc.), provide details.
+      placeholder: |
+        Tested in:
+        - FL Studio 25 build 1567
+
+        Result:
+        Plays correctly in VGMTrans, but incorrect in FL Studio.
+    validations:
+      required: false
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs
+      description: |
+        Zip logs and attach (drag and drop) them here.
+        You can also paste them, but it might be too much data for Github to handle.
+        Redact any personal information (e.g. usernames in file paths).
+        Do NOT paste screenshots.
+    validations:
+      required: false
+
+  - type: markdown
+    id: closing_notice
+    attributes:
+      value: |
+        **Thank you for your time.**
+
+        Issues that do not contain enough information to reproduce the problem may be closed.
