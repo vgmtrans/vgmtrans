@@ -1,8 +1,9 @@
 /*
- * VGMTrans (c) 2002-2024
+ * VGMTrans (c) 2002-2026
  * Licensed under the zlib license,
  * refer to the included LICENSE.txt file
 */
+
 #include "SF2Conversion.h"
 #include "SF2File.h"
 #include "SynthFile.h"
@@ -36,14 +37,14 @@ SF2File* createSF2File(
 ) {
   if (coll)
     coll->preSynthFileCreation();
-  SynthFile *synthfile = createSynthFile(instrsets, sampcolls);
+  SynthFile* synthfile = createSynthFile(instrsets, sampcolls);
   if (coll)
     coll->postSynthFileCreation();
   if (!synthfile) {
     L_ERROR("SF2 conversion failed");
     return nullptr;
   }
-  SF2File *sf2file = new SF2File(synthfile);
+  SF2File* sf2file = new SF2File(synthfile);
   delete synthfile;
   return sf2file;
 }
@@ -171,6 +172,10 @@ SynthFile* createSynthFile(
         newRgn->setLfoVibFreqHz(rgn->lfoVibFreqHz());
         newRgn->setLfoVibDepthCents(rgn->lfoVibDepthCents());
         newRgn->setLfoVibDelaySeconds(rgn->lfoVibDelaySeconds());
+
+        for (const auto& mod : rgn->modulators()) {
+          newRgn->addModulator(mod);
+        }
 
         if (realSampNum >= finalSamps.size()) {
           L_ERROR("Sample {} does not exist. Instr index: {:d}, Instr num: {:d}, Region index: {:d}", realSampNum, i, vgminstr->instrNum, j);
