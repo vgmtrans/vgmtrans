@@ -305,9 +305,8 @@ void VGMFileView::onPlaybackPositionChanged(int current, int max, PositionChange
     m_treeview->setPlaybackItems(m_playbackItems);
   }
 
-  const bool playbackActive = shouldHighlight && !m_playbackItems.empty();
   if (hexVisible) {
-    m_hexview->setPlaybackActive(playbackActive);
+    m_hexview->setPlaybackActive(shouldHighlight);
   }
 
   if (m_playbackItems == m_lastPlaybackItems) {
