@@ -47,6 +47,8 @@ QToolButton* createPanelButton(const QString& label, QWidget* parent) {
 }
 }  // namespace
 
+static int previewMidiChannelForEvent(const SeqEvent* event);
+
 VGMFileView::VGMFileView(VGMFile* vgmfile)
     : QMdiSubWindow(), m_vgmfile(vgmfile) {
   m_splitter = new SnappingSplitter(Qt::Horizontal, this);
@@ -473,6 +475,11 @@ void VGMFileView::previewModifierNoteForEvent(VGMItem* item, bool includeActiveN
     if (!seqEvent) {
       return false;
     }
+    const int midiChannel = previewMidiChannelForEvent(seqEvent);
+    if (midiChannel < 0) {
+      return false;
+    }
+
     uint8_t key = 0;
     uint8_t velocity = 0;
     if (const auto* noteOn = dynamic_cast<const NoteOnSeqEvent*>(seqEvent)) {
@@ -486,12 +493,12 @@ void VGMFileView::previewModifierNoteForEvent(VGMItem* item, bool includeActiveN
     }
 
     const uint16_t channelAndKey =
-        static_cast<uint16_t>((static_cast<uint16_t>(seqEvent->channel) << 8) | key);
+        static_cast<uint16_t>((static_cast<uint16_t>(midiChannel) << 8) | key);
     if (!seenKeys.emplace(channelAndKey).second) {
       return true;
     }
 
-    previewNotes.push_back({seqEvent->channel, key, velocity});
+    previewNotes.push_back({static_cast<uint8_t>(midiChannel), key, velocity});
     return true;
   };
 
@@ -628,6 +635,22 @@ int VGMFileView::noteKeyForEvent(const SeqEvent* event) {
     return durNote->absKey;
   }
   return -1;
+}
+
+static int previewMidiChannelForEvent(const SeqEvent* event) {
+  if (!event) {
+    return -1;
+  }
+
+  int channel = static_cast<int>(event->channel);
+  if (event->parentTrack) {
+    channel += event->parentTrack->channelGroup * 16;
+  }
+
+  if (channel < 0 || channel >= 128) {
+    return -1;
+  }
+  return channel;
 }
 
 void VGMFileView::onPlaybackPositionChanged(int current, int max, PositionChangeOrigin origin) {
