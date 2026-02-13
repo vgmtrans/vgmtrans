@@ -6,6 +6,8 @@
 
 #include "SimpleRhiWindow.h"
 
+#include "RhiWindowDragDropEvents.h"
+
 #include <rhi/qrhi.h>
 #include <rhi/qrhi_platform.h>
 
@@ -97,6 +99,14 @@ bool SimpleRhiWindow::event(QEvent* e) {
   }
 
   if (e && handleWindowEvent(e)) {
+    return true;
+  }
+
+  if (QtUi::handleRhiWindowDragDropEvent(
+          e,
+          [this]() { emit dragOverlayShowRequested(); },
+          [this]() { emit dragOverlayHideRequested(); },
+          [this](const QList<QUrl>& urls) { emit dropUrlsRequested(urls); })) {
     return true;
   }
 

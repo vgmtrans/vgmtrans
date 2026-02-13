@@ -130,6 +130,8 @@ add_executable(
   workarea/pianorollview/PianoRollView.h
   workarea/pianorollview/PianoRollZoomScrollBar.cpp
   workarea/pianorollview/PianoRollZoomScrollBar.h
+  workarea/rhi/RhiWindowMainWindowLocator.h
+  workarea/rhi/RhiWindowDragDropEvents.h
   workarea/rhi/SimpleRhiWindow.cpp
   workarea/rhi/SimpleRhiWindow.h
   workarea/RawFileListView.cpp
