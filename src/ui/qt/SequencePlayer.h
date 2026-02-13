@@ -7,6 +7,7 @@
 #pragma once
 
 #include <cstdint>
+#include <vector>
 
 #include <bass.h>
 #include <bassmidi.h>
@@ -98,12 +99,12 @@ private:
   bool loadCollection(const VGMColl *collection, bool startPlaying);
   bool ensurePreviewStream();
   void releasePreviewStream();
-  void syncPreviewChannelState(uint8_t channel) const;
 
   const VGMColl *m_active_vgmcoll{};
   HSTREAM m_active_stream{};
   HSTREAM m_preview_stream{};
   HSOUNDFONT m_loaded_sf{};
+  std::vector<uint8_t> m_active_midi_data;
 
   QTimer *m_seekupdate_timer{};
   QString m_song_title{};
