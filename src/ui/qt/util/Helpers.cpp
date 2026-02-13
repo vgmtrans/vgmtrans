@@ -5,6 +5,14 @@
  */
 
 #include "Helpers.h"
+
+#include <QUrl>
+#ifdef __APPLE__
+void qtOpenUrlNative(const QByteArray& encodedUrl);
+#else
+#include <QDesktopServices>
+#endif
+
 #include "Colors.h"
 #include "TintableSvgIconEngine.h"
 
@@ -419,4 +427,21 @@ QString getFullDescriptionForTooltip(VGMItem* item) {
   QString description = QString::fromStdString(item->description());
 
   return QString{"<nobr><h3>%1</h3>%2</nobr>"}.arg(name, description);
+}
+
+
+/*
+* QDesktopServices::openUrl() uses NSUrl on macOS,
+* which 'helpfully' re-encodes the URL as it sees potentially dangerous characters.
+* There is no way to bypass this, so we use our own launch function
+* that uses CFUrl directly.
+*/
+void qtOpenUrl(const QUrl& url) {
+  QByteArray encoded = url.toEncoded();
+
+#ifdef __APPLE__
+  qtOpenUrlNative(encoded);
+#else
+  QDesktopServices::openUrl(QUrl::fromEncoded(encoded));
+#endif
 }
