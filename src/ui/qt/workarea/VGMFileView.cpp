@@ -187,8 +187,8 @@ VGMFileView::PanelUi VGMFileView::createPanel(PanelSide side, bool isSeqFile) {
 
   if (isSeqFile) {
     auto* seq = dynamic_cast<VGMSeq*>(m_vgmfile);
-    panelUi.activeNoteView->setTrackCount(seq ? static_cast<int>(seq->aTracks.size()) : 0);
-    panelUi.pianoRollView->setTrackCount(seq ? static_cast<int>(seq->aTracks.size()) : 0);
+    panelUi.activeNoteView->setTrackCount(effectiveTrackCountForSeq(seq));
+    panelUi.pianoRollView->setTrackCount(effectiveTrackCountForSeq(seq));
     panelUi.pianoRollView->setSequence(seq);
   }
 
@@ -464,6 +464,7 @@ void VGMFileView::ensureTrackIndexMap(VGMSeq* seq) {
   if (!seq) {
     m_trackIndexSeq = nullptr;
     m_trackIndexByPtr.clear();
+    m_trackIndexByMidiPtr.clear();
     return;
   }
 
@@ -473,12 +474,68 @@ void VGMFileView::ensureTrackIndexMap(VGMSeq* seq) {
 
   m_trackIndexSeq = seq;
   m_trackIndexByPtr.clear();
+  m_trackIndexByMidiPtr.clear();
   for (size_t i = 0; i < seq->aTracks.size(); ++i) {
     auto* track = seq->aTracks[i];
     if (track) {
-      m_trackIndexByPtr[track] = static_cast<int>(i);
+      const int trackIndex = static_cast<int>(i);
+      m_trackIndexByPtr[track] = trackIndex;
+      if (track->pMidiTrack) {
+        m_trackIndexByMidiPtr.emplace(track->pMidiTrack, trackIndex);
+      }
     }
   }
+}
+
+int VGMFileView::trackIndexForEvent(const SeqEvent* event) const {
+  if (!event) {
+    return -1;
+  }
+
+  if (event->parentTrack) {
+    const auto trackIt = m_trackIndexByPtr.find(event->parentTrack);
+    if (trackIt != m_trackIndexByPtr.end()) {
+      return trackIt->second;
+    }
+    if (event->parentTrack->pMidiTrack) {
+      const auto midiIt = m_trackIndexByMidiPtr.find(event->parentTrack->pMidiTrack);
+      if (midiIt != m_trackIndexByMidiPtr.end()) {
+        return midiIt->second;
+      }
+    }
+  }
+
+  return static_cast<int>(event->channel);
+}
+
+int VGMFileView::effectiveTrackCountForSeq(VGMSeq* seq) const {
+  if (!seq) {
+    return 0;
+  }
+
+  int trackCount = static_cast<int>(seq->aTracks.size());
+  if (trackCount > 0) {
+    return trackCount;
+  }
+
+  if (seq->nNumTracks > 0) {
+    trackCount = static_cast<int>(seq->nNumTracks);
+  }
+
+  const auto& timeline = seq->timedEventIndex();
+  if (timeline.finalized()) {
+    int maxTrackIndex = trackCount - 1;
+    for (size_t i = 0; i < timeline.size(); ++i) {
+      const auto& timed = timeline.event(i);
+      if (!timed.event) {
+        continue;
+      }
+      maxTrackIndex = std::max(maxTrackIndex, static_cast<int>(timed.event->channel));
+    }
+    trackCount = std::max(trackCount, maxTrackIndex + 1);
+  }
+
+  return std::max(trackCount, 1);
 }
 
 int VGMFileView::noteKeyForEvent(const SeqEvent* event) {
@@ -627,10 +684,11 @@ void VGMFileView::onPlaybackPositionChanged(int current, int max, PositionChange
   m_playbackCursor->getActiveAt(current, m_activeTimedEvents);
 
   ensureTrackIndexMap(seq);
+  const int effectiveTrackCount = effectiveTrackCountForSeq(seq);
   std::vector<ActiveNoteView::ActiveKey> activeKeys;
   activeKeys.reserve(m_activeTimedEvents.size());
   for (const auto* timed : m_activeTimedEvents) {
-    if (!timed || !timed->event || !timed->event->parentTrack) {
+    if (!timed || !timed->event) {
       continue;
     }
 
@@ -639,12 +697,12 @@ void VGMFileView::onPlaybackPositionChanged(int current, int max, PositionChange
       continue;
     }
 
-    const auto trackIt = m_trackIndexByPtr.find(timed->event->parentTrack);
-    if (trackIt == m_trackIndexByPtr.end()) {
+    const int trackIndex = trackIndexForEvent(timed->event);
+    if (trackIndex < 0) {
       continue;
     }
 
-    activeKeys.push_back({trackIt->second, noteKey});
+    activeKeys.push_back({trackIndex, noteKey});
   }
 
   for (PanelSide side : {PanelSide::Left, PanelSide::Right}) {
@@ -653,11 +711,11 @@ void VGMFileView::onPlaybackPositionChanged(int current, int max, PositionChange
       continue;
     }
     if (panelUi.activeNoteView && panelUi.activeNoteView->isVisible()) {
-      panelUi.activeNoteView->setTrackCount(static_cast<int>(seq->aTracks.size()));
+      panelUi.activeNoteView->setTrackCount(effectiveTrackCount);
       panelUi.activeNoteView->setActiveNotes(activeKeys, playbackActive);
     }
     if (panelUi.pianoRollView && panelUi.pianoRollView->isVisible()) {
-      panelUi.pianoRollView->setTrackCount(static_cast<int>(seq->aTracks.size()));
+      panelUi.pianoRollView->setTrackCount(effectiveTrackCount);
       panelUi.pianoRollView->setSequence(seq);
       panelUi.pianoRollView->refreshSequenceData(false);
       panelUi.pianoRollView->setPlaybackTick(current, playbackActive);
@@ -682,6 +740,7 @@ void VGMFileView::onPlayerStatusChanged(bool playing) {
   m_playbackTimeline = nullptr;
   m_trackIndexSeq = nullptr;
   m_trackIndexByPtr.clear();
+  m_trackIndexByMidiPtr.clear();
 
   clearPlaybackVisuals();
 }
