@@ -112,6 +112,8 @@ private:
   void rebuildTrackIndexMap();
   // Resolves section-local track pointers back to logical track indices.
   int trackIndexForTrack(const SeqTrack* track) const;
+  // Resolves a visual track index for timed events, including no-track/channel-only sequences.
+  int trackIndexForEvent(const class SeqEvent* event) const;
   void rebuildTrackColors();
   void rebuildSequenceCache();
   bool updateActiveKeyStates();

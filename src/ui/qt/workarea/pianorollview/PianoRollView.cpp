@@ -122,7 +122,11 @@ void PianoRollView::setSequence(VGMSeq* seq) {
   m_activeNotes = std::make_shared<std::vector<PianoRollFrame::Note>>();
   m_selectedNotes = std::make_shared<std::vector<PianoRollFrame::Note>>();
 
-  m_trackCount = m_seq ? static_cast<int>(m_seq->aTracks.size()) : 0;
+  if (!m_seq) {
+    m_trackCount = 0;
+  } else {
+    m_trackCount = std::max(m_trackCount, static_cast<int>(m_seq->aTracks.size()));
+  }
   rebuildTrackIndexMap();
   rebuildTrackColors();
   rebuildSequenceCache();
@@ -155,7 +159,7 @@ void PianoRollView::refreshSequenceData(bool allowTimelineBuild) {
   }
 
   const int seqTrackCount = static_cast<int>(m_seq->aTracks.size());
-  if (seqTrackCount != m_trackCount) {
+  if (seqTrackCount > m_trackCount) {
     m_trackCount = seqTrackCount;
     rebuildTrackIndexMap();
     rebuildTrackColors();
@@ -625,6 +629,19 @@ int PianoRollView::trackIndexForTrack(const SeqTrack* track) const {
   return -1;
 }
 
+int PianoRollView::trackIndexForEvent(const SeqEvent* event) const {
+  if (!event) {
+    return -1;
+  }
+
+  const int trackIndex = trackIndexForTrack(event->parentTrack);
+  if (trackIndex >= 0) {
+    return trackIndex;
+  }
+
+  return static_cast<int>(event->channel);
+}
+
 void PianoRollView::rebuildTrackColors() {
   m_trackColors.resize(m_trackCount);
   for (int i = 0; i < m_trackCount; ++i) {
@@ -682,7 +699,7 @@ void PianoRollView::rebuildSequenceCache() {
     const auto& timed = timeline.event(i);
     maxEndTick = std::max<uint64_t>(maxEndTick, timed.endTickExclusive());
 
-    if (!timed.event || !timed.event->parentTrack) {
+    if (!timed.event) {
       continue;
     }
 
@@ -691,7 +708,7 @@ void PianoRollView::rebuildSequenceCache() {
       continue;
     }
 
-    const int trackIndex = trackIndexForTrack(timed.event->parentTrack);
+    const int trackIndex = trackIndexForEvent(timed.event);
     if (trackIndex < 0) {
       continue;
     }
@@ -811,7 +828,7 @@ bool PianoRollView::updateActiveKeyStates() {
     nextActiveNotes.reserve(active.size());
 
     for (const auto* timed : active) {
-      if (!timed || !timed->event || !timed->event->parentTrack) {
+      if (!timed || !timed->event) {
         continue;
       }
 
@@ -820,7 +837,7 @@ bool PianoRollView::updateActiveKeyStates() {
         continue;
       }
 
-      const int trackIndex = trackIndexForTrack(timed->event->parentTrack);
+      const int trackIndex = trackIndexForEvent(timed->event);
       if (trackIndex < 0) {
         continue;
       }
