@@ -970,6 +970,7 @@ void HexView::keyPressEvent(QKeyEvent* event) {
 // Hide modifier tooltip affordance when seek modifier key is released.
 void HexView::keyReleaseEvent(QKeyEvent* event) {
   if (event->key() == HexViewInput::kModifierKey) {
+    stopModifierNotePreview();
     hideTooltip();
   }
   QAbstractScrollArea::keyReleaseEvent(event);
@@ -1017,9 +1018,11 @@ void HexView::mousePressEvent(QMouseEvent* event) {
         if (item != m_lastSeekItem) {
           m_lastSeekItem = item;
           seekToEventRequested(item);
+          modifierNotePreviewRequested(item);
         }
         showTooltip(item, event->pos());
       } else {
+        stopModifierNotePreview();
         hideTooltip();
       }
       m_isDragging = true;
@@ -1048,6 +1051,7 @@ void HexView::mousePressEvent(QMouseEvent* event) {
 void HexView::mouseReleaseEvent(QMouseEvent* event) {
   if (event->button() == Qt::LeftButton) {
     m_isDragging = false;
+    stopModifierNotePreview();
     m_lastSeekItem = nullptr;
     const QPoint vp = viewport()->mapFromGlobal(QCursor::pos());
     handleTooltipHoverMove(vp, QApplication::keyboardModifiers());
@@ -1061,9 +1065,14 @@ void HexView::handleCoalescedMouseMove(const QPoint& pos,
                               Qt::KeyboardModifiers mods) {
   if (m_isDragging && buttons & Qt::LeftButton) {
     const int offset = getOffsetFromPoint(pos);
+    if (!mods.testFlag(HexViewInput::kModifier)) {
+      stopModifierNotePreview();
+    }
     if (offset == -1) {
       if (!mods.testFlag(HexViewInput::kModifier)) {
         selectionChanged(nullptr);
+      } else {
+        stopModifierNotePreview();
       }
       hideTooltip();
       return;
@@ -1074,7 +1083,10 @@ void HexView::handleCoalescedMouseMove(const QPoint& pos,
         if (item != m_lastSeekItem) {
           m_lastSeekItem = item;
           seekToEventRequested(item);
+          modifierNotePreviewRequested(item);
         }
+      } else {
+        stopModifierNotePreview();
       }
       hideTooltip();
       return;
@@ -1374,6 +1386,11 @@ void HexView::updateHighlightState(bool animateSelection) {
   setOverlayOpacity(OVERLAY_ALPHA_F);
   setShadowBlur(SHADOW_BLUR_RADIUS);
   setShadowOffset(QPointF(SHADOW_OFFSET_X, SHADOW_OFFSET_Y));
+}
+
+void HexView::stopModifierNotePreview() {
+  emit modifierNotePreviewStopped();
+  m_lastSeekItem = nullptr;
 }
 
 // Show rich HTML tooltip for a hovered item, avoiding redundant re-show for same item.
