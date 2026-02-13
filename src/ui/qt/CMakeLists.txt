@@ -166,6 +166,8 @@ target_sources(vgmtrans
       workarea/pianorollview/PianoRollRhiWindow.h
       workarea/pianorollview/PianoRollView.h
       workarea/pianorollview/PianoRollZoomScrollBar.h
+      workarea/rhi/RhiWindowMainWindowLocator.h
+      workarea/rhi/RhiWindowDragDropEvents.h
       workarea/rhi/SimpleRhiWindow.h
 )
 

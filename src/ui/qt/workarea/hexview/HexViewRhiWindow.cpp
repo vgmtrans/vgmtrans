@@ -9,17 +9,13 @@
 #include "HexView.h"
 #include "HexViewRhiRenderer.h"
 #include "LogManager.h"
+#include "workarea/rhi/RhiWindowDragDropEvents.h"
 
 #include <rhi/qrhi.h>
 #include <rhi/qrhi_platform.h>
 
-#include <QDragEnterEvent>
-#include <QDragLeaveEvent>
-#include <QDragMoveEvent>
-#include <QDropEvent>
 #include <QEvent>
 #include <QExposeEvent>
-#include <QMimeData>
 #include <QResizeEvent>
 #include <QScrollBar>
 
@@ -148,46 +144,12 @@ bool HexViewRhiWindow::event(QEvent* e) {
     return true;
   }
 
-  if (!m_view || !m_view->viewport()) {
-    return QWindow::event(e);
-  }
-
-  switch (e->type()) {
-    case QEvent::DragEnter:
-    case QEvent::DragMove:
-    case QEvent::DragLeave:
-    case QEvent::Drop: {
-      switch (e->type()) {
-        case QEvent::DragEnter: {
-          auto* dragEvent = static_cast<QDragEnterEvent*>(e);
-          emit dragOverlayShowRequested();
-          dragEvent->acceptProposedAction();
-          break;
-        }
-        case QEvent::DragMove: {
-          auto* dragEvent = static_cast<QDragMoveEvent*>(e);
-          emit dragOverlayShowRequested();
-          dragEvent->acceptProposedAction();
-          break;
-        }
-        case QEvent::DragLeave:
-          emit dragOverlayHideRequested();
-          e->accept();
-          break;
-        case QEvent::Drop: {
-          auto* dropEvent = static_cast<QDropEvent*>(e);
-          emit dropUrlsRequested(dropEvent->mimeData()->urls());
-          dropEvent->acceptProposedAction();
-          break;
-        }
-        default:
-          break;
-      }
-      return true;
-    }
-
-    default:
-      break;
+  if (QtUi::handleRhiWindowDragDropEvent(
+          e,
+          [this]() { emit dragOverlayShowRequested(); },
+          [this]() { emit dragOverlayHideRequested(); },
+          [this](const QList<QUrl>& urls) { emit dropUrlsRequested(urls); })) {
+    return true;
   }
 
   return QWindow::event(e);
