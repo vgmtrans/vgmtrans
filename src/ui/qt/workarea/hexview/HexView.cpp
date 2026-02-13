@@ -25,6 +25,7 @@
 #include <QRectF>
 #include <QResizeEvent>
 #include <QScrollBar>
+#include <QTimerEvent>
 #include <QToolTip>
 #include <QWidget>
 
@@ -32,6 +33,7 @@
 #include <cmath>
 #include <functional>
 #include <limits>
+#include <unordered_set>
 
 namespace {
 constexpr int BYTES_PER_LINE = 16;
@@ -41,6 +43,8 @@ constexpr int HEX_TO_ASCII_SPACING_CHARS = 4;
 constexpr int SELECTION_PADDING = 18;
 constexpr int VIEWPORT_PADDING = 10;
 constexpr int DIM_DURATION_MS = 200;
+constexpr int PLAYBACK_FADE_DURATION_MS = 300;
+constexpr float PLAYBACK_FADE_CURVE = 3.0f;
 constexpr int OVERLAY_ALPHA = 80;
 constexpr float OVERLAY_ALPHA_F = OVERLAY_ALPHA / 255.0f;
 constexpr float SHADOW_OFFSET_X = 0.0f;
@@ -76,6 +80,11 @@ uint64_t HexView::selectionKey(uint32_t offset, uint32_t length) {
 // Overload for plain selection ranges.
 uint64_t HexView::selectionKey(const SelectionRange& range) {
   return selectionKey(range.offset, range.length);
+}
+
+// Overload for fade playback selections (keyed by underlying range).
+uint64_t HexView::selectionKey(const FadePlaybackSelection& selection) {
+  return selectionKey(selection.range);
 }
 
 // Trivial destructor; QObject ownership handles child cleanup.
@@ -361,7 +370,7 @@ void HexView::setSelectedItem(VGMItem* item) {
   }
 }
 
-// Update active playback selections from timed events.
+// Update playback selections from active items and seed fade-out entries for removed ones.
 void HexView::setPlaybackSelectionsForItems(const std::vector<const VGMItem*>& items) {
   std::vector<SelectionRange> next;
   next.reserve(items.size());
@@ -373,30 +382,99 @@ void HexView::setPlaybackSelectionsForItems(const std::vector<const VGMItem*>& i
     next.push_back({item->offset(), length});
   }
 
+  // Track incoming active playback ranges for fast membership checks below.
+  std::unordered_set<uint64_t> nextKeys;
+  nextKeys.reserve(next.size() * 2 + 1);
+  for (const auto& selection : next) {
+    nextKeys.insert(selectionKey(selection));
+  }
+
+  // If a range became active again, remove its stale fade entry.
+  if (!m_fadePlaybackSelections.empty()) {
+    m_fadePlaybackSelections.erase(
+        std::remove_if(m_fadePlaybackSelections.begin(), m_fadePlaybackSelections.end(),
+                       [&](const FadePlaybackSelection& selection) {
+                         return nextKeys.find(selectionKey(selection)) != nextKeys.end();
+                       }),
+        m_fadePlaybackSelections.end());
+  }
+
+  // Seed fade entries only for ranges that were active and are now gone.
+  std::unordered_set<uint64_t> fadeKeys;
+  fadeKeys.reserve(m_fadePlaybackSelections.size() * 2 + 1);
+  for (const auto& selection : m_fadePlaybackSelections) {
+    fadeKeys.insert(selectionKey(selection));
+  }
+
+  const bool fadeEnabled = PLAYBACK_FADE_DURATION_MS > 0;
+  bool addedFade = false;
+  if (fadeEnabled) {
+    const qint64 now = playbackNowMs();
+    for (const auto& selection : m_playbackSelections) {
+      const uint64_t key = selectionKey(selection);
+      if (nextKeys.find(key) == nextKeys.end() && fadeKeys.insert(key).second) {
+        m_fadePlaybackSelections.push_back({selection, now, 1.0f});
+        addedFade = true;
+      }
+    }
+  } else {
+    m_fadePlaybackSelections.clear();
+  }
+
+  if (addedFade || !m_fadePlaybackSelections.empty()) {
+    ensurePlaybackFadeTimer();
+    updatePlaybackFade();
+  } else {
+    m_playbackFadeTimer.stop();
+  }
+
   m_playbackSelections = std::move(next);
   refreshSelectionVisuals(false);
 }
 
-// Clear active playback selection set.
-void HexView::clearPlaybackSelections(bool /*fade*/) {
+// Clear playback selection set immediately or convert it into fading playback highlights.
+void HexView::clearPlaybackSelections(bool fade) {
   if (m_playbackSelections.empty()) {
     return;
   }
+  if (fade && PLAYBACK_FADE_DURATION_MS > 0) {
+    // Convert the current active set into fade-out entries in one step.
+    const qint64 now = playbackNowMs();
+    std::unordered_set<uint64_t> fadeKeys;
+    fadeKeys.reserve(m_fadePlaybackSelections.size() * 2 + 1);
+    for (const auto& selection : m_fadePlaybackSelections) {
+      fadeKeys.insert(selectionKey(selection));
+    }
+    for (const auto& selection : m_playbackSelections) {
+      const uint64_t key = selectionKey(selection);
+      if (fadeKeys.insert(key).second) {
+        m_fadePlaybackSelections.push_back({selection, now, 1.0f});
+      }
+    }
+  } else {
+    m_fadePlaybackSelections.clear();
+  }
   m_playbackSelections.clear();
+  if (!m_fadePlaybackSelections.empty()) {
+    ensurePlaybackFadeTimer();
+    updatePlaybackFade();
+  } else {
+    m_playbackFadeTimer.stop();
+  }
   refreshSelectionVisuals(false);
 }
 
-// Toggle playback-highlight mode and reconcile current playback selection state.
+// Toggle playback-highlight mode and reconcile existing playback selection state.
 void HexView::setPlaybackActive(bool active) {
   if (m_playbackActive == active) {
     if (!active && !m_playbackSelections.empty()) {
-      clearPlaybackSelections(false);
+      clearPlaybackSelections();
     }
     return;
   }
   m_playbackActive = active;
   if (!m_playbackActive && !m_playbackSelections.empty()) {
-    clearPlaybackSelections(false);
+    clearPlaybackSelections();
     return;
   }
   refreshSelectionVisuals(false);
@@ -657,6 +735,12 @@ HexViewFrame::Data HexView::captureRhiFrameData(float dpr) {
   frame.playbackSelections.reserve(m_playbackSelections.size());
   for (const auto& range : m_playbackSelections) {
     frame.playbackSelections.push_back({range.offset, range.length});
+  }
+
+  frame.fadePlaybackSelections.reserve(m_fadePlaybackSelections.size());
+  for (const auto& fade : m_fadePlaybackSelections) {
+    frame.fadePlaybackSelections.push_back(
+        {{fade.range.offset, fade.range.length}, fade.alpha});
   }
 
   ensureGlyphAtlas(dpr);
@@ -1011,6 +1095,64 @@ void HexView::showSelectedItem(bool show, bool animate) {
 void HexView::clearFadeSelection() {
   m_fadeSelections.clear();
   requestRhiUpdate(false, true);
+}
+
+// Ensure fade timer is running while playback fade-outs are active.
+void HexView::ensurePlaybackFadeTimer() {
+  if (!m_playbackFadeTimer.isActive()) {
+    m_playbackFadeTimer.start(16, this);
+  }
+}
+
+// Return monotonically increasing playback-fade clock in milliseconds.
+qint64 HexView::playbackNowMs() {
+  if (!m_playbackFadeClock.isValid()) {
+    m_playbackFadeClock.start();
+  }
+  return m_playbackFadeClock.elapsed();
+}
+
+// Advance playback fade-out alphas and prune completed fade entries.
+void HexView::updatePlaybackFade() {
+  if (m_fadePlaybackSelections.empty()) {
+    return;
+  }
+  const qint64 nowMs = playbackNowMs();
+  const float duration = static_cast<float>(PLAYBACK_FADE_DURATION_MS);
+  const float curve = std::max(0.01f, PLAYBACK_FADE_CURVE);
+
+  // Decay alpha with a non-linear curve so fade starts strong and eases out.
+  for (auto& selection : m_fadePlaybackSelections) {
+    const qint64 elapsed = nowMs - selection.startMs;
+    const float t = duration > 0.0f ? std::clamp(elapsed / duration, 0.0f, 1.0f) : 1.0f;
+    const float inv = 1.0f - t;
+    selection.alpha = inv > 0.0f ? std::pow(inv, curve) : 0.0f;
+  }
+
+  // Drop fully faded entries to keep the per-frame mask work bounded.
+  m_fadePlaybackSelections.erase(
+      std::remove_if(m_fadePlaybackSelections.begin(), m_fadePlaybackSelections.end(),
+                     [](const FadePlaybackSelection& selection) {
+                       return selection.alpha <= 0.0f;
+                     }),
+      m_fadePlaybackSelections.end());
+
+  if (m_fadePlaybackSelections.empty() && m_playbackFadeTimer.isActive()) {
+    m_playbackFadeTimer.stop();
+  }
+}
+
+// Dispatch timer ticks for playback fade redraw scheduling.
+void HexView::timerEvent(QTimerEvent* event) {
+  if (event->timerId() == m_playbackFadeTimer.timerId()) {
+    updatePlaybackFade();
+    requestRhiUpdate(false, true);
+    if (m_fadePlaybackSelections.empty()) {
+      m_playbackFadeTimer.stop();
+    }
+    return;
+  }
+  QAbstractScrollArea::timerEvent(event);
 }
 
 // Resolve whether to show dim/shadow highlight based on selection/playback state.
