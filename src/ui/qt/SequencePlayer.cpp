@@ -233,7 +233,12 @@ bool SequencePlayer::ensurePreviewStreams() {
 
   if (!m_preview_state_stream) {
     HSTREAM previewStateStream = BASS_MIDI_StreamCreateFile(
-        true, m_active_midi_data.data(), 0, m_active_midi_data.size(), BASS_MIDI_DECAYEND, 0);
+        true,
+        m_active_midi_data.data(),
+        0,
+        m_active_midi_data.size(),
+        BASS_MIDI_DECAYEND | BASS_STREAM_DECODE,
+        0);
     if (!previewStateStream) {
       if (m_preview_note_stream) {
         BASS_StreamFree(m_preview_note_stream);
@@ -251,7 +256,6 @@ bool SequencePlayer::ensurePreviewStreams() {
     }
     BASS_ChannelSetAttribute(previewStateStream, BASS_ATTRIB_MIDI_CHANS, 128);
     BASS_ChannelFlags(previewStateStream, 0, BASS_MIDI_NOFX);
-    BASS_ChannelPause(previewStateStream);
     m_preview_state_stream = previewStateStream;
   }
 
@@ -280,8 +284,9 @@ bool SequencePlayer::syncPreviewChannelState(uint8_t channel, uint32_t tick) {
   if (!BASS_ChannelSetPosition(m_preview_state_stream, tick, BASS_POS_MIDI_TICK)) {
     return false;
   }
-  BASS_ChannelUpdate(m_preview_state_stream, 0);
 
+  // Clear previous preview state on this channel so missing events fall back to defaults.
+  BASS_MIDI_StreamEvent(m_preview_note_stream, channel, MIDI_EVENT_RESET, 0);
   BASS_MIDI_StreamEvent(m_preview_note_stream, channel, MIDI_EVENT_SOUNDOFF, 0);
 
   // Apply current global output gain so preview loudness matches playback.
