@@ -96,9 +96,13 @@ signals:
 private:
   SequencePlayer();
   bool loadCollection(const VGMColl *collection, bool startPlaying);
+  bool ensurePreviewStream();
+  void releasePreviewStream();
+  void syncPreviewChannelState(uint8_t channel) const;
 
   const VGMColl *m_active_vgmcoll{};
   HSTREAM m_active_stream{};
+  HSTREAM m_preview_stream{};
   HSOUNDFONT m_loaded_sf{};
 
   QTimer *m_seekupdate_timer{};
