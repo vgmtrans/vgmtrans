@@ -1002,11 +1002,11 @@ void HexView::handleSeekPress(VGMItem* item, const QPoint& pos) {
     if (item != m_lastSeekItem) {
       m_lastSeekItem = item;
       seekToEventRequested(item);
-      modifierNotePreviewRequested(item, true);
+      notePreviewRequested(item, true);
     }
     showTooltip(item, pos);
   } else {
-    stopModifierNotePreview();
+    stopNotePreview();
     hideTooltip();
   }
 }
@@ -1014,17 +1014,17 @@ void HexView::handleSeekPress(VGMItem* item, const QPoint& pos) {
 void HexView::handleSelectionPress(int offset, VGMItem* item) {
   if (offset == -1) {
     selectionChanged(nullptr);
-    stopModifierNotePreview();
+    stopNotePreview();
     return;
   }
 
   m_selectedOffset = offset;
   if (item == m_selectedItem) {
     selectionChanged(nullptr);
-    stopModifierNotePreview();
+    stopNotePreview();
   } else {
     selectionChanged(item);
-    modifierNotePreviewRequested(item, false);
+    notePreviewRequested(item, false);
   }
   hideTooltip();
 }
@@ -1035,13 +1035,13 @@ void HexView::handleSeekScrubDrag(int offset) {
       if (item != m_lastSeekItem) {
         m_lastSeekItem = item;
         seekToEventRequested(item);
-        modifierNotePreviewRequested(item, true);
+        notePreviewRequested(item, true);
       }
     } else {
-      stopModifierNotePreview();
+      stopNotePreview();
     }
   } else {
-    stopModifierNotePreview();
+    stopNotePreview();
   }
   hideTooltip();
 }
@@ -1049,7 +1049,7 @@ void HexView::handleSeekScrubDrag(int offset) {
 void HexView::handleSelectionDrag(int offset) {
   if (offset == -1) {
     selectionChanged(nullptr);
-    stopModifierNotePreview();
+    stopNotePreview();
     hideTooltip();
     return;
   }
@@ -1064,7 +1064,7 @@ void HexView::handleSelectionDrag(int offset) {
   auto* item = m_vgmfile->getItemAtOffset(offset, false);
   if (item != m_selectedItem) {
     selectionChanged(item);
-    modifierNotePreviewRequested(item, false);
+    notePreviewRequested(item, false);
   }
   hideTooltip();
 }
@@ -1095,7 +1095,7 @@ void HexView::mousePressEvent(QMouseEvent* event) {
 void HexView::mouseReleaseEvent(QMouseEvent* event) {
   if (event->button() == Qt::LeftButton) {
     m_isDragging = false;
-    stopModifierNotePreview();
+    stopNotePreview();
     m_lastSeekItem = nullptr;
     const QPoint vp = viewport()->mapFromGlobal(QCursor::pos());
     handleTooltipHoverMove(vp, QApplication::keyboardModifiers());
@@ -1405,8 +1405,8 @@ void HexView::updateHighlightState(bool animateSelection) {
   setShadowOffset(QPointF(SHADOW_OFFSET_X, SHADOW_OFFSET_Y));
 }
 
-void HexView::stopModifierNotePreview() {
-  emit modifierNotePreviewStopped();
+void HexView::stopNotePreview() {
+  emit notePreviewStopped();
   m_lastSeekItem = nullptr;
 }
 
