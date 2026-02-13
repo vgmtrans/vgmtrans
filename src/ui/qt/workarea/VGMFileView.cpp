@@ -459,8 +459,8 @@ void VGMFileView::seekToEvent(VGMItem* item) const {
 
 void VGMFileView::previewModifierNoteForEvent(VGMItem* item) const {
   auto* event = dynamic_cast<SeqEvent*>(item);
-  uint32_t ignoredTick = 0;
-  if (!prepareSeqEventForPlayback(event, ignoredTick)) {
+  uint32_t tick = 0;
+  if (!prepareSeqEventForPlayback(event, tick)) {
     SequencePlayer::the().stopPreviewNote();
     return;
   }
@@ -478,7 +478,7 @@ void VGMFileView::previewModifierNoteForEvent(VGMItem* item) const {
     return;
   }
 
-  SequencePlayer::the().previewNoteOn(event->channel, key, velocity);
+  SequencePlayer::the().previewNoteOn(event->channel, key, velocity, tick);
 }
 
 void VGMFileView::stopModifierNotePreview() const {
