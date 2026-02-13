@@ -1018,7 +1018,7 @@ void HexView::mousePressEvent(QMouseEvent* event) {
         if (item != m_lastSeekItem) {
           m_lastSeekItem = item;
           seekToEventRequested(item);
-          modifierNotePreviewRequested(item);
+          modifierNotePreviewRequested(item, true);
         }
         showTooltip(item, event->pos());
       } else {
@@ -1041,7 +1041,7 @@ void HexView::mousePressEvent(QMouseEvent* event) {
       stopModifierNotePreview();
     } else {
       selectionChanged(item);
-      modifierNotePreviewRequested(item);
+      modifierNotePreviewRequested(item, false);
     }
     hideTooltip();
     m_isDragging = true;
@@ -1084,7 +1084,7 @@ void HexView::handleCoalescedMouseMove(const QPoint& pos,
         if (item != m_lastSeekItem) {
           m_lastSeekItem = item;
           seekToEventRequested(item);
-          modifierNotePreviewRequested(item);
+          modifierNotePreviewRequested(item, true);
         }
       } else {
         stopModifierNotePreview();
@@ -1101,7 +1101,7 @@ void HexView::handleCoalescedMouseMove(const QPoint& pos,
     auto* item = m_vgmfile->getItemAtOffset(offset, false);
     if (item != m_selectedItem) {
       selectionChanged(item);
-      modifierNotePreviewRequested(item);
+      modifierNotePreviewRequested(item, false);
     }
     hideTooltip();
   }
