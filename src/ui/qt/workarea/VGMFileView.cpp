@@ -46,9 +46,56 @@ QToolButton* createPanelButton(const QString& label, QWidget* parent) {
   button->setSizePolicy(QSizePolicy::Minimum, QSizePolicy::Fixed);
   return button;
 }
-}  // namespace
 
-static int previewMidiChannelForEvent(const SeqEvent* event);
+int previewMidiChannelForEvent(const SeqEvent* event) {
+  if (!event) {
+    return -1;
+  }
+
+  int channel = static_cast<int>(event->channel);
+  if (event->parentTrack) {
+    channel += event->parentTrack->channelGroup * 16;
+  }
+
+  if (channel < 0 || channel >= 128) {
+    return -1;
+  }
+  return channel;
+}
+
+bool buildPreviewNoteForEvent(const SeqEvent* seqEvent, SequencePlayer::PreviewNote& outNote) {
+  if (!seqEvent) {
+    return false;
+  }
+
+  const int midiChannel = previewMidiChannelForEvent(seqEvent);
+  if (midiChannel < 0) {
+    return false;
+  }
+
+  uint8_t key = 0;
+  uint8_t velocity = 0;
+  if (const auto* noteOn = dynamic_cast<const NoteOnSeqEvent*>(seqEvent)) {
+    key = noteOn->absKey;
+    velocity = noteOn->vel;
+  } else if (const auto* durNote = dynamic_cast<const DurNoteSeqEvent*>(seqEvent)) {
+    key = durNote->absKey;
+    velocity = durNote->vel;
+  } else {
+    return false;
+  }
+
+  // Match the same velocity scaling used during MIDI conversion.
+  if (seqEvent->parentTrack && seqEvent->parentTrack->usesLinearAmplitudeScale()) {
+    velocity = convert7bitPercentAmpToStdMidiVal(velocity);
+  }
+
+  outNote.channel = static_cast<uint8_t>(midiChannel);
+  outNote.key = key;
+  outNote.velocity = velocity;
+  return true;
+}
+}  // namespace
 
 VGMFileView::VGMFileView(VGMFile* vgmfile)
     : QMdiSubWindow(), m_vgmfile(vgmfile) {
@@ -82,10 +129,9 @@ VGMFileView::VGMFileView(VGMFile* vgmfile)
 
     connect(panelUi.hexView, &HexView::selectionChanged, this, &VGMFileView::onSelectionChange);
     connect(panelUi.hexView, &HexView::seekToEventRequested, this, &VGMFileView::seekToEvent);
-    connect(panelUi.hexView, &HexView::modifierNotePreviewRequested, this,
-            &VGMFileView::previewModifierNoteForEvent);
-    connect(panelUi.hexView, &HexView::modifierNotePreviewStopped, this,
-            &VGMFileView::stopModifierNotePreview);
+    connect(panelUi.hexView, &HexView::notePreviewRequested, this,
+            &VGMFileView::previewNotesForEvent);
+    connect(panelUi.hexView, &HexView::notePreviewStopped, this, &VGMFileView::stopNotePreview);
     connect(panelUi.pianoRollView, &PianoRollView::selectionSetChanged, this, &VGMFileView::onSelectionSetChange);
 
     connect(panelUi.treeView, &VGMFileTreeView::currentItemChanged,
@@ -460,10 +506,16 @@ void VGMFileView::seekToEvent(VGMItem* item) const {
   SequencePlayer::the().seek(static_cast<int>(tick), PositionChangeOrigin::HexView);
 }
 
-void VGMFileView::previewModifierNoteForEvent(VGMItem* item, bool includeActiveNotesAtTick) const {
+void VGMFileView::previewNotesForEvent(VGMItem* item, bool includeActiveNotesAtTick) const {
   auto* event = dynamic_cast<SeqEvent*>(item);
   uint32_t tick = 0;
   if (!prepareSeqEventForPlayback(event, tick)) {
+    SequencePlayer::the().stopPreviewNote();
+    return;
+  }
+
+  SequencePlayer::PreviewNote selectedNote;
+  if (!buildPreviewNoteForEvent(event, selectedNote)) {
     SequencePlayer::the().stopPreviewNote();
     return;
   }
@@ -472,47 +524,14 @@ void VGMFileView::previewModifierNoteForEvent(VGMItem* item, bool includeActiveN
   previewNotes.reserve(includeActiveNotesAtTick ? 8 : 1);
   std::unordered_set<uint16_t> seenKeys;
 
-  const auto appendPreviewNote = [&](const SeqEvent* seqEvent) {
-    if (!seqEvent) {
-      return false;
-    }
-    const int midiChannel = previewMidiChannelForEvent(seqEvent);
-    if (midiChannel < 0) {
-      return false;
-    }
-
-    uint8_t key = 0;
-    uint8_t velocity = 0;
-    if (const auto* noteOn = dynamic_cast<const NoteOnSeqEvent*>(seqEvent)) {
-      key = noteOn->absKey;
-      velocity = noteOn->vel;
-    } else if (const auto* durNote = dynamic_cast<const DurNoteSeqEvent*>(seqEvent)) {
-      key = durNote->absKey;
-      velocity = durNote->vel;
-    } else {
-      return false;
-    }
-
-    // Match the same velocity scaling used during MIDI conversion.
-    if (seqEvent->parentTrack && seqEvent->parentTrack->usesLinearAmplitudeScale()) {
-      velocity = convert7bitPercentAmpToStdMidiVal(velocity);
-    }
-
-    const uint16_t channelAndKey =
-        static_cast<uint16_t>((static_cast<uint16_t>(midiChannel) << 8) | key);
-    if (!seenKeys.emplace(channelAndKey).second) {
-      return true;
-    }
-
-    previewNotes.push_back({static_cast<uint8_t>(midiChannel), key, velocity});
-    return true;
+  const auto noteKey = [](const SequencePlayer::PreviewNote& note) {
+    return static_cast<uint16_t>((static_cast<uint16_t>(note.channel) << 8) | note.key);
   };
 
-  if (!appendPreviewNote(event)) {
-    SequencePlayer::the().stopPreviewNote();
-    return;
-  }
+  previewNotes.push_back(selectedNote);
+  seenKeys.emplace(noteKey(selectedNote));
 
+  // Modifier-preview mode layers in every note currently active at this tick.
   if (includeActiveNotesAtTick && event->parentTrack && event->parentTrack->parentSeq) {
     const auto& timeline = event->parentTrack->parentSeq->timedEventIndex();
     if (timeline.finalized()) {
@@ -522,7 +541,14 @@ void VGMFileView::previewModifierNoteForEvent(VGMItem* item, bool includeActiveN
         if (!timed || !timed->event) {
           continue;
         }
-        appendPreviewNote(timed->event);
+        SequencePlayer::PreviewNote activeNote;
+        if (!buildPreviewNoteForEvent(timed->event, activeNote)) {
+          continue;
+        }
+        if (!seenKeys.emplace(noteKey(activeNote)).second) {
+          continue;
+        }
+        previewNotes.push_back(activeNote);
       }
     }
   }
@@ -530,7 +556,7 @@ void VGMFileView::previewModifierNoteForEvent(VGMItem* item, bool includeActiveN
   SequencePlayer::the().previewNotesAtTick(previewNotes, tick);
 }
 
-void VGMFileView::stopModifierNotePreview() const {
+void VGMFileView::stopNotePreview() const {
   SequencePlayer::the().stopPreviewNote();
 }
 
@@ -641,22 +667,6 @@ int VGMFileView::noteKeyForEvent(const SeqEvent* event) {
     return durNote->absKey;
   }
   return -1;
-}
-
-static int previewMidiChannelForEvent(const SeqEvent* event) {
-  if (!event) {
-    return -1;
-  }
-
-  int channel = static_cast<int>(event->channel);
-  if (event->parentTrack) {
-    channel += event->parentTrack->channelGroup * 16;
-  }
-
-  if (channel < 0 || channel >= 128) {
-    return -1;
-  }
-  return channel;
 }
 
 void VGMFileView::onPlaybackPositionChanged(int current, int max, PositionChangeOrigin origin) {
