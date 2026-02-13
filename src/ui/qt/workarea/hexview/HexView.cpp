@@ -1014,14 +1014,17 @@ void HexView::handleSeekPress(VGMItem* item, const QPoint& pos) {
 void HexView::handleSelectionPress(int offset, VGMItem* item) {
   if (offset == -1) {
     selectionChanged(nullptr);
+    stopModifierNotePreview();
     return;
   }
 
   m_selectedOffset = offset;
   if (item == m_selectedItem) {
     selectionChanged(nullptr);
+    stopModifierNotePreview();
   } else {
     selectionChanged(item);
+    modifierNotePreviewRequested(item);
   }
   hideTooltip();
 }
@@ -1044,9 +1047,9 @@ void HexView::handleSeekScrubDrag(int offset) {
 }
 
 void HexView::handleSelectionDrag(int offset) {
-
   if (offset == -1) {
     selectionChanged(nullptr);
+    stopModifierNotePreview();
     hideTooltip();
     return;
   }
@@ -1061,6 +1064,7 @@ void HexView::handleSelectionDrag(int offset) {
   auto* item = m_vgmfile->getItemAtOffset(offset, false);
   if (item != m_selectedItem) {
     selectionChanged(item);
+    modifierNotePreviewRequested(item);
   }
   hideTooltip();
 }
