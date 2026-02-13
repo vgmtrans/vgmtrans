@@ -25,6 +25,12 @@ enum class PositionChangeOrigin {
 class SequencePlayer : public QObject {
   Q_OBJECT
 public:
+  struct PreviewNote {
+    uint8_t channel = 0;
+    uint8_t key = 0;
+    uint8_t velocity = 0;
+  };
+
   static auto &the() {
     static SequencePlayer instance;
     return instance;
@@ -51,6 +57,7 @@ public:
    */
   void seek(int position, PositionChangeOrigin origin);
   bool previewNoteOn(uint8_t channel, uint8_t key, uint8_t velocity, uint32_t tick);
+  bool previewNotesAtTick(const std::vector<PreviewNote>& notes, uint32_t tick);
   void stopPreviewNote();
 
   /**
@@ -110,7 +117,5 @@ private:
 
   QTimer *m_seekupdate_timer{};
   QString m_song_title{};
-  bool m_previewNoteActive = false;
-  uint8_t m_previewNoteChannel = 0;
-  uint8_t m_previewNoteKey = 0;
+  std::vector<PreviewNote> m_previewActiveNotes;
 };

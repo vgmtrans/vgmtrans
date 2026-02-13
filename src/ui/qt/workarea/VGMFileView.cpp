@@ -457,7 +457,7 @@ void VGMFileView::seekToEvent(VGMItem* item) const {
   SequencePlayer::the().seek(static_cast<int>(tick), PositionChangeOrigin::HexView);
 }
 
-void VGMFileView::previewModifierNoteForEvent(VGMItem* item) const {
+void VGMFileView::previewModifierNoteForEvent(VGMItem* item, bool includeActiveNotesAtTick) const {
   auto* event = dynamic_cast<SeqEvent*>(item);
   uint32_t tick = 0;
   if (!prepareSeqEventForPlayback(event, tick)) {
@@ -465,20 +465,56 @@ void VGMFileView::previewModifierNoteForEvent(VGMItem* item) const {
     return;
   }
 
-  uint8_t key = 0;
-  uint8_t velocity = 0;
-  if (const auto* noteOn = dynamic_cast<const NoteOnSeqEvent*>(event)) {
-    key = noteOn->absKey;
-    velocity = noteOn->vel;
-  } else if (const auto* durNote = dynamic_cast<const DurNoteSeqEvent*>(event)) {
-    key = durNote->absKey;
-    velocity = durNote->vel;
-  } else {
+  std::vector<SequencePlayer::PreviewNote> previewNotes;
+  previewNotes.reserve(includeActiveNotesAtTick ? 8 : 1);
+  std::unordered_set<uint16_t> seenKeys;
+
+  const auto appendPreviewNote = [&](const SeqEvent* seqEvent) {
+    if (!seqEvent) {
+      return false;
+    }
+    uint8_t key = 0;
+    uint8_t velocity = 0;
+    if (const auto* noteOn = dynamic_cast<const NoteOnSeqEvent*>(seqEvent)) {
+      key = noteOn->absKey;
+      velocity = noteOn->vel;
+    } else if (const auto* durNote = dynamic_cast<const DurNoteSeqEvent*>(seqEvent)) {
+      key = durNote->absKey;
+      velocity = durNote->vel;
+    } else {
+      return false;
+    }
+
+    const uint16_t channelAndKey =
+        static_cast<uint16_t>((static_cast<uint16_t>(seqEvent->channel) << 8) | key);
+    if (!seenKeys.emplace(channelAndKey).second) {
+      return true;
+    }
+
+    previewNotes.push_back({seqEvent->channel, key, velocity});
+    return true;
+  };
+
+  if (!appendPreviewNote(event)) {
     SequencePlayer::the().stopPreviewNote();
     return;
   }
 
-  SequencePlayer::the().previewNoteOn(event->channel, key, velocity, tick);
+  if (includeActiveNotesAtTick && event->parentTrack && event->parentTrack->parentSeq) {
+    const auto& timeline = event->parentTrack->parentSeq->timedEventIndex();
+    if (timeline.finalized()) {
+      std::vector<const SeqTimedEvent*> activeTimedEvents;
+      timeline.getActiveAt(tick, activeTimedEvents);
+      for (const auto* timed : activeTimedEvents) {
+        if (!timed || !timed->event) {
+          continue;
+        }
+        appendPreviewNote(timed->event);
+      }
+    }
+  }
+
+  SequencePlayer::the().previewNotesAtTick(previewNotes, tick);
 }
 
 void VGMFileView::stopModifierNotePreview() const {

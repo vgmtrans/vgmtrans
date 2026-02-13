@@ -162,41 +162,61 @@ void SequencePlayer::seek(int position, PositionChangeOrigin origin) {
 }
 
 bool SequencePlayer::previewNoteOn(uint8_t channel, uint8_t key, uint8_t velocity, uint32_t tick) {
+  return previewNotesAtTick({PreviewNote{channel, key, velocity}}, tick);
+}
+
+bool SequencePlayer::previewNotesAtTick(const std::vector<PreviewNote>& notes, uint32_t tick) {
   if (!m_active_stream || !ensurePreviewStreams()) {
     return false;
   }
 
   stopPreviewNote();
-  if (!syncPreviewChannelState(channel, tick)) {
-    return false;
+  if (notes.empty()) {
+    return true;
+  }
+
+  std::array<bool, 128> syncedChannels{};
+  for (const auto& note : notes) {
+    if (note.channel >= 128 || syncedChannels[note.channel]) {
+      continue;
+    }
+    if (!syncPreviewChannelState(note.channel, tick)) {
+      return false;
+    }
+    syncedChannels[note.channel] = true;
   }
   BASS_ChannelPlay(m_preview_note_stream, false);
 
-  const DWORD packed = static_cast<DWORD>(key) | (static_cast<DWORD>(velocity) << 8);
-  if (!BASS_MIDI_StreamEvent(m_preview_note_stream, channel, MIDI_EVENT_NOTE, packed)) {
-    return false;
+  m_previewActiveNotes.clear();
+  m_previewActiveNotes.reserve(notes.size());
+  for (const auto& note : notes) {
+    if (note.channel >= 128 || note.key >= 128 || note.velocity == 0) {
+      continue;
+    }
+    const DWORD packed = static_cast<DWORD>(note.key) | (static_cast<DWORD>(note.velocity) << 8);
+    if (!BASS_MIDI_StreamEvent(m_preview_note_stream, note.channel, MIDI_EVENT_NOTE, packed)) {
+      continue;
+    }
+    m_previewActiveNotes.push_back(note);
   }
 
-  m_previewNoteActive = true;
-  m_previewNoteChannel = channel;
-  m_previewNoteKey = key;
-  return true;
+  return !m_previewActiveNotes.empty();
 }
 
 void SequencePlayer::stopPreviewNote() {
-  if (!m_previewNoteActive) {
+  if (m_previewActiveNotes.empty()) {
     return;
   }
 
   if (m_preview_note_stream) {
-    // NOTE event with velocity 0 is interpreted as Note Off for this key.
-    const DWORD noteOffParam = static_cast<DWORD>(m_previewNoteKey);
-    BASS_MIDI_StreamEvent(m_preview_note_stream, m_previewNoteChannel, MIDI_EVENT_NOTE, noteOffParam);
+    for (const auto& note : m_previewActiveNotes) {
+      // NOTE event with velocity 0 is interpreted as Note Off for this key.
+      const DWORD noteOffParam = static_cast<DWORD>(note.key);
+      BASS_MIDI_StreamEvent(m_preview_note_stream, note.channel, MIDI_EVENT_NOTE, noteOffParam);
+    }
   }
 
-  m_previewNoteActive = false;
-  m_previewNoteChannel = 0;
-  m_previewNoteKey = 0;
+  m_previewActiveNotes.clear();
 }
 
 bool SequencePlayer::ensurePreviewStreams() {
