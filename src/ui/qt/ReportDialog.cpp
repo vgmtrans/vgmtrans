@@ -28,6 +28,7 @@
 #include <QClipboard>
 #include <QTimer>
 #include <version.h>
+#include "LogManager.h"
 #include "Root.h"
 #include "RawFile.h"
 #include "VGMFile.h"
@@ -225,7 +226,7 @@ void ReportDialog::updateUrlStatus() {
       auto* raw_file = static_cast<RawFile*>(item->data(Qt::UserRole).value<void*>());
 
       if (sha.isEmpty()) {
-        QByteArray data = QByteArray::fromRawData(raw_file->data(), static_cast<int>(raw_file->size()));
+        QByteArray data = QByteArray::fromRawData(raw_file->data(), raw_file->size());
         sha = QCryptographicHash::hash(data, QCryptographicHash::Sha256).toHex();
         item->setData(Qt::UserRole + 1, sha);
       }
@@ -245,7 +246,7 @@ void ReportDialog::updateUrlStatus() {
   query.addQueryItem("affected_files", asset_list);
   url.setQuery(query);
 
-  int length = url.toString().length();
+  int length = url.toEncoded().length();
   m_chars_remaining = 2048 - length;
   m_status_label->setText(tr("%1 characters remaining").arg(m_chars_remaining));
   
@@ -356,10 +357,11 @@ void ReportDialog::submitReport() {
 
   url.setQuery(query);
 
-  if (url.toString().length() > 2048) {
-    QDesktopServices::openUrl(QUrl("https://github.com/vgmtrans/vgmtrans/issues/new"));
+  L_DEBUG("submitReport: Passing human-readable URL to qtOpenUrl: {}", url.toString().toStdString());
+  if (url.toEncoded().length() > 2048) {
+    qtOpenUrl(QUrl("https://github.com/vgmtrans/vgmtrans/issues/new"));
   } else {
-    QDesktopServices::openUrl(url);
+    qtOpenUrl(url);
   }
 
   m_feedback_label->setText(tr("GitHub opened in browser. You can now close this window."));

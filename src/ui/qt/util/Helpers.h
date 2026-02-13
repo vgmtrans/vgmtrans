@@ -10,6 +10,8 @@
 #include <VGMFile.h>
 #include <VGMItem.h>
 
+class QUrl;
+
 const QIcon &iconForFile(VGMFileVariant file);
 const QIcon &iconForItemType(VGMItem::Type type);
 
@@ -17,6 +19,8 @@ QColor colorForItemType(VGMItem::Type type);
 QColor textColorForItemType(VGMItem::Type type);
 
 QString getFullDescriptionForTooltip(VGMItem* item);
+
+void qtOpenUrl(const QUrl& url);
 
 template<typename ... Base>
 struct Visitor : Base ... {

@@ -118,6 +118,10 @@ add_executable(
   workarea/VGMFileListView.cpp
   workarea/VGMFileListView.h)
 
+if(APPLE)
+  target_sources(vgmtrans PRIVATE util/Helpers_mac.mm)
+endif()
+
 target_include_directories(vgmtrans PRIVATE . ./util ./widgets ./workarea)
 
 target_link_libraries(
