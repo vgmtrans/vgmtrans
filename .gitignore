@@ -208,3 +208,9 @@ compile_commands.json
 # Python environment
 .venv/
 __pycache__/
+
+# Miscellaneous, development-specific files
+junk/
+*.mid
+*.dls
+*.sf2
