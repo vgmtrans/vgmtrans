@@ -8,6 +8,7 @@
 #include <algorithm>
 #include <array>
 #include <cstddef>
+#include <unordered_set>
 
 #include "bass.h"
 #include "bassmidi.h"
@@ -81,6 +82,7 @@ static constexpr BASS_FILEPROCS memory_file_callbacks{MemFile::mem_close, MemFil
 static constexpr auto TICK_POLL_INTERVAL_MS = 1000/60;
 static constexpr float PREVIEW_BUFFER_SECONDS = 0.1f;
 static constexpr DWORD INVALID_MIDI_EVENT_VALUE = static_cast<DWORD>(-1);
+static constexpr DWORD DEFAULT_MIDI_MASTER_VOLUME = 0x3FFF;
 static constexpr std::array<DWORD, 31> PREVIEW_CHANNEL_STATE_EVENTS = {
     MIDI_EVENT_BANK,      MIDI_EVENT_BANK_LSB,  MIDI_EVENT_DRUMS,      MIDI_EVENT_PROGRAM,
     MIDI_EVENT_MODULATION, MIDI_EVENT_MODRANGE, MIDI_EVENT_VOLUME,     MIDI_EVENT_PAN,
@@ -174,12 +176,39 @@ bool SequencePlayer::previewNotesAtTick(const std::vector<PreviewNote>& notes, u
     return true;
   }
 
-  std::array<bool, 128> syncedChannels{};
+  std::vector<PreviewNote> validNotes;
+  validNotes.reserve(notes.size());
+  std::unordered_set<uint16_t> seenChannelAndKeys;
+  seenChannelAndKeys.reserve(notes.size() * 2 + 1);
   for (const auto& note : notes) {
-    if (note.channel >= 128 || syncedChannels[note.channel]) {
+    if (note.channel >= 128 || note.key >= 128 || note.velocity == 0) {
       continue;
     }
-    if (!syncPreviewChannelState(note.channel, tick)) {
+
+    const uint16_t channelAndKey =
+        static_cast<uint16_t>((static_cast<uint16_t>(note.channel) << 8) | note.key);
+    if (!seenChannelAndKeys.emplace(channelAndKey).second) {
+      continue;
+    }
+    validNotes.push_back(note);
+  }
+
+  if (validNotes.empty()) {
+    return false;
+  }
+
+  // Snap the decode-only state stream once, then copy state into the live preview stream.
+  if (!syncPreviewStateAtTick(tick)) {
+    return false;
+  }
+  syncPreviewGlobalState();
+
+  std::array<bool, 128> syncedChannels{};
+  for (const auto& note : validNotes) {
+    if (syncedChannels[note.channel]) {
+      continue;
+    }
+    if (!syncPreviewChannelState(note.channel)) {
       return false;
     }
     syncedChannels[note.channel] = true;
@@ -187,11 +216,8 @@ bool SequencePlayer::previewNotesAtTick(const std::vector<PreviewNote>& notes, u
   BASS_ChannelPlay(m_preview_note_stream, false);
 
   m_previewActiveNotes.clear();
-  m_previewActiveNotes.reserve(notes.size());
-  for (const auto& note : notes) {
-    if (note.channel >= 128 || note.key >= 128 || note.velocity == 0) {
-      continue;
-    }
+  m_previewActiveNotes.reserve(validNotes.size());
+  for (const auto& note : validNotes) {
     const DWORD packed = static_cast<DWORD>(note.key) | (static_cast<DWORD>(note.velocity) << 8);
     if (!BASS_MIDI_StreamEvent(m_preview_note_stream, note.channel, MIDI_EVENT_NOTE, packed)) {
       continue;
@@ -295,7 +321,7 @@ void SequencePlayer::releasePreviewStreams() {
   }
 }
 
-bool SequencePlayer::syncPreviewChannelState(uint8_t channel, uint32_t tick) {
+bool SequencePlayer::syncPreviewStateAtTick(uint32_t tick) {
   if (!m_preview_note_stream || !m_preview_state_stream) {
     return false;
   }
@@ -313,20 +339,31 @@ bool SequencePlayer::syncPreviewChannelState(uint8_t channel, uint32_t tick) {
     return false;
   }
 
-  // Clear previous preview state on this channel so missing events fall back to defaults.
-  BASS_MIDI_StreamEvent(m_preview_note_stream, channel, MIDI_EVENT_RESET, 0);
-  BASS_MIDI_StreamEvent(m_preview_note_stream, channel, MIDI_EVENT_SOUNDOFF, 0);
+  return true;
+}
 
+void SequencePlayer::syncPreviewGlobalState() {
   // Apply current global output gain so preview loudness matches playback.
   float volume = 1.0f;
   if (BASS_ChannelGetAttribute(m_active_stream, BASS_ATTRIB_VOL, &volume)) {
     BASS_ChannelSetAttribute(m_preview_note_stream, BASS_ATTRIB_VOL, volume);
   }
 
-  const DWORD masterVolume = BASS_MIDI_StreamGetEvent(m_preview_state_stream, 0, MIDI_EVENT_MASTERVOL);
-  if (masterVolume != INVALID_MIDI_EVENT_VALUE) {
-    BASS_MIDI_StreamEvent(m_preview_note_stream, 0, MIDI_EVENT_MASTERVOL, masterVolume);
+  DWORD masterVolume = BASS_MIDI_StreamGetEvent(m_preview_state_stream, 0, MIDI_EVENT_MASTERVOL);
+  if (masterVolume == INVALID_MIDI_EVENT_VALUE) {
+    masterVolume = DEFAULT_MIDI_MASTER_VOLUME;
   }
+  BASS_MIDI_StreamEvent(m_preview_note_stream, 0, MIDI_EVENT_MASTERVOL, masterVolume);
+}
+
+bool SequencePlayer::syncPreviewChannelState(uint8_t channel) {
+  if (!m_preview_note_stream || !m_preview_state_stream) {
+    return false;
+  }
+
+  // Clear previous preview state on this channel so missing events fall back to defaults.
+  BASS_MIDI_StreamEvent(m_preview_note_stream, channel, MIDI_EVENT_RESET, 0);
+  BASS_MIDI_StreamEvent(m_preview_note_stream, channel, MIDI_EVENT_SOUNDOFF, 0);
 
   for (const DWORD eventType : PREVIEW_CHANNEL_STATE_EVENTS) {
     const DWORD param = BASS_MIDI_StreamGetEvent(m_preview_state_stream, channel, eventType);

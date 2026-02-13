@@ -66,8 +66,8 @@ public:
 signals:
   void selectionChanged(VGMItem* item);
   void seekToEventRequested(VGMItem* item);
-  void modifierNotePreviewRequested(VGMItem* item, bool includeActiveNotesAtTick);
-  void modifierNotePreviewStopped();
+  void notePreviewRequested(VGMItem* item, bool includeActiveNotesAtTick);
+  void notePreviewStopped();
 
 protected:
   bool viewportEvent(QEvent* event) override;
@@ -148,7 +148,7 @@ private:
   void updateHighlightState(bool animateSelection);
   void showTooltip(VGMItem* item, const QPoint& pos);
   void hideTooltip();
-  void stopModifierNotePreview();
+  void stopNotePreview();
 
   VGMFile* m_vgmfile = nullptr;
   // Interaction state.
