@@ -28,6 +28,7 @@
 #include "VGMFileTreeView.h"
 #include "VGMColl.h"
 #include "VGMSeq.h"
+#include "ScaleConversion.h"
 #include "activenoteview/ActiveNoteView.h"
 #include "hexview/HexView.h"
 #include "pianorollview/PianoRollView.h"
@@ -490,6 +491,11 @@ void VGMFileView::previewModifierNoteForEvent(VGMItem* item, bool includeActiveN
       velocity = durNote->vel;
     } else {
       return false;
+    }
+
+    // Match the same velocity scaling used during MIDI conversion.
+    if (seqEvent->parentTrack && seqEvent->parentTrack->usesLinearAmplitudeScale()) {
+      velocity = convert7bitPercentAmpToStdMidiVal(velocity);
     }
 
     const uint16_t channelAndKey =
