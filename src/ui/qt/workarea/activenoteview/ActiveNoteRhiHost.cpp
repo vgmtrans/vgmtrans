@@ -8,11 +8,14 @@
 
 #include "ActiveNoteRhiRenderer.h"
 #include "ActiveNoteView.h"
+#include "workarea/rhi/RhiWindowMainWindowLocator.h"
+#include "workarea/rhi/SimpleRhiWindow.h"
 
 #if defined(Q_OS_LINUX)
 #include "ActiveNoteRhiWidget.h"
 #else
 #include "ActiveNoteRhiWindow.h"
+#include "MainWindow.h"
 #endif
 
 #include <QResizeEvent>
@@ -31,6 +34,15 @@ ActiveNoteRhiHost::ActiveNoteRhiHost(ActiveNoteView* view, QWidget* parent)
   auto* window = new ActiveNoteRhiWindow(view, m_renderer.get());
   m_window = window;
   m_surface = QWidget::createWindowContainer(window, this);
+
+  if (auto* mainWindow = QtUi::findMainWindowForWidget(this)) {
+    connect(window, &SimpleRhiWindow::dragOverlayShowRequested,
+            mainWindow, &MainWindow::showDragOverlay);
+    connect(window, &SimpleRhiWindow::dragOverlayHideRequested,
+            mainWindow, &MainWindow::hideDragOverlay);
+    connect(window, &SimpleRhiWindow::dropUrlsRequested,
+            mainWindow, &MainWindow::handleDroppedUrls);
+  }
 #endif
 
   if (m_surface) {

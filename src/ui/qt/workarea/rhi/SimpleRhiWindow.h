@@ -6,7 +6,9 @@
 
 #pragma once
 
+#include <QList>
 #include <QSize>
+#include <QUrl>
 #include <QWindow>
 
 #include <memory>
@@ -22,9 +24,16 @@ class QRhiRenderTarget;
 class QRhiSwapChain;
 
 class SimpleRhiWindow : public QWindow {
+  Q_OBJECT
+
 public:
   SimpleRhiWindow();
   ~SimpleRhiWindow() override;
+
+signals:
+  void dragOverlayShowRequested();
+  void dragOverlayHideRequested();
+  void dropUrlsRequested(const QList<QUrl>& urls);
 
 protected:
   bool event(QEvent* e) override;
