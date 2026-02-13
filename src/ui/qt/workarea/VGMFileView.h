@@ -25,6 +25,7 @@ class SnappingSplitter;
 class VGMFile;
 class VGMSeq;
 class SeqTrack;
+class MidiTrack;
 class HexView;
 class VGMFileTreeView;
 class ActiveNoteView;
@@ -83,6 +84,8 @@ private:
 
   void clearPlaybackVisuals();
   void ensureTrackIndexMap(VGMSeq* seq);
+  [[nodiscard]] int trackIndexForEvent(const SeqEvent* event) const;
+  [[nodiscard]] int effectiveTrackCountForSeq(VGMSeq* seq) const;
   static int noteKeyForEvent(const SeqEvent* event);
 
   PanelUi& panel(PanelSide side) { return m_panels[static_cast<size_t>(side)]; }
@@ -104,6 +107,7 @@ private:
   std::unique_ptr<SeqEventTimeIndex::Cursor> m_playbackCursor;
   VGMSeq* m_trackIndexSeq = nullptr;
   std::unordered_map<const SeqTrack*, int> m_trackIndexByPtr;
+  std::unordered_map<const MidiTrack*, int> m_trackIndexByMidiPtr;
 
 public slots:
   void onSelectionChange(VGMItem* item) const;
