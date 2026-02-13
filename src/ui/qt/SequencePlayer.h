@@ -7,6 +7,7 @@
 #pragma once
 
 #include <cstdint>
+#include <vector>
 
 #include <bass.h>
 #include <bassmidi.h>
@@ -49,7 +50,7 @@ public:
    * @param position relative to song start
    */
   void seek(int position, PositionChangeOrigin origin);
-  bool previewNoteOn(uint8_t channel, uint8_t key, uint8_t velocity);
+  bool previewNoteOn(uint8_t channel, uint8_t key, uint8_t velocity, uint32_t tick);
   void stopPreviewNote();
 
   /**
@@ -96,14 +97,16 @@ signals:
 private:
   SequencePlayer();
   bool loadCollection(const VGMColl *collection, bool startPlaying);
-  bool ensurePreviewStream();
-  void releasePreviewStream();
-  void syncPreviewChannelState(uint8_t channel);
+  bool ensurePreviewStreams();
+  void releasePreviewStreams();
+  bool syncPreviewChannelState(uint8_t channel, uint32_t tick);
 
   const VGMColl *m_active_vgmcoll{};
   HSTREAM m_active_stream{};
-  HSTREAM m_preview_stream{};
+  HSTREAM m_preview_note_stream{};
+  HSTREAM m_preview_state_stream{};
   HSOUNDFONT m_loaded_sf{};
+  std::vector<uint8_t> m_active_midi_data;
 
   QTimer *m_seekupdate_timer{};
   QString m_song_title{};
