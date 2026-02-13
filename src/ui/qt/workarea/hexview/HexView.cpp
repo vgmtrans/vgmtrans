@@ -1031,14 +1031,17 @@ void HexView::mousePressEvent(QMouseEvent* event) {
     }
     if (offset == -1) {
       selectionChanged(nullptr);
+      stopModifierNotePreview();
       return;
     }
 
     m_selectedOffset = offset;
     if (item == m_selectedItem) {
       selectionChanged(nullptr);
+      stopModifierNotePreview();
     } else {
       selectionChanged(item);
+      modifierNotePreviewRequested(item);
     }
     hideTooltip();
     m_isDragging = true;
@@ -1065,12 +1068,10 @@ void HexView::handleCoalescedMouseMove(const QPoint& pos,
                               Qt::KeyboardModifiers mods) {
   if (m_isDragging && buttons & Qt::LeftButton) {
     const int offset = getOffsetFromPoint(pos);
-    if (!mods.testFlag(HexViewInput::kModifier)) {
-      stopModifierNotePreview();
-    }
     if (offset == -1) {
       if (!mods.testFlag(HexViewInput::kModifier)) {
         selectionChanged(nullptr);
+        stopModifierNotePreview();
       } else {
         stopModifierNotePreview();
       }
@@ -1100,6 +1101,7 @@ void HexView::handleCoalescedMouseMove(const QPoint& pos,
     auto* item = m_vgmfile->getItemAtOffset(offset, false);
     if (item != m_selectedItem) {
       selectionChanged(item);
+      modifierNotePreviewRequested(item);
     }
     hideTooltip();
   }
