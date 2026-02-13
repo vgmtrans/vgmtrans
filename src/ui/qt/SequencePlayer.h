@@ -6,6 +6,8 @@
 
 #pragma once
 
+#include <cstdint>
+
 #include <bass.h>
 #include <bassmidi.h>
 #include <QObject>
@@ -47,6 +49,8 @@ public:
    * @param position relative to song start
    */
   void seek(int position, PositionChangeOrigin origin);
+  bool previewNoteOn(uint8_t channel, uint8_t key, uint8_t velocity);
+  void stopPreviewNote();
 
   /**
    * Checks whether the player is playing
@@ -99,4 +103,7 @@ private:
 
   QTimer *m_seekupdate_timer{};
   QString m_song_title{};
+  bool m_previewNoteActive = false;
+  uint8_t m_previewNoteChannel = 0;
+  uint8_t m_previewNoteKey = 0;
 };
