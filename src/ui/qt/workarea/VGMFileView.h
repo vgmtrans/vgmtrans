@@ -114,7 +114,7 @@ public slots:
   void onSelectionChange(VGMItem* item) const;
   void onSelectionSetChange(const std::vector<VGMItem*>& items, VGMItem* primaryItem) const;
   void seekToEvent(VGMItem* item) const;
-  void previewModifierNoteForEvent(VGMItem* item) const;
+  void previewModifierNoteForEvent(VGMItem* item, bool includeActiveNotesAtTick) const;
   void stopModifierNotePreview() const;
   void onPlaybackPositionChanged(int current, int max, PositionChangeOrigin origin);
   void onPlayerStatusChanged(bool playing);

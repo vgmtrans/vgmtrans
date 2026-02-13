@@ -66,7 +66,7 @@ public:
 signals:
   void selectionChanged(VGMItem* item);
   void seekToEventRequested(VGMItem* item);
-  void modifierNotePreviewRequested(VGMItem* item);
+  void modifierNotePreviewRequested(VGMItem* item, bool includeActiveNotesAtTick);
   void modifierNotePreviewStopped();
 
 protected:
