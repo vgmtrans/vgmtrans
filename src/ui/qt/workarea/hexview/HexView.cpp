@@ -1002,9 +1002,11 @@ void HexView::handleSeekPress(VGMItem* item, const QPoint& pos) {
     if (item != m_lastSeekItem) {
       m_lastSeekItem = item;
       seekToEventRequested(item);
+      modifierNotePreviewRequested(item);
     }
     showTooltip(item, pos);
   } else {
+    stopModifierNotePreview();
     hideTooltip();
   }
 }
@@ -1030,13 +1032,19 @@ void HexView::handleSeekScrubDrag(int offset) {
       if (item != m_lastSeekItem) {
         m_lastSeekItem = item;
         seekToEventRequested(item);
+        modifierNotePreviewRequested(item);
       }
+    } else {
+      stopModifierNotePreview();
     }
+  } else {
+    stopModifierNotePreview();
   }
   hideTooltip();
 }
 
 void HexView::handleSelectionDrag(int offset) {
+
   if (offset == -1) {
     selectionChanged(nullptr);
     hideTooltip();
@@ -1083,6 +1091,7 @@ void HexView::mousePressEvent(QMouseEvent* event) {
 void HexView::mouseReleaseEvent(QMouseEvent* event) {
   if (event->button() == Qt::LeftButton) {
     m_isDragging = false;
+    stopModifierNotePreview();
     m_lastSeekItem = nullptr;
     const QPoint vp = viewport()->mapFromGlobal(QCursor::pos());
     handleTooltipHoverMove(vp, QApplication::keyboardModifiers());
@@ -1390,6 +1399,11 @@ void HexView::updateHighlightState(bool animateSelection) {
   setOverlayOpacity(OVERLAY_ALPHA_F);
   setShadowBlur(SHADOW_BLUR_RADIUS);
   setShadowOffset(QPointF(SHADOW_OFFSET_X, SHADOW_OFFSET_Y));
+}
+
+void HexView::stopModifierNotePreview() {
+  emit modifierNotePreviewStopped();
+  m_lastSeekItem = nullptr;
 }
 
 // Show rich HTML tooltip for a hovered item, avoiding redundant re-show for same item.

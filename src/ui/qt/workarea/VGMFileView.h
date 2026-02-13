@@ -87,6 +87,7 @@ private:
   [[nodiscard]] int trackIndexForEvent(const SeqEvent* event) const;
   [[nodiscard]] int effectiveTrackCountForSeq(VGMSeq* seq) const;
   static int noteKeyForEvent(const SeqEvent* event);
+  bool prepareSeqEventForPlayback(SeqEvent* event, uint32_t& tick) const;
 
   PanelUi& panel(PanelSide side) { return m_panels[static_cast<size_t>(side)]; }
   const PanelUi& panel(PanelSide side) const { return m_panels[static_cast<size_t>(side)]; }
@@ -113,6 +114,8 @@ public slots:
   void onSelectionChange(VGMItem* item) const;
   void onSelectionSetChange(const std::vector<VGMItem*>& items, VGMItem* primaryItem) const;
   void seekToEvent(VGMItem* item) const;
+  void previewModifierNoteForEvent(VGMItem* item) const;
+  void stopModifierNotePreview() const;
   void onPlaybackPositionChanged(int current, int max, PositionChangeOrigin origin);
   void onPlayerStatusChanged(bool playing);
   void resetHexViewFont();

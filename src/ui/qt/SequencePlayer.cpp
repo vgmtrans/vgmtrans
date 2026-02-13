@@ -123,6 +123,8 @@ void SequencePlayer::toggle() {
 }
 
 void SequencePlayer::stop() {
+  stopPreviewNote();
+
   /* Stop polling seekbar, reset it, propagate that we're done */
   playbackPositionChanged(0, 1, PositionChangeOrigin::Playback);
 
@@ -140,8 +142,43 @@ void SequencePlayer::stop() {
 }
 
 void SequencePlayer::seek(int position, PositionChangeOrigin origin) {
+  stopPreviewNote();
   BASS_ChannelSetPosition(m_active_stream, position, BASS_POS_MIDI_TICK);
   playbackPositionChanged(position, totalTicks(), origin);
+}
+
+bool SequencePlayer::previewNoteOn(uint8_t channel, uint8_t key, uint8_t velocity) {
+  if (!m_active_stream) {
+    return false;
+  }
+
+  stopPreviewNote();
+
+  const DWORD packed = static_cast<DWORD>(key) | (static_cast<DWORD>(velocity) << 8);
+  if (!BASS_MIDI_StreamEvent(m_active_stream, channel, MIDI_EVENT_NOTE, packed)) {
+    return false;
+  }
+
+  m_previewNoteActive = true;
+  m_previewNoteChannel = channel;
+  m_previewNoteKey = key;
+  return true;
+}
+
+void SequencePlayer::stopPreviewNote() {
+  if (!m_previewNoteActive) {
+    return;
+  }
+
+  if (m_active_stream) {
+    // NOTE event with velocity 0 is interpreted as Note Off for this key.
+    const DWORD noteOffParam = static_cast<DWORD>(m_previewNoteKey);
+    BASS_MIDI_StreamEvent(m_active_stream, m_previewNoteChannel, MIDI_EVENT_NOTE, noteOffParam);
+  }
+
+  m_previewNoteActive = false;
+  m_previewNoteChannel = 0;
+  m_previewNoteKey = 0;
 }
 
 bool SequencePlayer::playing() const {
