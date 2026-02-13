@@ -6,6 +6,7 @@
 
 #include "SequencePlayer.h"
 #include <algorithm>
+#include <array>
 #include <cstddef>
 
 #include "bass.h"
@@ -79,20 +80,17 @@ static constexpr BASS_FILEPROCS memory_file_callbacks{MemFile::mem_close, MemFil
 /* How often (in ms) the current ticks are polled */
 static constexpr auto TICK_POLL_INTERVAL_MS = 1000/60;
 static constexpr float PREVIEW_BUFFER_SECONDS = 0.1f;
-static constexpr QWORD INVALID_MIDI_TICK = static_cast<QWORD>(-1);
-
-static BOOL CALLBACK suppressPreviewPlaybackEvents(HSTREAM,
-                                                   int,
-                                                   BASS_MIDI_EVENT*,
-                                                   BOOL seeking,
-                                                   void*) {
-  // Keep all events while seeking so channel/program/controller state is reconstructed.
-  if (seeking) {
-    return true;
-  }
-  // Drop all timeline-driven events during playback; preview notes are injected manually.
-  return false;
-}
+static constexpr DWORD INVALID_MIDI_EVENT_VALUE = static_cast<DWORD>(-1);
+static constexpr std::array<DWORD, 32> PREVIEW_CHANNEL_STATE_EVENTS = {
+    MIDI_EVENT_SYSTEM,    MIDI_EVENT_BANK,      MIDI_EVENT_BANK_LSB, MIDI_EVENT_DRUMS,
+    MIDI_EVENT_PROGRAM,   MIDI_EVENT_MODULATION, MIDI_EVENT_MODRANGE, MIDI_EVENT_VOLUME,
+    MIDI_EVENT_PAN,       MIDI_EVENT_EXPRESSION, MIDI_EVENT_PITCHRANGE, MIDI_EVENT_PITCH,
+    MIDI_EVENT_CHANPRES,  MIDI_EVENT_SUSTAIN,   MIDI_EVENT_SOSTENUTO, MIDI_EVENT_SOFT,
+    MIDI_EVENT_PORTAMENTO, MIDI_EVENT_PORTATIME, MIDI_EVENT_PORTANOTE, MIDI_EVENT_REVERB,
+    MIDI_EVENT_CHORUS,    MIDI_EVENT_CUTOFF,    MIDI_EVENT_RESONANCE, MIDI_EVENT_ATTACK,
+    MIDI_EVENT_DECAY,     MIDI_EVENT_RELEASE,   MIDI_EVENT_FINETUNE,  MIDI_EVENT_COARSETUNE,
+    MIDI_EVENT_VIBRATO_RATE, MIDI_EVENT_VIBRATO_DEPTH, MIDI_EVENT_VIBRATO_DELAY,
+    MIDI_EVENT_MOD_PITCH};
 
 SequencePlayer::SequencePlayer() {
   /* Use the system default output device.
@@ -151,7 +149,6 @@ void SequencePlayer::stop() {
   m_loaded_sf = 0;
   BASS_StreamFree(m_active_stream);
   m_active_stream = 0;
-  m_active_midi_data.clear();
   m_active_vgmcoll = nullptr;
 
   statusChange(false);
@@ -169,19 +166,7 @@ bool SequencePlayer::previewNoteOn(uint8_t channel, uint8_t key, uint8_t velocit
   }
 
   stopPreviewNote();
-
-  const QWORD activeTick = BASS_ChannelGetPosition(m_active_stream, BASS_POS_MIDI_TICK);
-  if (activeTick == INVALID_MIDI_TICK) {
-    return false;
-  }
-  if (!BASS_ChannelSetPosition(m_preview_stream, activeTick, BASS_POS_MIDI_TICK)) {
-    return false;
-  }
-
-  float volume = 1.0f;
-  if (BASS_ChannelGetAttribute(m_active_stream, BASS_ATTRIB_VOL, &volume)) {
-    BASS_ChannelSetAttribute(m_preview_stream, BASS_ATTRIB_VOL, volume);
-  }
+  syncPreviewChannelState(channel);
   BASS_ChannelPlay(m_preview_stream, false);
 
   const DWORD packed = static_cast<DWORD>(key) | (static_cast<DWORD>(velocity) << 8);
@@ -204,7 +189,6 @@ void SequencePlayer::stopPreviewNote() {
     // NOTE event with velocity 0 is interpreted as Note Off for this key.
     const DWORD noteOffParam = static_cast<DWORD>(m_previewNoteKey);
     BASS_MIDI_StreamEvent(m_preview_stream, m_previewNoteChannel, MIDI_EVENT_NOTE, noteOffParam);
-    BASS_ChannelPause(m_preview_stream);
   }
 
   m_previewNoteActive = false;
@@ -216,12 +200,11 @@ bool SequencePlayer::ensurePreviewStream() {
   if (m_preview_stream) {
     return true;
   }
-  if (!m_loaded_sf || m_active_midi_data.empty()) {
+  if (!m_loaded_sf) {
     return false;
   }
 
-  HSTREAM previewStream = BASS_MIDI_StreamCreateFile(
-      true, m_active_midi_data.data(), 0, m_active_midi_data.size(), BASS_MIDI_DECAYEND, 0);
+  HSTREAM previewStream = BASS_MIDI_StreamCreate(128, BASS_MIDI_DECAYEND, 0);
   if (!previewStream) {
     return false;
   }
@@ -238,10 +221,7 @@ bool SequencePlayer::ensurePreviewStream() {
   BASS_ChannelSetAttribute(previewStream, BASS_ATTRIB_MIDI_CHANS, 128);
   BASS_ChannelFlags(previewStream, 0, BASS_MIDI_NOFX);
   BASS_ChannelSetAttribute(previewStream, BASS_ATTRIB_BUFFER, PREVIEW_BUFFER_SECONDS);
-  if (!BASS_MIDI_StreamSetFilter(previewStream, false, suppressPreviewPlaybackEvents, nullptr)) {
-    BASS_StreamFree(previewStream);
-    return false;
-  }
+  BASS_ChannelPlay(previewStream, false);
 
   m_preview_stream = previewStream;
   return true;
@@ -256,6 +236,36 @@ void SequencePlayer::releasePreviewStream() {
 
   BASS_StreamFree(m_preview_stream);
   m_preview_stream = 0;
+}
+
+void SequencePlayer::syncPreviewChannelState(uint8_t channel) {
+  if (!m_active_stream || !m_preview_stream) {
+    return;
+  }
+
+  // Flush pending state updates on the paused main stream before querying channel state.
+  BASS_ChannelUpdate(m_active_stream, 0);
+
+  BASS_MIDI_StreamEvent(m_preview_stream, channel, MIDI_EVENT_SOUNDOFF, 0);
+
+  // Apply current global output gain so preview loudness matches playback.
+  float volume = 1.0f;
+  if (BASS_ChannelGetAttribute(m_active_stream, BASS_ATTRIB_VOL, &volume)) {
+    BASS_ChannelSetAttribute(m_preview_stream, BASS_ATTRIB_VOL, volume);
+  }
+
+  const DWORD masterVolume = BASS_MIDI_StreamGetEvent(m_active_stream, 0, MIDI_EVENT_MASTERVOL);
+  if (masterVolume != INVALID_MIDI_EVENT_VALUE) {
+    BASS_MIDI_StreamEvent(m_preview_stream, 0, MIDI_EVENT_MASTERVOL, masterVolume);
+  }
+
+  for (const DWORD eventType : PREVIEW_CHANNEL_STATE_EVENTS) {
+    const DWORD param = BASS_MIDI_StreamGetEvent(m_active_stream, channel, eventType);
+    if (param == INVALID_MIDI_EVENT_VALUE) {
+      continue;
+    }
+    BASS_MIDI_StreamEvent(m_preview_stream, channel, eventType, param);
+  }
 }
 
 bool SequencePlayer::playing() const {
@@ -365,7 +375,6 @@ bool SequencePlayer::loadCollection(const VGMColl *coll, bool startPlaying) {
   m_active_vgmcoll = coll;
   m_active_stream = midi_stream;
   m_loaded_sf = sf2_handle;
-  m_active_midi_data = std::move(raw_midi);
   m_song_title = QString::fromStdString(m_active_vgmcoll->name());
   if (startPlaying) {
     toggle();
