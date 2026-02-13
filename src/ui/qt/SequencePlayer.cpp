@@ -6,7 +6,6 @@
 
 #include "SequencePlayer.h"
 #include <algorithm>
-#include <array>
 #include <cstddef>
 
 #include "bass.h"
@@ -79,16 +78,8 @@ static constexpr BASS_FILEPROCS memory_file_callbacks{MemFile::mem_close, MemFil
                                                       MemFile::mem_read, MemFile::mem_seek};
 /* How often (in ms) the current ticks are polled */
 static constexpr auto TICK_POLL_INTERVAL_MS = 1000/60;
-static constexpr float PREVIEW_BUFFER_SECONDS = 0.01f;
-static constexpr DWORD INVALID_MIDI_EVENT_VALUE = static_cast<DWORD>(-1);
-static constexpr std::array<DWORD, 26> PREVIEW_CHANNEL_STATE_EVENTS = {
-    MIDI_EVENT_BANK,      MIDI_EVENT_BANK_LSB, MIDI_EVENT_DRUMS,   MIDI_EVENT_PROGRAM,
-    MIDI_EVENT_MODULATION, MIDI_EVENT_VOLUME,   MIDI_EVENT_PAN,     MIDI_EVENT_EXPRESSION,
-    MIDI_EVENT_SUSTAIN,   MIDI_EVENT_SOSTENUTO, MIDI_EVENT_SOFT,    MIDI_EVENT_PORTAMENTO,
-    MIDI_EVENT_PORTATIME, MIDI_EVENT_PORTANOTE, MIDI_EVENT_PITCHRANGE, MIDI_EVENT_PITCH,
-    MIDI_EVENT_REVERB,    MIDI_EVENT_CHORUS,   MIDI_EVENT_CUTOFF,  MIDI_EVENT_RESONANCE,
-    MIDI_EVENT_ATTACK,    MIDI_EVENT_DECAY,    MIDI_EVENT_RELEASE, MIDI_EVENT_FINETUNE,
-    MIDI_EVENT_COARSETUNE, MIDI_EVENT_CHANPRES};
+static constexpr float PREVIEW_BUFFER_SECONDS = 0.1f;
+static constexpr QWORD INVALID_MIDI_TICK = static_cast<QWORD>(-1);
 
 SequencePlayer::SequencePlayer() {
   /* Use the system default output device.
@@ -147,6 +138,7 @@ void SequencePlayer::stop() {
   m_loaded_sf = 0;
   BASS_StreamFree(m_active_stream);
   m_active_stream = 0;
+  m_active_midi_data.clear();
   m_active_vgmcoll = nullptr;
 
   statusChange(false);
@@ -164,7 +156,19 @@ bool SequencePlayer::previewNoteOn(uint8_t channel, uint8_t key, uint8_t velocit
   }
 
   stopPreviewNote();
-  syncPreviewChannelState(channel);
+
+  const QWORD activeTick = BASS_ChannelGetPosition(m_active_stream, BASS_POS_MIDI_TICK);
+  if (activeTick == INVALID_MIDI_TICK) {
+    return false;
+  }
+  if (!BASS_ChannelSetPosition(m_preview_stream, activeTick, BASS_POS_MIDI_TICK)) {
+    return false;
+  }
+
+  float volume = 1.0f;
+  if (BASS_ChannelGetAttribute(m_active_stream, BASS_ATTRIB_VOL, &volume)) {
+    BASS_ChannelSetAttribute(m_preview_stream, BASS_ATTRIB_VOL, volume);
+  }
   BASS_ChannelPlay(m_preview_stream, false);
 
   const DWORD packed = static_cast<DWORD>(key) | (static_cast<DWORD>(velocity) << 8);
@@ -198,11 +202,12 @@ bool SequencePlayer::ensurePreviewStream() {
   if (m_preview_stream) {
     return true;
   }
-  if (!m_loaded_sf) {
+  if (!m_loaded_sf || m_active_midi_data.empty()) {
     return false;
   }
 
-  HSTREAM previewStream = BASS_MIDI_StreamCreate(128, BASS_MIDI_DECAYEND, 0);
+  HSTREAM previewStream = BASS_MIDI_StreamCreateFile(
+      true, m_active_midi_data.data(), 0, m_active_midi_data.size(), BASS_MIDI_DECAYEND, 0);
   if (!previewStream) {
     return false;
   }
@@ -237,21 +242,6 @@ void SequencePlayer::releasePreviewStream() {
 
   BASS_StreamFree(m_preview_stream);
   m_preview_stream = 0;
-}
-
-void SequencePlayer::syncPreviewChannelState(uint8_t channel) const {
-  if (!m_active_stream || !m_preview_stream) {
-    return;
-  }
-
-  BASS_MIDI_StreamEvent(m_preview_stream, channel, MIDI_EVENT_NOTESOFF, 0);
-  for (const DWORD eventType : PREVIEW_CHANNEL_STATE_EVENTS) {
-    const DWORD param = BASS_MIDI_StreamGetEvent(m_active_stream, channel, eventType);
-    if (param == INVALID_MIDI_EVENT_VALUE) {
-      continue;
-    }
-    BASS_MIDI_StreamEvent(m_preview_stream, channel, eventType, param);
-  }
 }
 
 bool SequencePlayer::playing() const {
@@ -361,6 +351,7 @@ bool SequencePlayer::loadCollection(const VGMColl *coll, bool startPlaying) {
   m_active_vgmcoll = coll;
   m_active_stream = midi_stream;
   m_loaded_sf = sf2_handle;
+  m_active_midi_data = std::move(raw_midi);
   m_song_title = QString::fromStdString(m_active_vgmcoll->name());
   if (startPlaying) {
     toggle();
