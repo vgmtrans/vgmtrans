@@ -8,11 +8,14 @@
 
 #include "PianoRollRhiRenderer.h"
 #include "PianoRollView.h"
+#include "workarea/rhi/RhiWindowMainWindowLocator.h"
+#include "workarea/rhi/SimpleRhiWindow.h"
 
 #if defined(Q_OS_LINUX)
 #include "PianoRollRhiWidget.h"
 #else
 #include "PianoRollRhiWindow.h"
+#include "MainWindow.h"
 #endif
 
 #include <QResizeEvent>
@@ -34,6 +37,15 @@ PianoRollRhiHost::PianoRollRhiHost(PianoRollView* view, QWidget* parent)
   auto* window = new PianoRollRhiWindow(view, m_renderer.get());
   m_window = window;
   m_surface = QWidget::createWindowContainer(window, this);
+
+  if (auto* mainWindow = QtUi::findMainWindowForWidget(this)) {
+    connect(window, &SimpleRhiWindow::dragOverlayShowRequested,
+            mainWindow, &MainWindow::showDragOverlay);
+    connect(window, &SimpleRhiWindow::dragOverlayHideRequested,
+            mainWindow, &MainWindow::hideDragOverlay);
+    connect(window, &SimpleRhiWindow::dropUrlsRequested,
+            mainWindow, &MainWindow::handleDroppedUrls);
+  }
 #endif
 
   if (m_surface) {
