@@ -79,6 +79,10 @@ VGMFileView::VGMFileView(VGMFile* vgmfile)
 
     connect(panelUi.hexView, &HexView::selectionChanged, this, &VGMFileView::onSelectionChange);
     connect(panelUi.hexView, &HexView::seekToEventRequested, this, &VGMFileView::seekToEvent);
+    connect(panelUi.hexView, &HexView::modifierNotePreviewRequested, this,
+            &VGMFileView::previewModifierNoteForEvent);
+    connect(panelUi.hexView, &HexView::modifierNotePreviewStopped, this,
+            &VGMFileView::stopModifierNotePreview);
     connect(panelUi.pianoRollView, &PianoRollView::selectionSetChanged, this, &VGMFileView::onSelectionSetChange);
 
     connect(panelUi.treeView, &VGMFileTreeView::currentItemChanged,
@@ -417,29 +421,68 @@ void VGMFileView::onSelectionSetChange(const std::vector<VGMItem*>& items, VGMIt
   }
 }
 
-void VGMFileView::seekToEvent(VGMItem* item) const {
-  auto* event = dynamic_cast<SeqEvent*>(item);
+bool VGMFileView::prepareSeqEventForPlayback(SeqEvent* event, uint32_t& tick) const {
   if (!event || !event->parentTrack || !event->parentTrack->parentSeq) {
-    return;
+    return false;
   }
   if (!m_vgmfile->assocColls.empty()) {
     auto* assocColl = m_vgmfile->assocColls.front();
-    if (SequencePlayer::the().activeCollection() != assocColl) {
-      auto& seqPlayer = SequencePlayer::the();
+    auto& seqPlayer = SequencePlayer::the();
+    if (seqPlayer.activeCollection() != assocColl) {
       seqPlayer.setActiveCollection(assocColl);
+    }
+    if (seqPlayer.activeCollection() != assocColl) {
+      return false;
     }
   }
 
   const auto& timeline = event->parentTrack->parentSeq->timedEventIndex();
   if (!timeline.finalized()) {
-    return;
+    return false;
   }
-  uint32_t tick = 0;
   if (!timeline.firstStartTick(event, tick)) {
+    return false;
+  }
+
+  return true;
+}
+
+void VGMFileView::seekToEvent(VGMItem* item) const {
+  auto* event = dynamic_cast<SeqEvent*>(item);
+  uint32_t tick = 0;
+  if (!prepareSeqEventForPlayback(event, tick)) {
     return;
   }
 
   SequencePlayer::the().seek(static_cast<int>(tick), PositionChangeOrigin::HexView);
+}
+
+void VGMFileView::previewModifierNoteForEvent(VGMItem* item) const {
+  auto* event = dynamic_cast<SeqEvent*>(item);
+  uint32_t ignoredTick = 0;
+  if (!prepareSeqEventForPlayback(event, ignoredTick)) {
+    SequencePlayer::the().stopPreviewNote();
+    return;
+  }
+
+  uint8_t key = 0;
+  uint8_t velocity = 0;
+  if (const auto* noteOn = dynamic_cast<const NoteOnSeqEvent*>(event)) {
+    key = noteOn->absKey;
+    velocity = noteOn->vel;
+  } else if (const auto* durNote = dynamic_cast<const DurNoteSeqEvent*>(event)) {
+    key = durNote->absKey;
+    velocity = durNote->vel;
+  } else {
+    SequencePlayer::the().stopPreviewNote();
+    return;
+  }
+
+  SequencePlayer::the().previewNoteOn(event->channel, key, velocity);
+}
+
+void VGMFileView::stopModifierNotePreview() const {
+  SequencePlayer::the().stopPreviewNote();
 }
 
 void VGMFileView::clearPlaybackVisuals() {
