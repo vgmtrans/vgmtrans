@@ -81,6 +81,19 @@ static constexpr auto TICK_POLL_INTERVAL_MS = 1000/60;
 static constexpr float PREVIEW_BUFFER_SECONDS = 0.1f;
 static constexpr QWORD INVALID_MIDI_TICK = static_cast<QWORD>(-1);
 
+static BOOL CALLBACK suppressPreviewPlaybackEvents(HSTREAM,
+                                                   int,
+                                                   BASS_MIDI_EVENT*,
+                                                   BOOL seeking,
+                                                   void*) {
+  // Keep all events while seeking so channel/program/controller state is reconstructed.
+  if (seeking) {
+    return true;
+  }
+  // Drop all timeline-driven events during playback; preview notes are injected manually.
+  return false;
+}
+
 SequencePlayer::SequencePlayer() {
   /* Use the system default output device.
    * The sample rate is actually only respected on Linux: on Windows and macOS, BASS will use the
@@ -191,6 +204,7 @@ void SequencePlayer::stopPreviewNote() {
     // NOTE event with velocity 0 is interpreted as Note Off for this key.
     const DWORD noteOffParam = static_cast<DWORD>(m_previewNoteKey);
     BASS_MIDI_StreamEvent(m_preview_stream, m_previewNoteChannel, MIDI_EVENT_NOTE, noteOffParam);
+    BASS_ChannelPause(m_preview_stream);
   }
 
   m_previewNoteActive = false;
@@ -224,7 +238,7 @@ bool SequencePlayer::ensurePreviewStream() {
   BASS_ChannelSetAttribute(previewStream, BASS_ATTRIB_MIDI_CHANS, 128);
   BASS_ChannelFlags(previewStream, 0, BASS_MIDI_NOFX);
   BASS_ChannelSetAttribute(previewStream, BASS_ATTRIB_BUFFER, PREVIEW_BUFFER_SECONDS);
-  if (!BASS_ChannelPlay(previewStream, false)) {
+  if (!BASS_MIDI_StreamSetFilter(previewStream, false, suppressPreviewPlaybackEvents, nullptr)) {
     BASS_StreamFree(previewStream);
     return false;
   }
