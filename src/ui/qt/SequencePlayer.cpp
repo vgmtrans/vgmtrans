@@ -281,7 +281,16 @@ bool SequencePlayer::syncPreviewChannelState(uint8_t channel, uint32_t tick) {
     return false;
   }
 
-  if (!BASS_ChannelSetPosition(m_preview_state_stream, tick, BASS_POS_MIDI_TICK)) {
+  // BASS_POS_MIDI_TICK positions to the state *before* that tick, so seek one tick ahead to
+  // include controller/program updates that happen at the same tick as the selected note.
+  QWORD seekTick = static_cast<QWORD>(tick) + 1;
+  const QWORD stateLength = BASS_ChannelGetLength(m_preview_state_stream, BASS_POS_MIDI_TICK);
+  if (stateLength != static_cast<QWORD>(-1) && seekTick > stateLength) {
+    seekTick = stateLength;
+  }
+
+  if (!BASS_ChannelSetPosition(m_preview_state_stream, seekTick, BASS_POS_MIDI_TICK) &&
+      !BASS_ChannelSetPosition(m_preview_state_stream, tick, BASS_POS_MIDI_TICK)) {
     return false;
   }
 
