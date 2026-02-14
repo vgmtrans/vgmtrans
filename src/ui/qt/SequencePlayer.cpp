@@ -80,7 +80,7 @@ static constexpr BASS_FILEPROCS memory_file_callbacks{MemFile::mem_close, MemFil
                                                       MemFile::mem_read, MemFile::mem_seek};
 /* How often (in ms) the current ticks are polled */
 static constexpr auto TICK_POLL_INTERVAL_MS = 1000/60;
-static constexpr float PREVIEW_BUFFER_SECONDS = 0.1f;
+static constexpr float PREVIEW_BUFFER_SECONDS = 0.15f;
 static constexpr DWORD INVALID_MIDI_EVENT_VALUE = static_cast<DWORD>(-1);
 static constexpr DWORD DEFAULT_MIDI_MASTER_VOLUME = 0x3FFF;
 static constexpr std::array<DWORD, 31> PREVIEW_CHANNEL_STATE_EVENTS = {
