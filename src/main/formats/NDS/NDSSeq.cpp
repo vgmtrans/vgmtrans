@@ -324,7 +324,7 @@ bool NDSTrack::readEvent(void) {
       case 0xD2: {
         uint8_t val = readByte(curOffset++);
         addGenericEvent(beginOffset, curOffset - beginOffset, "Sustain Level", "", Type::Unknown);
-        addControllerEventNoItem(79, val);
+        addControllerEventNoItem(79, 127 - val);
         break;
       }
 

@@ -248,7 +248,7 @@ void NDSInstr::getArticData(VGMRgn* rgn, uint32_t offset) const {
   rgn->addModulator({ModSource::CC(72), ModDest::VolRelease, 1200});
   rgn->addModulator({ModSource::CC(73), ModDest::VolAttack, 1200});
   rgn->addModulator({ModSource::CC(75), ModDest::VolDecay, 1200});
-  rgn->addModulator({ModSource::CC(79, ModSourceFlag::DirectionNegative), ModDest::VolSustain, 1440});
+  rgn->addModulator({ModSource::CC(79), ModDest::VolSustain, 1440});
   rgn->addModulator({ModSource::CC(91), ModDest::ReverbSend, 200});
 }
 
