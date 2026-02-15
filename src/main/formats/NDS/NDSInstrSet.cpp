@@ -594,7 +594,8 @@ std::vector<uint8_t> NDSPSGSamp::decodeToNativePcm() {
                                      });
 
       /* We have to go from F64 to S16 */
-      int16_t out_value = static_cast<int16_t>(std::round(value * 0x7FFF));
+      /* Scale by 2.0 to normalize range from [-0.5, 0.5] to [-1.0, 1.0] */
+      int16_t out_value = static_cast<int16_t>(std::clamp(std::round(value * 0x7FFF * 2.0), -32768.0, 32767.0));
       output[i] = out_value;
     }
   }
