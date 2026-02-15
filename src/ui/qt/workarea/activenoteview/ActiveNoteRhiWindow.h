@@ -18,6 +18,7 @@ public:
   ~ActiveNoteRhiWindow() override;
 
 protected:
+  bool handleWindowEvent(QEvent* e) override;
   void onRhiInitialized(QRhi* rhi) override;
   void onRhiReleased() override;
   void renderRhiFrame(QRhiCommandBuffer* cb,

@@ -11,6 +11,7 @@
 #include "ActiveNoteRhiRenderer.h"
 
 class QResizeEvent;
+class QMouseEvent;
 class ActiveNoteView;
 class ActiveNoteRhiRenderer;
 
@@ -26,7 +27,11 @@ protected:
   void render(QRhiCommandBuffer* cb) override;
   void releaseResources() override;
   void resizeEvent(QResizeEvent* event) override;
+  void mousePressEvent(QMouseEvent* event) override;
+  void mouseMoveEvent(QMouseEvent* event) override;
+  void mouseReleaseEvent(QMouseEvent* event) override;
 
 private:
+  ActiveNoteView* m_view = nullptr;
   ActiveNoteRhiRenderer* m_renderer = nullptr;
 };

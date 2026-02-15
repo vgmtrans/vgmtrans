@@ -38,6 +38,8 @@
 #include "SeqTrack.h"
 
 namespace {
+constexpr uint8_t kActiveNotePreviewVelocity = 100;
+
 QToolButton* createPanelButton(const QString& label, QWidget* parent) {
   auto* button = new QToolButton(parent);
   button->setText(label);
@@ -61,6 +63,26 @@ int previewMidiChannelForEvent(const SeqEvent* event) {
     return -1;
   }
   return channel;
+}
+
+int previewMidiChannelForTrack(const VGMSeq* seq, int trackIndex) {
+  if (trackIndex < 0) {
+    return -1;
+  }
+
+  if (seq && trackIndex < static_cast<int>(seq->aTracks.size())) {
+    if (const auto* track = seq->aTracks[static_cast<size_t>(trackIndex)]) {
+      const int channel = track->channel + (track->channelGroup * 16);
+      if (channel >= 0 && channel < 128) {
+        return channel;
+      }
+    }
+  }
+
+  if (trackIndex >= 0 && trackIndex < 128) {
+    return trackIndex;
+  }
+  return -1;
 }
 
 bool buildPreviewNoteForEvent(const SeqEvent* seqEvent, SequencePlayer::PreviewNote& outNote) {
@@ -132,6 +154,10 @@ VGMFileView::VGMFileView(VGMFile* vgmfile)
     connect(panelUi.hexView, &HexView::notePreviewRequested, this,
             &VGMFileView::previewNotesForEvent);
     connect(panelUi.hexView, &HexView::notePreviewStopped, this, &VGMFileView::stopNotePreview);
+    connect(panelUi.activeNoteView, &ActiveNoteView::notePreviewRequested, this,
+            &VGMFileView::previewActiveNote);
+    connect(panelUi.activeNoteView, &ActiveNoteView::notePreviewStopped, this,
+            &VGMFileView::stopActiveNotePreview);
     connect(panelUi.pianoRollView, &PianoRollView::selectionSetChanged, this, &VGMFileView::onSelectionSetChange);
 
     connect(panelUi.treeView, &VGMFileTreeView::currentItemChanged,
@@ -557,6 +583,47 @@ void VGMFileView::previewNotesForEvent(VGMItem* item, bool includeActiveNotesAtT
 }
 
 void VGMFileView::stopNotePreview() const {
+  SequencePlayer::the().stopPreviewNote();
+}
+
+void VGMFileView::previewActiveNote(int trackIndex, int key) const {
+  if (key < 0 || key >= 128) {
+    SequencePlayer::the().stopPreviewNote();
+    return;
+  }
+
+  auto* seq = dynamic_cast<VGMSeq*>(m_vgmfile);
+  if (!seq) {
+    SequencePlayer::the().stopPreviewNote();
+    return;
+  }
+
+  auto& seqPlayer = SequencePlayer::the();
+  if (!m_vgmfile->assocColls.empty()) {
+    auto* assocColl = m_vgmfile->assocColls.front();
+    if (seqPlayer.activeCollection() != assocColl) {
+      seqPlayer.setActiveCollection(assocColl);
+    }
+    if (seqPlayer.activeCollection() != assocColl) {
+      seqPlayer.stopPreviewNote();
+      return;
+    }
+  }
+
+  const int midiChannel = previewMidiChannelForTrack(seq, trackIndex);
+  if (midiChannel < 0) {
+    seqPlayer.stopPreviewNote();
+    return;
+  }
+
+  const int tick = std::max(0, seqPlayer.elapsedTicks());
+  seqPlayer.previewNoteOn(static_cast<uint8_t>(midiChannel),
+                          static_cast<uint8_t>(key),
+                          kActiveNotePreviewVelocity,
+                          static_cast<uint32_t>(tick));
+}
+
+void VGMFileView::stopActiveNotePreview() const {
   SequencePlayer::the().stopPreviewNote();
 }
 
