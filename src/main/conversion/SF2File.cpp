@@ -1,16 +1,17 @@
 /*
-* VGMTrans (c) 2002-2024
+ * VGMTrans (c) 2002-2026
  * Licensed under the zlib license,
  * refer to the included LICENSE.txt file
  */
-#include <cmath>
+
 #include "SF2File.h"
+#include <algorithm>
+#include <cmath>
+
 #include "version.h"
-#include "VGMInstrSet.h"
 #include "SynthFile.h"
 #include "ScaleConversion.h"
 #include "Root.h"
-#include "VGMRgn.h"
 
 SF2InfoListChunk::SF2InfoListChunk(const std::string& name)
     : LISTChunk("INFO") {
@@ -30,7 +31,6 @@ SF2InfoListChunk::SF2InfoListChunk(const std::string& name)
   addChildChunk(new SF2StringChunk("ICRD", std::string(c_time_string)));
   addChildChunk(new SF2StringChunk("ISFT", std::string("VGMTrans " + std::string(VGMTRANS_VERSION))));
 }
-
 
 //  *******
 //  SF2File
@@ -224,6 +224,7 @@ SF2File::SF2File(SynthFile *synthfile)
 
   rgnCounter = 0;
   int instGenCounter = 0;
+  int modCounter = 0;
   for (size_t i = 0; i < numInstrs; i++) {
     SynthInstr *instr = synthfile->vInstrs[i];
 
@@ -232,7 +233,8 @@ SF2File::SF2File(SynthFile *synthfile)
       sfInstBag instBag{};
       instBag.wInstGenNdx = instGenCounter;
       instGenCounter += numOfGeneratorsForRgn(instr->vRgns[j]);
-      instBag.wInstModNdx = 0;
+      instBag.wInstModNdx = modCounter;
+      modCounter += instr->vRgns[j]->modulators().size();
 
       memcpy(ibagCk->data + (rgnCounter++ * sizeof(sfInstBag)), &instBag, sizeof(sfInstBag));
     }
@@ -240,17 +242,170 @@ SF2File::SF2File(SynthFile *synthfile)
   //  add terminal sfInstBag
   sfInstBag instBag{};
   instBag.wInstGenNdx = instGenCounter;
-  instBag.wInstModNdx = 0;
+  instBag.wInstModNdx = modCounter;
   memcpy(ibagCk->data + (rgnCounter * sizeof(sfInstBag)), &instBag, sizeof(sfInstBag));
   pdtaCk->addChildChunk(ibagCk);
 
   //***********
   // imod chunk
   //***********
+  // Calculate total size first
+  uint32_t numTotalMods = 0;
+  for (const auto instr : synthfile->vInstrs) {
+    for (const auto rgn : instr->vRgns) {
+      numTotalMods += rgn->modulators().size();
+    }
+  }
+
   Chunk *imodCk = new Chunk("imod");
+  imodCk->setSize((numTotalMods + 1) * sizeof(sfModList));
+  imodCk->data = new uint8_t[imodCk->size()];
+
+  constexpr auto getSf2Src = [](const ModSource &src) -> uint16_t {
+    uint16_t res = 0;
+    switch (src.type) {
+      case ModSourceType::CC:
+        res = 0x0080 | src.index;
+        break;
+      case ModSourceType::PitchBend:
+        res = 0x020E;
+        break;
+      case ModSourceType::NoteOnVelocity:
+        res = 0x0002;
+        break;
+      case ModSourceType::NoteOnKeyNumber:
+        res = 0x0003;
+        break;
+      case ModSourceType::PolyPressure:
+        res = 0x000A;
+        break;
+      case ModSourceType::ChannelPressure:
+        res = 0x000D;
+        break;
+      case ModSourceType::VibratoLFO:
+      case ModSourceType::ModulationLFO:
+      case ModSourceType::ModulationEnvelope:
+      case ModSourceType::VolumeEnvelope:
+       // Not direct sources in SF2 (reserved/illegal or no controller)
+        res = 0x0000;
+        break;
+      default:
+        break;
+    }
+    return res | static_cast<uint16_t>(src.flags);
+  };
+
+  uint32_t modDataPtr = 0;
+  for (const auto instr : synthfile->vInstrs) {
+    for (const auto rgn : instr->vRgns) {
+      for (const auto &mod : rgn->modulators()) {
+        sfInstModList modList{};
+        modList.sfModSrcOper = (SFModulator)getSf2Src(mod.source);
+
+        switch (mod.dest) {
+          case ModDest::VolAttack:
+            modList.sfModDestOper = attackVolEnv;
+            break;
+          case ModDest::VolHold:
+            modList.sfModDestOper = holdVolEnv;
+            break;
+          case ModDest::VolDecay:
+            modList.sfModDestOper = decayVolEnv;
+            break;
+          case ModDest::VolSustain:
+            modList.sfModDestOper = sustainVolEnv;
+            break;
+          case ModDest::VolRelease:
+            modList.sfModDestOper = releaseVolEnv;
+            break;
+          case ModDest::VolDelay:
+            modList.sfModDestOper = delayVolEnv;
+            break;
+          case ModDest::ModAttack:
+            modList.sfModDestOper = attackModEnv;
+            break;
+          case ModDest::ModHold:
+            modList.sfModDestOper = holdModEnv;
+            break;
+          case ModDest::ModDecay:
+            modList.sfModDestOper = decayModEnv;
+            break;
+          case ModDest::ModSustain:
+            modList.sfModDestOper = sustainModEnv;
+            break;
+          case ModDest::ModRelease:
+            modList.sfModDestOper = releaseModEnv;
+            break;
+          case ModDest::ModDelay:
+            modList.sfModDestOper = delayModEnv;
+            break;
+          case ModDest::Pan:
+            modList.sfModDestOper = pan;
+            break;
+          case ModDest::Attenuation:
+            modList.sfModDestOper = initialAttenuation;
+            break;
+          case ModDest::Pitch:
+            modList.sfModDestOper = fineTune;
+            break;
+          case ModDest::FilterCutoff:
+            modList.sfModDestOper = initialFilterFc;
+            break;
+          case ModDest::FilterQ:
+            modList.sfModDestOper = initialFilterQ;
+            break;
+          case ModDest::ReverbSend:
+            modList.sfModDestOper = reverbEffectsSend;
+            break;
+          case ModDest::ChorusSend:
+            modList.sfModDestOper = chorusEffectsSend;
+            break;
+          case ModDest::VibLfoToPitch:
+            modList.sfModDestOper = vibLfoToPitch;
+            break;
+          case ModDest::VibLfoFreq:
+            modList.sfModDestOper = freqVibLFO;
+            break;
+          case ModDest::VibLfoDelay:
+            modList.sfModDestOper = delayVibLFO;
+            break;
+          case ModDest::ModLfoToPitch:
+            modList.sfModDestOper = modLfoToPitch;
+            break;
+          case ModDest::ModLfoToFilterFc:
+            modList.sfModDestOper = modLfoToFilterFc;
+            break;
+          case ModDest::ModLfoToVolume:
+            modList.sfModDestOper = modLfoToVolume;
+            break;
+          case ModDest::ModLfoFreq:
+            modList.sfModDestOper = freqModLFO;
+            break;
+          case ModDest::ModLfoDelay:
+            modList.sfModDestOper = delayModLFO;
+            break;
+          case ModDest::ModEnvToPitch:
+            modList.sfModDestOper = modEnvToPitch;
+            break;
+          case ModDest::ModEnvToFilterFc:
+            modList.sfModDestOper = modEnvToFilterFc;
+            break;
+          default:
+            continue;
+          }
+
+        modList.modAmount = mod.amount;
+        modList.sfModAmtSrcOper = static_cast<SFModulator>(getSf2Src(mod.sourceAmt));
+        modList.sfModTransOper = static_cast<SFTransform>(mod.trans);
+        memcpy(imodCk->data + modDataPtr, &modList, sizeof(sfInstModList));
+        modDataPtr += sizeof(sfInstModList);
+      }
+    }
+  }
+
   //  create the terminal field
-  memset(&modList, 0, sizeof(sfModList));
-  imodCk->setData(&modList, sizeof(sfModList));
+  sfModList termModList{};
+  memcpy(imodCk->data + modDataPtr, &termModList, sizeof(sfModList));
   pdtaCk->addChildChunk(imodCk);
 
   //***********

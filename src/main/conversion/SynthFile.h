@@ -1,7 +1,15 @@
+/*
+ * VGMTrans (c) 2002-2026
+ * Licensed under the zlib license,
+ * refer to the included LICENSE.txt file
+ */
+
 #pragma once
 
-#include "RiffFile.h"
 #include <vector>
+
+#include "Modulator.h"
+#include "RiffFile.h"
 
 struct Loop;
 class VGMSamp;
@@ -120,10 +128,15 @@ class SynthRgn {
   SynthSampInfo *sampinfo {nullptr};
   SynthArt *art {nullptr};
 
+  void addModulator(Modulator mod) { m_modulators.push_back(mod); }
+  const std::vector<Modulator> &modulators() const { return m_modulators; }
+
 private:
   double m_lfoVibFreqHz       {0};
   double m_lfoVibDepthCents   {0};
   double m_lfoVibDelaySeconds {0};
+
+  std::vector<Modulator> m_modulators;
 };
 
 class SynthArt {

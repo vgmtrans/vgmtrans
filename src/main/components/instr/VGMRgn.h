@@ -1,4 +1,11 @@
+/*
+ * VGMTrans (c) 2002-2026
+ * Licensed under the zlib license,
+ * refer to the included LICENSE.txt file
+ */
+
 #pragma once
+#include "Modulator.h"
 #include "SynthFile.h"
 #include "VGMItem.h"
 #include "Loop.h"
@@ -6,6 +13,7 @@
 class VGMInstr;
 class VGMRgnItem;
 class VGMSampColl;
+
 
 // ******
 // VGMRgn
@@ -33,7 +41,6 @@ class VGMRgn : public VGMItem {
   void addPan(uint8_t pan, uint32_t offset, uint32_t length = 1, const std::string& name = "Pan");
   void setVolume(double volume);
   void setAttenuation(double decibels);
-  double attenDb() { return m_attenDb; }
   void addVolume(double volume, uint32_t offset, uint32_t length = 1);
   void addAttenuation(double decibels, uint32_t offset, uint32_t length = 1);
   void addUnityKey(uint8_t unityKey, uint32_t offset, uint32_t length = 1);
@@ -49,11 +56,11 @@ class VGMRgn : public VGMItem {
   void setLfoVibFreqHz(double freq) { m_lfoVibFreqHz = freq; }
   void setLfoVibDepthCents(double cents) { m_lfoVibDepthCents = cents; }
   void setLfoVibDelaySeconds(double seconds) { m_lfoVibDelaySeconds = seconds; }
+  [[nodiscard]] double attenDb() const { return m_attenDb; }
   [[nodiscard]] double lfoVibFreqHz() const { return m_lfoVibFreqHz; }
   [[nodiscard]] double lfoVibDepthCents() const { return m_lfoVibDepthCents; }
   [[nodiscard]] double lfoVibDelaySeconds() const { return m_lfoVibDelaySeconds; }
 
-public:
   VGMInstr *parInstr;
   u8 keyLow       {0};
   u8 keyHigh      {0x7F};
@@ -85,7 +92,13 @@ public:
   u16 release_transform {no_transform};
   double release_time   {0};     // in seconds
 
+  // Real-time modulation
+  void addModulator(Modulator mod) { m_modulators.push_back(mod); }
+  const std::vector<Modulator> &modulators() const { return m_modulators; }
+
 private:
+  std::vector<Modulator> m_modulators;
+
   double m_attenDb      {0};     // attenuation in decibels;
 
   double m_lfoVibFreqHz       {0};
