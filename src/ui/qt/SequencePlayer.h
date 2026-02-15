@@ -58,7 +58,6 @@ public:
   void seek(int position, PositionChangeOrigin origin);
   bool previewNoteOn(uint8_t channel, uint8_t key, uint8_t velocity, uint32_t tick);
   bool previewNotesAtTick(const std::vector<PreviewNote>& notes, uint32_t tick);
-  bool previewNotesAtTickIncremental(const std::vector<PreviewNote>& notes, uint32_t tick);
   void stopPreviewNote();
 
   /**
@@ -109,7 +108,7 @@ private:
   void releasePreviewStreams();
   bool syncPreviewStateAtTick(uint32_t tick);
   void syncPreviewGlobalState();
-  bool syncPreviewChannelState(uint8_t channel, bool resetChannel = true);
+  bool syncPreviewChannelState(uint8_t channel);
 
   const VGMColl *m_active_vgmcoll{};
   HSTREAM m_active_stream{};
@@ -121,6 +120,4 @@ private:
   QTimer *m_seekupdate_timer{};
   QString m_song_title{};
   std::vector<PreviewNote> m_previewActiveNotes;
-  uint32_t m_previewStateTick = 0;
-  bool m_previewStateTickValid = false;
 };
