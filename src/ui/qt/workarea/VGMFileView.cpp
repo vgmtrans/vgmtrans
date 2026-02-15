@@ -642,7 +642,7 @@ void VGMFileView::previewPianoRollNotes(const std::vector<VGMItem*>& items, VGMI
     return;
   }
 
-  SequencePlayer::the().previewNotesAtTick(previewNotes, tick);
+  SequencePlayer::the().updatePreviewNotesAtTick(previewNotes, tick);
 }
 
 void VGMFileView::stopNotePreview() const {
