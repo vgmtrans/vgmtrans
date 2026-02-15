@@ -134,6 +134,12 @@ private:
   [[nodiscard]] VGMItem* noteAtViewportPoint(const QPoint& pos) const;
   [[nodiscard]] QRect graphRectInViewport() const;
   [[nodiscard]] QRectF graphSelectionRectInViewport() const;
+  void normalizeNoteIndices(std::vector<size_t>& indices) const;
+  [[nodiscard]] bool isSelectedItem(VGMItem* item) const;
+  [[nodiscard]] std::vector<VGMItem*> uniqueItemsForNoteIndices(
+      const std::vector<size_t>& indices) const;
+  void rebuildSelectedNotesCache();
+  void previewSingleNoteAtViewportPoint(const QPoint& pos);
   void applySelectedNoteIndices(std::vector<size_t> indices,
                                 bool emitSelectionSignal,
                                 VGMItem* preferredPrimary = nullptr);
