@@ -157,7 +157,7 @@ VGMFileView::VGMFileView(VGMFile* vgmfile)
     connect(panelUi.activeNoteView, &ActiveNoteView::notePreviewRequested, this,
             &VGMFileView::previewActiveNote);
     connect(panelUi.activeNoteView, &ActiveNoteView::notePreviewStopped, this,
-            &VGMFileView::stopActiveNotePreview);
+            &VGMFileView::stopNotePreview);
     connect(panelUi.pianoRollView, &PianoRollView::selectionSetChanged, this, &VGMFileView::onSelectionSetChange);
 
     connect(panelUi.treeView, &VGMFileTreeView::currentItemChanged,
@@ -500,15 +500,8 @@ bool VGMFileView::prepareSeqEventForPlayback(SeqEvent* event, uint32_t& tick) co
   if (!event || !event->parentTrack || !event->parentTrack->parentSeq) {
     return false;
   }
-  if (!m_vgmfile->assocColls.empty()) {
-    auto* assocColl = m_vgmfile->assocColls.front();
-    auto& seqPlayer = SequencePlayer::the();
-    if (seqPlayer.activeCollection() != assocColl) {
-      seqPlayer.setActiveCollection(assocColl);
-    }
-    if (seqPlayer.activeCollection() != assocColl) {
-      return false;
-    }
+  if (!ensureAssociatedCollectionActive()) {
+    return false;
   }
 
   const auto& timeline = event->parentTrack->parentSeq->timedEventIndex();
@@ -520,6 +513,19 @@ bool VGMFileView::prepareSeqEventForPlayback(SeqEvent* event, uint32_t& tick) co
   }
 
   return true;
+}
+
+bool VGMFileView::ensureAssociatedCollectionActive() const {
+  if (m_vgmfile->assocColls.empty()) {
+    return true;
+  }
+
+  auto* assocColl = m_vgmfile->assocColls.front();
+  auto& seqPlayer = SequencePlayer::the();
+  if (seqPlayer.activeCollection() != assocColl) {
+    seqPlayer.setActiveCollection(assocColl);
+  }
+  return seqPlayer.activeCollection() == assocColl;
 }
 
 void VGMFileView::seekToEvent(VGMItem* item) const {
@@ -599,15 +605,9 @@ void VGMFileView::previewActiveNote(int trackIndex, int key) const {
   }
 
   auto& seqPlayer = SequencePlayer::the();
-  if (!m_vgmfile->assocColls.empty()) {
-    auto* assocColl = m_vgmfile->assocColls.front();
-    if (seqPlayer.activeCollection() != assocColl) {
-      seqPlayer.setActiveCollection(assocColl);
-    }
-    if (seqPlayer.activeCollection() != assocColl) {
-      seqPlayer.stopPreviewNote();
-      return;
-    }
+  if (!ensureAssociatedCollectionActive()) {
+    seqPlayer.stopPreviewNote();
+    return;
   }
 
   const int midiChannel = previewMidiChannelForTrack(seq, trackIndex);
@@ -621,10 +621,6 @@ void VGMFileView::previewActiveNote(int trackIndex, int key) const {
                           static_cast<uint8_t>(key),
                           kActiveNotePreviewVelocity,
                           static_cast<uint32_t>(tick));
-}
-
-void VGMFileView::stopActiveNotePreview() const {
-  SequencePlayer::the().stopPreviewNote();
 }
 
 void VGMFileView::clearPlaybackVisuals() {
