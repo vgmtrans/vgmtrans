@@ -483,14 +483,7 @@ bool PianoRollView::handleViewportMousePress(QMouseEvent* event) {
     m_noteSelectionDragging = false;
     m_noteSelectionAnchor = pos;
     m_noteSelectionCurrent = pos;
-
-    const int noteIndex = noteIndexAtViewportPoint(pos);
-    if (noteIndex >= 0 && noteIndex < static_cast<int>(m_selectableNotes.size())) {
-      const size_t index = static_cast<size_t>(noteIndex);
-      applyPreviewNoteIndices({index}, index);
-    } else {
-      clearPreviewNotes();
-    }
+    previewSingleNoteAtViewportPoint(pos);
 
     event->accept();
     return true;
@@ -541,13 +534,7 @@ bool PianoRollView::handleViewportMouseMove(QMouseEvent* event) {
     updateMarqueePreview(pos);
     requestRenderCoalesced();
   } else {
-    const int noteIndex = noteIndexAtViewportPoint(pos);
-    if (noteIndex >= 0 && noteIndex < static_cast<int>(m_selectableNotes.size())) {
-      const size_t index = static_cast<size_t>(noteIndex);
-      applyPreviewNoteIndices({index}, index);
-    } else {
-      clearPreviewNotes();
-    }
+    previewSingleNoteAtViewportPoint(pos);
   }
 
   event->accept();
@@ -1079,9 +1066,7 @@ QRectF PianoRollView::graphSelectionRectInViewport() const {
   return QRectF(left, top, right - left, bottom - top);
 }
 
-void PianoRollView::applySelectedNoteIndices(std::vector<size_t> indices,
-                                             bool emitSelectionSignal,
-                                             VGMItem* preferredPrimary) {
+void PianoRollView::normalizeNoteIndices(std::vector<size_t>& indices) const {
   indices.erase(std::remove_if(indices.begin(),
                                indices.end(),
                                [this](size_t index) {
@@ -1090,10 +1075,43 @@ void PianoRollView::applySelectedNoteIndices(std::vector<size_t> indices,
                 indices.end());
   std::sort(indices.begin(), indices.end());
   indices.erase(std::unique(indices.begin(), indices.end()), indices.end());
+}
 
-  const bool selectionSetWasChanged = (indices != m_selectedNoteIndices);
-  m_selectedNoteIndices = std::move(indices);
+bool PianoRollView::isSelectedItem(VGMItem* item) const {
+  if (!item) {
+    return false;
+  }
 
+  for (size_t selectedIndex : m_selectedNoteIndices) {
+    if (m_selectableNotes[selectedIndex].item == item) {
+      return true;
+    }
+  }
+  return false;
+}
+
+std::vector<VGMItem*> PianoRollView::uniqueItemsForNoteIndices(const std::vector<size_t>& indices) const {
+  std::vector<VGMItem*> items;
+  items.reserve(indices.size());
+
+  std::unordered_set<VGMItem*> seenItems;
+  seenItems.reserve(indices.size() * 2 + 1);
+
+  for (size_t index : indices) {
+    if (index >= m_selectableNotes.size()) {
+      continue;
+    }
+    VGMItem* item = m_selectableNotes[index].item;
+    if (!item || !seenItems.insert(item).second) {
+      continue;
+    }
+    items.push_back(item);
+  }
+
+  return items;
+}
+
+void PianoRollView::rebuildSelectedNotesCache() {
   std::vector<PianoRollFrame::Note> selectedNotes;
   selectedNotes.reserve(m_selectedNoteIndices.size());
   for (size_t selectedIndex : m_selectedNoteIndices) {
@@ -1106,23 +1124,32 @@ void PianoRollView::applySelectedNoteIndices(std::vector<size_t> indices,
     });
   }
   m_selectedNotes = std::make_shared<std::vector<PianoRollFrame::Note>>(std::move(selectedNotes));
+}
 
-  auto containsItem = [this](VGMItem* item) {
-    if (!item) {
-      return false;
-    }
-    for (size_t selectedIndex : m_selectedNoteIndices) {
-      if (m_selectableNotes[selectedIndex].item == item) {
-        return true;
-      }
-    }
-    return false;
-  };
+void PianoRollView::previewSingleNoteAtViewportPoint(const QPoint& pos) {
+  const int noteIndex = noteIndexAtViewportPoint(pos);
+  if (noteIndex < 0 || noteIndex >= static_cast<int>(m_selectableNotes.size())) {
+    clearPreviewNotes();
+    return;
+  }
+
+  const size_t index = static_cast<size_t>(noteIndex);
+  applyPreviewNoteIndices({index}, index);
+}
+
+void PianoRollView::applySelectedNoteIndices(std::vector<size_t> indices,
+                                             bool emitSelectionSignal,
+                                             VGMItem* preferredPrimary) {
+  normalizeNoteIndices(indices);
+
+  const bool selectionSetWasChanged = (indices != m_selectedNoteIndices);
+  m_selectedNoteIndices = std::move(indices);
+  rebuildSelectedNotesCache();
 
   VGMItem* nextPrimary = nullptr;
-  if (containsItem(preferredPrimary)) {
+  if (isSelectedItem(preferredPrimary)) {
     nextPrimary = preferredPrimary;
-  } else if (containsItem(m_primarySelectedItem)) {
+  } else if (isSelectedItem(m_primarySelectedItem)) {
     nextPrimary = m_primarySelectedItem;
   } else if (!m_selectedNoteIndices.empty()) {
     nextPrimary = m_selectableNotes[m_selectedNoteIndices.front()].item;
@@ -1142,18 +1169,7 @@ void PianoRollView::applySelectedNoteIndices(std::vector<size_t> indices,
 
 void PianoRollView::emitCurrentSelectionSignals() {
   emit selectionChanged(m_primarySelectedItem);
-
-  std::vector<VGMItem*> selectedItems;
-  selectedItems.reserve(m_selectedNoteIndices.size());
-  std::unordered_set<VGMItem*> selectedItemSet;
-  selectedItemSet.reserve(m_selectedNoteIndices.size() * 2 + 1);
-  for (size_t selectedIndex : m_selectedNoteIndices) {
-    VGMItem* selectedItem = m_selectableNotes[selectedIndex].item;
-    if (!selectedItem || !selectedItemSet.insert(selectedItem).second) {
-      continue;
-    }
-    selectedItems.push_back(selectedItem);
-  }
+  std::vector<VGMItem*> selectedItems = uniqueItemsForNoteIndices(m_selectedNoteIndices);
   emit selectionSetChanged(selectedItems, m_primarySelectedItem);
 }
 
@@ -1259,14 +1275,7 @@ void PianoRollView::updateMarqueePreview(const QPoint& cursorPos) {
 }
 
 void PianoRollView::applyPreviewNoteIndices(std::vector<size_t> indices, size_t anchorIndex) {
-  indices.erase(std::remove_if(indices.begin(),
-                               indices.end(),
-                               [this](size_t index) {
-                                 return index >= m_selectableNotes.size();
-                               }),
-                indices.end());
-  std::sort(indices.begin(), indices.end());
-  indices.erase(std::unique(indices.begin(), indices.end()), indices.end());
+  normalizeNoteIndices(indices);
 
   if (indices.empty()) {
     if (m_previewNoteIndices.empty()) {
@@ -1290,22 +1299,13 @@ void PianoRollView::applyPreviewNoteIndices(std::vector<size_t> indices, size_t 
   m_previewNoteIndices = std::move(indices);
   m_previewAnchorNoteIndex = anchorIndex;
 
-  std::vector<VGMItem*> previewItems;
-  previewItems.reserve(m_previewNoteIndices.size());
-  std::unordered_set<VGMItem*> seenItems;
-  seenItems.reserve(m_previewNoteIndices.size() * 2 + 1);
-
   VGMItem* anchorItem = m_selectableNotes[m_previewAnchorNoteIndex].item;
-  if (anchorItem && seenItems.insert(anchorItem).second) {
-    previewItems.push_back(anchorItem);
-  }
-
-  for (size_t previewIndex : m_previewNoteIndices) {
-    VGMItem* item = m_selectableNotes[previewIndex].item;
-    if (!item || !seenItems.insert(item).second) {
-      continue;
+  std::vector<VGMItem*> previewItems = uniqueItemsForNoteIndices(m_previewNoteIndices);
+  if (anchorItem) {
+    const auto anchorIt = std::find(previewItems.begin(), previewItems.end(), anchorItem);
+    if (anchorIt != previewItems.end() && anchorIt != previewItems.begin()) {
+      std::rotate(previewItems.begin(), anchorIt, anchorIt + 1);
     }
-    previewItems.push_back(item);
   }
 
   if (previewItems.empty()) {
