@@ -1238,8 +1238,6 @@ void PianoRollView::updateMarqueePreview(const QPoint& cursorPos) {
 
   std::vector<size_t> overlapIndices;
   overlapIndices.reserve(currentSelection.size());
-  size_t closestIndex = kInvalidNoteIndex;
-  float closestDistance = std::numeric_limits<float>::max();
 
   for (size_t selectedIndex : currentSelection) {
     const auto& note = m_selectableNotes[selectedIndex];
@@ -1248,25 +1246,12 @@ void PianoRollView::updateMarqueePreview(const QPoint& cursorPos) {
 
     if (frontierTick >= noteStartTick && frontierTick < noteEndTick) {
       overlapIndices.push_back(selectedIndex);
-      continue;
-    }
-
-    const float distance =
-        (frontierTick < noteStartTick) ? (noteStartTick - frontierTick) : (frontierTick - noteEndTick);
-    if (distance < closestDistance) {
-      closestDistance = distance;
-      closestIndex = selectedIndex;
     }
   }
 
   if (!overlapIndices.empty()) {
     const size_t anchorIndex = overlapIndices.front();
     applyPreviewNoteIndices(std::move(overlapIndices), anchorIndex);
-    return;
-  }
-
-  if (closestIndex != kInvalidNoteIndex) {
-    applyPreviewNoteIndices({closestIndex}, closestIndex);
     return;
   }
 
