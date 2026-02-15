@@ -8,7 +8,6 @@
 #include <algorithm>
 #include <array>
 #include <cstddef>
-#include <unordered_map>
 #include <unordered_set>
 
 #include "bass.h"
@@ -94,29 +93,6 @@ static constexpr std::array<DWORD, 31> PREVIEW_CHANNEL_STATE_EVENTS = {
     MIDI_EVENT_RELEASE,   MIDI_EVENT_FINETUNE,  MIDI_EVENT_COARSETUNE, MIDI_EVENT_VIBRATO_RATE,
     MIDI_EVENT_VIBRATO_DEPTH, MIDI_EVENT_VIBRATO_DELAY, MIDI_EVENT_MOD_PITCH};
 
-uint16_t previewNoteIdentity(const SequencePlayer::PreviewNote& note) {
-  return static_cast<uint16_t>((static_cast<uint16_t>(note.channel) << 8) | note.key);
-}
-
-std::vector<SequencePlayer::PreviewNote> normalizePreviewNotes(
-    const std::vector<SequencePlayer::PreviewNote>& notes) {
-  std::vector<SequencePlayer::PreviewNote> validNotes;
-  validNotes.reserve(notes.size());
-  std::unordered_set<uint16_t> seenChannelAndKeys;
-  seenChannelAndKeys.reserve(notes.size() * 2 + 1);
-  for (const auto& note : notes) {
-    if (note.channel >= 128 || note.key >= 128 || note.velocity == 0) {
-      continue;
-    }
-
-    if (!seenChannelAndKeys.emplace(previewNoteIdentity(note)).second) {
-      continue;
-    }
-    validNotes.push_back(note);
-  }
-  return validNotes;
-}
-
 SequencePlayer::SequencePlayer() {
   /* Use the system default output device.
    * The sample rate is actually only respected on Linux: on Windows and macOS, BASS will use the
@@ -191,15 +167,33 @@ bool SequencePlayer::previewNoteOn(uint8_t channel, uint8_t key, uint8_t velocit
 }
 
 bool SequencePlayer::previewNotesAtTick(const std::vector<PreviewNote>& notes, uint32_t tick) {
-  const std::vector<PreviewNote> validNotes = normalizePreviewNotes(notes);
-  stopPreviewNote();
-  m_previewStateTickValid = false;
-
-  if (validNotes.empty()) {
+  if (!m_active_stream || !ensurePreviewStreams()) {
     return false;
   }
 
-  if (!m_active_stream || !ensurePreviewStreams()) {
+  stopPreviewNote();
+  if (notes.empty()) {
+    return true;
+  }
+
+  std::vector<PreviewNote> validNotes;
+  validNotes.reserve(notes.size());
+  std::unordered_set<uint16_t> seenChannelAndKeys;
+  seenChannelAndKeys.reserve(notes.size() * 2 + 1);
+  for (const auto& note : notes) {
+    if (note.channel >= 128 || note.key >= 128 || note.velocity == 0) {
+      continue;
+    }
+
+    const uint16_t channelAndKey =
+        static_cast<uint16_t>((static_cast<uint16_t>(note.channel) << 8) | note.key);
+    if (!seenChannelAndKeys.emplace(channelAndKey).second) {
+      continue;
+    }
+    validNotes.push_back(note);
+  }
+
+  if (validNotes.empty()) {
     return false;
   }
 
@@ -221,122 +215,21 @@ bool SequencePlayer::previewNotesAtTick(const std::vector<PreviewNote>& notes, u
   }
   BASS_ChannelPlay(m_preview_note_stream, false);
 
-  std::vector<PreviewNote> activeNotes;
-  activeNotes.reserve(validNotes.size());
+  m_previewActiveNotes.clear();
+  m_previewActiveNotes.reserve(validNotes.size());
   for (const auto& note : validNotes) {
     const DWORD packed = static_cast<DWORD>(note.key) | (static_cast<DWORD>(note.velocity) << 8);
     if (!BASS_MIDI_StreamEvent(m_preview_note_stream, note.channel, MIDI_EVENT_NOTE, packed)) {
       continue;
     }
-    activeNotes.push_back(note);
+    m_previewActiveNotes.push_back(note);
   }
 
-  m_previewActiveNotes = std::move(activeNotes);
-  m_previewStateTick = tick;
-  m_previewStateTickValid = !m_previewActiveNotes.empty();
-  return m_previewStateTickValid;
-}
-
-bool SequencePlayer::previewNotesAtTickIncremental(const std::vector<PreviewNote>& notes, uint32_t tick) {
-  const std::vector<PreviewNote> validNotes = normalizePreviewNotes(notes);
-  if (validNotes.empty()) {
-    stopPreviewNote();
-    return true;
-  }
-
-  if (!m_active_stream || !ensurePreviewStreams()) {
-    return false;
-  }
-
-  std::unordered_map<uint16_t, PreviewNote> oldById;
-  oldById.reserve(m_previewActiveNotes.size() * 2 + 1);
-  for (const auto& note : m_previewActiveNotes) {
-    oldById.emplace(previewNoteIdentity(note), note);
-  }
-
-  std::unordered_map<uint16_t, PreviewNote> newById;
-  newById.reserve(validNotes.size() * 2 + 1);
-  for (const auto& note : validNotes) {
-    newById.emplace(previewNoteIdentity(note), note);
-  }
-
-  std::vector<PreviewNote> kept;
-  kept.reserve(std::min(m_previewActiveNotes.size(), validNotes.size()));
-  std::vector<PreviewNote> removed;
-  removed.reserve(m_previewActiveNotes.size());
-  std::vector<PreviewNote> added;
-  added.reserve(validNotes.size());
-
-  for (const auto& [identity, oldNote] : oldById) {
-    const auto newIt = newById.find(identity);
-    if (newIt == newById.end()) {
-      removed.push_back(oldNote);
-      continue;
-    }
-
-    if (newIt->second.velocity != oldNote.velocity) {
-      removed.push_back(oldNote);
-      added.push_back(newIt->second);
-      continue;
-    }
-
-    kept.push_back(oldNote);
-  }
-
-  for (const auto& [identity, newNote] : newById) {
-    if (oldById.find(identity) == oldById.end()) {
-      added.push_back(newNote);
-    }
-  }
-
-  const bool tickChanged = !m_previewStateTickValid || (tick != m_previewStateTick);
-  if (tickChanged) {
-    if (!syncPreviewStateAtTick(tick)) {
-      return false;
-    }
-    syncPreviewGlobalState();
-  }
-
-  for (const auto& note : removed) {
-    const DWORD noteOffParam = static_cast<DWORD>(note.key);
-    BASS_MIDI_StreamEvent(m_preview_note_stream, note.channel, MIDI_EVENT_NOTE, noteOffParam);
-  }
-
-  std::array<bool, 128> channelHasKeptNotes{};
-  for (const auto& note : kept) {
-    channelHasKeptNotes[note.channel] = true;
-  }
-
-  std::array<bool, 128> syncedChannels{};
-  for (const auto& note : added) {
-    if (syncedChannels[note.channel]) {
-      continue;
-    }
-
-    const bool resetChannel = !channelHasKeptNotes[note.channel];
-    if (tickChanged || resetChannel) {
-      if (!syncPreviewChannelState(note.channel, resetChannel)) {
-        return false;
-      }
-    }
-    syncedChannels[note.channel] = true;
-  }
-
-  BASS_ChannelPlay(m_preview_note_stream, false);
-  for (const auto& note : added) {
-    const DWORD packed = static_cast<DWORD>(note.key) | (static_cast<DWORD>(note.velocity) << 8);
-    BASS_MIDI_StreamEvent(m_preview_note_stream, note.channel, MIDI_EVENT_NOTE, packed);
-  }
-
-  m_previewActiveNotes = validNotes;
-  m_previewStateTick = tick;
-  m_previewStateTickValid = true;
-  return true;
+  return !m_previewActiveNotes.empty();
 }
 
 void SequencePlayer::stopPreviewNote() {
   if (m_previewActiveNotes.empty()) {
-    m_previewStateTickValid = false;
     return;
   }
 
@@ -349,7 +242,6 @@ void SequencePlayer::stopPreviewNote() {
   }
 
   m_previewActiveNotes.clear();
-  m_previewStateTickValid = false;
 }
 
 bool SequencePlayer::ensurePreviewStreams() {
@@ -417,8 +309,6 @@ bool SequencePlayer::ensurePreviewStreams() {
 
 void SequencePlayer::releasePreviewStreams() {
   stopPreviewNote();
-  m_previewStateTick = 0;
-  m_previewStateTickValid = false;
 
   if (m_preview_note_stream) {
     BASS_StreamFree(m_preview_note_stream);
@@ -466,16 +356,14 @@ void SequencePlayer::syncPreviewGlobalState() {
   BASS_MIDI_StreamEvent(m_preview_note_stream, 0, MIDI_EVENT_MASTERVOL, masterVolume);
 }
 
-bool SequencePlayer::syncPreviewChannelState(uint8_t channel, bool resetChannel) {
+bool SequencePlayer::syncPreviewChannelState(uint8_t channel) {
   if (!m_preview_note_stream || !m_preview_state_stream) {
     return false;
   }
 
-  if (resetChannel) {
-    // Clear previous preview state on this channel so missing events fall back to defaults.
-    BASS_MIDI_StreamEvent(m_preview_note_stream, channel, MIDI_EVENT_RESET, 0);
-    BASS_MIDI_StreamEvent(m_preview_note_stream, channel, MIDI_EVENT_SOUNDOFF, 0);
-  }
+  // Clear previous preview state on this channel so missing events fall back to defaults.
+  BASS_MIDI_StreamEvent(m_preview_note_stream, channel, MIDI_EVENT_RESET, 0);
+  BASS_MIDI_StreamEvent(m_preview_note_stream, channel, MIDI_EVENT_SOUNDOFF, 0);
 
   for (const DWORD eventType : PREVIEW_CHANNEL_STATE_EVENTS) {
     const DWORD param = BASS_MIDI_StreamGetEvent(m_preview_state_stream, channel, eventType);
