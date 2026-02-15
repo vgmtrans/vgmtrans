@@ -214,6 +214,7 @@ private:
   std::vector<SelectableNote> m_selectableNotes;
   std::vector<size_t> m_selectedNoteIndices;
   std::vector<size_t> m_previewNoteIndices;
+  std::vector<size_t> m_selectionOverlapOrder;
 
   std::array<ActiveKeyState, kMidiKeyCount> m_activeKeys{};
 };
