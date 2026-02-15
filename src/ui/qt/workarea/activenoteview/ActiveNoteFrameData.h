@@ -25,6 +25,7 @@ struct Data {
   bool playbackActive = false;
   std::vector<QColor> trackColors;
   std::vector<std::bitset<128>> activeKeysByTrack;
+  std::vector<std::bitset<128>> previewKeysByTrack;
 };
 
 }  // namespace ActiveNoteFrame

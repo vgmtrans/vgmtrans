@@ -10,14 +10,15 @@
 
 #include <rhi/qrhi.h>
 
+#include <QMouseEvent>
 #include <QResizeEvent>
 
 ActiveNoteRhiWidget::ActiveNoteRhiWidget(ActiveNoteView* view,
                                          ActiveNoteRhiRenderer* renderer,
                                          QWidget* parent)
     : QRhiWidget(parent),
+      m_view(view),
       m_renderer(renderer) {
-  Q_UNUSED(view);
 #if defined(Q_OS_LINUX)
   setApi(QRhiWidget::Api::OpenGL);
 #elif defined(Q_OS_WIN)
@@ -29,6 +30,8 @@ ActiveNoteRhiWidget::ActiveNoteRhiWidget(ActiveNoteView* view,
 #else
   setApi(QRhiWidget::Api::Null);
 #endif
+
+  setMouseTracking(true);
 }
 
 ActiveNoteRhiWidget::~ActiveNoteRhiWidget() {
@@ -80,4 +83,28 @@ void ActiveNoteRhiWidget::releaseResources() {
 void ActiveNoteRhiWidget::resizeEvent(QResizeEvent* event) {
   QRhiWidget::resizeEvent(event);
   update();
+}
+
+void ActiveNoteRhiWidget::mousePressEvent(QMouseEvent* event) {
+  if (m_view && m_view->handleViewportMousePress(event)) {
+    return;
+  }
+
+  event->ignore();
+}
+
+void ActiveNoteRhiWidget::mouseMoveEvent(QMouseEvent* event) {
+  if (m_view && m_view->handleViewportMouseMove(event)) {
+    return;
+  }
+
+  event->ignore();
+}
+
+void ActiveNoteRhiWidget::mouseReleaseEvent(QMouseEvent* event) {
+  if (m_view && m_view->handleViewportMouseRelease(event)) {
+    return;
+  }
+
+  event->ignore();
 }

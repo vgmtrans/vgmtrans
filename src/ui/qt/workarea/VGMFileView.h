@@ -116,6 +116,8 @@ public slots:
   void seekToEvent(VGMItem* item) const;
   void previewNotesForEvent(VGMItem* item, bool includeActiveNotesAtTick) const;
   void stopNotePreview() const;
+  void previewActiveNote(int trackIndex, int key) const;
+  void stopActiveNotePreview() const;
   void onPlaybackPositionChanged(int current, int max, PositionChangeOrigin origin);
   void onPlayerStatusChanged(bool playing);
   void resetHexViewFont();
