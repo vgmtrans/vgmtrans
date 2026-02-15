@@ -380,15 +380,24 @@ void ActiveNoteRhiRenderer::buildInstances(const ActiveNoteFrame::Data& frame, c
                           whiteKeyColor);
     }
 
-    if (frame.playbackActive && track < static_cast<int>(frame.activeKeysByTrack.size())) {
-      const auto& activeMask = frame.activeKeysByTrack[static_cast<size_t>(track)];
+    const bool hasPlaybackMask =
+        frame.playbackActive && track < static_cast<int>(frame.activeKeysByTrack.size());
+    const bool hasPreviewMask = track < static_cast<int>(frame.previewKeysByTrack.size());
+    if (hasPlaybackMask || hasPreviewMask) {
       for (int key = 0; key < 128; ++key) {
         if (isBlackKey(key)) {
           continue;
         }
-        if (!activeMask.test(static_cast<size_t>(key))) {
+        const bool playbackActive =
+            hasPlaybackMask && frame.activeKeysByTrack[static_cast<size_t>(track)].test(
+                static_cast<size_t>(key));
+        const bool previewActive =
+            hasPreviewMask && frame.previewKeysByTrack[static_cast<size_t>(track)].test(
+                static_cast<size_t>(key));
+        if (!playbackActive && !previewActive) {
           continue;
         }
+
         const KeyGeometry& geom = keyGeometry[static_cast<size_t>(key)];
         if (!geom.valid) {
           continue;
@@ -397,7 +406,7 @@ void ActiveNoteRhiRenderer::buildInstances(const ActiveNoteFrame::Data& frame, c
         const bool hasLeftBlack = key > 0 && isBlackKey(key - 1);
         const bool hasRightBlack = key < 127 && isBlackKey(key + 1);
         QColor activeWhite = trackColor;
-        activeWhite.setAlpha(150);
+        activeWhite.setAlpha(previewActive ? 188 : 150);
         appendWhiteKeyShape(geom.x,
                             y,
                             geom.width,
@@ -439,13 +448,17 @@ void ActiveNoteRhiRenderer::buildInstances(const ActiveNoteFrame::Data& frame, c
       blackKeyColor.setAlpha(255);
       appendRect(geom.x, y, geom.width, blackHeight, blackKeyColor);
 
-      const bool active = frame.playbackActive &&
-                          track < static_cast<int>(frame.activeKeysByTrack.size()) &&
-                          frame.activeKeysByTrack[static_cast<size_t>(track)].test(
-                              static_cast<size_t>(key));
+      const bool playbackActive = frame.playbackActive &&
+                                  track < static_cast<int>(frame.activeKeysByTrack.size()) &&
+                                  frame.activeKeysByTrack[static_cast<size_t>(track)].test(
+                                      static_cast<size_t>(key));
+      const bool previewActive = track < static_cast<int>(frame.previewKeysByTrack.size()) &&
+                                 frame.previewKeysByTrack[static_cast<size_t>(track)].test(
+                                     static_cast<size_t>(key));
+      const bool active = playbackActive || previewActive;
       if (active) {
         QColor activeBlack = trackColor.lighter(118);
-        activeBlack.setAlpha(230);
+        activeBlack.setAlpha(previewActive ? 248 : 230);
         appendRect(geom.x + 1.0f,
                    y + 1.0f,
                    std::max(0.0f, geom.width - 2.0f),

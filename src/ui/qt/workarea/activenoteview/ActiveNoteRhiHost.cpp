@@ -47,6 +47,7 @@ ActiveNoteRhiHost::ActiveNoteRhiHost(ActiveNoteView* view, QWidget* parent)
 
   if (m_surface) {
     m_surface->setFocusPolicy(Qt::NoFocus);
+    m_surface->setMouseTracking(true);
     m_surface->setGeometry(rect());
     m_surface->show();
   }
