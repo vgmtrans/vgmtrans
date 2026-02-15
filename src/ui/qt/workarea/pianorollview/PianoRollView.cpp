@@ -109,6 +109,8 @@ void PianoRollView::setSequence(VGMSeq* seq) {
     return;
   }
 
+  clearPreviewNotes();
+
   m_seq = seq;
   m_timeline = nullptr;
   m_timelineCursor.reset();
@@ -119,6 +121,9 @@ void PianoRollView::setSequence(VGMSeq* seq) {
   m_cachedTimelineFinalized = false;
   m_primarySelectedItem = nullptr;
   m_selectedNoteIndices.clear();
+  m_previewNoteIndices.clear();
+  m_lastPreviewAnchorNoteIndex = kInvalidNoteIndex;
+  m_previewAnchorNoteIndex = kInvalidNoteIndex;
   m_activeNotes = std::make_shared<std::vector<PianoRollFrame::Note>>();
   m_selectedNotes = std::make_shared<std::vector<PianoRollFrame::Note>>();
 
@@ -461,6 +466,7 @@ bool PianoRollView::handleViewportMousePress(QMouseEvent* event) {
 
   const QPoint pos = event->position().toPoint();
   if (pos.y() < kTopBarHeight && pos.x() >= kKeyboardWidth) {
+    clearPreviewNotes();
     m_noteSelectionPressActive = false;
     m_noteSelectionDragging = false;
     m_seekDragActive = true;
@@ -478,6 +484,16 @@ bool PianoRollView::handleViewportMousePress(QMouseEvent* event) {
     m_noteSelectionDragging = false;
     m_noteSelectionAnchor = pos;
     m_noteSelectionCurrent = pos;
+
+    const int noteIndex = noteIndexAtViewportPoint(pos);
+    if (noteIndex >= 0 && noteIndex < static_cast<int>(m_selectableNotes.size())) {
+      const size_t index = static_cast<size_t>(noteIndex);
+      m_lastPreviewAnchorNoteIndex = index;
+      applyPreviewNoteIndices({index}, index);
+    } else {
+      clearPreviewNotes();
+    }
+
     event->accept();
     return true;
   }
@@ -505,6 +521,15 @@ bool PianoRollView::handleViewportMouseMove(QMouseEvent* event) {
     return false;
   }
 
+  if (!(event->buttons() & Qt::LeftButton)) {
+    m_noteSelectionPressActive = false;
+    m_noteSelectionDragging = false;
+    clearPreviewNotes();
+    requestRender();
+    event->accept();
+    return true;
+  }
+
   const QPoint pos = event->position().toPoint();
   m_noteSelectionCurrent = pos;
   const QPoint dragDelta = m_noteSelectionCurrent - m_noteSelectionAnchor;
@@ -514,8 +539,19 @@ bool PianoRollView::handleViewportMouseMove(QMouseEvent* event) {
   }
 
   if (m_noteSelectionDragging) {
+    const std::vector<size_t> previousSelection = m_selectedNoteIndices;
     updateMarqueeSelection(false);
+    updateMarqueePreview(previousSelection, pos);
     requestRenderCoalesced();
+  } else {
+    const int noteIndex = noteIndexAtViewportPoint(pos);
+    if (noteIndex >= 0 && noteIndex < static_cast<int>(m_selectableNotes.size())) {
+      const size_t index = static_cast<size_t>(noteIndex);
+      m_lastPreviewAnchorNoteIndex = index;
+      applyPreviewNoteIndices({index}, index);
+    } else {
+      clearPreviewNotes();
+    }
   }
 
   event->accept();
@@ -533,7 +569,6 @@ bool PianoRollView::handleViewportMouseRelease(QMouseEvent* event) {
     m_seekDragActive = false;
     updateActiveKeyStates();
     requestRender();
-    emit seekRequested(m_currentTick);
 
     event->accept();
     return true;
@@ -559,6 +594,7 @@ bool PianoRollView::handleViewportMouseRelease(QMouseEvent* event) {
     }
   }
 
+  clearPreviewNotes();
   m_noteSelectionPressActive = false;
   const bool wasDragging = m_noteSelectionDragging;
   m_noteSelectionDragging = false;
@@ -1047,6 +1083,36 @@ QRectF PianoRollView::graphSelectionRectInViewport() const {
   return QRectF(left, top, right - left, bottom - top);
 }
 
+bool PianoRollView::selectableNotesOverlap(size_t lhsIndex, size_t rhsIndex) const {
+  if (lhsIndex >= m_selectableNotes.size() || rhsIndex >= m_selectableNotes.size()) {
+    return false;
+  }
+
+  const auto& lhs = m_selectableNotes[lhsIndex];
+  const auto& rhs = m_selectableNotes[rhsIndex];
+  const uint64_t lhsStart = lhs.startTick;
+  const uint64_t rhsStart = rhs.startTick;
+  const uint64_t lhsEnd = lhsStart + std::max<uint64_t>(1u, lhs.duration);
+  const uint64_t rhsEnd = rhsStart + std::max<uint64_t>(1u, rhs.duration);
+  return lhsStart < rhsEnd && rhsStart < lhsEnd;
+}
+
+std::vector<size_t> PianoRollView::overlappingSelectionForAnchor(size_t anchorIndex,
+                                                                 const std::vector<size_t>& selection) const {
+  std::vector<size_t> overlap;
+  if (anchorIndex >= m_selectableNotes.size() || selection.empty()) {
+    return overlap;
+  }
+
+  overlap.reserve(selection.size());
+  for (size_t selectedIndex : selection) {
+    if (selectableNotesOverlap(anchorIndex, selectedIndex)) {
+      overlap.push_back(selectedIndex);
+    }
+  }
+  return overlap;
+}
+
 void PianoRollView::applySelectedNoteIndices(std::vector<size_t> indices,
                                              bool emitSelectionSignal,
                                              VGMItem* preferredPrimary) {
@@ -1190,6 +1256,143 @@ void PianoRollView::updateMarqueeSelection(bool emitSelectionSignal) {
   }
 
   applySelectedNoteIndices(std::move(indices), emitSelectionSignal, nullptr);
+}
+
+void PianoRollView::updateMarqueePreview(const std::vector<size_t>& previousSelection,
+                                         const QPoint& cursorPos) {
+  const auto& currentSelection = m_selectedNoteIndices;
+  if (currentSelection.empty()) {
+    clearPreviewNotes();
+    return;
+  }
+
+  std::vector<size_t> added;
+  added.reserve(currentSelection.size());
+  std::set_difference(currentSelection.begin(),
+                      currentSelection.end(),
+                      previousSelection.begin(),
+                      previousSelection.end(),
+                      std::back_inserter(added));
+
+  if (!added.empty()) {
+    size_t anchorIndex = added.back();
+    const int hoveredNoteIndex = noteIndexAtViewportPoint(cursorPos);
+    if (hoveredNoteIndex >= 0) {
+      const size_t hoveredIndex = static_cast<size_t>(hoveredNoteIndex);
+      if (std::binary_search(added.begin(), added.end(), hoveredIndex)) {
+        anchorIndex = hoveredIndex;
+      }
+    }
+
+    m_lastPreviewAnchorNoteIndex = anchorIndex;
+    applyPreviewNoteIndices(overlappingSelectionForAnchor(anchorIndex, currentSelection), anchorIndex);
+    return;
+  }
+
+  std::vector<size_t> retainedPreview;
+  retainedPreview.reserve(std::min(m_previewNoteIndices.size(), currentSelection.size()));
+  std::set_intersection(m_previewNoteIndices.begin(),
+                        m_previewNoteIndices.end(),
+                        currentSelection.begin(),
+                        currentSelection.end(),
+                        std::back_inserter(retainedPreview));
+
+  if (!retainedPreview.empty()) {
+    size_t anchorIndex = m_previewAnchorNoteIndex;
+    if (anchorIndex == kInvalidNoteIndex ||
+        !std::binary_search(retainedPreview.begin(), retainedPreview.end(), anchorIndex)) {
+      anchorIndex = retainedPreview.front();
+    }
+    applyPreviewNoteIndices(std::move(retainedPreview), anchorIndex);
+    return;
+  }
+
+  size_t fallbackAnchor = m_lastPreviewAnchorNoteIndex;
+  if (fallbackAnchor == kInvalidNoteIndex ||
+      !std::binary_search(currentSelection.begin(), currentSelection.end(), fallbackAnchor)) {
+    const int hoveredNoteIndex = noteIndexAtViewportPoint(cursorPos);
+    if (hoveredNoteIndex >= 0) {
+      const size_t hoveredIndex = static_cast<size_t>(hoveredNoteIndex);
+      if (std::binary_search(currentSelection.begin(), currentSelection.end(), hoveredIndex)) {
+        fallbackAnchor = hoveredIndex;
+      }
+    }
+  }
+  if (fallbackAnchor == kInvalidNoteIndex ||
+      !std::binary_search(currentSelection.begin(), currentSelection.end(), fallbackAnchor)) {
+    fallbackAnchor = currentSelection.back();
+  }
+
+  m_lastPreviewAnchorNoteIndex = fallbackAnchor;
+  applyPreviewNoteIndices(overlappingSelectionForAnchor(fallbackAnchor, currentSelection), fallbackAnchor);
+}
+
+void PianoRollView::applyPreviewNoteIndices(std::vector<size_t> indices, size_t anchorIndex) {
+  indices.erase(std::remove_if(indices.begin(),
+                               indices.end(),
+                               [this](size_t index) {
+                                 return index >= m_selectableNotes.size();
+                               }),
+                indices.end());
+  std::sort(indices.begin(), indices.end());
+  indices.erase(std::unique(indices.begin(), indices.end()), indices.end());
+
+  if (indices.empty()) {
+    if (m_previewNoteIndices.empty()) {
+      return;
+    }
+    m_previewNoteIndices.clear();
+    m_previewAnchorNoteIndex = kInvalidNoteIndex;
+    emit notePreviewStopped();
+    return;
+  }
+
+  if (anchorIndex >= m_selectableNotes.size() ||
+      !std::binary_search(indices.begin(), indices.end(), anchorIndex)) {
+    anchorIndex = indices.front();
+  }
+
+  if (indices == m_previewNoteIndices && anchorIndex == m_previewAnchorNoteIndex) {
+    return;
+  }
+
+  m_previewNoteIndices = std::move(indices);
+  m_previewAnchorNoteIndex = anchorIndex;
+
+  std::vector<VGMItem*> previewItems;
+  previewItems.reserve(m_previewNoteIndices.size());
+  std::unordered_set<VGMItem*> seenItems;
+  seenItems.reserve(m_previewNoteIndices.size() * 2 + 1);
+
+  VGMItem* anchorItem = m_selectableNotes[m_previewAnchorNoteIndex].item;
+  if (anchorItem && seenItems.insert(anchorItem).second) {
+    previewItems.push_back(anchorItem);
+  }
+
+  for (size_t previewIndex : m_previewNoteIndices) {
+    VGMItem* item = m_selectableNotes[previewIndex].item;
+    if (!item || !seenItems.insert(item).second) {
+      continue;
+    }
+    previewItems.push_back(item);
+  }
+
+  if (previewItems.empty()) {
+    m_previewNoteIndices.clear();
+    m_previewAnchorNoteIndex = kInvalidNoteIndex;
+    emit notePreviewStopped();
+    return;
+  }
+
+  if (!anchorItem) {
+    anchorItem = previewItems.front();
+  }
+
+  emit notePreviewRequested(previewItems, anchorItem);
+}
+
+void PianoRollView::clearPreviewNotes() {
+  applyPreviewNoteIndices({}, kInvalidNoteIndex);
 }
 
 int PianoRollView::noteIndexAtViewportPoint(const QPoint& pos) const {

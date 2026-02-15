@@ -159,6 +159,10 @@ VGMFileView::VGMFileView(VGMFile* vgmfile)
     connect(panelUi.activeNoteView, &ActiveNoteView::notePreviewStopped, this,
             &VGMFileView::stopNotePreview);
     connect(panelUi.pianoRollView, &PianoRollView::selectionSetChanged, this, &VGMFileView::onSelectionSetChange);
+    connect(panelUi.pianoRollView, &PianoRollView::notePreviewRequested, this,
+            &VGMFileView::previewPianoRollNotes);
+    connect(panelUi.pianoRollView, &PianoRollView::notePreviewStopped, this,
+            &VGMFileView::stopNotePreview);
 
     connect(panelUi.treeView, &VGMFileTreeView::currentItemChanged,
             this,
@@ -583,6 +587,59 @@ void VGMFileView::previewNotesForEvent(VGMItem* item, bool includeActiveNotesAtT
         previewNotes.push_back(activeNote);
       }
     }
+  }
+
+  SequencePlayer::the().previewNotesAtTick(previewNotes, tick);
+}
+
+void VGMFileView::previewPianoRollNotes(const std::vector<VGMItem*>& items, VGMItem* anchorItem) const {
+  SeqEvent* anchorEvent = dynamic_cast<SeqEvent*>(anchorItem);
+  if (!anchorEvent) {
+    for (VGMItem* item : items) {
+      anchorEvent = dynamic_cast<SeqEvent*>(item);
+      if (anchorEvent) {
+        break;
+      }
+    }
+  }
+
+  uint32_t tick = 0;
+  if (!prepareSeqEventForPlayback(anchorEvent, tick)) {
+    SequencePlayer::the().stopPreviewNote();
+    return;
+  }
+
+  std::vector<SequencePlayer::PreviewNote> previewNotes;
+  previewNotes.reserve(items.size());
+  std::unordered_set<uint16_t> seenKeys;
+  seenKeys.reserve(items.size() * 2 + 1);
+  const auto noteKey = [](const SequencePlayer::PreviewNote& note) {
+    return static_cast<uint16_t>((static_cast<uint16_t>(note.channel) << 8) | note.key);
+  };
+
+  auto appendPreviewNote = [&](const SeqEvent* seqEvent) {
+    SequencePlayer::PreviewNote note;
+    if (!buildPreviewNoteForEvent(seqEvent, note)) {
+      return;
+    }
+    if (!seenKeys.emplace(noteKey(note)).second) {
+      return;
+    }
+    previewNotes.push_back(note);
+  };
+
+  appendPreviewNote(anchorEvent);
+  for (VGMItem* item : items) {
+    auto* seqEvent = dynamic_cast<SeqEvent*>(item);
+    if (!seqEvent || seqEvent == anchorEvent) {
+      continue;
+    }
+    appendPreviewNote(seqEvent);
+  }
+
+  if (previewNotes.empty()) {
+    SequencePlayer::the().stopPreviewNote();
+    return;
   }
 
   SequencePlayer::the().previewNotesAtTick(previewNotes, tick);

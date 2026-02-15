@@ -116,6 +116,7 @@ public slots:
   void onSelectionSetChange(const std::vector<VGMItem*>& items, VGMItem* primaryItem) const;
   void seekToEvent(VGMItem* item) const;
   void previewNotesForEvent(VGMItem* item, bool includeActiveNotesAtTick) const;
+  void previewPianoRollNotes(const std::vector<VGMItem*>& items, VGMItem* anchorItem) const;
   void stopNotePreview() const;
   void previewActiveNote(int trackIndex, int key) const;
   void onPlaybackPositionChanged(int current, int max, PositionChangeOrigin origin);

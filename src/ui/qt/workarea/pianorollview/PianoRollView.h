@@ -60,6 +60,8 @@ signals:
   void seekRequested(int tick);
   void selectionChanged(VGMItem* item);
   void selectionSetChanged(const std::vector<VGMItem*>& items, VGMItem* primaryItem);
+  void notePreviewRequested(const std::vector<VGMItem*>& items, VGMItem* anchorItem);
+  void notePreviewStopped();
 
 protected:
   void resizeEvent(QResizeEvent* event) override;
@@ -87,6 +89,7 @@ private:
   static constexpr int kMidiKeyCount = PianoRollFrame::kMidiKeyCount;
   static constexpr int kKeyboardWidth = 78;
   static constexpr int kTopBarHeight = 22;
+  static constexpr size_t kInvalidNoteIndex = std::numeric_limits<size_t>::max();
 
   static constexpr float kDefaultPixelsPerTick = 0.20f;
   static constexpr float kDefaultPixelsPerKey = 12.0f;
@@ -131,11 +134,17 @@ private:
   [[nodiscard]] VGMItem* noteAtViewportPoint(const QPoint& pos) const;
   [[nodiscard]] QRect graphRectInViewport() const;
   [[nodiscard]] QRectF graphSelectionRectInViewport() const;
+  [[nodiscard]] bool selectableNotesOverlap(size_t lhsIndex, size_t rhsIndex) const;
+  [[nodiscard]] std::vector<size_t> overlappingSelectionForAnchor(size_t anchorIndex,
+                                                                  const std::vector<size_t>& selection) const;
   void applySelectedNoteIndices(std::vector<size_t> indices,
                                 bool emitSelectionSignal,
                                 VGMItem* preferredPrimary = nullptr);
   void emitCurrentSelectionSignals();
   void updateMarqueeSelection(bool emitSelectionSignal);
+  void updateMarqueePreview(const std::vector<size_t>& previousSelection, const QPoint& cursorPos);
+  void applyPreviewNoteIndices(std::vector<size_t> indices, size_t anchorIndex);
+  void clearPreviewNotes();
 
   void zoomHorizontal(int steps, int anchorX, bool animated = false, int durationMs = 0);
   void zoomVertical(int steps, int anchorY, bool animated = false, int durationMs = 0);
@@ -189,6 +198,8 @@ private:
   QPoint m_noteSelectionAnchor;
   QPoint m_noteSelectionCurrent;
   VGMItem* m_primarySelectedItem = nullptr;
+  size_t m_lastPreviewAnchorNoteIndex = kInvalidNoteIndex;
+  size_t m_previewAnchorNoteIndex = kInvalidNoteIndex;
 
   // Primary map for regular sequences.
   std::unordered_map<const SeqTrack*, int> m_trackIndexByPtr;
@@ -202,6 +213,7 @@ private:
   std::shared_ptr<const std::vector<PianoRollFrame::TimeSignature>> m_timeSignatures;
   std::vector<SelectableNote> m_selectableNotes;
   std::vector<size_t> m_selectedNoteIndices;
+  std::vector<size_t> m_previewNoteIndices;
 
   std::array<ActiveKeyState, kMidiKeyCount> m_activeKeys{};
 };
