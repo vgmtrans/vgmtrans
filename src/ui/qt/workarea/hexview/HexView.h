@@ -168,7 +168,12 @@ private:
   qreal m_shadowStrength = 1.0;
   QElapsedTimer m_playbackFadeClock;
   QBasicTimer m_playbackFadeTimer;
+  QColor m_playbackGlowLow;
+  QColor m_playbackGlowHigh;
+  float m_playbackGlowStrength = 1.0f;
+  float m_playbackGlowRadius = 0.5f;
   float m_shadowEdgeCurve = 1.0f;
+  float m_playbackGlowEdgeCurve = 1.0f;
   bool m_scrollBarDragging = false;
   int m_pendingScrollY = 0;
 
