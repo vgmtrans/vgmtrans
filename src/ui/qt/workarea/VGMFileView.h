@@ -87,6 +87,7 @@ private:
   [[nodiscard]] int trackIndexForEvent(const SeqEvent* event) const;
   [[nodiscard]] int effectiveTrackCountForSeq(VGMSeq* seq) const;
   static int noteKeyForEvent(const SeqEvent* event);
+  [[nodiscard]] bool ensureAssociatedCollectionActive() const;
   bool prepareSeqEventForPlayback(SeqEvent* event, uint32_t& tick) const;
 
   PanelUi& panel(PanelSide side) { return m_panels[static_cast<size_t>(side)]; }
@@ -117,7 +118,6 @@ public slots:
   void previewNotesForEvent(VGMItem* item, bool includeActiveNotesAtTick) const;
   void stopNotePreview() const;
   void previewActiveNote(int trackIndex, int key) const;
-  void stopActiveNotePreview() const;
   void onPlaybackPositionChanged(int current, int max, PositionChangeOrigin origin);
   void onPlayerStatusChanged(bool playing);
   void resetHexViewFont();
