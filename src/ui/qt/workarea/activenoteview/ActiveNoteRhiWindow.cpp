@@ -11,6 +11,8 @@
 
 #include <rhi/qrhi.h>
 
+#include <QMouseEvent>
+
 ActiveNoteRhiWindow::ActiveNoteRhiWindow(ActiveNoteView* view, ActiveNoteRhiRenderer* renderer)
     : m_view(view),
       m_renderer(renderer) {
@@ -18,6 +20,25 @@ ActiveNoteRhiWindow::ActiveNoteRhiWindow(ActiveNoteView* view, ActiveNoteRhiRend
 
 ActiveNoteRhiWindow::~ActiveNoteRhiWindow() {
   releaseRhiResources();
+}
+
+bool ActiveNoteRhiWindow::handleWindowEvent(QEvent* e) {
+  if (!e || !m_view) {
+    return false;
+  }
+
+  switch (e->type()) {
+    case QEvent::MouseButtonPress:
+      return m_view->handleViewportMousePress(static_cast<QMouseEvent*>(e));
+    case QEvent::MouseMove:
+      return m_view->handleViewportMouseMove(static_cast<QMouseEvent*>(e));
+    case QEvent::MouseButtonRelease:
+      return m_view->handleViewportMouseRelease(static_cast<QMouseEvent*>(e));
+    default:
+      break;
+  }
+
+  return false;
 }
 
 void ActiveNoteRhiWindow::onRhiInitialized(QRhi* rhi) {
