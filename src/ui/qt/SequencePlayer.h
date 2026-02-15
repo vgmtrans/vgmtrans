@@ -58,6 +58,7 @@ public:
   void seek(int position, PositionChangeOrigin origin);
   bool previewNoteOn(uint8_t channel, uint8_t key, uint8_t velocity, uint32_t tick);
   bool previewNotesAtTick(const std::vector<PreviewNote>& notes, uint32_t tick);
+  bool updatePreviewNotesAtTick(const std::vector<PreviewNote>& notes, uint32_t tick);
   void stopPreviewNote();
 
   /**
@@ -108,7 +109,7 @@ private:
   void releasePreviewStreams();
   bool syncPreviewStateAtTick(uint32_t tick);
   void syncPreviewGlobalState();
-  bool syncPreviewChannelState(uint8_t channel);
+  bool syncPreviewChannelState(uint8_t channel, bool resetChannel = true);
 
   const VGMColl *m_active_vgmcoll{};
   HSTREAM m_active_stream{};
