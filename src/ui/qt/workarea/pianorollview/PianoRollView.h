@@ -134,15 +134,12 @@ private:
   [[nodiscard]] VGMItem* noteAtViewportPoint(const QPoint& pos) const;
   [[nodiscard]] QRect graphRectInViewport() const;
   [[nodiscard]] QRectF graphSelectionRectInViewport() const;
-  [[nodiscard]] bool selectableNotesOverlap(size_t lhsIndex, size_t rhsIndex) const;
-  [[nodiscard]] std::vector<size_t> overlappingSelectionForAnchor(size_t anchorIndex,
-                                                                  const std::vector<size_t>& selection) const;
   void applySelectedNoteIndices(std::vector<size_t> indices,
                                 bool emitSelectionSignal,
                                 VGMItem* preferredPrimary = nullptr);
   void emitCurrentSelectionSignals();
   void updateMarqueeSelection(bool emitSelectionSignal);
-  void updateMarqueePreview(const std::vector<size_t>& previousSelection, const QPoint& cursorPos);
+  void updateMarqueePreview(const QPoint& cursorPos);
   void applyPreviewNoteIndices(std::vector<size_t> indices, size_t anchorIndex);
   void clearPreviewNotes();
 
@@ -198,7 +195,6 @@ private:
   QPoint m_noteSelectionAnchor;
   QPoint m_noteSelectionCurrent;
   VGMItem* m_primarySelectedItem = nullptr;
-  size_t m_lastPreviewAnchorNoteIndex = kInvalidNoteIndex;
   size_t m_previewAnchorNoteIndex = kInvalidNoteIndex;
 
   // Primary map for regular sequences.
@@ -214,7 +210,6 @@ private:
   std::vector<SelectableNote> m_selectableNotes;
   std::vector<size_t> m_selectedNoteIndices;
   std::vector<size_t> m_previewNoteIndices;
-  std::vector<size_t> m_selectionOverlapOrder;
 
   std::array<ActiveKeyState, kMidiKeyCount> m_activeKeys{};
 };
