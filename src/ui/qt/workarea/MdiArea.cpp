@@ -15,7 +15,6 @@
 #include <QFontMetrics>
 #include <QHBoxLayout>
 #include <QIcon>
-#include <QImage>
 #include <QMenu>
 #include <QPaintEvent>
 #include <QPainter>
@@ -230,26 +229,6 @@ void paintDetailedInstruction(QPainter &painter, const DetailedInstructionLayout
 
 constexpr int kTabControlSpacing = 2;
 constexpr int kTabControlOuterMargin = 4;
-
-// Chooses a white/black stencil base by sampling the tab-strip background brightness.
-QColor tabControlBaseGlyphColor(const QPixmap &tabStripColumn, const QPalette &fallbackPalette) {
-  QColor background;
-  const QImage texture = tabStripColumn.toImage();
-  if (!texture.isNull()) {
-    background = texture.pixelColor(0, texture.height() / 2);
-  }
-
-  if (!background.isValid()) {
-    background = fallbackPalette.color(QPalette::Window);
-  }
-
-  if (!background.isValid()) {
-    background = QColor(0x20, 0x20, 0x20);
-  }
-
-  const int luma = qGray(background.rgb());
-  return luma < 128 ? QColor(Qt::white) : QColor(Qt::black);
-}
 
 QIcon panelButtonIcon(const QColor &tint) {
   return QIcon(new TintableSvgIconEngine(QStringLiteral(":/icons/midi-port.svg"), tint));
@@ -568,15 +547,21 @@ void MdiArea::refreshTabControlAppearance() {
   strip->setTextureColumn(m_cachedTabBarColumn);
 
   const QPalette glyphPalette = m_tabBar ? m_tabBar->palette() : m_tabControls->palette();
-  const QColor baseGlyph = tabControlBaseGlyphColor(m_cachedTabBarColumn, glyphPalette);
-  const auto withAlpha = [&](qreal alpha) {
-    QColor color = baseGlyph;
-    color.setAlphaF(std::clamp(alpha, 0.0, 1.0));
-    return color;
-  };
-  const QColor onGlyph = withAlpha(0.74);
-  const QColor offGlyph = withAlpha(0.48);
-  const QColor disabledGlyph = withAlpha(0.32);
+  QColor background = glyphPalette.color(QPalette::Window);
+  if (!background.isValid()) {
+    background = palette().color(QPalette::Window);
+  }
+  if (!background.isValid()) {
+    background = QColor(0x20, 0x20, 0x20);
+  }
+
+  const QColor baseGlyph = qGray(background.rgb()) < 128 ? QColor(Qt::white) : QColor(Qt::black);
+  QColor onGlyph = baseGlyph;
+  onGlyph.setAlphaF(0.74);
+  QColor offGlyph = baseGlyph;
+  offGlyph.setAlphaF(0.32);
+  QColor disabledGlyph = baseGlyph;
+  disabledGlyph.setAlphaF(0.12);
 
   auto assignIconForState = [&](QToolButton *button, bool onState) {
     if (!button) {
