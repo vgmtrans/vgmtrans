@@ -85,87 +85,7 @@ int previewMidiChannelForTrack(const VGMSeq* seq, int trackIndex) {
   return -1;
 }
 
-struct TransposeLaneState {
-  int transpose = 0;
-  uint32_t tick = 0;
-  size_t order = 0;
-  bool hasValue = false;
-};
-
-struct PreviewTransposeSnapshot {
-  std::array<int, 128> transposeByChannel{};
-};
-
-bool isNewerTransposePoint(uint32_t tick, size_t order, const TransposeLaneState& current) {
-  return !current.hasValue ||
-         tick > current.tick ||
-         (tick == current.tick && order >= current.order);
-}
-
-PreviewTransposeSnapshot buildPreviewTransposeSnapshot(VGMSeq* seq, uint32_t tick) {
-  PreviewTransposeSnapshot snapshot;
-  if (!seq) {
-    return snapshot;
-  }
-
-  const auto& timeline = seq->timedEventIndex();
-  if (!timeline.finalized()) {
-    return snapshot;
-  }
-
-  TransposeLaneState globalState;
-  std::array<TransposeLaneState, 128> trackStates{};
-
-  for (size_t i = 0; i < timeline.size(); ++i) {
-    const auto& timed = timeline.event(i);
-    if (!timed.event || timed.startTick > tick) {
-      continue;
-    }
-
-    const auto* transposeEvent = dynamic_cast<const TransposeSeqEvent*>(timed.event);
-    if (!transposeEvent) {
-      continue;
-    }
-
-    if (transposeEvent->isGlobalTranspose()) {
-      if (isNewerTransposePoint(timed.startTick, i, globalState)) {
-        globalState.transpose = transposeEvent->transpose();
-        globalState.tick = timed.startTick;
-        globalState.order = i;
-        globalState.hasValue = true;
-      }
-      continue;
-    }
-
-    const int channel = previewMidiChannelForEvent(timed.event);
-    if (channel < 0 || channel >= 128) {
-      continue;
-    }
-
-    auto& trackState = trackStates[static_cast<size_t>(channel)];
-    if (isNewerTransposePoint(timed.startTick, i, trackState)) {
-      trackState.transpose = transposeEvent->transpose();
-      trackState.tick = timed.startTick;
-      trackState.order = i;
-      trackState.hasValue = true;
-    }
-  }
-
-  const int globalTranspose = globalState.hasValue ? globalState.transpose : 0;
-  for (int channel = 0; channel < 128; ++channel) {
-    const auto& trackState = trackStates[static_cast<size_t>(channel)];
-    const int trackTranspose = trackState.hasValue ? trackState.transpose : 0;
-    const bool isDrumChannel = (channel % 16) == 9;
-    snapshot.transposeByChannel[static_cast<size_t>(channel)] =
-        trackTranspose + (isDrumChannel ? 0 : globalTranspose);
-  }
-
-  return snapshot;
-}
-
-bool buildPreviewNoteForEvent(const SeqEvent* seqEvent,
-                              const PreviewTransposeSnapshot& transposeSnapshot,
-                              SequencePlayer::PreviewNote& outNote) {
+bool buildPreviewNoteForEvent(const SeqEvent* seqEvent, SequencePlayer::PreviewNote& outNote) {
   if (!seqEvent) {
     return false;
   }
@@ -192,14 +112,8 @@ bool buildPreviewNoteForEvent(const SeqEvent* seqEvent,
     velocity = convert7bitPercentAmpToStdMidiVal(velocity);
   }
 
-  const int transposedKey =
-      static_cast<int>(key) + transposeSnapshot.transposeByChannel[static_cast<size_t>(midiChannel)];
-  if (transposedKey < 0 || transposedKey > 127) {
-    return false;
-  }
-
   outNote.channel = static_cast<uint8_t>(midiChannel);
-  outNote.key = static_cast<uint8_t>(transposedKey);
+  outNote.key = key;
   outNote.velocity = velocity;
   return true;
 }
@@ -636,11 +550,8 @@ void VGMFileView::previewNotesForEvent(VGMItem* item, bool includeActiveNotesAtT
     return;
   }
 
-  const PreviewTransposeSnapshot transposeSnapshot =
-      buildPreviewTransposeSnapshot(event->parentTrack->parentSeq, tick);
-
   SequencePlayer::PreviewNote selectedNote;
-  if (!buildPreviewNoteForEvent(event, transposeSnapshot, selectedNote)) {
+  if (!buildPreviewNoteForEvent(event, selectedNote)) {
     SequencePlayer::the().stopPreviewNote();
     return;
   }
@@ -667,7 +578,7 @@ void VGMFileView::previewNotesForEvent(VGMItem* item, bool includeActiveNotesAtT
           continue;
         }
         SequencePlayer::PreviewNote activeNote;
-        if (!buildPreviewNoteForEvent(timed->event, transposeSnapshot, activeNote)) {
+        if (!buildPreviewNoteForEvent(timed->event, activeNote)) {
           continue;
         }
         if (!seenKeys.emplace(noteKey(activeNote)).second) {
@@ -698,9 +609,6 @@ void VGMFileView::previewPianoRollNotes(const std::vector<VGMItem*>& items, VGMI
     return;
   }
 
-  const PreviewTransposeSnapshot transposeSnapshot =
-      buildPreviewTransposeSnapshot(anchorEvent->parentTrack->parentSeq, tick);
-
   std::vector<SequencePlayer::PreviewNote> previewNotes;
   previewNotes.reserve(items.size());
   std::unordered_set<uint16_t> seenKeys;
@@ -711,7 +619,7 @@ void VGMFileView::previewPianoRollNotes(const std::vector<VGMItem*>& items, VGMI
 
   auto appendPreviewNote = [&](const SeqEvent* seqEvent) {
     SequencePlayer::PreviewNote note;
-    if (!buildPreviewNoteForEvent(seqEvent, transposeSnapshot, note)) {
+    if (!buildPreviewNoteForEvent(seqEvent, note)) {
       return;
     }
     if (!seenKeys.emplace(noteKey(note)).second) {
