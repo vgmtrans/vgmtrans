@@ -239,10 +239,6 @@ QIcon panelButtonIcon(const QColor &tint) {
   return QIcon(new TintableSvgIconEngine(QStringLiteral(":/icons/midi-port.svg"), tint));
 }
 
-bool isTabBarScrollButton(const QToolButton *button) {
-  return button && button->isVisible() && button->arrowType() != Qt::NoArrow;
-}
-
 QIcon iconForPanelView(PanelViewKind viewKind) {
   switch (viewKind) {
     case PanelViewKind::Hex:
@@ -342,7 +338,7 @@ void MdiArea::setupTabBarControls() {
 #ifdef Q_OS_MAC
     m_tabBar->setElideMode(Qt::ElideNone);
 #endif
-    m_cachedStableTabBarColumn = QPixmap();
+    m_cachedTabBarColumn = QPixmap();
     m_tabBar->installEventFilter(this);
     // QMdiArea lays out the tab bar inside a host container; reserve space against that host.
     m_tabBarHost = m_tabBar->parentWidget();
@@ -548,37 +544,12 @@ void MdiArea::refreshTabControlAppearance() {
   }
 
   auto *strip = static_cast<TabControlStrip *>(m_tabControls);
-  QPixmap textureColumn;
-  if (m_tabBar && m_tabBar->width() > 0 && m_tabBar->height() > 0) {
-    const auto buttons = m_tabBar->findChildren<QToolButton *>(QString(), Qt::FindDirectChildrenOnly);
-    const bool hasScrollButtons = std::any_of(buttons.cbegin(), buttons.cend(), [](const QToolButton *button) {
-      return isTabBarScrollButton(button);
-    });
-
-    if (!hasScrollButtons) {
-      // Sample an actual rendered tab-bar column so background and divider lines match exactly.
-      const int sampleX = std::max(0, m_tabBar->width() - 1);
-      textureColumn = m_tabBar->grab(QRect(sampleX, 0, 1, m_tabBar->height()));
-      if (!textureColumn.isNull()) {
-        m_cachedStableTabBarColumn = textureColumn;
-      }
-    } else if (!m_cachedStableTabBarColumn.isNull()) {
-      // Keep using a stable non-scroller sample once overflow arrows appear.
-      textureColumn = m_cachedStableTabBarColumn;
-    } else {
-      // Fallback when startup begins in overflow mode: sample left of the arrow cluster.
-      int leftMostScrollX = m_tabBar->width();
-      for (const auto *button : buttons) {
-        if (!isTabBarScrollButton(button)) {
-          continue;
-        }
-        leftMostScrollX = std::min(leftMostScrollX, button->geometry().x());
-      }
-      const int sampleX = std::clamp(leftMostScrollX - 1, 0, m_tabBar->width() - 1);
-      textureColumn = m_tabBar->grab(QRect(sampleX, 0, 1, m_tabBar->height()));
-    }
+  if (m_cachedTabBarColumn.isNull() && m_tabBar && m_tabBar->width() > 0 && m_tabBar->height() > 0) {
+    // Capture once from the real tab-bar rendering and keep it until the palette/style changes.
+    const int sampleX = std::max(0, m_tabBar->width() - 1);
+    m_cachedTabBarColumn = m_tabBar->grab(QRect(sampleX, 0, 1, m_tabBar->height()));
   }
-  strip->setTextureColumn(textureColumn);
+  strip->setTextureColumn(m_cachedTabBarColumn);
 
   const QColor onGlyph = tabControlGlyphColor(m_tabControls, 0.74);
   const QColor offGlyph = tabControlGlyphColor(m_tabControls, 0.48);
@@ -615,7 +586,7 @@ void MdiArea::applyTabBarStyle() {
 void MdiArea::changeEvent(QEvent *event) {
   if (event->type() == QEvent::PaletteChange ||
       event->type() == QEvent::ApplicationPaletteChange) {
-    m_cachedStableTabBarColumn = QPixmap();
+    m_cachedTabBarColumn = QPixmap();
     updateBackgroundColor();
     refreshTabControlAppearance();
   }
@@ -630,7 +601,11 @@ bool MdiArea::eventFilter(QObject *watched, QEvent *event) {
       case QEvent::Resize:
       case QEvent::Move:
       case QEvent::LayoutRequest:
+        repositionTabBarControls();
+        refreshTabControlAppearance();
+        break;
       case QEvent::StyleChange:
+        m_cachedTabBarColumn = QPixmap();
         repositionTabBarControls();
         refreshTabControlAppearance();
         break;
