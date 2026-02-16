@@ -86,7 +86,6 @@ private:
   void ensureTrackIndexMap(VGMSeq* seq);
   [[nodiscard]] int trackIndexForEvent(const SeqEvent* event) const;
   [[nodiscard]] int effectiveTrackCountForSeq(VGMSeq* seq) const;
-  static int noteKeyForEvent(const SeqEvent* event);
   [[nodiscard]] bool ensureAssociatedCollectionActive() const;
   bool prepareSeqEventForPlayback(SeqEvent* event, uint32_t& tick) const;
 
