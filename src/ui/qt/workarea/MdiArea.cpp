@@ -36,6 +36,7 @@
 #include "Metrics.h"
 #include "QtVGMRoot.h"
 #include "services/NotificationCenter.h"
+#include "util/TintableSvgIconEngine.h"
 
 namespace {
 
@@ -200,8 +201,14 @@ void paintDetailedInstruction(QPainter &painter, const DetailedInstructionLayout
 constexpr int kTabControlSpacing = 2;
 constexpr int kTabControlOuterMargin = 4;
 
-QIcon iconForPanelButton() {
-  return QIcon(QStringLiteral(":/icons/midi-port.svg"));
+QColor tabControlGlyphColor(const QWidget *widget) {
+  QColor color = widget ? widget->palette().color(QPalette::WindowText) : QColor(Qt::white);
+  color.setAlphaF(0.72);
+  return color;
+}
+
+QIcon panelButtonIcon(const QColor &tint) {
+  return QIcon(new TintableSvgIconEngine(QStringLiteral(":/icons/midi-port.svg"), tint));
 }
 
 QIcon iconForPanelView(PanelViewKind viewKind) {
@@ -316,14 +323,16 @@ void MdiArea::setupTabBarControls() {
     QWidget *controlsParent = m_tabBarHost ? m_tabBarHost : m_tabBar;
     m_tabControls = new QWidget(controlsParent);
     auto *controlsLayout = new QHBoxLayout(m_tabControls);
-    controlsLayout->setContentsMargins(0, 0, 0, 0);
+    controlsLayout->setContentsMargins(0, 2, 0, 2);
     controlsLayout->setSpacing(kTabControlSpacing);
 
     auto createIconButton = [this](QWidget *parent, const QString &toolTip) {
       auto *button = new QToolButton(parent);
-      button->setAutoRaise(true);
-      button->setIcon(iconForPanelButton());
-      button->setIconSize(QSize(14, 14));
+      button->setAutoRaise(false);
+      button->setToolButtonStyle(Qt::ToolButtonIconOnly);
+      button->setIconSize(QSize(18, 18));
+      button->setFixedSize(QSize(30, 18));
+      button->setFocusPolicy(Qt::NoFocus);
       button->setToolTip(toolTip);
       return button;
     };
@@ -379,6 +388,7 @@ void MdiArea::setupTabBarControls() {
     });
   }
 
+  refreshTabControlAppearance();
   applyTabBarStyle();
   repositionTabBarControls();
   updateTabBarControls();
@@ -479,6 +489,39 @@ void MdiArea::repositionTabBarControls() {
   m_tabControls->raise();
 }
 
+// Applies the flat, stencil-like visual style used by the tab-strip controls.
+void MdiArea::refreshTabControlAppearance() {
+  if (!m_tabControls) {
+    return;
+  }
+
+  const QString controlsStyle = QStringLiteral(
+      "QToolButton {"
+      " border: none;"
+      " background: transparent;"
+      " padding: 0px;"
+      " margin: 0px;"
+      "}"
+      "QToolButton:hover { background: transparent; }"
+      "QToolButton:pressed { background: transparent; }"
+      "QToolButton:checked { background: transparent; }"
+      "QToolButton::menu-indicator { image: none; width: 0px; }");
+  if (m_tabControls->styleSheet() != controlsStyle) {
+    m_tabControls->setStyleSheet(controlsStyle);
+  }
+
+  const QIcon glyphIcon = panelButtonIcon(tabControlGlyphColor(m_tabControls));
+  if (m_singlePaneButton) {
+    m_singlePaneButton->setIcon(glyphIcon);
+  }
+  if (m_leftPaneButton) {
+    m_leftPaneButton->setIcon(glyphIcon);
+  }
+  if (m_rightPaneButton) {
+    m_rightPaneButton->setIcon(glyphIcon);
+  }
+}
+
 // Applies tab-bar styling in an idempotent way to avoid repolish loops.
 void MdiArea::applyTabBarStyle() {
   if (!m_tabBar) {
@@ -498,6 +541,7 @@ void MdiArea::changeEvent(QEvent *event) {
   if (event->type() == QEvent::PaletteChange ||
       event->type() == QEvent::ApplicationPaletteChange) {
     updateBackgroundColor();
+    refreshTabControlAppearance();
   }
   QMdiArea::changeEvent(event);
 }
