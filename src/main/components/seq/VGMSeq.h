@@ -9,6 +9,7 @@
 #include "RawFile.h"
 #include "MidiFile.h"
 #include "SeqEventTimeIndex.h"
+#include "TransposeTimeline.h"
 #include <set>
 #include <filesystem>
 
@@ -114,6 +115,8 @@ class VGMSeq : public VGMFile {
   void setInitialPitchBendRange(uint16_t cents) { m_initial_pitch_bend_range_cents = cents; }
 
   SeqEventTimeIndex& timedEventIndex() { return m_timedEvents; }
+  TransposeTimeline& transposeTimeline() { return m_transposeTimeline; }
+  const TransposeTimeline& transposeTimeline() const { return m_transposeTimeline; }
 
  protected:
   virtual bool loadTracks(ReadMode readMode, uint32_t stopTime = 1000000);
@@ -160,6 +163,7 @@ private:
 
   // Timeline of sequence events emitted during MIDI conversion.
   SeqEventTimeIndex m_timedEvents;
+  TransposeTimeline m_transposeTimeline;
 
   uint16_t m_ppqn;
 

@@ -46,6 +46,7 @@ bool VGMMultiSectionSeq::loadTracks(ReadMode readMode, uint32_t stopTime) {
 
   if (readMode == READMODE_CONVERT_TO_MIDI) {
     timedEventIndex().clear();
+    transposeTimeline().clear();
   }
 
   // reset variables
@@ -80,6 +81,7 @@ bool VGMMultiSectionSeq::postLoad() {
   } else if (readMode == READMODE_CONVERT_TO_MIDI) {
     midi->sort();
     timedEventIndex().finalize();
+    transposeTimeline().build(timedEventIndex());
   }
 
   return true;
