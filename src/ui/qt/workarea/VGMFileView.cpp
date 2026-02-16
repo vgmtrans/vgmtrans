@@ -117,6 +117,28 @@ bool buildPreviewNoteForEvent(const SeqEvent* seqEvent, SequencePlayer::PreviewN
   outNote.velocity = velocity;
   return true;
 }
+
+int transposedNoteKeyForTimedEvent(const VGMSeq* seq, const SeqTimedEvent* timed) {
+  if (!seq || !timed || !timed->event) {
+    return -1;
+  }
+
+  int noteKey = -1;
+  if (const auto* noteOn = dynamic_cast<const NoteOnSeqEvent*>(timed->event)) {
+    noteKey = noteOn->absKey;
+  } else if (const auto* durNote = dynamic_cast<const DurNoteSeqEvent*>(timed->event)) {
+    noteKey = durNote->absKey;
+  }
+  if (noteKey < 0) {
+    return -1;
+  }
+
+  noteKey += seq->transposeTimeline().totalTransposeForTimedEvent(timed);
+  if (noteKey < 0 || noteKey >= 128) {
+    return -1;
+  }
+  return noteKey;
+}
 }  // namespace
 
 VGMFileView::VGMFileView(VGMFile* vgmfile)
@@ -776,19 +798,6 @@ int VGMFileView::effectiveTrackCountForSeq(VGMSeq* seq) const {
   return std::max(trackCount, 1);
 }
 
-int VGMFileView::noteKeyForEvent(const SeqEvent* event) {
-  if (!event) {
-    return -1;
-  }
-  if (auto* noteOn = dynamic_cast<const NoteOnSeqEvent*>(event)) {
-    return noteOn->absKey;
-  }
-  if (auto* durNote = dynamic_cast<const DurNoteSeqEvent*>(event)) {
-    return durNote->absKey;
-  }
-  return -1;
-}
-
 void VGMFileView::onPlaybackPositionChanged(int current, int max, PositionChangeOrigin origin) {
   Q_UNUSED(max);
 
@@ -930,8 +939,8 @@ void VGMFileView::onPlaybackPositionChanged(int current, int max, PositionChange
       continue;
     }
 
-    const int noteKey = noteKeyForEvent(timed->event);
-    if (noteKey < 0 || noteKey >= 128) {
+    const int noteKey = transposedNoteKeyForTimedEvent(seq, timed);
+    if (noteKey < 0) {
       continue;
     }
 
