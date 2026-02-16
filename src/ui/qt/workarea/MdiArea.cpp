@@ -40,6 +40,34 @@
 
 namespace {
 
+class TabControlStrip final : public QWidget {
+public:
+  explicit TabControlStrip(QWidget *parent = nullptr) : QWidget(parent) {}
+
+  void setTextureColumn(QPixmap textureColumn) {
+    if (m_textureColumn.cacheKey() == textureColumn.cacheKey()) {
+      return;
+    }
+    m_textureColumn = std::move(textureColumn);
+    update();
+  }
+
+protected:
+  void paintEvent(QPaintEvent *event) override {
+    Q_UNUSED(event);
+
+    QPainter painter(this);
+    if (!m_textureColumn.isNull()) {
+      painter.drawTiledPixmap(rect(), m_textureColumn);
+      return;
+    }
+    painter.fillRect(rect(), palette().color(QPalette::Window));
+  }
+
+private:
+  QPixmap m_textureColumn;
+};
+
 struct InstructionHint {
   QString iconPath;
   QString text;
@@ -201,14 +229,18 @@ void paintDetailedInstruction(QPainter &painter, const DetailedInstructionLayout
 constexpr int kTabControlSpacing = 2;
 constexpr int kTabControlOuterMargin = 4;
 
-QColor tabControlGlyphColor(const QWidget *widget) {
+QColor tabControlGlyphColor(const QWidget *widget, qreal alpha) {
   QColor color = widget ? widget->palette().color(QPalette::WindowText) : QColor(Qt::white);
-  color.setAlphaF(0.72);
+  color.setAlphaF(alpha);
   return color;
 }
 
 QIcon panelButtonIcon(const QColor &tint) {
   return QIcon(new TintableSvgIconEngine(QStringLiteral(":/icons/midi-port.svg"), tint));
+}
+
+bool isTabBarScrollButton(const QToolButton *button) {
+  return button && button->isVisible() && button->arrowType() != Qt::NoArrow;
 }
 
 QIcon iconForPanelView(PanelViewKind viewKind) {
@@ -310,6 +342,7 @@ void MdiArea::setupTabBarControls() {
 #ifdef Q_OS_MAC
     m_tabBar->setElideMode(Qt::ElideNone);
 #endif
+    m_cachedStableTabBarColumn = QPixmap();
     m_tabBar->installEventFilter(this);
     // QMdiArea lays out the tab bar inside a host container; reserve space against that host.
     m_tabBarHost = m_tabBar->parentWidget();
@@ -321,9 +354,11 @@ void MdiArea::setupTabBarControls() {
   if (!m_tabControls) {
     // Keep controls outside the tab bar so we can hard-limit the tab bar width.
     QWidget *controlsParent = m_tabBarHost ? m_tabBarHost : m_tabBar;
-    m_tabControls = new QWidget(controlsParent);
+    m_tabControls = new TabControlStrip(controlsParent);
+    m_tabControls->setObjectName(QStringLiteral("TabControlStrip"));
+    m_tabControls->setAttribute(Qt::WA_StyledBackground, false);
     auto *controlsLayout = new QHBoxLayout(m_tabControls);
-    controlsLayout->setContentsMargins(0, 2, 0, 2);
+    controlsLayout->setContentsMargins(kTabControlOuterMargin, 0, kTabControlOuterMargin, 0);
     controlsLayout->setSpacing(kTabControlSpacing);
 
     auto createIconButton = [this](QWidget *parent, const QString &toolTip) {
@@ -437,6 +472,7 @@ void MdiArea::updateTabBarControls() {
     m_rightPaneButton->setEnabled(false);
     setSeqOnlyEnabled(m_leftPaneActions, false);
     setSeqOnlyEnabled(m_rightPaneActions, false);
+    refreshTabControlAppearance();
     return;
   }
 
@@ -454,6 +490,7 @@ void MdiArea::updateTabBarControls() {
   setSeqOnlyEnabled(m_rightPaneActions, sequenceViewsAvailable);
 
   m_rightPaneButton->setEnabled(!singlePane);
+  refreshTabControlAppearance();
 }
 
 // Repositions controls and reserves layout space so tabs never overlap them.
@@ -468,7 +505,7 @@ void MdiArea::repositionTabBarControls() {
   }
 
   const QSize controlsSize = m_tabControls->sizeHint();
-  const int reservedRightMargin = controlsSize.width() + (kTabControlOuterMargin * 2);
+  const int reservedRightMargin = controlsSize.width();
   if (m_reservedTabBarRightMargin != reservedRightMargin) {
     m_reservedTabBarRightMargin = reservedRightMargin;
   }
@@ -483,43 +520,81 @@ void MdiArea::repositionTabBarControls() {
     tabGeometry = m_tabBar->geometry();
   }
 
-  const int x = std::max(0, host->width() - controlsSize.width() - kTabControlOuterMargin);
-  const int y = std::max(0, tabGeometry.y() + (tabGeometry.height() - controlsSize.height()) / 2);
-  m_tabControls->setGeometry(x, y, controlsSize.width(), controlsSize.height());
+  const int x = std::max(0, host->width() - controlsSize.width());
+  const int y = tabGeometry.y();
+  m_tabControls->setGeometry(x, y, controlsSize.width(), tabGeometry.height());
   m_tabControls->raise();
 }
 
 // Applies the flat, stencil-like visual style used by the tab-strip controls.
 void MdiArea::refreshTabControlAppearance() {
-  if (!m_tabControls) {
+  if (!m_tabControls || !m_singlePaneButton || !m_leftPaneButton || !m_rightPaneButton) {
     return;
   }
 
   const QString controlsStyle = QStringLiteral(
-      "QToolButton {"
+      "QWidget#TabControlStrip QToolButton {"
       " border: none;"
       " background: transparent;"
       " padding: 0px;"
       " margin: 0px;"
       "}"
-      "QToolButton:hover { background: transparent; }"
-      "QToolButton:pressed { background: transparent; }"
-      "QToolButton:checked { background: transparent; }"
-      "QToolButton::menu-indicator { image: none; width: 0px; }");
+      "QWidget#TabControlStrip QToolButton:hover { background: transparent; }"
+      "QWidget#TabControlStrip QToolButton:pressed { background: transparent; }"
+      "QWidget#TabControlStrip QToolButton:checked { background: transparent; }"
+      "QWidget#TabControlStrip QToolButton::menu-indicator { image: none; width: 0px; }");
   if (m_tabControls->styleSheet() != controlsStyle) {
     m_tabControls->setStyleSheet(controlsStyle);
   }
 
-  const QIcon glyphIcon = panelButtonIcon(tabControlGlyphColor(m_tabControls));
-  if (m_singlePaneButton) {
-    m_singlePaneButton->setIcon(glyphIcon);
+  auto *strip = static_cast<TabControlStrip *>(m_tabControls);
+  QPixmap textureColumn;
+  if (m_tabBar && m_tabBar->width() > 0 && m_tabBar->height() > 0) {
+    const auto buttons = m_tabBar->findChildren<QToolButton *>(QString(), Qt::FindDirectChildrenOnly);
+    const bool hasScrollButtons = std::any_of(buttons.cbegin(), buttons.cend(), [](const QToolButton *button) {
+      return isTabBarScrollButton(button);
+    });
+
+    if (!hasScrollButtons) {
+      // Sample an actual rendered tab-bar column so background and divider lines match exactly.
+      const int sampleX = std::max(0, m_tabBar->width() - 1);
+      textureColumn = m_tabBar->grab(QRect(sampleX, 0, 1, m_tabBar->height()));
+      if (!textureColumn.isNull()) {
+        m_cachedStableTabBarColumn = textureColumn;
+      }
+    } else if (!m_cachedStableTabBarColumn.isNull()) {
+      // Keep using a stable non-scroller sample once overflow arrows appear.
+      textureColumn = m_cachedStableTabBarColumn;
+    } else {
+      // Fallback when startup begins in overflow mode: sample left of the arrow cluster.
+      int leftMostScrollX = m_tabBar->width();
+      for (const auto *button : buttons) {
+        if (!isTabBarScrollButton(button)) {
+          continue;
+        }
+        leftMostScrollX = std::min(leftMostScrollX, button->geometry().x());
+      }
+      const int sampleX = std::clamp(leftMostScrollX - 1, 0, m_tabBar->width() - 1);
+      textureColumn = m_tabBar->grab(QRect(sampleX, 0, 1, m_tabBar->height()));
+    }
   }
-  if (m_leftPaneButton) {
-    m_leftPaneButton->setIcon(glyphIcon);
-  }
-  if (m_rightPaneButton) {
-    m_rightPaneButton->setIcon(glyphIcon);
-  }
+  strip->setTextureColumn(textureColumn);
+
+  const QColor onGlyph = tabControlGlyphColor(m_tabControls, 0.74);
+  const QColor offGlyph = tabControlGlyphColor(m_tabControls, 0.48);
+  const QColor disabledGlyph = tabControlGlyphColor(m_tabControls, 0.32);
+
+  auto assignIconForState = [&](QToolButton *button, bool onState) {
+    if (!button) {
+      return;
+    }
+    const QColor glyph = !button->isEnabled() ? disabledGlyph : (onState ? onGlyph : offGlyph);
+    button->setIcon(panelButtonIcon(glyph));
+  };
+
+  assignIconForState(m_singlePaneButton, m_singlePaneButton->isChecked());
+  assignIconForState(m_leftPaneButton, true);
+  assignIconForState(m_rightPaneButton, true);
 }
 
 // Applies tab-bar styling in an idempotent way to avoid repolish loops.
@@ -540,6 +615,7 @@ void MdiArea::applyTabBarStyle() {
 void MdiArea::changeEvent(QEvent *event) {
   if (event->type() == QEvent::PaletteChange ||
       event->type() == QEvent::ApplicationPaletteChange) {
+    m_cachedStableTabBarColumn = QPixmap();
     updateBackgroundColor();
     refreshTabControlAppearance();
   }
@@ -556,6 +632,7 @@ bool MdiArea::eventFilter(QObject *watched, QEvent *event) {
       case QEvent::LayoutRequest:
       case QEvent::StyleChange:
         repositionTabBarControls();
+        refreshTabControlAppearance();
         break;
       default:
         break;
