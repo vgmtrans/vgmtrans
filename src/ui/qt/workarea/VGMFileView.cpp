@@ -5,12 +5,9 @@
  */
 
 #include <QApplication>
-#include <QButtonGroup>
-#include <QHBoxLayout>
 #include <QShortcut>
 #include <QStackedWidget>
 #include <QTimer>
-#include <QToolButton>
 #include <QTreeWidgetItem>
 #include <QVBoxLayout>
 #include <QtGlobal>
@@ -40,15 +37,6 @@
 
 namespace {
 constexpr uint8_t kActiveNotePreviewVelocity = 127;
-
-QToolButton* createPanelButton(const QString& label, QWidget* parent) {
-  auto* button = new QToolButton(parent);
-  button->setText(label);
-  button->setCheckable(true);
-  button->setAutoRaise(true);
-  button->setSizePolicy(QSizePolicy::Minimum, QSizePolicy::Fixed);
-  return button;
-}
 
 int previewMidiChannelForEvent(const SeqEvent* event) {
   if (!event) {
@@ -126,10 +114,10 @@ VGMFileView::VGMFileView(VGMFile* vgmfile)
   // Keep a stable default cursor across MDI tabs; embedded RHI windows can leak resize cursors.
   setCursor(Qt::ArrowCursor);
 
-  const bool isSeqFile = dynamic_cast<VGMSeq*>(m_vgmfile) != nullptr;
+  m_isSeqFile = dynamic_cast<VGMSeq*>(m_vgmfile) != nullptr;
 
-  panel(PanelSide::Left) = createPanel(PanelSide::Left, isSeqFile);
-  panel(PanelSide::Right) = createPanel(PanelSide::Right, isSeqFile);
+  panel(PanelSide::Left) = createPanel(PanelSide::Left, m_isSeqFile);
+  panel(PanelSide::Right) = createPanel(PanelSide::Right, m_isSeqFile);
 
   m_splitter->addWidget(panel(PanelSide::Left).container);
   m_splitter->addWidget(panel(PanelSide::Right).container);
@@ -171,19 +159,7 @@ VGMFileView::VGMFileView(VGMFile* vgmfile)
               auto* vgmitem = static_cast<VGMItem*>(item->data(0, Qt::UserRole).value<void*>());
               onSelectionChange(vgmitem);
             });
-
-    connect(panelUi.viewButtons,
-            &QButtonGroup::idClicked,
-            this,
-            [this, side](int id) {
-              setPanelView(side, static_cast<PanelViewKind>(id));
-            });
   }
-
-  connect(panel(PanelSide::Left).singlePaneToggle,
-          &QToolButton::toggled,
-          this,
-          &VGMFileView::setSinglePaneMode);
 
   connect(new QShortcut(QKeySequence::ZoomIn, this),
           &QShortcut::activated,
@@ -222,39 +198,6 @@ VGMFileView::PanelUi VGMFileView::createPanel(PanelSide side, bool isSeqFile) {
   auto* containerLayout = new QVBoxLayout(panelUi.container);
   containerLayout->setContentsMargins(0, 0, 0, 0);
   containerLayout->setSpacing(0);
-
-  auto* toolbar = new QWidget(panelUi.container);
-  auto* toolbarLayout = new QHBoxLayout(toolbar);
-  toolbarLayout->setContentsMargins(4, 4, 4, 4);
-  toolbarLayout->setSpacing(4);
-
-  if (side == PanelSide::Left) {
-    auto* singlePaneToggle = createPanelButton("1 Pane", toolbar);
-    singlePaneToggle->setToolTip("Hide the right panel and show only the left panel");
-    panelUi.singlePaneToggle = singlePaneToggle;
-    toolbarLayout->addWidget(singlePaneToggle);
-  }
-
-  panelUi.viewButtons = new QButtonGroup(panelUi.container);
-  panelUi.viewButtons->setExclusive(true);
-
-  auto* hexButton = createPanelButton("Hex", toolbar);
-  auto* treeButton = createPanelButton("Tree", toolbar);
-  auto* activeButton = createPanelButton("Active", toolbar);
-  auto* pianoButton = createPanelButton("Piano", toolbar);
-  activeButton->setEnabled(isSeqFile);
-  pianoButton->setEnabled(isSeqFile);
-
-  panelUi.viewButtons->addButton(hexButton, static_cast<int>(PanelViewKind::Hex));
-  panelUi.viewButtons->addButton(treeButton, static_cast<int>(PanelViewKind::Tree));
-  panelUi.viewButtons->addButton(activeButton, static_cast<int>(PanelViewKind::ActiveNotes));
-  panelUi.viewButtons->addButton(pianoButton, static_cast<int>(PanelViewKind::PianoRoll));
-
-  toolbarLayout->addWidget(hexButton);
-  toolbarLayout->addWidget(treeButton);
-  toolbarLayout->addWidget(activeButton);
-  toolbarLayout->addWidget(pianoButton);
-  toolbarLayout->addStretch(1);
 
   panelUi.stack = new QStackedWidget(panelUi.container);
   panelUi.hexView = new HexView(m_vgmfile, panelUi.stack);
@@ -305,10 +248,6 @@ VGMFileView::PanelUi VGMFileView::createPanel(PanelSide side, bool isSeqFile) {
     panelUi.currentKind = PanelViewKind::Tree;
   }
   panelUi.stack->setCurrentIndex(static_cast<int>(panelUi.currentKind));
-
-  panelUi.viewButtons->button(static_cast<int>(panelUi.currentKind))->setChecked(true);
-
-  containerLayout->addWidget(toolbar);
   containerLayout->addWidget(panelUi.stack, 1);
 
   return panelUi;
@@ -332,6 +271,10 @@ void VGMFileView::focusInEvent(QFocusEvent* event) {
 }
 
 void VGMFileView::setPanelView(PanelSide side, PanelViewKind viewKind) {
+  if (!supportsViewKind(viewKind)) {
+    return;
+  }
+
   auto& panelUi = panel(side);
   if (panelUi.currentKind == viewKind) {
     return;
@@ -347,11 +290,32 @@ void VGMFileView::setPanelView(PanelSide side, PanelViewKind viewKind) {
   }
 }
 
+PanelViewKind VGMFileView::panelView(PanelSide side) const {
+  return panel(side).currentKind;
+}
+
+bool VGMFileView::supportsViewKind(PanelViewKind viewKind) const {
+  switch (viewKind) {
+    case PanelViewKind::ActiveNotes:
+    case PanelViewKind::PianoRoll:
+      return m_isSeqFile;
+    case PanelViewKind::Hex:
+    case PanelViewKind::Tree:
+      return true;
+  }
+  return false;
+}
+
 void VGMFileView::setSinglePaneMode(bool singlePane) {
   auto& rightPanel = panel(PanelSide::Right);
   if (!rightPanel.container) {
     return;
   }
+
+  if (m_singlePaneMode == singlePane) {
+    return;
+  }
+  m_singlePaneMode = singlePane;
 
   if (singlePane) {
     m_lastSplitSizes = m_splitter->sizes();
@@ -368,6 +332,10 @@ void VGMFileView::setSinglePaneMode(bool singlePane) {
     }
   }
   m_splitter->persistState();
+}
+
+bool VGMFileView::singlePaneMode() const {
+  return m_singlePaneMode;
 }
 
 void VGMFileView::resetSnapRanges() const {
