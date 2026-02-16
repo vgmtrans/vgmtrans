@@ -277,6 +277,7 @@ MdiArea::MdiArea(QWidget *parent) : QMdiArea(parent) {
 #endif
 }
 
+// Extracts a VGMFileView from an MDI subwindow (or its hosted widget).
 VGMFileView *MdiArea::asFileView(QMdiSubWindow *window) {
   if (!window) {
     return nullptr;
@@ -289,6 +290,7 @@ VGMFileView *MdiArea::asFileView(QMdiSubWindow *window) {
   return qobject_cast<VGMFileView *>(window->widget());
 }
 
+// Lazily creates the right-side tab-strip controls and their menus.
 void MdiArea::setupTabBarControls() {
   if (!m_tabBar) {
     m_tabBar = findChild<QTabBar *>();
@@ -302,6 +304,7 @@ void MdiArea::setupTabBarControls() {
     m_tabBar->setElideMode(Qt::ElideNone);
 #endif
     m_tabBar->installEventFilter(this);
+    // QMdiArea lays out the tab bar inside a host container; reserve space against that host.
     m_tabBarHost = m_tabBar->parentWidget();
     if (m_tabBarHost) {
       m_tabBarHost->installEventFilter(this);
@@ -309,6 +312,7 @@ void MdiArea::setupTabBarControls() {
   }
 
   if (!m_tabControls) {
+    // Keep controls outside the tab bar so we can hard-limit the tab bar width.
     QWidget *controlsParent = m_tabBarHost ? m_tabBarHost : m_tabBar;
     m_tabControls = new QWidget(controlsParent);
     auto *controlsLayout = new QHBoxLayout(m_tabControls);
@@ -360,6 +364,7 @@ void MdiArea::setupTabBarControls() {
       addAction(PanelViewKind::ActiveNotes, tr("Active Notes"), actions.activeNotes);
       addAction(PanelViewKind::PianoRoll, tr("Piano Roll"), actions.pianoRoll);
 
+      // Both pane menus expose the same view list; the target pane is captured by `side`.
       button->setMenu(menu);
     };
 
@@ -379,6 +384,7 @@ void MdiArea::setupTabBarControls() {
   updateTabBarControls();
 }
 
+// Syncs tab-strip control state with the active VGMFileView.
 void MdiArea::updateTabBarControls() {
   if (!m_tabControls || !m_singlePaneButton || !m_leftPaneButton || !m_rightPaneButton) {
     return;
@@ -415,6 +421,7 @@ void MdiArea::updateTabBarControls() {
   m_leftPaneButton->setEnabled(hasFileView);
 
   if (!hasFileView) {
+    // No active file: keep controls visible but inert.
     QSignalBlocker blocker(m_singlePaneButton);
     m_singlePaneButton->setChecked(false);
     m_rightPaneButton->setEnabled(false);
@@ -439,6 +446,7 @@ void MdiArea::updateTabBarControls() {
   m_rightPaneButton->setEnabled(!singlePane);
 }
 
+// Repositions controls and reserves layout space so tabs never overlap them.
 void MdiArea::repositionTabBarControls() {
   if (!m_tabBar || !m_tabControls) {
     return;
@@ -456,6 +464,7 @@ void MdiArea::repositionTabBarControls() {
   }
 
   QRect tabGeometry = m_tabBar->geometry();
+  // Reserve a fixed strip on the right so tab text and overflow arrows stop before the controls.
   const int targetTabWidth = std::max(0, host->width() - tabGeometry.x() - m_reservedTabBarRightMargin);
   if (tabGeometry.width() != targetTabWidth) {
     tabGeometry.setWidth(targetTabWidth);
@@ -470,6 +479,7 @@ void MdiArea::repositionTabBarControls() {
   m_tabControls->raise();
 }
 
+// Applies tab-bar styling in an idempotent way to avoid repolish loops.
 void MdiArea::applyTabBarStyle() {
   if (!m_tabBar) {
     return;
@@ -477,6 +487,7 @@ void MdiArea::applyTabBarStyle() {
 
   const QString styleSheet =
       QStringLiteral("QTabBar::tab { height: %1px; }").arg(Size::VTab);
+  // Re-setting the same stylesheet can trigger repolish churn and recursive style events.
   if (m_tabBar->styleSheet() == styleSheet) {
     return;
   }
@@ -493,6 +504,7 @@ void MdiArea::changeEvent(QEvent *event) {
 
 bool MdiArea::eventFilter(QObject *watched, QEvent *event) {
   if (watched == m_tabBar || watched == m_tabBarHost) {
+    // Track host + tab-bar layout changes to keep the reserved right strip aligned.
     switch (event->type()) {
       case QEvent::Show:
       case QEvent::Resize:

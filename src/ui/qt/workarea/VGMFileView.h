@@ -55,7 +55,7 @@ public:
   void setSinglePaneMode(bool singlePane);
   [[nodiscard]] bool singlePaneMode() const;
   [[nodiscard]] bool supportsViewKind(PanelViewKind viewKind) const;
-  [[nodiscard]] bool supportsSequenceViews() const { return m_isSeqFile; }
+  [[nodiscard]] bool supportsSequenceViews() const;
 
 private:
   struct PanelUi {
