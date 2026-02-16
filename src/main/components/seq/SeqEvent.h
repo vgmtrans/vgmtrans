@@ -409,7 +409,9 @@ class TransposeSeqEvent : public SeqEvent {
       return fmt::format("{} - transpose: {}", name(), m_transpose);
   };
 
-private:
+  [[nodiscard]] int transpose() const noexcept { return m_transpose; }
+
+ private:
   int m_transpose;
 };
 
