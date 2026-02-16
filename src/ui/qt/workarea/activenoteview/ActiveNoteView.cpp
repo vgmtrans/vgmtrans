@@ -144,6 +144,9 @@ bool ActiveNoteView::handleViewportMousePress(QMouseEvent* event) {
   }
 
   m_previewDragActive = true;
+  if (viewport()) {
+    viewport()->grabMouse();
+  }
   setPreviewKey(hitTestKeyboardKey(event->position().toPoint()));
   event->accept();
   return true;
@@ -156,6 +159,9 @@ bool ActiveNoteView::handleViewportMouseMove(QMouseEvent* event) {
 
   if (!(event->buttons() & Qt::LeftButton)) {
     m_previewDragActive = false;
+    if (viewport() && QWidget::mouseGrabber() == viewport()) {
+      viewport()->releaseMouse();
+    }
     clearPreviewKey();
     event->accept();
     return true;
@@ -172,6 +178,9 @@ bool ActiveNoteView::handleViewportMouseRelease(QMouseEvent* event) {
   }
 
   m_previewDragActive = false;
+  if (viewport() && QWidget::mouseGrabber() == viewport()) {
+    viewport()->releaseMouse();
+  }
   clearPreviewKey();
   event->accept();
   return true;
