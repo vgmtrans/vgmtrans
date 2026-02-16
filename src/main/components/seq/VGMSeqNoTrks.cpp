@@ -103,16 +103,19 @@ MidiFile *VGMSeqNoTrks::convertToMidi(const VGMColl* coll) {
   this->midi = newmidi;
   this->SeqTrack::readMode = this->VGMSeq::readMode = READMODE_CONVERT_TO_MIDI;
   timedEventIndex().clear();
+  transposeTimeline().clear();
   if (!loadEvents(stopTime)) {
     delete midi;
     this->midi = nullptr;
     timedEventIndex().clear();
+    transposeTimeline().clear();
     return nullptr;
   }
   if (!postLoad()) {
     delete midi;
     this->midi = nullptr;
     timedEventIndex().clear();
+    transposeTimeline().clear();
     return nullptr;
   }
   this->midi = nullptr;
