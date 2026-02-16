@@ -1635,7 +1635,14 @@ void SeqTrack::addControllerEventNoItem(uint8_t controllerType, uint8_t controll
 void SeqTrack::addGlobalTranspose(uint32_t offset, uint32_t length, int8_t semitones, const std::string &sEventName) {
   bool isNewOffset = onEvent(offset, length);
 
-  recordSeqEvent<TransposeSeqEvent>(isNewOffset, getTime(), semitones, offset, length, sEventName);
+  recordSeqEvent<TransposeSeqEvent>(
+      isNewOffset,
+      getTime(),
+      semitones,
+      offset,
+      length,
+      sEventName,
+      TransposeSeqEvent::Scope::Global);
 
   if (readMode == READMODE_CONVERT_TO_MIDI)
     parentSeq->midi->globalTrack.insertGlobalTranspose(getTime(), semitones);

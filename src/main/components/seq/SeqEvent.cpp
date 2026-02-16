@@ -237,8 +237,11 @@ TransposeSeqEvent::TransposeSeqEvent(SeqTrack *pTrack,
                                      int theTranspose,
                                      uint32_t offset,
                                      uint32_t length,
-                                     const std::string &name)
-    : SeqEvent(pTrack, offset, length, name, Type::Transpose), m_transpose(theTranspose) { }
+                                     const std::string &name,
+                                     Scope scope)
+    : SeqEvent(pTrack, offset, length, name, Type::Transpose),
+      m_transpose(theTranspose),
+      m_scope(scope) { }
 
 // ******************
 // ModulationSeqEvent
@@ -353,5 +356,4 @@ TimeSigSeqEvent::TimeSigSeqEvent(SeqTrack *pTrack,
                                  const std::string &name)
     : SeqEvent(pTrack, offset, length, name, Type::TimeSignature), numer(numerator), denom(denominator),
       ticksPerQuarter(theTicksPerQuarter) { }
-
 
