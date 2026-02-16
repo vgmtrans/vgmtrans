@@ -402,15 +402,28 @@ private:
 
 class TransposeSeqEvent : public SeqEvent {
  public:
-  TransposeSeqEvent(SeqTrack *pTrack, int theTranspose, uint32_t offset = 0, uint32_t length = 0,
-                    const std::string &name = "");
+  enum class Scope : uint8_t {
+    Track,
+    Global,
+  };
+
+  TransposeSeqEvent(SeqTrack *pTrack,
+                    int theTranspose,
+                    uint32_t offset = 0,
+                    uint32_t length = 0,
+                    const std::string &name = "",
+                    Scope scope = Scope::Track);
 
   std::string description() override {
       return fmt::format("{} - transpose: {}", name(), m_transpose);
   };
 
+  [[nodiscard]] int transpose() const noexcept { return m_transpose; }
+  [[nodiscard]] Scope scope() const noexcept { return m_scope; }
+
 private:
   int m_transpose;
+  Scope m_scope;
 };
 
 //  ******************

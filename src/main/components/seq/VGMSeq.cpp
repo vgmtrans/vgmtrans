@@ -85,6 +85,7 @@ MidiFile *VGMSeq::convertToMidi(const VGMColl* coll) {
     delete midi;
     this->midi = nullptr;
     m_timedEvents.clear();
+    m_transposeTimeline.clear();
     return nullptr;
   }
   this->midi = nullptr;
@@ -125,6 +126,7 @@ bool VGMSeq::postLoad() {
   } else if (readMode == READMODE_CONVERT_TO_MIDI) {
     midi->sort();
     m_timedEvents.finalize();
+    m_transposeTimeline.build(m_timedEvents);
   }
 
   return true;
@@ -139,6 +141,7 @@ bool VGMSeq::loadTracks(ReadMode readMode, uint32_t stopTime) {
 
   if (readMode == READMODE_CONVERT_TO_MIDI) {
     m_timedEvents.clear();
+    m_transposeTimeline.clear();
   }
 
   // reset variables
