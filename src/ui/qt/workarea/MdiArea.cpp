@@ -15,6 +15,7 @@
 #include <QFontMetrics>
 #include <QHBoxLayout>
 #include <QIcon>
+#include <QImage>
 #include <QMenu>
 #include <QPaintEvent>
 #include <QPainter>
@@ -23,6 +24,7 @@
 #include <QShortcut>
 #include <QSignalBlocker>
 #include <QTabBar>
+#include <QTimer>
 #include <QToolButton>
 #include <algorithm>
 #include <cmath>
@@ -229,10 +231,24 @@ void paintDetailedInstruction(QPainter &painter, const DetailedInstructionLayout
 constexpr int kTabControlSpacing = 2;
 constexpr int kTabControlOuterMargin = 4;
 
-QColor tabControlGlyphColor(const QWidget *widget, qreal alpha) {
-  QColor color = widget ? widget->palette().color(QPalette::WindowText) : QColor(Qt::white);
-  color.setAlphaF(alpha);
-  return color;
+// Chooses a white/black stencil base by sampling the tab-strip background brightness.
+QColor tabControlBaseGlyphColor(const QPixmap &tabStripColumn, const QPalette &fallbackPalette) {
+  QColor background;
+  const QImage texture = tabStripColumn.toImage();
+  if (!texture.isNull()) {
+    background = texture.pixelColor(0, texture.height() / 2);
+  }
+
+  if (!background.isValid()) {
+    background = fallbackPalette.color(QPalette::Window);
+  }
+
+  if (!background.isValid()) {
+    background = QColor(0x20, 0x20, 0x20);
+  }
+
+  const int luma = qGray(background.rgb());
+  return luma < 128 ? QColor(Qt::white) : QColor(Qt::black);
 }
 
 QIcon panelButtonIcon(const QColor &tint) {
@@ -551,9 +567,16 @@ void MdiArea::refreshTabControlAppearance() {
   }
   strip->setTextureColumn(m_cachedTabBarColumn);
 
-  const QColor onGlyph = tabControlGlyphColor(m_tabControls, 0.74);
-  const QColor offGlyph = tabControlGlyphColor(m_tabControls, 0.48);
-  const QColor disabledGlyph = tabControlGlyphColor(m_tabControls, 0.32);
+  const QPalette glyphPalette = m_tabBar ? m_tabBar->palette() : m_tabControls->palette();
+  const QColor baseGlyph = tabControlBaseGlyphColor(m_cachedTabBarColumn, glyphPalette);
+  const auto withAlpha = [&](qreal alpha) {
+    QColor color = baseGlyph;
+    color.setAlphaF(std::clamp(alpha, 0.0, 1.0));
+    return color;
+  };
+  const QColor onGlyph = withAlpha(0.74);
+  const QColor offGlyph = withAlpha(0.48);
+  const QColor disabledGlyph = withAlpha(0.32);
 
   auto assignIconForState = [&](QToolButton *button, bool onState) {
     if (!button) {
@@ -566,6 +589,28 @@ void MdiArea::refreshTabControlAppearance() {
   assignIconForState(m_singlePaneButton, m_singlePaneButton->isChecked());
   assignIconForState(m_leftPaneButton, true);
   assignIconForState(m_rightPaneButton, true);
+}
+
+// Re-captures tab-strip colors after the theme transition settles.
+void MdiArea::refreshTabControlsAfterThemeChange() {
+  m_cachedTabBarColumn = QPixmap();
+  updateBackgroundColor();
+  refreshTabControlAppearance();
+
+  if (m_tabBar) {
+    m_tabBar->update();
+  }
+  if (m_tabControls) {
+    m_tabControls->update();
+  }
+
+  QTimer::singleShot(40, this, [this]() {
+    if (!m_tabBar || !m_tabControls) {
+      return;
+    }
+    m_cachedTabBarColumn = QPixmap();
+    refreshTabControlAppearance();
+  });
 }
 
 // Applies tab-bar styling in an idempotent way to avoid repolish loops.
@@ -585,10 +630,9 @@ void MdiArea::applyTabBarStyle() {
 
 void MdiArea::changeEvent(QEvent *event) {
   if (event->type() == QEvent::PaletteChange ||
-      event->type() == QEvent::ApplicationPaletteChange) {
-    m_cachedTabBarColumn = QPixmap();
-    updateBackgroundColor();
-    refreshTabControlAppearance();
+      event->type() == QEvent::ApplicationPaletteChange ||
+      event->type() == QEvent::StyleChange) {
+    refreshTabControlsAfterThemeChange();
   }
   QMdiArea::changeEvent(event);
 }
@@ -605,9 +649,10 @@ bool MdiArea::eventFilter(QObject *watched, QEvent *event) {
         refreshTabControlAppearance();
         break;
       case QEvent::StyleChange:
-        m_cachedTabBarColumn = QPixmap();
+      case QEvent::PaletteChange:
+      case QEvent::ApplicationPaletteChange:
         repositionTabBarControls();
-        refreshTabControlAppearance();
+        refreshTabControlsAfterThemeChange();
         break;
       default:
         break;

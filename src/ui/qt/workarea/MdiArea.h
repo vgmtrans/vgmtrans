@@ -59,6 +59,7 @@ private:
   void repositionTabBarControls();
   void applyTabBarStyle();
   void refreshTabControlAppearance();
+  void refreshTabControlsAfterThemeChange();
   void updateBackgroundColor();
   static VGMFileView *asFileView(QMdiSubWindow *window);
   void onSubWindowActivated(QMdiSubWindow *window);
