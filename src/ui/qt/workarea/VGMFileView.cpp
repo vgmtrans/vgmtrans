@@ -614,35 +614,32 @@ void VGMFileView::previewNotesForEvent(VGMItem* item, bool includeActiveNotesAtT
   SequencePlayer::the().previewNotesAtTick(previewNotes, tick);
 }
 
-void VGMFileView::previewPianoRollNotes(const std::vector<VGMItem*>& items, VGMItem* anchorItem) const {
-  SeqEvent* anchorEvent = dynamic_cast<SeqEvent*>(anchorItem);
-  if (!anchorEvent) {
-    for (VGMItem* item : items) {
-      anchorEvent = dynamic_cast<SeqEvent*>(item);
-      if (anchorEvent) {
-        break;
-      }
-    }
-  }
-
-  uint32_t tick = 0;
-  if (!prepareSeqEventForPlayback(anchorEvent, tick)) {
+void VGMFileView::previewPianoRollNotes(const std::vector<PianoRollView::PreviewSelection>& notes,
+                                        int tick) const {
+  if (!ensureAssociatedCollectionActive()) {
     SequencePlayer::the().stopPreviewNote();
     return;
   }
 
   std::vector<SequencePlayer::PreviewNote> previewNotes;
-  previewNotes.reserve(items.size());
+  previewNotes.reserve(notes.size());
   std::unordered_set<uint16_t> seenKeys;
-  seenKeys.reserve(items.size() * 2 + 1);
+  seenKeys.reserve(notes.size() * 2 + 1);
   const auto noteKey = [](const SequencePlayer::PreviewNote& note) {
     return static_cast<uint16_t>((static_cast<uint16_t>(note.channel) << 8) | note.key);
   };
 
-  auto appendPreviewNote = [&](const SeqEvent* seqEvent) {
+  auto appendPreviewNote = [&](const PianoRollView::PreviewSelection& selection) {
+    const auto* seqEvent = dynamic_cast<const SeqEvent*>(selection.item);
+    if (!seqEvent) {
+      return;
+    }
     SequencePlayer::PreviewNote note;
     if (!buildPreviewNoteForEvent(seqEvent, note)) {
       return;
+    }
+    if (selection.key >= 0 && selection.key < 128) {
+      note.key = static_cast<uint8_t>(selection.key);
     }
     if (!seenKeys.emplace(noteKey(note)).second) {
       return;
@@ -650,13 +647,8 @@ void VGMFileView::previewPianoRollNotes(const std::vector<VGMItem*>& items, VGMI
     previewNotes.push_back(note);
   };
 
-  appendPreviewNote(anchorEvent);
-  for (VGMItem* item : items) {
-    auto* seqEvent = dynamic_cast<SeqEvent*>(item);
-    if (!seqEvent || seqEvent == anchorEvent) {
-      continue;
-    }
-    appendPreviewNote(seqEvent);
+  for (const auto& selection : notes) {
+    appendPreviewNote(selection);
   }
 
   if (previewNotes.empty()) {
@@ -664,7 +656,8 @@ void VGMFileView::previewPianoRollNotes(const std::vector<VGMItem*>& items, VGMI
     return;
   }
 
-  SequencePlayer::the().updatePreviewNotesAtTick(previewNotes, tick);
+  const uint32_t clampedTick = static_cast<uint32_t>(std::max(0, tick));
+  SequencePlayer::the().updatePreviewNotesAtTick(previewNotes, clampedTick);
 }
 
 void VGMFileView::stopNotePreview() const {
