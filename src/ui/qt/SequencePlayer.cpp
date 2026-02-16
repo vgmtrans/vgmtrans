@@ -347,8 +347,20 @@ void SequencePlayer::stopPreviewNote() {
   }
 
   if (m_preview_note_stream) {
+    std::array<bool, 128> touchedChannels{};
     for (const auto& note : m_previewActiveNotes) {
       sendPreviewNoteOff(m_preview_note_stream, note);
+      touchedChannels[note.channel] = true;
+    }
+
+    for (uint8_t channel = 0; channel < touchedChannels.size(); ++channel) {
+      if (!touchedChannels[channel]) {
+        continue;
+      }
+      // Preview release must be immediate even if the captured state has sustain/sostenuto on.
+      BASS_MIDI_StreamEvent(m_preview_note_stream, channel, MIDI_EVENT_SUSTAIN, 0);
+      BASS_MIDI_StreamEvent(m_preview_note_stream, channel, MIDI_EVENT_SOSTENUTO, 0);
+      BASS_MIDI_StreamEvent(m_preview_note_stream, channel, MIDI_EVENT_SOUNDOFF, 0);
     }
   }
 
