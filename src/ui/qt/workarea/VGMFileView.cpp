@@ -270,7 +270,9 @@ void VGMFileView::focusInEvent(QFocusEvent* event) {
   panel(PanelSide::Left).treeView->updateStatusBar();
 }
 
+// Switches a pane to the requested view, ignoring unsupported view kinds.
 void VGMFileView::setPanelView(PanelSide side, PanelViewKind viewKind) {
+  // Guard against sequence-only views on non-sequence files.
   if (!supportsViewKind(viewKind)) {
     return;
   }
@@ -290,10 +292,12 @@ void VGMFileView::setPanelView(PanelSide side, PanelViewKind viewKind) {
   }
 }
 
+// Returns the currently visible view kind for the given pane.
 PanelViewKind VGMFileView::panelView(PanelSide side) const {
   return panel(side).currentKind;
 }
 
+// Reports whether the requested view kind is valid for this file type.
 bool VGMFileView::supportsViewKind(PanelViewKind viewKind) const {
   switch (viewKind) {
     case PanelViewKind::ActiveNotes:
@@ -306,6 +310,12 @@ bool VGMFileView::supportsViewKind(PanelViewKind viewKind) const {
   return false;
 }
 
+// True when sequence-only panes (Active Notes / Piano Roll) are available.
+bool VGMFileView::supportsSequenceViews() const {
+  return m_isSeqFile;
+}
+
+// Collapses/restores the right pane while preserving prior split sizes.
 void VGMFileView::setSinglePaneMode(bool singlePane) {
   auto& rightPanel = panel(PanelSide::Right);
   if (!rightPanel.container) {
@@ -318,6 +328,7 @@ void VGMFileView::setSinglePaneMode(bool singlePane) {
   m_singlePaneMode = singlePane;
 
   if (singlePane) {
+    // Preserve the current split so restoring 2-pane mode returns to the same ratio.
     m_lastSplitSizes = m_splitter->sizes();
     rightPanel.container->setVisible(false);
     m_splitter->setHandleWidth(0);
@@ -334,6 +345,7 @@ void VGMFileView::setSinglePaneMode(bool singlePane) {
   m_splitter->persistState();
 }
 
+// True when the right pane is currently collapsed.
 bool VGMFileView::singlePaneMode() const {
   return m_singlePaneMode;
 }
