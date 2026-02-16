@@ -35,6 +35,7 @@
 #include "Helpers.h"
 #include "Root.h"
 #include "SeqEvent.h"
+#include "SeqNoteUtils.h"
 #include "SeqTrack.h"
 
 namespace {
@@ -95,17 +96,13 @@ bool buildPreviewNoteForEvent(const SeqEvent* seqEvent, SequencePlayer::PreviewN
     return false;
   }
 
-  uint8_t key = 0;
-  uint8_t velocity = 0;
-  if (const auto* noteOn = dynamic_cast<const NoteOnSeqEvent*>(seqEvent)) {
-    key = noteOn->absKey;
-    velocity = noteOn->vel;
-  } else if (const auto* durNote = dynamic_cast<const DurNoteSeqEvent*>(seqEvent)) {
-    key = durNote->absKey;
-    velocity = durNote->vel;
-  } else {
+  const int rawKey = SeqNoteUtils::rawNoteKey(seqEvent);
+  const int rawVelocity = SeqNoteUtils::rawNoteVelocity(seqEvent);
+  if (rawKey < 0 || rawVelocity < 0) {
     return false;
   }
+  uint8_t key = static_cast<uint8_t>(rawKey);
+  uint8_t velocity = static_cast<uint8_t>(rawVelocity);
 
   // Match the same velocity scaling used during MIDI conversion.
   if (seqEvent->parentTrack && seqEvent->parentTrack->usesLinearAmplitudeScale()) {
@@ -116,53 +113,6 @@ bool buildPreviewNoteForEvent(const SeqEvent* seqEvent, SequencePlayer::PreviewN
   outNote.key = key;
   outNote.velocity = velocity;
   return true;
-}
-
-int rawNoteKeyForEvent(const SeqEvent* event) {
-  if (!event) {
-    return -1;
-  }
-  if (const auto* noteOn = dynamic_cast<const NoteOnSeqEvent*>(event)) {
-    return noteOn->absKey;
-  }
-  if (const auto* durNote = dynamic_cast<const DurNoteSeqEvent*>(event)) {
-    return durNote->absKey;
-  }
-  return -1;
-}
-
-int transposedNoteKeyForEventAtTick(const VGMSeq* seq, const SeqEvent* event, uint32_t tick) {
-  const int rawKey = rawNoteKeyForEvent(event);
-  if (rawKey < 0) {
-    return -1;
-  }
-
-  int noteKey = rawKey;
-  if (seq) {
-    noteKey += seq->transposeTimeline().totalTransposeAtTick(event ? event->parentTrack : nullptr, tick);
-  }
-
-  if (noteKey < 0 || noteKey >= 128) {
-    return -1;
-  }
-  return noteKey;
-}
-
-int transposedNoteKeyForTimedEvent(const VGMSeq* seq, const SeqTimedEvent* timed) {
-  if (!seq || !timed || !timed->event) {
-    return -1;
-  }
-
-  int noteKey = rawNoteKeyForEvent(timed->event);
-  if (noteKey < 0) {
-    return -1;
-  }
-
-  noteKey += seq->transposeTimeline().totalTransposeForTimedEvent(timed);
-  if (noteKey < 0 || noteKey >= 128) {
-    return -1;
-  }
-  return noteKey;
 }
 }  // namespace
 
@@ -603,7 +553,7 @@ void VGMFileView::previewNotesForEvent(VGMItem* item, bool includeActiveNotesAtT
     SequencePlayer::the().stopPreviewNote();
     return;
   }
-  const int selectedTransposedKey = transposedNoteKeyForEventAtTick(seq, event, tick);
+  const int selectedTransposedKey = SeqNoteUtils::transposedNoteKeyAtTick(seq, event, tick);
   if (selectedTransposedKey < 0) {
     SequencePlayer::the().stopPreviewNote();
     return;
@@ -635,7 +585,7 @@ void VGMFileView::previewNotesForEvent(VGMItem* item, bool includeActiveNotesAtT
         if (!buildPreviewNoteForEvent(timed->event, activeNote)) {
           continue;
         }
-        const int transposedKey = transposedNoteKeyForTimedEvent(seq, timed);
+        const int transposedKey = SeqNoteUtils::transposedNoteKeyForTimedEvent(seq, timed);
         if (transposedKey < 0) {
           continue;
         }
@@ -969,7 +919,7 @@ void VGMFileView::onPlaybackPositionChanged(int current, int max, PositionChange
       continue;
     }
 
-    const int noteKey = transposedNoteKeyForTimedEvent(seq, timed);
+    const int noteKey = SeqNoteUtils::transposedNoteKeyForTimedEvent(seq, timed);
     if (noteKey < 0) {
       continue;
     }
