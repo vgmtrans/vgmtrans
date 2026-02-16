@@ -39,7 +39,7 @@
 #include "SeqTrack.h"
 
 namespace {
-constexpr uint8_t kActiveNotePreviewVelocity = 100;
+constexpr uint8_t kActiveNotePreviewVelocity = 127;
 
 QToolButton* createPanelButton(const QString& label, QWidget* parent) {
   auto* button = new QToolButton(parent);
