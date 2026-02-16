@@ -42,6 +42,11 @@ class PianoRollView final : public QAbstractScrollArea {
   Q_OBJECT
 
 public:
+  struct PreviewSelection {
+    VGMItem* item = nullptr;
+    int key = -1;
+  };
+
   explicit PianoRollView(QWidget* parent = nullptr);
   ~PianoRollView() override = default;
 
@@ -60,7 +65,7 @@ signals:
   void seekRequested(int tick);
   void selectionChanged(VGMItem* item);
   void selectionSetChanged(const std::vector<VGMItem*>& items, VGMItem* primaryItem);
-  void notePreviewRequested(const std::vector<VGMItem*>& items, VGMItem* anchorItem);
+  void notePreviewRequested(const std::vector<PreviewSelection>& notes, int tick);
   void notePreviewStopped();
 
 protected:
@@ -146,7 +151,7 @@ private:
   void emitCurrentSelectionSignals();
   void updateMarqueeSelection(bool emitSelectionSignal);
   void updateMarqueePreview(const QPoint& cursorPos);
-  void applyPreviewNoteIndices(std::vector<size_t> indices, size_t anchorIndex);
+  void applyPreviewNoteIndices(std::vector<size_t> indices, size_t anchorIndex, int previewTick);
   void clearPreviewNotes();
 
   void zoomHorizontal(int steps, int anchorX, bool animated = false, int durationMs = 0);
@@ -214,6 +219,7 @@ private:
   std::shared_ptr<const std::vector<PianoRollFrame::Note>> m_selectedNotes;
   std::shared_ptr<const std::vector<PianoRollFrame::TimeSignature>> m_timeSignatures;
   std::vector<SelectableNote> m_selectableNotes;
+  std::unordered_map<const SeqTimedEvent*, uint8_t> m_transposedKeyByTimedEvent;
   std::vector<size_t> m_selectedNoteIndices;
   std::vector<size_t> m_previewNoteIndices;
 
