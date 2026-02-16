@@ -18,9 +18,7 @@
 #include "SeqEventTimeIndex.h"
 #include "pianorollview/PianoRollView.h"
 
-class QButtonGroup;
 class QStackedWidget;
-class QToolButton;
 class QWidget;
 class SnappingSplitter;
 class VGMFile;
@@ -52,12 +50,16 @@ class VGMFileView final : public QMdiSubWindow {
 
 public:
   explicit VGMFileView(VGMFile* vgmFile);
+  void setPanelView(PanelSide side, PanelViewKind viewKind);
+  [[nodiscard]] PanelViewKind panelView(PanelSide side) const;
+  void setSinglePaneMode(bool singlePane);
+  [[nodiscard]] bool singlePaneMode() const;
+  [[nodiscard]] bool supportsViewKind(PanelViewKind viewKind) const;
+  [[nodiscard]] bool supportsSequenceViews() const { return m_isSeqFile; }
 
 private:
   struct PanelUi {
     QWidget* container = nullptr;
-    QToolButton* singlePaneToggle = nullptr;
-    QButtonGroup* viewButtons = nullptr;
     QStackedWidget* stack = nullptr;
     HexView* hexView = nullptr;
     VGMFileTreeView* treeView = nullptr;
@@ -72,8 +74,6 @@ private:
   void closeEvent(QCloseEvent* closeEvent) override;
 
   PanelUi createPanel(PanelSide side, bool isSeqFile);
-  void setPanelView(PanelSide side, PanelViewKind viewKind);
-  void setSinglePaneMode(bool singlePane);
 
   void resetSnapRanges() const;
   [[nodiscard]] int hexViewFullWidth() const;
@@ -98,6 +98,8 @@ private:
   int m_defaultSplitterHandleWidth = 0;
   QList<int> m_lastSplitSizes;
   QFont m_defaultHexFont;
+  bool m_isSeqFile = false;
+  bool m_singlePaneMode = false;
 
   std::vector<const SeqTimedEvent*> m_playbackTimedEvents;
   std::vector<const SeqTimedEvent*> m_activeTimedEvents;
