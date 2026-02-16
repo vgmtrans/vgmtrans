@@ -403,18 +403,14 @@ private:
 class TransposeSeqEvent : public SeqEvent {
  public:
   TransposeSeqEvent(SeqTrack *pTrack, int theTranspose, uint32_t offset = 0, uint32_t length = 0,
-                    const std::string &name = "", bool isGlobal = false);
+                    const std::string &name = "");
 
   std::string description() override {
       return fmt::format("{} - transpose: {}", name(), m_transpose);
   };
 
-  [[nodiscard]] int transpose() const noexcept { return m_transpose; }
-  [[nodiscard]] bool isGlobalTranspose() const noexcept { return m_isGlobalTranspose; }
-
- private:
+private:
   int m_transpose;
-  bool m_isGlobalTranspose = false;
 };
 
 //  ******************
