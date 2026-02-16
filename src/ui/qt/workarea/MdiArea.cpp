@@ -6,18 +6,24 @@
 
 #include "MdiArea.h"
 
+#include <QAction>
+#include <QActionGroup>
 #include <QApplication>
 #include <QBrush>
 #include <QColor>
 #include <QEvent>
 #include <QFontMetrics>
+#include <QHBoxLayout>
 #include <QIcon>
+#include <QMenu>
 #include <QPaintEvent>
 #include <QPainter>
 #include <QPalette>
 #include <QPixmap>
 #include <QShortcut>
+#include <QSignalBlocker>
 #include <QTabBar>
+#include <QToolButton>
 #include <algorithm>
 #include <cmath>
 #include <utility>
@@ -191,6 +197,27 @@ void paintDetailedInstruction(QPainter &painter, const DetailedInstructionLayout
   painter.drawText(subRect, Qt::AlignLeft | Qt::AlignTop, layout.instruction.subText);
 }
 
+constexpr int kTabControlSpacing = 2;
+constexpr int kTabControlOuterMargin = 4;
+
+QIcon iconForPanelButton() {
+  return QIcon(QStringLiteral(":/icons/midi-port.svg"));
+}
+
+QIcon iconForPanelView(PanelViewKind viewKind) {
+  switch (viewKind) {
+    case PanelViewKind::Hex:
+      return QIcon(QStringLiteral(":/icons/binary.svg"));
+    case PanelViewKind::Tree:
+      return QIcon(QStringLiteral(":/icons/file.svg"));
+    case PanelViewKind::ActiveNotes:
+      return QIcon(QStringLiteral(":/icons/note.svg"));
+    case PanelViewKind::PianoRoll:
+      return QIcon(QStringLiteral(":/icons/track.svg"));
+  }
+  return QIcon(QStringLiteral(":/icons/file.svg"));
+}
+
 } // namespace
 
 MdiArea::MdiArea(QWidget *parent) : QMdiArea(parent) {
@@ -207,15 +234,7 @@ MdiArea::MdiArea(QWidget *parent) : QMdiArea(parent) {
   connect(&qtVGMRoot, &QtVGMRoot::UI_addedVGMColl, this, [this]() { viewport()->update(); });
   connect(&qtVGMRoot, &QtVGMRoot::UI_endRemoveVGMColls, this,[this]() { viewport()->update(); });
   connect(&qtVGMRoot, &QtVGMRoot::UI_removeVGMFile, this, [this](const VGMFile *file) { removeView(file); });
-
-  if (auto *tab_bar = findChild<QTabBar *>()) {
-    tab_bar->setStyleSheet(QString{"QTabBar::tab { height: %1; }"}.arg(Size::VTab));
-    tab_bar->setExpanding(false);
-    tab_bar->setUsesScrollButtons(true);
-#ifdef Q_OS_MAC
-    tab_bar->setElideMode(Qt::ElideNone);
-#endif
-  }
+  setupTabBarControls();
 
   // Create OS-specific keyboard shortcuts
   auto addShortcut = [this](const QKeySequence &seq, auto slot)
@@ -258,12 +277,236 @@ MdiArea::MdiArea(QWidget *parent) : QMdiArea(parent) {
 #endif
 }
 
+VGMFileView *MdiArea::asFileView(QMdiSubWindow *window) {
+  if (!window) {
+    return nullptr;
+  }
+
+  if (auto *fileView = qobject_cast<VGMFileView *>(window)) {
+    return fileView;
+  }
+
+  return qobject_cast<VGMFileView *>(window->widget());
+}
+
+void MdiArea::setupTabBarControls() {
+  if (!m_tabBar) {
+    m_tabBar = findChild<QTabBar *>();
+    if (!m_tabBar) {
+      return;
+    }
+
+    m_tabBar->setExpanding(false);
+    m_tabBar->setUsesScrollButtons(true);
+#ifdef Q_OS_MAC
+    m_tabBar->setElideMode(Qt::ElideNone);
+#endif
+    m_tabBar->installEventFilter(this);
+    m_tabBarHost = m_tabBar->parentWidget();
+    if (m_tabBarHost) {
+      m_tabBarHost->installEventFilter(this);
+    }
+  }
+
+  if (!m_tabControls) {
+    QWidget *controlsParent = m_tabBarHost ? m_tabBarHost : m_tabBar;
+    m_tabControls = new QWidget(controlsParent);
+    auto *controlsLayout = new QHBoxLayout(m_tabControls);
+    controlsLayout->setContentsMargins(0, 0, 0, 0);
+    controlsLayout->setSpacing(kTabControlSpacing);
+
+    auto createIconButton = [this](QWidget *parent, const QString &toolTip) {
+      auto *button = new QToolButton(parent);
+      button->setAutoRaise(true);
+      button->setIcon(iconForPanelButton());
+      button->setIconSize(QSize(14, 14));
+      button->setToolTip(toolTip);
+      return button;
+    };
+
+    m_singlePaneButton = createIconButton(m_tabControls, tr("Toggle 1-pane layout"));
+    m_singlePaneButton->setCheckable(true);
+    controlsLayout->addWidget(m_singlePaneButton);
+
+    m_leftPaneButton = createIconButton(m_tabControls, tr("Select left pane view"));
+    m_leftPaneButton->setPopupMode(QToolButton::InstantPopup);
+    controlsLayout->addWidget(m_leftPaneButton);
+
+    m_rightPaneButton = createIconButton(m_tabControls, tr("Select right pane view"));
+    m_rightPaneButton->setPopupMode(QToolButton::InstantPopup);
+    controlsLayout->addWidget(m_rightPaneButton);
+
+    auto createPaneMenu = [this](QToolButton *button, PanelSide side, PaneActions &actions) {
+      auto *menu = new QMenu(button);
+      auto *group = new QActionGroup(menu);
+      group->setExclusive(true);
+
+      auto addAction = [this, menu, group, side](PanelViewKind kind,
+                                                  const QString &text,
+                                                  QAction *&slot) {
+        slot = menu->addAction(iconForPanelView(kind), text);
+        slot->setCheckable(true);
+        group->addAction(slot);
+        connect(slot, &QAction::triggered, this, [this, side, kind]() {
+          if (auto *fileView = asFileView(activeSubWindow())) {
+            fileView->setPanelView(side, kind);
+            updateTabBarControls();
+          }
+        });
+      };
+
+      addAction(PanelViewKind::Hex, tr("Hex"), actions.hex);
+      addAction(PanelViewKind::Tree, tr("Tree"), actions.tree);
+      addAction(PanelViewKind::ActiveNotes, tr("Active Notes"), actions.activeNotes);
+      addAction(PanelViewKind::PianoRoll, tr("Piano Roll"), actions.pianoRoll);
+
+      button->setMenu(menu);
+    };
+
+    createPaneMenu(m_leftPaneButton, PanelSide::Left, m_leftPaneActions);
+    createPaneMenu(m_rightPaneButton, PanelSide::Right, m_rightPaneActions);
+
+    connect(m_singlePaneButton, &QToolButton::toggled, this, [this](bool singlePane) {
+      if (auto *fileView = asFileView(activeSubWindow())) {
+        fileView->setSinglePaneMode(singlePane);
+      }
+      updateTabBarControls();
+    });
+  }
+
+  applyTabBarStyle();
+  repositionTabBarControls();
+  updateTabBarControls();
+}
+
+void MdiArea::updateTabBarControls() {
+  if (!m_tabControls || !m_singlePaneButton || !m_leftPaneButton || !m_rightPaneButton) {
+    return;
+  }
+
+  auto *fileView = asFileView(activeSubWindow());
+  const bool hasFileView = fileView != nullptr;
+
+  auto setPaneSelection = [](const PaneActions &actions, PanelViewKind kind) {
+    if (actions.hex) {
+      actions.hex->setChecked(kind == PanelViewKind::Hex);
+    }
+    if (actions.tree) {
+      actions.tree->setChecked(kind == PanelViewKind::Tree);
+    }
+    if (actions.activeNotes) {
+      actions.activeNotes->setChecked(kind == PanelViewKind::ActiveNotes);
+    }
+    if (actions.pianoRoll) {
+      actions.pianoRoll->setChecked(kind == PanelViewKind::PianoRoll);
+    }
+  };
+
+  auto setSeqOnlyEnabled = [](PaneActions &actions, bool enabled) {
+    if (actions.activeNotes) {
+      actions.activeNotes->setEnabled(enabled);
+    }
+    if (actions.pianoRoll) {
+      actions.pianoRoll->setEnabled(enabled);
+    }
+  };
+
+  m_singlePaneButton->setEnabled(hasFileView);
+  m_leftPaneButton->setEnabled(hasFileView);
+
+  if (!hasFileView) {
+    QSignalBlocker blocker(m_singlePaneButton);
+    m_singlePaneButton->setChecked(false);
+    m_rightPaneButton->setEnabled(false);
+    setSeqOnlyEnabled(m_leftPaneActions, false);
+    setSeqOnlyEnabled(m_rightPaneActions, false);
+    return;
+  }
+
+  const bool singlePane = fileView->singlePaneMode();
+  {
+    QSignalBlocker blocker(m_singlePaneButton);
+    m_singlePaneButton->setChecked(singlePane);
+  }
+
+  setPaneSelection(m_leftPaneActions, fileView->panelView(PanelSide::Left));
+  setPaneSelection(m_rightPaneActions, fileView->panelView(PanelSide::Right));
+
+  const bool sequenceViewsAvailable = fileView->supportsSequenceViews();
+  setSeqOnlyEnabled(m_leftPaneActions, sequenceViewsAvailable);
+  setSeqOnlyEnabled(m_rightPaneActions, sequenceViewsAvailable);
+
+  m_rightPaneButton->setEnabled(!singlePane);
+}
+
+void MdiArea::repositionTabBarControls() {
+  if (!m_tabBar || !m_tabControls) {
+    return;
+  }
+
+  QWidget *host = m_tabBarHost ? m_tabBarHost : m_tabBar->parentWidget();
+  if (!host) {
+    return;
+  }
+
+  const QSize controlsSize = m_tabControls->sizeHint();
+  const int reservedRightMargin = controlsSize.width() + (kTabControlOuterMargin * 2);
+  if (m_reservedTabBarRightMargin != reservedRightMargin) {
+    m_reservedTabBarRightMargin = reservedRightMargin;
+  }
+
+  QRect tabGeometry = m_tabBar->geometry();
+  const int targetTabWidth = std::max(0, host->width() - tabGeometry.x() - m_reservedTabBarRightMargin);
+  if (tabGeometry.width() != targetTabWidth) {
+    tabGeometry.setWidth(targetTabWidth);
+    m_tabBar->setGeometry(tabGeometry);
+  } else {
+    tabGeometry = m_tabBar->geometry();
+  }
+
+  const int x = std::max(0, host->width() - controlsSize.width() - kTabControlOuterMargin);
+  const int y = std::max(0, tabGeometry.y() + (tabGeometry.height() - controlsSize.height()) / 2);
+  m_tabControls->setGeometry(x, y, controlsSize.width(), controlsSize.height());
+  m_tabControls->raise();
+}
+
+void MdiArea::applyTabBarStyle() {
+  if (!m_tabBar) {
+    return;
+  }
+
+  const QString styleSheet =
+      QStringLiteral("QTabBar::tab { height: %1px; }").arg(Size::VTab);
+  if (m_tabBar->styleSheet() == styleSheet) {
+    return;
+  }
+  m_tabBar->setStyleSheet(styleSheet);
+}
+
 void MdiArea::changeEvent(QEvent *event) {
   if (event->type() == QEvent::PaletteChange ||
       event->type() == QEvent::ApplicationPaletteChange) {
     updateBackgroundColor();
   }
   QMdiArea::changeEvent(event);
+}
+
+bool MdiArea::eventFilter(QObject *watched, QEvent *event) {
+  if (watched == m_tabBar || watched == m_tabBarHost) {
+    switch (event->type()) {
+      case QEvent::Show:
+      case QEvent::Resize:
+      case QEvent::Move:
+      case QEvent::LayoutRequest:
+      case QEvent::StyleChange:
+        repositionTabBarControls();
+        break;
+      default:
+        break;
+    }
+  }
+
+  return QMdiArea::eventFilter(watched, event);
 }
 
 void MdiArea::paintEvent(QPaintEvent *event) {
@@ -342,6 +585,8 @@ void MdiArea::updateBackgroundColor() {
 }
 
 void MdiArea::newView(VGMFile *file) {
+  setupTabBarControls();
+
   auto it = fileToWindowMap.find(file);
   // Check if a fileview for this vgmfile already exists
   if (it != fileToWindowMap.end()) {
@@ -362,6 +607,8 @@ void MdiArea::newView(VGMFile *file) {
     vgmfile_view->setWindowTitle(newTitle);
 #endif
   }
+
+  updateTabBarControls();
 }
 
 void MdiArea::removeView(const VGMFile *file) {
@@ -378,11 +625,17 @@ void MdiArea::removeView(const VGMFile *file) {
     windowToFileMap.erase(it->second);
     fileToWindowMap.erase(file);
   }
+
+  updateTabBarControls();
 }
 
 void MdiArea::onSubWindowActivated(QMdiSubWindow *window) {
-  if (!window)
+  setupTabBarControls();
+
+  if (!window) {
+    updateTabBarControls();
     return;
+  }
 
   // For some reason, if multiple documents are open, closing one document causes the others
   // to become windowed instead of maximized. This fixes the problem.
@@ -401,6 +654,8 @@ void MdiArea::onSubWindowActivated(QMdiSubWindow *window) {
       NotificationCenter::the()->selectVGMFile(file, this);
     }
   }
+
+  updateTabBarControls();
 }
 
 void MdiArea::onVGMFileSelected(const VGMFile *file, QWidget *caller) {
@@ -420,6 +675,8 @@ void MdiArea::onVGMFileSelected(const VGMFile *file, QWidget *caller) {
       caller->setFocus();
     }
   }
+
+  updateTabBarControls();
 }
 
 void MdiArea::ensureMaximizedSubWindow(QMdiSubWindow *window) {
