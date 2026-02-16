@@ -118,17 +118,42 @@ bool buildPreviewNoteForEvent(const SeqEvent* seqEvent, SequencePlayer::PreviewN
   return true;
 }
 
+int rawNoteKeyForEvent(const SeqEvent* event) {
+  if (!event) {
+    return -1;
+  }
+  if (const auto* noteOn = dynamic_cast<const NoteOnSeqEvent*>(event)) {
+    return noteOn->absKey;
+  }
+  if (const auto* durNote = dynamic_cast<const DurNoteSeqEvent*>(event)) {
+    return durNote->absKey;
+  }
+  return -1;
+}
+
+int transposedNoteKeyForEventAtTick(const VGMSeq* seq, const SeqEvent* event, uint32_t tick) {
+  const int rawKey = rawNoteKeyForEvent(event);
+  if (rawKey < 0) {
+    return -1;
+  }
+
+  int noteKey = rawKey;
+  if (seq) {
+    noteKey += seq->transposeTimeline().totalTransposeAtTick(event ? event->parentTrack : nullptr, tick);
+  }
+
+  if (noteKey < 0 || noteKey >= 128) {
+    return -1;
+  }
+  return noteKey;
+}
+
 int transposedNoteKeyForTimedEvent(const VGMSeq* seq, const SeqTimedEvent* timed) {
   if (!seq || !timed || !timed->event) {
     return -1;
   }
 
-  int noteKey = -1;
-  if (const auto* noteOn = dynamic_cast<const NoteOnSeqEvent*>(timed->event)) {
-    noteKey = noteOn->absKey;
-  } else if (const auto* durNote = dynamic_cast<const DurNoteSeqEvent*>(timed->event)) {
-    noteKey = durNote->absKey;
-  }
+  int noteKey = rawNoteKeyForEvent(timed->event);
   if (noteKey < 0) {
     return -1;
   }
@@ -571,12 +596,19 @@ void VGMFileView::previewNotesForEvent(VGMItem* item, bool includeActiveNotesAtT
     SequencePlayer::the().stopPreviewNote();
     return;
   }
+  auto* seq = (event && event->parentTrack) ? event->parentTrack->parentSeq : nullptr;
 
   SequencePlayer::PreviewNote selectedNote;
   if (!buildPreviewNoteForEvent(event, selectedNote)) {
     SequencePlayer::the().stopPreviewNote();
     return;
   }
+  const int selectedTransposedKey = transposedNoteKeyForEventAtTick(seq, event, tick);
+  if (selectedTransposedKey < 0) {
+    SequencePlayer::the().stopPreviewNote();
+    return;
+  }
+  selectedNote.key = static_cast<uint8_t>(selectedTransposedKey);
 
   std::vector<SequencePlayer::PreviewNote> previewNotes;
   previewNotes.reserve(includeActiveNotesAtTick ? 8 : 1);
@@ -590,8 +622,8 @@ void VGMFileView::previewNotesForEvent(VGMItem* item, bool includeActiveNotesAtT
   seenKeys.emplace(noteKey(selectedNote));
 
   // Modifier-preview mode layers in every note currently active at this tick.
-  if (includeActiveNotesAtTick && event->parentTrack && event->parentTrack->parentSeq) {
-    const auto& timeline = event->parentTrack->parentSeq->timedEventIndex();
+  if (includeActiveNotesAtTick && seq) {
+    const auto& timeline = seq->timedEventIndex();
     if (timeline.finalized()) {
       std::vector<const SeqTimedEvent*> activeTimedEvents;
       timeline.getActiveAt(tick, activeTimedEvents);
@@ -603,6 +635,11 @@ void VGMFileView::previewNotesForEvent(VGMItem* item, bool includeActiveNotesAtT
         if (!buildPreviewNoteForEvent(timed->event, activeNote)) {
           continue;
         }
+        const int transposedKey = transposedNoteKeyForTimedEvent(seq, timed);
+        if (transposedKey < 0) {
+          continue;
+        }
+        activeNote.key = static_cast<uint8_t>(transposedKey);
         if (!seenKeys.emplace(noteKey(activeNote)).second) {
           continue;
         }
