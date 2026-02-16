@@ -103,8 +103,6 @@ private:
   static constexpr float kMinPixelsPerKey = 3.0f;
   static constexpr float kMaxPixelsPerKey = 44.0f;
 
-  static int noteKeyForEvent(const class SeqEvent* event);
-
   [[nodiscard]] QColor colorForTrack(int trackIndex) const;
 
   bool handleViewportWheel(QWheelEvent* event);

@@ -11,6 +11,7 @@
 
 #include "SeqEvent.h"
 #include "SeqEventTimeIndex.h"
+#include "SeqNoteUtils.h"
 #include "SeqTrack.h"
 #include "VGMSeq.h"
 #include "util/NonTransientScrollBarStyle.h"
@@ -355,19 +356,6 @@ void PianoRollView::changeEvent(QEvent* event) {
       event->type() == QEvent::StyleChange) {
     requestRender();
   }
-}
-
-int PianoRollView::noteKeyForEvent(const SeqEvent* event) {
-  if (!event) {
-    return -1;
-  }
-  if (auto* noteOn = dynamic_cast<const NoteOnSeqEvent*>(event)) {
-    return noteOn->absKey;
-  }
-  if (auto* durNote = dynamic_cast<const DurNoteSeqEvent*>(event)) {
-    return durNote->absKey;
-  }
-  return -1;
 }
 
 QColor PianoRollView::colorForTrack(int trackIndex) const {
@@ -724,10 +712,7 @@ void PianoRollView::rebuildSequenceCache() {
       continue;
     }
 
-    int noteKey = noteKeyForEvent(timed.event);
-    if (noteKey >= 0) {
-      noteKey += m_seq->transposeTimeline().totalTransposeForTimedEvent(i);
-    }
+    int noteKey = SeqNoteUtils::transposedNoteKeyForTimedEvent(m_seq, &timed);
     if (noteKey < 0 || noteKey >= kMidiKeyCount) {
       continue;
     }
@@ -862,10 +847,7 @@ bool PianoRollView::updateActiveKeyStates() {
       if (keyIt != m_transposedKeyByTimedEvent.end()) {
         key = keyIt->second;
       } else {
-        key = noteKeyForEvent(timed->event);
-        if (m_seq && key >= 0) {
-          key += m_seq->transposeTimeline().totalTransposeForTimedEvent(timed);
-        }
+        key = SeqNoteUtils::transposedNoteKeyForTimedEvent(m_seq, timed);
       }
       if (key < 0 || key >= kMidiKeyCount) {
         continue;
