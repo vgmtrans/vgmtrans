@@ -77,6 +77,18 @@ public:
   };
   VGMFileTreeViewSettings VGMFileTreeView;
 
+  struct VGMSeqFileViewSettings : public SettingsGroup {
+    using SettingsGroup::SettingsGroup;
+
+    int leftPaneView() const;
+    void setLeftPaneView(int viewKind) const;
+    int rightPaneView() const;
+    void setRightPaneView(int viewKind) const;
+    int leftPaneWidth() const;
+    void setLeftPaneWidth(int width) const;
+  };
+  VGMSeqFileViewSettings VGMSeqFileView;
+
   struct ConversionSettings : public SettingsGroup {
     using SettingsGroup::SettingsGroup;
 
@@ -113,4 +125,3 @@ private:
   explicit Settings(QObject *parent = nullptr);
   QSettings settings;
 };
-

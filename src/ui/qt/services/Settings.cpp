@@ -7,12 +7,23 @@
 #include "Settings.h"
 #include "NotificationCenter.h"
 
+namespace {
+constexpr auto kVGMSeqFileViewGroup = "VGMSeqFileView";
+constexpr auto kLeftPaneViewKey = "leftPaneView";
+constexpr auto kRightPaneViewKey = "rightPaneView";
+constexpr auto kLeftPaneWidthKey = "leftPaneWidth";
+constexpr int kDefaultLeftPaneView = 0;   // PanelViewKind::Hex
+constexpr int kDefaultRightPaneView = 3;  // PanelViewKind::PianoRoll
+constexpr int kUnsetLeftPaneWidth = -1;
+}  // namespace
+
 SettingsGroup::SettingsGroup(Settings* parent) : parent(parent), settings(parent->settings) {
 }
 
 Settings::Settings(QObject *parent)
   : QObject(parent),
     VGMFileTreeView(this),
+    VGMSeqFileView(this),
     conversion(this),
     recentFiles(this)
 {
@@ -32,6 +43,45 @@ bool Settings::VGMFileTreeViewSettings::showDetails() const {
   settings.endGroup();
 
   return showDetails;
+}
+
+int Settings::VGMSeqFileViewSettings::leftPaneView() const {
+  settings.beginGroup(kVGMSeqFileViewGroup);
+  int viewKind = settings.value(kLeftPaneViewKey, kDefaultLeftPaneView).toInt();
+  settings.endGroup();
+  return viewKind;
+}
+
+void Settings::VGMSeqFileViewSettings::setLeftPaneView(int viewKind) const {
+  settings.beginGroup(kVGMSeqFileViewGroup);
+  settings.setValue(kLeftPaneViewKey, viewKind);
+  settings.endGroup();
+}
+
+int Settings::VGMSeqFileViewSettings::rightPaneView() const {
+  settings.beginGroup(kVGMSeqFileViewGroup);
+  int viewKind = settings.value(kRightPaneViewKey, kDefaultRightPaneView).toInt();
+  settings.endGroup();
+  return viewKind;
+}
+
+void Settings::VGMSeqFileViewSettings::setRightPaneView(int viewKind) const {
+  settings.beginGroup(kVGMSeqFileViewGroup);
+  settings.setValue(kRightPaneViewKey, viewKind);
+  settings.endGroup();
+}
+
+int Settings::VGMSeqFileViewSettings::leftPaneWidth() const {
+  settings.beginGroup(kVGMSeqFileViewGroup);
+  int width = settings.value(kLeftPaneWidthKey, kUnsetLeftPaneWidth).toInt();
+  settings.endGroup();
+  return width;
+}
+
+void Settings::VGMSeqFileViewSettings::setLeftPaneWidth(int width) const {
+  settings.beginGroup(kVGMSeqFileViewGroup);
+  settings.setValue(kLeftPaneWidthKey, width);
+  settings.endGroup();
 }
 
 /// Put settings into an OptionStore and have ConversionOptions load from it
@@ -85,4 +135,3 @@ void Settings::RecentFilesSettings::clear() const {
   settings.remove("files");
   settings.endGroup();
 }
-
