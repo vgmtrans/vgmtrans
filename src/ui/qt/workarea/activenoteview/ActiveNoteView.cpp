@@ -8,7 +8,9 @@
 
 #include "ActiveNoteRhiHost.h"
 
+#include <QApplication>
 #include <QColor>
+#include <QEvent>
 #include <QMouseEvent>
 #include <QPalette>
 #include <QResizeEvent>
@@ -32,6 +34,7 @@ ActiveNoteView::ActiveNoteView(QWidget* parent)
 }
 
 ActiveNoteView::~ActiveNoteView() {
+  endPreviewDrag();
   clearPreviewKey();
 }
 
@@ -143,10 +146,7 @@ bool ActiveNoteView::handleViewportMousePress(QMouseEvent* event) {
     return false;
   }
 
-  m_previewDragActive = true;
-  if (viewport()) {
-    viewport()->grabMouse();
-  }
+  beginPreviewDrag();
   setPreviewKey(hitTestKeyboardKey(event->position().toPoint()));
   event->accept();
   return true;
@@ -158,10 +158,7 @@ bool ActiveNoteView::handleViewportMouseMove(QMouseEvent* event) {
   }
 
   if (!(event->buttons() & Qt::LeftButton)) {
-    m_previewDragActive = false;
-    if (viewport() && QWidget::mouseGrabber() == viewport()) {
-      viewport()->releaseMouse();
-    }
+    endPreviewDrag();
     clearPreviewKey();
     event->accept();
     return true;
@@ -177,13 +174,66 @@ bool ActiveNoteView::handleViewportMouseRelease(QMouseEvent* event) {
     return false;
   }
 
-  m_previewDragActive = false;
-  if (viewport() && QWidget::mouseGrabber() == viewport()) {
-    viewport()->releaseMouse();
-  }
+  endPreviewDrag();
   clearPreviewKey();
   event->accept();
   return true;
+}
+
+void ActiveNoteView::beginPreviewDrag() {
+  m_previewDragActive = true;
+  if (!m_previewGlobalTracking && qApp) {
+    qApp->installEventFilter(this);
+    m_previewGlobalTracking = true;
+  }
+}
+
+void ActiveNoteView::endPreviewDrag() {
+  m_previewDragActive = false;
+  if (m_previewGlobalTracking && qApp) {
+    qApp->removeEventFilter(this);
+    m_previewGlobalTracking = false;
+  }
+}
+
+bool ActiveNoteView::eventFilter(QObject* watched, QEvent* event) {
+  if (!m_previewDragActive || !event) {
+    return QAbstractScrollArea::eventFilter(watched, event);
+  }
+
+  switch (event->type()) {
+    case QEvent::MouseMove: {
+      auto* mouseEvent = static_cast<QMouseEvent*>(event);
+      const Qt::MouseButtons buttons = mouseEvent->buttons() | QApplication::mouseButtons();
+      if (!(buttons & Qt::LeftButton)) {
+        endPreviewDrag();
+        clearPreviewKey();
+        break;
+      }
+      if (viewport()) {
+        const QPoint localPos = viewport()->mapFromGlobal(mouseEvent->globalPosition().toPoint());
+        setPreviewKey(hitTestKeyboardKey(localPos));
+      }
+      break;
+    }
+    case QEvent::MouseButtonRelease: {
+      auto* mouseEvent = static_cast<QMouseEvent*>(event);
+      if (mouseEvent->button() == Qt::LeftButton) {
+        endPreviewDrag();
+        clearPreviewKey();
+      }
+      break;
+    }
+    case QEvent::WindowDeactivate:
+    case QEvent::ApplicationDeactivate:
+      endPreviewDrag();
+      clearPreviewKey();
+      break;
+    default:
+      break;
+  }
+
+  return QAbstractScrollArea::eventFilter(watched, event);
 }
 
 ActiveNoteView::KeyHitResult ActiveNoteView::hitTestKeyboardKey(const QPoint& pos) const {
