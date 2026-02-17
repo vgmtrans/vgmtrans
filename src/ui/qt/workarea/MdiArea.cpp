@@ -547,21 +547,6 @@ void MdiArea::refreshTabControlAppearance() {
     return;
   }
 
-  const QString controlsStyle = QStringLiteral(
-      "QWidget#TabControlStrip QToolButton {"
-      " border: none;"
-      " background: transparent;"
-      " padding: 0px;"
-      " margin: 0px;"
-      "}"
-      "QWidget#TabControlStrip QToolButton:hover { background: transparent; }"
-      "QWidget#TabControlStrip QToolButton:pressed { background: transparent; }"
-      "QWidget#TabControlStrip QToolButton:checked { background: transparent; }"
-      "QWidget#TabControlStrip QToolButton::menu-indicator { image: none; width: 0px; }");
-  if (m_tabControls->styleSheet() != controlsStyle) {
-    m_tabControls->setStyleSheet(controlsStyle);
-  }
-
   auto *strip = static_cast<TabControlStrip *>(m_tabControls);
   if (m_cachedTabBarColumn.isNull() && m_tabBar && m_tabBar->width() > 0 && m_tabBar->height() > 0) {
     // Capture once from the real tab-bar rendering and keep it until the palette/style changes.
@@ -586,6 +571,34 @@ void MdiArea::refreshTabControlAppearance() {
   offGlyph.setAlphaF(0.32);
   QColor disabledGlyph = baseGlyph;
   disabledGlyph.setAlphaF(0.12);
+  QColor hoverFill = baseGlyph;
+  hoverFill.setAlphaF(0.15);
+  QColor pressedFill = baseGlyph;
+  pressedFill.setAlphaF(0.22);
+
+  const QString controlsStyle = QStringLiteral(
+      "QWidget#TabControlStrip QToolButton {"
+      " border: none;"
+      " background: transparent;"
+      " border-radius: 7px;"
+      " padding: 0px;"
+      " margin: 0px;"
+      "}"
+      "QWidget#TabControlStrip QToolButton:hover { background: rgba(%1,%2,%3,%4); }"
+      "QWidget#TabControlStrip QToolButton:pressed { background: rgba(%5,%6,%7,%8); }"
+      "QWidget#TabControlStrip QToolButton:disabled { background: transparent; }"
+      "QWidget#TabControlStrip QToolButton::menu-indicator { image: none; width: 0px; }")
+                                   .arg(hoverFill.red())
+                                   .arg(hoverFill.green())
+                                   .arg(hoverFill.blue())
+                                   .arg(hoverFill.alpha())
+                                   .arg(pressedFill.red())
+                                   .arg(pressedFill.green())
+                                   .arg(pressedFill.blue())
+                                   .arg(pressedFill.alpha());
+  if (m_tabControls->styleSheet() != controlsStyle) {
+    m_tabControls->setStyleSheet(controlsStyle);
+  }
 
   bool rightPaneHidden = false;
   if (auto *fileView = asFileView(activeSubWindow())) {
