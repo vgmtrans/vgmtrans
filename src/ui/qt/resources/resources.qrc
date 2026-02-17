@@ -24,6 +24,7 @@
   <file>icons/rest.svg</file>
   <file>icons/tempo.svg</file>
   <file>icons/progchange.svg</file>
+  <file>icons/left-pane.svg</file>
   <file>icons/loop.svg</file>
   <file>icons/loop-forever.svg</file>
   <file>icons/volume.svg</file>
@@ -34,6 +35,7 @@
   <file>icons/pitchbend.svg</file>
   <file>icons/midi-port.svg</file>
   <file>icons/magnify.svg</file>
+  <file>icons/right-pane.svg</file>
   <file>icons/volume-high.svg</file>
   <file>icons/tray-arrow-down.svg</file>
   <file>icons/toast_info.svg</file>
