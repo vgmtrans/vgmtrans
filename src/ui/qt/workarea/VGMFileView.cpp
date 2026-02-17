@@ -34,9 +34,25 @@
 #include "SeqEvent.h"
 #include "SeqNoteUtils.h"
 #include "SeqTrack.h"
+#include "services/Settings.h"
 
 namespace {
 constexpr uint8_t kActiveNotePreviewVelocity = 127;
+
+PanelViewKind sanitizeSeqPaneViewKind(int viewKind, PanelSide side) {
+  switch (viewKind) {
+    case static_cast<int>(PanelViewKind::Hex):
+      return PanelViewKind::Hex;
+    case static_cast<int>(PanelViewKind::Tree):
+      return PanelViewKind::Tree;
+    case static_cast<int>(PanelViewKind::ActiveNotes):
+      return PanelViewKind::ActiveNotes;
+    case static_cast<int>(PanelViewKind::PianoRoll):
+      return PanelViewKind::PianoRoll;
+    default:
+      return side == PanelSide::Left ? PanelViewKind::Hex : PanelViewKind::PianoRoll;
+  }
+}
 
 int previewMidiChannelForEvent(const SeqEvent* event) {
   if (!event) {
@@ -118,6 +134,13 @@ VGMFileView::VGMFileView(VGMFile* vgmfile)
 
   panel(PanelSide::Left) = createPanel(PanelSide::Left, m_isSeqFile);
   panel(PanelSide::Right) = createPanel(PanelSide::Right, m_isSeqFile);
+  if (m_isSeqFile) {
+    const auto& settings = Settings::the()->VGMSeqFileView;
+    setPanelView(PanelSide::Left,
+                 sanitizeSeqPaneViewKind(settings.leftPaneView(), PanelSide::Left));
+    setPanelView(PanelSide::Right,
+                 sanitizeSeqPaneViewKind(settings.rightPaneView(), PanelSide::Right));
+  }
 
   m_splitter->addWidget(panel(PanelSide::Left).container);
   m_splitter->addWidget(panel(PanelSide::Right).container);
@@ -130,6 +153,20 @@ VGMFileView::VGMFileView(VGMFile* vgmfile)
 
   m_defaultHexFont = panel(PanelSide::Left).hexView->font();
   applyHexViewFont(m_defaultHexFont);
+
+  connect(m_splitter,
+          &QSplitter::splitterMoved,
+          this,
+          [this](int, int) {
+            if (!m_isSeqFile || m_singlePaneMode) {
+              return;
+            }
+            const QList<int> sizes = m_splitter->sizes();
+            if (sizes.size() < 2 || sizes.first() <= 0) {
+              return;
+            }
+            Settings::the()->VGMSeqFileView.setLeftPaneWidth(sizes.first());
+          });
 
   for (PanelSide side : {PanelSide::Left, PanelSide::Right}) {
     auto& panelUi = panel(side);
@@ -189,6 +226,25 @@ VGMFileView::VGMFileView(VGMFile* vgmfile)
           &VGMFileView::onPlayerStatusChanged);
 
   setWidget(m_splitter);
+
+  if (m_isSeqFile) {
+    const int storedLeftPaneWidth = Settings::the()->VGMSeqFileView.leftPaneWidth();
+    if (storedLeftPaneWidth > 0) {
+      QTimer::singleShot(0, this, [this, storedLeftPaneWidth]() {
+        if (!m_splitter || m_singlePaneMode || m_splitter->width() <= 0) {
+          return;
+        }
+        const int handleWidth = m_splitter->handleWidth();
+        const int maxLeftPaneWidth =
+            std::max(1, m_splitter->width() - treeViewMinimumWidth - handleWidth);
+        const int leftPaneWidth = std::clamp(storedLeftPaneWidth, 1, maxLeftPaneWidth);
+        const int rightPaneWidth =
+            std::max(treeViewMinimumWidth, m_splitter->width() - leftPaneWidth - handleWidth);
+        m_splitter->setSizes(QList<int>{leftPaneWidth, rightPaneWidth});
+        m_splitter->persistState();
+      });
+    }
+  }
 }
 
 VGMFileView::PanelUi VGMFileView::createPanel(PanelSide side, bool isSeqFile) {
@@ -289,6 +345,14 @@ void VGMFileView::setPanelView(PanelSide side, PanelViewKind viewKind) {
     panelUi.treeView->updateStatusBar();
   } else if (viewKind == PanelViewKind::PianoRoll && panelUi.pianoRollView) {
     panelUi.pianoRollView->refreshSequenceData(true);
+  }
+
+  if (m_isSeqFile) {
+    if (side == PanelSide::Left) {
+      Settings::the()->VGMSeqFileView.setLeftPaneView(static_cast<int>(viewKind));
+    } else {
+      Settings::the()->VGMSeqFileView.setRightPaneView(static_cast<int>(viewKind));
+    }
   }
 }
 
