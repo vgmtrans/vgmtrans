@@ -21,7 +21,6 @@
 #include <QPalette>
 #include <QPixmap>
 #include <QShortcut>
-#include <QSignalBlocker>
 #include <QTabBar>
 #include <QTimer>
 #include <QToolButton>
@@ -230,22 +229,37 @@ void paintDetailedInstruction(QPainter &painter, const DetailedInstructionLayout
 constexpr int kTabControlSpacing = 2;
 constexpr int kTabControlOuterMargin = 4;
 
-QIcon panelButtonIcon(const QColor &tint) {
-  return QIcon(new TintableSvgIconEngine(QStringLiteral(":/icons/midi-port.svg"), tint));
+// Replace these paths when final per-view artwork is ready.
+const QString kHexViewIconPath = QStringLiteral(":/icons/binary.svg");
+const QString kTreeViewIconPath = QStringLiteral(":/icons/file.svg");
+const QString kActiveNotesViewIconPath = QStringLiteral(":/icons/note.svg");
+const QString kPianoRollViewIconPath = QStringLiteral(":/icons/track.svg");
+const QString kHiddenRightPaneIconPath = QStringLiteral(":/icons/view-split-vertical.svg");
+
+QString iconPathForPanelView(PanelViewKind viewKind) {
+  switch (viewKind) {
+    case PanelViewKind::Hex:
+      return kHexViewIconPath;
+    case PanelViewKind::Tree:
+      return kTreeViewIconPath;
+    case PanelViewKind::ActiveNotes:
+      return kActiveNotesViewIconPath;
+    case PanelViewKind::PianoRoll:
+      return kPianoRollViewIconPath;
+  }
+  return kTreeViewIconPath;
+}
+
+QIcon panelButtonIcon(const QString &iconPath, const QColor &tint) {
+  return QIcon(new TintableSvgIconEngine(iconPath, tint));
 }
 
 QIcon iconForPanelView(PanelViewKind viewKind) {
-  switch (viewKind) {
-    case PanelViewKind::Hex:
-      return QIcon(QStringLiteral(":/icons/binary.svg"));
-    case PanelViewKind::Tree:
-      return QIcon(QStringLiteral(":/icons/file.svg"));
-    case PanelViewKind::ActiveNotes:
-      return QIcon(QStringLiteral(":/icons/note.svg"));
-    case PanelViewKind::PianoRoll:
-      return QIcon(QStringLiteral(":/icons/track.svg"));
-  }
-  return QIcon(QStringLiteral(":/icons/file.svg"));
+  return QIcon(iconPathForPanelView(viewKind));
+}
+
+QIcon iconForHiddenRightPane() {
+  return QIcon(kHiddenRightPaneIconPath);
 }
 
 } // namespace
@@ -363,31 +377,32 @@ void MdiArea::setupTabBarControls() {
       return button;
     };
 
-    m_singlePaneButton = createIconButton(m_tabControls, tr("Toggle 1-pane layout"));
-    m_singlePaneButton->setCheckable(true);
-    controlsLayout->addWidget(m_singlePaneButton);
-
     m_leftPaneButton = createIconButton(m_tabControls, tr("Select left pane view"));
     m_leftPaneButton->setPopupMode(QToolButton::InstantPopup);
     controlsLayout->addWidget(m_leftPaneButton);
 
-    m_rightPaneButton = createIconButton(m_tabControls, tr("Select right pane view"));
+    m_rightPaneButton = createIconButton(m_tabControls, tr("Select or hide right pane view"));
     m_rightPaneButton->setPopupMode(QToolButton::InstantPopup);
     controlsLayout->addWidget(m_rightPaneButton);
 
-    auto createPaneMenu = [this](QToolButton *button, PanelSide side, PaneActions &actions) {
+    auto createPaneMenu = [this](QToolButton *button,
+                                 PanelSide side,
+                                 PaneActions &actions,
+                                 bool includeHiddenOption) {
       auto *menu = new QMenu(button);
       auto *group = new QActionGroup(menu);
       group->setExclusive(true);
 
-      auto addAction = [this, menu, group, side](PanelViewKind kind,
-                                                  const QString &text,
-                                                  QAction *&slot) {
+      auto addAction = [this, menu, group, side](PanelViewKind kind, const QString &text, QAction *&slot) {
         slot = menu->addAction(iconForPanelView(kind), text);
+        slot->setIconVisibleInMenu(true);
         slot->setCheckable(true);
         group->addAction(slot);
         connect(slot, &QAction::triggered, this, [this, side, kind]() {
           if (auto *fileView = asFileView(activeSubWindow())) {
+            if (side == PanelSide::Right) {
+              fileView->setSinglePaneMode(false);
+            }
             fileView->setPanelView(side, kind);
             updateTabBarControls();
           }
@@ -399,19 +414,26 @@ void MdiArea::setupTabBarControls() {
       addAction(PanelViewKind::ActiveNotes, tr("Active Notes"), actions.activeNotes);
       addAction(PanelViewKind::PianoRoll, tr("Piano Roll"), actions.pianoRoll);
 
-      // Both pane menus expose the same view list; the target pane is captured by `side`.
+      if (includeHiddenOption) {
+        menu->addSeparator();
+        actions.hidden = menu->addAction(iconForHiddenRightPane(), tr("Hidden"));
+        actions.hidden->setIconVisibleInMenu(true);
+        actions.hidden->setCheckable(true);
+        group->addAction(actions.hidden);
+        connect(actions.hidden, &QAction::triggered, this, [this]() {
+          if (auto *fileView = asFileView(activeSubWindow())) {
+            fileView->setSinglePaneMode(true);
+            updateTabBarControls();
+          }
+        });
+      }
+
+      // The target pane is captured by `side`; the right menu adds a hide option.
       button->setMenu(menu);
     };
 
-    createPaneMenu(m_leftPaneButton, PanelSide::Left, m_leftPaneActions);
-    createPaneMenu(m_rightPaneButton, PanelSide::Right, m_rightPaneActions);
-
-    connect(m_singlePaneButton, &QToolButton::toggled, this, [this](bool singlePane) {
-      if (auto *fileView = asFileView(activeSubWindow())) {
-        fileView->setSinglePaneMode(singlePane);
-      }
-      updateTabBarControls();
-    });
+    createPaneMenu(m_leftPaneButton, PanelSide::Left, m_leftPaneActions, false);
+    createPaneMenu(m_rightPaneButton, PanelSide::Right, m_rightPaneActions, true);
   }
 
   refreshTabControlAppearance();
@@ -422,14 +444,14 @@ void MdiArea::setupTabBarControls() {
 
 // Syncs tab-strip control state with the active VGMFileView.
 void MdiArea::updateTabBarControls() {
-  if (!m_tabControls || !m_singlePaneButton || !m_leftPaneButton || !m_rightPaneButton) {
+  if (!m_tabControls || !m_leftPaneButton || !m_rightPaneButton) {
     return;
   }
 
   auto *fileView = asFileView(activeSubWindow());
   const bool hasFileView = fileView != nullptr;
 
-  auto setPaneSelection = [](const PaneActions &actions, PanelViewKind kind) {
+  auto setPaneSelection = [](const PaneActions &actions, PanelViewKind kind, bool hiddenSelected) {
     if (actions.hex) {
       actions.hex->setChecked(kind == PanelViewKind::Hex);
     }
@@ -442,6 +464,9 @@ void MdiArea::updateTabBarControls() {
     if (actions.pianoRoll) {
       actions.pianoRoll->setChecked(kind == PanelViewKind::PianoRoll);
     }
+    if (actions.hidden) {
+      actions.hidden->setChecked(hiddenSelected);
+    }
   };
 
   auto setSeqOnlyEnabled = [](PaneActions &actions, bool enabled) {
@@ -453,14 +478,13 @@ void MdiArea::updateTabBarControls() {
     }
   };
 
-  m_singlePaneButton->setEnabled(hasFileView);
   m_leftPaneButton->setEnabled(hasFileView);
+  m_rightPaneButton->setEnabled(hasFileView);
 
   if (!hasFileView) {
     // No active file: keep controls visible but inert.
-    QSignalBlocker blocker(m_singlePaneButton);
-    m_singlePaneButton->setChecked(false);
-    m_rightPaneButton->setEnabled(false);
+    setPaneSelection(m_leftPaneActions, PanelViewKind::Hex, false);
+    setPaneSelection(m_rightPaneActions, PanelViewKind::Tree, false);
     setSeqOnlyEnabled(m_leftPaneActions, false);
     setSeqOnlyEnabled(m_rightPaneActions, false);
     refreshTabControlAppearance();
@@ -468,19 +492,13 @@ void MdiArea::updateTabBarControls() {
   }
 
   const bool singlePane = fileView->singlePaneMode();
-  {
-    QSignalBlocker blocker(m_singlePaneButton);
-    m_singlePaneButton->setChecked(singlePane);
-  }
-
-  setPaneSelection(m_leftPaneActions, fileView->panelView(PanelSide::Left));
-  setPaneSelection(m_rightPaneActions, fileView->panelView(PanelSide::Right));
+  setPaneSelection(m_leftPaneActions, fileView->panelView(PanelSide::Left), false);
+  setPaneSelection(m_rightPaneActions, fileView->panelView(PanelSide::Right), singlePane);
 
   const bool sequenceViewsAvailable = fileView->supportsSequenceViews();
   setSeqOnlyEnabled(m_leftPaneActions, sequenceViewsAvailable);
   setSeqOnlyEnabled(m_rightPaneActions, sequenceViewsAvailable);
 
-  m_rightPaneButton->setEnabled(!singlePane);
   refreshTabControlAppearance();
 }
 
@@ -519,7 +537,7 @@ void MdiArea::repositionTabBarControls() {
 
 // Applies the flat, stencil-like visual style used by the tab-strip controls.
 void MdiArea::refreshTabControlAppearance() {
-  if (!m_tabControls || !m_singlePaneButton || !m_leftPaneButton || !m_rightPaneButton) {
+  if (!m_tabControls || !m_leftPaneButton || !m_rightPaneButton) {
     return;
   }
 
@@ -563,17 +581,27 @@ void MdiArea::refreshTabControlAppearance() {
   QColor disabledGlyph = baseGlyph;
   disabledGlyph.setAlphaF(0.12);
 
-  auto assignIconForState = [&](QToolButton *button, bool onState) {
+  PanelViewKind leftViewKind = PanelViewKind::Hex;
+  PanelViewKind rightViewKind = PanelViewKind::Tree;
+  bool rightPaneHidden = false;
+  if (auto *fileView = asFileView(activeSubWindow())) {
+    leftViewKind = fileView->panelView(PanelSide::Left);
+    rightViewKind = fileView->panelView(PanelSide::Right);
+    rightPaneHidden = fileView->singlePaneMode();
+  }
+
+  auto assignIconForState = [&](QToolButton *button, const QString &iconPath, bool onState) {
     if (!button) {
       return;
     }
     const QColor glyph = !button->isEnabled() ? disabledGlyph : (onState ? onGlyph : offGlyph);
-    button->setIcon(panelButtonIcon(glyph));
+    button->setIcon(panelButtonIcon(iconPath, glyph));
   };
 
-  assignIconForState(m_singlePaneButton, m_singlePaneButton->isChecked());
-  assignIconForState(m_leftPaneButton, true);
-  assignIconForState(m_rightPaneButton, true);
+  assignIconForState(m_leftPaneButton, iconPathForPanelView(leftViewKind), true);
+  assignIconForState(m_rightPaneButton,
+                     rightPaneHidden ? kHiddenRightPaneIconPath : iconPathForPanelView(rightViewKind),
+                     !rightPaneHidden);
 }
 
 // Re-captures tab-strip colors after the theme transition settles.

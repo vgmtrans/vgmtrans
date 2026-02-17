@@ -51,6 +51,7 @@ private:
     QAction *tree = nullptr;
     QAction *activeNotes = nullptr;
     QAction *pianoRoll = nullptr;
+    QAction *hidden = nullptr;
   };
 
   MdiArea(QWidget *parent = nullptr);
@@ -69,7 +70,6 @@ private:
   QTabBar *m_tabBar = nullptr;
   QWidget *m_tabBarHost = nullptr;
   QWidget *m_tabControls = nullptr;
-  QToolButton *m_singlePaneButton = nullptr;
   QToolButton *m_leftPaneButton = nullptr;
   QToolButton *m_rightPaneButton = nullptr;
   PaneActions m_leftPaneActions{};
