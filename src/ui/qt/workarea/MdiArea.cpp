@@ -275,6 +275,14 @@ MdiArea::MdiArea(QWidget *parent) : QMdiArea(parent) {
 
   connect(this, &QMdiArea::subWindowActivated, this, &MdiArea::onSubWindowActivated);
   connect(NotificationCenter::the(), &NotificationCenter::vgmFileSelected, this, &MdiArea::onVGMFileSelected);
+  connect(qApp, &QApplication::focusChanged, this, [this](QWidget *, QWidget *now) {
+    auto *window = containingSubWindowForWidget(now);
+    if (!window || window != activeSubWindow()) {
+      return;
+    }
+    qDebug() << "blah";
+    syncSelectedFileForWindow(window);
+  });
   connect(&qtVGMRoot, &QtVGMRoot::UI_addedRawFile, this, [this]() { viewport()->update(); });
   connect(&qtVGMRoot, &QtVGMRoot::UI_endRemoveRawFiles, this, [this]() { viewport()->update(); });
   connect(&qtVGMRoot, &QtVGMRoot::UI_addedVGMColl, this, [this]() { viewport()->update(); });
@@ -334,6 +342,36 @@ VGMFileView *MdiArea::asFileView(QMdiSubWindow *window) {
   }
 
   return qobject_cast<VGMFileView *>(window->widget());
+}
+
+QMdiSubWindow *MdiArea::containingSubWindowForWidget(QWidget *widget) const {
+  QWidget *cursor = widget;
+  while (cursor) {
+    if (auto *subWindow = qobject_cast<QMdiSubWindow *>(cursor)) {
+      return windowToFileMap.find(subWindow) != windowToFileMap.end() ? subWindow : nullptr;
+    }
+    cursor = cursor->parentWidget();
+  }
+  return nullptr;
+}
+
+void MdiArea::syncSelectedFileForWindow(QMdiSubWindow *window) {
+  if (!window) {
+    return;
+  }
+
+  const auto it = windowToFileMap.find(window);
+  if (it == windowToFileMap.end()) {
+    return;
+  }
+
+  auto *file = it->second;
+  if (!file || file == m_lastNotifiedFile) {
+    return;
+  }
+
+  m_lastNotifiedFile = file;
+  NotificationCenter::the()->selectVGMFile(file, this);
 }
 
 // Lazily creates the right-side tab-strip controls and their menus.
@@ -803,6 +841,9 @@ void MdiArea::removeView(const VGMFile *file) {
     // Get rid of the saved pointers
     windowToFileMap.erase(it->second);
     fileToWindowMap.erase(file);
+    if (m_lastNotifiedFile == file) {
+      m_lastNotifiedFile = nullptr;
+    }
   }
 
   updateTabBarControls();
@@ -826,20 +867,23 @@ void MdiArea::onSubWindowActivated(QMdiSubWindow *window) {
     subWindow->widget()->setHidden(subWindow != window);
   }
 
-  if (window) {
-    auto it = windowToFileMap.find(window);
-    if (it != windowToFileMap.end()) {
-      VGMFile *file = it->second;
-      NotificationCenter::the()->selectVGMFile(file, this);
-    }
-  }
+  syncSelectedFileForWindow(window);
 
   updateTabBarControls();
 }
 
 void MdiArea::onVGMFileSelected(const VGMFile *file, QWidget *caller) {
-  if (caller == this || file == nullptr)
+  if (!file) {
     return;
+  }
+
+  if (caller != this) {
+    m_lastNotifiedFile = file;
+  }
+
+  if (caller == this) {
+    return;
+  }
 
   auto it = fileToWindowMap.find(file);
   if (it != fileToWindowMap.end()) {
