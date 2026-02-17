@@ -15,6 +15,8 @@
 
 class QResizeEvent;
 class QMouseEvent;
+class QObject;
+class QEvent;
 class ActiveNoteRhiHost;
 class ActiveNoteRhiWidget;
 class ActiveNoteRhiWindow;
@@ -43,6 +45,7 @@ signals:
 
 protected:
   void resizeEvent(QResizeEvent* event) override;
+  bool eventFilter(QObject* watched, QEvent* event) override;
 
 private:
   friend class ActiveNoteRhiWidget;
@@ -61,6 +64,8 @@ private:
   bool handleViewportMousePress(QMouseEvent* event);
   bool handleViewportMouseMove(QMouseEvent* event);
   bool handleViewportMouseRelease(QMouseEvent* event);
+  void beginPreviewDrag();
+  void endPreviewDrag();
 
   KeyHitResult hitTestKeyboardKey(const QPoint& pos) const;
   void setPreviewKey(const KeyHitResult& hit);
@@ -76,6 +81,7 @@ private:
   std::vector<std::bitset<kPianoKeyCount>> m_activeKeysByTrack;
   std::vector<std::bitset<kPianoKeyCount>> m_previewKeysByTrack;
   bool m_previewDragActive = false;
+  bool m_previewGlobalTracking = false;
   int m_previewTrackIndex = -1;
   int m_previewKey = -1;
 };
