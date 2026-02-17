@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="32" height="24"
+     viewBox="0 0 32 24" fill="none" aria-hidden="true">
+    <defs>
+        <!-- Clip for the right pane (keeps the outer-right corners rounded) -->
+        <clipPath id="rightPaneClip">
+            <path d="M16 0.75H28.25C29.907 0.75 31.25 2.093 31.25 3.75V20.25C31.25 21.907 29.907 23.25 28.25 23.25H16V0.75Z"/>
+        </clipPath>
+    </defs>
+
+    <!-- Right pane subtle fill -->
+    <g clip-path="url(#rightPaneClip)">
+        <rect x="16" y="0.75" width="15.25" height="22.5"
+              fill="currentColor" opacity="0.1"/>
+    </g>
+
+    <!-- Outer frame (inset by half stroke to avoid clipping) -->
+    <rect x="0.75" y="0.75" width="30.5" height="22.5" rx="3"
+          stroke="currentColor" stroke-width="1.5"/>
+
+    <!-- Vertical split divider (centered) -->
+    <path d="M16 0.75V23.25"
+          stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+
+    <!-- Chevron centered in the RIGHT pane (horizontally adjusted) -->
+    <path d="M20.375 11.3L23.625 14.6L26.875 11.3"
+          stroke="currentColor" stroke-width="2"
+          stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

@@ -226,10 +226,12 @@ void paintDetailedInstruction(QPainter &painter, const DetailedInstructionLayout
   painter.drawText(subRect, Qt::AlignLeft | Qt::AlignTop, layout.instruction.subText);
 }
 
-constexpr int kTabControlSpacing = 2;
-constexpr int kTabControlOuterMargin = 4;
+constexpr int kTabControlSpacing = 8;
+constexpr int kTabControlOuterMargin = 8;
 
 // Replace these paths when final per-view artwork is ready.
+const QString kLeftPaneButtonIconPath = QStringLiteral(":/icons/left-pane.svg");
+const QString kRightPaneButtonIconPath = QStringLiteral(":/icons/right-pane.svg");
 const QString kHexViewIconPath = QStringLiteral(":/icons/binary.svg");
 const QString kTreeViewIconPath = QStringLiteral(":/icons/file.svg");
 const QString kActiveNotesViewIconPath = QStringLiteral(":/icons/note.svg");
@@ -370,8 +372,8 @@ void MdiArea::setupTabBarControls() {
       auto *button = new QToolButton(parent);
       button->setAutoRaise(false);
       button->setToolButtonStyle(Qt::ToolButtonIconOnly);
-      button->setIconSize(QSize(18, 18));
-      button->setFixedSize(QSize(30, 18));
+      button->setIconSize(QSize(24, 18));
+      button->setFixedSize(QSize(32, 24));
       button->setFocusPolicy(Qt::NoFocus);
       button->setToolTip(toolTip);
       return button;
@@ -409,13 +411,7 @@ void MdiArea::setupTabBarControls() {
         });
       };
 
-      addAction(PanelViewKind::Hex, tr("Hex"), actions.hex);
-      addAction(PanelViewKind::Tree, tr("Tree"), actions.tree);
-      addAction(PanelViewKind::ActiveNotes, tr("Active Notes"), actions.activeNotes);
-      addAction(PanelViewKind::PianoRoll, tr("Piano Roll"), actions.pianoRoll);
-
       if (includeHiddenOption) {
-        menu->addSeparator();
         actions.hidden = menu->addAction(iconForHiddenRightPane(), tr("Hidden"));
         actions.hidden->setIconVisibleInMenu(true);
         actions.hidden->setCheckable(true);
@@ -426,7 +422,13 @@ void MdiArea::setupTabBarControls() {
             updateTabBarControls();
           }
         });
+        menu->addSeparator();
       }
+
+      addAction(PanelViewKind::Hex, tr("Hex"), actions.hex);
+      addAction(PanelViewKind::Tree, tr("Tree"), actions.tree);
+      addAction(PanelViewKind::ActiveNotes, tr("Active Notes"), actions.activeNotes);
+      addAction(PanelViewKind::PianoRoll, tr("Piano Roll"), actions.pianoRoll);
 
       // The target pane is captured by `side`; the right menu adds a hide option.
       button->setMenu(menu);
@@ -435,6 +437,10 @@ void MdiArea::setupTabBarControls() {
     createPaneMenu(m_leftPaneButton, PanelSide::Left, m_leftPaneActions, false);
     createPaneMenu(m_rightPaneButton, PanelSide::Right, m_rightPaneActions, true);
   }
+
+  m_tabBar->setCursor(Qt::ArrowCursor);
+  m_tabBarHost->setCursor(Qt::ArrowCursor);
+  m_tabControls->setCursor(Qt::ArrowCursor);
 
   refreshTabControlAppearance();
   applyTabBarStyle();
@@ -581,12 +587,8 @@ void MdiArea::refreshTabControlAppearance() {
   QColor disabledGlyph = baseGlyph;
   disabledGlyph.setAlphaF(0.12);
 
-  PanelViewKind leftViewKind = PanelViewKind::Hex;
-  PanelViewKind rightViewKind = PanelViewKind::Tree;
   bool rightPaneHidden = false;
   if (auto *fileView = asFileView(activeSubWindow())) {
-    leftViewKind = fileView->panelView(PanelSide::Left);
-    rightViewKind = fileView->panelView(PanelSide::Right);
     rightPaneHidden = fileView->singlePaneMode();
   }
 
@@ -598,10 +600,8 @@ void MdiArea::refreshTabControlAppearance() {
     button->setIcon(panelButtonIcon(iconPath, glyph));
   };
 
-  assignIconForState(m_leftPaneButton, iconPathForPanelView(leftViewKind), true);
-  assignIconForState(m_rightPaneButton,
-                     rightPaneHidden ? kHiddenRightPaneIconPath : iconPathForPanelView(rightViewKind),
-                     !rightPaneHidden);
+  assignIconForState(m_leftPaneButton, kLeftPaneButtonIconPath, true);
+  assignIconForState(m_rightPaneButton, kRightPaneButtonIconPath, !rightPaneHidden);
 }
 
 // Re-captures tab-strip colors after the theme transition settles.
