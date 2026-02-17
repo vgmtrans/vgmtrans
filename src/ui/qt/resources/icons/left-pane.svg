@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="32" height="24"
+     viewBox="0 0 32 24" fill="none" aria-hidden="true">
+    <defs>
+        <!-- Clip for the left pane (keeps the outer-left corners rounded) -->
+        <clipPath id="leftPaneClip">
+            <path d="M3.75 0.75H16V23.25H3.75C2.093 23.25 0.75 21.907 0.75 20.25V3.75C0.75 2.093 2.093 0.75 3.75 0.75Z"/>
+        </clipPath>
+    </defs>
+
+    <!-- Left pane subtle fill -->
+    <g clip-path="url(#leftPaneClip)">
+        <rect x="0.75" y="0.75" width="15.25" height="22.5"
+              fill="currentColor" opacity="0.1"/>
+    </g>
+
+    <!-- Outer frame (inset by half stroke to avoid clipping) -->
+    <rect x="0.75" y="0.75" width="30.5" height="22.5" rx="3"
+          stroke="currentColor" stroke-width="1.5"/>
+
+    <!-- Vertical split divider (centered) -->
+    <path d="M16 0.75V23.25"
+          stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+
+    <!-- Chevron centered in the LEFT pane (shifted right for true centering) -->
+    <path d="M5.125 11.3L8.375 14.6L11.625 11.3"
+          stroke="currentColor" stroke-width="2"
+          stroke-linecap="round" stroke-linejoin="round"/>
+</svg>
