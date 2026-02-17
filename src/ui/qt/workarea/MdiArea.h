@@ -63,6 +63,8 @@ private:
   void refreshTabControlsAfterThemeChange();
   void updateBackgroundColor();
   static VGMFileView *asFileView(QMdiSubWindow *window);
+  QMdiSubWindow *containingSubWindowForWidget(QWidget *widget) const;
+  void syncSelectedFileForWindow(QMdiSubWindow *window);
   void onSubWindowActivated(QMdiSubWindow *window);
   void onVGMFileSelected(const VGMFile *file, QWidget *caller);
   static void ensureMaximizedSubWindow(QMdiSubWindow *window);
@@ -79,4 +81,5 @@ private:
 
   std::unordered_map<const VGMFile *, QMdiSubWindow *> fileToWindowMap;
   std::unordered_map<QMdiSubWindow *, VGMFile *> windowToFileMap;
+  const VGMFile *m_lastNotifiedFile = nullptr;
 };
