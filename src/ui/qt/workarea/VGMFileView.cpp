@@ -34,6 +34,7 @@
 #include "SeqEvent.h"
 #include "SeqNoteUtils.h"
 #include "SeqTrack.h"
+#include "services/NotificationCenter.h"
 
 namespace {
 constexpr uint8_t kActiveNotePreviewVelocity = 127;
@@ -255,6 +256,7 @@ VGMFileView::PanelUi VGMFileView::createPanel(PanelSide side, bool isSeqFile) {
 
 void VGMFileView::focusInEvent(QFocusEvent* event) {
   QMdiSubWindow::focusInEvent(event);
+  NotificationCenter::the()->selectVGMFile(m_vgmfile, MdiArea::the());
 
   for (PanelSide side : {PanelSide::Left, PanelSide::Right}) {
     const auto& panelUi = panel(side);
