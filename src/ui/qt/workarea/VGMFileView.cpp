@@ -6,6 +6,7 @@
 
 #include <QApplication>
 #include <QShortcut>
+#include <QSplitter>
 #include <QStackedWidget>
 #include <QTimer>
 #include <QTreeWidgetItem>
@@ -20,7 +21,7 @@
 #include "VGMFileView.h"
 #include "MdiArea.h"
 #include "SequencePlayer.h"
-#include "SnappingSplitter.h"
+#include "SplitterSnapProvider.h"
 #include "VGMFile.h"
 #include "VGMFileTreeView.h"
 #include "VGMColl.h"
@@ -122,7 +123,7 @@ bool buildPreviewNoteForEvent(const SeqEvent* seqEvent, SequencePlayer::PreviewN
 
 VGMFileView::VGMFileView(VGMFile* vgmfile)
     : QMdiSubWindow(), m_vgmfile(vgmfile) {
-  m_splitter = new SnappingSplitter(Qt::Horizontal, this);
+  m_splitter = new QSplitter(Qt::Horizontal, this);
 
   setWindowTitle(QString::fromStdString(m_vgmfile->name()));
   setWindowIcon(iconForFile(vgmFileToVariant(vgmfile)));
@@ -147,26 +148,12 @@ VGMFileView::VGMFileView(VGMFile* vgmfile)
   m_splitter->setStretchFactor(0, 1);
   m_splitter->setStretchFactor(1, 1);
   m_splitter->setSizes(QList<int>{1, 1});
-  m_splitter->persistState();
   m_defaultSplitterHandleWidth = m_splitter->handleWidth();
-  resetSnapRanges();
 
   m_defaultHexFont = panel(PanelSide::Left).hexView->font();
   applyHexViewFont(m_defaultHexFont);
 
-  connect(m_splitter,
-          &QSplitter::splitterMoved,
-          this,
-          [this](int, int) {
-            if (!m_isSeqFile || m_singlePaneMode) {
-              return;
-            }
-            const QList<int> sizes = m_splitter->sizes();
-            if (sizes.size() < 2 || sizes.first() <= 0) {
-              return;
-            }
-            Settings::the()->VGMSeqFileView.setLeftPaneWidth(sizes.first());
-          });
+  connect(m_splitter, &QSplitter::splitterMoved, this, &VGMFileView::onSplitterMoved);
 
   for (PanelSide side : {PanelSide::Left, PanelSide::Right}) {
     auto& panelUi = panel(side);
@@ -227,30 +214,24 @@ VGMFileView::VGMFileView(VGMFile* vgmfile)
 
   setWidget(m_splitter);
 
-  if (m_isSeqFile) {
-    const int storedLeftPaneWidth = Settings::the()->VGMSeqFileView.leftPaneWidth();
-    const bool storedRightPaneHidden = Settings::the()->VGMSeqFileView.rightPaneHidden();
-    QTimer::singleShot(0, this, [this, storedLeftPaneWidth, storedRightPaneHidden]() {
-      if (!m_splitter || m_splitter->width() <= 0) {
-        return;
-      }
+  const int storedLeftPaneWidth = m_isSeqFile ? Settings::the()->VGMSeqFileView.leftPaneWidth() : -1;
+  const bool storedRightPaneHidden =
+      m_isSeqFile ? Settings::the()->VGMSeqFileView.rightPaneHidden() : false;
+  QTimer::singleShot(0, this, [this, storedLeftPaneWidth, storedRightPaneHidden]() {
+    if (!m_splitter || m_splitter->width() <= 0) {
+      return;
+    }
 
-      if (storedLeftPaneWidth > 0) {
-        const int handleWidth = m_splitter->handleWidth();
-        const int maxLeftPaneWidth =
-            std::max(1, m_splitter->width() - treeViewMinimumWidth - handleWidth);
-        const int leftPaneWidth = std::clamp(storedLeftPaneWidth, 1, maxLeftPaneWidth);
-        const int rightPaneWidth =
-            std::max(treeViewMinimumWidth, m_splitter->width() - leftPaneWidth - handleWidth);
-        m_splitter->setSizes(QList<int>{leftPaneWidth, rightPaneWidth});
-        m_splitter->persistState();
-      }
+    const QList<int> sizes = m_splitter->sizes();
+    const int initialLeftPaneWidth =
+        (sizes.size() >= 2 && sizes.first() > 0) ? sizes.first() : std::max(1, m_splitter->width() / 2);
+    m_preferredLeftPaneWidth = storedLeftPaneWidth > 0 ? storedLeftPaneWidth : initialLeftPaneWidth;
+    enforceSplitterPolicyForResize();
 
-      if (storedRightPaneHidden) {
-        setSinglePaneMode(true);
-      }
-    });
-  }
+    if (storedRightPaneHidden) {
+      setSinglePaneMode(true);
+    }
+  });
 }
 
 VGMFileView::PanelUi VGMFileView::createPanel(PanelSide side, bool isSeqFile) {
@@ -268,7 +249,7 @@ VGMFileView::PanelUi VGMFileView::createPanel(PanelSide side, bool isSeqFile) {
   panelUi.pianoRollView = new PianoRollView(panelUi.stack);
 
   panelUi.hexView->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
-  panelUi.treeView->setMinimumWidth(treeViewMinimumWidth);
+  panelUi.treeView->setMinimumWidth(rightPaneMinimumWidth);
 
   if (isSeqFile) {
     auto* seq = dynamic_cast<VGMSeq*>(m_vgmfile);
@@ -332,6 +313,11 @@ void VGMFileView::focusInEvent(QFocusEvent* event) {
   panel(PanelSide::Left).treeView->updateStatusBar();
 }
 
+void VGMFileView::resizeEvent(QResizeEvent* event) {
+  QMdiSubWindow::resizeEvent(event);
+  enforceSplitterPolicyForResize();
+}
+
 // Switches a pane to the requested view, ignoring unsupported view kinds.
 void VGMFileView::setPanelView(PanelSide side, PanelViewKind viewKind) {
   // Guard against sequence-only views on non-sequence files.
@@ -359,6 +345,10 @@ void VGMFileView::setPanelView(PanelSide side, PanelViewKind viewKind) {
     } else {
       Settings::the()->VGMSeqFileView.setRightPaneView(static_cast<int>(viewKind));
     }
+  }
+
+  if (side == PanelSide::Left) {
+    enforceSplitterPolicyForResize();
   }
 }
 
@@ -396,26 +386,21 @@ void VGMFileView::setSinglePaneMode(bool singlePane) {
     return;
   }
   m_singlePaneMode = singlePane;
+
   if (m_isSeqFile) {
     Settings::the()->VGMSeqFileView.setRightPaneHidden(singlePane);
   }
 
   if (singlePane) {
-    // Preserve the current split so restoring 2-pane mode returns to the same ratio.
-    m_lastSplitSizes = m_splitter->sizes();
+    ensurePreferredLeftPaneWidth();
     rightPanel.container->setVisible(false);
     m_splitter->setHandleWidth(0);
-    m_splitter->setSizes(QList<int>{std::max(1, width()), 0});
+    setSplitterSizes(std::max(1, width()), 0);
   } else {
     rightPanel.container->setVisible(true);
     m_splitter->setHandleWidth(m_defaultSplitterHandleWidth);
-    if (!m_lastSplitSizes.isEmpty() && m_lastSplitSizes.size() == 2) {
-      m_splitter->setSizes(m_lastSplitSizes);
-    } else {
-      m_splitter->setSizes(QList<int>{1, 1});
-    }
+    enforceSplitterPolicyForResize();
   }
-  m_splitter->persistState();
 }
 
 // True when the right pane is currently collapsed.
@@ -423,29 +408,11 @@ bool VGMFileView::singlePaneMode() const {
   return m_singlePaneMode;
 }
 
-void VGMFileView::resetSnapRanges() const {
-  if (!m_splitter) {
-    return;
-  }
-
-  m_splitter->clearSnapRanges();
-  m_splitter->addSnapRange(0, hexViewWidthSansAsciiAndAddress(), hexViewWidthSansAscii());
-  m_splitter->addSnapRange(0, hexViewWidthSansAscii(), hexViewFullWidth());
-}
-
 int VGMFileView::hexViewFullWidth() const {
   return panel(PanelSide::Left).hexView->getViewportFullWidth();
 }
 
-int VGMFileView::hexViewWidthSansAscii() const {
-  return panel(PanelSide::Left).hexView->getViewportWidthSansAscii();
-}
-
-int VGMFileView::hexViewWidthSansAsciiAndAddress() const {
-  return panel(PanelSide::Left).hexView->getViewportWidthSansAsciiAndAddress();
-}
-
-void VGMFileView::updateHexViewFont(qreal sizeIncrement) const {
+void VGMFileView::updateHexViewFont(qreal sizeIncrement) {
   // Increment the font size until it has an actual effect on width.
   QFont font = panel(PanelSide::Left).hexView->font();
   QFontMetricsF fontMetrics(font);
@@ -463,9 +430,14 @@ void VGMFileView::updateHexViewFont(qreal sizeIncrement) const {
   applyHexViewFont(font);
 }
 
-void VGMFileView::applyHexViewFont(QFont font) const {
+void VGMFileView::applyHexViewFont(QFont font) {
   const QList<int> splitterSizes = m_splitter->sizes();
-  const int actualWidthBeforeResize = splitterSizes.isEmpty() ? hexViewFullWidth() : splitterSizes.first();
+  const bool canAdjustSplitter =
+      m_splitter && widget() == m_splitter && m_splitter->width() > 0 && !m_singlePaneMode;
+  const int actualWidthBeforeResize =
+      (canAdjustSplitter && !splitterSizes.isEmpty() && splitterSizes.first() > 0)
+          ? splitterSizes.first()
+          : hexViewFullWidth();
   const int fullWidthBeforeResize = std::max(1, hexViewFullWidth());
 
   for (PanelSide side : {PanelSide::Left, PanelSide::Right}) {
@@ -484,9 +456,148 @@ void VGMFileView::applyHexViewFont(QFont font) const {
   const auto scaledWidthChange = static_cast<int>(
       std::round(static_cast<float>(widthChange) * percentHexViewVisible));
   const int newWidth = std::max(1, actualWidthBeforeResize + scaledWidthChange);
-  resetSnapRanges();
-  m_splitter->setSizes(QList<int>{newWidth, treeViewMinimumWidth});
-  m_splitter->persistState();
+  if (!canAdjustSplitter) {
+    return;
+  }
+  setLeftPaneWidth(newWidth, m_isSeqFile);
+  enforceSplitterPolicyForResize();
+}
+
+void VGMFileView::onSplitterMoved(int, int) {
+  if (m_updatingSplitter || m_singlePaneMode) {
+    return;
+  }
+
+  const QList<int> sizes = m_splitter->sizes();
+  if (sizes.size() < 2 || sizes.first() <= 0) {
+    return;
+  }
+
+  int leftPaneWidth = std::clamp(sizes.first(), 1, maxLeftPaneWidth());
+  leftPaneWidth = snapLeftPaneWidthForDrag(leftPaneWidth);
+  leftPaneWidth = std::clamp(leftPaneWidth, 1, maxLeftPaneWidth());
+  setLeftPaneWidth(leftPaneWidth, true);
+}
+
+void VGMFileView::ensurePreferredLeftPaneWidth() {
+  if (m_preferredLeftPaneWidth > 0 || !m_splitter) {
+    return;
+  }
+
+  const QList<int> sizes = m_splitter->sizes();
+  if (sizes.size() >= 2 && sizes.first() > 0) {
+    m_preferredLeftPaneWidth = sizes.first();
+    return;
+  }
+
+  if (m_splitter->width() > 0) {
+    m_preferredLeftPaneWidth = std::max(1, m_splitter->width() / 2);
+    return;
+  }
+
+  m_preferredLeftPaneWidth = 1;
+}
+
+int VGMFileView::maxLeftPaneWidth() const {
+  if (!m_splitter) {
+    return 1;
+  }
+
+  const int maxWidth = m_splitter->width() - m_splitter->handleWidth() - rightPaneMinimumWidth;
+  return std::max(1, maxWidth);
+}
+
+int VGMFileView::snapLeftPaneWidthForDrag(int leftPaneWidth) const {
+  auto* snapProvider = leftPaneSnapProvider();
+  if (!snapProvider) {
+    return leftPaneWidth;
+  }
+
+  int snappedWidth = leftPaneWidth;
+  for (const SplitterSnapRange& range : snapProvider->splitterSnapRanges()) {
+    if (range.lowerBound >= range.upperBound) {
+      continue;
+    }
+
+    const int halfway = range.upperBound + (range.lowerBound - range.upperBound) / 2;
+    if (snappedWidth <= range.upperBound && snappedWidth > range.lowerBound) {
+      snappedWidth = snappedWidth > halfway ? range.upperBound : range.lowerBound;
+    }
+  }
+  return snappedWidth;
+}
+
+int VGMFileView::snapLeftPaneWidthForResize(int leftPaneWidth) const {
+  auto* snapProvider = leftPaneSnapProvider();
+  if (!snapProvider) {
+    return leftPaneWidth;
+  }
+
+  int snappedWidth = leftPaneWidth;
+  for (const SplitterSnapRange& range : snapProvider->splitterSnapRanges()) {
+    if (range.lowerBound >= range.upperBound) {
+      continue;
+    }
+
+    if (snappedWidth < range.upperBound && snappedWidth > range.lowerBound) {
+      snappedWidth = range.lowerBound;
+    }
+  }
+  return snappedWidth;
+}
+
+SplitterSnapProvider* VGMFileView::leftPaneSnapProvider() const {
+  const auto& leftPanel = panel(PanelSide::Left);
+  if (!leftPanel.stack) {
+    return nullptr;
+  }
+
+  auto* currentWidget = leftPanel.stack->currentWidget();
+  if (!currentWidget) {
+    return nullptr;
+  }
+
+  return dynamic_cast<SplitterSnapProvider*>(currentWidget);
+}
+
+void VGMFileView::setSplitterSizes(int leftPaneWidth, int rightPaneWidth) {
+  if (!m_splitter) {
+    return;
+  }
+
+  m_updatingSplitter = true;
+  m_splitter->setSizes(QList<int>{std::max(0, leftPaneWidth), std::max(0, rightPaneWidth)});
+  m_updatingSplitter = false;
+}
+
+void VGMFileView::setLeftPaneWidth(int leftPaneWidth, bool persistWidth) {
+  ensurePreferredLeftPaneWidth();
+  m_preferredLeftPaneWidth = std::max(1, leftPaneWidth);
+
+  if (!m_singlePaneMode && m_splitter) {
+    const int clampedLeftPaneWidth = std::clamp(m_preferredLeftPaneWidth, 1, maxLeftPaneWidth());
+    const int rightPaneWidth = std::max(0, m_splitter->width() - clampedLeftPaneWidth - m_splitter->handleWidth());
+    setSplitterSizes(clampedLeftPaneWidth, rightPaneWidth);
+  }
+
+  if (persistWidth && m_isSeqFile) {
+    Settings::the()->VGMSeqFileView.setLeftPaneWidth(m_preferredLeftPaneWidth);
+  }
+}
+
+void VGMFileView::enforceSplitterPolicyForResize() {
+  if (!m_splitter || m_singlePaneMode) {
+    return;
+  }
+
+  ensurePreferredLeftPaneWidth();
+
+  int leftPaneWidth = std::clamp(m_preferredLeftPaneWidth, 1, maxLeftPaneWidth());
+  leftPaneWidth = snapLeftPaneWidthForResize(leftPaneWidth);
+  leftPaneWidth = std::clamp(leftPaneWidth, 1, maxLeftPaneWidth());
+
+  const int rightPaneWidth = std::max(0, m_splitter->width() - leftPaneWidth - m_splitter->handleWidth());
+  setSplitterSizes(leftPaneWidth, rightPaneWidth);
 }
 
 void VGMFileView::resetHexViewFont() {
