@@ -9,6 +9,7 @@
 #include <QAbstractScrollArea>
 #include <QElapsedTimer>
 #include <QPoint>
+#include <QSize>
 #include <QtGlobal>
 
 #include <array>
@@ -194,6 +195,7 @@ private:
   bool m_attemptedTimelineBuild = false;
   // Initial centering waits for a real viewport size (stacked views can report tiny pre-layout sizes).
   bool m_initialViewportPositioned = false;
+  QSize m_initialViewportSizeCandidate;
   bool m_viewportSyncQueued = false;
   bool m_coalescedRenderPending = false;
 
