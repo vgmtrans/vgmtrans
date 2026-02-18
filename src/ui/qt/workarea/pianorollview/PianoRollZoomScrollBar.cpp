@@ -64,15 +64,15 @@ void PianoRollZoomScrollBar::paintEvent(QPaintEvent* event) {
     }
 
     const QPalette pal = palette();
-    QColor fill = pal.color(QPalette::Button);
+    QColor fill = pal.color(QPalette::Active, QPalette::Button);
     if (m_pressed == button) {
       fill = fill.darker(130);
     } else if (m_hovered == button) {
       fill = fill.lighter(118);
     }
 
-    QColor border = pal.color(QPalette::Mid);
-    QColor fg = pal.color(QPalette::ButtonText);
+    QColor border = pal.color(QPalette::Active, QPalette::Mid);
+    QColor fg = pal.color(QPalette::Active, QPalette::ButtonText);
 
     painter.fillRect(rect, fill);
     painter.setPen(border);
