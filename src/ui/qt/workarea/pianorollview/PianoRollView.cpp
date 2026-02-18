@@ -369,6 +369,11 @@ bool PianoRollView::handleViewportWheel(QWheelEvent* event) {
     return false;
   }
 
+  constexpr float kWheelZoomSensitivity = 0.082f;
+  constexpr float kWheelZoomMinFactor = 0.82f;
+  constexpr float kWheelZoomMaxFactor = 1.24f;
+  constexpr int kWheelZoomAnimationMs = 40;
+
   const Qt::KeyboardModifiers mods = event->modifiers();
   const bool zoomHorizontalOnly = mods.testFlag(Qt::ControlModifier);
   const bool zoomVerticalOnly = mods.testFlag(Qt::AltModifier);
@@ -376,33 +381,35 @@ bool PianoRollView::handleViewportWheel(QWheelEvent* event) {
     return false;
   }
 
-  int delta = event->angleDelta().y();
-  if (delta == 0) {
-    delta = event->angleDelta().x();
-  }
-  if (delta == 0) {
-    delta = event->pixelDelta().y();
-  }
-  if (delta == 0) {
-    delta = event->pixelDelta().x();
+  float wheelUnits = 0.0f;
+  const QPoint angleDelta = event->angleDelta();
+  if (angleDelta.y() != 0) {
+    wheelUnits = static_cast<float>(angleDelta.y()) / 120.0f;
+  } else if (angleDelta.x() != 0) {
+    wheelUnits = static_cast<float>(angleDelta.x()) / 120.0f;
+  } else {
+    const QPoint pixelDelta = event->pixelDelta();
+    if (pixelDelta.y() != 0) {
+      wheelUnits = static_cast<float>(pixelDelta.y()) / 120.0f;
+    } else if (pixelDelta.x() != 0) {
+      wheelUnits = static_cast<float>(pixelDelta.x()) / 120.0f;
+    }
   }
 
-  int steps = 0;
-  if (delta > 0) {
-    steps = std::max(1, delta / 120);
-  } else if (delta < 0) {
-    steps = std::min(-1, delta / 120);
+  if (std::abs(wheelUnits) < 0.0001f) {
+    event->accept();
+    return true;
   }
-  if (steps == 0) {
-    steps = (delta >= 0) ? 1 : -1;
-  }
+
+  const float factor =
+      std::clamp(std::exp(wheelUnits * kWheelZoomSensitivity), kWheelZoomMinFactor, kWheelZoomMaxFactor);
 
   const QPoint pos = event->position().toPoint();
   if (zoomHorizontalOnly) {
-    zoomHorizontal(steps, pos.x(), false, 0);
+    zoomHorizontalFactor(factor, pos.x(), true, kWheelZoomAnimationMs);
   }
   if (zoomVerticalOnly) {
-    zoomVertical(steps, pos.y(), false, 0);
+    zoomVerticalFactor(factor, pos.y(), true, kWheelZoomAnimationMs);
   }
 
   event->accept();
