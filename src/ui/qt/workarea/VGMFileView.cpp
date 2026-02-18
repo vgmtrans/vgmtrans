@@ -229,11 +229,13 @@ VGMFileView::VGMFileView(VGMFile* vgmfile)
 
   if (m_isSeqFile) {
     const int storedLeftPaneWidth = Settings::the()->VGMSeqFileView.leftPaneWidth();
-    if (storedLeftPaneWidth > 0) {
-      QTimer::singleShot(0, this, [this, storedLeftPaneWidth]() {
-        if (!m_splitter || m_singlePaneMode || m_splitter->width() <= 0) {
-          return;
-        }
+    const bool storedRightPaneHidden = Settings::the()->VGMSeqFileView.rightPaneHidden();
+    QTimer::singleShot(0, this, [this, storedLeftPaneWidth, storedRightPaneHidden]() {
+      if (!m_splitter || m_splitter->width() <= 0) {
+        return;
+      }
+
+      if (storedLeftPaneWidth > 0) {
         const int handleWidth = m_splitter->handleWidth();
         const int maxLeftPaneWidth =
             std::max(1, m_splitter->width() - treeViewMinimumWidth - handleWidth);
@@ -242,8 +244,12 @@ VGMFileView::VGMFileView(VGMFile* vgmfile)
             std::max(treeViewMinimumWidth, m_splitter->width() - leftPaneWidth - handleWidth);
         m_splitter->setSizes(QList<int>{leftPaneWidth, rightPaneWidth});
         m_splitter->persistState();
-      });
-    }
+      }
+
+      if (storedRightPaneHidden) {
+        setSinglePaneMode(true);
+      }
+    });
   }
 }
 
@@ -390,6 +396,9 @@ void VGMFileView::setSinglePaneMode(bool singlePane) {
     return;
   }
   m_singlePaneMode = singlePane;
+  if (m_isSeqFile) {
+    Settings::the()->VGMSeqFileView.setRightPaneHidden(singlePane);
+  }
 
   if (singlePane) {
     // Preserve the current split so restoring 2-pane mode returns to the same ratio.

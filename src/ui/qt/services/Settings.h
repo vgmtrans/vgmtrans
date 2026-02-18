@@ -84,6 +84,8 @@ public:
     void setLeftPaneView(int viewKind) const;
     int rightPaneView() const;
     void setRightPaneView(int viewKind) const;
+    bool rightPaneHidden() const;
+    void setRightPaneHidden(bool hidden) const;
     int leftPaneWidth() const;
     void setLeftPaneWidth(int width) const;
   };

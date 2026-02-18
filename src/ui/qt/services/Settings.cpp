@@ -11,9 +11,11 @@ namespace {
 constexpr auto kVGMSeqFileViewGroup = "VGMSeqFileView";
 constexpr auto kLeftPaneViewKey = "leftPaneView";
 constexpr auto kRightPaneViewKey = "rightPaneView";
+constexpr auto kRightPaneHiddenKey = "rightPaneHidden";
 constexpr auto kLeftPaneWidthKey = "leftPaneWidth";
 constexpr int kDefaultLeftPaneView = 0;   // PanelViewKind::Hex
 constexpr int kDefaultRightPaneView = 3;  // PanelViewKind::PianoRoll
+constexpr bool kDefaultRightPaneHidden = false;
 constexpr int kUnsetLeftPaneWidth = -1;
 }  // namespace
 
@@ -68,6 +70,19 @@ int Settings::VGMSeqFileViewSettings::rightPaneView() const {
 void Settings::VGMSeqFileViewSettings::setRightPaneView(int viewKind) const {
   settings.beginGroup(kVGMSeqFileViewGroup);
   settings.setValue(kRightPaneViewKey, viewKind);
+  settings.endGroup();
+}
+
+bool Settings::VGMSeqFileViewSettings::rightPaneHidden() const {
+  settings.beginGroup(kVGMSeqFileViewGroup);
+  bool hidden = settings.value(kRightPaneHiddenKey, kDefaultRightPaneHidden).toBool();
+  settings.endGroup();
+  return hidden;
+}
+
+void Settings::VGMSeqFileViewSettings::setRightPaneHidden(bool hidden) const {
+  settings.beginGroup(kVGMSeqFileViewGroup);
+  settings.setValue(kRightPaneHiddenKey, hidden);
   settings.endGroup();
 }
 
