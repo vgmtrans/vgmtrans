@@ -21,6 +21,7 @@ public:
   ~PianoRollRhiHost() override;
 
   void requestUpdate();
+  void setSurfaceCursor(Qt::CursorShape shape);
 
 protected:
   void resizeEvent(QResizeEvent* event) override;
