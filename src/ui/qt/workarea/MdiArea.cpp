@@ -476,7 +476,7 @@ void MdiArea::updateTabBarControls() {
     return;
   }
 
-  auto *fileView = asFileView(activeSubWindow());
+  auto *fileView = asFileView(currentSubWindow());
   const bool hasFileView = fileView != nullptr;
 
   auto setPaneSelection = [](const PaneActions &actions, PanelViewKind kind, bool hiddenSelected) {
@@ -623,7 +623,7 @@ void MdiArea::refreshTabControlAppearance() {
   }
 
   bool rightPaneHidden = false;
-  if (auto *fileView = asFileView(activeSubWindow())) {
+  if (auto *fileView = asFileView(currentSubWindow())) {
     rightPaneHidden = fileView->singlePaneMode();
   }
 
@@ -635,6 +635,7 @@ void MdiArea::refreshTabControlAppearance() {
     button->setIcon(panelButtonIcon(iconPath, glyph));
   };
 
+  qDebug() << "set right pane hidden: " << rightPaneHidden;
   assignIconForState(m_leftPaneButton, kLeftPaneButtonIconPath, true);
   assignIconForState(m_rightPaneButton, kRightPaneButtonIconPath, !rightPaneHidden);
 }
