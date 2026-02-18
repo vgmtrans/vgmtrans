@@ -20,7 +20,8 @@
 
 class QStackedWidget;
 class QWidget;
-class SnappingSplitter;
+class QSplitter;
+class QResizeEvent;
 class VGMFile;
 class VGMSeq;
 class SeqTrack;
@@ -30,6 +31,7 @@ class VGMFileTreeView;
 class ActiveNoteView;
 class VGMItem;
 class SeqEvent;
+class SplitterSnapProvider;
 struct SeqTimedEvent;
 enum class PositionChangeOrigin;
 
@@ -68,19 +70,26 @@ private:
     PanelViewKind currentKind = PanelViewKind::Hex;
   };
 
-  static constexpr int treeViewMinimumWidth = 220;
+  static constexpr int rightPaneMinimumWidth = 220;
 
   void focusInEvent(QFocusEvent* event) override;
+  void resizeEvent(QResizeEvent* event) override;
   void closeEvent(QCloseEvent* closeEvent) override;
 
   PanelUi createPanel(PanelSide side, bool isSeqFile);
 
-  void resetSnapRanges() const;
   [[nodiscard]] int hexViewFullWidth() const;
-  [[nodiscard]] int hexViewWidthSansAscii() const;
-  [[nodiscard]] int hexViewWidthSansAsciiAndAddress() const;
-  void updateHexViewFont(qreal sizeIncrement) const;
-  void applyHexViewFont(QFont font) const;
+  void updateHexViewFont(qreal sizeIncrement);
+  void applyHexViewFont(QFont font);
+  void onSplitterMoved(int pos, int index);
+  void ensurePreferredLeftPaneWidth();
+  [[nodiscard]] int maxLeftPaneWidth() const;
+  [[nodiscard]] int snapLeftPaneWidthForDrag(int leftPaneWidth) const;
+  [[nodiscard]] int snapLeftPaneWidthForResize(int leftPaneWidth) const;
+  [[nodiscard]] SplitterSnapProvider* leftPaneSnapProvider() const;
+  void setSplitterSizes(int leftPaneWidth, int rightPaneWidth);
+  void setLeftPaneWidth(int leftPaneWidth, bool persistWidth);
+  void enforceSplitterPolicyForResize();
 
   void clearPlaybackVisuals();
   void ensureTrackIndexMap(VGMSeq* seq);
@@ -93,10 +102,11 @@ private:
   const PanelUi& panel(PanelSide side) const { return m_panels[static_cast<size_t>(side)]; }
 
   VGMFile* m_vgmfile{};
-  SnappingSplitter* m_splitter = nullptr;
+  QSplitter* m_splitter = nullptr;
   std::array<PanelUi, 2> m_panels{};
   int m_defaultSplitterHandleWidth = 0;
-  QList<int> m_lastSplitSizes;
+  int m_preferredLeftPaneWidth = -1;
+  bool m_updatingSplitter = false;
   QFont m_defaultHexFont;
   bool m_isSeqFile = false;
   bool m_singlePaneMode = false;
