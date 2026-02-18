@@ -25,6 +25,7 @@ class QEvent;
 class QPointF;
 class QRect;
 class QRectF;
+class QKeyEvent;
 class QMouseEvent;
 class QNativeGestureEvent;
 class QResizeEvent;
@@ -73,6 +74,8 @@ protected:
   void showEvent(QShowEvent* event) override;
   void scrollContentsBy(int dx, int dy) override;
   void changeEvent(QEvent* event) override;
+  void keyPressEvent(QKeyEvent* event) override;
+  void keyReleaseEvent(QKeyEvent* event) override;
 
 private:
   friend class PianoRollRhiWidget;
@@ -161,6 +164,8 @@ private:
   void applyVerticalScale(float scale, int anchorInNotes, float worldYAtAnchor);
   void animateHorizontalScale(float targetScale, int anchorX, int durationMs);
   void animateVerticalScale(float targetScale, int anchorY, int durationMs);
+  void setInteractionCursor(Qt::CursorShape shape);
+  void refreshInteractionCursor(Qt::KeyboardModifiers modifiers = Qt::NoModifier);
 
   PianoRollRhiHost* m_rhiHost = nullptr;
 
@@ -179,6 +184,7 @@ private:
   bool m_playbackActive = false;
   int m_currentTick = 0;
   bool m_seekDragActive = false;
+  bool m_panDragActive = false;
   bool m_noteSelectionPressActive = false;
   bool m_noteSelectionDragging = false;
   bool m_attemptedTimelineBuild = false;
@@ -203,6 +209,7 @@ private:
 
   QPoint m_noteSelectionAnchor;
   QPoint m_noteSelectionCurrent;
+  QPoint m_panDragLastPos;
   VGMItem* m_primarySelectedItem = nullptr;
   size_t m_previewAnchorNoteIndex = kInvalidNoteIndex;
 

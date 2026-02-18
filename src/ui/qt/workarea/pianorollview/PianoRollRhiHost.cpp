@@ -18,6 +18,7 @@
 #include "MainWindow.h"
 #endif
 
+#include <QCursor>
 #include <QResizeEvent>
 #include <QWindow>
 
@@ -70,6 +71,17 @@ void PianoRollRhiHost::requestUpdate() {
     m_window->requestUpdate();
   } else if (m_surface) {
     m_surface->update();
+  }
+}
+
+void PianoRollRhiHost::setSurfaceCursor(Qt::CursorShape shape) {
+  const QCursor cursor(shape);
+  setCursor(cursor);
+  if (m_surface) {
+    m_surface->setCursor(cursor);
+  }
+  if (m_window) {
+    m_window->setCursor(cursor);
   }
 }
 
