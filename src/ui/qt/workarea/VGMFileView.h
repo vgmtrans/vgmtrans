@@ -21,6 +21,8 @@
 class QStackedWidget;
 class QWidget;
 class QSplitter;
+class QObject;
+class QEvent;
 class QResizeEvent;
 class VGMFile;
 class VGMSeq;
@@ -72,6 +74,7 @@ private:
 
   static constexpr int rightPaneMinimumWidth = 220;
 
+  bool eventFilter(QObject* watched, QEvent* event) override;
   void focusInEvent(QFocusEvent* event) override;
   void resizeEvent(QResizeEvent* event) override;
   void closeEvent(QCloseEvent* closeEvent) override;

@@ -5,8 +5,10 @@
  */
 
 #include <QApplication>
+#include <QEvent>
 #include <QShortcut>
 #include <QSplitter>
+#include <QSplitterHandle>
 #include <QStackedWidget>
 #include <QTimer>
 #include <QTreeWidgetItem>
@@ -149,6 +151,7 @@ VGMFileView::VGMFileView(VGMFile* vgmfile)
   m_splitter->setStretchFactor(1, 1);
   m_splitter->setSizes(QList<int>{1, 1});
   m_defaultSplitterHandleWidth = m_splitter->handleWidth();
+  m_splitter->installEventFilter(this);
 
   m_defaultHexFont = panel(PanelSide::Left).hexView->font();
   applyHexViewFont(m_defaultHexFont);
@@ -214,7 +217,7 @@ VGMFileView::VGMFileView(VGMFile* vgmfile)
 
   setWidget(m_splitter);
 
-  const int storedLeftPaneWidth = m_isSeqFile ? Settings::the()->VGMSeqFileView.leftPaneWidth() : -1;
+  const int storedLeftPaneWidth = Settings::the()->VGMSeqFileView.leftPaneWidth();
   const bool storedRightPaneHidden =
       m_isSeqFile ? Settings::the()->VGMSeqFileView.rightPaneHidden() : false;
   QTimer::singleShot(0, this, [this, storedLeftPaneWidth, storedRightPaneHidden]() {
@@ -298,6 +301,7 @@ VGMFileView::PanelUi VGMFileView::createPanel(PanelSide side, bool isSeqFile) {
 
 void VGMFileView::focusInEvent(QFocusEvent* event) {
   QMdiSubWindow::focusInEvent(event);
+  enforceSplitterPolicyForResize();
 
   for (PanelSide side : {PanelSide::Left, PanelSide::Right}) {
     const auto& panelUi = panel(side);
@@ -316,6 +320,14 @@ void VGMFileView::focusInEvent(QFocusEvent* event) {
 void VGMFileView::resizeEvent(QResizeEvent* event) {
   QMdiSubWindow::resizeEvent(event);
   enforceSplitterPolicyForResize();
+}
+
+bool VGMFileView::eventFilter(QObject* watched, QEvent* event) {
+  if (watched == m_splitter && event &&
+      (event->type() == QEvent::Show || event->type() == QEvent::ShowToParent)) {
+    enforceSplitterPolicyForResize();
+  }
+  return QMdiSubWindow::eventFilter(watched, event);
 }
 
 // Switches a pane to the requested view, ignoring unsupported view kinds.
@@ -459,12 +471,14 @@ void VGMFileView::applyHexViewFont(QFont font) {
   if (!canAdjustSplitter) {
     return;
   }
-  setLeftPaneWidth(newWidth, m_isSeqFile);
+  setLeftPaneWidth(newWidth, true);
   enforceSplitterPolicyForResize();
 }
 
 void VGMFileView::onSplitterMoved(int, int) {
-  if (m_updatingSplitter || m_singlePaneMode) {
+  auto* splitterHandle = m_splitter ? m_splitter->handle(1) : nullptr;
+  if (m_updatingSplitter || m_singlePaneMode || !splitterHandle ||
+      !(QApplication::mouseButtons() & Qt::LeftButton) || !splitterHandle->underMouse()) {
     return;
   }
 
@@ -580,13 +594,13 @@ void VGMFileView::setLeftPaneWidth(int leftPaneWidth, bool persistWidth) {
     setSplitterSizes(clampedLeftPaneWidth, rightPaneWidth);
   }
 
-  if (persistWidth && m_isSeqFile) {
+  if (persistWidth) {
     Settings::the()->VGMSeqFileView.setLeftPaneWidth(m_preferredLeftPaneWidth);
   }
 }
 
 void VGMFileView::enforceSplitterPolicyForResize() {
-  if (!m_splitter || m_singlePaneMode) {
+  if (!m_splitter || m_singlePaneMode || m_splitter->width() <= 0) {
     return;
   }
 
