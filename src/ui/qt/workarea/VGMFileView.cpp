@@ -5,7 +5,9 @@
  */
 
 #include <QApplication>
+#include <QContextMenuEvent>
 #include <QEvent>
+#include <QMouseEvent>
 #include <QShortcut>
 #include <QSplitter>
 #include <QSplitterHandle>
@@ -17,6 +19,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <optional>
 #include <unordered_set>
 #include <utility>
 
@@ -151,6 +154,7 @@ VGMFileView::VGMFileView(VGMFile* vgmfile)
   m_splitter->setStretchFactor(1, 1);
   m_splitter->setSizes(QList<int>{1, 1});
   m_defaultSplitterHandleWidth = m_splitter->handleWidth();
+  qApp->installEventFilter(this);
   m_splitter->installEventFilter(this);
 
   m_defaultHexFont = panel(PanelSide::Left).hexView->font();
@@ -315,6 +319,55 @@ void VGMFileView::resizeEvent(QResizeEvent* event) {
 }
 
 bool VGMFileView::eventFilter(QObject* watched, QEvent* event) {
+  const auto showPaneMenuAt = [this, watched](const QPoint& globalPos) -> bool {
+    const auto sideForWidget = [this](QWidget* widget) -> std::optional<PanelSide> {
+      if (!widget) {
+        return std::nullopt;
+      }
+
+      if (auto* leftContainer = panel(PanelSide::Left).container;
+          leftContainer && (widget == leftContainer || leftContainer->isAncestorOf(widget))) {
+        return PanelSide::Left;
+      }
+      if (auto* rightContainer = panel(PanelSide::Right).container;
+          rightContainer && (widget == rightContainer || rightContainer->isAncestorOf(widget))) {
+        return PanelSide::Right;
+      }
+      return std::nullopt;
+    };
+
+    if (auto* sourceWidget = qobject_cast<QWidget*>(watched)) {
+      if (auto side = sideForWidget(sourceWidget); side.has_value()) {
+        MdiArea::the()->showPaneViewMenu(this, side.value(), globalPos);
+        return true;
+      }
+    }
+
+    if (auto* widgetAtPos = QApplication::widgetAt(globalPos)) {
+      if (auto side = sideForWidget(widgetAtPos); side.has_value()) {
+        MdiArea::the()->showPaneViewMenu(this, side.value(), globalPos);
+        return true;
+      }
+    }
+
+    return false;
+  };
+
+  if (event && event->type() == QEvent::ContextMenu) {
+    if (auto* contextMenuEvent = static_cast<QContextMenuEvent*>(event);
+        contextMenuEvent && showPaneMenuAt(contextMenuEvent->globalPos())) {
+      return true;
+    }
+  }
+
+  if (event && event->type() == QEvent::MouseButtonPress) {
+    auto* mouseEvent = static_cast<QMouseEvent*>(event);
+    if (mouseEvent && mouseEvent->button() == Qt::RightButton &&
+        showPaneMenuAt(mouseEvent->globalPosition().toPoint())) {
+      return true;
+    }
+  }
+
   if (watched == m_splitter && event &&
       (event->type() == QEvent::Show || event->type() == QEvent::ShowToParent)) {
     enforceSplitterPolicyForResize();

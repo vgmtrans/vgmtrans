@@ -6,12 +6,14 @@
 
 #pragma once
 
+#include <cstdint>
 #include <unordered_map>
 #include <QMdiArea>
 #include <QMdiSubWindow>
 
 class VGMFile;
 class VGMFileView;
+class QPoint;
 class QAction;
 class QEvent;
 class QObject;
@@ -19,6 +21,7 @@ class QPaintEvent;
 class QTabBar;
 class QToolButton;
 class QWidget;
+enum class PanelSide : uint8_t;
 
 class MdiArea : public QMdiArea {
   Q_OBJECT
@@ -39,6 +42,7 @@ public:
 
   void newView(VGMFile *file);
   void removeView(const VGMFile *file);
+  void showPaneViewMenu(VGMFileView* fileView, PanelSide side, const QPoint& globalPos);
 
 protected:
   void changeEvent(QEvent *event) override;
