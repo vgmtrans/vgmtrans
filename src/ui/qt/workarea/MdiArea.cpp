@@ -344,6 +344,93 @@ VGMFileView *MdiArea::asFileView(QMdiSubWindow *window) {
   return qobject_cast<VGMFileView *>(window->widget());
 }
 
+VGMFileView *MdiArea::currentFileView() const {
+  return asFileView(currentSubWindow());
+}
+
+void MdiArea::setPaneSelection(const PaneActions &actions, PanelViewKind kind, bool hiddenSelected) {
+  if (actions.hex) {
+    actions.hex->setChecked(kind == PanelViewKind::Hex);
+  }
+  if (actions.tree) {
+    actions.tree->setChecked(kind == PanelViewKind::Tree);
+  }
+  if (actions.activeNotes) {
+    actions.activeNotes->setChecked(kind == PanelViewKind::ActiveNotes);
+  }
+  if (actions.pianoRoll) {
+    actions.pianoRoll->setChecked(kind == PanelViewKind::PianoRoll);
+  }
+  if (actions.hidden) {
+    actions.hidden->setChecked(hiddenSelected);
+  }
+}
+
+void MdiArea::setSeqOnlyEnabled(PaneActions &actions, bool enabled) {
+  if (actions.activeNotes) {
+    actions.activeNotes->setEnabled(enabled);
+  }
+  if (actions.pianoRoll) {
+    actions.pianoRoll->setEnabled(enabled);
+  }
+}
+
+void MdiArea::applyEmptyPaneSelection() {
+  // No active file: keep controls visible but inert.
+  setPaneSelection(m_leftPaneActions, PanelViewKind::Hex, false);
+  setPaneSelection(m_rightPaneActions, PanelViewKind::Tree, false);
+  setSeqOnlyEnabled(m_leftPaneActions, false);
+  setSeqOnlyEnabled(m_rightPaneActions, false);
+}
+
+void MdiArea::applyPaneViewSelection(VGMFileView *fileView) {
+  if (!fileView) {
+    applyEmptyPaneSelection();
+    return;
+  }
+
+  const bool singlePane = fileView->singlePaneMode();
+  setPaneSelection(m_leftPaneActions, fileView->panelView(PanelSide::Left), false);
+  setPaneSelection(m_rightPaneActions, fileView->panelView(PanelSide::Right), singlePane);
+
+  const bool sequenceViewsAvailable = fileView->supportsSequenceViews();
+  setSeqOnlyEnabled(m_leftPaneActions, sequenceViewsAvailable);
+  setSeqOnlyEnabled(m_rightPaneActions, sequenceViewsAvailable);
+}
+
+void MdiArea::setPaneButtonsEnabled(bool enabled) {
+  if (m_leftPaneButton) {
+    m_leftPaneButton->setEnabled(enabled);
+  }
+  if (m_rightPaneButton) {
+    m_rightPaneButton->setEnabled(enabled);
+  }
+}
+
+void MdiArea::setPaneView(PanelSide side, PanelViewKind kind) {
+  auto *fileView = currentFileView();
+  if (!fileView) {
+    return;
+  }
+
+  if (side == PanelSide::Right) {
+    fileView->setSinglePaneMode(false);
+  }
+
+  fileView->setPanelView(side, kind);
+  updateTabBarControls();
+}
+
+void MdiArea::setRightPaneHidden(bool hidden) {
+  auto *fileView = currentFileView();
+  if (!fileView) {
+    return;
+  }
+
+  fileView->setSinglePaneMode(hidden);
+  updateTabBarControls();
+}
+
 QMdiSubWindow *MdiArea::containingSubWindowForWidget(QWidget *widget) const {
   QWidget *cursor = widget;
   while (cursor) {
@@ -438,15 +525,7 @@ void MdiArea::setupTabBarControls() {
         slot->setIconVisibleInMenu(true);
         slot->setCheckable(true);
         group->addAction(slot);
-        connect(slot, &QAction::triggered, this, [this, side, kind]() {
-          if (auto *fileView = asFileView(activeSubWindow())) {
-            if (side == PanelSide::Right) {
-              fileView->setSinglePaneMode(false);
-            }
-            fileView->setPanelView(side, kind);
-            updateTabBarControls();
-          }
-        });
+        connect(slot, &QAction::triggered, this, [this, side, kind]() { setPaneView(side, kind); });
       };
 
       if (includeHiddenOption) {
@@ -454,12 +533,7 @@ void MdiArea::setupTabBarControls() {
         actions.hidden->setIconVisibleInMenu(true);
         actions.hidden->setCheckable(true);
         group->addAction(actions.hidden);
-        connect(actions.hidden, &QAction::triggered, this, [this]() {
-          if (auto *fileView = asFileView(activeSubWindow())) {
-            fileView->setSinglePaneMode(true);
-            updateTabBarControls();
-          }
-        });
+        connect(actions.hidden, &QAction::triggered, this, [this]() { setRightPaneHidden(true); });
         menu->addSeparator();
       }
 
@@ -492,57 +566,18 @@ void MdiArea::updateTabBarControls() {
     return;
   }
 
-  auto *fileView = asFileView(currentSubWindow());
+  auto *fileView = currentFileView();
   const bool hasFileView = fileView != nullptr;
 
-  auto setPaneSelection = [](const PaneActions &actions, PanelViewKind kind, bool hiddenSelected) {
-    if (actions.hex) {
-      actions.hex->setChecked(kind == PanelViewKind::Hex);
-    }
-    if (actions.tree) {
-      actions.tree->setChecked(kind == PanelViewKind::Tree);
-    }
-    if (actions.activeNotes) {
-      actions.activeNotes->setChecked(kind == PanelViewKind::ActiveNotes);
-    }
-    if (actions.pianoRoll) {
-      actions.pianoRoll->setChecked(kind == PanelViewKind::PianoRoll);
-    }
-    if (actions.hidden) {
-      actions.hidden->setChecked(hiddenSelected);
-    }
-  };
-
-  auto setSeqOnlyEnabled = [](PaneActions &actions, bool enabled) {
-    if (actions.activeNotes) {
-      actions.activeNotes->setEnabled(enabled);
-    }
-    if (actions.pianoRoll) {
-      actions.pianoRoll->setEnabled(enabled);
-    }
-  };
-
-  m_leftPaneButton->setEnabled(hasFileView);
-  m_rightPaneButton->setEnabled(hasFileView);
+  setPaneButtonsEnabled(hasFileView);
 
   if (!hasFileView) {
-    // No active file: keep controls visible but inert.
-    setPaneSelection(m_leftPaneActions, PanelViewKind::Hex, false);
-    setPaneSelection(m_rightPaneActions, PanelViewKind::Tree, false);
-    setSeqOnlyEnabled(m_leftPaneActions, false);
-    setSeqOnlyEnabled(m_rightPaneActions, false);
+    applyEmptyPaneSelection();
     refreshTabControlAppearance();
     return;
   }
 
-  const bool singlePane = fileView->singlePaneMode();
-  setPaneSelection(m_leftPaneActions, fileView->panelView(PanelSide::Left), false);
-  setPaneSelection(m_rightPaneActions, fileView->panelView(PanelSide::Right), singlePane);
-
-  const bool sequenceViewsAvailable = fileView->supportsSequenceViews();
-  setSeqOnlyEnabled(m_leftPaneActions, sequenceViewsAvailable);
-  setSeqOnlyEnabled(m_rightPaneActions, sequenceViewsAvailable);
-
+  applyPaneViewSelection(fileView);
   refreshTabControlAppearance();
 }
 
@@ -639,7 +674,7 @@ void MdiArea::refreshTabControlAppearance() {
   }
 
   bool rightPaneHidden = false;
-  if (auto *fileView = asFileView(currentSubWindow())) {
+  if (auto *fileView = currentFileView()) {
     rightPaneHidden = fileView->singlePaneMode();
   }
 
@@ -651,7 +686,6 @@ void MdiArea::refreshTabControlAppearance() {
     button->setIcon(panelButtonIcon(iconPath, glyph));
   };
 
-  qDebug() << "set right pane hidden: " << rightPaneHidden;
   assignIconForState(m_leftPaneButton, kLeftPaneButtonIconPath, true);
   assignIconForState(m_rightPaneButton, kRightPaneButtonIconPath, !rightPaneHidden);
 }
@@ -856,7 +890,7 @@ void MdiArea::showPaneViewMenu(VGMFileView* fileView, PanelSide side, const QPoi
   }
 
   auto* window = qobject_cast<QMdiSubWindow*>(fileView);
-  if (window && window != activeSubWindow()) {
+  if (window && window != currentSubWindow()) {
     setActiveSubWindow(window);
   }
 
