@@ -322,13 +322,12 @@ PianoRollFrame::Data PianoRollView::captureRhiFrameData(float dpr) const {
 }
 
 void PianoRollView::paintEvent(QPaintEvent* event) {
-  QAbstractScrollArea::paintEvent(event);
+  // Latch once the first paint pass starts so initial layout recentering stops.
   m_initialPaintEvent = true;
+  QAbstractScrollArea::paintEvent(event);
 }
 
-
-void PianoRollView::resizeEvent(QResizeEvent* event) {
-  QAbstractScrollArea::resizeEvent(event);
+void PianoRollView::syncViewportLayoutState() {
   if (m_rhiHost) {
     m_rhiHost->setGeometry(viewport()->rect());
   }
@@ -336,10 +335,14 @@ void PianoRollView::resizeEvent(QResizeEvent* event) {
   requestRender();
 }
 
+void PianoRollView::resizeEvent(QResizeEvent* event) {
+  QAbstractScrollArea::resizeEvent(event);
+  syncViewportLayoutState();
+}
+
 void PianoRollView::showEvent(QShowEvent* event) {
   QAbstractScrollArea::showEvent(event);
-  updateScrollBars();
-  requestRender();
+  syncViewportLayoutState();
 }
 
 void PianoRollView::scrollContentsBy(int dx, int dy) {
