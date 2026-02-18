@@ -9,7 +9,6 @@
 #include <QAbstractScrollArea>
 #include <QElapsedTimer>
 #include <QPoint>
-#include <QSize>
 #include <QtGlobal>
 
 #include <array>
@@ -129,6 +128,7 @@ private:
   void rebuildSequenceCache();
   bool updateActiveKeyStates();
 
+  void syncViewportLayoutState();
   void updateScrollBars();
   void requestRender();
   void requestRenderCoalesced();
