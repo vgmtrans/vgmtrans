@@ -164,6 +164,9 @@ private:
   void applyVerticalScale(float scale, int anchorInNotes, float worldYAtAnchor);
   void animateHorizontalScale(float targetScale, int anchorX, int durationMs);
   void animateVerticalScale(float targetScale, int anchorY, int durationMs);
+  [[nodiscard]] Qt::KeyboardModifiers mergedModifiers(Qt::KeyboardModifiers modifiers = Qt::NoModifier) const;
+  void setPanDragActive(bool active, Qt::KeyboardModifiers modifiers = Qt::NoModifier);
+  void applyPanDragDelta(const QPoint& dragDelta);
   void setInteractionCursor(Qt::CursorShape shape);
   void refreshInteractionCursor(Qt::KeyboardModifiers modifiers = Qt::NoModifier);
 
