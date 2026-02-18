@@ -218,23 +218,15 @@ VGMFileView::VGMFileView(VGMFile* vgmfile)
   setWidget(m_splitter);
 
   const int storedLeftPaneWidth = Settings::the()->VGMSeqFileView.leftPaneWidth();
+  if (storedLeftPaneWidth > 0) {
+    m_preferredLeftPaneWidth = storedLeftPaneWidth;
+  }
+
   const bool storedRightPaneHidden =
       m_isSeqFile ? Settings::the()->VGMSeqFileView.rightPaneHidden() : false;
-  QTimer::singleShot(0, this, [this, storedLeftPaneWidth, storedRightPaneHidden]() {
-    if (!m_splitter || m_splitter->width() <= 0) {
-      return;
-    }
-
-    const QList<int> sizes = m_splitter->sizes();
-    const int initialLeftPaneWidth =
-        (sizes.size() >= 2 && sizes.first() > 0) ? sizes.first() : std::max(1, m_splitter->width() / 2);
-    m_preferredLeftPaneWidth = storedLeftPaneWidth > 0 ? storedLeftPaneWidth : initialLeftPaneWidth;
-    enforceSplitterPolicyForResize();
-
-    if (storedRightPaneHidden) {
-      setSinglePaneMode(true);
-    }
-  });
+  if (storedRightPaneHidden) {
+    setSinglePaneMode(true);
+  }
 }
 
 VGMFileView::PanelUi VGMFileView::createPanel(PanelSide side, bool isSeqFile) {
