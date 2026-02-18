@@ -21,6 +21,7 @@
 class QStackedWidget;
 class QWidget;
 class QSplitter;
+class QPoint;
 class QObject;
 class QEvent;
 class QResizeEvent;
@@ -90,6 +91,7 @@ private:
   [[nodiscard]] int snapLeftPaneWidthForDrag(int leftPaneWidth) const;
   [[nodiscard]] int snapLeftPaneWidthForResize(int leftPaneWidth) const;
   [[nodiscard]] SplitterSnapProvider* leftPaneSnapProvider() const;
+  bool paneSideAtGlobalPos(const QPoint& globalPos, PanelSide& side) const;
   void setSplitterSizes(int leftPaneWidth, int rightPaneWidth);
   void setLeftPaneWidth(int leftPaneWidth, bool persistWidth);
   void enforceSplitterPolicyForResize();
