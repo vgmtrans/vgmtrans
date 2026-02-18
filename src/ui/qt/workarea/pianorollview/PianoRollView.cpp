@@ -326,6 +326,9 @@ void PianoRollView::resizeEvent(QResizeEvent* event) {
   if (m_rhiHost) {
     m_rhiHost->setGeometry(viewport()->rect());
   }
+  if (!m_initialViewportPositioned) {
+    m_initialViewportSizeCandidate = QSize();
+  }
   updateScrollBars();
   if (!m_initialViewportPositioned) {
     scheduleViewportSync();
@@ -1071,10 +1074,17 @@ void PianoRollView::updateScrollBars() {
     // Defer initial centering until dimensions are actually usable.
     const bool usableViewport = noteViewportWidth >= 64 && noteViewportHeight >= 64;
     if (usableViewport) {
-      // Default initial focus: center of the keyboard range.
-      verticalScrollBar()->setValue(verticalScrollBar()->maximum() / 2);
-      m_initialViewportPositioned = true;
+      const QSize currentViewportSize(noteViewportWidth, noteViewportHeight);
+      if (m_initialViewportSizeCandidate == currentViewportSize) {
+        // Default initial focus: center of the keyboard range.
+        verticalScrollBar()->setValue(verticalScrollBar()->maximum() / 2);
+        m_initialViewportPositioned = true;
+      } else {
+        m_initialViewportSizeCandidate = currentViewportSize;
+        scheduleViewportSync();
+      }
     } else {
+      m_initialViewportSizeCandidate = QSize();
       scheduleViewportSync();
     }
   }
