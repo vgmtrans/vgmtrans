@@ -81,8 +81,6 @@ add_executable(
   widgets/ClickJumpSlider.h
   widgets/MarqueeLabel.cpp
   widgets/MarqueeLabel.h
-  widgets/SnappingSplitter.cpp
-  widgets/SnappingSplitter.h
   widgets/StatusBarContent.cpp
   widgets/StatusBarContent.h
   widgets/Toast.cpp
