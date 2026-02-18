@@ -280,7 +280,6 @@ MdiArea::MdiArea(QWidget *parent) : QMdiArea(parent) {
     if (!window || window != activeSubWindow()) {
       return;
     }
-    qDebug() << "blah";
     syncSelectedFileForWindow(window);
   });
   connect(&qtVGMRoot, &QtVGMRoot::UI_addedRawFile, this, [this]() { viewport()->update(); });
