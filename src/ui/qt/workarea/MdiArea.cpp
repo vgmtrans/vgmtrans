@@ -20,6 +20,7 @@
 #include <QPainter>
 #include <QPalette>
 #include <QPixmap>
+#include <QPoint>
 #include <QShortcut>
 #include <QTabBar>
 #include <QTimer>
@@ -846,6 +847,27 @@ void MdiArea::removeView(const VGMFile *file) {
   }
 
   updateTabBarControls();
+}
+
+void MdiArea::showPaneViewMenu(VGMFileView* fileView, PanelSide side, const QPoint& globalPos) {
+  if (!fileView) {
+    return;
+  }
+
+  auto* window = qobject_cast<QMdiSubWindow*>(fileView);
+  if (window && window != activeSubWindow()) {
+    setActiveSubWindow(window);
+  }
+
+  setupTabBarControls();
+  updateTabBarControls();
+
+  QToolButton* button = side == PanelSide::Left ? m_leftPaneButton : m_rightPaneButton;
+  if (!button || !button->menu()) {
+    return;
+  }
+
+  button->menu()->exec(globalPos);
 }
 
 void MdiArea::onSubWindowActivated(QMdiSubWindow *window) {
