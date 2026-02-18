@@ -71,6 +71,7 @@ signals:
   void notePreviewStopped();
 
 protected:
+  void paintEvent(QPaintEvent* event) override;
   void resizeEvent(QResizeEvent* event) override;
   void showEvent(QShowEvent* event) override;
   void scrollContentsBy(int dx, int dy) override;
@@ -129,7 +130,6 @@ private:
   bool updateActiveKeyStates();
 
   void updateScrollBars();
-  void scheduleViewportSync();
   void requestRender();
   void requestRenderCoalesced();
   void scheduleCoalescedRender(int delayMs);
@@ -193,10 +193,8 @@ private:
   bool m_noteSelectionPressActive = false;
   bool m_noteSelectionDragging = false;
   bool m_attemptedTimelineBuild = false;
-  // Initial centering waits for a real viewport size (stacked views can report tiny pre-layout sizes).
-  bool m_initialViewportPositioned = false;
-  QSize m_initialViewportSizeCandidate;
-  bool m_viewportSyncQueued = false;
+  // We wait for the initial paint event to fire to stop centering scrollbar on resize
+  bool m_initialPaintEvent = false;
   bool m_coalescedRenderPending = false;
 
   QElapsedTimer m_animClock;

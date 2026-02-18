@@ -321,29 +321,25 @@ PianoRollFrame::Data PianoRollView::captureRhiFrameData(float dpr) const {
   return frame;
 }
 
+void PianoRollView::paintEvent(QPaintEvent* event) {
+  QAbstractScrollArea::paintEvent(event);
+  m_initialPaintEvent = true;
+}
+
+
 void PianoRollView::resizeEvent(QResizeEvent* event) {
   QAbstractScrollArea::resizeEvent(event);
   if (m_rhiHost) {
     m_rhiHost->setGeometry(viewport()->rect());
   }
-  if (!m_initialViewportPositioned) {
-    m_initialViewportSizeCandidate = QSize();
-  }
   updateScrollBars();
-  if (!m_initialViewportPositioned) {
-    scheduleViewportSync();
-  }
   requestRender();
 }
 
 void PianoRollView::showEvent(QShowEvent* event) {
   QAbstractScrollArea::showEvent(event);
-  if (!m_initialViewportPositioned) {
-    scheduleViewportSync();
-  } else {
-    updateScrollBars();
-    requestRender();
-  }
+  updateScrollBars();
+  requestRender();
 }
 
 void PianoRollView::scrollContentsBy(int dx, int dy) {
@@ -1069,43 +1065,11 @@ void PianoRollView::updateScrollBars() {
   verticalScrollBar()->setPageStep(noteViewportHeight);
   verticalScrollBar()->setSingleStep(std::max(1, static_cast<int>(std::round(m_pixelsPerKey * 2.0f))));
 
-  if (!m_initialViewportPositioned) {
-    // QStackedWidget can report a tiny pre-layout viewport (e.g. ~28px) when hidden.
-    // Defer initial centering until dimensions are actually usable.
-    const bool usableViewport = noteViewportWidth >= 64 && noteViewportHeight >= 64;
-    if (usableViewport) {
-      const QSize currentViewportSize(noteViewportWidth, noteViewportHeight);
-      if (m_initialViewportSizeCandidate == currentViewportSize) {
-        // Default initial focus: center of the keyboard range.
-        verticalScrollBar()->setValue(verticalScrollBar()->maximum() / 2);
-        m_initialViewportPositioned = true;
-      } else {
-        m_initialViewportSizeCandidate = currentViewportSize;
-        scheduleViewportSync();
-      }
-    } else {
-      m_initialViewportSizeCandidate = QSize();
-      scheduleViewportSync();
-    }
+  if (!m_initialPaintEvent) {
+    verticalScrollBar()->setValue(verticalScrollBar()->maximum() / 2);
   }
 
   m_currentTick = clampTick(m_currentTick);
-}
-
-void PianoRollView::scheduleViewportSync() {
-  if (m_viewportSyncQueued) {
-    return;
-  }
-
-  m_viewportSyncQueued = true;
-  QTimer::singleShot(0, this, [this]() {
-    m_viewportSyncQueued = false;
-    if (!isVisible()) {
-      return;
-    }
-    updateScrollBars();
-    requestRender();
-  });
 }
 
 void PianoRollView::requestRender() {
