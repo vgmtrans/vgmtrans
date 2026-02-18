@@ -543,16 +543,14 @@ bool PianoRollView::handleViewportMousePress(QMouseEvent* event) {
     return true;
   }
 
-  if (pos.y() < kTopBarHeight && pos.x() >= kKeyboardWidth) {
-    clearPreviewNotes();
-    m_noteSelectionPressActive = false;
-    m_noteSelectionDragging = false;
-    m_seekDragActive = true;
-    m_currentTick = tickFromViewportX(pos.x());
-    updateActiveKeyStates();
-    requestRender();
-    emit seekRequested(m_currentTick);
+  if (activeModifiers.testFlag(Qt::ControlModifier)) {
+    beginSeekDragAtX(pos.x());
+    event->accept();
+    return true;
+  }
 
+  if (pos.y() < kTopBarHeight && pos.x() >= kKeyboardWidth) {
+    beginSeekDragAtX(pos.x());
     event->accept();
     return true;
   }
@@ -569,6 +567,17 @@ bool PianoRollView::handleViewportMousePress(QMouseEvent* event) {
   }
 
   return false;
+}
+
+void PianoRollView::beginSeekDragAtX(int viewportX) {
+  clearPreviewNotes();
+  m_noteSelectionPressActive = false;
+  m_noteSelectionDragging = false;
+  m_seekDragActive = true;
+  m_currentTick = tickFromViewportX(viewportX);
+  updateActiveKeyStates();
+  requestRender();
+  emit seekRequested(m_currentTick);
 }
 
 bool PianoRollView::handleViewportMouseMove(QMouseEvent* event) {

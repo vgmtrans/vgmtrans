@@ -154,6 +154,7 @@ private:
   void updateMarqueePreview(const QPoint& cursorPos);
   void applyPreviewNoteIndices(std::vector<size_t> indices, size_t anchorIndex, int previewTick);
   void clearPreviewNotes();
+  void beginSeekDragAtX(int viewportX);
 
   void zoomHorizontal(int steps, int anchorX, bool animated = false, int durationMs = 0);
   void zoomVertical(int steps, int anchorY, bool animated = false, int durationMs = 0);
