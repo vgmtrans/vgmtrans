@@ -22,6 +22,7 @@ class QTabBar;
 class QToolButton;
 class QWidget;
 enum class PanelSide : uint8_t;
+enum class PanelViewKind : uint8_t;
 
 class MdiArea : public QMdiArea {
   Q_OBJECT
@@ -67,6 +68,14 @@ private:
   void refreshTabControlsAfterThemeChange();
   void updateBackgroundColor();
   static VGMFileView *asFileView(QMdiSubWindow *window);
+  [[nodiscard]] VGMFileView *currentFileView() const;
+  static void setPaneSelection(const PaneActions &actions, PanelViewKind kind, bool hiddenSelected);
+  static void setSeqOnlyEnabled(PaneActions &actions, bool enabled);
+  void applyEmptyPaneSelection();
+  void applyPaneViewSelection(VGMFileView *fileView);
+  void setPaneButtonsEnabled(bool enabled);
+  void setPaneView(PanelSide side, PanelViewKind kind);
+  void setRightPaneHidden(bool hidden);
   QMdiSubWindow *containingSubWindowForWidget(QWidget *widget) const;
   void syncSelectedFileForWindow(QMdiSubWindow *window);
   void onSubWindowActivated(QMdiSubWindow *window);
