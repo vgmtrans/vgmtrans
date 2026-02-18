@@ -17,9 +17,11 @@
 #include "util/NonTransientScrollBarStyle.h"
 
 #include <QAbstractAnimation>
+#include <QCursor>
 #include <QEvent>
 #include <QEasingCurve>
 #include <QGuiApplication>
+#include <QKeyEvent>
 #include <QMouseEvent>
 #include <QNativeGestureEvent>
 #include <QPalette>
@@ -104,6 +106,9 @@ PianoRollView::PianoRollView(QWidget* parent)
   m_animClock.start();
   m_renderClock.start();
   updateScrollBars();
+  // Force a known default cursor to avoid stale inherited cursor state from
+  // embedded RHI surfaces (notably on Windows).
+  refreshInteractionCursor(Qt::NoModifier);
 }
 
 void PianoRollView::setSequence(VGMSeq* seq) {
@@ -359,6 +364,39 @@ void PianoRollView::changeEvent(QEvent* event) {
   }
 }
 
+void PianoRollView::keyPressEvent(QKeyEvent* event) {
+  QAbstractScrollArea::keyPressEvent(event);
+  refreshInteractionCursor(QGuiApplication::queryKeyboardModifiers());
+}
+
+void PianoRollView::keyReleaseEvent(QKeyEvent* event) {
+  QAbstractScrollArea::keyReleaseEvent(event);
+  refreshInteractionCursor(QGuiApplication::queryKeyboardModifiers());
+}
+
+void PianoRollView::setInteractionCursor(Qt::CursorShape shape) {
+  const QCursor cursor(shape);
+  setCursor(cursor);
+  viewport()->setCursor(cursor);
+  if (m_rhiHost) {
+    m_rhiHost->setSurfaceCursor(shape);
+  }
+}
+
+void PianoRollView::refreshInteractionCursor(Qt::KeyboardModifiers modifiers) {
+  if (m_panDragActive) {
+    setInteractionCursor(Qt::ClosedHandCursor);
+    return;
+  }
+
+  const Qt::KeyboardModifiers activeModifiers = modifiers | QGuiApplication::queryKeyboardModifiers();
+  if (activeModifiers.testFlag(Qt::AltModifier)) {
+    setInteractionCursor(Qt::OpenHandCursor);
+  } else {
+    setInteractionCursor(Qt::ArrowCursor);
+  }
+}
+
 QColor PianoRollView::colorForTrack(int trackIndex) const {
   const int hue = (trackIndex * 43) % 360;
   return QColor::fromHsv(hue, 190, 235);
@@ -377,6 +415,7 @@ bool PianoRollView::handleViewportWheel(QWheelEvent* event) {
   constexpr int kWheelZoomAnimationMs = 40;
 
   const Qt::KeyboardModifiers mods = event->modifiers();
+  refreshInteractionCursor(mods);
   const bool zoomHorizontalOnly = mods.testFlag(Qt::ControlModifier);
   const bool zoomVerticalOnly = mods.testFlag(Qt::AltModifier);
   if (!zoomHorizontalOnly && !zoomVerticalOnly) {
@@ -451,6 +490,7 @@ bool PianoRollView::handleViewportCoalescedZoomGesture(float rawDelta,
   // Native gesture modifiers can be stale/empty on some backends. Merge with
   // live keyboard state so Option/Alt pinch reliably drives Y-axis zoom.
   const Qt::KeyboardModifiers activeModifiers = modifiers | QGuiApplication::queryKeyboardModifiers();
+  refreshInteractionCursor(activeModifiers);
   if (activeModifiers.testFlag(Qt::AltModifier)) {
     zoomVerticalFactor(factor, anchor.y(), false, 0);
   } else {
@@ -465,7 +505,20 @@ bool PianoRollView::handleViewportMousePress(QMouseEvent* event) {
     return false;
   }
 
+  const Qt::KeyboardModifiers activeModifiers = event->modifiers() | QGuiApplication::queryKeyboardModifiers();
   const QPoint pos = event->position().toPoint();
+  if (activeModifiers.testFlag(Qt::AltModifier)) {
+    clearPreviewNotes();
+    m_seekDragActive = false;
+    m_noteSelectionPressActive = false;
+    m_noteSelectionDragging = false;
+    m_panDragActive = true;
+    m_panDragLastPos = pos;
+    refreshInteractionCursor(activeModifiers);
+    event->accept();
+    return true;
+  }
+
   if (pos.y() < kTopBarHeight && pos.x() >= kKeyboardWidth) {
     clearPreviewNotes();
     m_noteSelectionPressActive = false;
@@ -499,6 +552,36 @@ bool PianoRollView::handleViewportMouseMove(QMouseEvent* event) {
     return false;
   }
 
+  const Qt::KeyboardModifiers activeModifiers = event->modifiers() | QGuiApplication::queryKeyboardModifiers();
+  if (m_panDragActive) {
+    if (!(event->buttons() & Qt::LeftButton)) {
+      m_panDragActive = false;
+      refreshInteractionCursor(activeModifiers);
+      event->accept();
+      return true;
+    }
+
+    const QPoint pos = event->position().toPoint();
+    const QPoint dragDelta = pos - m_panDragLastPos;
+    m_panDragLastPos = pos;
+
+    if (!dragDelta.isNull()) {
+      auto* hbar = horizontalScrollBar();
+      auto* vbar = verticalScrollBar();
+      if (hbar) {
+        hbar->setValue(std::clamp(hbar->value() - dragDelta.x(), hbar->minimum(), hbar->maximum()));
+      }
+      if (vbar) {
+        vbar->setValue(std::clamp(vbar->value() - dragDelta.y(), vbar->minimum(), vbar->maximum()));
+      }
+      requestRenderCoalesced();
+    }
+
+    refreshInteractionCursor(activeModifiers);
+    event->accept();
+    return true;
+  }
+
   if (m_seekDragActive) {
     const QPoint pos = event->position().toPoint();
     m_currentTick = tickFromViewportX(pos.x());
@@ -511,6 +594,7 @@ bool PianoRollView::handleViewportMouseMove(QMouseEvent* event) {
   }
 
   if (!m_noteSelectionPressActive) {
+    refreshInteractionCursor(activeModifiers);
     return false;
   }
 
@@ -519,6 +603,7 @@ bool PianoRollView::handleViewportMouseMove(QMouseEvent* event) {
     m_noteSelectionDragging = false;
     clearPreviewNotes();
     requestRender();
+    refreshInteractionCursor(activeModifiers);
     event->accept();
     return true;
   }
@@ -539,6 +624,7 @@ bool PianoRollView::handleViewportMouseMove(QMouseEvent* event) {
     previewSingleNoteAtViewportPoint(pos);
   }
 
+  refreshInteractionCursor(activeModifiers);
   event->accept();
   return true;
 }
@@ -546,6 +632,14 @@ bool PianoRollView::handleViewportMouseMove(QMouseEvent* event) {
 bool PianoRollView::handleViewportMouseRelease(QMouseEvent* event) {
   if (!event || event->button() != Qt::LeftButton) {
     return false;
+  }
+
+  const Qt::KeyboardModifiers activeModifiers = event->modifiers() | QGuiApplication::queryKeyboardModifiers();
+  if (m_panDragActive) {
+    m_panDragActive = false;
+    refreshInteractionCursor(activeModifiers);
+    event->accept();
+    return true;
   }
 
   if (m_seekDragActive) {
@@ -588,6 +682,7 @@ bool PianoRollView::handleViewportMouseRelease(QMouseEvent* event) {
   }
 
   event->accept();
+  refreshInteractionCursor(activeModifiers);
   return true;
 }
 
