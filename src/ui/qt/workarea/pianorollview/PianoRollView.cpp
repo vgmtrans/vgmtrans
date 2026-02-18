@@ -366,12 +366,37 @@ void PianoRollView::changeEvent(QEvent* event) {
 
 void PianoRollView::keyPressEvent(QKeyEvent* event) {
   QAbstractScrollArea::keyPressEvent(event);
-  refreshInteractionCursor(QGuiApplication::queryKeyboardModifiers());
+  refreshInteractionCursor();
 }
 
 void PianoRollView::keyReleaseEvent(QKeyEvent* event) {
   QAbstractScrollArea::keyReleaseEvent(event);
-  refreshInteractionCursor(QGuiApplication::queryKeyboardModifiers());
+  refreshInteractionCursor();
+}
+
+Qt::KeyboardModifiers PianoRollView::mergedModifiers(Qt::KeyboardModifiers modifiers) const {
+  return modifiers | QGuiApplication::queryKeyboardModifiers();
+}
+
+void PianoRollView::setPanDragActive(bool active, Qt::KeyboardModifiers modifiers) {
+  m_panDragActive = active;
+  refreshInteractionCursor(modifiers);
+}
+
+void PianoRollView::applyPanDragDelta(const QPoint& dragDelta) {
+  if (dragDelta.isNull()) {
+    return;
+  }
+
+  auto* hbar = horizontalScrollBar();
+  auto* vbar = verticalScrollBar();
+  if (hbar) {
+    hbar->setValue(std::clamp(hbar->value() - dragDelta.x(), hbar->minimum(), hbar->maximum()));
+  }
+  if (vbar) {
+    vbar->setValue(std::clamp(vbar->value() - dragDelta.y(), vbar->minimum(), vbar->maximum()));
+  }
+  requestRenderCoalesced();
 }
 
 void PianoRollView::setInteractionCursor(Qt::CursorShape shape) {
@@ -389,7 +414,7 @@ void PianoRollView::refreshInteractionCursor(Qt::KeyboardModifiers modifiers) {
     return;
   }
 
-  const Qt::KeyboardModifiers activeModifiers = modifiers | QGuiApplication::queryKeyboardModifiers();
+  const Qt::KeyboardModifiers activeModifiers = mergedModifiers(modifiers);
   if (activeModifiers.testFlag(Qt::AltModifier)) {
     setInteractionCursor(Qt::OpenHandCursor);
   } else {
@@ -489,7 +514,7 @@ bool PianoRollView::handleViewportCoalescedZoomGesture(float rawDelta,
 
   // Native gesture modifiers can be stale/empty on some backends. Merge with
   // live keyboard state so Option/Alt pinch reliably drives Y-axis zoom.
-  const Qt::KeyboardModifiers activeModifiers = modifiers | QGuiApplication::queryKeyboardModifiers();
+  const Qt::KeyboardModifiers activeModifiers = mergedModifiers(modifiers);
   refreshInteractionCursor(activeModifiers);
   if (activeModifiers.testFlag(Qt::AltModifier)) {
     zoomVerticalFactor(factor, anchor.y(), false, 0);
@@ -505,16 +530,15 @@ bool PianoRollView::handleViewportMousePress(QMouseEvent* event) {
     return false;
   }
 
-  const Qt::KeyboardModifiers activeModifiers = event->modifiers() | QGuiApplication::queryKeyboardModifiers();
+  const Qt::KeyboardModifiers activeModifiers = mergedModifiers(event->modifiers());
   const QPoint pos = event->position().toPoint();
   if (activeModifiers.testFlag(Qt::AltModifier)) {
     clearPreviewNotes();
     m_seekDragActive = false;
     m_noteSelectionPressActive = false;
     m_noteSelectionDragging = false;
-    m_panDragActive = true;
+    setPanDragActive(true, activeModifiers);
     m_panDragLastPos = pos;
-    refreshInteractionCursor(activeModifiers);
     event->accept();
     return true;
   }
@@ -552,11 +576,10 @@ bool PianoRollView::handleViewportMouseMove(QMouseEvent* event) {
     return false;
   }
 
-  const Qt::KeyboardModifiers activeModifiers = event->modifiers() | QGuiApplication::queryKeyboardModifiers();
+  const Qt::KeyboardModifiers activeModifiers = mergedModifiers(event->modifiers());
   if (m_panDragActive) {
     if (!(event->buttons() & Qt::LeftButton)) {
-      m_panDragActive = false;
-      refreshInteractionCursor(activeModifiers);
+      setPanDragActive(false, activeModifiers);
       event->accept();
       return true;
     }
@@ -564,19 +587,7 @@ bool PianoRollView::handleViewportMouseMove(QMouseEvent* event) {
     const QPoint pos = event->position().toPoint();
     const QPoint dragDelta = pos - m_panDragLastPos;
     m_panDragLastPos = pos;
-
-    if (!dragDelta.isNull()) {
-      auto* hbar = horizontalScrollBar();
-      auto* vbar = verticalScrollBar();
-      if (hbar) {
-        hbar->setValue(std::clamp(hbar->value() - dragDelta.x(), hbar->minimum(), hbar->maximum()));
-      }
-      if (vbar) {
-        vbar->setValue(std::clamp(vbar->value() - dragDelta.y(), vbar->minimum(), vbar->maximum()));
-      }
-      requestRenderCoalesced();
-    }
-
+    applyPanDragDelta(dragDelta);
     refreshInteractionCursor(activeModifiers);
     event->accept();
     return true;
@@ -634,10 +645,9 @@ bool PianoRollView::handleViewportMouseRelease(QMouseEvent* event) {
     return false;
   }
 
-  const Qt::KeyboardModifiers activeModifiers = event->modifiers() | QGuiApplication::queryKeyboardModifiers();
+  const Qt::KeyboardModifiers activeModifiers = mergedModifiers(event->modifiers());
   if (m_panDragActive) {
-    m_panDragActive = false;
-    refreshInteractionCursor(activeModifiers);
+    setPanDragActive(false, activeModifiers);
     event->accept();
     return true;
   }
