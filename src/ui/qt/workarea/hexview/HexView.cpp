@@ -301,6 +301,13 @@ int HexView::getViewportWidthSansAsciiAndAddress() const {
   return getVirtualWidthSansAsciiAndAddress() + VIEWPORT_PADDING;
 }
 
+std::vector<SplitterSnapRange> HexView::splitterSnapRanges() const {
+  return {
+      {getViewportWidthSansAsciiAndAddress(), getViewportWidthSansAscii()},
+      {getViewportWidthSansAscii(), getViewportFullWidth()},
+  };
+}
+
 // Sync vertical scrollbar range/steps with current content and viewport dimensions.
 void HexView::updateScrollBars() {
   const int totalHeight = getVirtualHeight();
