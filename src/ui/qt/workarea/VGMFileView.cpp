@@ -19,7 +19,6 @@
 
 #include <algorithm>
 #include <cmath>
-#include <optional>
 #include <unordered_set>
 #include <utility>
 
@@ -319,60 +318,60 @@ void VGMFileView::resizeEvent(QResizeEvent* event) {
 }
 
 bool VGMFileView::eventFilter(QObject* watched, QEvent* event) {
-  const auto showPaneMenuAt = [this, watched](const QPoint& globalPos) -> bool {
-    const auto sideForWidget = [this](QWidget* widget) -> std::optional<PanelSide> {
-      if (!widget) {
-        return std::nullopt;
-      }
-
-      if (auto* leftContainer = panel(PanelSide::Left).container;
-          leftContainer && (widget == leftContainer || leftContainer->isAncestorOf(widget))) {
-        return PanelSide::Left;
-      }
-      if (auto* rightContainer = panel(PanelSide::Right).container;
-          rightContainer && (widget == rightContainer || rightContainer->isAncestorOf(widget))) {
-        return PanelSide::Right;
-      }
-      return std::nullopt;
-    };
-
-    if (auto* sourceWidget = qobject_cast<QWidget*>(watched)) {
-      if (auto side = sideForWidget(sourceWidget); side.has_value()) {
-        MdiArea::the()->showPaneViewMenu(this, side.value(), globalPos);
-        return true;
-      }
-    }
-
-    if (auto* widgetAtPos = QApplication::widgetAt(globalPos)) {
-      if (auto side = sideForWidget(widgetAtPos); side.has_value()) {
-        MdiArea::the()->showPaneViewMenu(this, side.value(), globalPos);
-        return true;
-      }
-    }
-
-    return false;
-  };
-
-  if (event && event->type() == QEvent::ContextMenu) {
-    if (auto* contextMenuEvent = static_cast<QContextMenuEvent*>(event);
-        contextMenuEvent && showPaneMenuAt(contextMenuEvent->globalPos())) {
-      return true;
-    }
-  }
-
-  if (event && event->type() == QEvent::MouseButtonPress) {
-    auto* mouseEvent = static_cast<QMouseEvent*>(event);
-    if (mouseEvent && mouseEvent->button() == Qt::RightButton &&
-        showPaneMenuAt(mouseEvent->globalPosition().toPoint())) {
-      return true;
-    }
-  }
-
   if (watched == m_splitter && event &&
       (event->type() == QEvent::Show || event->type() == QEvent::ShowToParent)) {
     enforceSplitterPolicyForResize();
   }
+
+  if (!event) {
+    return QMdiSubWindow::eventFilter(watched, event);
+  }
+
+  QPoint globalPos;
+  bool shouldShowPaneMenu = false;
+  if (event->type() == QEvent::ContextMenu) {
+    if (auto* contextMenuEvent = static_cast<QContextMenuEvent*>(event)) {
+      globalPos = contextMenuEvent->globalPos();
+      shouldShowPaneMenu = true;
+    }
+  } else if (event->type() == QEvent::MouseButtonPress) {
+    if (auto* mouseEvent = static_cast<QMouseEvent*>(event);
+        mouseEvent && mouseEvent->button() == Qt::RightButton) {
+      globalPos = mouseEvent->globalPosition().toPoint();
+      shouldShowPaneMenu = true;
+    }
+  }
+
+  if (shouldShowPaneMenu) {
+    PanelSide side = PanelSide::Left;
+    if (paneSideAtGlobalPos(globalPos, side)) {
+      MdiArea::the()->showPaneViewMenu(this, side, globalPos);
+      return true;
+    }
+  }
+
   return QMdiSubWindow::eventFilter(watched, event);
+}
+
+bool VGMFileView::paneSideAtGlobalPos(const QPoint& globalPos, PanelSide& side) const {
+  if (!m_splitter || !m_splitter->isVisible()) {
+    return false;
+  }
+
+  const QPoint localPos = m_splitter->mapFromGlobal(globalPos);
+  if (localPos.x() < 0 || localPos.y() < 0 ||
+      localPos.x() >= m_splitter->width() || localPos.y() >= m_splitter->height()) {
+    return false;
+  }
+
+  const QList<int> sizes = m_splitter->sizes();
+  if (sizes.size() < 2) {
+    return false;
+  }
+
+  const int leftPaneAndHandleWidth = std::max(0, sizes.first()) + std::max(0, m_splitter->handleWidth());
+  side = localPos.x() < leftPaneAndHandleWidth ? PanelSide::Left : PanelSide::Right;
+  return true;
 }
 
 // Switches a pane to the requested view, ignoring unsupported view kinds.
