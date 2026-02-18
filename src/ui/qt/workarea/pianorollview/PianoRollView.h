@@ -98,9 +98,9 @@ private:
 
   static constexpr float kDefaultPixelsPerTick = 0.20f;
   static constexpr float kDefaultPixelsPerKey = 12.0f;
-  static constexpr float kMinPixelsPerTick = 0.0125f;
+  static constexpr float kMinPixelsPerTick = 0.05f;
   static constexpr float kMaxPixelsPerTick = 6.0f;
-  static constexpr float kMinPixelsPerKey = 3.0f;
+  static constexpr float kMinPixelsPerKey = 5.0f;
   static constexpr float kMaxPixelsPerKey = 44.0f;
 
   [[nodiscard]] QColor colorForTrack(int trackIndex) const;
