@@ -19,6 +19,7 @@
 #include <QAbstractAnimation>
 #include <QEvent>
 #include <QEasingCurve>
+#include <QGuiApplication>
 #include <QMouseEvent>
 #include <QNativeGestureEvent>
 #include <QPalette>
@@ -438,7 +439,10 @@ bool PianoRollView::handleViewportCoalescedZoomGesture(float rawDelta,
     anchor = viewport()->mapFromGlobal(anchor);
   }
 
-  if (modifiers.testFlag(Qt::AltModifier)) {
+  // Native gesture modifiers can be stale/empty on some backends. Merge with
+  // live keyboard state so Option/Alt pinch reliably drives Y-axis zoom.
+  const Qt::KeyboardModifiers activeModifiers = modifiers | QGuiApplication::queryKeyboardModifiers();
+  if (activeModifiers.testFlag(Qt::AltModifier)) {
     zoomVerticalFactor(factor, anchor.y(), false, 0);
   } else {
     zoomHorizontalFactor(factor, anchor.x(), false, 0);
