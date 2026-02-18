@@ -1609,13 +1609,12 @@ void PianoRollView::animateHorizontalScale(float targetScale, int anchorX, int d
   m_horizontalZoomWorldTick = static_cast<float>(horizontalScrollBar()->value() + m_horizontalZoomAnchor) /
                               std::max(0.0001f, m_pixelsPerTick);
 
-  m_horizontalZoomAnimation->setDuration(std::max(1, durationMs));
-  m_horizontalZoomAnimation->setEndValue(targetScale);
   if (m_horizontalZoomAnimation->state() == QAbstractAnimation::Running) {
-    return;
+    m_horizontalZoomAnimation->stop();
   }
-
+  m_horizontalZoomAnimation->setDuration(std::max(1, durationMs));
   m_horizontalZoomAnimation->setStartValue(m_pixelsPerTick);
+  m_horizontalZoomAnimation->setEndValue(targetScale);
   m_horizontalZoomAnimation->start();
 }
 
@@ -1629,12 +1628,11 @@ void PianoRollView::animateVerticalScale(float targetScale, int anchorY, int dur
   m_verticalZoomWorldY = static_cast<float>(verticalScrollBar()->value() + m_verticalZoomAnchor) /
                          std::max(0.0001f, m_pixelsPerKey);
 
-  m_verticalZoomAnimation->setDuration(std::max(1, durationMs));
-  m_verticalZoomAnimation->setEndValue(targetScale);
   if (m_verticalZoomAnimation->state() == QAbstractAnimation::Running) {
-    return;
+    m_verticalZoomAnimation->stop();
   }
-
+  m_verticalZoomAnimation->setDuration(std::max(1, durationMs));
   m_verticalZoomAnimation->setStartValue(m_pixelsPerKey);
+  m_verticalZoomAnimation->setEndValue(targetScale);
   m_verticalZoomAnimation->start();
 }
