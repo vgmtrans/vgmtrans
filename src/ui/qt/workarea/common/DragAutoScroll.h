@@ -7,6 +7,7 @@
 #pragma once
 
 #include <QPoint>
+#include <QPointF>
 #include <QRect>
 
 class QWidget;
@@ -30,10 +31,9 @@ struct ScreenEdgeTravelPixels {
 [[nodiscard]] ScreenEdgeTravelPixels screenEdgeTravelPixels(const QWidget* widget,
                                                             const QRect& localRect);
 
-[[nodiscard]] QPoint edgeAutoScrollDelta(const QPoint& pointerPos,
-                                         const QRect& boundsRect,
-                                         const ScreenEdgeTravelPixels& travel,
-                                         const AutoScrollRampConfig& config);
+[[nodiscard]] QPointF edgeAutoScrollDelta(const QPoint& pointerPos,
+                                          const QRect& boundsRect,
+                                          const ScreenEdgeTravelPixels& travel,
+                                          const AutoScrollRampConfig& config);
 
 }  // namespace QtUi
-
