@@ -138,6 +138,8 @@ private:
   void scheduleCoalescedRender(int delayMs);
 
   [[nodiscard]] QPoint viewportPosFromGlobal(const QPointF& globalPos) const;
+  [[nodiscard]] QPoint graphWorldPosFromViewport(const QPoint& viewportPos) const;
+  [[nodiscard]] QPoint graphViewportPosFromWorld(const QPoint& worldPos) const;
   [[nodiscard]] QPoint autoScrollDeltaForGraphDrag(const QPoint& viewportPos) const;
   int clampTick(int tick) const;
   int tickFromViewportX(int x) const;
@@ -218,7 +220,9 @@ private:
 
   QPoint m_noteSelectionAnchor;
   QPoint m_noteSelectionCurrent;
+  QPoint m_noteSelectionAnchorWorld;
   QPoint m_panDragLastPos;
+  bool m_noteSelectionAnchorWorldValid = false;
   QBasicTimer m_noteSelectionAutoScrollTimer;
   VGMItem* m_primarySelectedItem = nullptr;
   size_t m_previewAnchorNoteIndex = kInvalidNoteIndex;
