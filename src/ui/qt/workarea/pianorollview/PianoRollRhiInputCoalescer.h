@@ -6,12 +6,19 @@
 
 #pragma once
 
+#include <QMouseEvent>
 #include <QNativeGestureEvent>
 #include <QPoint>
 #include <QWheelEvent>
 
 class PianoRollRhiInputCoalescer final {
 public:
+  struct MouseMoveBatch {
+    QPointF globalPos;
+    Qt::KeyboardModifiers modifiers = Qt::NoModifier;
+    Qt::MouseButtons buttons = Qt::NoButton;
+  };
+
   struct WheelBatch {
     QPointF globalPos;
     QPoint pixelDelta;
@@ -27,6 +34,27 @@ public:
     float rawDelta = 0.0f;
     Qt::KeyboardModifiers modifiers = Qt::NoModifier;
   };
+
+  void queueMouseMove(const QMouseEvent* event) {
+    if (!event) {
+      return;
+    }
+
+    m_pendingMouseMove = true;
+    m_mouseMove.globalPos = event->globalPosition();
+    m_mouseMove.modifiers = event->modifiers();
+    m_mouseMove.buttons = event->buttons();
+  }
+
+  bool takePendingMouseMove(MouseMoveBatch& out) {
+    if (!m_pendingMouseMove) {
+      return false;
+    }
+
+    m_pendingMouseMove = false;
+    out = m_mouseMove;
+    return true;
+  }
 
   void queueWheel(const QWheelEvent* event) {
     if (!event) {
@@ -103,4 +131,6 @@ private:
   WheelBatch m_wheel;
   bool m_pendingZoomGesture = false;
   ZoomBatch m_zoom;
+  bool m_pendingMouseMove = false;
+  MouseMoveBatch m_mouseMove;
 };
