@@ -708,15 +708,11 @@ bool PianoRollView::handleViewportMouseMove(QMouseEvent* event) {
   }
 
   if (m_noteSelectionDragging) {
-    // Apply one immediate step, then let timerEvent continue stepping while outside bounds.
+    // Timer-driven only: mouse-move just arms/disarms edge auto-scroll.
     const QPointF autoDelta = autoScrollDeltaForGraphDrag(pos);
     if (autoDelta.isNull()) {
       stopNoteSelectionAutoScroll();
     } else {
-      const QPoint panDelta = consumeAutoScrollDelta(autoDelta);
-      if (!panDelta.isNull()) {
-        applyPanDragDelta(panDelta);
-      }
       if (!m_noteSelectionAutoScrollTimer.isActive()) {
         m_noteSelectionAutoScrollTimer.start(kNoteSelectionAutoScrollIntervalMs, this);
       }
