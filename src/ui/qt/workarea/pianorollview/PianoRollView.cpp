@@ -1209,7 +1209,7 @@ QPoint PianoRollView::autoScrollDeltaForGraphDrag(const QPoint& viewportPos) con
   }
 
   // Base dead-zone / ramp / max-step profile; helper adapts it to per-edge monitor travel.
-  static constexpr QtUi::AutoScrollRampConfig kAutoScrollRampConfig{18, 40, 260};
+  static constexpr QtUi::AutoScrollRampConfig kAutoScrollRampConfig{24, 40, 320};
 
   const QtUi::ScreenEdgeTravelPixels travel = QtUi::screenEdgeTravelPixels(viewport(), graphRect);
   return QtUi::edgeAutoScrollDelta(viewportPos, graphRect, travel, kAutoScrollRampConfig);

@@ -50,6 +50,20 @@ void PianoRollRhiWidget::initialize(QRhiCommandBuffer* cb) {
 }
 
 void PianoRollRhiWidget::render(QRhiCommandBuffer* cb) {
+  if (m_view) {
+    PianoRollRhiInputCoalescer::MouseMoveBatch mouseMoveBatch;
+    if (m_inputCoalescer.takePendingMouseMove(mouseMoveBatch)) {
+      const QPoint viewportPos = mapFromGlobal(mouseMoveBatch.globalPos.toPoint());
+      QMouseEvent mouseEvent(QEvent::MouseMove,
+                             QPointF(viewportPos),
+                             mouseMoveBatch.globalPos,
+                             Qt::NoButton,
+                             mouseMoveBatch.buttons,
+                             mouseMoveBatch.modifiers);
+      m_view->handleViewportMouseMove(&mouseEvent);
+    }
+  }
+
   if (!cb) {
     return;
   }
@@ -117,7 +131,10 @@ void PianoRollRhiWidget::mousePressEvent(QMouseEvent* event) {
 }
 
 void PianoRollRhiWidget::mouseMoveEvent(QMouseEvent* event) {
-  if (m_view && m_view->handleViewportMouseMove(event)) {
+  if (m_view) {
+    m_inputCoalescer.queueMouseMove(event);
+    update();
+    event->accept();
     return;
   }
 
