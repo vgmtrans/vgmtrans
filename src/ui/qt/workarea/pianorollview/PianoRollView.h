@@ -141,6 +141,7 @@ private:
   [[nodiscard]] QPoint graphWorldPosFromViewport(const QPoint& viewportPos) const;
   [[nodiscard]] QPoint graphViewportPosFromWorld(const QPoint& worldPos) const;
   [[nodiscard]] QPointF autoScrollDeltaForGraphDrag(const QPoint& viewportPos) const;
+  void stopNoteSelectionAutoScroll();
   QPoint consumeAutoScrollDelta(const QPointF& dragDelta);
   int clampTick(int tick) const;
   int tickFromViewportX(int x) const;
