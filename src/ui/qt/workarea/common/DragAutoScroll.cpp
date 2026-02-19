@@ -11,6 +11,7 @@
 #include <QWidget>
 
 #include <algorithm>
+#include <cmath>
 #include <utility>
 
 namespace QtUi {
@@ -35,15 +36,15 @@ std::pair<int, int> tunedDeadZoneAndRamp(int travelPixels,
   return {deadZonePixels, rampDistancePixels};
 }
 
-// Computes one-axis auto-scroll step from pointer overflow and ramp config.
-int axisAutoScrollStep(int value,
-                       int minValue,
-                       int maxValue,
-                       int travelToMinPixels,
-                       int travelToMaxPixels,
-                       const AutoScrollRampConfig& config) {
+// Computes one-axis fractional auto-scroll step from pointer overflow and ramp config.
+float axisAutoScrollStep(int value,
+                         int minValue,
+                         int maxValue,
+                         int travelToMinPixels,
+                         int travelToMaxPixels,
+                         const AutoScrollRampConfig& config) {
   if (config.maxStep <= 0) {
-    return 0;
+    return 0.0f;
   }
 
   int distance = 0;
@@ -55,7 +56,7 @@ int axisAutoScrollStep(int value,
     distance = value - maxValue;
     direction = -1;  // outside max edge: negative pan delta
   } else {
-    return 0;
+    return 0.0f;
   }
 
   const int baseTotal = std::max(1, config.deadZonePixels + config.rampDistancePixels);
@@ -65,21 +66,23 @@ int axisAutoScrollStep(int value,
   const auto [deadZonePixels, rampDistancePixels] =
       tunedDeadZoneAndRamp(travelPixels, config.deadZonePixels, config.rampDistancePixels);
   if (distance <= deadZonePixels) {
-    return 0;
+    return 0.0f;
   }
 
   const int effectiveDistance = distance - deadZonePixels;
   if (rampDistancePixels <= 1) {
-    return direction * config.maxStep;
+    return static_cast<float>(direction * config.maxStep);
   }
 
   const int rampedDistance = std::min(effectiveDistance, rampDistancePixels);
-  const int step = 1 + ((rampedDistance - 1) * (config.maxStep - 1)) / (rampDistancePixels - 1);
-  if (step <= 0) {
-    return 0;
-  }
+  const float normalized = std::clamp(static_cast<float>(rampedDistance) /
+                                          static_cast<float>(rampDistancePixels),
+                                      0.0f,
+                                      1.0f);
+  // Quadratic easing gives finer low-speed control just past the dead zone.
+  const float step = static_cast<float>(config.maxStep) * std::pow(normalized, 2.0f);
 
-  return direction * step;
+  return static_cast<float>(direction) * step;
 }
 
 }  // namespace
@@ -114,11 +117,11 @@ ScreenEdgeTravelPixels screenEdgeTravelPixels(const QWidget* widget, const QRect
   return travel;
 }
 
-// Computes two-axis auto-scroll delta for a pointer relative to drag bounds.
-QPoint edgeAutoScrollDelta(const QPoint& pointerPos,
-                           const QRect& boundsRect,
-                           const ScreenEdgeTravelPixels& travel,
-                           const AutoScrollRampConfig& config) {
+// Computes two-axis fractional auto-scroll delta for a pointer relative to drag bounds.
+QPointF edgeAutoScrollDelta(const QPoint& pointerPos,
+                            const QRect& boundsRect,
+                            const ScreenEdgeTravelPixels& travel,
+                            const AutoScrollRampConfig& config) {
   if (boundsRect.isEmpty()) {
     return {};
   }
@@ -129,18 +132,18 @@ QPoint edgeAutoScrollDelta(const QPoint& pointerPos,
   const int topTravel = travel.valid ? travel.top : 0;
   const int bottomTravel = travel.valid ? travel.bottom : 0;
 
-  return QPoint(axisAutoScrollStep(pointerPos.x(),
-                                   boundsRect.left(),
-                                   boundsRect.right(),
-                                   leftTravel,
-                                   rightTravel,
-                                   config),
-                axisAutoScrollStep(pointerPos.y(),
-                                   boundsRect.top(),
-                                   boundsRect.bottom(),
-                                   topTravel,
-                                   bottomTravel,
-                                   config));
+  return QPointF(axisAutoScrollStep(pointerPos.x(),
+                                    boundsRect.left(),
+                                    boundsRect.right(),
+                                    leftTravel,
+                                    rightTravel,
+                                    config),
+                 axisAutoScrollStep(pointerPos.y(),
+                                    boundsRect.top(),
+                                    boundsRect.bottom(),
+                                    topTravel,
+                                    bottomTravel,
+                                    config));
 }
 
 }  // namespace QtUi
