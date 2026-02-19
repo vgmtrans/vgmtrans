@@ -27,6 +27,7 @@
 #include <QPalette>
 #include <QRectF>
 #include <QResizeEvent>
+#include <QScreen>
 #include <QScrollBar>
 #include <QShowEvent>
 #include <QTimer>
@@ -1205,10 +1206,45 @@ QPoint PianoRollView::autoScrollDeltaForGraphDrag(const QPoint& viewportPos) con
   }
 
   constexpr int kMaxAutoScrollStep = 18;
-  constexpr int kDeadZonePixels = 40;
-  constexpr int kRampDistancePixels = 260;
-  const auto axisDelta = [kMaxAutoScrollStep, kDeadZonePixels, kRampDistancePixels](
-                             int value, int minValue, int maxValue) {
+  constexpr int kBaseDeadZonePixels = 40;
+  constexpr int kBaseRampDistancePixels = 260;
+  constexpr int kBaseTuningDistancePixels = kBaseDeadZonePixels + kBaseRampDistancePixels;
+
+  int leftTravelPixels = kBaseTuningDistancePixels;
+  int rightTravelPixels = kBaseTuningDistancePixels;
+  int topTravelPixels = kBaseTuningDistancePixels;
+  int bottomTravelPixels = kBaseTuningDistancePixels;
+  if (viewport()) {
+    const QPoint graphCenterGlobal = viewport()->mapToGlobal(graphRect.center());
+    QScreen* screen = QGuiApplication::screenAt(graphCenterGlobal);
+    if (!screen) {
+      screen = QGuiApplication::primaryScreen();
+    }
+    if (screen) {
+      const QRect screenGeometry = screen->geometry();
+      const QPoint graphTopLeftGlobal = viewport()->mapToGlobal(graphRect.topLeft());
+      const QPoint graphBottomRightGlobal = viewport()->mapToGlobal(graphRect.bottomRight());
+      leftTravelPixels = std::max(0, graphTopLeftGlobal.x() - screenGeometry.left());
+      rightTravelPixels = std::max(0, screenGeometry.right() - graphBottomRightGlobal.x());
+      topTravelPixels = std::max(0, graphTopLeftGlobal.y() - screenGeometry.top());
+      bottomTravelPixels = std::max(0, screenGeometry.bottom() - graphBottomRightGlobal.y());
+    }
+  }
+
+  const auto tunedDeadZoneAndRamp = [kBaseDeadZonePixels, kBaseTuningDistancePixels](int travelPixels) {
+    if (travelPixels <= 0) {
+      return std::pair<int, int>{0, 1};
+    }
+
+    const int total = std::min(travelPixels, kBaseTuningDistancePixels);
+    int deadZonePixels = (kBaseDeadZonePixels * total) / kBaseTuningDistancePixels;
+    deadZonePixels = std::clamp(deadZonePixels, 0, std::max(0, total - 1));
+    const int rampDistancePixels = std::max(1, total - deadZonePixels);
+    return std::pair<int, int>{deadZonePixels, rampDistancePixels};
+  };
+
+  const auto axisDelta = [kMaxAutoScrollStep, &tunedDeadZoneAndRamp](
+                             int value, int minValue, int maxValue, int travelToMinPixels, int travelToMaxPixels) {
     int distance = 0;
     int direction = 0;
     if (value < minValue) {
@@ -1221,13 +1257,19 @@ QPoint PianoRollView::autoScrollDeltaForGraphDrag(const QPoint& viewportPos) con
       return 0;
     }
 
-    if (distance <= kDeadZonePixels) {
+    const int travelPixels = (direction > 0) ? travelToMinPixels : travelToMaxPixels;
+    const auto [deadZonePixels, rampDistancePixels] = tunedDeadZoneAndRamp(travelPixels);
+    if (distance <= deadZonePixels) {
       return 0;
     }
 
-    const int effectiveDistance = distance - kDeadZonePixels;
-    const int rampedDistance = std::min(effectiveDistance, kRampDistancePixels);
-    const int step = 1 + ((rampedDistance - 1) * (kMaxAutoScrollStep - 1)) / (kRampDistancePixels - 1);
+    const int effectiveDistance = distance - deadZonePixels;
+    if (rampDistancePixels <= 1) {
+      return direction * kMaxAutoScrollStep;
+    }
+
+    const int rampedDistance = std::min(effectiveDistance, rampDistancePixels);
+    const int step = 1 + ((rampedDistance - 1) * (kMaxAutoScrollStep - 1)) / (rampDistancePixels - 1);
     if (step <= 0) {
       return 0;
     }
@@ -1235,8 +1277,16 @@ QPoint PianoRollView::autoScrollDeltaForGraphDrag(const QPoint& viewportPos) con
     return direction * step;
   };
 
-  return QPoint(axisDelta(viewportPos.x(), graphRect.left(), graphRect.right()),
-                axisDelta(viewportPos.y(), graphRect.top(), graphRect.bottom()));
+  return QPoint(axisDelta(viewportPos.x(),
+                          graphRect.left(),
+                          graphRect.right(),
+                          leftTravelPixels,
+                          rightTravelPixels),
+                axisDelta(viewportPos.y(),
+                          graphRect.top(),
+                          graphRect.bottom(),
+                          topTravelPixels,
+                          bottomTravelPixels));
 }
 
 int PianoRollView::clampTick(int tick) const {
