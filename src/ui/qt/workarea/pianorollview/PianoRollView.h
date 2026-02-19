@@ -7,6 +7,7 @@
 #pragma once
 
 #include <QAbstractScrollArea>
+#include <QBasicTimer>
 #include <QElapsedTimer>
 #include <QPoint>
 #include <QtGlobal>
@@ -30,6 +31,7 @@ class QMouseEvent;
 class QNativeGestureEvent;
 class QResizeEvent;
 class QShowEvent;
+class QTimerEvent;
 class QVariantAnimation;
 class QWheelEvent;
 class MidiTrack;
@@ -77,6 +79,7 @@ protected:
   void changeEvent(QEvent* event) override;
   void keyPressEvent(QKeyEvent* event) override;
   void keyReleaseEvent(QKeyEvent* event) override;
+  void timerEvent(QTimerEvent* event) override;
 
 private:
   friend class PianoRollRhiWidget;
@@ -134,6 +137,8 @@ private:
   void requestRenderCoalesced();
   void scheduleCoalescedRender(int delayMs);
 
+  [[nodiscard]] QPoint viewportPosFromGlobal(const QPointF& globalPos) const;
+  [[nodiscard]] QPoint autoScrollDeltaForGraphDrag(const QPoint& viewportPos) const;
   int clampTick(int tick) const;
   int tickFromViewportX(int x) const;
   int scanlinePixelX(int tick) const;
@@ -214,6 +219,7 @@ private:
   QPoint m_noteSelectionAnchor;
   QPoint m_noteSelectionCurrent;
   QPoint m_panDragLastPos;
+  QBasicTimer m_noteSelectionAutoScrollTimer;
   VGMItem* m_primarySelectedItem = nullptr;
   size_t m_previewAnchorNoteIndex = kInvalidNoteIndex;
 
