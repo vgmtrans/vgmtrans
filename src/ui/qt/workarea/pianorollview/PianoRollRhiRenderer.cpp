@@ -1145,6 +1145,7 @@ void PianoRollRhiRenderer::buildDynamicInstances(const PianoRollFrame::Data& fra
     const float noteAreaTop = layout.noteAreaTop;
     const float noteAreaRight = layout.noteAreaLeft + layout.noteAreaWidth;
     const float noteAreaBottom = layout.noteAreaTop + layout.noteAreaHeight;
+    // Clip each marquee segment manually so edges vanish correctly when out of view.
     const auto appendClippedToNoteArea =
         [&](float x, float y, float w, float h, const QColor& color) {
           const float clippedLeft = std::max(x, noteAreaLeft);
@@ -1272,6 +1273,7 @@ void PianoRollRhiRenderer::forEachNoteInRange(const PianoRollFrame::Data& frame,
 
   const auto& notes = *frame.notes;
   const uint64_t maxDuration = std::max<uint64_t>(1, frame.maxNoteDurationTicks);
+  // Start before range to include long notes whose start is off-screen but body is visible.
   const uint64_t searchStart = (startTick > maxDuration)
                                    ? (startTick - maxDuration)
                                    : 0;
@@ -1321,6 +1323,7 @@ PianoRollRhiRenderer::NoteGeometry PianoRollRhiRenderer::computeNoteGeometry(con
   const float y = layout.noteAreaTop + ((127.0f - static_cast<float>(note.key)) * layout.pixelsPerKey) - layout.scrollY;
   const float h = std::max(1.0f, layout.pixelsPerKey - 1.0f);
 
+  // Keep note quads inside the scrollable note area (not keyboard or top bar).
   const float clippedX = std::max(layout.noteAreaLeft, x);
   const float clippedX2 = std::min(layout.noteAreaLeft + layout.noteAreaWidth, x2);
   const float clippedY = std::max(layout.noteAreaTop, y);

@@ -395,6 +395,7 @@ void PianoRollView::timerEvent(QTimerEvent* event) {
     return;
   }
 
+  // Keep edge auto-scroll running even when the pointer stops moving.
   const QPoint pos = viewportPosFromGlobal(QPointF(QCursor::pos()));
   const QPoint autoDelta = autoScrollDeltaForGraphDrag(pos);
   if (autoDelta.isNull()) {
@@ -596,6 +597,7 @@ bool PianoRollView::handleViewportMousePress(QMouseEvent* event) {
     m_noteSelectionPressActive = true;
     m_noteSelectionDragging = false;
     m_noteSelectionAnchor = pos;
+    // Keep the marquee origin in graph space so it stays attached to content while panning.
     m_noteSelectionAnchorWorld = graphWorldPosFromViewport(pos);
     m_noteSelectionAnchorWorldValid = true;
     m_noteSelectionCurrent = pos;
@@ -689,6 +691,7 @@ bool PianoRollView::handleViewportMouseMove(QMouseEvent* event) {
   }
 
   if (m_noteSelectionDragging) {
+    // Apply one immediate step, then let timerEvent continue stepping while outside bounds.
     const QPoint autoDelta = autoScrollDeltaForGraphDrag(pos);
     if (autoDelta.isNull()) {
       m_noteSelectionAutoScrollTimer.stop();
@@ -1205,6 +1208,7 @@ QPoint PianoRollView::autoScrollDeltaForGraphDrag(const QPoint& viewportPos) con
     return {};
   }
 
+  // Base dead-zone / ramp / max-step profile; helper adapts it to per-edge monitor travel.
   static constexpr QtUi::AutoScrollRampConfig kAutoScrollRampConfig{18, 40, 260};
 
   const QtUi::ScreenEdgeTravelPixels travel = QtUi::screenEdgeTravelPixels(viewport(), graphRect);
@@ -1245,6 +1249,7 @@ QRectF PianoRollView::graphSelectionRectInViewport() const {
     return {};
   }
 
+  // Convert world-space anchor back to viewport so marquee origin tracks scrolled content.
   const QPoint anchorViewport = m_noteSelectionAnchorWorldValid
                                     ? graphViewportPosFromWorld(m_noteSelectionAnchorWorld)
                                     : m_noteSelectionAnchor;
@@ -1373,6 +1378,7 @@ void PianoRollView::updateMarqueeSelection(bool emitSelectionSignal) {
     return;
   }
 
+  // Build selection in world coordinates so drag + auto-scroll keeps a stable content anchor.
   const QPoint anchorWorld = m_noteSelectionAnchorWorldValid
                                  ? m_noteSelectionAnchorWorld
                                  : graphWorldPosFromViewport(m_noteSelectionAnchor);
@@ -1402,6 +1408,7 @@ void PianoRollView::updateMarqueeSelection(bool emitSelectionSignal) {
   const uint64_t tickMin = static_cast<uint64_t>(std::floor(clampedWorldXMin / pixelsPerTick));
   const uint64_t tickMax = static_cast<uint64_t>(std::ceil(clampedWorldXMax / pixelsPerTick));
   const uint64_t maxDurationTicks = std::max<uint64_t>(1u, m_maxNoteDurationTicks);
+  // Include earlier start ticks so long notes crossing into the marquee are still considered.
   const uint64_t searchStartTick = (tickMin > maxDurationTicks) ? (tickMin - maxDurationTicks) : 0u;
   const uint64_t searchEndTickExclusive = tickMax + 1u;
 
