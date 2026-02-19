@@ -30,6 +30,7 @@
 #include <QScrollBar>
 #include <QShowEvent>
 #include <QTimer>
+#include <QTimerEvent>
 #include <QVariantAnimation>
 #include <QWheelEvent>
 
@@ -38,6 +39,10 @@
 #include <limits>
 #include <unordered_set>
 #include <utility>
+
+namespace {
+constexpr int kNoteSelectionAutoScrollIntervalMs = 16;
+}
 
 PianoRollView::PianoRollView(QWidget* parent)
     : QAbstractScrollArea(parent) {
@@ -376,6 +381,32 @@ void PianoRollView::keyReleaseEvent(QKeyEvent* event) {
   refreshInteractionCursor();
 }
 
+void PianoRollView::timerEvent(QTimerEvent* event) {
+  if (!event || event->timerId() != m_noteSelectionAutoScrollTimer.timerId()) {
+    QAbstractScrollArea::timerEvent(event);
+    return;
+  }
+
+  const bool leftDown = (QGuiApplication::mouseButtons() & Qt::LeftButton);
+  if (!leftDown || !m_noteSelectionPressActive || !m_noteSelectionDragging) {
+    m_noteSelectionAutoScrollTimer.stop();
+    return;
+  }
+
+  const QPoint pos = viewportPosFromGlobal(QPointF(QCursor::pos()));
+  const QPoint autoDelta = autoScrollDeltaForGraphDrag(pos);
+  if (autoDelta.isNull()) {
+    m_noteSelectionAutoScrollTimer.stop();
+    return;
+  }
+
+  m_noteSelectionCurrent = pos;
+  applyPanDragDelta(autoDelta);
+  updateMarqueeSelection(false);
+  updateMarqueePreview(pos);
+  requestRenderCoalesced();
+}
+
 Qt::KeyboardModifiers PianoRollView::mergedModifiers(Qt::KeyboardModifiers modifiers) const {
   return modifiers | QGuiApplication::queryKeyboardModifiers();
 }
@@ -532,6 +563,7 @@ bool PianoRollView::handleViewportMousePress(QMouseEvent* event) {
     return false;
   }
 
+  m_noteSelectionAutoScrollTimer.stop();
   const Qt::KeyboardModifiers activeModifiers = mergedModifiers(event->modifiers());
   const QPoint pos = viewportPosFromGlobal(event->globalPosition());
   if (activeModifiers.testFlag(Qt::AltModifier)) {
@@ -625,11 +657,13 @@ bool PianoRollView::handleViewportMouseMove(QMouseEvent* event) {
   }
 
   if (!m_noteSelectionPressActive) {
+    m_noteSelectionAutoScrollTimer.stop();
     refreshInteractionCursor(activeModifiers);
     return false;
   }
 
   if (!(activeButtons & Qt::LeftButton)) {
+    m_noteSelectionAutoScrollTimer.stop();
     m_noteSelectionPressActive = false;
     m_noteSelectionDragging = false;
     clearPreviewNotes();
@@ -648,11 +682,20 @@ bool PianoRollView::handleViewportMouseMove(QMouseEvent* event) {
   }
 
   if (m_noteSelectionDragging) {
-    applyPanDragDelta(autoScrollDeltaForGraphDrag(pos));
+    const QPoint autoDelta = autoScrollDeltaForGraphDrag(pos);
+    if (autoDelta.isNull()) {
+      m_noteSelectionAutoScrollTimer.stop();
+    } else {
+      applyPanDragDelta(autoDelta);
+      if (!m_noteSelectionAutoScrollTimer.isActive()) {
+        m_noteSelectionAutoScrollTimer.start(kNoteSelectionAutoScrollIntervalMs, this);
+      }
+    }
     updateMarqueeSelection(false);
     updateMarqueePreview(pos);
     requestRenderCoalesced();
   } else {
+    m_noteSelectionAutoScrollTimer.stop();
     previewSingleNoteAtViewportPoint(pos);
   }
 
@@ -666,6 +709,7 @@ bool PianoRollView::handleViewportMouseRelease(QMouseEvent* event) {
     return false;
   }
 
+  m_noteSelectionAutoScrollTimer.stop();
   const Qt::KeyboardModifiers activeModifiers = mergedModifiers(event->modifiers());
   if (m_panDragActive) {
     setPanDragActive(false, activeModifiers);
@@ -1144,14 +1188,34 @@ QPoint PianoRollView::autoScrollDeltaForGraphDrag(const QPoint& viewportPos) con
   }
 
   constexpr int kMaxAutoScrollStep = 12;
-  const auto axisDelta = [kMaxAutoScrollStep](int value, int minValue, int maxValue) {
+  constexpr int kDeadZonePixels = 40;
+  constexpr int kRampDistancePixels = 320;
+  const auto axisDelta = [kMaxAutoScrollStep, kDeadZonePixels, kRampDistancePixels](
+                             int value, int minValue, int maxValue) {
+    int distance = 0;
+    int direction = 0;
     if (value < minValue) {
-      return std::clamp(minValue - value, 1, kMaxAutoScrollStep);
+      distance = minValue - value;
+      direction = 1;
+    } else if (value > maxValue) {
+      distance = value - maxValue;
+      direction = -1;
+    } else {
+      return 0;
     }
-    if (value > maxValue) {
-      return -std::clamp(value - maxValue, 1, kMaxAutoScrollStep);
+
+    if (distance <= kDeadZonePixels) {
+      return 0;
     }
-    return 0;
+
+    const int effectiveDistance = distance - kDeadZonePixels;
+    const int rampedDistance = std::min(effectiveDistance, kRampDistancePixels);
+    const int step = 1 + ((rampedDistance - 1) * (kMaxAutoScrollStep - 1)) / (kRampDistancePixels - 1);
+    if (step <= 0) {
+      return 0;
+    }
+
+    return direction * step;
   };
 
   return QPoint(axisDelta(viewportPos.x(), graphRect.left(), graphRect.right()),
