@@ -17,9 +17,12 @@ namespace QtUi {
 
 namespace {
 
+// Scales the dead zone and ramp to fit available cursor travel.
 std::pair<int, int> tunedDeadZoneAndRamp(int travelPixels,
                                          int baseDeadZonePixels,
                                          int baseRampDistancePixels) {
+  // Compress dead-zone + ramp into available cursor travel so max speed is still reachable
+  // even when the window is flush against a screen edge.
   const int baseTotal = std::max(1, baseDeadZonePixels + baseRampDistancePixels);
   if (travelPixels <= 0) {
     return {0, 1};
@@ -32,6 +35,7 @@ std::pair<int, int> tunedDeadZoneAndRamp(int travelPixels,
   return {deadZonePixels, rampDistancePixels};
 }
 
+// Computes one-axis auto-scroll step from pointer overflow and ramp config.
 int axisAutoScrollStep(int value,
                        int minValue,
                        int maxValue,
@@ -46,16 +50,17 @@ int axisAutoScrollStep(int value,
   int direction = 0;
   if (value < minValue) {
     distance = minValue - value;
-    direction = 1;
+    direction = 1;   // outside min edge: positive pan delta
   } else if (value > maxValue) {
     distance = value - maxValue;
-    direction = -1;
+    direction = -1;  // outside max edge: negative pan delta
   } else {
     return 0;
   }
 
   const int baseTotal = std::max(1, config.deadZonePixels + config.rampDistancePixels);
   const int rawTravelPixels = (direction > 0) ? travelToMinPixels : travelToMaxPixels;
+  // If monitor travel is unavailable, fall back to the base profile.
   const int travelPixels = (rawTravelPixels > 0) ? rawTravelPixels : baseTotal;
   const auto [deadZonePixels, rampDistancePixels] =
       tunedDeadZoneAndRamp(travelPixels, config.deadZonePixels, config.rampDistancePixels);
@@ -79,12 +84,15 @@ int axisAutoScrollStep(int value,
 
 }  // namespace
 
+// Measures how many pixels the cursor can move from each edge to the screen bounds.
 ScreenEdgeTravelPixels screenEdgeTravelPixels(const QWidget* widget, const QRect& localRect) {
   ScreenEdgeTravelPixels travel;
   if (!widget || localRect.isEmpty()) {
     return travel;
   }
 
+  // Pick the screen that contains the drag region center, then measure available cursor
+  // travel from each edge of that region to the screen bounds.
   const QPoint centerGlobal = widget->mapToGlobal(localRect.center());
   QScreen* screen = QGuiApplication::screenAt(centerGlobal);
   if (!screen) {
@@ -106,6 +114,7 @@ ScreenEdgeTravelPixels screenEdgeTravelPixels(const QWidget* widget, const QRect
   return travel;
 }
 
+// Computes two-axis auto-scroll delta for a pointer relative to drag bounds.
 QPoint edgeAutoScrollDelta(const QPoint& pointerPos,
                            const QRect& boundsRect,
                            const ScreenEdgeTravelPixels& travel,
@@ -114,6 +123,7 @@ QPoint edgeAutoScrollDelta(const QPoint& pointerPos,
     return {};
   }
 
+  // Invalid travel means "unknown screen context"; axisAutoScrollStep will use base tuning.
   const int leftTravel = travel.valid ? travel.left : 0;
   const int rightTravel = travel.valid ? travel.right : 0;
   const int topTravel = travel.valid ? travel.top : 0;
@@ -134,4 +144,3 @@ QPoint edgeAutoScrollDelta(const QPoint& pointerPos,
 }
 
 }  // namespace QtUi
-
