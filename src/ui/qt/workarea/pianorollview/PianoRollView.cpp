@@ -1204,9 +1204,9 @@ QPoint PianoRollView::autoScrollDeltaForGraphDrag(const QPoint& viewportPos) con
     return {};
   }
 
-  constexpr int kMaxAutoScrollStep = 12;
+  constexpr int kMaxAutoScrollStep = 18;
   constexpr int kDeadZonePixels = 40;
-  constexpr int kRampDistancePixels = 320;
+  constexpr int kRampDistancePixels = 260;
   const auto axisDelta = [kMaxAutoScrollStep, kDeadZonePixels, kRampDistancePixels](
                              int value, int minValue, int maxValue) {
     int distance = 0;

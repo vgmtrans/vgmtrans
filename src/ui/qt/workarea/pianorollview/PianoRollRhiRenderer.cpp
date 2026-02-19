@@ -1139,64 +1139,33 @@ void PianoRollRhiRenderer::buildDynamicInstances(const PianoRollFrame::Data& fra
   if (frame.selectionRectVisible && frame.selectionRectW > 0.5f && frame.selectionRectH > 0.5f) {
     const float rawLeft = frame.selectionRectX;
     const float rawTop = frame.selectionRectY;
-    const float rawRight = frame.selectionRectX + frame.selectionRectW;
-    const float rawBottom = frame.selectionRectY + frame.selectionRectH;
+    const float rawW = frame.selectionRectW;
+    const float rawH = frame.selectionRectH;
     const float noteAreaLeft = layout.noteAreaLeft;
     const float noteAreaTop = layout.noteAreaTop;
     const float noteAreaRight = layout.noteAreaLeft + layout.noteAreaWidth;
     const float noteAreaBottom = layout.noteAreaTop + layout.noteAreaHeight;
-    const float clippedLeft = std::max(rawLeft, noteAreaLeft);
-    const float clippedTop = std::max(rawTop, noteAreaTop);
-    const float clippedRight = std::min(rawRight, noteAreaRight);
-    const float clippedBottom = std::min(rawBottom, noteAreaBottom);
-    const float clippedW = clippedRight - clippedLeft;
-    const float clippedH = clippedBottom - clippedTop;
-    if (clippedW > 0.5f && clippedH > 0.5f) {
-      appendRect(m_dynamicInstances,
-                 clippedLeft,
-                 clippedTop,
-                 clippedW,
-                 clippedH,
-                 frame.selectionRectFillColor);
+    const auto appendClippedToNoteArea =
+        [&](float x, float y, float w, float h, const QColor& color) {
+          const float clippedLeft = std::max(x, noteAreaLeft);
+          const float clippedTop = std::max(y, noteAreaTop);
+          const float clippedRight = std::min(x + w, noteAreaRight);
+          const float clippedBottom = std::min(y + h, noteAreaBottom);
+          appendRect(m_dynamicInstances,
+                     clippedLeft,
+                     clippedTop,
+                     clippedRight - clippedLeft,
+                     clippedBottom - clippedTop,
+                     color);
+        };
 
-      const bool drawTopEdge = rawTop >= noteAreaTop && rawTop < noteAreaBottom;
-      const bool drawBottomEdge = rawBottom > noteAreaTop && rawBottom <= noteAreaBottom;
-      const bool drawLeftEdge = rawLeft >= noteAreaLeft && rawLeft < noteAreaRight;
-      const bool drawRightEdge = rawRight > noteAreaLeft && rawRight <= noteAreaRight;
-      const float edge = 1.0f;
-      if (drawTopEdge) {
-        appendRect(m_dynamicInstances,
-                   clippedLeft,
-                   rawTop,
-                   clippedW,
-                   edge,
-                   frame.selectionRectOutlineColor);
-      }
-      if (drawBottomEdge) {
-        appendRect(m_dynamicInstances,
-                   clippedLeft,
-                   rawBottom - edge,
-                   clippedW,
-                   edge,
-                   frame.selectionRectOutlineColor);
-      }
-      if (drawLeftEdge) {
-        appendRect(m_dynamicInstances,
-                   rawLeft,
-                   clippedTop,
-                   edge,
-                   clippedH,
-                   frame.selectionRectOutlineColor);
-      }
-      if (drawRightEdge) {
-        appendRect(m_dynamicInstances,
-                   rawRight - edge,
-                   clippedTop,
-                   edge,
-                   clippedH,
-                   frame.selectionRectOutlineColor);
-      }
-    }
+    appendClippedToNoteArea(rawLeft, rawTop, rawW, rawH, frame.selectionRectFillColor);
+
+    const float edge = 1.0f;
+    appendClippedToNoteArea(rawLeft, rawTop, rawW, edge, frame.selectionRectOutlineColor);
+    appendClippedToNoteArea(rawLeft, rawTop + rawH - edge, rawW, edge, frame.selectionRectOutlineColor);
+    appendClippedToNoteArea(rawLeft, rawTop, edge, rawH, frame.selectionRectOutlineColor);
+    appendClippedToNoteArea(rawLeft + rawW - edge, rawTop, edge, rawH, frame.selectionRectOutlineColor);
   }
 
   const float blackKeyWidth = std::max(10.0f, layout.keyboardWidth * 0.63f);
