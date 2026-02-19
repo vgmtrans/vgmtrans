@@ -91,6 +91,8 @@ add_executable(
   widgets/TableView.h
   widgets/TitleBar.cpp
   widgets/TitleBar.h
+  workarea/common/DragAutoScroll.cpp
+  workarea/common/DragAutoScroll.h
   workarea/activenoteview/ActiveNoteFrameData.h
   workarea/activenoteview/ActiveNoteRhiHost.cpp
   workarea/activenoteview/ActiveNoteRhiHost.h

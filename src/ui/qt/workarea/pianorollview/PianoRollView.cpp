@@ -6,6 +6,7 @@
 
 #include "PianoRollView.h"
 
+#include "common/DragAutoScroll.h"
 #include "PianoRollRhiHost.h"
 #include "PianoRollZoomScrollBar.h"
 
@@ -27,7 +28,6 @@
 #include <QPalette>
 #include <QRectF>
 #include <QResizeEvent>
-#include <QScreen>
 #include <QScrollBar>
 #include <QShowEvent>
 #include <QTimer>
@@ -1205,88 +1205,10 @@ QPoint PianoRollView::autoScrollDeltaForGraphDrag(const QPoint& viewportPos) con
     return {};
   }
 
-  constexpr int kMaxAutoScrollStep = 18;
-  constexpr int kBaseDeadZonePixels = 40;
-  constexpr int kBaseRampDistancePixels = 260;
-  constexpr int kBaseTuningDistancePixels = kBaseDeadZonePixels + kBaseRampDistancePixels;
+  static constexpr QtUi::AutoScrollRampConfig kAutoScrollRampConfig{18, 40, 260};
 
-  int leftTravelPixels = kBaseTuningDistancePixels;
-  int rightTravelPixels = kBaseTuningDistancePixels;
-  int topTravelPixels = kBaseTuningDistancePixels;
-  int bottomTravelPixels = kBaseTuningDistancePixels;
-  if (viewport()) {
-    const QPoint graphCenterGlobal = viewport()->mapToGlobal(graphRect.center());
-    QScreen* screen = QGuiApplication::screenAt(graphCenterGlobal);
-    if (!screen) {
-      screen = QGuiApplication::primaryScreen();
-    }
-    if (screen) {
-      const QRect screenGeometry = screen->geometry();
-      const QPoint graphTopLeftGlobal = viewport()->mapToGlobal(graphRect.topLeft());
-      const QPoint graphBottomRightGlobal = viewport()->mapToGlobal(graphRect.bottomRight());
-      leftTravelPixels = std::max(0, graphTopLeftGlobal.x() - screenGeometry.left());
-      rightTravelPixels = std::max(0, screenGeometry.right() - graphBottomRightGlobal.x());
-      topTravelPixels = std::max(0, graphTopLeftGlobal.y() - screenGeometry.top());
-      bottomTravelPixels = std::max(0, screenGeometry.bottom() - graphBottomRightGlobal.y());
-    }
-  }
-
-  const auto tunedDeadZoneAndRamp = [kBaseDeadZonePixels, kBaseTuningDistancePixels](int travelPixels) {
-    if (travelPixels <= 0) {
-      return std::pair<int, int>{0, 1};
-    }
-
-    const int total = std::min(travelPixels, kBaseTuningDistancePixels);
-    int deadZonePixels = (kBaseDeadZonePixels * total) / kBaseTuningDistancePixels;
-    deadZonePixels = std::clamp(deadZonePixels, 0, std::max(0, total - 1));
-    const int rampDistancePixels = std::max(1, total - deadZonePixels);
-    return std::pair<int, int>{deadZonePixels, rampDistancePixels};
-  };
-
-  const auto axisDelta = [kMaxAutoScrollStep, &tunedDeadZoneAndRamp](
-                             int value, int minValue, int maxValue, int travelToMinPixels, int travelToMaxPixels) {
-    int distance = 0;
-    int direction = 0;
-    if (value < minValue) {
-      distance = minValue - value;
-      direction = 1;
-    } else if (value > maxValue) {
-      distance = value - maxValue;
-      direction = -1;
-    } else {
-      return 0;
-    }
-
-    const int travelPixels = (direction > 0) ? travelToMinPixels : travelToMaxPixels;
-    const auto [deadZonePixels, rampDistancePixels] = tunedDeadZoneAndRamp(travelPixels);
-    if (distance <= deadZonePixels) {
-      return 0;
-    }
-
-    const int effectiveDistance = distance - deadZonePixels;
-    if (rampDistancePixels <= 1) {
-      return direction * kMaxAutoScrollStep;
-    }
-
-    const int rampedDistance = std::min(effectiveDistance, rampDistancePixels);
-    const int step = 1 + ((rampedDistance - 1) * (kMaxAutoScrollStep - 1)) / (rampDistancePixels - 1);
-    if (step <= 0) {
-      return 0;
-    }
-
-    return direction * step;
-  };
-
-  return QPoint(axisDelta(viewportPos.x(),
-                          graphRect.left(),
-                          graphRect.right(),
-                          leftTravelPixels,
-                          rightTravelPixels),
-                axisDelta(viewportPos.y(),
-                          graphRect.top(),
-                          graphRect.bottom(),
-                          topTravelPixels,
-                          bottomTravelPixels));
+  const QtUi::ScreenEdgeTravelPixels travel = QtUi::screenEdgeTravelPixels(viewport(), graphRect);
+  return QtUi::edgeAutoScrollDelta(viewportPos, graphRect, travel, kAutoScrollRampConfig);
 }
 
 int PianoRollView::clampTick(int tick) const {
