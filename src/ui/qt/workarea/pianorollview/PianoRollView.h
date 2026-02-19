@@ -10,6 +10,7 @@
 #include <QBasicTimer>
 #include <QElapsedTimer>
 #include <QPoint>
+#include <QPointF>
 #include <QtGlobal>
 
 #include <array>
@@ -23,7 +24,6 @@
 #include "SeqEventTimeIndex.h"
 
 class QEvent;
-class QPointF;
 class QRect;
 class QRectF;
 class QKeyEvent;
@@ -140,7 +140,8 @@ private:
   [[nodiscard]] QPoint viewportPosFromGlobal(const QPointF& globalPos) const;
   [[nodiscard]] QPoint graphWorldPosFromViewport(const QPoint& viewportPos) const;
   [[nodiscard]] QPoint graphViewportPosFromWorld(const QPoint& worldPos) const;
-  [[nodiscard]] QPoint autoScrollDeltaForGraphDrag(const QPoint& viewportPos) const;
+  [[nodiscard]] QPointF autoScrollDeltaForGraphDrag(const QPoint& viewportPos) const;
+  QPoint consumeAutoScrollDelta(const QPointF& dragDelta);
   int clampTick(int tick) const;
   int tickFromViewportX(int x) const;
   int scanlinePixelX(int tick) const;
@@ -221,6 +222,7 @@ private:
   QPoint m_noteSelectionAnchor;
   QPoint m_noteSelectionCurrent;
   QPoint m_noteSelectionAnchorWorld;
+  QPointF m_noteSelectionAutoScrollRemainder;
   QPoint m_panDragLastPos;
   bool m_noteSelectionAnchorWorldValid = false;
   QBasicTimer m_noteSelectionAutoScrollTimer;
