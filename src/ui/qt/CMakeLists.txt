@@ -47,6 +47,7 @@ target_sources(vgmtrans
     widgets/ToastHost.cpp
     widgets/TableView.cpp
     widgets/TitleBar.cpp
+    workarea/common/DragAutoScroll.cpp
     workarea/activenoteview/ActiveNoteRhiHost.cpp
     workarea/activenoteview/ActiveNoteRhiRenderer.cpp
     workarea/activenoteview/ActiveNoteRhiWidget.cpp
@@ -121,6 +122,7 @@ target_sources(vgmtrans
       workarea/VGMFileListView.h
       workarea/VGMFileTreeView.h
       workarea/VGMFileView.h
+      workarea/common/DragAutoScroll.h
       workarea/activenoteview/ActiveNoteFrameData.h
       workarea/activenoteview/ActiveNoteRhiHost.h
       workarea/activenoteview/ActiveNoteRhiRenderer.h
