@@ -1273,18 +1273,13 @@ QRectF PianoRollView::graphSelectionRectInViewport() const {
     return {};
   }
 
-  const float leftLimit = static_cast<float>(graphRect.left());
-  const float topLimit = static_cast<float>(graphRect.top());
-  const float rightLimit = leftLimit + static_cast<float>(graphRect.width());
-  const float bottomLimit = topLimit + static_cast<float>(graphRect.height());
-
   const QPoint anchorViewport = m_noteSelectionAnchorWorldValid
                                     ? graphViewportPosFromWorld(m_noteSelectionAnchorWorld)
                                     : m_noteSelectionAnchor;
-  const float anchorX = std::clamp(static_cast<float>(anchorViewport.x()), leftLimit, rightLimit);
-  const float anchorY = std::clamp(static_cast<float>(anchorViewport.y()), topLimit, bottomLimit);
-  const float currentX = std::clamp(static_cast<float>(m_noteSelectionCurrent.x()), leftLimit, rightLimit);
-  const float currentY = std::clamp(static_cast<float>(m_noteSelectionCurrent.y()), topLimit, bottomLimit);
+  const float anchorX = static_cast<float>(anchorViewport.x());
+  const float anchorY = static_cast<float>(anchorViewport.y());
+  const float currentX = static_cast<float>(m_noteSelectionCurrent.x());
+  const float currentY = static_cast<float>(m_noteSelectionCurrent.y());
 
   const float left = std::min(anchorX, currentX);
   const float top = std::min(anchorY, currentY);
