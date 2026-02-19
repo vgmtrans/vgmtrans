@@ -63,6 +63,7 @@ target_sources(vgmtrans
     widgets/TitleBar.cpp
     widgets/Windows11ProxyStyle.cpp
     widgets/WindowBar.cpp
+    workarea/common/DragAutoScroll.cpp
     workarea/activenoteview/ActiveNoteRhiHost.cpp
     workarea/activenoteview/ActiveNoteRhiRenderer.cpp
     workarea/activenoteview/ActiveNoteRhiWidget.cpp
@@ -143,6 +144,7 @@ target_sources(vgmtrans
       workarea/VGMFileListView.h
       workarea/VGMFileTreeView.h
       workarea/VGMFileView.h
+      workarea/common/DragAutoScroll.h
       workarea/activenoteview/ActiveNoteFrameData.h
       workarea/activenoteview/ActiveNoteRhiHost.h
       workarea/activenoteview/ActiveNoteRhiRenderer.h
