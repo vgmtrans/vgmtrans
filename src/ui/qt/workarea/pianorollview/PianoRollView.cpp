@@ -533,7 +533,7 @@ bool PianoRollView::handleViewportMousePress(QMouseEvent* event) {
   }
 
   const Qt::KeyboardModifiers activeModifiers = mergedModifiers(event->modifiers());
-  const QPoint pos = event->position().toPoint();
+  const QPoint pos = viewportPosFromGlobal(event->globalPosition());
   if (activeModifiers.testFlag(Qt::AltModifier)) {
     clearPreviewNotes();
     m_seekDragActive = false;
@@ -588,14 +588,17 @@ bool PianoRollView::handleViewportMouseMove(QMouseEvent* event) {
   }
 
   const Qt::KeyboardModifiers activeModifiers = mergedModifiers(event->modifiers());
+  // Some RHI backends can report empty event->buttons() when dragging leaves
+  // the render surface. Merge with global button state to keep drags active.
+  const Qt::MouseButtons activeButtons = event->buttons() | QGuiApplication::mouseButtons();
   if (m_panDragActive) {
-    if (!(event->buttons() & Qt::LeftButton)) {
+    if (!(activeButtons & Qt::LeftButton)) {
       setPanDragActive(false, activeModifiers);
       event->accept();
       return true;
     }
 
-    const QPoint pos = event->position().toPoint();
+    const QPoint pos = viewportPosFromGlobal(event->globalPosition());
     const QPoint dragDelta = pos - m_panDragLastPos;
     m_panDragLastPos = pos;
     applyPanDragDelta(dragDelta);
@@ -605,7 +608,13 @@ bool PianoRollView::handleViewportMouseMove(QMouseEvent* event) {
   }
 
   if (m_seekDragActive) {
-    const QPoint pos = event->position().toPoint();
+    if (!(activeButtons & Qt::LeftButton)) {
+      m_seekDragActive = false;
+      event->accept();
+      return true;
+    }
+
+    const QPoint pos = viewportPosFromGlobal(event->globalPosition());
     m_currentTick = tickFromViewportX(pos.x());
     updateActiveKeyStates();
     requestRender();
@@ -620,7 +629,7 @@ bool PianoRollView::handleViewportMouseMove(QMouseEvent* event) {
     return false;
   }
 
-  if (!(event->buttons() & Qt::LeftButton)) {
+  if (!(activeButtons & Qt::LeftButton)) {
     m_noteSelectionPressActive = false;
     m_noteSelectionDragging = false;
     clearPreviewNotes();
@@ -630,7 +639,7 @@ bool PianoRollView::handleViewportMouseMove(QMouseEvent* event) {
     return true;
   }
 
-  const QPoint pos = event->position().toPoint();
+  const QPoint pos = viewportPosFromGlobal(event->globalPosition());
   m_noteSelectionCurrent = pos;
   const QPoint dragDelta = m_noteSelectionCurrent - m_noteSelectionAnchor;
   const bool movedEnough = std::abs(dragDelta.x()) >= 2 || std::abs(dragDelta.y()) >= 2;
@@ -639,6 +648,7 @@ bool PianoRollView::handleViewportMouseMove(QMouseEvent* event) {
   }
 
   if (m_noteSelectionDragging) {
+    applyPanDragDelta(autoScrollDeltaForGraphDrag(pos));
     updateMarqueeSelection(false);
     updateMarqueePreview(pos);
     requestRenderCoalesced();
@@ -664,7 +674,7 @@ bool PianoRollView::handleViewportMouseRelease(QMouseEvent* event) {
   }
 
   if (m_seekDragActive) {
-    const QPoint pos = event->position().toPoint();
+    const QPoint pos = viewportPosFromGlobal(event->globalPosition());
     m_currentTick = tickFromViewportX(pos.x());
     m_seekDragActive = false;
     updateActiveKeyStates();
@@ -678,7 +688,7 @@ bool PianoRollView::handleViewportMouseRelease(QMouseEvent* event) {
     return false;
   }
 
-  const QPoint pos = event->position().toPoint();
+  const QPoint pos = viewportPosFromGlobal(event->globalPosition());
   m_noteSelectionCurrent = pos;
   if (m_noteSelectionDragging) {
     updateMarqueeSelection(false);
@@ -1114,6 +1124,38 @@ void PianoRollView::scheduleCoalescedRender(int delayMs) {
     m_coalescedRenderPending = false;
     requestRender();
   });
+}
+
+QPoint PianoRollView::viewportPosFromGlobal(const QPointF& globalPos) const {
+  const QPoint globalPoint = globalPos.toPoint();
+  if (m_rhiHost) {
+    return m_rhiHost->mapFromGlobal(globalPoint);
+  }
+  if (viewport()) {
+    return viewport()->mapFromGlobal(globalPoint);
+  }
+  return globalPoint;
+}
+
+QPoint PianoRollView::autoScrollDeltaForGraphDrag(const QPoint& viewportPos) const {
+  const QRect graphRect = graphRectInViewport();
+  if (graphRect.isEmpty()) {
+    return {};
+  }
+
+  constexpr int kMaxAutoScrollStep = 12;
+  const auto axisDelta = [kMaxAutoScrollStep](int value, int minValue, int maxValue) {
+    if (value < minValue) {
+      return std::clamp(minValue - value, 1, kMaxAutoScrollStep);
+    }
+    if (value > maxValue) {
+      return -std::clamp(value - maxValue, 1, kMaxAutoScrollStep);
+    }
+    return 0;
+  };
+
+  return QPoint(axisDelta(viewportPos.x(), graphRect.left(), graphRect.right()),
+                axisDelta(viewportPos.y(), graphRect.top(), graphRect.bottom()));
 }
 
 int PianoRollView::clampTick(int tick) const {
