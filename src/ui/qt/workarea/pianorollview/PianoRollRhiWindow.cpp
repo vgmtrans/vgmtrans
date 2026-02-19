@@ -45,7 +45,10 @@ bool PianoRollRhiWindow::handleWindowEvent(QEvent* e) {
     case QEvent::MouseButtonPress:
       return m_view->handleViewportMousePress(static_cast<QMouseEvent*>(e));
     case QEvent::MouseMove:
-      return m_view->handleViewportMouseMove(static_cast<QMouseEvent*>(e));
+      m_inputCoalescer.queueMouseMove(static_cast<QMouseEvent*>(e));
+      requestUpdate();
+      e->accept();
+      return true;
     case QEvent::MouseButtonRelease:
       return m_view->handleViewportMouseRelease(static_cast<QMouseEvent*>(e));
     default:
@@ -129,6 +132,18 @@ bool PianoRollRhiWindow::handleWheelEvent(QWheelEvent* wheel) {
 void PianoRollRhiWindow::drainPendingInput() {
   if (!m_view || !m_view->viewport()) {
     return;
+  }
+
+  PianoRollRhiInputCoalescer::MouseMoveBatch mouseMoveBatch;
+  if (m_inputCoalescer.takePendingMouseMove(mouseMoveBatch)) {
+    const QPoint viewportPos = m_view->viewport()->mapFromGlobal(mouseMoveBatch.globalPos.toPoint());
+    QMouseEvent mouseEvent(QEvent::MouseMove,
+                           QPointF(viewportPos),
+                           mouseMoveBatch.globalPos,
+                           Qt::NoButton,
+                           mouseMoveBatch.buttons,
+                           mouseMoveBatch.modifiers);
+    m_view->handleViewportMouseMove(&mouseEvent);
   }
 
   PianoRollRhiInputCoalescer::ZoomBatch zoomBatch;

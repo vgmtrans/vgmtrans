@@ -8,6 +8,7 @@
 
 #include <QRhiWidget>
 
+#include "PianoRollRhiInputCoalescer.h"
 #include "PianoRollRhiRenderer.h"
 
 class QMouseEvent;
@@ -41,4 +42,5 @@ private:
   // Non-owning pointers; host controls their lifetime.
   PianoRollView* m_view = nullptr;
   PianoRollRhiRenderer* m_renderer = nullptr;
+  PianoRollRhiInputCoalescer m_inputCoalescer;
 };
