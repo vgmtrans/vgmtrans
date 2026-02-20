@@ -73,6 +73,7 @@ void PlayerService::stop() {
   statusChange(false);
 }
 
+// Seek using sample-domain coordinates and publish both sample and tick positions.
 void PlayerService::seekSamples(int position, PositionChangeOrigin origin) {
   player.seek(position);
   const int currentSamples = elapsedSamples();
@@ -84,10 +85,12 @@ void PlayerService::seekSamples(int position, PositionChangeOrigin origin) {
   playbackPositionChanged(currentSamples, maxSamples, origin);
 }
 
+// Seek using tick-domain coordinates by converting to samples first.
 void PlayerService::seekTicks(int position, PositionChangeOrigin origin) {
   seekSamples(player.samplesFromTicks(position), origin);
 }
 
+// Backward-compatible seek entry point that keeps legacy callers sample-based.
 void PlayerService::seek(int position, PositionChangeOrigin origin) {
   seekSamples(position, origin);
 }
@@ -104,10 +107,12 @@ int PlayerService::totalSamples() const {
     return static_cast<int>(player.totalSamples());
 }
 
+// Expose current playback position in ticks for timeline-driven UI features.
 int PlayerService::elapsedTicks() const {
   return static_cast<int>(player.elapsedTicks());
 }
 
+// Expose total sequence length in ticks for tick-domain ranges.
 int PlayerService::totalTicks() const {
   return static_cast<int>(player.totalTicks());
 }

@@ -104,10 +104,12 @@ void VSTSequencePlayer::play() {
   state.musicState = MusicState::Playing;
 }
 
+// Current playback position in samples.
 int VSTSequencePlayer::elapsedSamples() const {
   return static_cast<int>(state.samplesOffset);
 }
 
+// End-of-song position in samples.
 int VSTSequencePlayer::totalSamples() const {
   if (state.eventSampleOffsets.empty()) {
     return 0;
@@ -115,10 +117,12 @@ int VSTSequencePlayer::totalSamples() const {
   return state.eventSampleOffsets.back();
 }
 
+// Convert current sample position back into ticks for tick-domain consumers.
 int VSTSequencePlayer::elapsedTicks() const {
   return ticksFromSamples(elapsedSamples());
 }
 
+// End-of-song position in ticks, derived from the last MIDI event.
 int VSTSequencePlayer::totalTicks() const {
   if (state.events.empty()) {
     return 0;
@@ -126,6 +130,7 @@ int VSTSequencePlayer::totalTicks() const {
   return static_cast<int>(state.events.back()->absTime);
 }
 
+// Map tick -> sample using precomputed tempo segments and binary search.
 int VSTSequencePlayer::samplesFromTicks(int ticks) const {
   if (ticks <= 0 || state.tempoSegmentStartTicks.empty()) {
     return 0;
@@ -155,6 +160,7 @@ int VSTSequencePlayer::samplesFromTicks(int ticks) const {
   return static_cast<int>(sampleOffset);
 }
 
+// Map sample -> tick using precomputed tempo segments and binary search.
 int VSTSequencePlayer::ticksFromSamples(int samples) const {
   if (samples <= 0 || state.tempoSegmentStartSamples.empty()) {
     return 0;
@@ -218,6 +224,7 @@ void VSTSequencePlayer::seek(int samples) {
   // Calculate the offset of the event by doing some arithmetic on the iterator
   int index = std::distance(state.eventSampleOffsets.begin(), it);
   state.eventOffset = index;
+  // Keep exact user-requested sample position; eventOffset only anchors event iteration.
   state.samplesOffset = static_cast<uint32_t>(targetSample);
 
   // Iterate from the beginning of the sequence to the seek point. Record every relevant event
@@ -517,6 +524,7 @@ void VSTSequencePlayer::populateFileMidiBuffer(const uint8_t* fileData, uint32_t
 }
 
 void VSTSequencePlayer::clearState() {
+  // Reset all playback and tempo-mapping state before loading a new sequence.
   state.events.clear();
   state.eventSampleOffsets.clear();
   state.tempoSegmentStartTicks.clear();
@@ -582,6 +590,7 @@ bool VSTSequencePlayer::prepMidiPlayback(const VGMColl* coll) {
 }
 
 std::vector<int> VSTSequencePlayer::generateEventSampleTimes(vector<MidiEvent*>& events, int ppqn) {
+  // Build a compact tempo map so tick<->sample conversion can run in O(log tempo_changes).
   state.tempoSegmentStartTicks.clear();
   state.tempoSegmentStartSamples.clear();
   state.tempoSegmentSamplesPerTick.clear();
@@ -624,6 +633,7 @@ std::vector<int> VSTSequencePlayer::generateEventSampleTimes(vector<MidiEvent*>&
 
     currentSegmentTick = eventTick;
     currentSegmentSample = eventSample;
+    // Multiple tempo events can land on the same tick; keep one segment per tick.
     if (state.tempoSegmentStartTicks.back() == currentSegmentTick) {
       state.tempoSegmentStartSamples.back() = currentSegmentSample;
       state.tempoSegmentSamplesPerTick.back() = samplesPerTick;
