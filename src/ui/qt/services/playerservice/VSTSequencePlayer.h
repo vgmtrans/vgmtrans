@@ -30,9 +30,12 @@ struct PlaybackState {
   std::unique_ptr<MidiFile> midiFile;
   std::vector<MidiEvent*> events;
   std::vector<int> eventSampleOffsets;
-  uint32_t samplesOffset;
-  uint32_t eventOffset;
-  double sampleRate;
+  std::vector<int> tempoSegmentStartTicks;
+  std::vector<double> tempoSegmentStartSamples;
+  std::vector<double> tempoSegmentSamplesPerTick;
+  uint32_t samplesOffset = 0;
+  uint32_t eventOffset = 0;
+  double sampleRate = 44100.0;
   MusicState musicState = MusicState::Unloaded;
 };
 
@@ -64,18 +67,20 @@ public:
   void pause();
   void play();
   void seek(int samples);
+  int samplesFromTicks(int ticks) const;
+  int ticksFromSamples(int samples) const;
 
   bool isPlaying() const {
     return state.musicState == MusicState::Playing;
   }
 
-  int elapsedSamples() const {
-    return state.samplesOffset;
-  };
+  int elapsedSamples() const;
 
-  int totalSamples() const {
-    return state.eventSampleOffsets.back();
-  };
+  int totalSamples() const;
+
+  int elapsedTicks() const;
+
+  int totalTicks() const;
 
   void setSongEndCallback(std::function<void()> callback);
 
@@ -88,7 +93,7 @@ private:
   bool prepMidiPlayback(const VGMColl *coll);
   bool sendSF2ToVST(const VGMColl* coll);
   bool sendOpmToVST(const VGMColl* coll);
-  std::vector<int> generateEventSampleTimes(std::vector<MidiEvent*>& events, int ppqn) const;
+  std::vector<int> generateEventSampleTimes(std::vector<MidiEvent*>& events, int ppqn);
   juce::MidiMessage convertToChannelGroupMessage(MidiEvent* event) const;
   juce::MidiMessage convertToJuceMidiMessage(MidiEvent* event) const;
   void populateMidiBuffer(juce::MidiBuffer& midiBuffer, int samples);

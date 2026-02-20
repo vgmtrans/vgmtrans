@@ -74,7 +74,7 @@ VGMFileView::VGMFileView(VGMFile *vgmfile)
   connect(new QShortcut(QKeySequence(Qt::CTRL | Qt::Key_0), this), &QShortcut::activated,
           this, &VGMFileView::resetHexViewFont);
 
-  connect(PlayerService::getInstance(), &PlayerService::playbackPositionChanged,
+  connect(PlayerService::getInstance(), &PlayerService::playbackTickPositionChanged,
           this, &VGMFileView::onPlaybackPositionChanged);
   connect(PlayerService::getInstance(), &PlayerService::statusChange,
           this, &VGMFileView::onPlayerStatusChanged);
@@ -194,7 +194,7 @@ void VGMFileView::seekToEvent(VGMItem* item) const {
     return;
   }
 
-  PlayerService::getInstance()->seek(static_cast<int>(tick), PositionChangeOrigin::HexView);
+  PlayerService::getInstance()->seekTicks(static_cast<int>(tick), PositionChangeOrigin::HexView);
 }
 
 void VGMFileView::onPlaybackPositionChanged(int current, int max, PositionChangeOrigin origin) {

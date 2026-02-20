@@ -77,7 +77,7 @@ void IconBar::setupControls() {
   layout()->addWidget(m_title);
 
   connect(PlayerService::getInstance(), &PlayerService::statusChange, this, &IconBar::playerStatusChanged);
-  connect(PlayerService::getInstance(), &PlayerService::playbackPositionChanged, this, &IconBar::playbackRangeUpdate);
+  connect(PlayerService::getInstance(), &PlayerService::playbackSamplePositionChanged, this, &IconBar::playbackRangeUpdate);
 }
 
 void IconBar::showPlayInfo() {
