@@ -187,8 +187,8 @@ void VGMCollListView::keyPressEvent(QKeyEvent *e) {
 void VGMCollListView::handlePlaybackRequest() {
   QModelIndexList list = this->selectionModel()->selectedIndexes();
   if (list.empty() || list[0].row() >= model()->rowCount()) {
-    if (PlayerService::getInstance().activeCollection() != nullptr) {
-      PlayerService::getInstance().toggle();
+    if (PlayerService::getInstance()->activeCollection() != nullptr) {
+      PlayerService::getInstance()->toggle();
       return;
     }
     nothingToPlay();

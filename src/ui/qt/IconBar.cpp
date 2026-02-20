@@ -103,11 +103,11 @@ void IconBar::playerStatusChanged(bool playing) const {
     m_title->setText("Playing: " + PlayerService::getInstance()->songTitle());
   } else {
     m_play->setIcon(s_playicon);
-    const bool hasActive = SequencePlayer::the().activeCollection() != nullptr;
+    const bool hasActive = PlayerService::getInstance()->activeCollection() != nullptr;
     m_stop->setEnabled(hasActive);
     m_slider->setEnabled(hasActive);
     if (hasActive) {
-      m_title->setText("Paused: " + SequencePlayer::the().songTitle());
+      m_title->setText("Paused: " + PlayerService::getInstance()->songTitle());
     } else {
       m_title->setText("Playback interrupted");
     }

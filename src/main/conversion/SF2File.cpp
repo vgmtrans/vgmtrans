@@ -469,15 +469,14 @@ SF2File::SF2File(SynthFile *synthfile)
   this->addChildChunk(pdtaCk);
 }
 
-uint8_t* SF2File::saveToMem() {
-  auto buf = new uint8_t[size()];
-  write(buf);
+std::vector<uint8_t> SF2File::saveToMem() {
+  std::vector<uint8_t> buf(size());
+  write(buf.data());
   return buf;
 }
 
 bool SF2File::saveSF2File(const std::filesystem::path &filepath) {
   auto buf = saveToMem();
-  bool result = pRoot->UI_writeBufferToFile(filepath, buf, size());
-  delete[] buf;
+  bool result = pRoot->UI_writeBufferToFile(filepath, buf.data(), buf.size());
   return result;
 }

@@ -26,11 +26,9 @@ PlayerService::PlayerService() {
   m_seekupdate_timer = new QTimer(this);
   connect(m_seekupdate_timer, &QTimer::timeout, [this]() {
     if (playing()) {
-      // playbackPositionChanged(elapsedTicks(), totalTicks(), PositionChangeOrigin::Playback);
-      playbackPositionChanged(elapsedSamples(), totalSamples());
+      playbackPositionChanged(elapsedSamples(), totalSamples(), PositionChangeOrigin::Playback);
     }
   });
-  //  m_seekupdate_timer->start(TICK_POLL_INTERVAL_MS);
   m_seekupdate_timer->start(TICK_POLL_INTERVAL_MS);
 
   connect(&qtVGMRoot, &QtVGMRoot::UI_removeVGMColl, this, [this](VGMColl* coll) {
