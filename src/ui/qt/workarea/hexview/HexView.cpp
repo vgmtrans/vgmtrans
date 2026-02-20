@@ -264,6 +264,10 @@ int HexView::hexXOffset() const {
   return m_shouldDrawOffset ? ((NUM_ADDRESS_NIBBLES + ADDRESS_SPACING_CHARS) * m_charWidth) : 0;
 }
 
+HexView::DragMode HexView::dragModeForModifiers(Qt::KeyboardModifiers mods) {
+  return mods.testFlag(HexViewInput::kModifier) ? DragMode::SeekScrub : DragMode::Selection;
+}
+
 // Compute total virtual content height in pixels.
 int HexView::getVirtualHeight() const {
   return m_lineHeight * getTotalLines();
@@ -734,14 +738,13 @@ bool HexView::viewportEvent(QEvent* event) {
     auto* helpEvent = static_cast<QHelpEvent*>(event);
     const int offset = getOffsetFromPoint(helpEvent->pos());
     if (offset < 0) {
-      QToolTip::hideText();
+      hideTooltip();
       return true;
     }
     if (VGMItem* item = m_vgmfile->getItemAtOffset(offset, false)) {
-      const QString description = getFullDescriptionForTooltip(item);
-      if (!description.isEmpty()) {
-        QToolTip::showText(helpEvent->globalPos(), description, this);
-      }
+      showTooltip(item, helpEvent->pos());
+    } else {
+      hideTooltip();
     }
     return true;
   }
@@ -852,7 +855,7 @@ void HexView::changeEvent(QEvent* event) {
   QAbstractScrollArea::changeEvent(event);
 }
 
-// Handle keyboard navigation between adjacent items and modifier-driven tooltip refresh.
+// Handle keyboard navigation between adjacent items.
 void HexView::keyPressEvent(QKeyEvent* event) {
   if (!m_selectedItem) {
     QAbstractScrollArea::keyPressEvent(event);
@@ -861,10 +864,6 @@ void HexView::keyPressEvent(QKeyEvent* event) {
 
   uint32_t newOffset = 0;
   switch (event->key()) {
-    case HexViewInput::kModifierKey:
-      handleTooltipHoverMove(viewport()->mapFromGlobal(QCursor::pos()),
-                             QApplication::keyboardModifiers());
-      break;
     case Qt::Key_Up:
       newOffset = m_selectedOffset - BYTES_PER_LINE;
       goto selectNewOffset;
@@ -908,14 +907,6 @@ void HexView::keyPressEvent(QKeyEvent* event) {
   }
 }
 
-// Hide modifier tooltip affordance when seek modifier key is released.
-void HexView::keyReleaseEvent(QKeyEvent* event) {
-  if (event->key() == HexViewInput::kModifierKey) {
-    hideTooltip();
-  }
-  QAbstractScrollArea::keyReleaseEvent(event);
-}
-
 // Map viewport position to file byte offset across hex/ascii columns; return -1 if invalid.
 int HexView::getOffsetFromPoint(QPoint pos) const {
   const int y = pos.y() + verticalScrollBar()->value();
@@ -947,38 +938,82 @@ int HexView::getOffsetFromPoint(QPoint pos) const {
   return offset;
 }
 
+void HexView::handleSeekPress(VGMItem* item, const QPoint& pos) {
+  if (item) {
+    if (item != m_lastSeekItem) {
+      m_lastSeekItem = item;
+      seekToEventRequested(item);
+    }
+    showTooltip(item, pos);
+  } else {
+    hideTooltip();
+  }
+}
+
+void HexView::handleSelectionPress(int offset, VGMItem* item) {
+  if (offset == -1) {
+    selectionChanged(nullptr);
+    return;
+  }
+
+  m_selectedOffset = offset;
+  if (item == m_selectedItem) {
+    selectionChanged(nullptr);
+  } else {
+    selectionChanged(item);
+  }
+  hideTooltip();
+}
+
+void HexView::handleSeekScrubDrag(int offset) {
+  if (offset >= 0) {
+    if (auto* item = m_vgmfile->getItemAtOffset(offset, false)) {
+      if (item != m_lastSeekItem) {
+        m_lastSeekItem = item;
+        seekToEventRequested(item);
+      }
+    }
+  }
+  hideTooltip();
+}
+
+void HexView::handleSelectionDrag(int offset) {
+  if (offset == -1) {
+    selectionChanged(nullptr);
+    hideTooltip();
+    return;
+  }
+
+  m_selectedOffset = offset;
+  if (m_selectedItem && (m_selectedOffset >= m_selectedItem->offset()) &&
+      (m_selectedOffset < (m_selectedItem->offset() + m_selectedItem->length()))) {
+    hideTooltip();
+    return;
+  }
+
+  auto* item = m_vgmfile->getItemAtOffset(offset, false);
+  if (item != m_selectedItem) {
+    selectionChanged(item);
+  }
+  hideTooltip();
+}
+
 // Handle click-to-select and modifier-drag seek behavior.
 void HexView::mousePressEvent(QMouseEvent* event) {
   if (event->button() == Qt::LeftButton) {
     const int offset = getOffsetFromPoint(event->pos());
     auto* item = m_vgmfile->getItemAtOffset(offset, false);
-    const bool seekModifier = event->modifiers().testFlag(HexViewInput::kModifier);
-    if (seekModifier) {
-      if (item) {
-        if (item != m_lastSeekItem) {
-          m_lastSeekItem = item;
-          seekToEventRequested(item);
-        }
-        showTooltip(item, event->pos());
-      } else {
-        hideTooltip();
-      }
+    const DragMode mode = dragModeForModifiers(event->modifiers());
+    if (mode == DragMode::SeekScrub) {
+      handleSeekPress(item, event->pos());
       m_isDragging = true;
       QAbstractScrollArea::mousePressEvent(event);
       return;
     }
+    handleSelectionPress(offset, item);
     if (offset == -1) {
-      selectionChanged(nullptr);
       return;
     }
-
-    m_selectedOffset = offset;
-    if (item == m_selectedItem) {
-      selectionChanged(nullptr);
-    } else {
-      selectionChanged(item);
-    }
-    hideTooltip();
     m_isDragging = true;
   }
 
@@ -1000,37 +1035,18 @@ void HexView::mouseReleaseEvent(QMouseEvent* event) {
 void HexView::handleCoalescedMouseMove(const QPoint& pos,
                               Qt::MouseButtons buttons,
                               Qt::KeyboardModifiers mods) {
-  if (m_isDragging && buttons & Qt::LeftButton) {
-    const int offset = getOffsetFromPoint(pos);
-    if (offset == -1) {
-      if (!mods.testFlag(HexViewInput::kModifier)) {
-        selectionChanged(nullptr);
-      }
-      hideTooltip();
-      return;
-    }
+  if (!(m_isDragging && (buttons & Qt::LeftButton))) {
+    return;
+  }
 
-    if (mods.testFlag(HexViewInput::kModifier)) {
-      if (auto* item = m_vgmfile->getItemAtOffset(offset, false)) {
-        if (item != m_lastSeekItem) {
-          m_lastSeekItem = item;
-          seekToEventRequested(item);
-        }
-      }
-      hideTooltip();
+  const int offset = getOffsetFromPoint(pos);
+  switch (dragModeForModifiers(mods)) {
+    case DragMode::SeekScrub:
+      handleSeekScrubDrag(offset);
       return;
-    }
-    m_selectedOffset = offset;
-    if (m_selectedItem && (m_selectedOffset >= m_selectedItem->offset()) &&
-        (m_selectedOffset < (m_selectedItem->offset() + m_selectedItem->length()))) {
-      hideTooltip();
+    case DragMode::Selection:
+      handleSelectionDrag(offset);
       return;
-    }
-    auto* item = m_vgmfile->getItemAtOffset(offset, false);
-    if (item != m_selectedItem) {
-      selectionChanged(item);
-    }
-    hideTooltip();
   }
 }
 
@@ -1323,7 +1339,7 @@ void HexView::showTooltip(VGMItem* item, const QPoint& pos) {
     hideTooltip();
     return;
   }
-  if (m_tooltipItem && item->offset() == m_tooltipItem->offset()) {
+  if (m_tooltipItem == item) {
     return;
   }
   const QString description = tooltipHtmlWithIcon(item);
@@ -1337,9 +1353,6 @@ void HexView::showTooltip(VGMItem* item, const QPoint& pos) {
 
 // Hide active tooltip and clear tracked tooltip item.
 void HexView::hideTooltip() {
-  if (!m_tooltipItem) {
-    return;
-  }
   QToolTip::hideText();
   m_tooltipItem = nullptr;
 }

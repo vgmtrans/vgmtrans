@@ -71,7 +71,6 @@ protected:
   void scrollContentsBy(int dx, int dy) override;
   void changeEvent(QEvent* event) override;
   void keyPressEvent(QKeyEvent* event) override;
-  void keyReleaseEvent(QKeyEvent* event) override;
   void mousePressEvent(QMouseEvent* event) override;
   void mouseMoveEvent(QMouseEvent* event) override;
   void mouseReleaseEvent(QMouseEvent* event) override;
@@ -92,6 +91,10 @@ private:
     QColor bg;
     QColor fg;
   };
+  enum class DragMode {
+    Selection,
+    SeekScrub,
+  };
   struct GlyphAtlas {
     QImage image;
     std::array<QRectF, 128> uvTable{};
@@ -109,9 +112,14 @@ private:
   static uint64_t selectionKey(const FadePlaybackSelection& selection);
 
   int hexXOffset() const;
+  static DragMode dragModeForModifiers(Qt::KeyboardModifiers mods);
   int getVirtualHeight() const;
   int getTotalLines() const;
   int getOffsetFromPoint(QPoint pos) const;
+  void handleSelectionPress(int offset, VGMItem* item);
+  void handleSeekPress(VGMItem* item, const QPoint& pos);
+  void handleSelectionDrag(int offset);
+  void handleSeekScrubDrag(int offset);
   void requestRhiUpdate(bool markBaseDirty = false, bool markSelectionDirty = false);
   void clearCurrentSelection(bool animateSelection);
   void selectCurrentItem(bool animateSelection);
