@@ -159,12 +159,22 @@ bool PlayerService::loadCollection(const VGMColl *coll, bool startPlaying) {
 //  auto sf2_data_blob = new MemFile::DataBlob{0, std::vector<uint8_t>(rawSF2)};
 
   /* Init soundfont */
-  if (! player.loadCollection(coll, [this](){
-      QMetaObject::invokeMethod(this, "toggle", Qt::QueuedConnection);
+  if (! player.loadCollection(coll, [this, coll, startPlaying](){
+      if (!startPlaying) {
+        return;
+      }
+      QMetaObject::invokeMethod(this, [this, coll]() {
+        // Ignore stale callbacks from previously requested collections.
+        if (m_active_vgmcoll != coll || playing()) {
+          return;
+        }
+        toggle();
+      }, Qt::QueuedConnection);
       }))
   {
     L_ERROR("Could not load soundfont. Maybe the system is running out of "
                                   "memory or the sountfont was too large?");
+    return false;
   }
 
   /* Set callback used to signal that the playback is over */
@@ -182,9 +192,7 @@ bool PlayerService::loadCollection(const VGMColl *coll, bool startPlaying) {
 //  m_loaded_sf = sf2_handle;
   m_song_title = QString::fromStdString(m_active_vgmcoll->name());
 //  toggle();
-  if (startPlaying) {
-    toggle();
-  } else {
+  if (!startPlaying) {
     player.pause();
     statusChange(false);
   }
