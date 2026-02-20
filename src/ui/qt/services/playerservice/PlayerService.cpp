@@ -30,7 +30,6 @@ PlayerService::PlayerService() {
       playbackPositionChanged(elapsedSamples(), totalSamples(), PositionChangeOrigin::Playback);
     }
   });
-  //  m_seekupdate_timer->start(TICK_POLL_INTERVAL_MS);
   m_seekupdate_timer->start(TICK_POLL_INTERVAL_MS);
 
   connect(&qtVGMRoot, &QtVGMRoot::UI_removeVGMColl, this, [this](VGMColl* coll) {
