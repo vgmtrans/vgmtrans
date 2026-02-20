@@ -110,7 +110,7 @@ void PlaybackControls::setupControls() {
           });
   connect(PlayerService::getInstance(), &PlayerService::statusChange, this,
           &PlaybackControls::playerStatusChanged);
-  connect(PlayerService::getInstance(), &PlayerService::playbackPositionChanged, this,
+  connect(PlayerService::getInstance(), &PlayerService::playbackSamplePositionChanged, this,
           &PlaybackControls::playbackRangeUpdate);
   updateSeekBarVisibility();
   playerStatusChanged(PlayerService::getInstance()->playing());

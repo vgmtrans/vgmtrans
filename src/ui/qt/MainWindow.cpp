@@ -437,7 +437,7 @@ void MainWindow::routeSignals() {
   connect(m_playback_controls, &PlaybackControls::stopPressed, m_coll_listview,
           &VGMCollListView::handleStopRequest);
   connect(m_playback_controls, &PlaybackControls::seekingTo, PlayerService::getInstance(),
-          &PlayerService::seek);
+          &PlayerService::seekSamples);
   connect(&qtVGMRoot, &QtVGMRoot::UI_toastRequested, this, &MainWindow::showToast);
 
   auto *playShortcut = new QShortcut(QKeySequence(Qt::Key_Space), this);

@@ -6,9 +6,6 @@
 
 #include "PlayerService.h"
 
-#include <algorithm>
-#include <cstddef>
-
 #include "LogManager.h"
 #include "QtVGMRoot.h"
 #include "SF2Conversion.h"
@@ -27,7 +24,13 @@ PlayerService::PlayerService() {
   m_seekupdate_timer = new QTimer(this);
   connect(m_seekupdate_timer, &QTimer::timeout, [this]() {
     if (playing()) {
-      playbackPositionChanged(elapsedSamples(), totalSamples(), PositionChangeOrigin::Playback);
+      const int currentSamples = elapsedSamples();
+      const int maxSamples = totalSamples();
+      const int currentTicks = elapsedTicks();
+      const int maxTicks = totalTicks();
+      playbackSamplePositionChanged(currentSamples, maxSamples, PositionChangeOrigin::Playback);
+      playbackTickPositionChanged(currentTicks, maxTicks, PositionChangeOrigin::Playback);
+      playbackPositionChanged(currentSamples, maxSamples, PositionChangeOrigin::Playback);
     }
   });
   m_seekupdate_timer->start(TICK_POLL_INTERVAL_MS);
@@ -58,6 +61,8 @@ void PlayerService::toggle() {
 
 void PlayerService::stop() {
   /* Stop polling seekbar, reset it, propagate that we're done */
+  playbackSamplePositionChanged(0, 1, PositionChangeOrigin::Playback);
+  playbackTickPositionChanged(0, 1, PositionChangeOrigin::Playback);
   playbackPositionChanged(0, 1, PositionChangeOrigin::Playback);
 
   /* Stop the audio output */
@@ -68,10 +73,23 @@ void PlayerService::stop() {
   statusChange(false);
 }
 
-void PlayerService::seek(int position, PositionChangeOrigin origin) {
+void PlayerService::seekSamples(int position, PositionChangeOrigin origin) {
   player.seek(position);
-  //  playbackPositionChanged(position, totalTicks(), origin);
-  playbackPositionChanged(position, totalSamples(), origin);
+  const int currentSamples = elapsedSamples();
+  const int maxSamples = totalSamples();
+  const int currentTicks = elapsedTicks();
+  const int maxTicks = totalTicks();
+  playbackSamplePositionChanged(currentSamples, maxSamples, origin);
+  playbackTickPositionChanged(currentTicks, maxTicks, origin);
+  playbackPositionChanged(currentSamples, maxSamples, origin);
+}
+
+void PlayerService::seekTicks(int position, PositionChangeOrigin origin) {
+  seekSamples(player.samplesFromTicks(position), origin);
+}
+
+void PlayerService::seek(int position, PositionChangeOrigin origin) {
+  seekSamples(position, origin);
 }
 
 bool PlayerService::playing() const {
@@ -84,6 +102,14 @@ int PlayerService::elapsedSamples() const {
 
 int PlayerService::totalSamples() const {
     return static_cast<int>(player.totalSamples());
+}
+
+int PlayerService::elapsedTicks() const {
+  return static_cast<int>(player.elapsedTicks());
+}
+
+int PlayerService::totalTicks() const {
+  return static_cast<int>(player.totalTicks());
 }
 
 QString PlayerService::songTitle() const {

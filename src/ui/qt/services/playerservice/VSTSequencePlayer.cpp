@@ -6,10 +6,24 @@
 #include "LogManager.h"
 #include "SF2Conversion.h"
 #include "CPS/CPS1Instr.h"
+#include <algorithm>
+#include <cmath>
+#include <limits>
 
 using namespace std;
 
 #define MAX_CHANNELS 48
+
+namespace {
+constexpr int kDefaultTempoMicrosPerQuarter = 500000;
+constexpr double kMicrosPerSecond = 1000000.0;
+
+double samplesPerTickFromTempo(int microsPerQuarter, int ppqn, double sampleRate) {
+  const int safePpqn = std::max(ppqn, 1);
+  return (static_cast<double>(microsPerQuarter) * sampleRate) /
+         (static_cast<double>(safePpqn) * kMicrosPerSecond);
+}
+} // namespace
 
 VSTSequencePlayer::VSTSequencePlayer() = default;
 
@@ -90,16 +104,106 @@ void VSTSequencePlayer::play() {
   state.musicState = MusicState::Playing;
 }
 
+int VSTSequencePlayer::elapsedSamples() const {
+  return static_cast<int>(state.samplesOffset);
+}
+
+int VSTSequencePlayer::totalSamples() const {
+  if (state.eventSampleOffsets.empty()) {
+    return 0;
+  }
+  return state.eventSampleOffsets.back();
+}
+
+int VSTSequencePlayer::elapsedTicks() const {
+  return ticksFromSamples(elapsedSamples());
+}
+
+int VSTSequencePlayer::totalTicks() const {
+  if (state.events.empty()) {
+    return 0;
+  }
+  return static_cast<int>(state.events.back()->absTime);
+}
+
+int VSTSequencePlayer::samplesFromTicks(int ticks) const {
+  if (ticks <= 0 || state.tempoSegmentStartTicks.empty()) {
+    return 0;
+  }
+
+  const auto it = std::upper_bound(
+      state.tempoSegmentStartTicks.begin(),
+      state.tempoSegmentStartTicks.end(),
+      ticks
+  );
+  const int segmentIndex = static_cast<int>(
+      std::distance(state.tempoSegmentStartTicks.begin(), it) - 1
+  );
+  const int clampedSegmentIndex = std::max(segmentIndex, 0);
+
+  const int baseTick = state.tempoSegmentStartTicks[clampedSegmentIndex];
+  const double baseSample = state.tempoSegmentStartSamples[clampedSegmentIndex];
+  const double samplesPerTick = state.tempoSegmentSamplesPerTick[clampedSegmentIndex];
+
+  const double sampleOffset = baseSample + (ticks - baseTick) * samplesPerTick;
+  if (sampleOffset <= 0.0) {
+    return 0;
+  }
+  if (sampleOffset >= static_cast<double>(std::numeric_limits<int>::max())) {
+    return std::numeric_limits<int>::max();
+  }
+  return static_cast<int>(sampleOffset);
+}
+
+int VSTSequencePlayer::ticksFromSamples(int samples) const {
+  if (samples <= 0 || state.tempoSegmentStartSamples.empty()) {
+    return 0;
+  }
+
+  const auto it = std::upper_bound(
+      state.tempoSegmentStartSamples.begin(),
+      state.tempoSegmentStartSamples.end(),
+      static_cast<double>(samples)
+  );
+  const int segmentIndex = static_cast<int>(
+      std::distance(state.tempoSegmentStartSamples.begin(), it) - 1
+  );
+  const int clampedSegmentIndex = std::max(segmentIndex, 0);
+
+  const int baseTick = state.tempoSegmentStartTicks[clampedSegmentIndex];
+  const double baseSample = state.tempoSegmentStartSamples[clampedSegmentIndex];
+  const double samplesPerTick = state.tempoSegmentSamplesPerTick[clampedSegmentIndex];
+  if (samplesPerTick <= 0.0) {
+    return baseTick;
+  }
+
+  const double tickOffset = static_cast<double>(baseTick) + (samples - baseSample) / samplesPerTick;
+  if (tickOffset <= 0.0) {
+    return 0;
+  }
+  if (tickOffset >= static_cast<double>(std::numeric_limits<int>::max())) {
+    return std::numeric_limits<int>::max();
+  }
+  return static_cast<int>(tickOffset);
+}
+
 void VSTSequencePlayer::seek(int samples) {
   // Remember original music state and pause playback while we're processing the seek
   MusicState originalMusicState = state.musicState;
   state.musicState = MusicState::Paused;
 
+  if (state.eventSampleOffsets.empty() || state.events.empty()) {
+    state.musicState = originalMusicState;
+    return;
+  }
+
+  const int targetSample = std::clamp(samples, 0, totalSamples());
+
   // Do a binary search to find the offset of the MidiEvent we're seeking to
   auto it = std::lower_bound(
       state.eventSampleOffsets.begin(),
       state.eventSampleOffsets.end(),
-      samples
+      targetSample
   );
 
   // If we didn't find the event, or it's the last, jump to the end and let the audio callback stop playback
@@ -107,13 +211,14 @@ void VSTSequencePlayer::seek(int samples) {
     L_WARN("Could not seek to specified sample offset");
     state.samplesOffset = state.eventSampleOffsets.back();
     state.eventOffset = state.events.size();
+    state.musicState = originalMusicState;
     return;
   }
 
   // Calculate the offset of the event by doing some arithmetic on the iterator
   int index = std::distance(state.eventSampleOffsets.begin(), it);
   state.eventOffset = index;
-  state.samplesOffset = state.eventSampleOffsets[index];
+  state.samplesOffset = static_cast<uint32_t>(targetSample);
 
   // Iterate from the beginning of the sequence to the seek point. Record every relevant event
   // into the SeekChannelStates, overwriting them as we go so that they store the most recent
@@ -414,9 +519,16 @@ void VSTSequencePlayer::populateFileMidiBuffer(const uint8_t* fileData, uint32_t
 void VSTSequencePlayer::clearState() {
   state.events.clear();
   state.eventSampleOffsets.clear();
+  state.tempoSegmentStartTicks.clear();
+  state.tempoSegmentStartSamples.clear();
+  state.tempoSegmentSamplesPerTick.clear();
   state.eventOffset = 0;
   state.samplesOffset = 0;
-  state.sampleRate = deviceManager.getCurrentAudioDevice()->getCurrentSampleRate();
+  if (auto* audioDevice = deviceManager.getCurrentAudioDevice()) {
+    state.sampleRate = audioDevice->getCurrentSampleRate();
+  } else {
+    state.sampleRate = 44100.0;
+  }
 }
 
 bool VSTSequencePlayer::prepMidiPlayback(const VGMColl* coll) {
@@ -469,37 +581,57 @@ bool VSTSequencePlayer::prepMidiPlayback(const VGMColl* coll) {
   return true;
 }
 
-std::vector<int> VSTSequencePlayer::generateEventSampleTimes(vector<MidiEvent*>& events, int ppqn) const {
+std::vector<int> VSTSequencePlayer::generateEventSampleTimes(vector<MidiEvent*>& events, int ppqn) {
+  state.tempoSegmentStartTicks.clear();
+  state.tempoSegmentStartSamples.clear();
+  state.tempoSegmentSamplesPerTick.clear();
 
-  // Set the default milliseconds per tick, derived from the midi file's PPQN - pulses (ticks) per
-  // quarter and the default starting tempo of 120bpm.
-  int microsPerQuarter = 500000;
-  double millisPerTick = static_cast<double>(microsPerQuarter)/ ppqn / 1000.0;
-  double sampleRate = state.sampleRate;
+  if (events.empty()) {
+    return {};
+  }
+
+  const double sampleRate = state.sampleRate;
+  int microsPerQuarter = kDefaultTempoMicrosPerQuarter;
+  double samplesPerTick = samplesPerTickFromTempo(microsPerQuarter, ppqn, sampleRate);
+  int currentSegmentTick = 0;
+  double currentSegmentSample = 0.0;
+
+  state.tempoSegmentStartTicks.push_back(currentSegmentTick);
+  state.tempoSegmentStartSamples.push_back(currentSegmentSample);
+  state.tempoSegmentSamplesPerTick.push_back(samplesPerTick);
 
   std::vector<int> realTimeEventOffsets(events.size());
-
-  int lastTempoAbsTimeInTicks = 0;
-  int lastTempoAbsTimeInSamples = 0;
-
-  for(size_t i = 0; i < events.size(); ++i) {
+  for (size_t i = 0; i < events.size(); ++i) {
     MidiEvent* event = events[i];
+    const int eventTick = static_cast<int>(event->absTime);
+    const double eventSample = currentSegmentSample + (eventTick - currentSegmentTick) * samplesPerTick;
 
-    if (event->eventType() == MidiEventType::MIDIEVENT_TEMPO) {
-
-      // When we encounter a tempo event, we record the time offset of the event in both samples and ticks.
-      // Then, to calculate the sample time offset of any subsequent event, we substitute the sample offset
-      // of the most recent tempo event with the number of ticks that led up to that tempo event. Then, we take
-      // the remaining ticks and multiply them by millisPerTick. Add these together and we're done.
-      lastTempoAbsTimeInSamples = ((event->absTime - lastTempoAbsTimeInTicks) * millisPerTick) + lastTempoAbsTimeInSamples;
-      lastTempoAbsTimeInTicks = event->absTime;
-
-      TempoEvent* tempoEvent = static_cast<TempoEvent*>(event);
-      microsPerQuarter = static_cast<int>(tempoEvent->microSecs);
-      millisPerTick = static_cast<double>(microsPerQuarter)/ ppqn / 1000.0;
+    if (eventSample <= 0.0) {
+      realTimeEventOffsets[i] = 0;
+    } else if (eventSample >= static_cast<double>(std::numeric_limits<int>::max())) {
+      realTimeEventOffsets[i] = std::numeric_limits<int>::max();
+    } else {
+      realTimeEventOffsets[i] = static_cast<int>(eventSample);
     }
-    double eventTimeInMs = ((event->absTime - lastTempoAbsTimeInTicks) * millisPerTick) + lastTempoAbsTimeInSamples;
-    realTimeEventOffsets[i] = static_cast<int>(eventTimeInMs * sampleRate / 1000.0);
+
+    if (event->eventType() != MidiEventType::MIDIEVENT_TEMPO) {
+      continue;
+    }
+
+    TempoEvent* tempoEvent = static_cast<TempoEvent*>(event);
+    microsPerQuarter = static_cast<int>(tempoEvent->microSecs);
+    samplesPerTick = samplesPerTickFromTempo(microsPerQuarter, ppqn, sampleRate);
+
+    currentSegmentTick = eventTick;
+    currentSegmentSample = eventSample;
+    if (state.tempoSegmentStartTicks.back() == currentSegmentTick) {
+      state.tempoSegmentStartSamples.back() = currentSegmentSample;
+      state.tempoSegmentSamplesPerTick.back() = samplesPerTick;
+    } else {
+      state.tempoSegmentStartTicks.push_back(currentSegmentTick);
+      state.tempoSegmentStartSamples.push_back(currentSegmentSample);
+      state.tempoSegmentSamplesPerTick.push_back(samplesPerTick);
+    }
   }
 
   return realTimeEventOffsets;

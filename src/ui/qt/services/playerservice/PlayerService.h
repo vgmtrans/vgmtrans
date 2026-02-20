@@ -42,9 +42,16 @@ public:
    */
   void stop();
   /**
- * Moves the player position
- * @param position relative to song start
- */
+   * Moves the player position in samples.
+   * @param position relative to song start
+   */
+  void seekSamples(int position, PositionChangeOrigin origin);
+  /**
+   * Moves the player position in ticks.
+   * @param position relative to song start
+   */
+  void seekTicks(int position, PositionChangeOrigin origin);
+  // Compatibility shim for older call sites; equivalent to seekSamples().
   void seek(int position, PositionChangeOrigin origin);
 
   /**
@@ -53,13 +60,23 @@ public:
    */
   [[nodiscard]] bool playing() const;
   /**
-   * The number of samples elapsed since the player was started
+   * The number of ticks elapsed since the player was started
    * @return number of ticks relative to song start
+   */
+  [[nodiscard]] int elapsedTicks() const;
+  /**
+   * The total number of ticks in the song
+   * @return total ticks in the song
+   */
+  [[nodiscard]] int totalTicks() const;
+  /**
+   * The number of samples elapsed since the player was started
+   * @return number of samples relative to song start
    */
   [[nodiscard]] int elapsedSamples() const;
   /**
    * The total number of samples in the song
-   * @return total ticks in the song
+   * @return total samples in the song
    */
   [[nodiscard]] int totalSamples() const;
 
@@ -86,6 +103,9 @@ public:
 
 signals:
   void statusChange(bool playing);
+  void playbackSamplePositionChanged(int current, int max, PositionChangeOrigin origin);
+  void playbackTickPositionChanged(int current, int max, PositionChangeOrigin origin);
+  // Compatibility signal; mirrors playbackSamplePositionChanged.
   void playbackPositionChanged(int current, int max, PositionChangeOrigin origin);
 
 private:
