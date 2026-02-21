@@ -8,7 +8,11 @@
 #include <QFile>
 #include <QFileOpenEvent>
 #include <QFontDatabase>
+#if defined(Q_OS_LINUX) && QT_CONFIG(opengl)
+#include <QRhiWidget>
+#endif
 #include <QStyleFactory>
+#include <QTimer>
 #include <filesystem>
 #include "MainWindow.h"
 #include "QtVGMRoot.h"
@@ -39,6 +43,7 @@ int main(int argc, char *argv[]) {
   QCoreApplication::setAttribute(Qt::AA_DontCreateNativeWidgetSiblings);
 
   VGMTransApplication app(argc, argv);
+
 #ifdef _WIN32
   app.setStyle(QStyleFactory::create("fusion"));
 #endif
@@ -47,7 +52,19 @@ int main(int argc, char *argv[]) {
   QFontDatabase::addApplicationFont(":/fonts/Roboto_Mono/RobotoMono-VariableFont_wght.ttf");
 
   MainWindow window;
+#if defined(Q_OS_LINUX) && QT_CONFIG(opengl)
+  auto* rhiPrimer = new QRhiWidget(&window);
+  rhiPrimer->setApi(QRhiWidget::Api::OpenGL);
+  rhiPrimer->setAttribute(Qt::WA_TransparentForMouseEvents);
+  rhiPrimer->setFocusPolicy(Qt::NoFocus);
+  rhiPrimer->hide();
+#endif
   window.show();
+#if defined(Q_OS_LINUX) && QT_CONFIG(opengl)
+  QTimer::singleShot(0, &window, [rhiPrimer]() {
+    rhiPrimer->deleteLater();
+  });
+#endif
 
   const QStringList args = app.arguments();
   for (int i = 1; i < args.size(); ++i) {
