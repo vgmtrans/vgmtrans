@@ -35,7 +35,7 @@ int main(int argc, char *argv[]) {
   QCoreApplication::setApplicationName("VGMTrans");
 
   QGuiApplication::setHighDpiScaleFactorRoundingPolicy(Qt::HighDpiScaleFactorRoundingPolicy::Round);
-  // Keep dock splitter/input behavior stable when embedding RHI QWindow containers.
+  // Prevent native sibling promotion so dock splitters remain responsive with the RHI QWindow container.
   QCoreApplication::setAttribute(Qt::AA_DontCreateNativeWidgetSiblings);
 
   VGMTransApplication app(argc, argv);

@@ -28,6 +28,8 @@ class VGMFile;
 class VGMItem;
 class HexViewRhiHost;
 
+static constexpr int OUTLINE_FADE_DURATION_MS = 150;
+
 class HexView final : public QAbstractScrollArea {
   Q_OBJECT
   Q_PROPERTY(qreal overlayOpacity READ overlayOpacity WRITE setOverlayOpacity)
@@ -42,6 +44,7 @@ public:
   void setPlaybackSelectionsForItems(const std::vector<const VGMItem*>& items);
   void clearPlaybackSelections(bool fade = true);
   void setPlaybackActive(bool active);
+  void requestPlaybackFrame();
   int scrollYForRender() const;
   void setFont(const QFont& font);
   [[nodiscard]] int getVirtualFullWidth() const;
@@ -56,6 +59,7 @@ public:
   void handleCoalescedMouseMove(const QPoint& pos,
                                 Qt::MouseButtons buttons,
                                 Qt::KeyboardModifiers mods);
+  void handleTooltipHoverMove(const QPoint& pos, Qt::KeyboardModifiers mods);
 
 signals:
   void selectionChanged(VGMItem* item);
@@ -87,6 +91,10 @@ private:
     QColor bg;
     QColor fg;
   };
+  enum class DragMode {
+    Selection,
+    SeekScrub,
+  };
   struct GlyphAtlas {
     QImage image;
     std::array<QRectF, 128> uvTable{};
@@ -104,9 +112,14 @@ private:
   static uint64_t selectionKey(const FadePlaybackSelection& selection);
 
   int hexXOffset() const;
+  static DragMode dragModeForModifiers(Qt::KeyboardModifiers mods);
   int getVirtualHeight() const;
   int getTotalLines() const;
   int getOffsetFromPoint(QPoint pos) const;
+  void handleSelectionPress(int offset, VGMItem* item);
+  void handleSeekPress(VGMItem* item, const QPoint& pos);
+  void handleSelectionDrag(int offset);
+  void handleSeekScrubDrag(int offset);
   void requestRhiUpdate(bool markBaseDirty = false, bool markSelectionDirty = false);
   void clearCurrentSelection(bool animateSelection);
   void selectCurrentItem(bool animateSelection);
@@ -130,6 +143,8 @@ private:
   void ensurePlaybackFadeTimer();
   qint64 playbackNowMs();
   void updateHighlightState(bool animateSelection);
+  void showTooltip(VGMItem* item, const QPoint& pos);
+  void hideTooltip();
 
   VGMFile* m_vgmfile = nullptr;
   // Interaction state.
@@ -137,6 +152,7 @@ private:
   uint32_t m_selectedOffset = 0;
   bool m_isDragging = false;
   bool m_seekModifierActive = false;
+  VGMItem* m_tooltipItem = nullptr;
   VGMItem* m_lastSeekItem = nullptr;
   std::vector<SelectionRange> m_selections;
   std::vector<SelectionRange> m_fadeSelections;
@@ -168,6 +184,8 @@ private:
   qreal m_shadowStrength = 1.0;
   QElapsedTimer m_playbackFadeClock;
   QBasicTimer m_playbackFadeTimer;
+  QBasicTimer m_outlineFadeTimer;
+  QElapsedTimer m_outlineFadeClock;
   QColor m_playbackGlowLow;
   QColor m_playbackGlowHigh;
   float m_playbackGlowStrength = 1.0f;
