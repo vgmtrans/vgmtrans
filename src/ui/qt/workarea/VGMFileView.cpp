@@ -639,16 +639,13 @@ int VGMFileView::hexViewFullWidth() const {
 }
 
 void VGMFileView::updateHexViewFont(qreal sizeIncrement) {
-  if (!ensurePanelViewCreated(PanelSide::Left, PanelViewKind::Hex)) {
-    return;
-  }
-  auto* leftHex = panel(PanelSide::Left).hexView;
-  if (!leftHex) {
-    return;
-  }
-
   // Increment the font size until it has an actual effect on width.
-  QFont font = leftHex->font();
+  QFont font = m_activeHexFont;
+  if (const auto* leftHex = panel(PanelSide::Left).hexView) {
+    font = leftHex->font();
+  } else if (const auto* rightHex = panel(PanelSide::Right).hexView) {
+    font = rightHex->font();
+  }
   QFontMetricsF fontMetrics(font);
   const qreal origWidth = fontMetrics.horizontalAdvance("A");
   qreal fontSize = font.pointSizeF();
@@ -671,6 +668,12 @@ void VGMFileView::applyHexViewFont(QFont font, bool persistSetting) {
     if (pointSize > 0.0) {
       Settings::the()->VGMSeqFileView.setHexViewFontPointSize(pointSize);
     }
+  }
+
+  const bool hasAnyHexView =
+      panel(PanelSide::Left).hexView != nullptr || panel(PanelSide::Right).hexView != nullptr;
+  if (!hasAnyHexView) {
+    return;
   }
 
   const QList<int> splitterSizes = m_splitter->sizes();
