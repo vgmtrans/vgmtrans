@@ -13,7 +13,9 @@ constexpr auto kLeftPaneViewKey = "leftPaneView";
 constexpr auto kRightPaneViewKey = "rightPaneView";
 constexpr auto kRightPaneHiddenKey = "rightPaneHidden";
 constexpr auto kLeftPaneWidthKey = "leftPaneWidth";
-constexpr auto kHexViewFontPointSizeKey = "hexViewFontPointSize";
+constexpr auto kHexViewGroup = "HexView";
+constexpr auto kHexViewFontPointSizeKey = "fontPointSize";
+constexpr auto kLegacyHexViewFontPointSizeKey = "hexViewFontPointSize";
 constexpr int kDefaultLeftPaneView = 0;   // PanelViewKind::Hex
 constexpr int kDefaultRightPaneView = 3;  // PanelViewKind::PianoRoll
 constexpr bool kDefaultRightPaneHidden = false;
@@ -28,6 +30,7 @@ Settings::Settings(QObject *parent)
   : QObject(parent),
     VGMFileTreeView(this),
     VGMSeqFileView(this),
+    hexView(this),
     conversion(this),
     recentFiles(this)
 {
@@ -101,16 +104,30 @@ void Settings::VGMSeqFileViewSettings::setLeftPaneWidth(int width) const {
   settings.endGroup();
 }
 
-double Settings::VGMSeqFileViewSettings::hexViewFontPointSize() const {
-  settings.beginGroup(kVGMSeqFileViewGroup);
-  const double pointSize = settings.value(kHexViewFontPointSizeKey, kUnsetHexViewFontPointSize).toDouble();
+double Settings::HexViewSettings::fontPointSize() const {
+  settings.beginGroup(kHexViewGroup);
+  const bool hasNewSetting = settings.contains(kHexViewFontPointSizeKey);
+  const double pointSize =
+      settings.value(kHexViewFontPointSizeKey, kUnsetHexViewFontPointSize).toDouble();
   settings.endGroup();
-  return pointSize;
+  if (hasNewSetting) {
+    return pointSize;
+  }
+
+  settings.beginGroup(kVGMSeqFileViewGroup);
+  const double legacyPointSize =
+      settings.value(kLegacyHexViewFontPointSizeKey, kUnsetHexViewFontPointSize).toDouble();
+  settings.endGroup();
+  return legacyPointSize;
 }
 
-void Settings::VGMSeqFileViewSettings::setHexViewFontPointSize(double pointSize) const {
-  settings.beginGroup(kVGMSeqFileViewGroup);
+void Settings::HexViewSettings::setFontPointSize(double pointSize) const {
+  settings.beginGroup(kHexViewGroup);
   settings.setValue(kHexViewFontPointSizeKey, pointSize);
+  settings.endGroup();
+
+  settings.beginGroup(kVGMSeqFileViewGroup);
+  settings.remove(kLegacyHexViewFontPointSizeKey);
   settings.endGroup();
 }
 

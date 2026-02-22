@@ -151,7 +151,7 @@ VGMFileView::VGMFileView(VGMFile* vgmfile)
   panel(PanelSide::Right) = createPanel(PanelSide::Right);
   m_defaultHexFont = HexView::defaultViewFont();
   m_activeHexFont = m_defaultHexFont;
-  const double storedHexFontPointSize = Settings::the()->VGMSeqFileView.hexViewFontPointSize();
+  const double storedHexFontPointSize = Settings::the()->hexView.fontPointSize();
   if (storedHexFontPointSize > 0.0) {
     m_activeHexFont.setPointSizeF(storedHexFontPointSize);
   }
@@ -642,7 +642,7 @@ void VGMFileView::applyHexViewFont(QFont font, bool persistSetting) {
   if (persistSetting) {
     const double pointSize = m_activeHexFont.pointSizeF();
     if (pointSize > 0.0) {
-      Settings::the()->VGMSeqFileView.setHexViewFontPointSize(pointSize);
+      Settings::the()->hexView.setFontPointSize(pointSize);
     }
   }
 
