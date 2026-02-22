@@ -101,6 +101,7 @@ private:
   [[nodiscard]] int hexViewFullWidth() const;
   void updateHexViewFont(qreal sizeIncrement);
   void applyHexViewFont(QFont font, bool persistSetting = true);
+  void refreshPlaybackVisualsIfNeeded();
   void onSplitterMoved(int pos, int index);
   void ensurePreferredLeftPaneWidth();
   [[nodiscard]] int maxLeftPaneWidth() const;
