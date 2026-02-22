@@ -150,6 +150,11 @@ VGMFileView::VGMFileView(VGMFile* vgmfile)
   panel(PanelSide::Left) = createPanel(PanelSide::Left);
   panel(PanelSide::Right) = createPanel(PanelSide::Right);
   m_defaultHexFont = HexView::defaultViewFont();
+  m_activeHexFont = m_defaultHexFont;
+  const double storedHexFontPointSize = Settings::the()->VGMSeqFileView.hexViewFontPointSize();
+  if (storedHexFontPointSize > 0.0) {
+    m_activeHexFont.setPointSizeF(storedHexFontPointSize);
+  }
 
   setPanelView(PanelSide::Left, initialLeftView);
   if (storedRightPaneHidden) {
@@ -169,7 +174,7 @@ VGMFileView::VGMFileView(VGMFile* vgmfile)
   m_splitter->installEventFilter(this);
 
   if (panel(PanelSide::Left).hexView || panel(PanelSide::Right).hexView) {
-    applyHexViewFont(m_defaultHexFont);
+    applyHexViewFont(m_activeHexFont, false);
   }
 
   connect(m_splitter, &QSplitter::splitterMoved, this, &VGMFileView::onSplitterMoved);
@@ -422,10 +427,7 @@ bool VGMFileView::ensurePanelViewCreated(PanelSide side, PanelViewKind viewKind)
   panelUi.stack->insertWidget(panelViewStackIndex(viewKind), createdWidget);
 
   if (viewKind == PanelViewKind::Hex && panelUi.hexView) {
-    auto* leftHex = panel(PanelSide::Left).hexView;
-    if (leftHex && leftHex != panelUi.hexView) {
-      panelUi.hexView->setFont(leftHex->font());
-    }
+    panelUi.hexView->setFont(m_activeHexFont);
     panelUi.hexView->setMaximumWidth(panelUi.hexView->getViewportFullWidth());
   }
 
@@ -662,7 +664,15 @@ void VGMFileView::updateHexViewFont(qreal sizeIncrement) {
   applyHexViewFont(font);
 }
 
-void VGMFileView::applyHexViewFont(QFont font) {
+void VGMFileView::applyHexViewFont(QFont font, bool persistSetting) {
+  m_activeHexFont = font;
+  if (persistSetting) {
+    const double pointSize = m_activeHexFont.pointSizeF();
+    if (pointSize > 0.0) {
+      Settings::the()->VGMSeqFileView.setHexViewFontPointSize(pointSize);
+    }
+  }
+
   const QList<int> splitterSizes = m_splitter->sizes();
   const bool canAdjustSplitter =
       m_splitter && widget() == m_splitter && m_splitter->width() > 0 && !m_singlePaneMode;
@@ -677,7 +687,7 @@ void VGMFileView::applyHexViewFont(QFont font) {
     if (!hex) {
       continue;
     }
-    hex->setFont(font);
+    hex->setFont(m_activeHexFont);
     hex->setMaximumWidth(hex->getViewportFullWidth());
   }
 
