@@ -123,13 +123,6 @@ bool buildPreviewNoteForEvent(const SeqEvent* seqEvent, SequencePlayer::PreviewN
   outNote.velocity = velocity;
   return true;
 }
-
-QFont defaultHexViewFont() {
-  const double appFontPointSize = QApplication::font().pointSizeF();
-  QFont font("Roboto Mono", appFontPointSize + 1.0);
-  font.setPointSizeF(appFontPointSize + 1.0);
-  return font;
-}
 }  // namespace
 
 VGMFileView::VGMFileView(VGMFile* vgmfile)
@@ -156,7 +149,7 @@ VGMFileView::VGMFileView(VGMFile* vgmfile)
 
   panel(PanelSide::Left) = createPanel(PanelSide::Left);
   panel(PanelSide::Right) = createPanel(PanelSide::Right);
-  m_defaultHexFont = defaultHexViewFont();
+  m_defaultHexFont = HexView::defaultViewFont();
 
   setPanelView(PanelSide::Left, initialLeftView);
   if (storedRightPaneHidden) {

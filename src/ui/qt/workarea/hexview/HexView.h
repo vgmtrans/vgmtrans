@@ -41,6 +41,7 @@ class HexView final : public QAbstractScrollArea, public SplitterSnapProvider {
 public:
   explicit HexView(VGMFile* vgmfile, QWidget* parent = nullptr);
   ~HexView() override;
+  [[nodiscard]] static QFont defaultViewFont();
   void setSelectedItem(VGMItem* item);
   void setSelectedItems(const std::vector<const VGMItem*>& items,
                         const VGMItem* primaryItem = nullptr);
