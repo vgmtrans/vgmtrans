@@ -88,6 +88,8 @@ public:
     void setRightPaneHidden(bool hidden) const;
     int leftPaneWidth() const;
     void setLeftPaneWidth(int width) const;
+    double hexViewFontPointSize() const;
+    void setHexViewFontPointSize(double pointSize) const;
   };
   VGMSeqFileViewSettings VGMSeqFileView;
 

@@ -100,7 +100,7 @@ private:
 
   [[nodiscard]] int hexViewFullWidth() const;
   void updateHexViewFont(qreal sizeIncrement);
-  void applyHexViewFont(QFont font);
+  void applyHexViewFont(QFont font, bool persistSetting = true);
   void onSplitterMoved(int pos, int index);
   void ensurePreferredLeftPaneWidth();
   [[nodiscard]] int maxLeftPaneWidth() const;
@@ -129,6 +129,7 @@ private:
   int m_preferredLeftPaneWidth = -1;
   bool m_updatingSplitter = false;
   QFont m_defaultHexFont;
+  QFont m_activeHexFont;
   bool m_isSeqFile = false;
   bool m_singlePaneMode = false;
   bool m_playbackVisualsActive = false;
