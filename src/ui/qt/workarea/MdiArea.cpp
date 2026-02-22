@@ -414,7 +414,12 @@ void MdiArea::setPaneView(PanelSide side, PanelViewKind kind) {
   }
 
   if (side == PanelSide::Right) {
+    // Apply the requested right-pane view first (while hidden if needed) so
+    // unhide does not instantiate the previously-hidden view kind.
+    fileView->setPanelView(side, kind);
     fileView->setSinglePaneMode(false);
+    updateTabBarControls();
+    return;
   }
 
   fileView->setPanelView(side, kind);
