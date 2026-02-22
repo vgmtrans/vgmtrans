@@ -88,10 +88,16 @@ public:
     void setRightPaneHidden(bool hidden) const;
     int leftPaneWidth() const;
     void setLeftPaneWidth(int width) const;
-    double hexViewFontPointSize() const;
-    void setHexViewFontPointSize(double pointSize) const;
   };
   VGMSeqFileViewSettings VGMSeqFileView;
+
+  struct HexViewSettings : public SettingsGroup {
+    using SettingsGroup::SettingsGroup;
+
+    double fontPointSize() const;
+    void setFontPointSize(double pointSize) const;
+  };
+  HexViewSettings hexView;
 
   struct ConversionSettings : public SettingsGroup {
     using SettingsGroup::SettingsGroup;
