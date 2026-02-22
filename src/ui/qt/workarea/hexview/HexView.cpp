@@ -1437,6 +1437,9 @@ void HexView::showTooltip(VGMItem* item, const QPoint& pos) {
 
 // Hide active tooltip and clear tracked tooltip item.
 void HexView::hideTooltip() {
+  if (m_tooltipItem == nullptr) {
+    return;
+  }
   QToolTip::hideText();
   m_tooltipItem = nullptr;
 }
