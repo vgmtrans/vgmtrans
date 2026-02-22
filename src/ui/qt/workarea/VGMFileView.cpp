@@ -161,7 +161,7 @@ VGMFileView::VGMFileView(VGMFile* vgmfile)
   setPanelView(PanelSide::Left, initialLeftView);
   if (storedRightPaneHidden) {
     panel(PanelSide::Right).currentKind = initialRightView;
-    panel(PanelSide::Right).stack->setCurrentIndex(static_cast<int>(initialRightView));
+    panel(PanelSide::Right).stack->setCurrentIndex(panelViewStackIndex(initialRightView));
   } else {
     setPanelView(PanelSide::Right, initialRightView);
   }
@@ -241,7 +241,7 @@ VGMFileView::PanelUi VGMFileView::createPanel(PanelSide side) {
   } else {
     panelUi.currentKind = PanelViewKind::Tree;
   }
-  panelUi.stack->setCurrentIndex(static_cast<int>(panelUi.currentKind));
+  panelUi.stack->setCurrentIndex(panelViewStackIndex(panelUi.currentKind));
   containerLayout->addWidget(panelUi.stack, 1);
 
   return panelUi;
@@ -416,17 +416,17 @@ bool VGMFileView::ensurePanelViewCreated(PanelSide side, PanelViewKind viewKind)
     return false;
   }
 
-  const int viewIndex = static_cast<int>(viewKind);
-  QWidget* placeholder = panelUi.placeholders[static_cast<size_t>(viewIndex)];
+  const size_t viewIndex = panelViewIndex(viewKind);
+  QWidget* placeholder = panelUi.placeholders[viewIndex];
   if (placeholder) {
     if (panelUi.stack->indexOf(placeholder) >= 0) {
       panelUi.stack->removeWidget(placeholder);
     }
     placeholder->deleteLater();
-    panelUi.placeholders[static_cast<size_t>(viewIndex)] = nullptr;
+    panelUi.placeholders[viewIndex] = nullptr;
   }
 
-  panelUi.stack->insertWidget(viewIndex, createdWidget);
+  panelUi.stack->insertWidget(panelViewStackIndex(viewKind), createdWidget);
 
   if (viewKind == PanelViewKind::Hex && panelUi.hexView) {
     auto* leftHex = panel(PanelSide::Left).hexView;
