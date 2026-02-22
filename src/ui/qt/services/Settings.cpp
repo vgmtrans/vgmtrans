@@ -15,7 +15,6 @@ constexpr auto kRightPaneHiddenKey = "rightPaneHidden";
 constexpr auto kLeftPaneWidthKey = "leftPaneWidth";
 constexpr auto kHexViewGroup = "HexView";
 constexpr auto kHexViewFontPointSizeKey = "fontPointSize";
-constexpr auto kLegacyHexViewFontPointSizeKey = "hexViewFontPointSize";
 constexpr int kDefaultLeftPaneView = 0;   // PanelViewKind::Hex
 constexpr int kDefaultRightPaneView = 3;  // PanelViewKind::PianoRoll
 constexpr bool kDefaultRightPaneHidden = false;
@@ -106,28 +105,15 @@ void Settings::VGMSeqFileViewSettings::setLeftPaneWidth(int width) const {
 
 double Settings::HexViewSettings::fontPointSize() const {
   settings.beginGroup(kHexViewGroup);
-  const bool hasNewSetting = settings.contains(kHexViewFontPointSizeKey);
   const double pointSize =
       settings.value(kHexViewFontPointSizeKey, kUnsetHexViewFontPointSize).toDouble();
   settings.endGroup();
-  if (hasNewSetting) {
-    return pointSize;
-  }
-
-  settings.beginGroup(kVGMSeqFileViewGroup);
-  const double legacyPointSize =
-      settings.value(kLegacyHexViewFontPointSizeKey, kUnsetHexViewFontPointSize).toDouble();
-  settings.endGroup();
-  return legacyPointSize;
+  return pointSize;
 }
 
 void Settings::HexViewSettings::setFontPointSize(double pointSize) const {
   settings.beginGroup(kHexViewGroup);
   settings.setValue(kHexViewFontPointSizeKey, pointSize);
-  settings.endGroup();
-
-  settings.beginGroup(kVGMSeqFileViewGroup);
-  settings.remove(kLegacyHexViewFontPointSizeKey);
   settings.endGroup();
 }
 
