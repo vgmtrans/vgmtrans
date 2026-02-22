@@ -623,6 +623,11 @@ void VGMFileView::setSinglePaneMode(bool singlePane) {
     rightPanel.container->setVisible(true);
     m_splitter->setHandleWidth(m_defaultSplitterHandleWidth);
     enforceSplitterPolicyForResize();
+
+    const int playbackTick = std::max(0, SequencePlayer::the().elapsedTicks());
+    if (m_playbackVisualsActive || SequencePlayer::the().playing() || playbackTick > 0) {
+      onPlaybackPositionChanged(playbackTick, 0, PositionChangeOrigin::HexView);
+    }
   }
 }
 
