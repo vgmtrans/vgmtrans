@@ -66,6 +66,7 @@ private:
   struct PanelUi {
     QWidget* container = nullptr;
     QStackedWidget* stack = nullptr;
+    std::array<QWidget*, 4> placeholders{};
     HexView* hexView = nullptr;
     VGMFileTreeView* treeView = nullptr;
     ActiveNoteView* activeNoteView = nullptr;
@@ -80,7 +81,11 @@ private:
   void resizeEvent(QResizeEvent* event) override;
   void closeEvent(QCloseEvent* closeEvent) override;
 
-  PanelUi createPanel(PanelSide side, bool isSeqFile);
+  PanelUi createPanel(PanelSide side);
+  bool ensurePanelViewCreated(PanelSide side, PanelViewKind viewKind);
+  QWidget* panelWidget(const PanelUi& panelUi, PanelViewKind viewKind) const;
+  void applySelectionStateToPanelView(PanelSide side, PanelViewKind viewKind) const;
+  void applyPlaybackStateToPanelView(PanelSide side, PanelViewKind viewKind) const;
 
   [[nodiscard]] int hexViewFullWidth() const;
   void updateHexViewFont(qreal sizeIncrement);
@@ -115,6 +120,10 @@ private:
   QFont m_defaultHexFont;
   bool m_isSeqFile = false;
   bool m_singlePaneMode = false;
+  bool m_playbackVisualsActive = false;
+  bool m_playbackTickActive = false;
+  std::vector<const VGMItem*> m_selectedItems;
+  const VGMItem* m_primarySelectedItem = nullptr;
 
   std::vector<const SeqTimedEvent*> m_playbackTimedEvents;
   std::vector<const SeqTimedEvent*> m_activeTimedEvents;
@@ -128,8 +137,8 @@ private:
   std::unordered_map<const MidiTrack*, int> m_trackIndexByMidiPtr;
 
 public slots:
-  void onSelectionChange(VGMItem* item) const;
-  void onSelectionSetChange(const std::vector<VGMItem*>& items, VGMItem* primaryItem) const;
+  void onSelectionChange(VGMItem* item);
+  void onSelectionSetChange(const std::vector<VGMItem*>& items, VGMItem* primaryItem);
   void seekToEvent(VGMItem* item) const;
   void previewNotesForEvent(VGMItem* item, bool includeActiveNotesAtTick) const;
   void previewPianoRollNotes(const std::vector<PianoRollView::PreviewSelection>& notes, int tick) const;

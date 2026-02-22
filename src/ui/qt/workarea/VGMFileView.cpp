@@ -137,15 +137,20 @@ VGMFileView::VGMFileView(VGMFile* vgmfile)
 
   m_isSeqFile = dynamic_cast<VGMSeq*>(m_vgmfile) != nullptr;
 
-  panel(PanelSide::Left) = createPanel(PanelSide::Left, m_isSeqFile);
-  panel(PanelSide::Right) = createPanel(PanelSide::Right, m_isSeqFile);
+  PanelViewKind initialLeftView = PanelViewKind::Hex;
+  PanelViewKind initialRightView = PanelViewKind::Tree;
   if (m_isSeqFile) {
     const auto& settings = Settings::the()->VGMSeqFileView;
-    setPanelView(PanelSide::Left,
-                 sanitizeSeqPaneViewKind(settings.leftPaneView(), PanelSide::Left));
-    setPanelView(PanelSide::Right,
-                 sanitizeSeqPaneViewKind(settings.rightPaneView(), PanelSide::Right));
+    initialLeftView = sanitizeSeqPaneViewKind(settings.leftPaneView(), PanelSide::Left);
+    initialRightView = sanitizeSeqPaneViewKind(settings.rightPaneView(), PanelSide::Right);
   }
+
+  panel(PanelSide::Left) = createPanel(PanelSide::Left);
+  panel(PanelSide::Right) = createPanel(PanelSide::Right);
+  setPanelView(PanelSide::Left, initialLeftView);
+  setPanelView(PanelSide::Right, initialRightView);
+  // Keep one HexView always available so font shortcuts and split-width logic have a source.
+  ensurePanelViewCreated(PanelSide::Left, PanelViewKind::Hex);
 
   m_splitter->addWidget(panel(PanelSide::Left).container);
   m_splitter->addWidget(panel(PanelSide::Right).container);
@@ -156,40 +161,12 @@ VGMFileView::VGMFileView(VGMFile* vgmfile)
   qApp->installEventFilter(this);
   m_splitter->installEventFilter(this);
 
-  m_defaultHexFont = panel(PanelSide::Left).hexView->font();
-  applyHexViewFont(m_defaultHexFont);
+  if (panel(PanelSide::Left).hexView) {
+    m_defaultHexFont = panel(PanelSide::Left).hexView->font();
+    applyHexViewFont(m_defaultHexFont);
+  }
 
   connect(m_splitter, &QSplitter::splitterMoved, this, &VGMFileView::onSplitterMoved);
-
-  for (PanelSide side : {PanelSide::Left, PanelSide::Right}) {
-    auto& panelUi = panel(side);
-
-    connect(panelUi.hexView, &HexView::selectionChanged, this, &VGMFileView::onSelectionChange);
-    connect(panelUi.hexView, &HexView::seekToEventRequested, this, &VGMFileView::seekToEvent);
-    connect(panelUi.hexView, &HexView::notePreviewRequested, this,
-            &VGMFileView::previewNotesForEvent);
-    connect(panelUi.hexView, &HexView::notePreviewStopped, this, &VGMFileView::stopNotePreview);
-    connect(panelUi.activeNoteView, &ActiveNoteView::notePreviewRequested, this,
-            &VGMFileView::previewActiveNote);
-    connect(panelUi.activeNoteView, &ActiveNoteView::notePreviewStopped, this,
-            &VGMFileView::stopNotePreview);
-    connect(panelUi.pianoRollView, &PianoRollView::selectionSetChanged, this, &VGMFileView::onSelectionSetChange);
-    connect(panelUi.pianoRollView, &PianoRollView::notePreviewRequested, this,
-            &VGMFileView::previewPianoRollNotes);
-    connect(panelUi.pianoRollView, &PianoRollView::notePreviewStopped, this,
-            &VGMFileView::stopNotePreview);
-
-    connect(panelUi.treeView, &VGMFileTreeView::currentItemChanged,
-            this,
-            [this](const QTreeWidgetItem* item, QTreeWidgetItem*) {
-              if (item == nullptr) {
-                onSelectionChange(nullptr);
-                return;
-              }
-              auto* vgmitem = static_cast<VGMItem*>(item->data(0, Qt::UserRole).value<void*>());
-              onSelectionChange(vgmitem);
-            });
-  }
 
   connect(new QShortcut(QKeySequence::ZoomIn, this),
           &QShortcut::activated,
@@ -232,7 +209,7 @@ VGMFileView::VGMFileView(VGMFile* vgmfile)
   }
 }
 
-VGMFileView::PanelUi VGMFileView::createPanel(PanelSide side, bool isSeqFile) {
+VGMFileView::PanelUi VGMFileView::createPanel(PanelSide side) {
   PanelUi panelUi;
 
   panelUi.container = new QWidget(this);
@@ -241,47 +218,12 @@ VGMFileView::PanelUi VGMFileView::createPanel(PanelSide side, bool isSeqFile) {
   containerLayout->setSpacing(0);
 
   panelUi.stack = new QStackedWidget(panelUi.container);
-  panelUi.hexView = new HexView(m_vgmfile, panelUi.stack);
-  panelUi.treeView = new VGMFileTreeView(m_vgmfile, panelUi.stack);
-  panelUi.activeNoteView = new ActiveNoteView(panelUi.stack);
-  panelUi.pianoRollView = new PianoRollView(panelUi.stack);
-
-  panelUi.hexView->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
-  panelUi.treeView->setMinimumWidth(rightPaneMinimumWidth);
-
-  if (isSeqFile) {
-    auto* seq = dynamic_cast<VGMSeq*>(m_vgmfile);
-    panelUi.activeNoteView->setTrackCount(effectiveTrackCountForSeq(seq));
-    panelUi.pianoRollView->setTrackCount(effectiveTrackCountForSeq(seq));
-    panelUi.pianoRollView->setSequence(seq);
+  for (size_t i = 0; i < panelUi.placeholders.size(); ++i) {
+    auto* placeholder = new QWidget(panelUi.stack);
+    placeholder->setVisible(false);
+    panelUi.placeholders[i] = placeholder;
+    panelUi.stack->addWidget(placeholder);
   }
-
-  if (panelUi.pianoRollView) {
-    connect(panelUi.pianoRollView, &PianoRollView::seekRequested, this, [this](int tick) {
-      if (tick < 0) {
-        return;
-      }
-
-      if (m_vgmfile->assocColls.empty()) {
-        return;
-      }
-
-      auto* assocColl = m_vgmfile->assocColls.front();
-      auto& seqPlayer = SequencePlayer::the();
-      if (seqPlayer.activeCollection() != assocColl) {
-        seqPlayer.setActiveCollection(assocColl);
-      }
-
-      if (seqPlayer.activeCollection() == assocColl) {
-        seqPlayer.seek(tick, PositionChangeOrigin::SeekBar);
-      }
-    });
-  }
-
-  panelUi.stack->addWidget(panelUi.hexView);
-  panelUi.stack->addWidget(panelUi.treeView);
-  panelUi.stack->addWidget(panelUi.activeNoteView);
-  panelUi.stack->addWidget(panelUi.pianoRollView);
 
   if (side == PanelSide::Left) {
     panelUi.currentKind = PanelViewKind::Hex;
@@ -292,6 +234,200 @@ VGMFileView::PanelUi VGMFileView::createPanel(PanelSide side, bool isSeqFile) {
   containerLayout->addWidget(panelUi.stack, 1);
 
   return panelUi;
+}
+
+QWidget* VGMFileView::panelWidget(const PanelUi& panelUi, PanelViewKind viewKind) const {
+  switch (viewKind) {
+    case PanelViewKind::Hex:
+      return panelUi.hexView;
+    case PanelViewKind::Tree:
+      return panelUi.treeView;
+    case PanelViewKind::ActiveNotes:
+      return panelUi.activeNoteView;
+    case PanelViewKind::PianoRoll:
+      return panelUi.pianoRollView;
+  }
+  return nullptr;
+}
+
+void VGMFileView::applySelectionStateToPanelView(PanelSide side, PanelViewKind viewKind) const {
+  const auto& panelUi = panel(side);
+  switch (viewKind) {
+    case PanelViewKind::Hex:
+      if (panelUi.hexView) {
+        panelUi.hexView->setSelectedItems(m_selectedItems, m_primarySelectedItem);
+      }
+      break;
+    case PanelViewKind::Tree:
+      if (panelUi.treeView) {
+        panelUi.treeView->setSelectedItems(m_selectedItems, m_primarySelectedItem);
+      }
+      break;
+    case PanelViewKind::ActiveNotes:
+      break;
+    case PanelViewKind::PianoRoll:
+      if (panelUi.pianoRollView) {
+        panelUi.pianoRollView->setSelectedItems(m_selectedItems, m_primarySelectedItem);
+      }
+      break;
+  }
+}
+
+void VGMFileView::applyPlaybackStateToPanelView(PanelSide side, PanelViewKind viewKind) const {
+  const auto& panelUi = panel(side);
+  switch (viewKind) {
+    case PanelViewKind::Hex:
+      if (!panelUi.hexView) {
+        break;
+      }
+      panelUi.hexView->setPlaybackActive(m_playbackTickActive);
+      if (m_playbackVisualsActive) {
+        panelUi.hexView->setPlaybackSelectionsForItems(m_playbackItems);
+      } else {
+        panelUi.hexView->clearPlaybackSelections(false);
+      }
+      break;
+    case PanelViewKind::Tree:
+      if (!panelUi.treeView) {
+        break;
+      }
+      if (m_playbackVisualsActive) {
+        panelUi.treeView->setPlaybackItems(m_playbackItems);
+      } else {
+        panelUi.treeView->setPlaybackItems({});
+      }
+      break;
+    case PanelViewKind::ActiveNotes:
+      if (panelUi.activeNoteView && !m_playbackVisualsActive) {
+        panelUi.activeNoteView->clearPlaybackState();
+      }
+      break;
+    case PanelViewKind::PianoRoll:
+      if (panelUi.pianoRollView && !m_playbackVisualsActive) {
+        panelUi.pianoRollView->clearPlaybackState();
+      }
+      break;
+  }
+}
+
+bool VGMFileView::ensurePanelViewCreated(PanelSide side, PanelViewKind viewKind) {
+  if (!supportsViewKind(viewKind)) {
+    return false;
+  }
+
+  auto& panelUi = panel(side);
+  if (!panelUi.stack) {
+    return false;
+  }
+
+  if (panelWidget(panelUi, viewKind)) {
+    return true;
+  }
+
+  QWidget* createdWidget = nullptr;
+  switch (viewKind) {
+    case PanelViewKind::Hex: {
+      panelUi.hexView = new HexView(m_vgmfile, panelUi.stack);
+      panelUi.hexView->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+      connect(panelUi.hexView, &HexView::selectionChanged, this, &VGMFileView::onSelectionChange);
+      connect(panelUi.hexView, &HexView::seekToEventRequested, this, &VGMFileView::seekToEvent);
+      connect(panelUi.hexView, &HexView::notePreviewRequested, this, &VGMFileView::previewNotesForEvent);
+      connect(panelUi.hexView, &HexView::notePreviewStopped, this, &VGMFileView::stopNotePreview);
+      createdWidget = panelUi.hexView;
+      break;
+    }
+    case PanelViewKind::Tree: {
+      panelUi.treeView = new VGMFileTreeView(m_vgmfile, panelUi.stack);
+      panelUi.treeView->setMinimumWidth(rightPaneMinimumWidth);
+      connect(panelUi.treeView,
+              &VGMFileTreeView::currentItemChanged,
+              this,
+              [this](const QTreeWidgetItem* item, QTreeWidgetItem*) {
+                if (item == nullptr) {
+                  onSelectionChange(nullptr);
+                  return;
+                }
+                auto* vgmitem = static_cast<VGMItem*>(item->data(0, Qt::UserRole).value<void*>());
+                onSelectionChange(vgmitem);
+              });
+      createdWidget = panelUi.treeView;
+      break;
+    }
+    case PanelViewKind::ActiveNotes: {
+      panelUi.activeNoteView = new ActiveNoteView(panelUi.stack);
+      if (auto* seq = dynamic_cast<VGMSeq*>(m_vgmfile)) {
+        panelUi.activeNoteView->setTrackCount(effectiveTrackCountForSeq(seq));
+      }
+      connect(panelUi.activeNoteView, &ActiveNoteView::notePreviewRequested, this, &VGMFileView::previewActiveNote);
+      connect(panelUi.activeNoteView, &ActiveNoteView::notePreviewStopped, this, &VGMFileView::stopNotePreview);
+      createdWidget = panelUi.activeNoteView;
+      break;
+    }
+    case PanelViewKind::PianoRoll: {
+      panelUi.pianoRollView = new PianoRollView(panelUi.stack);
+      if (auto* seq = dynamic_cast<VGMSeq*>(m_vgmfile)) {
+        const int trackCount = effectiveTrackCountForSeq(seq);
+        panelUi.pianoRollView->setTrackCount(trackCount);
+        panelUi.pianoRollView->setSequence(seq);
+      }
+
+      connect(panelUi.pianoRollView,
+              &PianoRollView::seekRequested,
+              this,
+              [this](int tick) {
+                if (tick < 0) {
+                  return;
+                }
+
+                if (m_vgmfile->assocColls.empty()) {
+                  return;
+                }
+
+                auto* assocColl = m_vgmfile->assocColls.front();
+                auto& seqPlayer = SequencePlayer::the();
+                if (seqPlayer.activeCollection() != assocColl) {
+                  seqPlayer.setActiveCollection(assocColl);
+                }
+
+                if (seqPlayer.activeCollection() == assocColl) {
+                  seqPlayer.seek(tick, PositionChangeOrigin::SeekBar);
+                }
+              });
+      connect(panelUi.pianoRollView, &PianoRollView::selectionSetChanged, this, &VGMFileView::onSelectionSetChange);
+      connect(panelUi.pianoRollView, &PianoRollView::notePreviewRequested, this, &VGMFileView::previewPianoRollNotes);
+      connect(panelUi.pianoRollView, &PianoRollView::notePreviewStopped, this, &VGMFileView::stopNotePreview);
+      createdWidget = panelUi.pianoRollView;
+      break;
+    }
+  }
+
+  if (!createdWidget) {
+    return false;
+  }
+
+  const int viewIndex = static_cast<int>(viewKind);
+  QWidget* placeholder = panelUi.placeholders[static_cast<size_t>(viewIndex)];
+  if (placeholder) {
+    if (panelUi.stack->indexOf(placeholder) >= 0) {
+      panelUi.stack->removeWidget(placeholder);
+    }
+    placeholder->deleteLater();
+    panelUi.placeholders[static_cast<size_t>(viewIndex)] = nullptr;
+  }
+
+  panelUi.stack->insertWidget(viewIndex, createdWidget);
+
+  if (viewKind == PanelViewKind::Hex && panelUi.hexView) {
+    auto* leftHex = panel(PanelSide::Left).hexView;
+    if (leftHex && leftHex != panelUi.hexView) {
+      panelUi.hexView->setFont(leftHex->font());
+    }
+    panelUi.hexView->setMaximumWidth(panelUi.hexView->getViewportFullWidth());
+  }
+
+  applySelectionStateToPanelView(side, viewKind);
+  applyPlaybackStateToPanelView(side, viewKind);
+  return true;
 }
 
 void VGMFileView::focusInEvent(QFocusEvent* event) {
@@ -309,7 +445,11 @@ void VGMFileView::focusInEvent(QFocusEvent* event) {
     }
   }
 
-  panel(PanelSide::Left).treeView->updateStatusBar();
+  if (panel(PanelSide::Left).treeView) {
+    panel(PanelSide::Left).treeView->updateStatusBar();
+  } else if (panel(PanelSide::Right).treeView) {
+    panel(PanelSide::Right).treeView->updateStatusBar();
+  }
 }
 
 void VGMFileView::resizeEvent(QResizeEvent* event) {
@@ -381,13 +521,23 @@ void VGMFileView::setPanelView(PanelSide side, PanelViewKind viewKind) {
     return;
   }
 
+  if (!ensurePanelViewCreated(side, viewKind)) {
+    return;
+  }
+
   auto& panelUi = panel(side);
-  if (panelUi.currentKind == viewKind) {
+  QWidget* targetWidget = panelWidget(panelUi, viewKind);
+  if (!targetWidget) {
+    return;
+  }
+
+  if (panelUi.currentKind == viewKind && panelUi.stack &&
+      panelUi.stack->currentWidget() == targetWidget) {
     return;
   }
 
   panelUi.currentKind = viewKind;
-  panelUi.stack->setCurrentIndex(static_cast<int>(viewKind));
+  panelUi.stack->setCurrentWidget(targetWidget);
 
   if (viewKind == PanelViewKind::Tree && panelUi.treeView) {
     panelUi.treeView->updateStatusBar();
@@ -403,8 +553,13 @@ void VGMFileView::setPanelView(PanelSide side, PanelViewKind viewKind) {
     }
   }
 
-  if (side == PanelSide::Left) {
+  if (side == PanelSide::Left && m_splitter && m_splitter->count() >= 2) {
     enforceSplitterPolicyForResize();
+  }
+
+  const int playbackTick = std::max(0, SequencePlayer::the().elapsedTicks());
+  if (m_playbackVisualsActive || SequencePlayer::the().playing() || playbackTick > 0) {
+    onPlaybackPositionChanged(playbackTick, 0, PositionChangeOrigin::HexView);
   }
 }
 
@@ -465,12 +620,23 @@ bool VGMFileView::singlePaneMode() const {
 }
 
 int VGMFileView::hexViewFullWidth() const {
-  return panel(PanelSide::Left).hexView->getViewportFullWidth();
+  if (const auto* leftHex = panel(PanelSide::Left).hexView) {
+    return leftHex->getViewportFullWidth();
+  }
+  return 1;
 }
 
 void VGMFileView::updateHexViewFont(qreal sizeIncrement) {
+  if (!ensurePanelViewCreated(PanelSide::Left, PanelViewKind::Hex)) {
+    return;
+  }
+  auto* leftHex = panel(PanelSide::Left).hexView;
+  if (!leftHex) {
+    return;
+  }
+
   // Increment the font size until it has an actual effect on width.
-  QFont font = panel(PanelSide::Left).hexView->font();
+  QFont font = leftHex->font();
   QFontMetricsF fontMetrics(font);
   const qreal origWidth = fontMetrics.horizontalAdvance("A");
   qreal fontSize = font.pointSizeF();
@@ -674,7 +840,7 @@ void VGMFileView::closeEvent(QCloseEvent*) {
   MdiArea::the()->removeView(m_vgmfile);
 }
 
-void VGMFileView::onSelectionChange(VGMItem* item) const {
+void VGMFileView::onSelectionChange(VGMItem* item) {
   std::vector<VGMItem*> selectionItems;
   if (item) {
     selectionItems.push_back(item);
@@ -682,7 +848,7 @@ void VGMFileView::onSelectionChange(VGMItem* item) const {
   onSelectionSetChange(selectionItems, item);
 }
 
-void VGMFileView::onSelectionSetChange(const std::vector<VGMItem*>& items, VGMItem* primaryItem) const {
+void VGMFileView::onSelectionSetChange(const std::vector<VGMItem*>& items, VGMItem* primaryItem) {
   std::vector<const VGMItem*> normalizedItems;
   normalizedItems.reserve(items.size());
   std::unordered_set<const VGMItem*> itemSet;
@@ -700,6 +866,8 @@ void VGMFileView::onSelectionSetChange(const std::vector<VGMItem*>& items, VGMIt
   } else if (!normalizedItems.empty()) {
     normalizedPrimary = normalizedItems.front();
   }
+  m_selectedItems = normalizedItems;
+  m_primarySelectedItem = normalizedPrimary;
 
   for (PanelSide side : {PanelSide::Left, PanelSide::Right}) {
     if (auto* hex = panel(side).hexView) {
@@ -905,6 +1073,8 @@ void VGMFileView::previewActiveNote(int trackIndex, int key) const {
 }
 
 void VGMFileView::clearPlaybackVisuals() {
+  m_playbackVisualsActive = false;
+  m_playbackTickActive = false;
   for (PanelSide side : {PanelSide::Left, PanelSide::Right}) {
     if (auto* hex = panel(side).hexView) {
       hex->setPlaybackActive(false);
@@ -1016,23 +1186,29 @@ void VGMFileView::onPlaybackPositionChanged(int current, int max, PositionChange
 
   auto* seq = dynamic_cast<VGMSeq*>(m_vgmfile);
   if (!seq) {
+    m_playbackVisualsActive = false;
     clearPlaybackVisuals();
     return;
   }
 
   const auto* coll = SequencePlayer::the().activeCollection();
   if (!coll || !coll->containsVGMFile(m_vgmfile)) {
+    m_playbackVisualsActive = false;
     clearPlaybackVisuals();
     return;
   }
 
   const bool shouldHighlight = SequencePlayer::the().playing() || current > 0;
   if (!shouldHighlight) {
+    m_playbackVisualsActive = false;
+    m_playbackTickActive = false;
     clearPlaybackVisuals();
     return;
   }
 
   const bool playbackActive = current > 0;
+  m_playbackVisualsActive = true;
+  m_playbackTickActive = playbackActive;
   for (PanelSide side : {PanelSide::Left, PanelSide::Right}) {
     const auto& panelUi = panel(side);
     if (!panelUi.container || !panelUi.container->isVisible()) {
@@ -1047,6 +1223,8 @@ void VGMFileView::onPlaybackPositionChanged(int current, int max, PositionChange
   if (!timeline.finalized()) {
     m_playbackCursor.reset();
     m_playbackTimeline = nullptr;
+    m_playbackVisualsActive = false;
+    m_playbackTickActive = false;
     clearPlaybackVisuals();
     return;
   }
@@ -1185,6 +1363,8 @@ void VGMFileView::onPlayerStatusChanged(bool playing) {
   m_playbackItems.clear();
   m_lastPlaybackItems.clear();
   m_lastPlaybackPosition = 0;
+  m_playbackVisualsActive = false;
+  m_playbackTickActive = false;
   m_playbackCursor.reset();
   m_playbackTimeline = nullptr;
   m_trackIndexSeq = nullptr;
