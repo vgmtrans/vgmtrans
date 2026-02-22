@@ -127,6 +127,13 @@ uint64_t HexView::selectionKey(const FadePlaybackSelection& selection) {
 // Trivial destructor; QObject ownership handles child cleanup.
 HexView::~HexView() = default;
 
+QFont HexView::defaultViewFont() {
+  const double appFontPointSize = QApplication::font().pointSizeF();
+  QFont font("Roboto Mono", appFontPointSize + 1.0);
+  font.setPointSizeF(appFontPointSize + 1.0);
+  return font;
+}
+
 // Initialize HexView UI state, RHI host, typography, animations, and signal wiring.
 HexView::HexView(VGMFile* vgmfile, QWidget* parent)
     : QAbstractScrollArea(parent), m_vgmfile(vgmfile) {
@@ -144,9 +151,7 @@ HexView::HexView(VGMFile* vgmfile, QWidget* parent)
   m_rhiHost->setGeometry(viewport()->rect());
   m_rhiHost->show();
 
-  const double appFontPointSize = QApplication::font().pointSizeF();
-  QFont font("Roboto Mono", appFontPointSize + 1.0);
-  font.setPointSizeF(appFontPointSize + 1.0);
+  QFont font = defaultViewFont();
   setShadowStrength(SHADOW_STRENGTH);
   m_playbackGlowLow = PLAYBACK_GLOW_LOW;
   m_playbackGlowHigh = PLAYBACK_GLOW_HIGH;
