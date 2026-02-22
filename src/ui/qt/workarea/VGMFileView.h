@@ -63,10 +63,21 @@ public:
   [[nodiscard]] bool supportsSequenceViews() const;
 
 private:
+  static constexpr size_t panelViewCount =
+      static_cast<size_t>(PanelViewKind::PianoRoll) + 1;
+
+  [[nodiscard]] static constexpr size_t panelViewIndex(PanelViewKind viewKind) {
+    return static_cast<size_t>(viewKind);
+  }
+
+  [[nodiscard]] static constexpr int panelViewStackIndex(PanelViewKind viewKind) {
+    return static_cast<int>(panelViewIndex(viewKind));
+  }
+
   struct PanelUi {
     QWidget* container = nullptr;
     QStackedWidget* stack = nullptr;
-    std::array<QWidget*, 4> placeholders{};
+    std::array<QWidget*, panelViewCount> placeholders{};
     HexView* hexView = nullptr;
     VGMFileTreeView* treeView = nullptr;
     ActiveNoteView* activeNoteView = nullptr;
