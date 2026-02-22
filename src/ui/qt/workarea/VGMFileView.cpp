@@ -445,6 +445,11 @@ void VGMFileView::resizeEvent(QResizeEvent* event) {
   enforceSplitterPolicyForResize();
 }
 
+void VGMFileView::showEvent(QShowEvent* event) {
+  QMdiSubWindow::showEvent(event);
+  refreshPlaybackVisualsIfNeeded();
+}
+
 bool VGMFileView::eventFilter(QObject* watched, QEvent* event) {
   if (watched == m_splitter && event &&
       (event->type() == QEvent::Show || event->type() == QEvent::ShowToParent)) {
