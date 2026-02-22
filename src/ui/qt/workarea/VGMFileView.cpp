@@ -563,10 +563,7 @@ void VGMFileView::setPanelView(PanelSide side, PanelViewKind viewKind) {
     enforceSplitterPolicyForResize();
   }
 
-  const int playbackTick = std::max(0, SequencePlayer::the().elapsedTicks());
-  if (m_playbackVisualsActive || SequencePlayer::the().playing() || playbackTick > 0) {
-    onPlaybackPositionChanged(playbackTick, 0, PositionChangeOrigin::HexView);
-  }
+  refreshPlaybackVisualsIfNeeded();
 }
 
 // Returns the currently visible view kind for the given pane.
@@ -619,10 +616,7 @@ void VGMFileView::setSinglePaneMode(bool singlePane) {
     m_splitter->setHandleWidth(m_defaultSplitterHandleWidth);
     enforceSplitterPolicyForResize();
 
-    const int playbackTick = std::max(0, SequencePlayer::the().elapsedTicks());
-    if (m_playbackVisualsActive || SequencePlayer::the().playing() || playbackTick > 0) {
-      onPlaybackPositionChanged(playbackTick, 0, PositionChangeOrigin::HexView);
-    }
+    refreshPlaybackVisualsIfNeeded();
   }
 }
 
@@ -706,6 +700,13 @@ void VGMFileView::applyHexViewFont(QFont font, bool persistSetting) {
   }
   setLeftPaneWidth(newWidth, true);
   enforceSplitterPolicyForResize();
+}
+
+void VGMFileView::refreshPlaybackVisualsIfNeeded() {
+  const int playbackTick = std::max(0, SequencePlayer::the().elapsedTicks());
+  if (m_playbackVisualsActive || SequencePlayer::the().playing() || playbackTick > 0) {
+    onPlaybackPositionChanged(playbackTick, 0, PositionChangeOrigin::HexView);
+  }
 }
 
 void VGMFileView::onSplitterMoved(int, int) {
