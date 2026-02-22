@@ -1,10 +1,3 @@
-# ~~~
-# Dependencies
-# ~~~
-
-add_subdirectory("${PROJECT_SOURCE_DIR}/lib/bass"
-                 "${CMAKE_CURRENT_BINARY_DIR}/bass" EXCLUDE_FROM_ALL)
-
 find_package(Qt6 COMPONENTS Core Gui ShaderTools Widgets Svg GuiPrivate)
 if(NOT Qt6_FOUND AND CMAKE_SYSTEM_NAME STREQUAL "Windows")
   message(STATUS "Qt6 could not be found, falling back to vendored Qt6")
