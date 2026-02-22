@@ -159,7 +159,6 @@ VGMFileView::VGMFileView(VGMFile* vgmfile)
   setPanelView(PanelSide::Left, initialLeftView);
   if (storedRightPaneHidden) {
     panel(PanelSide::Right).currentKind = initialRightView;
-    panel(PanelSide::Right).stack->setCurrentIndex(panelViewStackIndex(initialRightView));
   } else {
     setPanelView(PanelSide::Right, initialRightView);
   }
@@ -227,19 +226,12 @@ VGMFileView::PanelUi VGMFileView::createPanel(PanelSide side) {
   containerLayout->setSpacing(0);
 
   panelUi.stack = new QStackedWidget(panelUi.container);
-  for (size_t i = 0; i < panelUi.placeholders.size(); ++i) {
-    auto* placeholder = new QWidget(panelUi.stack);
-    placeholder->setVisible(false);
-    panelUi.placeholders[i] = placeholder;
-    panelUi.stack->addWidget(placeholder);
-  }
 
   if (side == PanelSide::Left) {
     panelUi.currentKind = PanelViewKind::Hex;
   } else {
     panelUi.currentKind = PanelViewKind::Tree;
   }
-  panelUi.stack->setCurrentIndex(panelViewStackIndex(panelUi.currentKind));
   containerLayout->addWidget(panelUi.stack, 1);
 
   return panelUi;
@@ -414,17 +406,7 @@ bool VGMFileView::ensurePanelViewCreated(PanelSide side, PanelViewKind viewKind)
     return false;
   }
 
-  const size_t viewIndex = panelViewIndex(viewKind);
-  QWidget* placeholder = panelUi.placeholders[viewIndex];
-  if (placeholder) {
-    if (panelUi.stack->indexOf(placeholder) >= 0) {
-      panelUi.stack->removeWidget(placeholder);
-    }
-    placeholder->deleteLater();
-    panelUi.placeholders[viewIndex] = nullptr;
-  }
-
-  panelUi.stack->insertWidget(panelViewStackIndex(viewKind), createdWidget);
+  panelUi.stack->addWidget(createdWidget);
 
   if (viewKind == PanelViewKind::Hex && panelUi.hexView) {
     panelUi.hexView->setFont(m_activeHexFont);
