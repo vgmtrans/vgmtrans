@@ -25,6 +25,7 @@ class QPoint;
 class QObject;
 class QEvent;
 class QResizeEvent;
+class QShowEvent;
 class VGMFile;
 class VGMSeq;
 class SeqTrack;
@@ -78,6 +79,7 @@ private:
   bool eventFilter(QObject* watched, QEvent* event) override;
   void focusInEvent(QFocusEvent* event) override;
   void resizeEvent(QResizeEvent* event) override;
+  void showEvent(QShowEvent* event) override;
   void closeEvent(QCloseEvent* closeEvent) override;
 
   PanelUi createPanel(PanelSide side);
