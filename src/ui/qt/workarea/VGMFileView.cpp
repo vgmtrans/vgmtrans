@@ -1210,22 +1210,18 @@ void VGMFileView::onPlaybackPositionChanged(int current, int max, PositionChange
 
   auto* seq = dynamic_cast<VGMSeq*>(m_vgmfile);
   if (!seq) {
-    m_playbackVisualsActive = false;
     clearPlaybackVisuals();
     return;
   }
 
   const auto* coll = SequencePlayer::the().activeCollection();
   if (!coll || !coll->containsVGMFile(m_vgmfile)) {
-    m_playbackVisualsActive = false;
     clearPlaybackVisuals();
     return;
   }
 
   const bool shouldHighlight = SequencePlayer::the().playing() || current > 0;
   if (!shouldHighlight) {
-    m_playbackVisualsActive = false;
-    m_playbackTickActive = false;
     clearPlaybackVisuals();
     return;
   }
@@ -1247,8 +1243,6 @@ void VGMFileView::onPlaybackPositionChanged(int current, int max, PositionChange
   if (!timeline.finalized()) {
     m_playbackCursor.reset();
     m_playbackTimeline = nullptr;
-    m_playbackVisualsActive = false;
-    m_playbackTickActive = false;
     clearPlaybackVisuals();
     return;
   }
@@ -1387,8 +1381,6 @@ void VGMFileView::onPlayerStatusChanged(bool playing) {
   m_playbackItems.clear();
   m_lastPlaybackItems.clear();
   m_lastPlaybackPosition = 0;
-  m_playbackVisualsActive = false;
-  m_playbackTickActive = false;
   m_playbackCursor.reset();
   m_playbackTimeline = nullptr;
   m_trackIndexSeq = nullptr;
