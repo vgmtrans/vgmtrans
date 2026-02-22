@@ -1,22 +1,9 @@
-# VGMTrans (c) 2002-2021
+# VGMTrans (c) 2002-2026
 # Licensed under the zlib license
 # Check the included LICENSE.txt for details
 
 # For cmake-presets v3
 cmake_minimum_required(VERSION 3.21)
-
-set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
-set(CMAKE_CXX_STANDARD 20)
-set(CMAKE_OBJCXX_STANDARD 20)
-add_compile_definitions($<$<NOT:$<CONFIG:Debug>>:NDEBUG>)
-
-# Use ccache if present on the system
-find_program(CCACHE ccache)
-if(CCACHE)
-  message(STATUS "Using ccache: ${CCACHE}")
-  set(CMAKE_C_COMPILER_LAUNCHER ${CCACHE})
-  set(CMAKE_CXX_COMPILER_LAUNCHER ${CCACHE})
-endif()
 
 project(
   VGMTrans
@@ -62,22 +49,25 @@ endif()
 
 list(APPEND CMAKE_MODULE_PATH ${CMAKE_SOURCE_DIR}/cmake)
 
-if(APPLE AND EXISTS /usr/local/lib/)
-  # Generic Homebrew include path
-  list(APPEND CMAKE_PREFIX_PATH "/usr/local/include")
-endif()
-
-#
+# ~~~
 # Options
-#
+# ~~~
 
 option(ENABLE_UI_QT "Build the UI (Qt)" ON)
 option(ENABLE_CLI "Build the CLI application" ON)
 option(ENABLE_SHELL "Build the shell application" ON)
 
+# ~~~
+# Dependencies
+# ~~~
+
 add_subdirectory("${PROJECT_SOURCE_DIR}/lib/fmt")
 set(SPDLOG_FMT_EXTERNAL ON CACHE BOOL "Use external fmt library")
 add_subdirectory("${PROJECT_SOURCE_DIR}/lib/spdlog")
 add_subdirectory("${PROJECT_SOURCE_DIR}/lib/mio")
+
+# ~~~
+# Source
+# ~~~
 
 add_subdirectory(src)

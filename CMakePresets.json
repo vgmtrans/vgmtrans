@@ -10,6 +10,12 @@
                 "type": "equals",
                 "lhs": "${hostSystemName}",
                 "rhs": "Windows"
+            },
+            "environment": {
+                "CMAKE_EXPORT_COMPILE_COMMANDS": "ON"
+            },
+            "cacheVariables": {
+                "CMAKE_CXX_SCAN_FOR_MODULES": false
             }
         },
         {
@@ -17,13 +23,10 @@
             "inherits": "windows-base",
             "displayName": "Windows x64 (MSVC)",
             "description": "Build VGMTrans for Windows x64 using MSVC",
+            "toolchainFile": "${sourceDir}/cmake/toolchain/windows-x64.cmake",
             "architecture": {
                 "value": "x64",
                 "strategy": "external"
-            },
-            "environment": {
-                "CFLAGS": "/permissive- /Zc:strictStrings- /W3 -DNOMINMAX -D_CRT_SECURE_NO_DEPRECATE -D_CRT_NONSTDC_NO_DEPRECATE -D_USE_MATH_DEFINES",
-                "CXXFLAGS": "/permissive- /Zc:strictStrings- /W3 -DNOMINMAX -D_CRT_SECURE_NO_DEPRECATE -D_CRT_NONSTDC_NO_DEPRECATE -D_USE_MATH_DEFINES"
             }
         },
         {
@@ -31,6 +34,7 @@
             "inherits": "windows-base",
             "displayName": "Windows ARM64 (MSVC)",
             "description": "Build VGMTrans for Windows ARM64 using MSVC",
+            "toolchainFile": "${sourceDir}/cmake/toolchain/windows-arm64.cmake",
             "architecture": {
                 "value": "arm64",
                 "strategy": "external"
@@ -44,13 +48,13 @@
             "inherits": "windows-base",
             "displayName": "Windows x64 (Clang)",
             "description": "Build VGMTrans for Windows x64 using Clang",
+            "toolchainFile": "${sourceDir}/cmake/toolchain/windows-x64.cmake",
             "environment": {
-                "CFLAGS": "--target=x86_64-pc-windows-msvc -fuse-ld=lld /permissive- /W3 -DNOMINMAX -D_CRT_SECURE_NO_DEPRECATE -D_CRT_NONSTDC_NO_DEPRECATE -D_USE_MATH_DEFINES",
-                "CXXFLAGS": "--target=x86_64-pc-windows-msvc -fuse-ld=lld /permissive- /W3 -DNOMINMAX -D_CRT_SECURE_NO_DEPRECATE -D_CRT_NONSTDC_NO_DEPRECATE -D_USE_MATH_DEFINES"
+                "CC": "clang-cl.exe",
+                "CXX": "clang-cl.exe",
+                "LDFLAGS": "-fuse-ld=lld"
             },
             "cacheVariables": {
-                "CMAKE_C_COMPILER": "clang-cl.exe",
-                "CMAKE_CXX_COMPILER": "clang-cl.exe",
                 "WITH_LZMA_ASM": false
             }
         },
@@ -59,8 +63,17 @@
             "generator": "Ninja Multi-Config",
             "binaryDir": "${sourceDir}/build/${presetName}",
             "hidden": true,
+            "condition": {
+                "type": "equals",
+                "lhs": "${hostSystemName}",
+                "rhs": "Darwin"
+            },
             "environment": {
-                "CXXFLAGS": "-Wall -Wextra -Wshadow -Wunused -Wold-style-cast -Woverloaded-virtual -Wcast-align -Wnull-dereference"
+                "CMAKE_EXPORT_COMPILE_COMMANDS": "ON",
+                "CMAKE_PREFIX_PATH": "/usr/local/include:/usr/local/opt/qt6"
+            },
+            "cacheVariables": {
+                "CMAKE_CXX_SCAN_FOR_MODULES": false
             }
         },
         {
@@ -68,14 +81,11 @@
             "inherits": "macos-base",
             "displayName": "VGMTrans (Intel)",
             "description": "Build VGMTrans for Intel Macs",
+            "toolchainFile": "${sourceDir}/cmake/toolchain/macOS-Intel.cmake",
             "condition": {
                 "type": "equals",
                 "lhs": "${hostSystemName}",
                 "rhs": "Darwin"
-            },
-            "cacheVariables": {
-                "CMAKE_OSX_DEPLOYMENT_TARGET": "11.0",
-                "CMAKE_OSX_ARCHITECTURES": "x86_64h"
             }
         },
         {
@@ -83,14 +93,11 @@
             "inherits": "macos-base",
             "displayName": "VGMTrans (Apple Silicon)",
             "description": "Build VGMTrans for Apple Silicon Macs",
+            "toolchainFile": "${sourceDir}/cmake/toolchain/macOS-AppleSilicon.cmake",
             "condition": {
                 "type": "equals",
                 "lhs": "${hostSystemName}",
                 "rhs": "Darwin"
-            },
-            "cacheVariables": {
-                "CMAKE_OSX_DEPLOYMENT_TARGET": "11.0",
-                "CMAKE_OSX_ARCHITECTURES": "arm64"
             }
         },
         {
@@ -99,13 +106,17 @@
             "binaryDir": "${sourceDir}/build/${presetName}",
             "displayName": "Linux x64",
             "description": "Build VGMTrans for Linux x64",
+            "toolchainFile": "${sourceDir}/cmake/toolchain/Linux-x64.cmake",
             "condition": {
                 "type": "equals",
                 "lhs": "${hostSystemName}",
                 "rhs": "Linux"
             },
             "environment": {
-                "CXXFLAGS": "$penv{CXXFLAGS} -lstdc++fs -Wall -Wextra -Wshadow -Wunused -Wold-style-cast -Woverloaded-virtual -Wcast-align -Wnull-dereference"
+                "CMAKE_EXPORT_COMPILE_COMMANDS": "ON"
+            },
+            "cacheVariables": {
+                "CMAKE_CXX_SCAN_FOR_MODULES": false
             }
         }
     ],
@@ -147,6 +158,16 @@
             "configuration": "Release"
         },
         {
+            "name": "win-x64-asan-debug",
+            "displayName": "Windows x64 ASAN, Debug",
+            "configurePreset": "win-x64",
+            "configuration": "Debug",
+            "environment": {
+                "CFLAGS": "/fsanitize=address",
+                "CXXFLAGS": "/fsanitize=address"
+            }
+        },
+        {
             "name": "macos-intel-debug",
             "displayName": "macOS Intel, Debug",
             "configurePreset": "macos-intel",
@@ -154,7 +175,7 @@
         },
         {
             "name": "macos-intel-release",
-            "displayName": "macOS Release, Debug",
+            "displayName": "macOS Intel, Release",
             "configurePreset": "macos-intel",
             "configuration": "Release"
         },
@@ -171,6 +192,28 @@
             "configuration": "Release"
         },
         {
+            "name": "macos-intel-asan-debug",
+            "displayName": "macOS Intel ASAN, Debug",
+            "configurePreset": "macos-intel",
+            "configuration": "Debug",
+            "environment": {
+                "CFLAGS": "-fsanitize=address -fno-omit-frame-pointer",
+                "CXXFLAGS": "-fsanitize=address -fno-omit-frame-pointer",
+                "LDFLAGS": "-fsanitize=address"
+            }
+        },
+        {
+            "name": "macos-arm64-asan-debug",
+            "displayName": "macOS Apple Silicon ASAN, Debug",
+            "configurePreset": "macos-arm64",
+            "configuration": "Debug",
+            "environment": {
+                "CFLAGS": "-fsanitize=address -fno-omit-frame-pointer",
+                "CXXFLAGS": "-fsanitize=address -fno-omit-frame-pointer",
+                "LDFLAGS": "-fsanitize=address"
+            }
+        },
+        {
             "name": "linux-x64-debug",
             "displayName": "Linux x64, Debug",
             "configurePreset": "linux-x64",
@@ -181,6 +224,17 @@
             "displayName": "Linux x64, Release",
             "configurePreset": "linux-x64",
             "configuration": "Release"
+        },
+        {
+            "name": "linux-x64-asan-debug",
+            "displayName": "Linux x64 ASAN, Debug",
+            "configurePreset": "linux-x64",
+            "configuration": "Debug",
+            "environment": {
+                "CFLAGS": "-fsanitize=address -fno-omit-frame-pointer",
+                "CXXFLAGS": "-fsanitize=address -fno-omit-frame-pointer",
+                "LDFLAGS": "-fsanitize=address"
+            }
         }
     ]
 }
