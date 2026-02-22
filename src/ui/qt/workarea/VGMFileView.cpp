@@ -123,6 +123,13 @@ bool buildPreviewNoteForEvent(const SeqEvent* seqEvent, SequencePlayer::PreviewN
   outNote.velocity = velocity;
   return true;
 }
+
+QFont defaultHexViewFont() {
+  const double appFontPointSize = QApplication::font().pointSizeF();
+  QFont font("Roboto Mono", appFontPointSize + 1.0);
+  font.setPointSizeF(appFontPointSize + 1.0);
+  return font;
+}
 }  // namespace
 
 VGMFileView::VGMFileView(VGMFile* vgmfile)
@@ -136,6 +143,8 @@ VGMFileView::VGMFileView(VGMFile* vgmfile)
   setCursor(Qt::ArrowCursor);
 
   m_isSeqFile = dynamic_cast<VGMSeq*>(m_vgmfile) != nullptr;
+  const bool storedRightPaneHidden =
+      m_isSeqFile ? Settings::the()->VGMSeqFileView.rightPaneHidden() : false;
 
   PanelViewKind initialLeftView = PanelViewKind::Hex;
   PanelViewKind initialRightView = PanelViewKind::Tree;
@@ -147,10 +156,15 @@ VGMFileView::VGMFileView(VGMFile* vgmfile)
 
   panel(PanelSide::Left) = createPanel(PanelSide::Left);
   panel(PanelSide::Right) = createPanel(PanelSide::Right);
+  m_defaultHexFont = defaultHexViewFont();
+
   setPanelView(PanelSide::Left, initialLeftView);
-  setPanelView(PanelSide::Right, initialRightView);
-  // Keep one HexView always available so font shortcuts and split-width logic have a source.
-  ensurePanelViewCreated(PanelSide::Left, PanelViewKind::Hex);
+  if (storedRightPaneHidden) {
+    panel(PanelSide::Right).currentKind = initialRightView;
+    panel(PanelSide::Right).stack->setCurrentIndex(static_cast<int>(initialRightView));
+  } else {
+    setPanelView(PanelSide::Right, initialRightView);
+  }
 
   m_splitter->addWidget(panel(PanelSide::Left).container);
   m_splitter->addWidget(panel(PanelSide::Right).container);
@@ -161,8 +175,7 @@ VGMFileView::VGMFileView(VGMFile* vgmfile)
   qApp->installEventFilter(this);
   m_splitter->installEventFilter(this);
 
-  if (panel(PanelSide::Left).hexView) {
-    m_defaultHexFont = panel(PanelSide::Left).hexView->font();
+  if (panel(PanelSide::Left).hexView || panel(PanelSide::Right).hexView) {
     applyHexViewFont(m_defaultHexFont);
   }
 
@@ -202,8 +215,6 @@ VGMFileView::VGMFileView(VGMFile* vgmfile)
     m_preferredLeftPaneWidth = storedLeftPaneWidth;
   }
 
-  const bool storedRightPaneHidden =
-      m_isSeqFile ? Settings::the()->VGMSeqFileView.rightPaneHidden() : false;
   if (storedRightPaneHidden) {
     setSinglePaneMode(true);
   }
@@ -608,6 +619,7 @@ void VGMFileView::setSinglePaneMode(bool singlePane) {
     m_splitter->setHandleWidth(0);
     setSplitterSizes(std::max(1, width()), 0);
   } else {
+    ensurePanelViewCreated(PanelSide::Right, rightPanel.currentKind);
     rightPanel.container->setVisible(true);
     m_splitter->setHandleWidth(m_defaultSplitterHandleWidth);
     enforceSplitterPolicyForResize();
