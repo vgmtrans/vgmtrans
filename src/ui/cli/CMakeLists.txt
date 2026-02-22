@@ -1,7 +1,8 @@
-add_executable(
-  vgmtrans-cli
-  CLIVGMRoot.cpp
-  main_cli.cpp
+add_executable(vgmtrans-cli)
+target_sources(vgmtrans-cli
+  PRIVATE
+    CLIVGMRoot.cpp
+    main_cli.cpp
 )
 
 target_include_directories(vgmtrans-cli PUBLIC "${PROJECT_BINARY_DIR}/src")

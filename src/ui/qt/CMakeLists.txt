@@ -32,83 +32,105 @@ elseif(CMAKE_SYSTEM_NAME STREQUAL "Windows")
   set(GUI_TYPE WIN32)
 endif()
 
-add_executable(
-  vgmtrans
-  ${GUI_TYPE}
-  About.cpp
-  About.h
-  IconBar.cpp
-  IconBar.h
-  Logger.cpp
-  Logger.h
-  MainWindow.cpp
-  MainWindow.h
-  ManualCollectionDialog.cpp
-  ManualCollectionDialog.h
-  MenuBar.cpp
-  MenuBar.h
-  QtVGMRoot.cpp
-  QtVGMRoot.h
-  ReportDialog.cpp
-  ReportDialog.h
-  SequencePlayer.cpp
-  SequencePlayer.h
-  main_ui.cpp
-  services/MenuManager.cpp
-  services/MenuManager.h
-  services/Settings.cpp
-  services/Settings.h
-  services/NotificationCenter.cpp
-  services/NotificationCenter.h
-  services/commands/Command.h
-  services/commands/SaveCommands.h
-  services/commands/GeneralCommands.h
-  util/Colors.h
-  util/Helpers.cpp
-  util/Helpers.h
-  util/LambdaEventFilter.h
-  util/UIHelpers.cpp
-  util/UIHelpers.h
-  widgets/ClickJumpSlider.cpp
-  widgets/ClickJumpSlider.h
-  widgets/MarqueeLabel.cpp
-  widgets/MarqueeLabel.h
-  widgets/SnappingSplitter.cpp
-  widgets/SnappingSplitter.h
-  widgets/StatusBarContent.cpp
-  widgets/StatusBarContent.h
-  widgets/Toast.cpp
-  widgets/Toast.h
-  widgets/ToastHost.cpp
-  widgets/ToastHost.h
-  widgets/TableView.cpp
-  widgets/TableView.h
-  widgets/TitleBar.cpp
-  widgets/TitleBar.h
-  workarea/hexview/HexView.cpp
-  workarea/hexview/HexView.h
-  workarea/hexview/HexViewRhiHost.cpp
-  workarea/hexview/HexViewRhiHost.h
-  workarea/hexview/HexViewRhiRenderer.cpp
-  workarea/hexview/HexViewRhiRenderer.h
-  workarea/hexview/HexViewRhiWidget.cpp
-  workarea/hexview/HexViewRhiWidget.h
-  workarea/hexview/HexViewRhiWindow.cpp
-  workarea/hexview/HexViewRhiWindow.h
-  workarea/MdiArea.cpp
-  workarea/MdiArea.h
-  workarea/RawFileListView.cpp
-  workarea/RawFileListView.h
-  workarea/VGMCollListView.cpp
-  workarea/VGMCollListView.h
-  workarea/VGMCollView.cpp
-  workarea/VGMCollView.h
-  workarea/VGMFileTreeView.cpp
-  workarea/VGMFileTreeView.h
-  workarea/VGMFileView.cpp
-  workarea/VGMFileView.h
-  workarea/VGMFileListView.cpp
-  workarea/VGMFileListView.h)
+add_executable(vgmtrans ${GUI_TYPE})
+target_sources(vgmtrans
+  PRIVATE
+    About.cpp
+    IconBar.cpp
+    Logger.cpp
+    MainWindow.cpp
+    ManualCollectionDialog.cpp
+    MenuBar.cpp
+    QtVGMRoot.cpp
+    ReportDialog.cpp
+    SequencePlayer.cpp
+    main_ui.cpp
+    services/MenuManager.cpp
+    services/Settings.cpp
+    services/NotificationCenter.cpp
+    util/Helpers.cpp
+    util/UIHelpers.cpp
+    widgets/ClickJumpSlider.cpp
+    widgets/MarqueeLabel.cpp
+    widgets/SnappingSplitter.cpp
+    widgets/StatusBarContent.cpp
+    widgets/Toast.cpp
+    widgets/ToastHost.cpp
+    widgets/TableView.cpp
+    widgets/TitleBar.cpp
+    workarea/hexview/HexView.cpp
+    workarea/hexview/HexViewRhiHost.cpp
+    workarea/hexview/HexViewRhiRenderer.cpp
+    workarea/hexview/HexViewRhiWidget.cpp
+    workarea/hexview/HexViewRhiWindow.cpp
+    workarea/MdiArea.cpp
+    workarea/RawFileListView.cpp
+    workarea/VGMCollListView.cpp
+    workarea/VGMCollView.cpp
+    workarea/VGMFileTreeView.cpp
+    workarea/VGMFileView.cpp
+    workarea/VGMFileListView.cpp
+
+  PRIVATE
+    FILE_SET HEADERS TYPE HEADERS
+    FILES
+      About.h
+      IconBar.h
+      Logger.h
+      MainWindow.h
+      ManualCollectionDialog.h
+      MenuBar.h
+      QtVGMRoot.h
+      ReportDialog.h
+      SequencePlayer.h
+      services/MenuManager.h
+      services/NotificationCenter.h
+      services/Settings.h
+      services/commands/Command.h
+      services/commands/GeneralCommands.h
+      services/commands/SaveCommands.h
+      services/commands/VGMCollCommands.h
+  PRIVATE
+    FILE_SET headers_util TYPE HEADERS BASE_DIRS util
+    FILES
+      util/Colors.h
+      util/Helpers.h
+      util/LambdaEventFilter.h
+      util/Metrics.h
+      util/TintableSvgIconEngine.h
+      util/UIHelpers.h
+  PRIVATE
+    FILE_SET headers_widgets TYPE HEADERS BASE_DIRS widgets
+    FILES
+      widgets/ClickJumpSlider.h
+      widgets/MarqueeLabel.h
+      widgets/SnappingSplitter.h
+      widgets/StatusBarContent.h
+      widgets/TableView.h
+      widgets/TitleBar.h
+      widgets/Toast.h
+      widgets/ToastHost.h
+  PRIVATE
+    FILE_SET headers_workarea TYPE HEADERS BASE_DIRS workarea
+    FILES
+      workarea/MdiArea.h
+      workarea/RawFileListView.h
+      workarea/VGMCollListView.h
+      workarea/VGMCollView.h
+      workarea/VGMFileListView.h
+      workarea/VGMFileTreeView.h
+      workarea/VGMFileView.h
+      workarea/hexview/HexView.h
+      workarea/hexview/HexViewFrameData.h
+      workarea/hexview/HexViewInput.h
+      workarea/hexview/HexViewRhiEventForwarder.h
+      workarea/hexview/HexViewRhiHost.h
+      workarea/hexview/HexViewRhiInputCoalescer.h
+      workarea/hexview/HexViewRhiRenderer.h
+      workarea/hexview/HexViewRhiWidget.h
+      workarea/hexview/HexViewRhiWindow.h
+)
+
 
 if(APPLE)
   target_sources(vgmtrans PRIVATE util/Helpers_mac.mm)
@@ -117,7 +139,6 @@ endif()
 
 target_compile_features(vgmtrans PRIVATE cxx_std_20)
 
-target_include_directories(vgmtrans PRIVATE . ./util ./widgets ./workarea)
 
 target_link_libraries(
   vgmtrans
