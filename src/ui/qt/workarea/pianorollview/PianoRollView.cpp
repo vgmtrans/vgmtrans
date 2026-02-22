@@ -1042,7 +1042,7 @@ bool PianoRollView::updateActiveKeyStates() {
   }
   std::vector<PianoRollFrame::Note> nextActiveNotes;
 
-  if (m_timeline && m_timelineCursor && m_timeline->finalized()) {
+  if (m_playbackActive && m_timeline && m_timelineCursor && m_timeline->finalized()) {
     std::vector<const SeqTimedEvent*> active;
     m_timelineCursor->getActiveAt(static_cast<uint32_t>(std::max(0, m_currentTick)), active);
     nextActiveNotes.reserve(active.size());
