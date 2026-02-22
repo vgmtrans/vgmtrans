@@ -7,3 +7,4 @@ add_executable(
 target_include_directories(vgmtrans-cli PUBLIC "${PROJECT_BINARY_DIR}/src")
 
 target_link_libraries(vgmtrans-cli PRIVATE vgmtranscore)
+target_compile_features(vgmtrans-cli PRIVATE cxx_std_20)

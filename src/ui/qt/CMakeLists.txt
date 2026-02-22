@@ -5,14 +5,6 @@
 add_subdirectory("${PROJECT_SOURCE_DIR}/lib/bass"
                  "${CMAKE_CURRENT_BINARY_DIR}/bass" EXCLUDE_FROM_ALL)
 
-if(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
-  # Homebrew installs Qt (up to at least 5.9.1) in /usr/local/qt*, ensure it can
-  # be found by CMake since it is not in the default /usr/local prefix.
-  if(EXISTS /usr/local/opt/qt6)
-    list(APPEND CMAKE_PREFIX_PATH "/usr/local/opt/qt6")
-  endif()
-endif()
-
 find_package(Qt6 COMPONENTS Core Gui ShaderTools Widgets Svg GuiPrivate)
 if(NOT Qt6_FOUND AND CMAKE_SYSTEM_NAME STREQUAL "Windows")
   message(STATUS "Qt6 could not be found, falling back to vendored Qt6")
@@ -120,7 +112,10 @@ add_executable(
 
 if(APPLE)
   target_sources(vgmtrans PRIVATE util/Helpers_mac.mm)
+  set_target_properties(vgmtrans PROPERTIES OBJCXX_STANDARD 20)
 endif()
+
+target_compile_features(vgmtrans PRIVATE cxx_std_20)
 
 target_include_directories(vgmtrans PRIVATE . ./util ./widgets ./workarea)
 

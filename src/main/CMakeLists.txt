@@ -76,3 +76,4 @@ target_link_libraries(
   vgmtranscore
   PUBLIC spdlog::spdlog unarr ZLIB::ZLIB minizip mio chdr-static
 )
+target_compile_features(vgmtranscore PUBLIC cxx_std_20)

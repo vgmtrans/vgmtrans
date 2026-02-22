@@ -200,6 +200,7 @@ FakesAssemblies/
 # VisualStudio.gitignore end ---------------------------------------------------
 
 cmake-build-*
+CMakeUserPresets.json
 
 # Visual Studio Code
 .vscode
