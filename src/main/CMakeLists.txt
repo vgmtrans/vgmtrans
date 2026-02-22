@@ -1,56 +1,104 @@
-# Add zlib and minizip dependencies
-# Prefer system zlib; otherwise build vendored static
-option(USE_SYSTEM_ZLIB "Use system-provided zlib if available" ON)
+# ~~~
+# Dependencies
+# ~~~
 
-if (USE_SYSTEM_ZLIB)
-  find_package(ZLIB QUIET)
-endif()
+# mio is a header-only library
+add_subdirectory(${PROJECT_SOURCE_DIR}/lib/mio ${CMAKE_CURRENT_BINARY_DIR}/lib/mio EXCLUDE_FROM_ALL)
 
-if (NOT ZLIB_FOUND)
-  message(STATUS "System zlib not found; building vendored zlib (static)")
-  set(ZLIB_BUILD_TESTING OFF CACHE BOOL "[zlib] Enable Zlib Examples as tests"              FORCE)
-  set(ZLIB_BUILD_SHARED  OFF CACHE BOOL "[zlib] Enable building zlib shared library"        FORCE)
-  set(ZLIB_BUILD_STATIC  ON  CACHE BOOL "[zlib] Enable building zlib static library"        FORCE)
-  set(ZLIB_BUILD_MINIZIP OFF CACHE BOOL "[zlib] Enable building libminizip contrib library" FORCE)
-  set(ZLIB_INSTALL       OFF CACHE BOOL "[zlib] Enable installation of zlib"                FORCE)
-
-  add_subdirectory("${PROJECT_SOURCE_DIR}/lib/zlib"
-          "${CMAKE_BINARY_DIR}/lib/zlib"
-          EXCLUDE_FROM_ALL)
-
-  add_library(ZLIB::ZLIB ALIAS zlibstatic)
-endif()
-
-# Add minizip from our vendored zlib
-set(MINIZIP_DIR "${PROJECT_SOURCE_DIR}/lib/zlib/contrib/minizip")
-
-add_library(minizip STATIC
-        "${MINIZIP_DIR}/ioapi.c"
-        "${MINIZIP_DIR}/unzip.c"
-)
-if (WIN32)
-  target_sources(minizip PRIVATE "${MINIZIP_DIR}/iowin32.c")
-endif()
-
-target_include_directories(minizip PUBLIC "${MINIZIP_DIR}")
-target_link_libraries(minizip PUBLIC ZLIB::ZLIB)
-
-# Add libunarr
-message(INFO "Using built-in unarr")
-set(ENABLE_7Z         OFF CACHE BOOL "[unarr] Build with 7z support"               FORCE)
-set(USE_SYSTEM_BZ2    OFF CACHE BOOL "[unarr] Build with system bzip2 if possible" FORCE)
-set(BUILD_SHARED_LIBS OFF CACHE BOOL "[unarr] Build libunarr as a shared library"  FORCE)
-set(USE_SYSTEM_ZLIB   OFF CACHE BOOL "[unarr] Build with system zlib if possible"  FORCE)
-add_subdirectory("${PROJECT_SOURCE_DIR}/lib/unarr" "${CMAKE_BINARY_DIR}/lib/unarr" EXCLUDE_FROM_ALL)
-
-# Add libchdr
-if (ZLIB_FOUND)
-  set(WITH_SYSTEM_ZLIB ON  CACHE BOOL "[libchdr] Use system provided zlib library" FORCE)
+# nhlohmann-json is a header-only library,
+# but some distros provide it as a system package
+if(USE_SYSTEM_NLOHMANN)
+  find_package(nlohmann_json 3.12.0 REQUIRED)
 else()
-  # triggers our vendored zlibstatic path instead of libchdr's vendored zlib
-  set(WITH_SYSTEM_ZLIB OFF CACHE BOOL "[libchdr] Use system provided zlib library" FORCE)
+  message(STATUS "Using vendored nlohmann_json library")
+  add_library(nlohmann_json INTERFACE)
+  add_library(nlohmann_json::nlohmann_json ALIAS nlohmann_json)
+  target_sources(
+    nlohmann_json
+    INTERFACE
+    FILE_SET HEADERS BASE_DIRS ${PROJECT_SOURCE_DIR}/lib
+    FILES
+      ${PROJECT_SOURCE_DIR}/lib/nlohmann/json.hpp
+  )
 endif()
-add_subdirectory("${PROJECT_SOURCE_DIR}/lib/libchdr" "${CMAKE_BINARY_DIR}/lib/libchdr" EXCLUDE_FROM_ALL)
+
+if(ENABLE_UI_QT)
+  message(STATUS "Using vendored BASS(MIDI) library")
+  add_subdirectory(${PROJECT_SOURCE_DIR}/lib/bass ${CMAKE_CURRENT_BINARY_DIR}/lib/bass EXCLUDE_FROM_ALL)
+endif()
+
+if(USE_SYSTEM_FMT)
+  find_package(fmt 12.1.1 REQUIRED)
+else()  
+  message(STATUS "Using vendored fmt library")
+  add_subdirectory(${PROJECT_SOURCE_DIR}/lib/fmt ${CMAKE_CURRENT_BINARY_DIR}/lib/fmt)
+endif()  
+
+if(USE_SYSTEM_SPDLOG)
+  set(SPDLOG_FMT_EXTERNAL ${USE_SYSTEM_FMT} CACHE BOOL "Use external fmt library" FORCE)
+  find_package(spdlog 1.15.3 REQUIRED)
+else()
+  message(STATUS "Using vendored spdlog library")
+  set(SPDLOG_FMT_EXTERNAL ON CACHE BOOL "Use external fmt library" FORCE)
+  add_subdirectory(${PROJECT_SOURCE_DIR}/lib/spdlog ${CMAKE_CURRENT_BINARY_DIR}/lib/spdlog EXCLUDE_FROM_ALL)
+endif()
+
+if(USE_SYSTEM_ZLIB)
+  find_package(ZLIB REQUIRED)
+else()
+  message(STATUS "Using vendored zlib library")
+  set(ZLIB_BUILD_TESTING OFF CACHE BOOL "[zlib] Enable Zlib Examples as tests" FORCE)
+  set(ZLIB_BUILD_SHARED OFF CACHE BOOL "[zlib] Enable building zlib shared library" FORCE)
+  set(ZLIB_BUILD_STATIC ON CACHE BOOL "[zlib] Enable building zlib static library" FORCE)
+  set(ZLIB_BUILD_MINIZIP OFF CACHE BOOL "[zlib] Enable building libminizip contrib library" FORCE)
+  set(ZLIB_INSTALL OFF CACHE BOOL "[zlib] Enable installation of zlib" FORCE)
+
+  add_subdirectory(${PROJECT_SOURCE_DIR}/lib/zlib ${CMAKE_CURRENT_BINARY_DIR}/lib/zlib EXCLUDE_FROM_ALL)
+  add_library(ZLIB::ZLIB INTERFACE IMPORTED GLOBAL)
+  set_target_properties(ZLIB::ZLIB PROPERTIES INTERFACE_LINK_LIBRARIES zlibstatic)
+endif()
+
+if(USE_SYSTEM_MINIZIP)
+  find_package(minizip REQUIRED)
+else()
+  # Add minizip either linked to system zlib or vendored zlib
+  set(MINIZIP_DIR "${PROJECT_SOURCE_DIR}/lib/zlib/contrib/minizip")
+
+  add_library(minizip STATIC
+          "${MINIZIP_DIR}/ioapi.c"
+          "${MINIZIP_DIR}/unzip.c"
+  )
+  if(WIN32)
+    target_sources(minizip PRIVATE "${MINIZIP_DIR}/iowin32.c")
+  endif()
+
+  target_include_directories(minizip PUBLIC "${MINIZIP_DIR}")
+  target_link_libraries(minizip PUBLIC ZLIB::ZLIB)
+endif()
+
+if(USE_SYSTEM_UNARR)
+  find_package(unarr 1.1.0 REQUIRED)
+else()
+  message(STATUS "Using vendored unarr library")
+  set(ENABLE_7Z OFF CACHE BOOL "[unarr] Build with 7z support" FORCE)
+  set(USE_SYSTEM_BZ2 OFF CACHE BOOL "[unarr] Build with system bzip2 if possible" FORCE)
+  set(BUILD_SHARED_LIBS OFF CACHE BOOL "[unarr] Build libunarr as a shared library" FORCE)
+  set(USE_SYSTEM_ZLIB ${USE_SYSTEM_ZLIB} CACHE BOOL "[unarr] Build with system zlib if possible" FORCE)
+
+  add_subdirectory(${PROJECT_SOURCE_DIR}/lib/unarr ${CMAKE_CURRENT_BINARY_DIR}/lib/unarr EXCLUDE_FROM_ALL)
+endif()
+
+if(USE_SYSTEM_LIBCHDR)
+  find_package(libchdr REQUIRED)
+else()
+  message(STATUS "Using vendored libchdr library")
+  set(WITH_SYSTEM_ZLIB ${USE_SYSTEM_ZLIB} CACHE BOOL "[libchdr] Use system provided zlib library" FORCE)
+  add_subdirectory(${PROJECT_SOURCE_DIR}/lib/libchdr ${CMAKE_CURRENT_BINARY_DIR}/lib/libchdr EXCLUDE_FROM_ALL)
+endif()
+
+# ~~~
+# Build
+# ~~~
 
 add_library(vgmtranscore OBJECT)
 target_sources(vgmtranscore
@@ -474,11 +522,9 @@ target_sources(vgmtranscore
 )
 
 configure_file("version.h.in" "version.h")
-target_include_directories(vgmtranscore PUBLIC
-        ${PROJECT_SOURCE_DIR}/lib
-        ${CMAKE_CURRENT_BINARY_DIR})
+target_include_directories(vgmtranscore PUBLIC ${CMAKE_CURRENT_BINARY_DIR})
 target_link_libraries(
   vgmtranscore
-  PUBLIC spdlog::spdlog unarr ZLIB::ZLIB minizip mio chdr-static
+  PUBLIC spdlog::spdlog unarr ZLIB::ZLIB minizip mio chdr-static nlohmann_json::nlohmann_json
 )
 target_compile_features(vgmtranscore PUBLIC cxx_std_20)

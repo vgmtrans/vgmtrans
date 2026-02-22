@@ -2,8 +2,7 @@
 # Licensed under the zlib license
 # Check the included LICENSE.txt for details
 
-# For cmake-presets v3
-cmake_minimum_required(VERSION 3.21)
+cmake_minimum_required(VERSION 3.23)
 
 project(
   VGMTrans
@@ -57,14 +56,13 @@ option(ENABLE_UI_QT "Build the UI (Qt)" ON)
 option(ENABLE_CLI "Build the CLI application" ON)
 option(ENABLE_SHELL "Build the shell application" ON)
 
-# ~~~
-# Dependencies
-# ~~~
-
-add_subdirectory("${PROJECT_SOURCE_DIR}/lib/fmt")
-set(SPDLOG_FMT_EXTERNAL ON CACHE BOOL "Use external fmt library")
-add_subdirectory("${PROJECT_SOURCE_DIR}/lib/spdlog")
-add_subdirectory("${PROJECT_SOURCE_DIR}/lib/mio")
+option(USE_SYSTEM_FMT "Use system-provided fmt library" OFF)
+option(USE_SYSTEM_SPDLOG "Use system-provided spdlog library" OFF)
+option(USE_SYSTEM_ZLIB "Use system-provided zlib library" OFF)
+option(USE_SYSTEM_NLOHMANN "Use system-provided nlohmann_json library" OFF)
+option(USE_SYSTEM_UNARR "Use system-provided unarr library" OFF)
+option(USE_SYSTEM_LIBCHDR "Use system-provided libchdr library" OFF)
+option(USE_SYSTEM_MINIZIP "Use system-provided minizip library" OFF)
 
 # ~~~
 # Source
