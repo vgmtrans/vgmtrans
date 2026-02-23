@@ -189,6 +189,17 @@ if(CMAKE_SYSTEM_NAME MATCHES "Darwin")
     "${PROJECT_SOURCE_DIR}/bin/mame_roms.json"
     PROPERTIES MACOSX_PACKAGE_LOCATION Resources
   )
+
+  set_target_properties(vgmtrans PROPERTIES
+      INSTALL_RPATH "@executable_path/../Frameworks"
+      INSTALL_RPATH_USE_LINK_PATH TRUE
+  )
+
+  install(FILES
+          $<TARGET_FILE:BASS::BASS>
+          $<TARGET_FILE:BASS::MIDI>
+          DESTINATION "VGMTrans.app/Contents/Frameworks"
+  )
 elseif(CMAKE_SYSTEM_NAME MATCHES "Windows")
   target_sources(vgmtrans
                  PRIVATE "${CMAKE_CURRENT_LIST_DIR}/resources/VGMTrans.rc")
@@ -262,7 +273,17 @@ set(CPACK_PACKAGE_NAME "vgmtrans")
 set(CPACK_PACKAGE_VENDOR "VGMTrans Team")
 set(CPACK_PACKAGE_DESCRIPTION_SUMMARY
     "A converter for sequenced proprietary videogame music formats")
-set(CPACK_RPM_PACKAGE_LICENSE ZLIB)
+
+# This is unbranded because generating a .DS_Store on the fly is a nightmare
+# and storing it in the repo has all kind of issues. CI can use a fancy DMG
+# creation method, for local testing this is fine
+string(TOUPPER "${CPACK_GENERATOR}" _UPPER_CPACK_GENERATOR)
+if("DRAGNDROP" IN_LIST _UPPER_CPACK_GENERATOR OR "DRAGNDROP" STREQUAL _UPPER_CPACK_GENERATOR)
+  set(CPACK_DMG_VOLUME_NAME "VGMTrans")  
+  # Set the paths for the README and selfsign script inside the DMG package
+  install(FILES "${PROJECT_SOURCE_DIR}/bin/dmg/README.txt" DESTINATION "." COMPONENT Runtime)
+  install(PROGRAMS "${PROJECT_SOURCE_DIR}/bin/dmg/selfsign" DESTINATION "." RENAME "Unblock & Sign" COMPONENT Runtime)
+endif()
 
 if(NOT CPACK_GENERATOR)
   message(STATUS "Falling back to default CPack generator: ZIP")
