@@ -1,0 +1,71 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Copyright 2026 VGMTrans -->
+<component type="desktop-application">
+  <id>io.github.vgmtrans.vgmtrans</id>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>Zlib</project_license>
+  <name>VGMTrans</name>
+  <summary>Convert video game music</summary>
+  <description>
+    <p>
+      Extract and convert sequenced music from video games.
+      This application scans proprietary file formats to discover musical sequences
+      and instrument samples from numerous legacy consoles and handheld systems.
+    </p>
+    <p>
+      You can inspect the technical structure of game data with an interactive hex view,
+      preview music tracks using the built-in player, and export your favorite themes
+      to standard MIDI, SoundFont, or DLS formats for use in modern digital audio workstations.
+    </p>
+  </description>
+  <launchable type="desktop-id">io.github.vgmtrans.vgmtrans.desktop</launchable>
+  <url type="homepage">https://vgmtrans.github.io/audiodemo/</url>
+  <url type="bugtracker">https://github.com/vgmtrans/vgmtrans/issues</url>
+  <url type="vcs-browser">https://github.com/vgmtrans/vgmtrans</url>
+  <url type="contribute">https://github.com/vgmtrans/vgmtrans/blob/master/CONTRIBUTING.md</url>
+  <url type="contact">https://github.com/vgmtrans/vgmtrans/discussions</url>
+  <developer id="io.github.vgmtrans">
+      <name>VGMTrans Team</name>
+  </developer>
+  <branding>
+    <color type="primary" scheme_preference="light">#5b75b3</color>
+    <color type="primary" scheme_preference="dark">#1e2c50</color>
+  </branding>
+  <content_rating type="oars-1.1" />
+  <screenshots>
+    <screenshot type="default">
+      <caption>VGMTrans main window showing detected music files, analysis view, and playback controls</caption>
+      <image>https://raw.githubusercontent.com/vgmtrans/vgmtrans/@VCS_HASH_COMPLETE@/build-aux/screenshots/main_window.png</image>
+    </screenshot>
+  </screenshots>
+  <categories>
+    <category>AudioVideo</category>
+    <category>Audio</category>
+  </categories>
+  <keywords>
+    <keyword>midi</keyword>
+    <keyword>soundfont</keyword>
+    <keyword>dls</keyword>
+    <keyword>vgm</keyword>
+    <keyword>game music</keyword>
+    <keyword>converter</keyword>
+    <keyword>sequenced</keyword>
+    <keyword>snes</keyword>
+    <keyword>ps1</keyword>
+    <keyword>nds</keyword>
+    <keyword>gba</keyword>
+  </keywords>
+  <requires>
+    <control>keyboard</control>
+    <control>pointing</control>
+    <display_length compare="ge">768</display_length>
+  </requires>
+  <provides>
+    <binary>vgmtrans</binary>
+  </provides>
+  <releases>
+    <release version="@VCS_TAG@" date="@VCS_DATE@">
+      <url type="details">https://github.com/vgmtrans/vgmtrans/releases/tag/@VCS_TAG@</url>
+    </release>
+  </releases>
+</component>
