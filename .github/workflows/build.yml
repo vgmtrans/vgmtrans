@@ -35,8 +35,14 @@ jobs:
             modules: 'all'
 
       - name: "Set environment variables"
+        shell: bash
         run: |
-          echo "BRANCH=$(git rev-parse --abbrev-ref HEAD)" >> $GITHUB_ENV
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            BRANCH="pr${{ github.event.pull_request.number }}"
+          else
+            BRANCH="${{ github.ref_name }}"
+          fi
+          echo "BRANCH=$BRANCH" >> $GITHUB_ENV
           echo "/usr/local/bin" >> $GITHUB_PATH
 
       - name: "Prepare build"
@@ -115,8 +121,14 @@ jobs:
           show-progress: false
 
       - name: "Set environment variables"
+        shell: bash
         run: |
-          echo "BRANCH=$(git rev-parse --abbrev-ref HEAD)" >> $GITHUB_ENV
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            BRANCH="pr${{ github.event.pull_request.number }}"
+          else
+            BRANCH="${{ github.ref_name }}"
+          fi
+          echo "BRANCH=$BRANCH" >> $GITHUB_ENV
 
       - name: "Build Flatpak"
         uses: flatpak/flatpak-github-actions/flatpak-builder@v6
@@ -124,6 +136,7 @@ jobs:
           bundle: VGMTrans.flatpak
           manifest-path: build-aux/flatpak/io.github.vgmtrans.vgmtrans.yaml
           cache-key: flatpak-builder-${{ github.sha }}
+          upload-artifact: false
 
       - name: Run linter
         run: |
@@ -183,10 +196,19 @@ jobs:
            arch: 'win64_msvc2022_64'
            modules: 'all'
 
+       - name: "Set environment variables"
+         shell: bash
+         run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            BRANCH="pr${{ github.event.pull_request.number }}"
+          else
+            BRANCH="${{ github.ref_name }}"
+          fi
+          echo "BRANCH=$BRANCH" >> $GITHUB_ENV
+          echo "PACKAGE_FILE_NAME=VGMTrans-${{ github.sha }}-$BRANCH-${{ matrix.target }}-${{ runner.os }}" >> $GITHUB_ENV
+
        - name: "Prepare build"
          run: |
-          echo "BRANCH=$(git rev-parse --abbrev-ref HEAD)" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
-          echo "PACKAGE_FILE_NAME=VGMTrans-${{ github.sha }}-${{ env.BRANCH }}-${{ matrix.target }}-${{ runner.os }}" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
           # Force to have a flat install package layout.
           # Windows users get frightened at the sight of GNU directories.
           cmake --preset win-${{ matrix.target }} `
