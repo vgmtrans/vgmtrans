@@ -1,5 +1,5 @@
 /*
- * VGMTrans (c) 2002-2021
+ * VGMTrans (c) 2002-2026
  * Licensed under the zlib license,
  * refer to the included LICENSE.txt file
  */
@@ -9,6 +9,7 @@
 #include <QApplication>
 #include <QFileDialog>
 #include <QString>
+#include <filesystem>
 #include "QtVGMRoot.h"
 
 QtVGMRoot qtVGMRoot;
@@ -17,10 +18,27 @@ std::filesystem::path QtVGMRoot::UI_getResourceDirPath() {
   std::filesystem::path appDir = std::filesystem::path(QApplication::applicationDirPath().toStdWString());
 
 #if defined(Q_OS_MACOS)
-  return (appDir / ".." / "Resources").lexically_normal();
-#else
-  return appDir;
+  std::filesystem::path resDir = (appDir / ".." / "Resources").lexically_normal();
+  if (std::filesystem::exists(resDir / "mame_roms.json")) {
+    return resDir;
+  }
 #endif
+
+#if defined(VGMTRANS_DATA_DIR)
+  std::filesystem::path dataDir = std::filesystem::path(VGMTRANS_DATA_DIR);
+  if (std::filesystem::exists(dataDir / "mame_roms.json")) {
+    return dataDir;
+  }
+#endif
+
+#if defined(DEV_ENV_BUILD_TREE)
+  std::filesystem::path devDir = std::filesystem::path(DEV_ENV_BUILD_TREE);
+  if (std::filesystem::exists(devDir / "mame_roms.json")) {
+    return devDir;
+  }
+#endif
+
+  return appDir;
 }
 
 void QtVGMRoot::UI_setRootPtr(VGMRoot** theRoot) {

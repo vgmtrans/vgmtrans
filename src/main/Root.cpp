@@ -1,28 +1,33 @@
 /*
- * VGMTrans (c) 2002-2024
+ * VGMTrans (c) 2002-2026
  * Licensed under the zlib license,
  * refer to the included LICENSE.txt file
  */
 
-#include <fstream>
+#include "Root.h"
+
 #include <filesystem>
+#include <fstream>
+
 #include <spdlog/fmt/std.h>
 
-#include "Root.h"
+#include "FileLoader.h"
+#include "Format.h"
+#include "helper.h"
+#include "common.h"
+#include "LoaderManager.h"
+#include "LogManager.h"
+#include "Matcher.h"
+#include "Scanner.h"
+#include "ScannerManager.h"
 #include "VGMColl.h"
 #include "VGMFile.h"
-#include "VGMSeq.h"
 #include "VGMInstrSet.h"
-#include "VGMSampColl.h"
 #include "VGMMiscFile.h"
-#include "Format.h"
-#include "Scanner.h"
-#include "helper.h"
-#include "Matcher.h"
-#include "FileLoader.h"
-#include "LoaderManager.h"
-#include "ScannerManager.h"
-#include "LogManager.h"
+#include "VGMRgn.h"
+#include "VGMSamp.h"
+#include "VGMSampColl.h"
+#include "VGMSeq.h"
 
 VGMRoot *pRoot;
 
@@ -337,5 +342,26 @@ void VGMRoot::log(LogItem *theLog) {
 }
 
 std::filesystem::path VGMRoot::UI_getResourceDirPath() {
+#if defined(__APPLE__)
+  std::filesystem::path resDir = (std::filesystem::current_path() / ".." / "Resources").lexically_normal();
+  if (std::filesystem::exists(resDir / "mame_roms.json")) {
+    return resDir;
+  }
+#endif
+
+#if defined(VGMTRANS_DATA_DIR)
+  std::filesystem::path dataDir = std::filesystem::path(VGMTRANS_DATA_DIR);
+  if (std::filesystem::exists(dataDir / "mame_roms.json")) {
+    return dataDir;
+  }
+#endif
+
+#if defined(DEV_ENV_BUILD_TREE)
+  std::filesystem::path devDir = std::filesystem::path(DEV_ENV_BUILD_TREE);
+  if (std::filesystem::exists(devDir / "mame_roms.json")) {
+    return devDir;
+  }
+#endif
+
   return std::filesystem::current_path();
 }
