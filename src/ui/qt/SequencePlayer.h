@@ -60,6 +60,13 @@ public:
   bool previewNotesAtTick(const std::vector<PreviewNote>& notes, uint32_t tick);
   bool updatePreviewNotesAtTick(const std::vector<PreviewNote>& notes, uint32_t tick);
   void stopPreviewNote();
+  bool setTempoBpm(double bpm);
+  bool setChannelPan(uint8_t channel, uint8_t pan);
+  bool setChannelVolume(uint8_t channel, uint8_t volume);
+  bool setChannelMixLevel(uint8_t channel, uint8_t percent);
+  [[nodiscard]] double currentTempoBpm() const;
+  [[nodiscard]] int currentChannelPan(uint8_t channel) const;
+  [[nodiscard]] int currentChannelVolume(uint8_t channel) const;
 
   /**
    * Checks whether the player is playing
@@ -110,6 +117,8 @@ private:
   bool syncPreviewStateAtTick(uint32_t tick);
   void syncPreviewGlobalState();
   bool syncPreviewChannelState(uint8_t channel, bool resetChannel = true);
+  bool sendStreamEvent(uint8_t channel, DWORD event, DWORD value, bool toPreviewStream = false);
+  [[nodiscard]] DWORD streamEventValue(uint8_t channel, DWORD event) const;
 
   const VGMColl *m_active_vgmcoll{};
   HSTREAM m_active_stream{};
