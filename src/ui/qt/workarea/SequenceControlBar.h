@@ -10,6 +10,7 @@
 #include <memory>
 #include <vector>
 
+#include <QColor>
 #include <QWidget>
 
 class QDoubleSpinBox;
@@ -27,6 +28,7 @@ public:
     int id = -1;
     QString title;
     QString subtitle;
+    QColor borderColor;
     int midiChannel = -1;
     int pan = 64;
     int volume = 100;
@@ -71,6 +73,7 @@ private:
   void refreshScrollControls();
   void scrollBlocks(int deltaPixels);
   void refreshStyleSheet();
+  void applyStripFrameStyle(StripWidgets& strip, bool dimmed, bool soloed);
 
   bool m_updatingUi = false;
   QDoubleSpinBox* m_tempoSpin = nullptr;

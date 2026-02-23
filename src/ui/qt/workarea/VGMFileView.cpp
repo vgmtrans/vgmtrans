@@ -6,6 +6,7 @@
 
 #include <QApplication>
 #include <QContextMenuEvent>
+#include <QColor>
 #include <QEvent>
 #include <QMouseEvent>
 #include <QShortcut>
@@ -95,6 +96,11 @@ int previewMidiChannelForTrack(const VGMSeq* seq, int trackIndex) {
     return trackIndex;
   }
   return -1;
+}
+
+QColor mixerTrackColor(int trackIndex) {
+  const int hue = (trackIndex * 43) % 360;
+  return QColor::fromHsv(hue, 190, 235);
 }
 
 bool buildPreviewNoteForEvent(const SeqEvent* seqEvent, SequencePlayer::PreviewNote& outNote) {
@@ -1370,6 +1376,7 @@ void VGMFileView::rebuildSequenceControlBar(VGMSeq* seq) {
     stripConfig.subtitle = midiChannel >= 0
                                ? QStringLiteral("MIDI %1").arg(midiChannel + 1)
                                : QStringLiteral("MIDI --");
+    stripConfig.borderColor = mixerTrackColor(stripIndex);
     stripConfig.pan = panByStrip[static_cast<size_t>(stripIndex)];
     stripConfig.volume = volumeByStrip[static_cast<size_t>(stripIndex)];
 
