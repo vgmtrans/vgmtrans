@@ -1,3 +1,5 @@
+include(GNUInstallDirs)
+
 find_package(Qt6 REQUIRED COMPONENTS Core Gui ShaderTools Widgets Svg)
 # GuiPrivate was moved to a CMake component starting Qt 6.9,
 # so look for it separately to avoid breaking older versions
@@ -114,14 +116,12 @@ target_sources(vgmtrans
       workarea/hexview/HexViewRhiWindow.h
 )
 
-
 if(APPLE)
   target_sources(vgmtrans PRIVATE util/Helpers_mac.mm)
   set_target_properties(vgmtrans PROPERTIES OBJCXX_STANDARD 20)
 endif()
 
 target_compile_features(vgmtrans PRIVATE cxx_std_20)
-
 
 target_link_libraries(
   vgmtrans
@@ -158,12 +158,21 @@ qt_add_resources(UI_RESOURCES
                  "${CMAKE_CURRENT_LIST_DIR}/resources/resources.qrc")
 target_sources(vgmtrans PRIVATE ${UI_RESOURCES})
 
+# DLLs need to live next to the main executable for development testing
+if(WIN32)
+  add_custom_command(TARGET vgmtrans POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        $<TARGET_RUNTIME_DLLS:vgmtrans>
+        $<TARGET_FILE_DIR:vgmtrans>
+    COMMAND_EXPAND_LISTS
+  )
+endif()
+
 # ~~~
 # Install & package
 # ~~~
-if(CMAKE_SYSTEM_NAME MATCHES "Darwin")
-  set(BUNDLE_PATH "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/VGMTrans.app")
 
+if(CMAKE_SYSTEM_NAME MATCHES "Darwin")
   set_target_properties(
     vgmtrans
     PROPERTIES MACOSX_BUNDLE true
@@ -172,93 +181,86 @@ if(CMAKE_SYSTEM_NAME MATCHES "Darwin")
                OUTPUT_NAME VGMTrans)
 
   target_sources(vgmtrans
-                 PRIVATE "${CMAKE_CURRENT_LIST_DIR}/resources/appicon.icns")
-  set_source_files_properties("${CMAKE_CURRENT_LIST_DIR}/resources/appicon.icns"
-                              PROPERTIES MACOSX_PACKAGE_LOCATION Resources)
-
-  get_target_property(BASS_DLL_LOCATION BASS::BASS IMPORTED_LOCATION)
-  get_target_property(BASSMIDI_DLL_LOCATION BASS::MIDI IMPORTED_LOCATION)
-
-  add_custom_command(
-    TARGET vgmtrans
-    POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E copy_if_different "${CMAKE_SOURCE_DIR}/bin/mame_roms.json"
-          "$<TARGET_FILE_DIR:vgmtrans>/../Resources"
-    COMMAND ${CMAKE_COMMAND} -E copy_if_different "${BASS_DLL_LOCATION}"  "$<TARGET_FILE_DIR:vgmtrans>/"
-    COMMAND ${CMAKE_COMMAND} -E copy_if_different "${BASSMIDI_DLL_LOCATION}"  "$<TARGET_FILE_DIR:vgmtrans>/"
+                 PRIVATE "${CMAKE_CURRENT_LIST_DIR}/resources/appicon.icns"
+                         "${PROJECT_SOURCE_DIR}/bin/mame_roms.json")
+                         
+  set_source_files_properties(
+    "${CMAKE_CURRENT_LIST_DIR}/resources/appicon.icns"
+    "${PROJECT_SOURCE_DIR}/bin/mame_roms.json"
+    PROPERTIES MACOSX_PACKAGE_LOCATION Resources
   )
 elseif(CMAKE_SYSTEM_NAME MATCHES "Windows")
-  # Make sure the executable ends up in the binary directory without any
-  # additional folders
-  set_target_properties(
-    vgmtrans PROPERTIES RUNTIME_OUTPUT_DIRECTORY
-                        "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/$<$<CONFIG:Debug>:>")
   target_sources(vgmtrans
                  PRIVATE "${CMAKE_CURRENT_LIST_DIR}/resources/VGMTrans.rc")
+                 
+  install(FILES "${PROJECT_SOURCE_DIR}/bin/mame_roms.json"
+          DESTINATION "${CMAKE_INSTALL_BINDIR}")
+  install(FILES $<TARGET_RUNTIME_DLLS:vgmtrans>
+          DESTINATION "${CMAKE_INSTALL_BINDIR}")
 
-  # Copy ROMs definitions for CPS
-  add_custom_command(
-    TARGET vgmtrans
-    POST_BUILD
-    COMMAND
-      ${CMAKE_COMMAND} -E copy_if_different
-      "${CMAKE_SOURCE_DIR}/bin/mame_roms.json"
-      "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}")
-
-  get_target_property(MOC_EXECUTABLE_LOCATION Qt${Qt_VERSION_MAJOR}::moc
-                      IMPORTED_LOCATION)
-  get_filename_component(QT_BIN_LOCATION "${MOC_EXECUTABLE_LOCATION}" DIRECTORY)
-  find_program(WINDEPLOYQT windeployqt HINTS "${QT_BIN_LOCATION}")
-
-  add_custom_command(
-    TARGET vgmtrans
-    POST_BUILD
-    COMMAND
-      "${CMAKE_COMMAND}" -E env PATH="${QT_BIN_LOCATION}" "${WINDEPLOYQT}"
-      --plugindir="${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/QtPlugins"
-      --libdir="${CMAKE_RUNTIME_OUTPUT_DIRECTORY}"
-      $<IF:$<CONFIG:Debug>,--debug,--release> --no-translations
-      --no-compiler-runtime --no-system-d3d-compiler --no-opengl-sw
-      "$<TARGET_FILE:vgmtrans>")
-
-  add_custom_command(
-    TARGET vgmtrans
-    POST_BUILD
-    COMMAND
-      ${CMAKE_COMMAND} -E copy_if_different "${CMAKE_CURRENT_LIST_DIR}/qt.conf"
-      "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}")
-
-  get_target_property(BASS_DLL_LOCATION BASS::BASS IMPORTED_LOCATION)
-  add_custom_command(
-    TARGET vgmtrans
-    POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E copy_if_different "${BASS_DLL_LOCATION}"
-            "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}")
-
-  get_target_property(BASSMIDI_DLL_LOCATION BASS::MIDI IMPORTED_LOCATION)
-  add_custom_command(
-    TARGET vgmtrans
-    POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E copy_if_different "${BASSMIDI_DLL_LOCATION}"
-            "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}")
+	set(DEPLOY_EXTRA_OPTIONS
+      --no-system-d3d-compiler
+      --no-opengl-sw
+      --skip-plugin-types tls
+  )
 elseif(CMAKE_SYSTEM_NAME MATCHES "FreeBSD|OpenBSD|Linux")
-  install(TARGETS vgmtrans DESTINATION "${CMAKE_INSTALL_PREFIX}/bin")
-  install(
-    FILES resources/vgmtrans.png
-    DESTINATION "${CMAKE_INSTALL_PREFIX}/share/icons/hicolor/512x512/apps")
+  install(FILES
+          $<TARGET_FILE:BASS::BASS>
+          $<TARGET_FILE:BASS::MIDI>
+	        DESTINATION "${CMAKE_INSTALL_LIBDIR}")
+
+  set_target_properties(vgmtrans PROPERTIES
+    INSTALL_RPATH "\$ORIGIN/../${CMAKE_INSTALL_LIBDIR}"
+    INSTALL_RPATH_USE_LINK_PATH FALSE
+  )
+
+  install(FILES "${CMAKE_SOURCE_DIR}/bin/mame_roms.json"
+          DESTINATION "${CMAKE_INSTALL_DATADIR}/vgmtrans")
+  install(FILES resources/vgmtrans.png
+          DESTINATION "${CMAKE_INSTALL_DATADIR}/icons/hicolor/512x512/apps")
   install(FILES resources/VGMTrans.desktop
-          DESTINATION "${CMAKE_INSTALL_PREFIX}/share/applications")
+          DESTINATION "${CMAKE_INSTALL_DATADIR}/applications")
+  install(FILES "${CMAKE_SOURCE_DIR}/LICENSE"
+          DESTINATION "${CMAKE_INSTALL_DATAROOTDIR}/licenses/vgmtrans")
+  install(DIRECTORY "${CMAKE_SOURCE_DIR}/licenses/"
+          DESTINATION "${CMAKE_INSTALL_DATAROOTDIR}/licenses")
 endif()
 
+install(TARGETS vgmtrans
+        BUNDLE DESTINATION .
+        RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}"
+)
+
+qt_generate_deploy_app_script(
+    TARGET vgmtrans
+    OUTPUT_SCRIPT deploy_script
+    NO_UNSUPPORTED_PLATFORM_ERROR
+    NO_TRANSLATIONS
+		NO_COMPILER_RUNTIME
+    DEPLOY_TOOL_OPTIONS ${DEPLOY_EXTRA_OPTIONS}
+)
+install(SCRIPT ${deploy_script})
+
+# ~~~
+# CPack Setup
+# ~~~
 set(CPACK_PACKAGE_NAME "vgmtrans")
 set(CPACK_PACKAGE_VENDOR "VGMTrans Team")
 set(CPACK_PACKAGE_DESCRIPTION_SUMMARY
     "A converter for sequenced proprietary videogame music formats")
 set(CPACK_RPM_PACKAGE_LICENSE ZLIB)
 
-set(CPACK_SET_DESTDIR ON)
-set(CPACK_GENERATOR "ZIP")
-set(CPACK_SOURCE_GENERATOR "TGZ;ZIP")
+if(NOT CPACK_GENERATOR)
+  message(STATUS "Falling back to default CPack generator: ZIP")
+	set(CPACK_GENERATOR "ZIP")
+endif()
+
+if(NOT CPACK_SOURCE_GENERATOR)
+  message(STATUS "Falling back to default source archive CPack generator: ZIP")
+	set(CPACK_SOURCE_GENERATOR "TGZ;ZIP")
+endif()
+
+# Prevent hell from populating source packages
 set(CPACK_SOURCE_IGNORE_FILES "/build.*/;/\\\\.git/")
 list(APPEND CPACK_SOURCE_IGNORE_FILES "${CMAKE_BINARY_DIR}")
 

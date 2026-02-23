@@ -528,3 +528,17 @@ target_link_libraries(
   PUBLIC spdlog::spdlog unarr ZLIB::ZLIB minizip mio chdr-static nlohmann_json::nlohmann_json
 )
 target_compile_features(vgmtranscore PUBLIC cxx_std_20)
+
+configure_file(${PROJECT_SOURCE_DIR}/bin/mame_roms.json mame_roms.json COPYONLY)
+target_compile_definitions(vgmtranscore PUBLIC "DEV_ENV_BUILD_TREE=\"${CMAKE_CURRENT_BINARY_DIR}\"")
+
+if(CMAKE_SYSTEM_NAME MATCHES "FreeBSD|OpenBSD|Linux")
+  if(NOT VGMTRANS_DATA_DIR)
+    if(IS_ABSOLUTE "${CMAKE_INSTALL_DATADIR}")
+      set(VGMTRANS_DATA_DIR "${CMAKE_INSTALL_DATADIR}/vgmtrans")
+    else()
+      set(VGMTRANS_DATA_DIR "${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_DATADIR}/vgmtrans")
+    endif()
+  endif()
+  target_compile_definitions(vgmtranscore PUBLIC "VGMTRANS_DATA_DIR=\"${VGMTRANS_DATA_DIR}\"")
+endif()
