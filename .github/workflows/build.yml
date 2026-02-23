@@ -40,7 +40,11 @@ jobs:
           echo "/usr/local/bin" >> $GITHUB_PATH
 
       - name: "Prepare build"
-        run: cmake --preset "macos-${{ matrix.target }}"
+        run: >
+          cmake --preset "macos-${{ matrix.target }}" \
+            -DQT_DEBUG_FIND_PACKAGE=${{runner.debug == '1' && 'ON' || 'OFF' }} \
+            -DCMAKE_VERBOSE_MAKEFILE=${{runner.debug == '1' && 'ON' || 'OFF' }} \
+            -DCMAKE_FIND_DEBUG_MODE=${{runner.debug == '1' && 'ON' || 'OFF' }}
 
       - name: "Build project"
         run: cmake --build --preset "macos-${{ matrix.target }}-release" \
@@ -185,6 +189,9 @@ jobs:
           # Force to have a flat install package layout.
           # Windows users get frightened at the sight of GNU directories.
           cmake --preset win-${{ matrix.target }} `
+            -DQT_DEBUG_FIND_PACKAGE=${{runner.debug == '1' && 'ON' || 'OFF' }} `
+            -DCMAKE_VERBOSE_MAKEFILE=${{runner.debug == '1' && 'ON' || 'OFF' }} `
+            -DCMAKE_FIND_DEBUG_MODE=${{runner.debug == '1' && 'ON' || 'OFF' }} `
             -DCMAKE_INSTALL_PREFIX="${{ github.workspace }}/dist" `
             -DCMAKE_INSTALL_BINDIR="." `
             -DCMAKE_INSTALL_LIBDIR="." `
