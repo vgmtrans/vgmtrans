@@ -47,15 +47,15 @@ jobs:
             -DCMAKE_FIND_DEBUG_MODE=${{runner.debug == '1' && 'ON' || 'OFF' }}
 
       - name: "Build project"
-        run: cmake --build --preset "macos-${{ matrix.target }}-release" \
-          --target vgmtrans vgmtrans-shell
-
-      - name: "Package DMG (macOS)"
-        working-directory: "build/macos-${{ matrix.target }}/"
         run: |
-          macdeployqt \
-            bin/Release/VGMTrans.app \
-            -verbose=3 -always-overwrite -appstore-compliant
+          cmake --build \
+            --preset "macos-${{ matrix.target }}-release" \
+            --target vgmtrans vgmtrans-shell
+
+      - name: "Install project"
+        run: |
+          export DESTDIR=$PWD/"build/macos-${{ matrix.target }}/dist"
+          cmake --build --preset "macos-${{ matrix.target }}-release" --target install
 
       - name: "Checkout create-dmg"
         uses: actions/checkout@v4
@@ -71,7 +71,7 @@ jobs:
           ./create-dmg/create-dmg \
             --no-internet-enable \
             --volname "VGMTrans" \
-            --volicon "bin/Release/VGMTrans.app/Contents/Resources/appicon.icns" \
+            --volicon "dist/usr/local/VGMTrans.app/Contents/Resources/appicon.icns" \
             --background "${{ github.workspace }}/bin/dmg/bg.tif" \
             --text-size 12 \
             --window-pos 400 400 \
@@ -82,20 +82,21 @@ jobs:
             --app-drop-link 520 97 \
             --add-file "Unblock & Sign" "${{ github.workspace }}/bin/dmg/selfsign" 313 280 \
             --add-file "README.txt" "${{ github.workspace }}/bin/dmg/README.txt" 520 280 \
-            "bin/Release/VGMTrans-${{ github.sha }}.dmg" \
-            "bin/Release"
+            "VGMTrans-${{ github.sha }}.dmg" \
+            "dist/usr/local/"
+
       - name: Generate artifact attestation
         uses: actions/attest-build-provenance@v3
         if: ${{ github.event_name != 'pull_request' }}
         with:
           subject-name: VGMTrans-${{ github.sha }}-${{ env.BRANCH }}-${{ matrix.target }}-${{ runner.os }}
-          subject-path: "build/macos-${{ matrix.target }}/bin/Release/VGMTrans-${{ github.sha }}.dmg"
+          subject-path: "build/macos-${{ matrix.target }}/VGMTrans-${{ github.sha }}.dmg"
 
       - name: "Upload artifact"
         uses: actions/upload-artifact@v4
         with:
           name: VGMTrans-${{ github.sha }}-${{ env.BRANCH }}-${{ matrix.target }}-${{ runner.os }}.dmg
-          path: "build/macos-${{ matrix.target }}/bin/Release/VGMTrans-${{ github.sha }}.dmg"
+          path: "build/macos-${{ matrix.target }}/VGMTrans-${{ github.sha }}.dmg"
           
   linux:
     runs-on: ubuntu-24.04
