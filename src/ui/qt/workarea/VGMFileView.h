@@ -30,6 +30,7 @@ class VGMFile;
 class VGMSeq;
 class SeqTrack;
 class MidiTrack;
+class SequenceControlBar;
 class HexView;
 class VGMFileTreeView;
 class ActiveNoteView;
@@ -107,6 +108,12 @@ private:
   void ensureTrackIndexMap(VGMSeq* seq);
   [[nodiscard]] int trackIndexForEvent(const SeqEvent* event) const;
   [[nodiscard]] int effectiveTrackCountForSeq(VGMSeq* seq) const;
+  void rebuildSequenceControlBarIfNeeded();
+  void rebuildSequenceControlBar(VGMSeq* seq);
+  void updateSequenceControlValuesFromPlayback();
+  void applySequenceAudibilityState();
+  void setSequenceControlStripMuted(int stripId, bool muted);
+  void setSequenceControlStripSolo(int stripId, bool solo);
   [[nodiscard]] bool ensureAssociatedCollectionActive() const;
   bool prepareSeqEventForPlayback(SeqEvent* event, uint32_t& tick) const;
 
@@ -138,6 +145,18 @@ private:
   VGMSeq* m_trackIndexSeq = nullptr;
   std::unordered_map<const SeqTrack*, int> m_trackIndexByPtr;
   std::unordered_map<const MidiTrack*, int> m_trackIndexByMidiPtr;
+
+  struct SequenceStripBinding {
+    int stripId = -1;
+    int midiChannel = -1;
+  };
+
+  QWidget* m_rootContainer = nullptr;
+  SequenceControlBar* m_sequenceControlBar = nullptr;
+  std::vector<SequenceStripBinding> m_sequenceStripBindings;
+  bool m_sequenceControlUsesTrackLayout = false;
+  int m_sequenceControlStripCount = -1;
+  bool m_updatingSequenceControls = false;
 
 public slots:
   void onSelectionChange(VGMItem* item);

@@ -84,6 +84,9 @@ static constexpr auto TICK_POLL_INTERVAL_MS = 1000/60;
 static constexpr float PREVIEW_BUFFER_SECONDS = 0.15f;
 static constexpr DWORD INVALID_MIDI_EVENT_VALUE = static_cast<DWORD>(-1);
 static constexpr DWORD DEFAULT_MIDI_MASTER_VOLUME = 0x3FFF;
+static constexpr DWORD DEFAULT_MIDI_TEMPO_USEC_PER_QUARTER = 500000;
+static constexpr DWORD DEFAULT_MIDI_PAN = 64;
+static constexpr DWORD DEFAULT_MIDI_VOLUME = 100;
 static constexpr std::array<DWORD, 31> PREVIEW_CHANNEL_STATE_EVENTS = {
     MIDI_EVENT_BANK,      MIDI_EVENT_BANK_LSB,  MIDI_EVENT_DRUMS,      MIDI_EVENT_PROGRAM,
     MIDI_EVENT_MODULATION, MIDI_EVENT_MODRANGE, MIDI_EVENT_VOLUME,     MIDI_EVENT_PAN,
@@ -126,6 +129,23 @@ static std::vector<SequencePlayer::PreviewNote> sanitizePreviewNotes(
   }
 
   return validNotes;
+}
+
+static DWORD bpmToTempoUsec(double bpm) {
+  if (bpm <= 0.0) {
+    return DEFAULT_MIDI_TEMPO_USEC_PER_QUARTER;
+  }
+
+  const double usecPerQuarter = 60000000.0 / bpm;
+  const auto clamped = static_cast<DWORD>(std::clamp<double>(usecPerQuarter, 1.0, 16777215.0));
+  return clamped;
+}
+
+static double tempoUsecToBpm(DWORD usecPerQuarter) {
+  if (usecPerQuarter == 0) {
+    return 120.0;
+  }
+  return 60000000.0 / static_cast<double>(usecPerQuarter);
 }
 
 SequencePlayer::SequencePlayer() {
@@ -195,6 +215,79 @@ void SequencePlayer::seek(int position, PositionChangeOrigin origin) {
   stopPreviewNote();
   BASS_ChannelSetPosition(m_active_stream, position, BASS_POS_MIDI_TICK);
   playbackPositionChanged(position, totalTicks(), origin);
+}
+
+bool SequencePlayer::setTempoBpm(double bpm) {
+  if (!m_active_stream) {
+    return false;
+  }
+
+  return sendStreamEvent(0, MIDI_EVENT_TEMPO, bpmToTempoUsec(bpm));
+}
+
+bool SequencePlayer::setChannelPan(uint8_t channel, uint8_t pan) {
+  if (channel >= 128 || !m_active_stream) {
+    return false;
+  }
+
+  return sendStreamEvent(channel, MIDI_EVENT_PAN, std::clamp<DWORD>(pan, 0, 127), true);
+}
+
+bool SequencePlayer::setChannelVolume(uint8_t channel, uint8_t volume) {
+  if (channel >= 128 || !m_active_stream) {
+    return false;
+  }
+
+  return sendStreamEvent(channel, MIDI_EVENT_VOLUME, std::clamp<DWORD>(volume, 0, 127), true);
+}
+
+bool SequencePlayer::setChannelMixLevel(uint8_t channel, uint8_t percent) {
+  if (channel >= 128 || !m_active_stream) {
+    return false;
+  }
+
+  const DWORD mixLevel = std::clamp<DWORD>(percent, 0, 200);
+  const bool sent = sendStreamEvent(channel, MIDI_EVENT_MIXLEVEL, mixLevel, true);
+  if (!sent || mixLevel > 0) {
+    return sent;
+  }
+
+  // Immediately clear currently sounding notes when muting.
+  sendStreamEvent(channel, MIDI_EVENT_NOTESOFF, 0, true);
+  sendStreamEvent(channel, MIDI_EVENT_SOUNDOFF, 0, true);
+  return true;
+}
+
+double SequencePlayer::currentTempoBpm() const {
+  DWORD tempoUsec = streamEventValue(0, MIDI_EVENT_TEMPO);
+  if (tempoUsec == INVALID_MIDI_EVENT_VALUE) {
+    tempoUsec = DEFAULT_MIDI_TEMPO_USEC_PER_QUARTER;
+  }
+  return tempoUsecToBpm(tempoUsec);
+}
+
+int SequencePlayer::currentChannelPan(uint8_t channel) const {
+  if (channel >= 128) {
+    return static_cast<int>(DEFAULT_MIDI_PAN);
+  }
+
+  DWORD pan = streamEventValue(channel, MIDI_EVENT_PAN);
+  if (pan == INVALID_MIDI_EVENT_VALUE) {
+    pan = DEFAULT_MIDI_PAN;
+  }
+  return static_cast<int>(std::clamp<DWORD>(pan, 0, 127));
+}
+
+int SequencePlayer::currentChannelVolume(uint8_t channel) const {
+  if (channel >= 128) {
+    return static_cast<int>(DEFAULT_MIDI_VOLUME);
+  }
+
+  DWORD volume = streamEventValue(channel, MIDI_EVENT_VOLUME);
+  if (volume == INVALID_MIDI_EVENT_VALUE) {
+    volume = DEFAULT_MIDI_VOLUME;
+  }
+  return static_cast<int>(std::clamp<DWORD>(volume, 0, 127));
 }
 
 bool SequencePlayer::previewNoteOn(uint8_t channel, uint8_t key, uint8_t velocity, uint32_t tick) {
@@ -353,6 +446,25 @@ void SequencePlayer::stopPreviewNote() {
   }
 
   m_previewActiveNotes.clear();
+}
+
+bool SequencePlayer::sendStreamEvent(uint8_t channel, DWORD event, DWORD value, bool toPreviewStream) {
+  if (!m_active_stream) {
+    return false;
+  }
+
+  const bool sentToActive = BASS_MIDI_StreamEvent(m_active_stream, channel, event, value) != FALSE;
+  if (toPreviewStream && m_preview_note_stream) {
+    BASS_MIDI_StreamEvent(m_preview_note_stream, channel, event, value);
+  }
+  return sentToActive;
+}
+
+DWORD SequencePlayer::streamEventValue(uint8_t channel, DWORD event) const {
+  if (!m_active_stream) {
+    return INVALID_MIDI_EVENT_VALUE;
+  }
+  return BASS_MIDI_StreamGetEvent(m_active_stream, channel, event);
 }
 
 bool SequencePlayer::ensurePreviewStreams() {

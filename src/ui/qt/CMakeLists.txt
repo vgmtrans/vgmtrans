@@ -83,6 +83,7 @@ target_sources(vgmtrans
     workarea/rhi/SimpleRhiWindow.cpp
     workarea/MdiArea.cpp
     workarea/RawFileListView.cpp
+    workarea/SequenceControlBar.cpp
     workarea/VGMCollListView.cpp
     workarea/VGMCollView.cpp
     workarea/VGMFileTreeView.cpp
@@ -139,6 +140,7 @@ target_sources(vgmtrans
     FILES
       workarea/MdiArea.h
       workarea/RawFileListView.h
+      workarea/SequenceControlBar.h
       workarea/VGMCollListView.h
       workarea/VGMCollView.h
       workarea/VGMFileListView.h
