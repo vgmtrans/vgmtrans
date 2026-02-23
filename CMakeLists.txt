@@ -9,6 +9,8 @@ project(
   VERSION 1.3
   LANGUAGES C CXX)
 
+include(GNUInstallDirs)
+
 find_package(Git)
 if(GIT_FOUND)
   execute_process(

@@ -1,5 +1,3 @@
-include(GNUInstallDirs)
-
 find_package(Qt6 REQUIRED COMPONENTS Core Gui ShaderTools Widgets Svg)
 # GuiPrivate was moved to a CMake component starting Qt 6.9,
 # so look for it separately to avoid breaking older versions
