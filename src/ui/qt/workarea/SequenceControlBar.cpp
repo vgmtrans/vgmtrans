@@ -19,6 +19,7 @@
 #include <QScrollArea>
 #include <QScrollBar>
 #include <QToolButton>
+#include <QToolTip>
 #include <QVBoxLayout>
 #include <QtGlobal>
 
@@ -41,6 +42,25 @@ constexpr int kMinTempoBpm = 20;
 constexpr int kMaxTempoBpm = 360;
 constexpr int kMinChannelValue = 0;
 constexpr int kMaxChannelValue = 127;
+constexpr int kKnobCenterValue = 64;
+constexpr qreal kKnobStartAngleDegrees = 130.0;   // left edge of the dead-zone seam
+constexpr qreal kKnobCenterAngleDegrees = 270.0;  // straight up
+constexpr qreal kKnobEndAngleDegrees = 410.0;     // right edge of the dead-zone seam
+
+qreal knobPointerAngleDegrees(int value) {
+  const int v = std::clamp(value, kMinChannelValue, kMaxChannelValue);
+  if (v <= kKnobCenterValue) {
+    const qreal t = static_cast<qreal>(v) / static_cast<qreal>(kKnobCenterValue);
+    return kKnobStartAngleDegrees +
+           (kKnobCenterAngleDegrees - kKnobStartAngleDegrees) * t;
+  }
+
+  const qreal t =
+      static_cast<qreal>(v - kKnobCenterValue) /
+      static_cast<qreal>(kMaxChannelValue - kKnobCenterValue);
+  return kKnobCenterAngleDegrees +
+         (kKnobEndAngleDegrees - kKnobCenterAngleDegrees) * t;
+}
 
 class MixerKnob final : public QWidget {
 public:
@@ -53,6 +73,10 @@ public:
 
   void setOnValueChanged(std::function<void(int)> callback) {
     m_onValueChanged = std::move(callback);
+  }
+
+  void setBubblePrefix(QString prefix) {
+    m_bubblePrefix = std::move(prefix);
   }
 
   void setValue(int newValue) {
@@ -101,9 +125,7 @@ protected:
     painter.drawEllipse(face.adjusted(3.6, 2.8, -8.8, -9.4));
 
     // Indicator line.
-    const qreal valueRatio = static_cast<qreal>(m_value - m_minimum) /
-                             static_cast<qreal>(m_maximum - m_minimum);
-    const qreal angleDegrees = -140.0 + (valueRatio * 280.0);
+    const qreal angleDegrees = knobPointerAngleDegrees(m_value);
     const qreal angleRadians = qDegreesToRadians(angleDegrees);
     const QPointF indicatorStart = center +
                                    QPointF(std::cos(angleRadians), std::sin(angleRadians)) *
@@ -128,6 +150,7 @@ protected:
     m_dragging = true;
     m_dragOrigin = event->globalPosition();
     m_dragStartValue = m_value;
+    showValueBubble(event->globalPosition().toPoint());
     event->accept();
   }
 
@@ -141,16 +164,24 @@ protected:
     const qreal sensitivity = (event->modifiers() & Qt::ShiftModifier) ? 0.22 : 0.78;
     const int candidate = m_dragStartValue - static_cast<int>(std::round(deltaY * sensitivity));
     setValue(candidate);
+    showValueBubble(event->globalPosition().toPoint());
     event->accept();
   }
 
   void mouseReleaseEvent(QMouseEvent* event) override {
     if (event->button() == Qt::LeftButton && m_dragging) {
       m_dragging = false;
+      QToolTip::hideText();
       event->accept();
       return;
     }
     QWidget::mouseReleaseEvent(event);
+  }
+
+  void showValueBubble(const QPoint& globalPos) {
+    const QString prefix = m_bubblePrefix.isEmpty() ? QStringLiteral("VAL") : m_bubblePrefix;
+    const QString text = QStringLiteral("%1: %2").arg(prefix).arg(m_value);
+    QToolTip::showText(globalPos + QPoint(12, -20), text, this, rect());
   }
 
 private:
@@ -161,6 +192,7 @@ private:
   QPointF m_dragOrigin;
   int m_dragStartValue = 64;
   std::function<void(int)> m_onValueChanged;
+  QString m_bubblePrefix;
 };
 
 }  // namespace
@@ -462,10 +494,12 @@ void SequenceControlBar::rebuildStrips(const std::vector<StripConfig>& strips) {
     knobRow->setSpacing(2);
     knobRow->addStretch(1);
     strip->panKnob = new MixerKnob(strip->frame);
+    strip->panKnob->setBubblePrefix(QStringLiteral("PAN"));
     strip->panKnob->setValue(std::clamp(config.pan, kMinChannelValue, kMaxChannelValue));
     knobRow->addWidget(strip->panKnob, 0, Qt::AlignHCenter);
 
     strip->volumeKnob = new MixerKnob(strip->frame);
+    strip->volumeKnob->setBubblePrefix(QStringLiteral("VOL"));
     strip->volumeKnob->setValue(std::clamp(config.volume, kMinChannelValue, kMaxChannelValue));
     knobRow->addWidget(strip->volumeKnob, 0, Qt::AlignHCenter);
     knobRow->addStretch(1);
