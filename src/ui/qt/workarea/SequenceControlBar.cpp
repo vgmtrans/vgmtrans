@@ -29,11 +29,15 @@
 #include <functional>
 #include <utility>
 
+#include "util/Metrics.h"
+
 namespace {
-constexpr int kStripWidth = 126;
-constexpr int kStripHeight = 102;
-constexpr int kKnobSize = 36;
-constexpr int kScrollStepPixels = kStripWidth / 2;
+constexpr int kBarHeight = (Size::VTab * 3) / 2;
+constexpr int kStripWidth = 58;
+constexpr int kStripHeight = kBarHeight - 6;
+constexpr int kKnobSize = 16;
+constexpr int kScrollStepPixels = kStripWidth;
+constexpr int kTempoControlWidth = 96;
 constexpr int kDefaultTempoBpm = 120;
 constexpr int kMinTempoBpm = 20;
 constexpr int kMaxTempoBpm = 360;
@@ -116,7 +120,7 @@ protected:
                                  QPointF(std::cos(angleRadians), std::sin(angleRadians)) *
                                      (radius * 0.72);
 
-    QPen indicatorPen(QColor(255, 202, 108), 2.1, Qt::SolidLine, Qt::RoundCap);
+    QPen indicatorPen(QColor(255, 202, 108), 1.35, Qt::SolidLine, Qt::RoundCap);
     painter.setPen(indicatorPen);
     painter.drawLine(indicatorStart, indicatorEnd);
 
@@ -172,9 +176,8 @@ private:
 struct SequenceControlBar::StripWidgets {
   int id = -1;
   int midiChannel = -1;
+  QColor borderColor;
   QFrame* frame = nullptr;
-  QLabel* title = nullptr;
-  QLabel* subtitle = nullptr;
   QToolButton* muteButton = nullptr;
   QToolButton* soloButton = nullptr;
   QLabel* panLabel = nullptr;
@@ -187,23 +190,20 @@ SequenceControlBar::SequenceControlBar(QWidget* parent)
     : QWidget(parent) {
   setObjectName(QStringLiteral("SequenceControlBar"));
   setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
-  setMinimumHeight(112);
+  setFixedHeight(kBarHeight);
 
   auto* rootLayout = new QHBoxLayout(this);
-  rootLayout->setContentsMargins(8, 6, 8, 6);
-  rootLayout->setSpacing(8);
+  rootLayout->setContentsMargins(4, 2, 4, 2);
+  rootLayout->setSpacing(4);
 
   auto* tempoFrame = new QFrame(this);
   tempoFrame->setObjectName(QStringLiteral("TempoBlock"));
-  tempoFrame->setFixedWidth(134);
+  tempoFrame->setFixedWidth(kTempoControlWidth);
+  tempoFrame->setFixedHeight(kStripHeight);
 
   auto* tempoLayout = new QVBoxLayout(tempoFrame);
-  tempoLayout->setContentsMargins(8, 7, 8, 7);
-  tempoLayout->setSpacing(4);
-
-  auto* tempoLabel = new QLabel(QStringLiteral("Tempo"), tempoFrame);
-  tempoLabel->setObjectName(QStringLiteral("TempoTitle"));
-  tempoLayout->addWidget(tempoLabel);
+  tempoLayout->setContentsMargins(5, 4, 5, 4);
+  tempoLayout->setSpacing(0);
 
   m_tempoSpin = new QDoubleSpinBox(tempoFrame);
   m_tempoSpin->setDecimals(2);
@@ -214,6 +214,7 @@ SequenceControlBar::SequenceControlBar(QWidget* parent)
   m_tempoSpin->setSuffix(QStringLiteral(" BPM"));
   m_tempoSpin->setValue(kDefaultTempoBpm);
   m_tempoSpin->setAlignment(Qt::AlignCenter);
+  m_tempoSpin->setFixedHeight(22);
   tempoLayout->addWidget(m_tempoSpin);
 
   rootLayout->addWidget(tempoFrame, 0);
@@ -229,7 +230,7 @@ SequenceControlBar::SequenceControlBar(QWidget* parent)
   m_stripContainer->setObjectName(QStringLiteral("StripContainer"));
   m_stripLayout = new QHBoxLayout(m_stripContainer);
   m_stripLayout->setContentsMargins(0, 0, 0, 0);
-  m_stripLayout->setSpacing(6);
+  m_stripLayout->setSpacing(3);
   m_stripLayout->addStretch(1);
   m_stripScroll->setWidget(m_stripContainer);
   m_stripScroll->viewport()->installEventFilter(this);
@@ -246,14 +247,14 @@ SequenceControlBar::SequenceControlBar(QWidget* parent)
   m_scrollLeft->setObjectName(QStringLiteral("StripScrollButton"));
   m_scrollLeft->setText(QStringLiteral("<"));
   m_scrollLeft->setAutoRaise(true);
-  m_scrollLeft->setFixedSize(22, 22);
+  m_scrollLeft->setFixedSize(18, 18);
   scrollLayout->addWidget(m_scrollLeft);
 
   m_scrollRight = new QToolButton(m_scrollControls);
   m_scrollRight->setObjectName(QStringLiteral("StripScrollButton"));
   m_scrollRight->setText(QStringLiteral(">"));
   m_scrollRight->setAutoRaise(true);
-  m_scrollRight->setFixedSize(22, 22);
+  m_scrollRight->setFixedSize(18, 18);
   scrollLayout->addWidget(m_scrollRight);
 
   rootLayout->addWidget(m_scrollControls, 0, Qt::AlignVCenter);
@@ -419,36 +420,32 @@ void SequenceControlBar::rebuildStrips(const std::vector<StripConfig>& strips) {
     auto strip = std::make_unique<StripWidgets>();
     strip->id = config.id;
     strip->midiChannel = config.midiChannel;
+    strip->borderColor = config.borderColor;
 
     strip->frame = new QFrame(m_stripContainer);
     strip->frame->setObjectName(QStringLiteral("MixerStrip"));
     strip->frame->setProperty("dimmed", false);
     strip->frame->setProperty("solo", false);
     strip->frame->setFixedSize(kStripWidth, kStripHeight);
+    if (!config.title.isEmpty()) {
+      const QString tooltip =
+          config.subtitle.isEmpty() ? config.title : QStringLiteral("%1  (%2)").arg(config.title, config.subtitle);
+      strip->frame->setToolTip(tooltip);
+    }
 
     auto* stripLayout = new QVBoxLayout(strip->frame);
-    stripLayout->setContentsMargins(7, 6, 7, 6);
-    stripLayout->setSpacing(3);
-
-    strip->title = new QLabel(config.title, strip->frame);
-    strip->title->setObjectName(QStringLiteral("StripTitle"));
-    strip->title->setAlignment(Qt::AlignCenter);
-    stripLayout->addWidget(strip->title);
-
-    strip->subtitle = new QLabel(config.subtitle, strip->frame);
-    strip->subtitle->setObjectName(QStringLiteral("StripSubtitle"));
-    strip->subtitle->setAlignment(Qt::AlignCenter);
-    stripLayout->addWidget(strip->subtitle);
+    stripLayout->setContentsMargins(3, 2, 3, 2);
+    stripLayout->setSpacing(1);
 
     auto* buttonsLayout = new QHBoxLayout();
     buttonsLayout->setContentsMargins(0, 0, 0, 0);
-    buttonsLayout->setSpacing(4);
+    buttonsLayout->setSpacing(2);
 
     strip->muteButton = new QToolButton(strip->frame);
     strip->muteButton->setObjectName(QStringLiteral("StripToggle"));
     strip->muteButton->setCheckable(true);
     strip->muteButton->setText(QStringLiteral("M"));
-    strip->muteButton->setFixedSize(22, 18);
+    strip->muteButton->setFixedSize(18, 13);
     strip->muteButton->setToolTip(QStringLiteral("Mute"));
     buttonsLayout->addWidget(strip->muteButton);
 
@@ -456,20 +453,19 @@ void SequenceControlBar::rebuildStrips(const std::vector<StripConfig>& strips) {
     strip->soloButton->setObjectName(QStringLiteral("StripToggle"));
     strip->soloButton->setCheckable(true);
     strip->soloButton->setText(QStringLiteral("S"));
-    strip->soloButton->setFixedSize(22, 18);
+    strip->soloButton->setFixedSize(18, 13);
     strip->soloButton->setToolTip(QStringLiteral("Solo"));
     buttonsLayout->addWidget(strip->soloButton);
 
-    buttonsLayout->addStretch(1);
     stripLayout->addLayout(buttonsLayout);
 
     auto* knobRow = new QHBoxLayout();
     knobRow->setContentsMargins(0, 0, 0, 0);
-    knobRow->setSpacing(8);
+    knobRow->setSpacing(3);
 
     auto* panColumn = new QVBoxLayout();
     panColumn->setContentsMargins(0, 0, 0, 0);
-    panColumn->setSpacing(2);
+    panColumn->setSpacing(0);
     strip->panKnob = new MixerKnob(strip->frame);
     strip->panKnob->setValue(std::clamp(config.pan, kMinChannelValue, kMaxChannelValue));
     panColumn->addWidget(strip->panKnob, 0, Qt::AlignHCenter);
@@ -481,7 +477,7 @@ void SequenceControlBar::rebuildStrips(const std::vector<StripConfig>& strips) {
 
     auto* volColumn = new QVBoxLayout();
     volColumn->setContentsMargins(0, 0, 0, 0);
-    volColumn->setSpacing(2);
+    volColumn->setSpacing(0);
     strip->volumeKnob = new MixerKnob(strip->frame);
     strip->volumeKnob->setValue(std::clamp(config.volume, kMinChannelValue, kMaxChannelValue));
     volColumn->addWidget(strip->volumeKnob, 0, Qt::AlignHCenter);
@@ -543,6 +539,7 @@ void SequenceControlBar::rebuildStrips(const std::vector<StripConfig>& strips) {
       }
     });
 
+    applyStripFrameStyle(*strip, false, false);
     m_strips.push_back(std::move(strip));
   }
 
@@ -568,9 +565,7 @@ void SequenceControlBar::refreshStripInteractivity() {
     if (strip.frame) {
       strip.frame->setProperty("dimmed", controlsDisabled);
       strip.frame->setProperty("solo", soloed);
-      style()->unpolish(strip.frame);
-      style()->polish(strip.frame);
-      strip.frame->update();
+      applyStripFrameStyle(strip, controlsDisabled, soloed);
     }
 
     if (strip.muteButton) {
@@ -591,6 +586,42 @@ void SequenceControlBar::refreshStripInteractivity() {
     if (strip.volumeLabel) {
       strip.volumeLabel->setEnabled(!controlsDisabled);
     }
+  }
+}
+
+void SequenceControlBar::applyStripFrameStyle(StripWidgets& strip, bool dimmed, bool soloed) {
+  if (!strip.frame) {
+    return;
+  }
+
+  QColor border = strip.borderColor;
+  if (!border.isValid()) {
+    border = QColor::fromHsv((strip.id * 43) % 360, 190, 235);
+  }
+  if (soloed) {
+    border = border.lighter(120);
+  }
+  border.setAlpha(dimmed ? 126 : 238);
+
+  QColor baseBg = palette().color(QPalette::Window).darker(132);
+  baseBg.setAlpha(dimmed ? 190 : 226);
+
+  const QString frameStyle = QStringLiteral(
+      "QFrame#MixerStrip {"
+      " border: 1px solid rgba(%1,%2,%3,%4);"
+      " border-radius: 4px;"
+      " background: rgba(%5,%6,%7,%8);"
+      "}")
+                                 .arg(border.red())
+                                 .arg(border.green())
+                                 .arg(border.blue())
+                                 .arg(border.alpha())
+                                 .arg(baseBg.red())
+                                 .arg(baseBg.green())
+                                 .arg(baseBg.blue())
+                                 .arg(baseBg.alpha());
+  if (strip.frame->styleSheet() != frameStyle) {
+    strip.frame->setStyleSheet(frameStyle);
   }
 }
 
@@ -637,7 +668,7 @@ void SequenceControlBar::refreshStyleSheet() {
 
   const QColor barBg = base.darker(112);
   const QColor blockBg = base.darker(124);
-  const QColor blockBorder = base.lighter(108);
+  const QColor blockBorder = base.lighter(112);
 
   QColor subtleText = text;
   subtleText.setAlpha(160);
@@ -654,62 +685,36 @@ void SequenceControlBar::refreshStyleSheet() {
       "}"
       "QFrame#TempoBlock {"
       " border: 1px solid rgba(%2,%3,%4,210);"
-      " border-radius: 7px;"
+      " border-radius: 4px;"
       " background: %5;"
-      "}"
-      "QLabel#TempoTitle {"
-      " font-size: 10px;"
-      " font-weight: 600;"
-      " letter-spacing: 0.5px;"
-      " color: rgba(%6,%7,%8,%9);"
       "}"
       "QDoubleSpinBox {"
       " border: 1px solid rgba(255,255,255,0.09);"
-      " border-radius: 6px;"
-      " padding: 3px 6px;"
+      " border-radius: 4px;"
+      " padding: 1px 4px;"
       " color: palette(text);"
       " background: rgba(0,0,0,0.25);"
       " selection-background-color: rgba(255,255,255,0.2);"
-      "}"
-      "QFrame#MixerStrip {"
-      " border: 1px solid rgba(%2,%3,%4,224);"
-      " border-radius: 7px;"
-      " background: %10;"
-      "}"
-      "QFrame#MixerStrip[dimmed=\"true\"] {"
-      " background: rgba(0,0,0,0.42);"
-      " border: 1px solid rgba(255,255,255,0.08);"
-      "}"
-      "QFrame#MixerStrip[solo=\"true\"] {"
-      " border: 1px solid rgba(%11,%12,%13,220);"
-      "}"
-      "QLabel#StripTitle {"
       " font-size: 9px;"
-      " font-weight: 600;"
-      " letter-spacing: 0.4px;"
-      " color: palette(text);"
-      "}"
-      "QLabel#StripSubtitle {"
-      " font-size: 8px;"
-      " color: rgba(%6,%7,%8,%9);"
       "}"
       "QLabel#StripValueLabel {"
-      " font-size: 7px;"
+      " font-size: 6px;"
       " font-weight: 600;"
-      " letter-spacing: 0.5px;"
+      " letter-spacing: 0.35px;"
       " color: rgba(%6,%7,%8,%9);"
       "}"
       "QToolButton#StripToggle {"
       " border: 1px solid rgba(255,255,255,0.14);"
-      " border-radius: 5px;"
-      " background: rgba(%14,%15,%16,200);"
-      " color: rgba(%17,%18,%19,220);"
-      " font-size: 9px;"
+      " border-radius: 3px;"
+      " background: rgba(%10,%11,%12,200);"
+      " color: rgba(%13,%14,%15,220);"
+      " font-size: 8px;"
       " font-weight: 700;"
+      " padding: 0px;"
       "}"
       "QToolButton#StripToggle:checked {"
-      " background: rgba(%20,%21,%22,230);"
-      " color: rgba(%17,%18,%19,255);"
+      " background: rgba(%16,%17,%18,230);"
+      " color: rgba(%13,%14,%15,255);"
       " border: 1px solid rgba(255,255,255,0.28);"
       "}"
       "QToolButton#StripToggle:disabled {"
@@ -719,10 +724,11 @@ void SequenceControlBar::refreshStyleSheet() {
       "}"
       "QToolButton#StripScrollButton {"
       " border: none;"
-      " border-radius: 7px;"
+      " border-radius: 5px;"
       " background: transparent;"
       " color: palette(text);"
-      " font-weight: 600;"
+      " font-size: 9px;"
+      " font-weight: 700;"
       "}"
       "QToolButton#StripScrollButton:hover {"
       " background: rgba(255,255,255,0.14);"
@@ -743,10 +749,6 @@ void SequenceControlBar::refreshStyleSheet() {
                            .arg(subtleText.green())
                            .arg(subtleText.blue())
                            .arg(subtleText.alpha())
-                           .arg(base.darker(132).name())
-                           .arg(buttonOn.red())
-                           .arg(buttonOn.green())
-                           .arg(buttonOn.blue())
                            .arg(buttonOff.red())
                            .arg(buttonOff.green())
                            .arg(buttonOff.blue())
