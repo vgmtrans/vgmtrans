@@ -555,6 +555,10 @@ void SequenceControlBar::rebuildStrips(const std::vector<StripConfig>& strips) {
 }
 
 void SequenceControlBar::refreshStripInteractivity() {
+  const bool anySolo = std::any_of(m_strips.begin(), m_strips.end(), [](const auto& strip) {
+    return strip && strip->soloButton && strip->soloButton->isChecked();
+  });
+
   for (auto& stripPtr : m_strips) {
     if (!stripPtr) {
       continue;
@@ -562,7 +566,8 @@ void SequenceControlBar::refreshStripInteractivity() {
     auto& strip = *stripPtr;
     const bool muted = strip.muteButton && strip.muteButton->isChecked();
     const bool soloed = strip.soloButton && strip.soloButton->isChecked();
-    const bool controlsDisabled = muted;
+    const bool blockedBySolo = anySolo && !soloed;
+    const bool controlsDisabled = muted || blockedBySolo;
 
     if (strip.frame) {
       strip.frame->setProperty("dimmed", controlsDisabled);
