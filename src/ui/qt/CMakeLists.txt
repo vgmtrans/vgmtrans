@@ -1,19 +1,9 @@
-find_package(Qt6 COMPONENTS Core Gui ShaderTools Widgets Svg GuiPrivate)
-if(NOT Qt6_FOUND AND CMAKE_SYSTEM_NAME STREQUAL "Windows")
-  message(STATUS "Qt6 could not be found, falling back to vendored Qt6")
-  set(Qt6_DIR
-      "${CMAKE_SOURCE_DIR}/lib/vgmtrans-ext-win/qt6.6.1-x86_64-pc-windows-msvc/lib/cmake/Qt6"
-  )
-  if(NOT EXISTS "${Qt6_DIR}")
-    message(SEND_ERROR "Could not find `${Qt6_DIR}`")
-    message(
-      SEND_ERROR
-        "Did you forget to run `git submodule update --init --recursive`?")
-  endif()
-  find_package(Qt6 COMPONENTS Core Gui ShaderTools Widgets Svg GuiPrivate)
-endif()
-
-message(STATUS "Using Qt ${Qt6_VERSION}")
+find_package(Qt6 REQUIRED COMPONENTS Core Gui ShaderTools Widgets Svg)
+# GuiPrivate was moved to a CMake component starting Qt 6.9,
+# so look for it separately to avoid breaking older versions
+find_package(Qt6 COMPONENTS GuiPrivate QUIET)
+message(STATUS "Using Qt: ${Qt6_VERSION}")
+message(STATUS "Has own QtGuiPrivate: ${Qt6GuiPrivate_FOUND}")
 
 # ~~~
 # Build

@@ -1,6 +1,3 @@
-[submodule "win-deps"]
-	path = lib/vgmtrans-ext-win
-	url = ../vgmtrans-ext-win
 [submodule "lib/spdlog"]
 	path = lib/spdlog
 	url = https://github.com/gabime/spdlog.git
