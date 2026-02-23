@@ -1,0 +1,6 @@
+{
+  "io.github.vgmtrans.vgmtrans": [
+    "appstream-external-screenshot-url",
+    "appstream-screenshots-not-mirrored-in-ostree"
+  ]
+}

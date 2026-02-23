@@ -2,7 +2,7 @@
 Type=Application
 Name=VGMTrans
 Exec=vgmtrans
-Icon=vgmtrans
+Icon=io.github.vgmtrans.vgmtrans
 Comment=A converter for sequenced videogame music
 Terminal=false
 Categories=AudioVideo;

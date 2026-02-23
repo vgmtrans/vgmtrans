@@ -94,7 +94,10 @@ jobs:
           path: "build/macos-${{ matrix.target }}/bin/Release/VGMTrans-${{ github.sha }}.dmg"
           
   linux:
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
+    container:
+      image: ghcr.io/flathub-infra/flatpak-github-actions:kde-6.10
+      options: --privileged
     name: Linux, x64
     permissions:
       id-token: write
@@ -110,91 +113,39 @@ jobs:
         run: |
           echo "BRANCH=$(git rev-parse --abbrev-ref HEAD)" >> $GITHUB_ENV
 
-      - name: Install Qt
-        uses: jurplel/install-qt-action@v4
+      - name: "Build Flatpak"
+        uses: flatpak/flatpak-github-actions/flatpak-builder@v6
         with:
-          aqtversion: '==3.1.*'
-          version: '6.10.2'
-          host: 'linux'
-          target: 'desktop'
-          arch: 'linux_gcc_64'
-          modules: 'all'
+          bundle: VGMTrans.flatpak
+          manifest-path: build-aux/flatpak/io.github.vgmtrans.vgmtrans.yaml
+          cache-key: flatpak-builder-${{ github.sha }}
 
-      - name: "Install dependencies"
+      - name: Run linter
         run: |
-          wget https://apt.llvm.org/llvm.sh
-          chmod +x llvm.sh
-          sudo ./llvm.sh 20
+          flatpak install -y flathub org.flatpak.Builder
+          flatpak run --command=flatpak-builder-lint org.flatpak.Builder \
+            --gha-format \
+            --user-exceptions build-aux/flatpak/flatpak-exceptions.json \
+            manifest build-aux/flatpak/io.github.vgmtrans.vgmtrans.yaml
+          flatpak run --command=flatpak-builder-lint org.flatpak.Builder \
+            --gha-format \
+            --exceptions \
+            --user-exceptions build-aux/flatpak/flatpak-exceptions.json \
+            repo repo
+        shell: bash
 
-          sudo apt-get update
-          # libxcb-cursor-dev is missed by the Qt action
-          sudo apt-get install -y --no-install-recommends \
-            pkg-config \
-            clang-20 lld-20 \
-            ninja-build \
-            fuse \
-            libxcb-cursor-dev
-
-          echo 'export PATH="/usr/local/opt/llvm/bin:$PATH"' >> ~/.bash_profile
-
-      - name: "Prepare build"
-        run: |
-          export LDFLAGS="-L/usr/local/opt/llvm/lib"
-          export CFLAGS="-I/usr/local/opt/llvm/include -fuse-ld=lld"
-          export CXXFLAGS="-I/usr/local/opt/llvm/include -fuse-ld=lld"
-
-          export CC=clang-20
-          export CXX=clang++-20
-          cmake --preset linux-x64 \
-            -DCMAKE_INSTALL_PREFIX=/usr
-
-      - name: "Build project"
-        run: cmake --build --preset linux-x64-release
-
-      - name: "Run install target"
-        run: |
-          export DESTDIR=appdir
-          cmake --build --preset linux-x64-release --target install
-      - name: "Make AppImage"
-        working-directory: "build/linux-x64"
-        run: |
-          echo "Creating AppDir structure for AppImage"
-
-          find appdir/
-          mkdir -p appdir/usr/share
-
-          cp ${{ github.workspace }}/bin/mame_roms.json appdir/usr/bin
-          cp ${{ github.workspace }}/src/ui/qt/resources/VGMTrans.desktop appdir/usr/share
-          cp ${{ github.workspace }}/src/ui/qt/resources/vgmtrans.png appdir/
-
-          mkdir -p appdir/usr/lib
-          cp ${{ github.workspace }}/lib/bass/*.so appdir/usr/lib/
-
-          echo "Downloading linuxdeployqt"
-          wget -c -nv "https://github.com/probonopd/linuxdeployqt/releases/download/continuous/linuxdeployqt-continuous-x86_64.AppImage"
-          chmod a+x linuxdeployqt-continuous-x86_64.AppImage
-
-          echo "Creating AppImage"
-          ./linuxdeployqt-continuous-x86_64.AppImage appdir/usr/share/VGMTrans.desktop \
-            -executable=appdir/usr/lib/libbass.so -executable=appdir/usr/lib/libbassmidi.so \
-            -appimage -extra-plugins=platforms/,platformthemes/ \
-            -verbose=10
-
-          mkdir -p appdir/usr/share/licenses/VGMTrans
-          cp ${{ github.workspace }}/LICENSE appdir/usr/share/licenses/VGMTrans/
-
-          mv VGMTrans*.AppImage VGMTrans.AppImage
       - name: Generate artifact attestation
         uses: actions/attest-build-provenance@v3
         if: ${{ github.event_name != 'pull_request' }}
         with:
           subject-name: VGMTrans-${{ github.sha }}-${{ env.BRANCH }}-x86_64-${{ runner.os }}
-          subject-path: "build/linux-x64/VGMTrans.AppImage"
+          subject-path: "VGMTrans.flatpak"
+
       - name: "Upload artifact"
         uses: actions/upload-artifact@v4
         with:
-          name: VGMTrans-${{ github.sha }}-${{ env.BRANCH }}-x86_64-${{ runner.os }}.AppImage
-          path: "build/linux-x64/VGMTrans.AppImage"
+          name: VGMTrans-${{ github.sha }}-${{ env.BRANCH }}-x86_64-${{ runner.os }}.flatpak
+          path: VGMTrans.flatpak
 
   windows:
     runs-on: windows-2022

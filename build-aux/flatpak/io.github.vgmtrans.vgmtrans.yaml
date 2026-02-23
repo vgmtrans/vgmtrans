@@ -1,0 +1,28 @@
+app-id: io.github.vgmtrans.vgmtrans
+runtime: org.kde.Platform
+runtime-version: '6.10'
+sdk: org.kde.Sdk
+command: vgmtrans
+finish-args:
+  # Display and Audio
+  - --socket=wayland
+  - --socket=fallback-x11
+  - --socket=pulseaudio
+  # For hw accel
+  - --share=ipc
+  - --device=dri
+
+modules:
+  - name: VGMTrans
+    buildsystem: cmake-ninja
+    config-opts:
+      - -DCMAKE_BUILD_TYPE=Release
+      - -DENABLE_UI_QT=ON
+      - -DENABLE_CLI=OFF
+      - -DENABLE_SHELL=OFF
+      - -DFLATPAK=ON
+      - -DUSE_SYSTEM_ZLIB=ON
+      - -DVGMTRANS_DATA_DIR=/app/share/vgmtrans
+    sources:
+      - type: dir
+        path: ../../
