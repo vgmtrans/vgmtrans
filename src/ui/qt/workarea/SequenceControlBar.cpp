@@ -14,12 +14,10 @@
 #include <QLabel>
 #include <QMouseEvent>
 #include <QPainter>
-#include <QPainterPath>
 #include <QPalette>
 #include <QResizeEvent>
 #include <QScrollArea>
 #include <QScrollBar>
-#include <QStyle>
 #include <QToolButton>
 #include <QVBoxLayout>
 #include <QtGlobal>
@@ -33,11 +31,11 @@
 
 namespace {
 constexpr int kBarHeight = (Size::VTab * 3) / 2;
-constexpr int kStripWidth = 58;
+constexpr int kStripWidth = 60;
 constexpr int kStripHeight = kBarHeight - 6;
-constexpr int kKnobSize = 16;
+constexpr int kKnobSize = 20;
 constexpr int kScrollStepPixels = kStripWidth;
-constexpr int kTempoControlWidth = 96;
+constexpr int kTempoControlWidth = 90;
 constexpr int kDefaultTempoBpm = 120;
 constexpr int kMinTempoBpm = 20;
 constexpr int kMaxTempoBpm = 360;
@@ -84,29 +82,18 @@ protected:
       painter.setOpacity(0.42);
     }
 
-    // Outer bezel.
-    QRadialGradient bezelGradient(center, radius);
-    bezelGradient.setColorAt(0.0, QColor(242, 244, 248));
-    bezelGradient.setColorAt(0.42, QColor(170, 174, 182));
-    bezelGradient.setColorAt(1.0, QColor(58, 62, 70));
+    // Matte outer ring.
     painter.setPen(Qt::NoPen);
-    painter.setBrush(bezelGradient);
+    painter.setBrush(QColor(46, 50, 58));
     painter.drawEllipse(bounds);
 
-    // Knob face.
-    const QRectF face = bounds.adjusted(3.0, 3.0, -3.0, -3.0);
-    QRadialGradient faceGradient(face.center() + QPointF(-2.5, -3.0), face.width() * 0.58);
-    faceGradient.setColorAt(0.0, QColor(250, 250, 250));
-    faceGradient.setColorAt(0.35, QColor(191, 195, 204));
-    faceGradient.setColorAt(1.0, QColor(94, 99, 108));
+    // Knob face without glow corona.
+    const QRectF face = bounds.adjusted(2.2, 2.2, -2.2, -2.2);
+    QLinearGradient faceGradient(face.topLeft(), face.bottomRight());
+    faceGradient.setColorAt(0.0, QColor(216, 220, 228));
+    faceGradient.setColorAt(1.0, QColor(126, 132, 143));
     painter.setBrush(faceGradient);
     painter.drawEllipse(face);
-
-    // Specular highlight.
-    QPainterPath highlight;
-    highlight.addEllipse(face.adjusted(4.0, 3.0, -8.0, -11.0));
-    painter.setBrush(QColor(255, 255, 255, 46));
-    painter.drawPath(highlight);
 
     // Indicator line.
     const qreal valueRatio = static_cast<qreal>(m_value - m_minimum) /
@@ -180,8 +167,6 @@ struct SequenceControlBar::StripWidgets {
   QFrame* frame = nullptr;
   QToolButton* muteButton = nullptr;
   QToolButton* soloButton = nullptr;
-  QLabel* panLabel = nullptr;
-  QLabel* volumeLabel = nullptr;
   MixerKnob* panKnob = nullptr;
   MixerKnob* volumeKnob = nullptr;
 };
@@ -202,8 +187,13 @@ SequenceControlBar::SequenceControlBar(QWidget* parent)
   tempoFrame->setFixedHeight(kStripHeight);
 
   auto* tempoLayout = new QVBoxLayout(tempoFrame);
-  tempoLayout->setContentsMargins(5, 4, 5, 4);
-  tempoLayout->setSpacing(0);
+  tempoLayout->setContentsMargins(4, 1, 4, 1);
+  tempoLayout->setSpacing(1);
+
+  auto* tempoLabel = new QLabel(QStringLiteral("Tempo"), tempoFrame);
+  tempoLabel->setObjectName(QStringLiteral("TempoTitle"));
+  tempoLabel->setAlignment(Qt::AlignHCenter | Qt::AlignBottom);
+  tempoLayout->addWidget(tempoLabel);
 
   m_tempoSpin = new QDoubleSpinBox(tempoFrame);
   m_tempoSpin->setDecimals(2);
@@ -214,7 +204,7 @@ SequenceControlBar::SequenceControlBar(QWidget* parent)
   m_tempoSpin->setSuffix(QStringLiteral(" BPM"));
   m_tempoSpin->setValue(kDefaultTempoBpm);
   m_tempoSpin->setAlignment(Qt::AlignCenter);
-  m_tempoSpin->setFixedHeight(22);
+  m_tempoSpin->setFixedHeight(20);
   tempoLayout->addWidget(m_tempoSpin);
 
   rootLayout->addWidget(tempoFrame, 0);
@@ -434,18 +424,18 @@ void SequenceControlBar::rebuildStrips(const std::vector<StripConfig>& strips) {
     }
 
     auto* stripLayout = new QVBoxLayout(strip->frame);
-    stripLayout->setContentsMargins(3, 2, 3, 2);
-    stripLayout->setSpacing(1);
+    stripLayout->setContentsMargins(0, 0, 0, 0);
+    stripLayout->setSpacing(0);
 
     auto* buttonsLayout = new QHBoxLayout();
-    buttonsLayout->setContentsMargins(0, 0, 0, 0);
+    buttonsLayout->setContentsMargins(3, 0, 2, 0);
     buttonsLayout->setSpacing(2);
 
     strip->muteButton = new QToolButton(strip->frame);
     strip->muteButton->setObjectName(QStringLiteral("StripToggle"));
     strip->muteButton->setCheckable(true);
     strip->muteButton->setText(QStringLiteral("M"));
-    strip->muteButton->setFixedSize(18, 13);
+    strip->muteButton->setFixedSize(20, 15);
     strip->muteButton->setToolTip(QStringLiteral("Mute"));
     buttonsLayout->addWidget(strip->muteButton);
 
@@ -453,39 +443,23 @@ void SequenceControlBar::rebuildStrips(const std::vector<StripConfig>& strips) {
     strip->soloButton->setObjectName(QStringLiteral("StripToggle"));
     strip->soloButton->setCheckable(true);
     strip->soloButton->setText(QStringLiteral("S"));
-    strip->soloButton->setFixedSize(18, 13);
+    strip->soloButton->setFixedSize(20, 15);
     strip->soloButton->setToolTip(QStringLiteral("Solo"));
     buttonsLayout->addWidget(strip->soloButton);
 
+    buttonsLayout->addStretch(1);
     stripLayout->addLayout(buttonsLayout);
 
     auto* knobRow = new QHBoxLayout();
-    knobRow->setContentsMargins(0, 0, 0, 0);
-    knobRow->setSpacing(3);
-
-    auto* panColumn = new QVBoxLayout();
-    panColumn->setContentsMargins(0, 0, 0, 0);
-    panColumn->setSpacing(0);
+    knobRow->setContentsMargins(3, 0, 2, 0);
+    knobRow->setSpacing(2);
     strip->panKnob = new MixerKnob(strip->frame);
     strip->panKnob->setValue(std::clamp(config.pan, kMinChannelValue, kMaxChannelValue));
-    panColumn->addWidget(strip->panKnob, 0, Qt::AlignHCenter);
-    strip->panLabel = new QLabel(QStringLiteral("PAN"), strip->frame);
-    strip->panLabel->setObjectName(QStringLiteral("StripValueLabel"));
-    strip->panLabel->setAlignment(Qt::AlignCenter);
-    panColumn->addWidget(strip->panLabel);
-    knobRow->addLayout(panColumn, 1);
+    knobRow->addWidget(strip->panKnob, 0, Qt::AlignHCenter);
 
-    auto* volColumn = new QVBoxLayout();
-    volColumn->setContentsMargins(0, 0, 0, 0);
-    volColumn->setSpacing(0);
     strip->volumeKnob = new MixerKnob(strip->frame);
     strip->volumeKnob->setValue(std::clamp(config.volume, kMinChannelValue, kMaxChannelValue));
-    volColumn->addWidget(strip->volumeKnob, 0, Qt::AlignHCenter);
-    strip->volumeLabel = new QLabel(QStringLiteral("VOL"), strip->frame);
-    strip->volumeLabel->setObjectName(QStringLiteral("StripValueLabel"));
-    strip->volumeLabel->setAlignment(Qt::AlignCenter);
-    volColumn->addWidget(strip->volumeLabel);
-    knobRow->addLayout(volColumn, 1);
+    knobRow->addWidget(strip->volumeKnob, 0, Qt::AlignHCenter);
 
     stripLayout->addLayout(knobRow, 1);
 
@@ -580,12 +554,6 @@ void SequenceControlBar::refreshStripInteractivity() {
     if (strip.volumeKnob) {
       strip.volumeKnob->setEnabled(!controlsDisabled);
     }
-    if (strip.panLabel) {
-      strip.panLabel->setEnabled(!controlsDisabled);
-    }
-    if (strip.volumeLabel) {
-      strip.volumeLabel->setEnabled(!controlsDisabled);
-    }
   }
 }
 
@@ -608,8 +576,9 @@ void SequenceControlBar::applyStripFrameStyle(StripWidgets& strip, bool dimmed, 
 
   const QString frameStyle = QStringLiteral(
       "QFrame#MixerStrip {"
-      " border: 1px solid rgba(%1,%2,%3,%4);"
-      " border-radius: 4px;"
+      " border: none;"
+      " border-left: 3px solid rgba(%1,%2,%3,%4);"
+      " border-radius: 0px;"
       " background: rgba(%5,%6,%7,%8);"
       "}")
                                  .arg(border.red())
@@ -685,30 +654,29 @@ void SequenceControlBar::refreshStyleSheet() {
       "}"
       "QFrame#TempoBlock {"
       " border: 1px solid rgba(%2,%3,%4,210);"
-      " border-radius: 4px;"
+      " border-radius: 3px;"
       " background: %5;"
+      "}"
+      "QLabel#TempoTitle {"
+      " font-size: 8px;"
+      " font-weight: 600;"
+      " color: rgba(%6,%7,%8,%9);"
       "}"
       "QDoubleSpinBox {"
       " border: 1px solid rgba(255,255,255,0.09);"
-      " border-radius: 4px;"
+      " border-radius: 3px;"
       " padding: 1px 4px;"
       " color: palette(text);"
       " background: rgba(0,0,0,0.25);"
       " selection-background-color: rgba(255,255,255,0.2);"
-      " font-size: 9px;"
-      "}"
-      "QLabel#StripValueLabel {"
-      " font-size: 6px;"
-      " font-weight: 600;"
-      " letter-spacing: 0.35px;"
-      " color: rgba(%6,%7,%8,%9);"
+      " font-size: 8px;"
       "}"
       "QToolButton#StripToggle {"
       " border: 1px solid rgba(255,255,255,0.14);"
       " border-radius: 3px;"
       " background: rgba(%10,%11,%12,200);"
       " color: rgba(%13,%14,%15,220);"
-      " font-size: 8px;"
+      " font-size: 9px;"
       " font-weight: 700;"
       " padding: 0px;"
       "}"
