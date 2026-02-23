@@ -202,6 +202,8 @@ elseif(CMAKE_SYSTEM_NAME MATCHES "Windows")
       --skip-plugin-types tls
   )
 elseif(CMAKE_SYSTEM_NAME MATCHES "FreeBSD|OpenBSD|Linux")
+  set(APP_ID "io.github.vgmtrans.vgmtrans")
+
   install(FILES
           $<TARGET_FILE:BASS::BASS>
           $<TARGET_FILE:BASS::MIDI>
@@ -214,10 +216,19 @@ elseif(CMAKE_SYSTEM_NAME MATCHES "FreeBSD|OpenBSD|Linux")
 
   install(FILES "${CMAKE_SOURCE_DIR}/bin/mame_roms.json"
           DESTINATION "${CMAKE_INSTALL_DATADIR}/vgmtrans")
+
   install(FILES resources/vgmtrans.png
-          DESTINATION "${CMAKE_INSTALL_DATADIR}/icons/hicolor/512x512/apps")
+          DESTINATION "${CMAKE_INSTALL_DATADIR}/icons/hicolor/512x512/apps"
+          RENAME "${APP_ID}.png")
   install(FILES resources/VGMTrans.desktop
-          DESTINATION "${CMAKE_INSTALL_DATADIR}/applications")
+          DESTINATION "${CMAKE_INSTALL_DATADIR}/applications"
+          RENAME "${APP_ID}.desktop")
+
+  configure_file(resources/metainfo.xml.in "${CMAKE_CURRENT_BINARY_DIR}/metainfo.xml" @ONLY)
+  install(FILES "${CMAKE_CURRENT_BINARY_DIR}/metainfo.xml"
+          DESTINATION "${CMAKE_INSTALL_DATADIR}/metainfo"
+          RENAME "${APP_ID}.metainfo.xml")
+
   install(FILES "${CMAKE_SOURCE_DIR}/LICENSE"
           DESTINATION "${CMAKE_INSTALL_DATAROOTDIR}/licenses/vgmtrans")
   install(DIRECTORY "${CMAKE_SOURCE_DIR}/licenses/"
@@ -229,15 +240,18 @@ install(TARGETS vgmtrans
         RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}"
 )
 
-qt_generate_deploy_app_script(
-    TARGET vgmtrans
-    OUTPUT_SCRIPT deploy_script
-    NO_UNSUPPORTED_PLATFORM_ERROR
-    NO_TRANSLATIONS
-		NO_COMPILER_RUNTIME
-    DEPLOY_TOOL_OPTIONS ${DEPLOY_EXTRA_OPTIONS}
-)
-install(SCRIPT ${deploy_script})
+# 
+if (NOT FLATPAK)
+  qt_generate_deploy_app_script(
+      TARGET vgmtrans
+      OUTPUT_SCRIPT deploy_script
+      NO_UNSUPPORTED_PLATFORM_ERROR
+      NO_TRANSLATIONS
+      NO_COMPILER_RUNTIME
+      DEPLOY_TOOL_OPTIONS ${DEPLOY_EXTRA_OPTIONS}
+  )
+  install(SCRIPT ${deploy_script})
+endif()
 
 # ~~~
 # CPack Setup
