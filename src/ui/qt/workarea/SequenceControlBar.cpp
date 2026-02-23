@@ -84,16 +84,21 @@ protected:
 
     // Matte outer ring.
     painter.setPen(Qt::NoPen);
-    painter.setBrush(QColor(46, 50, 58));
+    painter.setBrush(QColor(34, 38, 45));
     painter.drawEllipse(bounds);
 
-    // Knob face without glow corona.
+    // Knob face: darker with subtle gradient shading.
     const QRectF face = bounds.adjusted(2.2, 2.2, -2.2, -2.2);
     QLinearGradient faceGradient(face.topLeft(), face.bottomRight());
-    faceGradient.setColorAt(0.0, QColor(216, 220, 228));
-    faceGradient.setColorAt(1.0, QColor(126, 132, 143));
+    faceGradient.setColorAt(0.0, QColor(116, 124, 138));
+    faceGradient.setColorAt(0.55, QColor(82, 90, 104));
+    faceGradient.setColorAt(1.0, QColor(54, 60, 72));
     painter.setBrush(faceGradient);
     painter.drawEllipse(face);
+
+    // Small top-left highlight to mimic hardware knob sheen.
+    painter.setBrush(QColor(255, 255, 255, 28));
+    painter.drawEllipse(face.adjusted(3.6, 2.8, -8.8, -9.4));
 
     // Indicator line.
     const qreal valueRatio = static_cast<qreal>(m_value - m_minimum) /
@@ -428,14 +433,15 @@ void SequenceControlBar::rebuildStrips(const std::vector<StripConfig>& strips) {
     stripLayout->setSpacing(0);
 
     auto* buttonsLayout = new QHBoxLayout();
-    buttonsLayout->setContentsMargins(3, 0, 2, 0);
+    buttonsLayout->setContentsMargins(2, 0, 2, 0);
     buttonsLayout->setSpacing(2);
+    buttonsLayout->addStretch(1);
 
     strip->muteButton = new QToolButton(strip->frame);
     strip->muteButton->setObjectName(QStringLiteral("StripToggle"));
     strip->muteButton->setCheckable(true);
     strip->muteButton->setText(QStringLiteral("M"));
-    strip->muteButton->setFixedSize(20, 15);
+    strip->muteButton->setFixedSize(22, 17);
     strip->muteButton->setToolTip(QStringLiteral("Mute"));
     buttonsLayout->addWidget(strip->muteButton);
 
@@ -443,16 +449,18 @@ void SequenceControlBar::rebuildStrips(const std::vector<StripConfig>& strips) {
     strip->soloButton->setObjectName(QStringLiteral("StripToggle"));
     strip->soloButton->setCheckable(true);
     strip->soloButton->setText(QStringLiteral("S"));
-    strip->soloButton->setFixedSize(20, 15);
+    strip->soloButton->setFixedSize(22, 17);
     strip->soloButton->setToolTip(QStringLiteral("Solo"));
     buttonsLayout->addWidget(strip->soloButton);
 
     buttonsLayout->addStretch(1);
     stripLayout->addLayout(buttonsLayout);
+    stripLayout->addSpacing(2);
 
     auto* knobRow = new QHBoxLayout();
-    knobRow->setContentsMargins(3, 0, 2, 0);
+    knobRow->setContentsMargins(2, 1, 2, 0);
     knobRow->setSpacing(2);
+    knobRow->addStretch(1);
     strip->panKnob = new MixerKnob(strip->frame);
     strip->panKnob->setValue(std::clamp(config.pan, kMinChannelValue, kMaxChannelValue));
     knobRow->addWidget(strip->panKnob, 0, Qt::AlignHCenter);
@@ -460,6 +468,7 @@ void SequenceControlBar::rebuildStrips(const std::vector<StripConfig>& strips) {
     strip->volumeKnob = new MixerKnob(strip->frame);
     strip->volumeKnob->setValue(std::clamp(config.volume, kMinChannelValue, kMaxChannelValue));
     knobRow->addWidget(strip->volumeKnob, 0, Qt::AlignHCenter);
+    knobRow->addStretch(1);
 
     stripLayout->addLayout(knobRow, 1);
 
