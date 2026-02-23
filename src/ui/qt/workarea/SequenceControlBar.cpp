@@ -33,7 +33,7 @@
 namespace {
 constexpr int kBarHeight = (Size::VTab * 3) / 2;
 constexpr int kStripWidth = 60;
-constexpr int kStripHeight = kBarHeight - 6;
+constexpr int kStripHeight = kBarHeight;
 constexpr int kKnobSize = 20;
 constexpr int kScrollStepPixels = kStripWidth;
 constexpr int kTempoControlWidth = 90;
@@ -215,7 +215,7 @@ SequenceControlBar::SequenceControlBar(QWidget* parent)
   setFixedHeight(kBarHeight);
 
   auto* rootLayout = new QHBoxLayout(this);
-  rootLayout->setContentsMargins(4, 2, 4, 2);
+  rootLayout->setContentsMargins(4, 0, 4, 0);
   rootLayout->setSpacing(4);
 
   auto* tempoFrame = new QFrame(this);
@@ -530,16 +530,6 @@ void SequenceControlBar::rebuildStrips(const std::vector<StripConfig>& strips) {
         return;
       }
 
-      if (checked) {
-        m_updatingUi = true;
-        for (auto& other : m_strips) {
-          if (other && other->id != id && other->soloButton->isChecked()) {
-            other->soloButton->setChecked(false);
-          }
-        }
-        m_updatingUi = false;
-      }
-
       refreshStripInteractivity();
       emit stripSoloChanged(id, checked);
     });
@@ -565,10 +555,6 @@ void SequenceControlBar::rebuildStrips(const std::vector<StripConfig>& strips) {
 }
 
 void SequenceControlBar::refreshStripInteractivity() {
-  const bool anySolo = std::any_of(m_strips.begin(), m_strips.end(), [](const auto& strip) {
-    return strip && strip->soloButton && strip->soloButton->isChecked();
-  });
-
   for (auto& stripPtr : m_strips) {
     if (!stripPtr) {
       continue;
@@ -576,8 +562,7 @@ void SequenceControlBar::refreshStripInteractivity() {
     auto& strip = *stripPtr;
     const bool muted = strip.muteButton && strip.muteButton->isChecked();
     const bool soloed = strip.soloButton && strip.soloButton->isChecked();
-    const bool blockedBySolo = anySolo && !soloed;
-    const bool controlsDisabled = muted || blockedBySolo;
+    const bool controlsDisabled = muted;
 
     if (strip.frame) {
       strip.frame->setProperty("dimmed", controlsDisabled);
@@ -586,10 +571,10 @@ void SequenceControlBar::refreshStripInteractivity() {
     }
 
     if (strip.muteButton) {
-      strip.muteButton->setEnabled(!blockedBySolo);
+      strip.muteButton->setEnabled(true);
     }
     if (strip.soloButton) {
-      strip.soloButton->setEnabled(!muted && !blockedBySolo);
+      strip.soloButton->setEnabled(!muted);
     }
     if (strip.panKnob) {
       strip.panKnob->setEnabled(!controlsDisabled);
