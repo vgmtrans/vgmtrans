@@ -7,17 +7,20 @@
 #include "SequenceControlBar.h"
 
 #include <QAbstractSpinBox>
+#include <QApplication>
 #include <QDoubleSpinBox>
 #include <QEvent>
 #include <QFrame>
 #include <QHBoxLayout>
 #include <QLabel>
+#include <QLineEdit>
 #include <QMouseEvent>
 #include <QPainter>
 #include <QPalette>
 #include <QResizeEvent>
 #include <QScrollArea>
 #include <QScrollBar>
+#include <QTimer>
 #include <QToolButton>
 #include <QToolTip>
 #include <QVBoxLayout>
@@ -224,13 +227,13 @@ SequenceControlBar::SequenceControlBar(QWidget* parent)
   tempoFrame->setFixedHeight(kStripHeight);
 
   auto* tempoLayout = new QVBoxLayout(tempoFrame);
-  tempoLayout->setContentsMargins(4, 1, 4, 1);
-  tempoLayout->setSpacing(1);
+  tempoLayout->setContentsMargins(4, 0, 4, 0);
+  tempoLayout->setSpacing(0);
 
   auto* tempoLabel = new QLabel(QStringLiteral("Tempo"), tempoFrame);
   tempoLabel->setObjectName(QStringLiteral("TempoTitle"));
-  tempoLabel->setAlignment(Qt::AlignHCenter | Qt::AlignBottom);
-  tempoLayout->addWidget(tempoLabel);
+  tempoLabel->setAlignment(Qt::AlignHCenter | Qt::AlignTop);
+  tempoLayout->addWidget(tempoLabel, 0, Qt::AlignHCenter | Qt::AlignTop);
 
   m_tempoSpin = new QDoubleSpinBox(tempoFrame);
   m_tempoSpin->setDecimals(2);
@@ -240,17 +243,16 @@ SequenceControlBar::SequenceControlBar(QWidget* parent)
   m_tempoSpin->setButtonSymbols(QAbstractSpinBox::NoButtons);
   m_tempoSpin->setValue(kDefaultTempoBpm);
   m_tempoSpin->setAlignment(Qt::AlignCenter);
+  m_tempoSpin->setSuffix(QStringLiteral(" BPM"));
   m_tempoSpin->setFixedHeight(20);
+  tempoLayout->addWidget(m_tempoSpin, 0, Qt::AlignHCenter | Qt::AlignTop);
+  tempoLayout->addStretch(1);
 
-  auto* tempoValueLayout = new QHBoxLayout();
-  tempoValueLayout->setContentsMargins(0, 0, 0, 0);
-  tempoValueLayout->setSpacing(4);
-  tempoValueLayout->addWidget(m_tempoSpin, 1);
-
-  auto* bpmLabel = new QLabel(QStringLiteral("BPM"), tempoFrame);
-  bpmLabel->setObjectName(QStringLiteral("TempoUnit"));
-  tempoValueLayout->addWidget(bpmLabel, 0, Qt::AlignVCenter);
-  tempoLayout->addLayout(tempoValueLayout);
+  m_tempoSpin->installEventFilter(this);
+  m_tempoLineEdit = m_tempoSpin->findChild<QLineEdit*>();
+  if (m_tempoLineEdit) {
+    m_tempoLineEdit->installEventFilter(this);
+  }
 
   rootLayout->addWidget(tempoFrame, 0);
 
@@ -294,14 +296,16 @@ SequenceControlBar::SequenceControlBar(QWidget* parent)
 
   rootLayout->addWidget(m_scrollControls, 0, Qt::AlignVCenter);
 
-  connect(m_tempoSpin,
-          qOverload<double>(&QDoubleSpinBox::valueChanged),
-          this,
-          [this](double value) {
-            if (!m_updatingUi) {
-              emit tempoChanged(value);
-            }
-          });
+  connect(m_tempoSpin, &QDoubleSpinBox::editingFinished, this, [this]() {
+    if (!m_tempoSpin || m_updatingUi || m_committingTempo) {
+      return;
+    }
+
+    m_committingTempo = true;
+    emit tempoChanged(m_tempoSpin->value());
+    m_tempoSpin->clearFocus();
+    m_committingTempo = false;
+  });
 
   connect(m_scrollLeft, &QToolButton::clicked, this, [this]() { scrollBlocks(-kScrollStepPixels); });
   connect(m_scrollRight, &QToolButton::clicked, this, [this]() { scrollBlocks(kScrollStepPixels); });
@@ -323,6 +327,11 @@ double SequenceControlBar::tempoBpm() const {
 
 void SequenceControlBar::setTempoBpm(double bpm) {
   if (!m_tempoSpin) {
+    return;
+  }
+
+  if (QWidget* focused = QApplication::focusWidget();
+      focused && (focused == m_tempoSpin || m_tempoSpin->isAncestorOf(focused))) {
     return;
   }
 
@@ -405,6 +414,26 @@ void SequenceControlBar::resizeEvent(QResizeEvent* event) {
 }
 
 bool SequenceControlBar::eventFilter(QObject* watched, QEvent* event) {
+  if ((watched == m_tempoSpin || watched == m_tempoLineEdit) && m_tempoSpin) {
+    switch (event->type()) {
+      case QEvent::FocusIn:
+      case QEvent::MouseButtonPress:
+      case QEvent::MouseButtonDblClick:
+        QTimer::singleShot(0, this, [this]() {
+          if (!m_tempoSpin) {
+            return;
+          }
+          if (QWidget* focused = QApplication::focusWidget();
+              focused && (focused == m_tempoSpin || m_tempoSpin->isAncestorOf(focused))) {
+            m_tempoSpin->selectAll();
+          }
+        });
+        break;
+      default:
+        break;
+    }
+  }
+
   if (watched == m_stripContainer || watched == m_stripScroll->viewport()) {
     switch (event->type()) {
       case QEvent::Resize:
@@ -690,14 +719,11 @@ void SequenceControlBar::refreshStyleSheet() {
       " background: transparent;"
       "}"
       "QLabel#TempoTitle {"
-      " font-size: 10px;"
-      " font-weight: 600;"
+      " font-size: 12px;"
+      " font-weight: 700;"
       " color: rgba(%5,%6,%7,%8);"
-      "}"
-      "QLabel#TempoUnit {"
-      " font-size: 8px;"
-      " font-weight: 600;"
-      " color: rgba(%5,%6,%7,%8);"
+      " padding-top: 0px;"
+      " padding-bottom: 0px;"
       "}"
       "QDoubleSpinBox {"
       " border: 1px solid rgba(255,255,255,0.09);"

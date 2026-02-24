@@ -17,6 +17,7 @@ class QDoubleSpinBox;
 class QEvent;
 class QHBoxLayout;
 class QLabel;
+class QLineEdit;
 class QScrollArea;
 class QToolButton;
 
@@ -76,7 +77,9 @@ private:
   void applyStripFrameStyle(StripWidgets& strip, bool dimmed, bool soloed);
 
   bool m_updatingUi = false;
+  bool m_committingTempo = false;
   QDoubleSpinBox* m_tempoSpin = nullptr;
+  QLineEdit* m_tempoLineEdit = nullptr;
   QScrollArea* m_stripScroll = nullptr;
   QWidget* m_stripContainer = nullptr;
   QHBoxLayout* m_stripLayout = nullptr;
