@@ -77,7 +77,6 @@ private:
   void applyStripFrameStyle(StripWidgets& strip, bool dimmed, bool soloed);
 
   bool m_updatingUi = false;
-  bool m_committingTempo = false;
   QDoubleSpinBox* m_tempoSpin = nullptr;
   QLineEdit* m_tempoLineEdit = nullptr;
   QScrollArea* m_stripScroll = nullptr;
