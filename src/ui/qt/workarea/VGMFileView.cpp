@@ -220,6 +220,7 @@ VGMFileView::VGMFileView(VGMFile* vgmfile)
 
   if (m_isSeqFile) {
     m_sequenceControlBar = new SequenceControlBar(m_rootContainer);
+    m_sequenceControlBar->setVisible(m_sequenceControlBarVisible);
     rootLayout->addWidget(m_sequenceControlBar, 0);
 
     connect(m_sequenceControlBar,
@@ -293,8 +294,10 @@ VGMFileView::VGMFileView(VGMFile* vgmfile)
     setSinglePaneMode(true);
   }
 
-  rebuildSequenceControlBarIfNeeded();
-  updateSequenceControlValuesFromPlayback();
+  if (sequenceControlBarVisible()) {
+    rebuildSequenceControlBarIfNeeded();
+    updateSequenceControlValuesFromPlayback();
+  }
 }
 
 VGMFileView::PanelUi VGMFileView::createPanel(PanelSide side) {
@@ -527,8 +530,10 @@ void VGMFileView::resizeEvent(QResizeEvent* event) {
 
 void VGMFileView::showEvent(QShowEvent* event) {
   QMdiSubWindow::showEvent(event);
-  rebuildSequenceControlBarIfNeeded();
-  updateSequenceControlValuesFromPlayback();
+  if (sequenceControlBarVisible()) {
+    rebuildSequenceControlBarIfNeeded();
+    updateSequenceControlValuesFromPlayback();
+  }
   refreshPlaybackVisualsIfNeeded();
 }
 
@@ -656,6 +661,33 @@ bool VGMFileView::supportsViewKind(PanelViewKind viewKind) const {
 // True when sequence-only panes (Active Notes / Piano Roll) are available.
 bool VGMFileView::supportsSequenceViews() const {
   return m_isSeqFile;
+}
+
+void VGMFileView::setSequenceControlBarVisible(bool visible) {
+  if (!m_isSeqFile || !m_sequenceControlBar) {
+    return;
+  }
+
+  if (m_sequenceControlBarVisible == visible) {
+    return;
+  }
+
+  m_sequenceControlBarVisible = visible;
+  m_sequenceControlBar->setVisible(visible);
+  if (!visible) {
+    return;
+  }
+
+  // Ensure fresh control structure/state when turning the bar back on.
+  m_sequenceControlStripCount = -1;
+  if (sequenceControlBarVisible()) {
+    rebuildSequenceControlBarIfNeeded();
+    updateSequenceControlValuesFromPlayback();
+  }
+}
+
+bool VGMFileView::sequenceControlBarVisible() const {
+  return m_isSeqFile && m_sequenceControlBarVisible;
 }
 
 // Collapses/restores the right pane while preserving prior split sizes.
@@ -1264,7 +1296,7 @@ int VGMFileView::effectiveTrackCountForSeq(VGMSeq* seq) const {
 }
 
 void VGMFileView::rebuildSequenceControlBarIfNeeded() {
-  if (!m_sequenceControlBar) {
+  if (!m_sequenceControlBar || !m_sequenceControlBarVisible) {
     return;
   }
 
@@ -1394,7 +1426,7 @@ void VGMFileView::rebuildSequenceControlBar(VGMSeq* seq) {
 }
 
 void VGMFileView::updateSequenceControlValuesFromPlayback() {
-  if (!m_sequenceControlBar) {
+  if (!m_sequenceControlBar || !m_sequenceControlBarVisible) {
     return;
   }
 
@@ -1654,8 +1686,10 @@ void VGMFileView::onPlaybackPositionChanged(int current, int max, PositionChange
 }
 
 void VGMFileView::onPlayerStatusChanged(bool playing) {
-  rebuildSequenceControlBarIfNeeded();
-  updateSequenceControlValuesFromPlayback();
+  if (sequenceControlBarVisible()) {
+    rebuildSequenceControlBarIfNeeded();
+    updateSequenceControlValuesFromPlayback();
+  }
 
   const auto* activeColl = SequencePlayer::the().activeCollection();
   if (activeColl && activeColl->containsVGMFile(m_vgmfile)) {

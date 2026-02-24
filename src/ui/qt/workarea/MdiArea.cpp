@@ -22,6 +22,7 @@
 #include <QPixmap>
 #include <QPoint>
 #include <QShortcut>
+#include <QSignalBlocker>
 #include <QTabBar>
 #include <QTimer>
 #include <QToolButton>
@@ -217,6 +218,7 @@ constexpr int kTabControlOuterMargin = 8;
 // Replace these paths when final per-view artwork is ready.
 const QString kLeftPaneButtonIconPath = QStringLiteral(":/icons/left-pane.svg");
 const QString kRightPaneButtonIconPath = QStringLiteral(":/icons/right-pane.svg");
+const QString kSequenceControlBarButtonIconPath = QStringLiteral(":/icons/control.svg");
 const QString kHexViewIconPath = QStringLiteral(":/icons/binary.svg");
 const QString kTreeViewIconPath = QStringLiteral(":/icons/file.svg");
 const QString kActiveNotesViewIconPath = QStringLiteral(":/icons/note.svg");
@@ -365,6 +367,11 @@ void MdiArea::applyEmptyPaneSelection() {
   setPaneSelection(m_rightPaneActions, PanelViewKind::Tree, false);
   setSeqOnlyEnabled(m_leftPaneActions, false);
   setSeqOnlyEnabled(m_rightPaneActions, false);
+  if (m_sequenceControlBarButton) {
+    QSignalBlocker blocker(m_sequenceControlBarButton);
+    m_sequenceControlBarButton->setChecked(false);
+    m_sequenceControlBarButton->setEnabled(false);
+  }
 }
 
 void MdiArea::applyPaneViewSelection(VGMFileView *fileView) {
@@ -380,6 +387,12 @@ void MdiArea::applyPaneViewSelection(VGMFileView *fileView) {
   const bool sequenceViewsAvailable = fileView->supportsSequenceViews();
   setSeqOnlyEnabled(m_leftPaneActions, sequenceViewsAvailable);
   setSeqOnlyEnabled(m_rightPaneActions, sequenceViewsAvailable);
+  if (m_sequenceControlBarButton) {
+    m_sequenceControlBarButton->setEnabled(sequenceViewsAvailable);
+    QSignalBlocker blocker(m_sequenceControlBarButton);
+    m_sequenceControlBarButton->setChecked(sequenceViewsAvailable &&
+                                           fileView->sequenceControlBarVisible());
+  }
 }
 
 void MdiArea::setPaneButtonsEnabled(bool enabled) {
@@ -388,6 +401,9 @@ void MdiArea::setPaneButtonsEnabled(bool enabled) {
   }
   if (m_rightPaneButton) {
     m_rightPaneButton->setEnabled(enabled);
+  }
+  if (m_sequenceControlBarButton) {
+    m_sequenceControlBarButton->setEnabled(enabled);
   }
 }
 
@@ -417,6 +433,16 @@ void MdiArea::setRightPaneHidden(bool hidden) {
   }
 
   fileView->setSinglePaneMode(hidden);
+  updateTabBarControls();
+}
+
+void MdiArea::setSequenceControlBarVisible(bool visible) {
+  auto *fileView = currentFileView();
+  if (!fileView || !fileView->supportsSequenceViews()) {
+    return;
+  }
+
+  fileView->setSequenceControlBarVisible(visible);
   updateTabBarControls();
 }
 
@@ -501,6 +527,14 @@ void MdiArea::setupTabBarControls() {
     m_rightPaneButton->setPopupMode(QToolButton::InstantPopup);
     controlsLayout->addWidget(m_rightPaneButton);
 
+    m_sequenceControlBarButton = createIconButton(m_tabControls, tr("Show sequence control bar"));
+    m_sequenceControlBarButton->setCheckable(true);
+    controlsLayout->addWidget(m_sequenceControlBarButton);
+    connect(m_sequenceControlBarButton,
+            &QToolButton::toggled,
+            this,
+            [this](bool visible) { setSequenceControlBarVisible(visible); });
+
     auto createPaneMenu = [this](QToolButton *button,
                                  PanelSide side,
                                  PaneActions &actions,
@@ -551,7 +585,7 @@ void MdiArea::setupTabBarControls() {
 
 // Syncs tab-strip control state with the active VGMFileView.
 void MdiArea::updateTabBarControls() {
-  if (!m_tabControls || !m_leftPaneButton || !m_rightPaneButton) {
+  if (!m_tabControls || !m_leftPaneButton || !m_rightPaneButton || !m_sequenceControlBarButton) {
     return;
   }
 
@@ -605,7 +639,7 @@ void MdiArea::repositionTabBarControls() {
 
 // Applies the flat, stencil-like visual style used by the tab-strip controls.
 void MdiArea::refreshTabControlAppearance() {
-  if (!m_tabControls || !m_leftPaneButton || !m_rightPaneButton) {
+  if (!m_tabControls || !m_leftPaneButton || !m_rightPaneButton || !m_sequenceControlBarButton) {
     return;
   }
 
@@ -663,8 +697,10 @@ void MdiArea::refreshTabControlAppearance() {
   }
 
   bool rightPaneHidden = false;
+  bool sequenceControlBarVisible = false;
   if (auto *fileView = currentFileView()) {
     rightPaneHidden = fileView->singlePaneMode();
+    sequenceControlBarVisible = fileView->sequenceControlBarVisible();
   }
 
   auto assignIconForState = [&](QToolButton *button, const QString &iconPath, bool onState) {
@@ -677,6 +713,9 @@ void MdiArea::refreshTabControlAppearance() {
 
   assignIconForState(m_leftPaneButton, kLeftPaneButtonIconPath, true);
   assignIconForState(m_rightPaneButton, kRightPaneButtonIconPath, !rightPaneHidden);
+  assignIconForState(m_sequenceControlBarButton,
+                     kSequenceControlBarButtonIconPath,
+                     sequenceControlBarVisible);
 }
 
 // Re-captures tab-strip colors after the theme transition settles.

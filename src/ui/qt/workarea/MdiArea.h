@@ -76,6 +76,7 @@ private:
   void setPaneButtonsEnabled(bool enabled);
   void setPaneView(PanelSide side, PanelViewKind kind);
   void setRightPaneHidden(bool hidden);
+  void setSequenceControlBarVisible(bool visible);
   QMdiSubWindow *containingSubWindowForWidget(QWidget *widget) const;
   void syncSelectedFileForWindow(QMdiSubWindow *window);
   void onSubWindowActivated(QMdiSubWindow *window);
@@ -87,6 +88,7 @@ private:
   QWidget *m_tabControls = nullptr;
   QToolButton *m_leftPaneButton = nullptr;
   QToolButton *m_rightPaneButton = nullptr;
+  QToolButton *m_sequenceControlBarButton = nullptr;
   PaneActions m_leftPaneActions{};
   PaneActions m_rightPaneActions{};
   int m_reservedTabBarRightMargin = 0;
