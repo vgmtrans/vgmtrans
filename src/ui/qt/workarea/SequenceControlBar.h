@@ -18,6 +18,7 @@ class QEvent;
 class QHBoxLayout;
 class QLabel;
 class QLineEdit;
+class QPaintEvent;
 class QScrollArea;
 class QToolButton;
 
@@ -60,6 +61,7 @@ signals:
   void stripVolumeChanged(int stripId, int volume);
 
 protected:
+  void paintEvent(QPaintEvent* event) override;
   void resizeEvent(QResizeEvent* event) override;
   bool eventFilter(QObject* watched, QEvent* event) override;
 
