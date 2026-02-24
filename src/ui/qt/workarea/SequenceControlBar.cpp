@@ -69,6 +69,17 @@ qreal knobPointerAngleDegrees(int value) {
          (kKnobEndAngleDegrees - kKnobCenterAngleDegrees) * t;
 }
 
+QColor sequenceControlBarBackgroundColor(const QPalette& palette) {
+  QColor color = palette.color(QPalette::Button);
+  if (!color.isValid()) {
+    color = palette.color(QPalette::Window);
+  }
+  if (!color.isValid()) {
+    color = QColor(112, 118, 126);
+  }
+  return color;
+}
+
 class StripScrollButton final : public QToolButton {
 public:
   enum class Direction { Left, Right };
@@ -283,10 +294,11 @@ SequenceControlBar::SequenceControlBar(QWidget* parent)
 
   auto* rootLayout = new QHBoxLayout(this);
   rootLayout->setContentsMargins(0, 0, 0, 0);
-  rootLayout->setSpacing(2);
+  rootLayout->setSpacing(0);
 
   auto* tempoFrame = new QFrame(this);
   tempoFrame->setObjectName(QStringLiteral("TempoBlock"));
+  tempoFrame->setFrameShape(QFrame::NoFrame);
   tempoFrame->setFixedWidth(kTempoControlWidth);
   tempoFrame->setFixedHeight(kStripHeight);
 
@@ -403,7 +415,7 @@ void SequenceControlBar::paintEvent(QPaintEvent* event) {
   QWidget::paintEvent(event);
 
   QPainter painter(this);
-  const QColor cover = palette().color(QPalette::Window).darker(132);
+  const QColor cover = sequenceControlBarBackgroundColor(palette());
   painter.fillRect(0, 0, width(), 2, cover);
   painter.fillRect(0, 0, 2, height(), cover);
 }
@@ -795,8 +807,7 @@ void SequenceControlBar::scrollBlocks(int deltaPixels) {
 }
 
 void SequenceControlBar::refreshStyleSheet() {
-  const QColor base = palette().color(QPalette::Window);
-  const QColor barBg = base.darker(132);
+  const QColor barBg = sequenceControlBarBackgroundColor(palette());
   const QColor text = palette().color(QPalette::WindowText);
 
   QColor subtleText = text;
@@ -814,7 +825,7 @@ void SequenceControlBar::refreshStyleSheet() {
       "QFrame#TempoBlock {"
       " border: none;"
       " border-radius: 0px;"
-      " background: %1;"
+      " background: transparent;"
       "}"
       "QLabel#TempoTitle {"
       " font-size: 10px;"
