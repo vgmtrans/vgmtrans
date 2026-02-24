@@ -243,6 +243,7 @@ SequenceControlBar::SequenceControlBar(QWidget* parent)
   m_tempoSpin->setButtonSymbols(QAbstractSpinBox::NoButtons);
   m_tempoSpin->setValue(kDefaultTempoBpm);
   m_tempoSpin->setAlignment(Qt::AlignCenter);
+  m_tempoSpin->setObjectName(QStringLiteral("TempoSpin"));
   m_tempoSpin->setFixedHeight(20);
 
   auto* tempoValueLayout = new QHBoxLayout();
@@ -713,7 +714,6 @@ void SequenceControlBar::refreshStyleSheet() {
   const QColor base = palette().color(QPalette::Window);
   const QColor barBg = base.darker(132);
   const QColor text = palette().color(QPalette::WindowText);
-  const QColor blockBorder = base.lighter(112);
 
   QColor subtleText = text;
   subtleText.setAlpha(160);
@@ -729,26 +729,26 @@ void SequenceControlBar::refreshStyleSheet() {
       " background: %1;"
       "}"
       "QFrame#TempoBlock {"
-      " border: 1px solid rgba(%2,%3,%4,210);"
-      " border-radius: 3px;"
+      " border: none;"
+      " border-radius: 0px;"
       " background: transparent;"
       "}"
       "QLabel#TempoTitle {"
       " font-size: 11px;"
       " font-weight: 700;"
-      " color: rgba(%5,%6,%7,%8);"
+      " color: rgba(%2,%3,%4,%5);"
       " padding-top: 0px;"
       " padding-bottom: 0px;"
       "}"
       "QLabel#TempoUnit {"
       " font-size: 8px;"
       " font-weight: 600;"
-      " color: rgba(%5,%6,%7,%8);"
+      " color: rgba(%2,%3,%4,%5);"
       "}"
-      "QDoubleSpinBox {"
-      " border: 1px solid rgba(255,255,255,0.09);"
-      " border-radius: 3px;"
-      " padding: 1px 4px;"
+      "QDoubleSpinBox#TempoSpin {"
+      " border: none;"
+      " border-radius: 0px;"
+      " padding: 1px 0px 1px 0px;"
       " color: palette(text);"
       " background: rgba(0,0,0,0.25);"
       " selection-background-color: rgba(255,255,255,0.2);"
@@ -757,15 +757,15 @@ void SequenceControlBar::refreshStyleSheet() {
       "QToolButton#StripToggle {"
       " border: 1px solid rgba(255,255,255,0.14);"
       " border-radius: 3px;"
-      " background: rgba(%9,%10,%11,200);"
-      " color: rgba(%12,%13,%14,220);"
+      " background: rgba(%6,%7,%8,200);"
+      " color: rgba(%9,%10,%11,220);"
       " font-size: 9px;"
       " font-weight: 700;"
       " padding: 0px;"
       "}"
       "QToolButton#StripToggle:checked {"
-      " background: rgba(%15,%16,%17,230);"
-      " color: rgba(%12,%13,%14,255);"
+      " background: rgba(%12,%13,%14,230);"
+      " color: rgba(%9,%10,%11,255);"
       " border: 1px solid rgba(255,255,255,0.28);"
       "}"
       "QToolButton#StripToggle:disabled {"
@@ -792,9 +792,6 @@ void SequenceControlBar::refreshStyleSheet() {
       " background: transparent;"
       "}")
                            .arg(barBg.name())
-                           .arg(blockBorder.red())
-                           .arg(blockBorder.green())
-                           .arg(blockBorder.blue())
                            .arg(subtleText.red())
                            .arg(subtleText.green())
                            .arg(subtleText.blue())
