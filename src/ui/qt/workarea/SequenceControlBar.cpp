@@ -349,6 +349,8 @@ SequenceControlBar::SequenceControlBar(QWidget* parent)
   m_stripScroll->setFrameShape(QFrame::NoFrame);
   m_stripScroll->setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
   m_stripScroll->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+  m_stripScroll->viewport()->setObjectName(QStringLiteral("StripViewport"));
+  m_stripScroll->viewport()->setAutoFillBackground(false);
 
   m_stripContainer = new QWidget(m_stripScroll);
   m_stripContainer->setObjectName(QStringLiteral("StripContainer"));
@@ -412,10 +414,11 @@ double SequenceControlBar::tempoBpm() const {
 }
 
 void SequenceControlBar::paintEvent(QPaintEvent* event) {
-  QWidget::paintEvent(event);
+  Q_UNUSED(event);
 
   QPainter painter(this);
   const QColor cover = sequenceControlBarBackgroundColor(palette());
+  painter.fillRect(rect(), cover);
   painter.fillRect(0, 0, width(), 2, cover);
   painter.fillRect(0, 0, 2, height(), cover);
 }
@@ -820,11 +823,23 @@ void SequenceControlBar::refreshStyleSheet() {
   const QString style = QStringLiteral(
       "QWidget#SequenceControlBar {"
       " border: none;"
-      " background: %1;"
+      " background: transparent;"
       "}"
       "QFrame#TempoBlock {"
       " border: none;"
       " border-radius: 0px;"
+      " background: transparent;"
+      "}"
+      "QScrollArea#StripScroll {"
+      " border: none;"
+      " background: transparent;"
+      "}"
+      "QWidget#StripViewport {"
+      " border: none;"
+      " background: transparent;"
+      "}"
+      "QWidget#StripContainer {"
+      " border: none;"
       " background: transparent;"
       "}"
       "QLabel#TempoTitle {"
@@ -869,7 +884,7 @@ void SequenceControlBar::refreshStyleSheet() {
       "}"
       "QWidget#StripScrollControls {"
       " border: none;"
-      " background: %1;"
+      " background: transparent;"
       "}")
                            .arg(barBg.name())
                            .arg(subtleText.red())
