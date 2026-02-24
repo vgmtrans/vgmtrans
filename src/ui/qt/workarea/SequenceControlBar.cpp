@@ -16,7 +16,9 @@
 #include <QLineEdit>
 #include <QMouseEvent>
 #include <QPainter>
+#include <QPainterPath>
 #include <QPalette>
+#include <QPaintEvent>
 #include <QResizeEvent>
 #include <QScrollArea>
 #include <QScrollBar>
@@ -37,6 +39,7 @@ namespace {
 constexpr int kBarHeight = (Size::VTab * 3) / 2;
 constexpr int kStripWidth = 60;
 constexpr int kStripHeight = kBarHeight;
+constexpr int kScrollButtonWidth = 22;
 constexpr int kKnobSize = 20;
 constexpr int kScrollStepPixels = kStripWidth;
 constexpr int kTempoControlWidth = 90;
@@ -64,6 +67,66 @@ qreal knobPointerAngleDegrees(int value) {
   return kKnobCenterAngleDegrees +
          (kKnobEndAngleDegrees - kKnobCenterAngleDegrees) * t;
 }
+
+class StripScrollButton final : public QToolButton {
+public:
+  enum class Direction { Left, Right };
+
+  explicit StripScrollButton(Direction direction, QWidget* parent = nullptr)
+      : QToolButton(parent), m_direction(direction) {
+    setObjectName(QStringLiteral("StripScrollButton"));
+    setAutoRaise(true);
+    setFocusPolicy(Qt::NoFocus);
+    setCursor(Qt::PointingHandCursor);
+    setFixedSize(kScrollButtonWidth, kStripHeight);
+  }
+
+protected:
+  void paintEvent(QPaintEvent*) override {
+    QPainter painter(this);
+    painter.setRenderHint(QPainter::Antialiasing, true);
+
+    QColor background(0, 0, 0, 0);
+    if (isEnabled()) {
+      if (isDown()) {
+        background = QColor(255, 255, 255, 40);
+      } else if (underMouse()) {
+        background = QColor(255, 255, 255, 26);
+      }
+    } else {
+      background = QColor(255, 255, 255, 10);
+    }
+
+    if (background.alpha() > 0) {
+      painter.fillRect(rect(), background);
+    }
+
+    QColor glyph = palette().color(QPalette::WindowText);
+    glyph.setAlpha(isEnabled() ? 210 : 88);
+    QPen chevronPen(glyph, 2.0, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin);
+    painter.setPen(chevronPen);
+
+    const qreal midX = rect().center().x();
+    const qreal midY = rect().center().y();
+    const qreal halfW = std::max<qreal>(4.2, width() * 0.18);
+    const qreal halfH = std::max<qreal>(5.8, height() * 0.20);
+
+    QPainterPath chevron;
+    if (m_direction == Direction::Left) {
+      chevron.moveTo(midX + halfW, midY - halfH);
+      chevron.lineTo(midX - halfW, midY);
+      chevron.lineTo(midX + halfW, midY + halfH);
+    } else {
+      chevron.moveTo(midX - halfW, midY - halfH);
+      chevron.lineTo(midX + halfW, midY);
+      chevron.lineTo(midX - halfW, midY + halfH);
+    }
+    painter.drawPath(chevron);
+  }
+
+private:
+  Direction m_direction;
+};
 
 class MixerKnob final : public QWidget {
 public:
@@ -218,8 +281,8 @@ SequenceControlBar::SequenceControlBar(QWidget* parent)
   setFixedHeight(kBarHeight);
 
   auto* rootLayout = new QHBoxLayout(this);
-  rootLayout->setContentsMargins(4, 0, 4, 0);
-  rootLayout->setSpacing(4);
+  rootLayout->setContentsMargins(0, 0, 0, 0);
+  rootLayout->setSpacing(2);
 
   auto* tempoFrame = new QFrame(this);
   tempoFrame->setObjectName(QStringLiteral("TempoBlock"));
@@ -227,7 +290,7 @@ SequenceControlBar::SequenceControlBar(QWidget* parent)
   tempoFrame->setFixedHeight(kStripHeight);
 
   auto* tempoLayout = new QVBoxLayout(tempoFrame);
-  tempoLayout->setContentsMargins(4, 3, 4, 0);
+  tempoLayout->setContentsMargins(4, 7, 4, 0);
   tempoLayout->setSpacing(0);
 
   auto* tempoLabel = new QLabel(QStringLiteral("Tempo"), tempoFrame);
@@ -287,25 +350,19 @@ SequenceControlBar::SequenceControlBar(QWidget* parent)
   rootLayout->addWidget(m_stripScroll, 1);
 
   m_scrollControls = new QWidget(this);
+  m_scrollControls->setObjectName(QStringLiteral("StripScrollControls"));
+  m_scrollControls->setFixedHeight(kStripHeight);
   auto* scrollLayout = new QHBoxLayout(m_scrollControls);
   scrollLayout->setContentsMargins(0, 0, 0, 0);
-  scrollLayout->setSpacing(4);
+  scrollLayout->setSpacing(0);
 
-  m_scrollLeft = new QToolButton(m_scrollControls);
-  m_scrollLeft->setObjectName(QStringLiteral("StripScrollButton"));
-  m_scrollLeft->setText(QStringLiteral("<"));
-  m_scrollLeft->setAutoRaise(true);
-  m_scrollLeft->setFixedSize(18, 18);
+  m_scrollLeft = new StripScrollButton(StripScrollButton::Direction::Left, m_scrollControls);
   scrollLayout->addWidget(m_scrollLeft);
 
-  m_scrollRight = new QToolButton(m_scrollControls);
-  m_scrollRight->setObjectName(QStringLiteral("StripScrollButton"));
-  m_scrollRight->setText(QStringLiteral(">"));
-  m_scrollRight->setAutoRaise(true);
-  m_scrollRight->setFixedSize(18, 18);
+  m_scrollRight = new StripScrollButton(StripScrollButton::Direction::Right, m_scrollControls);
   scrollLayout->addWidget(m_scrollRight);
 
-  rootLayout->addWidget(m_scrollControls, 0, Qt::AlignVCenter);
+  rootLayout->addWidget(m_scrollControls, 0, Qt::AlignTop);
 
   connect(m_tempoSpin,
           qOverload<double>(&QDoubleSpinBox::valueChanged),
@@ -339,6 +396,15 @@ SequenceControlBar::~SequenceControlBar() = default;
 
 double SequenceControlBar::tempoBpm() const {
   return m_tempoSpin ? m_tempoSpin->value() : kDefaultTempoBpm;
+}
+
+void SequenceControlBar::paintEvent(QPaintEvent* event) {
+  QWidget::paintEvent(event);
+
+  QPainter painter(this);
+  const QColor cover = palette().color(QPalette::Window).darker(132);
+  painter.fillRect(0, 0, width(), 2, cover);
+  painter.fillRect(0, 0, 2, height(), cover);
 }
 
 void SequenceControlBar::setTempoBpm(double bpm) {
@@ -724,14 +790,13 @@ void SequenceControlBar::refreshStyleSheet() {
 
   const QString style = QStringLiteral(
       "QWidget#SequenceControlBar {"
-      " border-top: 1px solid rgba(255,255,255,0.08);"
-      " border-bottom: 1px solid rgba(0,0,0,0.32);"
+      " border: none;"
       " background: %1;"
       "}"
       "QFrame#TempoBlock {"
       " border: none;"
       " border-radius: 0px;"
-      " background: transparent;"
+      " background: %1;"
       "}"
       "QLabel#TempoTitle {"
       " font-size: 11px;"
@@ -773,23 +838,9 @@ void SequenceControlBar::refreshStyleSheet() {
       " color: rgba(255,255,255,0.22);"
       " border: 1px solid rgba(255,255,255,0.08);"
       "}"
-      "QToolButton#StripScrollButton {"
+      "QWidget#StripScrollControls {"
       " border: none;"
-      " border-radius: 5px;"
-      " background: transparent;"
-      " color: palette(text);"
-      " font-size: 9px;"
-      " font-weight: 700;"
-      "}"
-      "QToolButton#StripScrollButton:hover {"
-      " background: rgba(255,255,255,0.14);"
-      "}"
-      "QToolButton#StripScrollButton:pressed {"
-      " background: rgba(255,255,255,0.2);"
-      "}"
-      "QToolButton#StripScrollButton:disabled {"
-      " color: rgba(255,255,255,0.26);"
-      " background: transparent;"
+      " background: %1;"
       "}")
                            .arg(barBg.name())
                            .arg(subtleText.red())
