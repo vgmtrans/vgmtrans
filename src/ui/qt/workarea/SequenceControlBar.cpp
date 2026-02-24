@@ -227,13 +227,13 @@ SequenceControlBar::SequenceControlBar(QWidget* parent)
   tempoFrame->setFixedHeight(kStripHeight);
 
   auto* tempoLayout = new QVBoxLayout(tempoFrame);
-  tempoLayout->setContentsMargins(4, 0, 4, 0);
+  tempoLayout->setContentsMargins(4, 3, 4, 0);
   tempoLayout->setSpacing(0);
 
   auto* tempoLabel = new QLabel(QStringLiteral("Tempo"), tempoFrame);
   tempoLabel->setObjectName(QStringLiteral("TempoTitle"));
-  tempoLabel->setAlignment(Qt::AlignHCenter | Qt::AlignTop);
-  tempoLayout->addWidget(tempoLabel, 0, Qt::AlignHCenter | Qt::AlignTop);
+  tempoLabel->setAlignment(Qt::AlignLeft | Qt::AlignTop);
+  tempoLayout->addWidget(tempoLabel, 0, Qt::AlignLeft | Qt::AlignTop);
 
   m_tempoSpin = new QDoubleSpinBox(tempoFrame);
   m_tempoSpin->setDecimals(2);
@@ -243,9 +243,19 @@ SequenceControlBar::SequenceControlBar(QWidget* parent)
   m_tempoSpin->setButtonSymbols(QAbstractSpinBox::NoButtons);
   m_tempoSpin->setValue(kDefaultTempoBpm);
   m_tempoSpin->setAlignment(Qt::AlignCenter);
-  m_tempoSpin->setSuffix(QStringLiteral(" BPM"));
   m_tempoSpin->setFixedHeight(20);
-  tempoLayout->addWidget(m_tempoSpin, 0, Qt::AlignHCenter | Qt::AlignTop);
+
+  auto* tempoValueLayout = new QHBoxLayout();
+  tempoValueLayout->setContentsMargins(0, 0, 0, 0);
+  tempoValueLayout->setSpacing(4);
+  tempoValueLayout->addWidget(m_tempoSpin, 0, Qt::AlignLeft | Qt::AlignTop);
+
+  auto* bpmLabel = new QLabel(QStringLiteral("BPM"), tempoFrame);
+  bpmLabel->setObjectName(QStringLiteral("TempoUnit"));
+  tempoValueLayout->addWidget(bpmLabel, 0, Qt::AlignLeft | Qt::AlignVCenter);
+  tempoValueLayout->addStretch(1);
+
+  tempoLayout->addLayout(tempoValueLayout);
   tempoLayout->addStretch(1);
 
   m_tempoSpin->installEventFilter(this);
@@ -296,15 +306,20 @@ SequenceControlBar::SequenceControlBar(QWidget* parent)
 
   rootLayout->addWidget(m_scrollControls, 0, Qt::AlignVCenter);
 
+  connect(m_tempoSpin,
+          qOverload<double>(&QDoubleSpinBox::valueChanged),
+          this,
+          [this](double value) {
+            if (!m_updatingUi) {
+              emit tempoChanged(value);
+            }
+          });
+
   connect(m_tempoSpin, &QDoubleSpinBox::editingFinished, this, [this]() {
-    if (!m_tempoSpin || m_updatingUi || m_committingTempo) {
+    if (!m_tempoSpin || m_updatingUi) {
       return;
     }
-
-    m_committingTempo = true;
-    emit tempoChanged(m_tempoSpin->value());
     m_tempoSpin->clearFocus();
-    m_committingTempo = false;
   });
 
   connect(m_scrollLeft, &QToolButton::clicked, this, [this]() { scrollBlocks(-kScrollStepPixels); });
@@ -719,11 +734,16 @@ void SequenceControlBar::refreshStyleSheet() {
       " background: transparent;"
       "}"
       "QLabel#TempoTitle {"
-      " font-size: 12px;"
+      " font-size: 11px;"
       " font-weight: 700;"
       " color: rgba(%5,%6,%7,%8);"
       " padding-top: 0px;"
       " padding-bottom: 0px;"
+      "}"
+      "QLabel#TempoUnit {"
+      " font-size: 8px;"
+      " font-weight: 600;"
+      " color: rgba(%5,%6,%7,%8);"
       "}"
       "QDoubleSpinBox {"
       " border: 1px solid rgba(255,255,255,0.09);"
