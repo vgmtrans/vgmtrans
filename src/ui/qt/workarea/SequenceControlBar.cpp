@@ -823,7 +823,7 @@ void SequenceControlBar::refreshStyleSheet() {
   const QString style = QStringLiteral(
       "QWidget#SequenceControlBar {"
       " border: none;"
-      " background: transparent;"
+      " background: %1;"
       "}"
       "QFrame#TempoBlock {"
       " border: none;"
