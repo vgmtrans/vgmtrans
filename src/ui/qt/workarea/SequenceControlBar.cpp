@@ -291,7 +291,7 @@ SequenceControlBar::SequenceControlBar(QWidget* parent)
   tempoFrame->setFixedHeight(kStripHeight);
 
   auto* tempoLayout = new QVBoxLayout(tempoFrame);
-  tempoLayout->setContentsMargins(8, 7, 4, 0);
+  tempoLayout->setContentsMargins(8, 5, 4, 0);
   tempoLayout->setSpacing(0);
 
   auto* tempoLabel = new QLabel(QStringLiteral("Tempo"), tempoFrame);
@@ -311,7 +311,7 @@ SequenceControlBar::SequenceControlBar(QWidget* parent)
   m_tempoSpin->setFixedHeight(20);
 
   auto* tempoValueLayout = new QHBoxLayout();
-  tempoValueLayout->setContentsMargins(0, 2, 0, 0);
+  tempoValueLayout->setContentsMargins(0, 4, 0, 0);
   tempoValueLayout->setSpacing(4);
   tempoValueLayout->addWidget(m_tempoSpin, 0, Qt::AlignLeft | Qt::AlignTop);
 
@@ -817,14 +817,14 @@ void SequenceControlBar::refreshStyleSheet() {
       " background: %1;"
       "}"
       "QLabel#TempoTitle {"
-      " font-size: 11px;"
+      " font-size: 10px;"
       " font-weight: 700;"
       " color: rgba(%2,%3,%4,%5);"
       " padding-top: 0px;"
       " padding-bottom: 0px;"
       "}"
       "QLabel#TempoUnit {"
-      " font-size: 8px;"
+      " font-size: 9px;"
       " font-weight: 600;"
       " color: rgba(%2,%3,%4,%5);"
       "}"
@@ -835,7 +835,7 @@ void SequenceControlBar::refreshStyleSheet() {
       " color: palette(text);"
       " background: rgba(0,0,0,0.25);"
       " selection-background-color: rgba(255,255,255,0.2);"
-      " font-size: 8px;"
+      " font-size: 9px;"
       "}"
       "QToolButton#StripToggle {"
       " border: 1px solid rgba(255,255,255,0.14);"
