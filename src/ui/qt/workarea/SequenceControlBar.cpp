@@ -73,9 +73,12 @@ qreal knobPointerAngleDegrees(int value) {
 QColor sequenceControlBarBackgroundColor(const QWidget* context) {
   if (context && context->window()) {
     if (auto* tabBar = context->window()->findChild<QTabBar*>()) {
-      QColor tabColor = tabBar->palette().color(QPalette::Button);
+      QColor tabColor = tabBar->palette().color(QPalette::Window);
       if (!tabColor.isValid()) {
-        tabColor = tabBar->palette().color(QPalette::Window);
+        tabColor = tabBar->palette().color(QPalette::Midlight);
+      }
+      if (!tabColor.isValid()) {
+        tabColor = tabBar->palette().color(QPalette::Button);
       }
       if (tabColor.isValid()) {
         return tabColor;
