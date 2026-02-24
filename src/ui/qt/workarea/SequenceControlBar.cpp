@@ -12,6 +12,7 @@
 #include <QEvent>
 #include <QFrame>
 #include <QHBoxLayout>
+#include <QKeyEvent>
 #include <QLabel>
 #include <QLineEdit>
 #include <QMouseEvent>
@@ -498,6 +499,18 @@ void SequenceControlBar::resizeEvent(QResizeEvent* event) {
 bool SequenceControlBar::eventFilter(QObject* watched, QEvent* event) {
   if ((watched == m_tempoSpin || watched == m_tempoLineEdit) && m_tempoSpin) {
     switch (event->type()) {
+      case QEvent::KeyPress:
+        if (auto* keyEvent = static_cast<QKeyEvent*>(event);
+            keyEvent &&
+            (keyEvent->key() == Qt::Key_Return || keyEvent->key() == Qt::Key_Enter)) {
+          m_tempoSpin->interpretText();
+          m_tempoSpin->clearFocus();
+          if (m_tempoLineEdit) {
+            m_tempoLineEdit->deselect();
+          }
+          return true;
+        }
+        break;
       case QEvent::FocusIn:
       case QEvent::MouseButtonPress:
       case QEvent::MouseButtonDblClick:
@@ -510,6 +523,11 @@ bool SequenceControlBar::eventFilter(QObject* watched, QEvent* event) {
             m_tempoSpin->selectAll();
           }
         });
+        break;
+      case QEvent::FocusOut:
+        if (m_tempoLineEdit) {
+          m_tempoLineEdit->deselect();
+        }
         break;
       default:
         break;
