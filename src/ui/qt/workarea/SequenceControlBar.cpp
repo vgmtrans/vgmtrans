@@ -23,6 +23,7 @@
 #include <QResizeEvent>
 #include <QScrollArea>
 #include <QScrollBar>
+#include <QTabBar>
 #include <QTimer>
 #include <QToolButton>
 #include <QToolTip>
@@ -69,7 +70,20 @@ qreal knobPointerAngleDegrees(int value) {
          (kKnobEndAngleDegrees - kKnobCenterAngleDegrees) * t;
 }
 
-QColor sequenceControlBarBackgroundColor(const QPalette& palette) {
+QColor sequenceControlBarBackgroundColor(const QWidget* context) {
+  if (context && context->window()) {
+    if (auto* tabBar = context->window()->findChild<QTabBar*>()) {
+      QColor tabColor = tabBar->palette().color(QPalette::Button);
+      if (!tabColor.isValid()) {
+        tabColor = tabBar->palette().color(QPalette::Window);
+      }
+      if (tabColor.isValid()) {
+        return tabColor;
+      }
+    }
+  }
+
+  const QPalette palette = context ? context->palette() : QPalette();
   QColor color = palette.color(QPalette::Button);
   if (!color.isValid()) {
     color = palette.color(QPalette::Window);
@@ -175,6 +189,7 @@ protected:
     QPainter painter(this);
     painter.setRenderHint(QPainter::Antialiasing, true);
 
+    const bool lightMode = qGray(palette().color(QPalette::Window).rgb()) > 140;
     const QRectF bounds = rect().adjusted(1.0, 1.0, -1.0, -1.0);
     const QPointF center = bounds.center();
     const qreal radius = std::min(bounds.width(), bounds.height()) * 0.5;
@@ -186,20 +201,26 @@ protected:
 
     // Matte outer ring.
     painter.setPen(Qt::NoPen);
-    painter.setBrush(QColor(34, 38, 45));
+    painter.setBrush(lightMode ? QColor(116, 123, 134) : QColor(34, 38, 45));
     painter.drawEllipse(bounds);
 
     // Knob face: darker with subtle gradient shading.
     const QRectF face = bounds.adjusted(2.2, 2.2, -2.2, -2.2);
     QLinearGradient faceGradient(face.topLeft(), face.bottomRight());
-    faceGradient.setColorAt(0.0, QColor(116, 124, 138));
-    faceGradient.setColorAt(0.55, QColor(82, 90, 104));
-    faceGradient.setColorAt(1.0, QColor(54, 60, 72));
+    if (lightMode) {
+      faceGradient.setColorAt(0.0, QColor(228, 233, 240));
+      faceGradient.setColorAt(0.55, QColor(196, 204, 214));
+      faceGradient.setColorAt(1.0, QColor(158, 168, 181));
+    } else {
+      faceGradient.setColorAt(0.0, QColor(116, 124, 138));
+      faceGradient.setColorAt(0.55, QColor(82, 90, 104));
+      faceGradient.setColorAt(1.0, QColor(54, 60, 72));
+    }
     painter.setBrush(faceGradient);
     painter.drawEllipse(face);
 
     // Small top-left highlight to mimic hardware knob sheen.
-    painter.setBrush(QColor(255, 255, 255, 28));
+    painter.setBrush(lightMode ? QColor(255, 255, 255, 78) : QColor(255, 255, 255, 28));
     painter.drawEllipse(face.adjusted(3.6, 2.8, -8.8, -9.4));
 
     // Indicator line.
@@ -212,7 +233,10 @@ protected:
                                  QPointF(std::cos(angleRadians), std::sin(angleRadians)) *
                                      (radius * 0.72);
 
-    QPen indicatorPen(QColor(255, 202, 108), 1.35, Qt::SolidLine, Qt::RoundCap);
+    QPen indicatorPen(lightMode ? QColor(44, 50, 60) : QColor(255, 202, 108),
+                      1.35,
+                      Qt::SolidLine,
+                      Qt::RoundCap);
     painter.setPen(indicatorPen);
     painter.drawLine(indicatorStart, indicatorEnd);
 
@@ -417,7 +441,7 @@ void SequenceControlBar::paintEvent(QPaintEvent* event) {
   Q_UNUSED(event);
 
   QPainter painter(this);
-  const QColor cover = sequenceControlBarBackgroundColor(palette());
+  const QColor cover = sequenceControlBarBackgroundColor(this);
   painter.fillRect(rect(), cover);
   painter.fillRect(0, 0, width(), 2, cover);
   painter.fillRect(0, 0, 2, height(), cover);
@@ -810,15 +834,16 @@ void SequenceControlBar::scrollBlocks(int deltaPixels) {
 }
 
 void SequenceControlBar::refreshStyleSheet() {
-  const QColor barBg = sequenceControlBarBackgroundColor(palette());
+  const QColor barBg = sequenceControlBarBackgroundColor(this);
   const QColor text = palette().color(QPalette::WindowText);
+  const bool lightMode = qGray(barBg.rgb()) > 140;
 
   QColor subtleText = text;
   subtleText.setAlpha(160);
 
-  QColor buttonOff = QColor(79, 86, 98);
-  QColor buttonOn = QColor(230, 176, 84);
-  QColor buttonText = QColor(240, 242, 246);
+  QColor buttonOff = lightMode ? QColor(167, 174, 184) : QColor(79, 86, 98);
+  QColor buttonOn = lightMode ? QColor(196, 153, 90) : QColor(230, 176, 84);
+  QColor buttonText = lightMode ? QColor(248, 250, 253) : QColor(240, 242, 246);
 
   const QString style = QStringLiteral(
       "QWidget#SequenceControlBar {"
