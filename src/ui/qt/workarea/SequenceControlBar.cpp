@@ -238,11 +238,19 @@ SequenceControlBar::SequenceControlBar(QWidget* parent)
   m_tempoSpin->setSingleStep(0.25);
   m_tempoSpin->setKeyboardTracking(false);
   m_tempoSpin->setButtonSymbols(QAbstractSpinBox::NoButtons);
-  m_tempoSpin->setSuffix(QStringLiteral(" BPM"));
   m_tempoSpin->setValue(kDefaultTempoBpm);
   m_tempoSpin->setAlignment(Qt::AlignCenter);
   m_tempoSpin->setFixedHeight(20);
-  tempoLayout->addWidget(m_tempoSpin);
+
+  auto* tempoValueLayout = new QHBoxLayout();
+  tempoValueLayout->setContentsMargins(0, 0, 0, 0);
+  tempoValueLayout->setSpacing(4);
+  tempoValueLayout->addWidget(m_tempoSpin, 1);
+
+  auto* bpmLabel = new QLabel(QStringLiteral("BPM"), tempoFrame);
+  bpmLabel->setObjectName(QStringLiteral("TempoUnit"));
+  tempoValueLayout->addWidget(bpmLabel, 0, Qt::AlignVCenter);
+  tempoLayout->addLayout(tempoValueLayout);
 
   rootLayout->addWidget(tempoFrame, 0);
 
@@ -604,24 +612,17 @@ void SequenceControlBar::applyStripFrameStyle(StripWidgets& strip, bool dimmed, 
   }
   border.setAlpha(dimmed ? 126 : 238);
 
-  QColor baseBg = palette().color(QPalette::Window).darker(132);
-  baseBg.setAlpha(dimmed ? 190 : 226);
-
   const QString frameStyle = QStringLiteral(
       "QFrame#MixerStrip {"
       " border: none;"
       " border-left: 3px solid rgba(%1,%2,%3,%4);"
       " border-radius: 0px;"
-      " background: rgba(%5,%6,%7,%8);"
+      " background: transparent;"
       "}")
                                  .arg(border.red())
                                  .arg(border.green())
                                  .arg(border.blue())
-                                 .arg(border.alpha())
-                                 .arg(baseBg.red())
-                                 .arg(baseBg.green())
-                                 .arg(baseBg.blue())
-                                 .arg(baseBg.alpha());
+                                 .arg(border.alpha());
   if (strip.frame->styleSheet() != frameStyle) {
     strip.frame->setStyleSheet(frameStyle);
   }
@@ -666,10 +667,8 @@ void SequenceControlBar::scrollBlocks(int deltaPixels) {
 
 void SequenceControlBar::refreshStyleSheet() {
   const QColor base = palette().color(QPalette::Window);
+  const QColor barBg = base.darker(132);
   const QColor text = palette().color(QPalette::WindowText);
-
-  const QColor barBg = base.darker(112);
-  const QColor blockBg = base.darker(124);
   const QColor blockBorder = base.lighter(112);
 
   QColor subtleText = text;
@@ -688,12 +687,17 @@ void SequenceControlBar::refreshStyleSheet() {
       "QFrame#TempoBlock {"
       " border: 1px solid rgba(%2,%3,%4,210);"
       " border-radius: 3px;"
-      " background: %5;"
+      " background: transparent;"
       "}"
       "QLabel#TempoTitle {"
+      " font-size: 10px;"
+      " font-weight: 600;"
+      " color: rgba(%5,%6,%7,%8);"
+      "}"
+      "QLabel#TempoUnit {"
       " font-size: 8px;"
       " font-weight: 600;"
-      " color: rgba(%6,%7,%8,%9);"
+      " color: rgba(%5,%6,%7,%8);"
       "}"
       "QDoubleSpinBox {"
       " border: 1px solid rgba(255,255,255,0.09);"
@@ -707,15 +711,15 @@ void SequenceControlBar::refreshStyleSheet() {
       "QToolButton#StripToggle {"
       " border: 1px solid rgba(255,255,255,0.14);"
       " border-radius: 3px;"
-      " background: rgba(%10,%11,%12,200);"
-      " color: rgba(%13,%14,%15,220);"
+      " background: rgba(%9,%10,%11,200);"
+      " color: rgba(%12,%13,%14,220);"
       " font-size: 9px;"
       " font-weight: 700;"
       " padding: 0px;"
       "}"
       "QToolButton#StripToggle:checked {"
-      " background: rgba(%16,%17,%18,230);"
-      " color: rgba(%13,%14,%15,255);"
+      " background: rgba(%15,%16,%17,230);"
+      " color: rgba(%12,%13,%14,255);"
       " border: 1px solid rgba(255,255,255,0.28);"
       "}"
       "QToolButton#StripToggle:disabled {"
@@ -745,7 +749,6 @@ void SequenceControlBar::refreshStyleSheet() {
                            .arg(blockBorder.red())
                            .arg(blockBorder.green())
                            .arg(blockBorder.blue())
-                           .arg(blockBg.name())
                            .arg(subtleText.red())
                            .arg(subtleText.green())
                            .arg(subtleText.blue())
