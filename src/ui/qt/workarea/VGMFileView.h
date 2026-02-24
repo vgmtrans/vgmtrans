@@ -61,6 +61,8 @@ public:
   [[nodiscard]] PanelViewKind panelView(PanelSide side) const;
   void setSinglePaneMode(bool singlePane);
   [[nodiscard]] bool singlePaneMode() const;
+  void setSequenceControlBarVisible(bool visible);
+  [[nodiscard]] bool sequenceControlBarVisible() const;
   [[nodiscard]] bool supportsViewKind(PanelViewKind viewKind) const;
   [[nodiscard]] bool supportsSequenceViews() const;
 
@@ -130,6 +132,7 @@ private:
   QFont m_activeHexFont;
   bool m_isSeqFile = false;
   bool m_singlePaneMode = false;
+  bool m_sequenceControlBarVisible = true;
   bool m_playbackVisualsActive = false;
   bool m_playbackTickActive = false;
   std::vector<const VGMItem*> m_selectedItems;
