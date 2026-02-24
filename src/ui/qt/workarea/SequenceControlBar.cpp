@@ -42,7 +42,7 @@ constexpr int kStripHeight = kBarHeight;
 constexpr int kScrollButtonWidth = 22;
 constexpr int kKnobSize = 20;
 constexpr int kScrollStepPixels = kStripWidth;
-constexpr int kTempoControlWidth = 90;
+constexpr int kTempoControlWidth = 78;
 constexpr int kDefaultTempoBpm = 120;
 constexpr int kMinTempoBpm = 20;
 constexpr int kMaxTempoBpm = 360;
@@ -108,8 +108,8 @@ protected:
 
     const qreal midX = rect().center().x();
     const qreal midY = rect().center().y();
-    const qreal halfW = std::max<qreal>(4.2, width() * 0.18);
-    const qreal halfH = std::max<qreal>(5.8, height() * 0.20);
+    const qreal halfW = std::max<qreal>(3.4, width() * 0.18 * 0.8);
+    const qreal halfH = std::max<qreal>(4.6, height() * 0.20 * 0.8);
 
     QPainterPath chevron;
     if (m_direction == Direction::Left) {
@@ -290,7 +290,7 @@ SequenceControlBar::SequenceControlBar(QWidget* parent)
   tempoFrame->setFixedHeight(kStripHeight);
 
   auto* tempoLayout = new QVBoxLayout(tempoFrame);
-  tempoLayout->setContentsMargins(4, 7, 4, 0);
+  tempoLayout->setContentsMargins(8, 7, 4, 0);
   tempoLayout->setSpacing(0);
 
   auto* tempoLabel = new QLabel(QStringLiteral("Tempo"), tempoFrame);
@@ -310,7 +310,7 @@ SequenceControlBar::SequenceControlBar(QWidget* parent)
   m_tempoSpin->setFixedHeight(20);
 
   auto* tempoValueLayout = new QHBoxLayout();
-  tempoValueLayout->setContentsMargins(0, 0, 0, 0);
+  tempoValueLayout->setContentsMargins(0, 2, 0, 0);
   tempoValueLayout->setSpacing(4);
   tempoValueLayout->addWidget(m_tempoSpin, 0, Qt::AlignLeft | Qt::AlignTop);
 
