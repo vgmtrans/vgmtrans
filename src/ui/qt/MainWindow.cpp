@@ -14,6 +14,12 @@
 #include <QStandardPaths>
 #include <QGridLayout>
 #include <QPushButton>
+#if defined(Q_OS_LINUX)
+#include <QDBusConnection>
+#include <QDBusMessage>
+#include <QDBusReply>
+#include <QVariantMap>
+#endif
 #include <QShortcut>
 #include <QMessageBox>
 #include <QStatusBar>
@@ -42,6 +48,56 @@
 #include "StatusBarContent.h"
 #include "LogManager.h"
 #include "widgets/ToastHost.h"
+
+namespace {
+constexpr auto MIME_PORTAL_FILETRANSFER = "application/vnd.portal.filetransfer";
+
+QStringList retrievePortalDroppedFiles([[maybe_unused]] const QMimeData* mimeData) {
+#if defined(VGMTRANS_HAVE_DBUS) && defined(Q_OS_LINUX)
+  if (!mimeData) {
+    return {};
+  }
+
+  QString portalMimeFormat;
+  for (const QString& format : mimeData->formats()) {
+    if (format == MIME_PORTAL_FILETRANSFER || format.startsWith(MIME_PORTAL_FILETRANSFER)) {
+      portalMimeFormat = format;
+      break;
+    }
+  }
+  if (portalMimeFormat.isEmpty()) {
+    return {};
+  }
+
+  QByteArray keyBytes = mimeData->data(portalMimeFormat);
+  if (const qsizetype nulPos = keyBytes.indexOf('\0'); nulPos >= 0) {
+    keyBytes.truncate(nulPos);
+  }
+
+  const QString key = QString::fromUtf8(keyBytes.trimmed());
+  if (key.isEmpty()) {
+    return {};
+  }
+
+  QDBusMessage msg = QDBusMessage::createMethodCall(
+      QStringLiteral("org.freedesktop.portal.Documents"),
+      QStringLiteral("/org/freedesktop/portal/documents"),
+      QStringLiteral("org.freedesktop.portal.FileTransfer"),
+      QStringLiteral("RetrieveFiles"));
+  QVariantMap options;
+  msg << key << options;
+
+  QDBusReply<QStringList> reply = QDBusConnection::sessionBus().call(msg);
+  if (!reply.isValid()) {
+    return {};
+  }
+
+  return reply.value();
+#else
+  return {};
+#endif
+}
+}  // namespace
 
 MainWindow::MainWindow() : QMainWindow(nullptr) {
   setWindowTitle("VGMTrans");
@@ -208,7 +264,21 @@ void MainWindow::dragLeaveEvent(QDragLeaveEvent *event) {
 }
 
 void MainWindow::dropEvent(QDropEvent *event) {
-  handleDroppedUrls(event->mimeData()->urls());
+  hideDragOverlay();
+
+  const QMimeData* mimeData = event->mimeData();
+  const QStringList portalFiles = retrievePortalDroppedFiles(mimeData);
+  if (!portalFiles.isEmpty()) {
+    for (const QString& filePath : portalFiles) {
+      if (!filePath.isEmpty()) {
+        openFileInternal(filePath);
+      }
+    }
+    event->acceptProposedAction();
+    return;
+  }
+
+  handleDroppedUrls(mimeData->urls());
   event->acceptProposedAction();
 }
 
@@ -230,14 +300,19 @@ void MainWindow::hideDragOverlay() {
 }
 
 void MainWindow::handleDroppedUrls(const QList<QUrl>& urls) {
-  hideDragOverlay();
-
   if (urls.isEmpty()) {
     return;
   }
 
   for (const auto &url : urls) {
-    openFileInternal(url.toLocalFile());
+    if (!url.isLocalFile()) {
+      continue;
+    }
+
+    const QString localFile = url.toLocalFile();
+    if (!localFile.isEmpty()) {
+      openFileInternal(localFile);
+    }
   }
 }
 

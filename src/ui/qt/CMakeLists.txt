@@ -5,6 +5,12 @@ find_package(Qt6 COMPONENTS GuiPrivate QUIET)
 message(STATUS "Using Qt: ${Qt6_VERSION}")
 message(STATUS "Has own QtGuiPrivate: ${Qt6GuiPrivate_FOUND}")
 
+# D-Bus is used on Linux for the XDG FileTransfer portal
+# and on macOS to workaround a macdeployqt bug
+if(CMAKE_SYSTEM_NAME MATCHES "Darwin|FreeBSD|OpenBSD|Linux")
+  find_package(Qt6 COMPONENTS DBus QUIET)
+endif()
+
 # ~~~
 # Build
 # ~~~
@@ -129,6 +135,17 @@ target_link_libraries(
           Qt6::Svg
           BASS::MIDI)
 
+if(Qt6DBus_FOUND)
+  target_link_libraries(vgmtrans PRIVATE Qt6::DBus)
+  target_compile_definitions(vgmtrans PRIVATE VGMTRANS_HAVE_DBUS)
+else()
+  if(CMAKE_SYSTEM_NAME MATCHES "Linux")
+    message(WARNING "Qt6::DBus not found, Wayland drag-and-drop will not work")
+  elseif(CMAKE_SYSTEM_NAME MATCHES "Darwin")
+    message(WARNING "Qt6::DBus not found, final .app bundle may not work")
+  endif()
+endif()
+
 qt_add_shaders(
   vgmtrans
   "hexview_shaders"
@@ -147,7 +164,6 @@ qt_add_shaders(
 
 # Workaround macdeployqt not correctly deploying QtDbus
 if(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
-  find_package(Qt6 REQUIRED COMPONENTS DBus)
   target_link_libraries(vgmtrans PUBLIC Qt6::DBus)
 endif()
 
