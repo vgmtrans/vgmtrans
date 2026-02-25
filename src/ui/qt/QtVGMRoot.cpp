@@ -9,7 +9,6 @@
 #include <QApplication>
 #include <QFile>
 #include <QFileDialog>
-#include <QFileInfo>
 #include <QMessageBox>
 #include <QString>
 #include <filesystem>
@@ -102,7 +101,6 @@ std::filesystem::path QtVGMRoot::UI_openFolder(const std::filesystem::path& sugg
 
 bool QtVGMRoot::openRawFileWithAccessRetry(const std::filesystem::path& requestedPath) {
   enum class FileAccess {
-    Missing,
     Readable,
     NotReadable
   };
@@ -112,12 +110,7 @@ bool QtVGMRoot::openRawFileWithAccessRetry(const std::filesystem::path& requeste
   };
 
   auto getFileAccess = [&toQString](const std::filesystem::path& path) {
-    const QFileInfo info(toQString(path));
-    if (!info.exists() || !info.isFile()) {
-      return FileAccess::Missing;
-    }
-
-    QFile file(info.filePath());
+    QFile file(toQString(path));
     if (file.open(QIODevice::ReadOnly)) {
       return FileAccess::Readable;
     }
@@ -132,10 +125,6 @@ bool QtVGMRoot::openRawFileWithAccessRetry(const std::filesystem::path& requeste
 
   const FileAccess requestedAccess = getFileAccess(requestedPath);
   if (requestedAccess == FileAccess::Readable) {
-    return openRawFile(requestedPath);
-  }
-
-  if (requestedAccess == FileAccess::Missing) {
     return openRawFile(requestedPath);
   }
 
