@@ -145,24 +145,23 @@ bool QtVGMRoot::openRawFileWithAccessRetry(const std::filesystem::path& requeste
   }
 
   const QString filename = toQString(requestedPath.filename());
-  const QString reason = QStringLiteral("Select the folder containing '%1'").arg(filename);
-  const std::filesystem::path chosenFolder =
-      UI_openFolder(requestedPath.parent_path(), reason.toUtf8().toStdString());
+  const QString title = QStringLiteral("Grant access to '%1'").arg(filename);
+  const QString chosenFile = QFileDialog::getOpenFileName(
+      QApplication::activeWindow(),
+      title,
+      toQString(requestedPath),
+      "All files (*)");
 
-  if (chosenFolder.empty()) {
+  if (chosenFile.isEmpty()) {
     toastOpenError(requestedPath);
     return false;
   }
 
-  if (getFileAccess(requestedPath) == FileAccess::Readable) {
-    return openRawFile(requestedPath);
-  }
-
-  const std::filesystem::path retryPath = chosenFolder / requestedPath.filename();
+  const std::filesystem::path retryPath = std::filesystem::path(chosenFile.toStdWString());
   if (getFileAccess(retryPath) == FileAccess::Readable) {
     return openRawFile(retryPath);
   }
 
-  toastOpenError(requestedPath);
+  toastOpenError(retryPath);
   return false;
 }
