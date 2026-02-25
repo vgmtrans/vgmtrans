@@ -76,16 +76,33 @@ void load_with_libs(const PSFFile &psf, const std::filesystem::path &basepath, I
                                   : std::nullopt;
   };
 
+  auto tryOpenLib = [&](const std::string& libname) {
+    auto newpath = basepath / libname;
+    auto doLoad = [&](const std::filesystem::path& p) {
+      DiskFile libfile(p);
+      PSFFile libpsf(libfile);
+      load_with_libs(libpsf, p.parent_path(), img, depth + 1);
+    };
+    try {
+      doLoad(newpath);
+    } catch (const std::exception& e) {
+      L_ERROR("Cannot open PSF library file '{}': {}. Asking user for folder.", libname, e.what());
+      auto chosen = pRoot->UI_openFolder(
+          basepath,
+          fmt::format("PSF library file '{}' could not be opened. Select the folder containing it.", libname));
+      if (chosen.empty()) {
+        throw std::runtime_error(fmt::format("PSF library file '{}' not accessible.", libname));
+      }
+      doLoad(chosen / libname);
+    }
+  };
+
   auto lib = findLib("_lib");
   if (!lib)
     lib = findLib("_Lib");
-  if (lib) {
-    auto newpath = basepath;
-    newpath /= *lib;
-    DiskFile libfile(newpath);
-    PSFFile libpsf(libfile);
-    load_with_libs(libpsf, newpath.parent_path(), img, depth + 1);
-  }
+
+  if (lib)
+    tryOpenLib(*lib);
 
   if (!psf.exe().empty()) {
     uint32_t addr = psf.version() == PSF1_VERSION ? psf.getExe<uint32_t>(0x18)
@@ -100,11 +117,7 @@ void load_with_libs(const PSFFile &psf, const std::filesystem::path &basepath, I
     auto it = psf.tags().find(fmt::format("_lib{}", i));
     if (it == psf.tags().end())
       break;
-    auto newpath = basepath;
-    newpath /= it->second;
-    DiskFile libfile(newpath);
-    PSFFile libpsf(libfile);
-    load_with_libs(libpsf, newpath.parent_path(), img, depth + 1);
+    tryOpenLib(it->second);
   }
 }
 
