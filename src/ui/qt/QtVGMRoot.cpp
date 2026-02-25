@@ -7,11 +7,7 @@
 #include "VGMFileTreeView.h"
 #include "UIHelpers.h"
 #include <QApplication>
-#include <QAbstractButton>
-#include <QFile>
 #include <QFileDialog>
-#include <QMessageBox>
-#include <QPushButton>
 #include <QString>
 #include <filesystem>
 #include "QtVGMRoot.h"
@@ -99,69 +95,4 @@ std::filesystem::path QtVGMRoot::UI_getSaveDirPath(const std::filesystem::path&)
 std::filesystem::path QtVGMRoot::UI_openFolder(const std::filesystem::path& suggestedPath,
                                                std::string_view reason) {
   return openFolderDialog(suggestedPath, reason);
-}
-
-bool QtVGMRoot::openRawFileWithAccessRetry(const std::filesystem::path& requestedPath) {
-  enum class FileAccess {
-    Readable,
-    NotReadable
-  };
-
-  auto toQString = [](const std::filesystem::path& path) {
-    return QString::fromStdWString(path.wstring());
-  };
-
-  auto getFileAccess = [&toQString](const std::filesystem::path& path) {
-    QFile file(toQString(path));
-    if (file.open(QIODevice::ReadOnly)) {
-      return FileAccess::Readable;
-    }
-
-    return FileAccess::NotReadable;
-  };
-
-  auto toastOpenError = [this, &toQString](const std::filesystem::path& path) {
-    const QString message = QStringLiteral("Error opening file at path: %1").arg(toQString(path));
-    UI_toast(message.toUtf8().toStdString(), ToastType::Error);
-  };
-
-  const FileAccess requestedAccess = getFileAccess(requestedPath);
-  if (requestedAccess == FileAccess::Readable) {
-    return openRawFile(requestedPath);
-  }
-
-  QMessageBox prompt(QMessageBox::Icon::Warning,
-                     "Permission required",
-                     "VGMTrans needs access to the folder containing this file.",
-                     QMessageBox::Cancel,
-                     QApplication::activeWindow());
-  QAbstractButton* grantButton = prompt.addButton("Grant Access", QMessageBox::AcceptRole);
-  prompt.setInformativeText(toQString(requestedPath));
-  prompt.exec();
-
-  if (prompt.clickedButton() != grantButton) {
-    toastOpenError(requestedPath);
-    return false;
-  }
-
-  const QString filename = toQString(requestedPath.filename());
-  const QString title = QStringLiteral("Grant access to '%1'").arg(filename);
-  const QString chosenFile = QFileDialog::getOpenFileName(
-      QApplication::activeWindow(),
-      title,
-      toQString(requestedPath),
-      "All files (*)");
-
-  if (chosenFile.isEmpty()) {
-    toastOpenError(requestedPath);
-    return false;
-  }
-
-  const std::filesystem::path retryPath = std::filesystem::path(chosenFile.toStdWString());
-  if (getFileAccess(retryPath) == FileAccess::Readable) {
-    return openRawFile(retryPath);
-  }
-
-  toastOpenError(retryPath);
-  return false;
 }

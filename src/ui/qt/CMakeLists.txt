@@ -153,6 +153,11 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
   target_link_libraries(vgmtrans PUBLIC Qt6::DBus)
 endif()
 
+if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+  find_package(Qt6 REQUIRED COMPONENTS DBus)
+  target_link_libraries(vgmtrans PRIVATE Qt6::DBus)
+endif()
+
 set_target_properties(vgmtrans PROPERTIES AUTOMOC ON)
 qt_add_resources(UI_RESOURCES
                  "${CMAKE_CURRENT_LIST_DIR}/resources/resources.qrc")
