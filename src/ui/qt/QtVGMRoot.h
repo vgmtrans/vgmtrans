@@ -35,6 +35,7 @@ public:
   std::filesystem::path UI_getSaveDirPath(const std::filesystem::path& suggestedDir) override;
   std::filesystem::path UI_openFolder(const std::filesystem::path& suggestedPath,
                                       std::string_view reason) override;
+  bool openRawFileWithAccessRetry(const std::filesystem::path& requestedPath);
 
 signals:
   void UI_beginLoadRawFile() override;

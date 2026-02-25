@@ -8,6 +8,8 @@
 #include "UIHelpers.h"
 #include <QApplication>
 #include <QFileDialog>
+#include <QFileInfo>
+#include <QMessageBox>
 #include <QString>
 #include <filesystem>
 #include "QtVGMRoot.h"
@@ -95,4 +97,60 @@ std::filesystem::path QtVGMRoot::UI_getSaveDirPath(const std::filesystem::path&)
 std::filesystem::path QtVGMRoot::UI_openFolder(const std::filesystem::path& suggestedPath,
                                                std::string_view reason) {
   return openFolderDialog(suggestedPath, reason);
+}
+
+bool QtVGMRoot::openRawFileWithAccessRetry(const std::filesystem::path& requestedPath) {
+  auto toQString = [](const std::filesystem::path& path) {
+    return QString::fromStdWString(path.wstring());
+  };
+
+  auto isReadableFile = [&toQString](const std::filesystem::path& path) {
+    const QFileInfo info(toQString(path));
+    return info.exists() && info.isFile() && info.isReadable();
+  };
+
+  auto toastOpenError = [this, &toQString](const std::filesystem::path& path) {
+    const QString message = QStringLiteral("Error opening file at path: %1").arg(toQString(path));
+    UI_toast(message.toUtf8().toStdString(), ToastType::Error);
+  };
+
+  if (isReadableFile(requestedPath)) {
+    return openRawFile(requestedPath);
+  }
+
+  QMessageBox prompt(QMessageBox::Icon::Warning,
+                     "Permission required",
+                     "VGMTrans needs access to the folder containing this file.",
+                     QMessageBox::Cancel,
+                     QApplication::activeWindow());
+  auto* grantButton = prompt.addButton("Grant Access", QMessageBox::AcceptRole);
+  prompt.setInformativeText(toQString(requestedPath));
+  prompt.exec();
+
+  if (prompt.clickedButton() != grantButton) {
+    toastOpenError(requestedPath);
+    return false;
+  }
+
+  const QString filename = toQString(requestedPath.filename());
+  const QString reason = QStringLiteral("Select the folder containing '%1'").arg(filename);
+  const std::filesystem::path chosenFolder =
+      UI_openFolder(requestedPath.parent_path(), reason.toUtf8().toStdString());
+
+  if (chosenFolder.empty()) {
+    toastOpenError(requestedPath);
+    return false;
+  }
+
+  if (isReadableFile(requestedPath)) {
+    return openRawFile(requestedPath);
+  }
+
+  const std::filesystem::path retryPath = chosenFolder / requestedPath.filename();
+  if (isReadableFile(retryPath)) {
+    return openRawFile(retryPath);
+  }
+
+  toastOpenError(requestedPath);
+  return false;
 }

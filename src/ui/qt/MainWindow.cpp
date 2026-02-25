@@ -237,7 +237,14 @@ void MainWindow::handleDroppedUrls(const QList<QUrl>& urls) {
   }
 
   for (const auto &url : urls) {
-    openFileInternal(url.toLocalFile());
+    if (!url.isLocalFile()) {
+      continue;
+    }
+
+    const QString path = url.toLocalFile();
+    if (!path.isEmpty()) {
+      openFileInternal(path);
+    }
   }
 }
 
@@ -278,7 +285,7 @@ void MainWindow::openFileInternal(const QString& filename) {
     }
   }
 
-  if (qtVGMRoot.openRawFile(filename.toStdWString())) {
+  if (qtVGMRoot.openRawFileWithAccessRetry(std::filesystem::path(filename.toStdWString()))) {
     Settings::the()->recentFiles.add(filename);
     m_menu_bar->updateRecentFilesMenu();
   }
