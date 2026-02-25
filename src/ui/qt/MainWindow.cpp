@@ -53,12 +53,36 @@
 namespace {
 constexpr auto kPortalFileTransferMime = "application/vnd.portal.filetransfer";
 
-QStringList retrievePortalDroppedFilesForKey(const QString& key,
-                                             const QString& busName,
-                                             const QString& objectPath) {
+QStringList retrievePortalDroppedFiles(const QMimeData* mimeData) {
+#if defined(Q_OS_LINUX)
+  if (!mimeData) {
+    return {};
+  }
+
+  QString portalMimeFormat;
+  for (const QString& format : mimeData->formats()) {
+    if (format == kPortalFileTransferMime || format.startsWith(kPortalFileTransferMime)) {
+      portalMimeFormat = format;
+      break;
+    }
+  }
+  if (portalMimeFormat.isEmpty()) {
+    return {};
+  }
+
+  QByteArray keyBytes = mimeData->data(portalMimeFormat);
+  if (const qsizetype nulPos = keyBytes.indexOf('\0'); nulPos >= 0) {
+    keyBytes.truncate(nulPos);
+  }
+
+  const QString key = QString::fromUtf8(keyBytes.trimmed());
+  if (key.isEmpty()) {
+    return {};
+  }
+
   QDBusMessage msg = QDBusMessage::createMethodCall(
-      busName,
-      objectPath,
+      QStringLiteral("org.freedesktop.portal.Documents"),
+      QStringLiteral("/org/freedesktop/portal/documents"),
       QStringLiteral("org.freedesktop.portal.FileTransfer"),
       QStringLiteral("RetrieveFiles"));
   QVariantMap options;
@@ -66,69 +90,10 @@ QStringList retrievePortalDroppedFilesForKey(const QString& key,
 
   QDBusReply<QStringList> reply = QDBusConnection::sessionBus().call(msg);
   if (!reply.isValid()) {
-    L_WARN("Portal file transfer retrieval failed via {}: {}: {}",
-           busName.toStdString(),
-           reply.error().name().toStdString(),
-           reply.error().message().toStdString());
     return {};
   }
 
-  const QStringList files = reply.value();
-  L_INFO("Portal file transfer retrieval via {} returned {} file(s)",
-         busName.toStdString(),
-         files.size());
-  return files;
-}
-
-QStringList retrievePortalDroppedFiles(const QMimeData* mimeData) {
-#if defined(Q_OS_LINUX)
-  if (!mimeData) {
-    return {};
-  }
-
-  const QStringList formats = mimeData->formats();
-  L_INFO("Drop mime formats: {}", formats.join(", ").toStdString());
-
-  QString portalMimeFormat;
-  for (const QString& format : formats) {
-    if (format == kPortalFileTransferMime || format.startsWith(kPortalFileTransferMime)) {
-      portalMimeFormat = format;
-      break;
-    }
-  }
-  if (portalMimeFormat.isEmpty()) {
-    L_INFO("Drop event does not include '{}' mime payload", kPortalFileTransferMime);
-    return {};
-  }
-
-  QByteArray keyBytes = mimeData->data(portalMimeFormat);
-  const qsizetype nulPos = keyBytes.indexOf('\0');
-  if (nulPos >= 0) {
-    keyBytes.truncate(nulPos);
-  }
-  keyBytes = keyBytes.trimmed();
-  L_INFO("Drop portal payload format '{}' with {} bytes",
-         portalMimeFormat.toStdString(),
-         keyBytes.size());
-
-  const QString key = QString::fromUtf8(keyBytes);
-  if (key.isEmpty()) {
-    L_WARN("Drop portal payload key is empty");
-    return {};
-  }
-
-  const QStringList docsFiles = retrievePortalDroppedFilesForKey(
-      key,
-      QStringLiteral("org.freedesktop.portal.Documents"),
-      QStringLiteral("/org/freedesktop/portal/documents"));
-  if (!docsFiles.isEmpty()) {
-    return docsFiles;
-  }
-
-  return retrievePortalDroppedFilesForKey(
-      key,
-      QStringLiteral("org.freedesktop.portal.Desktop"),
-      QStringLiteral("/org/freedesktop/portal/desktop"));
+  return reply.value();
 #else
   Q_UNUSED(mimeData);
   return {};
@@ -306,10 +271,8 @@ void MainWindow::dropEvent(QDropEvent *event) {
   const QMimeData* mimeData = event->mimeData();
   const QStringList portalFiles = retrievePortalDroppedFiles(mimeData);
   if (!portalFiles.isEmpty()) {
-    L_INFO("Opening {} dropped file(s) from portal transfer", portalFiles.size());
     for (const QString& filePath : portalFiles) {
       if (!filePath.isEmpty()) {
-        L_INFO("Dropped portal file: {}", filePath.toStdString());
         openFileInternal(filePath);
       }
     }
@@ -317,7 +280,6 @@ void MainWindow::dropEvent(QDropEvent *event) {
     return;
   }
 
-  L_INFO("Falling back to dropped URL list ({})", mimeData->urls().size());
   handleDroppedUrls(mimeData->urls());
   event->acceptProposedAction();
 }
@@ -340,22 +302,17 @@ void MainWindow::hideDragOverlay() {
 }
 
 void MainWindow::handleDroppedUrls(const QList<QUrl>& urls) {
-  hideDragOverlay();
-
   if (urls.isEmpty()) {
     return;
   }
 
-  L_INFO("Processing {} dropped URL(s)", urls.size());
   for (const auto &url : urls) {
     if (!url.isLocalFile()) {
-      L_WARN("Skipping non-local dropped URL: {}", url.toString().toStdString());
       continue;
     }
 
     const QString localFile = url.toLocalFile();
     if (!localFile.isEmpty()) {
-      L_INFO("Dropped local file: {}", localFile.toStdString());
       openFileInternal(localFile);
     }
   }
