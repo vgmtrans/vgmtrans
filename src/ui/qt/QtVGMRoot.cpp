@@ -7,6 +7,7 @@
 #include "VGMFileTreeView.h"
 #include "UIHelpers.h"
 #include <QApplication>
+#include <QFile>
 #include <QFileDialog>
 #include <QFileInfo>
 #include <QMessageBox>
@@ -100,13 +101,28 @@ std::filesystem::path QtVGMRoot::UI_openFolder(const std::filesystem::path& sugg
 }
 
 bool QtVGMRoot::openRawFileWithAccessRetry(const std::filesystem::path& requestedPath) {
+  enum class FileAccess {
+    Missing,
+    Readable,
+    NotReadable
+  };
+
   auto toQString = [](const std::filesystem::path& path) {
     return QString::fromStdWString(path.wstring());
   };
 
-  auto isReadableFile = [&toQString](const std::filesystem::path& path) {
+  auto getFileAccess = [&toQString](const std::filesystem::path& path) {
     const QFileInfo info(toQString(path));
-    return info.exists() && info.isFile() && info.isReadable();
+    if (!info.exists() || !info.isFile()) {
+      return FileAccess::Missing;
+    }
+
+    QFile file(info.filePath());
+    if (file.open(QIODevice::ReadOnly)) {
+      return FileAccess::Readable;
+    }
+
+    return FileAccess::NotReadable;
   };
 
   auto toastOpenError = [this, &toQString](const std::filesystem::path& path) {
@@ -114,7 +130,12 @@ bool QtVGMRoot::openRawFileWithAccessRetry(const std::filesystem::path& requeste
     UI_toast(message.toUtf8().toStdString(), ToastType::Error);
   };
 
-  if (isReadableFile(requestedPath)) {
+  const FileAccess requestedAccess = getFileAccess(requestedPath);
+  if (requestedAccess == FileAccess::Readable) {
+    return openRawFile(requestedPath);
+  }
+
+  if (requestedAccess == FileAccess::Missing) {
     return openRawFile(requestedPath);
   }
 
@@ -142,12 +163,12 @@ bool QtVGMRoot::openRawFileWithAccessRetry(const std::filesystem::path& requeste
     return false;
   }
 
-  if (isReadableFile(requestedPath)) {
+  if (getFileAccess(requestedPath) == FileAccess::Readable) {
     return openRawFile(requestedPath);
   }
 
   const std::filesystem::path retryPath = chosenFolder / requestedPath.filename();
-  if (isReadableFile(retryPath)) {
+  if (getFileAccess(retryPath) == FileAccess::Readable) {
     return openRawFile(retryPath);
   }
 
