@@ -7,6 +7,7 @@
 #include "VGMFileTreeView.h"
 #include "UIHelpers.h"
 #include <QApplication>
+#include <QAbstractButton>
 #include <QFile>
 #include <QFileDialog>
 #include <QMessageBox>
@@ -133,7 +134,7 @@ bool QtVGMRoot::openRawFileWithAccessRetry(const std::filesystem::path& requeste
                      "VGMTrans needs access to the folder containing this file.",
                      QMessageBox::Cancel,
                      QApplication::activeWindow());
-  auto* grantButton = prompt.addButton("Grant Access", QMessageBox::AcceptRole);
+  QAbstractButton* grantButton = prompt.addButton("Grant Access", QMessageBox::AcceptRole);
   prompt.setInformativeText(toQString(requestedPath));
   prompt.exec();
 
