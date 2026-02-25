@@ -11,6 +11,7 @@
 #include <QFile>
 #include <QFileDialog>
 #include <QMessageBox>
+#include <QPushButton>
 #include <QString>
 #include <filesystem>
 #include "QtVGMRoot.h"
