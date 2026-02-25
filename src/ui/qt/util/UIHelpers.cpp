@@ -59,14 +59,17 @@ std::filesystem::path openSaveDirDialog() {
 
 std::filesystem::path openFolderDialog(const std::filesystem::path& suggestedPath,
                                        std::string_view reason) {
-  QFileDialog dialog(QApplication::activeWindow());
-  dialog.setFileMode(QFileDialog::Directory);
-  dialog.setOption(QFileDialog::ShowDirsOnly, true);
-  dialog.setWindowTitle(QString::fromUtf8(reason.data(), static_cast<int>(reason.size())));
-  dialog.setDirectory(QString::fromStdWString(suggestedPath.wstring()));
+  QString initialDir = QString::fromStdWString(suggestedPath.wstring());
+  if (initialDir.isEmpty()) {
+    initialDir = QStandardPaths::writableLocation(QStandardPaths::HomeLocation);
+  }
 
-  if (dialog.exec()) {
-    const QString chosen = dialog.selectedFiles().at(0);
+  const QString chosen = QFileDialog::getExistingDirectory(
+      QApplication::activeWindow(),
+      QString::fromUtf8(reason.data(), static_cast<int>(reason.size())),
+      initialDir,
+      QFileDialog::ShowDirsOnly);
+  if (!chosen.isEmpty()) {
     return std::filesystem::path(chosen.toStdWString());
   }
   return {};
