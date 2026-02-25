@@ -20,3 +20,4 @@ void applyEffectToPixmap(QPixmap& src, QPixmap& tgt, QGraphicsEffect* effect, in
 
 std::filesystem::path openSaveDirDialog();
 std::filesystem::path openSaveFileDialog(const std::filesystem::path& suggested_filename, const std::string& extension);
+std::filesystem::path openFolderDialog(const std::filesystem::path& suggestedPath, std::string_view reason);
