@@ -96,6 +96,8 @@ public:
   virtual void UI_log(LogItem *) { }
   virtual void UI_toast(std::string_view message, ToastType type = ToastType::Info,
                         int duration_ms = DEFAULT_TOAST_DURATION) {}
+  virtual std::filesystem::path UI_openFolder(const std::filesystem::path& suggestedPath,
+                                              std::string_view reason) { return {}; }
 
   const std::vector<RawFile*>& rawFiles() { return m_rawfiles; }
   const std::vector<VGMFileVariant>& vgmFiles() { return m_vgmfiles; }

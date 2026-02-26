@@ -57,6 +57,21 @@ std::filesystem::path openSaveDirDialog() {
   return {};
 }
 
+std::filesystem::path openFolderDialog(const std::filesystem::path& suggestedPath,
+                                       std::string_view reason) {
+  QFileDialog dialog(QApplication::activeWindow());
+  dialog.setFileMode(QFileDialog::Directory);
+  dialog.setOption(QFileDialog::ShowDirsOnly, true);
+  dialog.setWindowTitle(QString::fromUtf8(reason.data(), static_cast<int>(reason.size())));
+  dialog.setDirectory(QString::fromStdWString(suggestedPath.wstring()));
+
+  if (dialog.exec()) {
+    const QString chosen = dialog.selectedFiles().at(0);
+    return std::filesystem::path(chosen.toStdWString());
+  }
+  return {};
+}
+
 std::filesystem::path openSaveFileDialog(const std::filesystem::path& suggested_filename, const std::string& extension) {
   static QString selected_dir = QStandardPaths::writableLocation(QStandardPaths::MusicLocation);
 
