@@ -27,6 +27,7 @@
 #include <algorithm>
 #include <array>
 #include <cmath>
+#include <cstdlib>
 #include <unordered_map>
 #include <utility>
 
@@ -58,6 +59,19 @@ QVector4D toVec4(const QColor& color) {
 
 bool isPrintable(uint8_t value) {
   return value >= 0x20 && value <= 0x7E;
+}
+
+bool shouldRandomizeHexViewBytes() {
+  return true;
+  // static const bool enabled = std::getenv("VGMTRANS_HEXVIEW_RANDOMIZE") != nullptr;
+  // return enabled;
+}
+
+uint8_t randomizedHexViewByte(uint32_t offset) {
+  uint32_t x = offset ^ 0xA3C59AC3u;
+  x *= 0x9E3779B1u;
+  x ^= x >> 16;
+  return static_cast<uint8_t>(x & 0xFFu);
 }
 
 QShader loadShader(const char* path) {
@@ -1082,7 +1096,13 @@ void HexViewRhiRenderer::rebuildCacheWindow(const HexViewFrame::Data& frame) {
     if (lineOffset < static_cast<int>(fileLength)) {
       entry.bytes = std::min(kBytesPerLine, static_cast<int>(fileLength) - lineOffset);
       if (entry.bytes > 0) {
-        std::copy_n(baseData + lineOffset, entry.bytes, entry.data.data());
+        if (shouldRandomizeHexViewBytes()) {
+          for (int i = 0; i < entry.bytes; ++i) {
+            entry.data[i] = randomizedHexViewByte(static_cast<uint32_t>(lineOffset + i));
+          }
+        } else {
+          std::copy_n(baseData + lineOffset, entry.bytes, entry.data.data());
+        }
         for (int i = 0; i < entry.bytes; ++i) {
           const int idx = lineOffset + i;
           entry.styles[i] = (styleIds && idx >= 0 && idx < static_cast<int>(styleIds->size()))
