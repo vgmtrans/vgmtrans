@@ -173,8 +173,9 @@ void MenuBar::appendInfoMenu() {
 }
 
 void MenuBar::reportBug() {
-  ReportDialog dialog(this);
-  dialog.exec();
+  auto *dialog = new ReportDialog(this);
+  dialog->setAttribute(Qt::WA_DeleteOnClose);
+  dialog->show();
 }
 
 void MenuBar::appendOptionsMenu() {
