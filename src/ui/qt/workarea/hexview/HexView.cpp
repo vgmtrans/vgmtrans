@@ -261,7 +261,11 @@ void HexView::setFont(const QFont& font) {
 
 // Return X origin of the hex byte columns (accounting for optional address column).
 int HexView::hexXOffset() const {
-  return m_shouldDrawOffset ? ((NUM_ADDRESS_NIBBLES + ADDRESS_SPACING_CHARS) * m_charWidth) : 0;
+  if (m_shouldDrawOffset) {
+    return (NUM_ADDRESS_NIBBLES + ADDRESS_SPACING_CHARS) * m_charWidth;
+  }
+  // Keep a half-cell inset in hex-only mode so the first glyph cell is fully visible.
+  return m_charHalfWidth;
 }
 
 HexView::DragMode HexView::dragModeForModifiers(Qt::KeyboardModifiers mods) {
@@ -296,7 +300,8 @@ int HexView::getVirtualWidthSansAscii() const {
 int HexView::getVirtualWidthSansAsciiAndAddress() const {
   if (m_virtual_width_sans_ascii_and_address == -1) {
     constexpr int numChars = BYTES_PER_LINE * 3;
-    m_virtual_width_sans_ascii_and_address = (numChars * m_charWidth) + SELECTION_PADDING;
+    m_virtual_width_sans_ascii_and_address =
+        (numChars * m_charWidth) + m_charHalfWidth + SELECTION_PADDING;
   }
   return m_virtual_width_sans_ascii_and_address;
 }
