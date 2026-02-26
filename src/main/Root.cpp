@@ -64,6 +64,7 @@ bool VGMRoot::openRawFile(const std::filesystem::path &filePath) {
   try {
     newFile = new DiskFile(filePath);
   } catch (...) {
+    L_ERROR("Failed to open file '{}': could not read from disk (file not found or permission denied)", filePath);
     UI_toast(fmt::format("Error opening file at path: {}", filePath), ToastType::Error);
     return false;
   }

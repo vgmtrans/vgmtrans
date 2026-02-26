@@ -33,6 +33,8 @@ public:
   std::filesystem::path UI_getSaveFilePath(const std::string& suggestedFilename,
                                           const std::string& extension) override;
   std::filesystem::path UI_getSaveDirPath(const std::filesystem::path& suggestedDir) override;
+  std::filesystem::path UI_openFolder(const std::filesystem::path& suggestedPath,
+                                      std::string_view reason) override;
 
 signals:
   void UI_beginLoadRawFile() override;

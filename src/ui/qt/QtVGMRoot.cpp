@@ -91,3 +91,8 @@ std::filesystem::path QtVGMRoot::UI_getSaveFilePath(const std::string& suggested
 std::filesystem::path QtVGMRoot::UI_getSaveDirPath(const std::filesystem::path&) {
   return openSaveDirDialog();
 }
+
+std::filesystem::path QtVGMRoot::UI_openFolder(const std::filesystem::path& suggestedPath,
+                                               std::string_view reason) {
+  return openFolderDialog(suggestedPath, reason);
+}
