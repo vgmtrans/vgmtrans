@@ -358,8 +358,10 @@ void HexView::updateLayout() {
     return;
   }
 
-  const bool newDrawOffset = width >= getViewportWidthSansAsciiAndAddress();
-  const bool newDrawAscii = width >= getViewportWidthSansAscii();
+  // Use strict bounds so snap points map cleanly to the intended collapsed states:
+  // at exactly "hex-only" width, keep offset hidden; at exactly "address+hex" width, keep ASCII hidden.
+  const bool newDrawOffset = width > getViewportWidthSansAsciiAndAddress();
+  const bool newDrawAscii = width > getViewportWidthSansAscii();
   const bool offsetChanged = (newDrawOffset != m_shouldDrawOffset);
   const bool asciiChanged = (newDrawAscii != m_shouldDrawAscii);
   m_shouldDrawOffset = newDrawOffset;
