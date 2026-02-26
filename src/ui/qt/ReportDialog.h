@@ -6,26 +6,25 @@
 
 #pragma once
 
-#include <QDialog>
+#include <QWidget>
+#include <QUrl>
 
 class QLineEdit;
 class QPlainTextEdit;
 class QListWidget;
 class QTreeWidget;
 class QLabel;
+class QPushButton;
 
-class ReportDialog : public QDialog {
+class ReportDialog : public QWidget {
   Q_OBJECT
 
 public:
   explicit ReportDialog(QWidget* parent = nullptr);
 
-protected:
-  void keyPressEvent(QKeyEvent* event) override;
-
 private:
   void updateUrlStatus();
-  QString getMarkdownReport() const;
+  QUrl buildReportUrl() const;
   void submitReport();
 
   QTimer* m_update_timer;
@@ -35,10 +34,6 @@ private:
   QPlainTextEdit* m_expected_edit;
   QListWidget* m_raw_list;
   QTreeWidget* m_vgm_tree;
-  QLabel* m_status_label;
-  QLabel* m_warning_label;
   QLabel* m_feedback_label;
   QPushButton* m_submit_button;
-  QPushButton* m_copy_button;
-  int m_chars_remaining;
 };
