@@ -229,6 +229,7 @@ private:
   QRhiTexture* m_glyphTex = nullptr;
   QRhiTexture* m_itemIdTex = nullptr;
   QRhiSampler* m_glyphSampler = nullptr;
+  QRhiSampler* m_linearSampler = nullptr;
   QRhiSampler* m_maskSampler = nullptr;
   QRhiShaderResourceBindings* m_rectSrb = nullptr;
   QRhiShaderResourceBindings* m_glyphSrb = nullptr;

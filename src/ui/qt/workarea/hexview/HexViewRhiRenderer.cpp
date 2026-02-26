@@ -112,10 +112,17 @@ void HexViewRhiRenderer::initIfNeeded(QRhi* rhi) {
   m_compositeUbuf = m_rhi->newBuffer(QRhiBuffer::Dynamic, QRhiBuffer::UniformBuffer, screenUboSize);
   m_compositeUbuf->create();
 
-  m_glyphSampler = m_rhi->newSampler(QRhiSampler::Linear, QRhiSampler::Linear,
+  // Glyph atlas text is rendered 1:1 in logical space; nearest avoids extra softening at
+  // fractional DPR values
+  m_glyphSampler = m_rhi->newSampler(QRhiSampler::Nearest, QRhiSampler::Nearest,
                                      QRhiSampler::None, QRhiSampler::ClampToEdge,
                                      QRhiSampler::ClampToEdge);
   m_glyphSampler->create();
+
+  m_linearSampler = m_rhi->newSampler(QRhiSampler::Linear, QRhiSampler::Linear,
+                                      QRhiSampler::None, QRhiSampler::ClampToEdge,
+                                      QRhiSampler::ClampToEdge);
+  m_linearSampler->create();
 
   m_maskSampler = m_rhi->newSampler(QRhiSampler::Nearest, QRhiSampler::Nearest,
                                     QRhiSampler::None, QRhiSampler::ClampToEdge,
@@ -165,6 +172,8 @@ void HexViewRhiRenderer::releaseResources() {
   m_itemIdTex = nullptr;
   delete m_glyphSampler;
   m_glyphSampler = nullptr;
+  delete m_linearSampler;
+  m_linearSampler = nullptr;
   delete m_maskSampler;
   m_maskSampler = nullptr;
 
@@ -749,11 +758,11 @@ void HexViewRhiRenderer::updateCompositeSrb() {
                                              QRhiShaderResourceBinding::FragmentStage,
                                              m_compositeUbuf),
     QRhiShaderResourceBinding::sampledTexture(1, QRhiShaderResourceBinding::FragmentStage,
-                                              m_contentTex, m_glyphSampler),
+                                              m_contentTex, m_linearSampler),
     QRhiShaderResourceBinding::sampledTexture(2, QRhiShaderResourceBinding::FragmentStage,
                                               m_maskTex, m_maskSampler),
     QRhiShaderResourceBinding::sampledTexture(3, QRhiShaderResourceBinding::FragmentStage,
-                                              m_edgeTex, m_glyphSampler),
+                                              m_edgeTex, m_linearSampler),
     QRhiShaderResourceBinding::sampledTexture(4, QRhiShaderResourceBinding::FragmentStage,
                                               m_itemIdTex, m_maskSampler)
   });
