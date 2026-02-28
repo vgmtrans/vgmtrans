@@ -126,6 +126,7 @@ target_sources(vgmtranscore
     components/seq/SeqEventTimeIndex.cpp
     components/seq/SeqSlider.cpp
     components/seq/SeqTrack.cpp
+    components/seq/TransposeTimeline.cpp
     components/seq/VGMSeq.cpp
     components/seq/VGMSeqNoTrks.cpp
     components/seq/VGMSeqSection.cpp
@@ -494,6 +495,7 @@ target_sources(vgmtranscore
       components/seq/SeqEventTimeIndex.h
       components/seq/SeqSlider.h
       components/seq/SeqTrack.h
+      components/seq/TransposeTimeline.h
       components/seq/VGMSeq.h
       components/seq/VGMSeqNoTrks.h
       components/seq/VGMSeqSection.h

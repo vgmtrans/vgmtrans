@@ -41,7 +41,6 @@ target_sources(vgmtrans
     util/UIHelpers.cpp
     widgets/ClickJumpSlider.cpp
     widgets/MarqueeLabel.cpp
-    widgets/SnappingSplitter.cpp
     widgets/StatusBarContent.cpp
     widgets/Toast.cpp
     widgets/ToastHost.cpp
@@ -107,7 +106,6 @@ target_sources(vgmtrans
     FILES
       widgets/ClickJumpSlider.h
       widgets/MarqueeLabel.h
-      widgets/SnappingSplitter.h
       widgets/StatusBarContent.h
       widgets/TableView.h
       widgets/TitleBar.h
