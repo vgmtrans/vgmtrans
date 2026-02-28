@@ -795,10 +795,11 @@ void HexViewRhiRenderer::updateUniforms(QRhiResourceUpdateBatch* u, float scroll
   const float charWidth = static_cast<float>(frame.charWidth);
   const float charHalfWidth = static_cast<float>(frame.charHalfWidth);
   const float lineHeight = static_cast<float>(frame.lineHeight);
-  const float hexStartX = static_cast<float>(frame.hexStartX) - charHalfWidth;
+  const float hexStartX = static_cast<float>(frame.hexStartX);
+  const float hexGlyphStartX = hexStartX + charHalfWidth;
   const float hexWidth = kBytesPerLine * 3.0f * charWidth;
-  const float asciiStartX = static_cast<float>(frame.hexStartX) +
-                            (kBytesPerLine * 3 + HEX_TO_ASCII_SPACING_CHARS) * charWidth;
+  const float asciiStartX =
+      hexGlyphStartX + (kBytesPerLine * 3 + HEX_TO_ASCII_SPACING_CHARS) * charWidth;
   const float asciiWidth = frame.shouldDrawAscii ? (kBytesPerLine * charWidth) : 0.0f;
 
   const float shadowRadius = std::max(0.0f, static_cast<float>(frame.shadowBlur));
@@ -1129,8 +1130,9 @@ void HexViewRhiRenderer::buildBaseInstances(const HexViewFrame::Data& frame) {
   const float lineHeight = static_cast<float>(frame.lineHeight);
 
   const float hexStartX = static_cast<float>(frame.hexStartX);
+  const float hexGlyphStartX = hexStartX + charHalfWidth;
   const float asciiStartX =
-      hexStartX + (kBytesPerLine * 3 + HEX_TO_ASCII_SPACING_CHARS) * charWidth;
+      hexGlyphStartX + (kBytesPerLine * 3 + HEX_TO_ASCII_SPACING_CHARS) * charWidth;
 
   const auto& styles = frame.styles;
   auto styleFor = [&](uint16_t styleId) -> const HexViewFrame::Style& {
@@ -1187,7 +1189,7 @@ void HexViewRhiRenderer::buildBaseInstances(const HexViewFrame::Data& frame) {
         const auto& style = styleFor(spanStyle);
         if (style.bg != clearColor) {
           const QVector4D bgColor = toVec4(style.bg);
-          const float hexX = hexStartX + spanStart * 3.0f * charWidth - charHalfWidth;
+          const float hexX = hexStartX + spanStart * 3.0f * charWidth;
           appendRect(m_baseRectInstances, hexX, y, spanLen * 3.0f * charWidth, lineHeight, bgColor);
           if (frame.shouldDrawAscii) {
             const float asciiX = asciiStartX + spanStart * charWidth;
@@ -1206,7 +1208,7 @@ void HexViewRhiRenderer::buildBaseInstances(const HexViewFrame::Data& frame) {
       const QVector4D textColor = toVec4(style.fg);
 
       const uint8_t value = entry.data[i];
-      const float hexX = hexStartX + i * 3.0f * charWidth;
+      const float hexX = hexGlyphStartX + i * 3.0f * charWidth;
       appendGlyph(m_baseGlyphInstances, hexX, y, charWidth, lineHeight, hexUvs[value >> 4], textColor);
       appendGlyph(m_baseGlyphInstances, hexX + charWidth, y, charWidth, lineHeight,
                   hexUvs[value & 0x0F], textColor);
@@ -1311,7 +1313,7 @@ void HexViewRhiRenderer::appendMaskRectsForIntervals(const std::vector<Interval>
       continue;
     }
 
-    const float hexX = ctx.hexStartX + interval.start * 3.0f * ctx.charWidth - ctx.charHalfWidth - padX;
+    const float hexX = ctx.hexStartX + interval.start * 3.0f * ctx.charWidth - padX;
     appendRect(m_maskRectInstances, hexX, y - padY,
                length * 3.0f * ctx.charWidth + padX * 2.0f,
                ctx.lineHeight + padY * 2.0f, maskColor);
@@ -1338,7 +1340,7 @@ void HexViewRhiRenderer::emitEdgeRuns(const std::unordered_map<uint32_t, EdgeRun
 
     const float runY = run.startLine * ctx.lineHeight;
     const float runH = (run.endLine - run.startLine + 1) * ctx.lineHeight;
-    const float hexX = ctx.hexStartX + run.startCol * 3.0f * ctx.charWidth - ctx.charHalfWidth;
+    const float hexX = ctx.hexStartX + run.startCol * 3.0f * ctx.charWidth;
     appendEdgeRect(m_edgeRectInstances, hexX, runY, length * 3.0f * ctx.charWidth, runH,
                    edgePad, edgeColor);
     if (ctx.shouldDrawAscii) {
@@ -1426,10 +1428,10 @@ void HexViewRhiRenderer::buildSelectionInstances(int startLine, int endLine,
   ctx.fileBaseOffset = frame.vgmfile ? frame.vgmfile->offset() : 0;
   ctx.fileLength = frame.vgmfile ? frame.vgmfile->length() : 0;
   ctx.charWidth = charWidth;
-  ctx.charHalfWidth = static_cast<float>(frame.charHalfWidth);
   ctx.lineHeight = lineHeight;
   ctx.hexStartX = static_cast<float>(frame.hexStartX);
-  ctx.asciiStartX = ctx.hexStartX + (kBytesPerLine * 3 + HEX_TO_ASCII_SPACING_CHARS) * ctx.charWidth;
+  ctx.asciiStartX = ctx.hexStartX + static_cast<float>(frame.charHalfWidth) +
+                    (kBytesPerLine * 3 + HEX_TO_ASCII_SPACING_CHARS) * ctx.charWidth;
   ctx.shouldDrawAscii = frame.shouldDrawAscii;
 
   const QVector4D selectionMaskColor(1.0f, 0.0f, 0.0f, 0.0f);

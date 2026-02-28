@@ -296,7 +296,7 @@ int HexView::getVirtualWidthSansAscii() const {
 int HexView::getVirtualWidthSansAsciiAndAddress() const {
   if (m_virtual_width_sans_ascii_and_address == -1) {
     constexpr int numChars = BYTES_PER_LINE * 3;
-    m_virtual_width_sans_ascii_and_address = (numChars * m_charWidth) + SELECTION_PADDING;
+    m_virtual_width_sans_ascii_and_address = (numChars * m_charWidth) + m_charWidth;
   }
   return m_virtual_width_sans_ascii_and_address;
 }
@@ -917,12 +917,12 @@ int HexView::getOffsetFromPoint(QPoint pos) const {
 
   const int hexStart = hexXOffset();
   const int hexEnd = hexStart + (BYTES_PER_LINE * 3 * m_charWidth);
-  const int asciiStart = hexEnd + (HEX_TO_ASCII_SPACING_CHARS * m_charWidth);
+  const int asciiStart = hexEnd + (HEX_TO_ASCII_SPACING_CHARS * m_charWidth) + m_charHalfWidth;
   const int asciiEnd = asciiStart + (BYTES_PER_LINE * m_charWidth);
 
   int byteNum = -1;
-  if (pos.x() >= hexStart - m_charHalfWidth && pos.x() < hexEnd - m_charHalfWidth) {
-    byteNum = ((pos.x() - hexStart + m_charHalfWidth) / m_charWidth) / 3;
+  if (pos.x() >= hexStart && pos.x() < hexEnd) {
+    byteNum = ((pos.x() - hexStart) / m_charWidth) / 3;
   } else if (pos.x() >= asciiStart && pos.x() < asciiEnd) {
     byteNum = (pos.x() - asciiStart) / m_charWidth;
   }
