@@ -55,7 +55,6 @@ target_sources(vgmtrans
     widgets/ItemViewDensity.cpp
     widgets/SeekBar.cpp
     widgets/MarqueeLabel.cpp
-    widgets/SnappingSplitter.cpp
     widgets/StatusBarContent.cpp
     widgets/Toast.cpp
     widgets/ToastHost.cpp
@@ -127,7 +126,6 @@ target_sources(vgmtrans
       widgets/ItemViewDensity.h
       widgets/SeekBar.h
       widgets/MarqueeLabel.h
-      widgets/SnappingSplitter.h
       widgets/StatusBarContent.h
       widgets/TableView.h
       widgets/TitleBar.h
