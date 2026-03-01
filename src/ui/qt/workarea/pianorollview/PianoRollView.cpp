@@ -283,12 +283,14 @@ void PianoRollView::setPlaybackTick(int tick, bool playbackActive) {
 
   if (playbackStateChanged && !m_playbackActive) {
     stopPlaybackAutoScrollAnimation();
+    m_waitForWheelScrollBegin = false;
   }
 
   if (playbackStateChanged && m_playbackActive) {
     m_playbackAutoScrollEnabled = true;
+    m_waitForWheelScrollBegin = true;
     if (!isPlaybackTickVisible(tick)) {
-      scrollPlaybackTickToViewportFraction(tick, kPlaybackPageTargetFraction);
+      scrollPlaybackTickToViewportFraction(tick, kPlaybackPageTargetFraction, false);
     }
   }
 
@@ -317,6 +319,7 @@ void PianoRollView::clearPlaybackState() {
   m_playbackActive = false;
   m_currentTick = 0;
   m_playbackAutoScrollEnabled = true;
+  m_waitForWheelScrollBegin = false;
   m_applyingPlaybackAutoScroll = false;
   updateActiveKeyStates();
   m_lastRenderedScanlineX = std::numeric_limits<int>::min();
@@ -613,6 +616,20 @@ bool PianoRollView::handleViewportWheel(QWheelEvent* event) {
 
   event->accept();
   return true;
+}
+
+// Filters stale trackpad momentum after play/resume until a new wheel gesture begins.
+bool PianoRollView::shouldAcceptViewportWheelScroll(Qt::ScrollPhase phase) {
+  if (!m_waitForWheelScrollBegin) {
+    return true;
+  }
+
+  if (phase == Qt::ScrollBegin || phase == Qt::NoScrollPhase) {
+    m_waitForWheelScrollBegin = false;
+    return true;
+  }
+
+  return false;
 }
 
 bool PianoRollView::handleViewportNativeGesture(QNativeGestureEvent* event) {
@@ -1371,7 +1388,7 @@ bool PianoRollView::isPlaybackTickVisible(int tick) const {
 }
 
 // Repositions horizontal scroll so the playback scanline lands at the requested viewport fraction.
-void PianoRollView::scrollPlaybackTickToViewportFraction(int tick, float viewportFraction) {
+void PianoRollView::scrollPlaybackTickToViewportFraction(int tick, float viewportFraction, bool animated) {
   auto* hbar = horizontalScrollBar();
   if (!hbar) {
     return;
@@ -1392,7 +1409,7 @@ void PianoRollView::scrollPlaybackTickToViewportFraction(int tick, float viewpor
   if (clampedScrollX == hbar->value()) {
     return;
   }
-  if (!m_playbackAutoScrollAnimation) {
+  if (!animated || !m_playbackAutoScrollAnimation) {
     m_applyingPlaybackAutoScroll = true;
     hbar->setValue(clampedScrollX);
     m_applyingPlaybackAutoScroll = false;

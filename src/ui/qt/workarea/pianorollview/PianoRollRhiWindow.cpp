@@ -82,6 +82,11 @@ bool PianoRollRhiWindow::handleWheelEvent(QWheelEvent* wheel) {
     return true;
   }
 
+  if (!m_view->shouldAcceptViewportWheelScroll(wheel->phase())) {
+    wheel->accept();
+    return true;
+  }
+
   // Plain scrolling path (no zoom modifiers). This mirrors scroll-area
   // semantics while staying in the RHI window input path.
   QScrollBar* hbar = m_view->horizontalScrollBar();
