@@ -79,22 +79,36 @@ private:
     int topBarHeight = 0;
     uint64_t staticTickStart = 0;
     uint64_t staticTickEnd = 0;
-    uint64_t notesPtr = 0;
     uint64_t timeSigPtr = 0;
-    uint64_t trackColorsHash = 0;
-    uint64_t trackEnabledHash = 0;
     uint32_t noteBackgroundColor = 0;
     uint32_t keyboardBackgroundColor = 0;
     uint32_t topBarBackgroundColor = 0;
     uint32_t measureLineColor = 0;
     uint32_t beatLineColor = 0;
     uint32_t keySeparatorColor = 0;
-    uint32_t noteOutlineColor = 0;
     uint32_t whiteKeyColor = 0;
     uint32_t blackKeyColor = 0;
     uint32_t whiteKeyRowColor = 0;
     uint32_t blackKeyRowColor = 0;
     uint32_t dividerColor = 0;
+  };
+
+  struct NoteInstance {
+    float startTick;
+    float duration;
+    float key;
+    float borderEnabled;
+    float r;
+    float g;
+    float b;
+    float a;
+  };
+
+  struct NoteDataKey {
+    uint64_t notesPtr = 0;
+    uint64_t trackColorsHash = 0;
+    uint64_t trackEnabledHash = 0;
+    uint32_t noteBackgroundColor = 0;
   };
 
   struct RectInstance {
@@ -135,13 +149,12 @@ private:
   static uint64_t hashTrackEnabled(const std::vector<uint8_t>& trackEnabled);
   static uint32_t colorKey(const QColor& color);
 
-  void ensurePipeline(QRhiRenderPassDescriptor* renderPassDesc, int sampleCount);
+  void ensurePipelines(QRhiRenderPassDescriptor* renderPassDesc, int sampleCount);
   bool ensureInstanceBuffer(QRhiBuffer*& buffer, int bytes, int minBytes);
   Layout computeLayout(const PianoRollFrame::Data& frame, const QSize& pixelSize) const;
-  StaticCacheKey makeStaticCacheKey(const PianoRollFrame::Data& frame,
-                                    const Layout& layout,
-                                    uint64_t trackColorsHash,
-                                    uint64_t trackEnabledHash) const;
+  StaticCacheKey makeStaticCacheKey(const PianoRollFrame::Data& frame, const Layout& layout) const;
+  NoteDataKey makeNoteDataKey(const PianoRollFrame::Data& frame) const;
+  void rebuildNoteInstances(const PianoRollFrame::Data& frame);
   uint64_t staticBucketStyleHash(const StaticCacheKey& key) const;
   uint64_t staticBucketId(const StaticCacheKey& key) const;
   void trimStaticBucketCache();
@@ -151,15 +164,6 @@ private:
                             const Layout& layout,
                             const StaticCacheKey& key);
   void buildDynamicInstances(const PianoRollFrame::Data& frame, const Layout& layout);
-
-  template <typename Fn>
-  void forEachNoteInRange(const PianoRollFrame::Data& frame,
-                          uint64_t startTick,
-                          uint64_t endTick,
-                          Fn&& fn) const;
-
-  template <typename Fn>
-  void forEachVisibleNote(const PianoRollFrame::Data& frame, const Layout& layout, Fn&& fn) const;
 
   NoteGeometry computeNoteGeometry(const PianoRollFrame::Note& note, const Layout& layout) const;
 
@@ -189,8 +193,10 @@ private:
   QRhiBuffer* m_staticBackInstanceBuffer = nullptr;
   QRhiBuffer* m_staticFrontInstanceBuffer = nullptr;
   QRhiBuffer* m_dynamicInstanceBuffer = nullptr;
+  QRhiBuffer* m_noteInstanceBuffer = nullptr;
   QRhiShaderResourceBindings* m_shaderBindings = nullptr;
   QRhiGraphicsPipeline* m_pipeline = nullptr;
+  QRhiGraphicsPipeline* m_notePipeline = nullptr;
 
   QRhiRenderPassDescriptor* m_outputRenderPass = nullptr;
   int m_sampleCount = 1;
@@ -199,6 +205,7 @@ private:
   std::vector<RectInstance> m_staticBackInstances;
   std::vector<RectInstance> m_staticFrontInstances;
   std::vector<RectInstance> m_dynamicInstances;
+  std::vector<NoteInstance> m_noteInstances;
   int m_dynamicFrontStart = 0;
 
   std::unordered_map<uint64_t, CachedStaticBucket> m_staticBucketCache;
@@ -207,4 +214,7 @@ private:
   uint64_t m_frameSerial = 0;
   bool m_hasActiveStaticBucket = false;
   bool m_staticDataDirty = true;
+  bool m_noteDataDirty = true;
+  bool m_hasNoteDataKey = false;
+  NoteDataKey m_noteDataKey;
 };
