@@ -8,6 +8,7 @@
 
 #include <cstdint>
 #include <memory>
+#include <unordered_map>
 #include <vector>
 
 #include <QColor>
@@ -89,4 +90,5 @@ private:
   QWidget* m_scrollControls = nullptr;
 
   std::vector<std::unique_ptr<BlockWidgets>> m_blocks;
+  std::unordered_map<int, BlockWidgets*> m_blocksById;
 };
