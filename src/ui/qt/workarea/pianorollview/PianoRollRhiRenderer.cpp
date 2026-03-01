@@ -735,8 +735,12 @@ bool PianoRollRhiRenderer::staticCacheKeyEqual(const StaticCacheKey& lhs, const 
 PianoRollRhiRenderer::NoteDataKey PianoRollRhiRenderer::makeNoteDataKey(const PianoRollFrame::Data& frame) const {
   NoteDataKey key;
   key.notesPtr = reinterpret_cast<uint64_t>(frame.notes.get());
-  key.trackColorsHash = hashTrackColors(frame.trackColors);
-  key.trackEnabledHash = hashTrackEnabled(frame.trackEnabled);
+  if (frame.trackColors) {
+    key.trackColorsHash = hashTrackColors(*frame.trackColors);
+  }
+  if (frame.trackEnabled) {
+    key.trackEnabledHash = hashTrackEnabled(*frame.trackEnabled);
+  }
   key.noteBackgroundColor = colorKey(frame.noteBackgroundColor);
   return key;
 }
@@ -749,15 +753,19 @@ void PianoRollRhiRenderer::rebuildNoteInstances(const PianoRollFrame::Data& fram
   }
 
   m_noteInstances.reserve(frame.notes->size());
+  const auto* trackColors = frame.trackColors.get();
+  const auto* trackEnabled = frame.trackEnabled.get();
   const auto colorForTrack = [&](int trackIndex) -> QColor {
-    if (trackIndex >= 0 && trackIndex < static_cast<int>(frame.trackColors.size())) {
-      return frame.trackColors[static_cast<size_t>(trackIndex)];
+    if (trackColors && trackIndex >= 0 && trackIndex < static_cast<int>(trackColors->size())) {
+      return (*trackColors)[static_cast<size_t>(trackIndex)];
     }
     return QColor::fromHsv((trackIndex * 43) % 360, 190, 235);
   };
   const auto isTrackEnabled = [&](int trackIndex) -> bool {
-    return trackIndex < 0 || trackIndex >= static_cast<int>(frame.trackEnabled.size()) ||
-           frame.trackEnabled[static_cast<size_t>(trackIndex)] != 0;
+    return !trackEnabled ||
+           trackIndex < 0 ||
+           trackIndex >= static_cast<int>(trackEnabled->size()) ||
+           (*trackEnabled)[static_cast<size_t>(trackIndex)] != 0;
   };
 
   for (const PianoRollFrame::Note& note : *frame.notes) {
@@ -1011,15 +1019,19 @@ void PianoRollRhiRenderer::buildDynamicInstances(const PianoRollFrame::Data& fra
     return;
   }
 
+  const auto* trackColors = frame.trackColors.get();
+  const auto* trackEnabled = frame.trackEnabled.get();
   const auto colorForTrack = [&](int trackIndex) -> QColor {
-    if (trackIndex >= 0 && trackIndex < static_cast<int>(frame.trackColors.size())) {
-      return frame.trackColors[static_cast<size_t>(trackIndex)];
+    if (trackColors && trackIndex >= 0 && trackIndex < static_cast<int>(trackColors->size())) {
+      return (*trackColors)[static_cast<size_t>(trackIndex)];
     }
     return QColor::fromHsv((trackIndex * 43) % 360, 190, 235);
   };
   const auto isTrackEnabled = [&](int trackIndex) -> bool {
-    return trackIndex < 0 || trackIndex >= static_cast<int>(frame.trackEnabled.size()) ||
-           frame.trackEnabled[static_cast<size_t>(trackIndex)] != 0;
+    return !trackEnabled ||
+           trackIndex < 0 ||
+           trackIndex >= static_cast<int>(trackEnabled->size()) ||
+           (*trackEnabled)[static_cast<size_t>(trackIndex)] != 0;
   };
 
   if (frame.activeNotes && !frame.activeNotes->empty()) {

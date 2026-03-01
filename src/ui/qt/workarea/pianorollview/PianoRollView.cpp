@@ -142,6 +142,9 @@ PianoRollView::PianoRollView(QWidget* parent)
   m_activeNotes = std::make_shared<std::vector<PianoRollFrame::Note>>();
   m_selectedNotes = std::make_shared<std::vector<PianoRollFrame::Note>>();
   m_timeSignatures = std::make_shared<std::vector<PianoRollFrame::TimeSignature>>();
+  m_trackEnabledMaskSnapshot = std::make_shared<std::vector<uint8_t>>();
+  m_trackColorsSnapshot = std::make_shared<std::vector<QColor>>();
+  rebuildFrameColors();
 
   for (auto& state : m_activeKeys) {
     state.trackIndex = -1;
@@ -224,6 +227,7 @@ void PianoRollView::setTrackEnabledMask(std::vector<uint8_t> trackEnabledMask) {
   }
 
   m_trackEnabledMask = std::move(trackEnabledMask);
+  m_trackEnabledMaskSnapshot = std::make_shared<std::vector<uint8_t>>(m_trackEnabledMask);
   rebuildTrackColors();
   updateActiveKeyStates();
   m_lastRenderedScanlineX = std::numeric_limits<int>::min();
@@ -388,8 +392,8 @@ PianoRollFrame::Data PianoRollView::captureRhiFrameData(float dpr) const {
   frame.elapsedSeconds = static_cast<float>(m_animClock.elapsed()) / 1000.0f;
   frame.playbackActive = m_playbackActive;
 
-  frame.trackColors = m_trackColors;
-  frame.trackEnabled = m_trackEnabledMask;
+  frame.trackColors = m_trackColorsSnapshot;
+  frame.trackEnabled = m_trackEnabledMaskSnapshot;
   frame.notes = m_notes;
   frame.activeNotes = m_activeNotes;
   frame.selectedNotes = m_selectedNotes;
@@ -400,32 +404,25 @@ PianoRollFrame::Data PianoRollView::captureRhiFrameData(float dpr) const {
     frame.activeKeyTrack[static_cast<size_t>(key)] = m_activeKeys[static_cast<size_t>(key)].trackIndex;
   }
 
-  const QPalette pal = palette();
-  const QColor base = pal.color(QPalette::Base);
-  const QColor window = pal.color(QPalette::Window);
-  const QColor text = pal.color(QPalette::Text);
-  const bool dark = base.lightnessF() < 0.5f;
-
-  frame.backgroundColor = window;
-  frame.noteBackgroundColor = dark ? base.lighter(108) : base;
-  frame.keyboardBackgroundColor = dark ? QColor(31, 35, 40) : QColor(219, 223, 228);
-  frame.topBarBackgroundColor = dark ? QColor(47, 52, 60) : QColor(210, 216, 224);
-  frame.topBarProgressColor = dark ? QColor(108, 125, 158, 85) : QColor(100, 129, 180, 70);
-  frame.measureLineColor = dark ? QColor(156, 164, 178, 74) : QColor(105, 114, 130, 48);
-  frame.beatLineColor = dark ? QColor(156, 164, 178, 48) : QColor(110, 119, 136, 34);
-  frame.keySeparatorColor = dark ? QColor(20, 24, 28, 140) : QColor(108, 116, 128, 70);
-  frame.noteOutlineColor = dark ? QColor(18, 20, 22, 180) : QColor(62, 70, 84, 130);
-  frame.scanLineColor = dark ? QColor(255, 94, 77, 230) : QColor(201, 56, 36, 220);
-  frame.whiteKeyColor = dark ? QColor(188, 193, 202) : QColor(242, 244, 247);
-  frame.blackKeyColor = dark ? QColor(58, 64, 74) : QColor(86, 93, 104);
-  frame.whiteKeyRowColor = dark ? QColor(76, 84, 95, 42) : QColor(98, 116, 138, 24);
-  frame.blackKeyRowColor = dark ? QColor(44, 50, 59, 68) : QColor(92, 106, 126, 34);
-  frame.dividerColor = dark ? text.lighter(115) : text.darker(125);
-  frame.dividerColor.setAlpha(dark ? 74 : 62);
-  frame.selectedNoteFillColor = dark ? QColor(72, 182, 255, 72) : QColor(52, 148, 225, 66);
-  frame.selectedNoteOutlineColor = dark ? QColor(138, 214, 255, 245) : QColor(36, 110, 196, 230);
-  frame.selectionRectFillColor = dark ? QColor(78, 184, 255, 42) : QColor(72, 158, 232, 40);
-  frame.selectionRectOutlineColor = dark ? QColor(138, 214, 255, 212) : QColor(36, 110, 196, 205);
+  frame.backgroundColor = m_frameColors.backgroundColor;
+  frame.noteBackgroundColor = m_frameColors.noteBackgroundColor;
+  frame.keyboardBackgroundColor = m_frameColors.keyboardBackgroundColor;
+  frame.topBarBackgroundColor = m_frameColors.topBarBackgroundColor;
+  frame.topBarProgressColor = m_frameColors.topBarProgressColor;
+  frame.measureLineColor = m_frameColors.measureLineColor;
+  frame.beatLineColor = m_frameColors.beatLineColor;
+  frame.keySeparatorColor = m_frameColors.keySeparatorColor;
+  frame.noteOutlineColor = m_frameColors.noteOutlineColor;
+  frame.scanLineColor = m_frameColors.scanLineColor;
+  frame.whiteKeyColor = m_frameColors.whiteKeyColor;
+  frame.blackKeyColor = m_frameColors.blackKeyColor;
+  frame.whiteKeyRowColor = m_frameColors.whiteKeyRowColor;
+  frame.blackKeyRowColor = m_frameColors.blackKeyRowColor;
+  frame.dividerColor = m_frameColors.dividerColor;
+  frame.selectedNoteFillColor = m_frameColors.selectedNoteFillColor;
+  frame.selectedNoteOutlineColor = m_frameColors.selectedNoteOutlineColor;
+  frame.selectionRectFillColor = m_frameColors.selectionRectFillColor;
+  frame.selectionRectOutlineColor = m_frameColors.selectionRectOutlineColor;
 
   if (m_noteSelectionDragging) {
     const QRectF marquee = graphSelectionRectInViewport();
@@ -485,6 +482,7 @@ void PianoRollView::changeEvent(QEvent* event) {
   if (event->type() == QEvent::PaletteChange ||
       event->type() == QEvent::ApplicationPaletteChange ||
       event->type() == QEvent::StyleChange) {
+    rebuildFrameColors();
     requestRender();
   }
 }
@@ -1006,6 +1004,7 @@ void PianoRollView::resizeTrackEnabledMaskToTrackCount() {
     return;
   }
   m_trackEnabledMask.resize(desired, static_cast<uint8_t>(1));
+  m_trackEnabledMaskSnapshot = std::make_shared<std::vector<uint8_t>>(m_trackEnabledMask);
 }
 
 void PianoRollView::rebuildTrackColors() {
@@ -1013,6 +1012,36 @@ void PianoRollView::rebuildTrackColors() {
   for (int i = 0; i < m_trackCount; ++i) {
     m_trackColors[static_cast<size_t>(i)] = isTrackEnabled(i) ? colorForTrack(i) : kDisabledTrackColor;
   }
+  m_trackColorsSnapshot = std::make_shared<std::vector<QColor>>(m_trackColors);
+}
+
+void PianoRollView::rebuildFrameColors() {
+  const QPalette pal = palette();
+  const QColor base = pal.color(QPalette::Base);
+  const QColor window = pal.color(QPalette::Window);
+  const QColor text = pal.color(QPalette::Text);
+  const bool dark = base.lightnessF() < 0.5f;
+
+  m_frameColors.backgroundColor = window;
+  m_frameColors.noteBackgroundColor = dark ? base.lighter(108) : base;
+  m_frameColors.keyboardBackgroundColor = dark ? QColor(31, 35, 40) : QColor(219, 223, 228);
+  m_frameColors.topBarBackgroundColor = dark ? QColor(47, 52, 60) : QColor(210, 216, 224);
+  m_frameColors.topBarProgressColor = dark ? QColor(108, 125, 158, 85) : QColor(100, 129, 180, 70);
+  m_frameColors.measureLineColor = dark ? QColor(156, 164, 178, 74) : QColor(105, 114, 130, 48);
+  m_frameColors.beatLineColor = dark ? QColor(156, 164, 178, 48) : QColor(110, 119, 136, 34);
+  m_frameColors.keySeparatorColor = dark ? QColor(20, 24, 28, 140) : QColor(108, 116, 128, 70);
+  m_frameColors.noteOutlineColor = dark ? QColor(18, 20, 22, 180) : QColor(62, 70, 84, 130);
+  m_frameColors.scanLineColor = dark ? QColor(255, 94, 77, 230) : QColor(201, 56, 36, 220);
+  m_frameColors.whiteKeyColor = dark ? QColor(188, 193, 202) : QColor(242, 244, 247);
+  m_frameColors.blackKeyColor = dark ? QColor(58, 64, 74) : QColor(86, 93, 104);
+  m_frameColors.whiteKeyRowColor = dark ? QColor(76, 84, 95, 42) : QColor(98, 116, 138, 24);
+  m_frameColors.blackKeyRowColor = dark ? QColor(44, 50, 59, 68) : QColor(92, 106, 126, 34);
+  m_frameColors.dividerColor = dark ? text.lighter(115) : text.darker(125);
+  m_frameColors.dividerColor.setAlpha(dark ? 74 : 62);
+  m_frameColors.selectedNoteFillColor = dark ? QColor(72, 182, 255, 72) : QColor(52, 148, 225, 66);
+  m_frameColors.selectedNoteOutlineColor = dark ? QColor(138, 214, 255, 245) : QColor(36, 110, 196, 230);
+  m_frameColors.selectionRectFillColor = dark ? QColor(78, 184, 255, 42) : QColor(72, 158, 232, 40);
+  m_frameColors.selectionRectOutlineColor = dark ? QColor(138, 214, 255, 212) : QColor(36, 110, 196, 205);
 }
 
 void PianoRollView::rebuildSequenceCache() {
