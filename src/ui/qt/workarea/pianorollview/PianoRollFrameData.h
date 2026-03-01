@@ -46,6 +46,7 @@ struct Data {
   int keyboardWidth = 72;
   int topBarHeight = 22;
   float pixelsPerTick = 0.10f;
+  float minPixelsPerTick = 0.05f;
   float pixelsPerKey = 12.0f;
   float elapsedSeconds = 0.0f;
 

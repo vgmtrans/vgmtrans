@@ -296,6 +296,7 @@ PianoRollFrame::Data PianoRollView::captureRhiFrameData(float dpr) const {
   frame.keyboardWidth = kKeyboardWidth;
   frame.topBarHeight = kTopBarHeight;
   frame.pixelsPerTick = m_pixelsPerTick;
+  frame.minPixelsPerTick = kMinPixelsPerTick;
   frame.pixelsPerKey = m_pixelsPerKey;
   frame.elapsedSeconds = static_cast<float>(m_animClock.elapsed()) / 1000.0f;
   frame.playbackActive = m_playbackActive;
