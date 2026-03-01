@@ -7,6 +7,7 @@
 #pragma once
 
 #include <cstdint>
+#include <unordered_map>
 #include <vector>
 
 #include <bass.h>
@@ -29,6 +30,10 @@ public:
     uint8_t channel = 0;
     uint8_t key = 0;
     uint8_t velocity = 0;
+  };
+  struct PlaybackState {
+    std::vector<uint8_t> mutedChannels;
+    std::vector<uint8_t> soloChannels;
   };
 
   static auto &the() {
@@ -67,6 +72,12 @@ public:
   [[nodiscard]] double currentTempoBpm() const;
   [[nodiscard]] int currentChannelPan(uint8_t channel) const;
   [[nodiscard]] int currentChannelVolume(uint8_t channel) const;
+  [[nodiscard]] bool channelMuted(const VGMColl* collection, int channelId) const;
+  [[nodiscard]] bool channelSolo(const VGMColl* collection, int channelId) const;
+  void setChannelMuted(const VGMColl* collection, int channelId, bool muted, int channelCount);
+  void setChannelSolo(const VGMColl* collection, int channelId, bool solo, int channelCount);
+  [[nodiscard]] std::vector<uint8_t> channelEnabledMask(const VGMColl* collection,
+                                                        int channelCount) const;
 
   /**
    * Checks whether the player is playing
@@ -119,6 +130,8 @@ private:
   bool syncPreviewChannelState(uint8_t channel, bool resetChannel = true);
   bool sendStreamEvent(uint8_t channel, DWORD event, DWORD value, bool toPreviewStream = false);
   [[nodiscard]] DWORD streamEventValue(uint8_t channel, DWORD event) const;
+  PlaybackState& ensurePlaybackState(const VGMColl* collection, int channelCount);
+  [[nodiscard]] const PlaybackState* findPlaybackState(const VGMColl* collection) const;
 
   const VGMColl *m_active_vgmcoll{};
   HSTREAM m_active_stream{};
@@ -130,4 +143,5 @@ private:
   QTimer *m_seekupdate_timer{};
   QString m_song_title{};
   std::vector<PreviewNote> m_previewActiveNotes;
+  std::unordered_map<const VGMColl*, PlaybackState> m_playbackStateByCollection;
 };

@@ -37,6 +37,7 @@ class ActiveNoteView;
 class VGMItem;
 class SeqEvent;
 class SplitterSnapProvider;
+class VGMColl;
 struct SeqTimedEvent;
 enum class PositionChangeOrigin;
 
@@ -107,17 +108,18 @@ private:
   void enforceSplitterPolicyForResize();
 
   void clearPlaybackVisuals();
+  [[nodiscard]] const VGMColl* associatedCollection() const;
   void ensureTrackIndexMap(VGMSeq* seq);
   [[nodiscard]] int trackIndexForEvent(const SeqEvent* event) const;
   [[nodiscard]] int effectiveTrackCountForSeq(VGMSeq* seq) const;
   void rebuildSequenceControlBarIfNeeded();
   void rebuildSequenceControlBar(VGMSeq* seq);
   void updateSequenceControlValuesFromPlayback();
-  void refreshSequenceTrackEnabledState();
-  void applySequenceTrackEnabledStateToViews() const;
+  [[nodiscard]] std::vector<uint8_t> sequenceChannelEnabledMask() const;
+  void applySequenceChannelEnabledStateToViews(const std::vector<uint8_t>& enabledMask) const;
   void applySequenceAudibilityState();
-  void setSequenceControlStripMuted(int stripId, bool muted);
-  void setSequenceControlStripSolo(int stripId, bool solo);
+  void setSequenceControlChannelMuted(int channelId, bool muted);
+  void setSequenceControlChannelSolo(int channelId, bool solo);
   [[nodiscard]] bool ensureAssociatedCollectionActive() const;
   bool prepareSeqEventForPlayback(SeqEvent* event, uint32_t& tick) const;
 
@@ -151,17 +153,16 @@ private:
   std::unordered_map<const SeqTrack*, int> m_trackIndexByPtr;
   std::unordered_map<const MidiTrack*, int> m_trackIndexByMidiPtr;
 
-  struct SequenceStripBinding {
-    int stripId = -1;
+  struct SequenceChannelBinding {
+    int channelId = -1;
     int midiChannel = -1;
   };
 
   QWidget* m_rootContainer = nullptr;
   SequenceControlBar* m_sequenceControlBar = nullptr;
-  std::vector<SequenceStripBinding> m_sequenceStripBindings;
-  std::vector<uint8_t> m_sequenceTrackEnabledMask;
+  std::vector<SequenceChannelBinding> m_sequenceChannelBindings;
   bool m_sequenceControlUsesTrackLayout = false;
-  int m_sequenceControlStripCount = -1;
+  int m_sequenceControlChannelCount = -1;
   bool m_updatingSequenceControls = false;
 
 public slots:

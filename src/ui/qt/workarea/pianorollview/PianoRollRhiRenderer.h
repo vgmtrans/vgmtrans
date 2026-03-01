@@ -148,7 +148,6 @@ private:
   void buildStaticInstances(const PianoRollFrame::Data& frame,
                             const Layout& layout,
                             const StaticCacheKey& key);
-  // Dynamic pass is rebuilt every frame (scanline, active highlights, glow).
   void buildDynamicInstances(const PianoRollFrame::Data& frame, const Layout& layout);
 
   template <typename Fn>

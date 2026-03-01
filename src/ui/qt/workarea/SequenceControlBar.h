@@ -26,7 +26,7 @@ class SequenceControlBar final : public QWidget {
   Q_OBJECT
 
 public:
-  struct StripConfig {
+  struct ChannelConfig {
     int id = -1;
     QString title;
     QString subtitle;
@@ -42,23 +42,23 @@ public:
   void setTempoBpm(double bpm);
   [[nodiscard]] double tempoBpm() const;
 
-  void setStrips(const std::vector<StripConfig>& strips);
-  [[nodiscard]] std::vector<int> stripIds() const;
+  void setChannels(const std::vector<ChannelConfig>& channels);
+  [[nodiscard]] std::vector<int> channelIds() const;
 
-  void setStripPan(int stripId, int pan);
-  void setStripVolume(int stripId, int volume);
-  void setStripMuted(int stripId, bool muted);
-  void setStripSolo(int stripId, bool solo);
+  void setChannelPan(int channelId, int pan);
+  void setChannelVolume(int channelId, int volume);
+  void setChannelMuted(int channelId, bool muted);
+  void setChannelSolo(int channelId, bool solo);
 
-  [[nodiscard]] bool stripMuted(int stripId) const;
-  [[nodiscard]] bool stripSolo(int stripId) const;
+  [[nodiscard]] bool channelMuted(int channelId) const;
+  [[nodiscard]] bool channelSolo(int channelId) const;
 
 signals:
   void tempoChanged(double bpm);
-  void stripMuteChanged(int stripId, bool muted);
-  void stripSoloChanged(int stripId, bool solo);
-  void stripPanChanged(int stripId, int pan);
-  void stripVolumeChanged(int stripId, int volume);
+  void chanMuteChanged(int channelId, bool muted);
+  void chanSoloChanged(int channelId, bool solo);
+  void chanPanChanged(int channelId, int pan);
+  void chanVolumeChanged(int channelId, int volume);
 
 protected:
   void paintEvent(QPaintEvent* event) override;
@@ -66,27 +66,27 @@ protected:
   bool eventFilter(QObject* watched, QEvent* event) override;
 
 private:
-  struct StripWidgets;
+  struct BlockWidgets;
 
-  StripWidgets* findStrip(int stripId);
-  const StripWidgets* findStrip(int stripId) const;
+  BlockWidgets* findBlock(int channelId);
+  const BlockWidgets* findBlock(int channelId) const;
 
-  void rebuildStrips(const std::vector<StripConfig>& strips);
-  void refreshStripInteractivity();
+  void rebuildChannelBlocks(const std::vector<ChannelConfig>& channels);
+  void refreshBlockInteractivity();
   void refreshScrollControls();
   void scrollBlocks(int deltaPixels);
   void refreshStyleSheet();
-  void applyStripFrameStyle(StripWidgets& strip, bool dimmed, bool soloed);
+  void applyBlockFrameStyle(BlockWidgets& block, bool dimmed, bool soloed);
 
   bool m_updatingUi = false;
   QDoubleSpinBox* m_tempoSpin = nullptr;
   QLineEdit* m_tempoLineEdit = nullptr;
-  QScrollArea* m_stripScroll = nullptr;
-  QWidget* m_stripContainer = nullptr;
-  QHBoxLayout* m_stripLayout = nullptr;
+  QScrollArea* m_blockScroll = nullptr;
+  QWidget* m_blockContainer = nullptr;
+  QHBoxLayout* m_blockLayout = nullptr;
   QToolButton* m_scrollLeft = nullptr;
   QToolButton* m_scrollRight = nullptr;
   QWidget* m_scrollControls = nullptr;
 
-  std::vector<std::unique_ptr<StripWidgets>> m_strips;
+  std::vector<std::unique_ptr<BlockWidgets>> m_blocks;
 };

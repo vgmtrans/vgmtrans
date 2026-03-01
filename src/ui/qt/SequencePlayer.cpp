@@ -170,6 +170,7 @@ SequencePlayer::SequencePlayer() {
     if (m_active_vgmcoll == coll) {
       stop();
     }
+    m_playbackStateByCollection.erase(coll);
   });
 }
 
@@ -288,6 +289,99 @@ int SequencePlayer::currentChannelVolume(uint8_t channel) const {
     volume = DEFAULT_MIDI_VOLUME;
   }
   return static_cast<int>(std::clamp<DWORD>(volume, 0, 127));
+}
+
+bool SequencePlayer::channelMuted(const VGMColl* collection, int channelId) const {
+  if (!collection || channelId < 0) {
+    return false;
+  }
+
+  const PlaybackState* state = findPlaybackState(collection);
+  if (!state || static_cast<size_t>(channelId) >= state->mutedChannels.size()) {
+    return false;
+  }
+  return state->mutedChannels[static_cast<size_t>(channelId)] != 0;
+}
+
+bool SequencePlayer::channelSolo(const VGMColl* collection, int channelId) const {
+  if (!collection || channelId < 0) {
+    return false;
+  }
+
+  const PlaybackState* state = findPlaybackState(collection);
+  if (!state || static_cast<size_t>(channelId) >= state->soloChannels.size()) {
+    return false;
+  }
+  return state->soloChannels[static_cast<size_t>(channelId)] != 0;
+}
+
+void SequencePlayer::setChannelMuted(const VGMColl* collection,
+                                     int channelId,
+                                     bool muted,
+                                     int channelCount) {
+  if (!collection || channelId < 0) {
+    return;
+  }
+
+  PlaybackState& state = ensurePlaybackState(collection, channelCount);
+  const size_t index = static_cast<size_t>(channelId);
+  if (index >= state.mutedChannels.size()) {
+    state.mutedChannels.resize(index + 1, 0);
+    state.soloChannels.resize(index + 1, 0);
+  }
+
+  state.mutedChannels[index] = static_cast<uint8_t>(muted ? 1 : 0);
+  if (muted) {
+    state.soloChannels[index] = 0;
+  }
+}
+
+void SequencePlayer::setChannelSolo(const VGMColl* collection,
+                                    int channelId,
+                                    bool solo,
+                                    int channelCount) {
+  if (!collection || channelId < 0) {
+    return;
+  }
+
+  PlaybackState& state = ensurePlaybackState(collection, channelCount);
+  const size_t index = static_cast<size_t>(channelId);
+  if (index >= state.soloChannels.size()) {
+    state.mutedChannels.resize(index + 1, 0);
+    state.soloChannels.resize(index + 1, 0);
+  }
+
+  if (state.mutedChannels[index] != 0 && solo) {
+    return;
+  }
+  state.soloChannels[index] = static_cast<uint8_t>(solo ? 1 : 0);
+}
+
+// Computes effective enabled state from saved mute/solo toggles.
+std::vector<uint8_t> SequencePlayer::channelEnabledMask(const VGMColl* collection,
+                                                        int channelCount) const {
+  const size_t count = static_cast<size_t>(std::max(0, channelCount));
+  std::vector<uint8_t> enabledMask(count, static_cast<uint8_t>(1));
+  const PlaybackState* state = findPlaybackState(collection);
+  if (!state) {
+    return enabledMask;
+  }
+
+  bool anySolo = false;
+  for (size_t i = 0; i < count; ++i) {
+    if (i < state->soloChannels.size() && state->soloChannels[i] != 0) {
+      anySolo = true;
+      break;
+    }
+  }
+
+  for (size_t i = 0; i < count; ++i) {
+    const bool muted = i < state->mutedChannels.size() && state->mutedChannels[i] != 0;
+    const bool soloed = i < state->soloChannels.size() && state->soloChannels[i] != 0;
+    enabledMask[i] = static_cast<uint8_t>((!muted && (!anySolo || soloed)) ? 1 : 0);
+  }
+
+  return enabledMask;
 }
 
 bool SequencePlayer::previewNoteOn(uint8_t channel, uint8_t key, uint8_t velocity, uint32_t tick) {
@@ -465,6 +559,30 @@ DWORD SequencePlayer::streamEventValue(uint8_t channel, DWORD event) const {
     return INVALID_MIDI_EVENT_VALUE;
   }
   return BASS_MIDI_StreamGetEvent(m_active_stream, channel, event);
+}
+
+SequencePlayer::PlaybackState& SequencePlayer::ensurePlaybackState(const VGMColl* collection, int channelCount) {
+  PlaybackState& state = m_playbackStateByCollection[collection];
+  const size_t count = static_cast<size_t>(std::max(0, channelCount));
+  if (state.mutedChannels.size() < count) {
+    state.mutedChannels.resize(count, 0);
+  }
+  if (state.soloChannels.size() < count) {
+    state.soloChannels.resize(count, 0);
+  }
+  return state;
+}
+
+const SequencePlayer::PlaybackState* SequencePlayer::findPlaybackState(const VGMColl* collection) const {
+  if (!collection) {
+    return nullptr;
+  }
+
+  const auto it = m_playbackStateByCollection.find(collection);
+  if (it == m_playbackStateByCollection.end()) {
+    return nullptr;
+  }
+  return &it->second;
 }
 
 bool SequencePlayer::ensurePreviewStreams() {

@@ -234,18 +234,18 @@ VGMFileView::VGMFileView(VGMFile* vgmfile)
             });
 
     connect(m_sequenceControlBar,
-            &SequenceControlBar::stripPanChanged,
+            &SequenceControlBar::chanPanChanged,
             this,
-            [this](int stripId, int pan) {
+            [this](int channelId, int pan) {
               if (!ensureAssociatedCollectionActive()) {
                 return;
               }
-              const auto it = std::find_if(m_sequenceStripBindings.begin(),
-                                           m_sequenceStripBindings.end(),
-                                           [stripId](const SequenceStripBinding& binding) {
-                                             return binding.stripId == stripId;
+              const auto it = std::find_if(m_sequenceChannelBindings.begin(),
+                                           m_sequenceChannelBindings.end(),
+                                           [channelId](const SequenceChannelBinding& binding) {
+                                             return binding.channelId == channelId;
                                            });
-              if (it == m_sequenceStripBindings.end() || it->midiChannel < 0 || it->midiChannel >= 128) {
+              if (it == m_sequenceChannelBindings.end() || it->midiChannel < 0 || it->midiChannel >= 128) {
                 return;
               }
               SequencePlayer::the().setChannelPan(static_cast<uint8_t>(it->midiChannel),
@@ -253,18 +253,18 @@ VGMFileView::VGMFileView(VGMFile* vgmfile)
             });
 
     connect(m_sequenceControlBar,
-            &SequenceControlBar::stripVolumeChanged,
+            &SequenceControlBar::chanVolumeChanged,
             this,
-            [this](int stripId, int volume) {
+            [this](int channelId, int volume) {
               if (!ensureAssociatedCollectionActive()) {
                 return;
               }
-              const auto it = std::find_if(m_sequenceStripBindings.begin(),
-                                           m_sequenceStripBindings.end(),
-                                           [stripId](const SequenceStripBinding& binding) {
-                                             return binding.stripId == stripId;
+              const auto it = std::find_if(m_sequenceChannelBindings.begin(),
+                                           m_sequenceChannelBindings.end(),
+                                           [channelId](const SequenceChannelBinding& binding) {
+                                             return binding.channelId == channelId;
                                            });
-              if (it == m_sequenceStripBindings.end() || it->midiChannel < 0 || it->midiChannel >= 128) {
+              if (it == m_sequenceChannelBindings.end() || it->midiChannel < 0 || it->midiChannel >= 128) {
                 return;
               }
               SequencePlayer::the().setChannelVolume(static_cast<uint8_t>(it->midiChannel),
@@ -272,14 +272,14 @@ VGMFileView::VGMFileView(VGMFile* vgmfile)
             });
 
     connect(m_sequenceControlBar,
-            &SequenceControlBar::stripMuteChanged,
+            &SequenceControlBar::chanMuteChanged,
             this,
-            [this](int stripId, bool muted) { setSequenceControlStripMuted(stripId, muted); });
+            [this](int channelId, bool muted) { setSequenceControlChannelMuted(channelId, muted); });
 
     connect(m_sequenceControlBar,
-            &SequenceControlBar::stripSoloChanged,
+            &SequenceControlBar::chanSoloChanged,
             this,
-            [this](int stripId, bool solo) { setSequenceControlStripSolo(stripId, solo); });
+            [this](int channelId, bool solo) { setSequenceControlChannelSolo(channelId, solo); });
   }
 
   rootLayout->addWidget(m_splitter, 1);
@@ -453,7 +453,7 @@ bool VGMFileView::ensurePanelViewCreated(PanelSide side, PanelViewKind viewKind)
         const int trackCount = effectiveTrackCountForSeq(seq);
         panelUi.pianoRollView->setTrackCount(trackCount);
         panelUi.pianoRollView->setSequence(seq);
-        panelUi.pianoRollView->setTrackEnabledMask(m_sequenceTrackEnabledMask);
+        panelUi.pianoRollView->setTrackEnabledMask(sequenceChannelEnabledMask());
       }
 
       connect(panelUi.pianoRollView,
@@ -680,13 +680,10 @@ void VGMFileView::setSequenceControlBarVisible(bool visible) {
   }
 
   // Ensure fresh control structure/state when turning the bar back on.
-  m_sequenceControlStripCount = -1;
+  m_sequenceControlChannelCount = -1;
   if (sequenceControlBarVisible()) {
     rebuildSequenceControlBarIfNeeded();
     updateSequenceControlValuesFromPlayback();
-  }
-  if (m_isSeqFile) {
-    refreshSequenceTrackEnabledState();
   }
 }
 
@@ -1036,11 +1033,11 @@ bool VGMFileView::prepareSeqEventForPlayback(SeqEvent* event, uint32_t& tick) co
 }
 
 bool VGMFileView::ensureAssociatedCollectionActive() const {
-  if (m_vgmfile->assocColls.empty()) {
+  const VGMColl* assocColl = associatedCollection();
+  if (!assocColl) {
     return true;
   }
 
-  auto* assocColl = m_vgmfile->assocColls.front();
   auto& seqPlayer = SequencePlayer::the();
   if (seqPlayer.activeCollection() != assocColl) {
     seqPlayer.setActiveCollection(assocColl);
@@ -1221,6 +1218,13 @@ void VGMFileView::clearPlaybackVisuals() {
   }
 }
 
+const VGMColl* VGMFileView::associatedCollection() const {
+  if (m_vgmfile->assocColls.empty()) {
+    return nullptr;
+  }
+  return m_vgmfile->assocColls.front();
+}
+
 void VGMFileView::ensureTrackIndexMap(VGMSeq* seq) {
   if (!seq) {
     m_trackIndexSeq = nullptr;
@@ -1310,12 +1314,12 @@ void VGMFileView::rebuildSequenceControlBarIfNeeded() {
   }
 
   const bool usesTrackLayout = !seq->aTracks.empty();
-  int stripCount = usesTrackLayout ? static_cast<int>(seq->aTracks.size()) : effectiveTrackCountForSeq(seq);
-  stripCount = std::clamp(stripCount, 1, 128);
+  int channelCount = usesTrackLayout ? static_cast<int>(seq->aTracks.size()) : effectiveTrackCountForSeq(seq);
+  channelCount = std::clamp(channelCount, 1, 128);
 
-  if (m_sequenceControlStripCount == stripCount &&
+  if (m_sequenceControlChannelCount == channelCount &&
       m_sequenceControlUsesTrackLayout == usesTrackLayout &&
-      static_cast<int>(m_sequenceStripBindings.size()) == stripCount) {
+      static_cast<int>(m_sequenceChannelBindings.size()) == channelCount) {
     return;
   }
 
@@ -1328,15 +1332,15 @@ void VGMFileView::rebuildSequenceControlBar(VGMSeq* seq) {
   }
 
   const bool usesTrackLayout = !seq->aTracks.empty();
-  int stripCount = usesTrackLayout ? static_cast<int>(seq->aTracks.size()) : effectiveTrackCountForSeq(seq);
-  stripCount = std::clamp(stripCount, 1, 128);
+  int channelCount = usesTrackLayout ? static_cast<int>(seq->aTracks.size()) : effectiveTrackCountForSeq(seq);
+  channelCount = std::clamp(channelCount, 1, 128);
 
   ensureTrackIndexMap(seq);
 
-  std::vector<int> panByStrip(static_cast<size_t>(stripCount), 64);
-  std::vector<int> volumeByStrip(static_cast<size_t>(stripCount), 100);
-  std::vector<uint32_t> firstPanTick(static_cast<size_t>(stripCount), std::numeric_limits<uint32_t>::max());
-  std::vector<uint32_t> firstVolTick(static_cast<size_t>(stripCount), std::numeric_limits<uint32_t>::max());
+  std::vector<int> panByChannel(static_cast<size_t>(channelCount), 64);
+  std::vector<int> volumeByChannel(static_cast<size_t>(channelCount), 100);
+  std::vector<uint32_t> firstPanTick(static_cast<size_t>(channelCount), std::numeric_limits<uint32_t>::max());
+  std::vector<uint32_t> firstVolTick(static_cast<size_t>(channelCount), std::numeric_limits<uint32_t>::max());
 
   double tempoBpm = 120.0;
   if (seq->tempoBPM > 0.0) {
@@ -1363,19 +1367,19 @@ void VGMFileView::rebuildSequenceControlBar(VGMSeq* seq) {
         }
       }
 
-      const int stripIndex = usesTrackLayout ? trackIndexForEvent(event) : static_cast<int>(event->channel);
-      if (stripIndex < 0 || stripIndex >= stripCount) {
+      const int channelIndex = usesTrackLayout ? trackIndexForEvent(event) : static_cast<int>(event->channel);
+      if (channelIndex < 0 || channelIndex >= channelCount) {
         continue;
       }
 
       if (auto* panEvent = dynamic_cast<const PanSeqEvent*>(event)) {
-        if (timed.startTick <= firstPanTick[static_cast<size_t>(stripIndex)]) {
-          firstPanTick[static_cast<size_t>(stripIndex)] = timed.startTick;
-          panByStrip[static_cast<size_t>(stripIndex)] = static_cast<int>(panEvent->pan);
+        if (timed.startTick <= firstPanTick[static_cast<size_t>(channelIndex)]) {
+          firstPanTick[static_cast<size_t>(channelIndex)] = timed.startTick;
+          panByChannel[static_cast<size_t>(channelIndex)] = static_cast<int>(panEvent->pan);
         }
       } else if (auto* volEvent = dynamic_cast<const VolSeqEvent*>(event)) {
-        if (timed.startTick <= firstVolTick[static_cast<size_t>(stripIndex)]) {
-          firstVolTick[static_cast<size_t>(stripIndex)] = timed.startTick;
+        if (timed.startTick <= firstVolTick[static_cast<size_t>(channelIndex)]) {
+          firstVolTick[static_cast<size_t>(channelIndex)] = timed.startTick;
 
           int volume = -1;
           if (volEvent->vol <= 127) {
@@ -1385,49 +1389,48 @@ void VGMFileView::rebuildSequenceControlBar(VGMSeq* seq) {
           }
 
           if (volume >= 0) {
-            volumeByStrip[static_cast<size_t>(stripIndex)] = std::clamp(volume, 0, 127);
+            volumeByChannel[static_cast<size_t>(channelIndex)] = std::clamp(volume, 0, 127);
           }
         }
       }
     }
   }
 
-  std::vector<SequenceControlBar::StripConfig> strips;
-  strips.reserve(static_cast<size_t>(stripCount));
-  m_sequenceStripBindings.clear();
-  m_sequenceStripBindings.reserve(static_cast<size_t>(stripCount));
+  std::vector<SequenceControlBar::ChannelConfig> channels;
+  channels.reserve(static_cast<size_t>(channelCount));
+  m_sequenceChannelBindings.clear();
+  m_sequenceChannelBindings.reserve(static_cast<size_t>(channelCount));
 
-  for (int stripIndex = 0; stripIndex < stripCount; ++stripIndex) {
-    int midiChannel = usesTrackLayout ? previewMidiChannelForTrack(seq, stripIndex) : stripIndex;
+  for (int channelIndex = 0; channelIndex < channelCount; ++channelIndex) {
+    int midiChannel = usesTrackLayout ? previewMidiChannelForTrack(seq, channelIndex) : channelIndex;
     if (midiChannel < 0 || midiChannel >= 128) {
       midiChannel = -1;
     }
 
-    SequenceControlBar::StripConfig stripConfig;
-    stripConfig.id = stripIndex;
-    stripConfig.midiChannel = midiChannel;
-    stripConfig.title = usesTrackLayout
-                            ? QStringLiteral("TRK %1").arg(stripIndex + 1, 2, 10, QLatin1Char('0'))
-                            : QStringLiteral("CH %1").arg(stripIndex + 1, 2, 10, QLatin1Char('0'));
-    stripConfig.subtitle = midiChannel >= 0
+    SequenceControlBar::ChannelConfig channelConfig;
+    channelConfig.id = channelIndex;
+    channelConfig.midiChannel = midiChannel;
+    channelConfig.title = usesTrackLayout
+                            ? QStringLiteral("TRK %1").arg(channelIndex + 1, 2, 10, QLatin1Char('0'))
+                            : QStringLiteral("CH %1").arg(channelIndex + 1, 2, 10, QLatin1Char('0'));
+    channelConfig.subtitle = midiChannel >= 0
                                ? QStringLiteral("MIDI %1").arg(midiChannel + 1)
                                : QStringLiteral("MIDI --");
-    stripConfig.borderColor = mixerTrackColor(stripIndex);
-    stripConfig.pan = panByStrip[static_cast<size_t>(stripIndex)];
-    stripConfig.volume = volumeByStrip[static_cast<size_t>(stripIndex)];
+    channelConfig.borderColor = mixerTrackColor(channelIndex);
+    channelConfig.pan = panByChannel[static_cast<size_t>(channelIndex)];
+    channelConfig.volume = volumeByChannel[static_cast<size_t>(channelIndex)];
 
-    strips.push_back(stripConfig);
-    m_sequenceStripBindings.push_back(SequenceStripBinding{stripIndex, midiChannel});
+    channels.push_back(channelConfig);
+    m_sequenceChannelBindings.push_back(SequenceChannelBinding{channelIndex, midiChannel});
   }
 
   m_sequenceControlUsesTrackLayout = usesTrackLayout;
-  m_sequenceControlStripCount = stripCount;
+  m_sequenceControlChannelCount = channelCount;
 
   m_updatingSequenceControls = true;
-  m_sequenceControlBar->setStrips(strips);
+  m_sequenceControlBar->setChannels(channels);
   m_sequenceControlBar->setTempoBpm(tempoBpm);
   m_updatingSequenceControls = false;
-  refreshSequenceTrackEnabledState();
 }
 
 void VGMFileView::updateSequenceControlValuesFromPlayback() {
@@ -1435,68 +1438,45 @@ void VGMFileView::updateSequenceControlValuesFromPlayback() {
     return;
   }
 
-  const auto* activeColl = SequencePlayer::the().activeCollection();
-  if (!activeColl || !activeColl->containsVGMFile(m_vgmfile)) {
-    return;
-  }
-
   auto& player = SequencePlayer::the();
+  const VGMColl* assocColl = associatedCollection();
+  const auto* activeColl = player.activeCollection();
+  const bool collectionActive = activeColl && activeColl->containsVGMFile(m_vgmfile);
+
   m_updatingSequenceControls = true;
-  m_sequenceControlBar->setTempoBpm(player.currentTempoBpm());
-  for (const auto& binding : m_sequenceStripBindings) {
-    if (binding.midiChannel < 0 || binding.midiChannel >= 128) {
+  if (collectionActive) {
+    m_sequenceControlBar->setTempoBpm(player.currentTempoBpm());
+  }
+  for (const auto& binding : m_sequenceChannelBindings) {
+    if (binding.channelId < 0) {
       continue;
     }
+    m_sequenceControlBar->setChannelMuted(binding.channelId,
+                                          player.channelMuted(assocColl, binding.channelId));
+    m_sequenceControlBar->setChannelSolo(binding.channelId,
+                                         player.channelSolo(assocColl, binding.channelId));
+
+    if (!collectionActive || binding.midiChannel < 0 || binding.midiChannel >= 128) {
+      continue;
+    }
+
     const auto channel = static_cast<uint8_t>(binding.midiChannel);
-    m_sequenceControlBar->setStripPan(binding.stripId, player.currentChannelPan(channel));
-    m_sequenceControlBar->setStripVolume(binding.stripId, player.currentChannelVolume(channel));
+    m_sequenceControlBar->setChannelPan(binding.channelId, player.currentChannelPan(channel));
+    m_sequenceControlBar->setChannelVolume(binding.channelId, player.currentChannelVolume(channel));
   }
   m_updatingSequenceControls = false;
+  applySequenceChannelEnabledStateToViews(sequenceChannelEnabledMask());
 }
 
-void VGMFileView::refreshSequenceTrackEnabledState() {
-  size_t maskSize = 0;
-  for (const auto& binding : m_sequenceStripBindings) {
-    if (binding.stripId < 0) {
-      continue;
-    }
-    maskSize = std::max(maskSize, static_cast<size_t>(binding.stripId + 1));
-  }
-
-  std::vector<uint8_t> nextMask(maskSize, static_cast<uint8_t>(1));
-  if (m_sequenceControlBar && !m_updatingSequenceControls) {
-    bool anySolo = false;
-    for (const auto& binding : m_sequenceStripBindings) {
-      if (binding.stripId >= 0 && m_sequenceControlBar->stripSolo(binding.stripId)) {
-        anySolo = true;
-        break;
-      }
-    }
-
-    for (const auto& binding : m_sequenceStripBindings) {
-      if (binding.stripId < 0 || static_cast<size_t>(binding.stripId) >= nextMask.size()) {
-        continue;
-      }
-
-      const bool muted = m_sequenceControlBar->stripMuted(binding.stripId);
-      const bool soloed = m_sequenceControlBar->stripSolo(binding.stripId);
-      nextMask[static_cast<size_t>(binding.stripId)] =
-          static_cast<uint8_t>((!muted && (!anySolo || soloed)) ? 1 : 0);
-    }
-  }
-
-  if (nextMask == m_sequenceTrackEnabledMask) {
-    return;
-  }
-
-  m_sequenceTrackEnabledMask = std::move(nextMask);
-  applySequenceTrackEnabledStateToViews();
+std::vector<uint8_t> VGMFileView::sequenceChannelEnabledMask() const {
+  const int channelCount = static_cast<int>(m_sequenceChannelBindings.size());
+  return SequencePlayer::the().channelEnabledMask(associatedCollection(), channelCount);
 }
 
-void VGMFileView::applySequenceTrackEnabledStateToViews() const {
+void VGMFileView::applySequenceChannelEnabledStateToViews(const std::vector<uint8_t>& enabledMask) const {
   for (PanelSide side : {PanelSide::Left, PanelSide::Right}) {
     if (auto* piano = panel(side).pianoRollView) {
-      piano->setTrackEnabledMask(m_sequenceTrackEnabledMask);
+      piano->setTrackEnabledMask(enabledMask);
     }
   }
 }
@@ -1506,7 +1486,8 @@ void VGMFileView::applySequenceAudibilityState() {
     return;
   }
 
-  refreshSequenceTrackEnabledState();
+  const std::vector<uint8_t> enabledMask = sequenceChannelEnabledMask();
+  applySequenceChannelEnabledStateToViews(enabledMask);
 
   if (!ensureAssociatedCollectionActive()) {
     return;
@@ -1518,16 +1499,16 @@ void VGMFileView::applySequenceAudibilityState() {
   }
 
   std::unordered_map<int, bool> channelAudibility;
-  channelAudibility.reserve(m_sequenceStripBindings.size() * 2 + 1);
+  channelAudibility.reserve(m_sequenceChannelBindings.size() * 2 + 1);
 
-  for (const auto& binding : m_sequenceStripBindings) {
+  for (const auto& binding : m_sequenceChannelBindings) {
     if (binding.midiChannel < 0 || binding.midiChannel >= 128) {
       continue;
     }
 
     bool audible = true;
-    if (binding.stripId >= 0 && static_cast<size_t>(binding.stripId) < m_sequenceTrackEnabledMask.size()) {
-      audible = m_sequenceTrackEnabledMask[static_cast<size_t>(binding.stripId)] != 0;
+    if (binding.channelId >= 0 && static_cast<size_t>(binding.channelId) < enabledMask.size()) {
+      audible = enabledMask[static_cast<size_t>(binding.channelId)] != 0;
     }
 
     auto [it, inserted] = channelAudibility.emplace(binding.midiChannel, audible);
@@ -1543,15 +1524,21 @@ void VGMFileView::applySequenceAudibilityState() {
   }
 }
 
-void VGMFileView::setSequenceControlStripMuted(int stripId, bool muted) {
-  Q_UNUSED(stripId);
-  Q_UNUSED(muted);
+void VGMFileView::setSequenceControlChannelMuted(int channelId, bool muted) {
+  const VGMColl* assocColl = associatedCollection();
+  if (assocColl && channelId >= 0) {
+    const int channelCount = static_cast<int>(m_sequenceChannelBindings.size());
+    SequencePlayer::the().setChannelMuted(assocColl, channelId, muted, channelCount);
+  }
   applySequenceAudibilityState();
 }
 
-void VGMFileView::setSequenceControlStripSolo(int stripId, bool solo) {
-  Q_UNUSED(stripId);
-  Q_UNUSED(solo);
+void VGMFileView::setSequenceControlChannelSolo(int channelId, bool solo) {
+  const VGMColl* assocColl = associatedCollection();
+  if (assocColl && channelId >= 0) {
+    const int channelCount = static_cast<int>(m_sequenceChannelBindings.size());
+    SequencePlayer::the().setChannelSolo(assocColl, channelId, solo, channelCount);
+  }
   applySequenceAudibilityState();
 }
 
