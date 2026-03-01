@@ -280,6 +280,14 @@ void PianoRollView::clearPlaybackState() {
   requestRender();
 }
 
+void PianoRollView::setContextPlaceholderEnabled(bool enabled) {
+  m_contextPlaceholderEnabled = enabled;
+}
+
+bool PianoRollView::contextPlaceholderEnabled() const {
+  return m_contextPlaceholderEnabled;
+}
+
 PianoRollFrame::Data PianoRollView::captureRhiFrameData(float dpr) const {
   PianoRollFrame::Data frame;
   frame.viewportSize = viewport()->size();

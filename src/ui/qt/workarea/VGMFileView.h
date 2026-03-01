@@ -22,6 +22,7 @@ class QStackedWidget;
 class QWidget;
 class QSplitter;
 class QPoint;
+class QMenu;
 class QObject;
 class QEvent;
 class QResizeEvent;
@@ -66,6 +67,7 @@ public:
   [[nodiscard]] bool sequenceControlBarVisible() const;
   [[nodiscard]] bool supportsViewKind(PanelViewKind viewKind) const;
   [[nodiscard]] bool supportsSequenceViews() const;
+  bool appendPaneSpecificContextActions(PanelSide side, QMenu& menu);
 
 private:
   struct PanelUi {
