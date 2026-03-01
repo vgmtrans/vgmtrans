@@ -673,15 +673,15 @@ bool VGMFileView::appendPaneSpecificContextActions(PanelSide side, QMenu& menu) 
   }
 
   QPointer<PianoRollView> view = panelUi.pianoRollView;
-  QAction* placeholder = menu.addAction(tr("Piano Roll Placeholder Option"));
-  placeholder->setCheckable(true);
-  placeholder->setChecked(view && view->contextPlaceholderEnabled());
-  connect(placeholder,
+  QAction* smoothAutoScroll = menu.addAction(tr("Smooth Auto Scroll"));
+  smoothAutoScroll->setCheckable(true);
+  smoothAutoScroll->setChecked(!view || view->smoothAutoScrollEnabled());
+  connect(smoothAutoScroll,
           &QAction::toggled,
           &menu,
           [view](bool enabled) {
             if (view) {
-              view->setContextPlaceholderEnabled(enabled);
+              view->setSmoothAutoScrollEnabled(enabled);
             }
           });
   return true;

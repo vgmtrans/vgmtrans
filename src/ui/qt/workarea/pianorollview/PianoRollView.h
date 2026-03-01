@@ -62,8 +62,8 @@ public:
 
   void setPlaybackTick(int tick, bool playbackActive);
   void clearPlaybackState();
-  void setContextPlaceholderEnabled(bool enabled);
-  [[nodiscard]] bool contextPlaceholderEnabled() const;
+  void setSmoothAutoScrollEnabled(bool enabled);
+  [[nodiscard]] bool smoothAutoScrollEnabled() const;
 
   PianoRollFrame::Data captureRhiFrameData(float dpr) const;
 
@@ -211,7 +211,7 @@ private:
   bool m_noteSelectionPressActive = false;
   bool m_noteSelectionDragging = false;
   bool m_attemptedTimelineBuild = false;
-  bool m_contextPlaceholderEnabled = false;
+  bool m_smoothAutoScrollEnabled = true;
   bool m_playbackAutoScrollEnabled = true;
   bool m_applyingPlaybackAutoScroll = false;
   bool m_applyingHorizontalZoomScroll = false;
