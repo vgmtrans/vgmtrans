@@ -55,6 +55,7 @@ public:
 
   void setSequence(VGMSeq* seq);
   void setTrackCount(int trackCount);
+  void setTrackEnabledMask(std::vector<uint8_t> trackEnabledMask);
   void refreshSequenceData(bool allowTimelineBuild);
   void setSelectedItems(const std::vector<const VGMItem*>& items,
                         const VGMItem* primaryItem = nullptr);
@@ -127,6 +128,8 @@ private:
   int trackIndexForTrack(const SeqTrack* track) const;
   // Resolves a visual track index for timed events, including no-track/channel-only sequences.
   int trackIndexForEvent(const class SeqEvent* event) const;
+  [[nodiscard]] bool isTrackEnabled(int trackIndex) const;
+  void resizeTrackEnabledMaskToTrackCount();
   void rebuildTrackColors();
   void rebuildSequenceCache();
   bool updateActiveKeyStates();
@@ -234,6 +237,7 @@ private:
   std::unordered_map<const SeqTrack*, int> m_trackIndexByPtr;
   // Fallback map for multi-section sequences that swap SeqTrack objects.
   std::unordered_map<const MidiTrack*, int> m_trackIndexByMidiPtr;
+  std::vector<uint8_t> m_trackEnabledMask;
   std::vector<QColor> m_trackColors;
 
   std::shared_ptr<const std::vector<PianoRollFrame::Note>> m_notes;
