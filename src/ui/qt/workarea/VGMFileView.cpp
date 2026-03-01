@@ -1601,6 +1601,7 @@ void VGMFileView::onPlaybackPositionChanged(int current, int max, PositionChange
   }
 
   const bool playbackActive = current > 0;
+  const bool playbackRunning = SequencePlayer::the().playing();
   m_playbackVisualsActive = true;
   m_playbackTickActive = playbackActive;
   for (PanelSide side : {PanelSide::Left, PanelSide::Right}) {
@@ -1737,7 +1738,7 @@ void VGMFileView::onPlaybackPositionChanged(int current, int max, PositionChange
       panelUi.pianoRollView->setTrackCount(effectiveTrackCount);
       panelUi.pianoRollView->setSequence(seq);
       panelUi.pianoRollView->refreshSequenceData(false);
-      panelUi.pianoRollView->setPlaybackTick(current, playbackActive);
+      panelUi.pianoRollView->setPlaybackTick(current, playbackRunning);
     }
   }
 }
@@ -1751,6 +1752,13 @@ void VGMFileView::onPlayerStatusChanged(bool playing) {
   const auto* activeColl = SequencePlayer::the().activeCollection();
   if (activeColl && activeColl->containsVGMFile(m_vgmfile)) {
     applySequenceAudibilityState();
+
+    const int playbackTick = std::max(0, SequencePlayer::the().elapsedTicks());
+    for (PanelSide side : {PanelSide::Left, PanelSide::Right}) {
+      if (auto* piano = panel(side).pianoRollView) {
+        piano->setPlaybackTick(playbackTick, playing);
+      }
+    }
   }
 
   if (playing) {
