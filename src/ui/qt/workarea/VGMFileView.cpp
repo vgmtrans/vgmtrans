@@ -8,7 +8,9 @@
 #include <QContextMenuEvent>
 #include <QColor>
 #include <QEvent>
+#include <QMenu>
 #include <QMouseEvent>
+#include <QPointer>
 #include <QShortcut>
 #include <QSplitter>
 #include <QSplitterHandle>
@@ -662,6 +664,27 @@ bool VGMFileView::supportsViewKind(PanelViewKind viewKind) const {
 // True when sequence-only panes (Active Notes / Piano Roll) are available.
 bool VGMFileView::supportsSequenceViews() const {
   return m_isSeqFile;
+}
+
+bool VGMFileView::appendPaneSpecificContextActions(PanelSide side, QMenu& menu) {
+  auto& panelUi = panel(side);
+  if (panelUi.currentKind != PanelViewKind::PianoRoll || !panelUi.pianoRollView) {
+    return false;
+  }
+
+  QPointer<PianoRollView> view = panelUi.pianoRollView;
+  QAction* placeholder = menu.addAction(tr("Piano Roll Placeholder Option"));
+  placeholder->setCheckable(true);
+  placeholder->setChecked(view && view->contextPlaceholderEnabled());
+  connect(placeholder,
+          &QAction::toggled,
+          &menu,
+          [view](bool enabled) {
+            if (view) {
+              view->setContextPlaceholderEnabled(enabled);
+            }
+          });
+  return true;
 }
 
 void VGMFileView::setSequenceControlBarVisible(bool visible) {

@@ -557,7 +557,6 @@ void MdiArea::setupTabBarControls() {
         actions.hidden->setCheckable(true);
         group->addAction(actions.hidden);
         connect(actions.hidden, &QAction::triggered, this, [this]() { setRightPaneHidden(true); });
-        menu->addSeparator();
       }
 
       addAction(PanelViewKind::Hex, tr("Hex"), actions.hex);
@@ -930,7 +929,13 @@ void MdiArea::showPaneViewMenu(VGMFileView* fileView, PanelSide side, const QPoi
     return;
   }
 
-  button->menu()->exec(globalPos);
+  QMenu contextMenu;
+  const bool hasSpecificActions = fileView->appendPaneSpecificContextActions(side, contextMenu);
+  if (hasSpecificActions && !button->menu()->actions().isEmpty()) {
+    contextMenu.addSeparator();
+  }
+  contextMenu.addActions(button->menu()->actions());
+  contextMenu.exec(globalPos);
 }
 
 void MdiArea::onSubWindowActivated(QMdiSubWindow *window) {

@@ -62,6 +62,8 @@ public:
 
   void setPlaybackTick(int tick, bool playbackActive);
   void clearPlaybackState();
+  void setContextPlaceholderEnabled(bool enabled);
+  [[nodiscard]] bool contextPlaceholderEnabled() const;
 
   PianoRollFrame::Data captureRhiFrameData(float dpr) const;
 
@@ -205,6 +207,7 @@ private:
   bool m_noteSelectionPressActive = false;
   bool m_noteSelectionDragging = false;
   bool m_attemptedTimelineBuild = false;
+  bool m_contextPlaceholderEnabled = false;
   // We wait for the initial paint event to fire to stop centering scrollbar on resize
   bool m_initialPaintEvent = false;
   bool m_coalescedRenderPending = false;
