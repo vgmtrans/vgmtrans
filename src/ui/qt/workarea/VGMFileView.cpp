@@ -1833,7 +1833,6 @@ void VGMFileView::onPlaybackPositionChanged(int current, int max, PositionChange
   m_playbackCursor->getActiveAt(current, m_activeTimedEvents);
 
   ensureTrackIndexMap(seq);
-  const int effectiveTrackCount = effectiveTrackCountForSeq(seq);
   std::vector<ActiveNoteView::ActiveKey> activeKeys;
   std::vector<PianoRollFrame::Note> activeNotes;
   activeKeys.reserve(m_activeTimedEvents.size());
@@ -1868,13 +1867,9 @@ void VGMFileView::onPlaybackPositionChanged(int current, int max, PositionChange
       continue;
     }
     if (panelUi.activeNoteView && panelUi.activeNoteView->isVisible()) {
-      panelUi.activeNoteView->setTrackCount(effectiveTrackCount);
       panelUi.activeNoteView->setActiveNotes(activeKeys, playbackActive);
     }
     if (panelUi.pianoRollView && panelUi.pianoRollView->isVisible()) {
-      panelUi.pianoRollView->setTrackCount(effectiveTrackCount);
-      panelUi.pianoRollView->setSequence(seq);
-      panelUi.pianoRollView->refreshSequenceData(false);
       panelUi.pianoRollView->setPlaybackTick(current, playbackRunning, &activeNotes);
     }
   }
