@@ -290,7 +290,7 @@ void PianoRollView::setPlaybackTick(int tick, bool playbackActive) {
     m_playbackAutoScrollEnabled = true;
     m_waitForWheelScrollBegin = true;
     if (!isPlaybackTickVisible(tick)) {
-      scrollPlaybackTickToViewportFraction(tick, kPlaybackPageTargetFraction, false);
+      scrollPlaybackTickToViewportFraction(tick, kPlaybackPageTargetFraction, m_smoothAutoScrollEnabled);
     }
   }
 
@@ -300,7 +300,7 @@ void PianoRollView::setPlaybackTick(int tick, bool playbackActive) {
       const int triggerX = static_cast<int>(std::lround(
           static_cast<float>(noteViewportWidth) * kPlaybackPageTriggerFraction));
       if (scanlinePixelX(tick) >= triggerX) {
-        scrollPlaybackTickToViewportFraction(tick, kPlaybackPageTargetFraction);
+        scrollPlaybackTickToViewportFraction(tick, kPlaybackPageTargetFraction, m_smoothAutoScrollEnabled);
       }
     }
   }
@@ -326,12 +326,19 @@ void PianoRollView::clearPlaybackState() {
   requestRender();
 }
 
-void PianoRollView::setContextPlaceholderEnabled(bool enabled) {
-  m_contextPlaceholderEnabled = enabled;
+void PianoRollView::setSmoothAutoScrollEnabled(bool enabled) {
+  if (m_smoothAutoScrollEnabled == enabled) {
+    return;
+  }
+
+  m_smoothAutoScrollEnabled = enabled;
+  if (!m_smoothAutoScrollEnabled) {
+    stopPlaybackAutoScrollAnimation();
+  }
 }
 
-bool PianoRollView::contextPlaceholderEnabled() const {
-  return m_contextPlaceholderEnabled;
+bool PianoRollView::smoothAutoScrollEnabled() const {
+  return m_smoothAutoScrollEnabled;
 }
 
 PianoRollFrame::Data PianoRollView::captureRhiFrameData(float dpr) const {
