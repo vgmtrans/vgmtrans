@@ -103,6 +103,28 @@ private:
     VGMItem* item = nullptr;
   };
 
+  struct FrameColors {
+    QColor backgroundColor;
+    QColor noteBackgroundColor;
+    QColor keyboardBackgroundColor;
+    QColor topBarBackgroundColor;
+    QColor topBarProgressColor;
+    QColor measureLineColor;
+    QColor beatLineColor;
+    QColor keySeparatorColor;
+    QColor noteOutlineColor;
+    QColor scanLineColor;
+    QColor whiteKeyColor;
+    QColor blackKeyColor;
+    QColor whiteKeyRowColor;
+    QColor blackKeyRowColor;
+    QColor dividerColor;
+    QColor selectedNoteFillColor;
+    QColor selectedNoteOutlineColor;
+    QColor selectionRectFillColor;
+    QColor selectionRectOutlineColor;
+  };
+
   static constexpr int kMidiKeyCount = PianoRollFrame::kMidiKeyCount;
   static constexpr int kKeyboardWidth = 78;
   static constexpr int kTopBarHeight = 22;
@@ -136,6 +158,7 @@ private:
   [[nodiscard]] bool isTrackEnabled(int trackIndex) const;
   void resizeTrackEnabledMaskToTrackCount();
   void rebuildTrackColors();
+  void rebuildFrameColors();
   void rebuildSequenceCache();
   bool applyResolvedActiveNotes(const std::vector<PianoRollFrame::Note>& resolvedActiveNotes);
   bool updateActiveKeyStates();
@@ -257,6 +280,9 @@ private:
   std::unordered_map<const MidiTrack*, int> m_trackIndexByMidiPtr;
   std::vector<uint8_t> m_trackEnabledMask;
   std::vector<QColor> m_trackColors;
+  std::shared_ptr<const std::vector<uint8_t>> m_trackEnabledMaskSnapshot;
+  std::shared_ptr<const std::vector<QColor>> m_trackColorsSnapshot;
+  FrameColors m_frameColors;
 
   std::shared_ptr<const std::vector<PianoRollFrame::Note>> m_notes;
   std::shared_ptr<const std::vector<PianoRollFrame::Note>> m_activeNotes;
