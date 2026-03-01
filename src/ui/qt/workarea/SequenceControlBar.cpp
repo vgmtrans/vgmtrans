@@ -39,11 +39,11 @@
 
 namespace {
 constexpr int kBarHeight = (Size::VTab * 3) / 2;
-constexpr int kStripWidth = 60;
-constexpr int kStripHeight = kBarHeight;
+constexpr int kBlockWidth = 60;
+constexpr int kBlockHeight = kBarHeight;
 constexpr int kScrollButtonWidth = 22;
 constexpr int kKnobSize = 20;
-constexpr int kScrollStepPixels = kStripWidth;
+constexpr int kScrollStepPixels = kBlockWidth;
 constexpr int kTempoControlWidth = 78;
 constexpr int kDefaultTempoBpm = 120;
 constexpr int kMinTempoBpm = 20;
@@ -97,17 +97,17 @@ QColor sequenceControlBarBackgroundColor(const QWidget* context) {
   return color;
 }
 
-class StripScrollButton final : public QToolButton {
+class BlockScrollButton final : public QToolButton {
 public:
   enum class Direction { Left, Right };
 
-  explicit StripScrollButton(Direction direction, QWidget* parent = nullptr)
+  explicit BlockScrollButton(Direction direction, QWidget* parent = nullptr)
       : QToolButton(parent), m_direction(direction) {
-    setObjectName(QStringLiteral("StripScrollButton"));
+    setObjectName(QStringLiteral("BlockScrollButton"));
     setAutoRaise(true);
     setFocusPolicy(Qt::NoFocus);
     setCursor(Qt::PointingHandCursor);
-    setFixedSize(kScrollButtonWidth, kStripHeight);
+    setFixedSize(kScrollButtonWidth, kBlockHeight);
   }
 
 protected:
@@ -302,7 +302,7 @@ private:
 
 }  // namespace
 
-struct SequenceControlBar::StripWidgets {
+struct SequenceControlBar::BlockWidgets {
   int id = -1;
   int midiChannel = -1;
   QColor borderColor;
@@ -327,7 +327,7 @@ SequenceControlBar::SequenceControlBar(QWidget* parent)
   tempoFrame->setObjectName(QStringLiteral("TempoBlock"));
   tempoFrame->setFrameShape(QFrame::NoFrame);
   tempoFrame->setFixedWidth(kTempoControlWidth);
-  tempoFrame->setFixedHeight(kStripHeight);
+  tempoFrame->setFixedHeight(kBlockHeight);
 
   auto* tempoLayout = new QVBoxLayout(tempoFrame);
   tempoLayout->setContentsMargins(8, 5, 4, 0);
@@ -370,38 +370,38 @@ SequenceControlBar::SequenceControlBar(QWidget* parent)
 
   rootLayout->addWidget(tempoFrame, 0);
 
-  m_stripScroll = new QScrollArea(this);
-  m_stripScroll->setObjectName(QStringLiteral("StripScroll"));
-  m_stripScroll->setWidgetResizable(true);
-  m_stripScroll->setFrameShape(QFrame::NoFrame);
-  m_stripScroll->setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
-  m_stripScroll->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
-  m_stripScroll->viewport()->setObjectName(QStringLiteral("StripViewport"));
-  m_stripScroll->viewport()->setAutoFillBackground(false);
+  m_blockScroll = new QScrollArea(this);
+  m_blockScroll->setObjectName(QStringLiteral("BlockScroll"));
+  m_blockScroll->setWidgetResizable(true);
+  m_blockScroll->setFrameShape(QFrame::NoFrame);
+  m_blockScroll->setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+  m_blockScroll->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+  m_blockScroll->viewport()->setObjectName(QStringLiteral("BlockViewport"));
+  m_blockScroll->viewport()->setAutoFillBackground(false);
 
-  m_stripContainer = new QWidget(m_stripScroll);
-  m_stripContainer->setObjectName(QStringLiteral("StripContainer"));
-  m_stripLayout = new QHBoxLayout(m_stripContainer);
-  m_stripLayout->setContentsMargins(0, 0, 0, 0);
-  m_stripLayout->setSpacing(3);
-  m_stripLayout->addStretch(1);
-  m_stripScroll->setWidget(m_stripContainer);
-  m_stripScroll->viewport()->installEventFilter(this);
-  m_stripContainer->installEventFilter(this);
+  m_blockContainer = new QWidget(m_blockScroll);
+  m_blockContainer->setObjectName(QStringLiteral("BlockContainer"));
+  m_blockLayout = new QHBoxLayout(m_blockContainer);
+  m_blockLayout->setContentsMargins(0, 0, 0, 0);
+  m_blockLayout->setSpacing(3);
+  m_blockLayout->addStretch(1);
+  m_blockScroll->setWidget(m_blockContainer);
+  m_blockScroll->viewport()->installEventFilter(this);
+  m_blockContainer->installEventFilter(this);
 
-  rootLayout->addWidget(m_stripScroll, 1);
+  rootLayout->addWidget(m_blockScroll, 1);
 
   m_scrollControls = new QWidget(this);
-  m_scrollControls->setObjectName(QStringLiteral("StripScrollControls"));
-  m_scrollControls->setFixedHeight(kStripHeight);
+  m_scrollControls->setObjectName(QStringLiteral("BlockScrollControls"));
+  m_scrollControls->setFixedHeight(kBlockHeight);
   auto* scrollLayout = new QHBoxLayout(m_scrollControls);
   scrollLayout->setContentsMargins(0, 0, 0, 0);
   scrollLayout->setSpacing(0);
 
-  m_scrollLeft = new StripScrollButton(StripScrollButton::Direction::Left, m_scrollControls);
+  m_scrollLeft = new BlockScrollButton(BlockScrollButton::Direction::Left, m_scrollControls);
   scrollLayout->addWidget(m_scrollLeft);
 
-  m_scrollRight = new StripScrollButton(StripScrollButton::Direction::Right, m_scrollControls);
+  m_scrollRight = new BlockScrollButton(BlockScrollButton::Direction::Right, m_scrollControls);
   scrollLayout->addWidget(m_scrollRight);
 
   rootLayout->addWidget(m_scrollControls, 0, Qt::AlignTop);
@@ -425,7 +425,7 @@ SequenceControlBar::SequenceControlBar(QWidget* parent)
   connect(m_scrollLeft, &QToolButton::clicked, this, [this]() { scrollBlocks(-kScrollStepPixels); });
   connect(m_scrollRight, &QToolButton::clicked, this, [this]() { scrollBlocks(kScrollStepPixels); });
 
-  connect(m_stripScroll->horizontalScrollBar(),
+  connect(m_blockScroll->horizontalScrollBar(),
           &QScrollBar::valueChanged,
           this,
           [this]() { refreshScrollControls(); });
@@ -470,65 +470,65 @@ void SequenceControlBar::setTempoBpm(double bpm) {
   m_updatingUi = false;
 }
 
-void SequenceControlBar::setStrips(const std::vector<StripConfig>& strips) {
-  rebuildStrips(strips);
-  refreshStripInteractivity();
+void SequenceControlBar::setChannels(const std::vector<ChannelConfig>& channels) {
+  rebuildChannelBlocks(channels);
+  refreshBlockInteractivity();
   refreshScrollControls();
 }
 
-std::vector<int> SequenceControlBar::stripIds() const {
+std::vector<int> SequenceControlBar::channelIds() const {
   std::vector<int> ids;
-  ids.reserve(m_strips.size());
-  for (const auto& strip : m_strips) {
-    ids.push_back(strip->id);
+  ids.reserve(m_blocks.size());
+  for (const auto& block : m_blocks) {
+    ids.push_back(block->id);
   }
   return ids;
 }
 
-void SequenceControlBar::setStripPan(int stripId, int pan) {
-  if (auto* strip = findStrip(stripId); strip && strip->panKnob) {
+void SequenceControlBar::setChannelPan(int channelId, int pan) {
+  if (auto* block = findBlock(channelId); block && block->panKnob) {
     m_updatingUi = true;
-    strip->panKnob->setValue(std::clamp(pan, kMinChannelValue, kMaxChannelValue));
+    block->panKnob->setValue(std::clamp(pan, kMinChannelValue, kMaxChannelValue));
     m_updatingUi = false;
   }
 }
 
-void SequenceControlBar::setStripVolume(int stripId, int volume) {
-  if (auto* strip = findStrip(stripId); strip && strip->volumeKnob) {
+void SequenceControlBar::setChannelVolume(int channelId, int volume) {
+  if (auto* block = findBlock(channelId); block && block->volumeKnob) {
     m_updatingUi = true;
-    strip->volumeKnob->setValue(std::clamp(volume, kMinChannelValue, kMaxChannelValue));
+    block->volumeKnob->setValue(std::clamp(volume, kMinChannelValue, kMaxChannelValue));
     m_updatingUi = false;
   }
 }
 
-void SequenceControlBar::setStripMuted(int stripId, bool muted) {
-  if (auto* strip = findStrip(stripId); strip && strip->muteButton) {
+void SequenceControlBar::setChannelMuted(int channelId, bool muted) {
+  if (auto* block = findBlock(channelId); block && block->muteButton) {
     m_updatingUi = true;
-    strip->muteButton->setChecked(muted);
+    block->muteButton->setChecked(muted);
     m_updatingUi = false;
-    refreshStripInteractivity();
+    refreshBlockInteractivity();
   }
 }
 
-void SequenceControlBar::setStripSolo(int stripId, bool solo) {
-  if (auto* strip = findStrip(stripId); strip && strip->soloButton) {
+void SequenceControlBar::setChannelSolo(int channelId, bool solo) {
+  if (auto* block = findBlock(channelId); block && block->soloButton) {
     m_updatingUi = true;
-    strip->soloButton->setChecked(solo);
+    block->soloButton->setChecked(solo);
     m_updatingUi = false;
-    refreshStripInteractivity();
+    refreshBlockInteractivity();
   }
 }
 
-bool SequenceControlBar::stripMuted(int stripId) const {
-  if (const auto* strip = findStrip(stripId); strip && strip->muteButton) {
-    return strip->muteButton->isChecked();
+bool SequenceControlBar::channelMuted(int channelId) const {
+  if (const auto* block = findBlock(channelId); block && block->muteButton) {
+    return block->muteButton->isChecked();
   }
   return false;
 }
 
-bool SequenceControlBar::stripSolo(int stripId) const {
-  if (const auto* strip = findStrip(stripId); strip && strip->soloButton) {
-    return strip->soloButton->isChecked();
+bool SequenceControlBar::channelSolo(int channelId) const {
+  if (const auto* block = findBlock(channelId); block && block->soloButton) {
+    return block->soloButton->isChecked();
   }
   return false;
 }
@@ -576,7 +576,7 @@ bool SequenceControlBar::eventFilter(QObject* watched, QEvent* event) {
     }
   }
 
-  if (watched == m_stripContainer || watched == m_stripScroll->viewport()) {
+  if (watched == m_blockContainer || watched == m_blockScroll->viewport()) {
     switch (event->type()) {
       case QEvent::Resize:
       case QEvent::LayoutRequest:
@@ -591,192 +591,192 @@ bool SequenceControlBar::eventFilter(QObject* watched, QEvent* event) {
   return QWidget::eventFilter(watched, event);
 }
 
-SequenceControlBar::StripWidgets* SequenceControlBar::findStrip(int stripId) {
-  auto it = std::find_if(m_strips.begin(), m_strips.end(), [stripId](const auto& strip) {
-    return strip && strip->id == stripId;
+SequenceControlBar::BlockWidgets* SequenceControlBar::findBlock(int channelId) {
+  auto it = std::find_if(m_blocks.begin(), m_blocks.end(), [channelId](const auto& block) {
+    return block && block->id == channelId;
   });
-  return (it == m_strips.end() || !(*it)) ? nullptr : it->get();
+  return (it == m_blocks.end() || !(*it)) ? nullptr : it->get();
 }
 
-const SequenceControlBar::StripWidgets* SequenceControlBar::findStrip(int stripId) const {
-  auto it = std::find_if(m_strips.begin(), m_strips.end(), [stripId](const auto& strip) {
-    return strip && strip->id == stripId;
+const SequenceControlBar::BlockWidgets* SequenceControlBar::findBlock(int channelId) const {
+  auto it = std::find_if(m_blocks.begin(), m_blocks.end(), [channelId](const auto& block) {
+    return block && block->id == channelId;
   });
-  return (it == m_strips.end() || !(*it)) ? nullptr : it->get();
+  return (it == m_blocks.end() || !(*it)) ? nullptr : it->get();
 }
 
-void SequenceControlBar::rebuildStrips(const std::vector<StripConfig>& strips) {
-  if (!m_stripLayout || !m_stripContainer) {
+void SequenceControlBar::rebuildChannelBlocks(const std::vector<ChannelConfig>& channels) {
+  if (!m_blockLayout || !m_blockContainer) {
     return;
   }
 
   m_updatingUi = true;
 
-  while (QLayoutItem* item = m_stripLayout->takeAt(0)) {
+  while (QLayoutItem* item = m_blockLayout->takeAt(0)) {
     if (QWidget* widget = item->widget()) {
       widget->deleteLater();
     }
     delete item;
   }
 
-  m_strips.clear();
-  m_strips.reserve(strips.size());
+  m_blocks.clear();
+  m_blocks.reserve(channels.size());
 
-  for (const auto& config : strips) {
-    auto strip = std::make_unique<StripWidgets>();
-    strip->id = config.id;
-    strip->midiChannel = config.midiChannel;
-    strip->borderColor = config.borderColor;
+  for (const auto& config : channels) {
+    auto block = std::make_unique<BlockWidgets>();
+    block->id = config.id;
+    block->midiChannel = config.midiChannel;
+    block->borderColor = config.borderColor;
 
-    strip->frame = new QFrame(m_stripContainer);
-    strip->frame->setObjectName(QStringLiteral("MixerStrip"));
-    strip->frame->setProperty("dimmed", false);
-    strip->frame->setProperty("solo", false);
-    strip->frame->setFixedSize(kStripWidth, kStripHeight);
+    block->frame = new QFrame(m_blockContainer);
+    block->frame->setObjectName(QStringLiteral("MixerBlock"));
+    block->frame->setProperty("dimmed", false);
+    block->frame->setProperty("solo", false);
+    block->frame->setFixedSize(kBlockWidth, kBlockHeight);
     if (!config.title.isEmpty()) {
       const QString tooltip =
           config.subtitle.isEmpty() ? config.title : QStringLiteral("%1  (%2)").arg(config.title, config.subtitle);
-      strip->frame->setToolTip(tooltip);
+      block->frame->setToolTip(tooltip);
     }
 
-    auto* stripLayout = new QVBoxLayout(strip->frame);
-    stripLayout->setContentsMargins(0, 0, 0, 0);
-    stripLayout->setSpacing(0);
+    auto* blockLayout = new QVBoxLayout(block->frame);
+    blockLayout->setContentsMargins(0, 0, 0, 0);
+    blockLayout->setSpacing(0);
 
     auto* buttonsLayout = new QHBoxLayout();
     buttonsLayout->setContentsMargins(2, 0, 2, 0);
     buttonsLayout->setSpacing(2);
     buttonsLayout->addStretch(1);
 
-    strip->muteButton = new QToolButton(strip->frame);
-    strip->muteButton->setObjectName(QStringLiteral("StripToggle"));
-    strip->muteButton->setCheckable(true);
-    strip->muteButton->setText(QStringLiteral("M"));
-    strip->muteButton->setFixedSize(22, 17);
-    strip->muteButton->setToolTip(QStringLiteral("Mute"));
-    buttonsLayout->addWidget(strip->muteButton);
+    block->muteButton = new QToolButton(block->frame);
+    block->muteButton->setObjectName(QStringLiteral("BlockToggle"));
+    block->muteButton->setCheckable(true);
+    block->muteButton->setText(QStringLiteral("M"));
+    block->muteButton->setFixedSize(22, 17);
+    block->muteButton->setToolTip(QStringLiteral("Mute"));
+    buttonsLayout->addWidget(block->muteButton);
 
-    strip->soloButton = new QToolButton(strip->frame);
-    strip->soloButton->setObjectName(QStringLiteral("StripToggle"));
-    strip->soloButton->setCheckable(true);
-    strip->soloButton->setText(QStringLiteral("S"));
-    strip->soloButton->setFixedSize(22, 17);
-    strip->soloButton->setToolTip(QStringLiteral("Solo"));
-    buttonsLayout->addWidget(strip->soloButton);
+    block->soloButton = new QToolButton(block->frame);
+    block->soloButton->setObjectName(QStringLiteral("BlockToggle"));
+    block->soloButton->setCheckable(true);
+    block->soloButton->setText(QStringLiteral("S"));
+    block->soloButton->setFixedSize(22, 17);
+    block->soloButton->setToolTip(QStringLiteral("Solo"));
+    buttonsLayout->addWidget(block->soloButton);
 
     buttonsLayout->addStretch(1);
-    stripLayout->addLayout(buttonsLayout);
-    stripLayout->addSpacing(2);
+    blockLayout->addLayout(buttonsLayout);
+    blockLayout->addSpacing(2);
 
     auto* knobRow = new QHBoxLayout();
     knobRow->setContentsMargins(2, 1, 2, 0);
     knobRow->setSpacing(2);
     knobRow->addStretch(1);
-    strip->panKnob = new MixerKnob(strip->frame);
-    strip->panKnob->setBubblePrefix(QStringLiteral("PAN"));
-    strip->panKnob->setValue(std::clamp(config.pan, kMinChannelValue, kMaxChannelValue));
-    knobRow->addWidget(strip->panKnob, 0, Qt::AlignHCenter);
+    block->panKnob = new MixerKnob(block->frame);
+    block->panKnob->setBubblePrefix(QStringLiteral("PAN"));
+    block->panKnob->setValue(std::clamp(config.pan, kMinChannelValue, kMaxChannelValue));
+    knobRow->addWidget(block->panKnob, 0, Qt::AlignHCenter);
 
-    strip->volumeKnob = new MixerKnob(strip->frame);
-    strip->volumeKnob->setBubblePrefix(QStringLiteral("VOL"));
-    strip->volumeKnob->setValue(std::clamp(config.volume, kMinChannelValue, kMaxChannelValue));
-    knobRow->addWidget(strip->volumeKnob, 0, Qt::AlignHCenter);
+    block->volumeKnob = new MixerKnob(block->frame);
+    block->volumeKnob->setBubblePrefix(QStringLiteral("VOL"));
+    block->volumeKnob->setValue(std::clamp(config.volume, kMinChannelValue, kMaxChannelValue));
+    knobRow->addWidget(block->volumeKnob, 0, Qt::AlignHCenter);
     knobRow->addStretch(1);
 
-    stripLayout->addLayout(knobRow, 1);
+    blockLayout->addLayout(knobRow, 1);
 
-    m_stripLayout->addWidget(strip->frame, 0, Qt::AlignVCenter);
+    m_blockLayout->addWidget(block->frame, 0, Qt::AlignVCenter);
 
-    connect(strip->muteButton, &QToolButton::toggled, this, [this, id = strip->id](bool checked) {
+    connect(block->muteButton, &QToolButton::toggled, this, [this, id = block->id](bool checked) {
       if (m_updatingUi) {
         return;
       }
 
       if (checked) {
-        if (auto* selfStrip = findStrip(id); selfStrip && selfStrip->soloButton->isChecked()) {
+        if (auto* selfBlock = findBlock(id); selfBlock && selfBlock->soloButton->isChecked()) {
           m_updatingUi = true;
-          selfStrip->soloButton->setChecked(false);
+          selfBlock->soloButton->setChecked(false);
           m_updatingUi = false;
         }
       }
 
-      refreshStripInteractivity();
-      emit stripMuteChanged(id, checked);
+      refreshBlockInteractivity();
+      emit chanMuteChanged(id, checked);
     });
 
-    connect(strip->soloButton, &QToolButton::toggled, this, [this, id = strip->id](bool checked) {
+    connect(block->soloButton, &QToolButton::toggled, this, [this, id = block->id](bool checked) {
       if (m_updatingUi) {
         return;
       }
 
-      refreshStripInteractivity();
-      emit stripSoloChanged(id, checked);
+      refreshBlockInteractivity();
+      emit chanSoloChanged(id, checked);
     });
 
-    strip->panKnob->setOnValueChanged([this, id = strip->id](int value) {
+    block->panKnob->setOnValueChanged([this, id = block->id](int value) {
       if (!m_updatingUi) {
-        emit stripPanChanged(id, value);
+        emit chanPanChanged(id, value);
       }
     });
 
-    strip->volumeKnob->setOnValueChanged([this, id = strip->id](int value) {
+    block->volumeKnob->setOnValueChanged([this, id = block->id](int value) {
       if (!m_updatingUi) {
-        emit stripVolumeChanged(id, value);
+        emit chanVolumeChanged(id, value);
       }
     });
 
-    applyStripFrameStyle(*strip, false, false);
-    m_strips.push_back(std::move(strip));
+    applyBlockFrameStyle(*block, false, false);
+    m_blocks.push_back(std::move(block));
   }
 
-  m_stripLayout->addStretch(1);
+  m_blockLayout->addStretch(1);
   m_updatingUi = false;
 }
 
-void SequenceControlBar::refreshStripInteractivity() {
-  const bool anySolo = std::any_of(m_strips.begin(), m_strips.end(), [](const auto& strip) {
-    return strip && strip->soloButton && strip->soloButton->isChecked();
+void SequenceControlBar::refreshBlockInteractivity() {
+  const bool anySolo = std::any_of(m_blocks.begin(), m_blocks.end(), [](const auto& block) {
+    return block && block->soloButton && block->soloButton->isChecked();
   });
 
-  for (auto& stripPtr : m_strips) {
-    if (!stripPtr) {
+  for (auto& blockPtr : m_blocks) {
+    if (!blockPtr) {
       continue;
     }
-    auto& strip = *stripPtr;
-    const bool muted = strip.muteButton && strip.muteButton->isChecked();
-    const bool soloed = strip.soloButton && strip.soloButton->isChecked();
+    auto& block = *blockPtr;
+    const bool muted = block.muteButton && block.muteButton->isChecked();
+    const bool soloed = block.soloButton && block.soloButton->isChecked();
     const bool blockedBySolo = anySolo && !soloed;
     const bool controlsDisabled = muted || blockedBySolo;
 
-    if (strip.frame) {
-      strip.frame->setProperty("dimmed", controlsDisabled);
-      strip.frame->setProperty("solo", soloed);
-      applyStripFrameStyle(strip, controlsDisabled, soloed);
+    if (block.frame) {
+      block.frame->setProperty("dimmed", controlsDisabled);
+      block.frame->setProperty("solo", soloed);
+      applyBlockFrameStyle(block, controlsDisabled, soloed);
     }
 
-    if (strip.muteButton) {
-      strip.muteButton->setEnabled(true);
+    if (block.muteButton) {
+      block.muteButton->setEnabled(true);
     }
-    if (strip.soloButton) {
-      strip.soloButton->setEnabled(!muted);
+    if (block.soloButton) {
+      block.soloButton->setEnabled(!muted);
     }
-    if (strip.panKnob) {
-      strip.panKnob->setEnabled(!controlsDisabled);
+    if (block.panKnob) {
+      block.panKnob->setEnabled(!controlsDisabled);
     }
-    if (strip.volumeKnob) {
-      strip.volumeKnob->setEnabled(!controlsDisabled);
+    if (block.volumeKnob) {
+      block.volumeKnob->setEnabled(!controlsDisabled);
     }
   }
 }
 
-void SequenceControlBar::applyStripFrameStyle(StripWidgets& strip, bool dimmed, bool soloed) {
-  if (!strip.frame) {
+void SequenceControlBar::applyBlockFrameStyle(BlockWidgets& block, bool dimmed, bool soloed) {
+  if (!block.frame) {
     return;
   }
 
-  QColor border = strip.borderColor;
+  QColor border = block.borderColor;
   if (!border.isValid()) {
-    border = QColor::fromHsv((strip.id * 43) % 360, 190, 235);
+    border = QColor::fromHsv((block.id * 43) % 360, 190, 235);
   }
   if (soloed) {
     border = border.lighter(120);
@@ -784,7 +784,7 @@ void SequenceControlBar::applyStripFrameStyle(StripWidgets& strip, bool dimmed, 
   border.setAlpha(dimmed ? 126 : 238);
 
   const QString frameStyle = QStringLiteral(
-      "QFrame#MixerStrip {"
+      "QFrame#MixerBlock {"
       " border: none;"
       " border-left: 3px solid rgba(%1,%2,%3,%4);"
       " border-radius: 0px;"
@@ -794,17 +794,17 @@ void SequenceControlBar::applyStripFrameStyle(StripWidgets& strip, bool dimmed, 
                                  .arg(border.green())
                                  .arg(border.blue())
                                  .arg(border.alpha());
-  if (strip.frame->styleSheet() != frameStyle) {
-    strip.frame->setStyleSheet(frameStyle);
+  if (block.frame->styleSheet() != frameStyle) {
+    block.frame->setStyleSheet(frameStyle);
   }
 }
 
 void SequenceControlBar::refreshScrollControls() {
-  if (!m_stripScroll || !m_scrollControls) {
+  if (!m_blockScroll || !m_scrollControls) {
     return;
   }
 
-  auto* hbar = m_stripScroll->horizontalScrollBar();
+  auto* hbar = m_blockScroll->horizontalScrollBar();
   if (!hbar) {
     m_scrollControls->setVisible(false);
     return;
@@ -823,11 +823,11 @@ void SequenceControlBar::refreshScrollControls() {
 }
 
 void SequenceControlBar::scrollBlocks(int deltaPixels) {
-  if (!m_stripScroll) {
+  if (!m_blockScroll) {
     return;
   }
 
-  auto* hbar = m_stripScroll->horizontalScrollBar();
+  auto* hbar = m_blockScroll->horizontalScrollBar();
   if (!hbar) {
     return;
   }
@@ -858,15 +858,15 @@ void SequenceControlBar::refreshStyleSheet() {
       " border-radius: 0px;"
       " background: transparent;"
       "}"
-      "QScrollArea#StripScroll {"
+      "QScrollArea#BlockScroll {"
       " border: none;"
       " background: transparent;"
       "}"
-      "QWidget#StripViewport {"
+      "QWidget#BlockViewport {"
       " border: none;"
       " background: transparent;"
       "}"
-      "QWidget#StripContainer {"
+      "QWidget#BlockContainer {"
       " border: none;"
       " background: transparent;"
       "}"
@@ -891,7 +891,7 @@ void SequenceControlBar::refreshStyleSheet() {
       " selection-background-color: rgba(255,255,255,0.2);"
       " font-size: 9px;"
       "}"
-      "QToolButton#StripToggle {"
+      "QToolButton#BlockToggle {"
       " border: 1px solid rgba(255,255,255,0.14);"
       " border-radius: 3px;"
       " background: rgba(%6,%7,%8,200);"
@@ -900,17 +900,17 @@ void SequenceControlBar::refreshStyleSheet() {
       " font-weight: 700;"
       " padding: 0px;"
       "}"
-      "QToolButton#StripToggle:checked {"
+      "QToolButton#BlockToggle:checked {"
       " background: rgba(%12,%13,%14,230);"
       " color: rgba(%9,%10,%11,255);"
       " border: 1px solid rgba(255,255,255,0.28);"
       "}"
-      "QToolButton#StripToggle:disabled {"
+      "QToolButton#BlockToggle:disabled {"
       " background: rgba(0,0,0,0.28);"
       " color: rgba(255,255,255,0.22);"
       " border: 1px solid rgba(255,255,255,0.08);"
       "}"
-      "QWidget#StripScrollControls {"
+      "QWidget#BlockScrollControls {"
       " border: none;"
       " background: transparent;"
       "}")
