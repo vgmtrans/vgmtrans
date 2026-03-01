@@ -814,8 +814,19 @@ void PianoRollRhiRenderer::buildStaticInstances(const PianoRollFrame::Data& fram
     const float noteY = (127.0f - static_cast<float>(note.key)) + kNoteInsetUnits;
 
     const bool trackEnabled = isTrackEnabled(note.trackIndex);
-    QColor noteColor = colorForTrack(note.trackIndex);
-    noteColor.setAlpha(trackEnabled ? 188 : 150);
+    QColor noteColor;
+    if (trackEnabled) {
+      noteColor = colorForTrack(note.trackIndex);
+      noteColor.setAlpha(188);
+    } else {
+      const QColor trackColor = colorForTrack(note.trackIndex);
+      const QColor bgColor = frame.noteBackgroundColor;
+      static constexpr float kTrackMix = 0.40f;
+      const float r = (bgColor.redF() * (1.0f - kTrackMix)) + (trackColor.redF() * kTrackMix);
+      const float g = (bgColor.greenF() * (1.0f - kTrackMix)) + (trackColor.greenF() * kTrackMix);
+      const float b = (bgColor.blueF() * (1.0f - kTrackMix)) + (trackColor.blueF() * kTrackMix);
+      noteColor = QColor::fromRgbF(r, g, b, 0.78f);
+    }
     appendRect(m_staticBackInstances,
                static_cast<float>(note.startTick),
                noteY,
