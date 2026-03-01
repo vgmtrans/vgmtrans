@@ -171,6 +171,7 @@ void PianoRollView::setTrackCount(int trackCount) {
   requestRender();
 }
 
+// Applies the effective per-track enabled mask used by playback highlighting.
 void PianoRollView::setTrackEnabledMask(std::vector<uint8_t> trackEnabledMask) {
   const size_t desiredTrackCount = static_cast<size_t>(std::max(0, m_trackCount));
   if (trackEnabledMask.empty()) {

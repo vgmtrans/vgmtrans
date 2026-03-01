@@ -296,6 +296,7 @@ uint64_t PianoRollRhiRenderer::hashTrackColors(const std::vector<QColor>& colors
   return hash;
 }
 
+// Hashes track-enabled state so static geometry cache invalidates on mute/solo changes.
 uint64_t PianoRollRhiRenderer::hashTrackEnabled(const std::vector<uint8_t>& trackEnabled) {
   uint64_t hash = 1469598103934665603ULL;
   for (const uint8_t enabled : trackEnabled) {
