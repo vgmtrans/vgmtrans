@@ -43,6 +43,8 @@
 
 namespace {
 constexpr int kNoteSelectionAutoScrollIntervalMs = 16;
+constexpr float kPlaybackPageTriggerFraction = 0.90f;
+constexpr float kPlaybackPageTargetFraction = 0.05f;
 const QColor kDisabledTrackColor(132, 132, 132);
 }
 
@@ -263,6 +265,24 @@ void PianoRollView::setPlaybackTick(int tick, bool playbackActive) {
   m_currentTick = tick;
   m_playbackActive = playbackActive;
 
+  if (playbackStateChanged && m_playbackActive) {
+    m_playbackAutoScrollEnabled = true;
+    if (!isPlaybackTickVisible(tick)) {
+      scrollPlaybackTickToViewportFraction(tick, kPlaybackPageTargetFraction);
+    }
+  }
+
+  if (m_playbackActive && m_playbackAutoScrollEnabled) {
+    const int noteViewportWidth = std::max(0, viewport()->width() - kKeyboardWidth);
+    if (noteViewportWidth > 0) {
+      const int triggerX = static_cast<int>(std::lround(
+          static_cast<float>(noteViewportWidth) * kPlaybackPageTriggerFraction));
+      if (scanlinePixelX(tick) >= triggerX) {
+        scrollPlaybackTickToViewportFraction(tick, kPlaybackPageTargetFraction);
+      }
+    }
+  }
+
   const bool activeKeysChanged = updateActiveKeyStates();
   const int scanX = scanlinePixelX(tick);
   const bool scanlineChanged = (scanX != m_lastRenderedScanlineX);
@@ -275,6 +295,8 @@ void PianoRollView::setPlaybackTick(int tick, bool playbackActive) {
 void PianoRollView::clearPlaybackState() {
   m_playbackActive = false;
   m_currentTick = 0;
+  m_playbackAutoScrollEnabled = true;
+  m_applyingPlaybackAutoScroll = false;
   updateActiveKeyStates();
   m_lastRenderedScanlineX = std::numeric_limits<int>::min();
   requestRender();
@@ -388,8 +410,10 @@ void PianoRollView::showEvent(QShowEvent* event) {
 
 void PianoRollView::scrollContentsBy(int dx, int dy) {
   QAbstractScrollArea::scrollContentsBy(dx, dy);
-  Q_UNUSED(dx);
   Q_UNUSED(dy);
+  if (dx != 0 && m_playbackActive && !m_applyingPlaybackAutoScroll && !m_applyingHorizontalZoomScroll) {
+    m_playbackAutoScrollEnabled = false;
+  }
   requestRenderCoalesced();
 }
 
@@ -1306,6 +1330,45 @@ int PianoRollView::scanlinePixelX(int tick) const {
   return static_cast<int>(std::lround(viewX));
 }
 
+// Returns whether the playback scanline is currently visible in the note viewport.
+bool PianoRollView::isPlaybackTickVisible(int tick) const {
+  const int noteViewportWidth = std::max(0, viewport()->width() - kKeyboardWidth);
+  if (noteViewportWidth <= 0) {
+    return true;
+  }
+
+  const int scanX = scanlinePixelX(tick);
+  return scanX >= 0 && scanX < noteViewportWidth;
+}
+
+// Repositions horizontal scroll so the playback scanline lands at the requested viewport fraction.
+void PianoRollView::scrollPlaybackTickToViewportFraction(int tick, float viewportFraction) {
+  auto* hbar = horizontalScrollBar();
+  if (!hbar) {
+    return;
+  }
+
+  const int noteViewportWidth = std::max(0, viewport()->width() - kKeyboardWidth);
+  if (noteViewportWidth <= 0) {
+    return;
+  }
+
+  const float clampedFraction = std::clamp(viewportFraction, 0.0f, 1.0f);
+  const int scanlineWorldX = static_cast<int>(std::lround(
+      static_cast<float>(clampTick(tick)) * std::max(0.0001f, m_pixelsPerTick)));
+  const int desiredViewportX =
+      static_cast<int>(std::lround(static_cast<float>(noteViewportWidth) * clampedFraction));
+  const int desiredScrollX = scanlineWorldX - desiredViewportX;
+  const int clampedScrollX = std::clamp(desiredScrollX, hbar->minimum(), hbar->maximum());
+  if (clampedScrollX == hbar->value()) {
+    return;
+  }
+
+  m_applyingPlaybackAutoScroll = true;
+  hbar->setValue(clampedScrollX);
+  m_applyingPlaybackAutoScroll = false;
+}
+
 QRect PianoRollView::graphRectInViewport() const {
   return QRect(kKeyboardWidth,
                kTopBarHeight,
@@ -1774,9 +1837,11 @@ void PianoRollView::applyHorizontalScale(float scale, int anchorInNotes, float w
   updateScrollBars();
 
   const int newValue = static_cast<int>(std::llround(worldTickAtAnchor * m_pixelsPerTick - anchorInNotes));
+  m_applyingHorizontalZoomScroll = true;
   horizontalScrollBar()->setValue(std::clamp(newValue,
                                              horizontalScrollBar()->minimum(),
                                              horizontalScrollBar()->maximum()));
+  m_applyingHorizontalZoomScroll = false;
   requestRender();
 }
 
