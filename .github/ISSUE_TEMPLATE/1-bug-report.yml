@@ -64,7 +64,7 @@ body:
     id: description
     attributes:
       label: Describe the problem
-      description: Be as specific and technical as you can. If you don't know, it's okay.
+      description: Be as specific and technical as you can. If this involves exported files, provide details about the program and version you used to test them.
       placeholder: |
         Instead of:
         "MIDI is broken"
@@ -101,20 +101,7 @@ body:
     validations:
       required: true
 
-  - type: textarea
-    id: comparison
-    attributes:
-      label: If this involves exported files
-      description: |
-        If the issue happens in another program (MIDI player, DAW, etc.), provide details.
-      placeholder: |
-        Tested in:
-        - FL Studio 25 build 1567
 
-        Result:
-        Plays correctly in VGMTrans, but incorrect in FL Studio.
-    validations:
-      required: false
 
   - type: textarea
     id: logs
