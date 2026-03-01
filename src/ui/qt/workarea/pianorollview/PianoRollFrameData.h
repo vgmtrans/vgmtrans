@@ -72,8 +72,8 @@ struct Data {
   QColor selectionRectFillColor;
   QColor selectionRectOutlineColor;
 
-  std::vector<QColor> trackColors;
-  std::vector<uint8_t> trackEnabled;
+  std::shared_ptr<const std::vector<QColor>> trackColors;
+  std::shared_ptr<const std::vector<uint8_t>> trackEnabled;
   std::shared_ptr<const std::vector<Note>> notes;
   std::shared_ptr<const std::vector<Note>> activeNotes;
   std::shared_ptr<const std::vector<Note>> selectedNotes;
