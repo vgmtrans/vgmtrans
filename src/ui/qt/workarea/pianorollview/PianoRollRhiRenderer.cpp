@@ -306,6 +306,42 @@ void PianoRollRhiRenderer::renderFrame(QRhiCommandBuffer* cb, const RenderTarget
   drawRectInstances(m_staticBackInstanceBuffer, staticBackCount);
 
   if (m_notePipeline && m_shaderBindings && m_noteInstanceBuffer && !m_noteInstances.empty()) {
+    int noteFirstInstance = 0;
+    int noteInstanceCount = static_cast<int>(m_noteInstances.size());
+    if (frame.notes && !frame.notes->empty()) {
+      const auto& notes = *frame.notes;
+      const uint64_t maxDuration = std::max<uint64_t>(1, frame.maxNoteDurationTicks);
+      const uint64_t searchStartTick = (layout.visibleStartTick > maxDuration)
+                                           ? (layout.visibleStartTick - maxDuration)
+                                           : 0;
+      const uint64_t searchEndTick = layout.visibleEndTick + 1;
+
+      const auto beginIt = std::lower_bound(
+          notes.begin(),
+          notes.end(),
+          searchStartTick,
+          [](const PianoRollFrame::Note& note, uint64_t tick) {
+            return static_cast<uint64_t>(note.startTick) < tick;
+          });
+      const auto endIt = std::lower_bound(
+          notes.begin(),
+          notes.end(),
+          searchEndTick,
+          [](const PianoRollFrame::Note& note, uint64_t tick) {
+            return static_cast<uint64_t>(note.startTick) < tick;
+          });
+
+      const int beginIndex = std::clamp(static_cast<int>(std::distance(notes.begin(), beginIt)),
+                                        0,
+                                        static_cast<int>(m_noteInstances.size()));
+      const int endIndex = std::clamp(static_cast<int>(std::distance(notes.begin(), endIt)),
+                                      beginIndex,
+                                      static_cast<int>(m_noteInstances.size()));
+      noteFirstInstance = beginIndex;
+      noteInstanceCount = std::max(0, endIndex - beginIndex);
+    }
+
+    if (noteInstanceCount > 0) {
     cb->setGraphicsPipeline(m_notePipeline);
     cb->setShaderResources(m_shaderBindings);
     const QRhiCommandBuffer::VertexInput noteBindings[] = {
@@ -318,7 +354,8 @@ void PianoRollRhiRenderer::renderFrame(QRhiCommandBuffer* cb, const RenderTarget
                        m_indexBuffer,
                        0,
                        QRhiCommandBuffer::IndexUInt16);
-    cb->drawIndexed(6, static_cast<int>(m_noteInstances.size()), 0, 0, 0);
+    cb->drawIndexed(6, noteInstanceCount, 0, 0, noteFirstInstance);
+    }
   }
 
   const int dynamicCount = static_cast<int>(m_dynamicInstances.size());
