@@ -12,6 +12,8 @@
 #include <rhi/qrhi.h>
 
 #include <QColor>
+#include <QDebug>
+#include <QElapsedTimer>
 #include <QFile>
 #include <QMatrix4x4>
 
@@ -36,8 +38,152 @@ static const quint16 kIndices[] = {0, 1, 2, 0, 2, 3};
 
 static constexpr int kMat4Bytes = 16 * sizeof(float);
 static constexpr int kUniformBytes = (16 + 4 + 4 + 4) * sizeof(float);
-static constexpr float kDashSegmentPx = 4.0f;
-static constexpr float kDashGapPx = 4.0f;
+
+bool isBlackMidiKey(int key) {
+  switch (key % 12) {
+    case 1:
+    case 3:
+    case 6:
+    case 8:
+    case 10:
+      return true;
+    default:
+      return false;
+  }
+}
+
+struct KeyboardKeyTopology {
+  float centerUnit = 0.0f;
+  float topSeamUnit = 0.0f;
+  float bottomSeamUnit = 0.0f;
+};
+
+struct KeyboardTopology {
+  std::array<KeyboardKeyTopology, PianoRollFrame::kMidiKeyCount> keys;
+  std::vector<int> whiteKeys;
+  std::vector<int> blackKeys;
+  std::vector<float> seamUnits;
+};
+
+// Enables optional profiling with `VGMTRANS_PROFILE_PIANOROLL=1`.
+bool pianoRollProfileEnabled() {
+  static const bool enabled = qEnvironmentVariableIntValue("VGMTRANS_PROFILE_PIANOROLL") > 0;
+  return enabled;
+}
+
+struct RenderProfileSample {
+  qint64 captureNs = 0;
+  qint64 staticNs = 0;
+  qint64 dynamicNs = 0;
+  qint64 uploadNs = 0;
+  qint64 drawNs = 0;
+  qint64 totalNs = 0;
+};
+
+// Aggregates per-frame timings and prints periodic averages.
+void logRenderProfileSample(const RenderProfileSample& sample) {
+  static constexpr int kLogEveryFrames = 120;
+  struct Totals {
+    int frames = 0;
+    qint64 captureNs = 0;
+    qint64 staticNs = 0;
+    qint64 dynamicNs = 0;
+    qint64 uploadNs = 0;
+    qint64 drawNs = 0;
+    qint64 totalNs = 0;
+  };
+
+  static Totals totals;
+  ++totals.frames;
+  totals.captureNs += sample.captureNs;
+  totals.staticNs += sample.staticNs;
+  totals.dynamicNs += sample.dynamicNs;
+  totals.uploadNs += sample.uploadNs;
+  totals.drawNs += sample.drawNs;
+  totals.totalNs += sample.totalNs;
+
+  if (totals.frames < kLogEveryFrames) {
+    return;
+  }
+
+  auto avgMs = [&](qint64 ns) -> double {
+    return static_cast<double>(ns) / 1000000.0 / static_cast<double>(totals.frames);
+  };
+  qInfo().nospace() << "[PianoRollRhiRenderer] avg over " << totals.frames
+                    << " frames: capture=" << avgMs(totals.captureNs) << "ms"
+                    << ", static=" << avgMs(totals.staticNs) << "ms"
+                    << ", dynamic=" << avgMs(totals.dynamicNs) << "ms"
+                    << ", upload=" << avgMs(totals.uploadNs) << "ms"
+                    << ", draw=" << avgMs(totals.drawNs) << "ms"
+                    << ", total=" << avgMs(totals.totalNs) << "ms";
+  totals = {};
+}
+
+// Precomputes white/black key topology once so frame builds avoid neighbor scans.
+const KeyboardTopology& keyboardTopology() {
+  static const KeyboardTopology topology = [] {
+    KeyboardTopology t;
+    std::array<bool, 257> seamDrawn{};
+
+    auto centerUnitForKey = [](int key) -> float {
+      return static_cast<float>(127 - key) + 0.5f;
+    };
+    auto addSeam = [&](float seamUnit) {
+      const int seamId = std::clamp(static_cast<int>(std::lround(seamUnit * 2.0f)), 0, 256);
+      if (seamDrawn[static_cast<size_t>(seamId)]) {
+        return;
+      }
+      seamDrawn[static_cast<size_t>(seamId)] = true;
+      t.seamUnits.push_back(seamUnit);
+    };
+
+    for (int key = 0; key < PianoRollFrame::kMidiKeyCount; ++key) {
+      auto& keyTopology = t.keys[static_cast<size_t>(key)];
+      keyTopology.centerUnit = centerUnitForKey(key);
+      keyTopology.topSeamUnit = keyTopology.centerUnit - 0.5f;
+      keyTopology.bottomSeamUnit = keyTopology.centerUnit + 0.5f;
+
+      if (isBlackMidiKey(key)) {
+        t.blackKeys.push_back(key);
+        continue;
+      }
+
+      t.whiteKeys.push_back(key);
+
+      int higherWhite = key + 1;
+      while (higherWhite < PianoRollFrame::kMidiKeyCount && isBlackMidiKey(higherWhite)) {
+        ++higherWhite;
+      }
+      int lowerWhite = key - 1;
+      while (lowerWhite >= 0 && isBlackMidiKey(lowerWhite)) {
+        --lowerWhite;
+      }
+
+      if (higherWhite < PianoRollFrame::kMidiKeyCount) {
+        if (higherWhite == key + 1) {
+          keyTopology.topSeamUnit = (keyTopology.centerUnit + centerUnitForKey(higherWhite)) * 0.5f;
+        } else {
+          keyTopology.topSeamUnit = centerUnitForKey(key + 1);
+        }
+      }
+
+      if (lowerWhite >= 0) {
+        if (lowerWhite == key - 1) {
+          keyTopology.bottomSeamUnit = (keyTopology.centerUnit + centerUnitForKey(lowerWhite)) * 0.5f;
+        } else {
+          keyTopology.bottomSeamUnit = centerUnitForKey(key - 1);
+        }
+      }
+
+      addSeam(keyTopology.topSeamUnit);
+      addSeam(keyTopology.bottomSeamUnit);
+    }
+
+    return t;
+  }();
+
+  return topology;
+}
 
 QShader loadShader(const char* path) {
   QFile file(QString::fromUtf8(path));
@@ -127,11 +273,8 @@ void PianoRollRhiRenderer::releaseResources() {
   m_dynamicInstances.clear();
   m_noteInstances.clear();
   m_dynamicFrontStart = 0;
-  clearStaticBucketCache();
-  m_staticBucketStyleHash = 0;
-  m_activeStaticBucketId = 0;
-  m_frameSerial = 0;
-  m_hasActiveStaticBucket = false;
+  m_hasStaticCacheKey = false;
+  m_staticCacheKey = {};
   m_staticDataDirty = true;
   m_noteDataDirty = true;
   m_hasNoteDataKey = false;
@@ -142,6 +285,16 @@ void PianoRollRhiRenderer::releaseResources() {
 void PianoRollRhiRenderer::renderFrame(QRhiCommandBuffer* cb, const RenderTargetInfo& target) {
   if (!cb || !m_rhi || !m_view || !target.renderTarget || !target.renderPassDesc || target.pixelSize.isEmpty()) {
     return;
+  }
+
+  const bool profileEnabled = pianoRollProfileEnabled();
+  QElapsedTimer profileTimer;
+  qint64 tCapture = 0;
+  qint64 tStatic = 0;
+  qint64 tDynamic = 0;
+  qint64 tUpload = 0;
+  if (profileEnabled) {
+    profileTimer.start();
   }
 
   const PianoRollFrame::Data frame = m_view->captureRhiFrameData(target.dpr);
@@ -170,37 +323,24 @@ void PianoRollRhiRenderer::renderFrame(QRhiCommandBuffer* cb, const RenderTarget
     m_hasNoteDataKey = true;
     m_noteDataDirty = true;
   }
-
-  const uint64_t styleHash = staticBucketStyleHash(key);
-  const uint64_t bucketId = staticBucketId(key);
-
-  if (m_staticBucketStyleHash != styleHash) {
-    clearStaticBucketCache();
-    m_staticBucketStyleHash = styleHash;
+  if (profileEnabled) {
+    tCapture = profileTimer.nsecsElapsed();
   }
 
-  auto bucketIt = m_staticBucketCache.find(bucketId);
-  if (bucketIt == m_staticBucketCache.end()) {
-    buildStaticInstances(frame, layout, key);
-
-    CachedStaticBucket bucket;
-    bucket.backInstances = m_staticBackInstances;
-    bucket.frontInstances = m_staticFrontInstances;
-    bucket.lastUsedFrame = ++m_frameSerial;
-    bucketIt = m_staticBucketCache.emplace(bucketId, std::move(bucket)).first;
-    trimStaticBucketCache();
-  } else {
-    bucketIt->second.lastUsedFrame = ++m_frameSerial;
-  }
-
-  if (!m_hasActiveStaticBucket || m_activeStaticBucketId != bucketId) {
-    m_activeStaticBucketId = bucketId;
-    m_hasActiveStaticBucket = true;
+  if (!m_hasStaticCacheKey || !staticCacheKeyEqual(key, m_staticCacheKey)) {
+    buildStaticInstances(frame, layout);
+    m_staticCacheKey = key;
+    m_hasStaticCacheKey = true;
     m_staticDataDirty = true;
   }
-  const CachedStaticBucket* activeStaticBucket = &bucketIt->second;
+  if (profileEnabled) {
+    tStatic = profileTimer.nsecsElapsed();
+  }
   // Dynamic overlays (active notes, scanline, progress) update every frame.
   buildDynamicInstances(frame, layout);
+  if (profileEnabled) {
+    tDynamic = profileTimer.nsecsElapsed();
+  }
 
   ensurePipelines(target.renderPassDesc, std::max(1, target.sampleCount));
 
@@ -235,24 +375,24 @@ void PianoRollRhiRenderer::renderFrame(QRhiCommandBuffer* cb, const RenderTarget
   ubo[27] = frame.noteOutlineColor.alphaF();
   updates->updateDynamicBuffer(m_uniformBuffer, 0, kUniformBytes, ubo.data());
 
-  if (m_staticDataDirty && activeStaticBucket) {
-    if (!activeStaticBucket->backInstances.empty()) {
-      const int staticBackBytes = static_cast<int>(activeStaticBucket->backInstances.size() * sizeof(RectInstance));
+  if (m_staticDataDirty) {
+    if (!m_staticBackInstances.empty()) {
+      const int staticBackBytes = static_cast<int>(m_staticBackInstances.size() * sizeof(RectInstance));
       if (ensureInstanceBuffer(m_staticBackInstanceBuffer, staticBackBytes, 16384)) {
         updates->updateDynamicBuffer(m_staticBackInstanceBuffer,
                                      0,
                                      staticBackBytes,
-                                     activeStaticBucket->backInstances.data());
+                                     m_staticBackInstances.data());
       }
     }
 
-    if (!activeStaticBucket->frontInstances.empty()) {
-      const int staticFrontBytes = static_cast<int>(activeStaticBucket->frontInstances.size() * sizeof(RectInstance));
+    if (!m_staticFrontInstances.empty()) {
+      const int staticFrontBytes = static_cast<int>(m_staticFrontInstances.size() * sizeof(RectInstance));
       if (ensureInstanceBuffer(m_staticFrontInstanceBuffer, staticFrontBytes, 4096)) {
         updates->updateDynamicBuffer(m_staticFrontInstanceBuffer,
                                      0,
                                      staticFrontBytes,
-                                     activeStaticBucket->frontInstances.data());
+                                     m_staticFrontInstances.data());
       }
     }
     m_staticDataDirty = false;
@@ -273,6 +413,9 @@ void PianoRollRhiRenderer::renderFrame(QRhiCommandBuffer* cb, const RenderTarget
       }
     }
     m_noteDataDirty = false;
+  }
+  if (profileEnabled) {
+    tUpload = profileTimer.nsecsElapsed();
   }
 
   cb->beginPass(target.renderTarget, frame.backgroundColor, {1.0f, 0}, updates);
@@ -301,8 +444,8 @@ void PianoRollRhiRenderer::renderFrame(QRhiCommandBuffer* cb, const RenderTarget
     cb->drawIndexed(6, count, 0, 0, firstInstance);
   };
 
-  const int staticBackCount = activeStaticBucket ? static_cast<int>(activeStaticBucket->backInstances.size()) : 0;
-  const int staticFrontCount = activeStaticBucket ? static_cast<int>(activeStaticBucket->frontInstances.size()) : 0;
+  const int staticBackCount = static_cast<int>(m_staticBackInstances.size());
+  const int staticFrontCount = static_cast<int>(m_staticFrontInstances.size());
   drawRectInstances(m_staticBackInstanceBuffer, staticBackCount);
 
   if (m_notePipeline && m_shaderBindings && m_noteInstanceBuffer && !m_noteInstances.empty()) {
@@ -342,19 +485,19 @@ void PianoRollRhiRenderer::renderFrame(QRhiCommandBuffer* cb, const RenderTarget
     }
 
     if (noteInstanceCount > 0) {
-    cb->setGraphicsPipeline(m_notePipeline);
-    cb->setShaderResources(m_shaderBindings);
-    const QRhiCommandBuffer::VertexInput noteBindings[] = {
-        {m_vertexBuffer, 0},
-        {m_noteInstanceBuffer, 0},
-    };
-    cb->setVertexInput(0,
-                       static_cast<int>(std::size(noteBindings)),
-                       noteBindings,
-                       m_indexBuffer,
-                       0,
-                       QRhiCommandBuffer::IndexUInt16);
-    cb->drawIndexed(6, noteInstanceCount, 0, 0, noteFirstInstance);
+      cb->setGraphicsPipeline(m_notePipeline);
+      cb->setShaderResources(m_shaderBindings);
+      const QRhiCommandBuffer::VertexInput noteBindings[] = {
+          {m_vertexBuffer, 0},
+          {m_noteInstanceBuffer, 0},
+      };
+      cb->setVertexInput(0,
+                         static_cast<int>(std::size(noteBindings)),
+                         noteBindings,
+                         m_indexBuffer,
+                         0,
+                         QRhiCommandBuffer::IndexUInt16);
+      cb->drawIndexed(6, noteInstanceCount, 0, 0, noteFirstInstance);
     }
   }
 
@@ -365,19 +508,22 @@ void PianoRollRhiRenderer::renderFrame(QRhiCommandBuffer* cb, const RenderTarget
   drawRectInstances(m_dynamicInstanceBuffer, dynamicCount - dynamicFrontStart, dynamicFrontStart);
 
   cb->endPass();
+
+  if (profileEnabled) {
+    const qint64 tEnd = profileTimer.nsecsElapsed();
+    logRenderProfileSample(RenderProfileSample{
+        tCapture,
+        tStatic - tCapture,
+        tDynamic - tStatic,
+        tUpload - tDynamic,
+        tEnd - tUpload,
+        tEnd,
+    });
+  }
 }
 
 bool PianoRollRhiRenderer::isBlackKey(int key) {
-  switch (key % 12) {
-    case 1:
-    case 3:
-    case 6:
-    case 8:
-    case 10:
-      return true;
-    default:
-      return false;
-  }
+  return isBlackMidiKey(key);
 }
 
 uint64_t PianoRollRhiRenderer::hashTrackColors(const std::vector<QColor>& colors) {
@@ -555,30 +701,12 @@ PianoRollRhiRenderer::Layout PianoRollRhiRenderer::computeLayout(const PianoRoll
 PianoRollRhiRenderer::StaticCacheKey PianoRollRhiRenderer::makeStaticCacheKey(const PianoRollFrame::Data& frame,
                                                                                const Layout& layout) const {
   StaticCacheKey key;
-  key.valid = true;
   key.viewSize = QSize(layout.viewWidth, layout.viewHeight);
-  key.totalTicks = frame.totalTicks;
-  key.ppqn = frame.ppqn;
-  key.keyboardWidth = frame.keyboardWidth;
-  key.topBarHeight = frame.topBarHeight;
-  {
-    const uint64_t totalTickEnd = static_cast<uint64_t>(std::max(1, frame.totalTicks)) + 1;
-    const float minPixelsPerTick = std::max(0.0001f, frame.minPixelsPerTick);
-    const uint64_t viewportTicks =
-        std::max<uint64_t>(1, static_cast<uint64_t>(std::ceil(layout.noteAreaWidth / minPixelsPerTick)));
-    const uint64_t bucketTicks = std::max<uint64_t>(64, viewportTicks / 2);
-    const uint64_t prePad = viewportTicks;
-    const uint64_t postPad = viewportTicks * 2;
-    const uint64_t bucketStart = (layout.visibleStartTick / bucketTicks) * bucketTicks;
-    key.staticTickStart = (bucketStart > prePad) ? (bucketStart - prePad) : 0;
-    key.staticTickEnd = std::min<uint64_t>(totalTickEnd, bucketStart + bucketTicks + postPad);
-  }
-  key.timeSigPtr = reinterpret_cast<uint64_t>(frame.timeSignatures.get());
+  key.keyboardWidth = static_cast<int>(std::lround(layout.keyboardWidth));
+  key.topBarHeight = static_cast<int>(std::lround(layout.topBarHeight));
   key.noteBackgroundColor = colorKey(frame.noteBackgroundColor);
   key.keyboardBackgroundColor = colorKey(frame.keyboardBackgroundColor);
   key.topBarBackgroundColor = colorKey(frame.topBarBackgroundColor);
-  key.measureLineColor = colorKey(frame.measureLineColor);
-  key.beatLineColor = colorKey(frame.beatLineColor);
   key.keySeparatorColor = colorKey(frame.keySeparatorColor);
   key.whiteKeyColor = colorKey(frame.whiteKeyColor);
   key.blackKeyColor = colorKey(frame.blackKeyColor);
@@ -586,6 +714,21 @@ PianoRollRhiRenderer::StaticCacheKey PianoRollRhiRenderer::makeStaticCacheKey(co
   key.blackKeyRowColor = colorKey(frame.blackKeyRowColor);
   key.dividerColor = colorKey(frame.dividerColor);
   return key;
+}
+
+bool PianoRollRhiRenderer::staticCacheKeyEqual(const StaticCacheKey& lhs, const StaticCacheKey& rhs) {
+  return lhs.viewSize == rhs.viewSize &&
+         lhs.keyboardWidth == rhs.keyboardWidth &&
+         lhs.topBarHeight == rhs.topBarHeight &&
+         lhs.noteBackgroundColor == rhs.noteBackgroundColor &&
+         lhs.keyboardBackgroundColor == rhs.keyboardBackgroundColor &&
+         lhs.topBarBackgroundColor == rhs.topBarBackgroundColor &&
+         lhs.keySeparatorColor == rhs.keySeparatorColor &&
+         lhs.whiteKeyColor == rhs.whiteKeyColor &&
+         lhs.blackKeyColor == rhs.blackKeyColor &&
+         lhs.whiteKeyRowColor == rhs.whiteKeyRowColor &&
+         lhs.blackKeyRowColor == rhs.blackKeyRowColor &&
+         lhs.dividerColor == rhs.dividerColor;
 }
 
 // Builds a compact cache key for note-instance uploads.
@@ -647,72 +790,7 @@ void PianoRollRhiRenderer::rebuildNoteInstances(const PianoRollFrame::Data& fram
   }
 }
 
-uint64_t PianoRollRhiRenderer::staticBucketStyleHash(const StaticCacheKey& key) const {
-  uint64_t hash = 1469598103934665603ULL;
-  auto hashMix = [&hash](uint64_t value) {
-    hash ^= value;
-    hash *= 1099511628211ULL;
-  };
-
-  hashMix(static_cast<uint64_t>(key.viewSize.width()));
-  hashMix(static_cast<uint64_t>(key.viewSize.height()));
-  hashMix(static_cast<uint64_t>(key.totalTicks));
-  hashMix(static_cast<uint64_t>(key.ppqn));
-  hashMix(static_cast<uint64_t>(key.keyboardWidth));
-  hashMix(static_cast<uint64_t>(key.topBarHeight));
-  hashMix(key.timeSigPtr);
-  hashMix(key.noteBackgroundColor);
-  hashMix(key.keyboardBackgroundColor);
-  hashMix(key.topBarBackgroundColor);
-  hashMix(key.measureLineColor);
-  hashMix(key.beatLineColor);
-  hashMix(key.keySeparatorColor);
-  hashMix(key.whiteKeyColor);
-  hashMix(key.blackKeyColor);
-  hashMix(key.whiteKeyRowColor);
-  hashMix(key.blackKeyRowColor);
-  hashMix(key.dividerColor);
-  return hash;
-}
-
-uint64_t PianoRollRhiRenderer::staticBucketId(const StaticCacheKey& key) const {
-  uint64_t hash = 1469598103934665603ULL;
-  hash ^= key.staticTickStart;
-  hash *= 1099511628211ULL;
-  hash ^= key.staticTickEnd;
-  hash *= 1099511628211ULL;
-  return hash;
-}
-
-void PianoRollRhiRenderer::trimStaticBucketCache() {
-  static constexpr size_t kMaxCachedBuckets = 10;
-  while (m_staticBucketCache.size() > kMaxCachedBuckets) {
-    auto lruIt = m_staticBucketCache.end();
-    for (auto it = m_staticBucketCache.begin(); it != m_staticBucketCache.end(); ++it) {
-      if (m_hasActiveStaticBucket && it->first == m_activeStaticBucketId) {
-        continue;
-      }
-      if (lruIt == m_staticBucketCache.end() || it->second.lastUsedFrame < lruIt->second.lastUsedFrame) {
-        lruIt = it;
-      }
-    }
-    if (lruIt == m_staticBucketCache.end()) {
-      break;
-    }
-    m_staticBucketCache.erase(lruIt);
-  }
-}
-
-void PianoRollRhiRenderer::clearStaticBucketCache() {
-  m_staticBucketCache.clear();
-  m_hasActiveStaticBucket = false;
-  m_activeStaticBucketId = 0;
-  m_staticDataDirty = true;
-}
-
-void PianoRollRhiRenderer::buildStaticInstances(const PianoRollFrame::Data& frame,
-                                                const Layout& layout,
-                                                const StaticCacheKey& cacheKey) {
+void PianoRollRhiRenderer::buildStaticInstances(const PianoRollFrame::Data& frame, const Layout& layout) {
   m_staticBackInstances.clear();
   m_staticFrontInstances.clear();
 
@@ -755,50 +833,45 @@ void PianoRollRhiRenderer::buildStaticInstances(const PianoRollFrame::Data& fram
              layout.keyboardWidth,
              layout.noteAreaHeight,
              frame.keyboardBackgroundColor);
-
-  const uint64_t staticTickStart = cacheKey.staticTickStart;
-  const uint64_t staticTickEnd = std::max<uint64_t>(staticTickStart + 1, cacheKey.staticTickEnd);
-  const float staticTickSpan = static_cast<float>(staticTickEnd - staticTickStart);
-  const float keySpan = static_cast<float>(PianoRollFrame::kMidiKeyCount);
-
+  const KeyboardTopology& topology = keyboardTopology();
   for (int key = 0; key < PianoRollFrame::kMidiKeyCount; ++key) {
     const float keyUnit = 127.0f - static_cast<float>(key);
 
     const QColor rowColor = isBlackKey(key) ? frame.blackKeyRowColor : frame.whiteKeyRowColor;
     appendRect(m_staticBackInstances,
-               static_cast<float>(staticTickStart),
+               layout.noteAreaLeft,
                keyUnit,
-               staticTickSpan,
+               layout.noteAreaWidth,
                1.0f,
                rowColor,
                LineStyle::Solid,
                0.0f,
                0.0f,
                0.0f,
+               0.0f,
                1.0f,
+               0.0f,
                1.0f,
-               1.0f,
-               1.0f,
-               1.0f,
+               0.0f,
                1.0f);
 
     QColor rowSep = frame.keySeparatorColor;
     rowSep.setAlpha(std::max(24, rowSep.alpha()));
     appendRect(m_staticBackInstances,
-               static_cast<float>(staticTickStart),
+               layout.noteAreaLeft,
                keyUnit,
-               staticTickSpan,
+               layout.noteAreaWidth,
                1.0f,
                rowSep,
                LineStyle::Solid,
                0.0f,
                0.0f,
                0.0f,
+               0.0f,
                1.0f,
+               0.0f,
                1.0f,
-               1.0f,
-               1.0f,
-               1.0f,
+               0.0f,
                0.0f);
   }
 
@@ -806,75 +879,10 @@ void PianoRollRhiRenderer::buildStaticInstances(const PianoRollFrame::Data& fram
   const float blackKeyHeightUnits = 1.0f;
   const float blackInnerHeightRatio = 0.62f;
   const float blackInnerWidthRatio = 0.86f;
-  // Keys are aligned to 12 equal note lanes, then white-key seams are derived
-  // from neighboring white notes to mimic a real keyboard silhouette.
-  auto centerUnitForKey = [](int key) -> float {
-    return static_cast<float>(127 - key) + 0.5f;
-  };
-
-  std::array<bool, 257> seamDrawn{};
-  auto drawSeamAtUnit = [&](float seamUnit) {
-    const int seamId = std::clamp(static_cast<int>(std::lround(seamUnit * 2.0f)), 0, 256);
-    if (seamDrawn[static_cast<size_t>(seamId)]) {
-      return;
-    }
-    seamDrawn[static_cast<size_t>(seamId)] = true;
-
-    QColor keySep = frame.keySeparatorColor;
-    keySep.setAlpha(std::max(56, keySep.alpha()));
-    appendRect(m_staticBackInstances,
-               0.0f,
-               seamUnit,
-               layout.keyboardWidth,
-               1.0f,
-               keySep,
-               LineStyle::Solid,
-               0.0f,
-               0.0f,
-               0.0f,
-               0.0f,
-               1.0f,
-               0.0f,
-               1.0f,
-               0.0f,
-               0.0f);
-  };
-
-  for (int key = 0; key < PianoRollFrame::kMidiKeyCount; ++key) {
-    if (isBlackKey(key)) {
-      continue;
-    }
-
-    int higherWhite = key + 1;
-    while (higherWhite < PianoRollFrame::kMidiKeyCount && isBlackKey(higherWhite)) {
-      ++higherWhite;
-    }
-    int lowerWhite = key - 1;
-    while (lowerWhite >= 0 && isBlackKey(lowerWhite)) {
-      --lowerWhite;
-    }
-
-    const float keyCenterUnit = centerUnitForKey(key);
-    float topSeamUnit = keyCenterUnit - 0.5f;
-    if (higherWhite < PianoRollFrame::kMidiKeyCount) {
-      if (higherWhite == key + 1) {
-        topSeamUnit = (keyCenterUnit + centerUnitForKey(higherWhite)) * 0.5f;
-      } else {
-        topSeamUnit = centerUnitForKey(key + 1);
-      }
-    }
-
-    float bottomSeamUnit = keyCenterUnit + 0.5f;
-    if (lowerWhite >= 0) {
-      if (lowerWhite == key - 1) {
-        bottomSeamUnit = (keyCenterUnit + centerUnitForKey(lowerWhite)) * 0.5f;
-      } else {
-        bottomSeamUnit = centerUnitForKey(key - 1);
-      }
-    }
-
-    const float keyTopUnit = topSeamUnit;
-    const float keyBottomUnit = bottomSeamUnit;
+  for (int key : topology.whiteKeys) {
+    const KeyboardKeyTopology& keyTopology = topology.keys[static_cast<size_t>(key)];
+    const float keyTopUnit = keyTopology.topSeamUnit;
+    const float keyBottomUnit = keyTopology.bottomSeamUnit;
     if (keyBottomUnit - keyTopUnit <= 0.001f) {
       continue;
     }
@@ -895,17 +903,31 @@ void PianoRollRhiRenderer::buildStaticInstances(const PianoRollFrame::Data& fram
                1.0f,
                0.0f,
                1.0f);
-
-    drawSeamAtUnit(topSeamUnit);
-    drawSeamAtUnit(bottomSeamUnit);
   }
 
-  for (int key = 0; key < PianoRollFrame::kMidiKeyCount; ++key) {
-    if (!isBlackKey(key)) {
-      continue;
-    }
+  QColor keySep = frame.keySeparatorColor;
+  keySep.setAlpha(std::max(56, keySep.alpha()));
+  for (float seamUnit : topology.seamUnits) {
+    appendRect(m_staticBackInstances,
+               0.0f,
+               seamUnit,
+               layout.keyboardWidth,
+               1.0f,
+               keySep,
+               LineStyle::Solid,
+               0.0f,
+               0.0f,
+               0.0f,
+               0.0f,
+               1.0f,
+               0.0f,
+               1.0f,
+               0.0f,
+               0.0f);
+  }
 
-    const float blackYUnit = centerUnitForKey(key) - (blackKeyHeightUnits * 0.5f);
+  for (int key : topology.blackKeys) {
+    const float blackYUnit = topology.keys[static_cast<size_t>(key)].centerUnit - (blackKeyHeightUnits * 0.5f);
 
     appendRect(m_staticFrontInstances,
                0.0f,
@@ -1152,45 +1174,11 @@ void PianoRollRhiRenderer::buildDynamicInstances(const PianoRollFrame::Data& fra
 
   const float blackKeyWidth = std::max(10.0f, layout.keyboardWidth * 0.63f);
   const float blackKeyHeight = std::max(2.0f, layout.pixelsPerKey);
-  auto centerUnitForKey = [](int key) -> float {
-    return static_cast<float>(127 - key) + 0.5f;
-  };
-
-  for (int key = 0; key < PianoRollFrame::kMidiKeyCount; ++key) {
-    if (isBlackKey(key)) {
-      continue;
-    }
-
-    int higherWhite = key + 1;
-    while (higherWhite < PianoRollFrame::kMidiKeyCount && isBlackKey(higherWhite)) {
-      ++higherWhite;
-    }
-    int lowerWhite = key - 1;
-    while (lowerWhite >= 0 && isBlackKey(lowerWhite)) {
-      --lowerWhite;
-    }
-
-    const float keyCenterUnit = centerUnitForKey(key);
-    float topSeamUnit = keyCenterUnit - 0.5f;
-    if (higherWhite < PianoRollFrame::kMidiKeyCount) {
-      if (higherWhite == key + 1) {
-        topSeamUnit = (keyCenterUnit + centerUnitForKey(higherWhite)) * 0.5f;
-      } else {
-        topSeamUnit = centerUnitForKey(key + 1);
-      }
-    }
-
-    float bottomSeamUnit = keyCenterUnit + 0.5f;
-    if (lowerWhite >= 0) {
-      if (lowerWhite == key - 1) {
-        bottomSeamUnit = (keyCenterUnit + centerUnitForKey(lowerWhite)) * 0.5f;
-      } else {
-        bottomSeamUnit = centerUnitForKey(key - 1);
-      }
-    }
-
-    const float keyTop = layout.noteAreaTop + (topSeamUnit * layout.pixelsPerKey) - layout.scrollY;
-    const float keyBottom = layout.noteAreaTop + (bottomSeamUnit * layout.pixelsPerKey) - layout.scrollY;
+  const KeyboardTopology& topology = keyboardTopology();
+  for (int key : topology.whiteKeys) {
+    const KeyboardKeyTopology& keyTopology = topology.keys[static_cast<size_t>(key)];
+    const float keyTop = layout.noteAreaTop + (keyTopology.topSeamUnit * layout.pixelsPerKey) - layout.scrollY;
+    const float keyBottom = layout.noteAreaTop + (keyTopology.bottomSeamUnit * layout.pixelsPerKey) - layout.scrollY;
     const float clippedTop = std::max(layout.noteAreaTop, keyTop);
     const float clippedBottom = std::min(layout.noteAreaTop + layout.noteAreaHeight, keyBottom);
     if (clippedBottom - clippedTop <= 0.5f) {
@@ -1214,12 +1202,8 @@ void PianoRollRhiRenderer::buildDynamicInstances(const PianoRollFrame::Data& fra
 
   // Black-key highlights must render above the static black key faces.
   m_dynamicFrontStart = static_cast<int>(m_dynamicInstances.size());
-  for (int key = 0; key < PianoRollFrame::kMidiKeyCount; ++key) {
-    if (!isBlackKey(key)) {
-      continue;
-    }
-
-    const float centerY = layout.noteAreaTop + (centerUnitForKey(key) * layout.pixelsPerKey) - layout.scrollY;
+  for (int key : topology.blackKeys) {
+    const float centerY = layout.noteAreaTop + (topology.keys[static_cast<size_t>(key)].centerUnit * layout.pixelsPerKey) - layout.scrollY;
     const float blackY = centerY - (blackKeyHeight * 0.5f);
     const float clippedTop = std::max(layout.noteAreaTop, blackY);
     const float clippedBottom = std::min(layout.noteAreaTop + layout.noteAreaHeight, blackY + blackKeyHeight);

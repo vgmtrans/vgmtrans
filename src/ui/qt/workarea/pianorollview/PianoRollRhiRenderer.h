@@ -10,7 +10,6 @@
 
 #include <array>
 #include <cstdint>
-#include <unordered_map>
 #include <vector>
 
 #include "PianoRollFrameData.h"
@@ -69,22 +68,12 @@ private:
   };
 
   struct StaticCacheKey {
-    // Key for CPU-generated static geometry. If any field changes, static
-    // instances are rebuilt and re-uploaded.
-    bool valid = false;
     QSize viewSize;
-    int totalTicks = 0;
-    int ppqn = 0;
     int keyboardWidth = 0;
     int topBarHeight = 0;
-    uint64_t staticTickStart = 0;
-    uint64_t staticTickEnd = 0;
-    uint64_t timeSigPtr = 0;
     uint32_t noteBackgroundColor = 0;
     uint32_t keyboardBackgroundColor = 0;
     uint32_t topBarBackgroundColor = 0;
-    uint32_t measureLineColor = 0;
-    uint32_t beatLineColor = 0;
     uint32_t keySeparatorColor = 0;
     uint32_t whiteKeyColor = 0;
     uint32_t blackKeyColor = 0;
@@ -133,12 +122,6 @@ private:
     float scrollMulY;
   };
 
-  struct CachedStaticBucket {
-    std::vector<RectInstance> backInstances;
-    std::vector<RectInstance> frontInstances;
-    uint64_t lastUsedFrame = 0;
-  };
-
   enum class LineStyle : int {
     Solid = 0,
     DottedVertical = 1,
@@ -153,16 +136,11 @@ private:
   bool ensureInstanceBuffer(QRhiBuffer*& buffer, int bytes, int minBytes);
   Layout computeLayout(const PianoRollFrame::Data& frame, const QSize& pixelSize) const;
   StaticCacheKey makeStaticCacheKey(const PianoRollFrame::Data& frame, const Layout& layout) const;
+  static bool staticCacheKeyEqual(const StaticCacheKey& lhs, const StaticCacheKey& rhs);
   NoteDataKey makeNoteDataKey(const PianoRollFrame::Data& frame) const;
   void rebuildNoteInstances(const PianoRollFrame::Data& frame);
-  uint64_t staticBucketStyleHash(const StaticCacheKey& key) const;
-  uint64_t staticBucketId(const StaticCacheKey& key) const;
-  void trimStaticBucketCache();
-  void clearStaticBucketCache();
 
-  void buildStaticInstances(const PianoRollFrame::Data& frame,
-                            const Layout& layout,
-                            const StaticCacheKey& key);
+  void buildStaticInstances(const PianoRollFrame::Data& frame, const Layout& layout);
   void buildDynamicInstances(const PianoRollFrame::Data& frame, const Layout& layout);
 
   NoteGeometry computeNoteGeometry(const PianoRollFrame::Note& note, const Layout& layout) const;
@@ -208,11 +186,8 @@ private:
   std::vector<NoteInstance> m_noteInstances;
   int m_dynamicFrontStart = 0;
 
-  std::unordered_map<uint64_t, CachedStaticBucket> m_staticBucketCache;
-  uint64_t m_staticBucketStyleHash = 0;
-  uint64_t m_activeStaticBucketId = 0;
-  uint64_t m_frameSerial = 0;
-  bool m_hasActiveStaticBucket = false;
+  bool m_hasStaticCacheKey = false;
+  StaticCacheKey m_staticCacheKey;
   bool m_staticDataDirty = true;
   bool m_noteDataDirty = true;
   bool m_hasNoteDataKey = false;

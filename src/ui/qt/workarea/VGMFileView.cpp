@@ -7,6 +7,8 @@
 #include <QApplication>
 #include <QContextMenuEvent>
 #include <QColor>
+#include <QDebug>
+#include <QElapsedTimer>
 #include <QEvent>
 #include <QMenu>
 #include <QMouseEvent>
@@ -104,6 +106,76 @@ QColor mixerTrackColor(int trackIndex) {
   const int hue = (trackIndex * 43) % 360;
   return QColor::fromHsv(hue, 190, 235);
 }
+
+// Enables optional playback-path profiling with `VGMTRANS_PROFILE_PIANOROLL=1`.
+bool pianoRollProfileEnabled() {
+  return true;
+  // static const bool enabled = qEnvironmentVariableIntValue("VGMTRANS_PROFILE_PIANOROLL") > 0;
+  // return enabled;
+}
+
+// Emits periodic aggregate timing for playback position updates.
+void logPlaybackPositionProfileSample(qint64 elapsedNs, PositionChangeOrigin origin) {
+  static constexpr int kLogEverySamples = 240;
+  struct Totals {
+    int samples = 0;
+    qint64 totalNs = 0;
+    qint64 maxNs = 0;
+    int playbackSamples = 0;
+    int seekBarSamples = 0;
+    int hexViewSamples = 0;
+  };
+
+  static Totals totals;
+  ++totals.samples;
+  totals.totalNs += elapsedNs;
+  totals.maxNs = std::max(totals.maxNs, elapsedNs);
+  switch (origin) {
+    case PositionChangeOrigin::Playback:
+      ++totals.playbackSamples;
+      break;
+    case PositionChangeOrigin::SeekBar:
+      ++totals.seekBarSamples;
+      break;
+    case PositionChangeOrigin::HexView:
+      ++totals.hexViewSamples;
+      break;
+  }
+
+  if (totals.samples < kLogEverySamples) {
+    return;
+  }
+
+  const double avgMs = static_cast<double>(totals.totalNs) / 1000000.0 / static_cast<double>(totals.samples);
+  const double maxMs = static_cast<double>(totals.maxNs) / 1000000.0;
+  qInfo().nospace() << "[VGMFileView::onPlaybackPositionChanged] avg over " << totals.samples
+                    << " calls: avg=" << avgMs << "ms"
+                    << ", max=" << maxMs << "ms"
+                    << ", by-origin(playback/seek/hex)="
+                    << totals.playbackSamples << "/" << totals.seekBarSamples << "/" << totals.hexViewSamples;
+  totals = {};
+}
+
+// Measures one callback invocation and reports it to the aggregate profiler.
+struct PlaybackPositionProfileScope {
+  explicit PlaybackPositionProfileScope(PositionChangeOrigin playbackOrigin)
+      : enabled(pianoRollProfileEnabled()), origin(playbackOrigin) {
+    if (enabled) {
+      timer.start();
+    }
+  }
+
+  ~PlaybackPositionProfileScope() {
+    if (!enabled) {
+      return;
+    }
+    logPlaybackPositionProfileSample(timer.nsecsElapsed(), origin);
+  }
+
+  bool enabled = false;
+  PositionChangeOrigin origin = PositionChangeOrigin::Playback;
+  QElapsedTimer timer;
+};
 
 bool buildPreviewNoteForEvent(const SeqEvent* seqEvent, SequencePlayer::PreviewNote& outNote) {
   if (!seqEvent) {
@@ -1566,6 +1638,7 @@ void VGMFileView::setSequenceControlChannelSolo(int channelId, bool solo) {
 }
 
 void VGMFileView::onPlaybackPositionChanged(int current, int max, PositionChangeOrigin origin) {
+  PlaybackPositionProfileScope profileScope(origin);
   Q_UNUSED(max);
 
   if (!isVisible()) {
