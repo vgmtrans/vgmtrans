@@ -1835,14 +1835,16 @@ void VGMFileView::onPlaybackPositionChanged(int current, int max, PositionChange
   ensureTrackIndexMap(seq);
   const int effectiveTrackCount = effectiveTrackCountForSeq(seq);
   std::vector<ActiveNoteView::ActiveKey> activeKeys;
+  std::vector<PianoRollFrame::Note> activeNotes;
   activeKeys.reserve(m_activeTimedEvents.size());
+  activeNotes.reserve(m_activeTimedEvents.size());
   for (const auto* timed : m_activeTimedEvents) {
     if (!timed || !timed->event) {
       continue;
     }
 
     const int noteKey = SeqNoteUtils::transposedNoteKeyForTimedEvent(seq, timed);
-    if (noteKey < 0) {
+    if (noteKey < 0 || noteKey >= PianoRollFrame::kMidiKeyCount) {
       continue;
     }
 
@@ -1852,6 +1854,12 @@ void VGMFileView::onPlaybackPositionChanged(int current, int max, PositionChange
     }
 
     activeKeys.push_back({trackIndex, noteKey});
+    activeNotes.push_back({
+        timed->startTick,
+        std::max<uint32_t>(1, timed->duration),
+        static_cast<uint8_t>(noteKey),
+        static_cast<int16_t>(trackIndex),
+    });
   }
 
   for (PanelSide side : {PanelSide::Left, PanelSide::Right}) {
@@ -1867,7 +1875,7 @@ void VGMFileView::onPlaybackPositionChanged(int current, int max, PositionChange
       panelUi.pianoRollView->setTrackCount(effectiveTrackCount);
       panelUi.pianoRollView->setSequence(seq);
       panelUi.pianoRollView->refreshSequenceData(false);
-      panelUi.pianoRollView->setPlaybackTick(current, playbackRunning);
+      panelUi.pianoRollView->setPlaybackTick(current, playbackRunning, &activeNotes);
     }
   }
 }

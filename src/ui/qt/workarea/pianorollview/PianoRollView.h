@@ -60,7 +60,9 @@ public:
   void setSelectedItems(const std::vector<const VGMItem*>& items,
                         const VGMItem* primaryItem = nullptr);
 
-  void setPlaybackTick(int tick, bool playbackActive);
+  void setPlaybackTick(int tick,
+                       bool playbackActive,
+                       const std::vector<PianoRollFrame::Note>* activeNotes = nullptr);
   void clearPlaybackState();
   void setSmoothAutoScrollEnabled(bool enabled);
   [[nodiscard]] bool smoothAutoScrollEnabled() const;
@@ -135,6 +137,7 @@ private:
   void resizeTrackEnabledMaskToTrackCount();
   void rebuildTrackColors();
   void rebuildSequenceCache();
+  bool applyResolvedActiveNotes(const std::vector<PianoRollFrame::Note>& resolvedActiveNotes);
   bool updateActiveKeyStates();
 
   void syncViewportLayoutState();
