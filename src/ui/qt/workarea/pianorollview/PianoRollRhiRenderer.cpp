@@ -35,7 +35,7 @@ static const float kVertices[] = {
 static const quint16 kIndices[] = {0, 1, 2, 0, 2, 3};
 
 static constexpr int kMat4Bytes = 16 * sizeof(float);
-static constexpr int kUniformBytes = (16 + 4 + 4) * sizeof(float);
+static constexpr int kUniformBytes = (16 + 4 + 4 + 4) * sizeof(float);
 static constexpr float kDashSegmentPx = 4.0f;
 static constexpr float kDashGapPx = 4.0f;
 
@@ -88,6 +88,9 @@ void PianoRollRhiRenderer::releaseResources() {
     m_rhi->makeThreadLocalNativeContextCurrent();
   }
 
+  delete m_notePipeline;
+  m_notePipeline = nullptr;
+
   delete m_pipeline;
   m_pipeline = nullptr;
 
@@ -102,6 +105,9 @@ void PianoRollRhiRenderer::releaseResources() {
 
   delete m_dynamicInstanceBuffer;
   m_dynamicInstanceBuffer = nullptr;
+
+  delete m_noteInstanceBuffer;
+  m_noteInstanceBuffer = nullptr;
 
   delete m_uniformBuffer;
   m_uniformBuffer = nullptr;
@@ -119,6 +125,7 @@ void PianoRollRhiRenderer::releaseResources() {
   m_staticBackInstances.clear();
   m_staticFrontInstances.clear();
   m_dynamicInstances.clear();
+  m_noteInstances.clear();
   m_dynamicFrontStart = 0;
   clearStaticBucketCache();
   m_staticBucketStyleHash = 0;
@@ -126,6 +133,9 @@ void PianoRollRhiRenderer::releaseResources() {
   m_frameSerial = 0;
   m_hasActiveStaticBucket = false;
   m_staticDataDirty = true;
+  m_noteDataDirty = true;
+  m_hasNoteDataKey = false;
+  m_noteDataKey = {};
   m_rhi = nullptr;
 }
 
@@ -148,9 +158,19 @@ void PianoRollRhiRenderer::renderFrame(QRhiCommandBuffer* cb, const RenderTarget
   }
 
   const Layout layout = computeLayout(frame, logicalSize);
-  const uint64_t trackColorsHash = hashTrackColors(frame.trackColors);
-  const uint64_t trackEnabledHash = hashTrackEnabled(frame.trackEnabled);
-  const StaticCacheKey key = makeStaticCacheKey(frame, layout, trackColorsHash, trackEnabledHash);
+  const StaticCacheKey key = makeStaticCacheKey(frame, layout);
+  const NoteDataKey noteKey = makeNoteDataKey(frame);
+  if (!m_hasNoteDataKey ||
+      noteKey.notesPtr != m_noteDataKey.notesPtr ||
+      noteKey.trackColorsHash != m_noteDataKey.trackColorsHash ||
+      noteKey.trackEnabledHash != m_noteDataKey.trackEnabledHash ||
+      noteKey.noteBackgroundColor != m_noteDataKey.noteBackgroundColor) {
+    rebuildNoteInstances(frame);
+    m_noteDataKey = noteKey;
+    m_hasNoteDataKey = true;
+    m_noteDataDirty = true;
+  }
+
   const uint64_t styleHash = staticBucketStyleHash(key);
   const uint64_t bucketId = staticBucketId(key);
 
@@ -174,16 +194,15 @@ void PianoRollRhiRenderer::renderFrame(QRhiCommandBuffer* cb, const RenderTarget
   }
 
   if (!m_hasActiveStaticBucket || m_activeStaticBucketId != bucketId) {
-    m_staticBackInstances = bucketIt->second.backInstances;
-    m_staticFrontInstances = bucketIt->second.frontInstances;
     m_activeStaticBucketId = bucketId;
     m_hasActiveStaticBucket = true;
     m_staticDataDirty = true;
   }
+  const CachedStaticBucket* activeStaticBucket = &bucketIt->second;
   // Dynamic overlays (active notes, scanline, progress) update every frame.
   buildDynamicInstances(frame, layout);
 
-  ensurePipeline(target.renderPassDesc, std::max(1, target.sampleCount));
+  ensurePipelines(target.renderPassDesc, std::max(1, target.sampleCount));
 
   QRhiResourceUpdateBatch* updates = m_rhi->nextResourceUpdateBatch();
   if (!m_staticBuffersUploaded) {
@@ -199,7 +218,7 @@ void PianoRollRhiRenderer::renderFrame(QRhiCommandBuffer* cb, const RenderTarget
             0.0f,
             -1.0f,
             1.0f);
-  std::array<float, 24> ubo{};
+  std::array<float, 28> ubo{};
   std::memcpy(ubo.data(), mvp.constData(), kMat4Bytes);
   // Camera packs scroll and world-space scale factors for shader-side transforms.
   ubo[16] = layout.scrollX;
@@ -208,22 +227,32 @@ void PianoRollRhiRenderer::renderFrame(QRhiCommandBuffer* cb, const RenderTarget
   ubo[19] = layout.pixelsPerKey;
   ubo[20] = layout.noteAreaLeft;
   ubo[21] = layout.noteAreaTop;
-  ubo[22] = 0.0f;
-  ubo[23] = 0.0f;
+  ubo[22] = layout.noteAreaLeft + layout.noteAreaWidth;
+  ubo[23] = layout.noteAreaTop + layout.noteAreaHeight;
+  ubo[24] = frame.noteOutlineColor.redF();
+  ubo[25] = frame.noteOutlineColor.greenF();
+  ubo[26] = frame.noteOutlineColor.blueF();
+  ubo[27] = frame.noteOutlineColor.alphaF();
   updates->updateDynamicBuffer(m_uniformBuffer, 0, kUniformBytes, ubo.data());
 
-  if (m_staticDataDirty) {
-    if (!m_staticBackInstances.empty()) {
-      const int staticBackBytes = static_cast<int>(m_staticBackInstances.size() * sizeof(RectInstance));
+  if (m_staticDataDirty && activeStaticBucket) {
+    if (!activeStaticBucket->backInstances.empty()) {
+      const int staticBackBytes = static_cast<int>(activeStaticBucket->backInstances.size() * sizeof(RectInstance));
       if (ensureInstanceBuffer(m_staticBackInstanceBuffer, staticBackBytes, 16384)) {
-        updates->updateDynamicBuffer(m_staticBackInstanceBuffer, 0, staticBackBytes, m_staticBackInstances.data());
+        updates->updateDynamicBuffer(m_staticBackInstanceBuffer,
+                                     0,
+                                     staticBackBytes,
+                                     activeStaticBucket->backInstances.data());
       }
     }
 
-    if (!m_staticFrontInstances.empty()) {
-      const int staticFrontBytes = static_cast<int>(m_staticFrontInstances.size() * sizeof(RectInstance));
+    if (!activeStaticBucket->frontInstances.empty()) {
+      const int staticFrontBytes = static_cast<int>(activeStaticBucket->frontInstances.size() * sizeof(RectInstance));
       if (ensureInstanceBuffer(m_staticFrontInstanceBuffer, staticFrontBytes, 4096)) {
-        updates->updateDynamicBuffer(m_staticFrontInstanceBuffer, 0, staticFrontBytes, m_staticFrontInstances.data());
+        updates->updateDynamicBuffer(m_staticFrontInstanceBuffer,
+                                     0,
+                                     staticFrontBytes,
+                                     activeStaticBucket->frontInstances.data());
       }
     }
     m_staticDataDirty = false;
@@ -236,41 +265,67 @@ void PianoRollRhiRenderer::renderFrame(QRhiCommandBuffer* cb, const RenderTarget
     }
   }
 
+  if (m_noteDataDirty) {
+    if (!m_noteInstances.empty()) {
+      const int noteBytes = static_cast<int>(m_noteInstances.size() * sizeof(NoteInstance));
+      if (ensureInstanceBuffer(m_noteInstanceBuffer, noteBytes, 16384)) {
+        updates->updateDynamicBuffer(m_noteInstanceBuffer, 0, noteBytes, m_noteInstances.data());
+      }
+    }
+    m_noteDataDirty = false;
+  }
+
   cb->beginPass(target.renderTarget, frame.backgroundColor, {1.0f, 0}, updates);
   cb->setViewport(QRhiViewport(0,
                                0,
                                static_cast<float>(target.pixelSize.width()),
                                static_cast<float>(target.pixelSize.height())));
 
-  if (m_pipeline && m_shaderBindings) {
+  auto drawRectInstances = [&](QRhiBuffer* buffer, int count, int firstInstance = 0) {
+    if (!m_pipeline || !m_shaderBindings || !buffer || count <= 0) {
+      return;
+    }
+
     cb->setGraphicsPipeline(m_pipeline);
     cb->setShaderResources(m_shaderBindings);
-
-    auto drawInstances = [&](QRhiBuffer* buffer, int count, int firstInstance = 0) {
-      if (!buffer || count <= 0) {
-        return;
-      }
-
-      const QRhiCommandBuffer::VertexInput bindings[] = {
-          {m_vertexBuffer, 0},
-          {buffer, 0},
-      };
-      cb->setVertexInput(0,
-                         static_cast<int>(std::size(bindings)),
-                         bindings,
-                         m_indexBuffer,
-                         0,
-                         QRhiCommandBuffer::IndexUInt16);
-      cb->drawIndexed(6, count, 0, 0, firstInstance);
+    const QRhiCommandBuffer::VertexInput bindings[] = {
+        {m_vertexBuffer, 0},
+        {buffer, 0},
     };
+    cb->setVertexInput(0,
+                       static_cast<int>(std::size(bindings)),
+                       bindings,
+                       m_indexBuffer,
+                       0,
+                       QRhiCommandBuffer::IndexUInt16);
+    cb->drawIndexed(6, count, 0, 0, firstInstance);
+  };
 
-    const int dynamicCount = static_cast<int>(m_dynamicInstances.size());
-    const int dynamicFrontStart = std::clamp(m_dynamicFrontStart, 0, dynamicCount);
-    drawInstances(m_staticBackInstanceBuffer, static_cast<int>(m_staticBackInstances.size()));
-    drawInstances(m_dynamicInstanceBuffer, dynamicFrontStart, 0);
-    drawInstances(m_staticFrontInstanceBuffer, static_cast<int>(m_staticFrontInstances.size()));
-    drawInstances(m_dynamicInstanceBuffer, dynamicCount - dynamicFrontStart, dynamicFrontStart);
+  const int staticBackCount = activeStaticBucket ? static_cast<int>(activeStaticBucket->backInstances.size()) : 0;
+  const int staticFrontCount = activeStaticBucket ? static_cast<int>(activeStaticBucket->frontInstances.size()) : 0;
+  drawRectInstances(m_staticBackInstanceBuffer, staticBackCount);
+
+  if (m_notePipeline && m_shaderBindings && m_noteInstanceBuffer && !m_noteInstances.empty()) {
+    cb->setGraphicsPipeline(m_notePipeline);
+    cb->setShaderResources(m_shaderBindings);
+    const QRhiCommandBuffer::VertexInput noteBindings[] = {
+        {m_vertexBuffer, 0},
+        {m_noteInstanceBuffer, 0},
+    };
+    cb->setVertexInput(0,
+                       static_cast<int>(std::size(noteBindings)),
+                       noteBindings,
+                       m_indexBuffer,
+                       0,
+                       QRhiCommandBuffer::IndexUInt16);
+    cb->drawIndexed(6, static_cast<int>(m_noteInstances.size()), 0, 0, 0);
   }
+
+  const int dynamicCount = static_cast<int>(m_dynamicInstances.size());
+  const int dynamicFrontStart = std::clamp(m_dynamicFrontStart, 0, dynamicCount);
+  drawRectInstances(m_dynamicInstanceBuffer, dynamicFrontStart, 0);
+  drawRectInstances(m_staticFrontInstanceBuffer, staticFrontCount);
+  drawRectInstances(m_dynamicInstanceBuffer, dynamicCount - dynamicFrontStart, dynamicFrontStart);
 
   cb->endPass();
 }
@@ -299,7 +354,7 @@ uint64_t PianoRollRhiRenderer::hashTrackColors(const std::vector<QColor>& colors
   return hash;
 }
 
-// Hashes track-enabled state so static geometry cache invalidates on mute/solo changes.
+// Hashes track-enabled state for note-instance cache invalidation on mute/solo changes.
 uint64_t PianoRollRhiRenderer::hashTrackEnabled(const std::vector<uint8_t>& trackEnabled) {
   uint64_t hash = 1469598103934665603ULL;
   for (const uint8_t enabled : trackEnabled) {
@@ -315,16 +370,21 @@ uint32_t PianoRollRhiRenderer::colorKey(const QColor& color) {
   return color.rgba();
 }
 
-void PianoRollRhiRenderer::ensurePipeline(QRhiRenderPassDescriptor* renderPassDesc, int sampleCount) {
+// Recreates draw pipelines when render-target sample state changes.
+void PianoRollRhiRenderer::ensurePipelines(QRhiRenderPassDescriptor* renderPassDesc, int sampleCount) {
   if (!renderPassDesc) {
     return;
   }
 
-  if (m_pipeline && m_shaderBindings && m_outputRenderPass == renderPassDesc && m_sampleCount == sampleCount) {
+  if (m_pipeline && m_notePipeline && m_shaderBindings &&
+      m_outputRenderPass == renderPassDesc && m_sampleCount == sampleCount) {
     return;
   }
 
   // Render pass/sample count changes require a fresh pipeline.
+  delete m_notePipeline;
+  m_notePipeline = nullptr;
+
   delete m_pipeline;
   m_pipeline = nullptr;
 
@@ -337,20 +397,27 @@ void PianoRollRhiRenderer::ensurePipeline(QRhiRenderPassDescriptor* renderPassDe
   m_shaderBindings = m_rhi->newShaderResourceBindings();
   m_shaderBindings->setBindings({
       QRhiShaderResourceBinding::uniformBuffer(0,
-                                               QRhiShaderResourceBinding::VertexStage,
+                                               QRhiShaderResourceBinding::VertexStage |
+                                                   QRhiShaderResourceBinding::FragmentStage,
                                                m_uniformBuffer),
   });
   m_shaderBindings->create();
 
-  QShader vertexShader = loadShader(":/shaders/pianorollquad.vert.qsb");
-  QShader fragmentShader = loadShader(":/shaders/pianorollquad.frag.qsb");
+  QRhiGraphicsPipeline::TargetBlend blend;
+  blend.enable = true;
+  blend.srcColor = QRhiGraphicsPipeline::SrcAlpha;
+  blend.dstColor = QRhiGraphicsPipeline::OneMinusSrcAlpha;
+  blend.srcAlpha = QRhiGraphicsPipeline::One;
+  blend.dstAlpha = QRhiGraphicsPipeline::OneMinusSrcAlpha;
 
-  QRhiVertexInputLayout inputLayout;
-  inputLayout.setBindings({
+  QShader rectVertexShader = loadShader(":/shaders/pianorollquad.vert.qsb");
+  QShader rectFragmentShader = loadShader(":/shaders/pianorollquad.frag.qsb");
+  QRhiVertexInputLayout rectInputLayout;
+  rectInputLayout.setBindings({
       {2 * static_cast<int>(sizeof(float))},
       {static_cast<int>(sizeof(RectInstance)), QRhiVertexInputBinding::PerInstance},
   });
-  inputLayout.setAttributes({
+  rectInputLayout.setAttributes({
       {0, 0, QRhiVertexInputAttribute::Float2, 0},
       {1, 1, QRhiVertexInputAttribute::Float4, 0},
       {1, 2, QRhiVertexInputAttribute::Float4, 4 * static_cast<int>(sizeof(float))},
@@ -363,22 +430,40 @@ void PianoRollRhiRenderer::ensurePipeline(QRhiRenderPassDescriptor* renderPassDe
   m_pipeline->setTopology(QRhiGraphicsPipeline::Triangles);
   m_pipeline->setSampleCount(m_sampleCount);
   m_pipeline->setShaderStages({
-      {QRhiShaderStage::Vertex, vertexShader},
-      {QRhiShaderStage::Fragment, fragmentShader},
+      {QRhiShaderStage::Vertex, rectVertexShader},
+      {QRhiShaderStage::Fragment, rectFragmentShader},
   });
   m_pipeline->setShaderResourceBindings(m_shaderBindings);
-  m_pipeline->setVertexInputLayout(inputLayout);
-
-  QRhiGraphicsPipeline::TargetBlend blend;
-  blend.enable = true;
-  blend.srcColor = QRhiGraphicsPipeline::SrcAlpha;
-  blend.dstColor = QRhiGraphicsPipeline::OneMinusSrcAlpha;
-  blend.srcAlpha = QRhiGraphicsPipeline::One;
-  blend.dstAlpha = QRhiGraphicsPipeline::OneMinusSrcAlpha;
+  m_pipeline->setVertexInputLayout(rectInputLayout);
   m_pipeline->setTargetBlends({blend});
-
   m_pipeline->setRenderPassDescriptor(renderPassDesc);
   m_pipeline->create();
+
+  QShader noteVertexShader = loadShader(":/shaders/pianorollnote.vert.qsb");
+  QShader noteFragmentShader = loadShader(":/shaders/pianorollnote.frag.qsb");
+  QRhiVertexInputLayout noteInputLayout;
+  noteInputLayout.setBindings({
+      {2 * static_cast<int>(sizeof(float))},
+      {static_cast<int>(sizeof(NoteInstance)), QRhiVertexInputBinding::PerInstance},
+  });
+  noteInputLayout.setAttributes({
+      {0, 0, QRhiVertexInputAttribute::Float2, 0},
+      {1, 1, QRhiVertexInputAttribute::Float4, 0},
+      {1, 2, QRhiVertexInputAttribute::Float4, 4 * static_cast<int>(sizeof(float))},
+  });
+
+  m_notePipeline = m_rhi->newGraphicsPipeline();
+  m_notePipeline->setTopology(QRhiGraphicsPipeline::Triangles);
+  m_notePipeline->setSampleCount(m_sampleCount);
+  m_notePipeline->setShaderStages({
+      {QRhiShaderStage::Vertex, noteVertexShader},
+      {QRhiShaderStage::Fragment, noteFragmentShader},
+  });
+  m_notePipeline->setShaderResourceBindings(m_shaderBindings);
+  m_notePipeline->setVertexInputLayout(noteInputLayout);
+  m_notePipeline->setTargetBlends({blend});
+  m_notePipeline->setRenderPassDescriptor(renderPassDesc);
+  m_notePipeline->create();
 }
 
 bool PianoRollRhiRenderer::ensureInstanceBuffer(QRhiBuffer*& buffer, int bytes, int minBytes) {
@@ -431,9 +516,7 @@ PianoRollRhiRenderer::Layout PianoRollRhiRenderer::computeLayout(const PianoRoll
 }
 
 PianoRollRhiRenderer::StaticCacheKey PianoRollRhiRenderer::makeStaticCacheKey(const PianoRollFrame::Data& frame,
-                                                                               const Layout& layout,
-                                                                               uint64_t trackColorsHash,
-                                                                               uint64_t trackEnabledHash) const {
+                                                                               const Layout& layout) const {
   StaticCacheKey key;
   key.valid = true;
   key.viewSize = QSize(layout.viewWidth, layout.viewHeight);
@@ -453,23 +536,78 @@ PianoRollRhiRenderer::StaticCacheKey PianoRollRhiRenderer::makeStaticCacheKey(co
     key.staticTickStart = (bucketStart > prePad) ? (bucketStart - prePad) : 0;
     key.staticTickEnd = std::min<uint64_t>(totalTickEnd, bucketStart + bucketTicks + postPad);
   }
-  key.notesPtr = reinterpret_cast<uint64_t>(frame.notes.get());
   key.timeSigPtr = reinterpret_cast<uint64_t>(frame.timeSignatures.get());
-  key.trackColorsHash = trackColorsHash;
-  key.trackEnabledHash = trackEnabledHash;
   key.noteBackgroundColor = colorKey(frame.noteBackgroundColor);
   key.keyboardBackgroundColor = colorKey(frame.keyboardBackgroundColor);
   key.topBarBackgroundColor = colorKey(frame.topBarBackgroundColor);
   key.measureLineColor = colorKey(frame.measureLineColor);
   key.beatLineColor = colorKey(frame.beatLineColor);
   key.keySeparatorColor = colorKey(frame.keySeparatorColor);
-  key.noteOutlineColor = colorKey(frame.noteOutlineColor);
   key.whiteKeyColor = colorKey(frame.whiteKeyColor);
   key.blackKeyColor = colorKey(frame.blackKeyColor);
   key.whiteKeyRowColor = colorKey(frame.whiteKeyRowColor);
   key.blackKeyRowColor = colorKey(frame.blackKeyRowColor);
   key.dividerColor = colorKey(frame.dividerColor);
   return key;
+}
+
+// Builds a compact cache key for note-instance uploads.
+PianoRollRhiRenderer::NoteDataKey PianoRollRhiRenderer::makeNoteDataKey(const PianoRollFrame::Data& frame) const {
+  NoteDataKey key;
+  key.notesPtr = reinterpret_cast<uint64_t>(frame.notes.get());
+  key.trackColorsHash = hashTrackColors(frame.trackColors);
+  key.trackEnabledHash = hashTrackEnabled(frame.trackEnabled);
+  key.noteBackgroundColor = colorKey(frame.noteBackgroundColor);
+  return key;
+}
+
+// Converts sequence notes into persistent GPU note instances.
+void PianoRollRhiRenderer::rebuildNoteInstances(const PianoRollFrame::Data& frame) {
+  m_noteInstances.clear();
+  if (!frame.notes || frame.notes->empty()) {
+    return;
+  }
+
+  m_noteInstances.reserve(frame.notes->size());
+  const auto colorForTrack = [&](int trackIndex) -> QColor {
+    if (trackIndex >= 0 && trackIndex < static_cast<int>(frame.trackColors.size())) {
+      return frame.trackColors[static_cast<size_t>(trackIndex)];
+    }
+    return QColor::fromHsv((trackIndex * 43) % 360, 190, 235);
+  };
+  const auto isTrackEnabled = [&](int trackIndex) -> bool {
+    return trackIndex < 0 || trackIndex >= static_cast<int>(frame.trackEnabled.size()) ||
+           frame.trackEnabled[static_cast<size_t>(trackIndex)] != 0;
+  };
+
+  for (const PianoRollFrame::Note& note : *frame.notes) {
+    const bool trackEnabled = isTrackEnabled(note.trackIndex);
+    QColor fillColor;
+    if (trackEnabled) {
+      fillColor = colorForTrack(note.trackIndex);
+      fillColor.setAlpha(188);
+    } else {
+      const QColor trackColor = colorForTrack(note.trackIndex);
+      const QColor bgColor = frame.noteBackgroundColor;
+      static constexpr float kTrackMix = 0.40f;
+      fillColor = QColor::fromRgbF(
+          (bgColor.redF() * (1.0f - kTrackMix)) + (trackColor.redF() * kTrackMix),
+          (bgColor.greenF() * (1.0f - kTrackMix)) + (trackColor.greenF() * kTrackMix),
+          (bgColor.blueF() * (1.0f - kTrackMix)) + (trackColor.blueF() * kTrackMix),
+          0.78f);
+    }
+
+    m_noteInstances.push_back(NoteInstance{
+        static_cast<float>(note.startTick),
+        static_cast<float>(std::max<uint32_t>(1, note.duration)),
+        static_cast<float>(note.key),
+        trackEnabled ? 1.0f : 0.0f,
+        fillColor.redF(),
+        fillColor.greenF(),
+        fillColor.blueF(),
+        fillColor.alphaF(),
+    });
+  }
 }
 
 uint64_t PianoRollRhiRenderer::staticBucketStyleHash(const StaticCacheKey& key) const {
@@ -485,17 +623,13 @@ uint64_t PianoRollRhiRenderer::staticBucketStyleHash(const StaticCacheKey& key) 
   hashMix(static_cast<uint64_t>(key.ppqn));
   hashMix(static_cast<uint64_t>(key.keyboardWidth));
   hashMix(static_cast<uint64_t>(key.topBarHeight));
-  hashMix(key.notesPtr);
   hashMix(key.timeSigPtr);
-  hashMix(key.trackColorsHash);
-  hashMix(key.trackEnabledHash);
   hashMix(key.noteBackgroundColor);
   hashMix(key.keyboardBackgroundColor);
   hashMix(key.topBarBackgroundColor);
   hashMix(key.measureLineColor);
   hashMix(key.beatLineColor);
   hashMix(key.keySeparatorColor);
-  hashMix(key.noteOutlineColor);
   hashMix(key.whiteKeyColor);
   hashMix(key.blackKeyColor);
   hashMix(key.whiteKeyRowColor);
@@ -788,100 +922,6 @@ void PianoRollRhiRenderer::buildStaticInstances(const PianoRollFrame::Data& fram
       }
     }
   }
-
-  const auto colorForTrack = [&](int trackIndex) -> QColor {
-    if (trackIndex >= 0 && trackIndex < static_cast<int>(frame.trackColors.size())) {
-      return frame.trackColors[static_cast<size_t>(trackIndex)];
-    }
-    return QColor::fromHsv((trackIndex * 43) % 360, 190, 235);
-  };
-  const auto isTrackEnabled = [&](int trackIndex) -> bool {
-    return trackIndex < 0 || trackIndex >= static_cast<int>(frame.trackEnabled.size()) ||
-           frame.trackEnabled[static_cast<size_t>(trackIndex)] != 0;
-  };
-
-  static constexpr float kNoteInsetUnits = 0.04f;
-  static constexpr float kNoteHeightUnits = 1.0f - (kNoteInsetUnits * 2.0f);
-  forEachNoteInRange(frame, staticTickStart, staticTickEnd, [&](const PianoRollFrame::Note& note, uint64_t noteEndTick) {
-    if (note.key >= PianoRollFrame::kMidiKeyCount) {
-      return;
-    }
-
-    const float noteW = std::max(0.0f, static_cast<float>(noteEndTick - note.startTick));
-    if (noteW <= 0.0f) {
-      return;
-    }
-    const float noteY = (127.0f - static_cast<float>(note.key)) + kNoteInsetUnits;
-
-    const bool trackEnabled = isTrackEnabled(note.trackIndex);
-    QColor noteColor;
-    if (trackEnabled) {
-      noteColor = colorForTrack(note.trackIndex);
-      noteColor.setAlpha(188);
-    } else {
-      const QColor trackColor = colorForTrack(note.trackIndex);
-      const QColor bgColor = frame.noteBackgroundColor;
-      static constexpr float kTrackMix = 0.40f;
-      const float r = (bgColor.redF() * (1.0f - kTrackMix)) + (trackColor.redF() * kTrackMix);
-      const float g = (bgColor.greenF() * (1.0f - kTrackMix)) + (trackColor.greenF() * kTrackMix);
-      const float b = (bgColor.blueF() * (1.0f - kTrackMix)) + (trackColor.blueF() * kTrackMix);
-      noteColor = QColor::fromRgbF(r, g, b, 0.78f);
-    }
-    appendRect(m_staticBackInstances,
-               static_cast<float>(note.startTick),
-               noteY,
-               noteW,
-               kNoteHeightUnits,
-               noteColor,
-               LineStyle::Solid,
-               0.0f,
-               0.0f,
-               0.0f,
-               1.0f,
-               1.0f,
-               1.0f,
-               1.0f,
-               1.0f,
-               1.0f);
-
-    if (!trackEnabled) {
-      return;
-    }
-
-    const float edgeThicknessPx = 1.0f;
-    appendRect(m_staticBackInstances,
-               static_cast<float>(note.startTick),
-               noteY,
-               noteW,
-               edgeThicknessPx,
-               frame.noteOutlineColor,
-               LineStyle::Solid,
-               0.0f,
-               0.0f,
-               0.0f,
-               1.0f,
-               1.0f,
-               1.0f,
-               1.0f,
-               1.0f,
-               0.0f);
-    appendRect(m_staticBackInstances,
-               static_cast<float>(note.startTick),
-               noteY + kNoteHeightUnits,
-               noteW,
-               edgeThicknessPx,
-               frame.noteOutlineColor,
-               LineStyle::Solid,
-               0.0f,
-               0.0f,
-               0.0f,
-               1.0f,
-               1.0f,
-               1.0f,
-               1.0f,
-               1.0f,
-               0.0f);
-  });
 
   const float blackKeyWidth = std::max(10.0f, layout.keyboardWidth * 0.63f);
   const float blackKeyHeightUnits = 1.0f;
@@ -1322,52 +1362,6 @@ void PianoRollRhiRenderer::buildDynamicInstances(const PianoRollFrame::Data& fra
                std::max(0.0f, clippedBottom - clippedTop - 2.0f),
                active);
   }
-}
-
-template <typename Fn>
-void PianoRollRhiRenderer::forEachNoteInRange(const PianoRollFrame::Data& frame,
-                                              uint64_t startTick,
-                                              uint64_t endTick,
-                                              Fn&& fn) const {
-  if (!frame.notes || frame.notes->empty()) {
-    return;
-  }
-
-  const auto& notes = *frame.notes;
-  const uint64_t maxDuration = std::max<uint64_t>(1, frame.maxNoteDurationTicks);
-  // Start before range to include long notes whose start is off-screen but body is visible.
-  const uint64_t searchStart = (startTick > maxDuration)
-                                   ? (startTick - maxDuration)
-                                   : 0;
-
-  auto it = std::lower_bound(notes.begin(),
-                             notes.end(),
-                             searchStart,
-                             [](const PianoRollFrame::Note& note, uint64_t tick) {
-                               return note.startTick < tick;
-                             });
-
-  for (; it != notes.end(); ++it) {
-    if (it->startTick > endTick) {
-      break;
-    }
-
-    const uint64_t noteDuration = std::max<uint64_t>(1, it->duration);
-    const uint64_t noteEndTick = static_cast<uint64_t>(it->startTick) + noteDuration;
-    if (noteEndTick < startTick) {
-      continue;
-    }
-
-    fn(*it, noteEndTick);
-  }
-}
-
-template <typename Fn>
-void PianoRollRhiRenderer::forEachVisibleNote(const PianoRollFrame::Data& frame,
-                                              const Layout& layout,
-                                              Fn&& fn) const {
-  // Start search a bit before the viewport so long notes crossing into view are included.
-  forEachNoteInRange(frame, layout.visibleStartTick, layout.visibleEndTick, std::forward<Fn>(fn));
 }
 
 PianoRollRhiRenderer::NoteGeometry PianoRollRhiRenderer::computeNoteGeometry(const PianoRollFrame::Note& note,
