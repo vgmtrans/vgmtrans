@@ -21,7 +21,7 @@ body:
       options:
         - Build failure (CMake/configure error)
         - Build failure (compilation/link error)
-        - Packaging issue (installer/AppImage/etc.)
+        - Packaging issue (macOS image/Flatpak/etc.)
         - Not sure
     validations:
       required: true
@@ -89,11 +89,11 @@ body:
     attributes:
       label: Packaging details (if applicable)
       description: |
-        If this is a packaging issue, specify packaging type (AppImage, installer, etc.),
+        If this is a packaging issue, specify packaging type (Flatpak, macOS image, etc.),
         how it was produced, what fails (launch error, missing DLL, etc.)
       placeholder: |
         Example:
-        AppImage built via CPack.
+        Flatpak built with command: ...
         Fails at runtime with:
         error while loading shared libraries: ...
     validations:
