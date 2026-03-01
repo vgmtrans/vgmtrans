@@ -43,6 +43,7 @@
 
 namespace {
 constexpr int kNoteSelectionAutoScrollIntervalMs = 16;
+constexpr int kPlaybackAutoScrollDurationMs = 1000;
 constexpr float kPlaybackPageTriggerFraction = 0.90f;
 constexpr float kPlaybackPageTargetFraction = 0.05f;
 const QColor kDisabledTrackColor(132, 132, 132);
@@ -96,6 +97,20 @@ PianoRollView::PianoRollView(QWidget* parent)
     applyVerticalScale(value.toFloat(), m_verticalZoomAnchor, m_verticalZoomWorldY);
   });
 
+  m_playbackAutoScrollAnimation = new QVariantAnimation(this);
+  m_playbackAutoScrollAnimation->setDuration(kPlaybackAutoScrollDurationMs);
+  m_playbackAutoScrollAnimation->setEasingCurve(QEasingCurve::OutQuint);
+  connect(m_playbackAutoScrollAnimation, &QVariantAnimation::valueChanged, this, [this](const QVariant& value) {
+    auto* hbar = horizontalScrollBar();
+    if (!hbar) {
+      return;
+    }
+
+    m_applyingPlaybackAutoScroll = true;
+    hbar->setValue(std::clamp(value.toInt(), hbar->minimum(), hbar->maximum()));
+    m_applyingPlaybackAutoScroll = false;
+  });
+
   m_rhiHost = new PianoRollRhiHost(this, viewport());
   // Host owns whichever render surface backend is active on this platform.
   m_rhiHost->setGeometry(viewport()->rect());
@@ -125,6 +140,7 @@ void PianoRollView::setSequence(VGMSeq* seq) {
     return;
   }
 
+  stopPlaybackAutoScrollAnimation();
   clearPreviewNotes();
 
   m_seq = seq;
@@ -265,6 +281,10 @@ void PianoRollView::setPlaybackTick(int tick, bool playbackActive) {
   m_currentTick = tick;
   m_playbackActive = playbackActive;
 
+  if (playbackStateChanged && !m_playbackActive) {
+    stopPlaybackAutoScrollAnimation();
+  }
+
   if (playbackStateChanged && m_playbackActive) {
     m_playbackAutoScrollEnabled = true;
     if (!isPlaybackTickVisible(tick)) {
@@ -293,6 +313,7 @@ void PianoRollView::setPlaybackTick(int tick, bool playbackActive) {
 }
 
 void PianoRollView::clearPlaybackState() {
+  stopPlaybackAutoScrollAnimation();
   m_playbackActive = false;
   m_currentTick = 0;
   m_playbackAutoScrollEnabled = true;
@@ -412,6 +433,7 @@ void PianoRollView::scrollContentsBy(int dx, int dy) {
   QAbstractScrollArea::scrollContentsBy(dx, dy);
   Q_UNUSED(dy);
   if (dx != 0 && m_playbackActive && !m_applyingPlaybackAutoScroll && !m_applyingHorizontalZoomScroll) {
+    stopPlaybackAutoScrollAnimation();
     m_playbackAutoScrollEnabled = false;
   }
   requestRenderCoalesced();
@@ -1273,6 +1295,13 @@ void PianoRollView::scheduleCoalescedRender(int delayMs) {
   });
 }
 
+void PianoRollView::stopPlaybackAutoScrollAnimation() {
+  if (m_playbackAutoScrollAnimation && m_playbackAutoScrollAnimation->state() == QAbstractAnimation::Running) {
+    m_playbackAutoScrollAnimation->stop();
+  }
+  m_applyingPlaybackAutoScroll = false;
+}
+
 QPoint PianoRollView::viewportPosFromGlobal(const QPointF& globalPos) const {
   const QPoint globalPoint = globalPos.toPoint();
   if (m_rhiHost) {
@@ -1363,10 +1392,17 @@ void PianoRollView::scrollPlaybackTickToViewportFraction(int tick, float viewpor
   if (clampedScrollX == hbar->value()) {
     return;
   }
+  if (!m_playbackAutoScrollAnimation) {
+    m_applyingPlaybackAutoScroll = true;
+    hbar->setValue(clampedScrollX);
+    m_applyingPlaybackAutoScroll = false;
+    return;
+  }
 
-  m_applyingPlaybackAutoScroll = true;
-  hbar->setValue(clampedScrollX);
-  m_applyingPlaybackAutoScroll = false;
+  m_playbackAutoScrollAnimation->stop();
+  m_playbackAutoScrollAnimation->setStartValue(hbar->value());
+  m_playbackAutoScrollAnimation->setEndValue(clampedScrollX);
+  m_playbackAutoScrollAnimation->start();
 }
 
 QRect PianoRollView::graphRectInViewport() const {

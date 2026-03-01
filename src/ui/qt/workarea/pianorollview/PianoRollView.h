@@ -141,6 +141,7 @@ private:
   void requestRender();
   void requestRenderCoalesced();
   void scheduleCoalescedRender(int delayMs);
+  void stopPlaybackAutoScrollAnimation();
 
   [[nodiscard]] QPoint viewportPosFromGlobal(const QPointF& globalPos) const;
   [[nodiscard]] QPoint graphWorldPosFromViewport(const QPoint& viewportPos) const;
@@ -221,6 +222,7 @@ private:
   QElapsedTimer m_renderClock;
   QVariantAnimation* m_horizontalZoomAnimation = nullptr;
   QVariantAnimation* m_verticalZoomAnimation = nullptr;
+  QVariantAnimation* m_playbackAutoScrollAnimation = nullptr;
   float m_horizontalZoomWorldTick = 0.0f;
   int m_horizontalZoomAnchor = 0;
   float m_verticalZoomWorldY = 0.0f;
