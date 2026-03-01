@@ -115,12 +115,14 @@ bool pianoRollProfileEnabled() {
 }
 
 // Emits periodic aggregate timing for playback position updates.
-void logPlaybackPositionProfileSample(qint64 elapsedNs, PositionChangeOrigin origin) {
+void logPlaybackPositionProfileSample(qint64 elapsedNs, qint64 sequenceControlNs, PositionChangeOrigin origin) {
   static constexpr int kLogEverySamples = 240;
   struct Totals {
     int samples = 0;
     qint64 totalNs = 0;
     qint64 maxNs = 0;
+    qint64 sequenceControlNs = 0;
+    qint64 maxSequenceControlNs = 0;
     int playbackSamples = 0;
     int seekBarSamples = 0;
     int hexViewSamples = 0;
@@ -130,6 +132,8 @@ void logPlaybackPositionProfileSample(qint64 elapsedNs, PositionChangeOrigin ori
   ++totals.samples;
   totals.totalNs += elapsedNs;
   totals.maxNs = std::max(totals.maxNs, elapsedNs);
+  totals.sequenceControlNs += sequenceControlNs;
+  totals.maxSequenceControlNs = std::max(totals.maxSequenceControlNs, sequenceControlNs);
   switch (origin) {
     case PositionChangeOrigin::Playback:
       ++totals.playbackSamples;
@@ -148,9 +152,13 @@ void logPlaybackPositionProfileSample(qint64 elapsedNs, PositionChangeOrigin ori
 
   const double avgMs = static_cast<double>(totals.totalNs) / 1000000.0 / static_cast<double>(totals.samples);
   const double maxMs = static_cast<double>(totals.maxNs) / 1000000.0;
+  const double avgSequenceControlMs =
+      static_cast<double>(totals.sequenceControlNs) / 1000000.0 / static_cast<double>(totals.samples);
+  const double maxSequenceControlMs = static_cast<double>(totals.maxSequenceControlNs) / 1000000.0;
   qInfo().nospace() << "[VGMFileView::onPlaybackPositionChanged] avg over " << totals.samples
                     << " calls: avg=" << avgMs << "ms"
                     << ", max=" << maxMs << "ms"
+                    << ", seq-control avg/max=" << avgSequenceControlMs << "/" << maxSequenceControlMs << "ms"
                     << ", by-origin(playback/seek/hex)="
                     << totals.playbackSamples << "/" << totals.seekBarSamples << "/" << totals.hexViewSamples;
   totals = {};
@@ -165,15 +173,20 @@ struct PlaybackPositionProfileScope {
     }
   }
 
+  void setSequenceControlNs(qint64 ns) {
+    sequenceControlNs = ns;
+  }
+
   ~PlaybackPositionProfileScope() {
     if (!enabled) {
       return;
     }
-    logPlaybackPositionProfileSample(timer.nsecsElapsed(), origin);
+    logPlaybackPositionProfileSample(timer.nsecsElapsed(), sequenceControlNs, origin);
   }
 
   bool enabled = false;
   PositionChangeOrigin origin = PositionChangeOrigin::Playback;
+  qint64 sequenceControlNs = 0;
   QElapsedTimer timer;
 };
 
@@ -1521,6 +1534,12 @@ void VGMFileView::rebuildSequenceControlBar(VGMSeq* seq) {
 
   m_sequenceControlUsesTrackLayout = usesTrackLayout;
   m_sequenceControlChannelCount = channelCount;
+  const size_t cacheSize = static_cast<size_t>(std::max(0, channelCount));
+  m_lastSequenceControlTempoBpm = std::numeric_limits<double>::quiet_NaN();
+  m_lastSequenceControlMuted.assign(cacheSize, static_cast<uint8_t>(0xFF));
+  m_lastSequenceControlSolo.assign(cacheSize, static_cast<uint8_t>(0xFF));
+  m_lastSequenceControlPan.assign(cacheSize, static_cast<int16_t>(-1));
+  m_lastSequenceControlVolume.assign(cacheSize, static_cast<int16_t>(-1));
 
   m_updatingSequenceControls = true;
   m_sequenceControlBar->setChannels(channels);
@@ -1537,30 +1556,60 @@ void VGMFileView::updateSequenceControlValuesFromPlayback() {
   const VGMColl* assocColl = associatedCollection();
   const auto* activeColl = player.activeCollection();
   const bool collectionActive = activeColl && activeColl->containsVGMFile(m_vgmfile);
+  bool muteSoloChanged = false;
 
   m_updatingSequenceControls = true;
   if (collectionActive) {
-    m_sequenceControlBar->setTempoBpm(player.currentTempoBpm());
+    const double tempoBpm = player.currentTempoBpm();
+    if (std::isnan(m_lastSequenceControlTempoBpm) ||
+        std::abs(tempoBpm - m_lastSequenceControlTempoBpm) >= 0.001) {
+      m_lastSequenceControlTempoBpm = tempoBpm;
+      m_sequenceControlBar->setTempoBpm(tempoBpm);
+    }
   }
   for (const auto& binding : m_sequenceChannelBindings) {
-    if (binding.channelId < 0) {
+    if (binding.channelId < 0 ||
+        static_cast<size_t>(binding.channelId) >= m_lastSequenceControlMuted.size()) {
       continue;
     }
-    m_sequenceControlBar->setChannelMuted(binding.channelId,
-                                          player.channelMuted(assocColl, binding.channelId));
-    m_sequenceControlBar->setChannelSolo(binding.channelId,
-                                         player.channelSolo(assocColl, binding.channelId));
+
+    const size_t channelIndex = static_cast<size_t>(binding.channelId);
+    const bool muted = player.channelMuted(assocColl, binding.channelId);
+    const bool solo = player.channelSolo(assocColl, binding.channelId);
+    const uint8_t mutedByte = static_cast<uint8_t>(muted ? 1 : 0);
+    const uint8_t soloByte = static_cast<uint8_t>(solo ? 1 : 0);
+
+    if (m_lastSequenceControlMuted[channelIndex] != mutedByte) {
+      m_lastSequenceControlMuted[channelIndex] = mutedByte;
+      m_sequenceControlBar->setChannelMuted(binding.channelId, muted);
+      muteSoloChanged = true;
+    }
+    if (m_lastSequenceControlSolo[channelIndex] != soloByte) {
+      m_lastSequenceControlSolo[channelIndex] = soloByte;
+      m_sequenceControlBar->setChannelSolo(binding.channelId, solo);
+      muteSoloChanged = true;
+    }
 
     if (!collectionActive || binding.midiChannel < 0 || binding.midiChannel >= 128) {
       continue;
     }
 
     const auto channel = static_cast<uint8_t>(binding.midiChannel);
-    m_sequenceControlBar->setChannelPan(binding.channelId, player.currentChannelPan(channel));
-    m_sequenceControlBar->setChannelVolume(binding.channelId, player.currentChannelVolume(channel));
+    const int pan = player.currentChannelPan(channel);
+    const int volume = player.currentChannelVolume(channel);
+    if (m_lastSequenceControlPan[channelIndex] != pan) {
+      m_lastSequenceControlPan[channelIndex] = static_cast<int16_t>(pan);
+      m_sequenceControlBar->setChannelPan(binding.channelId, pan);
+    }
+    if (m_lastSequenceControlVolume[channelIndex] != volume) {
+      m_lastSequenceControlVolume[channelIndex] = static_cast<int16_t>(volume);
+      m_sequenceControlBar->setChannelVolume(binding.channelId, volume);
+    }
   }
   m_updatingSequenceControls = false;
-  applySequenceChannelEnabledStateToViews(sequenceChannelEnabledMask());
+  if (muteSoloChanged) {
+    applySequenceChannelEnabledStateToViews(sequenceChannelEnabledMask());
+  }
 }
 
 std::vector<uint8_t> VGMFileView::sequenceChannelEnabledMask() const {
@@ -1652,8 +1701,15 @@ void VGMFileView::onPlaybackPositionChanged(int current, int max, PositionChange
     return;
   }
 
+  QElapsedTimer sequenceControlTimer;
+  if (profileScope.enabled) {
+    sequenceControlTimer.start();
+  }
   rebuildSequenceControlBarIfNeeded();
   updateSequenceControlValuesFromPlayback();
+  if (profileScope.enabled) {
+    profileScope.setSequenceControlNs(sequenceControlTimer.nsecsElapsed());
+  }
 
   auto* seq = dynamic_cast<VGMSeq*>(m_vgmfile);
   if (!seq) {

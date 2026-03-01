@@ -487,22 +487,33 @@ std::vector<int> SequenceControlBar::channelIds() const {
 
 void SequenceControlBar::setChannelPan(int channelId, int pan) {
   if (auto* block = findBlock(channelId); block && block->panKnob) {
+    const int clampedPan = std::clamp(pan, kMinChannelValue, kMaxChannelValue);
+    if (block->panKnob->value() == clampedPan) {
+      return;
+    }
     m_updatingUi = true;
-    block->panKnob->setValue(std::clamp(pan, kMinChannelValue, kMaxChannelValue));
+    block->panKnob->setValue(clampedPan);
     m_updatingUi = false;
   }
 }
 
 void SequenceControlBar::setChannelVolume(int channelId, int volume) {
   if (auto* block = findBlock(channelId); block && block->volumeKnob) {
+    const int clampedVolume = std::clamp(volume, kMinChannelValue, kMaxChannelValue);
+    if (block->volumeKnob->value() == clampedVolume) {
+      return;
+    }
     m_updatingUi = true;
-    block->volumeKnob->setValue(std::clamp(volume, kMinChannelValue, kMaxChannelValue));
+    block->volumeKnob->setValue(clampedVolume);
     m_updatingUi = false;
   }
 }
 
 void SequenceControlBar::setChannelMuted(int channelId, bool muted) {
   if (auto* block = findBlock(channelId); block && block->muteButton) {
+    if (block->muteButton->isChecked() == muted) {
+      return;
+    }
     m_updatingUi = true;
     block->muteButton->setChecked(muted);
     m_updatingUi = false;
@@ -512,6 +523,9 @@ void SequenceControlBar::setChannelMuted(int channelId, bool muted) {
 
 void SequenceControlBar::setChannelSolo(int channelId, bool solo) {
   if (auto* block = findBlock(channelId); block && block->soloButton) {
+    if (block->soloButton->isChecked() == solo) {
+      return;
+    }
     m_updatingUi = true;
     block->soloButton->setChecked(solo);
     m_updatingUi = false;
@@ -592,17 +606,13 @@ bool SequenceControlBar::eventFilter(QObject* watched, QEvent* event) {
 }
 
 SequenceControlBar::BlockWidgets* SequenceControlBar::findBlock(int channelId) {
-  auto it = std::find_if(m_blocks.begin(), m_blocks.end(), [channelId](const auto& block) {
-    return block && block->id == channelId;
-  });
-  return (it == m_blocks.end() || !(*it)) ? nullptr : it->get();
+  const auto it = m_blocksById.find(channelId);
+  return (it == m_blocksById.end()) ? nullptr : it->second;
 }
 
 const SequenceControlBar::BlockWidgets* SequenceControlBar::findBlock(int channelId) const {
-  auto it = std::find_if(m_blocks.begin(), m_blocks.end(), [channelId](const auto& block) {
-    return block && block->id == channelId;
-  });
-  return (it == m_blocks.end() || !(*it)) ? nullptr : it->get();
+  const auto it = m_blocksById.find(channelId);
+  return (it == m_blocksById.end()) ? nullptr : it->second;
 }
 
 void SequenceControlBar::rebuildChannelBlocks(const std::vector<ChannelConfig>& channels) {
@@ -620,7 +630,9 @@ void SequenceControlBar::rebuildChannelBlocks(const std::vector<ChannelConfig>& 
   }
 
   m_blocks.clear();
+  m_blocksById.clear();
   m_blocks.reserve(channels.size());
+  m_blocksById.reserve(channels.size());
 
   for (const auto& config : channels) {
     auto block = std::make_unique<BlockWidgets>();
@@ -726,6 +738,7 @@ void SequenceControlBar::rebuildChannelBlocks(const std::vector<ChannelConfig>& 
     });
 
     applyBlockFrameStyle(*block, false, false);
+    m_blocksById[block->id] = block.get();
     m_blocks.push_back(std::move(block));
   }
 

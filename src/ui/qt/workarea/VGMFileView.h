@@ -8,6 +8,7 @@
 
 #include <array>
 #include <cstdint>
+#include <limits>
 #include <memory>
 #include <unordered_map>
 #include <vector>
@@ -166,6 +167,11 @@ private:
   bool m_sequenceControlUsesTrackLayout = false;
   int m_sequenceControlChannelCount = -1;
   bool m_updatingSequenceControls = false;
+  double m_lastSequenceControlTempoBpm = std::numeric_limits<double>::quiet_NaN();
+  std::vector<uint8_t> m_lastSequenceControlMuted;
+  std::vector<uint8_t> m_lastSequenceControlSolo;
+  std::vector<int16_t> m_lastSequenceControlPan;
+  std::vector<int16_t> m_lastSequenceControlVolume;
 
 public slots:
   void onSelectionChange(VGMItem* item);
