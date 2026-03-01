@@ -301,6 +301,7 @@ void PianoRollView::setPlaybackTick(int tick, bool playbackActive) {
       const int triggerX = static_cast<int>(std::lround(
           static_cast<float>(noteViewportWidth) * kPlaybackPageTriggerFraction));
       if (scanlinePixelX(tick) >= triggerX) {
+        // Keep one smooth page-scroll animation alive and retarget it as needed.
         scrollPlaybackTickToViewportFraction(tick, kPlaybackPageTargetFraction, m_smoothAutoScrollEnabled);
       }
     }
@@ -1448,9 +1449,28 @@ void PianoRollView::scrollPlaybackTickToViewportFraction(int tick, float viewpor
     return;
   }
 
-  m_playbackAutoScrollAnimation->stop();
+  const bool animationRunning = (m_playbackAutoScrollAnimation->state() == QAbstractAnimation::Running);
+  if (animationRunning) {
+    const int currentEnd = std::clamp(m_playbackAutoScrollAnimation->endValue().toInt(),
+                                      hbar->minimum(),
+                                      hbar->maximum());
+    if (currentEnd == clampedScrollX) {
+      return;
+    }
+
+    // Under heavy CPU load, restarting each tick can starve progress. Retarget
+    // the current animation instead so it keeps moving and naturally catches up.
+    m_playbackAutoScrollAnimation->setEndValue(clampedScrollX);
+    return;
+  }
+
+  const bool hadPendingValue = m_pendingPlaybackAutoScrollValid;
+  const int pendingValue = m_pendingPlaybackAutoScrollValue;
   m_pendingPlaybackAutoScrollValid = false;
-  m_playbackAutoScrollAnimation->setStartValue(hbar->value());
+  const int animationStart = hadPendingValue
+                                 ? std::clamp(pendingValue, hbar->minimum(), hbar->maximum())
+                                 : hbar->value();
+  m_playbackAutoScrollAnimation->setStartValue(animationStart);
   m_playbackAutoScrollAnimation->setEndValue(clampedScrollX);
   m_playbackAutoScrollAnimation->start();
 }
