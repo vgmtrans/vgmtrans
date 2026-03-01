@@ -150,7 +150,8 @@ void PianoRollRhiRenderer::renderFrame(QRhiCommandBuffer* cb, const RenderTarget
 
   const Layout layout = computeLayout(frame, logicalSize);
   const uint64_t trackColorsHash = hashTrackColors(frame.trackColors);
-  const StaticCacheKey key = makeStaticCacheKey(frame, layout, trackColorsHash);
+  const uint64_t trackEnabledHash = hashTrackEnabled(frame.trackEnabled);
+  const StaticCacheKey key = makeStaticCacheKey(frame, layout, trackColorsHash, trackEnabledHash);
   const uint64_t styleHash = staticBucketStyleHash(key);
   const uint64_t bucketId = staticBucketId(key);
 
@@ -161,7 +162,7 @@ void PianoRollRhiRenderer::renderFrame(QRhiCommandBuffer* cb, const RenderTarget
 
   auto bucketIt = m_staticBucketCache.find(bucketId);
   if (bucketIt == m_staticBucketCache.end()) {
-    buildStaticInstances(frame, layout, trackColorsHash, key);
+    buildStaticInstances(frame, layout, key);
 
     CachedStaticBucket bucket;
     bucket.backInstances = m_staticBackInstances;
@@ -295,6 +296,17 @@ uint64_t PianoRollRhiRenderer::hashTrackColors(const std::vector<QColor>& colors
   return hash;
 }
 
+uint64_t PianoRollRhiRenderer::hashTrackEnabled(const std::vector<uint8_t>& trackEnabled) {
+  uint64_t hash = 1469598103934665603ULL;
+  for (const uint8_t enabled : trackEnabled) {
+    hash ^= static_cast<uint64_t>(enabled);
+    hash *= 1099511628211ULL;
+  }
+  hash ^= static_cast<uint64_t>(trackEnabled.size());
+  hash *= 1099511628211ULL;
+  return hash;
+}
+
 uint32_t PianoRollRhiRenderer::colorKey(const QColor& color) {
   return color.rgba();
 }
@@ -415,7 +427,8 @@ PianoRollRhiRenderer::Layout PianoRollRhiRenderer::computeLayout(const PianoRoll
 
 PianoRollRhiRenderer::StaticCacheKey PianoRollRhiRenderer::makeStaticCacheKey(const PianoRollFrame::Data& frame,
                                                                                const Layout& layout,
-                                                                               uint64_t trackColorsHash) const {
+                                                                               uint64_t trackColorsHash,
+                                                                               uint64_t trackEnabledHash) const {
   StaticCacheKey key;
   key.valid = true;
   key.viewSize = QSize(layout.viewWidth, layout.viewHeight);
@@ -439,6 +452,7 @@ PianoRollRhiRenderer::StaticCacheKey PianoRollRhiRenderer::makeStaticCacheKey(co
   key.notesPtr = reinterpret_cast<uint64_t>(frame.notes.get());
   key.timeSigPtr = reinterpret_cast<uint64_t>(frame.timeSignatures.get());
   key.trackColorsHash = trackColorsHash;
+  key.trackEnabledHash = trackEnabledHash;
   key.noteBackgroundColor = colorKey(frame.noteBackgroundColor);
   key.keyboardBackgroundColor = colorKey(frame.keyboardBackgroundColor);
   key.topBarBackgroundColor = colorKey(frame.topBarBackgroundColor);
@@ -472,6 +486,7 @@ uint64_t PianoRollRhiRenderer::staticBucketStyleHash(const StaticCacheKey& key) 
   hashMix(key.notesPtr);
   hashMix(key.timeSigPtr);
   hashMix(key.trackColorsHash);
+  hashMix(key.trackEnabledHash);
   hashMix(key.noteBackgroundColor);
   hashMix(key.keyboardBackgroundColor);
   hashMix(key.topBarBackgroundColor);
@@ -524,9 +539,7 @@ void PianoRollRhiRenderer::clearStaticBucketCache() {
 
 void PianoRollRhiRenderer::buildStaticInstances(const PianoRollFrame::Data& frame,
                                                 const Layout& layout,
-                                                uint64_t trackColorsHash,
                                                 const StaticCacheKey& cacheKey) {
-  Q_UNUSED(trackColorsHash);
   m_staticBackInstances.clear();
   m_staticFrontInstances.clear();
 
@@ -783,6 +796,10 @@ void PianoRollRhiRenderer::buildStaticInstances(const PianoRollFrame::Data& fram
     }
     return QColor::fromHsv((trackIndex * 43) % 360, 190, 235);
   };
+  const auto isTrackEnabled = [&](int trackIndex) -> bool {
+    return trackIndex < 0 || trackIndex >= static_cast<int>(frame.trackEnabled.size()) ||
+           frame.trackEnabled[static_cast<size_t>(trackIndex)] != 0;
+  };
 
   forEachNoteInRange(frame, staticTickStart, staticTickEnd, [&](const PianoRollFrame::Note& note, uint64_t noteEndTick) {
     if (note.key >= PianoRollFrame::kMidiKeyCount) {
@@ -798,8 +815,9 @@ void PianoRollRhiRenderer::buildStaticInstances(const PianoRollFrame::Data& fram
       return;
     }
 
+    const bool trackEnabled = isTrackEnabled(note.trackIndex);
     QColor noteColor = colorForTrack(note.trackIndex);
-    noteColor.setAlpha(188);
+    noteColor.setAlpha(trackEnabled ? 188 : 150);
     appendRect(m_staticBackInstances,
                x,
                y,
@@ -812,6 +830,10 @@ void PianoRollRhiRenderer::buildStaticInstances(const PianoRollFrame::Data& fram
                0.0f,
                1.0f,
                1.0f);
+
+    if (!trackEnabled) {
+      return;
+    }
 
     const float edgeThickness = 1.0f;
     appendRect(m_staticBackInstances,
@@ -1021,9 +1043,16 @@ void PianoRollRhiRenderer::buildDynamicInstances(const PianoRollFrame::Data& fra
     }
     return QColor::fromHsv((trackIndex * 43) % 360, 190, 235);
   };
+  const auto isTrackEnabled = [&](int trackIndex) -> bool {
+    return trackIndex < 0 || trackIndex >= static_cast<int>(frame.trackEnabled.size()) ||
+           frame.trackEnabled[static_cast<size_t>(trackIndex)] != 0;
+  };
 
   if (frame.activeNotes && !frame.activeNotes->empty()) {
     for (const PianoRollFrame::Note& note : *frame.activeNotes) {
+      if (!isTrackEnabled(note.trackIndex)) {
+        continue;
+      }
       const NoteGeometry geometry = computeNoteGeometry(note, layout);
       if (!geometry.valid) {
         continue;
@@ -1217,7 +1246,7 @@ void PianoRollRhiRenderer::buildDynamicInstances(const PianoRollFrame::Data& fra
     }
 
     const int activeTrack = frame.activeKeyTrack[static_cast<size_t>(key)];
-    if (activeTrack < 0) {
+    if (activeTrack < 0 || !isTrackEnabled(activeTrack)) {
       continue;
     }
 
@@ -1247,7 +1276,7 @@ void PianoRollRhiRenderer::buildDynamicInstances(const PianoRollFrame::Data& fra
     }
 
     const int activeTrack = frame.activeKeyTrack[static_cast<size_t>(key)];
-    if (activeTrack < 0) {
+    if (activeTrack < 0 || !isTrackEnabled(activeTrack)) {
       continue;
     }
 

@@ -43,6 +43,7 @@
 
 namespace {
 constexpr int kNoteSelectionAutoScrollIntervalMs = 16;
+const QColor kDisabledTrackColor(132, 132, 132);
 }
 
 PianoRollView::PianoRollView(QWidget* parent)
@@ -147,6 +148,7 @@ void PianoRollView::setSequence(VGMSeq* seq) {
     m_trackCount = std::max(m_trackCount, static_cast<int>(m_seq->aTracks.size()));
   }
   rebuildTrackIndexMap();
+  resizeTrackEnabledMaskToTrackCount();
   rebuildTrackColors();
   rebuildSequenceCache();
   updateActiveKeyStates();
@@ -162,6 +164,26 @@ void PianoRollView::setTrackCount(int trackCount) {
   }
 
   m_trackCount = trackCount;
+  resizeTrackEnabledMaskToTrackCount();
+  rebuildTrackColors();
+  updateActiveKeyStates();
+  m_lastRenderedScanlineX = std::numeric_limits<int>::min();
+  requestRender();
+}
+
+void PianoRollView::setTrackEnabledMask(std::vector<uint8_t> trackEnabledMask) {
+  const size_t desiredTrackCount = static_cast<size_t>(std::max(0, m_trackCount));
+  if (trackEnabledMask.empty()) {
+    trackEnabledMask.assign(desiredTrackCount, static_cast<uint8_t>(1));
+  } else if (trackEnabledMask.size() < desiredTrackCount) {
+    trackEnabledMask.resize(desiredTrackCount, static_cast<uint8_t>(1));
+  }
+
+  if (trackEnabledMask == m_trackEnabledMask) {
+    return;
+  }
+
+  m_trackEnabledMask = std::move(trackEnabledMask);
   rebuildTrackColors();
   updateActiveKeyStates();
   m_lastRenderedScanlineX = std::numeric_limits<int>::min();
@@ -181,6 +203,7 @@ void PianoRollView::refreshSequenceData(bool allowTimelineBuild) {
   if (seqTrackCount > m_trackCount) {
     m_trackCount = seqTrackCount;
     rebuildTrackIndexMap();
+    resizeTrackEnabledMaskToTrackCount();
     rebuildTrackColors();
   }
 
@@ -277,6 +300,7 @@ PianoRollFrame::Data PianoRollView::captureRhiFrameData(float dpr) const {
   frame.playbackActive = m_playbackActive;
 
   frame.trackColors = m_trackColors;
+  frame.trackEnabled = m_trackEnabledMask;
   frame.notes = m_notes;
   frame.activeNotes = m_activeNotes;
   frame.selectedNotes = m_selectedNotes;
@@ -860,10 +884,28 @@ int PianoRollView::trackIndexForEvent(const SeqEvent* event) const {
   return static_cast<int>(event->channel);
 }
 
+bool PianoRollView::isTrackEnabled(int trackIndex) const {
+  if (trackIndex < 0) {
+    return true;
+  }
+  if (trackIndex >= static_cast<int>(m_trackEnabledMask.size())) {
+    return true;
+  }
+  return m_trackEnabledMask[static_cast<size_t>(trackIndex)] != 0;
+}
+
+void PianoRollView::resizeTrackEnabledMaskToTrackCount() {
+  const size_t desired = static_cast<size_t>(std::max(0, m_trackCount));
+  if (m_trackEnabledMask.size() == desired) {
+    return;
+  }
+  m_trackEnabledMask.resize(desired, static_cast<uint8_t>(1));
+}
+
 void PianoRollView::rebuildTrackColors() {
   m_trackColors.resize(m_trackCount);
   for (int i = 0; i < m_trackCount; ++i) {
-    m_trackColors[static_cast<size_t>(i)] = colorForTrack(i);
+    m_trackColors[static_cast<size_t>(i)] = isTrackEnabled(i) ? colorForTrack(i) : kDisabledTrackColor;
   }
 }
 
@@ -1064,7 +1106,7 @@ bool PianoRollView::updateActiveKeyStates() {
       }
 
       const int trackIndex = trackIndexForEvent(timed->event);
-      if (trackIndex < 0) {
+      if (trackIndex < 0 || !isTrackEnabled(trackIndex)) {
         continue;
       }
 

@@ -113,6 +113,8 @@ private:
   void rebuildSequenceControlBarIfNeeded();
   void rebuildSequenceControlBar(VGMSeq* seq);
   void updateSequenceControlValuesFromPlayback();
+  void refreshSequenceTrackEnabledState();
+  void applySequenceTrackEnabledStateToViews() const;
   void applySequenceAudibilityState();
   void setSequenceControlStripMuted(int stripId, bool muted);
   void setSequenceControlStripSolo(int stripId, bool solo);
@@ -157,6 +159,7 @@ private:
   QWidget* m_rootContainer = nullptr;
   SequenceControlBar* m_sequenceControlBar = nullptr;
   std::vector<SequenceStripBinding> m_sequenceStripBindings;
+  std::vector<uint8_t> m_sequenceTrackEnabledMask;
   bool m_sequenceControlUsesTrackLayout = false;
   int m_sequenceControlStripCount = -1;
   bool m_updatingSequenceControls = false;

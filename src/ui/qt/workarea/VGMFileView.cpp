@@ -453,6 +453,7 @@ bool VGMFileView::ensurePanelViewCreated(PanelSide side, PanelViewKind viewKind)
         const int trackCount = effectiveTrackCountForSeq(seq);
         panelUi.pianoRollView->setTrackCount(trackCount);
         panelUi.pianoRollView->setSequence(seq);
+        panelUi.pianoRollView->setTrackEnabledMask(m_sequenceTrackEnabledMask);
       }
 
       connect(panelUi.pianoRollView,
@@ -683,6 +684,9 @@ void VGMFileView::setSequenceControlBarVisible(bool visible) {
   if (sequenceControlBarVisible()) {
     rebuildSequenceControlBarIfNeeded();
     updateSequenceControlValuesFromPlayback();
+  }
+  if (m_isSeqFile) {
+    refreshSequenceTrackEnabledState();
   }
 }
 
@@ -1423,6 +1427,7 @@ void VGMFileView::rebuildSequenceControlBar(VGMSeq* seq) {
   m_sequenceControlBar->setStrips(strips);
   m_sequenceControlBar->setTempoBpm(tempoBpm);
   m_updatingSequenceControls = false;
+  refreshSequenceTrackEnabledState();
 }
 
 void VGMFileView::updateSequenceControlValuesFromPlayback() {
@@ -1449,10 +1454,59 @@ void VGMFileView::updateSequenceControlValuesFromPlayback() {
   m_updatingSequenceControls = false;
 }
 
+void VGMFileView::refreshSequenceTrackEnabledState() {
+  size_t maskSize = 0;
+  for (const auto& binding : m_sequenceStripBindings) {
+    if (binding.stripId < 0) {
+      continue;
+    }
+    maskSize = std::max(maskSize, static_cast<size_t>(binding.stripId + 1));
+  }
+
+  std::vector<uint8_t> nextMask(maskSize, static_cast<uint8_t>(1));
+  if (m_sequenceControlBar && !m_updatingSequenceControls) {
+    bool anySolo = false;
+    for (const auto& binding : m_sequenceStripBindings) {
+      if (binding.stripId >= 0 && m_sequenceControlBar->stripSolo(binding.stripId)) {
+        anySolo = true;
+        break;
+      }
+    }
+
+    for (const auto& binding : m_sequenceStripBindings) {
+      if (binding.stripId < 0 || static_cast<size_t>(binding.stripId) >= nextMask.size()) {
+        continue;
+      }
+
+      const bool muted = m_sequenceControlBar->stripMuted(binding.stripId);
+      const bool soloed = m_sequenceControlBar->stripSolo(binding.stripId);
+      nextMask[static_cast<size_t>(binding.stripId)] =
+          static_cast<uint8_t>((!muted && (!anySolo || soloed)) ? 1 : 0);
+    }
+  }
+
+  if (nextMask == m_sequenceTrackEnabledMask) {
+    return;
+  }
+
+  m_sequenceTrackEnabledMask = std::move(nextMask);
+  applySequenceTrackEnabledStateToViews();
+}
+
+void VGMFileView::applySequenceTrackEnabledStateToViews() const {
+  for (PanelSide side : {PanelSide::Left, PanelSide::Right}) {
+    if (auto* piano = panel(side).pianoRollView) {
+      piano->setTrackEnabledMask(m_sequenceTrackEnabledMask);
+    }
+  }
+}
+
 void VGMFileView::applySequenceAudibilityState() {
   if (!m_sequenceControlBar || m_updatingSequenceControls) {
     return;
   }
+
+  refreshSequenceTrackEnabledState();
 
   if (!ensureAssociatedCollectionActive()) {
     return;
@@ -1463,14 +1517,6 @@ void VGMFileView::applySequenceAudibilityState() {
     return;
   }
 
-  bool anySolo = false;
-  for (const auto& binding : m_sequenceStripBindings) {
-    if (m_sequenceControlBar->stripSolo(binding.stripId)) {
-      anySolo = true;
-      break;
-    }
-  }
-
   std::unordered_map<int, bool> channelAudibility;
   channelAudibility.reserve(m_sequenceStripBindings.size() * 2 + 1);
 
@@ -1479,9 +1525,10 @@ void VGMFileView::applySequenceAudibilityState() {
       continue;
     }
 
-    const bool muted = m_sequenceControlBar->stripMuted(binding.stripId);
-    const bool soloed = m_sequenceControlBar->stripSolo(binding.stripId);
-    const bool audible = !muted && (!anySolo || soloed);
+    bool audible = true;
+    if (binding.stripId >= 0 && static_cast<size_t>(binding.stripId) < m_sequenceTrackEnabledMask.size()) {
+      audible = m_sequenceTrackEnabledMask[static_cast<size_t>(binding.stripId)] != 0;
+    }
 
     auto [it, inserted] = channelAudibility.emplace(binding.midiChannel, audible);
     if (!inserted) {
