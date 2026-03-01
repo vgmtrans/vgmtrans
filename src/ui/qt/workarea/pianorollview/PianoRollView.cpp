@@ -324,8 +324,8 @@ PianoRollFrame::Data PianoRollView::captureRhiFrameData(float dpr) const {
   frame.keyboardBackgroundColor = dark ? QColor(31, 35, 40) : QColor(219, 223, 228);
   frame.topBarBackgroundColor = dark ? QColor(47, 52, 60) : QColor(210, 216, 224);
   frame.topBarProgressColor = dark ? QColor(108, 125, 158, 85) : QColor(100, 129, 180, 70);
-  frame.measureLineColor = dark ? QColor(185, 196, 216, 125) : QColor(88, 102, 128, 96);
-  frame.beatLineColor = dark ? QColor(162, 169, 184, 62) : QColor(102, 112, 132, 54);
+  frame.measureLineColor = dark ? QColor(156, 164, 178, 74) : QColor(105, 114, 130, 48);
+  frame.beatLineColor = dark ? QColor(156, 164, 178, 48) : QColor(110, 119, 136, 34);
   frame.keySeparatorColor = dark ? QColor(20, 24, 28, 140) : QColor(108, 116, 128, 70);
   frame.noteOutlineColor = dark ? QColor(18, 20, 22, 180) : QColor(62, 70, 84, 130);
   frame.scanLineColor = dark ? QColor(255, 94, 77, 230) : QColor(201, 56, 36, 220);
@@ -1402,6 +1402,17 @@ void PianoRollView::applySelectedNoteIndices(std::vector<size_t> indices,
                                              bool emitSelectionSignal,
                                              VGMItem* preferredPrimary) {
   normalizeNoteIndices(indices);
+  size_t filteredCount = 0;
+  for (size_t index : indices) {
+    if (index >= m_selectableNotes.size()) {
+      continue;
+    }
+    if (!isTrackEnabled(m_selectableNotes[index].trackIndex)) {
+      continue;
+    }
+    indices[filteredCount++] = index;
+  }
+  indices.resize(filteredCount);
 
   const bool selectionSetWasChanged = (indices != m_selectedNoteIndices);
   m_selectedNoteIndices = std::move(indices);
@@ -1493,6 +1504,9 @@ void PianoRollView::updateMarqueeSelection(bool emitSelectionSignal) {
   indices.reserve(static_cast<size_t>(std::max<std::ptrdiff_t>(0, std::distance(beginIt, endIt))));
 
   for (auto it = beginIt; it != endIt; ++it) {
+    if (!isTrackEnabled(it->trackIndex)) {
+      continue;
+    }
     const float noteStartX = static_cast<float>(it->startTick) * pixelsPerTick;
     const float noteEndX = static_cast<float>(it->startTick + std::max<uint32_t>(1u, it->duration)) * pixelsPerTick;
     if (noteEndX <= clampedWorldXMin || noteStartX >= clampedWorldXMax) {
@@ -1658,7 +1672,7 @@ int PianoRollView::noteIndexAtViewportPoint(const QPoint& pos) const {
   int bestTrackIndex = std::numeric_limits<int>::min();
 
   for (auto it = beginIt; it != endIt; ++it) {
-    if (it->key != key || !it->item) {
+    if (it->key != key || !it->item || !isTrackEnabled(it->trackIndex)) {
       continue;
     }
 
