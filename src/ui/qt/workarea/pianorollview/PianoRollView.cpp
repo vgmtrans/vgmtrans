@@ -106,9 +106,10 @@ PianoRollView::PianoRollView(QWidget* parent)
       return;
     }
 
-    m_applyingPlaybackAutoScroll = true;
-    hbar->setValue(std::clamp(value.toInt(), hbar->minimum(), hbar->maximum()));
-    m_applyingPlaybackAutoScroll = false;
+    m_pendingPlaybackAutoScrollValue =
+        std::clamp(value.toInt(), hbar->minimum(), hbar->maximum());
+    m_pendingPlaybackAutoScrollValid = true;
+    requestRender();
   });
 
   m_rhiHost = new PianoRollRhiHost(this, viewport());
@@ -1323,6 +1324,30 @@ void PianoRollView::stopPlaybackAutoScrollAnimation() {
   if (m_playbackAutoScrollAnimation && m_playbackAutoScrollAnimation->state() == QAbstractAnimation::Running) {
     m_playbackAutoScrollAnimation->stop();
   }
+  m_pendingPlaybackAutoScrollValid = false;
+  m_applyingPlaybackAutoScroll = false;
+}
+
+// Applies the latest smooth auto-scroll animation step in sync with RHI frame rendering.
+void PianoRollView::drainPendingPlaybackAutoScroll() {
+  if (!m_pendingPlaybackAutoScrollValid) {
+    return;
+  }
+
+  auto* hbar = horizontalScrollBar();
+  if (!hbar) {
+    m_pendingPlaybackAutoScrollValid = false;
+    return;
+  }
+
+  const int nextValue = std::clamp(m_pendingPlaybackAutoScrollValue, hbar->minimum(), hbar->maximum());
+  m_pendingPlaybackAutoScrollValid = false;
+  if (nextValue == hbar->value()) {
+    return;
+  }
+
+  m_applyingPlaybackAutoScroll = true;
+  hbar->setValue(nextValue);
   m_applyingPlaybackAutoScroll = false;
 }
 
@@ -1424,6 +1449,7 @@ void PianoRollView::scrollPlaybackTickToViewportFraction(int tick, float viewpor
   }
 
   m_playbackAutoScrollAnimation->stop();
+  m_pendingPlaybackAutoScrollValid = false;
   m_playbackAutoScrollAnimation->setStartValue(hbar->value());
   m_playbackAutoScrollAnimation->setEndValue(clampedScrollX);
   m_playbackAutoScrollAnimation->start();

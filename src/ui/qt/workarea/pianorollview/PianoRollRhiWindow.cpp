@@ -197,6 +197,8 @@ void PianoRollRhiWindow::renderRhiFrame(QRhiCommandBuffer* cb,
     return;
   }
 
+  m_view->drainPendingPlaybackAutoScroll();
+
   // Match HexView's frame-coalesced input model: consume merged input payloads
   // once per rendered frame.
   drainPendingInput();
