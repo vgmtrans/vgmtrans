@@ -84,6 +84,7 @@ private:
     uint64_t notesPtr = 0;
     uint64_t timeSigPtr = 0;
     uint64_t trackColorsHash = 0;
+    uint64_t trackEnabledHash = 0;
     uint32_t noteBackgroundColor = 0;
     uint32_t keyboardBackgroundColor = 0;
     uint32_t topBarBackgroundColor = 0;
@@ -129,6 +130,7 @@ private:
 
   static bool isBlackKey(int key);
   static uint64_t hashTrackColors(const std::vector<QColor>& colors);
+  static uint64_t hashTrackEnabled(const std::vector<uint8_t>& trackEnabled);
   static uint32_t colorKey(const QColor& color);
 
   void ensurePipeline(QRhiRenderPassDescriptor* renderPassDesc, int sampleCount);
@@ -136,7 +138,8 @@ private:
   Layout computeLayout(const PianoRollFrame::Data& frame, const QSize& pixelSize) const;
   StaticCacheKey makeStaticCacheKey(const PianoRollFrame::Data& frame,
                                     const Layout& layout,
-                                    uint64_t trackColorsHash) const;
+                                    uint64_t trackColorsHash,
+                                    uint64_t trackEnabledHash) const;
   uint64_t staticBucketStyleHash(const StaticCacheKey& key) const;
   uint64_t staticBucketId(const StaticCacheKey& key) const;
   void trimStaticBucketCache();
@@ -144,7 +147,6 @@ private:
 
   void buildStaticInstances(const PianoRollFrame::Data& frame,
                             const Layout& layout,
-                            uint64_t trackColorsHash,
                             const StaticCacheKey& key);
   // Dynamic pass is rebuilt every frame (scanline, active highlights, glow).
   void buildDynamicInstances(const PianoRollFrame::Data& frame, const Layout& layout);
