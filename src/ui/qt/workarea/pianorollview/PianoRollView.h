@@ -116,6 +116,7 @@ private:
   [[nodiscard]] QColor colorForTrack(int trackIndex) const;
 
   bool handleViewportWheel(QWheelEvent* event);
+  bool shouldAcceptViewportWheelScroll(Qt::ScrollPhase phase);
   bool handleViewportNativeGesture(QNativeGestureEvent* event);
   bool handleViewportCoalescedZoomGesture(float rawDelta,
                                           const QPointF& globalPos,
@@ -153,7 +154,7 @@ private:
   int tickFromViewportX(int x) const;
   int scanlinePixelX(int tick) const;
   [[nodiscard]] bool isPlaybackTickVisible(int tick) const;
-  void scrollPlaybackTickToViewportFraction(int tick, float viewportFraction);
+  void scrollPlaybackTickToViewportFraction(int tick, float viewportFraction, bool animated = true);
   [[nodiscard]] int noteIndexAtViewportPoint(const QPoint& pos) const;
   [[nodiscard]] VGMItem* noteAtViewportPoint(const QPoint& pos) const;
   [[nodiscard]] QRect graphRectInViewport() const;
@@ -214,6 +215,7 @@ private:
   bool m_playbackAutoScrollEnabled = true;
   bool m_applyingPlaybackAutoScroll = false;
   bool m_applyingHorizontalZoomScroll = false;
+  bool m_waitForWheelScrollBegin = false;
   // We wait for the initial paint event to fire to stop centering scrollbar on resize
   bool m_initialPaintEvent = false;
   bool m_coalescedRenderPending = false;
