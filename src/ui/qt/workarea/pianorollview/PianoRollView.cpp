@@ -44,7 +44,7 @@
 namespace {
 constexpr int kNoteSelectionAutoScrollIntervalMs = 16;
 constexpr int kPlaybackAutoScrollDurationMs = 1000;
-constexpr float kPlaybackPageTriggerFraction = 0.90f;
+constexpr float kPlaybackPageTriggerFraction = 0.85f;
 constexpr float kPlaybackPageTargetFraction = 0.05f;
 const QColor kDisabledTrackColor(132, 132, 132);
 }
