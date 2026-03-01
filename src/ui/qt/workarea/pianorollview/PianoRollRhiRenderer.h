@@ -75,8 +75,6 @@ private:
     QSize viewSize;
     int totalTicks = 0;
     int ppqn = 0;
-    int pixelsPerTickQ = 0;
-    int pixelsPerKeyQ = 0;
     int keyboardWidth = 0;
     int topBarHeight = 0;
     uint64_t staticTickStart = 0;
@@ -113,6 +111,10 @@ private:
     float segment;
     float gap;
     float phase;
+    float posModeX;
+    float posModeY;
+    float sizeModeX;
+    float sizeModeY;
     float scrollMulX;
     float scrollMulY;
   };
@@ -172,7 +174,11 @@ private:
                   float gap = 0.0f,
                   float phase = 0.0f,
                   float scrollMulX = 0.0f,
-                  float scrollMulY = 0.0f);
+                  float scrollMulY = 0.0f,
+                  float posModeX = 0.0f,
+                  float posModeY = 0.0f,
+                  float sizeModeX = 0.0f,
+                  float sizeModeY = 0.0f);
 
   PianoRollView* m_view = nullptr;
 
