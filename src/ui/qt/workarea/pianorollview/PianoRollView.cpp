@@ -128,12 +128,14 @@ PianoRollView::PianoRollView(QWidget* parent)
 
     const int nextValue = std::clamp(value.toInt(), hbar->minimum(), hbar->maximum());
     if (m_rhiHost && m_rhiHost->syncPlaybackAutoScrollToRenderFrame()) {
+      // Window-backed RHI uses render-frame draining so scroll updates stay aligned with frame submission.
       m_pendingPlaybackAutoScrollValue = nextValue;
       m_pendingPlaybackAutoScrollValid = true;
       requestRender();
       return;
     }
 
+    // QRhiWidget path applies animation steps immediately to avoid render-cadence stutter on Linux.
     m_pendingPlaybackAutoScrollValid = false;
     if (nextValue == hbar->value()) {
       return;
