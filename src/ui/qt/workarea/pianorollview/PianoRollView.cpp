@@ -760,6 +760,8 @@ void PianoRollView::beginSeekDragAtX(int viewportX) {
   m_noteSelectionPressActive = false;
   m_noteSelectionDragging = false;
   m_noteSelectionAnchorWorldValid = false;
+  stopPlaybackAutoScrollAnimation();
+  m_playbackAutoScrollEnabled = true;
   m_seekDragActive = true;
   m_currentTick = tickFromViewportX(viewportX);
   updateActiveKeyStates();
