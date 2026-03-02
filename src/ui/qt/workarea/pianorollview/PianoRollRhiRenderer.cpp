@@ -1406,9 +1406,9 @@ void PianoRollRhiRenderer::buildStaticInstances(const PianoRollFrame::Data& fram
   const float blackKeyWidth = std::max(10.0f, layout.keyboardWidth * 0.63f);
   const float blackKeyHeightUnits = 1.0f;
   const float blackTopInsetLeftPx = 1.0f;
-  const float blackTopInsetRightPx = std::clamp(blackKeyWidth * 0.12f, 2.0f, 6.0f);
+  const float blackTopInsetRightPx = std::clamp(blackKeyWidth * 0.11f, 2.0f, 6.0f);
   const float blackTopInsetYUnits = 0.20f;
-  const float blackTopSheenCurve = 6.0f;
+  const float blackTopSheenCurve = 9.0f;
   for (int key : topology.whiteKeys) {
     const KeyboardKeyTopology& keyTopology = topology.keys[static_cast<size_t>(key)];
     const float keyTopUnit = keyTopology.topSeamUnit;
@@ -1492,7 +1492,7 @@ void PianoRollRhiRenderer::buildStaticInstances(const PianoRollFrame::Data& fram
                blackTop,
                LineStyle::HorizontalGradient,
                0.82f,
-               1.05f,
+               1.16f,
                blackTopSheenCurve,
                0.0f,
                1.0f,
