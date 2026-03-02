@@ -157,7 +157,7 @@ private:
   static uint32_t colorKey(const QColor& color);
 
   void ensurePipelines(QRhiRenderPassDescriptor* renderPassDesc, int sampleCount);
-  void ensureMeasureLabelAtlas(QRhiResourceUpdateBatch* updates);
+  void ensureMeasureLabelAtlas(QRhiResourceUpdateBatch* updates, float dpr);
   bool ensureInstanceBuffer(QRhiBuffer*& buffer, int bytes, int minBytes);
   Layout computeLayout(const PianoRollFrame::Data& frame, const QSize& pixelSize) const;
   StaticCacheKey makeStaticCacheKey(const PianoRollFrame::Data& frame, const Layout& layout) const;
@@ -217,6 +217,7 @@ private:
   bool m_staticBuffersUploaded = false;
   bool m_inited = false;
   bool m_measureLabelAtlasDirty = true;
+  float m_measureLabelAtlasScale = 1.0f;
   float m_measureLabelHeight = 0.0f;
   std::array<LabelGlyph, 128> m_measureLabelGlyphs{};
   std::vector<RectInstance> m_staticBackInstances;

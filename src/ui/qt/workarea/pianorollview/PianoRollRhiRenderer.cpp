@@ -296,6 +296,7 @@ void PianoRollRhiRenderer::releaseResources() {
   m_noteInstances.clear();
   m_dynamicFrontStart = 0;
   m_measureLabelAtlasDirty = true;
+  m_measureLabelAtlasScale = 1.0f;
   m_measureLabelHeight = 0.0f;
   m_measureLabelGlyphs = {};
   m_hasStaticCacheKey = false;
@@ -353,7 +354,7 @@ void PianoRollRhiRenderer::renderFrame(QRhiCommandBuffer* cb, const RenderTarget
   }
 
   QRhiResourceUpdateBatch* updates = m_rhi->nextResourceUpdateBatch();
-  ensureMeasureLabelAtlas(updates);
+  ensureMeasureLabelAtlas(updates, frame.dpr);
 
   if (!m_hasStaticCacheKey || !staticCacheKeyEqual(key, m_staticCacheKey)) {
     buildStaticInstances(frame, layout);
@@ -695,9 +696,15 @@ bool PianoRollRhiRenderer::ensureInstanceBuffer(QRhiBuffer*& buffer, int bytes, 
 }
 
 // Builds/uploads a tiny font atlas used by measure and keyboard labels.
-void PianoRollRhiRenderer::ensureMeasureLabelAtlas(QRhiResourceUpdateBatch* updates) {
+void PianoRollRhiRenderer::ensureMeasureLabelAtlas(QRhiResourceUpdateBatch* updates, float dpr) {
   if (!m_rhi || !updates || !m_measureLabelSampler) {
     return;
+  }
+
+  const float atlasScale = std::max(1.0f, dpr);
+  if (std::abs(atlasScale - m_measureLabelAtlasScale) > 0.01f) {
+    m_measureLabelAtlasScale = atlasScale;
+    m_measureLabelAtlasDirty = true;
   }
 
   if (!m_measureLabelAtlas) {
@@ -718,7 +725,7 @@ void PianoRollRhiRenderer::ensureMeasureLabelAtlas(QRhiResourceUpdateBatch* upda
   }
 
   QFont font = m_view ? m_view->font() : QFont{};
-  font.setPixelSize(kMeasureLabelFontPixelSize);
+  font.setPixelSize(std::max(1, static_cast<int>(std::lround(kMeasureLabelFontPixelSize * atlasScale))));
   QFontMetrics metrics(font);
 
   std::array<bool, 128> hasGlyph{};
@@ -768,8 +775,8 @@ void PianoRollRhiRenderer::ensureMeasureLabelAtlas(QRhiResourceUpdateBatch* upda
     glyph.v0 = static_cast<float>(kMeasureLabelPaddingPx) / static_cast<float>(atlas.height());
     glyph.u1 = static_cast<float>(right) / static_cast<float>(atlas.width());
     glyph.v1 = static_cast<float>(kMeasureLabelPaddingPx + glyphHeight) / static_cast<float>(atlas.height());
-    glyph.width = static_cast<float>(std::max(1, right - left));
-    glyph.advance = static_cast<float>(advance + 1);
+    glyph.width = static_cast<float>(std::max(1, right - left)) / atlasScale;
+    glyph.advance = static_cast<float>(advance + 1) / atlasScale;
     cursorX += advance + kMeasureLabelPaddingPx;
   }
   painter.end();
@@ -785,8 +792,22 @@ void PianoRollRhiRenderer::ensureMeasureLabelAtlas(QRhiResourceUpdateBatch* upda
   }
 
   updates->uploadTexture(m_measureLabelAtlas, atlas);
-  m_measureLabelHeight = static_cast<float>(glyphHeight);
+  m_measureLabelHeight = static_cast<float>(glyphHeight) / atlasScale;
   m_measureLabelAtlasDirty = false;
+
+  if (m_shaderBindings) {
+    m_shaderBindings->setBindings({
+        QRhiShaderResourceBinding::uniformBuffer(0,
+                                                 QRhiShaderResourceBinding::VertexStage |
+                                                     QRhiShaderResourceBinding::FragmentStage,
+                                                 m_uniformBuffer),
+        QRhiShaderResourceBinding::sampledTexture(1,
+                                                  QRhiShaderResourceBinding::FragmentStage,
+                                                  m_measureLabelAtlas,
+                                                  m_measureLabelSampler),
+    });
+    m_shaderBindings->create();
+  }
 }
 
 const PianoRollRhiRenderer::LabelGlyph* PianoRollRhiRenderer::glyphForLabelChar(QChar ch) const {
