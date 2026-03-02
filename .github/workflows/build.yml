@@ -88,7 +88,7 @@ jobs:
             --app-drop-link 520 97 \
             --add-file "Unblock & Sign" "${{ github.workspace }}/bin/dmg/selfsign" 313 280 \
             --add-file "README.txt" "${{ github.workspace }}/bin/dmg/README.txt" 520 280 \
-            "VGMTrans-${{ github.sha }}.dmg" \
+            "VGMTrans-${{ github.sha }}-${{ env.BRANCH }}-${{ matrix.target }}-${{ runner.os }}.dmg" \
             "dist/usr/local/"
 
       - name: Generate artifact attestation
@@ -96,14 +96,13 @@ jobs:
         if: ${{ github.event_name != 'pull_request' }}
         with:
           subject-name: VGMTrans-${{ github.sha }}-${{ env.BRANCH }}-${{ matrix.target }}-${{ runner.os }}
-          subject-path: "build/macos-${{ matrix.target }}/VGMTrans-${{ github.sha }}.dmg"
+          subject-path: "build/macos-${{ matrix.target }}/VGMTrans-${{ github.sha }}-${{ env.BRANCH }}-${{ matrix.target }}-${{ runner.os }}.dmg"
 
       - name: "Upload artifact"
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
-          name: VGMTrans-${{ github.sha }}-${{ env.BRANCH }}-${{ matrix.target }}-${{ runner.os }}.dmg
-          path: "build/macos-${{ matrix.target }}/VGMTrans-${{ github.sha }}.dmg"
-          
+          path: "build/macos-${{ matrix.target }}/VGMTrans-${{ github.sha }}-${{ env.BRANCH }}-${{ matrix.target }}-${{ runner.os }}.dmg"
+          archive: false
   linux:
     runs-on: ubuntu-24.04
     container:
@@ -133,7 +132,7 @@ jobs:
       - name: "Build Flatpak"
         uses: flatpak/flatpak-github-actions/flatpak-builder@v6
         with:
-          bundle: VGMTrans.flatpak
+          bundle: VGMTrans-${{ github.sha }}-${{ env.BRANCH }}-x86_64-${{ runner.os }}.flatpak
           manifest-path: build-aux/flatpak/io.github.vgmtrans.vgmtrans.yaml
           cache-key: flatpak-builder-${{ github.sha }}
           upload-artifact: false
@@ -157,13 +156,13 @@ jobs:
         if: ${{ github.event_name != 'pull_request' }}
         with:
           subject-name: VGMTrans-${{ github.sha }}-${{ env.BRANCH }}-x86_64-${{ runner.os }}
-          subject-path: "VGMTrans.flatpak"
+          subject-path: "VGMTrans-${{ github.sha }}-${{ env.BRANCH }}-x86_64-${{ runner.os }}.flatpak"
 
       - name: "Upload artifact"
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
-          name: VGMTrans-${{ github.sha }}-${{ env.BRANCH }}-x86_64-${{ runner.os }}.flatpak
-          path: VGMTrans.flatpak
+          path: VGMTrans-${{ github.sha }}-${{ env.BRANCH }}-x86_64-${{ runner.os }}.flatpak
+          archive: false
 
   windows:
     runs-on: windows-2022
@@ -239,7 +238,7 @@ jobs:
            subject-path: "build/win-${{ matrix.target }}/${{ env.PACKAGE_FILE_NAME }}.zip"
 
        - name: "Upload artifact"
-         uses: actions/upload-artifact@v4
+         uses: actions/upload-artifact@v7
          with:
-           name: ${{ env.PACKAGE_FILE_NAME }}
            path: "build/win-${{ matrix.target }}/${{ env.PACKAGE_FILE_NAME }}.zip"
+           archive: false
