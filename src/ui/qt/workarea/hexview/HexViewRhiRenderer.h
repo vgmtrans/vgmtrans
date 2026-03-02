@@ -137,7 +137,6 @@ private:
     uint32_t fileLength = 0;
     float lineHeight = 0.0f;
     float charWidth = 0.0f;
-    float charHalfWidth = 0.0f;
     float hexStartX = 0.0f;
     float asciiStartX = 0.0f;
     bool shouldDrawAscii = false;
