@@ -25,7 +25,7 @@ void main() {
   vec2 pos;
   vec2 size = inRect.zw;
   if (inParams.x > 5.5) {
-    // MeasureNumber instances are already in screen space; coordMode carries UVs.
+    // LabelText instances are already in screen space; coordMode carries UVs.
     pos = inRect.xy + (inPos * size);
     vGlyphUv = mix(inCoordMode.xy, inCoordMode.zw, inPos);
   } else {
