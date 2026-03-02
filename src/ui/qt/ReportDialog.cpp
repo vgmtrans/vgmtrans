@@ -52,8 +52,8 @@ ReportDialog::ReportDialog(QWidget* parent) : QWidget(parent) {
 
   auto* info_label = new QLabel(this);
   info_label->setText(tr(
-    "Use this form to auto-fill a bug report on our GitHub  <a href=\"https://github.com/vgmtrans/vgmtrans/issues\">issue tracker</a>. <b>You must be logged in to a GitHub account.</b><br/>"
-    "Fields marked with <b>*</b> are required."));
+    "Use this form to auto-fill a bug report on our GitHub  <a href=\"https://github.com/vgmtrans/vgmtrans/issues\">issue tracker</a>.<br/>"
+    "<b>You must be logged in to a GitHub account.</b>"));
   info_label->setTextFormat(Qt::RichText);
   info_label->setOpenExternalLinks(true);
   info_label->setTextInteractionFlags(Qt::TextBrowserInteraction);
@@ -65,7 +65,8 @@ ReportDialog::ReportDialog(QWidget* parent) : QWidget(parent) {
   m_title_edit = new QLineEdit(this);
   m_title_edit->setPlaceholderText(tr("Type a very short description of the problem here"));
   m_title_edit->setMaxLength(60);
-  auto* summary_label = new QLabel(tr("&Summary *"), this);
+  auto* summary_label = new QLabel(tr("&Summary <span style=\"color:red\">*</span>"), this);
+  summary_label->setTextFormat(Qt::RichText);
   summary_label->setBuddy(m_title_edit);
   title_layout->addWidget(summary_label);
   title_layout->addWidget(m_title_edit);
@@ -74,6 +75,7 @@ ReportDialog::ReportDialog(QWidget* parent) : QWidget(parent) {
   auto* main_scroll = new QScrollArea(this);
   main_scroll->setWidgetResizable(true);
   main_scroll->setFrameShape(QFrame::NoFrame);
+  main_scroll->setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOn);
 
   auto* scroll_widget = new QWidget(this);
   auto* scroll_layout = new QVBoxLayout(scroll_widget);
@@ -88,7 +90,8 @@ ReportDialog::ReportDialog(QWidget* parent) : QWidget(parent) {
   m_desc_edit->setFixedHeight(100);
   m_desc_edit->setTabChangesFocus(true);
   m_desc_edit->setPlaceholderText(tr("Instead of:\n\"MIDI is broken\"\nWrite:\n\"Track 3 is missing percussion after 00:12.\nThe original game playback includes drums at that timestamp.\"\n\nIf this also involves exported files, it's easier to understand if you mention where, e.g. \"broken in FL Studio 25\"."));
-  auto* desc_label = new QLabel(tr("&Description *"), this);
+  auto* desc_label = new QLabel(tr("&Description <span style=\"color:red\">*</span>"), this);
+  desc_label->setTextFormat(Qt::RichText);
   desc_label->setBuddy(m_desc_edit);
   details_layout->addWidget(desc_label);
   details_layout->addWidget(m_desc_edit);
@@ -98,7 +101,8 @@ ReportDialog::ReportDialog(QWidget* parent) : QWidget(parent) {
   m_steps_edit->setFixedHeight(100);
   m_steps_edit->setTabChangesFocus(true);
   m_steps_edit->setPlaceholderText(tr("1.\n2.\n3."));
-  auto* steps_label = new QLabel(tr("St&eps to Reproduce *"), this);
+  auto* steps_label = new QLabel(tr("St&eps to Reproduce <span style=\"color:red\">*</span>"), this);
+  steps_label->setTextFormat(Qt::RichText);
   steps_label->setBuddy(m_steps_edit);
   details_layout->addWidget(steps_label);
   details_layout->addWidget(m_steps_edit);
@@ -108,7 +112,8 @@ ReportDialog::ReportDialog(QWidget* parent) : QWidget(parent) {
   m_expected_edit->setFixedHeight(100);
   m_expected_edit->setTabChangesFocus(true);
   m_expected_edit->setPlaceholderText(tr("Actual:\nTrack 2 is silent after 00:15.\n\nExpected:\nTrack 2 should contain the melody heard in-game."));
-  auto* expected_label = new QLabel(tr("E&xpected Behavior *"), this);
+  auto* expected_label = new QLabel(tr("E&xpected Behavior <span style=\"color:red\">*</span>"), this);
+  expected_label->setTextFormat(Qt::RichText);
   expected_label->setBuddy(m_expected_edit);
   details_layout->addWidget(expected_label);
   details_layout->addWidget(m_expected_edit);
