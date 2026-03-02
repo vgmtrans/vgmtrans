@@ -22,7 +22,10 @@ class QRhiCommandBuffer;
 class QRhiGraphicsPipeline;
 class QRhiRenderPassDescriptor;
 class QRhiRenderTarget;
+class QRhiResourceUpdateBatch;
+class QRhiSampler;
 class QRhiShaderResourceBindings;
+class QRhiTexture;
 
 class PianoRollRhiRenderer {
 public:
@@ -105,6 +108,15 @@ private:
     uint32_t noteBackgroundColor = 0;
   };
 
+  struct LabelGlyph {
+    float u0 = 0.0f;
+    float v0 = 0.0f;
+    float u1 = 0.0f;
+    float v1 = 0.0f;
+    float width = 0.0f;
+    float advance = 0.0f;
+  };
+
   struct RectInstance {
     // Per-instance payload consumed by pianorollquad shaders.
     float x;
@@ -134,6 +146,7 @@ private:
     GridBeat = 3,
     TriangleDown = 4,
     TopBarGradient = 5,
+    MeasureNumber = 6,
   };
 
   static bool isBlackKey(int key);
@@ -142,12 +155,14 @@ private:
   static uint32_t colorKey(const QColor& color);
 
   void ensurePipelines(QRhiRenderPassDescriptor* renderPassDesc, int sampleCount);
+  void ensureMeasureLabelAtlas(QRhiResourceUpdateBatch* updates);
   bool ensureInstanceBuffer(QRhiBuffer*& buffer, int bytes, int minBytes);
   Layout computeLayout(const PianoRollFrame::Data& frame, const QSize& pixelSize) const;
   StaticCacheKey makeStaticCacheKey(const PianoRollFrame::Data& frame, const Layout& layout) const;
   static bool staticCacheKeyEqual(const StaticCacheKey& lhs, const StaticCacheKey& rhs);
   NoteDataKey makeNoteDataKey(const PianoRollFrame::Data& frame) const;
   void rebuildNoteInstances(const PianoRollFrame::Data& frame);
+  void appendMeasureNumberOverlays(const PianoRollFrame::Data& frame, const Layout& layout);
 
   void buildStaticInstances(const PianoRollFrame::Data& frame, const Layout& layout);
   void buildDynamicInstances(const PianoRollFrame::Data& frame, const Layout& layout);
@@ -181,6 +196,8 @@ private:
   QRhiBuffer* m_staticFrontInstanceBuffer = nullptr;
   QRhiBuffer* m_dynamicInstanceBuffer = nullptr;
   QRhiBuffer* m_noteInstanceBuffer = nullptr;
+  QRhiTexture* m_measureLabelAtlas = nullptr;
+  QRhiSampler* m_measureLabelSampler = nullptr;
   QRhiShaderResourceBindings* m_shaderBindings = nullptr;
   QRhiGraphicsPipeline* m_pipeline = nullptr;
   QRhiGraphicsPipeline* m_notePipeline = nullptr;
@@ -189,6 +206,9 @@ private:
   int m_sampleCount = 1;
   bool m_staticBuffersUploaded = false;
   bool m_inited = false;
+  bool m_measureLabelAtlasDirty = true;
+  float m_measureLabelHeight = 0.0f;
+  std::array<LabelGlyph, 10> m_measureLabelDigits{};
   std::vector<RectInstance> m_staticBackInstances;
   std::vector<RectInstance> m_staticFrontInstances;
   std::vector<RectInstance> m_dynamicInstances;
