@@ -1024,7 +1024,6 @@ void PianoRollRhiRenderer::appendPianoCKeyLabels(const PianoRollFrame::Data& fra
   }
 
   const KeyboardTopology& topology = keyboardTopology();
-  const float noteAreaBottom = layout.noteAreaTop + layout.noteAreaHeight;
   QColor labelColor = frame.blackKeyColor;
   labelColor.setAlpha(166);
 
@@ -1036,9 +1035,7 @@ void PianoRollRhiRenderer::appendPianoCKeyLabels(const PianoRollFrame::Data& fra
     const KeyboardKeyTopology& keyTopo = topology.keys[static_cast<size_t>(key)];
     const float keyTop = layout.noteAreaTop + (keyTopo.topSeamUnit * layout.pixelsPerKey) - layout.scrollY;
     const float keyBottom = layout.noteAreaTop + (keyTopo.bottomSeamUnit * layout.pixelsPerKey) - layout.scrollY;
-    const float clippedTop = std::max(layout.noteAreaTop, keyTop);
-    const float clippedBottom = std::min(noteAreaBottom, keyBottom);
-    const float keyHeight = clippedBottom - clippedTop;
+    const float keyHeight = keyBottom - keyTop;
     if (keyHeight <= 8.0f) {
       continue;
     }
@@ -1054,10 +1051,7 @@ void PianoRollRhiRenderer::appendPianoCKeyLabels(const PianoRollFrame::Data& fra
     }
 
     const float labelX = std::max(1.0f, layout.keyboardWidth - labelWidth - 4.0f);
-    float labelY = clippedBottom - labelHeight - 1.5f;
-    if (labelY < clippedTop) {
-      labelY = clippedTop;
-    }
+    const float labelY = keyBottom - labelHeight - 1.5f;
     appendLabelText(label, labelX, labelY, labelHeight, labelColor);
   }
 }
