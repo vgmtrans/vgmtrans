@@ -278,6 +278,26 @@ if (NOT FLATPAK)
       DEPLOY_TOOL_OPTIONS ${DEPLOY_EXTRA_OPTIONS}
   )
   install(SCRIPT ${deploy_script})
+
+  # On Windows, ensure qt.conf sets WindowsArguments = fontengine=freetype after deployment.
+  if(WIN32)
+    file(GENERATE
+            OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/patch-qtconf-$<CONFIG>.cmake"
+            CONTENT [==[
+set(_qtconf "$ENV{DESTDIR}${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_BINDIR}/qt.conf")
+
+if(NOT EXISTS "${_qtconf}")
+  message(FATAL_ERROR "Expected qt.conf was not generated: ${_qtconf}")
+endif()
+
+file(READ "${_qtconf}" _qtconf_contents)
+if(NOT _qtconf_contents MATCHES "WindowsArguments[ \t]*=[ \t]*fontengine=freetype")
+  file(APPEND "${_qtconf}" "\n[Platforms]\nWindowsArguments = fontengine=freetype\n")
+endif()
+]==]
+    )
+    install(SCRIPT "${CMAKE_CURRENT_BINARY_DIR}/patch-qtconf-$<CONFIG>.cmake")
+  endif()
 endif()
 
 # ~~~
