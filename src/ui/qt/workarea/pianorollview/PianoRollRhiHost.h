@@ -22,6 +22,7 @@ public:
 
   void requestUpdate();
   void setSurfaceCursor(Qt::CursorShape shape);
+  bool syncPlaybackAutoScrollToRenderFrame() const;
 
 protected:
   void resizeEvent(QResizeEvent* event) override;

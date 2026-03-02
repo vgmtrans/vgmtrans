@@ -51,10 +51,6 @@ void PianoRollRhiWidget::initialize(QRhiCommandBuffer* cb) {
 
 void PianoRollRhiWidget::render(QRhiCommandBuffer* cb) {
   if (m_view) {
-    m_view->drainPendingPlaybackAutoScroll();
-  }
-
-  if (m_view) {
     PianoRollRhiInputCoalescer::MouseMoveBatch mouseMoveBatch;
     if (m_inputCoalescer.takePendingMouseMove(mouseMoveBatch)) {
       const QPoint viewportPos = mapFromGlobal(mouseMoveBatch.globalPos.toPoint());
