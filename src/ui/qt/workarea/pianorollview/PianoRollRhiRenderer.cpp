@@ -222,23 +222,39 @@ void PianoRollRhiRenderer::initIfNeeded(QRhi* rhi) {
   m_vertexBuffer = m_rhi->newBuffer(QRhiBuffer::Immutable,
                                     QRhiBuffer::VertexBuffer,
                                     static_cast<int>(sizeof(kVertices)));
-  m_vertexBuffer->create();
+  if (!m_vertexBuffer || !m_vertexBuffer->create()) {
+    delete m_vertexBuffer;
+    m_vertexBuffer = nullptr;
+    return;
+  }
 
   m_indexBuffer = m_rhi->newBuffer(QRhiBuffer::Immutable,
                                    QRhiBuffer::IndexBuffer,
                                    static_cast<int>(sizeof(kIndices)));
-  m_indexBuffer->create();
+  if (!m_indexBuffer || !m_indexBuffer->create()) {
+    delete m_indexBuffer;
+    m_indexBuffer = nullptr;
+    return;
+  }
 
   const int ubufSize = m_rhi->ubufAligned(kUniformBytes);
   m_uniformBuffer = m_rhi->newBuffer(QRhiBuffer::Dynamic, QRhiBuffer::UniformBuffer, ubufSize);
-  m_uniformBuffer->create();
+  if (!m_uniformBuffer || !m_uniformBuffer->create()) {
+    delete m_uniformBuffer;
+    m_uniformBuffer = nullptr;
+    return;
+  }
 
   m_measureLabelSampler = m_rhi->newSampler(QRhiSampler::Linear,
                                             QRhiSampler::Linear,
                                             QRhiSampler::None,
                                             QRhiSampler::ClampToEdge,
                                             QRhiSampler::ClampToEdge);
-  m_measureLabelSampler->create();
+  if (!m_measureLabelSampler || !m_measureLabelSampler->create()) {
+    delete m_measureLabelSampler;
+    m_measureLabelSampler = nullptr;
+    return;
+  }
 
   m_staticBuffersUploaded = false;
   m_measureLabelAtlasDirty = true;
@@ -692,7 +708,12 @@ bool PianoRollRhiRenderer::ensureInstanceBuffer(QRhiBuffer*& buffer, int bytes, 
 
   delete buffer;
   buffer = m_rhi->newBuffer(QRhiBuffer::Dynamic, QRhiBuffer::VertexBuffer, targetSize);
-  return buffer->create();
+  if (!buffer || !buffer->create()) {
+    delete buffer;
+    buffer = nullptr;
+    return false;
+  }
+  return true;
 }
 
 // Builds/uploads a tiny font atlas used by measure and keyboard labels.
