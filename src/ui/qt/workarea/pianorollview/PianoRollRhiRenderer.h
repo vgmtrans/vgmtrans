@@ -215,6 +215,7 @@ private:
 
   QRhiRenderPassDescriptor* m_outputRenderPass = nullptr;
   int m_sampleCount = 1;
+  bool m_supportsBaseInstance = true;
   bool m_staticBuffersUploaded = false;
   bool m_inited = false;
   bool m_measureLabelAtlasDirty = true;
