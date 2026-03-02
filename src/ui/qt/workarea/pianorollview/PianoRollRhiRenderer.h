@@ -148,7 +148,8 @@ private:
     GridBeat = 3,
     TriangleDown = 4,
     TopBarGradient = 5,
-    LabelText = 6,
+    HorizontalGradient = 6,
+    LabelText = 7,
   };
 
   static bool isBlackKey(int key);
