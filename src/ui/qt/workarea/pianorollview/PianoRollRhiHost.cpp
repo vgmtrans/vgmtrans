@@ -85,6 +85,10 @@ void PianoRollRhiHost::setSurfaceCursor(Qt::CursorShape shape) {
   }
 }
 
+bool PianoRollRhiHost::syncPlaybackAutoScrollToRenderFrame() const {
+  return m_window != nullptr;
+}
+
 void PianoRollRhiHost::resizeEvent(QResizeEvent* event) {
   QWidget::resizeEvent(event);
   if (m_surface) {
