@@ -19,7 +19,7 @@ jobs:
     env:
       HOMEBREW_PREFIX: ${{ (matrix.target == 'intel' && '/usr/local') || '/opt/homebrew' }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           submodules: recursive
           show-progress: false
@@ -64,11 +64,12 @@ jobs:
           cmake --build --preset "macos-${{ matrix.target }}-release" --target install
 
       - name: "Checkout create-dmg"
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           repository: create-dmg/create-dmg
           path: "./build/macos-${{ matrix.target }}/create-dmg"
           ref: master
+          show-progress: false
 
       - name: Build macOS DMG
         shell: bash
@@ -92,7 +93,7 @@ jobs:
             "dist/usr/local/"
 
       - name: Generate artifact attestation
-        uses: actions/attest-build-provenance@v3
+        uses: actions/attest@v4
         if: ${{ github.event_name != 'pull_request' }}
         with:
           subject-name: VGMTrans-${{ github.sha }}-${{ env.BRANCH }}-${{ matrix.target }}-${{ runner.os }}
@@ -114,7 +115,7 @@ jobs:
       contents: read
       attestations: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           submodules: recursive
           show-progress: false
@@ -152,7 +153,7 @@ jobs:
         shell: bash
 
       - name: Generate artifact attestation
-        uses: actions/attest-build-provenance@v3
+        uses: actions/attest@v4
         if: ${{ github.event_name != 'pull_request' }}
         with:
           subject-name: VGMTrans-${{ github.sha }}-${{ env.BRANCH }}-x86_64-${{ runner.os }}
@@ -174,7 +175,7 @@ jobs:
       contents: read
       attestations: write
     steps:
-       - uses: actions/checkout@v4
+       - uses: actions/checkout@v6
          with:
           submodules: recursive
           show-progress: false
@@ -232,7 +233,7 @@ jobs:
             --target package
 
        - name: Generate artifact attestation
-         uses: actions/attest-build-provenance@v3
+         uses: actions/attest@v4
          if: ${{ github.event_name != 'pull_request' }}
          with:
            subject-path: "build/win-${{ matrix.target }}/${{ env.PACKAGE_FILE_NAME }}.zip"
