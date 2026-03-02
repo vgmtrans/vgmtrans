@@ -86,6 +86,7 @@ void PianoRollRhiHost::setSurfaceCursor(Qt::CursorShape shape) {
 }
 
 bool PianoRollRhiHost::syncPlaybackAutoScrollToRenderFrame() const {
+  // Only the native-window backend keeps playback auto-scroll synchronized to renderFrame().
   return m_window != nullptr;
 }
 
