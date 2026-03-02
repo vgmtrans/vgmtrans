@@ -132,6 +132,8 @@ private:
     DottedVertical = 1,
     GridMeasure = 2,
     GridBeat = 3,
+    TriangleDown = 4,
+    TopBarGradient = 5,
   };
 
   static bool isBlackKey(int key);
