@@ -20,7 +20,7 @@ layout(binding = 1) uniform sampler2D glyphAtlas;
 
 void main() {
   if (vParams.x > 5.5) {
-    // Sample glyph alpha from the measure-label atlas.
+    // Sample glyph alpha from the shared label atlas.
     float alpha = texture(glyphAtlas, vGlyphUv).a;
     if (alpha <= 0.001) {
       discard;

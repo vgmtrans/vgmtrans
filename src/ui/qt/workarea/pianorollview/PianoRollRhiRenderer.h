@@ -15,6 +15,8 @@
 #include "PianoRollFrameData.h"
 
 class QColor;
+class QChar;
+class QString;
 class PianoRollView;
 class QRhi;
 class QRhiBuffer;
@@ -146,7 +148,7 @@ private:
     GridBeat = 3,
     TriangleDown = 4,
     TopBarGradient = 5,
-    MeasureNumber = 6,
+    LabelText = 6,
   };
 
   static bool isBlackKey(int key);
@@ -163,6 +165,14 @@ private:
   NoteDataKey makeNoteDataKey(const PianoRollFrame::Data& frame) const;
   void rebuildNoteInstances(const PianoRollFrame::Data& frame);
   void appendMeasureNumberOverlays(const PianoRollFrame::Data& frame, const Layout& layout);
+  void appendPianoCKeyLabels(const PianoRollFrame::Data& frame, const Layout& layout);
+  const LabelGlyph* glyphForLabelChar(QChar ch) const;
+  float labelTextWidth(const QString& text, float labelHeight) const;
+  void appendLabelText(const QString& text,
+                       float x,
+                       float y,
+                       float labelHeight,
+                       const QColor& color);
 
   void buildStaticInstances(const PianoRollFrame::Data& frame, const Layout& layout);
   void buildDynamicInstances(const PianoRollFrame::Data& frame, const Layout& layout);
@@ -208,7 +218,7 @@ private:
   bool m_inited = false;
   bool m_measureLabelAtlasDirty = true;
   float m_measureLabelHeight = 0.0f;
-  std::array<LabelGlyph, 10> m_measureLabelDigits{};
+  std::array<LabelGlyph, 128> m_measureLabelGlyphs{};
   std::vector<RectInstance> m_staticBackInstances;
   std::vector<RectInstance> m_staticFrontInstances;
   std::vector<RectInstance> m_dynamicInstances;
