@@ -5,6 +5,7 @@ layout(location = 1) in vec2 vLocalPos;
 layout(location = 2) in vec2 vRectSize;
 layout(location = 3) in vec4 vParams;
 layout(location = 4) in vec2 vScenePos;
+layout(location = 5) in vec2 vGlyphUv;
 
 layout(location = 0) out vec4 fragColor;
 
@@ -15,8 +16,18 @@ layout(std140, binding = 0) uniform Ubuf {
   vec4 noteBorderColor;
 };
 
+layout(binding = 1) uniform sampler2D glyphAtlas;
+
 void main() {
-  if (vParams.x > 4.5) {
+  if (vParams.x > 5.5) {
+    // Sample glyph alpha from the measure-label atlas.
+    float alpha = texture(glyphAtlas, vGlyphUv).a;
+    if (alpha <= 0.001) {
+      discard;
+    }
+    fragColor = vec4(vColor.rgb, vColor.a * alpha);
+    return;
+  } else if (vParams.x > 4.5) {
     vec4 grad = vColor;
     float topScale = max(0.0, vParams.y);
     float bottomScale = max(0.0, vParams.z);

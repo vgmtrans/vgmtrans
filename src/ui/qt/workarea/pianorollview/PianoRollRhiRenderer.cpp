@@ -15,7 +15,12 @@
 #include <QDebug>
 #include <QElapsedTimer>
 #include <QFile>
+#include <QFont>
+#include <QFontMetrics>
+#include <QImage>
 #include <QMatrix4x4>
+#include <QPainter>
+#include <QString>
 
 #include <algorithm>
 #include <array>
@@ -39,6 +44,8 @@ static const quint16 kIndices[] = {0, 1, 2, 0, 2, 3};
 
 static constexpr int kMat4Bytes = 16 * sizeof(float);
 static constexpr int kUniformBytes = (16 + 4 + 4 + 4) * sizeof(float);
+static constexpr int kMeasureLabelFontPixelSize = 11;
+static constexpr int kMeasureLabelPaddingPx = 2;
 
 bool isBlackMidiKey(int key) {
   switch (key % 12) {
@@ -226,7 +233,15 @@ void PianoRollRhiRenderer::initIfNeeded(QRhi* rhi) {
   m_uniformBuffer = m_rhi->newBuffer(QRhiBuffer::Dynamic, QRhiBuffer::UniformBuffer, ubufSize);
   m_uniformBuffer->create();
 
+  m_measureLabelSampler = m_rhi->newSampler(QRhiSampler::Linear,
+                                            QRhiSampler::Linear,
+                                            QRhiSampler::None,
+                                            QRhiSampler::ClampToEdge,
+                                            QRhiSampler::ClampToEdge);
+  m_measureLabelSampler->create();
+
   m_staticBuffersUploaded = false;
+  m_measureLabelAtlasDirty = true;
   m_inited = true;
 }
 
@@ -256,6 +271,12 @@ void PianoRollRhiRenderer::releaseResources() {
   delete m_noteInstanceBuffer;
   m_noteInstanceBuffer = nullptr;
 
+  delete m_measureLabelAtlas;
+  m_measureLabelAtlas = nullptr;
+
+  delete m_measureLabelSampler;
+  m_measureLabelSampler = nullptr;
+
   delete m_uniformBuffer;
   m_uniformBuffer = nullptr;
 
@@ -274,6 +295,9 @@ void PianoRollRhiRenderer::releaseResources() {
   m_dynamicInstances.clear();
   m_noteInstances.clear();
   m_dynamicFrontStart = 0;
+  m_measureLabelAtlasDirty = true;
+  m_measureLabelHeight = 0.0f;
+  m_measureLabelDigits = {};
   m_hasStaticCacheKey = false;
   m_staticCacheKey = {};
   m_staticDataDirty = true;
@@ -328,6 +352,9 @@ void PianoRollRhiRenderer::renderFrame(QRhiCommandBuffer* cb, const RenderTarget
     tCapture = profileTimer.nsecsElapsed();
   }
 
+  QRhiResourceUpdateBatch* updates = m_rhi->nextResourceUpdateBatch();
+  ensureMeasureLabelAtlas(updates);
+
   if (!m_hasStaticCacheKey || !staticCacheKeyEqual(key, m_staticCacheKey)) {
     buildStaticInstances(frame, layout);
     m_staticCacheKey = key;
@@ -344,8 +371,6 @@ void PianoRollRhiRenderer::renderFrame(QRhiCommandBuffer* cb, const RenderTarget
   }
 
   ensurePipelines(target.renderPassDesc, std::max(1, target.sampleCount));
-
-  QRhiResourceUpdateBatch* updates = m_rhi->nextResourceUpdateBatch();
   if (!m_staticBuffersUploaded) {
     updates->uploadStaticBuffer(m_vertexBuffer, kVertices);
     updates->uploadStaticBuffer(m_indexBuffer, kIndices);
@@ -584,6 +609,10 @@ void PianoRollRhiRenderer::ensurePipelines(QRhiRenderPassDescriptor* renderPassD
                                                QRhiShaderResourceBinding::VertexStage |
                                                    QRhiShaderResourceBinding::FragmentStage,
                                                m_uniformBuffer),
+      QRhiShaderResourceBinding::sampledTexture(1,
+                                                QRhiShaderResourceBinding::FragmentStage,
+                                                m_measureLabelAtlas,
+                                                m_measureLabelSampler),
   });
   m_shaderBindings->create();
 
@@ -663,6 +692,267 @@ bool PianoRollRhiRenderer::ensureInstanceBuffer(QRhiBuffer*& buffer, int bytes, 
   delete buffer;
   buffer = m_rhi->newBuffer(QRhiBuffer::Dynamic, QRhiBuffer::VertexBuffer, targetSize);
   return buffer->create();
+}
+
+// Builds/uploads a tiny 0-9 font atlas used by top-bar measure labels.
+void PianoRollRhiRenderer::ensureMeasureLabelAtlas(QRhiResourceUpdateBatch* updates) {
+  if (!m_rhi || !updates || !m_measureLabelSampler) {
+    return;
+  }
+
+  if (!m_measureLabelAtlas) {
+    // Keep binding 1 valid even before the real atlas is generated.
+    m_measureLabelAtlas = m_rhi->newTexture(QRhiTexture::RGBA8, QSize(1, 1), 1);
+    if (!m_measureLabelAtlas || !m_measureLabelAtlas->create()) {
+      delete m_measureLabelAtlas;
+      m_measureLabelAtlas = nullptr;
+      return;
+    }
+    QImage whitePixel(1, 1, QImage::Format_RGBA8888);
+    whitePixel.fill(Qt::white);
+    updates->uploadTexture(m_measureLabelAtlas, whitePixel);
+  }
+
+  if (!m_measureLabelAtlasDirty) {
+    return;
+  }
+
+  QFont font = m_view ? m_view->font() : QFont{};
+  font.setPixelSize(kMeasureLabelFontPixelSize);
+  QFontMetrics metrics(font);
+
+  const int glyphHeight = std::max(1, metrics.height());
+  const int atlasHeight = glyphHeight + (2 * kMeasureLabelPaddingPx);
+  int atlasWidth = kMeasureLabelPaddingPx;
+  std::array<int, 10> advances{};
+  for (int digit = 0; digit < 10; ++digit) {
+    const QString text(QChar(static_cast<char16_t>('0' + digit)));
+    const int advance = std::max(1, metrics.horizontalAdvance(text));
+    advances[static_cast<size_t>(digit)] = advance;
+    atlasWidth += advance + kMeasureLabelPaddingPx;
+  }
+
+  QImage atlas(std::max(1, atlasWidth), atlasHeight, QImage::Format_RGBA8888);
+  atlas.fill(Qt::transparent);
+  QPainter painter(&atlas);
+  painter.setRenderHint(QPainter::TextAntialiasing, true);
+  painter.setPen(Qt::white);
+  painter.setFont(font);
+
+  const qreal baselineY = static_cast<qreal>(kMeasureLabelPaddingPx + metrics.ascent());
+  int cursorX = kMeasureLabelPaddingPx;
+  for (int digit = 0; digit < 10; ++digit) {
+    const QString text(QChar(static_cast<char16_t>('0' + digit)));
+    painter.drawText(QPointF(static_cast<qreal>(cursorX), baselineY), text);
+
+    const int advance = advances[static_cast<size_t>(digit)];
+    // Pad UV bounds by 1px so antialiased edges are not clipped.
+    const int left = std::max(0, cursorX - 1);
+    const int right = std::min(atlas.width(), cursorX + advance + 1);
+    LabelGlyph& glyph = m_measureLabelDigits[static_cast<size_t>(digit)];
+    glyph.u0 = static_cast<float>(left) / static_cast<float>(atlas.width());
+    glyph.v0 = static_cast<float>(kMeasureLabelPaddingPx) / static_cast<float>(atlas.height());
+    glyph.u1 = static_cast<float>(right) / static_cast<float>(atlas.width());
+    glyph.v1 = static_cast<float>(kMeasureLabelPaddingPx + glyphHeight) / static_cast<float>(atlas.height());
+    glyph.width = static_cast<float>(std::max(1, right - left));
+    glyph.advance = static_cast<float>(advance + 1);
+    cursorX += advance + kMeasureLabelPaddingPx;
+  }
+  painter.end();
+
+  if (m_measureLabelAtlas->pixelSize() != atlas.size()) {
+    delete m_measureLabelAtlas;
+    m_measureLabelAtlas = m_rhi->newTexture(QRhiTexture::RGBA8, atlas.size(), 1);
+    if (!m_measureLabelAtlas || !m_measureLabelAtlas->create()) {
+      delete m_measureLabelAtlas;
+      m_measureLabelAtlas = nullptr;
+      return;
+    }
+  }
+
+  updates->uploadTexture(m_measureLabelAtlas, atlas);
+  m_measureLabelHeight = static_cast<float>(glyphHeight);
+  m_measureLabelAtlasDirty = false;
+}
+
+// Emits top-bar measure-number glyph quads using the cached font atlas.
+void PianoRollRhiRenderer::appendMeasureNumberOverlays(const PianoRollFrame::Data& frame,
+                                                       const Layout& layout) {
+  if (layout.noteAreaWidth <= 0.0f || layout.topBarHeight <= 0.0f ||
+      !m_measureLabelAtlas || m_measureLabelHeight <= 0.0f) {
+    return;
+  }
+
+  struct MeasureSegment {
+    uint64_t start = 0;
+    uint64_t end = 0;
+    uint32_t measureTicks = 1;
+    uint64_t firstMeasureIndex = 0;
+  };
+
+  std::vector<PianoRollFrame::TimeSignature> signatures;
+  if (frame.timeSignatures && !frame.timeSignatures->empty()) {
+    signatures = *frame.timeSignatures;
+  } else {
+    signatures.push_back({0, 4, 4});
+  }
+  std::sort(signatures.begin(), signatures.end(), [](const auto& lhs, const auto& rhs) {
+    return lhs.tick < rhs.tick;
+  });
+
+  const uint64_t totalTickEnd = static_cast<uint64_t>(std::max(1, frame.totalTicks)) + 1;
+  std::vector<MeasureSegment> segments;
+  segments.reserve(signatures.size());
+
+  uint64_t runningMeasureIndex = 0;
+  for (size_t i = 0; i < signatures.size(); ++i) {
+    const auto& sig = signatures[i];
+    const uint64_t segStart = sig.tick;
+    uint64_t segEnd = totalTickEnd;
+    if (i + 1 < signatures.size()) {
+      segEnd = std::min<uint64_t>(segEnd, std::max<uint64_t>(segStart, signatures[i + 1].tick));
+    }
+    if (segStart >= totalTickEnd || segEnd <= segStart) {
+      continue;
+    }
+
+    const uint32_t numerator = std::max<uint32_t>(1, sig.numerator);
+    const uint32_t denominator = std::max<uint32_t>(1, sig.denominator);
+    const uint32_t beatTicks = std::max<uint32_t>(
+        1,
+        static_cast<uint32_t>(std::lround((static_cast<double>(frame.ppqn) * 4.0) /
+                                          static_cast<double>(denominator))));
+    const uint64_t measureTicks64 = static_cast<uint64_t>(beatTicks) * numerator;
+    const uint32_t measureTicks = static_cast<uint32_t>(std::min<uint64_t>(
+        std::numeric_limits<uint32_t>::max(),
+        std::max<uint64_t>(1, measureTicks64)));
+
+    const uint64_t spanTicks = segEnd - segStart;
+    const uint64_t measureCount = ((spanTicks - 1) / measureTicks) + 1;
+    segments.push_back({segStart, segEnd, measureTicks, runningMeasureIndex});
+    runningMeasureIndex += measureCount;
+  }
+  if (segments.empty()) {
+    return;
+  }
+
+  static constexpr float kMinMeasureSpacingForLabelsPx = 22.0f;
+  static constexpr float kTargetMeasureLabelSpacingPx = 44.0f;
+  static constexpr int kMaxVisibleLabels = 96;
+  static constexpr float kLabelOffsetXPx = 3.0f;
+
+  const uint64_t visibleStartTick = layout.visibleStartTick;
+  const uint64_t visibleEndTick = layout.visibleEndTick + 1;
+  float minMeasureSpacingPx = std::numeric_limits<float>::max();
+  for (const MeasureSegment& seg : segments) {
+    if (seg.end <= visibleStartTick || seg.start >= visibleEndTick) {
+      continue;
+    }
+    minMeasureSpacingPx = std::min(minMeasureSpacingPx,
+                                   static_cast<float>(seg.measureTicks) * layout.pixelsPerTick);
+  }
+  if (!std::isfinite(minMeasureSpacingPx) || minMeasureSpacingPx < kMinMeasureSpacingForLabelsPx) {
+    return;
+  }
+
+  const uint64_t labelStep = std::max<uint64_t>(
+      1,
+      // At dense zoom levels, draw every Nth measure to cap draw cost.
+      static_cast<uint64_t>(std::ceil(kTargetMeasureLabelSpacingPx / minMeasureSpacingPx)));
+  const float labelHeight = std::clamp(m_measureLabelHeight,
+                                       7.0f,
+                                       std::max(7.0f, layout.topBarHeight - 2.0f));
+  const float labelY = std::clamp(layout.topBarHeight * 0.16f,
+                                  1.0f,
+                                  std::max(1.0f, layout.topBarHeight - labelHeight - 1.0f));
+  const float noteAreaRight = layout.noteAreaLeft + layout.noteAreaWidth;
+  QColor labelColor = frame.measureLineColor.lighter(116);
+  labelColor.setAlpha(std::clamp(labelColor.alpha() + 84, 96, 220));
+
+  int visibleLabelCount = 0;
+  for (const MeasureSegment& seg : segments) {
+    if (seg.end <= visibleStartTick || seg.start >= visibleEndTick) {
+      continue;
+    }
+
+    uint64_t firstMeasureInSeg = 0;
+    if (visibleStartTick > seg.start) {
+      firstMeasureInSeg = (visibleStartTick - seg.start + seg.measureTicks - 1) / seg.measureTicks;
+    }
+
+    for (uint64_t localMeasure = firstMeasureInSeg;; ++localMeasure) {
+      const uint64_t tick = seg.start + (localMeasure * seg.measureTicks);
+      if (tick >= seg.end || tick >= visibleEndTick) {
+        break;
+      }
+
+      const uint64_t measureIndex = seg.firstMeasureIndex + localMeasure;
+      if ((measureIndex % labelStep) != 0) {
+        continue;
+      }
+
+      const int measureNumber = static_cast<int>(
+          std::min<uint64_t>(measureIndex + 1, static_cast<uint64_t>(std::numeric_limits<int>::max())));
+      const QString measureText = QString::number(measureNumber);
+      float labelWidth = 0.0f;
+      for (int i = 0; i < measureText.size(); ++i) {
+        const int digit = measureText.at(i).unicode() - u'0';
+        if (digit < 0 || digit > 9) {
+          continue;
+        }
+        labelWidth += m_measureLabelDigits[static_cast<size_t>(digit)].width;
+        if (i + 1 < measureText.size()) {
+          labelWidth += 1.0f;
+        }
+      }
+      if (labelWidth <= 0.0f) {
+        continue;
+      }
+
+      float labelX = layout.noteAreaLeft + (static_cast<float>(tick) * layout.pixelsPerTick) - layout.scrollX;
+      labelX += kLabelOffsetXPx;
+      if (labelX < layout.noteAreaLeft + 1.0f || labelX + labelWidth > noteAreaRight - 1.0f) {
+        continue;
+      }
+
+      float cursorX = labelX;
+      for (int i = 0; i < measureText.size(); ++i) {
+        const int digit = measureText.at(i).unicode() - u'0';
+        if (digit < 0 || digit > 9) {
+          continue;
+        }
+
+        const LabelGlyph& glyph = m_measureLabelDigits[static_cast<size_t>(digit)];
+        if (glyph.width <= 0.0f) {
+          continue;
+        }
+
+        appendRect(m_dynamicInstances,
+                   cursorX,
+                   labelY,
+                   glyph.width,
+                   labelHeight,
+                   labelColor,
+                   LineStyle::MeasureNumber,
+                   0.0f,
+                   0.0f,
+                   0.0f,
+                   0.0f,
+                   0.0f,
+                   // For MeasureNumber, coordMode packs glyph UV (u0,v0,u1,v1).
+                   glyph.u0,
+                   glyph.v0,
+                   glyph.u1,
+                   glyph.v1);
+        cursorX += glyph.advance;
+      }
+
+      ++visibleLabelCount;
+      if (visibleLabelCount >= kMaxVisibleLabels) {
+        return;
+      }
+    }
+  }
 }
 
 PianoRollRhiRenderer::Layout PianoRollRhiRenderer::computeLayout(const PianoRollFrame::Data& frame,
@@ -1147,6 +1437,8 @@ void PianoRollRhiRenderer::buildDynamicInstances(const PianoRollFrame::Data& fra
   if (layout.viewWidth <= 0 || layout.viewHeight <= 0 || layout.noteAreaWidth <= 0.0f || layout.noteAreaHeight <= 0.0f) {
     return;
   }
+
+  appendMeasureNumberOverlays(frame, layout);
 
   const auto* trackColors = frame.trackColors.get();
   const auto* trackEnabled = frame.trackEnabled.get();
