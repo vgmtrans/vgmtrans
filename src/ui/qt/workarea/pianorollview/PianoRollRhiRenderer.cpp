@@ -707,20 +707,19 @@ void PianoRollRhiRenderer::ensureMeasureLabelAtlas(QRhiResourceUpdateBatch* upda
     m_measureLabelAtlasDirty = true;
   }
 
-  if (!m_measureLabelAtlas) {
-    // Keep binding 1 valid even before the real atlas is generated.
-    m_measureLabelAtlas = m_rhi->newTexture(QRhiTexture::RGBA8, QSize(1, 1), 1);
-    if (!m_measureLabelAtlas || !m_measureLabelAtlas->create()) {
-      delete m_measureLabelAtlas;
-      m_measureLabelAtlas = nullptr;
-      return;
-    }
-    QImage whitePixel(1, 1, QImage::Format_RGBA8888);
-    whitePixel.fill(Qt::white);
-    updates->uploadTexture(m_measureLabelAtlas, whitePixel);
-  }
-
   if (!m_measureLabelAtlasDirty) {
+    if (!m_measureLabelAtlas) {
+      // Keep SRB binding 1 valid even before the first atlas is generated.
+      m_measureLabelAtlas = m_rhi->newTexture(QRhiTexture::RGBA8, QSize(1, 1), 1);
+      if (!m_measureLabelAtlas || !m_measureLabelAtlas->create()) {
+        delete m_measureLabelAtlas;
+        m_measureLabelAtlas = nullptr;
+        return;
+      }
+      QImage whitePixel(1, 1, QImage::Format_RGBA8888);
+      whitePixel.fill(Qt::white);
+      updates->uploadTexture(m_measureLabelAtlas, whitePixel);
+    }
     return;
   }
 
@@ -781,7 +780,7 @@ void PianoRollRhiRenderer::ensureMeasureLabelAtlas(QRhiResourceUpdateBatch* upda
   }
   painter.end();
 
-  if (m_measureLabelAtlas->pixelSize() != atlas.size()) {
+  if (!m_measureLabelAtlas || m_measureLabelAtlas->pixelSize() != atlas.size()) {
     delete m_measureLabelAtlas;
     m_measureLabelAtlas = m_rhi->newTexture(QRhiTexture::RGBA8, atlas.size(), 1);
     if (!m_measureLabelAtlas || !m_measureLabelAtlas->create()) {
