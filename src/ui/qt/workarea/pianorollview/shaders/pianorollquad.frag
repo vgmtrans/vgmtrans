@@ -4,11 +4,46 @@ layout(location = 0) in vec4 vColor;
 layout(location = 1) in vec2 vLocalPos;
 layout(location = 2) in vec2 vRectSize;
 layout(location = 3) in vec4 vParams;
+layout(location = 4) in vec2 vScenePos;
 
 layout(location = 0) out vec4 fragColor;
 
+layout(std140, binding = 0) uniform Ubuf {
+  mat4 mvp;
+  vec4 camera;
+  vec4 noteArea;
+};
+
 void main() {
-  if (vParams.x > 0.5) {
+  if (vParams.x > 1.5) {
+    if (vScenePos.x < noteArea.x || vScenePos.x > noteArea.z) {
+      discard;
+    }
+
+    float pixelsPerTick = max(0.0001, camera.z);
+    float tick = ((vScenePos.x - noteArea.x) + camera.x) / pixelsPerTick;
+    float originTick = max(0.0, vParams.w);
+    float beatTicks = max(1.0, vParams.y);
+    float measureTicks = max(beatTicks, vParams.z);
+    float relTick = max(0.0, tick - originTick);
+
+    float measureMod = mod(relTick, measureTicks);
+    float measureDistPx = min(measureMod, measureTicks - measureMod) * pixelsPerTick;
+    bool onMeasure = measureDistPx <= 0.5;
+
+    if (vParams.x < 2.5) {
+      if (!onMeasure) {
+        discard;
+      }
+    } else {
+      float beatMod = mod(relTick, beatTicks);
+      float beatDistPx = min(beatMod, beatTicks - beatMod) * pixelsPerTick;
+      bool onBeat = beatDistPx <= 0.5;
+      if (!onBeat || onMeasure) {
+        discard;
+      }
+    }
+  } else if (vParams.x > 0.5) {
     float segment = max(1.0, vParams.y);
     float gap = max(0.0, vParams.z);
     float cycle = segment + gap;
