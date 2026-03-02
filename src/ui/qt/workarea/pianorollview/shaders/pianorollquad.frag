@@ -12,10 +12,41 @@ layout(std140, binding = 0) uniform Ubuf {
   mat4 mvp;
   vec4 camera;
   vec4 noteArea;
+  vec4 noteBorderColor;
 };
 
 void main() {
-  if (vParams.x > 1.5) {
+  if (vParams.x > 4.5) {
+    vec4 grad = vColor;
+    float topScale = max(0.0, vParams.y);
+    float bottomScale = max(0.0, vParams.z);
+    float t = clamp(vLocalPos.y, 0.0, 1.0);
+    float scale = mix(topScale, bottomScale, t);
+    grad.rgb = clamp(grad.rgb * scale, 0.0, 1.0);
+    grad.a = 1.0;
+    fragColor = grad;
+    return;
+  } else if (vParams.x > 3.5) {
+    if (vScenePos.x < noteArea.x || vScenePos.x > noteArea.z) {
+      discard;
+    }
+    float x = clamp(vLocalPos.x, 0.0, 1.0);
+    float y = clamp(vLocalPos.y, 0.0, 1.0);
+    float halfWidth = 0.5 * (1.0 - y);
+    float edgeDist = halfWidth - abs(x - 0.5);
+    float aa = max(0.75 * fwidth(edgeDist), 0.001);
+    float triAlpha = smoothstep(0.0, aa, edgeDist);
+    if (triAlpha <= 0.0) {
+      discard;
+    }
+
+    float topScale = (vParams.y > 0.0) ? vParams.y : 1.0;
+    float bottomScale = (vParams.z > 0.0) ? vParams.z : 1.0;
+    float scale = mix(topScale, bottomScale, y);
+    vec3 rgb = clamp(vColor.rgb * scale, 0.0, 1.0);
+    fragColor = vec4(rgb, triAlpha * vColor.a);
+    return;
+  } else if (vParams.x > 1.5) {
     if (vScenePos.x < noteArea.x || vScenePos.x > noteArea.z) {
       discard;
     }

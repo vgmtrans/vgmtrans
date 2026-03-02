@@ -836,12 +836,6 @@ void PianoRollRhiRenderer::buildStaticInstances(const PianoRollFrame::Data& fram
 
   appendRect(m_staticBackInstances,
              layout.noteAreaLeft,
-             0.0f,
-             layout.noteAreaWidth,
-             layout.topBarHeight,
-             frame.topBarBackgroundColor);
-  appendRect(m_staticBackInstances,
-             layout.noteAreaLeft,
              layout.noteAreaTop,
              layout.noteAreaWidth,
              layout.noteAreaHeight,
@@ -893,6 +887,26 @@ void PianoRollRhiRenderer::buildStaticInstances(const PianoRollFrame::Data& fram
                0.0f,
                0.0f);
   }
+
+  // Draw the top bar after scrolling lane bands so it remains visually opaque.
+  QColor topBarBase = frame.topBarBackgroundColor;
+  topBarBase.setAlpha(255);
+  appendRect(m_staticBackInstances,
+             layout.noteAreaLeft,
+             0.0f,
+             layout.noteAreaWidth,
+             layout.topBarHeight,
+             topBarBase,
+             LineStyle::TopBarGradient,
+             1.10f,
+             0.86f,
+             0.0f,
+             0.0f,
+             0.0f,
+             0.0f,
+             0.0f,
+             0.0f,
+             0.0f);
 
   // Emit one procedural grid rect per time-signature segment instead of per-line quads.
   std::vector<PianoRollFrame::TimeSignature> signatures;
@@ -955,33 +969,17 @@ void PianoRollRhiRenderer::buildStaticInstances(const PianoRollFrame::Data& fram
                0.0f);
 
     QColor topMeasure = frame.measureLineColor;
-    topMeasure.setAlpha(std::min(255, topMeasure.alpha() + 30));
+    topMeasure.setAlpha(std::min(255, topMeasure.alpha() + 35));
+    const float topBarInset = std::clamp(layout.topBarHeight * 0.20f + 5.0f,
+                                         2.0f,
+                                         std::max(2.0f, layout.topBarHeight - 2.0f));
     appendRect(m_staticBackInstances,
                segX,
-               0.0f,
+               topBarInset,
                segW,
-               layout.topBarHeight,
+               layout.topBarHeight - topBarInset,
                topMeasure,
                LineStyle::GridMeasure,
-               beatTicksF,
-               measureTicksF,
-               originTickF,
-               1.0f,
-               0.0f,
-               1.0f,
-               0.0f,
-               1.0f,
-               0.0f);
-
-    QColor topBeat = frame.beatLineColor;
-    topBeat.setAlpha(std::max(20, topBeat.alpha() / 2));
-    appendRect(m_staticBackInstances,
-               segX,
-               0.0f,
-               segW,
-               layout.topBarHeight,
-               topBeat,
-               LineStyle::GridBeat,
                beatTicksF,
                measureTicksF,
                originTickF,
@@ -1272,14 +1270,21 @@ void PianoRollRhiRenderer::buildDynamicInstances(const PianoRollFrame::Data& fra
 
     appendRect(m_dynamicInstances, currentX - 1.0f, layout.noteAreaTop, 2.0f, layout.noteAreaHeight, scanColor);
     appendRect(m_dynamicInstances, currentX - 1.0f, 0.0f, 2.0f, layout.topBarHeight, scanColor);
-    appendRect(m_dynamicInstances, currentX - 4.0f, 0.0f, 8.0f, 3.0f, scanColor);
-
-    QColor progress = frame.topBarProgressColor;
-    progress.setAlpha(std::min(255, progress.alpha() + 45));
-    const float progressWidth = std::clamp(currentX - layout.noteAreaLeft, 0.0f, layout.noteAreaWidth);
-    if (progressWidth > 0.5f) {
-      appendRect(m_dynamicInstances, layout.noteAreaLeft, 0.0f, progressWidth, layout.topBarHeight, progress);
-    }
+    QColor headColor = frame.playbackActive ? QColor(235, 90, 75) : QColor(140, 70, 67);
+    headColor.setAlpha(255);
+    const float headHeight = std::clamp(layout.topBarHeight * 0.5f,
+                                        6.0f,
+                                        std::max(6.0f, layout.topBarHeight - 2.0f));
+    const float headWidth = std::max(14.0f, headHeight * 1.15f);
+    appendRect(m_dynamicInstances,
+               currentX - (headWidth * 0.5f),
+               0.0f,
+               headWidth,
+               headHeight,
+               headColor,
+               LineStyle::TriangleDown,
+               1.24f,
+               1.00f);
   }
 
   if (frame.selectionRectVisible && frame.selectionRectW > 0.5f && frame.selectionRectH > 0.5f) {

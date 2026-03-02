@@ -1027,8 +1027,8 @@ void PianoRollView::rebuildFrameColors() {
   m_frameColors.keyboardBackgroundColor = dark ? QColor(31, 35, 40) : QColor(219, 223, 228);
   m_frameColors.topBarBackgroundColor = dark ? QColor(47, 52, 60) : QColor(210, 216, 224);
   m_frameColors.topBarProgressColor = dark ? QColor(108, 125, 158, 85) : QColor(100, 129, 180, 70);
-  m_frameColors.measureLineColor = dark ? QColor(156, 164, 178, 74) : QColor(105, 114, 130, 48);
-  m_frameColors.beatLineColor = dark ? QColor(156, 164, 178, 48) : QColor(110, 119, 136, 34);
+  m_frameColors.measureLineColor = dark ? QColor(160, 168, 182, 82) : QColor(102, 111, 127, 54);
+  m_frameColors.beatLineColor = dark ? QColor(156, 164, 178, 38) : QColor(110, 119, 136, 26);
   m_frameColors.keySeparatorColor = dark ? QColor(20, 24, 28, 140) : QColor(108, 116, 128, 70);
   m_frameColors.noteOutlineColor = dark ? QColor(18, 20, 22, 180) : QColor(62, 70, 84, 130);
   m_frameColors.scanLineColor = dark ? QColor(255, 94, 77, 230) : QColor(201, 56, 36, 220);
