@@ -126,10 +126,21 @@ PianoRollView::PianoRollView(QWidget* parent)
       return;
     }
 
-    m_pendingPlaybackAutoScrollValue =
-        std::clamp(value.toInt(), hbar->minimum(), hbar->maximum());
-    m_pendingPlaybackAutoScrollValid = true;
-    requestRender();
+    const int nextValue = std::clamp(value.toInt(), hbar->minimum(), hbar->maximum());
+    if (m_rhiHost && m_rhiHost->syncPlaybackAutoScrollToRenderFrame()) {
+      m_pendingPlaybackAutoScrollValue = nextValue;
+      m_pendingPlaybackAutoScrollValid = true;
+      requestRender();
+      return;
+    }
+
+    m_pendingPlaybackAutoScrollValid = false;
+    if (nextValue == hbar->value()) {
+      return;
+    }
+    m_applyingPlaybackAutoScroll = true;
+    hbar->setValue(nextValue);
+    m_applyingPlaybackAutoScroll = false;
   });
 
   m_rhiHost = new PianoRollRhiHost(this, viewport());
