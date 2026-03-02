@@ -218,6 +218,7 @@ void PianoRollRhiRenderer::initIfNeeded(QRhi* rhi) {
   }
 
   m_rhi = rhi;
+  m_supportsBaseInstance = m_rhi->isFeatureSupported(QRhi::BaseInstance);
 
   m_vertexBuffer = m_rhi->newBuffer(QRhiBuffer::Immutable,
                                     QRhiBuffer::VertexBuffer,
@@ -304,6 +305,7 @@ void PianoRollRhiRenderer::releaseResources() {
 
   m_outputRenderPass = nullptr;
   m_sampleCount = 1;
+  m_supportsBaseInstance = true;
   m_staticBuffersUploaded = false;
   m_inited = false;
   m_staticBackInstances.clear();
@@ -471,12 +473,18 @@ void PianoRollRhiRenderer::renderFrame(QRhiCommandBuffer* cb, const RenderTarget
     if (!m_pipeline || !m_shaderBindings || !buffer || count <= 0) {
       return;
     }
+    quint32 instanceOffset = 0;
+    int drawFirstInstance = firstInstance;
+    if (!m_supportsBaseInstance && firstInstance > 0) {
+      instanceOffset = static_cast<quint32>(firstInstance * static_cast<int>(sizeof(RectInstance)));
+      drawFirstInstance = 0;
+    }
 
     cb->setGraphicsPipeline(m_pipeline);
     cb->setShaderResources(m_shaderBindings);
     const QRhiCommandBuffer::VertexInput bindings[] = {
         {m_vertexBuffer, 0},
-        {buffer, 0},
+        {buffer, instanceOffset},
     };
     cb->setVertexInput(0,
                        static_cast<int>(std::size(bindings)),
@@ -484,7 +492,7 @@ void PianoRollRhiRenderer::renderFrame(QRhiCommandBuffer* cb, const RenderTarget
                        m_indexBuffer,
                        0,
                        QRhiCommandBuffer::IndexUInt16);
-    cb->drawIndexed(6, count, 0, 0, firstInstance);
+    cb->drawIndexed(6, count, 0, 0, drawFirstInstance);
   };
 
   const int staticBackCount = static_cast<int>(m_staticBackInstances.size());
@@ -528,11 +536,18 @@ void PianoRollRhiRenderer::renderFrame(QRhiCommandBuffer* cb, const RenderTarget
     }
 
     if (noteInstanceCount > 0) {
+      quint32 noteInstanceOffset = 0;
+      int noteDrawFirstInstance = noteFirstInstance;
+      if (!m_supportsBaseInstance && noteFirstInstance > 0) {
+        noteInstanceOffset =
+            static_cast<quint32>(noteFirstInstance * static_cast<int>(sizeof(NoteInstance)));
+        noteDrawFirstInstance = 0;
+      }
       cb->setGraphicsPipeline(m_notePipeline);
       cb->setShaderResources(m_shaderBindings);
       const QRhiCommandBuffer::VertexInput noteBindings[] = {
           {m_vertexBuffer, 0},
-          {m_noteInstanceBuffer, 0},
+          {m_noteInstanceBuffer, noteInstanceOffset},
       };
       cb->setVertexInput(0,
                          static_cast<int>(std::size(noteBindings)),
@@ -540,7 +555,7 @@ void PianoRollRhiRenderer::renderFrame(QRhiCommandBuffer* cb, const RenderTarget
                          m_indexBuffer,
                          0,
                          QRhiCommandBuffer::IndexUInt16);
-      cb->drawIndexed(6, noteInstanceCount, 0, 0, noteFirstInstance);
+      cb->drawIndexed(6, noteInstanceCount, 0, 0, noteDrawFirstInstance);
     }
   }
 
