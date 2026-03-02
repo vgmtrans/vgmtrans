@@ -23,6 +23,7 @@
 #include <cstring>
 #include <cstdint>
 #include <iterator>
+#include <limits>
 #include <utility>
 
 namespace {
@@ -702,11 +703,16 @@ PianoRollRhiRenderer::StaticCacheKey PianoRollRhiRenderer::makeStaticCacheKey(co
                                                                                const Layout& layout) const {
   StaticCacheKey key;
   key.viewSize = QSize(layout.viewWidth, layout.viewHeight);
+  key.totalTicks = std::max(1, frame.totalTicks);
+  key.ppqn = std::max(1, frame.ppqn);
   key.keyboardWidth = static_cast<int>(std::lround(layout.keyboardWidth));
   key.topBarHeight = static_cast<int>(std::lround(layout.topBarHeight));
+  key.timeSigPtr = reinterpret_cast<uint64_t>(frame.timeSignatures.get());
   key.noteBackgroundColor = colorKey(frame.noteBackgroundColor);
   key.keyboardBackgroundColor = colorKey(frame.keyboardBackgroundColor);
   key.topBarBackgroundColor = colorKey(frame.topBarBackgroundColor);
+  key.measureLineColor = colorKey(frame.measureLineColor);
+  key.beatLineColor = colorKey(frame.beatLineColor);
   key.keySeparatorColor = colorKey(frame.keySeparatorColor);
   key.whiteKeyColor = colorKey(frame.whiteKeyColor);
   key.blackKeyColor = colorKey(frame.blackKeyColor);
@@ -718,11 +724,16 @@ PianoRollRhiRenderer::StaticCacheKey PianoRollRhiRenderer::makeStaticCacheKey(co
 
 bool PianoRollRhiRenderer::staticCacheKeyEqual(const StaticCacheKey& lhs, const StaticCacheKey& rhs) {
   return lhs.viewSize == rhs.viewSize &&
+         lhs.totalTicks == rhs.totalTicks &&
+         lhs.ppqn == rhs.ppqn &&
          lhs.keyboardWidth == rhs.keyboardWidth &&
          lhs.topBarHeight == rhs.topBarHeight &&
+         lhs.timeSigPtr == rhs.timeSigPtr &&
          lhs.noteBackgroundColor == rhs.noteBackgroundColor &&
          lhs.keyboardBackgroundColor == rhs.keyboardBackgroundColor &&
          lhs.topBarBackgroundColor == rhs.topBarBackgroundColor &&
+         lhs.measureLineColor == rhs.measureLineColor &&
+         lhs.beatLineColor == rhs.beatLineColor &&
          lhs.keySeparatorColor == rhs.keySeparatorColor &&
          lhs.whiteKeyColor == rhs.whiteKeyColor &&
          lhs.blackKeyColor == rhs.blackKeyColor &&
@@ -881,6 +892,126 @@ void PianoRollRhiRenderer::buildStaticInstances(const PianoRollFrame::Data& fram
                1.0f,
                0.0f,
                0.0f);
+  }
+
+  // Emit one procedural grid rect per time-signature segment instead of per-line quads.
+  std::vector<PianoRollFrame::TimeSignature> signatures;
+  if (frame.timeSignatures && !frame.timeSignatures->empty()) {
+    signatures = *frame.timeSignatures;
+  } else {
+    signatures.push_back({0, 4, 4});
+  }
+  std::sort(signatures.begin(), signatures.end(), [](const auto& a, const auto& b) {
+    return a.tick < b.tick;
+  });
+
+  const uint64_t totalTickEnd = static_cast<uint64_t>(std::max(1, frame.totalTicks)) + 1;
+  // Encodes beat/measure spacing in instance params; the fragment shader draws the vertical lines.
+  const auto appendGridSegment = [&](uint64_t segStart,
+                                     uint64_t segEnd,
+                                     uint32_t beatTicks,
+                                     uint32_t measureTicks) {
+    if (segEnd <= segStart || beatTicks == 0 || measureTicks == 0) {
+      return;
+    }
+
+    const float segX = static_cast<float>(segStart);
+    const float segW = static_cast<float>(segEnd - segStart);
+    const float beatTicksF = static_cast<float>(beatTicks);
+    const float measureTicksF = static_cast<float>(measureTicks);
+    const float originTickF = static_cast<float>(segStart);
+
+    appendRect(m_staticBackInstances,
+               segX,
+               layout.noteAreaTop,
+               segW,
+               layout.noteAreaHeight,
+               frame.measureLineColor,
+               LineStyle::GridMeasure,
+               beatTicksF,
+               measureTicksF,
+               originTickF,
+               1.0f,
+               0.0f,
+               1.0f,
+               0.0f,
+               1.0f,
+               0.0f);
+    appendRect(m_staticBackInstances,
+               segX,
+               layout.noteAreaTop,
+               segW,
+               layout.noteAreaHeight,
+               frame.beatLineColor,
+               LineStyle::GridBeat,
+               beatTicksF,
+               measureTicksF,
+               originTickF,
+               1.0f,
+               0.0f,
+               1.0f,
+               0.0f,
+               1.0f,
+               0.0f);
+
+    QColor topMeasure = frame.measureLineColor;
+    topMeasure.setAlpha(std::min(255, topMeasure.alpha() + 30));
+    appendRect(m_staticBackInstances,
+               segX,
+               0.0f,
+               segW,
+               layout.topBarHeight,
+               topMeasure,
+               LineStyle::GridMeasure,
+               beatTicksF,
+               measureTicksF,
+               originTickF,
+               1.0f,
+               0.0f,
+               1.0f,
+               0.0f,
+               1.0f,
+               0.0f);
+
+    QColor topBeat = frame.beatLineColor;
+    topBeat.setAlpha(std::max(20, topBeat.alpha() / 2));
+    appendRect(m_staticBackInstances,
+               segX,
+               0.0f,
+               segW,
+               layout.topBarHeight,
+               topBeat,
+               LineStyle::GridBeat,
+               beatTicksF,
+               measureTicksF,
+               originTickF,
+               1.0f,
+               0.0f,
+               1.0f,
+               0.0f,
+               1.0f,
+               0.0f);
+  };
+
+  for (size_t i = 0; i < signatures.size(); ++i) {
+    const auto& sig = signatures[i];
+    const uint32_t numerator = std::max<uint32_t>(1, sig.numerator);
+    const uint32_t denominator = std::max<uint32_t>(1, sig.denominator);
+    const uint32_t beatTicks = std::max<uint32_t>(
+        1,
+        static_cast<uint32_t>(std::lround((static_cast<double>(frame.ppqn) * 4.0) /
+                                          static_cast<double>(denominator))));
+    const uint64_t measureTicks64 = static_cast<uint64_t>(beatTicks) * numerator;
+    const uint32_t measureTicks = static_cast<uint32_t>(std::min<uint64_t>(
+        std::numeric_limits<uint32_t>::max(),
+        std::max<uint64_t>(1, measureTicks64)));
+
+    const uint64_t segStart = sig.tick;
+    uint64_t segEnd = totalTickEnd;
+    if (i + 1 < signatures.size()) {
+      segEnd = std::min<uint64_t>(segEnd, std::max<uint64_t>(segStart, signatures[i + 1].tick));
+    }
+    appendGridSegment(segStart, segEnd, beatTicks, measureTicks);
   }
 
   const float blackKeyWidth = std::max(10.0f, layout.keyboardWidth * 0.63f);

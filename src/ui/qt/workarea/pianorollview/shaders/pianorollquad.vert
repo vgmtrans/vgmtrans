@@ -11,6 +11,7 @@ layout(location = 0) out vec4 vColor;
 layout(location = 1) out vec2 vLocalPos;
 layout(location = 2) out vec2 vRectSize;
 layout(location = 3) out vec4 vParams;
+layout(location = 4) out vec2 vScenePos;
 
 layout(std140, binding = 0) uniform Ubuf {
   mat4 mvp;
@@ -41,4 +42,5 @@ void main() {
   vLocalPos = inPos;
   vRectSize = size;
   vParams = inParams;
+  vScenePos = pos;
 }

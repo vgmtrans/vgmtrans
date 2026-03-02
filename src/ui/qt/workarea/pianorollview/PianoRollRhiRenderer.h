@@ -69,11 +69,16 @@ private:
 
   struct StaticCacheKey {
     QSize viewSize;
+    int totalTicks = 0;
+    int ppqn = 0;
     int keyboardWidth = 0;
     int topBarHeight = 0;
+    uint64_t timeSigPtr = 0;
     uint32_t noteBackgroundColor = 0;
     uint32_t keyboardBackgroundColor = 0;
     uint32_t topBarBackgroundColor = 0;
+    uint32_t measureLineColor = 0;
+    uint32_t beatLineColor = 0;
     uint32_t keySeparatorColor = 0;
     uint32_t whiteKeyColor = 0;
     uint32_t blackKeyColor = 0;
@@ -125,6 +130,8 @@ private:
   enum class LineStyle : int {
     Solid = 0,
     DottedVertical = 1,
+    GridMeasure = 2,
+    GridBeat = 3,
   };
 
   static bool isBlackKey(int key);
