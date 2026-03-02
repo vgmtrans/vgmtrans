@@ -1405,8 +1405,10 @@ void PianoRollRhiRenderer::buildStaticInstances(const PianoRollFrame::Data& fram
 
   const float blackKeyWidth = std::max(10.0f, layout.keyboardWidth * 0.63f);
   const float blackKeyHeightUnits = 1.0f;
-  const float blackInnerHeightRatio = 0.62f;
-  const float blackInnerWidthRatio = 0.86f;
+  const float blackTopInsetLeftPx = 1.0f;
+  const float blackTopInsetRightPx = std::clamp(blackKeyWidth * 0.12f, 2.0f, 6.0f);
+  const float blackTopInsetYUnits = 0.20f;
+  const float blackTopSheenCurve = 6.0f;
   for (int key : topology.whiteKeys) {
     const KeyboardKeyTopology& keyTopology = topology.keys[static_cast<size_t>(key)];
     const float keyTopUnit = keyTopology.topSeamUnit;
@@ -1456,13 +1458,15 @@ void PianoRollRhiRenderer::buildStaticInstances(const PianoRollFrame::Data& fram
 
   for (int key : topology.blackKeys) {
     const float blackYUnit = topology.keys[static_cast<size_t>(key)].centerUnit - (blackKeyHeightUnits * 0.5f);
+    QColor blackBase = frame.blackKeyColor.darker(126);
+    blackBase.setAlpha(255);
 
     appendRect(m_staticFrontInstances,
                0.0f,
                blackYUnit,
                blackKeyWidth,
                blackKeyHeightUnits,
-               frame.blackKeyColor,
+               blackBase,
                LineStyle::Solid,
                0.0f,
                0.0f,
@@ -1474,47 +1478,28 @@ void PianoRollRhiRenderer::buildStaticInstances(const PianoRollFrame::Data& fram
                0.0f,
                1.0f);
 
-    QColor blackFace = frame.blackKeyColor.darker(116);
-    blackFace.setAlpha(230);
-    const float innerW = blackKeyWidth * blackInnerWidthRatio;
-    const float innerHUnits = blackKeyHeightUnits * blackInnerHeightRatio;
-    const float innerX = (blackKeyWidth - innerW) * 0.5f;
-    const float innerYUnit = blackYUnit + 0.04f;
+    QColor blackTop = frame.blackKeyColor.lighter(114);
+    blackTop.setAlpha(236);
+    const float innerW = std::max(1.0f, blackKeyWidth - blackTopInsetLeftPx - blackTopInsetRightPx);
+    const float innerHUnits = std::max(0.0f, blackKeyHeightUnits - (2.0f * blackTopInsetYUnits));
+    const float innerX = blackTopInsetLeftPx;
+    const float innerYUnit = blackYUnit + blackTopInsetYUnits;
     appendRect(m_staticFrontInstances,
                innerX,
                innerYUnit,
                innerW,
                std::max(0.0f, innerHUnits),
-               blackFace,
-               LineStyle::Solid,
-               0.0f,
-               0.0f,
-               0.0f,
+               blackTop,
+               LineStyle::HorizontalGradient,
+               0.82f,
+               1.05f,
+               blackTopSheenCurve,
                0.0f,
                1.0f,
                0.0f,
                1.0f,
                0.0f,
                1.0f);
-
-    QColor blackHighlight = frame.blackKeyColor.lighter(128);
-    blackHighlight.setAlpha(84);
-    appendRect(m_staticFrontInstances,
-               0.0f,
-               blackYUnit,
-               blackKeyWidth,
-               1.0f,
-               blackHighlight,
-               LineStyle::Solid,
-               0.0f,
-               0.0f,
-               0.0f,
-               0.0f,
-               1.0f,
-               0.0f,
-               1.0f,
-               0.0f,
-               0.0f);
   }
 
   appendRect(m_staticBackInstances,

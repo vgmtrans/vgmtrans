@@ -19,13 +19,25 @@ layout(std140, binding = 0) uniform Ubuf {
 layout(binding = 1) uniform sampler2D glyphAtlas;
 
 void main() {
-  if (vParams.x > 5.5) {
+  if (vParams.x > 6.5) {
     // Sample glyph alpha from the shared label atlas.
     float alpha = texture(glyphAtlas, vGlyphUv).a;
     if (alpha <= 0.001) {
       discard;
     }
     fragColor = vec4(vColor.rgb, vColor.a * alpha);
+    return;
+  } else if (vParams.x > 5.5) {
+    vec4 grad = vColor;
+    float leftScale = max(0.0, vParams.y);
+    float rightScale = max(0.0, vParams.z);
+    float t = clamp(vLocalPos.x, 0.0, 1.0);
+    float curve = max(1.0, vParams.w);
+    float ramp = pow(t, curve);
+    float scale = mix(leftScale, rightScale, ramp);
+    grad.rgb = clamp(grad.rgb * scale, 0.0, 1.0);
+    grad.a = 1.0;
+    fragColor = grad;
     return;
   } else if (vParams.x > 4.5) {
     vec4 grad = vColor;
