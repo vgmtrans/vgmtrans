@@ -4,13 +4,24 @@
  * refer to the included LICENSE.txt file
  */
 
+#include "NDSScanner.h"
+
+#include <algorithm>
+#include <string>
+#include <vector>
+
+#include <fmt/format.h>
+
+#include "ScannerManager.h"
 #include "NDSSeq.h"
 #include "NDSInstrSet.h"
-#include "ScannerManager.h"
 
 namespace vgmtrans::scanners {
-ScannerRegistration<NDSScanner> s_nds("NDS", {"nds", "sdat", "mini2sf", "2sf", "2sflib"});
+  ScannerRegistration<NDSScanner> s_nds("NDS", {"nds", "sdat", "mini2sf", "2sf", "2sflib"});
 }
+
+/* Observed from multiple samples, the maximum length of standard archives is 127 + null terminator */
+constexpr auto MAX_NAME_LEN = 128;
 
 void NDSScanner::scan(RawFile* file, void* /*info*/) {
   searchForSDAT(file);
@@ -74,38 +85,30 @@ uint32_t NDSScanner::loadFromSDAT(RawFile *file, uint32_t baseOff) {
   }
 
   for (uint32_t i = 0; i < nSeqs; i++) {
-    char temp[32];        //that 32 is totally arbitrary, i should change it
     if (hasSYMB) {
-      file->readBytes(file->readWord(pSeqNamePtrList + 4 + i * 4) + SYMBoff, 32, temp);
+      seqNames.push_back(file->readNullTerminatedString(file->readWord(pSeqNamePtrList + 4 + i * 4) + SYMBoff, MAX_NAME_LEN));
     }
     else {
-      snprintf(temp, 32, "SSEQ_%04d", i);
+      seqNames.push_back(fmt::format("SSEQ_{:04d}", i));
     }
-    seqNames.push_back(temp);
   }
 
   for (uint32_t i = 0; i < nBnks; i++) {
-    char temp[32];        //that 32 is totally arbitrary, i should change it
-
     if (hasSYMB) {
-      file->readBytes(file->readWord(pBnkNamePtrList + 4 + i * 4) + SYMBoff, 32, temp);
+      bnkNames.push_back(file->readNullTerminatedString(file->readWord(pBnkNamePtrList + 4 + i * 4) + SYMBoff, MAX_NAME_LEN));
     }
     else {
-      snprintf(temp, 32, "SBNK_%04d", i);
+      bnkNames.push_back(fmt::format("SBNK_{:04d}", i));
     }
-    bnkNames.push_back(temp);
   }
 
   for (uint32_t i = 0; i < nWAs; i++) {
-    char temp[32];        //that 32 is totally arbitrary, i should change it
-
     if (hasSYMB) {
-      file->readBytes(file->readWord(pWANamePtrList + 4 + i * 4) + SYMBoff, 32, temp);
+      waNames.push_back(file->readNullTerminatedString(file->readWord(pWANamePtrList + 4 + i * 4) + SYMBoff, MAX_NAME_LEN));
     }
     else {
-      snprintf(temp, 32, "SWAR_%04d", i);
+      waNames.push_back(fmt::format("SWAR_{:04d}", i));
     }
-    waNames.push_back(temp);
   }
 
   uint32_t pSeqInfoPtrList = file->readWord(INFOoff + 8) + INFOoff;
