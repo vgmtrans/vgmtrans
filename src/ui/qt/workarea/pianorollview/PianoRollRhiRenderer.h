@@ -207,11 +207,13 @@ private:
   QRhiBuffer* m_staticBackInstanceBuffer = nullptr;
   QRhiBuffer* m_staticFrontInstanceBuffer = nullptr;
   QRhiBuffer* m_dynamicInstanceBuffer = nullptr;
+  QRhiBuffer* m_activeLaserInstanceBuffer = nullptr;
   QRhiBuffer* m_noteInstanceBuffer = nullptr;
   QRhiTexture* m_measureLabelAtlas = nullptr;
   QRhiSampler* m_measureLabelSampler = nullptr;
   QRhiShaderResourceBindings* m_shaderBindings = nullptr;
   QRhiGraphicsPipeline* m_pipeline = nullptr;
+  QRhiGraphicsPipeline* m_activeLaserPipeline = nullptr;
   QRhiGraphicsPipeline* m_notePipeline = nullptr;
 
   QRhiRenderPassDescriptor* m_outputRenderPass = nullptr;
@@ -226,6 +228,7 @@ private:
   std::vector<RectInstance> m_staticBackInstances;
   std::vector<RectInstance> m_staticFrontInstances;
   std::vector<RectInstance> m_dynamicInstances;
+  std::vector<RectInstance> m_activeLaserInstances;
   std::vector<NoteInstance> m_noteInstances;
   int m_dynamicFrontStart = 0;
 
