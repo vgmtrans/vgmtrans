@@ -271,6 +271,9 @@ void PianoRollRhiRenderer::releaseResources() {
   delete m_notePipeline;
   m_notePipeline = nullptr;
 
+  delete m_activeLaserPipeline;
+  m_activeLaserPipeline = nullptr;
+
   delete m_pipeline;
   m_pipeline = nullptr;
 
@@ -285,6 +288,9 @@ void PianoRollRhiRenderer::releaseResources() {
 
   delete m_dynamicInstanceBuffer;
   m_dynamicInstanceBuffer = nullptr;
+
+  delete m_activeLaserInstanceBuffer;
+  m_activeLaserInstanceBuffer = nullptr;
 
   delete m_noteInstanceBuffer;
   m_noteInstanceBuffer = nullptr;
@@ -312,6 +318,7 @@ void PianoRollRhiRenderer::releaseResources() {
   m_staticBackInstances.clear();
   m_staticFrontInstances.clear();
   m_dynamicInstances.clear();
+  m_activeLaserInstances.clear();
   m_noteInstances.clear();
   m_dynamicFrontStart = 0;
   m_measureLabelAtlasDirty = true;
@@ -451,6 +458,17 @@ void PianoRollRhiRenderer::renderFrame(QRhiCommandBuffer* cb, const RenderTarget
     }
   }
 
+  if (!m_activeLaserInstances.empty()) {
+    const int activeLaserBytes =
+        static_cast<int>(m_activeLaserInstances.size() * sizeof(RectInstance));
+    if (ensureInstanceBuffer(m_activeLaserInstanceBuffer, activeLaserBytes, 4096)) {
+      updates->updateDynamicBuffer(m_activeLaserInstanceBuffer,
+                                   0,
+                                   activeLaserBytes,
+                                   m_activeLaserInstances.data());
+    }
+  }
+
   if (m_noteDataDirty) {
     if (!m_noteInstances.empty()) {
       const int noteBytes = static_cast<int>(m_noteInstances.size() * sizeof(NoteInstance));
@@ -470,8 +488,11 @@ void PianoRollRhiRenderer::renderFrame(QRhiCommandBuffer* cb, const RenderTarget
                                static_cast<float>(target.pixelSize.width()),
                                static_cast<float>(target.pixelSize.height())));
 
-  auto drawRectInstances = [&](QRhiBuffer* buffer, int count, int firstInstance = 0) {
-    if (!m_pipeline || !m_shaderBindings || !buffer || count <= 0) {
+  auto drawRectInstances = [&](QRhiGraphicsPipeline* pipeline,
+                               QRhiBuffer* buffer,
+                               int count,
+                               int firstInstance = 0) {
+    if (!pipeline || !m_shaderBindings || !buffer || count <= 0) {
       return;
     }
     quint32 instanceOffset = 0;
@@ -481,7 +502,7 @@ void PianoRollRhiRenderer::renderFrame(QRhiCommandBuffer* cb, const RenderTarget
       drawFirstInstance = 0;
     }
 
-    cb->setGraphicsPipeline(m_pipeline);
+    cb->setGraphicsPipeline(pipeline);
     cb->setShaderResources(m_shaderBindings);
     const QRhiCommandBuffer::VertexInput bindings[] = {
         {m_vertexBuffer, 0},
@@ -498,7 +519,8 @@ void PianoRollRhiRenderer::renderFrame(QRhiCommandBuffer* cb, const RenderTarget
 
   const int staticBackCount = static_cast<int>(m_staticBackInstances.size());
   const int staticFrontCount = static_cast<int>(m_staticFrontInstances.size());
-  drawRectInstances(m_staticBackInstanceBuffer, staticBackCount);
+  const int activeLaserCount = static_cast<int>(m_activeLaserInstances.size());
+  drawRectInstances(m_pipeline, m_staticBackInstanceBuffer, staticBackCount);
 
   if (m_notePipeline && m_shaderBindings && m_noteInstanceBuffer && !m_noteInstances.empty()) {
     int noteFirstInstance = 0;
@@ -562,9 +584,13 @@ void PianoRollRhiRenderer::renderFrame(QRhiCommandBuffer* cb, const RenderTarget
 
   const int dynamicCount = static_cast<int>(m_dynamicInstances.size());
   const int dynamicFrontStart = std::clamp(m_dynamicFrontStart, 0, dynamicCount);
-  drawRectInstances(m_dynamicInstanceBuffer, dynamicFrontStart, 0);
-  drawRectInstances(m_staticFrontInstanceBuffer, staticFrontCount);
-  drawRectInstances(m_dynamicInstanceBuffer, dynamicCount - dynamicFrontStart, dynamicFrontStart);
+  drawRectInstances(m_activeLaserPipeline, m_activeLaserInstanceBuffer, activeLaserCount);
+  drawRectInstances(m_pipeline, m_dynamicInstanceBuffer, dynamicFrontStart, 0);
+  drawRectInstances(m_pipeline, m_staticFrontInstanceBuffer, staticFrontCount);
+  drawRectInstances(m_pipeline,
+                    m_dynamicInstanceBuffer,
+                    dynamicCount - dynamicFrontStart,
+                    dynamicFrontStart);
 
   cb->endPass();
 
@@ -618,7 +644,7 @@ void PianoRollRhiRenderer::ensurePipelines(QRhiRenderPassDescriptor* renderPassD
     return;
   }
 
-  if (m_pipeline && m_notePipeline && m_shaderBindings &&
+  if (m_pipeline && m_activeLaserPipeline && m_notePipeline && m_shaderBindings &&
       m_outputRenderPass == renderPassDesc && m_sampleCount == sampleCount) {
     return;
   }
@@ -626,6 +652,9 @@ void PianoRollRhiRenderer::ensurePipelines(QRhiRenderPassDescriptor* renderPassD
   // Render pass/sample count changes require a fresh pipeline.
   delete m_notePipeline;
   m_notePipeline = nullptr;
+
+  delete m_activeLaserPipeline;
+  m_activeLaserPipeline = nullptr;
 
   delete m_pipeline;
   m_pipeline = nullptr;
@@ -656,6 +685,15 @@ void PianoRollRhiRenderer::ensurePipelines(QRhiRenderPassDescriptor* renderPassD
   blend.srcAlpha = QRhiGraphicsPipeline::One;
   blend.dstAlpha = QRhiGraphicsPipeline::OneMinusSrcAlpha;
 
+  QRhiGraphicsPipeline::TargetBlend activeLaserBlend;
+  activeLaserBlend.enable = true;
+  activeLaserBlend.srcColor = QRhiGraphicsPipeline::One;
+  activeLaserBlend.dstColor = QRhiGraphicsPipeline::One;
+  activeLaserBlend.opColor = QRhiGraphicsPipeline::Max;
+  activeLaserBlend.srcAlpha = QRhiGraphicsPipeline::One;
+  activeLaserBlend.dstAlpha = QRhiGraphicsPipeline::One;
+  activeLaserBlend.opAlpha = QRhiGraphicsPipeline::Max;
+
   QShader rectVertexShader = loadShader(":/shaders/pianorollquad.vert.qsb");
   QShader rectFragmentShader = loadShader(":/shaders/pianorollquad.frag.qsb");
   QRhiVertexInputLayout rectInputLayout;
@@ -684,6 +722,19 @@ void PianoRollRhiRenderer::ensurePipelines(QRhiRenderPassDescriptor* renderPassD
   m_pipeline->setTargetBlends({blend});
   m_pipeline->setRenderPassDescriptor(renderPassDesc);
   m_pipeline->create();
+
+  m_activeLaserPipeline = m_rhi->newGraphicsPipeline();
+  m_activeLaserPipeline->setTopology(QRhiGraphicsPipeline::Triangles);
+  m_activeLaserPipeline->setSampleCount(m_sampleCount);
+  m_activeLaserPipeline->setShaderStages({
+      {QRhiShaderStage::Vertex, rectVertexShader},
+      {QRhiShaderStage::Fragment, rectFragmentShader},
+  });
+  m_activeLaserPipeline->setShaderResourceBindings(m_shaderBindings);
+  m_activeLaserPipeline->setVertexInputLayout(rectInputLayout);
+  m_activeLaserPipeline->setTargetBlends({activeLaserBlend});
+  m_activeLaserPipeline->setRenderPassDescriptor(renderPassDesc);
+  m_activeLaserPipeline->create();
 
   QShader noteVertexShader = loadShader(":/shaders/pianorollnote.vert.qsb");
   QShader noteFragmentShader = loadShader(":/shaders/pianorollnote.frag.qsb");
@@ -1554,6 +1605,7 @@ void PianoRollRhiRenderer::buildStaticInstances(const PianoRollFrame::Data& fram
 
 void PianoRollRhiRenderer::buildDynamicInstances(const PianoRollFrame::Data& frame, const Layout& layout) {
   m_dynamicInstances.clear();
+  m_activeLaserInstances.clear();
   m_dynamicFrontStart = 0;
 
   if (layout.viewWidth <= 0 || layout.viewHeight <= 0 || layout.noteAreaWidth <= 0.0f || layout.noteAreaHeight <= 0.0f) {
@@ -1601,7 +1653,7 @@ void PianoRollRhiRenderer::buildDynamicInstances(const PianoRollFrame::Data& fra
           (static_cast<float>(note.key) * 0.233f) +
           (static_cast<float>(note.trackIndex + 1) * 0.671f);
 
-      appendRect(m_dynamicInstances,
+      appendRect(m_activeLaserInstances,
                  geometry.x - kActiveLaserAuraPadPx,
                  geometry.y - kActiveLaserAuraPadPx,
                  geometry.w + (2.0f * kActiveLaserAuraPadPx),
