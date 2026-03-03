@@ -90,19 +90,23 @@ void main() {
     float scorch = seamActive * behind * smoothstep(20.0, 0.0, dx);
     surface = mix(surface, surface * vec3(0.24, 0.20, 0.18), scorch * 0.95);
 
-    float aura = exp(-max(boxDist, 0.0) / auraFalloffPx);
+    float auraDist = max(boxDist, 0.0);
+    float aura = exp(-auraDist / auraFalloffPx);
     float auraSoft = pow(aura, 1.05);
-    float auraWide = exp(-max(boxDist, 0.0) / 42.0);
+    float auraWide = exp(-auraDist / 42.0);
+    // Force alpha/color to taper out well before the padded quad edge.
+    float auraGate = 1.0 - smoothstep(auraPadPx * 0.68, auraPadPx * 0.96, auraDist);
     float outsideMask = clamp(1.0 - rectMask, 0.0, 1.0);
-    float auraOutside = outsideMask * ((0.62 * auraSoft) + (0.34 * auraWide));
+    float auraOutside = outsideMask * ((0.62 * auraSoft) + (0.34 * auraWide)) * auraGate;
     float auraInside = (1.0 - outsideMask) * ((0.07 * auraSoft) + (0.03 * auraWide));
-    vec3 auraCol = vColor.rgb * (auraOutside + auraInside);
+    vec3 auraTint = mix(vColor.rgb, vec3(1.0), 0.30);
+    vec3 auraCol = (auraTint * auraOutside) + (vColor.rgb * auraInside);
     float seamBloom = seamActive * smoothstep(30.0, 0.0, dx) *
                       smoothstep(noteH * 0.95, 0.0, abs(notePx.y - (0.5 * noteH)));
     auraCol += seamTint * seamBloom * 0.12;
 
     vec3 outRgb = (surface * rectMask) + auraCol;
-    float auraAlpha = clamp((auraOutside * 0.88) + (auraInside * 0.18), 0.0, 1.0);
+    float auraAlpha = clamp((auraOutside * 0.72) + (auraInside * 0.14), 0.0, 1.0);
     float outAlpha = clamp(max(rectMask, auraAlpha), 0.0, 1.0);
     if (outAlpha <= 0.002) {
       discard;
