@@ -126,7 +126,9 @@ PianoRollView::PianoRollView(QWidget* parent)
       return;
     }
 
-    const int nextValue = std::clamp(value.toInt(), hbar->minimum(), hbar->maximum());
+    const int nextValue = std::clamp(static_cast<int>(std::lround(value.toDouble())),
+                                     hbar->minimum(),
+                                     hbar->maximum());
     if (m_rhiHost && m_rhiHost->syncPlaybackAutoScrollToRenderFrame()) {
       // Window-backed RHI uses render-frame draining so scroll updates stay aligned with frame submission.
       m_pendingPlaybackAutoScrollValue = nextValue;
@@ -1524,7 +1526,7 @@ void PianoRollView::scrollPlaybackTickToViewportFraction(int tick, float viewpor
 
   const bool animationRunning = (m_playbackAutoScrollAnimation->state() == QAbstractAnimation::Running);
   if (animationRunning) {
-    const int currentEnd = std::clamp(m_playbackAutoScrollAnimation->endValue().toInt(),
+    const int currentEnd = std::clamp(static_cast<int>(std::lround(m_playbackAutoScrollAnimation->endValue().toDouble())),
                                       hbar->minimum(),
                                       hbar->maximum());
     if (currentEnd == clampedScrollX) {
@@ -1533,7 +1535,7 @@ void PianoRollView::scrollPlaybackTickToViewportFraction(int tick, float viewpor
 
     // Under heavy CPU load, restarting each tick can starve progress. Retarget
     // the current animation instead so it keeps moving and naturally catches up.
-    m_playbackAutoScrollAnimation->setEndValue(clampedScrollX);
+    m_playbackAutoScrollAnimation->setEndValue(static_cast<qreal>(clampedScrollX));
     return;
   }
 
@@ -1543,8 +1545,8 @@ void PianoRollView::scrollPlaybackTickToViewportFraction(int tick, float viewpor
   const int animationStart = hadPendingValue
                                  ? std::clamp(pendingValue, hbar->minimum(), hbar->maximum())
                                  : hbar->value();
-  m_playbackAutoScrollAnimation->setStartValue(animationStart);
-  m_playbackAutoScrollAnimation->setEndValue(clampedScrollX);
+  m_playbackAutoScrollAnimation->setStartValue(static_cast<qreal>(animationStart));
+  m_playbackAutoScrollAnimation->setEndValue(static_cast<qreal>(clampedScrollX));
   m_playbackAutoScrollAnimation->start();
 }
 
