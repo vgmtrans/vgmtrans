@@ -4,7 +4,10 @@
  * refer to the included LICENSE.txt file
  */
 #pragma once
+
 #include "Scanner.h"
+
+#include <cstdint>
 
 class NDSScanner : public VGMScanner {
  public:
