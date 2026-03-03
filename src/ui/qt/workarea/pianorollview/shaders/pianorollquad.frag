@@ -18,8 +18,99 @@ layout(std140, binding = 0) uniform Ubuf {
 
 layout(binding = 1) uniform sampler2D glyphAtlas;
 
+float hash12(vec2 p) {
+  return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453123);
+}
+
+float valueNoise(vec2 p) {
+  vec2 i = floor(p);
+  vec2 f = fract(p);
+  f = f * f * (3.0 - 2.0 * f);
+
+  float a = hash12(i);
+  float b = hash12(i + vec2(1.0, 0.0));
+  float c = hash12(i + vec2(0.0, 1.0));
+  float d = hash12(i + vec2(1.0, 1.0));
+  return mix(mix(a, b, f.x), mix(c, d, f.x), f.y);
+}
+
+float sdBox(vec2 p, vec2 b) {
+  vec2 d = abs(p) - b;
+  return length(max(d, 0.0)) + min(max(d.x, d.y), 0.0);
+}
+
 void main() {
-  if (vParams.x > 6.5) {
+  if (vParams.x > 7.5) {
+    if (vScenePos.x < noteArea.x || vScenePos.x > noteArea.z ||
+        vScenePos.y < noteArea.y || vScenePos.y > noteArea.w) {
+      discard;
+    }
+
+    const float auraPadPx = 72.0;
+    const float auraFalloffPx = 13.0;
+
+    float noteW = max(1.0, vRectSize.x - (2.0 * auraPadPx));
+    float noteH = max(1.0, vRectSize.y - (2.0 * auraPadPx));
+    vec2 notePx = (vLocalPos * vRectSize) - vec2(auraPadPx);
+    vec2 noteHalf = 0.5 * vec2(noteW, noteH);
+    float boxDist = sdBox(notePx - noteHalf, noteHalf);
+    vec2 local = clamp(notePx / vec2(noteW, noteH), 0.0, 1.0);
+
+    float rectMask = 1.0 - smoothstep(0.0, 1.2, boxDist);
+    vec3 surface = vColor.rgb;
+    float t = max(0.0, vParams.z);
+    float seed = vParams.w;
+
+    // Base note look with subtle texture so seam effects stay readable.
+    surface *= 0.94 + 0.06 * sin((local.y * 16.0) + (t * 1.8));
+    surface *= 0.93 + 0.07 * (1.0 - abs((local.y * 2.0) - 1.0));
+
+    float edgeDist = min(min(local.x, 1.0 - local.x), min(local.y, 1.0 - local.y));
+    float edge = 1.0 - smoothstep(0.0, 0.10, edgeDist);
+    surface *= 1.0 - (edge * 0.10);
+
+    float pulse = 0.55 + 0.45 * sin((t * 10.0) + (seed * 0.35) + (local.y * 10.0));
+    surface += (0.015 + (0.030 * pulse)) * vColor.rgb;
+
+    float seamLocalX = vParams.y;
+    float seamActive = step(0.0, seamLocalX) * step(seamLocalX, 1.0);
+    float seamX = seamLocalX * noteW;
+    float dx = abs(notePx.x - seamX);
+    float seamGlow = seamActive * smoothstep(20.0, 0.0, dx);
+    float seamCore = seamActive * smoothstep(2.6, 0.0, dx);
+    float lick = valueNoise(vec2((local.y * 24.0) + seed, (t * 12.0) + (seed * 0.63)));
+    float flame = seamGlow * (0.50 + (0.50 * lick));
+    vec3 seamTint = mix(vColor.rgb, vec3(1.0), 0.45);
+
+    surface = mix(surface, (surface * 0.60) + (seamTint * 0.95), seamGlow * 0.62);
+    surface += seamTint * seamCore * 0.95;
+    surface += (vColor.rgb * (0.30 + (0.25 * lick))) * flame * 0.55;
+
+    float behind = smoothstep(0.0, 16.0, seamX - notePx.x);
+    float scorch = seamActive * behind * smoothstep(20.0, 0.0, dx);
+    surface = mix(surface, surface * vec3(0.24, 0.20, 0.18), scorch * 0.95);
+
+    float aura = exp(-max(boxDist, 0.0) / auraFalloffPx);
+    float auraSoft = pow(aura, 1.05);
+    float auraWide = exp(-max(boxDist, 0.0) / 42.0);
+    float outsideMask = clamp(1.0 - rectMask, 0.0, 1.0);
+    float auraOutside = outsideMask * ((0.62 * auraSoft) + (0.34 * auraWide));
+    float auraInside = (1.0 - outsideMask) * ((0.07 * auraSoft) + (0.03 * auraWide));
+    vec3 auraCol = vColor.rgb * (auraOutside + auraInside);
+    float seamBloom = seamActive * smoothstep(30.0, 0.0, dx) *
+                      smoothstep(noteH * 0.95, 0.0, abs(notePx.y - (0.5 * noteH)));
+    auraCol += seamTint * seamBloom * 0.12;
+
+    vec3 outRgb = (surface * rectMask) + auraCol;
+    float auraAlpha = clamp((auraOutside * 0.88) + (auraInside * 0.18), 0.0, 1.0);
+    float outAlpha = clamp(max(rectMask, auraAlpha), 0.0, 1.0);
+    if (outAlpha <= 0.002) {
+      discard;
+    }
+
+    fragColor = vec4(min(outRgb, vec3(3.0)), outAlpha);
+    return;
+  } else if (vParams.x > 6.5) {
     // Sample glyph alpha from the shared label atlas.
     float alpha = texture(glyphAtlas, vGlyphUv).a;
     if (alpha <= 0.001) {

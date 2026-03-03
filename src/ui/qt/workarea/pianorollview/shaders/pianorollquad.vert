@@ -24,7 +24,7 @@ layout(std140, binding = 0) uniform Ubuf {
 void main() {
   vec2 pos;
   vec2 size = inRect.zw;
-  if (inParams.x > 6.5) {
+  if (inParams.x > 6.5 && inParams.x < 7.5) {
     // LabelText instances are already in screen space; coordMode carries UVs.
     pos = inRect.xy + (inPos * size);
     vGlyphUv = mix(inCoordMode.xy, inCoordMode.zw, inPos);
