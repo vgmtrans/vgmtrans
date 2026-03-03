@@ -46,6 +46,7 @@ static constexpr int kMat4Bytes = 16 * sizeof(float);
 static constexpr int kUniformBytes = (16 + 4 + 4 + 4) * sizeof(float);
 static constexpr int kMeasureLabelFontPixelSize = 11;
 static constexpr int kMeasureLabelPaddingPx = 2;
+static constexpr float kActiveLaserAuraPadPx = 72.0f;
 
 bool isBlackMidiKey(int key) {
   switch (key % 12) {
@@ -1575,6 +1576,9 @@ void PianoRollRhiRenderer::buildDynamicInstances(const PianoRollFrame::Data& fra
            trackIndex >= static_cast<int>(trackEnabled->size()) ||
            (*trackEnabled)[static_cast<size_t>(trackIndex)] != 0;
   };
+  const float currentX = layout.noteAreaLeft + (static_cast<float>(frame.currentTick) * layout.pixelsPerTick) - layout.scrollX;
+  const bool playheadVisible =
+      (currentX >= layout.noteAreaLeft - 2.0f && currentX <= layout.noteAreaLeft + layout.noteAreaWidth + 2.0f);
 
   if (frame.activeNotes && !frame.activeNotes->empty()) {
     for (const PianoRollFrame::Note& note : *frame.activeNotes) {
@@ -1586,49 +1590,27 @@ void PianoRollRhiRenderer::buildDynamicInstances(const PianoRollFrame::Data& fra
         continue;
       }
 
-      QColor noteColor = colorForTrack(note.trackIndex);
-      noteColor = noteColor.lighter(148);
-      noteColor.setAlpha(245);
-      appendRect(m_dynamicInstances, geometry.x, geometry.y, geometry.w, geometry.h, noteColor);
-
-      const float basePhase = frame.elapsedSeconds * 2.5f + static_cast<float>(note.startTick) * 0.009f;
-      // Layered expanding rings approximate a subtle pulse/glow without extra passes.
-      for (int ring = 0; ring < 3; ++ring) {
-        const float ringPhase = std::fmod(basePhase + (static_cast<float>(ring) * 0.33f), 1.0f);
-        const float expand = (1.5f + (ringPhase * 13.0f) + (ring * 1.5f));
-        const float intensity = (1.0f - ringPhase) * (0.62f - (ring * 0.14f));
-        if (intensity <= 0.0f) {
-          continue;
-        }
-
-        const float gx = std::max(layout.noteAreaLeft, geometry.x - expand);
-        const float gy = std::max(layout.noteAreaTop, geometry.y - expand);
-        const float gx2 = std::min(layout.noteAreaLeft + layout.noteAreaWidth, geometry.x + geometry.w + expand);
-        const float gy2 = std::min(layout.noteAreaTop + layout.noteAreaHeight, geometry.y + geometry.h + expand);
-        if (gx2 - gx <= 0.5f || gy2 - gy <= 0.5f) {
-          continue;
-        }
-
-        QColor glow = noteColor;
-        glow.setAlpha(std::clamp(static_cast<int>(std::lround(255.0f * intensity)), 0, 255));
-        appendRect(m_dynamicInstances, gx, gy, gx2 - gx, gy2 - gy, glow);
+      QColor laserBase = colorForTrack(note.trackIndex).lighter(108);
+      laserBase.setAlpha(242);
+      float seamLocalX = -1.0f;
+      if (playheadVisible && currentX >= geometry.x && currentX <= geometry.x + geometry.w) {
+        seamLocalX = std::clamp((currentX - geometry.x) / std::max(1.0f, geometry.w), 0.0f, 1.0f);
       }
+      const float seamSeed =
+          (static_cast<float>(note.startTick) * 0.0079f) +
+          (static_cast<float>(note.key) * 0.233f) +
+          (static_cast<float>(note.trackIndex + 1) * 0.671f);
 
-      QColor noteEdge = frame.noteOutlineColor;
-      noteEdge.setAlpha(std::min(255, noteEdge.alpha() + 95));
-      const float edgeThickness = 1.0f;
       appendRect(m_dynamicInstances,
-                 geometry.x,
-                 geometry.y,
-                 geometry.w,
-                 edgeThickness,
-                 noteEdge);
-      appendRect(m_dynamicInstances,
-                 geometry.x,
-                 geometry.y + geometry.h - edgeThickness,
-                 geometry.w,
-                 edgeThickness,
-                 noteEdge);
+                 geometry.x - kActiveLaserAuraPadPx,
+                 geometry.y - kActiveLaserAuraPadPx,
+                 geometry.w + (2.0f * kActiveLaserAuraPadPx),
+                 geometry.h + (2.0f * kActiveLaserAuraPadPx),
+                 laserBase,
+                 LineStyle::ActiveLaser,
+                 seamLocalX,
+                 frame.elapsedSeconds,
+                 seamSeed);
     }
   }
 
@@ -1674,8 +1656,7 @@ void PianoRollRhiRenderer::buildDynamicInstances(const PianoRollFrame::Data& fra
     }
   }
 
-  const float currentX = layout.noteAreaLeft + (static_cast<float>(frame.currentTick) * layout.pixelsPerTick) - layout.scrollX;
-  if (currentX >= layout.noteAreaLeft - 2.0f && currentX <= layout.noteAreaLeft + layout.noteAreaWidth + 2.0f) {
+  if (playheadVisible) {
     QColor scanColor = frame.scanLineColor;
     if (!frame.playbackActive) {
       scanColor.setAlpha(std::max(100, scanColor.alpha() / 2));
