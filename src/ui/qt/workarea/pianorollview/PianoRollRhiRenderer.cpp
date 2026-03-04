@@ -205,6 +205,7 @@ QShader loadShader(const char* path) {
 }
 
 uint64_t noteIdentityHash(const PianoRollFrame::Note& note) {
+  // Stable key for fast active/inactive note matching in overlay rebuilds.
   uint64_t hash = 1469598103934665603ULL;
   auto mix = [&](uint64_t value) {
     hash ^= value;
@@ -422,6 +423,7 @@ void PianoRollRhiRenderer::renderFrame(QRhiCommandBuffer* cb, const RenderTarget
   if (frame.notes && !frame.notes->empty()) {
     const auto& notes = *frame.notes;
     const uint64_t maxDuration = std::max<uint64_t>(1, frame.maxNoteDurationTicks);
+    // Include notes that start before the viewport but extend into it.
     const uint64_t searchStartTick = (layout.visibleStartTick > maxDuration)
                                          ? (layout.visibleStartTick - maxDuration)
                                          : 0;
@@ -453,7 +455,9 @@ void PianoRollRhiRenderer::renderFrame(QRhiCommandBuffer* cb, const RenderTarget
   }
 
   m_inactiveOverlayNoteInstances.clear();
-  if (noteInstanceCount > 0 && frame.notes && !frame.notes->empty()) {
+  if (noteInstanceCount > 0 &&
+      frame.notes && !frame.notes->empty() &&
+      frame.activeNotes && !frame.activeNotes->empty()) {
     const auto& notes = *frame.notes;
     const auto* trackEnabled = frame.trackEnabled.get();
     const auto isTrackEnabled = [&](int trackIndex) -> bool {
@@ -463,31 +467,99 @@ void PianoRollRhiRenderer::renderFrame(QRhiCommandBuffer* cb, const RenderTarget
              (*trackEnabled)[static_cast<size_t>(trackIndex)] != 0;
     };
 
+    m_inactiveOverlayNoteInstances.reserve(static_cast<size_t>(noteInstanceCount));
     std::unordered_map<uint64_t, int> activeCounts;
-    if (frame.activeNotes && !frame.activeNotes->empty()) {
-      activeCounts.reserve(frame.activeNotes->size() * 2);
-      for (const PianoRollFrame::Note& active : *frame.activeNotes) {
-        if (!isTrackEnabled(active.trackIndex)) {
-          continue;
-        }
-        ++activeCounts[noteIdentityHash(active)];
+    activeCounts.reserve(frame.activeNotes->size() * 2);
+    std::array<std::vector<std::pair<uint64_t, uint64_t>>, PianoRollFrame::kMidiKeyCount>
+        activeSpansByKey;
+    // Count-based matching handles duplicate note identities deterministically.
+    for (const PianoRollFrame::Note& active : *frame.activeNotes) {
+      if (!isTrackEnabled(active.trackIndex)) {
+        continue;
       }
+      ++activeCounts[noteIdentityHash(active)];
+      if (active.key >= PianoRollFrame::kMidiKeyCount) {
+        continue;
+      }
+
+      const uint64_t startTick = static_cast<uint64_t>(active.startTick);
+      const uint64_t endTick = startTick + std::max<uint64_t>(1, active.duration);
+      activeSpansByKey[active.key].push_back({startTick, endTick});
     }
 
-    m_inactiveOverlayNoteInstances.reserve(static_cast<size_t>(noteInstanceCount));
+    for (auto& spans : activeSpansByKey) {
+      if (spans.size() <= 1) {
+        continue;
+      }
+      std::sort(spans.begin(), spans.end(), [](const auto& lhs, const auto& rhs) {
+        return lhs.first < rhs.first;
+      });
+      size_t out = 0;
+      for (size_t i = 1; i < spans.size(); ++i) {
+        if (spans[i].first <= spans[out].second) {
+          spans[out].second = std::max(spans[out].second, spans[i].second);
+        } else {
+          ++out;
+          spans[out] = spans[i];
+        }
+      }
+      spans.resize(out + 1);
+    }
+
+    const auto overlapsActiveSpan = [&](const PianoRollFrame::Note& note) -> bool {
+      if (note.key >= PianoRollFrame::kMidiKeyCount) {
+        return false;
+      }
+      const auto& spans = activeSpansByKey[note.key];
+      if (spans.empty()) {
+        return false;
+      }
+
+      const uint64_t noteStart = static_cast<uint64_t>(note.startTick);
+      const uint64_t noteEnd = noteStart + std::max<uint64_t>(1, note.duration);
+      const auto it = std::lower_bound(
+          spans.begin(),
+          spans.end(),
+          noteStart,
+          [](const std::pair<uint64_t, uint64_t>& span, uint64_t tick) {
+            return span.second <= tick;
+          });
+      return it != spans.end() && it->first < noteEnd;
+    };
+
+    // Only redraw inactive notes that can be covered by active cores.
+    // This preserves overlap readability without redrawing every visible note.
+    if (std::all_of(activeSpansByKey.begin(), activeSpansByKey.end(), [](const auto& spans) {
+          return spans.empty();
+        })) {
+      if (profileEnabled) {
+        tDynamic = profileTimer.nsecsElapsed();
+      }
+      ensurePipelines(target.renderPassDesc, std::max(1, target.sampleCount));
+      if (!m_staticBuffersUploaded) {
+        updates->uploadStaticBuffer(m_vertexBuffer, kVertices);
+        updates->uploadStaticBuffer(m_indexBuffer, kIndices);
+        m_staticBuffersUploaded = true;
+      }
+      // No active spans means no overlay candidates.
+      m_inactiveOverlayNoteInstances.clear();
+      goto skip_inactive_overlay_build;
+    }
+
     for (int noteIndex = noteVisibleBeginIndex; noteIndex < noteVisibleEndIndex; ++noteIndex) {
       const PianoRollFrame::Note& note = notes[static_cast<size_t>(noteIndex)];
-      bool isActive = false;
       const auto it = activeCounts.find(noteIdentityHash(note));
       if (it != activeCounts.end() && it->second > 0) {
         --(it->second);
-        isActive = true;
+        continue;
       }
-      if (!isActive) {
-        m_inactiveOverlayNoteInstances.push_back(m_noteInstances[static_cast<size_t>(noteIndex)]);
+      if (!overlapsActiveSpan(note)) {
+        continue;
       }
+      m_inactiveOverlayNoteInstances.push_back(m_noteInstances[static_cast<size_t>(noteIndex)]);
     }
   }
+skip_inactive_overlay_build:
   if (profileEnabled) {
     tDynamic = profileTimer.nsecsElapsed();
   }
@@ -652,6 +724,7 @@ void PianoRollRhiRenderer::renderFrame(QRhiCommandBuffer* cb, const RenderTarget
           static_cast<quint32>(firstInstance * static_cast<int>(sizeof(NoteInstance)));
       noteDrawFirstInstance = 0;
     }
+    // Notes write stencil=1 so aura can be masked from note-covered pixels.
     cb->setStencilRef(1);
     cb->setGraphicsPipeline(m_notePipeline);
     cb->setShaderResources(m_shaderBindings);
@@ -672,6 +745,9 @@ void PianoRollRhiRenderer::renderFrame(QRhiCommandBuffer* cb, const RenderTarget
     drawNoteInstances(m_noteInstanceBuffer, noteInstanceCount, noteFirstInstance);
   }
 
+  // Render order is intentional:
+  // notes -> external aura -> active core -> inactive-note redraw -> UI overlays.
+  // This keeps inactive notes visible over active highlighting while preserving glow.
   cb->setStencilRef(1);
   drawRectInstances(m_activeLaserPipeline, m_activeLaserInstanceBuffer, activeLaserCount);
   drawRectInstances(m_pipeline,
@@ -679,7 +755,9 @@ void PianoRollRhiRenderer::renderFrame(QRhiCommandBuffer* cb, const RenderTarget
                     activeLaserCoreCount,
                     0);
 
-  if (m_inactiveOverlayNoteInstanceBuffer && inactiveOverlayCount > 0) {
+  if (activeLaserCoreCount > 0 &&
+      m_inactiveOverlayNoteInstanceBuffer &&
+      inactiveOverlayCount > 0) {
     drawNoteInstances(m_inactiveOverlayNoteInstanceBuffer, inactiveOverlayCount, 0);
   }
 
