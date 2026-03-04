@@ -688,11 +688,11 @@ void PianoRollRhiRenderer::ensurePipelines(QRhiRenderPassDescriptor* renderPassD
   QRhiGraphicsPipeline::TargetBlend activeLaserBlend;
   activeLaserBlend.enable = true;
   activeLaserBlend.srcColor = QRhiGraphicsPipeline::One;
-  activeLaserBlend.dstColor = QRhiGraphicsPipeline::One;
-  activeLaserBlend.opColor = QRhiGraphicsPipeline::Max;
+  activeLaserBlend.dstColor = QRhiGraphicsPipeline::OneMinusSrcColor;
+  activeLaserBlend.opColor = QRhiGraphicsPipeline::Add;
   activeLaserBlend.srcAlpha = QRhiGraphicsPipeline::One;
-  activeLaserBlend.dstAlpha = QRhiGraphicsPipeline::One;
-  activeLaserBlend.opAlpha = QRhiGraphicsPipeline::Max;
+  activeLaserBlend.dstAlpha = QRhiGraphicsPipeline::OneMinusSrcAlpha;
+  activeLaserBlend.opAlpha = QRhiGraphicsPipeline::Add;
 
   QShader rectVertexShader = loadShader(":/shaders/pianorollquad.vert.qsb");
   QShader rectFragmentShader = loadShader(":/shaders/pianorollquad.frag.qsb");
@@ -1643,7 +1643,7 @@ void PianoRollRhiRenderer::buildDynamicInstances(const PianoRollFrame::Data& fra
       }
 
       QColor laserBase = colorForTrack(note.trackIndex).lighter(108);
-      laserBase.setAlpha(242);
+      laserBase.setAlpha(228);
       float seamLocalX = -1.0f;
       if (playheadVisible && currentX >= geometry.x && currentX <= geometry.x + geometry.w) {
         seamLocalX = std::clamp((currentX - geometry.x) / std::max(1.0f, geometry.w), 0.0f, 1.0f);

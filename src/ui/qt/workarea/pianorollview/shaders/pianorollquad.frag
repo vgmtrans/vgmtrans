@@ -112,7 +112,12 @@ void main() {
       discard;
     }
 
-    fragColor = vec4(min(outRgb, vec3(3.0)), outAlpha);
+    // Active-laser pass uses screen blending; scale by alpha so overlap brightens
+    // without blowing out or washing nearby notes.
+    const float laserStrength = 0.68;
+    float glowAlpha = outAlpha * laserStrength;
+    vec3 glowRgb = min(outRgb, vec3(1.35)) * glowAlpha;
+    fragColor = vec4(glowRgb, glowAlpha);
     return;
   } else if (vParams.x > 6.5) {
     // Sample glyph alpha from the shared label atlas.
