@@ -20,7 +20,7 @@ modules:
       - -DENABLE_UI_QT=ON
       - -DENABLE_CLI=OFF
       - -DENABLE_SHELL=OFF
-      - -DFLATPAK=ON
+      - -DNO_QT_DEPLOY=ON
       - -DUSE_SYSTEM_ZLIB=ON
       - -DVGMTRANS_DATA_DIR=/app/share/vgmtrans
     sources:
