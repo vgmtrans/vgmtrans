@@ -166,15 +166,6 @@ private:
                       const HexViewFrame::Data& frame, const LayoutMetrics& layout);
   bool ensureInstanceBuffer(QRhiBuffer*& buffer, int bytes);
   void updateInstanceBuffers(QRhiResourceUpdateBatch* u);
-  void drawRectBuffer(QRhiCommandBuffer* cb, QRhiBuffer* buffer, int count,
-                      int firstInstance = 0, QRhiShaderResourceBindings* srb = nullptr,
-                      QRhiGraphicsPipeline* pso = nullptr);
-  void drawEdgeBuffer(QRhiCommandBuffer* cb, QRhiBuffer* buffer, int count,
-                      int firstInstance = 0, QRhiShaderResourceBindings* srb = nullptr,
-                      QRhiGraphicsPipeline* pso = nullptr);
-  void drawGlyphBuffer(QRhiCommandBuffer* cb, QRhiBuffer* buffer, int count, int firstInstance = 0);
-  void drawFullscreen(QRhiCommandBuffer* cb, QRhiGraphicsPipeline* pso,
-                      QRhiShaderResourceBindings* srb);
 
   QRectF glyphUv(const QChar& ch, const HexViewFrame::Data& frame) const;
   void appendRect(std::vector<RectInstance>& rects, float x, float y, float w, float h,
