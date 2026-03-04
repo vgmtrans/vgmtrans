@@ -210,8 +210,8 @@ private:
   QRhiBuffer* m_dynamicInstanceBuffer = nullptr;
   QRhiBuffer* m_activeLaserInstanceBuffer = nullptr;
   QRhiBuffer* m_activeLaserCoreInstanceBuffer = nullptr;
-  QRhiBuffer* m_noteInstanceBuffer = nullptr;
-  QRhiBuffer* m_inactiveOverlayNoteInstanceBuffer = nullptr;
+  QRhiBuffer* m_activeNoteInstanceBuffer = nullptr;
+  QRhiBuffer* m_inactiveNoteInstanceBuffer = nullptr;
   QRhiTexture* m_measureLabelAtlas = nullptr;
   QRhiSampler* m_measureLabelSampler = nullptr;
   QRhiShaderResourceBindings* m_shaderBindings = nullptr;
@@ -234,13 +234,13 @@ private:
   std::vector<RectInstance> m_activeLaserInstances;
   std::vector<RectInstance> m_activeLaserCoreInstances;
   std::vector<NoteInstance> m_noteInstances;
-  std::vector<NoteInstance> m_inactiveOverlayNoteInstances;
+  std::vector<NoteInstance> m_activeNoteInstances;
+  std::vector<NoteInstance> m_inactiveNoteInstances;
   int m_dynamicFrontStart = 0;
 
   bool m_hasStaticCacheKey = false;
   StaticCacheKey m_staticCacheKey;
   bool m_staticDataDirty = true;
-  bool m_noteDataDirty = true;
   bool m_hasNoteDataKey = false;
   NoteDataKey m_noteDataKey;
 };
