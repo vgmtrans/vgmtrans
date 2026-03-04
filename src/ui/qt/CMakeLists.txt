@@ -256,10 +256,10 @@ elseif(CMAKE_SYSTEM_NAME MATCHES "FreeBSD|OpenBSD|Linux")
           DESTINATION "${CMAKE_INSTALL_DATADIR}/metainfo"
           RENAME "${APP_ID}.metainfo.xml")
 
+  install(DIRECTORY "${CMAKE_SOURCE_DIR}/licenses/"
+          DESTINATION "${CMAKE_INSTALL_DATAROOTDIR}/licenses/vgmtrans")
   install(FILES "${CMAKE_SOURCE_DIR}/LICENSE"
           DESTINATION "${CMAKE_INSTALL_DATAROOTDIR}/licenses/vgmtrans")
-  install(DIRECTORY "${CMAKE_SOURCE_DIR}/licenses/"
-          DESTINATION "${CMAKE_INSTALL_DATAROOTDIR}/licenses")
 endif()
 
 install(TARGETS vgmtrans
