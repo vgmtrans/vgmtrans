@@ -267,7 +267,7 @@ install(TARGETS vgmtrans
 )
 
 # 
-if (NOT FLATPAK)
+if (NOT NO_QT_DEPLOY)
   qt_generate_deploy_app_script(
       TARGET vgmtrans
       OUTPUT_SCRIPT deploy_script
