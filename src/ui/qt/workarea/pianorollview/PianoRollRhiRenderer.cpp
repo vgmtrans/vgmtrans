@@ -29,6 +29,7 @@
 #include <cstdint>
 #include <iterator>
 #include <limits>
+#include <unordered_map>
 #include <utility>
 
 namespace {
@@ -203,6 +204,19 @@ QShader loadShader(const char* path) {
   return QShader::fromSerialized(file.readAll());
 }
 
+uint64_t noteIdentityHash(const PianoRollFrame::Note& note) {
+  uint64_t hash = 1469598103934665603ULL;
+  auto mix = [&](uint64_t value) {
+    hash ^= value;
+    hash *= 1099511628211ULL;
+  };
+  mix(static_cast<uint64_t>(note.startTick));
+  mix(static_cast<uint64_t>(note.duration));
+  mix(static_cast<uint64_t>(note.key));
+  mix(static_cast<uint64_t>(static_cast<uint32_t>(note.trackIndex)));
+  return hash;
+}
+
 }  // namespace
 
 PianoRollRhiRenderer::PianoRollRhiRenderer(PianoRollView* view)
@@ -292,8 +306,14 @@ void PianoRollRhiRenderer::releaseResources() {
   delete m_activeLaserInstanceBuffer;
   m_activeLaserInstanceBuffer = nullptr;
 
+  delete m_activeLaserCoreInstanceBuffer;
+  m_activeLaserCoreInstanceBuffer = nullptr;
+
   delete m_noteInstanceBuffer;
   m_noteInstanceBuffer = nullptr;
+
+  delete m_inactiveOverlayNoteInstanceBuffer;
+  m_inactiveOverlayNoteInstanceBuffer = nullptr;
 
   delete m_measureLabelAtlas;
   m_measureLabelAtlas = nullptr;
@@ -319,7 +339,9 @@ void PianoRollRhiRenderer::releaseResources() {
   m_staticFrontInstances.clear();
   m_dynamicInstances.clear();
   m_activeLaserInstances.clear();
+  m_activeLaserCoreInstances.clear();
   m_noteInstances.clear();
+  m_inactiveOverlayNoteInstances.clear();
   m_dynamicFrontStart = 0;
   m_measureLabelAtlasDirty = true;
   m_measureLabelAtlasScale = 1.0f;
@@ -393,6 +415,79 @@ void PianoRollRhiRenderer::renderFrame(QRhiCommandBuffer* cb, const RenderTarget
   }
   // Dynamic overlays (active notes, scanline, progress) update every frame.
   buildDynamicInstances(frame, layout);
+  int noteFirstInstance = 0;
+  int noteInstanceCount = static_cast<int>(m_noteInstances.size());
+  int noteVisibleBeginIndex = 0;
+  int noteVisibleEndIndex = noteInstanceCount;
+  if (frame.notes && !frame.notes->empty()) {
+    const auto& notes = *frame.notes;
+    const uint64_t maxDuration = std::max<uint64_t>(1, frame.maxNoteDurationTicks);
+    const uint64_t searchStartTick = (layout.visibleStartTick > maxDuration)
+                                         ? (layout.visibleStartTick - maxDuration)
+                                         : 0;
+    const uint64_t searchEndTick = layout.visibleEndTick + 1;
+
+    const auto beginIt = std::lower_bound(
+        notes.begin(),
+        notes.end(),
+        searchStartTick,
+        [](const PianoRollFrame::Note& note, uint64_t tick) {
+          return static_cast<uint64_t>(note.startTick) < tick;
+        });
+    const auto endIt = std::lower_bound(
+        notes.begin(),
+        notes.end(),
+        searchEndTick,
+        [](const PianoRollFrame::Note& note, uint64_t tick) {
+          return static_cast<uint64_t>(note.startTick) < tick;
+        });
+
+    noteVisibleBeginIndex = std::clamp(static_cast<int>(std::distance(notes.begin(), beginIt)),
+                                       0,
+                                       static_cast<int>(m_noteInstances.size()));
+    noteVisibleEndIndex = std::clamp(static_cast<int>(std::distance(notes.begin(), endIt)),
+                                     noteVisibleBeginIndex,
+                                     static_cast<int>(m_noteInstances.size()));
+    noteFirstInstance = noteVisibleBeginIndex;
+    noteInstanceCount = std::max(0, noteVisibleEndIndex - noteVisibleBeginIndex);
+  }
+
+  m_inactiveOverlayNoteInstances.clear();
+  if (noteInstanceCount > 0 && frame.notes && !frame.notes->empty()) {
+    const auto& notes = *frame.notes;
+    const auto* trackEnabled = frame.trackEnabled.get();
+    const auto isTrackEnabled = [&](int trackIndex) -> bool {
+      return !trackEnabled ||
+             trackIndex < 0 ||
+             trackIndex >= static_cast<int>(trackEnabled->size()) ||
+             (*trackEnabled)[static_cast<size_t>(trackIndex)] != 0;
+    };
+
+    std::unordered_map<uint64_t, int> activeCounts;
+    if (frame.activeNotes && !frame.activeNotes->empty()) {
+      activeCounts.reserve(frame.activeNotes->size() * 2);
+      for (const PianoRollFrame::Note& active : *frame.activeNotes) {
+        if (!isTrackEnabled(active.trackIndex)) {
+          continue;
+        }
+        ++activeCounts[noteIdentityHash(active)];
+      }
+    }
+
+    m_inactiveOverlayNoteInstances.reserve(static_cast<size_t>(noteInstanceCount));
+    for (int noteIndex = noteVisibleBeginIndex; noteIndex < noteVisibleEndIndex; ++noteIndex) {
+      const PianoRollFrame::Note& note = notes[static_cast<size_t>(noteIndex)];
+      bool isActive = false;
+      const auto it = activeCounts.find(noteIdentityHash(note));
+      if (it != activeCounts.end() && it->second > 0) {
+        --(it->second);
+        isActive = true;
+      }
+      if (!isActive) {
+        m_inactiveOverlayNoteInstances.push_back(m_noteInstances[static_cast<size_t>(noteIndex)]);
+      }
+    }
+  }
   if (profileEnabled) {
     tDynamic = profileTimer.nsecsElapsed();
   }
@@ -469,6 +564,17 @@ void PianoRollRhiRenderer::renderFrame(QRhiCommandBuffer* cb, const RenderTarget
     }
   }
 
+  if (!m_activeLaserCoreInstances.empty()) {
+    const int activeLaserCoreBytes =
+        static_cast<int>(m_activeLaserCoreInstances.size() * sizeof(RectInstance));
+    if (ensureInstanceBuffer(m_activeLaserCoreInstanceBuffer, activeLaserCoreBytes, 2048)) {
+      updates->updateDynamicBuffer(m_activeLaserCoreInstanceBuffer,
+                                   0,
+                                   activeLaserCoreBytes,
+                                   m_activeLaserCoreInstances.data());
+    }
+  }
+
   if (m_noteDataDirty) {
     if (!m_noteInstances.empty()) {
       const int noteBytes = static_cast<int>(m_noteInstances.size() * sizeof(NoteInstance));
@@ -477,6 +583,17 @@ void PianoRollRhiRenderer::renderFrame(QRhiCommandBuffer* cb, const RenderTarget
       }
     }
     m_noteDataDirty = false;
+  }
+
+  if (!m_inactiveOverlayNoteInstances.empty()) {
+    const int overlayBytes =
+        static_cast<int>(m_inactiveOverlayNoteInstances.size() * sizeof(NoteInstance));
+    if (ensureInstanceBuffer(m_inactiveOverlayNoteInstanceBuffer, overlayBytes, 4096)) {
+      updates->updateDynamicBuffer(m_inactiveOverlayNoteInstanceBuffer,
+                                   0,
+                                   overlayBytes,
+                                   m_inactiveOverlayNoteInstances.data());
+    }
   }
   if (profileEnabled) {
     tUpload = profileTimer.nsecsElapsed();
@@ -520,73 +637,54 @@ void PianoRollRhiRenderer::renderFrame(QRhiCommandBuffer* cb, const RenderTarget
   const int staticBackCount = static_cast<int>(m_staticBackInstances.size());
   const int staticFrontCount = static_cast<int>(m_staticFrontInstances.size());
   const int activeLaserCount = static_cast<int>(m_activeLaserInstances.size());
+  const int activeLaserCoreCount = static_cast<int>(m_activeLaserCoreInstances.size());
+  const int inactiveOverlayCount = static_cast<int>(m_inactiveOverlayNoteInstances.size());
   drawRectInstances(m_pipeline, m_staticBackInstanceBuffer, staticBackCount);
 
-  if (m_notePipeline && m_shaderBindings && m_noteInstanceBuffer && !m_noteInstances.empty()) {
-    int noteFirstInstance = 0;
-    int noteInstanceCount = static_cast<int>(m_noteInstances.size());
-    if (frame.notes && !frame.notes->empty()) {
-      const auto& notes = *frame.notes;
-      const uint64_t maxDuration = std::max<uint64_t>(1, frame.maxNoteDurationTicks);
-      const uint64_t searchStartTick = (layout.visibleStartTick > maxDuration)
-                                           ? (layout.visibleStartTick - maxDuration)
-                                           : 0;
-      const uint64_t searchEndTick = layout.visibleEndTick + 1;
-
-      const auto beginIt = std::lower_bound(
-          notes.begin(),
-          notes.end(),
-          searchStartTick,
-          [](const PianoRollFrame::Note& note, uint64_t tick) {
-            return static_cast<uint64_t>(note.startTick) < tick;
-          });
-      const auto endIt = std::lower_bound(
-          notes.begin(),
-          notes.end(),
-          searchEndTick,
-          [](const PianoRollFrame::Note& note, uint64_t tick) {
-            return static_cast<uint64_t>(note.startTick) < tick;
-          });
-
-      const int beginIndex = std::clamp(static_cast<int>(std::distance(notes.begin(), beginIt)),
-                                        0,
-                                        static_cast<int>(m_noteInstances.size()));
-      const int endIndex = std::clamp(static_cast<int>(std::distance(notes.begin(), endIt)),
-                                      beginIndex,
-                                      static_cast<int>(m_noteInstances.size()));
-      noteFirstInstance = beginIndex;
-      noteInstanceCount = std::max(0, endIndex - beginIndex);
+  auto drawNoteInstances = [&](QRhiBuffer* buffer, int count, int firstInstance = 0) {
+    if (!m_notePipeline || !m_shaderBindings || !buffer || count <= 0) {
+      return;
     }
-
-    if (noteInstanceCount > 0) {
-      quint32 noteInstanceOffset = 0;
-      int noteDrawFirstInstance = noteFirstInstance;
-      if (!m_supportsBaseInstance && noteFirstInstance > 0) {
-        noteInstanceOffset =
-            static_cast<quint32>(noteFirstInstance * static_cast<int>(sizeof(NoteInstance)));
-        noteDrawFirstInstance = 0;
-      }
-      cb->setStencilRef(1);
-      cb->setGraphicsPipeline(m_notePipeline);
-      cb->setShaderResources(m_shaderBindings);
-      const QRhiCommandBuffer::VertexInput noteBindings[] = {
-          {m_vertexBuffer, 0},
-          {m_noteInstanceBuffer, noteInstanceOffset},
-      };
-      cb->setVertexInput(0,
-                         static_cast<int>(std::size(noteBindings)),
-                         noteBindings,
-                         m_indexBuffer,
-                         0,
-                         QRhiCommandBuffer::IndexUInt16);
-      cb->drawIndexed(6, noteInstanceCount, 0, 0, noteDrawFirstInstance);
+    quint32 noteInstanceOffset = 0;
+    int noteDrawFirstInstance = firstInstance;
+    if (!m_supportsBaseInstance && firstInstance > 0) {
+      noteInstanceOffset =
+          static_cast<quint32>(firstInstance * static_cast<int>(sizeof(NoteInstance)));
+      noteDrawFirstInstance = 0;
     }
+    cb->setStencilRef(1);
+    cb->setGraphicsPipeline(m_notePipeline);
+    cb->setShaderResources(m_shaderBindings);
+    const QRhiCommandBuffer::VertexInput noteBindings[] = {
+        {m_vertexBuffer, 0},
+        {buffer, noteInstanceOffset},
+    };
+    cb->setVertexInput(0,
+                       static_cast<int>(std::size(noteBindings)),
+                       noteBindings,
+                       m_indexBuffer,
+                       0,
+                       QRhiCommandBuffer::IndexUInt16);
+    cb->drawIndexed(6, count, 0, 0, noteDrawFirstInstance);
+  };
+
+  if (m_noteInstanceBuffer && !m_noteInstances.empty()) {
+    drawNoteInstances(m_noteInstanceBuffer, noteInstanceCount, noteFirstInstance);
+  }
+
+  cb->setStencilRef(1);
+  drawRectInstances(m_activeLaserPipeline, m_activeLaserInstanceBuffer, activeLaserCount);
+  drawRectInstances(m_pipeline,
+                    m_activeLaserCoreInstanceBuffer,
+                    activeLaserCoreCount,
+                    0);
+
+  if (m_inactiveOverlayNoteInstanceBuffer && inactiveOverlayCount > 0) {
+    drawNoteInstances(m_inactiveOverlayNoteInstanceBuffer, inactiveOverlayCount, 0);
   }
 
   const int dynamicCount = static_cast<int>(m_dynamicInstances.size());
   const int dynamicFrontStart = std::clamp(m_dynamicFrontStart, 0, dynamicCount);
-  cb->setStencilRef(1);
-  drawRectInstances(m_activeLaserPipeline, m_activeLaserInstanceBuffer, activeLaserCount);
   drawRectInstances(m_pipeline, m_dynamicInstanceBuffer, dynamicFrontStart, 0);
   drawRectInstances(m_pipeline, m_staticFrontInstanceBuffer, staticFrontCount);
   drawRectInstances(m_pipeline,
@@ -1624,6 +1722,7 @@ void PianoRollRhiRenderer::buildStaticInstances(const PianoRollFrame::Data& fram
 void PianoRollRhiRenderer::buildDynamicInstances(const PianoRollFrame::Data& frame, const Layout& layout) {
   m_dynamicInstances.clear();
   m_activeLaserInstances.clear();
+  m_activeLaserCoreInstances.clear();
   m_dynamicFrontStart = 0;
 
   if (layout.viewWidth <= 0 || layout.viewHeight <= 0 || layout.noteAreaWidth <= 0.0f || layout.noteAreaHeight <= 0.0f) {
@@ -1684,7 +1783,7 @@ void PianoRollRhiRenderer::buildDynamicInstances(const PianoRollFrame::Data& fra
                  frame.elapsedSeconds,
                  seamSeed);
 
-      appendRect(m_dynamicInstances,
+      appendRect(m_activeLaserCoreInstances,
                  geometry.x,
                  geometry.y,
                  geometry.w,
