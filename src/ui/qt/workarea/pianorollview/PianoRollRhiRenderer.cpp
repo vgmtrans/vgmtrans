@@ -310,11 +310,11 @@ void PianoRollRhiRenderer::releaseResources() {
   delete m_activeLaserCoreInstanceBuffer;
   m_activeLaserCoreInstanceBuffer = nullptr;
 
-  delete m_noteInstanceBuffer;
-  m_noteInstanceBuffer = nullptr;
+  delete m_activeNoteInstanceBuffer;
+  m_activeNoteInstanceBuffer = nullptr;
 
-  delete m_inactiveOverlayNoteInstanceBuffer;
-  m_inactiveOverlayNoteInstanceBuffer = nullptr;
+  delete m_inactiveNoteInstanceBuffer;
+  m_inactiveNoteInstanceBuffer = nullptr;
 
   delete m_measureLabelAtlas;
   m_measureLabelAtlas = nullptr;
@@ -342,7 +342,8 @@ void PianoRollRhiRenderer::releaseResources() {
   m_activeLaserInstances.clear();
   m_activeLaserCoreInstances.clear();
   m_noteInstances.clear();
-  m_inactiveOverlayNoteInstances.clear();
+  m_activeNoteInstances.clear();
+  m_inactiveNoteInstances.clear();
   m_dynamicFrontStart = 0;
   m_measureLabelAtlasDirty = true;
   m_measureLabelAtlasScale = 1.0f;
@@ -351,7 +352,6 @@ void PianoRollRhiRenderer::releaseResources() {
   m_hasStaticCacheKey = false;
   m_staticCacheKey = {};
   m_staticDataDirty = true;
-  m_noteDataDirty = true;
   m_hasNoteDataKey = false;
   m_noteDataKey = {};
   m_rhi = nullptr;
@@ -396,7 +396,6 @@ void PianoRollRhiRenderer::renderFrame(QRhiCommandBuffer* cb, const RenderTarget
     rebuildNoteInstances(frame);
     m_noteDataKey = noteKey;
     m_hasNoteDataKey = true;
-    m_noteDataDirty = true;
   }
   if (profileEnabled) {
     tCapture = profileTimer.nsecsElapsed();
@@ -416,10 +415,8 @@ void PianoRollRhiRenderer::renderFrame(QRhiCommandBuffer* cb, const RenderTarget
   }
   // Dynamic overlays (active notes, scanline, progress) update every frame.
   buildDynamicInstances(frame, layout);
-  int noteFirstInstance = 0;
-  int noteInstanceCount = static_cast<int>(m_noteInstances.size());
   int noteVisibleBeginIndex = 0;
-  int noteVisibleEndIndex = noteInstanceCount;
+  int noteVisibleEndIndex = static_cast<int>(m_noteInstances.size());
   if (frame.notes && !frame.notes->empty()) {
     const auto& notes = *frame.notes;
     const uint64_t maxDuration = std::max<uint64_t>(1, frame.maxNoteDurationTicks);
@@ -450,14 +447,12 @@ void PianoRollRhiRenderer::renderFrame(QRhiCommandBuffer* cb, const RenderTarget
     noteVisibleEndIndex = std::clamp(static_cast<int>(std::distance(notes.begin(), endIt)),
                                      noteVisibleBeginIndex,
                                      static_cast<int>(m_noteInstances.size()));
-    noteFirstInstance = noteVisibleBeginIndex;
-    noteInstanceCount = std::max(0, noteVisibleEndIndex - noteVisibleBeginIndex);
   }
 
-  m_inactiveOverlayNoteInstances.clear();
-  if (noteInstanceCount > 0 &&
-      frame.notes && !frame.notes->empty() &&
-      frame.activeNotes && !frame.activeNotes->empty()) {
+  m_activeNoteInstances.clear();
+  m_inactiveNoteInstances.clear();
+  if (noteVisibleEndIndex > noteVisibleBeginIndex &&
+      frame.notes && !frame.notes->empty()) {
     const auto& notes = *frame.notes;
     const auto* trackEnabled = frame.trackEnabled.get();
     const auto isTrackEnabled = [&](int trackIndex) -> bool {
@@ -467,25 +462,32 @@ void PianoRollRhiRenderer::renderFrame(QRhiCommandBuffer* cb, const RenderTarget
              (*trackEnabled)[static_cast<size_t>(trackIndex)] != 0;
     };
 
-    m_inactiveOverlayNoteInstances.reserve(static_cast<size_t>(noteInstanceCount));
+    const int visibleCount = noteVisibleEndIndex - noteVisibleBeginIndex;
+    m_activeNoteInstances.reserve(static_cast<size_t>(visibleCount));
+    m_inactiveNoteInstances.reserve(static_cast<size_t>(visibleCount));
+
     std::unordered_map<uint64_t, int> activeCounts;
-    activeCounts.reserve(frame.activeNotes->size() * 2);
-    // Count-based matching handles duplicate note identities deterministically.
-    for (const PianoRollFrame::Note& active : *frame.activeNotes) {
-      if (!isTrackEnabled(active.trackIndex)) {
-        continue;
+    if (frame.activeNotes && !frame.activeNotes->empty()) {
+      activeCounts.reserve(frame.activeNotes->size() * 2);
+      // Count-based matching handles duplicate note identities deterministically.
+      for (const PianoRollFrame::Note& active : *frame.activeNotes) {
+        if (!isTrackEnabled(active.trackIndex)) {
+          continue;
+        }
+        ++activeCounts[noteIdentityHash(active)];
       }
-      ++activeCounts[noteIdentityHash(active)];
     }
 
     for (int noteIndex = noteVisibleBeginIndex; noteIndex < noteVisibleEndIndex; ++noteIndex) {
       const PianoRollFrame::Note& note = notes[static_cast<size_t>(noteIndex)];
+      const NoteInstance& instance = m_noteInstances[static_cast<size_t>(noteIndex)];
       const auto it = activeCounts.find(noteIdentityHash(note));
       if (it != activeCounts.end() && it->second > 0) {
         --(it->second);
+        m_activeNoteInstances.push_back(instance);
         continue;
       }
-      m_inactiveOverlayNoteInstances.push_back(m_noteInstances[static_cast<size_t>(noteIndex)]);
+      m_inactiveNoteInstances.push_back(instance);
     }
   }
   if (profileEnabled) {
@@ -575,24 +577,24 @@ void PianoRollRhiRenderer::renderFrame(QRhiCommandBuffer* cb, const RenderTarget
     }
   }
 
-  if (m_noteDataDirty) {
-    if (!m_noteInstances.empty()) {
-      const int noteBytes = static_cast<int>(m_noteInstances.size() * sizeof(NoteInstance));
-      if (ensureInstanceBuffer(m_noteInstanceBuffer, noteBytes, 16384)) {
-        updates->updateDynamicBuffer(m_noteInstanceBuffer, 0, noteBytes, m_noteInstances.data());
-      }
+  if (!m_activeNoteInstances.empty()) {
+    const int activeNoteBytes = static_cast<int>(m_activeNoteInstances.size() * sizeof(NoteInstance));
+    if (ensureInstanceBuffer(m_activeNoteInstanceBuffer, activeNoteBytes, 4096)) {
+      updates->updateDynamicBuffer(m_activeNoteInstanceBuffer,
+                                   0,
+                                   activeNoteBytes,
+                                   m_activeNoteInstances.data());
     }
-    m_noteDataDirty = false;
   }
 
-  if (!m_inactiveOverlayNoteInstances.empty()) {
-    const int overlayBytes =
-        static_cast<int>(m_inactiveOverlayNoteInstances.size() * sizeof(NoteInstance));
-    if (ensureInstanceBuffer(m_inactiveOverlayNoteInstanceBuffer, overlayBytes, 4096)) {
-      updates->updateDynamicBuffer(m_inactiveOverlayNoteInstanceBuffer,
+  if (!m_inactiveNoteInstances.empty()) {
+    const int inactiveNoteBytes =
+        static_cast<int>(m_inactiveNoteInstances.size() * sizeof(NoteInstance));
+    if (ensureInstanceBuffer(m_inactiveNoteInstanceBuffer, inactiveNoteBytes, 16384)) {
+      updates->updateDynamicBuffer(m_inactiveNoteInstanceBuffer,
                                    0,
-                                   overlayBytes,
-                                   m_inactiveOverlayNoteInstances.data());
+                                   inactiveNoteBytes,
+                                   m_inactiveNoteInstances.data());
     }
   }
   if (profileEnabled) {
@@ -638,7 +640,8 @@ void PianoRollRhiRenderer::renderFrame(QRhiCommandBuffer* cb, const RenderTarget
   const int staticFrontCount = static_cast<int>(m_staticFrontInstances.size());
   const int activeLaserCount = static_cast<int>(m_activeLaserInstances.size());
   const int activeLaserCoreCount = static_cast<int>(m_activeLaserCoreInstances.size());
-  const int inactiveOverlayCount = static_cast<int>(m_inactiveOverlayNoteInstances.size());
+  const int activeNoteCount = static_cast<int>(m_activeNoteInstances.size());
+  const int inactiveNoteCount = static_cast<int>(m_inactiveNoteInstances.size());
   drawRectInstances(m_pipeline, m_staticBackInstanceBuffer, staticBackCount);
 
   auto drawNoteInstances = [&](QRhiBuffer* buffer, int count, int firstInstance = 0) {
@@ -669,13 +672,13 @@ void PianoRollRhiRenderer::renderFrame(QRhiCommandBuffer* cb, const RenderTarget
     cb->drawIndexed(6, count, 0, 0, noteDrawFirstInstance);
   };
 
-  if (m_noteInstanceBuffer && !m_noteInstances.empty()) {
-    drawNoteInstances(m_noteInstanceBuffer, noteInstanceCount, noteFirstInstance);
+  if (m_activeNoteInstanceBuffer && activeNoteCount > 0) {
+    drawNoteInstances(m_activeNoteInstanceBuffer, activeNoteCount, 0);
   }
 
   // Render order is intentional:
-  // notes -> external aura -> active core -> inactive-note redraw -> UI overlays.
-  // This keeps inactive notes visible over active highlighting while preserving glow.
+  // active notes -> external aura -> active core -> inactive notes -> UI overlays.
+  // Active notes first seed stencil for glow masking; inactive notes then sit on top.
   cb->setStencilRef(1);
   drawRectInstances(m_activeLaserPipeline, m_activeLaserInstanceBuffer, activeLaserCount);
   drawRectInstances(m_pipeline,
@@ -683,10 +686,8 @@ void PianoRollRhiRenderer::renderFrame(QRhiCommandBuffer* cb, const RenderTarget
                     activeLaserCoreCount,
                     0);
 
-  if (activeLaserCoreCount > 0 &&
-      m_inactiveOverlayNoteInstanceBuffer &&
-      inactiveOverlayCount > 0) {
-    drawNoteInstances(m_inactiveOverlayNoteInstanceBuffer, inactiveOverlayCount, 0);
+  if (m_inactiveNoteInstanceBuffer && inactiveNoteCount > 0) {
+    drawNoteInstances(m_inactiveNoteInstanceBuffer, inactiveNoteCount, 0);
   }
 
   const int dynamicCount = static_cast<int>(m_dynamicInstances.size());
