@@ -566,6 +566,7 @@ void PianoRollRhiRenderer::renderFrame(QRhiCommandBuffer* cb, const RenderTarget
             static_cast<quint32>(noteFirstInstance * static_cast<int>(sizeof(NoteInstance)));
         noteDrawFirstInstance = 0;
       }
+      cb->setStencilRef(1);
       cb->setGraphicsPipeline(m_notePipeline);
       cb->setShaderResources(m_shaderBindings);
       const QRhiCommandBuffer::VertexInput noteBindings[] = {
@@ -584,6 +585,7 @@ void PianoRollRhiRenderer::renderFrame(QRhiCommandBuffer* cb, const RenderTarget
 
   const int dynamicCount = static_cast<int>(m_dynamicInstances.size());
   const int dynamicFrontStart = std::clamp(m_dynamicFrontStart, 0, dynamicCount);
+  cb->setStencilRef(1);
   drawRectInstances(m_activeLaserPipeline, m_activeLaserInstanceBuffer, activeLaserCount);
   drawRectInstances(m_pipeline, m_dynamicInstanceBuffer, dynamicFrontStart, 0);
   drawRectInstances(m_pipeline, m_staticFrontInstanceBuffer, staticFrontCount);
@@ -733,6 +735,14 @@ void PianoRollRhiRenderer::ensurePipelines(QRhiRenderPassDescriptor* renderPassD
   m_activeLaserPipeline->setShaderResourceBindings(m_shaderBindings);
   m_activeLaserPipeline->setVertexInputLayout(rectInputLayout);
   m_activeLaserPipeline->setTargetBlends({activeLaserBlend});
+  // Exclude glow from all note-covered pixels to avoid overlap brightening.
+  m_activeLaserPipeline->setStencilTest(true);
+  QRhiGraphicsPipeline::StencilOpState activeLaserStencil;
+  activeLaserStencil.compareOp = QRhiGraphicsPipeline::NotEqual;
+  m_activeLaserPipeline->setStencilFront(activeLaserStencil);
+  m_activeLaserPipeline->setStencilBack(activeLaserStencil);
+  m_activeLaserPipeline->setStencilReadMask(0xFF);
+  m_activeLaserPipeline->setStencilWriteMask(0x00);
   m_activeLaserPipeline->setRenderPassDescriptor(renderPassDesc);
   m_activeLaserPipeline->create();
 
@@ -759,6 +769,14 @@ void PianoRollRhiRenderer::ensurePipelines(QRhiRenderPassDescriptor* renderPassD
   m_notePipeline->setShaderResourceBindings(m_shaderBindings);
   m_notePipeline->setVertexInputLayout(noteInputLayout);
   m_notePipeline->setTargetBlends({blend});
+  // Mark note pixels in stencil so the active-laser pass can skip them.
+  m_notePipeline->setStencilTest(true);
+  QRhiGraphicsPipeline::StencilOpState noteStencil;
+  noteStencil.passOp = QRhiGraphicsPipeline::Replace;
+  m_notePipeline->setStencilFront(noteStencil);
+  m_notePipeline->setStencilBack(noteStencil);
+  m_notePipeline->setStencilReadMask(0xFF);
+  m_notePipeline->setStencilWriteMask(0xFF);
   m_notePipeline->setRenderPassDescriptor(renderPassDesc);
   m_notePipeline->create();
 }
@@ -1644,6 +1662,8 @@ void PianoRollRhiRenderer::buildDynamicInstances(const PianoRollFrame::Data& fra
 
       QColor laserBase = colorForTrack(note.trackIndex).lighter(108);
       laserBase.setAlpha(228);
+      QColor laserCore = colorForTrack(note.trackIndex).lighter(112);
+      laserCore.setAlpha(255);
       float seamLocalX = -1.0f;
       if (playheadVisible && currentX >= geometry.x && currentX <= geometry.x + geometry.w) {
         seamLocalX = std::clamp((currentX - geometry.x) / std::max(1.0f, geometry.w), 0.0f, 1.0f);
@@ -1660,6 +1680,17 @@ void PianoRollRhiRenderer::buildDynamicInstances(const PianoRollFrame::Data& fra
                  geometry.h + (2.0f * kActiveLaserAuraPadPx),
                  laserBase,
                  LineStyle::ActiveLaser,
+                 seamLocalX,
+                 frame.elapsedSeconds,
+                 seamSeed);
+
+      appendRect(m_dynamicInstances,
+                 geometry.x,
+                 geometry.y,
+                 geometry.w,
+                 geometry.h,
+                 laserCore,
+                 LineStyle::ActiveLaserCore,
                  seamLocalX,
                  frame.elapsedSeconds,
                  seamSeed);
