@@ -67,11 +67,16 @@ void main() {
 
     float seamLocalX = vParams.y;
     float seamActive = step(0.0, seamLocalX) * step(seamLocalX, 1.0);
-    float seamX = seamLocalX * noteW;
-    float dx = abs(notePx.x - seamX);
-    float seamGlow = seamActive * smoothstep(18.0, 0.0, dx);
-    float seamCore = seamActive * smoothstep(2.6, 0.0, dx);
-    float lick = valueNoise(vec2((local.y * 24.0) + seed, (t * 12.0) + (seed * 0.63)));
+    float seamGlow = 0.0;
+    float seamCore = 0.0;
+    float lick = 0.0;
+    if (seamActive > 0.0) {
+      float seamX = seamLocalX * noteW;
+      float dx = abs(notePx.x - seamX);
+      seamGlow = smoothstep(18.0, 0.0, dx);
+      seamCore = smoothstep(2.6, 0.0, dx);
+      lick = valueNoise(vec2((local.y * 24.0) + seed, (t * 12.0) + (seed * 0.63)));
+    }
     vec3 seamTint = mix(vColor.rgb, vec3(1.0), 0.42);
 
     surface = mix(surface, (surface * 0.72) + (seamTint * 0.78), seamGlow * 0.46);
@@ -114,21 +119,31 @@ void main() {
 
     float seamLocalX = vParams.y;
     float seamActive = step(0.0, seamLocalX) * step(seamLocalX, 1.0);
-    float seamX = seamLocalX * noteW;
-    float dx = abs(notePx.x - seamX);
-    float seamGlow = seamActive * smoothstep(20.0, 0.0, dx);
-    float seamCore = seamActive * smoothstep(2.6, 0.0, dx);
-    float lick = valueNoise(vec2((local.y * 24.0) + seed, (t * 12.0) + (seed * 0.63)));
-    float flame = seamGlow * (0.50 + (0.50 * lick));
+    float seamX = 0.0;
+    float dx = 0.0;
+    float seamGlow = 0.0;
+    float seamCore = 0.0;
+    float lick = 0.0;
+    float flame = 0.0;
+    if (seamActive > 0.0) {
+      seamX = seamLocalX * noteW;
+      dx = abs(notePx.x - seamX);
+      seamGlow = smoothstep(20.0, 0.0, dx);
+      seamCore = smoothstep(2.6, 0.0, dx);
+      lick = valueNoise(vec2((local.y * 24.0) + seed, (t * 12.0) + (seed * 0.63)));
+      flame = seamGlow * (0.50 + (0.50 * lick));
+    }
     vec3 seamTint = mix(vColor.rgb, vec3(1.0), 0.45);
 
     surface = mix(surface, (surface * 0.60) + (seamTint * 0.95), seamGlow * 0.62);
     surface += seamTint * seamCore * 0.95;
     surface += (vColor.rgb * (0.30 + (0.25 * lick))) * flame * 0.55;
 
-    float behind = smoothstep(0.0, 16.0, seamX - notePx.x);
-    float scorch = seamActive * behind * smoothstep(20.0, 0.0, dx);
-    surface = mix(surface, surface * vec3(0.24, 0.20, 0.18), scorch * 0.95);
+    if (seamActive > 0.0) {
+      float behind = smoothstep(0.0, 16.0, seamX - notePx.x);
+      float scorch = behind * smoothstep(20.0, 0.0, dx);
+      surface = mix(surface, surface * vec3(0.24, 0.20, 0.18), scorch * 0.95);
+    }
 
     float auraDist = max(boxDist, 0.0);
     float aura = exp(-auraDist / auraFalloffPx);
@@ -141,9 +156,11 @@ void main() {
     float auraInside = (1.0 - outsideMask) * ((0.07 * auraSoft) + (0.03 * auraWide));
     vec3 auraTint = mix(vColor.rgb, vec3(1.0), 0.30);
     vec3 auraCol = (auraTint * auraOutside) + (vColor.rgb * auraInside);
-    float seamBloom = seamActive * smoothstep(30.0, 0.0, dx) *
-                      smoothstep(noteH * 0.95, 0.0, abs(notePx.y - (0.5 * noteH)));
-    auraCol += seamTint * seamBloom * 0.12;
+    if (seamActive > 0.0) {
+      float seamBloom = smoothstep(30.0, 0.0, dx) *
+                        smoothstep(noteH * 0.95, 0.0, abs(notePx.y - (0.5 * noteH)));
+      auraCol += seamTint * seamBloom * 0.12;
+    }
 
     vec3 outRgb = (surface * rectMask) + auraCol;
     float auraAlpha = clamp((auraOutside * 0.72) + (auraInside * 0.14), 0.0, 1.0);

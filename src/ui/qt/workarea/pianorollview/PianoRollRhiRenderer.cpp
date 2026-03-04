@@ -218,6 +218,20 @@ uint64_t noteIdentityHash(const PianoRollFrame::Note& note) {
   return hash;
 }
 
+bool isTrackEnabledForIndex(const std::vector<uint8_t>* trackEnabled, int trackIndex) {
+  return !trackEnabled ||
+         trackIndex < 0 ||
+         trackIndex >= static_cast<int>(trackEnabled->size()) ||
+         (*trackEnabled)[static_cast<size_t>(trackIndex)] != 0;
+}
+
+QColor colorForTrackIndex(const std::vector<QColor>* trackColors, int trackIndex) {
+  if (trackColors && trackIndex >= 0 && trackIndex < static_cast<int>(trackColors->size())) {
+    return (*trackColors)[static_cast<size_t>(trackIndex)];
+  }
+  return QColor::fromHsv((trackIndex * 43) % 360, 190, 235);
+}
+
 }  // namespace
 
 PianoRollRhiRenderer::PianoRollRhiRenderer(PianoRollView* view)
@@ -378,12 +392,7 @@ void PianoRollRhiRenderer::renderFrame(QRhiCommandBuffer* cb, const RenderTarget
   }
 
   // Work in logical coordinates; shaders/projector handle device pixels via viewport.
-  QSize logicalSize = frame.viewportSize;
-  if (logicalSize.isEmpty()) {
-    const float dpr = std::max(1.0f, target.dpr);
-    logicalSize = QSize(std::max(1, static_cast<int>(std::lround(static_cast<float>(target.pixelSize.width()) / dpr))),
-                        std::max(1, static_cast<int>(std::lround(static_cast<float>(target.pixelSize.height()) / dpr))));
-  }
+  const QSize logicalSize = frame.viewportSize;
 
   const Layout layout = computeLayout(frame, logicalSize);
   const StaticCacheKey key = makeStaticCacheKey(frame, layout);
@@ -455,39 +464,53 @@ void PianoRollRhiRenderer::renderFrame(QRhiCommandBuffer* cb, const RenderTarget
       frame.notes && !frame.notes->empty()) {
     const auto& notes = *frame.notes;
     const auto* trackEnabled = frame.trackEnabled.get();
-    const auto isTrackEnabled = [&](int trackIndex) -> bool {
-      return !trackEnabled ||
-             trackIndex < 0 ||
-             trackIndex >= static_cast<int>(trackEnabled->size()) ||
-             (*trackEnabled)[static_cast<size_t>(trackIndex)] != 0;
+    const auto isNoteVerticallyVisible = [&](const PianoRollFrame::Note& note) -> bool {
+      const float y = layout.noteAreaTop +
+                      ((127.0f - static_cast<float>(note.key)) * layout.pixelsPerKey) -
+                      layout.scrollY;
+      const float h = std::max(1.0f, layout.pixelsPerKey - 1.0f);
+      return (y + h) > layout.noteAreaTop &&
+             y < (layout.noteAreaTop + layout.noteAreaHeight);
     };
 
     const int visibleCount = noteVisibleEndIndex - noteVisibleBeginIndex;
     m_activeNoteInstances.reserve(static_cast<size_t>(visibleCount));
     m_inactiveNoteInstances.reserve(static_cast<size_t>(visibleCount));
 
-    std::unordered_map<uint64_t, int> activeCounts;
-    if (frame.activeNotes && !frame.activeNotes->empty()) {
+    if (!frame.activeNotes || frame.activeNotes->empty()) {
+      for (int noteIndex = noteVisibleBeginIndex; noteIndex < noteVisibleEndIndex; ++noteIndex) {
+        const PianoRollFrame::Note& note = notes[static_cast<size_t>(noteIndex)];
+        if (!isNoteVerticallyVisible(note)) {
+          continue;
+        }
+        m_inactiveNoteInstances.push_back(m_noteInstances[static_cast<size_t>(noteIndex)]);
+      }
+    } else {
+      std::unordered_map<uint64_t, int> activeCounts;
       activeCounts.reserve(frame.activeNotes->size() * 2);
       // Count-based matching handles duplicate note identities deterministically.
       for (const PianoRollFrame::Note& active : *frame.activeNotes) {
-        if (!isTrackEnabled(active.trackIndex)) {
+        if (!isTrackEnabledForIndex(trackEnabled, active.trackIndex)) {
           continue;
         }
         ++activeCounts[noteIdentityHash(active)];
       }
-    }
 
-    for (int noteIndex = noteVisibleBeginIndex; noteIndex < noteVisibleEndIndex; ++noteIndex) {
-      const PianoRollFrame::Note& note = notes[static_cast<size_t>(noteIndex)];
-      const NoteInstance& instance = m_noteInstances[static_cast<size_t>(noteIndex)];
-      const auto it = activeCounts.find(noteIdentityHash(note));
-      if (it != activeCounts.end() && it->second > 0) {
-        --(it->second);
-        m_activeNoteInstances.push_back(instance);
-        continue;
+      for (int noteIndex = noteVisibleBeginIndex; noteIndex < noteVisibleEndIndex; ++noteIndex) {
+        const PianoRollFrame::Note& note = notes[static_cast<size_t>(noteIndex)];
+        if (!isNoteVerticallyVisible(note)) {
+          continue;
+        }
+
+        const NoteInstance& instance = m_noteInstances[static_cast<size_t>(noteIndex)];
+        const auto it = activeCounts.find(noteIdentityHash(note));
+        if (it != activeCounts.end() && it->second > 0) {
+          --(it->second);
+          m_activeNoteInstances.push_back(instance);
+          continue;
+        }
+        m_inactiveNoteInstances.push_back(instance);
       }
-      m_inactiveNoteInstances.push_back(instance);
     }
   }
   if (profileEnabled) {
@@ -526,101 +549,66 @@ void PianoRollRhiRenderer::renderFrame(QRhiCommandBuffer* cb, const RenderTarget
   updates->updateDynamicBuffer(m_uniformBuffer, 0, kUniformBytes, ubo.data());
 
   if (m_staticDataDirty) {
-    if (!m_staticBackInstances.empty()) {
-      const int staticBackBytes = static_cast<int>(m_staticBackInstances.size() * sizeof(RectInstance));
-      if (ensureInstanceBuffer(m_staticBackInstanceBuffer, staticBackBytes, 16384)) {
-        updates->updateDynamicBuffer(m_staticBackInstanceBuffer,
-                                     0,
-                                     staticBackBytes,
-                                     m_staticBackInstances.data());
-      }
+    const int staticBackBytes = static_cast<int>(m_staticBackInstances.size() * sizeof(RectInstance));
+    if (staticBackBytes > 0 && ensureInstanceBuffer(m_staticBackInstanceBuffer, staticBackBytes, 16384)) {
+      updates->updateDynamicBuffer(m_staticBackInstanceBuffer,
+                                   0,
+                                   staticBackBytes,
+                                   m_staticBackInstances.data());
     }
 
-    if (!m_staticFrontInstances.empty()) {
-      const int staticFrontBytes = static_cast<int>(m_staticFrontInstances.size() * sizeof(RectInstance));
-      if (ensureInstanceBuffer(m_staticFrontInstanceBuffer, staticFrontBytes, 4096)) {
-        updates->updateDynamicBuffer(m_staticFrontInstanceBuffer,
-                                     0,
-                                     staticFrontBytes,
-                                     m_staticFrontInstances.data());
-      }
+    const int staticFrontBytes = static_cast<int>(m_staticFrontInstances.size() * sizeof(RectInstance));
+    if (staticFrontBytes > 0 && ensureInstanceBuffer(m_staticFrontInstanceBuffer, staticFrontBytes, 4096)) {
+      updates->updateDynamicBuffer(m_staticFrontInstanceBuffer,
+                                   0,
+                                   staticFrontBytes,
+                                   m_staticFrontInstances.data());
     }
     m_staticDataDirty = false;
   }
 
-  if (!m_dynamicInstances.empty()) {
-    const int dynamicBytes = static_cast<int>(m_dynamicInstances.size() * sizeof(RectInstance));
-    if (ensureInstanceBuffer(m_dynamicInstanceBuffer, dynamicBytes, 8192)) {
-      updates->updateDynamicBuffer(m_dynamicInstanceBuffer, 0, dynamicBytes, m_dynamicInstances.data());
+  auto uploadInstances = [&](QRhiBuffer*& buffer, const auto& instances, int minBytes) {
+    const int bytes = static_cast<int>(instances.size() * sizeof(instances[0]));
+    if (bytes <= 0 || !ensureInstanceBuffer(buffer, bytes, minBytes)) {
+      return;
     }
-  }
+    updates->updateDynamicBuffer(buffer, 0, bytes, instances.data());
+  };
 
-  if (!m_activeLaserInstances.empty()) {
-    const int activeLaserBytes =
-        static_cast<int>(m_activeLaserInstances.size() * sizeof(RectInstance));
-    if (ensureInstanceBuffer(m_activeLaserInstanceBuffer, activeLaserBytes, 4096)) {
-      updates->updateDynamicBuffer(m_activeLaserInstanceBuffer,
-                                   0,
-                                   activeLaserBytes,
-                                   m_activeLaserInstances.data());
-    }
-  }
-
-  if (!m_activeLaserCoreInstances.empty()) {
-    const int activeLaserCoreBytes =
-        static_cast<int>(m_activeLaserCoreInstances.size() * sizeof(RectInstance));
-    if (ensureInstanceBuffer(m_activeLaserCoreInstanceBuffer, activeLaserCoreBytes, 2048)) {
-      updates->updateDynamicBuffer(m_activeLaserCoreInstanceBuffer,
-                                   0,
-                                   activeLaserCoreBytes,
-                                   m_activeLaserCoreInstances.data());
-    }
-  }
-
-  if (!m_activeNoteInstances.empty()) {
-    const int activeNoteBytes = static_cast<int>(m_activeNoteInstances.size() * sizeof(NoteInstance));
-    if (ensureInstanceBuffer(m_activeNoteInstanceBuffer, activeNoteBytes, 4096)) {
-      updates->updateDynamicBuffer(m_activeNoteInstanceBuffer,
-                                   0,
-                                   activeNoteBytes,
-                                   m_activeNoteInstances.data());
-    }
-  }
-
-  if (!m_inactiveNoteInstances.empty()) {
-    const int inactiveNoteBytes =
-        static_cast<int>(m_inactiveNoteInstances.size() * sizeof(NoteInstance));
-    if (ensureInstanceBuffer(m_inactiveNoteInstanceBuffer, inactiveNoteBytes, 16384)) {
-      updates->updateDynamicBuffer(m_inactiveNoteInstanceBuffer,
-                                   0,
-                                   inactiveNoteBytes,
-                                   m_inactiveNoteInstances.data());
-    }
-  }
+  uploadInstances(m_dynamicInstanceBuffer, m_dynamicInstances, 8192);
+  uploadInstances(m_activeLaserInstanceBuffer, m_activeLaserInstances, 4096);
+  uploadInstances(m_activeLaserCoreInstanceBuffer, m_activeLaserCoreInstances, 2048);
+  uploadInstances(m_activeNoteInstanceBuffer, m_activeNoteInstances, 4096);
+  uploadInstances(m_inactiveNoteInstanceBuffer, m_inactiveNoteInstances, 16384);
   if (profileEnabled) {
     tUpload = profileTimer.nsecsElapsed();
   }
 
   cb->beginPass(target.renderTarget, frame.backgroundColor, {1.0f, 0}, updates);
-  cb->setViewport(QRhiViewport(0,
-                               0,
-                               static_cast<float>(target.pixelSize.width()),
-                               static_cast<float>(target.pixelSize.height())));
+  const QRhiViewport viewport(0,
+                              0,
+                              static_cast<float>(target.pixelSize.width()),
+                              static_cast<float>(target.pixelSize.height()));
+  cb->setViewport(viewport);
 
-  auto drawRectInstances = [&](QRhiGraphicsPipeline* pipeline,
-                               QRhiBuffer* buffer,
-                               int count,
-                               int firstInstance = 0) {
+  auto drawInstances = [&](QRhiGraphicsPipeline* pipeline,
+                           QRhiBuffer* buffer,
+                           int count,
+                           int firstInstance,
+                           int instanceStride,
+                           bool setStencilRefOne = false) {
     if (!pipeline || !m_shaderBindings || !buffer || count <= 0) {
       return;
     }
     quint32 instanceOffset = 0;
     int drawFirstInstance = firstInstance;
     if (!m_supportsBaseInstance && firstInstance > 0) {
-      instanceOffset = static_cast<quint32>(firstInstance * static_cast<int>(sizeof(RectInstance)));
+      instanceOffset = static_cast<quint32>(firstInstance * instanceStride);
       drawFirstInstance = 0;
     }
-
+    if (setStencilRefOne) {
+      cb->setStencilRef(1);
+    }
     cb->setGraphicsPipeline(pipeline);
     cb->setShaderResources(m_shaderBindings);
     const QRhiCommandBuffer::VertexInput bindings[] = {
@@ -642,62 +630,63 @@ void PianoRollRhiRenderer::renderFrame(QRhiCommandBuffer* cb, const RenderTarget
   const int activeLaserCoreCount = static_cast<int>(m_activeLaserCoreInstances.size());
   const int activeNoteCount = static_cast<int>(m_activeNoteInstances.size());
   const int inactiveNoteCount = static_cast<int>(m_inactiveNoteInstances.size());
-  drawRectInstances(m_pipeline, m_staticBackInstanceBuffer, staticBackCount);
-
-  auto drawNoteInstances = [&](QRhiBuffer* buffer, int count, int firstInstance = 0) {
-    if (!m_notePipeline || !m_shaderBindings || !buffer || count <= 0) {
-      return;
-    }
-    quint32 noteInstanceOffset = 0;
-    int noteDrawFirstInstance = firstInstance;
-    if (!m_supportsBaseInstance && firstInstance > 0) {
-      noteInstanceOffset =
-          static_cast<quint32>(firstInstance * static_cast<int>(sizeof(NoteInstance)));
-      noteDrawFirstInstance = 0;
-    }
-    // Notes write stencil=1 so aura can be masked from note-covered pixels.
-    cb->setStencilRef(1);
-    cb->setGraphicsPipeline(m_notePipeline);
-    cb->setShaderResources(m_shaderBindings);
-    const QRhiCommandBuffer::VertexInput noteBindings[] = {
-        {m_vertexBuffer, 0},
-        {buffer, noteInstanceOffset},
-    };
-    cb->setVertexInput(0,
-                       static_cast<int>(std::size(noteBindings)),
-                       noteBindings,
-                       m_indexBuffer,
-                       0,
-                       QRhiCommandBuffer::IndexUInt16);
-    cb->drawIndexed(6, count, 0, 0, noteDrawFirstInstance);
-  };
+  drawInstances(m_pipeline,
+                m_staticBackInstanceBuffer,
+                staticBackCount,
+                0,
+                static_cast<int>(sizeof(RectInstance)));
 
   if (m_activeNoteInstanceBuffer && activeNoteCount > 0) {
-    drawNoteInstances(m_activeNoteInstanceBuffer, activeNoteCount, 0);
+    // Notes write stencil=1 so aura can be masked from note-covered pixels.
+    drawInstances(m_notePipeline,
+                  m_activeNoteInstanceBuffer,
+                  activeNoteCount,
+                  0,
+                  static_cast<int>(sizeof(NoteInstance)),
+                  true);
   }
 
   // Render order is intentional:
   // active notes -> external aura -> active core -> inactive notes -> UI overlays.
   // Active notes first seed stencil for glow masking; inactive notes then sit on top.
-  cb->setStencilRef(1);
-  drawRectInstances(m_activeLaserPipeline, m_activeLaserInstanceBuffer, activeLaserCount);
-  drawRectInstances(m_pipeline,
-                    m_activeLaserCoreInstanceBuffer,
-                    activeLaserCoreCount,
-                    0);
+  drawInstances(m_activeLaserPipeline,
+                m_activeLaserInstanceBuffer,
+                activeLaserCount,
+                0,
+                static_cast<int>(sizeof(RectInstance)),
+                true);
+  drawInstances(m_pipeline,
+                m_activeLaserCoreInstanceBuffer,
+                activeLaserCoreCount,
+                0,
+                static_cast<int>(sizeof(RectInstance)));
 
   if (m_inactiveNoteInstanceBuffer && inactiveNoteCount > 0) {
-    drawNoteInstances(m_inactiveNoteInstanceBuffer, inactiveNoteCount, 0);
+    drawInstances(m_notePipeline,
+                  m_inactiveNoteInstanceBuffer,
+                  inactiveNoteCount,
+                  0,
+                  static_cast<int>(sizeof(NoteInstance)),
+                  true);
   }
 
   const int dynamicCount = static_cast<int>(m_dynamicInstances.size());
   const int dynamicFrontStart = std::clamp(m_dynamicFrontStart, 0, dynamicCount);
-  drawRectInstances(m_pipeline, m_dynamicInstanceBuffer, dynamicFrontStart, 0);
-  drawRectInstances(m_pipeline, m_staticFrontInstanceBuffer, staticFrontCount);
-  drawRectInstances(m_pipeline,
-                    m_dynamicInstanceBuffer,
-                    dynamicCount - dynamicFrontStart,
-                    dynamicFrontStart);
+  drawInstances(m_pipeline,
+                m_dynamicInstanceBuffer,
+                dynamicFrontStart,
+                0,
+                static_cast<int>(sizeof(RectInstance)));
+  drawInstances(m_pipeline,
+                m_staticFrontInstanceBuffer,
+                staticFrontCount,
+                0,
+                static_cast<int>(sizeof(RectInstance)));
+  drawInstances(m_pipeline,
+                m_dynamicInstanceBuffer,
+                dynamicCount - dynamicFrontStart,
+                dynamicFrontStart,
+                static_cast<int>(sizeof(RectInstance)));
 
   cb->endPass();
 
@@ -757,17 +746,14 @@ void PianoRollRhiRenderer::ensurePipelines(QRhiRenderPassDescriptor* renderPassD
   }
 
   // Render pass/sample count changes require a fresh pipeline.
-  delete m_notePipeline;
-  m_notePipeline = nullptr;
-
-  delete m_activeLaserPipeline;
-  m_activeLaserPipeline = nullptr;
-
-  delete m_pipeline;
-  m_pipeline = nullptr;
-
-  delete m_shaderBindings;
-  m_shaderBindings = nullptr;
+  auto resetOwned = [](auto*& ptr) {
+    delete ptr;
+    ptr = nullptr;
+  };
+  resetOwned(m_notePipeline);
+  resetOwned(m_activeLaserPipeline);
+  resetOwned(m_pipeline);
+  resetOwned(m_shaderBindings);
 
   m_outputRenderPass = renderPassDesc;
   m_sampleCount = sampleCount;
@@ -801,8 +787,11 @@ void PianoRollRhiRenderer::ensurePipelines(QRhiRenderPassDescriptor* renderPassD
   activeLaserBlend.dstAlpha = QRhiGraphicsPipeline::OneMinusSrcAlpha;
   activeLaserBlend.opAlpha = QRhiGraphicsPipeline::Add;
 
-  QShader rectVertexShader = loadShader(":/shaders/pianorollquad.vert.qsb");
-  QShader rectFragmentShader = loadShader(":/shaders/pianorollquad.frag.qsb");
+  static const QShader rectVertexShader = loadShader(":/shaders/pianorollquad.vert.qsb");
+  static const QShader rectFragmentShader = loadShader(":/shaders/pianorollquad.frag.qsb");
+  static const QShader noteVertexShader = loadShader(":/shaders/pianorollnote.vert.qsb");
+  static const QShader noteFragmentShader = loadShader(":/shaders/pianorollnote.frag.qsb");
+
   QRhiVertexInputLayout rectInputLayout;
   rectInputLayout.setBindings({
       {2 * static_cast<int>(sizeof(float))},
@@ -817,42 +806,42 @@ void PianoRollRhiRenderer::ensurePipelines(QRhiRenderPassDescriptor* renderPassD
       {1, 5, QRhiVertexInputAttribute::Float2, 16 * static_cast<int>(sizeof(float))},
   });
 
-  m_pipeline = m_rhi->newGraphicsPipeline();
-  m_pipeline->setTopology(QRhiGraphicsPipeline::Triangles);
-  m_pipeline->setSampleCount(m_sampleCount);
-  m_pipeline->setShaderStages({
-      {QRhiShaderStage::Vertex, rectVertexShader},
-      {QRhiShaderStage::Fragment, rectFragmentShader},
-  });
-  m_pipeline->setShaderResourceBindings(m_shaderBindings);
-  m_pipeline->setVertexInputLayout(rectInputLayout);
-  m_pipeline->setTargetBlends({blend});
-  m_pipeline->setRenderPassDescriptor(renderPassDesc);
-  m_pipeline->create();
+  auto createPipeline = [&](QRhiGraphicsPipeline*& pipeline,
+                            const QRhiVertexInputLayout& inputLayout,
+                            const QShader& vs,
+                            const QShader& fs,
+                            const QRhiGraphicsPipeline::TargetBlend& targetBlend,
+                            const QRhiGraphicsPipeline::StencilOpState* stencilFront,
+                            const QRhiGraphicsPipeline::StencilOpState* stencilBack,
+                            quint8 stencilReadMask,
+                            quint8 stencilWriteMask) {
+    pipeline = m_rhi->newGraphicsPipeline();
+    pipeline->setTopology(QRhiGraphicsPipeline::Triangles);
+    pipeline->setSampleCount(m_sampleCount);
+    pipeline->setShaderStages({
+        {QRhiShaderStage::Vertex, vs},
+        {QRhiShaderStage::Fragment, fs},
+    });
+    pipeline->setShaderResourceBindings(m_shaderBindings);
+    pipeline->setVertexInputLayout(inputLayout);
+    pipeline->setTargetBlends({targetBlend});
+    if (stencilFront || stencilBack) {
+      pipeline->setStencilTest(true);
+      if (stencilFront) {
+        pipeline->setStencilFront(*stencilFront);
+      }
+      if (stencilBack) {
+        pipeline->setStencilBack(*stencilBack);
+      }
+      pipeline->setStencilReadMask(stencilReadMask);
+      pipeline->setStencilWriteMask(stencilWriteMask);
+    }
+    pipeline->setRenderPassDescriptor(renderPassDesc);
+    pipeline->create();
+  };
 
-  m_activeLaserPipeline = m_rhi->newGraphicsPipeline();
-  m_activeLaserPipeline->setTopology(QRhiGraphicsPipeline::Triangles);
-  m_activeLaserPipeline->setSampleCount(m_sampleCount);
-  m_activeLaserPipeline->setShaderStages({
-      {QRhiShaderStage::Vertex, rectVertexShader},
-      {QRhiShaderStage::Fragment, rectFragmentShader},
-  });
-  m_activeLaserPipeline->setShaderResourceBindings(m_shaderBindings);
-  m_activeLaserPipeline->setVertexInputLayout(rectInputLayout);
-  m_activeLaserPipeline->setTargetBlends({activeLaserBlend});
-  // Exclude glow from all note-covered pixels to avoid overlap brightening.
-  m_activeLaserPipeline->setStencilTest(true);
   QRhiGraphicsPipeline::StencilOpState activeLaserStencil;
   activeLaserStencil.compareOp = QRhiGraphicsPipeline::NotEqual;
-  m_activeLaserPipeline->setStencilFront(activeLaserStencil);
-  m_activeLaserPipeline->setStencilBack(activeLaserStencil);
-  m_activeLaserPipeline->setStencilReadMask(0xFF);
-  m_activeLaserPipeline->setStencilWriteMask(0x00);
-  m_activeLaserPipeline->setRenderPassDescriptor(renderPassDesc);
-  m_activeLaserPipeline->create();
-
-  QShader noteVertexShader = loadShader(":/shaders/pianorollnote.vert.qsb");
-  QShader noteFragmentShader = loadShader(":/shaders/pianorollnote.frag.qsb");
   QRhiVertexInputLayout noteInputLayout;
   noteInputLayout.setBindings({
       {2 * static_cast<int>(sizeof(float))},
@@ -864,26 +853,39 @@ void PianoRollRhiRenderer::ensurePipelines(QRhiRenderPassDescriptor* renderPassD
       {1, 2, QRhiVertexInputAttribute::Float4, 4 * static_cast<int>(sizeof(float))},
   });
 
-  m_notePipeline = m_rhi->newGraphicsPipeline();
-  m_notePipeline->setTopology(QRhiGraphicsPipeline::Triangles);
-  m_notePipeline->setSampleCount(m_sampleCount);
-  m_notePipeline->setShaderStages({
-      {QRhiShaderStage::Vertex, noteVertexShader},
-      {QRhiShaderStage::Fragment, noteFragmentShader},
-  });
-  m_notePipeline->setShaderResourceBindings(m_shaderBindings);
-  m_notePipeline->setVertexInputLayout(noteInputLayout);
-  m_notePipeline->setTargetBlends({blend});
+  createPipeline(m_pipeline,
+                 rectInputLayout,
+                 rectVertexShader,
+                 rectFragmentShader,
+                 blend,
+                 nullptr,
+                 nullptr,
+                 0x00,
+                 0x00);
+
+  // Exclude glow from all note-covered pixels to avoid overlap brightening.
+  createPipeline(m_activeLaserPipeline,
+                 rectInputLayout,
+                 rectVertexShader,
+                 rectFragmentShader,
+                 activeLaserBlend,
+                 &activeLaserStencil,
+                 &activeLaserStencil,
+                 0xFF,
+                 0x00);
+
   // Mark note pixels in stencil so the active-laser pass can skip them.
-  m_notePipeline->setStencilTest(true);
   QRhiGraphicsPipeline::StencilOpState noteStencil;
   noteStencil.passOp = QRhiGraphicsPipeline::Replace;
-  m_notePipeline->setStencilFront(noteStencil);
-  m_notePipeline->setStencilBack(noteStencil);
-  m_notePipeline->setStencilReadMask(0xFF);
-  m_notePipeline->setStencilWriteMask(0xFF);
-  m_notePipeline->setRenderPassDescriptor(renderPassDesc);
-  m_notePipeline->create();
+  createPipeline(m_notePipeline,
+                 noteInputLayout,
+                 noteVertexShader,
+                 noteFragmentShader,
+                 blend,
+                 &noteStencil,
+                 &noteStencil,
+                 0xFF,
+                 0xFF);
 }
 
 bool PianoRollRhiRenderer::ensureInstanceBuffer(QRhiBuffer*& buffer, int bytes, int minBytes) {
@@ -891,9 +893,14 @@ bool PianoRollRhiRenderer::ensureInstanceBuffer(QRhiBuffer*& buffer, int bytes, 
     return true;
   }
 
-  const int targetSize = std::max(bytes, minBytes);
-  if (buffer && buffer->size() >= targetSize) {
+  const int requiredSize = std::max(bytes, minBytes);
+  if (buffer && buffer->size() >= requiredSize) {
     return true;
+  }
+
+  int targetSize = requiredSize;
+  if (buffer) {
+    targetSize = std::max(requiredSize, static_cast<int>(buffer->size()) * 2);
   }
 
   delete buffer;
@@ -1367,27 +1374,15 @@ void PianoRollRhiRenderer::rebuildNoteInstances(const PianoRollFrame::Data& fram
   m_noteInstances.reserve(frame.notes->size());
   const auto* trackColors = frame.trackColors.get();
   const auto* trackEnabled = frame.trackEnabled.get();
-  const auto colorForTrack = [&](int trackIndex) -> QColor {
-    if (trackColors && trackIndex >= 0 && trackIndex < static_cast<int>(trackColors->size())) {
-      return (*trackColors)[static_cast<size_t>(trackIndex)];
-    }
-    return QColor::fromHsv((trackIndex * 43) % 360, 190, 235);
-  };
-  const auto isTrackEnabled = [&](int trackIndex) -> bool {
-    return !trackEnabled ||
-           trackIndex < 0 ||
-           trackIndex >= static_cast<int>(trackEnabled->size()) ||
-           (*trackEnabled)[static_cast<size_t>(trackIndex)] != 0;
-  };
 
   for (const PianoRollFrame::Note& note : *frame.notes) {
-    const bool trackEnabled = isTrackEnabled(note.trackIndex);
+    const bool trackIsEnabled = isTrackEnabledForIndex(trackEnabled, note.trackIndex);
     QColor fillColor;
-    if (trackEnabled) {
-      fillColor = colorForTrack(note.trackIndex);
+    if (trackIsEnabled) {
+      fillColor = colorForTrackIndex(trackColors, note.trackIndex);
       fillColor.setAlpha(188);
     } else {
-      const QColor trackColor = colorForTrack(note.trackIndex);
+      const QColor trackColor = colorForTrackIndex(trackColors, note.trackIndex);
       const QColor bgColor = frame.noteBackgroundColor;
       static constexpr float kTrackMix = 0.40f;
       fillColor = QColor::fromRgbF(
@@ -1401,7 +1396,7 @@ void PianoRollRhiRenderer::rebuildNoteInstances(const PianoRollFrame::Data& fram
         static_cast<float>(note.startTick),
         static_cast<float>(std::max<uint32_t>(1, note.duration)),
         static_cast<float>(note.key),
-        trackEnabled ? 1.0f : 0.0f,
+        trackIsEnabled ? 1.0f : 0.0f,
         fillColor.redF(),
         fillColor.greenF(),
         fillColor.blueF(),
@@ -1740,25 +1735,13 @@ void PianoRollRhiRenderer::buildDynamicInstances(const PianoRollFrame::Data& fra
 
   const auto* trackColors = frame.trackColors.get();
   const auto* trackEnabled = frame.trackEnabled.get();
-  const auto colorForTrack = [&](int trackIndex) -> QColor {
-    if (trackColors && trackIndex >= 0 && trackIndex < static_cast<int>(trackColors->size())) {
-      return (*trackColors)[static_cast<size_t>(trackIndex)];
-    }
-    return QColor::fromHsv((trackIndex * 43) % 360, 190, 235);
-  };
-  const auto isTrackEnabled = [&](int trackIndex) -> bool {
-    return !trackEnabled ||
-           trackIndex < 0 ||
-           trackIndex >= static_cast<int>(trackEnabled->size()) ||
-           (*trackEnabled)[static_cast<size_t>(trackIndex)] != 0;
-  };
   const float currentX = layout.noteAreaLeft + (static_cast<float>(frame.currentTick) * layout.pixelsPerTick) - layout.scrollX;
   const bool playheadVisible =
       (currentX >= layout.noteAreaLeft - 2.0f && currentX <= layout.noteAreaLeft + layout.noteAreaWidth + 2.0f);
 
   if (frame.activeNotes && !frame.activeNotes->empty()) {
     for (const PianoRollFrame::Note& note : *frame.activeNotes) {
-      if (!isTrackEnabled(note.trackIndex)) {
+      if (!isTrackEnabledForIndex(trackEnabled, note.trackIndex)) {
         continue;
       }
       const NoteGeometry geometry = computeNoteGeometry(note, layout);
@@ -1766,9 +1749,9 @@ void PianoRollRhiRenderer::buildDynamicInstances(const PianoRollFrame::Data& fra
         continue;
       }
 
-      QColor laserBase = colorForTrack(note.trackIndex).lighter(108);
+      QColor laserBase = colorForTrackIndex(trackColors, note.trackIndex).lighter(108);
       laserBase.setAlpha(228);
-      QColor laserCore = colorForTrack(note.trackIndex).lighter(112);
+      QColor laserCore = colorForTrackIndex(trackColors, note.trackIndex).lighter(112);
       laserCore.setAlpha(255);
       float seamLocalX = -1.0f;
       if (playheadVisible && currentX >= geometry.x && currentX <= geometry.x + geometry.w) {
@@ -1805,6 +1788,12 @@ void PianoRollRhiRenderer::buildDynamicInstances(const PianoRollFrame::Data& fra
 
   if (frame.selectedNotes && !frame.selectedNotes->empty()) {
     const float edgeThickness = 1.0f;
+    auto appendOutline = [&](float x, float y, float w, float h, const QColor& color) {
+      appendRect(m_dynamicInstances, x, y, w, edgeThickness, color);
+      appendRect(m_dynamicInstances, x, y + h - edgeThickness, w, edgeThickness, color);
+      appendRect(m_dynamicInstances, x, y, edgeThickness, h, color);
+      appendRect(m_dynamicInstances, x + w - edgeThickness, y, edgeThickness, h, color);
+    };
     for (const PianoRollFrame::Note& selected : *frame.selectedNotes) {
       const NoteGeometry geometry = computeNoteGeometry(selected, layout);
       if (!geometry.valid) {
@@ -1817,31 +1806,11 @@ void PianoRollRhiRenderer::buildDynamicInstances(const PianoRollFrame::Data& fra
                  geometry.w,
                  geometry.h,
                  frame.selectedNoteFillColor);
-
-      appendRect(m_dynamicInstances,
-                 geometry.x,
-                 geometry.y,
-                 geometry.w,
-                 edgeThickness,
-                 frame.selectedNoteOutlineColor);
-      appendRect(m_dynamicInstances,
-                 geometry.x,
-                 geometry.y + geometry.h - edgeThickness,
-                 geometry.w,
-                 edgeThickness,
-                 frame.selectedNoteOutlineColor);
-      appendRect(m_dynamicInstances,
-                 geometry.x,
-                 geometry.y,
-                 edgeThickness,
-                 geometry.h,
-                 frame.selectedNoteOutlineColor);
-      appendRect(m_dynamicInstances,
-                 geometry.x + geometry.w - edgeThickness,
-                 geometry.y,
-                 edgeThickness,
-                 geometry.h,
-                 frame.selectedNoteOutlineColor);
+      appendOutline(geometry.x,
+                    geometry.y,
+                    geometry.w,
+                    geometry.h,
+                    frame.selectedNoteOutlineColor);
     }
   }
 
@@ -1895,12 +1864,18 @@ void PianoRollRhiRenderer::buildDynamicInstances(const PianoRollFrame::Data& fra
         };
 
     appendClippedToNoteArea(rawLeft, rawTop, rawW, rawH, frame.selectionRectFillColor);
-
     const float edge = 1.0f;
-    appendClippedToNoteArea(rawLeft, rawTop, rawW, edge, frame.selectionRectOutlineColor);
-    appendClippedToNoteArea(rawLeft, rawTop + rawH - edge, rawW, edge, frame.selectionRectOutlineColor);
-    appendClippedToNoteArea(rawLeft, rawTop, edge, rawH, frame.selectionRectOutlineColor);
-    appendClippedToNoteArea(rawLeft + rawW - edge, rawTop, edge, rawH, frame.selectionRectOutlineColor);
+    auto appendClippedOutline = [&](float x, float y, float w, float h, const QColor& color) {
+      appendClippedToNoteArea(x, y, w, edge, color);
+      appendClippedToNoteArea(x, y + h - edge, w, edge, color);
+      appendClippedToNoteArea(x, y, edge, h, color);
+      appendClippedToNoteArea(x + w - edge, y, edge, h, color);
+    };
+    appendClippedOutline(rawLeft,
+                         rawTop,
+                         rawW,
+                         rawH,
+                         frame.selectionRectOutlineColor);
   }
 
   const float blackKeyWidth = std::max(10.0f, layout.keyboardWidth * 0.63f);
@@ -1917,11 +1892,11 @@ void PianoRollRhiRenderer::buildDynamicInstances(const PianoRollFrame::Data& fra
     }
 
     const int activeTrack = frame.activeKeyTrack[static_cast<size_t>(key)];
-    if (activeTrack < 0 || !isTrackEnabled(activeTrack)) {
+    if (activeTrack < 0 || !isTrackEnabledForIndex(trackEnabled, activeTrack)) {
       continue;
     }
 
-    QColor active = colorForTrack(activeTrack).lighter(112);
+    QColor active = colorForTrackIndex(trackColors, activeTrack).lighter(112);
     active.setAlpha(172);
     appendRect(m_dynamicInstances,
                0.0f,
@@ -1946,11 +1921,11 @@ void PianoRollRhiRenderer::buildDynamicInstances(const PianoRollFrame::Data& fra
     }
 
     const int activeTrack = frame.activeKeyTrack[static_cast<size_t>(key)];
-    if (activeTrack < 0 || !isTrackEnabled(activeTrack)) {
+    if (activeTrack < 0 || !isTrackEnabledForIndex(trackEnabled, activeTrack)) {
       continue;
     }
 
-    QColor active = colorForTrack(activeTrack).lighter(133);
+    QColor active = colorForTrackIndex(trackColors, activeTrack).lighter(133);
     active.setAlpha(238);
     appendRect(m_dynamicInstances,
                1.0f,
