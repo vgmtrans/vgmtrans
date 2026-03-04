@@ -69,6 +69,7 @@ option(ENABLE_CLI "Build the CLI application" ON)
 option(ENABLE_SHELL "Build the shell application" ON)
 
 option(NO_QT_DEPLOY "Don't run the Qt deploy script during install (useful for system/Flatpak packaging)" OFF)
+option(INSTALL_SHELL "Install the shell application" OFF)
 
 option(USE_SYSTEM_FMT "Use system-provided fmt library" OFF)
 option(USE_SYSTEM_SPDLOG "Use system-provided spdlog library" OFF)
