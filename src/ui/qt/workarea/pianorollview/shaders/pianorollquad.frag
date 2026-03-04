@@ -40,7 +40,47 @@ float sdBox(vec2 p, vec2 b) {
 }
 
 void main() {
-  if (vParams.x > 7.5) {
+  if (vParams.x > 8.5) {
+    if (vScenePos.x < noteArea.x || vScenePos.x > noteArea.z ||
+        vScenePos.y < noteArea.y || vScenePos.y > noteArea.w) {
+      discard;
+    }
+
+    float noteW = max(1.0, vRectSize.x);
+    float noteH = max(1.0, vRectSize.y);
+    vec2 notePx = vLocalPos * vRectSize;
+    vec2 local = clamp(notePx / vec2(noteW, noteH), 0.0, 1.0);
+
+    vec3 surface = vColor.rgb;
+    float t = max(0.0, vParams.z);
+    float seed = vParams.w;
+
+    surface *= 0.95 + 0.05 * sin((local.y * 16.0) + (t * 1.8));
+    surface *= 0.94 + 0.06 * (1.0 - abs((local.y * 2.0) - 1.0));
+
+    float edgeDist = min(min(local.x, 1.0 - local.x), min(local.y, 1.0 - local.y));
+    float edge = 1.0 - smoothstep(0.0, 0.10, edgeDist);
+    surface *= 1.0 - (edge * 0.09);
+
+    float pulse = 0.55 + 0.45 * sin((t * 10.0) + (seed * 0.35) + (local.y * 10.0));
+    surface += (0.012 + (0.022 * pulse)) * vColor.rgb;
+
+    float seamLocalX = vParams.y;
+    float seamActive = step(0.0, seamLocalX) * step(seamLocalX, 1.0);
+    float seamX = seamLocalX * noteW;
+    float dx = abs(notePx.x - seamX);
+    float seamGlow = seamActive * smoothstep(18.0, 0.0, dx);
+    float seamCore = seamActive * smoothstep(2.6, 0.0, dx);
+    float lick = valueNoise(vec2((local.y * 24.0) + seed, (t * 12.0) + (seed * 0.63)));
+    vec3 seamTint = mix(vColor.rgb, vec3(1.0), 0.42);
+
+    surface = mix(surface, (surface * 0.72) + (seamTint * 0.78), seamGlow * 0.46);
+    surface += seamTint * seamCore * 0.72;
+    surface += (vColor.rgb * (0.20 + (0.18 * lick))) * seamGlow * 0.30;
+
+    fragColor = vec4(min(surface, vec3(1.55)), 1.0);
+    return;
+  } else if (vParams.x > 7.5) {
     if (vScenePos.x < noteArea.x || vScenePos.x > noteArea.z ||
         vScenePos.y < noteArea.y || vScenePos.y > noteArea.w) {
       discard;

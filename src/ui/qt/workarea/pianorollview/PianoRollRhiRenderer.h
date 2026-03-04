@@ -151,6 +151,7 @@ private:
     HorizontalGradient = 6,
     LabelText = 7,
     ActiveLaser = 8,
+    ActiveLaserCore = 9,
   };
 
   static bool isBlackKey(int key);
