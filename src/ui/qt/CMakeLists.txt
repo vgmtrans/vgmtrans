@@ -238,7 +238,6 @@ elseif(CMAKE_SYSTEM_NAME MATCHES "FreeBSD|OpenBSD|Linux")
 
   set_target_properties(vgmtrans PROPERTIES
     INSTALL_RPATH "\$ORIGIN/../${CMAKE_INSTALL_LIBDIR}"
-    INSTALL_RPATH_USE_LINK_PATH FALSE
   )
 
   install(FILES "${CMAKE_SOURCE_DIR}/bin/mame_roms.json"
