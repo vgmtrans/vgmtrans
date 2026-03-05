@@ -159,7 +159,9 @@ private:
   static uint64_t hashTrackEnabled(const std::vector<uint8_t>& trackEnabled);
   static uint32_t colorKey(const QColor& color);
 
-  void ensurePipelines(QRhiRenderPassDescriptor* renderPassDesc, int sampleCount);
+  void ensurePipelines(QRhiRenderPassDescriptor* renderPassDesc,
+                       int sampleCount,
+                       bool activeLaserUseScreenBlend);
   void ensureMeasureLabelAtlas(QRhiResourceUpdateBatch* updates, float dpr);
   bool ensureInstanceBuffer(QRhiBuffer*& buffer, int bytes, int minBytes);
   Layout computeLayout(const PianoRollFrame::Data& frame, const QSize& pixelSize) const;
@@ -233,6 +235,7 @@ private:
 
   QRhiRenderPassDescriptor* m_outputRenderPass = nullptr;
   int m_sampleCount = 1;
+  bool m_activeLaserUseScreenBlend = true;
   bool m_supportsBaseInstance = true;
   bool m_staticBuffersUploaded = false;
   bool m_inited = false;

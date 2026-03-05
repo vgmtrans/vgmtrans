@@ -14,6 +14,7 @@ layout(std140, binding = 0) uniform Ubuf {
   vec4 camera;
   vec4 noteArea;
   vec4 noteBorderColor;
+  vec4 glowConfig;
 };
 
 layout(binding = 1) uniform sampler2D glyphAtlas;
@@ -169,12 +170,34 @@ void main() {
       discard;
     }
 
-    // Active-laser pass uses screen blending; scale by alpha so overlap brightens
-    // without blowing out or washing nearby notes.
-    const float laserStrength = 0.68;
-    float glowAlpha = outAlpha * laserStrength;
-    vec3 glowRgb = min(outRgb, vec3(1.35)) * glowAlpha;
-    fragColor = vec4(glowRgb, glowAlpha);
+    if (glowConfig.x > 0.5) {
+      // Light mode: emit an outside-only chromatic aura so glow stays visible
+      // without turning overlapping colors into a gray haze.
+      float auraWideLight = exp(-auraDist / 2.0);
+      float lightRadiusGate = 1.0 - smoothstep(5.0, 15.0, auraDist); //smoothstep(20.0, 44.0, auraDist);
+      float auraOutsideLight = outsideMask * ((0.58 * auraSoft) + (0.10 * auraWideLight)) * auraGate * lightRadiusGate;
+      float seamHalo = 0.0;
+      if (seamActive > 0.0) {
+        seamHalo = smoothstep(18.0, 0.0, dx) *
+                   smoothstep(noteH * 0.90, 0.0, abs(notePx.y - (0.5 * noteH)));
+      }
+
+      vec3 lightHue = clamp(vColor.rgb * (1.10 + (0.12 * seamGlow)), 0.0, 1.0);
+      float lum = dot(lightHue, vec3(0.2126, 0.7152, 0.0722));
+      lightHue = clamp((lightHue - vec3(lum)) * 1.18 + vec3(lum), 0.0, 1.0);
+
+      float glowAlpha = clamp((auraOutsideLight * 0.42) + (seamHalo * 0.10), 0.0, 0.30);
+      if (glowAlpha <= 0.002) {
+        discard;
+      }
+      fragColor = vec4(lightHue, glowAlpha);
+    } else {
+      // Dark mode keeps screen-blended premultiplied glow.
+      const float laserStrength = 0.68;
+      float glowAlpha = outAlpha * laserStrength;
+      vec3 glowRgb = min(outRgb, vec3(1.35)) * glowAlpha;
+      fragColor = vec4(glowRgb, glowAlpha);
+    }
     return;
   } else if (vParams.x > 6.5) {
     // Sample glyph alpha from the shared label atlas.
