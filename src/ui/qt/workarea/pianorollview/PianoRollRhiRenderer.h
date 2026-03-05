@@ -178,7 +178,19 @@ private:
                        const QColor& color);
 
   void buildStaticInstances(const PianoRollFrame::Data& frame, const Layout& layout);
+  void appendStaticGridInstances(const PianoRollFrame::Data& frame, const Layout& layout);
+  void appendStaticKeyboardInstances(const PianoRollFrame::Data& frame, const Layout& layout);
   void buildDynamicInstances(const PianoRollFrame::Data& frame, const Layout& layout);
+  void appendActiveLaserInstances(const PianoRollFrame::Data& frame,
+                                  const Layout& layout,
+                                  const std::vector<QColor>* trackColors,
+                                  const std::vector<uint8_t>* trackEnabled,
+                                  float currentX,
+                                  bool playheadVisible);
+  void appendKeyboardHighlightInstances(const PianoRollFrame::Data& frame,
+                                        const Layout& layout,
+                                        const std::vector<QColor>* trackColors,
+                                        const std::vector<uint8_t>* trackEnabled);
 
   NoteGeometry computeNoteGeometry(const PianoRollFrame::Note& note, const Layout& layout) const;
 

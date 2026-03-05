@@ -1405,6 +1405,7 @@ void PianoRollRhiRenderer::rebuildNoteInstances(const PianoRollFrame::Data& fram
   }
 }
 
+// Builds all cached quads that do not depend on playback state.
 void PianoRollRhiRenderer::buildStaticInstances(const PianoRollFrame::Data& frame, const Layout& layout) {
   m_staticBackInstances.clear();
   m_staticFrontInstances.clear();
@@ -1442,10 +1443,9 @@ void PianoRollRhiRenderer::buildStaticInstances(const PianoRollFrame::Data& fram
              layout.keyboardWidth,
              layout.noteAreaHeight,
              frame.keyboardBackgroundColor);
-  const KeyboardTopology& topology = keyboardTopology();
+
   for (int key = 0; key < PianoRollFrame::kMidiKeyCount; ++key) {
     const float keyUnit = 127.0f - static_cast<float>(key);
-
     const QColor rowColor = isBlackKey(key) ? frame.blackKeyRowColor : frame.whiteKeyRowColor;
     appendRect(m_staticBackInstances,
                layout.noteAreaLeft,
@@ -1484,7 +1484,7 @@ void PianoRollRhiRenderer::buildStaticInstances(const PianoRollFrame::Data& fram
                0.0f);
   }
 
-  // Draw the top bar after scrolling lane bands so it remains visually opaque.
+  // Draw the top bar after scrolling lane rows so it stays visually opaque.
   QColor topBarBase = frame.topBarBackgroundColor;
   topBarBase.setAlpha(255);
   appendRect(m_staticBackInstances,
@@ -1504,7 +1504,25 @@ void PianoRollRhiRenderer::buildStaticInstances(const PianoRollFrame::Data& fram
              0.0f,
              0.0f);
 
-  // Emit one procedural grid rect per time-signature segment instead of per-line quads.
+  appendStaticGridInstances(frame, layout);
+  appendStaticKeyboardInstances(frame, layout);
+
+  appendRect(m_staticBackInstances,
+             layout.noteAreaLeft,
+             layout.topBarHeight - 1.0f,
+             layout.noteAreaWidth,
+             1.0f,
+             frame.dividerColor);
+  appendRect(m_staticBackInstances,
+             layout.noteAreaLeft - 1.0f,
+             0.0f,
+             1.0f,
+             static_cast<float>(layout.viewHeight),
+             frame.dividerColor);
+}
+
+// Emits procedural beat/measure grid segments for each time-signature region.
+void PianoRollRhiRenderer::appendStaticGridInstances(const PianoRollFrame::Data& frame, const Layout& layout) {
   std::vector<PianoRollFrame::TimeSignature> signatures;
   if (frame.timeSignatures && !frame.timeSignatures->empty()) {
     signatures = *frame.timeSignatures;
@@ -1516,7 +1534,6 @@ void PianoRollRhiRenderer::buildStaticInstances(const PianoRollFrame::Data& fram
   });
 
   const uint64_t totalTickEnd = static_cast<uint64_t>(std::max(1, frame.totalTicks)) + 1;
-  // Encodes beat/measure spacing in instance params; the fragment shader draws the vertical lines.
   const auto appendGridSegment = [&](uint64_t segStart,
                                      uint64_t segEnd,
                                      uint32_t beatTicks,
@@ -1531,6 +1548,7 @@ void PianoRollRhiRenderer::buildStaticInstances(const PianoRollFrame::Data& fram
     const float measureTicksF = static_cast<float>(measureTicks);
     const float originTickF = static_cast<float>(segStart);
 
+    // Beat/measure spacing is packed into instance params and expanded in the fragment shader.
     appendRect(m_staticBackInstances,
                segX,
                layout.noteAreaTop,
@@ -1603,17 +1621,16 @@ void PianoRollRhiRenderer::buildStaticInstances(const PianoRollFrame::Data& fram
     const uint64_t segStart = sig.tick;
     uint64_t segEnd = totalTickEnd;
     if (i + 1 < signatures.size()) {
+      // Signature i owns ticks up to, but not including, the next signature.
       segEnd = std::min<uint64_t>(segEnd, std::max<uint64_t>(segStart, signatures[i + 1].tick));
     }
     appendGridSegment(segStart, segEnd, beatTicks, measureTicks);
   }
+}
 
-  const float blackKeyWidth = std::max(10.0f, layout.keyboardWidth * 0.63f);
-  const float blackKeyHeightUnits = 1.0f;
-  const float blackTopInsetLeftPx = 1.0f;
-  const float blackTopInsetRightPx = std::clamp(blackKeyWidth * 0.11f, 2.0f, 6.0f);
-  const float blackTopInsetYUnits = 0.20f;
-  const float blackTopSheenCurve = 9.0f;
+// Draws static white and black key faces for the keyboard column.
+void PianoRollRhiRenderer::appendStaticKeyboardInstances(const PianoRollFrame::Data& frame, const Layout& layout) {
+  const KeyboardTopology& topology = keyboardTopology();
   for (int key : topology.whiteKeys) {
     const KeyboardKeyTopology& keyTopology = topology.keys[static_cast<size_t>(key)];
     const float keyTopUnit = keyTopology.topSeamUnit;
@@ -1661,11 +1678,18 @@ void PianoRollRhiRenderer::buildStaticInstances(const PianoRollFrame::Data& fram
                0.0f);
   }
 
+  // Black key faces are emitted in the static front layer so they stay above white keys.
+  const float blackKeyWidth = std::max(10.0f, layout.keyboardWidth * 0.63f);
+  const float blackKeyHeightUnits = 1.0f;
+  const float blackTopInsetLeftPx = 1.0f;
+  const float blackTopInsetRightPx = std::clamp(blackKeyWidth * 0.11f, 2.0f, 6.0f);
+  const float blackTopInsetYUnits = 0.20f;
+  const float blackTopSheenCurve = 9.0f;
+
   for (int key : topology.blackKeys) {
     const float blackYUnit = topology.keys[static_cast<size_t>(key)].centerUnit - (blackKeyHeightUnits * 0.5f);
     QColor blackBase = frame.blackKeyColor.darker(126);
     blackBase.setAlpha(255);
-
     appendRect(m_staticFrontInstances,
                0.0f,
                blackYUnit,
@@ -1693,7 +1717,7 @@ void PianoRollRhiRenderer::buildStaticInstances(const PianoRollFrame::Data& fram
                innerX,
                innerYUnit,
                innerW,
-               std::max(0.0f, innerHUnits),
+               innerHUnits,
                blackTop,
                LineStyle::HorizontalGradient,
                0.82f,
@@ -1706,21 +1730,9 @@ void PianoRollRhiRenderer::buildStaticInstances(const PianoRollFrame::Data& fram
                0.0f,
                1.0f);
   }
-
-  appendRect(m_staticBackInstances,
-             layout.noteAreaLeft,
-             layout.topBarHeight - 1.0f,
-             layout.noteAreaWidth,
-             1.0f,
-             frame.dividerColor);
-  appendRect(m_staticBackInstances,
-             layout.noteAreaLeft - 1.0f,
-             0.0f,
-             1.0f,
-             static_cast<float>(layout.viewHeight),
-             frame.dividerColor);
 }
 
+// Builds per-frame overlays and playback-dependent quads.
 void PianoRollRhiRenderer::buildDynamicInstances(const PianoRollFrame::Data& frame, const Layout& layout) {
   m_dynamicInstances.clear();
   m_activeLaserInstances.clear();
@@ -1739,67 +1751,22 @@ void PianoRollRhiRenderer::buildDynamicInstances(const PianoRollFrame::Data& fra
   const bool playheadVisible =
       (currentX >= layout.noteAreaLeft - 2.0f && currentX <= layout.noteAreaLeft + layout.noteAreaWidth + 2.0f);
 
-  if (frame.activeNotes && !frame.activeNotes->empty()) {
-    for (const PianoRollFrame::Note& note : *frame.activeNotes) {
-      if (!isTrackEnabledForIndex(trackEnabled, note.trackIndex)) {
-        continue;
-      }
-      const NoteGeometry geometry = computeNoteGeometry(note, layout);
-      if (!geometry.valid) {
-        continue;
-      }
-
-      QColor laserBase = colorForTrackIndex(trackColors, note.trackIndex).lighter(108);
-      laserBase.setAlpha(228);
-      QColor laserCore = colorForTrackIndex(trackColors, note.trackIndex).lighter(112);
-      laserCore.setAlpha(255);
-      float seamLocalX = -1.0f;
-      if (playheadVisible && currentX >= geometry.x && currentX <= geometry.x + geometry.w) {
-        seamLocalX = std::clamp((currentX - geometry.x) / std::max(1.0f, geometry.w), 0.0f, 1.0f);
-      }
-      const float seamSeed =
-          (static_cast<float>(note.startTick) * 0.0079f) +
-          (static_cast<float>(note.key) * 0.233f) +
-          (static_cast<float>(note.trackIndex + 1) * 0.671f);
-
-      appendRect(m_activeLaserInstances,
-                 geometry.x - kActiveLaserAuraPadPx,
-                 geometry.y - kActiveLaserAuraPadPx,
-                 geometry.w + (2.0f * kActiveLaserAuraPadPx),
-                 geometry.h + (2.0f * kActiveLaserAuraPadPx),
-                 laserBase,
-                 LineStyle::ActiveLaser,
-                 seamLocalX,
-                 frame.elapsedSeconds,
-                 seamSeed);
-
-      appendRect(m_activeLaserCoreInstances,
-                 geometry.x,
-                 geometry.y,
-                 geometry.w,
-                 geometry.h,
-                 laserCore,
-                 LineStyle::ActiveLaserCore,
-                 seamLocalX,
-                 frame.elapsedSeconds,
-                 seamSeed);
-    }
-  }
+  appendActiveLaserInstances(frame, layout, trackColors, trackEnabled, currentX, playheadVisible);
 
   if (frame.selectedNotes && !frame.selectedNotes->empty()) {
-    const float edgeThickness = 1.0f;
-    auto appendOutline = [&](float x, float y, float w, float h, const QColor& color) {
-      appendRect(m_dynamicInstances, x, y, w, edgeThickness, color);
-      appendRect(m_dynamicInstances, x, y + h - edgeThickness, w, edgeThickness, color);
-      appendRect(m_dynamicInstances, x, y, edgeThickness, h, color);
-      appendRect(m_dynamicInstances, x + w - edgeThickness, y, edgeThickness, h, color);
+    const float edge = 1.0f;
+    const auto appendOutline = [&](float x, float y, float w, float h, const QColor& color) {
+      appendRect(m_dynamicInstances, x, y, w, edge, color);
+      appendRect(m_dynamicInstances, x, y + h - edge, w, edge, color);
+      appendRect(m_dynamicInstances, x, y, edge, h, color);
+      appendRect(m_dynamicInstances, x + w - edge, y, edge, h, color);
     };
+
     for (const PianoRollFrame::Note& selected : *frame.selectedNotes) {
       const NoteGeometry geometry = computeNoteGeometry(selected, layout);
       if (!geometry.valid) {
         continue;
       }
-
       appendRect(m_dynamicInstances,
                  geometry.x,
                  geometry.y,
@@ -1848,24 +1815,24 @@ void PianoRollRhiRenderer::buildDynamicInstances(const PianoRollFrame::Data& fra
     const float noteAreaTop = layout.noteAreaTop;
     const float noteAreaRight = layout.noteAreaLeft + layout.noteAreaWidth;
     const float noteAreaBottom = layout.noteAreaTop + layout.noteAreaHeight;
+
     // Clip each marquee segment manually so edges vanish correctly when out of view.
-    const auto appendClippedToNoteArea =
-        [&](float x, float y, float w, float h, const QColor& color) {
-          const float clippedLeft = std::max(x, noteAreaLeft);
-          const float clippedTop = std::max(y, noteAreaTop);
-          const float clippedRight = std::min(x + w, noteAreaRight);
-          const float clippedBottom = std::min(y + h, noteAreaBottom);
-          appendRect(m_dynamicInstances,
-                     clippedLeft,
-                     clippedTop,
-                     clippedRight - clippedLeft,
-                     clippedBottom - clippedTop,
-                     color);
-        };
+    const auto appendClippedToNoteArea = [&](float x, float y, float w, float h, const QColor& color) {
+      const float clippedLeft = std::max(x, noteAreaLeft);
+      const float clippedTop = std::max(y, noteAreaTop);
+      const float clippedRight = std::min(x + w, noteAreaRight);
+      const float clippedBottom = std::min(y + h, noteAreaBottom);
+      appendRect(m_dynamicInstances,
+                 clippedLeft,
+                 clippedTop,
+                 clippedRight - clippedLeft,
+                 clippedBottom - clippedTop,
+                 color);
+    };
 
     appendClippedToNoteArea(rawLeft, rawTop, rawW, rawH, frame.selectionRectFillColor);
     const float edge = 1.0f;
-    auto appendClippedOutline = [&](float x, float y, float w, float h, const QColor& color) {
+    const auto appendClippedOutline = [&](float x, float y, float w, float h, const QColor& color) {
       appendClippedToNoteArea(x, y, w, edge, color);
       appendClippedToNoteArea(x, y + h - edge, w, edge, color);
       appendClippedToNoteArea(x, y, edge, h, color);
@@ -1878,13 +1845,80 @@ void PianoRollRhiRenderer::buildDynamicInstances(const PianoRollFrame::Data& fra
                          frame.selectionRectOutlineColor);
   }
 
+  appendKeyboardHighlightInstances(frame, layout, trackColors, trackEnabled);
+}
+
+// Adds glow aura/core quads for currently active notes.
+void PianoRollRhiRenderer::appendActiveLaserInstances(const PianoRollFrame::Data& frame,
+                                                      const Layout& layout,
+                                                      const std::vector<QColor>* trackColors,
+                                                      const std::vector<uint8_t>* trackEnabled,
+                                                      float currentX,
+                                                      bool playheadVisible) {
+  if (!frame.activeNotes || frame.activeNotes->empty()) {
+    return;
+  }
+
+  for (const PianoRollFrame::Note& note : *frame.activeNotes) {
+    if (!isTrackEnabledForIndex(trackEnabled, note.trackIndex)) {
+      continue;
+    }
+    const NoteGeometry geometry = computeNoteGeometry(note, layout);
+    if (!geometry.valid) {
+      continue;
+    }
+
+    QColor laserBase = colorForTrackIndex(trackColors, note.trackIndex).lighter(108);
+    laserBase.setAlpha(228);
+    QColor laserCore = colorForTrackIndex(trackColors, note.trackIndex).lighter(112);
+    laserCore.setAlpha(255);
+    float seamLocalX = -1.0f;
+    if (playheadVisible && currentX >= geometry.x && currentX <= geometry.x + geometry.w) {
+      seamLocalX = std::clamp((currentX - geometry.x) / std::max(1.0f, geometry.w), 0.0f, 1.0f);
+    }
+    const float seamSeed =
+        (static_cast<float>(note.startTick) * 0.0079f) +
+        (static_cast<float>(note.key) * 0.233f) +
+        (static_cast<float>(note.trackIndex + 1) * 0.671f);
+
+    appendRect(m_activeLaserInstances,
+               geometry.x - kActiveLaserAuraPadPx,
+               geometry.y - kActiveLaserAuraPadPx,
+               geometry.w + (2.0f * kActiveLaserAuraPadPx),
+               geometry.h + (2.0f * kActiveLaserAuraPadPx),
+               laserBase,
+               LineStyle::ActiveLaser,
+               seamLocalX,
+               frame.elapsedSeconds,
+               seamSeed);
+
+    appendRect(m_activeLaserCoreInstances,
+               geometry.x,
+               geometry.y,
+               geometry.w,
+               geometry.h,
+               laserCore,
+               LineStyle::ActiveLaserCore,
+               seamLocalX,
+               frame.elapsedSeconds,
+               seamSeed);
+  }
+}
+
+// Draws keyboard key highlights for currently active notes.
+void PianoRollRhiRenderer::appendKeyboardHighlightInstances(
+    const PianoRollFrame::Data& frame,
+    const Layout& layout,
+    const std::vector<QColor>* trackColors,
+    const std::vector<uint8_t>* trackEnabled) {
   const float blackKeyWidth = std::max(10.0f, layout.keyboardWidth * 0.63f);
   const float blackKeyHeight = std::max(2.0f, layout.pixelsPerKey);
   const KeyboardTopology& topology = keyboardTopology();
   for (int key : topology.whiteKeys) {
     const KeyboardKeyTopology& keyTopology = topology.keys[static_cast<size_t>(key)];
     const float keyTop = layout.noteAreaTop + (keyTopology.topSeamUnit * layout.pixelsPerKey) - layout.scrollY;
-    const float keyBottom = layout.noteAreaTop + (keyTopology.bottomSeamUnit * layout.pixelsPerKey) - layout.scrollY;
+    const float keyBottom =
+        layout.noteAreaTop + (keyTopology.bottomSeamUnit * layout.pixelsPerKey) - layout.scrollY;
     const float clippedTop = std::max(layout.noteAreaTop, keyTop);
     const float clippedBottom = std::min(layout.noteAreaTop + layout.noteAreaHeight, keyBottom);
     if (clippedBottom - clippedTop <= 0.5f) {
@@ -1912,7 +1946,9 @@ void PianoRollRhiRenderer::buildDynamicInstances(const PianoRollFrame::Data& fra
   // Black-key highlights must render above the static black key faces.
   m_dynamicFrontStart = static_cast<int>(m_dynamicInstances.size());
   for (int key : topology.blackKeys) {
-    const float centerY = layout.noteAreaTop + (topology.keys[static_cast<size_t>(key)].centerUnit * layout.pixelsPerKey) - layout.scrollY;
+    const float centerY =
+        layout.noteAreaTop + (topology.keys[static_cast<size_t>(key)].centerUnit * layout.pixelsPerKey) -
+        layout.scrollY;
     const float blackY = centerY - (blackKeyHeight * 0.5f);
     const float clippedTop = std::max(layout.noteAreaTop, blackY);
     const float clippedBottom = std::min(layout.noteAreaTop + layout.noteAreaHeight, blackY + blackKeyHeight);
@@ -1936,6 +1972,7 @@ void PianoRollRhiRenderer::buildDynamicInstances(const PianoRollFrame::Data& fra
   }
 }
 
+// Computes a note quad in screen space and clips it to the note area.
 PianoRollRhiRenderer::NoteGeometry PianoRollRhiRenderer::computeNoteGeometry(const PianoRollFrame::Note& note,
                                                                              const Layout& layout) const {
   NoteGeometry geometry;
