@@ -19,6 +19,7 @@ layout(std140, binding = 0) uniform Ubuf {
   vec4 camera;
   vec4 noteArea;
   vec4 noteBorderColor;
+  vec4 glowConfig;
 };
 
 void main() {

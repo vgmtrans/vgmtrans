@@ -44,7 +44,7 @@ static const float kVertices[] = {
 static const quint16 kIndices[] = {0, 1, 2, 0, 2, 3};
 
 static constexpr int kMat4Bytes = 16 * sizeof(float);
-static constexpr int kUniformBytes = (16 + 4 + 4 + 4) * sizeof(float);
+static constexpr int kUniformBytes = (16 + 4 + 4 + 4 + 4) * sizeof(float);
 static constexpr int kMeasureLabelFontPixelSize = 11;
 static constexpr int kMeasureLabelPaddingPx = 2;
 static constexpr float kActiveLaserAuraPadPx = 72.0f;
@@ -347,6 +347,7 @@ void PianoRollRhiRenderer::releaseResources() {
 
   m_outputRenderPass = nullptr;
   m_sampleCount = 1;
+  m_activeLaserUseScreenBlend = true;
   m_supportsBaseInstance = true;
   m_staticBuffersUploaded = false;
   m_inited = false;
@@ -517,7 +518,13 @@ void PianoRollRhiRenderer::renderFrame(QRhiCommandBuffer* cb, const RenderTarget
     tDynamic = profileTimer.nsecsElapsed();
   }
 
-  ensurePipelines(target.renderPassDesc, std::max(1, target.sampleCount));
+  const float noteBgLuma = (0.2126f * frame.noteBackgroundColor.redF()) +
+                           (0.7152f * frame.noteBackgroundColor.greenF()) +
+                           (0.0722f * frame.noteBackgroundColor.blueF());
+  const bool activeLaserUseScreenBlend = noteBgLuma < 0.58f;
+  ensurePipelines(target.renderPassDesc,
+                  std::max(1, target.sampleCount),
+                  activeLaserUseScreenBlend);
   if (!m_staticBuffersUploaded) {
     updates->uploadStaticBuffer(m_vertexBuffer, kVertices);
     updates->uploadStaticBuffer(m_indexBuffer, kIndices);
@@ -531,7 +538,7 @@ void PianoRollRhiRenderer::renderFrame(QRhiCommandBuffer* cb, const RenderTarget
             0.0f,
             -1.0f,
             1.0f);
-  std::array<float, 28> ubo{};
+  std::array<float, 32> ubo{};
   std::memcpy(ubo.data(), mvp.constData(), kMat4Bytes);
   // Camera packs scroll and world-space scale factors for shader-side transforms.
   ubo[16] = layout.scrollX;
@@ -546,6 +553,8 @@ void PianoRollRhiRenderer::renderFrame(QRhiCommandBuffer* cb, const RenderTarget
   ubo[25] = frame.noteOutlineColor.greenF();
   ubo[26] = frame.noteOutlineColor.blueF();
   ubo[27] = frame.noteOutlineColor.alphaF();
+  // 1.0 selects light-mode glow output in the quad shader.
+  ubo[28] = activeLaserUseScreenBlend ? 0.0f : 1.0f;
   updates->updateDynamicBuffer(m_uniformBuffer, 0, kUniformBytes, ubo.data());
 
   if (m_staticDataDirty) {
@@ -735,13 +744,16 @@ uint32_t PianoRollRhiRenderer::colorKey(const QColor& color) {
 }
 
 // Recreates draw pipelines when render-target sample state changes.
-void PianoRollRhiRenderer::ensurePipelines(QRhiRenderPassDescriptor* renderPassDesc, int sampleCount) {
+void PianoRollRhiRenderer::ensurePipelines(QRhiRenderPassDescriptor* renderPassDesc,
+                                           int sampleCount,
+                                           bool activeLaserUseScreenBlend) {
   if (!renderPassDesc) {
     return;
   }
 
   if (m_pipeline && m_activeLaserPipeline && m_notePipeline && m_shaderBindings &&
-      m_outputRenderPass == renderPassDesc && m_sampleCount == sampleCount) {
+      m_outputRenderPass == renderPassDesc && m_sampleCount == sampleCount &&
+      m_activeLaserUseScreenBlend == activeLaserUseScreenBlend) {
     return;
   }
 
@@ -757,6 +769,7 @@ void PianoRollRhiRenderer::ensurePipelines(QRhiRenderPassDescriptor* renderPassD
 
   m_outputRenderPass = renderPassDesc;
   m_sampleCount = sampleCount;
+  m_activeLaserUseScreenBlend = activeLaserUseScreenBlend;
 
   m_shaderBindings = m_rhi->newShaderResourceBindings();
   m_shaderBindings->setBindings({
@@ -780,8 +793,15 @@ void PianoRollRhiRenderer::ensurePipelines(QRhiRenderPassDescriptor* renderPassD
 
   QRhiGraphicsPipeline::TargetBlend activeLaserBlend;
   activeLaserBlend.enable = true;
-  activeLaserBlend.srcColor = QRhiGraphicsPipeline::One;
-  activeLaserBlend.dstColor = QRhiGraphicsPipeline::OneMinusSrcColor;
+  if (activeLaserUseScreenBlend) {
+    activeLaserBlend.srcColor = QRhiGraphicsPipeline::One;
+    activeLaserBlend.dstColor = QRhiGraphicsPipeline::OneMinusSrcColor;
+  } else {
+    // Light backgrounds need alpha-over composition (not screen) so the glow
+    // remains visible without hard clipping to white.
+    activeLaserBlend.srcColor = QRhiGraphicsPipeline::SrcAlpha;
+    activeLaserBlend.dstColor = QRhiGraphicsPipeline::OneMinusSrcAlpha;
+  }
   activeLaserBlend.opColor = QRhiGraphicsPipeline::Add;
   activeLaserBlend.srcAlpha = QRhiGraphicsPipeline::One;
   activeLaserBlend.dstAlpha = QRhiGraphicsPipeline::OneMinusSrcAlpha;
