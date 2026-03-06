@@ -83,4 +83,8 @@ class NDSTrack
   bool portamentoEnabled;
   uint8_t portamentoControlKey;
   uint8_t portamentoTime;
+  bool tieModeEnabled;
+  bool tieNoteActive;
+  uint8_t tieNoteKey;
+  uint32_t tieNoteEndTick;
 };

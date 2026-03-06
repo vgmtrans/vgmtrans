@@ -213,6 +213,10 @@ void NDSTrack::resetModState() {
   portamentoControlKey = clampMidi7Bit(static_cast<int>(kNdsDefaultPortamentoKey) +
                                        static_cast<int>(cKeyCorrection) + static_cast<int>(transpose));
   portamentoTime = 0;
+  tieModeEnabled = false;
+  tieNoteActive = false;
+  tieNoteKey = 0;
+  tieNoteEndTick = 0;
 }
 
 void NDSTrack::addTime(uint32_t delta) {
@@ -460,7 +464,32 @@ bool NDSTrack::readEvent(void) {
     uint8_t vel = readByte(curOffset++);
     dur = readVarLen(curOffset);//GetByte(curOffset++);
     onNoteStart(noteStartTick, status_byte);
-    addNoteByDur(beginOffset, curOffset - beginOffset, status_byte, vel, dur);
+
+    if (tieNoteActive && tieNoteEndTick <= noteStartTick) {
+      tieNoteActive = false;
+    }
+
+    if (tieModeEnabled && tieNoteActive && tieNoteKey == status_byte) {
+      // Tie keeps the voice alive; same-key notes just extend the existing note length.
+      makePrevDurNoteEnd(noteStartTick + dur);
+      tieNoteEndTick = noteStartTick + dur;
+      addTie(beginOffset, curOffset - beginOffset, dur, "Tie");
+    }
+    else {
+      if (tieModeEnabled && tieNoteActive) {
+        // Approximation: key changes in tie mode restart at this tick in MIDI.
+        makePrevDurNoteEnd(noteStartTick);
+        tieNoteActive = false;
+      }
+
+      addNoteByDur(beginOffset, curOffset - beginOffset, status_byte, vel, dur);
+      if (tieModeEnabled) {
+        tieNoteActive = true;
+        tieNoteKey = status_byte;
+        tieNoteEndTick = noteStartTick + dur;
+      }
+    }
+
     applySweepPitchForNote(noteStartTick, dur);
     if (noteWithDelta) {
       addTime(dur);
@@ -615,10 +644,17 @@ bool NDSTrack::readEvent(void) {
       }
 
       // [loveemu] (ex: Hanjuku Hero DS: NSE_42)
-      case 0xC8:
-        curOffset++;
-        addUnknown(beginOffset, curOffset - beginOffset, "Tie");
+      case 0xC8: {
+        tieModeEnabled = (readByte(curOffset++) != 0);
+        if (readMode == READMODE_CONVERT_TO_MIDI) {
+          makePrevDurNoteEnd(getTime());
+        }
+        tieNoteActive = false;
+        tieNoteEndTick = getTime();
+        addGenericEvent(beginOffset, curOffset - beginOffset, "Tie",
+                        tieModeEnabled ? "On" : "Off", Type::Tie);
         break;
+      }
 
       // [loveemu] (ex: Hanjuku Hero DS: NSE_50)
       case 0xC9: {
