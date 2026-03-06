@@ -1,12 +1,106 @@
 #include "NDSSeq.h"
 
+#include <array>
+#include <algorithm>
+#include <cmath>
+
+#include "NDSFormat.h"
+
 DECLARE_FORMAT(NDS);
 
 using namespace std;
 
+namespace {
+uint8_t clampMidi7Bit(int value) {
+  return static_cast<uint8_t>(std::clamp(value, 0, 127));
+}
+
+int8_t sineSampleAt(int index) {
+  static constexpr std::array<int8_t, 33> SINE_LOOKUP_TABLE{
+      0, 6, 12, 19, 25, 31, 37, 43, 49, 54, 60,
+      65, 71, 76, 81, 85, 90, 94, 98, 102, 106, 109,
+      112, 115, 117, 120, 122, 123, 125, 126, 126, 127, 127,
+  };
+
+  if (index < 0) {
+    index = 0;
+  } else if (index > 127) {
+    index = 127;
+  }
+
+  if (index < 32) {
+    return SINE_LOOKUP_TABLE[index];
+  }
+  if (index < 64) {
+    return SINE_LOOKUP_TABLE[32 - (index - 32)];
+  }
+  if (index < 96) {
+    return static_cast<int8_t>(-SINE_LOOKUP_TABLE[index - 64]);
+  }
+  return static_cast<int8_t>(-SINE_LOOKUP_TABLE[32 - (index - 96)]);
+}
+
+constexpr double kNdsPeriodicUpdateHz = 192.0;
+constexpr double kNdsLfoSpeedToHz = kNdsPeriodicUpdateHz / 512.0;
+constexpr double kSf2VibratoRateBaseHz = 0.375;
+constexpr double kSf2VibratoRateCcSpanCents = 8400.0;
+
+uint8_t speedToVibratoRateCc(uint8_t speed) {
+  if (speed == 0) {
+    return 0;
+  }
+
+  const double targetHz = static_cast<double>(speed) * kNdsLfoSpeedToHz;
+  if (targetHz <= kSf2VibratoRateBaseHz) {
+    return 0;
+  }
+
+  const double cents = 1200.0 * std::log2(targetHz / kSf2VibratoRateBaseHz);
+  const int cc = static_cast<int>(std::lround((cents * 127.0) / kSf2VibratoRateCcSpanCents));
+  return clampMidi7Bit(cc);
+}
+} // namespace
+
 NDSSeq::NDSSeq(RawFile *file, uint32_t offset, uint32_t length, string name)
     : VGMSeq(NDSFormat::name, file, offset, length, name) {
   setShouldTrackControlFlowState(true);
+}
+
+void NDSSeq::resetVars() {
+  VGMSeq::resetVars();
+
+  if (readMode == READMODE_ADD_TO_UI) {
+    m_tempoMap.clear();
+  }
+
+  if (m_tempoMap.empty()) {
+    m_tempoMap.emplace(0, TempoPoint{initialTempoBPM, -1});
+  }
+}
+
+void NDSSeq::registerTempoChange(uint32_t tick, double bpm, int trackIndex) {
+  if (bpm <= 0.0) {
+    return;
+  }
+
+  const TempoPoint point{bpm, trackIndex};
+  auto [it, inserted] = m_tempoMap.emplace(tick, point);
+  if (!inserted && trackIndex >= it->second.trackIndex) {
+    it->second = point;
+  }
+}
+
+double NDSSeq::tempoAtTick(uint32_t tick) const {
+  if (m_tempoMap.empty()) {
+    return (initialTempoBPM > 0.0) ? initialTempoBPM : 120.0;
+  }
+
+  auto it = m_tempoMap.upper_bound(tick);
+  if (it == m_tempoMap.begin()) {
+    return it->second.bpm;
+  }
+  --it;
+  return it->second.bpm;
 }
 
 bool NDSSeq::parseHeader(void) {
@@ -15,10 +109,11 @@ bool NDSSeq::parseHeader(void) {
   SSEQHdr->addChild(offset() + 8, 4, "Size");
   SSEQHdr->addChild(offset() + 12, 2, "Header Size");
   SSEQHdr->addUnknownChild(offset() + 14, 2);
-  //SeqChunkHdr->addSimpleChild(offset(), 4, "Blah");
+
   setLength(readWord(offset() + 8));
   setPPQN(0x30);
-  return true;        //successful
+
+  return true;
 }
 
 bool NDSSeq::parseTrackPointers(void) {
@@ -65,7 +160,6 @@ bool NDSSeq::parseTrackPointers(void) {
           (readByte(off + 4) << 16) + offset() + 0x1C;
       NDSTrack *newTrack = new NDSTrack(this, trkOffset);
       aTracks.push_back(newTrack);
-      //newTrack->
       off += 5;
       b = readByte(off);
     }
@@ -73,6 +167,7 @@ bool NDSSeq::parseTrackPointers(void) {
   }
   aTracks[0]->setOffset(off);
   aTracks[0]->dwStartOffset = off;
+  
   return true;
 }
 
@@ -89,6 +184,233 @@ NDSTrack::NDSTrack(NDSSeq *parentFile, uint32_t offset, uint32_t length)
 void NDSTrack::resetVars() {
   SeqTrack::resetVars();
   noteWithDelta = false;
+  resetModState();
+}
+
+void NDSTrack::resetModState() {
+  modDepth = 0;
+  modSpeed = 16;
+  modType = static_cast<uint8_t>(ModTarget::Pitch);
+  modRange = 1;
+  modDelay = 0;
+
+  modLastRenderTick = getTime();
+  modPhaseCounter = 0;
+  modDelayCounter = 0;
+  modPeriodicRemainder = 0.0;
+  modRangeSent = false;
+  pitchModEnableTick = getTime();
+  currentTempoBpm = static_cast<const NDSSeq*>(parentSeq)->tempoAtTick(getTime());
+
+  lastPitchModCc = -1;
+  lastPitchVibratoRateCc = -1;
+  lastExprCc = -1;
+  lastPanCc = -1;
+  sweepPitch = 0;
+  basePitchBend = 0;
+}
+
+void NDSTrack::addTime(uint32_t delta) {
+  renderModUntil(getTime() + delta);
+  SeqTrack::addTime(delta);
+}
+
+void NDSTrack::renderModUntil(uint32_t endTick) {
+  if (endTick <= modLastRenderTick) {
+    return;
+  }
+
+  for (uint32_t tick = modLastRenderTick; tick < endTick; tick++) {
+    renderModPoint(tick);
+    advanceModStateByMidiTicks(1, tick);
+  }
+  modLastRenderTick = endTick;
+}
+
+NDSTrack::ModTarget NDSTrack::toModTarget(uint8_t value) {
+  switch (value) {
+    case 0:
+      return ModTarget::Pitch;
+    case 1:
+      return ModTarget::Volume;
+    case 2:
+      return ModTarget::Pan;
+    default:
+      return ModTarget::Unknown;
+  }
+}
+
+std::string NDSTrack::to_string(ModTarget target) {
+  switch (target) {
+    case ModTarget::Pitch:
+      return "Pitch";
+    case ModTarget::Volume:
+      return "Volume";
+    case ModTarget::Pan:
+      return "Pan";
+    case ModTarget::Unknown:
+    default:
+      return "Unknown";
+  }
+}
+
+uint32_t NDSTrack::modDelayToMidiTicks(uint16_t delay, uint32_t atTick) const {
+  if (delay == 0) {
+    return 0;
+  }
+
+  const double tempoAtTick = static_cast<const NDSSeq*>(parentSeq)->tempoAtTick(atTick);
+  const double effectiveTempo = (tempoAtTick > 0.0) ? tempoAtTick : currentTempoBpm;
+
+  const double ticks = (static_cast<double>(delay) * effectiveTempo *
+                        static_cast<double>(parentSeq->ppqn())) /
+                       (60.0 * kNdsPeriodicUpdateHz);
+  return std::max<uint32_t>(1, static_cast<uint32_t>(std::lround(ticks)));
+}
+
+void NDSTrack::onNoteStart(uint32_t noteStartTick) {
+  modPhaseCounter = 0;
+  modDelayCounter = 0;
+
+  if (toModTarget(modType) != ModTarget::Pitch) {
+    return;
+  }
+
+  pitchModEnableTick = noteStartTick + modDelayToMidiTicks(modDelay, noteStartTick);
+  if (lastPitchModCc != 0) {
+    lastPitchModCc = -1;
+  }
+  emitPitchVibratoParamsAt(noteStartTick);
+}
+
+void NDSTrack::emitPitchModRangeAt(uint32_t tick) {
+  if (readMode != READMODE_CONVERT_TO_MIDI) {
+    return;
+  }
+  const double semitones = static_cast<double>(modRange);
+  pMidiTrack->insertModulationDepthRange(channel, semitones, tick);
+}
+
+void NDSTrack::emitPitchVibratoParamsAt(uint32_t tick) {
+  if (readMode != READMODE_CONVERT_TO_MIDI) {
+    return;
+  }
+
+  const bool depthEnabled = (tick >= pitchModEnableTick) && (modDepth != 0) && (modSpeed != 0);
+  const int depthCc = depthEnabled ? static_cast<int>(modDepth) : 0;
+  const int rateCc = static_cast<int>(speedToVibratoRateCc(modSpeed));
+
+  if (depthCc != lastPitchModCc) {
+    pMidiTrack->insertModulation(channel, static_cast<uint8_t>(depthCc), tick); // CC1
+    lastPitchModCc = depthCc;
+  }
+
+  if (rateCc != lastPitchVibratoRateCc) {
+    pMidiTrack->insertControllerEvent(channel, 76, static_cast<uint8_t>(rateCc), tick); // Vibrato Rate
+    lastPitchVibratoRateCc = rateCc;
+  }
+}
+
+void NDSTrack::applySweepPitchForNote(uint32_t startTick, uint32_t duration) {
+  if (readMode != READMODE_CONVERT_TO_MIDI || duration == 0 || sweepPitch == 0) {
+    return;
+  }
+
+  // As far as I can tell, sweep starts with note-on and decays linearly to 0 over note length.
+  const int startBend = std::clamp(static_cast<int>(basePitchBend) + static_cast<int>(sweepPitch), -8192, 8191);
+  const int endBend = std::clamp(static_cast<int>(basePitchBend), -8192, 8191);
+
+  pMidiTrack->insertPitchBend(channel, static_cast<int16_t>(startBend), startTick);
+  pMidiTrack->insertPitchBend(channel, static_cast<int16_t>(endBend), startTick + duration);
+}
+
+void NDSTrack::renderModPoint(uint32_t tick) {
+  const ModTarget target = toModTarget(modType);
+  if (target == ModTarget::Unknown) {
+    return;
+  }
+
+  int32_t raw = 0;
+  if (modDepth != 0 && modDelayCounter >= modDelay) {
+    const int index = (modPhaseCounter >> 8) & 0x7F;
+    raw = static_cast<int32_t>(sineSampleAt(index)) * static_cast<int32_t>(modDepth) * static_cast<int32_t>(modRange);
+  }
+
+  if (readMode != READMODE_CONVERT_TO_MIDI) {
+    return;
+  }
+
+  switch (target) {
+    case ModTarget::Pitch: {
+      if (!modRangeSent) {
+        emitPitchModRangeAt(tick);
+        modRangeSent = true;
+      }
+      emitPitchVibratoParamsAt(tick);
+      break;
+    }
+    case ModTarget::Volume: {
+      const int32_t lfo = (raw * 60) >> 14;
+      const uint8_t cc = clampMidi7Bit(static_cast<int>(expression) + static_cast<int>(lfo));
+      if (cc != lastExprCc) {
+        pMidiTrack->insertExpression(channel, cc, tick);
+        lastExprCc = cc;
+      }
+      break;
+    }
+    case ModTarget::Pan: {
+      const int32_t lfo = (raw * 64) >> 14;
+      const uint8_t cc = clampMidi7Bit(static_cast<int>(prevPan) + static_cast<int>(lfo));
+      if (cc != lastPanCc) {
+        pMidiTrack->insertPan(channel, cc, tick);
+        lastPanCc = cc;
+      }
+      break;
+    }
+    case ModTarget::Unknown:
+      break;
+  }
+}
+
+void NDSTrack::advanceModStateByMidiTicks(uint32_t midiTicks, uint32_t startTick) {
+  if (midiTicks == 0) {
+    return;
+  }
+
+  const auto* ndsSeq = static_cast<const NDSSeq*>(parentSeq);
+  for (uint32_t i = 0; i < midiTicks; i++) {
+    const double tempoAtTick = ndsSeq->tempoAtTick(startTick + i);
+    const double effectiveTempo = (tempoAtTick > 0.0) ? tempoAtTick : currentTempoBpm;
+    const double periodicPerMidiTick = (kNdsPeriodicUpdateHz * 60.0) /
+                                       (effectiveTempo * static_cast<double>(parentSeq->ppqn()));
+
+    const double stepsWithRemainder = modPeriodicRemainder + periodicPerMidiTick;
+    const uint32_t wholeSteps = static_cast<uint32_t>(stepsWithRemainder);
+    modPeriodicRemainder = stepsWithRemainder - static_cast<double>(wholeSteps);
+
+    for (uint32_t j = 0; j < wholeSteps; j++) {
+      advanceModStateOnePeriodicTick();
+    }
+  }
+}
+
+void NDSTrack::advanceModStateOnePeriodicTick() {
+  if (modDelayCounter < modDelay) {
+    modDelayCounter++;
+    return;
+  }
+
+  uint32_t offset = modPhaseCounter;
+  offset += static_cast<uint32_t>(modSpeed) << 6;
+  offset >>= 8;
+  while (offset >= 128) {
+    offset -= 128;
+  }
+  offset <<= 8;
+
+  modPhaseCounter += static_cast<uint16_t>(static_cast<uint32_t>(modSpeed) << 6);
+  modPhaseCounter &= 0xFF;
+  modPhaseCounter |= static_cast<uint16_t>(offset);
 }
 
 bool NDSTrack::readEvent(void) {
@@ -97,9 +419,12 @@ bool NDSTrack::readEvent(void) {
 
   if (status_byte < 0x80) //then it's a note on event
   {
+    const uint32_t noteStartTick = getTime();
     uint8_t vel = readByte(curOffset++);
     dur = readVarLen(curOffset);//GetByte(curOffset++);
+    onNoteStart(noteStartTick);
     addNoteByDur(beginOffset, curOffset - beginOffset, status_byte, vel, dur);
+    applySweepPitchForNote(noteStartTick, dur);
     if (noteWithDelta) {
       addTime(dur);
     }
@@ -212,21 +537,21 @@ bool NDSTrack::readEvent(void) {
       // [loveemu] (ex: Castlevania Dawn of Sorrow: SDL_BGM_BOSS1_)
       case 0xC2: {
         uint8_t mvol = readByte(curOffset++);
-        addUnknown(beginOffset, curOffset - beginOffset, "Master Volume");
+        addMasterVol(beginOffset, curOffset - beginOffset, mvol);
         break;
       }
 
       // [loveemu] (ex: Puyo Pop Fever 2: BGM00)
       case 0xC3: {
-        int8_t transpose = (signed) readByte(curOffset++);
+        int8_t transpose = static_cast<int8_t>(readByte(curOffset++));
         addTranspose(beginOffset, curOffset - beginOffset, transpose);
-//			AddGenericEvent(beginOffset, curOffset-beginOffset, "Transpose", NULL, BG_CLR_GREEN);
         break;
       }
 
       // [loveemu] pitch bend (ex: Castlevania Dawn of Sorrow: BGM_BOSS2)
       case 0xC4: {
         int16_t bend = (signed) readByte(curOffset++) * 64;
+        basePitchBend = bend;
         addPitchBend(beginOffset, curOffset - beginOffset, bend);
         break;
       }
@@ -266,28 +591,51 @@ bool NDSTrack::readEvent(void) {
 
       // [loveemu] (ex: Castlevania Dawn of Sorrow: SDL_BGM_ARR1_)
       case 0xCA: {
-        uint8_t amount = readByte(curOffset++);
-        addModulation(beginOffset, curOffset - beginOffset, amount, "Modulation Depth");
+        renderModUntil(getTime());
+        modDepth = readByte(curOffset++);
+        addGenericEvent(beginOffset, curOffset - beginOffset, "Modulation Depth",
+                        "Depth=" + std::to_string(modDepth), Type::Lfo);
+        if (modDepth == 0) {
+          lastPitchModCc = -1;
+          lastExprCc = -1;
+          lastPanCc = -1;
+        }
         break;
       }
 
       // [loveemu] (ex: Castlevania Dawn of Sorrow: SDL_BGM_ARR1_)
-      case 0xCB:
-        curOffset++;
-        addUnknown(beginOffset, curOffset - beginOffset, "Modulation Speed");
+      case 0xCB: {
+        renderModUntil(getTime());
+        modSpeed = readByte(curOffset++);
+        addGenericEvent(beginOffset, curOffset - beginOffset, "Modulation Speed",
+                        "Speed=" + std::to_string(modSpeed), Type::Lfo);
         break;
+      }
 
       // [loveemu] (ex: Children of Mana: SEQ_BGM001)
-      case 0xCC:
-        curOffset++;
-        addUnknown(beginOffset, curOffset - beginOffset, "Modulation Type");
+      case 0xCC: {
+        renderModUntil(getTime());
+        modType = readByte(curOffset++);
+        modRangeSent = false;
+        lastPitchModCc = -1;
+        lastPitchVibratoRateCc = -1;
+        lastExprCc = -1;
+        lastPanCc = -1;
+        const ModTarget target = toModTarget(modType);
+        addGenericEvent(beginOffset, curOffset - beginOffset, "Modulation Type",
+                        "Target=" + to_string(target), Type::Lfo);
         break;
+      }
 
       // [loveemu] (ex: Phoenix Wright - Ace Attorney: BGM021)
-      case 0xCD:
-        curOffset++;
-        addUnknown(beginOffset, curOffset - beginOffset, "Modulation Range");
+      case 0xCD: {
+        renderModUntil(getTime());
+        modRange = readByte(curOffset++);
+        modRangeSent = false;
+        addGenericEvent(beginOffset, curOffset - beginOffset, "Modulation Range",
+                        "Range=" + std::to_string(modRange), Type::Lfo);
         break;
+      }
 
       // [loveemu] (ex: Castlevania Dawn of Sorrow: SDL_BGM_ARR1_)
       case 0xCE: {
@@ -346,23 +694,39 @@ bool NDSTrack::readEvent(void) {
         break;
 
       // [loveemu] (ex: Children of Mana: SEQ_BGM001)
-      case 0xE0:
+      case 0xE0: {
+        renderModUntil(getTime());
+        modDelay = readShort(curOffset);
         curOffset += 2;
-        addUnknown(beginOffset, curOffset - beginOffset, "Modulation Delay");
+        modDelayCounter = 0;
+        if (toModTarget(modType) == ModTarget::Pitch) {
+          pitchModEnableTick = getTime() + modDelayToMidiTicks(modDelay, getTime());
+          lastPitchModCc = -1;
+          emitPitchVibratoParamsAt(getTime());
+        }
+        addGenericEvent(beginOffset, curOffset - beginOffset, "Modulation Delay",
+                        "Delay=" + std::to_string(modDelay), Type::Lfo);
         break;
+      }
 
       case 0xE1: {
         uint16_t bpm = readShort(curOffset);
         curOffset += 2;
+        currentTempoBpm = static_cast<double>(bpm);
         addTempoBPM(beginOffset, curOffset - beginOffset, bpm);
+        static_cast<NDSSeq*>(parentSeq)->registerTempoChange(
+            getTime(), currentTempoBpm, channelGroup * 16 + channel);
         break;
       }
 
       // [loveemu] (ex: Hippatte! Puzzle Bobble: SEQ_1pbgm03)
-      case 0xE3:
+      case 0xE3: {
+        sweepPitch = readShort(curOffset);
         curOffset += 2;
-        addUnknown(beginOffset, curOffset - beginOffset, "Sweep Pitch");
+        addGenericEvent(beginOffset, curOffset - beginOffset, "Sweep Pitch",
+                        "Sweep=" + std::to_string(sweepPitch), Type::Lfo);
         break;
+      }
 
       // [loveemu] (ex: Castlevania Dawn of Sorrow: SDL_BGM_WIND_)
       case 0xFC:
@@ -380,6 +744,7 @@ bool NDSTrack::readEvent(void) {
         break;
 
       case 0xFF:
+        renderModUntil(getTime());
         addEndOfTrack(beginOffset, curOffset - beginOffset);
         return false;
 
