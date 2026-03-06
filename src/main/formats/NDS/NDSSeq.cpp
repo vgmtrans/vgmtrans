@@ -201,6 +201,10 @@ void NDSTrack::resetModState() {
   lastPanCc = -1;
   sweepPitch = 0;
   basePitchBend = 0;
+  portamentoEnabled = false;
+  portamentoControlKey = clampMidi7Bit(static_cast<int>(kNdsDefaultPortamentoKey) +
+                                       static_cast<int>(cKeyCorrection) + static_cast<int>(transpose));
+  portamentoTime = 0;
 }
 
 void NDSTrack::addTime(uint32_t delta) {
@@ -261,7 +265,13 @@ uint32_t NDSTrack::modDelayToMidiTicks(uint16_t delay, uint32_t atTick) const {
   return std::max<uint32_t>(1, static_cast<uint32_t>(std::lround(ticks)));
 }
 
-void NDSTrack::onNoteStart(uint32_t noteStartTick) {
+void NDSTrack::onNoteStart(uint32_t noteStartTick, uint8_t noteKey) {
+  if (readMode == READMODE_CONVERT_TO_MIDI && portamentoEnabled) {
+    addPortamentoControlNoItem(portamentoControlKey);
+  }
+  portamentoControlKey = clampMidi7Bit(static_cast<int>(noteKey) + static_cast<int>(cKeyCorrection) +
+                                       static_cast<int>(transpose));
+
   modPhaseCounter = 0;
   modDelayCounter = 0;
 
@@ -309,12 +319,38 @@ void NDSTrack::applySweepPitchForNote(uint32_t startTick, uint32_t duration) {
     return;
   }
 
-  // As far as I can tell, sweep starts with note-on and decays linearly to 0 over note length.
-  const int startBend = std::clamp(static_cast<int>(basePitchBend) + static_cast<int>(sweepPitch), -8192, 8191);
-  const int endBend = std::clamp(static_cast<int>(basePitchBend), -8192, 8191);
+  uint32_t sweepLength = duration;
+  if (portamentoTime != 0) {
+    const uint64_t absSweep = static_cast<uint64_t>(std::abs(static_cast<int32_t>(sweepPitch)));
+    const uint64_t t = static_cast<uint64_t>(portamentoTime);
+    // Not 100% confident about this, but I think it's exact!
+    sweepLength = static_cast<uint32_t>((t * t * absSweep) >> 11);
+  }
 
-  pMidiTrack->insertPitchBend(channel, static_cast<int16_t>(startBend), startTick);
-  pMidiTrack->insertPitchBend(channel, static_cast<int16_t>(endBend), startTick + duration);
+  const int endBend = std::clamp(static_cast<int>(basePitchBend), -8192, 8191);
+  bool haveLast = false;
+  int lastBend = 0;
+
+  if (sweepLength == 0) {
+    pMidiTrack->insertPitchBend(channel, static_cast<int16_t>(endBend), startTick);
+    return;
+  }
+
+  const uint32_t rampTicks = std::min(duration, sweepLength);
+  for (uint32_t i = 0; i <= rampTicks; i++) {
+    const int64_t scaled = static_cast<int64_t>(sweepPitch) * static_cast<int64_t>(sweepLength - i);
+    const int sweepAtTick = static_cast<int>(scaled / static_cast<int64_t>(sweepLength));
+    const int bend = std::clamp(static_cast<int>(basePitchBend) + sweepAtTick, -8192, 8191);
+    if (!haveLast || bend != lastBend) {
+      pMidiTrack->insertPitchBend(channel, static_cast<int16_t>(bend), startTick + i);
+      lastBend = bend;
+      haveLast = true;
+    }
+  }
+
+  if (!haveLast || lastBend != endBend) {
+    pMidiTrack->insertPitchBend(channel, static_cast<int16_t>(endBend), startTick + duration);
+  }
 }
 
 void NDSTrack::renderModPoint(uint32_t tick) {
@@ -415,7 +451,7 @@ bool NDSTrack::readEvent(void) {
     const uint32_t noteStartTick = getTime();
     uint8_t vel = readByte(curOffset++);
     dur = readVarLen(curOffset);//GetByte(curOffset++);
-    onNoteStart(noteStartTick);
+    onNoteStart(noteStartTick, status_byte);
     addNoteByDur(beginOffset, curOffset - beginOffset, status_byte, vel, dur);
     applySweepPitchForNote(noteStartTick, dur);
     if (noteWithDelta) {
@@ -577,10 +613,19 @@ bool NDSTrack::readEvent(void) {
         break;
 
       // [loveemu] (ex: Hanjuku Hero DS: NSE_50)
-      case 0xC9:
-        curOffset++;
-        addUnknown(beginOffset, curOffset - beginOffset, "Portamento Control");
+      case 0xC9: {
+        uint8_t portKey = readByte(curOffset++);
+        portamentoEnabled = true;
+        portamentoControlKey = clampMidi7Bit(static_cast<int>(portKey) + static_cast<int>(cKeyCorrection) +
+                                             static_cast<int>(transpose));
+        if (readMode == READMODE_CONVERT_TO_MIDI) {
+          addPortamentoNoItem(true);
+          addPortamentoControlNoItem(portamentoControlKey);
+        }
+        addGenericEvent(beginOffset, curOffset - beginOffset, "Portamento Control",
+                        "Key=" + std::to_string(portKey), Type::Portamento);
         break;
+      }
 
       // [loveemu] (ex: Castlevania Dawn of Sorrow: SDL_BGM_ARR1_)
       case 0xCA: {
@@ -633,14 +678,15 @@ bool NDSTrack::readEvent(void) {
       // [loveemu] (ex: Castlevania Dawn of Sorrow: SDL_BGM_ARR1_)
       case 0xCE: {
         bool bPortOn = (readByte(curOffset++) != 0);
+        portamentoEnabled = bPortOn;
         addPortamento(beginOffset, curOffset - beginOffset, bPortOn);
         break;
       }
 
       // [loveemu] (ex: Bomberman: SEQ_AREA04)
       case 0xCF: {
-        uint8_t portTime = readByte(curOffset++);
-        addPortamentoTime(beginOffset, curOffset - beginOffset, portTime);
+        portamentoTime = readByte(curOffset++);
+        addPortamentoTime(beginOffset, curOffset - beginOffset, portamentoTime);
         break;
       }
 

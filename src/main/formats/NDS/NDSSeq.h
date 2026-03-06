@@ -52,7 +52,7 @@ class NDSTrack
   void renderModPoint(uint32_t tick);
   void advanceModStateByMidiTicks(uint32_t midiTicks, uint32_t startTick);
   void advanceModStateOnePeriodicTick();
-  void onNoteStart(uint32_t noteStartTick);
+  void onNoteStart(uint32_t noteStartTick, uint8_t noteKey);
   static ModTarget toModTarget(uint8_t value);
   static std::string to_string(ModTarget target);
   void applySweepPitchForNote(uint32_t startTick, uint32_t duration);
@@ -80,4 +80,7 @@ class NDSTrack
   int16_t basePitchBend;
   uint32_t pitchModEnableTick;
   double currentTempoBpm;
+  bool portamentoEnabled;
+  uint8_t portamentoControlKey;
+  uint8_t portamentoTime;
 };
