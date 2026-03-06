@@ -81,6 +81,8 @@ NDSInstr::NDSInstr(NDSInstrSet* instrSet, uint32_t offset, uint32_t length, uint
 }
 
 bool NDSInstr::loadInstr() {
+  addStandardVibratoHandling(nds::kVibratoDepthCents, nds::kVibratoBaseHz, nds::kVibratoMaxHz);
+
   // All of the undefined case values below are used for tone or noise channels
   switch (instrType) {
     case 0x01: {
