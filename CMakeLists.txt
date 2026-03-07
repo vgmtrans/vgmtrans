@@ -11,6 +11,9 @@ project(
 
 include(GNUInstallDirs)
 
+set(PROJECT_CHANGELOG_FILE "${PROJECT_SOURCE_DIR}/CHANGELOG.md")
+set(BUILD_CHANGELOG_SCRIPT "${PROJECT_SOURCE_DIR}/build-aux/build-changelog.py")
+
 find_package(Git)
 if(GIT_FOUND)
   execute_process(
@@ -46,9 +49,18 @@ if(GIT_FOUND)
     COMMAND ${GIT_EXECUTABLE} describe --tags --abbrev=0 --dirty=+
     OUTPUT_VARIABLE VCS_TAG
     OUTPUT_STRIP_TRAILING_WHITESPACE)
+
+  execute_process(
+    WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}
+    COMMAND ${GIT_EXECUTABLE} describe --exact-match --tags
+    OUTPUT_VARIABLE VCS_EXACT_TAG
+    OUTPUT_STRIP_TRAILING_WHITESPACE
+    ERROR_QUIET)
 else()
   set(VCS_HASH "unknown")
+  set(VCS_HASH_COMPLETE "unknown")
   set(VCS_BRANCH "unknown")
+  set(VCS_EXACT_TAG "v${CMAKE_PROJECT_VERSION}")
 endif()
 
 # Fallback for VCS_TAG if git failed or returned empty
@@ -56,9 +68,23 @@ if(NOT VCS_TAG)
   set(VCS_TAG "v${CMAKE_PROJECT_VERSION}")
 endif()
 
+if(VCS_TAG MATCHES "\\+$")
+  set(CHANGELOG_CURRENT_VERSION "Unreleased")
+elseif(VCS_EXACT_TAG)
+  set(CHANGELOG_CURRENT_VERSION "${VCS_EXACT_TAG}")
+else()
+  set(CHANGELOG_CURRENT_VERSION "Unreleased")
+endif()
+
 string(TIMESTAMP VCS_DATE "%Y-%m-%d")
 
 list(APPEND CMAKE_MODULE_PATH ${CMAKE_SOURCE_DIR}/cmake)
+set_property(
+  DIRECTORY
+  APPEND
+  PROPERTY CMAKE_CONFIGURE_DEPENDS
+           "${PROJECT_CHANGELOG_FILE}"
+           "${BUILD_CHANGELOG_SCRIPT}")
 
 # ~~~
 # Options
@@ -70,6 +96,7 @@ option(ENABLE_SHELL "Build the shell application" ON)
 
 option(NO_QT_DEPLOY "Don't run the Qt deploy script during install (useful for system/Flatpak packaging)" OFF)
 option(INSTALL_SHELL "Install the shell application" OFF)
+option(INSTALL_CHANGELOG "Install changelog in the release bundle" OFF)
 
 option(USE_SYSTEM_FMT "Use system-provided fmt library" OFF)
 option(USE_SYSTEM_SPDLOG "Use system-provided spdlog library" OFF)
