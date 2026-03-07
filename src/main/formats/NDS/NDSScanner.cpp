@@ -7,6 +7,7 @@
 #include "NDSScanner.h"
 
 #include <algorithm>
+#include <cstdint>
 #include <string>
 #include <vector>
 
@@ -22,6 +23,7 @@ namespace vgmtrans::scanners {
 
 /* Observed from multiple samples, the maximum length of standard archives is 127 + null terminator */
 constexpr auto MAX_NAME_LEN = 128;
+constexpr uint16_t INVALID_NDS_INDEX = 0xFFFF;
 
 void NDSScanner::scan(RawFile* file, void* /*info*/) {
   searchForSDAT(file);
@@ -177,8 +179,8 @@ uint32_t NDSScanner::loadFromSDAT(RawFile *file, uint32_t baseOff) {
     for (uint32_t i = 0; i < nWAs; i++)
       //for (vector<uint16_t>::iterator iter = vUniqueWAs.begin(); iter != new_end; iter++)
     {
-      if (valid[i] != 1 || waFileIDs[i] == (uint16_t) -1) {
-        WAs.push_back(NULL);
+      if (valid[i] != 1 || waFileIDs[i] == INVALID_NDS_INDEX) {
+        WAs.push_back(nullptr);
         continue;
       }
       uint32_t offset = FAToff + 12 + waFileIDs[i] * 0x10;
@@ -188,7 +190,7 @@ uint32_t NDSScanner::loadFromSDAT(RawFile *file, uint32_t baseOff) {
       NDSWaveArch *NewNDSwa = new NDSWaveArch(file, pWAFatData, fileSize, waNames[i]);
       if (!NewNDSwa->loadVGMFile()) {
         L_ERROR("Failed to load NDSWaveArch at 0x{:08X}", pWAFatData);
-        WAs.push_back(NULL);
+        WAs.push_back(nullptr);
         delete NewNDSwa;
         continue;
       }
@@ -215,13 +217,13 @@ uint32_t NDSScanner::loadFromSDAT(RawFile *file, uint32_t baseOff) {
       //	continue;
       NDSInstrSet *NewNDSInstrSet = new NDSInstrSet(file, pBnkFatData, fileSize, psg_sampcoll,
                                                     bnkNames[*iter]);
-      for (int i = 0; i < 4; i++)        //use first WA found.  Ideally, should load all WAs
-      {
-        short WAnum = bnkWAs[*iter][i];
-        if (WAnum != -1)
-          NewNDSInstrSet->sampCollWAList.push_back(WAs[WAnum]);
-        else
-          NewNDSInstrSet->sampCollWAList.push_back(NULL);
+      for (int i = 0; i < 4; i++) {  // use first WA found. Ideally, should load all WAs.
+        const uint16_t waNum = bnkWAs[*iter][i];
+        if (waNum != INVALID_NDS_INDEX && waNum < WAs.size()) {
+          NewNDSInstrSet->sampCollWAList.push_back(WAs[waNum]);
+        } else {
+          NewNDSInstrSet->sampCollWAList.push_back(nullptr);
+        }
       }
       if (!NewNDSInstrSet->loadVGMFile()) {
         L_ERROR("Failed to load NDSInstrSet at 0x{:08X}", pBnkFatData);
@@ -250,21 +252,31 @@ uint32_t NDSScanner::loadFromSDAT(RawFile *file, uint32_t baseOff) {
 
       VGMColl *coll = new VGMColl(seqNames[i]);
       coll->useSeq(NewNDSSeq);
-      uint32_t bnkIndex = 0;
-      for (uint32_t j = 0; j < BNKs.size(); j++) {
-        if (seqFileBnks[i] == BNKs[j].first) {
-          bnkIndex = j;
-          break;
-        }
+
+      if (seqFileBnks[i] >= bnkWAs.size()) {
+        L_WARN("Skipping sequence '{}' because it references out-of-range bank {}",
+               seqNames[i], seqFileBnks[i]);
+        delete coll;
+        continue;
       }
-      
-      NDSInstrSet *instrset = BNKs[bnkIndex].second;
+
+      auto bankIt = std::find_if(BNKs.begin(), BNKs.end(), [bankId = seqFileBnks[i]](const auto& bank) {
+        return bank.first == bankId;
+      });
+      if (bankIt == BNKs.end() || bankIt->second == nullptr) {
+        L_WARN("Skipping sequence '{}' because referenced bank {} is unavailable",
+               seqNames[i], seqFileBnks[i]);
+        delete coll;
+        continue;
+      }
+
       coll->addSampColl(psg_sampcoll);
-      coll->addInstrSet(BNKs[bnkIndex].second);
+      coll->addInstrSet(bankIt->second);
       for (int j = 0; j < 4; j++) {
-        short WAnum = bnkWAs[seqFileBnks[i]][j];
-        if (WAnum != -1)
-          coll->addSampColl(WAs[WAnum]);
+        const uint16_t waNum = bnkWAs[seqFileBnks[i]][j];
+        if (waNum != INVALID_NDS_INDEX && waNum < WAs.size() && WAs[waNum] != nullptr) {
+          coll->addSampColl(WAs[waNum]);
+        }
       }
       if (!coll->load()) {
         delete coll;
