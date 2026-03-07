@@ -68,8 +68,9 @@
     <binary>vgmtrans</binary>
   </provides>
   <releases>
-    <release version="@VCS_TAG@" date="@VCS_DATE@">
-      <url type="details">https://github.com/vgmtrans/vgmtrans/releases/tag/@VCS_TAG@</url>
+    <release version="@VCS_TAG@" date="@VCS_DATE@"@METAINFO_RELEASE_TYPE@>
+@METAINFO_RELEASE_DESCRIPTION_XML@
+@METAINFO_RELEASE_URL_XML@
     </release>
   </releases>
 </component>

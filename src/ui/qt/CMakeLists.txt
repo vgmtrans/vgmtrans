@@ -186,6 +186,55 @@ endif()
 # Install & package
 # ~~~
 
+set(BUNDLE_CHANGELOG_FILE "")
+set(METAINFO_RELEASE_DESCRIPTION_XML "")
+set(METAINFO_RELEASE_TYPE "")
+set(METAINFO_RELEASE_URL_XML "")
+
+if(INSTALL_CHANGELOG)
+  find_package(Python3 3.10)
+  if(NOT Python3_FOUND)
+    message(FATAL_ERROR "Option INSTALL_CHANGELOG=ON requires Python 3.10+")
+  endif()
+
+  message(STATUS "Generating Markdown release notes...")
+  set(GENERATED_CHANGELOG_DIR "${CMAKE_CURRENT_BINARY_DIR}/generated")
+  file(MAKE_DIRECTORY "${GENERATED_CHANGELOG_DIR}")
+  set(BUNDLE_CHANGELOG_FILE "${GENERATED_CHANGELOG_DIR}/CHANGELOG.md")
+  execute_process(
+    COMMAND
+      "${Python3_EXECUTABLE}" "${BUILD_CHANGELOG_SCRIPT}"
+      --input "${PROJECT_CHANGELOG_FILE}"
+      --current-version "${CHANGELOG_CURRENT_VERSION}"
+      --format markdown
+      --output "${BUNDLE_CHANGELOG_FILE}"
+    COMMAND_ERROR_IS_FATAL ANY)
+
+  if(CMAKE_SYSTEM_NAME MATCHES "FreeBSD|OpenBSD|Linux")
+    message(STATUS "Generating AppStream release notes...")
+    set(METAINFO_RELEASE_DESCRIPTION_FILE
+        "${GENERATED_CHANGELOG_DIR}/metainfo-release-description.xml")
+    execute_process(
+      COMMAND
+        "${Python3_EXECUTABLE}" "${BUILD_CHANGELOG_SCRIPT}"
+        --input "${PROJECT_CHANGELOG_FILE}"
+        --current-version "${CHANGELOG_CURRENT_VERSION}"
+        --format appstream
+        --output "${METAINFO_RELEASE_DESCRIPTION_FILE}"
+      COMMAND_ERROR_IS_FATAL ANY)
+    file(READ "${METAINFO_RELEASE_DESCRIPTION_FILE}" METAINFO_RELEASE_DESCRIPTION_XML)
+
+    if(CHANGELOG_CURRENT_VERSION STREQUAL "Unreleased")
+      set(METAINFO_RELEASE_TYPE " type=\"development\"")
+    else()
+      set(METAINFO_RELEASE_URL_XML
+"      <url type=\"details\">https://github.com/vgmtrans/vgmtrans/releases/tag/${VCS_EXACT_TAG}</url>")
+    endif()
+  endif()
+
+  install(FILES "${BUNDLE_CHANGELOG_FILE}" DESTINATION ".")
+endif()
+
 if(CMAKE_SYSTEM_NAME MATCHES "Darwin")
   set_target_properties(
     vgmtrans
@@ -266,7 +315,6 @@ install(TARGETS vgmtrans
         RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}"
 )
 
-# 
 if (NOT NO_QT_DEPLOY)
   qt_generate_deploy_app_script(
       TARGET vgmtrans
@@ -290,12 +338,14 @@ set(CPACK_PACKAGE_DESCRIPTION_SUMMARY
 # This is unbranded because generating a .DS_Store on the fly is a nightmare
 # and storing it in the repo has all kind of issues. CI can use a fancy DMG
 # creation method, for local testing this is fine
-string(TOUPPER "${CPACK_GENERATOR}" _UPPER_CPACK_GENERATOR)
-if("DRAGNDROP" IN_LIST _UPPER_CPACK_GENERATOR OR "DRAGNDROP" STREQUAL _UPPER_CPACK_GENERATOR)
+if("DRAGNDROP" IN_LIST CPACK_GENERATOR)
   set(CPACK_DMG_VOLUME_NAME "VGMTrans")  
-  # Set the paths for the README and selfsign script inside the DMG package
+
   install(FILES "${PROJECT_SOURCE_DIR}/bin/dmg/README.txt" DESTINATION "." COMPONENT Runtime)
   install(PROGRAMS "${PROJECT_SOURCE_DIR}/bin/dmg/selfsign" DESTINATION "." RENAME "Unblock & Sign" COMPONENT Runtime)
+  if(INSTALL_CHANGELOG)
+    install(FILES "${BUNDLE_CHANGELOG_FILE}" DESTINATION "." COMPONENT Runtime)
+  endif()
 endif()
 
 if(NOT CPACK_GENERATOR)

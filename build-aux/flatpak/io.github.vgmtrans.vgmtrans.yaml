@@ -21,6 +21,7 @@ modules:
       - -DENABLE_CLI=OFF
       - -DENABLE_SHELL=OFF
       - -DNO_QT_DEPLOY=ON
+      - -DINSTALL_CHANGELOG=ON
       - -DUSE_SYSTEM_ZLIB=ON
       - -DVGMTRANS_DATA_DIR=/app/share/vgmtrans
     sources:

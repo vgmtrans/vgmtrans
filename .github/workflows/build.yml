@@ -48,6 +48,7 @@ jobs:
       - name: "Prepare build"
         run: >
           cmake --preset "macos-${{ matrix.target }}" \
+            -DINSTALL_CHANGELOG=ON \
             -DQT_DEBUG_FIND_PACKAGE=${{runner.debug == '1' && 'ON' || 'OFF' }} \
             -DCMAKE_VERBOSE_MAKEFILE=${{runner.debug == '1' && 'ON' || 'OFF' }} \
             -DCMAKE_FIND_DEBUG_MODE=${{runner.debug == '1' && 'ON' || 'OFF' }}
@@ -81,20 +82,21 @@ jobs:
             --volicon "dist/usr/local/VGMTrans.app/Contents/Resources/appicon.icns" \
             --background "${{ github.workspace }}/bin/dmg/bg.tif" \
             --text-size 12 \
-            --window-pos 400 400 \
             --window-size 700 400 \
             --icon-size 80 \
             --icon "VGMTrans.app" 313 97 \
+            --icon "CHANGELOG.md" 563 280 \
+            --hide-extension "CHANGELOG.md" \
             --hide-extension "VGMTrans.app" \
             --app-drop-link 520 97 \
             --add-file "Unblock & Sign" "${{ github.workspace }}/bin/dmg/selfsign" 313 280 \
-            --add-file "README.txt" "${{ github.workspace }}/bin/dmg/README.txt" 520 280 \
+            --add-file "README.txt" "${{ github.workspace }}/bin/dmg/README.txt" 463 280 \
             "VGMTrans-${{ github.sha }}-${{ env.BRANCH }}-${{ matrix.target }}-${{ runner.os }}.dmg" \
             "dist/usr/local/"
 
       - name: Generate artifact attestation
         uses: actions/attest@v4
-        if: ${{ github.event_name != 'pull_request' }}
+        if: ${{ github.event_name == 'push' }}
         with:
           subject-name: VGMTrans-${{ github.sha }}-${{ env.BRANCH }}-${{ matrix.target }}-${{ runner.os }}
           subject-path: "build/macos-${{ matrix.target }}/VGMTrans-${{ github.sha }}-${{ env.BRANCH }}-${{ matrix.target }}-${{ runner.os }}.dmg"
@@ -154,7 +156,7 @@ jobs:
 
       - name: Generate artifact attestation
         uses: actions/attest@v4
-        if: ${{ github.event_name != 'pull_request' }}
+        if: ${{ github.event_name == 'push' }}
         with:
           subject-name: VGMTrans-${{ github.sha }}-${{ env.BRANCH }}-x86_64-${{ runner.os }}
           subject-path: "VGMTrans-${{ github.sha }}-${{ env.BRANCH }}-x86_64-${{ runner.os }}.flatpak"
@@ -212,6 +214,7 @@ jobs:
           # Force to have a flat install package layout.
           # Windows users get frightened at the sight of GNU directories.
           cmake --preset win-${{ matrix.target }} `
+            -DINSTALL_CHANGELOG=ON `
             -DQT_DEBUG_FIND_PACKAGE=${{runner.debug == '1' && 'ON' || 'OFF' }} `
             -DCMAKE_VERBOSE_MAKEFILE=${{runner.debug == '1' && 'ON' || 'OFF' }} `
             -DCMAKE_FIND_DEBUG_MODE=${{runner.debug == '1' && 'ON' || 'OFF' }} `
@@ -234,7 +237,7 @@ jobs:
 
        - name: Generate artifact attestation
          uses: actions/attest@v4
-         if: ${{ github.event_name != 'pull_request' }}
+         if: ${{ github.event_name == 'push' }}
          with:
            subject-path: "build/win-${{ matrix.target }}/${{ env.PACKAGE_FILE_NAME }}.zip"
 
