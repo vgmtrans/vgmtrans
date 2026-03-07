@@ -94,7 +94,7 @@ jobs:
 
       - name: Generate artifact attestation
         uses: actions/attest@v4
-        if: ${{ github.event_name != 'pull_request' }}
+        if: ${{ github.event_name == 'push' }}
         with:
           subject-name: VGMTrans-${{ github.sha }}-${{ env.BRANCH }}-${{ matrix.target }}-${{ runner.os }}
           subject-path: "build/macos-${{ matrix.target }}/VGMTrans-${{ github.sha }}-${{ env.BRANCH }}-${{ matrix.target }}-${{ runner.os }}.dmg"
@@ -154,7 +154,7 @@ jobs:
 
       - name: Generate artifact attestation
         uses: actions/attest@v4
-        if: ${{ github.event_name != 'pull_request' }}
+        if: ${{ github.event_name == 'push' }}
         with:
           subject-name: VGMTrans-${{ github.sha }}-${{ env.BRANCH }}-x86_64-${{ runner.os }}
           subject-path: "VGMTrans-${{ github.sha }}-${{ env.BRANCH }}-x86_64-${{ runner.os }}.flatpak"
@@ -212,6 +212,7 @@ jobs:
           # Force to have a flat install package layout.
           # Windows users get frightened at the sight of GNU directories.
           cmake --preset win-${{ matrix.target }} `
+            -DINSTALL_CHANGELOG=ON `
             -DQT_DEBUG_FIND_PACKAGE=${{runner.debug == '1' && 'ON' || 'OFF' }} `
             -DCMAKE_VERBOSE_MAKEFILE=${{runner.debug == '1' && 'ON' || 'OFF' }} `
             -DCMAKE_FIND_DEBUG_MODE=${{runner.debug == '1' && 'ON' || 'OFF' }} `
@@ -234,7 +235,7 @@ jobs:
 
        - name: Generate artifact attestation
          uses: actions/attest@v4
-         if: ${{ github.event_name != 'pull_request' }}
+         if: ${{ github.event_name == 'push' }}
          with:
            subject-path: "build/win-${{ matrix.target }}/${{ env.PACKAGE_FILE_NAME }}.zip"
 
