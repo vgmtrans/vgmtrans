@@ -176,7 +176,14 @@ bool NDSInstr::loadInstr() {
 }
 
 void NDSInstr::getSampCollPtr(VGMRgn* rgn, int waNum) const {
-  rgn->sampCollPtr = static_cast<NDSInstrSet*>(parInstrSet)->sampCollWAList[waNum];
+  auto* instrSet = static_cast<NDSInstrSet*>(parInstrSet);
+  if (waNum < 0 || static_cast<size_t>(waNum) >= instrSet->sampCollWAList.size()) {
+    L_WARN("NDS instrument {} references out-of-range wave archive index {}", instrNum, waNum);
+    rgn->sampCollPtr = nullptr;
+    return;
+  }
+
+  rgn->sampCollPtr = instrSet->sampCollWAList[waNum];
 }
 
 void NDSInstr::getArticData(VGMRgn* rgn, uint32_t offset) const {
