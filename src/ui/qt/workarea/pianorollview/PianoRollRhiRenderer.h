@@ -170,10 +170,7 @@ private:
   static bool staticCacheKeyEqual(const StaticCacheKey& lhs, const StaticCacheKey& rhs);
   NoteDataKey makeNoteDataKey(const PianoRollFrame::Data& frame) const;
   void rebuildNoteInstances(const PianoRollFrame::Data& frame);
-  void buildVisibleNoteInstances(const PianoRollFrame::Data& frame,
-                                 const Layout& layout,
-                                 float currentX,
-                                 bool playheadVisible);
+  void buildVisibleNoteInstances(const PianoRollFrame::Data& frame, const Layout& layout);
   void appendMeasureNumberOverlays(const PianoRollFrame::Data& frame, const Layout& layout);
   void appendPianoCKeyLabels(const PianoRollFrame::Data& frame, const Layout& layout);
   const LabelGlyph* glyphForLabelChar(QChar ch) const;
@@ -193,9 +190,7 @@ private:
                              bool playheadVisible);
   void appendActiveLaserForNote(const PianoRollFrame::Note& note,
                                 const NoteGeometry& geometry,
-                                const std::vector<QColor>* trackColors,
-                                  float currentX,
-                                  bool playheadVisible);
+                                const std::vector<QColor>* trackColors);
   void appendKeyboardHighlightInstances(const PianoRollFrame::Data& frame,
                                         const Layout& layout,
                                         const std::vector<QColor>* trackColors,

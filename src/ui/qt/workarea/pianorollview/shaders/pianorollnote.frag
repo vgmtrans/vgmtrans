@@ -61,44 +61,28 @@ void main() {
     float centerBand = 1.0 - abs((local.y * 2.0) - 1.0);
     float baseLuma = dot(color.rgb, vec3(0.2126, 0.7152, 0.0722));
     float darkBoost = 1.0 - smoothstep(0.18, 0.62, baseLuma);
+    float bodyLift = 0.36 + (0.34 * centerBand) + (0.16 * darkBoost);
 
-    surface *= 0.95 + 0.05 * sin((local.y * 16.0) + (t * 1.8));
-    surface *= 0.95 + (0.08 * centerBand);
+    surface *= 0.88 + 0.12 * sin((local.y * 16.0) + (t * 1.8));
+    surface *= 0.89 + (0.24 * centerBand);
 
     float edge = 1.0 - smoothstep(0.0, 2.0, max(0.0, -outerDist));
-    surface *= 1.0 - (edge * 0.12);
+    surface *= 1.0 - (edge * 0.36);
 
     float wispBand = activeFlowBand(local, t, seed);
     float wispLight = smoothstep(-0.55, 0.82, wispBand);
     float wispShadow = smoothstep(0.30, -0.90, wispBand);
     vec3 wispTint = mix(color.rgb, vec3(1.0), 0.14 + (0.26 * darkBoost));
-    surface = mix(surface, wispTint, (0.04 + (0.08 * darkBoost)) * wispLight);
-    surface *= 1.0 - ((0.06 + (0.10 * darkBoost)) * wispShadow);
+    surface = mix(surface, wispTint, (0.12 + (0.16 * darkBoost)) * wispLight);
+    surface *= 1.0 - ((0.14 + (0.18 * darkBoost)) * wispShadow);
 
     float pulse = 0.55 + 0.45 * sin((t * 10.0) + (seed * 0.35) + (local.y * 10.0));
-    surface += (0.024 + (0.040 * pulse)) * mix(color.rgb, vec3(1.0), 0.10 + (0.20 * darkBoost));
-    vec3 highlightTint = mix(color.rgb, vec3(1.0), 0.28 + (0.20 * darkBoost));
-    surface = mix(surface, highlightTint, 0.10 + (0.14 * centerBand) + (0.08 * darkBoost));
-
-    float seamLocalX = -1.0;
-    if (glowConfig.w > 0.5) {
-      float noteLeft = vScenePos.x - notePx.x;
-      seamLocalX = (glowConfig.z - noteLeft) / noteW;
-    }
-    float seamActive = step(0.0, seamLocalX) * step(seamLocalX, 1.0);
-    if (seamActive > 0.0) {
-      float seamX = seamLocalX * noteW;
-      float dx = abs(notePx.x - seamX);
-      float seamGlow = smoothstep(18.0, 0.0, dx);
-      float seamCore = smoothstep(2.6, 0.0, dx);
-      vec3 seamTint = mix(color.rgb, vec3(1.0), 0.42);
-
-      surface = mix(surface, (surface * 0.72) + (seamTint * 0.78), seamGlow * 0.46);
-      surface += seamTint * seamCore * 0.72;
-    }
+    surface += (0.060 + (0.090 * pulse)) * mix(color.rgb, vec3(1.0), 0.22 + (0.28 * darkBoost));
+    vec3 highlightTint = mix(color.rgb, vec3(1.0), 0.48 + (0.30 * darkBoost));
+    surface = mix(surface, highlightTint, bodyLift);
 
     color.rgb = min(surface, vec3(1.0));
-    color.a = min(1.0, color.a + 0.12 + (0.05 * darkBoost));
+    color.a = min(1.0, color.a + 0.28 + (0.09 * darkBoost));
   }
 
   float borderMask = 0.0;
