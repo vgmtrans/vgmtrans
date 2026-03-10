@@ -218,6 +218,12 @@ uint64_t noteIdentityHash(const PianoRollFrame::Note& note) {
   return hash;
 }
 
+float noteGlowSeed(const PianoRollFrame::Note& note) {
+  return (static_cast<float>(note.startTick) * 0.0079f) +
+         (static_cast<float>(note.key) * 0.233f) +
+         (static_cast<float>(note.trackIndex + 1) * 0.671f);
+}
+
 bool isTrackEnabledForIndex(const std::vector<uint8_t>* trackEnabled, int trackIndex) {
   return !trackEnabled ||
          trackIndex < 0 ||
@@ -321,14 +327,8 @@ void PianoRollRhiRenderer::releaseResources() {
   delete m_activeLaserInstanceBuffer;
   m_activeLaserInstanceBuffer = nullptr;
 
-  delete m_activeLaserCoreInstanceBuffer;
-  m_activeLaserCoreInstanceBuffer = nullptr;
-
-  delete m_activeNoteInstanceBuffer;
-  m_activeNoteInstanceBuffer = nullptr;
-
-  delete m_inactiveNoteInstanceBuffer;
-  m_inactiveNoteInstanceBuffer = nullptr;
+  delete m_noteInstanceBuffer;
+  m_noteInstanceBuffer = nullptr;
 
   delete m_measureLabelAtlas;
   m_measureLabelAtlas = nullptr;
@@ -355,10 +355,8 @@ void PianoRollRhiRenderer::releaseResources() {
   m_staticFrontInstances.clear();
   m_dynamicInstances.clear();
   m_activeLaserInstances.clear();
-  m_activeLaserCoreInstances.clear();
   m_noteInstances.clear();
-  m_activeNoteInstances.clear();
-  m_inactiveNoteInstances.clear();
+  m_visibleNoteInstances.clear();
   m_dynamicFrontStart = 0;
   m_measureLabelAtlasDirty = true;
   m_measureLabelAtlasScale = 1.0f;
@@ -423,97 +421,14 @@ void PianoRollRhiRenderer::renderFrame(QRhiCommandBuffer* cb, const RenderTarget
   if (profileEnabled) {
     tStatic = profileTimer.nsecsElapsed();
   }
-  // Dynamic overlays (active notes, scanline, progress) update every frame.
-  buildDynamicInstances(frame, layout);
-  int noteVisibleBeginIndex = 0;
-  int noteVisibleEndIndex = static_cast<int>(m_noteInstances.size());
-  if (frame.notes && !frame.notes->empty()) {
-    const auto& notes = *frame.notes;
-    const uint64_t maxDuration = std::max<uint64_t>(1, frame.maxNoteDurationTicks);
-    // Include notes that start before the viewport but extend into it.
-    const uint64_t searchStartTick = (layout.visibleStartTick > maxDuration)
-                                         ? (layout.visibleStartTick - maxDuration)
-                                         : 0;
-    const uint64_t searchEndTick = layout.visibleEndTick + 1;
+  const float currentX = layout.noteAreaLeft + (static_cast<float>(frame.currentTick) * layout.pixelsPerTick) -
+                         layout.scrollX;
+  const bool playheadVisible =
+      (currentX >= layout.noteAreaLeft - 2.0f && currentX <= layout.noteAreaLeft + layout.noteAreaWidth + 2.0f);
 
-    const auto beginIt = std::lower_bound(
-        notes.begin(),
-        notes.end(),
-        searchStartTick,
-        [](const PianoRollFrame::Note& note, uint64_t tick) {
-          return static_cast<uint64_t>(note.startTick) < tick;
-        });
-    const auto endIt = std::lower_bound(
-        notes.begin(),
-        notes.end(),
-        searchEndTick,
-        [](const PianoRollFrame::Note& note, uint64_t tick) {
-          return static_cast<uint64_t>(note.startTick) < tick;
-        });
-
-    noteVisibleBeginIndex = std::clamp(static_cast<int>(std::distance(notes.begin(), beginIt)),
-                                       0,
-                                       static_cast<int>(m_noteInstances.size()));
-    noteVisibleEndIndex = std::clamp(static_cast<int>(std::distance(notes.begin(), endIt)),
-                                     noteVisibleBeginIndex,
-                                     static_cast<int>(m_noteInstances.size()));
-  }
-
-  m_activeNoteInstances.clear();
-  m_inactiveNoteInstances.clear();
-  if (noteVisibleEndIndex > noteVisibleBeginIndex &&
-      frame.notes && !frame.notes->empty()) {
-    const auto& notes = *frame.notes;
-    const auto* trackEnabled = frame.trackEnabled.get();
-    const auto isNoteVerticallyVisible = [&](const PianoRollFrame::Note& note) -> bool {
-      const float y = layout.noteAreaTop +
-                      ((127.0f - static_cast<float>(note.key)) * layout.pixelsPerKey) -
-                      layout.scrollY;
-      const float h = std::max(1.0f, layout.pixelsPerKey - 1.0f);
-      return (y + h) > layout.noteAreaTop &&
-             y < (layout.noteAreaTop + layout.noteAreaHeight);
-    };
-
-    const int visibleCount = noteVisibleEndIndex - noteVisibleBeginIndex;
-    m_activeNoteInstances.reserve(static_cast<size_t>(visibleCount));
-    m_inactiveNoteInstances.reserve(static_cast<size_t>(visibleCount));
-
-    if (!frame.activeNotes || frame.activeNotes->empty()) {
-      for (int noteIndex = noteVisibleBeginIndex; noteIndex < noteVisibleEndIndex; ++noteIndex) {
-        const PianoRollFrame::Note& note = notes[static_cast<size_t>(noteIndex)];
-        if (!isNoteVerticallyVisible(note)) {
-          continue;
-        }
-        m_inactiveNoteInstances.push_back(m_noteInstances[static_cast<size_t>(noteIndex)]);
-      }
-    } else {
-      std::unordered_map<uint64_t, int> activeCounts;
-      activeCounts.reserve(frame.activeNotes->size() * 2);
-      // Count-based matching handles duplicate note identities deterministically.
-      for (const PianoRollFrame::Note& active : *frame.activeNotes) {
-        if (!isTrackEnabledForIndex(trackEnabled, active.trackIndex)) {
-          continue;
-        }
-        ++activeCounts[noteIdentityHash(active)];
-      }
-
-      for (int noteIndex = noteVisibleBeginIndex; noteIndex < noteVisibleEndIndex; ++noteIndex) {
-        const PianoRollFrame::Note& note = notes[static_cast<size_t>(noteIndex)];
-        if (!isNoteVerticallyVisible(note)) {
-          continue;
-        }
-
-        const NoteInstance& instance = m_noteInstances[static_cast<size_t>(noteIndex)];
-        const auto it = activeCounts.find(noteIdentityHash(note));
-        if (it != activeCounts.end() && it->second > 0) {
-          --(it->second);
-          m_activeNoteInstances.push_back(instance);
-          continue;
-        }
-        m_inactiveNoteInstances.push_back(instance);
-      }
-    }
-  }
+  // Dynamic overlays and visible note state update every frame.
+  buildDynamicInstances(frame, layout, currentX, playheadVisible);
+  buildVisibleNoteInstances(frame, layout, currentX, playheadVisible);
   if (profileEnabled) {
     tDynamic = profileTimer.nsecsElapsed();
   }
@@ -553,8 +468,11 @@ void PianoRollRhiRenderer::renderFrame(QRhiCommandBuffer* cb, const RenderTarget
   ubo[25] = frame.noteOutlineColor.greenF();
   ubo[26] = frame.noteOutlineColor.blueF();
   ubo[27] = frame.noteOutlineColor.alphaF();
-  // 1.0 selects light-mode glow output in the quad shader.
+  // glowConfig packs glow mode, animation time, and playhead position.
   ubo[28] = activeLaserUseScreenBlend ? 0.0f : 1.0f;
+  ubo[29] = frame.elapsedSeconds;
+  ubo[30] = currentX;
+  ubo[31] = playheadVisible ? 1.0f : 0.0f;
   updates->updateDynamicBuffer(m_uniformBuffer, 0, kUniformBytes, ubo.data());
 
   if (m_staticDataDirty) {
@@ -586,9 +504,7 @@ void PianoRollRhiRenderer::renderFrame(QRhiCommandBuffer* cb, const RenderTarget
 
   uploadInstances(m_dynamicInstanceBuffer, m_dynamicInstances, 8192);
   uploadInstances(m_activeLaserInstanceBuffer, m_activeLaserInstances, 4096);
-  uploadInstances(m_activeLaserCoreInstanceBuffer, m_activeLaserCoreInstances, 2048);
-  uploadInstances(m_activeNoteInstanceBuffer, m_activeNoteInstances, 4096);
-  uploadInstances(m_inactiveNoteInstanceBuffer, m_inactiveNoteInstances, 16384);
+  uploadInstances(m_noteInstanceBuffer, m_visibleNoteInstances, 16384);
   if (profileEnabled) {
     tUpload = profileTimer.nsecsElapsed();
   }
@@ -636,48 +552,31 @@ void PianoRollRhiRenderer::renderFrame(QRhiCommandBuffer* cb, const RenderTarget
   const int staticBackCount = static_cast<int>(m_staticBackInstances.size());
   const int staticFrontCount = static_cast<int>(m_staticFrontInstances.size());
   const int activeLaserCount = static_cast<int>(m_activeLaserInstances.size());
-  const int activeLaserCoreCount = static_cast<int>(m_activeLaserCoreInstances.size());
-  const int activeNoteCount = static_cast<int>(m_activeNoteInstances.size());
-  const int inactiveNoteCount = static_cast<int>(m_inactiveNoteInstances.size());
+  const int visibleNoteCount = static_cast<int>(m_visibleNoteInstances.size());
   drawInstances(m_pipeline,
                 m_staticBackInstanceBuffer,
                 staticBackCount,
                 0,
                 static_cast<int>(sizeof(RectInstance)));
 
-  if (m_activeNoteInstanceBuffer && activeNoteCount > 0) {
-    // Notes write stencil=1 so aura can be masked from note-covered pixels.
+  if (m_noteInstanceBuffer && visibleNoteCount > 0) {
+    // Notes write stencil=1 so the aura stays outside every covered pixel.
     drawInstances(m_notePipeline,
-                  m_activeNoteInstanceBuffer,
-                  activeNoteCount,
+                  m_noteInstanceBuffer,
+                  visibleNoteCount,
                   0,
                   static_cast<int>(sizeof(NoteInstance)),
                   true);
   }
 
   // Render order is intentional:
-  // active notes -> external aura -> active core -> inactive notes -> UI overlays.
-  // Active notes first seed stencil for glow masking; inactive notes then sit on top.
+  // ordered note bodies first, then the outside-only aura, then UI overlays.
   drawInstances(m_activeLaserPipeline,
                 m_activeLaserInstanceBuffer,
                 activeLaserCount,
                 0,
                 static_cast<int>(sizeof(RectInstance)),
-                true);
-  drawInstances(m_pipeline,
-                m_activeLaserCoreInstanceBuffer,
-                activeLaserCoreCount,
-                0,
-                static_cast<int>(sizeof(RectInstance)));
-
-  if (m_inactiveNoteInstanceBuffer && inactiveNoteCount > 0) {
-    drawInstances(m_notePipeline,
-                  m_inactiveNoteInstanceBuffer,
-                  inactiveNoteCount,
-                  0,
-                  static_cast<int>(sizeof(NoteInstance)),
                   true);
-  }
 
   const int dynamicCount = static_cast<int>(m_dynamicInstances.size());
   const int dynamicFrontStart = std::clamp(m_dynamicFrontStart, 0, dynamicCount);
@@ -871,6 +770,7 @@ void PianoRollRhiRenderer::ensurePipelines(QRhiRenderPassDescriptor* renderPassD
       {0, 0, QRhiVertexInputAttribute::Float2, 0},
       {1, 1, QRhiVertexInputAttribute::Float4, 0},
       {1, 2, QRhiVertexInputAttribute::Float4, 4 * static_cast<int>(sizeof(float))},
+      {1, 3, QRhiVertexInputAttribute::Float2, 8 * static_cast<int>(sizeof(float))},
   });
 
   createPipeline(m_pipeline,
@@ -1384,6 +1284,103 @@ PianoRollRhiRenderer::NoteDataKey PianoRollRhiRenderer::makeNoteDataKey(const Pi
   return key;
 }
 
+void PianoRollRhiRenderer::buildVisibleNoteInstances(const PianoRollFrame::Data& frame,
+                                                     const Layout& layout,
+                                                     float currentX,
+                                                     bool playheadVisible) {
+  m_visibleNoteInstances.clear();
+  m_activeLaserInstances.clear();
+  if (!frame.notes || frame.notes->empty() || m_noteInstances.empty()) {
+    return;
+  }
+
+  const auto& notes = *frame.notes;
+  const uint64_t maxDuration = std::max<uint64_t>(1, frame.maxNoteDurationTicks);
+  const uint64_t searchStartTick = (layout.visibleStartTick > maxDuration)
+                                       ? (layout.visibleStartTick - maxDuration)
+                                       : 0;
+  const uint64_t searchEndTick = layout.visibleEndTick + 1;
+
+  const auto beginIt = std::lower_bound(
+      notes.begin(),
+      notes.end(),
+      searchStartTick,
+      [](const PianoRollFrame::Note& note, uint64_t tick) {
+        return static_cast<uint64_t>(note.startTick) < tick;
+      });
+  const auto endIt = std::lower_bound(
+      notes.begin(),
+      notes.end(),
+      searchEndTick,
+      [](const PianoRollFrame::Note& note, uint64_t tick) {
+        return static_cast<uint64_t>(note.startTick) < tick;
+      });
+
+  const int noteVisibleBeginIndex = std::clamp(static_cast<int>(std::distance(notes.begin(), beginIt)),
+                                               0,
+                                               static_cast<int>(m_noteInstances.size()));
+  const int noteVisibleEndIndex = std::clamp(static_cast<int>(std::distance(notes.begin(), endIt)),
+                                             noteVisibleBeginIndex,
+                                             static_cast<int>(m_noteInstances.size()));
+  if (noteVisibleEndIndex <= noteVisibleBeginIndex) {
+    return;
+  }
+
+  const auto isNoteVerticallyVisible = [&](const PianoRollFrame::Note& note) -> bool {
+    const float y = layout.noteAreaTop +
+                    ((127.0f - static_cast<float>(note.key)) * layout.pixelsPerKey) -
+                    layout.scrollY;
+    const float h = std::max(1.0f, layout.pixelsPerKey - 1.0f);
+    return (y + h) > layout.noteAreaTop &&
+           y < (layout.noteAreaTop + layout.noteAreaHeight);
+  };
+
+  const int visibleCount = noteVisibleEndIndex - noteVisibleBeginIndex;
+  m_visibleNoteInstances.reserve(static_cast<size_t>(visibleCount));
+
+  if (!frame.activeNotes || frame.activeNotes->empty()) {
+    for (int noteIndex = noteVisibleBeginIndex; noteIndex < noteVisibleEndIndex; ++noteIndex) {
+      const PianoRollFrame::Note& note = notes[static_cast<size_t>(noteIndex)];
+      if (!isNoteVerticallyVisible(note)) {
+        continue;
+      }
+      m_visibleNoteInstances.push_back(m_noteInstances[static_cast<size_t>(noteIndex)]);
+    }
+    return;
+  }
+
+  std::unordered_map<uint64_t, int> activeCounts;
+  activeCounts.reserve(frame.activeNotes->size() * 2);
+  const auto* trackEnabled = frame.trackEnabled.get();
+  for (const PianoRollFrame::Note& active : *frame.activeNotes) {
+    if (!isTrackEnabledForIndex(trackEnabled, active.trackIndex)) {
+      continue;
+    }
+    ++activeCounts[noteIdentityHash(active)];
+  }
+
+  // Preserve the cached note order so overlap priority never depends on active state.
+  for (int noteIndex = noteVisibleBeginIndex; noteIndex < noteVisibleEndIndex; ++noteIndex) {
+    const PianoRollFrame::Note& note = notes[static_cast<size_t>(noteIndex)];
+    if (!isNoteVerticallyVisible(note)) {
+      continue;
+    }
+
+    NoteInstance instance = m_noteInstances[static_cast<size_t>(noteIndex)];
+    const auto it = activeCounts.find(noteIdentityHash(note));
+    if (it != activeCounts.end() && it->second > 0) {
+      --(it->second);
+      instance.active = 1.0f;
+      const NoteGeometry geometry = computeNoteGeometry(note, layout);
+      if (geometry.valid) {
+        appendActiveLaserForNote(note, geometry, frame.trackColors.get(), currentX, playheadVisible);
+      }
+    }
+
+    m_visibleNoteInstances.push_back(instance);
+  }
+}
+
 // Converts sequence notes into persistent GPU note instances.
 void PianoRollRhiRenderer::rebuildNoteInstances(const PianoRollFrame::Data& frame) {
   m_noteInstances.clear();
@@ -1421,6 +1418,8 @@ void PianoRollRhiRenderer::rebuildNoteInstances(const PianoRollFrame::Data& fram
         fillColor.greenF(),
         fillColor.blueF(),
         fillColor.alphaF(),
+        0.0f,
+        noteGlowSeed(note),
     });
   }
 }
@@ -1753,10 +1752,11 @@ void PianoRollRhiRenderer::appendStaticKeyboardInstances(const PianoRollFrame::D
 }
 
 // Builds per-frame overlays and playback-dependent quads.
-void PianoRollRhiRenderer::buildDynamicInstances(const PianoRollFrame::Data& frame, const Layout& layout) {
+void PianoRollRhiRenderer::buildDynamicInstances(const PianoRollFrame::Data& frame,
+                                                 const Layout& layout,
+                                                 float currentX,
+                                                 bool playheadVisible) {
   m_dynamicInstances.clear();
-  m_activeLaserInstances.clear();
-  m_activeLaserCoreInstances.clear();
   m_dynamicFrontStart = 0;
 
   if (layout.viewWidth <= 0 || layout.viewHeight <= 0 || layout.noteAreaWidth <= 0.0f || layout.noteAreaHeight <= 0.0f) {
@@ -1767,11 +1767,6 @@ void PianoRollRhiRenderer::buildDynamicInstances(const PianoRollFrame::Data& fra
 
   const auto* trackColors = frame.trackColors.get();
   const auto* trackEnabled = frame.trackEnabled.get();
-  const float currentX = layout.noteAreaLeft + (static_cast<float>(frame.currentTick) * layout.pixelsPerTick) - layout.scrollX;
-  const bool playheadVisible =
-      (currentX >= layout.noteAreaLeft - 2.0f && currentX <= layout.noteAreaLeft + layout.noteAreaWidth + 2.0f);
-
-  appendActiveLaserInstances(frame, layout, trackColors, trackEnabled, currentX, playheadVisible);
 
   if (frame.selectedNotes && !frame.selectedNotes->empty()) {
     const float edge = 1.0f;
@@ -1869,60 +1864,29 @@ void PianoRollRhiRenderer::buildDynamicInstances(const PianoRollFrame::Data& fra
 }
 
 // Adds glow aura/core quads for currently active notes.
-void PianoRollRhiRenderer::appendActiveLaserInstances(const PianoRollFrame::Data& frame,
-                                                      const Layout& layout,
-                                                      const std::vector<QColor>* trackColors,
-                                                      const std::vector<uint8_t>* trackEnabled,
-                                                      float currentX,
-                                                      bool playheadVisible) {
-  if (!frame.activeNotes || frame.activeNotes->empty()) {
-    return;
+void PianoRollRhiRenderer::appendActiveLaserForNote(const PianoRollFrame::Note& note,
+                                                    const NoteGeometry& geometry,
+                                                    const std::vector<QColor>* trackColors,
+                                                    float currentX,
+                                                    bool playheadVisible) {
+  QColor laserBase = colorForTrackIndex(trackColors, note.trackIndex).lighter(108);
+  laserBase.setAlpha(228);
+
+  float seamLocalX = -1.0f;
+  if (playheadVisible && currentX >= geometry.x && currentX <= geometry.x + geometry.w) {
+    seamLocalX = std::clamp((currentX - geometry.x) / std::max(1.0f, geometry.w), 0.0f, 1.0f);
   }
 
-  for (const PianoRollFrame::Note& note : *frame.activeNotes) {
-    if (!isTrackEnabledForIndex(trackEnabled, note.trackIndex)) {
-      continue;
-    }
-    const NoteGeometry geometry = computeNoteGeometry(note, layout);
-    if (!geometry.valid) {
-      continue;
-    }
-
-    QColor laserBase = colorForTrackIndex(trackColors, note.trackIndex).lighter(108);
-    laserBase.setAlpha(228);
-    QColor laserCore = colorForTrackIndex(trackColors, note.trackIndex).lighter(112);
-    laserCore.setAlpha(255);
-    float seamLocalX = -1.0f;
-    if (playheadVisible && currentX >= geometry.x && currentX <= geometry.x + geometry.w) {
-      seamLocalX = std::clamp((currentX - geometry.x) / std::max(1.0f, geometry.w), 0.0f, 1.0f);
-    }
-    const float seamSeed =
-        (static_cast<float>(note.startTick) * 0.0079f) +
-        (static_cast<float>(note.key) * 0.233f) +
-        (static_cast<float>(note.trackIndex + 1) * 0.671f);
-
-    appendRect(m_activeLaserInstances,
-               geometry.x - kActiveLaserAuraPadPx,
-               geometry.y - kActiveLaserAuraPadPx,
-               geometry.w + (2.0f * kActiveLaserAuraPadPx),
-               geometry.h + (2.0f * kActiveLaserAuraPadPx),
-               laserBase,
-               LineStyle::ActiveLaser,
-               seamLocalX,
-               frame.elapsedSeconds,
-               seamSeed);
-
-    appendRect(m_activeLaserCoreInstances,
-               geometry.x,
-               geometry.y,
-               geometry.w,
-               geometry.h,
-               laserCore,
-               LineStyle::ActiveLaserCore,
-               seamLocalX,
-               frame.elapsedSeconds,
-               seamSeed);
-  }
+  appendRect(m_activeLaserInstances,
+             geometry.x - kActiveLaserAuraPadPx,
+             geometry.y - kActiveLaserAuraPadPx,
+             geometry.w + (2.0f * kActiveLaserAuraPadPx),
+             geometry.h + (2.0f * kActiveLaserAuraPadPx),
+             laserBase,
+             LineStyle::ActiveLaser,
+             seamLocalX,
+             0.0f,
+             noteGlowSeed(note));
 }
 
 // Draws keyboard key highlights for currently active notes.
