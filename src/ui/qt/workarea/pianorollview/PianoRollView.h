@@ -160,6 +160,7 @@ private:
   void rebuildTrackColors();
   void rebuildFrameColors();
   void rebuildSequenceCache();
+  void updateInactiveNoteDimTarget(bool animated = true);
   bool applyResolvedActiveNotes(const std::vector<PianoRollFrame::Note>& resolvedActiveNotes);
   bool updateActiveKeyStates();
 
@@ -234,6 +235,7 @@ private:
   bool m_playbackActive = false;
   int m_currentTick = 0;
   bool m_seekDragActive = false;
+  bool m_lightFrameColors = true;
   bool m_panDragActive = false;
   bool m_noteSelectionPressActive = false;
   bool m_noteSelectionDragging = false;
@@ -253,6 +255,8 @@ private:
   QVariantAnimation* m_horizontalZoomAnimation = nullptr;
   QVariantAnimation* m_verticalZoomAnimation = nullptr;
   QVariantAnimation* m_playbackAutoScrollAnimation = nullptr;
+  QVariantAnimation* m_inactiveNoteDimAnimation = nullptr;
+  float m_inactiveNoteDimAlpha = 0.0f;
   float m_horizontalZoomWorldTick = 0.0f;
   int m_horizontalZoomAnchor = 0;
   float m_verticalZoomWorldY = 0.0f;

@@ -44,8 +44,10 @@
 namespace {
 constexpr int kNoteSelectionAutoScrollIntervalMs = 16;
 constexpr int kPlaybackAutoScrollDurationMs = 1000;
+constexpr int kInactiveNoteDimDurationMs = 160;
 constexpr float kPlaybackPageTriggerFraction = 0.85f;
 constexpr float kPlaybackPageTargetFraction = 0.05f;
+constexpr float kInactiveNoteDimMaxAlpha = 0.30f;
 const QColor kDisabledTrackColor(132, 132, 132);
 
 bool pianoRollNoteLess(const PianoRollFrame::Note& lhs, const PianoRollFrame::Note& rhs) {
@@ -145,6 +147,14 @@ PianoRollView::PianoRollView(QWidget* parent)
     m_applyingPlaybackAutoScroll = true;
     hbar->setValue(nextValue);
     m_applyingPlaybackAutoScroll = false;
+  });
+
+  m_inactiveNoteDimAnimation = new QVariantAnimation(this);
+  m_inactiveNoteDimAnimation->setDuration(kInactiveNoteDimDurationMs);
+  m_inactiveNoteDimAnimation->setEasingCurve(QEasingCurve::OutCubic);
+  connect(m_inactiveNoteDimAnimation, &QVariantAnimation::valueChanged, this, [this](const QVariant& value) {
+    m_inactiveNoteDimAlpha = std::clamp(value.toFloat(), 0.0f, kInactiveNoteDimMaxAlpha);
+    requestRenderCoalesced();
   });
 
   m_rhiHost = new PianoRollRhiHost(this, viewport());
@@ -322,6 +332,7 @@ void PianoRollView::setPlaybackTick(int tick,
 
   m_currentTick = tick;
   m_playbackActive = playbackActive;
+  updateInactiveNoteDimTarget();
 
   if (playbackStateChanged && !m_playbackActive) {
     stopPlaybackAutoScrollAnimation();
@@ -366,6 +377,7 @@ void PianoRollView::clearPlaybackState() {
   m_playbackAutoScrollEnabled = true;
   m_waitForWheelScrollBegin = false;
   m_applyingPlaybackAutoScroll = false;
+  updateInactiveNoteDimTarget();
   updateActiveKeyStates();
   m_lastRenderedScanlineX = std::numeric_limits<int>::min();
   requestRender();
@@ -405,6 +417,7 @@ PianoRollFrame::Data PianoRollView::captureRhiFrameData(float dpr) const {
   frame.minPixelsPerTick = kMinPixelsPerTick;
   frame.pixelsPerKey = m_pixelsPerKey;
   frame.elapsedSeconds = static_cast<float>(m_animClock.elapsed()) / 1000.0f;
+  frame.inactiveNoteDimAlpha = m_inactiveNoteDimAlpha;
   frame.playbackActive = m_playbackActive;
 
   frame.trackColors = m_trackColorsSnapshot;
@@ -498,6 +511,7 @@ void PianoRollView::changeEvent(QEvent* event) {
       event->type() == QEvent::ApplicationPaletteChange ||
       event->type() == QEvent::StyleChange) {
     rebuildFrameColors();
+    updateInactiveNoteDimTarget(false);
     requestRender();
   }
 }
@@ -732,6 +746,7 @@ bool PianoRollView::handleViewportMousePress(QMouseEvent* event) {
   if (activeModifiers.testFlag(Qt::AltModifier)) {
     clearPreviewNotes();
     m_seekDragActive = false;
+    updateInactiveNoteDimTarget();
     m_noteSelectionPressActive = false;
     m_noteSelectionDragging = false;
     m_noteSelectionAnchorWorldValid = false;
@@ -778,6 +793,7 @@ void PianoRollView::beginSeekDragAtX(int viewportX) {
   stopPlaybackAutoScrollAnimation();
   m_playbackAutoScrollEnabled = true;
   m_seekDragActive = true;
+  updateInactiveNoteDimTarget();
   m_currentTick = tickFromViewportX(viewportX);
   updateActiveKeyStates();
   requestRender();
@@ -812,6 +828,7 @@ bool PianoRollView::handleViewportMouseMove(QMouseEvent* event) {
   if (m_seekDragActive) {
     if (!(activeButtons & Qt::LeftButton)) {
       m_seekDragActive = false;
+      updateInactiveNoteDimTarget();
       event->accept();
       return true;
     }
@@ -892,6 +909,7 @@ bool PianoRollView::handleViewportMouseRelease(QMouseEvent* event) {
     const QPoint pos = viewportPosFromGlobal(event->globalPosition());
     m_currentTick = tickFromViewportX(pos.x());
     m_seekDragActive = false;
+    updateInactiveNoteDimTarget();
     updateActiveKeyStates();
     requestRender();
 
@@ -1038,6 +1056,7 @@ void PianoRollView::rebuildFrameColors() {
   const QColor window = pal.color(QPalette::Window);
   const QColor text = pal.color(QPalette::Text);
   const bool dark = base.lightnessF() < 0.5f;
+  m_lightFrameColors = !dark;
 
   m_frameColors.backgroundColor = window;
   m_frameColors.noteBackgroundColor = dark ? base.lighter(108) : base;
@@ -1059,6 +1078,34 @@ void PianoRollView::rebuildFrameColors() {
   m_frameColors.selectedNoteOutlineColor = dark ? QColor(138, 214, 255, 245) : QColor(36, 110, 196, 230);
   m_frameColors.selectionRectFillColor = dark ? QColor(78, 184, 255, 42) : QColor(72, 158, 232, 40);
   m_frameColors.selectionRectOutlineColor = dark ? QColor(138, 214, 255, 212) : QColor(36, 110, 196, 205);
+}
+
+void PianoRollView::updateInactiveNoteDimTarget(bool animated) {
+  const float targetAlpha = (m_lightFrameColors && (m_playbackActive || m_seekDragActive))
+                                ? kInactiveNoteDimMaxAlpha
+                                : 0.0f;
+  if (m_inactiveNoteDimAnimation &&
+      m_inactiveNoteDimAnimation->state() == QAbstractAnimation::Running &&
+      std::abs(targetAlpha - m_inactiveNoteDimAnimation->endValue().toFloat()) <= 0.001f) {
+    return;
+  }
+  if (std::abs(targetAlpha - m_inactiveNoteDimAlpha) <= 0.001f) {
+    return;
+  }
+
+  if (!m_inactiveNoteDimAnimation || !animated) {
+    if (m_inactiveNoteDimAnimation) {
+      m_inactiveNoteDimAnimation->stop();
+    }
+    m_inactiveNoteDimAlpha = targetAlpha;
+    requestRender();
+    return;
+  }
+
+  m_inactiveNoteDimAnimation->stop();
+  m_inactiveNoteDimAnimation->setStartValue(m_inactiveNoteDimAlpha);
+  m_inactiveNoteDimAnimation->setEndValue(targetAlpha);
+  m_inactiveNoteDimAnimation->start();
 }
 
 void PianoRollView::rebuildSequenceCache() {
