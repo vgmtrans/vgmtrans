@@ -428,7 +428,7 @@ void PianoRollRhiRenderer::renderFrame(QRhiCommandBuffer* cb, const RenderTarget
 
   // Dynamic overlays and visible note state update every frame.
   buildDynamicInstances(frame, layout, currentX, playheadVisible);
-  buildVisibleNoteInstances(frame, layout, currentX, playheadVisible);
+  buildVisibleNoteInstances(frame, layout);
   if (profileEnabled) {
     tDynamic = profileTimer.nsecsElapsed();
   }
@@ -468,11 +468,11 @@ void PianoRollRhiRenderer::renderFrame(QRhiCommandBuffer* cb, const RenderTarget
   ubo[25] = frame.noteOutlineColor.greenF();
   ubo[26] = frame.noteOutlineColor.blueF();
   ubo[27] = frame.noteOutlineColor.alphaF();
-  // glowConfig packs glow mode, animation time, and playhead position.
+  // glowConfig packs glow mode and animation time.
   ubo[28] = activeLaserUseScreenBlend ? 0.0f : 1.0f;
   ubo[29] = frame.elapsedSeconds;
-  ubo[30] = currentX;
-  ubo[31] = playheadVisible ? 1.0f : 0.0f;
+  ubo[30] = 0.0f;
+  ubo[31] = 0.0f;
   updates->updateDynamicBuffer(m_uniformBuffer, 0, kUniformBytes, ubo.data());
 
   if (m_staticDataDirty) {
@@ -1285,9 +1285,7 @@ PianoRollRhiRenderer::NoteDataKey PianoRollRhiRenderer::makeNoteDataKey(const Pi
 }
 
 void PianoRollRhiRenderer::buildVisibleNoteInstances(const PianoRollFrame::Data& frame,
-                                                     const Layout& layout,
-                                                     float currentX,
-                                                     bool playheadVisible) {
+                                                     const Layout& layout) {
   m_visibleNoteInstances.clear();
   m_activeLaserInstances.clear();
   if (!frame.notes || frame.notes->empty() || m_noteInstances.empty()) {
@@ -1373,7 +1371,7 @@ void PianoRollRhiRenderer::buildVisibleNoteInstances(const PianoRollFrame::Data&
       instance.active = 1.0f;
       const NoteGeometry geometry = computeNoteGeometry(note, layout);
       if (geometry.valid) {
-        appendActiveLaserForNote(note, geometry, frame.trackColors.get(), currentX, playheadVisible);
+        appendActiveLaserForNote(note, geometry, frame.trackColors.get());
       }
     }
 
@@ -1863,19 +1861,12 @@ void PianoRollRhiRenderer::buildDynamicInstances(const PianoRollFrame::Data& fra
   appendKeyboardHighlightInstances(frame, layout, trackColors, trackEnabled);
 }
 
-// Adds glow aura/core quads for currently active notes.
+// Adds outside-only glow aura quads for currently active notes.
 void PianoRollRhiRenderer::appendActiveLaserForNote(const PianoRollFrame::Note& note,
                                                     const NoteGeometry& geometry,
-                                                    const std::vector<QColor>* trackColors,
-                                                    float currentX,
-                                                    bool playheadVisible) {
+                                                    const std::vector<QColor>* trackColors) {
   QColor laserBase = colorForTrackIndex(trackColors, note.trackIndex).lighter(108);
   laserBase.setAlpha(228);
-
-  float seamLocalX = -1.0f;
-  if (playheadVisible && currentX >= geometry.x && currentX <= geometry.x + geometry.w) {
-    seamLocalX = std::clamp((currentX - geometry.x) / std::max(1.0f, geometry.w), 0.0f, 1.0f);
-  }
 
   appendRect(m_activeLaserInstances,
              geometry.x - kActiveLaserAuraPadPx,
@@ -1883,10 +1874,7 @@ void PianoRollRhiRenderer::appendActiveLaserForNote(const PianoRollFrame::Note& 
              geometry.w + (2.0f * kActiveLaserAuraPadPx),
              geometry.h + (2.0f * kActiveLaserAuraPadPx),
              laserBase,
-             LineStyle::ActiveLaser,
-             seamLocalX,
-             0.0f,
-             noteGlowSeed(note));
+             LineStyle::ActiveLaser);
 }
 
 // Draws keyboard key highlights for currently active notes.
