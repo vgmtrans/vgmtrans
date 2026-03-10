@@ -1335,6 +1335,8 @@ void PianoRollRhiRenderer::buildVisibleNoteInstances(const PianoRollFrame::Data&
 
   const int visibleCount = noteVisibleEndIndex - noteVisibleBeginIndex;
   m_visibleNoteInstances.reserve(static_cast<size_t>(visibleCount));
+  m_enabledVisibleNoteInstances.clear();
+  m_enabledVisibleNoteInstances.reserve(static_cast<size_t>(visibleCount));
 
   std::unordered_map<uint64_t, int> activeCounts;
   const auto* trackEnabled = frame.trackEnabled.get();
@@ -1350,7 +1352,9 @@ void PianoRollRhiRenderer::buildVisibleNoteInstances(const PianoRollFrame::Data&
   const float inactiveDim = std::clamp(frame.inactiveNoteDimAlpha, 0.0f, 1.0f);
   const float inactiveShade = 1.0f - (0.55f * inactiveDim);
 
-  // Preserve the cached note order so overlap priority never depends on active state.
+  // Keep muted notes behind enabled notes without rescanning the visible range.
+  // We preserve the original order inside each bucket, then append the enabled
+  // bucket after the muted one so overlap between the two groups is stable.
   for (int noteIndex = noteVisibleBeginIndex; noteIndex < noteVisibleEndIndex; ++noteIndex) {
     const PianoRollFrame::Note& note = notes[static_cast<size_t>(noteIndex)];
     if (!isNoteVerticallyVisible(note)) {
@@ -1358,15 +1362,19 @@ void PianoRollRhiRenderer::buildVisibleNoteInstances(const PianoRollFrame::Data&
     }
 
     NoteInstance instance = m_noteInstances[static_cast<size_t>(noteIndex)];
-    const auto it = activeCounts.find(noteIdentityHash(note));
+    const bool trackIsEnabled = instance.borderEnabled > 0.5f;
+
     bool isActive = false;
-    if (it != activeCounts.end() && it->second > 0) {
-      --(it->second);
-      instance.active = 1.0f;
-      isActive = true;
-      const NoteGeometry geometry = computeNoteGeometry(note, layout);
-      if (geometry.valid) {
-        appendActiveLaserForNote(note, geometry, frame.trackColors.get());
+    if (trackIsEnabled) {
+      const auto it = activeCounts.find(noteIdentityHash(note));
+      if (it != activeCounts.end() && it->second > 0) {
+        --(it->second);
+        instance.active = 1.0f;
+        isActive = true;
+        const NoteGeometry geometry = computeNoteGeometry(note, layout);
+        if (geometry.valid) {
+          appendActiveLaserForNote(note, geometry, frame.trackColors.get());
+        }
       }
     }
     if (!isActive && inactiveDim > 0.001f) {
@@ -1376,7 +1384,21 @@ void PianoRollRhiRenderer::buildVisibleNoteInstances(const PianoRollFrame::Data&
       instance.b *= inactiveShade;
     }
 
-    m_visibleNoteInstances.push_back(instance);
+    if (trackIsEnabled) {
+      m_enabledVisibleNoteInstances.push_back(instance);
+    } else {
+      m_visibleNoteInstances.push_back(instance);
+    }
+  }
+
+  if (m_visibleNoteInstances.empty()) {
+    m_visibleNoteInstances.swap(m_enabledVisibleNoteInstances);
+  } else {
+    // Muted notes were pushed directly into m_visibleNoteInstances above, so
+    // appending enabled notes here guarantees they draw on top.
+    m_visibleNoteInstances.insert(m_visibleNoteInstances.end(),
+                                  m_enabledVisibleNoteInstances.begin(),
+                                  m_enabledVisibleNoteInstances.end());
   }
 }
 

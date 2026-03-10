@@ -249,6 +249,7 @@ private:
   std::vector<RectInstance> m_activeLaserInstances;
   std::vector<NoteInstance> m_noteInstances;
   std::vector<NoteInstance> m_visibleNoteInstances;
+  std::vector<NoteInstance> m_enabledVisibleNoteInstances;
   int m_dynamicFrontStart = 0;
 
   bool m_hasStaticCacheKey = false;
