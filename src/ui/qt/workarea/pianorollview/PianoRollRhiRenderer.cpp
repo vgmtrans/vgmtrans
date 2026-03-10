@@ -1336,26 +1336,19 @@ void PianoRollRhiRenderer::buildVisibleNoteInstances(const PianoRollFrame::Data&
   const int visibleCount = noteVisibleEndIndex - noteVisibleBeginIndex;
   m_visibleNoteInstances.reserve(static_cast<size_t>(visibleCount));
 
-  if (!frame.activeNotes || frame.activeNotes->empty()) {
-    for (int noteIndex = noteVisibleBeginIndex; noteIndex < noteVisibleEndIndex; ++noteIndex) {
-      const PianoRollFrame::Note& note = notes[static_cast<size_t>(noteIndex)];
-      if (!isNoteVerticallyVisible(note)) {
+  std::unordered_map<uint64_t, int> activeCounts;
+  const auto* trackEnabled = frame.trackEnabled.get();
+  if (frame.activeNotes && !frame.activeNotes->empty()) {
+    activeCounts.reserve(frame.activeNotes->size() * 2);
+    for (const PianoRollFrame::Note& active : *frame.activeNotes) {
+      if (!isTrackEnabledForIndex(trackEnabled, active.trackIndex)) {
         continue;
       }
-      m_visibleNoteInstances.push_back(m_noteInstances[static_cast<size_t>(noteIndex)]);
+      ++activeCounts[noteIdentityHash(active)];
     }
-    return;
   }
-
-  std::unordered_map<uint64_t, int> activeCounts;
-  activeCounts.reserve(frame.activeNotes->size() * 2);
-  const auto* trackEnabled = frame.trackEnabled.get();
-  for (const PianoRollFrame::Note& active : *frame.activeNotes) {
-    if (!isTrackEnabledForIndex(trackEnabled, active.trackIndex)) {
-      continue;
-    }
-    ++activeCounts[noteIdentityHash(active)];
-  }
+  const float inactiveDim = std::clamp(frame.inactiveNoteDimAlpha, 0.0f, 1.0f);
+  const float inactiveShade = 1.0f - (0.55f * inactiveDim);
 
   // Preserve the cached note order so overlap priority never depends on active state.
   for (int noteIndex = noteVisibleBeginIndex; noteIndex < noteVisibleEndIndex; ++noteIndex) {
@@ -1366,13 +1359,21 @@ void PianoRollRhiRenderer::buildVisibleNoteInstances(const PianoRollFrame::Data&
 
     NoteInstance instance = m_noteInstances[static_cast<size_t>(noteIndex)];
     const auto it = activeCounts.find(noteIdentityHash(note));
+    bool isActive = false;
     if (it != activeCounts.end() && it->second > 0) {
       --(it->second);
       instance.active = 1.0f;
+      isActive = true;
       const NoteGeometry geometry = computeNoteGeometry(note, layout);
       if (geometry.valid) {
         appendActiveLaserForNote(note, geometry, frame.trackColors.get());
       }
+    }
+    if (!isActive && inactiveDim > 0.001f) {
+      // Keep active notes readable by darkening only the inactive note bodies.
+      instance.r *= inactiveShade;
+      instance.g *= inactiveShade;
+      instance.b *= inactiveShade;
     }
 
     m_visibleNoteInstances.push_back(instance);
