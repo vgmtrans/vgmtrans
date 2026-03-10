@@ -3,18 +3,21 @@
 layout(location = 0) in vec2 inPos;
 layout(location = 1) in vec4 inMeta;
 layout(location = 2) in vec4 inColor;
+layout(location = 3) in vec2 inState;
 
 layout(location = 0) out vec4 vFillColor;
 layout(location = 1) out vec2 vLocalPos;
 layout(location = 2) out vec2 vRectSize;
 layout(location = 3) out vec2 vScenePos;
 layout(location = 4) out float vBorderEnabled;
+layout(location = 5) out vec2 vNoteState;
 
 layout(std140, binding = 0) uniform Ubuf {
   mat4 mvp;
   vec4 camera;
   vec4 noteArea;
   vec4 noteBorderColor;
+  vec4 glowConfig;
 };
 
 void main() {
@@ -35,4 +38,5 @@ void main() {
   vRectSize = vec2(w, h);
   vScenePos = pos;
   vBorderEnabled = inMeta.w;
+  vNoteState = inState;
 }

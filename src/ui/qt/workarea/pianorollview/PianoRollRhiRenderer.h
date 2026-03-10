@@ -101,6 +101,8 @@ private:
     float g;
     float b;
     float a;
+    float active;
+    float glowSeed;
   };
 
   struct NoteDataKey {
@@ -151,7 +153,6 @@ private:
     HorizontalGradient = 6,
     LabelText = 7,
     ActiveLaser = 8,
-    ActiveLaserCore = 9,
   };
 
   static bool isBlackKey(int key);
@@ -169,6 +170,10 @@ private:
   static bool staticCacheKeyEqual(const StaticCacheKey& lhs, const StaticCacheKey& rhs);
   NoteDataKey makeNoteDataKey(const PianoRollFrame::Data& frame) const;
   void rebuildNoteInstances(const PianoRollFrame::Data& frame);
+  void buildVisibleNoteInstances(const PianoRollFrame::Data& frame,
+                                 const Layout& layout,
+                                 float currentX,
+                                 bool playheadVisible);
   void appendMeasureNumberOverlays(const PianoRollFrame::Data& frame, const Layout& layout);
   void appendPianoCKeyLabels(const PianoRollFrame::Data& frame, const Layout& layout);
   const LabelGlyph* glyphForLabelChar(QChar ch) const;
@@ -182,11 +187,13 @@ private:
   void buildStaticInstances(const PianoRollFrame::Data& frame, const Layout& layout);
   void appendStaticGridInstances(const PianoRollFrame::Data& frame, const Layout& layout);
   void appendStaticKeyboardInstances(const PianoRollFrame::Data& frame, const Layout& layout);
-  void buildDynamicInstances(const PianoRollFrame::Data& frame, const Layout& layout);
-  void appendActiveLaserInstances(const PianoRollFrame::Data& frame,
-                                  const Layout& layout,
-                                  const std::vector<QColor>* trackColors,
-                                  const std::vector<uint8_t>* trackEnabled,
+  void buildDynamicInstances(const PianoRollFrame::Data& frame,
+                             const Layout& layout,
+                             float currentX,
+                             bool playheadVisible);
+  void appendActiveLaserForNote(const PianoRollFrame::Note& note,
+                                const NoteGeometry& geometry,
+                                const std::vector<QColor>* trackColors,
                                   float currentX,
                                   bool playheadVisible);
   void appendKeyboardHighlightInstances(const PianoRollFrame::Data& frame,
@@ -223,9 +230,7 @@ private:
   QRhiBuffer* m_staticFrontInstanceBuffer = nullptr;
   QRhiBuffer* m_dynamicInstanceBuffer = nullptr;
   QRhiBuffer* m_activeLaserInstanceBuffer = nullptr;
-  QRhiBuffer* m_activeLaserCoreInstanceBuffer = nullptr;
-  QRhiBuffer* m_activeNoteInstanceBuffer = nullptr;
-  QRhiBuffer* m_inactiveNoteInstanceBuffer = nullptr;
+  QRhiBuffer* m_noteInstanceBuffer = nullptr;
   QRhiTexture* m_measureLabelAtlas = nullptr;
   QRhiSampler* m_measureLabelSampler = nullptr;
   QRhiShaderResourceBindings* m_shaderBindings = nullptr;
@@ -247,10 +252,8 @@ private:
   std::vector<RectInstance> m_staticFrontInstances;
   std::vector<RectInstance> m_dynamicInstances;
   std::vector<RectInstance> m_activeLaserInstances;
-  std::vector<RectInstance> m_activeLaserCoreInstances;
   std::vector<NoteInstance> m_noteInstances;
-  std::vector<NoteInstance> m_activeNoteInstances;
-  std::vector<NoteInstance> m_inactiveNoteInstances;
+  std::vector<NoteInstance> m_visibleNoteInstances;
   int m_dynamicFrontStart = 0;
 
   bool m_hasStaticCacheKey = false;
