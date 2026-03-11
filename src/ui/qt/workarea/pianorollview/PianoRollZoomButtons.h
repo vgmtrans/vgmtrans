@@ -6,16 +6,18 @@
 
 #pragma once
 
-#include <QScrollBar>
+#include <QWidget>
 
 class QMouseEvent;
-class QPaintEvent;
 
-class PianoRollZoomScrollBar final : public QScrollBar {
+class PianoRollZoomButtons final : public QWidget {
   Q_OBJECT
 
 public:
-  explicit PianoRollZoomScrollBar(Qt::Orientation orientation, QWidget* parent = nullptr);
+  explicit PianoRollZoomButtons(Qt::Orientation orientation, QWidget* parent = nullptr);
+
+  [[nodiscard]] QSize sizeHint() const override;
+  [[nodiscard]] QSize minimumSizeHint() const override;
 
 signals:
   void zoomInRequested();
@@ -41,6 +43,7 @@ private:
   [[nodiscard]] QRect zoomInRect() const;
   [[nodiscard]] Button buttonAt(const QPoint& pos) const;
 
+  Qt::Orientation m_orientation = Qt::Horizontal;
   Button m_hovered = Button::None;
   Button m_pressed = Button::None;
 };
