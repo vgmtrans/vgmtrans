@@ -408,8 +408,14 @@ void HexViewRhiRenderer::renderFrame(QRhiCommandBuffer* cb, const RenderTargetIn
     cb->drawIndexed(6, 1, 0, 0, 0);
   };
 
+  // Submit uploads before the first pass so render-pass startup does not also
+  // carry resource-update work on backends that are sensitive to it.
+  if (u) {
+    cb->resourceUpdate(u);
+  }
+
   // Pass 1: base content (background spans + glyphs) into an offscreen texture.
-  cb->beginPass(m_contentRt, clearColor, {1.0f, 0}, u);
+  cb->beginPass(m_contentRt, clearColor, {1.0f, 0}, nullptr);
   cb->setViewport(viewport);
   drawInstanced(m_rectPso,
                 m_rectSrb,
