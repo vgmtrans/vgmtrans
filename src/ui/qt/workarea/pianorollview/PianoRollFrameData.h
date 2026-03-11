@@ -14,6 +14,8 @@
 #include <memory>
 #include <vector>
 
+#include "workarea/rhi/RhiScrollChromeData.h"
+
 namespace PianoRollFrame {
 
 static constexpr int kMidiKeyCount = 128;
@@ -52,6 +54,7 @@ struct Data {
   float inactiveNoteDimAlpha = 0.0f;
 
   bool playbackActive = false;
+  RhiScrollAreaChromeSnapshot scrollChrome;
 
   QColor backgroundColor;
   QColor noteBackgroundColor;

@@ -29,7 +29,39 @@ float noteCornerRadius(vec2 size) {
 }
 
 void main() {
-  if (vParams.x > 7.5) {
+  if (vParams.x > 11.5) {
+    vec2 px = vLocalPos * vRectSize;
+    vec2 halfSize = 0.5 * vRectSize;
+    float radius = max(0.0, (0.5 * min(vRectSize.x, vRectSize.y)) - 0.75);
+    float dist = sdRoundBox(px - halfSize, halfSize - vec2(0.5), radius);
+    float aa = max(fwidth(dist), 0.001);
+    float alpha = 1.0 - smoothstep(0.0, aa, dist);
+    if (alpha <= 0.001) {
+      discard;
+    }
+    fragColor = vec4(vColor.rgb, vColor.a * alpha);
+    return;
+  } else if (vParams.x > 8.5) {
+    vec2 uv = clamp(vLocalPos, 0.0, 1.0);
+    if (vParams.x > 10.5) {
+      uv = vec2(uv.y, uv.x);
+    } else if (vParams.x > 9.5) {
+      uv = vec2(uv.y, 1.0 - uv.x);
+    } else {
+      uv = vec2(uv.x, 1.0 - uv.y);
+    }
+
+    float halfWidth = 0.5 * (1.0 - uv.y);
+    float edgeDist = halfWidth - abs(uv.x - 0.5);
+    float aa = max(0.75 * fwidth(edgeDist), 0.001);
+    float triAlpha = smoothstep(0.0, aa, edgeDist);
+    if (triAlpha <= 0.0) {
+      discard;
+    }
+
+    fragColor = vec4(vColor.rgb, triAlpha * vColor.a);
+    return;
+  } else if (vParams.x > 7.5) {
     if (vScenePos.x < noteArea.x || vScenePos.x > noteArea.z ||
         vScenePos.y < noteArea.y || vScenePos.y > noteArea.w) {
       discard;
