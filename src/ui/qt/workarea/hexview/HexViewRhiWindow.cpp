@@ -260,13 +260,7 @@ void HexViewRhiWindow::resizeSwapChain() {
     return;
   }
 
-  if (!m_ds || m_ds->pixelSize() != pixelSize) {
-    delete m_ds;
-    m_ds = m_rhi->newRenderBuffer(QRhiRenderBuffer::DepthStencil, pixelSize, m_sc->sampleCount(),
-                                  QRhiRenderBuffer::UsedWithSwapChainOnly);
-    m_ds->create();
-    m_sc->setDepthStencil(m_ds);
-  }
+  m_sc->setDepthStencil(nullptr);
 
   m_hasSwapChain = m_sc->createOrResize();
   L_DEBUG("HexViewRhiWindow swapchain resized pixelSize={}x{} sampleCount={}",
@@ -328,8 +322,6 @@ void HexViewRhiWindow::releaseResources() {
 
   delete m_rp;
   m_rp = nullptr;
-  delete m_ds;
-  m_ds = nullptr;
 
   releaseSwapChain();
   delete m_sc;
