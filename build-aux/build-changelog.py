@@ -49,6 +49,11 @@ def parse_argv() -> argparse.Namespace:
         choices=("markdown", "appstream"),
         help="Output format.",
     )
+    parser.add_argument(
+        "--no-heading",
+        action="store_true",
+        help="Omit the selected changelog section heading from markdown output.",
+    )
     parser.add_argument("--output", type=Path, help="Write output to this file.")
     return parser.parse_args()
 
@@ -109,10 +114,16 @@ def collect_references(text: str, references: list[tuple[str, str]]) -> list[str
     return [f"[{label}]: {target}" for label, target in references if label in labels]
 
 
-def render_markdown(section: Section, references: list[tuple[str, str]]) -> str:
-    output_lines = [section.heading]
+def render_markdown(
+    section: Section, references: list[tuple[str, str]], include_heading: bool = True
+) -> str:
+    output_lines: list[str] = []
+    if include_heading:
+        output_lines.append(section.heading)
 
     section_lines = list(section.lines)
+    while section_lines and not section_lines[0]:
+        section_lines.pop(0)
     while section_lines and not section_lines[-1]:
         section_lines.pop()
 
@@ -122,13 +133,8 @@ def render_markdown(section: Section, references: list[tuple[str, str]]) -> str:
     reference_lines = collect_references(body, references)
     if reference_lines:
         body = f"{body}\n\n" + "\n".join(reference_lines)
-    
-    full_changelog_section = (
-        "## Full changelog\n"
-        "- See the full version history "
-        "[here](https://github.com/vgmtrans/vgmtrans/blob/master/CHANGELOG.md)."
-    )
-    return f"{body}\n\n{full_changelog_section}\n"
+
+    return f"{body}\n"
 
 
 def squash_inline_markdown(text: str) -> str:
@@ -249,7 +255,9 @@ def main() -> int:
         return 1
 
     if args.format == "markdown":
-        output = render_markdown(section, references)
+        output = render_markdown(
+            section, references, include_heading=not args.no_heading
+        )
     else:
         output = render_appstream(section)
 
