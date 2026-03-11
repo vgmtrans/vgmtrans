@@ -8,11 +8,10 @@
 
 #include <QToolBar>
 
-class QSlider;
 class QPushButton;
 class QLabel;
 class MarqueeLabel;
-class ClickJumpSlider;
+class SeekBar;
 enum class PositionChangeOrigin;
 
 class IconBar final : public QWidget {
@@ -38,7 +37,7 @@ private:
   QPushButton *m_create{};
   QPushButton *m_play{};
   QPushButton *m_stop{};
-  ClickJumpSlider *m_slider{};
+  SeekBar *m_slider{};
   MarqueeLabel *m_title;
   inline static QIcon s_playicon;
   inline static QIcon s_pauseicon;
