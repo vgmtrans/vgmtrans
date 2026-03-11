@@ -206,6 +206,7 @@ private:
   QRhiBuffer* m_compositeUbuf = nullptr;
   QRhiTexture* m_glyphTex = nullptr;
   QRhiTexture* m_itemIdTex = nullptr;
+  QRhiTexture* m_edgeFallbackTex = nullptr;
   QRhiSampler* m_glyphSampler = nullptr;
   QRhiSampler* m_maskSampler = nullptr;
   QRhiShaderResourceBindings* m_rectSrb = nullptr;
@@ -217,6 +218,8 @@ private:
   QRhiGraphicsPipeline* m_maskPso = nullptr;
   QRhiGraphicsPipeline* m_edgePso = nullptr;
   QRhiGraphicsPipeline* m_compositePso = nullptr;
+  QRhiGraphicsPipeline* m_outputRectPso = nullptr;
+  QRhiGraphicsPipeline* m_outputGlyphPso = nullptr;
   int m_sampleCount = 1;
   uint64_t m_glyphAtlasVersion = 0;
   bool m_staticBuffersUploaded = false;
@@ -241,6 +244,8 @@ private:
   bool m_baseBufferDirty = false;
   bool m_selectionBufferDirty = false;
   bool m_itemIdDirty = true;
+  bool m_edgeFallbackDirty = true;
+  bool m_useEdgeFallback = true;
   bool m_outlineEnabled = false;
   float m_outlineAlpha = 0.0f;
   float m_lastFrameSeconds = 0.0f;
