@@ -121,6 +121,24 @@ private:
     float advance = 0.0f;
   };
 
+  struct VisibleNoteBuildStats {
+    int candidateCount = 0;
+    int horizontallyVisibleCount = 0;
+    int verticallyVisibleCount = 0;
+    int outputCount = 0;
+    int activeLaserCount = 0;
+  };
+
+  struct DynamicBuildStats {
+    int totalInstances = 0;
+    int measureLabelInstances = 0;
+    int selectionInstances = 0;
+    int playheadInstances = 0;
+    int marqueeInstances = 0;
+    int keyboardInstances = 0;
+    int scrollChromeInstances = 0;
+  };
+
   struct RectInstance {
     // Per-instance payload consumed by pianorollquad shaders.
     float x;
@@ -174,7 +192,9 @@ private:
   static bool staticCacheKeyEqual(const StaticCacheKey& lhs, const StaticCacheKey& rhs);
   NoteDataKey makeNoteDataKey(const PianoRollFrame::Data& frame) const;
   void rebuildNoteInstances(const PianoRollFrame::Data& frame);
-  void buildVisibleNoteInstances(const PianoRollFrame::Data& frame, const Layout& layout);
+  void buildVisibleNoteInstances(const PianoRollFrame::Data& frame,
+                                 const Layout& layout,
+                                 VisibleNoteBuildStats* stats = nullptr);
   void appendMeasureNumberOverlays(const PianoRollFrame::Data& frame, const Layout& layout);
   void appendPianoCKeyLabels(const PianoRollFrame::Data& frame, const Layout& layout);
   const LabelGlyph* glyphForLabelChar(QChar ch) const;
@@ -191,7 +211,8 @@ private:
   void buildDynamicInstances(const PianoRollFrame::Data& frame,
                              const Layout& layout,
                              float currentX,
-                             bool playheadVisible);
+                             bool playheadVisible,
+                             DynamicBuildStats* stats = nullptr);
   void appendActiveLaserForNote(const PianoRollFrame::Note& note,
                                 const NoteGeometry& geometry,
                                 const std::vector<QColor>* trackColors);
