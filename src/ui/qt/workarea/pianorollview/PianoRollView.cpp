@@ -8,14 +8,14 @@
 
 #include "common/DragAutoScroll.h"
 #include "PianoRollRhiHost.h"
-#include "PianoRollZoomScrollBar.h"
+#include "PianoRollZoomButtons.h"
+#include "workarea/rhi/RhiScrollAreaChrome.h"
 
 #include "SeqEvent.h"
 #include "SeqEventTimeIndex.h"
 #include "SeqNoteUtils.h"
 #include "SeqTrack.h"
 #include "VGMSeq.h"
-#include "util/NonTransientScrollBarStyle.h"
 
 #include <QAbstractAnimation>
 #include <QCursor>
@@ -78,32 +78,31 @@ PianoRollView::PianoRollView(QWidget* parent)
   setMouseTracking(true);
   viewport()->setMouseTracking(true);
 
-  auto* hbar = new PianoRollZoomScrollBar(Qt::Horizontal, this);
-  auto* vbar = new PianoRollZoomScrollBar(Qt::Vertical, this);
-  setHorizontalScrollBar(hbar);
-  setVerticalScrollBar(vbar);
+  m_scrollChrome = std::make_unique<RhiScrollAreaChrome>(
+      this,
+      [this](const QMargins& margins) {
+        setViewportMargins(margins);
+      });
+  m_scrollChrome->setHorizontalPolicy(Qt::ScrollBarAlwaysOn);
+  m_scrollChrome->setVerticalPolicy(Qt::ScrollBarAlwaysOn);
 
-  setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOn);
-  setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOn);
+  m_horizontalZoomButtons = new PianoRollZoomButtons(Qt::Horizontal, this);
+  m_verticalZoomButtons = new PianoRollZoomButtons(Qt::Vertical, this);
+  m_scrollChrome->setHorizontalTrailingWidget(m_horizontalZoomButtons);
+  m_scrollChrome->setVerticalTrailingWidget(m_verticalZoomButtons);
 
-#ifdef Q_OS_MAC
-  // Match HexView behavior so scrollbars remain visible above native RHI windows.
-  QtUi::applyNonTransientScrollBarStyle(hbar);
-  QtUi::applyNonTransientScrollBarStyle(vbar);
-#endif
-
-  connect(hbar, &PianoRollZoomScrollBar::zoomInRequested, this, [this]() {
+  connect(m_horizontalZoomButtons, &PianoRollZoomButtons::zoomInRequested, this, [this]() {
     // Zoom from viewport center when using scrollbar +/- buttons.
     zoomHorizontal(+1, viewport()->width() / 2, true, 150);
   });
-  connect(hbar, &PianoRollZoomScrollBar::zoomOutRequested, this, [this]() {
+  connect(m_horizontalZoomButtons, &PianoRollZoomButtons::zoomOutRequested, this, [this]() {
     zoomHorizontal(-1, viewport()->width() / 2, true, 150);
   });
 
-  connect(vbar, &PianoRollZoomScrollBar::zoomInRequested, this, [this]() {
+  connect(m_verticalZoomButtons, &PianoRollZoomButtons::zoomInRequested, this, [this]() {
     zoomVertical(+1, viewport()->height() / 2, true, 150);
   });
-  connect(vbar, &PianoRollZoomScrollBar::zoomOutRequested, this, [this]() {
+  connect(m_verticalZoomButtons, &PianoRollZoomButtons::zoomOutRequested, this, [this]() {
     zoomVertical(-1, viewport()->height() / 2, true, 150);
   });
 
@@ -140,7 +139,6 @@ PianoRollView::PianoRollView(QWidget* parent)
     }
 
     // QRhiWidget path applies animation steps immediately to avoid render-cadence stutter on Linux.
-    m_pendingPlaybackAutoScrollValid = false;
     if (nextValue == hbar->value()) {
       return;
     }
@@ -178,11 +176,13 @@ PianoRollView::PianoRollView(QWidget* parent)
 
   m_animClock.start();
   m_renderClock.start();
-  updateScrollBars();
+  syncViewportLayoutState();
   // Force a known default cursor to avoid stale inherited cursor state from
   // embedded RHI surfaces (notably on Windows).
   refreshInteractionCursor(Qt::NoModifier);
 }
+
+PianoRollView::~PianoRollView() = default;
 
 void PianoRollView::setSequence(VGMSeq* seq) {
   if (seq == m_seq) {
@@ -473,10 +473,17 @@ void PianoRollView::paintEvent(QPaintEvent* event) {
 }
 
 void PianoRollView::syncViewportLayoutState() {
+  if (m_scrollChrome) {
+    // Recompute viewport margins before sizing the hidden scroll models.
+    m_scrollChrome->syncLayout();
+  }
+  updateScrollBars();
+  if (m_scrollChrome) {
+    m_scrollChrome->syncLayout();
+  }
   if (m_rhiHost) {
     m_rhiHost->setGeometry(viewport()->rect());
   }
-  updateScrollBars();
   requestRender();
 }
 
@@ -512,6 +519,9 @@ void PianoRollView::changeEvent(QEvent* event) {
       event->type() == QEvent::StyleChange) {
     rebuildFrameColors();
     updateInactiveNoteDimTarget(false);
+    if (m_scrollChrome) {
+      m_scrollChrome->syncLayout();
+    }
     requestRender();
   }
 }
@@ -1451,7 +1461,6 @@ void PianoRollView::stopPlaybackAutoScrollAnimation() {
   m_applyingPlaybackAutoScroll = false;
 }
 
-// Applies the latest smooth auto-scroll animation step in sync with RHI frame rendering.
 void PianoRollView::drainPendingPlaybackAutoScroll() {
   if (!m_pendingPlaybackAutoScrollValid) {
     return;

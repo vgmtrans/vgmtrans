@@ -62,7 +62,9 @@ target_sources(vgmtrans
     workarea/pianorollview/PianoRollRhiWidget.cpp
     workarea/pianorollview/PianoRollRhiWindow.cpp
     workarea/pianorollview/PianoRollView.cpp
-    workarea/pianorollview/PianoRollZoomScrollBar.cpp
+    workarea/pianorollview/PianoRollZoomButtons.cpp
+    workarea/rhi/RhiScrollAreaChrome.cpp
+    workarea/rhi/RhiScrollBar.cpp
     workarea/rhi/SimpleRhiWindow.cpp
     workarea/MdiArea.cpp
     workarea/RawFileListView.cpp
@@ -145,7 +147,9 @@ target_sources(vgmtrans
       workarea/pianorollview/PianoRollRhiWidget.h
       workarea/pianorollview/PianoRollRhiWindow.h
       workarea/pianorollview/PianoRollView.h
-      workarea/pianorollview/PianoRollZoomScrollBar.h
+      workarea/pianorollview/PianoRollZoomButtons.h
+      workarea/rhi/RhiScrollAreaChrome.h
+      workarea/rhi/RhiScrollBar.h
       workarea/rhi/RhiWindowMainWindowLocator.h
       workarea/rhi/RhiWindowDragDropEvents.h
       workarea/rhi/SimpleRhiWindow.h
