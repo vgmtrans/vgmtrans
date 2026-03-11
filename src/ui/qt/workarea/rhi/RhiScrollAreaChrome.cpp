@@ -11,12 +11,13 @@
 #include <QAbstractScrollArea>
 #include <QPalette>
 #include <QScrollBar>
-#include <QWidget>
 
 #include <algorithm>
 #include <utility>
 
 namespace {
+constexpr Qt::Orientation kOrientations[] = {Qt::Horizontal, Qt::Vertical};
+
 RhiScrollButtonSnapshot makeButtonSnapshot(const QRect& rect,
                                           RhiScrollButtonGlyph glyph,
                                           bool hovered,
@@ -54,12 +55,12 @@ RhiScrollAreaChrome::RhiScrollAreaChrome(QAbstractScrollArea* area,
   m_verticalBar->bindTo(vbar);
 
   if (hbar) {
-    m_horizontalRangeConnection = QObject::connect(hbar, &QScrollBar::rangeChanged, m_area, [this]() {
+    QObject::connect(hbar, &QScrollBar::rangeChanged, m_area, [this]() {
       syncLayout();
     });
   }
   if (vbar) {
-    m_verticalRangeConnection = QObject::connect(vbar, &QScrollBar::rangeChanged, m_area, [this]() {
+    QObject::connect(vbar, &QScrollBar::rangeChanged, m_area, [this]() {
       syncLayout();
     });
   }
@@ -104,17 +105,38 @@ void RhiScrollAreaChrome::setVerticalArrowButtonsVisible(bool visible) {
 }
 
 void RhiScrollAreaChrome::setHorizontalButtons(std::vector<ButtonSpec> buttons) {
-  m_horizontalButtons = std::move(buttons);
-  m_hoveredHorizontalButton = -1;
-  m_pressedHorizontalButton = -1;
-  syncLayout();
+  setButtons(Qt::Horizontal, std::move(buttons));
 }
 
 void RhiScrollAreaChrome::setVerticalButtons(std::vector<ButtonSpec> buttons) {
-  m_verticalButtons = std::move(buttons);
-  m_hoveredVerticalButton = -1;
-  m_pressedVerticalButton = -1;
+  setButtons(Qt::Vertical, std::move(buttons));
+}
+
+void RhiScrollAreaChrome::setButtons(Qt::Orientation orientation, std::vector<ButtonSpec> buttonSpecs) {
+  buttons(orientation) = std::move(buttonSpecs);
+  hoveredButton(orientation) = -1;
+  pressedButton(orientation) = -1;
   syncLayout();
+}
+
+const std::vector<RhiScrollAreaChrome::ButtonSpec>& RhiScrollAreaChrome::buttons(Qt::Orientation orientation) const {
+  return (orientation == Qt::Horizontal) ? m_horizontalButtons : m_verticalButtons;
+}
+
+std::vector<RhiScrollAreaChrome::ButtonSpec>& RhiScrollAreaChrome::buttons(Qt::Orientation orientation) {
+  return (orientation == Qt::Horizontal) ? m_horizontalButtons : m_verticalButtons;
+}
+
+int& RhiScrollAreaChrome::hoveredButton(Qt::Orientation orientation) {
+  return (orientation == Qt::Horizontal) ? m_hoveredHorizontalButton : m_hoveredVerticalButton;
+}
+
+int& RhiScrollAreaChrome::pressedButton(Qt::Orientation orientation) {
+  return (orientation == Qt::Horizontal) ? m_pressedHorizontalButton : m_pressedVerticalButton;
+}
+
+int RhiScrollAreaChrome::laneExtent(Qt::Orientation orientation) const {
+  return (orientation == Qt::Horizontal) ? m_snapshot.bottomMargin : m_snapshot.rightMargin;
 }
 
 bool RhiScrollAreaChrome::shouldShowHorizontalBar() const {
@@ -145,25 +167,25 @@ bool RhiScrollAreaChrome::shouldShowVerticalBar() const {
   return vbar->maximum() > vbar->minimum();
 }
 
-QRect RhiScrollAreaChrome::horizontalButtonsRect() const {
-  if (!m_area || m_horizontalButtons.empty() || m_snapshot.bottomMargin <= 0) {
+QRect RhiScrollAreaChrome::buttonsRect(Qt::Orientation orientation) const {
+  if (!m_area || buttons(orientation).empty()) {
     return {};
   }
-  const QRect viewportRect = m_area->viewport()->geometry();
-  const int extent = m_snapshot.bottomMargin;
-  const int width = extent * static_cast<int>(m_horizontalButtons.size());
-  return QRect(viewportRect.right() - width + 1,
-               viewportRect.bottom() + 1,
-               width,
-               extent);
-}
 
-QRect RhiScrollAreaChrome::verticalButtonsRect() const {
-  if (!m_area || m_verticalButtons.empty() || m_snapshot.rightMargin <= 0) {
+  const QRect viewportRect = m_area->viewport()->geometry();
+  const int extent = laneExtent(orientation);
+  if (extent <= 0) {
     return {};
   }
-  const QRect viewportRect = m_area->viewport()->geometry();
-  const int extent = m_snapshot.rightMargin;
+
+  if (orientation == Qt::Horizontal) {
+    const int width = extent * static_cast<int>(m_horizontalButtons.size());
+    return QRect(viewportRect.right() - width + 1,
+                 viewportRect.bottom() + 1,
+                 width,
+                 extent);
+  }
+
   const int height = extent * static_cast<int>(m_verticalButtons.size());
   return QRect(viewportRect.right() + 1,
                viewportRect.bottom() - height + 1,
@@ -176,26 +198,21 @@ QRect RhiScrollAreaChrome::buttonRect(Qt::Orientation orientation, int index) co
     return {};
   }
 
-  if (orientation == Qt::Horizontal) {
-    const QRect strip = horizontalButtonsRect();
-    const int extent = m_snapshot.bottomMargin;
-    if (strip.isEmpty() || extent <= 0) {
-      return {};
-    }
-    return QRect(strip.left() + (index * extent), strip.top(), extent, strip.height());
-  }
-
-  const QRect strip = verticalButtonsRect();
-  const int extent = m_snapshot.rightMargin;
+  const QRect strip = buttonsRect(orientation);
+  const int extent = laneExtent(orientation);
   if (strip.isEmpty() || extent <= 0) {
     return {};
+  }
+
+  if (orientation == Qt::Horizontal) {
+    return QRect(strip.left() + (index * extent), strip.top(), extent, strip.height());
   }
   return QRect(strip.left(), strip.top() + (index * extent), strip.width(), extent);
 }
 
 int RhiScrollAreaChrome::buttonIndexAt(Qt::Orientation orientation, const QPoint& pos) const {
-  const std::vector<ButtonSpec>& buttons = (orientation == Qt::Horizontal) ? m_horizontalButtons : m_verticalButtons;
-  for (int i = 0; i < static_cast<int>(buttons.size()); ++i) {
+  const auto& orientationButtons = buttons(orientation);
+  for (int i = 0; i < static_cast<int>(orientationButtons.size()); ++i) {
     if (buttonRect(orientation, i).contains(pos)) {
       return i;
     }
@@ -240,6 +257,8 @@ void RhiScrollAreaChrome::syncLayout() {
                                          verticalExtent * static_cast<int>(m_verticalButtons.size()));
   }
 
+  // The hidden QScrollBars keep their full range math. The visible chrome just
+  // borrows margin lanes around the viewport and mirrors that model state.
   m_horizontalBar->setVisible(showHorizontal);
   m_verticalBar->setVisible(showVertical);
   m_horizontalBar->setGeometry(showHorizontal
@@ -255,11 +274,15 @@ void RhiScrollAreaChrome::syncLayout() {
                                          std::max(0, verticalLane.height() - verticalButtonStripHeight))
                                  : QRect());
 
-  m_hoveredHorizontalButton = (showHorizontal ? m_hoveredHorizontalButton : -1);
-  m_pressedHorizontalButton = (showHorizontal ? m_pressedHorizontalButton : -1);
-  m_hoveredVerticalButton = (showVertical ? m_hoveredVerticalButton : -1);
-  m_pressedVerticalButton = (showVertical ? m_pressedVerticalButton : -1);
+  hoveredButton(Qt::Horizontal) = showHorizontal ? hoveredButton(Qt::Horizontal) : -1;
+  pressedButton(Qt::Horizontal) = showHorizontal ? pressedButton(Qt::Horizontal) : -1;
+  hoveredButton(Qt::Vertical) = showVertical ? hoveredButton(Qt::Vertical) : -1;
+  pressedButton(Qt::Vertical) = showVertical ? pressedButton(Qt::Vertical) : -1;
 
+  refresh();
+}
+
+void RhiScrollAreaChrome::refresh() {
   updateSnapshot();
   requestRedraw();
 }
@@ -291,22 +314,26 @@ void RhiScrollAreaChrome::updateSnapshot() {
                                    m_snapshot.bottomMargin);
   }
 
-  for (int i = 0; i < static_cast<int>(m_horizontalButtons.size()); ++i) {
-    const QRect rect = buttonRect(Qt::Horizontal, i);
-    m_snapshot.horizontalButtons.push_back(makeButtonSnapshot(
-        rect,
-        m_horizontalButtons[static_cast<size_t>(i)].glyph,
-        m_hoveredHorizontalButton == i,
-        m_pressedHorizontalButton == i));
-  }
+  appendButtonSnapshots(Qt::Horizontal);
+  appendButtonSnapshots(Qt::Vertical);
+}
 
-  for (int i = 0; i < static_cast<int>(m_verticalButtons.size()); ++i) {
-    const QRect rect = buttonRect(Qt::Vertical, i);
-    m_snapshot.verticalButtons.push_back(makeButtonSnapshot(
-        rect,
-        m_verticalButtons[static_cast<size_t>(i)].glyph,
-        m_hoveredVerticalButton == i,
-        m_pressedVerticalButton == i));
+void RhiScrollAreaChrome::appendButtonSnapshots(Qt::Orientation orientation) {
+  // Custom edge buttons share the same lane/palette state as the scrollbar and
+  // are emitted into the same renderer-facing snapshot.
+  auto& destination = (orientation == Qt::Horizontal)
+      ? m_snapshot.horizontalButtons
+      : m_snapshot.verticalButtons;
+  const auto& orientationButtons = buttons(orientation);
+  const int hoveredIndex = hoveredButton(orientation);
+  const int pressedIndex = pressedButton(orientation);
+
+  for (int i = 0; i < static_cast<int>(orientationButtons.size()); ++i) {
+    destination.push_back(makeButtonSnapshot(
+        buttonRect(orientation, i),
+        orientationButtons[static_cast<size_t>(i)].glyph,
+        hoveredIndex == i,
+        pressedIndex == i));
   }
 }
 
@@ -321,22 +348,14 @@ bool RhiScrollAreaChrome::handleMousePress(const QPoint& pos) {
     return false;
   }
 
-  const int horizontalButton = buttonIndexAt(Qt::Horizontal, pos);
-  if (horizontalButton >= 0) {
-    m_pressedHorizontalButton = horizontalButton;
-    m_hoveredHorizontalButton = horizontalButton;
-    updateSnapshot();
-    requestRedraw();
-    return true;
-  }
-
-  const int verticalButton = buttonIndexAt(Qt::Vertical, pos);
-  if (verticalButton >= 0) {
-    m_pressedVerticalButton = verticalButton;
-    m_hoveredVerticalButton = verticalButton;
-    updateSnapshot();
-    requestRedraw();
-    return true;
+  for (Qt::Orientation orientation : kOrientations) {
+    const int index = buttonIndexAt(orientation, pos);
+    if (index >= 0) {
+      pressedButton(orientation) = index;
+      hoveredButton(orientation) = index;
+      refresh();
+      return true;
+    }
   }
 
   if (m_horizontalBar && m_horizontalBar->handleMousePress(pos)) {
@@ -353,21 +372,16 @@ bool RhiScrollAreaChrome::handleMouseMove(const QPoint& pos, Qt::MouseButtons bu
     return false;
   }
 
-  const int nextHoveredHorizontal = buttonIndexAt(Qt::Horizontal, pos);
-  const int nextHoveredVertical = buttonIndexAt(Qt::Vertical, pos);
-  bool handled = false;
-
-  if (nextHoveredHorizontal != m_hoveredHorizontalButton) {
-    m_hoveredHorizontalButton = nextHoveredHorizontal;
-    handled = true;
+  bool buttonHandled = false;
+  for (Qt::Orientation orientation : kOrientations) {
+    const int nextHovered = buttonIndexAt(orientation, pos);
+    if (nextHovered != hoveredButton(orientation)) {
+      hoveredButton(orientation) = nextHovered;
+      buttonHandled = true;
+    }
   }
-  if (nextHoveredVertical != m_hoveredVerticalButton) {
-    m_hoveredVerticalButton = nextHoveredVertical;
-    handled = true;
-  }
-  if (handled) {
-    updateSnapshot();
-    requestRedraw();
+  if (buttonHandled) {
+    refresh();
   }
 
   bool barHandled = false;
@@ -377,7 +391,7 @@ bool RhiScrollAreaChrome::handleMouseMove(const QPoint& pos, Qt::MouseButtons bu
   if (m_verticalBar && m_verticalBar->handleMouseMove(pos, buttons)) {
     barHandled = true;
   }
-  return handled || barHandled;
+  return buttonHandled || barHandled;
 }
 
 bool RhiScrollAreaChrome::handleMouseRelease(const QPoint& pos) {
@@ -386,22 +400,15 @@ bool RhiScrollAreaChrome::handleMouseRelease(const QPoint& pos) {
   }
 
   bool handled = false;
-  if (m_pressedHorizontalButton >= 0) {
-    const int pressed = m_pressedHorizontalButton;
-    m_pressedHorizontalButton = -1;
-    if (pressed == buttonIndexAt(Qt::Horizontal, pos)) {
-      const auto& button = m_horizontalButtons[static_cast<size_t>(pressed)];
-      if (button.onPressed) {
-        button.onPressed();
-      }
-      handled = true;
+  for (Qt::Orientation orientation : kOrientations) {
+    const int pressedIndex = pressedButton(orientation);
+    if (pressedIndex < 0) {
+      continue;
     }
-  }
-  if (m_pressedVerticalButton >= 0) {
-    const int pressed = m_pressedVerticalButton;
-    m_pressedVerticalButton = -1;
-    if (pressed == buttonIndexAt(Qt::Vertical, pos)) {
-      const auto& button = m_verticalButtons[static_cast<size_t>(pressed)];
+
+    pressedButton(orientation) = -1;
+    if (pressedIndex == buttonIndexAt(orientation, pos)) {
+      const auto& button = buttons(orientation)[static_cast<size_t>(pressedIndex)];
       if (button.onPressed) {
         button.onPressed();
       }
@@ -416,22 +423,20 @@ bool RhiScrollAreaChrome::handleMouseRelease(const QPoint& pos) {
     handled = true;
   }
 
-  updateSnapshot();
-  requestRedraw();
+  refresh();
   return handled;
 }
 
 void RhiScrollAreaChrome::handleLeave() {
-  m_hoveredHorizontalButton = -1;
-  m_pressedHorizontalButton = -1;
-  m_hoveredVerticalButton = -1;
-  m_pressedVerticalButton = -1;
+  hoveredButton(Qt::Horizontal) = -1;
+  pressedButton(Qt::Horizontal) = -1;
+  hoveredButton(Qt::Vertical) = -1;
+  pressedButton(Qt::Vertical) = -1;
   if (m_horizontalBar) {
     m_horizontalBar->handleLeave();
   }
   if (m_verticalBar) {
     m_verticalBar->handleLeave();
   }
-  updateSnapshot();
-  requestRedraw();
+  refresh();
 }

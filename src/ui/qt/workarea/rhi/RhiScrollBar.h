@@ -7,13 +7,11 @@
 #pragma once
 
 #include <QBasicTimer>
-#include <QMetaObject>
 #include <QObject>
 #include <QPointer>
 #include <QScrollBar>
 
 #include <functional>
-#include <vector>
 
 #include "RhiScrollChromeData.h"
 
@@ -83,13 +81,13 @@ private:
   void startRepeat(Part part);
   void stopRepeat();
   void clearDragState();
+  void refresh();
   void updateSnapshot();
   void requestRedraw() const;
 
   Qt::Orientation m_orientation = Qt::Horizontal;
   RedrawCallback m_requestRedraw;
   QPointer<QScrollBar> m_model;
-  std::vector<QMetaObject::Connection> m_modelConnections;
   QRect m_rect;
   QBasicTimer m_repeatTimer;
   RhiScrollBarSnapshot m_snapshot;
