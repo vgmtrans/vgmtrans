@@ -32,6 +32,7 @@ protected:
   void releaseResources() override;
   void resizeEvent(QResizeEvent* event) override;
   bool event(QEvent* event) override;
+  void leaveEvent(QEvent* event) override;
 
   void wheelEvent(QWheelEvent* event) override;
   void mousePressEvent(QMouseEvent* event) override;

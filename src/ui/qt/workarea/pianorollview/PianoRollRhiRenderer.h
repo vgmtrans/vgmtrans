@@ -153,6 +153,10 @@ private:
     HorizontalGradient = 6,
     LabelText = 7,
     ActiveLaser = 8,
+    TriangleUp = 9,
+    TriangleLeft = 10,
+    TriangleRight = 11,
+    ScrollThumb = 12,
   };
 
   static bool isBlackKey(int key);
@@ -195,6 +199,7 @@ private:
                                         const Layout& layout,
                                         const std::vector<QColor>* trackColors,
                                         const std::vector<uint8_t>* trackEnabled);
+  void appendScrollChromeInstances(const PianoRollFrame::Data& frame);
 
   NoteGeometry computeNoteGeometry(const PianoRollFrame::Note& note, const Layout& layout) const;
 
