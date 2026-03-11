@@ -1377,8 +1377,8 @@ void PianoRollRhiRenderer::buildVisibleNoteInstances(const PianoRollFrame::Data&
         }
       }
     }
-    if (!isActive && inactiveDim > 0.001f) {
-      // Keep active notes readable by darkening only the inactive note bodies.
+    if (trackIsEnabled && !isActive && inactiveDim > 0.001f) {
+      // Keep active enabled notes readable by darkening only their inactive peers.
       instance.r *= inactiveShade;
       instance.g *= inactiveShade;
       instance.b *= inactiveShade;
