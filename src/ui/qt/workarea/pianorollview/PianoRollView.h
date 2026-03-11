@@ -175,6 +175,8 @@ private:
   void drainPendingPlaybackAutoScroll();
   void advanceFrameDrivenPlaybackAutoScroll();
   [[nodiscard]] bool frameDrivenPlaybackAutoScrollActive() const;
+  [[nodiscard]] bool shouldPumpPlaybackFrames() const;
+  [[nodiscard]] float visualPlaybackTick() const;
 
   [[nodiscard]] QPoint viewportPosFromGlobal(const QPointF& globalPos) const;
   [[nodiscard]] QPoint graphWorldPosFromViewport(const QPoint& viewportPos) const;
@@ -267,10 +269,12 @@ private:
   float m_verticalZoomWorldY = 0.0f;
   int m_verticalZoomAnchor = 0;
   qint64 m_lastRenderMs = std::numeric_limits<qint64>::min() / 4;
+  qint64 m_lastPlaybackTickUpdateNs = 0;
   qint64 m_frameDrivenPlaybackAutoScrollStartNs = 0;
   int m_lastRenderedScanlineX = std::numeric_limits<int>::min();
   int m_frameDrivenPlaybackAutoScrollStartX = 0;
   int m_frameDrivenPlaybackAutoScrollEndX = 0;
+  float m_visualPlaybackTicksPerSecond = 0.0f;
 
   size_t m_cachedTimelineSize = 0;
   bool m_cachedTimelineFinalized = false;

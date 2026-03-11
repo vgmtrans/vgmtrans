@@ -159,6 +159,7 @@ SequencePlayer::SequencePlayer() {
   }
 
   m_seekupdate_timer = new QTimer(this);
+  m_seekupdate_timer->setTimerType(Qt::PreciseTimer);
   connect(m_seekupdate_timer, &QTimer::timeout, [this]() {
     if (playing()) {
       playbackPositionChanged(elapsedTicks(), totalTicks(), PositionChangeOrigin::Playback);
