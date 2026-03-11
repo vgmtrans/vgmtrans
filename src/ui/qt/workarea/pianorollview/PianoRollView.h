@@ -173,6 +173,8 @@ private:
   void scheduleCoalescedRender(int delayMs);
   void stopPlaybackAutoScrollAnimation();
   void drainPendingPlaybackAutoScroll();
+  void advanceFrameDrivenPlaybackAutoScroll();
+  [[nodiscard]] bool frameDrivenPlaybackAutoScrollActive() const;
 
   [[nodiscard]] QPoint viewportPosFromGlobal(const QPointF& globalPos) const;
   [[nodiscard]] QPoint graphWorldPosFromViewport(const QPoint& viewportPos) const;
@@ -253,7 +255,7 @@ private:
   // We wait for the initial paint event to fire to stop centering scrollbar on resize
   bool m_initialPaintEvent = false;
   bool m_coalescedRenderPending = false;
-  bool m_pendingPlaybackAutoScrollValid = false;
+  bool m_frameDrivenPlaybackAutoScrollActive = false;
 
   QElapsedTimer m_animClock;
   QElapsedTimer m_renderClock;
@@ -267,8 +269,10 @@ private:
   float m_verticalZoomWorldY = 0.0f;
   int m_verticalZoomAnchor = 0;
   qint64 m_lastRenderMs = std::numeric_limits<qint64>::min() / 4;
+  qint64 m_frameDrivenPlaybackAutoScrollStartNs = 0;
   int m_lastRenderedScanlineX = std::numeric_limits<int>::min();
-  int m_pendingPlaybackAutoScrollValue = 0;
+  int m_frameDrivenPlaybackAutoScrollStartX = 0;
+  int m_frameDrivenPlaybackAutoScrollEndX = 0;
 
   size_t m_cachedTimelineSize = 0;
   bool m_cachedTimelineFinalized = false;
