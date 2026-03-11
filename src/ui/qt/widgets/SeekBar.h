@@ -7,6 +7,7 @@
 #pragma once
 
 #include <QColor>
+#include <QPen>
 #include <QWidget>
 
 class SeekBar : public QWidget {
@@ -53,4 +54,5 @@ private:
   QColor m_trackColor;
   QColor m_fillColor;
   QColor m_thumbColor;
+  QPen m_thumbPen;
 };

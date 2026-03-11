@@ -48,6 +48,17 @@ QColor thumbColorFor(const QPalette& palette, bool enabled) {
   }
   return window.lighter(enabled ? 150 : 102);//(darker(enabled ? 130 : 120);
 }
+
+QPen thumbPenFor(const QPalette& palette, bool enabled) {
+  if (isDarkPalette(palette)) {
+    return Qt::NoPen;
+  }
+
+  QPen pen(palette.color(QPalette::Window).darker(enabled ? 160 : 140));
+  pen.setWidth(1);
+  pen.setCosmetic(true);
+  return pen;
+}
 }
 
 SeekBar::SeekBar(Qt::Orientation orientation, QWidget* parent)
@@ -173,6 +184,7 @@ void SeekBar::paintEvent(QPaintEvent* event) {
   }
 
   painter.setBrush(m_thumbColor);
+  painter.setPen(m_thumbPen);
   if (m_orientation == Qt::Horizontal) {
     const qreal centerX = thumbCenterForValue(m_value);
     painter.drawEllipse(QPointF(centerX, rect().center().y()), THUMB_RADIUS, THUMB_RADIUS);
@@ -188,6 +200,7 @@ void SeekBar::refreshCachedColors() {
   m_trackColor = trackColorFor(palette, isEnabled());
   m_fillColor = fillColorFor(palette, isEnabled());
   m_thumbColor = thumbColorFor(palette, isEnabled());
+  m_thumbPen = thumbPenFor(palette, isEnabled());
 }
 
 QRectF SeekBar::trackRect() const {
