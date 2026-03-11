@@ -131,10 +131,7 @@ PianoRollView::PianoRollView(QWidget* parent)
                                      hbar->minimum(),
                                      hbar->maximum());
     if (m_rhiHost && m_rhiHost->syncPlaybackAutoScrollToRenderFrame()) {
-      // Window-backed RHI uses render-frame draining so scroll updates stay aligned with frame submission.
-      m_pendingPlaybackAutoScrollValue = nextValue;
-      m_pendingPlaybackAutoScrollValid = true;
-      requestRender();
+      // Native-window playback scroll is advanced once per rendered frame instead.
       return;
     }
 
@@ -1457,30 +1454,55 @@ void PianoRollView::stopPlaybackAutoScrollAnimation() {
   if (m_playbackAutoScrollAnimation && m_playbackAutoScrollAnimation->state() == QAbstractAnimation::Running) {
     m_playbackAutoScrollAnimation->stop();
   }
-  m_pendingPlaybackAutoScrollValid = false;
+  m_frameDrivenPlaybackAutoScrollActive = false;
   m_applyingPlaybackAutoScroll = false;
 }
 
 void PianoRollView::drainPendingPlaybackAutoScroll() {
-  if (!m_pendingPlaybackAutoScrollValid) {
+  advanceFrameDrivenPlaybackAutoScroll();
+}
+
+void PianoRollView::advanceFrameDrivenPlaybackAutoScroll() {
+  if (!m_frameDrivenPlaybackAutoScrollActive) {
     return;
   }
 
   auto* hbar = horizontalScrollBar();
   if (!hbar) {
-    m_pendingPlaybackAutoScrollValid = false;
+    m_frameDrivenPlaybackAutoScrollActive = false;
     return;
   }
 
-  const int nextValue = std::clamp(m_pendingPlaybackAutoScrollValue, hbar->minimum(), hbar->maximum());
-  m_pendingPlaybackAutoScrollValid = false;
+  static const QEasingCurve kPlaybackAutoScrollEasing(QEasingCurve::OutQuint);
+  const qint64 elapsedNs = std::max<qint64>(0, m_animClock.nsecsElapsed() - m_frameDrivenPlaybackAutoScrollStartNs);
+  const float progress = std::clamp(
+      static_cast<float>(elapsedNs) / (static_cast<float>(kPlaybackAutoScrollDurationMs) * 1000000.0f),
+      0.0f,
+      1.0f);
+  const float eased = static_cast<float>(kPlaybackAutoScrollEasing.valueForProgress(progress));
+  const int nextValue = std::clamp(
+      static_cast<int>(std::lround(
+          m_frameDrivenPlaybackAutoScrollStartX +
+          (static_cast<float>(m_frameDrivenPlaybackAutoScrollEndX - m_frameDrivenPlaybackAutoScrollStartX) * eased))),
+      hbar->minimum(),
+      hbar->maximum());
   if (nextValue == hbar->value()) {
+    if (progress >= 1.0f || nextValue == m_frameDrivenPlaybackAutoScrollEndX) {
+      m_frameDrivenPlaybackAutoScrollActive = false;
+    }
     return;
   }
 
   m_applyingPlaybackAutoScroll = true;
   hbar->setValue(nextValue);
   m_applyingPlaybackAutoScroll = false;
+  if (progress >= 1.0f || nextValue == m_frameDrivenPlaybackAutoScrollEndX) {
+    m_frameDrivenPlaybackAutoScrollActive = false;
+  }
+}
+
+bool PianoRollView::frameDrivenPlaybackAutoScrollActive() const {
+  return m_frameDrivenPlaybackAutoScrollActive;
 }
 
 QPoint PianoRollView::viewportPosFromGlobal(const QPointF& globalPos) const {
@@ -1574,9 +1596,27 @@ void PianoRollView::scrollPlaybackTickToViewportFraction(int tick, float viewpor
     return;
   }
   if (!animated || !m_playbackAutoScrollAnimation) {
+    m_frameDrivenPlaybackAutoScrollActive = false;
     m_applyingPlaybackAutoScroll = true;
     hbar->setValue(clampedScrollX);
     m_applyingPlaybackAutoScroll = false;
+    return;
+  }
+
+  if (m_rhiHost && m_rhiHost->syncPlaybackAutoScrollToRenderFrame()) {
+    if (m_frameDrivenPlaybackAutoScrollActive && m_frameDrivenPlaybackAutoScrollEndX == clampedScrollX) {
+      return;
+    }
+
+    if (m_playbackAutoScrollAnimation->state() == QAbstractAnimation::Running) {
+      m_playbackAutoScrollAnimation->stop();
+    }
+
+    m_frameDrivenPlaybackAutoScrollActive = true;
+    m_frameDrivenPlaybackAutoScrollStartNs = m_animClock.nsecsElapsed();
+    m_frameDrivenPlaybackAutoScrollStartX = hbar->value();
+    m_frameDrivenPlaybackAutoScrollEndX = clampedScrollX;
+    requestRender();
     return;
   }
 
@@ -1595,13 +1635,8 @@ void PianoRollView::scrollPlaybackTickToViewportFraction(int tick, float viewpor
     return;
   }
 
-  const bool hadPendingValue = m_pendingPlaybackAutoScrollValid;
-  const int pendingValue = m_pendingPlaybackAutoScrollValue;
-  m_pendingPlaybackAutoScrollValid = false;
-  const int animationStart = hadPendingValue
-                                 ? std::clamp(pendingValue, hbar->minimum(), hbar->maximum())
-                                 : hbar->value();
-  m_playbackAutoScrollAnimation->setStartValue(static_cast<qreal>(animationStart));
+  m_frameDrivenPlaybackAutoScrollActive = false;
+  m_playbackAutoScrollAnimation->setStartValue(static_cast<qreal>(hbar->value()));
   m_playbackAutoScrollAnimation->setEndValue(static_cast<qreal>(clampedScrollX));
   m_playbackAutoScrollAnimation->start();
 }
