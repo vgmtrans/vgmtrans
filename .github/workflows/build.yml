@@ -3,11 +3,59 @@ on:
   push:
     branches:
       - master
+    tags:
+      - '*'
   pull_request:
   workflow_dispatch:
 jobs:
+  prepare:
+    name: Prepare metadata
+    runs-on: ubuntu-slim
+    outputs:
+      artifact_label: ${{ steps.meta.outputs.artifact_label }}
+      build_id: ${{ steps.meta.outputs.build_id }}
+      short_sha: ${{ steps.meta.outputs.short_sha }}
+      windows_targets: ${{ steps.meta.outputs.windows_targets }}
+    steps:
+      - name: Compute build metadata
+        id: meta
+        uses: actions/github-script@v8
+        with:
+          script: |
+            const ref = context.ref || '';
+            const refName = ref.replace(/^refs\/(heads|tags)\//, '');
+            const isTag = ref.startsWith('refs/tags/');
+            const isPush = context.eventName === 'push';
+
+            let buildId;
+            let buildSuffix = '';
+
+            if (context.eventName === 'pull_request') {
+              buildId = context.sha.slice(0, 7);
+              buildSuffix = `pr${context.payload.pull_request.number}`;
+            } else if (isTag) {
+              buildId = refName;
+            } else {
+              buildId = context.sha.slice(0, 7);
+              buildSuffix = refName;
+            }
+
+            const sanitize = (value) => (value || '').replace(/\//g, '-');
+            const safeBuildId = sanitize(buildId);
+            const safeBuildSuffix = sanitize(buildSuffix);
+            const artifactLabel = safeBuildSuffix
+              ? `${safeBuildId}-${safeBuildSuffix}`
+              : safeBuildId;
+            const windowsTargets = JSON.stringify(isPush ? ['x64-clang'] : ['x64', 'x64-clang']);
+
+            core.setOutput('artifact_label', artifactLabel);
+            core.setOutput('build_id', buildId);
+            core.setOutput('short_sha', context.sha.slice(0, 7));
+            core.setOutput('windows_targets', windowsTargets);
+
   macos:
     name: macOS 13.x+
+    needs: prepare
     runs-on: ${{ (matrix.target == 'intel' && 'macos-15') || 'macos-15' }}
     strategy:
       matrix:
@@ -18,6 +66,7 @@ jobs:
       attestations: write
     env:
       HOMEBREW_PREFIX: ${{ (matrix.target == 'intel' && '/usr/local') || '/opt/homebrew' }}
+      ARTIFACT_BASENAME: ${{ format('VGMTrans-macOS-{0}-{1}', matrix.target, needs.prepare.outputs.artifact_label) }}
     steps:
       - uses: actions/checkout@v6
         with:
@@ -34,16 +83,10 @@ jobs:
             arch: 'clang_64'
             modules: 'all'
 
-      - name: "Set environment variables"
+      - name: "Set PATH"
         shell: bash
         run: |
-          if [ "${{ github.event_name }}" = "pull_request" ]; then
-            BRANCH="pr${{ github.event.pull_request.number }}"
-          else
-            BRANCH="${{ github.ref_name }}"
-          fi
-          echo "BRANCH=$BRANCH" >> $GITHUB_ENV
-          echo "/usr/local/bin" >> $GITHUB_PATH
+          echo "/usr/local/bin" >> "$GITHUB_PATH"
 
       - name: "Prepare build"
         run: >
@@ -89,22 +132,23 @@ jobs:
             --app-drop-link 520 97 \
             --add-file "Unblock & Sign" "${{ github.workspace }}/bin/dmg/selfsign" 313 280 \
             --add-file "README.txt" "${{ github.workspace }}/bin/dmg/README.txt" 520 280 \
-            "VGMTrans-${{ github.sha }}-${{ env.BRANCH }}-${{ matrix.target }}-${{ runner.os }}.dmg" \
+            "${{ env.ARTIFACT_BASENAME }}.dmg" \
             "dist/usr/local/"
 
       - name: Generate artifact attestation
         uses: actions/attest@v4
         if: ${{ github.event_name == 'push' }}
         with:
-          subject-name: VGMTrans-${{ github.sha }}-${{ env.BRANCH }}-${{ matrix.target }}-${{ runner.os }}
-          subject-path: "build/macos-${{ matrix.target }}/VGMTrans-${{ github.sha }}-${{ env.BRANCH }}-${{ matrix.target }}-${{ runner.os }}.dmg"
+          subject-name: ${{ env.ARTIFACT_BASENAME }}
+          subject-path: "build/macos-${{ matrix.target }}/${{ env.ARTIFACT_BASENAME }}.dmg"
 
       - name: "Upload artifact"
         uses: actions/upload-artifact@v7
         with:
-          path: "build/macos-${{ matrix.target }}/VGMTrans-${{ github.sha }}-${{ env.BRANCH }}-${{ matrix.target }}-${{ runner.os }}.dmg"
-          archive: false
+          name: ${{ env.ARTIFACT_BASENAME }}
+          path: "build/macos-${{ matrix.target }}/${{ env.ARTIFACT_BASENAME }}.dmg"
   linux:
+    needs: prepare
     runs-on: ubuntu-24.04
     container:
       image: ghcr.io/flathub-infra/flatpak-github-actions:kde-6.10
@@ -114,26 +158,18 @@ jobs:
       id-token: write
       contents: read
       attestations: write
+    env:
+      ARTIFACT_BASENAME: ${{ format('VGMTrans-Linux-x86_64-{0}', needs.prepare.outputs.artifact_label) }}
     steps:
       - uses: actions/checkout@v6
         with:
           submodules: recursive
           show-progress: false
 
-      - name: "Set environment variables"
-        shell: bash
-        run: |
-          if [ "${{ github.event_name }}" = "pull_request" ]; then
-            BRANCH="pr${{ github.event.pull_request.number }}"
-          else
-            BRANCH="${{ github.ref_name }}"
-          fi
-          echo "BRANCH=$BRANCH" >> $GITHUB_ENV
-
       - name: "Build Flatpak"
         uses: flatpak/flatpak-github-actions/flatpak-builder@v6
         with:
-          bundle: VGMTrans-${{ github.sha }}-${{ env.BRANCH }}-x86_64-${{ runner.os }}.flatpak
+          bundle: ${{ env.ARTIFACT_BASENAME }}.flatpak
           manifest-path: build-aux/flatpak/io.github.vgmtrans.vgmtrans.yaml
           cache-key: flatpak-builder-${{ github.sha }}
           upload-artifact: false
@@ -156,24 +192,29 @@ jobs:
         uses: actions/attest@v4
         if: ${{ github.event_name == 'push' }}
         with:
-          subject-name: VGMTrans-${{ github.sha }}-${{ env.BRANCH }}-x86_64-${{ runner.os }}
-          subject-path: "VGMTrans-${{ github.sha }}-${{ env.BRANCH }}-x86_64-${{ runner.os }}.flatpak"
+          subject-name: ${{ env.ARTIFACT_BASENAME }}
+          subject-path: "${{ env.ARTIFACT_BASENAME }}.flatpak"
 
       - name: "Upload artifact"
         uses: actions/upload-artifact@v7
         with:
-          path: VGMTrans-${{ github.sha }}-${{ env.BRANCH }}-x86_64-${{ runner.os }}.flatpak
-          archive: false
+          name: ${{ env.ARTIFACT_BASENAME }}
+          path: ${{ env.ARTIFACT_BASENAME }}.flatpak
 
   windows:
+    needs: prepare
     runs-on: windows-2022
     strategy:
       matrix:
-        target: ['x64', 'x64-clang']
+        # We don't want to ship two Windows builds to users and clang performance is superior.
+        # Keep MSVC coverage for pull requests only.
+        target: ${{ fromJSON(needs.prepare.outputs.windows_targets) }}
     permissions:
       id-token: write
       contents: read
       attestations: write
+    env:
+      PACKAGE_FILE_NAME: ${{ format('VGMTrans-Windows-{0}-{1}', matrix.target == 'x64-clang' && 'x64' || 'x64-msvc', needs.prepare.outputs.artifact_label) }}
     steps:
        - uses: actions/checkout@v6
          with:
@@ -195,17 +236,6 @@ jobs:
            target: 'desktop'
            arch: 'win64_msvc2022_64'
            modules: 'all'
-
-       - name: "Set environment variables"
-         shell: bash
-         run: |
-          if [ "${{ github.event_name }}" = "pull_request" ]; then
-            BRANCH="pr${{ github.event.pull_request.number }}"
-          else
-            BRANCH="${{ github.ref_name }}"
-          fi
-          echo "BRANCH=$BRANCH" >> $GITHUB_ENV
-          echo "PACKAGE_FILE_NAME=VGMTrans-${{ github.sha }}-$BRANCH-${{ matrix.target }}-${{ runner.os }}" >> $GITHUB_ENV
 
        - name: "Prepare build"
          run: |
@@ -242,5 +272,125 @@ jobs:
        - name: "Upload artifact"
          uses: actions/upload-artifact@v7
          with:
+           name: ${{ env.PACKAGE_FILE_NAME }}
            path: "build/win-${{ matrix.target }}/${{ env.PACKAGE_FILE_NAME }}.zip"
-           archive: false
+
+  release:
+    name: Draft release
+    if: ${{ github.event_name == 'push' && startsWith(github.ref, 'refs/tags/') }}
+    runs-on: ubuntu-slim
+    needs: [prepare, macos, linux, windows]
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          show-progress: false
+
+      - name: Download build artifacts
+        uses: actions/download-artifact@v8
+        with:
+          path: release-assets
+
+      - name: Generate release notes
+        run: >
+          python3 build-aux/build-changelog.py
+          --input CHANGELOG.md
+          --current-version "${{ needs.prepare.outputs.build_id }}"
+          --format markdown
+          --no-heading
+          --output release-notes.md
+
+      - name: Create draft release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          mapfile -d '' release_files < <(find release-assets -type f -print0)
+          gh release create "${{ needs.prepare.outputs.build_id }}" \
+            "${release_files[@]}" \
+            --draft \
+            --title "VGMTrans ${{ needs.prepare.outputs.build_id }}" \
+            --notes-file release-notes.md \
+            --verify-tag
+
+  preview-release:
+    name: VGMTrans Preview prerelease
+    if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/master' }}
+    runs-on: ubuntu-slim
+    needs: [prepare, macos, linux, windows]
+    permissions:
+      contents: read
+    env:
+      VGMTRANS_PREVIEW_REPOSITORY: vgmtrans/vgmtrans-preview
+      VGMTRANS_PREVIEW_TAG: unstable
+      VGMTRANS_PREVIEW_TARGET: main
+      VGMTRANS_PREVIEW_VERSION: ${{ needs.prepare.outputs.short_sha }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          show-progress: false
+
+      - name: Download build artifacts
+        uses: actions/download-artifact@v8
+        with:
+          path: release-assets
+
+      - name: Generate release notes
+        env:
+          SOURCE_BRANCH: ${{ github.ref_name }}
+          SOURCE_REPOSITORY: ${{ github.repository }}
+          SOURCE_SHA: ${{ github.sha }}
+        shell: bash
+        run: |
+          python3 build-aux/build-changelog.py \
+            --input CHANGELOG.md \
+            --current-version Unreleased \
+            --format markdown \
+            --no-heading \
+            --output preview-release-notes.md
+
+          {
+            printf '> [!WARNING]\n'
+            printf '> These are test builds and may be less stable than the [current](https://github.com/vgmtrans/vgmtrans/releases) VGMTrans release. They may include bugs, but they can also contain new features and fixes not yet available in the latest stable release.\n\n'
+            cat preview-release-notes.md
+          } > preview-release-notes.tmp
+          mv preview-release-notes.tmp preview-release-notes.md
+
+          {
+            printf "\n## Build info\n"
+            printf -- "- Source commit: [\`%s\`](https://github.com/%s/commit/%s)\n" \
+              "$SOURCE_SHA" "$SOURCE_REPOSITORY" "$SOURCE_SHA"
+            printf -- "- Source branch: \`%s\`\n" "$SOURCE_BRANCH"
+          } >> preview-release-notes.md
+
+      - name: Generate preview app token
+        id: preview-app-token
+        uses: actions/create-github-app-token@v2
+        with:
+          # This is https://github.com/apps/vgmtrans-helper
+          app-id: ${{ vars.VGMTRANS_HELPER_APP_ID }}
+          private-key: ${{ secrets.VGMTRANS_HELPER_PRIVATE_KEY }}
+          owner: vgmtrans
+          repositories: |
+            vgmtrans-preview
+
+      - name: Replace preview prerelease
+        env:
+          GH_TOKEN: ${{ steps.preview-app-token.outputs.token }}
+        shell: bash
+        run: |
+          mapfile -d '' release_files < <(find release-assets -type f -print0)
+          if gh release view "$VGMTRANS_PREVIEW_TAG" --repo "$VGMTRANS_PREVIEW_REPOSITORY" >/dev/null 2>&1; then
+            gh release delete "$VGMTRANS_PREVIEW_TAG" \
+              --repo "$VGMTRANS_PREVIEW_REPOSITORY" \
+              --cleanup-tag \
+              --yes
+          fi
+
+          gh release create "$VGMTRANS_PREVIEW_TAG" \
+            "${release_files[@]}" \
+            --repo "$VGMTRANS_PREVIEW_REPOSITORY" \
+            --target "$VGMTRANS_PREVIEW_TARGET" \
+            --title "VGMTrans Preview $VGMTRANS_PREVIEW_VERSION" \
+            --notes-file preview-release-notes.md
