@@ -40,6 +40,8 @@ class VGMSeq;
 class VGMItem;
 class PianoRollRhiHost;
 class PianoRollRhiWindow;
+class PianoRollZoomButtons;
+class RhiScrollAreaChrome;
 
 class PianoRollView final : public QAbstractScrollArea {
   Q_OBJECT
@@ -51,7 +53,7 @@ public:
   };
 
   explicit PianoRollView(QWidget* parent = nullptr);
-  ~PianoRollView() override = default;
+  ~PianoRollView() override;
 
   void setSequence(VGMSeq* seq);
   void setTrackCount(int trackCount);
@@ -219,6 +221,9 @@ private:
   void refreshInteractionCursor(Qt::KeyboardModifiers modifiers = Qt::NoModifier);
 
   PianoRollRhiHost* m_rhiHost = nullptr;
+  std::unique_ptr<RhiScrollAreaChrome> m_scrollChrome;
+  PianoRollZoomButtons* m_horizontalZoomButtons = nullptr;
+  PianoRollZoomButtons* m_verticalZoomButtons = nullptr;
 
   VGMSeq* m_seq = nullptr;
   const SeqEventTimeIndex* m_timeline = nullptr;
