@@ -1196,8 +1196,8 @@ void PianoRollRhiRenderer::appendPianoCKeyLabels(const PianoRollFrame::Data& fra
 PianoRollRhiRenderer::Layout PianoRollRhiRenderer::computeLayout(const PianoRollFrame::Data& frame,
                                                                  const QSize& pixelSize) const {
   Layout layout;
-  layout.viewWidth = pixelSize.width();
-  layout.viewHeight = pixelSize.height();
+  layout.viewWidth = std::max(0, pixelSize.width() - frame.scrollChrome.rightMargin);
+  layout.viewHeight = std::max(0, pixelSize.height() - frame.scrollChrome.bottomMargin);
   if (layout.viewWidth <= 0 || layout.viewHeight <= 0) {
     return layout;
   }
@@ -1882,6 +1882,7 @@ void PianoRollRhiRenderer::buildDynamicInstances(const PianoRollFrame::Data& fra
   }
 
   appendKeyboardHighlightInstances(frame, layout, trackColors, trackEnabled);
+  appendScrollChromeInstances(frame);
 }
 
 // Adds outside-only glow aura quads for currently active notes.
@@ -1964,6 +1965,156 @@ void PianoRollRhiRenderer::appendKeyboardHighlightInstances(
                std::max(0.0f, blackKeyWidth - 2.0f),
                std::max(0.0f, clippedBottom - clippedTop - 2.0f),
                active);
+  }
+}
+
+void PianoRollRhiRenderer::appendScrollChromeInstances(const PianoRollFrame::Data& frame) {
+  const RhiScrollAreaChromeSnapshot& chrome = frame.scrollChrome;
+  const auto appendOutline = [&](const QRectF& rect) {
+    if (rect.width() <= 0.5f || rect.height() <= 0.5f) {
+      return;
+    }
+    const float edge = 1.0f;
+    appendRect(m_dynamicInstances, rect.left(), rect.top(), rect.width(), edge, chrome.colors.borderColor);
+    appendRect(m_dynamicInstances, rect.left(), rect.bottom() - edge, rect.width(), edge, chrome.colors.borderColor);
+    appendRect(m_dynamicInstances, rect.left(), rect.top(), edge, rect.height(), chrome.colors.borderColor);
+    appendRect(m_dynamicInstances, rect.right() - edge, rect.top(), edge, rect.height(), chrome.colors.borderColor);
+  };
+
+  const auto appendButtonGlyph = [&](const RhiScrollButtonSnapshot& button, Qt::Orientation orientation) {
+    if (!button.visible || button.rect.width() <= 0.5f || button.rect.height() <= 0.5f) {
+      return;
+    }
+
+    const float inset = std::max(
+        3.0f,
+        static_cast<float>(std::min(button.rect.width(), button.rect.height()) * 0.22));
+    const QRectF glyphRect = button.rect.adjusted(inset, inset, -inset, -inset);
+    switch (button.glyph) {
+      case RhiScrollButtonGlyph::Minus: {
+        const float thickness = 1.0f;
+        appendRect(m_dynamicInstances,
+                   glyphRect.left(),
+                   glyphRect.center().y() - (thickness * 0.5f),
+                   glyphRect.width(),
+                   thickness,
+                   chrome.colors.glyphColor);
+        break;
+      }
+      case RhiScrollButtonGlyph::Plus: {
+        const float thickness = 1.0f;
+        appendRect(m_dynamicInstances,
+                   glyphRect.left(),
+                   glyphRect.center().y() - (thickness * 0.5f),
+                   glyphRect.width(),
+                   thickness,
+                   chrome.colors.glyphColor);
+        appendRect(m_dynamicInstances,
+                   glyphRect.center().x() - (thickness * 0.5f),
+                   glyphRect.top(),
+                   thickness,
+                   glyphRect.height(),
+                   chrome.colors.glyphColor);
+        break;
+      }
+      case RhiScrollButtonGlyph::Backward: {
+        const LineStyle style = (orientation == Qt::Horizontal) ? LineStyle::TriangleLeft : LineStyle::TriangleUp;
+        appendRect(m_dynamicInstances,
+                   glyphRect.left(),
+                   glyphRect.top(),
+                   glyphRect.width(),
+                   glyphRect.height(),
+                   chrome.colors.glyphColor,
+                   style,
+                   1.0f,
+                   1.0f);
+        break;
+      }
+      case RhiScrollButtonGlyph::Forward: {
+        const LineStyle style = (orientation == Qt::Horizontal) ? LineStyle::TriangleRight : LineStyle::TriangleDown;
+        appendRect(m_dynamicInstances,
+                   glyphRect.left(),
+                   glyphRect.top(),
+                   glyphRect.width(),
+                   glyphRect.height(),
+                   chrome.colors.glyphColor,
+                   style,
+                   1.0f,
+                   1.0f);
+        break;
+      }
+    }
+  };
+
+  const auto appendBar = [&](const RhiScrollBarSnapshot& bar, const std::vector<RhiScrollButtonSnapshot>& buttons) {
+    if (!bar.visible || bar.laneRect.width() <= 0.5f || bar.laneRect.height() <= 0.5f) {
+      return;
+    }
+
+    appendRect(m_dynamicInstances,
+               bar.laneRect.left(),
+               bar.laneRect.top(),
+               bar.laneRect.width(),
+               bar.laneRect.height(),
+               chrome.colors.laneColor);
+    appendOutline(bar.laneRect);
+
+    if (bar.thumbRect.width() > 0.5f && bar.thumbRect.height() > 0.5f) {
+      const QColor thumbColor = bar.thumbPressed
+          ? chrome.colors.thumbPressedColor
+          : (bar.thumbHovered ? chrome.colors.thumbHoverColor : chrome.colors.thumbColor);
+      appendRect(m_dynamicInstances,
+                 bar.thumbRect.left(),
+                 bar.thumbRect.top(),
+                 bar.thumbRect.width(),
+                 bar.thumbRect.height(),
+                 thumbColor,
+                 LineStyle::ScrollThumb);
+    }
+
+    for (const RhiScrollButtonSnapshot& button : bar.arrowButtons) {
+      const QColor fill = button.pressed
+          ? chrome.colors.buttonPressedColor
+          : (button.hovered ? chrome.colors.buttonHoverColor : chrome.colors.laneColor);
+      appendRect(m_dynamicInstances,
+                 button.rect.left(),
+                 button.rect.top(),
+                 button.rect.width(),
+                 button.rect.height(),
+                 fill);
+      appendOutline(button.rect);
+      appendButtonGlyph(button, bar.orientation);
+    }
+
+    for (const RhiScrollButtonSnapshot& button : buttons) {
+      if (!button.visible) {
+        continue;
+      }
+      const QColor fill = button.pressed
+          ? chrome.colors.buttonPressedColor
+          : (button.hovered ? chrome.colors.buttonHoverColor : chrome.colors.laneColor);
+      appendRect(m_dynamicInstances,
+                 button.rect.left(),
+                 button.rect.top(),
+                 button.rect.width(),
+                 button.rect.height(),
+                 fill);
+      appendOutline(button.rect);
+      appendButtonGlyph(button, bar.orientation);
+    }
+  };
+
+  appendBar(chrome.horizontal, chrome.horizontalButtons);
+  appendBar(chrome.vertical, chrome.verticalButtons);
+
+  if (chrome.cornerRect.width() > 0.5f && chrome.cornerRect.height() > 0.5f) {
+    appendRect(m_dynamicInstances,
+               chrome.cornerRect.left(),
+               chrome.cornerRect.top(),
+               chrome.cornerRect.width(),
+               chrome.cornerRect.height(),
+               chrome.colors.laneColor);
+    appendOutline(chrome.cornerRect);
   }
 }
 

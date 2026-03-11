@@ -6,20 +6,17 @@
 
 #include "RhiScrollBar.h"
 
-#include <QMouseEvent>
-#include <QPainter>
 #include <QPalette>
-#include <QScrollBar>
-#include <QStyle>
+#include <QTimerEvent>
 
 #include <algorithm>
 #include <cmath>
 
 namespace {
-constexpr int kScrollbarThickness = 16;
-constexpr int kArrowExtent = 16;
-constexpr int kMinThumbLength = 28;
-constexpr int kThumbInset = 4;
+constexpr int kScrollbarThickness = 15;
+constexpr int kArrowExtent = 15;
+constexpr int kMinThumbLength = 24;
+constexpr int kThumbInset = 2;
 constexpr int kInitialRepeatDelayMs = 280;
 constexpr int kRepeatDelayMs = 50;
 
@@ -31,30 +28,26 @@ QColor laneBorderColor(const QPalette& palette) {
   return isLightPalette(palette) ? QColor(201, 201, 201) : QColor(82, 82, 82);
 }
 
-QColor trackColor(const QPalette& palette) {
-  return isLightPalette(palette) ? QColor(198, 198, 198) : QColor(116, 116, 116);
+QColor thumbColor(const QPalette& palette) {
+  return isLightPalette(palette) ? QColor(145, 145, 145) : QColor(170, 170, 170);
 }
 
-QColor thumbColor(const QPalette& palette, bool hovered, bool pressed) {
-  QColor color = isLightPalette(palette) ? QColor(145, 145, 145) : QColor(170, 170, 170);
-  if (pressed) {
-    return color.darker(118);
-  }
-  if (hovered) {
-    return color.lighter(110);
-  }
-  return color;
+QColor thumbHoverColor(const QPalette& palette) {
+  return thumbColor(palette).lighter(110);
 }
 
-QColor buttonFillColor(const QPalette& palette, bool hovered, bool pressed) {
-  QColor color = RhiScrollBar::laneColorForPalette(palette);
-  if (pressed) {
-    return isLightPalette(palette) ? color.darker(104) : color.lighter(110);
-  }
-  if (hovered) {
-    return isLightPalette(palette) ? color.lighter(101) : color.lighter(108);
-  }
-  return color;
+QColor thumbPressedColor(const QPalette& palette) {
+  return thumbColor(palette).darker(118);
+}
+
+QColor buttonHoverColor(const QPalette& palette) {
+  const QColor lane = RhiScrollBar::laneColorForPalette(palette);
+  return isLightPalette(palette) ? lane.lighter(101) : lane.lighter(108);
+}
+
+QColor buttonPressedColor(const QPalette& palette) {
+  const QColor lane = RhiScrollBar::laneColorForPalette(palette);
+  return isLightPalette(palette) ? lane.darker(104) : lane.lighter(110);
 }
 
 QColor glyphColor(const QPalette& palette) {
@@ -66,13 +59,16 @@ int axisValue(Qt::Orientation orientation, const QPoint& pos) {
 }
 }  // namespace
 
-RhiScrollBar::RhiScrollBar(Qt::Orientation orientation, QWidget* parent)
-    : QWidget(parent),
-      m_orientation(orientation) {
+RhiScrollBar::RhiScrollBar(Qt::Orientation orientation,
+                           RedrawCallback requestRedraw,
+                           QObject* parent)
+    : QObject(parent),
+      m_orientation(orientation),
+      m_requestRedraw(std::move(requestRedraw)) {
 #if defined(Q_OS_WIN)
   m_arrowButtonsVisible = true;
 #endif
-  setMouseTracking(true);
+  updateSnapshot();
 }
 
 QColor RhiScrollBar::laneColorForPalette(const QPalette& palette) {
@@ -81,6 +77,26 @@ QColor RhiScrollBar::laneColorForPalette(const QPalette& palette) {
 
 QColor RhiScrollBar::borderColorForPalette(const QPalette& palette) {
   return laneBorderColor(palette);
+}
+
+QColor RhiScrollBar::thumbColorForPalette(const QPalette& palette) {
+  return thumbColor(palette);
+}
+
+QColor RhiScrollBar::thumbHoverColorForPalette(const QPalette& palette) {
+  return thumbHoverColor(palette);
+}
+
+QColor RhiScrollBar::thumbPressedColorForPalette(const QPalette& palette) {
+  return thumbPressedColor(palette);
+}
+
+QColor RhiScrollBar::buttonHoverColorForPalette(const QPalette& palette) {
+  return buttonHoverColor(palette);
+}
+
+QColor RhiScrollBar::buttonPressedColorForPalette(const QPalette& palette) {
+  return buttonPressedColor(palette);
 }
 
 QColor RhiScrollBar::glyphColorForPalette(const QPalette& palette) {
@@ -101,35 +117,32 @@ void RhiScrollBar::bindTo(QScrollBar* model) {
 
   m_model = model;
   if (!m_model) {
-    hide();
+    setVisible(false);
     return;
   }
 
-  m_modelConnections.push_back(connect(m_model, &QScrollBar::valueChanged, this, [this]() {
-    update();
-  }));
-  m_modelConnections.push_back(connect(m_model, &QScrollBar::rangeChanged, this, [this]() {
-    update();
-  }));
-  m_modelConnections.push_back(connect(m_model, &QScrollBar::sliderMoved, this, [this]() {
-    update();
-  }));
-  m_modelConnections.push_back(connect(m_model, &QScrollBar::actionTriggered, this, [this]() {
-    update();
-  }));
+  auto markDirty = [this]() {
+    updateSnapshot();
+    requestRedraw();
+  };
+
+  m_modelConnections.push_back(connect(m_model, &QScrollBar::valueChanged, this, markDirty));
+  m_modelConnections.push_back(connect(m_model, &QScrollBar::rangeChanged, this, markDirty));
+  m_modelConnections.push_back(connect(m_model, &QScrollBar::sliderMoved, this, markDirty));
+  m_modelConnections.push_back(connect(m_model, &QScrollBar::actionTriggered, this, markDirty));
   m_modelConnections.push_back(connect(m_model, &QObject::destroyed, this, [this]() {
     m_model = nullptr;
     clearDragState();
     stopRepeat();
-    hide();
+    setVisible(false);
   }));
 
   syncFromModel();
 }
 
 void RhiScrollBar::syncFromModel() {
-  updateGeometry();
-  update();
+  updateSnapshot();
+  requestRedraw();
 }
 
 void RhiScrollBar::setArrowButtonsVisible(bool visible) {
@@ -137,8 +150,32 @@ void RhiScrollBar::setArrowButtonsVisible(bool visible) {
     return;
   }
   m_arrowButtonsVisible = visible;
-  updateGeometry();
-  update();
+  updateSnapshot();
+  requestRedraw();
+}
+
+void RhiScrollBar::setGeometry(const QRect& rect) {
+  if (m_rect == rect) {
+    return;
+  }
+  m_rect = rect;
+  updateSnapshot();
+  requestRedraw();
+}
+
+void RhiScrollBar::setVisible(bool visible) {
+  if (m_visible == visible) {
+    return;
+  }
+  m_visible = visible;
+  if (!m_visible) {
+    clearDragState();
+    stopRepeat();
+    m_pressedPart = Part::None;
+    m_hoveredPart = Part::None;
+  }
+  updateSnapshot();
+  requestRedraw();
 }
 
 QSize RhiScrollBar::sizeHint() const {
@@ -155,31 +192,31 @@ QSize RhiScrollBar::minimumSizeHint() const {
 }
 
 QRect RhiScrollBar::leadingArrowRect() const {
-  if (!m_arrowButtonsVisible) {
+  if (!m_arrowButtonsVisible || !m_visible) {
     return {};
   }
 
   if (m_orientation == Qt::Horizontal) {
-    return QRect(0, 0, std::min(kArrowExtent, width()), height());
+    return QRect(m_rect.left(), m_rect.top(), std::min(kArrowExtent, m_rect.width()), m_rect.height());
   }
-  return QRect(0, 0, width(), std::min(kArrowExtent, height()));
+  return QRect(m_rect.left(), m_rect.top(), m_rect.width(), std::min(kArrowExtent, m_rect.height()));
 }
 
 QRect RhiScrollBar::trailingArrowRect() const {
-  if (!m_arrowButtonsVisible) {
+  if (!m_arrowButtonsVisible || !m_visible) {
     return {};
   }
 
   if (m_orientation == Qt::Horizontal) {
-    const int extent = std::min(kArrowExtent, width());
-    return QRect(std::max(0, width() - extent), 0, extent, height());
+    const int extent = std::min(kArrowExtent, m_rect.width());
+    return QRect(std::max(m_rect.left(), m_rect.right() - extent + 1), m_rect.top(), extent, m_rect.height());
   }
-  const int extent = std::min(kArrowExtent, height());
-  return QRect(0, std::max(0, height() - extent), width(), extent);
+  const int extent = std::min(kArrowExtent, m_rect.height());
+  return QRect(m_rect.left(), std::max(m_rect.top(), m_rect.bottom() - extent + 1), m_rect.width(), extent);
 }
 
 QRect RhiScrollBar::trackRect() const {
-  QRect rect = this->rect().adjusted(0, 0, -1, -1);
+  QRect rect = m_rect.adjusted(0, 0, -1, -1);
   if (m_arrowButtonsVisible) {
     if (m_orientation == Qt::Horizontal) {
       rect.adjust(leadingArrowRect().width(), 0, -trailingArrowRect().width(), 0);
@@ -187,7 +224,7 @@ QRect RhiScrollBar::trackRect() const {
       rect.adjust(0, leadingArrowRect().height(), 0, -trailingArrowRect().height());
     }
   }
-  return rect.adjusted(2, 2, -2, -2);
+  return rect.adjusted(1, 1, -1, -1);
 }
 
 RhiScrollBar::ThumbMetrics RhiScrollBar::thumbMetrics() const {
@@ -219,11 +256,11 @@ RhiScrollBar::ThumbMetrics RhiScrollBar::thumbMetrics() const {
   metrics.thumbLength = thumbLength;
 
   if (m_orientation == Qt::Horizontal) {
-    const int thumbHeight = std::max(6, track.height() - (2 * kThumbInset));
+    const int thumbHeight = std::max(8, track.height() - (2 * kThumbInset));
     const int thumbTop = track.top() + ((track.height() - thumbHeight) / 2);
     metrics.rect = QRect(thumbStart, thumbTop, thumbLength, thumbHeight);
   } else {
-    const int thumbWidth = std::max(6, track.width() - (2 * kThumbInset));
+    const int thumbWidth = std::max(8, track.width() - (2 * kThumbInset));
     const int thumbLeft = track.left() + ((track.width() - thumbWidth) / 2);
     metrics.rect = QRect(thumbLeft, thumbStart, thumbWidth, thumbLength);
   }
@@ -232,7 +269,7 @@ RhiScrollBar::ThumbMetrics RhiScrollBar::thumbMetrics() const {
 }
 
 RhiScrollBar::Part RhiScrollBar::partAt(const QPoint& pos) const {
-  if (!rect().contains(pos)) {
+  if (!m_visible || !m_rect.contains(pos)) {
     return Part::None;
   }
   if (leadingArrowRect().contains(pos)) {
@@ -324,163 +361,131 @@ void RhiScrollBar::clearDragState() {
   m_dragThumbOffset = 0;
 }
 
-void RhiScrollBar::paintEvent(QPaintEvent* event) {
-  Q_UNUSED(event);
-
-  QPainter painter(this);
-  painter.setRenderHint(QPainter::Antialiasing, true);
-  painter.fillRect(rect(), laneColorForPalette(palette()));
-
-  const QColor border = borderColorForPalette(palette());
-  painter.setPen(border);
-  painter.drawRect(rect().adjusted(0, 0, -1, -1));
-
-  if (m_arrowButtonsVisible) {
-    const QRect leading = leadingArrowRect().adjusted(0, 0, -1, -1);
-    const QRect trailing = trailingArrowRect().adjusted(0, 0, -1, -1);
-    painter.fillRect(leading, buttonFillColor(palette(),
-                                              m_hoveredPart == Part::LeadingArrow,
-                                              m_pressedPart == Part::LeadingArrow));
-    painter.fillRect(trailing, buttonFillColor(palette(),
-                                               m_hoveredPart == Part::TrailingArrow,
-                                               m_pressedPart == Part::TrailingArrow));
-
-    painter.setPen(border);
-    if (m_orientation == Qt::Horizontal) {
-      painter.drawLine(leading.right(), leading.top(), leading.right(), leading.bottom());
-      painter.drawLine(trailing.left(), trailing.top(), trailing.left(), trailing.bottom());
-    } else {
-      painter.drawLine(leading.left(), leading.bottom(), leading.right(), leading.bottom());
-      painter.drawLine(trailing.left(), trailing.top(), trailing.right(), trailing.top());
-    }
-
-    painter.setBrush(glyphColorForPalette(palette()));
-    painter.setPen(Qt::NoPen);
-    auto drawArrow = [&](const QRect& buttonRect, bool leadingArrow) {
-      const int half = std::max(3, std::min(buttonRect.width(), buttonRect.height()) / 4);
-      const QPoint center = buttonRect.center();
-      QPolygon triangle;
-      if (m_orientation == Qt::Horizontal) {
-        if (leadingArrow) {
-          triangle << QPoint(center.x() - half, center.y())
-                   << QPoint(center.x() + half, center.y() - half)
-                   << QPoint(center.x() + half, center.y() + half);
-        } else {
-          triangle << QPoint(center.x() + half, center.y())
-                   << QPoint(center.x() - half, center.y() - half)
-                   << QPoint(center.x() - half, center.y() + half);
-        }
-      } else if (leadingArrow) {
-        triangle << QPoint(center.x(), center.y() - half)
-                 << QPoint(center.x() - half, center.y() + half)
-                 << QPoint(center.x() + half, center.y() + half);
-      } else {
-        triangle << QPoint(center.x(), center.y() + half)
-                 << QPoint(center.x() - half, center.y() - half)
-                 << QPoint(center.x() + half, center.y() - half);
-      }
-      painter.drawPolygon(triangle);
-    };
-    drawArrow(leadingArrowRect(), true);
-    drawArrow(trailingArrowRect(), false);
-  }
-
-  const QRect track = trackRect();
-  if (!track.isEmpty()) {
-    const QRect centerTrack = (m_orientation == Qt::Horizontal)
-        ? QRect(track.left(), track.center().y() - 2, track.width(), 4)
-        : QRect(track.center().x() - 2, track.top(), 4, track.height());
-    painter.setPen(Qt::NoPen);
-    painter.setBrush(trackColor(palette()));
-    painter.drawRoundedRect(centerTrack, 2.0, 2.0);
-  }
-
-  if (!m_model) {
+void RhiScrollBar::updateSnapshot() {
+  m_snapshot = {};
+  m_snapshot.visible = m_visible;
+  m_snapshot.orientation = m_orientation;
+  m_snapshot.laneRect = QRectF(m_rect);
+  if (!m_visible || m_rect.isEmpty()) {
     return;
   }
 
   const ThumbMetrics metrics = thumbMetrics();
-  if (metrics.rect.isEmpty()) {
-    return;
-  }
+  m_snapshot.thumbRect = QRectF(metrics.rect);
+  m_snapshot.thumbHovered = (m_hoveredPart == Part::Thumb) || m_draggingThumb;
+  m_snapshot.thumbPressed = (m_pressedPart == Part::Thumb) || m_draggingThumb;
 
-  painter.setBrush(thumbColor(palette(),
-                              m_hoveredPart == Part::Thumb || m_draggingThumb,
-                              m_pressedPart == Part::Thumb || m_draggingThumb));
-  painter.setPen(Qt::NoPen);
-  const qreal radius = (m_orientation == Qt::Horizontal)
-      ? (metrics.rect.height() / 2.0)
-      : (metrics.rect.width() / 2.0);
-  painter.drawRoundedRect(metrics.rect, radius, radius);
+  if (m_arrowButtonsVisible) {
+    const QRect leadingRect = leadingArrowRect();
+    if (!leadingRect.isEmpty()) {
+      m_snapshot.arrowButtons.push_back(RhiScrollButtonSnapshot{
+          QRectF(leadingRect),
+          RhiScrollButtonGlyph::Backward,
+          m_hoveredPart == Part::LeadingArrow,
+          m_pressedPart == Part::LeadingArrow,
+          true,
+      });
+    }
+    const QRect trailingRect = trailingArrowRect();
+    if (!trailingRect.isEmpty()) {
+      m_snapshot.arrowButtons.push_back(RhiScrollButtonSnapshot{
+          QRectF(trailingRect),
+          RhiScrollButtonGlyph::Forward,
+          m_hoveredPart == Part::TrailingArrow,
+          m_pressedPart == Part::TrailingArrow,
+          true,
+      });
+    }
+  }
 }
 
-void RhiScrollBar::mousePressEvent(QMouseEvent* event) {
-  if (!event || event->button() != Qt::LeftButton || !m_model) {
-    QWidget::mousePressEvent(event);
-    return;
+void RhiScrollBar::requestRedraw() const {
+  if (m_requestRedraw) {
+    m_requestRedraw();
+  }
+}
+
+bool RhiScrollBar::handleMousePress(const QPoint& pos) {
+  if (!m_visible || !m_model) {
+    return false;
   }
 
-  const Part part = partAt(event->pos());
+  const Part part = partAt(pos);
   m_pressedPart = part;
   m_hoveredPart = part;
   if (part == Part::Thumb) {
     m_draggingThumb = true;
-    m_dragThumbOffset = axisValue(m_orientation, event->pos()) -
+    m_dragThumbOffset = axisValue(m_orientation, pos) -
                         axisValue(m_orientation, thumbMetrics().rect.topLeft());
     m_model->setSliderDown(true);
   } else if (part != Part::None) {
     triggerAction(part);
     startRepeat(part);
   }
-  update();
-  event->accept();
+
+  if (part != Part::None) {
+    updateSnapshot();
+    requestRedraw();
+    return true;
+  }
+  return false;
 }
 
-void RhiScrollBar::mouseMoveEvent(QMouseEvent* event) {
-  if (!event) {
-    QWidget::mouseMoveEvent(event);
-    return;
+bool RhiScrollBar::handleMouseMove(const QPoint& pos, Qt::MouseButtons buttons) {
+  if (!m_visible || !m_model) {
+    return false;
   }
 
-  if (m_draggingThumb && m_model) {
-    m_model->setSliderPosition(valueForPointer(event->pos()));
-    event->accept();
-    return;
+  if (m_draggingThumb) {
+    if (!(buttons & Qt::LeftButton)) {
+      clearDragState();
+      m_pressedPart = Part::None;
+      m_hoveredPart = partAt(pos);
+      updateSnapshot();
+      requestRedraw();
+      return false;
+    }
+    m_model->setSliderPosition(valueForPointer(pos));
+    return true;
   }
 
-  const Part hovered = partAt(event->pos());
+  const Part hovered = partAt(pos);
   if (hovered != m_hoveredPart) {
     m_hoveredPart = hovered;
-    update();
+    updateSnapshot();
+    requestRedraw();
   }
-  QWidget::mouseMoveEvent(event);
+  return hovered != Part::None;
 }
 
-void RhiScrollBar::mouseReleaseEvent(QMouseEvent* event) {
-  if (event && event->button() == Qt::LeftButton) {
-    clearDragState();
-    stopRepeat();
-    m_pressedPart = Part::None;
-    m_hoveredPart = event ? partAt(event->pos()) : Part::None;
-    update();
-    event->accept();
-    return;
+bool RhiScrollBar::handleMouseRelease(const QPoint& pos) {
+  if (!m_visible || !m_model) {
+    return false;
   }
 
-  QWidget::mouseReleaseEvent(event);
+  const bool wasActive = m_draggingThumb || (m_pressedPart != Part::None);
+  clearDragState();
+  stopRepeat();
+  m_pressedPart = Part::None;
+  m_hoveredPart = partAt(pos);
+  updateSnapshot();
+  if (wasActive) {
+    requestRedraw();
+  }
+  return wasActive;
 }
 
-void RhiScrollBar::leaveEvent(QEvent* event) {
-  if (!m_draggingThumb) {
+void RhiScrollBar::handleLeave() {
+  if (!m_draggingThumb && m_hoveredPart != Part::None) {
     m_hoveredPart = Part::None;
-    update();
+    updateSnapshot();
+    requestRedraw();
   }
-  QWidget::leaveEvent(event);
 }
 
 void RhiScrollBar::timerEvent(QTimerEvent* event) {
   if (!event || event->timerId() != m_repeatTimer.timerId()) {
-    QWidget::timerEvent(event);
+    QObject::timerEvent(event);
     return;
   }
 

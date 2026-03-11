@@ -93,7 +93,8 @@ bool PianoRollRhiHost::syncPlaybackAutoScrollToRenderFrame() const {
 void PianoRollRhiHost::resizeEvent(QResizeEvent* event) {
   QWidget::resizeEvent(event);
   if (m_surface) {
-    // Keep the rendering surface perfectly aligned with the host viewport.
+    // Cover the full scroll-area rect so the renderer can draw both content
+    // and scrollbar chrome inside the same native/window-backed surface.
     m_surface->setGeometry(rect());
   }
 }

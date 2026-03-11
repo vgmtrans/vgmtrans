@@ -37,6 +37,11 @@ bool PianoRollRhiWindow::handleWindowEvent(QEvent* e) {
   switch (e->type()) {
     case QEvent::NativeGesture:
       return handleNativeGestureEvent(static_cast<QNativeGestureEvent*>(e));
+    case QEvent::Leave:
+      m_view->handleViewportLeave();
+      requestUpdate();
+      e->accept();
+      return true;
     case QEvent::Wheel:
       m_inputCoalescer.queueWheel(static_cast<QWheelEvent*>(e));
       requestUpdate();
@@ -141,7 +146,7 @@ void PianoRollRhiWindow::drainPendingInput() {
 
   PianoRollRhiInputCoalescer::MouseMoveBatch mouseMoveBatch;
   if (m_inputCoalescer.takePendingMouseMove(mouseMoveBatch)) {
-    const QPoint viewportPos = m_view->viewport()->mapFromGlobal(mouseMoveBatch.globalPos.toPoint());
+    const QPoint viewportPos = m_view->viewportPosFromGlobal(mouseMoveBatch.globalPos);
     QMouseEvent mouseEvent(QEvent::MouseMove,
                            QPointF(viewportPos),
                            mouseMoveBatch.globalPos,
@@ -163,8 +168,8 @@ void PianoRollRhiWindow::drainPendingInput() {
     return;
   }
 
-  const QPoint viewportPos = m_view->viewport()->mapFromGlobal(wheelBatch.globalPos.toPoint());
-  QWheelEvent wheelEvent(QPointF(viewportPos),
+  const QPoint hostPos = m_view->viewportPosFromGlobal(wheelBatch.globalPos);
+  QWheelEvent wheelEvent(QPointF(hostPos),
                          wheelBatch.globalPos,
                          wheelBatch.pixelDelta,
                          wheelBatch.angleDelta,

@@ -40,7 +40,6 @@ class VGMSeq;
 class VGMItem;
 class PianoRollRhiHost;
 class PianoRollRhiWindow;
-class PianoRollZoomButtons;
 class RhiScrollAreaChrome;
 
 class PianoRollView final : public QAbstractScrollArea {
@@ -150,6 +149,7 @@ private:
   bool handleViewportMousePress(QMouseEvent* event);
   bool handleViewportMouseMove(QMouseEvent* event);
   bool handleViewportMouseRelease(QMouseEvent* event);
+  void handleViewportLeave();
 
   void maybeBuildTimelineFromSequence();
   void rebuildTrackIndexMap();
@@ -224,8 +224,6 @@ private:
 
   PianoRollRhiHost* m_rhiHost = nullptr;
   std::unique_ptr<RhiScrollAreaChrome> m_scrollChrome;
-  PianoRollZoomButtons* m_horizontalZoomButtons = nullptr;
-  PianoRollZoomButtons* m_verticalZoomButtons = nullptr;
 
   VGMSeq* m_seq = nullptr;
   const SeqEventTimeIndex* m_timeline = nullptr;
