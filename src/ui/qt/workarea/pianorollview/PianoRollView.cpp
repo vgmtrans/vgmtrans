@@ -1070,8 +1070,8 @@ void PianoRollView::rebuildFrameColors() {
   m_frameColors.scanLineColor = dark ? QColor(255, 94, 77, 230) : QColor(201, 56, 36, 220);
   m_frameColors.whiteKeyColor = dark ? QColor(188, 193, 202) : QColor(242, 244, 247);
   m_frameColors.blackKeyColor = dark ? QColor(58, 64, 74) : QColor(86, 93, 104);
-  m_frameColors.whiteKeyRowColor = dark ? QColor(76, 84, 95, 42) : QColor(98, 116, 138, 24);
-  m_frameColors.blackKeyRowColor = dark ? QColor(44, 50, 59, 68) : QColor(92, 106, 126, 34);
+  m_frameColors.whiteKeyRowColor = dark ? QColor(76, 84, 95, 42) : QColor(235, 233, 230);
+  m_frameColors.blackKeyRowColor = dark ? QColor(44, 50, 59, 68) : QColor(223, 221, 218);
   m_frameColors.dividerColor = dark ? text.lighter(115) : text.darker(125);
   m_frameColors.dividerColor.setAlpha(dark ? 74 : 62);
   m_frameColors.selectedNoteFillColor = dark ? QColor(72, 182, 255, 72) : QColor(52, 148, 225, 66);
