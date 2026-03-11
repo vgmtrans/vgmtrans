@@ -1970,6 +1970,11 @@ void PianoRollRhiRenderer::appendKeyboardHighlightInstances(
 
 void PianoRollRhiRenderer::appendScrollChromeInstances(const PianoRollFrame::Data& frame) {
   const RhiScrollAreaChromeSnapshot& chrome = frame.scrollChrome;
+  if (!chrome.horizontal.visible && !chrome.vertical.visible &&
+      chrome.horizontalButtons.empty() && chrome.verticalButtons.empty()) {
+    return;
+  }
+
   const auto appendOutline = [&](const QRectF& rect) {
     if (rect.width() <= 0.5f || rect.height() <= 0.5f) {
       return;
@@ -2046,6 +2051,26 @@ void PianoRollRhiRenderer::appendScrollChromeInstances(const PianoRollFrame::Dat
     }
   };
 
+  const auto buttonFillColor = [&](const RhiScrollButtonSnapshot& button) {
+    return button.pressed
+        ? chrome.colors.buttonPressedColor
+        : (button.hovered ? chrome.colors.buttonHoverColor : chrome.colors.laneColor);
+  };
+
+  const auto appendButton = [&](const RhiScrollButtonSnapshot& button, Qt::Orientation orientation) {
+    if (!button.visible) {
+      return;
+    }
+    appendRect(m_dynamicInstances,
+               button.rect.left(),
+               button.rect.top(),
+               button.rect.width(),
+               button.rect.height(),
+               buttonFillColor(button));
+    appendOutline(button.rect);
+    appendButtonGlyph(button, orientation);
+  };
+
   const auto appendBar = [&](const RhiScrollBarSnapshot& bar, const std::vector<RhiScrollButtonSnapshot>& buttons) {
     if (!bar.visible || bar.laneRect.width() <= 0.5f || bar.laneRect.height() <= 0.5f) {
       return;
@@ -2073,34 +2098,11 @@ void PianoRollRhiRenderer::appendScrollChromeInstances(const PianoRollFrame::Dat
     }
 
     for (const RhiScrollButtonSnapshot& button : bar.arrowButtons) {
-      const QColor fill = button.pressed
-          ? chrome.colors.buttonPressedColor
-          : (button.hovered ? chrome.colors.buttonHoverColor : chrome.colors.laneColor);
-      appendRect(m_dynamicInstances,
-                 button.rect.left(),
-                 button.rect.top(),
-                 button.rect.width(),
-                 button.rect.height(),
-                 fill);
-      appendOutline(button.rect);
-      appendButtonGlyph(button, bar.orientation);
+      appendButton(button, bar.orientation);
     }
 
     for (const RhiScrollButtonSnapshot& button : buttons) {
-      if (!button.visible) {
-        continue;
-      }
-      const QColor fill = button.pressed
-          ? chrome.colors.buttonPressedColor
-          : (button.hovered ? chrome.colors.buttonHoverColor : chrome.colors.laneColor);
-      appendRect(m_dynamicInstances,
-                 button.rect.left(),
-                 button.rect.top(),
-                 button.rect.width(),
-                 button.rect.height(),
-                 fill);
-      appendOutline(button.rect);
-      appendButtonGlyph(button, bar.orientation);
+      appendButton(button, bar.orientation);
     }
   };
 

@@ -77,6 +77,8 @@ PianoRollView::PianoRollView(QWidget* parent)
   setMouseTracking(true);
   viewport()->setMouseTracking(true);
 
+  // The Qt scrollbars remain as hidden range/value models. The visible chrome
+  // is computed separately and rendered inside the RHI surface.
   m_scrollChrome = std::make_unique<RhiScrollAreaChrome>(
       this,
       [this](const QMargins& margins) {
@@ -1447,7 +1449,8 @@ void PianoRollView::requestRenderCoalesced() {
   static constexpr qint64 kMinRenderIntervalMs = 16;
   const qint64 nowMs = m_renderClock.elapsed();
   const qint64 sinceLastRender = nowMs - m_lastRenderMs;
-  // Clamp high-frequency scroll updates to roughly one render per refresh interval.
+  // Scroll gestures and hover updates can arrive much faster than the surface
+  // can present. Coalesce them so we request at most one fresh frame per beat.
   const int delayMs = (sinceLastRender >= kMinRenderIntervalMs)
                           ? 0
                           : static_cast<int>(kMinRenderIntervalMs - sinceLastRender);
@@ -1628,6 +1631,8 @@ void PianoRollView::scrollPlaybackTickToViewportFraction(int tick, float viewpor
       m_playbackAutoScrollAnimation->stop();
     }
 
+    // Native-window auto-scroll advances from rendered frames so the playback
+    // page turn stays smooth even when timer callbacks and frame delivery drift.
     m_frameDrivenPlaybackAutoScrollActive = true;
     m_frameDrivenPlaybackAutoScrollStartNs = m_animClock.nsecsElapsed();
     m_frameDrivenPlaybackAutoScrollStartX = hbar->value();
