@@ -108,10 +108,11 @@ void RhiScrollBar::bindTo(QScrollBar* model) {
     return;
   }
 
-  for (const QMetaObject::Connection& connection : m_modelConnections) {
-    disconnect(connection);
+  // The chrome can be rebound as views swap models; drop any old model wiring
+  // before attaching to the next hidden QScrollBar.
+  if (m_model) {
+    disconnect(m_model, nullptr, this, nullptr);
   }
-  m_modelConnections.clear();
   clearDragState();
   stopRepeat();
 
@@ -122,27 +123,25 @@ void RhiScrollBar::bindTo(QScrollBar* model) {
   }
 
   auto markDirty = [this]() {
-    updateSnapshot();
-    requestRedraw();
+    refresh();
   };
 
-  m_modelConnections.push_back(connect(m_model, &QScrollBar::valueChanged, this, markDirty));
-  m_modelConnections.push_back(connect(m_model, &QScrollBar::rangeChanged, this, markDirty));
-  m_modelConnections.push_back(connect(m_model, &QScrollBar::sliderMoved, this, markDirty));
-  m_modelConnections.push_back(connect(m_model, &QScrollBar::actionTriggered, this, markDirty));
-  m_modelConnections.push_back(connect(m_model, &QObject::destroyed, this, [this]() {
+  connect(m_model, &QScrollBar::valueChanged, this, markDirty);
+  connect(m_model, &QScrollBar::rangeChanged, this, markDirty);
+  connect(m_model, &QScrollBar::sliderMoved, this, markDirty);
+  connect(m_model, &QScrollBar::actionTriggered, this, markDirty);
+  connect(m_model, &QObject::destroyed, this, [this]() {
     m_model = nullptr;
     clearDragState();
     stopRepeat();
     setVisible(false);
-  }));
+  });
 
   syncFromModel();
 }
 
 void RhiScrollBar::syncFromModel() {
-  updateSnapshot();
-  requestRedraw();
+  refresh();
 }
 
 void RhiScrollBar::setArrowButtonsVisible(bool visible) {
@@ -150,8 +149,7 @@ void RhiScrollBar::setArrowButtonsVisible(bool visible) {
     return;
   }
   m_arrowButtonsVisible = visible;
-  updateSnapshot();
-  requestRedraw();
+  refresh();
 }
 
 void RhiScrollBar::setGeometry(const QRect& rect) {
@@ -159,8 +157,7 @@ void RhiScrollBar::setGeometry(const QRect& rect) {
     return;
   }
   m_rect = rect;
-  updateSnapshot();
-  requestRedraw();
+  refresh();
 }
 
 void RhiScrollBar::setVisible(bool visible) {
@@ -174,8 +171,7 @@ void RhiScrollBar::setVisible(bool visible) {
     m_pressedPart = Part::None;
     m_hoveredPart = Part::None;
   }
-  updateSnapshot();
-  requestRedraw();
+  refresh();
 }
 
 QSize RhiScrollBar::sizeHint() const {
@@ -240,6 +236,8 @@ RhiScrollBar::ThumbMetrics RhiScrollBar::thumbMetrics() const {
   const int range = std::max(0, maxValue - minValue);
   const int trackLength = (m_orientation == Qt::Horizontal) ? track.width() : track.height();
   const int fullRange = std::max(1, range + pageStep);
+  // Match standard scrollbar behavior: thumb size reflects how much content is
+  // visible, while thumb travel reflects the remaining scrollable range.
   const int thumbLength = std::clamp(
       static_cast<int>(std::lround((static_cast<double>(pageStep) / static_cast<double>(fullRange)) * trackLength)),
       kMinThumbLength,
@@ -361,6 +359,11 @@ void RhiScrollBar::clearDragState() {
   m_dragThumbOffset = 0;
 }
 
+void RhiScrollBar::refresh() {
+  updateSnapshot();
+  requestRedraw();
+}
+
 void RhiScrollBar::updateSnapshot() {
   m_snapshot = {};
   m_snapshot.visible = m_visible;
@@ -370,6 +373,8 @@ void RhiScrollBar::updateSnapshot() {
     return;
   }
 
+  // Snapshot data is the only thing the renderer sees, so fold all current
+  // hover/press/geometry state into it here.
   const ThumbMetrics metrics = thumbMetrics();
   m_snapshot.thumbRect = QRectF(metrics.rect);
   m_snapshot.thumbHovered = (m_hoveredPart == Part::Thumb) || m_draggingThumb;
@@ -424,8 +429,7 @@ bool RhiScrollBar::handleMousePress(const QPoint& pos) {
   }
 
   if (part != Part::None) {
-    updateSnapshot();
-    requestRedraw();
+    refresh();
     return true;
   }
   return false;
@@ -441,10 +445,10 @@ bool RhiScrollBar::handleMouseMove(const QPoint& pos, Qt::MouseButtons buttons) 
       clearDragState();
       m_pressedPart = Part::None;
       m_hoveredPart = partAt(pos);
-      updateSnapshot();
-      requestRedraw();
+      refresh();
       return false;
     }
+    // While dragging we forward thumb motion straight into the hidden model.
     m_model->setSliderPosition(valueForPointer(pos));
     return true;
   }
@@ -452,8 +456,7 @@ bool RhiScrollBar::handleMouseMove(const QPoint& pos, Qt::MouseButtons buttons) 
   const Part hovered = partAt(pos);
   if (hovered != m_hoveredPart) {
     m_hoveredPart = hovered;
-    updateSnapshot();
-    requestRedraw();
+    refresh();
   }
   return hovered != Part::None;
 }
@@ -478,8 +481,7 @@ bool RhiScrollBar::handleMouseRelease(const QPoint& pos) {
 void RhiScrollBar::handleLeave() {
   if (!m_draggingThumb && m_hoveredPart != Part::None) {
     m_hoveredPart = Part::None;
-    updateSnapshot();
-    requestRedraw();
+    refresh();
   }
 }
 

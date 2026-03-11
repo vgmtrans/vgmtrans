@@ -7,7 +7,6 @@
 #pragma once
 
 #include <QMargins>
-#include <QMetaObject>
 #include <QPoint>
 #include <Qt>
 
@@ -18,7 +17,6 @@
 #include "RhiScrollChromeData.h"
 
 class QAbstractScrollArea;
-class QScrollBar;
 class RhiScrollBar;
 
 class RhiScrollAreaChrome final {
@@ -56,12 +54,19 @@ public:
 private:
   // Hidden QScrollBar models still own range/value/page-step; this class only
   // lays out and hit-tests the chrome that gets drawn inside the RHI surface.
+  void setButtons(Qt::Orientation orientation, std::vector<ButtonSpec> buttonSpecs);
+  [[nodiscard]] const std::vector<ButtonSpec>& buttons(Qt::Orientation orientation) const;
+  [[nodiscard]] std::vector<ButtonSpec>& buttons(Qt::Orientation orientation);
+  [[nodiscard]] int& hoveredButton(Qt::Orientation orientation);
+  [[nodiscard]] int& pressedButton(Qt::Orientation orientation);
+  [[nodiscard]] int laneExtent(Qt::Orientation orientation) const;
   [[nodiscard]] bool shouldShowHorizontalBar() const;
   [[nodiscard]] bool shouldShowVerticalBar() const;
-  [[nodiscard]] QRect horizontalButtonsRect() const;
-  [[nodiscard]] QRect verticalButtonsRect() const;
+  [[nodiscard]] QRect buttonsRect(Qt::Orientation orientation) const;
   [[nodiscard]] QRect buttonRect(Qt::Orientation orientation, int index) const;
   [[nodiscard]] int buttonIndexAt(Qt::Orientation orientation, const QPoint& pos) const;
+  void appendButtonSnapshots(Qt::Orientation orientation);
+  void refresh();
   void updateSnapshot();
   void requestRedraw() const;
 
@@ -76,8 +81,6 @@ private:
   int m_pressedHorizontalButton = -1;
   int m_hoveredVerticalButton = -1;
   int m_pressedVerticalButton = -1;
-  QMetaObject::Connection m_horizontalRangeConnection;
-  QMetaObject::Connection m_verticalRangeConnection;
   Qt::ScrollBarPolicy m_horizontalPolicy = Qt::ScrollBarAlwaysOff;
   Qt::ScrollBarPolicy m_verticalPolicy = Qt::ScrollBarAlwaysOff;
   RhiScrollAreaChromeSnapshot m_snapshot;
