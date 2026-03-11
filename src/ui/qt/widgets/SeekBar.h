@@ -6,6 +6,7 @@
 
 #pragma once
 
+#include <QColor>
 #include <QWidget>
 
 class SeekBar : public QWidget {
@@ -41,6 +42,7 @@ private:
   [[nodiscard]] int displayedThumbPixel(int value) const;
   [[nodiscard]] int valueForPosition(const QPointF& pos) const;
   [[nodiscard]] QRect dirtyRectForValues(int oldValue, int newValue) const;
+  void refreshCachedColors();
   void updateValueFromPointer(const QPointF& pos);
 
   Qt::Orientation m_orientation;
@@ -48,4 +50,7 @@ private:
   int m_maximum = 1;
   int m_value = 0;
   bool m_sliderDown = false;
+  QColor m_trackColor;
+  QColor m_fillColor;
+  QColor m_thumbColor;
 };

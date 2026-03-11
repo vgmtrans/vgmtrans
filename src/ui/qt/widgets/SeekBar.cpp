@@ -10,6 +10,7 @@
 
 #include <QEvent>
 #include <QMouseEvent>
+#include <QPalette>
 #include <QPainter>
 
 #include <algorithm>
@@ -20,16 +21,32 @@ constexpr qreal THUMB_RADIUS = 10.0;
 constexpr qreal TRACK_RADIUS = TRACK_THICKNESS * 0.5;
 constexpr int DIRTY_PADDING = 2;
 
-QColor trackColorFor(bool enabled) {
-  return enabled ? QColor(66, 66, 66) : QColor(73, 73, 73);
+bool isDarkPalette(const QPalette& palette) {
+  return palette.color(QPalette::Window).lightnessF() < 0.5;
 }
 
-QColor fillColorFor(bool enabled) {
-  return enabled ? QColor(100, 100, 100) : QColor(116, 116, 116);
+QColor trackColorFor(const QPalette& palette, bool enabled) {
+  const QColor window = palette.color(QPalette::Window);
+  if (isDarkPalette(palette)) {
+    return window.lighter(enabled ? 150 : 125);
+  }
+  return window.darker(enabled ? 125 : 120);
 }
 
-QColor thumbColorFor(bool enabled) {
-  return enabled ? QColor(149, 149, 149) : QColor(160, 160, 160);
+QColor fillColorFor(const QPalette& palette, bool enabled) {
+  const QColor window = palette.color(QPalette::Window);
+  if (isDarkPalette(palette)) {
+    return window.lighter(enabled ? 250 : 200);
+  }
+  return window.darker(enabled ? 145 : 132);
+}
+
+QColor thumbColorFor(const QPalette& palette, bool enabled) {
+  const QColor window = palette.color(QPalette::Window);
+  if (isDarkPalette(palette)) {
+    return window.lighter(enabled ? 350 : 250);
+  }
+  return window.lighter(enabled ? 150 : 102);//(darker(enabled ? 130 : 120);
 }
 }
 
@@ -40,6 +57,7 @@ SeekBar::SeekBar(Qt::Orientation orientation, QWidget* parent)
   setCursor(Qt::PointingHandCursor);
   setFocusPolicy(Qt::NoFocus);
   setAttribute(Qt::WA_NoSystemBackground);
+  refreshCachedColors();
 }
 
 void SeekBar::setRange(int minimum, int maximum) {
@@ -83,8 +101,10 @@ void SeekBar::changeEvent(QEvent* event) {
   QWidget::changeEvent(event);
   switch (event->type()) {
     case QEvent::EnabledChange:
+    case QEvent::ApplicationPaletteChange:
     case QEvent::PaletteChange:
     case QEvent::StyleChange:
+      refreshCachedColors();
       update();
       break;
     default:
@@ -133,12 +153,9 @@ void SeekBar::paintEvent(QPaintEvent* event) {
   painter.setClipRect(event->rect());
 
   const QRectF track = trackRect();
-  const QColor trackColor = trackColorFor(isEnabled());
-  const QColor fillColor = fillColorFor(isEnabled());
-  const QColor thumbColor = thumbColorFor(isEnabled());
 
   painter.setPen(Qt::NoPen);
-  painter.setBrush(trackColor);
+  painter.setBrush(m_trackColor);
   painter.drawRoundedRect(track, TRACK_RADIUS, TRACK_RADIUS);
 
   if (m_maximum > m_minimum) {
@@ -150,12 +167,12 @@ void SeekBar::paintEvent(QPaintEvent* event) {
       played.setTop(std::min(track.bottom(), thumbCenter));
     }
     if (played.width() > 0.0 && played.height() > 0.0) {
-      painter.setBrush(fillColor);
+      painter.setBrush(m_fillColor);
       painter.drawRoundedRect(played, TRACK_RADIUS, TRACK_RADIUS);
     }
   }
 
-  painter.setBrush(thumbColor);
+  painter.setBrush(m_thumbColor);
   if (m_orientation == Qt::Horizontal) {
     const qreal centerX = thumbCenterForValue(m_value);
     painter.drawEllipse(QPointF(centerX, rect().center().y()), THUMB_RADIUS, THUMB_RADIUS);
@@ -163,6 +180,14 @@ void SeekBar::paintEvent(QPaintEvent* event) {
     const qreal centerY = thumbCenterForValue(m_value);
     painter.drawEllipse(QPointF(rect().center().x(), centerY), THUMB_RADIUS, THUMB_RADIUS);
   }
+}
+
+void SeekBar::refreshCachedColors() {
+  // Cache palette-derived tones so playback repaint work stays down to geometry only.
+  const QPalette palette = this->palette();
+  m_trackColor = trackColorFor(palette, isEnabled());
+  m_fillColor = fillColorFor(palette, isEnabled());
+  m_thumbColor = thumbColorFor(palette, isEnabled());
 }
 
 QRectF SeekBar::trackRect() const {
