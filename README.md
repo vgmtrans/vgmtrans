@@ -1,8 +1,8 @@
 # VGMTrans - Video Game Music Translator · ![Build status](https://github.com/vgmtrans/vgmtrans/actions/workflows/build.yml/badge.svg?branch=master)
 
-[![Audio demo](https://img.shields.io/badge/demo-audio-blue)](https://vgmtrans.github.io/audiodemo/)
-[![Nightly builds](https://img.shields.io/badge/download-nightly_builds-purple)](https://nightly.link/vgmtrans/vgmtrans/workflows/build/master)
-[![Releases](https://img.shields.io/badge/download-releases-238636)](https://github.com/vgmtrans/vgmtrans/releases)
+[![Audio demo](https://img.shields.io/badge/Audio%20Demo-Listen-1f6feb?style=for-the-badge)](https://vgmtrans.github.io/audiodemo/)
+[![Preview builds](https://img.shields.io/badge/Download-Preview-f97316?style=for-the-badge)](https://github.com/vgmtrans/vgmtrans-preview/releases/tag/unstable)
+[![Releases](https://img.shields.io/badge/Download-Stable%20Releases-238636?style=for-the-badge)](https://github.com/vgmtrans/vgmtrans/releases)
 
 VGMTrans is a cross-platform desktop app for **detecting, inspecting, and converting sequenced video game music**
 into standard formats like **MIDI**, **SoundFont2 (SF2)**, and **DLS**.
@@ -23,7 +23,7 @@ into standard formats like **MIDI**, **SoundFont2 (SF2)**, and **DLS**.
 Prebuilt binaries for Windows, macOS, and Linux:
 
 * [Official releases](https://github.com/vgmtrans/vgmtrans/releases)
-* [Bleeding edge versions](https://nightly.link/vgmtrans/vgmtrans/workflows/build/master)
+* [Latest preview build](https://github.com/vgmtrans/vgmtrans-preview/releases/tag/unstable)
 
 ## Supported Formats
 
