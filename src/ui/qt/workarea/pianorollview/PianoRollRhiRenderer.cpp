@@ -12,8 +12,6 @@
 #include <rhi/qrhi.h>
 
 #include <QColor>
-#include <QDebug>
-#include <QElapsedTimer>
 #include <QFile>
 #include <QFont>
 #include <QFontMetrics>
@@ -74,148 +72,6 @@ struct KeyboardTopology {
   std::vector<int> blackKeys;
   std::vector<float> seamUnits;
 };
-
-// Enables optional profiling with `VGMTRANS_PROFILE_PIANOROLL=1`.
-bool pianoRollProfileEnabled() {
-  return true;
-  // static const bool enabled = qEnvironmentVariableIntValue("VGMTRANS_PROFILE_PIANOROLL") > 0;
-  // return enabled;
-}
-
-struct RenderProfileSample {
-  qint64 captureNs = 0;
-  qint64 staticNs = 0;
-  qint64 overlayNs = 0;
-  qint64 noteBuildNs = 0;
-  qint64 uploadNs = 0;
-  qint64 resourceUpdateNs = 0;
-  qint64 beginPassNs = 0;
-  qint64 passSetupNs = 0;
-  qint64 baseDrawNs = 0;
-  qint64 noteDrawNs = 0;
-  qint64 auraDrawNs = 0;
-  qint64 overlayDrawNs = 0;
-  qint64 passEndNs = 0;
-  qint64 drawNs = 0;
-  qint64 totalNs = 0;
-  int noteCandidates = 0;
-  int horizontallyVisibleNotes = 0;
-  int verticallyVisibleNotes = 0;
-  int drawnNotes = 0;
-  int activeLasers = 0;
-  int dynamicInstances = 0;
-  int measureLabelInstances = 0;
-  int selectionInstances = 0;
-  int playheadInstances = 0;
-  int marqueeInstances = 0;
-  int keyboardInstances = 0;
-  int scrollChromeInstances = 0;
-};
-
-// Aggregates per-frame timings and prints periodic averages.
-void logRenderProfileSample(const RenderProfileSample& sample) {
-  static constexpr int kLogEveryFrames = 120;
-  struct Totals {
-    int frames = 0;
-    qint64 captureNs = 0;
-    qint64 staticNs = 0;
-    qint64 overlayNs = 0;
-    qint64 noteBuildNs = 0;
-    qint64 uploadNs = 0;
-    qint64 resourceUpdateNs = 0;
-    qint64 beginPassNs = 0;
-    qint64 passSetupNs = 0;
-    qint64 baseDrawNs = 0;
-    qint64 noteDrawNs = 0;
-    qint64 auraDrawNs = 0;
-    qint64 overlayDrawNs = 0;
-    qint64 passEndNs = 0;
-    qint64 drawNs = 0;
-    qint64 totalNs = 0;
-    int noteCandidates = 0;
-    int horizontallyVisibleNotes = 0;
-    int verticallyVisibleNotes = 0;
-    int drawnNotes = 0;
-    int activeLasers = 0;
-    int dynamicInstances = 0;
-    int measureLabelInstances = 0;
-    int selectionInstances = 0;
-    int playheadInstances = 0;
-    int marqueeInstances = 0;
-    int keyboardInstances = 0;
-    int scrollChromeInstances = 0;
-  };
-
-  static Totals totals;
-  ++totals.frames;
-  totals.captureNs += sample.captureNs;
-  totals.staticNs += sample.staticNs;
-  totals.overlayNs += sample.overlayNs;
-  totals.noteBuildNs += sample.noteBuildNs;
-  totals.uploadNs += sample.uploadNs;
-  totals.resourceUpdateNs += sample.resourceUpdateNs;
-  totals.beginPassNs += sample.beginPassNs;
-  totals.passSetupNs += sample.passSetupNs;
-  totals.baseDrawNs += sample.baseDrawNs;
-  totals.noteDrawNs += sample.noteDrawNs;
-  totals.auraDrawNs += sample.auraDrawNs;
-  totals.overlayDrawNs += sample.overlayDrawNs;
-  totals.passEndNs += sample.passEndNs;
-  totals.drawNs += sample.drawNs;
-  totals.totalNs += sample.totalNs;
-  totals.noteCandidates += sample.noteCandidates;
-  totals.horizontallyVisibleNotes += sample.horizontallyVisibleNotes;
-  totals.verticallyVisibleNotes += sample.verticallyVisibleNotes;
-  totals.drawnNotes += sample.drawnNotes;
-  totals.activeLasers += sample.activeLasers;
-  totals.dynamicInstances += sample.dynamicInstances;
-  totals.measureLabelInstances += sample.measureLabelInstances;
-  totals.selectionInstances += sample.selectionInstances;
-  totals.playheadInstances += sample.playheadInstances;
-  totals.marqueeInstances += sample.marqueeInstances;
-  totals.keyboardInstances += sample.keyboardInstances;
-  totals.scrollChromeInstances += sample.scrollChromeInstances;
-
-  if (totals.frames < kLogEveryFrames) {
-    return;
-  }
-
-  auto avgMs = [&](qint64 ns) -> double {
-    return static_cast<double>(ns) / 1000000.0 / static_cast<double>(totals.frames);
-  };
-  auto avgCount = [&](int count) -> double {
-    return static_cast<double>(count) / static_cast<double>(totals.frames);
-  };
-  qInfo().nospace() << "[PianoRollRhiRenderer] avg over " << totals.frames
-                    << " frames: capture=" << avgMs(totals.captureNs) << "ms"
-                    << ", static=" << avgMs(totals.staticNs) << "ms"
-                    << ", overlays=" << avgMs(totals.overlayNs) << "ms"
-                    << ", notes=" << avgMs(totals.noteBuildNs) << "ms"
-                    << ", upload=" << avgMs(totals.uploadNs) << "ms"
-                    << ", resource-update=" << avgMs(totals.resourceUpdateNs) << "ms"
-                    << ", begin-pass=" << avgMs(totals.beginPassNs) << "ms"
-                    << ", pass-setup=" << avgMs(totals.passSetupNs) << "ms"
-                    << ", base-draw=" << avgMs(totals.baseDrawNs) << "ms"
-                    << ", note-draw=" << avgMs(totals.noteDrawNs) << "ms"
-                    << ", aura-draw=" << avgMs(totals.auraDrawNs) << "ms"
-                    << ", overlay-draw=" << avgMs(totals.overlayDrawNs) << "ms"
-                    << ", pass-end=" << avgMs(totals.passEndNs) << "ms"
-                    << ", draw=" << avgMs(totals.drawNs) << "ms"
-                    << ", total=" << avgMs(totals.totalNs) << "ms"
-                    << ", note-candidates=" << avgCount(totals.noteCandidates)
-                    << ", note-hvis=" << avgCount(totals.horizontallyVisibleNotes)
-                    << ", note-vvis=" << avgCount(totals.verticallyVisibleNotes)
-                    << ", note-drawn=" << avgCount(totals.drawnNotes)
-                    << ", lasers=" << avgCount(totals.activeLasers)
-                    << ", dyn=" << avgCount(totals.dynamicInstances)
-                    << " (labels=" << avgCount(totals.measureLabelInstances)
-                    << ", sel=" << avgCount(totals.selectionInstances)
-                    << ", head=" << avgCount(totals.playheadInstances)
-                    << ", marquee=" << avgCount(totals.marqueeInstances)
-                    << ", keys=" << avgCount(totals.keyboardInstances)
-                    << ", chrome=" << avgCount(totals.scrollChromeInstances) << ")";
-  totals = {};
-}
 
 // Precomputes white/black key topology once so frame builds avoid neighbor scans.
 const KeyboardTopology& keyboardTopology() {
@@ -463,26 +319,6 @@ void PianoRollRhiRenderer::renderFrame(QRhiCommandBuffer* cb, const RenderTarget
     return;
   }
 
-  const bool profileEnabled = pianoRollProfileEnabled();
-  QElapsedTimer profileTimer;
-  qint64 tCapture = 0;
-  qint64 tStatic = 0;
-  qint64 tOverlays = 0;
-  qint64 tNotes = 0;
-  qint64 tUpload = 0;
-  qint64 tResourceUpdate = 0;
-  qint64 tBeginPass = 0;
-  qint64 tPassSetup = 0;
-  qint64 tBaseDraw = 0;
-  qint64 tNoteDraw = 0;
-  qint64 tAuraDraw = 0;
-  qint64 tOverlayDraw = 0;
-  DynamicBuildStats dynamicStats;
-  VisibleNoteBuildStats noteStats;
-  if (profileEnabled) {
-    profileTimer.start();
-  }
-
   const PianoRollFrame::Data frame = m_view->captureRhiFrameData(target.dpr);
   if (frame.viewportSize.isEmpty()) {
     return;
@@ -503,9 +339,6 @@ void PianoRollRhiRenderer::renderFrame(QRhiCommandBuffer* cb, const RenderTarget
     m_noteDataKey = noteKey;
     m_hasNoteDataKey = true;
   }
-  if (profileEnabled) {
-    tCapture = profileTimer.nsecsElapsed();
-  }
 
   QRhiResourceUpdateBatch* updates = m_rhi->nextResourceUpdateBatch();
   ensureMeasureLabelAtlas(updates, frame.dpr);
@@ -516,23 +349,14 @@ void PianoRollRhiRenderer::renderFrame(QRhiCommandBuffer* cb, const RenderTarget
     m_hasStaticCacheKey = true;
     m_staticDataDirty = true;
   }
-  if (profileEnabled) {
-    tStatic = profileTimer.nsecsElapsed();
-  }
   const float currentX = layout.noteAreaLeft + (frame.visualCurrentTick * layout.pixelsPerTick) -
                          layout.scrollX;
   const bool playheadVisible =
       (currentX >= layout.noteAreaLeft - 2.0f && currentX <= layout.noteAreaLeft + layout.noteAreaWidth + 2.0f);
 
   // Dynamic overlays and visible note state update every frame.
-  buildDynamicInstances(frame, layout, currentX, playheadVisible, profileEnabled ? &dynamicStats : nullptr);
-  if (profileEnabled) {
-    tOverlays = profileTimer.nsecsElapsed();
-  }
-  buildVisibleNoteInstances(frame, layout, profileEnabled ? &noteStats : nullptr);
-  if (profileEnabled) {
-    tNotes = profileTimer.nsecsElapsed();
-  }
+  buildDynamicInstances(frame, layout, currentX, playheadVisible);
+  buildVisibleNoteInstances(frame, layout);
 
   const float noteBgLuma = (0.2126f * frame.noteBackgroundColor.redF()) +
                            (0.7152f * frame.noteBackgroundColor.greenF()) +
@@ -606,29 +430,17 @@ void PianoRollRhiRenderer::renderFrame(QRhiCommandBuffer* cb, const RenderTarget
   uploadInstances(m_dynamicInstanceBuffer, m_dynamicInstances, 8192);
   uploadInstances(m_activeLaserInstanceBuffer, m_activeLaserInstances, 4096);
   uploadInstances(m_noteInstanceBuffer, m_visibleNoteInstances, 16384);
-  if (profileEnabled) {
-    tUpload = profileTimer.nsecsElapsed();
-  }
 
   if (updates) {
     cb->resourceUpdate(updates);
   }
-  if (profileEnabled) {
-    tResourceUpdate = profileTimer.nsecsElapsed();
-  }
 
   cb->beginPass(target.renderTarget, frame.backgroundColor, {1.0f, 0}, nullptr);
-  if (profileEnabled) {
-    tBeginPass = profileTimer.nsecsElapsed();
-  }
   const QRhiViewport viewport(0,
                               0,
                               static_cast<float>(target.pixelSize.width()),
                               static_cast<float>(target.pixelSize.height()));
   cb->setViewport(viewport);
-  if (profileEnabled) {
-    tPassSetup = profileTimer.nsecsElapsed();
-  }
 
   auto drawInstances = [&](QRhiGraphicsPipeline* pipeline,
                            QRhiBuffer* buffer,
@@ -672,9 +484,6 @@ void PianoRollRhiRenderer::renderFrame(QRhiCommandBuffer* cb, const RenderTarget
                 staticBackCount,
                 0,
                 static_cast<int>(sizeof(RectInstance)));
-  if (profileEnabled) {
-    tBaseDraw = profileTimer.nsecsElapsed();
-  }
 
   if (m_noteInstanceBuffer && visibleNoteCount > 0) {
     // Notes write stencil=1 so the aura stays outside every covered pixel.
@@ -685,9 +494,6 @@ void PianoRollRhiRenderer::renderFrame(QRhiCommandBuffer* cb, const RenderTarget
                   static_cast<int>(sizeof(NoteInstance)),
                   true);
   }
-  if (profileEnabled) {
-    tNoteDraw = profileTimer.nsecsElapsed();
-  }
 
   // Render order is intentional:
   // ordered note bodies first, then the outside-only aura, then UI overlays.
@@ -697,9 +503,6 @@ void PianoRollRhiRenderer::renderFrame(QRhiCommandBuffer* cb, const RenderTarget
                 0,
                 static_cast<int>(sizeof(RectInstance)),
                   true);
-  if (profileEnabled) {
-    tAuraDraw = profileTimer.nsecsElapsed();
-  }
 
   const int dynamicCount = static_cast<int>(m_dynamicInstances.size());
   const int dynamicFrontStart = std::clamp(m_dynamicFrontStart, 0, dynamicCount);
@@ -718,44 +521,8 @@ void PianoRollRhiRenderer::renderFrame(QRhiCommandBuffer* cb, const RenderTarget
                 dynamicCount - dynamicFrontStart,
                 dynamicFrontStart,
                 static_cast<int>(sizeof(RectInstance)));
-  if (profileEnabled) {
-    tOverlayDraw = profileTimer.nsecsElapsed();
-  }
 
   cb->endPass();
-
-  if (profileEnabled) {
-    const qint64 tEnd = profileTimer.nsecsElapsed();
-    logRenderProfileSample(RenderProfileSample{
-        tCapture,
-        tStatic - tCapture,
-        tOverlays - tStatic,
-        tNotes - tOverlays,
-        tUpload - tNotes,
-        tResourceUpdate - tUpload,
-        tBeginPass - tResourceUpdate,
-        tPassSetup - tBeginPass,
-        tBaseDraw - tPassSetup,
-        tNoteDraw - tBaseDraw,
-        tAuraDraw - tNoteDraw,
-        tOverlayDraw - tAuraDraw,
-        tEnd - tOverlayDraw,
-        tEnd - tUpload,
-        tEnd,
-        noteStats.candidateCount,
-        noteStats.horizontallyVisibleCount,
-        noteStats.verticallyVisibleCount,
-        noteStats.outputCount,
-        noteStats.activeLaserCount,
-        dynamicStats.totalInstances,
-        dynamicStats.measureLabelInstances,
-        dynamicStats.selectionInstances,
-        dynamicStats.playheadInstances,
-        dynamicStats.marqueeInstances,
-        dynamicStats.keyboardInstances,
-        dynamicStats.scrollChromeInstances,
-    });
-  }
 }
 
 bool PianoRollRhiRenderer::isBlackKey(int key) {
@@ -1432,8 +1199,7 @@ PianoRollRhiRenderer::NoteDataKey PianoRollRhiRenderer::makeNoteDataKey(const Pi
 }
 
 void PianoRollRhiRenderer::buildVisibleNoteInstances(const PianoRollFrame::Data& frame,
-                                                     const Layout& layout,
-                                                     VisibleNoteBuildStats* stats) {
+                                                     const Layout& layout) {
   m_visibleNoteInstances.clear();
   m_activeLaserInstances.clear();
   if (!frame.notes || frame.notes->empty() || m_noteInstances.empty()) {
@@ -1471,9 +1237,6 @@ void PianoRollRhiRenderer::buildVisibleNoteInstances(const PianoRollFrame::Data&
   if (noteVisibleEndIndex <= noteVisibleBeginIndex) {
     return;
   }
-  if (stats) {
-    stats->candidateCount = noteVisibleEndIndex - noteVisibleBeginIndex;
-  }
 
   const auto isNoteVerticallyVisible = [&](const PianoRollFrame::Note& note) -> bool {
     const float y = layout.noteAreaTop +
@@ -1483,8 +1246,6 @@ void PianoRollRhiRenderer::buildVisibleNoteInstances(const PianoRollFrame::Data&
     return (y + h) > layout.noteAreaTop &&
            y < (layout.noteAreaTop + layout.noteAreaHeight);
   };
-  const uint64_t visibleEndTickExclusive = layout.visibleEndTick + 1;
-
   const int visibleCount = noteVisibleEndIndex - noteVisibleBeginIndex;
   m_visibleNoteInstances.reserve(static_cast<size_t>(visibleCount));
   m_enabledVisibleNoteInstances.clear();
@@ -1509,19 +1270,8 @@ void PianoRollRhiRenderer::buildVisibleNoteInstances(const PianoRollFrame::Data&
   // bucket after the muted one so overlap between the two groups is stable.
   for (int noteIndex = noteVisibleBeginIndex; noteIndex < noteVisibleEndIndex; ++noteIndex) {
     const PianoRollFrame::Note& note = notes[static_cast<size_t>(noteIndex)];
-    const uint64_t noteStartTick = static_cast<uint64_t>(note.startTick);
-    const uint64_t noteEndTickExclusive =
-        noteStartTick + static_cast<uint64_t>(std::max<uint32_t>(1, note.duration));
-    const bool horizontallyVisible =
-        noteEndTickExclusive > layout.visibleStartTick && noteStartTick < visibleEndTickExclusive;
-    if (stats && horizontallyVisible) {
-      ++stats->horizontallyVisibleCount;
-    }
     if (!isNoteVerticallyVisible(note)) {
       continue;
-    }
-    if (stats) {
-      ++stats->verticallyVisibleCount;
     }
 
     NoteInstance instance = m_noteInstances[static_cast<size_t>(noteIndex)];
@@ -1537,9 +1287,6 @@ void PianoRollRhiRenderer::buildVisibleNoteInstances(const PianoRollFrame::Data&
         const NoteGeometry geometry = computeNoteGeometry(note, layout);
         if (geometry.valid) {
           appendActiveLaserForNote(note, geometry, frame.trackColors.get());
-          if (stats) {
-            ++stats->activeLaserCount;
-          }
         }
       }
     }
@@ -1565,9 +1312,6 @@ void PianoRollRhiRenderer::buildVisibleNoteInstances(const PianoRollFrame::Data&
     m_visibleNoteInstances.insert(m_visibleNoteInstances.end(),
                                   m_enabledVisibleNoteInstances.begin(),
                                   m_enabledVisibleNoteInstances.end());
-  }
-  if (stats) {
-    stats->outputCount = static_cast<int>(m_visibleNoteInstances.size());
   }
 }
 
@@ -1945,8 +1689,7 @@ void PianoRollRhiRenderer::appendStaticKeyboardInstances(const PianoRollFrame::D
 void PianoRollRhiRenderer::buildDynamicInstances(const PianoRollFrame::Data& frame,
                                                  const Layout& layout,
                                                  float currentX,
-                                                 bool playheadVisible,
-                                                 DynamicBuildStats* stats) {
+                                                 bool playheadVisible) {
   m_dynamicInstances.clear();
   m_dynamicFrontStart = 0;
 
@@ -1954,17 +1697,12 @@ void PianoRollRhiRenderer::buildDynamicInstances(const PianoRollFrame::Data& fra
     return;
   }
 
-  const int measureStart = static_cast<int>(m_dynamicInstances.size());
   appendMeasureNumberOverlays(frame, layout);
-  if (stats) {
-    stats->measureLabelInstances = static_cast<int>(m_dynamicInstances.size()) - measureStart;
-  }
 
   const auto* trackColors = frame.trackColors.get();
   const auto* trackEnabled = frame.trackEnabled.get();
 
   if (frame.selectedNotes && !frame.selectedNotes->empty()) {
-    const int selectionStart = static_cast<int>(m_dynamicInstances.size());
     const float edge = 1.0f;
     const auto appendOutline = [&](float x, float y, float w, float h, const QColor& color) {
       appendRect(m_dynamicInstances, x, y, w, edge, color);
@@ -1990,13 +1728,9 @@ void PianoRollRhiRenderer::buildDynamicInstances(const PianoRollFrame::Data& fra
                     geometry.h,
                     frame.selectedNoteOutlineColor);
     }
-    if (stats) {
-      stats->selectionInstances = static_cast<int>(m_dynamicInstances.size()) - selectionStart;
-    }
   }
 
   if (playheadVisible) {
-    const int playheadStart = static_cast<int>(m_dynamicInstances.size());
     QColor scanColor = frame.scanLineColor;
     if (!frame.playbackActive) {
       scanColor.setAlpha(std::max(100, scanColor.alpha() / 2));
@@ -2019,13 +1753,9 @@ void PianoRollRhiRenderer::buildDynamicInstances(const PianoRollFrame::Data& fra
                LineStyle::TriangleDown,
                1.24f,
                1.00f);
-    if (stats) {
-      stats->playheadInstances = static_cast<int>(m_dynamicInstances.size()) - playheadStart;
-    }
   }
 
   if (frame.selectionRectVisible && frame.selectionRectW > 0.5f && frame.selectionRectH > 0.5f) {
-    const int marqueeStart = static_cast<int>(m_dynamicInstances.size());
     const float rawLeft = frame.selectionRectX;
     const float rawTop = frame.selectionRectY;
     const float rawW = frame.selectionRectW;
@@ -2062,22 +1792,10 @@ void PianoRollRhiRenderer::buildDynamicInstances(const PianoRollFrame::Data& fra
                          rawW,
                          rawH,
                          frame.selectionRectOutlineColor);
-    if (stats) {
-      stats->marqueeInstances = static_cast<int>(m_dynamicInstances.size()) - marqueeStart;
-    }
   }
 
-  const int keyboardStart = static_cast<int>(m_dynamicInstances.size());
   appendKeyboardHighlightInstances(frame, layout, trackColors, trackEnabled);
-  if (stats) {
-    stats->keyboardInstances = static_cast<int>(m_dynamicInstances.size()) - keyboardStart;
-  }
-  const int chromeStart = static_cast<int>(m_dynamicInstances.size());
   appendScrollChromeInstances(frame);
-  if (stats) {
-    stats->scrollChromeInstances = static_cast<int>(m_dynamicInstances.size()) - chromeStart;
-    stats->totalInstances = static_cast<int>(m_dynamicInstances.size());
-  }
 }
 
 // Adds outside-only glow aura quads for currently active notes.
