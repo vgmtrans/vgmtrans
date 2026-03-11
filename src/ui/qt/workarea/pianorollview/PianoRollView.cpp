@@ -8,6 +8,7 @@
 
 #include "common/DragAutoScroll.h"
 #include "PianoRollRhiHost.h"
+#include "SequencePlayer.h"
 #include "workarea/rhi/RhiScrollAreaChrome.h"
 
 #include "SeqEvent.h"
@@ -322,6 +323,12 @@ void PianoRollView::setPlaybackTick(int tick,
 
   m_currentTick = tick;
   m_playbackActive = playbackActive;
+  if (m_playbackActive) {
+    m_lastPlaybackTickUpdateNs = m_animClock.nsecsElapsed();
+    m_visualPlaybackTicksPerSecond = static_cast<float>(
+        (std::max(1.0, SequencePlayer::the().currentTempoBpm()) *
+         static_cast<double>(std::max(1, m_ppqn))) / 60.0);
+  }
   updateInactiveNoteDimTarget();
 
   if (playbackStateChanged && !m_playbackActive) {
@@ -364,6 +371,8 @@ void PianoRollView::clearPlaybackState() {
   stopPlaybackAutoScrollAnimation();
   m_playbackActive = false;
   m_currentTick = 0;
+  m_lastPlaybackTickUpdateNs = 0;
+  m_visualPlaybackTicksPerSecond = 0.0f;
   m_playbackAutoScrollEnabled = true;
   m_waitForWheelScrollBegin = false;
   m_applyingPlaybackAutoScroll = false;
@@ -395,6 +404,9 @@ PianoRollFrame::Data PianoRollView::captureRhiFrameData(float dpr) const {
 
   frame.totalTicks = m_totalTicks;
   frame.currentTick = clampTick(m_currentTick);
+  // Active-note resolution stays callback-driven, but the scanline uses a
+  // predicted float tick so playback motion can stay smooth between callbacks.
+  frame.visualCurrentTick = visualPlaybackTick();
   frame.trackCount = m_trackCount;
   frame.ppqn = std::max(1, m_ppqn);
   frame.maxNoteDurationTicks = std::max<uint32_t>(1, m_maxNoteDurationTicks);
@@ -1522,6 +1534,30 @@ void PianoRollView::advanceFrameDrivenPlaybackAutoScroll() {
 
 bool PianoRollView::frameDrivenPlaybackAutoScrollActive() const {
   return m_frameDrivenPlaybackAutoScrollActive;
+}
+
+bool PianoRollView::shouldPumpPlaybackFrames() const {
+  return m_playbackActive || m_frameDrivenPlaybackAutoScrollActive;
+}
+
+float PianoRollView::visualPlaybackTick() const {
+  const float baseTick = static_cast<float>(clampTick(m_currentTick));
+  if (!m_playbackActive || m_lastPlaybackTickUpdateNs <= 0 || m_visualPlaybackTicksPerSecond <= 0.0f) {
+    return baseTick;
+  }
+
+  if (!SequencePlayer::the().playing()) {
+    return baseTick;
+  }
+
+  const qint64 nowNs = m_animClock.nsecsElapsed();
+  const qint64 elapsedNs = std::max<qint64>(0, nowNs - m_lastPlaybackTickUpdateNs);
+  const double predictedTick =
+      static_cast<double>(baseTick) +
+      (static_cast<double>(elapsedNs) * 1.0e-9 * static_cast<double>(m_visualPlaybackTicksPerSecond));
+  return std::clamp(static_cast<float>(predictedTick),
+                    0.0f,
+                    static_cast<float>(std::max(1, m_totalTicks)));
 }
 
 QPoint PianoRollView::viewportPosFromGlobal(const QPointF& globalPos) const {

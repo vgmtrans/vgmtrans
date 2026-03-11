@@ -217,7 +217,7 @@ void PianoRollRhiWindow::renderRhiFrame(QRhiCommandBuffer* cb,
   info.dpr = dpr;
   m_renderer->renderFrame(cb, info);
 
-  if (m_view->frameDrivenPlaybackAutoScrollActive()) {
+  if (m_view->shouldPumpPlaybackFrames()) {
     requestUpdate();
   }
 }

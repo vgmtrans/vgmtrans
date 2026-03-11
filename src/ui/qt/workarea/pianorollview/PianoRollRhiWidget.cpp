@@ -51,6 +51,8 @@ void PianoRollRhiWidget::initialize(QRhiCommandBuffer* cb) {
 
 void PianoRollRhiWidget::render(QRhiCommandBuffer* cb) {
   if (m_view) {
+    m_view->drainPendingPlaybackAutoScroll();
+
     PianoRollRhiInputCoalescer::MouseMoveBatch mouseMoveBatch;
     if (m_inputCoalescer.takePendingMouseMove(mouseMoveBatch)) {
       const QPoint viewportPos = m_view->viewportPosFromGlobal(mouseMoveBatch.globalPos);
@@ -90,6 +92,10 @@ void PianoRollRhiWidget::render(QRhiCommandBuffer* cb) {
   info.sampleCount = rt->sampleCount();
   info.dpr = rt->devicePixelRatio();
   m_renderer->renderFrame(cb, info);
+
+  if (m_view && m_view->shouldPumpPlaybackFrames()) {
+    update();
+  }
 }
 
 void PianoRollRhiWidget::releaseResources() {

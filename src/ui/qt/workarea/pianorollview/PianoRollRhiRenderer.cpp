@@ -421,7 +421,7 @@ void PianoRollRhiRenderer::renderFrame(QRhiCommandBuffer* cb, const RenderTarget
   if (profileEnabled) {
     tStatic = profileTimer.nsecsElapsed();
   }
-  const float currentX = layout.noteAreaLeft + (static_cast<float>(frame.currentTick) * layout.pixelsPerTick) -
+  const float currentX = layout.noteAreaLeft + (frame.visualCurrentTick * layout.pixelsPerTick) -
                          layout.scrollX;
   const bool playheadVisible =
       (currentX >= layout.noteAreaLeft - 2.0f && currentX <= layout.noteAreaLeft + layout.noteAreaWidth + 2.0f);

@@ -39,6 +39,7 @@ struct Data {
 
   int totalTicks = 1;
   int currentTick = 0;
+  float visualCurrentTick = 0.0f;
   int trackCount = 0;
   int ppqn = 48;
   uint32_t maxNoteDurationTicks = 1;
