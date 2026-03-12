@@ -667,11 +667,16 @@ void HexView::ensureGlyphAtlas(qreal dpr) {
     return;
   }
 
-  const int padding = 1;
-  const int glyphWidth = m_charWidth;
-  const int glyphHeight = m_lineHeight;
-  const int cellWidth = glyphWidth + padding * 2;
-  const int cellHeight = glyphHeight + padding * 2;
+  const int paddingPx = 1;
+  const int glyphWidthPx = std::max(1, static_cast<int>(std::round(m_charWidth * dpr)));
+  const int glyphHeightPx = std::max(1, static_cast<int>(std::round(m_lineHeight * dpr)));
+  const int cellWidthPx = glyphWidthPx + paddingPx * 2;
+  const int cellHeightPx = glyphHeightPx + paddingPx * 2;
+  const qreal padding = static_cast<qreal>(paddingPx) / dpr;
+  const qreal cellWidth = static_cast<qreal>(cellWidthPx) / dpr;
+  const qreal cellHeight = static_cast<qreal>(cellHeightPx) / dpr;
+  const qreal baseline =
+      static_cast<qreal>(std::round(QFontMetricsF(font()).ascent() * dpr)) / dpr;
 
   std::vector<QChar> glyphs;
   glyphs.reserve(0x7E - 0x20 + 1);
@@ -682,8 +687,8 @@ void HexView::ensureGlyphAtlas(qreal dpr) {
   const int columns = 16;
   const int rows = static_cast<int>((glyphs.size() + columns - 1) / columns);
 
-  const int imageWidth = static_cast<int>(std::ceil(cellWidth * dpr * columns));
-  const int imageHeight = static_cast<int>(std::ceil(cellHeight * dpr * rows));
+  const int imageWidth = cellWidthPx * columns;
+  const int imageHeight = cellHeightPx * rows;
 
   QImage image(imageWidth, imageHeight, QImage::Format_ARGB32_Premultiplied);
   image.fill(Qt::transparent);
@@ -694,8 +699,6 @@ void HexView::ensureGlyphAtlas(qreal dpr) {
   painter.setPen(Qt::white);
   painter.setRenderHint(QPainter::TextAntialiasing, true);
 
-  const qreal baseline = QFontMetricsF(font()).ascent();
-
   m_glyphAtlas->uvTable.fill(QRectF());
 
   for (size_t i = 0; i < glyphs.size(); ++i) {
@@ -703,13 +706,15 @@ void HexView::ensureGlyphAtlas(qreal dpr) {
     const int row = static_cast<int>(i / columns);
     const qreal cellX = col * cellWidth;
     const qreal cellY = row * cellHeight;
+    const int cellXPx = col * cellWidthPx;
+    const int cellYPx = row * cellHeightPx;
 
     painter.drawText(QPointF(cellX + padding, cellY + padding + baseline), QString(glyphs[i]));
 
-    const qreal u0 = (cellX + padding) * dpr / imageWidth;
-    const qreal v0 = (cellY + padding) * dpr / imageHeight;
-    const qreal u1 = (cellX + padding + glyphWidth) * dpr / imageWidth;
-    const qreal v1 = (cellY + padding + glyphHeight) * dpr / imageHeight;
+    const qreal u0 = static_cast<qreal>(cellXPx + paddingPx) / imageWidth;
+    const qreal v0 = static_cast<qreal>(cellYPx + paddingPx) / imageHeight;
+    const qreal u1 = static_cast<qreal>(cellXPx + paddingPx + glyphWidthPx) / imageWidth;
+    const qreal v1 = static_cast<qreal>(cellYPx + paddingPx + glyphHeightPx) / imageHeight;
 
     const ushort code = glyphs[i].unicode();
     if (code < m_glyphAtlas->uvTable.size()) {
@@ -719,8 +724,8 @@ void HexView::ensureGlyphAtlas(qreal dpr) {
 
   m_glyphAtlas->image = std::move(image);
   m_glyphAtlas->dpr = dpr;
-  m_glyphAtlas->glyphWidth = glyphWidth;
-  m_glyphAtlas->glyphHeight = glyphHeight;
+  m_glyphAtlas->glyphWidth = m_charWidth;
+  m_glyphAtlas->glyphHeight = m_lineHeight;
   m_glyphAtlas->cellWidth = cellWidth;
   m_glyphAtlas->cellHeight = cellHeight;
   m_glyphAtlas->font = font();
