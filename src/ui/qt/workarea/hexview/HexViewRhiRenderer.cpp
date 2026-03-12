@@ -248,7 +248,17 @@ void HexViewRhiRenderer::ensureSubpixelFontCache(float dpr) {
   }
 
   m_subpixelFontCache.rawFont = rawFont;
-  m_subpixelFontCache.baselinePx = rawFont.ascent();
+  const QFontMetricsF logicalMetrics(currentFont);
+  m_subpixelFontCache.baselineLogical = logicalMetrics.ascent();
+
+  const qreal cellWidthLogical = logicalMetrics.horizontalAdvance(QStringLiteral("A"));
+  const qreal cellHeightLogical = logicalMetrics.height();
+  const qreal probeMarginLogical = 2.0;
+  const int probeWidth =
+      std::max(1, static_cast<int>(std::ceil((cellWidthLogical + probeMarginLogical * 2.0) * dpr)));
+  const int probeHeight =
+      std::max(1, static_cast<int>(std::ceil((cellHeightLogical + probeMarginLogical * 2.0) * dpr)));
+  const int probeMarginPx = static_cast<int>(std::lround(probeMarginLogical * dpr));
 
   const auto fallbackGlyphs = rawFont.glyphIndexesForString(QStringLiteral("."));
   const quint32 fallbackGlyph = fallbackGlyphs.empty() ? 0u : fallbackGlyphs.front();
@@ -277,11 +287,43 @@ void HexViewRhiRenderer::ensureSubpixelFontCache(float dpr) {
       mask = mask.convertToFormat(QImage::Format_RGBX8888);
     }
 
-    const QRectF bounds = rawFont.boundingRect(glyphIndex);
     entry.mask = std::move(mask);
-    entry.left = static_cast<int>(std::floor(bounds.left()));
-    entry.top = static_cast<int>(std::floor(bounds.top()));
     entry.valid = true;
+
+    if (!entry.mask.isNull() && ch != ushort(' ')) {
+      QImage probe(probeWidth, probeHeight, QImage::Format_RGBX8888);
+      probe.fill(Qt::black);
+      probe.setDevicePixelRatio(dpr);
+
+      QPainter probePainter(&probe);
+      probePainter.setFont(currentFont);
+      probePainter.setPen(Qt::white);
+      probePainter.setRenderHint(QPainter::TextAntialiasing, true);
+      probePainter.drawText(QPointF(probeMarginLogical,
+                                    probeMarginLogical + logicalMetrics.ascent()),
+                            QString(QChar(ch)));
+      probePainter.end();
+
+      int minX = probe.width();
+      int minY = probe.height();
+      bool found = false;
+      for (int y = 0; y < probe.height(); ++y) {
+        const uchar* line = probe.constScanLine(y);
+        for (int x = 0; x < probe.width(); ++x) {
+          const uchar* px = line + x * 4;
+          if (px[0] || px[1] || px[2]) {
+            minX = std::min(minX, x);
+            minY = std::min(minY, y);
+            found = true;
+          }
+        }
+      }
+
+      if (found) {
+        entry.drawLeft = minX - probeMarginPx;
+        entry.drawTop = minY - probeMarginPx;
+      }
+    }
   }
 
   m_subpixelFontCache.valid = true;
@@ -298,7 +340,6 @@ void HexViewRhiRenderer::drawSubpixelText(QImage& image, const QString& text, qr
     return;
   }
 
-  const int baselinePx = static_cast<int>(std::lround(baselineY * dpr));
   const int textAlpha = color.alpha();
   const int textRed = color.red();
   const int textGreen = color.green();
@@ -324,8 +365,10 @@ void HexViewRhiRenderer::drawSubpixelText(QImage& image, const QString& text, qr
     }
 
     const int originXPx = static_cast<int>(std::lround((startX + i * stepX) * dpr));
-    const int dstLeft = originXPx + glyph->left;
-    const int dstTop = baselinePx + glyph->top;
+    const int cellTopPx = static_cast<int>(
+        std::lround((baselineY - m_subpixelFontCache.baselineLogical) * dpr));
+    const int dstLeft = originXPx + glyph->drawLeft;
+    const int dstTop = cellTopPx + glyph->drawTop;
     const int glyphWidth = glyph->mask.width();
     const int glyphHeight = glyph->mask.height();
 

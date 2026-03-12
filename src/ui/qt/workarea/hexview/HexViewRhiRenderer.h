@@ -149,8 +149,8 @@ private:
 
   struct SubpixelGlyph {
     QImage mask;
-    int left = 0;
-    int top = 0;
+    int drawLeft = 0;
+    int drawTop = 0;
     bool valid = false;
   };
 
@@ -158,7 +158,7 @@ private:
     QFont font;
     QRawFont rawFont;
     float dpr = 0.0f;
-    qreal baselinePx = 0.0;
+    qreal baselineLogical = 0.0;
     bool valid = false;
     std::array<SubpixelGlyph, 128> glyphs{};
   };
