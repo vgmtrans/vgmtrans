@@ -14,6 +14,7 @@
 #include <QApplication>
 #include <QBuffer>
 #include <QCursor>
+#include <QFontInfo>
 #include <QFontMetricsF>
 #include <QHash>
 #include <QHelpEvent>
@@ -39,6 +40,12 @@
 #include <functional>
 #include <limits>
 #include <unordered_set>
+
+#ifdef Q_OS_WIN
+#include <QtCore/qt_windows.h>
+#include <dwrite_1.h>
+#include <wrl/client.h>
+#endif
 
 namespace {
 constexpr int BYTES_PER_LINE = 16;
@@ -126,8 +133,12 @@ QString tooltipHtmlWithIcon(VGMItem* item) {
 }
 
 #ifdef Q_OS_WIN
+constexpr int DIRECTWRITE_GLYPH_X_ADJUST_PX = 0;
+constexpr int DIRECTWRITE_GLYPH_Y_ADJUST_PX = 0;
 constexpr int RAW_GLYPH_X_ADJUST_PX = 0;
 constexpr int RAW_GLYPH_Y_ADJUST_PX = 0;
+
+using Microsoft::WRL::ComPtr;
 
 int alphaAt(const QImage& image, const uchar* line, int x) {
   switch (image.format()) {
@@ -152,6 +163,216 @@ QPoint glyphTopLeftFromMetrics(const QRawFont& rawFont, quint32 glyphIndex, int 
   return QPoint(paddingPx + leftPx + RAW_GLYPH_X_ADJUST_PX,
                 paddingPx + baselinePx + topPx + RAW_GLYPH_Y_ADJUST_PX);
 }
+
+void blitGlyphCoverage(QImage& dst, int dstX, int dstY, const QImage& src) {
+  if (src.isNull()) {
+    return;
+  }
+
+  for (int y = 0; y < src.height(); ++y) {
+    const int outY = dstY + y;
+    if (outY < 0 || outY >= dst.height()) {
+      continue;
+    }
+
+    const QRgb* srcLine = reinterpret_cast<const QRgb*>(src.constScanLine(y));
+    QRgb* dstLine = reinterpret_cast<QRgb*>(dst.scanLine(outY));
+    for (int x = 0; x < src.width(); ++x) {
+      const int outX = dstX + x;
+      if (outX < 0 || outX >= dst.width()) {
+        continue;
+      }
+
+      const QRgb pixel = srcLine[x];
+      const int alpha = std::max({qRed(pixel), qGreen(pixel), qBlue(pixel), qAlpha(pixel)});
+      if (alpha == 0) {
+        continue;
+      }
+      dstLine[outX] = qPremultiply(qRgba(255, 255, 255, alpha));
+    }
+  }
+}
+
+class DirectWriteAtlasRenderer {
+public:
+  bool init(const QFont& font, qreal dpr, int cellWidthPx, int cellHeightPx) {
+    m_cellWidthPx = cellWidthPx;
+    m_cellHeightPx = cellHeightPx;
+
+    QFontInfo fontInfo(font);
+    const QString resolvedFamily = fontInfo.family().isEmpty() ? font.family() : fontInfo.family();
+    if (resolvedFamily.isEmpty()) {
+      return false;
+    }
+
+    QRawFont rawFont = QRawFont::fromFont(font);
+    qreal pixelSize = rawFont.isValid() ? rawFont.pixelSize() : 0.0;
+    if (pixelSize <= 0.0) {
+      pixelSize = fontInfo.pixelSize();
+    }
+    if (pixelSize <= 0.0) {
+      return false;
+    }
+    m_fontEmSize = static_cast<float>(pixelSize * dpr);
+    if (m_fontEmSize <= 0.0f) {
+      return false;
+    }
+
+    HRESULT hr = DWriteCreateFactory(DWRITE_FACTORY_TYPE_SHARED, __uuidof(IDWriteFactory),
+                                     reinterpret_cast<IUnknown**>(m_factory.GetAddressOf()));
+    if (FAILED(hr) || !m_factory) {
+      return false;
+    }
+
+    hr = m_factory->GetSystemFontCollection(m_fontCollection.GetAddressOf(), FALSE);
+    if (FAILED(hr) || !m_fontCollection) {
+      return false;
+    }
+
+    UINT32 familyIndex = 0;
+    BOOL familyExists = FALSE;
+    const std::wstring familyName = resolvedFamily.toStdWString();
+    hr = m_fontCollection->FindFamilyName(familyName.c_str(), &familyIndex, &familyExists);
+    if (FAILED(hr) || !familyExists) {
+      return false;
+    }
+
+    hr = m_fontCollection->GetFontFamily(familyIndex, m_fontFamily.GetAddressOf());
+    if (FAILED(hr) || !m_fontFamily) {
+      return false;
+    }
+
+    const DWRITE_FONT_WEIGHT weight =
+        static_cast<DWRITE_FONT_WEIGHT>(std::clamp(fontInfo.weight(), 1, 999));
+    const DWRITE_FONT_STYLE style =
+        fontInfo.italic() ? DWRITE_FONT_STYLE_ITALIC : DWRITE_FONT_STYLE_NORMAL;
+    hr = m_fontFamily->GetFirstMatchingFont(weight, DWRITE_FONT_STRETCH_NORMAL, style,
+                                            m_font.GetAddressOf());
+    if (FAILED(hr) || !m_font) {
+      return false;
+    }
+
+    hr = m_font->CreateFontFace(m_fontFace.GetAddressOf());
+    if (FAILED(hr) || !m_fontFace) {
+      return false;
+    }
+
+    DWRITE_FONT_METRICS metrics{};
+    m_fontFace->GetMetrics(&metrics);
+    if (metrics.designUnitsPerEm <= 0) {
+      return false;
+    }
+    m_baselinePx = static_cast<float>(metrics.ascent) * m_fontEmSize /
+                   static_cast<float>(metrics.designUnitsPerEm);
+
+    hr = m_factory->GetGdiInterop(m_gdiInterop.GetAddressOf());
+    if (FAILED(hr) || !m_gdiInterop) {
+      return false;
+    }
+
+    hr = m_gdiInterop->CreateBitmapRenderTarget(nullptr, m_cellWidthPx, m_cellHeightPx,
+                                                m_bitmapTarget.GetAddressOf());
+    if (FAILED(hr) || !m_bitmapTarget) {
+      return false;
+    }
+
+    m_bitmapTarget->SetPixelsPerDip(1.0f);
+
+    hr = m_factory->CreateRenderingParams(m_renderingParams.GetAddressOf());
+    if (FAILED(hr) || !m_renderingParams) {
+      return false;
+    }
+
+    if (SUCCEEDED(m_bitmapTarget.As(&m_bitmapTarget1)) && m_bitmapTarget1) {
+      m_bitmapTarget1->SetTextAntialiasMode(DWRITE_TEXT_ANTIALIAS_MODE_GRAYSCALE);
+    }
+
+    return true;
+  }
+
+  bool renderGlyphToAtlas(QChar glyph, int paddingPx, QImage& atlas, int cellXPx, int cellYPx) const {
+    if (!m_bitmapTarget || !m_fontFace) {
+      return false;
+    }
+    if (glyph == QLatin1Char(' ')) {
+      return true;
+    }
+
+    const UINT32 codePoint = glyph.unicode();
+    UINT16 glyphIndex = 0;
+    HRESULT hr = m_fontFace->GetGlyphIndices(&codePoint, 1, &glyphIndex);
+    if (FAILED(hr) || glyphIndex == 0) {
+      return false;
+    }
+
+    HDC dc = m_bitmapTarget->GetMemoryDC();
+    if (!dc) {
+      return false;
+    }
+
+    PatBlt(dc, 0, 0, m_cellWidthPx, m_cellHeightPx, BLACKNESS);
+    SetBkMode(dc, TRANSPARENT);
+
+    const FLOAT glyphAdvance = 0.0f;
+    DWRITE_GLYPH_RUN glyphRun{};
+    glyphRun.fontFace = m_fontFace.Get();
+    glyphRun.fontEmSize = m_fontEmSize;
+    glyphRun.glyphCount = 1;
+    glyphRun.glyphIndices = &glyphIndex;
+    glyphRun.glyphAdvances = &glyphAdvance;
+    glyphRun.glyphOffsets = nullptr;
+    glyphRun.isSideways = FALSE;
+    glyphRun.bidiLevel = 0;
+
+    RECT blackBox{};
+    hr = m_bitmapTarget->DrawGlyphRun(static_cast<FLOAT>(paddingPx + DIRECTWRITE_GLYPH_X_ADJUST_PX),
+                                      static_cast<FLOAT>(paddingPx + DIRECTWRITE_GLYPH_Y_ADJUST_PX) + m_baselinePx,
+                                      DWRITE_MEASURING_MODE_NATURAL, &glyphRun,
+                                      m_renderingParams.Get(), RGB(255, 255, 255), &blackBox);
+    if (FAILED(hr)) {
+      return false;
+    }
+
+    HBITMAP bitmap = static_cast<HBITMAP>(GetCurrentObject(dc, OBJ_BITMAP));
+    if (!bitmap) {
+      return false;
+    }
+
+    QImage glyphCell(m_cellWidthPx, m_cellHeightPx, QImage::Format_ARGB32);
+    glyphCell.fill(Qt::black);
+
+    BITMAPINFO bmi{};
+    bmi.bmiHeader.biSize = sizeof(BITMAPINFOHEADER);
+    bmi.bmiHeader.biWidth = m_cellWidthPx;
+    bmi.bmiHeader.biHeight = -m_cellHeightPx;
+    bmi.bmiHeader.biPlanes = 1;
+    bmi.bmiHeader.biBitCount = 32;
+    bmi.bmiHeader.biCompression = BI_RGB;
+
+    if (!GetDIBits(dc, bitmap, 0, static_cast<UINT>(m_cellHeightPx), glyphCell.bits(), &bmi,
+                   DIB_RGB_COLORS)) {
+      return false;
+    }
+
+    blitGlyphCoverage(atlas, cellXPx, cellYPx, glyphCell);
+    return true;
+  }
+
+private:
+  ComPtr<IDWriteFactory> m_factory;
+  ComPtr<IDWriteFontCollection> m_fontCollection;
+  ComPtr<IDWriteFontFamily> m_fontFamily;
+  ComPtr<IDWriteFont> m_font;
+  ComPtr<IDWriteFontFace> m_fontFace;
+  ComPtr<IDWriteGdiInterop> m_gdiInterop;
+  ComPtr<IDWriteBitmapRenderTarget> m_bitmapTarget;
+  ComPtr<IDWriteBitmapRenderTarget1> m_bitmapTarget1;
+  ComPtr<IDWriteRenderingParams> m_renderingParams;
+  float m_fontEmSize = 0.0f;
+  float m_baselinePx = 0.0f;
+  int m_cellWidthPx = 0;
+  int m_cellHeightPx = 0;
+};
 
 void blitGlyphAlpha(QImage& dst, int dstX, int dstY, const QImage& src) {
   if (src.isNull()) {
@@ -758,6 +979,8 @@ void HexView::ensureGlyphAtlas(qreal dpr) {
   painter.setRenderHint(QPainter::TextAntialiasing, true);
 
 #ifdef Q_OS_WIN
+  DirectWriteAtlasRenderer directWriteAtlas;
+  const bool useDirectWriteAtlas = directWriteAtlas.init(font(), dpr, cellWidthPx, cellHeightPx);
   QRawFont rawFont = QRawFont::fromFont(font());
   bool useRawAtlas = rawFont.isValid() && rawFont.pixelSize() > 0.0;
   if (useRawAtlas) {
@@ -778,7 +1001,10 @@ void HexView::ensureGlyphAtlas(qreal dpr) {
 
     bool drewGlyph = false;
 #ifdef Q_OS_WIN
-    if (useRawAtlas && glyphs[i] != QLatin1Char(' ')) {
+    if (useDirectWriteAtlas) {
+      drewGlyph = directWriteAtlas.renderGlyphToAtlas(glyphs[i], paddingPx, image, cellXPx, cellYPx);
+    }
+    if (!drewGlyph && useRawAtlas && glyphs[i] != QLatin1Char(' ')) {
       const auto glyphIndexes = rawFont.glyphIndexesForString(QString(glyphs[i]));
       if (!glyphIndexes.empty() && glyphIndexes.front() != 0) {
         const quint32 glyphIndex = glyphIndexes.front();
@@ -791,7 +1017,7 @@ void HexView::ensureGlyphAtlas(qreal dpr) {
           }
         }
       }
-    } else if (useRawAtlas) {
+    } else if (!drewGlyph && useRawAtlas) {
       drewGlyph = true;
     }
 #endif

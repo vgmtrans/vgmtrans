@@ -174,6 +174,7 @@ target_sources(vgmtrans PRIVATE ${UI_RESOURCES})
 
 # DLLs need to live next to the main executable for development testing
 if(WIN32)
+  target_link_libraries(vgmtrans PRIVATE dwrite gdi32)
   add_custom_command(TARGET vgmtrans POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy_if_different
         $<TARGET_RUNTIME_DLLS:vgmtrans>
