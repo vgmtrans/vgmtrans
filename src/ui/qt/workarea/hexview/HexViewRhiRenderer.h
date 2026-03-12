@@ -146,6 +146,8 @@ private:
   void releaseRenderTargets();
 
   void ensurePipelines(QRhiRenderPassDescriptor* outputRp, int outputSampleCount);
+  void ensureBaseContentTexture(QRhiResourceUpdateBatch* u, const QSize& pixelSize,
+                                const HexViewFrame::Data& frame);
   void ensureGlyphTexture(QRhiResourceUpdateBatch* u, const HexViewFrame::Data& frame);
   void ensureItemIdTexture(QRhiResourceUpdateBatch* u, int startLine, int endLine, int totalLines,
                            const HexViewFrame::Data& frame);
@@ -258,6 +260,10 @@ private:
   int m_lastStartLine = -1;
   int m_lastEndLine = -1;
   bool m_baseDirty = true;
+  QSize m_baseContentPixelSize;
+  int m_baseContentScrollY = 0;
+  float m_baseContentDpr = 0.0f;
+  bool m_baseContentValid = false;
   bool m_selectionDirty = true;
   bool m_baseBufferDirty = false;
   bool m_selectionBufferDirty = false;

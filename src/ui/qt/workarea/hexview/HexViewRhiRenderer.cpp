@@ -16,8 +16,10 @@
 #include <QColor>
 #include <QDebug>
 #include <QFile>
+#include <QFontMetricsF>
 #include <QImage>
 #include <QMatrix4x4>
+#include <QPainter>
 #include <QPalette>
 #include <QRectF>
 #include <QScrollBar>
@@ -210,6 +212,7 @@ void HexViewRhiRenderer::invalidateCache() {
   m_cacheStartLine = 0;
   m_cacheEndLine = -1;
   m_baseDirty = true;
+  m_baseContentValid = false;
   m_selectionDirty = true;
   m_itemIdDirty = true;
 }
@@ -262,12 +265,6 @@ void HexViewRhiRenderer::renderFrame(QRhiCommandBuffer* cb, const RenderTargetIn
 
   ensureCacheWindow(startLine, endLine, totalLines, frame);
 
-  if (m_baseDirty) {
-    buildBaseInstances(frame);
-    m_baseDirty = false;
-    m_baseBufferDirty = true;
-  }
-
   if (m_selectionDirty) {
     buildSelectionInstances(startLine, endLine, frame);
     m_selectionDirty = false;
@@ -310,6 +307,7 @@ void HexViewRhiRenderer::renderFrame(QRhiCommandBuffer* cb, const RenderTargetIn
   }
   ensureItemIdTexture(u, startLine, endLine, totalLines, frame);
   ensureRenderTargets(target.pixelSize);
+  ensureBaseContentTexture(u, target.pixelSize, frame);
   const int sampleCount = std::max(1, target.sampleCount);
   ensurePipelines(target.renderPassDesc, sampleCount);
   if (m_compositeSrbDirty && m_compositeSrb) {
@@ -318,35 +316,11 @@ void HexViewRhiRenderer::renderFrame(QRhiCommandBuffer* cb, const RenderTargetIn
   }
   updateUniforms(u, static_cast<float>(scrollY), target.pixelSize, frame);
   updateInstanceBuffers(u);
-
-  int baseRectFirst = 0;
-  int baseRectCount = 0;
-  int baseGlyphFirst = 0;
-  int baseGlyphCount = 0;
-  if (!m_lineRanges.empty()) {
-    const int maxIndex = static_cast<int>(m_lineRanges.size()) - 1;
-    const int visStart = std::clamp(startLine - m_cacheStartLine, 0, maxIndex);
-    const int visEnd = std::clamp(endLine - m_cacheStartLine, 0, maxIndex);
-    const LineRange& startRange = m_lineRanges[visStart];
-    const LineRange& endRange = m_lineRanges[visEnd];
-    baseRectFirst = static_cast<int>(startRange.rectStart);
-    const int baseRectLast = static_cast<int>(endRange.rectStart + endRange.rectCount);
-    baseRectCount = std::max(0, baseRectLast - baseRectFirst);
-    baseGlyphFirst = static_cast<int>(startRange.glyphStart);
-    const int baseGlyphLast = static_cast<int>(endRange.glyphStart + endRange.glyphCount);
-    baseGlyphCount = std::max(0, baseGlyphLast - baseGlyphFirst);
-  }
+  cb->resourceUpdate(u);
 
   const QColor clearColor = frame.windowColor;
 
-  // Pass 1: base content (background spans + glyphs) into an offscreen texture.
-  cb->beginPass(m_contentRt, clearColor, {1.0f, 0}, u);
-  cb->setViewport(QRhiViewport(0, 0, target.pixelSize.width(), target.pixelSize.height()));
-  drawRectBuffer(cb, m_baseRectBuf, baseRectCount, baseRectFirst);
-  drawGlyphBuffer(cb, m_baseGlyphBuf, baseGlyphCount, baseGlyphFirst);
-  cb->endPass();
-
-  // Pass 2: selection/playback mask into an offscreen texture.
+  // Pass 1: selection/playback mask into an offscreen texture.
   // Channel encoding:
   // R=selection mask, G=active playback, B=fading playback, A=fade alpha.
   cb->beginPass(m_maskRt, QColor(0, 0, 0, 0), {1.0f, 0}, nullptr);
@@ -355,7 +329,7 @@ void HexViewRhiRenderer::renderFrame(QRhiCommandBuffer* cb, const RenderTargetIn
                  m_maskPso);
   cb->endPass();
 
-  // Pass 3: edge field for drop shadow and playback glow falloff.
+  // Pass 2: edge field for drop shadow and playback glow falloff.
   const bool edgeEnabled = !m_edgeRectInstances.empty() &&
       ((frame.shadowBlur > 0.0 && frame.shadowStrength > 0.0) ||
        (frame.playbackGlowRadius > 0.0f && frame.playbackGlowStrength > 0.0f));
@@ -371,7 +345,7 @@ void HexViewRhiRenderer::renderFrame(QRhiCommandBuffer* cb, const RenderTargetIn
     cb->endPass();
   }
 
-  // Pass 4: fullscreen composite combines content + mask + edge + item-id textures.
+  // Pass 3: fullscreen composite combines content + mask + edge + item-id textures.
   cb->beginPass(target.renderTarget, clearColor, {1.0f, 0}, nullptr);
   cb->setViewport(QRhiViewport(0, 0, target.pixelSize.width(), target.pixelSize.height()));
   drawFullscreen(cb, m_compositePso, m_compositeSrb);
@@ -616,6 +590,126 @@ void HexViewRhiRenderer::ensurePipelines(QRhiRenderPassDescriptor* outputRp,
   m_compositePso->setSampleCount(m_sampleCount);
   m_compositePso->setRenderPassDescriptor(m_outputRp);
   m_compositePso->create();
+}
+
+void HexViewRhiRenderer::ensureBaseContentTexture(QRhiResourceUpdateBatch* u,
+                                                  const QSize& pixelSize,
+                                                  const HexViewFrame::Data& frame) {
+  if (!m_rhi || !u || !m_contentTex || pixelSize.isEmpty() || !m_view) {
+    return;
+  }
+
+  const float dpr =
+      frame.viewportSize.width() > 0
+          ? (static_cast<float>(pixelSize.width()) / frame.viewportSize.width())
+          : 1.0f;
+  const bool needsRefresh =
+      !m_baseContentValid || m_baseDirty || m_baseContentPixelSize != pixelSize ||
+      m_baseContentScrollY != frame.scrollY || !qFuzzyCompare(m_baseContentDpr, dpr);
+  if (!needsRefresh) {
+    return;
+  }
+
+  QImage image(pixelSize, QImage::Format_ARGB32_Premultiplied);
+  image.fill(frame.windowColor);
+  image.setDevicePixelRatio(dpr);
+
+  QPainter painter(&image);
+  painter.setRenderHint(QPainter::TextAntialiasing, true);
+  painter.setFont(m_view->font());
+  painter.setPen(frame.windowTextColor);
+  painter.translate(0.0, -frame.scrollY);
+
+  const QColor clearColor = frame.windowColor;
+  const QFontMetricsF metrics(painter.font());
+  const qreal baseline = metrics.ascent();
+  const qreal charWidth = static_cast<qreal>(frame.charWidth);
+  const qreal charHalfWidth = static_cast<qreal>(frame.charHalfWidth);
+  const qreal lineHeight = static_cast<qreal>(frame.lineHeight);
+  const qreal hexStartX = static_cast<qreal>(frame.hexStartX);
+  const qreal hexGlyphStartX = hexStartX + charHalfWidth;
+  const qreal asciiStartX =
+      hexGlyphStartX + (kBytesPerLine * 3 + HEX_TO_ASCII_SPACING_CHARS) * charWidth;
+
+  const auto& styles = frame.styles;
+  auto styleFor = [&](uint16_t styleId) -> const HexViewFrame::Style& {
+    if (styleId < styles.size()) {
+      return styles[styleId];
+    }
+    return styles.front();
+  };
+
+  static const char kHexDigits[] = "0123456789ABCDEF";
+
+  for (const auto& entry : m_cachedLines) {
+    const qreal y = static_cast<qreal>(entry.line) * lineHeight;
+    const qreal textBaseline = y + baseline;
+
+    if (frame.shouldDrawOffset) {
+      const uint32_t address = frame.vgmfile->offset() + static_cast<uint32_t>(entry.line * kBytesPerLine);
+      QString text;
+      if (frame.addressAsHex) {
+        text = QStringLiteral("%1").arg(address, NUM_ADDRESS_NIBBLES, 16, QLatin1Char('0')).toUpper();
+      } else {
+        text = QString::number(address).rightJustified(NUM_ADDRESS_NIBBLES, QLatin1Char('0'));
+      }
+      painter.setPen(frame.windowTextColor);
+      painter.drawText(QPointF(0.0, textBaseline), text);
+    }
+
+    if (entry.bytes <= 0) {
+      continue;
+    }
+
+    int spanStart = 0;
+    uint16_t spanStyle = entry.styles[0];
+    for (int i = 1; i <= entry.bytes; ++i) {
+      if (i == entry.bytes || entry.styles[i] != spanStyle) {
+        const int spanLen = i - spanStart;
+        const auto& style = styleFor(spanStyle);
+        if (style.bg != clearColor) {
+          const qreal hexX = hexStartX + spanStart * 3.0 * charWidth;
+          painter.fillRect(QRectF(hexX, y, spanLen * 3.0 * charWidth, lineHeight), style.bg);
+          if (frame.shouldDrawAscii) {
+            const qreal asciiX = asciiStartX + spanStart * charWidth;
+            painter.fillRect(QRectF(asciiX, y, spanLen * charWidth, lineHeight), style.bg);
+          }
+        }
+        if (i < entry.bytes) {
+          spanStart = i;
+          spanStyle = entry.styles[i];
+        }
+      }
+    }
+
+    for (int i = 0; i < entry.bytes; ++i) {
+      const auto& style = styleFor(entry.styles[i]);
+      painter.setPen(style.fg);
+
+      const uint8_t value = entry.data[i];
+      char byteText[3] = {
+          kHexDigits[value >> 4],
+          kHexDigits[value & 0x0F],
+          '\0',
+      };
+      const qreal hexX = hexGlyphStartX + i * 3.0 * charWidth;
+      painter.drawText(QPointF(hexX, textBaseline), QString::fromLatin1(byteText, 2));
+
+      if (frame.shouldDrawAscii) {
+        const char asciiChar = isPrintable(value) ? static_cast<char>(value) : '.';
+        const qreal asciiX = asciiStartX + i * charWidth;
+        painter.drawText(QPointF(asciiX, textBaseline), QString(QChar::fromLatin1(asciiChar)));
+      }
+    }
+  }
+
+  painter.end();
+  u->uploadTexture(m_contentTex, image);
+  m_baseContentPixelSize = pixelSize;
+  m_baseContentScrollY = frame.scrollY;
+  m_baseContentDpr = dpr;
+  m_baseContentValid = true;
+  m_baseDirty = false;
 }
 
 // Upload the glyph atlas texture when the source atlas version changes.
