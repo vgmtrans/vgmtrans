@@ -891,6 +891,7 @@ HexViewFrame::Data HexView::captureRhiFrameData(float dpr) {
   HexViewFrame::Data frame;
   frame.vgmfile = m_vgmfile;
   frame.viewportSize = viewport()->size();
+  frame.dpr = dpr;
   frame.totalLines = getTotalLines();
   frame.scrollY = scrollYForRender();
   frame.lineHeight = m_lineHeight;
