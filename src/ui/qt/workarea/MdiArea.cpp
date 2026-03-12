@@ -11,12 +11,13 @@
 #include <QColor>
 #include <QEvent>
 #include <QFontMetrics>
-#include <QIcon>
+#include <QImage>
 #include <QPaintEvent>
 #include <QPainter>
 #include <QPalette>
 #include <QPixmap>
 #include <QShortcut>
+#include <QSvgRenderer>
 #include <QTabBar>
 #include <algorithm>
 #include <cmath>
@@ -105,26 +106,36 @@ InstructionMetrics computeInstructionMetrics(const InstructionHint &hint, const 
   return {hint, font, metrics, iconSide, spacing, QSize(width, height)};
 }
 
-QPixmap tintedPixmap(const QString &iconPath, const QSize &size, const QColor &accent) {
+QPixmap tintedPixmap(const QString &iconPath, const QSize &size, const QColor &accent,
+                     qreal dpr) {
   if (size.isEmpty()) {
     return {};
   }
 
-  const QIcon icon(iconPath);
-  const QPixmap pixmap = icon.pixmap(size);
-  if (pixmap.isNull()) {
-    return pixmap;
+  const qreal effectiveDpr = std::max(1.0, dpr);
+  const QSize physicalSize = (QSizeF(size) * effectiveDpr).toSize();
+  if (physicalSize.isEmpty()) {
+    return {};
   }
 
-  QPixmap tinted(size);
-  tinted.fill(Qt::transparent);
+  QImage tintedImage(physicalSize, QImage::Format_ARGB32_Premultiplied);
+  tintedImage.fill(Qt::transparent);
 
-  QPainter iconPainter(&tinted);
+  QSvgRenderer renderer(iconPath);
+  if (!renderer.isValid()) {
+    return {};
+  }
+
+  QPainter iconPainter(&tintedImage);
   iconPainter.setRenderHint(QPainter::Antialiasing, true);
   iconPainter.setRenderHint(QPainter::SmoothPixmapTransform, true);
-  iconPainter.drawPixmap(0, 0, pixmap);
+  renderer.render(&iconPainter, QRectF(QPointF(0, 0), QSizeF(physicalSize)));
   iconPainter.setCompositionMode(QPainter::CompositionMode_SourceIn);
-  iconPainter.fillRect(tinted.rect(), accent);
+  iconPainter.fillRect(tintedImage.rect(), accent);
+  iconPainter.end();
+
+  QPixmap tinted = QPixmap::fromImage(tintedImage);
+  tinted.setDevicePixelRatio(effectiveDpr);
   return tinted;
 }
 
@@ -133,7 +144,8 @@ void paintInstruction(QPainter &painter, const InstructionMetrics &metrics, cons
   const QSize iconSize(metrics.iconSide, metrics.iconSide);
   const int iconX = topLeft.x() + (metrics.size.width() - metrics.iconSide) / 2;
   const int iconY = topLeft.y();
-  const QPixmap icon = tintedPixmap(metrics.hint.iconPath, iconSize, accent);
+  const QPixmap icon = tintedPixmap(metrics.hint.iconPath, iconSize, accent,
+                                    painter.device()->devicePixelRatioF());
   if (!icon.isNull()) {
     painter.drawPixmap(iconX, iconY, icon);
   }
@@ -174,7 +186,8 @@ void paintDetailedInstruction(QPainter &painter, const DetailedInstructionLayout
   const int rowLeft = origin.x();
   const int headingTop = origin.y();
   const QSize iconSize(layout.iconSide, layout.iconSide);
-  const QPixmap icon = tintedPixmap(layout.instruction.iconPath, iconSize, accent);
+  const QPixmap icon = tintedPixmap(layout.instruction.iconPath, iconSize, accent,
+                                    painter.device()->devicePixelRatioF());
   if (!icon.isNull()) {
     const int iconY = headingTop + (layout.headingMetrics.height() - layout.iconSide) / 2;
     painter.drawPixmap(rowLeft, iconY, icon);
