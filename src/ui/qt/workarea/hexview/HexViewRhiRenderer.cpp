@@ -610,7 +610,7 @@ void HexViewRhiRenderer::ensureBaseContentTexture(QRhiResourceUpdateBatch* u,
     return;
   }
 
-  QImage image(pixelSize, QImage::Format_RGBA8888_Premultiplied);
+  QImage image(pixelSize, QImage::Format_RGBX8888);
   image.fill(frame.windowColor);
   image.setDevicePixelRatio(dpr);
 
