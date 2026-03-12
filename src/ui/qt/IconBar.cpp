@@ -56,10 +56,6 @@ void IconBar::setupControls() {
   /* Needed to make sure the slider is properly rendered */
   m_slider->setRange(0, 1);
   m_slider->setValue(0);
-  #ifdef __APPLE__
-  /* HACK: workaround the slider being cut off on macOS */
-  m_slider->setFixedHeight(27);
-  #endif
   
   m_slider->setEnabled(false);
   m_slider->setToolTip("Seek");
