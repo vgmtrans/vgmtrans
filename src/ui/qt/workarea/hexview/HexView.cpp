@@ -126,6 +126,9 @@ QString tooltipHtmlWithIcon(VGMItem* item) {
 }
 
 #ifdef Q_OS_WIN
+constexpr int RAW_GLYPH_X_ADJUST_PX = 0;
+constexpr int RAW_GLYPH_Y_ADJUST_PX = 0;
+
 int alphaAt(const QImage& image, const uchar* line, int x) {
   switch (image.format()) {
     case QImage::Format_Alpha8:
@@ -137,34 +140,17 @@ int alphaAt(const QImage& image, const uchar* line, int x) {
   }
 }
 
-QPoint probeGlyphTopLeft(const QFont& font, qreal dpr, int cellWidthPx, int cellHeightPx,
-                         qreal padding, qreal baseline, QChar glyph) {
-  QImage probe(cellWidthPx, cellHeightPx, QImage::Format_ARGB32_Premultiplied);
-  probe.fill(Qt::transparent);
-  probe.setDevicePixelRatio(dpr);
-
-  QPainter painter(&probe);
-  painter.setFont(font);
-  painter.setPen(Qt::white);
-  painter.setRenderHint(QPainter::TextAntialiasing, true);
-  painter.drawText(QPointF(padding, padding + baseline), QString(glyph));
-  painter.end();
-
-  int minX = probe.width();
-  int minY = probe.height();
-  bool found = false;
-  for (int y = 0; y < probe.height(); ++y) {
-    const QRgb* line = reinterpret_cast<const QRgb*>(probe.constScanLine(y));
-    for (int x = 0; x < probe.width(); ++x) {
-      if (qAlpha(line[x]) != 0) {
-        minX = std::min(minX, x);
-        minY = std::min(minY, y);
-        found = true;
-      }
-    }
+QPoint glyphTopLeftFromMetrics(const QRawFont& rawFont, quint32 glyphIndex, int paddingPx) {
+  const QRectF bounds = rawFont.boundingRect(glyphIndex);
+  if (bounds.isEmpty()) {
+    return QPoint(-1, -1);
   }
 
-  return found ? QPoint(minX, minY) : QPoint(-1, -1);
+  const int baselinePx = std::max(0, static_cast<int>(std::round(rawFont.ascent())));
+  const int leftPx = static_cast<int>(std::floor(bounds.left()));
+  const int topPx = static_cast<int>(std::floor(bounds.top()));
+  return QPoint(paddingPx + leftPx + RAW_GLYPH_X_ADJUST_PX,
+                paddingPx + baselinePx + topPx + RAW_GLYPH_Y_ADJUST_PX);
 }
 
 void blitGlyphAlpha(QImage& dst, int dstX, int dstY, const QImage& src) {
@@ -795,12 +781,10 @@ void HexView::ensureGlyphAtlas(qreal dpr) {
     if (useRawAtlas && glyphs[i] != QLatin1Char(' ')) {
       const auto glyphIndexes = rawFont.glyphIndexesForString(QString(glyphs[i]));
       if (!glyphIndexes.empty() && glyphIndexes.front() != 0) {
-        const QImage alphaMap =
-            rawFont.alphaMapForGlyph(glyphIndexes.front(), QRawFont::PixelAntialiasing);
+        const quint32 glyphIndex = glyphIndexes.front();
+        const QImage alphaMap = rawFont.alphaMapForGlyph(glyphIndex, QRawFont::PixelAntialiasing);
         if (!alphaMap.isNull()) {
-          const QPoint topLeft =
-              probeGlyphTopLeft(font(), dpr, cellWidthPx, cellHeightPx, padding, baseline,
-                                glyphs[i]);
+          const QPoint topLeft = glyphTopLeftFromMetrics(rawFont, glyphIndex, paddingPx);
           if (topLeft.x() >= 0 && topLeft.y() >= 0) {
             blitGlyphAlpha(image, cellXPx + topLeft.x(), cellYPx + topLeft.y(), alphaMap);
             drewGlyph = true;
