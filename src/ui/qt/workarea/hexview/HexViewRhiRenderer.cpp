@@ -112,7 +112,7 @@ void HexViewRhiRenderer::initIfNeeded(QRhi* rhi) {
   m_compositeUbuf = m_rhi->newBuffer(QRhiBuffer::Dynamic, QRhiBuffer::UniformBuffer, screenUboSize);
   m_compositeUbuf->create();
 
-  m_glyphSampler = m_rhi->newSampler(QRhiSampler::Linear, QRhiSampler::Linear,
+  m_glyphSampler = m_rhi->newSampler(QRhiSampler::Nearest, QRhiSampler::Nearest,
                                      QRhiSampler::None, QRhiSampler::ClampToEdge,
                                      QRhiSampler::ClampToEdge);
   m_glyphSampler->create();

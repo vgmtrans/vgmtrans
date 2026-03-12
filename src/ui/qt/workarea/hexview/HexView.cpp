@@ -20,16 +20,15 @@
 #include <QImage>
 #include <QKeyEvent>
 #include <QMouseEvent>
-#include <QPixmap>
-#include <QProxyStyle>
-#include <QStyleFactory>
 #include <QPainter>
+#include <QPixmap>
 #include <QParallelAnimationGroup>
 #include <QPropertyAnimation>
+#include <QProxyStyle>
 #include <QRectF>
 #include <QResizeEvent>
 #include <QScrollBar>
-#include <QTimerEvent>
+#include <QStyleFactory>
 #include <QToolTip>
 #include <QWidget>
 
@@ -239,7 +238,7 @@ void HexView::setFont(const QFont& font) {
   const qreal charWidthSansSpacing = originalCharWidth - originalLetterSpacing;
   const qreal targetLetterSpacing = std::round(charWidthSansSpacing) - charWidthSansSpacing;
   adjustedFont.setLetterSpacing(QFont::AbsoluteSpacing, targetLetterSpacing);
-
+  
   fontMetrics = QFontMetricsF(adjustedFont);
   m_charWidth = static_cast<int>(std::round(fontMetrics.horizontalAdvance("A")));
   m_charHalfWidth = static_cast<int>(std::round(fontMetrics.horizontalAdvance("A") / 2.0));
