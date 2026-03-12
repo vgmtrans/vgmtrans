@@ -126,6 +126,9 @@ QString tooltipHtmlWithIcon(VGMItem* item) {
 }
 
 #ifdef Q_OS_WIN
+constexpr int PROBE_PIXEL_ALPHA_THRESHOLD = 32;
+constexpr int PROBE_AXIS_ALPHA_THRESHOLD = 96;
+
 // Read one coverage sample from a glyph bitmap row returned by Qt.
 // `line` is the raw byte pointer for a single scanline from `image.constScanLine(y)`.
 // We need this helper because `QRawFont::alphaMapForGlyph()` can return different
@@ -143,8 +146,10 @@ int alphaAt(const QImage& image, const uchar* line, int x) {
 }
 
 // Ask Qt to draw one glyph into a temporary cell-sized image, then find the first
-// non-transparent pixel. That gives us the top-left bitmap origin Qt used for this
-// glyph inside the cell, which we reuse when copying the raw glyph mask into the atlas.
+// row/column whose alpha is strong enough to represent the real glyph body rather
+// than a faint antialiasing fringe. That gives us a more stable top-left bitmap
+// origin for the glyph inside the cell, which we reuse when copying the raw glyph
+// mask into the atlas.
 QPoint probeGlyphTopLeft(const QFont& font, qreal dpr, int cellWidthPx, int cellHeightPx,
                          qreal padding, qreal baseline, QChar glyph) {
   QImage probe(cellWidthPx, cellHeightPx, QImage::Format_ARGB32_Premultiplied);
@@ -158,22 +163,34 @@ QPoint probeGlyphTopLeft(const QFont& font, qreal dpr, int cellWidthPx, int cell
   painter.drawText(QPointF(padding, padding + baseline), QString(glyph));
   painter.end();
 
-  int minX = probe.width();
-  int minY = probe.height();
-  bool found = false;
+  std::vector<int> columnAlpha(static_cast<size_t>(probe.width()), 0);
+  int minY = -1;
   for (int y = 0; y < probe.height(); ++y) {
     // line is a row of pixels from the temporary probe image.
     const QRgb* line = reinterpret_cast<const QRgb*>(probe.constScanLine(y));
+    int rowAlpha = 0;
     for (int x = 0; x < probe.width(); ++x) {
-      if (qAlpha(line[x]) != 0) {
-        minX = std::min(minX, x);
-        minY = std::min(minY, y);
-        found = true;
+      const int alpha = qAlpha(line[x]);
+      if (alpha < PROBE_PIXEL_ALPHA_THRESHOLD) {
+        continue;
       }
+      rowAlpha += alpha;
+      columnAlpha[static_cast<size_t>(x)] += alpha;
+    }
+    if (minY < 0 && rowAlpha >= PROBE_AXIS_ALPHA_THRESHOLD) {
+      minY = y;
     }
   }
 
-  return found ? QPoint(minX, minY) : QPoint(-1, -1);
+  int minX = -1;
+  for (int x = 0; x < probe.width(); ++x) {
+    if (columnAlpha[static_cast<size_t>(x)] >= PROBE_AXIS_ALPHA_THRESHOLD) {
+      minX = x;
+      break;
+    }
+  }
+
+  return (minX >= 0 && minY >= 0) ? QPoint(minX, minY) : QPoint(-1, -1);
 }
 
 // Copy the glyph coverage image from `src` into the atlas image `dst`.
