@@ -38,15 +38,14 @@ int main(int argc, char *argv[]) {
   QCoreApplication::setOrganizationDomain("vgmtrans.com");
   QCoreApplication::setApplicationName("VGMTrans");
 
-  QGuiApplication::setHighDpiScaleFactorRoundingPolicy(Qt::HighDpiScaleFactorRoundingPolicy::Round);
   // Prevent native sibling promotion so dock splitters remain responsive with the RHI QWindow container.
   QCoreApplication::setAttribute(Qt::AA_DontCreateNativeWidgetSiblings);
 
+#ifdef _WIN32
+  QApplication::setStyle("Fusion");
+#endif
   VGMTransApplication app(argc, argv);
 
-#ifdef _WIN32
-  app.setStyle(QStyleFactory::create("fusion"));
-#endif
   qtVGMRoot.init();
 
   QFontDatabase::addApplicationFont(":/fonts/Roboto_Mono/RobotoMono-VariableFont_wght.ttf");
