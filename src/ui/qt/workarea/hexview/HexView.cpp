@@ -14,7 +14,6 @@
 #include <QApplication>
 #include <QBuffer>
 #include <QCursor>
-#include <QDebug>
 #include <QFontMetricsF>
 #include <QHash>
 #include <QHelpEvent>
@@ -30,7 +29,6 @@
 #include <QRectF>
 #include <QResizeEvent>
 #include <QScrollBar>
-#include <QStringList>
 #include <QTimerEvent>
 #include <QToolTip>
 #include <QWidget>
@@ -64,145 +62,6 @@ constexpr float PLAYBACK_GLOW_EDGE_CURVE = 0.85f;
 const QColor PLAYBACK_GLOW_LOW(40, 40, 40);
 const QColor PLAYBACK_GLOW_HIGH(230, 230, 230);
 constexpr uint16_t STYLE_UNASSIGNED = std::numeric_limits<uint16_t>::max();
-
-enum class MetricSnapMode {
-  Round,
-  Ceil,
-  Floor,
-};
-
-struct HexViewExperimentConfig {
-  bool hasOverrides = false;
-  bool disableLetterSpacingSnap = false;
-  bool verticalSubpixelPositioning = false;
-  MetricSnapMode metricSnapMode = MetricSnapMode::Round;
-  bool overrideHintingPreference = false;
-  QFont::HintingPreference hintingPreference = QFont::PreferDefaultHinting;
-  bool addPreferAntialias = false;
-  bool addPreferQuality = false;
-  bool addForceOutline = false;
-};
-
-const HexViewExperimentConfig& hexViewExperimentConfig() {
-  static const HexViewExperimentConfig config = [] {
-    HexViewExperimentConfig experiment;
-
-#ifdef Q_OS_WIN
-    // Hardcoded HexView rendering experiments for Windows investigation.
-    experiment.hasOverrides = true;
-    experiment.overrideHintingPreference = true;
-    experiment.hintingPreference = QFont::PreferVerticalHinting;
-    experiment.addPreferQuality = true;
-    experiment.addPreferAntialias = true;
-    experiment.verticalSubpixelPositioning = true;
-    experiment.disableLetterSpacingSnap = false;
-    experiment.metricSnapMode = MetricSnapMode::Round;
-#endif
-
-    return experiment;
-  }();
-  return config;
-}
-
-const char* metricSnapModeName(MetricSnapMode mode) {
-  switch (mode) {
-    case MetricSnapMode::Round:
-      return "round";
-    case MetricSnapMode::Ceil:
-      return "ceil";
-    case MetricSnapMode::Floor:
-      return "floor";
-  }
-  return "round";
-}
-
-const char* hintingPreferenceName(QFont::HintingPreference preference) {
-  switch (preference) {
-    case QFont::PreferNoHinting:
-      return "none";
-    case QFont::PreferVerticalHinting:
-      return "vertical";
-    case QFont::PreferFullHinting:
-      return "full";
-    case QFont::PreferDefaultHinting:
-      break;
-  }
-  return "default";
-}
-
-void logHexViewExperimentsOnce() {
-  static bool logged = false;
-  if (logged) {
-    return;
-  }
-  logged = true;
-
-  const HexViewExperimentConfig& config = hexViewExperimentConfig();
-  if (!config.hasOverrides) {
-    return;
-  }
-
-  QStringList parts;
-  if (config.overrideHintingPreference) {
-    parts.append(QStringLiteral("hinting=%1")
-                     .arg(QString::fromLatin1(hintingPreferenceName(config.hintingPreference))));
-  }
-  if (config.addPreferQuality) {
-    parts.append(QStringLiteral("style=quality"));
-  }
-  if (config.addPreferAntialias) {
-    parts.append(QStringLiteral("style=antialias"));
-  }
-  if (config.addForceOutline) {
-    parts.append(QStringLiteral("style=outline"));
-  }
-  if (config.verticalSubpixelPositioning) {
-    parts.append(QStringLiteral("vertical-subpixel=on"));
-  }
-  if (config.disableLetterSpacingSnap) {
-    parts.append(QStringLiteral("letter-spacing-snap=off"));
-  }
-  parts.append(QStringLiteral("metric-snap=%1")
-                   .arg(QString::fromLatin1(metricSnapModeName(config.metricSnapMode))));
-
-  qInfo().noquote() << "HexView font experiments enabled:" << parts.join(", ");
-}
-
-int snapMetric(qreal value, MetricSnapMode mode) {
-  switch (mode) {
-    case MetricSnapMode::Round:
-      return static_cast<int>(std::round(value));
-    case MetricSnapMode::Ceil:
-      return static_cast<int>(std::ceil(value));
-    case MetricSnapMode::Floor:
-      return static_cast<int>(std::floor(value));
-  }
-  return static_cast<int>(std::round(value));
-}
-
-QFont applyHexViewExperimentFont(QFont font) {
-  const HexViewExperimentConfig& config = hexViewExperimentConfig();
-
-  if (config.overrideHintingPreference) {
-    font.setHintingPreference(config.hintingPreference);
-  }
-
-  QFont::StyleStrategy styleStrategy = font.styleStrategy();
-  if (config.addPreferQuality) {
-    styleStrategy = QFont::StyleStrategy(styleStrategy | QFont::PreferQuality);
-  }
-  if (config.addPreferAntialias) {
-    styleStrategy = QFont::StyleStrategy(styleStrategy | QFont::PreferAntialias);
-  }
-  if (config.addForceOutline) {
-    styleStrategy = QFont::StyleStrategy(styleStrategy | QFont::ForceOutline);
-  }
-  if (styleStrategy != font.styleStrategy()) {
-    font.setStyleStrategy(styleStrategy);
-  }
-
-  return font;
-}
 
 #ifdef Q_OS_MAC
 class NonTransientScrollBarStyle final : public QProxyStyle {
@@ -372,25 +231,19 @@ HexView::HexView(VGMFile* vgmfile, QWidget* parent)
 
 // Apply a monospaced font, normalize glyph metrics, and invalidate layout/glyph cache.
 void HexView::setFont(const QFont& font) {
-  logHexViewExperimentsOnce();
-
-  const HexViewExperimentConfig& experiment = hexViewExperimentConfig();
-  QFont adjustedFont = applyHexViewExperimentFont(font);
+  QFont adjustedFont = font;
   QFontMetricsF fontMetrics(adjustedFont);
 
-  if (!experiment.disableLetterSpacingSnap) {
-    const qreal originalCharWidth = fontMetrics.horizontalAdvance("A");
-    const qreal originalLetterSpacing = adjustedFont.letterSpacing();
-    const qreal charWidthSansSpacing = originalCharWidth - originalLetterSpacing;
-    const qreal targetLetterSpacing = std::round(charWidthSansSpacing) - charWidthSansSpacing;
-    adjustedFont.setLetterSpacing(QFont::AbsoluteSpacing, targetLetterSpacing);
-  }
+  const qreal originalCharWidth = fontMetrics.horizontalAdvance("A");
+  const qreal originalLetterSpacing = adjustedFont.letterSpacing();
+  const qreal charWidthSansSpacing = originalCharWidth - originalLetterSpacing;
+  const qreal targetLetterSpacing = std::round(charWidthSansSpacing) - charWidthSansSpacing;
+  adjustedFont.setLetterSpacing(QFont::AbsoluteSpacing, targetLetterSpacing);
 
   fontMetrics = QFontMetricsF(adjustedFont);
-  m_charWidth = snapMetric(fontMetrics.horizontalAdvance("A"), experiment.metricSnapMode);
-  m_charHalfWidth =
-      snapMetric(fontMetrics.horizontalAdvance("A") / 2.0, experiment.metricSnapMode);
-  m_lineHeight = snapMetric(fontMetrics.height(), experiment.metricSnapMode);
+  m_charWidth = static_cast<int>(std::round(fontMetrics.horizontalAdvance("A")));
+  m_charHalfWidth = static_cast<int>(std::round(fontMetrics.horizontalAdvance("A") / 2.0));
+  m_lineHeight = static_cast<int>(std::round(fontMetrics.height()));
 
   QAbstractScrollArea::setFont(adjustedFont);
 
@@ -840,9 +693,6 @@ void HexView::ensureGlyphAtlas(qreal dpr) {
   painter.setFont(font());
   painter.setPen(Qt::white);
   painter.setRenderHint(QPainter::TextAntialiasing, true);
-  if (hexViewExperimentConfig().verticalSubpixelPositioning) {
-    painter.setRenderHint(QPainter::VerticalSubpixelPositioning, true);
-  }
 
   const qreal baseline = QFontMetricsF(font()).ascent();
 
