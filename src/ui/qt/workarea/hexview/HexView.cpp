@@ -22,6 +22,7 @@
 #include <QMouseEvent>
 #include <QPixmap>
 #include <QProxyStyle>
+#include <QRawFont>
 #include <QStyleFactory>
 #include <QPainter>
 #include <QParallelAnimationGroup>
@@ -123,6 +124,77 @@ QString tooltipHtmlWithIcon(VGMItem* item) {
   return QString("<table cellspacing=\"0\" cellpadding=\"6\"><tr><td>%1</td></tr></table>")
       .arg(content);
 }
+
+#ifdef Q_OS_WIN
+int alphaAt(const QImage& image, const uchar* line, int x) {
+  switch (image.format()) {
+    case QImage::Format_Alpha8:
+    case QImage::Format_Grayscale8:
+    case QImage::Format_Indexed8:
+      return line[x];
+    default:
+      return qAlpha(reinterpret_cast<const QRgb*>(line)[x]);
+  }
+}
+
+QPoint probeGlyphTopLeft(const QFont& font, qreal dpr, int cellWidthPx, int cellHeightPx,
+                         qreal padding, qreal baseline, QChar glyph) {
+  QImage probe(cellWidthPx, cellHeightPx, QImage::Format_ARGB32_Premultiplied);
+  probe.fill(Qt::transparent);
+  probe.setDevicePixelRatio(dpr);
+
+  QPainter painter(&probe);
+  painter.setFont(font);
+  painter.setPen(Qt::white);
+  painter.setRenderHint(QPainter::TextAntialiasing, true);
+  painter.drawText(QPointF(padding, padding + baseline), QString(glyph));
+  painter.end();
+
+  int minX = probe.width();
+  int minY = probe.height();
+  bool found = false;
+  for (int y = 0; y < probe.height(); ++y) {
+    const QRgb* line = reinterpret_cast<const QRgb*>(probe.constScanLine(y));
+    for (int x = 0; x < probe.width(); ++x) {
+      if (qAlpha(line[x]) != 0) {
+        minX = std::min(minX, x);
+        minY = std::min(minY, y);
+        found = true;
+      }
+    }
+  }
+
+  return found ? QPoint(minX, minY) : QPoint(-1, -1);
+}
+
+void blitGlyphAlpha(QImage& dst, int dstX, int dstY, const QImage& src) {
+  if (src.isNull()) {
+    return;
+  }
+
+  for (int y = 0; y < src.height(); ++y) {
+    const int outY = dstY + y;
+    if (outY < 0 || outY >= dst.height()) {
+      continue;
+    }
+
+    const uchar* srcLine = src.constScanLine(y);
+    QRgb* dstLine = reinterpret_cast<QRgb*>(dst.scanLine(outY));
+    for (int x = 0; x < src.width(); ++x) {
+      const int outX = dstX + x;
+      if (outX < 0 || outX >= dst.width()) {
+        continue;
+      }
+
+      const int alpha = alphaAt(src, srcLine, x);
+      if (alpha == 0) {
+        continue;
+      }
+      dstLine[outX] = qPremultiply(qRgba(255, 255, 255, alpha));
+    }
+  }
+}
+#endif
 
 }  // namespace
 
@@ -699,6 +771,15 @@ void HexView::ensureGlyphAtlas(qreal dpr) {
   painter.setPen(Qt::white);
   painter.setRenderHint(QPainter::TextAntialiasing, true);
 
+#ifdef Q_OS_WIN
+  QRawFont rawFont = QRawFont::fromFont(font());
+  bool useRawAtlas = rawFont.isValid() && rawFont.pixelSize() > 0.0;
+  if (useRawAtlas) {
+    rawFont.setPixelSize(rawFont.pixelSize() * dpr);
+    useRawAtlas = rawFont.isValid();
+  }
+#endif
+
   m_glyphAtlas->uvTable.fill(QRectF());
 
   for (size_t i = 0; i < glyphs.size(); ++i) {
@@ -709,7 +790,31 @@ void HexView::ensureGlyphAtlas(qreal dpr) {
     const int cellXPx = col * cellWidthPx;
     const int cellYPx = row * cellHeightPx;
 
-    painter.drawText(QPointF(cellX + padding, cellY + padding + baseline), QString(glyphs[i]));
+    bool drewGlyph = false;
+#ifdef Q_OS_WIN
+    if (useRawAtlas && glyphs[i] != QLatin1Char(' ')) {
+      const auto glyphIndexes = rawFont.glyphIndexesForString(QString(glyphs[i]));
+      if (!glyphIndexes.empty() && glyphIndexes.front() != 0) {
+        const QImage alphaMap =
+            rawFont.alphaMapForGlyph(glyphIndexes.front(), QRawFont::PixelAntialiasing);
+        if (!alphaMap.isNull()) {
+          const QPoint topLeft =
+              probeGlyphTopLeft(font(), dpr, cellWidthPx, cellHeightPx, padding, baseline,
+                                glyphs[i]);
+          if (topLeft.x() >= 0 && topLeft.y() >= 0) {
+            blitGlyphAlpha(image, cellXPx + topLeft.x(), cellYPx + topLeft.y(), alphaMap);
+            drewGlyph = true;
+          }
+        }
+      }
+    } else if (useRawAtlas) {
+      drewGlyph = true;
+    }
+#endif
+    if (!drewGlyph) {
+      painter.drawText(QPointF(cellX + padding, cellY + padding + baseline),
+                       QString(glyphs[i]));
+    }
 
     const qreal u0 = static_cast<qreal>(cellXPx + paddingPx) / imageWidth;
     const qreal v0 = static_cast<qreal>(cellYPx + paddingPx) / imageHeight;
