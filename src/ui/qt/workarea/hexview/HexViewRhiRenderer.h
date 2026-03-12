@@ -7,6 +7,9 @@
 #pragma once
 
 #include <QElapsedTimer>
+#include <QFont>
+#include <QImage>
+#include <QRawFont>
 #include <QSize>
 #include <array>
 #include <cstdint>
@@ -16,7 +19,9 @@
 #include "HexViewFrameData.h"
 
 class QChar;
+class QColor;
 class QRectF;
+class QString;
 class QVector4D;
 class HexView;
 class QRhi;
@@ -142,12 +147,31 @@ private:
     bool shouldDrawAscii = false;
   };
 
+  struct SubpixelGlyph {
+    QImage mask;
+    int left = 0;
+    int top = 0;
+    bool valid = false;
+  };
+
+  struct SubpixelFontCache {
+    QFont font;
+    QRawFont rawFont;
+    float dpr = 0.0f;
+    qreal baselinePx = 0.0;
+    bool valid = false;
+    std::array<SubpixelGlyph, 128> glyphs{};
+  };
+
   void ensureRenderTargets(const QSize& pixelSize);
   void releaseRenderTargets();
 
   void ensurePipelines(QRhiRenderPassDescriptor* outputRp, int outputSampleCount);
   void ensureBaseContentTexture(QRhiResourceUpdateBatch* u, const QSize& pixelSize,
                                 const HexViewFrame::Data& frame);
+  void ensureSubpixelFontCache(float dpr);
+  void drawSubpixelText(QImage& image, const QString& text, qreal startX, qreal baselineY,
+                        qreal stepX, const QColor& color, float dpr);
   void ensureGlyphTexture(QRhiResourceUpdateBatch* u, const HexViewFrame::Data& frame);
   void ensureItemIdTexture(QRhiResourceUpdateBatch* u, int startLine, int endLine, int totalLines,
                            const HexViewFrame::Data& frame);
@@ -264,6 +288,7 @@ private:
   int m_baseContentScrollY = 0;
   float m_baseContentDpr = 0.0f;
   bool m_baseContentValid = false;
+  SubpixelFontCache m_subpixelFontCache;
   bool m_selectionDirty = true;
   bool m_baseBufferDirty = false;
   bool m_selectionBufferDirty = false;

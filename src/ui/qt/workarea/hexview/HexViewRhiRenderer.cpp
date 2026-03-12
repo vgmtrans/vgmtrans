@@ -213,8 +213,166 @@ void HexViewRhiRenderer::invalidateCache() {
   m_cacheEndLine = -1;
   m_baseDirty = true;
   m_baseContentValid = false;
+  m_subpixelFontCache = {};
   m_selectionDirty = true;
   m_itemIdDirty = true;
+}
+
+void HexViewRhiRenderer::ensureSubpixelFontCache(float dpr) {
+#ifdef Q_OS_WIN
+  if (!m_view || dpr <= 0.0f) {
+    m_subpixelFontCache = {};
+    return;
+  }
+
+  const QFont currentFont = m_view->font();
+  const bool needsRebuild =
+      !m_subpixelFontCache.valid || m_subpixelFontCache.font != currentFont ||
+      !qFuzzyCompare(m_subpixelFontCache.dpr, dpr);
+  if (!needsRebuild) {
+    return;
+  }
+
+  m_subpixelFontCache = {};
+  m_subpixelFontCache.font = currentFont;
+  m_subpixelFontCache.dpr = dpr;
+
+  QRawFont rawFont = QRawFont::fromFont(currentFont);
+  if (!rawFont.isValid() || rawFont.pixelSize() <= 0.0) {
+    return;
+  }
+
+  rawFont.setPixelSize(rawFont.pixelSize() * dpr);
+  if (!rawFont.isValid()) {
+    return;
+  }
+
+  m_subpixelFontCache.rawFont = rawFont;
+  m_subpixelFontCache.baselinePx = rawFont.ascent();
+
+  const auto fallbackGlyphs = rawFont.glyphIndexesForString(QStringLiteral("."));
+  const quint32 fallbackGlyph = fallbackGlyphs.empty() ? 0u : fallbackGlyphs.front();
+
+  for (ushort ch = 0; ch < m_subpixelFontCache.glyphs.size(); ++ch) {
+    auto& entry = m_subpixelFontCache.glyphs[ch];
+    quint32 glyphIndex = 0;
+    const auto glyphs = rawFont.glyphIndexesForString(QString(QChar(ch)));
+    if (!glyphs.empty()) {
+      glyphIndex = glyphs.front();
+    }
+    if (!glyphIndex && ch != ushort(' ') && fallbackGlyph) {
+      glyphIndex = fallbackGlyph;
+    }
+
+    if (!glyphIndex) {
+      entry.valid = (ch == ushort(' '));
+      continue;
+    }
+
+    QImage mask = rawFont.alphaMapForGlyph(glyphIndex, QRawFont::SubPixelAntialiasing);
+    if (mask.isNull()) {
+      mask = rawFont.alphaMapForGlyph(glyphIndex, QRawFont::PixelAntialiasing);
+    }
+    if (!mask.isNull()) {
+      mask = mask.convertToFormat(QImage::Format_RGBX8888);
+    }
+
+    const QRectF bounds = rawFont.boundingRect(glyphIndex);
+    entry.mask = std::move(mask);
+    entry.left = static_cast<int>(std::floor(bounds.left()));
+    entry.top = static_cast<int>(std::floor(bounds.top()));
+    entry.valid = true;
+  }
+
+  m_subpixelFontCache.valid = true;
+#else
+  Q_UNUSED(dpr);
+#endif
+}
+
+void HexViewRhiRenderer::drawSubpixelText(QImage& image, const QString& text, qreal startX,
+                                          qreal baselineY, qreal stepX, const QColor& color,
+                                          float dpr) {
+#ifdef Q_OS_WIN
+  if (!m_subpixelFontCache.valid || text.isEmpty() || image.isNull()) {
+    return;
+  }
+
+  const int baselinePx = static_cast<int>(std::lround(baselineY * dpr));
+  const int textAlpha = color.alpha();
+  const int textRed = color.red();
+  const int textGreen = color.green();
+  const int textBlue = color.blue();
+
+  auto blendChannel = [](uchar dst, int src, int coverage) -> uchar {
+    return static_cast<uchar>((src * coverage + dst * (255 - coverage) + 127) / 255);
+  };
+
+  auto glyphFor = [&](QChar ch) -> const SubpixelGlyph* {
+    const ushort code = ch.unicode();
+    if (code < m_subpixelFontCache.glyphs.size() &&
+        m_subpixelFontCache.glyphs[code].valid) {
+      return &m_subpixelFontCache.glyphs[code];
+    }
+    return &m_subpixelFontCache.glyphs[ushort('.')];
+  };
+
+  for (int i = 0; i < text.size(); ++i) {
+    const SubpixelGlyph* glyph = glyphFor(text.at(i));
+    if (!glyph || glyph->mask.isNull()) {
+      continue;
+    }
+
+    const int originXPx = static_cast<int>(std::lround((startX + i * stepX) * dpr));
+    const int dstLeft = originXPx + glyph->left;
+    const int dstTop = baselinePx + glyph->top;
+    const int glyphWidth = glyph->mask.width();
+    const int glyphHeight = glyph->mask.height();
+
+    for (int y = 0; y < glyphHeight; ++y) {
+      const int dstY = dstTop + y;
+      if (dstY < 0 || dstY >= image.height()) {
+        continue;
+      }
+
+      const uchar* srcLine = glyph->mask.constScanLine(y);
+      uchar* dstLine = image.scanLine(dstY);
+      for (int x = 0; x < glyphWidth; ++x) {
+        const int dstX = dstLeft + x;
+        if (dstX < 0 || dstX >= image.width()) {
+          continue;
+        }
+
+        const uchar* src = srcLine + x * 4;
+        int covR = src[0];
+        int covG = src[1];
+        int covB = src[2];
+        if (textAlpha < 255) {
+          covR = (covR * textAlpha + 127) / 255;
+          covG = (covG * textAlpha + 127) / 255;
+          covB = (covB * textAlpha + 127) / 255;
+        }
+        if (covR == 0 && covG == 0 && covB == 0) {
+          continue;
+        }
+
+        uchar* dst = dstLine + dstX * 4;
+        dst[0] = blendChannel(dst[0], textRed, covR);
+        dst[1] = blendChannel(dst[1], textGreen, covG);
+        dst[2] = blendChannel(dst[2], textBlue, covB);
+        dst[3] = 255;
+      }
+    }
+  }
+#else
+  Q_UNUSED(image);
+  Q_UNUSED(text);
+  Q_UNUSED(startX);
+  Q_UNUSED(baselineY);
+  Q_UNUSED(stepX);
+  Q_UNUSED(color);
+  Q_UNUSED(dpr);
+#endif
 }
 
 // Render one frame from a captured HexView snapshot through the full pass chain.
@@ -620,6 +778,13 @@ void HexViewRhiRenderer::ensureBaseContentTexture(QRhiResourceUpdateBatch* u,
   painter.setPen(frame.windowTextColor);
   painter.translate(0.0, -frame.scrollY);
 
+#ifdef Q_OS_WIN
+  ensureSubpixelFontCache(dpr);
+  const bool useSubpixelText = m_subpixelFontCache.valid;
+#else
+  const bool useSubpixelText = false;
+#endif
+
   const QColor clearColor = frame.windowColor;
   const QFontMetricsF metrics(painter.font());
   const qreal baseline = metrics.ascent();
@@ -653,8 +818,10 @@ void HexViewRhiRenderer::ensureBaseContentTexture(QRhiResourceUpdateBatch* u,
       } else {
         text = QString::number(address).rightJustified(NUM_ADDRESS_NIBBLES, QLatin1Char('0'));
       }
-      painter.setPen(frame.windowTextColor);
-      painter.drawText(QPointF(0.0, textBaseline), text);
+      if (!useSubpixelText) {
+        painter.setPen(frame.windowTextColor);
+        painter.drawText(QPointF(0.0, textBaseline), text);
+      }
     }
 
     if (entry.bytes <= 0) {
@@ -683,27 +850,77 @@ void HexViewRhiRenderer::ensureBaseContentTexture(QRhiResourceUpdateBatch* u,
     }
 
     for (int i = 0; i < entry.bytes; ++i) {
-      const auto& style = styleFor(entry.styles[i]);
-      painter.setPen(style.fg);
+      if (!useSubpixelText) {
+        const auto& style = styleFor(entry.styles[i]);
+        painter.setPen(style.fg);
 
-      const uint8_t value = entry.data[i];
-      char byteText[3] = {
-          kHexDigits[value >> 4],
-          kHexDigits[value & 0x0F],
-          '\0',
-      };
-      const qreal hexX = hexGlyphStartX + i * 3.0 * charWidth;
-      painter.drawText(QPointF(hexX, textBaseline), QString::fromLatin1(byteText, 2));
+        const uint8_t value = entry.data[i];
+        char byteText[3] = {
+            kHexDigits[value >> 4],
+            kHexDigits[value & 0x0F],
+            '\0',
+        };
+        const qreal hexX = hexGlyphStartX + i * 3.0 * charWidth;
+        painter.drawText(QPointF(hexX, textBaseline), QString::fromLatin1(byteText, 2));
 
-      if (frame.shouldDrawAscii) {
-        const char asciiChar = isPrintable(value) ? static_cast<char>(value) : '.';
-        const qreal asciiX = asciiStartX + i * charWidth;
-        painter.drawText(QPointF(asciiX, textBaseline), QString(QChar::fromLatin1(asciiChar)));
+        if (frame.shouldDrawAscii) {
+          const char asciiChar = isPrintable(value) ? static_cast<char>(value) : '.';
+          const qreal asciiX = asciiStartX + i * charWidth;
+          painter.drawText(QPointF(asciiX, textBaseline), QString(QChar::fromLatin1(asciiChar)));
+        }
       }
     }
   }
 
   painter.end();
+
+  if (useSubpixelText) {
+    for (const auto& entry : m_cachedLines) {
+      const qreal y = static_cast<qreal>(entry.line) * lineHeight;
+      const qreal textBaseline = y + baseline - frame.scrollY;
+
+      if (frame.shouldDrawOffset) {
+        const uint32_t address =
+            frame.vgmfile->offset() + static_cast<uint32_t>(entry.line * kBytesPerLine);
+        QString text;
+        if (frame.addressAsHex) {
+          text = QStringLiteral("%1")
+                     .arg(address, NUM_ADDRESS_NIBBLES, 16, QLatin1Char('0'))
+                     .toUpper();
+        } else {
+          text = QString::number(address).rightJustified(NUM_ADDRESS_NIBBLES,
+                                                         QLatin1Char('0'));
+        }
+        drawSubpixelText(image, text, 0.0, textBaseline, charWidth, frame.windowTextColor,
+                         dpr);
+      }
+
+      if (entry.bytes <= 0) {
+        continue;
+      }
+
+      for (int i = 0; i < entry.bytes; ++i) {
+        const auto& style = styleFor(entry.styles[i]);
+        const uint8_t value = entry.data[i];
+        char byteText[3] = {
+            kHexDigits[value >> 4],
+            kHexDigits[value & 0x0F],
+            '\0',
+        };
+        const qreal hexX = hexGlyphStartX + i * 3.0 * charWidth;
+        drawSubpixelText(image, QString::fromLatin1(byteText, 2), hexX, textBaseline,
+                         charWidth, style.fg, dpr);
+
+        if (frame.shouldDrawAscii) {
+          const char asciiChar = isPrintable(value) ? static_cast<char>(value) : '.';
+          const qreal asciiX = asciiStartX + i * charWidth;
+          drawSubpixelText(image, QString(QChar::fromLatin1(asciiChar)), asciiX,
+                           textBaseline, charWidth, style.fg, dpr);
+        }
+      }
+    }
+  }
+
   u->uploadTexture(m_contentTex, image);
   m_baseContentPixelSize = pixelSize;
   m_baseContentScrollY = frame.scrollY;
