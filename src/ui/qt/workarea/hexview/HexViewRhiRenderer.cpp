@@ -66,14 +66,7 @@ float pxToLogical(int px, float dpr) {
 
 struct LayoutMetrics {
   float dpr = 1.0f;
-  int charWidthPx = 0;
-  int charHalfWidthPx = 0;
-  int hexStartXPx = 0;
-  int hexGlyphStartXPx = 0;
-  int asciiStartXPx = 0;
-
   float charWidth = 0.0f;
-  float charHalfWidth = 0.0f;
   float lineHeight = 0.0f;
   float hexStartX = 0.0f;
   float hexGlyphStartX = 0.0f;
@@ -85,25 +78,24 @@ struct LayoutMetrics {
 LayoutMetrics computeLayoutMetrics(const HexViewFrame::Data& frame) {
   LayoutMetrics layout;
   layout.dpr = frame.dpr > 0.0 ? static_cast<float>(frame.dpr) : 1.0f;
-  layout.charWidthPx =
+  const int charWidthPx =
       std::max(1, static_cast<int>(std::round(static_cast<float>(frame.charWidth) * layout.dpr)));
-  layout.charHalfWidthPx = layout.charWidthPx / 2;
-  layout.hexStartXPx = frame.shouldDrawOffset
-                           ? ((NUM_ADDRESS_NIBBLES + ADDRESS_SPACING_CHARS) * layout.charWidthPx)
-                           : layout.charHalfWidthPx;
-  layout.hexGlyphStartXPx = layout.hexStartXPx + layout.charHalfWidthPx;
-  layout.asciiStartXPx = layout.hexGlyphStartXPx +
-                         ((BYTES_PER_LINE * 3 + HEX_TO_ASCII_SPACING_CHARS) * layout.charWidthPx);
+  const int charHalfWidthPx = charWidthPx / 2;
+  const int hexStartXPx = frame.shouldDrawOffset
+                              ? ((NUM_ADDRESS_NIBBLES + ADDRESS_SPACING_CHARS) * charWidthPx)
+                              : charHalfWidthPx;
+  const int hexGlyphStartXPx = hexStartXPx + charHalfWidthPx;
+  const int asciiStartXPx =
+      hexGlyphStartXPx + ((BYTES_PER_LINE * 3 + HEX_TO_ASCII_SPACING_CHARS) * charWidthPx);
 
-  layout.charWidth = pxToLogical(layout.charWidthPx, layout.dpr);
-  layout.charHalfWidth = pxToLogical(layout.charHalfWidthPx, layout.dpr);
+  layout.charWidth = pxToLogical(charWidthPx, layout.dpr);
   layout.lineHeight = static_cast<float>(frame.lineHeight);
-  layout.hexStartX = pxToLogical(layout.hexStartXPx, layout.dpr);
-  layout.hexGlyphStartX = pxToLogical(layout.hexGlyphStartXPx, layout.dpr);
-  layout.hexWidth = pxToLogical(BYTES_PER_LINE * 3 * layout.charWidthPx, layout.dpr);
-  layout.asciiStartX = pxToLogical(layout.asciiStartXPx, layout.dpr);
+  layout.hexStartX = pxToLogical(hexStartXPx, layout.dpr);
+  layout.hexGlyphStartX = pxToLogical(hexGlyphStartXPx, layout.dpr);
+  layout.hexWidth = pxToLogical(BYTES_PER_LINE * 3 * charWidthPx, layout.dpr);
+  layout.asciiStartX = pxToLogical(asciiStartXPx, layout.dpr);
   layout.asciiWidth =
-      frame.shouldDrawAscii ? pxToLogical(BYTES_PER_LINE * layout.charWidthPx, layout.dpr) : 0.0f;
+      frame.shouldDrawAscii ? pxToLogical(BYTES_PER_LINE * charWidthPx, layout.dpr) : 0.0f;
   return layout;
 }
 

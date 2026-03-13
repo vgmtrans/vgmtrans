@@ -49,8 +49,6 @@ struct Data {
   int scrollY = 0;
   int lineHeight = 0;
   int charWidth = 0;
-  int charHalfWidth = 0;
-  int hexStartX = 0;
   bool shouldDrawOffset = true;
   bool shouldDrawAscii = true;
   bool addressAsHex = true;

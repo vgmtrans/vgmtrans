@@ -126,7 +126,7 @@ QString tooltipHtmlWithIcon(VGMItem* item) {
 }
 
 #ifdef Q_OS_WIN
-constexpr int HEX_GLYPH_VERTICAL_ALPHA_THRESHOLD = 48;
+constexpr int HEX_GLYPH_VERTICAL_ALPHA_THRESHOLD = 196;
 
 struct GlyphVerticalBounds {
   int top = -1;
@@ -903,8 +903,6 @@ void HexView::ensureGlyphAtlas(qreal dpr) {
   m_glyphAtlas->dpr = dpr;
   m_glyphAtlas->glyphWidth = m_charWidth;
   m_glyphAtlas->glyphHeight = m_lineHeight;
-  m_glyphAtlas->cellWidth = cellWidth;
-  m_glyphAtlas->cellHeight = cellHeight;
   m_glyphAtlas->font = font();
   m_glyphAtlas->version++;
 
@@ -968,8 +966,6 @@ HexViewFrame::Data HexView::captureRhiFrameData(float dpr) {
   frame.scrollY = scrollYForRender();
   frame.lineHeight = m_lineHeight;
   frame.charWidth = m_charWidth;
-  frame.charHalfWidth = m_charHalfWidth;
-  frame.hexStartX = hexXOffset();
   frame.shouldDrawOffset = m_shouldDrawOffset;
   frame.shouldDrawAscii = m_shouldDrawAscii;
   frame.addressAsHex = m_addressAsHex;

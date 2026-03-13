@@ -101,8 +101,6 @@ private:
     qreal dpr = 0.0;
     int glyphWidth = 0;
     int glyphHeight = 0;
-    int cellWidth = 0;
-    int cellHeight = 0;
     uint64_t version = 0;
     QFont font;
   };
