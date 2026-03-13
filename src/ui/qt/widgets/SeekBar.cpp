@@ -5,14 +5,9 @@
  */
 
 #include "SeekBar.h"
-
-#include <cmath>
-
-#include <QEvent>
 #include <QMouseEvent>
 #include <QPalette>
 #include <QPainter>
-
 #include <algorithm>
 
 namespace {
@@ -22,41 +17,6 @@ constexpr qreal TRACK_RADIUS = TRACK_THICKNESS * 0.5;
 constexpr qreal HORIZONTAL_THUMB_Y_OFFSET = 1.0;
 constexpr qreal DISPLAY_STEPS_PER_DEVICE_PIXEL = 2.0;
 constexpr int DIRTY_PADDING = 2;
-
-bool isDarkPalette(const QPalette& palette) {
-  return palette.color(QPalette::Window).lightnessF() < 0.5;
-}
-
-QColor trackColorFor(const QPalette& palette, bool enabled) {
-  const QColor window = palette.color(QPalette::Window);
-  if (isDarkPalette(palette)) {
-    return window.lighter(enabled ? 150 : 125);
-  }
-  return window.darker(enabled ? 125 : 120);
-}
-
-QColor fillColorFor(const QPalette& palette, bool enabled) {
-  const QColor window = palette.color(QPalette::Window);
-  if (isDarkPalette(palette)) {
-    return window.lighter(enabled ? 225 : 150);
-  }
-  return window.darker(enabled ? 145 : 132);
-}
-
-QColor thumbColorFor(const QPalette& palette, bool enabled) {
-  const QColor window = palette.color(QPalette::Window);
-  if (isDarkPalette(palette)) {
-    return window.lighter(enabled ? 350 : 250);
-  }
-  return window.lighter(enabled ? 150 : 102);//(darker(enabled ? 130 : 120);
-}
-
-QPen thumbPenFor(const QPalette& palette, bool enabled) {
-  QPen pen = QPen(QColor(0, 0, 0, isDarkPalette(palette) ? 55 : 100));
-  pen.setWidth(1);
-  pen.setCosmetic(true);
-  return pen;
-}
 }
 
 SeekBar::SeekBar(QWidget* parent) : QWidget(parent) {
@@ -77,7 +37,7 @@ void SeekBar::setRange(int minimum, int maximum) {
   }
 
   m_minimum = minimum;
-  m_maximum = std::max(minimum, maximum);
+  m_maximum = maximum;
   m_value = std::clamp(m_value, m_minimum, m_maximum);
   update();
 }
@@ -183,10 +143,20 @@ void SeekBar::paintEvent(QPaintEvent* event) {
 void SeekBar::refreshCachedColors() {
   // Cache palette-derived tones so playback repaint work stays down to geometry only.
   const QPalette palette = this->palette();
-  m_trackColor = trackColorFor(palette, isEnabled());
-  m_fillColor = fillColorFor(palette, isEnabled());
-  m_thumbColor = thumbColorFor(palette, isEnabled());
-  m_thumbPen = thumbPenFor(palette, isEnabled());
+  const QColor window = palette.color(QPalette::Window);
+  const bool enabled = isEnabled();
+  const bool darkPalette = window.lightnessF() < 0.5;
+
+  m_trackColor = darkPalette ? window.lighter(enabled ? 150 : 125)
+                             : window.darker(enabled ? 125 : 120);
+  m_fillColor = darkPalette ? window.lighter(enabled ? 225 : 150)
+                            : window.darker(enabled ? 145 : 132);
+  m_thumbColor = darkPalette ? window.lighter(enabled ? 350 : 250)
+                             : window.lighter(enabled ? 150 : 102);
+
+  m_thumbPen = QPen(QColor(0, 0, 0, darkPalette ? 55 : 100));
+  m_thumbPen.setWidth(1);
+  m_thumbPen.setCosmetic(true);
 }
 
 QRectF SeekBar::trackRect() const {
