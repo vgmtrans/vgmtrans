@@ -64,18 +64,19 @@ float pxToLogical(int px, float dpr) {
   return dpr > 0.0f ? (static_cast<float>(px) / dpr) : static_cast<float>(px);
 }
 
-struct LayoutMetrics {
-  float dpr = 1.0f;
-  float charWidth = 0.0f;
-  float lineHeight = 0.0f;
-  float hexStartX = 0.0f;
-  float hexGlyphStartX = 0.0f;
-  float hexWidth = 0.0f;
-  float asciiStartX = 0.0f;
-  float asciiWidth = 0.0f;
-};
+QShader loadShader(const char* path) {
+  QFile file(QString::fromUtf8(path));
+  if (!file.open(QIODevice::ReadOnly)) {
+    qWarning("Failed to load shader: %s", path);
+    return {};
+  }
+  return QShader::fromSerialized(file.readAll());
+}
 
-LayoutMetrics computeLayoutMetrics(const HexViewFrame::Data& frame) {
+}  // namespace
+
+HexViewRhiRenderer::LayoutMetrics HexViewRhiRenderer::computeLayoutMetrics(
+    const HexViewFrame::Data& frame) {
   LayoutMetrics layout;
   layout.dpr = frame.dpr > 0.0 ? static_cast<float>(frame.dpr) : 1.0f;
   const int charWidthPx =
@@ -98,17 +99,6 @@ LayoutMetrics computeLayoutMetrics(const HexViewFrame::Data& frame) {
       frame.shouldDrawAscii ? pxToLogical(BYTES_PER_LINE * charWidthPx, layout.dpr) : 0.0f;
   return layout;
 }
-
-QShader loadShader(const char* path) {
-  QFile file(QString::fromUtf8(path));
-  if (!file.open(QIODevice::ReadOnly)) {
-    qWarning("Failed to load shader: %s", path);
-    return {};
-  }
-  return QShader::fromSerialized(file.readAll());
-}
-
-}  // namespace
 
 // Construct renderer state; GPU resources are created lazily in initIfNeeded().
 HexViewRhiRenderer::HexViewRhiRenderer(HexView* view, const char* logLabel)
@@ -300,15 +290,16 @@ void HexViewRhiRenderer::renderFrame(QRhiCommandBuffer* cb, const RenderTargetIn
   }
 
   ensureCacheWindow(startLine, endLine, totalLines, frame);
+  const LayoutMetrics layout = computeLayoutMetrics(frame);
 
   if (m_baseDirty) {
-    buildBaseInstances(frame);
+    buildBaseInstances(frame, layout);
     m_baseDirty = false;
     m_baseBufferDirty = true;
   }
 
   if (m_selectionDirty) {
-    buildSelectionInstances(startLine, endLine, frame);
+    buildSelectionInstances(startLine, endLine, frame, layout);
     m_selectionDirty = false;
     m_selectionBufferDirty = true;
   }
@@ -320,7 +311,6 @@ void HexViewRhiRenderer::renderFrame(QRhiCommandBuffer* cb, const RenderTargetIn
     m_staticBuffersUploaded = true;
   }
   ensureGlyphTexture(u, frame);
-  const LayoutMetrics layout = computeLayoutMetrics(frame);
   const float minCell = std::min(layout.charWidth, layout.lineHeight);
   const bool outlineAllowed = minCell >= OUTLINE_MIN_CELL_PX;
   const float nowSeconds = m_animTimer.isValid() ? (m_animTimer.elapsed() / 1000.0f) : 0.0f;
@@ -356,7 +346,7 @@ void HexViewRhiRenderer::renderFrame(QRhiCommandBuffer* cb, const RenderTargetIn
     updateCompositeSrb();
     m_compositeSrbDirty = false;
   }
-  updateUniforms(u, static_cast<float>(scrollY), target.pixelSize, frame);
+  updateUniforms(u, static_cast<float>(scrollY), target.pixelSize, frame, layout);
   updateInstanceBuffers(u);
 
   int baseRectFirst = 0;
@@ -803,7 +793,8 @@ void HexViewRhiRenderer::updateCompositeSrb() {
 // Upload per-frame transforms and effect/shader parameters to uniform buffers.
 void HexViewRhiRenderer::updateUniforms(QRhiResourceUpdateBatch* u, float scrollY,
                                         const QSize& pixelSize,
-                                        const HexViewFrame::Data& frame) {
+                                        const HexViewFrame::Data& frame,
+                                        const LayoutMetrics& layout) {
   const QSize viewSize = frame.viewportSize;
   const float uvFlipY = m_rhi->isYUpInFramebuffer() ? 0.0f : 1.0f;
   const float timeSeconds = m_animTimer.isValid() ? (m_animTimer.elapsed() / 1000.0f) : 0.0f;
@@ -822,7 +813,6 @@ void HexViewRhiRenderer::updateUniforms(QRhiResourceUpdateBatch* u, float scroll
   u->updateDynamicBuffer(m_ubuf, kMat4Bytes, kVec4Bytes, &snapInfo);
 
   QMatrix4x4 screenMvp = m_rhi->clipSpaceCorrMatrix();
-  const LayoutMetrics layout = computeLayoutMetrics(frame);
   const float dpr = layout.dpr;
 
   const float viewW = static_cast<float>(viewSize.width());
@@ -1152,7 +1142,8 @@ const HexViewRhiRenderer::CachedLine* HexViewRhiRenderer::cachedLineFor(int line
 }
 
 // Build base background and glyph instance streams from cached file lines.
-void HexViewRhiRenderer::buildBaseInstances(const HexViewFrame::Data& frame) {
+void HexViewRhiRenderer::buildBaseInstances(const HexViewFrame::Data& frame,
+                                            const LayoutMetrics& layout) {
   m_baseRectInstances.clear();
   m_baseGlyphInstances.clear();
   m_lineRanges.clear();
@@ -1168,7 +1159,6 @@ void HexViewRhiRenderer::buildBaseInstances(const HexViewFrame::Data& frame) {
   const QColor clearColor = frame.windowColor;
   const QVector4D addressColor = toVec4(frame.windowTextColor);
 
-  const LayoutMetrics layout = computeLayoutMetrics(frame);
   const float charWidth = layout.charWidth;
   const float lineHeight = layout.lineHeight;
   const float hexStartX = layout.hexStartX;
@@ -1441,7 +1431,8 @@ void HexViewRhiRenderer::appendMaskForSelections(
 
 // Build all selection/playback mask and edge instances for the current viewport.
 void HexViewRhiRenderer::buildSelectionInstances(int startLine, int endLine,
-                                                 const HexViewFrame::Data& frame) {
+                                                 const HexViewFrame::Data& frame,
+                                                 const LayoutMetrics& layout) {
   m_maskRectInstances.clear();
   m_edgeRectInstances.clear();
 
@@ -1460,7 +1451,6 @@ void HexViewRhiRenderer::buildSelectionInstances(int startLine, int endLine,
   m_maskRectInstances.reserve(static_cast<size_t>(visibleCount) * (frame.shouldDrawAscii ? 8 : 4));
   m_edgeRectInstances.reserve(static_cast<size_t>(visibleCount) * (frame.shouldDrawAscii ? 8 : 4));
 
-  const LayoutMetrics layout = computeLayoutMetrics(frame);
   const float charWidth = layout.charWidth;
   const float lineHeight = layout.lineHeight;
   SelectionBuildContext ctx;

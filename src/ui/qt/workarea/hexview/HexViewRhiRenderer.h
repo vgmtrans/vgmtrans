@@ -142,16 +142,28 @@ private:
     bool shouldDrawAscii = false;
   };
 
+  struct LayoutMetrics {
+    float dpr = 1.0f;
+    float charWidth = 0.0f;
+    float lineHeight = 0.0f;
+    float hexStartX = 0.0f;
+    float hexGlyphStartX = 0.0f;
+    float hexWidth = 0.0f;
+    float asciiStartX = 0.0f;
+    float asciiWidth = 0.0f;
+  };
+
   void ensureRenderTargets(const QSize& pixelSize);
   void releaseRenderTargets();
 
+  static LayoutMetrics computeLayoutMetrics(const HexViewFrame::Data& frame);
   void ensurePipelines(QRhiRenderPassDescriptor* outputRp, int outputSampleCount);
   void ensureGlyphTexture(QRhiResourceUpdateBatch* u, const HexViewFrame::Data& frame);
   void ensureItemIdTexture(QRhiResourceUpdateBatch* u, int startLine, int endLine, int totalLines,
                            const HexViewFrame::Data& frame);
   void updateCompositeSrb();
   void updateUniforms(QRhiResourceUpdateBatch* u, float scrollY, const QSize& pixelSize,
-                      const HexViewFrame::Data& frame);
+                      const HexViewFrame::Data& frame, const LayoutMetrics& layout);
   bool ensureInstanceBuffer(QRhiBuffer*& buffer, int bytes);
   void updateInstanceBuffers(QRhiResourceUpdateBatch* u);
   void drawRectBuffer(QRhiCommandBuffer* cb, QRhiBuffer* buffer, int count,
@@ -197,8 +209,9 @@ private:
                                float edgePad,
                                const QVector4D& maskColor,
                                const QVector4D& edgeColor);
-  void buildBaseInstances(const HexViewFrame::Data& frame);
-  void buildSelectionInstances(int startLine, int endLine, const HexViewFrame::Data& frame);
+  void buildBaseInstances(const HexViewFrame::Data& frame, const LayoutMetrics& layout);
+  void buildSelectionInstances(int startLine, int endLine, const HexViewFrame::Data& frame,
+                               const LayoutMetrics& layout);
 
   HexView* m_view = nullptr;
   const char* m_logLabel = "HexViewRhi";
