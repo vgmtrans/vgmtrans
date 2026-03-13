@@ -37,7 +37,7 @@ QColor trackColorFor(const QPalette& palette, bool enabled) {
 QColor fillColorFor(const QPalette& palette, bool enabled) {
   const QColor window = palette.color(QPalette::Window);
   if (isDarkPalette(palette)) {
-    return window.lighter(enabled ? 250 : 200);
+    return window.lighter(enabled ? 250 : 150);
   }
   return window.darker(enabled ? 145 : 132);
 }
@@ -51,7 +51,7 @@ QColor thumbColorFor(const QPalette& palette, bool enabled) {
 }
 
 QPen thumbPenFor(const QPalette& palette, bool enabled) {
-  QPen pen( QColor(0, 0, 0, 55) );
+  QPen pen = QPen(QColor(0, 0, 0, isDarkPalette(palette) ? 55 : 100));
   pen.setWidth(1);
   pen.setCosmetic(true);
   return pen;
@@ -251,8 +251,7 @@ int SeekBar::valueForPosition(const QPointF& pos) const {
     ratio = track.height() > 0.0 ? (track.bottom() - y) / track.height() : 0.0;
   }
 
-  return m_minimum +
-         static_cast<int>(std::lround(ratio * static_cast<qreal>(m_maximum - m_minimum)));
+  return m_minimum + static_cast<int>(std::lround(ratio * static_cast<qreal>(m_maximum - m_minimum)));
 }
 
 QRect SeekBar::dirtyRectForValues(int oldValue, int newValue) const {
