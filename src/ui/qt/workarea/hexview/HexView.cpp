@@ -67,17 +67,12 @@ constexpr uint16_t STYLE_UNASSIGNED = std::numeric_limits<uint16_t>::max();
 struct WidgetLayoutMetrics {
   qreal dpr = 1.0;
   int charWidthPx = 0;
-  int charHalfWidthPx = 0;
   int addressEndPx = 0;
   int hexStartPx = 0;
   int hexEndPx = 0;
   int asciiStartPx = 0;
   int asciiEndPx = 0;
 };
-
-qreal effectiveDpr(const QWidget* widget) {
-  return widget ? std::max<qreal>(widget->devicePixelRatioF(), 1.0) : 1.0;
-}
 
 int devicePxToLogicalCeil(int px, qreal dpr) {
   return dpr > 0.0 ? static_cast<int>(std::ceil(static_cast<qreal>(px) / dpr)) : px;
@@ -87,18 +82,19 @@ int logicalToDevicePx(int logicalPx, qreal dpr) {
   return static_cast<int>(std::floor(static_cast<qreal>(logicalPx) * dpr));
 }
 
-WidgetLayoutMetrics computeWidgetLayoutMetrics(int charWidth, bool shouldDrawOffset, qreal dpr) {
+WidgetLayoutMetrics computeWidgetLayoutMetrics(const QWidget* widget, int charWidth,
+                                               bool shouldDrawOffset) {
   WidgetLayoutMetrics layout;
-  layout.dpr = dpr > 0.0 ? dpr : 1.0;
+  layout.dpr = widget ? std::max<qreal>(widget->devicePixelRatioF(), 1.0) : 1.0;
   layout.charWidthPx = std::max(1, static_cast<int>(std::round(charWidth * layout.dpr)));
-  layout.charHalfWidthPx = layout.charWidthPx / 2;
+  const int charHalfWidthPx = layout.charWidthPx / 2;
   layout.addressEndPx = NUM_ADDRESS_NIBBLES * layout.charWidthPx;
   layout.hexStartPx = shouldDrawOffset
                           ? ((NUM_ADDRESS_NIBBLES + ADDRESS_SPACING_CHARS) * layout.charWidthPx)
-                          : layout.charHalfWidthPx;
+                          : charHalfWidthPx;
   layout.hexEndPx = layout.hexStartPx + (BYTES_PER_LINE * 3 * layout.charWidthPx);
   layout.asciiStartPx =
-      layout.hexEndPx + (HEX_TO_ASCII_SPACING_CHARS * layout.charWidthPx) + layout.charHalfWidthPx;
+      layout.hexEndPx + (HEX_TO_ASCII_SPACING_CHARS * layout.charWidthPx) + charHalfWidthPx;
   layout.asciiEndPx = layout.asciiStartPx + (BYTES_PER_LINE * layout.charWidthPx);
   return layout;
 }
@@ -455,14 +451,9 @@ void HexView::setFont(const QFont& font) {
 
   fontMetrics = QFontMetricsF(adjustedFont);
   m_charWidth = static_cast<int>(std::round(fontMetrics.horizontalAdvance("A")));
-  m_charHalfWidth = static_cast<int>(std::round(fontMetrics.horizontalAdvance("A") / 2.0));
   m_lineHeight = static_cast<int>(std::round(fontMetrics.height()));
 
   QAbstractScrollArea::setFont(adjustedFont);
-
-  m_virtual_full_width = -1;
-  m_virtual_width_sans_ascii = -1;
-  m_virtual_width_sans_ascii_and_address = -1;
 
   if (m_glyphAtlas) {
     m_glyphAtlas->dpr = 0.0;
@@ -475,7 +466,7 @@ void HexView::setFont(const QFont& font) {
 // Return X origin of the hex byte columns (accounting for optional address column).
 int HexView::hexXOffset() const {
   const WidgetLayoutMetrics layout =
-      computeWidgetLayoutMetrics(m_charWidth, m_shouldDrawOffset, effectiveDpr(viewport()));
+      computeWidgetLayoutMetrics(viewport(), m_charWidth, m_shouldDrawOffset);
   return devicePxToLogicalCeil(layout.hexStartPx, layout.dpr);
 }
 
@@ -493,7 +484,7 @@ int HexView::getVirtualFullWidth() const {
   constexpr int numChars = NUM_ADDRESS_NIBBLES + ADDRESS_SPACING_CHARS + (BYTES_PER_LINE * 3) +
                            HEX_TO_ASCII_SPACING_CHARS + BYTES_PER_LINE;
   const WidgetLayoutMetrics layout =
-      computeWidgetLayoutMetrics(m_charWidth, m_shouldDrawOffset, effectiveDpr(viewport()));
+      computeWidgetLayoutMetrics(viewport(), m_charWidth, m_shouldDrawOffset);
   return devicePxToLogicalCeil(numChars * layout.charWidthPx, layout.dpr) + SELECTION_PADDING;
 }
 
@@ -501,7 +492,7 @@ int HexView::getVirtualFullWidth() const {
 int HexView::getVirtualWidthSansAscii() const {
   constexpr int numChars = NUM_ADDRESS_NIBBLES + ADDRESS_SPACING_CHARS + (BYTES_PER_LINE * 3);
   const WidgetLayoutMetrics layout =
-      computeWidgetLayoutMetrics(m_charWidth, m_shouldDrawOffset, effectiveDpr(viewport()));
+      computeWidgetLayoutMetrics(viewport(), m_charWidth, m_shouldDrawOffset);
   return devicePxToLogicalCeil(numChars * layout.charWidthPx, layout.dpr) + SELECTION_PADDING;
 }
 
@@ -509,7 +500,7 @@ int HexView::getVirtualWidthSansAscii() const {
 int HexView::getVirtualWidthSansAsciiAndAddress() const {
   constexpr int numChars = (BYTES_PER_LINE * 3) + 2;
   const WidgetLayoutMetrics layout =
-      computeWidgetLayoutMetrics(m_charWidth, m_shouldDrawOffset, effectiveDpr(viewport()));
+      computeWidgetLayoutMetrics(viewport(), m_charWidth, m_shouldDrawOffset);
   return devicePxToLogicalCeil(numChars * layout.charWidthPx, layout.dpr);
 }
 
@@ -1173,7 +1164,7 @@ int HexView::getOffsetFromPoint(QPoint pos) const {
   }
 
   const WidgetLayoutMetrics layout =
-      computeWidgetLayoutMetrics(m_charWidth, m_shouldDrawOffset, effectiveDpr(viewport()));
+      computeWidgetLayoutMetrics(viewport(), m_charWidth, m_shouldDrawOffset);
   const int xPx = logicalToDevicePx(pos.x(), layout.dpr);
 
   int byteNum = -1;
@@ -1338,7 +1329,7 @@ void HexView::mouseMoveEvent(QMouseEvent* event) {
 void HexView::mouseDoubleClickEvent(QMouseEvent* event) {
   if (event->button() == Qt::LeftButton) {
     const WidgetLayoutMetrics layout =
-        computeWidgetLayoutMetrics(m_charWidth, m_shouldDrawOffset, effectiveDpr(viewport()));
+        computeWidgetLayoutMetrics(viewport(), m_charWidth, m_shouldDrawOffset);
     const int xPx = logicalToDevicePx(event->pos().x(), layout.dpr);
     if (m_shouldDrawOffset && xPx >= 0 && xPx < layout.addressEndPx) {
       m_addressAsHex = !m_addressAsHex;
