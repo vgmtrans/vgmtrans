@@ -64,6 +64,45 @@ const QColor PLAYBACK_GLOW_LOW(40, 40, 40);
 const QColor PLAYBACK_GLOW_HIGH(230, 230, 230);
 constexpr uint16_t STYLE_UNASSIGNED = std::numeric_limits<uint16_t>::max();
 
+struct WidgetLayoutMetrics {
+  qreal dpr = 1.0;
+  int charWidthPx = 0;
+  int charHalfWidthPx = 0;
+  int addressEndPx = 0;
+  int hexStartPx = 0;
+  int hexEndPx = 0;
+  int asciiStartPx = 0;
+  int asciiEndPx = 0;
+};
+
+qreal effectiveDpr(const QWidget* widget) {
+  return widget ? std::max<qreal>(widget->devicePixelRatioF(), 1.0) : 1.0;
+}
+
+int devicePxToLogicalCeil(int px, qreal dpr) {
+  return dpr > 0.0 ? static_cast<int>(std::ceil(static_cast<qreal>(px) / dpr)) : px;
+}
+
+int logicalToDevicePx(int logicalPx, qreal dpr) {
+  return static_cast<int>(std::floor(static_cast<qreal>(logicalPx) * dpr));
+}
+
+WidgetLayoutMetrics computeWidgetLayoutMetrics(int charWidth, bool shouldDrawOffset, qreal dpr) {
+  WidgetLayoutMetrics layout;
+  layout.dpr = dpr > 0.0 ? dpr : 1.0;
+  layout.charWidthPx = std::max(1, static_cast<int>(std::round(charWidth * layout.dpr)));
+  layout.charHalfWidthPx = layout.charWidthPx / 2;
+  layout.addressEndPx = NUM_ADDRESS_NIBBLES * layout.charWidthPx;
+  layout.hexStartPx = shouldDrawOffset
+                          ? ((NUM_ADDRESS_NIBBLES + ADDRESS_SPACING_CHARS) * layout.charWidthPx)
+                          : layout.charHalfWidthPx;
+  layout.hexEndPx = layout.hexStartPx + (BYTES_PER_LINE * 3 * layout.charWidthPx);
+  layout.asciiStartPx =
+      layout.hexEndPx + (HEX_TO_ASCII_SPACING_CHARS * layout.charWidthPx) + layout.charHalfWidthPx;
+  layout.asciiEndPx = layout.asciiStartPx + (BYTES_PER_LINE * layout.charWidthPx);
+  return layout;
+}
+
 #ifdef Q_OS_MAC
 class NonTransientScrollBarStyle final : public QProxyStyle {
 public:
@@ -435,7 +474,9 @@ void HexView::setFont(const QFont& font) {
 
 // Return X origin of the hex byte columns (accounting for optional address column).
 int HexView::hexXOffset() const {
-  return m_shouldDrawOffset ? ((NUM_ADDRESS_NIBBLES + ADDRESS_SPACING_CHARS) * m_charWidth) : m_charHalfWidth;
+  const WidgetLayoutMetrics layout =
+      computeWidgetLayoutMetrics(m_charWidth, m_shouldDrawOffset, effectiveDpr(viewport()));
+  return devicePxToLogicalCeil(layout.hexStartPx, layout.dpr);
 }
 
 HexView::DragMode HexView::dragModeForModifiers(Qt::KeyboardModifiers mods) {
@@ -449,30 +490,27 @@ int HexView::getVirtualHeight() const {
 
 // Compute full virtual content width (address + hex + ascii).
 int HexView::getVirtualFullWidth() const {
-  if (m_virtual_full_width == -1) {
-    constexpr int numChars = NUM_ADDRESS_NIBBLES + ADDRESS_SPACING_CHARS + (BYTES_PER_LINE * 3) +
-                             HEX_TO_ASCII_SPACING_CHARS + BYTES_PER_LINE;
-    m_virtual_full_width = (numChars * m_charWidth) + SELECTION_PADDING;
-  }
-  return m_virtual_full_width;
+  constexpr int numChars = NUM_ADDRESS_NIBBLES + ADDRESS_SPACING_CHARS + (BYTES_PER_LINE * 3) +
+                           HEX_TO_ASCII_SPACING_CHARS + BYTES_PER_LINE;
+  const WidgetLayoutMetrics layout =
+      computeWidgetLayoutMetrics(m_charWidth, m_shouldDrawOffset, effectiveDpr(viewport()));
+  return devicePxToLogicalCeil(numChars * layout.charWidthPx, layout.dpr) + SELECTION_PADDING;
 }
 
 // Compute virtual width when ASCII column is hidden.
 int HexView::getVirtualWidthSansAscii() const {
-  if (m_virtual_width_sans_ascii == -1) {
-    constexpr int numChars = NUM_ADDRESS_NIBBLES + ADDRESS_SPACING_CHARS + (BYTES_PER_LINE * 3);
-    m_virtual_width_sans_ascii = (numChars * m_charWidth) + SELECTION_PADDING;
-  }
-  return m_virtual_width_sans_ascii;
+  constexpr int numChars = NUM_ADDRESS_NIBBLES + ADDRESS_SPACING_CHARS + (BYTES_PER_LINE * 3);
+  const WidgetLayoutMetrics layout =
+      computeWidgetLayoutMetrics(m_charWidth, m_shouldDrawOffset, effectiveDpr(viewport()));
+  return devicePxToLogicalCeil(numChars * layout.charWidthPx, layout.dpr) + SELECTION_PADDING;
 }
 
 // Compute virtual width when both ASCII and address columns are hidden.
 int HexView::getVirtualWidthSansAsciiAndAddress() const {
-  if (m_virtual_width_sans_ascii_and_address == -1) {
-    constexpr int numChars = BYTES_PER_LINE * 3;
-    m_virtual_width_sans_ascii_and_address = (numChars * m_charWidth) + (m_charWidth * 2);
-  }
-  return m_virtual_width_sans_ascii_and_address;
+  constexpr int numChars = (BYTES_PER_LINE * 3) + 2;
+  const WidgetLayoutMetrics layout =
+      computeWidgetLayoutMetrics(m_charWidth, m_shouldDrawOffset, effectiveDpr(viewport()));
+  return devicePxToLogicalCeil(numChars * layout.charWidthPx, layout.dpr);
 }
 
 // Return active virtual width for the current column-visibility mode.
@@ -1134,16 +1172,15 @@ int HexView::getOffsetFromPoint(QPoint pos) const {
     return -1;
   }
 
-  const int hexStart = hexXOffset();
-  const int hexEnd = hexStart + (BYTES_PER_LINE * 3 * m_charWidth);
-  const int asciiStart = hexEnd + (HEX_TO_ASCII_SPACING_CHARS * m_charWidth) + m_charHalfWidth;
-  const int asciiEnd = asciiStart + (BYTES_PER_LINE * m_charWidth);
+  const WidgetLayoutMetrics layout =
+      computeWidgetLayoutMetrics(m_charWidth, m_shouldDrawOffset, effectiveDpr(viewport()));
+  const int xPx = logicalToDevicePx(pos.x(), layout.dpr);
 
   int byteNum = -1;
-  if (pos.x() >= hexStart && pos.x() < hexEnd) {
-    byteNum = ((pos.x() - hexStart) / m_charWidth) / 3;
-  } else if (pos.x() >= asciiStart && pos.x() < asciiEnd) {
-    byteNum = (pos.x() - asciiStart) / m_charWidth;
+  if (xPx >= layout.hexStartPx && xPx < layout.hexEndPx) {
+    byteNum = ((xPx - layout.hexStartPx) / layout.charWidthPx) / 3;
+  } else if (xPx >= layout.asciiStartPx && xPx < layout.asciiEndPx) {
+    byteNum = (xPx - layout.asciiStartPx) / layout.charWidthPx;
   }
   if (byteNum == -1) {
     return -1;
@@ -1300,8 +1337,10 @@ void HexView::mouseMoveEvent(QMouseEvent* event) {
 // Toggle address display radix when double-clicking in the address column.
 void HexView::mouseDoubleClickEvent(QMouseEvent* event) {
   if (event->button() == Qt::LeftButton) {
-    if (m_shouldDrawOffset && event->pos().x() >= 0 &&
-        event->pos().x() < (NUM_ADDRESS_NIBBLES * m_charWidth)) {
+    const WidgetLayoutMetrics layout =
+        computeWidgetLayoutMetrics(m_charWidth, m_shouldDrawOffset, effectiveDpr(viewport()));
+    const int xPx = logicalToDevicePx(event->pos().x(), layout.dpr);
+    if (m_shouldDrawOffset && xPx >= 0 && xPx < layout.addressEndPx) {
       m_addressAsHex = !m_addressAsHex;
       requestRhiUpdate(true);
     }
