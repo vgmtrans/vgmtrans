@@ -37,7 +37,7 @@ QColor trackColorFor(const QPalette& palette, bool enabled) {
 QColor fillColorFor(const QPalette& palette, bool enabled) {
   const QColor window = palette.color(QPalette::Window);
   if (isDarkPalette(palette)) {
-    return window.lighter(enabled ? 250 : 150);
+    return window.lighter(enabled ? 225 : 150);
   }
   return window.darker(enabled ? 145 : 132);
 }
