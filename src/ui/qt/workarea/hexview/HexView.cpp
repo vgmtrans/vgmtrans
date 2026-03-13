@@ -190,7 +190,7 @@ bool isHexColumnGlyph(QChar glyph) {
 }
 
 // Find the visible top/bottom rows in the raw glyph mask, ignoring faint pixels
-// so we can center the body of hex glyphs more consistently inside the atlas cell.
+// so we can place the visible body of hex glyphs without following AA fringe.
 GlyphVerticalBounds visibleVerticalBounds(const QImage& image, int alphaThreshold) {
   GlyphVerticalBounds bounds;
 
@@ -867,9 +867,7 @@ void HexView::ensureGlyphAtlas(qreal dpr) {
               if (bounds.top >= 0 && bounds.bottom >= bounds.top) {
                 const int bodyHeightPx = bounds.bottom - bounds.top + 1;
                 if (bodyHeightPx > 0 && bodyHeightPx <= glyphHeightPx) {
-                  glyphTopY = paddingPx +
-                              static_cast<int>(std::lround((glyphHeightPx - bodyHeightPx) / 2.0)) -
-                              bounds.top;
+                  glyphTopY = paddingPx + glyphHeightPx - 1 - bounds.bottom;
                 }
               }
             }
