@@ -58,10 +58,8 @@ QPen thumbPenFor(const QPalette& palette, bool enabled) {
 }
 }
 
-SeekBar::SeekBar(Qt::Orientation orientation, QWidget* parent)
-    : QWidget(parent), m_orientation(orientation) {
-  setSizePolicy(m_orientation == Qt::Horizontal ? QSizePolicy::Expanding : QSizePolicy::Fixed,
-                m_orientation == Qt::Horizontal ? QSizePolicy::Fixed : QSizePolicy::Expanding);
+SeekBar::SeekBar(QWidget* parent) : QWidget(parent) {
+  setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
   setCursor(Qt::PointingHandCursor);
   setFocusPolicy(Qt::NoFocus);
   setAttribute(Qt::WA_NoSystemBackground);
@@ -99,10 +97,7 @@ void SeekBar::setValue(int value) {
 }
 
 QSize SeekBar::sizeHint() const {
-  if (m_orientation == Qt::Horizontal) {
-    return QSize(160, 26);
-  }
-  return QSize(26, 160);
+  return QSize(160, 26);
 }
 
 void SeekBar::changeEvent(QEvent* event) {
@@ -169,11 +164,7 @@ void SeekBar::paintEvent(QPaintEvent* event) {
   if (m_maximum > m_minimum) {
     const qreal thumbCenter = thumbCenterForValue(m_value);
     QRectF played = track;
-    if (m_orientation == Qt::Horizontal) {
-      played.setRight(std::max(track.left(), thumbCenter));
-    } else {
-      played.setTop(std::min(track.bottom(), thumbCenter));
-    }
+    played.setRight(std::max(track.left(), thumbCenter));
     if (played.width() > 0.0 && played.height() > 0.0) {
       painter.setBrush(m_fillColor);
       painter.drawRoundedRect(played, TRACK_RADIUS, TRACK_RADIUS);
@@ -182,15 +173,10 @@ void SeekBar::paintEvent(QPaintEvent* event) {
 
   painter.setBrush(m_thumbColor);
   painter.setPen(m_thumbPen);
-  if (m_orientation == Qt::Horizontal) {
-    const qreal centerX = thumbCenterForValue(m_value);
-    painter.drawEllipse(QPointF(centerX, rect().center().y() + HORIZONTAL_THUMB_Y_OFFSET),
-                        THUMB_RADIUS,
-                        THUMB_RADIUS);
-  } else {
-    const qreal centerY = thumbCenterForValue(m_value);
-    painter.drawEllipse(QPointF(rect().center().x(), centerY), THUMB_RADIUS, THUMB_RADIUS);
-  }
+  const qreal centerX = thumbCenterForValue(m_value);
+  painter.drawEllipse(QPointF(centerX, rect().center().y() + HORIZONTAL_THUMB_Y_OFFSET),
+                      THUMB_RADIUS,
+                      THUMB_RADIUS);
 }
 
 void SeekBar::refreshCachedColors() {
@@ -204,30 +190,21 @@ void SeekBar::refreshCachedColors() {
 
 QRectF SeekBar::trackRect() const {
   // Reserve thumb radius at both ends so the handle stays fully inside the widget.
-  if (m_orientation == Qt::Horizontal) {
-    const qreal left = THUMB_RADIUS;
-    const qreal width = std::max<qreal>(0.0, rect().width() - THUMB_RADIUS * 2.0);
-    return QRectF(left, (rect().height() - TRACK_THICKNESS) * 0.5, width, TRACK_THICKNESS);
-  }
-
-  const qreal top = THUMB_RADIUS;
-  const qreal height = std::max<qreal>(0.0, rect().height() - THUMB_RADIUS * 2.0);
-  return QRectF((rect().width() - TRACK_THICKNESS) * 0.5, top, TRACK_THICKNESS, height);
+  const qreal left = THUMB_RADIUS;
+  const qreal width = std::max<qreal>(0.0, rect().width() - THUMB_RADIUS * 2.0);
+  return QRectF(left, (rect().height() - TRACK_THICKNESS) * 0.5, width, TRACK_THICKNESS);
 }
 
 qreal SeekBar::thumbCenterForValue(int value) const {
   // Map the logical range into track coordinates without involving style metrics.
   const QRectF track = trackRect();
   if (m_maximum <= m_minimum) {
-    return m_orientation == Qt::Horizontal ? track.left() : track.bottom();
+    return track.left();
   }
 
   const qreal ratio = static_cast<qreal>(value - m_minimum) /
                       static_cast<qreal>(m_maximum - m_minimum);
-  if (m_orientation == Qt::Horizontal) {
-    return track.left() + ratio * track.width();
-  }
-  return track.bottom() - ratio * track.height();
+  return track.left() + ratio * track.width();
 }
 
 int SeekBar::displayedThumbPixel(int value) const {
@@ -242,14 +219,8 @@ int SeekBar::valueForPosition(const QPointF& pos) const {
     return m_minimum;
   }
 
-  qreal ratio = 0.0;
-  if (m_orientation == Qt::Horizontal) {
-    const qreal x = std::clamp(pos.x(), track.left(), track.right());
-    ratio = track.width() > 0.0 ? (x - track.left()) / track.width() : 0.0;
-  } else {
-    const qreal y = std::clamp(pos.y(), track.top(), track.bottom());
-    ratio = track.height() > 0.0 ? (track.bottom() - y) / track.height() : 0.0;
-  }
+  const qreal x = std::clamp(pos.x(), track.left(), track.right());
+  const qreal ratio = track.width() > 0.0 ? (x - track.left()) / track.width() : 0.0;
 
   return m_minimum + static_cast<int>(std::lround(ratio * static_cast<qreal>(m_maximum - m_minimum)));
 }
@@ -258,15 +229,9 @@ QRect SeekBar::dirtyRectForValues(int oldValue, int newValue) const {
   // Limit repaints to the strip touched by the old and new thumb positions.
   const qreal oldCenter = thumbCenterForValue(oldValue);
   const qreal newCenter = thumbCenterForValue(newValue);
-  if (m_orientation == Qt::Horizontal) {
-    const qreal left = std::min(oldCenter, newCenter) - THUMB_RADIUS - DIRTY_PADDING;
-    const qreal right = std::max(oldCenter, newCenter) + THUMB_RADIUS + DIRTY_PADDING;
-    return QRectF(left, 0.0, right - left, height()).toAlignedRect().intersected(rect());
-  }
-
-  const qreal top = std::min(oldCenter, newCenter) - THUMB_RADIUS - DIRTY_PADDING;
-  const qreal bottom = std::max(oldCenter, newCenter) + THUMB_RADIUS + DIRTY_PADDING;
-  return QRectF(0.0, top, width(), bottom - top).toAlignedRect().intersected(rect());
+  const qreal left = std::min(oldCenter, newCenter) - THUMB_RADIUS - DIRTY_PADDING;
+  const qreal right = std::max(oldCenter, newCenter) + THUMB_RADIUS + DIRTY_PADDING;
+  return QRectF(left, 0.0, right - left, height()).toAlignedRect().intersected(rect());
 }
 
 void SeekBar::updateValueFromPointer(const QPointF& pos) {

@@ -13,7 +13,7 @@
 class SeekBar : public QWidget {
   Q_OBJECT
 public:
-  explicit SeekBar(Qt::Orientation orientation, QWidget* parent = nullptr);
+  explicit SeekBar(QWidget* parent = nullptr);
 
   void setRange(int minimum, int maximum);
   void setValue(int value);
@@ -22,7 +22,6 @@ public:
   [[nodiscard]] int minimum() const { return m_minimum; }
   [[nodiscard]] int maximum() const { return m_maximum; }
   [[nodiscard]] bool isSliderDown() const { return m_sliderDown; }
-  [[nodiscard]] Qt::Orientation orientation() const { return m_orientation; }
 
   QSize sizeHint() const override;
 
@@ -46,7 +45,6 @@ private:
   void refreshCachedColors();
   void updateValueFromPointer(const QPointF& pos);
 
-  Qt::Orientation m_orientation;
   int m_minimum = 0;
   int m_maximum = 1;
   int m_value = 0;
