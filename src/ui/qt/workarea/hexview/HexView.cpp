@@ -189,6 +189,16 @@ bool isHexColumnGlyph(QChar glyph) {
   return (code >= '0' && code <= '9') || (code >= 'A' && code <= 'F');
 }
 
+// Look up one character in the raw font and return its grayscale glyph mask.
+QImage rawGlyphAlphaMap(const QRawFont& rawFont, QChar glyph) {
+  const auto glyphIndexes = rawFont.glyphIndexesForString(QString(glyph));
+  if (glyphIndexes.empty() || glyphIndexes.front() == 0) {
+    return {};
+  }
+
+  return rawFont.alphaMapForGlyph(glyphIndexes.front(), QRawFont::PixelAntialiasing);
+}
+
 // Find the visible top/bottom rows in the raw glyph mask, ignoring faint pixels
 // so we can place the visible body of hex glyphs without following AA fringe.
 GlyphVerticalBounds visibleVerticalBounds(const QImage& image, int alphaThreshold) {
@@ -227,13 +237,7 @@ int centeredHexGlyphBottomY(QRawFont& rawFont, int glyphHeightPx, int paddingPx,
       break;
     }
 
-    const auto glyphIndexes = rawFont.glyphIndexesForString(QString(QLatin1Char(glyph)));
-    if (glyphIndexes.empty() || glyphIndexes.front() == 0) {
-      continue;
-    }
-
-    const QImage alphaMap =
-        rawFont.alphaMapForGlyph(glyphIndexes.front(), QRawFont::PixelAntialiasing);
+    const QImage alphaMap = rawGlyphAlphaMap(rawFont, QLatin1Char(glyph));
     if (alphaMap.isNull()) {
       continue;
     }
@@ -896,27 +900,23 @@ void HexView::ensureGlyphAtlas(qreal dpr) {
     bool drewGlyph = false;
 #ifdef Q_OS_WIN
     if (useRawAtlas && glyphs[i] != QLatin1Char(' ')) {
-      const auto glyphIndexes = rawFont.glyphIndexesForString(QString(glyphs[i]));
-      if (!glyphIndexes.empty() && glyphIndexes.front() != 0) {
-        const quint32 glyphIndex = glyphIndexes.front();
-        const QImage alphaMap = rawFont.alphaMapForGlyph(glyphIndex, QRawFont::PixelAntialiasing);
-        if (!alphaMap.isNull()) {
-          const QPoint topLeft =
-              probeGlyphTopLeft(font(), dpr, cellWidthPx, cellHeightPx, padding, baseline,
-                                glyphs[i]);
-          if (topLeft.x() >= 0 && topLeft.y() >= 0) {
-            int glyphTopY = topLeft.y();
-            if (isHexColumnGlyph(glyphs[i])) {
-              const GlyphVerticalBounds bounds =
-                  visibleVerticalBounds(alphaMap, HEX_GLYPH_VERTICAL_ALPHA_THRESHOLD);
-              if (hexGlyphBottomY >= 0 && bounds.top >= 0 && bounds.bottom >= bounds.top) {
-                glyphTopY = hexGlyphBottomY - bounds.bottom;
-              }
+      const QImage alphaMap = rawGlyphAlphaMap(rawFont, glyphs[i]);
+      if (!alphaMap.isNull()) {
+        const QPoint topLeft =
+            probeGlyphTopLeft(font(), dpr, cellWidthPx, cellHeightPx, padding, baseline,
+                              glyphs[i]);
+        if (topLeft.x() >= 0 && topLeft.y() >= 0) {
+          int glyphTopY = topLeft.y();
+          if (isHexColumnGlyph(glyphs[i])) {
+            const GlyphVerticalBounds bounds =
+                visibleVerticalBounds(alphaMap, HEX_GLYPH_VERTICAL_ALPHA_THRESHOLD);
+            if (hexGlyphBottomY >= 0 && bounds.top >= 0 && bounds.bottom >= bounds.top) {
+              glyphTopY = hexGlyphBottomY - bounds.bottom;
             }
-
-            blitGlyphAlpha(image, cellXPx + topLeft.x(), cellYPx + glyphTopY, alphaMap);
-            drewGlyph = true;
           }
+
+          blitGlyphAlpha(image, cellXPx + topLeft.x(), cellYPx + glyphTopY, alphaMap);
+          drewGlyph = true;
         }
       }
     } else if (useRawAtlas) {
