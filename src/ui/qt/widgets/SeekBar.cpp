@@ -19,6 +19,7 @@ namespace {
 constexpr qreal TRACK_THICKNESS = 4.0;
 constexpr qreal THUMB_RADIUS = 10.0;
 constexpr qreal TRACK_RADIUS = TRACK_THICKNESS * 0.5;
+constexpr qreal HORIZONTAL_THUMB_Y_OFFSET = 1.0;
 constexpr int DIRTY_PADDING = 2;
 
 bool isDarkPalette(const QPalette& palette) {
@@ -50,11 +51,7 @@ QColor thumbColorFor(const QPalette& palette, bool enabled) {
 }
 
 QPen thumbPenFor(const QPalette& palette, bool enabled) {
-  if (isDarkPalette(palette)) {
-    return Qt::NoPen;
-  }
-
-  QPen pen(palette.color(QPalette::Window).darker(enabled ? 160 : 140));
+  QPen pen( QColor(0, 0, 0, 55) );
   pen.setWidth(1);
   pen.setCosmetic(true);
   return pen;
@@ -187,7 +184,9 @@ void SeekBar::paintEvent(QPaintEvent* event) {
   painter.setPen(m_thumbPen);
   if (m_orientation == Qt::Horizontal) {
     const qreal centerX = thumbCenterForValue(m_value);
-    painter.drawEllipse(QPointF(centerX, rect().center().y()), THUMB_RADIUS, THUMB_RADIUS);
+    painter.drawEllipse(QPointF(centerX, rect().center().y() + HORIZONTAL_THUMB_Y_OFFSET),
+                        THUMB_RADIUS,
+                        THUMB_RADIUS);
   } else {
     const qreal centerY = thumbCenterForValue(m_value);
     painter.drawEllipse(QPointF(rect().center().x(), centerY), THUMB_RADIUS, THUMB_RADIUS);
