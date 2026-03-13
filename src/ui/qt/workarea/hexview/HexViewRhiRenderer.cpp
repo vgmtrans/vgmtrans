@@ -90,6 +90,8 @@ HexViewRhiRenderer::LayoutMetrics HexViewRhiRenderer::computeLayoutMetrics(
       hexGlyphStartXPx + ((BYTES_PER_LINE * 3 + HEX_TO_ASCII_SPACING_CHARS) * charWidthPx);
 
   layout.charWidth = pxToLogical(charWidthPx, layout.dpr);
+  // Keep row spacing on the original logical line-height model; the vertex shaders
+  // only snap X so rendering stays aligned with scroll, selection, and hit testing.
   layout.lineHeight = static_cast<float>(frame.lineHeight);
   layout.hexStartX = pxToLogical(hexStartXPx, layout.dpr);
   layout.hexGlyphStartX = pxToLogical(hexGlyphStartXPx, layout.dpr);

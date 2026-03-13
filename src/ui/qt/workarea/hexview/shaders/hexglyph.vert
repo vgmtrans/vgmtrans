@@ -17,7 +17,7 @@ void main() {
   vec2 pos = inRect.xy + inPos * inRect.zw;
   float dpr = snapInfo.x;
   if (dpr > 0.0) {
-    pos = round(pos * dpr) / dpr;
+    pos.x = round(pos.x * dpr) / dpr;
   }
   gl_Position = mvp * vec4(pos, 0.0, 1.0);
   vUv = mix(inUv.xy, inUv.zw, inPos);
