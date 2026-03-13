@@ -127,6 +127,9 @@ QString tooltipHtmlWithIcon(VGMItem* item) {
 
 #ifdef Q_OS_WIN
 constexpr int HEX_GLYPH_VERTICAL_ALPHA_THRESHOLD = 196;
+// Lift the shared hex-digit baseline slightly so the leveled glyphs sit closer
+// to the visual center of the cell instead of hugging the bottom edge.
+constexpr int HEX_GLYPH_VERTICAL_LIFT_PX = 1;
 
 struct GlyphVerticalBounds {
   int top = -1;
@@ -865,10 +868,7 @@ void HexView::ensureGlyphAtlas(qreal dpr) {
               const GlyphVerticalBounds bounds =
                   visibleVerticalBounds(alphaMap, HEX_GLYPH_VERTICAL_ALPHA_THRESHOLD);
               if (bounds.top >= 0 && bounds.bottom >= bounds.top) {
-                const int bodyHeightPx = bounds.bottom - bounds.top + 1;
-                if (bodyHeightPx > 0 && bodyHeightPx <= glyphHeightPx) {
-                  glyphTopY = paddingPx + glyphHeightPx - 1 - bounds.bottom;
-                }
+                glyphTopY = paddingPx + glyphHeightPx - 1 - bounds.bottom - HEX_GLYPH_VERTICAL_LIFT_PX;
               }
             }
 
