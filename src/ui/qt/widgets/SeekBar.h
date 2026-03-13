@@ -39,7 +39,8 @@ protected:
 private:
   [[nodiscard]] QRectF trackRect() const;
   [[nodiscard]] qreal thumbCenterForValue(int value) const;
-  [[nodiscard]] int displayedThumbPixel(int value) const;
+  [[nodiscard]] int displayedThumbStep(int value) const;
+  [[nodiscard]] qreal displayedThumbCenterForValue(int value) const;
   [[nodiscard]] int valueForPosition(const QPointF& pos) const;
   [[nodiscard]] QRect dirtyRectForValues(int oldValue, int newValue) const;
   void refreshCachedColors();

@@ -20,6 +20,7 @@ constexpr qreal TRACK_THICKNESS = 4.0;
 constexpr qreal THUMB_RADIUS = 10.0;
 constexpr qreal TRACK_RADIUS = TRACK_THICKNESS * 0.5;
 constexpr qreal HORIZONTAL_THUMB_Y_OFFSET = 1.0;
+constexpr qreal DISPLAY_STEPS_PER_DEVICE_PIXEL = 2.0;
 constexpr int DIRTY_PADDING = 2;
 
 bool isDarkPalette(const QPalette& palette) {
@@ -82,7 +83,7 @@ void SeekBar::setRange(int minimum, int maximum) {
 }
 
 void SeekBar::setValue(int value) {
-  // Passive playback updates only repaint when the thumb crosses a device pixel.
+  // Passive playback only repaints when the quantized displayed thumb position changes.
   const int clamped = std::clamp(value, m_minimum, m_maximum);
   if (m_value == clamped) {
     return;
@@ -90,7 +91,7 @@ void SeekBar::setValue(int value) {
 
   const int oldValue = m_value;
   m_value = clamped;
-  if (displayedThumbPixel(oldValue) == displayedThumbPixel(m_value)) {
+  if (displayedThumbStep(oldValue) == displayedThumbStep(m_value)) {
     return;
   }
   update(dirtyRectForValues(oldValue, m_value));
@@ -162,7 +163,7 @@ void SeekBar::paintEvent(QPaintEvent* event) {
   painter.drawRoundedRect(track, TRACK_RADIUS, TRACK_RADIUS);
 
   if (m_maximum > m_minimum) {
-    const qreal thumbCenter = thumbCenterForValue(m_value);
+    const qreal thumbCenter = displayedThumbCenterForValue(m_value);
     QRectF played = track;
     played.setRight(std::max(track.left(), thumbCenter));
     if (played.width() > 0.0 && played.height() > 0.0) {
@@ -173,7 +174,7 @@ void SeekBar::paintEvent(QPaintEvent* event) {
 
   painter.setBrush(m_thumbColor);
   painter.setPen(m_thumbPen);
-  const qreal centerX = thumbCenterForValue(m_value);
+  const qreal centerX = displayedThumbCenterForValue(m_value);
   painter.drawEllipse(QPointF(centerX, rect().center().y() + HORIZONTAL_THUMB_Y_OFFSET),
                       THUMB_RADIUS,
                       THUMB_RADIUS);
@@ -207,9 +208,15 @@ qreal SeekBar::thumbCenterForValue(int value) const {
   return track.left() + ratio * track.width();
 }
 
-int SeekBar::displayedThumbPixel(int value) const {
-  // Compare in device pixels so HiDPI displays still repaint at visibly smooth steps.
-  return static_cast<int>(std::lround(thumbCenterForValue(value) * devicePixelRatioF()));
+int SeekBar::displayedThumbStep(int value) const {
+  // Quantize the rendered thumb position to half-device-pixel steps.
+  return static_cast<int>(
+      std::lround(thumbCenterForValue(value) * devicePixelRatioF() * DISPLAY_STEPS_PER_DEVICE_PIXEL));
+}
+
+qreal SeekBar::displayedThumbCenterForValue(int value) const {
+  return static_cast<qreal>(displayedThumbStep(value)) /
+         (devicePixelRatioF() * DISPLAY_STEPS_PER_DEVICE_PIXEL);
 }
 
 int SeekBar::valueForPosition(const QPointF& pos) const {
@@ -227,8 +234,8 @@ int SeekBar::valueForPosition(const QPointF& pos) const {
 
 QRect SeekBar::dirtyRectForValues(int oldValue, int newValue) const {
   // Limit repaints to the strip touched by the old and new thumb positions.
-  const qreal oldCenter = thumbCenterForValue(oldValue);
-  const qreal newCenter = thumbCenterForValue(newValue);
+  const qreal oldCenter = displayedThumbCenterForValue(oldValue);
+  const qreal newCenter = displayedThumbCenterForValue(newValue);
   const qreal left = std::min(oldCenter, newCenter) - THUMB_RADIUS - DIRTY_PADDING;
   const qreal right = std::max(oldCenter, newCenter) + THUMB_RADIUS + DIRTY_PADDING;
   return QRectF(left, 0.0, right - left, height()).toAlignedRect().intersected(rect());
