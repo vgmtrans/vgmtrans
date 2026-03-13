@@ -126,8 +126,12 @@ QString tooltipHtmlWithIcon(VGMItem* item) {
 }
 
 #ifdef Q_OS_WIN
-constexpr int PROBE_PIXEL_ALPHA_THRESHOLD = 32;
-constexpr int PROBE_AXIS_ALPHA_THRESHOLD = 96;
+constexpr int HEX_GLYPH_VERTICAL_ALPHA_THRESHOLD = 48;
+
+struct GlyphVerticalBounds {
+  int top = -1;
+  int bottom = -1;
+};
 
 // Read one coverage sample from a glyph bitmap row returned by Qt.
 // `line` is the raw byte pointer for a single scanline from `image.constScanLine(y)`.
@@ -146,10 +150,8 @@ int alphaAt(const QImage& image, const uchar* line, int x) {
 }
 
 // Ask Qt to draw one glyph into a temporary cell-sized image, then find the first
-// row/column whose alpha is strong enough to represent the real glyph body rather
-// than a faint antialiasing fringe. That gives us a more stable top-left bitmap
-// origin for the glyph inside the cell, which we reuse when copying the raw glyph
-// mask into the atlas.
+// non-transparent pixel. That gives us the top-left bitmap origin Qt used for this
+// glyph inside the cell, which we reuse when copying the raw glyph mask into the atlas.
 QPoint probeGlyphTopLeft(const QFont& font, qreal dpr, int cellWidthPx, int cellHeightPx,
                          qreal padding, qreal baseline, QChar glyph) {
   QImage probe(cellWidthPx, cellHeightPx, QImage::Format_ARGB32_Premultiplied);
@@ -163,34 +165,54 @@ QPoint probeGlyphTopLeft(const QFont& font, qreal dpr, int cellWidthPx, int cell
   painter.drawText(QPointF(padding, padding + baseline), QString(glyph));
   painter.end();
 
-  std::vector<int> columnAlpha(static_cast<size_t>(probe.width()), 0);
-  int minY = -1;
+  int minX = probe.width();
+  int minY = probe.height();
+  bool found = false;
   for (int y = 0; y < probe.height(); ++y) {
     // line is a row of pixels from the temporary probe image.
     const QRgb* line = reinterpret_cast<const QRgb*>(probe.constScanLine(y));
-    int rowAlpha = 0;
     for (int x = 0; x < probe.width(); ++x) {
-      const int alpha = qAlpha(line[x]);
-      if (alpha < PROBE_PIXEL_ALPHA_THRESHOLD) {
-        continue;
+      if (qAlpha(line[x]) != 0) {
+        minX = std::min(minX, x);
+        minY = std::min(minY, y);
+        found = true;
       }
-      rowAlpha += alpha;
-      columnAlpha[static_cast<size_t>(x)] += alpha;
-    }
-    if (minY < 0 && rowAlpha >= PROBE_AXIS_ALPHA_THRESHOLD) {
-      minY = y;
     }
   }
 
-  int minX = -1;
-  for (int x = 0; x < probe.width(); ++x) {
-    if (columnAlpha[static_cast<size_t>(x)] >= PROBE_AXIS_ALPHA_THRESHOLD) {
-      minX = x;
-      break;
+  return found ? QPoint(minX, minY) : QPoint(-1, -1);
+}
+
+// Return true for the glyphs that matter in the hex column: 0-9 and A-F.
+bool isHexColumnGlyph(QChar glyph) {
+  const ushort code = glyph.unicode();
+  return (code >= '0' && code <= '9') || (code >= 'A' && code <= 'F');
+}
+
+// Find the visible top/bottom rows in the raw glyph mask, ignoring faint pixels
+// so we can center the body of hex glyphs more consistently inside the atlas cell.
+GlyphVerticalBounds visibleVerticalBounds(const QImage& image, int alphaThreshold) {
+  GlyphVerticalBounds bounds;
+
+  for (int y = 0; y < image.height(); ++y) {
+    const uchar* line = image.constScanLine(y);
+    bool rowHasVisibleCoverage = false;
+    for (int x = 0; x < image.width(); ++x) {
+      if (alphaAt(image, line, x) >= alphaThreshold) {
+        rowHasVisibleCoverage = true;
+        break;
+      }
     }
+    if (!rowHasVisibleCoverage) {
+      continue;
+    }
+    if (bounds.top < 0) {
+      bounds.top = y;
+    }
+    bounds.bottom = y;
   }
 
-  return (minX >= 0 && minY >= 0) ? QPoint(minX, minY) : QPoint(-1, -1);
+  return bounds;
 }
 
 // Copy the glyph coverage image from `src` into the atlas image `dst`.
@@ -838,7 +860,21 @@ void HexView::ensureGlyphAtlas(qreal dpr) {
               probeGlyphTopLeft(font(), dpr, cellWidthPx, cellHeightPx, padding, baseline,
                                 glyphs[i]);
           if (topLeft.x() >= 0 && topLeft.y() >= 0) {
-            blitGlyphAlpha(image, cellXPx + topLeft.x(), cellYPx + topLeft.y(), alphaMap);
+            int glyphTopY = topLeft.y();
+            if (isHexColumnGlyph(glyphs[i])) {
+              const GlyphVerticalBounds bounds =
+                  visibleVerticalBounds(alphaMap, HEX_GLYPH_VERTICAL_ALPHA_THRESHOLD);
+              if (bounds.top >= 0 && bounds.bottom >= bounds.top) {
+                const int bodyHeightPx = bounds.bottom - bounds.top + 1;
+                if (bodyHeightPx > 0 && bodyHeightPx <= glyphHeightPx) {
+                  glyphTopY = paddingPx +
+                              static_cast<int>(std::lround((glyphHeightPx - bodyHeightPx) / 2.0)) -
+                              bounds.top;
+                }
+              }
+            }
+
+            blitGlyphAlpha(image, cellXPx + topLeft.x(), cellYPx + glyphTopY, alphaMap);
             drewGlyph = true;
           }
         }
