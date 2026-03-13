@@ -38,7 +38,6 @@ int main(int argc, char *argv[]) {
   QCoreApplication::setOrganizationDomain("vgmtrans.com");
   QCoreApplication::setApplicationName("VGMTrans");
 
-  QGuiApplication::setHighDpiScaleFactorRoundingPolicy(Qt::HighDpiScaleFactorRoundingPolicy::Round);
   // Prevent native sibling promotion so dock splitters remain responsive with the RHI QWindow container.
   QCoreApplication::setAttribute(Qt::AA_DontCreateNativeWidgetSiblings);
 

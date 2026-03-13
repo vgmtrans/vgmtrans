@@ -44,12 +44,11 @@ struct GlyphAtlasView {
 struct Data {
   VGMFile* vgmfile = nullptr;
   QSize viewportSize;
+  qreal dpr = 1.0;
   int totalLines = 0;
   int scrollY = 0;
   int lineHeight = 0;
   int charWidth = 0;
-  int charHalfWidth = 0;
-  int hexStartX = 0;
   bool shouldDrawOffset = true;
   bool shouldDrawAscii = true;
   bool addressAsHex = true;

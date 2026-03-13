@@ -101,8 +101,6 @@ private:
     qreal dpr = 0.0;
     int glyphWidth = 0;
     int glyphHeight = 0;
-    int cellWidth = 0;
-    int cellHeight = 0;
     uint64_t version = 0;
     QFont font;
   };
@@ -161,15 +159,10 @@ private:
   bool m_playbackActive = false;
 
   int m_charWidth = 0;
-  int m_charHalfWidth = 0;
   int m_lineHeight = 0;
   bool m_addressAsHex = true;
   bool m_shouldDrawOffset = true;
   bool m_shouldDrawAscii = true;
-
-  mutable int m_virtual_full_width = -1;
-  mutable int m_virtual_width_sans_ascii = -1;
-  mutable int m_virtual_width_sans_ascii_and_address = -1;
 
   // Compact style table used by renderer; index 0 is the default/fallback style.
   std::vector<Style> m_styles;

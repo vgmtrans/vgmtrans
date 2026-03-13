@@ -18,9 +18,7 @@
 #include <QFile>
 #include <QImage>
 #include <QMatrix4x4>
-#include <QPalette>
 #include <QRectF>
-#include <QScrollBar>
 #include <QString>
 #include <QVector4D>
 
@@ -32,6 +30,8 @@
 
 namespace {
 constexpr int NUM_ADDRESS_NIBBLES = 8;
+constexpr int ADDRESS_SPACING_CHARS = 4;
+constexpr int BYTES_PER_LINE = 16;
 constexpr int HEX_TO_ASCII_SPACING_CHARS = 4;
 const QColor SHADOW_COLOR = Qt::black;
 const QColor OUTLINE_COLOR(35, 35, 35);
@@ -60,6 +60,10 @@ bool isPrintable(uint8_t value) {
   return value >= 0x20 && value <= 0x7E;
 }
 
+float pxToLogical(int px, float dpr) {
+  return dpr > 0.0f ? (static_cast<float>(px) / dpr) : static_cast<float>(px);
+}
+
 QShader loadShader(const char* path) {
   QFile file(QString::fromUtf8(path));
   if (!file.open(QIODevice::ReadOnly)) {
@@ -70,6 +74,33 @@ QShader loadShader(const char* path) {
 }
 
 }  // namespace
+
+HexViewRhiRenderer::LayoutMetrics HexViewRhiRenderer::computeLayoutMetrics(
+    const HexViewFrame::Data& frame) {
+  LayoutMetrics layout;
+  layout.dpr = frame.dpr > 0.0 ? static_cast<float>(frame.dpr) : 1.0f;
+  const int charWidthPx =
+      std::max(1, static_cast<int>(std::round(static_cast<float>(frame.charWidth) * layout.dpr)));
+  const int charHalfWidthPx = charWidthPx / 2;
+  const int hexStartXPx = frame.shouldDrawOffset
+                              ? ((NUM_ADDRESS_NIBBLES + ADDRESS_SPACING_CHARS) * charWidthPx)
+                              : charHalfWidthPx;
+  const int hexGlyphStartXPx = hexStartXPx + charHalfWidthPx;
+  const int asciiStartXPx =
+      hexGlyphStartXPx + ((BYTES_PER_LINE * 3 + HEX_TO_ASCII_SPACING_CHARS) * charWidthPx);
+
+  layout.charWidth = pxToLogical(charWidthPx, layout.dpr);
+  // Keep row spacing on the original logical line-height model; the vertex shaders
+  // only snap X so rendering stays aligned with scroll, selection, and hit testing.
+  layout.lineHeight = static_cast<float>(frame.lineHeight);
+  layout.hexStartX = pxToLogical(hexStartXPx, layout.dpr);
+  layout.hexGlyphStartX = pxToLogical(hexGlyphStartXPx, layout.dpr);
+  layout.hexWidth = pxToLogical(BYTES_PER_LINE * 3 * charWidthPx, layout.dpr);
+  layout.asciiStartX = pxToLogical(asciiStartXPx, layout.dpr);
+  layout.asciiWidth =
+      frame.shouldDrawAscii ? pxToLogical(BYTES_PER_LINE * charWidthPx, layout.dpr) : 0.0f;
+  return layout;
+}
 
 // Construct renderer state; GPU resources are created lazily in initIfNeeded().
 HexViewRhiRenderer::HexViewRhiRenderer(HexView* view, const char* logLabel)
@@ -100,7 +131,7 @@ void HexViewRhiRenderer::initIfNeeded(QRhi* rhi) {
   m_ibuf = m_rhi->newBuffer(QRhiBuffer::Immutable, QRhiBuffer::IndexBuffer, sizeof(kIndices));
   m_ibuf->create();
 
-  const int baseUboSize = m_rhi->ubufAligned(kMat4Bytes);
+  const int baseUboSize = m_rhi->ubufAligned(kMat4Bytes + kVec4Bytes);
   m_ubuf = m_rhi->newBuffer(QRhiBuffer::Dynamic, QRhiBuffer::UniformBuffer, baseUboSize);
   m_ubuf->create();
 
@@ -261,15 +292,16 @@ void HexViewRhiRenderer::renderFrame(QRhiCommandBuffer* cb, const RenderTargetIn
   }
 
   ensureCacheWindow(startLine, endLine, totalLines, frame);
+  const LayoutMetrics layout = computeLayoutMetrics(frame);
 
   if (m_baseDirty) {
-    buildBaseInstances(frame);
+    buildBaseInstances(frame, layout);
     m_baseDirty = false;
     m_baseBufferDirty = true;
   }
 
   if (m_selectionDirty) {
-    buildSelectionInstances(startLine, endLine, frame);
+    buildSelectionInstances(startLine, endLine, frame, layout);
     m_selectionDirty = false;
     m_selectionBufferDirty = true;
   }
@@ -281,7 +313,7 @@ void HexViewRhiRenderer::renderFrame(QRhiCommandBuffer* cb, const RenderTargetIn
     m_staticBuffersUploaded = true;
   }
   ensureGlyphTexture(u, frame);
-  const float minCell = std::min<float>(frame.charWidth, frame.lineHeight);
+  const float minCell = std::min(layout.charWidth, layout.lineHeight);
   const bool outlineAllowed = minCell >= OUTLINE_MIN_CELL_PX;
   const float nowSeconds = m_animTimer.isValid() ? (m_animTimer.elapsed() / 1000.0f) : 0.0f;
   float dt = (m_lastFrameSeconds > 0.0f) ? (nowSeconds - m_lastFrameSeconds) : 0.0f;
@@ -316,7 +348,7 @@ void HexViewRhiRenderer::renderFrame(QRhiCommandBuffer* cb, const RenderTargetIn
     updateCompositeSrb();
     m_compositeSrbDirty = false;
   }
-  updateUniforms(u, static_cast<float>(scrollY), target.pixelSize, frame);
+  updateUniforms(u, static_cast<float>(scrollY), target.pixelSize, frame, layout);
   updateInstanceBuffers(u);
 
   int baseRectFirst = 0;
@@ -763,7 +795,8 @@ void HexViewRhiRenderer::updateCompositeSrb() {
 // Upload per-frame transforms and effect/shader parameters to uniform buffers.
 void HexViewRhiRenderer::updateUniforms(QRhiResourceUpdateBatch* u, float scrollY,
                                         const QSize& pixelSize,
-                                        const HexViewFrame::Data& frame) {
+                                        const HexViewFrame::Data& frame,
+                                        const LayoutMetrics& layout) {
   const QSize viewSize = frame.viewportSize;
   const float uvFlipY = m_rhi->isYUpInFramebuffer() ? 0.0f : 1.0f;
   const float timeSeconds = m_animTimer.isValid() ? (m_animTimer.elapsed() / 1000.0f) : 0.0f;
@@ -775,9 +808,11 @@ void HexViewRhiRenderer::updateUniforms(QRhiResourceUpdateBatch* u, float scroll
   mvp.translate(0.f, -scrollY, 0.f);
 
   u->updateDynamicBuffer(m_ubuf, 0, kMat4Bytes, mvp.constData());
+  const QVector4D snapInfo(layout.dpr > 0.0f ? layout.dpr : 1.0f, 0.0f, 0.0f, 0.0f);
+  u->updateDynamicBuffer(m_ubuf, kMat4Bytes, kVec4Bytes, &snapInfo);
 
   QMatrix4x4 screenMvp = m_rhi->clipSpaceCorrMatrix();
-  const float dpr = viewSize.width() > 0 ? (static_cast<float>(pixelSize.width()) / viewSize.width()) : 1.0f;
+  const float dpr = layout.dpr;
 
   const float viewW = static_cast<float>(viewSize.width());
   const float viewH = static_cast<float>(viewSize.height());
@@ -792,15 +827,12 @@ void HexViewRhiRenderer::updateUniforms(QRhiResourceUpdateBatch* u, float scroll
           ? (static_cast<float>(frame.shadowOffset.y()) * dpr / pixelSize.height())
           : 0.0f;
 
-  const float charWidth = static_cast<float>(frame.charWidth);
-  const float charHalfWidth = static_cast<float>(frame.charHalfWidth);
-  const float lineHeight = static_cast<float>(frame.lineHeight);
-  const float hexStartX = static_cast<float>(frame.hexStartX);
-  const float hexGlyphStartX = hexStartX + charHalfWidth;
-  const float hexWidth = kBytesPerLine * 3.0f * charWidth;
-  const float asciiStartX =
-      hexGlyphStartX + (kBytesPerLine * 3 + HEX_TO_ASCII_SPACING_CHARS) * charWidth;
-  const float asciiWidth = frame.shouldDrawAscii ? (kBytesPerLine * charWidth) : 0.0f;
+  const float charWidth = layout.charWidth;
+  const float lineHeight = layout.lineHeight;
+  const float hexStartX = layout.hexStartX;
+  const float hexWidth = layout.hexWidth;
+  const float asciiStartX = layout.asciiStartX;
+  const float asciiWidth = layout.asciiWidth;
 
   const float shadowRadius = std::max(0.0f, static_cast<float>(frame.shadowBlur));
   const float glowRadius = std::max(0.0f, static_cast<float>(frame.playbackGlowRadius)) *
@@ -1109,7 +1141,8 @@ const HexViewRhiRenderer::CachedLine* HexViewRhiRenderer::cachedLineFor(int line
 }
 
 // Build base background and glyph instance streams from cached file lines.
-void HexViewRhiRenderer::buildBaseInstances(const HexViewFrame::Data& frame) {
+void HexViewRhiRenderer::buildBaseInstances(const HexViewFrame::Data& frame,
+                                            const LayoutMetrics& layout) {
   m_baseRectInstances.clear();
   m_baseGlyphInstances.clear();
   m_lineRanges.clear();
@@ -1125,14 +1158,11 @@ void HexViewRhiRenderer::buildBaseInstances(const HexViewFrame::Data& frame) {
   const QColor clearColor = frame.windowColor;
   const QVector4D addressColor = toVec4(frame.windowTextColor);
 
-  const float charWidth = static_cast<float>(frame.charWidth);
-  const float charHalfWidth = static_cast<float>(frame.charHalfWidth);
-  const float lineHeight = static_cast<float>(frame.lineHeight);
-
-  const float hexStartX = static_cast<float>(frame.hexStartX);
-  const float hexGlyphStartX = hexStartX + charHalfWidth;
-  const float asciiStartX =
-      hexGlyphStartX + (kBytesPerLine * 3 + HEX_TO_ASCII_SPACING_CHARS) * charWidth;
+  const float charWidth = layout.charWidth;
+  const float lineHeight = layout.lineHeight;
+  const float hexStartX = layout.hexStartX;
+  const float hexGlyphStartX = layout.hexGlyphStartX;
+  const float asciiStartX = layout.asciiStartX;
 
   const auto& styles = frame.styles;
   auto styleFor = [&](uint16_t styleId) -> const HexViewFrame::Style& {
@@ -1400,7 +1430,8 @@ void HexViewRhiRenderer::appendMaskForSelections(
 
 // Build all selection/playback mask and edge instances for the current viewport.
 void HexViewRhiRenderer::buildSelectionInstances(int startLine, int endLine,
-                                                 const HexViewFrame::Data& frame) {
+                                                 const HexViewFrame::Data& frame,
+                                                 const LayoutMetrics& layout) {
   m_maskRectInstances.clear();
   m_edgeRectInstances.clear();
 
@@ -1419,8 +1450,8 @@ void HexViewRhiRenderer::buildSelectionInstances(int startLine, int endLine,
   m_maskRectInstances.reserve(static_cast<size_t>(visibleCount) * (frame.shouldDrawAscii ? 8 : 4));
   m_edgeRectInstances.reserve(static_cast<size_t>(visibleCount) * (frame.shouldDrawAscii ? 8 : 4));
 
-  const float charWidth = static_cast<float>(frame.charWidth);
-  const float lineHeight = static_cast<float>(frame.lineHeight);
+  const float charWidth = layout.charWidth;
+  const float lineHeight = layout.lineHeight;
   SelectionBuildContext ctx;
   ctx.startLine = startLine;
   ctx.endLine = endLine;
@@ -1429,9 +1460,8 @@ void HexViewRhiRenderer::buildSelectionInstances(int startLine, int endLine,
   ctx.fileLength = frame.vgmfile ? frame.vgmfile->length() : 0;
   ctx.charWidth = charWidth;
   ctx.lineHeight = lineHeight;
-  ctx.hexStartX = static_cast<float>(frame.hexStartX);
-  ctx.asciiStartX = ctx.hexStartX + static_cast<float>(frame.charHalfWidth) +
-                    (kBytesPerLine * 3 + HEX_TO_ASCII_SPACING_CHARS) * ctx.charWidth;
+  ctx.hexStartX = layout.hexStartX;
+  ctx.asciiStartX = layout.asciiStartX;
   ctx.shouldDrawAscii = frame.shouldDrawAscii;
 
   const QVector4D selectionMaskColor(1.0f, 0.0f, 0.0f, 0.0f);
