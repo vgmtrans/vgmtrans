@@ -806,10 +806,7 @@ void HexViewRhiRenderer::updateUniforms(QRhiResourceUpdateBatch* u, float scroll
   mvp.translate(0.f, -scrollY, 0.f);
 
   u->updateDynamicBuffer(m_ubuf, 0, kMat4Bytes, mvp.constData());
-  const QVector4D snapInfo(viewSize.width() > 0
-                               ? (static_cast<float>(pixelSize.width()) / viewSize.width())
-                               : 1.0f,
-                           0.0f, 0.0f, 0.0f);
+  const QVector4D snapInfo(layout.dpr > 0.0f ? layout.dpr : 1.0f, 0.0f, 0.0f, 0.0f);
   u->updateDynamicBuffer(m_ubuf, kMat4Bytes, kVec4Bytes, &snapInfo);
 
   QMatrix4x4 screenMvp = m_rhi->clipSpaceCorrMatrix();
