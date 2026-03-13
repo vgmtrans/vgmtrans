@@ -218,7 +218,7 @@ QPoint probeGlyphTopLeft(const QFont& font, qreal dpr, int cellWidthPx, int cell
   return found ? QPoint(minX, minY) : QPoint(-1, -1);
 }
 
-// Return true for the glyphs that matter in the hex column: 0-9 and A-F.
+// Return true for hex glyphs: 0-9 and A-F.
 bool isHexColumnGlyph(QChar glyph) {
   const ushort code = glyph.unicode();
   return (code >= '0' && code <= '9') || (code >= 'A' && code <= 'F');
@@ -235,7 +235,7 @@ QImage rawGlyphAlphaMap(const QRawFont& rawFont, QChar glyph) {
 }
 
 // Find the visible top/bottom rows in the raw glyph mask, ignoring faint pixels
-// so we can place the visible body of hex glyphs without following AA fringe.
+// so we can place the visible body of hex glyphs while ignoring AA fringe.
 GlyphVerticalBounds visibleVerticalBounds(const QImage& image, int alphaThreshold) {
   GlyphVerticalBounds bounds;
 
@@ -903,6 +903,8 @@ void HexView::ensureGlyphAtlas(qreal dpr) {
   painter.setRenderHint(QPainter::TextAntialiasing, true);
 
 #ifdef Q_OS_WIN
+  // On Windows, atlas glyphs built with QPainter::drawText() comes out aliased at fractional DPR.
+  // Build the atlas from QRawFont's grayscale bitmap instead.
   QRawFont rawFont = QRawFont::fromFont(font());
   bool useRawAtlas = rawFont.isValid() && rawFont.pixelSize() > 0.0;
   int hexGlyphBottomY = -1;
@@ -910,6 +912,8 @@ void HexView::ensureGlyphAtlas(qreal dpr) {
     rawFont.setPixelSize(rawFont.pixelSize() * dpr);
     useRawAtlas = rawFont.isValid();
     if (useRawAtlas) {
+      // Compute one shared visible-bottom target for 0-9/A-F so the hex column stays
+      // level while still appearing vertically centered as a group in the cell.
       hexGlyphBottomY = centeredHexGlyphBottomY(rawFont, glyphHeightPx, paddingPx,
                                                 HEX_GLYPH_VERTICAL_ALPHA_THRESHOLD);
     }
@@ -931,6 +935,8 @@ void HexView::ensureGlyphAtlas(qreal dpr) {
     if (useRawAtlas && glyphs[i] != QLatin1Char(' ')) {
       const QImage alphaMap = rawGlyphAlphaMap(rawFont, glyphs[i]);
       if (!alphaMap.isNull()) {
+        // QRawFont gives us the glyph bitmap, but not the cell-local origin Qt would
+        // have used for drawText(), so probe that origin once and reuse it here.
         const QPoint topLeft =
             probeGlyphTopLeft(font(), dpr, cellWidthPx, cellHeightPx, padding, baseline,
                               glyphs[i]);
@@ -940,6 +946,8 @@ void HexView::ensureGlyphAtlas(qreal dpr) {
             const GlyphVerticalBounds bounds =
                 visibleVerticalBounds(alphaMap, HEX_GLYPH_VERTICAL_ALPHA_THRESHOLD);
             if (hexGlyphBottomY >= 0 && bounds.top >= 0 && bounds.bottom >= bounds.top) {
+              // Keep the probed X placement, but override Y so every hex glyph lands
+              // on the same visible bottom row.
               glyphTopY = hexGlyphBottomY - bounds.bottom;
             }
           }
