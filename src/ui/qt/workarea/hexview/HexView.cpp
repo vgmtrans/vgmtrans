@@ -127,9 +127,6 @@ QString tooltipHtmlWithIcon(VGMItem* item) {
 
 #ifdef Q_OS_WIN
 constexpr int HEX_GLYPH_VERTICAL_ALPHA_THRESHOLD = 196;
-// Lift the shared hex-digit baseline slightly so the leveled glyphs sit closer
-// to the visual center of the cell instead of hugging the bottom edge.
-constexpr int HEX_GLYPH_VERTICAL_LIFT_PX = 1;
 
 struct GlyphVerticalBounds {
   int top = -1;
@@ -216,6 +213,46 @@ GlyphVerticalBounds visibleVerticalBounds(const QImage& image, int alphaThreshol
   }
 
   return bounds;
+}
+
+// Center the tallest threshold-visible hex glyph body inside the cell, then use
+// its bottom row as the shared alignment target for 0-9/A-F.
+int centeredHexGlyphBottomY(QRawFont& rawFont, int glyphHeightPx, int paddingPx,
+                            int alphaThreshold) {
+  static constexpr char kHexGlyphs[] = "0123456789ABCDEF";
+  int maxBodyHeightPx = 0;
+
+  for (char glyph : kHexGlyphs) {
+    if (glyph == '\0') {
+      break;
+    }
+
+    const auto glyphIndexes = rawFont.glyphIndexesForString(QString(QLatin1Char(glyph)));
+    if (glyphIndexes.empty() || glyphIndexes.front() == 0) {
+      continue;
+    }
+
+    const QImage alphaMap =
+        rawFont.alphaMapForGlyph(glyphIndexes.front(), QRawFont::PixelAntialiasing);
+    if (alphaMap.isNull()) {
+      continue;
+    }
+
+    const GlyphVerticalBounds bounds = visibleVerticalBounds(alphaMap, alphaThreshold);
+    if (bounds.top < 0 || bounds.bottom < bounds.top) {
+      continue;
+    }
+
+    maxBodyHeightPx = std::max(maxBodyHeightPx, bounds.bottom - bounds.top + 1);
+  }
+
+  if (maxBodyHeightPx <= 0 || maxBodyHeightPx > glyphHeightPx) {
+    return -1;
+  }
+
+  const int centeredTopY =
+      paddingPx + static_cast<int>(std::lround((glyphHeightPx - maxBodyHeightPx) / 2.0));
+  return centeredTopY + maxBodyHeightPx - 1;
 }
 
 // Copy the glyph coverage image from `src` into the atlas image `dst`.
@@ -835,9 +872,14 @@ void HexView::ensureGlyphAtlas(qreal dpr) {
 #ifdef Q_OS_WIN
   QRawFont rawFont = QRawFont::fromFont(font());
   bool useRawAtlas = rawFont.isValid() && rawFont.pixelSize() > 0.0;
+  int hexGlyphBottomY = -1;
   if (useRawAtlas) {
     rawFont.setPixelSize(rawFont.pixelSize() * dpr);
     useRawAtlas = rawFont.isValid();
+    if (useRawAtlas) {
+      hexGlyphBottomY = centeredHexGlyphBottomY(rawFont, glyphHeightPx, paddingPx,
+                                                HEX_GLYPH_VERTICAL_ALPHA_THRESHOLD);
+    }
   }
 #endif
 
@@ -867,8 +909,8 @@ void HexView::ensureGlyphAtlas(qreal dpr) {
             if (isHexColumnGlyph(glyphs[i])) {
               const GlyphVerticalBounds bounds =
                   visibleVerticalBounds(alphaMap, HEX_GLYPH_VERTICAL_ALPHA_THRESHOLD);
-              if (bounds.top >= 0 && bounds.bottom >= bounds.top) {
-                glyphTopY = paddingPx + glyphHeightPx - 1 - bounds.bottom - HEX_GLYPH_VERTICAL_LIFT_PX;
+              if (hexGlyphBottomY >= 0 && bounds.top >= 0 && bounds.bottom >= bounds.top) {
+                glyphTopY = hexGlyphBottomY - bounds.bottom;
               }
             }
 
