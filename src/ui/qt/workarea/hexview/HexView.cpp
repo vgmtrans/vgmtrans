@@ -79,7 +79,7 @@ int devicePxToLogicalCeil(int px, qreal dpr) {
 }
 
 int logicalToDevicePx(int logicalPx, qreal dpr) {
-  return static_cast<int>(std::floor(static_cast<qreal>(logicalPx) * dpr));
+  return static_cast<int>(std::lround(static_cast<qreal>(logicalPx) * dpr));
 }
 
 WidgetLayoutMetrics computeWidgetLayoutMetrics(const QWidget* widget, int charWidth,
