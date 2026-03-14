@@ -145,8 +145,8 @@ jobs:
       - name: "Upload artifact"
         uses: actions/upload-artifact@v7
         with:
-          name: ${{ env.ARTIFACT_BASENAME }}
           path: "build/macos-${{ matrix.target }}/${{ env.ARTIFACT_BASENAME }}.dmg"
+          archive: false
   linux:
     needs: prepare
     runs-on: ubuntu-24.04
@@ -198,8 +198,8 @@ jobs:
       - name: "Upload artifact"
         uses: actions/upload-artifact@v7
         with:
-          name: ${{ env.ARTIFACT_BASENAME }}
           path: ${{ env.ARTIFACT_BASENAME }}.flatpak
+          archive: false
 
   windows:
     needs: prepare
@@ -272,8 +272,8 @@ jobs:
        - name: "Upload artifact"
          uses: actions/upload-artifact@v7
          with:
-           name: ${{ env.PACKAGE_FILE_NAME }}
            path: "build/win-${{ matrix.target }}/${{ env.PACKAGE_FILE_NAME }}.zip"
+           archive: false
 
   release:
     name: Draft release
@@ -291,6 +291,7 @@ jobs:
         uses: actions/download-artifact@v8
         with:
           path: release-assets
+          skip-decompress: true
 
       - name: Generate release notes
         run: >
@@ -335,6 +336,7 @@ jobs:
         uses: actions/download-artifact@v8
         with:
           path: release-assets
+          skip-decompress: true
 
       - name: Generate release notes
         env:
