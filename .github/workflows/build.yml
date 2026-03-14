@@ -7,6 +7,13 @@ on:
       - '*'
   pull_request:
   workflow_dispatch:
+
+env:
+  # Node 20 is deprecated, not all actions are ready.
+  # Dependabot will get them, for now force them to Node 24
+  # to silence warnings
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
 jobs:
   prepare:
     name: Prepare metadata
