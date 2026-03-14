@@ -85,10 +85,6 @@ bool CPS2Seq::postLoad() {
   if (readMode != READMODE_CONVERT_TO_MIDI)
     return true;
 
-  if (fmt_version <= CPS1_V502) {
-    return true;
-  }
-
   const double UPDATE_RATE_IN_HZ = (fmt_version == CPS3) ? CPS3_DRIVER_RATE_HZ : CPS2_DRIVER_RATE_HZ;
 
   // We need to add pitch bend events for vibrato, which is controlled by a software LFO
