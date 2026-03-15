@@ -10,10 +10,10 @@
 #include <cmath>
 
 #include <QGraphicsDropShadowEffect>
-#include <QGuiApplication>
 #include <QMouseEvent>
 #include <QPalette>
 #include <QPainter>
+#include <QShowEvent>
 
 #include <algorithm>
 
@@ -38,10 +38,6 @@ SeekBar::SeekBar(QWidget* parent) : QWidget(parent) {
   setCursor(Qt::PointingHandCursor);
   setFocusPolicy(Qt::NoFocus);
   setAttribute(Qt::WA_NoSystemBackground);
-  connect(qApp, &QGuiApplication::applicationStateChanged, this, [this](Qt::ApplicationState) {
-    refreshCachedColors();
-    update();
-  });
   refreshCachedColors();
 }
 
@@ -86,14 +82,21 @@ void SeekBar::changeEvent(QEvent* event) {
     case QEvent::ApplicationPaletteChange:
     case QEvent::PaletteChange:
     case QEvent::StyleChange:
-    case QEvent::WindowActivate:
-    case QEvent::WindowDeactivate:
       refreshCachedColors();
       update();
       break;
     default:
       break;
   }
+}
+
+bool SeekBar::eventFilter(QObject* watched, QEvent* event) {
+  if (watched == window() &&
+      (event->type() == QEvent::WindowActivate || event->type() == QEvent::WindowDeactivate)) {
+    refreshCachedColors();
+    repaint();
+  }
+  return QWidget::eventFilter(watched, event);
 }
 
 void SeekBar::mousePressEvent(QMouseEvent* event) {
@@ -153,6 +156,13 @@ void SeekBar::paintEvent(QPaintEvent* event) {
 
   const qreal thumbTop = rect().center().y() + HORIZONTAL_THUMB_Y_OFFSET - THUMB_PIXMAP_SIZE * 0.5;
   painter.drawPixmap(QPointF(centerX - THUMB_PIXMAP_SIZE * 0.5, thumbTop), m_thumbPixmap);
+}
+
+void SeekBar::showEvent(QShowEvent* event) {
+  if (QWidget* topLevel = window(); topLevel && topLevel != this) {
+    topLevel->installEventFilter(this);
+  }
+  QWidget::showEvent(event);
 }
 
 void SeekBar::invalidatePixmaps() {

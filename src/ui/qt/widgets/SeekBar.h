@@ -32,10 +32,12 @@ signals:
 
 protected:
   void changeEvent(QEvent* event) override;
+  bool eventFilter(QObject* watched, QEvent* event) override;
   void mousePressEvent(QMouseEvent* event) override;
   void mouseMoveEvent(QMouseEvent* event) override;
   void mouseReleaseEvent(QMouseEvent* event) override;
   void paintEvent(QPaintEvent* event) override;
+  void showEvent(QShowEvent* event) override;
 
 private:
   [[nodiscard]] QRectF trackRect() const;
