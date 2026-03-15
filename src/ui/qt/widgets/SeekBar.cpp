@@ -246,6 +246,7 @@ void SeekBar::refreshCachedColors() {
     m_trackColor = darkPalette ? window.lighter(132) : window.darker(102);
     m_fillColor = darkPalette ? window.lighter(145) : window.darker(120);
     m_thumbColor = darkPalette ? window.lighter(235) : window.lighter(106);
+    m_thumbShadowColor = QColor(0, 0, 0, darkPalette ? 36 : 28);
   } else {
     m_trackColor = darkPalette ? window.lighter(enabled ? 150 : 138)
                                : window.darker(enabled ? 125 : 120);
@@ -253,8 +254,8 @@ void SeekBar::refreshCachedColors() {
                               : window.darker(enabled ? 145 : 132);
     m_thumbColor = darkPalette ? window.lighter(enabled ? 310 : 250)
                                : window.lighter(enabled ? 150 : 102);
+    m_thumbShadowColor = QColor(0, 0, 0, darkPalette ? (enabled ? 52 : 36) : (enabled ? 42 : 28));
   }
-  m_thumbShadowColor = QColor(0, 0, 0, darkPalette ? (enabled ? 52 : 36) : (enabled ? 42 : 28));
   m_thumbPen = QPen(QColor(0, 0, 0, darkPalette ? (enabled ? 44 : 30) : (enabled ? 32 : 24)));
   m_thumbPen.setCosmetic(true);
   invalidatePixmaps();
