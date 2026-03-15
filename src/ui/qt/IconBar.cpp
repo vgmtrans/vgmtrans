@@ -83,7 +83,7 @@ void IconBar::showPlayInfo() {
 void IconBar::playbackRangeUpdate(int cur, int max, PositionChangeOrigin origin) {
   const int previousMaximum = m_slider->maximum();
   const bool rangeChanged = max != previousMaximum;
-  const bool forceImmediateUpdate = cur == m_slider->minimum() || max < previousMaximum;
+  const bool forceImmediateUpdate = cur == m_slider->minimum() || rangeChanged;
 
   if (rangeChanged) {
     m_slider->setRange(0, max);
