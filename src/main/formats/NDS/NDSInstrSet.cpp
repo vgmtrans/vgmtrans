@@ -244,6 +244,13 @@ void NDSInstr::getArticData(VGMRgn* rgn, uint32_t offset) const {
     rgn->pan = 0.5;
   else
     rgn->pan = static_cast<double>(Pan) / 127;
+
+  // NDS modulation control commands are mapped to some MIDI CC(s).
+  // SF2 has implicit CC1 as Vibrato LFO pitch-depth modulator; 
+  // we choose CC76 as Vibrato LFO frequency modulator.
+  // Base frequency and span have been chosen by trial and error.
+  rgn->setLfoVibFreqHz(0.375);
+  rgn->addModulator({ModSource::CC(76), ModDest::VibLfoFreq, 8400, ModSource{ModSourceType::None}, 0});
 }
 
 uint16_t NDSInstr::getFallingRate(uint8_t DecayTime) const {
