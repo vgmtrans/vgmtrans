@@ -80,17 +80,30 @@ void IconBar::showPlayInfo() {
   m_play->clearFocus();
 }
 
-void IconBar::playbackRangeUpdate(int cur, int max) const {
+void IconBar::playbackRangeUpdate(int cur, int max, PositionChangeOrigin origin) {
   if (max != m_slider->maximum()) {
     m_slider->setRange(0, max);
   }
 
-  if (!m_slider->isSliderDown()) {
-    m_slider->setValue(cur);
+  if (m_slider->isSliderDown()) {
+    m_skipNextPlaybackSliderUpdate = false;
+    return;
   }
+
+  if (origin == PositionChangeOrigin::Playback) {
+    m_skipNextPlaybackSliderUpdate = !m_skipNextPlaybackSliderUpdate;
+    if (m_skipNextPlaybackSliderUpdate) {
+      return;
+    }
+  } else {
+    m_skipNextPlaybackSliderUpdate = false;
+  }
+
+  m_slider->setValue(cur);
 }
 
-void IconBar::playerStatusChanged(bool playing) const {
+void IconBar::playerStatusChanged(bool playing) {
+  m_skipNextPlaybackSliderUpdate = false;
   if (playing) {
     m_slider->setEnabled(true);
     m_play->setIcon(s_pauseicon);
