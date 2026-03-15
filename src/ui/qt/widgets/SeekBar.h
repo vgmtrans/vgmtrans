@@ -8,6 +8,7 @@
 
 #include <QColor>
 #include <QPen>
+#include <QPixmap>
 #include <QWidget>
 
 class SeekBar : public QWidget {
@@ -43,6 +44,8 @@ private:
   [[nodiscard]] qreal displayedThumbCenterForValue(int value) const;
   [[nodiscard]] int valueForPosition(const QPointF& pos) const;
   [[nodiscard]] QRect dirtyRectForValues(int oldValue, int newValue) const;
+  void invalidatePixmaps();
+  void ensurePixmaps();
   void refreshCachedColors();
   void updateValueFromPointer(const QPointF& pos);
 
@@ -53,5 +56,12 @@ private:
   QColor m_trackColor;
   QColor m_fillColor;
   QColor m_thumbColor;
+  QColor m_thumbShadowColor;
   QPen m_thumbPen;
+  QPixmap m_trackPixmap;
+  QPixmap m_thumbPixmap;
+  QSize m_cachedPixmapSize;
+  qreal m_cachedPixmapDpr = 0.0;
+  bool m_thumbShadowEnabled = false;
+  bool m_pixmapsDirty = true;
 };

@@ -15,6 +15,8 @@ constexpr qreal TRACK_THICKNESS = 4.0;
 constexpr qreal THUMB_RADIUS = 10.0;
 constexpr qreal TRACK_RADIUS = TRACK_THICKNESS * 0.5;
 constexpr qreal HORIZONTAL_THUMB_Y_OFFSET = 1.0;
+constexpr qreal THUMB_SHADOW_Y_OFFSET = 1.5;
+constexpr qreal THUMB_PIXMAP_SIZE = THUMB_RADIUS * 2.0 + 6.0;
 constexpr qreal DISPLAY_STEPS_PER_DEVICE_PIXEL = 2.0;
 constexpr int DIRTY_PADDING = 2;
 }
@@ -112,32 +114,88 @@ void SeekBar::mouseReleaseEvent(QMouseEvent* event) {
 }
 
 void SeekBar::paintEvent(QPaintEvent* event) {
+  ensurePixmaps();
+
   QPainter painter(this);
   painter.setRenderHint(QPainter::Antialiasing, true);
-  painter.setClipRect(event->rect());
+  const QRectF dirtyRect = event->rect();
+  painter.setClipRect(dirtyRect);
 
+  const qreal centerX = displayedThumbCenterForValue(m_value);
   const QRectF track = trackRect();
+  painter.drawPixmap(track.topLeft(), m_trackPixmap);
 
-  painter.setPen(Qt::NoPen);
-  painter.setBrush(m_trackColor);
-  painter.drawRoundedRect(track, TRACK_RADIUS, TRACK_RADIUS);
-
-  if (m_maximum > m_minimum) {
-    const qreal thumbCenter = displayedThumbCenterForValue(m_value);
-    QRectF played = track;
-    played.setRight(std::max(track.left(), thumbCenter));
-    if (played.width() > 0.0 && played.height() > 0.0) {
-      painter.setBrush(m_fillColor);
-      painter.drawRoundedRect(played, TRACK_RADIUS, TRACK_RADIUS);
-    }
+  QRectF playedRect = track;
+  playedRect.setRight(std::max(track.left(), centerX));
+  if (!playedRect.isEmpty()) {
+    painter.setPen(Qt::NoPen);
+    painter.setBrush(m_fillColor);
+    painter.drawRoundedRect(playedRect, TRACK_RADIUS, TRACK_RADIUS);
   }
 
-  painter.setBrush(m_thumbColor);
-  painter.setPen(m_thumbPen);
-  const qreal centerX = displayedThumbCenterForValue(m_value);
-  painter.drawEllipse(QPointF(centerX, rect().center().y() + HORIZONTAL_THUMB_Y_OFFSET),
-                      THUMB_RADIUS,
-                      THUMB_RADIUS);
+  const qreal thumbTop = rect().center().y() + HORIZONTAL_THUMB_Y_OFFSET - THUMB_PIXMAP_SIZE * 0.5;
+  painter.drawPixmap(QPointF(centerX - THUMB_PIXMAP_SIZE * 0.5, thumbTop), m_thumbPixmap);
+}
+
+void SeekBar::invalidatePixmaps() {
+  m_pixmapsDirty = true;
+}
+
+void SeekBar::ensurePixmaps() {
+  const qreal dpr = devicePixelRatioF();
+  const QSize logicalSize = size();
+  if (!m_pixmapsDirty && m_cachedPixmapSize == logicalSize && qFuzzyCompare(m_cachedPixmapDpr, dpr)) {
+    return;
+  }
+
+  m_cachedPixmapSize = logicalSize;
+  m_cachedPixmapDpr = dpr;
+  m_pixmapsDirty = false;
+
+  const QSize pixelSize = QSizeF(width() * dpr, height() * dpr).toSize();
+  const QRectF track = trackRect();
+  const QSize trackPixelSize = QSizeF(track.width() * dpr, track.height() * dpr).toSize();
+  if (pixelSize.isEmpty() || trackPixelSize.isEmpty()) {
+    m_trackPixmap = QPixmap();
+    m_thumbPixmap = QPixmap();
+    return;
+  }
+
+  m_trackPixmap = QPixmap(trackPixelSize);
+  m_trackPixmap.setDevicePixelRatio(dpr);
+  m_trackPixmap.fill(Qt::transparent);
+
+  {
+    QPainter trackPainter(&m_trackPixmap);
+    trackPainter.setRenderHint(QPainter::Antialiasing, true);
+    trackPainter.setPen(Qt::NoPen);
+    trackPainter.setBrush(m_trackColor);
+    trackPainter.drawRoundedRect(QRectF(0.0, 0.0, track.width(), track.height()),
+                                 TRACK_RADIUS,
+                                 TRACK_RADIUS);
+  }
+
+  const QSize thumbPixelSize = QSizeF(THUMB_PIXMAP_SIZE * dpr, THUMB_PIXMAP_SIZE * dpr).toSize();
+  m_thumbPixmap = QPixmap(thumbPixelSize);
+  m_thumbPixmap.setDevicePixelRatio(dpr);
+  m_thumbPixmap.fill(Qt::transparent);
+
+  {
+    QPainter thumbPainter(&m_thumbPixmap);
+    thumbPainter.setRenderHint(QPainter::Antialiasing, true);
+    const QPointF center(THUMB_PIXMAP_SIZE * 0.5, THUMB_PIXMAP_SIZE * 0.5);
+    if (m_thumbShadowEnabled) {
+      thumbPainter.setPen(Qt::NoPen);
+      thumbPainter.setBrush(m_thumbShadowColor);
+      thumbPainter.drawEllipse(center + QPointF(0.0, THUMB_SHADOW_Y_OFFSET),
+                               THUMB_RADIUS + 0.5,
+                               THUMB_RADIUS + 0.5);
+    }
+
+    thumbPainter.setBrush(m_thumbColor);
+    thumbPainter.setPen(m_thumbPen);
+    thumbPainter.drawEllipse(center, THUMB_RADIUS, THUMB_RADIUS);
+  }
 }
 
 void SeekBar::refreshCachedColors() {
@@ -153,10 +211,13 @@ void SeekBar::refreshCachedColors() {
                             : window.darker(enabled ? 145 : 132);
   m_thumbColor = darkPalette ? window.lighter(enabled ? 310 : 250)
                              : window.lighter(enabled ? 150 : 102);
+  m_thumbShadowEnabled = !darkPalette;
+  m_thumbShadowColor = QColor(0, 0, 0, enabled ? 42 : 28);
 
   m_thumbPen = QPen(QColor(0, 0, 0, darkPalette ? 55 : 100));
   m_thumbPen.setWidth(1);
   m_thumbPen.setCosmetic(true);
+  invalidatePixmaps();
 }
 
 QRectF SeekBar::trackRect() const {
