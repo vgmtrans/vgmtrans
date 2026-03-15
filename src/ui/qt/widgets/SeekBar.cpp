@@ -29,7 +29,6 @@ constexpr qreal THUMB_SHADOW_Y_OFFSET = 1.0;
 constexpr qreal THUMB_SHADOW_EXTENT = 8.0;
 constexpr qreal THUMB_SOURCE_SIZE = THUMB_RADIUS * 2.0 + THUMB_SOURCE_PADDING * 2.0;
 constexpr qreal THUMB_PIXMAP_SIZE = THUMB_SOURCE_SIZE + THUMB_SHADOW_EXTENT * 2.0;
-constexpr qreal DISPLAY_STEPS_PER_DEVICE_PIXEL = 2.0;
 constexpr int DIRTY_PADDING = 2;
 }
 
@@ -284,12 +283,12 @@ qreal SeekBar::thumbCenterForValue(int value) const {
 int SeekBar::displayedThumbStep(int value) const {
   // Quantize the rendered thumb position to half-device-pixel steps.
   return static_cast<int>(
-      std::lround(thumbCenterForValue(value) * devicePixelRatioF() * DISPLAY_STEPS_PER_DEVICE_PIXEL));
+      std::lround(thumbCenterForValue(value) * devicePixelRatioF()));
 }
 
 qreal SeekBar::displayedThumbCenterForValue(int value) const {
   return static_cast<qreal>(displayedThumbStep(value)) /
-         (devicePixelRatioF() * DISPLAY_STEPS_PER_DEVICE_PIXEL);
+         devicePixelRatioF();
 }
 
 int SeekBar::valueForPosition(const QPointF& pos) const {
