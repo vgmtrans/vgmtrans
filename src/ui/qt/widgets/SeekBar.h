@@ -64,6 +64,5 @@ private:
   QPixmap m_thumbPixmap;
   QSize m_cachedPixmapSize;
   qreal m_cachedPixmapDpr = 0.0;
-  bool m_thumbShadowEnabled = false;
   bool m_pixmapsDirty = true;
 };

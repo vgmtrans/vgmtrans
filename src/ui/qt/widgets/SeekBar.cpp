@@ -222,20 +222,14 @@ void SeekBar::ensurePixmaps() {
     thumbPainter.drawEllipse(center, scaledRadius, scaledRadius);
   }
 
-  if (m_thumbShadowEnabled) {
-    auto* shadowEffect = new QGraphicsDropShadowEffect;
-    shadowEffect->setBlurRadius(THUMB_SHADOW_BLUR_RADIUS * dpr);
-    shadowEffect->setOffset(THUMB_SHADOW_X_OFFSET * dpr, THUMB_SHADOW_Y_OFFSET * dpr);
-    shadowEffect->setColor(m_thumbShadowColor);
-    applyEffectToPixmap(thumbSourcePixmap,
-                        m_thumbPixmap,
-                        shadowEffect,
-                        static_cast<int>(std::ceil(THUMB_SHADOW_EXTENT * dpr)));
-  } else {
-    m_thumbPixmap.fill(Qt::transparent);
-    QPainter thumbPainter(&m_thumbPixmap);
-    thumbPainter.drawPixmap(QPointF(THUMB_SHADOW_EXTENT * dpr, THUMB_SHADOW_EXTENT * dpr), thumbSourcePixmap);
-  }
+  auto* shadowEffect = new QGraphicsDropShadowEffect;
+  shadowEffect->setBlurRadius(THUMB_SHADOW_BLUR_RADIUS * dpr);
+  shadowEffect->setOffset(THUMB_SHADOW_X_OFFSET * dpr, THUMB_SHADOW_Y_OFFSET * dpr);
+  shadowEffect->setColor(m_thumbShadowColor);
+  applyEffectToPixmap(thumbSourcePixmap,
+                      m_thumbPixmap,
+                      shadowEffect,
+                      static_cast<int>(std::ceil(THUMB_SHADOW_EXTENT * dpr)));
 
   m_thumbPixmap.setDevicePixelRatio(dpr);
 }
@@ -260,7 +254,6 @@ void SeekBar::refreshCachedColors() {
     m_thumbColor = darkPalette ? window.lighter(enabled ? 310 : 250)
                                : window.lighter(enabled ? 150 : 102);
   }
-  m_thumbShadowEnabled = true;
   m_thumbShadowColor = QColor(0, 0, 0, darkPalette ? (enabled ? 52 : 36) : (enabled ? 42 : 28));
   m_thumbPen = QPen(QColor(0, 0, 0, darkPalette ? (enabled ? 44 : 30) : (enabled ? 32 : 24)));
   m_thumbPen.setCosmetic(true);
