@@ -147,7 +147,7 @@ void SeekBar::refreshCachedColors() {
   const bool enabled = isEnabled();
   const bool darkPalette = window.lightnessF() < 0.5;
 
-  m_trackColor = darkPalette ? window.lighter(enabled ? 132 : 125)
+  m_trackColor = darkPalette ? window.lighter(enabled ? 150 : 138)
                              : window.darker(enabled ? 125 : 120);
   m_fillColor = darkPalette ? window.lighter(enabled ? 200 : 150)
                             : window.darker(enabled ? 145 : 132);
