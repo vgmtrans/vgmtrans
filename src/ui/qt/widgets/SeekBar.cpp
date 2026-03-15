@@ -5,9 +5,15 @@
  */
 
 #include "SeekBar.h"
+#include "UIHelpers.h"
+
+#include <cmath>
+
+#include <QGraphicsDropShadowEffect>
 #include <QMouseEvent>
 #include <QPalette>
 #include <QPainter>
+
 #include <algorithm>
 
 namespace {
@@ -15,8 +21,13 @@ constexpr qreal TRACK_THICKNESS = 4.0;
 constexpr qreal THUMB_RADIUS = 10.0;
 constexpr qreal TRACK_RADIUS = TRACK_THICKNESS * 0.5;
 constexpr qreal HORIZONTAL_THUMB_Y_OFFSET = 1.0;
+constexpr qreal THUMB_SOURCE_PADDING = 1.0;
+constexpr qreal THUMB_SHADOW_BLUR_RADIUS = 5.0;
+constexpr qreal THUMB_SHADOW_X_OFFSET = 0.0;
 constexpr qreal THUMB_SHADOW_Y_OFFSET = 1.5;
-constexpr qreal THUMB_PIXMAP_SIZE = THUMB_RADIUS * 2.0 + 6.0;
+constexpr qreal THUMB_SHADOW_EXTENT = 8.0;
+constexpr qreal THUMB_SOURCE_SIZE = THUMB_RADIUS * 2.0 + THUMB_SOURCE_PADDING * 2.0;
+constexpr qreal THUMB_PIXMAP_SIZE = THUMB_SOURCE_SIZE + THUMB_SHADOW_EXTENT * 2.0;
 constexpr qreal DISPLAY_STEPS_PER_DEVICE_PIXEL = 2.0;
 constexpr int DIRTY_PADDING = 2;
 }
@@ -177,25 +188,39 @@ void SeekBar::ensurePixmaps() {
 
   const QSize thumbPixelSize = QSizeF(THUMB_PIXMAP_SIZE * dpr, THUMB_PIXMAP_SIZE * dpr).toSize();
   m_thumbPixmap = QPixmap(thumbPixelSize);
-  m_thumbPixmap.setDevicePixelRatio(dpr);
   m_thumbPixmap.fill(Qt::transparent);
 
-  {
-    QPainter thumbPainter(&m_thumbPixmap);
-    thumbPainter.setRenderHint(QPainter::Antialiasing, true);
-    const QPointF center(THUMB_PIXMAP_SIZE * 0.5, THUMB_PIXMAP_SIZE * 0.5);
-    if (m_thumbShadowEnabled) {
-      thumbPainter.setPen(Qt::NoPen);
-      thumbPainter.setBrush(m_thumbShadowColor);
-      thumbPainter.drawEllipse(center + QPointF(0.0, THUMB_SHADOW_Y_OFFSET),
-                               THUMB_RADIUS + 0.5,
-                               THUMB_RADIUS + 0.5);
-    }
+  const QSize thumbSourcePixelSize = QSizeF(THUMB_SOURCE_SIZE * dpr, THUMB_SOURCE_SIZE * dpr).toSize();
+  QPixmap thumbSourcePixmap(thumbSourcePixelSize);
+  thumbSourcePixmap.fill(Qt::transparent);
 
+  {
+    QPainter thumbPainter(&thumbSourcePixmap);
+    thumbPainter.setRenderHint(QPainter::Antialiasing, true);
+    const qreal scaledRadius = THUMB_RADIUS * dpr;
+    const qreal scaledPadding = THUMB_SOURCE_PADDING * dpr;
+    const QPointF center(scaledPadding + scaledRadius, scaledPadding + scaledRadius);
     thumbPainter.setBrush(m_thumbColor);
     thumbPainter.setPen(m_thumbPen);
-    thumbPainter.drawEllipse(center, THUMB_RADIUS, THUMB_RADIUS);
+    thumbPainter.drawEllipse(center, scaledRadius, scaledRadius);
   }
+
+  if (m_thumbShadowEnabled) {
+    auto* shadowEffect = new QGraphicsDropShadowEffect;
+    shadowEffect->setBlurRadius(THUMB_SHADOW_BLUR_RADIUS * dpr);
+    shadowEffect->setOffset(THUMB_SHADOW_X_OFFSET * dpr, THUMB_SHADOW_Y_OFFSET * dpr);
+    shadowEffect->setColor(m_thumbShadowColor);
+    applyEffectToPixmap(thumbSourcePixmap,
+                        m_thumbPixmap,
+                        shadowEffect,
+                        static_cast<int>(std::ceil(THUMB_SHADOW_EXTENT * dpr)));
+  } else {
+    m_thumbPixmap.fill(Qt::transparent);
+    QPainter thumbPainter(&m_thumbPixmap);
+    thumbPainter.drawPixmap(QPointF(THUMB_SHADOW_EXTENT * dpr, THUMB_SHADOW_EXTENT * dpr), thumbSourcePixmap);
+  }
+
+  m_thumbPixmap.setDevicePixelRatio(dpr);
 }
 
 void SeekBar::refreshCachedColors() {
