@@ -203,13 +203,12 @@ void blitGlyphAlpha(QImage& dst, int dstX, int dstY, const QImage& src) {
         continue;
       }
 
-      // Pull the per-pixel coverage out of whatever Qt image format `src` uses.
+      // Pull the per-pixel alpha out of whatever Qt image format `src` uses.
       const int alpha = alphaAt(src, srcLine, x);
       if (alpha == 0) {
         continue;
       }
-      // Store a white glyph with premultiplied alpha; later passes apply the real
-      // foreground color, so the atlas only needs coverage, not final RGB.
+      // Store a white glyph with premultiplied alpha
       dstLine[outX] = qPremultiply(qRgba(255, 255, 255, alpha));
     }
   }
