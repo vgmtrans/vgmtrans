@@ -10,6 +10,7 @@
 #include <cmath>
 
 #include <QGraphicsDropShadowEffect>
+#include <QGuiApplication>
 #include <QMouseEvent>
 #include <QPalette>
 #include <QPainter>
@@ -37,6 +38,10 @@ SeekBar::SeekBar(QWidget* parent) : QWidget(parent) {
   setCursor(Qt::PointingHandCursor);
   setFocusPolicy(Qt::NoFocus);
   setAttribute(Qt::WA_NoSystemBackground);
+  connect(qApp, &QGuiApplication::applicationStateChanged, this, [this](Qt::ApplicationState) {
+    refreshCachedColors();
+    update();
+  });
   refreshCachedColors();
 }
 
@@ -81,6 +86,8 @@ void SeekBar::changeEvent(QEvent* event) {
     case QEvent::ApplicationPaletteChange:
     case QEvent::PaletteChange:
     case QEvent::StyleChange:
+    case QEvent::WindowActivate:
+    case QEvent::WindowDeactivate:
       refreshCachedColors();
       update();
       break;
@@ -226,16 +233,23 @@ void SeekBar::ensurePixmaps() {
 void SeekBar::refreshCachedColors() {
   // Cache palette-derived tones so playback repaint work stays down to geometry only.
   const QPalette palette = this->palette();
-  const QColor window = palette.color(QPalette::Window);
   const bool enabled = isEnabled();
+  const bool windowActive = !window() || window()->isActiveWindow();
+  const QColor window = palette.color(QPalette::Window);
   const bool darkPalette = window.lightnessF() < 0.5;
 
-  m_trackColor = darkPalette ? window.lighter(enabled ? 150 : 138)
-                             : window.darker(enabled ? 125 : 120);
-  m_fillColor = darkPalette ? window.lighter(enabled ? 200 : 150)
-                            : window.darker(enabled ? 145 : 132);
-  m_thumbColor = darkPalette ? window.lighter(enabled ? 310 : 250)
-                             : window.lighter(enabled ? 150 : 102);
+  if (!windowActive) {
+    m_trackColor = darkPalette ? window.lighter(132) : window.darker(102);
+    m_fillColor = darkPalette ? window.lighter(145) : window.darker(120);
+    m_thumbColor = darkPalette ? window.lighter(235) : window.lighter(106);
+  } else {
+    m_trackColor = darkPalette ? window.lighter(enabled ? 150 : 138)
+                               : window.darker(enabled ? 125 : 120);
+    m_fillColor = darkPalette ? window.lighter(enabled ? 200 : 150)
+                              : window.darker(enabled ? 145 : 132);
+    m_thumbColor = darkPalette ? window.lighter(enabled ? 310 : 250)
+                               : window.lighter(enabled ? 150 : 102);
+  }
   m_thumbShadowEnabled = true;
   m_thumbShadowColor = QColor(0, 0, 0, darkPalette ? (enabled ? 52 : 36) : (enabled ? 42 : 28));
   m_thumbPen = QPen(QColor(0, 0, 0, darkPalette ? (enabled ? 44 : 30) : (enabled ? 32 : 24)));
