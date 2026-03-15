@@ -239,9 +239,13 @@ void SeekBar::refreshCachedColors() {
   m_thumbShadowEnabled = !darkPalette;
   m_thumbShadowColor = QColor(0, 0, 0, enabled ? 42 : 28);
 
-  m_thumbPen = QPen(QColor(0, 0, 0, darkPalette ? 55 : 100));
-  m_thumbPen.setWidth(1);
-  m_thumbPen.setCosmetic(true);
+  if (darkPalette) {
+    m_thumbPen = QPen(QColor(0, 0, 0, 55));
+    m_thumbPen.setWidth(1);
+    m_thumbPen.setCosmetic(true);
+  } else {
+    m_thumbPen = Qt::NoPen;
+  }
   invalidatePixmaps();
 }
 
