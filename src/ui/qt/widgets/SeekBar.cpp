@@ -245,9 +245,9 @@ void SeekBar::refreshCachedColors() {
   if (!windowActive) {
     m_trackColor = darkPalette ? window.lighter(132) : window.darker(102);
     m_fillColor = darkPalette ? window.lighter(145) : window.darker(120);
-    m_thumbColor = darkPalette ? window.lighter(235) : window.lighter(103);
+    m_thumbColor = darkPalette ? window.lighter(235) : window.lighter(105);
     m_thumbShadowColor = QColor(0, 0, 0, darkPalette ? 36 : 28);
-    m_thumbPen = QPen(QColor(0, 0, 0, darkPalette ? 30 : 4));
+    m_thumbPen = QPen(QColor(0, 0, 0, darkPalette ? 30 : 8));
   } else {
     m_trackColor = darkPalette ? window.lighter(enabled ? 150 : 138)
                                : window.darker(enabled ? 125 : 120);
