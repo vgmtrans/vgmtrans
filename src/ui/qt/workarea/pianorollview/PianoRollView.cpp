@@ -91,8 +91,8 @@ PianoRollView::PianoRollView(QWidget* parent)
   m_scrollChrome->setHorizontalPolicy(Qt::ScrollBarAlwaysOn);
   m_scrollChrome->setVerticalPolicy(Qt::ScrollBarAlwaysOn);
   m_scrollChrome->setHorizontalButtons({
-      {RhiScrollButtonGlyph::Minus, [this]() { zoomHorizontal(-1, viewport()->width() / 2, true, 150); }},
-      {RhiScrollButtonGlyph::Plus, [this]() { zoomHorizontal(+1, viewport()->width() / 2, true, 150); }},
+      {RhiScrollButtonGlyph::Minus, [this]() { zoomHorizontalFromButton(-1); }},
+      {RhiScrollButtonGlyph::Plus, [this]() { zoomHorizontalFromButton(+1); }},
   });
   m_scrollChrome->setVerticalButtons({
       {RhiScrollButtonGlyph::Minus, [this]() { zoomVertical(-1, viewport()->height() / 2, true, 150); }},
@@ -2103,6 +2103,20 @@ VGMItem* PianoRollView::noteAtViewportPoint(const QPoint& pos) const {
     return nullptr;
   }
   return m_selectableNotes[static_cast<size_t>(noteIndex)].item;
+}
+
+void PianoRollView::zoomHorizontalFromButton(int steps) {
+  if (steps == 0) {
+    return;
+  }
+
+  const int playheadX = kKeyboardWidth + static_cast<int>(std::lround(
+      visualPlaybackTick() * std::max(0.0001f, m_pixelsPerTick) -
+      static_cast<float>(horizontalScrollBar()->value())));
+  const int anchorX = (playheadX >= kKeyboardWidth && playheadX < viewport()->width())
+      ? playheadX
+      : (viewport()->width() / 2);
+  zoomHorizontal(steps, anchorX, true, 150);
 }
 
 void PianoRollView::zoomHorizontal(int steps, int anchorX, bool animated, int durationMs) {
