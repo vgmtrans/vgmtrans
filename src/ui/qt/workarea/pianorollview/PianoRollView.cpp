@@ -617,26 +617,41 @@ void PianoRollView::keyReleaseEvent(QKeyEvent* event) {
 }
 
 void PianoRollView::timerEvent(QTimerEvent* event) {
-  if (!event || event->timerId() != m_noteSelectionAutoScrollTimer.timerId()) {
+  if (!event || event->timerId() != m_dragAutoScrollTimer.timerId()) {
     QAbstractScrollArea::timerEvent(event);
     return;
   }
 
   const bool leftDown = (QGuiApplication::mouseButtons() & Qt::LeftButton);
-  if (!leftDown || !m_noteSelectionPressActive || !m_noteSelectionDragging) {
-    stopNoteSelectionAutoScroll();
+  if (!leftDown || (!m_seekDragActive && (!m_noteSelectionPressActive || !m_noteSelectionDragging))) {
+    stopDragAutoScroll();
     return;
   }
 
   // Keep edge auto-scroll running even when the pointer stops moving.
   const QPoint pos = viewportPosFromGlobal(QPointF(QCursor::pos()));
-  const QPointF autoDelta = autoScrollDeltaForGraphDrag(pos);
-  if (autoDelta.isNull()) {
-    stopNoteSelectionAutoScroll();
+  if (m_seekDragActive) {
+    const qreal autoScrollX = autoScrollDeltaForGraphDrag(pos).x();
+    if (qFuzzyIsNull(autoScrollX)) {
+      stopDragAutoScroll();
+      return;
+    }
+
+    const QPoint panDelta = consumeDragAutoScrollDelta(QPointF(autoScrollX, 0.0));
+    if (!panDelta.isNull()) {
+      applyPanDragDelta(QPoint(panDelta.x(), 0));
+    }
+    updateSeekDrag(pos.x());
     return;
   }
 
-  const QPoint panDelta = consumeAutoScrollDelta(autoDelta);
+  const QPointF autoDelta = autoScrollDeltaForGraphDrag(pos);
+  if (autoDelta.isNull()) {
+    stopDragAutoScroll();
+    return;
+  }
+
+  const QPoint panDelta = consumeDragAutoScrollDelta(autoDelta);
   m_noteSelectionCurrent = pos;
   if (!panDelta.isNull()) {
     applyPanDragDelta(panDelta);
@@ -671,18 +686,35 @@ void PianoRollView::applyPanDragDelta(const QPoint& dragDelta) {
   requestRenderCoalesced();
 }
 
-void PianoRollView::stopNoteSelectionAutoScroll() {
-  m_noteSelectionAutoScrollTimer.stop();
-  m_noteSelectionAutoScrollRemainder = {};
+void PianoRollView::stopDragAutoScroll() {
+  m_dragAutoScrollTimer.stop();
+  m_dragAutoScrollRemainder = {};
 }
 
-QPoint PianoRollView::consumeAutoScrollDelta(const QPointF& dragDelta) {
+QPoint PianoRollView::consumeDragAutoScrollDelta(const QPointF& dragDelta) {
   // Preserve sub-pixel drag speed and emit whole-pixel scroll steps over time.
-  m_noteSelectionAutoScrollRemainder += dragDelta;
-  const int stepX = static_cast<int>(std::trunc(m_noteSelectionAutoScrollRemainder.x()));
-  const int stepY = static_cast<int>(std::trunc(m_noteSelectionAutoScrollRemainder.y()));
-  m_noteSelectionAutoScrollRemainder -= QPointF(stepX, stepY);
+  m_dragAutoScrollRemainder += dragDelta;
+  const int stepX = static_cast<int>(std::trunc(m_dragAutoScrollRemainder.x()));
+  const int stepY = static_cast<int>(std::trunc(m_dragAutoScrollRemainder.y()));
+  m_dragAutoScrollRemainder -= QPointF(stepX, stepY);
   return QPoint(stepX, stepY);
+}
+
+void PianoRollView::updateSeekDrag(int viewportX, bool forceEmit) {
+  const QRect graphRect = graphRectInViewport();
+  if (!graphRect.isEmpty()) {
+    viewportX = std::clamp(viewportX, graphRect.left(), graphRect.right());
+  }
+
+  const int tick = tickFromViewportX(viewportX);
+  if (!forceEmit && tick == m_currentTick) {
+    return;
+  }
+
+  m_currentTick = tick;
+  updateActiveKeyStates();
+  requestRender();
+  emit seekRequested(m_currentTick);
 }
 
 void PianoRollView::setInteractionCursor(Qt::CursorShape shape) {
@@ -830,7 +862,7 @@ bool PianoRollView::handleViewportMousePress(QMouseEvent* event) {
     return false;
   }
 
-  stopNoteSelectionAutoScroll();
+  stopDragAutoScroll();
   const Qt::KeyboardModifiers activeModifiers = mergedModifiers(event->modifiers());
   const QPoint pos = viewportPosFromGlobal(event->globalPosition());
   if (m_scrollChrome && m_scrollChrome->handleMousePress(pos)) {
@@ -885,14 +917,12 @@ void PianoRollView::beginSeekDragAtX(int viewportX) {
   m_noteSelectionPressActive = false;
   m_noteSelectionDragging = false;
   m_noteSelectionAnchorWorldValid = false;
+  stopDragAutoScroll();
   stopPlaybackAutoScrollAnimation();
   m_playbackAutoScrollEnabled = true;
   m_seekDragActive = true;
   updateInactiveNoteDimTarget();
-  m_currentTick = tickFromViewportX(viewportX);
-  updateActiveKeyStates();
-  requestRender();
-  emit seekRequested(m_currentTick);
+  updateSeekDrag(viewportX, true);
 }
 
 bool PianoRollView::handleViewportMouseMove(QMouseEvent* event) {
@@ -929,28 +959,32 @@ bool PianoRollView::handleViewportMouseMove(QMouseEvent* event) {
   if (m_seekDragActive) {
     if (!(activeButtons & Qt::LeftButton)) {
       m_seekDragActive = false;
+      stopDragAutoScroll();
       updateInactiveNoteDimTarget();
       event->accept();
       return true;
     }
 
-    m_currentTick = tickFromViewportX(pos.x());
-    updateActiveKeyStates();
-    requestRender();
-    emit seekRequested(m_currentTick);
+    updateSeekDrag(pos.x());
+    const qreal autoScrollX = autoScrollDeltaForGraphDrag(pos).x();
+    if (qFuzzyIsNull(autoScrollX)) {
+      stopDragAutoScroll();
+    } else if (!m_dragAutoScrollTimer.isActive()) {
+      m_dragAutoScrollTimer.start(kNoteSelectionAutoScrollIntervalMs, this);
+    }
 
     event->accept();
     return true;
   }
 
   if (!m_noteSelectionPressActive) {
-    stopNoteSelectionAutoScroll();
+    stopDragAutoScroll();
     refreshInteractionCursor(activeModifiers);
     return false;
   }
 
   if (!(activeButtons & Qt::LeftButton)) {
-    stopNoteSelectionAutoScroll();
+    stopDragAutoScroll();
     m_noteSelectionPressActive = false;
     m_noteSelectionDragging = false;
     m_noteSelectionAnchorWorldValid = false;
@@ -972,17 +1006,17 @@ bool PianoRollView::handleViewportMouseMove(QMouseEvent* event) {
     // Timer-driven only: mouse-move just arms/disarms edge auto-scroll.
     const QPointF autoDelta = autoScrollDeltaForGraphDrag(pos);
     if (autoDelta.isNull()) {
-      stopNoteSelectionAutoScroll();
+      stopDragAutoScroll();
     } else {
-      if (!m_noteSelectionAutoScrollTimer.isActive()) {
-        m_noteSelectionAutoScrollTimer.start(kNoteSelectionAutoScrollIntervalMs, this);
+      if (!m_dragAutoScrollTimer.isActive()) {
+        m_dragAutoScrollTimer.start(kNoteSelectionAutoScrollIntervalMs, this);
       }
     }
     updateMarqueeSelection(false);
     updateMarqueePreview(pos);
     requestRenderCoalesced();
   } else {
-    stopNoteSelectionAutoScroll();
+    stopDragAutoScroll();
     previewSingleNoteAtViewportPoint(pos);
   }
 
@@ -996,7 +1030,7 @@ bool PianoRollView::handleViewportMouseRelease(QMouseEvent* event) {
     return false;
   }
 
-  stopNoteSelectionAutoScroll();
+  stopDragAutoScroll();
   const Qt::KeyboardModifiers activeModifiers = mergedModifiers(event->modifiers());
   const QPoint pos = viewportPosFromGlobal(event->globalPosition());
   if (!m_panDragActive && !m_seekDragActive && !m_noteSelectionPressActive &&
@@ -1012,11 +1046,9 @@ bool PianoRollView::handleViewportMouseRelease(QMouseEvent* event) {
   }
 
   if (m_seekDragActive) {
-    m_currentTick = tickFromViewportX(pos.x());
+    updateSeekDrag(pos.x());
     m_seekDragActive = false;
     updateInactiveNoteDimTarget();
-    updateActiveKeyStates();
-    requestRender();
 
     event->accept();
     return true;
@@ -1056,7 +1088,9 @@ bool PianoRollView::handleViewportMouseRelease(QMouseEvent* event) {
 }
 
 void PianoRollView::handleViewportLeave() {
-  stopNoteSelectionAutoScroll();
+  if (!m_seekDragActive && !m_noteSelectionDragging) {
+    stopDragAutoScroll();
+  }
   if (m_scrollChrome) {
     m_scrollChrome->handleLeave();
   }
