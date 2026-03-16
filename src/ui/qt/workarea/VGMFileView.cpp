@@ -1692,13 +1692,14 @@ void VGMFileView::onPlaybackPositionChanged(int current, int max, PositionChange
 
         // Immediately follow up with a current-tick-only pass so skip-faded events can settle.
         QTimer::singleShot(0, this, [this, current, max] {
-          onPlaybackPositionChanged(current, max, PositionChangeOrigin::HexView);
+          onPlaybackPositionChanged(current, max, PositionChangeOrigin::SeekBarSettle);
         });
       } else {
         m_playbackCursor->getActiveAt(current, m_playbackTimedEvents);
       }
       break;
     case PositionChangeOrigin::HexView:
+    case PositionChangeOrigin::SeekBarSettle:
       m_playbackCursor->getActiveAt(current, m_playbackTimedEvents);
       break;
   }

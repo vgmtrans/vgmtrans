@@ -20,7 +20,8 @@ class VGMColl;
 enum class PositionChangeOrigin {
   Playback,
   SeekBar,
-  HexView
+  HexView,
+  SeekBarSettle
 };
 
 class SequencePlayer : public QObject {
