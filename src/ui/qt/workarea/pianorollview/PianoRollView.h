@@ -66,6 +66,7 @@ public:
                        bool playbackActive,
                        const std::vector<PianoRollFrame::Note>* activeNotes = nullptr);
   void clearPlaybackState();
+  void enablePlaybackAutoScroll();
   void setSmoothAutoScrollEnabled(bool enabled);
   [[nodiscard]] bool smoothAutoScrollEnabled() const;
   void ensureTickVisible(int tick, float viewportFraction = 0.10f, bool animated = false);
