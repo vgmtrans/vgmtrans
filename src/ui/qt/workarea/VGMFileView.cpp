@@ -1789,10 +1789,10 @@ void VGMFileView::onPlaybackPositionChanged(int current, int max, PositionChange
     }
     if (panelUi.pianoRollView && panelUi.pianoRollView->isVisible()) {
       if (origin == PositionChangeOrigin::SeekBar || origin == PositionChangeOrigin::HexView) {
-        panelUi.pianoRollView->ensureTickVisible(current, 0.10f, false);
-        panelUi.pianoRollView->enablePlaybackAutoScroll();
+        panelUi.pianoRollView->setPlaybackTickFromSeek(current, playbackRunning, &activeNotes);
+      } else {
+        panelUi.pianoRollView->setPlaybackTick(current, playbackRunning, &activeNotes);
       }
-      panelUi.pianoRollView->setPlaybackTick(current, playbackRunning, &activeNotes);
     }
   }
 }
