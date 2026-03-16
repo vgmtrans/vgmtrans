@@ -107,6 +107,7 @@ private:
     uint8_t key = 0;
     int16_t trackIndex = -1;
     VGMItem* item = nullptr;
+    const SeqTimedEvent* timedEvent = nullptr;
   };
 
   struct FrameColors {
@@ -204,6 +205,7 @@ private:
   [[nodiscard]] std::vector<VGMItem*> uniqueItemsForNoteIndices(
       const std::vector<size_t>& indices) const;
   void rebuildSelectedNotesCache();
+  void updateSeekPreview();
   void previewSingleNoteAtViewportPoint(const QPoint& pos);
   void applySelectedNoteIndices(std::vector<size_t> indices,
                                 bool emitSelectionSignal,
@@ -211,7 +213,7 @@ private:
   void emitCurrentSelectionSignals();
   void updateMarqueeSelection(bool emitSelectionSignal);
   void updateMarqueePreview(const QPoint& cursorPos);
-  void applyPreviewNoteIndices(std::vector<size_t> indices, size_t anchorIndex, int previewTick);
+  void applyPreviewNoteIndices(std::vector<size_t> indices, int previewTick);
   void clearPreviewNotes();
   void beginSeekDragAtX(int viewportX);
 
@@ -294,7 +296,6 @@ private:
   bool m_noteSelectionAnchorWorldValid = false;
   QBasicTimer m_dragAutoScrollTimer;
   VGMItem* m_primarySelectedItem = nullptr;
-  size_t m_previewAnchorNoteIndex = kInvalidNoteIndex;
 
   // Primary map for regular sequences.
   std::unordered_map<const SeqTrack*, int> m_trackIndexByPtr;
@@ -312,8 +313,10 @@ private:
   std::shared_ptr<const std::vector<PianoRollFrame::TimeSignature>> m_timeSignatures;
   std::vector<SelectableNote> m_selectableNotes;
   std::unordered_map<const SeqTimedEvent*, uint8_t> m_transposedKeyByTimedEvent;
+  std::unordered_map<const SeqTimedEvent*, size_t> m_noteIndexByTimedEvent;
   std::vector<size_t> m_selectedNoteIndices;
   std::vector<size_t> m_previewNoteIndices;
+  int m_previewTick = -1;
 
   std::array<ActiveKeyState, kMidiKeyCount> m_activeKeys{};
 };
