@@ -286,7 +286,8 @@ void PianoRollView::refreshSequenceData(bool allowTimelineBuild) {
 }
 
 void PianoRollView::setSelectedItems(const std::vector<const VGMItem*>& items,
-                                     const VGMItem* primaryItem) {
+                                     const VGMItem* primaryItem,
+                                     bool revealSelection) {
   if (m_selectableNotes.empty()) {
     applySelectedNoteIndices({}, false, nullptr);
     return;
@@ -308,7 +309,51 @@ void PianoRollView::setSelectedItems(const std::vector<const VGMItem*>& items,
     }
   }
 
+  const VGMItem* previousPrimary = m_primarySelectedItem;
+  const bool selectionChanged = (indices != m_selectedNoteIndices);
   applySelectedNoteIndices(std::move(indices), false, const_cast<VGMItem*>(primaryItem));
+
+  if (!revealSelection || (!selectionChanged && m_primarySelectedItem == previousPrimary)) {
+    return;
+  }
+
+  size_t targetIndex = kInvalidNoteIndex;
+  if (m_primarySelectedItem) {
+    for (size_t index : m_selectedNoteIndices) {
+      if (m_selectableNotes[index].item == m_primarySelectedItem) {
+        targetIndex = index;
+        break;
+      }
+    }
+  }
+  if (targetIndex == kInvalidNoteIndex && !m_selectedNoteIndices.empty()) {
+    targetIndex = m_selectedNoteIndices.front();
+  }
+  if (targetIndex == kInvalidNoteIndex) {
+    return;
+  }
+
+  const auto& note = m_selectableNotes[targetIndex];
+  ensureTickVisible(static_cast<int>(note.startTick), 0.10f, false);
+
+  const int noteViewportHeight = std::max(0, viewport()->height() - kTopBarHeight);
+  if (noteViewportHeight <= 0) {
+    return;
+  }
+
+  const float noteTop = (127.0f - static_cast<float>(note.key)) * std::max(0.0001f, m_pixelsPerKey);
+  const float noteBottom = noteTop + std::max(1.0f, m_pixelsPerKey - 1.0f);
+  const int visibleTop = verticalScrollBar()->value();
+  const int visibleBottom = visibleTop + noteViewportHeight;
+  if (noteTop < static_cast<float>(visibleTop)) {
+    verticalScrollBar()->setValue(std::clamp(static_cast<int>(std::floor(noteTop)),
+                                             verticalScrollBar()->minimum(),
+                                             verticalScrollBar()->maximum()));
+  } else if (noteBottom > static_cast<float>(visibleBottom)) {
+    verticalScrollBar()->setValue(std::clamp(static_cast<int>(std::ceil(noteBottom)) - noteViewportHeight,
+                                             verticalScrollBar()->minimum(),
+                                             verticalScrollBar()->maximum()));
+  }
 }
 
 void PianoRollView::setPlaybackTick(int tick,

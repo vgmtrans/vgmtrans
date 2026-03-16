@@ -115,6 +115,9 @@ private:
   void ensureTrackIndexMap(VGMSeq* seq);
   [[nodiscard]] int trackIndexForEvent(const SeqEvent* event) const;
   [[nodiscard]] int effectiveTrackCountForSeq(VGMSeq* seq) const;
+  void applySelectionSetChange(const std::vector<VGMItem*>& items,
+                               VGMItem* primaryItem,
+                               bool revealInPianoRoll);
   void rebuildSequenceControlBarIfNeeded();
   void rebuildSequenceControlBar(VGMSeq* seq);
   void updateSequenceControlValuesFromPlayback();
@@ -176,6 +179,7 @@ private:
 public slots:
   void onSelectionChange(VGMItem* item);
   void onSelectionSetChange(const std::vector<VGMItem*>& items, VGMItem* primaryItem);
+  void onPianoRollSelectionSetChange(const std::vector<VGMItem*>& items, VGMItem* primaryItem);
   void seekToEvent(VGMItem* item) const;
   void previewNotesForEvent(VGMItem* item, bool includeActiveNotesAtTick) const;
   void previewPianoRollNotes(const std::vector<PianoRollView::PreviewSelection>& notes, int tick) const;

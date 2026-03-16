@@ -480,7 +480,7 @@ bool VGMFileView::ensurePanelViewCreated(PanelSide side, PanelViewKind viewKind)
                   seqPlayer.seek(tick, PositionChangeOrigin::SeekBar);
                 }
               });
-      connect(panelUi.pianoRollView, &PianoRollView::selectionSetChanged, this, &VGMFileView::onSelectionSetChange);
+      connect(panelUi.pianoRollView, &PianoRollView::selectionSetChanged, this, &VGMFileView::onPianoRollSelectionSetChange);
       connect(panelUi.pianoRollView, &PianoRollView::notePreviewRequested, this, &VGMFileView::previewPianoRollNotes);
       connect(panelUi.pianoRollView, &PianoRollView::notePreviewStopped, this, &VGMFileView::stopNotePreview);
       createdWidget = panelUi.pianoRollView;
@@ -998,6 +998,16 @@ void VGMFileView::onSelectionChange(VGMItem* item) {
 }
 
 void VGMFileView::onSelectionSetChange(const std::vector<VGMItem*>& items, VGMItem* primaryItem) {
+  applySelectionSetChange(items, primaryItem, true);
+}
+
+void VGMFileView::onPianoRollSelectionSetChange(const std::vector<VGMItem*>& items, VGMItem* primaryItem) {
+  applySelectionSetChange(items, primaryItem, false);
+}
+
+void VGMFileView::applySelectionSetChange(const std::vector<VGMItem*>& items,
+                                          VGMItem* primaryItem,
+                                          bool revealInPianoRoll) {
   std::vector<const VGMItem*> normalizedItems;
   normalizedItems.reserve(items.size());
   std::unordered_set<const VGMItem*> itemSet;
@@ -1023,7 +1033,7 @@ void VGMFileView::onSelectionSetChange(const std::vector<VGMItem*>& items, VGMIt
       hex->setSelectedItems(normalizedItems, normalizedPrimary);
     }
     if (auto* piano = panel(side).pianoRollView) {
-      piano->setSelectedItems(normalizedItems, normalizedPrimary);
+      piano->setSelectedItems(normalizedItems, normalizedPrimary, revealInPianoRoll);
     }
   }
 
@@ -1777,7 +1787,7 @@ void VGMFileView::onPlaybackPositionChanged(int current, int max, PositionChange
       panelUi.activeNoteView->setActiveNotes(activeKeys, playbackActive);
     }
     if (panelUi.pianoRollView && panelUi.pianoRollView->isVisible()) {
-      if (origin == PositionChangeOrigin::SeekBar) {
+      if (origin == PositionChangeOrigin::SeekBar || origin == PositionChangeOrigin::HexView) {
         panelUi.pianoRollView->ensureTickVisible(current, 0.10f, false);
       }
       panelUi.pianoRollView->setPlaybackTick(current, playbackRunning, &activeNotes);
