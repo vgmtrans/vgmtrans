@@ -404,9 +404,14 @@ void PianoRollView::ensureTickVisible(int tick, float viewportFraction, bool ani
   }
 
   const float pixelsPerTick = std::max(0.0001f, m_pixelsPerTick);
+  const float visibleSpanTicks =
+      static_cast<float>(std::max(0, viewport()->width() - kKeyboardWidth)) / pixelsPerTick;
   const float visibleStartTick = static_cast<float>(horizontalScrollBar()->value()) / pixelsPerTick;
   const float clampedFraction = std::clamp(viewportFraction, 0.0f, 1.0f);
-  const float targetFraction = (static_cast<float>(tick) < visibleStartTick)
+  const bool pageLeft =
+      static_cast<float>(tick) < visibleStartTick &&
+      static_cast<float>(tick) >= (visibleStartTick - (visibleSpanTicks * 0.20f));
+  const float targetFraction = pageLeft
       ? (1.0f - clampedFraction)
       : clampedFraction;
   scrollTickToViewportFraction(tick, targetFraction, animated);
