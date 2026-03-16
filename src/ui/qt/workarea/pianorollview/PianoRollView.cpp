@@ -414,6 +414,14 @@ void PianoRollView::setPlaybackTick(int tick,
   }
 }
 
+void PianoRollView::setPlaybackTickFromSeek(int tick,
+                                            bool playbackActive,
+                                            const std::vector<PianoRollFrame::Note>* activeNotes) {
+  ensureTickVisible(tick, 0.10f, false);
+  m_playbackAutoScrollEnabled = true;
+  setPlaybackTick(tick, playbackActive, activeNotes);
+}
+
 void PianoRollView::clearPlaybackState() {
   stopPlaybackAutoScrollAnimation();
   m_playbackActive = false;
@@ -427,10 +435,6 @@ void PianoRollView::clearPlaybackState() {
   updateActiveKeyStates();
   m_lastRenderedScanlineX = std::numeric_limits<int>::min();
   requestRender();
-}
-
-void PianoRollView::enablePlaybackAutoScroll() {
-  m_playbackAutoScrollEnabled = true;
 }
 
 void PianoRollView::setSmoothAutoScrollEnabled(bool enabled) {
