@@ -20,6 +20,7 @@ class VGMColl;
 enum class PositionChangeOrigin {
   Playback,
   SeekBar,
+  PianoRoll,
   HexView,
   SeekBarSettle
 };

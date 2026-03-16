@@ -477,7 +477,7 @@ bool VGMFileView::ensurePanelViewCreated(PanelSide side, PanelViewKind viewKind)
                 }
 
                 if (seqPlayer.activeCollection() == assocColl) {
-                  seqPlayer.seek(tick, PositionChangeOrigin::SeekBar);
+                  seqPlayer.seek(tick, PositionChangeOrigin::PianoRoll);
                 }
               });
       connect(panelUi.pianoRollView, &PianoRollView::selectionSetChanged, this, &VGMFileView::onPianoRollSelectionSetChange);
@@ -1684,6 +1684,7 @@ void VGMFileView::onPlaybackPositionChanged(int current, int max, PositionChange
       }
       break;
     case PositionChangeOrigin::SeekBar:
+    case PositionChangeOrigin::PianoRoll:
       // Distinguish between dragging and long seeks. Dragging highlights passed-through events.
       if (tickDiff >= -500 && tickDiff <= 500) {
         const int lesser = std::min(m_lastPlaybackPosition, current);
