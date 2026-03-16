@@ -281,9 +281,7 @@ qreal SeekBar::thumbCenterForValue(int value) const {
 }
 
 int SeekBar::displayedThumbStep(int value) const {
-  // Quantize the rendered thumb position to half-device-pixel steps.
-  return static_cast<int>(
-      std::lround(thumbCenterForValue(value) * devicePixelRatioF()));
+  return static_cast<int>(std::lround(thumbCenterForValue(value) * devicePixelRatioF()));
 }
 
 qreal SeekBar::displayedThumbCenterForValue(int value) const {
