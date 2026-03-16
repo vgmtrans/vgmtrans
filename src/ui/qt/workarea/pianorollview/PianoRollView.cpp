@@ -1727,12 +1727,20 @@ void PianoRollView::scrollTickToViewportFraction(int tick, float viewportFractio
   }
 
   if (m_rhiHost && m_rhiHost->syncPlaybackAutoScrollToRenderFrame()) {
-    if (m_frameDrivenPlaybackAutoScrollActive && m_frameDrivenPlaybackAutoScrollEndX == clampedScrollX) {
-      return;
-    }
-
     if (m_playbackAutoScrollAnimation->state() == QAbstractAnimation::Running) {
       m_playbackAutoScrollAnimation->stop();
+    }
+
+    if (m_frameDrivenPlaybackAutoScrollActive) {
+      if (m_frameDrivenPlaybackAutoScrollEndX == clampedScrollX) {
+        return;
+      }
+
+      // Mirror the QRhiWidget path: retarget the current page turn instead of
+      // restarting its duration every tick when playback outruns the viewport.
+      m_frameDrivenPlaybackAutoScrollEndX = clampedScrollX;
+      requestRender();
+      return;
     }
 
     // Native-window auto-scroll advances from rendered frames so the playback
@@ -2184,7 +2192,7 @@ void PianoRollView::zoomHorizontalFromButton(int steps) {
   const int anchorX = (playheadX >= kKeyboardWidth && playheadX < viewport()->width())
       ? playheadX
       : (viewport()->width() / 2);
-  zoomHorizontal(steps, anchorX, true, 150);
+  zoomHorizontal(steps, anchorX, true, 200);
 }
 
 void PianoRollView::zoomHorizontal(int steps, int anchorX, bool animated, int durationMs) {
