@@ -131,56 +131,6 @@ static std::vector<SequencePlayer::PreviewNote> sanitizePreviewNotes(
   return validNotes;
 }
 
-// Backward scrub can move to a tick before some channel state was ever set.
-// Feed the preview stream sensible controller defaults in that case so later
-// state does not leak backward across a held note.
-static DWORD previewDefaultChannelStateValue(DWORD eventType, uint8_t channel) {
-  switch (eventType) {
-    case MIDI_EVENT_BANK:
-    case MIDI_EVENT_BANK_LSB:
-    case MIDI_EVENT_PROGRAM:
-    case MIDI_EVENT_MODULATION:
-    case MIDI_EVENT_MODRANGE:
-    case MIDI_EVENT_CHANPRES:
-    case MIDI_EVENT_SUSTAIN:
-    case MIDI_EVENT_SOSTENUTO:
-    case MIDI_EVENT_SOFT:
-    case MIDI_EVENT_PORTAMENTO:
-    case MIDI_EVENT_PORTATIME:
-    case MIDI_EVENT_PORTANOTE:
-    case MIDI_EVENT_REVERB:
-    case MIDI_EVENT_CHORUS:
-      return 0;
-    case MIDI_EVENT_DRUMS:
-      return channel == 9 ? 1 : 0;
-    case MIDI_EVENT_VOLUME:
-      return DEFAULT_MIDI_VOLUME;
-    case MIDI_EVENT_PAN:
-      return DEFAULT_MIDI_PAN;
-    case MIDI_EVENT_EXPRESSION:
-      return 127;
-    case MIDI_EVENT_PITCHRANGE:
-      return 2;
-    case MIDI_EVENT_PITCH:
-    case MIDI_EVENT_FINETUNE:
-      return 8192;
-    case MIDI_EVENT_CUTOFF:
-    case MIDI_EVENT_RESONANCE:
-    case MIDI_EVENT_ATTACK:
-    case MIDI_EVENT_DECAY:
-    case MIDI_EVENT_RELEASE:
-    case MIDI_EVENT_COARSETUNE:
-    case MIDI_EVENT_VIBRATO_RATE:
-    case MIDI_EVENT_VIBRATO_DEPTH:
-    case MIDI_EVENT_VIBRATO_DELAY:
-      return 64;
-    case MIDI_EVENT_MOD_PITCH:
-      return 24;
-    default:
-      return INVALID_MIDI_EVENT_VALUE;
-  }
-}
-
 static DWORD bpmToTempoUsec(double bpm) {
   if (bpm <= 0.0) {
     return DEFAULT_MIDI_TEMPO_USEC_PER_QUARTER;
@@ -757,10 +707,7 @@ bool SequencePlayer::syncPreviewChannelState(uint8_t channel, bool resetChannel)
   }
 
   for (const DWORD eventType : PREVIEW_CHANNEL_STATE_EVENTS) {
-    DWORD param = BASS_MIDI_StreamGetEvent(m_preview_state_stream, channel, eventType);
-    if (param == INVALID_MIDI_EVENT_VALUE) {
-      param = previewDefaultChannelStateValue(eventType, channel);
-    }
+    const DWORD param = BASS_MIDI_StreamGetEvent(m_preview_state_stream, channel, eventType);
     if (param == INVALID_MIDI_EVENT_VALUE) {
       continue;
     }
