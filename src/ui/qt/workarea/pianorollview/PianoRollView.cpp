@@ -2256,10 +2256,10 @@ void PianoRollView::zoomVerticalFactor(float factor, int anchorY, bool animated,
 
 void PianoRollView::applyHorizontalScale(float scale, int anchorInNotes, float worldTickAtAnchor) {
   m_pixelsPerTick = std::clamp(scale, kMinPixelsPerTick, kMaxPixelsPerTick);
+  m_applyingHorizontalZoomScroll = true;
   updateScrollBars();
 
   const int newValue = static_cast<int>(std::llround(worldTickAtAnchor * m_pixelsPerTick - anchorInNotes));
-  m_applyingHorizontalZoomScroll = true;
   horizontalScrollBar()->setValue(std::clamp(newValue,
                                              horizontalScrollBar()->minimum(),
                                              horizontalScrollBar()->maximum()));

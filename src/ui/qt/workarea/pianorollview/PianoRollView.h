@@ -134,7 +134,7 @@ private:
   static constexpr size_t kInvalidNoteIndex = std::numeric_limits<size_t>::max();
 
   static constexpr float kDefaultPixelsPerTick = 0.60f;
-  static constexpr float kDefaultPixelsPerKey = 12.0f;
+  static constexpr float kDefaultPixelsPerKey = 10.0f;
   static constexpr float kMinPixelsPerTick = 0.05f;
   static constexpr float kMaxPixelsPerTick = 6.0f;
   static constexpr float kMinPixelsPerKey = 5.0f;
