@@ -402,7 +402,14 @@ void PianoRollView::ensureTickVisible(int tick, float viewportFraction, bool ani
   if (isTickVisible(tick)) {
     return;
   }
-  scrollTickToViewportFraction(tick, viewportFraction, animated);
+
+  const float pixelsPerTick = std::max(0.0001f, m_pixelsPerTick);
+  const float visibleStartTick = static_cast<float>(horizontalScrollBar()->value()) / pixelsPerTick;
+  const float clampedFraction = std::clamp(viewportFraction, 0.0f, 1.0f);
+  const float targetFraction = (static_cast<float>(tick) < visibleStartTick)
+      ? (1.0f - clampedFraction)
+      : clampedFraction;
+  scrollTickToViewportFraction(tick, targetFraction, animated);
 }
 
 PianoRollFrame::Data PianoRollView::captureRhiFrameData(float dpr) const {
