@@ -67,6 +67,7 @@ public:
   void clearPlaybackState();
   void setSmoothAutoScrollEnabled(bool enabled);
   [[nodiscard]] bool smoothAutoScrollEnabled() const;
+  void ensureTickVisible(int tick, float viewportFraction = 0.10f, bool animated = false);
 
   PianoRollFrame::Data captureRhiFrameData(float dpr) const;
 
@@ -187,8 +188,8 @@ private:
   int clampTick(int tick) const;
   int tickFromViewportX(int x) const;
   int scanlinePixelX(int tick) const;
-  [[nodiscard]] bool isPlaybackTickVisible(int tick) const;
-  void scrollPlaybackTickToViewportFraction(int tick, float viewportFraction, bool animated = true);
+  [[nodiscard]] bool isTickVisible(int tick) const;
+  void scrollTickToViewportFraction(int tick, float viewportFraction, bool animated = true);
   [[nodiscard]] int noteIndexAtViewportPoint(const QPoint& pos) const;
   [[nodiscard]] VGMItem* noteAtViewportPoint(const QPoint& pos) const;
   [[nodiscard]] QRect graphRectInViewport() const;

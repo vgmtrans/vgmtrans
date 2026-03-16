@@ -339,8 +339,8 @@ void PianoRollView::setPlaybackTick(int tick,
   if (playbackStateChanged && m_playbackActive) {
     m_playbackAutoScrollEnabled = true;
     m_waitForWheelScrollBegin = true;
-    if (!isPlaybackTickVisible(tick)) {
-      scrollPlaybackTickToViewportFraction(tick, kPlaybackPageTargetFraction, m_smoothAutoScrollEnabled);
+    if (!isTickVisible(tick)) {
+      scrollTickToViewportFraction(tick, kPlaybackPageTargetFraction, m_smoothAutoScrollEnabled);
     }
   }
 
@@ -351,7 +351,7 @@ void PianoRollView::setPlaybackTick(int tick,
           static_cast<float>(noteViewportWidth) * kPlaybackPageTriggerFraction));
       if (scanlinePixelX(tick) >= triggerX) {
         // Keep one smooth page-scroll animation alive and retarget it as needed.
-        scrollPlaybackTickToViewportFraction(tick, kPlaybackPageTargetFraction, m_smoothAutoScrollEnabled);
+        scrollTickToViewportFraction(tick, kPlaybackPageTargetFraction, m_smoothAutoScrollEnabled);
       }
     }
   }
@@ -395,6 +395,14 @@ void PianoRollView::setSmoothAutoScrollEnabled(bool enabled) {
 
 bool PianoRollView::smoothAutoScrollEnabled() const {
   return m_smoothAutoScrollEnabled;
+}
+
+void PianoRollView::ensureTickVisible(int tick, float viewportFraction, bool animated) {
+  tick = clampTick(tick);
+  if (isTickVisible(tick)) {
+    return;
+  }
+  scrollTickToViewportFraction(tick, viewportFraction, animated);
 }
 
 PianoRollFrame::Data PianoRollView::captureRhiFrameData(float dpr) const {
@@ -1617,8 +1625,8 @@ int PianoRollView::scanlinePixelX(int tick) const {
   return static_cast<int>(std::lround(viewX));
 }
 
-// Returns whether the playback scanline is currently visible in the note viewport.
-bool PianoRollView::isPlaybackTickVisible(int tick) const {
+// Returns whether the scanline for the given tick is currently visible in the note viewport.
+bool PianoRollView::isTickVisible(int tick) const {
   const int noteViewportWidth = std::max(0, viewport()->width() - kKeyboardWidth);
   if (noteViewportWidth <= 0) {
     return true;
@@ -1628,8 +1636,8 @@ bool PianoRollView::isPlaybackTickVisible(int tick) const {
   return scanX >= 0 && scanX < noteViewportWidth;
 }
 
-// Repositions horizontal scroll so the playback scanline lands at the requested viewport fraction.
-void PianoRollView::scrollPlaybackTickToViewportFraction(int tick, float viewportFraction, bool animated) {
+// Repositions horizontal scroll so the target tick lands at the requested viewport fraction.
+void PianoRollView::scrollTickToViewportFraction(int tick, float viewportFraction, bool animated) {
   auto* hbar = horizontalScrollBar();
   if (!hbar) {
     return;
@@ -1651,6 +1659,7 @@ void PianoRollView::scrollPlaybackTickToViewportFraction(int tick, float viewpor
     return;
   }
   if (!animated || !m_playbackAutoScrollAnimation) {
+    stopPlaybackAutoScrollAnimation();
     m_frameDrivenPlaybackAutoScrollActive = false;
     m_applyingPlaybackAutoScroll = true;
     hbar->setValue(clampedScrollX);
