@@ -187,10 +187,11 @@ private:
   [[nodiscard]] QPoint graphWorldPosFromViewport(const QPoint& viewportPos) const;
   [[nodiscard]] QPoint graphViewportPosFromWorld(const QPoint& worldPos) const;
   [[nodiscard]] QPointF autoScrollDeltaForGraphDrag(const QPoint& viewportPos) const;
-  void stopNoteSelectionAutoScroll();
-  QPoint consumeAutoScrollDelta(const QPointF& dragDelta);
+  void stopDragAutoScroll();
+  QPoint consumeDragAutoScrollDelta(const QPointF& dragDelta);
   int clampTick(int tick) const;
   int tickFromViewportX(int x) const;
+  void updateSeekDrag(int viewportX, bool forceEmit = false);
   int scanlinePixelX(int tick) const;
   [[nodiscard]] bool isTickVisible(int tick) const;
   void scrollTickToViewportFraction(int tick, float viewportFraction, bool animated = true);
@@ -288,10 +289,10 @@ private:
   QPoint m_noteSelectionAnchor;
   QPoint m_noteSelectionCurrent;
   QPoint m_noteSelectionAnchorWorld;
-  QPointF m_noteSelectionAutoScrollRemainder;
+  QPointF m_dragAutoScrollRemainder;
   QPoint m_panDragLastPos;
   bool m_noteSelectionAnchorWorldValid = false;
-  QBasicTimer m_noteSelectionAutoScrollTimer;
+  QBasicTimer m_dragAutoScrollTimer;
   VGMItem* m_primarySelectedItem = nullptr;
   size_t m_previewAnchorNoteIndex = kInvalidNoteIndex;
 
