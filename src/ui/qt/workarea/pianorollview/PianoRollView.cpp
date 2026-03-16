@@ -429,6 +429,10 @@ void PianoRollView::clearPlaybackState() {
   requestRender();
 }
 
+void PianoRollView::enablePlaybackAutoScroll() {
+  m_playbackAutoScrollEnabled = true;
+}
+
 void PianoRollView::setSmoothAutoScrollEnabled(bool enabled) {
   if (m_smoothAutoScrollEnabled == enabled) {
     return;
