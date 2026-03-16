@@ -1777,6 +1777,9 @@ void VGMFileView::onPlaybackPositionChanged(int current, int max, PositionChange
       panelUi.activeNoteView->setActiveNotes(activeKeys, playbackActive);
     }
     if (panelUi.pianoRollView && panelUi.pianoRollView->isVisible()) {
+      if (origin == PositionChangeOrigin::SeekBar) {
+        panelUi.pianoRollView->ensureTickVisible(current, 0.10f, false);
+      }
       panelUi.pianoRollView->setPlaybackTick(current, playbackRunning, &activeNotes);
     }
   }
