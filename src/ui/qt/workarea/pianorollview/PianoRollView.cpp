@@ -2190,7 +2190,7 @@ void PianoRollView::zoomHorizontal(int steps, int anchorX, bool animated, int du
     return;
   }
 
-  const float factor = std::pow(1.15f, static_cast<float>(steps));
+  const float factor = std::pow(1.45f, static_cast<float>(steps));
   zoomHorizontalFactor(factor, anchorX, animated, durationMs);
 }
 
