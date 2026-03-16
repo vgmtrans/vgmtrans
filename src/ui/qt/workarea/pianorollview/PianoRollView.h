@@ -131,7 +131,7 @@ private:
   static constexpr int kTopBarHeight = 22;
   static constexpr size_t kInvalidNoteIndex = std::numeric_limits<size_t>::max();
 
-  static constexpr float kDefaultPixelsPerTick = 0.20f;
+  static constexpr float kDefaultPixelsPerTick = 0.60f;
   static constexpr float kDefaultPixelsPerKey = 12.0f;
   static constexpr float kMinPixelsPerTick = 0.05f;
   static constexpr float kMaxPixelsPerTick = 6.0f;
@@ -209,6 +209,7 @@ private:
   void clearPreviewNotes();
   void beginSeekDragAtX(int viewportX);
 
+  void zoomHorizontalFromButton(int steps);
   void zoomHorizontal(int steps, int anchorX, bool animated = false, int durationMs = 0);
   void zoomVertical(int steps, int anchorY, bool animated = false, int durationMs = 0);
   void zoomHorizontalFactor(float factor, int anchorX, bool animated, int durationMs);
