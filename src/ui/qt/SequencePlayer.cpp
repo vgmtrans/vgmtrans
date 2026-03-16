@@ -101,6 +101,11 @@ static uint16_t previewNoteChannelAndKey(const SequencePlayer::PreviewNote& note
   return static_cast<uint16_t>((static_cast<uint16_t>(note.channel) << 8) | note.key);
 }
 
+static uint64_t previewNoteMatchKey(const SequencePlayer::PreviewNote& note) {
+  // Adjacent same-key notes should retrigger once the note instance changes.
+  return (static_cast<uint64_t>(note.startTick) << 16) | previewNoteChannelAndKey(note);
+}
+
 static void sendPreviewNoteOff(HSTREAM stream, const SequencePlayer::PreviewNote& note) {
   if (!stream) {
     return;
@@ -444,22 +449,22 @@ bool SequencePlayer::updatePreviewNotesAtTick(const std::vector<PreviewNote>& no
     return true;
   }
 
-  std::unordered_map<uint16_t, PreviewNote> targetByKey;
+  std::unordered_map<uint64_t, PreviewNote> targetByKey;
   targetByKey.reserve(targetNotes.size() * 2 + 1);
   for (const auto& note : targetNotes) {
-    targetByKey.emplace(previewNoteChannelAndKey(note), note);
+    targetByKey.emplace(previewNoteMatchKey(note), note);
   }
 
   std::vector<PreviewNote> notesToStop;
   notesToStop.reserve(m_previewActiveNotes.size());
   std::vector<PreviewNote> keptNotes;
   keptNotes.reserve(std::min(m_previewActiveNotes.size(), targetNotes.size()));
-  std::unordered_set<uint16_t> keptKeys;
+  std::unordered_set<uint64_t> keptKeys;
   keptKeys.reserve(targetNotes.size() * 2 + 1);
   std::array<bool, 128> channelHasKeptNotes{};
 
   for (const auto& activeNote : m_previewActiveNotes) {
-    const uint16_t key = previewNoteChannelAndKey(activeNote);
+    const uint64_t key = previewNoteMatchKey(activeNote);
     if (targetByKey.find(key) == targetByKey.end()) {
       notesToStop.push_back(activeNote);
       continue;
@@ -472,7 +477,7 @@ bool SequencePlayer::updatePreviewNotesAtTick(const std::vector<PreviewNote>& no
   std::vector<PreviewNote> notesToStart;
   notesToStart.reserve(targetNotes.size());
   for (const auto& note : targetNotes) {
-    if (keptKeys.find(previewNoteChannelAndKey(note)) != keptKeys.end()) {
+    if (keptKeys.find(previewNoteMatchKey(note)) != keptKeys.end()) {
       continue;
     }
     notesToStart.push_back(note);
@@ -502,20 +507,20 @@ bool SequencePlayer::updatePreviewNotesAtTick(const std::vector<PreviewNote>& no
   }
   BASS_ChannelPlay(m_preview_note_stream, false);
 
-  std::unordered_set<uint16_t> startedKeys;
+  std::unordered_set<uint64_t> startedKeys;
   startedKeys.reserve(notesToStart.size() * 2 + 1);
   for (const auto& note : notesToStart) {
     const DWORD packed = static_cast<DWORD>(note.key) | (static_cast<DWORD>(note.velocity) << 8);
     if (!BASS_MIDI_StreamEvent(m_preview_note_stream, note.channel, MIDI_EVENT_NOTE, packed)) {
       continue;
     }
-    startedKeys.emplace(previewNoteChannelAndKey(note));
+    startedKeys.emplace(previewNoteMatchKey(note));
   }
 
   m_previewActiveNotes.clear();
   m_previewActiveNotes.reserve(targetNotes.size());
   for (const auto& note : targetNotes) {
-    const uint16_t key = previewNoteChannelAndKey(note);
+    const uint64_t key = previewNoteMatchKey(note);
     if (keptKeys.find(key) != keptKeys.end() || startedKeys.find(key) != startedKeys.end()) {
       m_previewActiveNotes.push_back(note);
     }

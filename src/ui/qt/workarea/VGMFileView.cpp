@@ -131,6 +131,7 @@ bool buildPreviewNoteForEvent(const SeqEvent* seqEvent, SequencePlayer::PreviewN
   outNote.channel = static_cast<uint8_t>(midiChannel);
   outNote.key = key;
   outNote.velocity = velocity;
+  outNote.startTick = 0;
   return true;
 }
 }  // namespace
@@ -1139,6 +1140,7 @@ void VGMFileView::previewNotesForEvent(VGMItem* item, bool includeActiveNotesAtT
           continue;
         }
         activeNote.key = static_cast<uint8_t>(transposedKey);
+        activeNote.startTick = timed->startTick;
         if (!seenKeys.emplace(noteKey(activeNote)).second) {
           continue;
         }
@@ -1177,6 +1179,7 @@ void VGMFileView::previewPianoRollNotes(const std::vector<PianoRollView::Preview
     if (selection.key >= 0 && selection.key < 128) {
       note.key = static_cast<uint8_t>(selection.key);
     }
+    note.startTick = selection.startTick;
     if (!seenKeys.emplace(noteKey(note)).second) {
       return;
     }

@@ -2143,7 +2143,7 @@ void PianoRollView::applyPreviewNoteIndices(std::vector<size_t> indices, int pre
     if (!selected.item) {
       continue;
     }
-    previewNotes.push_back({selected.item, selected.key});
+    previewNotes.push_back({selected.item, selected.key, selected.startTick});
   }
 
   if (previewNotes.empty()) {

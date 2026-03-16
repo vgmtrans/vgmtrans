@@ -32,6 +32,7 @@ public:
     uint8_t channel = 0;
     uint8_t key = 0;
     uint8_t velocity = 0;
+    uint32_t startTick = 0;
   };
   struct PlaybackState {
     std::vector<uint8_t> mutedChannels;
