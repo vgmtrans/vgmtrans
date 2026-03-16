@@ -39,7 +39,7 @@ target_sources(vgmtrans
     services/NotificationCenter.cpp
     util/Helpers.cpp
     util/UIHelpers.cpp
-    widgets/ClickJumpSlider.cpp
+    widgets/SeekBar.cpp
     widgets/MarqueeLabel.cpp
     widgets/SnappingSplitter.cpp
     widgets/StatusBarContent.cpp
@@ -91,7 +91,7 @@ target_sources(vgmtrans
   PRIVATE
     FILE_SET headers_widgets TYPE HEADERS BASE_DIRS widgets
     FILES
-      widgets/ClickJumpSlider.h
+      widgets/SeekBar.h
       widgets/MarqueeLabel.h
       widgets/SnappingSplitter.h
       widgets/StatusBarContent.h

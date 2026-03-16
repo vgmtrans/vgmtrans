@@ -8,11 +8,10 @@
 
 #include <QToolBar>
 
-class QSlider;
 class QPushButton;
 class QLabel;
 class MarqueeLabel;
-class ClickJumpSlider;
+class SeekBar;
 enum class PositionChangeOrigin;
 
 class IconBar final : public QWidget {
@@ -29,8 +28,8 @@ signals:
   void createPressed();
 
 private slots:
-  void playerStatusChanged(bool playing) const;
-  void playbackRangeUpdate(int cur, int max) const;
+  void playerStatusChanged(bool playing);
+  void playbackRangeUpdate(int cur, int max, PositionChangeOrigin origin);
 
 private:
   void setupControls();
@@ -38,8 +37,9 @@ private:
   QPushButton *m_create{};
   QPushButton *m_play{};
   QPushButton *m_stop{};
-  ClickJumpSlider *m_slider{};
+  SeekBar *m_slider{};
   MarqueeLabel *m_title;
+  bool m_skipNextPlaybackSliderUpdate = false;
   inline static QIcon s_playicon;
   inline static QIcon s_pauseicon;
 };

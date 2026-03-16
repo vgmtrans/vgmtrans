@@ -6,7 +6,6 @@
 
 #include "IconBar.h"
 
-#include <QSlider>
 #include <QLabel>
 #include <QLayout>
 #include <QWhatsThis>
@@ -15,7 +14,7 @@
 #include "SequencePlayer.h"
 #include "Helpers.h"
 #include "MarqueeLabel.h"
-#include "ClickJumpSlider.h"
+#include "SeekBar.h"
 
 IconBar::IconBar(QWidget *parent) : QWidget(parent) {
   setLayout(new QHBoxLayout());
@@ -53,21 +52,17 @@ void IconBar::setupControls() {
   connect(m_stop, &QPushButton::pressed, this, &IconBar::stopPressed);
   layout()->addWidget(m_stop);
 
-  m_slider = new ClickJumpSlider(Qt::Horizontal);
+  m_slider = new SeekBar();
   /* Needed to make sure the slider is properly rendered */
   m_slider->setRange(0, 1);
   m_slider->setValue(0);
-  #ifdef __APPLE__
-  /* HACK: workaround the slider being cut off on macOS */
-  m_slider->setFixedHeight(25);
-  #endif
   
   m_slider->setEnabled(false);
   m_slider->setToolTip("Seek");
-  connect(m_slider, &QSlider::sliderMoved, [this](int value) {
+  connect(m_slider, &SeekBar::sliderMoved, [this](int value) {
     seekingTo(value, PositionChangeOrigin::SeekBar);
   });
-  connect(m_slider, &QSlider::sliderReleased, [this]() {
+  connect(m_slider, &SeekBar::sliderReleased, [this]() {
     seekingTo(m_slider->value(), PositionChangeOrigin::SeekBar);
   });
   layout()->addWidget(m_slider);
@@ -85,17 +80,34 @@ void IconBar::showPlayInfo() {
   m_play->clearFocus();
 }
 
-void IconBar::playbackRangeUpdate(int cur, int max) const {
-  if (max != m_slider->maximum()) {
+void IconBar::playbackRangeUpdate(int cur, int max, PositionChangeOrigin origin) {
+  const int previousMaximum = m_slider->maximum();
+  const bool rangeChanged = max != previousMaximum;
+  const bool forceImmediateUpdate = cur == m_slider->minimum() || rangeChanged;
+
+  if (rangeChanged) {
     m_slider->setRange(0, max);
   }
 
-  if (!m_slider->isSliderDown()) {
-    m_slider->setValue(cur);
+  if (m_slider->isSliderDown()) {
+    m_skipNextPlaybackSliderUpdate = false;
+    return;
   }
+
+  if (origin == PositionChangeOrigin::Playback && !forceImmediateUpdate) {
+    m_skipNextPlaybackSliderUpdate = !m_skipNextPlaybackSliderUpdate;
+    if (m_skipNextPlaybackSliderUpdate) {
+      return;
+    }
+  } else {
+    m_skipNextPlaybackSliderUpdate = false;
+  }
+
+  m_slider->setValue(cur);
 }
 
-void IconBar::playerStatusChanged(bool playing) const {
+void IconBar::playerStatusChanged(bool playing) {
+  m_skipNextPlaybackSliderUpdate = false;
   if (playing) {
     m_slider->setEnabled(true);
     m_play->setIcon(s_pauseicon);
