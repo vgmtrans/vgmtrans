@@ -59,7 +59,8 @@ public:
   void setTrackEnabledMask(std::vector<uint8_t> trackEnabledMask);
   void refreshSequenceData(bool allowTimelineBuild);
   void setSelectedItems(const std::vector<const VGMItem*>& items,
-                        const VGMItem* primaryItem = nullptr);
+                        const VGMItem* primaryItem = nullptr,
+                        bool revealSelection = true);
 
   void setPlaybackTick(int tick,
                        bool playbackActive,
