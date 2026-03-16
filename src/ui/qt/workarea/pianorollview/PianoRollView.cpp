@@ -195,10 +195,11 @@ void PianoRollView::setSequence(VGMSeq* seq) {
   m_primarySelectedItem = nullptr;
   m_selectedNoteIndices.clear();
   m_previewNoteIndices.clear();
-  m_previewAnchorNoteIndex = kInvalidNoteIndex;
+  m_previewTick = -1;
   m_activeNotes = std::make_shared<std::vector<PianoRollFrame::Note>>();
   m_selectedNotes = std::make_shared<std::vector<PianoRollFrame::Note>>();
   m_transposedKeyByTimedEvent.clear();
+  m_noteIndexByTimedEvent.clear();
 
   if (!m_seq) {
     m_trackCount = 0;
@@ -715,6 +716,7 @@ void PianoRollView::updateSeekDrag(int viewportX, bool forceEmit) {
   updateActiveKeyStates();
   requestRender();
   emit seekRequested(m_currentTick);
+  updateSeekPreview();
 }
 
 void PianoRollView::setInteractionCursor(Qt::CursorShape shape) {
@@ -960,6 +962,7 @@ bool PianoRollView::handleViewportMouseMove(QMouseEvent* event) {
     if (!(activeButtons & Qt::LeftButton)) {
       m_seekDragActive = false;
       stopDragAutoScroll();
+      clearPreviewNotes();
       updateInactiveNoteDimTarget();
       event->accept();
       return true;
@@ -1048,6 +1051,7 @@ bool PianoRollView::handleViewportMouseRelease(QMouseEvent* event) {
   if (m_seekDragActive) {
     updateSeekDrag(pos.x());
     m_seekDragActive = false;
+    clearPreviewNotes();
     updateInactiveNoteDimTarget();
 
     event->accept();
@@ -1259,10 +1263,12 @@ void PianoRollView::rebuildSequenceCache() {
   m_maxNoteDurationTicks = 1;
   m_selectableNotes.clear();
   m_transposedKeyByTimedEvent.clear();
+  m_noteIndexByTimedEvent.clear();
   m_selectedNoteIndices.clear();
   m_primarySelectedItem = nullptr;
   m_activeNotes = std::make_shared<std::vector<PianoRollFrame::Note>>();
   m_selectedNotes = std::make_shared<std::vector<PianoRollFrame::Note>>();
+  m_previewTick = -1;
 
   auto notes = std::make_shared<std::vector<PianoRollFrame::Note>>();
   auto signatures = std::make_shared<std::vector<PianoRollFrame::TimeSignature>>();
@@ -1333,6 +1339,7 @@ void PianoRollView::rebuildSequenceCache() {
         static_cast<uint8_t>(noteKey),
         static_cast<int16_t>(trackIndex),
         timed.event,
+        &timed,
     });
     maxDurationTicks = std::max<uint32_t>(maxDurationTicks, note.duration);
   }
@@ -1362,6 +1369,12 @@ void PianoRollView::rebuildSequenceCache() {
     }
     return a.duration < b.duration;
   });
+  m_noteIndexByTimedEvent.reserve(m_selectableNotes.size());
+  for (size_t i = 0; i < m_selectableNotes.size(); ++i) {
+    if (m_selectableNotes[i].timedEvent) {
+      m_noteIndexByTimedEvent.emplace(m_selectableNotes[i].timedEvent, i);
+    }
+  }
 
   if (!m_seq->aTracks.empty() && m_seq->aTracks.front()) {
     for (VGMItem* child : m_seq->aTracks.front()->children()) {
@@ -1913,7 +1926,32 @@ void PianoRollView::previewSingleNoteAtViewportPoint(const QPoint& pos) {
   }
 
   const size_t index = static_cast<size_t>(noteIndex);
-  applyPreviewNoteIndices({index}, index, static_cast<int>(m_selectableNotes[index].startTick));
+  applyPreviewNoteIndices({index}, static_cast<int>(m_selectableNotes[index].startTick));
+}
+
+void PianoRollView::updateSeekPreview() {
+  if (SequencePlayer::the().playing() || !m_timeline || !m_timelineCursor || !m_timeline->finalized()) {
+    clearPreviewNotes();
+    return;
+  }
+
+  std::vector<const SeqTimedEvent*> active;
+  m_timelineCursor->getActiveAt(static_cast<uint32_t>(std::max(0, m_currentTick)), active);
+
+  std::vector<size_t> indices;
+  indices.reserve(active.size());
+  for (const auto* timed : active) {
+    const auto noteIt = m_noteIndexByTimedEvent.find(timed);
+    if (noteIt == m_noteIndexByTimedEvent.end() || noteIt->second >= m_selectableNotes.size()) {
+      continue;
+    }
+    if (!isTrackEnabled(m_selectableNotes[noteIt->second].trackIndex)) {
+      continue;
+    }
+    indices.push_back(noteIt->second);
+  }
+
+  applyPreviewNoteIndices(std::move(indices), m_currentTick);
 }
 
 void PianoRollView::applySelectedNoteIndices(std::vector<size_t> indices,
@@ -2070,38 +2108,33 @@ void PianoRollView::updateMarqueePreview(const QPoint& cursorPos) {
   }
 
   if (!overlapIndices.empty()) {
-    const size_t anchorIndex = overlapIndices.front();
-    applyPreviewNoteIndices(std::move(overlapIndices), anchorIndex, previewTick);
+    applyPreviewNoteIndices(std::move(overlapIndices), previewTick);
     return;
   }
 
   clearPreviewNotes();
 }
 
-void PianoRollView::applyPreviewNoteIndices(std::vector<size_t> indices, size_t anchorIndex, int previewTick) {
+void PianoRollView::applyPreviewNoteIndices(std::vector<size_t> indices, int previewTick) {
   normalizeNoteIndices(indices);
+  const int clampedPreviewTick = std::max(0, previewTick);
 
   if (indices.empty()) {
-    if (m_previewNoteIndices.empty()) {
+    if (m_previewNoteIndices.empty() && m_previewTick < 0) {
       return;
     }
     m_previewNoteIndices.clear();
-    m_previewAnchorNoteIndex = kInvalidNoteIndex;
+    m_previewTick = -1;
     emit notePreviewStopped();
     return;
   }
 
-  if (anchorIndex >= m_selectableNotes.size() ||
-      !std::binary_search(indices.begin(), indices.end(), anchorIndex)) {
-    anchorIndex = indices.front();
-  }
-
-  if (indices == m_previewNoteIndices && anchorIndex == m_previewAnchorNoteIndex) {
+  if (indices == m_previewNoteIndices && clampedPreviewTick == m_previewTick) {
     return;
   }
 
   m_previewNoteIndices = std::move(indices);
-  m_previewAnchorNoteIndex = anchorIndex;
+  m_previewTick = clampedPreviewTick;
 
   std::vector<PreviewSelection> previewNotes;
   previewNotes.reserve(m_previewNoteIndices.size());
@@ -2115,16 +2148,16 @@ void PianoRollView::applyPreviewNoteIndices(std::vector<size_t> indices, size_t 
 
   if (previewNotes.empty()) {
     m_previewNoteIndices.clear();
-    m_previewAnchorNoteIndex = kInvalidNoteIndex;
+    m_previewTick = -1;
     emit notePreviewStopped();
     return;
   }
 
-  emit notePreviewRequested(previewNotes, std::max(0, previewTick));
+  emit notePreviewRequested(previewNotes, clampedPreviewTick);
 }
 
 void PianoRollView::clearPreviewNotes() {
-  applyPreviewNoteIndices({}, kInvalidNoteIndex, -1);
+  applyPreviewNoteIndices({}, -1);
 }
 
 int PianoRollView::noteIndexAtViewportPoint(const QPoint& pos) const {
