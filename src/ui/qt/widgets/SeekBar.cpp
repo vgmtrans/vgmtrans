@@ -165,44 +165,53 @@ void SeekBar::showEvent(QShowEvent* event) {
 }
 
 void SeekBar::invalidatePixmaps() {
-  m_pixmapsDirty = true;
+  m_trackPixmapDirty = true;
+  m_thumbPixmapDirty = true;
 }
 
 void SeekBar::ensurePixmaps() {
   const qreal dpr = devicePixelRatioF();
-  const QSize logicalSize = size();
-  if (!m_pixmapsDirty && m_cachedPixmapSize == logicalSize && qFuzzyCompare(m_cachedPixmapDpr, dpr)) {
+  const QRectF track = trackRect();
+  const QSize logicalTrackSize = track.size().toSize();
+  const QSize trackPixelSize = QSizeF(track.width() * dpr, track.height() * dpr).toSize();
+
+  // Redraw the track pixmap if necessary
+  if (m_trackPixmapDirty || m_cachedTrackSize != logicalTrackSize || !qFuzzyCompare(m_cachedTrackDpr, dpr)) {
+    m_cachedTrackSize = logicalTrackSize;
+    m_cachedTrackDpr = dpr;
+    m_trackPixmapDirty = false;
+
+    if (trackPixelSize.isEmpty()) {
+      m_trackPixmap = QPixmap();
+    } else {
+      m_trackPixmap = QPixmap(trackPixelSize);
+      m_trackPixmap.setDevicePixelRatio(dpr);
+      m_trackPixmap.fill(Qt::transparent);
+
+      QPainter trackPainter(&m_trackPixmap);
+      trackPainter.setRenderHint(QPainter::Antialiasing, true);
+      trackPainter.setPen(Qt::NoPen);
+      trackPainter.setBrush(m_trackColor);
+      trackPainter.drawRoundedRect(QRectF(0.0, 0.0, track.width(), track.height()),
+                                   TRACK_RADIUS,
+                                   TRACK_RADIUS);
+    }
+  }
+
+  // Redraw the thumb pixmap if necessary, otherwise return
+  if (!m_thumbPixmapDirty && qFuzzyCompare(m_cachedThumbDpr, dpr)) {
     return;
   }
 
-  m_cachedPixmapSize = logicalSize;
-  m_cachedPixmapDpr = dpr;
-  m_pixmapsDirty = false;
+  m_cachedThumbDpr = dpr;
+  m_thumbPixmapDirty = false;
 
-  const QSize pixelSize = QSizeF(width() * dpr, height() * dpr).toSize();
-  const QRectF track = trackRect();
-  const QSize trackPixelSize = QSizeF(track.width() * dpr, track.height() * dpr).toSize();
-  if (pixelSize.isEmpty() || trackPixelSize.isEmpty()) {
-    m_trackPixmap = QPixmap();
+  const QSize thumbPixelSize = QSizeF(THUMB_PIXMAP_SIZE * dpr, THUMB_PIXMAP_SIZE * dpr).toSize();
+  if (thumbPixelSize.isEmpty()) {
     m_thumbPixmap = QPixmap();
     return;
   }
 
-  m_trackPixmap = QPixmap(trackPixelSize);
-  m_trackPixmap.setDevicePixelRatio(dpr);
-  m_trackPixmap.fill(Qt::transparent);
-
-  {
-    QPainter trackPainter(&m_trackPixmap);
-    trackPainter.setRenderHint(QPainter::Antialiasing, true);
-    trackPainter.setPen(Qt::NoPen);
-    trackPainter.setBrush(m_trackColor);
-    trackPainter.drawRoundedRect(QRectF(0.0, 0.0, track.width(), track.height()),
-                                 TRACK_RADIUS,
-                                 TRACK_RADIUS);
-  }
-
-  const QSize thumbPixelSize = QSizeF(THUMB_PIXMAP_SIZE * dpr, THUMB_PIXMAP_SIZE * dpr).toSize();
   m_thumbPixmap = QPixmap(thumbPixelSize);
   m_thumbPixmap.fill(Qt::transparent);
 

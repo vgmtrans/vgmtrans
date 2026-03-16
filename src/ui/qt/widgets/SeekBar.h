@@ -62,7 +62,9 @@ private:
   QPen m_thumbPen;
   QPixmap m_trackPixmap;
   QPixmap m_thumbPixmap;
-  QSize m_cachedPixmapSize;
-  qreal m_cachedPixmapDpr = 0.0;
-  bool m_pixmapsDirty = true;
+  QSize m_cachedTrackSize;
+  qreal m_cachedTrackDpr = 0.0;
+  qreal m_cachedThumbDpr = 0.0;
+  bool m_trackPixmapDirty = true;
+  bool m_thumbPixmapDirty = true;
 };
