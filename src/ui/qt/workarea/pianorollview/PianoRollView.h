@@ -49,6 +49,7 @@ public:
   struct PreviewSelection {
     VGMItem* item = nullptr;
     int key = -1;
+    uint32_t startTick = 0;
   };
 
   explicit PianoRollView(QWidget* parent = nullptr);
