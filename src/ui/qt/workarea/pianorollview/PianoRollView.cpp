@@ -362,6 +362,8 @@ void PianoRollView::setPlaybackTick(int tick,
   tick = clampTick(tick);
   const bool tickChanged = (tick != m_currentTick);
   const bool playbackStateChanged = (playbackActive != m_playbackActive);
+  const bool horizontalZoomAnimating =
+      m_horizontalZoomAnimation && m_horizontalZoomAnimation->state() == QAbstractAnimation::Running;
   if (!tickChanged && !playbackStateChanged && !activeNotes) {
     return;
   }
@@ -384,12 +386,12 @@ void PianoRollView::setPlaybackTick(int tick,
   if (playbackStateChanged && m_playbackActive) {
     m_playbackAutoScrollEnabled = true;
     m_waitForWheelScrollBegin = true;
-    if (!isTickVisible(tick)) {
+    if (!horizontalZoomAnimating && !isTickVisible(tick)) {
       scrollTickToViewportFraction(tick, kPlaybackPageTargetFraction, m_smoothAutoScrollEnabled);
     }
   }
 
-  if (m_playbackActive && m_playbackAutoScrollEnabled) {
+  if (m_playbackActive && m_playbackAutoScrollEnabled && !horizontalZoomAnimating) {
     const int noteViewportWidth = std::max(0, viewport()->width() - kKeyboardWidth);
     if (noteViewportWidth > 0) {
       const int triggerX = static_cast<int>(std::lround(
@@ -2210,6 +2212,9 @@ void PianoRollView::zoomHorizontalFactor(float factor, int anchorX, bool animate
     return;
   }
 
+  // Horizontal zoom owns the X scroll position, so cancel any in-flight
+  // playback page turn before capturing the zoom anchor.
+  stopPlaybackAutoScrollAnimation();
   if (animated) {
     animateHorizontalScale(targetScale, anchorX, durationMs);
   } else {
