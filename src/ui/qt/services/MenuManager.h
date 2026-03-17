@@ -141,11 +141,10 @@ public:
    */
   template <typename Base, typename T = Base>
   QMenu* createMenuForItems(std::shared_ptr<std::vector<T*>> items) {
-
-    auto menu = new QMenu();
     if (items->empty()) {
       return nullptr;
     }
+    auto menu = new QMenu();
     auto commands = findCommonCommands<Base>(*items);
     createActionsForCommands<Base>(commands, items, menu, true);
     return menu;
