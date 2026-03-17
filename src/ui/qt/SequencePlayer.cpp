@@ -210,7 +210,7 @@ bool SequencePlayer::loadCollection(const VGMColl *coll, bool startPlaying) {
   auto midi = std::unique_ptr<MidiFile>(seq->convertToMidi(coll));
   if (!midi) {
     BASS_MIDI_FontFree(sf2_handle);
-    L_ERROR("Failed converting sequence to MIDI data");
+    L_ERROR("Failed to convert sequence to MIDI");
     return false;
   }
   std::vector<uint8_t> raw_midi;
@@ -221,7 +221,7 @@ bool SequencePlayer::loadCollection(const VGMColl *coll, bool startPlaying) {
   if (BASS_ErrorGetCode() != BASS_OK) {
     BASS_MIDI_FontFree(sf2_handle);
 
-    L_ERROR("Failed reading MIDI data");
+    L_ERROR("Failed to read MIDI data");
     return false;
   }
 
