@@ -121,7 +121,7 @@ int VGMFileListModel::columnCount(const QModelIndex &parent) const {
  */
 
 VGMFileListView::VGMFileListView(QWidget *parent) : TableView(parent) {
-  view_model = new VGMFileListModel();
+  view_model = new VGMFileListModel(this);
   VGMFileListView::setModel(view_model);
 
   setSelectionMode(QAbstractItemView::ExtendedSelection);
