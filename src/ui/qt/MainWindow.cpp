@@ -300,6 +300,8 @@ void MainWindow::hideDragOverlay() {
 }
 
 void MainWindow::handleDroppedUrls(const QList<QUrl>& urls) {
+  hideDragOverlay();
+
   if (urls.isEmpty()) {
     return;
   }
