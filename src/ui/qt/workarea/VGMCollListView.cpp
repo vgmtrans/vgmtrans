@@ -115,7 +115,7 @@ void VGMCollNameEditor::setModelData(QWidget *editor, QAbstractItemModel *model,
 VGMCollListView::VGMCollListView(QWidget *parent) : QListView(parent) {
   auto model = new VGMCollListViewModel(this);
   VGMCollListView::setModel(model);
-  setItemDelegate(new VGMCollNameEditor);
+  setItemDelegate(new VGMCollNameEditor(this));
 
   setContextMenuPolicy(Qt::CustomContextMenu);
   setSelectionMode(QAbstractItemView::ExtendedSelection);

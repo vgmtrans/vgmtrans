@@ -28,6 +28,9 @@ private:
 };
 
 class VGMCollNameEditor : public QStyledItemDelegate {
+public:
+  explicit VGMCollNameEditor(QObject* parent = nullptr) : QStyledItemDelegate(parent) {}
+
 protected:
   void setEditorData(QWidget *editor, const QModelIndex &index) const override;
   void setModelData(QWidget *editor, QAbstractItemModel *model,
