@@ -11,6 +11,7 @@
 #include <QApplication>
 #include <QBrush>
 #include <QColor>
+#include <QContextMenuEvent>
 #include <QEvent>
 #include <QFontMetrics>
 #include <QHBoxLayout>
@@ -261,6 +262,7 @@ MdiArea::MdiArea(QWidget *parent) : QMdiArea(parent) {
   updateBackgroundColor();
 
   connect(this, &QMdiArea::subWindowActivated, this, &MdiArea::onSubWindowActivated);
+  qApp->installEventFilter(this);
   connect(NotificationCenter::the(), &NotificationCenter::vgmFileSelected, this, &MdiArea::onVGMFileSelected);
   connect(qApp, &QApplication::focusChanged, this, [this](QWidget *, QWidget *now) {
     auto *window = containingSubWindowForWidget(now);
@@ -782,6 +784,23 @@ bool MdiArea::eventFilter(QObject *watched, QEvent *event) {
         break;
       default:
         break;
+    }
+  }
+
+  if (event && event->type() == QEvent::ContextMenu) {
+    auto* fileView = currentFileView();
+    auto* contextMenuEvent = static_cast<QContextMenuEvent*>(event);
+    auto* watchedWidget = qobject_cast<QWidget*>(watched);
+    const bool watchedBelongsToFileView =
+        fileView && watchedWidget &&
+        (watchedWidget == fileView ||
+         fileView == containingSubWindowForWidget(watchedWidget) ||
+         fileView->isAncestorOf(watchedWidget));
+    if (fileView && contextMenuEvent &&
+        !(watchedWidget && watchedWidget->windowType() == Qt::Popup) &&
+        (!watchedWidget || watchedBelongsToFileView) &&
+        fileView->showPaneContextMenuAt(contextMenuEvent->globalPos())) {
+      return true;
     }
   }
 

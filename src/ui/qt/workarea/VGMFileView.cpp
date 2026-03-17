@@ -5,11 +5,9 @@
  */
 
 #include <QApplication>
-#include <QContextMenuEvent>
 #include <QColor>
 #include <QEvent>
 #include <QMenu>
-#include <QMouseEvent>
 #include <QPointer>
 #include <QShortcut>
 #include <QSplitter>
@@ -180,7 +178,6 @@ VGMFileView::VGMFileView(VGMFile* vgmfile)
   m_splitter->setStretchFactor(1, 1);
   m_splitter->setSizes(QList<int>{1, 1});
   m_defaultSplitterHandleWidth = m_splitter->handleWidth();
-  qApp->installEventFilter(this);
   m_splitter->installEventFilter(this);
 
   if (panel(PanelSide::Left).hexView || panel(PanelSide::Right).hexView) {
@@ -547,34 +544,17 @@ bool VGMFileView::eventFilter(QObject* watched, QEvent* event) {
     enforceSplitterPolicyForResize();
   }
 
-  if (!event) {
-    return QMdiSubWindow::eventFilter(watched, event);
-  }
-
-  QPoint globalPos;
-  bool shouldShowPaneMenu = false;
-  if (event->type() == QEvent::ContextMenu) {
-    if (auto* contextMenuEvent = static_cast<QContextMenuEvent*>(event)) {
-      globalPos = contextMenuEvent->globalPos();
-      shouldShowPaneMenu = true;
-    }
-  } else if (event->type() == QEvent::MouseButtonPress) {
-    if (auto* mouseEvent = static_cast<QMouseEvent*>(event);
-        mouseEvent && mouseEvent->button() == Qt::RightButton) {
-      globalPos = mouseEvent->globalPosition().toPoint();
-      shouldShowPaneMenu = true;
-    }
-  }
-
-  if (shouldShowPaneMenu) {
-    PanelSide side = PanelSide::Left;
-    if (paneSideAtGlobalPos(globalPos, side)) {
-      MdiArea::the()->showPaneViewMenu(this, side, globalPos);
-      return true;
-    }
-  }
-
   return QMdiSubWindow::eventFilter(watched, event);
+}
+
+bool VGMFileView::showPaneContextMenuAt(const QPoint& globalPos) {
+  PanelSide side = PanelSide::Left;
+  if (!paneSideAtGlobalPos(globalPos, side)) {
+    return false;
+  }
+
+  MdiArea::the()->showPaneViewMenu(this, side, globalPos);
+  return true;
 }
 
 bool VGMFileView::paneSideAtGlobalPos(const QPoint& globalPos, PanelSide& side) const {
