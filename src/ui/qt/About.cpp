@@ -82,7 +82,7 @@ void About::setupInfoTab(QWidget* tab) {
 }
 
 void About::setupLicensesTab(QWidget* tab) {
-  auto *layout = new QHBoxLayout(this);
+  auto *layout = new QHBoxLayout(tab);
 
   auto *listWidget = new QListWidget();
   layout->addWidget(listWidget, 1);
