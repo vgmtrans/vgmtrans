@@ -35,6 +35,10 @@ public:
 
     switch (event->type()) {
       case QEvent::MouseButtonPress: {
+        auto* me = static_cast<QMouseEvent*>(event);
+        if (me->button() == Qt::RightButton) {
+          return false;
+        }
         m_view->setFocus(Qt::MouseFocusReason);
         dragging = true;
         QCoreApplication::sendEvent(m_view->viewport(), event);
@@ -45,6 +49,9 @@ public:
       case QEvent::MouseButtonDblClick: {
         // Ensure the second click still behaves like a press for quick select/deselect.
         auto* me = static_cast<QMouseEvent*>(event);
+        if (me->button() == Qt::RightButton) {
+          return false;
+        }
         if (!dragging && me->button() == Qt::LeftButton) {
           QMouseEvent pressEvent(QEvent::MouseButtonPress,
                                  me->position(),
@@ -73,11 +80,16 @@ public:
         return true;
       }
 
-      case QEvent::MouseButtonRelease:
+      case QEvent::MouseButtonRelease: {
+        auto* me = static_cast<QMouseEvent*>(event);
+        if (me->button() == Qt::RightButton) {
+          return false;
+        }
         QCoreApplication::sendEvent(m_view->viewport(), event);
         dragging = false;
         requestUpdate();
         return true;
+      }
 
       case QEvent::Wheel:
         m_input.queueWheel(static_cast<QWheelEvent*>(event));
