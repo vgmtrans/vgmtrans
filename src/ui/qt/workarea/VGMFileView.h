@@ -60,6 +60,7 @@ class VGMFileView final : public QMdiSubWindow {
 
 public:
   explicit VGMFileView(VGMFile* vgmFile);
+  bool showPaneContextMenuAt(const QPoint& globalPos);
   void setPanelView(PanelSide side, PanelViewKind viewKind);
   [[nodiscard]] PanelViewKind panelView(PanelSide side) const;
   void setSinglePaneMode(bool singlePane);
