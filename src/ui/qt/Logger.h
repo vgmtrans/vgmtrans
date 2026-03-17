@@ -25,9 +25,6 @@ public:
 
   void push(const LogItem *item);
 
-  signals:
-    void closeEvent(QCloseEvent *) override;
-
 private:
   void createElements();
   void connectElements();
