@@ -206,7 +206,12 @@ bool SequencePlayer::loadCollection(const VGMColl *coll, bool startPlaying) {
     return false;
   }
 
-  MidiFile *midi = seq->convertToMidi(coll);
+  auto midi = std::unique_ptr<MidiFile>(seq->convertToMidi(coll));
+  if (!midi) {
+    BASS_MIDI_FontFree(sf2_handle);
+    L_ERROR("Failed converting sequence to MIDI data");
+    return false;
+  }
   std::vector<uint8_t> raw_midi;
   midi->writeMidiToBuffer(raw_midi);
   /* Set up the MIDI stream */
