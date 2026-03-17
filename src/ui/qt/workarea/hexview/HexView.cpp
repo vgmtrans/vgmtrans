@@ -8,6 +8,7 @@
 #include "Helpers.h"
 #include "HexViewInput.h"
 #include "HexViewRhiHost.h"
+#include "MdiArea.h"
 #include "util/NonTransientScrollBarStyle.h"
 #include "services/NotificationCenter.h"
 #include "VGMFile.h"
@@ -393,6 +394,11 @@ HexView::HexView(VGMFile* vgmfile, QWidget* parent)
               return;
             }
             m_seekModifierActive = active;
+            if (MdiArea::the()->activeSubWindow() != window()) {
+              hideTooltip();
+              requestRhiUpdate();
+              return;
+            }
             m_outlineFadeClock.restart();
             if (!m_outlineFadeTimer.isActive()) {
               m_outlineFadeTimer.start(16, this);
