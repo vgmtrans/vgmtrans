@@ -394,7 +394,7 @@ HexView::HexView(VGMFile* vgmfile, QWidget* parent)
               return;
             }
             m_seekModifierActive = active;
-            if (MdiArea::the()->activeSubWindow() != window()) {
+            if (!isVisible()) {
               hideTooltip();
               requestRhiUpdate();
               return;
