@@ -15,6 +15,7 @@
 #include <QComboBox>
 #include <QRadioButton>
 #include <QCheckBox>
+#include <memory>
 #include <vector>
 
 #include "QtVGMRoot.h"
@@ -136,12 +137,12 @@ QListWidget *ManualCollectionDialog::makeSampleCollectionList() {
 }
 
 void ManualCollectionDialog::createCollection() {
-  VGMSeq *chosen_seq = nullptr;
+  VGMSeq* chosen_seq = nullptr;
   for (int i = 0; i < m_seq_list->count(); i++) {
     auto item = m_seq_list->item(i);
     auto radio = qobject_cast<QRadioButton *>(m_seq_list->itemWidget(item));
     if (radio->isChecked()) {
-      chosen_seq = static_cast<VGMSeq *>(item->data(Qt::UserRole).value<void *>());
+      chosen_seq = static_cast<VGMSeq*>(item->data(Qt::UserRole).value<void*>());
       break;
     }
   }
@@ -152,7 +153,7 @@ void ManualCollectionDialog::createCollection() {
   }
 
   // Get the VGMColl class for the format of the chosen sequence
-  auto coll = chosen_seq->format()->newCollection();
+  auto coll = std::unique_ptr<VGMColl>(chosen_seq->format()->newCollection());
   coll->setName(m_name_field->text().toStdString());
   coll->useSeq(chosen_seq);
 
@@ -160,11 +161,12 @@ void ManualCollectionDialog::createCollection() {
     auto item = m_instr_list->item(i);
     auto radio = qobject_cast<QCheckBox *>(m_instr_list->itemWidget(item));
     if (radio->checkState() == (Qt::Checked)) {
-      auto chosen_set = static_cast<VGMInstrSet *>(item->data(Qt::UserRole).value<void *>());
+      auto chosen_set = static_cast<VGMInstrSet*>(item->data(Qt::UserRole).value<void*>());
       coll->addInstrSet(chosen_set);
     }
   }
   if (coll->instrSets().empty()) {
+    coll->removeFileAssocs();
     QMessageBox::critical(this, "Error creating collection",
                           "At least an instrument set must be selected");
     return;
@@ -174,15 +176,22 @@ void ManualCollectionDialog::createCollection() {
     auto item = m_samp_list->item(i);
     auto radio = qobject_cast<QCheckBox *>(m_samp_list->itemWidget(item));
     if (radio->checkState() == (Qt::Checked)) {
-      auto sampcoll = static_cast<VGMSampColl *>(item->data(Qt::UserRole).value<void *>());
+      auto sampcoll = static_cast<VGMSampColl*>(item->data(Qt::UserRole).value<void*>());
       coll->addSampColl(sampcoll);
     }
   }
+
   if (coll->sampColls().empty() && coll->instrSets().front()->sampColl == nullptr) {
     pRoot->UI_toast("The created collection does not contain a sample collection. "
                     "The instrument bank will be silent.", ToastType::Warning);
   }
 
-  coll->load();
+  if (!coll->load()) {
+    coll->removeFileAssocs();
+    pRoot->UI_toast("An error occurred while creating the collection.", ToastType::Error);
+    return;
+  }
+
+  coll.release();
   close();
 }
