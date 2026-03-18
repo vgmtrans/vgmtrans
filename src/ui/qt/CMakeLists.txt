@@ -79,6 +79,7 @@ target_sources(vgmtrans
     workarea/pianorollview/PianoRollRhiWindow.cpp
     workarea/pianorollview/PianoRollGeometry.cpp
     workarea/pianorollview/PianoRollSequenceCache.cpp
+    workarea/pianorollview/PianoRollSelectionModel.cpp
     workarea/pianorollview/PianoRollView.cpp
     workarea/rhi/RhiScrollAreaChrome.cpp
     workarea/rhi/RhiScrollBar.cpp
@@ -171,6 +172,7 @@ target_sources(vgmtrans
       workarea/pianorollview/PianoRollRhiWidget.h
       workarea/pianorollview/PianoRollRhiWindow.h
       workarea/pianorollview/PianoRollSequenceCache.h
+      workarea/pianorollview/PianoRollSelectionModel.h
       workarea/pianorollview/PianoRollView.h
       workarea/rhi/RhiScrollChromeData.h
       workarea/rhi/RhiScrollAreaChrome.h

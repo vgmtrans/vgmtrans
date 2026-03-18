@@ -22,6 +22,7 @@
 #include "PianoRollFrameData.h"
 #include "PianoRollGeometry.h"
 #include "PianoRollSequenceCache.h"
+#include "PianoRollSelectionModel.h"
 
 class QEvent;
 class QRect;
@@ -44,11 +45,7 @@ class PianoRollView final : public QAbstractScrollArea {
   Q_OBJECT
 
 public:
-  struct PreviewSelection {
-    VGMItem* item = nullptr;
-    int key = -1;
-    uint32_t startTick = 0;
-  };
+  using PreviewSelection = PianoRollSelectionModel::PreviewSelection;
 
   explicit PianoRollView(QWidget* parent = nullptr);
   ~PianoRollView() override;
@@ -174,6 +171,12 @@ private:
   [[nodiscard]] const std::unordered_map<const SeqTimedEvent*, size_t>& noteIndexByTimedEvent() const {
     return m_sequenceCache.noteIndexByTimedEvent();
   }
+  [[nodiscard]] const std::vector<size_t>& selectedNoteIndices() const {
+    return m_selectionModel.selectedNoteIndices();
+  }
+  [[nodiscard]] VGMItem* primarySelectedItem() const {
+    return m_selectionModel.primarySelectedItem();
+  }
   void resizeTrackEnabledMaskToTrackCount();
   void rebuildTrackColors();
   void rebuildFrameColors();
@@ -203,11 +206,6 @@ private:
   void scrollTickToViewportFraction(int tick, float viewportFraction, bool animated = true);
   [[nodiscard]] int noteIndexAtViewportPoint(const QPoint& pos) const;
   [[nodiscard]] VGMItem* noteAtViewportPoint(const QPoint& pos) const;
-  void normalizeNoteIndices(std::vector<size_t>& indices) const;
-  [[nodiscard]] bool isSelectedItem(VGMItem* item) const;
-  [[nodiscard]] std::vector<VGMItem*> uniqueItemsForNoteIndices(
-      const std::vector<size_t>& indices) const;
-  void rebuildSelectedNotesCache();
   void updateSeekPreview();
   void previewSingleNoteAtViewportPoint(const QPoint& pos);
   void applySelectedNoteIndices(std::vector<size_t> indices,
@@ -291,7 +289,7 @@ private:
   QPoint m_panDragLastPos;
   bool m_noteSelectionAnchorWorldValid = false;
   QBasicTimer m_dragAutoScrollTimer;
-  VGMItem* m_primarySelectedItem = nullptr;
+  PianoRollSelectionModel m_selectionModel;
 
   std::vector<uint8_t> m_trackEnabledMask;
   std::vector<QColor> m_trackColors;
@@ -300,10 +298,6 @@ private:
   FrameColors m_frameColors;
 
   std::shared_ptr<const std::vector<PianoRollFrame::Note>> m_activeNotes;
-  std::shared_ptr<const std::vector<PianoRollFrame::Note>> m_selectedNotes;
-  std::vector<size_t> m_selectedNoteIndices;
-  std::vector<size_t> m_previewNoteIndices;
-  int m_previewTick = -1;
 
   std::array<ActiveKeyState, kMidiKeyCount> m_activeKeys{};
 };
