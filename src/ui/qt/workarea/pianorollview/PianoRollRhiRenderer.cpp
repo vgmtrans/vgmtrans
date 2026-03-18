@@ -73,6 +73,14 @@ struct KeyboardTopology {
   std::vector<float> seamUnits;
 };
 
+struct TimeSignatureSegment {
+  uint64_t start = 0;
+  uint64_t end = 0;
+  uint32_t beatTicks = 1;
+  uint32_t measureTicks = 1;
+  uint64_t firstMeasureIndex = 0;
+};
+
 // Precomputes white/black key topology once so frame builds avoid neighbor scans.
 const KeyboardTopology& keyboardTopology() {
   static const KeyboardTopology topology = [] {
@@ -186,6 +194,57 @@ QColor colorForTrackIndex(const std::vector<QColor>* trackColors, int trackIndex
     return (*trackColors)[static_cast<size_t>(trackIndex)];
   }
   return ::colorForTrackIndex(trackIndex);
+}
+
+template <typename Fn>
+void forEachTimeSignatureSegment(const PianoRollFrame::Data& frame, Fn&& fn) {
+  const uint64_t totalTickEnd = static_cast<uint64_t>(std::max(1, frame.totalTicks)) + 1;
+  const auto visit = [&](const PianoRollFrame::TimeSignature& sig,
+                         uint64_t segEnd,
+                         uint64_t& runningMeasureIndex) {
+    const uint64_t segStart = sig.tick;
+    if (segStart >= totalTickEnd || segEnd <= segStart) {
+      return;
+    }
+
+    const uint32_t numerator = std::max<uint32_t>(1, sig.numerator);
+    const uint32_t denominator = std::max<uint32_t>(1, sig.denominator);
+    const uint32_t beatTicks = std::max<uint32_t>(
+        1,
+        static_cast<uint32_t>(std::lround((static_cast<double>(frame.ppqn) * 4.0) /
+                                          static_cast<double>(denominator))));
+    const uint64_t measureTicks64 = static_cast<uint64_t>(beatTicks) * numerator;
+    const uint32_t measureTicks = static_cast<uint32_t>(std::min<uint64_t>(
+        std::numeric_limits<uint32_t>::max(),
+        std::max<uint64_t>(1, measureTicks64)));
+    const uint64_t measureCount = (((segEnd - segStart) - 1) / measureTicks) + 1;
+
+    fn(TimeSignatureSegment{
+        segStart,
+        segEnd,
+        beatTicks,
+        measureTicks,
+        runningMeasureIndex,
+    });
+    runningMeasureIndex += measureCount;
+  };
+
+  uint64_t runningMeasureIndex = 0;
+  if (!frame.timeSignatures || frame.timeSignatures->empty()) {
+    visit({0, 4, 4}, totalTickEnd, runningMeasureIndex);
+    return;
+  }
+
+  // PianoRollView normalizes these once when rebuilding the sequence cache.
+  const auto& signatures = *frame.timeSignatures;
+  for (size_t i = 0; i < signatures.size(); ++i) {
+    const auto& sig = signatures[i];
+    uint64_t segEnd = totalTickEnd;
+    if (i + 1 < signatures.size()) {
+      segEnd = std::min<uint64_t>(segEnd, std::max<uint64_t>(sig.tick, signatures[i + 1].tick));
+    }
+    visit(sig, segEnd, runningMeasureIndex);
+  }
 }
 
 }  // namespace
@@ -941,59 +1000,6 @@ void PianoRollRhiRenderer::appendMeasureNumberOverlays(const PianoRollFrame::Dat
     return;
   }
 
-  struct MeasureSegment {
-    uint64_t start = 0;
-    uint64_t end = 0;
-    uint32_t measureTicks = 1;
-    uint64_t firstMeasureIndex = 0;
-  };
-
-  std::vector<PianoRollFrame::TimeSignature> signatures;
-  if (frame.timeSignatures && !frame.timeSignatures->empty()) {
-    signatures = *frame.timeSignatures;
-  } else {
-    signatures.push_back({0, 4, 4});
-  }
-  std::sort(signatures.begin(), signatures.end(), [](const auto& lhs, const auto& rhs) {
-    return lhs.tick < rhs.tick;
-  });
-
-  const uint64_t totalTickEnd = static_cast<uint64_t>(std::max(1, frame.totalTicks)) + 1;
-  std::vector<MeasureSegment> segments;
-  segments.reserve(signatures.size());
-
-  uint64_t runningMeasureIndex = 0;
-  for (size_t i = 0; i < signatures.size(); ++i) {
-    const auto& sig = signatures[i];
-    const uint64_t segStart = sig.tick;
-    uint64_t segEnd = totalTickEnd;
-    if (i + 1 < signatures.size()) {
-      segEnd = std::min<uint64_t>(segEnd, std::max<uint64_t>(segStart, signatures[i + 1].tick));
-    }
-    if (segStart >= totalTickEnd || segEnd <= segStart) {
-      continue;
-    }
-
-    const uint32_t numerator = std::max<uint32_t>(1, sig.numerator);
-    const uint32_t denominator = std::max<uint32_t>(1, sig.denominator);
-    const uint32_t beatTicks = std::max<uint32_t>(
-        1,
-        static_cast<uint32_t>(std::lround((static_cast<double>(frame.ppqn) * 4.0) /
-                                          static_cast<double>(denominator))));
-    const uint64_t measureTicks64 = static_cast<uint64_t>(beatTicks) * numerator;
-    const uint32_t measureTicks = static_cast<uint32_t>(std::min<uint64_t>(
-        std::numeric_limits<uint32_t>::max(),
-        std::max<uint64_t>(1, measureTicks64)));
-
-    const uint64_t spanTicks = segEnd - segStart;
-    const uint64_t measureCount = ((spanTicks - 1) / measureTicks) + 1;
-    segments.push_back({segStart, segEnd, measureTicks, runningMeasureIndex});
-    runningMeasureIndex += measureCount;
-  }
-  if (segments.empty()) {
-    return;
-  }
-
   static constexpr float kMinMeasureSpacingForLabelsPx = 22.0f;
   static constexpr float kTargetMeasureLabelSpacingPx = 44.0f;
   static constexpr int kMaxVisibleLabels = 96;
@@ -1002,13 +1008,13 @@ void PianoRollRhiRenderer::appendMeasureNumberOverlays(const PianoRollFrame::Dat
   const uint64_t visibleStartTick = layout.visibleStartTick;
   const uint64_t visibleEndTick = layout.visibleEndTick + 1;
   float minMeasureSpacingPx = std::numeric_limits<float>::max();
-  for (const MeasureSegment& seg : segments) {
+  forEachTimeSignatureSegment(frame, [&](const TimeSignatureSegment& seg) {
     if (seg.end <= visibleStartTick || seg.start >= visibleEndTick) {
-      continue;
+      return;
     }
     minMeasureSpacingPx = std::min(minMeasureSpacingPx,
                                    static_cast<float>(seg.measureTicks) * layout.pixelsPerTick);
-  }
+  });
   if (!std::isfinite(minMeasureSpacingPx) || minMeasureSpacingPx < kMinMeasureSpacingForLabelsPx) {
     return;
   }
@@ -1028,9 +1034,12 @@ void PianoRollRhiRenderer::appendMeasureNumberOverlays(const PianoRollFrame::Dat
   labelColor.setAlpha(std::clamp(labelColor.alpha() + 84, 96, 220));
 
   int visibleLabelCount = 0;
-  for (const MeasureSegment& seg : segments) {
+  forEachTimeSignatureSegment(frame, [&](const TimeSignatureSegment& seg) {
+    if (visibleLabelCount >= kMaxVisibleLabels) {
+      return;
+    }
     if (seg.end <= visibleStartTick || seg.start >= visibleEndTick) {
-      continue;
+      return;
     }
 
     uint64_t firstMeasureInSeg = 0;
@@ -1067,10 +1076,10 @@ void PianoRollRhiRenderer::appendMeasureNumberOverlays(const PianoRollFrame::Dat
 
       ++visibleLabelCount;
       if (visibleLabelCount >= kMaxVisibleLabels) {
-        return;
+        break;
       }
     }
-  }
+  });
 }
 
 void PianoRollRhiRenderer::appendPianoCKeyLabels(const PianoRollFrame::Data& frame,
@@ -1483,30 +1492,12 @@ void PianoRollRhiRenderer::buildStaticInstances(const PianoRollFrame::Data& fram
 
 // Emits procedural beat/measure grid segments for each time-signature region.
 void PianoRollRhiRenderer::appendStaticGridInstances(const PianoRollFrame::Data& frame, const Layout& layout) {
-  std::vector<PianoRollFrame::TimeSignature> signatures;
-  if (frame.timeSignatures && !frame.timeSignatures->empty()) {
-    signatures = *frame.timeSignatures;
-  } else {
-    signatures.push_back({0, 4, 4});
-  }
-  std::sort(signatures.begin(), signatures.end(), [](const auto& a, const auto& b) {
-    return a.tick < b.tick;
-  });
-
-  const uint64_t totalTickEnd = static_cast<uint64_t>(std::max(1, frame.totalTicks)) + 1;
-  const auto appendGridSegment = [&](uint64_t segStart,
-                                     uint64_t segEnd,
-                                     uint32_t beatTicks,
-                                     uint32_t measureTicks) {
-    if (segEnd <= segStart || beatTicks == 0 || measureTicks == 0) {
-      return;
-    }
-
-    const float segX = static_cast<float>(segStart);
-    const float segW = static_cast<float>(segEnd - segStart);
-    const float beatTicksF = static_cast<float>(beatTicks);
-    const float measureTicksF = static_cast<float>(measureTicks);
-    const float originTickF = static_cast<float>(segStart);
+  forEachTimeSignatureSegment(frame, [&](const TimeSignatureSegment& seg) {
+    const float segX = static_cast<float>(seg.start);
+    const float segW = static_cast<float>(seg.end - seg.start);
+    const float beatTicksF = static_cast<float>(seg.beatTicks);
+    const float measureTicksF = static_cast<float>(seg.measureTicks);
+    const float originTickF = static_cast<float>(seg.start);
 
     // Beat/measure spacing is packed into instance params and expanded in the fragment shader.
     appendRect(m_staticBackInstances,
@@ -1563,29 +1554,7 @@ void PianoRollRhiRenderer::appendStaticGridInstances(const PianoRollFrame::Data&
                0.0f,
                1.0f,
                0.0f);
-  };
-
-  for (size_t i = 0; i < signatures.size(); ++i) {
-    const auto& sig = signatures[i];
-    const uint32_t numerator = std::max<uint32_t>(1, sig.numerator);
-    const uint32_t denominator = std::max<uint32_t>(1, sig.denominator);
-    const uint32_t beatTicks = std::max<uint32_t>(
-        1,
-        static_cast<uint32_t>(std::lround((static_cast<double>(frame.ppqn) * 4.0) /
-                                          static_cast<double>(denominator))));
-    const uint64_t measureTicks64 = static_cast<uint64_t>(beatTicks) * numerator;
-    const uint32_t measureTicks = static_cast<uint32_t>(std::min<uint64_t>(
-        std::numeric_limits<uint32_t>::max(),
-        std::max<uint64_t>(1, measureTicks64)));
-
-    const uint64_t segStart = sig.tick;
-    uint64_t segEnd = totalTickEnd;
-    if (i + 1 < signatures.size()) {
-      // Signature i owns ticks up to, but not including, the next signature.
-      segEnd = std::min<uint64_t>(segEnd, std::max<uint64_t>(segStart, signatures[i + 1].tick));
-    }
-    appendGridSegment(segStart, segEnd, beatTicks, measureTicks);
-  }
+  });
 }
 
 // Draws static white and black key faces for the keyboard column.
