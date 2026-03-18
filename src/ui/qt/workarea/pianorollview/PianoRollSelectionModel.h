@@ -16,6 +16,7 @@
 
 class VGMItem;
 
+// Owns PianoRoll selection and preview state independently from widget and input code.
 class PianoRollSelectionModel {
 public:
   using SelectableNote = PianoRollSequenceCache::SelectableNote;

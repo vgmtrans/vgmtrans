@@ -38,6 +38,7 @@ int PianoRollGeometry::clampTick(int tick) const {
 }
 
 int PianoRollGeometry::scanlineWorldX(int tick) const {
+  // Scanline positions are computed in world space first so scroll and visibility tests share the same value.
   return static_cast<int>(std::lround(
       static_cast<float>(clampTick(tick)) * std::max(0.0001f, m_metrics.pixelsPerTick)));
 }
@@ -93,6 +94,7 @@ QRectF PianoRollGeometry::graphSelectionRectInViewport(const QPoint& anchorViewp
     return {};
   }
 
+  // When the view scrolls during marquee drag, the anchor stays in graph space rather than screen space.
   const QPoint marqueeAnchorViewport = anchorWorldValid
                                            ? graphViewportPosFromWorld(anchorWorld)
                                            : anchorViewport;
