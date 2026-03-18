@@ -152,10 +152,6 @@ void HexViewRhiRenderer::initIfNeeded(QRhi* rhi) {
                                     QRhiSampler::ClampToEdge);
   m_maskSampler->create();
 
-  m_edgeFallbackTex = m_rhi->newTexture(QRhiTexture::RGBA8, QSize(1, 1), 1);
-  m_edgeFallbackTex->create();
-  m_edgeFallbackDirty = true;
-
   m_staticBuffersUploaded = false;
   m_sampleCount = 0;
   if (!m_frameTimer.isValid()) {
@@ -203,8 +199,6 @@ void HexViewRhiRenderer::releaseResources() {
   m_glyphTex = nullptr;
   delete m_itemIdTex;
   m_itemIdTex = nullptr;
-  delete m_edgeFallbackTex;
-  m_edgeFallbackTex = nullptr;
   delete m_glyphSampler;
   m_glyphSampler = nullptr;
   delete m_maskSampler;
@@ -360,17 +354,6 @@ void HexViewRhiRenderer::renderFrame(QRhiCommandBuffer* cb, const RenderTargetIn
   const bool edgeEnabled = needsComposite &&
       ((frame.shadowBlur > 0.0 && frame.shadowStrength > 0.0) ||
        (frame.playbackGlowRadius > 0.0f && frame.playbackGlowStrength > 0.0f));
-  if (m_useEdgeFallback != !edgeEnabled) {
-    m_useEdgeFallback = !edgeEnabled;
-    m_compositeSrbDirty = true;
-  }
-
-  if (m_edgeFallbackTex && m_edgeFallbackDirty) {
-    QImage whitePixel(1, 1, QImage::Format_RGBA8888);
-    whitePixel.fill(Qt::white);
-    u->uploadTexture(m_edgeFallbackTex, whitePixel);
-    m_edgeFallbackDirty = false;
-  }
 
   ensureItemIdTexture(u, startLine, endLine, totalLines, frame);
   ensureRenderTargets(target.pixelSize);
@@ -482,10 +465,8 @@ void HexViewRhiRenderer::renderFrame(QRhiCommandBuffer* cb, const RenderTargetIn
                 static_cast<int>(sizeof(GlyphInstance)));
   cb->endPass();
 
-  // Pass 2: selection/playback mask into an offscreen texture.
-  // Channel encoding:
-  // R=selection mask, G=active playback, B=fading playback, A=fade alpha.
-  cb->beginPass(m_maskRt, QColor(0, 0, 0, 0), {1.0f, 0}, nullptr);
+  // Pass 2: combined overlay/effect pass writes mask, edge falloff, and playback tint together.
+  cb->beginPass(m_effectRt, QColor(0, 0, 0, 0), {1.0f, 0}, nullptr);
   cb->setViewport(viewport);
   drawInstanced(m_maskPso,
                 m_rectSrb,
@@ -493,35 +474,32 @@ void HexViewRhiRenderer::renderFrame(QRhiCommandBuffer* cb, const RenderTargetIn
                 static_cast<int>(m_maskRectInstances.size()),
                 0,
                 static_cast<int>(sizeof(RectInstance)));
-  cb->endPass();
-
-  // Pass 3: combined effect pass writes edge falloff and playback tint fields together.
-  if (edgeEnabled) {
-    cb->beginPass(m_effectRt, QColor(255, 255, 255, 0), {1.0f, 0}, nullptr);
-    cb->setViewport(viewport);
+  if (hasPlayback && frame.playbackGlowRadius > 0.0f && frame.playbackGlowStrength > 0.0f) {
     drawInstanced(m_playbackColorPso,
                   m_rectSrb,
                   m_playbackColorRectBuf,
                   static_cast<int>(m_playbackColorRectInstances.size()),
                   0,
                   static_cast<int>(sizeof(RectInstance)));
+  }
+  if (edgeEnabled) {
     drawInstanced(m_edgePso,
                   m_edgeSrb,
                   m_edgeRectBuf,
                   static_cast<int>(m_edgeRectInstances.size()),
                   0,
                   static_cast<int>(sizeof(EdgeInstance)));
-    cb->endPass();
   }
+  cb->endPass();
 
-  // Pass 4: fullscreen composite combines content + mask + playback color + edge + item-id textures.
+  // Pass 3: fullscreen composite combines content + mask + playback color + edge + item-id textures.
   cb->beginPass(target.renderTarget, clearColor, {1.0f, 0}, nullptr);
   cb->setViewport(viewport);
   drawFullscreen(m_compositePso, m_compositeSrb);
   cb->endPass();
 }
 
-// Ensure offscreen content/mask/effect render targets match current output pixel size.
+// Ensure offscreen content/effect render targets match current output pixel size.
 void HexViewRhiRenderer::ensureRenderTargets(const QSize& pixelSize) {
   if (!m_rhi || pixelSize.isEmpty()) {
     return;
@@ -547,12 +525,13 @@ void HexViewRhiRenderer::ensureRenderTargets(const QSize& pixelSize) {
   };
 
   makeSingleTarget(&m_contentTex, &m_contentRt, &m_contentRp);
-  makeSingleTarget(&m_maskTex, &m_maskRt, &m_maskRp);
+  makeTexture(&m_maskTex);
   makeTexture(&m_edgeTex);
   makeTexture(&m_playbackColorTex);
 
   QRhiTextureRenderTargetDescription effectDesc;
-  effectDesc.setColorAttachments({QRhiColorAttachment(m_edgeTex),
+  effectDesc.setColorAttachments({QRhiColorAttachment(m_maskTex),
+                                  QRhiColorAttachment(m_edgeTex),
                                   QRhiColorAttachment(m_playbackColorTex)});
   m_effectRt = m_rhi->newTextureRenderTarget(effectDesc);
   m_effectRp = m_effectRt->newCompatibleRenderPassDescriptor();
@@ -571,10 +550,6 @@ void HexViewRhiRenderer::releaseRenderTargets() {
   delete m_contentTex;
   m_contentTex = nullptr;
 
-  delete m_maskRp;
-  m_maskRp = nullptr;
-  delete m_maskRt;
-  m_maskRt = nullptr;
   delete m_maskTex;
   m_maskTex = nullptr;
 
@@ -592,7 +567,7 @@ void HexViewRhiRenderer::releaseRenderTargets() {
 // Build or rebuild pipelines and SRBs when RP descriptors/samples/bindings change.
 void HexViewRhiRenderer::ensurePipelines(QRhiRenderPassDescriptor* outputRp,
                                          int outputSampleCount) {
-  if (!outputRp || !m_contentRp || !m_maskRp || !m_effectRp) {
+  if (!outputRp || !m_contentRp || !m_effectRp) {
     return;
   }
 
@@ -725,10 +700,10 @@ void HexViewRhiRenderer::ensurePipelines(QRhiRenderPassDescriptor* outputRp,
   edgeBlend.enable = true;
   edgeBlend.srcColor = QRhiGraphicsPipeline::One;
   edgeBlend.dstColor = QRhiGraphicsPipeline::One;
-  edgeBlend.opColor = QRhiGraphicsPipeline::Min;
+  edgeBlend.opColor = QRhiGraphicsPipeline::Max;
   edgeBlend.srcAlpha = QRhiGraphicsPipeline::One;
   edgeBlend.dstAlpha = QRhiGraphicsPipeline::One;
-  edgeBlend.opAlpha = QRhiGraphicsPipeline::Min;
+  edgeBlend.opAlpha = QRhiGraphicsPipeline::Max;
 
   QRhiGraphicsPipeline::TargetBlend noWriteBlend;
   noWriteBlend.colorWrite = {};
@@ -773,15 +748,15 @@ void HexViewRhiRenderer::ensurePipelines(QRhiRenderPassDescriptor* outputRp,
                  rectFrag,
                  rectInputLayout,
                  m_rectSrb,
-                 {maskBlend},
+                 {maskBlend, noWriteBlend, noWriteBlend},
                  1,
-                 m_maskRp);
+                 m_effectRp);
   createPipeline(m_playbackColorPso,
                  rectVert,
                  rectEffectFrag,
                  rectInputLayout,
                  m_rectSrb,
-                 {noWriteBlend, blend},
+                 {noWriteBlend, noWriteBlend, blend},
                  1,
                  m_effectRp);
   createPipeline(m_edgePso,
@@ -789,7 +764,7 @@ void HexViewRhiRenderer::ensurePipelines(QRhiRenderPassDescriptor* outputRp,
                  edgeEffectFrag,
                  edgeInputLayout,
                  m_edgeSrb,
-                 {edgeBlend, noWriteBlend},
+                 {noWriteBlend, edgeBlend, noWriteBlend},
                  1,
                  m_effectRp);
   createPipeline(m_compositePso,
@@ -943,7 +918,6 @@ void HexViewRhiRenderer::updateCompositeSrb() {
   if (!m_compositeSrb) {
     return;
   }
-  QRhiTexture* edgeSampleTex = m_useEdgeFallback ? m_edgeFallbackTex : m_edgeTex;
   m_compositeSrb->setBindings({
     QRhiShaderResourceBinding::uniformBuffer(0,
                                              QRhiShaderResourceBinding::VertexStage |
@@ -954,7 +928,7 @@ void HexViewRhiRenderer::updateCompositeSrb() {
     QRhiShaderResourceBinding::sampledTexture(2, QRhiShaderResourceBinding::FragmentStage,
                                               m_maskTex, m_maskSampler),
     QRhiShaderResourceBinding::sampledTexture(3, QRhiShaderResourceBinding::FragmentStage,
-                                              edgeSampleTex, m_glyphSampler),
+                                              m_edgeTex, m_glyphSampler),
     QRhiShaderResourceBinding::sampledTexture(4, QRhiShaderResourceBinding::FragmentStage,
                                               m_playbackColorTex, m_glyphSampler),
     QRhiShaderResourceBinding::sampledTexture(5, QRhiShaderResourceBinding::FragmentStage,
