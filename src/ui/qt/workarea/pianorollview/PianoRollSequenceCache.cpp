@@ -16,6 +16,7 @@
 
 namespace {
 
+// Orders notes by their visible placement so render data and selectable-note indices stay aligned.
 bool pianoRollNoteLess(const PianoRollFrame::Note& lhs, const PianoRollFrame::Note& rhs) {
   if (lhs.startTick != rhs.startTick) {
     return lhs.startTick < rhs.startTick;
@@ -87,6 +88,7 @@ int PianoRollSequenceCache::trackIndexForTrack(const SeqTrack* track) const {
     return trackIt->second;
   }
 
+  // Multi-section playback can swap SeqTrack instances while keeping the same MidiTrack.
   if (track->pMidiTrack) {
     const auto midiTrackIt = m_trackIndexByMidiPtr.find(track->pMidiTrack);
     if (midiTrackIt != m_trackIndexByMidiPtr.end()) {
@@ -129,6 +131,7 @@ void PianoRollSequenceCache::rebuild(VGMSeq* seq) {
   auto signatures = std::make_shared<std::vector<PianoRollFrame::TimeSignature>>();
 
   if (!timeline.finalized()) {
+    // Rendering can still proceed with an empty note snapshot until timing has been finalized.
     signatures->push_back({0, 4, 4});
     m_notes = notes;
     m_timeSignatures = signatures;
@@ -178,6 +181,7 @@ void PianoRollSequenceCache::rebuild(VGMSeq* seq) {
     maxDurationTicks = std::max<uint32_t>(maxDurationTicks, note.duration);
   }
 
+  // Keep both note arrays in the same order so timed-event lookups can reuse selectable-note indices.
   std::sort(notes->begin(), notes->end(), pianoRollNoteLess);
   std::sort(m_selectableNotes.begin(), m_selectableNotes.end(), [](const auto& a, const auto& b) {
     if (a.startTick != b.startTick) {
@@ -199,6 +203,7 @@ void PianoRollSequenceCache::rebuild(VGMSeq* seq) {
     }
   }
 
+  // Time signatures are currently sourced from the first track, matching the pre-refactor view behavior.
   if (!seq->aTracks.empty() && seq->aTracks.front()) {
     for (VGMItem* child : seq->aTracks.front()->children()) {
       auto* sig = dynamic_cast<TimeSigSeqEvent*>(child);
@@ -243,6 +248,7 @@ void PianoRollSequenceCache::rebuild(VGMSeq* seq) {
     }
 
     signatures->assign(deduped.begin(), deduped.end());
+    // Ensure the renderer always has a time signature starting at tick 0.
     if (!signatures->empty() && signatures->front().tick != 0) {
       signatures->insert(signatures->begin(), {0, signatures->front().numerator, signatures->front().denominator});
     }

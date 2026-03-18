@@ -20,6 +20,7 @@ class SeqTrack;
 class VGMItem;
 class VGMSeq;
 
+// Builds and owns the derived sequence snapshot consumed by PianoRollView and the renderer.
 class PianoRollSequenceCache {
 public:
   struct SelectableNote {
@@ -61,6 +62,7 @@ public:
   }
 
 private:
+  // Builds both direct track lookups and MidiTrack fallbacks for multi-section sequences.
   void rebuildTrackIndexMaps(VGMSeq* seq);
 
   const SeqEventTimeIndex* m_timeline = nullptr;

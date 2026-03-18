@@ -10,6 +10,7 @@
 #include <QRect>
 #include <QRectF>
 
+// Centralizes PianoRoll viewport/world/tick conversions from one immutable metrics snapshot.
 class PianoRollGeometry {
 public:
   struct Metrics {

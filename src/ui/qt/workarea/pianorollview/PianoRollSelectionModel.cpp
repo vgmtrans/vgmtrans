@@ -43,6 +43,7 @@ std::vector<VGMItem*> PianoRollSelectionModel::uniqueItemsForSelectedNoteIndices
   return items;
 }
 
+// Applies a selection set, filters out disabled notes, and resolves the primary selected item.
 PianoRollSelectionModel::SelectionUpdate PianoRollSelectionModel::applySelectedNoteIndices(
     std::vector<size_t> indices,
     const std::vector<SelectableNote>& notes,
@@ -50,6 +51,7 @@ PianoRollSelectionModel::SelectionUpdate PianoRollSelectionModel::applySelectedN
     VGMItem* preferredPrimary) {
   normalizeNoteIndices(indices, notes.size());
 
+  // Selection snapshots only keep notes that are still visible/enabled in the current track mask.
   size_t filteredCount = 0;
   for (size_t index : indices) {
     if (index >= notes.size()) {
@@ -66,6 +68,7 @@ PianoRollSelectionModel::SelectionUpdate PianoRollSelectionModel::applySelectedN
   m_selectedNoteIndices = std::move(indices);
   rebuildSelectedNotesCache(notes);
 
+  // Preserve the preferred or previous primary item when it still belongs to the current selection.
   VGMItem* nextPrimary = nullptr;
   if (isSelectedItem(notes, preferredPrimary)) {
     nextPrimary = preferredPrimary;
@@ -80,6 +83,7 @@ PianoRollSelectionModel::SelectionUpdate PianoRollSelectionModel::applySelectedN
   return {.selectionChanged = selectionChanged, .primaryChanged = primaryChanged};
 }
 
+// Converts preview note indices into the lightweight preview payload emitted by PianoRollView.
 PianoRollSelectionModel::PreviewUpdate PianoRollSelectionModel::applyPreviewNoteIndices(
     std::vector<size_t> indices,
     int previewTick,
@@ -103,6 +107,7 @@ PianoRollSelectionModel::PreviewUpdate PianoRollSelectionModel::applyPreviewNote
   m_previewNoteIndices = std::move(indices);
   m_previewTick = clampedPreviewTick;
 
+  // Preview events only carry playable notes, so empty/non-note selections collapse to "stopped".
   std::vector<PreviewSelection> previewNotes;
   previewNotes.reserve(m_previewNoteIndices.size());
   for (size_t index : m_previewNoteIndices) {
@@ -127,6 +132,7 @@ PianoRollSelectionModel::PreviewUpdate PianoRollSelectionModel::applyPreviewNote
 }
 
 void PianoRollSelectionModel::normalizeNoteIndices(std::vector<size_t>& indices, size_t noteCount) const {
+  // Keep note-index sets canonical so equality checks are stable across input paths.
   indices.erase(std::remove_if(indices.begin(),
                                indices.end(),
                                [noteCount](size_t index) {
@@ -151,6 +157,7 @@ bool PianoRollSelectionModel::isSelectedItem(const std::vector<SelectableNote>& 
 }
 
 void PianoRollSelectionModel::rebuildSelectedNotesCache(const std::vector<SelectableNote>& notes) {
+  // Renderer-facing selection data drops item pointers and keeps only note geometry.
   std::vector<PianoRollFrame::Note> selectedNotes;
   selectedNotes.reserve(m_selectedNoteIndices.size());
   for (size_t selectedIndex : m_selectedNoteIndices) {

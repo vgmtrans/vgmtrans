@@ -16,6 +16,7 @@
 #include <memory>
 #include <vector>
 
+// Owns playback tick state plus the active note/key snapshots used by rendering.
 class PianoRollPlaybackController {
 public:
   static constexpr int kMidiKeyCount = PianoRollFrame::kMidiKeyCount;

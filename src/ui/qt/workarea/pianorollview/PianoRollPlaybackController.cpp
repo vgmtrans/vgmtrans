@@ -10,6 +10,7 @@
 
 namespace {
 
+// Orders notes by visual position and returns true when lhs should be drawn before rhs.
 bool pianoRollNoteLess(const PianoRollFrame::Note& lhs, const PianoRollFrame::Note& rhs) {
   if (lhs.startTick != rhs.startTick) {
     return lhs.startTick < rhs.startTick;
@@ -23,6 +24,7 @@ bool pianoRollNoteLess(const PianoRollFrame::Note& lhs, const PianoRollFrame::No
   return lhs.duration < rhs.duration;
 }
 
+// Returns true when two renderer-facing note records are identical.
 bool pianoRollNoteEqual(const PianoRollFrame::Note& lhs, const PianoRollFrame::Note& rhs) {
   return lhs.startTick == rhs.startTick &&
          lhs.duration == rhs.duration &&
@@ -48,6 +50,7 @@ void PianoRollPlaybackController::clear() {
   }
 }
 
+// Updates playback tick state and caches enough timing data to predict in-between frame positions.
 PianoRollPlaybackController::TickUpdate PianoRollPlaybackController::setPlaybackTick(int tick,
                                                                                      bool playbackActive,
                                                                                      qint64 nowNs,
@@ -73,6 +76,7 @@ void PianoRollPlaybackController::setCurrentTick(int tick) {
   m_currentTick = tick;
 }
 
+// Rebuilds active-note and active-key snapshots from the resolved playback notes.
 bool PianoRollPlaybackController::applyResolvedActiveNotes(
     const std::vector<PianoRollFrame::Note>& resolvedActiveNotes,
     const std::function<bool(int trackIndex)>& isTrackEnabled) {
@@ -97,6 +101,7 @@ bool PianoRollPlaybackController::applyResolvedActiveNotes(
     note.duration = std::max<uint32_t>(1, note.duration);
     nextActiveNotes.push_back(note);
 
+    // The newest note on a key owns the keyboard highlight for that key.
     auto& state = nextActiveKeys[static_cast<size_t>(note.key)];
     if (state.trackIndex < 0 || note.startTick >= state.startTick) {
       state.trackIndex = note.trackIndex;
@@ -136,6 +141,7 @@ bool PianoRollPlaybackController::applyResolvedActiveNotes(
   return activeKeysChanged || activeNotesChanged;
 }
 
+// Predicts the current scanline tick between playback callbacks.
 float PianoRollPlaybackController::visualPlaybackTick(qint64 nowNs, int totalTicks, bool playerRunning) const {
   const float baseTick = static_cast<float>(std::clamp(m_currentTick, 0, std::max(1, totalTicks)));
   if (!m_playbackActive || m_lastPlaybackTickUpdateNs <= 0 || m_visualPlaybackTicksPerSecond <= 0.0f) {
