@@ -345,7 +345,7 @@ void PianoRollView::setSelectedItems(const std::vector<const VGMItem*>& items,
 void PianoRollView::setPlaybackTick(int tick,
                                     bool playbackActive,
                                     const std::vector<PianoRollFrame::Note>* activeNotes) {
-  tick = clampTick(tick);
+  tick = geometry().clampTick(tick);
   const bool tickChanged = (tick != m_currentTick);
   const bool playbackStateChanged = (playbackActive != m_playbackActive);
   const bool horizontalZoomAnimating =
@@ -372,17 +372,17 @@ void PianoRollView::setPlaybackTick(int tick,
   if (playbackStateChanged && m_playbackActive) {
     m_playbackAutoScrollEnabled = true;
     m_waitForWheelScrollBegin = true;
-    if (!horizontalZoomAnimating && !isTickVisible(tick)) {
+    if (!horizontalZoomAnimating && !geometry().isTickVisible(tick)) {
       scrollTickToViewportFraction(tick, kPlaybackPageTargetFraction, m_smoothAutoScrollEnabled);
     }
   }
 
   if (m_playbackActive && m_playbackAutoScrollEnabled && !horizontalZoomAnimating) {
-    const int noteViewportWidth = std::max(0, viewport()->width() - kKeyboardWidth);
+    const int noteViewportWidth = geometry().noteViewportWidth();
     if (noteViewportWidth > 0) {
       const int triggerX = static_cast<int>(std::lround(
           static_cast<float>(noteViewportWidth) * kPlaybackPageTriggerFraction));
-      if (scanlinePixelX(tick) >= triggerX) {
+      if (geometry().scanlinePixelX(tick) >= triggerX) {
         // Keep one smooth page-scroll animation alive and retarget it as needed.
         scrollTickToViewportFraction(tick, kPlaybackPageTargetFraction, m_smoothAutoScrollEnabled);
       }
@@ -392,7 +392,7 @@ void PianoRollView::setPlaybackTick(int tick,
   const bool activeKeysChanged = activeNotes
       ? applyResolvedActiveNotes(*activeNotes)
       : updateActiveKeyStates();
-  const int scanX = scanlinePixelX(tick);
+  const int scanX = geometry().scanlinePixelX(tick);
   const bool scanlineChanged = (scanX != m_lastRenderedScanlineX);
   if (playbackStateChanged || activeKeysChanged || scanlineChanged) {
     m_lastRenderedScanlineX = scanX;
@@ -439,14 +439,15 @@ bool PianoRollView::smoothAutoScrollEnabled() const {
 }
 
 void PianoRollView::ensureTickVisible(int tick, float viewportFraction, bool animated) {
-  tick = clampTick(tick);
-  if (isTickVisible(tick)) {
+  const auto rollGeometry = geometry();
+  tick = rollGeometry.clampTick(tick);
+  if (rollGeometry.isTickVisible(tick)) {
     return;
   }
 
   const float pixelsPerTick = std::max(0.0001f, m_pixelsPerTick);
   const float visibleSpanTicks =
-      static_cast<float>(std::max(0, viewport()->width() - kKeyboardWidth)) / pixelsPerTick;
+      static_cast<float>(rollGeometry.noteViewportWidth()) / pixelsPerTick;
   const float visibleStartTick = static_cast<float>(horizontalScrollBar()->value()) / pixelsPerTick;
   const float clampedFraction = std::clamp(viewportFraction, 0.0f, 1.0f);
   const bool pageLeft =
@@ -464,7 +465,7 @@ PianoRollFrame::Data PianoRollView::captureRhiFrameData(float dpr) const {
   frame.dpr = std::max(1.0f, dpr);
 
   frame.totalTicks = totalTicks();
-  frame.currentTick = clampTick(m_currentTick);
+  frame.currentTick = geometry().clampTick(m_currentTick);
   // Active-note resolution stays callback-driven, but the scanline uses a
   // predicted float tick so playback motion can stay smooth between callbacks.
   frame.visualCurrentTick = visualPlaybackTick();
@@ -519,7 +520,11 @@ PianoRollFrame::Data PianoRollView::captureRhiFrameData(float dpr) const {
   frame.selectionRectOutlineColor = m_frameColors.selectionRectOutlineColor;
 
   if (m_noteSelectionDragging) {
-    const QRectF marquee = graphSelectionRectInViewport();
+    const QRectF marquee = geometry().graphSelectionRectInViewport(
+        m_noteSelectionAnchor,
+        m_noteSelectionCurrent,
+        m_noteSelectionAnchorWorldValid,
+        m_noteSelectionAnchorWorld);
     if (!marquee.isEmpty()) {
       frame.selectionRectVisible = true;
       frame.selectionRectX = static_cast<float>(marquee.left());
@@ -687,12 +692,13 @@ QPoint PianoRollView::consumeDragAutoScrollDelta(const QPointF& dragDelta) {
 }
 
 void PianoRollView::updateSeekDrag(int viewportX, bool forceEmit) {
-  const QRect graphRect = graphRectInViewport();
+  const auto rollGeometry = geometry();
+  const QRect graphRect = rollGeometry.graphRectInViewport();
   if (!graphRect.isEmpty()) {
     viewportX = std::clamp(viewportX, graphRect.left(), graphRect.right());
   }
 
-  const int tick = tickFromViewportX(viewportX);
+  const int tick = rollGeometry.tickFromViewportX(viewportX);
   if (!forceEmit && tick == m_currentTick) {
     return;
   }
@@ -886,7 +892,7 @@ bool PianoRollView::handleViewportMousePress(QMouseEvent* event) {
     m_noteSelectionDragging = false;
     m_noteSelectionAnchor = pos;
     // Keep the marquee origin in graph space so it stays attached to content while panning.
-    m_noteSelectionAnchorWorld = graphWorldPosFromViewport(pos);
+    m_noteSelectionAnchorWorld = geometry().graphWorldPosFromViewport(pos);
     m_noteSelectionAnchorWorldValid = true;
     m_noteSelectionCurrent = pos;
     previewSingleNoteAtViewportPoint(pos);
@@ -1197,7 +1203,7 @@ void PianoRollView::rebuildSequenceCache() {
   m_previewNoteIndices.clear();
   m_previewTick = -1;
   m_sequenceCache.rebuild(m_seq);
-  m_currentTick = clampTick(m_currentTick);
+  m_currentTick = geometry().clampTick(m_currentTick);
 }
 
 bool PianoRollView::updateActiveKeyStates() {
@@ -1303,15 +1309,11 @@ bool PianoRollView::applyResolvedActiveNotes(const std::vector<PianoRollFrame::N
 }
 
 void PianoRollView::updateScrollBars() {
-  const int noteViewportWidth = std::max(0, viewport()->width() - kKeyboardWidth);
-  const int noteViewportHeight = std::max(0, viewport()->height() - kTopBarHeight);
-
-  const int contentWidth = std::max(
-      1,
-      static_cast<int>(std::ceil(static_cast<float>(totalTicks()) * m_pixelsPerTick)));
-  const int contentHeight = std::max(
-      1,
-      static_cast<int>(std::ceil(static_cast<float>(kMidiKeyCount) * m_pixelsPerKey)));
+  const auto rollGeometry = geometry();
+  const int noteViewportWidth = rollGeometry.noteViewportWidth();
+  const int noteViewportHeight = rollGeometry.noteViewportHeight();
+  const int contentWidth = rollGeometry.contentWidth();
+  const int contentHeight = rollGeometry.contentHeight();
 
   horizontalScrollBar()->setRange(0, std::max(0, contentWidth - noteViewportWidth));
   horizontalScrollBar()->setPageStep(noteViewportWidth);
@@ -1325,7 +1327,7 @@ void PianoRollView::updateScrollBars() {
     verticalScrollBar()->setValue(verticalScrollBar()->maximum() / 2);
   }
 
-  m_currentTick = clampTick(m_currentTick);
+  m_currentTick = rollGeometry.clampTick(m_currentTick);
 }
 
 void PianoRollView::requestRender() {
@@ -1430,7 +1432,7 @@ bool PianoRollView::shouldPumpPlaybackFrames() const {
 }
 
 float PianoRollView::visualPlaybackTick() const {
-  const float baseTick = static_cast<float>(clampTick(m_currentTick));
+  const float baseTick = static_cast<float>(geometry().clampTick(m_currentTick));
   if (!m_playbackActive || m_lastPlaybackTickUpdateNs <= 0 || m_visualPlaybackTicksPerSecond <= 0.0f) {
     return baseTick;
   }
@@ -1449,6 +1451,21 @@ float PianoRollView::visualPlaybackTick() const {
                     static_cast<float>(std::max(1, totalTicks())));
 }
 
+PianoRollGeometry PianoRollView::geometry() const {
+  PianoRollGeometry::Metrics metrics;
+  metrics.viewportWidth = viewport() ? viewport()->width() : 0;
+  metrics.viewportHeight = viewport() ? viewport()->height() : 0;
+  metrics.scrollX = horizontalScrollBar() ? horizontalScrollBar()->value() : 0;
+  metrics.scrollY = verticalScrollBar() ? verticalScrollBar()->value() : 0;
+  metrics.keyboardWidth = kKeyboardWidth;
+  metrics.topBarHeight = kTopBarHeight;
+  metrics.midiKeyCount = kMidiKeyCount;
+  metrics.totalTicks = totalTicks();
+  metrics.pixelsPerTick = m_pixelsPerTick;
+  metrics.pixelsPerKey = m_pixelsPerKey;
+  return PianoRollGeometry(metrics);
+}
+
 QPoint PianoRollView::viewportPosFromGlobal(const QPointF& globalPos) const {
   const QPoint globalPoint = globalPos.toPoint();
   if (m_rhiHost) {
@@ -1460,18 +1477,8 @@ QPoint PianoRollView::viewportPosFromGlobal(const QPointF& globalPos) const {
   return globalPoint;
 }
 
-QPoint PianoRollView::graphWorldPosFromViewport(const QPoint& viewportPos) const {
-  return QPoint(horizontalScrollBar()->value() + (viewportPos.x() - kKeyboardWidth),
-                verticalScrollBar()->value() + (viewportPos.y() - kTopBarHeight));
-}
-
-QPoint PianoRollView::graphViewportPosFromWorld(const QPoint& worldPos) const {
-  return QPoint(kKeyboardWidth + (worldPos.x() - horizontalScrollBar()->value()),
-                kTopBarHeight + (worldPos.y() - verticalScrollBar()->value()));
-}
-
 QPointF PianoRollView::autoScrollDeltaForGraphDrag(const QPoint& viewportPos) const {
-  const QRect graphRect = graphRectInViewport();
+  const QRect graphRect = geometry().graphRectInViewport();
   if (graphRect.isEmpty()) {
     return {};
   }
@@ -1485,38 +1492,6 @@ QPointF PianoRollView::autoScrollDeltaForGraphDrag(const QPoint& viewportPos) co
   return delta / currentDpr;
 }
 
-int PianoRollView::clampTick(int tick) const {
-  return std::clamp(tick, 0, std::max(1, totalTicks()));
-}
-
-int PianoRollView::tickFromViewportX(int x) const {
-  if (m_pixelsPerTick <= 0.0f) {
-    return 0;
-  }
-
-  const int localX = std::max(0, x - kKeyboardWidth);
-  const float absoluteX = static_cast<float>(horizontalScrollBar()->value() + localX);
-  const int tick = static_cast<int>(std::llround(absoluteX / m_pixelsPerTick));
-  return clampTick(tick);
-}
-
-int PianoRollView::scanlinePixelX(int tick) const {
-  const float absoluteX = static_cast<float>(clampTick(tick)) * std::max(0.0001f, m_pixelsPerTick);
-  const float viewX = absoluteX - static_cast<float>(horizontalScrollBar()->value());
-  return static_cast<int>(std::lround(viewX));
-}
-
-// Returns whether the scanline for the given tick is currently visible in the note viewport.
-bool PianoRollView::isTickVisible(int tick) const {
-  const int noteViewportWidth = std::max(0, viewport()->width() - kKeyboardWidth);
-  if (noteViewportWidth <= 0) {
-    return true;
-  }
-
-  const int scanX = scanlinePixelX(tick);
-  return scanX >= 0 && scanX < noteViewportWidth;
-}
-
 // Repositions horizontal scroll so the target tick lands at the requested viewport fraction.
 void PianoRollView::scrollTickToViewportFraction(int tick, float viewportFraction, bool animated) {
   auto* hbar = horizontalScrollBar();
@@ -1524,14 +1499,14 @@ void PianoRollView::scrollTickToViewportFraction(int tick, float viewportFractio
     return;
   }
 
-  const int noteViewportWidth = std::max(0, viewport()->width() - kKeyboardWidth);
+  const auto rollGeometry = geometry();
+  const int noteViewportWidth = rollGeometry.noteViewportWidth();
   if (noteViewportWidth <= 0) {
     return;
   }
 
   const float clampedFraction = std::clamp(viewportFraction, 0.0f, 1.0f);
-  const int scanlineWorldX = static_cast<int>(std::lround(
-      static_cast<float>(clampTick(tick)) * std::max(0.0001f, m_pixelsPerTick)));
+  const int scanlineWorldX = rollGeometry.scanlineWorldX(tick);
   const int desiredViewportX =
       static_cast<int>(std::lround(static_cast<float>(noteViewportWidth) * clampedFraction));
   const int desiredScrollX = scanlineWorldX - desiredViewportX;
@@ -1594,35 +1569,6 @@ void PianoRollView::scrollTickToViewportFraction(int tick, float viewportFractio
   m_playbackAutoScrollAnimation->setStartValue(static_cast<qreal>(hbar->value()));
   m_playbackAutoScrollAnimation->setEndValue(static_cast<qreal>(clampedScrollX));
   m_playbackAutoScrollAnimation->start();
-}
-
-QRect PianoRollView::graphRectInViewport() const {
-  return QRect(kKeyboardWidth,
-               kTopBarHeight,
-               std::max(0, viewport()->width() - kKeyboardWidth),
-               std::max(0, viewport()->height() - kTopBarHeight));
-}
-
-QRectF PianoRollView::graphSelectionRectInViewport() const {
-  const QRect graphRect = graphRectInViewport();
-  if (graphRect.isEmpty()) {
-    return {};
-  }
-
-  // Convert world-space anchor back to viewport so marquee origin tracks scrolled content.
-  const QPoint anchorViewport = m_noteSelectionAnchorWorldValid
-                                    ? graphViewportPosFromWorld(m_noteSelectionAnchorWorld)
-                                    : m_noteSelectionAnchor;
-  const float anchorX = static_cast<float>(anchorViewport.x());
-  const float anchorY = static_cast<float>(anchorViewport.y());
-  const float currentX = static_cast<float>(m_noteSelectionCurrent.x());
-  const float currentY = static_cast<float>(m_noteSelectionCurrent.y());
-
-  const float left = std::min(anchorX, currentX);
-  const float top = std::min(anchorY, currentY);
-  const float right = std::max(anchorX, currentX);
-  const float bottom = std::max(anchorY, currentY);
-  return QRectF(left, top, right - left, bottom - top);
 }
 
 void PianoRollView::normalizeNoteIndices(std::vector<size_t>& indices) const {
@@ -1782,10 +1728,11 @@ void PianoRollView::updateMarqueeSelection(bool emitSelectionSignal) {
   }
 
   // Build selection in world coordinates so drag + auto-scroll keeps a stable content anchor.
+  const auto rollGeometry = geometry();
   const QPoint anchorWorld = m_noteSelectionAnchorWorldValid
                                  ? m_noteSelectionAnchorWorld
-                                 : graphWorldPosFromViewport(m_noteSelectionAnchor);
-  const QPoint currentWorld = graphWorldPosFromViewport(m_noteSelectionCurrent);
+                                 : rollGeometry.graphWorldPosFromViewport(m_noteSelectionAnchor);
+  const QPoint currentWorld = rollGeometry.graphWorldPosFromViewport(m_noteSelectionCurrent);
 
   const float worldXMin = static_cast<float>(std::min(anchorWorld.x(), currentWorld.x()));
   const float worldXMax = static_cast<float>(std::max(anchorWorld.x(), currentWorld.x()));
