@@ -194,8 +194,6 @@ private:
   QBasicTimer m_playbackFadeTimer;
   QBasicTimer m_outlineFadeTimer;
   QElapsedTimer m_outlineFadeClock;
-  QColor m_playbackGlowLow;
-  QColor m_playbackGlowHigh;
   float m_playbackGlowStrength = 1.0f;
   float m_playbackGlowRadius = 0.5f;
   float m_shadowEdgeCurve = 1.0f;

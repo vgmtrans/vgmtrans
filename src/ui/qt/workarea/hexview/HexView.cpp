@@ -60,8 +60,7 @@ constexpr float SHADOW_EDGE_CURVE = 1.1f;
 constexpr float PLAYBACK_GLOW_STRENGTH = 0.75f;
 constexpr float PLAYBACK_GLOW_RADIUS = 2.2f;
 constexpr float PLAYBACK_GLOW_EDGE_CURVE = 0.85f;
-const QColor PLAYBACK_GLOW_LOW(40, 40, 40);
-const QColor PLAYBACK_GLOW_HIGH(230, 230, 230);
+const QColor PLAYBACK_GLOW_FALLBACK(230, 230, 230);
 constexpr uint16_t STYLE_UNASSIGNED = std::numeric_limits<uint16_t>::max();
 
 struct WidgetLayoutMetrics {
@@ -367,8 +366,6 @@ HexView::HexView(VGMFile* vgmfile, QWidget* parent)
 
   QFont font = defaultViewFont();
   setShadowStrength(SHADOW_STRENGTH);
-  m_playbackGlowLow = PLAYBACK_GLOW_LOW;
-  m_playbackGlowHigh = PLAYBACK_GLOW_HIGH;
   m_playbackGlowStrength = PLAYBACK_GLOW_STRENGTH;
   m_playbackGlowRadius = PLAYBACK_GLOW_RADIUS;
   m_shadowEdgeCurve = SHADOW_EDGE_CURVE;
@@ -747,7 +744,7 @@ void HexView::setPlaybackSelectionsForItems(const std::vector<const VGMItem*>& i
     }
     const uint32_t length = item->length() > 0 ? item->length() : 1u;
     const QColor glowColor =
-        (i < glowColors.size() && glowColors[i].isValid()) ? glowColors[i] : m_playbackGlowHigh;
+        (i < glowColors.size() && glowColors[i].isValid()) ? glowColors[i] : PLAYBACK_GLOW_FALLBACK;
     next.push_back({item->offset(), length, glowColor});
   }
 
@@ -1137,8 +1134,6 @@ HexViewFrame::Data HexView::captureRhiFrameData(float dpr) {
   frame.shadowBlur = m_shadowBlur;
   frame.shadowStrength = m_shadowStrength;
   frame.shadowOffset = m_shadowOffset;
-  frame.playbackGlowLow = m_playbackGlowLow;
-  frame.playbackGlowHigh = m_playbackGlowHigh;
   frame.playbackGlowStrength = m_playbackGlowStrength;
   frame.playbackGlowRadius = m_playbackGlowRadius;
   frame.shadowEdgeCurve = m_shadowEdgeCurve;

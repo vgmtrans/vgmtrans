@@ -33,7 +33,6 @@ constexpr int NUM_ADDRESS_NIBBLES = 8;
 constexpr int ADDRESS_SPACING_CHARS = 4;
 constexpr int BYTES_PER_LINE = 16;
 constexpr int HEX_TO_ASCII_SPACING_CHARS = 4;
-const QColor SHADOW_COLOR = Qt::black;
 const QColor OUTLINE_COLOR(35, 35, 35);
 constexpr float OUTLINE_ALPHA = 1.0f;
 constexpr float OUTLINE_MIN_CELL_PX = 6.0f;
@@ -139,7 +138,7 @@ void HexViewRhiRenderer::initIfNeeded(QRhi* rhi) {
   m_edgeUbuf = m_rhi->newBuffer(QRhiBuffer::Dynamic, QRhiBuffer::UniformBuffer, edgeUboSize);
   m_edgeUbuf->create();
 
-  const int screenUboSize = m_rhi->ubufAligned(kMat4Bytes + kVec4Bytes * 8);
+  const int screenUboSize = m_rhi->ubufAligned(kMat4Bytes + kVec4Bytes * 6);
   m_compositeUbuf = m_rhi->newBuffer(QRhiBuffer::Dynamic, QRhiBuffer::UniformBuffer, screenUboSize);
   m_compositeUbuf->create();
 
@@ -660,7 +659,6 @@ void HexViewRhiRenderer::ensurePipelines(QRhiRenderPassDescriptor* outputRp,
   const QShader glyphFrag = loadShader(":/shaders/hexglyph.frag.qsb");
   const QShader screenVert = loadShader(":/shaders/hexscreen.vert.qsb");
   const QShader edgeVert = loadShader(":/shaders/hexedge.vert.qsb");
-  const QShader edgeFrag = loadShader(":/shaders/hexedge.frag.qsb");
   const QShader edgeEffectFrag = loadShader(":/shaders/hexedge_effect.frag.qsb");
   const QShader compositeFrag = loadShader(":/shaders/hexcomposite.frag.qsb");
 
@@ -748,11 +746,7 @@ void HexViewRhiRenderer::ensurePipelines(QRhiRenderPassDescriptor* outputRp,
     pso->setVertexInputLayout(inputLayout);
     pso->setShaderResourceBindings(srb);
     pso->setCullMode(QRhiGraphicsPipeline::None);
-    if (!targetBlends.size()) {
-      pso->setTargetBlends({});
-    } else {
-      pso->setTargetBlends(targetBlends);
-    }
+    pso->setTargetBlends(targetBlends);
     pso->setSampleCount(sampleCount);
     pso->setRenderPassDescriptor(rp);
     pso->create();
@@ -1023,12 +1017,7 @@ void HexViewRhiRenderer::updateUniforms(QRhiResourceUpdateBatch* u, float scroll
                                    shadowUvX, shadowUvY);
   const QVector4D columnLayout(hexStartX, hexWidth, asciiStartX, asciiWidth);
   const QVector4D viewInfo(viewW, viewH, uvFlipY, dpr);
-  const QVector4D shadowColor = toVec4(SHADOW_COLOR);
-  const QColor glowLow = frame.playbackGlowLow;
-  const QColor glowHigh = frame.playbackGlowHigh;
-  const QVector4D glowLowAndStrength(glowLow.redF(), glowLow.greenF(), glowLow.blueF(),
-                                     frame.playbackGlowStrength);
-  const QVector4D glowHighVec(glowHigh.redF(), glowHigh.greenF(), glowHigh.blueF(), 0.0f);
+  const QVector4D effectInfo(frame.playbackGlowStrength, 0.0f, 0.0f, 0.0f);
   const float outlineAlpha = m_outlineAlpha;
   const QVector4D outlineColor(OUTLINE_COLOR.redF(), OUTLINE_COLOR.greenF(),
                                OUTLINE_COLOR.blueF(), outlineAlpha);
@@ -1045,14 +1034,10 @@ void HexViewRhiRenderer::updateUniforms(QRhiResourceUpdateBatch* u, float scroll
   u->updateDynamicBuffer(m_compositeUbuf, kMat4Bytes + kVec4Bytes * 2, kVec4Bytes,
                          &viewInfo);
   u->updateDynamicBuffer(m_compositeUbuf, kMat4Bytes + kVec4Bytes * 3, kVec4Bytes,
-                         &shadowColor);
+                         &effectInfo);
   u->updateDynamicBuffer(m_compositeUbuf, kMat4Bytes + kVec4Bytes * 4, kVec4Bytes,
-                         &glowLowAndStrength);
-  u->updateDynamicBuffer(m_compositeUbuf, kMat4Bytes + kVec4Bytes * 5, kVec4Bytes,
-                         &glowHighVec);
-  u->updateDynamicBuffer(m_compositeUbuf, kMat4Bytes + kVec4Bytes * 6, kVec4Bytes,
                          &outlineColor);
-  u->updateDynamicBuffer(m_compositeUbuf, kMat4Bytes + kVec4Bytes * 7, kVec4Bytes,
+  u->updateDynamicBuffer(m_compositeUbuf, kMat4Bytes + kVec4Bytes * 5, kVec4Bytes,
                          &itemIdWindow);
 }
 
