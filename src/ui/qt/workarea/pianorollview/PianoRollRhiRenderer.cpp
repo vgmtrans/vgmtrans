@@ -28,7 +28,6 @@
 #include <cstdint>
 #include <iterator>
 #include <limits>
-#include <unordered_map>
 #include <utility>
 
 namespace {
@@ -149,18 +148,24 @@ QShader loadShader(const char* path) {
   return QShader::fromSerialized(file.readAll());
 }
 
-uint64_t noteIdentityHash(const PianoRollFrame::Note& note) {
-  // Stable key for fast active/inactive note matching in overlay rebuilds.
-  uint64_t hash = 1469598103934665603ULL;
-  auto mix = [&](uint64_t value) {
-    hash ^= value;
-    hash *= 1099511628211ULL;
-  };
-  mix(static_cast<uint64_t>(note.startTick));
-  mix(static_cast<uint64_t>(note.duration));
-  mix(static_cast<uint64_t>(note.key));
-  mix(static_cast<uint64_t>(static_cast<uint32_t>(note.trackIndex)));
-  return hash;
+bool noteLess(const PianoRollFrame::Note& lhs, const PianoRollFrame::Note& rhs) {
+  if (lhs.startTick != rhs.startTick) {
+    return lhs.startTick < rhs.startTick;
+  }
+  if (lhs.key != rhs.key) {
+    return lhs.key < rhs.key;
+  }
+  if (lhs.trackIndex != rhs.trackIndex) {
+    return lhs.trackIndex < rhs.trackIndex;
+  }
+  return lhs.duration < rhs.duration;
+}
+
+bool noteEqual(const PianoRollFrame::Note& lhs, const PianoRollFrame::Note& rhs) {
+  return lhs.startTick == rhs.startTick &&
+         lhs.duration == rhs.duration &&
+         lhs.key == rhs.key &&
+         lhs.trackIndex == rhs.trackIndex;
 }
 
 float noteGlowSeed(const PianoRollFrame::Note& note) {
@@ -1252,17 +1257,16 @@ void PianoRollRhiRenderer::buildVisibleNoteInstances(const PianoRollFrame::Data&
   m_enabledVisibleNoteInstances.clear();
   m_enabledVisibleNoteInstances.reserve(static_cast<size_t>(visibleCount));
 
-  std::unordered_map<uint64_t, int> activeCounts;
-  const auto* trackEnabled = frame.trackEnabled.get();
-  if (frame.activeNotes && !frame.activeNotes->empty()) {
-    activeCounts.reserve(frame.activeNotes->size() * 2);
-    for (const PianoRollFrame::Note& active : *frame.activeNotes) {
-      if (!isTrackEnabledForIndex(trackEnabled, active.trackIndex)) {
-        continue;
-      }
-      ++activeCounts[noteIdentityHash(active)];
-    }
-  }
+  const auto* activeNotes = frame.activeNotes.get();
+  auto activeIt = activeNotes
+      ? std::lower_bound(activeNotes->begin(),
+                         activeNotes->end(),
+                         searchStartTick,
+                         [](const PianoRollFrame::Note& note, uint64_t tick) {
+                           return static_cast<uint64_t>(note.startTick) < tick;
+                         })
+      : std::vector<PianoRollFrame::Note>::const_iterator{};
+  const auto activeEnd = activeNotes ? activeNotes->end() : std::vector<PianoRollFrame::Note>::const_iterator{};
   const float inactiveDim = std::clamp(frame.inactiveNoteDimAlpha, 0.0f, 1.0f);
   const float inactiveShade = 1.0f - (0.55f * inactiveDim);
 
@@ -1279,10 +1283,12 @@ void PianoRollRhiRenderer::buildVisibleNoteInstances(const PianoRollFrame::Data&
     const bool trackIsEnabled = instance.borderEnabled > 0.5f;
 
     bool isActive = false;
-    if (trackIsEnabled) {
-      const auto it = activeCounts.find(noteIdentityHash(note));
-      if (it != activeCounts.end() && it->second > 0) {
-        --(it->second);
+    if (trackIsEnabled && activeNotes) {
+      while (activeIt != activeEnd && noteLess(*activeIt, note)) {
+        ++activeIt;
+      }
+      if (activeIt != activeEnd && noteEqual(*activeIt, note)) {
+        ++activeIt;
         instance.active = 1.0f;
         isActive = true;
         const NoteGeometry geometry = computeNoteGeometry(note, layout);
