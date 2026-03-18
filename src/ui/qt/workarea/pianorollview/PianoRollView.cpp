@@ -270,7 +270,8 @@ void PianoRollView::setSelectedItems(const std::vector<const VGMItem*>& items,
   const bool selectionChanged = (indices != selectedNoteIndices());
   applySelectedNoteIndices(std::move(indices), false, const_cast<VGMItem*>(primaryItem));
 
-  if (!revealSelection || (!selectionChanged && primarySelectedItem() == previousPrimary)) {
+  const bool shouldRevealSelection = revealSelection && !SequencePlayer::the().playing();
+  if (!shouldRevealSelection || (!selectionChanged && primarySelectedItem() == previousPrimary)) {
     return;
   }
 
