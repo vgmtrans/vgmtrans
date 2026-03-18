@@ -23,6 +23,7 @@ public:
 
   void markBaseDirty();
   void markSelectionDirty();
+  void markPlaybackDirty();
   void invalidateCache();
   void requestUpdate();
 

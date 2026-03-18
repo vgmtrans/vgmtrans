@@ -86,24 +86,10 @@ protected:
   void timerEvent(QTimerEvent* event) override;
 
 private:
-  struct SelectionRange {
-    uint32_t offset;
-    uint32_t length;
-  };
-  struct PlaybackSelection {
-    uint32_t offset;
-    uint32_t length;
-    QColor glowColor;
-  };
-  struct FadePlaybackSelection {
-    PlaybackSelection range;
-    qint64 startMs = 0;
-    float alpha = 0.0f;
-  };
-  struct Style {
-    QColor bg;
-    QColor fg;
-  };
+  using SelectionRange = HexViewFrame::SelectionRange;
+  using PlaybackSelection = HexViewFrame::PlaybackSelection;
+  using FadePlaybackSelection = HexViewFrame::FadePlaybackSelection;
+  using Style = HexViewFrame::Style;
   enum class DragMode {
     Selection,
     SeekScrub,
@@ -132,7 +118,9 @@ private:
   void handleSeekPress(VGMItem* item, const QPoint& pos);
   void handleSelectionDrag(int offset);
   void handleSeekScrubDrag(int offset);
-  void requestRhiUpdate(bool markBaseDirty = false, bool markSelectionDirty = false);
+  void requestRhiUpdate(bool markBaseDirty = false,
+                        bool markSelectionDirty = false,
+                        bool markPlaybackDirty = false);
   void clearCurrentSelection(bool animateSelection);
   void selectCurrentItem(bool animateSelection);
   void refreshSelectionVisuals(bool animateSelection);
