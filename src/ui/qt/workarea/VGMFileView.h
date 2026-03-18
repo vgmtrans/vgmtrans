@@ -13,6 +13,7 @@
 #include <unordered_map>
 #include <vector>
 
+#include <QColor>
 #include <QFont>
 #include <QMdiSubWindow>
 
@@ -152,7 +153,9 @@ private:
   std::vector<const SeqTimedEvent*> m_playbackTimedEvents;
   std::vector<const SeqTimedEvent*> m_activeTimedEvents;
   std::vector<const VGMItem*> m_playbackItems;
+  std::vector<QColor> m_playbackItemColors;
   std::vector<const VGMItem*> m_lastPlaybackItems;
+  std::vector<QColor> m_lastPlaybackItemColors;
   int m_lastPlaybackPosition = 0;
   const SeqEventTimeIndex* m_playbackTimeline = nullptr;
   std::unique_ptr<SeqEventTimeIndex::Cursor> m_playbackCursor;

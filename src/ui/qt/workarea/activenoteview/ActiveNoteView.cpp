@@ -7,6 +7,7 @@
 #include "ActiveNoteView.h"
 
 #include "ActiveNoteRhiHost.h"
+#include "Helpers.h"
 
 #include <QColor>
 #include <QMouseEvent>
@@ -120,9 +121,7 @@ void ActiveNoteView::resizeEvent(QResizeEvent* event) {
 }
 
 QColor ActiveNoteView::colorForTrack(int trackIndex) const {
-  // Spread hues to keep neighboring tracks visually distinct.
-  const int hue = (trackIndex * 43) % 360;
-  return QColor::fromHsv(hue, 190, 235);
+  return colorForTrackIndex(trackIndex);
 }
 
 bool ActiveNoteView::isBlackKey(int key) {

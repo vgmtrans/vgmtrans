@@ -31,9 +31,10 @@ class QRhiShaderResourceBindings;
 class QRhiTexture;
 
 // HexViewRhiRenderer builds GPU instance streams from an immutable HexView snapshot
-// and renders in four passes:
+// and renders in five passes:
 // 1) content (text + backgrounds), 2) mask (selection ids/channels),
-// 3) edge field (for shadow/glow falloff), 4) composite (final shading).
+// 3) playback color field, 4) edge field (for shadow/glow falloff),
+// 5) composite (final shading).
 class HexViewRhiRenderer {
 public:
   struct RenderTargetInfo {
@@ -175,6 +176,10 @@ private:
                                float edgePad,
                                const QVector4D& maskColor,
                                const QVector4D& edgeColor);
+  void appendPlaybackColorForSelections(
+      const std::vector<HexViewFrame::PlaybackSelection>& selections,
+      const SelectionBuildContext& ctx,
+      float pad);
   void buildBaseInstances(const HexViewFrame::Data& frame, const LayoutMetrics& layout);
   void buildSelectionInstances(int startLine, int endLine, const HexViewFrame::Data& frame,
                                const LayoutMetrics& layout);
@@ -191,6 +196,9 @@ private:
   QRhiTexture* m_maskTex = nullptr;
   QRhiTextureRenderTarget* m_maskRt = nullptr;
   QRhiRenderPassDescriptor* m_maskRp = nullptr;
+  QRhiTexture* m_playbackColorTex = nullptr;
+  QRhiTextureRenderTarget* m_playbackColorRt = nullptr;
+  QRhiRenderPassDescriptor* m_playbackColorRp = nullptr;
   QRhiTexture* m_edgeTex = nullptr;
   QRhiTextureRenderTarget* m_edgeRt = nullptr;
   QRhiRenderPassDescriptor* m_edgeRp = nullptr;
@@ -200,6 +208,7 @@ private:
   QRhiBuffer* m_baseRectBuf = nullptr;
   QRhiBuffer* m_baseGlyphBuf = nullptr;
   QRhiBuffer* m_maskRectBuf = nullptr;
+  QRhiBuffer* m_playbackColorRectBuf = nullptr;
   QRhiBuffer* m_edgeRectBuf = nullptr;
   QRhiBuffer* m_ubuf = nullptr;
   QRhiBuffer* m_edgeUbuf = nullptr;
@@ -216,6 +225,7 @@ private:
   QRhiGraphicsPipeline* m_rectPso = nullptr;
   QRhiGraphicsPipeline* m_glyphPso = nullptr;
   QRhiGraphicsPipeline* m_maskPso = nullptr;
+  QRhiGraphicsPipeline* m_playbackColorPso = nullptr;
   QRhiGraphicsPipeline* m_edgePso = nullptr;
   QRhiGraphicsPipeline* m_compositePso = nullptr;
   QRhiGraphicsPipeline* m_outputRectPso = nullptr;
@@ -234,6 +244,7 @@ private:
   std::vector<RectInstance> m_baseRectInstances;
   std::vector<GlyphInstance> m_baseGlyphInstances;
   std::vector<RectInstance> m_maskRectInstances;
+  std::vector<RectInstance> m_playbackColorRectInstances;
   std::vector<EdgeInstance> m_edgeRectInstances;
   int m_cacheStartLine = 0;
   int m_cacheEndLine = -1;

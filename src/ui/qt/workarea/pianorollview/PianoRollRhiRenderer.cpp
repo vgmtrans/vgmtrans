@@ -6,6 +6,7 @@
 
 #include "PianoRollRhiRenderer.h"
 
+#include "Helpers.h"
 #include "PianoRollView.h"
 
 #include <rhi/qshader.h>
@@ -179,7 +180,7 @@ QColor colorForTrackIndex(const std::vector<QColor>* trackColors, int trackIndex
   if (trackColors && trackIndex >= 0 && trackIndex < static_cast<int>(trackColors->size())) {
     return (*trackColors)[static_cast<size_t>(trackIndex)];
   }
-  return QColor::fromHsv((trackIndex * 43) % 360, 190, 235);
+  return ::colorForTrackIndex(trackIndex);
 }
 
 }  // namespace
