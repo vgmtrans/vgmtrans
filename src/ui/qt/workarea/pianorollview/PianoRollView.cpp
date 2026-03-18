@@ -160,6 +160,7 @@ void PianoRollView::setSequence(VGMSeq* seq) {
   m_noteSelectionPressActive = false;
   m_noteSelectionDragging = false;
   m_noteSelectionAnchorWorldValid = false;
+  m_resumePlaybackAfterSeekDrag = false;
   m_selectionModel.clear();
   m_playbackController.clear();
 
@@ -878,6 +879,7 @@ void PianoRollView::beginSeekDragAtX(int viewportX) {
   stopDragAutoScroll();
   stopPlaybackAutoScrollAnimation();
   m_playbackAutoScrollEnabled = true;
+  maybePausePlaybackForSeekDrag();
   m_seekDragActive = true;
   updateInactiveNoteDimTarget();
   updateSeekDrag(viewportX, true);
@@ -916,10 +918,7 @@ bool PianoRollView::handleViewportMouseMove(QMouseEvent* event) {
 
   if (m_seekDragActive) {
     if (!(activeButtons & Qt::LeftButton)) {
-      m_seekDragActive = false;
-      stopDragAutoScroll();
-      clearPreviewNotes();
-      updateInactiveNoteDimTarget();
+      finishSeekDrag(false);
       event->accept();
       return true;
     }
@@ -1005,11 +1004,7 @@ bool PianoRollView::handleViewportMouseRelease(QMouseEvent* event) {
   }
 
   if (m_seekDragActive) {
-    updateSeekDrag(pos.x());
-    m_seekDragActive = false;
-    clearPreviewNotes();
-    updateInactiveNoteDimTarget();
-
+    finishSeekDrag(true, pos.x());
     event->accept();
     return true;
   }
@@ -1475,6 +1470,34 @@ void PianoRollView::previewSingleNoteAtViewportPoint(const QPoint& pos) {
 
   const size_t index = static_cast<size_t>(noteIndex);
   applyPreviewNoteIndices({index}, static_cast<int>(selectableNotes()[index].startTick));
+}
+
+void PianoRollView::maybePausePlaybackForSeekDrag() {
+  auto& seqPlayer = SequencePlayer::the();
+  m_resumePlaybackAfterSeekDrag = seqPlayer.playing();
+  if (m_resumePlaybackAfterSeekDrag) {
+    seqPlayer.pause();
+  }
+}
+
+void PianoRollView::finishSeekDrag(bool commitPosition, int viewportX) {
+  if (!m_seekDragActive) {
+    return;
+  }
+
+  if (commitPosition) {
+    updateSeekDrag(viewportX);
+  }
+  m_seekDragActive = false;
+  stopDragAutoScroll();
+  clearPreviewNotes();
+  updateInactiveNoteDimTarget();
+
+  auto& seqPlayer = SequencePlayer::the();
+  if (m_resumePlaybackAfterSeekDrag && !seqPlayer.playing() && seqPlayer.activeCollection() != nullptr) {
+    seqPlayer.resume();
+  }
+  m_resumePlaybackAfterSeekDrag = false;
 }
 
 void PianoRollView::updateSeekPreview() {

@@ -55,6 +55,8 @@ public:
    * Toggles the status of the player
    */
   void toggle();
+  void pause();
+  void resume();
   /**
    * Stops the player (unloads resources)
    */

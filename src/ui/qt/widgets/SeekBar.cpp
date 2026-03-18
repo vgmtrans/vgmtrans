@@ -105,6 +105,7 @@ void SeekBar::mousePressEvent(QMouseEvent* event) {
   }
 
   m_sliderDown = true;
+  emit sliderPressed();
   updateValueFromPointer(event->position());
   grabMouse();
   event->accept();

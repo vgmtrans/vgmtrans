@@ -27,6 +27,7 @@ public:
   QSize sizeHint() const override;
 
 signals:
+  void sliderPressed();
   void sliderMoved(int value);
   void sliderReleased();
 

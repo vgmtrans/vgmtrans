@@ -43,4 +43,5 @@ private:
   SeekBar *m_slider{};
   bool m_hasSelectedCollection = false;
   bool m_skipNextPlaybackSliderUpdate = false;
+  bool m_resumePlaybackAfterSeekBarDrag = false;
 };

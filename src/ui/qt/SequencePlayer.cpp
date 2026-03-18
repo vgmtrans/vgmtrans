@@ -187,15 +187,30 @@ SequencePlayer::~SequencePlayer() {
 
 void SequencePlayer::toggle() {
   if (playing()) {
-    BASS_ChannelPause(m_active_stream);
-    m_seekupdate_timer->stop();
+    pause();
   } else {
-    BASS_ChannelPlay(m_active_stream, false);
-    m_seekupdate_timer->start(TICK_POLL_INTERVAL_MS);
+    resume();
+  }
+}
+
+void SequencePlayer::pause() {
+  if (!m_active_stream || !playing()) {
+    return;
   }
 
-  bool status = playing();
-  statusChange(status);
+  BASS_ChannelPause(m_active_stream);
+  m_seekupdate_timer->stop();
+  statusChange(false);
+}
+
+void SequencePlayer::resume() {
+  if (!m_active_stream || playing()) {
+    return;
+  }
+
+  BASS_ChannelPlay(m_active_stream, false);
+  m_seekupdate_timer->start(TICK_POLL_INTERVAL_MS);
+  statusChange(true);
 }
 
 void SequencePlayer::stop() {
