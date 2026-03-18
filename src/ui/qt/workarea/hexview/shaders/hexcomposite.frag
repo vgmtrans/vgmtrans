@@ -13,14 +13,15 @@ layout(std140, binding = 0) uniform Ubuf {
   vec4 overlayAndShadow;   // x=overlayOpacity, y=shadowStrength, z=shadowOffsetX, w=shadowOffsetY
   vec4 columnLayout;       // x=hexStart, y=hexWidth, z=asciiStart, w=asciiWidth
   vec4 viewInfo;           // x=viewWidth, y=viewHeight, z=flipY, w=devicePixelRatio
-  vec4 shadowColor;
-  vec4 glowLowAndStrength; // rgb=glowLow, a=glowStrength
-  vec4 glowHigh;
+  vec4 effectInfo;         // x=glowStrength
   vec4 outlineColor;       // rgba
   vec4 itemIdWindow;       // x=lineHeight, y=scrollY, z=itemIdStartLine, w=itemIdHeight
 };
 
 layout(location = 0) out vec4 fragColor;
+
+const vec3 GLOW_LOW_RGB = vec3(40.0 / 255.0);
+const vec3 GLOW_HIGH_RGB = vec3(230.0 / 255.0);
 
 float decodeItemId(vec2 uv) {
   vec2 rg = texture(itemIdTex, uv).rg * 255.0 + 0.5;
@@ -138,9 +139,9 @@ void main() {
   vec2 viewSize = viewInfo.xy;
   float flipY = viewInfo.z;
   float dpr = max(viewInfo.w, 1.0);
-  vec3 glowLow = glowLowAndStrength.rgb;
-  float glowStrength = glowLowAndStrength.a;
-  vec3 glowHighRgb = glowHigh.rgb;
+  vec3 glowLow = GLOW_LOW_RGB;
+  float glowStrength = effectInfo.x;
+  vec3 glowHighRgb = GLOW_HIGH_RGB;
 
   float x = vUv.x * viewSize.x;
   bool inHex = (x >= hexStart) && (x < hexStart + hexWidth);
@@ -163,8 +164,8 @@ void main() {
   vec4 edgeShadow = texture(edgeTex, shadowUv);
   float selHalo = computeShadowHalo(edgeShadow.r, sel);
 
-  float shadowAlpha = selHalo * shadowStrength * shadowColor.a;
-  vec3 withShadow = mix(restored, shadowColor.rgb, shadowAlpha);
+  float shadowAlpha = selHalo * shadowStrength;
+  vec3 withShadow = restored * (1.0 - shadowAlpha);
 
   vec4 edgeGlow = texture(edgeTex, vUv);
   vec4 playbackColorSample = texture(playbackColorTex, vUv);
@@ -172,6 +173,7 @@ void main() {
                                         playFadeAlpha);
   float activeGlow = clamp(playHalos.x * glowStrength, 0.0, 1.0);
   float fadeGlow = clamp(playHalos.y * glowStrength, 0.0, 1.0);
+  float glowValue = max(activeGlow, fadeGlow);
 
   vec3 trackGlowBase = playbackColorSample.rgb;
   float hasTrackGlowColor = step(0.001, playbackColorSample.a);
@@ -180,13 +182,10 @@ void main() {
                           min(trackGlowBase * 1.18 + vec3(0.06), vec3(1.0)),
                           hasTrackGlowColor);
 
-  vec3 activeColor = mix(glowLow, glowHighTint, smoothstep(0.0, 1.0, activeGlow));
-  vec3 fadeColor = mix(glowLow, glowHighTint, smoothstep(0.0, 1.0, fadeGlow));
+  vec3 glowColor = mix(glowLow, glowHighTint, smoothstep(0.0, 1.0, glowValue));
 
-  vec3 withGlow = mix(withShadow, activeColor, clamp(activeGlow * 1.1, 0.0, 1.0));
-  withGlow = clamp(withGlow + activeColor * activeGlow * 0.50, 0.0, 1.0);
-  withGlow = mix(withGlow, fadeColor, clamp(fadeGlow * 1.1, 0.0, 1.0));
-  withGlow = clamp(withGlow + fadeColor * fadeGlow * 0.50, 0.0, 1.0);
+  vec3 withGlow = mix(withShadow, glowColor, clamp(glowValue * 1.1, 0.0, 1.0));
+  withGlow = clamp(withGlow + glowColor * glowValue * 0.50, 0.0, 1.0);
 
   fragColor = vec4(withGlow, base.a);
 }

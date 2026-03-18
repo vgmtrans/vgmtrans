@@ -8,9 +8,7 @@ layout(std140, binding = 0) uniform Ubuf {
   vec4 overlayAndShadow;   // x=overlayOpacity, y=shadowStrength, z=shadowOffsetX, w=shadowOffsetY
   vec4 columnLayout;       // x=hexStart, y=hexWidth, z=asciiStart, w=asciiWidth
   vec4 viewInfo;           // x=viewWidth, y=viewHeight, z=flipY, w=devicePixelRatio
-  vec4 shadowColor;
-  vec4 glowLowAndStrength; // rgb=glowLow, a=glowStrength
-  vec4 glowHigh;
+  vec4 effectInfo;         // x=glowStrength
   vec4 outlineColor;       // rgba
   vec4 itemIdWindow;       // x=lineHeight, y=scrollY, z=itemIdStartLine, w=itemIdHeight
 };
