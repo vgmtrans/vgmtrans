@@ -49,9 +49,7 @@ public:
   void clear();
 
   [[nodiscard]] const std::vector<size_t>& selectedNoteIndices() const { return m_selectedNoteIndices; }
-  [[nodiscard]] const std::vector<size_t>& previewNoteIndices() const { return m_previewNoteIndices; }
   [[nodiscard]] VGMItem* primarySelectedItem() const { return m_primarySelectedItem; }
-  [[nodiscard]] int previewTick() const { return m_previewTick; }
   [[nodiscard]] const std::shared_ptr<const std::vector<PianoRollFrame::Note>>& selectedNotes() const {
     return m_selectedNotes;
   }
