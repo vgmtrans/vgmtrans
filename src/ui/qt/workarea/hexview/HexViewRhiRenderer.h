@@ -160,6 +160,8 @@ private:
                       const HexViewFrame::Data& frame, const LayoutMetrics& layout);
   bool ensureInstanceBuffer(QRhiBuffer*& buffer, int bytes);
   void updateInstanceBuffers(QRhiResourceUpdateBatch* u);
+  void populateVisibleLineByteCounts(int startLine, int endLine, std::vector<uint8_t>& lineBytes) const;
+  static uint16_t spanMaskBits(int startCol, int endCol);
 
   QRectF glyphUv(const QChar& ch, const HexViewFrame::Data& frame) const;
   void appendRect(std::vector<RectInstance>& rects, float x, float y, float w, float h,
@@ -168,6 +170,11 @@ private:
                       float pad, const QVector4D& flags, const QVector4D& tint);
   void appendGlyph(std::vector<GlyphInstance>& glyphs, float x, float y, float w, float h,
                    const QRectF& uv, const QVector4D& color);
+  void appendMaskSpan(std::vector<RectInstance>& rects, const SelectionBuildContext& ctx,
+                      int line, int startCol, int endCol, const QVector4D& color);
+  void appendEdgeSpan(std::vector<EdgeInstance>& rects, const SelectionBuildContext& ctx,
+                      int line, int startCol, int endCol, float pad, const QVector4D& flags,
+                      const QVector4D& tint);
 
   void ensureCacheWindow(int startLine, int endLine, int totalLines,
                          const HexViewFrame::Data& frame);
