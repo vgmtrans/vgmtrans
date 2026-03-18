@@ -17,11 +17,10 @@
 #include <cstdint>
 #include <limits>
 #include <memory>
-#include <unordered_map>
 #include <vector>
 
 #include "PianoRollFrameData.h"
-#include "SeqEventTimeIndex.h"
+#include "PianoRollSequenceCache.h"
 
 class QEvent;
 class QRect;
@@ -34,8 +33,6 @@ class QShowEvent;
 class QTimerEvent;
 class QVariantAnimation;
 class QWheelEvent;
-class MidiTrack;
-class SeqTrack;
 class VGMSeq;
 class VGMItem;
 class PianoRollRhiHost;
@@ -101,15 +98,7 @@ private:
     int trackIndex = -1;
     uint32_t startTick = 0;
   };
-
-  struct SelectableNote {
-    uint32_t startTick = 0;
-    uint32_t duration = 0;
-    uint8_t key = 0;
-    int16_t trackIndex = -1;
-    VGMItem* item = nullptr;
-    const SeqTimedEvent* timedEvent = nullptr;
-  };
+  using SelectableNote = PianoRollSequenceCache::SelectableNote;
 
   struct FrameColors {
     QColor backgroundColor;
@@ -159,12 +148,31 @@ private:
   void handleViewportLeave();
 
   void maybeBuildTimelineFromSequence();
-  void rebuildTrackIndexMap();
-  // Resolves section-local track pointers back to logical track indices.
-  int trackIndexForTrack(const SeqTrack* track) const;
-  // Resolves a visual track index for timed events, including no-track/channel-only sequences.
-  int trackIndexForEvent(const class SeqEvent* event) const;
   [[nodiscard]] bool isTrackEnabled(int trackIndex) const;
+  [[nodiscard]] int ppqn() const { return m_sequenceCache.ppqn(); }
+  [[nodiscard]] int totalTicks() const { return m_sequenceCache.totalTicks(); }
+  [[nodiscard]] uint32_t maxNoteDurationTicks() const { return m_sequenceCache.maxNoteDurationTicks(); }
+  [[nodiscard]] const SeqEventTimeIndex* timeline() const { return m_sequenceCache.timeline(); }
+  [[nodiscard]] SeqEventTimeIndex::Cursor* timelineCursor() { return m_sequenceCache.timelineCursor(); }
+  [[nodiscard]] const SeqEventTimeIndex::Cursor* timelineCursor() const { return m_sequenceCache.timelineCursor(); }
+  [[nodiscard]] int trackIndexForEvent(const class SeqEvent* event) const {
+    return m_sequenceCache.trackIndexForEvent(event);
+  }
+  [[nodiscard]] const std::shared_ptr<const std::vector<PianoRollFrame::Note>>& notes() const {
+    return m_sequenceCache.notes();
+  }
+  [[nodiscard]] const std::shared_ptr<const std::vector<PianoRollFrame::TimeSignature>>& timeSignatures() const {
+    return m_sequenceCache.timeSignatures();
+  }
+  [[nodiscard]] const std::vector<SelectableNote>& selectableNotes() const {
+    return m_sequenceCache.selectableNotes();
+  }
+  [[nodiscard]] const std::unordered_map<const SeqTimedEvent*, uint8_t>& transposedKeyByTimedEvent() const {
+    return m_sequenceCache.transposedKeyByTimedEvent();
+  }
+  [[nodiscard]] const std::unordered_map<const SeqTimedEvent*, size_t>& noteIndexByTimedEvent() const {
+    return m_sequenceCache.noteIndexByTimedEvent();
+  }
   void resizeTrackEnabledMaskToTrackCount();
   void rebuildTrackColors();
   void rebuildFrameColors();
@@ -238,13 +246,9 @@ private:
   std::unique_ptr<RhiScrollAreaChrome> m_scrollChrome;
 
   VGMSeq* m_seq = nullptr;
-  const SeqEventTimeIndex* m_timeline = nullptr;
-  std::unique_ptr<SeqEventTimeIndex::Cursor> m_timelineCursor;
+  PianoRollSequenceCache m_sequenceCache;
 
   int m_trackCount = 0;
-  int m_ppqn = 48;
-  int m_totalTicks = 1;
-  uint32_t m_maxNoteDurationTicks = 1;
 
   float m_pixelsPerTick = kDefaultPixelsPerTick;
   float m_pixelsPerKey = kDefaultPixelsPerKey;
@@ -286,9 +290,6 @@ private:
   int m_frameDrivenPlaybackAutoScrollEndX = 0;
   float m_visualPlaybackTicksPerSecond = 0.0f;
 
-  size_t m_cachedTimelineSize = 0;
-  bool m_cachedTimelineFinalized = false;
-
   QPoint m_noteSelectionAnchor;
   QPoint m_noteSelectionCurrent;
   QPoint m_noteSelectionAnchorWorld;
@@ -298,23 +299,14 @@ private:
   QBasicTimer m_dragAutoScrollTimer;
   VGMItem* m_primarySelectedItem = nullptr;
 
-  // Primary map for regular sequences.
-  std::unordered_map<const SeqTrack*, int> m_trackIndexByPtr;
-  // Fallback map for multi-section sequences that swap SeqTrack objects.
-  std::unordered_map<const MidiTrack*, int> m_trackIndexByMidiPtr;
   std::vector<uint8_t> m_trackEnabledMask;
   std::vector<QColor> m_trackColors;
   std::shared_ptr<const std::vector<uint8_t>> m_trackEnabledMaskSnapshot;
   std::shared_ptr<const std::vector<QColor>> m_trackColorsSnapshot;
   FrameColors m_frameColors;
 
-  std::shared_ptr<const std::vector<PianoRollFrame::Note>> m_notes;
   std::shared_ptr<const std::vector<PianoRollFrame::Note>> m_activeNotes;
   std::shared_ptr<const std::vector<PianoRollFrame::Note>> m_selectedNotes;
-  std::shared_ptr<const std::vector<PianoRollFrame::TimeSignature>> m_timeSignatures;
-  std::vector<SelectableNote> m_selectableNotes;
-  std::unordered_map<const SeqTimedEvent*, uint8_t> m_transposedKeyByTimedEvent;
-  std::unordered_map<const SeqTimedEvent*, size_t> m_noteIndexByTimedEvent;
   std::vector<size_t> m_selectedNoteIndices;
   std::vector<size_t> m_previewNoteIndices;
   int m_previewTick = -1;
