@@ -62,6 +62,23 @@ PanelViewKind sanitizeSeqPaneViewKind(int viewKind, PanelSide side) {
   }
 }
 
+bool paneViewUsesEmbeddedWindow(PanelViewKind viewKind) {
+#if defined(Q_OS_LINUX)
+  Q_UNUSED(viewKind);
+  return false;
+#else
+  switch (viewKind) {
+    case PanelViewKind::Hex:
+    case PanelViewKind::ActiveNotes:
+    case PanelViewKind::PianoRoll:
+      return true;
+    case PanelViewKind::Tree:
+      return false;
+  }
+  return false;
+#endif
+}
+
 int previewMidiChannelForEvent(const SeqEvent* event) {
   if (!event) {
     return -1;
@@ -136,7 +153,12 @@ bool buildPreviewNoteForEvent(const SeqEvent* seqEvent, SequencePlayer::PreviewN
 
 VGMFileView::VGMFileView(VGMFile* vgmfile)
     : QMdiSubWindow(), m_vgmfile(vgmfile) {
-  m_splitter = new QSplitter(Qt::Horizontal, this);
+  m_rootContainer = new QWidget(this);
+  auto* rootLayout = new QVBoxLayout(m_rootContainer);
+  rootLayout->setContentsMargins(0, 0, 0, 0);
+  rootLayout->setSpacing(0);
+
+  m_splitter = new QSplitter(Qt::Horizontal, m_rootContainer);
 
   setWindowTitle(QString::fromStdString(m_vgmfile->name()));
   setWindowIcon(iconForFile(vgmFileToVariant(vgmfile)));
@@ -165,13 +187,6 @@ VGMFileView::VGMFileView(VGMFile* vgmfile)
     m_activeHexFont.setPointSizeF(storedHexFontPointSize);
   }
 
-  setPanelView(PanelSide::Left, initialLeftView);
-  if (storedRightPaneHidden) {
-    panel(PanelSide::Right).currentKind = initialRightView;
-  } else {
-    setPanelView(PanelSide::Right, initialRightView);
-  }
-
   m_splitter->addWidget(panel(PanelSide::Left).container);
   m_splitter->addWidget(panel(PanelSide::Right).container);
   m_splitter->setStretchFactor(0, 1);
@@ -179,10 +194,6 @@ VGMFileView::VGMFileView(VGMFile* vgmfile)
   m_splitter->setSizes(QList<int>{1, 1});
   m_defaultSplitterHandleWidth = m_splitter->handleWidth();
   m_splitter->installEventFilter(this);
-
-  if (panel(PanelSide::Left).hexView || panel(PanelSide::Right).hexView) {
-    applyHexViewFont(m_activeHexFont, false);
-  }
 
   connect(m_splitter, &QSplitter::splitterMoved, this, &VGMFileView::onSplitterMoved);
 
@@ -212,11 +223,6 @@ VGMFileView::VGMFileView(VGMFile* vgmfile)
           &SequencePlayer::statusChange,
           this,
           &VGMFileView::onPlayerStatusChanged);
-
-  m_rootContainer = new QWidget(this);
-  auto* rootLayout = new QVBoxLayout(m_rootContainer);
-  rootLayout->setContentsMargins(0, 0, 0, 0);
-  rootLayout->setSpacing(0);
 
   if (m_isSeqFile) {
     m_sequenceControlBar = new SequenceControlBar(m_rootContainer);
@@ -290,6 +296,17 @@ VGMFileView::VGMFileView(VGMFile* vgmfile)
     m_preferredLeftPaneWidth = storedLeftPaneWidth;
   }
 
+  setPanelView(PanelSide::Left, initialLeftView);
+  if (storedRightPaneHidden) {
+    panel(PanelSide::Right).currentKind = initialRightView;
+  } else {
+    setPanelView(PanelSide::Right, initialRightView);
+  }
+
+  if (panel(PanelSide::Left).hexView || panel(PanelSide::Right).hexView) {
+    applyHexViewFont(m_activeHexFont, false);
+  }
+
   if (storedRightPaneHidden) {
     setSinglePaneMode(true);
   }
@@ -303,7 +320,7 @@ VGMFileView::VGMFileView(VGMFile* vgmfile)
 VGMFileView::PanelUi VGMFileView::createPanel(PanelSide side) {
   PanelUi panelUi;
 
-  panelUi.container = new QWidget(this);
+  panelUi.container = new QWidget(m_splitter);
   auto* containerLayout = new QVBoxLayout(panelUi.container);
   containerLayout->setContentsMargins(0, 0, 0, 0);
   containerLayout->setSpacing(0);
@@ -406,6 +423,16 @@ bool VGMFileView::ensurePanelViewCreated(PanelSide side, PanelViewKind viewKind)
 
   if (panelWidget(panelUi, viewKind)) {
     return true;
+  }
+
+  // On macOS/Windows these views embed a real QWindow via QWindowContainer.
+  // Under the wrapped QMdiSubWindow/QAbstractScrollArea hierarchy, creating
+  // that embedded window while the pane container is still "alien" can leave
+  // passive hover/input in a bad state (HexView hover would not wake up until
+  // the whole app was obscured and exposed again). Forcing the pane container
+  // native first gives QWindowContainer the ancestor chain it expects.
+  if (panelUi.container && paneViewUsesEmbeddedWindow(viewKind)) {
+    panelUi.container->winId();
   }
 
   QWidget* createdWidget = nullptr;
@@ -531,6 +558,7 @@ void VGMFileView::resizeEvent(QResizeEvent* event) {
 
 void VGMFileView::showEvent(QShowEvent* event) {
   QMdiSubWindow::showEvent(event);
+  enforceSplitterPolicyForResize();
   if (sequenceControlBarVisible()) {
     rebuildSequenceControlBarIfNeeded();
     updateSequenceControlValuesFromPlayback();
@@ -778,7 +806,7 @@ void VGMFileView::applyHexViewFont(QFont font, bool persistSetting) {
 
   const QList<int> splitterSizes = m_splitter->sizes();
   const bool canAdjustSplitter =
-      m_splitter && widget() == m_splitter && m_splitter->width() > 0 && !m_singlePaneMode;
+      m_splitter && widget() == m_rootContainer && isVisible() && m_splitter->width() > 0 && !m_singlePaneMode;
   const int actualWidthBeforeResize =
       (canAdjustSplitter && !splitterSizes.isEmpty() && splitterSizes.first() > 0)
           ? splitterSizes.first()
