@@ -31,9 +31,9 @@ class QRhiShaderResourceBindings;
 class QRhiTexture;
 
 // HexViewRhiRenderer builds GPU instance streams from an immutable HexView snapshot
-// and renders in four passes:
-// 1) content (text + backgrounds), 2) mask (selection ids/channels),
-// 3) combined effects (playback color + edge field), 4) composite (final shading).
+// and renders in three passes:
+// 1) content (text + backgrounds), 2) combined overlay/effects
+// (mask + edge field + playback color), 3) composite (final shading).
 class HexViewRhiRenderer {
 public:
   struct RenderTargetInfo {
@@ -193,8 +193,6 @@ private:
   QRhiRenderPassDescriptor* m_contentRp = nullptr;
   QRhiRenderPassDescriptor* m_outputRp = nullptr;
   QRhiTexture* m_maskTex = nullptr;
-  QRhiTextureRenderTarget* m_maskRt = nullptr;
-  QRhiRenderPassDescriptor* m_maskRp = nullptr;
   QRhiTexture* m_playbackColorTex = nullptr;
   QRhiTexture* m_edgeTex = nullptr;
   QRhiTextureRenderTarget* m_effectRt = nullptr;
@@ -212,7 +210,6 @@ private:
   QRhiBuffer* m_compositeUbuf = nullptr;
   QRhiTexture* m_glyphTex = nullptr;
   QRhiTexture* m_itemIdTex = nullptr;
-  QRhiTexture* m_edgeFallbackTex = nullptr;
   QRhiSampler* m_glyphSampler = nullptr;
   QRhiSampler* m_maskSampler = nullptr;
   QRhiShaderResourceBindings* m_rectSrb = nullptr;
@@ -252,8 +249,6 @@ private:
   bool m_baseBufferDirty = false;
   bool m_selectionBufferDirty = false;
   bool m_itemIdDirty = true;
-  bool m_edgeFallbackDirty = true;
-  bool m_useEdgeFallback = true;
   bool m_outlineEnabled = false;
   float m_outlineAlpha = 0.0f;
   float m_lastFrameSeconds = 0.0f;

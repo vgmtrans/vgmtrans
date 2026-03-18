@@ -114,14 +114,14 @@ float computeShadowHalo(float selectionNorm, float selectedMask) {
   if (overlayAndShadow.y <= 0.0) {
     return 0.0;
   }
-  return (1.0 - smoothstep(0.0, 1.0, selectionNorm)) * (1.0 - selectedMask);
+  return selectionNorm * (1.0 - selectedMask);
 }
 
 vec2 computePlaybackHalos(float activeNorm, float fadeNorm, float activeMask,
                           float fadeMask, float fadeAlpha) {
   float anyPlaybackMask = max(activeMask, fadeMask);
-  float activeHalo = (1.0 - smoothstep(0.0, 1.0, activeNorm)) * (1.0 - activeMask);
-  float fadeHalo = (1.0 - smoothstep(0.0, 1.0, fadeNorm)) * (1.0 - anyPlaybackMask) * fadeAlpha;
+  float activeHalo = activeNorm * (1.0 - activeMask);
+  float fadeHalo = fadeNorm * (1.0 - anyPlaybackMask) * fadeAlpha;
   return vec2(activeHalo, fadeHalo);
 }
 
