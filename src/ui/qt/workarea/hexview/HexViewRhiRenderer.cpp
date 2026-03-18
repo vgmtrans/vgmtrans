@@ -1655,7 +1655,7 @@ void HexViewRhiRenderer::buildSelectionInstances(int startLine, int endLine,
   const float shadowPad = std::max(0.0f, static_cast<float>(frame.shadowBlur));
   const float glowBase = std::max(0.0f, static_cast<float>(frame.playbackGlowRadius)) *
                          std::max(1.0f, std::min(charWidth, lineHeight));
-  const float glowPad = glowBase * 1.35f;
+  const float glowPad = glowBase * 1.6f;
   auto appendMaskForRangeNoEdge =
       [&](const HexViewFrame::SelectionRange& range, const QVector4D& maskColor) {
         if (range.length == 0) {
