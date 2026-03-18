@@ -49,25 +49,6 @@ constexpr int kInactiveNoteDimDurationMs = 160;
 constexpr float kPlaybackPageTriggerFraction = 0.85f;
 constexpr float kPlaybackPageTargetFraction = 0.05f;
 constexpr float kInactiveNoteDimMaxAlpha = 0.30f;
-bool pianoRollNoteLess(const PianoRollFrame::Note& lhs, const PianoRollFrame::Note& rhs) {
-  if (lhs.startTick != rhs.startTick) {
-    return lhs.startTick < rhs.startTick;
-  }
-  if (lhs.key != rhs.key) {
-    return lhs.key < rhs.key;
-  }
-  if (lhs.trackIndex != rhs.trackIndex) {
-    return lhs.trackIndex < rhs.trackIndex;
-  }
-  return lhs.duration < rhs.duration;
-}
-
-bool pianoRollNoteEqual(const PianoRollFrame::Note& lhs, const PianoRollFrame::Note& rhs) {
-  return lhs.startTick == rhs.startTick &&
-         lhs.duration == rhs.duration &&
-         lhs.key == rhs.key &&
-         lhs.trackIndex == rhs.trackIndex;
-}
 }
 
 PianoRollView::PianoRollView(QWidget* parent)
@@ -151,15 +132,9 @@ PianoRollView::PianoRollView(QWidget* parent)
   m_rhiHost->setFocusPolicy(Qt::NoFocus);
   m_rhiHost->setMouseTracking(true);
 
-  m_activeNotes = std::make_shared<std::vector<PianoRollFrame::Note>>();
   m_trackEnabledMaskSnapshot = std::make_shared<std::vector<uint8_t>>();
   m_trackColorsSnapshot = std::make_shared<std::vector<QColor>>();
   rebuildFrameColors();
-
-  for (auto& state : m_activeKeys) {
-    state.trackIndex = -1;
-    state.startTick = 0;
-  }
 
   m_animClock.start();
   m_renderClock.start();
@@ -186,7 +161,7 @@ void PianoRollView::setSequence(VGMSeq* seq) {
   m_noteSelectionDragging = false;
   m_noteSelectionAnchorWorldValid = false;
   m_selectionModel.clear();
-  m_activeNotes = std::make_shared<std::vector<PianoRollFrame::Note>>();
+  m_playbackController.clear();
 
   if (!m_seq) {
     m_trackCount = 0;
@@ -341,30 +316,28 @@ void PianoRollView::setPlaybackTick(int tick,
                                     bool playbackActive,
                                     const std::vector<PianoRollFrame::Note>* activeNotes) {
   tick = geometry().clampTick(tick);
-  const bool tickChanged = (tick != m_currentTick);
-  const bool playbackStateChanged = (playbackActive != m_playbackActive);
+  const bool tickChanged = (tick != currentTick());
+  const bool playbackStateChanged = (playbackActive != this->playbackActive());
   const bool horizontalZoomAnimating =
       m_horizontalZoomAnimation && m_horizontalZoomAnimation->state() == QAbstractAnimation::Running;
   if (!tickChanged && !playbackStateChanged && !activeNotes) {
     return;
   }
+  const auto tickUpdate = m_playbackController.setPlaybackTick(
+      tick,
+      playbackActive,
+      m_animClock.nsecsElapsed(),
+      SequencePlayer::the().currentTempoBpm(),
+      ppqn());
 
-  m_currentTick = tick;
-  m_playbackActive = playbackActive;
-  if (m_playbackActive) {
-    m_lastPlaybackTickUpdateNs = m_animClock.nsecsElapsed();
-    m_visualPlaybackTicksPerSecond = static_cast<float>(
-        (std::max(1.0, SequencePlayer::the().currentTempoBpm()) *
-         static_cast<double>(std::max(1, ppqn()))) / 60.0);
-  }
   updateInactiveNoteDimTarget();
 
-  if (playbackStateChanged && !m_playbackActive) {
+  if (tickUpdate.playbackStateChanged && !this->playbackActive()) {
     stopPlaybackAutoScrollAnimation();
     m_waitForWheelScrollBegin = false;
   }
 
-  if (playbackStateChanged && m_playbackActive) {
+  if (tickUpdate.playbackStateChanged && this->playbackActive()) {
     m_playbackAutoScrollEnabled = true;
     m_waitForWheelScrollBegin = true;
     if (!horizontalZoomAnimating && !geometry().isTickVisible(tick)) {
@@ -372,7 +345,7 @@ void PianoRollView::setPlaybackTick(int tick,
     }
   }
 
-  if (m_playbackActive && m_playbackAutoScrollEnabled && !horizontalZoomAnimating) {
+  if (this->playbackActive() && m_playbackAutoScrollEnabled && !horizontalZoomAnimating) {
     const int noteViewportWidth = geometry().noteViewportWidth();
     if (noteViewportWidth > 0) {
       const int triggerX = static_cast<int>(std::lround(
@@ -389,7 +362,7 @@ void PianoRollView::setPlaybackTick(int tick,
       : updateActiveKeyStates();
   const int scanX = geometry().scanlinePixelX(tick);
   const bool scanlineChanged = (scanX != m_lastRenderedScanlineX);
-  if (playbackStateChanged || activeKeysChanged || scanlineChanged) {
+  if (tickUpdate.playbackStateChanged || activeKeysChanged || scanlineChanged) {
     m_lastRenderedScanlineX = scanX;
     requestRender();
   }
@@ -405,10 +378,7 @@ void PianoRollView::setPlaybackTickFromSeek(int tick,
 
 void PianoRollView::clearPlaybackState() {
   stopPlaybackAutoScrollAnimation();
-  m_playbackActive = false;
-  m_currentTick = 0;
-  m_lastPlaybackTickUpdateNs = 0;
-  m_visualPlaybackTicksPerSecond = 0.0f;
+  m_playbackController.clear();
   m_playbackAutoScrollEnabled = true;
   m_waitForWheelScrollBegin = false;
   m_applyingPlaybackAutoScroll = false;
@@ -460,7 +430,7 @@ PianoRollFrame::Data PianoRollView::captureRhiFrameData(float dpr) const {
   frame.dpr = std::max(1.0f, dpr);
 
   frame.totalTicks = totalTicks();
-  frame.currentTick = geometry().clampTick(m_currentTick);
+  frame.currentTick = geometry().clampTick(currentTick());
   // Active-note resolution stays callback-driven, but the scanline uses a
   // predicted float tick so playback motion can stay smooth between callbacks.
   frame.visualCurrentTick = visualPlaybackTick();
@@ -477,7 +447,7 @@ PianoRollFrame::Data PianoRollView::captureRhiFrameData(float dpr) const {
   frame.pixelsPerKey = m_pixelsPerKey;
   frame.elapsedSeconds = static_cast<float>(m_animClock.elapsed()) / 1000.0f;
   frame.inactiveNoteDimAlpha = m_inactiveNoteDimAlpha;
-  frame.playbackActive = m_playbackActive;
+  frame.playbackActive = playbackActive();
   if (m_scrollChrome) {
     frame.scrollChrome = m_scrollChrome->snapshot();
   }
@@ -485,13 +455,14 @@ PianoRollFrame::Data PianoRollView::captureRhiFrameData(float dpr) const {
   frame.trackColors = m_trackColorsSnapshot;
   frame.trackEnabled = m_trackEnabledMaskSnapshot;
   frame.notes = notes();
-  frame.activeNotes = m_activeNotes;
+  frame.activeNotes = m_playbackController.activeNotes();
   frame.selectedNotes = m_selectionModel.selectedNotes();
   frame.timeSignatures = timeSignatures();
 
   frame.activeKeyTrack.fill(-1);
   for (int key = 0; key < kMidiKeyCount; ++key) {
-    frame.activeKeyTrack[static_cast<size_t>(key)] = m_activeKeys[static_cast<size_t>(key)].trackIndex;
+    frame.activeKeyTrack[static_cast<size_t>(key)] =
+        m_playbackController.activeKeys()[static_cast<size_t>(key)].trackIndex;
   }
 
   frame.backgroundColor = m_frameColors.backgroundColor;
@@ -566,7 +537,7 @@ void PianoRollView::showEvent(QShowEvent* event) {
 void PianoRollView::scrollContentsBy(int dx, int dy) {
   QAbstractScrollArea::scrollContentsBy(dx, dy);
   Q_UNUSED(dy);
-  if (dx != 0 && m_playbackActive && !m_applyingPlaybackAutoScroll && !m_applyingHorizontalZoomScroll) {
+  if (dx != 0 && playbackActive() && !m_applyingPlaybackAutoScroll && !m_applyingHorizontalZoomScroll) {
     stopPlaybackAutoScrollAnimation();
     m_playbackAutoScrollEnabled = false;
   }
@@ -694,14 +665,14 @@ void PianoRollView::updateSeekDrag(int viewportX, bool forceEmit) {
   }
 
   const int tick = rollGeometry.tickFromViewportX(viewportX);
-  if (!forceEmit && tick == m_currentTick) {
+  if (!forceEmit && tick == currentTick()) {
     return;
   }
 
-  m_currentTick = tick;
+  m_playbackController.setCurrentTick(tick);
   updateActiveKeyStates();
   requestRender();
-  emit seekRequested(m_currentTick);
+  emit seekRequested(currentTick());
   updateSeekPreview();
 }
 
@@ -1163,7 +1134,7 @@ void PianoRollView::rebuildFrameColors() {
 }
 
 void PianoRollView::updateInactiveNoteDimTarget(bool animated) {
-  const float targetAlpha = (m_lightFrameColors && (m_playbackActive || m_seekDragActive))
+  const float targetAlpha = (m_lightFrameColors && (playbackActive() || m_seekDragActive))
                                 ? kInactiveNoteDimMaxAlpha
                                 : 0.0f;
   if (m_inactiveNoteDimAnimation &&
@@ -1191,18 +1162,18 @@ void PianoRollView::updateInactiveNoteDimTarget(bool animated) {
 }
 
 void PianoRollView::rebuildSequenceCache() {
-  m_activeNotes = std::make_shared<std::vector<PianoRollFrame::Note>>();
+  m_playbackController.clear();
   m_selectionModel.clear();
   m_sequenceCache.rebuild(m_seq);
-  m_currentTick = geometry().clampTick(m_currentTick);
+  m_playbackController.setCurrentTick(geometry().clampTick(currentTick()));
 }
 
 bool PianoRollView::updateActiveKeyStates() {
   std::vector<PianoRollFrame::Note> resolvedActiveNotes;
 
-  if (m_playbackActive && timeline() && timelineCursor() && timeline()->finalized()) {
+  if (playbackActive() && timeline() && timelineCursor() && timeline()->finalized()) {
     std::vector<const SeqTimedEvent*> active;
-    timelineCursor()->getActiveAt(static_cast<uint32_t>(std::max(0, m_currentTick)), active);
+    timelineCursor()->getActiveAt(static_cast<uint32_t>(std::max(0, currentTick())), active);
     resolvedActiveNotes.reserve(active.size());
 
     for (const auto* timed : active) {
@@ -1240,63 +1211,9 @@ bool PianoRollView::updateActiveKeyStates() {
 }
 
 bool PianoRollView::applyResolvedActiveNotes(const std::vector<PianoRollFrame::Note>& resolvedActiveNotes) {
-  std::array<ActiveKeyState, kMidiKeyCount> nextActiveKeys{};
-  for (auto& state : nextActiveKeys) {
-    state.trackIndex = -1;
-    state.startTick = 0;
-  }
-  std::vector<PianoRollFrame::Note> nextActiveNotes;
-  nextActiveNotes.reserve(resolvedActiveNotes.size());
-
-  for (const auto& resolved : resolvedActiveNotes) {
-    if (resolved.key >= kMidiKeyCount) {
-      continue;
-    }
-    if (resolved.trackIndex < 0 || !isTrackEnabled(resolved.trackIndex)) {
-      continue;
-    }
-
-    PianoRollFrame::Note note = resolved;
-    note.duration = std::max<uint32_t>(1, note.duration);
-    nextActiveNotes.push_back(note);
-
-    auto& state = nextActiveKeys[static_cast<size_t>(note.key)];
-    if (state.trackIndex < 0 || note.startTick >= state.startTick) {
-      state.trackIndex = note.trackIndex;
-      state.startTick = note.startTick;
-    }
-  }
-
-  std::sort(nextActiveNotes.begin(), nextActiveNotes.end(), pianoRollNoteLess);
-
-  bool activeKeysChanged = false;
-  for (int key = 0; key < kMidiKeyCount; ++key) {
-    const auto& oldState = m_activeKeys[static_cast<size_t>(key)];
-    const auto& newState = nextActiveKeys[static_cast<size_t>(key)];
-    if (oldState.trackIndex != newState.trackIndex || oldState.startTick != newState.startTick) {
-      activeKeysChanged = true;
-      break;
-    }
-  }
-
-  bool activeNotesChanged = true;
-  if (m_activeNotes && m_activeNotes->size() == nextActiveNotes.size()) {
-    activeNotesChanged = false;
-    for (size_t i = 0; i < nextActiveNotes.size(); ++i) {
-      const auto& oldNote = (*m_activeNotes)[i];
-      const auto& newNote = nextActiveNotes[i];
-      if (!pianoRollNoteEqual(oldNote, newNote)) {
-        activeNotesChanged = true;
-        break;
-      }
-    }
-  }
-  if (activeNotesChanged || !m_activeNotes) {
-    m_activeNotes = std::make_shared<std::vector<PianoRollFrame::Note>>(std::move(nextActiveNotes));
-  }
-
-  m_activeKeys = std::move(nextActiveKeys);
-  return activeKeysChanged || activeNotesChanged;
+  return m_playbackController.applyResolvedActiveNotes(
+      resolvedActiveNotes,
+      [this](int trackIndex) { return isTrackEnabled(trackIndex); });
 }
 
 void PianoRollView::updateScrollBars() {
@@ -1318,7 +1235,7 @@ void PianoRollView::updateScrollBars() {
     verticalScrollBar()->setValue(verticalScrollBar()->maximum() / 2);
   }
 
-  m_currentTick = rollGeometry.clampTick(m_currentTick);
+  m_playbackController.setCurrentTick(rollGeometry.clampTick(currentTick()));
 }
 
 void PianoRollView::requestRender() {
@@ -1419,27 +1336,14 @@ bool PianoRollView::frameDrivenPlaybackAutoScrollActive() const {
 }
 
 bool PianoRollView::shouldPumpPlaybackFrames() const {
-  return m_playbackActive || m_frameDrivenPlaybackAutoScrollActive;
+  return playbackActive() || m_frameDrivenPlaybackAutoScrollActive;
 }
 
 float PianoRollView::visualPlaybackTick() const {
-  const float baseTick = static_cast<float>(geometry().clampTick(m_currentTick));
-  if (!m_playbackActive || m_lastPlaybackTickUpdateNs <= 0 || m_visualPlaybackTicksPerSecond <= 0.0f) {
-    return baseTick;
-  }
-
-  if (!SequencePlayer::the().playing()) {
-    return baseTick;
-  }
-
-  const qint64 nowNs = m_animClock.nsecsElapsed();
-  const qint64 elapsedNs = std::max<qint64>(0, nowNs - m_lastPlaybackTickUpdateNs);
-  const double predictedTick =
-      static_cast<double>(baseTick) +
-      (static_cast<double>(elapsedNs) * 1.0e-9 * static_cast<double>(m_visualPlaybackTicksPerSecond));
-  return std::clamp(static_cast<float>(predictedTick),
-                    0.0f,
-                    static_cast<float>(std::max(1, totalTicks())));
+  return m_playbackController.visualPlaybackTick(
+      m_animClock.nsecsElapsed(),
+      totalTicks(),
+      SequencePlayer::the().playing());
 }
 
 PianoRollGeometry PianoRollView::geometry() const {
@@ -1580,7 +1484,7 @@ void PianoRollView::updateSeekPreview() {
   }
 
   std::vector<const SeqTimedEvent*> active;
-  timelineCursor()->getActiveAt(static_cast<uint32_t>(std::max(0, m_currentTick)), active);
+  timelineCursor()->getActiveAt(static_cast<uint32_t>(std::max(0, currentTick())), active);
 
   const auto& noteIndexMap = noteIndexByTimedEvent();
   const auto& notes = selectableNotes();
@@ -1597,7 +1501,7 @@ void PianoRollView::updateSeekPreview() {
     indices.push_back(noteIt->second);
   }
 
-  applyPreviewNoteIndices(std::move(indices), m_currentTick);
+  applyPreviewNoteIndices(std::move(indices), currentTick());
 }
 
 void PianoRollView::applySelectedNoteIndices(std::vector<size_t> indices,

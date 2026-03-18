@@ -78,6 +78,7 @@ target_sources(vgmtrans
     workarea/pianorollview/PianoRollRhiWidget.cpp
     workarea/pianorollview/PianoRollRhiWindow.cpp
     workarea/pianorollview/PianoRollGeometry.cpp
+    workarea/pianorollview/PianoRollPlaybackController.cpp
     workarea/pianorollview/PianoRollSequenceCache.cpp
     workarea/pianorollview/PianoRollSelectionModel.cpp
     workarea/pianorollview/PianoRollView.cpp
@@ -166,6 +167,7 @@ target_sources(vgmtrans
       workarea/hexview/HexViewRhiWindow.h
       workarea/pianorollview/PianoRollFrameData.h
       workarea/pianorollview/PianoRollGeometry.h
+      workarea/pianorollview/PianoRollPlaybackController.h
       workarea/pianorollview/PianoRollRhiInputCoalescer.h
       workarea/pianorollview/PianoRollRhiHost.h
       workarea/pianorollview/PianoRollRhiRenderer.h

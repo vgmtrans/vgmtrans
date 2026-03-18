@@ -21,6 +21,7 @@
 
 #include "PianoRollFrameData.h"
 #include "PianoRollGeometry.h"
+#include "PianoRollPlaybackController.h"
 #include "PianoRollSequenceCache.h"
 #include "PianoRollSelectionModel.h"
 
@@ -92,10 +93,6 @@ private:
   friend class PianoRollRhiWidget;
   friend class PianoRollRhiWindow;
 
-  struct ActiveKeyState {
-    int trackIndex = -1;
-    uint32_t startTick = 0;
-  };
   using SelectableNote = PianoRollSequenceCache::SelectableNote;
 
   struct FrameColors {
@@ -150,6 +147,8 @@ private:
   [[nodiscard]] int ppqn() const { return m_sequenceCache.ppqn(); }
   [[nodiscard]] int totalTicks() const { return m_sequenceCache.totalTicks(); }
   [[nodiscard]] uint32_t maxNoteDurationTicks() const { return m_sequenceCache.maxNoteDurationTicks(); }
+  [[nodiscard]] bool playbackActive() const { return m_playbackController.playbackActive(); }
+  [[nodiscard]] int currentTick() const { return m_playbackController.currentTick(); }
   [[nodiscard]] const SeqEventTimeIndex* timeline() const { return m_sequenceCache.timeline(); }
   [[nodiscard]] SeqEventTimeIndex::Cursor* timelineCursor() { return m_sequenceCache.timelineCursor(); }
   [[nodiscard]] const SeqEventTimeIndex::Cursor* timelineCursor() const { return m_sequenceCache.timelineCursor(); }
@@ -236,6 +235,7 @@ private:
 
   PianoRollRhiHost* m_rhiHost = nullptr;
   std::unique_ptr<RhiScrollAreaChrome> m_scrollChrome;
+  PianoRollPlaybackController m_playbackController;
 
   VGMSeq* m_seq = nullptr;
   PianoRollSequenceCache m_sequenceCache;
@@ -245,8 +245,6 @@ private:
   float m_pixelsPerTick = kDefaultPixelsPerTick;
   float m_pixelsPerKey = kDefaultPixelsPerKey;
 
-  bool m_playbackActive = false;
-  int m_currentTick = 0;
   bool m_seekDragActive = false;
   bool m_lightFrameColors = true;
   bool m_panDragActive = false;
@@ -275,12 +273,10 @@ private:
   float m_verticalZoomWorldY = 0.0f;
   int m_verticalZoomAnchor = 0;
   qint64 m_lastRenderMs = std::numeric_limits<qint64>::min() / 4;
-  qint64 m_lastPlaybackTickUpdateNs = 0;
   qint64 m_frameDrivenPlaybackAutoScrollStartNs = 0;
   int m_lastRenderedScanlineX = std::numeric_limits<int>::min();
   int m_frameDrivenPlaybackAutoScrollStartX = 0;
   int m_frameDrivenPlaybackAutoScrollEndX = 0;
-  float m_visualPlaybackTicksPerSecond = 0.0f;
 
   QPoint m_noteSelectionAnchor;
   QPoint m_noteSelectionCurrent;
@@ -296,8 +292,4 @@ private:
   std::shared_ptr<const std::vector<uint8_t>> m_trackEnabledMaskSnapshot;
   std::shared_ptr<const std::vector<QColor>> m_trackColorsSnapshot;
   FrameColors m_frameColors;
-
-  std::shared_ptr<const std::vector<PianoRollFrame::Note>> m_activeNotes;
-
-  std::array<ActiveKeyState, kMidiKeyCount> m_activeKeys{};
 };
