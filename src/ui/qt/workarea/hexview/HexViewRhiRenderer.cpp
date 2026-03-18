@@ -298,7 +298,8 @@ void HexViewRhiRenderer::renderFrame(QRhiCommandBuffer* cb, const RenderTargetIn
   const int endLine =
       std::clamp((scrollY + viewportHeight) / frame.lineHeight, 0, totalLines - 1);
 
-  if (startLine != m_lastStartLine || endLine != m_lastEndLine) {
+  const bool viewportChanged = startLine != m_lastStartLine || endLine != m_lastEndLine;
+  if (viewportChanged) {
     m_lastStartLine = startLine;
     m_lastEndLine = endLine;
     m_selectionDirty = true;
@@ -1045,6 +1046,9 @@ bool HexViewRhiRenderer::ensureInstanceBuffer(QRhiBuffer*& buffer, int bytes) {
 // Upload dirty base/selection/playback instance arrays to their corresponding dynamic buffers.
 void HexViewRhiRenderer::updateInstanceBuffers(QRhiResourceUpdateBatch* u) {
   auto uploadIfDirty = [&](QRhiBuffer*& buffer, const void* data, int bytes, bool dirty) {
+    if (!buffer && bytes <= 0) {
+      return;
+    }
     const bool resized = ensureInstanceBuffer(buffer, bytes);
     if ((dirty || resized) && bytes > 0 && data) {
       u->updateDynamicBuffer(buffer, 0, bytes, data);
@@ -1535,19 +1539,26 @@ void HexViewRhiRenderer::buildPlaybackEffectInstances(int startLine, int endLine
   ctx.asciiStartX = layout.asciiStartX;
   ctx.shouldDrawAscii = frame.shouldDrawAscii;
 
-  std::vector<uint8_t> lineBytes(static_cast<size_t>(visibleCount), 0);
-  std::vector<uint16_t> activeMasks(static_cast<size_t>(visibleCount), 0);
-  std::vector<uint16_t> fadeMasks(static_cast<size_t>(visibleCount), 0);
-  std::vector<std::array<QVector4D, kBytesPerLine>> activeColors(static_cast<size_t>(visibleCount));
-  std::vector<std::array<QVector4D, kBytesPerLine>> fadeColors(static_cast<size_t>(visibleCount));
-  std::vector<std::array<float, kBytesPerLine>> fadeAlphas(static_cast<size_t>(visibleCount));
+  m_lineByteScratch.assign(static_cast<size_t>(visibleCount), 0);
+  m_maskScratchA.assign(static_cast<size_t>(visibleCount), 0);
+  m_maskScratchB.assign(static_cast<size_t>(visibleCount), 0);
+  m_alphaScratch.assign(static_cast<size_t>(visibleCount), {});
 
   for (int line = ctx.startLine; line <= ctx.endLine; ++line) {
     const CachedLine* entry = cachedLineFor(line);
     if (entry && entry->bytes > 0) {
-      lineBytes[static_cast<size_t>(line - ctx.startLine)] =
+      m_lineByteScratch[static_cast<size_t>(line - ctx.startLine)] =
           static_cast<uint8_t>(std::min(entry->bytes, kBytesPerLine));
     }
+  }
+
+  const bool needsGlow = frame.playbackGlowRadius > 0.0f && frame.playbackGlowStrength > 0.0f;
+  if (needsGlow) {
+    m_colorScratchA.assign(static_cast<size_t>(visibleCount), {});
+    m_colorScratchB.assign(static_cast<size_t>(visibleCount), {});
+  } else {
+    m_colorScratchA.clear();
+    m_colorScratchB.clear();
   }
 
   auto appendMaskSpan = [&](std::vector<RectInstance>& rects,
@@ -1594,7 +1605,7 @@ void HexViewRhiRenderer::buildPlaybackEffectInstances(int startLine, int endLine
   auto populatePlaybackField =
       [&](const HexViewFrame::PlaybackSelection& selection,
           std::vector<uint16_t>& masks,
-          std::vector<std::array<QVector4D, kBytesPerLine>>& colors,
+          std::vector<std::array<QVector4D, kBytesPerLine>>* colors,
           std::vector<std::array<float, kBytesPerLine>>* alphas,
           float alphaValue) {
         if (selection.length == 0) {
@@ -1612,9 +1623,12 @@ void HexViewRhiRenderer::buildPlaybackEffectInstances(int startLine, int endLine
           return;
         }
 
-        const QColor glowColor =
-            selection.glowColor.isValid() ? selection.glowColor : QColor(Qt::white);
-        const QVector4D tint(glowColor.redF(), glowColor.greenF(), glowColor.blueF(), 1.0f);
+        QVector4D tint;
+        if (colors) {
+          const QColor glowColor =
+              selection.glowColor.isValid() ? selection.glowColor : QColor(Qt::white);
+          tint = QVector4D(glowColor.redF(), glowColor.greenF(), glowColor.blueF(), 1.0f);
+        }
         const int selStartLine = selectionStart / kBytesPerLine;
         const int selEndLine = (selectionEnd - 1) / kBytesPerLine;
         const int lineStart = std::max(ctx.startLine, selStartLine);
@@ -1622,7 +1636,7 @@ void HexViewRhiRenderer::buildPlaybackEffectInstances(int startLine, int endLine
 
         for (int line = lineStart; line <= lineEnd; ++line) {
           const size_t lineIndex = static_cast<size_t>(line - ctx.startLine);
-          const int lineByteCount = static_cast<int>(lineBytes[lineIndex]);
+          const int lineByteCount = static_cast<int>(m_lineByteScratch[lineIndex]);
           if (lineByteCount <= 0) {
             continue;
           }
@@ -1638,7 +1652,9 @@ void HexViewRhiRenderer::buildPlaybackEffectInstances(int startLine, int endLine
 
           for (int col = clampedStart; col < clampedEnd; ++col) {
             masks[lineIndex] |= static_cast<uint16_t>(1u << col);
-            colors[lineIndex][static_cast<size_t>(col)] = tint;
+            if (colors) {
+              (*colors)[lineIndex][static_cast<size_t>(col)] = tint;
+            }
             if (alphas) {
               (*alphas)[lineIndex][static_cast<size_t>(col)] =
                   std::max((*alphas)[lineIndex][static_cast<size_t>(col)], alphaValue);
@@ -1650,7 +1666,7 @@ void HexViewRhiRenderer::buildPlaybackEffectInstances(int startLine, int endLine
     for (int line = ctx.startLine; line <= ctx.endLine; ++line) {
       const size_t lineIndex = static_cast<size_t>(line - ctx.startLine);
       const uint16_t maskBits = masks[lineIndex];
-      const int lineByteCount = static_cast<int>(lineBytes[lineIndex]);
+      const int lineByteCount = static_cast<int>(m_lineByteScratch[lineIndex]);
       int col = 0;
       while (col < lineByteCount) {
         while (col < lineByteCount && (maskBits & static_cast<uint16_t>(1u << col)) == 0u) {
@@ -1670,12 +1686,12 @@ void HexViewRhiRenderer::buildPlaybackEffectInstances(int startLine, int endLine
   auto emitFadeAlphaSpans = [&]() {
     for (int line = ctx.startLine; line <= ctx.endLine; ++line) {
       const size_t lineIndex = static_cast<size_t>(line - ctx.startLine);
-      const int lineByteCount = static_cast<int>(lineBytes[lineIndex]);
+      const int lineByteCount = static_cast<int>(m_lineByteScratch[lineIndex]);
       int startCol = -1;
       float currentAlpha = 0.0f;
       for (int col = 0; col <= lineByteCount; ++col) {
         const float alpha =
-            (col < lineByteCount) ? fadeAlphas[lineIndex][static_cast<size_t>(col)] : 0.0f;
+            (col < lineByteCount) ? m_alphaScratch[lineIndex][static_cast<size_t>(col)] : 0.0f;
         if (startCol < 0) {
           if (alpha > 0.0f) {
             startCol = col;
@@ -1706,7 +1722,7 @@ void HexViewRhiRenderer::buildPlaybackEffectInstances(int startLine, int endLine
         for (int line = ctx.startLine; line <= ctx.endLine; ++line) {
           const size_t lineIndex = static_cast<size_t>(line - ctx.startLine);
           const uint16_t maskBits = masks[lineIndex];
-          const int lineByteCount = static_cast<int>(lineBytes[lineIndex]);
+          const int lineByteCount = static_cast<int>(m_lineByteScratch[lineIndex]);
           int col = 0;
           while (col < lineByteCount) {
             while (col < lineByteCount && (maskBits & static_cast<uint16_t>(1u << col)) == 0u) {
@@ -1729,17 +1745,25 @@ void HexViewRhiRenderer::buildPlaybackEffectInstances(int startLine, int endLine
       };
 
   for (const auto& selection : frame.playbackSelections) {
-    populatePlaybackField(selection, activeMasks, activeColors, nullptr, 0.0f);
+    populatePlaybackField(selection,
+                         m_maskScratchA,
+                         needsGlow ? &m_colorScratchA : nullptr,
+                         nullptr,
+                         0.0f);
   }
   for (const auto& selection : frame.fadePlaybackSelections) {
     if (selection.alpha <= 0.0f) {
       continue;
     }
-    populatePlaybackField(selection.range, fadeMasks, fadeColors, &fadeAlphas, selection.alpha);
+    populatePlaybackField(selection.range,
+                         m_maskScratchB,
+                         needsGlow ? &m_colorScratchB : nullptr,
+                         &m_alphaScratch,
+                         selection.alpha);
   }
 
-  emitMaskSpans(activeMasks, QVector4D(0.0f, 1.0f, 0.0f, 0.0f));
-  emitMaskSpans(fadeMasks, QVector4D(0.0f, 0.0f, 1.0f, 0.0f));
+  emitMaskSpans(m_maskScratchA, QVector4D(0.0f, 1.0f, 0.0f, 0.0f));
+  emitMaskSpans(m_maskScratchB, QVector4D(0.0f, 0.0f, 1.0f, 0.0f));
   emitFadeAlphaSpans();
 
   const float glowBase = std::max(0.0f, static_cast<float>(frame.playbackGlowRadius)) *
@@ -1748,6 +1772,14 @@ void HexViewRhiRenderer::buildPlaybackEffectInstances(int startLine, int endLine
       (frame.playbackGlowRadius > 0.0f && frame.playbackGlowStrength > 0.0f)
           ? (glowBase * 1.6f)
           : 0.0f;
-  emitTintedEdgeSpans(activeMasks, activeColors, QVector4D(0.0f, 1.0f, 0.0f, 0.0f), glowPad);
-  emitTintedEdgeSpans(fadeMasks, fadeColors, QVector4D(0.0f, 0.0f, 1.0f, 0.0f), glowPad);
+  if (needsGlow && glowPad > 0.0f) {
+    emitTintedEdgeSpans(m_maskScratchA,
+                        m_colorScratchA,
+                        QVector4D(0.0f, 1.0f, 0.0f, 0.0f),
+                        glowPad);
+    emitTintedEdgeSpans(m_maskScratchB,
+                        m_colorScratchB,
+                        QVector4D(0.0f, 0.0f, 1.0f, 0.0f),
+                        glowPad);
+  }
 }

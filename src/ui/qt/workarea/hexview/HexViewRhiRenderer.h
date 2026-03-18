@@ -8,6 +8,7 @@
 
 #include <QElapsedTimer>
 #include <QSize>
+#include <QVector4D>
 #include <array>
 #include <cstdint>
 #include <vector>
@@ -16,7 +17,6 @@
 
 class QChar;
 class QRectF;
-class QVector4D;
 class HexView;
 class QRhi;
 class QRhiBuffer;
@@ -237,6 +237,12 @@ private:
   std::vector<EdgeInstance> m_selectionEdgeRectInstances;
   std::vector<RectInstance> m_playbackMaskRectInstances;
   std::vector<EdgeInstance> m_playbackEdgeRectInstances;
+  std::vector<uint8_t> m_lineByteScratch;
+  std::vector<uint16_t> m_maskScratchA;
+  std::vector<uint16_t> m_maskScratchB;
+  std::vector<std::array<QVector4D, kBytesPerLine>> m_colorScratchA;
+  std::vector<std::array<QVector4D, kBytesPerLine>> m_colorScratchB;
+  std::vector<std::array<float, kBytesPerLine>> m_alphaScratch;
   int m_cacheStartLine = 0;
   int m_cacheEndLine = -1;
   int m_lastStartLine = -1;
