@@ -20,6 +20,7 @@
 #include <vector>
 
 #include "PianoRollFrameData.h"
+#include "PianoRollGeometry.h"
 #include "PianoRollSequenceCache.h"
 
 class QEvent;
@@ -192,23 +193,16 @@ private:
   [[nodiscard]] bool frameDrivenPlaybackAutoScrollActive() const;
   [[nodiscard]] bool shouldPumpPlaybackFrames() const;
   [[nodiscard]] float visualPlaybackTick() const;
+  [[nodiscard]] PianoRollGeometry geometry() const;
 
   [[nodiscard]] QPoint viewportPosFromGlobal(const QPointF& globalPos) const;
-  [[nodiscard]] QPoint graphWorldPosFromViewport(const QPoint& viewportPos) const;
-  [[nodiscard]] QPoint graphViewportPosFromWorld(const QPoint& worldPos) const;
   [[nodiscard]] QPointF autoScrollDeltaForGraphDrag(const QPoint& viewportPos) const;
   void stopDragAutoScroll();
   QPoint consumeDragAutoScrollDelta(const QPointF& dragDelta);
-  int clampTick(int tick) const;
-  int tickFromViewportX(int x) const;
   void updateSeekDrag(int viewportX, bool forceEmit = false);
-  int scanlinePixelX(int tick) const;
-  [[nodiscard]] bool isTickVisible(int tick) const;
   void scrollTickToViewportFraction(int tick, float viewportFraction, bool animated = true);
   [[nodiscard]] int noteIndexAtViewportPoint(const QPoint& pos) const;
   [[nodiscard]] VGMItem* noteAtViewportPoint(const QPoint& pos) const;
-  [[nodiscard]] QRect graphRectInViewport() const;
-  [[nodiscard]] QRectF graphSelectionRectInViewport() const;
   void normalizeNoteIndices(std::vector<size_t>& indices) const;
   [[nodiscard]] bool isSelectedItem(VGMItem* item) const;
   [[nodiscard]] std::vector<VGMItem*> uniqueItemsForNoteIndices(
