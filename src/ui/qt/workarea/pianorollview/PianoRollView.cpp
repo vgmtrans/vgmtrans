@@ -151,10 +151,8 @@ PianoRollView::PianoRollView(QWidget* parent)
   m_rhiHost->setFocusPolicy(Qt::NoFocus);
   m_rhiHost->setMouseTracking(true);
 
-  m_notes = std::make_shared<std::vector<PianoRollFrame::Note>>();
   m_activeNotes = std::make_shared<std::vector<PianoRollFrame::Note>>();
   m_selectedNotes = std::make_shared<std::vector<PianoRollFrame::Note>>();
-  m_timeSignatures = std::make_shared<std::vector<PianoRollFrame::TimeSignature>>();
   m_trackEnabledMaskSnapshot = std::make_shared<std::vector<uint8_t>>();
   m_trackColorsSnapshot = std::make_shared<std::vector<QColor>>();
   rebuildFrameColors();
@@ -183,29 +181,23 @@ void PianoRollView::setSequence(VGMSeq* seq) {
   clearPreviewNotes();
 
   m_seq = seq;
-  m_timeline = nullptr;
-  m_timelineCursor.reset();
+  m_sequenceCache.clear();
   m_attemptedTimelineBuild = false;
   m_noteSelectionPressActive = false;
   m_noteSelectionDragging = false;
   m_noteSelectionAnchorWorldValid = false;
-  m_cachedTimelineSize = 0;
-  m_cachedTimelineFinalized = false;
   m_primarySelectedItem = nullptr;
   m_selectedNoteIndices.clear();
   m_previewNoteIndices.clear();
   m_previewTick = -1;
   m_activeNotes = std::make_shared<std::vector<PianoRollFrame::Note>>();
   m_selectedNotes = std::make_shared<std::vector<PianoRollFrame::Note>>();
-  m_transposedKeyByTimedEvent.clear();
-  m_noteIndexByTimedEvent.clear();
 
   if (!m_seq) {
     m_trackCount = 0;
   } else {
     m_trackCount = std::max(m_trackCount, static_cast<int>(m_seq->aTracks.size()));
   }
-  rebuildTrackIndexMap();
   resizeTrackEnabledMaskToTrackCount();
   rebuildTrackColors();
   rebuildSequenceCache();
@@ -262,18 +254,12 @@ void PianoRollView::refreshSequenceData(bool allowTimelineBuild) {
   const int seqTrackCount = static_cast<int>(m_seq->aTracks.size());
   if (seqTrackCount > m_trackCount) {
     m_trackCount = seqTrackCount;
-    rebuildTrackIndexMap();
     resizeTrackEnabledMaskToTrackCount();
     rebuildTrackColors();
   }
 
   const auto& timeline = m_seq->timedEventIndex();
-  const bool timelineFinalized = timeline.finalized();
-  const size_t timelineSize = timeline.size();
-
-  if (m_timeline == &timeline &&
-      m_cachedTimelineFinalized == timelineFinalized &&
-      m_cachedTimelineSize == timelineSize) {
+  if (m_sequenceCache.matchesTimelineState(timeline)) {
     // Timeline identity + size/finalized status unchanged -> cached notes still valid.
     return;
   }
@@ -288,7 +274,7 @@ void PianoRollView::refreshSequenceData(bool allowTimelineBuild) {
 void PianoRollView::setSelectedItems(const std::vector<const VGMItem*>& items,
                                      const VGMItem* primaryItem,
                                      bool revealSelection) {
-  if (m_selectableNotes.empty()) {
+  if (selectableNotes().empty()) {
     applySelectedNoteIndices({}, false, nullptr);
     return;
   }
@@ -302,9 +288,9 @@ void PianoRollView::setSelectedItems(const std::vector<const VGMItem*>& items,
   }
 
   std::vector<size_t> indices;
-  indices.reserve(m_selectableNotes.size());
-  for (size_t i = 0; i < m_selectableNotes.size(); ++i) {
-    if (selectedItemSet.find(m_selectableNotes[i].item) != selectedItemSet.end()) {
+  indices.reserve(selectableNotes().size());
+  for (size_t i = 0; i < selectableNotes().size(); ++i) {
+    if (selectedItemSet.find(selectableNotes()[i].item) != selectedItemSet.end()) {
       indices.push_back(i);
     }
   }
@@ -320,7 +306,7 @@ void PianoRollView::setSelectedItems(const std::vector<const VGMItem*>& items,
   size_t targetIndex = kInvalidNoteIndex;
   if (m_primarySelectedItem) {
     for (size_t index : m_selectedNoteIndices) {
-      if (m_selectableNotes[index].item == m_primarySelectedItem) {
+      if (selectableNotes()[index].item == m_primarySelectedItem) {
         targetIndex = index;
         break;
       }
@@ -333,7 +319,7 @@ void PianoRollView::setSelectedItems(const std::vector<const VGMItem*>& items,
     return;
   }
 
-  const auto& note = m_selectableNotes[targetIndex];
+  const auto& note = selectableNotes()[targetIndex];
   ensureTickVisible(static_cast<int>(note.startTick), 0.10f, false);
 
   const int noteViewportHeight = std::max(0, viewport()->height() - kTopBarHeight);
@@ -374,7 +360,7 @@ void PianoRollView::setPlaybackTick(int tick,
     m_lastPlaybackTickUpdateNs = m_animClock.nsecsElapsed();
     m_visualPlaybackTicksPerSecond = static_cast<float>(
         (std::max(1.0, SequencePlayer::the().currentTempoBpm()) *
-         static_cast<double>(std::max(1, m_ppqn))) / 60.0);
+         static_cast<double>(std::max(1, ppqn()))) / 60.0);
   }
   updateInactiveNoteDimTarget();
 
@@ -477,14 +463,14 @@ PianoRollFrame::Data PianoRollView::captureRhiFrameData(float dpr) const {
   frame.viewportSize = size();
   frame.dpr = std::max(1.0f, dpr);
 
-  frame.totalTicks = m_totalTicks;
+  frame.totalTicks = totalTicks();
   frame.currentTick = clampTick(m_currentTick);
   // Active-note resolution stays callback-driven, but the scanline uses a
   // predicted float tick so playback motion can stay smooth between callbacks.
   frame.visualCurrentTick = visualPlaybackTick();
   frame.trackCount = m_trackCount;
-  frame.ppqn = std::max(1, m_ppqn);
-  frame.maxNoteDurationTicks = std::max<uint32_t>(1, m_maxNoteDurationTicks);
+  frame.ppqn = std::max(1, ppqn());
+  frame.maxNoteDurationTicks = std::max<uint32_t>(1, maxNoteDurationTicks());
 
   frame.scrollX = horizontalScrollBar()->value();
   frame.scrollY = verticalScrollBar()->value();
@@ -502,10 +488,10 @@ PianoRollFrame::Data PianoRollView::captureRhiFrameData(float dpr) const {
 
   frame.trackColors = m_trackColorsSnapshot;
   frame.trackEnabled = m_trackEnabledMaskSnapshot;
-  frame.notes = m_notes;
+  frame.notes = notes();
   frame.activeNotes = m_activeNotes;
   frame.selectedNotes = m_selectedNotes;
-  frame.timeSignatures = m_timeSignatures;
+  frame.timeSignatures = timeSignatures();
 
   frame.activeKeyTrack.fill(-1);
   for (int key = 0; key < kMidiKeyCount; ++key) {
@@ -1069,7 +1055,7 @@ bool PianoRollView::handleViewportMouseRelease(QMouseEvent* event) {
     if (noteIndex >= 0) {
       applySelectedNoteIndices({static_cast<size_t>(noteIndex)},
                                true,
-                               m_selectableNotes[static_cast<size_t>(noteIndex)].item);
+                               selectableNotes()[static_cast<size_t>(noteIndex)].item);
     } else {
       applySelectedNoteIndices({}, true, nullptr);
     }
@@ -1115,60 +1101,6 @@ void PianoRollView::maybeBuildTimelineFromSequence() {
   const VGMColl* coll = m_seq->assocColls.empty() ? nullptr : m_seq->assocColls.front();
   MidiFile* midi = m_seq->convertToMidi(coll);
   delete midi;
-}
-
-void PianoRollView::rebuildTrackIndexMap() {
-  m_trackIndexByPtr.clear();
-  m_trackIndexByMidiPtr.clear();
-
-  if (!m_seq) {
-    return;
-  }
-
-  for (size_t i = 0; i < m_seq->aTracks.size(); ++i) {
-    if (auto* track = m_seq->aTracks[i]) {
-      const int trackIndex = static_cast<int>(i);
-      m_trackIndexByPtr[track] = trackIndex;
-      if (track->pMidiTrack) {
-        m_trackIndexByMidiPtr.emplace(track->pMidiTrack, trackIndex);
-      }
-    }
-  }
-}
-
-int PianoRollView::trackIndexForTrack(const SeqTrack* track) const {
-  if (!track) {
-    return -1;
-  }
-
-  const auto trackIt = m_trackIndexByPtr.find(track);
-  if (trackIt != m_trackIndexByPtr.end()) {
-    return trackIt->second;
-  }
-
-  // Multi-section sequences can emit events from section track instances no longer
-  // present in aTracks. Resolve by shared MidiTrack when available.
-  if (track->pMidiTrack) {
-    const auto midiTrackIt = m_trackIndexByMidiPtr.find(track->pMidiTrack);
-    if (midiTrackIt != m_trackIndexByMidiPtr.end()) {
-      return midiTrackIt->second;
-    }
-  }
-
-  return -1;
-}
-
-int PianoRollView::trackIndexForEvent(const SeqEvent* event) const {
-  if (!event) {
-    return -1;
-  }
-
-  const int trackIndex = trackIndexForTrack(event->parentTrack);
-  if (trackIndex >= 0) {
-    return trackIndex;
-  }
-
-  return static_cast<int>(event->channel);
 }
 
 bool PianoRollView::isTrackEnabled(int trackIndex) const {
@@ -1258,187 +1190,22 @@ void PianoRollView::updateInactiveNoteDimTarget(bool animated) {
 }
 
 void PianoRollView::rebuildSequenceCache() {
-  m_ppqn = (m_seq && m_seq->ppqn() > 0) ? m_seq->ppqn() : 48;
-  m_maxNoteDurationTicks = 1;
-  m_selectableNotes.clear();
-  m_transposedKeyByTimedEvent.clear();
-  m_noteIndexByTimedEvent.clear();
   m_selectedNoteIndices.clear();
   m_primarySelectedItem = nullptr;
   m_activeNotes = std::make_shared<std::vector<PianoRollFrame::Note>>();
   m_selectedNotes = std::make_shared<std::vector<PianoRollFrame::Note>>();
+  m_previewNoteIndices.clear();
   m_previewTick = -1;
-
-  auto notes = std::make_shared<std::vector<PianoRollFrame::Note>>();
-  auto signatures = std::make_shared<std::vector<PianoRollFrame::TimeSignature>>();
-
-  m_totalTicks = 1;
-  m_timeline = nullptr;
-  m_timelineCursor.reset();
-
-  if (!m_seq) {
-    m_notes = notes;
-    m_timeSignatures = signatures;
-    m_cachedTimelineFinalized = false;
-    m_cachedTimelineSize = 0;
-    return;
-  }
-
-  rebuildTrackIndexMap();
-
-  const auto& timeline = m_seq->timedEventIndex();
-  m_timeline = &timeline;
-  m_cachedTimelineFinalized = timeline.finalized();
-  m_cachedTimelineSize = timeline.size();
-
-  if (!timeline.finalized()) {
-    // Rendering proceeds with empty notes until the timeline is finalized.
-    m_notes = notes;
-    signatures->push_back({0, 4, 4});
-    m_timeSignatures = signatures;
-    m_selectableNotes.clear();
-    return;
-  }
-
-  m_timelineCursor = std::make_unique<SeqEventTimeIndex::Cursor>(timeline);
-
-  uint64_t maxEndTick = 1;
-  uint32_t maxDurationTicks = 1;
-  notes->reserve(timeline.size());
-  m_selectableNotes.reserve(timeline.size());
-  for (size_t i = 0; i < timeline.size(); ++i) {
-    const auto& timed = timeline.event(i);
-    maxEndTick = std::max<uint64_t>(maxEndTick, timed.endTickExclusive());
-
-    if (!timed.event) {
-      continue;
-    }
-
-    int noteKey = SeqNoteUtils::transposedNoteKeyForTimedEvent(m_seq, &timed);
-    if (noteKey < 0 || noteKey >= kMidiKeyCount) {
-      continue;
-    }
-    m_transposedKeyByTimedEvent.emplace(&timed, static_cast<uint8_t>(noteKey));
-
-    const int trackIndex = trackIndexForEvent(timed.event);
-    if (trackIndex < 0) {
-      continue;
-    }
-
-    const uint32_t noteDuration = std::max<uint32_t>(1, timed.duration);
-    PianoRollFrame::Note note;
-    note.startTick = timed.startTick;
-    note.duration = noteDuration;
-    note.key = static_cast<uint8_t>(noteKey);
-    note.trackIndex = static_cast<int16_t>(trackIndex);
-    notes->push_back(note);
-    m_selectableNotes.push_back({
-        timed.startTick,
-        noteDuration,
-        static_cast<uint8_t>(noteKey),
-        static_cast<int16_t>(trackIndex),
-        timed.event,
-        &timed,
-    });
-    maxDurationTicks = std::max<uint32_t>(maxDurationTicks, note.duration);
-  }
-
-  std::sort(notes->begin(), notes->end(), [](const auto& a, const auto& b) {
-    if (a.startTick != b.startTick) {
-      return a.startTick < b.startTick;
-    }
-    if (a.key != b.key) {
-      return a.key < b.key;
-    }
-    if (a.trackIndex != b.trackIndex) {
-      return a.trackIndex < b.trackIndex;
-    }
-    return a.duration < b.duration;
-  });
-
-  std::sort(m_selectableNotes.begin(), m_selectableNotes.end(), [](const auto& a, const auto& b) {
-    if (a.startTick != b.startTick) {
-      return a.startTick < b.startTick;
-    }
-    if (a.key != b.key) {
-      return a.key < b.key;
-    }
-    if (a.trackIndex != b.trackIndex) {
-      return a.trackIndex < b.trackIndex;
-    }
-    return a.duration < b.duration;
-  });
-  m_noteIndexByTimedEvent.reserve(m_selectableNotes.size());
-  for (size_t i = 0; i < m_selectableNotes.size(); ++i) {
-    if (m_selectableNotes[i].timedEvent) {
-      m_noteIndexByTimedEvent.emplace(m_selectableNotes[i].timedEvent, i);
-    }
-  }
-
-  if (!m_seq->aTracks.empty() && m_seq->aTracks.front()) {
-    for (VGMItem* child : m_seq->aTracks.front()->children()) {
-      auto* sig = dynamic_cast<TimeSigSeqEvent*>(child);
-      if (!sig) {
-        continue;
-      }
-
-      uint32_t tick = 0;
-      if (!timeline.firstStartTick(sig, tick)) {
-        continue;
-      }
-
-      signatures->push_back({
-          tick,
-          std::max<uint8_t>(1, sig->numer),
-          std::max<uint8_t>(1, sig->denom),
-      });
-    }
-  }
-
-  if (signatures->empty()) {
-    signatures->push_back({0, 4, 4});
-  } else {
-    std::sort(signatures->begin(), signatures->end(), [](const auto& a, const auto& b) {
-      if (a.tick != b.tick) {
-        return a.tick < b.tick;
-      }
-      if (a.numerator != b.numerator) {
-        return a.numerator < b.numerator;
-      }
-      return a.denominator < b.denominator;
-    });
-
-    std::vector<PianoRollFrame::TimeSignature> deduped;
-    deduped.reserve(signatures->size());
-    for (const auto& sig : *signatures) {
-      if (!deduped.empty() && deduped.back().tick == sig.tick) {
-        deduped.back() = sig;
-      } else {
-        deduped.push_back(sig);
-      }
-    }
-
-    signatures->assign(deduped.begin(), deduped.end());
-    if (!signatures->empty() && signatures->front().tick != 0) {
-      signatures->insert(signatures->begin(), {0, signatures->front().numerator, signatures->front().denominator});
-    }
-  }
-
-  maxEndTick = std::min<uint64_t>(maxEndTick, static_cast<uint64_t>(std::numeric_limits<int>::max()));
-  m_totalTicks = std::max(1, static_cast<int>(maxEndTick));
-  m_maxNoteDurationTicks = std::max<uint32_t>(1, maxDurationTicks);
-
-  m_notes = notes;
-  m_timeSignatures = signatures;
+  m_sequenceCache.rebuild(m_seq);
   m_currentTick = clampTick(m_currentTick);
 }
 
 bool PianoRollView::updateActiveKeyStates() {
   std::vector<PianoRollFrame::Note> resolvedActiveNotes;
 
-  if (m_playbackActive && m_timeline && m_timelineCursor && m_timeline->finalized()) {
+  if (m_playbackActive && timeline() && timelineCursor() && timeline()->finalized()) {
     std::vector<const SeqTimedEvent*> active;
-    m_timelineCursor->getActiveAt(static_cast<uint32_t>(std::max(0, m_currentTick)), active);
+    timelineCursor()->getActiveAt(static_cast<uint32_t>(std::max(0, m_currentTick)), active);
     resolvedActiveNotes.reserve(active.size());
 
     for (const auto* timed : active) {
@@ -1447,8 +1214,9 @@ bool PianoRollView::updateActiveKeyStates() {
       }
 
       int key = -1;
-      const auto keyIt = m_transposedKeyByTimedEvent.find(timed);
-      if (keyIt != m_transposedKeyByTimedEvent.end()) {
+      const auto& transposedKeys = transposedKeyByTimedEvent();
+      const auto keyIt = transposedKeys.find(timed);
+      if (keyIt != transposedKeys.end()) {
         key = keyIt->second;
       } else {
         key = SeqNoteUtils::transposedNoteKeyForTimedEvent(m_seq, timed);
@@ -1540,7 +1308,7 @@ void PianoRollView::updateScrollBars() {
 
   const int contentWidth = std::max(
       1,
-      static_cast<int>(std::ceil(static_cast<float>(m_totalTicks) * m_pixelsPerTick)));
+      static_cast<int>(std::ceil(static_cast<float>(totalTicks()) * m_pixelsPerTick)));
   const int contentHeight = std::max(
       1,
       static_cast<int>(std::ceil(static_cast<float>(kMidiKeyCount) * m_pixelsPerKey)));
@@ -1678,7 +1446,7 @@ float PianoRollView::visualPlaybackTick() const {
       (static_cast<double>(elapsedNs) * 1.0e-9 * static_cast<double>(m_visualPlaybackTicksPerSecond));
   return std::clamp(static_cast<float>(predictedTick),
                     0.0f,
-                    static_cast<float>(std::max(1, m_totalTicks)));
+                    static_cast<float>(std::max(1, totalTicks())));
 }
 
 QPoint PianoRollView::viewportPosFromGlobal(const QPointF& globalPos) const {
@@ -1718,7 +1486,7 @@ QPointF PianoRollView::autoScrollDeltaForGraphDrag(const QPoint& viewportPos) co
 }
 
 int PianoRollView::clampTick(int tick) const {
-  return std::clamp(tick, 0, std::max(1, m_totalTicks));
+  return std::clamp(tick, 0, std::max(1, totalTicks()));
 }
 
 int PianoRollView::tickFromViewportX(int x) const {
@@ -1858,10 +1626,11 @@ QRectF PianoRollView::graphSelectionRectInViewport() const {
 }
 
 void PianoRollView::normalizeNoteIndices(std::vector<size_t>& indices) const {
+  const auto& notes = selectableNotes();
   indices.erase(std::remove_if(indices.begin(),
                                indices.end(),
-                               [this](size_t index) {
-                                 return index >= m_selectableNotes.size();
+                               [&notes](size_t index) {
+                                 return index >= notes.size();
                                }),
                 indices.end());
   std::sort(indices.begin(), indices.end());
@@ -1874,7 +1643,7 @@ bool PianoRollView::isSelectedItem(VGMItem* item) const {
   }
 
   for (size_t selectedIndex : m_selectedNoteIndices) {
-    if (m_selectableNotes[selectedIndex].item == item) {
+    if (selectableNotes()[selectedIndex].item == item) {
       return true;
     }
   }
@@ -1882,6 +1651,7 @@ bool PianoRollView::isSelectedItem(VGMItem* item) const {
 }
 
 std::vector<VGMItem*> PianoRollView::uniqueItemsForNoteIndices(const std::vector<size_t>& indices) const {
+  const auto& notes = selectableNotes();
   std::vector<VGMItem*> items;
   items.reserve(indices.size());
 
@@ -1889,10 +1659,10 @@ std::vector<VGMItem*> PianoRollView::uniqueItemsForNoteIndices(const std::vector
   seenItems.reserve(indices.size() * 2 + 1);
 
   for (size_t index : indices) {
-    if (index >= m_selectableNotes.size()) {
+    if (index >= notes.size()) {
       continue;
     }
-    VGMItem* item = m_selectableNotes[index].item;
+    VGMItem* item = notes[index].item;
     if (!item || !seenItems.insert(item).second) {
       continue;
     }
@@ -1903,10 +1673,11 @@ std::vector<VGMItem*> PianoRollView::uniqueItemsForNoteIndices(const std::vector
 }
 
 void PianoRollView::rebuildSelectedNotesCache() {
+  const auto& notes = selectableNotes();
   std::vector<PianoRollFrame::Note> selectedNotes;
   selectedNotes.reserve(m_selectedNoteIndices.size());
   for (size_t selectedIndex : m_selectedNoteIndices) {
-    const auto& selected = m_selectableNotes[selectedIndex];
+    const auto& selected = notes[selectedIndex];
     selectedNotes.push_back({
         selected.startTick,
         selected.duration,
@@ -1919,32 +1690,34 @@ void PianoRollView::rebuildSelectedNotesCache() {
 
 void PianoRollView::previewSingleNoteAtViewportPoint(const QPoint& pos) {
   const int noteIndex = noteIndexAtViewportPoint(pos);
-  if (noteIndex < 0 || noteIndex >= static_cast<int>(m_selectableNotes.size())) {
+  if (noteIndex < 0 || noteIndex >= static_cast<int>(selectableNotes().size())) {
     clearPreviewNotes();
     return;
   }
 
   const size_t index = static_cast<size_t>(noteIndex);
-  applyPreviewNoteIndices({index}, static_cast<int>(m_selectableNotes[index].startTick));
+  applyPreviewNoteIndices({index}, static_cast<int>(selectableNotes()[index].startTick));
 }
 
 void PianoRollView::updateSeekPreview() {
-  if (SequencePlayer::the().playing() || !m_timeline || !m_timelineCursor || !m_timeline->finalized()) {
+  if (SequencePlayer::the().playing() || !timeline() || !timelineCursor() || !timeline()->finalized()) {
     clearPreviewNotes();
     return;
   }
 
   std::vector<const SeqTimedEvent*> active;
-  m_timelineCursor->getActiveAt(static_cast<uint32_t>(std::max(0, m_currentTick)), active);
+  timelineCursor()->getActiveAt(static_cast<uint32_t>(std::max(0, m_currentTick)), active);
 
+  const auto& noteIndexMap = noteIndexByTimedEvent();
+  const auto& notes = selectableNotes();
   std::vector<size_t> indices;
   indices.reserve(active.size());
   for (const auto* timed : active) {
-    const auto noteIt = m_noteIndexByTimedEvent.find(timed);
-    if (noteIt == m_noteIndexByTimedEvent.end() || noteIt->second >= m_selectableNotes.size()) {
+    const auto noteIt = noteIndexMap.find(timed);
+    if (noteIt == noteIndexMap.end() || noteIt->second >= notes.size()) {
       continue;
     }
-    if (!isTrackEnabled(m_selectableNotes[noteIt->second].trackIndex)) {
+    if (!isTrackEnabled(notes[noteIt->second].trackIndex)) {
       continue;
     }
     indices.push_back(noteIt->second);
@@ -1957,12 +1730,13 @@ void PianoRollView::applySelectedNoteIndices(std::vector<size_t> indices,
                                              bool emitSelectionSignal,
                                              VGMItem* preferredPrimary) {
   normalizeNoteIndices(indices);
+  const auto& notes = selectableNotes();
   size_t filteredCount = 0;
   for (size_t index : indices) {
-    if (index >= m_selectableNotes.size()) {
+    if (index >= notes.size()) {
       continue;
     }
-    if (!isTrackEnabled(m_selectableNotes[index].trackIndex)) {
+    if (!isTrackEnabled(notes[index].trackIndex)) {
       continue;
     }
     indices[filteredCount++] = index;
@@ -1979,7 +1753,7 @@ void PianoRollView::applySelectedNoteIndices(std::vector<size_t> indices,
   } else if (isSelectedItem(m_primarySelectedItem)) {
     nextPrimary = m_primarySelectedItem;
   } else if (!m_selectedNoteIndices.empty()) {
-    nextPrimary = m_selectableNotes[m_selectedNoteIndices.front()].item;
+    nextPrimary = notes[m_selectedNoteIndices.front()].item;
   }
 
   const bool primaryChanged = (nextPrimary != m_primarySelectedItem);
@@ -2001,7 +1775,8 @@ void PianoRollView::emitCurrentSelectionSignals() {
 }
 
 void PianoRollView::updateMarqueeSelection(bool emitSelectionSignal) {
-  if (m_selectableNotes.empty()) {
+  const auto& notes = selectableNotes();
+  if (notes.empty()) {
     applySelectedNoteIndices({}, emitSelectionSignal, nullptr);
     return;
   }
@@ -2035,21 +1810,21 @@ void PianoRollView::updateMarqueeSelection(bool emitSelectionSignal) {
 
   const uint64_t tickMin = static_cast<uint64_t>(std::floor(clampedWorldXMin / pixelsPerTick));
   const uint64_t tickMax = static_cast<uint64_t>(std::ceil(clampedWorldXMax / pixelsPerTick));
-  const uint64_t maxDurationTicks = std::max<uint64_t>(1u, m_maxNoteDurationTicks);
+  const uint64_t maxDurationTicks = std::max<uint64_t>(1u, maxNoteDurationTicks());
   // Include earlier start ticks so long notes crossing into the marquee are still considered.
   const uint64_t searchStartTick = (tickMin > maxDurationTicks) ? (tickMin - maxDurationTicks) : 0u;
   const uint64_t searchEndTickExclusive = tickMax + 1u;
 
   const auto beginIt = std::lower_bound(
-      m_selectableNotes.begin(),
-      m_selectableNotes.end(),
+      notes.begin(),
+      notes.end(),
       searchStartTick,
       [](const SelectableNote& note, uint64_t tick) {
         return static_cast<uint64_t>(note.startTick) < tick;
       });
   const auto endIt = std::lower_bound(
-      m_selectableNotes.begin(),
-      m_selectableNotes.end(),
+      notes.begin(),
+      notes.end(),
       searchEndTickExclusive,
       [](const SelectableNote& note, uint64_t tick) {
         return static_cast<uint64_t>(note.startTick) < tick;
@@ -2074,7 +1849,7 @@ void PianoRollView::updateMarqueeSelection(bool emitSelectionSignal) {
       continue;
     }
 
-    indices.push_back(static_cast<size_t>(std::distance(m_selectableNotes.begin(), it)));
+    indices.push_back(static_cast<size_t>(std::distance(notes.begin(), it)));
   }
 
   applySelectedNoteIndices(std::move(indices), emitSelectionSignal, nullptr);
@@ -2096,8 +1871,9 @@ void PianoRollView::updateMarqueePreview(const QPoint& cursorPos) {
   std::vector<size_t> overlapIndices;
   overlapIndices.reserve(currentSelection.size());
 
+  const auto& notes = selectableNotes();
   for (size_t selectedIndex : currentSelection) {
-    const auto& note = m_selectableNotes[selectedIndex];
+    const auto& note = notes[selectedIndex];
     const float noteStartTick = static_cast<float>(note.startTick);
     const float noteEndTick = noteStartTick + static_cast<float>(std::max<uint32_t>(1u, note.duration));
 
@@ -2135,10 +1911,11 @@ void PianoRollView::applyPreviewNoteIndices(std::vector<size_t> indices, int pre
   m_previewNoteIndices = std::move(indices);
   m_previewTick = clampedPreviewTick;
 
+  const auto& notes = selectableNotes();
   std::vector<PreviewSelection> previewNotes;
   previewNotes.reserve(m_previewNoteIndices.size());
   for (size_t index : m_previewNoteIndices) {
-    const auto& selected = m_selectableNotes[index];
+    const auto& selected = notes[index];
     if (!selected.item) {
       continue;
     }
@@ -2160,7 +1937,8 @@ void PianoRollView::clearPreviewNotes() {
 }
 
 int PianoRollView::noteIndexAtViewportPoint(const QPoint& pos) const {
-  if (pos.x() < kKeyboardWidth || pos.y() < kTopBarHeight || m_selectableNotes.empty()) {
+  const auto& notes = selectableNotes();
+  if (pos.x() < kKeyboardWidth || pos.y() < kTopBarHeight || notes.empty()) {
     return -1;
   }
 
@@ -2195,7 +1973,7 @@ int PianoRollView::noteIndexAtViewportPoint(const QPoint& pos) const {
   const uint64_t tickFloor = (worldTick <= 0.0f)
                                  ? 0u
                                  : static_cast<uint64_t>(std::floor(worldTick));
-  const uint64_t maxDurationTicks = std::max<uint64_t>(1u, m_maxNoteDurationTicks);
+  const uint64_t maxDurationTicks = std::max<uint64_t>(1u, maxNoteDurationTicks());
   const uint64_t searchStartTick = (tickFloor > maxDurationTicks)
                                        ? (tickFloor - maxDurationTicks)
                                        : 0u;
@@ -2203,15 +1981,15 @@ int PianoRollView::noteIndexAtViewportPoint(const QPoint& pos) const {
       tickFloor + 2u, static_cast<uint64_t>(std::numeric_limits<uint32_t>::max()) + 1u);
 
   const auto beginIt = std::lower_bound(
-      m_selectableNotes.begin(),
-      m_selectableNotes.end(),
+      notes.begin(),
+      notes.end(),
       searchStartTick,
       [](const SelectableNote& note, uint64_t tick) {
         return static_cast<uint64_t>(note.startTick) < tick;
       });
   const auto endIt = std::lower_bound(
-      m_selectableNotes.begin(),
-      m_selectableNotes.end(),
+      notes.begin(),
+      notes.end(),
       searchEndTickExclusive,
       [](const SelectableNote& note, uint64_t tick) {
         return static_cast<uint64_t>(note.startTick) < tick;
@@ -2238,7 +2016,7 @@ int PianoRollView::noteIndexAtViewportPoint(const QPoint& pos) const {
         (it->startTick > bestStartTick) ||
         (it->startTick == bestStartTick && it->trackIndex >= bestTrackIndex);
     if (betterMatch) {
-      bestNoteIndex = static_cast<int>(std::distance(m_selectableNotes.begin(), it));
+      bestNoteIndex = static_cast<int>(std::distance(notes.begin(), it));
       bestStartTick = it->startTick;
       bestTrackIndex = it->trackIndex;
     }
@@ -2249,10 +2027,10 @@ int PianoRollView::noteIndexAtViewportPoint(const QPoint& pos) const {
 
 VGMItem* PianoRollView::noteAtViewportPoint(const QPoint& pos) const {
   const int noteIndex = noteIndexAtViewportPoint(pos);
-  if (noteIndex < 0 || noteIndex >= static_cast<int>(m_selectableNotes.size())) {
+  if (noteIndex < 0 || noteIndex >= static_cast<int>(selectableNotes().size())) {
     return nullptr;
   }
-  return m_selectableNotes[static_cast<size_t>(noteIndex)].item;
+  return selectableNotes()[static_cast<size_t>(noteIndex)].item;
 }
 
 void PianoRollView::zoomHorizontalFromButton(int steps) {
