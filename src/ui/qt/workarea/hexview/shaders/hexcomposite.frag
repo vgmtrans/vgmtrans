@@ -131,12 +131,12 @@ float computeShadowHalo(float selectionNorm, float selectedMask) {
   return (1.0 - smoothstep(0.0, 1.0, selectionNorm)) * (1.0 - selectedMask);
 }
 
-float computePlaybackHalo(float activeNorm, float fadeNorm, float activeMask,
+vec2 computePlaybackHalos(float activeNorm, float fadeNorm, float activeMask,
                           float fadeMask, float fadeAlpha) {
   float anyPlaybackMask = max(activeMask, fadeMask);
   float activeHalo = (1.0 - smoothstep(0.0, 1.0, activeNorm)) * (1.0 - activeMask);
   float fadeHalo = (1.0 - smoothstep(0.0, 1.0, fadeNorm)) * (1.0 - anyPlaybackMask) * fadeAlpha;
-  return max(activeHalo, fadeHalo);
+  return vec2(activeHalo, fadeHalo);
 }
 
 float computeGlowTurbulence(vec2 uv, vec2 viewSize, float timeSeconds) {
@@ -197,11 +197,12 @@ void main() {
 
   vec4 edgeGlow = texture(edgeTex, vUv);
   vec4 playbackColorSample = texture(playbackColorTex, vUv);
-  float playHalo = computePlaybackHalo(edgeGlow.g, edgeGlow.b, playActiveMask, playFadeMask,
-                                       playFadeAlpha);
+  vec2 playHalos = computePlaybackHalos(edgeGlow.g, edgeGlow.b, playActiveMask, playFadeMask,
+                                        playFadeAlpha);
   float turbulence = computeGlowTurbulence(vUv, viewSize, time);
-
-  float flame = clamp(playHalo * glowStrength * turbulence, 0.0, 1.0);
+  float activeGlow = clamp(playHalos.x * glowStrength, 0.0, 1.0);
+  float fadeGlow = clamp(playHalos.y * glowStrength * turbulence, 0.0, 1.0);
+  float flame = max(activeGlow, fadeGlow);
 
   vec3 trackGlowBase = playbackColorSample.rgb;
   float hasTrackGlowColor = step(0.001, playbackColorSample.a);
