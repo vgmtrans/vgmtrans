@@ -159,8 +159,8 @@ void HexViewRhiRenderer::initIfNeeded(QRhi* rhi) {
 
   m_staticBuffersUploaded = false;
   m_sampleCount = 0;
-  if (!m_animTimer.isValid()) {
-    m_animTimer.start();
+  if (!m_frameTimer.isValid()) {
+    m_frameTimer.start();
   }
   m_inited = true;
 }
@@ -329,7 +329,7 @@ void HexViewRhiRenderer::renderFrame(QRhiCommandBuffer* cb, const RenderTargetIn
   ensureGlyphTexture(u, frame);
   const float minCell = std::min(layout.charWidth, layout.lineHeight);
   const bool outlineAllowed = minCell >= OUTLINE_MIN_CELL_PX;
-  const float nowSeconds = m_animTimer.isValid() ? (m_animTimer.elapsed() / 1000.0f) : 0.0f;
+  const float nowSeconds = m_frameTimer.isValid() ? (m_frameTimer.elapsed() / 1000.0f) : 0.0f;
   float dt = (m_lastFrameSeconds > 0.0f) ? (nowSeconds - m_lastFrameSeconds) : 0.0f;
   m_lastFrameSeconds = nowSeconds;
   if (dt > 0.25f) {
@@ -496,21 +496,16 @@ void HexViewRhiRenderer::renderFrame(QRhiCommandBuffer* cb, const RenderTargetIn
                 static_cast<int>(sizeof(RectInstance)));
   cb->endPass();
 
-  // Pass 3: playback color field used to tint the glow per active range.
-  cb->beginPass(m_playbackColorRt, QColor(0, 0, 0, 0), {1.0f, 0}, nullptr);
-  cb->setViewport(viewport);
-  drawInstanced(m_playbackColorPso,
-                m_rectSrb,
-                m_playbackColorRectBuf,
-                static_cast<int>(m_playbackColorRectInstances.size()),
-                0,
-                static_cast<int>(sizeof(RectInstance)));
-  cb->endPass();
-
-  // Pass 4: edge field for drop shadow and playback glow falloff.
+  // Pass 3: combined effect pass writes edge falloff and playback tint fields together.
   if (edgeEnabled) {
-    cb->beginPass(m_edgeRt, QColor(255, 255, 255, 255), {1.0f, 0}, nullptr);
+    cb->beginPass(m_effectRt, QColor(255, 255, 255, 0), {1.0f, 0}, nullptr);
     cb->setViewport(viewport);
+    drawInstanced(m_playbackColorPso,
+                  m_rectSrb,
+                  m_playbackColorRectBuf,
+                  static_cast<int>(m_playbackColorRectInstances.size()),
+                  0,
+                  static_cast<int>(sizeof(RectInstance)));
     drawInstanced(m_edgePso,
                   m_edgeSrb,
                   m_edgeRectBuf,
@@ -520,14 +515,14 @@ void HexViewRhiRenderer::renderFrame(QRhiCommandBuffer* cb, const RenderTargetIn
     cb->endPass();
   }
 
-  // Pass 5: fullscreen composite combines content + mask + playback color + edge + item-id textures.
+  // Pass 4: fullscreen composite combines content + mask + playback color + edge + item-id textures.
   cb->beginPass(target.renderTarget, clearColor, {1.0f, 0}, nullptr);
   cb->setViewport(viewport);
   drawFullscreen(m_compositePso, m_compositeSrb);
   cb->endPass();
 }
 
-// Ensure offscreen content/mask/playback-color/edge render targets match current output pixel size.
+// Ensure offscreen content/mask/effect render targets match current output pixel size.
 void HexViewRhiRenderer::ensureRenderTargets(const QSize& pixelSize) {
   if (!m_rhi || pixelSize.isEmpty()) {
     return;
@@ -538,20 +533,32 @@ void HexViewRhiRenderer::ensureRenderTargets(const QSize& pixelSize) {
 
   releaseRenderTargets();
 
-  auto makeTarget = [&](QRhiTexture** tex, QRhiTextureRenderTarget** rt,
-                        QRhiRenderPassDescriptor** rp) {
+  auto makeTexture = [&](QRhiTexture** tex) {
     *tex = m_rhi->newTexture(QRhiTexture::RGBA8, pixelSize, 1, QRhiTexture::RenderTarget);
     (*tex)->create();
+  };
+
+  auto makeSingleTarget = [&](QRhiTexture** tex, QRhiTextureRenderTarget** rt,
+                              QRhiRenderPassDescriptor** rp) {
+    makeTexture(tex);
     *rt = m_rhi->newTextureRenderTarget(QRhiTextureRenderTargetDescription(*tex));
     *rp = (*rt)->newCompatibleRenderPassDescriptor();
     (*rt)->setRenderPassDescriptor(*rp);
     (*rt)->create();
   };
 
-  makeTarget(&m_contentTex, &m_contentRt, &m_contentRp);
-  makeTarget(&m_maskTex, &m_maskRt, &m_maskRp);
-  makeTarget(&m_playbackColorTex, &m_playbackColorRt, &m_playbackColorRp);
-  makeTarget(&m_edgeTex, &m_edgeRt, &m_edgeRp);
+  makeSingleTarget(&m_contentTex, &m_contentRt, &m_contentRp);
+  makeSingleTarget(&m_maskTex, &m_maskRt, &m_maskRp);
+  makeTexture(&m_edgeTex);
+  makeTexture(&m_playbackColorTex);
+
+  QRhiTextureRenderTargetDescription effectDesc;
+  effectDesc.setColorAttachments({QRhiColorAttachment(m_edgeTex),
+                                  QRhiColorAttachment(m_playbackColorTex)});
+  m_effectRt = m_rhi->newTextureRenderTarget(effectDesc);
+  m_effectRp = m_effectRt->newCompatibleRenderPassDescriptor();
+  m_effectRt->setRenderPassDescriptor(m_effectRp);
+  m_effectRt->create();
 
   m_pipelinesDirty = true;
 }
@@ -572,17 +579,13 @@ void HexViewRhiRenderer::releaseRenderTargets() {
   delete m_maskTex;
   m_maskTex = nullptr;
 
-  delete m_playbackColorRp;
-  m_playbackColorRp = nullptr;
-  delete m_playbackColorRt;
-  m_playbackColorRt = nullptr;
+  delete m_effectRp;
+  m_effectRp = nullptr;
+  delete m_effectRt;
+  m_effectRt = nullptr;
   delete m_playbackColorTex;
   m_playbackColorTex = nullptr;
 
-  delete m_edgeRp;
-  m_edgeRp = nullptr;
-  delete m_edgeRt;
-  m_edgeRt = nullptr;
   delete m_edgeTex;
   m_edgeTex = nullptr;
 }
@@ -590,7 +593,7 @@ void HexViewRhiRenderer::releaseRenderTargets() {
 // Build or rebuild pipelines and SRBs when RP descriptors/samples/bindings change.
 void HexViewRhiRenderer::ensurePipelines(QRhiRenderPassDescriptor* outputRp,
                                          int outputSampleCount) {
-  if (!outputRp || !m_contentRp || !m_maskRp || !m_playbackColorRp || !m_edgeRp) {
+  if (!outputRp || !m_contentRp || !m_maskRp || !m_effectRp) {
     return;
   }
 
@@ -652,11 +655,13 @@ void HexViewRhiRenderer::ensurePipelines(QRhiRenderPassDescriptor* outputRp,
 
   const QShader rectVert = loadShader(":/shaders/hexquad.vert.qsb");
   const QShader rectFrag = loadShader(":/shaders/hexquad.frag.qsb");
+  const QShader rectEffectFrag = loadShader(":/shaders/hexquad_effect.frag.qsb");
   const QShader glyphVert = loadShader(":/shaders/hexglyph.vert.qsb");
   const QShader glyphFrag = loadShader(":/shaders/hexglyph.frag.qsb");
   const QShader screenVert = loadShader(":/shaders/hexscreen.vert.qsb");
   const QShader edgeVert = loadShader(":/shaders/hexedge.vert.qsb");
   const QShader edgeFrag = loadShader(":/shaders/hexedge.frag.qsb");
+  const QShader edgeEffectFrag = loadShader(":/shaders/hexedge_effect.frag.qsb");
   const QShader compositeFrag = loadShader(":/shaders/hexcomposite.frag.qsb");
 
   QRhiVertexInputLayout rectInputLayout;
@@ -727,12 +732,15 @@ void HexViewRhiRenderer::ensurePipelines(QRhiRenderPassDescriptor* outputRp,
   edgeBlend.dstAlpha = QRhiGraphicsPipeline::One;
   edgeBlend.opAlpha = QRhiGraphicsPipeline::Min;
 
+  QRhiGraphicsPipeline::TargetBlend noWriteBlend;
+  noWriteBlend.colorWrite = {};
+
   auto createPipeline = [&](QRhiGraphicsPipeline*& pso,
                             const QShader& vs,
                             const QShader& fs,
                             const QRhiVertexInputLayout& inputLayout,
                             QRhiShaderResourceBindings* srb,
-                            const QRhiGraphicsPipeline::TargetBlend* targetBlend,
+                            std::initializer_list<QRhiGraphicsPipeline::TargetBlend> targetBlends,
                             int sampleCount,
                             QRhiRenderPassDescriptor* rp) {
     pso = m_rhi->newGraphicsPipeline();
@@ -740,8 +748,10 @@ void HexViewRhiRenderer::ensurePipelines(QRhiRenderPassDescriptor* outputRp,
     pso->setVertexInputLayout(inputLayout);
     pso->setShaderResourceBindings(srb);
     pso->setCullMode(QRhiGraphicsPipeline::None);
-    if (targetBlend) {
-      pso->setTargetBlends({*targetBlend});
+    if (!targetBlends.size()) {
+      pso->setTargetBlends({});
+    } else {
+      pso->setTargetBlends(targetBlends);
     }
     pso->setSampleCount(sampleCount);
     pso->setRenderPassDescriptor(rp);
@@ -753,7 +763,7 @@ void HexViewRhiRenderer::ensurePipelines(QRhiRenderPassDescriptor* outputRp,
                  rectFrag,
                  rectInputLayout,
                  m_rectSrb,
-                 &blend,
+                 {blend},
                  1,
                  m_contentRp);
   createPipeline(m_glyphPso,
@@ -761,7 +771,7 @@ void HexViewRhiRenderer::ensurePipelines(QRhiRenderPassDescriptor* outputRp,
                  glyphFrag,
                  glyphInputLayout,
                  m_glyphSrb,
-                 &blend,
+                 {blend},
                  1,
                  m_contentRp);
   createPipeline(m_maskPso,
@@ -769,31 +779,31 @@ void HexViewRhiRenderer::ensurePipelines(QRhiRenderPassDescriptor* outputRp,
                  rectFrag,
                  rectInputLayout,
                  m_rectSrb,
-                 &maskBlend,
+                 {maskBlend},
                  1,
                  m_maskRp);
   createPipeline(m_playbackColorPso,
                  rectVert,
-                 rectFrag,
+                 rectEffectFrag,
                  rectInputLayout,
                  m_rectSrb,
-                 &blend,
+                 {noWriteBlend, blend},
                  1,
-                 m_playbackColorRp);
+                 m_effectRp);
   createPipeline(m_edgePso,
                  edgeVert,
-                 edgeFrag,
+                 edgeEffectFrag,
                  edgeInputLayout,
                  m_edgeSrb,
-                 &edgeBlend,
+                 {edgeBlend, noWriteBlend},
                  1,
-                 m_edgeRp);
+                 m_effectRp);
   createPipeline(m_compositePso,
                  screenVert,
                  compositeFrag,
                  screenInputLayout,
                  m_compositeSrb,
-                 nullptr,
+                 {},
                  m_sampleCount,
                  m_outputRp);
   createPipeline(m_outputRectPso,
@@ -801,7 +811,7 @@ void HexViewRhiRenderer::ensurePipelines(QRhiRenderPassDescriptor* outputRp,
                  rectFrag,
                  rectInputLayout,
                  m_rectSrb,
-                 &blend,
+                 {blend},
                  m_sampleCount,
                  m_outputRp);
   createPipeline(m_outputGlyphPso,
@@ -809,7 +819,7 @@ void HexViewRhiRenderer::ensurePipelines(QRhiRenderPassDescriptor* outputRp,
                  glyphFrag,
                  glyphInputLayout,
                  m_glyphSrb,
-                 &blend,
+                 {blend},
                  m_sampleCount,
                  m_outputRp);
 }
@@ -966,7 +976,6 @@ void HexViewRhiRenderer::updateUniforms(QRhiResourceUpdateBatch* u, float scroll
                                         const LayoutMetrics& layout) {
   const QSize viewSize = frame.viewportSize;
   const float uvFlipY = m_rhi->isYUpInFramebuffer() ? 0.0f : 1.0f;
-  const float timeSeconds = m_animTimer.isValid() ? (m_animTimer.elapsed() / 1000.0f) : 0.0f;
 
   QMatrix4x4 proj;
   proj.ortho(0.f, float(viewSize.width()), float(viewSize.height()), 0.f, -1.f, 1.f);
@@ -1013,13 +1022,13 @@ void HexViewRhiRenderer::updateUniforms(QRhiResourceUpdateBatch* u, float scroll
   const QVector4D overlayAndShadow(static_cast<float>(frame.overlayOpacity), shadowStrength,
                                    shadowUvX, shadowUvY);
   const QVector4D columnLayout(hexStartX, hexWidth, asciiStartX, asciiWidth);
-  const QVector4D viewAndTime(viewW, viewH, uvFlipY, timeSeconds);
+  const QVector4D viewInfo(viewW, viewH, uvFlipY, dpr);
   const QVector4D shadowColor = toVec4(SHADOW_COLOR);
   const QColor glowLow = frame.playbackGlowLow;
   const QColor glowHigh = frame.playbackGlowHigh;
   const QVector4D glowLowAndStrength(glowLow.redF(), glowLow.greenF(), glowLow.blueF(),
                                      frame.playbackGlowStrength);
-  const QVector4D glowHighAndDpr(glowHigh.redF(), glowHigh.greenF(), glowHigh.blueF(), dpr);
+  const QVector4D glowHighVec(glowHigh.redF(), glowHigh.greenF(), glowHigh.blueF(), 0.0f);
   const float outlineAlpha = m_outlineAlpha;
   const QVector4D outlineColor(OUTLINE_COLOR.redF(), OUTLINE_COLOR.greenF(),
                                OUTLINE_COLOR.blueF(), outlineAlpha);
@@ -1034,13 +1043,13 @@ void HexViewRhiRenderer::updateUniforms(QRhiResourceUpdateBatch* u, float scroll
   u->updateDynamicBuffer(m_compositeUbuf, kMat4Bytes + kVec4Bytes * 1, kVec4Bytes,
                          &columnLayout);
   u->updateDynamicBuffer(m_compositeUbuf, kMat4Bytes + kVec4Bytes * 2, kVec4Bytes,
-                         &viewAndTime);
+                         &viewInfo);
   u->updateDynamicBuffer(m_compositeUbuf, kMat4Bytes + kVec4Bytes * 3, kVec4Bytes,
                          &shadowColor);
   u->updateDynamicBuffer(m_compositeUbuf, kMat4Bytes + kVec4Bytes * 4, kVec4Bytes,
                          &glowLowAndStrength);
   u->updateDynamicBuffer(m_compositeUbuf, kMat4Bytes + kVec4Bytes * 5, kVec4Bytes,
-                         &glowHighAndDpr);
+                         &glowHighVec);
   u->updateDynamicBuffer(m_compositeUbuf, kMat4Bytes + kVec4Bytes * 6, kVec4Bytes,
                          &outlineColor);
   u->updateDynamicBuffer(m_compositeUbuf, kMat4Bytes + kVec4Bytes * 7, kVec4Bytes,
