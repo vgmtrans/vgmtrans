@@ -205,14 +205,16 @@ void main() {
 
   vec3 trackGlowBase = playbackColorSample.rgb;
   float hasTrackGlowColor = step(0.001, playbackColorSample.a);
-  glowLow = mix(glowLow, trackGlowBase * 0.28, hasTrackGlowColor);
-  glowHigh = mix(glowHigh, mix(trackGlowBase, vec3(1.0), 0.22), hasTrackGlowColor);
+  glowLow = mix(glowLow, trackGlowBase * 0.42, hasTrackGlowColor);
+  glowHigh = mix(glowHigh,
+                 min(trackGlowBase * 1.18 + vec3(0.06), vec3(1.0)),
+                 hasTrackGlowColor);
 
   float flameRamp = smoothstep(0.0, 1.0, flame);
   vec3 flameColor = mix(glowLow, glowHigh, flameRamp);
 
-  vec3 withGlow = mix(withShadow, flameColor, clamp(flame, 0.0, 1.0));
-  withGlow = clamp(withGlow + flameColor * flame * 0.35, 0.0, 1.0);
+  vec3 withGlow = mix(withShadow, flameColor, clamp(flame * 1.1, 0.0, 1.0));
+  withGlow = clamp(withGlow + flameColor * flame * 0.65, 0.0, 1.0);
 
   fragColor = vec4(withGlow, base.a);
 }
