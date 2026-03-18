@@ -177,6 +177,8 @@ void HexViewRhiRenderer::releaseResources() {
   m_glyphPso = nullptr;
   delete m_maskPso;
   m_maskPso = nullptr;
+  delete m_playbackColorPso;
+  m_playbackColorPso = nullptr;
   delete m_edgePso;
   m_edgePso = nullptr;
   delete m_compositePso;
@@ -219,6 +221,8 @@ void HexViewRhiRenderer::releaseResources() {
   m_baseGlyphBuf = nullptr;
   delete m_maskRectBuf;
   m_maskRectBuf = nullptr;
+  delete m_playbackColorRectBuf;
+  m_playbackColorRectBuf = nullptr;
   delete m_edgeRectBuf;
   m_edgeRectBuf = nullptr;
   delete m_ubuf;
@@ -492,7 +496,18 @@ void HexViewRhiRenderer::renderFrame(QRhiCommandBuffer* cb, const RenderTargetIn
                 static_cast<int>(sizeof(RectInstance)));
   cb->endPass();
 
-  // Pass 3: edge field for drop shadow and playback glow falloff.
+  // Pass 3: playback color field used to tint the glow per active range.
+  cb->beginPass(m_playbackColorRt, QColor(0, 0, 0, 0), {1.0f, 0}, nullptr);
+  cb->setViewport(viewport);
+  drawInstanced(m_playbackColorPso,
+                m_rectSrb,
+                m_playbackColorRectBuf,
+                static_cast<int>(m_playbackColorRectInstances.size()),
+                0,
+                static_cast<int>(sizeof(RectInstance)));
+  cb->endPass();
+
+  // Pass 4: edge field for drop shadow and playback glow falloff.
   if (edgeEnabled) {
     cb->beginPass(m_edgeRt, QColor(255, 255, 255, 255), {1.0f, 0}, nullptr);
     cb->setViewport(viewport);
@@ -505,14 +520,14 @@ void HexViewRhiRenderer::renderFrame(QRhiCommandBuffer* cb, const RenderTargetIn
     cb->endPass();
   }
 
-  // Pass 4: fullscreen composite combines content + mask + edge + item-id textures.
+  // Pass 5: fullscreen composite combines content + mask + playback color + edge + item-id textures.
   cb->beginPass(target.renderTarget, clearColor, {1.0f, 0}, nullptr);
   cb->setViewport(viewport);
   drawFullscreen(m_compositePso, m_compositeSrb);
   cb->endPass();
 }
 
-// Ensure offscreen content/mask/edge render targets match current output pixel size.
+// Ensure offscreen content/mask/playback-color/edge render targets match current output pixel size.
 void HexViewRhiRenderer::ensureRenderTargets(const QSize& pixelSize) {
   if (!m_rhi || pixelSize.isEmpty()) {
     return;
@@ -535,6 +550,7 @@ void HexViewRhiRenderer::ensureRenderTargets(const QSize& pixelSize) {
 
   makeTarget(&m_contentTex, &m_contentRt, &m_contentRp);
   makeTarget(&m_maskTex, &m_maskRt, &m_maskRp);
+  makeTarget(&m_playbackColorTex, &m_playbackColorRt, &m_playbackColorRp);
   makeTarget(&m_edgeTex, &m_edgeRt, &m_edgeRp);
 
   m_pipelinesDirty = true;
@@ -556,6 +572,13 @@ void HexViewRhiRenderer::releaseRenderTargets() {
   delete m_maskTex;
   m_maskTex = nullptr;
 
+  delete m_playbackColorRp;
+  m_playbackColorRp = nullptr;
+  delete m_playbackColorRt;
+  m_playbackColorRt = nullptr;
+  delete m_playbackColorTex;
+  m_playbackColorTex = nullptr;
+
   delete m_edgeRp;
   m_edgeRp = nullptr;
   delete m_edgeRt;
@@ -567,7 +590,7 @@ void HexViewRhiRenderer::releaseRenderTargets() {
 // Build or rebuild pipelines and SRBs when RP descriptors/samples/bindings change.
 void HexViewRhiRenderer::ensurePipelines(QRhiRenderPassDescriptor* outputRp,
                                          int outputSampleCount) {
-  if (!outputRp || !m_contentRp || !m_maskRp || !m_edgeRp) {
+  if (!outputRp || !m_contentRp || !m_maskRp || !m_playbackColorRp || !m_edgeRp) {
     return;
   }
 
@@ -591,6 +614,7 @@ void HexViewRhiRenderer::ensurePipelines(QRhiRenderPassDescriptor* outputRp,
   resetOwned(m_rectPso);
   resetOwned(m_glyphPso);
   resetOwned(m_maskPso);
+  resetOwned(m_playbackColorPso);
   resetOwned(m_edgePso);
   resetOwned(m_compositePso);
   resetOwned(m_outputRectPso);
@@ -748,6 +772,14 @@ void HexViewRhiRenderer::ensurePipelines(QRhiRenderPassDescriptor* outputRp,
                  &maskBlend,
                  1,
                  m_maskRp);
+  createPipeline(m_playbackColorPso,
+                 rectVert,
+                 rectFrag,
+                 rectInputLayout,
+                 m_rectSrb,
+                 &blend,
+                 1,
+                 m_playbackColorRp);
   createPipeline(m_edgePso,
                  edgeVert,
                  edgeFrag,
@@ -920,6 +952,8 @@ void HexViewRhiRenderer::updateCompositeSrb() {
     QRhiShaderResourceBinding::sampledTexture(3, QRhiShaderResourceBinding::FragmentStage,
                                               edgeSampleTex, m_glyphSampler),
     QRhiShaderResourceBinding::sampledTexture(4, QRhiShaderResourceBinding::FragmentStage,
+                                              m_playbackColorTex, m_glyphSampler),
+    QRhiShaderResourceBinding::sampledTexture(5, QRhiShaderResourceBinding::FragmentStage,
                                               m_itemIdTex, m_maskSampler)
   });
   m_compositeSrb->create();
@@ -1033,7 +1067,7 @@ bool HexViewRhiRenderer::ensureInstanceBuffer(QRhiBuffer*& buffer, int bytes) {
   return true;
 }
 
-// Upload dirty base/mask/edge instance arrays to their corresponding dynamic buffers.
+// Upload dirty base/mask/playback-color/edge instance arrays to their corresponding dynamic buffers.
 void HexViewRhiRenderer::updateInstanceBuffers(QRhiResourceUpdateBatch* u) {
   auto uploadIfDirty = [&](QRhiBuffer*& buffer, const void* data, int bytes, bool dirty) {
     const bool resized = ensureInstanceBuffer(buffer, bytes);
@@ -1045,11 +1079,17 @@ void HexViewRhiRenderer::updateInstanceBuffers(QRhiResourceUpdateBatch* u) {
   const int baseRectBytes = static_cast<int>(m_baseRectInstances.size() * sizeof(RectInstance));
   const int baseGlyphBytes = static_cast<int>(m_baseGlyphInstances.size() * sizeof(GlyphInstance));
   const int maskRectBytes = static_cast<int>(m_maskRectInstances.size() * sizeof(RectInstance));
+  const int playbackColorRectBytes =
+      static_cast<int>(m_playbackColorRectInstances.size() * sizeof(RectInstance));
   const int edgeRectBytes = static_cast<int>(m_edgeRectInstances.size() * sizeof(EdgeInstance));
 
   uploadIfDirty(m_baseRectBuf, m_baseRectInstances.data(), baseRectBytes, m_baseBufferDirty);
   uploadIfDirty(m_baseGlyphBuf, m_baseGlyphInstances.data(), baseGlyphBytes, m_baseBufferDirty);
   uploadIfDirty(m_maskRectBuf, m_maskRectInstances.data(), maskRectBytes, m_selectionBufferDirty);
+  uploadIfDirty(m_playbackColorRectBuf,
+                m_playbackColorRectInstances.data(),
+                playbackColorRectBytes,
+                m_selectionBufferDirty);
   uploadIfDirty(m_edgeRectBuf, m_edgeRectInstances.data(), edgeRectBytes, m_selectionBufferDirty);
 
   m_baseBufferDirty = false;
@@ -1502,11 +1542,81 @@ void HexViewRhiRenderer::appendMaskForSelections(
   }
 }
 
+// Build a padded color field for playback glow tinting.
+void HexViewRhiRenderer::appendPlaybackColorForSelections(
+    const std::vector<HexViewFrame::PlaybackSelection>& selections,
+    const SelectionBuildContext& ctx,
+    float pad) {
+  if (selections.empty() || ctx.visibleCount <= 0) {
+    return;
+  }
+
+  for (const auto& selection : selections) {
+    if (selection.length == 0) {
+      continue;
+    }
+
+    int selectionStart = static_cast<int>(selection.offset - ctx.fileBaseOffset);
+    int selectionEnd = selectionStart + static_cast<int>(selection.length);
+    if (selectionEnd <= 0 || selectionStart >= static_cast<int>(ctx.fileLength)) {
+      continue;
+    }
+    selectionStart = std::max(selectionStart, 0);
+    selectionEnd = std::min(selectionEnd, static_cast<int>(ctx.fileLength));
+    if (selectionEnd <= selectionStart) {
+      continue;
+    }
+
+    const int selStartLine = selectionStart / kBytesPerLine;
+    const int selEndLine = (selectionEnd - 1) / kBytesPerLine;
+    const int lineStart = std::max(ctx.startLine, selStartLine);
+    const int lineEnd = std::min(ctx.endLine, selEndLine);
+    const QColor glowColor = selection.glowColor.isValid() ? selection.glowColor : QColor(Qt::white);
+    const QVector4D color(glowColor.redF(), glowColor.greenF(), glowColor.blueF(), 1.0f);
+
+    for (int line = lineStart; line <= lineEnd; ++line) {
+      const CachedLine* entry = cachedLineFor(line);
+      if (!entry || entry->bytes <= 0) {
+        continue;
+      }
+
+      const int lineOffset = line * kBytesPerLine;
+      const int startCol = (line == selStartLine) ? (selectionStart - lineOffset) : 0;
+      const int endCol = (line == selEndLine) ? (selectionEnd - lineOffset) : entry->bytes;
+      const int clampedStart = std::clamp(startCol, 0, entry->bytes);
+      const int clampedEnd = std::clamp(endCol, 0, entry->bytes);
+      const int spanLen = clampedEnd - clampedStart;
+      if (spanLen <= 0) {
+        continue;
+      }
+
+      const float y = line * ctx.lineHeight;
+      const float hexX = ctx.hexStartX + clampedStart * 3.0f * ctx.charWidth - pad;
+      appendRect(m_playbackColorRectInstances,
+                 hexX,
+                 y - pad,
+                 spanLen * 3.0f * ctx.charWidth + pad * 2.0f,
+                 ctx.lineHeight + pad * 2.0f,
+                 color);
+      if (ctx.shouldDrawAscii) {
+        const float asciiX = ctx.asciiStartX + clampedStart * ctx.charWidth - pad;
+        appendRect(m_playbackColorRectInstances,
+                   asciiX,
+                   y - pad,
+                   spanLen * ctx.charWidth + pad * 2.0f,
+                   ctx.lineHeight + pad * 2.0f,
+                   color);
+      }
+    }
+  }
+}
+
 // Build all selection/playback mask and edge instances for the current viewport.
 void HexViewRhiRenderer::buildSelectionInstances(int startLine, int endLine,
                                                  const HexViewFrame::Data& frame,
                                                  const LayoutMetrics& layout) {
   m_maskRectInstances.clear();
+  m_playbackColorRectInstances.clear();
   m_edgeRectInstances.clear();
 
   const bool hasSelection = !frame.selections.empty() || !frame.fadeSelections.empty();
@@ -1522,6 +1632,8 @@ void HexViewRhiRenderer::buildSelectionInstances(int startLine, int endLine,
   }
 
   m_maskRectInstances.reserve(static_cast<size_t>(visibleCount) * (frame.shouldDrawAscii ? 8 : 4));
+  m_playbackColorRectInstances.reserve(
+      static_cast<size_t>(visibleCount) * (frame.shouldDrawAscii ? 8 : 4));
   m_edgeRectInstances.reserve(static_cast<size_t>(visibleCount) * (frame.shouldDrawAscii ? 8 : 4));
 
   const float charWidth = layout.charWidth;
@@ -1609,30 +1721,40 @@ void HexViewRhiRenderer::buildSelectionInstances(int startLine, int endLine,
 
   if (!frame.playbackSelections.empty()) {
     // Active playback in green channel.
+    std::vector<HexViewFrame::SelectionRange> playbackRanges;
+    playbackRanges.reserve(frame.playbackSelections.size());
+    for (const auto& selection : frame.playbackSelections) {
+      playbackRanges.push_back({selection.offset, selection.length});
+    }
     const QVector4D playbackMaskColor(0.0f, 1.0f, 0.0f, 0.0f);
     const QVector4D playbackEdgeColor(0.0f, 1.0f, 0.0f, 0.0f);
-    appendMaskForSelections(frame.playbackSelections, ctx, 0.0f, 0.0f, glowPad,
+    appendMaskForSelections(playbackRanges, ctx, 0.0f, 0.0f, glowPad,
                             playbackMaskColor, playbackEdgeColor);
+    appendPlaybackColorForSelections(frame.playbackSelections, ctx, glowPad);
   }
 
   if (!frame.fadePlaybackSelections.empty()) {
     // Fading playback uses blue for mask membership and alpha as fade amount.
     std::vector<HexViewFrame::SelectionRange> fadeRanges;
+    std::vector<HexViewFrame::PlaybackSelection> fadeColorRanges;
     fadeRanges.reserve(frame.fadePlaybackSelections.size());
+    fadeColorRanges.reserve(frame.fadePlaybackSelections.size());
     for (const auto& selection : frame.fadePlaybackSelections) {
-      fadeRanges.push_back(selection.range);
+      fadeRanges.push_back({selection.range.offset, selection.range.length});
+      fadeColorRanges.push_back(selection.range);
     }
 
     const QVector4D playbackMaskColor(0.0f, 0.0f, 1.0f, 0.0f);
     const QVector4D playbackEdgeColor(0.0f, 0.0f, 1.0f, 0.0f);
     appendMaskForSelections(fadeRanges, ctx, 0.0f, 0.0f, glowPad, playbackMaskColor,
                             playbackEdgeColor);
+    appendPlaybackColorForSelections(fadeColorRanges, ctx, glowPad);
     for (const auto& selection : frame.fadePlaybackSelections) {
       if (selection.alpha <= 0.0f) {
         continue;
       }
       const QVector4D fadeMaskColor(0.0f, 0.0f, 1.0f, selection.alpha);
-      appendMaskForRangeNoEdge(selection.range, fadeMaskColor);
+      appendMaskForRangeNoEdge({selection.range.offset, selection.range.length}, fadeMaskColor);
     }
   }
 }

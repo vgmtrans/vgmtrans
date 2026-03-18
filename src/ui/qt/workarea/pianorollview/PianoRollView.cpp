@@ -9,6 +9,7 @@
 #include "common/DragAutoScroll.h"
 #include "PianoRollRhiHost.h"
 #include "SequencePlayer.h"
+#include "Helpers.h"
 #include "workarea/rhi/RhiScrollAreaChrome.h"
 
 #include "SeqEvent.h"
@@ -48,8 +49,6 @@ constexpr int kInactiveNoteDimDurationMs = 160;
 constexpr float kPlaybackPageTriggerFraction = 0.85f;
 constexpr float kPlaybackPageTargetFraction = 0.05f;
 constexpr float kInactiveNoteDimMaxAlpha = 0.30f;
-const QColor kDisabledTrackColor(132, 132, 132);
-
 bool pianoRollNoteLess(const PianoRollFrame::Note& lhs, const PianoRollFrame::Note& rhs) {
   if (lhs.startTick != rhs.startTick) {
     return lhs.startTick < rhs.startTick;
@@ -743,8 +742,7 @@ void PianoRollView::refreshInteractionCursor(Qt::KeyboardModifiers modifiers) {
 }
 
 QColor PianoRollView::colorForTrack(int trackIndex) const {
-  const int hue = (trackIndex * 43) % 360;
-  return QColor::fromHsv(hue, 190, 235);
+  return colorForTrackIndex(trackIndex);
 }
 
 bool PianoRollView::handleViewportWheel(QWheelEvent* event) {
@@ -1195,7 +1193,8 @@ void PianoRollView::resizeTrackEnabledMaskToTrackCount() {
 void PianoRollView::rebuildTrackColors() {
   m_trackColors.resize(m_trackCount);
   for (int i = 0; i < m_trackCount; ++i) {
-    m_trackColors[static_cast<size_t>(i)] = isTrackEnabled(i) ? colorForTrack(i) : kDisabledTrackColor;
+    m_trackColors[static_cast<size_t>(i)] =
+        isTrackEnabled(i) ? colorForTrack(i) : disabledTrackColor();
   }
   m_trackColorsSnapshot = std::make_shared<std::vector<QColor>>(m_trackColors);
 }

@@ -5,7 +5,8 @@ layout(location = 0) in vec2 vUv;
 layout(binding = 1) uniform sampler2D contentTex;
 layout(binding = 2) uniform sampler2D maskTex;
 layout(binding = 3) uniform sampler2D edgeTex;
-layout(binding = 4) uniform sampler2D itemIdTex;
+layout(binding = 4) uniform sampler2D playbackColorTex;
+layout(binding = 5) uniform sampler2D itemIdTex;
 
 layout(std140, binding = 0) uniform Ubuf {
   mat4 mvp;
@@ -195,11 +196,17 @@ void main() {
   vec3 withShadow = mix(restored, shadowColor.rgb, shadowAlpha);
 
   vec4 edgeGlow = texture(edgeTex, vUv);
+  vec4 playbackColorSample = texture(playbackColorTex, vUv);
   float playHalo = computePlaybackHalo(edgeGlow.g, edgeGlow.b, playActiveMask, playFadeMask,
                                        playFadeAlpha);
   float turbulence = computeGlowTurbulence(vUv, viewSize, time);
 
   float flame = clamp(playHalo * glowStrength * turbulence, 0.0, 1.0);
+
+  vec3 trackGlowBase = playbackColorSample.rgb;
+  float hasTrackGlowColor = step(0.001, playbackColorSample.a);
+  glowLow = mix(glowLow, trackGlowBase * 0.28, hasTrackGlowColor);
+  glowHigh = mix(glowHigh, mix(trackGlowBase, vec3(1.0), 0.22), hasTrackGlowColor);
 
   float flameRamp = smoothstep(0.0, 1.0, flame);
   vec3 flameColor = mix(glowLow, glowHigh, flameRamp);

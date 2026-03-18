@@ -328,6 +328,11 @@ uint64_t HexView::selectionKey(const SelectionRange& range) {
   return selectionKey(range.offset, range.length);
 }
 
+// Overload for colored playback ranges (keyed only by byte span).
+uint64_t HexView::selectionKey(const PlaybackSelection& range) {
+  return selectionKey(range.offset, range.length);
+}
+
 // Overload for fade playback selections (keyed by underlying range).
 uint64_t HexView::selectionKey(const FadePlaybackSelection& selection) {
   return selectionKey(selection.range);
@@ -731,15 +736,19 @@ void HexView::setSelectedItems(const std::vector<const VGMItem*>& items,
 }
 
 // Update playback selections from active items and seed fade-out entries for removed ones.
-void HexView::setPlaybackSelectionsForItems(const std::vector<const VGMItem*>& items) {
-  std::vector<SelectionRange> next;
+void HexView::setPlaybackSelectionsForItems(const std::vector<const VGMItem*>& items,
+                                            const std::vector<QColor>& glowColors) {
+  std::vector<PlaybackSelection> next;
   next.reserve(items.size());
-  for (const auto* item : items) {
+  for (size_t i = 0; i < items.size(); ++i) {
+    const auto* item = items[i];
     if (!item) {
       continue;
     }
     const uint32_t length = item->length() > 0 ? item->length() : 1u;
-    next.push_back({item->offset(), length});
+    const QColor glowColor =
+        (i < glowColors.size() && glowColors[i].isValid()) ? glowColors[i] : m_playbackGlowHigh;
+    next.push_back({item->offset(), length, glowColor});
   }
 
   // Track incoming active playback ranges for fast membership checks below.
@@ -1156,13 +1165,13 @@ HexViewFrame::Data HexView::captureRhiFrameData(float dpr) {
 
   frame.playbackSelections.reserve(m_playbackSelections.size());
   for (const auto& range : m_playbackSelections) {
-    frame.playbackSelections.push_back({range.offset, range.length});
+    frame.playbackSelections.push_back({range.offset, range.length, range.glowColor});
   }
 
   frame.fadePlaybackSelections.reserve(m_fadePlaybackSelections.size());
   for (const auto& fade : m_fadePlaybackSelections) {
     frame.fadePlaybackSelections.push_back(
-        {{fade.range.offset, fade.range.length}, fade.alpha});
+        {{fade.range.offset, fade.range.length, fade.range.glowColor}, fade.alpha});
   }
 
   ensureGlyphAtlas(dpr);

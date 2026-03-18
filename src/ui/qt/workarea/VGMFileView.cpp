@@ -115,11 +115,6 @@ int previewMidiChannelForTrack(const VGMSeq* seq, int trackIndex) {
   return -1;
 }
 
-QColor mixerTrackColor(int trackIndex) {
-  const int hue = (trackIndex * 43) % 360;
-  return QColor::fromHsv(hue, 190, 235);
-}
-
 bool buildPreviewNoteForEvent(const SeqEvent* seqEvent, SequencePlayer::PreviewNote& outNote) {
   if (!seqEvent) {
     return false;
@@ -383,7 +378,7 @@ void VGMFileView::applyPlaybackStateToPanelView(PanelSide side, PanelViewKind vi
       }
       panelUi.hexView->setPlaybackActive(m_playbackTickActive);
       if (m_playbackVisualsActive) {
-        panelUi.hexView->setPlaybackSelectionsForItems(m_playbackItems);
+        panelUi.hexView->setPlaybackSelectionsForItems(m_playbackItems, m_playbackItemColors);
       } else {
         panelUi.hexView->clearPlaybackSelections(false);
       }
@@ -1245,6 +1240,10 @@ void VGMFileView::previewActiveNote(int trackIndex, int key) const {
 void VGMFileView::clearPlaybackVisuals() {
   m_playbackVisualsActive = false;
   m_playbackTickActive = false;
+  m_playbackItems.clear();
+  m_playbackItemColors.clear();
+  m_lastPlaybackItems.clear();
+  m_lastPlaybackItemColors.clear();
   for (PanelSide side : {PanelSide::Left, PanelSide::Right}) {
     if (auto* hex = panel(side).hexView) {
       hex->setPlaybackActive(false);
@@ -1460,7 +1459,7 @@ void VGMFileView::rebuildSequenceControlBar(VGMSeq* seq) {
     channelConfig.subtitle = midiChannel >= 0
                                ? QStringLiteral("MIDI %1").arg(midiChannel + 1)
                                : QStringLiteral("MIDI --");
-    channelConfig.borderColor = mixerTrackColor(channelIndex);
+    channelConfig.borderColor = colorForTrackIndex(channelIndex);
     channelConfig.pan = panByChannel[static_cast<size_t>(channelIndex)];
     channelConfig.volume = volumeByChannel[static_cast<size_t>(channelIndex)];
 
@@ -1717,13 +1716,26 @@ void VGMFileView::onPlaybackPositionChanged(int current, int max, PositionChange
   }
   m_lastPlaybackPosition = current;
 
+  ensureTrackIndexMap(seq);
+  const std::vector<uint8_t> enabledMask = sequenceChannelEnabledMask();
   m_playbackItems.clear();
+  m_playbackItemColors.clear();
   m_playbackItems.reserve(m_playbackTimedEvents.size());
+  m_playbackItemColors.reserve(m_playbackTimedEvents.size());
   for (const auto* timed : m_playbackTimedEvents) {
     if (!timed || !timed->event) {
       continue;
     }
     m_playbackItems.push_back(timed->event);
+    QColor glowColor = colorForItemType(timed->event->type);
+    if (const auto* event = dynamic_cast<const SeqEvent*>(timed->event)) {
+      const int trackIndex = trackIndexForEvent(event);
+      const bool trackEnabled = trackIndex < 0 ||
+                                trackIndex >= static_cast<int>(enabledMask.size()) ||
+                                enabledMask[static_cast<size_t>(trackIndex)] != 0;
+      glowColor = trackEnabled ? colorForTrackIndex(trackIndex) : disabledTrackColor();
+    }
+    m_playbackItemColors.push_back(glowColor);
   }
 
   for (PanelSide side : {PanelSide::Left, PanelSide::Right}) {
@@ -1736,7 +1748,8 @@ void VGMFileView::onPlaybackPositionChanged(int current, int max, PositionChange
     }
   }
 
-  if (m_playbackItems == m_lastPlaybackItems) {
+  if (m_playbackItems == m_lastPlaybackItems &&
+      m_playbackItemColors == m_lastPlaybackItemColors) {
     for (PanelSide side : {PanelSide::Left, PanelSide::Right}) {
       const auto& panelUi = panel(side);
       if (!panelUi.container || !panelUi.container->isVisible()) {
@@ -1748,21 +1761,20 @@ void VGMFileView::onPlaybackPositionChanged(int current, int max, PositionChange
     }
   } else {
     m_lastPlaybackItems = m_playbackItems;
+    m_lastPlaybackItemColors = m_playbackItemColors;
     for (PanelSide side : {PanelSide::Left, PanelSide::Right}) {
       const auto& panelUi = panel(side);
       if (!panelUi.container || !panelUi.container->isVisible()) {
         continue;
       }
       if (panelUi.hexView) {
-        panelUi.hexView->setPlaybackSelectionsForItems(m_playbackItems);
+        panelUi.hexView->setPlaybackSelectionsForItems(m_playbackItems, m_playbackItemColors);
       }
     }
   }
 
   m_activeTimedEvents.clear();
   m_playbackCursor->getActiveAt(current, m_activeTimedEvents);
-
-  ensureTrackIndexMap(seq);
   std::vector<ActiveNoteView::ActiveKey> activeKeys;
   std::vector<PianoRollFrame::Note> activeNotes;
   activeKeys.reserve(m_activeTimedEvents.size());

@@ -45,7 +45,8 @@ public:
   void setSelectedItem(VGMItem* item);
   void setSelectedItems(const std::vector<const VGMItem*>& items,
                         const VGMItem* primaryItem = nullptr);
-  void setPlaybackSelectionsForItems(const std::vector<const VGMItem*>& items);
+  void setPlaybackSelectionsForItems(const std::vector<const VGMItem*>& items,
+                                     const std::vector<QColor>& glowColors = {});
   void clearPlaybackSelections(bool fade = true);
   void setPlaybackActive(bool active);
   void requestPlaybackFrame();
@@ -89,8 +90,13 @@ private:
     uint32_t offset;
     uint32_t length;
   };
+  struct PlaybackSelection {
+    uint32_t offset;
+    uint32_t length;
+    QColor glowColor;
+  };
   struct FadePlaybackSelection {
-    SelectionRange range;
+    PlaybackSelection range;
     qint64 startMs = 0;
     float alpha = 0.0f;
   };
@@ -114,6 +120,7 @@ private:
 
   static uint64_t selectionKey(uint32_t offset, uint32_t length);
   static uint64_t selectionKey(const SelectionRange& range);
+  static uint64_t selectionKey(const PlaybackSelection& range);
   static uint64_t selectionKey(const FadePlaybackSelection& selection);
 
   int hexXOffset() const;
@@ -162,7 +169,7 @@ private:
   VGMItem* m_lastSeekItem = nullptr;
   std::vector<SelectionRange> m_selections;
   std::vector<SelectionRange> m_fadeSelections;
-  std::vector<SelectionRange> m_playbackSelections;
+  std::vector<PlaybackSelection> m_playbackSelections;
   std::vector<FadePlaybackSelection> m_fadePlaybackSelections;
   bool m_playbackActive = false;
 
