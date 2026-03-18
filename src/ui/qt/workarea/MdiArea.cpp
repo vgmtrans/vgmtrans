@@ -661,7 +661,7 @@ void MdiArea::refreshTabControlAppearance() {
     background = QColor(0x20, 0x20, 0x20);
   }
 
-  const QColor baseGlyph = qGray(background.rgb()) < 128 ? QColor(Qt::white) : QColor(Qt::black);
+  const QColor baseGlyph = qGray(background.rgb()) < 128 ? QColor(Qt::white) : QColor(48, 48, 48);
   QColor onGlyph = baseGlyph;
   onGlyph.setAlphaF(0.74);
   QColor offGlyph = baseGlyph;
