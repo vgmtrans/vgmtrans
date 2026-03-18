@@ -446,7 +446,7 @@ void HexView::setFont(const QFont& font) {
   }
 
   updateLayout();
-  requestRhiUpdate(true, true);
+  requestRhiUpdate(true, true, true);
 }
 
 // Return X origin of the hex byte columns (accounting for optional address column).
@@ -533,7 +533,9 @@ void HexView::updateScrollBars() {
 }
 
 // Forward dirty/update requests to the active RHI host.
-void HexView::requestRhiUpdate(bool markBaseDirty, bool markSelectionDirty) {
+void HexView::requestRhiUpdate(bool markBaseDirty,
+                               bool markSelectionDirty,
+                               bool markPlaybackDirty) {
   if (!m_rhiHost) {
     return;
   }
@@ -542,6 +544,9 @@ void HexView::requestRhiUpdate(bool markBaseDirty, bool markSelectionDirty) {
   }
   if (markSelectionDirty) {
     m_rhiHost->markSelectionDirty();
+  }
+  if (markPlaybackDirty) {
+    m_rhiHost->markPlaybackDirty();
   }
   m_rhiHost->requestUpdate();
 }
@@ -563,7 +568,9 @@ void HexView::updateLayout() {
 
   updateScrollBars();
 
-  requestRhiUpdate(offsetChanged || asciiChanged, offsetChanged || asciiChanged);
+  requestRhiUpdate(offsetChanged || asciiChanged,
+                   offsetChanged || asciiChanged,
+                   offsetChanged || asciiChanged);
 }
 
 // Return total line count required to display file bytes at 16 bytes per line.
@@ -795,7 +802,8 @@ void HexView::setPlaybackSelectionsForItems(const std::vector<const VGMItem*>& i
   }
 
   m_playbackSelections = std::move(next);
-  refreshSelectionVisuals(false);
+  updateHighlightState(false);
+  requestRhiUpdate(false, false, true);
 }
 
 // Clear playback selection set immediately or convert it into fading playback highlights.
@@ -827,7 +835,8 @@ void HexView::clearPlaybackSelections(bool fade) {
   } else {
     m_playbackFadeTimer.stop();
   }
-  refreshSelectionVisuals(false);
+  updateHighlightState(false);
+  requestRhiUpdate(false, false, true);
 }
 
 // Toggle playback-highlight mode and reconcile existing playback selection state.
@@ -843,7 +852,8 @@ void HexView::setPlaybackActive(bool active) {
     clearPlaybackSelections();
     return;
   }
-  refreshSelectionVisuals(false);
+  updateHighlightState(false);
+  requestRhiUpdate(false, false, true);
 }
 
 // Request another frame while playback/outline effects are animating.
@@ -1142,32 +1152,12 @@ HexViewFrame::Data HexView::captureRhiFrameData(float dpr) {
   frame.windowColor = palette().color(QPalette::Window);
   frame.windowTextColor = palette().color(QPalette::WindowText);
 
-  frame.styleIds = &m_styleIds;
-  frame.styles.reserve(m_styles.size());
-  for (const auto& style : m_styles) {
-    frame.styles.push_back({style.bg, style.fg});
-  }
-
-  frame.selections.reserve(m_selections.size());
-  for (const auto& range : m_selections) {
-    frame.selections.push_back({range.offset, range.length});
-  }
-
-  frame.fadeSelections.reserve(m_fadeSelections.size());
-  for (const auto& range : m_fadeSelections) {
-    frame.fadeSelections.push_back({range.offset, range.length});
-  }
-
-  frame.playbackSelections.reserve(m_playbackSelections.size());
-  for (const auto& range : m_playbackSelections) {
-    frame.playbackSelections.push_back({range.offset, range.length, range.glowColor});
-  }
-
-  frame.fadePlaybackSelections.reserve(m_fadePlaybackSelections.size());
-  for (const auto& fade : m_fadePlaybackSelections) {
-    frame.fadePlaybackSelections.push_back(
-        {{fade.range.offset, fade.range.length, fade.range.glowColor}, fade.alpha});
-  }
+  frame.styleIds = m_styleIds;
+  frame.styles = m_styles;
+  frame.selections = m_selections;
+  frame.fadeSelections = m_fadeSelections;
+  frame.playbackSelections = m_playbackSelections;
+  frame.fadePlaybackSelections = m_fadePlaybackSelections;
 
   ensureGlyphAtlas(dpr);
   if (m_glyphAtlas) {
@@ -1186,7 +1176,7 @@ void HexView::changeEvent(QEvent* event) {
       m_styles[0].bg = palette().color(QPalette::Window);
       m_styles[0].fg = palette().color(QPalette::WindowText);
     }
-    requestRhiUpdate(true, true);
+    requestRhiUpdate(true);
   }
   QAbstractScrollArea::changeEvent(event);
 }
@@ -1639,7 +1629,7 @@ void HexView::updatePlaybackFade() {
 void HexView::timerEvent(QTimerEvent* event) {
   if (event->timerId() == m_playbackFadeTimer.timerId()) {
     updatePlaybackFade();
-    requestRhiUpdate(false, true);
+    requestRhiUpdate(false, false, true);
     if (m_fadePlaybackSelections.empty()) {
       m_playbackFadeTimer.stop();
     }

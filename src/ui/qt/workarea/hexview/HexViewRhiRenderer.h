@@ -52,6 +52,7 @@ public:
 
   void markBaseDirty();
   void markSelectionDirty();
+  void markPlaybackDirty();
   void invalidateCache();
 
   void renderFrame(QRhiCommandBuffer* cb, const RenderTargetInfo& target);
@@ -81,10 +82,14 @@ private:
     float rectY;
     float rectW;
     float rectH;
-    float r;
-    float g;
-    float b;
-    float a;
+    float flagR;
+    float flagG;
+    float flagB;
+    float flagA;
+    float tintR;
+    float tintG;
+    float tintB;
+    float tintA;
   };
 
   struct GlyphInstance {
@@ -160,7 +165,7 @@ private:
   void appendRect(std::vector<RectInstance>& rects, float x, float y, float w, float h,
                   const QVector4D& color);
   void appendEdgeRect(std::vector<EdgeInstance>& rects, float x, float y, float w, float h,
-                      float pad, const QVector4D& color);
+                      float pad, const QVector4D& flags, const QVector4D& tint);
   void appendGlyph(std::vector<GlyphInstance>& glyphs, float x, float y, float w, float h,
                    const QRectF& uv, const QVector4D& color);
 
@@ -168,20 +173,11 @@ private:
                          const HexViewFrame::Data& frame);
   void rebuildCacheWindow(const HexViewFrame::Data& frame);
   const CachedLine* cachedLineFor(int line) const;
-  void appendMaskForSelections(const std::vector<HexViewFrame::SelectionRange>& selections,
-                               const SelectionBuildContext& ctx,
-                               float padX,
-                               float padY,
-                               float edgePad,
-                               const QVector4D& maskColor,
-                               const QVector4D& edgeColor);
-  void appendPlaybackColorForSelections(
-      const std::vector<HexViewFrame::PlaybackSelection>& selections,
-      const SelectionBuildContext& ctx,
-      float pad);
   void buildBaseInstances(const HexViewFrame::Data& frame, const LayoutMetrics& layout);
-  void buildSelectionInstances(int startLine, int endLine, const HexViewFrame::Data& frame,
-                               const LayoutMetrics& layout);
+  void buildSelectionEffectInstances(int startLine, int endLine, const HexViewFrame::Data& frame,
+                                     const LayoutMetrics& layout);
+  void buildPlaybackEffectInstances(int startLine, int endLine, const HexViewFrame::Data& frame,
+                                    const LayoutMetrics& layout);
 
   HexView* m_view = nullptr;
   const char* m_logLabel = "HexViewRhi";
@@ -202,9 +198,10 @@ private:
   QRhiBuffer* m_ibuf = nullptr;
   QRhiBuffer* m_baseRectBuf = nullptr;
   QRhiBuffer* m_baseGlyphBuf = nullptr;
-  QRhiBuffer* m_maskRectBuf = nullptr;
-  QRhiBuffer* m_playbackColorRectBuf = nullptr;
-  QRhiBuffer* m_edgeRectBuf = nullptr;
+  QRhiBuffer* m_selectionMaskRectBuf = nullptr;
+  QRhiBuffer* m_selectionEdgeRectBuf = nullptr;
+  QRhiBuffer* m_playbackMaskRectBuf = nullptr;
+  QRhiBuffer* m_playbackEdgeRectBuf = nullptr;
   QRhiBuffer* m_ubuf = nullptr;
   QRhiBuffer* m_edgeUbuf = nullptr;
   QRhiBuffer* m_compositeUbuf = nullptr;
@@ -219,7 +216,6 @@ private:
   QRhiGraphicsPipeline* m_rectPso = nullptr;
   QRhiGraphicsPipeline* m_glyphPso = nullptr;
   QRhiGraphicsPipeline* m_maskPso = nullptr;
-  QRhiGraphicsPipeline* m_playbackColorPso = nullptr;
   QRhiGraphicsPipeline* m_edgePso = nullptr;
   QRhiGraphicsPipeline* m_compositePso = nullptr;
   QRhiGraphicsPipeline* m_outputRectPso = nullptr;
@@ -237,17 +233,20 @@ private:
   std::vector<LineRange> m_lineRanges;
   std::vector<RectInstance> m_baseRectInstances;
   std::vector<GlyphInstance> m_baseGlyphInstances;
-  std::vector<RectInstance> m_maskRectInstances;
-  std::vector<RectInstance> m_playbackColorRectInstances;
-  std::vector<EdgeInstance> m_edgeRectInstances;
+  std::vector<RectInstance> m_selectionMaskRectInstances;
+  std::vector<EdgeInstance> m_selectionEdgeRectInstances;
+  std::vector<RectInstance> m_playbackMaskRectInstances;
+  std::vector<EdgeInstance> m_playbackEdgeRectInstances;
   int m_cacheStartLine = 0;
   int m_cacheEndLine = -1;
   int m_lastStartLine = -1;
   int m_lastEndLine = -1;
   bool m_baseDirty = true;
   bool m_selectionDirty = true;
+  bool m_playbackDirty = true;
   bool m_baseBufferDirty = false;
   bool m_selectionBufferDirty = false;
+  bool m_playbackBufferDirty = false;
   bool m_itemIdDirty = true;
   bool m_outlineEnabled = false;
   float m_outlineAlpha = 0.0f;

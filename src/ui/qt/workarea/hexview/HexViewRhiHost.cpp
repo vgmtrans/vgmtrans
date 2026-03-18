@@ -73,6 +73,12 @@ void HexViewRhiHost::markSelectionDirty() {
   }
 }
 
+void HexViewRhiHost::markPlaybackDirty() {
+  if (m_renderer) {
+    m_renderer->markPlaybackDirty();
+  }
+}
+
 void HexViewRhiHost::invalidateCache() {
   if (m_renderer) {
     m_renderer->invalidateCache();

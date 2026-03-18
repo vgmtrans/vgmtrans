@@ -14,6 +14,7 @@
 
 #include <array>
 #include <cstdint>
+#include <span>
 #include <vector>
 
 class VGMFile;
@@ -33,6 +34,7 @@ struct PlaybackSelection {
 
 struct FadePlaybackSelection {
   PlaybackSelection range;
+  int64_t startMs = 0;
   float alpha = 0.0f;
 };
 
@@ -71,12 +73,12 @@ struct Data {
 
   QColor windowColor;
   QColor windowTextColor;
-  const std::vector<uint16_t>* styleIds = nullptr;
-  std::vector<Style> styles;
-  std::vector<SelectionRange> selections;
-  std::vector<SelectionRange> fadeSelections;
-  std::vector<PlaybackSelection> playbackSelections;
-  std::vector<FadePlaybackSelection> fadePlaybackSelections;
+  std::span<const uint16_t> styleIds;
+  std::span<const Style> styles;
+  std::span<const SelectionRange> selections;
+  std::span<const SelectionRange> fadeSelections;
+  std::span<const PlaybackSelection> playbackSelections;
+  std::span<const FadePlaybackSelection> fadePlaybackSelections;
   GlyphAtlasView glyphAtlas;
 };
 
