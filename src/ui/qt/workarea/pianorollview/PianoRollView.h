@@ -207,6 +207,8 @@ private:
   [[nodiscard]] VGMItem* noteAtViewportPoint(const QPoint& pos) const;
   void updateSeekPreview();
   void previewSingleNoteAtViewportPoint(const QPoint& pos);
+  void maybePausePlaybackForSeekDrag();
+  void finishSeekDrag(bool commitPosition, int viewportX = 0);
   void applySelectedNoteIndices(std::vector<size_t> indices,
                                 bool emitSelectionSignal,
                                 VGMItem* preferredPrimary = nullptr);
@@ -285,6 +287,7 @@ private:
   QPoint m_panDragLastPos;
   bool m_noteSelectionAnchorWorldValid = false;
   QBasicTimer m_dragAutoScrollTimer;
+  bool m_resumePlaybackAfterSeekDrag = false;
   PianoRollSelectionModel m_selectionModel;
 
   std::vector<uint8_t> m_trackEnabledMask;
