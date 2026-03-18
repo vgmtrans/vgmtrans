@@ -12,30 +12,15 @@ layout(std140, binding = 0) uniform Ubuf {
   mat4 mvp;
   vec4 overlayAndShadow;   // x=overlayOpacity, y=shadowStrength, z=shadowOffsetX, w=shadowOffsetY
   vec4 columnLayout;       // x=hexStart, y=hexWidth, z=asciiStart, w=asciiWidth
-  vec4 viewAndTime;        // x=viewWidth, y=viewHeight, z=flipY, w=timeSeconds
+  vec4 viewInfo;           // x=viewWidth, y=viewHeight, z=flipY, w=devicePixelRatio
   vec4 shadowColor;
   vec4 glowLowAndStrength; // rgb=glowLow, a=glowStrength
-  vec4 glowHighAndDpr;     // rgb=glowHigh, a=devicePixelRatio
+  vec4 glowHigh;
   vec4 outlineColor;       // rgba
   vec4 itemIdWindow;       // x=lineHeight, y=scrollY, z=itemIdStartLine, w=itemIdHeight
 };
 
 layout(location = 0) out vec4 fragColor;
-
-float hash2(vec2 p) {
-  return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453);
-}
-
-float noise2(vec2 p) {
-  vec2 i = floor(p);
-  vec2 f = fract(p);
-  vec2 u = f * f * (3.0 - 2.0 * f);
-  float a = hash2(i);
-  float b = hash2(i + vec2(1.0, 0.0));
-  float c = hash2(i + vec2(0.0, 1.0));
-  float d = hash2(i + vec2(1.0, 1.0));
-  return mix(mix(a, b, u.x), mix(c, d, u.x), u.y);
-}
 
 float decodeItemId(vec2 uv) {
   vec2 rg = texture(itemIdTex, uv).rg * 255.0 + 0.5;
@@ -139,19 +124,6 @@ vec2 computePlaybackHalos(float activeNorm, float fadeNorm, float activeMask,
   return vec2(activeHalo, fadeHalo);
 }
 
-float computeGlowTurbulence(vec2 uv, vec2 viewSize, float timeSeconds) {
-  vec2 p = uv * viewSize * 0.055;
-  float t = timeSeconds * 0.85;
-
-  float n1 = noise2(p + vec2(0.0, t * 1.2));
-  float n2 = noise2(p * 1.7 + vec2(7.4, t * 1.6));
-  float n3 = noise2(p * 2.9 + vec2(-3.1, t * 2.2));
-
-  float flicker = mix(n1, n2, 0.6);
-  float lick = mix(n2, n3, 0.5);
-  return 0.65 + 0.55 * mix(flicker, lick, 0.5);
-}
-
 void main() {
   vec4 base = texture(contentTex, vUv);
 
@@ -163,13 +135,12 @@ void main() {
   float asciiStart = columnLayout.z;
   float asciiWidth = columnLayout.w;
 
-  vec2 viewSize = viewAndTime.xy;
-  float flipY = viewAndTime.z;
-  float dpr = max(glowHighAndDpr.a, 1.0);
-  float time = viewAndTime.w;
+  vec2 viewSize = viewInfo.xy;
+  float flipY = viewInfo.z;
+  float dpr = max(viewInfo.w, 1.0);
   vec3 glowLow = glowLowAndStrength.rgb;
   float glowStrength = glowLowAndStrength.a;
-  vec3 glowHigh = glowHighAndDpr.rgb;
+  vec3 glowHighRgb = glowHigh.rgb;
 
   float x = vUv.x * viewSize.x;
   bool inHex = (x >= hexStart) && (x < hexStart + hexWidth);
@@ -199,23 +170,23 @@ void main() {
   vec4 playbackColorSample = texture(playbackColorTex, vUv);
   vec2 playHalos = computePlaybackHalos(edgeGlow.g, edgeGlow.b, playActiveMask, playFadeMask,
                                         playFadeAlpha);
-  float turbulence = computeGlowTurbulence(vUv, viewSize, time);
   float activeGlow = clamp(playHalos.x * glowStrength, 0.0, 1.0);
-  float fadeGlow = clamp(playHalos.y * glowStrength * turbulence, 0.0, 1.0);
-  float flame = max(activeGlow, fadeGlow);
+  float fadeGlow = clamp(playHalos.y * glowStrength, 0.0, 1.0);
 
   vec3 trackGlowBase = playbackColorSample.rgb;
   float hasTrackGlowColor = step(0.001, playbackColorSample.a);
   glowLow = mix(glowLow, trackGlowBase * 0.34, hasTrackGlowColor);
-  glowHigh = mix(glowHigh,
-                 min(trackGlowBase * 1.18 + vec3(0.06), vec3(1.0)),
-                 hasTrackGlowColor);
+  vec3 glowHighTint = mix(glowHighRgb,
+                          min(trackGlowBase * 1.18 + vec3(0.06), vec3(1.0)),
+                          hasTrackGlowColor);
 
-  float flameRamp = smoothstep(0.0, 1.0, flame);
-  vec3 flameColor = mix(glowLow, glowHigh, flameRamp);
+  vec3 activeColor = mix(glowLow, glowHighTint, smoothstep(0.0, 1.0, activeGlow));
+  vec3 fadeColor = mix(glowLow, glowHighTint, smoothstep(0.0, 1.0, fadeGlow));
 
-  vec3 withGlow = mix(withShadow, flameColor, clamp(flame * 1.1, 0.0, 1.0));
-  withGlow = clamp(withGlow + flameColor * flame * 0.50, 0.0, 1.0);
+  vec3 withGlow = mix(withShadow, activeColor, clamp(activeGlow * 1.1, 0.0, 1.0));
+  withGlow = clamp(withGlow + activeColor * activeGlow * 0.50, 0.0, 1.0);
+  withGlow = mix(withGlow, fadeColor, clamp(fadeGlow * 1.1, 0.0, 1.0));
+  withGlow = clamp(withGlow + fadeColor * fadeGlow * 0.50, 0.0, 1.0);
 
   fragColor = vec4(withGlow, base.a);
 }

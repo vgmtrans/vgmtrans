@@ -24,7 +24,6 @@ void main() {
   float glowRadius = edgeParams.y;
   float shadowCurve = max(edgeParams.z, 0.0001);
   float glowCurve = max(edgeParams.w, 0.0001);
-
   float isShadow = step(0.5, vColor.r);
   float isGlowActive = step(0.5, vColor.g);
   float isGlowFade = step(0.5, vColor.b);
@@ -34,8 +33,11 @@ void main() {
   float dist = sdRect(vPos, center, halfSize);
   float outside = max(dist, 0.0);
 
-  float shadowNorm = shadowRadius > 0.0001 ? clamp(pow(outside / shadowRadius, shadowCurve), 0.0, 1.0) : 1.0;
-  float glowNorm = glowRadius > 0.0001 ? clamp(pow(outside / glowRadius, glowCurve), 0.0, 1.0) : 1.0;
+  float shadowNorm = shadowRadius > 0.0001
+      ? clamp(pow(outside / shadowRadius, shadowCurve), 0.0, 1.0)
+      : 1.0;
+  float glowNorm = glowRadius > 0.0001 ? clamp(pow(outside / glowRadius, glowCurve), 0.0, 1.0)
+                                       : 1.0;
 
   float r = mix(1.0, shadowNorm, isShadow);
   float g = mix(1.0, glowNorm, isGlowActive);

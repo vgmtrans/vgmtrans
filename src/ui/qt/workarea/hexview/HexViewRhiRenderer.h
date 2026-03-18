@@ -31,10 +31,9 @@ class QRhiShaderResourceBindings;
 class QRhiTexture;
 
 // HexViewRhiRenderer builds GPU instance streams from an immutable HexView snapshot
-// and renders in five passes:
+// and renders in four passes:
 // 1) content (text + backgrounds), 2) mask (selection ids/channels),
-// 3) playback color field, 4) edge field (for shadow/glow falloff),
-// 5) composite (final shading).
+// 3) combined effects (playback color + edge field), 4) composite (final shading).
 class HexViewRhiRenderer {
 public:
   struct RenderTargetInfo {
@@ -197,11 +196,9 @@ private:
   QRhiTextureRenderTarget* m_maskRt = nullptr;
   QRhiRenderPassDescriptor* m_maskRp = nullptr;
   QRhiTexture* m_playbackColorTex = nullptr;
-  QRhiTextureRenderTarget* m_playbackColorRt = nullptr;
-  QRhiRenderPassDescriptor* m_playbackColorRp = nullptr;
   QRhiTexture* m_edgeTex = nullptr;
-  QRhiTextureRenderTarget* m_edgeRt = nullptr;
-  QRhiRenderPassDescriptor* m_edgeRp = nullptr;
+  QRhiTextureRenderTarget* m_effectRt = nullptr;
+  QRhiRenderPassDescriptor* m_effectRp = nullptr;
 
   QRhiBuffer* m_vbuf = nullptr;
   QRhiBuffer* m_ibuf = nullptr;
@@ -237,7 +234,7 @@ private:
   bool m_supportsBaseInstance = false;
   bool m_loggedInit = false;
   bool m_loggedFrame = false;
-  QElapsedTimer m_animTimer;
+  QElapsedTimer m_frameTimer;
 
   std::vector<CachedLine> m_cachedLines;
   std::vector<LineRange> m_lineRanges;
