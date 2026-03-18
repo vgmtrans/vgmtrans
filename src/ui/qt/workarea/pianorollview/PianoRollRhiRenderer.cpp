@@ -397,8 +397,8 @@ void PianoRollRhiRenderer::renderFrame(QRhiCommandBuffer* cb, const RenderTarget
   const NoteDataKey noteKey = makeNoteDataKey(frame);
   if (!m_hasNoteDataKey ||
       noteKey.notesPtr != m_noteDataKey.notesPtr ||
-      noteKey.trackColorsHash != m_noteDataKey.trackColorsHash ||
-      noteKey.trackEnabledHash != m_noteDataKey.trackEnabledHash ||
+      noteKey.trackColorsPtr != m_noteDataKey.trackColorsPtr ||
+      noteKey.trackEnabledPtr != m_noteDataKey.trackEnabledPtr ||
       noteKey.noteBackgroundColor != m_noteDataKey.noteBackgroundColor) {
     rebuildNoteInstances(frame);
     m_noteDataKey = noteKey;
@@ -592,29 +592,6 @@ void PianoRollRhiRenderer::renderFrame(QRhiCommandBuffer* cb, const RenderTarget
 
 bool PianoRollRhiRenderer::isBlackKey(int key) {
   return isBlackMidiKey(key);
-}
-
-uint64_t PianoRollRhiRenderer::hashTrackColors(const std::vector<QColor>& colors) {
-  uint64_t hash = 1469598103934665603ULL;
-  for (const QColor& color : colors) {
-    hash ^= static_cast<uint64_t>(color.rgba());
-    hash *= 1099511628211ULL;
-  }
-  hash ^= static_cast<uint64_t>(colors.size());
-  hash *= 1099511628211ULL;
-  return hash;
-}
-
-// Hashes track-enabled state for note-instance cache invalidation on mute/solo changes.
-uint64_t PianoRollRhiRenderer::hashTrackEnabled(const std::vector<uint8_t>& trackEnabled) {
-  uint64_t hash = 1469598103934665603ULL;
-  for (const uint8_t enabled : trackEnabled) {
-    hash ^= static_cast<uint64_t>(enabled);
-    hash *= 1099511628211ULL;
-  }
-  hash ^= static_cast<uint64_t>(trackEnabled.size());
-  hash *= 1099511628211ULL;
-  return hash;
 }
 
 uint32_t PianoRollRhiRenderer::colorKey(const QColor& color) {
@@ -1203,12 +1180,8 @@ bool PianoRollRhiRenderer::staticCacheKeyEqual(const StaticCacheKey& lhs, const 
 PianoRollRhiRenderer::NoteDataKey PianoRollRhiRenderer::makeNoteDataKey(const PianoRollFrame::Data& frame) const {
   NoteDataKey key;
   key.notesPtr = reinterpret_cast<uint64_t>(frame.notes.get());
-  if (frame.trackColors) {
-    key.trackColorsHash = hashTrackColors(*frame.trackColors);
-  }
-  if (frame.trackEnabled) {
-    key.trackEnabledHash = hashTrackEnabled(*frame.trackEnabled);
-  }
+  key.trackColorsPtr = reinterpret_cast<uint64_t>(frame.trackColors.get());
+  key.trackEnabledPtr = reinterpret_cast<uint64_t>(frame.trackEnabled.get());
   key.noteBackgroundColor = colorKey(frame.noteBackgroundColor);
   return key;
 }

@@ -107,8 +107,8 @@ private:
 
   struct NoteDataKey {
     uint64_t notesPtr = 0;
-    uint64_t trackColorsHash = 0;
-    uint64_t trackEnabledHash = 0;
+    uint64_t trackColorsPtr = 0;
+    uint64_t trackEnabledPtr = 0;
     uint32_t noteBackgroundColor = 0;
   };
 
@@ -160,8 +160,6 @@ private:
   };
 
   static bool isBlackKey(int key);
-  static uint64_t hashTrackColors(const std::vector<QColor>& colors);
-  static uint64_t hashTrackEnabled(const std::vector<uint8_t>& trackEnabled);
   static uint32_t colorKey(const QColor& color);
 
   void ensurePipelines(QRhiRenderPassDescriptor* renderPassDesc,
