@@ -1090,6 +1090,31 @@ void HexViewRhiRenderer::updateInstanceBuffers(QRhiResourceUpdateBatch* u) {
   m_playbackBufferDirty = false;
 }
 
+void HexViewRhiRenderer::populateVisibleLineByteCounts(int startLine, int endLine,
+                                                       std::vector<uint8_t>& lineBytes) const {
+  lineBytes.assign(static_cast<size_t>(std::max(0, endLine - startLine + 1)), 0);
+  for (int line = startLine; line <= endLine; ++line) {
+    const CachedLine* entry = cachedLineFor(line);
+    if (entry && entry->bytes > 0) {
+      lineBytes[static_cast<size_t>(line - startLine)] =
+          static_cast<uint8_t>(std::min(entry->bytes, kBytesPerLine));
+    }
+  }
+}
+
+uint16_t HexViewRhiRenderer::spanMaskBits(int startCol, int endCol) {
+  const int start = std::clamp(startCol, 0, kBytesPerLine);
+  const int end = std::clamp(endCol, 0, kBytesPerLine);
+  if (end <= start) {
+    return 0;
+  }
+  const uint32_t lowMask = (start > 0) ? ((uint32_t(1) << start) - 1u) : 0u;
+  const uint32_t highMask = (end >= kBytesPerLine)
+                                ? 0xFFFFu
+                                : ((uint32_t(1) << end) - 1u);
+  return static_cast<uint16_t>(highMask & ~lowMask);
+}
+
 // Resolve atlas UVs for a character, with '.' as a fallback glyph.
 QRectF HexViewRhiRenderer::glyphUv(const QChar& ch,
                                    const HexViewFrame::Data& frame) const {
@@ -1138,6 +1163,47 @@ void HexViewRhiRenderer::appendGlyph(std::vector<GlyphInstance>& glyphs, float x
                     static_cast<float>(uv.left()), static_cast<float>(uv.top()),
                     static_cast<float>(uv.right()), static_cast<float>(uv.bottom()),
                     color.x(), color.y(), color.z(), color.w()});
+}
+
+void HexViewRhiRenderer::appendMaskSpan(std::vector<RectInstance>& rects,
+                                        const SelectionBuildContext& ctx,
+                                        int line,
+                                        int startCol,
+                                        int endCol,
+                                        const QVector4D& color) {
+  const int spanLen = endCol - startCol;
+  if (spanLen <= 0) {
+    return;
+  }
+  const float y = line * ctx.lineHeight;
+  const float hexX = ctx.hexStartX + startCol * 3.0f * ctx.charWidth;
+  appendRect(rects, hexX, y, spanLen * 3.0f * ctx.charWidth, ctx.lineHeight, color);
+  if (ctx.shouldDrawAscii) {
+    const float asciiX = ctx.asciiStartX + startCol * ctx.charWidth;
+    appendRect(rects, asciiX, y, spanLen * ctx.charWidth, ctx.lineHeight, color);
+  }
+}
+
+void HexViewRhiRenderer::appendEdgeSpan(std::vector<EdgeInstance>& rects,
+                                        const SelectionBuildContext& ctx,
+                                        int line,
+                                        int startCol,
+                                        int endCol,
+                                        float pad,
+                                        const QVector4D& flags,
+                                        const QVector4D& tint) {
+  const int spanLen = endCol - startCol;
+  if (spanLen <= 0) {
+    return;
+  }
+  const float y = line * ctx.lineHeight;
+  const float hexX = ctx.hexStartX + startCol * 3.0f * ctx.charWidth;
+  appendEdgeRect(rects, hexX, y, spanLen * 3.0f * ctx.charWidth, ctx.lineHeight, pad, flags,
+                 tint);
+  if (ctx.shouldDrawAscii) {
+    const float asciiX = ctx.asciiStartX + startCol * ctx.charWidth;
+    appendEdgeRect(rects, asciiX, y, spanLen * ctx.charWidth, ctx.lineHeight, pad, flags, tint);
+  }
 }
 
 // Ensure cached file-line window covers the visible range plus a scroll margin.
@@ -1373,65 +1439,8 @@ void HexViewRhiRenderer::buildSelectionEffectInstances(int startLine, int endLin
   ctx.asciiStartX = layout.asciiStartX;
   ctx.shouldDrawAscii = frame.shouldDrawAscii;
 
-  std::vector<uint8_t> lineBytes(static_cast<size_t>(visibleCount), 0);
-  std::vector<uint16_t> lineMasks(static_cast<size_t>(visibleCount), 0);
-  for (int line = ctx.startLine; line <= ctx.endLine; ++line) {
-    const CachedLine* entry = cachedLineFor(line);
-    if (entry && entry->bytes > 0) {
-      lineBytes[static_cast<size_t>(line - ctx.startLine)] =
-          static_cast<uint8_t>(std::min(entry->bytes, kBytesPerLine));
-    }
-  }
-
-  auto spanMaskBits = [](int startCol, int endCol) -> uint16_t {
-    const int start = std::clamp(startCol, 0, kBytesPerLine);
-    const int end = std::clamp(endCol, 0, kBytesPerLine);
-    if (end <= start) {
-      return 0;
-    }
-    const uint32_t lowMask = (start > 0) ? ((uint32_t(1) << start) - 1u) : 0u;
-    const uint32_t highMask = (end >= kBytesPerLine)
-                                  ? 0xFFFFu
-                                  : ((uint32_t(1) << end) - 1u);
-    return static_cast<uint16_t>(highMask & ~lowMask);
-  };
-  auto appendMaskSpan = [&](std::vector<RectInstance>& rects,
-                            int line,
-                            int startCol,
-                            int endCol,
-                            const QVector4D& color) {
-    const int spanLen = endCol - startCol;
-    if (spanLen <= 0) {
-      return;
-    }
-    const float y = line * ctx.lineHeight;
-    const float hexX = ctx.hexStartX + startCol * 3.0f * ctx.charWidth;
-    appendRect(rects, hexX, y, spanLen * 3.0f * ctx.charWidth, ctx.lineHeight, color);
-    if (ctx.shouldDrawAscii) {
-      const float asciiX = ctx.asciiStartX + startCol * ctx.charWidth;
-      appendRect(rects, asciiX, y, spanLen * ctx.charWidth, ctx.lineHeight, color);
-    }
-  };
-  auto appendEdgeSpan = [&](std::vector<EdgeInstance>& rects,
-                            int line,
-                            int startCol,
-                            int endCol,
-                            float pad,
-                            const QVector4D& flags,
-                            const QVector4D& tint) {
-    const int spanLen = endCol - startCol;
-    if (spanLen <= 0) {
-      return;
-    }
-    const float y = line * ctx.lineHeight;
-    const float hexX = ctx.hexStartX + startCol * 3.0f * ctx.charWidth;
-    appendEdgeRect(rects, hexX, y, spanLen * 3.0f * ctx.charWidth, ctx.lineHeight, pad, flags,
-                   tint);
-    if (ctx.shouldDrawAscii) {
-      const float asciiX = ctx.asciiStartX + startCol * ctx.charWidth;
-      appendEdgeRect(rects, asciiX, y, spanLen * ctx.charWidth, ctx.lineHeight, pad, flags, tint);
-    }
-  };
+  populateVisibleLineByteCounts(ctx.startLine, ctx.endLine, m_lineByteScratch);
+  m_maskScratchA.assign(static_cast<size_t>(visibleCount), 0);
 
   for (const auto& selection : selections) {
     if (selection.length == 0) {
@@ -1456,7 +1465,7 @@ void HexViewRhiRenderer::buildSelectionEffectInstances(int startLine, int endLin
 
     for (int line = lineStart; line <= lineEnd; ++line) {
       const size_t lineIndex = static_cast<size_t>(line - ctx.startLine);
-      const int lineByteCount = static_cast<int>(lineBytes[lineIndex]);
+      const int lineByteCount = static_cast<int>(m_lineByteScratch[lineIndex]);
       if (lineByteCount <= 0) {
         continue;
       }
@@ -1466,7 +1475,7 @@ void HexViewRhiRenderer::buildSelectionEffectInstances(int startLine, int endLin
       const int clampedStart = std::clamp(startCol, 0, lineByteCount);
       const int clampedEnd = std::clamp(endCol, 0, lineByteCount);
       if (clampedEnd > clampedStart) {
-        lineMasks[lineIndex] |= spanMaskBits(clampedStart, clampedEnd);
+        m_maskScratchA[lineIndex] |= spanMaskBits(clampedStart, clampedEnd);
       }
     }
   }
@@ -1481,8 +1490,8 @@ void HexViewRhiRenderer::buildSelectionEffectInstances(int startLine, int endLin
 
   for (int line = ctx.startLine; line <= ctx.endLine; ++line) {
     const size_t lineIndex = static_cast<size_t>(line - ctx.startLine);
-    const uint16_t maskBits = lineMasks[lineIndex];
-    const int lineByteCount = static_cast<int>(lineBytes[lineIndex]);
+    const uint16_t maskBits = m_maskScratchA[lineIndex];
+    const int lineByteCount = static_cast<int>(m_lineByteScratch[lineIndex]);
     int col = 0;
     while (col < lineByteCount) {
       while (col < lineByteCount && (maskBits & static_cast<uint16_t>(1u << col)) == 0u) {
@@ -1496,9 +1505,9 @@ void HexViewRhiRenderer::buildSelectionEffectInstances(int startLine, int endLin
         ++col;
       }
       const int endCol = col;
-      appendMaskSpan(m_selectionMaskRectInstances, line, startCol, endCol, selectionMaskColor);
+      appendMaskSpan(m_selectionMaskRectInstances, ctx, line, startCol, endCol, selectionMaskColor);
       if (shadowPad > 0.0f) {
-        appendEdgeSpan(m_selectionEdgeRectInstances, line, startCol, endCol, shadowPad,
+        appendEdgeSpan(m_selectionEdgeRectInstances, ctx, line, startCol, endCol, shadowPad,
                        selectionEdgeFlags, noTint);
       }
     }
@@ -1539,65 +1548,19 @@ void HexViewRhiRenderer::buildPlaybackEffectInstances(int startLine, int endLine
   ctx.asciiStartX = layout.asciiStartX;
   ctx.shouldDrawAscii = frame.shouldDrawAscii;
 
-  m_lineByteScratch.assign(static_cast<size_t>(visibleCount), 0);
+  populateVisibleLineByteCounts(ctx.startLine, ctx.endLine, m_lineByteScratch);
   m_maskScratchA.assign(static_cast<size_t>(visibleCount), 0);
   m_maskScratchB.assign(static_cast<size_t>(visibleCount), 0);
   m_alphaScratch.assign(static_cast<size_t>(visibleCount), {});
 
-  for (int line = ctx.startLine; line <= ctx.endLine; ++line) {
-    const CachedLine* entry = cachedLineFor(line);
-    if (entry && entry->bytes > 0) {
-      m_lineByteScratch[static_cast<size_t>(line - ctx.startLine)] =
-          static_cast<uint8_t>(std::min(entry->bytes, kBytesPerLine));
-    }
-  }
-
   const bool needsGlow = frame.playbackGlowRadius > 0.0f && frame.playbackGlowStrength > 0.0f;
   if (needsGlow) {
-    m_colorScratchA.assign(static_cast<size_t>(visibleCount), {});
-    m_colorScratchB.assign(static_cast<size_t>(visibleCount), {});
+    m_colorScratchA.resize(static_cast<size_t>(visibleCount));
+    m_colorScratchB.resize(static_cast<size_t>(visibleCount));
   } else {
     m_colorScratchA.clear();
     m_colorScratchB.clear();
   }
-
-  auto appendMaskSpan = [&](std::vector<RectInstance>& rects,
-                            int line,
-                            int startCol,
-                            int endCol,
-                            const QVector4D& color) {
-    const int spanLen = endCol - startCol;
-    if (spanLen <= 0) {
-      return;
-    }
-    const float y = line * ctx.lineHeight;
-    const float hexX = ctx.hexStartX + startCol * 3.0f * ctx.charWidth;
-    appendRect(rects, hexX, y, spanLen * 3.0f * ctx.charWidth, ctx.lineHeight, color);
-    if (ctx.shouldDrawAscii) {
-      const float asciiX = ctx.asciiStartX + startCol * ctx.charWidth;
-      appendRect(rects, asciiX, y, spanLen * ctx.charWidth, ctx.lineHeight, color);
-    }
-  };
-  auto appendEdgeSpan = [&](std::vector<EdgeInstance>& rects,
-                            int line,
-                            int startCol,
-                            int endCol,
-                            float pad,
-                            const QVector4D& flags,
-                            const QVector4D& tint) {
-    const int spanLen = endCol - startCol;
-    if (spanLen <= 0) {
-      return;
-    }
-    const float y = line * ctx.lineHeight;
-    const float hexX = ctx.hexStartX + startCol * 3.0f * ctx.charWidth;
-    appendEdgeRect(rects, hexX, y, spanLen * 3.0f * ctx.charWidth, ctx.lineHeight, pad, flags,
-                   tint);
-    if (ctx.shouldDrawAscii) {
-      const float asciiX = ctx.asciiStartX + startCol * ctx.charWidth;
-      appendEdgeRect(rects, asciiX, y, spanLen * ctx.charWidth, ctx.lineHeight, pad, flags, tint);
-    }
-  };
   auto sameTint = [](const QVector4D& a, const QVector4D& b) {
     return std::abs(a.x() - b.x()) < 0.0001f && std::abs(a.y() - b.y()) < 0.0001f &&
            std::abs(a.z() - b.z()) < 0.0001f && std::abs(a.w() - b.w()) < 0.0001f;
@@ -1679,7 +1642,7 @@ void HexViewRhiRenderer::buildPlaybackEffectInstances(int startLine, int endLine
         while (col < lineByteCount && (maskBits & static_cast<uint16_t>(1u << col)) != 0u) {
           ++col;
         }
-        appendMaskSpan(m_playbackMaskRectInstances, line, startCol, col, color);
+        appendMaskSpan(m_playbackMaskRectInstances, ctx, line, startCol, col, color);
       }
     }
   };
@@ -1701,6 +1664,7 @@ void HexViewRhiRenderer::buildPlaybackEffectInstances(int startLine, int endLine
         }
         if (col == lineByteCount || alpha <= 0.0f || std::abs(alpha - currentAlpha) > 0.0001f) {
           appendMaskSpan(m_playbackMaskRectInstances,
+                         ctx,
                          line,
                          startCol,
                          col,
@@ -1739,7 +1703,7 @@ void HexViewRhiRenderer::buildPlaybackEffectInstances(int startLine, int endLine
                    sameTint(colors[lineIndex][static_cast<size_t>(col)], tint)) {
               ++col;
             }
-            appendEdgeSpan(m_playbackEdgeRectInstances, line, startCol, col, pad, flags, tint);
+            appendEdgeSpan(m_playbackEdgeRectInstances, ctx, line, startCol, col, pad, flags, tint);
           }
         }
       };
