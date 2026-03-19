@@ -34,7 +34,8 @@ public:
 
   void paint(QPainter *p, const QRect &rect,
              QIcon::Mode mode, QIcon::State state) override {
-    p->drawPixmap(rect, pixmap(rect.size(), mode, state));
+    const qreal dpr = p->device() ? p->device()->devicePixelRatioF() : qGuiApp->devicePixelRatio();
+    p->drawPixmap(rect.topLeft(), renderCached(rect.size(), dpr));
   }
 
 private:
@@ -63,6 +64,8 @@ private:
 
     QSvgRenderer renderer(m_path);
     QPainter p(&img);
+    p.setRenderHint(QPainter::Antialiasing, true);
+    p.setRenderHint(QPainter::SmoothPixmapTransform, true);
     renderer.render(&p, QRectF(QPointF(0, 0), QSizeF(phys)));
 
     p.setCompositionMode(QPainter::CompositionMode_SourceIn);
