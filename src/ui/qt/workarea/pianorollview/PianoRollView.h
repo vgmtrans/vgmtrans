@@ -184,6 +184,7 @@ private:
   bool applyResolvedActiveNotes(const std::vector<PianoRollFrame::Note>& resolvedActiveNotes);
   bool updateActiveKeyStates();
 
+  void ensureScrollChromeButtonsInstalled();
   void syncViewportLayoutState();
   void updateScrollBars();
   void requestRender();
@@ -262,6 +263,7 @@ private:
   bool m_initialPaintEvent = false;
   bool m_coalescedRenderPending = false;
   bool m_frameDrivenPlaybackAutoScrollActive = false;
+  bool m_scrollChromeButtonsInstalled = false;
 
   QElapsedTimer m_animClock;
   QElapsedTimer m_renderClock;

@@ -236,11 +236,12 @@ RhiScrollBar::ThumbMetrics RhiScrollBar::thumbMetrics() const {
   const int range = std::max(0, maxValue - minValue);
   const int trackLength = (m_orientation == Qt::Horizontal) ? track.width() : track.height();
   const int fullRange = std::max(1, range + pageStep);
+  const int minThumbLength = std::min(kMinThumbLength, trackLength);
   // Match standard scrollbar behavior: thumb size reflects how much content is
   // visible, while thumb travel reflects the remaining scrollable range.
   const int thumbLength = std::clamp(
       static_cast<int>(std::lround((static_cast<double>(pageStep) / static_cast<double>(fullRange)) * trackLength)),
-      kMinThumbLength,
+      minThumbLength,
       trackLength);
   const int travel = std::max(0, trackLength - thumbLength);
   const double ratio = (range <= 0)

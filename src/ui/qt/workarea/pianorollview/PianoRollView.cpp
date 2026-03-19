@@ -70,14 +70,11 @@ PianoRollView::PianoRollView(QWidget* parent)
       });
   m_scrollChrome->setHorizontalPolicy(Qt::ScrollBarAlwaysOn);
   m_scrollChrome->setVerticalPolicy(Qt::ScrollBarAlwaysOn);
-  m_scrollChrome->setHorizontalButtons({
-      {RhiScrollButtonGlyph::Minus, [this]() { zoomHorizontalFromButton(-1); }},
-      {RhiScrollButtonGlyph::Plus, [this]() { zoomHorizontalFromButton(+1); }},
-  });
-  m_scrollChrome->setVerticalButtons({
-      {RhiScrollButtonGlyph::Minus, [this]() { zoomVertical(-1, viewport()->height() / 2, true, 150); }},
-      {RhiScrollButtonGlyph::Plus, [this]() { zoomVertical(+1, viewport()->height() / 2, true, 150); }},
-  });
+  // Piano-roll chrome uses custom plus/minus zoom buttons instead of the
+  // platform scrollbar arrow buttons. Leaving Windows arrows enabled shrinks
+  // the constructor-time scrollbar track enough to trip debug clamp checks.
+  m_scrollChrome->setHorizontalArrowButtonsVisible(false);
+  m_scrollChrome->setVerticalArrowButtonsVisible(false);
 
   m_horizontalZoomAnimation = new QVariantAnimation(this);
   m_horizontalZoomAnimation->setEasingCurve(QEasingCurve::OutCubic);
@@ -511,6 +508,25 @@ void PianoRollView::paintEvent(QPaintEvent* event) {
   QAbstractScrollArea::paintEvent(event);
 }
 
+void PianoRollView::ensureScrollChromeButtonsInstalled() {
+  if (m_scrollChromeButtonsInstalled || !m_scrollChrome) {
+    return;
+  }
+
+  // Installing custom buttons triggers an immediate chrome sync, so wait until
+  // QAbstractScrollArea has delivered a real layout pass instead of doing this
+  // from the constructor against its transient default geometry.
+  m_scrollChromeButtonsInstalled = true;
+  m_scrollChrome->setHorizontalButtons({
+      {RhiScrollButtonGlyph::Minus, [this]() { zoomHorizontalFromButton(-1); }},
+      {RhiScrollButtonGlyph::Plus, [this]() { zoomHorizontalFromButton(+1); }},
+  });
+  m_scrollChrome->setVerticalButtons({
+      {RhiScrollButtonGlyph::Minus, [this]() { zoomVertical(-1, viewport()->height() / 2, true, 150); }},
+      {RhiScrollButtonGlyph::Plus, [this]() { zoomVertical(+1, viewport()->height() / 2, true, 150); }},
+  });
+}
+
 void PianoRollView::syncViewportLayoutState() {
   if (m_scrollChrome) {
     // Recompute viewport margins before sizing the hidden scroll models.
@@ -528,11 +544,13 @@ void PianoRollView::syncViewportLayoutState() {
 
 void PianoRollView::resizeEvent(QResizeEvent* event) {
   QAbstractScrollArea::resizeEvent(event);
+  ensureScrollChromeButtonsInstalled();
   syncViewportLayoutState();
 }
 
 void PianoRollView::showEvent(QShowEvent* event) {
   QAbstractScrollArea::showEvent(event);
+  ensureScrollChromeButtonsInstalled();
   syncViewportLayoutState();
 }
 
