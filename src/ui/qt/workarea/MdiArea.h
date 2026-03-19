@@ -93,7 +93,8 @@ private:
   PaneActions m_leftPaneActions{};
   PaneActions m_rightPaneActions{};
   int m_reservedTabBarRightMargin = 0;
-  QPixmap m_cachedTabBarColumn;
+  QPixmap m_cachedActiveTabBarColumn;
+  QPixmap m_cachedInactiveTabBarColumn;
   bool m_tabBarColumnCapturePending = false;
 
   std::unordered_map<const VGMFile *, QMdiSubWindow *> fileToWindowMap;
