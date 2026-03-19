@@ -493,7 +493,8 @@ void MdiArea::setupTabBarControls() {
 #ifdef Q_OS_MAC
     m_tabBar->setElideMode(Qt::ElideNone);
 #endif
-    m_cachedTabBarColumn = QPixmap();
+    m_cachedActiveTabBarColumn = QPixmap();
+    m_cachedInactiveTabBarColumn = QPixmap();
     m_tabBarColumnCapturePending = false;
     m_tabBar->installEventFilter(this);
     // QMdiArea lays out the tab bar inside a host container; reserve space against that host.
@@ -647,7 +648,10 @@ void MdiArea::refreshTabControlAppearance() {
     return;
   }
 
-  static_cast<TabControlStrip *>(m_tabControls)->setTextureColumn(m_cachedTabBarColumn);
+  const QPixmap &tabBarColumn =
+      qApp->applicationState() == Qt::ApplicationActive ? m_cachedActiveTabBarColumn
+                                                        : m_cachedInactiveTabBarColumn;
+  static_cast<TabControlStrip *>(m_tabControls)->setTextureColumn(tabBarColumn);
 
   const QPalette glyphPalette = m_tabBar ? m_tabBar->palette() : m_tabControls->palette();
   QColor background = glyphPalette.color(QPalette::Window);
@@ -718,7 +722,8 @@ void MdiArea::refreshTabControlAppearance() {
 
 // Re-captures tab-strip colors after the theme transition settles.
 void MdiArea::refreshTabControlsAfterThemeChange() {
-  m_cachedTabBarColumn = QPixmap();
+  m_cachedActiveTabBarColumn = QPixmap();
+  m_cachedInactiveTabBarColumn = QPixmap();
   m_tabBarColumnCapturePending = false;
   updateBackgroundColor();
   refreshTabControlAppearance();
@@ -756,6 +761,16 @@ void MdiArea::changeEvent(QEvent *event) {
 }
 
 bool MdiArea::eventFilter(QObject *watched, QEvent *event) {
+  if (watched == qApp && event && event->type() == QEvent::ApplicationStateChange) {
+    refreshTabControlAppearance();
+    if (m_tabBar) {
+      m_tabBar->update();
+    }
+    if (m_tabControls) {
+      m_tabControls->update();
+    }
+  }
+
   if (watched == m_tabBar || watched == m_tabBarHost) {
     // Track host + tab-bar layout changes to keep the reserved right strip aligned.
     switch (event->type()) {
@@ -767,12 +782,19 @@ bool MdiArea::eventFilter(QObject *watched, QEvent *event) {
         refreshTabControlAppearance();
         break;
       case QEvent::Paint:
-        if (watched == m_tabBar && m_cachedTabBarColumn.isNull() && !m_tabBarColumnCapturePending) {
+        if (watched == m_tabBar &&
+            (qApp->applicationState() == Qt::ApplicationActive ? m_cachedActiveTabBarColumn
+                                                               : m_cachedInactiveTabBarColumn)
+                .isNull() &&
+            !m_tabBarColumnCapturePending) {
           m_tabBarColumnCapturePending = true;
           // Capture after the paint returns so the strip sees the tab bar's settled pixels.
           QMetaObject::invokeMethod(this, [this]() {
             m_tabBarColumnCapturePending = false;
-            if (!m_tabBar || !m_tabControls || !m_cachedTabBarColumn.isNull() ||
+            QPixmap &tabBarColumn =
+                qApp->applicationState() == Qt::ApplicationActive ? m_cachedActiveTabBarColumn
+                                                                  : m_cachedInactiveTabBarColumn;
+            if (!m_tabBar || !m_tabControls || !tabBarColumn.isNull() ||
                 m_tabBar->width() <= 0 || m_tabBar->height() <= 0) {
               return;
             }
@@ -785,14 +807,14 @@ bool MdiArea::eventFilter(QObject *watched, QEvent *event) {
 
             const int sampleX = std::max(0, m_tabBar->width() - sampleWidth - 1);
             const QPoint sampleGlobal = m_tabBar->mapToGlobal(QPoint(sampleX, 0));
-            m_cachedTabBarColumn =
+            tabBarColumn =
                 windowHandle->screen()->grabWindow(0, sampleGlobal.x(), sampleGlobal.y(),
                                                    sampleWidth, m_tabBar->height());
 #else
             const int sampleX = std::max(0, m_tabBar->width() - sampleWidth - 1);
-            m_cachedTabBarColumn = m_tabBar->grab(QRect(sampleX, 0, sampleWidth, m_tabBar->height()));
+            tabBarColumn = m_tabBar->grab(QRect(sampleX, 0, sampleWidth, m_tabBar->height()));
 #endif
-            static_cast<TabControlStrip *>(m_tabControls)->setTextureColumn(m_cachedTabBarColumn);
+            static_cast<TabControlStrip *>(m_tabControls)->setTextureColumn(tabBarColumn);
           }, Qt::QueuedConnection);
         }
         break;
