@@ -92,7 +92,7 @@ private:
   PaneActions m_leftPaneActions{};
   PaneActions m_rightPaneActions{};
   int m_reservedTabBarRightMargin = 0;
-  QPixmap m_cachedTabBarColumn;
+  QObject *m_tabBarBackgroundCache = nullptr;
 
   std::unordered_map<const VGMFile *, QMdiSubWindow *> fileToWindowMap;
   std::unordered_map<QMdiSubWindow *, VGMFile *> windowToFileMap;
