@@ -648,9 +648,8 @@ void MdiArea::refreshTabControlAppearance() {
     return;
   }
 
-  const QPixmap &tabBarColumn =
-      qApp->applicationState() == Qt::ApplicationActive ? m_cachedActiveTabBarColumn
-                                                        : m_cachedInactiveTabBarColumn;
+  const bool tabBarWindowActive = m_tabBar && m_tabBar->window() && m_tabBar->window()->isActiveWindow();
+  const QPixmap &tabBarColumn = tabBarWindowActive ? m_cachedActiveTabBarColumn : m_cachedInactiveTabBarColumn;
   static_cast<TabControlStrip *>(m_tabControls)->setTextureColumn(tabBarColumn);
 
   const QPalette glyphPalette = m_tabBar ? m_tabBar->palette() : m_tabControls->palette();
@@ -761,7 +760,9 @@ void MdiArea::changeEvent(QEvent *event) {
 }
 
 bool MdiArea::eventFilter(QObject *watched, QEvent *event) {
-  if (watched == qApp && event && event->type() == QEvent::ApplicationStateChange) {
+  if (m_tabBar && watched == m_tabBar->window() && event &&
+      (event->type() == QEvent::WindowActivate || event->type() == QEvent::WindowDeactivate ||
+       event->type() == QEvent::ActivationChange)) {
     refreshTabControlAppearance();
     if (m_tabBar) {
       m_tabBar->update();
@@ -783,17 +784,15 @@ bool MdiArea::eventFilter(QObject *watched, QEvent *event) {
         break;
       case QEvent::Paint:
         if (watched == m_tabBar &&
-            (qApp->applicationState() == Qt::ApplicationActive ? m_cachedActiveTabBarColumn
-                                                               : m_cachedInactiveTabBarColumn)
-                .isNull() &&
-            !m_tabBarColumnCapturePending) {
+            ((m_tabBar->window() && m_tabBar->window()->isActiveWindow()) ?
+               m_cachedActiveTabBarColumn
+             : m_cachedInactiveTabBarColumn).isNull() && !m_tabBarColumnCapturePending) {
           m_tabBarColumnCapturePending = true;
           // Capture after the paint returns so the strip sees the tab bar's settled pixels.
           QMetaObject::invokeMethod(this, [this]() {
             m_tabBarColumnCapturePending = false;
-            QPixmap &tabBarColumn =
-                qApp->applicationState() == Qt::ApplicationActive ? m_cachedActiveTabBarColumn
-                                                                  : m_cachedInactiveTabBarColumn;
+            const bool tabBarWindowActive = m_tabBar && m_tabBar->window() && m_tabBar->window()->isActiveWindow();
+            QPixmap &tabBarColumn = tabBarWindowActive ? m_cachedActiveTabBarColumn : m_cachedInactiveTabBarColumn;
             if (!m_tabBar || !m_tabControls || !tabBarColumn.isNull() ||
                 m_tabBar->width() <= 0 || m_tabBar->height() <= 0) {
               return;
