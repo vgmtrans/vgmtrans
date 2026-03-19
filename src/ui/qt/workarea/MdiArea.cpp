@@ -74,83 +74,6 @@ private:
   QPixmap m_textureColumn;
 };
 
-// Keeps the sampled tab-bar strip in sync by capturing only after a real tab-bar paint.
-class TabBarBackgroundCache final : public QObject {
-public:
-  explicit TabBarBackgroundCache(QObject *parent = nullptr) : QObject(parent) {}
-
-  void bind(QTabBar *tabBar, TabControlStrip *strip) {
-    if (m_tabBar == tabBar && m_strip == strip) {
-      return;
-    }
-
-    if (m_tabBar) {
-      m_tabBar->removeEventFilter(this);
-    }
-
-    m_tabBar = tabBar;
-    m_strip = strip;
-    if (m_tabBar) {
-      m_tabBar->installEventFilter(this);
-    }
-    applyTexture();
-  }
-
-  void invalidate() {
-    m_texture = QPixmap();
-    m_capturePending = false;
-    applyTexture();
-  }
-
-protected:
-  bool eventFilter(QObject *watched, QEvent *event) override {
-    if (watched == m_tabBar && event && event->type() == QEvent::Paint &&
-        m_texture.isNull() && !m_capturePending) {
-      m_capturePending = true;
-      QMetaObject::invokeMethod(this, [this]() {
-        m_capturePending = false;
-        capture();
-      }, Qt::QueuedConnection);
-    }
-    return QObject::eventFilter(watched, event);
-  }
-
-private:
-  void capture() {
-    if (!m_tabBar || !m_strip || m_tabBar->width() <= 0 || m_tabBar->height() <= 0) {
-      return;
-    }
-
-#ifdef Q_OS_WIN
-    auto *windowHandle = m_tabBar->window() ? m_tabBar->window()->windowHandle() : nullptr;
-    if (!windowHandle || !windowHandle->isExposed() || !windowHandle->screen()) {
-      return;
-    }
-
-    constexpr int sampleWidth = 1;
-    const int sampleX = std::max(0, m_tabBar->width() - sampleWidth - 1);
-    const QPoint sampleGlobal = m_tabBar->mapToGlobal(QPoint(sampleX, 0));
-    m_texture = windowHandle->screen()->grabWindow(0, sampleGlobal.x(), sampleGlobal.y(),
-                                                   sampleWidth, m_tabBar->height());
-#else
-    const int sampleX = std::max(0, m_tabBar->width() - 1);
-    m_texture = m_tabBar->grab(QRect(sampleX, 0, 1, m_tabBar->height()));
-#endif
-    applyTexture();
-  }
-
-  void applyTexture() const {
-    if (m_strip) {
-      m_strip->setTextureColumn(m_texture);
-    }
-  }
-
-  QTabBar *m_tabBar = nullptr;
-  TabControlStrip *m_strip = nullptr;
-  QPixmap m_texture;
-  bool m_capturePending = false;
-};
-
 struct InstructionHint {
   QString iconPath;
   QString text;
@@ -570,6 +493,8 @@ void MdiArea::setupTabBarControls() {
 #ifdef Q_OS_MAC
     m_tabBar->setElideMode(Qt::ElideNone);
 #endif
+    m_cachedTabBarColumn = QPixmap();
+    m_tabBarColumnCapturePending = false;
     m_tabBar->installEventFilter(this);
     // QMdiArea lays out the tab bar inside a host container; reserve space against that host.
     m_tabBarHost = m_tabBar->parentWidget();
@@ -652,12 +577,6 @@ void MdiArea::setupTabBarControls() {
     createPaneMenu(m_rightPaneButton, PanelSide::Right, m_rightPaneActions, true);
   }
 
-  if (!m_tabBarBackgroundCache) {
-    m_tabBarBackgroundCache = new TabBarBackgroundCache(this);
-  }
-  static_cast<TabBarBackgroundCache *>(m_tabBarBackgroundCache)
-      ->bind(m_tabBar, static_cast<TabControlStrip *>(m_tabControls));
-
   m_tabBar->setCursor(Qt::ArrowCursor);
   m_tabBarHost->setCursor(Qt::ArrowCursor);
   m_tabControls->setCursor(Qt::ArrowCursor);
@@ -728,10 +647,7 @@ void MdiArea::refreshTabControlAppearance() {
     return;
   }
 
-  if (m_tabBarBackgroundCache) {
-    static_cast<TabBarBackgroundCache *>(m_tabBarBackgroundCache)
-        ->bind(m_tabBar, static_cast<TabControlStrip *>(m_tabControls));
-  }
+  static_cast<TabControlStrip *>(m_tabControls)->setTextureColumn(m_cachedTabBarColumn);
 
   const QPalette glyphPalette = m_tabBar ? m_tabBar->palette() : m_tabControls->palette();
   QColor background = glyphPalette.color(QPalette::Window);
@@ -802,9 +718,8 @@ void MdiArea::refreshTabControlAppearance() {
 
 // Re-captures tab-strip colors after the theme transition settles.
 void MdiArea::refreshTabControlsAfterThemeChange() {
-  if (m_tabBarBackgroundCache) {
-    static_cast<TabBarBackgroundCache *>(m_tabBarBackgroundCache)->invalidate();
-  }
+  m_cachedTabBarColumn = QPixmap();
+  m_tabBarColumnCapturePending = false;
   updateBackgroundColor();
   refreshTabControlAppearance();
 
@@ -850,6 +765,36 @@ bool MdiArea::eventFilter(QObject *watched, QEvent *event) {
       case QEvent::LayoutRequest:
         repositionTabBarControls();
         refreshTabControlAppearance();
+        break;
+      case QEvent::Paint:
+        if (watched == m_tabBar && m_cachedTabBarColumn.isNull() && !m_tabBarColumnCapturePending) {
+          m_tabBarColumnCapturePending = true;
+          // Capture after the paint returns so the strip sees the tab bar's settled pixels.
+          QMetaObject::invokeMethod(this, [this]() {
+            m_tabBarColumnCapturePending = false;
+            if (!m_tabBar || !m_tabControls || !m_cachedTabBarColumn.isNull() ||
+                m_tabBar->width() <= 0 || m_tabBar->height() <= 0) {
+              return;
+            }
+            constexpr int sampleWidth = 4;
+#ifdef Q_OS_WIN
+            auto *windowHandle = m_tabBar->window() ? m_tabBar->window()->windowHandle() : nullptr;
+            if (!windowHandle || !windowHandle->isExposed() || !windowHandle->screen()) {
+              return;
+            }
+
+            const int sampleX = std::max(0, m_tabBar->width() - sampleWidth - 1);
+            const QPoint sampleGlobal = m_tabBar->mapToGlobal(QPoint(sampleX, 0));
+            m_cachedTabBarColumn =
+                windowHandle->screen()->grabWindow(0, sampleGlobal.x(), sampleGlobal.y(),
+                                                   sampleWidth, m_tabBar->height());
+#else
+            const int sampleX = std::max(0, m_tabBar->width() - sampleWidth - 1);
+            m_cachedTabBarColumn = m_tabBar->grab(QRect(sampleX, 0, sampleWidth, m_tabBar->height()));
+#endif
+            static_cast<TabControlStrip *>(m_tabControls)->setTextureColumn(m_cachedTabBarColumn);
+          }, Qt::QueuedConnection);
+        }
         break;
       case QEvent::StyleChange:
       case QEvent::PaletteChange:

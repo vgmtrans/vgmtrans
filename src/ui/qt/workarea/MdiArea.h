@@ -10,6 +10,7 @@
 #include <unordered_map>
 #include <QMdiArea>
 #include <QMdiSubWindow>
+#include <QPixmap>
 
 class VGMFile;
 class VGMFileView;
@@ -92,7 +93,8 @@ private:
   PaneActions m_leftPaneActions{};
   PaneActions m_rightPaneActions{};
   int m_reservedTabBarRightMargin = 0;
-  QObject *m_tabBarBackgroundCache = nullptr;
+  QPixmap m_cachedTabBarColumn;
+  bool m_tabBarColumnCapturePending = false;
 
   std::unordered_map<const VGMFile *, QMdiSubWindow *> fileToWindowMap;
   std::unordered_map<QMdiSubWindow *, VGMFile *> windowToFileMap;
