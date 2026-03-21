@@ -8,6 +8,7 @@
 
 #include <QAction>
 #include <QActionGroup>
+#include <QAbstractButton>
 #include <QApplication>
 #include <QBrush>
 #include <QColor>
@@ -23,12 +24,11 @@
 #include <QPalette>
 #include <QPixmap>
 #include <QPoint>
-#include <QScreen>
+#include <QScopedValueRollback>
 #include <QShortcut>
 #include <QSignalBlocker>
 #include <QTabBar>
 #include <QToolButton>
-#include <QWindow>
 #include <algorithm>
 #include <cmath>
 #include <utility>
@@ -50,11 +50,11 @@ class TabControlStrip final : public QWidget {
 public:
   explicit TabControlStrip(QWidget *parent = nullptr) : QWidget(parent) {}
 
-  void setTextureColumn(QPixmap textureColumn) {
-    if (m_textureColumn.cacheKey() == textureColumn.cacheKey()) {
+  void setBackgroundColor(QColor backgroundColor) {
+    if (m_backgroundColor == backgroundColor) {
       return;
     }
-    m_textureColumn = std::move(textureColumn);
+    m_backgroundColor = std::move(backgroundColor);
     update();
   }
 
@@ -63,15 +63,24 @@ protected:
     Q_UNUSED(event);
 
     QPainter painter(this);
-    if (!m_textureColumn.isNull()) {
-      painter.drawTiledPixmap(rect(), m_textureColumn);
-      return;
-    }
-    painter.fillRect(rect(), palette().color(QPalette::Window));
+    painter.fillRect(rect(), m_backgroundColor.isValid() ? m_backgroundColor
+                                                         : palette().color(QPalette::Window));
   }
 
 private:
-  QPixmap m_textureColumn;
+  QColor m_backgroundColor;
+};
+
+struct FlatTabBarColors {
+  QColor stripBackground;
+  QColor activeTabBackground;
+  QColor inactiveTabBackground;
+  QColor hoveredInactiveTabBackground;
+  QColor activeText;
+  QColor inactiveText;
+  QColor disabledText;
+  QColor hoverFill;
+  QColor pressedFill;
 };
 
 struct InstructionHint {
@@ -146,6 +155,88 @@ InstructionMetrics computeInstructionMetrics(const InstructionHint &hint, const 
   return {hint, font, metrics, iconSide, spacing, QSize(width, height)};
 }
 
+QPixmap tintedPixmap(const QString &iconPath, const QSize &size, const QColor &accent) {
+  if (size.isEmpty()) {
+    return {};
+  }
+
+  const QIcon icon(iconPath);
+  const QPixmap pixmap = icon.pixmap(size);
+  if (pixmap.isNull()) {
+    return pixmap;
+  }
+
+  QPixmap tinted(size);
+  tinted.fill(Qt::transparent);
+
+  QPainter iconPainter(&tinted);
+  iconPainter.setRenderHint(QPainter::Antialiasing, true);
+  iconPainter.setRenderHint(QPainter::SmoothPixmapTransform, true);
+  iconPainter.drawPixmap(0, 0, pixmap);
+  iconPainter.setCompositionMode(QPainter::CompositionMode_SourceIn);
+  iconPainter.fillRect(tinted.rect(), accent);
+  return tinted;
+}
+
+QString cssColor(const QColor &color) {
+  return QStringLiteral("rgba(%1,%2,%3,%4)")
+      .arg(color.red())
+      .arg(color.green())
+      .arg(color.blue())
+      .arg(color.alpha());
+}
+
+FlatTabBarColors flatTabBarColors(const QWidget *context) {
+  const QWidget *paletteSource = context && context->window() ? context->window() : context;
+  const QPalette palette = paletteSource ? paletteSource->palette() : qApp->palette();
+  auto colorFor = [&](QPalette::ColorRole primary,
+                      QPalette::ColorRole fallback,
+                      const QColor &defaultColor = QColor()) {
+    QColor color = palette.color(primary);
+    if (!color.isValid()) {
+      color = palette.color(fallback);
+    }
+    return color.isValid() ? color : defaultColor;
+  };
+  auto readableTextFor = [](const QColor &background, const QColor &preferred) {
+    QColor text = preferred;
+    if (!text.isValid()) {
+      text = qGray(background.rgb()) < 128 ? QColor(244, 244, 244) : QColor(32, 32, 32);
+    }
+    if ((qGray(background.rgb()) < 128) == (qGray(text.rgb()) < 128)) {
+      text = qGray(background.rgb()) < 128 ? QColor(244, 244, 244) : QColor(32, 32, 32);
+    }
+    return text;
+  };
+  auto withAlpha = [](QColor color, int alpha) {
+    color.setAlpha(alpha);
+    return color;
+  };
+
+  const QColor stripBackground = colorFor(QPalette::Window, QPalette::Base, QColor(48, 48, 48));
+  const QColor activeTabBackground = colorFor(QPalette::Button, QPalette::Window, stripBackground);
+  const bool darkPalette = qGray(activeTabBackground.rgb()) < 128;
+  const QColor inactiveTabBackground =
+      darkPalette ? activeTabBackground.darker(152) : activeTabBackground.darker(116);
+  const QColor hoveredInactiveTabBackground =
+      darkPalette ? inactiveTabBackground.lighter(108) : inactiveTabBackground.lighter(104);
+  QColor textColor = colorFor(QPalette::ButtonText, QPalette::WindowText);
+  const QColor activeText = readableTextFor(activeTabBackground, textColor);
+  const QColor inactiveText = readableTextFor(inactiveTabBackground, textColor);
+  const QColor interactionColor = readableTextFor(inactiveTabBackground, textColor);
+
+  return {
+      inactiveTabBackground,
+      activeTabBackground,
+      inactiveTabBackground,
+      hoveredInactiveTabBackground,
+      activeText,
+      withAlpha(inactiveText, 170),
+      withAlpha(inactiveText, 96),
+      withAlpha(interactionColor, 24),
+      withAlpha(interactionColor, 40),
+  };
+}
 void paintInstruction(QPainter &painter, const InstructionMetrics &metrics, const QPoint &topLeft,
                       const QColor &accent) {
   const QSize iconSize(metrics.iconSide, metrics.iconSide);
@@ -488,14 +579,12 @@ void MdiArea::setupTabBarControls() {
       return;
     }
 
+    m_tabBar->setDrawBase(false);
     m_tabBar->setExpanding(false);
     m_tabBar->setUsesScrollButtons(true);
 #ifdef Q_OS_MAC
     m_tabBar->setElideMode(Qt::ElideNone);
 #endif
-    m_cachedActiveTabBarColumn = QPixmap();
-    m_cachedInactiveTabBarColumn = QPixmap();
-    m_tabBarColumnCapturePending = false;
     m_tabBar->installEventFilter(this);
     // QMdiArea lays out the tab bar inside a host container; reserve space against that host.
     m_tabBarHost = m_tabBar->parentWidget();
@@ -579,11 +668,14 @@ void MdiArea::setupTabBarControls() {
   }
 
   m_tabBar->setCursor(Qt::ArrowCursor);
-  m_tabBarHost->setCursor(Qt::ArrowCursor);
+  if (m_tabBarHost) {
+    m_tabBarHost->setCursor(Qt::ArrowCursor);
+  }
   m_tabControls->setCursor(Qt::ArrowCursor);
 
-  refreshTabControlAppearance();
   applyTabBarStyle();
+  refreshTabControlAppearance();
+  ensureTabCloseButtonsOnRight();
   repositionTabBarControls();
   updateTabBarControls();
 }
@@ -593,6 +685,8 @@ void MdiArea::updateTabBarControls() {
   if (!m_tabControls || !m_leftPaneButton || !m_rightPaneButton || !m_sequenceControlBarButton) {
     return;
   }
+
+  ensureTabCloseButtonsOnRight();
 
   auto *fileView = currentFileView();
   const bool hasFileView = fileView != nullptr;
@@ -642,36 +736,16 @@ void MdiArea::repositionTabBarControls() {
   m_tabControls->raise();
 }
 
-// Applies the flat, stencil-like visual style used by the tab-strip controls.
+// Applies the flat visual style shared by the tab-strip controls.
 void MdiArea::refreshTabControlAppearance() {
   if (!m_tabControls || !m_leftPaneButton || !m_rightPaneButton || !m_sequenceControlBarButton) {
     return;
   }
 
-  const bool tabBarWindowActive = m_tabBar && m_tabBar->window() && m_tabBar->window()->isActiveWindow();
-  const QPixmap &tabBarColumn = tabBarWindowActive ? m_cachedActiveTabBarColumn : m_cachedInactiveTabBarColumn;
-  static_cast<TabControlStrip *>(m_tabControls)->setTextureColumn(tabBarColumn);
-
-  const QPalette glyphPalette = m_tabBar ? m_tabBar->palette() : m_tabControls->palette();
-  QColor background = glyphPalette.color(QPalette::Window);
-  if (!background.isValid()) {
-    background = palette().color(QPalette::Window);
-  }
-  if (!background.isValid()) {
-    background = QColor(0x20, 0x20, 0x20);
-  }
-
-  const QColor baseGlyph = qGray(background.rgb()) < 128 ? QColor(Qt::white) : QColor(48, 48, 48);
-  QColor onGlyph = baseGlyph;
-  onGlyph.setAlphaF(0.74);
-  QColor offGlyph = baseGlyph;
-  offGlyph.setAlphaF(0.32);
-  QColor disabledGlyph = baseGlyph;
-  disabledGlyph.setAlphaF(0.12);
-  QColor hoverFill = baseGlyph;
-  hoverFill.setAlphaF(0.15);
-  QColor pressedFill = baseGlyph;
-  pressedFill.setAlphaF(0.22);
+  const FlatTabBarColors colors =
+      flatTabBarColors(m_tabBar ? static_cast<const QWidget *>(m_tabBar)
+                                : static_cast<const QWidget *>(m_tabControls));
+  static_cast<TabControlStrip *>(m_tabControls)->setBackgroundColor(colors.stripBackground);
 
   const QString controlsStyle = QStringLiteral(
       "QWidget#TabControlStrip QToolButton {"
@@ -681,18 +755,12 @@ void MdiArea::refreshTabControlAppearance() {
       " padding: 0px;"
       " margin: 0px;"
       "}"
-      "QWidget#TabControlStrip QToolButton:hover { background: rgba(%1,%2,%3,%4); }"
-      "QWidget#TabControlStrip QToolButton:pressed { background: rgba(%5,%6,%7,%8); }"
+      "QWidget#TabControlStrip QToolButton:hover { background: %1; }"
+      "QWidget#TabControlStrip QToolButton:pressed { background: %2; }"
       "QWidget#TabControlStrip QToolButton:disabled { background: transparent; }"
       "QWidget#TabControlStrip QToolButton::menu-indicator { image: none; width: 0px; }")
-                                   .arg(hoverFill.red())
-                                   .arg(hoverFill.green())
-                                   .arg(hoverFill.blue())
-                                   .arg(hoverFill.alpha())
-                                   .arg(pressedFill.red())
-                                   .arg(pressedFill.green())
-                                   .arg(pressedFill.blue())
-                                   .arg(pressedFill.alpha());
+                                   .arg(cssColor(colors.hoverFill))
+                                   .arg(cssColor(colors.pressedFill));
   if (m_tabControls->styleSheet() != controlsStyle) {
     m_tabControls->setStyleSheet(controlsStyle);
   }
@@ -708,7 +776,9 @@ void MdiArea::refreshTabControlAppearance() {
     if (!button) {
       return;
     }
-    const QColor glyph = !button->isEnabled() ? disabledGlyph : (onState ? onGlyph : offGlyph);
+    const QColor glyph = !button->isEnabled()
+                             ? colors.disabledText
+                             : (onState ? colors.activeText : colors.inactiveText);
     button->setIcon(panelButtonIcon(iconPath, glyph));
   };
 
@@ -719,13 +789,17 @@ void MdiArea::refreshTabControlAppearance() {
                      sequenceControlBarVisible);
 }
 
-// Re-captures tab-strip colors after the theme transition settles.
+// Reapplies tab-strip colors after the theme transition settles.
 void MdiArea::refreshTabControlsAfterThemeChange() {
-  m_cachedActiveTabBarColumn = QPixmap();
-  m_cachedInactiveTabBarColumn = QPixmap();
-  m_tabBarColumnCapturePending = false;
+  if (m_refreshingTabControlsAfterThemeChange) {
+    return;
+  }
+
+  QScopedValueRollback<bool> refreshingGuard(m_refreshingTabControlsAfterThemeChange, true);
   updateBackgroundColor();
+  applyTabBarStyle();
   refreshTabControlAppearance();
+  ensureTabCloseButtonsOnRight();
 
   if (m_tabBar) {
     m_tabBar->update();
@@ -741,13 +815,109 @@ void MdiArea::applyTabBarStyle() {
     return;
   }
 
-  const QString styleSheet =
-      QStringLiteral("QTabBar::tab { height: %1px; }").arg(Size::VTab);
+  const FlatTabBarColors colors = flatTabBarColors(m_tabBar);
+  const QColor barBackground = colors.stripBackground;
+  const QColor selectedTabBackground = colors.activeTabBackground;
+  QColor inactiveTabBorder = colors.activeText;
+  inactiveTabBorder.setAlpha(22);
+  const QString styleSheet = QStringLiteral(
+      "QTabBar {"
+      " background: %1;"
+      " qproperty-drawBase: 0;"
+      "}"
+      "QTabBar::tab {"
+      " background: %2;"
+      " color: %3;"
+      " border: none;"
+      " border-right: 1px solid %11;"
+      " border-radius: 0px;"
+      " margin: 0px;"
+      " padding: 0px 0px 0px 15px;"
+      " min-height: %4px;"
+      "}"
+      "QTabBar::tab:selected {"
+      " background: %5;"
+      " color: %6;"
+      " border-left-color: transparent;"
+      " border-right-color: transparent;"
+      "}"
+      "QTabBar::tab:hover:!selected {"
+      " background: %7;"
+      " color: %6;"
+      " border-right-color: %11;"
+      "}"
+      "QTabBar::tab:disabled {"
+      " color: %8;"
+      "}"
+      "QTabBar QToolButton {"
+      " border: none;"
+      " background: %1;"
+      " padding: 0px;"
+      " margin: 0px;"
+      "}"
+      "QTabBar QToolButton:hover {"
+      " background: %9;"
+      "}"
+      "QTabBar QToolButton:pressed {"
+      " background: %10;"
+      "}")
+                                   .arg(cssColor(barBackground))
+                                   .arg(cssColor(barBackground))
+                                   .arg(cssColor(colors.inactiveText))
+                                   .arg(Size::VTab)
+                                   .arg(cssColor(selectedTabBackground))
+                                   .arg(cssColor(colors.activeText))
+                                   .arg(cssColor(colors.hoveredInactiveTabBackground))
+                                   .arg(cssColor(colors.disabledText))
+                                   .arg(cssColor(colors.hoverFill))
+                                    .arg(cssColor(colors.pressedFill))
+                                   .arg(cssColor(inactiveTabBorder));
   // Re-setting the same stylesheet can trigger repolish churn and recursive style events.
   if (m_tabBar->styleSheet() == styleSheet) {
     return;
   }
   m_tabBar->setStyleSheet(styleSheet);
+}
+
+void MdiArea::ensureTabCloseButtonsOnRight() {
+  if (!m_tabBar || !m_tabBar->tabsClosable()) {
+    return;
+  }
+
+  for (int index = 0; index < m_tabBar->count(); ++index) {
+    QWidget *buttonWidget = m_tabBar->tabButton(index, QTabBar::RightSide);
+    if (!buttonWidget) {
+      buttonWidget = m_tabBar->tabButton(index, QTabBar::LeftSide);
+    }
+    if (!buttonWidget) {
+      continue;
+    }
+
+    if (m_tabBar->tabButton(index, QTabBar::RightSide) != buttonWidget) {
+      m_tabBar->setTabButton(index, QTabBar::LeftSide, nullptr);
+      m_tabBar->setTabButton(index, QTabBar::RightSide, buttonWidget);
+    }
+
+    auto *button = qobject_cast<QAbstractButton *>(buttonWidget);
+    if (!button || button->property("mdiCloseConnected").toBool()) {
+      continue;
+    }
+
+    connect(button, &QAbstractButton::clicked, this, [this, button]() {
+      if (!m_tabBar) {
+        return;
+      }
+
+      for (int tabIndex = 0; tabIndex < m_tabBar->count(); ++tabIndex) {
+        if (m_tabBar->tabButton(tabIndex, QTabBar::RightSide) == button ||
+            m_tabBar->tabButton(tabIndex, QTabBar::LeftSide) == button) {
+          QMetaObject::invokeMethod(m_tabBar, "tabCloseRequested", Q_ARG(int, tabIndex));
+          return;
+        }
+      }
+    });
+    button->setProperty("mdiCloseConnected", true);
+  }
 }
 
 void MdiArea::changeEvent(QEvent *event) {
@@ -781,41 +951,7 @@ bool MdiArea::eventFilter(QObject *watched, QEvent *event) {
       case QEvent::LayoutRequest:
         repositionTabBarControls();
         refreshTabControlAppearance();
-        break;
-      case QEvent::Paint:
-        if (watched == m_tabBar &&
-            ((m_tabBar->window() && m_tabBar->window()->isActiveWindow()) ?
-               m_cachedActiveTabBarColumn
-             : m_cachedInactiveTabBarColumn).isNull() && !m_tabBarColumnCapturePending) {
-          m_tabBarColumnCapturePending = true;
-          // Capture after the paint returns so the strip sees the tab bar's settled pixels.
-          QMetaObject::invokeMethod(this, [this]() {
-            m_tabBarColumnCapturePending = false;
-            const bool tabBarWindowActive = m_tabBar && m_tabBar->window() && m_tabBar->window()->isActiveWindow();
-            QPixmap &tabBarColumn = tabBarWindowActive ? m_cachedActiveTabBarColumn : m_cachedInactiveTabBarColumn;
-            if (!m_tabBar || !m_tabControls || !tabBarColumn.isNull() ||
-                m_tabBar->width() <= 0 || m_tabBar->height() <= 0) {
-              return;
-            }
-            constexpr int sampleWidth = 4;
-#ifdef Q_OS_WIN
-            auto *windowHandle = m_tabBar->window() ? m_tabBar->window()->windowHandle() : nullptr;
-            if (!windowHandle || !windowHandle->isExposed() || !windowHandle->screen()) {
-              return;
-            }
-
-            const int sampleX = std::max(0, m_tabBar->width() - sampleWidth - 1);
-            const QPoint sampleGlobal = m_tabBar->mapToGlobal(QPoint(sampleX, 0));
-            tabBarColumn =
-                windowHandle->screen()->grabWindow(0, sampleGlobal.x(), sampleGlobal.y(),
-                                                   sampleWidth, m_tabBar->height());
-#else
-            const int sampleX = std::max(0, m_tabBar->width() - sampleWidth - 1);
-            tabBarColumn = m_tabBar->grab(QRect(sampleX, 0, sampleWidth, m_tabBar->height()));
-#endif
-            static_cast<TabControlStrip *>(m_tabControls)->setTextureColumn(tabBarColumn);
-          }, Qt::QueuedConnection);
-        }
+        ensureTabCloseButtonsOnRight();
         break;
       case QEvent::StyleChange:
       case QEvent::PaletteChange:

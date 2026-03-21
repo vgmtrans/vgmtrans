@@ -10,7 +10,6 @@
 #include <unordered_map>
 #include <QMdiArea>
 #include <QMdiSubWindow>
-#include <QPixmap>
 
 class VGMFile;
 class VGMFileView;
@@ -67,6 +66,7 @@ private:
   void applyTabBarStyle();
   void refreshTabControlAppearance();
   void refreshTabControlsAfterThemeChange();
+  void ensureTabCloseButtonsOnRight();
   void updateBackgroundColor();
   static VGMFileView *asFileView(QMdiSubWindow *window);
   [[nodiscard]] VGMFileView *currentFileView() const;
@@ -93,9 +93,7 @@ private:
   PaneActions m_leftPaneActions{};
   PaneActions m_rightPaneActions{};
   int m_reservedTabBarRightMargin = 0;
-  QPixmap m_cachedActiveTabBarColumn;
-  QPixmap m_cachedInactiveTabBarColumn;
-  bool m_tabBarColumnCapturePending = false;
+  bool m_refreshingTabControlsAfterThemeChange = false;
 
   std::unordered_map<const VGMFile *, QMdiSubWindow *> fileToWindowMap;
   std::unordered_map<QMdiSubWindow *, VGMFile *> windowToFileMap;
