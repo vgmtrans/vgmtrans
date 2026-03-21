@@ -160,6 +160,9 @@ MainWindow::MainWindow() : QMainWindow(nullptr) {
 void MainWindow::createElements() {
   setDocumentMode(true);
   setTabPosition(Qt::BottomDockWidgetArea, QTabWidget::North);
+  setStyleSheet(QStringLiteral(
+      "QMainWindow::separator { background: transparent; }"
+      "QMainWindow::separator:hover { background: transparent; }"));
   setCorner(Qt::TopLeftCorner, Qt::LeftDockWidgetArea);
   setCorner(Qt::BottomLeftCorner, Qt::BottomDockWidgetArea);
   setCorner(Qt::BottomRightCorner, Qt::BottomDockWidgetArea);
