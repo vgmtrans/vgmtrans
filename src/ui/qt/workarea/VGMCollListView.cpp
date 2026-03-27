@@ -10,7 +10,6 @@
 #include <QLineEdit>
 #include <VGMColl.h>
 #include <VGMExport.h>
-#include <VGMSeq.h>
 #include "SequencePlayer.h"
 #include "widgets/ItemViewDensity.h"
 #include "workarea/MdiArea.h"
@@ -225,12 +224,17 @@ void VGMCollListView::onVGMFileSelected(VGMFile* file, const QWidget* caller) {
     return;
   }
 
-  auto *seq = dynamic_cast<VGMSeq *>(file);
-  if (!seq || seq->assocColls.empty()) {
+  if (file == nullptr) {
+    clearSelection();
+    updateSelectedCollection();
     return;
   }
 
-  VGMColl *coll = seq->assocColls.front();
+  if (file->assocColls.empty()) {
+    return;
+  }
+
+  VGMColl *coll = file->assocColls.front();
   const auto& colls = qtVGMRoot.vgmColls();
   auto it = std::find(colls.begin(), colls.end(), coll);
   if (it == colls.end()) {
