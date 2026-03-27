@@ -23,5 +23,4 @@ public:
   }
   [[nodiscard]] QList<QKeySequence> shortcutKeySequences() const override { return {Qt::Key_Return}; };
   [[nodiscard]] std::string name() const override { return "Play / Pause"; }
-  [[nodiscard]] std::optional<MenuPath> menuPath() const override { return MenuPaths::Preview; }
 };

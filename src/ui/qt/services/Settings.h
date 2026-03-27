@@ -7,6 +7,7 @@
 #pragma once
 
 #include "Options.h"
+#include <QByteArray>
 #include <QObject>
 #include <QSettings>
 #include <QStringList>
@@ -109,8 +110,22 @@ public:
   };
   RecentFilesSettings recentFiles;
 
+  struct MainWindowSettings : public SettingsGroup {
+    using SettingsGroup::SettingsGroup;
+
+    QByteArray windowGeometry() const;
+    void setWindowGeometry(const QByteArray& geometry) const;
+
+    QByteArray dockState() const;
+    void setDockState(const QByteArray& dockState) const;
+    void clearDockState() const;
+
+    QByteArray floatingDockGeometry(const QString& dockName) const;
+    void setFloatingDockGeometry(const QString& dockName, const QByteArray& geometry) const;
+  };
+  MainWindowSettings mainWindow;
+
 private:
   explicit Settings(QObject *parent = nullptr);
   QSettings settings;
 };
-

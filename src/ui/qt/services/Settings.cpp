@@ -14,7 +14,8 @@ Settings::Settings(QObject *parent)
   : QObject(parent),
     VGMFileTreeView(this),
     conversion(this),
-    recentFiles(this)
+    recentFiles(this),
+    mainWindow(this)
 {
   conversion.loadIntoOptionsStore();
 }
@@ -86,3 +87,42 @@ void Settings::RecentFilesSettings::clear() const {
   settings.endGroup();
 }
 
+QByteArray Settings::MainWindowSettings::windowGeometry() const {
+  settings.beginGroup("MainWindow");
+  const QByteArray geometry = settings.value("geometry").toByteArray();
+  settings.endGroup();
+  return geometry;
+}
+
+void Settings::MainWindowSettings::setWindowGeometry(const QByteArray& geometry) const {
+  settings.beginGroup("MainWindow");
+  settings.setValue("geometry", geometry);
+  settings.endGroup();
+}
+
+QByteArray Settings::MainWindowSettings::dockState() const {
+  settings.beginGroup("MainWindow");
+  const QByteArray dockState = settings.value("dockState").toByteArray();
+  settings.endGroup();
+  return dockState;
+}
+
+void Settings::MainWindowSettings::setDockState(const QByteArray& dockState) const {
+  settings.beginGroup("MainWindow");
+  settings.setValue("dockState", dockState);
+  settings.endGroup();
+}
+
+void Settings::MainWindowSettings::clearDockState() const {
+  settings.beginGroup("MainWindow");
+  settings.remove("dockState");
+  settings.endGroup();
+}
+
+QByteArray Settings::MainWindowSettings::floatingDockGeometry(const QString& dockName) const {
+  return settings.value(QStringLiteral("MainWindow/FloatingDocks/%1").arg(dockName)).toByteArray();
+}
+
+void Settings::MainWindowSettings::setFloatingDockGeometry(const QString& dockName, const QByteArray& geometry) const {
+  settings.setValue(QStringLiteral("MainWindow/FloatingDocks/%1").arg(dockName), geometry);
+}

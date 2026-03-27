@@ -6,6 +6,7 @@
 
 #pragma once
 
+#include <QByteArray>
 #include <QList>
 #include <QMainWindow>
 #include <QUrl>
@@ -25,6 +26,7 @@ class QDragEnterEvent;
 class QDragMoveEvent;
 class QDragLeaveEvent;
 class QDropEvent;
+class QCloseEvent;
 class QResizeEvent;
 namespace QWK {
 class WidgetWindowAgent;
@@ -45,6 +47,7 @@ protected:
   void dragMoveEvent(QDragMoveEvent *event) override;
   void dragLeaveEvent(QDragLeaveEvent *event) override;
   void dropEvent(QDropEvent *event) override;
+  void closeEvent(QCloseEvent *event) override;
   void resizeEvent(QResizeEvent *event) override;
   bool eventFilter(QObject* obj, QEvent* event) override;
 
@@ -53,6 +56,23 @@ private:
   void configureWindowAgent();
   void createStatusBar();
   void routeSignals();
+  void activateMainLayout();
+  void captureLeftDockAreaWidth();
+  void captureBottomDockAreaHeight();
+  void applyDockAreaTargets(bool applyLeftWidth, bool applyBottomHeight);
+  void captureCollectionContentsLeftDockHeight();
+  void applyPendingCollectionContentsBottomAreaHeight();
+  bool moveCollectionContentsToLeftDockIfNeeded();
+  bool moveCollectionContentsToBottomDockIfNeeded();
+  bool normalizeCollectionContentsDockPlacement();
+  void syncDockLayoutState(bool persistState);
+  void settleDockLayoutChange(bool applyAreaTargets);
+  void updateCollectionContentsWidthLock();
+  void scheduleDockStateUpdate();
+  void applyDefaultDockLayout();
+  void showRestoredFloatingDocks();
+  void resetDockLayout();
+  void saveLayoutSettings() const;
   void updateDragOverlayAppearance();
   void updateDragOverlayGeometry();
 
@@ -63,6 +83,7 @@ private:
   QDockWidget *m_rawfile_dock{};
   QDockWidget *m_vgmfile_dock{};
   QDockWidget *m_coll_dock{};
+  QDockWidget *m_coll_view_dock{};
   MenuBar *m_menu_bar{};
   PlaybackControls *m_playback_controls{};
   StatusBarContent *statusBarContent{};
@@ -73,4 +94,14 @@ private:
   WindowBar *m_windowBar{};
   QWidget *m_dragOverlay{};
   QWK::WidgetWindowAgent *m_windowAgent{};
+  QByteArray m_defaultDockState{};
+  QByteArray m_savedDockState{};
+  int m_collectionContentsLeftDockHeight{};
+  int m_pendingCollectionContentsBottomHeight{};
+  int m_leftDockAreaPreferredWidth{};
+  int m_bottomDockAreaPreferredHeight{};
+  bool m_adjustingDockLayout{};
+  bool m_restoringDockState{};
+  bool m_closingDown{};
+  bool m_dockSeparatorDragActive{};
 };

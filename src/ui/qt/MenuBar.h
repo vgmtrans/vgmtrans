@@ -40,6 +40,7 @@ signals:
   void openRecentFile(const QString& filename);
   void exit();
   void showAbout();
+  void resetDockLayout();
 
 private slots:
   void handleVGMFileContextChange(const QList<VGMFile*>& files);
@@ -73,6 +74,7 @@ private:
   QAction *menu_reset_hex_font{};
   QAction *menu_increase_hex_font{};
   QAction *menu_decrease_hex_font{};
+  QAction *menu_reset_dock_layout{};
 
   // File actions
   QAction *menu_open_file{};

@@ -15,8 +15,9 @@ void qtOpenUrlNative(const QByteArray& encodedUrl) {
     );
 
     if (cfUrl) {
-      NSURL* nsUrl = (__bridge_transfer NSURL*)cfUrl;
+      NSURL* nsUrl = (__bridge NSURL*)cfUrl;
       [[NSWorkspace sharedWorkspace] openURL:nsUrl];
+      CFRelease(cfUrl);
     } else {
       L_ERROR("Could not open bug URL: {}", encodedUrl.constData());
     }

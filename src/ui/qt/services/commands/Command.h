@@ -154,5 +154,4 @@ public:
 namespace MenuPaths {
 inline const Command::MenuPath File{"File"};
 inline const Command::MenuPath Convert{"Convert"};
-inline const Command::MenuPath Preview{"Preview"};
 }
