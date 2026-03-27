@@ -6,6 +6,7 @@
 
 #pragma once
 
+#include <QByteArray>
 #include <QList>
 #include <QMainWindow>
 #include <QUrl>
@@ -14,7 +15,6 @@
 class QWidget;
 class QDockWidget;
 class MenuBar;
-class MainWindowDockLayout;
 class PlaybackControls;
 class Logger;
 class VGMCollListView;
@@ -56,6 +56,23 @@ private:
   void configureWindowAgent();
   void createStatusBar();
   void routeSignals();
+  void activateMainLayout();
+  void captureLeftDockAreaWidth();
+  void captureBottomDockAreaHeight();
+  void applyDockAreaTargets(bool applyLeftWidth, bool applyBottomHeight);
+  void captureCollectionContentsLeftDockHeight();
+  void applyPendingCollectionContentsBottomAreaHeight();
+  bool moveCollectionContentsToLeftDockIfNeeded();
+  bool moveCollectionContentsToBottomDockIfNeeded();
+  bool normalizeCollectionContentsDockPlacement();
+  void syncDockLayoutState(bool persistState);
+  void settleDockLayoutChange(bool applyAreaTargets);
+  void updateCollectionContentsWidthLock();
+  void scheduleDockStateUpdate();
+  void applyDefaultDockLayout();
+  void showRestoredFloatingDocks();
+  void resetDockLayout();
+  void saveLayoutSettings() const;
   void updateDragOverlayAppearance();
   void updateDragOverlayGeometry();
 
@@ -77,5 +94,14 @@ private:
   WindowBar *m_windowBar{};
   QWidget *m_dragOverlay{};
   QWK::WidgetWindowAgent *m_windowAgent{};
-  MainWindowDockLayout *m_dockLayout{};
+  QByteArray m_defaultDockState{};
+  QByteArray m_savedDockState{};
+  int m_collectionContentsLeftDockHeight{};
+  int m_pendingCollectionContentsBottomHeight{};
+  int m_leftDockAreaPreferredWidth{};
+  int m_bottomDockAreaPreferredHeight{};
+  bool m_adjustingDockLayout{};
+  bool m_restoringDockState{};
+  bool m_closingDown{};
+  bool m_dockSeparatorDragActive{};
 };
