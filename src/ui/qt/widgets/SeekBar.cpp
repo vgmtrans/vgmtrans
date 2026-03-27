@@ -71,7 +71,7 @@ void SeekBar::setValue(int value) {
 }
 
 QSize SeekBar::sizeHint() const {
-  return QSize(160, 26);
+  return QSize(220, 26);
 }
 
 void SeekBar::changeEvent(QEvent* event) {

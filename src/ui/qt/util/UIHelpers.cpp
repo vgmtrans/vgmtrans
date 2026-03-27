@@ -5,8 +5,13 @@
 */
 
 #include "UIHelpers.h"
+#include "TintableSvgIconEngine.h"
+#include <QIcon>
 #include <QWidget>
 #include <QScrollArea>
+#include <QScrollBar>
+#include <QToolButton>
+#include <QStyle>
 #include <QGraphicsScene>
 #include <QGraphicsPixmapItem>
 #include <QPainter>
@@ -25,6 +30,19 @@ QScrollArea* getContainingScrollArea(const QWidget* widget) {
   return nullptr;
 }
 
+int horizontalScrollBarReservedHeight(const QAbstractScrollArea* area) {
+  const QScrollBar* hbar = area->horizontalScrollBar();
+
+  const int extent = hbar->sizeHint().height();
+  const int overlap = hbar->style()->pixelMetric(
+      QStyle::PM_ScrollView_ScrollBarOverlap,
+      nullptr,
+      hbar
+  );
+
+  return std::max(0, extent - overlap);
+}
+
 void applyEffectToPixmap(QPixmap &src, QPixmap &tgt, QGraphicsEffect *effect, int extent)
 {
   if(src.isNull()) return;  // Check if src is valid
@@ -39,6 +57,127 @@ void applyEffectToPixmap(QPixmap &src, QPixmap &tgt, QGraphicsEffect *effect, in
   tgt.fill(Qt::transparent);
   QPainter ptr(&tgt);
   scene.render(&ptr, QRectF(), QRectF(-extent, -extent, src.width() + extent*2, src.height() + extent*2));
+}
+
+QIcon stencilSvgIcon(const QString &iconPath, const QColor &color) {
+  return QIcon(new TintableSvgIconEngine(iconPath, color));
+}
+
+QIcon gradientStencilSvgIcon(const QString &iconPath, const QColor &startColor, const QColor &endColor,
+                             int angleDegrees) {
+  return QIcon(new TintableSvgIconEngine(iconPath, startColor, endColor, angleDegrees));
+}
+
+QPixmap tintedIconPixmap(const QIcon &icon, const QSize &size, const QColor &color, qreal devicePixelRatio) {
+  if (size.isEmpty()) {
+    return {};
+  }
+
+  QPixmap pixmap = icon.pixmap(size, std::max(devicePixelRatio, qreal(1.0)));
+  if (pixmap.isNull()) {
+    return pixmap;
+  }
+
+  QPainter painter(&pixmap);
+  painter.setCompositionMode(QPainter::CompositionMode_SourceIn);
+  painter.fillRect(pixmap.rect(), color);
+  return pixmap;
+}
+
+QString cssColor(const QColor &color) {
+  return QStringLiteral("rgba(%1, %2, %3, %4)")
+      .arg(color.red())
+      .arg(color.green())
+      .arg(color.blue())
+      .arg(color.alpha());
+}
+
+QColor blendColors(const QColor &foreground, const QColor &background, qreal foregroundWeight) {
+  const qreal backgroundWeight = 1.0 - foregroundWeight;
+  return QColor::fromRgbF(foreground.redF() * foregroundWeight + background.redF() * backgroundWeight,
+                          foreground.greenF() * foregroundWeight + background.greenF() * backgroundWeight,
+                          foreground.blueF() * foregroundWeight + background.blueF() * backgroundWeight,
+                          foreground.alphaF() * foregroundWeight + background.alphaF() * backgroundWeight);
+}
+
+bool isDarkPalette(const QPalette &palette) {
+  return palette.color(QPalette::Window).lightnessF() < 0.5;
+}
+
+void configureToolButton(QToolButton *button, const QString &toolTip, const QSize &buttonSize,
+                         const QSize &iconSize, bool textOnly) {
+  if (!button) {
+    return;
+  }
+
+  button->setAutoRaise(true);
+  button->setFocusPolicy(Qt::NoFocus);
+  button->setToolTip(toolTip);
+  button->setCursor(Qt::ArrowCursor);
+  button->setToolButtonStyle(textOnly ? Qt::ToolButtonTextOnly : Qt::ToolButtonIconOnly);
+
+  if (buttonSize.isValid()) {
+    button->setFixedSize(buttonSize);
+  }
+
+  if (iconSize.isValid()) {
+    button->setIconSize(iconSize);
+  }
+}
+
+QString toolBarButtonStyle(const QPalette &palette, bool checkable) {
+  const bool darkPalette = isDarkPalette(palette);
+  QColor hoverFill = palette.color(QPalette::Text);
+  hoverFill.setAlpha(darkPalette ? 18 : 12);
+  QColor pressedFill = palette.color(QPalette::Text);
+  pressedFill.setAlpha(darkPalette ? 28 : 20);
+
+  QString style = QStringLiteral(
+      "QToolButton {"
+      " border: none;"
+      " background: transparent;"
+      " border-radius: 6px;"
+      " padding: 0px;"
+      " margin: 0px;"
+      "}"
+      "QToolButton:hover { background: %1; }"
+      "QToolButton:pressed { background: %2; }")
+                      .arg(cssColor(hoverFill))
+                      .arg(cssColor(pressedFill));
+
+  if (checkable) {
+    QColor checkedFill = palette.color(QPalette::Text);
+    checkedFill.setAlpha(darkPalette ? 38 : 33);
+    style += QStringLiteral("QToolButton:checked { background: %1; }").arg(cssColor(checkedFill));
+  }
+
+  return style;
+}
+
+QColor toolBarButtonIconColor(const QPalette &palette, bool enabled) {
+  const QColor windowColor = palette.color(QPalette::Window);
+  const bool darkPalette = isDarkPalette(palette);
+  const QColor textColor =
+      enabled ? palette.color(QPalette::Text) : palette.color(QPalette::Disabled, QPalette::Text);
+  return blendColors(textColor, windowColor, enabled ? (darkPalette ? 0.72 : 0.56) : (darkPalette ? 0.6 : 0.46));
+}
+
+void refreshStencilToolButton(QToolButton *button, const QString &iconPath, const QPalette &palette,
+                              bool checkable) {
+  if (!button) {
+    return;
+  }
+
+  button->setStyleSheet(toolBarButtonStyle(palette, checkable));
+  button->setIcon(stencilSvgIcon(iconPath, toolBarButtonIconColor(palette, button->isEnabled())));
+}
+
+QString toolBarTextButtonStyle(const QPalette &palette, int leftMargin) {
+  return QStringLiteral(
+      "QToolButton { border: none; background: transparent; padding: 0px; margin: 0px 0px 0px %1px; color: %2; }"
+      "QToolButton::menu-indicator { image: none; width: 0px; }")
+      .arg(leftMargin)
+      .arg(cssColor(toolBarButtonIconColor(palette)));
 }
 
 std::filesystem::path openSaveDirDialog() {

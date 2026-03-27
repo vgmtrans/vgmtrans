@@ -29,6 +29,7 @@
 #include "VGMFileView.h"
 #include "Metrics.h"
 #include "QtVGMRoot.h"
+#include "UIHelpers.h"
 #include "services/NotificationCenter.h"
 
 namespace {
@@ -105,35 +106,15 @@ InstructionMetrics computeInstructionMetrics(const InstructionHint &hint, const 
   return {hint, font, metrics, iconSide, spacing, QSize(width, height)};
 }
 
-QPixmap tintedPixmap(const QString &iconPath, const QSize &size, const QColor &accent) {
-  if (size.isEmpty()) {
-    return {};
-  }
-
-  const QIcon icon(iconPath);
-  const QPixmap pixmap = icon.pixmap(size);
-  if (pixmap.isNull()) {
-    return pixmap;
-  }
-
-  QPixmap tinted(size);
-  tinted.fill(Qt::transparent);
-
-  QPainter iconPainter(&tinted);
-  iconPainter.setRenderHint(QPainter::Antialiasing, true);
-  iconPainter.setRenderHint(QPainter::SmoothPixmapTransform, true);
-  iconPainter.drawPixmap(0, 0, pixmap);
-  iconPainter.setCompositionMode(QPainter::CompositionMode_SourceIn);
-  iconPainter.fillRect(tinted.rect(), accent);
-  return tinted;
-}
-
 void paintInstruction(QPainter &painter, const InstructionMetrics &metrics, const QPoint &topLeft,
                       const QColor &accent) {
   const QSize iconSize(metrics.iconSide, metrics.iconSide);
   const int iconX = topLeft.x() + (metrics.size.width() - metrics.iconSide) / 2;
   const int iconY = topLeft.y();
-  const QPixmap icon = tintedPixmap(metrics.hint.iconPath, iconSize, accent);
+  const qreal devicePixelRatio =
+      painter.device() ? painter.device()->devicePixelRatioF() : qreal(1.0);
+  const QPixmap icon =
+      tintedIconPixmap(QIcon(metrics.hint.iconPath), iconSize, accent, devicePixelRatio);
   if (!icon.isNull()) {
     painter.drawPixmap(iconX, iconY, icon);
   }
@@ -174,7 +155,10 @@ void paintDetailedInstruction(QPainter &painter, const DetailedInstructionLayout
   const int rowLeft = origin.x();
   const int headingTop = origin.y();
   const QSize iconSize(layout.iconSide, layout.iconSide);
-  const QPixmap icon = tintedPixmap(layout.instruction.iconPath, iconSize, accent);
+  const qreal devicePixelRatio =
+      painter.device() ? painter.device()->devicePixelRatioF() : qreal(1.0);
+  const QPixmap icon = tintedIconPixmap(QIcon(layout.instruction.iconPath), iconSize, accent,
+                                        devicePixelRatio);
   if (!icon.isNull()) {
     const int iconY = headingTop + (layout.headingMetrics.height() - layout.iconSide) / 2;
     painter.drawPixmap(rowLeft, iconY, icon);

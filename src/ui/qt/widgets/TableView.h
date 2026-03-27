@@ -16,6 +16,7 @@ public:
   ~TableView() override = default;
 
   void setModel(QAbstractItemModel *model) override;
+  void setIconSize(const QSize &size);
 
 protected:
   void scrollContentsBy(int dx, int dy) override;

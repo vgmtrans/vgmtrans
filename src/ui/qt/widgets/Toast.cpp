@@ -12,13 +12,13 @@
 #include <QGraphicsOpacityEffect>
 #include <QIcon>
 #include <QLabel>
-#include <QPainter>
-#include <QPixmap>
 #include <QPushButton>
 #include <QScreen>
 #include <QSizePolicy>
 #include <QVariantAnimation>
 #include <QVBoxLayout>
+
+#include "UIHelpers.h"
 
 static constexpr const char* kInfoIcon    = ":/icons/toast_info.svg";
 static constexpr const char* kWarnIcon    = ":/icons/toast_warning.svg";
@@ -32,19 +32,6 @@ static const ToastTheme kThemes[] = {
   { QColor(230,201,197), QColor(155, 64, 68), QColor(173,151,151), kErrorIcon   }, // Error
   { QColor(226,242,216), QColor( 98,114, 88), QColor(198,209,188), kSuccessIcon }, // Success
 };
-
-static inline QPixmap tintedIcon(const QIcon& base, const QSize& pxSize, const QColor& color) {
-  QPixmap pm = base.pixmap(pxSize);
-  if (!pm.isNull()) {
-    const qreal dpr = pm.devicePixelRatio();
-    QPainter p(&pm);
-    p.setCompositionMode(QPainter::CompositionMode_SourceIn);
-    p.fillRect(pm.rect(), color);
-    p.end();
-    pm.setDevicePixelRatio(dpr);
-  }
-  return pm;
-}
 
 const ToastTheme& Toast::themeFor(ToastType type) noexcept {
   const int idx = static_cast<int>(type);
@@ -147,8 +134,9 @@ void Toast::applyTheme(const ToastTheme& th) {
   ).arg(th.bg.name(), th.border.name(), th.text.name()));
 
   // tint close icon
-  m_close->setIcon(QIcon(tintedIcon(QIcon(QString(kCloseIcon)),
-                                    QSize(kCloseIconPx, kCloseIconPx), th.text)));
+  m_close->setIcon(QIcon(tintedIconPixmap(QIcon(QString(kCloseIcon)),
+                                          QSize(kCloseIconPx, kCloseIconPx), th.text,
+                                          m_close->devicePixelRatioF())));
 }
 
 void Toast::setTextHtml(const QString& message) {
@@ -200,8 +188,9 @@ void Toast::showMessage(const QString& message, ToastType type, int duration_ms)
   setTextHtml(message);
 
   // main icon (tinted to theme text color)
-  m_icon->setPixmap(tintedIcon(QIcon(QString::fromUtf8(th.icon)),
-                               QSize(kIconPx, kIconPx), th.text));
+  m_icon->setPixmap(tintedIconPixmap(QIcon(QString::fromUtf8(th.icon)),
+                                     QSize(kIconPx, kIconPx), th.text,
+                                     m_icon->devicePixelRatioF()));
 
   adjustSize();
 

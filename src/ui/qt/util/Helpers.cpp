@@ -345,7 +345,7 @@ const QIcon &iconForItemType(VGMItem::Type type) {
       break;
   }
 
-  static auto i_gen = QIcon(":/icons/file.svg");
+  static auto i_gen = QIcon(":/icons/binary.svg");
   return i_gen;
 }
 

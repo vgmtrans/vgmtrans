@@ -380,8 +380,8 @@ HexView::HexView(VGMFile* vgmfile, QWidget* parent)
   m_rhiHost->show();
 
   const double appFontPointSize = QApplication::font().pointSizeF();
-  QFont font("Roboto Mono", appFontPointSize + 1.0);
-  font.setPointSizeF(appFontPointSize + 1.0);
+  QFont font("Roboto Mono", appFontPointSize);
+  font.setPointSizeF(appFontPointSize);
   setShadowStrength(SHADOW_STRENGTH);
   m_playbackGlowLow = PLAYBACK_GLOW_LOW;
   m_playbackGlowHigh = PLAYBACK_GLOW_HIGH;
