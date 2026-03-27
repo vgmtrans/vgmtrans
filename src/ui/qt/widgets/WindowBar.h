@@ -14,6 +14,7 @@
 
 class QAbstractButton;
 class QAction;
+class QToolButton;
 
 class WindowBar final : public QWidget {
   Q_OBJECT
