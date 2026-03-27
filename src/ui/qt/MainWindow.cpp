@@ -12,8 +12,11 @@
 #include <QFileInfo>
 #include <QFileDialog>
 #include <QStandardPaths>
+#include <QAbstractButton>
+#include <QDockWidget>
 #include <QGridLayout>
-#include <QPushButton>
+#include <QTimer>
+#include <QVBoxLayout>
 #if defined(Q_OS_LINUX)
 #include <QDBusConnection>
 #include <QDBusMessage>
@@ -28,11 +31,12 @@
 #include <QKeyEvent>
 #include <filesystem>
 #include <version.h>
+#include <QWKWidgets/widgetwindowagent.h>
 #include "ManualCollectionDialog.h"
 #include "MainWindow.h"
 #include "QtVGMRoot.h"
 #include "MenuBar.h"
-#include "IconBar.h"
+#include "PlaybackControls.h"
 #include "About.h"
 #include "Logger.h"
 #include "SequencePlayer.h"
@@ -47,6 +51,7 @@
 #include "TitleBar.h"
 #include "StatusBarContent.h"
 #include "LogManager.h"
+#include "widgets/WindowBar.h"
 #include "widgets/ToastHost.h"
 
 namespace {
@@ -102,12 +107,17 @@ QStringList retrievePortalDroppedFiles([[maybe_unused]] const QMimeData* mimeDat
 MainWindow::MainWindow() : QMainWindow(nullptr) {
   setWindowTitle("VGMTrans");
   setWindowIcon(QIcon(":/vgmtrans.png"));
-
-  setUnifiedTitleAndToolBarOnMac(true);
+  setAttribute(Qt::WA_DontCreateNativeAncestors);
+  setAttribute(Qt::WA_ContentsMarginsRespectsSafeArea, false);
   setAcceptDrops(true);
   setContextMenuPolicy(Qt::NoContextMenu);
+  setDockOptions(QMainWindow::AnimatedDocks | QMainWindow::AllowNestedDocks);
+
+  m_windowAgent = new QWK::WidgetWindowAgent(this);
+  m_windowAgent->setup(this);
 
   createElements();
+  configureWindowAgent();
   routeSignals();
   qApp->installEventFilter(this);
 
@@ -133,15 +143,27 @@ void MainWindow::createElements() {
   setDocumentMode(true);
   setTabPosition(Qt::BottomDockWidgetArea, QTabWidget::North);
 
+  const auto installTitleBar = [this](QDockWidget *dock, const QString& title,
+                                      TitleBar::Buttons buttons) {
+    auto *titleBar = new TitleBar(title, buttons, dock);
+    connect(titleBar, &TitleBar::hideRequested, dock, &QDockWidget::hide);
+    connect(titleBar, &TitleBar::addRequested, this, [this]() {
+      ManualCollectionDialog dialog(this);
+      dialog.exec();
+    });
+    dock->setTitleBarWidget(titleBar);
+    return titleBar;
+  };
+
   m_rawfile_dock = new QDockWidget("Raw files");
   m_rawfile_dock->setWidget(new RawFileListView());
   m_rawfile_dock->setContentsMargins(0, 0, 0, 0);
-  m_rawfile_dock->setTitleBarWidget(new TitleBar("Scanned Files"));
+  installTitleBar(m_rawfile_dock, "Scanned Files", TitleBar::HideButton);
 
   m_vgmfile_dock = new QDockWidget("Detected Music Files");
   m_vgmfile_dock->setWidget(new VGMFileListView());
   m_vgmfile_dock->setContentsMargins(0, 0, 0, 0);
-  m_vgmfile_dock->setTitleBarWidget(new TitleBar("Detected Music Files"));
+  installTitleBar(m_vgmfile_dock, "Detected Music Files", TitleBar::HideButton);
 
 
   addDockWidget(Qt::LeftDockWidgetArea, m_rawfile_dock);
@@ -152,13 +174,12 @@ void MainWindow::createElements() {
 
   m_coll_listview = new VGMCollListView();
   m_coll_view = new VGMCollView();
-  m_icon_bar = new IconBar();
+  m_playback_controls = new PlaybackControls();
 
   auto coll_list_area = new QWidget();
   auto coll_list_area_layout = new QVBoxLayout();
   coll_list_area_layout->setContentsMargins(0, 0, 0, 0);
   coll_list_area_layout->addWidget(m_coll_listview);
-  coll_list_area_layout->addWidget(m_icon_bar);
   coll_list_area->setLayout(coll_list_area_layout);
 
   auto coll_wrapper = new QWidget();
@@ -171,24 +192,90 @@ void MainWindow::createElements() {
   m_coll_dock->setWidget(coll_wrapper);
   m_coll_dock->setContentsMargins(0, 0, 0, 0);
   addDockWidget(Qt::BottomDockWidgetArea, m_coll_dock);
-  m_coll_dock->setTitleBarWidget(new QWidget());
+  installTitleBar(m_coll_dock, "Collections", TitleBar::HideButton | TitleBar::NewButton);
 
   m_logger = new Logger();
+  m_logger->setWindowTitle("Logs");
+  m_logger->setContentsMargins(0, 0, 0, 0);
   addDockWidget(Qt::BottomDockWidgetArea, m_logger);
-  m_logger->setTitleBarWidget(new QWidget());
+  if (TitleBar *loggerTitleBar = installTitleBar(m_logger, "Logs", TitleBar::HideButton)) {
+    m_logger->installTitleBarControls(loggerTitleBar);
+  }
 
   tabifyDockWidget(m_logger, m_coll_dock);
   m_coll_dock->setFocus();
 
-  QList<QDockWidget *> docks = findChildren<QDockWidget *>(QString(), Qt::FindDirectChildrenOnly);
-  m_menu_bar = new MenuBar(this, docks);
-  setMenuBar(m_menu_bar);
+  const QList<QDockWidget *> viewMenuDocks{
+      m_vgmfile_dock,
+      m_coll_dock,
+      m_rawfile_dock,
+      m_logger,
+  };
+
+  m_windowBar = new WindowBar(this);
+
+#if defined(Q_OS_MACOS) || defined(Q_OS_MAC)
+  m_menu_bar = new MenuBar(nullptr, viewMenuDocks);
+  m_menu_bar->setNativeMenuBar(true);
+#else
+  m_menu_bar = new MenuBar(nullptr, viewMenuDocks);
+  m_menu_bar->setNativeMenuBar(false);
+  m_windowBar->setMenuBarWidget(m_menu_bar);
+#endif
+  m_menu_bar->setShortcutHost(this);
+  m_windowBar->setCenterWidget(m_playback_controls);
+  m_windowBar->setDockToggleButtons({
+      {m_vgmfile_dock->toggleViewAction(), QStringLiteral(":/icons/music-box-outline.svg")},
+      {m_coll_dock->toggleViewAction(), QStringLiteral(":/icons/music-box-multiple-outline.svg")},
+      {m_rawfile_dock->toggleViewAction(), QStringLiteral(":/icons/file-search-outline.svg")},
+      {m_logger->toggleViewAction(), QStringLiteral(":/icons/book-open-variant-outline.svg")},
+  });
   createStatusBar();
   m_toastHost = new ToastHost(this);
 }
 
+void MainWindow::configureWindowAgent() {
+  if (!m_windowAgent || !m_windowBar) {
+    return;
+  }
+
+  m_windowAgent->setTitleBar(m_windowBar);
+  if (QWidget *dockControls = m_windowBar->dockControls()) {
+    m_windowAgent->setHitTestVisible(dockControls, true);
+  }
+  if (QWidget *menuBarWidget = m_windowBar->menuBarWidget()) {
+    m_windowAgent->setHitTestVisible(menuBarWidget, true);
+  }
+  if (QWidget *centerWidget = m_windowBar->centerWidget()) {
+    for (QWidget *child : centerWidget->findChildren<QWidget *>(Qt::FindDirectChildrenOnly)) {
+      m_windowAgent->setHitTestVisible(child, true);
+    }
+  }
+
+#if defined(Q_OS_MACOS) || defined(Q_OS_MAC)
+  m_windowAgent->setWindowAttribute(QStringLiteral("no-system-buttons"), false);
+  setMenuWidget(m_windowBar);
+  m_windowAgent->setSystemButtonArea(m_windowBar->systemButtonArea());
+#else
+  if (QAbstractButton *windowIconButton = m_windowBar->windowIconButton()) {
+    m_windowAgent->setSystemButton(QWK::WindowAgentBase::WindowIcon, windowIconButton);
+  }
+  if (QAbstractButton *minimizeButton = m_windowBar->minimizeButton()) {
+    m_windowAgent->setSystemButton(QWK::WindowAgentBase::Minimize, minimizeButton);
+  }
+  if (QAbstractButton *maximizeButton = m_windowBar->maximizeButton()) {
+    m_windowAgent->setSystemButton(QWK::WindowAgentBase::Maximize, maximizeButton);
+  }
+  if (QAbstractButton *closeButton = m_windowBar->closeButton()) {
+    m_windowAgent->setSystemButton(QWK::WindowAgentBase::Close, closeButton);
+  }
+  setMenuWidget(m_windowBar);
+#endif
+}
+
 void MainWindow::createStatusBar() {
   statusBarContent = new StatusBarContent;
+  statusBar()->setSizeGripEnabled(false);
   statusBar()->setMaximumHeight(statusBarContent->maximumHeight());
   statusBar()->addPermanentWidget(statusBarContent, 1);
 }
@@ -207,6 +294,17 @@ void MainWindow::showEvent(QShowEvent* event) {
   resizeDocks({m_rawfile_dock, m_vgmfile_dock, m_coll_dock}, sizes, Qt::Vertical);
 
   updateDragOverlayGeometry();
+
+#if defined(Q_OS_MACOS) || defined(Q_OS_MAC)
+  QTimer::singleShot(0, this, [this]() {
+    if (!m_windowAgent || !m_windowBar) {
+      return;
+    }
+
+    m_windowAgent->setSystemButtonArea(nullptr);
+    m_windowAgent->setSystemButtonArea(m_windowBar->systemButtonArea());
+  });
+#endif
 }
 
 void MainWindow::routeSignals() {
@@ -218,15 +316,14 @@ void MainWindow::routeSignals() {
     about.exec();
   });
 
-  connect(m_icon_bar, &IconBar::playToggle, m_coll_listview,
+  connect(m_playback_controls, &PlaybackControls::playToggle, m_coll_listview,
           &VGMCollListView::handlePlaybackRequest);
-  connect(m_coll_listview, &VGMCollListView::nothingToPlay, m_icon_bar, &IconBar::showPlayInfo);
-  connect(m_icon_bar, &IconBar::stopPressed, m_coll_listview, &VGMCollListView::handleStopRequest);
-  connect(m_icon_bar, &IconBar::seekingTo, &SequencePlayer::the(), &SequencePlayer::seek);
-  connect(m_icon_bar, &IconBar::createPressed, [this]() {
-    ManualCollectionDialog wiz(this);
-    wiz.exec();
-  });
+  connect(m_coll_listview, &VGMCollListView::nothingToPlay, m_playback_controls,
+          &PlaybackControls::showPlayInfo);
+  connect(m_playback_controls, &PlaybackControls::stopPressed, m_coll_listview,
+          &VGMCollListView::handleStopRequest);
+  connect(m_playback_controls, &PlaybackControls::seekingTo, &SequencePlayer::the(),
+          &SequencePlayer::seek);
   connect(&qtVGMRoot, &QtVGMRoot::UI_toastRequested, this, &MainWindow::showToast);
 
   auto *playShortcut = new QShortcut(QKeySequence(Qt::Key_Space), this);

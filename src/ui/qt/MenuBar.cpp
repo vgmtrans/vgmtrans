@@ -45,6 +45,10 @@ MenuBar::MenuBar(QWidget *parent, const QList<QDockWidget *> &dockWidgets) : QMe
           this, &MenuBar::handleRawFileContextChange);
 }
 
+void MenuBar::setShortcutHost(QWidget *host) {
+  m_shortcutHost = host;
+}
+
 void MenuBar::appendFileMenu() {
   m_fileMenu = addMenu("File");
   m_topLevelMenus.insert("File", m_fileMenu);
@@ -347,6 +351,9 @@ void MenuBar::refreshContextualMenus() {
 void MenuBar::clearContextualMenus() {
   for (auto& [menu, actions] : m_contextActions) {
     for (auto* action : actions) {
+      if (m_shortcutHost && action) {
+        m_shortcutHost->removeAction(action);
+      }
       if (menu && action) {
         menu->removeAction(action);
         action->deleteLater();

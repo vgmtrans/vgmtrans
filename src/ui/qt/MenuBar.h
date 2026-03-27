@@ -12,6 +12,7 @@
 #include <QMap>
 #include <QMenu>
 #include <QMenuBar>
+#include <QPointer>
 
 #include <algorithm>
 #include <map>
@@ -32,6 +33,7 @@ class MenuBar final : public QMenuBar {
 public:
   explicit MenuBar(QWidget *parent = nullptr, const QList<QDockWidget *>& dockWidgets = {});
   void updateRecentFilesMenu();
+  void setShortcutHost(QWidget *host);
 
 signals:
   void openFile();
@@ -89,6 +91,7 @@ private:
   std::vector<QMenu*> m_dynamicSubmenus;
   std::map<QMenu*, std::vector<QAction*>> m_contextActions;
   std::map<QMenu*, QAction*> m_contextSeparators;
+  QPointer<QWidget> m_shortcutHost;
 
   QList<VGMFile*> m_selectedVGMFiles;
   QList<VGMColl*> m_selectedVGMColls;
@@ -118,6 +121,13 @@ void MenuBar::appendContextualCommands(const MenuManager::MenuCommandMap& comman
     }
 
     auto actions = MenuManager::the()->createActionsForCommands<Base>(commandList, items, targetMenu, false);
+    if (m_shortcutHost) {
+      for (auto *action : actions) {
+        if (action) {
+          m_shortcutHost->addAction(action);
+        }
+      }
+    }
     auto& storedActions = m_contextActions[targetMenu];
     storedActions.insert(storedActions.end(), actions.begin(), actions.end());
 

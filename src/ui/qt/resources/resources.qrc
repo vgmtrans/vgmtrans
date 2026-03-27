@@ -3,15 +3,12 @@
   <file>vgmtrans.png</file>
   <file>fonts/Roboto_Mono/RobotoMono-VariableFont_wght.ttf</file>
   <file>icons/open_file.svg</file>
-  <file>icons/player_play.svg</file>
-  <file>icons/player_pause.svg</file>
-  <file>icons/player_stop.svg</file>
-  <file>icons/player_next.svg</file>
-  <file>icons/player_prev.svg</file>
+  <file>icons/play.svg</file>
+  <file>icons/pause.svg</file>
+  <file>icons/stop.svg</file>
   <file>icons/sequence.svg</file>
   <file>icons/sample-collection.svg</file>
   <file>icons/sample.svg</file>
-  <file>icons/file.svg</file>
   <file>icons/file-outline.svg</file>
   <file>icons/collection.svg</file>
   <file>icons/instrument-set.svg</file>
@@ -42,7 +39,21 @@
   <file>icons/toast_error.svg</file>
   <file>icons/toast_success.svg</file>
   <file>icons/toast_close.svg</file>
+  <file>icons/minus.svg</file>
+  <file>icons/plus.svg</file>
+  <file>icons/file-search-outline.svg</file>
+  <file>icons/music-box-outline.svg</file>
+  <file>icons/music-box-multiple-outline.svg</file>
+  <file>icons/book-open-variant-outline.svg</file>
+  <file>icons/package-variant.svg</file>
+  <file>icons/trash-can-outline.svg</file>
+  <file>icons/export.svg</file>
+  <file>window-bar/minimize.svg</file>
+  <file>window-bar/maximize.svg</file>
+  <file>window-bar/restore.svg</file>
+  <file>window-bar/close.svg</file>
   <file alias="legal/VGMTrans">../../../../LICENSE</file>
+  <file alias="legal/QWindowKit">../../../../lib/qwindowkit/LICENSE</file>
   <file alias="legal/zlib">../../../../lib/zlib/LICENSE</file>
   <file alias="legal/unarr">../../../../lib/unarr/COPYING</file>
   <file alias="legal/spdlog">../../../../lib/spdlog/LICENSE</file>

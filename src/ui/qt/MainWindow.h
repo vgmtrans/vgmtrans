@@ -14,18 +14,21 @@
 class QWidget;
 class QDockWidget;
 class MenuBar;
-class IconBar;
+class PlaybackControls;
 class Logger;
 class VGMCollListView;
 class VGMCollView;
-class QPushButton;
 class StatusBarContent;
 class ToastHost;
+class WindowBar;
 class QDragEnterEvent;
 class QDragMoveEvent;
 class QDragLeaveEvent;
 class QDropEvent;
 class QResizeEvent;
+namespace QWK {
+class WidgetWindowAgent;
+}
 
 class MainWindow final : public QMainWindow {
   Q_OBJECT
@@ -47,6 +50,7 @@ protected:
 
 private:
   void createElements();
+  void configureWindowAgent();
   void createStatusBar();
   void routeSignals();
   void updateDragOverlayAppearance();
@@ -60,12 +64,13 @@ private:
   QDockWidget *m_vgmfile_dock{};
   QDockWidget *m_coll_dock{};
   MenuBar *m_menu_bar{};
-  IconBar *m_icon_bar{};
+  PlaybackControls *m_playback_controls{};
   StatusBarContent *statusBarContent{};
   Logger *m_logger{};
   VGMCollListView *m_coll_listview{};
   VGMCollView *m_coll_view{};
-  QPushButton *m_manual_creation_btn{};
   ToastHost *m_toastHost{};
+  WindowBar *m_windowBar{};
   QWidget *m_dragOverlay{};
+  QWK::WidgetWindowAgent *m_windowAgent{};
 };

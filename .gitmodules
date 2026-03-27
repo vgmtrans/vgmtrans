@@ -10,3 +10,6 @@
 [submodule "lib/fmt"]
 	path = lib/fmt
 	url = https://github.com/fmtlib/fmt.git
+[submodule "lib/qwindowkit"]
+	path = lib/qwindowkit
+	url = https://github.com/stdware/qwindowkit.git

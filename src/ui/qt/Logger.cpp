@@ -6,20 +6,24 @@
 
 #include "Logger.h"
 
-#include <QComboBox>
+#include <QActionGroup>
 #include <QColor>
 #include <QFileDialog>
 #include <QFontDatabase>
-#include <QGridLayout>
+#include <QFrame>
+#include <QMenu>
 #include <QPlainTextEdit>
-#include <QPushButton>
 #include <QSaveFile>
 #include <QTextCharFormat>
 #include <QTextCursor>
 #include <QTimer>
+#include <QToolButton>
 #include <QPalette>
+#include <QWidget>
 #include <LogItem.h>
 #include "QtVGMRoot.h"
+#include "TitleBar.h"
+#include "util/UIHelpers.h"
 
 static Logger *s_instance = nullptr;
 
@@ -27,6 +31,39 @@ namespace {
 
 constexpr int FLUSH_INTERVAL_MS = 500;
 constexpr int FLUSH_MESSAGE_THRESHOLD = 5000;
+constexpr int kAccessoryButtonWidth = 22;
+constexpr int kAccessoryButtonHeight = 20;
+constexpr int kAccessoryIconSize = 16;
+constexpr int kFilterButtonLeftMargin = 6;
+constexpr int kLoggerMinimumWidth = 240;
+
+QString filterButtonText(int level) {
+  switch (level) {
+  case LOG_LEVEL_ERR:
+    return QStringLiteral(u"Errors ▾");
+  case LOG_LEVEL_WARN:
+    return QStringLiteral(u"Warnings+ ▾");
+  case LOG_LEVEL_INFO:
+    return QStringLiteral(u"Info+ ▾");
+  case LOG_LEVEL_DEBUG:
+  default:
+    return QStringLiteral(u"Debug ▾");
+  }
+}
+
+QString filterMenuText(int level) {
+  switch (level) {
+  case LOG_LEVEL_ERR:
+    return QStringLiteral("Errors");
+  case LOG_LEVEL_WARN:
+    return QStringLiteral("Errors, warnings");
+  case LOG_LEVEL_INFO:
+    return QStringLiteral("Errors, warnings, information");
+  case LOG_LEVEL_DEBUG:
+  default:
+    return QStringLiteral("Complete debug information");
+  }
+}
 
 QString levelPrefix(LogLevel level) {
   switch (level) {
@@ -62,47 +99,26 @@ Logger::Logger(QWidget *parent)
     : QDockWidget("Log", parent), m_level(LOG_LEVEL_INFO), m_flushTimer(new QTimer(this)) {
   s_instance = this;
   setAllowedAreas(Qt::AllDockWidgetAreas);
+  setMinimumWidth(kLoggerMinimumWidth);
 
   createElements();
   connectElements();
 }
 
 void Logger::createElements() {
-  logger_wrapper = new QWidget;
-
-  logger_textarea = new QPlainTextEdit(logger_wrapper);
+  logger_textarea = new QPlainTextEdit(this);
   logger_textarea->setReadOnly(true);
   logger_textarea->setVerticalScrollBarPolicy(Qt::ScrollBarAsNeeded);
   logger_textarea->setHorizontalScrollBarPolicy(Qt::ScrollBarAsNeeded);
   logger_textarea->setFont(QFontDatabase::systemFont(QFontDatabase::FixedFont));
+  logger_textarea->setFrameStyle(QFrame::NoFrame);
   m_flushTimer->setSingleShot(true);
   connect(m_flushTimer, &QTimer::timeout, this, &Logger::flushPending);
 
-  logger_filter = new QComboBox(logger_wrapper);
-  logger_filter->setEditable(false);
-  logger_filter->addItems({"Errors", "Errors, warnings", "Errors, warnings, information",
-                           "Complete debug information"});
-  logger_filter->setCurrentIndex(m_level);
-
-  logger_clear = new QPushButton("Clear", logger_wrapper);
-  logger_save = new QPushButton("Export log", logger_wrapper);
-
-  QGridLayout *logger_layout = new QGridLayout;
-  logger_layout->addWidget(logger_filter, 0, 0);
-  logger_layout->addWidget(logger_clear, 0, 1);
-  logger_layout->addWidget(logger_save, 0, 2);
-  logger_layout->addWidget(logger_textarea, 1, 0, 1, -1);
-
-  logger_wrapper->setLayout(logger_layout);
-
-  setWidget(logger_wrapper);
-};
+  setWidget(logger_textarea);
+}
 
 void Logger::connectElements() {
-  connect(logger_clear, &QPushButton::pressed, this, &Logger::clearLog);
-  connect(logger_filter, QOverload<int>::of(&QComboBox::currentIndexChanged),
-          [this](int level) { m_level = level; });
-  connect(logger_save, &QPushButton::pressed, this, &Logger::exportLog);
   connect(&qtVGMRoot, &QtVGMRoot::UI_log, this, &Logger::push);
 }
 
@@ -112,6 +128,57 @@ QString Logger::getLogText() {
     return s_instance->logger_textarea->toPlainText();
   }
   return {};
+}
+
+void Logger::installTitleBarControls(TitleBar *titleBar) {
+  if (!titleBar) {
+    return;
+  }
+
+  m_titleBar = titleBar;
+
+  const auto addIconButton = [titleBar](const QString &toolTip) {
+    auto *button = new QToolButton(titleBar);
+    configureToolButton(button, toolTip, QSize(kAccessoryButtonWidth, kAccessoryButtonHeight),
+                        QSize(kAccessoryIconSize, kAccessoryIconSize));
+    titleBar->addLeadingWidget(button);
+    return button;
+  };
+
+  m_filterButton = new QToolButton(titleBar);
+  configureToolButton(m_filterButton, QStringLiteral("Log level"), QSize(), QSize(), true);
+  m_filterButton->setPopupMode(QToolButton::InstantPopup);
+  m_filterButton->setText(filterButtonText(m_level));
+  QFont font = m_filterButton->font();
+  font.setPointSizeF(font.pointSizeF() + 0.10);
+  m_filterButton->setFont(font);
+  m_filterButton->setMinimumWidth(m_filterButton->fontMetrics().horizontalAdvance(filterButtonText(LOG_LEVEL_WARN)));
+
+  auto *filterMenu = new QMenu(m_filterButton);
+  auto *filterActions = new QActionGroup(filterMenu);
+  filterActions->setExclusive(true);
+  for (int level = LOG_LEVEL_ERR; level <= LOG_LEVEL_DEBUG; ++level) {
+    QAction *action = filterMenu->addAction(filterMenuText(level));
+    action->setData(level);
+    action->setCheckable(true);
+    action->setChecked(level == m_level);
+    filterActions->addAction(action);
+  }
+  connect(filterActions, &QActionGroup::triggered, this,
+          [this](QAction *action) { setLevel(action ? action->data().toInt() : LOG_LEVEL_INFO); });
+  m_filterButton->setMenu(filterMenu);
+  titleBar->addLeadingWidget(m_filterButton);
+
+  m_clearButton = addIconButton(QStringLiteral("Clear All"));
+  connect(m_clearButton, &QToolButton::clicked, this, &Logger::clearLog);
+  auto *buttonSpacer = new QWidget(titleBar);
+  buttonSpacer->setFixedWidth(6);
+  titleBar->addLeadingWidget(buttonSpacer);
+  m_exportButton = addIconButton(QStringLiteral("Export Log"));
+  connect(m_exportButton, &QToolButton::clicked, this, &Logger::exportLog);
+
+  connect(titleBar, &TitleBar::appearanceChanged, this, &Logger::refreshTitleBarControls);
+  refreshTitleBarControls();
 }
 
 void Logger::exportLog() {
@@ -126,7 +193,9 @@ void Logger::exportLog() {
   }
 
   QSaveFile log(path);
-  log.open(QIODevice::WriteOnly);
+  if (!log.open(QIODevice::WriteOnly)) {
+    return;
+  }
 
   QByteArray out_buf;
   out_buf.append(logger_textarea->toPlainText().toUtf8());
@@ -138,6 +207,40 @@ void Logger::clearLog() {
   m_flushTimer->stop();
   m_pendingMessages.clear();
   logger_textarea->clear();
+}
+
+void Logger::setLevel(int level) {
+  m_level = level;
+  if (!m_filterButton) {
+    return;
+  }
+
+  m_filterButton->setText(filterButtonText(level));
+  if (QMenu *filterMenu = m_filterButton->menu()) {
+    for (QAction *action : filterMenu->actions()) {
+      action->setChecked(action->data().toInt() == level);
+    }
+  }
+}
+
+void Logger::refreshTitleBarControls() {
+  if (!m_titleBar) {
+    return;
+  }
+
+  const QPalette palette = m_titleBar->palette();
+
+  if (m_filterButton) {
+    m_filterButton->setStyleSheet(toolBarTextButtonStyle(palette, kFilterButtonLeftMargin));
+  }
+
+  if (m_clearButton) {
+    refreshStencilToolButton(m_clearButton, QStringLiteral(":/icons/trash-can-outline.svg"), palette);
+  }
+
+  if (m_exportButton) {
+    refreshStencilToolButton(m_exportButton, QStringLiteral(":/icons/export.svg"), palette);
+  }
 }
 
 void Logger::push(const LogItem *item) {

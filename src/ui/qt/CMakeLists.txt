@@ -5,6 +5,17 @@ find_package(Qt6 COMPONENTS GuiPrivate QUIET)
 message(STATUS "Using Qt: ${Qt6_VERSION}")
 message(STATUS "Has own QtGuiPrivate: ${Qt6GuiPrivate_FOUND}")
 
+if(NOT TARGET QWindowKit::Widgets)
+  set(QWINDOWKIT_BUILD_STATIC ON CACHE BOOL "" FORCE)
+  set(QWINDOWKIT_BUILD_WIDGETS ON CACHE BOOL "" FORCE)
+  set(QWINDOWKIT_BUILD_QUICK OFF CACHE BOOL "" FORCE)
+  set(QWINDOWKIT_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
+  set(QWINDOWKIT_INSTALL OFF CACHE BOOL "" FORCE)
+  add_subdirectory(${PROJECT_SOURCE_DIR}/lib/qwindowkit
+                   ${CMAKE_CURRENT_BINARY_DIR}/lib/qwindowkit
+                   EXCLUDE_FROM_ALL)
+endif()
+
 # D-Bus is used on Linux for the XDG FileTransfer portal
 # and on macOS to workaround a macdeployqt bug
 if(CMAKE_SYSTEM_NAME MATCHES "Darwin|FreeBSD|OpenBSD|Linux")
@@ -25,7 +36,7 @@ add_executable(vgmtrans ${GUI_TYPE})
 target_sources(vgmtrans
   PRIVATE
     About.cpp
-    IconBar.cpp
+    PlaybackControls.cpp
     Logger.cpp
     MainWindow.cpp
     ManualCollectionDialog.cpp
@@ -48,6 +59,7 @@ target_sources(vgmtrans
     widgets/ToastHost.cpp
     widgets/TableView.cpp
     widgets/TitleBar.cpp
+    widgets/WindowBar.cpp
     workarea/hexview/HexView.cpp
     workarea/hexview/HexViewRhiHost.cpp
     workarea/hexview/HexViewRhiRenderer.cpp
@@ -65,7 +77,7 @@ target_sources(vgmtrans
     FILE_SET HEADERS TYPE HEADERS
     FILES
       About.h
-      IconBar.h
+      PlaybackControls.h
       Logger.h
       MainWindow.h
       ManualCollectionDialog.h
@@ -102,6 +114,7 @@ target_sources(vgmtrans
       widgets/TitleBar.h
       widgets/Toast.h
       widgets/ToastHost.h
+      widgets/WindowBar.h
   PRIVATE
     FILE_SET headers_workarea TYPE HEADERS BASE_DIRS workarea
     FILES
@@ -133,6 +146,7 @@ target_compile_features(vgmtrans PRIVATE cxx_std_20)
 target_link_libraries(
   vgmtrans
   PRIVATE vgmtranscore
+          QWindowKit::Widgets
           Qt6::Widgets
           Qt6::GuiPrivate
           Qt6::Svg

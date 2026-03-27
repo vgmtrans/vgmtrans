@@ -10,10 +10,10 @@
 #include <QString>
 
 class QPlainTextEdit;
-class QComboBox;
-class QPushButton;
 class QTimer;
+class QToolButton;
 class LogItem;
+class TitleBar;
 enum LogLevel : int;
 
 class Logger : public QDockWidget {
@@ -22,27 +22,32 @@ class Logger : public QDockWidget {
 public:
   explicit Logger(QWidget *parent = nullptr);
   static QString getLogText();
+  int level() const { return m_level; }
+  void installTitleBarControls(TitleBar *titleBar);
 
   void push(const LogItem *item);
+
+public slots:
+  void exportLog();
+  void clearLog();
+  void setLevel(int level);
 
 private:
   void createElements();
   void connectElements();
-  void exportLog();
-  void clearLog();
   void flushPending();
+  void refreshTitleBarControls();
 
   struct PendingMessage {
     QString text;
     LogLevel level;
   };
 
-  QWidget *logger_wrapper;
+  TitleBar *m_titleBar{};
   QPlainTextEdit *logger_textarea;
-
-  QComboBox *logger_filter;
-  QPushButton *logger_clear;
-  QPushButton *logger_save;
+  QToolButton *m_filterButton{};
+  QToolButton *m_clearButton{};
+  QToolButton *m_exportButton{};
 
   int m_level;
   QTimer *m_flushTimer;
