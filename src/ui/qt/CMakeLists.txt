@@ -92,6 +92,7 @@ target_sources(vgmtrans
   PRIVATE
     FILE_SET headers_widgets TYPE HEADERS BASE_DIRS widgets
     FILES
+      widgets/FixedHeightListDelegate.h
       widgets/ItemViewDensity.h
       widgets/SeekBar.h
       widgets/MarqueeLabel.h

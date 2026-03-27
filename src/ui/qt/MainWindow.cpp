@@ -151,7 +151,7 @@ void MainWindow::createElements() {
   setCentralWidget(MdiArea::the());
 
   m_coll_listview = new VGMCollListView();
-  m_coll_view = new VGMCollView(m_coll_listview->selectionModel());
+  m_coll_view = new VGMCollView();
   m_icon_bar = new IconBar();
 
   auto coll_list_area = new QWidget();

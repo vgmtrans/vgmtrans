@@ -6,9 +6,9 @@
 
 #pragma once
 #include <QAbstractListModel>
-#include <QStyledItemDelegate>
 #include <QListView>
 #include <QKeyEvent>
+#include "widgets/FixedHeightListDelegate.h"
 
 class VGMColl;
 class VGMFile;
@@ -27,9 +27,10 @@ private:
   bool isLoadingRawFile = false;
 };
 
-class VGMCollNameEditor : public QStyledItemDelegate {
+class VGMCollNameEditor : public FixedHeightListDelegate {
 public:
-  explicit VGMCollNameEditor(QObject* parent = nullptr) : QStyledItemDelegate(parent) {}
+  explicit VGMCollNameEditor(int itemHeight, QObject* parent = nullptr)
+      : FixedHeightListDelegate(itemHeight, parent) {}
 
 protected:
   void setEditorData(QWidget *editor, const QModelIndex &index) const override;
@@ -54,5 +55,6 @@ private:
   void keyPressEvent(QKeyEvent *e) override;
   void onSelectionChanged(const QItemSelection &selected, const QItemSelection &deselected);
   void onVGMFileSelected(VGMFile* file, const QWidget* caller);
+  void updateSelectedCollection() const;
   void updateContextualMenus() const;
 };

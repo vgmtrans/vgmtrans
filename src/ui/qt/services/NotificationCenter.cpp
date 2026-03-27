@@ -34,6 +34,10 @@ void NotificationCenter::selectVGMFile(VGMFile* vgmfile, QWidget* caller) {
   emit vgmFileSelected(vgmfile, caller);
 }
 
+void NotificationCenter::selectVGMColl(VGMColl* coll, QWidget* caller) {
+  emit vgmCollSelected(coll, caller);
+}
+
 void NotificationCenter::setSeekModifierActive(bool active) {
   emit seekModifierChanged(active);
 }

@@ -10,8 +10,8 @@
 #include <QLineEdit>
 #include <VGMColl.h>
 #include <VGMExport.h>
-#include <VGMSeq.h>
 #include "SequencePlayer.h"
+#include "widgets/ItemViewDensity.h"
 #include "workarea/MdiArea.h"
 #include "QtVGMRoot.h"
 #include "services/MenuManager.h"
@@ -115,20 +115,23 @@ void VGMCollNameEditor::setModelData(QWidget *editor, QAbstractItemModel *model,
 VGMCollListView::VGMCollListView(QWidget *parent) : QListView(parent) {
   auto model = new VGMCollListViewModel(this);
   VGMCollListView::setModel(model);
-  setItemDelegate(new VGMCollNameEditor(this));
 
   setContextMenuPolicy(Qt::CustomContextMenu);
   setSelectionMode(QAbstractItemView::ExtendedSelection);
   setResizeMode(QListView::Adjust);
   setIconSize(QSize(16, 16));
+  setItemDelegate(new VGMCollNameEditor(ItemViewDensity::listItemHeight(this), this));
+  ItemViewDensity::apply(this);
   setWrapping(true);
 
 #ifdef Q_OS_MAC
   // On MacOS, a wrapping QListView gives unwanted padding to the scrollbar. This compensates.
-  int scrollBarThickness = style()->pixelMetric(QStyle::PM_ScrollBarExtent);
-  QMargins margins = viewportMargins();
-  margins.setBottom(margins.bottom() - scrollBarThickness);
-  setViewportMargins(margins);
+  if (isWrapping()) {
+    int scrollBarThickness = style()->pixelMetric(QStyle::PM_ScrollBarExtent);
+    QMargins margins = viewportMargins();
+    margins.setBottom(margins.bottom() - scrollBarThickness);
+    setViewportMargins(margins);
+  }
 #endif
 
   connect(this, &QListView::doubleClicked, this,
@@ -143,6 +146,8 @@ VGMCollListView::VGMCollListView(QWidget *parent) : QListView(parent) {
     }
   });
   connect(selectionModel(), &QItemSelectionModel::selectionChanged, this, &VGMCollListView::onSelectionChanged);
+  connect(selectionModel(), &QItemSelectionModel::currentChanged, this,
+          [this](const QModelIndex&, const QModelIndex&) { updateSelectedCollection(); });
   connect(NotificationCenter::the(), &NotificationCenter::vgmFileSelected, this,
           &VGMCollListView::onVGMFileSelected);
 }
@@ -205,6 +210,7 @@ void VGMCollListView::handleStopRequest() {
 
 void VGMCollListView::onSelectionChanged(const QItemSelection&, const QItemSelection&) {
   updateContextualMenus();
+  updateSelectedCollection();
 }
 
 void VGMCollListView::onVGMFileSelected(VGMFile* file, const QWidget* caller) {
@@ -212,12 +218,17 @@ void VGMCollListView::onVGMFileSelected(VGMFile* file, const QWidget* caller) {
     return;
   }
 
-  auto *seq = dynamic_cast<VGMSeq *>(file);
-  if (!seq || seq->assocColls.empty()) {
+  if (file == nullptr) {
+    clearSelection();
+    updateSelectedCollection();
     return;
   }
 
-  VGMColl *coll = seq->assocColls.front();
+  if (file->assocColls.empty()) {
+    return;
+  }
+
+  VGMColl *coll = file->assocColls.front();
   const auto& colls = qtVGMRoot.vgmColls();
   auto it = std::find(colls.begin(), colls.end(), coll);
   if (it == colls.end()) {
@@ -234,6 +245,31 @@ void VGMCollListView::onVGMFileSelected(VGMFile* file, const QWidget* caller) {
   selectionModel()->setCurrentIndex(index, QItemSelectionModel::ClearAndSelect);
   blockSignals(false);
   scrollTo(index, QAbstractItemView::EnsureVisible);
+}
+
+void VGMCollListView::updateSelectedCollection() const {
+  if (!selectionModel() || !selectionModel()->hasSelection()) {
+    NotificationCenter::the()->selectVGMColl(nullptr, const_cast<VGMCollListView*>(this));
+    return;
+  }
+
+  QModelIndex index = selectionModel()->currentIndex();
+  if (!index.isValid()) {
+    const QModelIndexList selected = selectionModel()->selectedRows();
+    if (selected.isEmpty()) {
+      NotificationCenter::the()->selectVGMColl(nullptr, const_cast<VGMCollListView*>(this));
+      return;
+    }
+    index = selected.front();
+  }
+
+  if (!index.isValid() || static_cast<size_t>(index.row()) >= qtVGMRoot.vgmColls().size()) {
+    NotificationCenter::the()->selectVGMColl(nullptr, const_cast<VGMCollListView*>(this));
+    return;
+  }
+
+  NotificationCenter::the()->selectVGMColl(qtVGMRoot.vgmColls()[index.row()],
+                                           const_cast<VGMCollListView*>(this));
 }
 
 void VGMCollListView::updateContextualMenus() const {
