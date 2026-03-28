@@ -16,24 +16,28 @@ QtVGMRoot qtVGMRoot;
 
 std::filesystem::path QtVGMRoot::UI_getResourceDirPath() {
   std::filesystem::path appDir = std::filesystem::path(QApplication::applicationDirPath().toStdWString());
+  const auto hasMameJson = [](const std::filesystem::path& dirPath) {
+    std::error_code ec;
+    return std::filesystem::exists(dirPath / "mame_roms.json", ec) && !ec;
+  };
 
 #if defined(Q_OS_MACOS)
   std::filesystem::path resDir = (appDir / ".." / "Resources").lexically_normal();
-  if (std::filesystem::exists(resDir / "mame_roms.json")) {
+  if (hasMameJson(resDir)) {
     return resDir;
   }
 #endif
 
 #if defined(VGMTRANS_DATA_DIR)
   std::filesystem::path dataDir = std::filesystem::path(VGMTRANS_DATA_DIR);
-  if (std::filesystem::exists(dataDir / "mame_roms.json")) {
+  if (hasMameJson(dataDir)) {
     return dataDir;
   }
 #endif
 
 #if defined(DEV_ENV_BUILD_TREE)
   std::filesystem::path devDir = std::filesystem::path(DEV_ENV_BUILD_TREE);
-  if (std::filesystem::exists(devDir / "mame_roms.json")) {
+  if (hasMameJson(devDir)) {
     return devDir;
   }
 #endif
