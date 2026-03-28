@@ -226,51 +226,56 @@ MAMEGame* loadGameEntry(const json& gameJson) {
 }  // namespace
 
 bool MAMELoader::loadJSON() {
-  const auto jsonFilePath = pRoot->UI_getResourceDirPath() / kMameJsonFilename;
-  std::ifstream jsonFile(jsonFilePath);
-  if (!jsonFile.is_open()) {
-    L_ERROR("Failed to open MAME ROM definition JSON at {}", jsonFilePath);
-    return false;
-  }
-
-  json document;
   try {
-    document = json::parse(jsonFile);
-  } catch (const json::parse_error& error) {
-    L_ERROR("Failed to parse MAME ROM definition JSON: {}", error.what());
-    return false;
-  }
-
-  const json* games = nullptr;
-  if (document.is_array()) {
-    games = &document;
-  }
-  else if (document.is_object()) {
-    if (auto gamesIt = document.find("games"); gamesIt != document.end() && gamesIt->is_array()) {
-      games = &(*gamesIt);
-    }
-  }
-
-  if (!games) {
-    if (auto gamesIt = document.find("games"); gamesIt != document.end() && gamesIt->is_array()) {
-      games = &(*gamesIt);
-    }
-  }
-
-  if (!games) {
-    L_ERROR("MAME ROM definition JSON does not contain a 'games' array");
-    return false;
-  }
-
-  for (const auto& gameJson : *games) {
-    MAMEGame* gameentry = loadGameEntry(gameJson);
-    if (!gameentry) {
+    const auto jsonFilePath = pRoot->UI_getResourceDirPath() / kMameJsonFilename;
+    std::ifstream jsonFile(jsonFilePath);
+    if (!jsonFile.is_open()) {
+      L_ERROR("Failed to open MAME ROM definition JSON at {}", jsonFilePath);
       return false;
     }
-    gamemap[gameentry->name] = gameentry;
-  }
 
-  return true;
+    json document;
+    try {
+      document = json::parse(jsonFile);
+    } catch (const json::parse_error& error) {
+      L_ERROR("Failed to parse MAME ROM definition JSON: {}", error.what());
+      return false;
+    }
+
+    const json* games = nullptr;
+    if (document.is_array()) {
+      games = &document;
+    }
+    else if (document.is_object()) {
+      if (auto gamesIt = document.find("games"); gamesIt != document.end() && gamesIt->is_array()) {
+        games = &(*gamesIt);
+      }
+    }
+
+    if (!games) {
+      if (auto gamesIt = document.find("games"); gamesIt != document.end() && gamesIt->is_array()) {
+        games = &(*gamesIt);
+      }
+    }
+
+    if (!games) {
+      L_ERROR("MAME ROM definition JSON does not contain a 'games' array");
+      return false;
+    }
+
+    for (const auto& gameJson : *games) {
+      MAMEGame* gameentry = loadGameEntry(gameJson);
+      if (!gameentry) {
+        return false;
+      }
+      gamemap[gameentry->name] = gameentry;
+    }
+
+    return true;
+  } catch (const std::filesystem::filesystem_error& error) {
+    L_ERROR("Filesystem error while loading MAME ROM definition JSON: {}", error.what());
+    return false;
+  }
 }
 
 void MAMELoader::apply(const RawFile* file) {
