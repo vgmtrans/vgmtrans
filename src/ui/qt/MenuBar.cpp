@@ -150,16 +150,9 @@ VGMFileView* MenuBar::currentVGMFileView() const {
 
 void MenuBar::updateHexFontActions() {
   const bool hasActiveView = currentVGMFileView() != nullptr;
-
-  if (menu_reset_hex_font) {
-    menu_reset_hex_font->setEnabled(hasActiveView);
-  }
-  if (menu_increase_hex_font) {
-    menu_increase_hex_font->setEnabled(hasActiveView);
-  }
-  if (menu_decrease_hex_font) {
-    menu_decrease_hex_font->setEnabled(hasActiveView);
-  }
+  menu_reset_hex_font->setEnabled(hasActiveView);
+  menu_increase_hex_font->setEnabled(hasActiveView);
+  menu_decrease_hex_font->setEnabled(hasActiveView);
 }
 
 void MenuBar::appendInfoMenu() {

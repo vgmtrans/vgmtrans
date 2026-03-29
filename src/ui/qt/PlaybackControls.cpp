@@ -191,7 +191,5 @@ void PlaybackControls::playerStatusChanged(bool playing) {
 }
 
 void PlaybackControls::updateSeekBarVisibility() {
-  if (m_slider) {
-    m_slider->setVisible(contentsRect().width() >= kSeekBarVisibleWidthThreshold);
-  }
+  m_slider->setVisible(contentsRect().width() >= kSeekBarVisibleWidthThreshold);
 }

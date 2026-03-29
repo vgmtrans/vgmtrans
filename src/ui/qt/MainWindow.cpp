@@ -237,14 +237,8 @@ void MainWindow::createElements() {
 }
 
 void MainWindow::configureWindowAgent() {
-  if (!m_windowAgent || !m_windowBar) {
-    return;
-  }
-
   m_windowAgent->setTitleBar(m_windowBar);
-  if (QWidget *dockControls = m_windowBar->dockControls()) {
-    m_windowAgent->setHitTestVisible(dockControls, true);
-  }
+  m_windowAgent->setHitTestVisible(m_windowBar->dockControls(), true);
   if (QWidget *menuBarWidget = m_windowBar->menuBarWidget()) {
     m_windowAgent->setHitTestVisible(menuBarWidget, true);
   }
@@ -259,18 +253,10 @@ void MainWindow::configureWindowAgent() {
   setMenuWidget(m_windowBar);
   m_windowAgent->setSystemButtonArea(m_windowBar->systemButtonArea());
 #else
-  if (QAbstractButton *windowIconButton = m_windowBar->windowIconButton()) {
-    m_windowAgent->setSystemButton(QWK::WindowAgentBase::WindowIcon, windowIconButton);
-  }
-  if (QAbstractButton *minimizeButton = m_windowBar->minimizeButton()) {
-    m_windowAgent->setSystemButton(QWK::WindowAgentBase::Minimize, minimizeButton);
-  }
-  if (QAbstractButton *maximizeButton = m_windowBar->maximizeButton()) {
-    m_windowAgent->setSystemButton(QWK::WindowAgentBase::Maximize, maximizeButton);
-  }
-  if (QAbstractButton *closeButton = m_windowBar->closeButton()) {
-    m_windowAgent->setSystemButton(QWK::WindowAgentBase::Close, closeButton);
-  }
+  m_windowAgent->setSystemButton(QWK::WindowAgentBase::WindowIcon, m_windowBar->windowIconButton());
+  m_windowAgent->setSystemButton(QWK::WindowAgentBase::Minimize, m_windowBar->minimizeButton());
+  m_windowAgent->setSystemButton(QWK::WindowAgentBase::Maximize, m_windowBar->maximizeButton());
+  m_windowAgent->setSystemButton(QWK::WindowAgentBase::Close, m_windowBar->closeButton());
   setMenuWidget(m_windowBar);
 #endif
 }
@@ -299,10 +285,6 @@ void MainWindow::showEvent(QShowEvent* event) {
 
 #if defined(Q_OS_MACOS) || defined(Q_OS_MAC)
   QTimer::singleShot(0, this, [this]() {
-    if (!m_windowAgent || !m_windowBar) {
-      return;
-    }
-
     m_windowAgent->setSystemButtonArea(nullptr);
     m_windowAgent->setSystemButtonArea(m_windowBar->systemButtonArea());
   });
@@ -382,9 +364,6 @@ void MainWindow::dropEvent(QDropEvent *event) {
 }
 
 void MainWindow::showDragOverlay() {
-  if (!m_dragOverlay) {
-    return;
-  }
   updateDragOverlayGeometry();
   if (!m_dragOverlay->isVisible()) {
     m_dragOverlay->show();
@@ -393,9 +372,7 @@ void MainWindow::showDragOverlay() {
 }
 
 void MainWindow::hideDragOverlay() {
-  if (m_dragOverlay) {
-    m_dragOverlay->hide();
-  }
+  m_dragOverlay->hide();
 }
 
 void MainWindow::handleDroppedUrls(const QList<QUrl>& urls) {
@@ -461,8 +438,7 @@ void MainWindow::openFileInternal(const QString& filename) {
 }
 
 void MainWindow::showToast(const QString& message, ToastType type, int duration_ms) {
-  if (m_toastHost)
-    m_toastHost->showToast(message, type, duration_ms);
+  m_toastHost->showToast(message, type, duration_ms);
 }
 
 void MainWindow::resizeEvent(QResizeEvent *event) {
@@ -471,16 +447,10 @@ void MainWindow::resizeEvent(QResizeEvent *event) {
 }
 
 void MainWindow::updateDragOverlayAppearance() {
-  if (!m_dragOverlay)
-    return;
-
   m_dragOverlay->setStyleSheet(QStringLiteral("background-color: rgba(0, 0, 0, 102);"));
 }
 
 void MainWindow::updateDragOverlayGeometry() {
-  if (!m_dragOverlay)
-    return;
-
   m_dragOverlay->setGeometry(rect());
   m_dragOverlay->raise();
 }

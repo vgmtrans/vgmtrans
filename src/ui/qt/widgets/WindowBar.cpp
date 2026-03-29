@@ -141,19 +141,15 @@ WindowBar::WindowBar(QWidget *parent) : QWidget(parent) {
   applyWindowButtonStyle(m_closeButton, true);
 
   connect(m_minimizeButton, &QToolButton::clicked, this, [this]() {
-    if (QWidget *topLevelWindow = window()) {
-      topLevelWindow->showMinimized();
-    }
+    QWidget *topLevelWindow = window();
+    topLevelWindow->showMinimized();
   });
   connect(m_maximizeButton, &QToolButton::clicked, this, [this]() {
-    if (QWidget *topLevelWindow = window()) {
-      topLevelWindow->isMaximized() ? topLevelWindow->showNormal() : topLevelWindow->showMaximized();
-    }
+    QWidget *topLevelWindow = window();
+    topLevelWindow->isMaximized() ? topLevelWindow->showNormal() : topLevelWindow->showMaximized();
   });
   connect(m_closeButton, &QToolButton::clicked, this, [this]() {
-    if (QWidget *topLevelWindow = window()) {
-      topLevelWindow->close();
-    }
+    window()->close();
   });
 
   buttonLayout->addWidget(m_minimizeButton);
@@ -232,14 +228,7 @@ void WindowBar::setMenuBarWidget(QWidget *widget) {
 }
 
 void WindowBar::setDockToggleButtons(const QList<ToggleButtonSpec> &buttons) {
-  if (!m_dockControls) {
-    return;
-  }
-
   auto *dockControlsLayout = qobject_cast<QHBoxLayout *>(m_dockControls->layout());
-  if (!dockControlsLayout) {
-    return;
-  }
 
   while (QLayoutItem *item = dockControlsLayout->takeAt(0)) {
     if (QWidget *widget = item->widget()) {
@@ -344,7 +333,7 @@ void WindowBar::attachToTopLevelWindow() {
 }
 
 void WindowBar::updateResponsiveLayout() {
-  if (!m_layout || !m_centerWidget || m_centerWidget == m_centerPlaceholder) {
+  if (m_centerWidget == m_centerPlaceholder) {
     return;
   }
 
@@ -461,7 +450,7 @@ void WindowBar::refreshDockToggleButtons() {
 
 void WindowBar::syncWindowButtons() {
 #if !defined(Q_OS_MACOS) && !defined(Q_OS_MAC)
-  const bool maximized = window() && window()->isMaximized();
+  const bool maximized = window()->isMaximized();
 
 #if defined(Q_OS_WIN) || defined(Q_OS_LINUX)
   const bool darkPalette = isDarkPalette(palette());
@@ -470,39 +459,24 @@ void WindowBar::syncWindowButtons() {
       blendColors(palette().color(QPalette::Text), windowColor, darkPalette ? 0.88 : 0.72);
   const QColor disabledColor =
       blendColors(palette().color(QPalette::Disabled, QPalette::Text), windowColor, darkPalette ? 0.6 : 0.48);
-  if (m_windowIconButton) {
-    const QIcon windowIcon = window() ? window()->windowIcon() : QIcon(QStringLiteral(":/vgmtrans.png"));
-    m_windowIconButton->setIcon(windowIcon);
-  }
-  if (m_minimizeButton) {
-    m_minimizeButton->setIcon(multiStateStencilIcon(
-        QStringLiteral(":/window-bar/minimize.svg"), buttonColor, buttonColor, disabledColor,
-        QSize(kCustomWindowGlyphSize, kCustomWindowGlyphSize)));
-  }
-  if (m_maximizeButton) {
-    m_maximizeButton->setIcon(multiStateStencilIcon(
-        maximized ? QStringLiteral(":/window-bar/restore.svg") : QStringLiteral(":/window-bar/maximize.svg"),
-        buttonColor, buttonColor, disabledColor, QSize(kCustomWindowGlyphSize, kCustomWindowGlyphSize)));
-    m_maximizeButton->setToolTip(maximized ? "Restore window" : "Maximize window");
-  }
-  if (m_closeButton) {
-    m_closeButton->setIcon(multiStateStencilIcon(
-        QStringLiteral(":/window-bar/close.svg"), buttonColor,
-        kWindowsCustomChrome ? QColor(Qt::white) : buttonColor, disabledColor,
-        QSize(kCustomWindowGlyphSize, kCustomWindowGlyphSize)));
-  }
+  m_windowIconButton->setIcon(window()->windowIcon());
+  m_minimizeButton->setIcon(multiStateStencilIcon(
+      QStringLiteral(":/window-bar/minimize.svg"), buttonColor, buttonColor, disabledColor,
+      QSize(kCustomWindowGlyphSize, kCustomWindowGlyphSize)));
+  m_maximizeButton->setIcon(multiStateStencilIcon(
+      maximized ? QStringLiteral(":/window-bar/restore.svg") : QStringLiteral(":/window-bar/maximize.svg"),
+      buttonColor, buttonColor, disabledColor, QSize(kCustomWindowGlyphSize, kCustomWindowGlyphSize)));
+  m_maximizeButton->setToolTip(maximized ? "Restore window" : "Maximize window");
+  m_closeButton->setIcon(multiStateStencilIcon(
+      QStringLiteral(":/window-bar/close.svg"), buttonColor,
+      kWindowsCustomChrome ? QColor(Qt::white) : buttonColor, disabledColor,
+      QSize(kCustomWindowGlyphSize, kCustomWindowGlyphSize)));
 #else
-  if (m_minimizeButton) {
-    m_minimizeButton->setIcon(style()->standardIcon(QStyle::SP_TitleBarMinButton, nullptr, this));
-  }
-  if (m_maximizeButton) {
-    m_maximizeButton->setIcon(style()->standardIcon(
-        maximized ? QStyle::SP_TitleBarNormalButton : QStyle::SP_TitleBarMaxButton, nullptr, this));
-    m_maximizeButton->setToolTip(maximized ? "Restore window" : "Maximize window");
-  }
-  if (m_closeButton) {
-    m_closeButton->setIcon(style()->standardIcon(QStyle::SP_TitleBarCloseButton, nullptr, this));
-  }
+  m_minimizeButton->setIcon(style()->standardIcon(QStyle::SP_TitleBarMinButton, nullptr, this));
+  m_maximizeButton->setIcon(style()->standardIcon(
+      maximized ? QStyle::SP_TitleBarNormalButton : QStyle::SP_TitleBarMaxButton, nullptr, this));
+  m_maximizeButton->setToolTip(maximized ? "Restore window" : "Maximize window");
+  m_closeButton->setIcon(style()->standardIcon(QStyle::SP_TitleBarCloseButton, nullptr, this));
 #endif
 #endif
 }

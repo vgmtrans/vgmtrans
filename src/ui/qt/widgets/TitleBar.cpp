@@ -94,7 +94,7 @@ TitleBar::TitleBar(const QString& title, Buttons buttons, QWidget *parent) : QWi
 }
 
 void TitleBar::addLeadingWidget(QWidget *widget) {
-  if (!widget || !m_leadingLayout) {
+  if (!widget) {
     return;
   }
   widget->setParent(m_leadingContainer);
@@ -132,10 +132,6 @@ void TitleBar::updateButtonStyles() {
 }
 
 void TitleBar::updateButtonsVisible() {
-  if (!m_buttonContainer) {
-    return;
-  }
-
   auto *dock = qobject_cast<QDockWidget *>(parentWidget());
   QWidget *focus = QApplication::focusWidget();
   const bool focused = dock && focus && (focus == dock || dock->isAncestorOf(focus));

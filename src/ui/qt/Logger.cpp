@@ -224,23 +224,10 @@ void Logger::setLevel(int level) {
 }
 
 void Logger::refreshTitleBarControls() {
-  if (!m_titleBar) {
-    return;
-  }
-
   const QPalette palette = m_titleBar->palette();
-
-  if (m_filterButton) {
-    m_filterButton->setStyleSheet(toolBarTextButtonStyle(palette, kFilterButtonLeftMargin));
-  }
-
-  if (m_clearButton) {
-    refreshStencilToolButton(m_clearButton, QStringLiteral(":/icons/trash-can-outline.svg"), palette);
-  }
-
-  if (m_exportButton) {
-    refreshStencilToolButton(m_exportButton, QStringLiteral(":/icons/export.svg"), palette);
-  }
+  m_filterButton->setStyleSheet(toolBarTextButtonStyle(palette, kFilterButtonLeftMargin));
+  refreshStencilToolButton(m_clearButton, QStringLiteral(":/icons/trash-can-outline.svg"), palette);
+  refreshStencilToolButton(m_exportButton, QStringLiteral(":/icons/export.svg"), palette);
 }
 
 void Logger::push(const LogItem *item) {
