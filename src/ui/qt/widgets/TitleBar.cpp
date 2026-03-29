@@ -24,7 +24,8 @@ constexpr int kTitleBarIconSize = 16;
 constexpr int kTitleToLeadingControlsGap = 12;
 }
 
-TitleBar::TitleBar(const QString& title, Buttons buttons, QWidget *parent) : QWidget(parent) {
+TitleBar::TitleBar(const QString& title, Buttons buttons, QWidget *parent, const QString& actionToolTip)
+    : QWidget(parent) {
   setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
 
   auto *titleLayout = new QHBoxLayout(this);
@@ -40,11 +41,11 @@ TitleBar::TitleBar(const QString& title, Buttons buttons, QWidget *parent) : QWi
     return button;
   };
 
-  if (buttons.testFlag(NewButton)) {
-    m_newButton = makeButton("New collection");
+  if (buttons.testFlag(ActionButton)) {
+    m_actionButton = makeButton(actionToolTip.isEmpty() ? QStringLiteral("Action") : actionToolTip);
     titleLayout->addSpacing(kTitleToLeadingControlsGap);
-    titleLayout->addWidget(m_newButton);
-    connect(m_newButton, &QToolButton::clicked, this, &TitleBar::addRequested);
+    titleLayout->addWidget(m_actionButton);
+    connect(m_actionButton, &QToolButton::clicked, this, &TitleBar::actionRequested);
   }
 
   m_leadingContainer = new QWidget(this);
@@ -122,8 +123,8 @@ bool TitleBar::eventFilter(QObject *watched, QEvent *event) {
 }
 
 void TitleBar::updateButtonStyles() {
-  if (m_newButton) {
-    refreshStencilToolButton(m_newButton, QStringLiteral(":/icons/plus.svg"), palette());
+  if (m_actionButton) {
+    refreshStencilToolButton(m_actionButton, QStringLiteral(":/icons/plus.svg"), palette());
   }
 
   if (m_hideButton) {
