@@ -18,12 +18,12 @@ public:
   enum Button {
     NoButtons = 0x0,
     HideButton = 0x1,
-    ActionButton = 0x2,
+    NewButton = 0x2,
   };
   Q_DECLARE_FLAGS(Buttons, Button)
 
   explicit TitleBar(const QString& title, Buttons buttons = NoButtons, QWidget *parent = nullptr,
-                    const QString& actionToolTip = {});
+                    const QString& newToolTip = {});
   ~TitleBar() override = default;
 
   void addLeadingWidget(QWidget *widget);
@@ -41,7 +41,7 @@ protected:
 
 signals:
   void hideRequested();
-  void actionRequested();
+  void newRequested();
   void appearanceChanged();
 
 private:
@@ -53,7 +53,7 @@ private:
   QWidget *m_buttonContainer{};
   class QGraphicsOpacityEffect *m_buttonOpacity{};
   class QPropertyAnimation *m_buttonFade{};
-  class QToolButton *m_actionButton{};
+  class QToolButton *m_newButton{};
   class QToolButton *m_hideButton{};
   bool m_buttonsVisible{};
 };

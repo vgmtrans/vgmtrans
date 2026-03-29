@@ -144,8 +144,8 @@ void MainWindow::createElements() {
 
   const auto installTitleBar = [this](QDockWidget *dock, const QString& title,
                                       TitleBar::Buttons buttons,
-                                      const QString& actionToolTip = QString()) {
-    auto *titleBar = new TitleBar(title, buttons, dock, actionToolTip);
+                                      const QString& newToolTip = QString()) {
+    auto *titleBar = new TitleBar(title, buttons, dock, newToolTip);
     connect(titleBar, &TitleBar::hideRequested, dock, &QDockWidget::hide);
     dock->setTitleBarWidget(titleBar);
     return titleBar;
@@ -189,9 +189,9 @@ void MainWindow::createElements() {
   m_coll_dock->setContentsMargins(0, 0, 0, 0);
   addDockWidget(Qt::BottomDockWidgetArea, m_coll_dock);
   TitleBar *collTitleBar = installTitleBar(
-      m_coll_dock, "Collections", TitleBar::HideButton | TitleBar::ActionButton,
+      m_coll_dock, "Collections", TitleBar::HideButton | TitleBar::NewButton,
       QStringLiteral("New collection"));
-  connect(collTitleBar, &TitleBar::actionRequested, this, [this]() {
+  connect(collTitleBar, &TitleBar::newRequested, this, [this]() {
     ManualCollectionDialog dialog(this);
     dialog.exec();
   });
