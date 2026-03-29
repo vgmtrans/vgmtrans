@@ -255,7 +255,7 @@ jobs:
             -DCMAKE_FIND_DEBUG_MODE=${{runner.debug == '1' && 'ON' || 'OFF' }} `
             -DCMAKE_INSTALL_PREFIX="${{ github.workspace }}/dist" `
             -DCMAKE_INSTALL_BINDIR="." `
-            -DCMAKE_INSTALL_LIBDIR="." `
+            -DCMAKE_INSTALL_LIBDIR="lib" `
             -DCPACK_PACKAGE_FILE_NAME="${{ env.PACKAGE_FILE_NAME }}"
 
        - name: "Build project"
