@@ -74,13 +74,7 @@ WindowBar::WindowBar(QWidget *parent) : QWidget(parent) {
       0, 0, 0, 0
 #endif
   );
-  m_layout->setSpacing(
-#if defined(Q_OS_MACOS) || defined(Q_OS_MAC)
-      8
-#else
-      6
-#endif
-  );
+  m_layout->setSpacing(6);
 
   m_menuBarPlaceholder = new QWidget(this);
   m_menuBarPlaceholder->setFixedSize(0, 0);
