@@ -155,10 +155,6 @@ WindowBar::WindowBar(QWidget *parent) : QWidget(parent) {
 
 }
 
-QWidget *WindowBar::centerWidget() const {
-  return m_centerWidget == m_centerPlaceholder ? nullptr : m_centerWidget;
-}
-
 void WindowBar::setCenterWidget(QWidget *widget) {
   QWidget *replacement = widget ? widget : m_centerPlaceholder;
   if (replacement == m_centerWidget) {
@@ -177,10 +173,6 @@ void WindowBar::setCenterWidget(QWidget *widget) {
     widget->show();
   }
   updateResponsiveLayout();
-}
-
-QWidget *WindowBar::menuBarWidget() const {
-  return m_menuBarWidget == m_menuBarPlaceholder ? nullptr : m_menuBarWidget;
 }
 
 void WindowBar::setMenuBarWidget(QWidget *widget) {
@@ -250,30 +242,6 @@ void WindowBar::setDockToggleButtons(const QList<ToggleButtonSpec> &buttons) {
 
   refreshDockToggleButtons();
   updateResponsiveLayout();
-}
-
-QWidget *WindowBar::dockControls() const {
-  return m_dockControls;
-}
-
-QAbstractButton *WindowBar::windowIconButton() const {
-  return m_windowIconButton;
-}
-
-QWidget *WindowBar::systemButtonArea() const {
-  return m_systemButtonArea;
-}
-
-QAbstractButton *WindowBar::minimizeButton() const {
-  return m_minimizeButton;
-}
-
-QAbstractButton *WindowBar::maximizeButton() const {
-  return m_maximizeButton;
-}
-
-QAbstractButton *WindowBar::closeButton() const {
-  return m_closeButton;
 }
 
 void WindowBar::changeEvent(QEvent *event) {

@@ -9,11 +9,11 @@
 #include <QList>
 #include <QPointer>
 #include <QString>
+#include <QToolButton>
 #include <QWidget>
 
 class QAbstractButton;
 class QAction;
-class QToolButton;
 
 class WindowBar final : public QWidget {
   Q_OBJECT
@@ -26,17 +26,21 @@ public:
 
   explicit WindowBar(QWidget *parent = nullptr);
 
-  QWidget *centerWidget() const;
+  QWidget *centerWidget() const {
+    return m_centerWidget == m_centerPlaceholder ? nullptr : m_centerWidget;
+  }
   void setCenterWidget(QWidget *widget);
-  QWidget *menuBarWidget() const;
+  QWidget *menuBarWidget() const {
+    return m_menuBarWidget == m_menuBarPlaceholder ? nullptr : m_menuBarWidget;
+  }
   void setMenuBarWidget(QWidget *widget);
   void setDockToggleButtons(const QList<ToggleButtonSpec> &buttons);
-  QWidget *dockControls() const;
-  QAbstractButton *windowIconButton() const;
-  QWidget *systemButtonArea() const;
-  QAbstractButton *minimizeButton() const;
-  QAbstractButton *maximizeButton() const;
-  QAbstractButton *closeButton() const;
+  QWidget *dockControls() const { return m_dockControls; }
+  QAbstractButton *windowIconButton() const { return m_windowIconButton; }
+  QWidget *systemButtonArea() const { return m_systemButtonArea; }
+  QAbstractButton *minimizeButton() const { return m_minimizeButton; }
+  QAbstractButton *maximizeButton() const { return m_maximizeButton; }
+  QAbstractButton *closeButton() const { return m_closeButton; }
 
 protected:
   void changeEvent(QEvent *event) override;
