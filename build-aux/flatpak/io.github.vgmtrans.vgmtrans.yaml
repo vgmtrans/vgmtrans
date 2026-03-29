@@ -13,10 +13,20 @@ finish-args:
   - --device=dri
 
 modules:
+  - name: qmsetup
+    buildsystem: cmake-ninja
+    subdir: lib/qwindowkit/qmsetup
+    config-opts:
+      - -DCMAKE_BUILD_TYPE=Release
+    sources:
+      - type: dir
+        path: ../../
+
   - name: VGMTrans
     buildsystem: cmake-ninja
     config-opts:
       - -DCMAKE_BUILD_TYPE=Release
+      - -Dqmsetup_DIR=/app/lib/cmake/qmsetup
       - -DENABLE_UI_QT=ON
       - -DENABLE_CLI=OFF
       - -DENABLE_SHELL=OFF
