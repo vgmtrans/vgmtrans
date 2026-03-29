@@ -147,10 +147,6 @@ void MainWindow::createElements() {
                                       TitleBar::Buttons buttons) {
     auto *titleBar = new TitleBar(title, buttons, dock);
     connect(titleBar, &TitleBar::hideRequested, dock, &QDockWidget::hide);
-    connect(titleBar, &TitleBar::addRequested, this, [this]() {
-      ManualCollectionDialog dialog(this);
-      dialog.exec();
-    });
     dock->setTitleBarWidget(titleBar);
     return titleBar;
   };
@@ -192,7 +188,13 @@ void MainWindow::createElements() {
   m_coll_dock->setWidget(coll_wrapper);
   m_coll_dock->setContentsMargins(0, 0, 0, 0);
   addDockWidget(Qt::BottomDockWidgetArea, m_coll_dock);
-  installTitleBar(m_coll_dock, "Collections", TitleBar::HideButton | TitleBar::NewButton);
+  if (TitleBar *collTitleBar =
+          installTitleBar(m_coll_dock, "Collections", TitleBar::HideButton | TitleBar::NewButton)) {
+    connect(collTitleBar, &TitleBar::addRequested, this, [this]() {
+      ManualCollectionDialog dialog(this);
+      dialog.exec();
+    });
+  }
 
   m_logger = new Logger();
   m_logger->setWindowTitle("Logs");
