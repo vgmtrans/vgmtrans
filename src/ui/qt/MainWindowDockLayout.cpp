@@ -1,12 +1,9 @@
 #include "MainWindowDockLayout.h"
 
 #include <QAction>
-#include <QApplication>
 #include <QDockWidget>
-#include <QEvent>
 #include <QLayout>
 #include <QMainWindow>
-#include <QMouseEvent>
 #include <QSize>
 #include <QTimer>
 #include <QWidget>
@@ -22,13 +19,12 @@
 namespace {
 constexpr int kDockLayoutStateVersion = 2;
 
-bool isVisibleDockInArea(const QMainWindow* window, QDockWidget* dock, Qt::DockWidgetArea area) {
+bool isVisibleDockInArea(const QMainWindow *window, QDockWidget *dock, Qt::DockWidgetArea area) {
   return dock && dock->isVisible() && !dock->isFloating() && window->dockWidgetArea(dock) == area;
 }
 
-bool hasVisibleDockInArea(const QMainWindow* window, const QList<QDockWidget*>& docks,
-                          Qt::DockWidgetArea area) {
-  for (QDockWidget* dock : docks) {
+bool hasVisibleDockInArea(const QMainWindow *window, const QList<QDockWidget *>& docks, Qt::DockWidgetArea area) {
+  for (QDockWidget *dock : docks) {
     if (isVisibleDockInArea(window, dock, area)) {
       return true;
     }
@@ -36,9 +32,9 @@ bool hasVisibleDockInArea(const QMainWindow* window, const QList<QDockWidget*>& 
   return false;
 }
 
-QDockWidget* firstVisibleDockInArea(const QMainWindow* window, const QList<QDockWidget*>& docks,
+QDockWidget *firstVisibleDockInArea(const QMainWindow *window, const QList<QDockWidget *>& docks,
                                     Qt::DockWidgetArea area) {
-  for (QDockWidget* dock : docks) {
+  for (QDockWidget *dock : docks) {
     if (isVisibleDockInArea(window, dock, area)) {
       return dock;
     }
@@ -46,26 +42,26 @@ QDockWidget* firstVisibleDockInArea(const QMainWindow* window, const QList<QDock
   return nullptr;
 }
 
-int dockSizeForOrientation(QDockWidget* dock, Qt::Orientation orientation) {
+int dockSizeForOrientation(QDockWidget *dock, Qt::Orientation orientation) {
   return orientation == Qt::Horizontal ? dock->width() : dock->height();
 }
 
-int firstVisibleDockSizeInArea(const QMainWindow* window, const QList<QDockWidget*>& docks,
+int firstVisibleDockSizeInArea(const QMainWindow *window, const QList<QDockWidget *>& docks,
                                Qt::DockWidgetArea area, Qt::Orientation orientation) {
-  if (QDockWidget* dock = firstVisibleDockInArea(window, docks, area)) {
+  if (QDockWidget *dock = firstVisibleDockInArea(window, docks, area)) {
     return dockSizeForOrientation(dock, orientation);
   }
   return 0;
 }
 
-bool isLeftMostDockInArea(const QMainWindow* window, QDockWidget* dock,
-                          const QList<QDockWidget*>& docks, Qt::DockWidgetArea area) {
+bool isLeftMostDockInArea(const QMainWindow *window, QDockWidget *dock, const QList<QDockWidget *>& docks,
+                          Qt::DockWidgetArea area) {
   if (!isVisibleDockInArea(window, dock, area)) {
     return false;
   }
 
   int leftMostX = dock->geometry().left();
-  for (QDockWidget* candidate : docks) {
+  for (QDockWidget *candidate : docks) {
     if (!isVisibleDockInArea(window, candidate, area)) {
       continue;
     }
@@ -75,10 +71,10 @@ bool isLeftMostDockInArea(const QMainWindow* window, QDockWidget* dock,
   return dock->geometry().left() == leftMostX;
 }
 
-QDockWidget* leftMostDockInArea(const QMainWindow* window, const QList<QDockWidget*>& docks,
+QDockWidget *leftMostDockInArea(const QMainWindow *window, const QList<QDockWidget *>& docks,
                                 Qt::DockWidgetArea area) {
-  QDockWidget* leftMostDock = nullptr;
-  for (QDockWidget* dock : docks) {
+  QDockWidget *leftMostDock = nullptr;
+  for (QDockWidget *dock : docks) {
     if (!isVisibleDockInArea(window, dock, area)) {
       continue;
     }
@@ -89,10 +85,10 @@ QDockWidget* leftMostDockInArea(const QMainWindow* window, const QList<QDockWidg
   return leftMostDock;
 }
 
-QDockWidget* bottomMostDockInArea(const QMainWindow* window, const QList<QDockWidget*>& docks,
+QDockWidget *bottomMostDockInArea(const QMainWindow *window, const QList<QDockWidget *>& docks,
                                   Qt::DockWidgetArea area) {
-  QDockWidget* bottomMostDock = nullptr;
-  for (QDockWidget* dock : docks) {
+  QDockWidget *bottomMostDock = nullptr;
+  for (QDockWidget *dock : docks) {
     if (!isVisibleDockInArea(window, dock, area)) {
       continue;
     }
@@ -103,29 +99,27 @@ QDockWidget* bottomMostDockInArea(const QMainWindow* window, const QList<QDockWi
   return bottomMostDock;
 }
 
-QList<QDockWidget*> visibleDocksInAreaSorted(const QMainWindow* window,
-                                             const QList<QDockWidget*>& docks,
-                                             Qt::DockWidgetArea area, Qt::Orientation orientation) {
-  QList<QDockWidget*> visibleDocks;
-  for (QDockWidget* dock : docks) {
+QList<QDockWidget *> visibleDocksInAreaSorted(const QMainWindow *window, const QList<QDockWidget *>& docks,
+                                              Qt::DockWidgetArea area, Qt::Orientation orientation) {
+  QList<QDockWidget *> visibleDocks;
+  for (QDockWidget *dock : docks) {
     if (isVisibleDockInArea(window, dock, area)) {
       visibleDocks.append(dock);
     }
   }
 
-  std::sort(visibleDocks.begin(), visibleDocks.end(),
-            [orientation](QDockWidget* lhs, QDockWidget* rhs) {
-              if (orientation == Qt::Horizontal) {
-                return lhs->geometry().left() < rhs->geometry().left();
-              }
-              return lhs->geometry().top() < rhs->geometry().top();
-            });
+  std::sort(visibleDocks.begin(), visibleDocks.end(), [orientation](QDockWidget *lhs, QDockWidget *rhs) {
+    if (orientation == Qt::Horizontal) {
+      return lhs->geometry().left() < rhs->geometry().left();
+    }
+    return lhs->geometry().top() < rhs->geometry().top();
+  });
 
   return visibleDocks;
 }
 
 template <typename Fn>
-void runWithUpdatesSuspended(QWidget* widget, Fn&& fn) {
+void runWithUpdatesSuspended(QWidget *widget, Fn &&fn) {
   const bool updatesWereEnabled = widget->updatesEnabled();
   if (updatesWereEnabled) {
     widget->setUpdatesEnabled(false);
@@ -138,29 +132,18 @@ void runWithUpdatesSuspended(QWidget* widget, Fn&& fn) {
     widget->update();
   }
 }
-
-class ScopedDockLayoutAdjustment {
-public:
-  explicit ScopedDockLayoutAdjustment(bool& adjustingLayout) : m_adjustingLayout(adjustingLayout) {
-    // Suppress reconcile feedback while we perform our own corrective dock
-    // moves; those moves emit the same signals as user interactions.
-    m_adjustingLayout = true;
-  }
-
-  ~ScopedDockLayoutAdjustment() { m_adjustingLayout = false; }
-
-private:
-  bool& m_adjustingLayout;
-};
 }  // namespace
 
-MainWindowDockLayout::MainWindowDockLayout(MainWindow* window, Docks docks)
-    : QObject(window), m_window(window), m_rawfileDock(docks.rawFiles),
-      m_vgmfileDock(docks.vgmFiles), m_collectionsDock(docks.collections),
-      m_collectionContentsDock(docks.collectionContents), m_loggerDock(docks.logs),
+MainWindowDockLayout::MainWindowDockLayout(MainWindow *window, Docks docks)
+    : QObject(window),
+      m_window(window),
+      m_rawfileDock(docks.rawFiles),
+      m_vgmfileDock(docks.vgmFiles),
+      m_collectionsDock(docks.collections),
+      m_collectionContentsDock(docks.collectionContents),
+      m_loggerDock(docks.logs),
       m_collectionListView(docks.collectionListView),
-      m_allDocks{m_rawfileDock, m_vgmfileDock, m_collectionsDock, m_collectionContentsDock,
-                 m_loggerDock},
+      m_allDocks{m_rawfileDock, m_vgmfileDock, m_collectionsDock, m_collectionContentsDock, m_loggerDock},
       m_leftAreaDocks{m_rawfileDock, m_vgmfileDock, m_collectionsDock, m_collectionContentsDock},
       m_leftAreaPrimaryDocks{m_rawfileDock, m_vgmfileDock, m_collectionsDock},
       m_bottomAreaDocks{m_collectionContentsDock, m_collectionsDock, m_loggerDock},
@@ -173,27 +156,21 @@ MainWindowDockLayout::MainWindowDockLayout(MainWindow* window, Docks docks)
 }
 
 void MainWindowDockLayout::restoreWindowGeometry() const {
-  if (const QByteArray geometry = Settings::the()->mainWindow.windowGeometry();
-      !geometry.isEmpty()) {
+  if (const QByteArray geometry = Settings::the()->mainWindow.windowGeometry(); !geometry.isEmpty()) {
     m_window->restoreGeometry(geometry);
   }
 }
 
-// Build the current default layout once, then layer any persisted user state on
-// top of it so reset can always return to a known baseline.
 void MainWindowDockLayout::initializeAfterFirstShow() {
   if (!m_defaultDockState.isEmpty()) {
     return;
   }
 
   m_restoringDockState = true;
-  // Capture a known-good baseline before applying any saved layout so reset can
-  // always return to the current product default.
   applyDefaultDockLayout();
   m_defaultDockState = m_window->saveState(kDockLayoutStateVersion);
 
-  if (!m_savedDockState.isEmpty() &&
-      !m_window->restoreState(m_savedDockState, kDockLayoutStateVersion)) {
+  if (!m_savedDockState.isEmpty() && !m_window->restoreState(m_savedDockState, kDockLayoutStateVersion)) {
     m_savedDockState.clear();
   }
   restoreFloatingDocks();
@@ -214,10 +191,6 @@ void MainWindowDockLayout::handleResize(const QSize& oldSize, const QSize& newSi
   const bool heightExpanded = oldSize.height() >= 0 && newSize.height() > oldSize.height();
 
   if (!widthChanged && !heightChanged) {
-    return;
-  }
-
-  if (clampPendingFloatingDockRedockWindowSize(newSize)) {
     return;
   }
 
@@ -257,9 +230,8 @@ void MainWindowDockLayout::resetToDefault() {
   }
 
   cancelInteraction();
-  clearPendingReconcile();
-  m_pendingBottomCompanionToggleShowDock = nullptr;
-  m_pendingFloatingDockRedock.clear();
+  m_pendingReconcileFlags = ReconcileNone;
+  m_reconcileTimer->stop();
 
   m_restoringDockState = true;
   const bool restored = m_window->restoreState(m_defaultDockState, kDockLayoutStateVersion);
@@ -280,213 +252,58 @@ void MainWindowDockLayout::resetToDefault() {
 void MainWindowDockLayout::saveOnClose() {
   m_closingDown = true;
   cancelInteraction();
-  clearPendingReconcile();
-  m_pendingBottomCompanionToggleShowDock = nullptr;
-  m_pendingFloatingDockRedock.clear();
+  m_pendingReconcileFlags = ReconcileNone;
+  m_reconcileTimer->stop();
   m_savedDockState = m_window->saveState(kDockLayoutStateVersion);
   saveLayoutSettings();
 }
 
-// Dock signals often arrive while Qt is still reshuffling the layout, so route
-// them all through the queued reconciliation path instead of reacting inline.
 void MainWindowDockLayout::connectSignals() {
-  for (QDockWidget* dock : m_allDocks) {
-    connectDockSignals(dock);
+  for (QDockWidget *dock : m_allDocks) {
+    if (!dock) {
+      continue;
+    }
+
+    connect(dock, &QDockWidget::visibilityChanged, this, [this](bool) { requestDockLayoutSettle(false); });
+    connect(dock, &QDockWidget::dockLocationChanged, this,
+            [this](Qt::DockWidgetArea) { requestDockLayoutSettle(false); });
+    connect(dock, &QDockWidget::topLevelChanged, this, [this](bool floating) {
+      requestDockLayoutSettle(!floating);
+    });
   }
 
   connect(m_collectionsDock->toggleViewAction(), &QAction::toggled, this, [this](bool checked) {
     if (checked) {
-      noteBottomDockWillBeShown(m_collectionsDock);
+      noteBottomDockWillBeShown();
     }
   });
   connect(m_loggerDock->toggleViewAction(), &QAction::toggled, this, [this](bool checked) {
     if (checked) {
-      noteBottomDockWillBeShown(m_loggerDock);
+      noteBottomDockWillBeShown();
     }
   });
-}
-
-void MainWindowDockLayout::connectDockSignals(QDockWidget* dock) {
-  if (!dock) {
-    return;
-  }
-
-  if (QWidget* titleBar = dock->titleBarWidget()) {
-    titleBar->installEventFilter(this);
-  }
-
-  connect(dock, &QDockWidget::visibilityChanged, this,
-          [this, dock](bool visible) { handleDockVisibilityChanged(dock, visible); });
-  connect(dock, &QDockWidget::dockLocationChanged, this,
-          [this](Qt::DockWidgetArea) { requestDockLayoutSettle(false); });
-  connect(dock, &QDockWidget::topLevelChanged, this,
-          [this, dock](bool floating) { handleDockTopLevelChanged(dock, floating); });
-}
-
-bool MainWindowDockLayout::shouldSkipDockLayoutWork() const {
-  return m_defaultDockState.isEmpty() || m_restoringDockState || m_closingDown;
-}
-
-QDockWidget* MainWindowDockLayout::dockForTitleBar(QObject* watched) const {
-  for (QDockWidget* dock : m_allDocks) {
-    if (dock && watched == dock->titleBarWidget()) {
-      return dock;
-    }
-  }
-  return nullptr;
-}
-
-void MainWindowDockLayout::captureDockAreaPreferredSize(const QList<QDockWidget*>& docks,
-                                                        Qt::DockWidgetArea area,
-                                                        Qt::Orientation orientation,
-                                                        int& preferredSize) {
-  if (const int dockSize = firstVisibleDockSizeInArea(m_window, docks, area, orientation);
-      dockSize > 0) {
-    preferredSize = dockSize;
-  }
-}
-
-bool MainWindowDockLayout::clampPendingFloatingDockRedockWindowSize(const QSize& newSize) {
-  if (!m_pendingFloatingDockRedock.dock || m_pendingFloatingDockRedock.dock->isFloating() ||
-      !m_pendingFloatingDockRedock.windowSize.isValid()) {
-    return false;
-  }
-
-  QSize clampedSize = newSize;
-  clampedSize.setWidth(
-      std::min(clampedSize.width(), m_pendingFloatingDockRedock.windowSize.width()));
-  clampedSize.setHeight(
-      std::min(clampedSize.height(), m_pendingFloatingDockRedock.windowSize.height()));
-  if (clampedSize == newSize) {
-    return false;
-  }
-
-  // Drag re-dock can momentarily grow the main window from the floating dock's
-  // last top-level geometry. Clamp that transient resize back to the pre-redock
-  // size before it becomes the new settled window size.
-  m_window->resize(clampedSize);
-  return true;
-}
-
-void MainWindowDockLayout::handleDockVisibilityChanged(QDockWidget* dock, bool visible) {
-  const bool shouldFlushImmediately =
-      visible && dock && dock == m_pendingBottomCompanionToggleShowDock;
-  if (dock == m_pendingBottomCompanionToggleShowDock) {
-    m_pendingBottomCompanionToggleShowDock = nullptr;
-  }
-
-  if (!shouldFlushImmediately) {
-    requestDockLayoutSettle(false);
-    return;
-  }
-
-  // Re-enabling Collections/Logs via the toggle buttons can briefly paint the
-  // recreated bottom area without Collection Contents. Flush that one path
-  // immediately; drag re-dock stays on the queued path.
-  queueReconcile(ReconcileSettleLayout | ReconcileUpdateWidthLock);
-  processPendingReconcile();
-}
-
-void MainWindowDockLayout::handleDockTopLevelChanged(QDockWidget* dock, bool floating) {
-  if (floating && QApplication::mouseButtons() != Qt::NoButton) {
-    m_dockWidgetDragActive = true;
-  }
-  if (!floating) {
-    applyPendingFloatingDockRedockState(dock, false);
-  }
-
-  requestDockLayoutSettle(!floating);
-  if (!floating) {
-    queuePostRedockSettle(dock);
-  }
-}
-
-void MainWindowDockLayout::queuePostRedockSettle(QDockWidget* dock) {
-  // Double-click re-dock can report topLevelChanged(false) before Qt has fully
-  // restored the dock into its target area. Queue one more settle on the next
-  // turn so Collection Contents can react to the final dock area assignment
-  // immediately.
-  QTimer::singleShot(0, this, [this, dock]() {
-    applyPendingFloatingDockRedockState(dock, true);
-    requestDockLayoutSettle(true);
-  });
-}
-
-void MainWindowDockLayout::rememberFloatingDockRedockState(QDockWidget* dock) {
-  if (!dock || !dock->isFloating()) {
-    return;
-  }
-
-  // Double-click re-dock can briefly size the main window or target dock area
-  // from the floating window's current geometry. Snapshot the settled sizes
-  // first so we can restore them as soon as Qt reattaches the dock.
-  captureLeftDockAreaWidth();
-  captureBottomDockAreaHeight();
-  m_pendingFloatingDockRedock.dock = dock;
-  m_pendingFloatingDockRedock.windowSize = m_window->size();
-  m_pendingFloatingDockRedock.leftAreaWidth = m_leftDockAreaPreferredWidth;
-  m_pendingFloatingDockRedock.bottomAreaHeight = m_bottomDockAreaPreferredHeight;
-}
-
-void MainWindowDockLayout::clearPendingReconcile() {
-  m_pendingReconcileFlags = ReconcileNone;
-  m_reconcileTimer->stop();
-}
-
-bool MainWindowDockLayout::eventFilter(QObject* watched, QEvent* event) {
-  if (!event) {
-    return QObject::eventFilter(watched, event);
-  }
-
-  if (event->type() == QEvent::MouseButtonPress) {
-    QDockWidget* dock = dockForTitleBar(watched);
-    if (!dock) {
-      return QObject::eventFilter(watched, event);
-    }
-
-    auto* mouseEvent = static_cast<QMouseEvent*>(event);
-    if (mouseEvent->button() == Qt::LeftButton && dock->isFloating()) {
-      rememberFloatingDockRedockState(dock);
-    }
-  } else if (event->type() == QEvent::MouseMove) {
-    QDockWidget* dock = dockForTitleBar(watched);
-    if (!dock) {
-      return QObject::eventFilter(watched, event);
-    }
-
-    auto* mouseEvent = static_cast<QMouseEvent*>(event);
-    if ((mouseEvent->buttons() & Qt::LeftButton) != 0u && !dock->isFloating()) {
-      m_dockWidgetDragActive = true;
-    }
-  } else if (event->type() == QEvent::MouseButtonDblClick) {
-    QDockWidget* dock = dockForTitleBar(watched);
-    if (!dock) {
-      return QObject::eventFilter(watched, event);
-    }
-
-    auto* mouseEvent = static_cast<QMouseEvent*>(event);
-    if (mouseEvent->button() == Qt::LeftButton) {
-      rememberFloatingDockRedockState(dock);
-    }
-  }
-
-  return QObject::eventFilter(watched, event);
 }
 
 void MainWindowDockLayout::activateMainLayout() {
-  if (QLayout* mainLayout = m_window->layout()) {
+  if (QLayout *mainLayout = m_window->layout()) {
     mainLayout->activate();
   }
 }
 
 void MainWindowDockLayout::captureLeftDockAreaWidth() {
-  captureDockAreaPreferredSize(m_leftAreaDocks, Qt::LeftDockWidgetArea, Qt::Horizontal,
-                               m_leftDockAreaPreferredWidth);
+  if (const int dockSize =
+          firstVisibleDockSizeInArea(m_window, m_leftAreaDocks, Qt::LeftDockWidgetArea, Qt::Horizontal);
+      dockSize > 0) {
+    m_leftDockAreaPreferredWidth = dockSize;
+  }
 }
 
 void MainWindowDockLayout::captureBottomDockAreaHeight() {
-  captureDockAreaPreferredSize(m_bottomAreaDocks, Qt::BottomDockWidgetArea, Qt::Vertical,
-                               m_bottomDockAreaPreferredHeight);
+  if (const int dockSize =
+          firstVisibleDockSizeInArea(m_window, m_bottomAreaDocks, Qt::BottomDockWidgetArea, Qt::Vertical);
+      dockSize > 0) {
+    m_bottomDockAreaPreferredHeight = dockSize;
+  }
 }
 
 void MainWindowDockLayout::snapshotDockAreaSizes(bool persistState) {
@@ -498,26 +315,23 @@ void MainWindowDockLayout::snapshotDockAreaSizes(bool persistState) {
   }
 }
 
-// Keep dock-area growth feeling stable by reapplying the last settled left
-// width and bottom height when the main window expands.
 void MainWindowDockLayout::applyDockAreaTargets(bool applyLeftWidth, bool applyBottomHeight) {
   bool resized = false;
   const auto resizeAreaToPreferredSize =
-      [this, &resized](const QList<QDockWidget*>& docks, Qt::DockWidgetArea area,
+      [this, &resized](const QList<QDockWidget *>& docks, Qt::DockWidgetArea area,
                        Qt::Orientation orientation, int preferredSize) {
         if (preferredSize <= 0) {
           return;
         }
 
-        if (QDockWidget* dock = firstVisibleDockInArea(m_window, docks, area)) {
+        if (QDockWidget *dock = firstVisibleDockInArea(m_window, docks, area)) {
           m_window->resizeDocks({dock}, {preferredSize}, orientation);
           resized = true;
         }
       };
 
   if (applyLeftWidth) {
-    resizeAreaToPreferredSize(m_leftAreaDocks, Qt::LeftDockWidgetArea, Qt::Horizontal,
-                              m_leftDockAreaPreferredWidth);
+    resizeAreaToPreferredSize(m_leftAreaDocks, Qt::LeftDockWidgetArea, Qt::Horizontal, m_leftDockAreaPreferredWidth);
   }
 
   if (applyBottomHeight) {
@@ -530,16 +344,13 @@ void MainWindowDockLayout::applyDockAreaTargets(bool applyLeftWidth, bool applyB
   }
 }
 
-// Remember the left-stack height for Collection Contents only when it fully
-// owns the bottom edge of that stack.
 void MainWindowDockLayout::captureCollectionContentsLeftDockHeight() {
-  if (shouldSkipDockLayoutWork() || m_adjustingDockLayout) {
+  if (m_defaultDockState.isEmpty() || m_adjustingDockLayout || m_restoringDockState || m_closingDown) {
     return;
   }
 
   if (isVisibleDockInArea(m_window, m_collectionContentsDock, Qt::LeftDockWidgetArea) &&
-      bottomMostDockInArea(m_window, m_leftAreaDocks, Qt::LeftDockWidgetArea) ==
-          m_collectionContentsDock &&
+      bottomMostDockInArea(m_window, m_leftAreaDocks, Qt::LeftDockWidgetArea) == m_collectionContentsDock &&
       !hasVisibleDockInArea(m_window, m_bottomCompanionDocks, Qt::BottomDockWidgetArea)) {
     m_collectionContentsLeftDockHeight = m_collectionContentsDock->height();
     m_bottomDockAreaPreferredHeight = m_collectionContentsLeftDockHeight;
@@ -548,7 +359,7 @@ void MainWindowDockLayout::captureCollectionContentsLeftDockHeight() {
 }
 
 void MainWindowDockLayout::applyPendingCollectionContentsBottomAreaHeight() {
-  if (shouldSkipDockLayoutWork() || m_pendingCollectionContentsBottomHeight <= 0 ||
+  if (m_restoringDockState || m_closingDown || m_pendingCollectionContentsBottomHeight <= 0 ||
       !isVisibleDockInArea(m_window, m_collectionContentsDock, Qt::BottomDockWidgetArea)) {
     return;
   }
@@ -559,19 +370,16 @@ void MainWindowDockLayout::applyPendingCollectionContentsBottomAreaHeight() {
   m_pendingCollectionContentsBottomHeight = 0;
 }
 
-// If Collection Contents is the only bottom dock left, fold it back into the
-// left column so the layout does not leave an orphaned bottom strip.
 bool MainWindowDockLayout::moveCollectionContentsToLeftDockIfNeeded() {
   if (!hasVisibleDockInArea(m_window, m_leftAreaPrimaryDocks, Qt::LeftDockWidgetArea) ||
-      !isLeftMostDockInArea(m_window, m_collectionContentsDock, m_bottomAreaDocks,
-                            Qt::BottomDockWidgetArea) ||
+      !isLeftMostDockInArea(m_window, m_collectionContentsDock, m_bottomAreaDocks, Qt::BottomDockWidgetArea) ||
       hasVisibleDockInArea(m_window, m_bottomCompanionDocks, Qt::BottomDockWidgetArea)) {
     return false;
   }
 
-  QList<QDockWidget*> leftDocks = visibleDocksInAreaSorted(m_window, m_leftAreaPrimaryDocks,
-                                                           Qt::LeftDockWidgetArea, Qt::Vertical);
-  QDockWidget* anchorDock = leftDocks.isEmpty() ? nullptr : leftDocks.constLast();
+  QList<QDockWidget *> leftDocks =
+      visibleDocksInAreaSorted(m_window, m_leftAreaPrimaryDocks, Qt::LeftDockWidgetArea, Qt::Vertical);
+  QDockWidget *anchorDock = leftDocks.isEmpty() ? nullptr : leftDocks.constLast();
   if (!anchorDock) {
     return false;
   }
@@ -579,7 +387,7 @@ bool MainWindowDockLayout::moveCollectionContentsToLeftDockIfNeeded() {
   const int collectionContentsHeight = m_collectionContentsDock->height();
   QList<int> leftDockHeights;
   leftDockHeights.reserve(leftDocks.size() + 1);
-  for (QDockWidget* dock : leftDocks) {
+  for (QDockWidget *dock : leftDocks) {
     leftDockHeights.append(dock->height());
   }
   leftDocks.append(m_collectionContentsDock);
@@ -587,53 +395,45 @@ bool MainWindowDockLayout::moveCollectionContentsToLeftDockIfNeeded() {
 
   m_collectionContentsLeftDockHeight = collectionContentsHeight;
   m_pendingCollectionContentsBottomHeight = 0;
-  ScopedDockLayoutAdjustment adjustingDockLayout(m_adjustingDockLayout);
-  setCollectionContentsWidthLock(0);
-  // Explicitly move the dock out of the bottom area before splitting it into
-  // the left stack. Drag-undocking a neighboring bottom dock can leave Qt with
-  // a transient bottom-area placeholder that splitDockWidget() alone does not
-  // fully clear.
-  m_window->addDockWidget(Qt::LeftDockWidgetArea, m_collectionContentsDock);
-  activateMainLayout();
+  m_adjustingDockLayout = true;
+  m_collectionContentsDock->setMinimumWidth(0);
+  m_collectionContentsDock->setMaximumWidth(QWIDGETSIZE_MAX);
   m_window->splitDockWidget(anchorDock, m_collectionContentsDock, Qt::Vertical);
   activateMainLayout();
   m_window->resizeDocks(leftDocks, leftDockHeights, Qt::Vertical);
   activateMainLayout();
+  m_adjustingDockLayout = false;
   return true;
 }
 
-// Once Collections or Logs are back in the bottom area, move Collection Contents to be
-// alongside them instead of leaving it in the left stack.
 bool MainWindowDockLayout::moveCollectionContentsToBottomDockIfNeeded() {
   if (!isVisibleDockInArea(m_window, m_collectionContentsDock, Qt::LeftDockWidgetArea) ||
-      bottomMostDockInArea(m_window, m_leftAreaDocks, Qt::LeftDockWidgetArea) !=
-          m_collectionContentsDock ||
+      bottomMostDockInArea(m_window, m_leftAreaDocks, Qt::LeftDockWidgetArea) != m_collectionContentsDock ||
       !hasVisibleDockInArea(m_window, m_bottomCompanionDocks, Qt::BottomDockWidgetArea)) {
     return false;
   }
 
-  QDockWidget* anchorDock =
-      leftMostDockInArea(m_window, m_bottomCompanionDocks, Qt::BottomDockWidgetArea);
+  QDockWidget *anchorDock = leftMostDockInArea(m_window, m_bottomCompanionDocks, Qt::BottomDockWidgetArea);
   if (!anchorDock) {
     return false;
   }
 
   const int collectionContentsWidth = m_collectionContentsDock->width();
-  const int collectionContentsHeight = m_collectionContentsLeftDockHeight > 0
-                                           ? m_collectionContentsLeftDockHeight
-                                           : m_collectionContentsDock->height();
+  const int collectionContentsHeight = m_collectionContentsLeftDockHeight > 0 ? m_collectionContentsLeftDockHeight
+                                                                              : m_collectionContentsDock->height();
 
   m_pendingCollectionContentsBottomHeight = collectionContentsHeight;
-  ScopedDockLayoutAdjustment adjustingDockLayout(m_adjustingDockLayout);
-  setCollectionContentsWidthLock(0);
+  m_adjustingDockLayout = true;
+  m_collectionContentsDock->setMinimumWidth(0);
+  m_collectionContentsDock->setMaximumWidth(QWIDGETSIZE_MAX);
   m_window->addDockWidget(Qt::BottomDockWidgetArea, m_collectionContentsDock);
   m_window->splitDockWidget(m_collectionContentsDock, anchorDock, Qt::Horizontal);
   activateMainLayout();
 
   m_bottomDockAreaPreferredHeight = collectionContentsHeight;
-  QList<QDockWidget*> bottomDocks;
+  QList<QDockWidget *> bottomDocks;
   QList<int> bottomDockHeights;
-  for (QDockWidget* dock : m_bottomAreaDocks) {
+  for (QDockWidget *dock : m_bottomAreaDocks) {
     if (isVisibleDockInArea(m_window, dock, Qt::BottomDockWidgetArea)) {
       bottomDocks.append(dock);
       bottomDockHeights.append(collectionContentsHeight);
@@ -644,24 +444,34 @@ bool MainWindowDockLayout::moveCollectionContentsToBottomDockIfNeeded() {
   }
   m_window->resizeDocks({m_collectionContentsDock}, {collectionContentsWidth}, Qt::Horizontal);
   activateMainLayout();
+  m_adjustingDockLayout = false;
   return true;
 }
 
 bool MainWindowDockLayout::normalizeCollectionContentsDockPlacement() {
-  if (shouldSkipDockLayoutWork() || m_adjustingDockLayout) {
+  if (m_adjustingDockLayout || m_defaultDockState.isEmpty() || m_restoringDockState || m_closingDown) {
     return false;
   }
 
   return moveCollectionContentsToLeftDockIfNeeded() || moveCollectionContentsToBottomDockIfNeeded();
 }
 
-void MainWindowDockLayout::setCollectionContentsWidthLock(int targetWidth) {
+void MainWindowDockLayout::updateCollectionContentsWidthLock() {
   constexpr int kUnlockedMinimumWidth = 0;
   constexpr int kUnlockedMaximumWidth = QWIDGETSIZE_MAX;
 
-  // A non-positive target width means "unlock" and let Qt size Collection
-  // Contents freely. Otherwise pin min/max width to the same value so its left
-  // edge stays aligned with the left dock column.
+  const bool shouldLockWidth =
+      hasVisibleDockInArea(m_window, m_leftAreaDocks, Qt::LeftDockWidgetArea) &&
+      isLeftMostDockInArea(m_window, m_collectionContentsDock, m_bottomAreaDocks, Qt::BottomDockWidgetArea);
+
+  if (!shouldLockWidth) {
+    m_collectionContentsDock->setMinimumWidth(kUnlockedMinimumWidth);
+    m_collectionContentsDock->setMaximumWidth(kUnlockedMaximumWidth);
+    return;
+  }
+
+  const int targetWidth =
+      firstVisibleDockSizeInArea(m_window, m_leftAreaDocks, Qt::LeftDockWidgetArea, Qt::Horizontal);
   if (targetWidth <= 0) {
     m_collectionContentsDock->setMinimumWidth(kUnlockedMinimumWidth);
     m_collectionContentsDock->setMaximumWidth(kUnlockedMaximumWidth);
@@ -670,29 +480,6 @@ void MainWindowDockLayout::setCollectionContentsWidthLock(int targetWidth) {
 
   m_collectionContentsDock->setMinimumWidth(targetWidth);
   m_collectionContentsDock->setMaximumWidth(targetWidth);
-}
-
-// When Collection Contents visually bridges the left column and the bottom
-// row, pin its width to the left column so both edges stay aligned.
-void MainWindowDockLayout::updateCollectionContentsWidthLock() {
-  const bool shouldLockWidth =
-      hasVisibleDockInArea(m_window, m_leftAreaDocks, Qt::LeftDockWidgetArea) &&
-      isLeftMostDockInArea(m_window, m_collectionContentsDock, m_bottomAreaDocks,
-                           Qt::BottomDockWidgetArea);
-
-  if (!shouldLockWidth) {
-    setCollectionContentsWidthLock(0);
-    return;
-  }
-
-  const int targetWidth =
-      firstVisibleDockSizeInArea(m_window, m_leftAreaDocks, Qt::LeftDockWidgetArea, Qt::Horizontal);
-  if (targetWidth <= 0) {
-    setCollectionContentsWidthLock(0);
-    return;
-  }
-
-  setCollectionContentsWidthLock(targetWidth);
 }
 
 void MainWindowDockLayout::applyDefaultDockLayout() {
@@ -705,31 +492,26 @@ void MainWindowDockLayout::applyDefaultDockLayout() {
   m_loggerDock->show();
   activateMainLayout();
 
-  const int bottomDockAreaHeight =
-      Size::VTab + horizontalScrollBarReservedHeight(m_collectionListView) +
+  const int bottomDockAreaHeight = Size::VTab + horizontalScrollBarReservedHeight(m_collectionListView) +
       static_cast<int>(4.5 * ItemViewDensity::listItemStride(m_collectionListView));
 
   m_window->resizeDocks({m_rawfileDock, m_vgmfileDock}, {26, 74}, Qt::Vertical);
   m_window->resizeDocks({m_collectionContentsDock, m_collectionsDock, m_loggerDock},
-                        {bottomDockAreaHeight, bottomDockAreaHeight, bottomDockAreaHeight},
-                        Qt::Vertical);
+                        {bottomDockAreaHeight, bottomDockAreaHeight, bottomDockAreaHeight}, Qt::Vertical);
   m_window->resizeDocks({m_collectionContentsDock, m_collectionsDock, m_loggerDock}, {27, 38, 35},
                         Qt::Horizontal);
   activateMainLayout();
   m_loggerDock->hide();
 }
 
-// Floating dock widgets need one event-loop turn after restoreState() before
-// their saved geometry can be applied reliably.
 void MainWindowDockLayout::restoreFloatingDocks() {
   QTimer::singleShot(0, this, [this]() {
-    for (QDockWidget* dock : m_allDocks) {
+    for (QDockWidget *dock : m_allDocks) {
       if (!dock || !dock->isFloating() || !dock->toggleViewAction()->isChecked()) {
         continue;
       }
       dock->show();
-      const QByteArray geometry =
-          Settings::the()->mainWindow.floatingDockGeometry(dock->objectName());
+      const QByteArray geometry = Settings::the()->mainWindow.floatingDockGeometry(dock->objectName());
       if (!geometry.isEmpty()) {
         dock->restoreGeometry(geometry);
       }
@@ -740,7 +522,7 @@ void MainWindowDockLayout::restoreFloatingDocks() {
 
 void MainWindowDockLayout::saveLayoutSettings() const {
   Settings::the()->mainWindow.setWindowGeometry(m_window->saveGeometry());
-  for (QDockWidget* dock : m_allDocks) {
+  for (QDockWidget *dock : m_allDocks) {
     if (!dock) {
       continue;
     }
@@ -755,13 +537,12 @@ void MainWindowDockLayout::saveLayoutSettings() const {
   }
 }
 
-void MainWindowDockLayout::noteBottomDockWillBeShown(QDockWidget* dock) {
+void MainWindowDockLayout::noteBottomDockWillBeShown() {
   captureCollectionContentsLeftDockHeight();
-  m_pendingBottomCompanionToggleShowDock = dock;
 }
 
 void MainWindowDockLayout::requestDockLayoutSettle(bool applyAreaTargets) {
-  if (shouldSkipDockLayoutWork()) {
+  if (m_defaultDockState.isEmpty() || m_restoringDockState || m_closingDown) {
     return;
   }
 
@@ -772,10 +553,8 @@ void MainWindowDockLayout::requestDockLayoutSettle(bool applyAreaTargets) {
   queueReconcile(flags);
 }
 
-// Merge bursts of dock events into one deferred pass so we reconcile against
-// Qt's settled layout rather than its transient intermediate states.
 void MainWindowDockLayout::queueReconcile(unsigned flags) {
-  if (flags == ReconcileNone || shouldSkipDockLayoutWork()) {
+  if (flags == ReconcileNone || m_defaultDockState.isEmpty() || m_restoringDockState || m_closingDown) {
     return;
   }
 
@@ -785,100 +564,39 @@ void MainWindowDockLayout::queueReconcile(unsigned flags) {
   }
 }
 
-bool MainWindowDockLayout::shouldDeferReconcile(unsigned flags) {
-  if ((flags & ReconcileSettleLayout) != 0u && m_dockWidgetDragActive &&
-      QApplication::mouseButtons() != Qt::NoButton) {
-    // Drag-to-float emits dock signals before Qt has fully finished the drag
-    // transaction. Wait until the mouse is released so we normalize against the
-    // final settled dock tree instead of a transient placeholder layout.
-    m_pendingReconcileFlags |= flags;
-    m_reconcileTimer->start(16);
-    return true;
-  }
-
-  if (QApplication::mouseButtons() == Qt::NoButton) {
-    m_dockWidgetDragActive = false;
-  }
-
-  if (m_adjustingDockLayout) {
-    // Our own corrective moves can emit more dock signals; retry after the
-    // current adjustment finishes.
-    m_pendingReconcileFlags |= flags;
-    m_reconcileTimer->start(0);
-    return true;
-  }
-
-  return false;
-}
-
-void MainWindowDockLayout::runFullReconcile(bool applyAreaTargets) {
-  runWithUpdatesSuspended(m_window, [this, applyAreaTargets]() {
-    // Normalize placement first, then resize/lock/persist the settled result.
-    activateMainLayout();
-    const bool normalizedCollectionContents = normalizeCollectionContentsDockPlacement();
-    const bool applyBottomHeight =
-        applyAreaTargets ||
-        (normalizedCollectionContents &&
-         isVisibleDockInArea(m_window, m_collectionContentsDock, Qt::BottomDockWidgetArea));
-    if (applyAreaTargets || applyBottomHeight) {
-      applyDockAreaTargets(applyAreaTargets, applyBottomHeight);
-    }
-    applyPendingCollectionContentsBottomAreaHeight();
-    captureCollectionContentsLeftDockHeight();
-    updateCollectionContentsWidthLock();
-    activateMainLayout();
-    snapshotDockAreaSizes(true);
-  });
-}
-
-// Apply the queued dock-policy work in one place: either run a full
-// normalize/resize/persist pass or, for separator drags, just refresh the
-// Collection Contents width lock.
 void MainWindowDockLayout::processPendingReconcile() {
-  if (m_pendingReconcileFlags == ReconcileNone || shouldSkipDockLayoutWork()) {
+  if (m_pendingReconcileFlags == ReconcileNone || m_defaultDockState.isEmpty() || m_restoringDockState ||
+      m_closingDown) {
     return;
   }
 
   const unsigned flags = std::exchange(m_pendingReconcileFlags, ReconcileNone);
-  if (shouldDeferReconcile(flags)) {
+  if (m_adjustingDockLayout) {
+    queueReconcile(flags);
     return;
   }
 
   if ((flags & ReconcileSettleLayout) != 0u) {
-    runFullReconcile((flags & ReconcileApplyAreaTargets) != 0u);
+    const bool applyAreaTargets = (flags & ReconcileApplyAreaTargets) != 0u;
+    runWithUpdatesSuspended(m_window, [this, applyAreaTargets]() {
+      activateMainLayout();
+      const bool normalizedCollectionContents = normalizeCollectionContentsDockPlacement();
+      const bool applyBottomHeight = applyAreaTargets ||
+          (normalizedCollectionContents &&
+           isVisibleDockInArea(m_window, m_collectionContentsDock, Qt::BottomDockWidgetArea));
+      if (applyAreaTargets || applyBottomHeight) {
+        applyDockAreaTargets(applyAreaTargets, applyBottomHeight);
+      }
+      applyPendingCollectionContentsBottomAreaHeight();
+      captureCollectionContentsLeftDockHeight();
+      updateCollectionContentsWidthLock();
+      activateMainLayout();
+      snapshotDockAreaSizes(true);
+    });
     return;
   }
 
   if ((flags & ReconcileUpdateWidthLock) != 0u) {
     updateCollectionContentsWidthLock();
   }
-}
-
-void MainWindowDockLayout::applyPendingFloatingDockRedockState(QDockWidget* dock, bool clearState) {
-  if (!m_pendingFloatingDockRedock.matches(dock)) {
-    return;
-  }
-
-  // Replay the pre-redock window and dock-area sizes for the specific dock
-  // whose floating geometry we just snapshotted.
-  if (m_pendingFloatingDockRedock.windowSize.isValid()) {
-    m_window->resize(m_pendingFloatingDockRedock.windowSize);
-  }
-
-  const Qt::DockWidgetArea area = m_window->dockWidgetArea(dock);
-  if (area == Qt::LeftDockWidgetArea && m_pendingFloatingDockRedock.leftAreaWidth > 0) {
-    m_leftDockAreaPreferredWidth = m_pendingFloatingDockRedock.leftAreaWidth;
-    applyDockAreaTargets(true, false);
-  } else if (area == Qt::BottomDockWidgetArea && m_pendingFloatingDockRedock.bottomAreaHeight > 0) {
-    m_bottomDockAreaPreferredHeight = m_pendingFloatingDockRedock.bottomAreaHeight;
-    applyDockAreaTargets(false, true);
-  }
-
-  activateMainLayout();
-
-  if (!clearState) {
-    return;
-  }
-
-  m_pendingFloatingDockRedock.clear();
 }
