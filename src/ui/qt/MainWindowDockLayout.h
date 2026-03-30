@@ -10,8 +10,7 @@ class QSize;
 class QTimer;
 class VGMCollListView;
 
-// Owns dock placement policy and persisted dock/window state so MainWindow can
-// stay focused on constructing widgets and routing app-level interactions.
+// Encapsulates MainWindow dock policy, persistence, and layout reconciliation.
 class MainWindowDockLayout final : public QObject {
 public:
   struct Docks {
@@ -63,6 +62,7 @@ private:
   void queueReconcile(unsigned flags);
   void processPendingReconcile();
 
+  // Cached dock and widget pointers used throughout the layout rules.
   MainWindow *m_window{};
   QDockWidget *m_rawfileDock{};
   QDockWidget *m_vgmfileDock{};
@@ -70,18 +70,25 @@ private:
   QDockWidget *m_collectionContentsDock{};
   QDockWidget *m_loggerDock{};
   VGMCollListView *m_collectionListView{};
+
+  // Precomputed dock groups shared by the placement heuristics.
   QList<QDockWidget *> m_allDocks{};
   QList<QDockWidget *> m_leftAreaDocks{};
   QList<QDockWidget *> m_leftAreaPrimaryDocks{};
   QList<QDockWidget *> m_bottomAreaDocks{};
   QList<QDockWidget *> m_bottomCompanionDocks{};
-  QTimer *m_reconcileTimer{};
+
+  // Saved layout state and remembered dock sizes, including the Collection
+  // Contents height carried between the left stack and bottom row.
   QByteArray m_defaultDockState{};
   QByteArray m_savedDockState{};
   int m_collectionContentsLeftDockHeight{};
   int m_pendingCollectionContentsBottomHeight{};
   int m_leftDockAreaPreferredWidth{};
   int m_bottomDockAreaPreferredHeight{};
+
+  // Queued reconciliation state used to coalesce dock churn before reacting.
+  QTimer *m_reconcileTimer{};
   unsigned m_pendingReconcileFlags{};
   bool m_adjustingDockLayout{};
   bool m_restoringDockState{};
