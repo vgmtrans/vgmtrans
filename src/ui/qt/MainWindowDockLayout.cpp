@@ -161,12 +161,16 @@ void MainWindowDockLayout::restoreWindowGeometry() const {
   }
 }
 
+// Build the current default layout once, then layer any persisted user state on
+// top of it so reset can always return to a known baseline.
 void MainWindowDockLayout::initializeAfterFirstShow() {
   if (!m_defaultDockState.isEmpty()) {
     return;
   }
 
   m_restoringDockState = true;
+  // Capture a known-good baseline before applying any saved layout so reset can
+  // always return to the current product default.
   applyDefaultDockLayout();
   m_defaultDockState = m_window->saveState(kDockLayoutStateVersion);
 
@@ -258,6 +262,8 @@ void MainWindowDockLayout::saveOnClose() {
   saveLayoutSettings();
 }
 
+// Dock signals often arrive while Qt is still reshuffling the layout, so route
+// them all through the queued reconciliation path instead of reacting inline.
 void MainWindowDockLayout::connectSignals() {
   for (QDockWidget *dock : m_allDocks) {
     if (!dock) {
@@ -315,6 +321,8 @@ void MainWindowDockLayout::snapshotDockAreaSizes(bool persistState) {
   }
 }
 
+// Keep dock-area growth feeling stable by reapplying the last settled left
+// width and bottom height when the main window expands.
 void MainWindowDockLayout::applyDockAreaTargets(bool applyLeftWidth, bool applyBottomHeight) {
   bool resized = false;
   const auto resizeAreaToPreferredSize =
@@ -344,6 +352,8 @@ void MainWindowDockLayout::applyDockAreaTargets(bool applyLeftWidth, bool applyB
   }
 }
 
+// Remember the left-stack height for Collection Contents only when it fully
+// owns the bottom edge of that stack.
 void MainWindowDockLayout::captureCollectionContentsLeftDockHeight() {
   if (m_defaultDockState.isEmpty() || m_adjustingDockLayout || m_restoringDockState || m_closingDown) {
     return;
@@ -370,6 +380,8 @@ void MainWindowDockLayout::applyPendingCollectionContentsBottomAreaHeight() {
   m_pendingCollectionContentsBottomHeight = 0;
 }
 
+// If Collection Contents is the only bottom dock left, fold it back into the
+// left column so the layout does not leave an orphaned bottom strip.
 bool MainWindowDockLayout::moveCollectionContentsToLeftDockIfNeeded() {
   if (!hasVisibleDockInArea(m_window, m_leftAreaPrimaryDocks, Qt::LeftDockWidgetArea) ||
       !isLeftMostDockInArea(m_window, m_collectionContentsDock, m_bottomAreaDocks, Qt::BottomDockWidgetArea) ||
@@ -406,6 +418,8 @@ bool MainWindowDockLayout::moveCollectionContentsToLeftDockIfNeeded() {
   return true;
 }
 
+// Once Collections or Logs are back in the bottom area, move Collection Contents to be
+// alongside them instead of leaving it in the left stack.
 bool MainWindowDockLayout::moveCollectionContentsToBottomDockIfNeeded() {
   if (!isVisibleDockInArea(m_window, m_collectionContentsDock, Qt::LeftDockWidgetArea) ||
       bottomMostDockInArea(m_window, m_leftAreaDocks, Qt::LeftDockWidgetArea) != m_collectionContentsDock ||
@@ -456,6 +470,8 @@ bool MainWindowDockLayout::normalizeCollectionContentsDockPlacement() {
   return moveCollectionContentsToLeftDockIfNeeded() || moveCollectionContentsToBottomDockIfNeeded();
 }
 
+// When Collection Contents visually bridges the left column and the bottom
+// row, pin its width to the left column so both edges stay aligned.
 void MainWindowDockLayout::updateCollectionContentsWidthLock() {
   constexpr int kUnlockedMinimumWidth = 0;
   constexpr int kUnlockedMaximumWidth = QWIDGETSIZE_MAX;
@@ -504,6 +520,8 @@ void MainWindowDockLayout::applyDefaultDockLayout() {
   m_loggerDock->hide();
 }
 
+// Floating dock widgets need one event-loop turn after restoreState() before
+// their saved geometry can be applied reliably.
 void MainWindowDockLayout::restoreFloatingDocks() {
   QTimer::singleShot(0, this, [this]() {
     for (QDockWidget *dock : m_allDocks) {
@@ -553,6 +571,8 @@ void MainWindowDockLayout::requestDockLayoutSettle(bool applyAreaTargets) {
   queueReconcile(flags);
 }
 
+// Merge bursts of dock events into one deferred pass so we reconcile against
+// Qt's settled layout rather than its transient intermediate states.
 void MainWindowDockLayout::queueReconcile(unsigned flags) {
   if (flags == ReconcileNone || m_defaultDockState.isEmpty() || m_restoringDockState || m_closingDown) {
     return;
@@ -564,6 +584,9 @@ void MainWindowDockLayout::queueReconcile(unsigned flags) {
   }
 }
 
+// Apply the queued dock-policy work in one place: either run a full
+// normalize/resize/persist pass or, for separator drags, just refresh the
+// Collection Contents width lock.
 void MainWindowDockLayout::processPendingReconcile() {
   if (m_pendingReconcileFlags == ReconcileNone || m_defaultDockState.isEmpty() || m_restoringDockState ||
       m_closingDown) {
@@ -572,6 +595,8 @@ void MainWindowDockLayout::processPendingReconcile() {
 
   const unsigned flags = std::exchange(m_pendingReconcileFlags, ReconcileNone);
   if (m_adjustingDockLayout) {
+    // Our own corrective moves can emit more dock signals; retry after the
+    // current adjustment finishes.
     queueReconcile(flags);
     return;
   }
@@ -579,6 +604,7 @@ void MainWindowDockLayout::processPendingReconcile() {
   if ((flags & ReconcileSettleLayout) != 0u) {
     const bool applyAreaTargets = (flags & ReconcileApplyAreaTargets) != 0u;
     runWithUpdatesSuspended(m_window, [this, applyAreaTargets]() {
+      // Normalize placement first, then resize/lock/persist the settled result.
       activateMainLayout();
       const bool normalizedCollectionContents = normalizeCollectionContentsDockPlacement();
       const bool applyBottomHeight = applyAreaTargets ||

@@ -10,6 +10,8 @@ class QSize;
 class QTimer;
 class VGMCollListView;
 
+// Owns dock placement policy and persisted dock/window state so MainWindow can
+// stay focused on constructing widgets and routing app-level interactions.
 class MainWindowDockLayout final : public QObject {
 public:
   struct Docks {
