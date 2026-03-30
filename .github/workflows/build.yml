@@ -176,6 +176,7 @@ jobs:
       - name: Debug qwindowkit checkout
         shell: bash
         run: |
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
           git rev-parse HEAD
           git submodule status --recursive
           git -C lib/qwindowkit rev-parse HEAD
@@ -239,6 +240,7 @@ jobs:
        - name: Debug qwindowkit checkout
          shell: bash
          run: |
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
           git rev-parse HEAD
           git submodule status --recursive
           git -C lib/qwindowkit rev-parse HEAD
