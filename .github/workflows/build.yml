@@ -173,6 +173,14 @@ jobs:
           submodules: recursive
           show-progress: false
 
+      - name: Debug qwindowkit checkout
+        shell: bash
+        run: |
+          git rev-parse HEAD
+          git submodule status --recursive
+          git -C lib/qwindowkit rev-parse HEAD
+          sed -n '116,126p' lib/qwindowkit/CMakeLists.txt
+
       - name: "Build Flatpak"
         uses: flatpak/flatpak-github-actions/flatpak-builder@v6
         with:
@@ -227,6 +235,14 @@ jobs:
          with:
           submodules: recursive
           show-progress: false
+
+       - name: Debug qwindowkit checkout
+         shell: bash
+         run: |
+          git rev-parse HEAD
+          git submodule status --recursive
+          git -C lib/qwindowkit rev-parse HEAD
+          sed -n '116,126p' lib/qwindowkit/CMakeLists.txt
 
        - name: "Source vcvars for ${{ matrix.target }}"
          if: ${{ !contains(matrix.target, '-clang') }}
