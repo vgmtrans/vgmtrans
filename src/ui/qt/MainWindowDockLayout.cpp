@@ -3,8 +3,10 @@
 #include <QAction>
 #include <QApplication>
 #include <QDockWidget>
+#include <QEvent>
 #include <QLayout>
 #include <QMainWindow>
+#include <QMouseEvent>
 #include <QSize>
 #include <QTimer>
 #include <QWidget>
@@ -271,6 +273,10 @@ void MainWindowDockLayout::connectSignals() {
       continue;
     }
 
+    if (QWidget *titleBar = dock->titleBarWidget()) {
+      titleBar->installEventFilter(this);
+    }
+
     connect(dock, &QDockWidget::visibilityChanged, this, [this](bool) {
       // Visibility changes are the one path where waiting for the queued pass
       // can let Qt paint an intermediate frame. Flush the reconcile
@@ -306,6 +312,25 @@ void MainWindowDockLayout::connectSignals() {
       noteBottomDockWillBeShown();
     }
   });
+}
+
+bool MainWindowDockLayout::eventFilter(QObject *watched, QEvent *event) {
+  if (event && event->type() == QEvent::MouseMove) {
+    auto *mouseEvent = static_cast<QMouseEvent *>(event);
+    if ((mouseEvent->buttons() & Qt::LeftButton) != 0u) {
+      for (QDockWidget *dock : m_allDocks) {
+        if (!dock) {
+          continue;
+        }
+        if (watched == dock->titleBarWidget()) {
+          m_dockWidgetDragActive = true;
+          break;
+        }
+      }
+    }
+  }
+
+  return QObject::eventFilter(watched, event);
 }
 
 void MainWindowDockLayout::activateMainLayout() {

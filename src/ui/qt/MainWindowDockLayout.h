@@ -6,6 +6,7 @@
 
 class MainWindow;
 class QDockWidget;
+class QEvent;
 class QSize;
 class QTimer;
 class VGMCollListView;
@@ -35,6 +36,8 @@ public:
   void saveOnClose();
 
 private:
+  bool eventFilter(QObject *watched, QEvent *event) override;
+
   enum ReconcileFlag : unsigned {
     ReconcileNone = 0,
     ReconcileSettleLayout = 1u << 0,
