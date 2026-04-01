@@ -84,8 +84,8 @@ private:
   void applyDefaultDockLayout();
   void restoreFloatingDocks();
   void saveLayoutSettings() const;
-  void noteBottomDockWillBeShown();
-  void handleDockVisibilityChanged();
+  void noteBottomDockWillBeShown(QDockWidget* dock);
+  void handleDockVisibilityChanged(QDockWidget* dock, bool visible);
   void handleDockTopLevelChanged(QDockWidget* dock, bool floating);
   void queuePostRedockSettle(QDockWidget* dock);
   void rememberFloatingDockRedockState(QDockWidget* dock);
@@ -130,5 +130,6 @@ private:
   bool m_closingDown{};
   bool m_dockSeparatorDragActive{};
   bool m_dockWidgetDragActive{};
+  QDockWidget* m_pendingBottomCompanionToggleShowDock{};
   FloatingDockRedockState m_pendingFloatingDockRedock{};
 };

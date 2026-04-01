@@ -254,6 +254,7 @@ void MainWindowDockLayout::resetToDefault() {
 
   cancelInteraction();
   clearPendingReconcile();
+  m_pendingBottomCompanionToggleShowDock = nullptr;
   m_pendingFloatingDockRedock.clear();
 
   m_restoringDockState = true;
@@ -276,6 +277,7 @@ void MainWindowDockLayout::saveOnClose() {
   m_closingDown = true;
   cancelInteraction();
   clearPendingReconcile();
+  m_pendingBottomCompanionToggleShowDock = nullptr;
   m_pendingFloatingDockRedock.clear();
   m_savedDockState = m_window->saveState(kDockLayoutStateVersion);
   saveLayoutSettings();
@@ -290,12 +292,12 @@ void MainWindowDockLayout::connectSignals() {
 
   connect(m_collectionsDock->toggleViewAction(), &QAction::toggled, this, [this](bool checked) {
     if (checked) {
-      noteBottomDockWillBeShown();
+      noteBottomDockWillBeShown(m_collectionsDock);
     }
   });
   connect(m_loggerDock->toggleViewAction(), &QAction::toggled, this, [this](bool checked) {
     if (checked) {
-      noteBottomDockWillBeShown();
+      noteBottomDockWillBeShown(m_loggerDock);
     }
   });
 }
@@ -310,7 +312,7 @@ void MainWindowDockLayout::connectDockSignals(QDockWidget* dock) {
   }
 
   connect(dock, &QDockWidget::visibilityChanged, this,
-          [this](bool) { handleDockVisibilityChanged(); });
+          [this, dock](bool visible) { handleDockVisibilityChanged(dock, visible); });
   connect(dock, &QDockWidget::dockLocationChanged, this,
           [this](Qt::DockWidgetArea) { requestDockLayoutSettle(false); });
   connect(dock, &QDockWidget::topLevelChanged, this,
@@ -340,10 +342,21 @@ void MainWindowDockLayout::captureDockAreaPreferredSize(const QList<QDockWidget*
   }
 }
 
-void MainWindowDockLayout::handleDockVisibilityChanged() {
-  // Visibility changes are the one path where waiting for the queued pass can
-  // let Qt paint an intermediate frame. Flush the reconcile immediately;
-  // drag-sensitive cases are still deferred inside processPendingReconcile().
+void MainWindowDockLayout::handleDockVisibilityChanged(QDockWidget* dock, bool visible) {
+  const bool shouldFlushImmediately =
+      visible && dock && dock == m_pendingBottomCompanionToggleShowDock;
+  if (dock == m_pendingBottomCompanionToggleShowDock) {
+    m_pendingBottomCompanionToggleShowDock = nullptr;
+  }
+
+  if (!shouldFlushImmediately) {
+    requestDockLayoutSettle(false);
+    return;
+  }
+
+  // Re-enabling Collections/Logs via the toggle buttons can briefly paint the
+  // recreated bottom area without Collection Contents. Flush that one path
+  // immediately; drag re-dock stays on the queued path.
   queueReconcile(ReconcileSettleLayout | ReconcileUpdateWidthLock);
   processPendingReconcile();
 }
@@ -706,8 +719,9 @@ void MainWindowDockLayout::saveLayoutSettings() const {
   }
 }
 
-void MainWindowDockLayout::noteBottomDockWillBeShown() {
+void MainWindowDockLayout::noteBottomDockWillBeShown(QDockWidget* dock) {
   captureCollectionContentsLeftDockHeight();
+  m_pendingBottomCompanionToggleShowDock = dock;
 }
 
 void MainWindowDockLayout::requestDockLayoutSettle(bool applyAreaTargets) {
