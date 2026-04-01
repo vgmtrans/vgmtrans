@@ -14,6 +14,7 @@
 
 namespace {
 constexpr int kWindows11MenuCornerRadius = 8;
+constexpr int kWindows11MenuItemHorizontalPadding = 6;
 constexpr int kWindows11MenuItemVerticalPadding = 2;
 
 QColor menuBackgroundColor(const QPalette &palette) {
@@ -46,8 +47,25 @@ QSize Windows11MenuProxyStyle::sizeFromContents(ContentsType type, const QStyleO
     return contentSize;
   }
 
+  contentSize.rwidth() += kWindows11MenuItemHorizontalPadding * 2;
   contentSize.rheight() += kWindows11MenuItemVerticalPadding * 2;
   return contentSize;
+}
+
+void Windows11MenuProxyStyle::drawControl(ControlElement element, const QStyleOption *option,
+                                          QPainter *painter, const QWidget *widget) const {
+  if (element == CE_MenuItem && option && painter && qobject_cast<const QMenu *>(widget)) {
+    if (const auto *menuItem = qstyleoption_cast<const QStyleOptionMenuItem *>(option)) {
+      QStyleOptionMenuItem paddedMenuItem(*menuItem);
+      paddedMenuItem.rect = menuItem->rect.marginsRemoved(
+          QMargins(kWindows11MenuItemHorizontalPadding, 0,
+                   kWindows11MenuItemHorizontalPadding, 0));
+      QProxyStyle::drawControl(element, &paddedMenuItem, painter, widget);
+      return;
+    }
+  }
+
+  QProxyStyle::drawControl(element, option, painter, widget);
 }
 
 void Windows11MenuProxyStyle::drawPrimitive(PrimitiveElement element, const QStyleOption *option,
