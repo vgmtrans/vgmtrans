@@ -322,7 +322,7 @@ bool MainWindowDockLayout::eventFilter(QObject *watched, QEvent *event) {
         if (!dock) {
           continue;
         }
-        if (watched == dock->titleBarWidget()) {
+        if (watched == dock->titleBarWidget() && !dock->isFloating()) {
           m_dockWidgetDragActive = true;
           break;
         }
