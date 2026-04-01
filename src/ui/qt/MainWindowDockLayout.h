@@ -79,6 +79,7 @@ private:
   bool moveCollectionContentsToLeftDockIfNeeded();
   bool moveCollectionContentsToBottomDockIfNeeded();
   bool normalizeCollectionContentsDockPlacement();
+  void setCollectionContentsWidthLock(int targetWidth);
   void updateCollectionContentsWidthLock();
   void applyDefaultDockLayout();
   void restoreFloatingDocks();
@@ -91,6 +92,8 @@ private:
   void clearPendingReconcile();
   void requestDockLayoutSettle(bool applyAreaTargets);
   void queueReconcile(unsigned flags);
+  bool shouldDeferReconcile(unsigned flags);
+  void runFullReconcile(bool applyAreaTargets);
   void processPendingReconcile();
   void applyPendingFloatingDockRedockState(QDockWidget* dock, bool clearState);
 
