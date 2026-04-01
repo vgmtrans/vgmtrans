@@ -217,6 +217,10 @@ void MainWindowDockLayout::handleResize(const QSize& oldSize, const QSize& newSi
     return;
   }
 
+  if (clampPendingFloatingDockRedockWindowSize(newSize)) {
+    return;
+  }
+
   applyDockAreaTargets(widthExpanded, heightExpanded);
   updateCollectionContentsWidthLock();
   activateMainLayout();
@@ -342,6 +346,28 @@ void MainWindowDockLayout::captureDockAreaPreferredSize(const QList<QDockWidget*
   }
 }
 
+bool MainWindowDockLayout::clampPendingFloatingDockRedockWindowSize(const QSize& newSize) {
+  if (!m_pendingFloatingDockRedock.dock || m_pendingFloatingDockRedock.dock->isFloating() ||
+      !m_pendingFloatingDockRedock.windowSize.isValid()) {
+    return false;
+  }
+
+  QSize clampedSize = newSize;
+  clampedSize.setWidth(
+      std::min(clampedSize.width(), m_pendingFloatingDockRedock.windowSize.width()));
+  clampedSize.setHeight(
+      std::min(clampedSize.height(), m_pendingFloatingDockRedock.windowSize.height()));
+  if (clampedSize == newSize) {
+    return false;
+  }
+
+  // Drag re-dock can momentarily grow the main window from the floating dock's
+  // last top-level geometry. Clamp that transient resize back to the pre-redock
+  // size before it becomes the new settled window size.
+  m_window->resize(clampedSize);
+  return true;
+}
+
 void MainWindowDockLayout::handleDockVisibilityChanged(QDockWidget* dock, bool visible) {
   const bool shouldFlushImmediately =
       visible && dock && dock == m_pendingBottomCompanionToggleShowDock;
@@ -412,7 +438,17 @@ bool MainWindowDockLayout::eventFilter(QObject* watched, QEvent* event) {
     return QObject::eventFilter(watched, event);
   }
 
-  if (event->type() == QEvent::MouseMove) {
+  if (event->type() == QEvent::MouseButtonPress) {
+    QDockWidget* dock = dockForTitleBar(watched);
+    if (!dock) {
+      return QObject::eventFilter(watched, event);
+    }
+
+    auto* mouseEvent = static_cast<QMouseEvent*>(event);
+    if (mouseEvent->button() == Qt::LeftButton && dock->isFloating()) {
+      rememberFloatingDockRedockState(dock);
+    }
+  } else if (event->type() == QEvent::MouseMove) {
     QDockWidget* dock = dockForTitleBar(watched);
     if (!dock) {
       return QObject::eventFilter(watched, event);

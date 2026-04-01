@@ -70,6 +70,7 @@ private:
   QDockWidget* dockForTitleBar(QObject* watched) const;
   void captureDockAreaPreferredSize(const QList<QDockWidget*>& docks, Qt::DockWidgetArea area,
                                     Qt::Orientation orientation, int& preferredSize);
+  bool clampPendingFloatingDockRedockWindowSize(const QSize& newSize);
   void captureLeftDockAreaWidth();
   void captureBottomDockAreaHeight();
   void snapshotDockAreaSizes(bool persistState);
