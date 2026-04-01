@@ -8,54 +8,14 @@
 #include <QFile>
 #include <QFileOpenEvent>
 #include <QFontDatabase>
-#include <QGraphicsDropShadowEffect>
 #if defined(Q_OS_LINUX) && QT_CONFIG(opengl)
 #include <QRhiWidget>
 #endif
-#include <QMenu>
-#include <QProxyStyle>
 #include <QTimer>
 #include <filesystem>
 #include "MainWindow.h"
 #include "QtVGMRoot.h"
-
-namespace {
-
-#if defined(Q_OS_WIN)
-constexpr int kWindows11MenuCornerRadius = 8;
-
-class Windows11MenuProxyStyle final : public QProxyStyle {
-public:
-  using QProxyStyle::QProxyStyle;
-
-  void polish(QWidget *widget) override {
-    QProxyStyle::polish(widget);
-
-    if (auto *menu = qobject_cast<QMenu *>(widget);
-        menu && qobject_cast<QGraphicsDropShadowEffect *>(menu->graphicsEffect())) {
-      menu->setGraphicsEffect(nullptr);
-    }
-  }
-
-  void drawPrimitive(PrimitiveElement element, const QStyleOption *option, QPainter *painter,
-                     const QWidget *widget = nullptr) const override {
-    if (element == PE_PanelMenu && option && painter && qobject_cast<const QMenu *>(widget)) {
-      QColor borderColor = option->palette.color(QPalette::WindowText);
-      borderColor.setAlpha(0x12);
-
-      painter->setPen(borderColor);
-      painter->setBrush(option->palette.brush(QPalette::Window));
-      painter->drawRoundedRect(option->rect.marginsRemoved(QMargins(2, 2, 2, 2)),
-                               kWindows11MenuCornerRadius, kWindows11MenuCornerRadius);
-      return;
-    }
-
-    QProxyStyle::drawPrimitive(element, option, painter, widget);
-  }
-};
-#endif
-
-}
+#include "widgets/Windows11MenuProxyStyle.h"
 
 class VGMTransApplication final : public QApplication {
 public:

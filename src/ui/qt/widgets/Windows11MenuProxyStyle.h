@@ -17,10 +17,6 @@ public:
   using QProxyStyle::QProxyStyle;
 
   void polish(QWidget *widget) override;
-  QSize sizeFromContents(ContentsType type, const QStyleOption *option, const QSize &size,
-                         const QWidget *widget) const override;
-  void drawControl(ControlElement element, const QStyleOption *option, QPainter *painter,
-                   const QWidget *widget = nullptr) const override;
   void drawPrimitive(PrimitiveElement element, const QStyleOption *option, QPainter *painter,
                      const QWidget *widget = nullptr) const override;
 };

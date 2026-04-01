@@ -5,7 +5,6 @@
 */
 
 #include "Windows11MenuProxyStyle.h"
-#include "UIHelpers.h"
 
 #include <QGraphicsDropShadowEffect>
 #include <QMenu>
@@ -14,15 +13,6 @@
 
 namespace {
 constexpr int kWindows11MenuCornerRadius = 8;
-constexpr int kWindows11MenuItemHorizontalPadding = 6;
-constexpr int kWindows11MenuItemVerticalPadding = 2;
-
-QColor menuBackgroundColor(const QPalette &palette) {
-  QColor backgroundColor = blendColors(palette.color(QPalette::Base),
-                                       palette.color(QPalette::AlternateBase), 0.9);
-  backgroundColor.setAlpha(255);
-  return backgroundColor;
-}
 }
 
 void Windows11MenuProxyStyle::polish(QWidget *widget) {
@@ -34,48 +24,14 @@ void Windows11MenuProxyStyle::polish(QWidget *widget) {
   }
 }
 
-QSize Windows11MenuProxyStyle::sizeFromContents(ContentsType type, const QStyleOption *option,
-                                                const QSize &size, const QWidget *widget) const {
-  QSize contentSize = QProxyStyle::sizeFromContents(type, option, size, widget);
-
-  if (type != CT_MenuItem || !qobject_cast<const QMenu *>(widget)) {
-    return contentSize;
-  }
-
-  const auto *menuItem = qstyleoption_cast<const QStyleOptionMenuItem *>(option);
-  if (!menuItem || menuItem->menuItemType == QStyleOptionMenuItem::Separator) {
-    return contentSize;
-  }
-
-  contentSize.rwidth() += kWindows11MenuItemHorizontalPadding * 2;
-  contentSize.rheight() += kWindows11MenuItemVerticalPadding * 2;
-  return contentSize;
-}
-
-void Windows11MenuProxyStyle::drawControl(ControlElement element, const QStyleOption *option,
-                                          QPainter *painter, const QWidget *widget) const {
-  if (element == CE_MenuItem && option && painter && qobject_cast<const QMenu *>(widget)) {
-    if (const auto *menuItem = qstyleoption_cast<const QStyleOptionMenuItem *>(option)) {
-      QStyleOptionMenuItem paddedMenuItem(*menuItem);
-      paddedMenuItem.rect = menuItem->rect.marginsRemoved(
-          QMargins(kWindows11MenuItemHorizontalPadding, 0,
-                   kWindows11MenuItemHorizontalPadding, 0));
-      QProxyStyle::drawControl(element, &paddedMenuItem, painter, widget);
-      return;
-    }
-  }
-
-  QProxyStyle::drawControl(element, option, painter, widget);
-}
-
 void Windows11MenuProxyStyle::drawPrimitive(PrimitiveElement element, const QStyleOption *option,
                                             QPainter *painter, const QWidget *widget) const {
   if (element == PE_PanelMenu && option && painter && qobject_cast<const QMenu *>(widget)) {
     QColor borderColor = option->palette.color(QPalette::WindowText);
-    borderColor.setAlpha(45);
+    borderColor.setAlpha(0x12);
 
     painter->setPen(borderColor);
-    painter->setBrush(menuBackgroundColor(option->palette));
+    painter->setBrush(option->palette.brush(QPalette::Window));
     painter->drawRoundedRect(option->rect.marginsRemoved(QMargins(2, 2, 2, 2)),
                              kWindows11MenuCornerRadius, kWindows11MenuCornerRadius);
     return;
