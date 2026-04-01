@@ -64,6 +64,7 @@ private:
   void requestDockLayoutSettle(bool applyAreaTargets);
   void queueReconcile(unsigned flags);
   void processPendingReconcile();
+  void applyPendingFloatingDockRedockState(QDockWidget *dock, bool clearState);
 
   // Cached dock and widget pointers used throughout the layout rules.
   MainWindow *m_window{};
@@ -98,6 +99,8 @@ private:
   bool m_closingDown{};
   bool m_dockSeparatorDragActive{};
   bool m_dockWidgetDragActive{};
-  QDockWidget *m_pendingBottomCompanionRedockDock{};
-  QSize m_pendingBottomCompanionRedockWindowSize{};
+  QDockWidget *m_pendingFloatingDockRedockDock{};
+  QSize m_pendingFloatingDockRedockWindowSize{};
+  int m_pendingFloatingDockRedockLeftAreaWidth{};
+  int m_pendingFloatingDockRedockBottomAreaHeight{};
 };

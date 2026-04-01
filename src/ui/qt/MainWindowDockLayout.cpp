@@ -291,9 +291,8 @@ void MainWindowDockLayout::connectSignals() {
       if (floating && QApplication::mouseButtons() != Qt::NoButton) {
         m_dockWidgetDragActive = true;
       }
-      if (!floating && dock == m_pendingBottomCompanionRedockDock && m_pendingBottomCompanionRedockWindowSize.isValid()) {
-        m_window->resize(m_pendingBottomCompanionRedockWindowSize);
-        activateMainLayout();
+      if (!floating) {
+        applyPendingFloatingDockRedockState(dock, false);
       }
       requestDockLayoutSettle(!floating);
       if (!floating) {
@@ -302,12 +301,7 @@ void MainWindowDockLayout::connectSignals() {
         // on the next turn so Collection Contents can react to the final dock
         // area assignment immediately.
         QTimer::singleShot(0, this, [this, dock]() {
-          if (dock == m_pendingBottomCompanionRedockDock && m_pendingBottomCompanionRedockWindowSize.isValid()) {
-            m_window->resize(m_pendingBottomCompanionRedockWindowSize);
-            activateMainLayout();
-            m_pendingBottomCompanionRedockDock = nullptr;
-            m_pendingBottomCompanionRedockWindowSize = QSize();
-          }
+          applyPendingFloatingDockRedockState(dock, true);
           requestDockLayoutSettle(true);
         });
       }
@@ -347,13 +341,18 @@ bool MainWindowDockLayout::eventFilter(QObject *watched, QEvent *event) {
   } else if (event->type() == QEvent::MouseButtonDblClick) {
     auto *mouseEvent = static_cast<QMouseEvent *>(event);
     if (mouseEvent->button() == Qt::LeftButton) {
-      for (QDockWidget *dock : m_bottomCompanionDocks) {
+      captureLeftDockAreaWidth();
+      captureBottomDockAreaHeight();
+
+      for (QDockWidget *dock : m_allDocks) {
         if (!dock) {
           continue;
         }
         if (watched == dock->titleBarWidget() && dock->isFloating()) {
-          m_pendingBottomCompanionRedockDock = dock;
-          m_pendingBottomCompanionRedockWindowSize = m_window->size();
+          m_pendingFloatingDockRedockDock = dock;
+          m_pendingFloatingDockRedockWindowSize = m_window->size();
+          m_pendingFloatingDockRedockLeftAreaWidth = m_leftDockAreaPreferredWidth;
+          m_pendingFloatingDockRedockBottomAreaHeight = m_bottomDockAreaPreferredHeight;
           break;
         }
       }
@@ -719,4 +718,34 @@ void MainWindowDockLayout::processPendingReconcile() {
   if ((flags & ReconcileUpdateWidthLock) != 0u) {
     updateCollectionContentsWidthLock();
   }
+}
+
+void MainWindowDockLayout::applyPendingFloatingDockRedockState(QDockWidget *dock, bool clearState) {
+  if (!dock || dock != m_pendingFloatingDockRedockDock) {
+    return;
+  }
+
+  if (m_pendingFloatingDockRedockWindowSize.isValid()) {
+    m_window->resize(m_pendingFloatingDockRedockWindowSize);
+  }
+
+  const Qt::DockWidgetArea area = m_window->dockWidgetArea(dock);
+  if (area == Qt::LeftDockWidgetArea && m_pendingFloatingDockRedockLeftAreaWidth > 0) {
+    m_leftDockAreaPreferredWidth = m_pendingFloatingDockRedockLeftAreaWidth;
+    applyDockAreaTargets(true, false);
+  } else if (area == Qt::BottomDockWidgetArea && m_pendingFloatingDockRedockBottomAreaHeight > 0) {
+    m_bottomDockAreaPreferredHeight = m_pendingFloatingDockRedockBottomAreaHeight;
+    applyDockAreaTargets(false, true);
+  }
+
+  activateMainLayout();
+
+  if (!clearState) {
+    return;
+  }
+
+  m_pendingFloatingDockRedockDock = nullptr;
+  m_pendingFloatingDockRedockWindowSize = QSize();
+  m_pendingFloatingDockRedockLeftAreaWidth = 0;
+  m_pendingFloatingDockRedockBottomAreaHeight = 0;
 }
