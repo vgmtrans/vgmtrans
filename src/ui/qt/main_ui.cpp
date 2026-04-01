@@ -8,6 +8,7 @@
 #include <QFile>
 #include <QFileOpenEvent>
 #include <QFontDatabase>
+#include <QGraphicsDropShadowEffect>
 #if defined(Q_OS_LINUX) && QT_CONFIG(opengl)
 #include <QRhiWidget>
 #endif
@@ -28,11 +29,12 @@ public:
   using QProxyStyle::QProxyStyle;
 
   void polish(QWidget *widget) override {
-    if (auto *menu = qobject_cast<QMenu *>(widget)) {
-      menu->setWindowFlag(Qt::NoDropShadowWindowHint, true);
-    }
-
     QProxyStyle::polish(widget);
+
+    if (auto *menu = qobject_cast<QMenu *>(widget);
+        menu && qobject_cast<QGraphicsDropShadowEffect *>(menu->graphicsEffect())) {
+      menu->setGraphicsEffect(nullptr);
+    }
   }
 
   void drawPrimitive(PrimitiveElement element, const QStyleOption *option, QPainter *painter,
