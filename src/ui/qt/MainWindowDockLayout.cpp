@@ -1,6 +1,7 @@
 #include "MainWindowDockLayout.h"
 
 #include <QAction>
+#include <QApplication>
 #include <QDockWidget>
 #include <QLayout>
 #include <QMainWindow>
@@ -410,6 +411,12 @@ bool MainWindowDockLayout::moveCollectionContentsToLeftDockIfNeeded() {
   m_adjustingDockLayout = true;
   m_collectionContentsDock->setMinimumWidth(0);
   m_collectionContentsDock->setMaximumWidth(QWIDGETSIZE_MAX);
+  // Explicitly move the dock out of the bottom area before splitting it into
+  // the left stack. Drag-undocking a neighboring bottom dock can leave Qt with
+  // a transient bottom-area placeholder that splitDockWidget() alone does not
+  // fully clear.
+  m_window->addDockWidget(Qt::LeftDockWidgetArea, m_collectionContentsDock);
+  activateMainLayout();
   m_window->splitDockWidget(anchorDock, m_collectionContentsDock, Qt::Vertical);
   activateMainLayout();
   m_window->resizeDocks(leftDocks, leftDockHeights, Qt::Vertical);
@@ -594,10 +601,20 @@ void MainWindowDockLayout::processPendingReconcile() {
   }
 
   const unsigned flags = std::exchange(m_pendingReconcileFlags, ReconcileNone);
+  if ((flags & ReconcileSettleLayout) != 0u && QApplication::mouseButtons() != Qt::NoButton) {
+    // Drag-to-float emits dock signals before Qt has fully finished the drag
+    // transaction. Wait until the mouse is released so we normalize against the
+    // final settled dock tree instead of a transient placeholder layout.
+    m_pendingReconcileFlags |= flags;
+    m_reconcileTimer->start(16);
+    return;
+  }
+
   if (m_adjustingDockLayout) {
     // Our own corrective moves can emit more dock signals; retry after the
     // current adjustment finishes.
-    queueReconcile(flags);
+    m_pendingReconcileFlags |= flags;
+    m_reconcileTimer->start(0);
     return;
   }
 
