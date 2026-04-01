@@ -275,7 +275,17 @@ void MainWindowDockLayout::connectSignals() {
     connect(dock, &QDockWidget::dockLocationChanged, this,
             [this](Qt::DockWidgetArea) { requestDockLayoutSettle(false); });
     connect(dock, &QDockWidget::topLevelChanged, this, [this](bool floating) {
+      if (floating && QApplication::mouseButtons() != Qt::NoButton) {
+        m_dockWidgetDragActive = true;
+      }
       requestDockLayoutSettle(!floating);
+      if (!floating) {
+        // Double-click re-dock can report topLevelChanged(false) before Qt has
+        // fully restored the dock into its target area. Queue one more settle
+        // on the next turn so Collection Contents can react to the final dock
+        // area assignment immediately.
+        QTimer::singleShot(0, this, [this]() { requestDockLayoutSettle(true); });
+      }
     });
   }
 
@@ -601,13 +611,18 @@ void MainWindowDockLayout::processPendingReconcile() {
   }
 
   const unsigned flags = std::exchange(m_pendingReconcileFlags, ReconcileNone);
-  if ((flags & ReconcileSettleLayout) != 0u && QApplication::mouseButtons() != Qt::NoButton) {
+  if ((flags & ReconcileSettleLayout) != 0u && m_dockWidgetDragActive &&
+      QApplication::mouseButtons() != Qt::NoButton) {
     // Drag-to-float emits dock signals before Qt has fully finished the drag
     // transaction. Wait until the mouse is released so we normalize against the
     // final settled dock tree instead of a transient placeholder layout.
     m_pendingReconcileFlags |= flags;
     m_reconcileTimer->start(16);
     return;
+  }
+
+  if (QApplication::mouseButtons() == Qt::NoButton) {
+    m_dockWidgetDragActive = false;
   }
 
   if (m_adjustingDockLayout) {

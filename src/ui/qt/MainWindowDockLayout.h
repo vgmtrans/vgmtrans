@@ -94,4 +94,5 @@ private:
   bool m_restoringDockState{};
   bool m_closingDown{};
   bool m_dockSeparatorDragActive{};
+  bool m_dockWidgetDragActive{};
 };
