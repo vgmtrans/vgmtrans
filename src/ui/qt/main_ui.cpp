@@ -27,6 +27,14 @@ class Windows11MenuProxyStyle final : public QProxyStyle {
 public:
   using QProxyStyle::QProxyStyle;
 
+  void polish(QWidget *widget) override {
+    if (auto *menu = qobject_cast<QMenu *>(widget)) {
+      menu->setWindowFlag(Qt::NoDropShadowWindowHint, true);
+    }
+
+    QProxyStyle::polish(widget);
+  }
+
   void drawPrimitive(PrimitiveElement element, const QStyleOption *option, QPainter *painter,
                      const QWidget *widget = nullptr) const override {
     if (element == PE_PanelMenu && option && painter && qobject_cast<const QMenu *>(widget)) {
