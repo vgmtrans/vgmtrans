@@ -287,9 +287,13 @@ void MainWindowDockLayout::connectSignals() {
     });
     connect(dock, &QDockWidget::dockLocationChanged, this,
             [this](Qt::DockWidgetArea) { requestDockLayoutSettle(false); });
-    connect(dock, &QDockWidget::topLevelChanged, this, [this](bool floating) {
+    connect(dock, &QDockWidget::topLevelChanged, this, [this, dock](bool floating) {
       if (floating && QApplication::mouseButtons() != Qt::NoButton) {
         m_dockWidgetDragActive = true;
+      }
+      if (!floating && dock == m_pendingBottomCompanionRedockDock && m_pendingBottomCompanionRedockWindowSize.isValid()) {
+        m_window->resize(m_pendingBottomCompanionRedockWindowSize);
+        activateMainLayout();
       }
       requestDockLayoutSettle(!floating);
       if (!floating) {
@@ -297,7 +301,15 @@ void MainWindowDockLayout::connectSignals() {
         // fully restored the dock into its target area. Queue one more settle
         // on the next turn so Collection Contents can react to the final dock
         // area assignment immediately.
-        QTimer::singleShot(0, this, [this]() { requestDockLayoutSettle(true); });
+        QTimer::singleShot(0, this, [this, dock]() {
+          if (dock == m_pendingBottomCompanionRedockDock && m_pendingBottomCompanionRedockWindowSize.isValid()) {
+            m_window->resize(m_pendingBottomCompanionRedockWindowSize);
+            activateMainLayout();
+            m_pendingBottomCompanionRedockDock = nullptr;
+            m_pendingBottomCompanionRedockWindowSize = QSize();
+          }
+          requestDockLayoutSettle(true);
+        });
       }
     });
   }
@@ -315,7 +327,11 @@ void MainWindowDockLayout::connectSignals() {
 }
 
 bool MainWindowDockLayout::eventFilter(QObject *watched, QEvent *event) {
-  if (event && event->type() == QEvent::MouseMove) {
+  if (!event) {
+    return QObject::eventFilter(watched, event);
+  }
+
+  if (event->type() == QEvent::MouseMove) {
     auto *mouseEvent = static_cast<QMouseEvent *>(event);
     if ((mouseEvent->buttons() & Qt::LeftButton) != 0u) {
       for (QDockWidget *dock : m_allDocks) {
@@ -324,6 +340,20 @@ bool MainWindowDockLayout::eventFilter(QObject *watched, QEvent *event) {
         }
         if (watched == dock->titleBarWidget() && !dock->isFloating()) {
           m_dockWidgetDragActive = true;
+          break;
+        }
+      }
+    }
+  } else if (event->type() == QEvent::MouseButtonDblClick) {
+    auto *mouseEvent = static_cast<QMouseEvent *>(event);
+    if (mouseEvent->button() == Qt::LeftButton) {
+      for (QDockWidget *dock : m_bottomCompanionDocks) {
+        if (!dock) {
+          continue;
+        }
+        if (watched == dock->titleBarWidget() && dock->isFloating()) {
+          m_pendingBottomCompanionRedockDock = dock;
+          m_pendingBottomCompanionRedockWindowSize = m_window->size();
           break;
         }
       }

@@ -3,11 +3,11 @@
 #include <QByteArray>
 #include <QList>
 #include <QObject>
+#include <QSize>
 
 class MainWindow;
 class QDockWidget;
 class QEvent;
-class QSize;
 class QTimer;
 class VGMCollListView;
 
@@ -98,4 +98,6 @@ private:
   bool m_closingDown{};
   bool m_dockSeparatorDragActive{};
   bool m_dockWidgetDragActive{};
+  QDockWidget *m_pendingBottomCompanionRedockDock{};
+  QSize m_pendingBottomCompanionRedockWindowSize{};
 };
