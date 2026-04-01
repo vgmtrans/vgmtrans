@@ -20,11 +20,7 @@ void Windows11MenuProxyStyle::polish(QWidget *widget) {
 
   if (auto *menu = qobject_cast<QMenu *>(widget);
       menu && qobject_cast<QGraphicsDropShadowEffect *>(menu->graphicsEffect())) {
-    auto *shadow = static_cast<QGraphicsDropShadowEffect *>(menu->graphicsEffect());
-    shadow->setBlurRadius(10);
-    shadow->setXOffset(0);
-    shadow->setYOffset(2);
-    shadow->setColor(Qt::black);
+    menu->setGraphicsEffect(nullptr);
   }
 }
 
