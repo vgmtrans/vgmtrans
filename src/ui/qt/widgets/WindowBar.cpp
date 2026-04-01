@@ -201,13 +201,7 @@ void WindowBar::setMenuBarWidget(QWidget *widget) {
         "QMenuBar::item { padding: 3px 8px; margin: 0px; background: transparent; }"
         "QMenuBar::item:selected { background: palette(alternate-base); border-radius: 8px; }"
         "QMenuBar::item:pressed { background: palette(alternate-base); }"
-        "QMenu { padding: 8px 0px; "
-                "background-color: palette(base);"
-                "border: 1px solid palette(alternate-base);"
-                "border-radius: 8px;"
-        "}"
-        "QMenu::item { background: palette(base); padding: 6px 12px; margin: 0px; }"
-        "QMenu::item:selected { background: palette(alternate-base); }"));
+        "QMenu { padding: 8px 0px; }"));
 #else
     widget->setStyleSheet(QStringLiteral("QMenuBar { background: transparent; border: none; }"));
 #endif
