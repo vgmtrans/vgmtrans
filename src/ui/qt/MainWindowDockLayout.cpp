@@ -271,7 +271,14 @@ void MainWindowDockLayout::connectSignals() {
       continue;
     }
 
-    connect(dock, &QDockWidget::visibilityChanged, this, [this](bool) { requestDockLayoutSettle(false); });
+    connect(dock, &QDockWidget::visibilityChanged, this, [this](bool) {
+      // Visibility changes are the one path where waiting for the queued pass
+      // can let Qt paint an intermediate frame. Flush the reconcile
+      // immediately; drag-sensitive cases are still deferred inside
+      // processPendingReconcile().
+      queueReconcile(ReconcileSettleLayout | ReconcileUpdateWidthLock);
+      processPendingReconcile();
+    });
     connect(dock, &QDockWidget::dockLocationChanged, this,
             [this](Qt::DockWidgetArea) { requestDockLayoutSettle(false); });
     connect(dock, &QDockWidget::topLevelChanged, this, [this](bool floating) {
