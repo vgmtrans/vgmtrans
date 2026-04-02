@@ -20,6 +20,9 @@ constexpr int kWindows11MenuItemHorizontalPadding = 6;
 constexpr int kWindows11MenuItemVerticalPadding = 2;
 constexpr int kItemSelectionTextInset = 4;
 constexpr int kTableItemSelectionTextInset = 0;
+constexpr int kTableSelectionIndicatorWidth = 3;
+constexpr int kTableSelectionIndicatorGap = 4;
+constexpr int kTableSelectionIndicatorVerticalInset = 4;
 
 QColor menuBackgroundColor(const QPalette &palette) {
   QColor backgroundColor = blendColors(palette.color(QPalette::Base),
@@ -57,6 +60,53 @@ bool usesWindows11BaseStyle(const QProxyStyle *style) {
 
 bool usesCustomSelectionPanel(const QWidget *widget) {
   return ancestorWidget<QTableView>(widget) || ancestorWidget<QListView>(widget);
+}
+
+bool isLeadingTableCell(const QStyleOptionViewItem *viewItem, const QWidget *widget) {
+  const auto *tableView = ancestorWidget<QTableView>(widget);
+  if (!tableView || !viewItem) {
+    return false;
+  }
+
+  const QWidget *viewport = tableView->viewport();
+  if (!viewport) {
+    return false;
+  }
+
+  const int leadingEdgeX = viewItem->direction == Qt::RightToLeft ? viewport->width() - 1 : 0;
+  const int leadingColumn = tableView->columnAt(leadingEdgeX);
+  const int itemColumn = tableView->columnAt(viewItem->rect.center().x());
+  return leadingColumn >= 0 && itemColumn == leadingColumn;
+}
+
+bool isLeadingSelectedTableCell(const QStyleOptionViewItem *viewItem, const QWidget *widget) {
+  return isLeadingTableCell(viewItem, widget) &&
+         viewItem && viewItem->state.testFlag(QStyle::State_Selected);
+}
+
+int tableSelectionContentOffset(const QStyleOptionViewItem *viewItem, const QWidget *widget) {
+  return isLeadingTableCell(viewItem, widget)
+             ? kTableSelectionIndicatorWidth + kTableSelectionIndicatorGap
+             : 0;
+}
+
+QRect tableSelectionIndicatorRect(const QStyleOptionViewItem *viewItem, const QWidget *widget) {
+  if (!isLeadingSelectedTableCell(viewItem, widget)) {
+    return {};
+  }
+
+  QRect indicatorRect = viewItem->rect;
+  if (viewItem->direction == Qt::RightToLeft) {
+    indicatorRect.setLeft(std::max(indicatorRect.left(),
+                                   indicatorRect.right() - kTableSelectionIndicatorWidth + 1));
+  } else {
+    indicatorRect.setRight(std::min(indicatorRect.right(),
+                                    indicatorRect.left() + kTableSelectionIndicatorWidth - 1));
+  }
+
+  indicatorRect.adjust(0, kTableSelectionIndicatorVerticalInset, 0,
+                       -kTableSelectionIndicatorVerticalInset);
+  return indicatorRect;
 }
 
 QRect selectionFillRect(const QStyleOptionViewItem *viewItem, const QStyle *style,
@@ -135,6 +185,28 @@ void Windows11ProxyStyle::drawControl(ControlElement element, const QStyleOption
   QProxyStyle::drawControl(element, option, painter, widget);
 }
 
+QRect Windows11ProxyStyle::subElementRect(SubElement element, const QStyleOption *option,
+                                          const QWidget *widget) const {
+  QRect rect = QProxyStyle::subElementRect(element, option, widget);
+  if (!widget || !usesWindows11BaseStyle(this)) {
+    return rect;
+  }
+
+  if (element != SE_ItemViewItemCheckIndicator && element != SE_ItemViewItemDecoration &&
+      element != SE_ItemViewItemText && element != SE_ItemViewItemFocusRect) {
+    return rect;
+  }
+
+  const auto *viewItem = qstyleoption_cast<const QStyleOptionViewItem *>(option);
+  const int contentOffset = tableSelectionContentOffset(viewItem, widget);
+  if (contentOffset <= 0) {
+    return rect;
+  }
+
+  rect.translate(viewItem->direction == Qt::RightToLeft ? -contentOffset : contentOffset, 0);
+  return rect;
+}
+
 void Windows11ProxyStyle::drawPrimitive(PrimitiveElement element, const QStyleOption *option,
                                         QPainter *painter, const QWidget *widget) const {
   if (element == PE_PanelMenu && option && painter && qobject_cast<const QMenu *>(widget)) {
@@ -163,6 +235,19 @@ void Windows11ProxyStyle::drawPrimitive(PrimitiveElement element, const QStyleOp
       painter->fillRect(selectionFillRect(viewItem, this, widget),
                         viewItem->palette.brush(colorGroupForState(viewItem->state),
                                                 QPalette::Highlight));
+
+      if (const QRect indicatorRect = tableSelectionIndicatorRect(viewItem, widget);
+          indicatorRect.isValid()) {
+        painter->save();
+        painter->setRenderHint(QPainter::Antialiasing, true);
+        painter->setPen(Qt::NoPen);
+        painter->setBrush(viewItem->palette.brush(colorGroupForState(viewItem->state),
+                                                  QPalette::Accent));
+        painter->drawRoundedRect(indicatorRect, indicatorRect.width() / 2.0,
+                                 indicatorRect.width() / 2.0);
+        painter->restore();
+      }
+
       return;
     }
   }
