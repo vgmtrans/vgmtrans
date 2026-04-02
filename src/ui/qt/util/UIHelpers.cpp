@@ -6,6 +6,11 @@
 
 #include "UIHelpers.h"
 #include "TintableSvgIconEngine.h"
+
+#include <algorithm>
+#include <array>
+#include <cmath>
+
 #include <QIcon>
 #include <QWidget>
 #include <QScrollArea>
@@ -18,6 +23,47 @@
 #include <QFileDialog>
 #include <QStandardPaths>
 #include <QApplication>
+
+namespace {
+QColor compositeColors(const QColor &foreground, const QColor &background) {
+  const qreal foregroundAlpha = foreground.alphaF();
+  const qreal backgroundAlpha = background.alphaF();
+  const qreal outAlpha = foregroundAlpha + backgroundAlpha * (1.0 - foregroundAlpha);
+  if (outAlpha <= 0.0) {
+    return {};
+  }
+
+  const auto compositeChannel = [=](qreal foregroundChannel, qreal backgroundChannel) {
+    return (foregroundChannel * foregroundAlpha +
+            backgroundChannel * backgroundAlpha * (1.0 - foregroundAlpha)) /
+           outAlpha;
+  };
+
+  return QColor::fromRgbF(compositeChannel(foreground.redF(), background.redF()),
+                          compositeChannel(foreground.greenF(), background.greenF()),
+                          compositeChannel(foreground.blueF(), background.blueF()), outAlpha);
+}
+
+qreal linearizedColorComponent(qreal component) {
+  return component <= 0.03928 ? component / 12.92
+                              : std::pow((component + 0.055) / 1.055, 2.4);
+}
+
+qreal relativeLuminance(const QColor &color) {
+  return 0.2126 * linearizedColorComponent(color.redF()) +
+         0.7152 * linearizedColorComponent(color.greenF()) +
+         0.0722 * linearizedColorComponent(color.blueF());
+}
+
+qreal contrastRatio(const QColor &foreground, const QColor &background) {
+  const QColor visibleForeground = compositeColors(foreground, background);
+  const qreal foregroundLuminance = relativeLuminance(visibleForeground);
+  const qreal backgroundLuminance = relativeLuminance(background);
+  const qreal lighter = std::max(foregroundLuminance, backgroundLuminance);
+  const qreal darker = std::min(foregroundLuminance, backgroundLuminance);
+  return (lighter + 0.05) / (darker + 0.05);
+}
+}
 
 QScrollArea* getContainingScrollArea(const QWidget* widget) {
   QWidget* viewport = widget->parentWidget();
@@ -98,6 +144,43 @@ QColor blendColors(const QColor &foreground, const QColor &background, qreal for
                           foreground.greenF() * foregroundWeight + background.greenF() * backgroundWeight,
                           foreground.blueF() * foregroundWeight + background.blueF() * backgroundWeight,
                           foreground.alphaF() * foregroundWeight + background.alphaF() * backgroundWeight);
+}
+
+QColor contrastingTextColor(const QColor &foreground, const QColor &background, const QPalette &palette,
+                            QPalette::ColorGroup colorGroup) {
+  constexpr qreal kPreferredContrastRatio = 4.5;
+
+  const QColor effectiveBackground = compositeColors(foreground, background);
+  const std::array<QColor, 5> paletteCandidates{
+      palette.color(colorGroup, QPalette::Text),
+      palette.color(colorGroup, QPalette::WindowText),
+      palette.color(colorGroup, QPalette::ButtonText),
+      palette.color(colorGroup, QPalette::HighlightedText),
+      palette.color(colorGroup, QPalette::BrightText),
+  };
+
+  QColor bestPaletteColor;
+  qreal bestPaletteContrast = -1.0;
+  for (const QColor &candidate : paletteCandidates) {
+    const qreal candidateContrast = contrastRatio(candidate, effectiveBackground);
+    if (candidateContrast > bestPaletteContrast) {
+      bestPaletteContrast = candidateContrast;
+      bestPaletteColor = candidate;
+    }
+  }
+
+  const QColor darkFallback(Qt::black);
+  const QColor lightFallback(Qt::white);
+  const qreal darkContrast = contrastRatio(darkFallback, effectiveBackground);
+  const qreal lightContrast = contrastRatio(lightFallback, effectiveBackground);
+  const QColor fallbackColor = darkContrast >= lightContrast ? darkFallback : lightFallback;
+  const qreal fallbackContrast = std::max(darkContrast, lightContrast);
+
+  if (bestPaletteContrast >= kPreferredContrastRatio || bestPaletteContrast >= fallbackContrast) {
+    return bestPaletteColor;
+  }
+
+  return fallbackColor;
 }
 
 bool isDarkPalette(const QPalette &palette) {

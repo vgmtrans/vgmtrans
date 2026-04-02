@@ -67,12 +67,21 @@ void setAccentBrush(QPalette &palette, const QBrush &brush) {
   palette.setBrush(QPalette::Disabled, QPalette::Accent, brush);
 }
 
-void setHighlightedTextColors(QPalette &palette) {
+QColor selectionFillColor(const QPalette &palette, QPalette::ColorGroup colorGroup) {
+  QColor accentColor = palette.brush(colorGroup, QPalette::Accent).color();
+  accentColor.setAlpha(kItemSelectionAccentAlpha);
+  return accentColor;
+}
+
+void setSelectionTextColors(QPalette &palette) {
   for (const auto colorGroup : {QPalette::Active, QPalette::Inactive, QPalette::Disabled}) {
-    const QColor highlightedTextColor = palette.color(colorGroup, QPalette::HighlightedText);
-    palette.setColor(colorGroup, QPalette::Text, highlightedTextColor);
-    palette.setColor(colorGroup, QPalette::WindowText, highlightedTextColor);
-    palette.setColor(colorGroup, QPalette::ButtonText, highlightedTextColor);
+    const QColor textColor = contrastingTextColor(selectionFillColor(palette, colorGroup),
+                                                  palette.color(colorGroup, QPalette::Window),
+                                                  palette, colorGroup);
+    palette.setColor(colorGroup, QPalette::HighlightedText, textColor);
+    palette.setColor(colorGroup, QPalette::Text, textColor);
+    palette.setColor(colorGroup, QPalette::WindowText, textColor);
+    palette.setColor(colorGroup, QPalette::ButtonText, textColor);
   }
 }
 
@@ -85,9 +94,8 @@ QBrush accentBrush(const QStyleOptionViewItem *viewItem) {
 }
 
 QBrush selectionFillBrush(const QStyleOptionViewItem *viewItem) {
-  QColor accentColor = accentBrush(viewItem).color();
-  accentColor.setAlpha(kItemSelectionAccentAlpha);
-  return QBrush(accentColor);
+  return viewItem ? QBrush(selectionFillColor(viewItem->palette, colorGroupForState(viewItem->state)))
+                  : QBrush();
 }
 
 bool isTreeBranchColumn(const QStyleOptionViewItem *viewItem, const QWidget *widget) {
@@ -185,7 +193,7 @@ void Windows11ProxyStyle::drawControl(ControlElement element, const QStyleOption
       adjustedViewItem.state &= ~(QStyle::State_Selected | QStyle::State_MouseOver);
       adjustedViewItem.showDecorationSelected = false;
       setAccentBrush(adjustedViewItem.palette, QBrush(kHiddenItemViewAccentColor));
-      setHighlightedTextColors(adjustedViewItem.palette);
+      setSelectionTextColors(adjustedViewItem.palette);
       const CustomSelectionPaintContext previousContext = m_customSelectionPaintContext;
       m_customSelectionPaintContext.widget = widget;
       m_customSelectionPaintContext.viewItem = *viewItem;
