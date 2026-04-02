@@ -12,7 +12,7 @@ class QWidget;
 class QPainter;
 class QStyleOption;
 
-class Windows11MenuProxyStyle final : public QProxyStyle {
+class Windows11ProxyStyle final : public QProxyStyle {
 public:
   using QProxyStyle::QProxyStyle;
 

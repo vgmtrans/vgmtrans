@@ -4,13 +4,14 @@
 * refer to the included LICENSE.txt file
 */
 
-#include "Windows11MenuProxyStyle.h"
+#include "Windows11ProxyStyle.h"
 #include "UIHelpers.h"
 
 #include <QGraphicsDropShadowEffect>
 #include <QMenu>
 #include <QPainter>
 #include <QStyleOption>
+#include <QTableView>
 
 namespace {
 constexpr int kWindows11MenuCornerRadius = 8;
@@ -23,9 +24,36 @@ QColor menuBackgroundColor(const QPalette &palette) {
   backgroundColor.setAlpha(255);
   return backgroundColor;
 }
+
+template <typename T>
+const T *ancestorWidget(const QWidget *widget) {
+  const QWidget *current = widget;
+  while (current) {
+    if (const auto *matchedWidget = qobject_cast<const T *>(current)) {
+      return matchedWidget;
+    }
+    current = current->parentWidget();
+  }
+  return nullptr;
 }
 
-void Windows11MenuProxyStyle::polish(QWidget *widget) {
+QPalette::ColorGroup colorGroupForState(QStyle::State state) {
+  if (!state.testFlag(QStyle::State_Enabled)) {
+    return QPalette::Disabled;
+  }
+
+  return state.testFlag(QStyle::State_Active) ? QPalette::Normal : QPalette::Inactive;
+}
+
+bool usesWindows11BaseStyle(const QProxyStyle *style) {
+  const QStyle *baseStyle = style ? style->baseStyle() : nullptr;
+  return baseStyle &&
+         (baseStyle->inherits("QWindows11Style") ||
+          baseStyle->name().compare(QStringLiteral("windows11"), Qt::CaseInsensitive) == 0);
+}
+}
+
+void Windows11ProxyStyle::polish(QWidget *widget) {
   QProxyStyle::polish(widget);
 
   if (auto *menu = qobject_cast<QMenu *>(widget);
@@ -34,8 +62,8 @@ void Windows11MenuProxyStyle::polish(QWidget *widget) {
   }
 }
 
-QSize Windows11MenuProxyStyle::sizeFromContents(ContentsType type, const QStyleOption *option,
-                                                const QSize &size, const QWidget *widget) const {
+QSize Windows11ProxyStyle::sizeFromContents(ContentsType type, const QStyleOption *option,
+                                            const QSize &size, const QWidget *widget) const {
   QSize contentSize = QProxyStyle::sizeFromContents(type, option, size, widget);
 
   if (type != CT_MenuItem || !qobject_cast<const QMenu *>(widget)) {
@@ -52,8 +80,8 @@ QSize Windows11MenuProxyStyle::sizeFromContents(ContentsType type, const QStyleO
   return contentSize;
 }
 
-void Windows11MenuProxyStyle::drawControl(ControlElement element, const QStyleOption *option,
-                                          QPainter *painter, const QWidget *widget) const {
+void Windows11ProxyStyle::drawControl(ControlElement element, const QStyleOption *option,
+                                      QPainter *painter, const QWidget *widget) const {
   if (element == CE_MenuItem && option && painter && qobject_cast<const QMenu *>(widget)) {
     if (const auto *menuItem = qstyleoption_cast<const QStyleOptionMenuItem *>(option)) {
       QStyleOptionMenuItem paddedMenuItem(*menuItem);
@@ -68,8 +96,8 @@ void Windows11MenuProxyStyle::drawControl(ControlElement element, const QStyleOp
   QProxyStyle::drawControl(element, option, painter, widget);
 }
 
-void Windows11MenuProxyStyle::drawPrimitive(PrimitiveElement element, const QStyleOption *option,
-                                            QPainter *painter, const QWidget *widget) const {
+void Windows11ProxyStyle::drawPrimitive(PrimitiveElement element, const QStyleOption *option,
+                                        QPainter *painter, const QWidget *widget) const {
   if (element == PE_PanelMenu && option && painter && qobject_cast<const QMenu *>(widget)) {
     QColor borderColor = option->palette.color(QPalette::WindowText);
     borderColor.setAlpha(45);
@@ -79,6 +107,21 @@ void Windows11MenuProxyStyle::drawPrimitive(PrimitiveElement element, const QSty
     painter->drawRoundedRect(option->rect.marginsRemoved(QMargins(2, 2, 2, 2)),
                              kWindows11MenuCornerRadius, kWindows11MenuCornerRadius);
     return;
+  }
+
+  if ((element == PE_PanelItemViewRow || element == PE_PanelItemViewItem) && option && painter &&
+      widget && usesWindows11BaseStyle(this)) {
+    if (const auto *viewItem = qstyleoption_cast<const QStyleOptionViewItem *>(option);
+        viewItem && viewItem->state.testFlag(QStyle::State_Selected) &&
+        ancestorWidget<QTableView>(widget)) {
+      // Qt's Windows 11 style paints rounded selection chrome per table cell, which shows up as
+      // narrow leading bars when rows span multiple columns. Fill the row/item panel directly so
+      // selected tables keep a normal continuous highlight.
+      painter->fillRect(viewItem->rect,
+                        viewItem->palette.brush(colorGroupForState(viewItem->state),
+                                                QPalette::Highlight));
+      return;
+    }
   }
 
   QProxyStyle::drawPrimitive(element, option, painter, widget);

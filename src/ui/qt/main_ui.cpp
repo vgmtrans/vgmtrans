@@ -15,7 +15,7 @@
 #include <filesystem>
 #include "MainWindow.h"
 #include "QtVGMRoot.h"
-#include "widgets/Windows11MenuProxyStyle.h"
+#include "widgets/Windows11ProxyStyle.h"
 
 class VGMTransApplication final : public QApplication {
 public:
@@ -47,9 +47,9 @@ int main(int argc, char *argv[]) {
   if (QStyle *style = app.style();
       style && (style->inherits("QWindows11Style") ||
                 style->name().compare(QStringLiteral("windows11"), Qt::CaseInsensitive) == 0)) {
-    app.setStyle(new Windows11MenuProxyStyle(style->name()));
+    app.setStyle(new Windows11ProxyStyle(style->name()));
   } else {
-    app.setStyle(new Windows11MenuProxyStyle("fusion"));
+    app.setStyle(new Windows11ProxyStyle("fusion"));
   }
 
   QFont font = app.font();
