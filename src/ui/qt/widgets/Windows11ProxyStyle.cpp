@@ -8,6 +8,7 @@
 #include "UIHelpers.h"
 
 #include <QGraphicsDropShadowEffect>
+#include <QListView>
 #include <QMenu>
 #include <QPainter>
 #include <QStyleOption>
@@ -50,6 +51,10 @@ bool usesWindows11BaseStyle(const QProxyStyle *style) {
   return baseStyle &&
          (baseStyle->inherits("QWindows11Style") ||
           baseStyle->name().compare(QStringLiteral("windows11"), Qt::CaseInsensitive) == 0);
+}
+
+bool usesCustomSelectionPanel(const QWidget *widget) {
+  return ancestorWidget<QTableView>(widget) || ancestorWidget<QListView>(widget);
 }
 }
 
@@ -113,10 +118,10 @@ void Windows11ProxyStyle::drawPrimitive(PrimitiveElement element, const QStyleOp
       widget && usesWindows11BaseStyle(this)) {
     if (const auto *viewItem = qstyleoption_cast<const QStyleOptionViewItem *>(option);
         viewItem && viewItem->state.testFlag(QStyle::State_Selected) &&
-        ancestorWidget<QTableView>(widget)) {
+        usesCustomSelectionPanel(widget)) {
       // Qt's Windows 11 style paints rounded selection chrome per table cell, which shows up as
-      // narrow leading bars when rows span multiple columns. Fill the row/item panel directly so
-      // selected tables keep a normal continuous highlight.
+      // narrow leading bars in our selected item views. Fill the row/item panel directly so
+      // selected tables and lists keep a normal continuous highlight.
       painter->fillRect(viewItem->rect,
                         viewItem->palette.brush(colorGroupForState(viewItem->state),
                                                 QPalette::Highlight));
