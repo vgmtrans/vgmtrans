@@ -7,6 +7,7 @@
 #pragma once
 
 #include <QProxyStyle>
+#include <QStyleOption>
 
 class QWidget;
 class QPainter;
@@ -25,4 +26,15 @@ public:
                        const QWidget *widget = nullptr) const override;
   void drawPrimitive(PrimitiveElement element, const QStyleOption *option, QPainter *painter,
                      const QWidget *widget = nullptr) const override;
+
+private:
+  struct CustomSelectionPaintContext {
+    const QWidget *widget = nullptr;
+    QStyleOptionViewItem viewItem;
+    bool active = false;
+  };
+
+  const QStyleOptionViewItem *currentCustomSelectionViewItem(const QWidget *widget) const;
+
+  mutable CustomSelectionPaintContext m_customSelectionPaintContext;
 };
