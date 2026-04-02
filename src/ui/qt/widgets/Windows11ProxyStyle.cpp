@@ -18,12 +18,9 @@ namespace {
 constexpr int kWindows11MenuCornerRadius = 8;
 constexpr int kWindows11MenuItemHorizontalPadding = 6;
 constexpr int kWindows11MenuItemVerticalPadding = 2;
-constexpr int kItemSelectionTextInset = 4;
-constexpr int kTableItemSelectionTextInset = 0;
-constexpr int kTableSelectionIndicatorWidth = 3;
-constexpr int kTableSelectionIndicatorGap = 4;
-constexpr int kTableSelectionIndicatorVerticalInset = 4;
-const QColor kTestItemViewAccentColor(Qt::transparent);
+constexpr int kLeadingTableCellContentOffset = 7;
+constexpr int kItemSelectionAccentAlpha = 32;
+const QColor kHiddenItemViewAccentColor(Qt::transparent);
 
 QColor menuBackgroundColor(const QPalette &palette) {
   QColor backgroundColor = blendColors(palette.color(QPalette::Base),
@@ -71,7 +68,18 @@ void setAccentBrush(QPalette &palette, const QBrush &brush) {
   palette.setBrush(QPalette::Disabled, QPalette::Accent, brush);
 }
 
-bool usesTestAccentOverride(const QStyleOptionViewItem *viewItem, const QWidget *widget) {
+QBrush selectionAccentBrush(const QStyleOptionViewItem *viewItem) {
+  if (!viewItem) {
+    return {};
+  }
+
+  QColor accentColor =
+      viewItem->palette.brush(colorGroupForState(viewItem->state), QPalette::Accent).color();
+  accentColor.setAlpha(kItemSelectionAccentAlpha);
+  return QBrush(accentColor);
+}
+
+bool usesHiddenAccentOverride(const QStyleOptionViewItem *viewItem, const QWidget *widget) {
   return ancestorWidget<QTableView>(widget) && !isLeadingTableCell(viewItem, widget);
 }
 
@@ -92,66 +100,8 @@ bool isLeadingTableCell(const QStyleOptionViewItem *viewItem, const QWidget *wid
   return leadingColumn >= 0 && itemColumn == leadingColumn;
 }
 
-bool isLeadingSelectedTableCell(const QStyleOptionViewItem *viewItem, const QWidget *widget) {
-  return isLeadingTableCell(viewItem, widget) &&
-         viewItem && viewItem->state.testFlag(QStyle::State_Selected);
-}
-
-int tableSelectionContentOffset(const QStyleOptionViewItem *viewItem, const QWidget *widget) {
-  return isLeadingTableCell(viewItem, widget)
-             ? kTableSelectionIndicatorWidth + kTableSelectionIndicatorGap
-             : 0;
-}
-
-QRect tableSelectionIndicatorRect(const QStyleOptionViewItem *viewItem, const QWidget *widget) {
-  if (!isLeadingSelectedTableCell(viewItem, widget)) {
-    return {};
-  }
-
-  QRect indicatorRect = viewItem->rect;
-  if (viewItem->direction == Qt::RightToLeft) {
-    indicatorRect.setLeft(std::max(indicatorRect.left(),
-                                   indicatorRect.right() - kTableSelectionIndicatorWidth + 1));
-  } else {
-    indicatorRect.setRight(std::min(indicatorRect.right(),
-                                    indicatorRect.left() + kTableSelectionIndicatorWidth - 1));
-  }
-
-  indicatorRect.adjust(0, kTableSelectionIndicatorVerticalInset, 0,
-                       -kTableSelectionIndicatorVerticalInset);
-  return indicatorRect;
-}
-
-QRect selectionFillRect(const QStyleOptionViewItem *viewItem, const QStyle *style,
-                        const QWidget *widget) {
-  if (!viewItem) {
-    return {};
-  }
-
-  QRect fillRect = viewItem->rect;
-  if (!viewItem->features.testFlag(QStyleOptionViewItem::HasDecoration) ||
-      !viewItem->decorationSize.isValid() || !style) {
-    return fillRect;
-  }
-
-  const int textInset = ancestorWidget<QTableView>(widget) ? kTableItemSelectionTextInset
-                                                            : kItemSelectionTextInset;
-  const QRect textRect = style->subElementRect(QStyle::SE_ItemViewItemText, viewItem, widget);
-  if (textRect.isValid()) {
-    if (viewItem->direction == Qt::RightToLeft) {
-      fillRect.setRight(std::min(fillRect.right(), textRect.right() + textInset));
-    } else {
-      fillRect.setLeft(std::max(fillRect.left(), textRect.left() - textInset));
-    }
-    return fillRect;
-  }
-
-  if (viewItem->direction == Qt::RightToLeft) {
-    fillRect.adjust(0, 0, -(viewItem->decorationSize.width() + textInset), 0);
-  } else {
-    fillRect.adjust(viewItem->decorationSize.width() + textInset, 0, 0, 0);
-  }
-  return fillRect;
+int leadingTableCellContentOffset(const QStyleOptionViewItem *viewItem, const QWidget *widget) {
+  return isLeadingTableCell(viewItem, widget) ? kLeadingTableCellContentOffset : 0;
 }
 }
 
@@ -198,9 +148,9 @@ void Windows11ProxyStyle::drawControl(ControlElement element, const QStyleOption
   if (element == CE_ItemViewItem && option && painter && widget && usesWindows11BaseStyle(this)) {
     if (const auto *viewItem = qstyleoption_cast<const QStyleOptionViewItem *>(option);
         viewItem && viewItem->state.testFlag(QStyle::State_Selected) &&
-        usesTestAccentOverride(viewItem, widget)) {
+        usesHiddenAccentOverride(viewItem, widget)) {
       QStyleOptionViewItem adjustedViewItem(*viewItem);
-      setAccentBrush(adjustedViewItem.palette, QBrush(kTestItemViewAccentColor));
+      setAccentBrush(adjustedViewItem.palette, QBrush(kHiddenItemViewAccentColor));
       QProxyStyle::drawControl(element, &adjustedViewItem, painter, widget);
       return;
     }
@@ -222,7 +172,7 @@ QRect Windows11ProxyStyle::subElementRect(SubElement element, const QStyleOption
   }
 
   const auto *viewItem = qstyleoption_cast<const QStyleOptionViewItem *>(option);
-  const int contentOffset = tableSelectionContentOffset(viewItem, widget);
+  const int contentOffset = leadingTableCellContentOffset(viewItem, widget);
   if (contentOffset <= 0) {
     return rect;
   }
@@ -248,11 +198,22 @@ void Windows11ProxyStyle::drawPrimitive(PrimitiveElement element, const QStyleOp
       widget && usesWindows11BaseStyle(this)) {
     if (const auto *viewItem = qstyleoption_cast<const QStyleOptionViewItem *>(option);
         viewItem && viewItem->state.testFlag(QStyle::State_Selected) &&
-        usesTestAccentOverride(viewItem, widget)) {
+        usesCustomSelectionPanel(widget)) {
       QStyleOptionViewItem adjustedViewItem(*viewItem);
-      setAccentBrush(adjustedViewItem.palette, QBrush(kTestItemViewAccentColor));
-      QProxyStyle::drawPrimitive(element, &adjustedViewItem, painter, widget);
-      return;
+      if (usesHiddenAccentOverride(viewItem, widget)) {
+        setAccentBrush(adjustedViewItem.palette, QBrush(kHiddenItemViewAccentColor));
+      }
+
+      if (ancestorWidget<QTableView>(widget) && element == PE_PanelItemViewRow) {
+        QProxyStyle::drawPrimitive(element, &adjustedViewItem, painter, widget);
+        return;
+      }
+
+      if (element == PE_PanelItemViewItem) {
+        QProxyStyle::drawPrimitive(element, &adjustedViewItem, painter, widget);
+        painter->fillRect(viewItem->rect, selectionAccentBrush(viewItem));
+        return;
+      }
     }
   }
 
