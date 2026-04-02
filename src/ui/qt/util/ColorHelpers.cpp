@@ -5,6 +5,7 @@
 */
 
 #include "ColorHelpers.h"
+#include "Colors.h"
 
 #include <algorithm>
 #include <array>
@@ -65,6 +66,12 @@ QColor blendColors(const QColor &foreground, const QColor &background, qreal for
                           foreground.greenF() * foregroundWeight + background.greenF() * backgroundWeight,
                           foreground.blueF() * foregroundWeight + background.blueF() * backgroundWeight,
                           foreground.alphaF() * foregroundWeight + background.alphaF() * backgroundWeight);
+}
+
+QColor itemSelectionFillColor(const QPalette &palette, QPalette::ColorGroup colorGroup) {
+  QColor accentColor = palette.brush(colorGroup, QPalette::Accent).color();
+  accentColor.setAlpha(UIColors::ItemSelectionAccentAlpha);
+  return accentColor;
 }
 
 QColor contrastingTextColor(const QColor &foreground, const QColor &background, const QPalette &palette,

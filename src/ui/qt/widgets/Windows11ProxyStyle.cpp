@@ -19,7 +19,6 @@ namespace {
 constexpr int kWindows11MenuCornerRadius = 8;
 constexpr int kWindows11MenuItemHorizontalPadding = 6;
 constexpr int kWindows11MenuItemVerticalPadding = 2;
-constexpr int kItemSelectionAccentAlpha = 96;
 const QColor kHiddenItemViewAccentColor(Qt::transparent);
 
 QColor menuBackgroundColor(const QPalette &palette) {
@@ -67,12 +66,6 @@ void setAccentBrush(QPalette &palette, const QBrush &brush) {
   palette.setBrush(QPalette::Disabled, QPalette::Accent, brush);
 }
 
-QColor selectionFillColor(const QPalette &palette, QPalette::ColorGroup colorGroup) {
-  QColor accentColor = palette.brush(colorGroup, QPalette::Accent).color();
-  accentColor.setAlpha(kItemSelectionAccentAlpha);
-  return accentColor;
-}
-
 QBrush accentBrush(const QStyleOptionViewItem *viewItem) {
   if (!viewItem) {
     return {};
@@ -87,7 +80,7 @@ struct SelectionColors {
 };
 
 SelectionColors selectionColors(const QPalette &palette, QPalette::ColorGroup colorGroup) {
-  const QColor fillColor = selectionFillColor(palette, colorGroup);
+  const QColor fillColor = itemSelectionFillColor(palette, colorGroup);
   return {
       fillColor,
       contrastingTextColor(fillColor, palette.color(colorGroup, QPalette::Window), palette,
@@ -145,7 +138,7 @@ void drawSelectionBackground(QPainter *painter, const QStyleOptionViewItem *view
 
   const QPalette::ColorGroup colorGroup = colorGroupForState(viewItem->state);
   painter->fillRect(selectionBackgroundRect(viewItem, widget),
-                    selectionFillBrush(selectionFillColor(viewItem->palette, colorGroup)));
+                    selectionFillBrush(itemSelectionFillColor(viewItem->palette, colorGroup)));
 }
 }
 

@@ -25,3 +25,7 @@ namespace EventColors {
   inline auto CLR_DARK_GREEN = QColor(95,130,107,255);
   inline auto CLR_YELLOW = QColor(241,250,140,255);
 }
+
+namespace UIColors {
+  inline constexpr int ItemSelectionAccentAlpha = 96;
+}

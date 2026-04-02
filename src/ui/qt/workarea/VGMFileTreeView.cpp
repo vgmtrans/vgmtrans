@@ -5,6 +5,7 @@
  */
 #include "VGMFileTreeView.h"
 #include "VGMFileView.h"
+#include "ColorHelpers.h"
 #include "hexview/HexViewInput.h"
 
 #include <QAbstractTextDocumentLayout>
@@ -80,6 +81,19 @@ void VMGFileTreeHeaderView::toggleShowDetails() const {
 // VGMTreeDisplayItem
 // ***********************************
 
+namespace {
+QColor selectedTreeTextColor(const QStyleOptionViewItem &paintopt) {
+  const QPalette::ColorGroup colorGroup =
+      !paintopt.state.testFlag(QStyle::State_Enabled)
+          ? QPalette::Disabled
+          : paintopt.state.testFlag(QStyle::State_Active) ? QPalette::Normal
+                                                          : QPalette::Inactive;
+  const QColor selectionColor = itemSelectionFillColor(paintopt.palette, colorGroup);
+  return contrastingTextColor(selectionColor, paintopt.palette.color(colorGroup, QPalette::Window),
+                              paintopt.palette, colorGroup);
+}
+}
+
 void VGMTreeDisplayItem::paint(QPainter *painter, const QStyleOptionViewItem &option,
                                const QModelIndex &index) const {
   QStyleOptionViewItem paintopt = option;
@@ -90,17 +104,13 @@ void VGMTreeDisplayItem::paint(QPainter *painter, const QStyleOptionViewItem &op
   QTextDocument backing_doc;
   backing_doc.setHtml(paintopt.text);
   QAbstractTextDocumentLayout::PaintContext textContext;
+  textContext.palette = paintopt.palette;
   if (paintopt.state.testFlag(QStyle::State_Selected)) {
-    const QPalette::ColorGroup colorGroup =
-        !paintopt.state.testFlag(QStyle::State_Enabled)
-            ? QPalette::Disabled
-            : paintopt.state.testFlag(QStyle::State_Active) ? QPalette::Normal
-                                                            : QPalette::Inactive;
-    const QColor textColor = paintopt.palette.color(colorGroup, QPalette::HighlightedText);
-    textContext.palette = paintopt.palette;
+    const QColor textColor = selectedTreeTextColor(paintopt);
     textContext.palette.setColor(QPalette::Text, textColor);
-  } else {
-    textContext.palette = paintopt.palette;
+    textContext.palette.setColor(QPalette::WindowText, textColor);
+    textContext.palette.setColor(QPalette::ButtonText, textColor);
+    textContext.palette.setColor(QPalette::HighlightedText, textColor);
   }
 
   // Paint the item's background
