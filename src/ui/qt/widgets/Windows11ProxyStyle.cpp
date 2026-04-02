@@ -73,18 +73,6 @@ QColor selectionFillColor(const QPalette &palette, QPalette::ColorGroup colorGro
   return accentColor;
 }
 
-void setSelectionTextColors(QPalette &palette) {
-  for (const auto colorGroup : {QPalette::Active, QPalette::Inactive, QPalette::Disabled}) {
-    const QColor textColor = contrastingTextColor(selectionFillColor(palette, colorGroup),
-                                                  palette.color(colorGroup, QPalette::Window),
-                                                  palette, colorGroup);
-    palette.setColor(colorGroup, QPalette::HighlightedText, textColor);
-    palette.setColor(colorGroup, QPalette::Text, textColor);
-    palette.setColor(colorGroup, QPalette::WindowText, textColor);
-    palette.setColor(colorGroup, QPalette::ButtonText, textColor);
-  }
-}
-
 QBrush accentBrush(const QStyleOptionViewItem *viewItem) {
   if (!viewItem) {
     return {};
@@ -93,9 +81,30 @@ QBrush accentBrush(const QStyleOptionViewItem *viewItem) {
   return viewItem->palette.brush(colorGroupForState(viewItem->state), QPalette::Accent);
 }
 
-QBrush selectionFillBrush(const QStyleOptionViewItem *viewItem) {
-  return viewItem ? QBrush(selectionFillColor(viewItem->palette, colorGroupForState(viewItem->state)))
-                  : QBrush();
+struct SelectionColors {
+  QColor fillColor;
+  QColor textColor;
+};
+
+SelectionColors selectionColors(const QPalette &palette, QPalette::ColorGroup colorGroup) {
+  const QColor fillColor = selectionFillColor(palette, colorGroup);
+  return {
+      fillColor,
+      contrastingTextColor(fillColor, palette.color(colorGroup, QPalette::Window), palette,
+                           colorGroup),
+  };
+}
+
+void setSelectionTextColors(QPalette &palette, QPalette::ColorGroup colorGroup,
+                            const QColor &textColor) {
+  palette.setColor(colorGroup, QPalette::HighlightedText, textColor);
+  palette.setColor(colorGroup, QPalette::Text, textColor);
+  palette.setColor(colorGroup, QPalette::WindowText, textColor);
+  palette.setColor(colorGroup, QPalette::ButtonText, textColor);
+}
+
+QBrush selectionFillBrush(const QColor &fillColor) {
+  return QBrush(fillColor);
 }
 
 bool isTreeBranchColumn(const QStyleOptionViewItem *viewItem, const QWidget *widget) {
@@ -134,7 +143,9 @@ void drawSelectionBackground(QPainter *painter, const QStyleOptionViewItem *view
     return;
   }
 
-  painter->fillRect(selectionBackgroundRect(viewItem, widget), selectionFillBrush(viewItem));
+  const QPalette::ColorGroup colorGroup = colorGroupForState(viewItem->state);
+  painter->fillRect(selectionBackgroundRect(viewItem, widget),
+                    selectionFillBrush(selectionFillColor(viewItem->palette, colorGroup)));
 }
 }
 
@@ -190,10 +201,12 @@ void Windows11ProxyStyle::drawControl(ControlElement element, const QStyleOption
         viewItem && viewItem->state.testFlag(QStyle::State_Selected) &&
         usesCustomSelectionPanel(widget)) {
       QStyleOptionViewItem adjustedViewItem(*viewItem);
+      const QPalette::ColorGroup colorGroup = colorGroupForState(viewItem->state);
+      const SelectionColors colors = selectionColors(adjustedViewItem.palette, colorGroup);
       adjustedViewItem.state &= ~(QStyle::State_Selected | QStyle::State_MouseOver);
       adjustedViewItem.showDecorationSelected = false;
       setAccentBrush(adjustedViewItem.palette, QBrush(kHiddenItemViewAccentColor));
-      setSelectionTextColors(adjustedViewItem.palette);
+      setSelectionTextColors(adjustedViewItem.palette, colorGroup, colors.textColor);
       const CustomSelectionPaintContext previousContext = m_customSelectionPaintContext;
       m_customSelectionPaintContext.widget = widget;
       m_customSelectionPaintContext.viewItem = *viewItem;
