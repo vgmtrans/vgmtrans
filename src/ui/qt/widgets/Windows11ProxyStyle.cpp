@@ -85,15 +85,12 @@ bool isTreeBranchColumn(const QStyleOptionViewItem *viewItem, const QWidget *wid
 }
 
 QRect selectionBackgroundRect(const QStyleOptionViewItem *viewItem, const QWidget *widget) {
-  if (!viewItem) {
-    return {};
-  }
-
   QRect selectionRect = viewItem->rect;
   if (!isTreeBranchColumn(viewItem, widget)) {
     return selectionRect;
   }
 
+  // Tree items in column 0 need the custom selection fill to extend into the branch gutter.
   const auto *treeView = ancestorWidget<QTreeView>(widget);
   const QWidget *viewport = treeView ? treeView->viewport() : nullptr;
   if (!viewport) {
@@ -166,6 +163,8 @@ void Windows11ProxyStyle::drawControl(ControlElement element, const QStyleOption
         isSelectedCustomItemView(viewItem, widget)) {
       QStyleOptionViewItem adjustedViewItem(*viewItem);
       const QPalette::ColorGroup colorGroup = colorGroupForState(viewItem->state);
+      // Clear Qt's selected state so the Windows 11 base style does not paint its native
+      // selection background or accent bar.
       adjustedViewItem.state &= ~(QStyle::State_Selected | QStyle::State_MouseOver);
       adjustedViewItem.showDecorationSelected = false;
       adjustedViewItem.palette.setBrush(QPalette::Active, QPalette::Accent,
@@ -177,6 +176,8 @@ void Windows11ProxyStyle::drawControl(ControlElement element, const QStyleOption
       setSelectionTextColors(adjustedViewItem.palette, colorGroup,
                              selectionTextColor(adjustedViewItem.palette, colorGroup));
       const CustomSelectionPaintContext previousContext = m_customSelectionPaintContext;
+      // Preserve the original selected item so nested primitive paints can still draw our custom
+      // background.
       m_customSelectionPaintContext.widget = widget;
       m_customSelectionPaintContext.viewItem = viewItem;
       QProxyStyle::drawControl(element, &adjustedViewItem, painter, widget);
@@ -203,6 +204,8 @@ void Windows11ProxyStyle::drawPrimitive(PrimitiveElement element, const QStyleOp
 
   if ((element == PE_PanelItemViewRow || element == PE_PanelItemViewItem) && painter && widget &&
       usesWindows11BaseStyle(this)) {
+    // Draw the selected background ourselves here, because we cleared State_Selected before
+    // delegating to the base style.
     const bool usesSelectionContext =
         m_customSelectionPaintContext.widget == widget && m_customSelectionPaintContext.viewItem;
     const QStyleOptionViewItem *viewItem =
