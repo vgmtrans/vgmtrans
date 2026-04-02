@@ -48,6 +48,8 @@ int main(int argc, char *argv[]) {
       style && (style->inherits("QWindows11Style") ||
                 style->name().compare(QStringLiteral("windows11"), Qt::CaseInsensitive) == 0)) {
     app.setStyle(new Windows11MenuProxyStyle(style->name()));
+  } else {
+    app.setStyle(new Windows11MenuProxyStyle("fusion"));
   }
 
   QFont font = app.font();
