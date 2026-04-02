@@ -7,6 +7,7 @@
 #include "VGMFileView.h"
 #include "hexview/HexViewInput.h"
 
+#include <QAbstractTextDocumentLayout>
 #include <QTextDocument>
 #include <QPainter>
 #include <QApplication>
@@ -88,6 +89,19 @@ void VGMTreeDisplayItem::paint(QPainter *painter, const QStyleOptionViewItem &op
 
   QTextDocument backing_doc;
   backing_doc.setHtml(paintopt.text);
+  QAbstractTextDocumentLayout::PaintContext textContext;
+  if (paintopt.state.testFlag(QStyle::State_Selected)) {
+    const QPalette::ColorGroup colorGroup =
+        !paintopt.state.testFlag(QStyle::State_Enabled)
+            ? QPalette::Disabled
+            : paintopt.state.testFlag(QStyle::State_Active) ? QPalette::Normal
+                                                            : QPalette::Inactive;
+    const QColor textColor = paintopt.palette.color(colorGroup, QPalette::HighlightedText);
+    textContext.palette = paintopt.palette;
+    textContext.palette.setColor(QPalette::Text, textColor);
+  } else {
+    textContext.palette = paintopt.palette;
+  }
 
   // Paint the item's background
   paintopt.text = QString{};
@@ -96,7 +110,8 @@ void VGMTreeDisplayItem::paint(QPainter *painter, const QStyleOptionViewItem &op
   QRect textRect = style->subElementRect(QStyle::SE_ItemViewItemText, &paintopt);
   painter->save();
   painter->translate(textRect.topLeft());
-  backing_doc.drawContents(painter, textRect.translated(-textRect.topLeft()));
+  textContext.clip = textRect.translated(-textRect.topLeft());
+  backing_doc.documentLayout()->draw(painter, textContext);
 
   painter->restore();
 }

@@ -19,7 +19,7 @@ namespace {
 constexpr int kWindows11MenuCornerRadius = 8;
 constexpr int kWindows11MenuItemHorizontalPadding = 6;
 constexpr int kWindows11MenuItemVerticalPadding = 2;
-constexpr int kItemSelectionAccentAlpha = 64;
+constexpr int kItemSelectionAccentAlpha = 96;
 const QColor kHiddenItemViewAccentColor(Qt::transparent);
 
 QColor menuBackgroundColor(const QPalette &palette) {
