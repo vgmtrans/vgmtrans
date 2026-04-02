@@ -23,6 +23,7 @@ constexpr int kTableItemSelectionTextInset = 0;
 constexpr int kTableSelectionIndicatorWidth = 3;
 constexpr int kTableSelectionIndicatorGap = 4;
 constexpr int kTableSelectionIndicatorVerticalInset = 4;
+const QColor kTestItemViewAccentColor(Qt::transparent);
 
 QColor menuBackgroundColor(const QPalette &palette) {
   QColor backgroundColor = blendColors(palette.color(QPalette::Base),
@@ -60,6 +61,18 @@ bool usesWindows11BaseStyle(const QProxyStyle *style) {
 
 bool usesCustomSelectionPanel(const QWidget *widget) {
   return ancestorWidget<QTableView>(widget) || ancestorWidget<QListView>(widget);
+}
+
+bool isLeadingTableCell(const QStyleOptionViewItem *viewItem, const QWidget *widget);
+
+void setAccentBrush(QPalette &palette, const QBrush &brush) {
+  palette.setBrush(QPalette::Active, QPalette::Accent, brush);
+  palette.setBrush(QPalette::Inactive, QPalette::Accent, brush);
+  palette.setBrush(QPalette::Disabled, QPalette::Accent, brush);
+}
+
+bool usesTestAccentOverride(const QStyleOptionViewItem *viewItem, const QWidget *widget) {
+  return ancestorWidget<QTableView>(widget) && !isLeadingTableCell(viewItem, widget);
 }
 
 bool isLeadingTableCell(const QStyleOptionViewItem *viewItem, const QWidget *widget) {
@@ -182,6 +195,17 @@ void Windows11ProxyStyle::drawControl(ControlElement element, const QStyleOption
     }
   }
 
+  if (element == CE_ItemViewItem && option && painter && widget && usesWindows11BaseStyle(this)) {
+    if (const auto *viewItem = qstyleoption_cast<const QStyleOptionViewItem *>(option);
+        viewItem && viewItem->state.testFlag(QStyle::State_Selected) &&
+        usesTestAccentOverride(viewItem, widget)) {
+      QStyleOptionViewItem adjustedViewItem(*viewItem);
+      setAccentBrush(adjustedViewItem.palette, QBrush(kTestItemViewAccentColor));
+      QProxyStyle::drawControl(element, &adjustedViewItem, painter, widget);
+      return;
+    }
+  }
+
   QProxyStyle::drawControl(element, option, painter, widget);
 }
 
@@ -224,30 +248,10 @@ void Windows11ProxyStyle::drawPrimitive(PrimitiveElement element, const QStyleOp
       widget && usesWindows11BaseStyle(this)) {
     if (const auto *viewItem = qstyleoption_cast<const QStyleOptionViewItem *>(option);
         viewItem && viewItem->state.testFlag(QStyle::State_Selected) &&
-        usesCustomSelectionPanel(widget)) {
-      if (ancestorWidget<QTableView>(widget) && element == PE_PanelItemViewRow) {
-        return;
-      }
-
-      // Qt's Windows 11 style paints rounded selection chrome per table cell, which shows up as
-      // narrow leading bars in our selected item views. Fill the row/item panel directly so
-      // selected tables and lists keep a normal continuous highlight.
-      painter->fillRect(selectionFillRect(viewItem, this, widget),
-                        viewItem->palette.brush(colorGroupForState(viewItem->state),
-                                                QPalette::Highlight));
-
-      if (const QRect indicatorRect = tableSelectionIndicatorRect(viewItem, widget);
-          indicatorRect.isValid()) {
-        painter->save();
-        painter->setRenderHint(QPainter::Antialiasing, true);
-        painter->setPen(Qt::NoPen);
-        painter->setBrush(viewItem->palette.brush(colorGroupForState(viewItem->state),
-                                                  QPalette::Accent));
-        painter->drawRoundedRect(indicatorRect, indicatorRect.width() / 2.0,
-                                 indicatorRect.width() / 2.0);
-        painter->restore();
-      }
-
+        usesTestAccentOverride(viewItem, widget)) {
+      QStyleOptionViewItem adjustedViewItem(*viewItem);
+      setAccentBrush(adjustedViewItem.palette, QBrush(kTestItemViewAccentColor));
+      QProxyStyle::drawPrimitive(element, &adjustedViewItem, painter, widget);
       return;
     }
   }
