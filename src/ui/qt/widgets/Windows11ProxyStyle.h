@@ -11,7 +11,6 @@
 
 class QWidget;
 class QPainter;
-class QStyleOption;
 
 class Windows11ProxyStyle final : public QProxyStyle {
 public:
@@ -28,11 +27,8 @@ public:
 private:
   struct CustomSelectionPaintContext {
     const QWidget *widget = nullptr;
-    QStyleOptionViewItem viewItem;
-    bool active = false;
+    const QStyleOptionViewItem *viewItem = nullptr;
   };
-
-  const QStyleOptionViewItem *currentCustomSelectionViewItem(const QWidget *widget) const;
 
   mutable CustomSelectionPaintContext m_customSelectionPaintContext;
 };

@@ -45,7 +45,7 @@ QPalette::ColorGroup colorGroupForState(QStyle::State state) {
     return QPalette::Disabled;
   }
 
-  return state.testFlag(QStyle::State_Active) ? QPalette::Normal : QPalette::Inactive;
+  return state.testFlag(QStyle::State_Active) ? QPalette::Active : QPalette::Inactive;
 }
 
 bool usesWindows11BaseStyle(const QProxyStyle *style) {
@@ -60,32 +60,15 @@ bool usesCustomSelectionPanel(const QWidget *widget) {
          ancestorWidget<QTreeView>(widget);
 }
 
-void setAccentBrush(QPalette &palette, const QBrush &brush) {
-  palette.setBrush(QPalette::Active, QPalette::Accent, brush);
-  palette.setBrush(QPalette::Inactive, QPalette::Accent, brush);
-  palette.setBrush(QPalette::Disabled, QPalette::Accent, brush);
+bool isSelectedCustomItemView(const QStyleOptionViewItem *viewItem, const QWidget *widget) {
+  return viewItem && viewItem->state.testFlag(QStyle::State_Selected) &&
+         usesCustomSelectionPanel(widget);
 }
 
-QBrush accentBrush(const QStyleOptionViewItem *viewItem) {
-  if (!viewItem) {
-    return {};
-  }
-
-  return viewItem->palette.brush(colorGroupForState(viewItem->state), QPalette::Accent);
-}
-
-struct SelectionColors {
-  QColor fillColor;
-  QColor textColor;
-};
-
-SelectionColors selectionColors(const QPalette &palette, QPalette::ColorGroup colorGroup) {
+QColor selectionTextColor(const QPalette &palette, QPalette::ColorGroup colorGroup) {
   const QColor fillColor = itemSelectionFillColor(palette, colorGroup);
-  return {
-      fillColor,
-      contrastingTextColor(fillColor, palette.color(colorGroup, QPalette::Window), palette,
-                           colorGroup),
-  };
+  return contrastingTextColor(fillColor, palette.color(colorGroup, QPalette::Window), palette,
+                              colorGroup);
 }
 
 void setSelectionTextColors(QPalette &palette, QPalette::ColorGroup colorGroup,
@@ -94,10 +77,6 @@ void setSelectionTextColors(QPalette &palette, QPalette::ColorGroup colorGroup,
   palette.setColor(colorGroup, QPalette::Text, textColor);
   palette.setColor(colorGroup, QPalette::WindowText, textColor);
   palette.setColor(colorGroup, QPalette::ButtonText, textColor);
-}
-
-QBrush selectionFillBrush(const QColor &fillColor) {
-  return QBrush(fillColor);
 }
 
 bool isTreeBranchColumn(const QStyleOptionViewItem *viewItem, const QWidget *widget) {
@@ -138,7 +117,7 @@ void drawSelectionBackground(QPainter *painter, const QStyleOptionViewItem *view
 
   const QPalette::ColorGroup colorGroup = colorGroupForState(viewItem->state);
   painter->fillRect(selectionBackgroundRect(viewItem, widget),
-                    selectionFillBrush(itemSelectionFillColor(viewItem->palette, colorGroup)));
+                    itemSelectionFillColor(viewItem->palette, colorGroup));
 }
 }
 
@@ -149,13 +128,6 @@ void Windows11ProxyStyle::polish(QWidget *widget) {
       menu && qobject_cast<QGraphicsDropShadowEffect *>(menu->graphicsEffect())) {
     menu->setGraphicsEffect(nullptr);
   }
-}
-
-const QStyleOptionViewItem *Windows11ProxyStyle::currentCustomSelectionViewItem(
-    const QWidget *widget) const {
-  return m_customSelectionPaintContext.active && m_customSelectionPaintContext.widget == widget
-             ? &m_customSelectionPaintContext.viewItem
-             : nullptr;
 }
 
 QSize Windows11ProxyStyle::sizeFromContents(ContentsType type, const QStyleOption *option,
@@ -191,19 +163,22 @@ void Windows11ProxyStyle::drawControl(ControlElement element, const QStyleOption
 
   if (element == CE_ItemViewItem && option && painter && widget && usesWindows11BaseStyle(this)) {
     if (const auto *viewItem = qstyleoption_cast<const QStyleOptionViewItem *>(option);
-        viewItem && viewItem->state.testFlag(QStyle::State_Selected) &&
-        usesCustomSelectionPanel(widget)) {
+        isSelectedCustomItemView(viewItem, widget)) {
       QStyleOptionViewItem adjustedViewItem(*viewItem);
       const QPalette::ColorGroup colorGroup = colorGroupForState(viewItem->state);
-      const SelectionColors colors = selectionColors(adjustedViewItem.palette, colorGroup);
       adjustedViewItem.state &= ~(QStyle::State_Selected | QStyle::State_MouseOver);
       adjustedViewItem.showDecorationSelected = false;
-      setAccentBrush(adjustedViewItem.palette, QBrush(kHiddenItemViewAccentColor));
-      setSelectionTextColors(adjustedViewItem.palette, colorGroup, colors.textColor);
+      adjustedViewItem.palette.setBrush(QPalette::Active, QPalette::Accent,
+                                        QBrush(kHiddenItemViewAccentColor));
+      adjustedViewItem.palette.setBrush(QPalette::Inactive, QPalette::Accent,
+                                        QBrush(kHiddenItemViewAccentColor));
+      adjustedViewItem.palette.setBrush(QPalette::Disabled, QPalette::Accent,
+                                        QBrush(kHiddenItemViewAccentColor));
+      setSelectionTextColors(adjustedViewItem.palette, colorGroup,
+                             selectionTextColor(adjustedViewItem.palette, colorGroup));
       const CustomSelectionPaintContext previousContext = m_customSelectionPaintContext;
       m_customSelectionPaintContext.widget = widget;
-      m_customSelectionPaintContext.viewItem = *viewItem;
-      m_customSelectionPaintContext.active = true;
+      m_customSelectionPaintContext.viewItem = viewItem;
       QProxyStyle::drawControl(element, &adjustedViewItem, painter, widget);
       m_customSelectionPaintContext = previousContext;
       return;
@@ -228,23 +203,16 @@ void Windows11ProxyStyle::drawPrimitive(PrimitiveElement element, const QStyleOp
 
   if ((element == PE_PanelItemViewRow || element == PE_PanelItemViewItem) && painter && widget &&
       usesWindows11BaseStyle(this)) {
-    if (const QStyleOptionViewItem *contextViewItem = currentCustomSelectionViewItem(widget)) {
-      if (element == PE_PanelItemViewRow) {
-        return;
+    const bool usesSelectionContext =
+        m_customSelectionPaintContext.widget == widget && m_customSelectionPaintContext.viewItem;
+    const QStyleOptionViewItem *viewItem =
+        usesSelectionContext ? m_customSelectionPaintContext.viewItem
+                             : qstyleoption_cast<const QStyleOptionViewItem *>(option);
+
+    if (viewItem && (usesSelectionContext || isSelectedCustomItemView(viewItem, widget))) {
+      if (element == PE_PanelItemViewItem) {
+        drawSelectionBackground(painter, viewItem, widget);
       }
-
-      drawSelectionBackground(painter, contextViewItem, widget);
-      return;
-    }
-
-    if (const auto *viewItem = qstyleoption_cast<const QStyleOptionViewItem *>(option);
-        viewItem && viewItem->state.testFlag(QStyle::State_Selected) &&
-        usesCustomSelectionPanel(widget)) {
-      if (element == PE_PanelItemViewRow) {
-        return;
-      }
-
-      drawSelectionBackground(painter, viewItem, widget);
       return;
     }
   }
