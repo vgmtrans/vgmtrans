@@ -18,10 +18,7 @@ namespace {
 constexpr int kWindows11MenuCornerRadius = 8;
 constexpr int kWindows11MenuItemHorizontalPadding = 6;
 constexpr int kWindows11MenuItemVerticalPadding = 2;
-constexpr int kLeadingTableCellContentOffset = 7;
-constexpr int kItemSelectionAccentAlpha = 32;
-constexpr int kItemSelectionIndicatorWidth = 2;
-constexpr int kItemSelectionIndicatorVerticalInset = 4;
+constexpr int kItemSelectionAccentAlpha = 64;
 const QColor kHiddenItemViewAccentColor(Qt::transparent);
 
 QColor menuBackgroundColor(const QPalette &palette) {
@@ -93,52 +90,6 @@ QBrush selectionFillBrush(const QStyleOptionViewItem *viewItem) {
   return QBrush(accentColor);
 }
 
-bool isLeadingTableCell(const QStyleOptionViewItem *viewItem, const QWidget *widget) {
-  const auto *tableView = ancestorWidget<QTableView>(widget);
-  if (!tableView || !viewItem) {
-    return false;
-  }
-
-  const QWidget *viewport = tableView->viewport();
-  if (!viewport) {
-    return false;
-  }
-
-  const int leadingEdgeX = viewItem->direction == Qt::RightToLeft ? viewport->width() - 1 : 0;
-  const int leadingColumn = tableView->columnAt(leadingEdgeX);
-  const int itemColumn = tableView->columnAt(viewItem->rect.center().x());
-  return leadingColumn >= 0 && itemColumn == leadingColumn;
-}
-
-int leadingTableCellContentOffset(const QStyleOptionViewItem *viewItem, const QWidget *widget) {
-  return isLeadingTableCell(viewItem, widget) ? kLeadingTableCellContentOffset : 0;
-}
-
-bool drawsSelectionIndicator(const QStyleOptionViewItem *viewItem, const QWidget *widget) {
-  return ancestorWidget<QListView>(widget) || isLeadingTableCell(viewItem, widget);
-}
-
-void drawSelectionIndicator(QPainter *painter, const QStyleOptionViewItem *viewItem,
-                            const QWidget *widget) {
-  if (!painter || !viewItem || !drawsSelectionIndicator(viewItem, widget)) {
-    return;
-  }
-
-  QRect indicatorRect = viewItem->rect.adjusted(0, kItemSelectionIndicatorVerticalInset, 0,
-                                                -kItemSelectionIndicatorVerticalInset);
-  if (!indicatorRect.isValid()) {
-    return;
-  }
-
-  if (viewItem->direction == Qt::RightToLeft) {
-    indicatorRect.setLeft(indicatorRect.right() - kItemSelectionIndicatorWidth + 1);
-  } else {
-    indicatorRect.setWidth(kItemSelectionIndicatorWidth);
-  }
-
-  painter->fillRect(indicatorRect, accentBrush(viewItem));
-}
-
 void drawSelectionBackground(QPainter *painter, const QStyleOptionViewItem *viewItem,
                              const QWidget *widget) {
   if (!painter || !viewItem) {
@@ -146,7 +97,6 @@ void drawSelectionBackground(QPainter *painter, const QStyleOptionViewItem *view
   }
 
   painter->fillRect(viewItem->rect, selectionFillBrush(viewItem));
-  drawSelectionIndicator(painter, viewItem, widget);
 }
 }
 
@@ -217,28 +167,6 @@ void Windows11ProxyStyle::drawControl(ControlElement element, const QStyleOption
   }
 
   QProxyStyle::drawControl(element, option, painter, widget);
-}
-
-QRect Windows11ProxyStyle::subElementRect(SubElement element, const QStyleOption *option,
-                                          const QWidget *widget) const {
-  QRect rect = QProxyStyle::subElementRect(element, option, widget);
-  if (!widget || !usesWindows11BaseStyle(this)) {
-    return rect;
-  }
-
-  if (element != SE_ItemViewItemCheckIndicator && element != SE_ItemViewItemDecoration &&
-      element != SE_ItemViewItemText && element != SE_ItemViewItemFocusRect) {
-    return rect;
-  }
-
-  const auto *viewItem = qstyleoption_cast<const QStyleOptionViewItem *>(option);
-  const int contentOffset = leadingTableCellContentOffset(viewItem, widget);
-  if (contentOffset <= 0) {
-    return rect;
-  }
-
-  rect.translate(viewItem->direction == Qt::RightToLeft ? -contentOffset : contentOffset, 0);
-  return rect;
 }
 
 void Windows11ProxyStyle::drawPrimitive(PrimitiveElement element, const QStyleOption *option,
