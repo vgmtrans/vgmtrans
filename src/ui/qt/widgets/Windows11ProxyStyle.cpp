@@ -18,6 +18,8 @@ namespace {
 constexpr int kWindows11MenuCornerRadius = 8;
 constexpr int kWindows11MenuItemHorizontalPadding = 6;
 constexpr int kWindows11MenuItemVerticalPadding = 2;
+constexpr int kItemSelectionTextInset = 4;
+constexpr int kTableItemSelectionTextInset = 0;
 
 QColor menuBackgroundColor(const QPalette &palette) {
   QColor backgroundColor = blendColors(palette.color(QPalette::Base),
@@ -55,6 +57,38 @@ bool usesWindows11BaseStyle(const QProxyStyle *style) {
 
 bool usesCustomSelectionPanel(const QWidget *widget) {
   return ancestorWidget<QTableView>(widget) || ancestorWidget<QListView>(widget);
+}
+
+QRect selectionFillRect(const QStyleOptionViewItem *viewItem, const QStyle *style,
+                        const QWidget *widget) {
+  if (!viewItem) {
+    return {};
+  }
+
+  QRect fillRect = viewItem->rect;
+  if (!viewItem->features.testFlag(QStyleOptionViewItem::HasDecoration) ||
+      !viewItem->decorationSize.isValid() || !style) {
+    return fillRect;
+  }
+
+  const int textInset = ancestorWidget<QTableView>(widget) ? kTableItemSelectionTextInset
+                                                            : kItemSelectionTextInset;
+  const QRect textRect = style->subElementRect(QStyle::SE_ItemViewItemText, viewItem, widget);
+  if (textRect.isValid()) {
+    if (viewItem->direction == Qt::RightToLeft) {
+      fillRect.setRight(std::min(fillRect.right(), textRect.right() + textInset));
+    } else {
+      fillRect.setLeft(std::max(fillRect.left(), textRect.left() - textInset));
+    }
+    return fillRect;
+  }
+
+  if (viewItem->direction == Qt::RightToLeft) {
+    fillRect.adjust(0, 0, -(viewItem->decorationSize.width() + textInset), 0);
+  } else {
+    fillRect.adjust(viewItem->decorationSize.width() + textInset, 0, 0, 0);
+  }
+  return fillRect;
 }
 }
 
@@ -119,10 +153,14 @@ void Windows11ProxyStyle::drawPrimitive(PrimitiveElement element, const QStyleOp
     if (const auto *viewItem = qstyleoption_cast<const QStyleOptionViewItem *>(option);
         viewItem && viewItem->state.testFlag(QStyle::State_Selected) &&
         usesCustomSelectionPanel(widget)) {
+      if (ancestorWidget<QTableView>(widget) && element == PE_PanelItemViewRow) {
+        return;
+      }
+
       // Qt's Windows 11 style paints rounded selection chrome per table cell, which shows up as
       // narrow leading bars in our selected item views. Fill the row/item panel directly so
       // selected tables and lists keep a normal continuous highlight.
-      painter->fillRect(viewItem->rect,
+      painter->fillRect(selectionFillRect(viewItem, this, widget),
                         viewItem->palette.brush(colorGroupForState(viewItem->state),
                                                 QPalette::Highlight));
       return;
