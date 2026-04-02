@@ -13,6 +13,7 @@
 #include <QPainter>
 #include <QStyleOption>
 #include <QTableView>
+#include <QTreeView>
 
 namespace {
 constexpr int kWindows11MenuCornerRadius = 8;
@@ -56,7 +57,8 @@ bool usesWindows11BaseStyle(const QProxyStyle *style) {
 }
 
 bool usesCustomSelectionPanel(const QWidget *widget) {
-  return ancestorWidget<QTableView>(widget) || ancestorWidget<QListView>(widget);
+  return ancestorWidget<QTableView>(widget) || ancestorWidget<QListView>(widget) ||
+         ancestorWidget<QTreeView>(widget);
 }
 
 bool isLeadingTableCell(const QStyleOptionViewItem *viewItem, const QWidget *widget);
