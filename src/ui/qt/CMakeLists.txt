@@ -49,6 +49,7 @@ target_sources(vgmtrans
     services/MenuManager.cpp
     services/Settings.cpp
     services/NotificationCenter.cpp
+    util/ColorHelpers.cpp
     util/Helpers.cpp
     util/UIHelpers.cpp
     widgets/ItemViewDensity.cpp
@@ -98,6 +99,7 @@ target_sources(vgmtrans
   PRIVATE
     FILE_SET headers_util TYPE HEADERS BASE_DIRS util
     FILES
+      util/ColorHelpers.h
       util/Colors.h
       util/Helpers.h
       util/LambdaEventFilter.h
