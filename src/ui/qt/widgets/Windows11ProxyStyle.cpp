@@ -61,8 +61,6 @@ bool usesCustomSelectionPanel(const QWidget *widget) {
          ancestorWidget<QTreeView>(widget);
 }
 
-bool isLeadingTableCell(const QStyleOptionViewItem *viewItem, const QWidget *widget);
-
 void setAccentBrush(QPalette &palette, const QBrush &brush) {
   palette.setBrush(QPalette::Active, QPalette::Accent, brush);
   palette.setBrush(QPalette::Inactive, QPalette::Accent, brush);
@@ -92,13 +90,43 @@ QBrush selectionFillBrush(const QStyleOptionViewItem *viewItem) {
   return QBrush(accentColor);
 }
 
+bool isTreeBranchColumn(const QStyleOptionViewItem *viewItem, const QWidget *widget) {
+  return ancestorWidget<QTreeView>(widget) && viewItem && viewItem->index.isValid() &&
+         viewItem->index.column() == 0;
+}
+
+QRect selectionBackgroundRect(const QStyleOptionViewItem *viewItem, const QWidget *widget) {
+  if (!viewItem) {
+    return {};
+  }
+
+  QRect selectionRect = viewItem->rect;
+  if (!isTreeBranchColumn(viewItem, widget)) {
+    return selectionRect;
+  }
+
+  const auto *treeView = ancestorWidget<QTreeView>(widget);
+  const QWidget *viewport = treeView ? treeView->viewport() : nullptr;
+  if (!viewport) {
+    return selectionRect;
+  }
+
+  if (viewItem->direction == Qt::RightToLeft) {
+    selectionRect.setRight(viewport->width() - 1);
+  } else {
+    selectionRect.setLeft(0);
+  }
+
+  return selectionRect;
+}
+
 void drawSelectionBackground(QPainter *painter, const QStyleOptionViewItem *viewItem,
                              const QWidget *widget) {
   if (!painter || !viewItem) {
     return;
   }
 
-  painter->fillRect(viewItem->rect, selectionFillBrush(viewItem));
+  painter->fillRect(selectionBackgroundRect(viewItem, widget), selectionFillBrush(viewItem));
 }
 }
 
