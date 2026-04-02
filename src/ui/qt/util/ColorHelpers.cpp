@@ -12,6 +12,7 @@
 #include <cmath>
 
 namespace {
+// Alpha-composite a foreground color over a background color.
 QColor compositeColors(const QColor &foreground, const QColor &background) {
   const qreal foregroundAlpha = foreground.alphaF();
   const qreal backgroundAlpha = background.alphaF();
@@ -31,17 +32,20 @@ QColor compositeColors(const QColor &foreground, const QColor &background) {
                           compositeChannel(foreground.blueF(), background.blueF()), outAlpha);
 }
 
+// Convert an sRGB channel to linear space for luminance calculations.
 qreal linearizedColorComponent(qreal component) {
   return component <= 0.03928 ? component / 12.92
                               : std::pow((component + 0.055) / 1.055, 2.4);
 }
 
+// Compute the WCAG relative luminance of a color.
 qreal relativeLuminance(const QColor &color) {
   return 0.2126 * linearizedColorComponent(color.redF()) +
          0.7152 * linearizedColorComponent(color.greenF()) +
          0.0722 * linearizedColorComponent(color.blueF());
 }
 
+// Compute the contrast ratio between a foreground color and a background color.
 qreal contrastRatio(const QColor &foreground, const QColor &background) {
   const QColor visibleForeground = compositeColors(foreground, background);
   const qreal foregroundLuminance = relativeLuminance(visibleForeground);
@@ -52,6 +56,7 @@ qreal contrastRatio(const QColor &foreground, const QColor &background) {
 }
 }
 
+// Format a QColor as a CSS rgba(...) string.
 QString cssColor(const QColor &color) {
   return QStringLiteral("rgba(%1, %2, %3, %4)")
       .arg(color.red())
@@ -60,6 +65,7 @@ QString cssColor(const QColor &color) {
       .arg(color.alpha());
 }
 
+// Linearly blend two colors by the supplied foreground weight.
 QColor blendColors(const QColor &foreground, const QColor &background, qreal foregroundWeight) {
   const qreal backgroundWeight = 1.0 - foregroundWeight;
   return QColor::fromRgbF(foreground.redF() * foregroundWeight + background.redF() * backgroundWeight,
@@ -68,12 +74,15 @@ QColor blendColors(const QColor &foreground, const QColor &background, qreal for
                           foreground.alphaF() * foregroundWeight + background.alphaF() * backgroundWeight);
 }
 
+// Derive the translucent item selection fill from the palette's Accent color.
 QColor itemSelectionFillColor(const QPalette &palette, QPalette::ColorGroup colorGroup) {
   QColor accentColor = palette.brush(colorGroup, QPalette::Accent).color();
   accentColor.setAlpha(UIColors::ItemSelectionAccentAlpha);
   return accentColor;
 }
 
+// Choose the highest-contrast text color for a foreground shown over a background, preferring
+// palette colors before falling back to black or white.
 QColor contrastingTextColor(const QColor &foreground, const QColor &background, const QPalette &palette,
                             QPalette::ColorGroup colorGroup) {
   constexpr qreal kPreferredContrastRatio = 4.5;
@@ -111,6 +120,7 @@ QColor contrastingTextColor(const QColor &foreground, const QColor &background, 
   return fallbackColor;
 }
 
+// Report whether the palette's window color should be treated as dark.
 bool isDarkPalette(const QPalette &palette) {
   return palette.color(QPalette::Window).lightnessF() < 0.5;
 }
