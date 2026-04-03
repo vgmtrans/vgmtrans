@@ -27,18 +27,6 @@ size_t qHash(const ContrastColorCacheKey &key, size_t seed = 0) noexcept {
                     static_cast<int>(key.colorGroup));
 }
 
-ContrastColorCacheKey makeContrastColorCacheKey(const QColor &overlayBackground,
-                                                const QColor &baseBackground,
-                                                const QPalette &palette,
-                                                QPalette::ColorGroup colorGroup) {
-  return {
-      static_cast<quint64>(overlayBackground.rgba64()),
-      static_cast<quint64>(baseBackground.rgba64()),
-      palette.cacheKey(),
-      colorGroup,
-  };
-}
-
 // Alpha-composite a foreground color over a background color.
 QColor compositeColors(const QColor &foreground, const QColor &background) {
   const qreal foregroundAlpha = foreground.alphaF();
@@ -82,9 +70,8 @@ qreal contrastRatio(const QColor &foreground, const QColor &background) {
   return (lighter + 0.05) / (darker + 0.05);
 }
 
-QColor computeContrastingTextColorForBackground(const QColor &effectiveBackground,
-                                                const QPalette &palette,
-                                                QPalette::ColorGroup colorGroup) {
+QColor textColorForBackground(const QColor &effectiveBackground, const QPalette &palette,
+                              QPalette::ColorGroup colorGroup) {
   constexpr qreal kPreferredContrastRatio = 4.5;
 
   const std::array<QColor, 5> paletteCandidates{
@@ -157,13 +144,17 @@ QColor contrastingTextColor(const QColor &overlayBackground, const QColor &baseB
                             QPalette::ColorGroup colorGroup) {
   static QHash<ContrastColorCacheKey, QColor> cache;
 
-  const ContrastColorCacheKey cacheKey =
-      makeContrastColorCacheKey(overlayBackground, baseBackground, palette, colorGroup);
+  const ContrastColorCacheKey cacheKey{
+      static_cast<quint64>(overlayBackground.rgba64()),
+      static_cast<quint64>(baseBackground.rgba64()),
+      palette.cacheKey(),
+      colorGroup,
+  };
   if (const auto it = cache.constFind(cacheKey); it != cache.constEnd()) {
     return it.value();
   }
 
-  const QColor textColor = computeContrastingTextColorForBackground(
+  const QColor textColor = textColorForBackground(
       compositeColors(overlayBackground, baseBackground), palette, colorGroup);
   cache.insert(cacheKey, textColor);
   return textColor;
