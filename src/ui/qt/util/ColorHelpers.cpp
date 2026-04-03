@@ -83,11 +83,11 @@ QColor itemSelectionFillColor(const QPalette &palette, QPalette::ColorGroup colo
 
 // Choose the highest-contrast text color for a foreground shown over a background, preferring
 // palette colors before falling back to black or white.
-QColor contrastingTextColor(const QColor &foreground, const QColor &background, const QPalette &palette,
+QColor contrastingTextColor(const QColor &background1, const QColor &background2, const QPalette &palette,
                             QPalette::ColorGroup colorGroup) {
   constexpr qreal kPreferredContrastRatio = 4.5;
 
-  const QColor effectiveBackground = compositeColors(foreground, background);
+  const QColor effectiveBackground = compositeColors(background1, background2);
   const std::array<QColor, 5> paletteCandidates{
       palette.color(colorGroup, QPalette::Text),
       palette.color(colorGroup, QPalette::WindowText),

@@ -14,7 +14,7 @@ QString cssColor(const QColor &color);
 QColor blendColors(const QColor &foreground, const QColor &background, qreal foregroundWeight);
 QColor itemSelectionFillColor(const QPalette &palette,
                               QPalette::ColorGroup colorGroup = QPalette::Active);
-QColor contrastingTextColor(const QColor &foreground, const QColor &background,
+QColor contrastingTextColor(const QColor &background1, const QColor &background2,
                             const QPalette &palette,
                             QPalette::ColorGroup colorGroup = QPalette::Active);
 bool isDarkPalette(const QPalette &palette);
