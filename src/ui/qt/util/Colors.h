@@ -27,5 +27,5 @@ namespace EventColors {
 }
 
 namespace UIColors {
-  inline constexpr int ItemSelectionAccentAlpha = 96;
+  inline constexpr int ItemSelectionAccentAlpha = 48;
 }
