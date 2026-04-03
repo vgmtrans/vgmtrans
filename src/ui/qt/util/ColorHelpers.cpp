@@ -14,8 +14,8 @@
 
 namespace {
 struct ContrastColorCacheKey {
-  quint64 background1Rgba64;
-  quint64 background2Rgba64;
+  quint64 overlayBackgroundRgba64;
+  quint64 baseBackgroundRgba64;
   qint64 paletteCacheKey;
   QPalette::ColorGroup colorGroup;
 
@@ -23,17 +23,17 @@ struct ContrastColorCacheKey {
 };
 
 size_t qHash(const ContrastColorCacheKey &key, size_t seed = 0) noexcept {
-  return qHashMulti(seed, key.background1Rgba64, key.background2Rgba64, key.paletteCacheKey,
+  return qHashMulti(seed, key.overlayBackgroundRgba64, key.baseBackgroundRgba64, key.paletteCacheKey,
                     static_cast<int>(key.colorGroup));
 }
 
-ContrastColorCacheKey makeContrastColorCacheKey(const QColor &background1,
-                                                const QColor &background2,
+ContrastColorCacheKey makeContrastColorCacheKey(const QColor &overlayBackground,
+                                                const QColor &baseBackground,
                                                 const QPalette &palette,
                                                 QPalette::ColorGroup colorGroup) {
   return {
-      static_cast<quint64>(background1.rgba64()),
-      static_cast<quint64>(background2.rgba64()),
+      static_cast<quint64>(overlayBackground.rgba64()),
+      static_cast<quint64>(baseBackground.rgba64()),
       palette.cacheKey(),
       colorGroup,
   };
@@ -81,6 +81,43 @@ qreal contrastRatio(const QColor &foreground, const QColor &background) {
   const qreal darker = std::min(foregroundLuminance, backgroundLuminance);
   return (lighter + 0.05) / (darker + 0.05);
 }
+
+QColor computeContrastingTextColorForBackground(const QColor &effectiveBackground,
+                                                const QPalette &palette,
+                                                QPalette::ColorGroup colorGroup) {
+  constexpr qreal kPreferredContrastRatio = 4.5;
+
+  const std::array<QColor, 5> paletteCandidates{
+      palette.color(colorGroup, QPalette::Text),
+      palette.color(colorGroup, QPalette::WindowText),
+      palette.color(colorGroup, QPalette::ButtonText),
+      palette.color(colorGroup, QPalette::HighlightedText),
+      palette.color(colorGroup, QPalette::BrightText),
+  };
+
+  QColor bestPaletteColor;
+  qreal bestPaletteContrast = -1.0;
+  for (const QColor &candidate : paletteCandidates) {
+    const qreal candidateContrast = contrastRatio(candidate, effectiveBackground);
+    if (candidateContrast > bestPaletteContrast) {
+      bestPaletteContrast = candidateContrast;
+      bestPaletteColor = candidate;
+    }
+  }
+
+  const QColor darkFallback(Qt::black);
+  const QColor lightFallback(Qt::white);
+  const qreal darkContrast = contrastRatio(darkFallback, effectiveBackground);
+  const qreal lightContrast = contrastRatio(lightFallback, effectiveBackground);
+  const QColor fallbackColor = darkContrast >= lightContrast ? darkFallback : lightFallback;
+  const qreal fallbackContrast = std::max(darkContrast, lightContrast);
+
+  if (bestPaletteContrast >= kPreferredContrastRatio || bestPaletteContrast >= fallbackContrast) {
+    return bestPaletteColor;
+  }
+
+  return fallbackColor;
+}
 }
 
 // Format a QColor as a CSS rgba(...) string.
@@ -110,49 +147,26 @@ QColor itemSelectionFillColor(const QPalette &palette, QPalette::ColorGroup colo
 
 // Choose the highest-contrast text color for a foreground shown over a background, preferring
 // palette colors before falling back to black or white.
-QColor contrastingTextColor(const QColor &background1, const QColor &background2, const QPalette &palette,
+QColor contrastingTextColor(const QColor &background, const QPalette &palette, QPalette::ColorGroup colorGroup) {
+  return contrastingTextColor(Qt::transparent, background, palette, colorGroup);
+}
+
+// Choose the highest-contrast text color for content shown over an overlay composited on a base
+// background, preferring palette colors before falling back to black or white.
+QColor contrastingTextColor(const QColor &overlayBackground, const QColor &baseBackground, const QPalette &palette,
                             QPalette::ColorGroup colorGroup) {
-  constexpr qreal kPreferredContrastRatio = 4.5;
   static QHash<ContrastColorCacheKey, QColor> cache;
 
-  const ContrastColorCacheKey cacheKey = makeContrastColorCacheKey(background1, background2, palette, colorGroup);
+  const ContrastColorCacheKey cacheKey =
+      makeContrastColorCacheKey(overlayBackground, baseBackground, palette, colorGroup);
   if (const auto it = cache.constFind(cacheKey); it != cache.constEnd()) {
     return it.value();
   }
 
-  const QColor effectiveBackground = compositeColors(background1, background2);
-  const std::array<QColor, 5> paletteCandidates{
-      palette.color(colorGroup, QPalette::Text),
-      palette.color(colorGroup, QPalette::WindowText),
-      palette.color(colorGroup, QPalette::ButtonText),
-      palette.color(colorGroup, QPalette::HighlightedText),
-      palette.color(colorGroup, QPalette::BrightText),
-  };
-
-  QColor bestPaletteColor;
-  qreal bestPaletteContrast = -1.0;
-  for (const QColor &candidate : paletteCandidates) {
-    const qreal candidateContrast = contrastRatio(candidate, effectiveBackground);
-    if (candidateContrast > bestPaletteContrast) {
-      bestPaletteContrast = candidateContrast;
-      bestPaletteColor = candidate;
-    }
-  }
-
-  const QColor darkFallback(Qt::black);
-  const QColor lightFallback(Qt::white);
-  const qreal darkContrast = contrastRatio(darkFallback, effectiveBackground);
-  const qreal lightContrast = contrastRatio(lightFallback, effectiveBackground);
-  const QColor fallbackColor = darkContrast >= lightContrast ? darkFallback : lightFallback;
-  const qreal fallbackContrast = std::max(darkContrast, lightContrast);
-
-  if (bestPaletteContrast >= kPreferredContrastRatio || bestPaletteContrast >= fallbackContrast) {
-    cache.insert(cacheKey, bestPaletteColor);
-    return bestPaletteColor;
-  }
-
-  cache.insert(cacheKey, fallbackColor);
-  return fallbackColor;
+  const QColor textColor = computeContrastingTextColorForBackground(
+      compositeColors(overlayBackground, baseBackground), palette, colorGroup);
+  cache.insert(cacheKey, textColor);
+  return textColor;
 }
 
 // Report whether the palette's window color should be treated as dark.
