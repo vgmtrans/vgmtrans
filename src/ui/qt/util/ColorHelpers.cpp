@@ -10,8 +10,35 @@
 #include <algorithm>
 #include <array>
 #include <cmath>
+#include <QHash>
 
 namespace {
+struct ContrastColorCacheKey {
+  quint64 background1Rgba64;
+  quint64 background2Rgba64;
+  qint64 paletteCacheKey;
+  QPalette::ColorGroup colorGroup;
+
+  bool operator==(const ContrastColorCacheKey &other) const = default;
+};
+
+size_t qHash(const ContrastColorCacheKey &key, size_t seed = 0) noexcept {
+  return qHashMulti(seed, key.background1Rgba64, key.background2Rgba64, key.paletteCacheKey,
+                    static_cast<int>(key.colorGroup));
+}
+
+ContrastColorCacheKey makeContrastColorCacheKey(const QColor &background1,
+                                                const QColor &background2,
+                                                const QPalette &palette,
+                                                QPalette::ColorGroup colorGroup) {
+  return {
+      static_cast<quint64>(background1.rgba64()),
+      static_cast<quint64>(background2.rgba64()),
+      palette.cacheKey(),
+      colorGroup,
+  };
+}
+
 // Alpha-composite a foreground color over a background color.
 QColor compositeColors(const QColor &foreground, const QColor &background) {
   const qreal foregroundAlpha = foreground.alphaF();
@@ -86,6 +113,12 @@ QColor itemSelectionFillColor(const QPalette &palette, QPalette::ColorGroup colo
 QColor contrastingTextColor(const QColor &background1, const QColor &background2, const QPalette &palette,
                             QPalette::ColorGroup colorGroup) {
   constexpr qreal kPreferredContrastRatio = 4.5;
+  static QHash<ContrastColorCacheKey, QColor> cache;
+
+  const ContrastColorCacheKey cacheKey = makeContrastColorCacheKey(background1, background2, palette, colorGroup);
+  if (const auto it = cache.constFind(cacheKey); it != cache.constEnd()) {
+    return it.value();
+  }
 
   const QColor effectiveBackground = compositeColors(background1, background2);
   const std::array<QColor, 5> paletteCandidates{
@@ -114,9 +147,11 @@ QColor contrastingTextColor(const QColor &background1, const QColor &background2
   const qreal fallbackContrast = std::max(darkContrast, lightContrast);
 
   if (bestPaletteContrast >= kPreferredContrastRatio || bestPaletteContrast >= fallbackContrast) {
+    cache.insert(cacheKey, bestPaletteColor);
     return bestPaletteColor;
   }
 
+  cache.insert(cacheKey, fallbackColor);
   return fallbackColor;
 }
 
