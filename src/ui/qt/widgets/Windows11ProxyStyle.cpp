@@ -19,7 +19,6 @@ namespace {
 constexpr int kWindows11MenuCornerRadius = 8;
 constexpr int kWindows11MenuItemHorizontalPadding = 6;
 constexpr int kWindows11MenuItemVerticalPadding = 2;
-const QColor kHiddenItemViewAccentColor(Qt::transparent);
 
 QColor menuBackgroundColor(const QPalette &palette) {
   QColor backgroundColor = blendColors(palette.color(QPalette::Base),
@@ -167,12 +166,6 @@ void Windows11ProxyStyle::drawControl(ControlElement element, const QStyleOption
       // selection background or accent bar.
       adjustedViewItem.state &= ~(QStyle::State_Selected | QStyle::State_MouseOver);
       adjustedViewItem.showDecorationSelected = false;
-      adjustedViewItem.palette.setBrush(QPalette::Active, QPalette::Accent,
-                                        QBrush(kHiddenItemViewAccentColor));
-      adjustedViewItem.palette.setBrush(QPalette::Inactive, QPalette::Accent,
-                                        QBrush(kHiddenItemViewAccentColor));
-      adjustedViewItem.palette.setBrush(QPalette::Disabled, QPalette::Accent,
-                                        QBrush(kHiddenItemViewAccentColor));
       setSelectionTextColors(adjustedViewItem.palette, colorGroup,
                              selectionTextColor(adjustedViewItem.palette, colorGroup));
       const CustomSelectionPaintContext previousContext = m_customSelectionPaintContext;
