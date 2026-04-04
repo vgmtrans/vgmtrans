@@ -24,3 +24,4 @@
 - Fixed an issues where samples from Nintendo DS (SDAT) data were being read with the wrong sample rate,
   resulting in instruments playing at the wrong pitch or seemingly be absent.
 - Fixed various memory leaks, most notably one which occurred on collection playback.
+- Fixed loading of older SPC files that do not have ID666 tags.

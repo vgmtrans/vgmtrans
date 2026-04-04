@@ -28,7 +28,8 @@ SPCFile::SPCFile(const RawFile& file) {
     throw std::runtime_error("Invalid SPC signature");
   }
 
-  m_hasID666Tag = file.readByte(0x23);
+  m_hasID666Tag = file.readByte(0x23) == 0x1a;
+  L_DEBUG("SPC file has ID666 tag? {}", m_hasID666Tag);
   m_versionMinor = file.readByte(0x24);
   file.readBytes(0x100, m_ram.size(), m_ram.data());
   file.readBytes(0x10100, m_dspRegisters.size(), m_dspRegisters.data());
@@ -48,8 +49,18 @@ void SPCFile::loadID666Tag(const RawFile& file) {
   m_id666Tag.nameOfDumper = file.readNullTerminatedString(0x6E, 16);
   m_id666Tag.comments = file.readNullTerminatedString(0x7E, 32);
   m_id666Tag.dateDumped = file.readNullTerminatedString(0x9E, 11);
-  m_id666Tag.secondsToPlay = std::stoi(file.readNullTerminatedString(0xA9, 3));
-  m_id666Tag.fadeLength = std::stoi(file.readNullTerminatedString(0xAC, 5));
+  try {
+    m_id666Tag.secondsToPlay = std::stoi(file.readNullTerminatedString(0xA9, 3));
+  } catch (const std::exception& e) {
+    L_WARN("Failed to parse seconds to play from ID666 tag: {}", e.what());
+    m_id666Tag.secondsToPlay = 0;
+  }
+  try {
+    m_id666Tag.fadeLength = std::stoi(file.readNullTerminatedString(0xAC, 5));
+  } catch (const std::exception& e) {
+    L_WARN("Failed to parse fade length from ID666 tag: {}", e.what());
+    m_id666Tag.fadeLength = 0;
+  }
   m_id666Tag.artist = file.readNullTerminatedString(0xB1, 32);
   m_id666Tag.defaultChannelDisables = file.readByte(0xD1);
   m_id666Tag.emulatorUsed = file.readByte(0xD2);
