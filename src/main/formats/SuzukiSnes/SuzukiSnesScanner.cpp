@@ -215,7 +215,6 @@ void SuzukiSnesScanner::searchForSuzukiSnesFromARAM(RawFile *file) {
     addrVolumeTable = file->readShort(ofsLoadInstr + 10);
     addrADSRTable = file->readShort(ofsLoadInstr + 18);
     addrTuningTable = file->readShort(ofsLoadInstr + 30);
-    // TODO find out where SD3 stores percussion instruments
     addrDrumKitTable = version != SUZUKISNES_SD3 ? addrSeqHeader : 0;
   } else {
     return;
