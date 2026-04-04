@@ -209,17 +209,20 @@ void SuzukiSnesScanner::searchForSuzukiSnesFromARAM(RawFile *file) {
   uint16_t addrVolumeTable;
   uint16_t addrTuningTable;
   uint16_t addrADSRTable;
+  uint16_t addrDrumKitTable;
   if (file->searchBytePattern(ptnLoadInstr, ofsLoadInstr)) {
     addrSRCNTable = file->readShort(ofsLoadInstr + 5);
     addrVolumeTable = file->readShort(ofsLoadInstr + 10);
     addrADSRTable = file->readShort(ofsLoadInstr + 18);
     addrTuningTable = file->readShort(ofsLoadInstr + 30);
+    // TODO find out where SD3 stores percussion instruments
+    addrDrumKitTable = version != SUZUKISNES_SD3 ? addrSeqHeader : 0;
   } else {
     return;
   }
 
   SuzukiSnesInstrSet *newInstrSet =
-      new SuzukiSnesInstrSet(file, version, spcDirAddr, addrSRCNTable, addrVolumeTable, addrADSRTable, addrTuningTable);
+      new SuzukiSnesInstrSet(file, version, spcDirAddr, addrSRCNTable, addrVolumeTable, addrADSRTable, addrTuningTable, addrDrumKitTable);
   if (!newInstrSet->loadVGMFile()) {
     delete newInstrSet;
     return;

@@ -1,4 +1,6 @@
 #include "SuzukiSnesSeq.h"
+
+#include "SuzukiSnesInstr.h"
 #include "spdlog/fmt/fmt.h"
 
 DECLARE_FORMAT(SuzukiSnes);
@@ -44,7 +46,7 @@ bool SuzukiSnesSeq::parseHeader() {
   VGMHeader *header = addHeader(offset(), 0);
   uint32_t curOffset = offset();
 
-  // skip unknown stream
+  // percussion table is actually parsed by SuzukiSnesDrumKit instead
   if (version != SUZUKISNES_SD3) {
     while (true) {
       if (curOffset + 1 >= 0x10000) {
@@ -53,12 +55,12 @@ bool SuzukiSnesSeq::parseHeader() {
 
       uint8_t firstByte = readByte(curOffset);
       if (firstByte >= 0x80) {
-        header->addChild(curOffset, 1, "Unknown Items End");
+        header->addChild(curOffset, 1, "Percussion End");
         curOffset++;
         break;
       }
       else {
-        header->addUnknownChild(curOffset, 5);
+        header->addChild(curOffset, 5, "Percussion");
         curOffset += 5;
       }
     }
@@ -212,6 +214,8 @@ void SuzukiSnesTrack::resetVars() {
   spcVolume = 100;
   loopLevel = 0;
   infiniteLoopPoint = 0;
+  percussion = false;
+  nonPercussionProgram = 0;
 }
 
 bool SuzukiSnesTrack::readEvent() {
@@ -293,9 +297,11 @@ bool SuzukiSnesTrack::readEvent() {
       if (noteIndex < 12) {
         uint8_t note = octave * 12 + noteIndex;
 
-        // TODO: percussion note
-
-        addNoteByDur(beginOffset, curOffset - beginOffset, note, NOTE_VELOCITY, dur);
+        if (percussion) {
+          addNoteByDur(beginOffset, curOffset - beginOffset, noteIndex + SuzukiSnesDrumKitRgn::KEY_BIAS - transpose, NOTE_VELOCITY, dur, "Percussion Note with Duration");
+        } else {
+          addNoteByDur(beginOffset, curOffset - beginOffset, note, NOTE_VELOCITY, dur);
+        }
         addTime(dur);
       }
       else if (noteIndex == 13) {
@@ -558,6 +564,7 @@ bool SuzukiSnesTrack::readEvent() {
     case EVENT_PROGCHANGE: {
       uint8_t newProg = readByte(curOffset++);
       addProgramChange(beginOffset, curOffset - beginOffset, newProg);
+      nonPercussionProgram = newProg;
       break;
     }
 
@@ -661,11 +668,15 @@ bool SuzukiSnesTrack::readEvent() {
 
     case EVENT_PERC_ON: {
       addGenericEvent(beginOffset, curOffset - beginOffset, "Percussion On", desc, Type::UseDrumKit);
+      percussion = true;
+      addProgramChangeNoItem(SuzukiSnesInstrSet::DRUMKIT_PROGRAM, true);
       break;
     }
 
     case EVENT_PERC_OFF: {
       addGenericEvent(beginOffset, curOffset - beginOffset, "Percussion Off", desc, Type::UseDrumKit);
+      percussion = false;
+      addProgramChangeNoItem(nonPercussionProgram, true);
       break;
     }
 

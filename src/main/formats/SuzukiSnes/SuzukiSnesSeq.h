@@ -106,6 +106,8 @@ class SuzukiSnesTrack
   uint16_t infiniteLoopPoint;
 
   uint8_t spcVolume;
+  bool percussion;
+  uint8_t nonPercussionProgram;
 
   uint8_t loopLevel;
   uint8_t loopCount[SUZUKISNES_LOOP_LEVEL_MAX];
