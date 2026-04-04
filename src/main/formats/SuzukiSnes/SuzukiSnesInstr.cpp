@@ -21,7 +21,7 @@ SuzukiSnesInstrSet::SuzukiSnesInstrSet(RawFile *file,
                                        uint16_t addrTuningTable,
                                        uint16_t addrDrumKitTable,
                                        const std::string &name) :
-    VGMInstrSet(SuzukiSnesFormat::name, file, addrSRCNTable, 0, name), version(ver),
+    VGMInstrSet(SuzukiSnesFormat::name, file, addrDrumKitTable, 0, name), version(ver),
     spcDirAddr(spcDirAddr),
     addrSRCNTable(addrSRCNTable),
     addrVolumeTable(addrVolumeTable),
@@ -168,7 +168,7 @@ SuzukiSnesDrumKit::SuzukiSnesDrumKit(VGMInstrSet *instrSet,
                                      uint16_t addrADSRTable,
                                      uint16_t addrDrumKitTable,
                                      const std::string &name) :
-  VGMInstr(instrSet, addrTuningTable, 0, programNum >> 7, programNum & 0x7F, name), version(ver),
+  VGMInstr(instrSet, addrDrumKitTable, 0, programNum >> 7, programNum & 0x7F, name), version(ver),
   spcDirAddr(spcDirAddr),
   addrTuningTable(addrTuningTable),
   addrADSRTable(addrADSRTable),
@@ -181,7 +181,7 @@ SuzukiSnesDrumKit::~SuzukiSnesDrumKit() {
 bool SuzukiSnesDrumKit::loadInstr() {
   uint16_t addr = addrDrumKitTable;
 
-  for (uint16_t i = addr; i < 0x80; i += 5) {
+  for (uint16_t i = addr; readByte(i) < 0x80; i += 5) {
     SuzukiSnesDrumKitRgn *rgn = new SuzukiSnesDrumKitRgn(this, version, addrDrumKitTable);
 
     if (!rgn->initializePercussionRegion(i, spcDirAddr, addrADSRTable, addrTuningTable)) {
