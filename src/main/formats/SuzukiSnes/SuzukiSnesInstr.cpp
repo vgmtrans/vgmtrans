@@ -291,7 +291,7 @@ bool SuzukiSnesDrumKitRgn::initializePercussionRegion(uint16_t noteOffset,
   // sampNum is absolute key to play
   unityKey = (unityKey + KEY_BIAS) - readByte(keyOffset) + percussionIndex;
 
-  addSampNum(sampNum, srcnOffset);
+  addSampNum(instrumentIndex, srcnOffset);
   addChild(keyOffset, 1, "Key");
 
   addVolume(readByte(volumeOffset) / 256.0, volumeOffset, 1);
