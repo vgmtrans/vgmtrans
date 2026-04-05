@@ -185,6 +185,9 @@ void VGMCollListView::keyPressEvent(QKeyEvent *e) {
     case Qt::Key_Return:
       handlePlaybackRequest();
       break;
+    case Qt::Key_F2:
+      requestRenameCurrentSelection();
+      break;
     case Qt::Key_Escape:
       handleStopRequest();
       break;
@@ -210,6 +213,21 @@ void VGMCollListView::handlePlaybackRequest() {
 
 void VGMCollListView::handleStopRequest() {
   SequencePlayer::the().stop();
+}
+
+void VGMCollListView::requestRenameCurrentSelection() {
+  if (!selectionModel() || !selectionModel()->hasSelection()) {
+    return;
+  }
+
+  const QModelIndex index = selectionModel()->currentIndex().isValid()
+                                ? selectionModel()->currentIndex()
+                                : selectionModel()->selectedRows().value(0);
+  if (!index.isValid()) {
+    return;
+  }
+
+  requestRename(qtVGMRoot.vgmColls()[index.row()]);
 }
 
 void VGMCollListView::requestRename(VGMColl* coll) {

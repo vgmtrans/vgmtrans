@@ -52,6 +52,7 @@ public slots:
   void requestRename(VGMColl* coll);
 
 private:
+  void requestRenameCurrentSelection();
   void collectionMenu(const QPoint &pos) const;
   void keyPressEvent(QKeyEvent *e) override;
   void onSelectionChanged(const QItemSelection &selected, const QItemSelection &deselected);

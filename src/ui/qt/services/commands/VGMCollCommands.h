@@ -33,11 +33,7 @@ public:
   }
 
   [[nodiscard]] QList<QKeySequence> shortcutKeySequences() const override {
-#if defined(Q_OS_MACOS) || defined(Q_OS_MAC)
-    return {};
-#else
     return {Qt::Key_F2};
-#endif
   }
 
   [[nodiscard]] bool shouldDisplayForItemCount(size_t count) const override { return count == 1; }

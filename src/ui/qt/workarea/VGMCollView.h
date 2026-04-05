@@ -27,6 +27,8 @@ public:
 
   int rowCount(const QModelIndex &parent = QModelIndex()) const override;
   QVariant data(const QModelIndex &index, int role = Qt::DisplayRole) const override;
+  bool setData(const QModelIndex &index, const QVariant &value, int role) override;
+  Qt::ItemFlags flags(const QModelIndex &index) const override;
 
   [[nodiscard]] VGMColl *coll() const { return m_coll; }
   [[nodiscard]] VGMFile *fileFromIndex(const QModelIndex& index) const;
@@ -50,6 +52,9 @@ public:
 
 private:
   void keyPressEvent(QKeyEvent *e) override;
+  void handleActivationRequest() const;
+  void handlePlaybackRequest() const;
+  void requestRenameCurrentSelection();
   void itemMenu(const QPoint &pos);
   void onSelectionChanged(const QItemSelection &selected, const QItemSelection &deselected);
   void updateContextualMenus() const;
