@@ -80,6 +80,7 @@ public:
                     SuzukiSnesVersion ver,
                     uint32_t programNum,
                     uint32_t spcDirAddr,
+                    uint16_t addrSRCNTable,
                     uint16_t addrTuningTable,
                     uint16_t addrADSRTable,
                     uint16_t addrDrumKitTable,
@@ -92,6 +93,7 @@ public:
 
 protected:
   uint32_t spcDirAddr;
+  uint16_t addrSRCNTable;
   uint16_t addrTuningTable;
   uint16_t addrADSRTable;
   uint16_t addrDrumKitTable;
@@ -140,6 +142,7 @@ public:
 
   bool initializePercussionRegion(uint16_t noteOffset,
                                   uint32_t spcDirAddr,
+                                  uint16_t addrSRCNTable,
                                   uint16_t addrADSRTable,
                                   uint16_t addrTuningTable);
 };

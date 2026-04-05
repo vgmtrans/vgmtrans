@@ -93,7 +93,8 @@ bool SuzukiSnesInstrSet::parseInstrPointers() {
   }
 
   if (addrDrumKitTable && readShort(addrDrumKitTable) >= 0x80) {
-    SuzukiSnesDrumKit *newDrumKitInstr = new SuzukiSnesDrumKit(this, version, DRUMKIT_PROGRAM, spcDirAddr, addrTuningTable, addrADSRTable, addrDrumKitTable, "Drum Kit");
+    SuzukiSnesDrumKit *newDrumKitInstr = new SuzukiSnesDrumKit(this, version, DRUMKIT_PROGRAM,
+      spcDirAddr, addrSRCNTable, addrTuningTable, addrADSRTable, addrDrumKitTable, "Drum Kit");
     aInstrs.push_back(newDrumKitInstr);
   }
 
@@ -164,12 +165,14 @@ SuzukiSnesDrumKit::SuzukiSnesDrumKit(VGMInstrSet *instrSet,
                                      SuzukiSnesVersion ver,
                                      uint32_t programNum,
                                      uint32_t spcDirAddr,
+                                     uint16_t addrSRCNTable,
                                      uint16_t addrTuningTable,
                                      uint16_t addrADSRTable,
                                      uint16_t addrDrumKitTable,
                                      const std::string &name) :
   VGMInstr(instrSet, addrDrumKitTable, 0, programNum >> 7, programNum & 0x7F, name), version(ver),
   spcDirAddr(spcDirAddr),
+  addrSRCNTable(addrSRCNTable),
   addrTuningTable(addrTuningTable),
   addrADSRTable(addrADSRTable),
   addrDrumKitTable(addrDrumKitTable) {
@@ -184,7 +187,7 @@ bool SuzukiSnesDrumKit::loadInstr() {
   for (uint16_t i = addr; readByte(i) < 0x80; i += 5) {
     SuzukiSnesDrumKitRgn *rgn = new SuzukiSnesDrumKitRgn(this, version, addrDrumKitTable);
 
-    if (!rgn->initializePercussionRegion(i, spcDirAddr, addrADSRTable, addrTuningTable)) {
+    if (!rgn->initializePercussionRegion(i, spcDirAddr, addrSRCNTable, addrADSRTable, addrTuningTable)) {
       delete rgn;
       continue;
     }
@@ -269,20 +272,20 @@ SuzukiSnesDrumKitRgn::SuzukiSnesDrumKitRgn(SuzukiSnesDrumKit *instr,
 
 bool SuzukiSnesDrumKitRgn::initializePercussionRegion(uint16_t noteOffset,
                                                       uint32_t spcDirAddr,
+                                                      uint16_t addrSRCNTable,
                                                       uint16_t addrADSRTable,
                                                       uint16_t addrTuningTable)
 {
-  uint16_t srcnOffset = noteOffset + 1;
+  uint16_t instrOffset = noteOffset + 1;
   uint16_t keyOffset = noteOffset + 2;
   uint16_t volumeOffset = noteOffset + 3;
   uint16_t panOffset = noteOffset + 4;
 
-  uint8_t instrumentIndex = readByte(srcnOffset);
+  uint8_t instrNum = readByte(instrOffset);
+  addChild(instrOffset, 1, "Instrument");
 
-  if (instrumentIndex == 0 || instrumentIndex == 0xFF) {
-    return false;
-  }
-  initializeCommonRegion(instrumentIndex, spcDirAddr, addrADSRTable, addrTuningTable);
+  uint8_t srcn = readByte(addrSRCNTable + instrNum);
+  initializeCommonRegion(srcn, spcDirAddr, addrADSRTable, addrTuningTable);
 
   uint8_t percussionIndex = readByte(noteOffset);
   setName(fmt::format("Drum {}", percussionIndex));
@@ -291,7 +294,7 @@ bool SuzukiSnesDrumKitRgn::initializePercussionRegion(uint16_t noteOffset,
   // sampNum is absolute key to play
   unityKey = (unityKey + KEY_BIAS) - readByte(keyOffset) + percussionIndex;
 
-  addSampNum(instrumentIndex, srcnOffset);
+  addSampNum(srcn, addrSRCNTable + instrNum, 1);
   addChild(keyOffset, 1, "Key");
 
   addVolume(readByte(volumeOffset) / 256.0, volumeOffset, 1);
