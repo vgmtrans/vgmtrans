@@ -49,6 +49,7 @@ signals:
 public slots:
   void handlePlaybackRequest();
   static void handleStopRequest();
+  void requestRename(VGMColl* coll);
 
 private:
   void collectionMenu(const QPoint &pos) const;

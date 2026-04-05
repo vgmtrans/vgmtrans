@@ -134,6 +134,14 @@ public:
   [[nodiscard]] virtual QList<QKeySequence> shortcutKeySequences() const { return {}; };
 
   /**
+   * Controls whether the command should be surfaced for the current selection size.
+   */
+  [[nodiscard]] virtual bool shouldDisplayForItemCount(size_t count) const {
+    Q_UNUSED(count);
+    return true;
+  }
+
+  /**
    * Specifies the menu path where this command should be surfaced in the main menu bar.
    * Returning std::nullopt means the command is contextual only.
    * The first element of the path represents the top-level menu name.

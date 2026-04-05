@@ -106,6 +106,10 @@ public:
 
     // Iterate over each command in the reference list
     for (const auto& refCmd : referenceCommands) {
+      if (!refCmd->shouldDisplayForItemCount(items.size())) {
+        continue;
+      }
+
       std::string refCmdName = refCmd->name();
       bool isCommon = true;
 

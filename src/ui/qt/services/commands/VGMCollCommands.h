@@ -8,6 +8,7 @@
 
 #include "GeneralCommands.h"
 #include "SequencePlayer.h"
+#include "services/NotificationCenter.h"
 #include "services/commands/Command.h"
 #include "VGMColl.h"
 
@@ -23,4 +24,22 @@ public:
   }
   [[nodiscard]] QList<QKeySequence> shortcutKeySequences() const override { return {Qt::Key_Return}; };
   [[nodiscard]] std::string name() const override { return "Play / Pause"; }
+};
+
+class RenameCommand : public SingleItemCommand<VGMColl> {
+public:
+  void executeItem(VGMColl* coll) const override {
+    NotificationCenter::the()->requestVGMCollRename(coll);
+  }
+
+  [[nodiscard]] QList<QKeySequence> shortcutKeySequences() const override {
+#if defined(Q_OS_MACOS) || defined(Q_OS_MAC)
+    return {};
+#else
+    return {Qt::Key_F2};
+#endif
+  }
+
+  [[nodiscard]] bool shouldDisplayForItemCount(size_t count) const override { return count == 1; }
+  [[nodiscard]] std::string name() const override { return "Rename"; }
 };

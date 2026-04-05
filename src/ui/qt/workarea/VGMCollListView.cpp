@@ -88,7 +88,7 @@ Qt::ItemFlags VGMCollListViewModel::flags(const QModelIndex &index) const {
     return Qt::ItemIsEnabled;
   }
 
-  return QAbstractListModel::flags(index);
+  return QAbstractListModel::flags(index) | Qt::ItemIsEditable;
 }
 
 /*
@@ -121,6 +121,7 @@ VGMCollListView::VGMCollListView(QWidget *parent) : QListView(parent) {
   setSelectionMode(QAbstractItemView::ExtendedSelection);
   setResizeMode(QListView::Adjust);
   setIconSize(QSize(16, 16));
+  setEditTriggers(QAbstractItemView::NoEditTriggers);
   setItemDelegate(new VGMCollNameEditor(ItemViewDensity::listItemHeight(this), this));
   ItemViewDensity::apply(this);
   setWrapping(true);
@@ -151,6 +152,8 @@ VGMCollListView::VGMCollListView(QWidget *parent) : QListView(parent) {
           [this](const QModelIndex&, const QModelIndex&) { updateSelectedCollection(); });
   connect(NotificationCenter::the(), &NotificationCenter::vgmFileSelected, this,
           &VGMCollListView::onVGMFileSelected);
+  connect(NotificationCenter::the(), &NotificationCenter::vgmCollRenameRequested, this,
+          &VGMCollListView::requestRename);
 }
 
 void VGMCollListView::collectionMenu(const QPoint &pos) const {
@@ -207,6 +210,28 @@ void VGMCollListView::handlePlaybackRequest() {
 
 void VGMCollListView::handleStopRequest() {
   SequencePlayer::the().stop();
+}
+
+void VGMCollListView::requestRename(VGMColl* coll) {
+  if (!coll) {
+    return;
+  }
+
+  const auto& colls = qtVGMRoot.vgmColls();
+  auto it = std::find(colls.begin(), colls.end(), coll);
+  if (it == colls.end()) {
+    return;
+  }
+
+  const auto index = model()->index(static_cast<int>(std::distance(colls.begin(), it)), 0);
+  if (!index.isValid()) {
+    return;
+  }
+
+  setFocus(Qt::OtherFocusReason);
+  selectionModel()->setCurrentIndex(index, QItemSelectionModel::ClearAndSelect);
+  scrollTo(index, QAbstractItemView::EnsureVisible);
+  edit(index, QAbstractItemView::AllEditTriggers, nullptr);
 }
 
 void VGMCollListView::onSelectionChanged(const QItemSelection&, const QItemSelection&) {

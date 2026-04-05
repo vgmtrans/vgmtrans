@@ -38,6 +38,10 @@ void NotificationCenter::selectVGMColl(VGMColl* coll, QWidget* caller) {
   emit vgmCollSelected(coll, caller);
 }
 
+void NotificationCenter::requestVGMCollRename(VGMColl* coll) {
+  emit vgmCollRenameRequested(coll);
+}
+
 void NotificationCenter::setSeekModifierActive(bool active) {
   emit seekModifierChanged(active);
 }
