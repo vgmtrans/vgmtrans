@@ -29,7 +29,6 @@ SPCFile::SPCFile(const RawFile& file) {
   }
 
   m_hasID666Tag = file.readByte(0x23) == 0x1a;
-  L_DEBUG("SPC file has ID666 tag? {}", m_hasID666Tag);
   m_versionMinor = file.readByte(0x24);
   file.readBytes(0x100, m_ram.size(), m_ram.data());
   file.readBytes(0x10100, m_dspRegisters.size(), m_dspRegisters.data());
