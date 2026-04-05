@@ -1,5 +1,4 @@
 #include "SuzukiSnesSeq.h"
-
 #include "SuzukiSnesInstr.h"
 #include "spdlog/fmt/fmt.h"
 
