@@ -52,6 +52,7 @@
 #include "TitleBar.h"
 #include "StatusBarContent.h"
 #include "LogManager.h"
+#include "util/DockSeparatorHitTest.h"
 #include "widgets/WindowBar.h"
 #include "widgets/ToastHost.h"
 
@@ -334,7 +335,176 @@ void MainWindow::routeSignals() {
   connect(playShortcut, &QShortcut::activated, m_coll_listview, &VGMCollListView::handlePlaybackRequest);
 }
 
+bool MainWindow::redirectDockSeparatorEvent(QObject* obj, QEvent* event) {
+  if (!event) {
+    return false;
+  }
+
+  auto* widget = qobject_cast<QWidget*>(obj);
+  const bool belongsToWindow = widget && (widget == this || isAncestorOf(widget));
+
+  if ((event->type() == QEvent::Leave || event->type() == QEvent::HoverLeave) &&
+      widget && widget == m_dockSeparatorCursorWidget && !m_forwardedDockSeparatorDragActive) {
+    clearDockSeparatorProxyCursor();
+    return false;
+  }
+
+  const auto forwardMouseEvent = [this](QEvent::Type type, const QMouseEvent* sourceEvent,
+                                        const QPoint& windowPos) {
+    const QPointF localPos(windowPos);
+    const QPointF globalPos(mapToGlobal(windowPos));
+    QMouseEvent forwardedEvent(type, localPos, globalPos, sourceEvent->button(),
+                               sourceEvent->buttons(), sourceEvent->modifiers(),
+                               sourceEvent->pointingDevice());
+    m_replayingDockSeparatorEvent = true;
+    QApplication::sendEvent(this, &forwardedEvent);
+    m_replayingDockSeparatorEvent = false;
+  };
+
+  switch (event->type()) {
+  case QEvent::MouseButtonPress: {
+    auto* mouseEvent = static_cast<QMouseEvent*>(event);
+    if (!widget || widget == this || !belongsToWindow || mouseEvent->button() != Qt::LeftButton) {
+      return false;
+    }
+
+    DockSeparatorHit hit;
+    if (!findDockSeparatorHit(this, mapFromGlobal(mouseEvent->globalPosition().toPoint()), hit)) {
+      return false;
+    }
+
+    setDockSeparatorProxyCursor(widget, hit.cursorShape);
+    m_forwardedDockSeparatorDragActive = true;
+    m_forwardedDockSeparatorCursorShape = hit.cursorShape;
+    m_forwardedDockSeparatorAnchorPos = hit.snappedPos;
+    m_dockLayout->beginSeparatorDrag();
+    forwardMouseEvent(QEvent::MouseButtonPress, mouseEvent, hit.snappedPos);
+    return true;
+  }
+
+  case QEvent::MouseMove: {
+    auto* mouseEvent = static_cast<QMouseEvent*>(event);
+    if (m_forwardedDockSeparatorDragActive) {
+      if (widget == this) {
+        return false;
+      }
+
+      forwardMouseEvent(QEvent::MouseMove, mouseEvent,
+                        dockSeparatorProxyDragPos(mapFromGlobal(mouseEvent->globalPosition().toPoint())));
+      return true;
+    }
+
+    if (!widget || widget == this || !belongsToWindow) {
+      return false;
+    }
+
+    DockSeparatorHit hit;
+    if (findDockSeparatorHit(this, mapFromGlobal(mouseEvent->globalPosition().toPoint()), hit)) {
+      setDockSeparatorProxyCursor(widget, hit.cursorShape);
+    } else if (widget == m_dockSeparatorCursorWidget) {
+      clearDockSeparatorProxyCursor();
+    }
+    return false;
+  }
+
+  case QEvent::HoverMove: {
+    if (m_forwardedDockSeparatorDragActive || !widget || widget == this || !belongsToWindow) {
+      return false;
+    }
+
+    auto* hoverEvent = static_cast<QHoverEvent*>(event);
+    DockSeparatorHit hit;
+    if (findDockSeparatorHit(this, widget->mapTo(this, hoverEvent->position().toPoint()), hit)) {
+      setDockSeparatorProxyCursor(widget, hit.cursorShape);
+    } else if (widget == m_dockSeparatorCursorWidget) {
+      clearDockSeparatorProxyCursor();
+    }
+    return false;
+  }
+
+  case QEvent::MouseButtonRelease: {
+    if (!m_forwardedDockSeparatorDragActive) {
+      return false;
+    }
+
+    auto* mouseEvent = static_cast<QMouseEvent*>(event);
+    if (widget == this) {
+      m_forwardedDockSeparatorDragActive = false;
+      clearDockSeparatorProxyCursor();
+      return false;
+    }
+
+    forwardMouseEvent(QEvent::MouseButtonRelease, mouseEvent,
+                      dockSeparatorProxyDragPos(mapFromGlobal(mouseEvent->globalPosition().toPoint())));
+    m_forwardedDockSeparatorDragActive = false;
+
+    if (!widget || !belongsToWindow) {
+      clearDockSeparatorProxyCursor();
+      return true;
+    }
+
+    DockSeparatorHit hit;
+    if (findDockSeparatorHit(this, mapFromGlobal(mouseEvent->globalPosition().toPoint()), hit)) {
+      setDockSeparatorProxyCursor(widget, hit.cursorShape);
+    } else {
+      clearDockSeparatorProxyCursor();
+    }
+    return true;
+  }
+
+  default:
+    return false;
+  }
+}
+
+QPoint MainWindow::dockSeparatorProxyDragPos(const QPoint& windowPos) const {
+  QPoint dragPos = windowPos;
+  if (m_forwardedDockSeparatorCursorShape == Qt::SplitHCursor) {
+    dragPos.setY(m_forwardedDockSeparatorAnchorPos.y());
+  } else if (m_forwardedDockSeparatorCursorShape == Qt::SplitVCursor) {
+    dragPos.setX(m_forwardedDockSeparatorAnchorPos.x());
+  }
+  return dragPos;
+}
+
+void MainWindow::setDockSeparatorProxyCursor(QWidget* widget, Qt::CursorShape cursorShape) {
+  if (!widget) {
+    clearDockSeparatorProxyCursor();
+    return;
+  }
+
+  if (m_dockSeparatorCursorWidget == widget && widget->cursor().shape() == cursorShape) {
+    return;
+  }
+
+  clearDockSeparatorProxyCursor();
+  m_dockSeparatorCursorWidget = widget;
+  m_dockSeparatorCursorBackup = widget->cursor();
+  m_dockSeparatorCursorWidgetHadCursor = widget->testAttribute(Qt::WA_SetCursor);
+  widget->setCursor(cursorShape);
+}
+
+void MainWindow::clearDockSeparatorProxyCursor() {
+  if (!m_dockSeparatorCursorWidget) {
+    return;
+  }
+
+  if (m_dockSeparatorCursorWidgetHadCursor) {
+    m_dockSeparatorCursorWidget->setCursor(m_dockSeparatorCursorBackup);
+  } else {
+    m_dockSeparatorCursorWidget->unsetCursor();
+  }
+
+  m_dockSeparatorCursorWidget = nullptr;
+  m_dockSeparatorCursorWidgetHadCursor = false;
+  m_dockSeparatorCursorBackup = QCursor();
+}
+
 bool MainWindow::eventFilter(QObject* obj, QEvent* event) {
+  if (!m_replayingDockSeparatorEvent && redirectDockSeparatorEvent(obj, event)) {
+    return true;
+  }
+
   if (event->type() == QEvent::MouseButtonPress) {
     auto *mouseEvent = static_cast<QMouseEvent *>(event);
     auto *widget = qobject_cast<QWidget *>(obj);
@@ -358,6 +528,8 @@ bool MainWindow::eventFilter(QObject* obj, QEvent* event) {
       NotificationCenter::the()->setSeekModifierActive(active);
     }
   } else if (event->type() == QEvent::ApplicationDeactivate) {
+    m_forwardedDockSeparatorDragActive = false;
+    clearDockSeparatorProxyCursor();
     m_dockLayout->cancelInteraction();
     NotificationCenter::the()->setSeekModifierActive(false);
   }

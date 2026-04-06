@@ -50,6 +50,7 @@ target_sources(vgmtrans
     services/Settings.cpp
     services/NotificationCenter.cpp
     util/ColorHelpers.cpp
+    util/DockSeparatorHitTest.cpp
     util/Helpers.cpp
     util/UIHelpers.cpp
     widgets/ItemViewDensity.cpp
@@ -101,6 +102,7 @@ target_sources(vgmtrans
     FILES
       util/ColorHelpers.h
       util/Colors.h
+      util/DockSeparatorHitTest.h
       util/Helpers.h
       util/LambdaEventFilter.h
       util/Metrics.h

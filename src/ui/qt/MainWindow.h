@@ -7,7 +7,9 @@
 #pragma once
 
 #include <QList>
+#include <QCursor>
 #include <QMainWindow>
+#include <QPointer>
 #include <QUrl>
 #include "Root.h"
 
@@ -56,6 +58,10 @@ private:
   void configureWindowAgent();
   void createStatusBar();
   void routeSignals();
+  bool redirectDockSeparatorEvent(QObject* obj, QEvent* event);
+  QPoint dockSeparatorProxyDragPos(const QPoint& windowPos) const;
+  void setDockSeparatorProxyCursor(QWidget* widget, Qt::CursorShape cursorShape);
+  void clearDockSeparatorProxyCursor();
   void updateDragOverlayAppearance();
   void updateDragOverlayGeometry();
 
@@ -78,4 +84,11 @@ private:
   QWidget *m_dragOverlay{};
   QWK::WidgetWindowAgent *m_windowAgent{};
   MainWindowDockLayout *m_dockLayout{};
+  bool m_replayingDockSeparatorEvent{};
+  bool m_forwardedDockSeparatorDragActive{};
+  Qt::CursorShape m_forwardedDockSeparatorCursorShape{Qt::ArrowCursor};
+  QPoint m_forwardedDockSeparatorAnchorPos{};
+  QPointer<QWidget> m_dockSeparatorCursorWidget{};
+  QCursor m_dockSeparatorCursorBackup{};
+  bool m_dockSeparatorCursorWidgetHadCursor{};
 };
