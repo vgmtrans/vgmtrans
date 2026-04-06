@@ -4,6 +4,8 @@
  * See the included LICENSE for more information
 */
 #include <cassert>
+#include <algorithm>
+
 #include "DLSConversion.h"
 #include "VGMInstrSet.h"
 #include "VGMRgn.h"
@@ -41,11 +43,7 @@ void unpackSampColl(DLSFile &dls, const VGMSampColl *sampColl, std::vector<VGMSa
 }
 
 bool createDLSFile(DLSFile& dls, const VGMColl& coll) {
-  bool result = true;
-  coll.preSynthFileCreation();
-  result &= mainDLSCreation(dls, coll.instrSets(), coll.sampColls());
-  coll.postSynthFileCreation();
-  return result;
+  return createDLSFile(dls, coll.instrSets(), coll.sampColls(), &coll);
 }
 bool createDLSFile(
   DLSFile& dls,
@@ -56,7 +54,17 @@ bool createDLSFile(
   bool result = true;
   if (coll)
     coll->preSynthFileCreation();
+
+  for (auto* instrset : instrsets) {
+    instrset->prepareForExport(coll);
+  }
+
   result &= mainDLSCreation(dls, instrsets, sampcolls);
+
+  for (auto* instrset : instrsets) {
+    instrset->cleanupAfterExport();
+  }
+
   if (coll)
     coll->postSynthFileCreation();
   return result;
@@ -67,6 +75,12 @@ bool mainDLSCreation(
   const std::vector<VGMInstrSet*>& m_instrsets,
   const std::vector<VGMSampColl*>& m_sampcolls
 ) {
+  auto appendSampColl = [](std::vector<VGMSampColl*>& finalSampColls, VGMSampColl* sampColl) {
+    if (sampColl != nullptr && std::ranges::find(finalSampColls, sampColl) == finalSampColls.end()) {
+      finalSampColls.push_back(sampColl);
+    }
+  };
+
   if (m_instrsets.empty()) {
     L_ERROR("No instrument sets available to create DLS");
     return false;
@@ -77,29 +91,36 @@ bool mainDLSCreation(
 
   /* Grab samples either from the local sampcolls or from the instrument sets */
   if (!m_sampcolls.empty()) {
-    for (auto & sampcoll : m_sampcolls) {
-      finalSampColls.push_back(sampcoll);
-      unpackSampColl(dls, sampcoll, finalSamps);
+    for (auto* sampcoll : m_sampcolls) {
+      appendSampColl(finalSampColls, sampcoll);
     }
   } else {
-    for (auto & instrset : m_instrsets) {
-      if (auto instrset_sampcoll = instrset->sampColl) {
-        finalSampColls.push_back(instrset_sampcoll);
-        unpackSampColl(dls, instrset_sampcoll, finalSamps);
-      }
+    for (auto* instrset : m_instrsets) {
+      appendSampColl(finalSampColls, instrset->sampColl);
     }
   }
 
-    if (finalSamps.empty()) {
-      L_ERROR("No sample collection available to create DLS");
-      return false;
+  for (auto* instrset : m_instrsets) {
+    for (auto* sampcoll : instrset->exportExtraSampColls()) {
+      appendSampColl(finalSampColls, sampcoll);
     }
+  }
+
+  for (auto* sampcoll : finalSampColls) {
+    unpackSampColl(dls, sampcoll, finalSamps);
+  }
+
+  if (finalSamps.empty()) {
+    L_ERROR("No sample collection available to create DLS");
+    return false;
+  }
 
   for (size_t inst = 0; inst < m_instrsets.size(); inst++) {
     VGMInstrSet *set = m_instrsets[inst];
-    size_t nInstrs = set->aInstrs.size();
+    const auto& instrs = set->exportInstrs();
+    size_t nInstrs = instrs.size();
     for (size_t i = 0; i < nInstrs; i++) {
-      VGMInstr* vgminstr = set->aInstrs[i];
+      VGMInstr* vgminstr = instrs[i];
       size_t nRgns = vgminstr->regions().size();
       std::string name = vgminstr->name();
       auto bank_no = vgminstr->bank;

@@ -3,6 +3,8 @@
  * Licensed under the zlib license,
  * refer to the included LICENSE.txt file
 */
+#include <algorithm>
+
 #include "SF2Conversion.h"
 #include "SF2File.h"
 #include "SynthFile.h"
@@ -17,16 +19,7 @@
 namespace conversion {
 
 SF2File* createSF2File(const VGMColl& coll) {
-  coll.preSynthFileCreation();
-  SynthFile *synthfile = createSynthFile(coll.instrSets(), coll.sampColls());
-  coll.postSynthFileCreation();
-  if (!synthfile) {
-    L_ERROR("SF2 conversion for aborted");
-    return nullptr;
-  }
-  SF2File *sf2file = new SF2File(synthfile);
-  delete synthfile;
-  return sf2file;
+  return createSF2File(coll.instrSets(), coll.sampColls(), &coll);
 }
 
 SF2File* createSF2File(
@@ -36,7 +29,17 @@ SF2File* createSF2File(
 ) {
   if (coll)
     coll->preSynthFileCreation();
+
+  for (auto* instrset : instrsets) {
+    instrset->prepareForExport(coll);
+  }
+
   SynthFile *synthfile = createSynthFile(instrsets, sampcolls);
+
+  for (auto* instrset : instrsets) {
+    instrset->cleanupAfterExport();
+  }
+
   if (coll)
     coll->postSynthFileCreation();
   if (!synthfile) {
@@ -52,6 +55,12 @@ SynthFile* createSynthFile(
   const std::vector<VGMInstrSet*>& m_instrsets,
   const std::vector<VGMSampColl*>& m_sampcolls
 ) {
+  auto appendSampColl = [](std::vector<const VGMSampColl*>& finalSampColls, const VGMSampColl* sampColl) {
+    if (sampColl != nullptr && std::ranges::find(finalSampColls, sampColl) == finalSampColls.end()) {
+      finalSampColls.push_back(sampColl);
+    }
+  };
+
   if (m_instrsets.empty()) {
     L_ERROR("No instrument sets available to create a SynthFile.");
     return nullptr;
@@ -65,17 +74,23 @@ SynthFile* createSynthFile(
 
   /* Grab samples either from the local sampcolls or from the instrument sets */
   if (!m_sampcolls.empty()) {
-    for (auto & sampcoll : m_sampcolls) {
-      finalSampColls.push_back(sampcoll);
-      unpackSampColl(*synthfile, sampcoll, finalSamps);
+    for (auto* sampcoll : m_sampcolls) {
+      appendSampColl(finalSampColls, sampcoll);
     }
   } else {
-    for (auto & instrset : m_instrsets) {
-      if (auto instrset_sampcoll = instrset->sampColl) {
-        finalSampColls.push_back(instrset_sampcoll);
-        unpackSampColl(*synthfile, instrset_sampcoll, finalSamps);
-      }
+    for (auto* instrset : m_instrsets) {
+      appendSampColl(finalSampColls, instrset->sampColl);
     }
+  }
+
+  for (auto* instrset : m_instrsets) {
+    for (auto* sampcoll : instrset->exportExtraSampColls()) {
+      appendSampColl(finalSampColls, sampcoll);
+    }
+  }
+
+  for (const auto* sampcoll : finalSampColls) {
+    unpackSampColl(*synthfile, sampcoll, finalSamps);
   }
 
   if (finalSamps.empty()) {
@@ -86,9 +101,10 @@ SynthFile* createSynthFile(
 
   for (size_t inst = 0; inst < m_instrsets.size(); inst++) {
     const VGMInstrSet* set = m_instrsets[inst];
-    size_t nInstrs = set->aInstrs.size();
+    const auto& instrs = set->exportInstrs();
+    size_t nInstrs = instrs.size();
     for (size_t i = 0; i < nInstrs; i++) {
-      VGMInstr* vgminstr = set->aInstrs[i];
+      VGMInstr* vgminstr = instrs[i];
       size_t nRgns = vgminstr->regions().size();
       if (nRgns == 0)  // do not write an instrument if it has no regions
         continue;
