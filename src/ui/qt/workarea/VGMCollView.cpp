@@ -304,7 +304,20 @@ void VGMCollView::itemMenu(const QPoint &pos) {
   if (!menu) {
     return;
   }
-
+  if (selectedFiles->empty() && selectedColls->size() == 1) {
+    QAction *beforeAction = nullptr;
+    for (QAction *action : menu->actions()) {
+      if (action && action->isSeparator()) {
+        beforeAction = action;
+        break;
+      }
+    }
+    auto *renameAction = new QAction(QStringLiteral("Rename"), menu);
+    renameAction->setShortcut(QKeySequence(Qt::Key_F2));
+    renameAction->setShortcutVisibleInContextMenu(true);
+    connect(renameAction, &QAction::triggered, this, &VGMCollView::requestRenameCurrentSelection);
+    menu->insertAction(beforeAction, renameAction);
+  }
   menu->exec(m_listview->viewport()->mapToGlobal(pos));
   menu->deleteLater();
 }
@@ -356,8 +369,23 @@ void VGMCollView::requestRenameCurrentSelection() {
     return;
   }
 
-  m_listview->scrollTo(currentIndex, QAbstractItemView::EnsureVisible);
-  m_listview->edit(currentIndex);
+  requestRename(vgmCollViewModel->coll());
+}
+
+void VGMCollView::requestRename(VGMColl* coll) {
+  if (!coll || vgmCollViewModel->coll() != coll) {
+    return;
+  }
+
+  const QModelIndex index = vgmCollViewModel->index(0, 0);
+  if (!index.isValid()) {
+    return;
+  }
+
+  m_listview->setFocus(Qt::OtherFocusReason);
+  m_listview->selectionModel()->setCurrentIndex(index, QItemSelectionModel::ClearAndSelect);
+  m_listview->scrollTo(index, QAbstractItemView::EnsureVisible);
+  m_listview->edit(index);
 }
 
 void VGMCollView::onSelectionChanged(const QItemSelection&, const QItemSelection&) {

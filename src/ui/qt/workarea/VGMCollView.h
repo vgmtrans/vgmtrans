@@ -66,6 +66,7 @@ private slots:
   void onVGMFileSelected(const VGMFile *file, const QWidget* caller) const;
 
 private:
+  void requestRename(VGMColl* coll);
   VGMCollViewModel *vgmCollViewModel;
   QListView *m_listview;
 };

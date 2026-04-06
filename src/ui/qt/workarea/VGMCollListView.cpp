@@ -152,8 +152,6 @@ VGMCollListView::VGMCollListView(QWidget *parent) : QListView(parent) {
           [this](const QModelIndex&, const QModelIndex&) { updateSelectedCollection(); });
   connect(NotificationCenter::the(), &NotificationCenter::vgmFileSelected, this,
           &VGMCollListView::onVGMFileSelected);
-  connect(NotificationCenter::the(), &NotificationCenter::vgmCollRenameRequested, this,
-          &VGMCollListView::requestRename);
 }
 
 void VGMCollListView::collectionMenu(const QPoint &pos) const {
@@ -175,6 +173,20 @@ void VGMCollListView::collectionMenu(const QPoint &pos) const {
     }
   }
   auto menu = MenuManager::the()->createMenuForItems<VGMColl>(selectedColls);
+  if (selectedColls->size() == 1) {
+    QAction *beforeAction = nullptr;
+    for (QAction *action : menu->actions()) {
+      if (action && action->isSeparator()) {
+        beforeAction = action;
+        break;
+      }
+    }
+    auto *renameAction = new QAction(QStringLiteral("Rename"), menu);
+    renameAction->setShortcut(QKeySequence(Qt::Key_F2));
+    renameAction->setShortcutVisibleInContextMenu(true);
+    connect(renameAction, &QAction::triggered, this, &VGMCollListView::requestRenameCurrentSelection);
+    menu->insertAction(beforeAction, renameAction);
+  }
   menu->exec(mapToGlobal(pos));
   menu->deleteLater();
 }

@@ -49,10 +49,10 @@ signals:
 public slots:
   void handlePlaybackRequest();
   static void handleStopRequest();
-  void requestRename(VGMColl* coll);
 
 private:
   void requestRenameCurrentSelection();
+  void requestRename(VGMColl* coll);
   void collectionMenu(const QPoint &pos) const;
   void keyPressEvent(QKeyEvent *e) override;
   void onSelectionChanged(const QItemSelection &selected, const QItemSelection &deselected);
