@@ -178,14 +178,6 @@ QPixmap tintedPixmap(const QString &iconPath, const QSize &size, const QColor &a
   return tinted;
 }
 
-QString cssColor(const QColor &color) {
-  return QStringLiteral("rgba(%1,%2,%3,%4)")
-      .arg(color.red())
-      .arg(color.green())
-      .arg(color.blue())
-      .arg(color.alpha());
-}
-
 FlatTabBarColors flatTabBarColors(const QWidget *context) {
   const QWidget *paletteSource = context && context->window() ? context->window() : context;
   const QPalette palette = paletteSource ? paletteSource->palette() : qApp->palette();
