@@ -41,6 +41,7 @@ class AkaoInstrSet final : public VGMInstrSet {
   AkaoInstrSet(RawFile *file, uint32_t offset, uint32_t end_boundary_offset, AkaoPs1Version version,
     uint32_t id, std::string name = "Akao Instrument Bank (Dummy)");
   bool parseInstrPointers() override;
+  void useColl(const VGMColl* coll) override;
 
   [[nodiscard]] AkaoPs1Version version() const noexcept { return version_; }
 

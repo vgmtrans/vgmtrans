@@ -6,6 +6,7 @@
 
 class AkaoInstrSet;
 class AkaoArt;
+class AkaoSampColl;
 
 // ********
 // AkaoColl
@@ -17,10 +18,6 @@ public:
       : VGMColl(std::move(name)) {}
 
   bool loadMain() override;
-  void preSynthFileCreation() const override;
-  void postSynthFileCreation() const override;
-
-private:
   std::tuple<std::unordered_map<int, AkaoArt *>, std::unordered_map<int, int>,
              std::unordered_map<int, AkaoSampColl *>>
   mapSampleCollections() const;

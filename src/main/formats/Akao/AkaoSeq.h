@@ -153,6 +153,7 @@ class AkaoSeq final :
 
   [[nodiscard]] std::string readTimestampAsText() const;
   [[nodiscard]] double getTempoInBPM(uint16_t tempo) const;
+  [[nodiscard]] bool usesIndividualArts() const noexcept { return bUsesIndividualArts; }
 
   [[nodiscard]] AkaoInstrSet* newInstrSet() const;
 

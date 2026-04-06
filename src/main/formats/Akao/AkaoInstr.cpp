@@ -5,7 +5,9 @@
  */
 
 #include "AkaoInstr.h"
+#include "AkaoSeq.h"
 #include "VGMSamp.h"
+#include "VGMColl.h"
 #include "PSXSPU.h"
 
 // ************
@@ -97,6 +99,54 @@ bool AkaoInstrSet::parseInstrPointers() {
   }
 
   return true;
+}
+
+void AkaoInstrSet::useColl(const VGMColl* coll) {
+  if (coll == nullptr) {
+    return;
+  }
+
+  const auto* seq = dynamic_cast<const AkaoSeq*>(coll->seq());
+  if (seq == nullptr || !seq->usesIndividualArts()) {
+    return;
+  }
+
+  const auto* akaoColl = dynamic_cast<const AkaoColl*>(coll);
+  if (akaoColl == nullptr) {
+    return;
+  }
+
+  auto mappings = akaoColl->mapSampleCollections();
+  auto& artIdToSampleNumMap = std::get<1>(mappings);
+
+  for (auto* vgmsampcoll : coll->sampColls()) {
+    const auto* sampcoll = dynamic_cast<const AkaoSampColl*>(vgmsampcoll);
+    if (sampcoll == nullptr) {
+      continue;
+    }
+
+    for (size_t i = 0; i < sampcoll->akArts.size(); i++) {
+      const AkaoArt* art = &sampcoll->akArts[i];
+      auto* newInstr = new AkaoInstr(this, 0, 0, 0, sampcoll->starting_art_id + static_cast<uint32_t>(i));
+      auto* rgn = new AkaoRgn(newInstr, 0, 0);
+
+      if (art->loop_point != 0) {
+        rgn->setLoopInfo(1, art->loop_point,
+                         sampcoll->samples[art->sample_num]->dataLength - art->loop_point);
+      }
+
+      if (auto itSampleNum = artIdToSampleNumMap.find(art->artID); itSampleNum != artIdToSampleNumMap.end()) {
+        rgn->setSampNum(itSampleNum->second);
+      }
+
+      psxConvADSR<AkaoRgn>(rgn, art->ADSR1, art->ADSR2, false);
+      rgn->unityKey = art->unityKey;
+      rgn->fineTune = art->fineTune;
+
+      newInstr->addRgn(rgn);
+      addTempInstr(newInstr);
+    }
+  }
 }
 
 // *********
