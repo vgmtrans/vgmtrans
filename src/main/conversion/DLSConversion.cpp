@@ -52,9 +52,6 @@ bool createDLSFile(
   const VGMColl* coll
 ) {
   bool result = true;
-  if (coll)
-    coll->preSynthFileCreation();
-
   for (auto* instrset : instrsets) {
     instrset->prepareForExport(coll);
   }
@@ -64,9 +61,6 @@ bool createDLSFile(
   for (auto* instrset : instrsets) {
     instrset->cleanupAfterExport();
   }
-
-  if (coll)
-    coll->postSynthFileCreation();
   return result;
 }
 

@@ -33,8 +33,6 @@ class VGMColl {
   void addMiscFile(VGMMiscFile* theMiscFile);
   bool load();
   virtual bool loadMain() { return true; }
-  virtual void preSynthFileCreation() const {}
-  virtual void postSynthFileCreation() const {}
 
   bool containsVGMFile(const VGMFile*) const;
 

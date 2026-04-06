@@ -27,9 +27,6 @@ SF2File* createSF2File(
   const std::vector<VGMSampColl*>& sampcolls,
   const VGMColl* coll
 ) {
-  if (coll)
-    coll->preSynthFileCreation();
-
   for (auto* instrset : instrsets) {
     instrset->prepareForExport(coll);
   }
@@ -39,9 +36,6 @@ SF2File* createSF2File(
   for (auto* instrset : instrsets) {
     instrset->cleanupAfterExport();
   }
-
-  if (coll)
-    coll->postSynthFileCreation();
   if (!synthfile) {
     L_ERROR("SF2 conversion failed");
     return nullptr;
