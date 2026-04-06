@@ -25,6 +25,7 @@
 #include "Helpers.h"
 #include "MdiArea.h"
 #include "SequencePlayer.h"
+#include "workarea/InlineRenameHelpers.h"
 #include "services/NotificationCenter.h"
 #include "services/MenuManager.h"
 
@@ -77,6 +78,18 @@ VGMCollViewModel::VGMCollViewModel(QObject *parent)
     : QAbstractListModel(parent), m_coll(nullptr) {
   connect(NotificationCenter::the(), &NotificationCenter::vgmCollSelected,
           this, &VGMCollViewModel::handleSelectedCollChanged);
+  connect(NotificationCenter::the(), &NotificationCenter::vgmCollRenamed, this, [this](VGMColl* coll) {
+    if (m_coll != coll) {
+      return;
+    }
+
+    const auto index = this->index(0, 0);
+    if (!index.isValid()) {
+      return;
+    }
+
+    emit dataChanged(index, index, {Qt::DisplayRole, Qt::EditRole});
+  });
 }
 
 int VGMCollViewModel::rowCount(const QModelIndex &parent) const {
@@ -129,8 +142,7 @@ bool VGMCollViewModel::setData(const QModelIndex &index, const QVariant &value, 
     return false;
   }
 
-  m_coll->setName(value.toString().toStdString());
-  emit dataChanged(index, index, {Qt::DisplayRole, Qt::EditRole});
+  NotificationCenter::the()->renameVGMColl(m_coll, value.toString());
   return true;
 }
 
@@ -261,7 +273,7 @@ VGMCollView::VGMCollView(QWidget *parent) : QWidget(parent) {
   m_listview->setSelectionMode(QAbstractItemView::ExtendedSelection);
   m_listview->setSelectionRectVisible(true);
   m_listview->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
-  m_listview->setEditTriggers(QAbstractItemView::NoEditTriggers);
+  m_listview->setEditTriggers(QAbstractItemView::EditKeyPressed);
 
   connect(&qtVGMRoot, &QtVGMRoot::UI_removeVGMColl, this, &VGMCollView::removeVGMColl);
   connect(m_listview, &QWidget::customContextMenuRequested, this, &VGMCollView::itemMenu);
@@ -269,6 +281,18 @@ VGMCollView::VGMCollView(QWidget *parent) : QWidget(parent) {
   connect(m_listview->selectionModel(), &QItemSelectionModel::currentChanged, this, &VGMCollView::handleCurrentChanged);
   connect(m_listview->selectionModel(), &QItemSelectionModel::selectionChanged, this, &VGMCollView::onSelectionChanged);
   connect(NotificationCenter::the(), &NotificationCenter::vgmFileSelected, this, &VGMCollView::onVGMFileSelected);
+  connect(NotificationCenter::the(), &NotificationCenter::vgmCollRenamed, this, [this](VGMColl* coll) {
+    if (vgmCollViewModel->coll() != coll) {
+      return;
+    }
+
+    const QModelIndex currentIndex = m_listview->currentIndex();
+    if (!currentIndex.isValid() || !vgmCollViewModel->isCollectionIndex(currentIndex)) {
+      return;
+    }
+
+    handleCurrentChanged(currentIndex, {});
+  });
 
   setLayout(layout);
 }
@@ -305,18 +329,9 @@ void VGMCollView::itemMenu(const QPoint &pos) {
     return;
   }
   if (selectedFiles->empty() && selectedColls->size() == 1) {
-    QAction *beforeAction = nullptr;
-    for (QAction *action : menu->actions()) {
-      if (action && action->isSeparator()) {
-        beforeAction = action;
-        break;
-      }
-    }
-    auto *renameAction = new QAction(QStringLiteral("Rename"), menu);
-    renameAction->setShortcut(QKeySequence(Qt::Key_F2));
-    renameAction->setShortcutVisibleInContextMenu(true);
-    connect(renameAction, &QAction::triggered, this, &VGMCollView::requestRenameCurrentSelection);
-    menu->insertAction(beforeAction, renameAction);
+    InlineRenameHelpers::insertRenameAction(menu, this, [this] {
+      beginRenameCurrentSelection();
+    });
   }
   menu->exec(m_listview->viewport()->mapToGlobal(pos));
   menu->deleteLater();
@@ -327,9 +342,6 @@ void VGMCollView::keyPressEvent(QKeyEvent *e) {
     case Qt::Key_Enter:
     case Qt::Key_Return:
       handleActivationRequest();
-      break;
-    case Qt::Key_F2:
-      requestRenameCurrentSelection();
       break;
     default:
       QWidget::keyPressEvent(e);
@@ -359,33 +371,17 @@ void VGMCollView::handlePlaybackRequest() const {
   }
 }
 
-void VGMCollView::requestRenameCurrentSelection() {
-  if (!vgmCollViewModel->coll()) {
-    return;
-  }
-
-  const auto currentIndex = m_listview->currentIndex();
-  if (!currentIndex.isValid() || !vgmCollViewModel->isCollectionIndex(currentIndex)) {
-    return;
-  }
-
-  requestRename(vgmCollViewModel->coll());
-}
-
-void VGMCollView::requestRename(VGMColl* coll) {
-  if (!coll || vgmCollViewModel->coll() != coll) {
-    return;
-  }
-
-  const QModelIndex index = vgmCollViewModel->index(0, 0);
+void VGMCollView::beginRenameCurrentSelection() {
+  const QModelIndex index = InlineRenameHelpers::currentOrFirstSelectedRow(m_listview->selectionModel());
   if (!index.isValid()) {
     return;
   }
 
-  m_listview->setFocus(Qt::OtherFocusReason);
-  m_listview->selectionModel()->setCurrentIndex(index, QItemSelectionModel::ClearAndSelect);
-  m_listview->scrollTo(index, QAbstractItemView::EnsureVisible);
-  m_listview->edit(index);
+  if (!vgmCollViewModel->isCollectionIndex(index)) {
+    return;
+  }
+
+  InlineRenameHelpers::beginInlineRename(m_listview, index);
 }
 
 void VGMCollView::onSelectionChanged(const QItemSelection&, const QItemSelection&) {

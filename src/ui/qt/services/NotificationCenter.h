@@ -13,6 +13,7 @@ class VGMItem;
 class VGMFile;
 class VGMColl;
 class RawFile;
+
 class NotificationCenter : public QObject {
   Q_OBJECT
 
@@ -35,6 +36,7 @@ public:
   void updateStatusForItem(VGMItem* item);
   void selectVGMFile(VGMFile* vgmfile, QWidget* caller);
   void selectVGMColl(VGMColl* coll, QWidget* caller);
+  void renameVGMColl(VGMColl* coll, const QString& newName);
   void setSeekModifierActive(bool active);
   void updateContextualMenusForVGMFiles(const QList<VGMFile*>& files);
   void updateContextualMenusForVGMColls(const QList<VGMColl*>& colls);
@@ -49,6 +51,7 @@ signals:
   void statusUpdated(const QString& name, const QString& description, const QIcon* icon, int offset, int size);
   void vgmFileSelected(VGMFile *file, QWidget* caller);
   void vgmCollSelected(VGMColl *coll, QWidget* caller);
+  void vgmCollRenamed(VGMColl* coll);
   void seekModifierChanged(bool active);
   void vgmFileContextCommandsChanged(const QList<VGMFile*>& files);
   void vgmCollContextCommandsChanged(const QList<VGMColl*>& colls);

@@ -6,13 +6,10 @@
 
 #pragma once
 #include <QAbstractListModel>
-#include <QListView>
 #include <QKeyEvent>
-#include "widgets/FixedHeightListDelegate.h"
+#include <QListView>
 
-class VGMColl;
 class VGMFile;
-class VGMCollListView;
 class QItemSelection;
 
 class VGMCollListViewModel : public QAbstractListModel {
@@ -20,22 +17,12 @@ public:
   explicit VGMCollListViewModel(QObject *parent = nullptr);
   int rowCount(const QModelIndex &parent = QModelIndex()) const override;
   QVariant data(const QModelIndex &index, int role = Qt::DisplayRole) const override;
+  bool setData(const QModelIndex &index, const QVariant &value, int role) override;
   Qt::ItemFlags flags(const QModelIndex &index) const override;
 
 private:
   size_t collsBeforeLoad;
   bool isLoadingRawFile = false;
-};
-
-class VGMCollNameEditor : public FixedHeightListDelegate {
-public:
-  explicit VGMCollNameEditor(int itemHeight, QObject* parent = nullptr)
-      : FixedHeightListDelegate(itemHeight, parent) {}
-
-protected:
-  void setEditorData(QWidget *editor, const QModelIndex &index) const override;
-  void setModelData(QWidget *editor, QAbstractItemModel *model,
-                    const QModelIndex &index) const override;
 };
 
 class VGMCollListView : public QListView {
@@ -51,9 +38,8 @@ public slots:
   static void handleStopRequest();
 
 private:
-  void requestRenameCurrentSelection();
-  void requestRename(VGMColl* coll);
-  void collectionMenu(const QPoint &pos) const;
+  void beginRenameCurrentSelection();
+  void collectionMenu(const QPoint &pos);
   void keyPressEvent(QKeyEvent *e) override;
   void onSelectionChanged(const QItemSelection &selected, const QItemSelection &deselected);
   void onVGMFileSelected(VGMFile* file, const QWidget* caller);

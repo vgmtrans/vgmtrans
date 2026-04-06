@@ -7,13 +7,14 @@
 #include "VGMCollListView.h"
 
 #include <algorithm>
-#include <QLineEdit>
 #include <VGMColl.h>
 #include <VGMExport.h>
 #include <VGMSeq.h>
 #include "SequencePlayer.h"
+#include "widgets/FixedHeightListDelegate.h"
 #include "widgets/ItemViewDensity.h"
 #include "workarea/MdiArea.h"
+#include "workarea/InlineRenameHelpers.h"
 #include "QtVGMRoot.h"
 #include "services/MenuManager.h"
 #include "services/NotificationCenter.h"
@@ -67,6 +68,20 @@ VGMCollListViewModel::VGMCollListViewModel(QObject *parent) : QAbstractListModel
   connect(&qtVGMRoot, &QtVGMRoot::UI_addedVGMColl, addCollection);
   connect(&qtVGMRoot, &QtVGMRoot::UI_beginRemoveVGMColls, startResettingModel);
   connect(&qtVGMRoot, &QtVGMRoot::UI_endRemoveVGMColls, endResettingModel);
+  connect(NotificationCenter::the(), &NotificationCenter::vgmCollRenamed, this, [this](VGMColl* coll) {
+    const auto& colls = qtVGMRoot.vgmColls();
+    auto it = std::find(colls.begin(), colls.end(), coll);
+    if (it == colls.end()) {
+      return;
+    }
+
+    const auto index = this->index(static_cast<int>(std::distance(colls.begin(), it)), 0);
+    if (!index.isValid()) {
+      return;
+    }
+
+    emit dataChanged(index, index, {Qt::DisplayRole, Qt::EditRole});
+  });
 }
 
 int VGMCollListViewModel::rowCount(const QModelIndex &) const {
@@ -83,30 +98,22 @@ QVariant VGMCollListViewModel::data(const QModelIndex &index, int role) const {
   return QVariant();
 }
 
+bool VGMCollListViewModel::setData(const QModelIndex &index, const QVariant &value, int role) {
+  if (role != Qt::EditRole || !index.isValid() ||
+      static_cast<size_t>(index.row()) >= qtVGMRoot.vgmColls().size()) {
+    return false;
+  }
+
+  NotificationCenter::the()->renameVGMColl(qtVGMRoot.vgmColls()[index.row()], value.toString());
+  return true;
+}
+
 Qt::ItemFlags VGMCollListViewModel::flags(const QModelIndex &index) const {
   if (!index.isValid()) {
     return Qt::ItemIsEnabled;
   }
 
   return QAbstractListModel::flags(index) | Qt::ItemIsEditable;
-}
-
-/*
- * VGMCollNameEditor
- */
-
-void VGMCollNameEditor::setEditorData(QWidget *editor, const QModelIndex &index) const {
-  QString orig_name = index.model()->data(index, Qt::EditRole).toString();
-  auto *line_edit = qobject_cast<QLineEdit *>(editor);
-  line_edit->setText(orig_name);
-}
-
-void VGMCollNameEditor::setModelData(QWidget *editor, QAbstractItemModel *model,
-                                     const QModelIndex &index) const {
-  auto *line_edit = qobject_cast<QLineEdit *>(editor);
-  auto new_name = line_edit->text().toStdString();
-  qtVGMRoot.vgmColls()[index.row()]->setName(new_name);
-  model->dataChanged(index, index);
 }
 
 /*
@@ -121,8 +128,8 @@ VGMCollListView::VGMCollListView(QWidget *parent) : QListView(parent) {
   setSelectionMode(QAbstractItemView::ExtendedSelection);
   setResizeMode(QListView::Adjust);
   setIconSize(QSize(16, 16));
-  setEditTriggers(QAbstractItemView::NoEditTriggers);
-  setItemDelegate(new VGMCollNameEditor(ItemViewDensity::listItemHeight(this), this));
+  setEditTriggers(QAbstractItemView::EditKeyPressed);
+  setItemDelegate(new FixedHeightListDelegate(ItemViewDensity::listItemHeight(this), this));
   ItemViewDensity::apply(this);
   setWrapping(true);
 
@@ -154,7 +161,7 @@ VGMCollListView::VGMCollListView(QWidget *parent) : QListView(parent) {
           &VGMCollListView::onVGMFileSelected);
 }
 
-void VGMCollListView::collectionMenu(const QPoint &pos) const {
+void VGMCollListView::collectionMenu(const QPoint &pos) {
   if (selectedIndexes().empty()) {
     return;
   }
@@ -174,18 +181,9 @@ void VGMCollListView::collectionMenu(const QPoint &pos) const {
   }
   auto menu = MenuManager::the()->createMenuForItems<VGMColl>(selectedColls);
   if (selectedColls->size() == 1) {
-    QAction *beforeAction = nullptr;
-    for (QAction *action : menu->actions()) {
-      if (action && action->isSeparator()) {
-        beforeAction = action;
-        break;
-      }
-    }
-    auto *renameAction = new QAction(QStringLiteral("Rename"), menu);
-    renameAction->setShortcut(QKeySequence(Qt::Key_F2));
-    renameAction->setShortcutVisibleInContextMenu(true);
-    connect(renameAction, &QAction::triggered, this, &VGMCollListView::requestRenameCurrentSelection);
-    menu->insertAction(beforeAction, renameAction);
+    InlineRenameHelpers::insertRenameAction(menu, this, [this] {
+      beginRenameCurrentSelection();
+    });
   }
   menu->exec(mapToGlobal(pos));
   menu->deleteLater();
@@ -196,9 +194,6 @@ void VGMCollListView::keyPressEvent(QKeyEvent *e) {
     case Qt::Key_Enter:
     case Qt::Key_Return:
       handlePlaybackRequest();
-      break;
-    case Qt::Key_F2:
-      requestRenameCurrentSelection();
       break;
     case Qt::Key_Escape:
       handleStopRequest();
@@ -227,41 +222,13 @@ void VGMCollListView::handleStopRequest() {
   SequencePlayer::the().stop();
 }
 
-void VGMCollListView::requestRenameCurrentSelection() {
-  if (!selectionModel() || !selectionModel()->hasSelection()) {
-    return;
-  }
-
-  const QModelIndex index = selectionModel()->currentIndex().isValid()
-                                ? selectionModel()->currentIndex()
-                                : selectionModel()->selectedRows().value(0);
+void VGMCollListView::beginRenameCurrentSelection() {
+  const QModelIndex index = InlineRenameHelpers::currentOrFirstSelectedRow(selectionModel());
   if (!index.isValid()) {
     return;
   }
 
-  requestRename(qtVGMRoot.vgmColls()[index.row()]);
-}
-
-void VGMCollListView::requestRename(VGMColl* coll) {
-  if (!coll) {
-    return;
-  }
-
-  const auto& colls = qtVGMRoot.vgmColls();
-  auto it = std::find(colls.begin(), colls.end(), coll);
-  if (it == colls.end()) {
-    return;
-  }
-
-  const auto index = model()->index(static_cast<int>(std::distance(colls.begin(), it)), 0);
-  if (!index.isValid()) {
-    return;
-  }
-
-  setFocus(Qt::OtherFocusReason);
-  selectionModel()->setCurrentIndex(index, QItemSelectionModel::ClearAndSelect);
-  scrollTo(index, QAbstractItemView::EnsureVisible);
-  edit(index, QAbstractItemView::AllEditTriggers, nullptr);
+  InlineRenameHelpers::beginInlineRename(this, index);
 }
 
 void VGMCollListView::onSelectionChanged(const QItemSelection&, const QItemSelection&) {

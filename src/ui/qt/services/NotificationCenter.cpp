@@ -5,6 +5,7 @@
  */
 
 #include "NotificationCenter.h"
+#include "VGMColl.h"
 #include "VGMItem.h"
 #include "Helpers.h"
 
@@ -36,6 +37,20 @@ void NotificationCenter::selectVGMFile(VGMFile* vgmfile, QWidget* caller) {
 
 void NotificationCenter::selectVGMColl(VGMColl* coll, QWidget* caller) {
   emit vgmCollSelected(coll, caller);
+}
+
+void NotificationCenter::renameVGMColl(VGMColl* coll, const QString& newName) {
+  if (!coll) {
+    return;
+  }
+
+  const std::string name = newName.toStdString();
+  if (coll->name() == name) {
+    return;
+  }
+
+  coll->setName(name);
+  emit vgmCollRenamed(coll);
 }
 
 void NotificationCenter::setSeekModifierActive(bool active) {

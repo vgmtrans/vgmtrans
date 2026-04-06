@@ -54,7 +54,7 @@ private:
   void keyPressEvent(QKeyEvent *e) override;
   void handleActivationRequest() const;
   void handlePlaybackRequest() const;
-  void requestRenameCurrentSelection();
+  void beginRenameCurrentSelection();
   void itemMenu(const QPoint &pos);
   void onSelectionChanged(const QItemSelection &selected, const QItemSelection &deselected);
   void updateContextualMenus() const;
@@ -66,7 +66,6 @@ private slots:
   void onVGMFileSelected(const VGMFile *file, const QWidget* caller) const;
 
 private:
-  void requestRename(VGMColl* coll);
   VGMCollViewModel *vgmCollViewModel;
   QListView *m_listview;
 };
