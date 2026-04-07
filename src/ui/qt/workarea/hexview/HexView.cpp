@@ -58,7 +58,7 @@ constexpr float SHADOW_BLUR_RADIUS = SELECTION_PADDING * 1.0f;
 constexpr float SHADOW_STRENGTH = 0.5;
 constexpr float SHADOW_EDGE_CURVE = 1.1f;
 constexpr float PLAYBACK_GLOW_STRENGTH = 0.75f;
-constexpr float PLAYBACK_GLOW_RADIUS = 2.2f;
+constexpr float PLAYBACK_GLOW_RADIUS = 1.8f;
 constexpr float PLAYBACK_GLOW_EDGE_CURVE = 0.85f;
 const QColor PLAYBACK_GLOW_FALLBACK(230, 230, 230);
 constexpr uint16_t STYLE_UNASSIGNED = std::numeric_limits<uint16_t>::max();
