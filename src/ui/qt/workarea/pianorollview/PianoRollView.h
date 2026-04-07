@@ -118,7 +118,7 @@ private:
   };
 
   static constexpr int kMidiKeyCount = PianoRollFrame::kMidiKeyCount;
-  static constexpr int kKeyboardWidth = 78;
+  static constexpr int kKeyboardWidth = 44;
   static constexpr int kTopBarHeight = 22;
   static constexpr size_t kInvalidNoteIndex = std::numeric_limits<size_t>::max();
 

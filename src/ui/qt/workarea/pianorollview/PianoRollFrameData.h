@@ -46,7 +46,7 @@ struct Data {
 
   int scrollX = 0;
   int scrollY = 0;
-  int keyboardWidth = 72;
+  int keyboardWidth = 44;
   int topBarHeight = 22;
   float pixelsPerTick = 0.10f;
   float minPixelsPerTick = 0.05f;
