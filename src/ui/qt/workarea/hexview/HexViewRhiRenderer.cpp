@@ -721,6 +721,15 @@ void HexViewRhiRenderer::ensurePipelines(QRhiRenderPassDescriptor* outputRp,
   edgeBlend.dstAlpha = QRhiGraphicsPipeline::One;
   edgeBlend.opAlpha = QRhiGraphicsPipeline::Max;
 
+  QRhiGraphicsPipeline::TargetBlend colorAccumulateBlend;
+  colorAccumulateBlend.enable = true;
+  colorAccumulateBlend.srcColor = QRhiGraphicsPipeline::One;
+  colorAccumulateBlend.dstColor = QRhiGraphicsPipeline::One;
+  colorAccumulateBlend.opColor = QRhiGraphicsPipeline::Add;
+  colorAccumulateBlend.srcAlpha = QRhiGraphicsPipeline::One;
+  colorAccumulateBlend.dstAlpha = QRhiGraphicsPipeline::One;
+  colorAccumulateBlend.opAlpha = QRhiGraphicsPipeline::Add;
+
   QRhiGraphicsPipeline::TargetBlend noWriteBlend;
   noWriteBlend.colorWrite = {};
 
@@ -772,7 +781,7 @@ void HexViewRhiRenderer::ensurePipelines(QRhiRenderPassDescriptor* outputRp,
                  edgeEffectFrag,
                  edgeInputLayout,
                  m_edgeSrb,
-                 {noWriteBlend, edgeBlend, blend},
+                 {noWriteBlend, edgeBlend, colorAccumulateBlend},
                  1,
                  m_effectRp);
   createPipeline(m_compositePso,
@@ -1590,7 +1599,10 @@ void HexViewRhiRenderer::buildPlaybackEffectInstances(int startLine, int endLine
         if (colors) {
           const QColor glowColor =
               selection.glowColor.isValid() ? selection.glowColor : QColor(Qt::white);
-          tint = QVector4D(glowColor.redF(), glowColor.greenF(), glowColor.blueF(), 1.0f);
+          tint = QVector4D(glowColor.redF(),
+                           glowColor.greenF(),
+                           glowColor.blueF(),
+                           std::clamp(alphaValue, 0.0f, 1.0f));
         }
         const int selStartLine = selectionStart / kBytesPerLine;
         const int selEndLine = (selectionEnd - 1) / kBytesPerLine;
@@ -1713,7 +1725,7 @@ void HexViewRhiRenderer::buildPlaybackEffectInstances(int startLine, int endLine
                          m_maskScratchA,
                          needsGlow ? &m_colorScratchA : nullptr,
                          nullptr,
-                         0.0f);
+                         1.0f);
   }
   for (const auto& selection : frame.fadePlaybackSelections) {
     if (selection.alpha <= 0.0f) {
