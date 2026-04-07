@@ -625,6 +625,7 @@ void VGMFileView::setPanelView(PanelSide side, PanelViewKind viewKind) {
 
   panelUi.currentKind = viewKind;
   panelUi.stack->setCurrentWidget(targetWidget);
+  setFocusProxy(targetWidget);
 
   if (viewKind == PanelViewKind::Tree && panelUi.treeView) {
     panelUi.treeView->updateStatusBar();
