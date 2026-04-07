@@ -1093,8 +1093,8 @@ void PianoRollRhiRenderer::appendPianoCKeyLabels(const PianoRollFrame::Data& fra
       continue;
     }
 
-    const float labelX = std::max(1.0f, layout.keyboardWidth - labelWidth - 4.0f);
-    const float labelY = keyBottom - labelHeight - 1.5f;
+    const float labelX = std::max(1.0f, layout.keyboardWidth - labelWidth - 2.0f);
+    const float labelY = keyBottom - labelHeight;
     appendLabelText(label, labelX, labelY, labelHeight, labelColor);
   }
 }
