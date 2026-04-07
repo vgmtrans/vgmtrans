@@ -192,7 +192,9 @@ void VGMCollListView::collectionMenu(const QPoint &pos) {
 void VGMCollListView::keyPressEvent(QKeyEvent *e) {
   switch (e->key()) {
     case Qt::Key_Enter:
+#if !defined(Q_OS_MACOS) && !defined(Q_OS_MAC)
     case Qt::Key_Return:
+#endif
       handlePlaybackRequest();
       break;
     case Qt::Key_Escape:

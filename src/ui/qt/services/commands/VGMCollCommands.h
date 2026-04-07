@@ -21,6 +21,12 @@ public:
   void executeItem(VGMColl* coll) const override {
     SequencePlayer::the().playCollection(coll);
   }
-  [[nodiscard]] QList<QKeySequence> shortcutKeySequences() const override { return {Qt::Key_Return}; };
+  [[nodiscard]] QList<QKeySequence> shortcutKeySequences() const override {
+#if defined(Q_OS_MACOS) || defined(Q_OS_MAC)
+    return {Qt::Key_Space};
+#else
+    return {Qt::Key_Return};
+#endif
+  };
   [[nodiscard]] std::string name() const override { return "Play / Pause"; }
 };
