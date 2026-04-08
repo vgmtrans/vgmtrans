@@ -330,6 +330,12 @@ void DLSArt::addVibrato(int32_t depth, int32_t frequency, int32_t delay) {
       CONN_SRC_NONE, CONN_SRC_NONE, CONN_DST_LFO_STARTDELAY, CONN_TRN_NONE, delay));
 }
 
+void DLSArt::addConnectionBlock(uint16_t source, uint16_t control, uint16_t destination,
+                                uint16_t transform, int32_t scale) {
+  m_blocks.emplace_back(std::make_unique<ConnectionBlock>(source, control, destination, transform,
+                                                          scale));
+}
+
 //  ***************
 //  ConnectionBlock
 //  ***************

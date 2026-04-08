@@ -142,8 +142,9 @@ bool mainDLSCreation(
         if (rgn->sampOffset != -1) {
           bool bFoundIt = false;
           for (uint32_t s = 0; s < sampColl->samples.size(); s++) {             //for every sample
-            if (rgn->sampOffset == sampColl->samples[s]->offset() ||
-                rgn->sampOffset == sampColl->samples[s]->offset() - sampColl->offset() - sampColl->sampDataOffset) {
+            auto samp_offset = sampColl->samples[s]->offset();
+            if (static_cast<uint32_t>(rgn->sampOffset) == samp_offset ||
+                static_cast<uint32_t>(rgn->sampOffset) == samp_offset - sampColl->offset() - sampColl->sampDataOffset) {
               realSampNum = s;
 
               //samples[m]->loop.loopStart = parInstrSet->aInstrs[i]->aRgns[k]->loop.loopStart;
@@ -267,6 +268,139 @@ bool mainDLSCreation(
           int32_t vibFreq = hertzToDlsPitch(rgn->lfoVibFreqHz());
           int32_t vibDelay = secondsToDlsTimecents(rgn->lfoVibDelaySeconds());
           newArt->addVibrato(vibDepth, vibFreq, vibDelay);
+        }
+
+        for (const auto &mod : rgn->modulators()) {
+          uint16_t src = CONN_SRC_NONE;
+          uint16_t dest = CONN_DST_NONE;
+          uint16_t transform = CONN_TRN_NONE;
+
+          // Map Source
+          switch (mod.source.type) {
+            case ModSourceType::CC: {
+              uint8_t cc = mod.source.index;
+              switch (cc) {
+                default:
+                  L_WARN("Converting {}: modulator with unsupported CC {} (DLS limitation). Some players may not support this modulator.",
+                         set->name(), cc);
+                  [[fallthrough]];
+                case 1:  // Mod Wheel
+                  [[fallthrough]];
+                case 7:  // Volume
+                  [[fallthrough]];
+                case 10: // Pan
+                  [[fallthrough]];
+                case 11: // Expression
+                  [[fallthrough]];
+                case 91: // Reverb
+                  [[fallthrough]];
+                case 93: // Chorus
+                  src = 0x0080 | cc;
+                  break;
+              }
+              break;
+            }
+            case ModSourceType::PitchBend:
+              src = CONN_SRC_PITCHWHEEL;
+              break;
+            case ModSourceType::NoteOnVelocity:
+              src = CONN_SRC_KEYONVELOCITY;
+              break;
+            case ModSourceType::NoteOnKeyNumber:
+              src = CONN_SRC_KEYNUMBER;
+              break;
+            default:
+              L_WARN("Converting {}: skipping modulator with unsupported source type 0x{:x} (DLS limitation).",
+                     set->name(), static_cast<int>(mod.source.type));
+              continue; // Unsupported DLS source
+          }
+
+          uint16_t control = CONN_SRC_NONE;
+          if (mod.sourceAmt.type == ModSourceType::CC) {
+            control = 0x0080 | mod.sourceAmt.index;
+          }
+
+          // Map Destination
+          switch (mod.dest) {
+            case ModDest::VolAttack:
+              dest = CONN_DST_EG1_ATTACKTIME;
+              break;
+            case ModDest::VolDecay:
+              dest = CONN_DST_EG1_DECAYTIME;
+              break;
+            case ModDest::VolRelease:
+              dest = CONN_DST_EG1_RELEASETIME;
+              break;
+            case ModDest::VolSustain:
+              dest = CONN_DST_EG1_SUSTAINLEVEL;
+              break;
+            case ModDest::VolHold:
+              dest = CONN_DST_EG1_HOLDTIME;
+              break;
+            case ModDest::VolDelay:
+              dest = CONN_DST_EG1_DELAYTIME;
+              break;
+            case ModDest::ModAttack:
+              dest = CONN_DST_EG2_ATTACKTIME;
+              break;
+            case ModDest::ModDecay:
+              dest = CONN_DST_EG2_DECAYTIME;
+              break;
+            case ModDest::ModRelease:
+              dest = CONN_DST_EG2_RELEASETIME;
+              break;
+            case ModDest::ModSustain:
+              dest = CONN_DST_EG2_SUSTAINLEVEL;
+              break;
+            case ModDest::ModHold:
+              dest = CONN_DST_EG2_HOLDTIME;
+              break;
+            case ModDest::ModDelay:
+              dest = CONN_DST_EG2_DELAYTIME;
+              break;
+            case ModDest::Pan:
+              dest = CONN_DST_PAN;
+              break;
+            case ModDest::Attenuation:
+              dest = CONN_DST_ATTENUATION;
+              break;
+            case ModDest::Pitch:
+              dest = CONN_DST_PITCH;
+              break;
+            case ModDest::FilterCutoff:
+              dest = CONN_DST_FILTER_CUTOFF;
+              break;
+            case ModDest::FilterQ:
+              dest = CONN_DST_FILTER_Q;
+              break;
+            case ModDest::ReverbSend:
+              dest = CONN_DST_REVERB_SEND;
+              break;
+            case ModDest::ChorusSend:
+              dest = CONN_DST_CHORUS_SEND;
+              break;
+            case ModDest::VibLfoFreq:
+              dest = CONN_DST_LFO_FREQUENCY;
+              break;
+            case ModDest::VibLfoDelay:
+              dest = CONN_DST_LFO_STARTDELAY;
+              break;
+            default:
+              continue;
+          }
+
+          double scaleFactor = 1.0;
+          if (mod.dest == ModDest::VolSustain) {
+            // Convert SF2 cB (0.1 dB) to DLS Level units (~0.096 dB)
+            // 1000 DLS units = 96 dB. 1 SF2 unit = 0.1 dB.
+            // Factor = 0.1 / 0.096 = 1.041666...
+            scaleFactor = 1.04166667;
+          }
+
+          int32_t scale = static_cast<int32_t>(mod.amount * 65536.0 * scaleFactor);
+          if (src != CONN_SRC_NONE && dest != CONN_DST_NONE) {
+             newArt->addConnectionBlock(src, control, dest, transform, scale);
+          }
         }
 
         newWsmp->setPitchInfo(realUnityKey, totalFineTune, totalAttenuation);

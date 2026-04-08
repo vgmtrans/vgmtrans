@@ -43,6 +43,12 @@ class VGMSamp;
 #define CONN_DST_RESERVED 0x0002
 #define CONN_DST_PITCH 0x0003
 #define CONN_DST_PAN 0x0004
+#define CONN_DST_REVERB_SEND 0x0005
+#define CONN_DST_CHORUS_SEND 0x0006
+
+/* Filter Destinations */
+#define CONN_DST_FILTER_CUTOFF 0x0100
+#define CONN_DST_FILTER_Q 0x0101
 
 /* LFO Destinations */
 #define CONN_DST_LFO_FREQUENCY 0x0104
@@ -191,6 +197,8 @@ public:
                long sustain_lev, long release_time, uint16_t rls_transform);
   void addPan(long pan);
   void addVibrato(int32_t depth, int32_t frequency, int32_t delay);
+  void addConnectionBlock(uint16_t source, uint16_t control, uint16_t destination,
+                          uint16_t transform, int32_t scale);
 
   uint32_t GetSize() const;
   void Write(std::vector<uint8_t> &buf) const;
