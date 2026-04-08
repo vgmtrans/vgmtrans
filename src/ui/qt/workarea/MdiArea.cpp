@@ -15,9 +15,11 @@
 #include <QContextMenuEvent>
 #include <QEvent>
 #include <QFontMetrics>
+#include <QGuiApplication>
 #include <QHBoxLayout>
 #include <QIcon>
 #include <QMenu>
+#include <QMouseEvent>
 #include <QMetaObject>
 #include <QPaintEvent>
 #include <QPainter>
@@ -606,12 +608,21 @@ void MdiArea::setupTabBarControls() {
       return button;
     };
 
+    const bool waylandPopupWorkaround =
+        QGuiApplication::platformName().contains(QStringLiteral("wayland"), Qt::CaseInsensitive);
+
     m_leftPaneButton = createIconButton(m_tabControls, tr("Select left pane view"));
     m_leftPaneButton->setPopupMode(QToolButton::InstantPopup);
+    if (waylandPopupWorkaround) {
+      m_leftPaneButton->installEventFilter(this);
+    }
     controlsLayout->addWidget(m_leftPaneButton);
 
     m_rightPaneButton = createIconButton(m_tabControls, tr("Select or hide right pane view"));
     m_rightPaneButton->setPopupMode(QToolButton::InstantPopup);
+    if (waylandPopupWorkaround) {
+      m_rightPaneButton->installEventFilter(this);
+    }
     controlsLayout->addWidget(m_rightPaneButton);
 
     m_sequenceControlBarButton = createIconButton(m_tabControls, tr("Show sequence control bar"));
@@ -922,15 +933,30 @@ void MdiArea::changeEvent(QEvent *event) {
 }
 
 bool MdiArea::eventFilter(QObject *watched, QEvent *event) {
-  if (m_tabBar && watched == m_tabBar->window() && event &&
-      (event->type() == QEvent::WindowActivate || event->type() == QEvent::WindowDeactivate ||
-       event->type() == QEvent::ActivationChange)) {
-    refreshTabControlAppearance();
-    if (m_tabBar) {
-      m_tabBar->update();
-    }
-    if (m_tabControls) {
-      m_tabControls->update();
+  if (watched == m_leftPaneButton || watched == m_rightPaneButton) {
+    static const bool waylandPopupWorkaround =
+        QGuiApplication::platformName().contains(QStringLiteral("wayland"), Qt::CaseInsensitive);
+    if (waylandPopupWorkaround && event) {
+      if (event->type() == QEvent::MouseButtonPress) {
+        auto *mouseEvent = static_cast<QMouseEvent *>(event);
+        if (mouseEvent->button() == Qt::LeftButton) {
+          auto *button = qobject_cast<QToolButton *>(watched);
+          if (button && button->isEnabled() && button->menu()) {
+            if (button->menu()->isVisible()) {
+              button->menu()->hide();
+            } else {
+              const QPoint popupPos = button->mapToGlobal(QPoint(0, button->height()));
+              button->menu()->popup(popupPos);
+            }
+            return true;
+          }
+        }
+      } else if (event->type() == QEvent::MouseButtonRelease) {
+        auto *mouseEvent = static_cast<QMouseEvent *>(event);
+        if (mouseEvent->button() == Qt::LeftButton) {
+          return true;
+        }
+      }
     }
   }
 
