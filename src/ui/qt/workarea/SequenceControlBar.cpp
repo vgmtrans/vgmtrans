@@ -71,41 +71,18 @@ qreal knobPointerAngleDegrees(int value) {
          (kKnobEndAngleDegrees - kKnobCenterAngleDegrees) * t;
 }
 
-QColor sequenceControlBarBackgroundColor(const QWidget* context) {
-  if (context && context->window()) {
-    if (auto* tabBar = context->window()->findChild<QTabBar*>()) {
-      QColor tabColor = tabBar->palette().color(QPalette::Window);
-      if (!tabColor.isValid()) {
-        tabColor = tabBar->palette().color(QPalette::Midlight);
-      }
-      if (!tabColor.isValid()) {
-        tabColor = tabBar->palette().color(QPalette::Button);
-      }
-      if (tabColor.isValid()) {
-        return tabColor;
-      }
-    }
+QColor sequenceControlBarBackgroundColor(const QWidget& context) {
+  if (const auto* tabBar = context.window()->findChild<QTabBar*>()) {
+    return tabBar->palette().color(QPalette::Window);
   }
-
-  const QPalette palette = context ? context->palette() : QPalette();
-  QColor color = palette.color(QPalette::Button);
-  if (!color.isValid()) {
-    color = palette.color(QPalette::Window);
-  }
-  if (!color.isValid()) {
-    color = QColor(112, 118, 126);
-  }
-  return color;
+  return context.palette().color(QPalette::Button);
 }
 
-QColor sequenceControlBarSeparatorColor(const QWidget* context) {
-  const QPalette palette = context ? context->palette() : QPalette();
+QColor sequenceControlBarSeparatorColor(const QWidget& context) {
+  const QPalette palette = context.palette();
   const bool darkPalette = isDarkPalette(palette);
   const QColor background = sequenceControlBarBackgroundColor(context);
-  QColor separatorContrast = palette.color(QPalette::WindowText);
-  if (!separatorContrast.isValid()) {
-    separatorContrast = palette.color(QPalette::Text);
-  }
+  const QColor separatorContrast = palette.color(QPalette::WindowText);
   return blendColors(separatorContrast, background, darkPalette ? 0.3 : 0.2);
 }
 
@@ -428,7 +405,7 @@ SequenceControlBar::SequenceControlBar(QWidget* parent)
           });
 
   connect(m_tempoSpin, &QDoubleSpinBox::editingFinished, this, [this]() {
-    if (!m_tempoSpin || m_updatingUi) {
+    if (m_updatingUi) {
       return;
     }
     m_tempoSpin->clearFocus();
@@ -449,7 +426,7 @@ SequenceControlBar::SequenceControlBar(QWidget* parent)
 SequenceControlBar::~SequenceControlBar() = default;
 
 double SequenceControlBar::tempoBpm() const {
-  return m_tempoSpin ? m_tempoSpin->value() : kDefaultTempoBpm;
+  return m_tempoSpin->value();
 }
 
 void SequenceControlBar::changeEvent(QEvent* event) {
@@ -464,9 +441,9 @@ void SequenceControlBar::paintEvent(QPaintEvent* event) {
   Q_UNUSED(event);
 
   QPainter painter(this);
-  const QColor cover = sequenceControlBarBackgroundColor(this);
+  const QColor cover = sequenceControlBarBackgroundColor(*this);
   const bool darkPalette = isDarkPalette(palette());
-  QColor separator = sequenceControlBarSeparatorColor(this);
+  QColor separator = sequenceControlBarSeparatorColor(*this);
   separator.setAlpha(160);
   painter.fillRect(rect(), cover);
   painter.fillRect(0, 0, 2, height(), cover);
@@ -476,10 +453,6 @@ void SequenceControlBar::paintEvent(QPaintEvent* event) {
 }
 
 void SequenceControlBar::setTempoBpm(double bpm) {
-  if (!m_tempoSpin) {
-    return;
-  }
-
   if (QWidget* focused = QApplication::focusWidget();
       focused && (focused == m_tempoSpin || m_tempoSpin->isAncestorOf(focused))) {
     return;
@@ -511,7 +484,7 @@ std::vector<int> SequenceControlBar::channelIds() const {
 }
 
 void SequenceControlBar::setChannelPan(int channelId, int pan) {
-  if (auto* block = findBlock(channelId); block && block->panKnob) {
+  if (auto* block = findBlock(channelId)) {
     const int clampedPan = std::clamp(pan, kMinChannelValue, kMaxChannelValue);
     if (block->panKnob->value() == clampedPan) {
       return;
@@ -523,7 +496,7 @@ void SequenceControlBar::setChannelPan(int channelId, int pan) {
 }
 
 void SequenceControlBar::setChannelVolume(int channelId, int volume) {
-  if (auto* block = findBlock(channelId); block && block->volumeKnob) {
+  if (auto* block = findBlock(channelId)) {
     const int clampedVolume = std::clamp(volume, kMinChannelValue, kMaxChannelValue);
     if (block->volumeKnob->value() == clampedVolume) {
       return;
@@ -535,7 +508,7 @@ void SequenceControlBar::setChannelVolume(int channelId, int volume) {
 }
 
 void SequenceControlBar::setChannelMuted(int channelId, bool muted) {
-  if (auto* block = findBlock(channelId); block && block->muteButton) {
+  if (auto* block = findBlock(channelId)) {
     if (block->muteButton->isChecked() == muted) {
       return;
     }
@@ -547,7 +520,7 @@ void SequenceControlBar::setChannelMuted(int channelId, bool muted) {
 }
 
 void SequenceControlBar::setChannelSolo(int channelId, bool solo) {
-  if (auto* block = findBlock(channelId); block && block->soloButton) {
+  if (auto* block = findBlock(channelId)) {
     if (block->soloButton->isChecked() == solo) {
       return;
     }
@@ -559,14 +532,14 @@ void SequenceControlBar::setChannelSolo(int channelId, bool solo) {
 }
 
 bool SequenceControlBar::channelMuted(int channelId) const {
-  if (const auto* block = findBlock(channelId); block && block->muteButton) {
+  if (const auto* block = findBlock(channelId)) {
     return block->muteButton->isChecked();
   }
   return false;
 }
 
 bool SequenceControlBar::channelSolo(int channelId) const {
-  if (const auto* block = findBlock(channelId); block && block->soloButton) {
+  if (const auto* block = findBlock(channelId)) {
     return block->soloButton->isChecked();
   }
   return false;
@@ -578,12 +551,11 @@ void SequenceControlBar::resizeEvent(QResizeEvent* event) {
 }
 
 bool SequenceControlBar::eventFilter(QObject* watched, QEvent* event) {
-  if ((watched == m_tempoSpin || watched == m_tempoLineEdit) && m_tempoSpin) {
+  if (watched == m_tempoSpin || watched == m_tempoLineEdit) {
     switch (event->type()) {
       case QEvent::KeyPress:
         if (auto* keyEvent = static_cast<QKeyEvent*>(event);
-            keyEvent &&
-            (keyEvent->key() == Qt::Key_Return || keyEvent->key() == Qt::Key_Enter)) {
+            keyEvent->key() == Qt::Key_Return || keyEvent->key() == Qt::Key_Enter) {
           m_tempoSpin->interpretText();
           m_tempoSpin->clearFocus();
           if (m_tempoLineEdit) {
@@ -596,9 +568,6 @@ bool SequenceControlBar::eventFilter(QObject* watched, QEvent* event) {
       case QEvent::MouseButtonPress:
       case QEvent::MouseButtonDblClick:
         QTimer::singleShot(0, this, [this]() {
-          if (!m_tempoSpin) {
-            return;
-          }
           if (QWidget* focused = QApplication::focusWidget();
               focused && (focused == m_tempoSpin || m_tempoSpin->isAncestorOf(focused))) {
             m_tempoSpin->selectAll();
@@ -641,10 +610,6 @@ const SequenceControlBar::BlockWidgets* SequenceControlBar::findBlock(int channe
 }
 
 void SequenceControlBar::rebuildChannelBlocks(const std::vector<ChannelConfig>& channels) {
-  if (!m_blockLayout || !m_blockContainer) {
-    return;
-  }
-
   m_updatingUi = true;
 
   while (QLayoutItem* item = m_blockLayout->takeAt(0)) {
@@ -723,17 +688,18 @@ void SequenceControlBar::rebuildChannelBlocks(const std::vector<ChannelConfig>& 
 
     m_blockLayout->addWidget(block->frame, 0, Qt::AlignVCenter);
 
-    connect(block->muteButton, &QToolButton::toggled, this, [this, id = block->id](bool checked) {
+    connect(block->muteButton,
+            &QToolButton::toggled,
+            this,
+            [this, blockPtr = block.get(), id = block->id](bool checked) {
       if (m_updatingUi) {
         return;
       }
 
-      if (checked) {
-        if (auto* selfBlock = findBlock(id); selfBlock && selfBlock->soloButton->isChecked()) {
-          m_updatingUi = true;
-          selfBlock->soloButton->setChecked(false);
-          m_updatingUi = false;
-        }
+      if (checked && blockPtr->soloButton->isChecked()) {
+        m_updatingUi = true;
+        blockPtr->soloButton->setChecked(false);
+        m_updatingUi = false;
       }
 
       refreshBlockInteractivity();
@@ -772,43 +738,26 @@ void SequenceControlBar::rebuildChannelBlocks(const std::vector<ChannelConfig>& 
 
 void SequenceControlBar::refreshBlockInteractivity() {
   const bool anySolo = std::any_of(m_blocks.begin(), m_blocks.end(), [](const auto& block) {
-    return block && block->soloButton && block->soloButton->isChecked();
+    return block->soloButton->isChecked();
   });
 
   for (auto& blockPtr : m_blocks) {
-    if (!blockPtr) {
-      continue;
-    }
     auto& block = *blockPtr;
-    const bool muted = block.muteButton && block.muteButton->isChecked();
-    const bool soloed = block.soloButton && block.soloButton->isChecked();
+    const bool muted = block.muteButton->isChecked();
+    const bool soloed = block.soloButton->isChecked();
     const bool blockedBySolo = anySolo && !soloed;
     const bool controlsDisabled = muted || blockedBySolo;
 
-    if (block.frame) {
-      applyBlockFrameStyle(block, controlsDisabled, soloed);
-    }
+    applyBlockFrameStyle(block, controlsDisabled, soloed);
 
-    if (block.muteButton) {
-      block.muteButton->setEnabled(true);
-    }
-    if (block.soloButton) {
-      block.soloButton->setEnabled(!muted);
-    }
-    if (block.panKnob) {
-      block.panKnob->setEnabled(!controlsDisabled);
-    }
-    if (block.volumeKnob) {
-      block.volumeKnob->setEnabled(!controlsDisabled);
-    }
+    block.muteButton->setEnabled(true);
+    block.soloButton->setEnabled(!muted);
+    block.panKnob->setEnabled(!controlsDisabled);
+    block.volumeKnob->setEnabled(!controlsDisabled);
   }
 }
 
 void SequenceControlBar::applyBlockFrameStyle(BlockWidgets& block, bool dimmed, bool soloed) {
-  if (!block.frame) {
-    return;
-  }
-
   QColor trackColor = block.borderColor;
   if (!trackColor.isValid()) {
     trackColor = QColor::fromHsv((block.id * 43) % 360, 190, 235);
@@ -824,7 +773,7 @@ void SequenceControlBar::applyBlockFrameStyle(BlockWidgets& block, bool dimmed, 
   border.setAlpha(dimmed ? 126 : 238);
   QColor fill = trackColor;
   fill.setAlpha(dimmed ? 32 : 96);
-  QColor separator = sequenceControlBarSeparatorColor(this);
+  QColor separator = sequenceControlBarSeparatorColor(*this);
   separator.setAlpha(dimmed ? 110 : 160);
   QColor leftSeparator = separator;
   leftSeparator.setAlpha(block.frame->property("leadingSeparator").toBool() ? separator.alpha() : 0);
@@ -850,16 +799,7 @@ void SequenceControlBar::applyBlockFrameStyle(BlockWidgets& block, bool dimmed, 
 }
 
 void SequenceControlBar::refreshScrollControls() {
-  if (!m_blockScroll || !m_scrollControls) {
-    return;
-  }
-
   auto* hbar = m_blockScroll->horizontalScrollBar();
-  if (!hbar) {
-    m_scrollControls->setVisible(false);
-    return;
-  }
-
   const bool hasOverflow = hbar->maximum() > 0;
   m_scrollControls->setVisible(hasOverflow);
 
@@ -873,21 +813,13 @@ void SequenceControlBar::refreshScrollControls() {
 }
 
 void SequenceControlBar::scrollBlocks(int deltaPixels) {
-  if (!m_blockScroll) {
-    return;
-  }
-
   auto* hbar = m_blockScroll->horizontalScrollBar();
-  if (!hbar) {
-    return;
-  }
-
   hbar->setValue(hbar->value() + deltaPixels);
   refreshScrollControls();
 }
 
 void SequenceControlBar::refreshStyleSheet() {
-  const QColor barBg = sequenceControlBarBackgroundColor(this);
+  const QColor barBg = sequenceControlBarBackgroundColor(*this);
   const QColor text = palette().color(QPalette::WindowText);
   const bool darkPalette = isDarkPalette(palette());
   const bool lightMode = qGray(barBg.rgb()) > 140;
@@ -909,9 +841,6 @@ void SequenceControlBar::refreshStyleSheet() {
   QColor buttonText = text;
   buttonText.setAlpha(darkPalette ? 196 : 176);
   QColor buttonDisabledText = palette().color(QPalette::Disabled, QPalette::WindowText);
-  if (!buttonDisabledText.isValid()) {
-    buttonDisabledText = text;
-  }
   buttonDisabledText.setAlpha(darkPalette ? 98 : 88);
   const QColor checkedText = contrastingTextColor(buttonOn, barBg, palette());
 
