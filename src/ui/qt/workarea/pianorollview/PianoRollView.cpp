@@ -93,14 +93,10 @@ PianoRollView::PianoRollView(QWidget* parent)
   m_playbackAutoScrollAnimation->setEasingCurve(QEasingCurve::OutQuint);
   connect(m_playbackAutoScrollAnimation, &QVariantAnimation::valueChanged, this, [this](const QVariant& value) {
     auto* hbar = horizontalScrollBar();
-    if (!hbar) {
-      return;
-    }
-
     const int nextValue = std::clamp(static_cast<int>(std::lround(value.toDouble())),
                                      hbar->minimum(),
                                      hbar->maximum());
-    if (m_rhiHost && m_rhiHost->syncPlaybackAutoScrollToRenderFrame()) {
+    if (m_rhiHost->syncPlaybackAutoScrollToRenderFrame()) {
       // Native-window playback scroll is advanced once per rendered frame instead.
       return;
     }
@@ -318,7 +314,7 @@ void PianoRollView::setPlaybackTick(int tick,
   const bool tickChanged = (tick != currentTick());
   const bool playbackStateChanged = (playbackActive != this->playbackActive());
   const bool horizontalZoomAnimating =
-      m_horizontalZoomAnimation && m_horizontalZoomAnimation->state() == QAbstractAnimation::Running;
+      m_horizontalZoomAnimation->state() == QAbstractAnimation::Running;
   if (!tickChanged && !playbackStateChanged && !activeNotes) {
     return;
   }
@@ -447,9 +443,7 @@ PianoRollFrame::Data PianoRollView::captureRhiFrameData(float dpr) const {
   frame.elapsedSeconds = static_cast<float>(m_animClock.elapsed()) / 1000.0f;
   frame.inactiveNoteDimAlpha = m_inactiveNoteDimAlpha;
   frame.playbackActive = playbackActive();
-  if (m_scrollChrome) {
-    frame.scrollChrome = m_scrollChrome->snapshot();
-  }
+  frame.scrollChrome = m_scrollChrome->snapshot();
 
   frame.trackColors = m_trackColorsSnapshot;
   frame.trackEnabled = m_trackEnabledMaskSnapshot;
@@ -509,7 +503,7 @@ void PianoRollView::paintEvent(QPaintEvent* event) {
 }
 
 void PianoRollView::ensureScrollChromeButtonsInstalled() {
-  if (m_scrollChromeButtonsInstalled || !m_scrollChrome) {
+  if (m_scrollChromeButtonsInstalled) {
     return;
   }
 
@@ -528,17 +522,11 @@ void PianoRollView::ensureScrollChromeButtonsInstalled() {
 }
 
 void PianoRollView::syncViewportLayoutState() {
-  if (m_scrollChrome) {
-    // Recompute viewport margins before sizing the hidden scroll models.
-    m_scrollChrome->syncLayout();
-  }
+  // Recompute viewport margins before sizing the hidden scroll models.
+  m_scrollChrome->syncLayout();
   updateScrollBars();
-  if (m_scrollChrome) {
-    m_scrollChrome->syncLayout();
-  }
-  if (m_rhiHost) {
-    m_rhiHost->setGeometry(rect());
-  }
+  m_scrollChrome->syncLayout();
+  m_rhiHost->setGeometry(rect());
   requestRender();
 }
 
@@ -567,18 +555,12 @@ void PianoRollView::scrollContentsBy(int dx, int dy) {
 void PianoRollView::changeEvent(QEvent* event) {
   QAbstractScrollArea::changeEvent(event);
 
-  if (!event) {
-    return;
-  }
-
   if (event->type() == QEvent::PaletteChange ||
       event->type() == QEvent::ApplicationPaletteChange ||
       event->type() == QEvent::StyleChange) {
     rebuildFrameColors();
     updateInactiveNoteDimTarget(false);
-    if (m_scrollChrome) {
-      m_scrollChrome->syncLayout();
-    }
+    m_scrollChrome->syncLayout();
     requestRender();
   }
 }
@@ -594,7 +576,7 @@ void PianoRollView::keyReleaseEvent(QKeyEvent* event) {
 }
 
 void PianoRollView::timerEvent(QTimerEvent* event) {
-  if (!event || event->timerId() != m_dragAutoScrollTimer.timerId()) {
+  if (event->timerId() != m_dragAutoScrollTimer.timerId()) {
     QAbstractScrollArea::timerEvent(event);
     return;
   }
@@ -654,12 +636,8 @@ void PianoRollView::applyPanDragDelta(const QPoint& dragDelta) {
 
   auto* hbar = horizontalScrollBar();
   auto* vbar = verticalScrollBar();
-  if (hbar) {
-    hbar->setValue(std::clamp(hbar->value() - dragDelta.x(), hbar->minimum(), hbar->maximum()));
-  }
-  if (vbar) {
-    vbar->setValue(std::clamp(vbar->value() - dragDelta.y(), vbar->minimum(), vbar->maximum()));
-  }
+  hbar->setValue(std::clamp(hbar->value() - dragDelta.x(), hbar->minimum(), hbar->maximum()));
+  vbar->setValue(std::clamp(vbar->value() - dragDelta.y(), vbar->minimum(), vbar->maximum()));
   requestRenderCoalesced();
 }
 
@@ -700,9 +678,7 @@ void PianoRollView::setInteractionCursor(Qt::CursorShape shape) {
   const QCursor cursor(shape);
   setCursor(cursor);
   viewport()->setCursor(cursor);
-  if (m_rhiHost) {
-    m_rhiHost->setSurfaceCursor(shape);
-  }
+  m_rhiHost->setSurfaceCursor(shape);
 }
 
 void PianoRollView::refreshInteractionCursor(Qt::KeyboardModifiers modifiers) {
@@ -724,10 +700,6 @@ QColor PianoRollView::colorForTrack(int trackIndex) const {
 }
 
 bool PianoRollView::handleViewportWheel(QWheelEvent* event) {
-  if (!event) {
-    return false;
-  }
-
   constexpr float kWheelZoomSensitivity = 0.11f;
   constexpr float kWheelZoomMinFactor = 0.80f;
   constexpr float kWheelZoomMaxFactor = 1.30f;
@@ -793,7 +765,7 @@ bool PianoRollView::shouldAcceptViewportWheelScroll(Qt::ScrollPhase phase) {
 }
 
 bool PianoRollView::handleViewportNativeGesture(QNativeGestureEvent* event) {
-  if (!event || event->gestureType() != Qt::ZoomNativeGesture) {
+  if (event->gestureType() != Qt::ZoomNativeGesture) {
     return false;
   }
 
@@ -814,13 +786,8 @@ bool PianoRollView::handleViewportCoalescedZoomGesture(float rawDelta,
 
   const float factor = std::clamp(std::exp(rawDelta), 0.55f, 1.85f);
 
-  QPoint anchor = globalPos.toPoint();
-  if (m_rhiHost) {
-    // Gestures arrive in global space from the render surface.
-    anchor = m_rhiHost->mapFromGlobal(anchor);
-  } else {
-    anchor = viewport()->mapFromGlobal(anchor);
-  }
+  // Gestures arrive in global space from the render surface.
+  const QPoint anchor = m_rhiHost->mapFromGlobal(globalPos.toPoint());
 
   // Native gesture modifiers can be stale/empty on some backends. Merge with
   // live keyboard state so Option/Alt pinch reliably drives Y-axis zoom.
@@ -836,14 +803,14 @@ bool PianoRollView::handleViewportCoalescedZoomGesture(float rawDelta,
 }
 
 bool PianoRollView::handleViewportMousePress(QMouseEvent* event) {
-  if (!event || event->button() != Qt::LeftButton) {
+  if (event->button() != Qt::LeftButton) {
     return false;
   }
 
   stopDragAutoScroll();
   const Qt::KeyboardModifiers activeModifiers = mergedModifiers(event->modifiers());
   const QPoint pos = viewportPosFromGlobal(event->globalPosition());
-  if (m_scrollChrome && m_scrollChrome->handleMousePress(pos)) {
+  if (m_scrollChrome->handleMousePress(pos)) {
     refreshInteractionCursor(activeModifiers);
     event->accept();
     return true;
@@ -905,17 +872,13 @@ void PianoRollView::beginSeekDragAtX(int viewportX) {
 }
 
 bool PianoRollView::handleViewportMouseMove(QMouseEvent* event) {
-  if (!event) {
-    return false;
-  }
-
   const Qt::KeyboardModifiers activeModifiers = mergedModifiers(event->modifiers());
   // Some RHI backends can report empty event->buttons() when dragging leaves
   // the render surface. Merge with global button state to keep drags active.
   const Qt::MouseButtons activeButtons = event->buttons() | QGuiApplication::mouseButtons();
   const QPoint pos = viewportPosFromGlobal(event->globalPosition());
   const bool contentInteractionActive = m_panDragActive || m_seekDragActive || m_noteSelectionPressActive;
-  if (!contentInteractionActive && m_scrollChrome && m_scrollChrome->handleMouseMove(pos, activeButtons)) {
+  if (!contentInteractionActive && m_scrollChrome->handleMouseMove(pos, activeButtons)) {
     refreshInteractionCursor(activeModifiers);
     event->accept();
     return true;
@@ -1003,7 +966,7 @@ bool PianoRollView::handleViewportMouseMove(QMouseEvent* event) {
 }
 
 bool PianoRollView::handleViewportMouseRelease(QMouseEvent* event) {
-  if (!event || event->button() != Qt::LeftButton) {
+  if (event->button() != Qt::LeftButton) {
     return false;
   }
 
@@ -1011,7 +974,7 @@ bool PianoRollView::handleViewportMouseRelease(QMouseEvent* event) {
   const Qt::KeyboardModifiers activeModifiers = mergedModifiers(event->modifiers());
   const QPoint pos = viewportPosFromGlobal(event->globalPosition());
   if (!m_panDragActive && !m_seekDragActive && !m_noteSelectionPressActive &&
-      m_scrollChrome && m_scrollChrome->handleMouseRelease(pos)) {
+      m_scrollChrome->handleMouseRelease(pos)) {
     refreshInteractionCursor(activeModifiers);
     event->accept();
     return true;
@@ -1065,9 +1028,7 @@ void PianoRollView::handleViewportLeave() {
   if (!m_seekDragActive && !m_noteSelectionDragging) {
     stopDragAutoScroll();
   }
-  if (m_scrollChrome) {
-    m_scrollChrome->handleLeave();
-  }
+  m_scrollChrome->handleLeave();
   refreshInteractionCursor();
 }
 
@@ -1151,8 +1112,7 @@ void PianoRollView::updateInactiveNoteDimTarget(bool animated) {
   const float targetAlpha = (m_lightFrameColors && (playbackActive() || m_seekDragActive))
                                 ? kInactiveNoteDimMaxAlpha
                                 : 0.0f;
-  if (m_inactiveNoteDimAnimation &&
-      m_inactiveNoteDimAnimation->state() == QAbstractAnimation::Running &&
+  if (m_inactiveNoteDimAnimation->state() == QAbstractAnimation::Running &&
       std::abs(targetAlpha - m_inactiveNoteDimAnimation->endValue().toFloat()) <= 0.001f) {
     return;
   }
@@ -1160,10 +1120,8 @@ void PianoRollView::updateInactiveNoteDimTarget(bool animated) {
     return;
   }
 
-  if (!m_inactiveNoteDimAnimation || !animated) {
-    if (m_inactiveNoteDimAnimation) {
-      m_inactiveNoteDimAnimation->stop();
-    }
+  if (!animated) {
+    m_inactiveNoteDimAnimation->stop();
     m_inactiveNoteDimAlpha = targetAlpha;
     requestRender();
     return;
@@ -1253,13 +1211,15 @@ void PianoRollView::updateScrollBars() {
 }
 
 void PianoRollView::requestRender() {
-  if (m_rhiHost) {
-    m_rhiHost->requestUpdate();
-    if (!m_renderClock.isValid()) {
-      m_renderClock.start();
-    }
-    m_lastRenderMs = m_renderClock.elapsed();
+  if (!m_rhiHost) {
+    return;
   }
+
+  m_rhiHost->requestUpdate();
+  if (!m_renderClock.isValid()) {
+    m_renderClock.start();
+  }
+  m_lastRenderMs = m_renderClock.elapsed();
 }
 
 void PianoRollView::requestRenderCoalesced() {
@@ -1295,7 +1255,7 @@ void PianoRollView::scheduleCoalescedRender(int delayMs) {
 }
 
 void PianoRollView::stopPlaybackAutoScrollAnimation() {
-  if (m_playbackAutoScrollAnimation && m_playbackAutoScrollAnimation->state() == QAbstractAnimation::Running) {
+  if (m_playbackAutoScrollAnimation->state() == QAbstractAnimation::Running) {
     m_playbackAutoScrollAnimation->stop();
   }
   m_frameDrivenPlaybackAutoScrollActive = false;
@@ -1312,11 +1272,6 @@ void PianoRollView::advanceFrameDrivenPlaybackAutoScroll() {
   }
 
   auto* hbar = horizontalScrollBar();
-  if (!hbar) {
-    m_frameDrivenPlaybackAutoScrollActive = false;
-    return;
-  }
-
   static const QEasingCurve kPlaybackAutoScrollEasing(QEasingCurve::OutQuint);
   const qint64 elapsedNs = std::max<qint64>(0, m_animClock.nsecsElapsed() - m_frameDrivenPlaybackAutoScrollStartNs);
   const float progress = std::clamp(
@@ -1362,10 +1317,10 @@ float PianoRollView::visualPlaybackTick() const {
 
 PianoRollGeometry PianoRollView::geometry() const {
   PianoRollGeometry::Metrics metrics;
-  metrics.viewportWidth = viewport() ? viewport()->width() : 0;
-  metrics.viewportHeight = viewport() ? viewport()->height() : 0;
-  metrics.scrollX = horizontalScrollBar() ? horizontalScrollBar()->value() : 0;
-  metrics.scrollY = verticalScrollBar() ? verticalScrollBar()->value() : 0;
+  metrics.viewportWidth = viewport()->width();
+  metrics.viewportHeight = viewport()->height();
+  metrics.scrollX = horizontalScrollBar()->value();
+  metrics.scrollY = verticalScrollBar()->value();
   metrics.keyboardWidth = kKeyboardWidth;
   metrics.topBarHeight = kTopBarHeight;
   metrics.midiKeyCount = kMidiKeyCount;
@@ -1376,14 +1331,7 @@ PianoRollGeometry PianoRollView::geometry() const {
 }
 
 QPoint PianoRollView::viewportPosFromGlobal(const QPointF& globalPos) const {
-  const QPoint globalPoint = globalPos.toPoint();
-  if (m_rhiHost) {
-    return m_rhiHost->mapFromGlobal(globalPoint);
-  }
-  if (viewport()) {
-    return viewport()->mapFromGlobal(globalPoint);
-  }
-  return globalPoint;
+  return m_rhiHost->mapFromGlobal(globalPos.toPoint());
 }
 
 QPointF PianoRollView::autoScrollDeltaForGraphDrag(const QPoint& viewportPos) const {
@@ -1397,17 +1345,13 @@ QPointF PianoRollView::autoScrollDeltaForGraphDrag(const QPoint& viewportPos) co
 
   const QtUi::ScreenEdgeTravelPixels travel = QtUi::screenEdgeTravelPixels(viewport(), graphRect);
   QPointF delta = QtUi::edgeAutoScrollDelta(viewportPos, graphRect, travel, kAutoScrollRampConfig);
-  const qreal currentDpr = std::max<qreal>(1.0, viewport() ? viewport()->devicePixelRatioF() : devicePixelRatioF());
+  const qreal currentDpr = std::max<qreal>(1.0, viewport()->devicePixelRatioF());
   return delta / currentDpr;
 }
 
 // Repositions horizontal scroll so the target tick lands at the requested viewport fraction.
 void PianoRollView::scrollTickToViewportFraction(int tick, float viewportFraction, bool animated) {
   auto* hbar = horizontalScrollBar();
-  if (!hbar) {
-    return;
-  }
-
   const auto rollGeometry = geometry();
   const int noteViewportWidth = rollGeometry.noteViewportWidth();
   if (noteViewportWidth <= 0) {
@@ -1423,7 +1367,7 @@ void PianoRollView::scrollTickToViewportFraction(int tick, float viewportFractio
   if (clampedScrollX == hbar->value()) {
     return;
   }
-  if (!animated || !m_playbackAutoScrollAnimation) {
+  if (!animated) {
     stopPlaybackAutoScrollAnimation();
     m_frameDrivenPlaybackAutoScrollActive = false;
     m_applyingPlaybackAutoScroll = true;
@@ -1432,7 +1376,7 @@ void PianoRollView::scrollTickToViewportFraction(int tick, float viewportFractio
     return;
   }
 
-  if (m_rhiHost && m_rhiHost->syncPlaybackAutoScrollToRenderFrame()) {
+  if (m_rhiHost->syncPlaybackAutoScrollToRenderFrame()) {
     if (m_playbackAutoScrollAnimation->state() == QAbstractAnimation::Running) {
       m_playbackAutoScrollAnimation->stop();
     }
@@ -1902,10 +1846,6 @@ void PianoRollView::applyVerticalScale(float scale, int anchorInNotes, float wor
 }
 
 void PianoRollView::animateHorizontalScale(float targetScale, int anchorX, int durationMs) {
-  if (!m_horizontalZoomAnimation) {
-    return;
-  }
-
   const int noteViewportWidth = std::max(0, viewport()->width() - kKeyboardWidth);
   m_horizontalZoomAnchor = std::clamp(anchorX - kKeyboardWidth, 0, noteViewportWidth);
   m_horizontalZoomWorldTick = static_cast<float>(horizontalScrollBar()->value() + m_horizontalZoomAnchor) /
@@ -1921,10 +1861,6 @@ void PianoRollView::animateHorizontalScale(float targetScale, int anchorX, int d
 }
 
 void PianoRollView::animateVerticalScale(float targetScale, int anchorY, int durationMs) {
-  if (!m_verticalZoomAnimation) {
-    return;
-  }
-
   const int noteViewportHeight = std::max(0, viewport()->height() - kTopBarHeight);
   m_verticalZoomAnchor = std::clamp(anchorY - kTopBarHeight, 0, noteViewportHeight);
   m_verticalZoomWorldY = static_cast<float>(verticalScrollBar()->value() + m_verticalZoomAnchor) /

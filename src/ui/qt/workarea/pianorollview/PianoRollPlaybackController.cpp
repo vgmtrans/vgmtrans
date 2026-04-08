@@ -93,7 +93,7 @@ bool PianoRollPlaybackController::applyResolvedActiveNotes(
     if (resolved.key >= kMidiKeyCount) {
       continue;
     }
-    if (resolved.trackIndex < 0 || (isTrackEnabled && !isTrackEnabled(resolved.trackIndex))) {
+    if (resolved.trackIndex < 0 || !isTrackEnabled(resolved.trackIndex)) {
       continue;
     }
 
@@ -122,7 +122,7 @@ bool PianoRollPlaybackController::applyResolvedActiveNotes(
   }
 
   bool activeNotesChanged = true;
-  if (m_activeNotes && m_activeNotes->size() == nextActiveNotes.size()) {
+  if (m_activeNotes->size() == nextActiveNotes.size()) {
     activeNotesChanged = false;
     for (size_t i = 0; i < nextActiveNotes.size(); ++i) {
       const auto& oldNote = (*m_activeNotes)[i];
@@ -133,7 +133,7 @@ bool PianoRollPlaybackController::applyResolvedActiveNotes(
       }
     }
   }
-  if (activeNotesChanged || !m_activeNotes) {
+  if (activeNotesChanged) {
     m_activeNotes = std::make_shared<std::vector<PianoRollFrame::Note>>(std::move(nextActiveNotes));
   }
 

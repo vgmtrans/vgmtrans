@@ -28,10 +28,6 @@ PianoRollRhiWindow::~PianoRollRhiWindow() {
 }
 
 bool PianoRollRhiWindow::handleWindowEvent(QEvent* e) {
-  if (!e || !m_view) {
-    return false;
-  }
-
   // Forward all user interaction to PianoRollView so both the window-backed
   // and widget-backed surfaces share identical behavior.
   switch (e->type()) {
@@ -64,10 +60,6 @@ bool PianoRollRhiWindow::handleWindowEvent(QEvent* e) {
 }
 
 bool PianoRollRhiWindow::handleNativeGestureEvent(QNativeGestureEvent* gesture) {
-  if (!gesture || !m_view) {
-    return false;
-  }
-
   if (gesture->gestureType() != Qt::ZoomNativeGesture) {
     return m_view->handleViewportNativeGesture(gesture);
   }
@@ -79,10 +71,6 @@ bool PianoRollRhiWindow::handleNativeGestureEvent(QNativeGestureEvent* gesture) 
 }
 
 bool PianoRollRhiWindow::handleWheelEvent(QWheelEvent* wheel) {
-  if (!wheel || !m_view) {
-    return false;
-  }
-
   if (m_view->handleViewportWheel(wheel)) {
     return true;
   }
@@ -96,10 +84,6 @@ bool PianoRollRhiWindow::handleWheelEvent(QWheelEvent* wheel) {
   // semantics while staying in the RHI window input path.
   QScrollBar* hbar = m_view->horizontalScrollBar();
   QScrollBar* vbar = m_view->verticalScrollBar();
-  if (!hbar || !vbar) {
-    return false;
-  }
-
   int dx = 0;
   int dy = 0;
   const QPoint pixelDelta = wheel->pixelDelta();
@@ -140,10 +124,6 @@ bool PianoRollRhiWindow::handleWheelEvent(QWheelEvent* wheel) {
 }
 
 void PianoRollRhiWindow::drainPendingInput() {
-  if (!m_view || !m_view->viewport()) {
-    return;
-  }
-
   PianoRollRhiInputCoalescer::MouseMoveBatch mouseMoveBatch;
   if (m_inputCoalescer.takePendingMouseMove(mouseMoveBatch)) {
     const QPoint viewportPos = m_view->viewportPosFromGlobal(mouseMoveBatch.globalPos);
@@ -181,15 +161,11 @@ void PianoRollRhiWindow::drainPendingInput() {
 }
 
 void PianoRollRhiWindow::onRhiInitialized(QRhi* rhi) {
-  if (m_renderer) {
-    m_renderer->initIfNeeded(rhi);
-  }
+  m_renderer->initIfNeeded(rhi);
 }
 
 void PianoRollRhiWindow::onRhiReleased() {
-  if (m_renderer) {
-    m_renderer->releaseResources();
-  }
+  m_renderer->releaseResources();
 }
 
 void PianoRollRhiWindow::renderRhiFrame(QRhiCommandBuffer* cb,
@@ -198,10 +174,6 @@ void PianoRollRhiWindow::renderRhiFrame(QRhiCommandBuffer* cb,
                                         const QSize& pixelSize,
                                         int sampleCount,
                                         float dpr) {
-  if (!m_view || !m_view->viewport() || !m_renderer) {
-    return;
-  }
-
   m_view->drainPendingPlaybackAutoScroll();
 
   // Match HexView's frame-coalesced input model: consume merged input payloads

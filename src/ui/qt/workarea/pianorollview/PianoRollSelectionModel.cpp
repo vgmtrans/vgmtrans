@@ -54,10 +54,7 @@ PianoRollSelectionModel::SelectionUpdate PianoRollSelectionModel::applySelectedN
   // Selection snapshots only keep notes that are still visible/enabled in the current track mask.
   size_t filteredCount = 0;
   for (size_t index : indices) {
-    if (index >= notes.size()) {
-      continue;
-    }
-    if (isTrackEnabled && !isTrackEnabled(notes[index].trackIndex)) {
+    if (!isTrackEnabled(notes[index].trackIndex)) {
       continue;
     }
     indices[filteredCount++] = index;
