@@ -98,6 +98,17 @@ QColor sequenceControlBarBackgroundColor(const QWidget* context) {
   return color;
 }
 
+QColor sequenceControlBarSeparatorColor(const QWidget* context) {
+  const QPalette palette = context ? context->palette() : QPalette();
+  const bool darkPalette = isDarkPalette(palette);
+  const QColor background = sequenceControlBarBackgroundColor(context);
+  QColor separatorContrast = palette.color(QPalette::WindowText);
+  if (!separatorContrast.isValid()) {
+    separatorContrast = palette.color(QPalette::Text);
+  }
+  return blendColors(separatorContrast, background, darkPalette ? 0.3 : 0.2);
+}
+
 class BlockScrollButton final : public QToolButton {
 public:
   enum class Direction { Left, Right };
@@ -455,11 +466,7 @@ void SequenceControlBar::paintEvent(QPaintEvent* event) {
   QPainter painter(this);
   const QColor cover = sequenceControlBarBackgroundColor(this);
   const bool darkPalette = isDarkPalette(palette());
-  QColor separatorContrast = palette().color(QPalette::WindowText);
-  if (!separatorContrast.isValid()) {
-    separatorContrast = palette().color(QPalette::Text);
-  }
-  QColor separator = blendColors(separatorContrast, cover, darkPalette ? 0.3 : 0.2);
+  QColor separator = sequenceControlBarSeparatorColor(this);
   separator.setAlpha(160);
   painter.fillRect(rect(), cover);
   painter.fillRect(0, 0, 2, height(), cover);
@@ -660,9 +667,7 @@ void SequenceControlBar::rebuildChannelBlocks(const std::vector<ChannelConfig>& 
 
     block->frame = new QFrame(m_blockContainer);
     block->frame->setObjectName(QStringLiteral("MixerBlock"));
-    block->frame->setProperty("dimmed", false);
     block->frame->setProperty("leadingSeparator", m_blocks.empty());
-    block->frame->setProperty("solo", false);
     block->frame->setFixedSize(kBlockWidth, kBlockHeight);
     if (!config.title.isEmpty()) {
       const QString tooltip =
@@ -781,8 +786,6 @@ void SequenceControlBar::refreshBlockInteractivity() {
     const bool controlsDisabled = muted || blockedBySolo;
 
     if (block.frame) {
-      block.frame->setProperty("dimmed", controlsDisabled);
-      block.frame->setProperty("solo", soloed);
       applyBlockFrameStyle(block, controlsDisabled, soloed);
     }
 
@@ -821,12 +824,7 @@ void SequenceControlBar::applyBlockFrameStyle(BlockWidgets& block, bool dimmed, 
   border.setAlpha(dimmed ? 126 : 238);
   QColor fill = trackColor;
   fill.setAlpha(dimmed ? 32 : 96);
-  const QColor background = sequenceControlBarBackgroundColor(this);
-  QColor separatorContrast = palette().color(QPalette::WindowText);
-  if (!separatorContrast.isValid()) {
-    separatorContrast = palette().color(QPalette::Text);
-  }
-  QColor separator = blendColors(separatorContrast, background, darkPalette ? 0.3 : 0.2);
+  QColor separator = sequenceControlBarSeparatorColor(this);
   separator.setAlpha(dimmed ? 110 : 160);
   QColor leftSeparator = separator;
   leftSeparator.setAlpha(block.frame->property("leadingSeparator").toBool() ? separator.alpha() : 0);
