@@ -92,7 +92,7 @@ bool SuzukiSnesInstrSet::parseInstrPointers() {
     return false;
   }
 
-  if (addrDrumKitTable && readShort(addrDrumKitTable) >= 0x80) {
+  if (addrDrumKitTable && readByte(addrDrumKitTable) >= 0x80) {
     SuzukiSnesDrumKit *newDrumKitInstr = new SuzukiSnesDrumKit(this, version, DRUMKIT_PROGRAM,
       spcDirAddr, addrSRCNTable, addrTuningTable, addrADSRTable, addrDrumKitTable, "Drum Kit");
     aInstrs.push_back(newDrumKitInstr);
