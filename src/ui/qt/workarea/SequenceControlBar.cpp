@@ -36,9 +36,10 @@
 #include <utility>
 
 #include "util/Metrics.h"
+#include "util/UIHelpers.h"
 
 namespace {
-constexpr int kBarHeight = (Size::VTab * 3) / 2;
+constexpr int kBarHeight = (Size::VTab * 3) / 2 + 4;
 constexpr int kBlockWidth = 60;
 constexpr int kBlockHeight = kBarHeight;
 constexpr int kScrollButtonWidth = 22;
@@ -383,7 +384,7 @@ SequenceControlBar::SequenceControlBar(QWidget* parent)
   m_blockContainer->setObjectName(QStringLiteral("BlockContainer"));
   m_blockLayout = new QHBoxLayout(m_blockContainer);
   m_blockLayout->setContentsMargins(0, 0, 0, 0);
-  m_blockLayout->setSpacing(3);
+  m_blockLayout->setSpacing(0);
   m_blockLayout->addStretch(1);
   m_blockScroll->setWidget(m_blockContainer);
   m_blockScroll->viewport()->installEventFilter(this);
@@ -440,14 +441,31 @@ double SequenceControlBar::tempoBpm() const {
   return m_tempoSpin ? m_tempoSpin->value() : kDefaultTempoBpm;
 }
 
+void SequenceControlBar::changeEvent(QEvent* event) {
+  QWidget::changeEvent(event);
+
+  if (event->type() == QEvent::PaletteChange || event->type() == QEvent::ApplicationPaletteChange) {
+    refreshStyleSheet();
+  }
+}
+
 void SequenceControlBar::paintEvent(QPaintEvent* event) {
   Q_UNUSED(event);
 
   QPainter painter(this);
   const QColor cover = sequenceControlBarBackgroundColor(this);
+  const bool darkPalette = isDarkPalette(palette());
+  QColor separatorContrast = palette().color(QPalette::WindowText);
+  if (!separatorContrast.isValid()) {
+    separatorContrast = palette().color(QPalette::Text);
+  }
+  QColor separator = blendColors(separatorContrast, cover, darkPalette ? 0.3 : 0.2);
+  separator.setAlpha(160);
   painter.fillRect(rect(), cover);
-  painter.fillRect(0, 0, width(), 2, cover);
   painter.fillRect(0, 0, 2, height(), cover);
+  if (!darkPalette) {
+    painter.fillRect(0, 0, width(), 1, separator);
+  }
 }
 
 void SequenceControlBar::setTempoBpm(double bpm) {
@@ -643,6 +661,7 @@ void SequenceControlBar::rebuildChannelBlocks(const std::vector<ChannelConfig>& 
     block->frame = new QFrame(m_blockContainer);
     block->frame->setObjectName(QStringLiteral("MixerBlock"));
     block->frame->setProperty("dimmed", false);
+    block->frame->setProperty("leadingSeparator", m_blocks.empty());
     block->frame->setProperty("solo", false);
     block->frame->setFixedSize(kBlockWidth, kBlockHeight);
     if (!config.title.isEmpty()) {
@@ -656,29 +675,29 @@ void SequenceControlBar::rebuildChannelBlocks(const std::vector<ChannelConfig>& 
     blockLayout->setSpacing(0);
 
     auto* buttonsLayout = new QHBoxLayout();
-    buttonsLayout->setContentsMargins(2, 0, 2, 0);
+    buttonsLayout->setContentsMargins(2, 2, 2, 0);
     buttonsLayout->setSpacing(2);
     buttonsLayout->addStretch(1);
 
     block->muteButton = new QToolButton(block->frame);
     block->muteButton->setObjectName(QStringLiteral("BlockToggle"));
+    configureToolButton(
+        block->muteButton, QStringLiteral("Mute"), QSize(22, 17), QSize(), true);
     block->muteButton->setCheckable(true);
     block->muteButton->setText(QStringLiteral("M"));
-    block->muteButton->setFixedSize(22, 17);
-    block->muteButton->setToolTip(QStringLiteral("Mute"));
     buttonsLayout->addWidget(block->muteButton);
 
     block->soloButton = new QToolButton(block->frame);
     block->soloButton->setObjectName(QStringLiteral("BlockToggle"));
+    configureToolButton(
+        block->soloButton, QStringLiteral("Solo"), QSize(22, 17), QSize(), true);
     block->soloButton->setCheckable(true);
     block->soloButton->setText(QStringLiteral("S"));
-    block->soloButton->setFixedSize(22, 17);
-    block->soloButton->setToolTip(QStringLiteral("Solo"));
     buttonsLayout->addWidget(block->soloButton);
 
     buttonsLayout->addStretch(1);
     blockLayout->addLayout(buttonsLayout);
-    blockLayout->addSpacing(2);
+    blockLayout->addSpacing(0);
 
     auto* knobRow = new QHBoxLayout();
     knobRow->setContentsMargins(2, 1, 2, 0);
@@ -787,26 +806,46 @@ void SequenceControlBar::applyBlockFrameStyle(BlockWidgets& block, bool dimmed, 
     return;
   }
 
-  QColor border = block.borderColor;
-  if (!border.isValid()) {
-    border = QColor::fromHsv((block.id * 43) % 360, 190, 235);
+  QColor trackColor = block.borderColor;
+  if (!trackColor.isValid()) {
+    trackColor = QColor::fromHsv((block.id * 43) % 360, 190, 235);
   }
+  const bool darkPalette = isDarkPalette(palette());
+  QColor border = trackColor;
   if (soloed) {
     border = border.lighter(120);
   }
+  if (!darkPalette) {
+    border = border.darker(122);
+  }
   border.setAlpha(dimmed ? 126 : 238);
+  QColor fill = trackColor;
+  fill.setAlpha(dimmed ? 32 : 96);
+  const QColor background = sequenceControlBarBackgroundColor(this);
+  QColor separatorContrast = palette().color(QPalette::WindowText);
+  if (!separatorContrast.isValid()) {
+    separatorContrast = palette().color(QPalette::Text);
+  }
+  QColor separator = blendColors(separatorContrast, background, darkPalette ? 0.3 : 0.2);
+  separator.setAlpha(dimmed ? 110 : 160);
+  QColor leftSeparator = separator;
+  leftSeparator.setAlpha(block.frame->property("leadingSeparator").toBool() ? separator.alpha() : 0);
+  const int topAccentThickness = 3;
 
   const QString frameStyle = QStringLiteral(
       "QFrame#MixerBlock {"
       " border: none;"
-      " border-left: 3px solid rgba(%1,%2,%3,%4);"
+      " border-top: %1px solid %2;"
+      " border-left: 1px solid %3;"
+      " border-right: 1px solid %4;"
       " border-radius: 0px;"
-      " background: transparent;"
+      " background: %5;"
       "}")
-                                 .arg(border.red())
-                                 .arg(border.green())
-                                 .arg(border.blue())
-                                 .arg(border.alpha());
+                                 .arg(topAccentThickness)
+                                 .arg(cssColor(border))
+                                 .arg(cssColor(leftSeparator))
+                                 .arg(cssColor(separator))
+                                 .arg(cssColor(fill));
   if (block.frame->styleSheet() != frameStyle) {
     block.frame->setStyleSheet(frameStyle);
   }
@@ -852,14 +891,31 @@ void SequenceControlBar::scrollBlocks(int deltaPixels) {
 void SequenceControlBar::refreshStyleSheet() {
   const QColor barBg = sequenceControlBarBackgroundColor(this);
   const QColor text = palette().color(QPalette::WindowText);
+  const bool darkPalette = isDarkPalette(palette());
   const bool lightMode = qGray(barBg.rgb()) > 140;
 
   QColor subtleText = text;
   subtleText.setAlpha(160);
 
-  QColor buttonOff = lightMode ? QColor(167, 174, 184) : QColor(79, 86, 98);
   QColor buttonOn = lightMode ? QColor(196, 153, 90) : QColor(230, 176, 84);
-  QColor buttonText = lightMode ? QColor(248, 250, 253) : QColor(240, 242, 246);
+  buttonOn.setAlpha(lightMode ? 222 : 232);
+  QColor buttonOnHover = buttonOn.lighter(lightMode ? 104 : 108);
+  buttonOnHover.setAlpha(buttonOn.alpha());
+  QColor buttonOnPressed = buttonOn.darker(lightMode ? 106 : 110);
+  buttonOnPressed.setAlpha(buttonOn.alpha());
+
+  QColor buttonHover = text;
+  buttonHover.setAlpha(darkPalette ? 18 : 12);
+  QColor buttonPressed = text;
+  buttonPressed.setAlpha(darkPalette ? 28 : 20);
+  QColor buttonText = text;
+  buttonText.setAlpha(darkPalette ? 196 : 176);
+  QColor buttonDisabledText = palette().color(QPalette::Disabled, QPalette::WindowText);
+  if (!buttonDisabledText.isValid()) {
+    buttonDisabledText = text;
+  }
+  buttonDisabledText.setAlpha(darkPalette ? 98 : 88);
+  const QColor checkedText = contrastingTextColor(buttonOn, barBg, palette());
 
   const QString style = QStringLiteral(
       "QWidget#SequenceControlBar {"
@@ -905,42 +961,50 @@ void SequenceControlBar::refreshStyleSheet() {
       " font-size: 9px;"
       "}"
       "QToolButton#BlockToggle {"
-      " border: 1px solid rgba(255,255,255,0.14);"
-      " border-radius: 3px;"
-      " background: rgba(%6,%7,%8,200);"
-      " color: rgba(%9,%10,%11,220);"
-      " font-size: 9px;"
+      " border: none;"
+      " border-radius: 5px;"
+      " background: transparent;"
+      " color: %6;"
+      " font-size: 11px;"
       " font-weight: 700;"
       " padding: 0px;"
       "}"
-      "QToolButton#BlockToggle:checked {"
-      " background: rgba(%12,%13,%14,230);"
-      " color: rgba(%9,%10,%11,255);"
-      " border: 1px solid rgba(255,255,255,0.28);"
+      "QToolButton#BlockToggle:hover {"
+      " background: %7;"
+      " color: %8;"
       "}"
+      "QToolButton#BlockToggle:pressed {"
+      " background: %9;"
+      " color: %8;"
+      "}"
+      "QToolButton#BlockToggle:checked {"
+      " background: %10;"
+      " color: %11;"
+      "}"
+      "QToolButton#BlockToggle:checked:hover { background: %12; }"
+      "QToolButton#BlockToggle:checked:pressed { background: %13; }"
       "QToolButton#BlockToggle:disabled {"
-      " background: rgba(0,0,0,0.28);"
-      " color: rgba(255,255,255,0.22);"
-      " border: 1px solid rgba(255,255,255,0.08);"
+      " background: transparent;"
+      " color: %14;"
       "}"
       "QWidget#BlockScrollControls {"
       " border: none;"
       " background: transparent;"
       "}")
-                           .arg(barBg.name())
+                           .arg(cssColor(barBg))
                            .arg(subtleText.red())
                            .arg(subtleText.green())
                            .arg(subtleText.blue())
                            .arg(subtleText.alpha())
-                           .arg(buttonOff.red())
-                           .arg(buttonOff.green())
-                           .arg(buttonOff.blue())
-                           .arg(buttonText.red())
-                           .arg(buttonText.green())
-                           .arg(buttonText.blue())
-                           .arg(buttonOn.red())
-                           .arg(buttonOn.green())
-                           .arg(buttonOn.blue());
+                           .arg(cssColor(buttonText))
+                           .arg(cssColor(buttonHover))
+                           .arg(cssColor(text))
+                           .arg(cssColor(buttonPressed))
+                           .arg(cssColor(buttonOn))
+                           .arg(cssColor(checkedText))
+                           .arg(cssColor(buttonOnHover))
+                           .arg(cssColor(buttonOnPressed))
+                           .arg(cssColor(buttonDisabledText));
 
   if (styleSheet() != style) {
     setStyleSheet(style);
