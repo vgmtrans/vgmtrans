@@ -62,6 +62,7 @@ signals:
   void chanVolumeChanged(int channelId, int volume);
 
 protected:
+  void changeEvent(QEvent* event) override;
   void paintEvent(QPaintEvent* event) override;
   void resizeEvent(QResizeEvent* event) override;
   bool eventFilter(QObject* watched, QEvent* event) override;
