@@ -36,10 +36,6 @@ public:
   };
 
   void queueMouseMove(const QMouseEvent* event) {
-    if (!event) {
-      return;
-    }
-
     m_pendingMouseMove = true;
     m_mouseMove.globalPos = event->globalPosition();
     m_mouseMove.modifiers = event->modifiers();
@@ -57,10 +53,6 @@ public:
   }
 
   void queueWheel(const QWheelEvent* event) {
-    if (!event) {
-      return;
-    }
-
     m_pendingWheel = true;
 
     QPoint pixel = event->pixelDelta();
@@ -89,7 +81,7 @@ public:
   }
 
   void queueNativeZoomGesture(const QNativeGestureEvent* event) {
-    if (!event || event->gestureType() != Qt::ZoomNativeGesture) {
+    if (event->gestureType() != Qt::ZoomNativeGesture) {
       return;
     }
 

@@ -44,26 +44,22 @@ PianoRollRhiWidget::~PianoRollRhiWidget() {
 
 void PianoRollRhiWidget::initialize(QRhiCommandBuffer* cb) {
   Q_UNUSED(cb);
-  if (m_renderer) {
-    m_renderer->initIfNeeded(rhi());
-  }
+  m_renderer->initIfNeeded(rhi());
 }
 
 void PianoRollRhiWidget::render(QRhiCommandBuffer* cb) {
-  if (m_view) {
-    m_view->drainPendingPlaybackAutoScroll();
+  m_view->drainPendingPlaybackAutoScroll();
 
-    PianoRollRhiInputCoalescer::MouseMoveBatch mouseMoveBatch;
-    if (m_inputCoalescer.takePendingMouseMove(mouseMoveBatch)) {
-      const QPoint viewportPos = m_view->viewportPosFromGlobal(mouseMoveBatch.globalPos);
-      QMouseEvent mouseEvent(QEvent::MouseMove,
-                             QPointF(viewportPos),
-                             mouseMoveBatch.globalPos,
-                             Qt::NoButton,
-                             mouseMoveBatch.buttons,
-                             mouseMoveBatch.modifiers);
-      m_view->handleViewportMouseMove(&mouseEvent);
-    }
+  PianoRollRhiInputCoalescer::MouseMoveBatch mouseMoveBatch;
+  if (m_inputCoalescer.takePendingMouseMove(mouseMoveBatch)) {
+    const QPoint viewportPos = m_view->viewportPosFromGlobal(mouseMoveBatch.globalPos);
+    QMouseEvent mouseEvent(QEvent::MouseMove,
+                           QPointF(viewportPos),
+                           mouseMoveBatch.globalPos,
+                           Qt::NoButton,
+                           mouseMoveBatch.buttons,
+                           mouseMoveBatch.modifiers);
+    m_view->handleViewportMouseMove(&mouseEvent);
   }
 
   if (!cb) {
@@ -75,9 +71,6 @@ void PianoRollRhiWidget::render(QRhiCommandBuffer* cb) {
     return;
   }
 
-  if (!m_renderer) {
-    return;
-  }
   m_renderer->initIfNeeded(widgetRhi);
 
   QRhiRenderTarget* rt = renderTarget();
@@ -93,15 +86,13 @@ void PianoRollRhiWidget::render(QRhiCommandBuffer* cb) {
   info.dpr = rt->devicePixelRatio();
   m_renderer->renderFrame(cb, info);
 
-  if (m_view && m_view->shouldPumpPlaybackFrames()) {
+  if (m_view->shouldPumpPlaybackFrames()) {
     update();
   }
 }
 
 void PianoRollRhiWidget::releaseResources() {
-  if (m_renderer) {
-    m_renderer->releaseResources();
-  }
+  m_renderer->releaseResources();
 }
 
 void PianoRollRhiWidget::resizeEvent(QResizeEvent* event) {
@@ -110,9 +101,9 @@ void PianoRollRhiWidget::resizeEvent(QResizeEvent* event) {
 }
 
 bool PianoRollRhiWidget::event(QEvent* event) {
-  if (event && event->type() == QEvent::NativeGesture) {
+  if (event->type() == QEvent::NativeGesture) {
     // Keep pinch/gesture handling centralized in PianoRollView.
-    if (m_view && m_view->handleViewportNativeGesture(static_cast<QNativeGestureEvent*>(event))) {
+    if (m_view->handleViewportNativeGesture(static_cast<QNativeGestureEvent*>(event))) {
       return true;
     }
   }
@@ -121,15 +112,13 @@ bool PianoRollRhiWidget::event(QEvent* event) {
 }
 
 void PianoRollRhiWidget::leaveEvent(QEvent* event) {
-  if (m_view) {
-    m_view->handleViewportLeave();
-    update();
-  }
+  m_view->handleViewportLeave();
+  update();
   QRhiWidget::leaveEvent(event);
 }
 
 void PianoRollRhiWidget::wheelEvent(QWheelEvent* event) {
-  if (m_view && m_view->handleViewportWheel(event)) {
+  if (m_view->handleViewportWheel(event)) {
     return;
   }
 
@@ -137,7 +126,7 @@ void PianoRollRhiWidget::wheelEvent(QWheelEvent* event) {
 }
 
 void PianoRollRhiWidget::mousePressEvent(QMouseEvent* event) {
-  if (m_view && m_view->handleViewportMousePress(event)) {
+  if (m_view->handleViewportMousePress(event)) {
     return;
   }
 
@@ -145,18 +134,13 @@ void PianoRollRhiWidget::mousePressEvent(QMouseEvent* event) {
 }
 
 void PianoRollRhiWidget::mouseMoveEvent(QMouseEvent* event) {
-  if (m_view) {
-    m_inputCoalescer.queueMouseMove(event);
-    update();
-    event->accept();
-    return;
-  }
-
-  event->ignore();
+  m_inputCoalescer.queueMouseMove(event);
+  update();
+  event->accept();
 }
 
 void PianoRollRhiWidget::mouseReleaseEvent(QMouseEvent* event) {
-  if (m_view && m_view->handleViewportMouseRelease(event)) {
+  if (m_view->handleViewportMouseRelease(event)) {
     return;
   }
 
