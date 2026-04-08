@@ -250,6 +250,8 @@ jobs:
           # Windows users get frightened at the sight of GNU directories.
           cmake --preset win-${{ matrix.target }} `
             -DINSTALL_CHANGELOG=ON `
+            -DINSTALL_CLI=ON `
+            -DINSTALL_SHELL=ON `
             -DQT_DEBUG_FIND_PACKAGE=${{runner.debug == '1' && 'ON' || 'OFF' }} `
             -DCMAKE_VERBOSE_MAKEFILE=${{runner.debug == '1' && 'ON' || 'OFF' }} `
             -DCMAKE_FIND_DEBUG_MODE=${{runner.debug == '1' && 'ON' || 'OFF' }} `
@@ -262,7 +264,7 @@ jobs:
          run: |
            cmake --build `
             --preset win-${{ matrix.target }}-release `
-            --target vgmtrans vgmtrans-shell
+            --target vgmtrans vgmtrans-cli vgmtrans-shell
 
        - name: "Package project"
          run: |
