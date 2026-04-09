@@ -43,6 +43,7 @@
 #include "UIHelpers.h"
 #include "services/NotificationCenter.h"
 #include "util/TintableSvgIconEngine.h"
+#include "widgets/MenuPopupToolButton.h"
 
 namespace {
 
@@ -595,8 +596,7 @@ void MdiArea::setupTabBarControls() {
     controlsLayout->setContentsMargins(kTabControlOuterMargin, 0, kTabControlOuterMargin, 0);
     controlsLayout->setSpacing(kTabControlSpacing);
 
-    auto createIconButton = [this](QWidget *parent, const QString &toolTip) {
-      auto *button = new QToolButton(parent);
+    auto configureButton = [](QToolButton *button, const QString &toolTip) {
       button->setAutoRaise(false);
       button->setToolButtonStyle(Qt::ToolButtonIconOnly);
       button->setIconSize(QSize(24, 18));
@@ -606,12 +606,17 @@ void MdiArea::setupTabBarControls() {
       return button;
     };
 
-    m_leftPaneButton = createIconButton(m_tabControls, tr("Select left pane view"));
-    m_leftPaneButton->setPopupMode(QToolButton::InstantPopup);
+    auto createIconButton = [&configureButton](QWidget *parent, const QString &toolTip) {
+      return configureButton(new QToolButton(parent), toolTip);
+    };
+    auto createMenuButton = [&configureButton](QWidget *parent, const QString &toolTip) {
+      return configureButton(new MenuPopupToolButton(parent), toolTip);
+    };
+
+    m_leftPaneButton = createMenuButton(m_tabControls, tr("Select left pane view"));
     controlsLayout->addWidget(m_leftPaneButton);
 
-    m_rightPaneButton = createIconButton(m_tabControls, tr("Select or hide right pane view"));
-    m_rightPaneButton->setPopupMode(QToolButton::InstantPopup);
+    m_rightPaneButton = createMenuButton(m_tabControls, tr("Select or hide right pane view"));
     controlsLayout->addWidget(m_rightPaneButton);
 
     m_sequenceControlBarButton = createIconButton(m_tabControls, tr("Show sequence control bar"));

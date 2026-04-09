@@ -53,6 +53,7 @@ target_sources(vgmtrans
     util/Helpers.cpp
     util/UIHelpers.cpp
     widgets/ItemViewDensity.cpp
+    widgets/MenuPopupToolButton.cpp
     widgets/SeekBar.cpp
     widgets/MarqueeLabel.cpp
     widgets/StatusBarContent.cpp
@@ -129,6 +130,7 @@ target_sources(vgmtrans
     FILES
       widgets/FixedHeightListDelegate.h
       widgets/ItemViewDensity.h
+      widgets/MenuPopupToolButton.h
       widgets/SeekBar.h
       widgets/MarqueeLabel.h
       widgets/StatusBarContent.h
