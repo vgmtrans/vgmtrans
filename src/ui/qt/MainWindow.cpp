@@ -29,7 +29,7 @@
 #include <QDBusReply>
 #include <QVariantMap>
 #endif
-#if defined(Q_OS_LINUX)
+#if defined(Q_OS_LINUX) && QT_CONFIG(vulkan)
 #include <QRhiWidget>
 #endif
 #include <filesystem>
@@ -266,15 +266,6 @@ void MainWindow::createElements() {
   });
   createStatusBar();
   m_toastHost = new ToastHost(this);
-
-#if defined(Q_OS_LINUX) && QT_CONFIG(opengl)
-  m_rhiPrimer = new QRhiWidget(this);
-  m_rhiPrimer->setApi(QRhiWidget::Api::OpenGL);
-  resize(1280, 800);
-  m_rhiPrimer->setAttribute(Qt::WA_TransparentForMouseEvents);
-  m_rhiPrimer->setFocusPolicy(Qt::NoFocus);
-  m_rhiPrimer->hide();
-#endif
 }
 
 void MainWindow::configureWindowAgent() {

@@ -128,13 +128,14 @@ void ActiveNoteRhiRenderer::renderFrame(QRhiCommandBuffer* cb, const RenderTarge
     m_staticBuffersUploaded = true;
   }
 
-  QMatrix4x4 mvp;
-  mvp.ortho(0.0f,
-            static_cast<float>(target.pixelSize.width()),
-            static_cast<float>(target.pixelSize.height()),
-            0.0f,
-            -1.0f,
-            1.0f);
+  QMatrix4x4 proj;
+  proj.ortho(0.0f,
+             static_cast<float>(target.pixelSize.width()),
+             static_cast<float>(target.pixelSize.height()),
+             0.0f,
+             -1.0f,
+             1.0f);
+  QMatrix4x4 mvp = m_rhi->clipSpaceCorrMatrix() * proj;
   updates->updateDynamicBuffer(m_uniformBuffer, 0, kMat4Bytes, mvp.constData());
 
   if (!m_instances.empty()) {
@@ -148,6 +149,7 @@ void ActiveNoteRhiRenderer::renderFrame(QRhiCommandBuffer* cb, const RenderTarge
   cb->setViewport(QRhiViewport(0, 0,
                                static_cast<float>(target.pixelSize.width()),
                                static_cast<float>(target.pixelSize.height())));
+  cb->setScissor(QRhiScissor(0, 0, target.pixelSize.width(), target.pixelSize.height()));
 
   if (m_pipeline && m_shaderBindings && !m_instances.empty() && m_instanceBuffer) {
     cb->setGraphicsPipeline(m_pipeline);

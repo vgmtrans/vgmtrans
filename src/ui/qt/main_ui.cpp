@@ -8,7 +8,7 @@
 #include <QFile>
 #include <QFileOpenEvent>
 #include <QFontDatabase>
-#if defined(Q_OS_LINUX) && QT_CONFIG(opengl)
+#if defined(Q_OS_LINUX) && QT_CONFIG(vulkan)
 #include <QRhiWidget>
 #endif
 #include <QTimer>
@@ -67,17 +67,18 @@ int main(int argc, char *argv[]) {
 
   MainWindow window;
 
-#if defined(Q_OS_LINUX) && QT_CONFIG(opengl)
+#if defined(Q_OS_LINUX) && QT_CONFIG(vulkan)
   // Prime QRhiWidget once at startup to avoid first-use window re-creation. Not necessary for other platforms
   // where we use a QWindow instead of QRhiWidget.
-  auto* rhiPrimer = new QRhiWidget(&window);
-  rhiPrimer->setApi(QRhiWidget::Api::OpenGL);
+  auto* rhiPrimer = new QRhiWidget(nullptr);
+  rhiPrimer->setApi(QRhiWidget::Api::Vulkan);
+  rhiPrimer->setParent(&window);
   rhiPrimer->hide();
 #endif
 
   window.show();
 
-#if defined(Q_OS_LINUX) && QT_CONFIG(opengl)
+#if defined(Q_OS_LINUX) && QT_CONFIG(vulkan)
   QTimer::singleShot(0, rhiPrimer, &QObject::deleteLater);
 #endif
 

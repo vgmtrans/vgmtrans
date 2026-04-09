@@ -436,13 +436,14 @@ void PianoRollRhiRenderer::renderFrame(QRhiCommandBuffer* cb, const RenderTarget
     m_staticBuffersUploaded = true;
   }
 
-  QMatrix4x4 mvp;
-  mvp.ortho(0.0f,
-            static_cast<float>(logicalSize.width()),
-            static_cast<float>(logicalSize.height()),
-            0.0f,
-            -1.0f,
-            1.0f);
+  QMatrix4x4 proj;
+  proj.ortho(0.0f,
+             static_cast<float>(logicalSize.width()),
+             static_cast<float>(logicalSize.height()),
+             0.0f,
+             -1.0f,
+             1.0f);
+  QMatrix4x4 mvp = m_rhi->clipSpaceCorrMatrix() * proj;
   std::array<float, 32> ubo{};
   std::memcpy(ubo.data(), mvp.constData(), kMat4Bytes);
   // Camera packs scroll and world-space scale factors for shader-side transforms.
@@ -506,6 +507,7 @@ void PianoRollRhiRenderer::renderFrame(QRhiCommandBuffer* cb, const RenderTarget
                               static_cast<float>(target.pixelSize.width()),
                               static_cast<float>(target.pixelSize.height()));
   cb->setViewport(viewport);
+  cb->setScissor(QRhiScissor(0, 0, target.pixelSize.width(), target.pixelSize.height()));
 
   auto drawInstances = [&](QRhiGraphicsPipeline* pipeline,
                            QRhiBuffer* buffer,

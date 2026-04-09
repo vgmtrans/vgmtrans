@@ -23,7 +23,7 @@ PianoRollRhiWidget::PianoRollRhiWidget(PianoRollView* view,
       m_renderer(renderer) {
   // Match the platform's preferred graphics backend for QRhiWidget.
 #if defined(Q_OS_LINUX)
-  setApi(QRhiWidget::Api::OpenGL);
+  setApi(QRhiWidget::Api::Vulkan);
 #elif defined(Q_OS_WIN)
   setApi(QRhiWidget::Api::Direct3D11);
 #elif defined(Q_OS_MACOS) || defined(Q_OS_IOS)
