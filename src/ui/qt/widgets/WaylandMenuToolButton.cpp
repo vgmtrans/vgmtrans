@@ -11,7 +11,7 @@ WaylandMenuToolButton::WaylandMenuToolButton(QWidget *parent) : QToolButton(pare
   setPopupMode(QToolButton::InstantPopup);
 }
 
-bool WaylandMenuToolButton::shouldUsePopupOnPress() {
+bool WaylandMenuToolButton::isWaylandPlatform() {
 #ifdef Q_OS_LINUX
   return QGuiApplication::platformName().contains(QStringLiteral("wayland"), Qt::CaseInsensitive);
 #else
@@ -21,7 +21,7 @@ bool WaylandMenuToolButton::shouldUsePopupOnPress() {
 
 bool WaylandMenuToolButton::shouldHandleMousePress(const QMouseEvent &event) const {
   QMenu *popupMenu = menu();
-  return shouldUsePopupOnPress() && event.button() == Qt::LeftButton && popupMenu != nullptr &&
+  return isWaylandPlatform() && event.button() == Qt::LeftButton && popupMenu != nullptr &&
          !popupMenu->isVisible() && hitButton(event.position().toPoint());
 }
 
@@ -93,7 +93,7 @@ void WaylandMenuToolButton::mousePressEvent(QMouseEvent *event) {
 
 void WaylandMenuToolButton::mouseReleaseEvent(QMouseEvent *event) {
   // Swallow the release that opened the menu so QToolButton does not process the same click twice.
-  if (shouldUsePopupOnPress() && m_menuOpenedFromPress && event->button() == Qt::LeftButton) {
+  if (isWaylandPlatform() && m_menuOpenedFromPress && event->button() == Qt::LeftButton) {
     event->accept();
     return;
   }

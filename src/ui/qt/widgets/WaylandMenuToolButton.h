@@ -18,7 +18,7 @@ protected:
   void mouseReleaseEvent(QMouseEvent *event) override;
 
 private:
-  [[nodiscard]] static bool shouldUsePopupOnPress();
+  [[nodiscard]] static bool isWaylandPlatform();
   [[nodiscard]] bool shouldHandleMousePress(const QMouseEvent &event) const;
   [[nodiscard]] QPoint popupMenuPosition(const QMenu &menu) const;
   void popupMenuFromPress();
