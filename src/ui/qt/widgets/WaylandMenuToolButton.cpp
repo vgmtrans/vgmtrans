@@ -1,4 +1,4 @@
-#include "MenuPopupToolButton.h"
+#include "WaylandMenuToolButton.h"
 
 #include <QGuiApplication>
 #include <QMenu>
@@ -7,11 +7,11 @@
 #include <QRect>
 #include <QScreen>
 
-MenuPopupToolButton::MenuPopupToolButton(QWidget *parent) : QToolButton(parent) {
+WaylandMenuToolButton::WaylandMenuToolButton(QWidget *parent) : QToolButton(parent) {
   setPopupMode(QToolButton::InstantPopup);
 }
 
-bool MenuPopupToolButton::shouldUsePopupOnPress() {
+bool WaylandMenuToolButton::shouldUsePopupOnPress() {
 #ifdef Q_OS_LINUX
   return QGuiApplication::platformName().contains(QStringLiteral("wayland"), Qt::CaseInsensitive);
 #else
@@ -19,13 +19,13 @@ bool MenuPopupToolButton::shouldUsePopupOnPress() {
 #endif
 }
 
-bool MenuPopupToolButton::shouldHandleMousePress(const QMouseEvent &event) const {
+bool WaylandMenuToolButton::shouldHandleMousePress(const QMouseEvent &event) const {
   QMenu *popupMenu = menu();
   return shouldUsePopupOnPress() && event.button() == Qt::LeftButton && popupMenu != nullptr &&
          !popupMenu->isVisible() && hitButton(event.position().toPoint());
 }
 
-QPoint MenuPopupToolButton::popupMenuPosition(const QMenu &menu) const {
+QPoint WaylandMenuToolButton::popupMenuPosition(const QMenu &menu) const {
   const QRect rect = this->rect();
   const QSize sizeHint = menu.sizeHint();
   QScreen *screen = QGuiApplication::screenAt(mapToGlobal(rect.center()));
@@ -60,7 +60,7 @@ QPoint MenuPopupToolButton::popupMenuPosition(const QMenu &menu) const {
   return pos;
 }
 
-void MenuPopupToolButton::popupMenuFromPress() {
+void WaylandMenuToolButton::popupMenuFromPress() {
   QMenu *popupMenu = menu();
   Q_ASSERT(popupMenu);
 
@@ -71,17 +71,17 @@ void MenuPopupToolButton::popupMenuFromPress() {
   connect(popupMenu,
           &QMenu::aboutToHide,
           this,
-          &MenuPopupToolButton::onMenuAboutToHide,
+          &WaylandMenuToolButton::onMenuAboutToHide,
           Qt::UniqueConnection);
   popupMenu->setNoReplayFor(this);
   popupMenu->popup(popupMenuPosition(*popupMenu));
 }
 
-void MenuPopupToolButton::onMenuAboutToHide() {
+void WaylandMenuToolButton::onMenuAboutToHide() {
   m_menuOpenedFromPress = false;
 }
 
-void MenuPopupToolButton::mousePressEvent(QMouseEvent *event) {
+void WaylandMenuToolButton::mousePressEvent(QMouseEvent *event) {
   if (shouldHandleMousePress(*event)) {
     event->accept();
     popupMenuFromPress();
@@ -91,7 +91,7 @@ void MenuPopupToolButton::mousePressEvent(QMouseEvent *event) {
   QToolButton::mousePressEvent(event);
 }
 
-void MenuPopupToolButton::mouseReleaseEvent(QMouseEvent *event) {
+void WaylandMenuToolButton::mouseReleaseEvent(QMouseEvent *event) {
   // Swallow the release that opened the menu so QToolButton does not process the same click twice.
   if (shouldUsePopupOnPress() && m_menuOpenedFromPress && event->button() == Qt::LeftButton) {
     event->accept();

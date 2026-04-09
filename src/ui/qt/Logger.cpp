@@ -24,6 +24,9 @@
 #include "QtVGMRoot.h"
 #include "TitleBar.h"
 #include "util/UIHelpers.h"
+#ifdef Q_OS_LINUX
+#include "widgets/WaylandMenuToolButton.h"
+#endif
 
 static Logger *s_instance = nullptr;
 
@@ -145,7 +148,12 @@ void Logger::installTitleBarControls(TitleBar *titleBar) {
     return button;
   };
 
-  m_filterButton = new QToolButton(titleBar);
+  m_filterButton =
+#ifdef Q_OS_LINUX
+      new WaylandMenuToolButton(titleBar);
+#else
+      new QToolButton(titleBar);
+#endif
   configureToolButton(m_filterButton, QStringLiteral("Log level"), QSize(), QSize(), true);
   m_filterButton->setPopupMode(QToolButton::InstantPopup);
   m_filterButton->setText(filterButtonText(m_level));

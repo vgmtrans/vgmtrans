@@ -7,11 +7,11 @@ class QMouseEvent;
 class QWidget;
 
 // Uses QMenu::popup() for Wayland mouse activation to avoid QToolButton's internal exec() path.
-class MenuPopupToolButton final : public QToolButton {
+class WaylandMenuToolButton final : public QToolButton {
   Q_OBJECT
 
 public:
-  explicit MenuPopupToolButton(QWidget *parent = nullptr);
+  explicit WaylandMenuToolButton(QWidget *parent = nullptr);
 
 protected:
   void mousePressEvent(QMouseEvent *event) override;

@@ -44,7 +44,7 @@
 #include "services/NotificationCenter.h"
 #include "util/TintableSvgIconEngine.h"
 #ifdef Q_OS_LINUX
-#include "widgets/MenuPopupToolButton.h"
+#include "widgets/WaylandMenuToolButton.h"
 #endif
 
 namespace {
@@ -613,7 +613,8 @@ void MdiArea::setupTabBarControls() {
     };
     auto createMenuButton = [&configureButton, &createIconButton](QWidget *parent, const QString &toolTip) {
 #ifdef Q_OS_LINUX
-      return configureButton(new MenuPopupToolButton(parent), toolTip);
+      // On Wayland, QToolButton::showMenu() intermittently fails. So we use a workaround.
+      return configureButton(new WaylandMenuToolButton(parent), toolTip);
 #else
       auto *button = createIconButton(parent, toolTip);
       button->setPopupMode(QToolButton::InstantPopup);
