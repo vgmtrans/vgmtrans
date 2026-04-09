@@ -43,7 +43,9 @@
 #include "UIHelpers.h"
 #include "services/NotificationCenter.h"
 #include "util/TintableSvgIconEngine.h"
+#ifdef Q_OS_LINUX
 #include "widgets/MenuPopupToolButton.h"
+#endif
 
 namespace {
 
@@ -609,8 +611,14 @@ void MdiArea::setupTabBarControls() {
     auto createIconButton = [&configureButton](QWidget *parent, const QString &toolTip) {
       return configureButton(new QToolButton(parent), toolTip);
     };
-    auto createMenuButton = [&configureButton](QWidget *parent, const QString &toolTip) {
+    auto createMenuButton = [&configureButton, &createIconButton](QWidget *parent, const QString &toolTip) {
+#ifdef Q_OS_LINUX
       return configureButton(new MenuPopupToolButton(parent), toolTip);
+#else
+      auto *button = createIconButton(parent, toolTip);
+      button->setPopupMode(QToolButton::InstantPopup);
+      return button;
+#endif
     };
 
     m_leftPaneButton = createMenuButton(m_tabControls, tr("Select left pane view"));

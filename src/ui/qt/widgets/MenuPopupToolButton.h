@@ -1,6 +1,5 @@
 #pragma once
 
-#include <QPointer>
 #include <QToolButton>
 
 class QMenu;
@@ -20,11 +19,10 @@ protected:
 
 private:
   [[nodiscard]] static bool shouldUsePopupOnPress();
-  [[nodiscard]] bool shouldHandleMousePress(const QMouseEvent *event) const;
+  [[nodiscard]] bool shouldHandleMousePress(const QMouseEvent &event) const;
   [[nodiscard]] QPoint popupMenuPosition(const QMenu &menu) const;
   void popupMenuFromPress();
   void onMenuAboutToHide();
 
-  QPointer<QMenu> m_popupMenu;
   bool m_menuOpenedFromPress = false;
 };
