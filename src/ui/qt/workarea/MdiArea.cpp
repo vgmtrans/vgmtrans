@@ -622,12 +622,6 @@ void MdiArea::setupTabBarControls() {
 #endif
     };
 
-    m_leftPaneButton = createMenuButton(m_tabControls, tr("Select left pane view"));
-    controlsLayout->addWidget(m_leftPaneButton);
-
-    m_rightPaneButton = createMenuButton(m_tabControls, tr("Select or hide right pane view"));
-    controlsLayout->addWidget(m_rightPaneButton);
-
     m_sequenceControlBarButton = createIconButton(m_tabControls, tr("Show sequence control bar"));
     m_sequenceControlBarButton->setCheckable(true);
     controlsLayout->addWidget(m_sequenceControlBarButton);
@@ -635,6 +629,12 @@ void MdiArea::setupTabBarControls() {
             &QToolButton::toggled,
             this,
             [this](bool visible) { setSequenceControlBarVisible(visible); });
+
+    m_leftPaneButton = createMenuButton(m_tabControls, tr("Select left pane view"));
+    controlsLayout->addWidget(m_leftPaneButton);
+
+    m_rightPaneButton = createMenuButton(m_tabControls, tr("Select or hide right pane view"));
+    controlsLayout->addWidget(m_rightPaneButton);
 
     auto createPaneMenu = [this](QToolButton *button,
                                  PanelSide side,
