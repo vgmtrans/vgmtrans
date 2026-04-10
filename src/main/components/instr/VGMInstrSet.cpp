@@ -107,7 +107,9 @@ bool VGMInstrSet::loadInstrs() {
 void VGMInstrSet::prepareForExport(const VGMColl* coll) {
   cleanupAfterExport();
   m_exportInstrs = aInstrs;
-  useColl(coll);
+  if (coll != nullptr) {
+    useColl(coll);
+  }
 }
 
 void VGMInstrSet::cleanupAfterExport() {
