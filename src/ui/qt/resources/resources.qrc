@@ -29,6 +29,7 @@
   <file>icons/volume.svg</file>
   <file>icons/adsr.svg</file>
   <file>icons/pan.svg</file>
+  <file>icons/playback-auto-scroll.svg</file>
   <file>icons/repeat-begin.svg</file>
   <file>icons/repeat-end.svg</file>
   <file>icons/pitchbend.svg</file>

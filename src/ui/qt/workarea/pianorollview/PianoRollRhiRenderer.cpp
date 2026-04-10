@@ -19,6 +19,7 @@
 #include <QImage>
 #include <QMatrix4x4>
 #include <QPainter>
+#include <QSvgRenderer>
 #include <QString>
 
 #include <algorithm>
@@ -46,6 +47,12 @@ static constexpr int kUniformBytes = (16 + 4 + 4 + 4 + 4) * sizeof(float);
 static constexpr int kMeasureLabelFontPixelSize = 11;
 static constexpr int kMeasureLabelPaddingPx = 2;
 static constexpr float kActiveLaserAuraPadPx = 72.0f;
+constexpr char kPlaybackAutoScrollIconGlyph = '~';
+
+void renderPlaybackAutoScrollIcon(QPainter& painter, const QRectF& rect) {
+  QSvgRenderer renderer(QStringLiteral(":/icons/playback-auto-scroll.svg"));
+  renderer.render(&painter, rect);
+}
 
 bool isBlackMidiKey(int key) {
   switch (key % 12) {
@@ -824,11 +831,12 @@ void PianoRollRhiRenderer::ensureMeasureLabelAtlas(QRhiResourceUpdateBatch* upda
   QFontMetrics metrics(font);
 
   std::array<bool, 128> hasGlyph{};
-  const char* atlasChars = "0123456789C-~";
+  const char* atlasChars = "0123456789C-";
   for (const char* ch = atlasChars; *ch != '\0'; ++ch) {
     const unsigned char code = static_cast<unsigned char>(*ch);
     hasGlyph[code] = true;
   }
+  hasGlyph[static_cast<unsigned char>(kPlaybackAutoScrollIconGlyph)] = true;
 
   const int glyphHeight = std::max(1, metrics.height());
   const int atlasHeight = glyphHeight + (2 * kMeasureLabelPaddingPx);
@@ -838,10 +846,9 @@ void PianoRollRhiRenderer::ensureMeasureLabelAtlas(QRhiResourceUpdateBatch* upda
     if (!hasGlyph[static_cast<size_t>(code)]) {
       continue;
     }
-    const QString text(QChar(static_cast<char16_t>(code)));
-    const int advance = (code == '~')
+    const int advance = (code == kPlaybackAutoScrollIconGlyph)
         ? std::max(1, glyphHeight)
-        : std::max(1, metrics.horizontalAdvance(text));
+        : std::max(1, metrics.horizontalAdvance(QChar(static_cast<char16_t>(code))));
     advances[static_cast<size_t>(code)] = advance;
     atlasWidth += advance + kMeasureLabelPaddingPx;
   }
@@ -862,47 +869,13 @@ void PianoRollRhiRenderer::ensureMeasureLabelAtlas(QRhiResourceUpdateBatch* upda
       continue;
     }
     const int advance = advances[static_cast<size_t>(code)];
-    if (code == '~') {
-      const qreal iconLeft = static_cast<qreal>(cursorX);
-      const qreal iconTop = static_cast<qreal>(kMeasureLabelPaddingPx);
-      const qreal iconSize = static_cast<qreal>(glyphHeight);
-      const qreal centerX = iconLeft + (static_cast<qreal>(advance) * 0.5);
-      const qreal centerY = iconTop + (iconSize * 0.56);
-      const qreal arm = iconSize * 0.22;
-      const qreal chevronInset = 0.0;
-      const qreal stemTop = iconTop + (iconSize * 0.36);
-      const qreal stemBottom = iconTop + (iconSize * 0.90);
-      const qreal headHalfWidth = iconSize * 0.31;
-      const qreal headTop = iconTop + (iconSize * 0.03);
-      const qreal headBottom = stemTop;
-
-      QPen chevronPen(Qt::white);
-      chevronPen.setWidthF(std::max(1.5f, atlasScale * 1.2f));
-      chevronPen.setCapStyle(Qt::RoundCap);
-      chevronPen.setJoinStyle(Qt::RoundJoin);
-      painter.setPen(chevronPen);
-      painter.drawLine(QPointF(iconLeft + chevronInset, centerY - arm), QPointF(iconLeft + chevronInset + arm, centerY));
-      painter.drawLine(QPointF(iconLeft + chevronInset, centerY + arm), QPointF(iconLeft + chevronInset + arm, centerY));
-      painter.drawLine(QPointF(iconLeft + static_cast<qreal>(advance) - chevronInset, centerY - arm),
-                       QPointF(iconLeft + static_cast<qreal>(advance) - chevronInset - arm, centerY));
-      painter.drawLine(QPointF(iconLeft + static_cast<qreal>(advance) - chevronInset, centerY + arm),
-                       QPointF(iconLeft + static_cast<qreal>(advance) - chevronInset - arm, centerY));
-      QPen stemPen(Qt::white);
-      stemPen.setWidthF(std::max(2.3f, atlasScale * 1.8f));
-      stemPen.setCapStyle(Qt::RoundCap);
-      stemPen.setJoinStyle(Qt::RoundJoin);
-      painter.setPen(stemPen);
-      painter.drawLine(QPointF(centerX, stemTop), QPointF(centerX, stemBottom));
-      painter.setPen(Qt::NoPen);
-      painter.setBrush(Qt::white);
-      const QPointF head[3] = {
-          QPointF(centerX - headHalfWidth, headTop),
-          QPointF(centerX + headHalfWidth, headTop),
-          QPointF(centerX, headBottom),
-      };
-      painter.drawConvexPolygon(head, 3);
-      painter.setPen(Qt::white);
-      painter.setBrush(Qt::NoBrush);
+    if (code == kPlaybackAutoScrollIconGlyph) {
+      renderPlaybackAutoScrollIcon(
+          painter,
+          QRectF(static_cast<qreal>(cursorX),
+                 static_cast<qreal>(kMeasureLabelPaddingPx),
+                 static_cast<qreal>(advance),
+                 static_cast<qreal>(glyphHeight)));
     } else {
       const QString text(QChar(static_cast<char16_t>(code)));
       painter.drawText(QPointF(static_cast<qreal>(cursorX), baselineY), text);
@@ -1404,15 +1377,6 @@ void PianoRollRhiRenderer::buildStaticInstances(const PianoRollFrame::Data& fram
     return;
   }
 
-  QColor cornerBase = frame.topBarBackgroundColor;
-  cornerBase.setAlpha(255);
-  appendRect(m_staticBackInstances,
-             0.0f,
-             0.0f,
-             layout.keyboardWidth,
-             layout.topBarHeight,
-             cornerBase);
-
   if (layout.noteAreaWidth <= 0.0f || layout.noteAreaHeight <= 0.0f) {
     appendRect(m_staticBackInstances,
                layout.keyboardWidth - 1.0f,
@@ -1726,11 +1690,12 @@ void PianoRollRhiRenderer::buildDynamicInstances(const PianoRollFrame::Data& fra
     QColor glyphColor = enabled ? frame.whiteKeyColor : frame.scrollChrome.colors.glyphColor;
     glyphColor.setAlpha(245);
 
-    const float glyphHeight = std::max(9.0f, buttonHeight - 4.0f);
-    const float glyphWidth = labelTextWidth(QStringLiteral("~"), glyphHeight);
+    const float glyphHeight = std::max(10.0f, buttonHeight - 0.0f);
+    const QString glyphText(QChar(static_cast<char16_t>(kPlaybackAutoScrollIconGlyph)));
+    const float glyphWidth = labelTextWidth(glyphText, glyphHeight);
     const float glyphX = buttonX + ((buttonWidth - glyphWidth) * 0.5f);
     const float glyphY = buttonY + std::floor((buttonHeight - glyphHeight) * 0.5f);
-    appendLabelText(QStringLiteral("~"), glyphX, glyphY, glyphHeight, glyphColor);
+    appendLabelText(glyphText, glyphX, glyphY, glyphHeight, glyphColor);
   };
 
   if (layout.noteAreaWidth <= 0.0f || layout.noteAreaHeight <= 0.0f) {
