@@ -1677,7 +1677,6 @@ void PianoRollRhiRenderer::buildDynamicInstances(const PianoRollFrame::Data& fra
     const bool enabled = m_view && m_view->playbackAutoScrollEnabled();
     if (enabled) {
       QColor enabledFill = frame.topBarProgressColor;
-      enabledFill.setAlpha(std::max(150, enabledFill.alpha() + 80));
       appendRect(m_dynamicInstances,
                  buttonX,
                  buttonY,
