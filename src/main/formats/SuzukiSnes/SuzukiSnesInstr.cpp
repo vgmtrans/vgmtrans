@@ -8,8 +8,12 @@
 #include "SuzukiSnesSeq.h"
 #include "SNESDSP.h"
 #include "VGMColl.h"
-#include <algorithm>
 #include <spdlog/fmt/fmt.h>
+
+namespace {
+constexpr uint8_t kSuzukiSnesSrcnCount = 0x40;
+constexpr uint16_t kSuzukiSnesSd3DrumKitOffset = 16;
+}
 
 // ******************
 // SuzukiSnesInstrSet
@@ -36,14 +40,13 @@ bool SuzukiSnesInstrSet::parseHeader() {
 }
 
 bool SuzukiSnesInstrSet::parseInstrPointers() {
-  usedSRCNs.clear();
   for (uint8_t instrNum = 0; instrNum <= 0x7f; instrNum++) {
     uint32_t ofsSRCNEntry = addrSRCNTable + instrNum;
     if (ofsSRCNEntry + 1 > 0x10000) {
       continue;
     }
     uint8_t srcn = readByte(ofsSRCNEntry);
-    if (srcn >= 0x40) {
+    if (srcn >= kSuzukiSnesSrcnCount) {
       continue;
     }
 
@@ -80,8 +83,6 @@ bool SuzukiSnesInstrSet::parseInstrPointers() {
       continue;
     }
 
-    usedSRCNs.push_back(srcn);
-
     SuzukiSnesInstr *newInstr = new SuzukiSnesInstr(
       this, version, instrNum, spcDirAddr, addrSRCNTable, addrVolumeTable, addrADSRTable,
       addrTuningTable, fmt::format("Instrument: {:#x}", srcn));
@@ -91,14 +92,9 @@ bool SuzukiSnesInstrSet::parseInstrPointers() {
     return false;
   }
 
-  if (addrDrumKitTable && readByte(addrDrumKitTable) < 0x80) {
-    SuzukiSnesDrumKit *newDrumKitInstr = new SuzukiSnesDrumKit(this, version, DRUMKIT_PROGRAM,
-      spcDirAddr, addrSRCNTable, addrTuningTable, addrADSRTable, addrDrumKitTable, "Drum Kit");
-    aInstrs.push_back(newDrumKitInstr);
-  }
-
-  std::sort(usedSRCNs.begin(), usedSRCNs.end());
-  SNESSampColl *newSampColl = new SNESSampColl(SuzukiSnesFormat::name, this->rawFile(), spcDirAddr, usedSRCNs);
+  // Load all valid Suzuki sample slots so conversion-time drumkits can reuse the base sample collection.
+  SNESSampColl *newSampColl = new SNESSampColl(
+      SuzukiSnesFormat::name, this->rawFile(), spcDirAddr, kSuzukiSnesSrcnCount);
   if (!newSampColl->loadVGMFile()) {
     delete newSampColl;
     return false;
@@ -108,7 +104,7 @@ bool SuzukiSnesInstrSet::parseInstrPointers() {
 }
 
 void SuzukiSnesInstrSet::useColl(const VGMColl* coll) {
-  if (coll == nullptr || version == SUZUKISNES_SD3 || coll->seq() == nullptr) {
+  if (coll == nullptr || coll->seq() == nullptr) {
     return;
   }
 
@@ -117,45 +113,19 @@ void SuzukiSnesInstrSet::useColl(const VGMColl* coll) {
     return;
   }
 
-  auto* drumKit = new SuzukiSnesDrumKit(this, version, DRUMKIT_PROGRAM, spcDirAddr, addrSRCNTable,
-                                        addrTuningTable, addrADSRTable,
-                                        static_cast<uint16_t>(seq->offset()), "Drum Kit");
-  if (!drumKit->loadInstr()) {
-    delete drumKit;
+  uint16_t addrDrumKitTable = static_cast<uint16_t>(seq->offset());
+  if (version == SUZUKISNES_SD3) {
+    addrDrumKitTable += kSuzukiSnesSd3DrumKitOffset;
+  }
+  if (readByte(addrDrumKitTable) >= 0x80) {
     return;
   }
 
-  std::vector<uint8_t> extraSRCNs;
-  extraSRCNs.reserve(drumKit->regions().size());
-  for (auto* vgmRgn : drumKit->regions()) {
-    auto* rgn = dynamic_cast<SuzukiSnesRgn*>(vgmRgn);
-    if (rgn == nullptr) {
-      continue;
-    }
-
-    const auto srcn = static_cast<uint8_t>(rgn->sampNum);
-    if (std::binary_search(usedSRCNs.begin(), usedSRCNs.end(), srcn) ||
-        std::find(extraSRCNs.begin(), extraSRCNs.end(), srcn) != extraSRCNs.end()) {
-      continue;
-    }
-
-    extraSRCNs.push_back(srcn);
-  }
-
-  if (!extraSRCNs.empty()) {
-    auto* tempSampColl = new SNESSampColl(SuzukiSnesFormat::name, this, spcDirAddr, extraSRCNs);
-    if (!addTempSampColl(tempSampColl)) {
-      delete drumKit;
-      return;
-    }
-
-    for (auto* vgmRgn : drumKit->regions()) {
-      auto* rgn = dynamic_cast<SuzukiSnesRgn*>(vgmRgn);
-      if (rgn != nullptr &&
-          std::find(extraSRCNs.begin(), extraSRCNs.end(), static_cast<uint8_t>(rgn->sampNum)) != extraSRCNs.end()) {
-        rgn->sampCollPtr = tempSampColl;
-      }
-    }
+  auto* drumKit = new SuzukiSnesDrumKit(this, version, DRUMKIT_PROGRAM, spcDirAddr, addrSRCNTable,
+                                        addrTuningTable, addrADSRTable, addrDrumKitTable, "Drum Kit");
+  if (!drumKit->loadInstr() || drumKit->regions().empty()) {
+    delete drumKit;
+    return;
   }
 
   addTempInstr(drumKit);
