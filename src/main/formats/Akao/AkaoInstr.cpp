@@ -102,10 +102,6 @@ bool AkaoInstrSet::parseInstrPointers() {
 }
 
 void AkaoInstrSet::useColl(const VGMColl* coll) {
-  if (coll == nullptr) {
-    return;
-  }
-
   const auto* seq = dynamic_cast<const AkaoSeq*>(coll->seq());
   if (seq == nullptr || !seq->usesIndividualArts()) {
     return;
