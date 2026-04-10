@@ -61,7 +61,7 @@ bool SuzukiSnesSeq::parseHeader() {
       auto drum = header->addChild(curOffset, 5, "Percussion");
       drum->addChild(curOffset++, 1, "Note Index");
       drum->addChild(curOffset++, 1, "Base Instrument");
-      drum->addChild(curOffset++, 1, "Key");
+      drum->addChild(curOffset++, 1, "Unity Key");
       drum->addChild(curOffset++, 1, "Volume");
       drum->addChild(curOffset++, 1, "Pan");
     }

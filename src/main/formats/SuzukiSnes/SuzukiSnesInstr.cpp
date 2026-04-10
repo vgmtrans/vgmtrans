@@ -30,8 +30,6 @@ SuzukiSnesInstrSet::SuzukiSnesInstrSet(RawFile *file,
     addrDrumKitTable(addrDrumKitTable) {
 }
 
-SuzukiSnesInstrSet::~SuzukiSnesInstrSet() {}
-
 bool SuzukiSnesInstrSet::parseHeader() {
   return true;
 }
@@ -176,9 +174,6 @@ SuzukiSnesDrumKit::SuzukiSnesDrumKit(VGMInstrSet *instrSet,
   addrTuningTable(addrTuningTable),
   addrADSRTable(addrADSRTable),
   addrDrumKitTable(addrDrumKitTable) {
-}
-
-SuzukiSnesDrumKit::~SuzukiSnesDrumKit() {
 }
 
 bool SuzukiSnesDrumKit::loadInstr() {
