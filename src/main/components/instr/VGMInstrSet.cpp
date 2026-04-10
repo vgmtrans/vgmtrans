@@ -27,7 +27,6 @@ VGMInstrSet::VGMInstrSet(const std::string &format, RawFile *file, uint32_t offs
 
 VGMInstrSet::~VGMInstrSet() {
   deleteVect(m_tempInstrs);
-  deleteVect(m_tempSampColls);
   delete sampColl;
 }
 
@@ -115,7 +114,6 @@ void VGMInstrSet::cleanupAfterExport() {
   unuseColl();
   m_exportInstrs.clear();
   deleteVect(m_tempInstrs);
-  deleteVect(m_tempSampColls);
 }
 
 const std::vector<VGMInstr*>& VGMInstrSet::exportInstrs() const {
@@ -126,17 +124,6 @@ void VGMInstrSet::addTempInstr(VGMInstr* instr) {
   assert(instr != nullptr);
   m_tempInstrs.push_back(instr);
   m_exportInstrs.push_back(instr);
-}
-
-bool VGMInstrSet::addTempSampColl(VGMSampColl* tempSampColl) {
-  assert(tempSampColl != nullptr);
-  if (!tempSampColl->load()) {
-    delete tempSampColl;
-    return false;
-  }
-
-  m_tempSampColls.push_back(tempSampColl);
-  return true;
 }
 
 // ********

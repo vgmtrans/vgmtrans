@@ -3,8 +3,6 @@
  * Licensed under the zlib license,
  * refer to the included LICENSE.txt file
 */
-#include <algorithm>
-
 #include "SF2Conversion.h"
 #include "SF2File.h"
 #include "SynthFile.h"
@@ -49,12 +47,6 @@ SynthFile* createSynthFile(
   const std::vector<VGMInstrSet*>& m_instrsets,
   const std::vector<VGMSampColl*>& m_sampcolls
 ) {
-  auto appendSampColl = [](std::vector<const VGMSampColl*>& finalSampColls, const VGMSampColl* sampColl) {
-    if (sampColl != nullptr && std::ranges::find(finalSampColls, sampColl) == finalSampColls.end()) {
-      finalSampColls.push_back(sampColl);
-    }
-  };
-
   if (m_instrsets.empty()) {
     L_ERROR("No instrument sets available to create a SynthFile.");
     return nullptr;
@@ -68,23 +60,17 @@ SynthFile* createSynthFile(
 
   /* Grab samples either from the local sampcolls or from the instrument sets */
   if (!m_sampcolls.empty()) {
-    for (auto* sampcoll : m_sampcolls) {
-      appendSampColl(finalSampColls, sampcoll);
+    for (auto & sampcoll : m_sampcolls) {
+      finalSampColls.push_back(sampcoll);
+      unpackSampColl(*synthfile, sampcoll, finalSamps);
     }
   } else {
-    for (auto* instrset : m_instrsets) {
-      appendSampColl(finalSampColls, instrset->sampColl);
+    for (auto & instrset : m_instrsets) {
+      if (auto instrset_sampcoll = instrset->sampColl) {
+        finalSampColls.push_back(instrset_sampcoll);
+        unpackSampColl(*synthfile, instrset_sampcoll, finalSamps);
+      }
     }
-  }
-
-  for (auto* instrset : m_instrsets) {
-    for (auto* sampcoll : instrset->exportExtraSampColls()) {
-      appendSampColl(finalSampColls, sampcoll);
-    }
-  }
-
-  for (const auto* sampcoll : finalSampColls) {
-    unpackSampColl(*synthfile, sampcoll, finalSamps);
   }
 
   if (finalSamps.empty()) {
