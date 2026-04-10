@@ -398,6 +398,15 @@ bool PianoRollView::smoothAutoScrollEnabled() const {
   return m_smoothAutoScrollEnabled;
 }
 
+QRect PianoRollView::playbackAutoScrollButtonRect() const {
+  const int buttonHeight = std::max(8, kTopBarHeight - 6);
+  const int buttonWidth = std::max(buttonHeight, std::min(kKeyboardWidth - 8, buttonHeight + 14));
+  return QRect((kKeyboardWidth - buttonWidth) / 2,
+               (kTopBarHeight - buttonHeight) / 2,
+               buttonWidth,
+               buttonHeight);
+}
+
 void PianoRollView::ensureTickVisible(int tick, float viewportFraction, bool animated) {
   const auto rollGeometry = geometry();
   tick = rollGeometry.clampTick(tick);
@@ -810,6 +819,16 @@ bool PianoRollView::handleViewportMousePress(QMouseEvent* event) {
   stopDragAutoScroll();
   const Qt::KeyboardModifiers activeModifiers = mergedModifiers(event->modifiers());
   const QPoint pos = viewportPosFromGlobal(event->globalPosition());
+  if (playbackAutoScrollButtonRect().contains(pos)) {
+    if (m_playbackAutoScrollEnabled) {
+      stopPlaybackAutoScrollAnimation();
+    }
+    m_playbackAutoScrollEnabled = !m_playbackAutoScrollEnabled;
+    requestRender();
+    refreshInteractionCursor(activeModifiers);
+    event->accept();
+    return true;
+  }
   if (m_scrollChrome->handleMousePress(pos)) {
     refreshInteractionCursor(activeModifiers);
     event->accept();

@@ -824,7 +824,7 @@ void PianoRollRhiRenderer::ensureMeasureLabelAtlas(QRhiResourceUpdateBatch* upda
   QFontMetrics metrics(font);
 
   std::array<bool, 128> hasGlyph{};
-  const char* atlasChars = "0123456789C-";
+  const char* atlasChars = "0123456789C-~";
   for (const char* ch = atlasChars; *ch != '\0'; ++ch) {
     const unsigned char code = static_cast<unsigned char>(*ch);
     hasGlyph[code] = true;
@@ -839,7 +839,9 @@ void PianoRollRhiRenderer::ensureMeasureLabelAtlas(QRhiResourceUpdateBatch* upda
       continue;
     }
     const QString text(QChar(static_cast<char16_t>(code)));
-    const int advance = std::max(1, metrics.horizontalAdvance(text));
+    const int advance = (code == '~')
+        ? std::max(1, glyphHeight)
+        : std::max(1, metrics.horizontalAdvance(text));
     advances[static_cast<size_t>(code)] = advance;
     atlasWidth += advance + kMeasureLabelPaddingPx;
   }
@@ -847,6 +849,7 @@ void PianoRollRhiRenderer::ensureMeasureLabelAtlas(QRhiResourceUpdateBatch* upda
   QImage atlas(std::max(1, atlasWidth), atlasHeight, QImage::Format_RGBA8888);
   atlas.fill(Qt::transparent);
   QPainter painter(&atlas);
+  painter.setRenderHint(QPainter::Antialiasing, true);
   painter.setRenderHint(QPainter::TextAntialiasing, true);
   painter.setPen(Qt::white);
   painter.setFont(font);
@@ -858,10 +861,53 @@ void PianoRollRhiRenderer::ensureMeasureLabelAtlas(QRhiResourceUpdateBatch* upda
     if (!hasGlyph[static_cast<size_t>(code)]) {
       continue;
     }
-    const QString text(QChar(static_cast<char16_t>(code)));
-    painter.drawText(QPointF(static_cast<qreal>(cursorX), baselineY), text);
-
     const int advance = advances[static_cast<size_t>(code)];
+    if (code == '~') {
+      const qreal iconLeft = static_cast<qreal>(cursorX);
+      const qreal iconTop = static_cast<qreal>(kMeasureLabelPaddingPx);
+      const qreal iconSize = static_cast<qreal>(glyphHeight);
+      const qreal centerX = iconLeft + (static_cast<qreal>(advance) * 0.5);
+      const qreal centerY = iconTop + (iconSize * 0.56);
+      const qreal arm = iconSize * 0.22;
+      const qreal chevronInset = 0.0;
+      const qreal stemTop = iconTop + (iconSize * 0.36);
+      const qreal stemBottom = iconTop + (iconSize * 0.90);
+      const qreal headHalfWidth = iconSize * 0.31;
+      const qreal headTop = iconTop + (iconSize * 0.03);
+      const qreal headBottom = stemTop;
+
+      QPen chevronPen(Qt::white);
+      chevronPen.setWidthF(std::max(1.5f, atlasScale * 1.2f));
+      chevronPen.setCapStyle(Qt::RoundCap);
+      chevronPen.setJoinStyle(Qt::RoundJoin);
+      painter.setPen(chevronPen);
+      painter.drawLine(QPointF(iconLeft + chevronInset, centerY - arm), QPointF(iconLeft + chevronInset + arm, centerY));
+      painter.drawLine(QPointF(iconLeft + chevronInset, centerY + arm), QPointF(iconLeft + chevronInset + arm, centerY));
+      painter.drawLine(QPointF(iconLeft + static_cast<qreal>(advance) - chevronInset, centerY - arm),
+                       QPointF(iconLeft + static_cast<qreal>(advance) - chevronInset - arm, centerY));
+      painter.drawLine(QPointF(iconLeft + static_cast<qreal>(advance) - chevronInset, centerY + arm),
+                       QPointF(iconLeft + static_cast<qreal>(advance) - chevronInset - arm, centerY));
+      QPen stemPen(Qt::white);
+      stemPen.setWidthF(std::max(2.3f, atlasScale * 1.8f));
+      stemPen.setCapStyle(Qt::RoundCap);
+      stemPen.setJoinStyle(Qt::RoundJoin);
+      painter.setPen(stemPen);
+      painter.drawLine(QPointF(centerX, stemTop), QPointF(centerX, stemBottom));
+      painter.setPen(Qt::NoPen);
+      painter.setBrush(Qt::white);
+      const QPointF head[3] = {
+          QPointF(centerX - headHalfWidth, headTop),
+          QPointF(centerX + headHalfWidth, headTop),
+          QPointF(centerX, headBottom),
+      };
+      painter.drawConvexPolygon(head, 3);
+      painter.setPen(Qt::white);
+      painter.setBrush(Qt::NoBrush);
+    } else {
+      const QString text(QChar(static_cast<char16_t>(code)));
+      painter.drawText(QPointF(static_cast<qreal>(cursorX), baselineY), text);
+    }
+
     // Pad UV bounds by 1px so antialiased edges are not clipped.
     const int left = std::max(0, cursorX - 1);
     const int right = std::min(atlas.width(), cursorX + advance + 1);
@@ -1358,12 +1404,14 @@ void PianoRollRhiRenderer::buildStaticInstances(const PianoRollFrame::Data& fram
     return;
   }
 
+  QColor cornerBase = frame.topBarBackgroundColor;
+  cornerBase.setAlpha(255);
   appendRect(m_staticBackInstances,
              0.0f,
              0.0f,
              layout.keyboardWidth,
              layout.topBarHeight,
-             frame.keyboardBackgroundColor.darker(108));
+             cornerBase);
 
   if (layout.noteAreaWidth <= 0.0f || layout.noteAreaHeight <= 0.0f) {
     appendRect(m_staticBackInstances,
@@ -1644,7 +1692,50 @@ void PianoRollRhiRenderer::buildDynamicInstances(const PianoRollFrame::Data& fra
   m_dynamicInstances.clear();
   m_dynamicFrontStart = 0;
 
-  if (layout.viewWidth <= 0 || layout.viewHeight <= 0 || layout.noteAreaWidth <= 0.0f || layout.noteAreaHeight <= 0.0f) {
+  if (layout.viewWidth <= 0 || layout.viewHeight <= 0) {
+    return;
+  }
+
+  const auto appendPlaybackAutoScrollButton = [&]() {
+    QColor cornerBase = frame.topBarBackgroundColor;
+    cornerBase.setAlpha(255);
+    appendRect(m_dynamicInstances,
+               0.0f,
+               0.0f,
+               layout.keyboardWidth,
+               layout.topBarHeight,
+               cornerBase);
+
+    const float buttonHeight = std::max(8.0f, layout.topBarHeight - 6.0f);
+    const float buttonWidth = std::max(buttonHeight, std::min(layout.keyboardWidth - 8.0f, buttonHeight + 14.0f));
+    const float buttonX = std::floor((layout.keyboardWidth - buttonWidth) * 0.5f);
+    const float buttonY = std::floor((layout.topBarHeight - buttonHeight) * 0.5f);
+    const bool enabled = m_view && m_view->playbackAutoScrollEnabled();
+    if (enabled) {
+      QColor enabledFill = frame.topBarProgressColor;
+      enabledFill.setAlpha(std::max(150, enabledFill.alpha() + 80));
+      appendRect(m_dynamicInstances,
+                 buttonX,
+                 buttonY,
+                 buttonWidth,
+                 buttonHeight,
+                 enabledFill,
+                 LineStyle::ScrollThumb);
+    }
+
+    QColor glyphColor = enabled ? frame.whiteKeyColor : frame.scrollChrome.colors.glyphColor;
+    glyphColor.setAlpha(245);
+
+    const float glyphHeight = std::max(9.0f, buttonHeight - 4.0f);
+    const float glyphWidth = labelTextWidth(QStringLiteral("~"), glyphHeight);
+    const float glyphX = buttonX + ((buttonWidth - glyphWidth) * 0.5f);
+    const float glyphY = buttonY + std::floor((buttonHeight - glyphHeight) * 0.5f);
+    appendLabelText(QStringLiteral("~"), glyphX, glyphY, glyphHeight, glyphColor);
+  };
+
+  if (layout.noteAreaWidth <= 0.0f || layout.noteAreaHeight <= 0.0f) {
+    appendPlaybackAutoScrollButton();
+    appendScrollChromeInstances(frame);
     return;
   }
 
@@ -1746,6 +1837,7 @@ void PianoRollRhiRenderer::buildDynamicInstances(const PianoRollFrame::Data& fra
   }
 
   appendKeyboardHighlightInstances(frame, layout, trackColors, trackEnabled);
+  appendPlaybackAutoScrollButton();
   appendScrollChromeInstances(frame);
 }
 

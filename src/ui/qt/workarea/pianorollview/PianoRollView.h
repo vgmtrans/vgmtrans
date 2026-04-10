@@ -68,6 +68,7 @@ public:
   void clearPlaybackState();
   void setSmoothAutoScrollEnabled(bool enabled);
   [[nodiscard]] bool smoothAutoScrollEnabled() const;
+  [[nodiscard]] bool playbackAutoScrollEnabled() const { return m_playbackAutoScrollEnabled; }
   void ensureTickVisible(int tick, float viewportFraction = 0.10f, bool animated = false);
 
   PianoRollFrame::Data captureRhiFrameData(float dpr) const;
@@ -235,6 +236,7 @@ private:
   void applyPanDragDelta(const QPoint& dragDelta);
   void setInteractionCursor(Qt::CursorShape shape);
   void refreshInteractionCursor(Qt::KeyboardModifiers modifiers = Qt::NoModifier);
+  [[nodiscard]] QRect playbackAutoScrollButtonRect() const;
 
   PianoRollRhiHost* m_rhiHost = nullptr;
   std::unique_ptr<RhiScrollAreaChrome> m_scrollChrome;
