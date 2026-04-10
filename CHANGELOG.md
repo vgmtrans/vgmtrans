@@ -7,6 +7,7 @@
 
 - Added an in-app dialog to help with reporting bugs.
 - Added Flatpak builds for Linux. From now on, stable releases will be automatically available on Flathub.
+- Added Drum Kit support to the SuzukiSnes driver (Seiken Densetsu 3, Super Mario RPG, etc)
 
 ### Changed
 
