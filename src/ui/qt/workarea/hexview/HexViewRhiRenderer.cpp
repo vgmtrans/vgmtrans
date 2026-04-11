@@ -949,9 +949,9 @@ void HexViewRhiRenderer::updateCompositeSrb() {
     QRhiShaderResourceBinding::sampledTexture(2, QRhiShaderResourceBinding::FragmentStage,
                                               m_maskTex, m_maskSampler),
     QRhiShaderResourceBinding::sampledTexture(3, QRhiShaderResourceBinding::FragmentStage,
-                                              m_edgeTex, m_glyphSampler),
+                                              m_edgeTex, m_maskSampler),
     QRhiShaderResourceBinding::sampledTexture(4, QRhiShaderResourceBinding::FragmentStage,
-                                              m_playbackColorTex, m_glyphSampler),
+                                              m_playbackColorTex, m_maskSampler),
     QRhiShaderResourceBinding::sampledTexture(5, QRhiShaderResourceBinding::FragmentStage,
                                               m_itemIdTex, m_maskSampler)
   });

@@ -50,6 +50,6 @@ void main() {
                    glowHalo * isGlowActive,
                    glowHalo * isGlowFade,
                    0.0);
-  float glowWeight = glowHalo * vTint.a * max(isGlowActive, isGlowFade);
+  float glowWeight = glowHalo * vTint.a * isGlowActive;
   playbackColorField = vec4(vTint.rgb * glowWeight, glowWeight);
 }
