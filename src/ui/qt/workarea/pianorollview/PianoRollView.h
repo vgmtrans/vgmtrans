@@ -287,8 +287,10 @@ private:
   QPoint m_noteSelectionAnchor;
   QPoint m_noteSelectionCurrent;
   QPoint m_noteSelectionAnchorWorld;
+  std::vector<size_t> m_noteSelectionBaseIndices;
   QPointF m_dragAutoScrollRemainder;
   QPoint m_panDragLastPos;
+  bool m_noteSelectionAppendMode = false;
   bool m_noteSelectionAnchorWorldValid = false;
   QBasicTimer m_dragAutoScrollTimer;
   bool m_resumePlaybackAfterSeekDrag = false;

@@ -152,6 +152,8 @@ void PianoRollView::setSequence(VGMSeq* seq) {
   m_attemptedTimelineBuild = false;
   m_noteSelectionPressActive = false;
   m_noteSelectionDragging = false;
+  m_noteSelectionAppendMode = false;
+  m_noteSelectionBaseIndices.clear();
   m_noteSelectionAnchorWorldValid = false;
   m_resumePlaybackAfterSeekDrag = false;
   m_selectionModel.clear();
@@ -840,6 +842,8 @@ bool PianoRollView::handleViewportMousePress(QMouseEvent* event) {
     updateInactiveNoteDimTarget();
     m_noteSelectionPressActive = false;
     m_noteSelectionDragging = false;
+    m_noteSelectionAppendMode = false;
+    m_noteSelectionBaseIndices.clear();
     m_noteSelectionAnchorWorldValid = false;
     setPanDragActive(true, activeModifiers);
     m_panDragLastPos = pos;
@@ -862,6 +866,8 @@ bool PianoRollView::handleViewportMousePress(QMouseEvent* event) {
   if (pos.y() >= kTopBarHeight && pos.x() >= kKeyboardWidth) {
     m_noteSelectionPressActive = true;
     m_noteSelectionDragging = false;
+    m_noteSelectionAppendMode = false;
+    m_noteSelectionBaseIndices.clear();
     m_noteSelectionAnchor = pos;
     // Keep the marquee origin in graph space so it stays attached to content while panning.
     m_noteSelectionAnchorWorld = geometry().graphWorldPosFromViewport(pos);
@@ -880,6 +886,8 @@ void PianoRollView::beginSeekDragAtX(int viewportX) {
   clearPreviewNotes();
   m_noteSelectionPressActive = false;
   m_noteSelectionDragging = false;
+  m_noteSelectionAppendMode = false;
+  m_noteSelectionBaseIndices.clear();
   m_noteSelectionAnchorWorldValid = false;
   stopDragAutoScroll();
   stopPlaybackAutoScrollAnimation();
@@ -946,6 +954,8 @@ bool PianoRollView::handleViewportMouseMove(QMouseEvent* event) {
     stopDragAutoScroll();
     m_noteSelectionPressActive = false;
     m_noteSelectionDragging = false;
+    m_noteSelectionAppendMode = false;
+    m_noteSelectionBaseIndices.clear();
     m_noteSelectionAnchorWorldValid = false;
     clearPreviewNotes();
     requestRender();
@@ -959,6 +969,8 @@ bool PianoRollView::handleViewportMouseMove(QMouseEvent* event) {
   const bool movedEnough = std::abs(dragDelta.x()) >= 2 || std::abs(dragDelta.y()) >= 2;
   if (!m_noteSelectionDragging && movedEnough) {
     m_noteSelectionDragging = true;
+    m_noteSelectionAppendMode = activeModifiers.testFlag(Qt::ShiftModifier);
+    m_noteSelectionBaseIndices = m_noteSelectionAppendMode ? selectedNoteIndices() : std::vector<size_t>{};
   }
 
   if (m_noteSelectionDragging) {
@@ -1033,6 +1045,8 @@ bool PianoRollView::handleViewportMouseRelease(QMouseEvent* event) {
   m_noteSelectionPressActive = false;
   const bool wasDragging = m_noteSelectionDragging;
   m_noteSelectionDragging = false;
+  m_noteSelectionAppendMode = false;
+  m_noteSelectionBaseIndices.clear();
   m_noteSelectionAnchorWorldValid = false;
   if (wasDragging) {
     requestRender();
@@ -1534,9 +1548,16 @@ void PianoRollView::emitCurrentSelectionSignals() {
 }
 
 void PianoRollView::updateMarqueeSelection(bool emitSelectionSignal) {
+  const auto applyMarqueeSelection = [this, emitSelectionSignal](std::vector<size_t> indices) {
+    if (m_noteSelectionAppendMode) {
+      indices.insert(indices.end(), m_noteSelectionBaseIndices.begin(), m_noteSelectionBaseIndices.end());
+    }
+    applySelectedNoteIndices(std::move(indices), emitSelectionSignal, nullptr);
+  };
+
   const auto& notes = selectableNotes();
   if (notes.empty()) {
-    applySelectedNoteIndices({}, emitSelectionSignal, nullptr);
+    applyMarqueeSelection({});
     return;
   }
 
@@ -1552,7 +1573,7 @@ void PianoRollView::updateMarqueeSelection(bool emitSelectionSignal) {
   const float worldYMin = static_cast<float>(std::min(anchorWorld.y(), currentWorld.y()));
   const float worldYMax = static_cast<float>(std::max(anchorWorld.y(), currentWorld.y()));
   if (worldXMax <= worldXMin || worldYMax <= worldYMin) {
-    applySelectedNoteIndices({}, emitSelectionSignal, nullptr);
+    applyMarqueeSelection({});
     return;
   }
 
@@ -1561,7 +1582,7 @@ void PianoRollView::updateMarqueeSelection(bool emitSelectionSignal) {
   const float clampedWorldYMin = std::max(0.0f, worldYMin);
   const float clampedWorldYMax = std::max(0.0f, worldYMax);
   if (clampedWorldXMax <= clampedWorldXMin || clampedWorldYMax <= clampedWorldYMin) {
-    applySelectedNoteIndices({}, emitSelectionSignal, nullptr);
+    applyMarqueeSelection({});
     return;
   }
 
@@ -1612,7 +1633,7 @@ void PianoRollView::updateMarqueeSelection(bool emitSelectionSignal) {
     indices.push_back(static_cast<size_t>(std::distance(notes.begin(), it)));
   }
 
-  applySelectedNoteIndices(std::move(indices), emitSelectionSignal, nullptr);
+  applyMarqueeSelection(std::move(indices));
 }
 
 void PianoRollView::updateMarqueePreview(const QPoint& cursorPos) {
