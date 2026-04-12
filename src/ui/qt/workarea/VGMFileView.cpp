@@ -678,6 +678,96 @@ bool VGMFileView::appendPaneSpecificContextActions(PanelSide side, QMenu& menu) 
   }
 
   QPointer<PianoRollView> view = panelUi.pianoRollView;
+  bool addedChannelActions = false;
+
+  if (auto* seq = dynamic_cast<VGMSeq*>(m_vgmfile)) {
+    ensureTrackIndexMap(seq);
+
+    const bool usesTrackLayout = !seq->aTracks.empty();
+    int channelCount = usesTrackLayout ? static_cast<int>(seq->aTracks.size()) : effectiveTrackCountForSeq(seq);
+    channelCount = std::clamp(channelCount, 1, 128);
+    if (m_sequenceControlUsesTrackLayout != usesTrackLayout ||
+        m_sequenceControlChannelCount != channelCount ||
+        static_cast<int>(m_sequenceChannelBindings.size()) != channelCount) {
+      rebuildSequenceControlBar(seq);
+    }
+
+    const VGMColl* assocColl = associatedCollection();
+    if (assocColl) {
+      std::vector<int> selectedChannels;
+      selectedChannels.reserve(m_selectedItems.size());
+
+      // Populate vector of selectedChannels
+      std::unordered_set<int> seenChannelIds;
+      seenChannelIds.reserve(m_selectedItems.size() * 2 + 1);
+      for (const VGMItem* item : m_selectedItems) {
+        const auto* event = dynamic_cast<const SeqEvent*>(item);
+        if (!event) {
+          continue;
+        }
+
+        const int channelId = usesTrackLayout ? trackIndexForEvent(event) : static_cast<int>(event->channel);
+        if (channelId < 0 || channelId >= channelCount || !seenChannelIds.emplace(channelId).second) {
+          continue;
+        }
+        selectedChannels.push_back(channelId);
+      }
+
+      // Determine if there are any muted or soloed channels
+      auto& player = SequencePlayer::the();
+      bool hasMutedOrSoloedChannels = false;
+      for (int channelId = 0; channelId < channelCount; ++channelId) {
+        if (player.channelMuted(assocColl, channelId) || player.channelSolo(assocColl, channelId)) {
+          hasMutedOrSoloedChannels = true;
+          break;
+        }
+      }
+
+      const auto addChannelAction = [&](const QString& text, auto apply) {
+        QAction* action = menu.addAction(text);
+        connect(action,
+                &QAction::triggered,
+                this,
+                [this, apply = std::move(apply)]() mutable {
+                  apply(SequencePlayer::the());
+                  applySequenceAudibilityState();
+                  updateSequenceControlValuesFromPlayback();
+                });
+        addedChannelActions = true;
+      };
+
+      if (!selectedChannels.empty()) {
+        addChannelAction(tr("Mute Channels of Selection"),
+                         [assocColl, channelCount, selectedChannels](SequencePlayer& player) {
+                           for (int channelId : selectedChannels) {
+                             player.setChannelMuted(assocColl, channelId, true, channelCount);
+                           }
+                         });
+        addChannelAction(tr("Solo Channels of Selection"),
+                         [assocColl, channelCount, selectedChannels](SequencePlayer& player) {
+                           for (int channelId : selectedChannels) {
+                             player.setChannelMuted(assocColl, channelId, false, channelCount);
+                             player.setChannelSolo(assocColl, channelId, true, channelCount);
+                           }
+                         });
+      }
+
+      if (hasMutedOrSoloedChannels) {
+        addChannelAction(tr("Reset Channel Mute/Solo"),
+                         [assocColl, channelCount](SequencePlayer& player) {
+                           for (int channelId = 0; channelId < channelCount; ++channelId) {
+                             player.setChannelMuted(assocColl, channelId, false, channelCount);
+                             player.setChannelSolo(assocColl, channelId, false, channelCount);
+                           }
+                         });
+      }
+    }
+  }
+
+  if (addedChannelActions) {
+    menu.addSeparator();
+  }
+
   QAction* smoothAutoScroll = menu.addAction(tr("Smooth Auto Scroll"));
   smoothAutoScroll->setCheckable(true);
   smoothAutoScroll->setChecked(!view || view->smoothAutoScrollEnabled());
