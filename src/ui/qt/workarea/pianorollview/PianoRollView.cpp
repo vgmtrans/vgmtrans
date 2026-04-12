@@ -1033,9 +1033,12 @@ bool PianoRollView::handleViewportMouseRelease(QMouseEvent* event) {
   } else {
     const int noteIndex = noteIndexAtViewportPoint(pos);
     if (noteIndex >= 0) {
-      applySelectedNoteIndices({static_cast<size_t>(noteIndex)},
-                               true,
-                               selectableNotes()[static_cast<size_t>(noteIndex)].item);
+      std::vector<size_t> indices{static_cast<size_t>(noteIndex)};
+      if (activeModifiers.testFlag(Qt::ShiftModifier)) {
+        const auto& existing = selectedNoteIndices();
+        indices.insert(indices.end(), existing.begin(), existing.end());
+      }
+      applySelectedNoteIndices(std::move(indices), true, selectableNotes()[static_cast<size_t>(noteIndex)].item);
     } else {
       applySelectedNoteIndices({}, true, nullptr);
     }
