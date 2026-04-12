@@ -117,6 +117,8 @@ private:
   void ensureTrackIndexMap(VGMSeq* seq);
   [[nodiscard]] int trackIndexForEvent(const SeqEvent* event) const;
   [[nodiscard]] int effectiveTrackCountForSeq(VGMSeq* seq) const;
+  [[nodiscard]] std::vector<int> selectedChannelsForCurrentSelection(bool usesTrackLayout, int channelCount) const;
+  [[nodiscard]] bool anyChannelsMutedOrSoloed(const VGMColl* assocColl, int channelCount) const;
   void applySelectionSetChange(const std::vector<VGMItem*>& items,
                                VGMItem* primaryItem,
                                bool revealInPianoRoll);

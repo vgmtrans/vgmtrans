@@ -694,34 +694,8 @@ bool VGMFileView::appendPaneSpecificContextActions(PanelSide side, QMenu& menu) 
 
     const VGMColl* assocColl = associatedCollection();
     if (assocColl) {
-      std::vector<int> selectedChannels;
-      selectedChannels.reserve(m_selectedItems.size());
-
-      // Populate vector of selectedChannels
-      std::unordered_set<int> seenChannelIds;
-      seenChannelIds.reserve(m_selectedItems.size() * 2 + 1);
-      for (const VGMItem* item : m_selectedItems) {
-        const auto* event = dynamic_cast<const SeqEvent*>(item);
-        if (!event) {
-          continue;
-        }
-
-        const int channelId = usesTrackLayout ? trackIndexForEvent(event) : static_cast<int>(event->channel);
-        if (channelId < 0 || channelId >= channelCount || !seenChannelIds.emplace(channelId).second) {
-          continue;
-        }
-        selectedChannels.push_back(channelId);
-      }
-
-      // Determine if there are any muted or soloed channels
-      auto& player = SequencePlayer::the();
-      bool hasMutedOrSoloedChannels = false;
-      for (int channelId = 0; channelId < channelCount; ++channelId) {
-        if (player.channelMuted(assocColl, channelId) || player.channelSolo(assocColl, channelId)) {
-          hasMutedOrSoloedChannels = true;
-          break;
-        }
-      }
+      const std::vector<int> selectedChannels = selectedChannelsForCurrentSelection(usesTrackLayout, channelCount);
+      const bool hasMutedOrSoloedChannels = anyChannelsMutedOrSoloed(assocColl, channelCount);
 
       const auto addChannelAction = [&](const QString& text, auto apply) {
         QAction* action = menu.addAction(text);
@@ -1435,6 +1409,40 @@ int VGMFileView::effectiveTrackCountForSeq(VGMSeq* seq) const {
   }
 
   return std::max(trackCount, 1);
+}
+
+std::vector<int> VGMFileView::selectedChannelsForCurrentSelection(bool usesTrackLayout, int channelCount) const {
+  std::vector<int> selectedChannels;
+  selectedChannels.reserve(m_selectedItems.size());
+
+  std::unordered_set<int> seenChannelIds;
+  seenChannelIds.reserve(m_selectedItems.size() * 2 + 1);
+  for (const VGMItem* item : m_selectedItems) {
+    const auto* event = dynamic_cast<const SeqEvent*>(item);
+    if (!event) {
+      continue;
+    }
+
+    const int channelId = usesTrackLayout ? trackIndexForEvent(event) : static_cast<int>(event->channel);
+    if (channelId < 0 || channelId >= channelCount || !seenChannelIds.emplace(channelId).second) {
+      continue;
+    }
+
+    selectedChannels.push_back(channelId);
+  }
+
+  return selectedChannels;
+}
+
+bool VGMFileView::anyChannelsMutedOrSoloed(const VGMColl* assocColl, int channelCount) const {
+  auto& player = SequencePlayer::the();
+  for (int channelId = 0; channelId < channelCount; ++channelId) {
+    if (player.channelMuted(assocColl, channelId) || player.channelSolo(assocColl, channelId)) {
+      return true;
+    }
+  }
+
+  return false;
 }
 
 void VGMFileView::rebuildSequenceControlBarIfNeeded() {
