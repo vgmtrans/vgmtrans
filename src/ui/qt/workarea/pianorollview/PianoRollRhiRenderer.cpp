@@ -1030,6 +1030,10 @@ void PianoRollRhiRenderer::appendMeasureNumberOverlays(const PianoRollFrame::Dat
   const float noteAreaRight = layout.noteAreaLeft + layout.noteAreaWidth;
   QColor labelColor = frame.measureLineColor.lighter(116);
   labelColor.setAlpha(std::clamp(labelColor.alpha() + 84, 96, 220));
+  if (frame.topBarBackgroundColor.lightnessF() > 0.5f) {
+    labelColor = frame.blackKeyColor;
+    labelColor.setAlpha(196);
+  }
 
   int visibleLabelCount = 0;
   forEachTimeSignatureSegment(frame, [&](const TimeSignatureSegment& seg) {

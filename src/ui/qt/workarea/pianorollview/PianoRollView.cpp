@@ -9,6 +9,7 @@
 #include "common/DragAutoScroll.h"
 #include "PianoRollRhiHost.h"
 #include "SequencePlayer.h"
+#include "ColorHelpers.h"
 #include "Helpers.h"
 #include "workarea/rhi/RhiScrollAreaChrome.h"
 
@@ -1119,7 +1120,7 @@ void PianoRollView::rebuildFrameColors() {
   const QColor base = pal.color(QPalette::Base);
   const QColor window = pal.color(QPalette::Window);
   const QColor text = pal.color(QPalette::Text);
-  const bool dark = base.lightnessF() < 0.5f;
+  const bool dark = isDarkPalette(pal);
   m_lightFrameColors = !dark;
 
   m_frameColors.backgroundColor = window;
