@@ -150,7 +150,6 @@ class MixerKnob final : public QWidget {
 public:
   explicit MixerKnob(QWidget* parent = nullptr) : QWidget(parent) {
     setFixedSize(kKnobSize, kKnobSize);
-    setCursor(Qt::SizeVerCursor);
   }
 
   [[nodiscard]] int value() const { return m_value; }
@@ -242,6 +241,7 @@ protected:
     }
 
     m_dragging = true;
+    setCursor(Qt::SizeVerCursor);
     m_dragOrigin = event->globalPosition();
     m_dragStartValue = m_value;
     showValueBubble(event->globalPosition().toPoint());
@@ -265,6 +265,7 @@ protected:
   void mouseReleaseEvent(QMouseEvent* event) override {
     if (event->button() == Qt::LeftButton && m_dragging) {
       m_dragging = false;
+      unsetCursor();
       QToolTip::hideText();
       event->accept();
       return;
