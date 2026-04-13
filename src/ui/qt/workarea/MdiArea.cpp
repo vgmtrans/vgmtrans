@@ -308,36 +308,8 @@ constexpr int kTabControlOuterMargin = 8;
 const QString kLeftPaneButtonIconPath = QStringLiteral(":/icons/left-pane.svg");
 const QString kRightPaneButtonIconPath = QStringLiteral(":/icons/right-pane.svg");
 const QString kSequenceControlBarButtonIconPath = QStringLiteral(":/icons/control.svg");
-const QString kHexViewIconPath = QStringLiteral(":/icons/binary.svg");
-const QString kTreeViewIconPath = QStringLiteral(":/icons/file.svg");
-const QString kActiveNotesViewIconPath = QStringLiteral(":/icons/note.svg");
-const QString kPianoRollViewIconPath = QStringLiteral(":/icons/track.svg");
-const QString kHiddenRightPaneIconPath = QStringLiteral(":/icons/view-split-vertical.svg");
-
-QString iconPathForPanelView(PanelViewKind viewKind) {
-  switch (viewKind) {
-    case PanelViewKind::Hex:
-      return kHexViewIconPath;
-    case PanelViewKind::Tree:
-      return kTreeViewIconPath;
-    case PanelViewKind::ActiveNotes:
-      return kActiveNotesViewIconPath;
-    case PanelViewKind::PianoRoll:
-      return kPianoRollViewIconPath;
-  }
-  return kTreeViewIconPath;
-}
-
 QIcon panelButtonIcon(const QString &iconPath, const QColor &tint) {
   return QIcon(new TintableSvgIconEngine(iconPath, tint));
-}
-
-QIcon iconForPanelView(PanelViewKind viewKind) {
-  return QIcon(iconPathForPanelView(viewKind));
-}
-
-QIcon iconForHiddenRightPane() {
-  return QIcon(kHiddenRightPaneIconPath);
 }
 
 } // namespace
@@ -645,16 +617,14 @@ void MdiArea::setupTabBarControls() {
       group->setExclusive(true);
 
       auto addAction = [this, menu, group, side](PanelViewKind kind, const QString &text, QAction *&slot) {
-        slot = menu->addAction(iconForPanelView(kind), text);
-        slot->setIconVisibleInMenu(true);
+        slot = menu->addAction(text);
         slot->setCheckable(true);
         group->addAction(slot);
         connect(slot, &QAction::triggered, this, [this, side, kind]() { setPaneView(side, kind); });
       };
 
       if (includeHiddenOption) {
-        actions.hidden = menu->addAction(iconForHiddenRightPane(), tr("Hidden"));
-        actions.hidden->setIconVisibleInMenu(true);
+        actions.hidden = menu->addAction(tr("Hidden"));
         actions.hidden->setCheckable(true);
         group->addAction(actions.hidden);
         connect(actions.hidden, &QAction::triggered, this, [this]() { setRightPaneHidden(true); });
