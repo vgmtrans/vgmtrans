@@ -46,6 +46,12 @@ constexpr int kScrollButtonWidth = 22;
 constexpr int kKnobSize = 20;
 constexpr int kScrollStepPixels = kBlockWidth;
 constexpr int kTempoControlWidth = 78;
+constexpr int kTempoGlyphSize = 16;
+constexpr int kTempoSpinWidth = 50;
+constexpr int kTempoSpinHeight = 20;
+constexpr int kTempoBottomMargin = 3;
+constexpr int kTempoSideMargin = 7;
+constexpr int kTempoRowSpacing = 2;
 constexpr int kDefaultTempoBpm = 120;
 constexpr int kMinTempoBpm = 20;
 constexpr int kMaxTempoBpm = 360;
@@ -320,13 +326,19 @@ SequenceControlBar::SequenceControlBar(QWidget* parent)
   tempoFrame->setFixedHeight(kBlockHeight);
 
   auto* tempoLayout = new QVBoxLayout(tempoFrame);
-  tempoLayout->setContentsMargins(8, 5, 4, 0);
+  tempoLayout->setContentsMargins(kTempoSideMargin, 0, kTempoSideMargin, kTempoBottomMargin);
   tempoLayout->setSpacing(0);
+  tempoLayout->addStretch(1);
 
-  auto* tempoLabel = new QLabel(QStringLiteral("Tempo"), tempoFrame);
-  tempoLabel->setObjectName(QStringLiteral("TempoTitle"));
-  tempoLabel->setAlignment(Qt::AlignLeft | Qt::AlignTop);
-  tempoLayout->addWidget(tempoLabel, 0, Qt::AlignLeft | Qt::AlignTop);
+  auto* tempoRow = new QHBoxLayout();
+  tempoRow->setContentsMargins(0, 0, 0, 0);
+  tempoRow->setSpacing(kTempoRowSpacing);
+
+  m_tempoGlyph = new QLabel(tempoFrame);
+  m_tempoGlyph->setObjectName(QStringLiteral("TempoGlyph"));
+  m_tempoGlyph->setAlignment(Qt::AlignCenter);
+  m_tempoGlyph->setFixedSize(kTempoGlyphSize, kTempoGlyphSize);
+  tempoRow->addWidget(m_tempoGlyph, 0, Qt::AlignVCenter);
 
   m_tempoSpin = new QDoubleSpinBox(tempoFrame);
   m_tempoSpin->setDecimals(2);
@@ -337,20 +349,12 @@ SequenceControlBar::SequenceControlBar(QWidget* parent)
   m_tempoSpin->setValue(kDefaultTempoBpm);
   m_tempoSpin->setAlignment(Qt::AlignCenter);
   m_tempoSpin->setObjectName(QStringLiteral("TempoSpin"));
-  m_tempoSpin->setFixedHeight(20);
+  m_tempoSpin->setFixedSize(kTempoSpinWidth, kTempoSpinHeight);
 
-  auto* tempoValueLayout = new QHBoxLayout();
-  tempoValueLayout->setContentsMargins(0, 4, 0, 0);
-  tempoValueLayout->setSpacing(4);
-  tempoValueLayout->addWidget(m_tempoSpin, 0, Qt::AlignLeft | Qt::AlignTop);
+  tempoRow->addWidget(m_tempoSpin, 0, Qt::AlignVCenter);
+  tempoRow->addStretch(1);
 
-  auto* bpmLabel = new QLabel(QStringLiteral("BPM"), tempoFrame);
-  bpmLabel->setObjectName(QStringLiteral("TempoUnit"));
-  tempoValueLayout->addWidget(bpmLabel, 0, Qt::AlignLeft | Qt::AlignVCenter);
-  tempoValueLayout->addStretch(1);
-
-  tempoLayout->addLayout(tempoValueLayout);
-  tempoLayout->addStretch(1);
+  tempoLayout->addLayout(tempoRow);
 
   m_tempoSpin->installEventFilter(this);
   m_tempoLineEdit = m_tempoSpin->findChild<QLineEdit*>();
@@ -843,6 +847,8 @@ void SequenceControlBar::refreshStyleSheet() {
   buttonText.setAlpha(darkPalette ? 196 : 176);
   QColor buttonDisabledText = palette().color(QPalette::Disabled, QPalette::WindowText);
   buttonDisabledText.setAlpha(darkPalette ? 98 : 88);
+  QColor tempoSpinActiveFill = text;
+  tempoSpinActiveFill.setAlphaF(0.2);
   const QColor checkedText = contrastingTextColor(buttonOn, barBg, palette());
 
   const QString style = QStringLiteral(
@@ -867,63 +873,54 @@ void SequenceControlBar::refreshStyleSheet() {
       " border: none;"
       " background: transparent;"
       "}"
-      "QLabel#TempoTitle {"
-      " font-size: 10px;"
-      " font-weight: 700;"
-      " color: rgba(%2,%3,%4,%5);"
-      " padding-top: 0px;"
-      " padding-bottom: 0px;"
-      "}"
-      "QLabel#TempoUnit {"
-      " font-size: 9px;"
-      " font-weight: 600;"
-      " color: rgba(%2,%3,%4,%5);"
+      "QLabel#TempoGlyph {"
+      " background: transparent;"
       "}"
       "QDoubleSpinBox#TempoSpin {"
       " border: none;"
       " border-radius: 0px;"
       " padding: 1px 0px 1px 0px;"
       " color: palette(text);"
-      " background: rgba(0,0,0,0.25);"
+      " background: transparent;"
       " selection-background-color: rgba(255,255,255,0.2);"
-      " font-size: 9px;"
+      " font-size: 12px;"
+      "}"
+      "QDoubleSpinBox#TempoSpin:hover,"
+      "QDoubleSpinBox#TempoSpin:focus {"
+      " background: %11;"
       "}"
       "QToolButton#BlockToggle {"
       " border: none;"
       " border-radius: 5px;"
       " background: transparent;"
-      " color: %6;"
+      " color: %2;"
       " font-size: 11px;"
       " font-weight: 700;"
       " padding: 0px;"
       "}"
       "QToolButton#BlockToggle:hover {"
-      " background: %7;"
-      " color: %8;"
+      " background: %3;"
+      " color: %4;"
       "}"
       "QToolButton#BlockToggle:pressed {"
-      " background: %9;"
-      " color: %8;"
+      " background: %5;"
+      " color: %4;"
       "}"
       "QToolButton#BlockToggle:checked {"
-      " background: %10;"
-      " color: %11;"
+      " background: %6;"
+      " color: %7;"
       "}"
-      "QToolButton#BlockToggle:checked:hover { background: %12; }"
-      "QToolButton#BlockToggle:checked:pressed { background: %13; }"
+      "QToolButton#BlockToggle:checked:hover { background: %8; }"
+      "QToolButton#BlockToggle:checked:pressed { background: %9; }"
       "QToolButton#BlockToggle:disabled {"
       " background: transparent;"
-      " color: %14;"
+      " color: %10;"
       "}"
       "QWidget#BlockScrollControls {"
       " border: none;"
       " background: transparent;"
       "}")
                            .arg(cssColor(barBg))
-                           .arg(subtleText.red())
-                           .arg(subtleText.green())
-                           .arg(subtleText.blue())
-                           .arg(subtleText.alpha())
                            .arg(cssColor(buttonText))
                            .arg(cssColor(buttonHover))
                            .arg(cssColor(text))
@@ -932,9 +929,15 @@ void SequenceControlBar::refreshStyleSheet() {
                            .arg(cssColor(checkedText))
                            .arg(cssColor(buttonOnHover))
                            .arg(cssColor(buttonOnPressed))
-                           .arg(cssColor(buttonDisabledText));
+                           .arg(cssColor(buttonDisabledText))
+                           .arg(cssColor(tempoSpinActiveFill));
 
   if (styleSheet() != style) {
     setStyleSheet(style);
+  }
+
+  if (m_tempoGlyph) {
+    const QIcon icon = stencilSvgIcon(QStringLiteral(":/icons/tempo.svg"), subtleText);
+    m_tempoGlyph->setPixmap(icon.pixmap(QSize(kTempoGlyphSize, kTempoGlyphSize)));
   }
 }

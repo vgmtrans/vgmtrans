@@ -81,6 +81,7 @@ private:
   void applyBlockFrameStyle(BlockWidgets& block, bool dimmed, bool soloed);
 
   bool m_updatingUi = false;
+  QLabel* m_tempoGlyph = nullptr;
   QDoubleSpinBox* m_tempoSpin = nullptr;
   QLineEdit* m_tempoLineEdit = nullptr;
   QScrollArea* m_blockScroll = nullptr;
