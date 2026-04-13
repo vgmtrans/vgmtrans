@@ -46,6 +46,22 @@
 
 namespace {
 constexpr uint8_t kActiveNotePreviewVelocity = 127;
+constexpr double kTempoCompareEpsilon = 0.001;
+
+bool temposMatch(double lhs, double rhs) {
+  return !std::isnan(lhs) && !std::isnan(rhs) && std::abs(lhs - rhs) < kTempoCompareEpsilon;
+}
+
+void resetSequenceControlMuteSolo(SequencePlayer& player, const VGMColl* assocColl, int channelCount) {
+  if (!assocColl || channelCount <= 0) {
+    return;
+  }
+
+  for (int channelId = 0; channelId < channelCount; ++channelId) {
+    player.setChannelMuted(assocColl, channelId, false, channelCount);
+    player.setChannelSolo(assocColl, channelId, false, channelCount);
+  }
+}
 
 PanelViewKind sanitizeSeqPaneViewKind(int viewKind, PanelSide side) {
   switch (viewKind) {
@@ -231,7 +247,26 @@ VGMFileView::VGMFileView(VGMFile* vgmfile)
               if (!ensureAssociatedCollectionActive()) {
                 return;
               }
-              SequencePlayer::the().setTempoBpm(bpm);
+              if (SequencePlayer::the().setTempoBpm(bpm)) {
+                m_lastSequenceControlUserTempoBpm = bpm;
+              }
+            });
+
+    connect(m_sequenceControlBar,
+            &SequenceControlBar::resetRequested,
+            this,
+            [this]() {
+              auto& player = SequencePlayer::the();
+              resetSequenceControlMuteSolo(player,
+                                           associatedCollection(),
+                                           static_cast<int>(m_sequenceChannelBindings.size()));
+              applySequenceAudibilityState();
+
+              if (!std::isnan(m_lastSequenceControlTempoBpm) && ensureAssociatedCollectionActive()) {
+                player.setTempoBpm(m_lastSequenceControlTempoBpm);
+              }
+
+              updateSequenceControlValuesFromPlayback();
             });
 
     connect(m_sequenceControlBar,
@@ -729,10 +764,7 @@ bool VGMFileView::appendPaneSpecificContextActions(PanelSide side, QMenu& menu) 
       if (hasMutedOrSoloedChannels) {
         addChannelAction(tr("Reset Channel Mute/Solo"),
                          [assocColl, channelCount](SequencePlayer& player) {
-                           for (int channelId = 0; channelId < channelCount; ++channelId) {
-                             player.setChannelMuted(assocColl, channelId, false, channelCount);
-                             player.setChannelSolo(assocColl, channelId, false, channelCount);
-                           }
+                           resetSequenceControlMuteSolo(player, assocColl, channelCount);
                          });
       }
     }
@@ -1569,7 +1601,8 @@ void VGMFileView::rebuildSequenceControlBar(VGMSeq* seq) {
   m_sequenceControlUsesTrackLayout = usesTrackLayout;
   m_sequenceControlChannelCount = channelCount;
   const size_t cacheSize = static_cast<size_t>(std::max(0, channelCount));
-  m_lastSequenceControlTempoBpm = std::numeric_limits<double>::quiet_NaN();
+  m_lastSequenceControlTempoBpm = tempoBpm;
+  m_lastSequenceControlUserTempoBpm = std::numeric_limits<double>::quiet_NaN();
   m_lastSequenceControlMuted.assign(cacheSize, static_cast<uint8_t>(0xFF));
   m_lastSequenceControlSolo.assign(cacheSize, static_cast<uint8_t>(0xFF));
   m_lastSequenceControlPan.assign(cacheSize, static_cast<int16_t>(-1));
@@ -1595,9 +1628,12 @@ void VGMFileView::updateSequenceControlValuesFromPlayback() {
   m_updatingSequenceControls = true;
   if (collectionActive) {
     const double tempoBpm = player.currentTempoBpm();
-    if (std::isnan(m_lastSequenceControlTempoBpm) ||
-        std::abs(tempoBpm - m_lastSequenceControlTempoBpm) >= 0.001) {
+    if (!temposMatch(tempoBpm, m_lastSequenceControlUserTempoBpm)) {
       m_lastSequenceControlTempoBpm = tempoBpm;
+      m_lastSequenceControlUserTempoBpm = std::numeric_limits<double>::quiet_NaN();
+    }
+
+    if (!temposMatch(tempoBpm, m_sequenceControlBar->tempoBpm())) {
       m_sequenceControlBar->setTempoBpm(tempoBpm);
     }
   }

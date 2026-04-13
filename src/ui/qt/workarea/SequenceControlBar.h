@@ -56,6 +56,7 @@ public:
 
 signals:
   void tempoChanged(double bpm);
+  void resetRequested();
   void chanMuteChanged(int channelId, bool muted);
   void chanSoloChanged(int channelId, bool solo);
   void chanPanChanged(int channelId, int pan);

@@ -49,9 +49,11 @@ constexpr int kTempoControlWidth = 78;
 constexpr int kTempoGlyphSize = 16;
 constexpr int kTempoSpinWidth = 50;
 constexpr int kTempoSpinHeight = 20;
-constexpr int kTempoBottomMargin = 3;
+constexpr int kTempoBottomMargin = 2;
 constexpr int kTempoSideMargin = 7;
 constexpr int kTempoRowSpacing = 2;
+constexpr int kTempoResetButtonTopMargin = 7;
+constexpr int kTempoResetButtonHeight = 17;
 constexpr int kDefaultTempoBpm = 120;
 constexpr int kMinTempoBpm = 20;
 constexpr int kMaxTempoBpm = 360;
@@ -328,6 +330,24 @@ SequenceControlBar::SequenceControlBar(QWidget* parent)
   auto* tempoLayout = new QVBoxLayout(tempoFrame);
   tempoLayout->setContentsMargins(kTempoSideMargin, 0, kTempoSideMargin, kTempoBottomMargin);
   tempoLayout->setSpacing(0);
+
+  auto* resetRow = new QHBoxLayout();
+  resetRow->setContentsMargins(0, kTempoResetButtonTopMargin, 0, 0);
+  resetRow->setSpacing(0);
+  resetRow->addStretch(1);
+
+  auto* tempoResetButton = new QToolButton(tempoFrame);
+  tempoResetButton->setObjectName(QStringLiteral("BlockToggle"));
+  configureToolButton(tempoResetButton,
+                      tr("Reset channel mute/solo and tempo"),
+                      QSize(kTempoControlWidth - (kTempoSideMargin * 2), kTempoResetButtonHeight),
+                      QSize(),
+                      true);
+  tempoResetButton->setText(tr("Reset"));
+  resetRow->addWidget(tempoResetButton);
+  resetRow->addStretch(1);
+
+  tempoLayout->addLayout(resetRow);
   tempoLayout->addStretch(1);
 
   auto* tempoRow = new QHBoxLayout();
@@ -350,6 +370,7 @@ SequenceControlBar::SequenceControlBar(QWidget* parent)
   m_tempoSpin->setAlignment(Qt::AlignCenter);
   m_tempoSpin->setObjectName(QStringLiteral("TempoSpin"));
   m_tempoSpin->setFixedSize(kTempoSpinWidth, kTempoSpinHeight);
+  m_tempoSpin->setCursor(Qt::ArrowCursor);
 
   tempoRow->addWidget(m_tempoSpin, 0, Qt::AlignVCenter);
   tempoRow->addStretch(1);
@@ -359,8 +380,11 @@ SequenceControlBar::SequenceControlBar(QWidget* parent)
   m_tempoSpin->installEventFilter(this);
   m_tempoLineEdit = m_tempoSpin->findChild<QLineEdit*>();
   if (m_tempoLineEdit) {
+    m_tempoLineEdit->setCursor(Qt::ArrowCursor);
     m_tempoLineEdit->installEventFilter(this);
   }
+
+  connect(tempoResetButton, &QToolButton::clicked, this, &SequenceControlBar::resetRequested);
 
   rootLayout->addWidget(tempoFrame, 0);
 
@@ -578,6 +602,11 @@ bool SequenceControlBar::eventFilter(QObject* watched, QEvent* event) {
             m_tempoSpin->selectAll();
           }
         });
+        break;
+      case QEvent::MouseMove:
+        if (watched == m_tempoLineEdit && (QApplication::mouseButtons() & Qt::LeftButton)) {
+          return true;
+        }
         break;
       case QEvent::FocusOut:
         if (m_tempoLineEdit) {

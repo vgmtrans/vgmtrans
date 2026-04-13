@@ -177,6 +177,7 @@ private:
   int m_sequenceControlChannelCount = -1;
   bool m_updatingSequenceControls = false;
   double m_lastSequenceControlTempoBpm = std::numeric_limits<double>::quiet_NaN();
+  double m_lastSequenceControlUserTempoBpm = std::numeric_limits<double>::quiet_NaN();
   std::vector<uint8_t> m_lastSequenceControlMuted;
   std::vector<uint8_t> m_lastSequenceControlSolo;
   std::vector<int16_t> m_lastSequenceControlPan;
