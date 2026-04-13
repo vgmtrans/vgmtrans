@@ -1709,6 +1709,7 @@ void VGMFileView::setSequenceControlChannelMuted(int channelId, bool muted) {
     SequencePlayer::the().setChannelMuted(assocColl, channelId, muted, channelCount);
   }
   applySequenceAudibilityState();
+  updateSequenceControlValuesFromPlayback();
 }
 
 void VGMFileView::setSequenceControlChannelSolo(int channelId, bool solo) {
@@ -1718,6 +1719,7 @@ void VGMFileView::setSequenceControlChannelSolo(int channelId, bool solo) {
     SequencePlayer::the().setChannelSolo(assocColl, channelId, solo, channelCount);
   }
   applySequenceAudibilityState();
+  updateSequenceControlValuesFromPlayback();
 }
 
 void VGMFileView::onPlaybackPositionChanged(int current, int max, PositionChangeOrigin origin) {
