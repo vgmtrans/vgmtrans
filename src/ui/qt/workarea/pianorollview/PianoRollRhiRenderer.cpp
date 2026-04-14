@@ -1690,8 +1690,10 @@ void PianoRollRhiRenderer::buildDynamicInstances(const PianoRollFrame::Data& fra
                  LineStyle::ScrollThumb);
     }
 
-    QColor glyphColor = enabled ? frame.whiteKeyColor : frame.scrollChrome.colors.glyphColor;
-    glyphColor.setAlpha(245);
+    QColor glyphColor = frame.scrollChrome.colors.glyphColor;
+    if (enabled && glyphColor.lightnessF() < 0.6f) {
+      glyphColor = glyphColor.darker(150);
+    }
 
     const float glyphHeight = std::max(10.0f, buttonHeight - 0.0f);
     const QString glyphText(QChar(static_cast<char16_t>(kPlaybackAutoScrollIconGlyph)));
