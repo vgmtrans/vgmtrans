@@ -6,16 +6,22 @@
 
 #pragma once
 #include <memory>
+#include <unordered_map>
+#include <QColor>
 #include <QFont>
 #include <QMdiSubWindow>
 #include <vector>
 #include "SeqEventTimeIndex.h"
 
+class MidiTrack;
 class SnappingSplitter;
 class VGMFile;
+class VGMSeq;
 class HexView;
 class VGMFileTreeView;
 class VGMItem;
+class SeqEvent;
+class SeqTrack;
 struct SeqTimedEvent;
 enum class PositionChangeOrigin;
 
@@ -36,6 +42,8 @@ private:
   int hexViewWidthSansAsciiAndAddress() const;
   void updateHexViewFont(qreal sizeIncrement) const;
   void applyHexViewFont(QFont font) const;
+  void ensureTrackIndexMap(VGMSeq* seq);
+  int trackIndexForEvent(const SeqEvent* event) const;
 
   VGMFileTreeView* m_treeview{};
   VGMFile* m_vgmfile{};
@@ -44,10 +52,15 @@ private:
   QFont m_defaultHexFont;
   std::vector<const SeqTimedEvent*> m_playbackTimedEvents;
   std::vector<const VGMItem*> m_playbackItems;
+  std::vector<QColor> m_playbackItemColors;
   std::vector<const VGMItem*> m_lastPlaybackItems;
+  std::vector<QColor> m_lastPlaybackItemColors;
   int m_lastPlaybackPosition = 0;
   const SeqEventTimeIndex* m_playbackTimeline = nullptr;
   std::unique_ptr<SeqEventTimeIndex::Cursor> m_playbackCursor;
+  VGMSeq* m_trackIndexSeq = nullptr;
+  std::unordered_map<const SeqTrack*, int> m_trackIndexByPtr;
+  std::unordered_map<const MidiTrack*, int> m_trackIndexByMidiPtr;
 
 public slots:
   void onSelectionChange(VGMItem* item) const;
