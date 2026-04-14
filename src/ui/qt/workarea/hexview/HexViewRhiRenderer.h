@@ -52,6 +52,7 @@ public:
 
   void markBaseDirty();
   void markSelectionDirty();
+  void markPlaybackDirty();
   void invalidateCache();
 
   void renderFrame(QRhiCommandBuffer* cb, const RenderTargetInfo& target);
@@ -241,6 +242,7 @@ private:
   int m_lastEndLine = -1;
   bool m_baseDirty = true;
   bool m_selectionDirty = true;
+  bool m_playbackDirty = true;
   bool m_baseBufferDirty = false;
   bool m_selectionBufferDirty = false;
   bool m_itemIdDirty = true;
