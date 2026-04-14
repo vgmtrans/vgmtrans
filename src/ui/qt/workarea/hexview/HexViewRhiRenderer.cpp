@@ -318,6 +318,7 @@ void HexViewRhiRenderer::renderFrame(QRhiCommandBuffer* cb, const RenderTargetIn
   if (m_selectionDirty) {
     buildSelectionEffectInstances(startLine, endLine, frame, layout);
     m_selectionDirty = false;
+    m_playbackDirty = false;
     m_selectionBufferDirty = true;
   }
   if (m_playbackDirty) {

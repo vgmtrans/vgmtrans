@@ -32,6 +32,12 @@ struct PlaybackSelection {
   QColor glowColor;
 };
 
+struct PlaybackSelection {
+  uint32_t offset = 0;
+  uint32_t length = 0;
+  QColor glowColor;
+};
+
 struct FadePlaybackSelection {
   PlaybackSelection range;
   int64_t startMs = 0;
