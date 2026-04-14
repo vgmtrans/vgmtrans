@@ -19,7 +19,6 @@ class QExposeEvent;
 class QResizeEvent;
 class QRhi;
 class QRhiCommandBuffer;
-class QRhiRenderBuffer;
 class QRhiRenderPassDescriptor;
 class QRhiSwapChain;
 class HexView;
@@ -58,7 +57,6 @@ private:
 
   QRhi* m_rhi = nullptr;
   QRhiSwapChain* m_sc = nullptr;
-  QRhiRenderBuffer* m_ds = nullptr;
   QRhiRenderPassDescriptor* m_rp = nullptr;
   QRhiCommandBuffer* m_cb = nullptr;
 

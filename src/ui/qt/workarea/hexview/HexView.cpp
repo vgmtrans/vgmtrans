@@ -8,6 +8,7 @@
 #include "Helpers.h"
 #include "HexViewInput.h"
 #include "HexViewRhiHost.h"
+#include "util/NonTransientScrollBarStyle.h"
 #include "services/NotificationCenter.h"
 #include "VGMFile.h"
 
@@ -21,9 +22,7 @@
 #include <QKeyEvent>
 #include <QMouseEvent>
 #include <QPixmap>
-#include <QProxyStyle>
 #include <QRawFont>
-#include <QStyleFactory>
 #include <QPainter>
 #include <QParallelAnimationGroup>
 #include <QPropertyAnimation>
@@ -98,22 +97,6 @@ WidgetLayoutMetrics computeWidgetLayoutMetrics(const QWidget* widget, int charWi
   layout.asciiEndPx = layout.asciiStartPx + (BYTES_PER_LINE * layout.charWidthPx);
   return layout;
 }
-
-#ifdef Q_OS_MAC
-class NonTransientScrollBarStyle final : public QProxyStyle {
-public:
-  using QProxyStyle::QProxyStyle;
-
-  int styleHint(StyleHint hint, const QStyleOption* option = nullptr,
-                const QWidget* widget = nullptr,
-                QStyleHintReturn* returnData = nullptr) const override {
-    if (hint == QStyle::SH_ScrollBar_Transient) {
-      return 0;
-    }
-    return QProxyStyle::styleHint(hint, option, widget, returnData);
-  }
-};
-#endif
 
 QString tooltipIconDataUrl(VGMItem::Type type) {
   static QHash<int, QString> cache;
@@ -353,6 +336,13 @@ uint64_t HexView::selectionKey(const FadePlaybackSelection& selection) {
 // Trivial destructor; QObject ownership handles child cleanup.
 HexView::~HexView() = default;
 
+QFont HexView::defaultViewFont() {
+  const double appFontPointSize = QApplication::font().pointSizeF();
+  QFont font("Roboto Mono", appFontPointSize + 1.0);
+  font.setPointSizeF(appFontPointSize + 1.0);
+  return font;
+}
+
 // Initialize HexView UI state, RHI host, typography, animations, and signal wiring.
 HexView::HexView(VGMFile* vgmfile, QWidget* parent)
     : QAbstractScrollArea(parent), m_vgmfile(vgmfile) {
@@ -363,25 +353,14 @@ HexView::HexView(VGMFile* vgmfile, QWidget* parent)
 #ifdef Q_OS_MAC
   // With AA_DontCreateNativeWidgetSiblings, the RHI QWindow can cover transient (overlay)
   // scrollbars, so keep HexView's scrollbars non-transient on macOS.
-  QStyle* baseStyle = QStyleFactory::create(QStringLiteral("macos"));
-  if (!baseStyle)
-    baseStyle = QStyleFactory::create(QStringLiteral("macintosh"));
-  if (!baseStyle)
-    baseStyle = QStyleFactory::create(QStringLiteral("Fusion"));
-  auto* scrollStyle = baseStyle ? new NonTransientScrollBarStyle(baseStyle)
-                                : new NonTransientScrollBarStyle();
-  verticalScrollBar()->setStyle(scrollStyle);
-  if (!scrollStyle->parent())
-    scrollStyle->setParent(verticalScrollBar());
+  QtUi::applyNonTransientScrollBarStyle(verticalScrollBar());
 #endif
 
   m_rhiHost = new HexViewRhiHost(this, viewport());
   m_rhiHost->setGeometry(viewport()->rect());
   m_rhiHost->show();
 
-  const double appFontPointSize = QApplication::font().pointSizeF();
-  QFont font("Roboto Mono", appFontPointSize);
-  font.setPointSizeF(appFontPointSize);
+  QFont font = defaultViewFont();
   setShadowStrength(SHADOW_STRENGTH);
   m_playbackGlowLow = PLAYBACK_GLOW_LOW;
   m_playbackGlowHigh = PLAYBACK_GLOW_HIGH;
@@ -415,6 +394,11 @@ HexView::HexView(VGMFile* vgmfile, QWidget* parent)
               return;
             }
             m_seekModifierActive = active;
+            if (!isVisible()) {
+              hideTooltip();
+              requestRhiUpdate();
+              return;
+            }
             m_outlineFadeClock.restart();
             if (!m_outlineFadeTimer.isActive()) {
               m_outlineFadeTimer.start(16, this);
@@ -1610,6 +1594,9 @@ void HexView::showTooltip(VGMItem* item, const QPoint& pos) {
 
 // Hide active tooltip and clear tracked tooltip item.
 void HexView::hideTooltip() {
+  if (m_tooltipItem == nullptr) {
+    return;
+  }
   QToolTip::hideText();
   m_tooltipItem = nullptr;
 }

@@ -8,15 +8,14 @@
 
 #include "HexView.h"
 #include "HexViewRhiRenderer.h"
+#include "workarea/rhi/RhiWindowMainWindowLocator.h"
 
 #if defined(Q_OS_LINUX)
 #include "HexViewRhiWidget.h"
 #else
 #include "HexViewRhiWindow.h"
-#include "MainWindow.h"
 #endif
 
-#include <QApplication>
 #include <QWindow>
 #include <QResizeEvent>
 
@@ -36,22 +35,7 @@ HexViewRhiHost::HexViewRhiHost(HexView* view, QWidget* parent)
 
   auto* rhiWindow = qobject_cast<HexViewRhiWindow*>(m_window);
   if (rhiWindow) {
-    MainWindow* mainWindow = nullptr;
-    for (QWidget* widget = this; widget; widget = widget->parentWidget()) {
-      mainWindow = qobject_cast<MainWindow*>(widget);
-      if (mainWindow) {
-        break;
-      }
-    }
-    if (!mainWindow) {
-      const auto topLevelWidgets = QApplication::topLevelWidgets();
-      for (QWidget* widget : topLevelWidgets) {
-        mainWindow = qobject_cast<MainWindow*>(widget);
-        if (mainWindow) {
-          break;
-        }
-      }
-    }
+    MainWindow* mainWindow = QtUi::findMainWindowForWidget(this);
     if (mainWindow) {
       connect(rhiWindow, &HexViewRhiWindow::dragOverlayShowRequested,
               mainWindow, &MainWindow::showDragOverlay);

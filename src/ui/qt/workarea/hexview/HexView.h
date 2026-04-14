@@ -40,6 +40,7 @@ class HexView final : public QAbstractScrollArea {
 public:
   explicit HexView(VGMFile* vgmfile, QWidget* parent = nullptr);
   ~HexView() override;
+  [[nodiscard]] static QFont defaultViewFont();
   void setSelectedItem(VGMItem* item);
   void setPlaybackSelectionsForItems(const std::vector<const VGMItem*>& items);
   void clearPlaybackSelections(bool fade = true);
