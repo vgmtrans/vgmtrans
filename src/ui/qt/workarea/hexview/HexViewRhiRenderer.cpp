@@ -153,6 +153,10 @@ void HexViewRhiRenderer::initIfNeeded(QRhi* rhi) {
                                     QRhiSampler::ClampToEdge);
   m_maskSampler->create();
 
+  m_edgeFallbackTex = m_rhi->newTexture(QRhiTexture::RGBA8, QSize(1, 1), 1);
+  m_edgeFallbackTex->create();
+  m_edgeFallbackDirty = true;
+
   m_staticBuffersUploaded = false;
   m_sampleCount = 0;
   if (!m_animTimer.isValid()) {
@@ -177,6 +181,10 @@ void HexViewRhiRenderer::releaseResources() {
   m_edgePso = nullptr;
   delete m_compositePso;
   m_compositePso = nullptr;
+  delete m_outputRectPso;
+  m_outputRectPso = nullptr;
+  delete m_outputGlyphPso;
+  m_outputGlyphPso = nullptr;
 
   delete m_rectSrb;
   m_rectSrb = nullptr;
@@ -194,6 +202,8 @@ void HexViewRhiRenderer::releaseResources() {
   m_glyphTex = nullptr;
   delete m_itemIdTex;
   m_itemIdTex = nullptr;
+  delete m_edgeFallbackTex;
+  m_edgeFallbackTex = nullptr;
   delete m_glyphSampler;
   m_glyphSampler = nullptr;
   delete m_maskSampler;
@@ -340,6 +350,25 @@ void HexViewRhiRenderer::renderFrame(QRhiCommandBuffer* cb, const RenderTargetIn
   if (std::abs(m_outlineAlpha - targetOutline) > 0.001f) {
     m_view->requestPlaybackFrame();
   }
+  const bool hasSelections = !frame.selections.empty() || !frame.fadeSelections.empty();
+  const bool hasPlayback = !frame.playbackSelections.empty() || !frame.fadePlaybackSelections.empty();
+  const bool needsComposite = hasSelections || hasPlayback || outlineEnabled ||
+                              frame.overlayOpacity > 0.001;
+  const bool edgeEnabled = needsComposite &&
+      ((frame.shadowBlur > 0.0 && frame.shadowStrength > 0.0) ||
+       (frame.playbackGlowRadius > 0.0f && frame.playbackGlowStrength > 0.0f));
+  if (m_useEdgeFallback != !edgeEnabled) {
+    m_useEdgeFallback = !edgeEnabled;
+    m_compositeSrbDirty = true;
+  }
+
+  if (m_edgeFallbackTex && m_edgeFallbackDirty) {
+    QImage whitePixel(1, 1, QImage::Format_RGBA8888);
+    whitePixel.fill(Qt::white);
+    u->uploadTexture(m_edgeFallbackTex, whitePixel);
+    m_edgeFallbackDirty = false;
+  }
+
   ensureItemIdTexture(u, startLine, endLine, totalLines, frame);
   ensureRenderTargets(target.pixelSize);
   const int sampleCount = std::max(1, target.sampleCount);
@@ -414,6 +443,25 @@ void HexViewRhiRenderer::renderFrame(QRhiCommandBuffer* cb, const RenderTargetIn
     cb->resourceUpdate(u);
   }
 
+  if (!needsComposite) {
+    cb->beginPass(target.renderTarget, clearColor, {1.0f, 0}, nullptr);
+    cb->setViewport(viewport);
+    drawInstanced(m_outputRectPso,
+                  m_rectSrb,
+                  m_baseRectBuf,
+                  baseRectCount,
+                  baseRectFirst,
+                  static_cast<int>(sizeof(RectInstance)));
+    drawInstanced(m_outputGlyphPso,
+                  m_glyphSrb,
+                  m_baseGlyphBuf,
+                  baseGlyphCount,
+                  baseGlyphFirst,
+                  static_cast<int>(sizeof(GlyphInstance)));
+    cb->endPass();
+    return;
+  }
+
   // Pass 1: base content (background spans + glyphs) into an offscreen texture.
   cb->beginPass(m_contentRt, clearColor, {1.0f, 0}, nullptr);
   cb->setViewport(viewport);
@@ -445,20 +493,17 @@ void HexViewRhiRenderer::renderFrame(QRhiCommandBuffer* cb, const RenderTargetIn
   cb->endPass();
 
   // Pass 3: edge field for drop shadow and playback glow falloff.
-  const bool edgeEnabled = !m_edgeRectInstances.empty() &&
-      ((frame.shadowBlur > 0.0 && frame.shadowStrength > 0.0) ||
-       (frame.playbackGlowRadius > 0.0f && frame.playbackGlowStrength > 0.0f));
-  cb->beginPass(m_edgeRt, QColor(255, 255, 255, 255), {1.0f, 0}, nullptr);
-  cb->setViewport(viewport);
   if (edgeEnabled) {
+    cb->beginPass(m_edgeRt, QColor(255, 255, 255, 255), {1.0f, 0}, nullptr);
+    cb->setViewport(viewport);
     drawInstanced(m_edgePso,
                   m_edgeSrb,
                   m_edgeRectBuf,
                   static_cast<int>(m_edgeRectInstances.size()),
                   0,
                   static_cast<int>(sizeof(EdgeInstance)));
+    cb->endPass();
   }
-  cb->endPass();
 
   // Pass 4: fullscreen composite combines content + mask + edge + item-id textures.
   cb->beginPass(target.renderTarget, clearColor, {1.0f, 0}, nullptr);
@@ -548,6 +593,8 @@ void HexViewRhiRenderer::ensurePipelines(QRhiRenderPassDescriptor* outputRp,
   resetOwned(m_maskPso);
   resetOwned(m_edgePso);
   resetOwned(m_compositePso);
+  resetOwned(m_outputRectPso);
+  resetOwned(m_outputGlyphPso);
   resetOwned(m_rectSrb);
   resetOwned(m_glyphSrb);
   resetOwned(m_edgeSrb);
@@ -717,6 +764,22 @@ void HexViewRhiRenderer::ensurePipelines(QRhiRenderPassDescriptor* outputRp,
                  nullptr,
                  m_sampleCount,
                  m_outputRp);
+  createPipeline(m_outputRectPso,
+                 rectVert,
+                 rectFrag,
+                 rectInputLayout,
+                 m_rectSrb,
+                 &blend,
+                 m_sampleCount,
+                 m_outputRp);
+  createPipeline(m_outputGlyphPso,
+                 glyphVert,
+                 glyphFrag,
+                 glyphInputLayout,
+                 m_glyphSrb,
+                 &blend,
+                 m_sampleCount,
+                 m_outputRp);
 }
 
 // Upload the glyph atlas texture when the source atlas version changes.
@@ -844,6 +907,7 @@ void HexViewRhiRenderer::updateCompositeSrb() {
   if (!m_compositeSrb) {
     return;
   }
+  QRhiTexture* edgeSampleTex = m_useEdgeFallback ? m_edgeFallbackTex : m_edgeTex;
   m_compositeSrb->setBindings({
     QRhiShaderResourceBinding::uniformBuffer(0,
                                              QRhiShaderResourceBinding::VertexStage |
@@ -854,7 +918,7 @@ void HexViewRhiRenderer::updateCompositeSrb() {
     QRhiShaderResourceBinding::sampledTexture(2, QRhiShaderResourceBinding::FragmentStage,
                                               m_maskTex, m_maskSampler),
     QRhiShaderResourceBinding::sampledTexture(3, QRhiShaderResourceBinding::FragmentStage,
-                                              m_edgeTex, m_glyphSampler),
+                                              edgeSampleTex, m_glyphSampler),
     QRhiShaderResourceBinding::sampledTexture(4, QRhiShaderResourceBinding::FragmentStage,
                                               m_itemIdTex, m_maskSampler)
   });
