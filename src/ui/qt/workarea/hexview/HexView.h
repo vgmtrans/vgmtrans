@@ -21,6 +21,7 @@
 #include <unordered_map>
 #include <vector>
 #include "HexViewFrameData.h"
+#include "workarea/SplitterSnapProvider.h"
 
 class QParallelAnimationGroup;
 class QWidget;
@@ -30,7 +31,7 @@ class HexViewRhiHost;
 
 static constexpr int OUTLINE_FADE_DURATION_MS = 150;
 
-class HexView final : public QAbstractScrollArea {
+class HexView final : public QAbstractScrollArea, public SplitterSnapProvider {
   Q_OBJECT
   Q_PROPERTY(qreal overlayOpacity READ overlayOpacity WRITE setOverlayOpacity)
   Q_PROPERTY(qreal shadowBlur READ shadowBlur WRITE setShadowBlur)
@@ -42,6 +43,8 @@ public:
   ~HexView() override;
   [[nodiscard]] static QFont defaultViewFont();
   void setSelectedItem(VGMItem* item);
+  void setSelectedItems(const std::vector<const VGMItem*>& items,
+                        const VGMItem* primaryItem = nullptr);
   void setPlaybackSelectionsForItems(const std::vector<const VGMItem*>& items);
   void clearPlaybackSelections(bool fade = true);
   void setPlaybackActive(bool active);
@@ -55,6 +58,7 @@ public:
   [[nodiscard]] int getViewportFullWidth() const;
   [[nodiscard]] int getViewportWidthSansAscii() const;
   [[nodiscard]] int getViewportWidthSansAsciiAndAddress() const;
+  [[nodiscard]] std::vector<SplitterSnapRange> splitterSnapRanges() const override;
   HexViewFrame::Data captureRhiFrameData(float dpr);
 
   void handleCoalescedMouseMove(const QPoint& pos,
