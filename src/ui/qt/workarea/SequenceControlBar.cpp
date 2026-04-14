@@ -471,14 +471,11 @@ void SequenceControlBar::paintEvent(QPaintEvent* event) {
 
   QPainter painter(this);
   const QColor cover = sequenceControlBarBackgroundColor(*this);
-  const bool darkPalette = isDarkPalette(palette());
   QColor separator = sequenceControlBarSeparatorColor(*this);
-  separator.setAlpha(160);
+  separator.setAlpha(isDarkPalette(palette()) ? 208 : 160);
   painter.fillRect(rect(), cover);
   painter.fillRect(0, 0, 2, height(), cover);
-  if (!darkPalette) {
-    painter.fillRect(0, 0, width(), 1, separator);
-  }
+  painter.fillRect(0, 0, width(), 1, separator);
 }
 
 void SequenceControlBar::setTempoBpm(double bpm) {

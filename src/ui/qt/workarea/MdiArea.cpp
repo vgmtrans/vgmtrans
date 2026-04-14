@@ -698,10 +698,9 @@ void MdiArea::refreshTabControlAppearance() {
   const QPalette palette = effectivePalette(m_tabBar ? static_cast<const QWidget *>(m_tabBar)
                                                      : static_cast<const QWidget *>(m_tabControls));
   const bool darkPalette = isDarkPalette(palette);
-  const QColor checkedGlyph = toolBarButtonIconColor(palette);
-  const QColor inactiveGlyph = checkedGlyph;
+  const QColor buttonGlyph = toolBarButtonIconColor(palette);
   const QColor disabledGlyph = withAlpha(toolBarButtonIconColor(palette, false), darkPalette ? 74 : 56);
-  const QColor checkedFill = blendColors(checkedGlyph, colors.stripBackground, 0.2);
+  const QColor checkedFill = blendColors(buttonGlyph, colors.stripBackground, 0.2);
   static_cast<TabControlStrip *>(m_tabControls)->setBackgroundColor(colors.stripBackground);
 
   const QString controlsStyle = QStringLiteral(
@@ -741,9 +740,7 @@ void MdiArea::refreshTabControlAppearance() {
       return;
     }
     const QColor glyph = !button->isEnabled() ?
-          disabledGlyph : (button->isCheckable() && onState ? checkedGlyph
-                                                            : (onState ? colors.activeText
-                                                                       : inactiveGlyph));
+          disabledGlyph : ((button->isCheckable() || !onState) ? buttonGlyph : colors.activeText);
     button->setIcon(panelButtonIcon(iconPath, glyph));
   };
 
