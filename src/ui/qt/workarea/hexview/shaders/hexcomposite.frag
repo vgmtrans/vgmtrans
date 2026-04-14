@@ -70,6 +70,16 @@ float computeOutlineMask(float xPx, float yPx, bool inHex, bool inAscii, float d
   }
   localX -= byteIdx * cellW;
 
+  float edgePx = 2.0 / dpr;
+  float leftEdge = step(localX, edgePx);
+  float rightEdge = step(cellW - edgePx, localX);
+  float topEdge = step(localY, edgePx);
+  float bottomEdge = step(lineHeightPx - edgePx, localY);
+  // Interior pixels can skip all item-id texture sampling.
+  if (leftEdge + rightEdge + topEdge + bottomEdge <= 0.0) {
+    return 0.0;
+  }
+
   vec2 texSize = vec2(bytesPerLine, itemIdWindow.w);
   vec2 texel = vec2(1.0) / texSize;
   vec2 centerUv = vec2(byteIdx + 0.5, lineIdx + 0.5) / texSize;
@@ -78,16 +88,22 @@ float computeOutlineMask(float xPx, float yPx, bool inHex, bool inAscii, float d
     return 0.0;
   }
 
-  float leftId = (byteIdx > 0.0) ? decodeItemId(centerUv - vec2(texel.x, 0.0)) : id;
-  float rightId = (byteIdx < bytesPerLine - 1.0) ? decodeItemId(centerUv + vec2(texel.x, 0.0)) : id;
-  float upId = (lineIdx > 0.0) ? decodeItemId(centerUv - vec2(0.0, texel.y)) : id;
-  float downId = (lineIdx < itemIdWindow.w - 1.0) ? decodeItemId(centerUv + vec2(0.0, texel.y)) : id;
-
-  float edgePx = 2.0 / dpr;
-  float leftEdge = step(localX, edgePx);
-  float rightEdge = step(cellW - edgePx, localX);
-  float topEdge = step(localY, edgePx);
-  float bottomEdge = step(lineHeightPx - edgePx, localY);
+  float leftId = id;
+  if (leftEdge > 0.0 && byteIdx > 0.0) {
+    leftId = decodeItemId(centerUv - vec2(texel.x, 0.0));
+  }
+  float rightId = id;
+  if (rightEdge > 0.0 && byteIdx < bytesPerLine - 1.0) {
+    rightId = decodeItemId(centerUv + vec2(texel.x, 0.0));
+  }
+  float upId = id;
+  if (topEdge > 0.0 && lineIdx > 0.0) {
+    upId = decodeItemId(centerUv - vec2(0.0, texel.y));
+  }
+  float downId = id;
+  if (bottomEdge > 0.0 && lineIdx < itemIdWindow.w - 1.0) {
+    downId = decodeItemId(centerUv + vec2(0.0, texel.y));
+  }
 
   float drawLeft = (leftId < 0.5 || id < leftId) ? 1.0 : 0.0;
   float drawRight = (rightId < 0.5 || id < rightId) ? 1.0 : 0.0;
@@ -99,14 +115,6 @@ float computeOutlineMask(float xPx, float yPx, bool inHex, bool inAscii, float d
                topEdge * drawUp * step(0.5, abs(id - upId)) +
                bottomEdge * drawDown * step(0.5, abs(id - downId));
   return clamp(edge, 0.0, 1.0);
-}
-
-float computeSelectionHighlight(vec4 mask) {
-  float sel = clamp(mask.r, 0.0, 1.0);
-  float playActiveMask = clamp(mask.g, 0.0, 1.0);
-  float playFadeMask = clamp(mask.b, 0.0, 1.0);
-  float playFadeAlpha = clamp(mask.a, 0.0, 1.0);
-  return max(sel, max(playActiveMask, playFadeMask * playFadeAlpha));
 }
 
 vec3 applyDimOutlineAndHighlight(vec3 baseRgb, float inColumns, float highlight, float outlineMask) {
@@ -172,7 +180,7 @@ void main() {
   float playActiveMask = clamp(mask.g, 0.0, 1.0);
   float playFadeMask = clamp(mask.b, 0.0, 1.0);
   float playFadeAlpha = clamp(mask.a, 0.0, 1.0);
-  float highlight = computeSelectionHighlight(mask);
+  float highlight = max(sel, max(playActiveMask, playFadeMask * playFadeAlpha));
   float logicalY = mix(1.0 - vUv.y, vUv.y, flipY);
   float y = logicalY * viewSize.y;
   float outlineMask = computeOutlineMask(x, y, inHex, inAscii, dpr);
