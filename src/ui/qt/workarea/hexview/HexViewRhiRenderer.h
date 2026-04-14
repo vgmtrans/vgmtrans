@@ -8,6 +8,7 @@
 
 #include <QElapsedTimer>
 #include <QSize>
+#include <QVector4D>
 #include <array>
 #include <cstdint>
 #include <vector>
@@ -16,7 +17,6 @@
 
 class QChar;
 class QRectF;
-class QVector4D;
 class HexView;
 class QRhi;
 class QRhiBuffer;
@@ -31,9 +31,9 @@ class QRhiShaderResourceBindings;
 class QRhiTexture;
 
 // HexViewRhiRenderer builds GPU instance streams from an immutable HexView snapshot
-// and renders in four passes:
-// 1) content (text + backgrounds), 2) mask (selection ids/channels),
-// 3) edge field (for shadow/glow falloff), 4) composite (final shading).
+// and renders in three passes:
+// 1) content (text + backgrounds), 2) combined overlay/effects
+// (mask + edge field + playback color), 3) composite (final shading).
 class HexViewRhiRenderer {
 public:
   struct RenderTargetInfo {
@@ -82,10 +82,14 @@ private:
     float rectY;
     float rectW;
     float rectH;
-    float r;
-    float g;
-    float b;
-    float a;
+    float flagR;
+    float flagG;
+    float flagB;
+    float flagA;
+    float tintR;
+    float tintG;
+    float tintB;
+    float tintA;
   };
 
   struct GlyphInstance {
@@ -156,29 +160,31 @@ private:
                       const HexViewFrame::Data& frame, const LayoutMetrics& layout);
   bool ensureInstanceBuffer(QRhiBuffer*& buffer, int bytes);
   void updateInstanceBuffers(QRhiResourceUpdateBatch* u);
+  void populateVisibleLineByteCounts(int startLine, int endLine, std::vector<uint8_t>& lineBytes) const;
+  static uint16_t spanMaskBits(int startCol, int endCol);
 
   QRectF glyphUv(const QChar& ch, const HexViewFrame::Data& frame) const;
   void appendRect(std::vector<RectInstance>& rects, float x, float y, float w, float h,
                   const QVector4D& color);
   void appendEdgeRect(std::vector<EdgeInstance>& rects, float x, float y, float w, float h,
-                      float pad, const QVector4D& color);
+                      float pad, const QVector4D& flags, const QVector4D& tint);
   void appendGlyph(std::vector<GlyphInstance>& glyphs, float x, float y, float w, float h,
                    const QRectF& uv, const QVector4D& color);
+  void appendMaskSpan(std::vector<RectInstance>& rects, const SelectionBuildContext& ctx,
+                      int line, int startCol, int endCol, const QVector4D& color);
+  void appendEdgeSpan(std::vector<EdgeInstance>& rects, const SelectionBuildContext& ctx,
+                      int line, int startCol, int endCol, float pad, const QVector4D& flags,
+                      const QVector4D& tint);
 
   void ensureCacheWindow(int startLine, int endLine, int totalLines,
                          const HexViewFrame::Data& frame);
   void rebuildCacheWindow(const HexViewFrame::Data& frame);
   const CachedLine* cachedLineFor(int line) const;
-  void appendMaskForSelections(std::span<const HexViewFrame::SelectionRange> selections,
-                               const SelectionBuildContext& ctx,
-                               float padX,
-                               float padY,
-                               float edgePad,
-                               const QVector4D& maskColor,
-                               const QVector4D& edgeColor);
   void buildBaseInstances(const HexViewFrame::Data& frame, const LayoutMetrics& layout);
-  void buildSelectionInstances(int startLine, int endLine, const HexViewFrame::Data& frame,
-                               const LayoutMetrics& layout);
+  void buildSelectionEffectInstances(int startLine, int endLine, const HexViewFrame::Data& frame,
+                                     const LayoutMetrics& layout);
+  void buildPlaybackEffectInstances(int startLine, int endLine, const HexViewFrame::Data& frame,
+                                    const LayoutMetrics& layout);
 
   HexView* m_view = nullptr;
   const char* m_logLabel = "HexViewRhi";
@@ -190,24 +196,24 @@ private:
   QRhiRenderPassDescriptor* m_contentRp = nullptr;
   QRhiRenderPassDescriptor* m_outputRp = nullptr;
   QRhiTexture* m_maskTex = nullptr;
-  QRhiTextureRenderTarget* m_maskRt = nullptr;
-  QRhiRenderPassDescriptor* m_maskRp = nullptr;
+  QRhiTexture* m_playbackColorTex = nullptr;
   QRhiTexture* m_edgeTex = nullptr;
-  QRhiTextureRenderTarget* m_edgeRt = nullptr;
-  QRhiRenderPassDescriptor* m_edgeRp = nullptr;
+  QRhiTextureRenderTarget* m_effectRt = nullptr;
+  QRhiRenderPassDescriptor* m_effectRp = nullptr;
 
   QRhiBuffer* m_vbuf = nullptr;
   QRhiBuffer* m_ibuf = nullptr;
   QRhiBuffer* m_baseRectBuf = nullptr;
   QRhiBuffer* m_baseGlyphBuf = nullptr;
-  QRhiBuffer* m_maskRectBuf = nullptr;
-  QRhiBuffer* m_edgeRectBuf = nullptr;
+  QRhiBuffer* m_selectionMaskRectBuf = nullptr;
+  QRhiBuffer* m_selectionEdgeRectBuf = nullptr;
+  QRhiBuffer* m_playbackMaskRectBuf = nullptr;
+  QRhiBuffer* m_playbackEdgeRectBuf = nullptr;
   QRhiBuffer* m_ubuf = nullptr;
   QRhiBuffer* m_edgeUbuf = nullptr;
   QRhiBuffer* m_compositeUbuf = nullptr;
   QRhiTexture* m_glyphTex = nullptr;
   QRhiTexture* m_itemIdTex = nullptr;
-  QRhiTexture* m_edgeFallbackTex = nullptr;
   QRhiSampler* m_glyphSampler = nullptr;
   QRhiSampler* m_maskSampler = nullptr;
   QRhiShaderResourceBindings* m_rectSrb = nullptr;
@@ -228,14 +234,22 @@ private:
   bool m_supportsBaseInstance = false;
   bool m_loggedInit = false;
   bool m_loggedFrame = false;
-  QElapsedTimer m_animTimer;
+  QElapsedTimer m_frameTimer;
 
   std::vector<CachedLine> m_cachedLines;
   std::vector<LineRange> m_lineRanges;
   std::vector<RectInstance> m_baseRectInstances;
   std::vector<GlyphInstance> m_baseGlyphInstances;
-  std::vector<RectInstance> m_maskRectInstances;
-  std::vector<EdgeInstance> m_edgeRectInstances;
+  std::vector<RectInstance> m_selectionMaskRectInstances;
+  std::vector<EdgeInstance> m_selectionEdgeRectInstances;
+  std::vector<RectInstance> m_playbackMaskRectInstances;
+  std::vector<EdgeInstance> m_playbackEdgeRectInstances;
+  std::vector<uint8_t> m_lineByteScratch;
+  std::vector<uint16_t> m_maskScratchA;
+  std::vector<uint16_t> m_maskScratchB;
+  std::vector<std::array<QVector4D, kBytesPerLine>> m_colorScratchA;
+  std::vector<std::array<QVector4D, kBytesPerLine>> m_colorScratchB;
+  std::vector<std::array<float, kBytesPerLine>> m_alphaScratch;
   int m_cacheStartLine = 0;
   int m_cacheEndLine = -1;
   int m_lastStartLine = -1;
@@ -245,9 +259,8 @@ private:
   bool m_playbackDirty = true;
   bool m_baseBufferDirty = false;
   bool m_selectionBufferDirty = false;
+  bool m_playbackBufferDirty = false;
   bool m_itemIdDirty = true;
-  bool m_edgeFallbackDirty = true;
-  bool m_useEdgeFallback = true;
   bool m_outlineEnabled = false;
   float m_outlineAlpha = 0.0f;
   float m_lastFrameSeconds = 0.0f;
