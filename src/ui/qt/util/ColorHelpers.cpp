@@ -164,3 +164,8 @@ QColor contrastingTextColor(const QColor &overlayBackground, const QColor &baseB
 bool isDarkPalette(const QPalette &palette) {
   return palette.color(QPalette::Window).lightnessF() < 0.5;
 }
+
+QColor withAlpha(QColor color, int alpha) {
+  color.setAlpha(alpha);
+  return color;
+}

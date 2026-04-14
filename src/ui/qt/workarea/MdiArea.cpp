@@ -41,6 +41,7 @@
 #include "Metrics.h"
 #include "QtVGMRoot.h"
 #include "UIHelpers.h"
+#include "ColorHelpers.h"
 #include "services/NotificationCenter.h"
 #include "util/TintableSvgIconEngine.h"
 #ifdef Q_OS_LINUX
@@ -77,7 +78,6 @@ private:
 struct FlatTabBarColors {
   QColor stripBackground;
   QColor activeTabBackground;
-  QColor inactiveTabBackground;
   QColor hoveredInactiveTabBackground;
   QColor activeText;
   QColor inactiveText;
@@ -181,55 +181,29 @@ QPixmap tintedPixmap(const QString &iconPath, const QSize &size, const QColor &a
   return tinted;
 }
 
-FlatTabBarColors flatTabBarColors(const QWidget *context) {
+QPalette effectivePalette(const QWidget *context) {
   const QWidget *paletteSource = context && context->window() ? context->window() : context;
-  const QPalette palette = paletteSource ? paletteSource->palette() : qApp->palette();
-  auto colorFor = [&](QPalette::ColorRole primary,
-                      QPalette::ColorRole fallback,
-                      const QColor &defaultColor = QColor()) {
-    QColor color = palette.color(primary);
-    if (!color.isValid()) {
-      color = palette.color(fallback);
-    }
-    return color.isValid() ? color : defaultColor;
-  };
-  auto readableTextFor = [](const QColor &background, const QColor &preferred) {
-    QColor text = preferred;
-    if (!text.isValid()) {
-      text = qGray(background.rgb()) < 128 ? QColor(244, 244, 244) : QColor(32, 32, 32);
-    }
-    if ((qGray(background.rgb()) < 128) == (qGray(text.rgb()) < 128)) {
-      text = qGray(background.rgb()) < 128 ? QColor(244, 244, 244) : QColor(32, 32, 32);
-    }
-    return text;
-  };
-  auto withAlpha = [](QColor color, int alpha) {
-    color.setAlpha(alpha);
-    return color;
-  };
+  return paletteSource ? paletteSource->palette() : qApp->palette();
+}
 
-  const QColor stripBackground = colorFor(QPalette::Window, QPalette::Base, QColor(48, 48, 48));
-  const QColor activeTabBackground = colorFor(QPalette::Button, QPalette::Window, stripBackground);
-  const bool darkPalette = qGray(activeTabBackground.rgb()) < 128;
-  const QColor inactiveTabBackground =
-      darkPalette ? activeTabBackground.darker(152) : activeTabBackground.darker(116);
-  const QColor hoveredInactiveTabBackground =
-      darkPalette ? inactiveTabBackground.lighter(108) : inactiveTabBackground.lighter(104);
-  QColor textColor = colorFor(QPalette::ButtonText, QPalette::WindowText);
-  const QColor activeText = readableTextFor(activeTabBackground, textColor);
-  const QColor inactiveText = readableTextFor(inactiveTabBackground, textColor);
-  const QColor interactionColor = readableTextFor(inactiveTabBackground, textColor);
+FlatTabBarColors flatTabBarColors(const QWidget *context) {
+  const QPalette palette = effectivePalette(context);
+  const bool darkPalette = isDarkPalette(palette);
+  const QColor buttonColor = palette.color(QPalette::Button);
+  const QColor activeTabBackground = buttonColor;
+  const QColor inactiveTabBackground = darkPalette ? buttonColor.darker(152) : buttonColor.darker(116);
+  const QColor stripBackground = inactiveTabBackground;
+  const QColor inactiveText = contrastingTextColor(inactiveTabBackground, palette);
 
   return {
-      inactiveTabBackground,
+      stripBackground,
       activeTabBackground,
-      inactiveTabBackground,
-      hoveredInactiveTabBackground,
-      activeText,
-      withAlpha(inactiveText, 170),
-      withAlpha(inactiveText, 96),
-      withAlpha(interactionColor, 24),
-      withAlpha(interactionColor, 40),
+      darkPalette ? inactiveTabBackground.lighter(108) : inactiveTabBackground.lighter(104),
+      contrastingTextColor(activeTabBackground, palette),
+      withAlpha(inactiveText, 110),
+      withAlpha(inactiveText, 72),
+      withAlpha(inactiveText, 24),
+      withAlpha(inactiveText, 40),
   };
 }
 void paintInstruction(QPainter &painter, const InstructionMetrics &metrics, const QPoint &topLeft,
@@ -721,6 +695,13 @@ void MdiArea::refreshTabControlAppearance() {
   const FlatTabBarColors colors =
       flatTabBarColors(m_tabBar ? static_cast<const QWidget *>(m_tabBar)
                                 : static_cast<const QWidget *>(m_tabControls));
+  const QPalette palette = effectivePalette(m_tabBar ? static_cast<const QWidget *>(m_tabBar)
+                                                     : static_cast<const QWidget *>(m_tabControls));
+  const bool darkPalette = isDarkPalette(palette);
+  const QColor checkedGlyph = toolBarButtonIconColor(palette);
+  const QColor inactiveGlyph = checkedGlyph;
+  const QColor disabledGlyph = withAlpha(toolBarButtonIconColor(palette, false), darkPalette ? 74 : 56);
+  const QColor checkedFill = blendColors(checkedGlyph, colors.stripBackground, 0.2);
   static_cast<TabControlStrip *>(m_tabControls)->setBackgroundColor(colors.stripBackground);
 
   const QString controlsStyle = QStringLiteral(
@@ -733,10 +714,17 @@ void MdiArea::refreshTabControlAppearance() {
       "}"
       "QWidget#TabControlStrip QToolButton:hover { background: %1; }"
       "QWidget#TabControlStrip QToolButton:pressed { background: %2; }"
-      "QWidget#TabControlStrip QToolButton:disabled { background: transparent; }"
+      "QWidget#TabControlStrip QToolButton:checked { background: %3; }"
+      "QWidget#TabControlStrip QToolButton:checked:hover { background: %4; }"
+      "QWidget#TabControlStrip QToolButton:checked:pressed { background: %5; }"
+      "QWidget#TabControlStrip QToolButton:disabled,"
+      "QWidget#TabControlStrip QToolButton:checked:disabled { background: transparent; }"
       "QWidget#TabControlStrip QToolButton::menu-indicator { image: none; width: 0px; }")
                                    .arg(cssColor(colors.hoverFill))
-                                   .arg(cssColor(colors.pressedFill));
+                                   .arg(cssColor(colors.pressedFill))
+                                   .arg(cssColor(checkedFill))
+                                   .arg(cssColor(withAlpha(checkedFill, darkPalette ? 182 : 220)))
+                                   .arg(cssColor(withAlpha(checkedFill, darkPalette ? 212 : 255)));
   if (m_tabControls->styleSheet() != controlsStyle) {
     m_tabControls->setStyleSheet(controlsStyle);
   }
@@ -752,9 +740,10 @@ void MdiArea::refreshTabControlAppearance() {
     if (!button) {
       return;
     }
-    const QColor glyph = !button->isEnabled()
-                             ? colors.disabledText
-                             : (onState ? colors.activeText : colors.inactiveText);
+    const QColor glyph = !button->isEnabled() ?
+          disabledGlyph : (button->isCheckable() && onState ? checkedGlyph
+                                                            : (onState ? colors.activeText
+                                                                       : inactiveGlyph));
     button->setIcon(panelButtonIcon(iconPath, glyph));
   };
 
@@ -846,7 +835,7 @@ void MdiArea::applyTabBarStyle() {
                                    .arg(cssColor(colors.hoveredInactiveTabBackground))
                                    .arg(cssColor(colors.disabledText))
                                    .arg(cssColor(colors.hoverFill))
-                                    .arg(cssColor(colors.pressedFill))
+                                   .arg(cssColor(colors.pressedFill))
                                    .arg(cssColor(inactiveTabBorder));
   // Re-setting the same stylesheet can trigger repolish churn and recursive style events.
   if (m_tabBar->styleSheet() == styleSheet) {

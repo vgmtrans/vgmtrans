@@ -20,3 +20,4 @@ QColor contrastingTextColor(const QColor &overlayBackground, const QColor &baseB
                             const QPalette &palette,
                             QPalette::ColorGroup colorGroup = QPalette::Active);
 bool isDarkPalette(const QPalette &palette);
+QColor withAlpha(QColor color, int alpha);
