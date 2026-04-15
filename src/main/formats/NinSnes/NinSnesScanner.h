@@ -26,6 +26,7 @@ class NinSnesScanner : public VGMScanner {
   static BytePattern ptnLoadInstrTableAddressSMW;
   static BytePattern ptnSetDIR;
   static BytePattern ptnSetDIRYI;
+  static BytePattern ptnSetDIRVS;
   static BytePattern ptnSetDIRSMW;
 
   // PATTERNS FOR DERIVED VERSIONS

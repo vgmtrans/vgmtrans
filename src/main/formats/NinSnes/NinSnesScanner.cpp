@@ -196,6 +196,17 @@ BytePattern NinSnesScanner::ptnSetDIRYI(
 	,
 	7);
 
+//; Vegas Stakes SPC
+//0817: e5 fe 07     mov   a,$07FE           ; reads $5d from $7FE
+//042e: 8d 5d        mov   y,#$5d
+//0430: 3f de 09     call  $09de             ; source dir = $5d00
+BytePattern NinSnesScanner::ptnSetDIRVS(
+  "\xe5\xfe\x07\x8d\x5d\x3f\xde\x09"
+  ,
+  "x??xxx??"
+  ,
+  8);
+
 //; Super Mario World SPC
 //; default values for DSP regs
 //1295: db $7f,$7f,$00,$00,$2f,$60,$00,$00,$00,$80,$60,$02
@@ -1641,6 +1652,10 @@ void NinSnesScanner::searchForNinSnesFromARAM(RawFile *file) {
     }
     else if (file->searchBytePattern(ptnSetDIRYI, ofsSetDIR)) {
       spcDirAddr = file->readByte(ofsSetDIR + 1) << 8;
+    }
+    else if (file->searchBytePattern(ptnSetDIRVS, ofsSetDIR)) {
+      u16 spcDirAddrPtr = file->readShort(ofsSetDIR + 1);
+      spcDirAddr = file->readByte(spcDirAddrPtr) << 8;
     }
     else if (file->searchBytePattern(ptnSetDIRSMW, ofsSetDIR)) {
       spcDirAddr = file->readByte(ofsSetDIR + 9) << 8;
