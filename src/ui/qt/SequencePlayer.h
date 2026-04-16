@@ -106,7 +106,9 @@ private:
   bool loadCollection(const VGMColl *collection, bool startPlaying);
   bool ensurePreviewStreams();
   void releasePreviewStreams();
-  bool syncPreviewChannelState(uint8_t channel, uint32_t tick);
+  bool syncPreviewStateAtTick(uint32_t tick);
+  void syncPreviewGlobalState();
+  bool syncPreviewChannelState(uint8_t channel);
 
   const VGMColl *m_active_vgmcoll{};
   HSTREAM m_active_stream{};
