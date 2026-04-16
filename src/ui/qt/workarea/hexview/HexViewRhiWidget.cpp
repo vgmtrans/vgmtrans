@@ -15,12 +15,12 @@
 
 HexViewRhiWidget::HexViewRhiWidget(HexView* view, HexViewRhiRenderer* renderer,
                                    QWidget* parent)
-    : QRhiWidget(parent),
+    : QRhiWidget(nullptr),
       m_view(view),
       m_renderer(renderer),
       m_eventForwarder(view, [this]() { update(); }) {
 #if defined(Q_OS_LINUX)
-  setApi(QRhiWidget::Api::OpenGL);
+  setApi(QRhiWidget::Api::Vulkan);
 #elif defined(Q_OS_WIN)
   setApi(QRhiWidget::Api::Direct3D11);
 #elif defined(Q_OS_MACOS) || defined(Q_OS_IOS)
@@ -30,6 +30,10 @@ HexViewRhiWidget::HexViewRhiWidget(HexView* view, HexViewRhiRenderer* renderer,
 #else
   setApi(QRhiWidget::Api::Null);
 #endif
+
+  if (parent) {
+    setParent(parent);
+  }
 }
 
 HexViewRhiWidget::~HexViewRhiWidget() {

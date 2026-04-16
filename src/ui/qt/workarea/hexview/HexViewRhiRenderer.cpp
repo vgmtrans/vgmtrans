@@ -445,6 +445,7 @@ void HexViewRhiRenderer::renderFrame(QRhiCommandBuffer* cb, const RenderTargetIn
   if (!needsComposite) {
     cb->beginPass(target.renderTarget, clearColor, {1.0f, 0}, nullptr);
     cb->setViewport(viewport);
+    cb->setScissor(QRhiScissor(0, 0, target.pixelSize.width(), target.pixelSize.height()));
     drawInstanced(m_outputRectPso,
                   m_rectSrb,
                   m_baseRectBuf,
@@ -464,6 +465,7 @@ void HexViewRhiRenderer::renderFrame(QRhiCommandBuffer* cb, const RenderTargetIn
   // Pass 1: base content (background spans + glyphs) into an offscreen texture.
   cb->beginPass(m_contentRt, clearColor, {1.0f, 0}, nullptr);
   cb->setViewport(viewport);
+  cb->setScissor(QRhiScissor(0, 0, target.pixelSize.width(), target.pixelSize.height()));
   drawInstanced(m_rectPso,
                 m_rectSrb,
                 m_baseRectBuf,
@@ -481,6 +483,7 @@ void HexViewRhiRenderer::renderFrame(QRhiCommandBuffer* cb, const RenderTargetIn
   // Pass 2: combined overlay/effect pass writes mask, edge falloff, and playback tint together.
   cb->beginPass(m_effectRt, QColor(0, 0, 0, 0), {1.0f, 0}, nullptr);
   cb->setViewport(viewport);
+  cb->setScissor(QRhiScissor(0, 0, target.pixelSize.width(), target.pixelSize.height()));
   drawInstanced(m_maskPso,
                 m_rectSrb,
                 m_selectionMaskRectBuf,
@@ -512,6 +515,7 @@ void HexViewRhiRenderer::renderFrame(QRhiCommandBuffer* cb, const RenderTargetIn
   // Pass 3: fullscreen composite combines content + mask + playback color + edge + item-id textures.
   cb->beginPass(target.renderTarget, clearColor, {1.0f, 0}, nullptr);
   cb->setViewport(viewport);
+  cb->setScissor(QRhiScissor(0, 0, target.pixelSize.width(), target.pixelSize.height()));
   drawFullscreen(m_compositePso, m_compositeSrb);
   cb->endPass();
 }
