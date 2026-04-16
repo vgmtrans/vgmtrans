@@ -7,6 +7,7 @@
 #pragma once
 #include "SeqEventTimeIndex.h"
 
+#include <cstdint>
 #include <memory>
 #include <unordered_map>
 #include <vector>
@@ -44,6 +45,7 @@ private:
   int hexViewWidthSansAsciiAndAddress() const;
   void updateHexViewFont(qreal sizeIncrement) const;
   void applyHexViewFont(QFont font) const;
+  bool prepareSeqEventForPlayback(SeqEvent* event, uint32_t& tick) const;
   void ensureTrackIndexMap(VGMSeq* seq);
   int trackIndexForEvent(const SeqEvent* event) const;
 
@@ -67,6 +69,8 @@ private:
 public slots:
   void onSelectionChange(VGMItem* item) const;
   void seekToEvent(VGMItem* item) const;
+  void previewNotesForEvent(VGMItem* item, bool includeActiveNotesAtTick) const;
+  void stopNotePreview() const;
   void onPlaybackPositionChanged(int current, int max, PositionChangeOrigin origin);
   void onPlayerStatusChanged(bool playing);
   void resetHexViewFont();

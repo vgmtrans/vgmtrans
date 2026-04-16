@@ -11,6 +11,7 @@
 #include "hexview/HexView.h"
 #include "MdiArea.h"
 #include "Root.h"
+#include "ScaleConversion.h"
 #include "SeqEvent.h"
 #include "SeqTrack.h"
 #include "SequencePlayer.h"
@@ -22,10 +23,65 @@
 
 #include <algorithm>
 #include <cmath>
+#include <unordered_set>
 
 #include <QApplication>
 #include <QShortcut>
 #include <QtGlobal>
+
+namespace {
+int previewMidiChannelForEvent(const SeqEvent* event) {
+  if (!event) {
+    return -1;
+  }
+
+  int channel = static_cast<int>(event->channel);
+  if (event->parentTrack) {
+    channel += event->parentTrack->channelGroup * 16;
+  }
+
+  if (channel < 0 || channel >= 128) {
+    return -1;
+  }
+  return channel;
+}
+
+bool buildPreviewNoteForEvent(const SeqEvent* event, SequencePlayer::PreviewNote& outNote) {
+  if (!event) {
+    return false;
+  }
+
+  uint8_t key = 0;
+  uint8_t velocity = 0;
+  if (const auto* noteOn = dynamic_cast<const NoteOnSeqEvent*>(event)) {
+    key = noteOn->absKey;
+    velocity = noteOn->vel;
+  } else if (const auto* durNote = dynamic_cast<const DurNoteSeqEvent*>(event)) {
+    key = durNote->absKey;
+    velocity = durNote->vel;
+  } else {
+    return false;
+  }
+
+  const int midiChannel = previewMidiChannelForEvent(event);
+  if (midiChannel < 0) {
+    return false;
+  }
+
+  if (event->parentTrack && event->parentTrack->usesLinearAmplitudeScale()) {
+    velocity = convert7bitPercentAmpToStdMidiVal(velocity);
+  }
+
+  outNote.channel = static_cast<uint8_t>(midiChannel);
+  outNote.key = key;
+  outNote.velocity = velocity;
+  return true;
+}
+
+uint16_t previewChannelAndKey(const SequencePlayer::PreviewNote& note) {
+  return static_cast<uint16_t>((static_cast<uint16_t>(note.channel) << 8) | note.key);
+}
+}  // namespace
 
 VGMFileView::VGMFileView(VGMFile *vgmfile)
     : QMdiSubWindow(), m_vgmfile(vgmfile), m_hexview(new HexView(vgmfile)) {
@@ -54,6 +110,8 @@ VGMFileView::VGMFileView(VGMFile *vgmfile)
 
   connect(m_hexview, &HexView::selectionChanged, this, &VGMFileView::onSelectionChange);
   connect(m_hexview, &HexView::seekToEventRequested, this, &VGMFileView::seekToEvent);
+  connect(m_hexview, &HexView::notePreviewRequested, this, &VGMFileView::previewNotesForEvent);
+  connect(m_hexview, &HexView::notePreviewStopped, this, &VGMFileView::stopNotePreview);
 
   connect(m_treeview, &VGMFileTreeView::currentItemChanged,
           [&](const QTreeWidgetItem *item, QTreeWidgetItem *) {
@@ -176,29 +234,90 @@ void VGMFileView::onSelectionChange(VGMItem *item) const {
   }
 }
 
-void VGMFileView::seekToEvent(VGMItem* item) const {
-  auto* event = dynamic_cast<SeqEvent*>(item);
+bool VGMFileView::prepareSeqEventForPlayback(SeqEvent* event, uint32_t& tick) const {
   if (!event || !event->parentTrack || !event->parentTrack->parentSeq) {
-    return;
+    return false;
   }
   if (!m_vgmfile->assocColls.empty()) {
-    auto assocColl = m_vgmfile->assocColls.front();
-    if (SequencePlayer::the().activeCollection() != assocColl) {
-      auto& seqPlayer = SequencePlayer::the();
+    auto* assocColl = m_vgmfile->assocColls.front();
+    auto& seqPlayer = SequencePlayer::the();
+    if (seqPlayer.activeCollection() != assocColl) {
       seqPlayer.setActiveCollection(assocColl);
+    }
+    if (seqPlayer.activeCollection() != assocColl) {
+      return false;
     }
   }
 
   const auto& timeline = event->parentTrack->parentSeq->timedEventIndex();
   if (!timeline.finalized()) {
-    return;
+    return false;
   }
-  u32 tick = 0;
   if (!timeline.firstStartTick(event, tick)) {
+    return false;
+  }
+
+  return true;
+}
+
+void VGMFileView::seekToEvent(VGMItem* item) const {
+  auto* event = dynamic_cast<SeqEvent*>(item);
+  uint32_t tick = 0;
+  if (!prepareSeqEventForPlayback(event, tick)) {
     return;
   }
 
   SequencePlayer::the().seek(static_cast<int>(tick), PositionChangeOrigin::HexView);
+}
+
+void VGMFileView::previewNotesForEvent(VGMItem* item, bool includeActiveNotesAtTick) const {
+  auto* event = dynamic_cast<SeqEvent*>(item);
+  uint32_t tick = 0;
+  if (!prepareSeqEventForPlayback(event, tick)) {
+    SequencePlayer::the().stopPreviewNote();
+    return;
+  }
+
+  std::vector<SequencePlayer::PreviewNote> previewNotes;
+  previewNotes.reserve(includeActiveNotesAtTick ? 8 : 1);
+  std::unordered_set<uint16_t> seenChannelAndKeys;
+
+  const auto appendPreviewNote = [&](const SeqEvent* seqEvent) {
+    SequencePlayer::PreviewNote note;
+    if (!buildPreviewNoteForEvent(seqEvent, note)) {
+      return false;
+    }
+    if (!seenChannelAndKeys.emplace(previewChannelAndKey(note)).second) {
+      return true;
+    }
+    previewNotes.push_back(note);
+    return true;
+  };
+
+  if (!appendPreviewNote(event)) {
+    SequencePlayer::the().stopPreviewNote();
+    return;
+  }
+
+  if (includeActiveNotesAtTick && event->parentTrack && event->parentTrack->parentSeq) {
+    const auto& timeline = event->parentTrack->parentSeq->timedEventIndex();
+    if (timeline.finalized()) {
+      std::vector<const SeqTimedEvent*> activeTimedEvents;
+      timeline.getActiveAt(tick, activeTimedEvents);
+      for (const auto* timed : activeTimedEvents) {
+        if (!timed || !timed->event) {
+          continue;
+        }
+        appendPreviewNote(timed->event);
+      }
+    }
+  }
+
+  SequencePlayer::the().previewNotesAtTick(previewNotes, tick);
+}
+
+void VGMFileView::stopNotePreview() const {
+  SequencePlayer::the().stopPreviewNote();
 }
 
 void VGMFileView::ensureTrackIndexMap(VGMSeq* seq) {

@@ -6,6 +6,9 @@
 
 #pragma once
 
+#include <cstdint>
+#include <vector>
+
 #include <bass.h>
 #include <bassmidi.h>
 #include <QObject>
@@ -22,6 +25,12 @@ enum class PositionChangeOrigin {
 class SequencePlayer : public QObject {
   Q_OBJECT
 public:
+  struct PreviewNote {
+    uint8_t channel = 0;
+    uint8_t key = 0;
+    uint8_t velocity = 0;
+  };
+
   static auto &the() {
     static SequencePlayer instance;
     return instance;
@@ -47,6 +56,9 @@ public:
    * @param position relative to song start
    */
   void seek(int position, PositionChangeOrigin origin);
+  bool previewNoteOn(uint8_t channel, uint8_t key, uint8_t velocity, uint32_t tick);
+  bool previewNotesAtTick(const std::vector<PreviewNote>& notes, uint32_t tick);
+  void stopPreviewNote();
 
   /**
    * Checks whether the player is playing
@@ -92,11 +104,18 @@ signals:
 private:
   SequencePlayer();
   bool loadCollection(const VGMColl *collection, bool startPlaying);
+  bool ensurePreviewStreams();
+  void releasePreviewStreams();
+  bool syncPreviewChannelState(uint8_t channel, uint32_t tick);
 
   const VGMColl *m_active_vgmcoll{};
   HSTREAM m_active_stream{};
+  HSTREAM m_preview_note_stream{};
+  HSTREAM m_preview_state_stream{};
   HSOUNDFONT m_loaded_sf{};
+  std::vector<uint8_t> m_active_midi_data;
 
   QTimer *m_seekupdate_timer{};
   QString m_song_title{};
+  std::vector<PreviewNote> m_previewActiveNotes;
 };
