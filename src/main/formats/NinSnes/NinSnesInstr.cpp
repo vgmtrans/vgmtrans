@@ -302,8 +302,8 @@ NinSnesRgn::NinSnesRgn(NinSnesInstr *instr,
   double coarse_tuning;
 
   // Very large NinSnes pitch multipliers can wrap the SNES DSP's 14-bit pitch instead of acting
-  // like a normal transposition. We have only observed this on percussion instruments (ex. F-Zero
-  // Big Blue), which the driver plays at fixed note 0x24 (base pitch 0x0217). When that happens,
+  // like a normal transposition. We have only observed this on percussion instruments (ex. SimCity
+  // Metropolis), which the driver plays at fixed note 0x24 (base pitch 0x0217). When that happens,
   // assume percussion usage and replace the raw multiplier with the wrapped pitch actually heard at
   // 0x24, expressed again as an equivalent scale factor for SF2/DLS unity key / fine-tune calculation.
   bool wrapsPercussion = (((uint32_t)0x0217 * pitch_scale) >> 8) > 0x3FFF;
