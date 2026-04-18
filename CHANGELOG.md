@@ -7,7 +7,7 @@
 
 - Added an in-app dialog to help with reporting bugs.
 - Added Flatpak builds for Linux. From now on, stable releases will be automatically available on Flathub.
-- Added Drum Kit support to the more standard versions of the N-SPC driver (Nintendo's SNES SDK driver).
+- Added Drum Kit support to the standard N-SPC driver (Nintendo's SNES SDK driver).
 - Added Drum Kit support to the SuzukiSnes driver (Seiken Densetsu 3, Super Mario RPG, etc)
 
 ### Changed
@@ -17,6 +17,7 @@
 - Improved accuracy of Nintendo DS (SDAT) instrument ADSR.
 - Improved Wayland support (drag and drop, sandbox).
 - The space-bar hotkey to toggle playback no longer requires clicking on a collection first.
+- Improved detection of N-SPC driver instrument data.
 
 ### Fixed
 
