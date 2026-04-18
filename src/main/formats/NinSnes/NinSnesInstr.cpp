@@ -4,8 +4,35 @@
  * refer to the included LICENSE.txt file
  */
 #include "NinSnesInstr.h"
+#include "NinSnesSeq.h"
 #include "SNESDSP.h"
+#include "VGMColl.h"
 #include <spdlog/fmt/fmt.h>
+
+namespace {
+
+VGMRgn* cloneRgnForDrumKit(VGMInstr* instr, VGMRgn* sourceRgn, uint8_t noteIndex, int8_t globalTranspose) {
+  auto* newRgn = new VGMRgn(instr,
+                            sourceRgn->offset(),
+                            sourceRgn->length(),
+                            noteIndex,
+                            noteIndex,
+                            sourceRgn->velLow,
+                            sourceRgn->velHigh,
+                            sourceRgn->sampNum);
+
+  newRgn->sampOffset = sourceRgn->sampOffset;
+  newRgn->unityKey = sourceRgn->unityKey + (noteIndex - 0x3C) - globalTranspose;
+  newRgn->fineTune = sourceRgn->fineTune;
+  newRgn->attack_time = sourceRgn->attack_time;
+  newRgn->decay_time = sourceRgn->decay_time;
+  newRgn->sustain_level = sourceRgn->sustain_level;
+  newRgn->sustain_time = sourceRgn->sustain_time;
+  newRgn->release_time = sourceRgn->release_time;
+  return newRgn;
+}
+
+}  // namespace
 
 // ****************
 // NinSnesInstrSet
@@ -117,6 +144,49 @@ bool NinSnesInstrSet::parseInstrPointers() {
   return true;
 }
 
+void NinSnesInstrSet::useColl(const VGMColl* coll) {
+  if (coll == nullptr || coll->seq() == nullptr) {
+    return;
+  }
+
+  const auto* seq = dynamic_cast<const NinSnesSeq*>(coll->seq());
+  if (seq == nullptr || seq->rawFile() != rawFile() || seq->version != version) {
+    return;
+  }
+
+  const auto& percussionInstrNoteMap = seq->percussionInstrNoteMap();
+  if (percussionInstrNoteMap.empty()) {
+    return;
+  }
+
+  // Create the drumkit instrument for percussion note events
+  auto* drumKit = new VGMInstr(this, 0, 0, 127, 0, "Drum Kit");
+  for (const auto& [instrIndex, percussionDef] : percussionInstrNoteMap) {
+    // Get the referenced instrument by checking its instrument number
+    VGMInstr* sourceInstr = nullptr;
+    for (auto* instr : aInstrs) {
+      if (instr->instrNum == instrIndex) {
+        sourceInstr = instr;
+        break;
+      }
+    }
+    if (sourceInstr == nullptr) {
+      continue;
+    }
+
+    for (auto* sourceRgn : sourceInstr->regions()) {
+      drumKit->addRgn(cloneRgnForDrumKit(drumKit, sourceRgn, percussionDef.noteIndex, percussionDef.globalTranspose));
+    }
+  }
+
+  if (drumKit->regions().empty()) {
+    delete drumKit;
+    return;
+  }
+
+  addTempInstr(drumKit);
+}
+
 // *************
 // NinSnesInstr
 // *************
@@ -219,7 +289,7 @@ NinSnesRgn::NinSnesRgn(NinSnesInstr *instr,
   uint8_t adsr1 = readByte(offset + 1);
   uint8_t adsr2 = readByte(offset + 2);
   uint8_t gain = readByte(offset + 3);
-  int16_t pitch_scale;
+  uint16_t pitch_scale;
   if (version == NINSNES_EARLIER) {
     pitch_scale = (int8_t) readByte(offset + 4) * 256;
   }
@@ -230,6 +300,17 @@ NinSnesRgn::NinSnesRgn(NinSnesInstr *instr,
   const double pitch_fixer = 4286.0 / 4096.0;
   double fine_tuning;
   double coarse_tuning;
+
+  // Very large NinSnes pitch multipliers can wrap the SNES DSP's 14-bit pitch instead of acting
+  // like a normal transposition. We have only observed this on percussion instruments (ex. F-Zero
+  // Big Blue), which the driver plays at fixed note 0x24 (base pitch 0x0217). When that happens,
+  // assume percussion usage and replace the raw multiplier with the wrapped pitch actually heard at
+  // 0x24, expressed again as an equivalent scale factor for SF2/DLS unity key / fine-tune calculation.
+  bool wrapsPercussion = (((uint32_t)0x0217 * pitch_scale) >> 8) > 0x3FFF;
+  if (wrapsPercussion) {
+    pitch_scale = ((((uint32_t)0x0217 * pitch_scale) >> 8) & 0x3FFF) * 256.0 / 0x0217;
+  }
+
   fine_tuning = modf((log(pitch_scale * pitch_fixer / 256.0) / log(2.0)) * 12.0, &coarse_tuning);
 
   // normalize

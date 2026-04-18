@@ -46,6 +46,8 @@ void NinSnesSeq::resetVars() {
 
   spcPercussionBase = spcPercussionBaseInit;
   sectionRepeatCount = 0;
+  globalTranspose = 0;
+  m_percussionInstrNoteMap.clear();
 
   // Intelligent Systems:
   intelliUseCustomNoteParam = false;
@@ -512,7 +514,6 @@ void NinSnesSeq::loadEventMap() {
       break;
 
     case NINSNES_HAL:
-      EventMap[0xfa] = EVENT_NOP1;
       break;
 
     case NINSNES_KONAMI:
@@ -592,7 +593,7 @@ void NinSnesSeq::loadStandardVcmdMap(uint8_t statusByte) {
   EventMap[statusByte + 0x17] = EVENT_ECHO_PARAM;
   EventMap[statusByte + 0x18] = EVENT_ECHO_VOLUME_FADE;
   EventMap[statusByte + 0x19] = EVENT_PITCH_SLIDE;
-  EventMap[statusByte + 0x1a] = EVENT_PERCCUSION_PATCH_BASE;
+  EventMap[statusByte + 0x1a] = EVENT_PERCUSSION_PATCH_BASE;
 }
 
 double NinSnesSeq::getTempoInBPM(uint8_t tempo) {
@@ -719,7 +720,9 @@ NinSnesTrack::NinSnesTrack(NinSnesSection *parentSection, uint32_t offset, uint3
     : SeqTrack(parentSection->parentSeq, offset, length, theName),
       parentSection(parentSection),
       shared(NULL),
-      available(true) {
+      available(true),
+      m_lastNoteWasPercussion(false),
+      nonPercussionProgram(0) {
   resetVars();
   bDetermineTrackLengthEventByEvent = true;
 }
@@ -730,6 +733,47 @@ void NinSnesTrack::resetVars(void) {
   cKeyCorrection = SEQ_KEYOFS;
   if (shared != NULL) {
     transpose = shared->spcTranspose;
+  }
+  m_lastNoteWasPercussion = false;
+  nonPercussionProgram = 0;
+}
+
+void NinSnesTrack::restoreNonPercussionProgramIfNeeded() {
+  if (!m_lastNoteWasPercussion) {
+    return;
+  }
+
+  addBankSelectNoItem(0);
+  addProgramChangeNoItem(nonPercussionProgram, false);
+  m_lastNoteWasPercussion = false;
+}
+
+void NinSnesTrack::switchToPercussionProgramIfNeeded() {
+  if (m_lastNoteWasPercussion) {
+    return;
+  }
+
+  addBankSelectNoItem(127);
+  addProgramChangeNoItem(0, false);
+  m_lastNoteWasPercussion = true;
+}
+
+void NinSnesTrack::addProgramChangeEvent(uint32_t offset,
+                                         uint32_t length,
+                                         uint32_t progNum,
+                                         bool requireBank,
+                                         const std::string &eventName) {
+  nonPercussionProgram = progNum;
+
+  bool isNewOffset = onEvent(offset, length);
+  recordSeqEvent<ProgChangeSeqEvent>(isNewOffset, getTime(), progNum, offset, length, eventName);
+
+  if (readMode == READMODE_ADD_TO_UI) {
+    parentSeq->addInstrumentRef(progNum);
+  }
+
+  if (!m_lastNoteWasPercussion) {
+    addProgramChangeNoItem(progNum, requireBank);
   }
 }
 
@@ -882,8 +926,11 @@ bool NinSnesTrack::readEvent(void) {
       uint8_t duration = (shared->spcNoteDuration * shared->spcNoteDurRate) >> 8;
       duration = std::min(std::max(duration, (uint8_t) 1), (uint8_t) (shared->spcNoteDuration - 2));
 
+      restoreNonPercussionProgramIfNeeded();
+
       // Note: Konami engine can have volume=0
       addNoteByDur(beginOffset, curOffset - beginOffset, noteNumber, shared->spcNoteVolume / 2, duration, "Note");
+      m_lastNoteWasPercussion = false;
       addTime(shared->spcNoteDuration);
       break;
     }
@@ -904,27 +951,43 @@ bool NinSnesTrack::readEvent(void) {
     }
 
     case EVENT_PERCUSSION_NOTE: {
-      uint8_t noteNumber = statusByte - parentSeq->STATUS_PERCUSSION_NOTE_MIN;
+      // Like standard MIDI drum channels, percussion notes swap the ability to denote pitch (key)
+      // for the ability to indicate which instrument to play per note. The EVENT_PERCUSSION_PATCH_BASE
+      // event sets the base instr index to use (spcPercussionBase). The instrument to use is then
+      // spcPercussionBase + the percussion note opcode index. So, if spcPercussionBase is 5
+      // and the percussion note opcode is CB when STATUS_PERCUSSION_NOTE_MIN is CA, it would use
+      // instrument 6.
+      uint8_t instrIndex = statusByte - parentSeq->STATUS_PERCUSSION_NOTE_MIN;
 
-      noteNumber += parentSeq->spcPercussionBase;
+      instrIndex += parentSeq->spcPercussionBase;
 
       if (parentSeq->version == NINSNES_QUINTET_ACTR) {
-        noteNumber += parentSeq->quintetBGMInstrBase;
+        instrIndex += parentSeq->quintetBGMInstrBase;
       }
       else if (NinSnesFormat::isQuintetVersion(parentSeq->version)) {
-        noteNumber = readByte(parentSeq->quintetAddrBGMInstrLookup + noteNumber);
+        instrIndex = readByte(parentSeq->quintetAddrBGMInstrLookup + instrIndex);
       }
+
+      // Pitches are fixed, but we assign each drum to a unique note. The note value is 0x24
+      // plus the instrument index (relative to the base percussion instrument).
+      // We maintain a table of these mappings which NinSnesInstrSet uses at conversion time to
+      // create the drum kit. We also indicate the global transpose, since that should affect
+      // percussion note pitch. We do that by factoring it into the instrument region unity key.
+      uint8_t noteIndex = 0x24 + instrIndex - parentSeq->spcPercussionBase;
+      parentSeq->addPercussionInstrNoteMapping(instrIndex, noteIndex, parentSeq->globalTranspose);
 
       uint8_t duration = (shared->spcNoteDuration * shared->spcNoteDurRate) >> 8;
       duration = std::min(std::max(duration, (uint8_t) 1), (uint8_t) (shared->spcNoteDuration - 2));
 
       // Note: Konami engine can have volume=0
+      switchToPercussionProgramIfNeeded();
       addPercNoteByDur(beginOffset,
                        curOffset - beginOffset,
-                       noteNumber,
+                       static_cast<int8_t>(noteIndex - cKeyCorrection - parentSeq->globalTranspose),
                        shared->spcNoteVolume / 2,
                        duration,
                        "Percussion Note");
+      m_lastNoteWasPercussion = true;
       addTime(shared->spcNoteDuration);
       break;
     }
@@ -946,7 +1009,7 @@ bool NinSnesTrack::readEvent(void) {
         newProgNum = readByte(parentSeq->quintetAddrBGMInstrLookup + newProgNum);
       }
 
-      addProgramChange(beginOffset, curOffset - beginOffset, newProgNum, true);
+      addProgramChangeEvent(beginOffset, curOffset - beginOffset, newProgNum, true);
       break;
     }
 
@@ -1037,6 +1100,7 @@ bool NinSnesTrack::readEvent(void) {
 
     case EVENT_GLOBAL_TRANSPOSE: {
       int8_t semitones = readByte(curOffset++);
+      parentSeq->globalTranspose = semitones;
       addGlobalTranspose(beginOffset, curOffset - beginOffset, semitones);
       break;
     }
@@ -1250,7 +1314,7 @@ bool NinSnesTrack::readEvent(void) {
       break;
     }
 
-    case EVENT_PERCCUSION_PATCH_BASE: {
+    case EVENT_PERCUSSION_PATCH_BASE: {
       uint8_t percussionBase = readByte(curOffset++);
       parentSeq->spcPercussionBase = percussionBase;
 
@@ -1267,7 +1331,8 @@ bool NinSnesTrack::readEvent(void) {
       uint8_t newProgNum = readByte(curOffset++);
       uint8_t adsr1 = readByte(curOffset++);
       uint8_t adsr2 = readByte(curOffset++);
-      addProgramChange(beginOffset, curOffset - beginOffset, newProgNum, true, "Program Change & ADSR");
+      addProgramChangeEvent(beginOffset, curOffset - beginOffset, newProgNum, true,
+                            "Program Change & ADSR");
       break;
     }
 
@@ -1509,7 +1574,10 @@ bool NinSnesTrack::readEvent(void) {
           newProgNum &= 0x1f;
         }
 
-        addProgramChangeNoItem(newProgNum, true);
+        nonPercussionProgram = newProgNum;
+        if (!m_lastNoteWasPercussion) {
+          addProgramChangeNoItem(newProgNum, true);
+        }
 
         addVolNoItem(newVol / 2);
 

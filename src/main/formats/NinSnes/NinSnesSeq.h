@@ -45,7 +45,7 @@ enum NinSnesSeqEventType {
   EVENT_ECHO_PARAM,
   EVENT_ECHO_VOLUME_FADE,
   EVENT_PITCH_SLIDE,
-  EVENT_PERCCUSION_PATCH_BASE,
+  EVENT_PERCUSSION_PATCH_BASE,
 
   // Nintendo RD2:
       EVENT_RD2_PROGCHANGE_AND_ADSR,
@@ -104,6 +104,11 @@ class NinSnesTrackSharedData {
   uint8_t konamiLoopCount;
 };
 
+struct NinSnesPercussionDef {
+  uint8_t noteIndex;
+  int8_t globalTranspose;
+};
+
 class NinSnesSeq:
     public VGMMultiSectionSeq {
  public:
@@ -142,6 +147,7 @@ class NinSnesSeq:
 
   uint8_t spcPercussionBase;
   uint8_t sectionRepeatCount;
+  int8_t globalTranspose;
 
   // Konami:
   uint16_t konamiBaseAddress;
@@ -160,6 +166,13 @@ class NinSnesSeq:
   // Falcom:
   uint16_t falcomBaseOffset;
 
+  void addPercussionInstrNoteMapping(uint8_t instrIndex, uint8_t noteIndex, int8_t globalTranspose) {
+    m_percussionInstrNoteMap[instrIndex] = {noteIndex, globalTranspose};
+  }
+  const std::map<uint8_t, NinSnesPercussionDef>& percussionInstrNoteMap() const {
+    return m_percussionInstrNoteMap;
+  }
+
 protected:
   VGMHeader *header;
 
@@ -168,6 +181,7 @@ protected:
   void loadStandardVcmdMap(uint8_t statusByte);
 
   uint8_t spcPercussionBaseInit;
+  std::map<uint8_t, NinSnesPercussionDef> m_percussionInstrNoteMap;
 };
 
 class NinSnesSection
@@ -199,4 +213,16 @@ class NinSnesTrack
   NinSnesSection *parentSection;
   NinSnesTrackSharedData *shared;
   bool available;
+
+ private:
+  void restoreNonPercussionProgramIfNeeded();
+  void switchToPercussionProgramIfNeeded();
+  void addProgramChangeEvent(uint32_t offset,
+                             uint32_t length,
+                             uint32_t progNum,
+                             bool requireBank,
+                             const std::string &eventName = "Program Change");
+
+  bool m_lastNoteWasPercussion;
+  uint32_t nonPercussionProgram;
 };

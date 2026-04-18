@@ -18,8 +18,9 @@ class NinSnesInstrSet:
                   const std::string &name = "NinSnesInstrSet");
   virtual ~NinSnesInstrSet();
 
-  virtual bool parseHeader();
-  virtual bool parseInstrPointers();
+  bool parseHeader() override;
+  bool parseInstrPointers() override;
+  void useColl(const VGMColl* coll) override;
 
   NinSnesVersion version;
 
