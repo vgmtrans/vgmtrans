@@ -717,17 +717,12 @@ void NinSnesTrackSharedData::resetVars(void) {
 //  ************
 
 NinSnesTrack::NinSnesTrack(NinSnesSection *parentSection, uint32_t offset, uint32_t length, const std::string &theName)
-    : SeqTrack(parentSection->parentSeq, offset, length, theName),
-      parentSection(parentSection),
-      shared(NULL),
-      available(true),
-      m_lastNoteWasPercussion(false),
-      nonPercussionProgram(0) {
+    : SeqTrack(parentSection->parentSeq, offset, length, theName), parentSection(parentSection) {
   resetVars();
   bDetermineTrackLengthEventByEvent = true;
 }
 
-void NinSnesTrack::resetVars(void) {
+void NinSnesTrack::resetVars() {
   SeqTrack::resetVars();
 
   cKeyCorrection = SEQ_KEYOFS;
@@ -777,7 +772,7 @@ void NinSnesTrack::addProgramChangeEvent(uint32_t offset,
   }
 }
 
-bool NinSnesTrack::readEvent(void) {
+bool NinSnesTrack::readEvent() {
   if (!available) {
     return false;
   }

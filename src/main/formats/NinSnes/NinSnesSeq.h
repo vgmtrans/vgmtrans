@@ -211,8 +211,8 @@ class NinSnesTrack
   int8_t calculatePanValue(uint8_t pan, double &volumeScale, bool &reverseLeft, bool &reverseRight);
 
   NinSnesSection *parentSection;
-  NinSnesTrackSharedData *shared;
-  bool available;
+  NinSnesTrackSharedData *shared = nullptr;
+  bool available = true;
 
  private:
   void restoreNonPercussionProgramIfNeeded();
@@ -223,6 +223,6 @@ class NinSnesTrack
                              bool requireBank,
                              const std::string &eventName = "Program Change");
 
-  bool m_lastNoteWasPercussion;
-  uint32_t nonPercussionProgram;
+  bool m_lastNoteWasPercussion = false;
+  uint32_t nonPercussionProgram = 0;
 };

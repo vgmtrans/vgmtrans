@@ -145,7 +145,7 @@ bool NinSnesInstrSet::parseInstrPointers() {
 }
 
 void NinSnesInstrSet::useColl(const VGMColl* coll) {
-  if (coll == nullptr || coll->seq() == nullptr) {
+  if (coll->seq() == nullptr) {
     return;
   }
 
