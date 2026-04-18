@@ -1611,6 +1611,11 @@ void NinSnesScanner::searchForNinSnesFromARAM(RawFile *file) {
   if (file->searchBytePattern(ptnLoadInstrTableAddress, ofsLoadInstrTableAddressASM)) {
     addrInstrTable =
         file->readByte(ofsLoadInstrTableAddressASM + 7) | (file->readByte(ofsLoadInstrTableAddressASM + 10) << 8);
+    // Fix for HyperZone
+    u32 firstWord = file->readWord(addrInstrTable);
+    if (firstWord == 0 || firstWord == 0xFFFFFFFF) {
+      addrInstrTable += 4;
+    }
   }
   else if (file->searchBytePattern(ptnLoadInstrTableAddressSMW, ofsLoadInstrTableAddressASM)) {
     addrInstrTable =
