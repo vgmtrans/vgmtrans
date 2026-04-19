@@ -662,6 +662,10 @@ uint32_t NinSnesSeq::resolveProgramNumber(uint8_t instrumentByte, uint8_t* logic
 }
 
 bool NinSnesSeq::usesIntelliCustomPercTable() const {
+  if (version == NINSNES_INTELLI_FE4) {
+    return true;
+  }
+
   if (version == NINSNES_INTELLI_TA) {
     return (intelliTAFlags & 0x40) != 0;
   }
@@ -670,7 +674,7 @@ bool NinSnesSeq::usesIntelliCustomPercTable() const {
 }
 
 void NinSnesSeq::setIntelliCustomPercTableEnabled(bool enabled) {
-  if (version == NINSNES_INTELLI_TA) {
+  if (version == NINSNES_INTELLI_TA || version == NINSNES_INTELLI_FE4) {
     if (enabled) {
       intelliTAFlags |= 0x40;
     }
@@ -1113,7 +1117,8 @@ bool NinSnesTrack::readEvent() {
       const uint8_t slot = statusByte - parentSeq->STATUS_PERCUSSION_NOTE_MIN;
       uint8_t duration = getEffectiveNoteDuration();
 
-      if (parentSeq->version == NINSNES_INTELLI_TA &&
+      if ((parentSeq->version == NINSNES_INTELLI_TA ||
+           parentSeq->version == NINSNES_INTELLI_FE4) &&
           slot < NINSNES_INTELLI_TA_PERCUSSION_SLOT_COUNT) {
         if (parentSeq->usesIntelliCustomPercTable()) {
           const auto& customEntry = parentSeq->intelliCustomPercTable[slot];
@@ -1763,9 +1768,11 @@ bool NinSnesTrack::readEvent() {
       uint8_t paramIndex = readByte(curOffset++);
       desc = fmt::format("Index: {:d}", paramIndex);
 
+      const bool taStyleVoiceParam =
+          (parentSeq->version == NINSNES_INTELLI_TA || parentSeq->version == NINSNES_INTELLI_FE4);
       bool canReadVoiceParam = false;
       uint32_t addrVoiceParam = 0;
-      if (parentSeq->version == NINSNES_INTELLI_TA) {
+      if (taStyleVoiceParam) {
         if (parentSeq->intelliVoiceParamTableDefined) {
           addrVoiceParam = parentSeq->intelliVoiceParamTable + (paramIndex * 4u);
           canReadVoiceParam = (addrVoiceParam + 3) < 0x10000;
@@ -1796,7 +1803,7 @@ bool NinSnesTrack::readEvent() {
         uint8_t logicalProgNum = 0;
         uint32_t resolvedProgNum = instrByte;
 
-        if (parentSeq->version == NINSNES_INTELLI_TA) {
+        if (taStyleVoiceParam) {
           panValue = packedPanByte & 0x1f;
           fineTuningCents = (((packedPanByte >> 5) & 0x07) * 5 / 256.0) * 100.0;
           resolvedProgNum = parentSeq->resolveProgramNumber(instrByte, &logicalProgNum);
@@ -1838,10 +1845,6 @@ bool NinSnesTrack::readEvent() {
             int8_t newTranspose = lastByte;
             shared->spcTranspose = newTranspose;
             transpose = newTranspose;
-
-            uint8_t newTuning = (instrByte >> 3) * 5;
-            fineTuningCents = (newTuning / 256.0) * 100.0;
-
             break;
           }
 
@@ -1871,7 +1874,7 @@ bool NinSnesTrack::readEvent() {
                        fineTuningCents / 100.0,
                        shared->spcTranspose);
       }
-      else if (parentSeq->version == NINSNES_INTELLI_TA) {
+      else if (taStyleVoiceParam) {
         if (!parentSeq->intelliVoiceParamTableDefined) {
           fmt::format_to(std::back_inserter(desc), "  Table: Undefined");
         }
@@ -1952,7 +1955,7 @@ bool NinSnesTrack::readEvent() {
       uint8_t arg1 = readByte(curOffset++);
       uint8_t numEntries = (arg1 & 15) + 1;
 
-      if (parentSeq->version == NINSNES_INTELLI_TA) {
+      if (parentSeq->version == NINSNES_INTELLI_TA || parentSeq->version == NINSNES_INTELLI_FE4) {
         for (uint8_t slot = 0; slot < numEntries && slot < NINSNES_INTELLI_TA_PERCUSSION_SLOT_COUNT;
              slot++) {
           auto& customEntry = parentSeq->intelliCustomPercTable[slot];
@@ -2057,14 +2060,28 @@ bool NinSnesTrack::readEvent() {
 
       switch (type) {
         case 0x01:
-          curOffset++;
-          addUnknown(beginOffset, curOffset - beginOffset);
-          break;
+        case 0x02: {
+          uint8_t param = readByte(curOffset++);
+          bool bitValue = (type == 0x01);
 
-        case 0x02:
-          curOffset++;
-          addUnknown(beginOffset, curOffset - beginOffset);
+          if (bitValue) {
+            parentSeq->intelliTAFlags |= param;
+          }
+          else {
+            parentSeq->intelliTAFlags &= static_cast<uint8_t>(~param);
+          }
+
+          desc = fmt::format("Mask: ${:02X}", param);
+          if (type == 0x01) {
+            addGenericEvent(beginOffset, curOffset - beginOffset, "Set Global Flags", desc,
+                            Type::ChangeState);
+          }
+          else {
+            addGenericEvent(beginOffset, curOffset - beginOffset, "Clear Global Flags", desc,
+                            Type::ChangeState);
+          }
           break;
+        }
 
         default:
           addUnknown(beginOffset, curOffset - beginOffset);

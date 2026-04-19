@@ -263,7 +263,7 @@ void NinSnesInstrSet::useColl(const VGMColl* coll) {
     return;
   }
 
-  if (seq->version == NINSNES_INTELLI_TA) {
+  if (seq->version == NINSNES_INTELLI_TA || seq->version == NINSNES_INTELLI_FE4) {
     for (const auto& overrideDef : seq->intelliTAInstrumentOverrides()) {
       auto* overrideInstr = new VGMInstr(
           this,
