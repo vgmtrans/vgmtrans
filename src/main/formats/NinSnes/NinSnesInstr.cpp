@@ -11,7 +11,25 @@
 
 namespace {
 
-VGMRgn* cloneRgnForDrumKit(VGMInstr* instr, VGMRgn* sourceRgn, uint8_t noteIndex, int8_t globalTranspose) {
+constexpr uint8_t kNinSnesMidiKeyCorrection = 24;
+
+uint32_t getProgramNumber(const VGMInstr* instr) {
+  return (instr->bank << 7) | (instr->instrNum & 0x7f);
+}
+
+VGMInstr* findInstrByProgram(const std::vector<VGMInstr*>& instrs, uint32_t progNum) {
+  for (auto* instr : instrs) {
+    if (getProgramNumber(instr) == progNum) {
+      return instr;
+    }
+  }
+  return nullptr;
+}
+
+VGMRgn* cloneLegacyRgnForDrumKit(VGMInstr* instr,
+                                 VGMRgn* sourceRgn,
+                                 uint8_t noteIndex,
+                                 int8_t globalTranspose) {
   auto* newRgn = new VGMRgn(instr,
                             sourceRgn->offset(),
                             sourceRgn->length(),
@@ -30,6 +48,91 @@ VGMRgn* cloneRgnForDrumKit(VGMInstr* instr, VGMRgn* sourceRgn, uint8_t noteIndex
   newRgn->sustain_time = sourceRgn->sustain_time;
   newRgn->release_time = sourceRgn->release_time;
   return newRgn;
+}
+
+VGMRgn* cloneIntelliTARgnForDrumKit(VGMInstr* instr,
+                                    VGMRgn* sourceRgn,
+                                    uint8_t drumKey,
+                                    uint8_t playedNoteByte) {
+  auto* newRgn = new VGMRgn(instr,
+                            sourceRgn->offset(),
+                            sourceRgn->length(),
+                            drumKey,
+                            drumKey,
+                            sourceRgn->velLow,
+                            sourceRgn->velHigh,
+                            sourceRgn->sampNum);
+
+  newRgn->sampOffset = sourceRgn->sampOffset;
+  newRgn->sampDataLength = sourceRgn->sampDataLength;
+  newRgn->unityKey =
+      sourceRgn->unityKey + drumKey - ((playedNoteByte & 0x7f) + kNinSnesMidiKeyCorrection);
+  newRgn->coarseTune = sourceRgn->coarseTune;
+  newRgn->fineTune = sourceRgn->fineTune;
+  newRgn->loop = sourceRgn->loop;
+  newRgn->pan = sourceRgn->pan;
+  newRgn->setAttenuation(sourceRgn->attenDb());
+  newRgn->attack_time = sourceRgn->attack_time;
+  newRgn->decay_time = sourceRgn->decay_time;
+  newRgn->sustain_level = sourceRgn->sustain_level;
+  newRgn->sustain_time = sourceRgn->sustain_time;
+  newRgn->release_time = sourceRgn->release_time;
+  newRgn->setLfoVibFreqHz(sourceRgn->lfoVibFreqHz());
+  newRgn->setLfoVibDepthCents(sourceRgn->lfoVibDepthCents());
+  newRgn->setLfoVibDelaySeconds(sourceRgn->lfoVibDelaySeconds());
+  return newRgn;
+}
+
+VGMRgn* createRgnFromHeaderData(VGMInstr* instr,
+                                RawFile* rawFile,
+                                NinSnesVersion version,
+                                uint32_t spcDirAddr,
+                                const std::array<uint8_t, 6>& regionData) {
+  const uint8_t srcn = regionData[0];
+  const uint8_t adsr1 = regionData[1];
+  const uint8_t adsr2 = regionData[2];
+  const uint8_t gain = regionData[3];
+  const uint16_t offDirEnt = spcDirAddr + (srcn * 4);
+
+  if (offDirEnt + 4 > 0x10000 || !SNESSampColl::isValidSampleDir(rawFile, offDirEnt, true)) {
+    return nullptr;
+  }
+
+  uint16_t pitch_scale = 0;
+  if (version == NINSNES_EARLIER) {
+    pitch_scale = static_cast<uint16_t>(static_cast<int8_t>(regionData[4]) * 256);
+  }
+  else {
+    pitch_scale = static_cast<uint16_t>((regionData[4] << 8) | regionData[5]);
+  }
+
+  const double pitch_fixer = 4286.0 / 4096.0;
+  double fine_tuning;
+  double coarse_tuning;
+
+  bool wrapsPercussion = (((uint32_t) 0x0217 * pitch_scale) >> 8) > 0x3FFF;
+  if (wrapsPercussion) {
+    pitch_scale = ((((uint32_t) 0x0217 * pitch_scale) >> 8) & 0x3FFF) * 256.0 / 0x0217;
+  }
+
+  fine_tuning = modf((log(pitch_scale * pitch_fixer / 256.0) / log(2.0)) * 12.0, &coarse_tuning);
+
+  if (fine_tuning >= 0.5) {
+    coarse_tuning += 1.0;
+    fine_tuning -= 1.0;
+  }
+  else if (fine_tuning <= -0.5) {
+    coarse_tuning -= 1.0;
+    fine_tuning += 1.0;
+  }
+
+  auto* rgn = new VGMRgn(instr, 0, NinSnesInstr::expectedSize(version));
+  rgn->sampOffset = rawFile->readShort(offDirEnt) - spcDirAddr;
+  rgn->sampNum = srcn;
+  rgn->unityKey = 96 - static_cast<int>(coarse_tuning);
+  rgn->fineTune = static_cast<int16_t>(fine_tuning * 100.0);
+  snesConvADSR<VGMRgn>(rgn, adsr1, adsr2, gain);
+  return rgn;
 }
 
 }  // namespace
@@ -135,7 +238,13 @@ bool NinSnesInstrSet::parseInstrPointers() {
   }
 
   std::sort(usedSRCNs.begin(), usedSRCNs.end());
-  SNESSampColl *newSampColl = new SNESSampColl(NinSnesFormat::name, this->rawFile(), spcDirAddr, usedSRCNs);
+  SNESSampColl *newSampColl = nullptr;
+  if (version == NINSNES_INTELLI_TA) {
+    newSampColl = new SNESSampColl(NinSnesFormat::name, this->rawFile(), spcDirAddr, 0x80);
+  }
+  else {
+    newSampColl = new SNESSampColl(NinSnesFormat::name, this->rawFile(), spcDirAddr, usedSRCNs);
+  }
   if (!newSampColl->loadVGMFile()) {
     delete newSampColl;
     return false;
@@ -151,6 +260,58 @@ void NinSnesInstrSet::useColl(const VGMColl* coll) {
 
   const auto* seq = dynamic_cast<const NinSnesSeq*>(coll->seq());
   if (seq == nullptr || seq->rawFile() != rawFile() || seq->version != version) {
+    return;
+  }
+
+  if (seq->version == NINSNES_INTELLI_TA) {
+    for (const auto& overrideDef : seq->intelliTAInstrumentOverrides()) {
+      auto* overrideInstr = new VGMInstr(
+          this,
+          0,
+          NinSnesInstr::expectedSize(version),
+          overrideDef.progNum >> 7,
+          overrideDef.progNum & 0x7f,
+          fmt::format("Instrument {:d} (Overwrite)", overrideDef.logicalInstrIndex));
+      auto* rgn =
+          createRgnFromHeaderData(overrideInstr, rawFile(), version, spcDirAddr, overrideDef.regionData);
+      if (rgn == nullptr) {
+        delete overrideInstr;
+        continue;
+      }
+      overrideInstr->addRgn(rgn);
+      addTempInstr(overrideInstr);
+    }
+
+    for (const auto& drumKitDef : seq->intelliTADrumKitDefs()) {
+      auto* drumKit = new VGMInstr(
+          this, 0, 0, 127, drumKitDef.program, fmt::format("Drum Kit {:d}", drumKitDef.program));
+
+      for (size_t slot = 0; slot < drumKitDef.slots.size(); slot++) {
+        const auto& slotDef = drumKitDef.slots[slot];
+        if (!slotDef.active) {
+          continue;
+        }
+
+        VGMInstr* sourceInstr = findInstrByProgram(exportInstrs(), slotDef.sourceProgNum);
+        if (sourceInstr == nullptr) {
+          continue;
+        }
+
+        const uint8_t drumKey = static_cast<uint8_t>(0x24 + slot);
+        for (auto* sourceRgn : sourceInstr->regions()) {
+          drumKit->addRgn(
+              cloneIntelliTARgnForDrumKit(drumKit, sourceRgn, drumKey, slotDef.playedNoteByte));
+        }
+      }
+
+      if (drumKit->regions().empty()) {
+        delete drumKit;
+        continue;
+      }
+
+      addTempInstr(drumKit);
+    }
+
     return;
   }
 
@@ -175,7 +336,8 @@ void NinSnesInstrSet::useColl(const VGMColl* coll) {
     }
 
     for (auto* sourceRgn : sourceInstr->regions()) {
-      drumKit->addRgn(cloneRgnForDrumKit(drumKit, sourceRgn, percussionDef.noteIndex, percussionDef.globalTranspose));
+      drumKit->addRgn(
+          cloneLegacyRgnForDrumKit(drumKit, sourceRgn, percussionDef.noteIndex, percussionDef.globalTranspose));
     }
   }
 

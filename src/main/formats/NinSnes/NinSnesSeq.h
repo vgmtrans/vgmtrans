@@ -1,4 +1,6 @@
 #pragma once
+#include <array>
+#include <optional>
 #include "VGMMultiSectionSeq.h"
 #include "SeqTrack.h"
 #include "NinSnesFormat.h"
@@ -109,6 +111,33 @@ struct NinSnesPercussionDef {
   int8_t globalTranspose;
 };
 
+constexpr size_t NINSNES_INTELLI_TA_PERCUSSION_SLOT_COUNT = 16;
+
+struct NinSnesIntelliTACustomPercEntry {
+  uint8_t patchByte = 0;
+  uint8_t noteByte = 0;
+  uint8_t panByte = 0;
+};
+
+struct NinSnesIntelliTAInstrumentOverride {
+  uint8_t logicalInstrIndex = 0;
+  uint32_t progNum = 0;
+  std::array<uint8_t, 6> regionData {};
+};
+
+struct NinSnesIntelliTADrumKitSlot {
+  bool active = false;
+  uint32_t sourceProgNum = 0;
+  uint8_t playedNoteByte = 0xa4;
+
+  bool operator==(const NinSnesIntelliTADrumKitSlot& other) const = default;
+};
+
+struct NinSnesIntelliTADrumKitDef {
+  uint8_t program = 0;
+  std::array<NinSnesIntelliTADrumKitSlot, NINSNES_INTELLI_TA_PERCUSSION_SLOT_COUNT> slots {};
+};
+
 class NinSnesSeq:
     public VGMMultiSectionSeq {
  public:
@@ -130,6 +159,11 @@ class NinSnesSeq:
 
   uint16_t convertToAPUAddress(uint16_t offset);
   uint16_t getShortAddress(uint32_t offset);
+  uint32_t resolveProgramNumber(uint8_t instrumentByte,
+                                uint8_t* logicalInstrIndex = nullptr) const;
+  uint32_t registerIntelliTAInstrumentOverride(uint8_t logicalInstrIndex,
+                                               const std::array<uint8_t, 6>& regionData);
+  uint8_t ensureIntelliTADrumKitProgram();
 
   NinSnesVersion version;
   uint8_t STATUS_END;
@@ -158,6 +192,8 @@ class NinSnesSeq:
   bool intelliUseCustomPercTable;
   uint16_t intelliVoiceParamTable;
   uint8_t intelliVoiceParamTableSize;
+  std::array<NinSnesIntelliTACustomPercEntry, NINSNES_INTELLI_TA_PERCUSSION_SLOT_COUNT> intelliCustomPercTable;
+  std::array<uint32_t, 0x80> intelliInstrumentProgramMap;
 
   // Quintet
   uint8_t quintetBGMInstrBase;
@@ -172,6 +208,12 @@ class NinSnesSeq:
   const std::map<uint8_t, NinSnesPercussionDef>& percussionInstrNoteMap() const {
     return m_percussionInstrNoteMap;
   }
+  const std::vector<NinSnesIntelliTAInstrumentOverride>& intelliTAInstrumentOverrides() const {
+    return m_intelliTAInstrumentOverrides;
+  }
+  const std::vector<NinSnesIntelliTADrumKitDef>& intelliTADrumKitDefs() const {
+    return m_intelliTADrumKitDefs;
+  }
 
 protected:
   VGMHeader *header;
@@ -179,9 +221,13 @@ protected:
  private:
   void loadEventMap();
   void loadStandardVcmdMap(uint8_t statusByte);
+  NinSnesIntelliTADrumKitDef buildIntelliTADrumKitDef() const;
 
   uint8_t spcPercussionBaseInit;
   std::map<uint8_t, NinSnesPercussionDef> m_percussionInstrNoteMap;
+  uint32_t m_nextIntelliTAOverrideProgram;
+  std::vector<NinSnesIntelliTAInstrumentOverride> m_intelliTAInstrumentOverrides;
+  std::vector<NinSnesIntelliTADrumKitDef> m_intelliTADrumKitDefs;
 };
 
 class NinSnesSection
@@ -216,13 +262,18 @@ class NinSnesTrack
 
  private:
   void restoreNonPercussionProgramIfNeeded();
-  void switchToPercussionProgramIfNeeded();
+  void switchToPercussionProgramIfNeeded(uint8_t program = 0);
+  void addPercussionPanNoItem(uint8_t midiPan, uint8_t expressionLevel);
+  void addPercussionReverbNoItem(uint8_t reverbLevel);
   void addProgramChangeEvent(uint32_t offset,
                              uint32_t length,
                              uint32_t progNum,
                              bool requireBank,
-                             const std::string &eventName = "Program Change");
+                             const std::string &eventName = "Program Change",
+                             std::optional<uint8_t> logicalProgram = std::nullopt);
 
   bool m_lastNoteWasPercussion = false;
   uint32_t nonPercussionProgram = 0;
+  uint8_t currentPercussionProgram = 0;
+  std::optional<uint8_t> currentLogicalProgram;
 };
