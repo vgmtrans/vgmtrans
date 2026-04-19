@@ -14,6 +14,7 @@
 #include <QShowEvent>
 #include <QStyle>
 #include <QToolButton>
+#include "ColorHelpers.h"
 #include "UIHelpers.h"
 
 namespace {

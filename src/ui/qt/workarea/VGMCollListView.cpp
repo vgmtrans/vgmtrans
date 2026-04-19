@@ -7,16 +7,33 @@
 #include "VGMCollListView.h"
 
 #include <algorithm>
+#include <QStringView>
 #include <QLineEdit>
+#include <QResizeEvent>
 #include <VGMColl.h>
 #include <VGMExport.h>
 #include <VGMSeq.h>
 #include "SequencePlayer.h"
+#include "widgets/EmptyStateWidget.h"
 #include "widgets/ItemViewDensity.h"
 #include "workarea/MdiArea.h"
 #include "QtVGMRoot.h"
 #include "services/MenuManager.h"
 #include "services/NotificationCenter.h"
+#include "util/UIHelpers.h"
+
+static constexpr int kSearchEmptyCompactHeightThreshold = 170;
+
+static InstructionHint SearchEmptyStateHeadingHint() {
+  InstructionHint hint;
+  hint.iconPath = QStringLiteral(":/icons/magnify.svg");
+  hint.text = QStringLiteral("No matching collections");
+  hint.fontScale = 1.30;
+  hint.iconScale = 2.0;
+  hint.fontWeight = QFont::DemiBold;
+  hint.minPointSize = 12;
+  return hint;
+}
 
 static const QIcon &VGMCollIcon() {
   static QIcon icon(":/icons/collection.svg");
@@ -135,22 +152,158 @@ VGMCollListView::VGMCollListView(QWidget *parent) : QListView(parent) {
   }
 #endif
 
+  m_searchEmptyState = new EmptyStateWidget(SearchEmptyStateHeadingHint(), nullptr, viewport());
+  m_searchEmptyState->setAttribute(Qt::WA_TransparentForMouseEvents, true);
+  m_searchEmptyState->setFocusPolicy(Qt::NoFocus);
+  m_searchEmptyState->setBodyText(QString());
+  m_searchEmptyState->setCompactLayoutHeightThreshold(kSearchEmptyCompactHeightThreshold);
+  m_searchEmptyState->setGeometry(viewport()->rect());
+  m_searchEmptyState->hide();
+
   connect(this, &QListView::doubleClicked, this,
           &VGMCollListView::handlePlaybackRequest);
   connect(this, &QAbstractItemView::customContextMenuRequested, this,
           &VGMCollListView::collectionMenu);
   connect(model, &VGMCollListViewModel::dataChanged, [this]() {
+    applyFilter();
     if (!selectedIndexes().empty()) {
       selectionModel()->currentChanged(selectedIndexes().front(), {});
     } else {
       selectionModel()->currentChanged({}, {});
     }
   });
+  connect(model, &QAbstractItemModel::rowsInserted, this, [this]() { applyFilter(); });
+  connect(model, &QAbstractItemModel::rowsRemoved, this, [this]() { applyFilter(); });
+  connect(model, &QAbstractItemModel::modelReset, this, [this]() { applyFilter(); });
   connect(selectionModel(), &QItemSelectionModel::selectionChanged, this, &VGMCollListView::onSelectionChanged);
   connect(selectionModel(), &QItemSelectionModel::currentChanged, this,
           [this](const QModelIndex&, const QModelIndex&) { updateSelectedCollection(); });
   connect(NotificationCenter::the(), &NotificationCenter::vgmFileSelected, this,
           &VGMCollListView::onVGMFileSelected);
+
+  applyFilter();
+}
+
+int VGMCollListView::visibleCollectionCount() const {
+  if (!model()) {
+    return 0;
+  }
+
+  int visibleCount = 0;
+  const int totalRows = model()->rowCount();
+  for (int row = 0; row < totalRows; ++row) {
+    if (!isRowHidden(row)) {
+      ++visibleCount;
+    }
+  }
+  return visibleCount;
+}
+
+void VGMCollListView::setFilterText(const QString& text) {
+  const QString trimmed = text.trimmed();
+  if (m_filterText == trimmed) {
+    return;
+  }
+  m_filterText = trimmed;
+  applyFilter();
+}
+
+void VGMCollListView::clearFilter() {
+  setFilterText(QString());
+}
+
+void VGMCollListView::applyFilter() {
+  const auto& allColls = qtVGMRoot.vgmColls();
+  int visibleCount = 0;
+  const bool hasFilter = !m_filterText.isEmpty();
+  bool currentHidden = false;
+  QModelIndex firstVisibleIndex;
+  const QModelIndex current = selectionModel()->currentIndex();
+
+  for (int row = 0; row < static_cast<int>(allColls.size()); ++row) {
+    const bool visible = matchesFilter(allColls[static_cast<size_t>(row)]);
+    setRowHidden(row, !visible);
+    if (visible) {
+      ++visibleCount;
+    }
+
+    const QModelIndex index = model()->index(row, 0);
+    if (visible && !firstVisibleIndex.isValid() && index.isValid()) {
+      firstVisibleIndex = index;
+    }
+    if (index.isValid() && selectionModel()->isSelected(index) && !visible) {
+      selectionModel()->select(index, QItemSelectionModel::Deselect);
+      if (current == index) {
+        currentHidden = true;
+      }
+    }
+  }
+
+  if (currentHidden) {
+    QModelIndex replacementCurrent;
+    const QModelIndexList selected = selectionModel()->selectedRows();
+    if (!selected.isEmpty()) {
+      replacementCurrent = selected.front();
+    } else if (firstVisibleIndex.isValid()) {
+      replacementCurrent = firstVisibleIndex;
+    }
+    selectionModel()->setCurrentIndex(replacementCurrent, QItemSelectionModel::NoUpdate);
+  }
+
+  updateContextualMenus();
+  updateSelectedCollection();
+  updateSearchEmptyState(visibleCount, hasFilter);
+  emit filterVisibilityChanged(visibleCount, hasFilter);
+}
+
+void VGMCollListView::updateSearchEmptyState(int visibleCount, bool hasFilter) {
+  if (!m_searchEmptyState) {
+    return;
+  }
+
+  const bool show = hasFilter && visibleCount == 0;
+  m_searchEmptyState->setEmptyStateShown(show);
+  m_searchEmptyState->setVisible(show);
+  if (show) {
+    m_searchEmptyState->setGeometry(viewport()->rect());
+    m_searchEmptyState->raise();
+  }
+}
+
+void VGMCollListView::resizeEvent(QResizeEvent *event) {
+  QListView::resizeEvent(event);
+  if (m_searchEmptyState) {
+    m_searchEmptyState->setGeometry(viewport()->rect());
+  }
+}
+
+bool VGMCollListView::matchesFilter(const VGMColl* coll) const {
+  if (!coll) {
+    return false;
+  }
+
+  if (m_filterText.isEmpty()) {
+    return true;
+  }
+
+  const QStringView needle = QStringView(m_filterText);
+  const QString collName = QString::fromStdString(coll->name());
+  if (collName.contains(needle, Qt::CaseInsensitive)) {
+    return true;
+  }
+
+  if (const VGMSeq* seq = coll->seq()) {
+    const QString seqName = QString::fromStdString(seq->name());
+    if (seqName.contains(needle, Qt::CaseInsensitive)) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+bool VGMCollListView::indexIsVisible(const QModelIndex& index) const {
+  return index.isValid() && !isRowHidden(index.row());
 }
 
 void VGMCollListView::collectionMenu(const QPoint &pos) const {
@@ -167,10 +320,14 @@ void VGMCollListView::collectionMenu(const QPoint &pos) const {
   auto selectedColls = std::make_shared<std::vector<VGMColl*>>();
   selectedColls->reserve(list.size());
   for (const auto &index : list) {
-    if (index.isValid()) {
+    if (indexIsVisible(index)) {
       selectedColls->push_back(qtVGMRoot.vgmColls()[index.row()]);
     }
   }
+  if (selectedColls->empty()) {
+    return;
+  }
+
   auto menu = MenuManager::the()->createMenuForItems<VGMColl>(selectedColls);
   menu->exec(mapToGlobal(pos));
   menu->deleteLater();
@@ -192,7 +349,7 @@ void VGMCollListView::keyPressEvent(QKeyEvent *e) {
 
 void VGMCollListView::handlePlaybackRequest() {
   QModelIndexList list = this->selectionModel()->selectedIndexes();
-  if (list.empty() || list[0].row() >= model()->rowCount()) {
+  if (list.empty() || !indexIsVisible(list[0]) || list[0].row() >= model()->rowCount()) {
     if (SequencePlayer::the().activeCollection() != nullptr) {
       SequencePlayer::the().toggle();
       return;
@@ -239,7 +396,11 @@ void VGMCollListView::onVGMFileSelected(VGMFile* file, const QWidget* caller) {
 
   const int row = static_cast<int>(std::distance(colls.begin(), it));
   const auto index = model()->index(row, 0);
-  if (!index.isValid()) {
+  if (!index.isValid() || !indexIsVisible(index)) {
+    clearSelection();
+    selectionModel()->setCurrentIndex({}, QItemSelectionModel::NoUpdate);
+    updateContextualMenus();
+    updateSelectedCollection();
     return;
   }
 
@@ -255,17 +416,19 @@ void VGMCollListView::updateSelectedCollection() const {
     return;
   }
 
+  const QModelIndexList selected = selectionModel()->selectedRows();
+  if (selected.isEmpty()) {
+    NotificationCenter::the()->selectVGMColl(nullptr, const_cast<VGMCollListView*>(this));
+    return;
+  }
+
   QModelIndex index = selectionModel()->currentIndex();
-  if (!index.isValid()) {
-    const QModelIndexList selected = selectionModel()->selectedRows();
-    if (selected.isEmpty()) {
-      NotificationCenter::the()->selectVGMColl(nullptr, const_cast<VGMCollListView*>(this));
-      return;
-    }
+  if (!index.isValid() || !selectionModel()->isSelected(index)) {
     index = selected.front();
   }
 
-  if (!index.isValid() || static_cast<size_t>(index.row()) >= qtVGMRoot.vgmColls().size()) {
+  if (!indexIsVisible(index) ||
+      static_cast<size_t>(index.row()) >= qtVGMRoot.vgmColls().size()) {
     NotificationCenter::the()->selectVGMColl(nullptr, const_cast<VGMCollListView*>(this));
     return;
   }
@@ -275,17 +438,12 @@ void VGMCollListView::updateSelectedCollection() const {
 }
 
 void VGMCollListView::updateContextualMenus() const {
-  if (!selectionModel()) {
-    NotificationCenter::the()->updateContextualMenusForVGMColls({});
-    return;
-  }
-
   QModelIndexList list = selectionModel()->selectedRows();
   QList<VGMColl*> colls;
   colls.reserve(list.size());
 
   for (const auto& index : list) {
-    if (index.isValid()) {
+    if (indexIsVisible(index)) {
       colls.append(qtVGMRoot.vgmColls()[index.row()]);
     }
   }

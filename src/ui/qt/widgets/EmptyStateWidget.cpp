@@ -7,10 +7,12 @@
 #include "EmptyStateWidget.h"
 
 #include <QColor>
+#include <QBoxLayout>
 #include <QEvent>
 #include <QIcon>
 #include <QLabel>
 #include <QPalette>
+#include <QResizeEvent>
 #include <QSizePolicy>
 #include <QStackedLayout>
 #include <QVBoxLayout>
@@ -50,28 +52,46 @@ EmptyStateWidget::EmptyStateWidget(const InstructionHint &headingHint,
   emptyLayout->setSpacing(0);
   emptyLayout->addStretch();
 
-  m_iconLabel = new QLabel(m_emptyView);
-  m_iconLabel->setAlignment(Qt::AlignHCenter | Qt::AlignBottom);
+  m_emptyContent = new QWidget(m_emptyView);
+  m_emptyContent->setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Minimum);
+  m_emptyContentLayout = new QBoxLayout(QBoxLayout::TopToBottom, m_emptyContent);
+  m_emptyContentLayout->setContentsMargins(0, 0, 0, 0);
+  m_emptyContentLayout->setSpacing(kEmptyStateContentSpacing);
+  m_emptyContentLayout->setAlignment(Qt::AlignCenter);
+
+  m_iconLabel = new QLabel(m_emptyContent);
+  m_iconLabel->setAlignment(Qt::AlignCenter);
   m_iconLabel->setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Fixed);
 
-  m_headingLabel = new QLabel(m_emptyView);
+  m_textContainer = new QWidget(m_emptyContent);
+  m_textContainer->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Minimum);
+  auto *textLayout = new QVBoxLayout(m_textContainer);
+  textLayout->setContentsMargins(0, 0, 0, 0);
+  textLayout->setSpacing(kEmptyStateContentSpacing);
+
+  m_headingLabel = new QLabel(m_textContainer);
   m_headingLabel->setAlignment(Qt::AlignHCenter | Qt::AlignTop);
   m_headingLabel->setWordWrap(true);
   m_headingLabel->setSizePolicy(QSizePolicy::Ignored, QSizePolicy::Minimum);
 
-  m_bodyLabel = new QLabel(m_emptyView);
+  m_bodyLabel = new QLabel(m_textContainer);
   m_bodyLabel->setAlignment(Qt::AlignHCenter | Qt::AlignTop);
   m_bodyLabel->setWordWrap(true);
   m_bodyLabel->setSizePolicy(QSizePolicy::Ignored, QSizePolicy::Minimum);
 
-  emptyLayout->addWidget(m_iconLabel, 0, Qt::AlignHCenter);
-  emptyLayout->addWidget(m_headingLabel);
-  emptyLayout->addWidget(m_bodyLabel);
+  textLayout->addWidget(m_headingLabel);
+  textLayout->addWidget(m_bodyLabel);
+
+  m_emptyContentLayout->addWidget(m_iconLabel);
+  m_emptyContentLayout->addWidget(m_textContainer);
+
+  emptyLayout->addWidget(m_emptyContent);
   emptyLayout->addStretch();
 
   m_stack->addWidget(m_emptyView);
   m_emptyView->hide();
 
+  updateLayoutMode();
   refreshEmptyStatePresentation();
   setEmptyStateShown(false);
 }
@@ -92,6 +112,20 @@ void EmptyStateWidget::setEmptyStateContent(const QString &iconPath,
   m_headingHint.iconPath = iconPath;
   m_headingHint.text = heading;
   m_emptyBody = body;
+  refreshEmptyStatePresentation();
+}
+
+void EmptyStateWidget::setCompactLayoutHeightThreshold(int threshold) {
+  if (threshold < 0) {
+    threshold = 0;
+  }
+
+  if (m_compactLayoutHeightThreshold == threshold) {
+    return;
+  }
+
+  m_compactLayoutHeightThreshold = threshold;
+  updateLayoutMode();
   refreshEmptyStatePresentation();
 }
 
@@ -117,6 +151,50 @@ void EmptyStateWidget::changeEvent(QEvent *event) {
       event->type() == QEvent::StyleChange) {
     refreshEmptyStatePresentation();
   }
+}
+
+void EmptyStateWidget::resizeEvent(QResizeEvent *event) {
+  QWidget::resizeEvent(event);
+  updateLayoutMode();
+}
+
+void EmptyStateWidget::updateLayoutMode() {
+  if (!m_emptyContentLayout || !m_headingLabel || !m_bodyLabel || !m_textContainer) {
+    return;
+  }
+
+  const bool compact = m_compactLayoutHeightThreshold > 0
+      && height() < m_compactLayoutHeightThreshold;
+  if (m_compactLayoutActive == compact) {
+    return;
+  }
+
+  m_compactLayoutActive = compact;
+  m_emptyContentLayout->setDirection(compact ? QBoxLayout::LeftToRight
+                                             : QBoxLayout::TopToBottom);
+
+  if (compact) {
+    m_textContainer->setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Minimum);
+    m_headingLabel->setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Minimum);
+    m_bodyLabel->setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Minimum);
+
+    m_headingLabel->setAlignment(Qt::AlignCenter);
+    m_bodyLabel->setAlignment(Qt::AlignCenter);
+    m_headingLabel->setWordWrap(false);
+  } else {
+    m_textContainer->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Minimum);
+    m_headingLabel->setSizePolicy(QSizePolicy::Ignored, QSizePolicy::Minimum);
+    m_bodyLabel->setSizePolicy(QSizePolicy::Ignored, QSizePolicy::Minimum);
+
+    m_headingLabel->setAlignment(Qt::AlignHCenter | Qt::AlignTop);
+    m_bodyLabel->setAlignment(Qt::AlignHCenter | Qt::AlignTop);
+    m_headingLabel->setWordWrap(true);
+  }
+
+  m_textContainer->updateGeometry();
+  m_headingLabel->updateGeometry();
+  m_bodyLabel->updateGeometry();
+  m_emptyContent->updateGeometry();
 }
 
 void EmptyStateWidget::refreshEmptyStatePresentation() {
@@ -171,10 +249,4 @@ void EmptyStateWidget::refreshEmptyStatePresentation() {
   } else {
     m_bodyLabel->clear();
   }
-
-  m_iconLabel->setContentsMargins(0, 0, 0, hasIcon ? headingMetrics.spacing : 0);
-  m_bodyLabel->setContentsMargins(0,
-                                  (hasHeading && hasBody) ? kEmptyStateContentSpacing : 0,
-                                  0,
-                                  0);
 }

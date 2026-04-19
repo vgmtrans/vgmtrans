@@ -8,12 +8,15 @@
 #include <QDragLeaveEvent>
 #include <QDragMoveEvent>
 #include <QDropEvent>
+#include <QAction>
 #include <QFileDialog>
 #include <QDockWidget>
 #include <QApplication>
 #include <QCloseEvent>
 #include <QFileInfo>
+#include <QHBoxLayout>
 #include <QKeyEvent>
+#include <QLineEdit>
 #include <QMessageBox>
 #include <QMimeData>
 #include <QMouseEvent>
@@ -43,6 +46,7 @@
 #include "SequencePlayer.h"
 #include "services/NotificationCenter.h"
 #include "services/Settings.h"
+#include "util/UIHelpers.h"
 #include "workarea/RawFileListView.h"
 #include "workarea/VGMFileListView.h"
 #include "workarea/VGMCollListView.h"
@@ -161,9 +165,9 @@ void MainWindow::createElements() {
   setCorner(Qt::BottomLeftCorner, Qt::BottomDockWidgetArea);
   setCorner(Qt::BottomRightCorner, Qt::BottomDockWidgetArea);
 
-  const auto installTitleBar = [this](QDockWidget *dock, const QString& title,
-                                      TitleBar::Buttons buttons,
-                                      const QString& newToolTip = QString()) {
+  const auto installTitleBar = [](QDockWidget *dock, const QString& title,
+                                  TitleBar::Buttons buttons,
+                                  const QString& newToolTip = QString()) {
     auto *titleBar = new TitleBar(title, buttons, dock, newToolTip);
     connect(titleBar, &TitleBar::hideRequested, dock, &QDockWidget::hide);
     dock->setTitleBarWidget(titleBar);
@@ -211,6 +215,45 @@ void MainWindow::createElements() {
     ManualCollectionDialog dialog(this);
     dialog.exec();
   });
+
+  auto* collLeadingControls = new QWidget(collTitleBar);
+  auto* collLeadingLayout = new QHBoxLayout(collLeadingControls);
+  collLeadingLayout->setContentsMargins(0, 0, 0, 0);
+  collLeadingLayout->setSpacing(0);
+
+  auto* collSearchEdit = new QLineEdit(collLeadingControls);
+  collSearchEdit->setPlaceholderText(QStringLiteral("Search"));
+  collSearchEdit->setClearButtonEnabled(true);
+  collSearchEdit->setFixedWidth(220);
+  collSearchEdit->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Fixed);
+#ifdef Q_OS_MAC
+  collSearchEdit->setAttribute(Qt::WA_MacShowFocusRect, false);
+  collSearchEdit->setStyleSheet(
+      "QLineEdit {"
+      "  background-color: palette(base);"
+      "  border: 1px solid palette(mid);"
+      "  border-radius: 5px;"
+      "  padding: 0px 6px;"
+      "}"
+      "QLineEdit:focus {"
+      "  border: 1px solid palette(highlight);"
+      "}");
+#endif
+  collSearchEdit->setFixedHeight(20);
+  QAction* collSearchIconAction =
+      collSearchEdit->addAction(QIcon(), QLineEdit::LeadingPosition);
+  collLeadingLayout->addWidget(collSearchEdit);
+  collTitleBar->addLeadingWidget(collLeadingControls);
+
+  const auto refreshCollectionTitleControls =
+      [collTitleBar, collSearchIconAction]() {
+        collSearchIconAction->setIcon(stencilSvgIcon(
+            QStringLiteral(":/icons/magnify.svg"),
+            toolBarButtonIconColor(collTitleBar->palette())));
+      };
+  refreshCollectionTitleControls();
+  connect(collTitleBar, &TitleBar::appearanceChanged, this, refreshCollectionTitleControls);
+  connect(collSearchEdit, &QLineEdit::textChanged, m_coll_listview, &VGMCollListView::setFilterText);
 
   m_coll_view_dock = new QDockWidget("Collection Contents");
   m_coll_view_dock->setObjectName(QStringLiteral("collectionContentDock"));
