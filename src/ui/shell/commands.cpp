@@ -8,6 +8,8 @@
 
 #include <fstream>
 #include <string>
+#include <algorithm>
+#include <cctype>
 
 #include <fmt/format.h>
 #include <fmt/color.h>
@@ -15,7 +17,7 @@
 #include "DBGVGMRoot.h"
 #include "RawFile.h"
 #include "SeqTrack.h"
-#include "MidiFile.h"
+#include "StitchExport.h"
 #include "VGMColl.h"
 #include "VGMFile.h"
 #include "VGMInstrSet.h"
@@ -630,6 +632,72 @@ void sequence_export(const std::vector<std::string>& args) {
   }
 }
 
+void collection_stitch(const std::vector<std::string>& args) {
+  std::filesystem::path midiPath = args[2];
+  std::filesystem::path sf2Path = args[3];
+
+  std::vector<conversion::MidiMergeEntry> entries;
+  entries.reserve(args.size() - 4);
+
+  std::vector<std::string> collectionIndices;
+  collectionIndices.reserve(args.size() - 4);
+
+  for (size_t argIdx = 4; argIdx < args.size(); ++argIdx) {
+    VGMColl* coll = getVGMColl(args[argIdx]);
+    if (!coll) {
+      return;
+    }
+
+    VGMSeq* seq = coll->seq();
+    if (!seq) {
+      fmt::println("Collection '{}' has no sequence, so stitched export cannot be built.",
+                   coll->name());
+      return;
+    }
+
+    entries.push_back({coll, coll->name()});
+    collectionIndices.push_back(args[argIdx]);
+  }
+
+  if (entries.empty()) {
+    fmt::println("No collection indices were provided.");
+    return;
+  }
+
+  conversion::StitchedExportResult exportResult;
+  if (!conversion::exportStitchedMidiAndSf2(entries, midiPath, sf2Path,
+                                            &exportResult)) {
+    fmt::println("Failed to export stitched output. Check logs for details.");
+    return;
+  }
+
+  fmt::println("Stitched MIDI: {}", midiPath.string());
+  fmt::println("Merged SF2: {}", sf2Path.string());
+  for (size_t i = 0; i < entries.size(); ++i) {
+    std::string chunkName = entries[i].label;
+    if (chunkName.empty()) {
+      const VGMColl* coll = entries[i].collection;
+      if (coll && coll->seq()) {
+        chunkName = coll->seq()->name();
+      }
+      else if (coll) {
+        chunkName = coll->name();
+      }
+      else {
+        chunkName = "(unknown)";
+      }
+    }
+    const uint32_t startTick =
+        (i < exportResult.mergeResult.startTimes.size())
+            ? exportResult.mergeResult.startTimes[i]
+            : 0;
+    const uint32_t bankOffset =
+        (i < exportResult.bankOffsets.size()) ? exportResult.bankOffsets[i] : 0;
+    fmt::println("  part {} (#{} '{}'): start tick {} bank +{}", i + 1, collectionIndices[i], chunkName,
+                 startTick, bankOffset);
+  }
+}
+
 void cmd_load(const std::vector<std::string>& args) {
   if (args.size() < 2) {
     fmt::println("Usage: load <path>");
@@ -724,7 +792,10 @@ void registerCommands() {
       "Operate on collections",
       {{"list", "", "List all collections", 2, collection_list},
        {"info", "<index>", "Show information about a collection", 3, collection_info},
-       {"export", "<index> <dir>", "Export MIDI + SF2 to directory", 4, collection_export}}};
+       {"export", "<index> <dir>", "Export MIDI + SF2 to directory", 4, collection_export},
+       {"stitch", "<midi_path> <sf2_path> <coll_idx...>",
+        "Stitch collections in order and export remapped MIDI + merged SF2", 5,
+        collection_stitch}}};
 
   commandRegistry["instrumentset"] = {
       "instrumentset",
