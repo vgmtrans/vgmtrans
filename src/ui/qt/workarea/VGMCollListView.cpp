@@ -23,6 +23,7 @@
 #include "services/MenuManager.h"
 #include "services/NotificationCenter.h"
 #include "util/UIHelpers.h"
+#include "util/Colors.h"
 
 static constexpr int kSearchEmptyCompactHeightThreshold = 170;
 
@@ -43,7 +44,7 @@ static const QIcon &VGMCollIcon() {
 }
 
 static const QIcon &VGMPlayingCollIcon() {
-  static QIcon icon = stencilSvgIcon(QStringLiteral(":/icons/play.svg"), QColor(0x2f, 0xbf, 0x71));
+  static QIcon icon = stencilSvgIcon(QStringLiteral(":/icons/play.svg"), UIColors::PlayingIconColor);
   return icon;
 }
 
@@ -53,7 +54,7 @@ QIcon StitchPositionIcon(int oneBasedPosition) {
   QColor bubbleColor = palette.color(QPalette::Highlight);
   QColor textColor = palette.color(QPalette::HighlightedText);
   if (!bubbleColor.isValid()) {
-    bubbleColor = QColor(70, 150, 255);
+    bubbleColor = UIColors::FallbackHighlightColor;
   }
   if (!textColor.isValid()) {
     textColor = Qt::white;

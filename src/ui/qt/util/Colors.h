@@ -28,4 +28,6 @@ namespace EventColors {
 
 namespace UIColors {
   inline constexpr int ItemSelectionAccentAlpha = 48;
+  inline auto PlayingIconColor = QColor(0x2f, 0xbf, 0x71);
+  inline auto FallbackHighlightColor = QColor(70, 150, 255);
 }
