@@ -164,6 +164,8 @@ class NinSnesSeq:
   uint32_t registerIntelliTAInstrumentOverride(uint8_t logicalInstrIndex,
                                                const std::array<uint8_t, 6>& regionData);
   uint8_t ensureIntelliTADrumKitProgram();
+  bool usesIntelliCustomPercTable() const;
+  void setIntelliCustomPercTableEnabled(bool enabled);
 
   NinSnesVersion version;
   uint8_t STATUS_END;
@@ -192,8 +194,11 @@ class NinSnesSeq:
   bool intelliUseCustomPercTable;
   uint16_t intelliVoiceParamTable;
   uint8_t intelliVoiceParamTableSize;
+  bool intelliVoiceParamTableDefined;
   std::array<NinSnesIntelliTACustomPercEntry, NINSNES_INTELLI_TA_PERCUSSION_SLOT_COUNT> intelliCustomPercTable;
   std::array<uint32_t, 0x80> intelliInstrumentProgramMap;
+  uint8_t intelliTAFlags;
+  uint8_t intelliTAUnknownGlobalByte;
 
   // Quintet
   uint8_t quintetBGMInstrBase;
@@ -262,10 +267,12 @@ class NinSnesTrack
 
  private:
   uint8_t getEffectiveNoteDuration() const;
+  void setTrackedProgramState(uint32_t progNum, std::optional<uint8_t> logicalProgram = std::nullopt);
   void restoreNonPercussionProgramIfNeeded();
   void switchToPercussionProgramIfNeeded(uint8_t program = 0);
-  void addPercussionPanNoItem(uint8_t midiPan, uint8_t expressionLevel);
-  void addPercussionReverbNoItem(uint8_t reverbLevel);
+  void applyIntelliTAPercussionState(uint8_t instrumentByte,
+                                     std::optional<uint8_t> panByte = std::nullopt,
+                                     std::optional<uint8_t> reverbLevel = std::nullopt);
   void addProgramChangeEvent(uint32_t offset,
                              uint32_t length,
                              uint32_t progNum,

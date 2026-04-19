@@ -27,6 +27,9 @@ NinSnesSeq::NinSnesSeq(RawFile *file,
       konamiBaseAddress(0),
       intelliVoiceParamTable(0),
       intelliVoiceParamTableSize(0),
+      intelliVoiceParamTableDefined(false),
+      intelliTAFlags(0),
+      intelliTAUnknownGlobalByte(0),
       quintetBGMInstrBase(0),
       falcomBaseOffset(0),
       m_nextIntelliTAOverrideProgram(0x80) {
@@ -55,7 +58,10 @@ void NinSnesSeq::resetVars() {
   intelliUseCustomPercTable = false;
   intelliVoiceParamTable = 0;
   intelliVoiceParamTableSize = 0;
+  intelliVoiceParamTableDefined = false;
   intelliCustomPercTable = {};
+  intelliTAFlags = 0;
+  intelliTAUnknownGlobalByte = 0;
   m_nextIntelliTAOverrideProgram = 0x80;
   m_intelliTAInstrumentOverrides.clear();
   m_intelliTADrumKitDefs.clear();
@@ -655,6 +661,28 @@ uint32_t NinSnesSeq::resolveProgramNumber(uint8_t instrumentByte, uint8_t* logic
   return logicalProgram;
 }
 
+bool NinSnesSeq::usesIntelliCustomPercTable() const {
+  if (version == NINSNES_INTELLI_TA) {
+    return (intelliTAFlags & 0x40) != 0;
+  }
+
+  return intelliUseCustomPercTable;
+}
+
+void NinSnesSeq::setIntelliCustomPercTableEnabled(bool enabled) {
+  if (version == NINSNES_INTELLI_TA) {
+    if (enabled) {
+      intelliTAFlags |= 0x40;
+    }
+    else {
+      intelliTAFlags &= static_cast<uint8_t>(~0x40);
+    }
+    return;
+  }
+
+  intelliUseCustomPercTable = enabled;
+}
+
 uint32_t NinSnesSeq::registerIntelliTAInstrumentOverride(
     uint8_t logicalInstrIndex,
     const std::array<uint8_t, 6>& regionData) {
@@ -670,12 +698,13 @@ uint32_t NinSnesSeq::registerIntelliTAInstrumentOverride(
 
 NinSnesIntelliTADrumKitDef NinSnesSeq::buildIntelliTADrumKitDef() const {
   NinSnesIntelliTADrumKitDef drumKitDef;
+  const bool useCustomPercTable = usesIntelliCustomPercTable();
 
   for (size_t slot = 0; slot < NINSNES_INTELLI_TA_PERCUSSION_SLOT_COUNT; slot++) {
     uint8_t instrumentByte;
     uint8_t playedNoteByte;
 
-    if (intelliUseCustomPercTable) {
+    if (useCustomPercTable) {
       const auto& customEntry = intelliCustomPercTable[slot];
       instrumentByte = customEntry.patchByte & 0xbf;
       playedNoteByte = customEntry.noteByte;
@@ -836,6 +865,17 @@ uint8_t NinSnesTrack::getEffectiveNoteDuration() const {
   return std::min(std::max(duration, (uint8_t) 1), (uint8_t) (shared->spcNoteDuration - 2));
 }
 
+void NinSnesTrack::setTrackedProgramState(uint32_t progNum, std::optional<uint8_t> logicalProgram) {
+  nonPercussionProgram = progNum;
+  if (logicalProgram.has_value()) {
+    currentLogicalProgram = logicalProgram;
+  }
+
+  if (readMode == READMODE_ADD_TO_UI) {
+    static_cast<NinSnesSeq*>(parentSeq)->addInstrumentRef(progNum);
+  }
+}
+
 void NinSnesTrack::restoreNonPercussionProgramIfNeeded() {
   if (!m_lastNoteWasPercussion) {
     return;
@@ -857,19 +897,28 @@ void NinSnesTrack::switchToPercussionProgramIfNeeded(uint8_t program) {
   m_lastNoteWasPercussion = true;
 }
 
-void NinSnesTrack::addPercussionPanNoItem(uint8_t midiPan, uint8_t expressionLevel) {
-  const uint8_t originalChannel = channel;
-  channel = 9;
-  addPanNoItem(midiPan);
-  addExpressionNoItem(expressionLevel);
-  channel = originalChannel;
-}
+void NinSnesTrack::applyIntelliTAPercussionState(uint8_t instrumentByte,
+                                                 std::optional<uint8_t> panByte,
+                                                 std::optional<uint8_t> reverbLevel) {
+  if (panByte.has_value()) {
+    double volumeScale;
+    bool reverseLeft;
+    bool reverseRight;
+    const int8_t midiPan =
+        calculatePanValue(*panByte, volumeScale, reverseLeft, reverseRight);
+    const uint8_t expressionLevel = convertPercentAmpToStdMidiVal(volumeScale);
+    addPanNoItem(midiPan);
+    addExpressionNoItem(expressionLevel);
+  }
 
-void NinSnesTrack::addPercussionReverbNoItem(uint8_t reverbLevel) {
-  const uint8_t originalChannel = channel;
-  channel = 9;
-  addReverbNoItem(reverbLevel);
-  channel = originalChannel;
+  if (reverbLevel.has_value()) {
+    addReverbNoItem(*reverbLevel);
+  }
+
+  auto* ninSeq = static_cast<NinSnesSeq*>(parentSeq);
+  uint8_t logicalProgram = 0;
+  const uint32_t progNum = ninSeq->resolveProgramNumber(instrumentByte, &logicalProgram);
+  setTrackedProgramState(progNum, logicalProgram);
 }
 
 void NinSnesTrack::addProgramChangeEvent(uint32_t offset,
@@ -878,17 +927,10 @@ void NinSnesTrack::addProgramChangeEvent(uint32_t offset,
                                          bool requireBank,
                                          const std::string &eventName,
                                          std::optional<uint8_t> logicalProgram) {
-  nonPercussionProgram = progNum;
-  if (logicalProgram.has_value()) {
-    currentLogicalProgram = logicalProgram;
-  }
+  setTrackedProgramState(progNum, logicalProgram);
 
   bool isNewOffset = onEvent(offset, length);
   recordSeqEvent<ProgChangeSeqEvent>(isNewOffset, getTime(), progNum, offset, length, eventName);
-
-  if (readMode == READMODE_ADD_TO_UI) {
-    parentSeq->addInstrumentRef(progNum);
-  }
 
   if (!m_lastNoteWasPercussion) {
     addProgramChangeNoItem(progNum, requireBank);
@@ -1073,19 +1115,16 @@ bool NinSnesTrack::readEvent() {
 
       if (parentSeq->version == NINSNES_INTELLI_TA &&
           slot < NINSNES_INTELLI_TA_PERCUSSION_SLOT_COUNT) {
-        if (parentSeq->intelliUseCustomPercTable) {
+        if (parentSeq->usesIntelliCustomPercTable()) {
           const auto& customEntry = parentSeq->intelliCustomPercTable[slot];
-
-          if (customEntry.panByte < 0x80) {
-            double volumeScale;
-            bool reverseLeft;
-            bool reverseRight;
-            int8_t midiPan =
-                calculatePanValue(customEntry.panByte, volumeScale, reverseLeft, reverseRight);
-            addPercussionPanNoItem(midiPan, convertPercentAmpToStdMidiVal(volumeScale));
-          }
-
-          addPercussionReverbNoItem((customEntry.patchByte & 0x40) != 0 ? 40 : 0);
+          applyIntelliTAPercussionState(customEntry.patchByte & 0xbf,
+                                        customEntry.panByte < 0x80
+                                            ? std::optional<uint8_t>(customEntry.panByte)
+                                            : std::nullopt,
+                                        static_cast<uint8_t>((customEntry.patchByte & 0x40) != 0 ? 40 : 0));
+        }
+        else {
+          applyIntelliTAPercussionState(statusByte);
         }
 
         const uint8_t drumProgram = parentSeq->ensureIntelliTADrumKitProgram();
@@ -1455,7 +1494,7 @@ bool NinSnesTrack::readEvent() {
       uint8_t percussionBase = readByte(curOffset++);
       parentSeq->spcPercussionBase = percussionBase;
       if (parentSeq->version == NINSNES_INTELLI_TA) {
-        parentSeq->intelliUseCustomPercTable = false;
+        parentSeq->setIntelliCustomPercTableEnabled(false);
       }
 
       desc = fmt::format("Percussion Base: {:d}", percussionBase);
@@ -1684,6 +1723,7 @@ bool NinSnesTrack::readEvent() {
       if (param >= 0) {
         parentSeq->intelliVoiceParamTableSize = param;
         parentSeq->intelliVoiceParamTable = curOffset;
+        parentSeq->intelliVoiceParamTableDefined = true;
         curOffset += parentSeq->intelliVoiceParamTableSize * 4;
         desc = fmt::format("Number of Items: {:d}", parentSeq->intelliVoiceParamTableSize);
         addGenericEvent(beginOffset, curOffset - beginOffset, "Voice Param Table", desc, Type::Misc);
@@ -1702,7 +1742,7 @@ bool NinSnesTrack::readEvent() {
             const uint32_t newProgNum =
                 parentSeq->registerIntelliTAInstrumentOverride(instrNum, regionData);
             if (currentLogicalProgram.has_value() && currentLogicalProgram.value() == instrNum) {
-              nonPercussionProgram = newProgNum;
+              setTrackedProgramState(newProgNum, instrNum);
               if (!m_lastNoteWasPercussion) {
                 addProgramChangeNoItem(newProgNum, true);
               }
@@ -1723,8 +1763,23 @@ bool NinSnesTrack::readEvent() {
       uint8_t paramIndex = readByte(curOffset++);
       desc = fmt::format("Index: {:d}", paramIndex);
 
-      if (paramIndex < parentSeq->intelliVoiceParamTableSize) {
-        uint16_t addrVoiceParam = parentSeq->intelliVoiceParamTable + (paramIndex * 4);
+      bool canReadVoiceParam = false;
+      uint32_t addrVoiceParam = 0;
+      if (parentSeq->version == NINSNES_INTELLI_TA) {
+        if (parentSeq->intelliVoiceParamTableDefined) {
+          addrVoiceParam = parentSeq->intelliVoiceParamTable + (paramIndex * 4u);
+          canReadVoiceParam = (addrVoiceParam + 3) < 0x10000;
+          if (paramIndex >= parentSeq->intelliVoiceParamTableSize) {
+            fmt::format_to(std::back_inserter(desc), "  Out of Declared Range");
+          }
+        }
+      }
+      else if (paramIndex < parentSeq->intelliVoiceParamTableSize) {
+        addrVoiceParam = parentSeq->intelliVoiceParamTable + (paramIndex * 4u);
+        canReadVoiceParam = true;
+      }
+
+      if (canReadVoiceParam) {
         uint8_t instrByte = readByte(addrVoiceParam);
         uint8_t newVol = readByte(addrVoiceParam + 1);
         uint8_t packedPanByte = readByte(addrVoiceParam + 2);
@@ -1803,11 +1858,7 @@ bool NinSnesTrack::readEvent() {
 
         addFineTuningNoItem(fineTuningCents);
 
-        currentLogicalProgram = logicalProgNum;
-        nonPercussionProgram = resolvedProgNum;
-        if (readMode == READMODE_ADD_TO_UI) {
-          parentSeq->addInstrumentRef(resolvedProgNum);
-        }
+        setTrackedProgramState(resolvedProgNum, logicalProgNum);
         if (!m_lastNoteWasPercussion) {
           addProgramChangeNoItem(resolvedProgNum, true);
         }
@@ -1819,6 +1870,16 @@ bool NinSnesTrack::readEvent() {
                        panValue,
                        fineTuningCents / 100.0,
                        shared->spcTranspose);
+      }
+      else if (parentSeq->version == NINSNES_INTELLI_TA) {
+        if (!parentSeq->intelliVoiceParamTableDefined) {
+          fmt::format_to(std::back_inserter(desc), "  Table: Undefined");
+        }
+        else {
+          fmt::format_to(std::back_inserter(desc),
+                         "  Record Address: ${:04X} (Invalid)",
+                         static_cast<uint16_t>(addrVoiceParam & 0xffff));
+        }
       }
 
       addGenericEvent(beginOffset, curOffset - beginOffset, "Load Voice Param", desc,
@@ -1900,7 +1961,7 @@ bool NinSnesTrack::readEvent() {
           customEntry.panByte = readByte(curOffset++);
         }
 
-        parentSeq->intelliUseCustomPercTable = true;
+        parentSeq->setIntelliCustomPercTableEnabled(true);
 
         desc = fmt::format("Entries: {:d}", numEntries);
         addGenericEvent(beginOffset, curOffset - beginOffset, "Custom Percussion Table", desc,
@@ -1917,41 +1978,47 @@ bool NinSnesTrack::readEvent() {
       uint8_t type = readByte(curOffset++);
 
       switch (type) {
-        case 0x00:
-          curOffset += 3;
-          addUnknown(beginOffset, curOffset - beginOffset);
+        case 0x00: {
+          uint8_t valueLo = readByte(curOffset++);
+          uint8_t valueHi = readByte(curOffset++);
+          uint8_t packedType = readByte(curOffset++);
+          uint16_t requestValue = valueLo | (valueHi << 8);
+          uint8_t requestKind = (packedType & 0x07) << 1;
+          uint8_t requestPriority = packedType & 0xf8;
+
+          desc = fmt::format("Value: ${:04X}  Kind: ${:02X}  Priority: ${:02X}",
+                             requestValue, requestKind, requestPriority);
+          addGenericEvent(beginOffset, curOffset - beginOffset, "Queued Global Request", desc,
+                          Type::Misc);
           break;
+        }
 
         case 0x01:
         case 0x02: {
-          // set/clear bitflag in $ca
           uint8_t param = readByte(curOffset++);
           bool bitValue = (type == 0x01);
 
-          if ((param & 0x80) != 0) {
-            parentSeq->intelliUseCustomNoteParam = bitValue;
+          if (bitValue) {
+            parentSeq->intelliTAFlags |= param;
           }
-          if ((param & 0x40) != 0) {
-            parentSeq->intelliUseCustomPercTable = bitValue;
+          else {
+            parentSeq->intelliTAFlags &= static_cast<uint8_t>(~param);
           }
 
-          if (param == 0x80) {
-            desc = fmt::format("Status: {}", (bitValue ? "On" : "Off"));
-            addGenericEvent(beginOffset, curOffset - beginOffset, "Use Custom Note Param",
-                            desc, Type::ChangeState);
-          }
-          else if (param == 0x40) {
+          if (param == 0x40) {
             desc = fmt::format("Status: {}", (bitValue ? "On" : "Off"));
             addGenericEvent(beginOffset, curOffset - beginOffset, "Use Custom Percussion Table",
                             desc, Type::ChangeState);
           }
           else {
-            desc = fmt::format("Value: ${:02X}", param);
+            desc = fmt::format("Mask: ${:02X}", param);
             if (type == 0x01) {
-              addGenericEvent(beginOffset, curOffset - beginOffset, "Set Flags On", desc, Type::ChangeState);
+              addGenericEvent(beginOffset, curOffset - beginOffset, "Set Global Flags", desc,
+                              Type::ChangeState);
             }
             else {
-              addGenericEvent(beginOffset, curOffset - beginOffset, "Set Flags Off", desc, Type::ChangeState);
+              addGenericEvent(beginOffset, curOffset - beginOffset, "Clear Global Flags", desc,
+                              Type::ChangeState);
             }
           }
 
@@ -1971,8 +2038,10 @@ bool NinSnesTrack::readEvent() {
           break;
 
         case 0x05:
-          curOffset++;
-          addUnknown(beginOffset, curOffset - beginOffset);
+          parentSeq->intelliTAUnknownGlobalByte = readByte(curOffset++);
+          desc = fmt::format("Value: ${:02X}", parentSeq->intelliTAUnknownGlobalByte);
+          addGenericEvent(beginOffset, curOffset - beginOffset, "Set Global Byte $0364", desc,
+                          Type::ChangeState);
           break;
 
         default:
