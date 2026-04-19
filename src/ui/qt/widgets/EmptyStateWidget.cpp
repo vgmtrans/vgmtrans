@@ -6,8 +6,8 @@
 
 #include "EmptyStateWidget.h"
 
-#include <QColor>
 #include <QBoxLayout>
+#include <QColor>
 #include <QEvent>
 #include <QIcon>
 #include <QLabel>
