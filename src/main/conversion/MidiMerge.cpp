@@ -17,6 +17,7 @@
 #include "common.h"
 #include "LogManager.h"
 #include "MidiFile.h"
+#include "Options.h"
 #include "SF2Conversion.h"
 #include "SF2File.h"
 #include "SynthFile.h"
@@ -98,7 +99,47 @@ bool applyBankOffsetToTrack(MidiTrack* track,
     return true;
   }
 
+  const bool useMmaBanks = ConversionOptions::the().bankSelectStyle() == BankSelectStyle::MMA;
   std::array<bool, 16> usedChannels {};
+  std::array<uint16_t, 16> sourceBanks {};
+  auto updateSourceBank = [useMmaBanks](uint16_t& sourceBank,
+                                        MidiEventType eventType,
+                                        uint8_t dataByte) {
+    if (!useMmaBanks) {
+      if (eventType == MIDIEVENT_BANKSELECT) {
+        sourceBank = dataByte;
+      }
+      return;
+    }
+
+    if (eventType == MIDIEVENT_BANKSELECT) {
+      sourceBank = static_cast<uint16_t>((dataByte << 7) | (sourceBank & 0x7F));
+    } else {
+      sourceBank = static_cast<uint16_t>((sourceBank & 0x3F80) | dataByte);
+    }
+  };
+  auto remapBankByte = [useMmaBanks, bankOffset](uint16_t sourceBank,
+                                                 MidiEventType eventType,
+                                                 uint8_t& dataByte) {
+    const uint16_t remappedBank = static_cast<uint16_t>(sourceBank + bankOffset);
+    if (useMmaBanks) {
+      if (remappedBank > 0x3FFF) {
+        L_ERROR("Bank remap overflowed the MIDI bank-select range.");
+        return false;
+      }
+      dataByte = static_cast<uint8_t>(
+          eventType == MIDIEVENT_BANKSELECT ? ((remappedBank >> 7) & 0x7F) : (remappedBank & 0x7F));
+      return true;
+    }
+
+    if (remappedBank > 127) {
+      L_ERROR("Bank remap overflowed the MIDI/SF2 bank range.");
+      return false;
+    }
+    dataByte = static_cast<uint8_t>(eventType == MIDIEVENT_BANKSELECT ? remappedBank : 0);
+    return true;
+  };
+
   for (MidiEvent* event : track->aEvents) {
     if (!event) {
       continue;
@@ -108,35 +149,38 @@ bool applyBankOffsetToTrack(MidiTrack* track,
       usedChannels[event->channel & 0x0F] = true;
     }
 
-    if (event->eventType() == MIDIEVENT_BANKSELECT) {
-      auto* controller = dynamic_cast<ControllerEvent*>(event);
-      if (!controller) {
-        continue;
-      }
-
-      const uint16_t remappedBank = static_cast<uint16_t>(controller->dataByte) + bankOffset;
-      if (remappedBank > 127) {
-        L_ERROR("Bank remap overflowed the MIDI/SF2 bank range.");
-        return false;
-      }
-      controller->dataByte = static_cast<uint8_t>(remappedBank);
+    const MidiEventType eventType = event->eventType();
+    if (eventType != MIDIEVENT_BANKSELECT && eventType != MIDIEVENT_BANKSELECTFINE) {
+      continue;
     }
-    else if (event->eventType() == MIDIEVENT_BANKSELECTFINE) {
-      auto* controller = dynamic_cast<ControllerEvent*>(event);
-      if (controller) {
-        controller->dataByte = 0;
-      }
+
+    auto* controller = dynamic_cast<ControllerEvent*>(event);
+    if (!controller) {
+      continue;
+    }
+
+    const uint8_t channel = controller->channel & 0x0F;
+    updateSourceBank(sourceBanks[channel], eventType, controller->dataByte);
+    if (!remapBankByte(sourceBanks[channel], eventType, controller->dataByte)) {
+      return false;
     }
   }
 
   std::vector<MidiEvent*> injectedBankEvents;
   injectedBankEvents.reserve(32);
+  uint8_t remappedBankMsb = 0;
+  uint8_t remappedBankLsb = 0;
+  if (!remapBankByte(0, MIDIEVENT_BANKSELECT, remappedBankMsb) ||
+      !remapBankByte(0, MIDIEVENT_BANKSELECTFINE, remappedBankLsb)) {
+    return false;
+  }
+
   for (uint8_t channel = 0; channel < 16; ++channel) {
     if (!usedChannels[channel]) {
       continue;
     }
-    injectedBankEvents.push_back(new BankSelectEvent(track, channel, startTick, bankOffset));
-    injectedBankEvents.push_back(new BankSelectFineEvent(track, channel, startTick, 0));
+    injectedBankEvents.push_back(new BankSelectEvent(track, channel, startTick, remappedBankMsb));
+    injectedBankEvents.push_back(new BankSelectFineEvent(track, channel, startTick, remappedBankLsb));
   }
 
   // Keep injected bank selects ahead of same-tick program changes when priorities are equal
