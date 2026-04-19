@@ -52,6 +52,7 @@ namespace {
 constexpr int RoleCollectionPointer = Qt::UserRole;
 constexpr QSize kQueueIconSize(16, 16);
 constexpr QSize kActionIconSize(16, 16);
+constexpr int kQueueRowHeight = 28;
 constexpr int kBalloonMinWidth = 420;
 constexpr int kBalloonMinHeight = 320;
 constexpr int kAnchorVerticalGap = 6;
@@ -204,6 +205,7 @@ QListWidgetItem *makeCollectionItem(VGMColl *coll) {
   auto *item = new QListWidgetItem(collectionLabel(coll));
   item->setData(RoleCollectionPointer,
                 static_cast<qulonglong>(reinterpret_cast<uintptr_t>(coll)));
+  item->setSizeHint(QSize(0, kQueueRowHeight));
   return item;
 }
 
