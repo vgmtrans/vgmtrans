@@ -46,6 +46,7 @@
 #include "ManualCollectionDialog.h"
 #include "SequencePlayer.h"
 #include "services/commands/StitchCommands.h"
+#include "widgets/StitchUI.h"
 #include "services/NotificationCenter.h"
 #include "services/Settings.h"
 #include "util/UIHelpers.h"

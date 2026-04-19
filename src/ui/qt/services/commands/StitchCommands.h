@@ -14,16 +14,7 @@ class QWidget;
 class VGMColl;
 class QAbstractButton;
 
-namespace stitchui {
-void openCollectionStitchBalloon(const std::vector<VGMColl*>& initialCollections,
-                                 QWidget* parent = nullptr,
-                                 QWidget* anchor = nullptr,
-                                 QAbstractButton* toggleButton = nullptr);
-[[nodiscard]] bool toggleCollectionStitchBalloon(const std::vector<VGMColl*>& initialCollections,
-                                                 QWidget* parent = nullptr,
-                                                 QWidget* anchor = nullptr,
-                                                 QAbstractButton* toggleButton = nullptr);
-}
+
 
 class StitchSequencesCommand : public ItemListCommand<VGMFile> {
 public:
