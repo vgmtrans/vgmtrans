@@ -455,7 +455,9 @@ public:
       resize(width(), kBalloonMinHeight);
     }
 
-    positionRelativeTo(anchor);
+    const QRect mdiRect(MdiArea::the()->mapToGlobal(QPoint(0, 0)), MdiArea::the()->size());
+    move(mdiRect.left(), mdiRect.bottom() - height() + 1);
+    move(mdiRect.left() + 20, mdiRect.bottom() - height() - 20);
     show();
     raise();
     activateWindow();
