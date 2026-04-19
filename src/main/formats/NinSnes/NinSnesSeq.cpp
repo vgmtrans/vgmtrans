@@ -1717,41 +1717,46 @@ bool NinSnesTrack::readEvent() {
         uint16_t addrVoiceParam = parentSeq->intelliVoiceParamTable + (paramIndex * 4);
         uint8_t instrByte = readByte(addrVoiceParam);
         uint8_t newVol = readByte(addrVoiceParam + 1);
-        uint8_t newPan = readByte(addrVoiceParam + 2);
-        uint8_t tuningByte = readByte(addrVoiceParam + 3);
-
-        uint8_t newProgNum = instrByte;
-        if (parentSeq->version != NINSNES_INTELLI_FE3) {
-          newProgNum &= 0x1f;
-        }
-
-        currentLogicalProgram = newProgNum;
-        if (parentSeq->version == NINSNES_INTELLI_TA) {
-          newProgNum = parentSeq->resolveProgramNumber(newProgNum);
-        }
-
-        nonPercussionProgram = newProgNum;
-        if (!m_lastNoteWasPercussion) {
-          addProgramChangeNoItem(newProgNum, true);
-        }
+        uint8_t packedPanByte = readByte(addrVoiceParam + 2);
+        uint8_t lastByte = readByte(addrVoiceParam + 3);
 
         addVolNoItem(newVol / 2);
 
         double volumeScale;
         bool reverseLeft;
         bool reverseRight;
-        int8_t midiPan = calculatePanValue(newPan, volumeScale, reverseLeft, reverseRight);
+        uint8_t panValue = packedPanByte;
+        double fineTuningCents = this->fineTuningCents;
+
+        uint8_t logicalProgNum = 0;
+        uint32_t resolvedProgNum = instrByte;
+
+        if (parentSeq->version == NINSNES_INTELLI_TA) {
+          panValue = packedPanByte & 0x1f;
+          fineTuningCents = (((packedPanByte >> 5) & 0x07) * 5 / 256.0) * 100.0;
+          resolvedProgNum = parentSeq->resolveProgramNumber(instrByte, &logicalProgNum);
+        }
+        else {
+          uint8_t resolvedLogicalProgNum = instrByte;
+          if (parentSeq->version != NINSNES_INTELLI_FE3) {
+            resolvedLogicalProgNum &= 0x1f;
+          }
+          logicalProgNum = resolvedLogicalProgNum;
+          resolvedProgNum = resolvedLogicalProgNum;
+        }
+
+        int8_t midiPan = calculatePanValue(panValue, volumeScale, reverseLeft, reverseRight);
         addPanNoItem(midiPan);
         addExpressionNoItem(convertPercentAmpToStdMidiVal(volumeScale));
 
         switch (parentSeq->version) {
           case NINSNES_INTELLI_FE3: {
-            uint8_t tuningIndex = tuningByte & 15;
-            uint8_t transposeIndex = (tuningByte & 0x70) >> 4;
+            uint8_t tuningIndex = lastByte & 15;
+            uint8_t transposeIndex = (lastByte & 0x70) >> 4;
 
             if (tuningIndex != 0) {
               uint8_t newTuning = (tuningIndex - 1) * 5;
-              addFineTuningNoItem((newTuning / 256.0) * 100.0);
+              fineTuningCents = (newTuning / 256.0) * 100.0;
             }
 
             if (transposeIndex != 0) {
@@ -1764,21 +1769,46 @@ bool NinSnesTrack::readEvent() {
             break;
           }
 
-          case NINSNES_INTELLI_TA:
           case NINSNES_INTELLI_FE4: {
-            int8_t newTranspose = tuningByte;
+            int8_t newTranspose = lastByte;
             shared->spcTranspose = newTranspose;
             transpose = newTranspose;
 
             uint8_t newTuning = (instrByte >> 3) * 5;
-            addFineTuningNoItem((newTuning / 256.0) * 100.0);
+            fineTuningCents = (newTuning / 256.0) * 100.0;
 
+            break;
+          }
+
+          case NINSNES_INTELLI_TA: {
+            int8_t newTranspose = lastByte;
+            shared->spcTranspose = newTranspose;
+            transpose = newTranspose;
             break;
           }
 
           default:
             break;
         }
+
+        addFineTuningNoItem(fineTuningCents);
+
+        currentLogicalProgram = logicalProgNum;
+        nonPercussionProgram = resolvedProgNum;
+        if (readMode == READMODE_ADD_TO_UI) {
+          parentSeq->addInstrumentRef(resolvedProgNum);
+        }
+        if (!m_lastNoteWasPercussion) {
+          addProgramChangeNoItem(resolvedProgNum, true);
+        }
+
+        fmt::format_to(std::back_inserter(desc),
+                       "  Instrument: ${:02X}  Volume: {:d}  Pan: {:d}  Tuning: {:.3f} semitones  Transpose: {:d}",
+                       instrByte,
+                       newVol,
+                       panValue,
+                       fineTuningCents / 100.0,
+                       shared->spcTranspose);
       }
 
       addGenericEvent(beginOffset, curOffset - beginOffset, "Load Voice Param", desc,
