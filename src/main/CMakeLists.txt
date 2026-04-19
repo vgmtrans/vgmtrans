@@ -132,9 +132,11 @@ target_sources(vgmtranscore
     conversion/DLSConversion.cpp
     conversion/DLSFile.cpp
     conversion/MidiFile.cpp
+    conversion/MidiMerge.cpp
     conversion/RiffFile.cpp
     conversion/SF2Conversion.cpp
     conversion/SF2File.cpp
+    conversion/StitchExport.cpp
     conversion/SynthFile.cpp
     conversion/VGMExport.cpp
     formats/Akao/AkaoFormat.cpp
@@ -502,9 +504,11 @@ target_sources(vgmtranscore
       conversion/DLSConversion.h
       conversion/DLSFile.h
       conversion/MidiFile.h
+      conversion/MidiMerge.h
       conversion/RiffFile.h
       conversion/SF2Conversion.h
       conversion/SF2File.h
+      conversion/StitchExport.h
       conversion/SynthFile.h
       conversion/VGMExport.h
     FILE_SET headers_loaders TYPE HEADERS BASE_DIRS loaders
