@@ -10,6 +10,7 @@
 - Added Drum Kit support to the standard N-SPC driver (Nintendo's SNES SDK driver).
 - Added Drum Kit support to the SuzukiSnes driver (Seiken Densetsu 3, Super Mario RPG, etc)
 - Added a search field to the Collections panel
+- Added stitched export for collection chunks: drag collections into a stitch queue, reorder them, and export as a merged MIDI + SF2.
 
 ### Changed
 

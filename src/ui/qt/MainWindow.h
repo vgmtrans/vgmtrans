@@ -28,6 +28,7 @@ class QDragLeaveEvent;
 class QDropEvent;
 class QCloseEvent;
 class QResizeEvent;
+class QToolButton;
 namespace QWK {
 class WidgetWindowAgent;
 }
@@ -72,6 +73,7 @@ private:
   StatusBarContent *statusBarContent{};
   Logger *m_logger{};
   VGMCollListView *m_coll_listview{};
+  QToolButton *m_stitchButton{};
   VGMCollView *m_coll_view{};
   ToastHost *m_toastHost{};
   WindowBar *m_windowBar{};

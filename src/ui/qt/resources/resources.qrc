@@ -2,7 +2,6 @@
 <qresource>
   <file>vgmtrans.png</file>
   <file>fonts/Roboto_Mono/RobotoMono-VariableFont_wght.ttf</file>
-  <file>icons/open_file.svg</file>
   <file>icons/play.svg</file>
   <file>icons/pause.svg</file>
   <file>icons/stop.svg</file>
@@ -31,6 +30,7 @@
   <file>icons/repeat-end.svg</file>
   <file>icons/pitchbend.svg</file>
   <file>icons/midi-port.svg</file>
+  <file>icons/stitch.svg</file>
   <file>icons/magnify.svg</file>
   <file>icons/volume-high.svg</file>
   <file>icons/tray-arrow-down.svg</file>
@@ -48,6 +48,8 @@
   <file>icons/package-variant.svg</file>
   <file>icons/trash-can-outline.svg</file>
   <file>icons/export.svg</file>
+  <file>icons/clear.svg</file>
+  <file>icons/transfer-left.svg</file>
   <file>window-bar/minimize.svg</file>
   <file>window-bar/maximize.svg</file>
   <file>window-bar/restore.svg</file>

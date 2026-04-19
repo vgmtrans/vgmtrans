@@ -9,6 +9,8 @@
 #include <algorithm>
 #include <QStringView>
 #include <QLineEdit>
+#include <QPainter>
+#include <QPixmap>
 #include <QResizeEvent>
 #include <VGMColl.h>
 #include <VGMExport.h>
@@ -37,6 +39,59 @@ static InstructionHint SearchEmptyStateHeadingHint() {
 
 static const QIcon &VGMCollIcon() {
   static QIcon icon(":/icons/collection.svg");
+  return icon;
+}
+
+static const QIcon &VGMPlayingCollIcon() {
+  static QIcon icon = stencilSvgIcon(QStringLiteral(":/icons/play.svg"), QColor(0x2f, 0xbf, 0x71));
+  return icon;
+}
+
+QIcon StitchPositionIcon(int oneBasedPosition) {
+  constexpr int iconSide = 16;
+  const QPalette palette = qApp ? qApp->palette() : QPalette();
+  QColor bubbleColor = palette.color(QPalette::Highlight);
+  QColor textColor = palette.color(QPalette::HighlightedText);
+  if (!bubbleColor.isValid()) {
+    bubbleColor = QColor(70, 150, 255);
+  }
+  if (!textColor.isValid()) {
+    textColor = Qt::white;
+  }
+
+  qreal maxDevicePixelRatio = 1.0;
+  for (QScreen* screen : QGuiApplication::screens()) {
+    if (!screen) {
+      continue;
+    }
+    maxDevicePixelRatio = std::max(maxDevicePixelRatio, screen->devicePixelRatio());
+  }
+  const int maxScale = std::clamp(static_cast<int>(std::ceil(maxDevicePixelRatio)), 1, 3);
+
+  QIcon icon;
+  for (int scale = 1; scale <= maxScale; ++scale) {
+    QPixmap pixmap(iconSide * scale, iconSide * scale);
+    pixmap.setDevicePixelRatio(scale);
+    pixmap.fill(Qt::transparent);
+
+    QPainter painter(&pixmap);
+    painter.setRenderHint(QPainter::Antialiasing, true);
+    painter.setPen(Qt::NoPen);
+    painter.setBrush(bubbleColor);
+    painter.drawEllipse(QRectF(0.5, 0.5, iconSide - 1.0, iconSide - 1.0));
+
+    QFont font = qApp ? qApp->font() : QFont();
+    font.setBold(true);
+    font.setPixelSize(oneBasedPosition < 10 ? 10 : 8);
+    painter.setFont(font);
+    painter.setPen(textColor);
+    painter.drawText(QRect(0, 0, iconSide, iconSide), Qt::AlignCenter,
+                     QString::number(oneBasedPosition));
+    painter.end();
+
+    icon.addPixmap(pixmap);
+  }
+
   return icon;
 }
 
@@ -84,6 +139,10 @@ VGMCollListViewModel::VGMCollListViewModel(QObject *parent) : QAbstractListModel
   connect(&qtVGMRoot, &QtVGMRoot::UI_addedVGMColl, addCollection);
   connect(&qtVGMRoot, &QtVGMRoot::UI_beginRemoveVGMColls, startResettingModel);
   connect(&qtVGMRoot, &QtVGMRoot::UI_endRemoveVGMColls, endResettingModel);
+  connect(NotificationCenter::the(), &NotificationCenter::stitchPlanCollectionsChanged, this,
+          &VGMCollListViewModel::setStitchPlanCollections);
+    connect(&SequencePlayer::the(), &SequencePlayer::statusChange, this,
+      [this](bool) { refreshDecorationIcons(); });
 }
 
 int VGMCollListViewModel::rowCount(const QModelIndex &) const {
@@ -91,9 +150,24 @@ int VGMCollListViewModel::rowCount(const QModelIndex &) const {
 }
 
 QVariant VGMCollListViewModel::data(const QModelIndex &index, int role) const {
+  if (!index.isValid() || index.row() < 0 ||
+      static_cast<size_t>(index.row()) >= qtVGMRoot.vgmColls().size()) {
+    return {};
+  }
+
+  const VGMColl* coll = qtVGMRoot.vgmColls()[index.row()];
+
   if (role == Qt::DisplayRole || role == Qt::EditRole) {
-    return QString::fromStdString(qtVGMRoot.vgmColls()[index.row()]->name());
+    return QString::fromStdString(coll->name());
   } else if (role == Qt::DecorationRole) {
+    const auto &player = SequencePlayer::the();
+    if (player.playing() && player.activeCollection() == coll) {
+      return VGMPlayingCollIcon();
+    }
+    if (const auto it = m_stitchPlanPositionByCollection.constFind(coll);
+        it != m_stitchPlanPositionByCollection.cend()) {
+      return StitchPositionIcon(*it + 1);
+    }
     return VGMCollIcon();
   }
 
@@ -105,7 +179,38 @@ Qt::ItemFlags VGMCollListViewModel::flags(const QModelIndex &index) const {
     return Qt::ItemIsEnabled;
   }
 
-  return QAbstractListModel::flags(index);
+  return QAbstractListModel::flags(index) | Qt::ItemIsDragEnabled;
+}
+
+void VGMCollListViewModel::setStitchPlanCollections(const QList<VGMColl*>& orderedCollections) {
+  QHash<const VGMColl*, int> newPositions;
+  newPositions.reserve(orderedCollections.size());
+
+  int position = 0;
+  for (VGMColl* coll : orderedCollections) {
+    if (!coll || newPositions.contains(coll)) {
+      ++position;
+      continue;
+    }
+    newPositions.insert(coll, position++);
+  }
+
+  if (m_stitchPlanPositionByCollection == newPositions) {
+    return;
+  }
+
+  m_stitchPlanPositionByCollection = newPositions;
+
+  refreshDecorationIcons();
+}
+
+void VGMCollListViewModel::refreshDecorationIcons() {
+  const int totalRows = rowCount();
+  if (totalRows <= 0) {
+    return;
+  }
+
+  emit dataChanged(index(0, 0), index(totalRows - 1, 0), {Qt::DecorationRole});
 }
 
 /*
@@ -136,11 +241,17 @@ VGMCollListView::VGMCollListView(QWidget *parent) : QListView(parent) {
 
   setContextMenuPolicy(Qt::CustomContextMenu);
   setSelectionMode(QAbstractItemView::ExtendedSelection);
+  setSelectionRectVisible(true);
   setResizeMode(QListView::Adjust);
   setIconSize(QSize(16, 16));
   setItemDelegate(new VGMCollNameEditor(ItemViewDensity::listItemHeight(this), this));
   ItemViewDensity::apply(this);
   setWrapping(true);
+  setDragEnabled(false);
+  setAcceptDrops(false);
+  setDropIndicatorShown(false);
+  setDragDropMode(QAbstractItemView::NoDragDrop);
+  setDefaultDropAction(Qt::MoveAction);
 
 #ifdef Q_OS_MAC
   // On MacOS, a wrapping QListView gives unwanted padding to the scrollbar. This compensates.
@@ -180,8 +291,46 @@ VGMCollListView::VGMCollListView(QWidget *parent) : QListView(parent) {
           [this](const QModelIndex&, const QModelIndex&) { updateSelectedCollection(); });
   connect(NotificationCenter::the(), &NotificationCenter::vgmFileSelected, this,
           &VGMCollListView::onVGMFileSelected);
+  connect(NotificationCenter::the(), &NotificationCenter::collectionStitchUiVisibilityChanged,
+          this, &VGMCollListView::setStitchDragDropEnabled);
 
   applyFilter();
+}
+
+void VGMCollListView::setStitchDragDropEnabled(bool enabled) {
+  if (dragEnabled() == enabled) {
+    return;
+  }
+
+  setDragEnabled(enabled);
+  setDragDropMode(enabled ? QAbstractItemView::DragOnly : QAbstractItemView::NoDragDrop);
+}
+
+std::vector<VGMColl*> VGMCollListView::selectedCollections() const {
+  std::vector<VGMColl*> colls;
+  if (!selectionModel()) {
+    return colls;
+  }
+
+  QModelIndexList selectedRows = selectionModel()->selectedRows();
+  std::sort(selectedRows.begin(), selectedRows.end(),
+            [](const QModelIndex& left, const QModelIndex& right) {
+              return left.row() < right.row();
+            });
+
+  const auto& allColls = qtVGMRoot.vgmColls();
+  colls.reserve(selectedRows.size());
+  for (const auto& index : selectedRows) {
+    if (!indexIsVisible(index)) {
+      continue;
+    }
+    if (index.row() < 0 || static_cast<size_t>(index.row()) >= allColls.size()) {
+      continue;
+    }
+    colls.push_back(allColls[index.row()]);
+  }
+
+  return colls;
 }
 
 int VGMCollListView::visibleCollectionCount() const {
