@@ -38,15 +38,12 @@ uint8_t normalizeSf2Bank(uint32_t bank) {
   return static_cast<uint8_t>(bank16 & 0x7F);
 }
 
-uint32_t rescaleTick(uint32_t tick, uint16_t srcPPQN, uint16_t dstPPQN) {
+uint64_t rescaleTick(uint32_t tick, uint16_t srcPPQN, uint16_t dstPPQN) {
   if (srcPPQN == 0 || dstPPQN == 0 || srcPPQN == dstPPQN) {
     return tick;
   }
 
-  const uint64_t scaled =
-      (static_cast<uint64_t>(tick) * static_cast<uint64_t>(dstPPQN) + (srcPPQN / 2u)) / srcPPQN;
-  return (scaled > std::numeric_limits<uint32_t>::max()) ? std::numeric_limits<uint32_t>::max()
-                                                          : static_cast<uint32_t>(scaled);
+  return (static_cast<uint64_t>(tick) * static_cast<uint64_t>(dstPPQN) + (srcPPQN / 2u)) / srcPPQN;
 }
 
 uint32_t getMidiDurationTicks(const MidiFile& midi) {
@@ -83,7 +80,7 @@ void retimeTrack(MidiTrack* track, uint16_t srcPPQN, uint16_t dstPPQN, uint32_t 
       continue;
     }
 
-    event->absTime = rescaleTick(event->absTime, srcPPQN, dstPPQN) + startTick;
+    event->absTime = static_cast<uint32_t>(rescaleTick(event->absTime, srcPPQN, dstPPQN) + startTick);
   }
 }
 
@@ -385,7 +382,7 @@ std::unique_ptr<MidiFile> mergeMidiSequences(const std::vector<MidiMergeEntry>& 
         return nullptr;
       }
       startTicks[i] = static_cast<uint32_t>(cursor);
-      const uint32_t durationInTarget = rescaleTick(parts[i].durationTicks, parts[i].ppqn, targetPPQN);
+      const uint64_t durationInTarget = rescaleTick(parts[i].durationTicks, parts[i].ppqn, targetPPQN);
       cursor += durationInTarget;
       cursor += options.sequentialGapTicks;
     }
