@@ -129,13 +129,18 @@ bool applyBankOffsetToTrack(MidiTrack* track,
     }
   }
 
+  std::vector<MidiEvent*> injectedBankEvents;
+  injectedBankEvents.reserve(32);
   for (uint8_t channel = 0; channel < 16; ++channel) {
     if (!usedChannels[channel]) {
       continue;
     }
-    track->aEvents.push_back(new BankSelectEvent(track, channel, startTick, bankOffset));
-    track->aEvents.push_back(new BankSelectFineEvent(track, channel, startTick, 0));
+    injectedBankEvents.push_back(new BankSelectEvent(track, channel, startTick, bankOffset));
+    injectedBankEvents.push_back(new BankSelectFineEvent(track, channel, startTick, 0));
   }
+
+  // Keep injected bank selects ahead of same-tick program changes when priorities are equal
+  track->aEvents.insert(track->aEvents.begin(), injectedBankEvents.begin(), injectedBankEvents.end());
 
   return true;
 }
