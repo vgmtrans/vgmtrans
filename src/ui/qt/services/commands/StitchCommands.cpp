@@ -346,7 +346,7 @@ public:
     m_headingDragHandle = new StitchDragHandleWidget(this);
 
     auto* headingRow = new QHBoxLayout(m_headingDragHandle);
-    headingRow->setContentsMargins(0, 0, 0, 0);
+    headingRow->setContentsMargins(0, 10, 0, 8);
     headingRow->setSpacing(4);
 
     auto* heading = new QLabel(QStringLiteral("Stitch Queue"), m_headingDragHandle);
