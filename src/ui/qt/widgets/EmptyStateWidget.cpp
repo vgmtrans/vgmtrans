@@ -8,6 +8,7 @@
 
 #include <QBoxLayout>
 #include <QColor>
+#include <QBoxLayout>
 #include <QEvent>
 #include <QIcon>
 #include <QLabel>
