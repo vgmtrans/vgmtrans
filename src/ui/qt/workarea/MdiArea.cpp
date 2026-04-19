@@ -27,29 +27,13 @@
 #include <VGMColl.h>
 
 #include "VGMFileView.h"
+#include "InstructionHintLayout.h"
 #include "Metrics.h"
 #include "QtVGMRoot.h"
 #include "UIHelpers.h"
 #include "services/NotificationCenter.h"
 
 namespace {
-
-struct InstructionHint {
-  QString iconPath;
-  QString text;
-  qreal fontScale;
-  qreal iconScale;
-  qreal spacingScale;
-};
-
-struct InstructionMetrics {
-  InstructionHint hint;
-  QFont font;
-  QFontMetrics metrics;
-  int iconSide;
-  int spacing;
-  QSize size;
-};
 
 struct DetailedInstruction {
   QString iconPath;
@@ -80,57 +64,12 @@ struct DetailedInstructionLayout {
         subMetrics(this->subFont) {}
 };
 
-QFont prepareFont(const QFont &base, qreal scale) {
-  QFont font = base;
-  if (font.pointSizeF() > 0) {
-    font.setPointSizeF(font.pointSizeF() * scale);
-  } else if (font.pixelSize() > 0) {
-    font.setPixelSize(static_cast<int>(font.pixelSize() * scale));
-  } else {
-    font.setPointSize(scale >= 1.5 ? 18 : 14);
-  }
-  font.setBold(false);
-  font.setWeight(QFont::Normal);
-  font.setFamily(QStringLiteral("Helvetica Neue"));
-  return font;
-}
-
-InstructionMetrics computeInstructionMetrics(const InstructionHint &hint, const QFont &baseFont) {
-  QFont font = prepareFont(baseFont, hint.fontScale);
-  QFontMetrics metrics(font);
-  const int iconSide = static_cast<int>(metrics.height() * hint.iconScale);
-  const int spacing = std::max(2, static_cast<int>(metrics.height() * hint.spacingScale));
-  const int textWidth = metrics.horizontalAdvance(hint.text);
-  const int width = std::max(iconSide, textWidth);
-  const int height = iconSide + spacing + metrics.height();
-  return {hint, font, metrics, iconSide, spacing, QSize(width, height)};
-}
-
-void paintInstruction(QPainter &painter, const InstructionMetrics &metrics, const QPoint &topLeft,
-                      const QColor &accent) {
-  const QSize iconSize(metrics.iconSide, metrics.iconSide);
-  const int iconX = topLeft.x() + (metrics.size.width() - metrics.iconSide) / 2;
-  const int iconY = topLeft.y();
-  const qreal devicePixelRatio =
-      painter.device() ? painter.device()->devicePixelRatioF() : qreal(1.0);
-  const QPixmap icon =
-      tintedIconPixmap(QIcon(metrics.hint.iconPath), iconSize, accent, devicePixelRatio);
-  if (!icon.isNull()) {
-    painter.drawPixmap(iconX, iconY, icon);
-  }
-
-  painter.setFont(metrics.font);
-  painter.setPen(accent);
-
-  const int textTop = iconY + metrics.iconSide + metrics.spacing;
-  const QRect textRect(topLeft.x(), textTop, metrics.size.width(), metrics.metrics.height());
-  painter.drawText(textRect, Qt::AlignHCenter | Qt::AlignTop, metrics.hint.text);
-}
-
 DetailedInstructionLayout computeDetailedInstructionLayout(const DetailedInstruction &instruction,
                                                            const QFont &baseFont) {
-  QFont headingFont = prepareFont(baseFont, 1.8);
-  QFont subFont = prepareFont(baseFont, 1.25);
+  QFont headingFont = prepareInstructionFont(baseFont, 1.8, QFont::Normal, 0,
+                                             QStringLiteral("Helvetica Neue"));
+  QFont subFont = prepareInstructionFont(baseFont, 1.25, QFont::Normal, 0,
+                                         QStringLiteral("Helvetica Neue"));
   DetailedInstructionLayout layout(instruction, headingFont, subFont);
 
   layout.iconSide = std::max(layout.headingMetrics.height(),

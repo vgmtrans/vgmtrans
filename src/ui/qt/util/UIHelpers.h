@@ -6,8 +6,6 @@
 
 #pragma once
 
-#include "ColorHelpers.h"
-
 #include <filesystem>
 #include <string>
 #include <QColor>

@@ -51,8 +51,10 @@ target_sources(vgmtrans
     services/NotificationCenter.cpp
     util/ColorHelpers.cpp
     util/Helpers.cpp
+    util/InstructionHintLayout.cpp
     util/UIHelpers.cpp
     widgets/ItemViewDensity.cpp
+    widgets/EmptyStateWidget.cpp
     widgets/SeekBar.cpp
     widgets/MarqueeLabel.cpp
     widgets/SnappingSplitter.cpp
@@ -102,6 +104,7 @@ target_sources(vgmtrans
       util/ColorHelpers.h
       util/Colors.h
       util/Helpers.h
+      util/InstructionHintLayout.h
       util/LambdaEventFilter.h
       util/Metrics.h
       util/TintableSvgIconEngine.h
@@ -110,6 +113,7 @@ target_sources(vgmtrans
     FILE_SET headers_widgets TYPE HEADERS BASE_DIRS widgets
     FILES
       widgets/FixedHeightListDelegate.h
+      widgets/EmptyStateWidget.h
       widgets/ItemViewDensity.h
       widgets/SeekBar.h
       widgets/MarqueeLabel.h

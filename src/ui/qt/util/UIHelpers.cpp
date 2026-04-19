@@ -5,6 +5,7 @@
 */
 
 #include "UIHelpers.h"
+#include "ColorHelpers.h"
 #include "TintableSvgIconEngine.h"
 
 #include <QIcon>
@@ -19,6 +20,7 @@
 #include <QFileDialog>
 #include <QStandardPaths>
 #include <QApplication>
+#include <QPixmap>
 
 QScrollArea* getContainingScrollArea(const QWidget* widget) {
   QWidget* viewport = widget->parentWidget();
