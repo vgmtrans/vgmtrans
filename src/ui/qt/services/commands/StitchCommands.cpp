@@ -340,8 +340,8 @@ public:
     setAttribute(Qt::WA_DeleteOnClose, false);
 
     auto* rootLayout = new QVBoxLayout(this);
-    rootLayout->setContentsMargins(10, 10, 10, 10);
-    rootLayout->setSpacing(8);
+    rootLayout->setContentsMargins(10, 0, 10, 10);
+    rootLayout->setSpacing(0);
 
     m_headingDragHandle = new StitchDragHandleWidget(this);
 
