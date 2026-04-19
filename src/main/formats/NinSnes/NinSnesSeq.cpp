@@ -824,6 +824,16 @@ void NinSnesTrack::resetVars() {
   nonPercussionProgram = 0;
   currentPercussionProgram = 0;
   currentLogicalProgram.reset();
+  intelliLegato = false;
+}
+
+uint8_t NinSnesTrack::getEffectiveNoteDuration() const {
+  if (intelliLegato) {
+    return shared->spcNoteDuration;
+  }
+
+  uint8_t duration = (shared->spcNoteDuration * shared->spcNoteDurRate) >> 8;
+  return std::min(std::max(duration, (uint8_t) 1), (uint8_t) (shared->spcNoteDuration - 2));
 }
 
 void NinSnesTrack::restoreNonPercussionProgramIfNeeded() {
@@ -1031,8 +1041,7 @@ bool NinSnesTrack::readEvent() {
 
     case EVENT_NOTE: {
       uint8_t noteNumber = statusByte - parentSeq->STATUS_NOTE_MIN;
-      uint8_t duration = (shared->spcNoteDuration * shared->spcNoteDurRate) >> 8;
-      duration = std::min(std::max(duration, (uint8_t) 1), (uint8_t) (shared->spcNoteDuration - 2));
+      uint8_t duration = getEffectiveNoteDuration();
 
       restoreNonPercussionProgramIfNeeded();
 
@@ -1060,8 +1069,7 @@ bool NinSnesTrack::readEvent() {
 
     case EVENT_PERCUSSION_NOTE: {
       const uint8_t slot = statusByte - parentSeq->STATUS_PERCUSSION_NOTE_MIN;
-      uint8_t duration = (shared->spcNoteDuration * shared->spcNoteDurRate) >> 8;
-      duration = std::min(std::max(duration, (uint8_t) 1), (uint8_t) (shared->spcNoteDuration - 2));
+      uint8_t duration = getEffectiveNoteDuration();
 
       if (parentSeq->version == NINSNES_INTELLI_TA &&
           slot < NINSNES_INTELLI_TA_PERCUSSION_SLOT_COUNT) {
@@ -1590,12 +1598,14 @@ bool NinSnesTrack::readEvent() {
     }
 
     case EVENT_INTELLI_LEGATO_ON: {
-      // TODO: cancel keyoff of note (i.e. full duration)
-      addGenericEvent(beginOffset, curOffset - beginOffset, "Legato On", desc, Type::Portamento);
+      intelliLegato = true;
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Legato On (No Key Off)", desc,
+                      Type::Portamento);
       break;
     }
 
     case EVENT_INTELLI_LEGATO_OFF: {
+      intelliLegato = false;
       addGenericEvent(beginOffset, curOffset - beginOffset, "Legato Off", desc, Type::Portamento);
       break;
     }
@@ -1838,17 +1848,33 @@ bool NinSnesTrack::readEvent() {
     case EVENT_INTELLI_GAIN_SUSTAIN_TIME_AND_RATE: {
       uint8_t sustainDurRate = readByte(curOffset++);
       uint8_t sustainGAIN = readByte(curOffset++);
-      desc = fmt::format("Duration for Sustain: {:d}/256  GAIN for Sustain: ${:02X}",
-                         sustainDurRate, sustainGAIN);
-      addGenericEvent(beginOffset, curOffset - beginOffset, "GAIN Sustain Time/Rate",
-                      desc, Type::Adsr);
+      if (parentSeq->version == NINSNES_INTELLI_TA) {
+        shared->spcNoteDurRate = sustainDurRate;
+        desc = fmt::format("Duration Rate: {:d}/256  GAIN: ${:02X}", sustainDurRate, sustainGAIN);
+        addGenericEvent(beginOffset, curOffset - beginOffset, "Duration Rate / GAIN", desc,
+                        Type::DurationChange);
+      }
+      else {
+        desc = fmt::format("Duration for Sustain: {:d}/256  GAIN for Sustain: ${:02X}",
+                           sustainDurRate, sustainGAIN);
+        addGenericEvent(beginOffset, curOffset - beginOffset, "GAIN Sustain Time/Rate",
+                        desc, Type::Adsr);
+      }
       break;
     }
 
     case EVENT_INTELLI_GAIN_SUSTAIN_TIME: {
       uint8_t sustainDurRate = readByte(curOffset++);
-      desc = fmt::format("Duration for Sustain: {:d}/256", sustainDurRate);
-      addGenericEvent(beginOffset, curOffset - beginOffset, "GAIN Sustain Time", desc, Type::Adsr);
+      if (parentSeq->version == NINSNES_INTELLI_TA) {
+        shared->spcNoteDurRate = sustainDurRate;
+        desc = fmt::format("Duration Rate: {:d}/256", sustainDurRate);
+        addGenericEvent(beginOffset, curOffset - beginOffset, "Duration Rate", desc,
+                        Type::DurationChange);
+      }
+      else {
+        desc = fmt::format("Duration for Sustain: {:d}/256", sustainDurRate);
+        addGenericEvent(beginOffset, curOffset - beginOffset, "GAIN Sustain Time", desc, Type::Adsr);
+      }
       break;
     }
 
@@ -1933,11 +1959,13 @@ bool NinSnesTrack::readEvent() {
         }
 
         case 0x03:
-          // TODO: cancel keyoff of note (i.e. full duration)
-          addGenericEvent(beginOffset, curOffset - beginOffset, "Legato On", desc, Type::Portamento);
+          intelliLegato = true;
+          addGenericEvent(beginOffset, curOffset - beginOffset, "Legato On (No Key Off)", desc,
+                          Type::Portamento);
           break;
 
         case 0x04:
+          intelliLegato = false;
           addGenericEvent(beginOffset, curOffset - beginOffset, "Legato Off", desc,
                           Type::Portamento);
           break;

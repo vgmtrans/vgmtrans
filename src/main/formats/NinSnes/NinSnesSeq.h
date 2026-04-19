@@ -261,6 +261,7 @@ class NinSnesTrack
   bool available = true;
 
  private:
+  uint8_t getEffectiveNoteDuration() const;
   void restoreNonPercussionProgramIfNeeded();
   void switchToPercussionProgramIfNeeded(uint8_t program = 0);
   void addPercussionPanNoItem(uint8_t midiPan, uint8_t expressionLevel);
@@ -276,4 +277,5 @@ class NinSnesTrack
   uint32_t nonPercussionProgram = 0;
   uint8_t currentPercussionProgram = 0;
   std::optional<uint8_t> currentLogicalProgram;
+  bool intelliLegato = false;
 };
