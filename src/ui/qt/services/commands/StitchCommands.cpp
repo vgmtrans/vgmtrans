@@ -383,7 +383,7 @@ public:
     rootLayout->addWidget(m_emptyState, 1);
 
     auto* actionRow = new QHBoxLayout();
-    actionRow->setContentsMargins(0, 0, 0, 0);
+    actionRow->setContentsMargins(0, 8, 0, 0);
     actionRow->setSpacing(6);
 
     m_removeButton = new QPushButton(this);
