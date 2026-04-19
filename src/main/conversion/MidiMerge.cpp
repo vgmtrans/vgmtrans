@@ -10,6 +10,7 @@
 #include <array>
 #include <limits>
 #include <memory>
+#include <numeric>
 #include <set>
 #include <unordered_map>
 #include <utility>
@@ -48,12 +49,6 @@ uint32_t rescaleTick(uint32_t tick, uint16_t srcPPQN, uint16_t dstPPQN) {
                                                           : static_cast<uint32_t>(scaled);
 }
 
-uint32_t shiftTick(uint32_t tick, uint32_t startTick) {
-  const uint64_t shifted = static_cast<uint64_t>(tick) + static_cast<uint64_t>(startTick);
-  return (shifted > std::numeric_limits<uint32_t>::max()) ? std::numeric_limits<uint32_t>::max()
-                                                           : static_cast<uint32_t>(shifted);
-}
-
 uint32_t getMidiDurationTicks(const MidiFile& midi) {
   uint32_t maxTick = 0;
 
@@ -88,7 +83,7 @@ void retimeTrack(MidiTrack* track, uint16_t srcPPQN, uint16_t dstPPQN, uint32_t 
       continue;
     }
 
-    event->absTime = shiftTick(rescaleTick(event->absTime, srcPPQN, dstPPQN), startTick);
+    event->absTime = rescaleTick(event->absTime, srcPPQN, dstPPQN) + startTick;
   }
 }
 
@@ -357,7 +352,16 @@ std::unique_ptr<MidiFile> mergeMidiSequences(const std::vector<MidiMergeEntry>& 
       midi->setPPQN(ppqn);
     }
 
-    targetPPQN = std::max(targetPPQN, ppqn);
+    if (targetPPQN == 0) {
+      targetPPQN = ppqn;
+    } else {
+      const uint64_t lcm = std::lcm(static_cast<uint64_t>(targetPPQN), static_cast<uint64_t>(ppqn));
+      if (lcm <= 1920) {
+        targetPPQN = static_cast<uint16_t>(lcm);
+      } else {
+        targetPPQN = std::max(targetPPQN, ppqn);
+      }
+    }
 
     ConvertedPart part;
     part.durationTicks = getMidiDurationTicks(*midi);
@@ -374,12 +378,20 @@ std::unique_ptr<MidiFile> mergeMidiSequences(const std::vector<MidiMergeEntry>& 
   if (!options.startTimes.empty()) {
     startTicks = options.startTimes;
   } else {
-    uint32_t cursor = 0;
+    uint64_t cursor = 0;
     for (size_t i = 0; i < parts.size(); ++i) {
-      startTicks[i] = cursor;
+      if (cursor > std::numeric_limits<uint32_t>::max()) {
+        L_ERROR("Merged MIDI exceeds maximum 32-bit tick duration.");
+        return nullptr;
+      }
+      startTicks[i] = static_cast<uint32_t>(cursor);
       const uint32_t durationInTarget = rescaleTick(parts[i].durationTicks, parts[i].ppqn, targetPPQN);
-      cursor = shiftTick(cursor, durationInTarget);
-      cursor = shiftTick(cursor, options.sequentialGapTicks);
+      cursor += durationInTarget;
+      cursor += options.sequentialGapTicks;
+    }
+    if (cursor > std::numeric_limits<uint32_t>::max()) {
+      L_ERROR("Merged MIDI exceeds maximum 32-bit tick duration.");
+      return nullptr;
     }
   }
 
