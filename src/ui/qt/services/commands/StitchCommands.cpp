@@ -25,6 +25,7 @@
 #include <QKeyEvent>
 #include <QLabel>
 #include <QListWidget>
+#include <QMouseEvent>
 #include <QPointer>
 #include <QPushButton>
 #include <QScreen>
@@ -32,6 +33,7 @@
 #include <QShowEvent>
 #include <QToolButton>
 #include <QVBoxLayout>
+#include <QWindow>
 
 #include "common.h"
 #include "Root.h"
@@ -223,6 +225,25 @@ void configureActionButton(QPushButton* button, const QString& text, const QStri
   button->setIconSize(kActionIconSize);
 }
 
+class StitchDragHandleWidget final : public QWidget {
+public:
+  explicit StitchDragHandleWidget(QWidget* parent = nullptr) : QWidget(parent) {
+    setCursor(Qt::OpenHandCursor);
+  }
+
+protected:
+  void mousePressEvent(QMouseEvent* event) override {
+    if (event && event->button() == Qt::LeftButton) {
+      if (QWidget* topLevel = window(); topLevel && topLevel->windowHandle()
+          && topLevel->windowHandle()->startSystemMove()) {
+        event->accept();
+        return;
+      }
+    }
+    QWidget::mousePressEvent(event);
+  }
+};
+
 class StitchQueueListWidget final : public QListWidget {
 public:
   using ExternalDropHandler = std::function<void(const std::vector<VGMColl*>&, int)>;
@@ -310,7 +331,7 @@ private:
 class StitchExportBalloon final : public QFrame {
 public:
   explicit StitchExportBalloon(QWidget* parent = nullptr)
-      : QFrame(parent, Qt::Tool | Qt::FramelessWindowHint) {
+  : QFrame(parent, Qt::Tool | Qt::FramelessWindowHint | Qt::WindowStaysOnTopHint) {
     setObjectName(QStringLiteral("stitchExportBalloon"));
     setFrameShape(QFrame::NoFrame);
     setFrameShadow(QFrame::Plain);
@@ -322,23 +343,26 @@ public:
     rootLayout->setContentsMargins(10, 10, 10, 10);
     rootLayout->setSpacing(8);
 
-    auto* headingRow = new QHBoxLayout();
+    m_headingDragHandle = new StitchDragHandleWidget(this);
+
+    auto* headingRow = new QHBoxLayout(m_headingDragHandle);
     headingRow->setContentsMargins(0, 0, 0, 0);
     headingRow->setSpacing(4);
 
-    auto* heading = new QLabel(QStringLiteral("Stitch Queue"), this);
+    auto* heading = new QLabel(QStringLiteral("Stitch Queue"), m_headingDragHandle);
+    heading->setAttribute(Qt::WA_TransparentForMouseEvents, true);
     QFont headingFont = heading->font();
     headingFont.setBold(true);
     heading->setFont(headingFont);
 
-    m_closeButton = new QToolButton(this);
+    m_closeButton = new QToolButton(m_headingDragHandle);
     configureToolButton(m_closeButton, QStringLiteral("Close stitch queue"),
                         QSize(22, 20), QSize(14, 14));
 
     headingRow->addWidget(heading);
     headingRow->addStretch(1);
     headingRow->addWidget(m_closeButton);
-    rootLayout->addLayout(headingRow);
+    rootLayout->addWidget(m_headingDragHandle);
 
     m_queueList = new StitchQueueListWidget(this);
     m_queueList->setSelectionMode(QAbstractItemView::ExtendedSelection);
@@ -634,6 +658,7 @@ private:
   QPushButton* m_removeButton = nullptr;
   QPushButton* m_clearButton = nullptr;
   QPushButton* m_exportButton = nullptr;
+  QWidget* m_headingDragHandle = nullptr;
   QToolButton* m_closeButton = nullptr;
   QPointer<QAbstractButton> m_toggleButton;
 };
