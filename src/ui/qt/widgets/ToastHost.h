@@ -15,7 +15,7 @@ enum class ToastType;
 class ToastHost : public QObject {
   Q_OBJECT
 public:
-  explicit ToastHost(QWidget* parentWidget);
+  explicit ToastHost(QWidget* ownerWidget, QWidget* anchorWidget = nullptr);
   ~ToastHost() override = default;
 
   // Create + show a toast (newest appears at the top)
@@ -33,7 +33,8 @@ private:
   void onToastDismissed(Toast* t);
 
 private:
-  QWidget* m_parent{nullptr};
+  QWidget* m_owner{nullptr};
+  QWidget* m_anchor{nullptr};
   QVector<Toast*> m_toasts;  // index 0 == newest (top)
   int m_marginX{10};
   int m_marginY{10};

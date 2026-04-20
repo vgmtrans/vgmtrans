@@ -10,18 +10,20 @@
 #include <QEvent>
 #include <QWidget>
 
-ToastHost::ToastHost(QWidget* parentWidget)
-  : QObject(parentWidget), m_parent(parentWidget) {
-  if (m_parent)
-    m_parent->installEventFilter(this);
+ToastHost::ToastHost(QWidget* ownerWidget, QWidget* anchorWidget)
+  : QObject(ownerWidget), m_owner(ownerWidget), m_anchor(anchorWidget ? anchorWidget : ownerWidget) {
+  if (m_owner)
+    m_owner->installEventFilter(this);
+  if (m_anchor && m_anchor != m_owner)
+    m_anchor->installEventFilter(this);
 }
 
 Toast* ToastHost::showToast(const QString& message, ToastType type, int duration_ms) {
-  if (!m_parent)
+  if (!m_owner)
     return nullptr;
 
   // Newest toast goes at index 0 (top)
-  auto* t = new Toast(m_parent);
+  auto* t = new Toast(m_owner, m_anchor);
   t->setMargins(m_marginX, m_marginY);
   t->showMessage(message, type, duration_ms);
 
@@ -41,14 +43,15 @@ void ToastHost::onToastDismissed(Toast* t) {
 }
 
 bool ToastHost::eventFilter(QObject* watched, QEvent* event) {
-  if (watched == m_parent && (event->type() == QEvent::Move || event->type() == QEvent::Resize)) {
+  if ((watched == m_owner || watched == m_anchor) &&
+      (event->type() == QEvent::Move || event->type() == QEvent::Resize)) {
     reflow();
   }
   return QObject::eventFilter(watched, event);
 }
 
 void ToastHost::reflow() {
-  if (!m_parent)
+  if (!m_owner)
     return;
 
   int y = 0; // stack offset from top, grows downward

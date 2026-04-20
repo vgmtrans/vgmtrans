@@ -43,7 +43,7 @@ const ToastTheme& Toast::themeFor(ToastType type) noexcept {
   return fallback;
 }
 
-Toast::Toast(QWidget* parent)
+Toast::Toast(QWidget* parent, QWidget* anchorWidget)
   : QWidget(parent, kToastWindowFlags),
     m_bubble(new QFrame(this)),
     m_icon(new QLabel(m_bubble)),
@@ -58,6 +58,7 @@ Toast::Toast(QWidget* parent)
 
   if (parent)
     parent->installEventFilter(this);
+  setAnchorWidget(anchorWidget);
 
   auto* outer = new QVBoxLayout(this);
   outer->setContentsMargins(0,0,0,0);
@@ -180,10 +181,28 @@ void Toast::cancelAnimations() noexcept {
   m_opacity_effect->setOpacity(0.0);
 }
 
+void Toast::setAnchorWidget(QWidget* anchorWidget) {
+  QWidget* normalizedAnchor = anchorWidget ? anchorWidget : parentWidget();
+  if (m_anchorWidget == normalizedAnchor) {
+    return;
+  }
+
+  if (m_anchorWidget && m_anchorWidget != parentWidget()) {
+    m_anchorWidget->removeEventFilter(this);
+  }
+
+  m_anchorWidget = normalizedAnchor;
+
+  if (m_anchorWidget && m_anchorWidget != parentWidget()) {
+    m_anchorWidget->installEventFilter(this);
+  }
+}
+
 void Toast::updatePlacement() {
-  if (QWidget* p = parentWidget()) {
+  QWidget* anchor = m_anchorWidget ? m_anchorWidget.data() : parentWidget();
+  if (anchor) {
     const QPoint topLeft =
-        p->mapToGlobal(QPoint(p->width() - width() - m_marginX, m_marginY + m_stackOffsetY));
+        anchor->mapToGlobal(QPoint(anchor->width() - width() - m_marginX, m_marginY + m_stackOffsetY));
     move(topLeft);
     return;
   }
@@ -227,9 +246,11 @@ void Toast::onCloseClicked() noexcept {
 }
 
 bool Toast::eventFilter(QObject* watched, QEvent* event) {
-  QWidget* p = parentWidget();
-  if (watched == p && (event->type() == QEvent::Move || event->type() == QEvent::Resize)) {
-    if (isVisible() && p) {
+  QWidget* owner = parentWidget();
+  QWidget* anchor = m_anchorWidget ? m_anchorWidget.data() : owner;
+  if ((watched == owner || watched == anchor) &&
+      (event->type() == QEvent::Move || event->type() == QEvent::Resize)) {
+    if (isVisible()) {
       updatePlacement();
     }
   }

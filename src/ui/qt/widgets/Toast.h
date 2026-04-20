@@ -5,6 +5,7 @@
  */
 
 #pragma once
+#include <QPointer>
 #include <QWidget>
 #include <QTimer>
 
@@ -23,9 +24,10 @@ struct ToastTheme {
 class Toast : public QWidget {
   Q_OBJECT
 public:
-  explicit Toast(QWidget* parent = nullptr);
+  explicit Toast(QWidget* parent = nullptr, QWidget* anchorWidget = nullptr);
   void showMessage(const QString& message, ToastType type, int duration_ms = 3000);
   void updatePlacement();
+  void setAnchorWidget(QWidget* anchorWidget);
 
   // host-controlled placement knobs
   void setMargins(int marginX, int marginY) noexcept { m_marginX = marginX; m_marginY = marginY; }
@@ -73,6 +75,7 @@ private:
   int m_marginX{10};
   int m_marginY{10};
   int m_stackOffsetY{0};
+  QPointer<QWidget> m_anchorWidget;
 
   // internal: to ensure dismissed() is sent once
   bool m_emittedDismissed{false};
