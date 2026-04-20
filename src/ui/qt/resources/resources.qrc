@@ -48,8 +48,8 @@
   <file>icons/package-variant.svg</file>
   <file>icons/trash-can-outline.svg</file>
   <file>icons/export.svg</file>
-  <file>icons/clear.svg</file>
-  <file>icons/transfer-left.svg</file>
+  <file>icons/close-circle.svg</file>
+  <file>icons/minus-circle-outline.svg</file>
   <file>window-bar/minimize.svg</file>
   <file>window-bar/maximize.svg</file>
   <file>window-bar/restore.svg</file>

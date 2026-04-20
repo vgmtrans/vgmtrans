@@ -604,8 +604,8 @@ private:
       button->setIcon(stencilSvgIcon(iconPath, iconColor));
     };
 
-    refreshButtonIcon(m_removeButton, QStringLiteral(":/icons/transfer-left.svg"));
-    refreshButtonIcon(m_clearButton, QStringLiteral(":/icons/clear.svg"));
+    refreshButtonIcon(m_removeButton, QStringLiteral(":/icons/minus-circle-outline.svg"));
+    refreshButtonIcon(m_clearButton, QStringLiteral(":/icons/close-circle.svg"));
     refreshButtonIcon(m_exportButton, QStringLiteral(":/icons/export.svg"));
     refreshStencilToolButton(m_closeButton, QStringLiteral(":/icons/toast_close.svg"), palette);
 
