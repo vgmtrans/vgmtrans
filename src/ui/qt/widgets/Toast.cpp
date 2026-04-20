@@ -15,6 +15,7 @@
 #include <QVariantAnimation>
 #include <QVBoxLayout>
 
+#include "Helpers.h"
 #include "UIHelpers.h"
 
 static constexpr const char* kInfoIcon    = ":/icons/toast_info.svg";
@@ -172,6 +173,8 @@ void Toast::cancelAnimations() noexcept {
 }
 
 void Toast::dismiss() noexcept {
+  if (m_useToolWindow)
+    qtSetMacWindowChildOf(this, nullptr);
   if (!m_emittedDismissed) {
     m_emittedDismissed = true;
     emit dismissed(this);
@@ -207,6 +210,8 @@ void Toast::showMessage(const QString& message, ToastType type, QWidget* anchorW
   updatePlacement(anchorWidget);
 
   show();
+  if (m_useToolWindow)
+    qtSetMacWindowChildOf(this, parentWidget());
   raise();
   startFadeIn();
 }

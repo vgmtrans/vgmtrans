@@ -445,3 +445,8 @@ void qtOpenUrl(const QUrl& url) {
   QDesktopServices::openUrl(QUrl::fromEncoded(encoded));
 #endif
 }
+
+#ifndef __APPLE__
+void qtSetMacWindowChildOf(QWidget*, QWidget*) {
+}
+#endif
