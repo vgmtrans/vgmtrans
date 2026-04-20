@@ -338,8 +338,8 @@ HexView::~HexView() = default;
 
 QFont HexView::defaultViewFont() {
   const double appFontPointSize = QApplication::font().pointSizeF();
-  QFont font("Roboto Mono", appFontPointSize + 1.0);
-  font.setPointSizeF(appFontPointSize + 1.0);
+  QFont font("Roboto Mono", appFontPointSize);
+  font.setPointSizeF(appFontPointSize);
   return font;
 }
 
