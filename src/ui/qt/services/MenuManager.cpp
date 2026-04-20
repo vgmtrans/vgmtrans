@@ -24,8 +24,9 @@ MenuManager::MenuManager() {
       std::make_shared<OpenCommand>(),
       std::make_shared<CommandSeparator>(),
       std::make_shared<SaveAsMidiCommand>(),
-      std::make_shared<StitchSequencesCommand>(),
       std::make_shared<SaveAsOriginalFormatCommand<VGMFile>>(),
+      std::make_shared<CommandSeparator>(),
+      std::make_shared<StitchSequencesCommand>(),
       std::make_shared<CommandSeparator>(),
       std::make_shared<CloseVGMFileCommand>(),
   });
@@ -64,10 +65,11 @@ MenuManager::MenuManager() {
       std::make_shared<PlayCommand>(),
       std::make_shared<CommandSeparator>(),
       std::make_shared<SaveCollCommand<conversion::Target::MIDI | conversion::Target::SF2>>(),
-      std::make_shared<StitchCollectionsCommand>(),
       std::make_shared<SaveCollCommand<conversion::Target::MIDI | conversion::Target::DLS>>(),
       std::make_shared<SaveCollCommand<conversion::Target::MIDI | conversion::Target::SF2
                        | conversion::Target::DLS>>(),
+      std::make_shared<CommandSeparator>(),
+      std::make_shared<StitchCollectionsCommand>(),
   });
 }
 
