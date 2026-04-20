@@ -208,18 +208,10 @@ void EmptyStateWidget::refreshEmptyStatePresentation() {
 
   const QPalette palette = this->palette();
   const QPalette::ColorGroup colorGroup = palette.currentColorGroup();
-  const QPalette::ColorRole headingForegroundRole =
-      m_headingLabel->foregroundRole() != QPalette::NoRole ? m_headingLabel->foregroundRole()
-                                                           : QPalette::WindowText;
-  const QPalette::ColorRole headingBackgroundRole =
-      m_headingLabel->backgroundRole() != QPalette::NoRole ? m_headingLabel->backgroundRole()
-                                                           : QPalette::Window;
-  const QPalette::ColorRole bodyForegroundRole =
-      m_bodyLabel->foregroundRole() != QPalette::NoRole ? m_bodyLabel->foregroundRole()
-                                                        : QPalette::WindowText;
-  const QPalette::ColorRole bodyBackgroundRole =
-      m_bodyLabel->backgroundRole() != QPalette::NoRole ? m_bodyLabel->backgroundRole()
-                                                        : QPalette::Window;
+  const QPalette::ColorRole headingForegroundRole = m_headingLabel->foregroundRole();
+  const QPalette::ColorRole headingBackgroundRole = m_headingLabel->backgroundRole();
+  const QPalette::ColorRole bodyForegroundRole = m_bodyLabel->foregroundRole();
+  const QPalette::ColorRole bodyBackgroundRole = m_bodyLabel->backgroundRole();
 
   const QColor headingColor = blendColors(palette.color(colorGroup, headingForegroundRole),
                                           palette.color(colorGroup, headingBackgroundRole), 0.62);
