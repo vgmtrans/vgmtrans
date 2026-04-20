@@ -80,7 +80,18 @@ public:
     return m_contextFactory;
   }
 
+  [[nodiscard]] bool isEnabled(const PropertyMap& properties) const override {
+    auto context = m_contextFactory->createContext(properties);
+    if (!context) {
+      return false;
+    }
+
+    const auto& items = dynamic_cast<ItemListCommandContext<T>&>(*context).items();
+    return isEnabledForItems(items);
+  }
+
   virtual void executeItems(std::vector<T*> items) const = 0;
+  [[nodiscard]] virtual bool isEnabledForItems(const std::vector<T*>& items) const { return !items.empty(); }
 
 private:
   std::shared_ptr<ItemListContextFactory<T>> m_contextFactory;

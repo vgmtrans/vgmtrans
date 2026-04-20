@@ -128,6 +128,12 @@ public:
   [[nodiscard]] virtual std::shared_ptr<CommandContextFactory> contextFactory() const = 0;
 
   /**
+   * Determines whether the command should be enabled for the provided known properties.
+   * Properties that require user input may still contain their default values at this stage.
+   */
+  [[nodiscard]] virtual bool isEnabled(const PropertyMap& properties) const { return true; }
+
+  /**
    * Defines a key sequence that will be displayed in the menu as a shortcut for the command
    * @return the keyboard shortcut
    */
