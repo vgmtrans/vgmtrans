@@ -268,7 +268,7 @@ VGMCollListView::VGMCollListView(QWidget *parent) : QListView(parent) {
   m_searchEmptyState->setFocusPolicy(Qt::NoFocus);
   m_searchEmptyState->setBodyText(QString());
   m_searchEmptyState->setCompactLayoutHeightThreshold(kSearchEmptyCompactHeightThreshold);
-  m_searchEmptyState->setGeometry(viewport()->rect());
+  m_searchEmptyState->setGeometry(searchEmptyStateRect());
   m_searchEmptyState->hide();
 
   connect(this, &QListView::doubleClicked, this,
@@ -295,6 +295,16 @@ VGMCollListView::VGMCollListView(QWidget *parent) : QListView(parent) {
           this, &VGMCollListView::setStitchDragDropEnabled);
 
   applyFilter();
+}
+
+QRect VGMCollListView::searchEmptyStateRect() const {
+  QRect rect = viewport()->rect();
+#ifdef Q_OS_MAC
+  if (isWrapping()) {
+    rect.setHeight(std::max(0, rect.height() - style()->pixelMetric(QStyle::PM_ScrollBarExtent)));
+  }
+#endif
+  return rect;
 }
 
 void VGMCollListView::setStitchDragDropEnabled(bool enabled) {
@@ -414,7 +424,7 @@ void VGMCollListView::updateSearchEmptyState(int visibleCount, bool hasFilter) {
   m_searchEmptyState->setEmptyStateShown(show);
   m_searchEmptyState->setVisible(show);
   if (show) {
-    m_searchEmptyState->setGeometry(viewport()->rect());
+    m_searchEmptyState->setGeometry(searchEmptyStateRect());
     m_searchEmptyState->raise();
   }
 }
@@ -422,7 +432,7 @@ void VGMCollListView::updateSearchEmptyState(int visibleCount, bool hasFilter) {
 void VGMCollListView::resizeEvent(QResizeEvent *event) {
   QListView::resizeEvent(event);
   if (m_searchEmptyState) {
-    m_searchEmptyState->setGeometry(viewport()->rect());
+    m_searchEmptyState->setGeometry(searchEmptyStateRect());
   }
 }
 

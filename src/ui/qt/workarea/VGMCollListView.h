@@ -71,6 +71,7 @@ private:
   void setStitchDragDropEnabled(bool enabled);
 
   void resizeEvent(QResizeEvent *event) override;
+  [[nodiscard]] QRect searchEmptyStateRect() const;
   void applyFilter();
   void updateSearchEmptyState(int visibleCount, bool hasFilter);
   [[nodiscard]] bool matchesFilter(const VGMColl* coll) const;
