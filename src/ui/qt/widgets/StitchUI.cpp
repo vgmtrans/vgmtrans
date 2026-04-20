@@ -350,7 +350,7 @@ public:
     headingRow->setContentsMargins(0, 10, 0, 8);
     headingRow->setSpacing(4);
 
-    auto* heading = new QLabel(QStringLiteral("Stitch Queue"), m_headingDragHandle);
+    auto* heading = new QLabel(QStringLiteral("Collection Stitcher"), m_headingDragHandle);
     heading->setAttribute(Qt::WA_TransparentForMouseEvents, true);
     QFont headingFont = heading->font();
     headingFont.setBold(true);
@@ -377,10 +377,10 @@ public:
 
     m_emptyState = new EmptyStateWidget(
         defaultEmptyStateHeadingHint(QStringLiteral(":/icons/stitch.svg"),
-                                     QStringLiteral("Drop collections to stitch")),
+                                     QStringLiteral("Drop collections here")),
         m_queueList, this);
     m_emptyState->setBodyText(
-        QStringLiteral("Drag from Collections, reorder, then export MIDI + SF2."));
+        QStringLiteral("Reorder, then export as MIDI + SF2."));
     rootLayout->addWidget(m_emptyState, 1);
 
     auto* actionRow = new QHBoxLayout();
