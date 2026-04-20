@@ -6,7 +6,6 @@
 
 #include "EmptyStateWidget.h"
 
-#include <QBoxLayout>
 #include <QColor>
 #include <QBoxLayout>
 #include <QEvent>
@@ -18,6 +17,7 @@
 #include <QStackedLayout>
 #include <QVBoxLayout>
 
+#include "util/ColorHelpers.h"
 #include "util/UIHelpers.h"
 
 static constexpr int kEmptyStateHorizontalInset = 24;
@@ -206,19 +206,34 @@ void EmptyStateWidget::refreshEmptyStatePresentation() {
 
   const InstructionMetrics headingMetrics = computeInstructionMetrics(headingHint, font());
 
-  QColor headingColor = palette().color(QPalette::WindowText);
-  QColor bodyColor = headingColor;
-  QColor iconColor = headingColor;
-  headingColor.setAlphaF(0.62);
-  bodyColor.setAlphaF(0.48);
-  iconColor.setAlphaF(0.40);
+  const QPalette palette = this->palette();
+  const QPalette::ColorGroup colorGroup = palette.currentColorGroup();
+  const QPalette::ColorRole headingForegroundRole =
+      m_headingLabel->foregroundRole() != QPalette::NoRole ? m_headingLabel->foregroundRole()
+                                                           : QPalette::WindowText;
+  const QPalette::ColorRole headingBackgroundRole =
+      m_headingLabel->backgroundRole() != QPalette::NoRole ? m_headingLabel->backgroundRole()
+                                                           : QPalette::Window;
+  const QPalette::ColorRole bodyForegroundRole =
+      m_bodyLabel->foregroundRole() != QPalette::NoRole ? m_bodyLabel->foregroundRole()
+                                                        : QPalette::WindowText;
+  const QPalette::ColorRole bodyBackgroundRole =
+      m_bodyLabel->backgroundRole() != QPalette::NoRole ? m_bodyLabel->backgroundRole()
+                                                        : QPalette::Window;
+
+  const QColor headingColor = blendColors(palette.color(colorGroup, headingForegroundRole),
+                                          palette.color(colorGroup, headingBackgroundRole), 0.62);
+  const QColor bodyColor = blendColors(palette.color(colorGroup, bodyForegroundRole),
+                                       palette.color(colorGroup, bodyBackgroundRole), 0.48);
+  const QColor iconColor = blendColors(palette.color(colorGroup, headingForegroundRole),
+                                       palette.color(colorGroup, headingBackgroundRole), 0.40);
 
   QPalette headingPalette = m_headingLabel->palette();
-  headingPalette.setColor(QPalette::WindowText, headingColor);
+  headingPalette.setColor(headingForegroundRole, headingColor);
   m_headingLabel->setPalette(headingPalette);
 
   QPalette bodyPalette = m_bodyLabel->palette();
-  bodyPalette.setColor(QPalette::WindowText, bodyColor);
+  bodyPalette.setColor(bodyForegroundRole, bodyColor);
   m_bodyLabel->setPalette(bodyPalette);
 
   m_headingLabel->setFont(headingMetrics.font);
