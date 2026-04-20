@@ -336,6 +336,11 @@ public:
     setObjectName(QStringLiteral("stitchExportBalloon"));
     setFrameShape(QFrame::NoFrame);
     setFrameShadow(QFrame::Plain);
+    setStyleSheet(QStringLiteral(
+        "QFrame#stitchExportBalloon {"
+        "  background-color: palette(window);"
+        "  border: 1px solid palette(mid);"
+        "}"));
     setMinimumSize(kBalloonMinWidth, kBalloonMinHeight);
     setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Preferred);
     setAttribute(Qt::WA_DeleteOnClose, false);
