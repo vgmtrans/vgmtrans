@@ -20,6 +20,14 @@ public:
     ToolWindow,
   };
 
+  static constexpr Mode defaultMode() noexcept {
+#if defined(Q_OS_LINUX)
+    return Mode::ChildWidget;
+#else
+    return Mode::ToolWindow;
+#endif
+  }
+
   explicit ToastHost(QWidget* ownerWidget, QWidget* anchorWidget = nullptr,
                      Mode mode = Mode::ChildWidget);
   ~ToastHost() override = default;

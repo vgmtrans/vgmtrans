@@ -367,13 +367,7 @@ void MainWindow::createElements() {
       {m_logger->toggleViewAction(), QStringLiteral(":/icons/book-open-variant-outline.svg")},
   });
   createStatusBar();
-
-#if defined(Q_OS_LINUX)
-  const auto toastMode = ToastHost::Mode::ChildWidget;
-#else
-  const auto toastMode = ToastHost::Mode::ToolWindow;
-#endif
-  m_toastHost = new ToastHost(this, MdiArea::the(), toastMode);
+  m_toastHost = new ToastHost(this, MdiArea::the(), ToastHost::defaultMode());
 }
 
 void MainWindow::configureWindowAgent() {
