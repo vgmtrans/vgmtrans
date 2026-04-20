@@ -25,6 +25,8 @@ void qtOpenUrlNative(const QByteArray& encodedUrl) {
   }
 }
 
+// On macOS, attaching the toast panel as an NSWindow child makes it track the main
+// window during live drags instead of waiting for delayed Qt move notifications.
 void qtSetMacWindowChildOf(QWidget* child, QWidget* parent) {
   @autoreleasepool {
     if (!child)

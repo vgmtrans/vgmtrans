@@ -6,7 +6,6 @@
 
 #pragma once
 #include <QObject>
-#include <QPoint>
 #include <QVector>
 
 class QWidget;
@@ -43,7 +42,6 @@ private:
   QWidget* m_owner{nullptr};
   QWidget* m_anchor{nullptr};
   Mode m_mode{Mode::ChildWidget};
-  QPoint m_ownerPos;
   QVector<Toast*> m_toasts;  // index 0 == newest (top)
   int m_marginX{10};
   int m_marginY{10};

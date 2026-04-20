@@ -8,15 +8,13 @@
 #include "Toast.h"
 
 #include <QEvent>
-#include <QMoveEvent>
 #include <QWidget>
 
 ToastHost::ToastHost(QWidget* ownerWidget, QWidget* anchorWidget, Mode mode)
   : QObject(ownerWidget),
     m_owner(ownerWidget),
     m_anchor(anchorWidget ? anchorWidget : ownerWidget),
-    m_mode(mode),
-    m_ownerPos(ownerWidget ? ownerWidget->pos() : QPoint()) {
+    m_mode(mode) {
   if (m_anchor)
     m_anchor->installEventFilter(this);
   if (m_mode == Mode::ToolWindow && m_owner && m_owner != m_anchor)
@@ -41,20 +39,8 @@ void ToastHost::onToastDismissed(Toast* t) {
 }
 
 bool ToastHost::eventFilter(QObject* watched, QEvent* event) {
-#if !defined(Q_OS_MACOS) && !defined(Q_OS_MAC)
-  if (watched == m_owner && event->type() == QEvent::Move) {
-    const QPoint delta = static_cast<QMoveEvent*>(event)->pos() - m_ownerPos;
-    m_ownerPos = static_cast<QMoveEvent*>(event)->pos();
-    if (m_mode == Mode::ToolWindow && !delta.isNull()) {
-      for (Toast* t : m_toasts)
-        t->move(t->pos() + delta);
-      return QObject::eventFilter(watched, event);
-    }
-  }
-#endif
-
   if ((watched == m_owner || watched == m_anchor) &&
-      (event->type() == QEvent::Resize || (watched == m_anchor && event->type() == QEvent::Move))) {
+      (event->type() == QEvent::Move || event->type() == QEvent::Resize)) {
     reflow();
   }
   return QObject::eventFilter(watched, event);
