@@ -33,19 +33,9 @@ void StitchSequencesCommand::executeItems(std::vector<VGMFile*> vgmfiles) const 
     collections.push_back(const_cast<VGMColl*>(coll));
   }
 
-  if (collections.size() < 2) {
-    pRoot->UI_toast("Select at least two sequence chunks to stitch.", ToastType::Info);
-    return;
-  }
-
   stitchui::openCollectionStitchBalloon(collections, QApplication::activeWindow());
 }
 
 void StitchCollectionsCommand::executeItems(std::vector<VGMColl*> vgmcolls) const {
-  if (vgmcolls.size() < 2) {
-    pRoot->UI_toast("Select at least two collections to stitch.", ToastType::Info);
-    return;
-  }
-
   stitchui::openCollectionStitchBalloon(vgmcolls, QApplication::activeWindow());
 }
