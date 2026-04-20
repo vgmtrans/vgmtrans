@@ -367,7 +367,7 @@ void MainWindow::createElements() {
       {m_logger->toggleViewAction(), QStringLiteral(":/icons/book-open-variant-outline.svg")},
   });
   createStatusBar();
-  m_toastHost = new ToastHost(this, MdiArea::the());
+  m_toastHost = new ToastHost(this, MdiArea::the(), ToastHost::Mode::ToolWindow);
 }
 
 void MainWindow::configureWindowAgent() {

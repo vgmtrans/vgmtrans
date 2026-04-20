@@ -15,7 +15,13 @@ enum class ToastType;
 class ToastHost : public QObject {
   Q_OBJECT
 public:
-  explicit ToastHost(QWidget* ownerWidget, QWidget* anchorWidget = nullptr);
+  enum class Mode {
+    ChildWidget,
+    ToolWindow,
+  };
+
+  explicit ToastHost(QWidget* ownerWidget, QWidget* anchorWidget = nullptr,
+                     Mode mode = Mode::ChildWidget);
   ~ToastHost() override = default;
 
   // Create + show a toast (newest appears at the top)
@@ -35,6 +41,7 @@ private:
 private:
   QWidget* m_owner{nullptr};
   QWidget* m_anchor{nullptr};
+  Mode m_mode{Mode::ChildWidget};
   QVector<Toast*> m_toasts;  // index 0 == newest (top)
   int m_marginX{10};
   int m_marginY{10};

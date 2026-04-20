@@ -6,14 +6,11 @@
 
 #include "Toast.h"
 
-#include <QApplication>
 #include <QColor>
-#include <QEvent>
 #include <QGraphicsOpacityEffect>
 #include <QIcon>
 #include <QLabel>
 #include <QPushButton>
-#include <QScreen>
 #include <QSizePolicy>
 #include <QVariantAnimation>
 #include <QVBoxLayout>
@@ -25,7 +22,7 @@ static constexpr const char* kWarnIcon    = ":/icons/toast_warning.svg";
 static constexpr const char* kErrorIcon   = ":/icons/toast_error.svg";
 static constexpr const char* kSuccessIcon = ":/icons/toast_success.svg";
 static constexpr const char* kCloseIcon   = ":/icons/toast_close.svg";
-static constexpr Qt::WindowFlags kToastWindowFlags =
+static constexpr Qt::WindowFlags kToastToolWindowFlags =
     Qt::Tool | Qt::FramelessWindowHint | Qt::WindowDoesNotAcceptFocus;
 
 static const ToastTheme kThemes[] = {
@@ -43,22 +40,21 @@ const ToastTheme& Toast::themeFor(ToastType type) noexcept {
   return fallback;
 }
 
-Toast::Toast(QWidget* parent, QWidget* anchorWidget)
-  : QWidget(parent, kToastWindowFlags),
+Toast::Toast(QWidget* parent, bool useToolWindow)
+  : QWidget(parent),
     m_bubble(new QFrame(this)),
     m_icon(new QLabel(m_bubble)),
     m_text(new QLabel(m_bubble)),
     m_close(new QPushButton(m_bubble)),
     m_opacity_effect(new QGraphicsOpacityEffect(this)),
-    m_opacity_anim(new QVariantAnimation(this)) {
+    m_opacity_anim(new QVariantAnimation(this)),
+    m_useToolWindow(useToolWindow) {
 
   setAttribute(Qt::WA_TranslucentBackground);
   setAttribute(Qt::WA_ShowWithoutActivating);
-  setFocusPolicy(Qt::NoFocus);
-
-  if (parent)
-    parent->installEventFilter(this);
-  setAnchorWidget(anchorWidget);
+  setWindowFlags(m_useToolWindow ? kToastToolWindowFlags : Qt::FramelessWindowHint);
+  if (m_useToolWindow)
+    setFocusPolicy(Qt::NoFocus);
 
   auto* outer = new QVBoxLayout(this);
   outer->setContentsMargins(0,0,0,0);
@@ -111,13 +107,7 @@ Toast::Toast(QWidget* parent, QWidget* anchorWidget)
     if (qFuzzyCompare(m_opacity_effect->opacity(), 1.0)) {
       m_timer.start(m_duration_ms);
     } else {
-      // fade-out complete
-      if (!m_emittedDismissed) {
-        m_emittedDismissed = true;
-        emit dismissed(this);
-      }
-      hide();
-      deleteLater();
+      dismiss();
     }
   });
 
@@ -181,39 +171,25 @@ void Toast::cancelAnimations() noexcept {
   m_opacity_effect->setOpacity(0.0);
 }
 
-void Toast::setAnchorWidget(QWidget* anchorWidget) {
-  QWidget* normalizedAnchor = anchorWidget ? anchorWidget : parentWidget();
-  if (m_anchorWidget == normalizedAnchor) {
-    return;
+void Toast::dismiss() noexcept {
+  if (!m_emittedDismissed) {
+    m_emittedDismissed = true;
+    emit dismissed(this);
   }
-
-  if (m_anchorWidget && m_anchorWidget != parentWidget()) {
-    m_anchorWidget->removeEventFilter(this);
-  }
-
-  m_anchorWidget = normalizedAnchor;
-
-  if (m_anchorWidget && m_anchorWidget != parentWidget()) {
-    m_anchorWidget->installEventFilter(this);
-  }
+  hide();
+  deleteLater();
 }
 
-void Toast::updatePlacement() {
-  QWidget* anchor = m_anchorWidget ? m_anchorWidget.data() : parentWidget();
-  if (anchor) {
-    const QPoint topLeft =
-        anchor->mapToGlobal(QPoint(anchor->width() - width() - m_marginX, m_marginY + m_stackOffsetY));
-    move(topLeft);
+void Toast::updatePlacement(QWidget* anchorWidget) {
+  QWidget* anchor = anchorWidget ? anchorWidget : parentWidget();
+  if (!anchor)
     return;
-  }
 
-  if (QScreen* screen = QGuiApplication::primaryScreen()) {
-    const QRect geom = screen->availableGeometry();
-    move(geom.right() - width() - m_marginX, geom.top() + m_marginY + m_stackOffsetY);
-  }
+  const QPoint pos(anchor->width() - width() - m_marginX, m_marginY + m_stackOffsetY);
+  move(m_useToolWindow ? anchor->mapToGlobal(pos) : pos);
 }
 
-void Toast::showMessage(const QString& message, ToastType type, int duration_ms) {
+void Toast::showMessage(const QString& message, ToastType type, QWidget* anchorWidget, int duration_ms) {
   m_duration_ms = duration_ms;
   m_emittedDismissed = false;
   cancelAnimations();
@@ -228,7 +204,7 @@ void Toast::showMessage(const QString& message, ToastType type, int duration_ms)
                                      m_icon->devicePixelRatioF()));
 
   adjustSize();
-  updatePlacement();
+  updatePlacement(anchorWidget);
 
   show();
   raise();
@@ -236,23 +212,6 @@ void Toast::showMessage(const QString& message, ToastType type, int duration_ms)
 }
 
 void Toast::onCloseClicked() noexcept {
-  if (!m_emittedDismissed) {
-    m_emittedDismissed = true;
-    emit dismissed(this);
-  }
   cancelAnimations();
-  hide();
-  deleteLater();
-}
-
-bool Toast::eventFilter(QObject* watched, QEvent* event) {
-  QWidget* owner = parentWidget();
-  QWidget* anchor = m_anchorWidget ? m_anchorWidget.data() : owner;
-  if ((watched == owner || watched == anchor) &&
-      (event->type() == QEvent::Move || event->type() == QEvent::Resize)) {
-    if (isVisible()) {
-      updatePlacement();
-    }
-  }
-  return QWidget::eventFilter(watched, event);
+  dismiss();
 }
