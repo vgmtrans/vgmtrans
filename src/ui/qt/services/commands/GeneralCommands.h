@@ -145,23 +145,6 @@ public:
 };
 
 /**
- * A command for closing a VGMColl
- */
-class CloseVGMCollCommand : public ItemListCommand<VGMColl> {
-public:
-  void executeItems(std::vector<VGMColl*> vgmcolls) const override {
-    pRoot->pushRemoveVGMColls();
-    for (auto coll : vgmcolls) {
-      pRoot->removeVGMColl(coll);
-    }
-    pRoot->popRemoveVGMColls();
-  }
-  [[nodiscard]] QList<QKeySequence> shortcutKeySequences() const override { return {Qt::Key_Backspace, Qt::Key_Delete}; };
-  [[nodiscard]] std::string name() const override { return "Remove"; }
-  [[nodiscard]] std::optional<MenuPath> menuPath() const override { return MenuPaths::File; }
-};
-
-/**
  * A command for opening a VGMFile in the MdiArea
  */
 class OpenCommand : public ItemListCommand<VGMFile> {
