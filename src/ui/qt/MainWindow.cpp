@@ -9,6 +9,7 @@
 #include <QDragMoveEvent>
 #include <QDropEvent>
 #include <QFileDialog>
+#include <QFont>
 #include <QAction>
 #include <QDockWidget>
 #include <QApplication>
@@ -49,6 +50,7 @@
 #include "widgets/StitchUI.h"
 #include "services/NotificationCenter.h"
 #include "services/Settings.h"
+#include "util/ColorHelpers.h"
 #include "util/UIHelpers.h"
 #include "workarea/RawFileListView.h"
 #include "workarea/VGMFileListView.h"
@@ -64,7 +66,7 @@
 
 namespace {
 constexpr auto MIME_PORTAL_FILETRANSFER = "application/vnd.portal.filetransfer";
-constexpr int kCollectionTitleControlSpacing = 10;
+constexpr int kCollectionTitleControlSpacing = 20;
 
 bool isDockSeparatorCursor(Qt::CursorShape shape) {
   return shape == Qt::SplitHCursor || shape == Qt::SplitVCursor;
@@ -265,20 +267,13 @@ void MainWindow::createElements() {
   auto* collSearchEdit = new QLineEdit(collLeadingControls);
   collSearchEdit->setPlaceholderText(QStringLiteral("Search"));
   collSearchEdit->setClearButtonEnabled(true);
-  collSearchEdit->setFixedWidth(220);
+  collSearchEdit->setFixedWidth(180);
   collSearchEdit->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Fixed);
+  QFont collSearchFont = collSearchEdit->font();
+  collSearchFont.setPointSizeF(collSearchFont.pointSizeF() - 1.0);
+  collSearchEdit->setFont(collSearchFont);
 #ifdef Q_OS_MAC
   collSearchEdit->setAttribute(Qt::WA_MacShowFocusRect, false);
-  collSearchEdit->setStyleSheet(
-      "QLineEdit {"
-      "  background-color: palette(base);"
-      "  border: 1px solid palette(mid);"
-      "  border-radius: 5px;"
-      "  padding: 0px 6px;"
-      "}"
-      "QLineEdit:focus {"
-      "  border: 1px solid palette(highlight);"
-      "}");
 #endif
   const int searchControlHeight = m_stitchButton->height();
   collSearchEdit->setFixedHeight(searchControlHeight);
@@ -290,11 +285,31 @@ void MainWindow::createElements() {
   collTitleBar->addLeadingWidget(collLeadingControls);
 
   const auto refreshCollectionTitleControls =
-      [collTitleBar, this, collSearchIconAction]() {
+      [collTitleBar, this, collSearchEdit, collSearchIconAction]() {
+    const QPalette titleBarPalette = collTitleBar->palette();
+    const QColor titleBarBackground = titleBarPalette.color(QPalette::Window);
+    const QColor borderColor = blendColors(titleBarPalette.color(QPalette::Text), titleBarBackground, 0.08);
+    const QColor focusBorderColor = blendColors(titleBarPalette.color(QPalette::Highlight), titleBarBackground, 0.84);
+    const QColor focusBackground = blendColors(titleBarBackground, titleBarPalette.color(QPalette::Text), 0.96);
+    collSearchEdit->setStyleSheet(QStringLiteral(
+        "QLineEdit {"
+        "  background-color: %1;"
+        "  border: 1px solid %2;"
+        "  border-radius: 5px;"
+        "  padding: 0px 6px 0px 0px;"
+        "}"
+        "QLineEdit:focus {"
+        "  border: 2px solid %3;"
+        "  background-color: %4;"
+        "}")
+                                      .arg(cssColor(titleBarBackground))
+                                      .arg(cssColor(borderColor))
+                                      .arg(cssColor(focusBorderColor))
+                                      .arg(cssColor(focusBackground)));
     refreshStencilToolButton(m_stitchButton, QStringLiteral(":/icons/stitch.svg"),
-                             collTitleBar->palette(), true);
+                             titleBarPalette, true);
     collSearchIconAction->setIcon(stencilSvgIcon(QStringLiteral(":/icons/magnify.svg"),
-                                                 toolBarButtonIconColor(collTitleBar->palette())));
+                                                 toolBarButtonIconColor(titleBarPalette)));
   };
   refreshCollectionTitleControls();
   connect(collTitleBar, &TitleBar::appearanceChanged, this, refreshCollectionTitleControls);
