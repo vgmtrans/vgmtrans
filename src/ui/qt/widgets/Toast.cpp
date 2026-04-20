@@ -25,6 +25,8 @@ static constexpr const char* kWarnIcon    = ":/icons/toast_warning.svg";
 static constexpr const char* kErrorIcon   = ":/icons/toast_error.svg";
 static constexpr const char* kSuccessIcon = ":/icons/toast_success.svg";
 static constexpr const char* kCloseIcon   = ":/icons/toast_close.svg";
+static constexpr Qt::WindowFlags kToastWindowFlags =
+    Qt::Tool | Qt::FramelessWindowHint | Qt::WindowDoesNotAcceptFocus;
 
 static const ToastTheme kThemes[] = {
   { QColor(209,231,243), QColor( 82,123,167), QColor(171,194,202), kInfoIcon    }, // Info
@@ -42,7 +44,7 @@ const ToastTheme& Toast::themeFor(ToastType type) noexcept {
 }
 
 Toast::Toast(QWidget* parent)
-  : QWidget(parent),
+  : QWidget(parent, kToastWindowFlags),
     m_bubble(new QFrame(this)),
     m_icon(new QLabel(m_bubble)),
     m_text(new QLabel(m_bubble)),
@@ -52,7 +54,7 @@ Toast::Toast(QWidget* parent)
 
   setAttribute(Qt::WA_TranslucentBackground);
   setAttribute(Qt::WA_ShowWithoutActivating);
-  setWindowFlags(Qt::FramelessWindowHint);
+  setFocusPolicy(Qt::NoFocus);
 
   if (parent)
     parent->installEventFilter(this);
@@ -178,6 +180,20 @@ void Toast::cancelAnimations() noexcept {
   m_opacity_effect->setOpacity(0.0);
 }
 
+void Toast::updatePlacement() {
+  if (QWidget* p = parentWidget()) {
+    const QPoint topLeft =
+        p->mapToGlobal(QPoint(p->width() - width() - m_marginX, m_marginY + m_stackOffsetY));
+    move(topLeft);
+    return;
+  }
+
+  if (QScreen* screen = QGuiApplication::primaryScreen()) {
+    const QRect geom = screen->availableGeometry();
+    move(geom.right() - width() - m_marginX, geom.top() + m_marginY + m_stackOffsetY);
+  }
+}
+
 void Toast::showMessage(const QString& message, ToastType type, int duration_ms) {
   m_duration_ms = duration_ms;
   m_emittedDismissed = false;
@@ -193,14 +209,7 @@ void Toast::showMessage(const QString& message, ToastType type, int duration_ms)
                                      m_icon->devicePixelRatioF()));
 
   adjustSize();
-
-  // Initial placement; host will keep it updated via setStackOffset + margins
-  if (QWidget* pw = parentWidget()) {
-    move(pw->width() - width() - m_marginX, m_marginY + m_stackOffsetY);
-  } else if (QScreen* screen = QGuiApplication::primaryScreen()) {
-    const QRect geom = screen->availableGeometry();
-    move(geom.right() - width() - m_marginX, geom.top() + m_marginY + m_stackOffsetY);
-  }
+  updatePlacement();
 
   show();
   raise();
@@ -221,7 +230,7 @@ bool Toast::eventFilter(QObject* watched, QEvent* event) {
   QWidget* p = parentWidget();
   if (watched == p && (event->type() == QEvent::Move || event->type() == QEvent::Resize)) {
     if (isVisible() && p) {
-      move(p->width() - width() - m_marginX, m_marginY + m_stackOffsetY);
+      updatePlacement();
     }
   }
   return QWidget::eventFilter(watched, event);

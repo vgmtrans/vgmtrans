@@ -25,6 +25,7 @@ class Toast : public QWidget {
 public:
   explicit Toast(QWidget* parent = nullptr);
   void showMessage(const QString& message, ToastType type, int duration_ms = 3000);
+  void updatePlacement();
 
   // host-controlled placement knobs
   void setMargins(int marginX, int marginY) noexcept { m_marginX = marginX; m_marginY = marginY; }

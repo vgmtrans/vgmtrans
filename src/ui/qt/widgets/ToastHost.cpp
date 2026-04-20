@@ -57,8 +57,7 @@ void ToastHost::reflow() {
       continue;
     t->setMargins(m_marginX, m_marginY);
     t->setStackOffset(y);
-    // X/Y are applied by Toast's eventFilter as well; set once here:
-    t->move(m_parent->width() - t->width() - m_marginX, m_marginY + y);
+    t->updatePlacement();
     t->raise();
     y += t->height() + m_spacing;
   }
