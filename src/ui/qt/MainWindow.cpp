@@ -259,7 +259,7 @@ void MainWindow::createElements() {
   collLeadingLayout->setSpacing(kCollectionTitleControlSpacing);
 
   m_stitchButton = new QToolButton(collLeadingControls);
-  configureToolButton(m_stitchButton, QStringLiteral("Stitch selected collections"),
+  configureToolButton(m_stitchButton, QStringLiteral("Stitch collections"),
                       QSize(22, 20), QSize(16, 16));
   m_stitchButton->setCheckable(true);
   m_stitchButton->setChecked(false);

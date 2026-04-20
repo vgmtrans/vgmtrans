@@ -6,6 +6,8 @@
 
 #include "widgets/StitchUI.h"
 
+#include "ColorHelpers.h"
+
 #include <algorithm>
 #include <cstdint>
 #include <filesystem>
@@ -336,11 +338,16 @@ public:
     setObjectName(QStringLiteral("stitchExportBalloon"));
     setFrameShape(QFrame::NoFrame);
     setFrameShadow(QFrame::Plain);
-    setStyleSheet(QStringLiteral(
+    const QColor borderColor = blendColors(
+      palette().color(QPalette::Window),
+      palette().color(QPalette::Text),
+      0.88);
+    setStyleSheet(QString(
         "QFrame#stitchExportBalloon {"
         "  background-color: palette(window);"
-        "  border: 1px solid palette(mid);"
-        "}"));
+        "  border: 1px solid %1;"
+        "}")
+        .arg(cssColor(borderColor)));
     setMinimumSize(kBalloonMinWidth, kBalloonMinHeight);
     setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Preferred);
     setAttribute(Qt::WA_DeleteOnClose, false);
@@ -385,7 +392,7 @@ public:
                                      QStringLiteral("Drop collections here")),
         m_queueList, this);
     m_emptyState->setBodyText(
-        QStringLiteral("Reorder, then export as MIDI + SF2."));
+        QStringLiteral("Reorder, then export as joined MIDI + SF2."));
     rootLayout->addWidget(m_emptyState, 1);
 
     auto* actionRow = new QHBoxLayout();
