@@ -230,9 +230,7 @@ void configureActionButton(QPushButton* button, const QString& text, const QStri
 
 class StitchDragHandleWidget final : public QWidget {
 public:
-  explicit StitchDragHandleWidget(QWidget* parent = nullptr) : QWidget(parent) {
-    setCursor(Qt::OpenHandCursor);
-  }
+  using QWidget::QWidget;
 
 protected:
   void mousePressEvent(QMouseEvent* event) override {
@@ -718,4 +716,3 @@ bool toggleCollectionStitchBalloon(const std::vector<VGMColl*>& initialCollectio
 }
 
 }  // namespace stitchui
-
