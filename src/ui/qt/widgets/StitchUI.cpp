@@ -392,7 +392,7 @@ public:
                                      QStringLiteral("Drop collections here")),
         m_queueList, this);
     m_emptyState->setBodyText(
-        QStringLiteral("Reorder, then export as joined MIDI + SF2."));
+        QStringLiteral("Reorder, then export as joined MIDI + SF2"));
     rootLayout->addWidget(m_emptyState, 1);
 
     auto* actionRow = new QHBoxLayout();
