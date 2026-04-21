@@ -3,8 +3,8 @@
  * Licensed under the zlib license,
  * refer to the included LICENSE.txt file
  */
-#include "NinSnesInstr.h"
-#include "NinSnesSeq.h"
+#include "../NinSnesInstr.h"
+#include "../NinSnesSeq.h"
 #include "SNESDSP.h"
 #include "VGMColl.h"
 #include <spdlog/fmt/fmt.h>
