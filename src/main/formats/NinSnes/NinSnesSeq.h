@@ -93,7 +93,6 @@ protected:
 
  private:
   void loadEventMap();
-  void loadStandardVcmdMap(uint8_t statusByte);
   NinSnesIntelliTADrumKitDef buildIntelliTADrumKitDef() const;
 
   uint8_t spcPercussionBaseInit;
