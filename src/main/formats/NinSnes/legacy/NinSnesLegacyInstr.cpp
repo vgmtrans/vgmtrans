@@ -36,8 +36,8 @@ VGMInstr* findInstrByProgram(const std::vector<VGMInstr*>& instrs, uint32_t prog
   return nullptr;
 }
 
-uint16_t readPitchScale(NinSnesVersion version, uint8_t pitchHigh, uint8_t pitchLow) {
-  if (version == NINSNES_EARLIER) {
+uint16_t readPitchScale(const NinSnesProfile& profile, uint8_t pitchHigh, uint8_t pitchLow) {
+  if (profile.instrumentLayout == NinSnesInstrumentLayoutId::Earlier5Byte) {
     return static_cast<uint16_t>(static_cast<int8_t>(pitchHigh) * 256);
   }
   return static_cast<uint16_t>((pitchHigh << 8) | pitchLow);
@@ -132,6 +132,7 @@ VGMRgn* createRgnFromHeaderData(VGMInstr* instr,
                                 NinSnesVersion version,
                                 uint32_t spcDirAddr,
                                 const std::array<uint8_t, 6>& regionData) {
+  const auto& profile = getNinSnesProfile(version);
   const uint8_t srcn = regionData[0];
   const uint8_t adsr1 = regionData[1];
   const uint8_t adsr2 = regionData[2];
@@ -142,7 +143,7 @@ VGMRgn* createRgnFromHeaderData(VGMInstr* instr,
     return nullptr;
   }
 
-  const auto tuning = calculatePitchTuning(readPitchScale(version, regionData[4], regionData[5]));
+  const auto tuning = calculatePitchTuning(readPitchScale(profile, regionData[4], regionData[5]));
 
   auto* rgn = new VGMRgn(instr, 0, NinSnesInstr::expectedSize(version));
   rgn->sampOffset = rawFile->readShort(offDirEnt) - spcDirAddr;
@@ -426,23 +427,26 @@ NinSnesRgn::NinSnesRgn(NinSnesInstr *instr,
                        uint16_t konamiTuningTableAddress,
                        uint8_t konamiTuningTableSize) :
     VGMRgn(instr, offset, NinSnesInstr::expectedSize(ver)), version(ver) {
+  const auto& profile = getNinSnesProfile(version);
   uint8_t srcn = readByte(offset);
   uint8_t adsr1 = readByte(offset + 1);
   uint8_t adsr2 = readByte(offset + 2);
   uint8_t gain = readByte(offset + 3);
   const uint8_t pitchHigh = readByte(offset + 4);
-  const uint8_t pitchLow = (version == NINSNES_EARLIER) ? 0 : readByte(offset + 5);
-  const auto tuning = calculatePitchTuning(readPitchScale(version, pitchHigh, pitchLow));
+  const bool earlierLayout = profile.instrumentLayout == NinSnesInstrumentLayoutId::Earlier5Byte;
+  const uint8_t pitchLow = earlierLayout ? 0 : readByte(offset + 5);
+  const auto tuning = calculatePitchTuning(readPitchScale(profile, pitchHigh, pitchLow));
 
   addSampNum(srcn, offset, 1);
   addChild(offset + 1, 1, "ADSR1");
   addChild(offset + 2, 1, "ADSR2");
   addChild(offset + 3, 1, "GAIN");
-  if (version == NINSNES_EARLIER) {
+  if (earlierLayout) {
     addUnityKey(tuning.unityKey, offset + 4, 1);
     addFineTune(tuning.fineTune, offset + 4, 1);
   }
-  else if (version == NINSNES_KONAMI && konamiTuningTableAddress != 0) {
+  else if (profile.instrumentLayout == NinSnesInstrumentLayoutId::KonamiTuningTable &&
+           konamiTuningTableAddress != 0) {
     uint16_t addrTuningTableCoarse = konamiTuningTableAddress;
     uint16_t addrTuningTableFine = konamiTuningTableAddress + konamiTuningTableSize;
 
