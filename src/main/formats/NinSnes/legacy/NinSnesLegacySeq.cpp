@@ -400,66 +400,34 @@ double NinSnesSeq::getTempoInBPM(uint8_t tempo) {
 }
 
 uint16_t NinSnesSeq::convertToAPUAddress(uint16_t offset) {
-  if (version == NINSNES_KONAMI) {
-    return konamiBaseAddress + offset;
-  }
-  else if (version == NINSNES_FALCOM_YS4) {
-    return falcomBaseOffset + offset;
-  }
-  else {
-    return offset;
-  }
+  return convertNinSnesAddress(getNinSnesProfile(profileId), offset, konamiBaseAddress, falcomBaseOffset);
 }
 
 uint16_t NinSnesSeq::getShortAddress(uint32_t offset) {
-  return convertToAPUAddress(readShort(offset));
+  return readNinSnesAddress(
+      getNinSnesProfile(profileId), rawFile(), offset, konamiBaseAddress, falcomBaseOffset);
 }
 
 uint32_t NinSnesSeq::resolveProgramNumber(uint8_t instrumentByte, uint8_t* logicalInstrIndex) const {
-  uint8_t logicalProgram = instrumentByte;
-
-  if (version != NINSNES_HUMAN && instrumentByte >= 0x80) {
-    logicalProgram =
-        static_cast<uint8_t>((instrumentByte - STATUS_PERCUSSION_NOTE_MIN) + spcPercussionBase);
-  }
-
-  if (version == NINSNES_QUINTET_ACTR) {
-    logicalProgram = static_cast<uint8_t>(logicalProgram + quintetBGMInstrBase);
-  }
-  else if (NinSnesFormat::isQuintetVersion(version)) {
-    logicalProgram = readByte(quintetAddrBGMInstrLookup + logicalProgram);
-  }
-
-  if (logicalInstrIndex != nullptr) {
-    *logicalInstrIndex = logicalProgram;
-  }
-
-  if (version == NINSNES_INTELLI_TA && logicalProgram < intelliInstrumentProgramMap.size()) {
-    return intelliInstrumentProgramMap[logicalProgram];
-  }
-
-  return logicalProgram;
+  return resolveNinSnesProgramNumber(getNinSnesProfile(profileId),
+                                     rawFile(),
+                                     instrumentByte,
+                                     STATUS_PERCUSSION_NOTE_MIN,
+                                     spcPercussionBase,
+                                     quintetBGMInstrBase,
+                                     quintetAddrBGMInstrLookup,
+                                     &intelliInstrumentProgramMap,
+                                     logicalInstrIndex);
 }
 
 bool NinSnesSeq::usesIntelliCustomPercTable() const {
-  if (version == NINSNES_INTELLI_FE4) {
-    return true;
-  }
-
-  if (version == NINSNES_INTELLI_TA) {
-    return (intelliPerc.flags & 0x40) != 0;
-  }
-
-  return intelliUseCustomPercTable;
+  return usesNinSnesIntelliCustomPercTable(
+      getNinSnesProfile(profileId), intelliUseCustomPercTable, intelliPerc.flags);
 }
 
 void NinSnesSeq::setIntelliCustomPercTableEnabled(bool enabled) {
-  if (isIntelliTablePercussionVersion(version)) {
-    updateIntelliFlags(intelliPerc.flags, 0x40, enabled);
-    return;
-  }
-
-  intelliUseCustomPercTable = enabled;
+  setNinSnesIntelliCustomPercTableEnabled(
+      getNinSnesProfile(profileId), enabled, intelliUseCustomPercTable, intelliPerc.flags);
 }
 
 uint32_t NinSnesSeq::registerIntelliTAInstrumentOverride(
@@ -1915,86 +1883,23 @@ uint16_t NinSnesTrack::getShortAddress(uint32_t offset) {
 
 void NinSnesTrack::getVolumeBalance(uint16_t pan, double &volumeLeft, double &volumeRight) {
   NinSnesSeq *parentSeq = (NinSnesSeq *) this->parentSeq;
-
-  uint8_t panIndex = pan >> 8;
-  if (parentSeq->version == NINSNES_TOSE) {
-    if (panIndex <= 10) {
-      // pan right, decrease left volume
-      volumeLeft = (255 - 25 * std::max(10 - panIndex, 0)) / 256.0;
-      volumeRight = 1.0;
-    }
-    else {
-      // pan left, decrease right volume
-      volumeLeft = 1.0;
-      volumeRight = (255 - 25 * std::max(panIndex - 10, 0)) / 256.0;
-    }
-  }
-  else {
-    uint8_t panMaxIndex = (uint8_t) (parentSeq->panTable.size() - 1);
-    if (panIndex > panMaxIndex) {
-      // unexpected behavior
-      pan = panMaxIndex << 8;
-      panIndex = panMaxIndex;
-    }
-
-    // actual engine divides pan by 256, though pan value is 7-bit
-    // by the way, note that it is right-to-left pan
-    volumeRight = readPanTable((panMaxIndex << 8) - pan) / 128.0;
-    volumeLeft = readPanTable(pan) / 128.0;
-
-    if (parentSeq->version == NINSNES_HAL) {
-      // left-to-right pan
-      std::swap(volumeLeft, volumeRight);
-    }
-  }
+  getNinSnesVolumeBalance(getNinSnesProfile(parentSeq->profileId), parentSeq->panTable, pan, volumeLeft, volumeRight);
 }
 
 uint8_t NinSnesTrack::readPanTable(uint16_t pan) {
   NinSnesSeq *parentSeq = (NinSnesSeq *) this->parentSeq;
-
-  if (parentSeq->version == NINSNES_TOSE) {
-    // no pan table
-    return 0;
-  }
-
-  uint8_t panIndex = pan >> 8;
-  uint8_t panFraction = pan & 0xff;
-
-  uint8_t panMaxIndex = (uint8_t) (parentSeq->panTable.size() - 1);
-  if (panIndex > panMaxIndex) {
-    // unexpected behavior
-    panIndex = panMaxIndex;
-    panFraction = 0; // floor(pan)
-  }
-
-  uint8_t volumeRate = parentSeq->panTable[panIndex];
-
-  // linear interpolation for pan fade
-  uint8_t nextVolumeRate = (panIndex < panMaxIndex) ? parentSeq->panTable[panIndex + 1] : volumeRate;
-  uint8_t volumeRateDelta = nextVolumeRate - volumeRate;
-  volumeRate += (volumeRateDelta * panFraction) >> 8;
-
-  return volumeRate;
+  return readNinSnesPanTable(getNinSnesProfile(parentSeq->profileId), parentSeq->panTable, pan);
 }
 
 int8_t NinSnesTrack::calculatePanValue(uint8_t pan, double &volumeScale, bool &reverseLeft, bool &reverseRight) {
   NinSnesSeq *parentSeq = (NinSnesSeq *) this->parentSeq;
-
-  uint8_t panIndex;
-  if (parentSeq->version == NINSNES_TOSE) {
-    panIndex = pan;
-    reverseLeft = false;
-    reverseRight = false;
-  }
-  else {
-    panIndex = pan & 0x1f;
-    reverseLeft = (pan & 0x80) != 0;
-    reverseRight = (pan & 0x40) != 0;
-  }
+  const auto panState = decodeNinSnesPanValue(getNinSnesProfile(parentSeq->profileId), pan);
+  reverseLeft = panState.reverseLeft;
+  reverseRight = panState.reverseRight;
 
   double volumeLeft;
   double volumeRight;
-  getVolumeBalance(panIndex << 8, volumeLeft, volumeRight);
+  getVolumeBalance(panState.panIndex << 8, volumeLeft, volumeRight);
 
   // TODO: correct volume scale of TOSE sequence
   int8_t midiPan = convertVolumeBalanceToStdMidiPan(volumeLeft, volumeRight, &volumeScale);

@@ -1,6 +1,11 @@
 #include "NinSnesProfile.h"
 
 #include <array>
+#include <algorithm>
+#include <utility>
+
+#include "SNESDSP.h"
+#include "io/RawFile.h"
 
 namespace {
 
@@ -352,8 +357,277 @@ const NinSnesProfile& getNinSnesProfile(NinSnesVersion version) {
   return kUnknownProfile;
 }
 
+const NinSnesProfile& getNinSnesProfile(NinSnesProfileId id) {
+  for (const auto& profile : kProfiles) {
+    if (profile.id == id) {
+      return profile;
+    }
+  }
+
+  return kUnknownProfile;
+}
+
 NinSnesProfileId getNinSnesProfileId(NinSnesVersion version) {
   return getNinSnesProfile(version).id;
+}
+
+uint16_t convertNinSnesAddress(const NinSnesProfile& profile,
+                               uint16_t rawAddress,
+                               uint16_t konamiBaseAddress,
+                               uint16_t falcomBaseOffset) {
+  switch (profile.addressModel) {
+    case NinSnesAddressModelId::KonamiBase:
+      return static_cast<uint16_t>(konamiBaseAddress + rawAddress);
+
+    case NinSnesAddressModelId::FalcomBaseOffset:
+      return static_cast<uint16_t>(falcomBaseOffset + rawAddress);
+
+    case NinSnesAddressModelId::Direct:
+    default:
+      return rawAddress;
+  }
+}
+
+uint16_t readNinSnesAddress(const NinSnesProfile& profile,
+                            const RawFile* file,
+                            uint32_t offset,
+                            uint16_t konamiBaseAddress,
+                            uint16_t falcomBaseOffset) {
+  return convertNinSnesAddress(profile, file->readShort(offset), konamiBaseAddress, falcomBaseOffset);
+}
+
+uint32_t getNinSnesInstrumentHeaderSize(const NinSnesProfile& profile) {
+  return profile.instrumentLayout == NinSnesInstrumentLayoutId::Earlier5Byte ? 5 : 6;
+}
+
+uint16_t getNinSnesInstrumentSlotCount(const NinSnesProfile& profile) {
+  if (profile.legacyVersion == NINSNES_HUMAN) {
+    return static_cast<uint16_t>((0x200 / getNinSnesInstrumentHeaderSize(profile)) + 1);
+  }
+
+  return 0x80;
+}
+
+bool isBlankNinSnesInstrumentSlot(const NinSnesProfile& profile,
+                                  const RawFile* file,
+                                  uint32_t addrInstrHeader) {
+  const uint32_t instrItemSize = getNinSnesInstrumentHeaderSize(profile);
+  if (addrInstrHeader + instrItemSize > 0x10000) {
+    return false;
+  }
+
+  if (profile.instrumentLayout == NinSnesInstrumentLayoutId::Earlier5Byte) {
+    return false;
+  }
+
+  bool allZero = true;
+  bool allFF = true;
+  for (uint32_t i = 0; i < instrItemSize; i++) {
+    const uint8_t b = file->readByte(addrInstrHeader + i);
+    allZero &= (b == 0x00);
+    allFF &= (b == 0xFF);
+  }
+  return allZero || allFF;
+}
+
+bool isValidNinSnesInstrumentHeader(const NinSnesProfile& profile,
+                                    const RawFile* file,
+                                    uint32_t addrInstrHeader,
+                                    uint32_t spcDirAddr,
+                                    bool validateSample) {
+  const uint32_t instrItemSize = getNinSnesInstrumentHeaderSize(profile);
+  if (addrInstrHeader + instrItemSize > 0x10000) {
+    return false;
+  }
+
+  std::vector<uint8_t> instrHeader(instrItemSize);
+  file->readBytes(addrInstrHeader, instrItemSize, instrHeader.data());
+  if (std::all_of(instrHeader.cbegin(), instrHeader.cend(), [](uint8_t b) { return b == 0x00 || b == 0xFF; })) {
+    return false;
+  }
+
+  const uint8_t srcn = instrHeader[0];
+  const uint8_t adsr1 = instrHeader[1];
+  const uint8_t gain = instrHeader[3];
+  if (srcn >= 0x80 || (adsr1 == 0 && gain == 0)) {
+    return false;
+  }
+
+  const uint32_t addrDIRentry = spcDirAddr + (srcn * 4);
+  if (!SNESSampColl::isValidSampleDir(file, addrDIRentry, validateSample)) {
+    return false;
+  }
+
+  const uint16_t srcAddr = file->readShort(addrDIRentry);
+  const uint16_t loopStartAddr = file->readShort(addrDIRentry + 2);
+  if (srcAddr > loopStartAddr || (loopStartAddr - srcAddr) % 9 != 0) {
+    return false;
+  }
+
+  return true;
+}
+
+bool requiresNinSnesSampleStartAfterDirEntry(const NinSnesProfile& profile) {
+  return profile.legacyVersion == NINSNES_EARLIER || profile.legacyVersion == NINSNES_STANDARD;
+}
+
+bool loadsFullNinSnesSampleDirectory(const NinSnesProfile& profile) {
+  return profile.legacyVersion == NINSNES_INTELLI_TA;
+}
+
+uint32_t resolveNinSnesProgramNumber(const NinSnesProfile& profile,
+                                     const RawFile* file,
+                                     uint8_t instrumentByte,
+                                     uint8_t percussionStatusMin,
+                                     uint8_t percussionBase,
+                                     uint8_t quintetBgmInstrBase,
+                                     uint16_t quintetInstrLookupAddr,
+                                     const std::array<uint32_t, 0x80>* intelliInstrumentProgramMap,
+                                     uint8_t* logicalProgram) {
+  uint8_t resolvedLogicalProgram = instrumentByte;
+
+  if (profile.programResolver != NinSnesProgramResolverId::Direct && instrumentByte >= 0x80) {
+    resolvedLogicalProgram =
+        static_cast<uint8_t>((instrumentByte - percussionStatusMin) + percussionBase);
+  }
+
+  switch (profile.programResolver) {
+    case NinSnesProgramResolverId::QuintetActRBase:
+      resolvedLogicalProgram = static_cast<uint8_t>(resolvedLogicalProgram + quintetBgmInstrBase);
+      break;
+
+    case NinSnesProgramResolverId::QuintetLookup:
+      resolvedLogicalProgram = file->readByte(quintetInstrLookupAddr + resolvedLogicalProgram);
+      break;
+
+    case NinSnesProgramResolverId::IntelliTaOverride:
+      break;
+
+    case NinSnesProgramResolverId::StandardPercussion:
+    case NinSnesProgramResolverId::Direct:
+    default:
+      break;
+  }
+
+  if (logicalProgram != nullptr) {
+    *logicalProgram = resolvedLogicalProgram;
+  }
+
+  if (profile.programResolver == NinSnesProgramResolverId::IntelliTaOverride &&
+      intelliInstrumentProgramMap != nullptr &&
+      resolvedLogicalProgram < intelliInstrumentProgramMap->size()) {
+    return (*intelliInstrumentProgramMap)[resolvedLogicalProgram];
+  }
+
+  return resolvedLogicalProgram;
+}
+
+bool usesNinSnesIntelliCustomPercTable(const NinSnesProfile& profile,
+                                       bool runtimeCustomPercTable,
+                                       uint8_t intelliPercFlags) {
+  if (profile.legacyVersion == NINSNES_INTELLI_FE4) {
+    return true;
+  }
+
+  if (profile.legacyVersion == NINSNES_INTELLI_TA) {
+    return (intelliPercFlags & 0x40) != 0;
+  }
+
+  return runtimeCustomPercTable;
+}
+
+void setNinSnesIntelliCustomPercTableEnabled(const NinSnesProfile& profile,
+                                             bool enabled,
+                                             bool& runtimeCustomPercTable,
+                                             uint8_t& intelliPercFlags) {
+  if (profile.legacyVersion == NINSNES_INTELLI_TA || profile.legacyVersion == NINSNES_INTELLI_FE4) {
+    if (enabled) {
+      intelliPercFlags |= 0x40;
+    }
+    else {
+      intelliPercFlags &= static_cast<uint8_t>(~0x40);
+    }
+    return;
+  }
+
+  runtimeCustomPercTable = enabled;
+}
+
+uint8_t readNinSnesPanTable(const NinSnesProfile& profile,
+                            const std::vector<uint8_t>& panTable,
+                            uint16_t pan) {
+  if (profile.panModel == NinSnesPanModelId::ToseLinear) {
+    return 0;
+  }
+
+  if (panTable.empty()) {
+    return 0;
+  }
+
+  uint8_t panIndex = pan >> 8;
+  uint8_t panFraction = pan & 0xff;
+
+  uint8_t panMaxIndex = static_cast<uint8_t>(panTable.size() - 1);
+  if (panIndex > panMaxIndex) {
+    panIndex = panMaxIndex;
+    panFraction = 0;
+  }
+
+  uint8_t volumeRate = panTable[panIndex];
+  uint8_t nextVolumeRate = (panIndex < panMaxIndex) ? panTable[panIndex + 1] : volumeRate;
+  uint8_t volumeRateDelta = nextVolumeRate - volumeRate;
+  volumeRate += (volumeRateDelta * panFraction) >> 8;
+  return volumeRate;
+}
+
+void getNinSnesVolumeBalance(const NinSnesProfile& profile,
+                             const std::vector<uint8_t>& panTable,
+                             uint16_t pan,
+                             double& volumeLeft,
+                             double& volumeRight) {
+  uint8_t panIndex = pan >> 8;
+  if (profile.panModel == NinSnesPanModelId::ToseLinear) {
+    if (panIndex <= 10) {
+      volumeLeft = (255 - 25 * std::max(10 - panIndex, 0)) / 256.0;
+      volumeRight = 1.0;
+    }
+    else {
+      volumeLeft = 1.0;
+      volumeRight = (255 - 25 * std::max(panIndex - 10, 0)) / 256.0;
+    }
+    return;
+  }
+
+  if (panTable.empty()) {
+    volumeLeft = 1.0;
+    volumeRight = 1.0;
+    return;
+  }
+
+  uint8_t panMaxIndex = static_cast<uint8_t>(panTable.size() - 1);
+  if (panIndex > panMaxIndex) {
+    pan = panMaxIndex << 8;
+    panIndex = panMaxIndex;
+  }
+
+  volumeRight = readNinSnesPanTable(profile, panTable, (panMaxIndex << 8) - pan) / 128.0;
+  volumeLeft = readNinSnesPanTable(profile, panTable, pan) / 128.0;
+
+  if (profile.panModel == NinSnesPanModelId::HalTable) {
+    std::swap(volumeLeft, volumeRight);
+  }
+}
+
+NinSnesPanState decodeNinSnesPanValue(const NinSnesProfile& profile, uint8_t pan) {
+  if (profile.panModel == NinSnesPanModelId::ToseLinear) {
+    return {pan, false, false};
+  }
+
+  return {
+      static_cast<uint8_t>(pan & 0x1f),
+      (pan & 0x80) != 0,
+      (pan & 0x40) != 0,
+  };
 }
 
 NinSnesSeqDefinition buildNinSnesSeqDefinition(NinSnesVersion version,

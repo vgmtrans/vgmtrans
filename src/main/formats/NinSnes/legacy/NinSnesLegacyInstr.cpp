@@ -18,7 +18,7 @@ uint32_t getProgramNumber(const VGMInstr* instr) {
 }
 
 bool usesIntelliTempDrumKitExport(NinSnesVersion version) {
-  return version == NINSNES_INTELLI_TA || version == NINSNES_INTELLI_FE4;
+  return getNinSnesProfile(version).supportsDynamicDrumKitExport;
 }
 
 VGMInstr* findInstrByProgram(const std::vector<VGMInstr*>& instrs, uint32_t progNum) {
@@ -178,36 +178,22 @@ bool NinSnesInstrSet::parseHeader() {
 }
 
 bool NinSnesInstrSet::parseInstrPointers() {
-  uint8_t instr_max = 0x7f;
-  if (version == NINSNES_HUMAN) {
-    instr_max = 0x200 / NinSnesInstr::expectedSize(version);
+  const auto& profile = getNinSnesProfile(profileId);
+  const uint16_t instrCount = getNinSnesInstrumentSlotCount(profile);
+  if (instrCount == 0) {
+    return false;
   }
 
   usedSRCNs.clear();
-  for (int instr = 0; instr <= instr_max; instr++) {
+  for (uint16_t instr = 0; instr < instrCount; instr++) {
     uint32_t instrItemSize = NinSnesInstr::expectedSize(version);
     uint32_t addrInstrHeader = offset() + (instrItemSize * instr);
     if (addrInstrHeader + instrItemSize > 0x10000) {
       return false;
     }
 
-    // skip blank slot
-    if (version != NINSNES_EARLIER) {
-      // Kirby Super Star
-      if (readByte(addrInstrHeader) == 0xff && readByte(addrInstrHeader + 1) == 0xff
-        && readByte(addrInstrHeader + 2) == 0xff &&
-        readByte(addrInstrHeader + 3) == 0xff && readByte(addrInstrHeader + 4) == 0xff
-        && readByte(addrInstrHeader + 5) == 0xff) {
-        continue;
-      }
-
-      // Bubsy in Claws Encounters of the Furred Kind
-      if (readByte(addrInstrHeader) == 0 && readByte(addrInstrHeader + 1) == 0
-        && readByte(addrInstrHeader + 2) == 0 &&
-        readByte(addrInstrHeader + 3) == 0 && readByte(addrInstrHeader + 4) == 0
-        && readByte(addrInstrHeader + 5) == 0) {
-        continue;
-      }
+    if (isBlankNinSnesInstrumentSlot(profile, this->rawFile(), addrInstrHeader)) {
+      continue;
     }
 
     uint8_t srcn = readByte(addrInstrHeader);
@@ -233,7 +219,7 @@ bool NinSnesInstrSet::parseInstrPointers() {
       continue;
     }
 
-    if (version == NINSNES_EARLIER || version == NINSNES_STANDARD) {
+    if (requiresNinSnesSampleStartAfterDirEntry(profile)) {
       if (addrSampStart < offDirEnt + 4) {
         continue;
       }
@@ -257,7 +243,7 @@ bool NinSnesInstrSet::parseInstrPointers() {
 
   std::sort(usedSRCNs.begin(), usedSRCNs.end());
   SNESSampColl *newSampColl = nullptr;
-  if (version == NINSNES_INTELLI_TA) {
+  if (loadsFullNinSnesSampleDirectory(profile)) {
     newSampColl = new SNESSampColl(NinSnesFormat::name, this->rawFile(), spcDirAddr, 0x80);
   }
   else {
@@ -408,51 +394,12 @@ bool NinSnesInstr::isValidHeader(RawFile *file,
                                  uint32_t addrInstrHeader,
                                  uint32_t spcDirAddr,
                                  bool validateSample) {
-  
-  auto instrItemSize = NinSnesInstr::expectedSize(version);
-
-  if (addrInstrHeader + instrItemSize > 0x10000) {
-    return false;
-  }
-
-  std::vector<uint8_t> instrHeader(instrItemSize);
-  file->readBytes(addrInstrHeader, instrItemSize, instrHeader.data());
-
-  if (std::all_of(instrHeader.cbegin(), instrHeader.cend(),
-                  [](const uint8_t b) { return b == 0x00 || b == 0xFF; })) {
-    return false;
-  }
-
-  const uint8_t &srcn = instrHeader[0];
-  const uint8_t &adsr1 = instrHeader[1];
-  const uint8_t &adsr2 = instrHeader[2];
-  const uint8_t &gain = instrHeader[3];
-
-  if (srcn >= 0x80 || (adsr1 == 0 && gain == 0)) {
-    return false;
-  }
-
-  uint32_t addrDIRentry = spcDirAddr + (srcn * 4);
-  if (!SNESSampColl::isValidSampleDir(file, addrDIRentry, validateSample)) {
-    return false;
-  }
-
-  uint16_t srcAddr = file->readShort(addrDIRentry);
-  uint16_t loopStartAddr = file->readShort(addrDIRentry + 2);
-  if (srcAddr > loopStartAddr || (loopStartAddr - srcAddr) % 9 != 0) {
-    return false;
-  }
-
-  return true;
+  return isValidNinSnesInstrumentHeader(
+      getNinSnesProfile(version), file, addrInstrHeader, spcDirAddr, validateSample);
 }
 
 uint32_t NinSnesInstr::expectedSize(NinSnesVersion version) {
-  if (version == NINSNES_EARLIER) {
-    return 5;
-  }
-  else {
-    return 6;
-  }
+  return getNinSnesInstrumentHeaderSize(getNinSnesProfile(version));
 }
 
 // ***********
