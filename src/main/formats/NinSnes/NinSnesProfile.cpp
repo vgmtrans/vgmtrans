@@ -14,6 +14,13 @@ std::vector<uint8_t> defaultTable(const std::array<uint8_t, N>& values) {
   return {values.begin(), values.end()};
 }
 
+template <size_t N>
+void assignDefaultTableIfEmpty(std::vector<uint8_t>& table, const std::array<uint8_t, N>& values) {
+  if (table.empty()) {
+    table = defaultTable(values);
+  }
+}
+
 void loadStandardVcmdMap(std::map<uint8_t, NinSnesSeqEventType>& eventMap, uint8_t statusByte) {
   eventMap[statusByte + 0x00] = EVENT_PROGCHANGE;
   eventMap[statusByte + 0x01] = EVENT_PAN;
@@ -104,6 +111,229 @@ constexpr std::array<uint8_t, 64> kDurVolTableIntelliFe4 = {
     0xd6, 0xd8, 0xdb, 0xdd, 0xe0, 0xe2, 0xe5, 0xe8,
     0xea, 0xed, 0xef, 0xf2, 0xf4, 0xf7, 0xf9, 0xfc,
 };
+
+void initializeSeqDefinition(NinSnesSeqDefinition& definition, const NinSnesProfile& profile) {
+  definition.status = (profile.baseProfile == NinSnesBaseProfileId::Earlier)
+                          ? NinSnesSeqStatus {0x00, 0x80, 0xc5, 0xd0, 0xd9}
+                          : NinSnesSeqStatus {0x00, 0x80, 0xc7, 0xca, 0xdf};
+
+  definition.eventMap[0x00] = EVENT_END;
+
+  for (int statusByte = 0x01; statusByte < definition.status.noteMin; statusByte++) {
+    definition.eventMap[static_cast<uint8_t>(statusByte)] = EVENT_NOTE_PARAM;
+  }
+
+  for (int statusByte = definition.status.noteMin; statusByte <= definition.status.noteMax; statusByte++) {
+    definition.eventMap[static_cast<uint8_t>(statusByte)] = EVENT_NOTE;
+  }
+
+  definition.eventMap[definition.status.noteMax + 1] = EVENT_TIE;
+  definition.eventMap[definition.status.noteMax + 2] = EVENT_REST;
+
+  for (int statusByte = definition.status.percussionNoteMin;
+       statusByte <= definition.status.percussionNoteMax;
+       statusByte++) {
+    definition.eventMap[static_cast<uint8_t>(statusByte)] = EVENT_PERCUSSION_NOTE;
+  }
+}
+
+void applyEarlierSeqDialect(NinSnesSeqDefinition& definition) {
+  definition.eventMap[0xda] = EVENT_PROGCHANGE;
+  definition.eventMap[0xdb] = EVENT_PAN;
+  definition.eventMap[0xdc] = EVENT_PAN_FADE;
+  definition.eventMap[0xdd] = EVENT_PITCH_SLIDE;
+  definition.eventMap[0xde] = EVENT_VIBRATO_ON;
+  definition.eventMap[0xdf] = EVENT_VIBRATO_OFF;
+  definition.eventMap[0xe0] = EVENT_MASTER_VOLUME;
+  definition.eventMap[0xe1] = EVENT_MASTER_VOLUME_FADE;
+  definition.eventMap[0xe2] = EVENT_TEMPO;
+  definition.eventMap[0xe3] = EVENT_TEMPO_FADE;
+  definition.eventMap[0xe4] = EVENT_GLOBAL_TRANSPOSE;
+  definition.eventMap[0xe5] = EVENT_TREMOLO_ON;
+  definition.eventMap[0xe6] = EVENT_TREMOLO_OFF;
+  definition.eventMap[0xe7] = EVENT_VOLUME;
+  definition.eventMap[0xe8] = EVENT_VOLUME_FADE;
+  definition.eventMap[0xe9] = EVENT_CALL;
+  definition.eventMap[0xea] = EVENT_VIBRATO_FADE;
+  definition.eventMap[0xeb] = EVENT_PITCH_ENVELOPE_TO;
+  definition.eventMap[0xec] = EVENT_PITCH_ENVELOPE_FROM;
+  definition.eventMap[0xee] = EVENT_TUNING;
+  definition.eventMap[0xef] = EVENT_ECHO_ON;
+  definition.eventMap[0xf0] = EVENT_ECHO_OFF;
+  definition.eventMap[0xf1] = EVENT_ECHO_PARAM;
+  definition.eventMap[0xf2] = EVENT_ECHO_VOLUME_FADE;
+
+  assignDefaultTableIfEmpty(definition.volumeTable, kVolumeTableEarlier);
+  assignDefaultTableIfEmpty(definition.durRateTable, kDurTableEarlier);
+  assignDefaultTableIfEmpty(definition.panTable, kPanTableEarlier);
+}
+
+void applyStandardSeqDialect(NinSnesSeqDefinition& definition) {
+  loadStandardVcmdMap(definition.eventMap, 0xe0);
+  assignDefaultTableIfEmpty(definition.volumeTable, kVolumeTableStandard);
+  assignDefaultTableIfEmpty(definition.durRateTable, kDurTableStandard);
+  assignDefaultTableIfEmpty(definition.panTable, kPanTableStandard);
+}
+
+void applyIntelliFe3SeqDialect(NinSnesSeqDefinition& definition) {
+  for (int statusByte = 0x01; statusByte < definition.status.noteMin; statusByte++) {
+    definition.eventMap[static_cast<uint8_t>(statusByte)] = EVENT_INTELLI_NOTE_PARAM;
+  }
+  loadStandardVcmdMap(definition.eventMap, 0xd6);
+  definition.eventMap[0xf1] = EVENT_INTELLI_ECHO_ON;
+  definition.eventMap[0xf2] = EVENT_INTELLI_ECHO_OFF;
+  definition.eventMap[0xf3] = EVENT_INTELLI_LEGATO_ON;
+  definition.eventMap[0xf4] = EVENT_INTELLI_LEGATO_OFF;
+  definition.eventMap[0xf5] = EVENT_INTELLI_FE3_EVENT_F5;
+  definition.eventMap[0xf6] = EVENT_INTELLI_WRITE_APU_PORT;
+  definition.eventMap[0xf7] = EVENT_INTELLI_JUMP_SHORT_CONDITIONAL;
+  definition.eventMap[0xf8] = EVENT_INTELLI_JUMP_SHORT;
+  definition.eventMap[0xf9] = EVENT_INTELLI_FE3_EVENT_F9;
+  definition.eventMap[0xfa] = EVENT_INTELLI_DEFINE_VOICE_PARAM;
+  definition.eventMap[0xfb] = EVENT_INTELLI_LOAD_VOICE_PARAM;
+  definition.eventMap[0xfc] = EVENT_INTELLI_ADSR;
+  definition.eventMap[0xfd] = EVENT_INTELLI_GAIN_SUSTAIN_TIME_AND_RATE;
+
+  assignDefaultTableIfEmpty(definition.volumeTable, kVolumeTableIntelli);
+  assignDefaultTableIfEmpty(definition.durRateTable, kDurTableIntelli);
+  assignDefaultTableIfEmpty(definition.intelliDurVolTable, kDurVolTableIntelliFe3);
+  assignDefaultTableIfEmpty(definition.panTable, kPanTableStandard);
+}
+
+void applyIntelliTaSeqDialect(NinSnesSeqDefinition& definition) {
+  loadStandardVcmdMap(definition.eventMap, 0xda);
+  definition.eventMap[0xf5] = EVENT_INTELLI_ECHO_ON;
+  definition.eventMap[0xf6] = EVENT_INTELLI_ECHO_OFF;
+  definition.eventMap[0xf7] = EVENT_INTELLI_ADSR;
+  definition.eventMap[0xf8] = EVENT_INTELLI_GAIN_SUSTAIN_TIME_AND_RATE;
+  definition.eventMap[0xf9] = EVENT_INTELLI_GAIN_SUSTAIN_TIME;
+  definition.eventMap[0xfa] = EVENT_INTELLI_DEFINE_VOICE_PARAM;
+  definition.eventMap[0xfb] = EVENT_INTELLI_LOAD_VOICE_PARAM;
+  definition.eventMap[0xfc] = EVENT_INTELLI_FE4_EVENT_FC;
+  definition.eventMap[0xfd] = EVENT_INTELLI_TA_SUBEVENT;
+
+  assignDefaultTableIfEmpty(definition.volumeTable, kVolumeTableIntelli);
+  assignDefaultTableIfEmpty(definition.durRateTable, kDurTableIntelli);
+  assignDefaultTableIfEmpty(definition.panTable, kPanTableStandard);
+}
+
+void applyIntelliFe4SeqDialect(NinSnesSeqDefinition& definition) {
+  for (int statusByte = 0x01; statusByte < definition.status.noteMin; statusByte++) {
+    definition.eventMap[static_cast<uint8_t>(statusByte)] = EVENT_INTELLI_NOTE_PARAM;
+  }
+  loadStandardVcmdMap(definition.eventMap, 0xda);
+  definition.eventMap[0xf5] = EVENT_INTELLI_ECHO_ON;
+  definition.eventMap[0xf6] = EVENT_INTELLI_ECHO_OFF;
+  definition.eventMap[0xf7] = EVENT_INTELLI_GAIN;
+  definition.eventMap[0xf8] = EVENT_INTELLI_GAIN;
+  definition.eventMap[0xf9] = EVENT_UNKNOWN0;
+  definition.eventMap[0xfa] = EVENT_INTELLI_DEFINE_VOICE_PARAM;
+  definition.eventMap[0xfb] = EVENT_INTELLI_LOAD_VOICE_PARAM;
+  definition.eventMap[0xfc] = EVENT_INTELLI_FE4_EVENT_FC;
+  definition.eventMap[0xfd] = EVENT_INTELLI_FE4_SUBEVENT;
+
+  assignDefaultTableIfEmpty(definition.intelliDurVolTable, kDurVolTableIntelliFe4);
+  assignDefaultTableIfEmpty(definition.panTable, kPanTableStandard);
+}
+
+void applyBaseSeqDialect(NinSnesSeqDefinition& definition, const NinSnesProfile& profile) {
+  if (profile.baseProfile == NinSnesBaseProfileId::Earlier) {
+    applyEarlierSeqDialect(definition);
+    return;
+  }
+
+  if (profile.baseProfile == NinSnesBaseProfileId::Intelli) {
+    switch (profile.intelliMode) {
+      case NinSnesIntelliModeId::Fe3:
+        applyIntelliFe3SeqDialect(definition);
+        return;
+
+      case NinSnesIntelliModeId::Ta:
+        applyIntelliTaSeqDialect(definition);
+        return;
+
+      case NinSnesIntelliModeId::Fe4:
+        applyIntelliFe4SeqDialect(definition);
+        return;
+
+      case NinSnesIntelliModeId::None:
+      default:
+        break;
+    }
+  }
+
+  applyStandardSeqDialect(definition);
+}
+
+void applyDerivedSeqOverrides(NinSnesSeqDefinition& definition, const NinSnesProfile& profile) {
+  switch (profile.id) {
+    case NinSnesProfileId::Rd1:
+      definition.eventMap[0xfb] = EVENT_UNKNOWN2;
+      definition.eventMap[0xfc] = EVENT_UNKNOWN0;
+      definition.eventMap[0xfd] = EVENT_UNKNOWN0;
+      definition.eventMap[0xfe] = EVENT_UNKNOWN0;
+      break;
+
+    case NinSnesProfileId::Rd2:
+      definition.eventMap[0xfb] = EVENT_RD2_PROGCHANGE_AND_ADSR;
+      definition.eventMap[0xfd] = EVENT_PROGCHANGE;
+      break;
+
+    case NinSnesProfileId::Konami:
+      definition.eventMap[0xe4] = EVENT_UNKNOWN2;
+      definition.eventMap[0xe5] = EVENT_KONAMI_LOOP_START;
+      definition.eventMap[0xe6] = EVENT_KONAMI_LOOP_END;
+      definition.eventMap[0xe8] = EVENT_NOP;
+      definition.eventMap[0xe9] = EVENT_NOP;
+      definition.eventMap[0xf5] = EVENT_UNKNOWN0;
+      definition.eventMap[0xf6] = EVENT_UNKNOWN0;
+      definition.eventMap[0xf7] = EVENT_UNKNOWN0;
+      definition.eventMap[0xf8] = EVENT_UNKNOWN0;
+      definition.eventMap[0xfb] = EVENT_KONAMI_ADSR_AND_GAIN;
+      definition.eventMap[0xfc] = EVENT_NOP;
+      definition.eventMap[0xfd] = EVENT_NOP;
+      definition.eventMap[0xfe] = EVENT_NOP;
+      break;
+
+    case NinSnesProfileId::Lemmings:
+      for (int statusByte = 0x01; statusByte < definition.status.noteMin; statusByte++) {
+        definition.eventMap[static_cast<uint8_t>(statusByte)] = EVENT_LEMMINGS_NOTE_PARAM;
+      }
+      definition.eventMap[0xe5] = EVENT_UNKNOWN1;
+      definition.eventMap[0xe6] = EVENT_UNKNOWN2;
+      definition.eventMap[0xfb] = EVENT_NOP1;
+      definition.eventMap[0xfc] = EVENT_UNKNOWN0;
+      definition.eventMap[0xfd] = EVENT_UNKNOWN0;
+      definition.eventMap[0xfe] = EVENT_UNKNOWN0;
+      definition.volumeTable.clear();
+      definition.durRateTable.clear();
+      break;
+
+    case NinSnesProfileId::Tose:
+      definition.panTable.clear();
+      break;
+
+    case NinSnesProfileId::QuintetIog:
+    case NinSnesProfileId::QuintetTs:
+      definition.eventMap[0xf4] = EVENT_QUINTET_TUNING;
+      definition.eventMap[0xff] = EVENT_QUINTET_ADSR;
+      break;
+
+    case NinSnesProfileId::Unknown:
+    case NinSnesProfileId::Earlier:
+    case NinSnesProfileId::Standard:
+    case NinSnesProfileId::Hal:
+    case NinSnesProfileId::IntelliFe3:
+    case NinSnesProfileId::IntelliTa:
+    case NinSnesProfileId::IntelliFe4:
+    case NinSnesProfileId::Human:
+    case NinSnesProfileId::QuintetActR:
+    case NinSnesProfileId::QuintetActR2:
+    case NinSnesProfileId::FalcomYs4:
+    default:
+      break;
+  }
+}
 
 constexpr NinSnesProfile kUnknownProfile {
     NinSnesProfileId::Unknown,
@@ -600,236 +830,20 @@ NinSnesSeqDefinition buildNinSnesSeqDefinition(NinSnesVersion version,
                                                const std::vector<uint8_t>& durRateTable,
                                                const std::vector<uint8_t>& panTable,
                                                const std::vector<uint8_t>& intelliDurVolTable) {
+  const auto& profile = getNinSnesProfile(version);
   NinSnesSeqDefinition definition;
   definition.volumeTable = volumeTable;
   definition.durRateTable = durRateTable;
   definition.panTable = panTable;
   definition.intelliDurVolTable = intelliDurVolTable;
 
-  if (version == NINSNES_UNKNOWN) {
+  if (profile.id == NinSnesProfileId::Unknown) {
     return definition;
   }
 
-  switch (version) {
-    case NINSNES_EARLIER:
-      definition.status = {0x00, 0x80, 0xc5, 0xd0, 0xd9};
-      break;
-
-    default:
-      definition.status = {0x00, 0x80, 0xc7, 0xca, 0xdf};
-      break;
-  }
-
-  definition.eventMap[0x00] = EVENT_END;
-
-  for (int statusByte = 0x01; statusByte < definition.status.noteMin; statusByte++) {
-    definition.eventMap[static_cast<uint8_t>(statusByte)] = EVENT_NOTE_PARAM;
-  }
-
-  for (int statusByte = definition.status.noteMin; statusByte <= definition.status.noteMax; statusByte++) {
-    definition.eventMap[static_cast<uint8_t>(statusByte)] = EVENT_NOTE;
-  }
-
-  definition.eventMap[definition.status.noteMax + 1] = EVENT_TIE;
-  definition.eventMap[definition.status.noteMax + 2] = EVENT_REST;
-
-  for (int statusByte = definition.status.percussionNoteMin;
-       statusByte <= definition.status.percussionNoteMax;
-       statusByte++) {
-    definition.eventMap[static_cast<uint8_t>(statusByte)] = EVENT_PERCUSSION_NOTE;
-  }
-
-  switch (version) {
-    case NINSNES_EARLIER:
-      definition.eventMap[0xda] = EVENT_PROGCHANGE;
-      definition.eventMap[0xdb] = EVENT_PAN;
-      definition.eventMap[0xdc] = EVENT_PAN_FADE;
-      definition.eventMap[0xdd] = EVENT_PITCH_SLIDE;
-      definition.eventMap[0xde] = EVENT_VIBRATO_ON;
-      definition.eventMap[0xdf] = EVENT_VIBRATO_OFF;
-      definition.eventMap[0xe0] = EVENT_MASTER_VOLUME;
-      definition.eventMap[0xe1] = EVENT_MASTER_VOLUME_FADE;
-      definition.eventMap[0xe2] = EVENT_TEMPO;
-      definition.eventMap[0xe3] = EVENT_TEMPO_FADE;
-      definition.eventMap[0xe4] = EVENT_GLOBAL_TRANSPOSE;
-      definition.eventMap[0xe5] = EVENT_TREMOLO_ON;
-      definition.eventMap[0xe6] = EVENT_TREMOLO_OFF;
-      definition.eventMap[0xe7] = EVENT_VOLUME;
-      definition.eventMap[0xe8] = EVENT_VOLUME_FADE;
-      definition.eventMap[0xe9] = EVENT_CALL;
-      definition.eventMap[0xea] = EVENT_VIBRATO_FADE;
-      definition.eventMap[0xeb] = EVENT_PITCH_ENVELOPE_TO;
-      definition.eventMap[0xec] = EVENT_PITCH_ENVELOPE_FROM;
-      definition.eventMap[0xee] = EVENT_TUNING;
-      definition.eventMap[0xef] = EVENT_ECHO_ON;
-      definition.eventMap[0xf0] = EVENT_ECHO_OFF;
-      definition.eventMap[0xf1] = EVENT_ECHO_PARAM;
-      definition.eventMap[0xf2] = EVENT_ECHO_VOLUME_FADE;
-
-      if (definition.volumeTable.empty()) {
-        definition.volumeTable = defaultTable(kVolumeTableEarlier);
-      }
-      if (definition.durRateTable.empty()) {
-        definition.durRateTable = defaultTable(kDurTableEarlier);
-      }
-      if (definition.panTable.empty()) {
-        definition.panTable = defaultTable(kPanTableEarlier);
-      }
-      break;
-
-    case NINSNES_INTELLI_FE3:
-      for (int statusByte = 0x01; statusByte < definition.status.noteMin; statusByte++) {
-        definition.eventMap[static_cast<uint8_t>(statusByte)] = EVENT_INTELLI_NOTE_PARAM;
-      }
-      loadStandardVcmdMap(definition.eventMap, 0xd6);
-      definition.eventMap[0xf1] = EVENT_INTELLI_ECHO_ON;
-      definition.eventMap[0xf2] = EVENT_INTELLI_ECHO_OFF;
-      definition.eventMap[0xf3] = EVENT_INTELLI_LEGATO_ON;
-      definition.eventMap[0xf4] = EVENT_INTELLI_LEGATO_OFF;
-      definition.eventMap[0xf5] = EVENT_INTELLI_FE3_EVENT_F5;
-      definition.eventMap[0xf6] = EVENT_INTELLI_WRITE_APU_PORT;
-      definition.eventMap[0xf7] = EVENT_INTELLI_JUMP_SHORT_CONDITIONAL;
-      definition.eventMap[0xf8] = EVENT_INTELLI_JUMP_SHORT;
-      definition.eventMap[0xf9] = EVENT_INTELLI_FE3_EVENT_F9;
-      definition.eventMap[0xfa] = EVENT_INTELLI_DEFINE_VOICE_PARAM;
-      definition.eventMap[0xfb] = EVENT_INTELLI_LOAD_VOICE_PARAM;
-      definition.eventMap[0xfc] = EVENT_INTELLI_ADSR;
-      definition.eventMap[0xfd] = EVENT_INTELLI_GAIN_SUSTAIN_TIME_AND_RATE;
-
-      if (definition.volumeTable.empty()) {
-        definition.volumeTable = defaultTable(kVolumeTableIntelli);
-      }
-      if (definition.durRateTable.empty()) {
-        definition.durRateTable = defaultTable(kDurTableIntelli);
-      }
-      if (definition.intelliDurVolTable.empty()) {
-        definition.intelliDurVolTable = defaultTable(kDurVolTableIntelliFe3);
-      }
-      if (definition.panTable.empty()) {
-        definition.panTable = defaultTable(kPanTableStandard);
-      }
-      break;
-
-    case NINSNES_INTELLI_TA:
-      loadStandardVcmdMap(definition.eventMap, 0xda);
-      definition.eventMap[0xf5] = EVENT_INTELLI_ECHO_ON;
-      definition.eventMap[0xf6] = EVENT_INTELLI_ECHO_OFF;
-      definition.eventMap[0xf7] = EVENT_INTELLI_ADSR;
-      definition.eventMap[0xf8] = EVENT_INTELLI_GAIN_SUSTAIN_TIME_AND_RATE;
-      definition.eventMap[0xf9] = EVENT_INTELLI_GAIN_SUSTAIN_TIME;
-      definition.eventMap[0xfa] = EVENT_INTELLI_DEFINE_VOICE_PARAM;
-      definition.eventMap[0xfb] = EVENT_INTELLI_LOAD_VOICE_PARAM;
-      definition.eventMap[0xfc] = EVENT_INTELLI_FE4_EVENT_FC;
-      definition.eventMap[0xfd] = EVENT_INTELLI_TA_SUBEVENT;
-
-      if (definition.volumeTable.empty()) {
-        definition.volumeTable = defaultTable(kVolumeTableIntelli);
-      }
-      if (definition.durRateTable.empty()) {
-        definition.durRateTable = defaultTable(kDurTableIntelli);
-      }
-      if (definition.panTable.empty()) {
-        definition.panTable = defaultTable(kPanTableStandard);
-      }
-      break;
-
-    case NINSNES_INTELLI_FE4:
-      for (int statusByte = 0x01; statusByte < definition.status.noteMin; statusByte++) {
-        definition.eventMap[static_cast<uint8_t>(statusByte)] = EVENT_INTELLI_NOTE_PARAM;
-      }
-      loadStandardVcmdMap(definition.eventMap, 0xda);
-      definition.eventMap[0xf5] = EVENT_INTELLI_ECHO_ON;
-      definition.eventMap[0xf6] = EVENT_INTELLI_ECHO_OFF;
-      definition.eventMap[0xf7] = EVENT_INTELLI_GAIN;
-      definition.eventMap[0xf8] = EVENT_INTELLI_GAIN;
-      definition.eventMap[0xf9] = EVENT_UNKNOWN0;
-      definition.eventMap[0xfa] = EVENT_INTELLI_DEFINE_VOICE_PARAM;
-      definition.eventMap[0xfb] = EVENT_INTELLI_LOAD_VOICE_PARAM;
-      definition.eventMap[0xfc] = EVENT_INTELLI_FE4_EVENT_FC;
-      definition.eventMap[0xfd] = EVENT_INTELLI_FE4_SUBEVENT;
-
-      if (definition.intelliDurVolTable.empty()) {
-        definition.intelliDurVolTable = defaultTable(kDurVolTableIntelliFe4);
-      }
-      if (definition.panTable.empty()) {
-        definition.panTable = defaultTable(kPanTableStandard);
-      }
-      break;
-
-    default:
-      loadStandardVcmdMap(definition.eventMap, 0xe0);
-
-      if (definition.volumeTable.empty()) {
-        definition.volumeTable = defaultTable(kVolumeTableStandard);
-      }
-      if (definition.durRateTable.empty()) {
-        definition.durRateTable = defaultTable(kDurTableStandard);
-      }
-      if (definition.panTable.empty()) {
-        definition.panTable = defaultTable(kPanTableStandard);
-      }
-      break;
-  }
-
-  switch (version) {
-    case NINSNES_RD1:
-      definition.eventMap[0xfb] = EVENT_UNKNOWN2;
-      definition.eventMap[0xfc] = EVENT_UNKNOWN0;
-      definition.eventMap[0xfd] = EVENT_UNKNOWN0;
-      definition.eventMap[0xfe] = EVENT_UNKNOWN0;
-      break;
-
-    case NINSNES_RD2:
-      definition.eventMap[0xfb] = EVENT_RD2_PROGCHANGE_AND_ADSR;
-      definition.eventMap[0xfd] = EVENT_PROGCHANGE;
-      break;
-
-    case NINSNES_KONAMI:
-      definition.eventMap[0xe4] = EVENT_UNKNOWN2;
-      definition.eventMap[0xe5] = EVENT_KONAMI_LOOP_START;
-      definition.eventMap[0xe6] = EVENT_KONAMI_LOOP_END;
-      definition.eventMap[0xe8] = EVENT_NOP;
-      definition.eventMap[0xe9] = EVENT_NOP;
-      definition.eventMap[0xf5] = EVENT_UNKNOWN0;
-      definition.eventMap[0xf6] = EVENT_UNKNOWN0;
-      definition.eventMap[0xf7] = EVENT_UNKNOWN0;
-      definition.eventMap[0xf8] = EVENT_UNKNOWN0;
-      definition.eventMap[0xfb] = EVENT_KONAMI_ADSR_AND_GAIN;
-      definition.eventMap[0xfc] = EVENT_NOP;
-      definition.eventMap[0xfd] = EVENT_NOP;
-      definition.eventMap[0xfe] = EVENT_NOP;
-      break;
-
-    case NINSNES_LEMMINGS:
-      for (int statusByte = 0x01; statusByte < definition.status.noteMin; statusByte++) {
-        definition.eventMap[static_cast<uint8_t>(statusByte)] = EVENT_LEMMINGS_NOTE_PARAM;
-      }
-
-      definition.eventMap[0xe5] = EVENT_UNKNOWN1;
-      definition.eventMap[0xe6] = EVENT_UNKNOWN2;
-      definition.eventMap[0xfb] = EVENT_NOP1;
-      definition.eventMap[0xfc] = EVENT_UNKNOWN0;
-      definition.eventMap[0xfd] = EVENT_UNKNOWN0;
-      definition.eventMap[0xfe] = EVENT_UNKNOWN0;
-      definition.volumeTable.clear();
-      definition.durRateTable.clear();
-      break;
-
-    case NINSNES_TOSE:
-      definition.panTable.clear();
-      break;
-
-    case NINSNES_QUINTET_IOG:
-    case NINSNES_QUINTET_TS:
-      definition.eventMap[0xf4] = EVENT_QUINTET_TUNING;
-      definition.eventMap[0xff] = EVENT_QUINTET_ADSR;
-      break;
-
-    case NINSNES_HAL:
-    case NINSNES_HUMAN:
-    default:
-      break;
-  }
+  initializeSeqDefinition(definition, profile);
+  applyBaseSeqDialect(definition, profile);
+  applyDerivedSeqOverrides(definition, profile);
 
   return definition;
 }
