@@ -233,6 +233,7 @@ bool NinSnesSeq::parseHeader() {
 }
 
 bool NinSnesSeq::readEvent(long stopTime) {
+  const auto& profile = getNinSnesProfile(profileId);
   uint32_t beginOffset = curOffset;
   if (curOffset + 1 >= 0x10000) {
     return false;
@@ -271,7 +272,7 @@ bool NinSnesSeq::readEvent(long stopTime) {
     bool doJump = false;
     bool infiniteLoop = false;
 
-    if (version == NINSNES_TOSE) {
+    if (profile.playlistModel == NinSnesPlaylistModelId::Tose) {
       if (sectionRepeatCount == 0) {
         // set new repeat count
         sectionRepeatCount = (uint8_t) repeatCount;
@@ -365,7 +366,7 @@ bool NinSnesSeq::readEvent(long stopTime) {
       bContinue = false;
     }
 
-    if (version == NINSNES_UNKNOWN) {
+    if (profile.id == NinSnesProfileId::Unknown) {
       bContinue = false;
     }
   }
