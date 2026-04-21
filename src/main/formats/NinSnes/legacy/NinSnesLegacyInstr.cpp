@@ -13,6 +13,11 @@ namespace {
 
 constexpr uint8_t kNinSnesMidiKeyCorrection = 24;
 
+struct NinSnesPitchTuning {
+  int unityKey = 96;
+  int16_t fineTune = 0;
+};
+
 uint32_t getProgramNumber(const VGMInstr* instr) {
   return (instr->bank << 7) | (instr->instrNum & 0x7f);
 }
@@ -28,6 +33,40 @@ VGMInstr* findInstrByProgram(const std::vector<VGMInstr*>& instrs, uint32_t prog
     }
   }
   return nullptr;
+}
+
+uint16_t readPitchScale(NinSnesVersion version, uint8_t pitchHigh, uint8_t pitchLow) {
+  if (version == NINSNES_EARLIER) {
+    return static_cast<uint16_t>(static_cast<int8_t>(pitchHigh) * 256);
+  }
+  return static_cast<uint16_t>((pitchHigh << 8) | pitchLow);
+}
+
+NinSnesPitchTuning calculatePitchTuning(uint16_t pitchScale) {
+  const double pitchFixer = 4286.0 / 4096.0;
+  double fineTuning;
+  double coarseTuning;
+
+  const bool wrapsPercussion = (((uint32_t)0x0217 * pitchScale) >> 8) > 0x3FFF;
+  if (wrapsPercussion) {
+    pitchScale = ((((uint32_t)0x0217 * pitchScale) >> 8) & 0x3FFF) * 256.0 / 0x0217;
+  }
+
+  fineTuning = modf((log(pitchScale * pitchFixer / 256.0) / log(2.0)) * 12.0, &coarseTuning);
+
+  if (fineTuning >= 0.5) {
+    coarseTuning += 1.0;
+    fineTuning -= 1.0;
+  }
+  else if (fineTuning <= -0.5) {
+    coarseTuning -= 1.0;
+    fineTuning += 1.0;
+  }
+
+  return {
+      .unityKey = 96 - static_cast<int>(coarseTuning),
+      .fineTune = static_cast<int16_t>(fineTuning * 100.0),
+  };
 }
 
 VGMRgn* cloneLegacyRgnForDrumKit(VGMInstr* instr,
@@ -102,39 +141,13 @@ VGMRgn* createRgnFromHeaderData(VGMInstr* instr,
     return nullptr;
   }
 
-  uint16_t pitch_scale = 0;
-  if (version == NINSNES_EARLIER) {
-    pitch_scale = static_cast<uint16_t>(static_cast<int8_t>(regionData[4]) * 256);
-  }
-  else {
-    pitch_scale = static_cast<uint16_t>((regionData[4] << 8) | regionData[5]);
-  }
-
-  const double pitch_fixer = 4286.0 / 4096.0;
-  double fine_tuning;
-  double coarse_tuning;
-
-  bool wrapsPercussion = (((uint32_t) 0x0217 * pitch_scale) >> 8) > 0x3FFF;
-  if (wrapsPercussion) {
-    pitch_scale = ((((uint32_t) 0x0217 * pitch_scale) >> 8) & 0x3FFF) * 256.0 / 0x0217;
-  }
-
-  fine_tuning = modf((log(pitch_scale * pitch_fixer / 256.0) / log(2.0)) * 12.0, &coarse_tuning);
-
-  if (fine_tuning >= 0.5) {
-    coarse_tuning += 1.0;
-    fine_tuning -= 1.0;
-  }
-  else if (fine_tuning <= -0.5) {
-    coarse_tuning -= 1.0;
-    fine_tuning += 1.0;
-  }
+  const auto tuning = calculatePitchTuning(readPitchScale(version, regionData[4], regionData[5]));
 
   auto* rgn = new VGMRgn(instr, 0, NinSnesInstr::expectedSize(version));
   rgn->sampOffset = rawFile->readShort(offDirEnt) - spcDirAddr;
   rgn->sampNum = srcn;
-  rgn->unityKey = 96 - static_cast<int>(coarse_tuning);
-  rgn->fineTune = static_cast<int16_t>(fine_tuning * 100.0);
+  rgn->unityKey = tuning.unityKey;
+  rgn->fineTune = tuning.fineTune;
   snesConvADSR<VGMRgn>(rgn, adsr1, adsr2, gain);
   return rgn;
 }
@@ -416,47 +429,17 @@ NinSnesRgn::NinSnesRgn(NinSnesInstr *instr,
   uint8_t adsr1 = readByte(offset + 1);
   uint8_t adsr2 = readByte(offset + 2);
   uint8_t gain = readByte(offset + 3);
-  uint16_t pitch_scale;
-  if (version == NINSNES_EARLIER) {
-    pitch_scale = (int8_t) readByte(offset + 4) * 256;
-  }
-  else {
-    pitch_scale = getShortBE(offset + 4);
-  }
-
-  const double pitch_fixer = 4286.0 / 4096.0;
-  double fine_tuning;
-  double coarse_tuning;
-
-  // Very large NinSnes pitch multipliers can wrap the SNES DSP's 14-bit pitch instead of acting
-  // like a normal transposition. We have only observed this on percussion instruments (ex. SimCity
-  // Metropolis), which the driver plays at fixed note 0x24 (base pitch 0x0217). When that happens,
-  // assume percussion usage and replace the raw multiplier with the wrapped pitch actually heard at
-  // 0x24, expressed again as an equivalent scale factor for SF2/DLS unity key / fine-tune calculation.
-  bool wrapsPercussion = (((uint32_t)0x0217 * pitch_scale) >> 8) > 0x3FFF;
-  if (wrapsPercussion) {
-    pitch_scale = ((((uint32_t)0x0217 * pitch_scale) >> 8) & 0x3FFF) * 256.0 / 0x0217;
-  }
-
-  fine_tuning = modf((log(pitch_scale * pitch_fixer / 256.0) / log(2.0)) * 12.0, &coarse_tuning);
-
-  // normalize
-  if (fine_tuning >= 0.5) {
-    coarse_tuning += 1.0;
-    fine_tuning -= 1.0;
-  }
-  else if (fine_tuning <= -0.5) {
-    coarse_tuning -= 1.0;
-    fine_tuning += 1.0;
-  }
+  const uint8_t pitchHigh = readByte(offset + 4);
+  const uint8_t pitchLow = (version == NINSNES_EARLIER) ? 0 : readByte(offset + 5);
+  const auto tuning = calculatePitchTuning(readPitchScale(version, pitchHigh, pitchLow));
 
   addSampNum(srcn, offset, 1);
   addChild(offset + 1, 1, "ADSR1");
   addChild(offset + 2, 1, "ADSR2");
   addChild(offset + 3, 1, "GAIN");
   if (version == NINSNES_EARLIER) {
-    addUnityKey(96 - (int) (coarse_tuning), offset + 4, 1);
-    addFineTune((int16_t) (fine_tuning * 100.0), offset + 4, 1);
+    addUnityKey(tuning.unityKey, offset + 4, 1);
+    addFineTune(tuning.fineTune, offset + 4, 1);
   }
   else if (version == NINSNES_KONAMI && konamiTuningTableAddress != 0) {
     uint16_t addrTuningTableCoarse = konamiTuningTableAddress;
@@ -482,8 +465,8 @@ NinSnesRgn::NinSnesRgn(NinSnesInstr *instr,
     addChild(offset + 4, 2, "Tuning (Unused)");
   }
   else {
-    addUnityKey(96 - (int) (coarse_tuning), offset + 4, 1);
-    addFineTune((int16_t) (fine_tuning * 100.0), offset + 5, 1);
+    addUnityKey(tuning.unityKey, offset + 4, 1);
+    addFineTune(tuning.fineTune, offset + 5, 1);
   }
   snesConvADSR<VGMRgn>(this, adsr1, adsr2, gain);
 }
