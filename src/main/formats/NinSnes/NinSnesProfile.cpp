@@ -436,7 +436,7 @@ bool requiresNinSnesSampleStartAfterDirEntry(const NinSnesProfile& profile) {
 }
 
 bool loadsFullNinSnesSampleDirectory(const NinSnesProfile& profile) {
-  return profile.legacyVersion == NINSNES_INTELLI_TA;
+  return profile.intelliMode == NinSnesIntelliModeId::Ta;
 }
 
 uint32_t resolveNinSnesProgramNumber(const NinSnesProfile& profile,
@@ -489,11 +489,11 @@ uint32_t resolveNinSnesProgramNumber(const NinSnesProfile& profile,
 bool usesNinSnesIntelliCustomPercTable(const NinSnesProfile& profile,
                                        bool runtimeCustomPercTable,
                                        uint8_t intelliPercFlags) {
-  if (profile.legacyVersion == NINSNES_INTELLI_FE4) {
+  if (profile.intelliMode == NinSnesIntelliModeId::Fe4) {
     return true;
   }
 
-  if (profile.legacyVersion == NINSNES_INTELLI_TA) {
+  if (profile.intelliMode == NinSnesIntelliModeId::Ta) {
     return (intelliPercFlags & 0x40) != 0;
   }
 
@@ -504,7 +504,8 @@ void setNinSnesIntelliCustomPercTableEnabled(const NinSnesProfile& profile,
                                              bool enabled,
                                              bool& runtimeCustomPercTable,
                                              uint8_t& intelliPercFlags) {
-  if (profile.legacyVersion == NINSNES_INTELLI_TA || profile.legacyVersion == NINSNES_INTELLI_FE4) {
+  if (profile.intelliMode == NinSnesIntelliModeId::Ta ||
+      profile.intelliMode == NinSnesIntelliModeId::Fe4) {
     if (enabled) {
       intelliPercFlags |= 0x40;
     }
