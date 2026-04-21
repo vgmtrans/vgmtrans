@@ -1450,6 +1450,8 @@ void NinSnesScanner::searchForNinSnesFromARAM(RawFile *file) {
     }
   }
 
+  const auto& profile = getNinSnesProfile(version);
+
   // Quintet: ACQUIRE INSTRUMENT BASE:
   uint8_t quintetBGMInstrBase = 0;
   uint16_t quintetAddrBGMInstrLookup = 0;
@@ -1489,8 +1491,8 @@ void NinSnesScanner::searchForNinSnesFromARAM(RawFile *file) {
     }
 
     uint16_t firstSectionPtr = file->readShort(addrSectionListPtr);
-    if (version == NINSNES_KONAMI) {
-      firstSectionPtr += konamiBaseAddress;
+    if (profile.addressModel == NinSnesAddressModelId::KonamiBase) {
+      firstSectionPtr = convertNinSnesAddress(profile, firstSectionPtr, konamiBaseAddress, falcomBaseOffset);
     }
     if (firstSectionPtr == 0) {
       continue;
@@ -1509,13 +1511,10 @@ void NinSnesScanner::searchForNinSnesFromARAM(RawFile *file) {
       continue;
     }
 
-    if (version == NINSNES_KONAMI) {
-      addrFirstSection += konamiBaseAddress;
-    }
-    else if (version == NINSNES_FALCOM_YS4) {
+    if (profile.addressModel == NinSnesAddressModelId::FalcomBaseOffset) {
       falcomBaseOffset = firstSectionPtr - falcomBaseAddress;
-      addrFirstSection += falcomBaseOffset;
     }
+    addrFirstSection = convertNinSnesAddress(profile, addrFirstSection, konamiBaseAddress, falcomBaseOffset);
     if (addrFirstSection + 16 > 0x10000) {
       break;
     }
@@ -1529,12 +1528,7 @@ void NinSnesScanner::searchForNinSnesFromARAM(RawFile *file) {
           break;
         }
 
-        if (version == NINSNES_KONAMI) {
-          addrTrackStart += konamiBaseAddress;
-        }
-        else if (version == NINSNES_FALCOM_YS4) {
-          addrTrackStart += falcomBaseOffset;
-        }
+        addrTrackStart = convertNinSnesAddress(profile, addrTrackStart, konamiBaseAddress, falcomBaseOffset);
 
         if ((addrTrackStart & 0xff00) == 0 || addrTrackStart == 0xffff) {
           hasIllegalTrack = true;
@@ -1565,10 +1559,10 @@ void NinSnesScanner::searchForNinSnesFromARAM(RawFile *file) {
       }
 
       uint16_t firstSectionPtr = file->readShort(addrSectionListPtr);
-      if (version == NINSNES_KONAMI) {
-        firstSectionPtr += konamiBaseAddress;
+      if (profile.addressModel == NinSnesAddressModelId::KonamiBase) {
+        firstSectionPtr = convertNinSnesAddress(profile, firstSectionPtr, konamiBaseAddress, falcomBaseOffset);
       }
-      else if (version == NINSNES_FALCOM_YS4) {
+      if (profile.addressModel == NinSnesAddressModelId::FalcomBaseOffset) {
         falcomBaseOffset = firstSectionPtr - falcomBaseAddress;
       }
       if (firstSectionPtr > addrCurrentSection) {
@@ -1579,13 +1573,8 @@ void NinSnesScanner::searchForNinSnesFromARAM(RawFile *file) {
       if ((addrCurrentSection % 2) == (curAddress % 2)) {
         uint8_t sectionCount = 0; // prevent overrun of illegal data
         while (curAddress >= 0x0100 && curAddress < 0xfff0 && sectionCount < 32) {
-          uint16_t addrSection = file->readShort(curAddress);
-          if (version == NINSNES_KONAMI) {
-            addrSection += konamiBaseAddress;
-          }
-          else if (version == NINSNES_FALCOM_YS4) {
-            addrSection += falcomBaseOffset;
-          }
+          uint16_t addrSection =
+              convertNinSnesAddress(profile, file->readShort(curAddress), konamiBaseAddress, falcomBaseOffset);
 
           if (curAddress == addrCurrentSection) {
             songIndexCandidate = songIndex;
@@ -1618,8 +1607,8 @@ void NinSnesScanner::searchForNinSnesFromARAM(RawFile *file) {
 
   // load the song
   uint16_t addrSongStart = file->readShort(addrSongList + guessedSongIndex * 2);
-  if (version == NINSNES_KONAMI) {
-    addrSongStart += konamiBaseAddress;
+  if (profile.addressModel == NinSnesAddressModelId::KonamiBase) {
+    addrSongStart = convertNinSnesAddress(profile, addrSongStart, konamiBaseAddress, falcomBaseOffset);
   }
 
   // scan for instrument table

@@ -14,7 +14,7 @@ struct NinSnesIntelliPercussionNoteState {
 };
 
 bool isIntelliTablePercussionVersion(NinSnesVersion version) {
-  return version == NINSNES_INTELLI_TA || version == NINSNES_INTELLI_FE4;
+  return getNinSnesProfile(version).supportsDynamicDrumKitExport;
 }
 
 bool isIntelliPackedVoiceParamVersion(NinSnesVersion version) {
@@ -876,16 +876,8 @@ bool NinSnesTrack::readEvent() {
       // spcPercussionBase + the percussion note opcode index. So, if spcPercussionBase is 5
       // and the percussion note opcode is CB when STATUS_PERCUSSION_NOTE_MIN is CA, it would use
       // instrument 6.
-      uint8_t instrIndex = slot;
-
-      instrIndex += parentSeq->spcPercussionBase;
-
-      if (parentSeq->version == NINSNES_QUINTET_ACTR) {
-        instrIndex += parentSeq->quintetBGMInstrBase;
-      }
-      else if (NinSnesFormat::isQuintetVersion(parentSeq->version)) {
-        instrIndex = readByte(parentSeq->quintetAddrBGMInstrLookup + instrIndex);
-      }
+      uint8_t instrIndex = 0;
+      parentSeq->resolveProgramNumber(static_cast<uint8_t>(slot + parentSeq->spcPercussionBase), &instrIndex);
 
       // Pitches are fixed, but we assign each drum to a unique note. The note value is 0x24
       // plus the instrument index (relative to the base percussion instrument).
