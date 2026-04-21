@@ -613,7 +613,7 @@ uint32_t getNinSnesInstrumentHeaderSize(const NinSnesProfile& profile) {
 }
 
 uint16_t getNinSnesInstrumentSlotCount(const NinSnesProfile& profile) {
-  if (profile.legacyVersion == NINSNES_HUMAN) {
+  if (profile.instrTableAddressModel == NinSnesInstrTableAddressModelId::Human) {
     return static_cast<uint16_t>((0x200 / getNinSnesInstrumentHeaderSize(profile)) + 1);
   }
 
@@ -680,7 +680,7 @@ bool isValidNinSnesInstrumentHeader(const NinSnesProfile& profile,
 }
 
 bool requiresNinSnesSampleStartAfterDirEntry(const NinSnesProfile& profile) {
-  return profile.legacyVersion == NINSNES_EARLIER || profile.legacyVersion == NINSNES_STANDARD;
+  return profile.baseProfile == NinSnesBaseProfileId::Earlier || profile.id == NinSnesProfileId::Standard;
 }
 
 bool loadsFullNinSnesSampleDirectory(const NinSnesProfile& profile) {
