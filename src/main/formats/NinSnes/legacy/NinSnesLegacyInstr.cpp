@@ -23,7 +23,8 @@ uint32_t getProgramNumber(const VGMInstr* instr) {
 }
 
 bool usesIntelliTempDrumKitExport(NinSnesVersion version) {
-  return getNinSnesProfile(version).supportsDynamicDrumKitExport;
+  const auto intelliMode = getNinSnesProfile(version).intelliMode;
+  return intelliMode == NinSnesIntelliModeId::Ta || intelliMode == NinSnesIntelliModeId::Fe4;
 }
 
 VGMInstr* findInstrByProgram(const std::vector<VGMInstr*>& instrs, uint32_t progNum) {

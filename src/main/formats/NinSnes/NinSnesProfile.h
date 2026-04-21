@@ -20,9 +20,7 @@ struct NinSnesProfile {
   NinSnesProgramResolverId programResolver;
   NinSnesPanModelId panModel;
   NinSnesInstrumentLayoutId instrumentLayout;
-  bool supportsIntelliVoiceParams;
-  bool supportsDynamicInstrumentOverrides;
-  bool supportsDynamicDrumKitExport;
+  NinSnesIntelliModeId intelliMode;
 };
 
 struct NinSnesSeqStatus {

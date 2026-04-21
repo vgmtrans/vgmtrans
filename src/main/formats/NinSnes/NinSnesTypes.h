@@ -101,3 +101,10 @@ enum class NinSnesInstrumentLayoutId {
   Standard6Byte,
   KonamiTuningTable,
 };
+
+enum class NinSnesIntelliModeId {
+  None = 0,
+  Fe3,
+  Ta,
+  Fe4,
+};

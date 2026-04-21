@@ -14,11 +14,8 @@ struct NinSnesIntelliPercussionNoteState {
 };
 
 bool isIntelliTablePercussionVersion(NinSnesVersion version) {
-  return getNinSnesProfile(version).supportsDynamicDrumKitExport;
-}
-
-bool isIntelliPackedVoiceParamVersion(NinSnesVersion version) {
-  return isIntelliTablePercussionVersion(version);
+  const auto intelliMode = getNinSnesProfile(version).intelliMode;
+  return intelliMode == NinSnesIntelliModeId::Ta || intelliMode == NinSnesIntelliModeId::Fe4;
 }
 
 void addIntelliByteChild(VGMItem* parent,
@@ -62,8 +59,10 @@ bool getIntelliVoiceParamAddress(const NinSnesSeq& seq,
 
   addrVoiceParam = seq.intelliVoiceParam.addr + (index * 4u);
   outOfRange = index >= seq.intelliVoiceParam.size;
-  return (addrVoiceParam + 3) < 0x10000 &&
-         (isIntelliPackedVoiceParamVersion(seq.version) || !outOfRange);
+  const auto intelliMode = getNinSnesProfile(seq.profileId).intelliMode;
+  const bool packedVoiceParams =
+      intelliMode == NinSnesIntelliModeId::Ta || intelliMode == NinSnesIntelliModeId::Fe4;
+  return (addrVoiceParam + 3) < 0x10000 && (packedVoiceParams || !outOfRange);
 }
 
 constexpr std::array<const char*, 4> INTELLI_VOICE_PARAM_LABELS = {
@@ -678,6 +677,7 @@ bool NinSnesTrack::readEvent() {
   }
 
   NinSnesSeq *parentSeq = (NinSnesSeq *) this->parentSeq;
+  const auto intelliMode = getNinSnesProfile(parentSeq->profileId).intelliMode;
   uint32_t beginOffset = curOffset;
   if (curOffset >= 0x10000) {
     return false;
@@ -1213,7 +1213,7 @@ bool NinSnesTrack::readEvent() {
     case EVENT_PERCUSSION_PATCH_BASE: {
       uint8_t percussionBase = readByte(curOffset++);
       parentSeq->spcPercussionBase = percussionBase;
-      if (parentSeq->version == NINSNES_INTELLI_TA) {
+      if (intelliMode == NinSnesIntelliModeId::Ta) {
         parentSeq->setIntelliCustomPercTableEnabled(false);
       }
 
@@ -1314,7 +1314,7 @@ bool NinSnesTrack::readEvent() {
       // INTELLIGENT SYSTEMS EVENTS START >>
 
     case EVENT_INTELLI_NOTE_PARAM: {
-      if (parentSeq->version != NINSNES_INTELLI_FE4 && !parentSeq->intelliUseCustomNoteParam) {
+      if (intelliMode == NinSnesIntelliModeId::Fe3 && !parentSeq->intelliUseCustomNoteParam) {
         goto OnEventNoteParam;
       }
 
@@ -1452,9 +1452,10 @@ bool NinSnesTrack::readEvent() {
         if (readMode == READMODE_ADD_TO_UI) {
           if (SeqEvent* event = findSeqEventAtOffset(beginOffset, curOffset - beginOffset);
               event != nullptr && event->children().empty()) {
-            const auto& labels = isIntelliPackedVoiceParamVersion(parentSeq->version)
-                                     ? INTELLI_PACKED_VOICE_PARAM_LABELS
-                                     : INTELLI_VOICE_PARAM_LABELS;
+            const bool packedVoiceParams =
+                intelliMode == NinSnesIntelliModeId::Ta || intelliMode == NinSnesIntelliModeId::Fe4;
+            const auto& labels =
+                packedVoiceParams ? INTELLI_PACKED_VOICE_PARAM_LABELS : INTELLI_VOICE_PARAM_LABELS;
             for (uint8_t itemIndex = 0; itemIndex < parentSeq->intelliVoiceParam.size; itemIndex++) {
               const uint32_t recordOffset = tableOffset + itemIndex * 4u;
               addIntelliTableItem(event,
@@ -1470,7 +1471,7 @@ bool NinSnesTrack::readEvent() {
         }
       }
       else {
-        if (parentSeq->version == NINSNES_INTELLI_FE3 || parentSeq->version == NINSNES_INTELLI_TA) {
+        if (intelliMode == NinSnesIntelliModeId::Fe3 || intelliMode == NinSnesIntelliModeId::Ta) {
           const uint8_t instrNum = param & 0x3f;
           const uint32_t regionOffset = curOffset;
           std::array<uint8_t, 6> regionData {};
@@ -1480,7 +1481,7 @@ bool NinSnesTrack::readEvent() {
           curOffset += 6;
           desc = fmt::format("Instrument: {:d}", instrNum);
 
-          if (parentSeq->version == NINSNES_INTELLI_TA) {
+          if (intelliMode == NinSnesIntelliModeId::Ta) {
             const uint32_t newProgNum =
                 parentSeq->registerIntelliTAInstrumentOverride(instrNum, regionData);
             if (currentLogicalProgram.has_value() && currentLogicalProgram.value() == instrNum) {
@@ -1518,7 +1519,8 @@ bool NinSnesTrack::readEvent() {
 
       uint32_t addrVoiceParam = 0;
       bool outOfRange = false;
-      const bool taStyleVoiceParam = isIntelliPackedVoiceParamVersion(parentSeq->version);
+      const bool taStyleVoiceParam =
+          intelliMode == NinSnesIntelliModeId::Ta || intelliMode == NinSnesIntelliModeId::Fe4;
       const bool canReadVoiceParam =
           getIntelliVoiceParamAddress(*parentSeq, paramIndex, addrVoiceParam, outOfRange);
       if (taStyleVoiceParam && outOfRange) {
@@ -1549,7 +1551,7 @@ bool NinSnesTrack::readEvent() {
         }
         else {
           uint8_t resolvedLogicalProgNum = instrByte;
-          if (parentSeq->version != NINSNES_INTELLI_FE3) {
+          if (intelliMode != NinSnesIntelliModeId::Fe3) {
             resolvedLogicalProgNum &= 0x1f;
           }
           logicalProgNum = resolvedLogicalProgNum;
@@ -1560,8 +1562,8 @@ bool NinSnesTrack::readEvent() {
         addPanNoItem(midiPan);
         addExpressionNoItem(convertPercentAmpToStdMidiVal(volumeScale));
 
-        switch (parentSeq->version) {
-          case NINSNES_INTELLI_FE3: {
+        switch (intelliMode) {
+          case NinSnesIntelliModeId::Fe3: {
             uint8_t tuningIndex = lastByte & 15;
             uint8_t transposeIndex = (lastByte & 0x70) >> 4;
 
@@ -1580,14 +1582,8 @@ bool NinSnesTrack::readEvent() {
             break;
           }
 
-          case NINSNES_INTELLI_FE4: {
-            int8_t newTranspose = lastByte;
-            shared->spcTranspose = newTranspose;
-            transpose = newTranspose;
-            break;
-          }
-
-          case NINSNES_INTELLI_TA: {
+          case NinSnesIntelliModeId::Fe4:
+          case NinSnesIntelliModeId::Ta: {
             int8_t newTranspose = lastByte;
             shared->spcTranspose = newTranspose;
             transpose = newTranspose;
@@ -1651,7 +1647,7 @@ bool NinSnesTrack::readEvent() {
     case EVENT_INTELLI_GAIN_SUSTAIN_TIME_AND_RATE: {
       uint8_t sustainDurRate = readByte(curOffset++);
       uint8_t sustainGAIN = readByte(curOffset++);
-      if (parentSeq->version == NINSNES_INTELLI_TA) {
+      if (intelliMode == NinSnesIntelliModeId::Ta) {
         shared->spcNoteDurRate = sustainDurRate;
         desc = fmt::format("Duration Rate: {:d}/256  GAIN: ${:02X}", sustainDurRate, sustainGAIN);
         addGenericEvent(beginOffset, curOffset - beginOffset, "Duration Rate / GAIN", desc,
@@ -1668,7 +1664,7 @@ bool NinSnesTrack::readEvent() {
 
     case EVENT_INTELLI_GAIN_SUSTAIN_TIME: {
       uint8_t sustainDurRate = readByte(curOffset++);
-      if (parentSeq->version == NINSNES_INTELLI_TA) {
+      if (intelliMode == NinSnesIntelliModeId::Ta) {
         shared->spcNoteDurRate = sustainDurRate;
         desc = fmt::format("Duration Rate: {:d}/256", sustainDurRate);
         addGenericEvent(beginOffset, curOffset - beginOffset, "Duration Rate", desc,
