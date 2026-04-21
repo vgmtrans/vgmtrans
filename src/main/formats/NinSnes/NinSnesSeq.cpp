@@ -21,6 +21,55 @@ bool isIntelliPackedVoiceParamVersion(NinSnesVersion version) {
   return isIntelliTablePercussionVersion(version);
 }
 
+void addIntelliByteChild(VGMItem* parent,
+                         uint32_t offset,
+                         const std::string& label,
+                         uint8_t value) {
+  parent->addChild(offset, 1, fmt::format("{}: ${:02X}", label, value));
+}
+
+void addIntelliVoiceParamChildren(VGMItem* parent,
+                                  NinSnesVersion version,
+                                  uint32_t recordOffset,
+                                  const std::array<uint8_t, 4>& recordData) {
+  addIntelliByteChild(parent, recordOffset, "Instrument", recordData[0]);
+  addIntelliByteChild(parent, recordOffset + 1, "Volume", recordData[1]);
+
+  if (isIntelliPackedVoiceParamVersion(version)) {
+    addIntelliByteChild(parent, recordOffset + 2, "Pan/Tuning", recordData[2]);
+    addIntelliByteChild(parent, recordOffset + 3, "Transpose", recordData[3]);
+  }
+  else {
+    addIntelliByteChild(parent, recordOffset + 2, "Pan", recordData[2]);
+    addIntelliByteChild(parent, recordOffset + 3, "Tuning/Transpose", recordData[3]);
+  }
+}
+
+void addIntelliOverwriteChildren(VGMItem* parent,
+                                 uint32_t regionOffset,
+                                 const std::array<uint8_t, 6>& regionData) {
+  static constexpr std::array<const char*, 6> LABELS = {
+      "SRCN/Noise",
+      "ADSR1",
+      "ADSR2",
+      "GAIN",
+      "Pitch Low",
+      "Pitch High",
+  };
+
+  for (size_t i = 0; i < regionData.size(); i++) {
+    addIntelliByteChild(parent, regionOffset + i, LABELS[i], regionData[i]);
+  }
+}
+
+void addIntelliPercussionEntryChildren(VGMItem* parent,
+                                       uint32_t entryOffset,
+                                       const NinSnesIntelliTACustomPercEntry& entry) {
+  addIntelliByteChild(parent, entryOffset, "Patch", entry.patchByte);
+  addIntelliByteChild(parent, entryOffset + 1, "Note", entry.noteByte);
+  addIntelliByteChild(parent, entryOffset + 2, "Pan", entry.panByte);
+}
+
 void updateIntelliFlags(uint8_t& flags, uint8_t mask, bool enabled) {
   if (enabled) {
     flags |= mask;
@@ -1754,16 +1803,36 @@ bool NinSnesTrack::readEvent() {
     case EVENT_INTELLI_DEFINE_VOICE_PARAM: {
       int8_t param = readByte(curOffset++);
       if (param >= 0) {
-        parentSeq->intelliVoiceParam.addr = curOffset;
+        const uint32_t tableOffset = curOffset;
+        parentSeq->intelliVoiceParam.addr = tableOffset;
         parentSeq->intelliVoiceParam.size = param;
         parentSeq->intelliVoiceParam.defined = true;
         curOffset += parentSeq->intelliVoiceParam.size * 4;
         desc = fmt::format("Number of Items: {:d}", parentSeq->intelliVoiceParam.size);
         addGenericEvent(beginOffset, curOffset - beginOffset, "Voice Param Table", desc, Type::Misc);
+
+        if (readMode == READMODE_ADD_TO_UI) {
+          SeqEvent* event = findSeqEventAtOffset(beginOffset, curOffset - beginOffset);
+          if (event != nullptr && event->children().empty()) {
+            for (uint8_t itemIndex = 0; itemIndex < parentSeq->intelliVoiceParam.size; itemIndex++) {
+              const uint32_t recordOffset = tableOffset + itemIndex * 4u;
+              std::array<uint8_t, 4> recordData = {
+                  readByte(recordOffset),
+                  readByte(recordOffset + 1),
+                  readByte(recordOffset + 2),
+                  readByte(recordOffset + 3),
+              };
+              VGMItem* recordItem = event->addChild(
+                  recordOffset, 4, fmt::format("Voice Param {:d}", itemIndex));
+              addIntelliVoiceParamChildren(recordItem, parentSeq->version, recordOffset, recordData);
+            }
+          }
+        }
       }
       else {
         if (parentSeq->version == NINSNES_INTELLI_FE3 || parentSeq->version == NINSNES_INTELLI_TA) {
           const uint8_t instrNum = param & 0x3f;
+          const uint32_t regionOffset = curOffset;
           std::array<uint8_t, 6> regionData {};
           for (size_t i = 0; i < regionData.size(); i++) {
             regionData[i] = readByte(curOffset + i);
@@ -1784,6 +1853,16 @@ bool NinSnesTrack::readEvent() {
 
           addGenericEvent(beginOffset, curOffset - beginOffset, "Overwrite Instrument Region", desc,
                           Type::Misc);
+
+          if (readMode == READMODE_ADD_TO_UI) {
+            SeqEvent* event = findSeqEventAtOffset(beginOffset, curOffset - beginOffset);
+            if (event != nullptr && event->children().empty()) {
+              VGMItem* regionItem = event->addChild(
+                  regionOffset, static_cast<uint32_t>(regionData.size()),
+                  fmt::format("Instrument {:d}", instrNum));
+              addIntelliOverwriteChildren(regionItem, regionOffset, regionData);
+            }
+          }
         }
         else {
           addUnknown(beginOffset, curOffset - beginOffset);
@@ -1973,6 +2052,7 @@ bool NinSnesTrack::readEvent() {
     case EVENT_INTELLI_FE4_EVENT_FC: {
       uint8_t arg1 = readByte(curOffset++);
       uint8_t numEntries = (arg1 & 15) + 1;
+      const uint32_t tableOffset = curOffset;
 
       if (isIntelliTablePercussionVersion(parentSeq->version)) {
         for (uint8_t slot = 0; slot < numEntries && slot < NINSNES_INTELLI_TA_PERCUSSION_SLOT_COUNT;
@@ -1988,6 +2068,23 @@ bool NinSnesTrack::readEvent() {
         desc = fmt::format("Entries: {:d}", numEntries);
         addGenericEvent(beginOffset, curOffset - beginOffset, "Custom Percussion Table", desc,
                         Type::ChangeState);
+
+        if (readMode == READMODE_ADD_TO_UI) {
+          SeqEvent* event = findSeqEventAtOffset(beginOffset, curOffset - beginOffset);
+          if (event != nullptr && event->children().empty()) {
+            for (uint8_t slot = 0;
+                 slot < numEntries && slot < NINSNES_INTELLI_TA_PERCUSSION_SLOT_COUNT;
+                 slot++) {
+              const uint32_t entryOffset = tableOffset + slot * 3u;
+              const uint8_t drumNote = static_cast<uint8_t>(
+                  parentSeq->STATUS_PERCUSSION_NOTE_MIN + slot);
+              VGMItem* drumItem = event->addChild(
+                  entryOffset, 3, fmt::format("Drum ${:02X}", drumNote));
+              addIntelliPercussionEntryChildren(
+                  drumItem, entryOffset, parentSeq->intelliPerc.table[slot]);
+            }
+          }
+        }
       }
       else {
         curOffset += numEntries * 3;
