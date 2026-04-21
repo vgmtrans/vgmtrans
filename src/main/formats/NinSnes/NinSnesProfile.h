@@ -20,6 +20,7 @@ struct NinSnesProfile {
   NinSnesProgramResolverId programResolver;
   NinSnesPanModelId panModel;
   NinSnesInstrumentLayoutId instrumentLayout;
+  NinSnesInstrTableAddressModelId instrTableAddressModel;
   NinSnesIntelliModeId intelliMode;
 };
 

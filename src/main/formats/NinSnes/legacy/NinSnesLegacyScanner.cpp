@@ -1627,32 +1627,37 @@ void NinSnesScanner::searchForNinSnesFromARAM(RawFile *file) {
       addrInstrTable =
           file->readByte(ofsLoadInstrTableAddressASM + 3) | (file->readByte(ofsLoadInstrTableAddressASM + 6) << 8);
     }
-      // DERIVED VERSIONS
-    else if (version == NINSNES_HUMAN) {
-      if (file->searchBytePattern(ptnLoadInstrTableAddressCTOW, ofsLoadInstrTableAddressASM)) {
-        addrInstrTable =
-            file->readByte(ofsLoadInstrTableAddressASM + 7) | (file->readByte(ofsLoadInstrTableAddressASM + 10) << 8);
-      }
-      else if (file->searchBytePattern(ptnLoadInstrTableAddressSOS, ofsLoadInstrTableAddressASM)) {
-        addrInstrTable =
-            file->readByte(ofsLoadInstrTableAddressASM + 1) | (file->readByte(ofsLoadInstrTableAddressASM + 4) << 8);
-      }
-      else {
-        return;
-      }
-    }
-    else if (version == NINSNES_TOSE) {
-      if (file->searchBytePattern(ptnLoadInstrTableAddressYSFR, ofsLoadInstrTableAddressASM)) {
-        spcDirAddr = file->readByte(ofsLoadInstrTableAddressASM + 3) << 8;
-        addrInstrTable =
-            file->readByte(ofsLoadInstrTableAddressASM + 10) | (file->readByte(ofsLoadInstrTableAddressASM + 13) << 8);
-      }
-      else {
-        return;
-      }
-    }
     else {
-      return;
+      switch (profile.instrTableAddressModel) {
+        case NinSnesInstrTableAddressModelId::Human:
+          if (file->searchBytePattern(ptnLoadInstrTableAddressCTOW, ofsLoadInstrTableAddressASM)) {
+            addrInstrTable = file->readByte(ofsLoadInstrTableAddressASM + 7) |
+                             (file->readByte(ofsLoadInstrTableAddressASM + 10) << 8);
+          }
+          else if (file->searchBytePattern(ptnLoadInstrTableAddressSOS, ofsLoadInstrTableAddressASM)) {
+            addrInstrTable = file->readByte(ofsLoadInstrTableAddressASM + 1) |
+                             (file->readByte(ofsLoadInstrTableAddressASM + 4) << 8);
+          }
+          else {
+            return;
+          }
+          break;
+
+        case NinSnesInstrTableAddressModelId::Tose:
+          if (file->searchBytePattern(ptnLoadInstrTableAddressYSFR, ofsLoadInstrTableAddressASM)) {
+            spcDirAddr = file->readByte(ofsLoadInstrTableAddressASM + 3) << 8;
+            addrInstrTable = file->readByte(ofsLoadInstrTableAddressASM + 10) |
+                             (file->readByte(ofsLoadInstrTableAddressASM + 13) << 8);
+          }
+          else {
+            return;
+          }
+          break;
+
+        case NinSnesInstrTableAddressModelId::Standard:
+        default:
+          return;
+      }
     }
 
     // scan for DIR address
