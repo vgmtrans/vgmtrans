@@ -920,8 +920,29 @@ void NinSnesScanner::scan(RawFile *file, void *info) {
   }
 }
 
+void NinSnesScanner::loadFromScanResult(RawFile* file, const NinSnesScanResult& scanResult) {
+  auto* newSeq = new NinSnesSeq(file, scanResult);
+  if (!newSeq->loadVGMFile()) {
+    delete newSeq;
+    return;
+  }
+
+  if (scanResult.version == NINSNES_UNKNOWN ||
+      scanResult.instrTableAddr == 0 ||
+      scanResult.spcDirAddr == 0) {
+    return;
+  }
+
+  auto* newInstrSet = new NinSnesInstrSet(file, scanResult);
+  if (!newInstrSet->loadVGMFile()) {
+    delete newInstrSet;
+    return;
+  }
+}
+
 void NinSnesScanner::searchForNinSnesFromARAM(RawFile *file) {
   NinSnesVersion version = NINSNES_NONE;
+  NinSnesSignatureId signature = NinSnesSignatureId::None;
 
   std::string basefilename = file->stem();
   std::string name = file->tag.hasTitle() ? file->tag.title : basefilename;
@@ -933,18 +954,22 @@ void NinSnesScanner::searchForNinSnesFromARAM(RawFile *file) {
   uint16_t falcomBaseAddress = 0xffff;
   uint16_t falcomBaseOffset = 0;
   if (file->searchBytePattern(ptnIncSectionPtr, ofsIncSectionPtr)) {
+    signature = NinSnesSignatureId::Standard;
     addrSectionPtr = file->readByte(ofsIncSectionPtr + 3);
   }
     // DERIVED VERSIONS
   else if (file->searchBytePattern(ptnIncSectionPtrGD3, ofsIncSectionPtr)) {
+    signature = NinSnesSignatureId::Konami;
     uint8_t konamiBaseAddressPtr = file->readByte(ofsIncSectionPtr + 16);
     addrSectionPtr = file->readByte(ofsIncSectionPtr + 3);
     konamiBaseAddress = file->readShort(konamiBaseAddressPtr);
   }
   else if (file->searchBytePattern(ptnIncSectionPtrYSFR, ofsIncSectionPtr)) {
+    signature = NinSnesSignatureId::Tose;
 	  addrSectionPtr = file->readByte(ofsIncSectionPtr + 3);
   }
   else if (file->searchBytePattern(ptnIncSectionPtrYs4, ofsIncSectionPtr)) {
+    signature = NinSnesSignatureId::FalcomYs4;
 	  addrSectionPtr = file->readByte(ofsIncSectionPtr + 3);
   }
   else {
@@ -1112,6 +1137,7 @@ void NinSnesScanner::searchForNinSnesFromARAM(RawFile *file) {
     // DERIVED VERSIONS (prevent false-positive)
     if (file->searchBytePattern(ptnInitSectionPtrYs4, ofsInitSectionPtr)) {
       // Ys IV - Mask of the Sun
+      signature = NinSnesSignatureId::FalcomYs4;
       addrSongList = file->readShort(ofsInitSectionPtr + 5);
       falcomBaseAddress = file->readByte(ofsInitSectionPtr + 13) << 8;
       version = NINSNES_FALCOM_YS4;
@@ -1125,6 +1151,7 @@ void NinSnesScanner::searchForNinSnesFromARAM(RawFile *file) {
     addrSongList = file->readShort(ofsInitSectionPtr + 12);
   }
   else if (file->searchBytePattern(ptnInitSectionPtrSMW, ofsInitSectionPtr)) {
+    signature = NinSnesSignatureId::Earlier;
     addrSongList = file->readShort(ofsInitSectionPtr + 3);
   }
   // DERIVED VERSIONS
@@ -1136,6 +1163,7 @@ void NinSnesScanner::searchForNinSnesFromARAM(RawFile *file) {
     }
   }
   else if (file->searchBytePattern(ptnInitSectionPtrTS, ofsInitSectionPtr)) {
+    signature = NinSnesSignatureId::Quintet;
     uint16_t addrSongListPtr = file->readShort(ofsInitSectionPtr + 1);
     addrSongList = file->readShort(addrSongListPtr);
   }
@@ -1232,6 +1260,7 @@ void NinSnesScanner::searchForNinSnesFromARAM(RawFile *file) {
       // DERIVED VERSIONS
       if (file->searchBytePattern(ptnJumpToVcmdCTOW, ofsJumpToVcmd)) {
         // Human Games: Clock Tower, Firemen, S.O.S. (Septentrion)
+        signature = NinSnesSignatureId::Human;
         addrVoiceCmdAddressTable = file->readShort(ofsJumpToVcmd + 10);
         addrVoiceCmdLengthTable = file->readShort(ofsJumpToVcmd + 17);
         version = NINSNES_HUMAN;
@@ -1381,6 +1410,7 @@ void NinSnesScanner::searchForNinSnesFromARAM(RawFile *file) {
 
         uint32_t ofsIntelliVCmdFA;
         if (file->searchBytePattern(ptnIntelliVCmdFA, ofsIntelliVCmdFA)) {
+          signature = NinSnesSignatureId::Intelligent;
           // Intelligent Systems
           if (file->searchBytePattern(ptnDispatchNoteFE3, ofsDispatchNote)) {
             const uint8_t INTELLI_FE3_VCMD_LEN_TABLE[40] =
@@ -1425,6 +1455,7 @@ void NinSnesScanner::searchForNinSnesFromARAM(RawFile *file) {
   uint16_t quintetAddrBGMInstrLookup = 0;
   switch (version) {
     case NINSNES_QUINTET_ACTR: {
+      signature = NinSnesSignatureId::Quintet;
       uint16_t addrBGMInstrBase = file->readShort(ofsInstrVCmd + 18);
       quintetBGMInstrBase = file->readByte(addrBGMInstrBase);
       break;
@@ -1432,10 +1463,12 @@ void NinSnesScanner::searchForNinSnesFromARAM(RawFile *file) {
 
     case NINSNES_QUINTET_ACTR2:
     case NINSNES_QUINTET_IOG:
+      signature = NinSnesSignatureId::Quintet;
       quintetAddrBGMInstrLookup = file->readShort(ofsInstrVCmd + 19);
       break;
 
     case NINSNES_QUINTET_TS:
+      signature = NinSnesSignatureId::Quintet;
       quintetAddrBGMInstrLookup = file->readShort(ofsInstrVCmd + 18);
       break;
 
@@ -1589,91 +1622,78 @@ void NinSnesScanner::searchForNinSnesFromARAM(RawFile *file) {
     addrSongStart += konamiBaseAddress;
   }
 
-  NinSnesSeq *newSeq = new NinSnesSeq(file, version, addrSongStart, 0, volumeTable, durRateTable, name);
-  newSeq->konamiBaseAddress = konamiBaseAddress;
-  newSeq->quintetBGMInstrBase = quintetBGMInstrBase;
-  newSeq->quintetAddrBGMInstrLookup = quintetAddrBGMInstrLookup;
-  newSeq->falcomBaseOffset = falcomBaseOffset;
-  if (!newSeq->loadVGMFile()) {
-    delete newSeq;
-    return;
-  }
-
-  // skip unknown instruments
-  if (version == NINSNES_UNKNOWN) {
-    return;
-  }
-
   // scan for instrument table
   uint32_t ofsLoadInstrTableAddressASM;
-  uint32_t addrInstrTable;
+  uint32_t addrInstrTable = 0;
   uint16_t spcDirAddr = 0;
-  if (file->searchBytePattern(ptnLoadInstrTableAddress, ofsLoadInstrTableAddressASM)) {
-    addrInstrTable =
-        file->readByte(ofsLoadInstrTableAddressASM + 7) | (file->readByte(ofsLoadInstrTableAddressASM + 10) << 8);
-    // Fix for HyperZone
-    u32 firstWord = file->readWord(addrInstrTable);
-    if (firstWord == 0 || firstWord == 0xFFFFFFFF) {
-      addrInstrTable += 4;
-    }
-  }
-  else if (file->searchBytePattern(ptnLoadInstrTableAddressSMW, ofsLoadInstrTableAddressASM)) {
-    addrInstrTable =
-        file->readByte(ofsLoadInstrTableAddressASM + 3) | (file->readByte(ofsLoadInstrTableAddressASM + 6) << 8);
-  }
-    // DERIVED VERSIONS
-  else if (version == NINSNES_HUMAN) {
-    if (file->searchBytePattern(ptnLoadInstrTableAddressCTOW, ofsLoadInstrTableAddressASM)) {
+  if (version != NINSNES_UNKNOWN) {
+    if (file->searchBytePattern(ptnLoadInstrTableAddress, ofsLoadInstrTableAddressASM)) {
       addrInstrTable =
           file->readByte(ofsLoadInstrTableAddressASM + 7) | (file->readByte(ofsLoadInstrTableAddressASM + 10) << 8);
+      // Fix for HyperZone
+      u32 firstWord = file->readWord(addrInstrTable);
+      if (firstWord == 0 || firstWord == 0xFFFFFFFF) {
+        addrInstrTable += 4;
+      }
     }
-    else if (file->searchBytePattern(ptnLoadInstrTableAddressSOS, ofsLoadInstrTableAddressASM)) {
+    else if (file->searchBytePattern(ptnLoadInstrTableAddressSMW, ofsLoadInstrTableAddressASM)) {
       addrInstrTable =
-          file->readByte(ofsLoadInstrTableAddressASM + 1) | (file->readByte(ofsLoadInstrTableAddressASM + 4) << 8);
-    }
-    else {
-      return;
-    }
-  }
-  else if (version == NINSNES_TOSE) {
-    if (file->searchBytePattern(ptnLoadInstrTableAddressYSFR, ofsLoadInstrTableAddressASM)) {
-      spcDirAddr = file->readByte(ofsLoadInstrTableAddressASM + 3) << 8;
-      addrInstrTable =
-          file->readByte(ofsLoadInstrTableAddressASM + 10) | (file->readByte(ofsLoadInstrTableAddressASM + 13) << 8);
-    }
-    else {
-      return;
-    }
-  }
-  else {
-    return;
-  }
-
-  // scan for DIR address
-  if (spcDirAddr == 0) {
-    uint32_t ofsSetDIR;
-    if (file->searchBytePattern(ptnSetDIR, ofsSetDIR)) {
-      spcDirAddr = file->readByte(ofsSetDIR + 4) << 8;
-    }
-    else if (file->searchBytePattern(ptnSetDIRYI, ofsSetDIR)) {
-      spcDirAddr = file->readByte(ofsSetDIR + 1) << 8;
-    }
-    else if (file->searchBytePattern(ptnSetDIRVS, ofsSetDIR)) {
-      u16 spcDirAddrPtr = file->readShort(ofsSetDIR + 1);
-      spcDirAddr = file->readByte(spcDirAddrPtr) << 8;
-    }
-    else if (file->searchBytePattern(ptnSetDIRSMW, ofsSetDIR)) {
-      spcDirAddr = file->readByte(ofsSetDIR + 9) << 8;
+          file->readByte(ofsLoadInstrTableAddressASM + 3) | (file->readByte(ofsLoadInstrTableAddressASM + 6) << 8);
     }
       // DERIVED VERSIONS
-    else if (file->searchBytePattern(ptnSetDIRCTOW, ofsSetDIR)) {
-      spcDirAddr = file->readByte(ofsSetDIR + 3) << 8;
+    else if (version == NINSNES_HUMAN) {
+      if (file->searchBytePattern(ptnLoadInstrTableAddressCTOW, ofsLoadInstrTableAddressASM)) {
+        addrInstrTable =
+            file->readByte(ofsLoadInstrTableAddressASM + 7) | (file->readByte(ofsLoadInstrTableAddressASM + 10) << 8);
+      }
+      else if (file->searchBytePattern(ptnLoadInstrTableAddressSOS, ofsLoadInstrTableAddressASM)) {
+        addrInstrTable =
+            file->readByte(ofsLoadInstrTableAddressASM + 1) | (file->readByte(ofsLoadInstrTableAddressASM + 4) << 8);
+      }
+      else {
+        return;
+      }
     }
-    else if (file->searchBytePattern(ptnSetDIRTS, ofsSetDIR)) {
-      spcDirAddr = file->readByte(ofsSetDIR + 1) << 8;
+    else if (version == NINSNES_TOSE) {
+      if (file->searchBytePattern(ptnLoadInstrTableAddressYSFR, ofsLoadInstrTableAddressASM)) {
+        spcDirAddr = file->readByte(ofsLoadInstrTableAddressASM + 3) << 8;
+        addrInstrTable =
+            file->readByte(ofsLoadInstrTableAddressASM + 10) | (file->readByte(ofsLoadInstrTableAddressASM + 13) << 8);
+      }
+      else {
+        return;
+      }
     }
     else {
       return;
+    }
+
+    // scan for DIR address
+    if (spcDirAddr == 0) {
+      uint32_t ofsSetDIR;
+      if (file->searchBytePattern(ptnSetDIR, ofsSetDIR)) {
+        spcDirAddr = file->readByte(ofsSetDIR + 4) << 8;
+      }
+      else if (file->searchBytePattern(ptnSetDIRYI, ofsSetDIR)) {
+        spcDirAddr = file->readByte(ofsSetDIR + 1) << 8;
+      }
+      else if (file->searchBytePattern(ptnSetDIRVS, ofsSetDIR)) {
+        u16 spcDirAddrPtr = file->readShort(ofsSetDIR + 1);
+        spcDirAddr = file->readByte(spcDirAddrPtr) << 8;
+      }
+      else if (file->searchBytePattern(ptnSetDIRSMW, ofsSetDIR)) {
+        spcDirAddr = file->readByte(ofsSetDIR + 9) << 8;
+      }
+        // DERIVED VERSIONS
+      else if (file->searchBytePattern(ptnSetDIRCTOW, ofsSetDIR)) {
+        spcDirAddr = file->readByte(ofsSetDIR + 3) << 8;
+      }
+      else if (file->searchBytePattern(ptnSetDIRTS, ofsSetDIR)) {
+        spcDirAddr = file->readByte(ofsSetDIR + 1) << 8;
+      }
+      else {
+        return;
+      }
     }
   }
 
@@ -1692,11 +1712,25 @@ void NinSnesScanner::searchForNinSnesFromARAM(RawFile *file) {
     }
   }
 
-  NinSnesInstrSet *newInstrSet = new NinSnesInstrSet(file, version, addrInstrTable, spcDirAddr);
-  newInstrSet->konamiTuningTableAddress = konamiTuningTableAddress;
-  newInstrSet->konamiTuningTableSize = konamiTuningTableSize;
-  if (!newInstrSet->loadVGMFile()) {
-    delete newInstrSet;
-    return;
-  }
+  NinSnesScanResult scanResult;
+  scanResult.version = version;
+  scanResult.signature = signature;
+  scanResult.profile = getNinSnesProfileId(version);
+  scanResult.name = name;
+  scanResult.songIndex = guessedSongIndex;
+  scanResult.songListAddr = addrSongList;
+  scanResult.songStartAddr = addrSongStart;
+  scanResult.sectionPtrAddr = addrSectionPtr;
+  scanResult.instrTableAddr = addrInstrTable;
+  scanResult.spcDirAddr = spcDirAddr;
+  scanResult.konamiBaseAddress = konamiBaseAddress == 0xffff ? 0 : konamiBaseAddress;
+  scanResult.falcomBaseOffset = falcomBaseOffset;
+  scanResult.quintetBGMInstrBase = quintetBGMInstrBase;
+  scanResult.quintetAddrBGMInstrLookup = quintetAddrBGMInstrLookup;
+  scanResult.konamiTuningTableAddress = konamiTuningTableAddress;
+  scanResult.konamiTuningTableSize = konamiTuningTableSize;
+  scanResult.volumeTable = std::move(volumeTable);
+  scanResult.durRateTable = std::move(durRateTable);
+
+  loadFromScanResult(file, scanResult);
 }

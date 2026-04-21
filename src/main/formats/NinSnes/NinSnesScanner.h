@@ -6,6 +6,7 @@
 #pragma once
 #include "Scanner.h"
 #include "BytePattern.h"
+#include "NinSnesScanResult.h"
 
 class NinSnesScanner : public VGMScanner {
  public:
@@ -15,6 +16,8 @@ class NinSnesScanner : public VGMScanner {
   void searchForNinSnesFromARAM(RawFile *file);
 
  private:
+  void loadFromScanResult(RawFile *file, const NinSnesScanResult& scanResult);
+
   static BytePattern ptnBranchForVcmd;
   static BytePattern ptnBranchForVcmdReadahead;
   static BytePattern ptnJumpToVcmd;

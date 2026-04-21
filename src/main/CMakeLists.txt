@@ -219,6 +219,7 @@ target_sources(vgmtranscore
     formats/NeverlandSnes/NeverlandSnesScanner.cpp
     formats/NeverlandSnes/NeverlandSnesSeq.cpp
     formats/NinSnes/NinSnesInstr.cpp
+    formats/NinSnes/NinSnesProfile.cpp
     formats/NinSnes/NinSnesScanner.cpp
     formats/NinSnes/NinSnesSeq.cpp
     formats/Org/OrgScanner.cpp
@@ -393,8 +394,11 @@ target_sources(vgmtranscore
       formats/NeverlandSnes/NeverlandSnesSeq.h
       formats/NinSnes/NinSnesFormat.h
       formats/NinSnes/NinSnesInstr.h
+      formats/NinSnes/NinSnesProfile.h
+      formats/NinSnes/NinSnesScanResult.h
       formats/NinSnes/NinSnesScanner.h
       formats/NinSnes/NinSnesSeq.h
+      formats/NinSnes/NinSnesTypes.h
       formats/Org/OrgFormat.h
       formats/Org/OrgScanner.h
       formats/Org/OrgSeq.h

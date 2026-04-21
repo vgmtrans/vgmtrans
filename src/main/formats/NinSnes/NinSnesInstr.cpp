@@ -151,9 +151,23 @@ NinSnesInstrSet::NinSnesInstrSet(RawFile *file,
                                  uint32_t spcDirAddr,
                                  const std::string &name) :
     VGMInstrSet(NinSnesFormat::name, file, offset, 0, name), version(ver),
+    signature(NinSnesSignatureId::None),
+    profileId(getNinSnesProfileId(ver)),
     spcDirAddr(spcDirAddr),
     konamiTuningTableAddress(0),
     konamiTuningTableSize(0) {
+}
+
+NinSnesInstrSet::NinSnesInstrSet(RawFile* file, const NinSnesScanResult& scanResult)
+    : NinSnesInstrSet(file,
+                      scanResult.version,
+                      scanResult.instrTableAddr,
+                      scanResult.spcDirAddr,
+                      "NinSnesInstrSet") {
+  signature = scanResult.signature;
+  profileId = scanResult.profile;
+  konamiTuningTableAddress = scanResult.konamiTuningTableAddress;
+  konamiTuningTableSize = scanResult.konamiTuningTableSize;
 }
 
 NinSnesInstrSet::~NinSnesInstrSet() {

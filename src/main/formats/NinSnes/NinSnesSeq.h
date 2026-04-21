@@ -4,6 +4,7 @@
 #include "VGMMultiSectionSeq.h"
 #include "SeqTrack.h"
 #include "NinSnesFormat.h"
+#include "NinSnesScanResult.h"
 #include "NinSnesScanner.h"
 
 enum NinSnesSeqEventType {
@@ -172,6 +173,7 @@ class NinSnesSeq:
              const std::vector<uint8_t> &theVolumeTable = std::vector<uint8_t>(),
              const std::vector<uint8_t> &theDurRateTable = std::vector<uint8_t>(),
              std::string theName = "NinSnes Seq");
+  NinSnesSeq(RawFile *file, const NinSnesScanResult& scanResult);
   virtual ~NinSnesSeq();
 
   virtual bool parseHeader();
@@ -192,6 +194,8 @@ class NinSnesSeq:
   void setIntelliCustomPercTableEnabled(bool enabled);
 
   NinSnesVersion version;
+  NinSnesSignatureId signature;
+  NinSnesProfileId profileId;
   uint8_t STATUS_END;
   uint8_t STATUS_NOTE_MIN;
   uint8_t STATUS_NOTE_MAX;

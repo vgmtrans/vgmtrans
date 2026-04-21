@@ -130,6 +130,8 @@ NinSnesSeq::NinSnesSeq(RawFile *file,
                        const std::vector<uint8_t> &theDurRateTable,
                        std::string theName)
     : VGMMultiSectionSeq(NinSnesFormat::name, file, offset, 0, theName), version(ver),
+      signature(NinSnesSignatureId::None),
+      profileId(getNinSnesProfileId(ver)),
       header(NULL),
       volumeTable(theVolumeTable),
       durRateTable(theDurRateTable),
@@ -145,6 +147,22 @@ NinSnesSeq::NinSnesSeq(RawFile *file,
   setAlwaysWriteInitialReverb(0);
 
   loadEventMap();
+}
+
+NinSnesSeq::NinSnesSeq(RawFile* file, const NinSnesScanResult& scanResult)
+    : NinSnesSeq(file,
+                 scanResult.version,
+                 scanResult.songStartAddr,
+                 0,
+                 scanResult.volumeTable,
+                 scanResult.durRateTable,
+                 scanResult.name) {
+  signature = scanResult.signature;
+  profileId = scanResult.profile;
+  konamiBaseAddress = scanResult.konamiBaseAddress;
+  quintetBGMInstrBase = scanResult.quintetBGMInstrBase;
+  quintetAddrBGMInstrLookup = scanResult.quintetAddrBGMInstrLookup;
+  falcomBaseOffset = scanResult.falcomBaseOffset;
 }
 
 NinSnesSeq::~NinSnesSeq() {

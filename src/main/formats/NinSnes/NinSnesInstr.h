@@ -3,6 +3,7 @@
 #include "VGMSampColl.h"
 #include "VGMRgn.h"
 #include "NinSnesFormat.h"
+#include "NinSnesScanResult.h"
 
 // ****************
 // NinSnesInstrSet
@@ -16,6 +17,7 @@ class NinSnesInstrSet:
                   uint32_t offset,
                   uint32_t spcDirAddr,
                   const std::string &name = "NinSnesInstrSet");
+  NinSnesInstrSet(RawFile *file, const NinSnesScanResult& scanResult);
   virtual ~NinSnesInstrSet();
 
   bool parseHeader() override;
@@ -23,6 +25,8 @@ class NinSnesInstrSet:
   void useColl(const VGMColl* coll) override;
 
   NinSnesVersion version;
+  NinSnesSignatureId signature;
+  NinSnesProfileId profileId;
 
   uint16_t konamiTuningTableAddress;
   uint8_t konamiTuningTableSize;
