@@ -1455,25 +1455,23 @@ void NinSnesScanner::searchForNinSnesFromARAM(RawFile *file) {
   // Quintet: ACQUIRE INSTRUMENT BASE:
   uint8_t quintetBGMInstrBase = 0;
   uint16_t quintetAddrBGMInstrLookup = 0;
-  switch (version) {
-    case NINSNES_QUINTET_ACTR: {
+  switch (profile.programResolver) {
+    case NinSnesProgramResolverId::QuintetActRBase: {
       signature = NinSnesSignatureId::Quintet;
       uint16_t addrBGMInstrBase = file->readShort(ofsInstrVCmd + 18);
       quintetBGMInstrBase = file->readByte(addrBGMInstrBase);
       break;
     }
 
-    case NINSNES_QUINTET_ACTR2:
-    case NINSNES_QUINTET_IOG:
+    case NinSnesProgramResolverId::QuintetLookup:
       signature = NinSnesSignatureId::Quintet;
-      quintetAddrBGMInstrLookup = file->readShort(ofsInstrVCmd + 19);
+      quintetAddrBGMInstrLookup =
+          file->readShort(ofsInstrVCmd + (profile.id == NinSnesProfileId::QuintetTs ? 18 : 19));
       break;
 
-    case NINSNES_QUINTET_TS:
-      signature = NinSnesSignatureId::Quintet;
-      quintetAddrBGMInstrLookup = file->readShort(ofsInstrVCmd + 18);
-      break;
-
+    case NinSnesProgramResolverId::Direct:
+    case NinSnesProgramResolverId::StandardPercussion:
+    case NinSnesProgramResolverId::IntelliTaOverride:
     default:
       break;
   }
@@ -1615,7 +1613,7 @@ void NinSnesScanner::searchForNinSnesFromARAM(RawFile *file) {
   uint32_t ofsLoadInstrTableAddressASM;
   uint32_t addrInstrTable = 0;
   uint16_t spcDirAddr = 0;
-  if (version != NINSNES_UNKNOWN) {
+  if (profile.id != NinSnesProfileId::Unknown) {
     if (file->searchBytePattern(ptnLoadInstrTableAddress, ofsLoadInstrTableAddressASM)) {
       addrInstrTable =
           file->readByte(ofsLoadInstrTableAddressASM + 7) | (file->readByte(ofsLoadInstrTableAddressASM + 10) << 8);
@@ -1688,7 +1686,7 @@ void NinSnesScanner::searchForNinSnesFromARAM(RawFile *file) {
 
   uint16_t konamiTuningTableAddress = 0;
   uint8_t konamiTuningTableSize = 0;
-  if (version == NINSNES_KONAMI) {
+  if (profile.instrumentLayout == NinSnesInstrumentLayoutId::KonamiTuningTable) {
     if (file->searchBytePattern(ptnInstrVCmdGD3, ofsInstrVCmd)) {
       uint16_t konamiAddrTuningTableLow = file->readShort(ofsInstrVCmd + 10);
       uint16_t konamiAddrTuningTableHigh = file->readShort(ofsInstrVCmd + 14);
