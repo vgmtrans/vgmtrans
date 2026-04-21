@@ -119,6 +119,30 @@ struct NinSnesIntelliTACustomPercEntry {
   uint8_t panByte = 0;
 };
 
+struct NinSnesIntelliVoiceParamState {
+  uint16_t addr = 0;
+  uint8_t size = 0;
+  bool defined = false;
+
+  void clear() {
+    addr = 0;
+    size = 0;
+    defined = false;
+  }
+};
+
+struct NinSnesIntelliPercussionState {
+  std::array<NinSnesIntelliTACustomPercEntry, NINSNES_INTELLI_TA_PERCUSSION_SLOT_COUNT> table {};
+  uint8_t flags = 0;
+  uint8_t unknownByte = 0;
+
+  void clear() {
+    table = {};
+    flags = 0;
+    unknownByte = 0;
+  }
+};
+
 struct NinSnesIntelliTAInstrumentOverride {
   uint8_t logicalInstrIndex = 0;
   uint32_t progNum = 0;
@@ -192,13 +216,9 @@ class NinSnesSeq:
   std::vector<uint8_t> intelliDurVolTable;
   bool intelliUseCustomNoteParam;
   bool intelliUseCustomPercTable;
-  uint16_t intelliVoiceParamTable;
-  uint8_t intelliVoiceParamTableSize;
-  bool intelliVoiceParamTableDefined;
-  std::array<NinSnesIntelliTACustomPercEntry, NINSNES_INTELLI_TA_PERCUSSION_SLOT_COUNT> intelliCustomPercTable;
+  NinSnesIntelliVoiceParamState intelliVoiceParam;
+  NinSnesIntelliPercussionState intelliPerc;
   std::array<uint32_t, 0x80> intelliInstrumentProgramMap;
-  uint8_t intelliTAFlags;
-  uint8_t intelliTAUnknownGlobalByte;
 
   // Quintet
   uint8_t quintetBGMInstrBase;
@@ -270,9 +290,9 @@ class NinSnesTrack
   void setTrackedProgramState(uint32_t progNum, std::optional<uint8_t> logicalProgram = std::nullopt);
   void restoreNonPercussionProgramIfNeeded();
   void switchToPercussionProgramIfNeeded(uint8_t program = 0);
-  void applyIntelliTAPercussionState(uint8_t instrumentByte,
-                                     std::optional<uint8_t> panByte = std::nullopt,
-                                     std::optional<uint8_t> reverbLevel = std::nullopt);
+  void applyIntelliPercussionState(uint8_t instrumentByte,
+                                   std::optional<uint8_t> panByte = std::nullopt,
+                                   std::optional<uint8_t> reverbLevel = std::nullopt);
   void addProgramChangeEvent(uint32_t offset,
                              uint32_t length,
                              uint32_t progNum,

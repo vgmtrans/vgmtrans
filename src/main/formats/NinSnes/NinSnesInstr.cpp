@@ -17,6 +17,10 @@ uint32_t getProgramNumber(const VGMInstr* instr) {
   return (instr->bank << 7) | (instr->instrNum & 0x7f);
 }
 
+bool usesIntelliTempDrumKitExport(NinSnesVersion version) {
+  return version == NINSNES_INTELLI_TA || version == NINSNES_INTELLI_FE4;
+}
+
 VGMInstr* findInstrByProgram(const std::vector<VGMInstr*>& instrs, uint32_t progNum) {
   for (auto* instr : instrs) {
     if (getProgramNumber(instr) == progNum) {
@@ -263,7 +267,7 @@ void NinSnesInstrSet::useColl(const VGMColl* coll) {
     return;
   }
 
-  if (seq->version == NINSNES_INTELLI_TA || seq->version == NINSNES_INTELLI_FE4) {
+  if (usesIntelliTempDrumKitExport(seq->version)) {
     for (const auto& overrideDef : seq->intelliTAInstrumentOverrides()) {
       auto* overrideInstr = new VGMInstr(
           this,
