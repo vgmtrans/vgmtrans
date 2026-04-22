@@ -131,6 +131,7 @@ public:
 private:
   NinSnesSeq& seq() const;
   NinSnesIntelliModeId intelliMode() const;
+  bool handleIntelliPercussionNote(uint32_t beginOffset, uint8_t slot, uint8_t duration);
   void readStandardNoteParam(uint32_t beginOffset, uint8_t statusByte, std::string& desc);
   void readLemmingsNoteParam(uint32_t beginOffset, uint8_t statusByte, std::string& desc);
   void readIntelliNoteParam(uint32_t beginOffset, uint8_t statusByte, std::string& desc);
