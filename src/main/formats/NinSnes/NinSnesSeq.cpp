@@ -1,4 +1,4 @@
-#include "../NinSnesSeq.h"
+#include "NinSnesSeq.h"
 #include "SeqEvent.h"
 #include "ScaleConversion.h"
 #include "spdlog/fmt/fmt.h"
