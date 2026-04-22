@@ -13,8 +13,8 @@ struct NinSnesIntelliPercussionNoteState {
   std::optional<uint8_t> reverbLevel;
 };
 
-bool isIntelliTablePercussionVersion(NinSnesVersion version) {
-  const auto intelliMode = getNinSnesProfile(version).intelliMode;
+bool isIntelliTablePercussionVersion(NinSnesProfileId profileId) {
+  const auto intelliMode = getNinSnesProfile(profileId).intelliMode;
   return intelliMode == NinSnesIntelliModeId::Ta || intelliMode == NinSnesIntelliModeId::Fe4;
 }
 
@@ -128,7 +128,7 @@ NinSnesSeq::NinSnesSeq(RawFile *file,
                        const std::vector<uint8_t> &theVolumeTable,
                        const std::vector<uint8_t> &theDurRateTable,
                        std::string theName)
-    : VGMMultiSectionSeq(NinSnesFormat::name, file, offset, 0, theName), version(ver),
+    : VGMMultiSectionSeq(NinSnesFormat::name, file, offset, 0, theName),
       signature(NinSnesSignatureId::None),
       profileId(getNinSnesProfileId(ver)),
       header(NULL),
@@ -375,8 +375,8 @@ bool NinSnesSeq::readEvent(long stopTime) {
 }
 
 void NinSnesSeq::loadEventMap() {
-  const auto definition =
-      buildNinSnesSeqDefinition(version, volumeTable, durRateTable, panTable, intelliDurVolTable);
+  const auto definition = buildNinSnesSeqDefinition(
+      getNinSnesProfile(profileId).legacyVersion, volumeTable, durRateTable, panTable, intelliDurVolTable);
 
   STATUS_END = definition.status.end;
   STATUS_NOTE_MIN = definition.status.noteMin;
@@ -849,7 +849,7 @@ bool NinSnesTrack::readEvent() {
       const uint8_t slot = statusByte - parentSeq->STATUS_PERCUSSION_NOTE_MIN;
       uint8_t duration = getEffectiveNoteDuration();
 
-      if (isIntelliTablePercussionVersion(parentSeq->version) &&
+      if (isIntelliTablePercussionVersion(parentSeq->profileId) &&
           slot < NINSNES_INTELLI_TA_PERCUSSION_SLOT_COUNT) {
         const auto percussionState = getIntelliPercussionNoteState(*parentSeq, slot);
         applyIntelliPercussionState(percussionState.instrumentByte,
@@ -1692,7 +1692,7 @@ bool NinSnesTrack::readEvent() {
       uint8_t numEntries = (arg1 & 15) + 1;
       const uint32_t tableOffset = curOffset;
 
-      if (isIntelliTablePercussionVersion(parentSeq->version)) {
+      if (isIntelliTablePercussionVersion(parentSeq->profileId)) {
         for (uint8_t slot = 0; slot < numEntries && slot < NINSNES_INTELLI_TA_PERCUSSION_SLOT_COUNT;
              slot++) {
           auto& customEntry = parentSeq->intelliPerc.table[slot];

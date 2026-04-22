@@ -22,8 +22,8 @@ uint32_t getProgramNumber(const VGMInstr* instr) {
   return (instr->bank << 7) | (instr->instrNum & 0x7f);
 }
 
-bool usesIntelliTempDrumKitExport(NinSnesVersion version) {
-  const auto intelliMode = getNinSnesProfile(version).intelliMode;
+bool usesIntelliTempDrumKitExport(NinSnesProfileId profileId) {
+  const auto intelliMode = getNinSnesProfile(profileId).intelliMode;
   return intelliMode == NinSnesIntelliModeId::Ta || intelliMode == NinSnesIntelliModeId::Fe4;
 }
 
@@ -278,11 +278,11 @@ void NinSnesInstrSet::useColl(const VGMColl* coll) {
   }
 
   const auto* seq = dynamic_cast<const NinSnesSeq*>(coll->seq());
-  if (seq == nullptr || seq->rawFile() != rawFile() || seq->version != version) {
+  if (seq == nullptr || seq->rawFile() != rawFile() || seq->profileId != profileId) {
     return;
   }
 
-  if (usesIntelliTempDrumKitExport(seq->version)) {
+  if (usesIntelliTempDrumKitExport(seq->profileId)) {
     for (const auto& overrideDef : seq->intelliTAInstrumentOverrides()) {
       auto* overrideInstr = new VGMInstr(
           this,

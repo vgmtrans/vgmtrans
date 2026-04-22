@@ -37,7 +37,6 @@ class NinSnesSeq:
   bool usesIntelliCustomPercTable() const;
   void setIntelliCustomPercTableEnabled(bool enabled);
 
-  NinSnesVersion version;
   NinSnesSignatureId signature;
   NinSnesProfileId profileId;
   uint8_t STATUS_END;
