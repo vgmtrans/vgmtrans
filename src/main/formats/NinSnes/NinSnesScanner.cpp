@@ -9,7 +9,6 @@
 #include "ScannerManager.h"
 
 #include <array>
-#include <cstring>
 #include <optional>
 
 namespace vgmtrans::scanners {
@@ -35,20 +34,14 @@ struct NinSnesVoiceCommandInfo {
   NinSnesProfileId profileId = NinSnesProfileId::Unknown;
 };
 
+struct NinSnesInstrumentProbeInfo {
+  uint32_t tableAddress = 0;
+  uint16_t dirAddress = 0;
+};
+
 template <size_t N>
 bool matchNinSnesByteTable(RawFile* file, uint16_t offset, const std::array<uint8_t, N>& table) {
   return file->matchBytes(table.data(), offset, table.size());
-}
-
-template <size_t N>
-BytePattern makePatchedBytePattern(const char (&bytes)[N], const char* mask,
-                                   std::initializer_list<std::pair<size_t, uint8_t>> patches) {
-  std::array<char, N - 1> pattern{};
-  std::memcpy(pattern.data(), bytes, N - 1);
-  for (const auto& [index, value] : patches) {
-    pattern[index] = static_cast<char>(value);
-  }
-  return BytePattern(pattern.data(), mask, N - 1);
 }
 
 std::vector<uint8_t> readNinSnesByteTable(RawFile* file, uint16_t address, uint8_t length) {
@@ -155,118 +148,13 @@ void NinSnesScanner::searchForNinSnesFromARAM(RawFile* file) {
   }
 
   auto findSongList = [&]() -> std::optional<NinSnesSongListInfo> {
-    // BEGIN DYNAMIC PATTERN DEFINITIONS
-
-    //; Kirby Super Star SPC
-    //; set initial value to section pointer
-    // 08e4: f5 ff 38  mov   a,$38ff+x
-    // 08e7: fd        mov   y,a
-    // 08e8: f5 fe 38  mov   a,$38fe+x
-    // 08eb: da 30     movw  $30,ya
-    const BytePattern ptnInitSectionPtr = makePatchedBytePattern("\xf5\xff\x38\xfd\xf5\xfe\x38\xda"
-                                                                 "\x30",
-                                                                 "x??xx??x"
-                                                                 "x",
-                                                                 {{8, addrSectionPtr}});
-
-    //; Yoshi's Island SPC
-    //; set initial value to section pointer
-    // 06f0: 1c        asl   a
-    // 06f1: 5d        mov   x,a
-    // 06f2: f5 8f ff  mov   a,$ff8f+x
-    // 06f5: fd        mov   y,a
-    // 06f6: d0 03     bne   $06fb
-    // 06f8: c4 04     mov   $04,a
-    // 06fa: 6f        ret
-    // 06fb: f5 8e ff  mov   a,$ff8e+x
-    // 06fe: da 40     movw  $40,ya
-    const BytePattern ptnInitSectionPtrYI =
-        makePatchedBytePattern("\x1c\x5d\xf5\x8f\xff\xfd\xd0\x03"
-                               "\xc4\x04\x6f\xf5\x8e\xff\xda\x40",
-                               "xxx??xxx"
-                               "x?xx??xx",
-                               {{15, addrSectionPtr}});
-
-    //; Super Mario World SPC
-    //; set initial value to section pointer
-    // 0b5f: 1c        asl   a
-    // 0b60: fd        mov   y,a
-    // 0b61: f6 5e 13  mov   a,$135e+y
-    // 0b64: c4 40     mov   $40,a
-    // 0b66: f6 5f 13  mov   a,$135f+y
-    // 0b69: c4 41     mov   $41,a
-    const BytePattern ptnInitSectionPtrSMW = makePatchedBytePattern(
-        "\x1c\xfd\xf6\x5e\x13\xc4\x40\xf6"
-        "\x5f\x13\xc4\x41",
-        "xxx??xxx"
-        "??xx",
-        {{6, addrSectionPtr}, {11, static_cast<uint8_t>(addrSectionPtr + 1)}});
-
-    // DERIVED VERSIONS
-
-    //; Gradius 3 SPC
-    // 08b7: 5d        mov   x,a
-    // 08b8: f5 fc 11  mov   a,$11fc+x
-    // 08bb: f0 ee     beq   $08ab
-    // 08bd: fd        mov   y,a
-    // 08be: f5 fb 11  mov   a,$11fb+x
-    // 08c1: da 40     movw  $40,ya            ; song metaindex ptr
-    const BytePattern ptnInitSectionPtrGD3 =
-        makePatchedBytePattern("\x5d\xf5\xfc\x11\xf0\xee\xfd\xf5"
-                               "\xfb\x11\xda\x40",
-                               "xx??x?xx"
-                               "??xx",
-                               {{11, addrSectionPtr}});
-
-    //; Yoshi's Safari SPC
-    // 1488: fd        mov   y,a
-    // 1489: f7 48     mov   a,($48)+y
-    // 148b: c4 4c     mov   $4c,a
-    // 148d: fc        inc   y
-    // 148e: f7 48     mov   a,($48)+y
-    // 1490: c4 4d     mov   $4d,a
-    const BytePattern ptnInitSectionPtrYSFR = makePatchedBytePattern(
-        "\xfd\xf7\x48\xc4\x4c\xfc\xf7\x48"
-        "\xc4\x4d",
-        "xx?xxxx?"
-        "xx",
-        {{4, addrSectionPtr}, {9, static_cast<uint8_t>(addrSectionPtr + 1)}});
-
-    //; Terranigma SPC
-    // 0521: e5 fc 10  mov   a,$10fc
-    // 0524: ec fd 10  mov   y,$10fd
-    // 0527: da 23     movw  $23,ya            ; section list address from $10fc/d
-    // 0529: 3a 23     incw  $23
-    // 052b: 3a 23     incw  $23               ; skip first word
-    const BytePattern ptnInitSectionPtrTS =
-        makePatchedBytePattern("\xe5\xfc\x10\xec\xfd\x10\xda\x23"
-                               "\x3a\x23\x3a\x23",
-                               "x??x??xx"
-                               "xxxx",
-                               {{7, addrSectionPtr}, {9, addrSectionPtr}, {11, addrSectionPtr}});
-
-    //; Ys IV - Mask of the Sun SPC
-    // 11f8: f5 b9 06  mov   a,$06b9+x
-    // 11fb: fd        mov   y,a
-    // 11fc: f5 b8 06  mov   a,$06b8+x
-    // 11ff: da 35     movw  $35,ya            ; load section playlist ptr
-    // 1201: 2d        push  a
-    // 1202: dd        mov   a,y
-    // 1203: 80        setc
-    // 1204: a8 d0     sbc   a,#$d0            ; address to offset (decrease $d000)
-    // 1206: fd        mov   y,a
-    // 1207: ae        pop   a
-    // 1208: da 17     movw  $17,ya            ; save the offset
-    const BytePattern ptnInitSectionPtrYs4 =
-        makePatchedBytePattern("\xf5\xb9\x06\xfd\xf5\xb8\x06\xda"
-                               "\x35\x2d\xdd\x80\xa8\xd0\xfd\xae"
-                               "\xda\x17",
-                               "x??xx??x"
-                               "xxxxx?xx"
-                               "xx",
-                               {{8, addrSectionPtr}});
-
-    // END DYNAMIC PATTERN DEFINITIONS
+    const BytePattern ptnInitSectionPtr = makeInitSectionPtrPattern(addrSectionPtr);
+    const BytePattern ptnInitSectionPtrYI = makeInitSectionPtrYIPattern(addrSectionPtr);
+    const BytePattern ptnInitSectionPtrSMW = makeInitSectionPtrSMWPattern(addrSectionPtr);
+    const BytePattern ptnInitSectionPtrGD3 = makeInitSectionPtrGD3Pattern(addrSectionPtr);
+    const BytePattern ptnInitSectionPtrYSFR = makeInitSectionPtrYSFRPattern(addrSectionPtr);
+    const BytePattern ptnInitSectionPtrTS = makeInitSectionPtrTSPattern(addrSectionPtr);
+    const BytePattern ptnInitSectionPtrYs4 = makeInitSectionPtrYs4Pattern(addrSectionPtr);
 
     uint32_t ofsInitSectionPtr;
     NinSnesSongListInfo info;
@@ -317,9 +205,7 @@ void NinSnesScanner::searchForNinSnesFromARAM(RawFile* file) {
 
     if (file->searchBytePattern(ptnInitSectionPtrYSFR, ofsInitSectionPtr)) {
       const uint8_t addrSongListPtr = file->readByte(ofsInitSectionPtr + 2);
-      const BytePattern ptnInitSongListPtrYSFR = makePatchedBytePattern(
-          "\x8f\x00\x48\x8f\x1e\x49", "x?xx?x",
-          {{2, addrSongListPtr}, {5, static_cast<uint8_t>(addrSongListPtr + 1)}});
+      const BytePattern ptnInitSongListPtrYSFR = makeInitSongListPtrYSFRPattern(addrSongListPtr);
 
       uint32_t ofsInitSongListPtr;
       if (!file->searchBytePattern(ptnInitSongListPtrYSFR, ofsInitSongListPtr)) {
@@ -581,214 +467,221 @@ void NinSnesScanner::searchForNinSnesFromARAM(RawFile* file) {
       break;
   }
 
-  // GUESS SONG COUNT
-  // Test Case: Star Fox, Kirby Super Star, Earthbound
-  // Note that the result sometimes exceeds the real length
-  uint8_t songListLength = 1;
-  uint16_t addrSectionListCutoff = 0xffff;
-  // skip index 0, it's not a part of table in most games
-  for (uint8_t songIndex = 1; songIndex <= 0x7f; songIndex++) {
-    uint32_t addrSectionListPtr = addrSongList + songIndex * 2;
-    if (addrSectionListPtr >= addrSectionListCutoff) {
-      break;
-    }
-
+  auto readSectionListPtr = [&](uint32_t addrSectionListPtr) -> uint16_t {
     uint16_t firstSectionPtr = file->readShort(addrSectionListPtr);
     if (profile.addressModel == NinSnesAddressModelId::KonamiBase) {
       firstSectionPtr =
           convertNinSnesAddress(profile, firstSectionPtr, konamiBaseAddress, falcomBaseOffset);
     }
-    if (firstSectionPtr == 0) {
-      continue;
-    }
-    if ((firstSectionPtr & 0xff00) == 0 || firstSectionPtr == 0xffff) {
-      break;
-    }
-    if (firstSectionPtr >= addrSectionListPtr) {
-      addrSectionListCutoff = std::min(addrSectionListCutoff, firstSectionPtr);
-    }
+    return firstSectionPtr;
+  };
 
-    uint16_t addrFirstSection = file->readShort(firstSectionPtr);
-    if (addrFirstSection < 0x0100) {
-      // usually it does not appear
-      // probably it's broken
-      continue;
-    }
-
+  auto updateFalcomBaseOffset = [&](uint16_t firstSectionPtr) {
     if (profile.addressModel == NinSnesAddressModelId::FalcomBaseOffset) {
       falcomBaseOffset = firstSectionPtr - falcomBaseAddress;
     }
-    addrFirstSection =
-        convertNinSnesAddress(profile, addrFirstSection, konamiBaseAddress, falcomBaseOffset);
-    if (addrFirstSection + 16 > 0x10000) {
-      break;
-    }
+  };
 
-    bool hasIllegalTrack = false;
+  auto hasIllegalTrackPointers = [&](uint16_t addrFirstSection) -> bool {
     for (uint8_t trackIndex = 0; trackIndex < 8; trackIndex++) {
       uint16_t addrTrackStart = file->readShort(addrFirstSection + trackIndex * 2);
-      if (addrTrackStart != 0) {
-        if (addrTrackStart == 0xffff) {
-          hasIllegalTrack = true;
-          break;
-        }
+      if (addrTrackStart == 0) {
+        continue;
+      }
+      if (addrTrackStart == 0xffff) {
+        return true;
+      }
 
-        addrTrackStart =
-            convertNinSnesAddress(profile, addrTrackStart, konamiBaseAddress, falcomBaseOffset);
-
-        if ((addrTrackStart & 0xff00) == 0 || addrTrackStart == 0xffff) {
-          hasIllegalTrack = true;
-          break;
-        }
+      addrTrackStart =
+          convertNinSnesAddress(profile, addrTrackStart, konamiBaseAddress, falcomBaseOffset);
+      if ((addrTrackStart & 0xff00) == 0 || addrTrackStart == 0xffff) {
+        return true;
       }
     }
-    if (hasIllegalTrack) {
-      break;
+    return false;
+  };
+
+  auto findSongListLength = [&]() -> uint8_t {
+    uint8_t songListLength = 1;
+    uint16_t addrSectionListCutoff = 0xffff;
+
+    for (uint8_t songIndex = 1; songIndex <= 0x7f; songIndex++) {
+      const uint32_t addrSectionListPtr = addrSongList + songIndex * 2;
+      if (addrSectionListPtr >= addrSectionListCutoff) {
+        break;
+      }
+
+      const uint16_t firstSectionPtr = readSectionListPtr(addrSectionListPtr);
+      if (firstSectionPtr == 0) {
+        continue;
+      }
+      if ((firstSectionPtr & 0xff00) == 0 || firstSectionPtr == 0xffff) {
+        break;
+      }
+      if (firstSectionPtr >= addrSectionListPtr) {
+        addrSectionListCutoff = std::min(addrSectionListCutoff, firstSectionPtr);
+      }
+
+      uint16_t addrFirstSection = file->readShort(firstSectionPtr);
+      if (addrFirstSection < 0x0100) {
+        continue;
+      }
+
+      updateFalcomBaseOffset(firstSectionPtr);
+      addrFirstSection =
+          convertNinSnesAddress(profile, addrFirstSection, konamiBaseAddress, falcomBaseOffset);
+      if (addrFirstSection + 16 > 0x10000 || hasIllegalTrackPointers(addrFirstSection)) {
+        break;
+      }
+
+      songListLength = songIndex + 1;
     }
 
-    songListLength = songIndex + 1;
-  }
+    return songListLength;
+  };
 
-  // GUESS CURRENT SONG NUMBER
-  uint8_t guessedSongIndex = 0xff;
-
-  // scan for a song that contains the current section
-  // (note that the section pointer points to the "next" section actually, in most cases)
-  uint16_t addrCurrentSection = file->readShort(addrSectionPtr);
-  if (addrCurrentSection >= 0x0100 && addrCurrentSection < 0xfff0) {
-    uint8_t songIndexCandidate = 0xff;
+  auto findCurrentSongIndex = [&](uint8_t songListLength) -> std::optional<uint8_t> {
+    const uint16_t addrCurrentSection = file->readShort(addrSectionPtr);
+    if (addrCurrentSection < 0x0100 || addrCurrentSection >= 0xfff0) {
+      return std::nullopt;
+    }
 
     for (uint8_t songIndex = 0; songIndex <= songListLength; songIndex++) {
-      uint32_t addrSectionListPtr = addrSongList + songIndex * 2;
+      const uint32_t addrSectionListPtr = addrSongList + songIndex * 2;
       if (addrSectionListPtr == 0 || addrSectionListPtr == 0xffff) {
         continue;
       }
 
-      uint16_t firstSectionPtr = file->readShort(addrSectionListPtr);
-      if (profile.addressModel == NinSnesAddressModelId::KonamiBase) {
-        firstSectionPtr =
-            convertNinSnesAddress(profile, firstSectionPtr, konamiBaseAddress, falcomBaseOffset);
-      }
-      if (profile.addressModel == NinSnesAddressModelId::FalcomBaseOffset) {
-        falcomBaseOffset = firstSectionPtr - falcomBaseAddress;
-      }
-      if (firstSectionPtr > addrCurrentSection) {
+      const uint16_t firstSectionPtr = readSectionListPtr(addrSectionListPtr);
+      updateFalcomBaseOffset(firstSectionPtr);
+      if (firstSectionPtr > addrCurrentSection ||
+          (addrCurrentSection % 2) != (firstSectionPtr % 2)) {
         continue;
       }
 
       uint16_t curAddress = firstSectionPtr;
-      if ((addrCurrentSection % 2) == (curAddress % 2)) {
-        uint8_t sectionCount = 0;  // prevent overrun of illegal data
-        while (curAddress >= 0x0100 && curAddress < 0xfff0 && sectionCount < 32) {
-          uint16_t addrSection = convertNinSnesAddress(profile, file->readShort(curAddress),
-                                                       konamiBaseAddress, falcomBaseOffset);
-
-          if (curAddress == addrCurrentSection) {
-            songIndexCandidate = songIndex;
-            break;
-          }
-
-          if ((addrSection & 0xff00) == 0) {
-            // section list end / jump
-            break;
-          }
-
-          curAddress += 2;
-          sectionCount++;
+      uint8_t sectionCount = 0;
+      while (curAddress >= 0x0100 && curAddress < 0xfff0 && sectionCount < 32) {
+        const uint16_t addrSection =
+            readNinSnesAddress(profile, file, curAddress, konamiBaseAddress, falcomBaseOffset);
+        if (curAddress == addrCurrentSection) {
+          return songIndex;
         }
-
-        if (songIndexCandidate != 0xff) {
+        if ((addrSection & 0xff00) == 0) {
           break;
         }
+
+        curAddress += 2;
+        sectionCount++;
       }
     }
 
-    if (songIndexCandidate != 0xff) {
-      guessedSongIndex = songIndexCandidate;
-    }
-  }
+    return std::nullopt;
+  };
 
-  if (guessedSongIndex == 0xff) {
+  const uint8_t songListLength = findSongListLength();
+  const auto guessedSongIndex = findCurrentSongIndex(songListLength);
+  if (!guessedSongIndex) {
     return;
   }
 
   // load the song
-  uint16_t addrSongStart = file->readShort(addrSongList + guessedSongIndex * 2);
+  uint16_t addrSongStart = file->readShort(addrSongList + (*guessedSongIndex) * 2);
   if (profile.addressModel == NinSnesAddressModelId::KonamiBase) {
     addrSongStart =
         convertNinSnesAddress(profile, addrSongStart, konamiBaseAddress, falcomBaseOffset);
   }
 
-  // scan for instrument table
-  uint32_t ofsLoadInstrTableAddressASM;
-  uint32_t addrInstrTable = 0;
-  uint16_t spcDirAddr = 0;
-  if (profile.id != NinSnesProfileId::Unknown) {
+  auto findDirAddress = [&]() -> std::optional<uint16_t> {
+    uint32_t ofsSetDIR;
+    if (file->searchBytePattern(ptnSetDIR, ofsSetDIR)) {
+      return static_cast<uint16_t>(file->readByte(ofsSetDIR + 4) << 8);
+    }
+    if (file->searchBytePattern(ptnSetDIRYI, ofsSetDIR)) {
+      return static_cast<uint16_t>(file->readByte(ofsSetDIR + 1) << 8);
+    }
+    if (file->searchBytePattern(ptnSetDIRVS, ofsSetDIR)) {
+      const u16 spcDirAddrPtr = file->readShort(ofsSetDIR + 1);
+      return static_cast<uint16_t>(file->readByte(spcDirAddrPtr) << 8);
+    }
+    if (file->searchBytePattern(ptnSetDIRSMW, ofsSetDIR)) {
+      return static_cast<uint16_t>(file->readByte(ofsSetDIR + 9) << 8);
+    }
+    if (file->searchBytePattern(ptnSetDIRCTOW, ofsSetDIR)) {
+      return static_cast<uint16_t>(file->readByte(ofsSetDIR + 3) << 8);
+    }
+    if (file->searchBytePattern(ptnSetDIRTS, ofsSetDIR)) {
+      return static_cast<uint16_t>(file->readByte(ofsSetDIR + 1) << 8);
+    }
+    return std::nullopt;
+  };
+
+  auto findInstrumentProbeInfo = [&]() -> std::optional<NinSnesInstrumentProbeInfo> {
+    if (profile.id == NinSnesProfileId::Unknown) {
+      return NinSnesInstrumentProbeInfo{};
+    }
+
+    uint32_t ofsLoadInstrTableAddressASM;
+    NinSnesInstrumentProbeInfo info;
     if (file->searchBytePattern(ptnLoadInstrTableAddress, ofsLoadInstrTableAddressASM)) {
-      addrInstrTable = file->readByte(ofsLoadInstrTableAddressASM + 7) |
-                       (file->readByte(ofsLoadInstrTableAddressASM + 10) << 8);
-      // Fix for HyperZone
-      u32 firstWord = file->readWord(addrInstrTable);
+      info.tableAddress = file->readByte(ofsLoadInstrTableAddressASM + 7) |
+                          (file->readByte(ofsLoadInstrTableAddressASM + 10) << 8);
+      const u32 firstWord = file->readWord(info.tableAddress);
       if (firstWord == 0 || firstWord == 0xFFFFFFFF) {
-        addrInstrTable += 4;
+        info.tableAddress += 4;
       }
     } else if (file->searchBytePattern(ptnLoadInstrTableAddressSMW, ofsLoadInstrTableAddressASM)) {
-      addrInstrTable = file->readByte(ofsLoadInstrTableAddressASM + 3) |
-                       (file->readByte(ofsLoadInstrTableAddressASM + 6) << 8);
+      info.tableAddress = file->readByte(ofsLoadInstrTableAddressASM + 3) |
+                          (file->readByte(ofsLoadInstrTableAddressASM + 6) << 8);
     } else {
       switch (profile.instrTableAddressModel) {
         case NinSnesInstrTableAddressModelId::Human:
           if (file->searchBytePattern(ptnLoadInstrTableAddressCTOW, ofsLoadInstrTableAddressASM)) {
-            addrInstrTable = file->readByte(ofsLoadInstrTableAddressASM + 7) |
-                             (file->readByte(ofsLoadInstrTableAddressASM + 10) << 8);
+            info.tableAddress = file->readByte(ofsLoadInstrTableAddressASM + 7) |
+                                (file->readByte(ofsLoadInstrTableAddressASM + 10) << 8);
           } else if (file->searchBytePattern(ptnLoadInstrTableAddressSOS,
                                              ofsLoadInstrTableAddressASM)) {
-            addrInstrTable = file->readByte(ofsLoadInstrTableAddressASM + 1) |
-                             (file->readByte(ofsLoadInstrTableAddressASM + 4) << 8);
+            info.tableAddress = file->readByte(ofsLoadInstrTableAddressASM + 1) |
+                                (file->readByte(ofsLoadInstrTableAddressASM + 4) << 8);
           } else {
-            return;
+            return std::nullopt;
           }
           break;
 
         case NinSnesInstrTableAddressModelId::Tose:
-          if (file->searchBytePattern(ptnLoadInstrTableAddressYSFR, ofsLoadInstrTableAddressASM)) {
-            spcDirAddr = file->readByte(ofsLoadInstrTableAddressASM + 3) << 8;
-            addrInstrTable = file->readByte(ofsLoadInstrTableAddressASM + 10) |
-                             (file->readByte(ofsLoadInstrTableAddressASM + 13) << 8);
-          } else {
-            return;
+          if (!file->searchBytePattern(ptnLoadInstrTableAddressYSFR, ofsLoadInstrTableAddressASM)) {
+            return std::nullopt;
           }
+          info.dirAddress = file->readByte(ofsLoadInstrTableAddressASM + 3) << 8;
+          info.tableAddress = file->readByte(ofsLoadInstrTableAddressASM + 10) |
+                              (file->readByte(ofsLoadInstrTableAddressASM + 13) << 8);
           break;
 
         case NinSnesInstrTableAddressModelId::Standard:
         default:
-          return;
+          return std::nullopt;
       }
     }
 
-    // scan for DIR address
-    if (spcDirAddr == 0) {
-      uint32_t ofsSetDIR;
-      if (file->searchBytePattern(ptnSetDIR, ofsSetDIR)) {
-        spcDirAddr = file->readByte(ofsSetDIR + 4) << 8;
-      } else if (file->searchBytePattern(ptnSetDIRYI, ofsSetDIR)) {
-        spcDirAddr = file->readByte(ofsSetDIR + 1) << 8;
-      } else if (file->searchBytePattern(ptnSetDIRVS, ofsSetDIR)) {
-        u16 spcDirAddrPtr = file->readShort(ofsSetDIR + 1);
-        spcDirAddr = file->readByte(spcDirAddrPtr) << 8;
-      } else if (file->searchBytePattern(ptnSetDIRSMW, ofsSetDIR)) {
-        spcDirAddr = file->readByte(ofsSetDIR + 9) << 8;
+    if (info.dirAddress == 0) {
+      const auto dirAddress = findDirAddress();
+      if (!dirAddress) {
+        return std::nullopt;
       }
-      // DERIVED VERSIONS
-      else if (file->searchBytePattern(ptnSetDIRCTOW, ofsSetDIR)) {
-        spcDirAddr = file->readByte(ofsSetDIR + 3) << 8;
-      } else if (file->searchBytePattern(ptnSetDIRTS, ofsSetDIR)) {
-        spcDirAddr = file->readByte(ofsSetDIR + 1) << 8;
-      } else {
-        return;
-      }
+      info.dirAddress = *dirAddress;
     }
+
+    return info;
+  };
+
+  uint32_t addrInstrTable = 0;
+  uint16_t spcDirAddr = 0;
+  const auto instrumentProbeInfo = findInstrumentProbeInfo();
+  if (!instrumentProbeInfo) {
+    return;
   }
+  addrInstrTable = instrumentProbeInfo->tableAddress;
+  spcDirAddr = instrumentProbeInfo->dirAddress;
 
   uint16_t konamiTuningTableAddress = 0;
   uint8_t konamiTuningTableSize = 0;
@@ -809,7 +702,7 @@ void NinSnesScanner::searchForNinSnesFromARAM(RawFile* file) {
   scanResult.signature = signature;
   scanResult.profile = profileId;
   scanResult.name = name;
-  scanResult.songIndex = guessedSongIndex;
+  scanResult.songIndex = *guessedSongIndex;
   scanResult.songListAddr = addrSongList;
   scanResult.songStartAddr = addrSongStart;
   scanResult.sectionPtrAddr = addrSectionPtr;

@@ -6,6 +6,90 @@
 
 #include "NinSnesScanner.h"
 
+#include <array>
+#include <cstring>
+
+namespace {
+
+template <size_t N>
+BytePattern makePatchedBytePattern(const char (&bytes)[N], const char* mask,
+                                   std::initializer_list<std::pair<size_t, uint8_t>> patches) {
+  std::array<char, N - 1> pattern{};
+  std::memcpy(pattern.data(), bytes, N - 1);
+  for (const auto& [index, value] : patches) {
+    pattern[index] = static_cast<char>(value);
+  }
+  return BytePattern(pattern.data(), mask, N - 1);
+}
+
+}  // namespace
+
+BytePattern NinSnesScanner::makeInitSectionPtrPattern(uint8_t addrSectionPtr) {
+  return makePatchedBytePattern("\xf5\xff\x38\xfd\xf5\xfe\x38\xda"
+                                "\x30",
+                                "x??xx??x"
+                                "x",
+                                {{8, addrSectionPtr}});
+}
+
+BytePattern NinSnesScanner::makeInitSectionPtrYIPattern(uint8_t addrSectionPtr) {
+  return makePatchedBytePattern("\x1c\x5d\xf5\x8f\xff\xfd\xd0\x03"
+                                "\xc4\x04\x6f\xf5\x8e\xff\xda\x40",
+                                "xxx??xxx"
+                                "x?xx??xx",
+                                {{15, addrSectionPtr}});
+}
+
+BytePattern NinSnesScanner::makeInitSectionPtrSMWPattern(uint8_t addrSectionPtr) {
+  return makePatchedBytePattern(
+      "\x1c\xfd\xf6\x5e\x13\xc4\x40\xf6"
+      "\x5f\x13\xc4\x41",
+      "xxx??xxx"
+      "??xx",
+      {{6, addrSectionPtr}, {11, static_cast<uint8_t>(addrSectionPtr + 1)}});
+}
+
+BytePattern NinSnesScanner::makeInitSectionPtrGD3Pattern(uint8_t addrSectionPtr) {
+  return makePatchedBytePattern("\x5d\xf5\xfc\x11\xf0\xee\xfd\xf5"
+                                "\xfb\x11\xda\x40",
+                                "xx??x?xx"
+                                "??xx",
+                                {{11, addrSectionPtr}});
+}
+
+BytePattern NinSnesScanner::makeInitSectionPtrYSFRPattern(uint8_t addrSectionPtr) {
+  return makePatchedBytePattern(
+      "\xfd\xf7\x48\xc4\x4c\xfc\xf7\x48"
+      "\xc4\x4d",
+      "xx?xxxx?"
+      "xx",
+      {{4, addrSectionPtr}, {9, static_cast<uint8_t>(addrSectionPtr + 1)}});
+}
+
+BytePattern NinSnesScanner::makeInitSectionPtrTSPattern(uint8_t addrSectionPtr) {
+  return makePatchedBytePattern("\xe5\xfc\x10\xec\xfd\x10\xda\x23"
+                                "\x3a\x23\x3a\x23",
+                                "x??x??xx"
+                                "xxxx",
+                                {{7, addrSectionPtr}, {9, addrSectionPtr}, {11, addrSectionPtr}});
+}
+
+BytePattern NinSnesScanner::makeInitSectionPtrYs4Pattern(uint8_t addrSectionPtr) {
+  return makePatchedBytePattern("\xf5\xb9\x06\xfd\xf5\xb8\x06\xda"
+                                "\x35\x2d\xdd\x80\xa8\xd0\xfd\xae"
+                                "\xda\x17",
+                                "x??xx??x"
+                                "xxxxx?xx"
+                                "xx",
+                                {{8, addrSectionPtr}});
+}
+
+BytePattern NinSnesScanner::makeInitSongListPtrYSFRPattern(uint8_t addrSongListPtr) {
+  return makePatchedBytePattern(
+      "\x8f\x00\x48\x8f\x1e\x49", "x?xx?x",
+      {{2, addrSongListPtr}, {5, static_cast<uint8_t>(addrSongListPtr + 1)}});
+}
+
 //; Yoshi's Island SPC
 //; vcmd branches 80-ff
 // 0813: 68 e0     cmp   a,#$e0
