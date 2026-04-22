@@ -52,7 +52,7 @@ bool getIntelliVoiceParamAddress(const NinSnesSeq& seq, uint8_t index, uint32_t&
 
   addrVoiceParam = seq.intelliVoiceParam.addr + (index * 4u);
   outOfRange = index >= seq.intelliVoiceParam.size;
-  const auto intelliMode = getNinSnesProfile(seq.profileId).intelliMode;
+  const auto intelliMode = seq.profile().intelliMode;
   const bool packedVoiceParams =
       intelliMode == NinSnesIntelliModeId::Ta || intelliMode == NinSnesIntelliModeId::Fe4;
   return (addrVoiceParam + 3) < 0x10000 && (packedVoiceParams || !outOfRange);
@@ -140,6 +140,10 @@ NinSnesSeq::NinSnesSeq(RawFile* file, const NinSnesScanResult& scanResult)
 NinSnesSeq::~NinSnesSeq() {
 }
 
+const NinSnesProfile& NinSnesSeq::profile() const {
+  return getNinSnesProfile(profileId);
+}
+
 void NinSnesSeq::resetVars() {
   VGMMultiSectionSeq::resetVars();
 
@@ -206,7 +210,7 @@ bool NinSnesSeq::parseHeader() {
 }
 
 bool NinSnesSeq::readEvent(long stopTime) {
-  const auto& profile = getNinSnesProfile(profileId);
+  const auto& profile = this->profile();
   uint32_t beginOffset = curOffset;
   if (curOffset + 1 >= 0x10000) {
     return false;
@@ -367,31 +371,27 @@ double NinSnesSeq::getTempoInBPM(uint8_t tempo) {
 }
 
 uint16_t NinSnesSeq::convertToAPUAddress(uint16_t offset) {
-  return convertNinSnesAddress(getNinSnesProfile(profileId), offset, konamiBaseAddress,
-                               falcomBaseOffset);
+  return convertNinSnesAddress(profile(), offset, konamiBaseAddress, falcomBaseOffset);
 }
 
 uint16_t NinSnesSeq::getShortAddress(uint32_t offset) {
-  return readNinSnesAddress(getNinSnesProfile(profileId), rawFile(), offset, konamiBaseAddress,
-                            falcomBaseOffset);
+  return readNinSnesAddress(profile(), rawFile(), offset, konamiBaseAddress, falcomBaseOffset);
 }
 
 uint32_t NinSnesSeq::resolveProgramNumber(uint8_t instrumentByte,
                                           uint8_t* logicalInstrIndex) const {
-  return resolveNinSnesProgramNumber(getNinSnesProfile(profileId), rawFile(), instrumentByte,
-                                     STATUS_PERCUSSION_NOTE_MIN, spcPercussionBase,
-                                     quintetBGMInstrBase, quintetAddrBGMInstrLookup,
+  return resolveNinSnesProgramNumber(profile(), rawFile(), instrumentByte, STATUS_PERCUSSION_NOTE_MIN,
+                                     spcPercussionBase, quintetBGMInstrBase, quintetAddrBGMInstrLookup,
                                      &intelliInstrumentProgramMap, logicalInstrIndex);
 }
 
 bool NinSnesSeq::usesIntelliCustomPercTable() const {
-  return usesNinSnesIntelliCustomPercTable(getNinSnesProfile(profileId), intelliUseCustomPercTable,
-                                           intelliPerc.flags);
+  return usesNinSnesIntelliCustomPercTable(profile(), intelliUseCustomPercTable, intelliPerc.flags);
 }
 
 void NinSnesSeq::setIntelliCustomPercTableEnabled(bool enabled) {
-  setNinSnesIntelliCustomPercTableEnabled(getNinSnesProfile(profileId), enabled,
-                                          intelliUseCustomPercTable, intelliPerc.flags);
+  setNinSnesIntelliCustomPercTableEnabled(profile(), enabled, intelliUseCustomPercTable,
+                                          intelliPerc.flags);
 }
 
 uint32_t NinSnesSeq::registerIntelliTAInstrumentOverride(uint8_t logicalInstrIndex,
@@ -631,352 +631,246 @@ void NinSnesTrack::addProgramChangeEvent(uint32_t offset, uint32_t length, uint3
   }
 }
 
-bool NinSnesTrack::readEvent() {
-  if (!available) {
-    return false;
+NinSnesSeq& NinSnesTrack::seq() const {
+  return *static_cast<NinSnesSeq*>(parentSeq);
+}
+
+NinSnesIntelliModeId NinSnesTrack::intelliMode() const {
+  return seq().profile().intelliMode;
+}
+
+void NinSnesTrack::readStandardNoteParam(uint32_t beginOffset, uint8_t statusByte,
+                                         std::string& desc) {
+  auto& parentSeq = seq();
+  shared->spcNoteDuration = statusByte;
+  desc = fmt::format("Duration: {:d}", shared->spcNoteDuration);
+
+  if (curOffset + 1 < 0x10000 && readByte(curOffset) <= 0x7f) {
+    const uint8_t quantizeAndVelocity = readByte(curOffset++);
+    const uint8_t durIndex = (quantizeAndVelocity >> 4) & 7;
+    const uint8_t velIndex = quantizeAndVelocity & 15;
+
+    shared->spcNoteDurRate = parentSeq.durRateTable[durIndex];
+    shared->spcNoteVolume = parentSeq.volumeTable[velIndex];
+
+    fmt::format_to(std::back_inserter(desc),
+                   "  Quantize: {:d} ({:d}/256)  Velocity: {:d} ({:d}/256)", durIndex,
+                   shared->spcNoteDurRate, velIndex, shared->spcNoteVolume);
   }
 
-  NinSnesSeq* parentSeq = (NinSnesSeq*)this->parentSeq;
-  const auto intelliMode = getNinSnesProfile(parentSeq->profileId).intelliMode;
-  uint32_t beginOffset = curOffset;
-  if (curOffset >= 0x10000) {
-    return false;
+  addGenericEvent(beginOffset, curOffset - beginOffset, "Note Param", desc, Type::DurationChange);
+}
+
+void NinSnesTrack::readLemmingsNoteParam(uint32_t beginOffset, uint8_t statusByte,
+                                         std::string& desc) {
+  shared->spcNoteDuration = statusByte;
+  desc = fmt::format("Duration: {:d}", shared->spcNoteDuration);
+
+  if (curOffset + 1 < 0x10000 && readByte(curOffset) <= 0x7f) {
+    const uint8_t durByte = readByte(curOffset++);
+    shared->spcNoteDurRate = (durByte << 1) + (durByte >> 1) + (durByte & 1);
+    fmt::format_to(std::back_inserter(desc), "  Quantize: {} ({}/256)", durByte,
+                   shared->spcNoteDurRate);
+
+    if (curOffset + 1 < 0x10000 && readByte(curOffset) <= 0x7f) {
+      const uint8_t velByte = readByte(curOffset++);
+      shared->spcNoteVolume = velByte << 1;
+      fmt::format_to(std::back_inserter(desc), "  Velocity: {} ({}/256)", velByte,
+                     shared->spcNoteVolume);
+    }
   }
 
-  uint8_t statusByte = readByte(curOffset++);
-  bool bContinue = true;
+  addGenericEvent(beginOffset, curOffset - beginOffset, "Note Param", desc, Type::DurationChange);
+}
 
-  std::string desc;
-
-  NinSnesSeqEventType eventType = (NinSnesSeqEventType)0;
-  std::map<uint8_t, NinSnesSeqEventType>::iterator pEventType =
-      parentSeq->EventMap.find(statusByte);
-  if (pEventType != parentSeq->EventMap.end()) {
-    eventType = pEventType->second;
+void NinSnesTrack::readIntelliNoteParam(uint32_t beginOffset, uint8_t statusByte,
+                                        std::string& desc) {
+  auto& parentSeq = seq();
+  if (intelliMode() == NinSnesIntelliModeId::Fe3 && !parentSeq.intelliUseCustomNoteParam) {
+    readStandardNoteParam(beginOffset, statusByte, desc);
+    return;
   }
+
+  shared->spcNoteDuration = statusByte;
+  desc = fmt::format("Duration: {:d}", shared->spcNoteDuration);
+
+  while (curOffset + 1 < 0x10000 && readByte(curOffset) <= 0x7f) {
+    const uint8_t noteParam = readByte(curOffset++);
+    if (noteParam < 0x40) {
+      const uint8_t durIndex = noteParam & 0x3f;
+      shared->spcNoteDurRate = parentSeq.intelliDurVolTable[durIndex];
+      fmt::format_to(std::back_inserter(desc), "  Quantize: {} ({}/256)", durIndex,
+                     shared->spcNoteDurRate);
+    } else {
+      const uint8_t velIndex = noteParam & 0x3f;
+      shared->spcNoteVolume = parentSeq.intelliDurVolTable[velIndex];
+      fmt::format_to(std::back_inserter(desc), "  Velocity: {} ({}/256)", velIndex,
+                     shared->spcNoteVolume);
+    }
+  }
+
+  addGenericEvent(beginOffset, curOffset - beginOffset, "Note Param", desc, Type::DurationChange);
+}
+
+bool NinSnesTrack::handleCoreEvent(NinSnesSeqEventType eventType, uint32_t beginOffset,
+                                   uint8_t statusByte, std::string& desc,
+                                   bool& continueReading) {
+  auto& parentSeq = seq();
 
   switch (eventType) {
-    case EVENT_UNKNOWN0: {
+    case EVENT_UNKNOWN0:
       desc = fmt::format("Event: 0x{:02X}", statusByte);
       addUnknown(beginOffset, curOffset - beginOffset, "Unknown Event", desc);
-      break;
-    }
+      return true;
 
     case EVENT_UNKNOWN1: {
-      uint8_t arg1 = readByte(curOffset++);
+      const uint8_t arg1 = readByte(curOffset++);
       desc = fmt::format("Event: 0x{:02X}  Arg1: {:d}", statusByte, arg1);
       addUnknown(beginOffset, curOffset - beginOffset, "Unknown Event", desc);
-      break;
+      return true;
     }
 
     case EVENT_UNKNOWN2: {
-      uint8_t arg1 = readByte(curOffset++);
-      uint8_t arg2 = readByte(curOffset++);
+      const uint8_t arg1 = readByte(curOffset++);
+      const uint8_t arg2 = readByte(curOffset++);
       desc = fmt::format("Event: 0x{:02X}  Arg1: {:d}  Arg2: {:d}", statusByte, arg1, arg2);
       addUnknown(beginOffset, curOffset - beginOffset, "Unknown Event", desc);
-      break;
+      return true;
     }
 
     case EVENT_UNKNOWN3: {
-      uint8_t arg1 = readByte(curOffset++);
-      uint8_t arg2 = readByte(curOffset++);
-      uint8_t arg3 = readByte(curOffset++);
+      const uint8_t arg1 = readByte(curOffset++);
+      const uint8_t arg2 = readByte(curOffset++);
+      const uint8_t arg3 = readByte(curOffset++);
       desc = fmt::format("Event: 0x{:02X}  Arg1: {:d}  Arg2: {:d}  Arg3: {:d}", statusByte, arg1,
                          arg2, arg3);
       addUnknown(beginOffset, curOffset - beginOffset, "Unknown Event", desc);
-      break;
+      return true;
     }
 
     case EVENT_UNKNOWN4: {
-      uint8_t arg1 = readByte(curOffset++);
-      uint8_t arg2 = readByte(curOffset++);
-      uint8_t arg3 = readByte(curOffset++);
-      uint8_t arg4 = readByte(curOffset++);
+      const uint8_t arg1 = readByte(curOffset++);
+      const uint8_t arg2 = readByte(curOffset++);
+      const uint8_t arg3 = readByte(curOffset++);
+      const uint8_t arg4 = readByte(curOffset++);
       desc = fmt::format("Event: 0x{:02X}  Arg1: {:d}  Arg2: {:d}  Arg3: {:d}  Arg4: {:d}",
                          statusByte, arg1, arg2, arg3, arg4);
       addUnknown(beginOffset, curOffset - beginOffset, "Unknown Event", desc);
-      break;
+      return true;
     }
 
-    case EVENT_NOP: {
+    case EVENT_NOP:
       addGenericEvent(beginOffset, curOffset - beginOffset, "NOP", desc, Type::Nop);
-      break;
-    }
+      return true;
 
-    case EVENT_NOP1: {
+    case EVENT_NOP1:
       curOffset++;
       addGenericEvent(beginOffset, curOffset - beginOffset, "NOP", desc, Type::Nop);
-      break;
-    }
+      return true;
 
-    case EVENT_END: {
-      // AddEvent is called at the last of this function
-
+    case EVENT_END:
       if (shared->loopCount == 0) {
-        // finish this section as soon as possible
         if (readMode == READMODE_FIND_DELTA_LENGTH) {
-          for (size_t trackIndex = 0; trackIndex < parentSeq->aTracks.size(); trackIndex++) {
-            parentSeq->aTracks[trackIndex]->totalTicks = getTime();
+          for (size_t trackIndex = 0; trackIndex < parentSeq.aTracks.size(); trackIndex++) {
+            parentSeq.aTracks[trackIndex]->totalTicks = getTime();
           }
         } else if (readMode == READMODE_CONVERT_TO_MIDI) {
-          // TODO: cancel all expected notes and fader-output events
-          for (size_t trackIndex = 0; trackIndex < parentSeq->aTracks.size(); trackIndex++) {
-            parentSeq->aTracks[trackIndex]->limitPrevDurNoteEnd();
+          for (size_t trackIndex = 0; trackIndex < parentSeq.aTracks.size(); trackIndex++) {
+            parentSeq.aTracks[trackIndex]->limitPrevDurNoteEnd();
           }
         }
 
-        parentSeq->deactivateAllTracks();
-        bContinue = false;
-        parentSeq->bIncTickAfterProcessingTracks = false;
+        parentSeq.deactivateAllTracks();
+        continueReading = false;
+        parentSeq.bIncTickAfterProcessingTracks = false;
       } else {
-        uint32_t eventLength = curOffset - beginOffset;
-
         shared->loopCount--;
-        if (shared->loopCount == 0) {
-          // repeat end
-          curOffset = shared->loopReturnAddress;
-        } else {
-          // repeat again
-          curOffset = shared->loopStartAddress;
-        }
+        curOffset =
+            (shared->loopCount == 0) ? shared->loopReturnAddress : shared->loopStartAddress;
       }
-      break;
-    }
+      return true;
 
-    case EVENT_NOTE_PARAM: {
-    OnEventNoteParam:
-      // param #0: duration
-      shared->spcNoteDuration = statusByte;
-      desc = fmt::format("Duration: {:d}", shared->spcNoteDuration);
-
-      // param #1: quantize and velocity (optional)
-      if (curOffset + 1 < 0x10000 && readByte(curOffset) <= 0x7f) {
-        uint8_t quantizeAndVelocity = readByte(curOffset++);
-
-        uint8_t durIndex = (quantizeAndVelocity >> 4) & 7;
-        uint8_t velIndex = quantizeAndVelocity & 15;
-
-        shared->spcNoteDurRate = parentSeq->durRateTable[durIndex];
-        shared->spcNoteVolume = parentSeq->volumeTable[velIndex];
-
-        fmt::format_to(std::back_inserter(desc),
-                       "  Quantize: {:d} ({:d}/256)  Velocity: {:d} ({:d}/256)", durIndex,
-                       shared->spcNoteDurRate, velIndex, shared->spcNoteVolume);
-      }
-
-      addGenericEvent(beginOffset, curOffset - beginOffset, "Note Param", desc,
-                      Type::DurationChange);
-      break;
-    }
+    case EVENT_NOTE_PARAM:
+      readStandardNoteParam(beginOffset, statusByte, desc);
+      return true;
 
     case EVENT_NOTE: {
-      uint8_t noteNumber = statusByte - parentSeq->STATUS_NOTE_MIN;
-      uint8_t duration = getEffectiveNoteDuration();
-
+      const uint8_t noteNumber = statusByte - parentSeq.STATUS_NOTE_MIN;
+      const uint8_t duration = getEffectiveNoteDuration();
       restoreNonPercussionProgramIfNeeded();
-
-      // Note: Konami engine can have volume=0
       addNoteByDur(beginOffset, curOffset - beginOffset, noteNumber, shared->spcNoteVolume / 2,
                    duration, "Note");
       m_lastNoteWasPercussion = false;
       addTime(shared->spcNoteDuration);
-      break;
+      return true;
     }
 
     case EVENT_TIE: {
       uint8_t duration = (shared->spcNoteDuration * shared->spcNoteDurRate) >> 8;
-      duration = std::min(std::max(duration, (uint8_t)1), (uint8_t)(shared->spcNoteDuration - 2));
+      duration = std::min(std::max(duration, static_cast<uint8_t>(1)),
+                          static_cast<uint8_t>(shared->spcNoteDuration - 2));
       desc = fmt::format("Duration: {:d}", duration);
       makePrevDurNoteEnd(getTime() + duration);
       addTie(beginOffset, curOffset - beginOffset, duration, "Tie", desc);
       addTime(shared->spcNoteDuration);
-      break;
+      return true;
     }
 
-    case EVENT_REST: {
+    case EVENT_REST:
       addRest(beginOffset, curOffset - beginOffset, shared->spcNoteDuration);
-      break;
-    }
+      return true;
 
     case EVENT_PERCUSSION_NOTE: {
-      const uint8_t slot = statusByte - parentSeq->STATUS_PERCUSSION_NOTE_MIN;
-      uint8_t duration = getEffectiveNoteDuration();
+      const uint8_t slot = statusByte - parentSeq.STATUS_PERCUSSION_NOTE_MIN;
+      const uint8_t duration = getEffectiveNoteDuration();
 
-      if (isIntelliTablePercussionVersion(parentSeq->profileId) &&
+      if (isIntelliTablePercussionVersion(parentSeq.profileId) &&
           slot < NINSNES_INTELLI_TA_PERCUSSION_SLOT_COUNT) {
-        const auto percussionState = getIntelliPercussionNoteState(*parentSeq, slot);
+        const auto percussionState = getIntelliPercussionNoteState(parentSeq, slot);
         applyIntelliPercussionState(percussionState.instrumentByte, percussionState.panByte,
                                     percussionState.reverbLevel);
 
-        const uint8_t drumProgram = parentSeq->ensureIntelliTADrumKitProgram();
+        const uint8_t drumProgram = parentSeq.ensureIntelliTADrumKitProgram();
         const uint8_t drumKey = static_cast<uint8_t>(0x24 + slot);
 
         switchToPercussionProgramIfNeeded(drumProgram);
         addPercNoteByDur(beginOffset, curOffset - beginOffset,
-                         static_cast<int8_t>(drumKey - cKeyCorrection - parentSeq->globalTranspose),
+                         static_cast<int8_t>(drumKey - cKeyCorrection - parentSeq.globalTranspose),
                          shared->spcNoteVolume / 2, duration, "Percussion Note");
         m_lastNoteWasPercussion = true;
         addTime(shared->spcNoteDuration);
-        break;
+        return true;
       }
 
-      // Like standard MIDI drum channels, percussion notes swap the ability to denote pitch (key)
-      // for the ability to indicate which instrument to play per note. The
-      // EVENT_PERCUSSION_PATCH_BASE event sets the base instr index to use (spcPercussionBase). The
-      // instrument to use is then spcPercussionBase + the percussion note opcode index. So, if
-      // spcPercussionBase is 5 and the percussion note opcode is CB when STATUS_PERCUSSION_NOTE_MIN
-      // is CA, it would use instrument 6.
       uint8_t instrIndex = 0;
-      parentSeq->resolveProgramNumber(static_cast<uint8_t>(slot + parentSeq->spcPercussionBase),
-                                      &instrIndex);
+      parentSeq.resolveProgramNumber(static_cast<uint8_t>(slot + parentSeq.spcPercussionBase),
+                                     &instrIndex);
 
-      // Pitches are fixed, but we assign each drum to a unique note. The note value is 0x24
-      // plus the instrument index (relative to the base percussion instrument).
-      // We maintain a table of these mappings which NinSnesInstrSet uses at conversion time to
-      // create the drum kit. We also indicate the global transpose, since that should affect
-      // percussion note pitch. We do that by factoring it into the instrument region unity key.
-      uint8_t noteIndex = 0x24 + instrIndex - parentSeq->spcPercussionBase;
-      parentSeq->addPercussionInstrNoteMapping(instrIndex, noteIndex, parentSeq->globalTranspose);
+      const uint8_t noteIndex = 0x24 + instrIndex - parentSeq.spcPercussionBase;
+      parentSeq.addPercussionInstrNoteMapping(instrIndex, noteIndex, parentSeq.globalTranspose);
 
-      // Note: Konami engine can have volume=0
       switchToPercussionProgramIfNeeded();
       addPercNoteByDur(beginOffset, curOffset - beginOffset,
-                       static_cast<int8_t>(noteIndex - cKeyCorrection - parentSeq->globalTranspose),
+                       static_cast<int8_t>(noteIndex - cKeyCorrection - parentSeq.globalTranspose),
                        shared->spcNoteVolume / 2, duration, "Percussion Note");
       m_lastNoteWasPercussion = true;
       addTime(shared->spcNoteDuration);
-      break;
+      return true;
     }
 
     case EVENT_PROGCHANGE: {
       const uint8_t instrumentByte = readByte(curOffset++);
       uint8_t logicalProgNum = 0;
-      const uint32_t newProgNum = parentSeq->resolveProgramNumber(instrumentByte, &logicalProgNum);
+      const uint32_t newProgNum = parentSeq.resolveProgramNumber(instrumentByte, &logicalProgNum);
       addProgramChangeEvent(beginOffset, curOffset - beginOffset, newProgNum, true,
                             "Program Change", logicalProgNum);
-      break;
-    }
-
-    case EVENT_PAN: {
-      uint8_t newPan = readByte(curOffset++);
-
-      double volumeScale;
-      bool reverseLeft;
-      bool reverseRight;
-      int8_t midiPan = calculatePanValue(newPan, volumeScale, reverseLeft, reverseRight);
-      addPan(beginOffset, curOffset - beginOffset, midiPan);
-      addExpressionNoItem(convertPercentAmpToStdMidiVal(volumeScale));
-      break;
-    }
-
-    case EVENT_PAN_FADE: {
-      uint8_t fadeLength = readByte(curOffset++);
-      uint8_t newPan = readByte(curOffset++);
-
-      double volumeLeft;
-      double volumeRight;
-      getVolumeBalance(newPan << 8, volumeLeft, volumeRight);
-
-      uint8_t midiPan = convertVolumeBalanceToStdMidiPan(volumeLeft, volumeRight);
-
-      // TODO: fade in real curve
-      // TODO: apply volume scale
-      addPanSlide(beginOffset, curOffset - beginOffset, fadeLength, midiPan);
-      break;
-    }
-
-    case EVENT_VIBRATO_ON: {
-      uint8_t vibratoDelay = readByte(curOffset++);
-      uint8_t vibratoRate = readByte(curOffset++);
-      uint8_t vibratoDepth = readByte(curOffset++);
-
-      desc = fmt::format("Delay: {:d}  Rate: {:d}  Depth: {:d}", vibratoDelay, vibratoRate,
-                         vibratoDepth);
-      addGenericEvent(beginOffset, curOffset - beginOffset, "Vibrato", desc, Type::Vibrato);
-      break;
-    }
-
-    case EVENT_VIBRATO_OFF: {
-      addGenericEvent(beginOffset, curOffset - beginOffset, "Vibrato Off", desc, Type::Vibrato);
-      break;
-    }
-
-    case EVENT_MASTER_VOLUME: {
-      uint8_t newVol = readByte(curOffset++);
-      addMasterVol(beginOffset, curOffset - beginOffset, newVol / 2);
-      break;
-    }
-
-    case EVENT_MASTER_VOLUME_FADE: {
-      uint8_t fadeLength = readByte(curOffset++);
-      uint8_t newVol = readByte(curOffset++);
-
-      desc = fmt::format("Length: {:d}  Volume: {:d}", fadeLength, newVol);
-      addMastVolSlide(beginOffset, curOffset - beginOffset, fadeLength, newVol / 2);
-      break;
-    }
-
-    case EVENT_TEMPO: {
-      uint8_t newTempo = readByte(curOffset++);
-      addTempoBPM(beginOffset, curOffset - beginOffset, parentSeq->getTempoInBPM(newTempo));
-      break;
-    }
-
-    case EVENT_TEMPO_FADE: {
-      uint8_t fadeLength = readByte(curOffset++);
-      uint8_t newTempo = readByte(curOffset++);
-
-      addTempoSlide(beginOffset, curOffset - beginOffset, fadeLength,
-                    (int)(60000000 / parentSeq->getTempoInBPM(newTempo)));
-      break;
-    }
-
-    case EVENT_GLOBAL_TRANSPOSE: {
-      int8_t semitones = readByte(curOffset++);
-      parentSeq->globalTranspose = semitones;
-      addGlobalTranspose(beginOffset, curOffset - beginOffset, semitones);
-      break;
-    }
-
-    case EVENT_TRANSPOSE: {
-      int8_t semitones = readByte(curOffset++);
-      shared->spcTranspose = semitones;
-      addTranspose(beginOffset, curOffset - beginOffset, semitones);
-      break;
-    }
-
-    case EVENT_TREMOLO_ON: {
-      uint8_t tremoloDelay = readByte(curOffset++);
-      uint8_t tremoloRate = readByte(curOffset++);
-      uint8_t tremoloDepth = readByte(curOffset++);
-      desc = fmt::format("Delay: {:d}  Rate: {:d}  Depth: {:d}", tremoloDelay, tremoloRate,
-                         tremoloDepth);
-      addGenericEvent(beginOffset, curOffset - beginOffset, "Tremolo", desc, Type::Tremelo);
-      break;
-    }
-
-    case EVENT_TREMOLO_OFF: {
-      addGenericEvent(beginOffset, curOffset - beginOffset, "Tremolo Off", desc, Type::Tremelo);
-      break;
-    }
-
-    case EVENT_VOLUME: {
-      uint8_t newVol = readByte(curOffset++);
-      addVol(beginOffset, curOffset - beginOffset, newVol / 2);
-      break;
-    }
-
-    case EVENT_VOLUME_FADE: {
-      uint8_t fadeLength = readByte(curOffset++);
-      uint8_t newVol = readByte(curOffset++);
-      addVolSlide(beginOffset, curOffset - beginOffset, fadeLength, newVol / 2);
-      break;
+      return true;
     }
 
     case EVENT_CALL: {
-      uint16_t dest = getShortAddress(curOffset);
+      const uint16_t dest = getShortAddress(curOffset);
       curOffset += 2;
-      uint8_t times = readByte(curOffset++);
+      const uint8_t times = readByte(curOffset++);
 
       shared->loopReturnAddress = curOffset;
       shared->loopStartAddress = dest;
@@ -985,379 +879,426 @@ bool NinSnesTrack::readEvent() {
       desc = fmt::format("Destination: ${:04X}  Times: {:d}", dest, times);
       addGenericEvent(beginOffset, curOffset - beginOffset, "Pattern Play", desc,
                       Type::RepeatStart);
-
-      // Add the next "END" event to UI
-      if (curOffset < 0x10000 && readByte(curOffset) == parentSeq->STATUS_END) {
-        if (shared->loopCount == 0) {
-          addGenericEvent(curOffset, 1, "Section End", desc, Type::RepeatEnd);
-        } else {
-          addGenericEvent(curOffset, 1, "Pattern End", desc, Type::RepeatEnd);
-        }
-      }
-
+      addPendingEndEvent(statusByte, desc);
       curOffset = shared->loopStartAddress;
-      break;
+      return true;
+    }
+
+    default:
+      return false;
+  }
+}
+
+bool NinSnesTrack::handleControllerEvent(NinSnesSeqEventType eventType, uint32_t beginOffset,
+                                         std::string& desc) {
+  auto& parentSeq = seq();
+
+  switch (eventType) {
+    case EVENT_PAN: {
+      const uint8_t newPan = readByte(curOffset++);
+      double volumeScale;
+      bool reverseLeft;
+      bool reverseRight;
+      const int8_t midiPan = calculatePanValue(newPan, volumeScale, reverseLeft, reverseRight);
+      addPan(beginOffset, curOffset - beginOffset, midiPan);
+      addExpressionNoItem(convertPercentAmpToStdMidiVal(volumeScale));
+      return true;
+    }
+
+    case EVENT_PAN_FADE: {
+      const uint8_t fadeLength = readByte(curOffset++);
+      const uint8_t newPan = readByte(curOffset++);
+      double volumeLeft;
+      double volumeRight;
+      getVolumeBalance(newPan << 8, volumeLeft, volumeRight);
+      const uint8_t midiPan = convertVolumeBalanceToStdMidiPan(volumeLeft, volumeRight);
+      addPanSlide(beginOffset, curOffset - beginOffset, fadeLength, midiPan);
+      return true;
+    }
+
+    case EVENT_VIBRATO_ON: {
+      const uint8_t vibratoDelay = readByte(curOffset++);
+      const uint8_t vibratoRate = readByte(curOffset++);
+      const uint8_t vibratoDepth = readByte(curOffset++);
+      desc = fmt::format("Delay: {:d}  Rate: {:d}  Depth: {:d}", vibratoDelay, vibratoRate,
+                         vibratoDepth);
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Vibrato", desc, Type::Vibrato);
+      return true;
+    }
+
+    case EVENT_VIBRATO_OFF:
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Vibrato Off", desc, Type::Vibrato);
+      return true;
+
+    case EVENT_MASTER_VOLUME: {
+      const uint8_t newVol = readByte(curOffset++);
+      addMasterVol(beginOffset, curOffset - beginOffset, newVol / 2);
+      return true;
+    }
+
+    case EVENT_MASTER_VOLUME_FADE: {
+      const uint8_t fadeLength = readByte(curOffset++);
+      const uint8_t newVol = readByte(curOffset++);
+      desc = fmt::format("Length: {:d}  Volume: {:d}", fadeLength, newVol);
+      addMastVolSlide(beginOffset, curOffset - beginOffset, fadeLength, newVol / 2);
+      return true;
+    }
+
+    case EVENT_TEMPO: {
+      const uint8_t newTempo = readByte(curOffset++);
+      addTempoBPM(beginOffset, curOffset - beginOffset, parentSeq.getTempoInBPM(newTempo));
+      return true;
+    }
+
+    case EVENT_TEMPO_FADE: {
+      const uint8_t fadeLength = readByte(curOffset++);
+      const uint8_t newTempo = readByte(curOffset++);
+      addTempoSlide(beginOffset, curOffset - beginOffset, fadeLength,
+                    static_cast<int>(60000000 / parentSeq.getTempoInBPM(newTempo)));
+      return true;
+    }
+
+    case EVENT_GLOBAL_TRANSPOSE: {
+      const int8_t semitones = readByte(curOffset++);
+      parentSeq.globalTranspose = semitones;
+      addGlobalTranspose(beginOffset, curOffset - beginOffset, semitones);
+      return true;
+    }
+
+    case EVENT_TRANSPOSE: {
+      const int8_t semitones = readByte(curOffset++);
+      shared->spcTranspose = semitones;
+      addTranspose(beginOffset, curOffset - beginOffset, semitones);
+      return true;
+    }
+
+    case EVENT_TREMOLO_ON: {
+      const uint8_t tremoloDelay = readByte(curOffset++);
+      const uint8_t tremoloRate = readByte(curOffset++);
+      const uint8_t tremoloDepth = readByte(curOffset++);
+      desc = fmt::format("Delay: {:d}  Rate: {:d}  Depth: {:d}", tremoloDelay, tremoloRate,
+                         tremoloDepth);
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Tremolo", desc, Type::Tremelo);
+      return true;
+    }
+
+    case EVENT_TREMOLO_OFF:
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Tremolo Off", desc, Type::Tremelo);
+      return true;
+
+    case EVENT_VOLUME: {
+      const uint8_t newVol = readByte(curOffset++);
+      addVol(beginOffset, curOffset - beginOffset, newVol / 2);
+      return true;
+    }
+
+    case EVENT_VOLUME_FADE: {
+      const uint8_t fadeLength = readByte(curOffset++);
+      const uint8_t newVol = readByte(curOffset++);
+      addVolSlide(beginOffset, curOffset - beginOffset, fadeLength, newVol / 2);
+      return true;
     }
 
     case EVENT_VIBRATO_FADE: {
-      uint8_t fadeLength = readByte(curOffset++);
+      const uint8_t fadeLength = readByte(curOffset++);
       desc = fmt::format("Length: {:d}", fadeLength);
       addGenericEvent(beginOffset, curOffset - beginOffset, "Vibrato Fade", desc, Type::Vibrato);
-      break;
+      return true;
     }
 
     case EVENT_PITCH_ENVELOPE_TO: {
-      uint8_t pitchEnvDelay = readByte(curOffset++);
-      uint8_t pitchEnvLength = readByte(curOffset++);
-      int8_t pitchEnvSemitones = (int8_t)readByte(curOffset++);
-
+      const uint8_t pitchEnvDelay = readByte(curOffset++);
+      const uint8_t pitchEnvLength = readByte(curOffset++);
+      const int8_t pitchEnvSemitones = static_cast<int8_t>(readByte(curOffset++));
       desc = fmt::format("Delay: {:d}  Length: {:d}  Semitones: {:d}", pitchEnvDelay,
                          pitchEnvLength, pitchEnvSemitones);
       addGenericEvent(beginOffset, curOffset - beginOffset, "Pitch Envelope (To)", desc,
                       Type::PitchEnvelope);
-      break;
+      return true;
     }
 
     case EVENT_PITCH_ENVELOPE_FROM: {
-      uint8_t pitchEnvDelay = readByte(curOffset++);
-      uint8_t pitchEnvLength = readByte(curOffset++);
-      int8_t pitchEnvSemitones = (int8_t)readByte(curOffset++);
-
+      const uint8_t pitchEnvDelay = readByte(curOffset++);
+      const uint8_t pitchEnvLength = readByte(curOffset++);
+      const int8_t pitchEnvSemitones = static_cast<int8_t>(readByte(curOffset++));
       desc = fmt::format("Delay: {:d}  Length: {:d}  Semitones: {:d}", pitchEnvDelay,
                          pitchEnvLength, pitchEnvSemitones);
       addGenericEvent(beginOffset, curOffset - beginOffset, "Pitch Envelope (From)", desc,
                       Type::PitchEnvelope);
-      break;
+      return true;
     }
 
-    case EVENT_PITCH_ENVELOPE_OFF: {
+    case EVENT_PITCH_ENVELOPE_OFF:
       addGenericEvent(beginOffset, curOffset - beginOffset, "Pitch Envelope Off", desc,
                       Type::PitchEnvelope);
-      break;
-    }
+      return true;
 
     case EVENT_TUNING: {
-      uint8_t newTuning = readByte(curOffset++);
+      const uint8_t newTuning = readByte(curOffset++);
       addFineTuning(beginOffset, curOffset - beginOffset, (newTuning / 256.0) * 100.0);
-      break;
-    }
-
-    case EVENT_QUINTET_TUNING: {
-      // TODO: Correct fine tuning on Quintet games
-      // In Quintet games (at least in Terranigma), the fine tuning command overwrites the
-      // fractional part of instrument tuning. In other words, we cannot calculate the tuning amount
-      // without reading the instrument table.
-      uint8_t newTuning = readByte(curOffset++);
-      addGenericEvent(beginOffset, curOffset - beginOffset, "Fine Tuning", desc, Type::FineTune);
-      addFineTuningNoItem((newTuning / 256.0) *
-                          61.8);  // obviously not correct, but better than nothing?
-      break;
+      return true;
     }
 
     case EVENT_ECHO_ON: {
-      uint8_t spcEON = readByte(curOffset++);
-      uint8_t spcEVOL_L = readByte(curOffset++);
-      uint8_t spcEVOL_R = readByte(curOffset++);
+      const uint8_t spcEON = readByte(curOffset++);
+      const uint8_t spcEVOL_L = readByte(curOffset++);
+      const uint8_t spcEVOL_R = readByte(curOffset++);
 
       desc = "Channels: ";
       for (int channelNo = MAX_TRACKS - 1; channelNo >= 0; channelNo--) {
         if ((spcEON & (1 << channelNo)) != 0) {
           fmt::format_to(std::back_inserter(desc), "{}", channelNo);
-          parentSeq->aTracks[channelNo]->addReverbNoItem(40);
+          parentSeq.aTracks[channelNo]->addReverbNoItem(40);
         } else {
           desc.push_back('-');
-          parentSeq->aTracks[channelNo]->addReverbNoItem(0);
+          parentSeq.aTracks[channelNo]->addReverbNoItem(0);
         }
       }
 
       fmt::format_to(std::back_inserter(desc), "  Volume Left: {:d}  Volume Right: {:d}", spcEVOL_L,
                      spcEVOL_R);
       addGenericEvent(beginOffset, curOffset - beginOffset, "Echo", desc, Type::Reverb);
-      break;
+      return true;
     }
 
-    case EVENT_ECHO_OFF: {
+    case EVENT_ECHO_OFF:
       addGenericEvent(beginOffset, curOffset - beginOffset, "Echo Off", desc, Type::Reverb);
-      break;
-    }
+      return true;
 
     case EVENT_ECHO_PARAM: {
-      uint8_t spcEDL = readByte(curOffset++);
-      uint8_t spcEFB = readByte(curOffset++);
-      uint8_t spcFIR = readByte(curOffset++);
-
+      const uint8_t spcEDL = readByte(curOffset++);
+      const uint8_t spcEFB = readByte(curOffset++);
+      const uint8_t spcFIR = readByte(curOffset++);
       desc = fmt::format("Delay: {:d}  Feedback: {:d}  FIR: {:d}", spcEDL, spcEFB, spcFIR);
       addGenericEvent(beginOffset, curOffset - beginOffset, "Echo Param", desc, Type::Reverb);
-      break;
+      return true;
     }
 
     case EVENT_ECHO_VOLUME_FADE: {
-      uint8_t fadeLength = readByte(curOffset++);
-      uint8_t spcEVOL_L = readByte(curOffset++);
-      uint8_t spcEVOL_R = readByte(curOffset++);
-
+      const uint8_t fadeLength = readByte(curOffset++);
+      const uint8_t spcEVOL_L = readByte(curOffset++);
+      const uint8_t spcEVOL_R = readByte(curOffset++);
       desc = fmt::format("Length: {:d}  Volume Left: {:d}  Volume Right: {:d}", fadeLength,
                          spcEVOL_L, spcEVOL_R);
-      addGenericEvent(beginOffset, curOffset - beginOffset, "Echo Volume Fade", desc, Type::Reverb);
-      break;
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Echo Volume Fade", desc,
+                      Type::Reverb);
+      return true;
     }
 
     case EVENT_PITCH_SLIDE: {
-      uint8_t pitchSlideDelay = readByte(curOffset++);
-      uint8_t pitchSlideLength = readByte(curOffset++);
-      uint8_t pitchSlideTargetNote = readByte(curOffset++);
-      desc = fmt::format("Delay: {:d}  Length: {:d}  Note: {:d}", pitchSlideDelay, pitchSlideLength,
-                         (int)(pitchSlideTargetNote - 0x80));
+      const uint8_t pitchSlideDelay = readByte(curOffset++);
+      const uint8_t pitchSlideLength = readByte(curOffset++);
+      const uint8_t pitchSlideTargetNote = readByte(curOffset++);
+      desc = fmt::format("Delay: {:d}  Length: {:d}  Note: {:d}", pitchSlideDelay,
+                         pitchSlideLength, static_cast<int>(pitchSlideTargetNote - 0x80));
       addGenericEvent(beginOffset, curOffset - beginOffset, "Pitch Slide", desc,
                       Type::PitchBendSlide);
-      break;
+      return true;
     }
 
     case EVENT_PERCUSSION_PATCH_BASE: {
-      uint8_t percussionBase = readByte(curOffset++);
-      parentSeq->spcPercussionBase = percussionBase;
-      if (intelliMode == NinSnesIntelliModeId::Ta) {
-        parentSeq->setIntelliCustomPercTableEnabled(false);
+      const uint8_t percussionBase = readByte(curOffset++);
+      parentSeq.spcPercussionBase = percussionBase;
+      if (intelliMode() == NinSnesIntelliModeId::Ta) {
+        parentSeq.setIntelliCustomPercTableEnabled(false);
       }
 
       desc = fmt::format("Percussion Base: {:d}", percussionBase);
       addGenericEvent(beginOffset, curOffset - beginOffset, "Percussion Base", desc,
                       Type::ChangeState);
-      break;
+      return true;
     }
 
-      // NINTENDO RD2 EVENTS START >>
+    default:
+      return false;
+  }
+}
 
+bool NinSnesTrack::handleVariantEvent(NinSnesSeqEventType eventType, uint32_t beginOffset,
+                                      uint8_t statusByte, std::string& desc) {
+  auto& parentSeq = seq();
+
+  switch (eventType) {
     case EVENT_RD2_PROGCHANGE_AND_ADSR: {
-      // This event overwrites ADSR in instrument table
-      uint8_t instrumentByte = readByte(curOffset++);
-      uint8_t adsr1 = readByte(curOffset++);
-      uint8_t adsr2 = readByte(curOffset++);
+      const uint8_t instrumentByte = readByte(curOffset++);
+      curOffset += 2;
       uint8_t logicalProgNum = 0;
-      uint32_t newProgNum = parentSeq->resolveProgramNumber(instrumentByte, &logicalProgNum);
+      const uint32_t newProgNum = parentSeq.resolveProgramNumber(instrumentByte, &logicalProgNum);
       addProgramChangeEvent(beginOffset, curOffset - beginOffset, newProgNum, true,
                             "Program Change & ADSR", logicalProgNum);
-      break;
+      return true;
     }
 
-      // << NINTENDO RD2 EVENTS END
-
-      // KONAMI EVENTS START >>
-
-    case EVENT_KONAMI_LOOP_START: {
+    case EVENT_KONAMI_LOOP_START:
       addGenericEvent(beginOffset, curOffset - beginOffset, "Loop Start", desc, Type::RepeatStart);
       shared->konamiLoopStart = curOffset;
       shared->konamiLoopCount = 0;
-      break;
-    }
+      return true;
 
     case EVENT_KONAMI_LOOP_END: {
-      uint8_t times = readByte(curOffset++);
-      int8_t volumeDelta = readByte(curOffset++);
-      int8_t pitchDelta = readByte(curOffset++);
-
+      const uint8_t times = readByte(curOffset++);
+      const int8_t volumeDelta = readByte(curOffset++);
+      const int8_t pitchDelta = readByte(curOffset++);
       desc = fmt::format("Times: {:d}  Volume Delta: {:d}  Pitch Delta: {:d}/16 semitones", times,
                          volumeDelta, pitchDelta);
       addGenericEvent(beginOffset, curOffset - beginOffset, "Loop End", desc, Type::RepeatEnd);
 
       shared->konamiLoopCount++;
       if (shared->konamiLoopCount != times) {
-        // repeat again
         curOffset = shared->konamiLoopStart;
       }
-
-      break;
+      return true;
     }
 
     case EVENT_KONAMI_ADSR_AND_GAIN: {
-      uint8_t adsr1 = readByte(curOffset++);
-      uint8_t adsr2 = readByte(curOffset++);
-      uint8_t gain = readByte(curOffset++);
+      const uint8_t adsr1 = readByte(curOffset++);
+      const uint8_t adsr2 = readByte(curOffset++);
+      const uint8_t gain = readByte(curOffset++);
       desc = fmt::format("ADSR(1): ${:02X}  ADSR(2): ${:02X}  GAIN: ${:02X}", adsr1, adsr2, gain);
       addGenericEvent(beginOffset, curOffset - beginOffset, "ADSR/GAIN", desc, Type::Adsr);
-      break;
+      return true;
     }
 
-      // << KONAMI EVENTS END
+    case EVENT_LEMMINGS_NOTE_PARAM:
+      readLemmingsNoteParam(beginOffset, statusByte, desc);
+      return true;
 
-      // LEMMINGS EVENTS START >>
-
-    case EVENT_LEMMINGS_NOTE_PARAM: {
-      // param #0: duration
-      shared->spcNoteDuration = statusByte;
-      desc = fmt::format("Duration: {:d}", shared->spcNoteDuration);
-
-      // param #1: quantize (optional)
-      if (curOffset + 1 < 0x10000 && readByte(curOffset) <= 0x7f) {
-        uint8_t durByte = readByte(curOffset++);
-        shared->spcNoteDurRate =
-            (durByte << 1) + (durByte >> 1) + (durByte & 1);  // approx percent?
-        fmt::format_to(std::back_inserter(desc), "  Quantize: {} ({}/256)", durByte,
-                       shared->spcNoteDurRate);
-
-        // param #2: velocity (optional)
-        if (curOffset + 1 < 0x10000 && readByte(curOffset) <= 0x7f) {
-          uint8_t velByte = readByte(curOffset++);
-          shared->spcNoteVolume = velByte << 1;
-          fmt::format_to(std::back_inserter(desc), "  Velocity: {} ({}/256)", velByte,
-                         shared->spcNoteVolume);
-        }
-      }
-
-      addGenericEvent(beginOffset, curOffset - beginOffset, "Note Param", desc,
-                      Type::DurationChange);
-      break;
+    case EVENT_QUINTET_TUNING: {
+      const uint8_t newTuning = readByte(curOffset++);
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Fine Tuning", desc, Type::FineTune);
+      addFineTuningNoItem((newTuning / 256.0) * 61.8);
+      return true;
     }
 
-      // << LEMMINGS EVENTS END
-
-      // INTELLIGENT SYSTEMS EVENTS START >>
-
-    case EVENT_INTELLI_NOTE_PARAM: {
-      if (intelliMode == NinSnesIntelliModeId::Fe3 && !parentSeq->intelliUseCustomNoteParam) {
-        goto OnEventNoteParam;
-      }
-
-      // param #0: duration
-      shared->spcNoteDuration = statusByte;
-      desc = fmt::format("Duration: {:d}", shared->spcNoteDuration);
-
-      // param #1,2...: quantize/velocity (optional)
-      while (curOffset + 1 < 0x10000 && readByte(curOffset) <= 0x7f) {
-        uint8_t noteParam = readByte(curOffset++);
-        if (noteParam < 0x40) {  // 00..3f
-          uint8_t durIndex = noteParam & 0x3f;
-          shared->spcNoteDurRate = parentSeq->intelliDurVolTable[durIndex];
-          fmt::format_to(std::back_inserter(desc), "  Quantize: {} ({}/256)", durIndex,
-                         shared->spcNoteDurRate);
-        } else {  // 40..7f
-          uint8_t velIndex = noteParam & 0x3f;
-          shared->spcNoteVolume = parentSeq->intelliDurVolTable[velIndex];
-          fmt::format_to(std::back_inserter(desc), "  Velocity: {} ({}/256)", velIndex,
-                         shared->spcNoteVolume);
-        }
-      }
-
-      addGenericEvent(beginOffset, curOffset - beginOffset, "Note Param", desc,
-                      Type::DurationChange);
-      break;
+    case EVENT_QUINTET_ADSR: {
+      const uint8_t adsr1 = readByte(curOffset++);
+      const uint8_t sustainRate = readByte(curOffset++);
+      const uint8_t sustainLevel = readByte(curOffset++);
+      const uint8_t adsr2 = (sustainLevel << 5) | sustainRate;
+      desc =
+          fmt::format("ADSR(1): ${:02X}  Sustain Rate: {:d} Sustain Level: {}  (ADSR(2): ${:02X})",
+                      adsr1, sustainRate, sustainLevel, adsr2);
+      addGenericEvent(beginOffset, curOffset - beginOffset, "ADSR", desc, Type::Adsr);
+      return true;
     }
 
-    case EVENT_INTELLI_ECHO_ON: {
+    default:
+      return false;
+  }
+}
+
+bool NinSnesTrack::handleIntelliEvent(NinSnesSeqEventType eventType, uint32_t beginOffset,
+                                      uint8_t statusByte, std::string& desc) {
+  auto& parentSeq = seq();
+  const auto currentIntelliMode = intelliMode();
+
+  switch (eventType) {
+    case EVENT_INTELLI_NOTE_PARAM:
+      readIntelliNoteParam(beginOffset, statusByte, desc);
+      return true;
+
+    case EVENT_INTELLI_ECHO_ON:
       addReverb(beginOffset, curOffset - beginOffset, 40, "Echo On");
-      break;
-    }
+      return true;
 
-    case EVENT_INTELLI_ECHO_OFF: {
+    case EVENT_INTELLI_ECHO_OFF:
       addReverb(beginOffset, curOffset - beginOffset, 0, "Echo Off");
-      break;
-    }
+      return true;
 
-    case EVENT_INTELLI_LEGATO_ON: {
+    case EVENT_INTELLI_LEGATO_ON:
       intelliLegato = true;
       addGenericEvent(beginOffset, curOffset - beginOffset, "Legato On (No Key Off)", desc,
                       Type::Portamento);
-      break;
-    }
+      return true;
 
-    case EVENT_INTELLI_LEGATO_OFF: {
+    case EVENT_INTELLI_LEGATO_OFF:
       intelliLegato = false;
       addGenericEvent(beginOffset, curOffset - beginOffset, "Legato Off", desc, Type::Portamento);
-      break;
-    }
+      return true;
 
     case EVENT_INTELLI_JUMP_SHORT_CONDITIONAL: {
-      uint8_t offset = readByte(curOffset++);
-      uint16_t dest = curOffset + offset;
-
+      const uint8_t offset = readByte(curOffset++);
+      const uint16_t dest = curOffset + offset;
       desc = fmt::format("Destination: ${:04X}", dest);
       addGenericEvent(beginOffset, curOffset - beginOffset, "Conditional Jump (Short)", desc,
                       Type::Misc);
-
-      // condition for branch has not been researched yet
       curOffset = dest;
-      break;
+      return true;
     }
 
     case EVENT_INTELLI_JUMP_SHORT: {
-      uint8_t offset = readByte(curOffset++);
-      uint16_t dest = curOffset + offset;
-
+      const uint8_t offset = readByte(curOffset++);
+      const uint16_t dest = curOffset + offset;
       desc = fmt::format("Destination: ${:04X}", dest);
       addGenericEvent(beginOffset, curOffset - beginOffset, "Jump (Short)", desc, Type::Misc);
-
       curOffset = dest;
-      break;
+      return true;
     }
 
     case EVENT_INTELLI_FE3_EVENT_F5: {
-      uint8_t param = readByte(curOffset++);
+      const uint8_t param = readByte(curOffset++);
       if (param < 0xf0) {
-        // wait for APU port #2
         desc = fmt::format("Value: {:d}", param);
         addGenericEvent(beginOffset, curOffset - beginOffset, "Wait for APU Port #2", desc,
                         Type::ChangeState);
-      } else {
-        // set/clear bitflag in $ca
-        uint8_t bit = param & 7;
-        bool bitValue = (param & 8) == 0;
-
-        desc = fmt::format("Status: {}", (bitValue ? "On" : "Off"));
-        switch (bit) {
-          case 0:
-            parentSeq->intelliUseCustomPercTable = bitValue;
-            addGenericEvent(beginOffset, curOffset - beginOffset, "Use Custom Percussion Table",
-                            desc, Type::ChangeState);
-            break;
-
-          case 7:
-            parentSeq->intelliUseCustomNoteParam = bitValue;
-            addGenericEvent(beginOffset, curOffset - beginOffset, "Use Custom Note Param", desc,
-                            Type::ChangeState);
-            break;
-
-          default:
-            addUnknown(beginOffset, curOffset - beginOffset, "Unknown Event", desc);
-        }
+        return true;
       }
-      break;
+
+      const uint8_t bit = param & 7;
+      const bool bitValue = (param & 8) == 0;
+      desc = fmt::format("Status: {}", (bitValue ? "On" : "Off"));
+      switch (bit) {
+        case 0:
+          parentSeq.intelliUseCustomPercTable = bitValue;
+          addGenericEvent(beginOffset, curOffset - beginOffset, "Use Custom Percussion Table",
+                          desc, Type::ChangeState);
+          return true;
+
+        case 7:
+          parentSeq.intelliUseCustomNoteParam = bitValue;
+          addGenericEvent(beginOffset, curOffset - beginOffset, "Use Custom Note Param", desc,
+                          Type::ChangeState);
+          return true;
+
+        default:
+          addUnknown(beginOffset, curOffset - beginOffset, "Unknown Event", desc);
+          return true;
+      }
     }
 
     case EVENT_INTELLI_WRITE_APU_PORT: {
-      uint8_t value = readByte(curOffset++);
+      const uint8_t value = readByte(curOffset++);
       desc = fmt::format("Value: {:d}", value);
       addGenericEvent(beginOffset, curOffset - beginOffset, "Write APU Port", desc,
                       Type::ChangeState);
-      break;
+      return true;
     }
 
-    case EVENT_INTELLI_FE3_EVENT_F9: {
+    case EVENT_INTELLI_FE3_EVENT_F9:
       curOffset += 36;
       addUnknown(beginOffset, curOffset - beginOffset);
-      break;
-    }
+      return true;
 
     case EVENT_INTELLI_DEFINE_VOICE_PARAM: {
-      int8_t param = readByte(curOffset++);
+      const int8_t param = readByte(curOffset++);
       if (param >= 0) {
         const uint32_t tableOffset = curOffset;
-        parentSeq->intelliVoiceParam.addr = tableOffset;
-        parentSeq->intelliVoiceParam.size = param;
-        parentSeq->intelliVoiceParam.defined = true;
-        curOffset += parentSeq->intelliVoiceParam.size * 4;
-        desc = fmt::format("Number of Items: {:d}", parentSeq->intelliVoiceParam.size);
+        parentSeq.intelliVoiceParam.addr = tableOffset;
+        parentSeq.intelliVoiceParam.size = param;
+        parentSeq.intelliVoiceParam.defined = true;
+        curOffset += parentSeq.intelliVoiceParam.size * 4;
+        desc = fmt::format("Number of Items: {:d}", parentSeq.intelliVoiceParam.size);
         addGenericEvent(beginOffset, curOffset - beginOffset, "Voice Param Table", desc,
                         Type::Misc);
 
         if (readMode == READMODE_ADD_TO_UI) {
           if (SeqEvent* event = findSeqEventAtOffset(beginOffset, curOffset - beginOffset);
               event != nullptr && event->children().empty()) {
-            const bool packedVoiceParams =
-                intelliMode == NinSnesIntelliModeId::Ta || intelliMode == NinSnesIntelliModeId::Fe4;
+            const bool packedVoiceParams = currentIntelliMode == NinSnesIntelliModeId::Ta ||
+                                           currentIntelliMode == NinSnesIntelliModeId::Fe4;
             const auto& labels =
                 packedVoiceParams ? INTELLI_PACKED_VOICE_PARAM_LABELS : INTELLI_VOICE_PARAM_LABELS;
-            for (uint8_t itemIndex = 0; itemIndex < parentSeq->intelliVoiceParam.size;
-                 itemIndex++) {
+            for (uint8_t itemIndex = 0; itemIndex < parentSeq.intelliVoiceParam.size; itemIndex++) {
               const uint32_t recordOffset = tableOffset + itemIndex * 4u;
               addIntelliTableItem(event, recordOffset, fmt::format("Voice Param {:d}", itemIndex),
                                   labels,
@@ -1366,64 +1307,66 @@ bool NinSnesTrack::readEvent() {
             }
           }
         }
-      } else {
-        if (intelliMode == NinSnesIntelliModeId::Fe3 || intelliMode == NinSnesIntelliModeId::Ta) {
-          const uint8_t instrNum = param & 0x3f;
-          const uint32_t regionOffset = curOffset;
-          std::array<uint8_t, 6> regionData{};
-          for (size_t i = 0; i < regionData.size(); i++) {
-            regionData[i] = readByte(curOffset + i);
-          }
-          curOffset += 6;
-          desc = fmt::format("Instrument: {:d}", instrNum);
-
-          if (intelliMode == NinSnesIntelliModeId::Ta) {
-            const uint32_t newProgNum =
-                parentSeq->registerIntelliTAInstrumentOverride(instrNum, regionData);
-            if (currentLogicalProgram.has_value() && currentLogicalProgram.value() == instrNum) {
-              setTrackedProgramState(newProgNum, instrNum);
-              if (!m_lastNoteWasPercussion) {
-                addProgramChangeNoItem(newProgNum, true);
-              }
-            }
-          }
-
-          addGenericEvent(beginOffset, curOffset - beginOffset, "Overwrite Instrument Region", desc,
-                          Type::Misc);
-
-          if (readMode == READMODE_ADD_TO_UI) {
-            if (SeqEvent* event = findSeqEventAtOffset(beginOffset, curOffset - beginOffset);
-                event != nullptr && event->children().empty()) {
-              addIntelliTableItem(event, regionOffset, fmt::format("Instrument {:d}", instrNum),
-                                  INTELLI_OVERWRITE_LABELS, regionData);
-            }
-          }
-        } else {
-          addUnknown(beginOffset, curOffset - beginOffset);
-        }
+        return true;
       }
-      break;
+
+      if (currentIntelliMode == NinSnesIntelliModeId::Fe3 ||
+          currentIntelliMode == NinSnesIntelliModeId::Ta) {
+        const uint8_t instrNum = param & 0x3f;
+        const uint32_t regionOffset = curOffset;
+        std::array<uint8_t, 6> regionData{};
+        for (size_t i = 0; i < regionData.size(); i++) {
+          regionData[i] = readByte(curOffset + i);
+        }
+        curOffset += 6;
+        desc = fmt::format("Instrument: {:d}", instrNum);
+
+        if (currentIntelliMode == NinSnesIntelliModeId::Ta) {
+          const uint32_t newProgNum =
+              parentSeq.registerIntelliTAInstrumentOverride(instrNum, regionData);
+          if (currentLogicalProgram.has_value() && *currentLogicalProgram == instrNum) {
+            setTrackedProgramState(newProgNum, instrNum);
+            if (!m_lastNoteWasPercussion) {
+              addProgramChangeNoItem(newProgNum, true);
+            }
+          }
+        }
+
+        addGenericEvent(beginOffset, curOffset - beginOffset, "Overwrite Instrument Region", desc,
+                        Type::Misc);
+
+        if (readMode == READMODE_ADD_TO_UI) {
+          if (SeqEvent* event = findSeqEventAtOffset(beginOffset, curOffset - beginOffset);
+              event != nullptr && event->children().empty()) {
+            addIntelliTableItem(event, regionOffset, fmt::format("Instrument {:d}", instrNum),
+                                INTELLI_OVERWRITE_LABELS, regionData);
+          }
+        }
+      } else {
+        addUnknown(beginOffset, curOffset - beginOffset);
+      }
+      return true;
     }
 
     case EVENT_INTELLI_LOAD_VOICE_PARAM: {
-      uint8_t paramIndex = readByte(curOffset++);
+      const uint8_t paramIndex = readByte(curOffset++);
       desc = fmt::format("Index: {:d}", paramIndex);
 
       uint32_t addrVoiceParam = 0;
       bool outOfRange = false;
-      const bool taStyleVoiceParam =
-          intelliMode == NinSnesIntelliModeId::Ta || intelliMode == NinSnesIntelliModeId::Fe4;
+      const bool taStyleVoiceParam = currentIntelliMode == NinSnesIntelliModeId::Ta ||
+                                     currentIntelliMode == NinSnesIntelliModeId::Fe4;
       const bool canReadVoiceParam =
-          getIntelliVoiceParamAddress(*parentSeq, paramIndex, addrVoiceParam, outOfRange);
+          getIntelliVoiceParamAddress(parentSeq, paramIndex, addrVoiceParam, outOfRange);
       if (taStyleVoiceParam && outOfRange) {
         fmt::format_to(std::back_inserter(desc), "  Out of Declared Range");
       }
 
       if (canReadVoiceParam) {
-        uint8_t instrByte = readByte(addrVoiceParam);
-        uint8_t newVol = readByte(addrVoiceParam + 1);
-        uint8_t packedPanByte = readByte(addrVoiceParam + 2);
-        uint8_t lastByte = readByte(addrVoiceParam + 3);
+        const uint8_t instrByte = readByte(addrVoiceParam);
+        const uint8_t newVol = readByte(addrVoiceParam + 1);
+        const uint8_t packedPanByte = readByte(addrVoiceParam + 2);
+        const uint8_t lastByte = readByte(addrVoiceParam + 3);
 
         addVolNoItem(newVol / 2);
 
@@ -1439,43 +1382,42 @@ bool NinSnesTrack::readEvent() {
         if (taStyleVoiceParam) {
           panValue = packedPanByte & 0x1f;
           fineTuningCents = (((packedPanByte >> 5) & 0x07) * 5 / 256.0) * 100.0;
-          resolvedProgNum = parentSeq->resolveProgramNumber(instrByte, &logicalProgNum);
+          resolvedProgNum = parentSeq.resolveProgramNumber(instrByte, &logicalProgNum);
         } else {
           uint8_t resolvedLogicalProgNum = instrByte;
-          if (intelliMode != NinSnesIntelliModeId::Fe3) {
+          if (currentIntelliMode != NinSnesIntelliModeId::Fe3) {
             resolvedLogicalProgNum &= 0x1f;
           }
           logicalProgNum = resolvedLogicalProgNum;
           resolvedProgNum = resolvedLogicalProgNum;
         }
 
-        int8_t midiPan = calculatePanValue(panValue, volumeScale, reverseLeft, reverseRight);
+        const int8_t midiPan = calculatePanValue(panValue, volumeScale, reverseLeft, reverseRight);
         addPanNoItem(midiPan);
         addExpressionNoItem(convertPercentAmpToStdMidiVal(volumeScale));
 
-        switch (intelliMode) {
+        switch (currentIntelliMode) {
           case NinSnesIntelliModeId::Fe3: {
-            uint8_t tuningIndex = lastByte & 15;
-            uint8_t transposeIndex = (lastByte & 0x70) >> 4;
+            const uint8_t tuningIndex = lastByte & 15;
+            const uint8_t transposeIndex = (lastByte & 0x70) >> 4;
 
             if (tuningIndex != 0) {
-              uint8_t newTuning = (tuningIndex - 1) * 5;
+              const uint8_t newTuning = (tuningIndex - 1) * 5;
               fineTuningCents = (newTuning / 256.0) * 100.0;
             }
 
             if (transposeIndex != 0) {
-              const int8_t FE3_TRANSPOSE_TABLE[7] = {-24, -12, -1, 0, 1, 12, 24};
-              int8_t newTranspose = FE3_TRANSPOSE_TABLE[transposeIndex - 1];
+              constexpr std::array<int8_t, 7> FE3_TRANSPOSE_TABLE = {-24, -12, -1, 0, 1, 12, 24};
+              const int8_t newTranspose = FE3_TRANSPOSE_TABLE[transposeIndex - 1];
               shared->spcTranspose = newTranspose;
               transpose = newTranspose;
             }
-
             break;
           }
 
           case NinSnesIntelliModeId::Fe4:
           case NinSnesIntelliModeId::Ta: {
-            int8_t newTranspose = lastByte;
+            const int8_t newTranspose = lastByte;
             shared->spcTranspose = newTranspose;
             transpose = newTranspose;
             break;
@@ -1497,7 +1439,7 @@ bool NinSnesTrack::readEvent() {
                        "Transpose: {:d}",
                        instrByte, newVol, panValue, fineTuningCents / 100.0, shared->spcTranspose);
       } else if (taStyleVoiceParam) {
-        if (!parentSeq->intelliVoiceParam.defined) {
+        if (!parentSeq.intelliVoiceParam.defined) {
           fmt::format_to(std::back_inserter(desc), "  Table: Undefined");
         } else {
           fmt::format_to(std::back_inserter(desc), "  Record Address: ${:04X} (Invalid)",
@@ -1507,33 +1449,21 @@ bool NinSnesTrack::readEvent() {
 
       addGenericEvent(beginOffset, curOffset - beginOffset, "Load Voice Param", desc,
                       Type::ProgramChange);
-      break;
+      return true;
     }
 
     case EVENT_INTELLI_ADSR: {
-      uint8_t adsr1 = readByte(curOffset++);
-      uint8_t adsr2 = readByte(curOffset++);
+      const uint8_t adsr1 = readByte(curOffset++);
+      const uint8_t adsr2 = readByte(curOffset++);
       desc = fmt::format("ADSR(1): ${:02X}  ADSR(2): ${:02X}", adsr1, adsr2);
       addGenericEvent(beginOffset, curOffset - beginOffset, "ADSR", desc, Type::Adsr);
-      break;
-    }
-
-    case EVENT_QUINTET_ADSR: {
-      uint8_t adsr1 = readByte(curOffset++);
-      uint8_t sustain_rate = readByte(curOffset++);
-      uint8_t sustain_level = readByte(curOffset++);
-      uint8_t adsr2 = (sustain_level << 5) | sustain_rate;
-      desc =
-          fmt::format("ADSR(1): ${:02X}  Sustain Rate: {:d} Sustain Level: {}  (ADSR(2): ${:02X})",
-                      adsr1, sustain_rate, sustain_level, adsr2);
-      addGenericEvent(beginOffset, curOffset - beginOffset, "ADSR", desc, Type::Adsr);
-      break;
+      return true;
     }
 
     case EVENT_INTELLI_GAIN_SUSTAIN_TIME_AND_RATE: {
-      uint8_t sustainDurRate = readByte(curOffset++);
-      uint8_t sustainGAIN = readByte(curOffset++);
-      if (intelliMode == NinSnesIntelliModeId::Ta) {
+      const uint8_t sustainDurRate = readByte(curOffset++);
+      const uint8_t sustainGAIN = readByte(curOffset++);
+      if (currentIntelliMode == NinSnesIntelliModeId::Ta) {
         shared->spcNoteDurRate = sustainDurRate;
         desc = fmt::format("Duration Rate: {:d}/256  GAIN: ${:02X}", sustainDurRate, sustainGAIN);
         addGenericEvent(beginOffset, curOffset - beginOffset, "Duration Rate / GAIN", desc,
@@ -1544,12 +1474,12 @@ bool NinSnesTrack::readEvent() {
         addGenericEvent(beginOffset, curOffset - beginOffset, "GAIN Sustain Time/Rate", desc,
                         Type::Adsr);
       }
-      break;
+      return true;
     }
 
     case EVENT_INTELLI_GAIN_SUSTAIN_TIME: {
-      uint8_t sustainDurRate = readByte(curOffset++);
-      if (intelliMode == NinSnesIntelliModeId::Ta) {
+      const uint8_t sustainDurRate = readByte(curOffset++);
+      if (currentIntelliMode == NinSnesIntelliModeId::Ta) {
         shared->spcNoteDurRate = sustainDurRate;
         desc = fmt::format("Duration Rate: {:d}/256", sustainDurRate);
         addGenericEvent(beginOffset, curOffset - beginOffset, "Duration Rate", desc,
@@ -1559,35 +1489,32 @@ bool NinSnesTrack::readEvent() {
         addGenericEvent(beginOffset, curOffset - beginOffset, "GAIN Sustain Time", desc,
                         Type::Adsr);
       }
-      break;
+      return true;
     }
 
     case EVENT_INTELLI_GAIN: {
-      // This event will update GAIN immediately,
-      // however, note that Fire Emblem 4 does not switch to GAIN mode until note off.
-      uint8_t gain = readByte(curOffset++);
+      const uint8_t gain = readByte(curOffset++);
       desc = fmt::format("  GAIN: ${:02X}", gain);
       addGenericEvent(beginOffset, curOffset - beginOffset, "GAIN (Release Rate)", desc,
                       Type::Adsr);
-      break;
+      return true;
     }
 
     case EVENT_INTELLI_FE4_EVENT_FC: {
-      uint8_t arg1 = readByte(curOffset++);
-      uint8_t numEntries = (arg1 & 15) + 1;
+      const uint8_t arg1 = readByte(curOffset++);
+      const uint8_t numEntries = (arg1 & 15) + 1;
       const uint32_t tableOffset = curOffset;
 
-      if (isIntelliTablePercussionVersion(parentSeq->profileId)) {
+      if (isIntelliTablePercussionVersion(parentSeq.profileId)) {
         for (uint8_t slot = 0; slot < numEntries && slot < NINSNES_INTELLI_TA_PERCUSSION_SLOT_COUNT;
              slot++) {
-          auto& customEntry = parentSeq->intelliPerc.table[slot];
+          auto& customEntry = parentSeq.intelliPerc.table[slot];
           customEntry.patchByte = readByte(curOffset++);
           customEntry.noteByte = readByte(curOffset++);
           customEntry.panByte = readByte(curOffset++);
         }
 
-        parentSeq->setIntelliCustomPercTableEnabled(true);
-
+        parentSeq.setIntelliCustomPercTableEnabled(true);
         desc = fmt::format("Entries: {:d}", numEntries);
         addGenericEvent(beginOffset, curOffset - beginOffset, "Custom Percussion Table", desc,
                         Type::ChangeState);
@@ -1599,8 +1526,8 @@ bool NinSnesTrack::readEvent() {
                  slot < numEntries && slot < NINSNES_INTELLI_TA_PERCUSSION_SLOT_COUNT; slot++) {
               const uint32_t entryOffset = tableOffset + slot * 3u;
               const uint8_t drumNote =
-                  static_cast<uint8_t>(parentSeq->STATUS_PERCUSSION_NOTE_MIN + slot);
-              const auto& entry = parentSeq->intelliPerc.table[slot];
+                  static_cast<uint8_t>(parentSeq.STATUS_PERCUSSION_NOTE_MIN + slot);
+              const auto& entry = parentSeq.intelliPerc.table[slot];
               addIntelliTableItem(event, entryOffset, fmt::format("Drum ${:02X}", drumNote),
                                   INTELLI_PERCUSSION_ENTRY_LABELS,
                                   {entry.patchByte, entry.noteByte, entry.panByte});
@@ -1611,34 +1538,33 @@ bool NinSnesTrack::readEvent() {
         curOffset += numEntries * 3;
         addUnknown(beginOffset, curOffset - beginOffset);
       }
-      break;
+      return true;
     }
 
     case EVENT_INTELLI_TA_SUBEVENT: {
-      uint8_t type = readByte(curOffset++);
+      const uint8_t type = readByte(curOffset++);
 
       switch (type) {
         case 0x00: {
-          uint8_t valueLo = readByte(curOffset++);
-          uint8_t valueHi = readByte(curOffset++);
-          uint8_t packedType = readByte(curOffset++);
-          uint16_t requestValue = valueLo | (valueHi << 8);
-          uint8_t requestKind = (packedType & 0x07) << 1;
-          uint8_t requestPriority = packedType & 0xf8;
+          const uint8_t valueLo = readByte(curOffset++);
+          const uint8_t valueHi = readByte(curOffset++);
+          const uint8_t packedType = readByte(curOffset++);
+          const uint16_t requestValue = valueLo | (valueHi << 8);
+          const uint8_t requestKind = (packedType & 0x07) << 1;
+          const uint8_t requestPriority = packedType & 0xf8;
 
           desc = fmt::format("Value: ${:04X}  Kind: ${:02X}  Priority: ${:02X}", requestValue,
                              requestKind, requestPriority);
           addGenericEvent(beginOffset, curOffset - beginOffset, "Queued Global Request", desc,
                           Type::Misc);
-          break;
+          return true;
         }
 
         case 0x01:
         case 0x02: {
-          uint8_t param = readByte(curOffset++);
-          bool bitValue = (type == 0x01);
-
-          updateIntelliFlags(parentSeq->intelliPerc.flags, param, bitValue);
+          const uint8_t param = readByte(curOffset++);
+          const bool bitValue = (type == 0x01);
+          updateIntelliFlags(parentSeq.intelliPerc.flags, param, bitValue);
 
           if (param == 0x40) {
             desc = fmt::format("Status: {}", (bitValue ? "On" : "Off"));
@@ -1646,124 +1572,129 @@ bool NinSnesTrack::readEvent() {
                             desc, Type::ChangeState);
           } else {
             desc = fmt::format("Mask: ${:02X}", param);
-            if (type == 0x01) {
-              addGenericEvent(beginOffset, curOffset - beginOffset, "Set Global Flags", desc,
-                              Type::ChangeState);
-            } else {
-              addGenericEvent(beginOffset, curOffset - beginOffset, "Clear Global Flags", desc,
-                              Type::ChangeState);
-            }
+            addGenericEvent(beginOffset, curOffset - beginOffset,
+                            (type == 0x01) ? "Set Global Flags" : "Clear Global Flags", desc,
+                            Type::ChangeState);
           }
-
-          break;
+          return true;
         }
 
         case 0x03:
           intelliLegato = true;
           addGenericEvent(beginOffset, curOffset - beginOffset, "Legato On (No Key Off)", desc,
                           Type::Portamento);
-          break;
+          return true;
 
         case 0x04:
           intelliLegato = false;
           addGenericEvent(beginOffset, curOffset - beginOffset, "Legato Off", desc,
                           Type::Portamento);
-          break;
+          return true;
 
         case 0x05:
-          parentSeq->intelliPerc.unknownByte = readByte(curOffset++);
-          desc = fmt::format("Value: ${:02X}", parentSeq->intelliPerc.unknownByte);
+          parentSeq.intelliPerc.unknownByte = readByte(curOffset++);
+          desc = fmt::format("Value: ${:02X}", parentSeq.intelliPerc.unknownByte);
           addGenericEvent(beginOffset, curOffset - beginOffset, "Set Global Byte $0364", desc,
                           Type::ChangeState);
-          break;
+          return true;
 
         default:
           addUnknown(beginOffset, curOffset - beginOffset);
-          break;
+          return true;
       }
-
-      break;
     }
 
     case EVENT_INTELLI_FE4_SUBEVENT: {
-      uint8_t type = readByte(curOffset++);
-
+      const uint8_t type = readByte(curOffset++);
       switch (type) {
         case 0x01:
         case 0x02: {
-          uint8_t param = readByte(curOffset++);
-          bool bitValue = (type == 0x01);
-
-          updateIntelliFlags(parentSeq->intelliPerc.flags, param, bitValue);
-
+          const uint8_t param = readByte(curOffset++);
+          const bool bitValue = (type == 0x01);
+          updateIntelliFlags(parentSeq.intelliPerc.flags, param, bitValue);
           desc = fmt::format("Mask: ${:02X}", param);
-          if (type == 0x01) {
-            addGenericEvent(beginOffset, curOffset - beginOffset, "Set Global Flags", desc,
-                            Type::ChangeState);
-          } else {
-            addGenericEvent(beginOffset, curOffset - beginOffset, "Clear Global Flags", desc,
-                            Type::ChangeState);
-          }
-          break;
+          addGenericEvent(beginOffset, curOffset - beginOffset,
+                          (type == 0x01) ? "Set Global Flags" : "Clear Global Flags", desc,
+                          Type::ChangeState);
+          return true;
         }
 
         default:
           addUnknown(beginOffset, curOffset - beginOffset);
-          break;
+          return true;
       }
-
-      break;
     }
 
-      // << INTELLIGENT SYSTEMS EVENTS END
+    default:
+      return false;
+  }
+}
 
-    default: {
-      auto descr = logEvent(statusByte);
-      addUnknown(beginOffset, curOffset - beginOffset, "Unknown Event", descr);
-      bContinue = false;
-      break;
-    }
+void NinSnesTrack::addPendingEndEvent(uint8_t statusByte, const std::string& desc) {
+  const auto& parentSeq = seq();
+  if (curOffset + 1 <= 0x10000 && statusByte != parentSeq.STATUS_END &&
+      readByte(curOffset) == parentSeq.STATUS_END) {
+    addGenericEvent(curOffset, 1, (shared->loopCount == 0) ? "Section End" : "Pattern End", desc,
+                    (shared->loopCount == 0) ? Type::TrackEnd : Type::RepeatEnd);
+  }
+}
+
+bool NinSnesTrack::readEvent() {
+  if (!available) {
+    return false;
   }
 
-  // Add the next "END" event to UI
-  // (because it often gets interrupted by the end of other track)
-  if (curOffset + 1 <= 0x10000 && statusByte != parentSeq->STATUS_END &&
-      readByte(curOffset) == parentSeq->STATUS_END) {
-    if (shared->loopCount == 0) {
-      addGenericEvent(curOffset, 1, "Section End", desc, Type::TrackEnd);
-    } else {
-      addGenericEvent(curOffset, 1, "Pattern End", desc, Type::RepeatEnd);
-    }
+  const auto& parentSeq = seq();
+  const uint32_t beginOffset = curOffset;
+  if (curOffset >= 0x10000) {
+    return false;
   }
 
-  return bContinue;
+  const uint8_t statusByte = readByte(curOffset++);
+  bool continueReading = true;
+  std::string desc;
+
+  NinSnesSeqEventType eventType = static_cast<NinSnesSeqEventType>(0);
+  if (const auto pEventType = parentSeq.EventMap.find(statusByte);
+      pEventType != parentSeq.EventMap.end()) {
+    eventType = pEventType->second;
+  }
+
+  if (!handleCoreEvent(eventType, beginOffset, statusByte, desc, continueReading) &&
+      !handleControllerEvent(eventType, beginOffset, desc) &&
+      !handleVariantEvent(eventType, beginOffset, statusByte, desc) &&
+      !handleIntelliEvent(eventType, beginOffset, statusByte, desc)) {
+    const auto descr = logEvent(statusByte);
+    addUnknown(beginOffset, curOffset - beginOffset, "Unknown Event", descr);
+    continueReading = false;
+  }
+
+  addPendingEndEvent(statusByte, desc);
+  return continueReading;
 }
 
 uint16_t NinSnesTrack::convertToApuAddress(uint16_t offset) {
-  NinSnesSeq* parentSeq = (NinSnesSeq*)this->parentSeq;
-  return parentSeq->convertToAPUAddress(offset);
+  return seq().convertToAPUAddress(offset);
 }
 
 uint16_t NinSnesTrack::getShortAddress(uint32_t offset) {
-  NinSnesSeq* parentSeq = (NinSnesSeq*)this->parentSeq;
-  return parentSeq->getShortAddress(offset);
+  return seq().getShortAddress(offset);
 }
 
 void NinSnesTrack::getVolumeBalance(uint16_t pan, double& volumeLeft, double& volumeRight) {
-  NinSnesSeq* parentSeq = (NinSnesSeq*)this->parentSeq;
-  getNinSnesVolumeBalance(getNinSnesProfile(parentSeq->profileId), parentSeq->panTable, pan,
-                          volumeLeft, volumeRight);
+  const auto& parentSeq = seq();
+  getNinSnesVolumeBalance(parentSeq.profile(), parentSeq.panTable, pan, volumeLeft, volumeRight);
 }
 
 uint8_t NinSnesTrack::readPanTable(uint16_t pan) {
-  NinSnesSeq* parentSeq = (NinSnesSeq*)this->parentSeq;
-  return readNinSnesPanTable(getNinSnesProfile(parentSeq->profileId), parentSeq->panTable, pan);
+  const auto& parentSeq = seq();
+  return readNinSnesPanTable(parentSeq.profile(), parentSeq.panTable, pan);
 }
 
 int8_t NinSnesTrack::calculatePanValue(uint8_t pan, double& volumeScale, bool& reverseLeft,
                                        bool& reverseRight) {
-  NinSnesSeq* parentSeq = (NinSnesSeq*)this->parentSeq;
-  const auto panState = decodeNinSnesPanValue(getNinSnesProfile(parentSeq->profileId), pan);
+  const auto& parentSeq = seq();
+  const auto panState = decodeNinSnesPanValue(parentSeq.profile(), pan);
   reverseLeft = panState.reverseLeft;
   reverseRight = panState.reverseRight;
 

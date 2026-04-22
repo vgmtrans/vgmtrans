@@ -7,6 +7,8 @@
 #include "NinSnesScanResult.h"
 #include "NinSnesSeqState.h"
 
+struct NinSnesProfile;
+
 class NinSnesSeq : public VGMMultiSectionSeq {
 public:
   NinSnesSeq(RawFile* file, NinSnesProfileId profile, uint32_t offset, uint8_t percussion_base = 0,
@@ -20,6 +22,7 @@ public:
   virtual void resetVars();
   virtual bool readEvent(long stopTime);
 
+  const NinSnesProfile& profile() const;
   double getTempoInBPM();
   double getTempoInBPM(uint8_t tempo);
 
@@ -126,6 +129,21 @@ public:
   bool available = true;
 
 private:
+  NinSnesSeq& seq() const;
+  NinSnesIntelliModeId intelliMode() const;
+  void readStandardNoteParam(uint32_t beginOffset, uint8_t statusByte, std::string& desc);
+  void readLemmingsNoteParam(uint32_t beginOffset, uint8_t statusByte, std::string& desc);
+  void readIntelliNoteParam(uint32_t beginOffset, uint8_t statusByte, std::string& desc);
+  bool handleCoreEvent(NinSnesSeqEventType eventType, uint32_t beginOffset, uint8_t statusByte,
+                       std::string& desc, bool& continueReading);
+  bool handleControllerEvent(NinSnesSeqEventType eventType, uint32_t beginOffset,
+                             std::string& desc);
+  bool handleVariantEvent(NinSnesSeqEventType eventType, uint32_t beginOffset, uint8_t statusByte,
+                          std::string& desc);
+  bool handleIntelliEvent(NinSnesSeqEventType eventType, uint32_t beginOffset, uint8_t statusByte,
+                          std::string& desc);
+  void addPendingEndEvent(uint8_t statusByte, const std::string& desc);
+
   uint8_t getEffectiveNoteDuration() const;
   void setTrackedProgramState(uint32_t progNum,
                               std::optional<uint8_t> logicalProgram = std::nullopt);
