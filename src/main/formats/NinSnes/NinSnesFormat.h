@@ -5,13 +5,6 @@
 #include "FilegroupMatcher.h"
 
 BEGIN_FORMAT(NinSnes)
-  USING_SCANNER(NinSnesScanner)
-  USING_MATCHER(FilegroupMatcher)
-
-  static inline bool isQuintetVersion(NinSnesVersion version) {
-    return version == NINSNES_QUINTET_ACTR ||
-        version == NINSNES_QUINTET_ACTR2 ||
-        version == NINSNES_QUINTET_IOG ||
-        version == NINSNES_QUINTET_TS;
-  }
+USING_SCANNER(NinSnesScanner)
+USING_MATCHER(FilegroupMatcher)
 END_FORMAT()

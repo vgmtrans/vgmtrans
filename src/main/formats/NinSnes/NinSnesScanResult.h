@@ -6,7 +6,6 @@
 #include "NinSnesProfile.h"
 
 struct NinSnesScanResult {
-  NinSnesVersion version = NINSNES_NONE;
   NinSnesSignatureId signature = NinSnesSignatureId::None;
   NinSnesProfileId profile = NinSnesProfileId::Unknown;
 
@@ -31,6 +30,6 @@ struct NinSnesScanResult {
   std::vector<uint8_t> durRateTable;
 
   [[nodiscard]] const NinSnesProfile& profileDefinition() const {
-    return getNinSnesProfile(version);
+    return getNinSnesProfile(profile);
   }
 };

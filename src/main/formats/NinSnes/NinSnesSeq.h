@@ -7,17 +7,13 @@
 #include "NinSnesScanResult.h"
 #include "NinSnesSeqState.h"
 
-class NinSnesSeq:
-    public VGMMultiSectionSeq {
- public:
-  NinSnesSeq(RawFile *file,
-             NinSnesVersion ver,
-             uint32_t offset,
-             uint8_t percussion_base = 0,
-             const std::vector<uint8_t> &theVolumeTable = std::vector<uint8_t>(),
-             const std::vector<uint8_t> &theDurRateTable = std::vector<uint8_t>(),
+class NinSnesSeq : public VGMMultiSectionSeq {
+public:
+  NinSnesSeq(RawFile* file, NinSnesProfileId profile, uint32_t offset, uint8_t percussion_base = 0,
+             const std::vector<uint8_t>& theVolumeTable = std::vector<uint8_t>(),
+             const std::vector<uint8_t>& theDurRateTable = std::vector<uint8_t>(),
              std::string theName = "NinSnes Seq");
-  NinSnesSeq(RawFile *file, const NinSnesScanResult& scanResult);
+  NinSnesSeq(RawFile* file, const NinSnesScanResult& scanResult);
   virtual ~NinSnesSeq();
 
   virtual bool parseHeader();
@@ -29,8 +25,7 @@ class NinSnesSeq:
 
   uint16_t convertToAPUAddress(uint16_t offset);
   uint16_t getShortAddress(uint32_t offset);
-  uint32_t resolveProgramNumber(uint8_t instrumentByte,
-                                uint8_t* logicalInstrIndex = nullptr) const;
+  uint32_t resolveProgramNumber(uint8_t instrumentByte, uint8_t* logicalInstrIndex = nullptr) const;
   uint32_t registerIntelliTAInstrumentOverride(uint8_t logicalInstrIndex,
                                                const std::array<uint8_t, 6>& regionData);
   uint8_t ensureIntelliTADrumKitProgram();
@@ -74,7 +69,8 @@ class NinSnesSeq:
   // Falcom:
   uint16_t falcomBaseOffset;
 
-  void addPercussionInstrNoteMapping(uint8_t instrIndex, uint8_t noteIndex, int8_t globalTranspose) {
+  void addPercussionInstrNoteMapping(uint8_t instrIndex, uint8_t noteIndex,
+                                     int8_t globalTranspose) {
     m_percussionInstrNoteMap[instrIndex] = {noteIndex, globalTranspose};
   }
   const std::map<uint8_t, NinSnesPercussionDef>& percussionInstrNoteMap() const {
@@ -88,9 +84,9 @@ class NinSnesSeq:
   }
 
 protected:
-  VGMHeader *header;
+  VGMHeader* header;
 
- private:
+private:
   void loadEventMap();
   NinSnesIntelliTADrumKitDef buildIntelliTADrumKitDef() const;
 
@@ -101,10 +97,9 @@ protected:
   std::vector<NinSnesIntelliTADrumKitDef> m_intelliTADrumKitDefs;
 };
 
-class NinSnesSection
-    : public VGMSeqSection {
- public:
-  NinSnesSection(NinSnesSeq *parentFile, uint32_t offset = 0, uint32_t length = 0);
+class NinSnesSection : public VGMSeqSection {
+public:
+  NinSnesSection(NinSnesSeq* parentFile, uint32_t offset = 0, uint32_t length = 0);
 
   virtual bool parseTrackPointers();
 
@@ -112,38 +107,35 @@ class NinSnesSection
   uint16_t getShortAddress(uint32_t offset);
 };
 
-class NinSnesTrack
-    : public SeqTrack {
- public:
-  NinSnesTrack
-      (NinSnesSection *parentSection, uint32_t offset = 0, uint32_t length = 0, const std::string &theName = "NinSnes Track");
+class NinSnesTrack : public SeqTrack {
+public:
+  NinSnesTrack(NinSnesSection* parentSection, uint32_t offset = 0, uint32_t length = 0,
+               const std::string& theName = "NinSnes Track");
 
   virtual void resetVars();
   virtual bool readEvent();
 
   uint16_t convertToApuAddress(uint16_t offset);
   uint16_t getShortAddress(uint32_t offset);
-  void getVolumeBalance(uint16_t pan, double &volumeLeft, double &volumeRight);
+  void getVolumeBalance(uint16_t pan, double& volumeLeft, double& volumeRight);
   uint8_t readPanTable(uint16_t pan);
-  int8_t calculatePanValue(uint8_t pan, double &volumeScale, bool &reverseLeft, bool &reverseRight);
+  int8_t calculatePanValue(uint8_t pan, double& volumeScale, bool& reverseLeft, bool& reverseRight);
 
-  NinSnesSection *parentSection;
-  NinSnesTrackSharedData *shared = nullptr;
+  NinSnesSection* parentSection;
+  NinSnesTrackSharedData* shared = nullptr;
   bool available = true;
 
- private:
+private:
   uint8_t getEffectiveNoteDuration() const;
-  void setTrackedProgramState(uint32_t progNum, std::optional<uint8_t> logicalProgram = std::nullopt);
+  void setTrackedProgramState(uint32_t progNum,
+                              std::optional<uint8_t> logicalProgram = std::nullopt);
   void restoreNonPercussionProgramIfNeeded();
   void switchToPercussionProgramIfNeeded(uint8_t program = 0);
   void applyIntelliPercussionState(uint8_t instrumentByte,
                                    std::optional<uint8_t> panByte = std::nullopt,
                                    std::optional<uint8_t> reverbLevel = std::nullopt);
-  void addProgramChangeEvent(uint32_t offset,
-                             uint32_t length,
-                             uint32_t progNum,
-                             bool requireBank,
-                             const std::string &eventName = "Program Change",
+  void addProgramChangeEvent(uint32_t offset, uint32_t length, uint32_t progNum, bool requireBank,
+                             const std::string& eventName = "Program Change",
                              std::optional<uint8_t> logicalProgram = std::nullopt);
 
   bool m_lastNoteWasPercussion = false;
