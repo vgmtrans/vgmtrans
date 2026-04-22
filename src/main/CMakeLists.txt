@@ -218,10 +218,10 @@ target_sources(vgmtranscore
     formats/NamcoSnes/NamcoSnesSeq.cpp
     formats/NeverlandSnes/NeverlandSnesScanner.cpp
     formats/NeverlandSnes/NeverlandSnesSeq.cpp
-    formats/NinSnes/legacy/NinSnesLegacyInstr.cpp
+    formats/NinSnes/NinSnesInstr.cpp
     formats/NinSnes/NinSnesProfile.cpp
-    formats/NinSnes/legacy/NinSnesLegacyScanner.cpp
-    formats/NinSnes/legacy/NinSnesLegacySeq.cpp
+    formats/NinSnes/NinSnesScanner.cpp
+    formats/NinSnes/NinSnesSeq.cpp
     formats/Org/OrgScanner.cpp
     formats/Org/OrgSeq.cpp
     formats/PS1/PS1Seq.cpp
