@@ -13,7 +13,7 @@ class NinSnesInstrSet:
     public VGMInstrSet {
  public:
   NinSnesInstrSet(RawFile *file,
-                  NinSnesVersion ver,
+                  NinSnesProfileId profile,
                   uint32_t offset,
                   uint32_t spcDirAddr,
                   const std::string &name = "NinSnesInstrSet");
@@ -24,7 +24,6 @@ class NinSnesInstrSet:
   bool parseInstrPointers() override;
   void useColl(const VGMColl* coll) override;
 
-  NinSnesVersion version;
   NinSnesSignatureId signature;
   NinSnesProfileId profileId;
 
@@ -44,7 +43,7 @@ class NinSnesInstr
     : public VGMInstr {
  public:
   NinSnesInstr(VGMInstrSet *instrSet,
-               NinSnesVersion ver,
+               NinSnesProfileId profile,
                uint32_t offset,
                uint32_t theBank,
                uint32_t theInstrNum,
@@ -55,10 +54,10 @@ class NinSnesInstr
   virtual bool loadInstr();
 
   static bool isValidHeader
-      (RawFile *file, NinSnesVersion version, uint32_t addrInstrHeader, uint32_t spcDirAddr, bool validateSample);
-  static uint32_t expectedSize(NinSnesVersion version);
+      (RawFile *file, NinSnesProfileId profileId, uint32_t addrInstrHeader, uint32_t spcDirAddr, bool validateSample);
+  static uint32_t expectedSize(NinSnesProfileId profileId);
 
-  NinSnesVersion version;
+  NinSnesProfileId profileId;
 
   uint16_t konamiTuningTableAddress;
   uint8_t konamiTuningTableSize;
@@ -75,13 +74,11 @@ class NinSnesRgn
     : public VGMRgn {
  public:
   NinSnesRgn(NinSnesInstr *instr,
-             NinSnesVersion ver,
+             NinSnesProfileId profileId,
              uint32_t offset,
              uint16_t konamiTuningTableAddress = 0,
              uint8_t konamiTuningTableSize = 0);
   virtual ~NinSnesRgn();
 
   virtual bool loadRgn();
-
-  NinSnesVersion version;
 };
