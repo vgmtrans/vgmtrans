@@ -256,9 +256,12 @@ void NinSnesTrack::applyIntelliPercussionState(uint8_t instrumentByte,
   }
 
   auto& parentSeq = seq();
-  uint8_t logicalProgram = 0;
-  const uint32_t progNum = parentSeq.resolveProgramNumber(instrumentByte, &logicalProgram);
-  setTrackedProgramState(progNum, logicalProgram);
+  const uint32_t progNum = parentSeq.resolveProgramNumber(instrumentByte);
+  if (readMode == READMODE_ADD_TO_UI) {
+    // Intelli percussion borrows a source patch for export/UI, but it should not
+    // replace the melodic program restored after the drum hit.
+    parentSeq.addInstrumentRef(progNum);
+  }
 }
 
 bool NinSnesTrack::handleIntelliPercussionNote(uint32_t beginOffset, uint8_t slot,
