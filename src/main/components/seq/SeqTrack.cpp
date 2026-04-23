@@ -327,30 +327,25 @@ SeqEvent* SeqTrack::addGenericEvent(uint32_t offset,
                                     const std::string &sEventDesc,
                                     Type type) {
   bool isNewOffset = onEvent(offset, length);
-  SeqEvent* event = nullptr;
 
   if (readMode == READMODE_ADD_TO_UI) {
-    if (isNewOffset) {
-      event = addEvent(new SeqEvent(this, offset, length, sEventName, type, sEventDesc));
-    }
-  }
-  else if (readMode == READMODE_CONVERT_TO_MIDI) {
-    if (SeqEvent* existing = findSeqEventAtOffset(m_lastEventOffset, m_lastEventLength)) {
-      parentSeq->timedEventIndex().addEvent(existing, getTime(), 0);
-    }
-    if (bWriteGenericEventAsTextEvent) {
-      std::string miditext(sEventName);
-      if (!sEventDesc.empty()) {
-        miditext += " - ";
-        miditext += sEventDesc;
-      }
-      pMidiTrack->addText(miditext);
-    }
+    return isNewOffset ? addEvent(new SeqEvent(this, offset, length, sEventName, type, sEventDesc))
+                       : nullptr;
   }
 
-  return event;
+  recordSeqEvent<SeqEvent>(isNewOffset, getTime(), offset, length, sEventName, type, sEventDesc);
+
+  if (readMode == READMODE_CONVERT_TO_MIDI && bWriteGenericEventAsTextEvent) {
+    std::string miditext(sEventName);
+    if (!sEventDesc.empty()) {
+      miditext += " - ";
+      miditext += sEventDesc;
+    }
+    pMidiTrack->addText(miditext);
+  }
+
+  return nullptr;
 }
-
 
 void SeqTrack::addUnknown(uint32_t offset,
                           uint32_t length,
