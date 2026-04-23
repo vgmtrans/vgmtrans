@@ -596,11 +596,8 @@ uint32_t resolveNinSnesProgramNumber(const NinSnesProfile& profile, const RawFil
 
 bool usesNinSnesIntelliCustomPercTable(const NinSnesProfile& profile, bool runtimeCustomPercTable,
                                        uint8_t intelliPercFlags) {
-  if (profile.intelliMode == NinSnesIntelliModeId::Fe4) {
-    return true;
-  }
-
-  if (profile.intelliMode == NinSnesIntelliModeId::Ta) {
+  if (profile.intelliMode == NinSnesIntelliModeId::Ta ||
+      profile.intelliMode == NinSnesIntelliModeId::Fe4) {
     return (intelliPercFlags & 0x40) != 0;
   }
 
