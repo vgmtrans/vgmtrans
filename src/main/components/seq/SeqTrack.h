@@ -105,7 +105,7 @@ protected:
   virtual bool isOffsetUsed(uint32_t offset);
 
   virtual bool onEvent(uint32_t offset, uint32_t length);
-  virtual void addEvent(SeqEvent *pSeqEvent);
+  virtual SeqEvent* addEvent(SeqEvent *pSeqEvent);
 
   template <typename EventType, typename... Args>
   void recordSeqEvent(bool isNewOffset, uint32_t startTick, Args&&... args) {
@@ -148,7 +148,7 @@ private:
   void endActiveNoteIndex(int8_t key, uint32_t endTick);
 
  public:
-  void addGenericEvent(uint32_t offset, uint32_t length, const std::string &sEventName, const std::string &sEventDesc, Type type);
+  SeqEvent* addGenericEvent(uint32_t offset, uint32_t length, const std::string &sEventName, const std::string &sEventDesc, Type type);
   void addSetOctave(uint32_t offset, uint32_t length, uint8_t newOctave, const std::string &sEventName = "Set Octave");
   void addIncrementOctave(uint32_t offset, uint32_t length, const std::string &sEventName = "Increment Octave");    // 1,Sep.2009 revise
   void addDecrementOctave(uint32_t offset, uint32_t length, const std::string &sEventName = "Decrement Octave");    // 1,Sep.2009 revise

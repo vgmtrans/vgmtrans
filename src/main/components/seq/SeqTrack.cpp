@@ -276,9 +276,9 @@ bool SeqTrack::onEvent(uint32_t offset, uint32_t length) {
   return visitedAddresses.insert(offset).second;
 }
 
-void SeqTrack::addEvent(SeqEvent *pSeqEvent) {
+SeqEvent* SeqTrack::addEvent(SeqEvent *pSeqEvent) {
   if (readMode != READMODE_ADD_TO_UI)
-    return;
+    return nullptr;
 
   addChild(pSeqEvent);
 
@@ -296,6 +296,8 @@ void SeqTrack::addEvent(SeqEvent *pSeqEvent) {
     if (length() < newTrkLen)
       setLength(newTrkLen);
   }
+
+  return pSeqEvent;
 }
 
 SeqEvent* SeqTrack::findSeqEventAtOffset(uint32_t offset, uint32_t length) {
@@ -319,16 +321,23 @@ SeqEvent* SeqTrack::findSeqEventAtOffset(uint32_t offset, uint32_t length) {
   return seqEvent;
 }
 
-void SeqTrack::addGenericEvent(uint32_t offset,
-                               uint32_t length,
-                               const std::string &sEventName,
-                               const std::string &sEventDesc,
-                               Type type) {
+SeqEvent* SeqTrack::addGenericEvent(uint32_t offset,
+                                    uint32_t length,
+                                    const std::string &sEventName,
+                                    const std::string &sEventDesc,
+                                    Type type) {
   bool isNewOffset = onEvent(offset, length);
+  SeqEvent* event = nullptr;
 
-  recordSeqEvent<SeqEvent>(isNewOffset, getTime(), offset, length, sEventName, type, sEventDesc);
-
-  if (readMode == READMODE_CONVERT_TO_MIDI) {
+  if (readMode == READMODE_ADD_TO_UI) {
+    if (isNewOffset) {
+      event = addEvent(new SeqEvent(this, offset, length, sEventName, type, sEventDesc));
+    }
+  }
+  else if (readMode == READMODE_CONVERT_TO_MIDI) {
+    if (SeqEvent* existing = findSeqEventAtOffset(m_lastEventOffset, m_lastEventLength)) {
+      parentSeq->timedEventIndex().addEvent(existing, getTime(), 0);
+    }
     if (bWriteGenericEventAsTextEvent) {
       std::string miditext(sEventName);
       if (!sEventDesc.empty()) {
@@ -338,6 +347,8 @@ void SeqTrack::addGenericEvent(uint32_t offset,
       pMidiTrack->addText(miditext);
     }
   }
+
+  return event;
 }
 
 

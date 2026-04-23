@@ -330,13 +330,6 @@ bool NinSnesTrack::handleIntelliEvent(NinSnesSeqEventType eventType, uint32_t be
                                       uint8_t statusByte, std::string& desc) {
   auto& parentSeq = seq();
   const auto currentIntelliMode = intelliMode();
-  auto findEmptyUiEvent = [&](uint32_t eventOffset) -> SeqEvent* {
-    if (SeqEvent* event = findSeqEventAtOffset(eventOffset, curOffset - eventOffset);
-        event != nullptr && event->children().empty()) {
-      return event;
-    }
-    return nullptr;
-  };
 
   switch (eventType) {
     case EVENT_INTELLI_NOTE_PARAM:
@@ -434,10 +427,10 @@ bool NinSnesTrack::handleIntelliEvent(NinSnesSeqEventType eventType, uint32_t be
         parentSeq.intelliVoiceParam.defined = true;
         curOffset += parentSeq.intelliVoiceParam.size * 4;
         desc = fmt::format("Number of Items: {:d}", parentSeq.intelliVoiceParam.size);
-        addGenericEvent(beginOffset, curOffset - beginOffset, "Voice Param Table", desc,
-                        Type::Misc);
+        SeqEvent* event = addGenericEvent(beginOffset, curOffset - beginOffset,
+                            "Voice Param Table", desc, Type::Misc);
 
-        if (SeqEvent* event = findEmptyUiEvent(beginOffset); event != nullptr) {
+        if (event != nullptr) {
           const auto& labels = isPackedIntelliVoiceParam(currentIntelliMode)
                                    ? INTELLI_PACKED_VOICE_PARAM_LABELS
                                    : INTELLI_VOICE_PARAM_LABELS;
@@ -474,10 +467,10 @@ bool NinSnesTrack::handleIntelliEvent(NinSnesSeqEventType eventType, uint32_t be
           }
         }
 
-        addGenericEvent(beginOffset, curOffset - beginOffset, "Overwrite Instrument Region", desc,
-                        Type::Misc);
+        SeqEvent* event = addGenericEvent(beginOffset, curOffset - beginOffset,
+                                          "Overwrite Instrument Region", desc, Type::Misc);
 
-        if (SeqEvent* event = findEmptyUiEvent(beginOffset); event != nullptr) {
+        if (event != nullptr) {
           addIntelliTableItem(event, regionOffset, fmt::format("Instrument {:d}", instrNum),
                               INTELLI_OVERWRITE_LABELS, regionData);
         }
@@ -607,10 +600,10 @@ bool NinSnesTrack::handleIntelliEvent(NinSnesSeqEventType eventType, uint32_t be
 
         parentSeq.setIntelliCustomPercTableEnabled(true);
         desc = fmt::format("Entries: {:d}", numEntries);
-        addGenericEvent(beginOffset, curOffset - beginOffset, "Custom Percussion Table", desc,
-                        Type::ChangeState);
+        SeqEvent* event = addGenericEvent(beginOffset, curOffset - beginOffset,
+                           "Custom Percussion Table", desc, Type::ChangeState);
 
-        if (SeqEvent* event = findEmptyUiEvent(beginOffset); event != nullptr) {
+        if (event != nullptr) {
           for (uint8_t slot = 0;
                slot < numEntries && slot < NINSNES_INTELLI_TA_PERCUSSION_SLOT_COUNT; slot++) {
             const uint32_t entryOffset = tableOffset + slot * 3u;

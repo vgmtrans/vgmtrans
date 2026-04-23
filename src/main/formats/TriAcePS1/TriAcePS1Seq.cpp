@@ -317,16 +317,17 @@ bool TriAcePS1Track::isOffsetUsed(uint32_t offset) {
   return false;
 }
 
-void TriAcePS1Track::addEvent(SeqEvent *pSeqEvent) {
+SeqEvent* TriAcePS1Track::addEvent(SeqEvent *pSeqEvent) {
   TriAcePS1ScorePattern *pattern = ((TriAcePS1Seq *) parentSeq)->curScorePattern;
   if (pattern == NULL) {
     // it must be already added, reject it
     delete pSeqEvent;
-    return;
+    return nullptr;
   }
 
   if (readMode != READMODE_ADD_TO_UI)
-    return;
+    return nullptr;
 
   pattern->addChild(pSeqEvent);
+  return pSeqEvent;
 }
