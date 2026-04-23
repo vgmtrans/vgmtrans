@@ -146,13 +146,13 @@ private:
   void addPendingEndEvent(uint8_t statusByte, const std::string& desc);
 
   uint8_t getEffectiveNoteDuration() const;
-  void setTrackedProgramState(uint32_t progNum,
+  void rememberMelodicProgram(uint32_t progNum,
                               std::optional<uint8_t> logicalProgram = std::nullopt);
   void restoreNonPercussionProgramIfNeeded();
   void switchToPercussionProgramIfNeeded(uint8_t program = 0);
-  void applyIntelliPercussionState(uint8_t instrumentByte,
-                                   std::optional<uint8_t> panByte = std::nullopt,
-                                   std::optional<uint8_t> reverbLevel = std::nullopt);
+  void applyIntelliPercussionSlotState(uint8_t instrumentByte,
+                                       std::optional<uint8_t> panByte = std::nullopt,
+                                       std::optional<uint8_t> reverbLevel = std::nullopt);
   void addProgramChangeEvent(uint32_t offset, uint32_t length, uint32_t progNum, bool requireBank,
                              const std::string& eventName = "Program Change",
                              std::optional<uint8_t> logicalProgram = std::nullopt);

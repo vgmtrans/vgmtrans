@@ -54,6 +54,7 @@ void updateIntelliFlags(uint8_t& flags, uint8_t mask, bool enabled) {
   }
 }
 
+// Resolves a voice-param record address and reports TA/FE4 out-of-range table access.
 bool getIntelliVoiceParamAddress(const NinSnesSeq& seq, uint8_t index, uint32_t& addrVoiceParam,
                                  bool& outOfRange) {
   addrVoiceParam = 0;
@@ -69,6 +70,7 @@ bool getIntelliVoiceParamAddress(const NinSnesSeq& seq, uint8_t index, uint32_t&
   return (addrVoiceParam + 3) < 0x10000 && (packedVoiceParams || !outOfRange);
 }
 
+// Resolves Intelli flag-mask events and applies their side effects.
 const char* describeIntelliFlagMaskEvent(NinSnesSeq& seq, uint8_t param, bool bitValue,
                                          bool allowCustomPercLabel, std::string& desc) {
   updateIntelliFlags(seq.intelliPerc.flags, param, bitValue);
@@ -82,6 +84,7 @@ const char* describeIntelliFlagMaskEvent(NinSnesSeq& seq, uint8_t param, bool bi
   return bitValue ? "Set Global Flags" : "Clear Global Flags";
 }
 
+// Decodes one Intelli voice-param record into resolved playback state.
 NinSnesIntelliVoiceParamRecord decodeIntelliVoiceParamRecord(const NinSnesSeq& seq,
                                                              NinSnesIntelliModeId intelliMode,
                                                              uint32_t addrVoiceParam,
@@ -164,6 +167,7 @@ constexpr std::array<const char*, 3> INTELLI_PERCUSSION_ENTRY_LABELS = {
     "Pan",
 };
 
+// Derives the live Intelli percussion slot state, including custom table overrides.
 NinSnesIntelliPercussionNoteState getIntelliPercussionNoteState(const NinSnesSeq& seq,
                                                                 uint8_t slot) {
   NinSnesIntelliPercussionNoteState percussionState;
@@ -193,6 +197,7 @@ void NinSnesSeq::setIntelliCustomPercTableEnabled(bool enabled) {
                                           intelliPerc.flags);
 }
 
+// Registers a TA instrument overwrite as a synthetic exported program.
 uint32_t NinSnesSeq::registerIntelliTAInstrumentOverride(uint8_t logicalInstrIndex,
                                                          const std::array<uint8_t, 6>& regionData) {
   const uint32_t progNum = m_nextIntelliTAOverrideProgram++;
@@ -205,6 +210,7 @@ uint32_t NinSnesSeq::registerIntelliTAInstrumentOverride(uint8_t logicalInstrInd
   return progNum;
 }
 
+// Builds the current TA drum-kit definition from Intelli percussion slots.
 NinSnesIntelliTADrumKitDef NinSnesSeq::buildIntelliTADrumKitDef() const {
   NinSnesIntelliTADrumKitDef drumKitDef;
 
@@ -219,6 +225,7 @@ NinSnesIntelliTADrumKitDef NinSnesSeq::buildIntelliTADrumKitDef() const {
   return drumKitDef;
 }
 
+// Reuses or allocates the exported drum-kit program for the current Intelli slot layout.
 uint8_t NinSnesSeq::ensureIntelliTADrumKitProgram() {
   auto drumKitDef = buildIntelliTADrumKitDef();
 
@@ -238,9 +245,10 @@ uint8_t NinSnesSeq::ensureIntelliTADrumKitProgram() {
   return drumKitDef.program;
 }
 
-void NinSnesTrack::applyIntelliPercussionState(uint8_t instrumentByte,
-                                               std::optional<uint8_t> panByte,
-                                               std::optional<uint8_t> reverbLevel) {
+// Applies Intelli percussion slot controls and references its source patch.
+void NinSnesTrack::applyIntelliPercussionSlotState(uint8_t instrumentByte,
+                                                   std::optional<uint8_t> panByte,
+                                                   std::optional<uint8_t> reverbLevel) {
   if (panByte.has_value()) {
     double volumeScale;
     bool reverseLeft;
@@ -258,12 +266,11 @@ void NinSnesTrack::applyIntelliPercussionState(uint8_t instrumentByte,
   auto& parentSeq = seq();
   const uint32_t progNum = parentSeq.resolveProgramNumber(instrumentByte);
   if (readMode == READMODE_ADD_TO_UI) {
-    // Intelli percussion borrows a source patch for export/UI, but it should not
-    // replace the melodic program restored after the drum hit.
     parentSeq.addInstrumentRef(progNum);
   }
 }
 
+// Emits an Intelli table percussion note through the synthetic TA/FE4 drum kit.
 bool NinSnesTrack::handleIntelliPercussionNote(uint32_t beginOffset, uint8_t slot,
                                                uint8_t duration) {
   auto& parentSeq = seq();
@@ -273,8 +280,8 @@ bool NinSnesTrack::handleIntelliPercussionNote(uint32_t beginOffset, uint8_t slo
   }
 
   const auto percussionState = getIntelliPercussionNoteState(parentSeq, slot);
-  applyIntelliPercussionState(percussionState.instrumentByte, percussionState.panByte,
-                              percussionState.reverbLevel);
+  applyIntelliPercussionSlotState(percussionState.instrumentByte, percussionState.panByte,
+                                  percussionState.reverbLevel);
 
   const uint8_t drumProgram = parentSeq.ensureIntelliTADrumKitProgram();
   const uint8_t drumKey = static_cast<uint8_t>(0x24 + slot);
@@ -288,6 +295,7 @@ bool NinSnesTrack::handleIntelliPercussionNote(uint32_t beginOffset, uint8_t slo
   return true;
 }
 
+// Reads Intelli note-param streams, which encode duration and velocity indices inline.
 void NinSnesTrack::readIntelliNoteParam(uint32_t beginOffset, uint8_t statusByte,
                                         std::string& desc) {
   auto& parentSeq = seq();
@@ -317,6 +325,7 @@ void NinSnesTrack::readIntelliNoteParam(uint32_t beginOffset, uint8_t statusByte
   addGenericEvent(beginOffset, curOffset - beginOffset, "Note Param", desc, Type::DurationChange);
 }
 
+// Handles Intelligent Systems-only events and their FE3/FE4/TA variant behavior.
 bool NinSnesTrack::handleIntelliEvent(NinSnesSeqEventType eventType, uint32_t beginOffset,
                                       uint8_t statusByte, std::string& desc) {
   auto& parentSeq = seq();
@@ -458,7 +467,7 @@ bool NinSnesTrack::handleIntelliEvent(NinSnesSeqEventType eventType, uint32_t be
           const uint32_t newProgNum =
               parentSeq.registerIntelliTAInstrumentOverride(instrNum, regionData);
           if (currentLogicalProgram.has_value() && *currentLogicalProgram == instrNum) {
-            setTrackedProgramState(newProgNum, instrNum);
+            rememberMelodicProgram(newProgNum, instrNum);
             if (!m_lastNoteWasPercussion) {
               addProgramChangeNoItem(newProgNum, true);
             }
@@ -510,7 +519,7 @@ bool NinSnesTrack::handleIntelliEvent(NinSnesSeqEventType eventType, uint32_t be
         transpose = record.transpose;
         addFineTuningNoItem(record.fineTuningCents);
 
-        setTrackedProgramState(record.resolvedProgNum, record.logicalProgNum);
+        rememberMelodicProgram(record.resolvedProgNum, record.logicalProgNum);
         if (!m_lastNoteWasPercussion) {
           addProgramChangeNoItem(record.resolvedProgNum, true);
         }

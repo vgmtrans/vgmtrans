@@ -412,7 +412,9 @@ uint8_t NinSnesTrack::getEffectiveNoteDuration() const {
   return std::min(std::max(duration, (uint8_t)1), (uint8_t)(shared->spcNoteDuration - 2));
 }
 
-void NinSnesTrack::setTrackedProgramState(uint32_t progNum, std::optional<uint8_t> logicalProgram) {
+// Remembers the melodic program restored after percussion notes.
+void NinSnesTrack::rememberMelodicProgram(uint32_t progNum,
+                                          std::optional<uint8_t> logicalProgram) {
   nonPercussionProgram = progNum;
   if (logicalProgram.has_value()) {
     currentLogicalProgram = logicalProgram;
@@ -447,7 +449,7 @@ void NinSnesTrack::switchToPercussionProgramIfNeeded(uint8_t program) {
 void NinSnesTrack::addProgramChangeEvent(uint32_t offset, uint32_t length, uint32_t progNum,
                                          bool requireBank, const std::string& eventName,
                                          std::optional<uint8_t> logicalProgram) {
-  setTrackedProgramState(progNum, logicalProgram);
+  rememberMelodicProgram(progNum, logicalProgram);
 
   bool isNewOffset = onEvent(offset, length);
   recordSeqEvent<ProgChangeSeqEvent>(isNewOffset, getTime(), progNum, offset, length, eventName);
