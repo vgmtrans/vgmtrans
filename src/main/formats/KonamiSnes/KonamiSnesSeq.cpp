@@ -440,7 +440,12 @@ bool KonamiSnesTrack::readEvent(void) {
         addTie(beginOffset, curOffset - beginOffset, dur, "Tie", desc);
       }
       else {
-        addNoteByDur(beginOffset, curOffset - beginOffset, key, vel, dur);
+        if (percussion) {
+          addPercNoteByDur(beginOffset, curOffset - beginOffset, key, vel, dur);
+        }
+        else {
+          addNoteByDur(beginOffset, curOffset - beginOffset, key, vel, dur);
+        }
         prevNoteKey = key;
       }
       prevNoteSlurred = (noteDurationRate == parentSeq->NOTE_DUR_RATE_MAX);
