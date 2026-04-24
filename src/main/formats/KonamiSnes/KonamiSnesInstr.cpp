@@ -13,6 +13,10 @@ namespace {
 constexpr uint8_t kKonamiSnesPercussionNoteCount = 0x60;
 constexpr uint8_t kKonamiSnesPercussionBaseNote = 0x3c;
 
+constexpr bool usesLegacyInstrumentLayout(KonamiSnesVersion version) {
+  return version >= KONAMISNES_V1 && version <= KONAMISNES_V3;
+}
+
 bool isValidPercussionHeader(RawFile *file,
                              KonamiSnesVersion version,
                              uint32_t addrInstrHeader,
@@ -21,11 +25,35 @@ bool isValidPercussionHeader(RawFile *file,
     return false;
   }
 
-  const bool legacyLayout =
-      (version == KONAMISNES_V1 || version == KONAMISNES_V2 || version == KONAMISNES_V3);
+  const bool legacyLayout = usesLegacyInstrumentLayout(version);
   const uint8_t pan = file->readByte(addrInstrHeader + (legacyLayout ? 6 : 5));
   const uint8_t vol = file->readByte(addrInstrHeader + (legacyLayout ? 7 : 6));
   return pan <= (legacyLayout ? 0x14 : 0x28) && vol <= 0x7f;
+}
+
+template <typename Visitor>
+bool forEachPercussionHeader(RawFile *file,
+                             KonamiSnesVersion version,
+                             uint32_t tableOffset,
+                             uint32_t spcDirAddr,
+                             Visitor &&visit) {
+  const uint32_t instrItemSize = KonamiSnesInstr::expectedSize(version);
+  bool foundHeader = false;
+  for (uint8_t percussionNote = 0; percussionNote < kKonamiSnesPercussionNoteCount; percussionNote++) {
+    const uint32_t addrInstrHeader = tableOffset + (instrItemSize * percussionNote);
+    if (!isValidPercussionHeader(file, version, addrInstrHeader, spcDirAddr)) {
+      if (foundHeader) {
+        break;
+      }
+      continue;
+    }
+
+    foundHeader = true;
+    if (!visit(percussionNote, addrInstrHeader)) {
+      return false;
+    }
+  }
+  return foundHeader;
 }
 }
 
@@ -67,19 +95,12 @@ bool KonamiSnesInstrSet::parseInstrPointers() {
       usedSRCNs.push_back(srcn);
     }
   };
+  const uint32_t instrItemSize = KonamiSnesInstr::expectedSize(version);
 
   for (int instr = 0; instr <= 0xff; instr++) {
-    uint32_t instrItemSize = KonamiSnesInstr::expectedSize(version);
-
-    uint32_t addrInstrHeader;
-    if (instr < firstBankedInstr) {
-      // common samples
-      addrInstrHeader = offset() + (instrItemSize * instr);
-    }
-    else {
-      // switchable samples
-      addrInstrHeader = bankedInstrOffset + (instrItemSize * (instr - firstBankedInstr));
-    }
+    const uint32_t addrInstrHeader = (instr < firstBankedInstr)
+                                         ? offset() + (instrItemSize * instr)
+                                         : bankedInstrOffset + (instrItemSize * (instr - firstBankedInstr));
     if (addrInstrHeader + instrItemSize > 0x10000) {
       return false;
     }
@@ -88,9 +109,7 @@ bool KonamiSnesInstrSet::parseInstrPointers() {
       if (instr < firstBankedInstr) {
         continue;
       }
-      else {
-        break;
-      }
+      break;
     }
     if (!KonamiSnesInstr::isValidHeader(this->rawFile(), version, addrInstrHeader, spcDirAddr, true)) {
       continue;
@@ -112,21 +131,12 @@ bool KonamiSnesInstrSet::parseInstrPointers() {
     aInstrs.push_back(newInstr);
   }
 
-  bool hasPercussionSamples = false;
-  const uint32_t percInstrItemSize = KonamiSnesInstr::expectedSize(version);
-  for (uint8_t percussionNote = 0; percussionNote < kKonamiSnesPercussionNoteCount; percussionNote++) {
-    uint32_t addrInstrHeader = percInstrOffset + (percInstrItemSize * percussionNote);
-    if (!isValidPercussionHeader(this->rawFile(), version, addrInstrHeader, spcDirAddr)) {
-      if (hasPercussionSamples) {
-        break;
-      }
-      continue;
-    }
-
-    addUsedSRCN(readByte(addrInstrHeader));
-    hasPercussionSamples = true;
-  }
-
+  const bool hasPercussionSamples =
+      forEachPercussionHeader(this->rawFile(), version, percInstrOffset, spcDirAddr,
+                              [&](uint8_t, uint32_t addrInstrHeader) {
+                                addUsedSRCN(readByte(addrInstrHeader));
+                                return true;
+                              });
   if (hasPercussionSamples) {
     auto *newInstr = new KonamiSnesInstr(this,
                                          version,
@@ -176,38 +186,25 @@ KonamiSnesInstr::~KonamiSnesInstr() {
 
 bool KonamiSnesInstr::loadInstr() {
   if (percussion) {
-    const uint32_t instrItemSize = KonamiSnesInstr::expectedSize(version);
-    bool loadedAnyRegion = false;
-    for (uint8_t percussionNote = 0; percussionNote < kKonamiSnesPercussionNoteCount; percussionNote++) {
-      uint32_t addrInstrHeader = offset() + (instrItemSize * percussionNote);
-      if (!isValidPercussionHeader(rawFile(), version, addrInstrHeader, spcDirAddr)) {
-        if (loadedAnyRegion) {
-          break;
-        }
-        continue;
-      }
+    const bool loadedAnyRegion =
+        forEachPercussionHeader(rawFile(), version, offset(), spcDirAddr,
+                                [&](uint8_t percussionNote, uint32_t addrInstrHeader) {
+                                  const uint8_t srcn = readByte(addrInstrHeader);
+                                  const uint32_t offDirEnt = spcDirAddr + (srcn * 4);
+                                  const uint16_t addrSampStart = readShort(offDirEnt);
 
-      uint8_t srcn = readByte(addrInstrHeader);
-      uint32_t offDirEnt = spcDirAddr + (srcn * 4);
-      if (offDirEnt + 4 > 0x10000) {
-        continue;
-      }
+                                  auto *rgn = new KonamiSnesRgn(this, version, addrInstrHeader, true, percussionNote);
+                                  rgn->sampOffset = addrSampStart - spcDirAddr;
+                                  if (!rgn->loadRgn()) {
+                                    delete rgn;
+                                    return false;
+                                  }
 
-      uint16_t addrSampStart = readShort(offDirEnt);
-
-      auto *rgn = new KonamiSnesRgn(this, version, addrInstrHeader, true, percussionNote);
-      rgn->sampOffset = addrSampStart - spcDirAddr;
-      if (!rgn->loadRgn()) {
-        delete rgn;
-        return false;
-      }
-
-      addRgn(rgn);
-      loadedAnyRegion = true;
-    }
-
+                                  addRgn(rgn);
+                                  return true;
+                                });
     setGuessedLength();
-    return !regions().empty();
+    return loadedAnyRegion && !regions().empty();
   }
 
   uint8_t srcn = readByte(offset());
@@ -238,10 +235,6 @@ bool KonamiSnesInstr::isValidHeader(RawFile *file,
   }
 
   uint8_t srcn = file->readByte(addrInstrHeader);
-  int16_t pitch_scale = file->readShortBE(addrInstrHeader + 1);
-  uint8_t adsr1 = file->readByte(addrInstrHeader + 3);
-  uint8_t adsr2 = file->readByte(addrInstrHeader + 4);
-
   if (srcn == 0xff) // SRCN:FF is false-positive in 99.999999% of cases
   {
     return false;
@@ -262,11 +255,7 @@ bool KonamiSnesInstr::isValidHeader(RawFile *file,
 }
 
 uint32_t KonamiSnesInstr::expectedSize(KonamiSnesVersion version) {
-  if (version == KONAMISNES_V1 || version == KONAMISNES_V2 || version == KONAMISNES_V3) {
-    return 8;
-  } else {
-    return 7;
-  }
+  return usesLegacyInstrumentLayout(version) ? 8 : 7;
 }
 
 // *************
@@ -278,25 +267,22 @@ KonamiSnesRgn::KonamiSnesRgn(KonamiSnesInstr *instr,
                              uint32_t offset,
                              bool percussion,
                              uint8_t percussionNote) :
-    VGMRgn(instr, offset, KonamiSnesInstr::expectedSize(ver)),
-    version(ver) {
-  const bool legacyLayout =
-      (ver == KONAMISNES_V1 || ver == KONAMISNES_V2 || ver == KONAMISNES_V3);
-  uint8_t srcn = readByte(offset);
-  int8_t raw_key = readByte(offset + 1);
-  int8_t tuning = readByte(offset + 2);
-  uint8_t adsr1 = readByte(offset + 3);
-  uint8_t adsr2 = readByte(offset + 4);
-  uint8_t gain = legacyLayout ? readByte(offset + 5) : adsr2;
-  uint32_t panOffset = legacyLayout ? offset + 6 : offset + 5;
-  uint32_t volOffset = legacyLayout ? offset + 7 : offset + 6;
-  uint8_t pan = readByte(panOffset);
-  uint8_t vol = readByte(volOffset);
+    VGMRgn(instr, offset, KonamiSnesInstr::expectedSize(ver)) {
+  const bool legacyLayout = usesLegacyInstrumentLayout(ver);
+  const uint8_t srcn = readByte(offset);
+  const int8_t raw_key = readByte(offset + 1);
+  const int8_t tuning = readByte(offset + 2);
+  const uint8_t adsr1 = readByte(offset + 3);
+  const uint8_t adsr2 = readByte(offset + 4);
+  const uint8_t gain = legacyLayout ? readByte(offset + 5) : adsr2;
+  const uint32_t panOffset = legacyLayout ? offset + 6 : offset + 5;
+  const uint32_t volOffset = legacyLayout ? offset + 7 : offset + 6;
+  const uint8_t vol = readByte(volOffset);
 
   const int8_t key = (tuning >= 0) ? raw_key : (raw_key - 1);
   const int16_t full_tuning = static_cast<int16_t>((static_cast<uint8_t>(key) << 8) | static_cast<uint8_t>(tuning));
 
-  bool use_adsr = ((adsr1 & 0x80) != 0);
+  const bool use_adsr = ((adsr1 & 0x80) != 0);
 
   double fine_tuning;
   double coarse_tuning;

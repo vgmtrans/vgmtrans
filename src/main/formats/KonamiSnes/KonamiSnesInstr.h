@@ -81,6 +81,4 @@ class KonamiSnesRgn
   virtual ~KonamiSnesRgn();
 
   virtual bool loadRgn();
-
-  KonamiSnesVersion version;
 };

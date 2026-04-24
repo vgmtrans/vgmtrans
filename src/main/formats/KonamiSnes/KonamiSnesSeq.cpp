@@ -4,6 +4,7 @@
  * refer to the included LICENSE.txt file
  */
 #include "KonamiSnesSeq.h"
+#include "KonamiSnesInstr.h"
 #include "ScaleConversion.h"
 #include "spdlog/fmt/fmt.h"
 
@@ -457,7 +458,7 @@ bool KonamiSnesTrack::readEvent(void) {
     case EVENT_PERCUSSION_ON: {
       addGenericEvent(beginOffset, curOffset - beginOffset, "Percussion On", desc, Type::ChangeState);
       if (!percussion) {
-        addProgramChange(beginOffset, curOffset - beginOffset, 127 << 7, true);
+        addProgramChange(beginOffset, curOffset - beginOffset, KonamiSnesInstrSet::DRUMKIT_PROGRAM, true);
         percussion = true;
       }
       break;
