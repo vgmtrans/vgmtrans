@@ -6,7 +6,13 @@
 
 #include "KonamiSnesInstr.h"
 #include "SNESDSP.h"
+#include <algorithm>
 #include <spdlog/fmt/fmt.h>
+
+namespace {
+constexpr uint8_t kKonamiSnesPercussionNoteCount = 0x60;
+constexpr uint8_t kKonamiSnesPercussionBaseNote = 0x3c;
+}
 
 // ******************
 // KonamiSnesInstrSet
@@ -41,6 +47,12 @@ bool KonamiSnesInstrSet::parseHeader() {
 
 bool KonamiSnesInstrSet::parseInstrPointers() {
   usedSRCNs.clear();
+  auto addUsedSRCN = [this](uint8_t srcn) {
+    if (std::find(usedSRCNs.begin(), usedSRCNs.end(), srcn) == usedSRCNs.end()) {
+      usedSRCNs.push_back(srcn);
+    }
+  };
+
   for (int instr = 0; instr <= 0xff; instr++) {
     uint32_t instrItemSize = KonamiSnesInstr::expectedSize(version);
 
@@ -77,24 +89,41 @@ bool KonamiSnesInstrSet::parseInstrPointers() {
       continue;
     }
 
-    std::vector<uint8_t>::iterator itrSRCN = find(usedSRCNs.begin(), usedSRCNs.end(), srcn);
-    if (itrSRCN == usedSRCNs.end()) {
-      usedSRCNs.push_back(srcn);
-    }
+    addUsedSRCN(srcn);
 
     KonamiSnesInstr *newInstr = new KonamiSnesInstr(
       this, version, addrInstrHeader, instr >> 7, instr & 0x7f,
       spcDirAddr, false, fmt::format("Instrument {}", instr));
     aInstrs.push_back(newInstr);
   }
-  if (aInstrs.size() == 0) {
-    return false;
+
+  bool hasPercussionSamples = false;
+  const uint32_t percInstrItemSize = KonamiSnesInstr::expectedSize(version);
+  for (uint8_t percussionNote = 0; percussionNote < kKonamiSnesPercussionNoteCount; percussionNote++) {
+    uint32_t addrInstrHeader = percInstrOffset + (percInstrItemSize * percussionNote);
+    if (!KonamiSnesInstr::isValidHeader(this->rawFile(), version, addrInstrHeader, spcDirAddr, true)) {
+      continue;
+    }
+
+    addUsedSRCN(readByte(addrInstrHeader));
+    hasPercussionSamples = true;
   }
 
-  // percussive samples
-  KonamiSnesInstr
-      *newInstr = new KonamiSnesInstr(this, version, percInstrOffset, 127, 0, spcDirAddr, true, "Percussions");
-  aInstrs.push_back(newInstr);
+  if (hasPercussionSamples) {
+    auto *newInstr = new KonamiSnesInstr(this,
+                                         version,
+                                         percInstrOffset,
+                                         DRUMKIT_PROGRAM >> 7,
+                                         DRUMKIT_PROGRAM & 0x7f,
+                                         spcDirAddr,
+                                         true,
+                                         "Percussions");
+    aInstrs.push_back(newInstr);
+  }
+
+  if (aInstrs.empty()) {
+    return false;
+  }
 
   std::sort(usedSRCNs.begin(), usedSRCNs.end());
   SNESSampColl *newSampColl = new SNESSampColl(KonamiSnesFormat::name, this->rawFile(), spcDirAddr, usedSRCNs);
@@ -127,9 +156,34 @@ KonamiSnesInstr::~KonamiSnesInstr() {
 }
 
 bool KonamiSnesInstr::loadInstr() {
-  // TODO: percussive samples
   if (percussion) {
-    return true;
+    const uint32_t instrItemSize = KonamiSnesInstr::expectedSize(version);
+    for (uint8_t percussionNote = 0; percussionNote < kKonamiSnesPercussionNoteCount; percussionNote++) {
+      uint32_t addrInstrHeader = offset() + (instrItemSize * percussionNote);
+      if (!isValidHeader(rawFile(), version, addrInstrHeader, spcDirAddr, true)) {
+        continue;
+      }
+
+      uint8_t srcn = readByte(addrInstrHeader);
+      uint32_t offDirEnt = spcDirAddr + (srcn * 4);
+      if (offDirEnt + 4 > 0x10000) {
+        continue;
+      }
+
+      uint16_t addrSampStart = readShort(offDirEnt);
+
+      auto *rgn = new KonamiSnesRgn(this, version, addrInstrHeader, true, percussionNote);
+      rgn->sampOffset = addrSampStart - spcDirAddr;
+      if (!rgn->loadRgn()) {
+        delete rgn;
+        return false;
+      }
+
+      addRgn(rgn);
+    }
+
+    setGuessedLength();
+    return !regions().empty();
   }
 
   uint8_t srcn = readByte(offset());
@@ -144,6 +198,7 @@ bool KonamiSnesInstr::loadInstr() {
   rgn->sampOffset = addrSampStart - spcDirAddr;
   addRgn(rgn);
 
+  setGuessedLength();
   return true;
 }
 
@@ -194,10 +249,12 @@ uint32_t KonamiSnesInstr::expectedSize(KonamiSnesVersion version) {
 // KonamiSnesRgn
 // *************
 
-KonamiSnesRgn::KonamiSnesRgn(KonamiSnesInstr *instr, KonamiSnesVersion ver, uint32_t offset, bool percussion) :
+KonamiSnesRgn::KonamiSnesRgn(KonamiSnesInstr *instr,
+                             KonamiSnesVersion ver,
+                             uint32_t offset,
+                             bool percussion,
+                             uint8_t percussionNote) :
     VGMRgn(instr, offset, KonamiSnesInstr::expectedSize(ver)) {
-  // TODO: percussive samples
-
   uint8_t srcn = readByte(offset);
   int8_t raw_key = readByte(offset + 1);
   int8_t tuning = readByte(offset + 2);
@@ -228,7 +285,15 @@ KonamiSnesRgn::KonamiSnesRgn(KonamiSnesInstr *instr, KonamiSnesVersion ver, uint
   }
 
   addSampNum(srcn, offset, 1);
-  addUnityKey(72 - (int) (coarse_tuning), offset + 1, 1);
+  int unityKey = 72 - static_cast<int>(coarse_tuning);
+  if (percussion) {
+    keyLow = percussionNote;
+    keyHigh = percussionNote;
+    // Rhythm notes always force SPC note $3c after loading the per-note instrument,
+    // so move the exported drumkit region's unity key by the slot index delta.
+    unityKey += static_cast<int>(percussionNote) - kKonamiSnesPercussionBaseNote;
+  }
+  addUnityKey(static_cast<uint8_t>(std::clamp(unityKey, 0, 127)), offset + 1, 1);
   addFineTune((int16_t) (fine_tuning * 100.0), offset + 2, 1);
   addChild(offset + 3, 1, "ADSR1");
   addChild(offset + 4, 1, use_adsr ? "ADSR2" : "GAIN");
