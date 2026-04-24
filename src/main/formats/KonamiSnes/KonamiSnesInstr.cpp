@@ -22,6 +22,10 @@ constexpr bool usesLegacyInstrumentLayout(KonamiSnesVersion version) {
   return version >= KONAMISNES_V1 && version <= KONAMISNES_V3;
 }
 
+constexpr bool usesLegacyPanRange(KonamiSnesVersion version) {
+  return version == KONAMISNES_V1 || version == KONAMISNES_V2;
+}
+
 // Legacy percussion tables can be shorter than the nominal 0x60 slots. Clamp the scan
 // to entries that still look like sane drum definitions so we do not run into SPC code.
 bool isValidPercussionHeader(RawFile *file,
@@ -35,7 +39,7 @@ bool isValidPercussionHeader(RawFile *file,
   const bool legacyLayout = usesLegacyInstrumentLayout(version);
   const uint8_t pan = file->readByte(addrInstrHeader + (legacyLayout ? 6 : 5));
   const uint8_t vol = file->readByte(addrInstrHeader + (legacyLayout ? 7 : 6));
-  return pan <= (legacyLayout ? 0x14 : 0x28) && vol <= 0x7f;
+  return pan <= (usesLegacyPanRange(version) ? 0x14 : 0x28) && vol <= 0x7f;
 }
 
 std::vector<PercussionHeader> collectPercussionHeaders(RawFile *file,
