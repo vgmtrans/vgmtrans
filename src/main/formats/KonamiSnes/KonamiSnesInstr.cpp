@@ -13,10 +13,17 @@ namespace {
 constexpr uint8_t kKonamiSnesPercussionNoteCount = 0x60;
 constexpr uint8_t kKonamiSnesPercussionBaseNote = 0x3c;
 
+struct PercussionHeader {
+  uint8_t note;
+  uint32_t offset;
+};
+
 constexpr bool usesLegacyInstrumentLayout(KonamiSnesVersion version) {
   return version >= KONAMISNES_V1 && version <= KONAMISNES_V3;
 }
 
+// Legacy percussion tables can be shorter than the nominal 0x60 slots. Clamp the scan
+// to entries that still look like sane drum definitions so we do not run into SPC code.
 bool isValidPercussionHeader(RawFile *file,
                              KonamiSnesVersion version,
                              uint32_t addrInstrHeader,
@@ -31,29 +38,27 @@ bool isValidPercussionHeader(RawFile *file,
   return pan <= (legacyLayout ? 0x14 : 0x28) && vol <= 0x7f;
 }
 
-template <typename Visitor>
-bool forEachPercussionHeader(RawFile *file,
-                             KonamiSnesVersion version,
-                             uint32_t tableOffset,
-                             uint32_t spcDirAddr,
-                             Visitor &&visit) {
+std::vector<PercussionHeader> collectPercussionHeaders(RawFile *file,
+                                                       KonamiSnesVersion version,
+                                                       uint32_t tableOffset,
+                                                       uint32_t spcDirAddr) {
+  std::vector<PercussionHeader> headers;
+  headers.reserve(kKonamiSnesPercussionNoteCount);
   const uint32_t instrItemSize = KonamiSnesInstr::expectedSize(version);
-  bool foundHeader = false;
   for (uint8_t percussionNote = 0; percussionNote < kKonamiSnesPercussionNoteCount; percussionNote++) {
     const uint32_t addrInstrHeader = tableOffset + (instrItemSize * percussionNote);
     if (!isValidPercussionHeader(file, version, addrInstrHeader, spcDirAddr)) {
-      if (foundHeader) {
+      // Some games leave unused slots at the front, but once real drum entries start,
+      // the first invalid header means we have walked past the table.
+      if (!headers.empty()) {
         break;
       }
       continue;
     }
 
-    foundHeader = true;
-    if (!visit(percussionNote, addrInstrHeader)) {
-      return false;
-    }
+    headers.push_back({percussionNote, addrInstrHeader});
   }
-  return foundHeader;
+  return headers;
 }
 }
 
@@ -105,6 +110,8 @@ bool KonamiSnesInstrSet::parseInstrPointers() {
       return false;
     }
 
+    // The banked table is often partially filled, so use the lighter structural check to
+    // decide where it ends and the stricter sample check to decide what is exportable.
     if (!KonamiSnesInstr::isValidHeader(this->rawFile(), version, addrInstrHeader, spcDirAddr, false)) {
       if (instr < firstBankedInstr) {
         continue;
@@ -131,13 +138,12 @@ bool KonamiSnesInstrSet::parseInstrPointers() {
     aInstrs.push_back(newInstr);
   }
 
-  const bool hasPercussionSamples =
-      forEachPercussionHeader(this->rawFile(), version, percInstrOffset, spcDirAddr,
-                              [&](uint8_t, uint32_t addrInstrHeader) {
-                                addUsedSRCN(readByte(addrInstrHeader));
-                                return true;
-                              });
-  if (hasPercussionSamples) {
+  const auto percussionHeaders =
+      collectPercussionHeaders(this->rawFile(), version, percInstrOffset, spcDirAddr);
+  for (const auto &header : percussionHeaders) {
+    addUsedSRCN(readByte(header.offset));
+  }
+  if (!percussionHeaders.empty()) {
     auto *newInstr = new KonamiSnesInstr(this,
                                          version,
                                          percInstrOffset,
@@ -186,25 +192,23 @@ KonamiSnesInstr::~KonamiSnesInstr() {
 
 bool KonamiSnesInstr::loadInstr() {
   if (percussion) {
-    const bool loadedAnyRegion =
-        forEachPercussionHeader(rawFile(), version, offset(), spcDirAddr,
-                                [&](uint8_t percussionNote, uint32_t addrInstrHeader) {
-                                  const uint8_t srcn = readByte(addrInstrHeader);
-                                  const uint32_t offDirEnt = spcDirAddr + (srcn * 4);
-                                  const uint16_t addrSampStart = readShort(offDirEnt);
+    const auto percussionHeaders = collectPercussionHeaders(rawFile(), version, offset(), spcDirAddr);
+    for (const auto &header : percussionHeaders) {
+      const uint8_t srcn = readByte(header.offset);
+      const uint32_t offDirEnt = spcDirAddr + (srcn * 4);
+      const uint16_t addrSampStart = readShort(offDirEnt);
 
-                                  auto *rgn = new KonamiSnesRgn(this, version, addrInstrHeader, true, percussionNote);
-                                  rgn->sampOffset = addrSampStart - spcDirAddr;
-                                  if (!rgn->loadRgn()) {
-                                    delete rgn;
-                                    return false;
-                                  }
+      auto *rgn = new KonamiSnesRgn(this, version, header.offset, true, header.note);
+      rgn->sampOffset = addrSampStart - spcDirAddr;
+      if (!rgn->loadRgn()) {
+        delete rgn;
+        return false;
+      }
 
-                                  addRgn(rgn);
-                                  return true;
-                                });
+      addRgn(rgn);
+    }
     setGuessedLength();
-    return loadedAnyRegion && !regions().empty();
+    return !percussionHeaders.empty() && !regions().empty();
   }
 
   uint8_t srcn = readByte(offset());
@@ -304,7 +308,7 @@ KonamiSnesRgn::KonamiSnesRgn(KonamiSnesInstr *instr,
   if (percussion) {
     keyLow = percussionNote;
     keyHigh = percussionNote;
-    // Rhythm notes always force SPC note $3c after loading the per-note instrument,
+    // Percussion notes always force SPC note $3c after loading the per-note instrument,
     // so move the exported drumkit region's unity key by the slot index delta.
     unityKey += static_cast<int>(percussionNote) - kKonamiSnesPercussionBaseNote;
   }
