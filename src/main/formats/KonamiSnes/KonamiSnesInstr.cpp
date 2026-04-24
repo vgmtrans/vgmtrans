@@ -12,6 +12,21 @@
 namespace {
 constexpr uint8_t kKonamiSnesPercussionNoteCount = 0x60;
 constexpr uint8_t kKonamiSnesPercussionBaseNote = 0x3c;
+
+bool isValidPercussionHeader(RawFile *file,
+                             KonamiSnesVersion version,
+                             uint32_t addrInstrHeader,
+                             uint32_t spcDirAddr) {
+  if (!KonamiSnesInstr::isValidHeader(file, version, addrInstrHeader, spcDirAddr, true)) {
+    return false;
+  }
+
+  const bool legacyLayout =
+      (version == KONAMISNES_V1 || version == KONAMISNES_V2 || version == KONAMISNES_V3);
+  const uint8_t pan = file->readByte(addrInstrHeader + (legacyLayout ? 6 : 5));
+  const uint8_t vol = file->readByte(addrInstrHeader + (legacyLayout ? 7 : 6));
+  return pan <= (legacyLayout ? 0x14 : 0x28) && vol <= 0x7f;
+}
 }
 
 // ******************
@@ -101,7 +116,10 @@ bool KonamiSnesInstrSet::parseInstrPointers() {
   const uint32_t percInstrItemSize = KonamiSnesInstr::expectedSize(version);
   for (uint8_t percussionNote = 0; percussionNote < kKonamiSnesPercussionNoteCount; percussionNote++) {
     uint32_t addrInstrHeader = percInstrOffset + (percInstrItemSize * percussionNote);
-    if (!KonamiSnesInstr::isValidHeader(this->rawFile(), version, addrInstrHeader, spcDirAddr, true)) {
+    if (!isValidPercussionHeader(this->rawFile(), version, addrInstrHeader, spcDirAddr)) {
+      if (hasPercussionSamples) {
+        break;
+      }
       continue;
     }
 
@@ -148,6 +166,7 @@ KonamiSnesInstr::KonamiSnesInstr(VGMInstrSet *instrSet,
                                  bool percussion,
                                  const std::string &name) :
     VGMInstr(instrSet, offset, KonamiSnesInstr::expectedSize(ver), theBank, theInstrNum, name),
+    version(ver),
     spcDirAddr(spcDirAddr),
     percussion(percussion) {
 }
@@ -158,9 +177,13 @@ KonamiSnesInstr::~KonamiSnesInstr() {
 bool KonamiSnesInstr::loadInstr() {
   if (percussion) {
     const uint32_t instrItemSize = KonamiSnesInstr::expectedSize(version);
+    bool loadedAnyRegion = false;
     for (uint8_t percussionNote = 0; percussionNote < kKonamiSnesPercussionNoteCount; percussionNote++) {
       uint32_t addrInstrHeader = offset() + (instrItemSize * percussionNote);
-      if (!isValidHeader(rawFile(), version, addrInstrHeader, spcDirAddr, true)) {
+      if (!isValidPercussionHeader(rawFile(), version, addrInstrHeader, spcDirAddr)) {
+        if (loadedAnyRegion) {
+          break;
+        }
         continue;
       }
 
@@ -180,6 +203,7 @@ bool KonamiSnesInstr::loadInstr() {
       }
 
       addRgn(rgn);
+      loadedAnyRegion = true;
     }
 
     setGuessedLength();
@@ -254,19 +278,24 @@ KonamiSnesRgn::KonamiSnesRgn(KonamiSnesInstr *instr,
                              uint32_t offset,
                              bool percussion,
                              uint8_t percussionNote) :
-    VGMRgn(instr, offset, KonamiSnesInstr::expectedSize(ver)) {
+    VGMRgn(instr, offset, KonamiSnesInstr::expectedSize(ver)),
+    version(ver) {
+  const bool legacyLayout =
+      (ver == KONAMISNES_V1 || ver == KONAMISNES_V2 || ver == KONAMISNES_V3);
   uint8_t srcn = readByte(offset);
   int8_t raw_key = readByte(offset + 1);
   int8_t tuning = readByte(offset + 2);
   uint8_t adsr1 = readByte(offset + 3);
   uint8_t adsr2 = readByte(offset + 4);
-  uint8_t pan = readByte(offset + 5);
-  uint8_t vol = readByte(offset + 6);
+  uint8_t gain = legacyLayout ? readByte(offset + 5) : adsr2;
+  uint32_t panOffset = legacyLayout ? offset + 6 : offset + 5;
+  uint32_t volOffset = legacyLayout ? offset + 7 : offset + 6;
+  uint8_t pan = readByte(panOffset);
+  uint8_t vol = readByte(volOffset);
 
   const int8_t key = (tuning >= 0) ? raw_key : (raw_key - 1);
   const int16_t full_tuning = static_cast<int16_t>((static_cast<uint8_t>(key) << 8) | static_cast<uint8_t>(tuning));
 
-  uint8_t gain = adsr2;
   bool use_adsr = ((adsr1 & 0x80) != 0);
 
   double fine_tuning;
@@ -296,12 +325,18 @@ KonamiSnesRgn::KonamiSnesRgn(KonamiSnesInstr *instr,
   addUnityKey(static_cast<uint8_t>(std::clamp(unityKey, 0, 127)), offset + 1, 1);
   addFineTune((int16_t) (fine_tuning * 100.0), offset + 2, 1);
   addChild(offset + 3, 1, "ADSR1");
-  addChild(offset + 4, 1, use_adsr ? "ADSR2" : "GAIN");
-  addChild(offset + 5, 1, "Pan");
+  if (legacyLayout) {
+    addChild(offset + 4, 1, "ADSR2");
+    addChild(offset + 5, 1, "GAIN");
+  }
+  else {
+    addChild(offset + 4, 1, use_adsr ? "ADSR2" : "GAIN");
+  }
+  addChild(panOffset, 1, "Pan");
   // volume is *decreased* by final volume value
   // so it is impossible to convert it in 100% accuracy
   // the following value 72.0 is chosen as a "average channel volume level (before pan processing)"
-  addVolume(std::max(1.0 - (vol / 72.0), 0.0), offset + 6);
+  addVolume(std::max(1.0 - (vol / 72.0), 0.0), volOffset);
   snesConvADSR<VGMRgn>(this, adsr1, adsr2, gain);
 }
 
