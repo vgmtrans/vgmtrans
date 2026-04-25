@@ -7,10 +7,12 @@
 
 - Added an in-app dialog to help with reporting bugs.
 - Added Flatpak builds for Linux. From now on, stable releases will be automatically available on Flathub.
+- Added stitched export for collection chunks: drag collections into a stitch queue, reorder them, and export as a merged MIDI + SF2.
+- Added a search field to the Collections panel
 - Added Drum Kit support to the standard N-SPC driver (Nintendo's SNES SDK driver).
 - Added Drum Kit support to the SuzukiSnes driver (Seiken Densetsu 3, Super Mario RPG, etc)
-- Added a search field to the Collections panel
-- Added stitched export for collection chunks: drag collections into a stitch queue, reorder them, and export as a merged MIDI + SF2.
+- Added Drum Kit support to the KonamiSnes driver.
+- Improved support for late-era Intelligent Systems SNES/SFC titles (Tetris Attack, Fire Emblem 4, Super Famicom Wars) 
 
 ### Changed
 
