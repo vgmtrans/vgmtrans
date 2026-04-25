@@ -1303,7 +1303,11 @@ void HexView::handleSelectionPress(int offset, VGMItem* item) {
     stopNotePreview();
   } else {
     selectionChanged(item);
-    notePreviewRequested(item, false);
+    if (item) {
+      notePreviewRequested(item, false);
+    } else {
+      stopNotePreview();
+    }
   }
   hideTooltip();
 }
@@ -1343,7 +1347,11 @@ void HexView::handleSelectionDrag(int offset) {
   auto* item = m_vgmfile->getItemAtOffset(offset, false);
   if (item != m_selectedItem) {
     selectionChanged(item);
-    notePreviewRequested(item, false);
+    if (item) {
+      notePreviewRequested(item, false);
+    } else {
+      stopNotePreview();
+    }
   }
   hideTooltip();
 }
