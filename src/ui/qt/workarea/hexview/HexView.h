@@ -43,8 +43,7 @@ public:
   ~HexView() override;
   [[nodiscard]] static QFont defaultViewFont();
   void setSelectedItem(VGMItem* item);
-  void setSelectedItems(const std::vector<const VGMItem*>& items,
-                        const VGMItem* primaryItem = nullptr);
+  void setSelectedItems(const std::vector<const VGMItem*>& items, const VGMItem* primaryItem = nullptr);
   void setPlaybackSelectionsForItems(const std::vector<const VGMItem*>& items,
                                      const std::vector<QColor>& glowColors = {});
   void clearPlaybackSelections(bool fade = true);
