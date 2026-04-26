@@ -4,6 +4,7 @@
  * refer to the included LICENSE.txt file
  */
 #pragma once
+#include <optional>
 #include "VGMSeq.h"
 #include "SeqTrack.h"
 #include "SeqEvent.h"
@@ -121,33 +122,38 @@ class KonamiSnesTrack
   bool prevNoteSlurred;
 
  private:
-  bool consumePitchSlideV3(uint32_t& offset,
-                           uint8_t& delay,
-                           uint8_t& length,
-                           uint8_t& targetNote,
-                           int16_t& pitchDelta);
-  void clearPitchSlide();
-  void addPitchSlideV3Event(uint32_t offset,
-                            uint32_t length,
-                            uint8_t delay,
-                            uint8_t slideLength,
-                            uint8_t targetNote,
-                            int16_t pitchDelta);
-  uint16_t pitchSlideRangeCents(uint8_t length, uint8_t targetNote, int16_t pitchDelta) const;
-  void updatePitchBendRange(uint16_t cents);
-  void updatePitchBend(int16_t bend);
+  struct PitchSlideV3 {
+    uint32_t offset;
+    uint8_t delay;
+    uint8_t length;
+    uint8_t targetNote;
+    int16_t delta;
+  };
+
+  struct ActivePitchSlide {
+    bool baseValid = false;
+    double baseSemitones = 0.0;
+    double currentSemitones = 0.0;
+    uint8_t delay = 0;
+    uint8_t length = 0;
+    double targetSemitones = 0.0;
+    double deltaSemitones = 0.0;
+  };
+
+  std::optional<PitchSlideV3> consumePitchSlideV3();
+  PitchSlideV3 readPitchSlideV3(uint32_t offset);
+  void addPitchSlideV3Event(const PitchSlideV3& slide);
+  void clearActivePitchSlide();
+  void resetPitchForNote(uint8_t key);
+  void beginPitchSlideV3(const PitchSlideV3& slide);
+  uint16_t pitchSlideRangeCents(const PitchSlideV3& slide) const;
+  void setPitchBendRange(uint16_t cents);
+  void setPitchBend(int16_t bend);
   void applyCurrentPitchBend();
-  void startPitchSlideV3(uint8_t delay, uint8_t length, uint8_t targetNote, int16_t pitchDelta);
   double getTuningInSemitones(int8_t tuning);
   uint8_t convertGAINAmountToGAIN(uint8_t gainAmount);
 
-  bool pitchBaseValid;
-  double basePitchSemitones;
-  double currentPitchSemitones;
-  uint8_t pitchSlideDelay;
-  uint8_t pitchSlideLength;
-  double pitchSlideTargetSemitones;
-  double pitchSlideDeltaSemitones;
+  ActivePitchSlide pitchSlide;
   uint16_t pitchBendRangeCents;
   int16_t currentPitchBend;
 };
