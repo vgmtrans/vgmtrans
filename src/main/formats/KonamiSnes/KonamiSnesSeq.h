@@ -97,6 +97,7 @@ class KonamiSnesTrack
   KonamiSnesTrack(KonamiSnesSeq *parentFile, uint32_t offset = 0, uint32_t length = 0);
   virtual void resetVars();
   virtual bool readEvent();
+  virtual void onTickBegin() override;
 
   uint8_t noteLength;
   uint8_t noteDurationRate;
@@ -120,6 +121,33 @@ class KonamiSnesTrack
   bool prevNoteSlurred;
 
  private:
+  void clearPitchSlide();
+  void readPitchSlideV3Args(uint8_t& delay,
+                            uint8_t& length,
+                            uint8_t& targetNote,
+                            int16_t& pitchDelta);
+  void addPitchSlideV3Event(uint32_t offset,
+                            uint32_t length,
+                            uint8_t delay,
+                            uint8_t slideLength,
+                            uint8_t targetNote,
+                            int16_t pitchDelta);
+  void updatePitchBendRange(uint16_t cents);
+  void updatePitchBend(int16_t bend);
+  void startPitchSlideV3(uint8_t delay, uint8_t length, uint8_t targetNote, int16_t pitchDelta);
+  int16_t pitchBendForSemitoneDelta(double semitoneDelta, uint16_t rangeCents) const;
+  double currentNotePitchSemitones(uint8_t key) const;
+  double targetNotePitchSemitones(uint8_t targetNote) const;
   double getTuningInSemitones(int8_t tuning);
   uint8_t convertGAINAmountToGAIN(uint8_t gainAmount);
+
+  bool hasPitchState;
+  double pitchReferenceSemitones;
+  double currentPitchSemitones;
+  uint8_t pitchSlideDelay;
+  uint8_t pitchSlideLength;
+  double pitchSlideTargetSemitones;
+  double pitchSlideDeltaSemitones;
+  uint16_t pitchBendRangeCents;
+  int16_t currentPitchBend;
 };

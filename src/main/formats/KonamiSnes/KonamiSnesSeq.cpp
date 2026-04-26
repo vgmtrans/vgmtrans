@@ -7,8 +7,16 @@
 #include "KonamiSnesInstr.h"
 #include "ScaleConversion.h"
 #include "spdlog/fmt/fmt.h"
+#include <algorithm>
+#include <cmath>
 
 DECLARE_FORMAT(KonamiSnes);
+
+namespace {
+constexpr uint16_t KONAMI_SNES_STD_PITCH_BEND_RANGE_CENTS = 200;
+constexpr int16_t MIDI_PITCH_BEND_MIN = -8192;
+constexpr int16_t MIDI_PITCH_BEND_MAX = 8191;
+}
 
 //  **********
 //  KonamiSnesSeq
@@ -53,9 +61,11 @@ const uint8_t KonamiSnesSeq::PAN_TABLE[] = {
 KonamiSnesSeq::KonamiSnesSeq(RawFile *file, KonamiSnesVersion ver, uint32_t seqdataOffset, std::string newName)
     : VGMSeq(KonamiSnesFormat::name, file, seqdataOffset, 0, newName), version(ver) {
   setAllowDiscontinuousTrackData(true);
+  bLoadTickByTick = true;
 
   useReverb();
   setAlwaysWriteInitialReverb(0);
+  setAlwaysWriteInitialPitchBendRange(KONAMI_SNES_STD_PITCH_BEND_RANGE_CENTS);
 
   loadEventMap();
 }
@@ -299,6 +309,16 @@ void KonamiSnesTrack::resetVars(void) {
 
   prevNoteKey = -1;
   prevNoteSlurred = false;
+
+  hasPitchState = false;
+  pitchReferenceSemitones = 0.0;
+  currentPitchSemitones = 0.0;
+  pitchSlideDelay = 0;
+  pitchSlideLength = 0;
+  pitchSlideTargetSemitones = 0.0;
+  pitchSlideDeltaSemitones = 0.0;
+  pitchBendRangeCents = KONAMI_SNES_STD_PITCH_BEND_RANGE_CENTS;
+  currentPitchBend = 0;
 }
 
 double KonamiSnesTrack::getTuningInSemitones(int8_t tuning) {
@@ -317,6 +337,131 @@ uint8_t KonamiSnesTrack::convertGAINAmountToGAIN(uint8_t gainAmount) {
     gain = 0xa0 | ((gainAmount - 100) & 0x1f);
   }
   return gain;
+}
+
+void KonamiSnesTrack::onTickBegin() {
+  if (pitchSlideLength == 0 || !hasPitchState) {
+    return;
+  }
+
+  if (pitchSlideDelay > 0) {
+    pitchSlideDelay -= 1;
+    return;
+  }
+
+  pitchSlideLength -= 1;
+  if (pitchSlideLength == 0) {
+    currentPitchSemitones = pitchSlideTargetSemitones;
+  }
+  else {
+    currentPitchSemitones += pitchSlideDeltaSemitones;
+  }
+
+  updatePitchBend(pitchBendForSemitoneDelta(currentPitchSemitones - pitchReferenceSemitones,
+                                            pitchBendRangeCents));
+}
+
+void KonamiSnesTrack::clearPitchSlide() {
+  pitchSlideDelay = 0;
+  pitchSlideLength = 0;
+  pitchSlideTargetSemitones = 0.0;
+  pitchSlideDeltaSemitones = 0.0;
+}
+
+void KonamiSnesTrack::readPitchSlideV3Args(uint8_t& delay,
+                                           uint8_t& length,
+                                           uint8_t& targetNote,
+                                           int16_t& pitchDelta) {
+  delay = readByte(curOffset++);
+  length = readByte(curOffset++);
+  targetNote = readByte(curOffset++);
+  pitchDelta = readShort(curOffset);
+  curOffset += 2;
+}
+
+void KonamiSnesTrack::addPitchSlideV3Event(uint32_t offset,
+                                           uint32_t length,
+                                           uint8_t delay,
+                                           uint8_t slideLength,
+                                           uint8_t targetNote,
+                                           int16_t pitchDelta) {
+  const uint8_t pitchSlideNoteNumber = (targetNote & 0x7f) + transpose;
+  const auto desc = fmt::format("Delay: {:d}  Length: {:d}  Final Note: {:d}  Delta: {:.1f} semitones",
+                                delay, slideLength, pitchSlideNoteNumber, pitchDelta / 256.0);
+  addGenericEvent(offset, length, "Pitch Slide", desc, Type::PitchBendSlide);
+}
+
+void KonamiSnesTrack::updatePitchBendRange(uint16_t cents) {
+  if (cents == 0 || cents == pitchBendRangeCents) {
+    return;
+  }
+
+  addPitchBendRangeNoItem(cents);
+  pitchBendRangeCents = cents;
+
+  if (hasPitchState) {
+    updatePitchBend(pitchBendForSemitoneDelta(currentPitchSemitones - pitchReferenceSemitones,
+                                              pitchBendRangeCents));
+  }
+}
+
+void KonamiSnesTrack::updatePitchBend(int16_t bend) {
+  if (bend == currentPitchBend) {
+    return;
+  }
+
+  if (readMode == READMODE_CONVERT_TO_MIDI) {
+    pMidiTrack->addPitchBend(channel, bend);
+  }
+  currentPitchBend = bend;
+}
+
+void KonamiSnesTrack::startPitchSlideV3(uint8_t delay,
+                                        uint8_t length,
+                                        uint8_t targetNote,
+                                        int16_t pitchDelta) {
+  clearPitchSlide();
+
+  if (percussion || !hasPitchState || length == 0) {
+    return;
+  }
+
+  pitchSlideDelay = delay;
+  pitchSlideLength = length;
+  pitchSlideTargetSemitones = targetNotePitchSemitones(targetNote);
+  pitchSlideDeltaSemitones = pitchDelta / 256.0;
+  // pitch delta is applied every processing loop, not just every music tick
+  // a musical tick gets processed once the tempo accumulator overflows an accumulator >= 0x100
+  pitchSlideDeltaSemitones *= 256.0 / static_cast<KonamiSnesSeq*>(parentSeq)->tempo;
+
+  double maxSlideSemitones =
+      std::abs(pitchSlideTargetSemitones - pitchReferenceSemitones);
+  if (length > 1) {
+    maxSlideSemitones = std::max(maxSlideSemitones,
+                                 std::abs((length - 1) * pitchSlideDeltaSemitones));
+  }
+
+  uint16_t rangeCents = KONAMI_SNES_STD_PITCH_BEND_RANGE_CENTS;
+  if (maxSlideSemitones > 2.0) {
+    rangeCents = static_cast<uint16_t>(std::ceil(maxSlideSemitones) * 100.0);
+  }
+  updatePitchBendRange(rangeCents);
+}
+
+int16_t KonamiSnesTrack::pitchBendForSemitoneDelta(double semitoneDelta, uint16_t rangeCents) const {
+  const auto bend =
+      static_cast<int32_t>(std::lround((semitoneDelta * 100.0 / rangeCents) * 8192.0));
+  return static_cast<int16_t>(std::clamp(bend,
+                                         static_cast<int32_t>(MIDI_PITCH_BEND_MIN),
+                                         static_cast<int32_t>(MIDI_PITCH_BEND_MAX)));
+}
+
+double KonamiSnesTrack::currentNotePitchSemitones(uint8_t key) const {
+  return key + cKeyCorrection + transpose + coarseTuningSemitones + (fineTuningCents / 100.0);
+}
+
+double KonamiSnesTrack::targetNotePitchSemitones(uint8_t targetNote) const {
+  return (targetNote & 0x7f) + cKeyCorrection + transpose + coarseTuningSemitones;
 }
 
 bool KonamiSnesTrack::readEvent() {
@@ -436,20 +581,56 @@ bool KonamiSnesTrack::readEvent() {
         }
       }
 
+      const uint32_t noteLengthBytes = curOffset - beginOffset;
+      bool hasPitchSlide = false;
+      uint32_t pitchSlideOffset = curOffset;
+      uint8_t pitchSlideDelay = 0;
+      uint8_t pitchSlideLength = 0;
+      uint8_t pitchSlideNote = 0;
+      int16_t pitchDelta = 0;
+
+      if (isValidOffset(curOffset)) {
+        auto nextEvent = parentSeq->EventMap.find(readByte(curOffset));
+        if (nextEvent != parentSeq->EventMap.end() && nextEvent->second == EVENT_PITCH_SLIDE_V3) {
+          hasPitchSlide = true;
+          curOffset += 1;
+          readPitchSlideV3Args(pitchSlideDelay, pitchSlideLength, pitchSlideNote, pitchDelta);
+        }
+      }
+
+      clearPitchSlide();
+      hasPitchState = false;
+      updatePitchBend(0);
+      if (hasPitchSlide) {
+        const double notePitch = currentNotePitchSemitones(key);
+        pitchReferenceSemitones = notePitch;
+        currentPitchSemitones = notePitch;
+        hasPitchState = true;
+        startPitchSlideV3(pitchSlideDelay, pitchSlideLength, pitchSlideNote, pitchDelta);
+      }
+
       if (prevNoteSlurred && key == prevNoteKey) {
         // TODO: Note volume can be changed during a tied note
         // See the end of Konami Logo sequence for example
         makePrevDurNoteEnd(getTime() + dur);
-        addTie(beginOffset, curOffset - beginOffset, dur, "Tie", desc);
+        addTie(beginOffset, noteLengthBytes, dur, "Tie", desc);
       }
       else {
         if (percussion) {
-          addPercNoteByDur(beginOffset, curOffset - beginOffset, key, vel, dur);
+          addPercNoteByDur(beginOffset, noteLengthBytes, key, vel, dur);
         }
         else {
-          addNoteByDur(beginOffset, curOffset - beginOffset, key, vel, dur);
+          addNoteByDur(beginOffset, noteLengthBytes, key, vel, dur);
         }
         prevNoteKey = key;
+      }
+      currentPitchSemitones = currentNotePitchSemitones(key);
+      pitchReferenceSemitones = currentPitchSemitones;
+      hasPitchState = !percussion;
+      if (hasPitchSlide) {
+        startPitchSlideV3(pitchSlideDelay, pitchSlideLength, pitchSlideNote, pitchDelta);
+        addPitchSlideV3Event(pitchSlideOffset, curOffset - pitchSlideOffset, pitchSlideDelay,
+                             pitchSlideLength, pitchSlideNote, pitchDelta);
       }
       prevNoteSlurred = (noteDurationRate == parentSeq->NOTE_DUR_RATE_MAX) && !percussion;
       addTime(len);
@@ -498,7 +679,29 @@ bool KonamiSnesTrack::readEvent() {
 
     case EVENT_REST: {
       noteLength = readByte(curOffset++);
-      addRest(beginOffset, curOffset - beginOffset, noteLength);
+
+      const uint32_t restLengthBytes = curOffset - beginOffset;
+      bool hasPitchSlide = false;
+      uint32_t pitchSlideOffset = curOffset;
+      uint8_t pitchSlideDelay = 0;
+      uint8_t pitchSlideLength = 0;
+      uint8_t pitchSlideNote = 0;
+      int16_t pitchDelta = 0;
+      if (isValidOffset(curOffset)) {
+        auto nextEvent = parentSeq->EventMap.find(readByte(curOffset));
+        if (nextEvent != parentSeq->EventMap.end() && nextEvent->second == EVENT_PITCH_SLIDE_V3) {
+          hasPitchSlide = true;
+          curOffset += 1;
+          readPitchSlideV3Args(pitchSlideDelay, pitchSlideLength, pitchSlideNote, pitchDelta);
+        }
+      }
+
+      addRest(beginOffset, restLengthBytes, noteLength);
+      if (hasPitchSlide) {
+        startPitchSlideV3(pitchSlideDelay, pitchSlideLength, pitchSlideNote, pitchDelta);
+        addPitchSlideV3Event(pitchSlideOffset, curOffset - pitchSlideOffset, pitchSlideDelay,
+                             pitchSlideLength, pitchSlideNote, pitchDelta);
+      }
       prevNoteSlurred = false;
       break;
     }
@@ -848,18 +1051,13 @@ bool KonamiSnesTrack::readEvent() {
     }
 
     case EVENT_PITCH_SLIDE_V3: {
-      uint8_t pitchSlideDelay = readByte(curOffset++);
-      uint8_t pitchSlideLength = readByte(curOffset++);
-      uint8_t pitchSlideNote = readByte(curOffset++);
-      int16_t pitchDelta = readShort(curOffset);
-      curOffset += 2;
-
-      uint8_t pitchSlideNoteNumber = (pitchSlideNote & 0x7f) + transpose;
-
-      desc = fmt::format("Delay: {:d}  Length: {:d}  Final Note: {:d}  Delta: {:.1f} semitones",
-                         pitchSlideDelay, pitchSlideLength, pitchSlideNoteNumber, pitchDelta / 256.0);
-      addGenericEvent(beginOffset, curOffset - beginOffset, "Pitch Slide", desc,
-                      Type::PitchBendSlide);
+      uint8_t pitchSlideDelay;
+      uint8_t pitchSlideLength;
+      uint8_t pitchSlideNote;
+      int16_t pitchDelta;
+      readPitchSlideV3Args(pitchSlideDelay, pitchSlideLength, pitchSlideNote, pitchDelta);
+      addPitchSlideV3Event(beginOffset, curOffset - beginOffset, pitchSlideDelay,
+                           pitchSlideLength, pitchSlideNote, pitchDelta);
       break;
     }
 
