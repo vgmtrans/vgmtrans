@@ -125,12 +125,15 @@ class KonamiSnesTrack
   double seqTuningCents;
 
  private:
-  struct PitchSlideV3 {
+  struct PitchSlide {
     uint32_t offset;
+    uint8_t eventLength;
     uint8_t delay;
     uint8_t length;
     uint8_t targetNote;
+    double targetSemitones = 0.0;
     int16_t delta;
+    double deltaSemitones = 0.0;
   };
 
   struct ActivePitchSlide {
@@ -143,13 +146,14 @@ class KonamiSnesTrack
     double deltaSemitones = 0.0;
   };
 
-  std::optional<PitchSlideV3> consumePitchSlideV3();
-  PitchSlideV3 readPitchSlideV3(uint32_t offset);
-  void addPitchSlideV3Event(const PitchSlideV3& slide);
+  std::optional<PitchSlide> consumePitchSlide();
+  PitchSlide readPitchSlide(KonamiSnesSeqEventType eventType, uint32_t offset);
+  void addPitchSlideEvent(const PitchSlide& slide);
   void clearActivePitchSlide();
+  double noteSemitones(uint8_t key, bool includeTuning) const;
   void resetPitchForNote(uint8_t key);
-  void beginPitchSlideV3(const PitchSlideV3& slide);
-  uint16_t pitchSlideRangeCents(const PitchSlideV3& slide) const;
+  void beginPitchSlide(const PitchSlide& slide);
+  uint16_t pitchSlideRangeCents(const PitchSlide& slide) const;
   void setPitchBendRange(uint16_t cents);
   void setPitchBend(int16_t bend);
   void applyCurrentPitchBend();
