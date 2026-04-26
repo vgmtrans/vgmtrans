@@ -763,7 +763,7 @@ void HexView::setPlaybackSelectionsForItems(const std::vector<const VGMItem*>& i
     const uint32_t length = item->length() > 0 ? item->length() : 1u;
     const QColor glowColor =
         (i < glowColors.size() && glowColors[i].isValid()) ? glowColors[i] : PLAYBACK_GLOW_FALLBACK;
-    next.push_back({item->offset(), length, glowColor});
+    next.emplace_back(item->offset(), length, glowColor);
   }
 
   // Track incoming active playback ranges for fast membership checks below.
