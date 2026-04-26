@@ -133,9 +133,11 @@ target_sources(vgmtranscore
     conversion/DLSConversion.cpp
     conversion/DLSFile.cpp
     conversion/MidiFile.cpp
+    conversion/MidiMerge.cpp
     conversion/RiffFile.cpp
     conversion/SF2Conversion.cpp
     conversion/SF2File.cpp
+    conversion/StitchExport.cpp
     conversion/SynthFile.cpp
     conversion/VGMExport.cpp
     formats/Akao/AkaoFormat.cpp
@@ -220,8 +222,11 @@ target_sources(vgmtranscore
     formats/NeverlandSnes/NeverlandSnesScanner.cpp
     formats/NeverlandSnes/NeverlandSnesSeq.cpp
     formats/NinSnes/NinSnesInstr.cpp
+    formats/NinSnes/NinSnesProfile.cpp
     formats/NinSnes/NinSnesScanner.cpp
+    formats/NinSnes/NinSnesScannerPatterns.cpp
     formats/NinSnes/NinSnesSeq.cpp
+    formats/NinSnes/NinSnesSeqIntelli.cpp
     formats/Org/OrgScanner.cpp
     formats/Org/OrgSeq.cpp
     formats/PS1/PS1Seq.cpp
@@ -394,8 +399,12 @@ target_sources(vgmtranscore
       formats/NeverlandSnes/NeverlandSnesSeq.h
       formats/NinSnes/NinSnesFormat.h
       formats/NinSnes/NinSnesInstr.h
+      formats/NinSnes/NinSnesProfile.h
+      formats/NinSnes/NinSnesScanResult.h
       formats/NinSnes/NinSnesScanner.h
       formats/NinSnes/NinSnesSeq.h
+      formats/NinSnes/NinSnesSeqState.h
+      formats/NinSnes/NinSnesTypes.h
       formats/Org/OrgFormat.h
       formats/Org/OrgScanner.h
       formats/Org/OrgSeq.h
@@ -504,9 +513,11 @@ target_sources(vgmtranscore
       conversion/DLSConversion.h
       conversion/DLSFile.h
       conversion/MidiFile.h
+      conversion/MidiMerge.h
       conversion/RiffFile.h
       conversion/SF2Conversion.h
       conversion/SF2File.h
+      conversion/StitchExport.h
       conversion/SynthFile.h
       conversion/VGMExport.h
     FILE_SET headers_loaders TYPE HEADERS BASE_DIRS loaders

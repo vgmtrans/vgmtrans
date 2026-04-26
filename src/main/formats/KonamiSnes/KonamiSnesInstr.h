@@ -11,6 +11,8 @@
 class KonamiSnesInstrSet:
     public VGMInstrSet {
  public:
+  static constexpr uint32_t DRUMKIT_PROGRAM = (0x7F << 7);
+
   KonamiSnesInstrSet(RawFile *file,
                      KonamiSnesVersion ver,
                      uint32_t offset,
@@ -71,10 +73,12 @@ class KonamiSnesInstr
 class KonamiSnesRgn
     : public VGMRgn {
  public:
-  KonamiSnesRgn(KonamiSnesInstr *instr, KonamiSnesVersion ver, uint32_t offset, bool percussion);
+  KonamiSnesRgn(KonamiSnesInstr *instr,
+                KonamiSnesVersion ver,
+                uint32_t offset,
+                bool percussion,
+                uint8_t percussionNote = 0);
   virtual ~KonamiSnesRgn();
 
   virtual bool loadRgn();
-
-  KonamiSnesVersion version;
 };

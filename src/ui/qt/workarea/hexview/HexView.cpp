@@ -97,6 +97,7 @@ WidgetLayoutMetrics computeWidgetLayoutMetrics(const QWidget* widget, int charWi
   layout.asciiEndPx = layout.asciiStartPx + (BYTES_PER_LINE * layout.charWidthPx);
   return layout;
 }
+
 QString tooltipIconDataUrl(VGMItem::Type type) {
   static QHash<int, QString> cache;
   const int key = static_cast<int>(type);
@@ -342,8 +343,8 @@ HexView::~HexView() = default;
 
 QFont HexView::defaultViewFont() {
   const double appFontPointSize = QApplication::font().pointSizeF();
-  QFont font("Roboto Mono", appFontPointSize + 1.0);
-  font.setPointSizeF(appFontPointSize + 1.0);
+  QFont font("Roboto Mono", appFontPointSize);
+  font.setPointSizeF(appFontPointSize);
   return font;
 }
 
@@ -654,6 +655,7 @@ void HexView::setSelectedItem(VGMItem* item) {
   }
 }
 
+// Select multiple items, using the primary item as the anchor for keyboard focus and scroll-to-visible behavior.
 void HexView::setSelectedItems(const std::vector<const VGMItem*>& items,
                                const VGMItem* primaryItem) {
   if (items.empty()) {
@@ -661,6 +663,8 @@ void HexView::setSelectedItems(const std::vector<const VGMItem*>& items,
     return;
   }
 
+  // If the caller did not provide an explicit primary item, fall back to the first non-null entry so we still have
+  // a stable anchor for the selection.
   VGMItem* resolvedPrimary = const_cast<VGMItem*>(primaryItem);
   if (!resolvedPrimary) {
     for (const auto* item : items) {
@@ -688,8 +692,10 @@ void HexView::setSelectedItems(const std::vector<const VGMItem*>& items,
     if (!item) {
       continue;
     }
+    // Zero-length items still need a visible caret-width highlight in the hex view, so normalize them to a one-byte range.
     const uint32_t length = item->length() > 0 ? item->length() : 1u;
     const SelectionRange range{item->offset(), length};
+    // Ignore duplicate ranges so the renderer and highlight animation only see one entry per distinct byte span.
     if (keys.insert(selectionKey(range)).second) {
       selections.push_back(range);
     }
@@ -700,6 +706,7 @@ void HexView::setSelectedItems(const std::vector<const VGMItem*>& items,
     return;
   }
 
+  // Keep the stored ranges ordered for deterministic rendering and hit-testing.
   std::sort(selections.begin(), selections.end(), [](const SelectionRange& a, const SelectionRange& b) {
     if (a.offset != b.offset) {
       return a.offset < b.offset;
@@ -712,6 +719,7 @@ void HexView::setSelectedItems(const std::vector<const VGMItem*>& items,
   updateHighlightState(true);
   requestRhiUpdate(false, true);
 
+  // Reuse the single-item visibility logic and anchor it to the primary item.
   if (!m_lineHeight) {
     return;
   }

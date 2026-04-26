@@ -276,9 +276,9 @@ bool SeqTrack::onEvent(uint32_t offset, uint32_t length) {
   return visitedAddresses.insert(offset).second;
 }
 
-void SeqTrack::addEvent(SeqEvent *pSeqEvent) {
+SeqEvent* SeqTrack::addEvent(SeqEvent *pSeqEvent) {
   if (readMode != READMODE_ADD_TO_UI)
-    return;
+    return nullptr;
 
   addChild(pSeqEvent);
 
@@ -296,6 +296,8 @@ void SeqTrack::addEvent(SeqEvent *pSeqEvent) {
     if (length() < newTrkLen)
       setLength(newTrkLen);
   }
+
+  return pSeqEvent;
 }
 
 SeqEvent* SeqTrack::findSeqEventAtOffset(uint32_t offset, uint32_t length) {
@@ -319,27 +321,31 @@ SeqEvent* SeqTrack::findSeqEventAtOffset(uint32_t offset, uint32_t length) {
   return seqEvent;
 }
 
-void SeqTrack::addGenericEvent(uint32_t offset,
-                               uint32_t length,
-                               const std::string &sEventName,
-                               const std::string &sEventDesc,
-                               Type type) {
+SeqEvent* SeqTrack::addGenericEvent(uint32_t offset,
+                                    uint32_t length,
+                                    const std::string &sEventName,
+                                    const std::string &sEventDesc,
+                                    Type type) {
   bool isNewOffset = onEvent(offset, length);
+
+  if (readMode == READMODE_ADD_TO_UI) {
+    return isNewOffset ? addEvent(new SeqEvent(this, offset, length, sEventName, type, sEventDesc))
+                       : nullptr;
+  }
 
   recordSeqEvent<SeqEvent>(isNewOffset, getTime(), offset, length, sEventName, type, sEventDesc);
 
-  if (readMode == READMODE_CONVERT_TO_MIDI) {
-    if (bWriteGenericEventAsTextEvent) {
-      std::string miditext(sEventName);
-      if (!sEventDesc.empty()) {
-        miditext += " - ";
-        miditext += sEventDesc;
-      }
-      pMidiTrack->addText(miditext);
+  if (readMode == READMODE_CONVERT_TO_MIDI && bWriteGenericEventAsTextEvent) {
+    std::string miditext(sEventName);
+    if (!sEventDesc.empty()) {
+      miditext += " - ";
+      miditext += sEventDesc;
     }
+    pMidiTrack->addText(miditext);
   }
-}
 
+  return nullptr;
+}
 
 void SeqTrack::addUnknown(uint32_t offset,
                           uint32_t length,

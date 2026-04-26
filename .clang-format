@@ -15,13 +15,15 @@ AlwaysBreakAfterReturnType: None
 AlwaysBreakBeforeMultilineStrings: false
 AlwaysBreakTemplateDeclarations: "Yes"
 BasedOnStyle: Google
-ColumnLimit:     100
+BreakBeforeBraces: Attach
+ColumnLimit:     120
 ConstructorInitializerAllOnOneLineOrOnePerLine: false
 ConstructorInitializerIndentWidth: 4
 ContinuationIndentWidth: 4
 Cpp11BracedListStyle: true
 IndentWidth:     2
 IndentWrappedFunctionNames: false
+InsertBraces:    true
 KeepEmptyLinesAtTheStartOfBlocks: false
 Language:        Cpp
 MaxEmptyLinesToKeep: 1

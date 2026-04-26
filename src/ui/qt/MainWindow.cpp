@@ -9,11 +9,15 @@
 #include <QDragMoveEvent>
 #include <QDropEvent>
 #include <QFileDialog>
+#include <QFont>
+#include <QAction>
 #include <QDockWidget>
 #include <QApplication>
 #include <QCloseEvent>
 #include <QFileInfo>
+#include <QHBoxLayout>
 #include <QKeyEvent>
+#include <QLineEdit>
 #include <QMessageBox>
 #include <QMimeData>
 #include <QMouseEvent>
@@ -22,6 +26,7 @@
 #include <QStandardPaths>
 #include <QStatusBar>
 #include <QTimer>
+#include <QToolButton>
 #include <QVBoxLayout>
 #if defined(Q_OS_LINUX)
 #include <QDBusConnection>
@@ -44,8 +49,12 @@
 #include "Logger.h"
 #include "ManualCollectionDialog.h"
 #include "SequencePlayer.h"
+#include "services/commands/StitchCommands.h"
+#include "widgets/StitchUI.h"
 #include "services/NotificationCenter.h"
 #include "services/Settings.h"
+#include "util/ColorHelpers.h"
+#include "util/UIHelpers.h"
 #include "workarea/RawFileListView.h"
 #include "workarea/VGMFileListView.h"
 #include "workarea/VGMCollListView.h"
@@ -60,9 +69,41 @@
 
 namespace {
 constexpr auto MIME_PORTAL_FILETRANSFER = "application/vnd.portal.filetransfer";
+constexpr int kCollectionTitleControlSpacing = 20;
 
 bool isDockSeparatorCursor(Qt::CursorShape shape) {
   return shape == Qt::SplitHCursor || shape == Qt::SplitVCursor;
+}
+
+bool hasPortalFileTransferMime(const QMimeData* mimeData) {
+  if (!mimeData) {
+    return false;
+  }
+
+  for (const QString& format : mimeData->formats()) {
+    if (format == MIME_PORTAL_FILETRANSFER || format.startsWith(MIME_PORTAL_FILETRANSFER)) {
+      return true;
+    }
+  }
+  return false;
+}
+
+bool hasLocalFileUrls(const QMimeData* mimeData) {
+  if (!mimeData || !mimeData->hasUrls()) {
+    return false;
+  }
+
+  const QList<QUrl> urls = mimeData->urls();
+  for (const QUrl& url : urls) {
+    if (url.isLocalFile()) {
+      return true;
+    }
+  }
+  return false;
+}
+
+bool isFileDropMime(const QMimeData* mimeData) {
+  return hasPortalFileTransferMime(mimeData) || hasLocalFileUrls(mimeData);
 }
 
 QStringList retrievePortalDroppedFiles([[maybe_unused]] const QMimeData* mimeData) {
@@ -167,7 +208,7 @@ void MainWindow::createElements() {
   setCorner(Qt::BottomLeftCorner, Qt::BottomDockWidgetArea);
   setCorner(Qt::BottomRightCorner, Qt::BottomDockWidgetArea);
 
-  const auto installTitleBar = [this](QDockWidget *dock, const QString& title,
+  const auto installTitleBar = [](QDockWidget *dock, const QString& title,
                                       TitleBar::Buttons buttons,
                                       const QString& newToolTip = QString()) {
     auto *titleBar = new TitleBar(title, buttons, dock, newToolTip);
@@ -218,6 +259,73 @@ void MainWindow::createElements() {
     dialog.exec();
   });
 
+  auto* collLeadingControls = new QWidget(collTitleBar);
+  auto* collLeadingLayout = new QHBoxLayout(collLeadingControls);
+  collLeadingLayout->setContentsMargins(0, 0, 0, 0);
+  collLeadingLayout->setSpacing(kCollectionTitleControlSpacing);
+
+  m_stitchButton = new QToolButton(collLeadingControls);
+  configureToolButton(m_stitchButton, QStringLiteral("Stitch collections"),
+                      QSize(22, 20), QSize(16, 16));
+  m_stitchButton->setCheckable(true);
+  m_stitchButton->setChecked(false);
+
+  auto* collSearchEdit = new QLineEdit(collLeadingControls);
+  collSearchEdit->setPlaceholderText(QStringLiteral("Search"));
+  collSearchEdit->setClearButtonEnabled(true);
+  collSearchEdit->setFixedWidth(180);
+  collSearchEdit->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Fixed);
+  QFont collSearchFont = collSearchEdit->font();
+  collSearchFont.setPointSizeF(collSearchFont.pointSizeF() - 1.0);
+  collSearchEdit->setFont(collSearchFont);
+#ifdef Q_OS_MAC
+  collSearchEdit->setAttribute(Qt::WA_MacShowFocusRect, false);
+#endif
+  const int searchControlHeight = m_stitchButton->height();
+  collSearchEdit->setFixedHeight(searchControlHeight);
+  QAction* collSearchIconAction =
+      collSearchEdit->addAction(QIcon(), QLineEdit::LeadingPosition);
+
+  collLeadingLayout->addWidget(m_stitchButton);
+  collLeadingLayout->addWidget(collSearchEdit);
+  collTitleBar->addLeadingWidget(collLeadingControls);
+
+  const auto refreshCollectionTitleControls =
+      [collTitleBar, this, collSearchEdit, collSearchIconAction]() {
+    const QPalette titleBarPalette = collTitleBar->palette();
+    const QColor titleBarBackground = titleBarPalette.color(QPalette::Window);
+    const QColor borderColor = blendColors(titleBarPalette.color(QPalette::Text), titleBarBackground, 0.08);
+    const QColor focusBorderColor = blendColors(titleBarPalette.color(QPalette::Highlight), titleBarBackground, 0.84);
+    const QColor focusBackground = blendColors(titleBarBackground, titleBarPalette.color(QPalette::Text), 0.96);
+    collSearchEdit->setStyleSheet(QStringLiteral(
+        "QLineEdit {"
+        "  background-color: %1;"
+        "  border: 1px solid %2;"
+        "  border-radius: 5px;"
+        "  padding: 0px 6px 0px 0px;"
+        "}"
+        "QLineEdit:focus {"
+        "  border: 2px solid %3;"
+        "  background-color: %4;"
+        "}")
+                                      .arg(cssColor(titleBarBackground))
+                                      .arg(cssColor(borderColor))
+                                      .arg(cssColor(focusBorderColor))
+                                      .arg(cssColor(focusBackground)));
+    refreshStencilToolButton(m_stitchButton, QStringLiteral(":/icons/stitch.svg"),
+                             titleBarPalette, true);
+    collSearchIconAction->setIcon(stencilSvgIcon(QStringLiteral(":/icons/magnify.svg"),
+                                                 toolBarButtonIconColor(titleBarPalette)));
+  };
+  refreshCollectionTitleControls();
+  connect(collTitleBar, &TitleBar::appearanceChanged, this, refreshCollectionTitleControls);
+  connect(collSearchEdit, &QLineEdit::textChanged, m_coll_listview, &VGMCollListView::setFilterText);
+  connect(m_stitchButton, &QToolButton::clicked, this, [this]() {
+    const bool isOpen = stitchui::toggleCollectionStitchBalloon(
+        m_coll_listview->selectedCollections(), this, m_stitchButton, m_stitchButton);
+    m_stitchButton->setChecked(isOpen);
+  });
+
   m_coll_view_dock = new QDockWidget("Collection Contents");
   m_coll_view_dock->setObjectName(QStringLiteral("collectionContentDock"));
   m_coll_view_dock->setAllowedAreas(Qt::LeftDockWidgetArea | Qt::BottomDockWidgetArea);
@@ -265,7 +373,7 @@ void MainWindow::createElements() {
       {m_logger->toggleViewAction(), QStringLiteral(":/icons/book-open-variant-outline.svg")},
   });
   createStatusBar();
-  m_toastHost = new ToastHost(this);
+  m_toastHost = new ToastHost(this, MdiArea::the(), ToastHost::defaultMode());
 }
 
 void MainWindow::configureWindowAgent() {
@@ -371,11 +479,29 @@ bool MainWindow::eventFilter(QObject* obj, QEvent* event) {
 }
 
 void MainWindow::dragEnterEvent(QDragEnterEvent *event) {
+  if (!event) {
+    return;
+  }
+
+  if (!isFileDropMime(event->mimeData())) {
+    event->ignore();
+    hideDragOverlay();
+    return;
+  }
   event->acceptProposedAction();
   showDragOverlay();
 }
 
 void MainWindow::dragMoveEvent(QDragMoveEvent *event) {
+  if (!event) {
+    return;
+  }
+
+  if (!isFileDropMime(event->mimeData())) {
+    event->ignore();
+    hideDragOverlay();
+    return;
+  }
   event->acceptProposedAction();
   showDragOverlay();
 }
@@ -387,6 +513,14 @@ void MainWindow::dragLeaveEvent(QDragLeaveEvent *event) {
 
 void MainWindow::dropEvent(QDropEvent *event) {
   hideDragOverlay();
+  if (!event) {
+    return;
+  }
+
+  if (!isFileDropMime(event->mimeData())) {
+    event->ignore();
+    return;
+  }
 
   const QMimeData* mimeData = event->mimeData();
   const QStringList portalFiles = retrievePortalDroppedFiles(mimeData);

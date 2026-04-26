@@ -53,3 +53,11 @@ void NotificationCenter::updateContextualMenusForVGMColls(const QList<VGMColl*>&
 void NotificationCenter::updateContextualMenusForRawFiles(const QList<RawFile*>& files) {
   emit rawFileContextCommandsChanged(files);
 }
+
+void NotificationCenter::setStitchPlanCollections(const QList<VGMColl*>& orderedCollections) {
+  emit stitchPlanCollectionsChanged(orderedCollections);
+}
+
+void NotificationCenter::setCollectionStitchUiVisible(bool visible) {
+  emit collectionStitchUiVisibilityChanged(visible);
+}

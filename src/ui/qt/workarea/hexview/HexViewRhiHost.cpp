@@ -14,7 +14,6 @@
 #include "HexViewRhiWidget.h"
 #else
 #include "HexViewRhiWindow.h"
-#include "MainWindow.h"
 #endif
 
 #include <QWindow>

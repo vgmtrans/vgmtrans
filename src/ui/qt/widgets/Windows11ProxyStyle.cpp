@@ -5,6 +5,7 @@
 */
 
 #include "Windows11ProxyStyle.h"
+#include "ColorHelpers.h"
 #include "UIHelpers.h"
 
 #include <QGraphicsDropShadowEffect>

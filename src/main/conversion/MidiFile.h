@@ -10,6 +10,8 @@
 #include <unordered_map>
 #include <filesystem>
 
+#include "common.h"
+
 class VGMSeq;
 
 class MidiFile;

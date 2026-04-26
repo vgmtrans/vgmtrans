@@ -16,6 +16,7 @@
 #include "SequencePlayer.h"
 #include "SeekBar.h"
 #include "UIHelpers.h"
+#include "ColorHelpers.h"
 
 namespace {
 constexpr int kTransportControlHeight = 32;

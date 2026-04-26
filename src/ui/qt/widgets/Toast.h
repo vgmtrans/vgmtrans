@@ -23,19 +23,18 @@ struct ToastTheme {
 class Toast : public QWidget {
   Q_OBJECT
 public:
-  explicit Toast(QWidget* parent = nullptr);
-  void showMessage(const QString& message, ToastType type, int duration_ms = 3000);
+  explicit Toast(QWidget* parent = nullptr, bool useToolWindow = false);
+  void showMessage(const QString& message, ToastType type, QWidget* anchorWidget,
+                   int duration_ms = 3000);
+  void updatePlacement(QWidget* anchorWidget);
 
   // host-controlled placement knobs
   void setMargins(int marginX, int marginY) noexcept { m_marginX = marginX; m_marginY = marginY; }
   void setStackOffset(int offsetY) noexcept { m_stackOffsetY = offsetY; }
 
-  signals:
-    // emitted exactly once when the toast is dismissed (fadeout or close)
-    void dismissed(Toast* self);
-
-protected:
-  bool eventFilter(QObject* watched, QEvent* event) override;
+signals:
+  // emitted exactly once when the toast is dismissed (fadeout or close)
+  void dismissed(Toast* self);
 
 private slots:
   void onCloseClicked() noexcept;
@@ -47,6 +46,7 @@ private:
   void startFadeIn();
   void startFadeOut();
   void cancelAnimations() noexcept;
+  void dismiss() noexcept;
 
 private:
   QFrame* m_bubble{nullptr};
@@ -72,6 +72,7 @@ private:
   int m_marginX{10};
   int m_marginY{10};
   int m_stackOffsetY{0};
+  bool m_useToolWindow{false};
 
   // internal: to ensure dismissed() is sent once
   bool m_emittedDismissed{false};

@@ -191,6 +191,14 @@ public:
         continue;
       }
       auto propSpecs = contextFactory->propertySpecifications();
+      PropertyMap initialPropMap;
+      for (const auto& propSpec : propSpecs) {
+        if (propSpec.valueType == PropertySpecValueType::ItemList) {
+          initialPropMap.insert({propSpec.key, items});
+        } else {
+          initialPropMap.insert({propSpec.key, propSpec.defaultValue});
+        }
+      }
 
       auto action = menu->addAction(command->name().c_str(), [command, items, propSpecs, contextFactory] {
         PropertyMap propMap;
@@ -234,6 +242,7 @@ public:
         }
         command->execute(*context);
       });
+      action->setEnabled(command->isEnabled(initialPropMap));
       if (const auto& keySequences = command->shortcutKeySequences(); !keySequences.empty()) {
         action->setShortcuts(keySequences);
         action->setShortcutVisibleInContextMenu(true);

@@ -6,15 +6,26 @@
 #pragma once
 #include "Scanner.h"
 #include "BytePattern.h"
+#include "NinSnesScanResult.h"
 
 class NinSnesScanner : public VGMScanner {
- public:
+public:
   explicit NinSnesScanner(Format* format) : VGMScanner(format) {}
 
-  virtual void scan(RawFile *file, void *info = 0);
-  void searchForNinSnesFromARAM(RawFile *file);
+  virtual void scan(RawFile* file, void* info = 0);
+  void searchForNinSnesFromARAM(RawFile* file);
 
- private:
+private:
+  void loadFromScanResult(RawFile* file, const NinSnesScanResult& scanResult);
+  static BytePattern makeInitSectionPtrPattern(uint8_t addrSectionPtr);
+  static BytePattern makeInitSectionPtrYIPattern(uint8_t addrSectionPtr);
+  static BytePattern makeInitSectionPtrSMWPattern(uint8_t addrSectionPtr);
+  static BytePattern makeInitSectionPtrGD3Pattern(uint8_t addrSectionPtr);
+  static BytePattern makeInitSectionPtrYSFRPattern(uint8_t addrSectionPtr);
+  static BytePattern makeInitSectionPtrTSPattern(uint8_t addrSectionPtr);
+  static BytePattern makeInitSectionPtrYs4Pattern(uint8_t addrSectionPtr);
+  static BytePattern makeInitSongListPtrYSFRPattern(uint8_t addrSongListPtr);
+
   static BytePattern ptnBranchForVcmd;
   static BytePattern ptnBranchForVcmdReadahead;
   static BytePattern ptnJumpToVcmd;
@@ -26,6 +37,7 @@ class NinSnesScanner : public VGMScanner {
   static BytePattern ptnLoadInstrTableAddressSMW;
   static BytePattern ptnSetDIR;
   static BytePattern ptnSetDIRYI;
+  static BytePattern ptnSetDIRVS;
   static BytePattern ptnSetDIRSMW;
 
   // PATTERNS FOR DERIVED VERSIONS

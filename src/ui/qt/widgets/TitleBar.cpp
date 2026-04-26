@@ -50,7 +50,8 @@ TitleBar::TitleBar(const QString& title, Buttons buttons, QWidget *parent, const
 
   m_leadingContainer = new QWidget(this);
   m_leadingLayout = new QHBoxLayout(m_leadingContainer);
-  m_leadingLayout->setContentsMargins(kTitleToLeadingControlsGap, 0, 0, 0);
+  const int leadingLeftMargin = buttons.testFlag(NewButton) ? 1 : kTitleToLeadingControlsGap;
+  m_leadingLayout->setContentsMargins(leadingLeftMargin, 0, 0, 0);
   m_leadingLayout->setSpacing(1);
   m_leadingContainer->hide();
   titleLayout->addWidget(m_leadingContainer);

@@ -108,6 +108,9 @@ void VGMInstrSet::prepareForExport(const VGMColl* coll) {
   cleanupAfterExport();
   m_exportInstrs = aInstrs;
   if (coll != nullptr) {
+    if (coll->seq() == nullptr) {
+      L_DEBUG("Collection is missing a sequence. This is unusual.");
+    }
     useColl(coll);
   }
 }

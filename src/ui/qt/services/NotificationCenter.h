@@ -41,6 +41,8 @@ public:
   void updateContextualMenusForVGMFiles(const QList<VGMFile*>& files);
   void updateContextualMenusForVGMColls(const QList<VGMColl*>& colls);
   void updateContextualMenusForRawFiles(const QList<RawFile*>& files);
+  void setStitchPlanCollections(const QList<VGMColl*>& orderedCollections);
+  void setCollectionStitchUiVisible(bool visible);
 
   void vgmfiletree_setShowDetails(bool showDetails) { emit vgmfiletree_showDetailsChanged(showDetails); }
 
@@ -55,6 +57,8 @@ signals:
   void vgmFileContextCommandsChanged(const QList<VGMFile*>& files);
   void vgmCollContextCommandsChanged(const QList<VGMColl*>& colls);
   void rawFileContextCommandsChanged(const QList<RawFile*>& files);
+  void stitchPlanCollectionsChanged(const QList<VGMColl*>& orderedCollections);
+  void collectionStitchUiVisibilityChanged(bool visible);
 
   void vgmfiletree_showDetailsChanged(bool showDetails);
 };

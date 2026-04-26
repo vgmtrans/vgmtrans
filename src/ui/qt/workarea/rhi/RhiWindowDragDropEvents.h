@@ -66,4 +66,3 @@ inline bool handleRhiWindowDragDropEvent(
 }
 
 }  // namespace QtUi
-
