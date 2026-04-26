@@ -245,6 +245,11 @@ void HexViewRhiRenderer::markSelectionDirty() {
   m_selectionDirty = true;
 }
 
+// Mark playback-only overlay geometry as stale.
+void HexViewRhiRenderer::markPlaybackDirty() {
+  m_playbackDirty = true;
+}
+
 // Drop CPU line cache and force a full geometry/id rebuild.
 void HexViewRhiRenderer::invalidateCache() {
   m_cachedLines.clear();
@@ -252,6 +257,7 @@ void HexViewRhiRenderer::invalidateCache() {
   m_cacheEndLine = -1;
   m_baseDirty = true;
   m_selectionDirty = true;
+  m_playbackDirty = true;
   m_itemIdDirty = true;
 }
 
@@ -299,6 +305,7 @@ void HexViewRhiRenderer::renderFrame(QRhiCommandBuffer* cb, const RenderTargetIn
     m_lastStartLine = startLine;
     m_lastEndLine = endLine;
     m_selectionDirty = true;
+    m_playbackDirty = true;
   }
 
   ensureCacheWindow(startLine, endLine, totalLines, frame);
@@ -310,9 +317,10 @@ void HexViewRhiRenderer::renderFrame(QRhiCommandBuffer* cb, const RenderTargetIn
     m_baseBufferDirty = true;
   }
 
-  if (m_selectionDirty) {
+  if (m_selectionDirty || m_playbackDirty) {
     buildSelectionInstances(startLine, endLine, frame, layout);
     m_selectionDirty = false;
+    m_playbackDirty = false;
     m_selectionBufferDirty = true;
   }
 
@@ -1122,6 +1130,7 @@ void HexViewRhiRenderer::ensureCacheWindow(int startLine, int endLine, int total
   rebuildCacheWindow(frame);
   m_baseDirty = true;
   m_selectionDirty = true;
+  m_playbackDirty = true;
 }
 
 // Rebuild cached line bytes and style ids for the current cache window.
@@ -1608,10 +1617,15 @@ void HexViewRhiRenderer::buildSelectionInstances(int startLine, int endLine,
   }
 
   if (!frame.playbackSelections.empty()) {
+    std::vector<HexViewFrame::SelectionRange> playbackRanges;
+    playbackRanges.reserve(frame.playbackSelections.size());
+    for (const auto& selection : frame.playbackSelections) {
+      playbackRanges.push_back({selection.offset, selection.length});
+    }
     // Active playback in green channel.
     const QVector4D playbackMaskColor(0.0f, 1.0f, 0.0f, 0.0f);
     const QVector4D playbackEdgeColor(0.0f, 1.0f, 0.0f, 0.0f);
-    appendMaskForSelections(frame.playbackSelections, ctx, 0.0f, 0.0f, glowPad,
+    appendMaskForSelections(playbackRanges, ctx, 0.0f, 0.0f, glowPad,
                             playbackMaskColor, playbackEdgeColor);
   }
 
@@ -1620,7 +1634,7 @@ void HexViewRhiRenderer::buildSelectionInstances(int startLine, int endLine,
     std::vector<HexViewFrame::SelectionRange> fadeRanges;
     fadeRanges.reserve(frame.fadePlaybackSelections.size());
     for (const auto& selection : frame.fadePlaybackSelections) {
-      fadeRanges.push_back(selection.range);
+      fadeRanges.push_back({selection.range.offset, selection.range.length});
     }
 
     const QVector4D playbackMaskColor(0.0f, 0.0f, 1.0f, 0.0f);
@@ -1632,7 +1646,7 @@ void HexViewRhiRenderer::buildSelectionInstances(int startLine, int endLine,
         continue;
       }
       const QVector4D fadeMaskColor(0.0f, 0.0f, 1.0f, selection.alpha);
-      appendMaskForRangeNoEdge(selection.range, fadeMaskColor);
+      appendMaskForRangeNoEdge({selection.range.offset, selection.range.length}, fadeMaskColor);
     }
   }
 }

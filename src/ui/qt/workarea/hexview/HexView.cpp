@@ -61,6 +61,7 @@ constexpr float PLAYBACK_GLOW_RADIUS = 1.8f;
 constexpr float PLAYBACK_GLOW_EDGE_CURVE = 0.85f;
 const QColor PLAYBACK_GLOW_LOW(40, 40, 40);
 const QColor PLAYBACK_GLOW_HIGH(230, 230, 230);
+const QColor PLAYBACK_GLOW_FALLBACK(230, 230, 230);
 constexpr uint16_t STYLE_UNASSIGNED = std::numeric_limits<uint16_t>::max();
 
 struct WidgetLayoutMetrics {
@@ -328,6 +329,11 @@ uint64_t HexView::selectionKey(const SelectionRange& range) {
   return selectionKey(range.offset, range.length);
 }
 
+// Overload for colored playback ranges (keyed only by byte span).
+uint64_t HexView::selectionKey(const PlaybackSelection& range) {
+  return selectionKey(range.offset, range.length);
+}
+
 // Overload for fade playback selections (keyed by underlying range).
 uint64_t HexView::selectionKey(const FadePlaybackSelection& selection) {
   return selectionKey(selection.range);
@@ -444,7 +450,7 @@ void HexView::setFont(const QFont& font) {
   }
 
   updateLayout();
-  requestRhiUpdate(true, true);
+  requestRhiUpdate(true, true, true);
 }
 
 // Return X origin of the hex byte columns (accounting for optional address column).
@@ -531,7 +537,9 @@ void HexView::updateScrollBars() {
 }
 
 // Forward dirty/update requests to the active RHI host.
-void HexView::requestRhiUpdate(bool markBaseDirty, bool markSelectionDirty) {
+void HexView::requestRhiUpdate(bool markBaseDirty,
+                               bool markSelectionDirty,
+                               bool markPlaybackDirty) {
   if (!m_rhiHost) {
     return;
   }
@@ -540,6 +548,9 @@ void HexView::requestRhiUpdate(bool markBaseDirty, bool markSelectionDirty) {
   }
   if (markSelectionDirty) {
     m_rhiHost->markSelectionDirty();
+  }
+  if (markPlaybackDirty) {
+    m_rhiHost->markPlaybackDirty();
   }
   m_rhiHost->requestUpdate();
 }
@@ -561,7 +572,9 @@ void HexView::updateLayout() {
 
   updateScrollBars();
 
-  requestRhiUpdate(offsetChanged || asciiChanged, offsetChanged || asciiChanged);
+  requestRhiUpdate(offsetChanged || asciiChanged,
+                   offsetChanged || asciiChanged,
+                   offsetChanged || asciiChanged);
 }
 
 // Return total line count required to display file bytes at 16 bytes per line.
@@ -738,15 +751,19 @@ void HexView::setSelectedItems(const std::vector<const VGMItem*>& items,
 }
 
 // Update playback selections from active items and seed fade-out entries for removed ones.
-void HexView::setPlaybackSelectionsForItems(const std::vector<const VGMItem*>& items) {
-  std::vector<SelectionRange> next;
+void HexView::setPlaybackSelectionsForItems(const std::vector<const VGMItem*>& items,
+                                            const std::vector<QColor>& glowColors) {
+  std::vector<PlaybackSelection> next;
   next.reserve(items.size());
-  for (const auto* item : items) {
+  for (size_t i = 0; i < items.size(); ++i) {
+    const auto* item = items[i];
     if (!item) {
       continue;
     }
     const uint32_t length = item->length() > 0 ? item->length() : 1u;
-    next.push_back({item->offset(), length});
+    const QColor glowColor =
+        (i < glowColors.size() && glowColors[i].isValid()) ? glowColors[i] : PLAYBACK_GLOW_FALLBACK;
+    next.emplace_back(item->offset(), length, glowColor);
   }
 
   // Track incoming active playback ranges for fast membership checks below.
@@ -796,7 +813,8 @@ void HexView::setPlaybackSelectionsForItems(const std::vector<const VGMItem*>& i
   }
 
   m_playbackSelections = std::move(next);
-  refreshSelectionVisuals(false);
+  updateHighlightState(false);
+  requestRhiUpdate(false, false, true);
 }
 
 // Clear playback selection set immediately or convert it into fading playback highlights.
@@ -828,7 +846,8 @@ void HexView::clearPlaybackSelections(bool fade) {
   } else {
     m_playbackFadeTimer.stop();
   }
-  refreshSelectionVisuals(false);
+  updateHighlightState(false);
+  requestRhiUpdate(false, false, true);
 }
 
 // Toggle playback-highlight mode and reconcile existing playback selection state.
@@ -844,7 +863,8 @@ void HexView::setPlaybackActive(bool active) {
     clearPlaybackSelections();
     return;
   }
-  refreshSelectionVisuals(false);
+  updateHighlightState(false);
+  requestRhiUpdate(false, false, true);
 }
 
 // Request another frame while playback/outline effects are animating.
@@ -1161,15 +1181,11 @@ HexViewFrame::Data HexView::captureRhiFrameData(float dpr) {
     frame.fadeSelections.push_back({range.offset, range.length});
   }
 
-  frame.playbackSelections.reserve(m_playbackSelections.size());
-  for (const auto& range : m_playbackSelections) {
-    frame.playbackSelections.push_back({range.offset, range.length});
-  }
+  frame.playbackSelections = m_playbackSelections;
 
   frame.fadePlaybackSelections.reserve(m_fadePlaybackSelections.size());
   for (const auto& fade : m_fadePlaybackSelections) {
-    frame.fadePlaybackSelections.push_back(
-        {{fade.range.offset, fade.range.length}, fade.alpha});
+    frame.fadePlaybackSelections.push_back(fade);
   }
 
   ensureGlyphAtlas(dpr);
@@ -1649,7 +1665,7 @@ void HexView::updatePlaybackFade() {
 void HexView::timerEvent(QTimerEvent* event) {
   if (event->timerId() == m_playbackFadeTimer.timerId()) {
     updatePlaybackFade();
-    requestRhiUpdate(false, true);
+    requestRhiUpdate(false, false, true);
     if (m_fadePlaybackSelections.empty()) {
       m_playbackFadeTimer.stop();
     }
