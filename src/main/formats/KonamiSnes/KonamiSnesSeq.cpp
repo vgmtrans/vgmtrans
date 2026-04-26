@@ -63,6 +63,7 @@ KonamiSnesSeq::KonamiSnesSeq(RawFile *file, KonamiSnesVersion ver, uint32_t seqd
   setAllowDiscontinuousTrackData(true);
   bLoadTickByTick = true;
 
+  setAlwaysWriteInitialVol(127);
   useReverb();
   setAlwaysWriteInitialReverb(0);
   setAlwaysWriteInitialPitchBendRange(KONAMI_SNES_STD_PITCH_BEND_RANGE_CENTS);
@@ -164,7 +165,7 @@ void KonamiSnesSeq::loadEventMap() {
   EventMap[0xec] = EVENT_TRANSPABS;
   EventMap[0xed] = EVENT_ADSR1;
   EventMap[0xee] = EVENT_VOLUME;
-  EventMap[0xef] = EVENT_VOLUME_FADE;
+  EventMap[0xef] = EVENT_VOLUME_SLIDE_V1;
   EventMap[0xf0] = EVENT_PORTAMENTO;
   EventMap[0xf1] = EVENT_PITCH_ENVELOPE_V2;
   EventMap[0xf2] = EVENT_TUNING;
@@ -225,6 +226,7 @@ void KonamiSnesSeq::loadEventMap() {
       }
 
       EventMap[0xed] = EVENT_ADSR1;
+      EventMap[0xef] = EVENT_VOLUME_SLIDE_V2;
       EventMap[0xf1] = EVENT_PITCH_ENVELOPE_V2;
       EventMap[0xf3] = EVENT_PITCH_SLIDE_V3;
       EventMap[0xfa] = EVENT_ADSR_GAIN;
@@ -238,6 +240,7 @@ void KonamiSnesSeq::loadEventMap() {
       }
 
       EventMap[0xed] = EVENT_ADSR1;
+      EventMap[0xef] = EVENT_VOLUME_SLIDE_V2;
       EventMap[0xf1] = EVENT_PITCH_ENVELOPE_V2;
       EventMap[0xf3] = EVENT_PITCH_SLIDE_V3;
       EventMap[0xfa] = EVENT_ADSR_GAIN;
@@ -312,7 +315,7 @@ void KonamiSnesTrack::resetVars(void) {
 
   seqTuningCents = 0.0;
 
-
+  volumeSlide = {};
   pitchSlide = {};
   pitchBendRangeCents = KONAMI_SNES_STD_PITCH_BEND_RANGE_CENTS;
   currentPitchBend = 0;
@@ -337,6 +340,27 @@ uint8_t KonamiSnesTrack::convertGAINAmountToGAIN(uint8_t gainAmount) {
 }
 
 void KonamiSnesTrack::onTickBegin() {
+  if (volumeSlide.useLength) {
+    volumeSlide.length -= 1;
+    if (volumeSlide.length == 0) {
+      volumeSlide.currentVolume = volumeSlide.targetVolume;
+      clearActiveVolumeSlide();
+    }
+    else {
+      volumeSlide.currentVolume += volumeSlide.delta;
+    }
+    applyCurrentVolume();
+  }
+  else if (volumeSlide.delta != 0) {
+    volumeSlide.currentVolume += volumeSlide.delta;
+    if ((volumeSlide.delta > 0 && volumeSlide.currentVolume >= volumeSlide.targetVolume)
+        || (volumeSlide.delta < 0 && volumeSlide.currentVolume <= volumeSlide.targetVolume)) {
+      volumeSlide.currentVolume = volumeSlide.targetVolume;
+      clearActiveVolumeSlide();
+    }
+    applyCurrentVolume();
+  }
+
   if (pitchSlide.length == 0 || !pitchSlide.baseValid) {
     return;
   }
@@ -505,6 +529,72 @@ void KonamiSnesTrack::beginPitchSlide(const PitchSlide& slide) {
   pitchSlide.length = slide.length;
   pitchSlide.targetSemitones = slide.targetSemitones;
   pitchSlide.deltaSemitones = slide.deltaSemitones;
+}
+
+KonamiSnesTrack::VolumeSlide KonamiSnesTrack::readVolumeSlide(KonamiSnesSeqEventType eventType, uint32_t offset) const {
+  VolumeSlide slide {offset, 0};
+
+  switch (eventType) {
+    case EVENT_VOLUME_SLIDE_V1:
+      slide.length = readByte(curOffset);
+      slide.targetVolume = readByte(curOffset + 1);
+      slide.useLength = true;
+      if (slide.length != 0) {
+        slide.delta = static_cast<int16_t>(((static_cast<int32_t>(slide.targetVolume) << 8)
+                                            - (volumeSlide.currentVolume & 0xff00))
+                                           / slide.length);
+      }
+      break;
+
+    case EVENT_VOLUME_SLIDE_V2:
+      slide.targetVolume = readByte(curOffset);
+      slide.delta = static_cast<int16_t>(static_cast<int8_t>(readByte(curOffset + 1)) << 4);
+      break;
+
+    default:
+      assert(false);
+      break;
+  }
+
+  return slide;
+}
+
+void KonamiSnesTrack::addVolumeSlideEvent(const VolumeSlide& slide) {
+  const std::string desc = slide.useLength
+      ? fmt::format("Length: {:d}  Target Volume: {:d}", slide.length, slide.targetVolume)
+      : fmt::format("Target Volume: {:d}  Speed: {:.2f}", slide.targetVolume, slide.delta / 256.0);
+  addGenericEvent(slide.offset, 3, "Volume Slide", desc, Type::VolumeSlide);
+}
+
+void KonamiSnesTrack::clearActiveVolumeSlide() {
+  volumeSlide.targetVolume = volumeSlide.currentVolume;
+  volumeSlide.delta = 0;
+  volumeSlide.length = 0;
+  volumeSlide.useLength = false;
+}
+
+void KonamiSnesTrack::applyCurrentVolume() {
+  const uint8_t rawVolume = static_cast<uint8_t>(std::clamp(volumeSlide.currentVolume >> 8, 0, 0xff));
+  const uint8_t midiVolume = convertPercentAmpToStdMidiVal(rawVolume / 255.0);
+  if (midiVolume != vol) {
+    addVolNoItem(midiVolume);
+  }
+}
+
+void KonamiSnesTrack::beginVolumeSlide(const VolumeSlide& slide) {
+  addVolumeSlideEvent(slide);
+
+  volumeSlide.currentVolume &= 0xff00;
+  volumeSlide.targetVolume = slide.targetVolume << 8;
+  volumeSlide.delta = slide.delta;
+  volumeSlide.length = slide.length;
+  volumeSlide.useLength = slide.useLength;
+
+  if ((slide.useLength && slide.length == 0) || (!slide.useLength && slide.delta == 0)) {
+    volumeSlide.currentVolume = volumeSlide.targetVolume;
+    clearActiveVolumeSlide();
+    applyCurrentVolume();
+  }
 }
 
 int16_t KonamiSnesTrack::getLoopVolumeDelta() const {
@@ -1002,16 +1092,18 @@ bool KonamiSnesTrack::readEvent() {
 
     case EVENT_VOLUME: {
       uint8_t newVolume = readByte(curOffset++);
+      volumeSlide.currentVolume = newVolume << 8;
+      clearActiveVolumeSlide();
       uint8_t midiVolume = convertPercentAmpToStdMidiVal(newVolume / 255.0);
       addVol(beginOffset, curOffset - beginOffset, midiVolume);
       break;
     }
 
-    case EVENT_VOLUME_FADE: {
-      uint8_t newVolume = readByte(curOffset++);
-      uint8_t fadeSpeed = readByte(curOffset++);
-      desc = fmt::format("Volume: {:d}  Fade Length: {:d}", newVolume, fadeSpeed);
-      addGenericEvent(beginOffset, curOffset - beginOffset, "Volume Fade", desc, Type::VolumeSlide);
+    case EVENT_VOLUME_SLIDE_V1:
+    case EVENT_VOLUME_SLIDE_V2: {
+      const auto slide = readVolumeSlide(eventType, beginOffset);
+      curOffset += 2;
+      beginVolumeSlide(slide);
       break;
     }
 

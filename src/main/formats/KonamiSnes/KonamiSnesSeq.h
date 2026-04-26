@@ -39,7 +39,8 @@ enum KonamiSnesSeqEventType {
   EVENT_ADSR1,
   EVENT_ADSR2,
   EVENT_VOLUME,
-  EVENT_VOLUME_FADE,
+  EVENT_VOLUME_SLIDE_V1,
+  EVENT_VOLUME_SLIDE_V2,
   EVENT_PORTAMENTO,
   EVENT_PITCH_ENVELOPE_V1,
   EVENT_PITCH_ENVELOPE_V2,
@@ -146,6 +147,22 @@ class KonamiSnesTrack
     double deltaSemitones = 0.0;
   };
 
+  struct VolumeSlide {
+    uint32_t offset;
+    uint8_t targetVolume;
+    int16_t delta = 0;
+    uint8_t length = 0;
+    bool useLength = false;
+  };
+
+  struct ActiveVolumeSlide {
+    int32_t currentVolume = 0xff00;
+    int32_t targetVolume = 0xff00;
+    int16_t delta = 0;
+    uint8_t length = 0;
+    bool useLength = false;
+  };
+
   std::optional<PitchSlide> consumePitchSlide();
   PitchSlide readPitchSlide(KonamiSnesSeqEventType eventType, uint32_t offset);
   void addPitchSlideEvent(const PitchSlide& slide);
@@ -154,6 +171,11 @@ class KonamiSnesTrack
   void resetPitchForNote(uint8_t key);
   void beginPitchSlide(const PitchSlide& slide);
   uint16_t pitchSlideRangeCents(const PitchSlide& slide) const;
+  VolumeSlide readVolumeSlide(KonamiSnesSeqEventType eventType, uint32_t offset) const;
+  void addVolumeSlideEvent(const VolumeSlide& slide);
+  void clearActiveVolumeSlide();
+  void applyCurrentVolume();
+  void beginVolumeSlide(const VolumeSlide& slide);
   void setPitchBendRange(uint16_t cents);
   void setPitchBend(int16_t bend);
   void applyCurrentPitchBend();
@@ -164,6 +186,7 @@ class KonamiSnesTrack
   void applyEffectiveTuning(uint32_t offset, uint32_t length);
 
 
+  ActiveVolumeSlide volumeSlide;
   ActivePitchSlide pitchSlide;
   uint16_t pitchBendRangeCents;
   int16_t currentPitchBend;
