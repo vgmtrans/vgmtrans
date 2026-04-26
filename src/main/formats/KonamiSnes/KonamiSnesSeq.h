@@ -55,6 +55,8 @@ enum KonamiSnesSeqEventType {
   EVENT_VIBRATO_FADE,
   EVENT_ADSR_GAIN,
   EVENT_PROGCHANGEVOL,
+  EVENT_CONDITIONAL_JUMP_V1,
+  EVENT_LINEAR_PITCH_ENVELOPE_V2,
   EVENT_GOTO,
   EVENT_CALL,
   EVENT_END,
@@ -120,6 +122,7 @@ class KonamiSnesTrack
   uint8_t instrument;
   int8_t prevNoteKey;
   bool prevNoteSlurred;
+  double seqTuningCents;
 
  private:
   struct PitchSlideV3 {
@@ -152,6 +155,10 @@ class KonamiSnesTrack
   void applyCurrentPitchBend();
   double getTuningInSemitones(int8_t tuning);
   uint8_t convertGAINAmountToGAIN(uint8_t gainAmount);
+  int16_t getLoopVolumeDelta() const;
+  double getLoopPitchDeltaCents() const;
+  void applyEffectiveTuning(uint32_t offset, uint32_t length);
+
 
   ActivePitchSlide pitchSlide;
   uint16_t pitchBendRangeCents;

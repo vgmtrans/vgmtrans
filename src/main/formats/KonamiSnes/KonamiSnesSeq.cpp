@@ -184,21 +184,21 @@ void KonamiSnesSeq::loadEventMap() {
 
   switch (version) {
     case KONAMISNES_V1:
-      EventMap[0xed] = EVENT_UNKNOWN3; // nop
+      EventMap[0xed] = EVENT_UNKNOWN3; // nop with 3 parameter bytes total
       EventMap[0xf1] = EVENT_PITCH_ENVELOPE_V1;
       EventMap[0xf3] = EVENT_PITCH_SLIDE_V1;
       EventMap[0xfa] = EVENT_UNKNOWN3;
       EventMap[0xfb] = EVENT_UNKNOWN1;
-      EventMap.erase(0xfc); // game-specific?
+      EventMap[0xfc] = EVENT_CONDITIONAL_JUMP_V1;
       break;
 
     case KONAMISNES_V2:
-      EventMap[0xed] = EVENT_UNKNOWN3; // nop
+      EventMap[0xed] = EVENT_UNKNOWN3; // nop with 3 parameter bytes total
       EventMap[0xf1] = EVENT_PITCH_ENVELOPE_V1;
       EventMap[0xf3] = EVENT_PITCH_SLIDE_V2;
       EventMap[0xfa] = EVENT_UNKNOWN3;
       EventMap[0xfb] = EVENT_UNKNOWN1;
-      EventMap.erase(0xfc); // game-specific?
+      EventMap[0xfc] = EVENT_LINEAR_PITCH_ENVELOPE_V2;
       break;
 
     case KONAMISNES_V3:
@@ -309,6 +309,9 @@ void KonamiSnesTrack::resetVars(void) {
 
   prevNoteKey = -1;
   prevNoteSlurred = false;
+
+  seqTuningCents = 0.0;
+
 
   pitchSlide = {};
   pitchBendRangeCents = KONAMI_SNES_STD_PITCH_BEND_RANGE_CENTS;
@@ -471,6 +474,28 @@ void KonamiSnesTrack::beginPitchSlideV3(const PitchSlideV3& slide) {
   pitchSlide.deltaSemitones *= 256.0 / std::max<uint8_t>(static_cast<KonamiSnesSeq*>(parentSeq)->tempo, 1);
 }
 
+int16_t KonamiSnesTrack::getLoopVolumeDelta() const {
+  return loopVolumeDelta + loopVolumeDelta2;
+}
+
+double KonamiSnesTrack::getLoopPitchDeltaCents() const {
+  // The loop opcodes store pitch deltas in units of 8/256 semitones.
+  return static_cast<double>(loopPitchDelta + loopPitchDelta2) * (100.0 / 32.0);
+}
+
+void KonamiSnesTrack::applyEffectiveTuning(uint32_t offset, uint32_t length) {
+  const double totalCents = seqTuningCents + getLoopPitchDeltaCents();
+  const double desiredCoarse = std::trunc(totalCents / 100.0);
+  const double desiredFine = totalCents - (desiredCoarse * 100.0);
+
+  if (coarseTuningSemitones != desiredCoarse) {
+    addCoarseTuningNoItem(desiredCoarse);
+  }
+  if (std::abs(fineTuningCents - desiredFine) > 0.001) {
+    addFineTuningNoItem(desiredFine);
+  }
+}
+
 bool KonamiSnesTrack::readEvent() {
   KonamiSnesSeq *parentSeq = (KonamiSnesSeq *) this->parentSeq;
   uint32_t beginOffset = curOffset;
@@ -572,7 +597,9 @@ bool KonamiSnesTrack::readEvent() {
         vel = 1; // TODO: verification
       }
 
+      vel = static_cast<uint8_t>(std::clamp<int>(vel + getLoopVolumeDelta(), 1, 127));
       vel = convertPercentAmpToStdMidiVal(vel / 127.0);
+      applyEffectiveTuning(beginOffset, curOffset - beginOffset);
 
       uint8_t dur = len;
       if (noteDurationRate != parentSeq->NOTE_DUR_RATE_MAX) {
@@ -656,8 +683,8 @@ bool KonamiSnesTrack::readEvent() {
         newTuning -= 16;
       }
 
-      double cents = getTuningInSemitones(newTuning) * 100.0;
-      addFineTuning(beginOffset, curOffset - beginOffset, cents, "Instant Fine Tuning");
+      seqTuningCents = getTuningInSemitones(newTuning) * 100.0;
+      applyEffectiveTuning(beginOffset, curOffset - beginOffset);
       break;
     }
 
@@ -844,6 +871,7 @@ bool KonamiSnesTrack::readEvent() {
         curOffset = loopReturnAddr;
         loopVolumeDelta += volumeDelta;
         loopPitchDelta += pitchDelta;
+        applyEffectiveTuning(beginOffset, curOffset - beginOffset);
 
         assert(loopReturnAddr != 0);
       }
@@ -851,6 +879,7 @@ bool KonamiSnesTrack::readEvent() {
         loopCount = 0;
         loopVolumeDelta = 0;
         loopPitchDelta = 0;
+        applyEffectiveTuning(beginOffset, curOffset - beginOffset);
       }
       break;
     }
@@ -889,6 +918,7 @@ bool KonamiSnesTrack::readEvent() {
         curOffset = loopReturnAddr2;
         loopVolumeDelta2 += volumeDelta;
         loopPitchDelta2 += pitchDelta;
+        applyEffectiveTuning(beginOffset, curOffset - beginOffset);
 
         assert(loopReturnAddr2 != 0);
       }
@@ -896,6 +926,7 @@ bool KonamiSnesTrack::readEvent() {
         loopCount2 = 0;
         loopVolumeDelta2 = 0;
         loopPitchDelta2 = 0;
+        applyEffectiveTuning(beginOffset, curOffset - beginOffset);
       }
       break;
     }
@@ -985,8 +1016,8 @@ bool KonamiSnesTrack::readEvent() {
 
     case EVENT_TUNING: {
       int8_t newTuning = (int8_t) readByte(curOffset++);
-      double cents = getTuningInSemitones(newTuning) * 100.0;
-      addFineTuning(beginOffset, curOffset - beginOffset, cents);
+      seqTuningCents = getTuningInSemitones(newTuning) * 100.0;
+      applyEffectiveTuning(beginOffset, curOffset - beginOffset);
       break;
     }
 
@@ -1106,6 +1137,32 @@ bool KonamiSnesTrack::readEvent() {
       desc = fmt::format("ADSR(1): ${:02X}  ADSR(2): ${:02X}  GAIN: ${:02X}",
                          newADSR1, newADSR2, newGAIN);
       addGenericEvent(beginOffset, curOffset - beginOffset, "ADSR(2)", desc, Type::Adsr);
+      break;
+    }
+
+    case EVENT_CONDITIONAL_JUMP_V1: {
+      uint16_t dest = readShort(curOffset);
+      curOffset += 2;
+      const uint16_t altDest = readShort(curOffset);
+      desc = fmt::format("Destination: ${:04X}  Alternate Destination: ${:04X}", dest, altDest);
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Conditional Jump", desc,
+                      Type::JumpConditional);
+
+      // Contra III-style 0xFC chooses between two encoded destinations at runtime.
+      // Follow the default path here so parsing stays in sync without depending on CPU state.
+      curOffset = dest;
+      bContinue = checkControlStateForInfiniteLoop(dest);
+      break;
+    }
+
+    case EVENT_LINEAR_PITCH_ENVELOPE_V2: {
+      const uint8_t deltaFraction = readByte(curOffset++);
+      const uint8_t deltaInteger = readByte(curOffset++);
+      const int16_t pitchDelta = static_cast<int16_t>(
+          static_cast<uint16_t>(deltaFraction) | (static_cast<uint16_t>(deltaInteger) << 8));
+      desc = fmt::format("Delta: {:.1f} semitones", pitchDelta / 256.0);
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Linear Pitch Envelope", desc,
+                      Type::PitchEnvelope);
       break;
     }
 
