@@ -319,7 +319,7 @@ uint8_t KonamiSnesTrack::convertGAINAmountToGAIN(uint8_t gainAmount) {
   return gain;
 }
 
-bool KonamiSnesTrack::readEvent(void) {
+bool KonamiSnesTrack::readEvent() {
   KonamiSnesSeq *parentSeq = (KonamiSnesSeq *) this->parentSeq;
   uint32_t beginOffset = curOffset;
   if (curOffset >= 0x10000) {
@@ -420,6 +420,8 @@ bool KonamiSnesTrack::readEvent(void) {
         vel = 1; // TODO: verification
       }
 
+      vel = convertPercentAmpToStdMidiVal(vel / 127.0);
+
       uint8_t dur = len;
       if (noteDurationRate != parentSeq->NOTE_DUR_RATE_MAX) {
         if (parentSeq->version == KONAMISNES_V1) {
@@ -449,7 +451,7 @@ bool KonamiSnesTrack::readEvent(void) {
         }
         prevNoteKey = key;
       }
-      prevNoteSlurred = (noteDurationRate == parentSeq->NOTE_DUR_RATE_MAX);
+      prevNoteSlurred = (noteDurationRate == parentSeq->NOTE_DUR_RATE_MAX) && !percussion;
       addTime(len);
 
       break;
