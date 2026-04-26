@@ -1142,7 +1142,7 @@ void HexViewRhiRenderer::rebuildCacheWindow(const HexViewFrame::Data& frame) {
 
   const uint32_t fileLength = frame.vgmfile->length();
   const auto* baseData = reinterpret_cast<const uint8_t*>(frame.vgmfile->data());
-  const auto* styleIds = frame.styleIds;
+  const auto styleIds = frame.styleIds;
   const size_t count = static_cast<size_t>(m_cacheEndLine - m_cacheStartLine + 1);
   m_cachedLines.reserve(count);
 
@@ -1156,8 +1156,8 @@ void HexViewRhiRenderer::rebuildCacheWindow(const HexViewFrame::Data& frame) {
         std::copy_n(baseData + lineOffset, entry.bytes, entry.data.data());
         for (int i = 0; i < entry.bytes; ++i) {
           const int idx = lineOffset + i;
-          entry.styles[i] = (styleIds && idx >= 0 && idx < static_cast<int>(styleIds->size()))
-                                ? (*styleIds)[idx]
+          entry.styles[i] = (idx >= 0 && idx < static_cast<int>(styleIds.size()))
+                                ? styleIds[static_cast<size_t>(idx)]
                                 : 0;
         }
       }
@@ -1312,11 +1312,11 @@ void HexViewRhiRenderer::buildBaseInstances(const HexViewFrame::Data& frame,
 
 // Build mask and edge geometry for a selection set across the visible range.
 void HexViewRhiRenderer::appendMaskForSelections(
-    const std::vector<HexViewFrame::SelectionRange>& selections,
-                                                 const SelectionBuildContext& ctx,
-                                                 float padX,
-                                                 float padY,
-                                                 float edgePad,
+    std::span<const HexViewFrame::SelectionRange> selections,
+    const SelectionBuildContext& ctx,
+    float padX,
+    float padY,
+    float edgePad,
                                                  const QVector4D& maskColor,
                                                  const QVector4D& edgeColor) {
   if (selections.empty() || ctx.visibleCount <= 0) {
@@ -1610,8 +1610,7 @@ void HexViewRhiRenderer::buildSelectionInstances(int startLine, int endLine,
       };
 
   if (hasSelection) {
-    const std::vector<HexViewFrame::SelectionRange>& selections =
-        frame.selections.empty() ? frame.fadeSelections : frame.selections;
+    const auto selections = frame.selections.empty() ? frame.fadeSelections : frame.selections;
     appendMaskForSelections(selections, ctx, 0.0f, 0.0f, shadowPad, selectionMaskColor,
                             selectionEdgeColor);
   }

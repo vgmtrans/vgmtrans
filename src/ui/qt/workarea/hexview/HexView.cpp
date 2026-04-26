@@ -761,9 +761,8 @@ void HexView::setPlaybackSelectionsForItems(const std::vector<const VGMItem*>& i
       continue;
     }
     const uint32_t length = item->length() > 0 ? item->length() : 1u;
-    const QColor glowColor =
-        (i < glowColors.size() && glowColors[i].isValid()) ? glowColors[i] : PLAYBACK_GLOW_FALLBACK;
-    next.emplace_back(item->offset(), length, glowColor);
+    const QColor glowColor = (i < glowColors.size() && glowColors[i].isValid()) ? glowColors[i] : PLAYBACK_GLOW_FALLBACK;
+    next.push_back({item->offset(), length, glowColor});
   }
 
   // Track incoming active playback ranges for fast membership checks below.
@@ -1165,28 +1164,12 @@ HexViewFrame::Data HexView::captureRhiFrameData(float dpr) {
   frame.windowColor = palette().color(QPalette::Window);
   frame.windowTextColor = palette().color(QPalette::WindowText);
 
-  frame.styleIds = &m_styleIds;
-  frame.styles.reserve(m_styles.size());
-  for (const auto& style : m_styles) {
-    frame.styles.push_back({style.bg, style.fg});
-  }
-
-  frame.selections.reserve(m_selections.size());
-  for (const auto& range : m_selections) {
-    frame.selections.push_back({range.offset, range.length});
-  }
-
-  frame.fadeSelections.reserve(m_fadeSelections.size());
-  for (const auto& range : m_fadeSelections) {
-    frame.fadeSelections.push_back({range.offset, range.length});
-  }
-
+  frame.styleIds = m_styleIds;
+  frame.styles = m_styles;
+  frame.selections = m_selections;
+  frame.fadeSelections = m_fadeSelections;
   frame.playbackSelections = m_playbackSelections;
-
-  frame.fadePlaybackSelections.reserve(m_fadePlaybackSelections.size());
-  for (const auto& fade : m_fadePlaybackSelections) {
-    frame.fadePlaybackSelections.push_back(fade);
-  }
+  frame.fadePlaybackSelections = m_fadePlaybackSelections;
 
   ensureGlyphAtlas(dpr);
   if (m_glyphAtlas) {

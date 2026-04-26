@@ -169,7 +169,7 @@ private:
                          const HexViewFrame::Data& frame);
   void rebuildCacheWindow(const HexViewFrame::Data& frame);
   const CachedLine* cachedLineFor(int line) const;
-  void appendMaskForSelections(const std::vector<HexViewFrame::SelectionRange>& selections,
+  void appendMaskForSelections(std::span<const HexViewFrame::SelectionRange> selections,
                                const SelectionBuildContext& ctx,
                                float padX,
                                float padY,
