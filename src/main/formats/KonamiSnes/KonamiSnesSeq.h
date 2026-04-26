@@ -127,20 +127,17 @@ class KonamiSnesTrack
                            uint8_t& targetNote,
                            int16_t& pitchDelta);
   void clearPitchSlide();
-  void readPitchSlideV3Args(uint8_t& delay,
-                            uint8_t& length,
-                            uint8_t& targetNote,
-                            int16_t& pitchDelta);
   void addPitchSlideV3Event(uint32_t offset,
                             uint32_t length,
                             uint8_t delay,
                             uint8_t slideLength,
                             uint8_t targetNote,
                             int16_t pitchDelta);
+  uint16_t pitchSlideRangeCents(uint8_t length, uint8_t targetNote, int16_t pitchDelta) const;
   void updatePitchBendRange(uint16_t cents);
   void updatePitchBend(int16_t bend);
+  void applyCurrentPitchBend();
   void startPitchSlideV3(uint8_t delay, uint8_t length, uint8_t targetNote, int16_t pitchDelta);
-  int16_t pitchBendForSemitoneDelta(double semitoneDelta, uint16_t rangeCents) const;
   double getTuningInSemitones(int8_t tuning);
   uint8_t convertGAINAmountToGAIN(uint8_t gainAmount);
 
