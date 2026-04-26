@@ -6,21 +6,17 @@
 
 #include "SequenceControlBar.h"
 
-#include <QAbstractSpinBox>
+#include "ColorHelpers.h"
+
 #include <QApplication>
 #include <QDoubleSpinBox>
 #include <QEvent>
-#include <QFrame>
-#include <QHBoxLayout>
-#include <QKeyEvent>
 #include <QLabel>
 #include <QLineEdit>
-#include <QMouseEvent>
 #include <QPainter>
 #include <QPainterPath>
 #include <QPalette>
 #include <QPaintEvent>
-#include <QResizeEvent>
 #include <QScrollArea>
 #include <QScrollBar>
 #include <QTabBar>

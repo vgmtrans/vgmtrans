@@ -59,7 +59,6 @@ target_sources(vgmtrans
     widgets/EmptyStateWidget.cpp
     widgets/SeekBar.cpp
     widgets/MarqueeLabel.cpp
-    widgets/SnappingSplitter.cpp
     widgets/StitchUI.cpp
     widgets/StatusBarContent.cpp
     widgets/Toast.cpp
