@@ -78,6 +78,8 @@ void KonamiSnesSeq::resetVars(void) {
   VGMSeq::resetVars();
 
   tempo = 0;
+  tempoFade = {};
+  tempoFadeLastUpdatedTime = static_cast<uint32_t>(-1);
 }
 
 bool KonamiSnesSeq::parseHeader(void) {
@@ -161,7 +163,7 @@ void KonamiSnesSeq::loadEventMap() {
   EventMap[0xe8] = EVENT_LOOP_START_2;
   EventMap[0xe9] = EVENT_LOOP_END_2;
   EventMap[0xea] = EVENT_TEMPO;
-  EventMap[0xeb] = EVENT_TEMPO_FADE;
+  EventMap[0xeb] = EVENT_TEMPO_FADE_V1;
   EventMap[0xec] = EVENT_TRANSPABS;
   EventMap[0xed] = EVENT_ADSR1;
   EventMap[0xee] = EVENT_VOLUME;
@@ -226,6 +228,7 @@ void KonamiSnesSeq::loadEventMap() {
       }
 
       EventMap[0xed] = EVENT_ADSR1;
+      EventMap[0xeb] = EVENT_TEMPO_FADE_V2;
       EventMap[0xef] = EVENT_VOLUME_SLIDE_V2;
       EventMap[0xf1] = EVENT_PITCH_ENVELOPE_V2;
       EventMap[0xf3] = EVENT_PITCH_SLIDE_V3;
@@ -241,6 +244,7 @@ void KonamiSnesSeq::loadEventMap() {
       }
 
       EventMap[0xed] = EVENT_ADSR1;
+      EventMap[0xeb] = EVENT_TEMPO_FADE_V2;
       EventMap[0xef] = EVENT_VOLUME_SLIDE_V2;
       EventMap[0xf1] = EVENT_PITCH_ENVELOPE_V2;
       EventMap[0xf3] = EVENT_PITCH_SLIDE_V3;
@@ -317,7 +321,6 @@ void KonamiSnesTrack::resetVars(void) {
 
   seqTuningCents = 0.0;
 
-  tempoFade = {};
   panFade = {};
   panFade.currentPan = defaultPanValue() << 8;
   panFade.targetPan = panFade.currentPan;
@@ -346,16 +349,31 @@ uint8_t KonamiSnesTrack::convertGAINAmountToGAIN(uint8_t gainAmount) {
 }
 
 void KonamiSnesTrack::onTickBegin() {
-  if (tempoFade.length > 0) {
-    tempoFade.length -= 1;
-    if (tempoFade.length == 0) {
-      tempoFade.currentTempo = tempoFade.targetTempo;
-      clearActiveTempoFade();
+  auto *seq = static_cast<KonamiSnesSeq*>(parentSeq);
+  auto &tempoFade = seq->tempoFade;
+  if (seq->tempoFadeLastUpdatedTime != getTime()) {
+    seq->tempoFadeLastUpdatedTime = getTime();
+
+    if (tempoFade.useLength) {
+      tempoFade.length -= 1;
+      if (tempoFade.length == 0) {
+        tempoFade.currentTempo = tempoFade.targetTempo;
+        clearActiveTempoFade();
+      }
+      else {
+        tempoFade.currentTempo += tempoFade.delta;
+      }
+      applyCurrentTempo();
     }
-    else {
+    else if (tempoFade.delta != 0) {
       tempoFade.currentTempo += tempoFade.delta;
+      if ((tempoFade.delta > 0 && tempoFade.currentTempo >= tempoFade.targetTempo)
+          || (tempoFade.delta < 0 && tempoFade.currentTempo <= tempoFade.targetTempo)) {
+        tempoFade.currentTempo = tempoFade.targetTempo;
+        clearActiveTempoFade();
+      }
+      applyCurrentTempo();
     }
-    applyCurrentTempo();
   }
 
   if (panFade.useLength) {
@@ -747,15 +765,71 @@ void KonamiSnesTrack::applyCurrentPan() {
   }
 }
 
+KonamiSnesTrack::TempoFade KonamiSnesTrack::readTempoFade(KonamiSnesSeqEventType eventType, uint32_t offset) const {
+  const auto &tempoFade = static_cast<KonamiSnesSeq*>(parentSeq)->tempoFade;
+  TempoFade fade {offset, 0};
+
+  switch (eventType) {
+    case EVENT_TEMPO_FADE_V1:
+      fade.length = readByte(curOffset);
+      fade.targetTempo = readByte(curOffset + 1);
+      fade.useLength = true;
+      if (fade.length != 0) {
+        fade.delta = static_cast<int16_t>(((static_cast<int32_t>(fade.targetTempo) << 8)
+                                           - (tempoFade.currentTempo & 0xff00))
+                                          / fade.length);
+      }
+      break;
+
+    case EVENT_TEMPO_FADE_V2:
+      fade.targetTempo = readByte(curOffset);
+      fade.delta = static_cast<int16_t>(static_cast<int8_t>(readByte(curOffset + 1)) << 4);
+      break;
+
+    default:
+      assert(false);
+      break;
+  }
+
+  return fade;
+}
+
+void KonamiSnesTrack::addTempoFadeEvent(const TempoFade& fade) {
+  const auto bpm = static_cast<KonamiSnesSeq*>(parentSeq)->getTempoInBPM(fade.targetTempo);
+  const std::string desc = fade.useLength
+      ? fmt::format("Length: {:d}  Target BPM: {}", fade.length, bpm)
+      : fmt::format("Target BPM: {}  Speed: {:.2f}", bpm, fade.delta / 256.0);
+  addGenericEvent(fade.offset, 3, "Tempo Fade", desc, Type::Tempo);
+}
+
+void KonamiSnesTrack::beginTempoFade(const TempoFade& fade) {
+  addTempoFadeEvent(fade);
+
+  auto &tempoFade = static_cast<KonamiSnesSeq*>(parentSeq)->tempoFade;
+  tempoFade.currentTempo &= 0xff00;
+  tempoFade.targetTempo = fade.targetTempo << 8;
+  tempoFade.delta = fade.delta;
+  tempoFade.length = fade.length;
+  tempoFade.useLength = fade.useLength;
+
+  if ((fade.useLength && fade.length == 0) || (!fade.useLength && fade.delta == 0)) {
+    tempoFade.currentTempo = tempoFade.targetTempo;
+    clearActiveTempoFade();
+    applyCurrentTempo();
+  }
+}
+
 void KonamiSnesTrack::clearActiveTempoFade() {
+  auto &tempoFade = static_cast<KonamiSnesSeq*>(parentSeq)->tempoFade;
   tempoFade.targetTempo = tempoFade.currentTempo;
   tempoFade.delta = 0;
   tempoFade.length = 0;
+  tempoFade.useLength = false;
 }
 
 void KonamiSnesTrack::applyCurrentTempo() {
-  const auto newTempo = static_cast<uint8_t>(std::clamp(tempoFade.currentTempo >> 8, 0, 0xff));
   auto *seq = static_cast<KonamiSnesSeq*>(parentSeq);
+  const auto newTempo = static_cast<uint8_t>(std::clamp(seq->tempoFade.currentTempo >> 8, 0, 0xff));
   if (newTempo != seq->tempo) {
     seq->tempo = newTempo;
     addTempoBPMNoItem(seq->getTempoInBPM(newTempo));
@@ -1199,29 +1273,18 @@ bool KonamiSnesTrack::readEvent() {
       // actual Konami engine has tempo for each tracks,
       // here we set the song speed as a global tempo
       uint8_t newTempo = readByte(curOffset++);
-      tempoFade.currentTempo = newTempo << 8;
+      parentSeq->tempoFade.currentTempo = newTempo << 8;
       clearActiveTempoFade();
       parentSeq->tempo = newTempo;
       addTempoBPM(beginOffset, curOffset - beginOffset, parentSeq->getTempoInBPM(newTempo));
       break;
     }
 
-    case EVENT_TEMPO_FADE: {
-      const uint8_t fadeLength = readByte(curOffset++);
-      const uint8_t targetTempo = readByte(curOffset++);
-      desc = fmt::format("Length: {:d}  Target BPM: {}", fadeLength, parentSeq->getTempoInBPM(targetTempo));
-      addGenericEvent(beginOffset, curOffset - beginOffset, "Tempo Fade", desc, Type::Tempo);
-
-      tempoFade.length = fadeLength;
-      tempoFade.targetTempo = targetTempo << 8;
-      tempoFade.delta = fadeLength == 0
-          ? 0
-          : static_cast<int16_t>((tempoFade.targetTempo - (tempoFade.currentTempo & 0xff00)) / fadeLength);
-      if (fadeLength == 0) {
-        tempoFade.currentTempo = tempoFade.targetTempo;
-        clearActiveTempoFade();
-        applyCurrentTempo();
-      }
+    case EVENT_TEMPO_FADE_V1:
+    case EVENT_TEMPO_FADE_V2: {
+      const auto fade = readTempoFade(eventType, beginOffset);
+      curOffset += 2;
+      beginTempoFade(fade);
       break;
     }
 

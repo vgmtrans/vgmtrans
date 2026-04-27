@@ -34,7 +34,8 @@ enum KonamiSnesSeqEventType {
   EVENT_LOOP_START_2,
   EVENT_LOOP_END_2,
   EVENT_TEMPO,
-  EVENT_TEMPO_FADE,
+  EVENT_TEMPO_FADE_V1,
+  EVENT_TEMPO_FADE_V2,
   EVENT_TRANSPABS,
   EVENT_ADSR1,
   EVENT_ADSR2,
@@ -67,6 +68,14 @@ enum KonamiSnesSeqEventType {
 class KonamiSnesSeq
     : public VGMSeq {
  public:
+  struct ActiveTempoFade {
+    int32_t currentTempo = 0;
+    int32_t targetTempo = 0;
+    int16_t delta = 0;
+    uint8_t length = 0;
+    bool useLength = false;
+  };
+
   KonamiSnesSeq
       (RawFile *file, KonamiSnesVersion ver, uint32_t seqdataOffset, std::string newName = "Konami SNES Seq");
   ~KonamiSnesSeq() override;
@@ -76,6 +85,8 @@ class KonamiSnesSeq
   void resetVars() override;
 
   uint8_t tempo;
+  ActiveTempoFade tempoFade;
+  uint32_t tempoFadeLastUpdatedTime;
 
   KonamiSnesVersion version;
   std::map<uint8_t, KonamiSnesSeqEventType> EventMap;
@@ -180,11 +191,12 @@ class KonamiSnesTrack
     bool useLength = false;
   };
 
-  struct ActiveTempoFade {
-    int32_t currentTempo = 0;
-    int32_t targetTempo = 0;
+  struct TempoFade {
+    uint32_t offset;
+    uint8_t targetTempo;
     int16_t delta = 0;
     uint8_t length = 0;
+    bool useLength = false;
   };
 
   std::optional<PitchSlide> consumePitchSlide();
@@ -208,6 +220,9 @@ class KonamiSnesTrack
   void beginPanFade(const PanFade& fade);
   void clearActivePanFade();
   void applyCurrentPan();
+  TempoFade readTempoFade(KonamiSnesSeqEventType eventType, uint32_t offset) const;
+  void addTempoFadeEvent(const TempoFade& fade);
+  void beginTempoFade(const TempoFade& fade);
   void clearActiveTempoFade();
   void applyCurrentTempo();
   void setPitchBendRange(uint16_t cents);
@@ -219,8 +234,6 @@ class KonamiSnesTrack
   double getLoopPitchDeltaCents() const;
   void applyEffectiveTuning(uint32_t offset, uint32_t length);
 
-
-  ActiveTempoFade tempoFade;
   ActivePanFade panFade;
   ActiveVolumeSlide volumeSlide;
   ActivePitchSlide pitchSlide;
