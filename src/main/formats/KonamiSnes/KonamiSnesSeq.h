@@ -40,8 +40,8 @@ enum KonamiSnesSeqEventType {
   EVENT_ADSR1,
   EVENT_ADSR2,
   EVENT_VOLUME,
-  EVENT_VOLUME_SLIDE_V1,
-  EVENT_VOLUME_SLIDE_V2,
+  EVENT_VOLUME_FADE_V1,
+  EVENT_VOLUME_FADE_V2,
   EVENT_PORTAMENTO,
   EVENT_PITCH_ENVELOPE_V1,
   EVENT_PITCH_ENVELOPE_V2,
@@ -159,7 +159,7 @@ class KonamiSnesTrack
     double deltaSemitones = 0.0;
   };
 
-  struct VolumeSlide {
+  struct VolumeFade {
     uint32_t offset;
     uint8_t targetVolume;
     int16_t delta = 0;
@@ -207,11 +207,11 @@ class KonamiSnesTrack
   void resetPitchForNote(uint8_t key);
   void beginPitchSlide(const PitchSlide& slide);
   uint16_t pitchSlideRangeCents(const PitchSlide& slide) const;
-  VolumeSlide readVolumeSlide(KonamiSnesSeqEventType eventType, uint32_t offset) const;
-  void addVolumeSlideEvent(const VolumeSlide& slide);
-  void clearActiveVolumeSlide();
+  VolumeFade readVolumeFade(KonamiSnesSeqEventType eventType, uint32_t offset) const;
+  void addVolumeFadeEvent(const VolumeFade& fade);
+  void clearActiveVolumeFade();
   void applyCurrentVolume();
-  void beginVolumeSlide(const VolumeSlide& slide);
+  void beginVolumeFade(const VolumeFade& fade);
   uint8_t defaultPanValue() const;
   uint8_t clampPanValue(uint8_t pan) const;
   uint8_t convertPanValueToMidiPan(uint8_t pan) const;
@@ -235,7 +235,7 @@ class KonamiSnesTrack
   void applyEffectiveTuning(uint32_t offset, uint32_t length);
 
   ActivePanFade panFade;
-  ActiveVolumeSlide volumeSlide;
+  ActiveVolumeSlide volumeFade;
   ActivePitchSlide pitchSlide;
   uint16_t pitchBendRangeCents;
   int16_t currentPitchBend;
