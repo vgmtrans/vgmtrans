@@ -317,6 +317,7 @@ void KonamiSnesTrack::resetVars(void) {
 
   seqTuningCents = 0.0;
 
+  tempoFade = {};
   panFade = {};
   panFade.currentPan = defaultPanValue() << 8;
   panFade.targetPan = panFade.currentPan;
@@ -345,6 +346,18 @@ uint8_t KonamiSnesTrack::convertGAINAmountToGAIN(uint8_t gainAmount) {
 }
 
 void KonamiSnesTrack::onTickBegin() {
+  if (tempoFade.length > 0) {
+    tempoFade.length -= 1;
+    if (tempoFade.length == 0) {
+      tempoFade.currentTempo = tempoFade.targetTempo;
+      clearActiveTempoFade();
+    }
+    else {
+      tempoFade.currentTempo += tempoFade.delta;
+    }
+    applyCurrentTempo();
+  }
+
   if (panFade.useLength) {
     panFade.length -= 1;
     if (panFade.length == 0) {
@@ -731,6 +744,21 @@ void KonamiSnesTrack::applyCurrentPan() {
   const uint8_t midiPan = convertPanValueToMidiPan(clampPanValue(panFade.currentPan >> 8));
   if (midiPan != prevPan) {
     addPanNoItem(midiPan);
+  }
+}
+
+void KonamiSnesTrack::clearActiveTempoFade() {
+  tempoFade.targetTempo = tempoFade.currentTempo;
+  tempoFade.delta = 0;
+  tempoFade.length = 0;
+}
+
+void KonamiSnesTrack::applyCurrentTempo() {
+  const auto newTempo = static_cast<uint8_t>(std::clamp(tempoFade.currentTempo >> 8, 0, 0xff));
+  auto *seq = static_cast<KonamiSnesSeq*>(parentSeq);
+  if (newTempo != seq->tempo) {
+    seq->tempo = newTempo;
+    addTempoBPMNoItem(seq->getTempoInBPM(newTempo));
   }
 }
 
@@ -1171,16 +1199,29 @@ bool KonamiSnesTrack::readEvent() {
       // actual Konami engine has tempo for each tracks,
       // here we set the song speed as a global tempo
       uint8_t newTempo = readByte(curOffset++);
+      tempoFade.currentTempo = newTempo << 8;
+      clearActiveTempoFade();
       parentSeq->tempo = newTempo;
-      addTempoBPM(beginOffset, curOffset - beginOffset, parentSeq->getTempoInBPM());
+      addTempoBPM(beginOffset, curOffset - beginOffset, parentSeq->getTempoInBPM(newTempo));
       break;
     }
 
     case EVENT_TEMPO_FADE: {
-      uint8_t newTempo = readByte(curOffset++);
-      uint8_t fadeSpeed = readByte(curOffset++);
-      desc = fmt::format("BPM: {}  Fade Length: {}", parentSeq->getTempoInBPM(newTempo), fadeSpeed);
+      const uint8_t fadeLength = readByte(curOffset++);
+      const uint8_t targetTempo = readByte(curOffset++);
+      desc = fmt::format("Length: {:d}  Target BPM: {}", fadeLength, parentSeq->getTempoInBPM(targetTempo));
       addGenericEvent(beginOffset, curOffset - beginOffset, "Tempo Fade", desc, Type::Tempo);
+
+      tempoFade.length = fadeLength;
+      tempoFade.targetTempo = targetTempo << 8;
+      tempoFade.delta = fadeLength == 0
+          ? 0
+          : static_cast<int16_t>((tempoFade.targetTempo - (tempoFade.currentTempo & 0xff00)) / fadeLength);
+      if (fadeLength == 0) {
+        tempoFade.currentTempo = tempoFade.targetTempo;
+        clearActiveTempoFade();
+        applyCurrentTempo();
+      }
       break;
     }
 

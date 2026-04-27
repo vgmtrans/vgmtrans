@@ -180,6 +180,13 @@ class KonamiSnesTrack
     bool useLength = false;
   };
 
+  struct ActiveTempoFade {
+    int32_t currentTempo = 0;
+    int32_t targetTempo = 0;
+    int16_t delta = 0;
+    uint8_t length = 0;
+  };
+
   std::optional<PitchSlide> consumePitchSlide();
   PitchSlide readPitchSlide(KonamiSnesSeqEventType eventType, uint32_t offset);
   void addPitchSlideEvent(const PitchSlide& slide);
@@ -201,6 +208,8 @@ class KonamiSnesTrack
   void beginPanFade(const PanFade& fade);
   void clearActivePanFade();
   void applyCurrentPan();
+  void clearActiveTempoFade();
+  void applyCurrentTempo();
   void setPitchBendRange(uint16_t cents);
   void setPitchBend(int16_t bend);
   void applyCurrentPitchBend();
@@ -211,6 +220,7 @@ class KonamiSnesTrack
   void applyEffectiveTuning(uint32_t offset, uint32_t length);
 
 
+  ActiveTempoFade tempoFade;
   ActivePanFade panFade;
   ActiveVolumeSlide volumeSlide;
   ActivePitchSlide pitchSlide;
