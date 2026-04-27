@@ -61,6 +61,10 @@ std::vector<PercussionHeader> collectPercussionHeaders(RawFile *file,
   const uint32_t instrItemSize = KonamiSnesInstr::expectedSize(version);
   for (uint8_t percussionNote = 0; percussionNote < kKonamiSnesPercussionNoteCount; percussionNote++) {
     const uint32_t addrInstrHeader = tableOffset + (instrItemSize * percussionNote);
+    if (addrInstrHeader + instrItemSize > 0x10000) {
+      break;
+    }
+
     if (!isValidPercussionHeader(file, version, addrInstrHeader, spcDirAddr)) {
       const bool legacyLayout = usesLegacyInstrumentLayout(version);
       const uint8_t pan = file->readByte(addrInstrHeader + (legacyLayout ? 6 : 5));
