@@ -52,7 +52,8 @@ enum KonamiSnesSeqEventType {
   EVENT_ECHO_PARAM,
   EVENT_LOOP_WITH_VOLTA_START,
   EVENT_LOOP_WITH_VOLTA_END,
-  EVENT_PAN_FADE,
+  EVENT_PAN_FADE_V1,
+  EVENT_PAN_FADE_V2,
   EVENT_VIBRATO_FADE,
   EVENT_ADSR_GAIN,
   EVENT_PROGCHANGEVOL,
@@ -168,6 +169,15 @@ class KonamiSnesTrack
     int32_t targetPan = 0;
     int16_t delta = 0;
     uint8_t length = 0;
+    bool useLength = false;
+  };
+
+  struct PanFade {
+    uint32_t offset;
+    uint8_t targetPan;
+    int16_t delta = 0;
+    uint8_t length = 0;
+    bool useLength = false;
   };
 
   std::optional<PitchSlide> consumePitchSlide();
@@ -186,6 +196,9 @@ class KonamiSnesTrack
   uint8_t defaultPanValue() const;
   uint8_t clampPanValue(uint8_t pan) const;
   uint8_t convertPanValueToMidiPan(uint8_t pan) const;
+  PanFade readPanFade(KonamiSnesSeqEventType eventType, uint32_t offset) const;
+  void addPanFadeEvent(const PanFade& fade);
+  void beginPanFade(const PanFade& fade);
   void clearActivePanFade();
   void applyCurrentPan();
   void setPitchBendRange(uint16_t cents);

@@ -174,7 +174,7 @@ void KonamiSnesSeq::loadEventMap() {
   EventMap[0xf5] = EVENT_ECHO_PARAM;
   EventMap[0xf6] = EVENT_LOOP_WITH_VOLTA_START;
   EventMap[0xf7] = EVENT_LOOP_WITH_VOLTA_END;
-  EventMap[0xf8] = EVENT_PAN_FADE;
+  EventMap[0xf8] = EVENT_PAN_FADE_V1;
   EventMap[0xf9] = EVENT_VIBRATO_FADE;
   EventMap[0xfa] = EVENT_ADSR_GAIN;
   EventMap[0xfb] = EVENT_ADSR2;
@@ -229,6 +229,7 @@ void KonamiSnesSeq::loadEventMap() {
       EventMap[0xef] = EVENT_VOLUME_SLIDE_V2;
       EventMap[0xf1] = EVENT_PITCH_ENVELOPE_V2;
       EventMap[0xf3] = EVENT_PITCH_SLIDE_V3;
+      EventMap[0xf8] = EVENT_PAN_FADE_V2;
       EventMap[0xfa] = EVENT_ADSR_GAIN;
       EventMap[0xfb] = EVENT_ADSR2;
       EventMap[0xfc] = EVENT_PROGCHANGEVOL;
@@ -243,6 +244,7 @@ void KonamiSnesSeq::loadEventMap() {
       EventMap[0xef] = EVENT_VOLUME_SLIDE_V2;
       EventMap[0xf1] = EVENT_PITCH_ENVELOPE_V2;
       EventMap[0xf3] = EVENT_PITCH_SLIDE_V3;
+      EventMap[0xf8] = EVENT_PAN_FADE_V2;
       EventMap[0xfa] = EVENT_ADSR_GAIN;
       EventMap[0xfb] = EVENT_ADSR2;
       EventMap[0xfc] = EVENT_PROGCHANGEVOL;
@@ -343,7 +345,7 @@ uint8_t KonamiSnesTrack::convertGAINAmountToGAIN(uint8_t gainAmount) {
 }
 
 void KonamiSnesTrack::onTickBegin() {
-  if (panFade.length > 0) {
+  if (panFade.useLength) {
     panFade.length -= 1;
     if (panFade.length == 0) {
       panFade.currentPan = panFade.targetPan;
@@ -351,6 +353,15 @@ void KonamiSnesTrack::onTickBegin() {
     }
     else {
       panFade.currentPan += panFade.delta;
+    }
+    applyCurrentPan();
+  }
+  else if (panFade.delta != 0) {
+    panFade.currentPan += panFade.delta;
+    if ((panFade.delta > 0 && panFade.currentPan >= panFade.targetPan)
+        || (panFade.delta < 0 && panFade.currentPan <= panFade.targetPan)) {
+      panFade.currentPan = panFade.targetPan;
+      clearActivePanFade();
     }
     applyCurrentPan();
   }
@@ -660,10 +671,60 @@ uint8_t KonamiSnesTrack::convertPanValueToMidiPan(uint8_t pan) const {
   return convertLinearPercentPanValToStdMidiVal(static_cast<double>(volumeRight) / (volumeLeft + volumeRight));
 }
 
+KonamiSnesTrack::PanFade KonamiSnesTrack::readPanFade(KonamiSnesSeqEventType eventType, uint32_t offset) const {
+  PanFade fade {offset, 0};
+
+  switch (eventType) {
+    case EVENT_PAN_FADE_V1:
+      fade.length = readByte(curOffset);
+      fade.targetPan = clampPanValue(readByte(curOffset + 1));
+      fade.useLength = true;
+      if (fade.length != 0) {
+        fade.delta = static_cast<int16_t>(((static_cast<int32_t>(fade.targetPan) << 8) - (panFade.currentPan & 0xff00)) / fade.length);
+      }
+      break;
+
+    case EVENT_PAN_FADE_V2:
+      fade.targetPan = clampPanValue(readByte(curOffset));
+      fade.delta = static_cast<int16_t>(static_cast<int8_t>(readByte(curOffset + 1)) << 4);
+      break;
+
+    default:
+      assert(false);
+      break;
+  }
+
+  return fade;
+}
+
+void KonamiSnesTrack::addPanFadeEvent(const PanFade& fade) {
+  const std::string desc = fade.useLength
+      ? fmt::format("Length: {:d}  Target Pan: {:d}", fade.length, fade.targetPan)
+      : fmt::format("Target Pan: {:d}  Speed: {:.2f}", fade.targetPan, fade.delta / 256.0);
+  addGenericEvent(fade.offset, 3, "Pan Fade", desc, Type::PanSlide);
+}
+
+void KonamiSnesTrack::beginPanFade(const PanFade& fade) {
+  addPanFadeEvent(fade);
+
+  panFade.currentPan &= 0xff00;
+  panFade.targetPan = fade.targetPan << 8;
+  panFade.delta = fade.delta;
+  panFade.length = fade.length;
+  panFade.useLength = fade.useLength;
+
+  if ((fade.useLength && fade.length == 0) || (!fade.useLength && fade.delta == 0)) {
+    panFade.currentPan = panFade.targetPan;
+    clearActivePanFade();
+    applyCurrentPan();
+  }
+}
+
 void KonamiSnesTrack::clearActivePanFade() {
   panFade.targetPan = panFade.currentPan;
   panFade.delta = 0;
   panFade.length = 0;
+  panFade.useLength = false;
 }
 
 void KonamiSnesTrack::applyCurrentPan() {
@@ -1261,22 +1322,11 @@ bool KonamiSnesTrack::readEvent() {
       break;
     }
 
-    case EVENT_PAN_FADE: {
-      const uint8_t fadeLength = readByte(curOffset++);
-      const uint8_t targetPan = clampPanValue(readByte(curOffset++));
-      desc = fmt::format("Length: {:d}  Target Pan: {:d}", fadeLength, targetPan);
-      addGenericEvent(beginOffset, curOffset - beginOffset, "Pan Fade", desc, Type::PanSlide);
-
-      panFade.length = fadeLength;
-      panFade.targetPan = targetPan << 8;
-      panFade.delta = fadeLength == 0
-          ? 0
-          : static_cast<int16_t>((panFade.targetPan - (panFade.currentPan & 0xff00)) / fadeLength);
-      if (fadeLength == 0) {
-        panFade.currentPan = panFade.targetPan;
-        clearActivePanFade();
-        applyCurrentPan();
-      }
+    case EVENT_PAN_FADE_V1:
+    case EVENT_PAN_FADE_V2: {
+      const auto fade = readPanFade(eventType, beginOffset);
+      curOffset += 2;
+      beginPanFade(fade);
       break;
     }
 
