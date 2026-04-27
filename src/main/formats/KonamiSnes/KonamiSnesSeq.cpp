@@ -393,6 +393,7 @@ std::optional<KonamiSnesTrack::PitchSlide> KonamiSnesTrack::consumePitchSlide() 
 
   switch (nextEvent->second) {
     case EVENT_PITCH_SLIDE_V1:
+    case EVENT_PITCH_SLIDE_V2:
     case EVENT_PITCH_SLIDE_V3:
       return readPitchSlide(nextEvent->second, curOffset++);
 
@@ -418,6 +419,18 @@ KonamiSnesTrack::PitchSlide KonamiSnesTrack::readPitchSlide(KonamiSnesSeqEventTy
         slide.delta = static_cast<int16_t>(((slide.targetSemitones - pitchSlide.currentSemitones) * 256.0)
                                            / slide.length);
         slide.deltaSemitones = slide.delta / 256.0;
+      }
+      break;
+
+    case EVENT_PITCH_SLIDE_V2:
+      slide.eventLength = 4;
+      slide.targetSemitones = noteSemitones(slide.targetNote, false);
+      if (slide.length != 0) {
+        slide.eventLength = 7;
+        curOffset += 1;
+        slide.delta = static_cast<int16_t>(readShort(curOffset));
+        slide.deltaSemitones = slide.delta / 256.0;
+        curOffset += 2;
       }
       break;
 
@@ -1146,28 +1159,10 @@ bool KonamiSnesTrack::readEvent() {
     }
 
     case EVENT_PITCH_SLIDE_V1:
+    case EVENT_PITCH_SLIDE_V2:
     case EVENT_PITCH_SLIDE_V3:
       addPitchSlideEvent(readPitchSlide(eventType, beginOffset));
       break;
-
-    case EVENT_PITCH_SLIDE_V2: {
-      uint8_t arg1 = readByte(curOffset++);
-      uint8_t arg2 = readByte(curOffset++);
-      uint8_t arg3 = readByte(curOffset++);
-      desc = fmt::format("Arg1: {:d}  Arg2: {:d}  Arg3: {:d}", arg1, arg2, arg3);
-
-      if (arg2 != 0) {
-        uint8_t arg4 = readByte(curOffset++);
-        uint8_t arg5 = readByte(curOffset++);
-        uint8_t arg6 = readByte(curOffset++);
-        fmt::format_to(std::back_inserter(desc), "  Arg4: {:d}  Arg5: {:d}  Arg6: {:d}",
-                       arg4, arg5, arg6);
-      }
-
-      addGenericEvent(beginOffset, curOffset - beginOffset, "Pitch Slide", desc,
-                      Type::PitchBendSlide);
-      break;
-    }
 
     case EVENT_ECHO: {
       uint8_t echoChannels = readByte(curOffset++);

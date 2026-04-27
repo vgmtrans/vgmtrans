@@ -133,7 +133,7 @@ class KonamiSnesTrack
     uint8_t length;
     uint8_t targetNote;
     double targetSemitones = 0.0;
-    int16_t delta;
+    int16_t delta = 0;
     double deltaSemitones = 0.0;
   };
 
