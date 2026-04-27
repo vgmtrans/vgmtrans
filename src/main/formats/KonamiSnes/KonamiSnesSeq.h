@@ -207,6 +207,7 @@ class KonamiSnesTrack
   void resetPitchForNote(uint8_t key);
   void beginPitchSlide(const PitchSlide& slide);
   uint16_t pitchSlideRangeCents(const PitchSlide& slide) const;
+  uint8_t getNoteDuration(uint8_t length, uint8_t durationRate) const;
   VolumeFade readVolumeFade(KonamiSnesSeqEventType eventType, uint32_t offset) const;
   void addVolumeFadeEvent(const VolumeFade& fade);
   void clearActiveVolumeFade();
@@ -233,6 +234,10 @@ class KonamiSnesTrack
   int16_t getLoopVolumeDelta() const;
   double getLoopPitchDeltaCents() const;
   void applyEffectiveTuning(uint32_t offset, uint32_t length);
+  void addUnknownEvent(uint32_t beginOffset, uint8_t statusByte, uint8_t argCount);
+  void resetPanAfterProgramChange();
+  KonamiSnesSeq& seq();
+  const KonamiSnesSeq& seq() const;
 
   ActivePanFade panFade;
   ActiveVolumeSlide volumeFade;
