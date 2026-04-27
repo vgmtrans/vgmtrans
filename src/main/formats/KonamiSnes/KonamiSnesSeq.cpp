@@ -315,6 +315,9 @@ void KonamiSnesTrack::resetVars(void) {
 
   seqTuningCents = 0.0;
 
+  panFade = {};
+  panFade.currentPan = defaultPanValue() << 8;
+  panFade.targetPan = panFade.currentPan;
   volumeSlide = {};
   pitchSlide = {};
   pitchBendRangeCents = KONAMI_SNES_STD_PITCH_BEND_RANGE_CENTS;
@@ -340,6 +343,18 @@ uint8_t KonamiSnesTrack::convertGAINAmountToGAIN(uint8_t gainAmount) {
 }
 
 void KonamiSnesTrack::onTickBegin() {
+  if (panFade.length > 0) {
+    panFade.length -= 1;
+    if (panFade.length == 0) {
+      panFade.currentPan = panFade.targetPan;
+      clearActivePanFade();
+    }
+    else {
+      panFade.currentPan += panFade.delta;
+    }
+    applyCurrentPan();
+  }
+
   if (volumeSlide.useLength) {
     volumeSlide.length -= 1;
     if (volumeSlide.length == 0) {
@@ -610,6 +625,54 @@ void KonamiSnesTrack::beginVolumeSlide(const VolumeSlide& slide) {
   }
 }
 
+uint8_t KonamiSnesTrack::defaultPanValue() const {
+  return static_cast<KonamiSnesSeq*>(parentSeq)->version <= KONAMISNES_V2 ? 10 : 20;
+}
+
+uint8_t KonamiSnesTrack::clampPanValue(uint8_t pan) const {
+  return std::min(pan, static_cast<KonamiSnesSeq*>(parentSeq)->version <= KONAMISNES_V2 ? uint8_t {20}
+                                                                                         : uint8_t {40});
+}
+
+uint8_t KonamiSnesTrack::convertPanValueToMidiPan(uint8_t pan) const {
+  uint8_t volumeLeft;
+  uint8_t volumeRight;
+  switch (static_cast<KonamiSnesSeq*>(parentSeq)->version) {
+    case KONAMISNES_V1:
+      pan = std::min(pan, static_cast<uint8_t>(20));
+      volumeLeft = static_cast<KonamiSnesSeq*>(parentSeq)->PAN_VOLUME_LEFT_V1[pan];
+      volumeRight = static_cast<KonamiSnesSeq*>(parentSeq)->PAN_VOLUME_RIGHT_V1[pan];
+      break;
+
+    case KONAMISNES_V2:
+      pan = std::min(pan, static_cast<uint8_t>(20));
+      volumeLeft = static_cast<KonamiSnesSeq*>(parentSeq)->PAN_VOLUME_LEFT_V2[pan];
+      volumeRight = static_cast<KonamiSnesSeq*>(parentSeq)->PAN_VOLUME_RIGHT_V2[pan];
+      break;
+
+    default:
+      pan = std::min(pan, static_cast<uint8_t>(40));
+      volumeLeft = KonamiSnesSeq::PAN_TABLE[40 - pan];
+      volumeRight = KonamiSnesSeq::PAN_TABLE[pan];
+      break;
+  }
+
+  return convertLinearPercentPanValToStdMidiVal(static_cast<double>(volumeRight) / (volumeLeft + volumeRight));
+}
+
+void KonamiSnesTrack::clearActivePanFade() {
+  panFade.targetPan = panFade.currentPan;
+  panFade.delta = 0;
+  panFade.length = 0;
+}
+
+void KonamiSnesTrack::applyCurrentPan() {
+  const uint8_t midiPan = convertPanValueToMidiPan(clampPanValue(panFade.currentPan >> 8));
+  if (midiPan != prevPan) {
+    addPanNoItem(midiPan);
+  }
+}
+
 int16_t KonamiSnesTrack::getLoopVolumeDelta() const {
   return loopVolumeDelta + loopVolumeDelta2;
 }
@@ -873,6 +936,8 @@ bool KonamiSnesTrack::readEvent() {
 
       instrument = newProg;
       addProgramChange(beginOffset, curOffset - beginOffset, newProg, true);
+      panFade.currentPan = defaultPanValue() << 8;
+      clearActivePanFade();
       addPanNoItem(64); // TODO: apply true pan from instrument table
       break;
     }
@@ -886,12 +951,15 @@ bool KonamiSnesTrack::readEvent() {
 
       uint8_t midiVolume = convertPercentAmpToStdMidiVal(newVolume / 255.0);
       addVolNoItem(midiVolume);
+      panFade.currentPan = defaultPanValue() << 8;
+      clearActivePanFade();
       addPanNoItem(64); // TODO: apply true pan from instrument table
       break;
     }
 
     case EVENT_PAN: {
       uint8_t newPan = readByte(curOffset++);
+      clearActivePanFade();
 
       bool instrumentPanOff;
       bool instrumentPanOn;
@@ -916,37 +984,9 @@ bool KonamiSnesTrack::readEvent() {
                         desc, Type::Pan);
       }
       else {
-        uint8_t volumeLeft;
-        uint8_t volumeRight;
-        switch (parentSeq->version) {
-          case KONAMISNES_V1:
-          case KONAMISNES_V2: {
-            const uint8_t *PAN_VOLUME_LEFT;
-            const uint8_t *PAN_VOLUME_RIGHT;
-            if (parentSeq->version == KONAMISNES_V1) {
-              PAN_VOLUME_LEFT = parentSeq->PAN_VOLUME_LEFT_V1;
-              PAN_VOLUME_RIGHT = parentSeq->PAN_VOLUME_RIGHT_V1;
-            }
-            else { // KONAMISNES_V2
-              PAN_VOLUME_LEFT = parentSeq->PAN_VOLUME_LEFT_V2;
-              PAN_VOLUME_RIGHT = parentSeq->PAN_VOLUME_RIGHT_V2;
-            }
-
-            newPan = std::min(newPan, (uint8_t) 20);
-            volumeLeft = PAN_VOLUME_LEFT[newPan];
-            volumeRight = PAN_VOLUME_RIGHT[newPan];
-            break;
-          }
-
-          default:
-            newPan = std::min(newPan, (uint8_t) 40);
-            volumeLeft = KonamiSnesSeq::PAN_TABLE[40 - newPan];
-            volumeRight = KonamiSnesSeq::PAN_TABLE[newPan];
-        }
-
-        double linearPan = (double) volumeRight / (volumeLeft + volumeRight);
-        uint8_t midiPan = convertLinearPercentPanValToStdMidiVal(linearPan);
-
+        newPan = clampPanValue(newPan);
+        panFade.currentPan = newPan << 8;
+        const uint8_t midiPan = convertPanValueToMidiPan(newPan);
         // TODO: apply volume scale
         addPan(beginOffset, curOffset - beginOffset, midiPan);
       }
@@ -1222,10 +1262,21 @@ bool KonamiSnesTrack::readEvent() {
     }
 
     case EVENT_PAN_FADE: {
-      uint8_t newPan = readByte(curOffset++);
-      uint8_t fadeSpeed = readByte(curOffset++);
-      desc = fmt::format("Pan: {:d}  Fade Length: {:d}", newPan, fadeSpeed);
+      const uint8_t fadeLength = readByte(curOffset++);
+      const uint8_t targetPan = clampPanValue(readByte(curOffset++));
+      desc = fmt::format("Length: {:d}  Target Pan: {:d}", fadeLength, targetPan);
       addGenericEvent(beginOffset, curOffset - beginOffset, "Pan Fade", desc, Type::PanSlide);
+
+      panFade.length = fadeLength;
+      panFade.targetPan = targetPan << 8;
+      panFade.delta = fadeLength == 0
+          ? 0
+          : static_cast<int16_t>((panFade.targetPan - (panFade.currentPan & 0xff00)) / fadeLength);
+      if (fadeLength == 0) {
+        panFade.currentPan = panFade.targetPan;
+        clearActivePanFade();
+        applyCurrentPan();
+      }
       break;
     }
 

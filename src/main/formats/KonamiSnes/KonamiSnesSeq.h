@@ -163,6 +163,13 @@ class KonamiSnesTrack
     bool useLength = false;
   };
 
+  struct ActivePanFade {
+    int32_t currentPan = 0;
+    int32_t targetPan = 0;
+    int16_t delta = 0;
+    uint8_t length = 0;
+  };
+
   std::optional<PitchSlide> consumePitchSlide();
   PitchSlide readPitchSlide(KonamiSnesSeqEventType eventType, uint32_t offset);
   void addPitchSlideEvent(const PitchSlide& slide);
@@ -176,6 +183,11 @@ class KonamiSnesTrack
   void clearActiveVolumeSlide();
   void applyCurrentVolume();
   void beginVolumeSlide(const VolumeSlide& slide);
+  uint8_t defaultPanValue() const;
+  uint8_t clampPanValue(uint8_t pan) const;
+  uint8_t convertPanValueToMidiPan(uint8_t pan) const;
+  void clearActivePanFade();
+  void applyCurrentPan();
   void setPitchBendRange(uint16_t cents);
   void setPitchBend(int16_t bend);
   void applyCurrentPitchBend();
@@ -186,6 +198,7 @@ class KonamiSnesTrack
   void applyEffectiveTuning(uint32_t offset, uint32_t length);
 
 
+  ActivePanFade panFade;
   ActiveVolumeSlide volumeSlide;
   ActivePitchSlide pitchSlide;
   uint16_t pitchBendRangeCents;
