@@ -96,6 +96,7 @@ class KonamiSnesSeq
   static const uint8_t PAN_VOLUME_LEFT_V2[];
   static const uint8_t PAN_VOLUME_RIGHT_V2[];
   static const uint8_t PAN_TABLE[];
+  static const uint8_t VOL_TABLE[];
 
   uint8_t NOTE_DUR_RATE_MAX;
 
