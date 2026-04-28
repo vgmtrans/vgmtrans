@@ -445,10 +445,6 @@ void KonamiSnesTrack::onTickBegin() {
 }
 
 std::optional<KonamiSnesTrack::PitchSlide> KonamiSnesTrack::consumePitchSlide() {
-  if (!isValidOffset(curOffset)) {
-    return std::nullopt;
-  }
-
   const auto &parentSeq = seq();
   const auto statusByte = readByte(curOffset);
   auto nextEvent = parentSeq.EventMap.find(statusByte);
