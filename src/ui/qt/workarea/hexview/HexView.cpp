@@ -758,8 +758,7 @@ void HexView::setPlaybackSelectionsForItems(const std::vector<const VGMItem*>& i
       continue;
     }
     const uint32_t length = item->length() > 0 ? item->length() : 1u;
-    const QColor glowColor =
-        (i < glowColors.size() && glowColors[i].isValid()) ? glowColors[i] : PLAYBACK_GLOW_FALLBACK;
+    const QColor glowColor = (i < glowColors.size() && glowColors[i].isValid()) ? glowColors[i] : PLAYBACK_GLOW_FALLBACK;
     next.push_back({item->offset(), length, glowColor});
   }
 
@@ -1298,7 +1297,11 @@ void HexView::handleSelectionPress(int offset, VGMItem* item) {
     stopNotePreview();
   } else {
     selectionChanged(item);
-    notePreviewRequested(item, false);
+    if (item) {
+      notePreviewRequested(item, false);
+    } else {
+      stopNotePreview();
+    }
   }
   hideTooltip();
 }
@@ -1338,7 +1341,11 @@ void HexView::handleSelectionDrag(int offset) {
   auto* item = m_vgmfile->getItemAtOffset(offset, false);
   if (item != m_selectedItem) {
     selectionChanged(item);
-    notePreviewRequested(item, false);
+    if (item) {
+      notePreviewRequested(item, false);
+    } else {
+      stopNotePreview();
+    }
   }
   hideTooltip();
 }
