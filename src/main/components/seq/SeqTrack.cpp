@@ -11,6 +11,17 @@
 #include "VGMSeqNoTrks.h"
 #include "helper.h"
 #include <algorithm>
+#include <cmath>
+
+namespace {
+constexpr uint16_t maxLevelForResolution(Resolution res) {
+  return res == Resolution::FourteenBit ? 16383 : 127;
+}
+
+double normalizedLevelFromRaw(uint16_t rawLevel, Resolution res) {
+  return rawLevel / static_cast<double>(maxLevelForResolution(res));
+}
+}  // namespace
 
 SeqTrack::SeqTrack(VGMSeq *parentFile, uint32_t offset, uint32_t length, std::string name)
     : VGMItem(parentFile, offset, length, std::move(name), Type::Track),
@@ -31,8 +42,11 @@ void SeqTrack::resetVars() {
   totalTicks = -1;
   deltaTime = 0;
   vol = 100;
+  volResolution = Resolution::SevenBit;
   expression = 127;
+  expressionResolution = Resolution::SevenBit;
   mastVol = 127;
+  masterVolResolution = Resolution::SevenBit;
   prevPan = 64;
   prevReverb = 40;
   channelGroup = 0;
@@ -791,29 +805,34 @@ double SeqTrack::applyLevelCorrection(double level, LevelController controller) 
     if (parentSeq->panVolumeCorrectionMode == relevantCorrectionMode)
       level *= panVolumeCorrectionRate;
   }
-  if (usesLinearAmplitudeScale())
-    level = sqrt(level);
-  return level;
+  return std::clamp(level, 0.0, 1.0);
 }
 
 void SeqTrack::addLevelNoItem(double level, LevelController controller, Resolution res, int absTime) {
-  u16 origLevel = static_cast<u16>(level * (res == Resolution::FourteenBit ? 16383.0 : 127.0));
+  level = std::clamp(level, 0.0, 1.0);
+  const uint16_t maxLevel = maxLevelForResolution(res);
+  const u16 origLevel = static_cast<u16>(std::lround(level * maxLevel));
   switch (controller) {
     case LevelController::Volume:
       vol = origLevel;
+      volResolution = res;
       break;
     case LevelController::Expression:
       expression = origLevel;
+      expressionResolution = res;
       break;
     case LevelController::MasterVolume:
       mastVol = origLevel;
+      masterVolResolution = res;
       break;
   }
 
   level = applyLevelCorrection(level, controller);
   switch (res) {
     case Resolution::SevenBit: {
-      u8 midiLevel = static_cast<uint8_t>(std::min(level * 127.0, 127.0));
+      const u8 midiLevel = usesLinearAmplitudeScale()
+        ? convertPercentAmpToStdMidiVal(level)
+        : static_cast<u8>(std::lround(level * maxLevel));
       switch (controller) {
         case LevelController::Volume:
           if (readMode == READMODE_CONVERT_TO_MIDI) {
@@ -846,9 +865,11 @@ void SeqTrack::addLevelNoItem(double level, LevelController controller, Resoluti
       break;
     }
     case Resolution::FourteenBit: {
-      u16 midiLevel = static_cast<uint16_t>(std::min(level * 16383.0, 16383.0));
-      u8 levelHi = static_cast<uint8_t>((midiLevel >> 7) & 0x7F);
-      u8 levelLo = static_cast<uint8_t>(midiLevel & 0x7F);
+      const u16 midiLevel = usesLinearAmplitudeScale()
+        ? convertPercentAmpToStd14BitMidiVal(level)
+        : static_cast<u16>(std::lround(level * maxLevel));
+      const u8 levelHi = static_cast<uint8_t>((midiLevel >> 7) & 0x7F);
+      const u8 levelLo = static_cast<uint8_t>(midiLevel & 0x7F);
       switch (controller) {
         case LevelController::Volume:
           if (readMode == READMODE_CONVERT_TO_MIDI) {
@@ -868,7 +889,7 @@ void SeqTrack::addLevelNoItem(double level, LevelController controller, Resoluti
               pMidiTrack->addExpression(channel, levelHi);
             } else {
               pMidiTrack->insertExpressionFine(channel, levelLo, absTime);
-              pMidiTrack->insertVol(channel, levelHi, absTime);
+              pMidiTrack->insertExpression(channel, levelHi, absTime);
             }
           }
           break;
@@ -885,6 +906,27 @@ void SeqTrack::addLevelNoItem(double level, LevelController controller, Resoluti
       break;
     }
   }
+}
+
+void SeqTrack::reapplyStoredLevelNoItem(LevelController controller, int absTime) {
+  uint16_t rawLevel;
+  Resolution resolution;
+  switch (controller) {
+    case LevelController::Volume:
+      rawLevel = vol;
+      resolution = volResolution;
+      break;
+    case LevelController::Expression:
+      rawLevel = expression;
+      resolution = expressionResolution;
+      break;
+    case LevelController::MasterVolume:
+      rawLevel = mastVol;
+      resolution = masterVolResolution;
+      break;
+  }
+
+  addLevelNoItem(normalizedLevelFromRaw(rawLevel, resolution), controller, resolution, absTime);
 }
 
 void SeqTrack::addVol(u32 offset, u32 length, double volPercent, Resolution res, const std::string &sEventName) {
@@ -930,7 +972,7 @@ void SeqTrack::insertVol(uint32_t offset,
   bool isNewOffset = onEvent(offset, length);
 
   recordSeqEvent<VolSeqEvent>(isNewOffset, absTime, newVol, offset, length, sEventName);
-  addLevelNoItem(newVol / 127.0, LevelController::Volume, Resolution::SevenBit);
+  addLevelNoItem(newVol / 127.0, LevelController::Volume, Resolution::SevenBit, absTime);
 }
 
 void SeqTrack::addExpression(u32 offset, u32 length, double levelPercent, Resolution res, const std::string &sEventName) {
@@ -1029,11 +1071,11 @@ void SeqTrack::addPanNoItem(uint8_t pan) {
 
     switch (parentSeq->panVolumeCorrectionMode) {
     case PanVolumeCorrectionMode::kAdjustVolumeController:
-      addVolNoItem(vol);
+      reapplyStoredLevelNoItem(LevelController::Volume);
       break;
 
     case PanVolumeCorrectionMode::kAdjustExpressionController:
-      addExpressionNoItem(expression);
+      reapplyStoredLevelNoItem(LevelController::Expression);
       break;
 
     default:
@@ -1075,11 +1117,11 @@ void SeqTrack::insertPan(uint32_t offset,
     // TODO: (bugfix) Pan volume compensation does not work properly when using pan slider and volume slider at the same time
     switch (parentSeq->panVolumeCorrectionMode) {
     case PanVolumeCorrectionMode::kAdjustVolumeController:
-      insertVol(offset, length, vol, absTime);
+      reapplyStoredLevelNoItem(LevelController::Volume, absTime);
       break;
 
     case PanVolumeCorrectionMode::kAdjustExpressionController:
-      insertExpression(offset, length, expression, absTime);
+      reapplyStoredLevelNoItem(LevelController::Expression, absTime);
       break;
 
     default:
