@@ -957,12 +957,14 @@ void SeqTrack::addVolSlide(uint32_t offset,
 
   recordDurSeqEvent<VolSlideSeqEvent>(isNewOffset, getTime(), dur, targVol, dur, offset, length, sEventName);
 
-  if (readMode == READMODE_CONVERT_TO_MIDI)
+  if (readMode == READMODE_CONVERT_TO_MIDI) {
     addControllerSlide(dur,
                        vol,
                        targVol,
                        usesLinearAmplitudeScale() ? convert7bitPercentAmpToStdMidiVal : nullptr,
                        &MidiTrack::insertVol);
+    volResolution = Resolution::SevenBit;
+  }
 }
 
 void SeqTrack::insertVol(uint32_t offset,
@@ -1005,12 +1007,14 @@ void SeqTrack::addExpressionSlide(uint32_t offset,
 
   recordDurSeqEvent<ExpressionSlideSeqEvent>(isNewOffset, getTime(), dur, targExpr, dur, offset, length, sEventName);
 
-  if (readMode == READMODE_CONVERT_TO_MIDI)
+  if (readMode == READMODE_CONVERT_TO_MIDI) {
     addControllerSlide(dur,
                        expression,
                        targExpr,
                        usesLinearAmplitudeScale() ? convert7bitPercentAmpToStdMidiVal : nullptr,
                        &MidiTrack::insertExpression);
+    expressionResolution = Resolution::SevenBit;
+  }
 }
 
 void SeqTrack::insertExpression(uint32_t offset,
@@ -1048,12 +1052,14 @@ void SeqTrack::addMastVolSlide(uint32_t offset,
 
   recordDurSeqEvent<MastVolSlideSeqEvent>(isNewOffset, getTime(), dur, targVol, dur, offset, length, sEventName);
 
-  if (readMode == READMODE_CONVERT_TO_MIDI)
+  if (readMode == READMODE_CONVERT_TO_MIDI) {
     addControllerSlide(dur,
                        mastVol,
                        targVol,
                        usesLinearAmplitudeScale() ? convert7bitPercentAmpToStdMidiVal : nullptr,
                        &MidiTrack::insertMasterVol);
+    masterVolResolution = Resolution::SevenBit;
+  }
 }
 
 void SeqTrack::addPan(uint32_t offset, uint32_t length, uint8_t pan, const std::string &sEventName) {
