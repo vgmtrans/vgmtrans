@@ -294,11 +294,19 @@ CPS2Instr::CPS2Instr(VGMInstrSet *instrSet,
 }
 
 bool CPS2Instr::loadInstr() {
-  std::vector<VGMRgn*> rgns;
+  struct CPSRgnInfo {
+    VGMRgn* rgn;
+    uint8_t attack_rate;
+    uint8_t decay_rate;
+    uint8_t sustain_level;
+    uint8_t sustain_rate;
+    uint8_t release_rate;
+  };
+
+  std::vector<CPSRgnInfo> rgns;
   const CPS2FormatVer formatVer = formatVersion();
   if (formatVer < CPS2_V103) {
     VGMRgn* rgn = new VGMRgn(this, offset(), length());
-    rgns.push_back(rgn);
     rgn->addChild(this->offset(),     1, "Sample Info Index");
     rgn->addChild(this->offset() + 1, 1, "Unknown / Ignored");
     rgn->addChild(this->offset() + 2, 1, "Attack Rate");
@@ -311,15 +319,15 @@ bool CPS2Instr::loadInstr() {
     qs_prog_info_ver_101 progInfo;
     readBytes(offset(), sizeof(qs_prog_info_ver_101), &progInfo);
     rgn->sampNum = progInfo.sample_index;
-    this->attack_rate = progInfo.attack_rate;
-    this->decay_rate = progInfo.decay_rate;
-    this->sustain_level = progInfo.sustain_level;
-    this->sustain_rate = progInfo.sustain_rate;
-    this->release_rate = progInfo.release_rate;
+    rgns.push_back({rgn,
+                    progInfo.attack_rate,
+                    progInfo.decay_rate,
+                    progInfo.sustain_level,
+                    progInfo.sustain_rate,
+                    progInfo.release_rate});
   }
   else if (formatVer < CPS2_V130 || formatVer == CPS2_V200 || formatVer == CPS2_V201B) {
     VGMRgn* rgn = new VGMRgn(this, offset(), length());
-    rgns.push_back(rgn);
     qs_prog_info_ver_103 progInfo;
     readBytes(offset(), sizeof(qs_prog_info_ver_103), &progInfo);
 
@@ -331,11 +339,12 @@ bool CPS2Instr::loadInstr() {
     rgn->addChild(this->offset() + 6, 1, "Sustain Rate");
     rgn->addChild(this->offset() + 7, 1, "Release Rate");
 
-    this->attack_rate = progInfo.attack_rate;
-    this->decay_rate = progInfo.decay_rate;
-    this->sustain_level = progInfo.sustain_level;
-    this->sustain_rate = progInfo.sustain_rate;
-    this->release_rate = progInfo.release_rate;
+    rgns.push_back({rgn,
+                    progInfo.attack_rate,
+                    progInfo.decay_rate,
+                    progInfo.sustain_level,
+                    progInfo.sustain_rate,
+                    progInfo.release_rate});
   }
   else if (formatVer == CPS3) {
     uint8_t prevKeyHigh = 0;
@@ -345,12 +354,10 @@ bool CPS2Instr::loadInstr() {
         break;
 
       VGMRgn* rgn = new VGMRgn(this, off, 12);
-      rgns.push_back(rgn);
 
       qs_prog_info_ver_cps3 progInfo;
       readBytes(off, sizeof(qs_prog_info_ver_cps3), &progInfo);
 
-      //    rgn->AddFineTune( (int16_t)((progInfo.fine_tune / 256.0) * 100), this->offset() + 2, 1);
       rgn->addKeyHigh(progInfo.key_high, off + 0, 1);
       rgn->keyLow = prevKeyHigh + 1;
       prevKeyHigh = progInfo.key_high;
@@ -360,7 +367,10 @@ bool CPS2Instr::loadInstr() {
       uint8_t pan = progInfo.pan_override == -1 ? 64 : progInfo.pan_override;
       rgn->addPan(pan, off+1, 1, "Pan Override");
 
-      auto volume_percent = ((64 + progInfo.volume_adjustment) & 0x7F) / 64.0;
+      double volume_percent = ((64 + progInfo.volume_adjustment) & 0x7F) / 64.0;
+      // CPS3 instrument regions can (almost) double volume, but SF2 only allows attenuation. To compensate, we set a
+      // default (neutral) attenuation of half volume. Doubled CPS3 instruent volume translates to no attenuation.
+      volume_percent /= 2.0;
       rgn->addVolume(volume_percent, off+2, 1);
       rgn->addUnknown(off+3, 1);
       rgn->addSampNum((progInfo.sample_index_hi << 8) + progInfo.sample_index_lo, off+4, 2);
@@ -374,18 +384,17 @@ bool CPS2Instr::loadInstr() {
       rgn->addChild(off + 10, 1, "Sustain Rate");
       rgn->addChild(off + 11, 1, "Release Rate");
 
-
-      this->attack_rate = progInfo.attack_rate;
-      this->decay_rate = progInfo.decay_rate;
-      this->sustain_level = progInfo.sustain_level;
-      this->sustain_rate = progInfo.sustain_rate;
-      this->release_rate = progInfo.release_rate;
+      rgns.push_back({rgn,
+                      progInfo.attack_rate,
+                      progInfo.decay_rate,
+                      progInfo.sustain_level,
+                      progInfo.sustain_rate,
+                      progInfo.release_rate});
     }
     setLength(off - offset());
   }
   else {
     VGMRgn* rgn = new VGMRgn(this, offset(), length(), "Region");
-    rgns.push_back(rgn);
     qs_prog_info_ver_130 progInfo;
     readBytes(offset(), sizeof(qs_prog_info_ver_130), &progInfo);
 
@@ -396,14 +405,17 @@ bool CPS2Instr::loadInstr() {
     const CPSArticTable* articTable = static_cast<CPS2InstrSet*>(this->parInstrSet)->articTable;
     const qs_artic_info* artic = &articTable->artics[progInfo.artic_index];
     rgn->sampNum = progInfo.sample_index;
-    this->attack_rate = artic->attack_rate;
-    this->decay_rate = artic->decay_rate;
-    this->sustain_level = artic->sustain_level;
-    this->sustain_rate = artic->sustain_rate;
-    this->release_rate = artic->release_rate;
+    rgns.push_back({rgn,
+                    artic->attack_rate,
+                    artic->decay_rate,
+                    artic->sustain_level,
+                    artic->sustain_rate,
+                    artic->release_rate});
   }
 
-  for (auto rgn : rgns) {
+  for (const auto& rgnInfo : rgns) {
+    VGMRgn* rgn = rgnInfo.rgn;
+
     // Fix for Dungeons and Dragons Shadow Over Mystara
     if (rgn->sampNum >= 0x8000)
       rgn->sampNum -= 0x8000;
@@ -412,11 +424,11 @@ bool CPS2Instr::loadInstr() {
     if (rgn->sampNum >= static_cast<CPS2InstrSet*>(parInstrSet)->sampInfoTable->numSamples)
       rgn->sampNum = 0;
 
-    uint16_t Ar = attack_rate_table[std::min<u8>(attack_rate, 63)];
-    uint16_t Dr = decay_rate_table[std::min<u8>(decay_rate, 63)];
-    uint16_t Sl = sustain_level_table[std::min<u8>(sustain_level, 127)];
-    uint16_t Sr = decay_rate_table[std::min<u8>(sustain_rate, 63)];
-    uint16_t Rr = decay_rate_table[std::min<u8>(release_rate, 63)];
+    uint16_t Ar = attack_rate_table[std::min<u8>(rgnInfo.attack_rate, 63)];
+    uint16_t Dr = decay_rate_table[std::min<u8>(rgnInfo.decay_rate, 63)];
+    uint16_t Sl = sustain_level_table[std::min<u8>(rgnInfo.sustain_level, 127)];
+    uint16_t Sr = decay_rate_table[std::min<u8>(rgnInfo.sustain_rate, 63)];
+    uint16_t Rr = decay_rate_table[std::min<u8>(rgnInfo.release_rate, 63)];
 
     const double UPDATE_RATE_IN_HZ = formatVer == CPS3 ? CPS3_DRIVER_RATE_HZ : CPS2_DRIVER_RATE_HZ;
     // The rate values are all measured from max to min, as the SF2 and DLS specs call for.
@@ -432,7 +444,7 @@ bool CPS2Instr::loadInstr() {
     //  super short - then let's set the sustain level to 0 and substitute the sustain
     //  rate into the decay rate,  achieving the same effect as sustain rate.
 
-    if (this->sustain_level >= 0x7E && this->sustain_rate > 0 && this->decay_rate > 1) {
+    if (rgnInfo.sustain_level >= 0x7E && rgnInfo.sustain_rate > 0 && rgnInfo.decay_rate > 1) {
       //for a better approximation, we count the ticks to get from original Dr to original Sl
       ticks = static_cast<long>(ceil((0xFFFF - Sl)) / static_cast<double>(Dr));
       ticks += static_cast<long>(ceil(Sl / static_cast<double>(Sr)));
