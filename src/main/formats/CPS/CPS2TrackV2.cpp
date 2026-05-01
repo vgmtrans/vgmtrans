@@ -13,8 +13,8 @@ CPS2TrackV2::CPS2TrackV2(CPS2Seq *parentSeq, uint32_t offset, uint32_t length)
 }
 
 void CPS2TrackV2::resetVars() {
-  m_master_volume = 0;
-  m_secondary_volume = 0x40;
+  m_volume = 0;
+  m_expression = 0x40;
   memset(loopCounter, 0, sizeof(loopCounter));
   memset(loopOffset, 0, sizeof(loopOffset));
   SeqTrack::resetVars();
@@ -120,10 +120,12 @@ bool CPS2TrackV2::readEvent() {
       break;
     }
 
-    case C6_TRACK_MASTER_VOLUME: {
-      m_master_volume = readByte(curOffset++);
-      double volPercent = (m_master_volume * m_secondary_volume) / (127.0 * 127.0);
-      addVol(beginOffset, curOffset - beginOffset, volPercent, Resolution::FourteenBit, "Track Master Volume");
+    case C6_VOLUME: {
+      m_volume = readByte(curOffset++);
+      // We fold expression into volume to not interfere with our tremolo implementation
+      double expression = m_expression > 0 ? m_expression + 1 : 0;
+      double volPercent = (m_volume * expression) / (128.0 * 128.0);
+      addVol(beginOffset, curOffset - beginOffset, volPercent, Resolution::FourteenBit);
       break;
     }
 
@@ -133,10 +135,12 @@ bool CPS2TrackV2::readEvent() {
       break;
     }
 
-    case EVENT_C8: {
-      m_secondary_volume = readByte(curOffset++);
-      double volPercent = (m_master_volume * m_secondary_volume) / (127.0 * 127.0);
-      addVol(beginOffset, curOffset - beginOffset, volPercent, Resolution::FourteenBit);
+    case C8_EXPRESSION: {
+      m_expression = readByte(curOffset++);
+      double expression = m_expression > 0 ? m_expression + 1 : 0;
+      double volPercent = (m_volume * expression) / (128.0 * 128.0);
+      // We fold expression into volume to not interfere with our tremolo implementation
+      addVol(beginOffset, curOffset - beginOffset, volPercent, Resolution::FourteenBit, "Expression");
       break;
     }
 
@@ -154,7 +158,7 @@ bool CPS2TrackV2::readEvent() {
       break;
 
     case EVENT_CC:
-      //      curOffset++; //REALLY DOES ONE THING THEN JUMPS TO EVENT CE
+      // need to check if it's different in CPS2 usage vs CPS3
       curOffset += 3;
       addUnknown(beginOffset, curOffset-beginOffset);
       break;

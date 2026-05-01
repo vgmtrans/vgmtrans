@@ -238,12 +238,6 @@ protected:
   CPS2FormatVer formatVersion() const { return (static_cast<CPS2InstrSet*>(parInstrSet))->fmt_version; }
 
 protected:
-  uint8_t attack_rate{};
-  uint8_t decay_rate{};
-  uint8_t sustain_level{};
-  uint8_t sustain_rate{};
-  uint8_t release_rate{};
-
   int info_ptr{};        //pointer to start of instrument set block
   int nNumRegions{};
 };
