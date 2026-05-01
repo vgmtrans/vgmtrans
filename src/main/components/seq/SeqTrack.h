@@ -140,7 +140,7 @@ protected:
 
 private:
   void addControllerSlide(u32 dur, u16 &prevVal, u16 targVal, uint8_t (*scalerFunc)(uint8_t), void (MidiTrack::*insertFunc)(uint8_t, uint8_t, uint32_t)) const;
-  double applyLevelCorrection(double level, LevelController controller) const;
+  double applyPanVolumeCorrection(double level, LevelController controller) const;
   void addLevelNoItem(double level, LevelController controller, Resolution res, int absTime = -1);
   void reapplyStoredLevelNoItem(LevelController controller, int absTime = -1);
   void purgePrevDurEvents(uint32_t absTime);

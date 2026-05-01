@@ -797,7 +797,7 @@ void SeqTrack::clearPrevDurEvents() {
   prevDurEventIndices.clear();
 }
 
-double SeqTrack::applyLevelCorrection(double level, LevelController controller) const {
+double SeqTrack::applyPanVolumeCorrection(double level, LevelController controller) const {
   if (controller != LevelController::MasterVolume) {
     PanVolumeCorrectionMode relevantCorrectionMode = controller == LevelController::Volume ?
       PanVolumeCorrectionMode::kAdjustVolumeController :
@@ -805,7 +805,7 @@ double SeqTrack::applyLevelCorrection(double level, LevelController controller) 
     if (parentSeq->panVolumeCorrectionMode == relevantCorrectionMode)
       level *= panVolumeCorrectionRate;
   }
-  return std::clamp(level, 0.0, 1.0);
+  return level;
 }
 
 void SeqTrack::addLevelNoItem(double level, LevelController controller, Resolution res, int absTime) {
@@ -827,7 +827,8 @@ void SeqTrack::addLevelNoItem(double level, LevelController controller, Resoluti
       break;
   }
 
-  level = applyLevelCorrection(level, controller);
+  level = applyPanVolumeCorrection(level, controller);
+  level = std::clamp(level, 0.0, 1.0);
   switch (res) {
     case Resolution::SevenBit: {
       const u8 midiLevel = usesLinearAmplitudeScale()
