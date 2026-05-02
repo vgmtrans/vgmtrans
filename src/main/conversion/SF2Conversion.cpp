@@ -89,6 +89,9 @@ SynthFile* createSynthFile(
       if (nRgns == 0)  // do not write an instrument if it has no regions
         continue;
       SynthInstr* newInstr = synthfile->addInstr(vgminstr->bank, vgminstr->instrNum, vgminstr->reverb);
+      for (const auto& modulator : vgminstr->modulators()) {
+        newInstr->addModulator(modulator);
+      }
       for (uint32_t j = 0; j < nRgns; j++) {
         VGMRgn* rgn = vgminstr->regions()[j];
         //				if (rgn->sampNum+1 > sampColl->samples.size())	//does thereferenced sample exist?

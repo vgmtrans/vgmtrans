@@ -5,6 +5,7 @@
  */
 
 #include "VGMInstrSet.h"
+#include <cmath>
 #include <spdlog/fmt/fmt.h>
 #include "VGMSampColl.h"
 #include "VGMSamp.h"
@@ -147,6 +148,16 @@ void VGMInstr::setBank(uint32_t bankNum) {
 
 void VGMInstr::setInstrNum(uint32_t theInstrNum) {
   instrNum = theInstrNum;
+}
+
+void VGMInstr::addModulator(InstrumentModSource source, InstrumentModDestination destination,
+                            int32_t amount) {
+  m_modulators.push_back({source, destination, amount});
+}
+
+void VGMInstr::addModWheelToVibratoPitch(double cents) {
+  addModulator(InstrumentModSource::ModWheel, InstrumentModDestination::VibLfoToPitch,
+               static_cast<int32_t>(std::lround(cents)));
 }
 
 VGMRgn *VGMInstr::addRgn(VGMRgn *rgn) {

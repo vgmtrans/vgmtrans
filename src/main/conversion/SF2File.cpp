@@ -3,7 +3,9 @@
  * Licensed under the zlib license,
  * refer to the included LICENSE.txt file
  */
+#include <algorithm>
 #include <cmath>
+#include <limits>
 #include "SF2File.h"
 #include "version.h"
 #include "VGMInstrSet.h"
@@ -11,6 +13,38 @@
 #include "ScaleConversion.h"
 #include "Root.h"
 #include "VGMRgn.h"
+
+namespace {
+
+SFModulator sf2SourceForModSource(InstrumentModSource source) {
+  constexpr uint16_t midiContinuousController = 1u << 7;
+  return static_cast<SFModulator>(midiContinuousController | static_cast<uint8_t>(source));
+}
+
+SFGenerator sf2GeneratorForModDestination(InstrumentModDestination destination) {
+  switch (destination) {
+    case InstrumentModDestination::VibLfoToPitch:
+      return vibLfoToPitch;
+    case InstrumentModDestination::VibLfoFrequency:
+      return freqVibLFO;
+    case InstrumentModDestination::VibLfoStartDelay:
+      return delayVibLFO;
+    case InstrumentModDestination::ModLfoToVolume:
+      return modLfoToVolume;
+    case InstrumentModDestination::ModLfoFrequency:
+      return freqModLFO;
+    case InstrumentModDestination::ModLfoStartDelay:
+      return delayModLFO;
+  }
+  return endOper;
+}
+
+int16_t sf2AmountForModulator(const InstrumentModulator& modulator) {
+  return static_cast<int16_t>(std::clamp<int32_t>(
+      modulator.amount, std::numeric_limits<int16_t>::min(), std::numeric_limits<int16_t>::max()));
+}
+
+} // namespace
 
 SF2InfoListChunk::SF2InfoListChunk(const std::string& name)
     : LISTChunk("INFO") {
@@ -224,6 +258,7 @@ SF2File::SF2File(SynthFile *synthfile)
 
   rgnCounter = 0;
   int instGenCounter = 0;
+  int instModCounter = 0;
   for (size_t i = 0; i < numInstrs; i++) {
     SynthInstr *instr = synthfile->vInstrs[i];
 
@@ -232,7 +267,8 @@ SF2File::SF2File(SynthFile *synthfile)
       sfInstBag instBag{};
       instBag.wInstGenNdx = instGenCounter;
       instGenCounter += numOfGeneratorsForRgn(instr->vRgns[j]);
-      instBag.wInstModNdx = 0;
+      instBag.wInstModNdx = static_cast<uint16_t>(instModCounter);
+      instModCounter += static_cast<int>(instr->modulators().size());
 
       memcpy(ibagCk->data + (rgnCounter++ * sizeof(sfInstBag)), &instBag, sizeof(sfInstBag));
     }
@@ -240,17 +276,38 @@ SF2File::SF2File(SynthFile *synthfile)
   //  add terminal sfInstBag
   sfInstBag instBag{};
   instBag.wInstGenNdx = instGenCounter;
-  instBag.wInstModNdx = 0;
+  instBag.wInstModNdx = static_cast<uint16_t>(instModCounter);
   memcpy(ibagCk->data + (rgnCounter * sizeof(sfInstBag)), &instBag, sizeof(sfInstBag));
   pdtaCk->addChildChunk(ibagCk);
 
   //***********
   // imod chunk
   //***********
+  uint32_t numTotalMods = 1;
+  for (const auto instr : synthfile->vInstrs) {
+    numTotalMods += static_cast<uint32_t>(instr->modulators().size() * instr->vRgns.size());
+  }
+
   Chunk *imodCk = new Chunk("imod");
-  //  create the terminal field
-  memset(&modList, 0, sizeof(sfModList));
-  imodCk->setData(&modList, sizeof(sfModList));
+  imodCk->setSize(numTotalMods * sizeof(sfInstModList));
+  imodCk->data = new uint8_t[imodCk->size()];
+  dataPtr = 0;
+  for (const auto instr : synthfile->vInstrs) {
+    for (size_t j = 0; j < instr->vRgns.size(); j++) {
+      for (const auto& modulator : instr->modulators()) {
+        sfInstModList instModList{};
+        instModList.sfModSrcOper = sf2SourceForModSource(modulator.source);
+        instModList.sfModDestOper = sf2GeneratorForModDestination(modulator.destination);
+        instModList.modAmount = sf2AmountForModulator(modulator);
+        instModList.sfModAmtSrcOper = 0;
+        instModList.sfModTransOper = linear;
+        memcpy(imodCk->data + dataPtr, &instModList, sizeof(sfInstModList));
+        dataPtr += sizeof(sfInstModList);
+      }
+    }
+  }
+  sfInstModList instModList{};
+  memcpy(imodCk->data + dataPtr, &instModList, sizeof(sfInstModList));
   pdtaCk->addChildChunk(imodCk);
 
   //***********

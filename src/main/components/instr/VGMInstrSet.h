@@ -1,5 +1,6 @@
 #pragma once
 #include "common.h"
+#include "InstrumentModulation.h"
 #include "VGMFile.h"
 
 class VGMSampColl;
@@ -66,6 +67,10 @@ public:
   inline void setBank(uint32_t bankNum);
   inline void setInstrNum(uint32_t theInstrNum);
 
+  void addModulator(InstrumentModSource source, InstrumentModDestination destination, int32_t amount);
+  void addModWheelToVibratoPitch(double cents);
+  [[nodiscard]] const std::vector<InstrumentModulator>& modulators() const { return m_modulators; }
+
   VGMRgn *addRgn(VGMRgn *rgn);
   VGMRgn *addRgn(uint32_t offset, uint32_t length, int sampNum, uint8_t keyLow = 0,
                  uint8_t keyHigh = 0x7F, uint8_t velLow = 0, uint8_t velHigh = 0x7F);
@@ -85,4 +90,5 @@ protected:
 private:
   bool m_auto_add_regions_as_children{true};
   std::vector<VGMRgn*> m_regions;
+  std::vector<InstrumentModulator> m_modulators;
 };

@@ -94,6 +94,15 @@ SynthRgn *SynthInstr::addRgn(const SynthRgn& rgn) {
   return vRgns.back();
 }
 
+void SynthInstr::addModulator(const InstrumentModulator& modulator) {
+  m_modulators.push_back(modulator);
+}
+
+void SynthInstr::addModulator(InstrumentModSource source, InstrumentModDestination destination,
+                              int32_t amount) {
+  m_modulators.push_back({source, destination, amount});
+}
+
 //  ********
 //  SynthRgn
 //  ********

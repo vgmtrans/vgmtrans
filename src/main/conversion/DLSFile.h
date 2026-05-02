@@ -7,6 +7,7 @@
 #pragma once
 
 #include "common.h"
+#include "InstrumentModulation.h"
 #include "RiffFile.h"
 #include <filesystem>
 
@@ -191,6 +192,7 @@ public:
                long sustain_lev, long release_time, uint16_t rls_transform);
   void addPan(long pan);
   void addVibrato(int32_t depth, int32_t frequency, int32_t delay);
+  void addModulator(const InstrumentModulator& modulator);
 
   uint32_t GetSize() const;
   void Write(std::vector<uint8_t> &buf) const;

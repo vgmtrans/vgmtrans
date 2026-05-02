@@ -487,6 +487,7 @@ target_sources(vgmtranscore
       components/VGMTag.h
     FILE_SET headers_components_instr TYPE HEADERS BASE_DIRS components/instr
     FILES
+      components/instr/InstrumentModulation.h
       components/instr/VGMInstrSet.h
       components/instr/VGMRgn.h
       components/instr/VGMSamp.h

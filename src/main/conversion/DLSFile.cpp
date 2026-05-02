@@ -5,10 +5,12 @@
  */
 
 #include <algorithm>
+#include <limits>
 #include <numeric>
 #include <ranges>
 #include <vector>
 #include "DLSFile.h"
+#include "ScaleConversion.h"
 #include "VGMInstrSet.h"
 #include "VGMSamp.h"
 #include "Root.h"
@@ -274,6 +276,30 @@ void DLSRgn::setWaveLinkInfo(uint16_t options, uint16_t phaseGroup, uint32_t the
 //  DLSArt
 //  ******
 
+namespace {
+
+uint16_t dlsSourceForModSource(InstrumentModSource source) {
+  switch (source) {
+    case InstrumentModSource::ModWheel:
+      return CONN_SRC_CC1;
+    case InstrumentModSource::Volume:
+      return CONN_SRC_CC7;
+    case InstrumentModSource::Pan:
+      return CONN_SRC_CC10;
+    case InstrumentModSource::Expression:
+      return CONN_SRC_CC11;
+  }
+  return CONN_SRC_NONE;
+}
+
+int32_t toDls16Dot16Scale(int32_t amount) {
+  const int64_t scaled = static_cast<int64_t>(amount) * 65536;
+  return static_cast<int32_t>(std::clamp<int64_t>(
+      scaled, std::numeric_limits<int32_t>::min(), std::numeric_limits<int32_t>::max()));
+}
+
+} // namespace
+
 uint32_t DLSArt::GetSize() const {
   uint32_t size = 0;
   size += LIST_HDR_SIZE;  //"lar2" list
@@ -328,6 +354,35 @@ void DLSArt::addVibrato(int32_t depth, int32_t frequency, int32_t delay) {
 
   m_blocks.emplace_back(std::make_unique<ConnectionBlock>(
       CONN_SRC_NONE, CONN_SRC_NONE, CONN_DST_LFO_STARTDELAY, CONN_TRN_NONE, delay));
+}
+
+void DLSArt::addModulator(const InstrumentModulator& modulator) {
+  const uint16_t source = dlsSourceForModSource(modulator.source);
+
+  switch (modulator.destination) {
+    case InstrumentModDestination::VibLfoToPitch:
+      m_blocks.emplace_back(std::make_unique<ConnectionBlock>(
+          CONN_SRC_LFO, source, CONN_DST_PITCH, CONN_TRN_NONE,
+          centsToDlsPitchScale(modulator.amount)));
+      break;
+    case InstrumentModDestination::VibLfoFrequency:
+    case InstrumentModDestination::ModLfoFrequency:
+      m_blocks.emplace_back(std::make_unique<ConnectionBlock>(
+          source, CONN_SRC_NONE, CONN_DST_LFO_FREQUENCY, CONN_TRN_NONE,
+          centsToDlsPitchScale(modulator.amount)));
+      break;
+    case InstrumentModDestination::VibLfoStartDelay:
+    case InstrumentModDestination::ModLfoStartDelay:
+      m_blocks.emplace_back(std::make_unique<ConnectionBlock>(
+          source, CONN_SRC_NONE, CONN_DST_LFO_STARTDELAY, CONN_TRN_NONE,
+          toDls16Dot16Scale(modulator.amount)));
+      break;
+    case InstrumentModDestination::ModLfoToVolume:
+      m_blocks.emplace_back(std::make_unique<ConnectionBlock>(
+          CONN_SRC_LFO, source, CONN_DST_ATTENUATION, CONN_TRN_NONE,
+          toDls16Dot16Scale(modulator.amount)));
+      break;
+  }
 }
 
 //  ***************
