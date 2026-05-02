@@ -44,12 +44,13 @@ void main() {
 
   float shadowHalo = 1.0 - smoothstep(0.0, 1.0, shadowNorm);
   float glowHalo = 1.0 - smoothstep(0.0, 1.0, glowNorm);
+  float fadeGlowAlpha = pow(vTint.a, 3.0);
 
   maskField = vec4(0.0);
   edgeField = vec4(shadowHalo * isShadow,
                    glowHalo * isGlowActive,
-                   glowHalo * isGlowFade,
+                   glowHalo * fadeGlowAlpha * isGlowFade,
                    0.0);
-  float glowWeight = glowHalo * vTint.a * isGlowActive;
+  float glowWeight = glowHalo * max(vTint.a * isGlowActive, fadeGlowAlpha * isGlowFade);
   playbackColorField = vec4(vTint.rgb * glowWeight, glowWeight);
 }

@@ -118,9 +118,9 @@ float computeShadowHalo(float selectionNorm, float selectedMask) {
 
 vec2 computePlaybackHalos(float activeNorm, float fadeNorm, float activeMask,
                           float fadeMask, float fadeAlpha) {
-  float anyPlaybackMask = max(activeMask, fadeMask);
   float activeHalo = activeNorm * (1.0 - activeMask);
-  float fadeHalo = fadeNorm * (1.0 - anyPlaybackMask) * fadeAlpha;
+  float fadeOcclusion = max(activeMask, fadeMask * fadeAlpha);
+  float fadeHalo = fadeNorm * (1.0 - fadeOcclusion);
   return vec2(activeHalo, fadeHalo);
 }
 
