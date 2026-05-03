@@ -398,6 +398,11 @@ void DLSArt::addGenerator(const InstrumentGenerator& generator) {
           CONN_SRC_NONE, CONN_SRC_NONE, CONN_DST_LFO_STARTDELAY, CONN_TRN_NONE,
           toDls16Dot16Scale(generator.amount)));
       break;
+    case InstrumentModDestination::InitialAttenuation:
+      m_blocks.emplace_back(std::make_unique<ConnectionBlock>(
+          CONN_SRC_NONE, CONN_SRC_NONE, CONN_DST_ATTENUATION, CONN_TRN_NONE,
+          toDls16Dot16Scale(generator.amount)));
+      break;
   }
 }
 
@@ -433,6 +438,11 @@ void DLSArt::addModulator(const InstrumentModulator& modulator) {
     case InstrumentModDestination::ModLfoToVolume:
       m_blocks.emplace_back(std::make_unique<ConnectionBlock>(
           CONN_SRC_LFO, source, CONN_DST_ATTENUATION, CONN_TRN_NONE,
+          toDls16Dot16Scale(modulator.amount)));
+      break;
+    case InstrumentModDestination::InitialAttenuation:
+      m_blocks.emplace_back(std::make_unique<ConnectionBlock>(
+          source, CONN_SRC_NONE, CONN_DST_ATTENUATION, CONN_TRN_NONE,
           toDls16Dot16Scale(modulator.amount)));
       break;
   }

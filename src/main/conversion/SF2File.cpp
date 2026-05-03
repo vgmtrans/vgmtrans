@@ -57,6 +57,8 @@ SFGenerator sf2GeneratorForModDestination(InstrumentModDestination destination) 
       return freqModLFO;
     case InstrumentModDestination::ModLfoStartDelay:
       return delayModLFO;
+    case InstrumentModDestination::InitialAttenuation:
+      return initialAttenuation;
   }
   return endOper;
 }

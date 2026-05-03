@@ -22,6 +22,7 @@ enum class InstrumentModDestination : uint8_t {
   ModLfoToVolume,
   ModLfoFrequency,
   ModLfoStartDelay,
+  InitialAttenuation,
 };
 
 struct InstrumentModulator {
@@ -29,7 +30,7 @@ struct InstrumentModulator {
   InstrumentModDestination destination;
 
   // Amount units are the shared SF2/DLS semantic units for the destination:
-  // cents for pitch/frequency, timecents for delay, and centibels for volume.
+  // cents for pitch/frequency, timecents for delay, and centibels for volume/attenuation.
   int32_t amount;
 };
 
@@ -37,6 +38,6 @@ struct InstrumentGenerator {
   InstrumentModDestination destination;
 
   // Absolute generator amount in shared SF2/DLS semantic units:
-  // cents for pitch/frequency, timecents for delay, and centibels for volume.
+  // cents for pitch/frequency, timecents for delay, and centibels for volume/attenuation.
   int32_t amount;
 };
