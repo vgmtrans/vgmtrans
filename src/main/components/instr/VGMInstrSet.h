@@ -73,6 +73,7 @@ public:
   [[nodiscard]] const std::vector<InstrumentModulator>& modulators() const { return m_modulators; }
   void addGlobalGenerator(InstrumentModDestination destination, int32_t amount);
   void addGlobalVibratoFrequency(double hertz);
+  void addGlobalTremoloFrequency(double hertz);
   [[nodiscard]] const std::vector<InstrumentGenerator>& globalGenerators() const { return m_globalGenerators; }
 
   VGMRgn *addRgn(VGMRgn *rgn);
