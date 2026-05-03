@@ -106,10 +106,25 @@ bool CapcomSnesInstr::loadInstr() {
   // 15.564 Hz  -> about +1114 cents
   // Full range is abs(-8480) + 1114 = 9594, but we want 0x7F to hit the actual max, so 9594 * (128/127) = 9670 cents
   // Thus, we set the global base frequency to 0.061 and create a unipolar channel pressure modulator with range 9670.
+
+  // add ModWheel to Vibrato Depth modulator
   addModWheelToVibratoPitch(1200);
+  // nullify default ChannelPressure to vibrato pitch depth modulator
   addModulator(InstrumentModSource::ChannelPressure, InstrumentModDestination::VibLfoToPitch, 0);
+  // add global zone vibrato frequency generator for default frequency of 0.061 hz. Tremolo at 0.122
   addGlobalVibratoFrequency(0.061);
+  addGlobalTremoloFrequency(0.122);
+  // add ChannelPressure to Vibrato Frequency modulator, covering up to 15.564 Hz relative to the 0.061 Hz default
+  // for Tremolo, the range is 0.122 to 31.128 Hz
   addModulator(InstrumentModSource::ChannelPressure, InstrumentModDestination::VibLfoFrequency, 9670);
+  addModulator(InstrumentModSource::ChannelPressure, InstrumentModDestination::ModLfoFrequency, 9670);
+
+  // Tremolo in the CapcomSnes driver only applies an attenuation - it never boosts the volume. This is different
+  // from SF2.
+  // add CC93 to Tremolo Depth modulator
+  addModulator(InstrumentModSource::ChorusSend, InstrumentModDestination::ModLfoToVolume, 484);
+  addModulator(InstrumentModSource::ChorusSend, InstrumentModDestination::InitialAttenuation, 484);
+
 
   uint16_t addrSampStart = readShort(offDirEnt);
 

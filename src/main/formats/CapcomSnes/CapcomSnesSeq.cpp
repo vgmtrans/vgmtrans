@@ -236,6 +236,63 @@ void CapcomSnesTrack::setNoteSlurred(bool slurred) {
 double CapcomSnesTrack::getTuningInSemitones(int8_t tuning) {
   return tuning / 256.0;
 }
+static const int table[17] = {
+  0x00,0x0c,0x19,0x26,0x33,0x40,0x4c,0x59,
+  0x66,0x73,0x80,0x8c,0x99,0xb3,0xcc,0xe6,0xff
+};
+
+// 968 can produce a modLfoToVolume outside useful range, but is still a legal in-range value for SF2.
+#define TREMOLO_HALF_AMOUNT 484
+
+int tremolo_scalar_at_trough(int T) {
+  if (T <= 0) return 250;
+  if (T >= 127) return 0;
+
+  int I = 0x7E81 - T * 255;
+
+  if (I <= 0) return 0;
+
+  int J = I >> 3;
+  int n = J >> 8;
+  int frac = J & 0xFF;
+
+  if (n < 0) return 0;
+  if (n >= 16) return table[16];
+
+  return table[n] + ((table[n + 1] - table[n]) * frac) / 256;
+}
+
+int tremolo_T_to_cc92(int T) {
+  int s = tremolo_scalar_at_trough(T);
+
+  double depth_cb;
+
+  if (s <= 0) {
+    // SF2 practical mute floor.
+    depth_cb = 960.0;
+  } else {
+    // Source driver loudest scalar is approximately 250.
+    depth_cb = 200.0 * log10(250.0 / (double)s);
+
+    if (depth_cb < 0.0) depth_cb = 0.0;
+    if (depth_cb > 960.0) depth_cb = 960.0;
+  }
+
+  // Correct-depth-range mapping:
+  //   depth_cb ~= 2 * TREMOLO_HALF_AMOUNT * CC93 / 128
+  //
+  // Therefore:
+  //   CC93 ~= depth_cb * 128 / (2 * TREMOLO_HALF_AMOUNT)
+
+  int cc = (int)floor(
+    depth_cb * 128.0 / (2.0 * (double)TREMOLO_HALF_AMOUNT) + 0.5
+  );
+
+  if (cc < 0) cc = 0;
+  if (cc > 127) cc = 127;
+
+  return cc;
+}
 
 // Convert from Hz -> SF2 cents (linear to exponential) -> CC
 uint8_t sourceFreqByteToCc(uint8_t freqByte) {
@@ -672,6 +729,7 @@ bool CapcomSnesTrack::readEvent() {
             break;
           case 1:
             // Tremolo Depth
+            addControllerEventNoItem(93, tremolo_T_to_cc92(lfoAmount));
             desc = fmt::format("Amount: {:d}", lfoType, lfoAmount);
             addGenericEvent(beginOffset, curOffset - beginOffset, "Tremolo Depth", desc, Type::Lfo);
             break;
