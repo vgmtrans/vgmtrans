@@ -87,8 +87,7 @@ CapcomSnesInstr::CapcomSnesInstr(VGMInstrSet *instrSet,
                                  uint32_t theInstrNum,
                                  uint32_t spcDirAddr,
                                  const std::string &name) :
-    VGMInstr(instrSet, offset, 6, theBank, theInstrNum, name),
-    spcDirAddr(spcDirAddr) {
+    VGMInstr(instrSet, offset, 6, theBank, theInstrNum, name), spcDirAddr(spcDirAddr) {
 }
 
 CapcomSnesInstr::~CapcomSnesInstr() {}
@@ -99,6 +98,18 @@ bool CapcomSnesInstr::loadInstr() {
   if (offDirEnt + 4 > 0x10000) {
     return false;
   }
+
+  // Vibrato has a full +/- octave range of 1200 cents (max depth value evaluates to 127/128 of range, just like SF2)
+  // Vibrato frequency range is 0x00 -> 0.061 Hz to 0xFF -> 15.564 Hz.
+  // SF2 cents are calculated via 1200log2(f/8.176):
+  // 0.061 Hz   -> about -8480 cents
+  // 15.564 Hz  -> about +1114 cents
+  // Full range is abs(-8480) + 1114 = 9594, but we want 0x7F to hit the actual max, so 9594 * (128/127) = 9670 cents
+  // Thus, we set the global base frequency to 0.061 and create a unipolar channel pressure modulator with range 9670.
+  addModWheelToVibratoPitch(1200);
+  addModulator(InstrumentModSource::ChannelPressure, InstrumentModDestination::VibLfoToPitch, 0);
+  addGlobalVibratoFrequency(0.061);
+  addModulator(InstrumentModSource::ChannelPressure, InstrumentModDestination::VibLfoFrequency, 9670);
 
   uint16_t addrSampStart = readShort(offDirEnt);
 
@@ -148,29 +159,33 @@ CapcomSnesRgn::CapcomSnesRgn(CapcomSnesInstr *instr, uint32_t offset) :
   uint8_t adsr1 = readByte(offset + 1);
   uint8_t adsr2 = readByte(offset + 2);
   uint8_t gain = readByte(offset + 3);
-  int16_t pitch_scale = getShortBE(offset + 4);
-
-  constexpr double pitch_fixer = 4286.0 / 4096.0;
-  double fine_tuning;
-  double coarse_tuning;
-  fine_tuning = modf((log(pitch_scale * pitch_fixer / 256.0) / log(2.0)) * 12.0, &coarse_tuning);
-
-  // normalize
-  if (fine_tuning >= 0.5) {
-    coarse_tuning += 1.0;
-    fine_tuning -= 1.0;
-  }
-  else if (fine_tuning <= -0.5) {
-    coarse_tuning -= 1.0;
-    fine_tuning += 1.0;
-  }
+  int16_t pitchScale = getShortBE(offset + 4);
 
   addSampNum(srcn, offset, 1);
   addChild(offset + 1, 1, "ADSR1");
   addChild(offset + 2, 1, "ADSR2");
   addChild(offset + 3, 1, "GAIN");
-  addUnityKey(96 - static_cast<int>(coarse_tuning), offset + 4, 1);
-  addFineTune(static_cast<int16_t>(fine_tuning * 100.0), offset + 5, 1);
+
+  constexpr int baseUnityKey = 96;
+  // MMX pitch-table C is 0x10BE, but the driver writes 0x10B0 for that neutral C after its low-nibble
+  // pitch quantization. That's a -5.66 cent difference. We'll opt for driver-accurate.
+  constexpr double referencePitch = 0x10B0 / 4096.0;
+
+  const double ratio = pitchScale != 0 ? (static_cast<double>(pitchScale) / 256.0) * referencePitch : 1.0;
+  const double semitones = 12.0 * std::log2(ratio);
+  int coarse = static_cast<int>(std::lround(semitones));
+  int fine = static_cast<int>(std::lround((semitones - coarse) * 100.0));
+
+  if (fine >= 50) {
+    ++coarse;
+    fine -= 100;
+  } else if (fine < -50) {
+    --coarse;
+    fine += 100;
+  }
+
+  addUnityKey(baseUnityKey - coarse, offset + 4, 1);
+  addFineTune(static_cast<int16_t>(fine), offset + 5, 1);
   snesConvADSR<VGMRgn>(this, adsr1, adsr2, gain);
 
   uint8_t sl = (adsr2 >> 5);

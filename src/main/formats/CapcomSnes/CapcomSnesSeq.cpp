@@ -164,6 +164,9 @@ void CapcomSnesTrack::resetVars() {
   transpose = 0;
   lastNoteSlurred = false;
   lastKey = -1;
+  lastVibratoDepth = 0;
+  lastLfoFrequency = 0;
+
   for (uint8_t& i : repeatCount) {
     i = 0;
   }
@@ -232,6 +235,24 @@ void CapcomSnesTrack::setNoteSlurred(bool slurred) {
 
 double CapcomSnesTrack::getTuningInSemitones(int8_t tuning) {
   return tuning / 256.0;
+}
+
+// Convert from Hz -> SF2 cents (linear to exponential) -> CC
+uint8_t sourceFreqByteToCc(uint8_t freqByte) {
+  if (freqByte == 0)
+    return 0; // this is a special-case that disables vibrato
+
+  constexpr double sf2ZeroHz = 8.176;
+  constexpr double sourceHzStep = 1000.0 / 16384.0;
+
+  constexpr double baseCents = -8479.0;
+  constexpr double modAmount = 9669.0;
+
+  double hz = static_cast<double>(freqByte) * sourceHzStep;
+  double cents = 1200.0 * std::log2(hz / sf2ZeroHz);
+
+  int cc = static_cast<int>(std::round(128.0 * (cents - baseCents) / modAmount));
+  return static_cast<uint8_t>(std::clamp(cc, 0, 127));
 }
 
 bool CapcomSnesTrack::readEvent() {
@@ -643,8 +664,33 @@ bool CapcomSnesTrack::readEvent() {
       case EVENT_LFO: {
         uint8_t lfoType = readByte(curOffset++);
         uint8_t lfoAmount = readByte(curOffset++);
-        desc = fmt::format("Type: {:d}  Amount: {:d}", lfoType, lfoAmount);
-        addGenericEvent(beginOffset, curOffset - beginOffset, "LFO Param", desc, Type::Lfo);
+        switch (lfoType) {
+          case 0:
+            // Vibrato Depth
+            lastVibratoDepth = lfoAmount;
+            addModulation(beginOffset, curOffset - beginOffset, lfoAmount, "Vibrato Depth");
+            break;
+          case 1:
+            // Tremolo Depth
+            desc = fmt::format("Amount: {:d}", lfoType, lfoAmount);
+            addGenericEvent(beginOffset, curOffset - beginOffset, "Tremolo Depth", desc, Type::Lfo);
+            break;
+          case 2:
+            // LFO Rate
+            if (lfoAmount == 0 && lastLfoFrequency != 0 && lastVibratoDepth != 0) {
+              addModulationNoItem(0);
+            } else if (lfoAmount != 0 && lastLfoFrequency == 0 && lastVibratoDepth != 0) {
+              addModulationNoItem(lastVibratoDepth);
+            }
+            lastLfoFrequency = lfoAmount;
+            addChannelPressure(beginOffset, curOffset - beginOffset, sourceFreqByteToCc(lfoAmount), "LFO Rate");
+            break;
+          case 3:
+            // Reset LFO phase on note on. argument 1 enables, 0 disables. On by default.
+            desc = fmt::format("Type: {:d}  Amount: {:d}", lfoType, lfoAmount);
+            addGenericEvent(beginOffset, curOffset - beginOffset, "Reset LFO at Note On", desc, Type::Lfo);
+            break;
+        }
         break;
       }
 
