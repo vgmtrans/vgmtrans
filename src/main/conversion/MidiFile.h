@@ -46,6 +46,7 @@ typedef enum {
   MIDIEVENT_PAN,
   MIDIEVENT_PROGRAMCHANGE,
   MIDIEVENT_PITCHBEND,
+  MIDIEVENT_CHANNELPRESSURE,
   MIDIEVENT_TEMPO,
   MIDIEVENT_TIMESIG,
   MIDIEVENT_MODULATION,
@@ -131,6 +132,8 @@ class MidiTrack {
 
   void addPitchBend(uint8_t channel, int16_t bend);
   void insertPitchBend(uint8_t channel, short bend, uint32_t absTime);
+  void addChannelPressure(uint8_t channel, uint8_t pressure);
+  void insertChannelPressure(uint8_t channel, uint8_t pressure, uint32_t absTime);
   void addPitchBendRange(uint8_t channel, uint16_t cents);
   void insertPitchBendRange(uint8_t channel, uint16_t cents, uint32_t absTime);
   void addFineTuning(uint8_t channel, uint8_t msb, uint8_t lsb);
@@ -518,6 +521,15 @@ class PitchBendEvent
   int16_t bend;
 };
 
+class ChannelPressureEvent
+    : public MidiEvent {
+ public:
+  ChannelPressureEvent(MidiTrack *prntTrk, uint8_t channel, uint32_t absoluteTime, uint8_t pressure);
+  MidiEventType eventType() override { return MIDIEVENT_CHANNELPRESSURE; }
+  uint32_t writeEvent(std::vector<uint8_t> &buf, uint32_t time) override;
+
+  uint8_t pressure;
+};
 
 class TempoEvent
     : public MidiEvent {

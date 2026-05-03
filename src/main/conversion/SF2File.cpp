@@ -18,7 +18,29 @@ namespace {
 
 SFModulator sf2SourceForModSource(InstrumentModSource source) {
   constexpr uint16_t midiContinuousController = 1u << 7;
-  return static_cast<SFModulator>(midiContinuousController | static_cast<uint8_t>(source));
+  constexpr uint16_t bipolar = 1u << 9;
+
+  switch (source) {
+    case InstrumentModSource::ModWheel:
+      return static_cast<SFModulator>(midiContinuousController | 1);
+    case InstrumentModSource::ChannelPressure:
+      return 13;
+    case InstrumentModSource::PolyPressure:
+      return 10;
+    case InstrumentModSource::PitchWheel:
+      return static_cast<SFModulator>(bipolar | 14);
+    case InstrumentModSource::Volume:
+      return static_cast<SFModulator>(midiContinuousController | 7);
+    case InstrumentModSource::Pan:
+      return static_cast<SFModulator>(midiContinuousController | 10);
+    case InstrumentModSource::Expression:
+      return static_cast<SFModulator>(midiContinuousController | 11);
+    case InstrumentModSource::ReverbSend:
+      return static_cast<SFModulator>(midiContinuousController | 91);
+    case InstrumentModSource::ChorusSend:
+      return static_cast<SFModulator>(midiContinuousController | 93);
+  }
+  return 0;
 }
 
 SFGenerator sf2GeneratorForModDestination(InstrumentModDestination destination) {

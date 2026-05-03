@@ -160,6 +160,11 @@ void VGMInstr::addModWheelToVibratoPitch(double cents) {
                static_cast<int32_t>(std::lround(cents)));
 }
 
+void VGMInstr::addChannelPressureToVibratoRate(double cents) {
+  addModulator(InstrumentModSource::ChannelPressure, InstrumentModDestination::VibLfoFrequency,
+               static_cast<int32_t>(std::lround(cents)));
+}
+
 VGMRgn *VGMInstr::addRgn(VGMRgn *rgn) {
   m_regions.emplace_back(rgn);
   if (m_auto_add_regions_as_children)

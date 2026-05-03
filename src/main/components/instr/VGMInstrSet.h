@@ -69,6 +69,7 @@ public:
 
   void addModulator(InstrumentModSource source, InstrumentModDestination destination, int32_t amount);
   void addModWheelToVibratoPitch(double cents);
+  void addChannelPressureToVibratoRate(double cents);
   [[nodiscard]] const std::vector<InstrumentModulator>& modulators() const { return m_modulators; }
 
   VGMRgn *addRgn(VGMRgn *rgn);

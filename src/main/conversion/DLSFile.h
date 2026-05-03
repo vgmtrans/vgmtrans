@@ -26,12 +26,17 @@ class VGMSamp;
 #define CONN_SRC_EG1 0x0004
 #define CONN_SRC_EG2 0x0005
 #define CONN_SRC_PITCHWHEEL 0x0006
+#define CONN_SRC_POLYPRESSURE 0x0007
+#define CONN_SRC_CHANNELPRESSURE 0x0008
+#define CONN_SRC_VIBRATO 0x0009
 
 /* Midi Controllers 0-127 */
 #define CONN_SRC_CC1 0x0081
 #define CONN_SRC_CC7 0x0087
 #define CONN_SRC_CC10 0x008a
 #define CONN_SRC_CC11 0x008b
+#define CONN_SRC_CC91 0x00db
+#define CONN_SRC_CC93 0x00dd
 
 /* Registered Parameter Numbers */
 #define CONN_SRC_RPN0 0x0100
@@ -48,6 +53,10 @@ class VGMSamp;
 /* LFO Destinations */
 #define CONN_DST_LFO_FREQUENCY 0x0104
 #define CONN_DST_LFO_STARTDELAY 0x0105
+
+/* DLS2 Vibrato LFO Destinations */
+#define CONN_DST_VIB_FREQUENCY 0x0114
+#define CONN_DST_VIB_STARTDELAY 0x0115
 
 /* EG1 Destinations */
 #define CONN_DST_EG1_ATTACKTIME 0x0206

@@ -44,6 +44,7 @@ public:
     NoteOn,
     Octave,
     Pan,
+    ChannelPressure,
     PanLfo,
     PanSlide,
     PanEnvelope,

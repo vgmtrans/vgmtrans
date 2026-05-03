@@ -328,6 +328,22 @@ class PitchBendSeqEvent : public SeqEvent {
   short pitchbend;
 };
 
+//  ***********************
+//  ChannelPressureSeqEvent
+//  ***********************
+
+class ChannelPressureSeqEvent : public SeqEvent {
+ public:
+  ChannelPressureSeqEvent(SeqTrack *pTrack, uint8_t pressure, uint32_t offset = 0,
+                          uint32_t length = 0, const std::string &name = "");
+
+  std::string description() override {
+    return fmt::format("{} - channel pressure: {}", name(), static_cast<int>(pressure));
+  };
+
+  uint8_t pressure;
+};
+
 //  **********************
 //  PitchBendRangeSeqEvent
 //  **********************

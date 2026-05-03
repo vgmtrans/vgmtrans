@@ -4,10 +4,15 @@
 
 enum class InstrumentModSource : uint8_t {
   // Keep this list to controllers expressible by both SF2 and DLS2.
-  ModWheel = 1,
-  Volume = 7,
-  Pan = 10,
-  Expression = 11,
+  ModWheel,
+  ChannelPressure,
+  PolyPressure,
+  PitchWheel,
+  Volume,
+  Pan,
+  Expression,
+  ReverbSend,
+  ChorusSend,
 };
 
 enum class InstrumentModDestination : uint8_t {
