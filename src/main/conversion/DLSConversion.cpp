@@ -269,6 +269,9 @@ bool mainDLSCreation(
           int32_t vibDelay = secondsToDlsTimecents(rgn->lfoVibDelaySeconds());
           newArt->addVibrato(vibDepth, vibFreq, vibDelay);
         }
+        for (const auto& generator : vgminstr->globalGenerators()) {
+          newArt->addGenerator(generator);
+        }
         for (const auto& modulator : vgminstr->modulators()) {
           newArt->addModulator(modulator);
         }

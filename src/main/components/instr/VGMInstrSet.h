@@ -71,6 +71,9 @@ public:
   void addModWheelToVibratoPitch(double cents);
   void addChannelPressureToVibratoRate(double cents);
   [[nodiscard]] const std::vector<InstrumentModulator>& modulators() const { return m_modulators; }
+  void addGlobalGenerator(InstrumentModDestination destination, int32_t amount);
+  void addGlobalVibratoFrequency(double hertz);
+  [[nodiscard]] const std::vector<InstrumentGenerator>& globalGenerators() const { return m_globalGenerators; }
 
   VGMRgn *addRgn(VGMRgn *rgn);
   VGMRgn *addRgn(uint32_t offset, uint32_t length, int sampNum, uint8_t keyLow = 0,
@@ -92,4 +95,5 @@ private:
   bool m_auto_add_regions_as_children{true};
   std::vector<VGMRgn*> m_regions;
   std::vector<InstrumentModulator> m_modulators;
+  std::vector<InstrumentGenerator> m_globalGenerators;
 };

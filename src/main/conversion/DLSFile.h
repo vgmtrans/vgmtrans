@@ -201,6 +201,7 @@ public:
                long sustain_lev, long release_time, uint16_t rls_transform);
   void addPan(long pan);
   void addVibrato(int32_t depth, int32_t frequency, int32_t delay);
+  void addGenerator(const InstrumentGenerator& generator);
   void addModulator(const InstrumentModulator& modulator);
 
   uint32_t GetSize() const;

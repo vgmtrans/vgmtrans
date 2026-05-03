@@ -103,6 +103,14 @@ void SynthInstr::addModulator(InstrumentModSource source, InstrumentModDestinati
   m_modulators.push_back({source, destination, amount});
 }
 
+void SynthInstr::addGlobalGenerator(const InstrumentGenerator& generator) {
+  m_globalGenerators.push_back(generator);
+}
+
+void SynthInstr::addGlobalGenerator(InstrumentModDestination destination, int32_t amount) {
+  m_globalGenerators.push_back({destination, amount});
+}
+
 //  ********
 //  SynthRgn
 //  ********

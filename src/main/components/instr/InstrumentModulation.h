@@ -32,3 +32,11 @@ struct InstrumentModulator {
   // cents for pitch/frequency, timecents for delay, and centibels for volume.
   int32_t amount;
 };
+
+struct InstrumentGenerator {
+  InstrumentModDestination destination;
+
+  // Absolute generator amount in shared SF2/DLS semantic units:
+  // cents for pitch/frequency, timecents for delay, and centibels for volume.
+  int32_t amount;
+};

@@ -165,6 +165,19 @@ void VGMInstr::addChannelPressureToVibratoRate(double cents) {
                static_cast<int32_t>(std::lround(cents)));
 }
 
+void VGMInstr::addGlobalGenerator(InstrumentModDestination destination, int32_t amount) {
+  m_globalGenerators.push_back({destination, amount});
+}
+
+void VGMInstr::addGlobalVibratoFrequency(double hertz) {
+  if (hertz <= 0.0 || !std::isfinite(hertz)) {
+    return;
+  }
+
+  addGlobalGenerator(InstrumentModDestination::VibLfoFrequency,
+                     static_cast<int32_t>(std::lround(1200.0 * std::log2(hertz / 8.176))));
+}
+
 VGMRgn *VGMInstr::addRgn(VGMRgn *rgn) {
   m_regions.emplace_back(rgn);
   if (m_auto_add_regions_as_children)

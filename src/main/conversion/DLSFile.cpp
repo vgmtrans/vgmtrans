@@ -366,6 +366,41 @@ void DLSArt::addVibrato(int32_t depth, int32_t frequency, int32_t delay) {
       CONN_SRC_NONE, CONN_SRC_NONE, CONN_DST_VIB_STARTDELAY, CONN_TRN_NONE, delay));
 }
 
+void DLSArt::addGenerator(const InstrumentGenerator& generator) {
+  switch (generator.destination) {
+    case InstrumentModDestination::VibLfoToPitch:
+      m_blocks.emplace_back(std::make_unique<ConnectionBlock>(
+          CONN_SRC_VIBRATO, CONN_SRC_NONE, CONN_DST_PITCH, CONN_TRN_NONE,
+          centsToDlsPitchScale(generator.amount)));
+      break;
+    case InstrumentModDestination::VibLfoFrequency:
+      m_blocks.emplace_back(std::make_unique<ConnectionBlock>(
+          CONN_SRC_NONE, CONN_SRC_NONE, CONN_DST_VIB_FREQUENCY, CONN_TRN_NONE,
+          centsToDlsPitchScale(generator.amount)));
+      break;
+    case InstrumentModDestination::VibLfoStartDelay:
+      m_blocks.emplace_back(std::make_unique<ConnectionBlock>(
+          CONN_SRC_NONE, CONN_SRC_NONE, CONN_DST_VIB_STARTDELAY, CONN_TRN_NONE,
+          toDls16Dot16Scale(generator.amount)));
+      break;
+    case InstrumentModDestination::ModLfoToVolume:
+      m_blocks.emplace_back(std::make_unique<ConnectionBlock>(
+          CONN_SRC_LFO, CONN_SRC_NONE, CONN_DST_ATTENUATION, CONN_TRN_NONE,
+          toDls16Dot16Scale(generator.amount)));
+      break;
+    case InstrumentModDestination::ModLfoFrequency:
+      m_blocks.emplace_back(std::make_unique<ConnectionBlock>(
+          CONN_SRC_NONE, CONN_SRC_NONE, CONN_DST_LFO_FREQUENCY, CONN_TRN_NONE,
+          centsToDlsPitchScale(generator.amount)));
+      break;
+    case InstrumentModDestination::ModLfoStartDelay:
+      m_blocks.emplace_back(std::make_unique<ConnectionBlock>(
+          CONN_SRC_NONE, CONN_SRC_NONE, CONN_DST_LFO_STARTDELAY, CONN_TRN_NONE,
+          toDls16Dot16Scale(generator.amount)));
+      break;
+  }
+}
+
 void DLSArt::addModulator(const InstrumentModulator& modulator) {
   const uint16_t source = dlsSourceForModSource(modulator.source);
 

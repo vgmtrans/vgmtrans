@@ -66,8 +66,13 @@ int16_t sf2AmountForModulator(const InstrumentModulator& modulator) {
       modulator.amount, std::numeric_limits<int16_t>::min(), std::numeric_limits<int16_t>::max()));
 }
 
+int16_t sf2AmountForGenerator(const InstrumentGenerator& generator) {
+  return static_cast<int16_t>(std::clamp<int32_t>(
+      generator.amount, std::numeric_limits<int16_t>::min(), std::numeric_limits<int16_t>::max()));
+}
+
 bool hasInstrumentGlobalZone(const SynthInstr* instr) {
-  return !instr->modulators().empty();
+  return !instr->globalGenerators().empty() || !instr->modulators().empty();
 }
 
 } // namespace
@@ -300,6 +305,7 @@ SF2File::SF2File(SynthFile *synthfile)
       sfInstBag globalInstBag{};
       globalInstBag.wInstGenNdx = static_cast<uint16_t>(instGenCounter);
       globalInstBag.wInstModNdx = static_cast<uint16_t>(instModCounter);
+      instGenCounter += static_cast<int>(instr->globalGenerators().size());
       instModCounter += static_cast<int>(instr->modulators().size());
       memcpy(ibagCk->data + (instBagCounter++ * sizeof(sfInstBag)), &globalInstBag, sizeof(sfInstBag));
     }
@@ -356,6 +362,7 @@ SF2File::SF2File(SynthFile *synthfile)
   //***********
   u32 numTotalGens = 1;
   for (const auto instr : synthfile->vInstrs) {
+    numTotalGens += static_cast<uint32_t>(instr->globalGenerators().size());
     for (const auto rgn : instr->vRgns) {
       numTotalGens += numOfGeneratorsForRgn(rgn);
     }
@@ -367,6 +374,14 @@ SF2File::SF2File(SynthFile *synthfile)
   dataPtr = 0;
   for (size_t i = 0; i < numInstrs; i++) {
     SynthInstr *instr = synthfile->vInstrs[i];
+
+    for (const auto& generator : instr->globalGenerators()) {
+      sfInstGenList instGenList{};
+      instGenList.sfGenOper = sf2GeneratorForModDestination(generator.destination);
+      instGenList.genAmount.shAmount = sf2AmountForGenerator(generator);
+      memcpy(igenCk->data + dataPtr, &instGenList, sizeof(sfInstGenList));
+      dataPtr += sizeof(sfInstGenList);
+    }
 
     size_t numRgns = instr->vRgns.size();
     for (size_t j = 0; j < numRgns; j++) {
