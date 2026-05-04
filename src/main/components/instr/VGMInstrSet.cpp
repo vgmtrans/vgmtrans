@@ -149,6 +149,28 @@ void VGMInstr::setInstrNum(uint32_t theInstrNum) {
   instrNum = theInstrNum;
 }
 
+VGMRgn *VGMInstr::addRgn(VGMRgn *rgn) {
+  m_regions.emplace_back(rgn);
+  if (m_auto_add_regions_as_children)
+    addChild(rgn);
+  return rgn;
+}
+
+VGMRgn *VGMInstr::addRgn(uint32_t offset, uint32_t length, int sampNum, uint8_t keyLow,
+                         uint8_t keyHigh, uint8_t velLow, uint8_t velHigh) {
+  VGMRgn *newRgn = new VGMRgn(this, offset, length, keyLow, keyHigh, velLow, velHigh, sampNum);
+  m_regions.emplace_back(newRgn);
+  if (m_auto_add_regions_as_children)
+    addChild(newRgn);
+  return newRgn;
+}
+
+void VGMInstr::deleteRegions() {
+  deleteVect(m_regions);
+}
+
+// Generator and Modulator methods
+
 void VGMInstr::addModulator(ModSource source, ModDest destination, int32_t amount) {
   m_modulators.push_back({source, destination, amount});
 }
@@ -177,20 +199,26 @@ void VGMInstr::addAttenuationModulator(ModSource source, ModDest destination, do
   addModulator(source, destination, ParamAmount::attenuationDb(decibels));
 }
 
-void VGMInstr::addModWheelToVibratoPitch(double cents) {
-  addPitchModulator(ModSource::ModWheel, ModDest::VibLfoToPitch, cents);
+void VGMInstr::addStandardVibratoHandling(double maxDepthCents,
+                                         double minHertz,
+                                         double maxHertz) {
+  addPitchModulator(ModSource::ModWheel, ModDest::VibLfoToPitch, maxDepthCents);
+  // nullify default channel pressure to vib lfo pitch modulator
+  addPitchModulator(ModSource::ChannelPressure, ModDest::VibLfoToPitch, 0);
+  addFrequencyGenerator(ModDest::VibLfoFreq, minHertz);
+  addFrequencyRangeModulator(ModSource::ChannelPressure, ModDest::VibLfoFreq, minHertz, maxHertz);
 }
 
-void VGMInstr::addChannelPressureToVibratoRateModulator(double minHertz, double maxHertz) {
-  addFrequencyRangeModulator(ModSource::ChannelPressure,
-                             ModDest::VibLfoFreq,
-                             minHertz, maxHertz);
-}
-
-void VGMInstr::addChannelPressureToTremoloRateModulator(double minHertz, double maxHertz) {
-  addFrequencyRangeModulator(ModSource::ChannelPressure,
-                             ModDest::ModLfoFreq,
-                             minHertz, maxHertz);
+void VGMInstr::addStandardTremoloHandling(double maxDepthDb,
+                                         double minHertz,
+                                         double maxHertz,
+                                         bool attenOnly) {
+  addFrequencyGenerator(ModDest::ModLfoFreq, minHertz);
+  addFrequencyRangeModulator(ModSource::ChannelPressure, ModDest::ModLfoFreq, minHertz, maxHertz);
+  addAttenuationModulator(ModSource::ChorusSend, ModDest::ModLfoToVol, maxDepthDb);
+  if (attenOnly) {
+    addAttenuationModulator(ModSource::ChorusSend, ModDest::InitialAtten, maxDepthDb);
+  }
 }
 
 void VGMInstr::addGlobalGenerator(ModDest destination, int32_t amount) {
@@ -227,24 +255,4 @@ void VGMInstr::addGlobalVibratoFrequency(double hertz) {
 
 void VGMInstr::addGlobalTremoloFrequency(double hertz) {
   addFrequencyGenerator(ModDest::ModLfoFreq, hertz);
-}
-
-VGMRgn *VGMInstr::addRgn(VGMRgn *rgn) {
-  m_regions.emplace_back(rgn);
-  if (m_auto_add_regions_as_children)
-    addChild(rgn);
-  return rgn;
-}
-
-VGMRgn *VGMInstr::addRgn(uint32_t offset, uint32_t length, int sampNum, uint8_t keyLow,
-                         uint8_t keyHigh, uint8_t velLow, uint8_t velHigh) {
-  VGMRgn *newRgn = new VGMRgn(this, offset, length, keyLow, keyHigh, velLow, velHigh, sampNum);
-  m_regions.emplace_back(newRgn);
-  if (m_auto_add_regions_as_children)
-    addChild(newRgn);
-  return newRgn;
-}
-
-void VGMInstr::deleteRegions() {
-  deleteVect(m_regions);
 }

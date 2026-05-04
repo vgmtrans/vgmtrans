@@ -75,9 +75,8 @@ public:
                                   double minHertz, double maxHertz);
   void addDelayModulator(ModSource source, ModDest destination, double seconds);
   void addAttenuationModulator(ModSource source, ModDest destination, double decibels);
-  void addModWheelToVibratoPitch(double cents);
-  void addChannelPressureToVibratoRateModulator(double minHertz, double maxHertz);
-  void addChannelPressureToTremoloRateModulator(double minHertz, double maxHertz);
+  void addStandardVibratoHandling(double maxDepthCents, double minHertz, double maxHertz);
+  void addStandardTremoloHandling(double maxDepthDb, double minHertz, double maxHertz, bool attenOnly);
   [[nodiscard]] const std::vector<InstrumentModulator>& modulators() const { return m_modulators; }
   void addGlobalGenerator(ModDest destination, int32_t amount);
   void addGlobalGenerator(ModDest destination, ParamAmount amount);
