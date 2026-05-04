@@ -166,6 +166,7 @@ void CapcomSnesTrack::resetVars() {
   lastNoteSlurred = false;
   lastKey = -1;
   lastVibratoDepth = 0;
+  lastTremoloDepth = 0;
   lastLfoFrequency = 0;
 
   for (uint8_t& i : repeatCount) {
@@ -263,19 +264,15 @@ uint8_t convertCapcomVolumeToMidi(uint8_t sourceVolume) {
 }
 
 int computeTremoloScalarAtTrough(int sourceDepth) {
-  if (sourceDepth <= 0) {
-    return kCapcomTremoloPeakScalar;
-  }
-  if (sourceDepth >= 127) {
+  sourceDepth = std::clamp(sourceDepth, 0, 127);
+
+  if (sourceDepth == 0)
+    return 250;
+  if (sourceDepth == 127)
     return 0;
-  }
 
   // Tremolo depth walks the same loudness curve as volume, but in reverse.
   const int inverseCurvePosition = 0x7E81 - sourceDepth * 255;
-  if (inverseCurvePosition <= 0) {
-    return 0;
-  }
-
   const int scaledCurvePosition = inverseCurvePosition >> 3;
   return interpolateCapcomVolumeCurve(scaledCurvePosition >> 8, scaledCurvePosition & 0xff);
 }
@@ -722,21 +719,28 @@ bool CapcomSnesTrack::readEvent() {
         switch (lfoType) {
           case 0:
             // Vibrato Depth
-            lastVibratoDepth = lfoAmount;
+            lastVibratoDepth = lfoAmount & 0x7F;
             addModulation(beginOffset, curOffset - beginOffset, lfoAmount, "Vibrato Depth");
             break;
           case 1:
             // Tremolo Depth
-            addControllerEventNoItem(93, convertTremoloDepthToMidiValue(lfoAmount));
-            desc = fmt::format("Amount: {:d}", lfoType, lfoAmount);
+            lastTremoloDepth = convertTremoloDepthToMidiValue(lfoAmount);
+            addControllerEventNoItem(93, lastTremoloDepth);
+            desc = fmt::format("Amount: {:d}", lfoAmount);
             addGenericEvent(beginOffset, curOffset - beginOffset, "Tremolo Depth", desc, Type::Lfo);
             break;
           case 2:
             // LFO Rate
-            if (lfoAmount == 0 && lastLfoFrequency != 0 && lastVibratoDepth != 0) {
-              addModulationNoItem(0);
-            } else if (lfoAmount != 0 && lastLfoFrequency == 0 && lastVibratoDepth != 0) {
-              addModulationNoItem(lastVibratoDepth);
+            if (lfoAmount == 0 && lastLfoFrequency != 0) {// && lastVibratoDepth != 0) {
+              if (lastVibratoDepth != 0)
+                addModulationNoItem(0);
+              if (lastTremoloDepth != 0)
+                addControllerEventNoItem(93, 0);
+            } else if (lfoAmount != 0 && lastLfoFrequency == 0) { // && lastVibratoDepth != 0) {
+              if (lastVibratoDepth != 0)
+                addModulationNoItem(lastVibratoDepth);
+              if (lastTremoloDepth != 0)
+                addControllerEventNoItem(93, lastTremoloDepth);
             }
             lastLfoFrequency = lfoAmount;
             addChannelPressure(beginOffset,
