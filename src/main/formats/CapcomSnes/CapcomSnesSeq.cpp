@@ -731,7 +731,7 @@ bool CapcomSnesTrack::readEvent() {
           case 0:
             // Vibrato Depth
             lastVibratoDepth = lfoAmount & 0x7F;
-            addModulation(beginOffset, curOffset - beginOffset, lfoAmount, "Vibrato Depth");
+            addModulation(beginOffset, curOffset - beginOffset, lastVibratoDepth, "Vibrato Depth");
             break;
           case 1:
             // Tremolo Depth
@@ -742,12 +742,12 @@ bool CapcomSnesTrack::readEvent() {
             break;
           case 2:
             // LFO Rate
-            if (lfoAmount == 0 && lastLfoFrequency != 0) {// && lastVibratoDepth != 0) {
+            if (lfoAmount == 0 && lastLfoFrequency != 0) {
               if (lastVibratoDepth != 0)
                 addModulationNoItem(0);
               if (lastTremoloDepth != 0)
                 addControllerEventNoItem(93, 0);
-            } else if (lfoAmount != 0 && lastLfoFrequency == 0) { // && lastVibratoDepth != 0) {
+            } else if (lfoAmount != 0 && lastLfoFrequency == 0) {
               if (lastVibratoDepth != 0)
                 addModulationNoItem(lastVibratoDepth);
               if (lastTremoloDepth != 0)
