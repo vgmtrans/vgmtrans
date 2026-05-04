@@ -1188,7 +1188,7 @@ void HexView::changeEvent(QEvent* event) {
       m_styles[0].bg = palette().color(QPalette::Window);
       m_styles[0].fg = palette().color(QPalette::WindowText);
     }
-    requestRhiUpdate(true, true);
+    requestRhiUpdate(true);
   }
   QAbstractScrollArea::changeEvent(event);
 }
