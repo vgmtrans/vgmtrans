@@ -67,20 +67,28 @@ public:
   inline void setBank(uint32_t bankNum);
   inline void setInstrNum(uint32_t theInstrNum);
 
+  VGMRgn *addRgn(VGMRgn *rgn);
+  VGMRgn *addRgn(uint32_t offset, uint32_t length, int sampNum, uint8_t keyLow = 0,
+                 uint8_t keyHigh = 0x7F, uint8_t velLow = 0, uint8_t velHigh = 0x7F);
+
+  // Modulator support
   void addModulator(ModSource source, ModDest destination, int32_t amount);
   void addModulator(ModSource source, ModDest destination, ParamAmount amount);
-  // Convenience helpers for format code that wants to work in musical units rather than SF2/DLS scalars.
+
+  // Helpers for adding modulators using more-intuitive units
   void addPitchModulator(ModSource source, ModDest destination, double cents);
-  void addFrequencyRangeModulator(ModSource source, ModDest destination,
-                                  double minHertz, double maxHertz);
+  void addFrequencyRangeModulator(ModSource source, ModDest destination, double minHertz, double maxHertz);
   void addDelayModulator(ModSource source, ModDest destination, double seconds);
   void addAttenuationModulator(ModSource source, ModDest destination, double decibels);
   void addStandardVibratoHandling(double maxDepthCents, double minHertz, double maxHertz);
   void addStandardTremoloHandling(double maxDepthDb, double minHertz, double maxHertz, bool attenOnly);
   [[nodiscard]] const std::vector<InstrumentModulator>& modulators() const { return m_modulators; }
+
+  // Generator support
   void addGlobalGenerator(ModDest destination, int32_t amount);
   void addGlobalGenerator(ModDest destination, ParamAmount amount);
-  // Generator helpers in musical units.
+
+  // Helpers for adding generators using more-intuitive units.
   void addPitchGenerator(ModDest destination, double cents);
   void addFrequencyGenerator(ModDest destination, double hertz);
   void addDelayGenerator(ModDest destination, double seconds);
@@ -88,10 +96,6 @@ public:
   void addGlobalVibratoFrequency(double hertz);
   void addGlobalTremoloFrequency(double hertz);
   [[nodiscard]] const std::vector<InstrumentGenerator>& globalGenerators() const { return m_globalGenerators; }
-
-  VGMRgn *addRgn(VGMRgn *rgn);
-  VGMRgn *addRgn(uint32_t offset, uint32_t length, int sampNum, uint8_t keyLow = 0,
-                 uint8_t keyHigh = 0x7F, uint8_t velLow = 0, uint8_t velHigh = 0x7F);
 
   virtual bool loadInstr() { return true; }
 

@@ -169,7 +169,7 @@ void VGMInstr::deleteRegions() {
   deleteVect(m_regions);
 }
 
-// Generator and Modulator methods
+// Modulator methods
 
 void VGMInstr::addModulator(ModSource source, ModDest destination, int32_t amount) {
   m_modulators.push_back({source, destination, amount});
@@ -220,6 +220,8 @@ void VGMInstr::addStandardTremoloHandling(double maxDepthDb,
     addAttenuationModulator(ModSource::ChorusSend, ModDest::InitialAtten, maxDepthDb);
   }
 }
+
+// Generator methods
 
 void VGMInstr::addGlobalGenerator(ModDest destination, int32_t amount) {
   m_globalGenerators.push_back({destination, amount});
