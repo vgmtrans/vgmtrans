@@ -302,12 +302,12 @@ uint8_t sourceFreqByteToCc(uint8_t freqByte) {
 
   constexpr double sourceHzStep = 1000.0 / 16384.0;
   constexpr double baseHz = sourceHzStep;
-  const double baseCents = static_cast<double>(InstrumentParamAmount::hertz(baseHz).value());
+  const double baseCents = static_cast<double>(ParamAmount::hertz(baseHz).value());
   const double modAmount = static_cast<double>(
-      InstrumentParamAmount::hertzRange(baseHz, 255.0 * sourceHzStep).value());
+      ParamAmount::hertzRange(baseHz, 255.0 * sourceHzStep).value());
 
   double hz = static_cast<double>(freqByte) * sourceHzStep;
-  double cents = static_cast<double>(InstrumentParamAmount::hertz(hz).value());
+  double cents = static_cast<double>(ParamAmount::hertz(hz).value());
 
   int cc = static_cast<int>(std::round(128.0 * (cents - baseCents) / modAmount));
   return static_cast<uint8_t>(std::clamp(cc, 0, 127));

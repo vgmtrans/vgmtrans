@@ -15,7 +15,7 @@ constexpr double kCapcomVibratoBaseHz = kCapcomLfoStepHz;
 constexpr double kCapcomVibratoMaxHz = 255.0 * kCapcomLfoStepHz;
 constexpr double kCapcomTremoloBaseHz = 2.0 * kCapcomLfoStepHz;
 constexpr double kCapcomTremoloMaxHz = 510.0 * kCapcomLfoStepHz;
-constexpr double kCapcomTremoloHalfDepthCentibels = 484.0;
+constexpr double kCapcomTremoloHalfDepthDb = 48.4;
 
 }  // namespace
 
@@ -117,24 +117,18 @@ bool CapcomSnesInstr::loadInstr() {
   // add ModWheel to Vibrato Depth modulator
   addModWheelToVibratoPitch(1200);
   // nullify default ChannelPressure to vibrato pitch depth modulator
-  addModulator(InstrumentModSource::ChannelPressure, InstrumentModDestination::VibLfoToPitch,
-               InstrumentParamAmount::cents(0));
+  addPitchModulator(ModSource::ChannelPressure, ModDest::VibLfoToPitch, 0);
   // add global zone vibrato frequency generator for the default base rate. Tremolo runs at twice the base rate.
-  addGlobalGenerator(InstrumentModDestination::VibLfoFrequency, InstrumentParamAmount::hertz(kCapcomVibratoBaseHz));
-  addGlobalGenerator(InstrumentModDestination::ModLfoFrequency, InstrumentParamAmount::hertz(kCapcomTremoloBaseHz));
-  // add ChannelPressure to Vibrato/Tremolo Frequency modulators, each spanning the full Capcom Hz range.
-  addModulator(InstrumentModSource::ChannelPressure, InstrumentModDestination::VibLfoFrequency,
-               InstrumentParamAmount::hertzRange(kCapcomVibratoBaseHz, kCapcomVibratoMaxHz));
-  addModulator(InstrumentModSource::ChannelPressure, InstrumentModDestination::ModLfoFrequency,
-               InstrumentParamAmount::hertzRange(kCapcomTremoloBaseHz, kCapcomTremoloMaxHz));
+  addFrequencyGenerator(ModDest::VibLfoFreq, kCapcomVibratoBaseHz);
+  addFrequencyGenerator(ModDest::ModLfoFreq, kCapcomTremoloBaseHz);
+  addChannelPressureToVibratoRateModulator(kCapcomVibratoBaseHz, kCapcomVibratoMaxHz);
+  addChannelPressureToTremoloRateModulator(kCapcomTremoloBaseHz, kCapcomTremoloMaxHz);
 
   // Tremolo in the CapcomSnes driver only applies an attenuation - it never boosts the volume. This is different
   // from SF2.
   // add CC93 to Tremolo Depth modulator
-  addModulator(InstrumentModSource::ChorusSend, InstrumentModDestination::ModLfoToVolume,
-               InstrumentParamAmount::centibels(kCapcomTremoloHalfDepthCentibels));
-  addModulator(InstrumentModSource::ChorusSend, InstrumentModDestination::InitialAttenuation,
-               InstrumentParamAmount::centibels(kCapcomTremoloHalfDepthCentibels));
+  addAttenuationModulator(ModSource::ChorusSend, ModDest::ModLfoToVol, kCapcomTremoloHalfDepthDb);
+  addAttenuationModulator(ModSource::ChorusSend, ModDest::InitialAtten, kCapcomTremoloHalfDepthDb);
 
 
   uint16_t addrSampStart = readShort(offDirEnt);
