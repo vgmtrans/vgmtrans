@@ -176,7 +176,7 @@ CapcomSnesRgn::CapcomSnesRgn(CapcomSnesInstr *instr, uint32_t offset) :
 
   constexpr int baseUnityKey = 96;
   // MMX pitch-table C is 0x10BE, but the driver writes 0x10B0 for that neutral C after its low-nibble
-  // pitch quantization. That's a -5.66 cent difference. We'll opt for driver-accurate.
+  // pitch quantization. That's a -5.66 cent difference. Using 0x10BE would give pitches that are on avg more sharp.
   constexpr double referencePitch = 0x10B0 / 4096.0;
 
   const double ratio = pitchScale != 0 ? (static_cast<double>(pitchScale) / 256.0) * referencePitch : 1.0;
