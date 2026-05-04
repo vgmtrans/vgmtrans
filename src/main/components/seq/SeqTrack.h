@@ -140,8 +140,9 @@ protected:
 
 private:
   void addControllerSlide(u32 dur, u16 &prevVal, u16 targVal, uint8_t (*scalerFunc)(uint8_t), void (MidiTrack::*insertFunc)(uint8_t, uint8_t, uint32_t)) const;
-  double applyLevelCorrection(double level, LevelController controller) const;
+  double applyPanVolumeCorrection(double level, LevelController controller) const;
   void addLevelNoItem(double level, LevelController controller, Resolution res, int absTime = -1);
+  void reapplyStoredLevelNoItem(LevelController controller, int absTime = -1);
   void purgePrevDurEvents(uint32_t absTime);
   void clearPrevDurEvents();
   void trackActiveNoteIndex(int8_t key, SeqEventTimeIndex::Index idx);
@@ -295,8 +296,11 @@ private:
   uint8_t prevVel;
   uint8_t octave;
   u16 vol;
+  Resolution volResolution;
   u16 expression;
+  Resolution expressionResolution;
   u16 mastVol;
+  Resolution masterVolResolution;
   double panVolumeCorrectionRate; // as percentage of original volume (default: 1.0)
   u16 prevPan;
   uint8_t prevReverb;
