@@ -68,10 +68,12 @@ public:
   inline void setInstrNum(uint32_t theInstrNum);
 
   void addModulator(InstrumentModSource source, InstrumentModDestination destination, int32_t amount);
+  void addModulator(InstrumentModSource source, InstrumentModDestination destination, InstrumentParamAmount amount);
   void addModWheelToVibratoPitch(double cents);
   void addChannelPressureToVibratoRate(double cents);
   [[nodiscard]] const std::vector<InstrumentModulator>& modulators() const { return m_modulators; }
   void addGlobalGenerator(InstrumentModDestination destination, int32_t amount);
+  void addGlobalGenerator(InstrumentModDestination destination, InstrumentParamAmount amount);
   void addGlobalVibratoFrequency(double hertz);
   void addGlobalTremoloFrequency(double hertz);
   [[nodiscard]] const std::vector<InstrumentGenerator>& globalGenerators() const { return m_globalGenerators; }

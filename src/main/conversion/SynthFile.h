@@ -48,9 +48,11 @@ class SynthInstr {
 
   void addModulator(const InstrumentModulator& modulator);
   void addModulator(InstrumentModSource source, InstrumentModDestination destination, int32_t amount);
+  void addModulator(InstrumentModSource source, InstrumentModDestination destination, InstrumentParamAmount amount);
   [[nodiscard]] const std::vector<InstrumentModulator>& modulators() const { return m_modulators; }
   void addGlobalGenerator(const InstrumentGenerator& generator);
   void addGlobalGenerator(InstrumentModDestination destination, int32_t amount);
+  void addGlobalGenerator(InstrumentModDestination destination, InstrumentParamAmount amount);
   [[nodiscard]] const std::vector<InstrumentGenerator>& globalGenerators() const { return m_globalGenerators; }
 
   uint32_t ulBank;

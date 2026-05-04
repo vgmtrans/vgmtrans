@@ -103,12 +103,29 @@ void SynthInstr::addModulator(InstrumentModSource source, InstrumentModDestinati
   m_modulators.push_back({source, destination, amount});
 }
 
+void SynthInstr::addModulator(InstrumentModSource source, InstrumentModDestination destination,
+                              InstrumentParamAmount amount) {
+  if (!amount.valid()) {
+    return;
+  }
+
+  addModulator(source, destination, amount.value());
+}
+
 void SynthInstr::addGlobalGenerator(const InstrumentGenerator& generator) {
   m_globalGenerators.push_back(generator);
 }
 
 void SynthInstr::addGlobalGenerator(InstrumentModDestination destination, int32_t amount) {
   m_globalGenerators.push_back({destination, amount});
+}
+
+void SynthInstr::addGlobalGenerator(InstrumentModDestination destination, InstrumentParamAmount amount) {
+  if (!amount.valid()) {
+    return;
+  }
+
+  addGlobalGenerator(destination, amount.value());
 }
 
 //  ********
