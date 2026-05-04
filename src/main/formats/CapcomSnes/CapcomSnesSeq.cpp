@@ -5,6 +5,7 @@
  */
 #include <sstream>
 #include "CapcomSnesSeq.h"
+#include "InstrumentModulation.h"
 #include "ScaleConversion.h"
 
 DECLARE_FORMAT(CapcomSnes);
@@ -299,14 +300,14 @@ uint8_t sourceFreqByteToCc(uint8_t freqByte) {
   if (freqByte == 0)
     return 0; // this is a special-case that disables vibrato
 
-  constexpr double sf2ZeroHz = 8.176;
   constexpr double sourceHzStep = 1000.0 / 16384.0;
-
-  constexpr double baseCents = -8479.0;
-  constexpr double modAmount = 9669.0;
+  constexpr double baseHz = sourceHzStep;
+  const double baseCents = static_cast<double>(InstrumentParamAmount::hertz(baseHz).value());
+  const double modAmount = static_cast<double>(
+      InstrumentParamAmount::hertzRange(baseHz, 255.0 * sourceHzStep).value());
 
   double hz = static_cast<double>(freqByte) * sourceHzStep;
-  double cents = 1200.0 * std::log2(hz / sf2ZeroHz);
+  double cents = static_cast<double>(InstrumentParamAmount::hertz(hz).value());
 
   int cc = static_cast<int>(std::round(128.0 * (cents - baseCents) / modAmount));
   return static_cast<uint8_t>(std::clamp(cc, 0, 127));
