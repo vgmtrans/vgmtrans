@@ -113,22 +113,10 @@ bool CapcomSnesInstr::loadInstr() {
   // Vibrato has a full +/- octave range of 1200 cents (max depth value evaluates to 127/128 of range, just like SF2)
   // Vibrato frequency is a unipolar sweep from one Capcom LFO step up to 255 steps, so we use the
   // step frequency as the global base and let channel pressure span the full range in Hz.
+  // Tremolo runs at twice the base vibrato rate and only attenuates, never boosts.
 
-  // add ModWheel to Vibrato Depth modulator
-  addModWheelToVibratoPitch(1200);
-  // nullify default ChannelPressure to vibrato pitch depth modulator
-  addPitchModulator(ModSource::ChannelPressure, ModDest::VibLfoToPitch, 0);
-  // add global zone vibrato frequency generator for the default base rate. Tremolo runs at twice the base rate.
-  addFrequencyGenerator(ModDest::VibLfoFreq, kCapcomVibratoBaseHz);
-  addFrequencyGenerator(ModDest::ModLfoFreq, kCapcomTremoloBaseHz);
-  addChannelPressureToVibratoRateModulator(kCapcomVibratoBaseHz, kCapcomVibratoMaxHz);
-  addChannelPressureToTremoloRateModulator(kCapcomTremoloBaseHz, kCapcomTremoloMaxHz);
-
-  // Tremolo in the CapcomSnes driver only applies an attenuation - it never boosts the volume. This is different
-  // from SF2.
-  // add CC93 to Tremolo Depth modulator
-  addAttenuationModulator(ModSource::ChorusSend, ModDest::ModLfoToVol, kCapcomTremoloHalfDepthDb);
-  addAttenuationModulator(ModSource::ChorusSend, ModDest::InitialAtten, kCapcomTremoloHalfDepthDb);
+  addStandardVibratoHandling(1200, kCapcomVibratoBaseHz, kCapcomVibratoMaxHz);
+  addStandardTremoloHandling(kCapcomTremoloHalfDepthDb, kCapcomTremoloBaseHz, kCapcomTremoloMaxHz, true);
 
 
   uint16_t addrSampStart = readShort(offDirEnt);
