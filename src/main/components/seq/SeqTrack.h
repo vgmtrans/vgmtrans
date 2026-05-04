@@ -119,7 +119,9 @@ protected:
                                              Args&&... args) {
     if (readMode == READMODE_ADD_TO_UI) {
       if (isNewOffset) {
-        addEvent(new EventType(this, std::forward<Args>(args)...));
+        auto* event = new EventType(this, std::forward<Args>(args)...);
+        event->channel = static_cast<uint8_t>(channel);
+        addEvent(event);
       }
       return SeqEventTimeIndex::kInvalidIndex;
     }

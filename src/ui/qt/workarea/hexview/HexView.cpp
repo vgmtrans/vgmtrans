@@ -47,8 +47,8 @@ constexpr int HEX_TO_ASCII_SPACING_CHARS = 4;
 constexpr int SELECTION_PADDING = 18;
 constexpr int VIEWPORT_PADDING = 10;
 constexpr int DIM_DURATION_MS = 200;
-constexpr int PLAYBACK_FADE_DURATION_MS = 300;
-constexpr float PLAYBACK_FADE_CURVE = 3.0f;
+constexpr int PLAYBACK_FADE_DURATION_MS = 450;
+constexpr float PLAYBACK_FADE_CURVE = 2.0f;
 constexpr int OVERLAY_ALPHA = 80;
 constexpr float OVERLAY_ALPHA_F = OVERLAY_ALPHA / 255.0f;
 constexpr float SHADOW_OFFSET_X = 0.0f;
@@ -56,11 +56,9 @@ constexpr float SHADOW_OFFSET_Y = 0.0f;
 constexpr float SHADOW_BLUR_RADIUS = SELECTION_PADDING * 1.0f;
 constexpr float SHADOW_STRENGTH = 0.5;
 constexpr float SHADOW_EDGE_CURVE = 1.1f;
-constexpr float PLAYBACK_GLOW_STRENGTH = 0.55f;
+constexpr float PLAYBACK_GLOW_STRENGTH = 0.75f;
 constexpr float PLAYBACK_GLOW_RADIUS = 1.8f;
 constexpr float PLAYBACK_GLOW_EDGE_CURVE = 0.85f;
-const QColor PLAYBACK_GLOW_LOW(40, 40, 40);
-const QColor PLAYBACK_GLOW_HIGH(230, 230, 230);
 const QColor PLAYBACK_GLOW_FALLBACK(230, 230, 230);
 constexpr uint16_t STYLE_UNASSIGNED = std::numeric_limits<uint16_t>::max();
 
@@ -368,8 +366,6 @@ HexView::HexView(VGMFile* vgmfile, QWidget* parent)
 
   QFont font = defaultViewFont();
   setShadowStrength(SHADOW_STRENGTH);
-  m_playbackGlowLow = PLAYBACK_GLOW_LOW;
-  m_playbackGlowHigh = PLAYBACK_GLOW_HIGH;
   m_playbackGlowStrength = PLAYBACK_GLOW_STRENGTH;
   m_playbackGlowRadius = PLAYBACK_GLOW_RADIUS;
   m_shadowEdgeCurve = SHADOW_EDGE_CURVE;
@@ -1154,8 +1150,6 @@ HexViewFrame::Data HexView::captureRhiFrameData(float dpr) {
   frame.shadowBlur = m_shadowBlur;
   frame.shadowStrength = m_shadowStrength;
   frame.shadowOffset = m_shadowOffset;
-  frame.playbackGlowLow = m_playbackGlowLow;
-  frame.playbackGlowHigh = m_playbackGlowHigh;
   frame.playbackGlowStrength = m_playbackGlowStrength;
   frame.playbackGlowRadius = m_playbackGlowRadius;
   frame.shadowEdgeCurve = m_shadowEdgeCurve;
@@ -1382,6 +1376,7 @@ void HexView::mouseReleaseEvent(QMouseEvent* event) {
   if (event->button() == Qt::LeftButton) {
     m_isDragging = false;
     stopNotePreview();
+    m_lastSeekItem = nullptr;
     const QPoint vp = viewport()->mapFromGlobal(QCursor::pos());
     handleTooltipHoverMove(vp, QApplication::keyboardModifiers());
   }

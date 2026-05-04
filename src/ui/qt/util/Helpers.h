@@ -6,6 +6,7 @@
 
 #pragma once
 
+#include <QColor>
 #include <QIcon>
 #include <VGMFile.h>
 #include <VGMItem.h>
@@ -18,6 +19,8 @@ const QIcon &iconForItemType(VGMItem::Type type);
 
 QColor colorForItemType(VGMItem::Type type);
 QColor textColorForItemType(VGMItem::Type type);
+QColor colorForTrackIndex(int trackIndex);
+QColor disabledTrackColor();
 
 QString getFullDescriptionForTooltip(VGMItem* item);
 

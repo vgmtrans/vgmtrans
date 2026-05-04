@@ -197,6 +197,55 @@ void VGMFileView::seekToEvent(VGMItem* item) const {
   SequencePlayer::the().seek(static_cast<int>(tick), PositionChangeOrigin::HexView);
 }
 
+void VGMFileView::ensureTrackIndexMap(VGMSeq* seq) {
+  if (!seq) {
+    m_trackIndexSeq = nullptr;
+    m_trackIndexByPtr.clear();
+    m_trackIndexByMidiPtr.clear();
+    return;
+  }
+
+  if (m_trackIndexSeq == seq && m_trackIndexByPtr.size() == seq->aTracks.size()) {
+    return;
+  }
+
+  m_trackIndexSeq = seq;
+  m_trackIndexByPtr.clear();
+  m_trackIndexByMidiPtr.clear();
+  for (size_t i = 0; i < seq->aTracks.size(); ++i) {
+    auto* track = seq->aTracks[i];
+    if (!track) {
+      continue;
+    }
+    const int trackIndex = static_cast<int>(i);
+    m_trackIndexByPtr[track] = trackIndex;
+    if (track->pMidiTrack) {
+      m_trackIndexByMidiPtr.emplace(track->pMidiTrack, trackIndex);
+    }
+  }
+}
+
+int VGMFileView::trackIndexForEvent(const SeqEvent* event) const {
+  if (!event) {
+    return -1;
+  }
+
+  if (event->parentTrack) {
+    const auto trackIt = m_trackIndexByPtr.find(event->parentTrack);
+    if (trackIt != m_trackIndexByPtr.end()) {
+      return trackIt->second;
+    }
+    if (event->parentTrack->pMidiTrack) {
+      const auto midiIt = m_trackIndexByMidiPtr.find(event->parentTrack->pMidiTrack);
+      if (midiIt != m_trackIndexByMidiPtr.end()) {
+        return midiIt->second;
+      }
+    }
+  }
+
+  return static_cast<int>(event->channel);
+}
+
 void VGMFileView::onPlaybackPositionChanged(int current, int max, PositionChangeOrigin origin) {
   if (!isVisible()) {
     return;
@@ -218,6 +267,7 @@ void VGMFileView::onPlaybackPositionChanged(int current, int max, PositionChange
       m_hexview->setPlaybackActive(false);
       m_hexview->clearPlaybackSelections(false);
       m_lastPlaybackItems.clear();
+      m_lastPlaybackItemColors.clear();
     }
     if (treeVisible) {
       m_treeview->setPlaybackItems({});
@@ -231,6 +281,7 @@ void VGMFileView::onPlaybackPositionChanged(int current, int max, PositionChange
       m_hexview->setPlaybackActive(false);
       m_hexview->clearPlaybackSelections(false);
       m_lastPlaybackItems.clear();
+      m_lastPlaybackItemColors.clear();
     }
     if (treeVisible) {
       m_treeview->setPlaybackItems({});
@@ -246,6 +297,7 @@ void VGMFileView::onPlaybackPositionChanged(int current, int max, PositionChange
       m_hexview->setPlaybackActive(false);
       m_hexview->clearPlaybackSelections(false);
       m_lastPlaybackItems.clear();
+      m_lastPlaybackItemColors.clear();
     }
     if (treeVisible) {
       m_treeview->setPlaybackItems({});
@@ -291,14 +343,25 @@ void VGMFileView::onPlaybackPositionChanged(int current, int max, PositionChange
   }
   m_lastPlaybackPosition = current;
 
+  ensureTrackIndexMap(seq);
   m_playbackItems.clear();
+  m_playbackItemColors.clear();
   m_playbackItems.reserve(m_playbackTimedEvents.size());
+  m_playbackItemColors.reserve(m_playbackTimedEvents.size());
   for (const auto* timed : m_playbackTimedEvents) {
     if (!timed || !timed->event) {
       continue;
     }
     auto* event = timed->event;
     m_playbackItems.push_back(event);
+    QColor glowColor = colorForItemType(event->type);
+    if (const auto* seqEvent = dynamic_cast<const SeqEvent*>(event)) {
+      const int trackIndex = trackIndexForEvent(seqEvent);
+      if (trackIndex >= 0) {
+        glowColor = colorForTrackIndex(trackIndex);
+      }
+    }
+    m_playbackItemColors.push_back(glowColor);
   }
 
   if (treeVisible) {
@@ -309,7 +372,8 @@ void VGMFileView::onPlaybackPositionChanged(int current, int max, PositionChange
     m_hexview->setPlaybackActive(shouldHighlight);
   }
 
-  if (m_playbackItems == m_lastPlaybackItems) {
+  if (m_playbackItems == m_lastPlaybackItems &&
+      m_playbackItemColors == m_lastPlaybackItemColors) {
     if (hexVisible) {
       m_hexview->requestPlaybackFrame();
     }
@@ -317,8 +381,9 @@ void VGMFileView::onPlaybackPositionChanged(int current, int max, PositionChange
   }
 
   m_lastPlaybackItems = m_playbackItems;
+  m_lastPlaybackItemColors = m_playbackItemColors;
   if (hexVisible) {
-    m_hexview->setPlaybackSelectionsForItems(m_playbackItems);
+    m_hexview->setPlaybackSelectionsForItems(m_playbackItems, m_playbackItemColors);
   }
 }
 
@@ -329,10 +394,15 @@ void VGMFileView::onPlayerStatusChanged(bool playing) {
     return;
   m_playbackTimedEvents.clear();
   m_playbackItems.clear();
+  m_playbackItemColors.clear();
   m_lastPlaybackItems.clear();
+  m_lastPlaybackItemColors.clear();
   m_lastPlaybackPosition = 0;
   m_playbackCursor.reset();
   m_playbackTimeline = nullptr;
+  m_trackIndexSeq = nullptr;
+  m_trackIndexByPtr.clear();
+  m_trackIndexByMidiPtr.clear();
   m_hexview->setPlaybackActive(false);
   m_hexview->clearPlaybackSelections(false);
   if (m_treeview) {

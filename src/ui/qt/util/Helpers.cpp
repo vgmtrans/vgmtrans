@@ -422,6 +422,16 @@ QColor textColorForItemType(VGMItem::Type type) {
     return EventColors::CLR_BG_DARK;
 }
 
+QColor colorForTrackIndex(int trackIndex) {
+  const int hue = (trackIndex * 43) % 360;
+  return QColor::fromHsv(hue, 190, 235);
+}
+
+QColor disabledTrackColor() {
+  static const QColor kDisabledTrackColor(132, 132, 132);
+  return kDisabledTrackColor;
+}
+
 QString getFullDescriptionForTooltip(VGMItem* item) {
   QString name = QString::fromStdString(item->name());
   QString description = QString::fromStdString(item->description());

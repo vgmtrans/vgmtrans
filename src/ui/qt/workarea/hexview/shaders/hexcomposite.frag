@@ -118,9 +118,9 @@ float computeShadowHalo(float selectionNorm, float selectedMask) {
 
 vec2 computePlaybackHalos(float activeNorm, float fadeNorm, float activeMask,
                           float fadeMask, float fadeAlpha) {
-  float anyPlaybackMask = max(activeMask, fadeMask);
   float activeHalo = activeNorm * (1.0 - activeMask);
-  float fadeHalo = fadeNorm * (1.0 - anyPlaybackMask) * fadeAlpha;
+  float fadeOcclusion = max(activeMask, fadeMask * fadeAlpha);
+  float fadeHalo = fadeNorm * (1.0 - fadeOcclusion);
   return vec2(activeHalo, fadeHalo);
 }
 
@@ -174,8 +174,11 @@ void main() {
   float fadeGlow = clamp(playHalos.y * glowStrength, 0.0, 1.0);
   float glowValue = max(activeGlow, fadeGlow);
 
-  vec3 trackGlowBase = playbackColorSample.rgb;
-  float hasTrackGlowColor = step(0.001, playbackColorSample.a);
+  float playbackColorWeight = max(playbackColorSample.a, 0.0);
+  vec3 trackGlowBase =
+      playbackColorWeight > 0.0001 ? clamp(playbackColorSample.rgb / playbackColorWeight, 0.0, 1.0)
+                                   : vec3(0.0);
+  float hasTrackGlowColor = step(0.0001, playbackColorWeight);
   glowLow = mix(glowLow, trackGlowBase * 0.34, hasTrackGlowColor);
   vec3 glowHighTint = mix(glowHighRgb,
                           min(trackGlowBase * 1.18 + vec3(0.06), vec3(1.0)),
