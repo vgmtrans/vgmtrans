@@ -117,6 +117,7 @@ target_sources(vgmtranscore
     components/VGMMultiSectionSeq.cpp
     components/VGMSampColl.cpp
     components/VGMTag.cpp
+    components/instr/InstrumentModulation.cpp
     components/instr/VGMInstrSet.cpp
     components/instr/VGMRgn.cpp
     components/instr/VGMSamp.cpp

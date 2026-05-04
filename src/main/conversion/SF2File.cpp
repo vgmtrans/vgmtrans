@@ -16,48 +16,48 @@
 
 namespace {
 
-SFModulator sf2SourceForModSource(InstrumentModSource source) {
+SFModulator sf2SourceForModSource(ModSource source) {
   constexpr uint16_t midiContinuousController = 1u << 7;
   constexpr uint16_t bipolar = 1u << 9;
 
   switch (source) {
-    case InstrumentModSource::ModWheel:
+    case ModSource::ModWheel:
       return static_cast<SFModulator>(midiContinuousController | 1);
-    case InstrumentModSource::ChannelPressure:
+    case ModSource::ChannelPressure:
       return 13;
-    case InstrumentModSource::PolyPressure:
+    case ModSource::PolyPressure:
       return 10;
-    case InstrumentModSource::PitchWheel:
+    case ModSource::PitchWheel:
       return static_cast<SFModulator>(bipolar | 14);
-    case InstrumentModSource::Volume:
+    case ModSource::Volume:
       return static_cast<SFModulator>(midiContinuousController | 7);
-    case InstrumentModSource::Pan:
+    case ModSource::Pan:
       return static_cast<SFModulator>(midiContinuousController | 10);
-    case InstrumentModSource::Expression:
+    case ModSource::Expression:
       return static_cast<SFModulator>(midiContinuousController | 11);
-    case InstrumentModSource::ReverbSend:
+    case ModSource::ReverbSend:
       return static_cast<SFModulator>(midiContinuousController | 91);
-    case InstrumentModSource::ChorusSend:
+    case ModSource::ChorusSend:
       return static_cast<SFModulator>(midiContinuousController | 93);
   }
   return 0;
 }
 
-SFGenerator sf2GeneratorForModDestination(InstrumentModDestination destination) {
+SFGenerator sf2GeneratorForModDestination(ModDest destination) {
   switch (destination) {
-    case InstrumentModDestination::VibLfoToPitch:
+    case ModDest::VibLfoToPitch:
       return vibLfoToPitch;
-    case InstrumentModDestination::VibLfoFrequency:
+    case ModDest::VibLfoFreq:
       return freqVibLFO;
-    case InstrumentModDestination::VibLfoStartDelay:
+    case ModDest::VibLfoDelay:
       return delayVibLFO;
-    case InstrumentModDestination::ModLfoToVolume:
+    case ModDest::ModLfoToVol:
       return modLfoToVolume;
-    case InstrumentModDestination::ModLfoFrequency:
+    case ModDest::ModLfoFreq:
       return freqModLFO;
-    case InstrumentModDestination::ModLfoStartDelay:
+    case ModDest::ModLfoDelay:
       return delayModLFO;
-    case InstrumentModDestination::InitialAttenuation:
+    case ModDest::InitialAtten:
       return initialAttenuation;
   }
   return endOper;

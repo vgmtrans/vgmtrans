@@ -5,7 +5,6 @@
  */
 
 #include "VGMInstrSet.h"
-#include <cmath>
 #include <spdlog/fmt/fmt.h>
 #include "VGMSampColl.h"
 #include "VGMSamp.h"
@@ -14,78 +13,11 @@
 #include "Root.h"
 #include "Format.h"
 #include "LogManager.h"
-#include "ScaleConversion.h"
 #include "helper.h"
-
-namespace {
-
-constexpr double kSf2LfoReferenceHz = 8.176;
-
-bool isValidFiniteNumber(double value) {
-  return std::isfinite(value);
-}
-
-int32_t hertzToInstrumentCents(double hertz) {
-  return static_cast<int32_t>(std::lround(1200.0 * std::log2(hertz / kSf2LfoReferenceHz)));
-}
-
-}  // namespace
 
 // ***********
 // VGMInstrSet
 // ***********
-
-InstrumentParamAmount InstrumentParamAmount::raw(int32_t amount) {
-  return InstrumentParamAmount(amount, true);
-}
-
-InstrumentParamAmount InstrumentParamAmount::cents(double cents) {
-  if (!isValidFiniteNumber(cents)) {
-    return InstrumentParamAmount(0, false);
-  }
-
-  return InstrumentParamAmount(static_cast<int32_t>(std::lround(cents)), true);
-}
-
-InstrumentParamAmount InstrumentParamAmount::hertz(double hertz) {
-  if (hertz <= 0.0 || !isValidFiniteNumber(hertz)) {
-    return InstrumentParamAmount(0, false);
-  }
-
-  return InstrumentParamAmount(hertzToInstrumentCents(hertz), true);
-}
-
-InstrumentParamAmount InstrumentParamAmount::hertzRange(double minHertz, double maxHertz) {
-  if (minHertz <= 0.0 || maxHertz <= 0.0 ||
-      !isValidFiniteNumber(minHertz) || !isValidFiniteNumber(maxHertz)) {
-    return InstrumentParamAmount(0, false);
-  }
-
-  const double minCents = static_cast<double>(hertzToInstrumentCents(minHertz));
-  const double maxCents = static_cast<double>(hertzToInstrumentCents(maxHertz));
-  const double fullScaleRange = (maxCents - minCents) * 128.0 / 127.0;
-  return InstrumentParamAmount(static_cast<int32_t>(std::lround(fullScaleRange)), true);
-}
-
-InstrumentParamAmount InstrumentParamAmount::seconds(double seconds) {
-  return InstrumentParamAmount(secondsToSf2Timecents(seconds), true);
-}
-
-InstrumentParamAmount InstrumentParamAmount::centibels(double centibels) {
-  if (!isValidFiniteNumber(centibels)) {
-    return InstrumentParamAmount(0, false);
-  }
-
-  return InstrumentParamAmount(static_cast<int32_t>(std::lround(centibels)), true);
-}
-
-InstrumentParamAmount InstrumentParamAmount::attenuationDb(double decibels) {
-  if (!isValidFiniteNumber(decibels)) {
-    return InstrumentParamAmount(0, false);
-  }
-
-  return InstrumentParamAmount(static_cast<int32_t>(std::lround(decibels * 10.0)), true);
-}
 
 VGMInstrSet::VGMInstrSet(const std::string &format, RawFile *file, uint32_t offset, uint32_t length,
                          std::string name, VGMSampColl *theSampColl)
@@ -217,13 +149,11 @@ void VGMInstr::setInstrNum(uint32_t theInstrNum) {
   instrNum = theInstrNum;
 }
 
-void VGMInstr::addModulator(InstrumentModSource source, InstrumentModDestination destination,
-                            int32_t amount) {
+void VGMInstr::addModulator(ModSource source, ModDest destination, int32_t amount) {
   m_modulators.push_back({source, destination, amount});
 }
 
-void VGMInstr::addModulator(InstrumentModSource source, InstrumentModDestination destination,
-                            InstrumentParamAmount amount) {
+void VGMInstr::addModulator(ModSource source, ModDest destination, ParamAmount amount) {
   if (!amount.valid()) {
     return;
   }
@@ -231,21 +161,43 @@ void VGMInstr::addModulator(InstrumentModSource source, InstrumentModDestination
   addModulator(source, destination, amount.value());
 }
 
+void VGMInstr::addPitchModulator(ModSource source, ModDest destination, double cents) {
+  addModulator(source, destination, ParamAmount::cents(cents));
+}
+
+void VGMInstr::addFrequencyRangeModulator(ModSource source, ModDest destination, double minHertz, double maxHertz) {
+  addModulator(source, destination, ParamAmount::hertzRange(minHertz, maxHertz));
+}
+
+void VGMInstr::addDelayModulator(ModSource source, ModDest destination, double seconds) {
+  addModulator(source, destination, ParamAmount::seconds(seconds));
+}
+
+void VGMInstr::addAttenuationModulator(ModSource source, ModDest destination, double decibels) {
+  addModulator(source, destination, ParamAmount::attenuationDb(decibels));
+}
+
 void VGMInstr::addModWheelToVibratoPitch(double cents) {
-  addModulator(InstrumentModSource::ModWheel, InstrumentModDestination::VibLfoToPitch,
-               InstrumentParamAmount::cents(cents));
+  addPitchModulator(ModSource::ModWheel, ModDest::VibLfoToPitch, cents);
 }
 
-void VGMInstr::addChannelPressureToVibratoRate(double cents) {
-  addModulator(InstrumentModSource::ChannelPressure, InstrumentModDestination::VibLfoFrequency,
-               InstrumentParamAmount::cents(cents));
+void VGMInstr::addChannelPressureToVibratoRateModulator(double minHertz, double maxHertz) {
+  addFrequencyRangeModulator(ModSource::ChannelPressure,
+                             ModDest::VibLfoFreq,
+                             minHertz, maxHertz);
 }
 
-void VGMInstr::addGlobalGenerator(InstrumentModDestination destination, int32_t amount) {
+void VGMInstr::addChannelPressureToTremoloRateModulator(double minHertz, double maxHertz) {
+  addFrequencyRangeModulator(ModSource::ChannelPressure,
+                             ModDest::ModLfoFreq,
+                             minHertz, maxHertz);
+}
+
+void VGMInstr::addGlobalGenerator(ModDest destination, int32_t amount) {
   m_globalGenerators.push_back({destination, amount});
 }
 
-void VGMInstr::addGlobalGenerator(InstrumentModDestination destination, InstrumentParamAmount amount) {
+void VGMInstr::addGlobalGenerator(ModDest destination, ParamAmount amount) {
   if (!amount.valid()) {
     return;
   }
@@ -253,12 +205,28 @@ void VGMInstr::addGlobalGenerator(InstrumentModDestination destination, Instrume
   addGlobalGenerator(destination, amount.value());
 }
 
+void VGMInstr::addPitchGenerator(ModDest destination, double cents) {
+  addGlobalGenerator(destination, ParamAmount::cents(cents));
+}
+
+void VGMInstr::addFrequencyGenerator(ModDest destination, double hertz) {
+  addGlobalGenerator(destination, ParamAmount::hertz(hertz));
+}
+
+void VGMInstr::addDelayGenerator(ModDest destination, double seconds) {
+  addGlobalGenerator(destination, ParamAmount::seconds(seconds));
+}
+
+void VGMInstr::addAttenuationGenerator(ModDest destination, double decibels) {
+  addGlobalGenerator(destination, ParamAmount::attenuationDb(decibels));
+}
+
 void VGMInstr::addGlobalVibratoFrequency(double hertz) {
-  addGlobalGenerator(InstrumentModDestination::VibLfoFrequency, InstrumentParamAmount::hertz(hertz));
+  addFrequencyGenerator(ModDest::VibLfoFreq, hertz);
 }
 
 void VGMInstr::addGlobalTremoloFrequency(double hertz) {
-  addGlobalGenerator(InstrumentModDestination::ModLfoFrequency, InstrumentParamAmount::hertz(hertz));
+  addFrequencyGenerator(ModDest::ModLfoFreq, hertz);
 }
 
 VGMRgn *VGMInstr::addRgn(VGMRgn *rgn) {

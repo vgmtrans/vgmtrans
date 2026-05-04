@@ -67,13 +67,25 @@ public:
   inline void setBank(uint32_t bankNum);
   inline void setInstrNum(uint32_t theInstrNum);
 
-  void addModulator(InstrumentModSource source, InstrumentModDestination destination, int32_t amount);
-  void addModulator(InstrumentModSource source, InstrumentModDestination destination, InstrumentParamAmount amount);
+  void addModulator(ModSource source, ModDest destination, int32_t amount);
+  void addModulator(ModSource source, ModDest destination, ParamAmount amount);
+  // Convenience helpers for format code that wants to work in musical units rather than SF2/DLS scalars.
+  void addPitchModulator(ModSource source, ModDest destination, double cents);
+  void addFrequencyRangeModulator(ModSource source, ModDest destination,
+                                  double minHertz, double maxHertz);
+  void addDelayModulator(ModSource source, ModDest destination, double seconds);
+  void addAttenuationModulator(ModSource source, ModDest destination, double decibels);
   void addModWheelToVibratoPitch(double cents);
-  void addChannelPressureToVibratoRate(double cents);
+  void addChannelPressureToVibratoRateModulator(double minHertz, double maxHertz);
+  void addChannelPressureToTremoloRateModulator(double minHertz, double maxHertz);
   [[nodiscard]] const std::vector<InstrumentModulator>& modulators() const { return m_modulators; }
-  void addGlobalGenerator(InstrumentModDestination destination, int32_t amount);
-  void addGlobalGenerator(InstrumentModDestination destination, InstrumentParamAmount amount);
+  void addGlobalGenerator(ModDest destination, int32_t amount);
+  void addGlobalGenerator(ModDest destination, ParamAmount amount);
+  // Generator helpers in musical units.
+  void addPitchGenerator(ModDest destination, double cents);
+  void addFrequencyGenerator(ModDest destination, double hertz);
+  void addDelayGenerator(ModDest destination, double seconds);
+  void addAttenuationGenerator(ModDest destination, double decibels);
   void addGlobalVibratoFrequency(double hertz);
   void addGlobalTremoloFrequency(double hertz);
   [[nodiscard]] const std::vector<InstrumentGenerator>& globalGenerators() const { return m_globalGenerators; }
