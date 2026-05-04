@@ -241,7 +241,8 @@ double CapcomSnesTrack::getTuningInSemitones(int8_t tuning) {
 namespace {
 
 constexpr int kCapcomVolumeCurveLastIndex = 16;
-constexpr int kCapcomTremoloPeakScalar = 250;
+constexpr int kCapcomV1TremoloPeakScalar = 255;
+constexpr int kCapcomV2TremoloPeakScalar = 250;
 constexpr double kSf2TremoloMuteFloorCentibels = 960.0;
 
 // 968 can produce a modLfoToVolume outside the practical range, but it is still
@@ -263,7 +264,16 @@ uint8_t convertCapcomVolumeToMidi(uint8_t sourceVolume) {
   return interpolateCapcomVolumeCurve(scaledCurvePosition >> 8, scaledCurvePosition & 0xff);
 }
 
-int computeTremoloScalarAtTrough(int sourceDepth) {
+int computeV1TremoloScalarAtTrough(int sourceDepth) {
+  const int depth = sourceDepth & 0x7f;
+
+  if (depth == 0)
+    return 255;
+
+  return 255 - ((2 * depth * 255) >> 8);
+}
+
+int computeV2TremoloScalarAtTrough(int sourceDepth) {
   sourceDepth = std::clamp(sourceDepth, 0, 127);
 
   if (sourceDepth == 0)
@@ -277,12 +287,22 @@ int computeTremoloScalarAtTrough(int sourceDepth) {
   return interpolateCapcomVolumeCurve(scaledCurvePosition >> 8, scaledCurvePosition & 0xff);
 }
 
-int convertTremoloDepthToMidiValue(int sourceDepth) {
-  const int troughScalar = computeTremoloScalarAtTrough(sourceDepth);
+int convertTremoloDepthToMidiValue(int sourceDepth, CapcomSnesVersion version) {
+  int peakScalar;
+  int troughScalar;
+
+  if (version == CAPCOMSNES_V1_BGM_IN_LIST) {
+    peakScalar = kCapcomV1TremoloPeakScalar;
+    troughScalar = computeV1TremoloScalarAtTrough(sourceDepth);
+  }
+  else {
+    peakScalar = kCapcomV2TremoloPeakScalar;
+    troughScalar = computeV2TremoloScalarAtTrough(sourceDepth);
+  }
   double depthCentibels = kSf2TremoloMuteFloorCentibels;
 
   if (troughScalar > 0) {
-    depthCentibels = 200.0 * log10(kCapcomTremoloPeakScalar / static_cast<double>(troughScalar));
+    depthCentibels = 200.0 * log10(peakScalar / static_cast<double>(troughScalar));
     depthCentibels = std::clamp(depthCentibels, 0.0, kSf2TremoloMuteFloorCentibels);
   }
 
@@ -724,7 +744,7 @@ bool CapcomSnesTrack::readEvent() {
             break;
           case 1:
             // Tremolo Depth
-            lastTremoloDepth = convertTremoloDepthToMidiValue(lfoAmount);
+            lastTremoloDepth = convertTremoloDepthToMidiValue(lfoAmount, parentSeq->version);
             addControllerEventNoItem(93, lastTremoloDepth);
             desc = fmt::format("Amount: {:d}", lfoAmount);
             addGenericEvent(beginOffset, curOffset - beginOffset, "Tremolo Depth", desc, Type::Lfo);
