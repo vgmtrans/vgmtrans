@@ -310,21 +310,16 @@ int convertTremoloDepthToMidiValue(int sourceDepth, CapcomSnesVersion version) {
   return std::clamp(midiValue, 0, 127);
 }
 
-// Convert from Hz -> SF2 cents (linear to exponential) -> 7-bit MIDI value scaled to the modulator amount
 uint8_t convertLfoRateByteToMidiVal(uint8_t freqByte) {
   if (freqByte == 0)
     return 0; // this is a special-case that disables vibrato
 
-  constexpr double sourceHzStep = 1000.0 / 16384.0;
-  constexpr double baseHz = sourceHzStep;
-  const double baseCents = ParamAmount::hertz(baseHz).value();
-  const double modAmount = ParamAmount::hertzRange(baseHz, 255.0 * sourceHzStep).value();
-
-  double hz = static_cast<double>(freqByte) * sourceHzStep;
-  double cents = ParamAmount::hertz(hz).value();
-
-  int cc = static_cast<int>(std::round(128.0 * (cents - baseCents) / modAmount));
-  return static_cast<uint8_t>(std::clamp(cc, 0, 127));
+  // CapcomSnes stores rate as a multiple of a fixed LFO step; the shared helper
+  // handles the Hz -> 7-bit MIDI mapping that matches the instrument modulator.
+  constexpr double kCapcomLfoStepHz = 1000.0 / 16384.0;
+  return midiValueForHertzInRange(static_cast<double>(freqByte) * kCapcomLfoStepHz,
+                                  kCapcomLfoStepHz,
+                                  255.0 * kCapcomLfoStepHz);
 }
 
 }  // namespace

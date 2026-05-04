@@ -53,6 +53,10 @@ private:
   bool m_valid;
 };
 
+// Convert an absolute frequency into the 7-bit MIDI value that drives a
+// ParamAmount::hertzRange(minHertz, maxHertz) modulator or generator.
+uint8_t midiValueForHertzInRange(double hertz, double minHertz, double maxHertz);
+
 struct SynthModulator {
   ModSource source;
   ModDest destination;
