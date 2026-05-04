@@ -240,18 +240,15 @@ double CapcomSnesTrack::getTuningInSemitones(int8_t tuning) {
 }
 namespace {
 
-constexpr int kCapcomVolumeCurveLastIndex = 16;
-constexpr int kCapcomV1TremoloPeakScalar = 255;
-constexpr int kCapcomV2TremoloPeakScalar = 250;
-constexpr double kSf2TremoloMuteFloorCentibels = 960.0;
+constexpr int kVolumeCurveLastIndex = 16;
+constexpr int kTremoloPeakScalarV1 = 255;
+constexpr int kTremoloPeakScalarV2 = 250;
+constexpr double kTremoloMuteFloorCentibels = 960.0;
+constexpr int kTremoloHalfAmount = 484;
 
-// 968 can produce a modLfoToVolume outside the practical range, but it is still
-// a legal SF2 value, so keep the conversion centered on half that amount.
-constexpr int kSf2TremoloHalfAmount = 484;
-
-int interpolateCapcomVolumeCurve(int curveIndex, int curveFraction) {
-  if (curveIndex >= kCapcomVolumeCurveLastIndex) {
-    return CapcomSnesSeq::volTable[kCapcomVolumeCurveLastIndex];
+int interpolateVolumeCurve(int curveIndex, int curveFraction) {
+  if (curveIndex >= kVolumeCurveLastIndex) {
+    return CapcomSnesSeq::volTable[kVolumeCurveLastIndex];
   }
 
   const int lower = CapcomSnesSeq::volTable[curveIndex];
@@ -259,9 +256,9 @@ int interpolateCapcomVolumeCurve(int curveIndex, int curveFraction) {
   return lower + ((upper - lower) * curveFraction) / 256;
 }
 
-uint8_t convertCapcomVolumeToMidi(uint8_t sourceVolume) {
-  const int scaledCurvePosition = sourceVolume * kCapcomVolumeCurveLastIndex;
-  return interpolateCapcomVolumeCurve(scaledCurvePosition >> 8, scaledCurvePosition & 0xff);
+uint8_t calculateV2Volume(uint8_t sourceVolume) {
+  const int scaledCurvePosition = sourceVolume * kVolumeCurveLastIndex;
+  return interpolateVolumeCurve(scaledCurvePosition >> 8, scaledCurvePosition & 0xff);
 }
 
 int computeV1TremoloScalarAtTrough(int sourceDepth) {
@@ -284,7 +281,7 @@ int computeV2TremoloScalarAtTrough(int sourceDepth) {
   // Tremolo depth walks the same loudness curve as volume, but in reverse.
   const int inverseCurvePosition = 0x7E81 - sourceDepth * 255;
   const int scaledCurvePosition = inverseCurvePosition >> 3;
-  return interpolateCapcomVolumeCurve(scaledCurvePosition >> 8, scaledCurvePosition & 0xff);
+  return interpolateVolumeCurve(scaledCurvePosition >> 8, scaledCurvePosition & 0xff);
 }
 
 int convertTremoloDepthToMidiValue(int sourceDepth, CapcomSnesVersion version) {
@@ -292,40 +289,39 @@ int convertTremoloDepthToMidiValue(int sourceDepth, CapcomSnesVersion version) {
   int troughScalar;
 
   if (version == CAPCOMSNES_V1_BGM_IN_LIST) {
-    peakScalar = kCapcomV1TremoloPeakScalar;
+    peakScalar = kTremoloPeakScalarV1;
     troughScalar = computeV1TremoloScalarAtTrough(sourceDepth);
   }
   else {
-    peakScalar = kCapcomV2TremoloPeakScalar;
+    peakScalar = kTremoloPeakScalarV2;
     troughScalar = computeV2TremoloScalarAtTrough(sourceDepth);
   }
-  double depthCentibels = kSf2TremoloMuteFloorCentibels;
+  double depthCentibels = kTremoloMuteFloorCentibels;
 
   if (troughScalar > 0) {
     depthCentibels = 200.0 * log10(peakScalar / static_cast<double>(troughScalar));
-    depthCentibels = std::clamp(depthCentibels, 0.0, kSf2TremoloMuteFloorCentibels);
+    depthCentibels = std::clamp(depthCentibels, 0.0, kTremoloMuteFloorCentibels);
   }
 
   // SF2 tremolo depth is expressed as +/- modLfoToVolume around zero, so the
   // MIDI value needs to map into twice the stored half-range.
   const int midiValue = static_cast<int>(
-      floor(depthCentibels * 128.0 / (2.0 * static_cast<double>(kSf2TremoloHalfAmount)) + 0.5));
+      floor(depthCentibels * 128.0 / (2.0 * static_cast<double>(kTremoloHalfAmount)) + 0.5));
   return std::clamp(midiValue, 0, 127);
 }
 
-// Convert from Hz -> SF2 cents (linear to exponential) -> channel pressure.
-uint8_t convertLfoRateByteToChannelPressure(uint8_t freqByte) {
+// Convert from Hz -> SF2 cents (linear to exponential) -> 7-bit MIDI value scaled to the modulator amount
+uint8_t convertLfoRateByteToMidiVal(uint8_t freqByte) {
   if (freqByte == 0)
     return 0; // this is a special-case that disables vibrato
 
   constexpr double sourceHzStep = 1000.0 / 16384.0;
   constexpr double baseHz = sourceHzStep;
-  const double baseCents = static_cast<double>(ParamAmount::hertz(baseHz).value());
-  const double modAmount = static_cast<double>(
-      ParamAmount::hertzRange(baseHz, 255.0 * sourceHzStep).value());
+  const double baseCents = ParamAmount::hertz(baseHz).value();
+  const double modAmount = ParamAmount::hertzRange(baseHz, 255.0 * sourceHzStep).value();
 
   double hz = static_cast<double>(freqByte) * sourceHzStep;
-  double cents = static_cast<double>(ParamAmount::hertz(hz).value());
+  double cents = ParamAmount::hertz(hz).value();
 
   int cc = static_cast<int>(std::round(128.0 * (cents - baseCents) / modAmount));
   return static_cast<uint8_t>(std::clamp(cc, 0, 127));
@@ -525,7 +521,7 @@ bool CapcomSnesTrack::readEvent() {
         }
         else {
           // Later drivers shape volume through the engine's 17-point loudness curve.
-          midiVolume = convertCapcomVolumeToMidi(newVolume);
+          midiVolume = calculateV2Volume(newVolume);
         }
 
         addVol(beginOffset, curOffset - beginOffset, midiVolume);
@@ -726,7 +722,7 @@ bool CapcomSnesTrack::readEvent() {
         }
         else {
           // Master volume follows the same loudness curve as per-track volume.
-          midiVolume = convertCapcomVolumeToMidi(newVolume);
+          midiVolume = calculateV2Volume(newVolume);
         }
 
         addMasterVol(beginOffset, curOffset - beginOffset, midiVolume);
@@ -765,7 +761,7 @@ bool CapcomSnesTrack::readEvent() {
             lastLfoFrequency = lfoAmount;
             addChannelPressure(beginOffset,
                                curOffset - beginOffset,
-                               convertLfoRateByteToChannelPressure(lfoAmount),
+                               convertLfoRateByteToMidiVal(lfoAmount),
                                "LFO Rate");
             break;
           case 3:
