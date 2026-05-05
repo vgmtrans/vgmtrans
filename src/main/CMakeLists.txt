@@ -22,11 +22,6 @@ else()
   )
 endif()
 
-if(ENABLE_UI_QT)
-  message(STATUS "Using vendored BASS(MIDI) library")
-  add_subdirectory(${PROJECT_SOURCE_DIR}/lib/bass ${CMAKE_CURRENT_BINARY_DIR}/lib/bass EXCLUDE_FROM_ALL)
-endif()
-
 if(USE_SYSTEM_FMT)
   find_package(fmt 12.1.1 REQUIRED)
 else()  

@@ -537,6 +537,8 @@ void MainWindow::dropEvent(QDropEvent *event) {
 
 void MainWindow::closeEvent(QCloseEvent *event) {
   m_dockLayout->saveOnClose();
+  // Delete the PlayerService before JUCE shuts down to avoid a memory leak being reported.
+  PlayerService::deleteInstance();
   QMainWindow::closeEvent(event);
 }
 
@@ -569,12 +571,6 @@ void MainWindow::handleDroppedUrls(const QList<QUrl>& urls) {
       openFileInternal(localFile);
     }
   }
-}
-
-void MainWindow::closeEvent(QCloseEvent *event) {
-  // Delete the PlayerService before JUCE shuts down to avoid a memory leak being reported.
-  PlayerService::deleteInstance();
-  event->accept();
 }
 
 void MainWindow::openFile() {
