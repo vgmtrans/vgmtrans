@@ -97,13 +97,7 @@ public:
   [[nodiscard]] const std::vector<InstrumentModulator>& modulators() const { return m_modulators; }
 
   // Generator support
-  void addGlobalGenerator(ModDest destination, int32_t amount);
   void addGlobalGenerator(ModDest destination, ModAmount amount);
-  // Helpers for adding generators using more-intuitive units.
-  void addGlobalGeneratorCents(ModDest destination, double cents);
-  void addGlobalGeneratorHertz(ModDest destination, double hertz);
-  void addGlobalGeneratorSeconds(ModDest destination, double seconds);
-  void addGlobalGeneratorDecibels(ModDest destination, double decibels);
   // Helpers for adding specific-generators
   void addGlobalVibratoFrequency(double hertz);
   void addGlobalTremoloFrequency(double hertz);

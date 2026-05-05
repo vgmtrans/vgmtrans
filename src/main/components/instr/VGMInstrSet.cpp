@@ -205,7 +205,7 @@ void VGMInstr::addStandardVibratoHandling(double maxDepthCents,
   addPitchModulator(ModSource::ModWheel, ModDest::VibLfoToPitch, maxDepthCents);
   // nullify default channel pressure to vib lfo pitch modulator
   addPitchModulator(ModSource::ChannelPressure, ModDest::VibLfoToPitch, 0);
-  addGlobalGeneratorHertz(ModDest::VibLfoFreq, minHertz);
+  addGlobalGenerator(ModDest::VibLfoFreq, ModAmount::fromHertz(minHertz));
   addFrequencyRangeModulator(ModSource::ChannelPressure, ModDest::VibLfoFreq, minHertz, maxHertz);
 }
 
@@ -213,7 +213,7 @@ void VGMInstr::addStandardTremoloHandling(double maxDepthDb,
                                          double minHertz,
                                          double maxHertz,
                                          TremoloGainMode gainMode) {
-  addGlobalGeneratorHertz(ModDest::ModLfoFreq, minHertz);
+  addGlobalGenerator(ModDest::ModLfoFreq, ModAmount::fromHertz(minHertz));
   addFrequencyRangeModulator(ModSource::ChannelPressure, ModDest::ModLfoFreq, minHertz, maxHertz);
   addAttenuationModulator(ModSource::ChorusSend, ModDest::ModLfoToVol, maxDepthDb);
   if (gainMode == TremoloGainMode::NoBoost) {
@@ -223,38 +223,18 @@ void VGMInstr::addStandardTremoloHandling(double maxDepthDb,
 
 // Generator methods
 
-void VGMInstr::addGlobalGenerator(ModDest destination, int32_t amount) {
-  m_globalGenerators.push_back({destination, amount});
-}
-
 void VGMInstr::addGlobalGenerator(ModDest destination, ModAmount amount) {
   if (!amount.valid()) {
     return;
   }
 
-  addGlobalGenerator(destination, amount.value());
-}
-
-void VGMInstr::addGlobalGeneratorCents(ModDest destination, double cents) {
-  addGlobalGenerator(destination, ModAmount::fromCents(cents));
-}
-
-void VGMInstr::addGlobalGeneratorHertz(ModDest destination, double hertz) {
-  addGlobalGenerator(destination, ModAmount::fromHertz(hertz));
-}
-
-void VGMInstr::addGlobalGeneratorSeconds(ModDest destination, double seconds) {
-  addGlobalGenerator(destination, ModAmount::fromSeconds(seconds));
-}
-
-void VGMInstr::addGlobalGeneratorDecibels(ModDest destination, double decibels) {
-  addGlobalGenerator(destination, ModAmount::fromDecibels(decibels));
+  m_globalGenerators.push_back({destination, amount.value()});
 }
 
 void VGMInstr::addGlobalVibratoFrequency(double hertz) {
-  addGlobalGeneratorHertz(ModDest::VibLfoFreq, hertz);
+  addGlobalGenerator(ModDest::VibLfoFreq, ModAmount::fromHertz(hertz));
 }
 
 void VGMInstr::addGlobalTremoloFrequency(double hertz) {
-  addGlobalGeneratorHertz(ModDest::ModLfoFreq, hertz);
+  addGlobalGenerator(ModDest::ModLfoFreq, ModAmount::fromHertz(hertz));
 }

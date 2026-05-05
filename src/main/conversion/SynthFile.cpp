@@ -116,16 +116,12 @@ void SynthInstr::addGlobalGenerator(const InstrumentGenerator& generator) {
   m_globalGenerators.push_back(generator);
 }
 
-void SynthInstr::addGlobalGenerator(ModDest destination, int32_t amount) {
-  m_globalGenerators.push_back({destination, amount});
-}
-
 void SynthInstr::addGlobalGenerator(ModDest destination, ModAmount amount) {
   if (!amount.valid()) {
     return;
   }
 
-  addGlobalGenerator(destination, amount.value());
+  m_globalGenerators.push_back({destination, amount.value()});
 }
 
 //  ********
