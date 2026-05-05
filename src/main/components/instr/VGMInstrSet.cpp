@@ -175,7 +175,7 @@ void VGMInstr::addModulator(ModSource source, ModDest destination, int32_t amoun
   m_modulators.push_back({source, destination, amount});
 }
 
-void VGMInstr::addModulator(ModSource source, ModDest destination, ParamAmount amount) {
+void VGMInstr::addModulator(ModSource source, ModDest destination, ModAmount amount) {
   if (!amount.valid()) {
     return;
   }
@@ -184,19 +184,19 @@ void VGMInstr::addModulator(ModSource source, ModDest destination, ParamAmount a
 }
 
 void VGMInstr::addPitchModulator(ModSource source, ModDest destination, double cents) {
-  addModulator(source, destination, ParamAmount::cents(cents));
+  addModulator(source, destination, ModAmount::fromCents(cents));
 }
 
 void VGMInstr::addFrequencyRangeModulator(ModSource source, ModDest destination, double minHertz, double maxHertz) {
-  addModulator(source, destination, ParamAmount::hertzRange(minHertz, maxHertz));
+  addModulator(source, destination, ModAmount::fromHertzRange(minHertz, maxHertz));
 }
 
 void VGMInstr::addDelayModulator(ModSource source, ModDest destination, double seconds) {
-  addModulator(source, destination, ParamAmount::seconds(seconds));
+  addModulator(source, destination, ModAmount::fromSeconds(seconds));
 }
 
 void VGMInstr::addAttenuationModulator(ModSource source, ModDest destination, double decibels) {
-  addModulator(source, destination, ParamAmount::attenuationDb(decibels));
+  addModulator(source, destination, ModAmount::fromDecibels(decibels));
 }
 
 void VGMInstr::addStandardVibratoHandling(double maxDepthCents,
@@ -227,7 +227,7 @@ void VGMInstr::addGlobalGenerator(ModDest destination, int32_t amount) {
   m_globalGenerators.push_back({destination, amount});
 }
 
-void VGMInstr::addGlobalGenerator(ModDest destination, ParamAmount amount) {
+void VGMInstr::addGlobalGenerator(ModDest destination, ModAmount amount) {
   if (!amount.valid()) {
     return;
   }
@@ -236,19 +236,19 @@ void VGMInstr::addGlobalGenerator(ModDest destination, ParamAmount amount) {
 }
 
 void VGMInstr::addGlobalGeneratorCents(ModDest destination, double cents) {
-  addGlobalGenerator(destination, ParamAmount::cents(cents));
+  addGlobalGenerator(destination, ModAmount::fromCents(cents));
 }
 
 void VGMInstr::addGlobalGeneratorHertz(ModDest destination, double hertz) {
-  addGlobalGenerator(destination, ParamAmount::hertz(hertz));
+  addGlobalGenerator(destination, ModAmount::fromHertz(hertz));
 }
 
 void VGMInstr::addGlobalGeneratorSeconds(ModDest destination, double seconds) {
-  addGlobalGenerator(destination, ParamAmount::seconds(seconds));
+  addGlobalGenerator(destination, ModAmount::fromSeconds(seconds));
 }
 
 void VGMInstr::addGlobalGeneratorDecibels(ModDest destination, double decibels) {
-  addGlobalGenerator(destination, ParamAmount::attenuationDb(decibels));
+  addGlobalGenerator(destination, ModAmount::fromDecibels(decibels));
 }
 
 void VGMInstr::addGlobalVibratoFrequency(double hertz) {

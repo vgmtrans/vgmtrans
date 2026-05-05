@@ -18,54 +18,54 @@ int32_t hertzToInstrumentCents(double hertz) {
 
 }  // namespace
 
-ParamAmount ParamAmount::raw(int32_t amount) {
-  return ParamAmount(amount, true);
+ModAmount ModAmount::raw(int32_t amount) {
+  return ModAmount(amount, true);
 }
 
-ParamAmount ParamAmount::cents(double cents) {
+ModAmount ModAmount::fromCents(double cents) {
   if (!std::isfinite(cents)) {
-    return ParamAmount(0, false);
+    return ModAmount(0, false);
   }
 
-  return ParamAmount(static_cast<int32_t>(std::lround(cents)), true);
+  return ModAmount(static_cast<int32_t>(std::lround(cents)), true);
 }
 
-ParamAmount ParamAmount::hertz(double hertz) {
+ModAmount ModAmount::fromHertz(double hertz) {
   if (hertz <= 0.0 || !std::isfinite(hertz)) {
-    return ParamAmount(0, false);
+    return ModAmount(0, false);
   }
 
-  return ParamAmount(hertzToInstrumentCents(hertz), true);
+  return ModAmount(hertzToInstrumentCents(hertz), true);
 }
 
-ParamAmount ParamAmount::hertzRange(double minHertz, double maxHertz) {
+ModAmount ModAmount::fromHertzRange(double minHertz, double maxHertz) {
   if (minHertz <= 0.0 || maxHertz <= 0.0 ||
       !std::isfinite(minHertz) || !std::isfinite(maxHertz)) {
-    return ParamAmount(0, false);
+    return ModAmount(0, false);
   }
 
   const double minCents = static_cast<double>(hertzToInstrumentCents(minHertz));
   const double maxCents = static_cast<double>(hertzToInstrumentCents(maxHertz));
   const double fullScaleRange = (maxCents - minCents) * 128.0 / 127.0;
-  return ParamAmount(static_cast<int32_t>(std::lround(fullScaleRange)), true);
+  return ModAmount(static_cast<int32_t>(std::lround(fullScaleRange)), true);
 }
 
-ParamAmount ParamAmount::seconds(double seconds) {
-  return ParamAmount(secondsToSf2Timecents(seconds), true);
+ModAmount ModAmount::fromSeconds(double seconds) {
+  return ModAmount(secondsToSf2Timecents(seconds), true);
 }
 
-ParamAmount ParamAmount::centibels(double centibels) {
+ModAmount ModAmount::fromCentibels(double centibels) {
   if (!std::isfinite(centibels)) {
-    return ParamAmount(0, false);
+    return ModAmount(0, false);
   }
 
-  return ParamAmount(static_cast<int32_t>(std::lround(centibels)), true);
+  return ModAmount(static_cast<int32_t>(std::lround(centibels)), true);
 }
 
-ParamAmount ParamAmount::attenuationDb(double decibels) {
+ModAmount ModAmount::fromDecibels(double decibels) {
   if (!std::isfinite(decibels)) {
-    return ParamAmount(0, false);
+    return ModAmount(0, false);
   }
 
-  return ParamAmount(static_cast<int32_t>(std::lround(decibels * 10.0)), true);
+  return ModAmount(static_cast<int32_t>(std::lround(decibels * 10.0)), true);
 }

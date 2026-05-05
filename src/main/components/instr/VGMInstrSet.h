@@ -82,7 +82,7 @@ public:
 
   // Modulator support
   void addModulator(ModSource source, ModDest destination, int32_t amount);
-  void addModulator(ModSource source, ModDest destination, ParamAmount amount);
+  void addModulator(ModSource source, ModDest destination, ModAmount amount);
 
   // Helpers for adding modulators using more-intuitive units
   void addPitchModulator(ModSource source, ModDest destination, double cents);
@@ -98,7 +98,7 @@ public:
 
   // Generator support
   void addGlobalGenerator(ModDest destination, int32_t amount);
-  void addGlobalGenerator(ModDest destination, ParamAmount amount);
+  void addGlobalGenerator(ModDest destination, ModAmount amount);
   // Helpers for adding generators using more-intuitive units.
   void addGlobalGeneratorCents(ModDest destination, double cents);
   void addGlobalGeneratorHertz(ModDest destination, double hertz);

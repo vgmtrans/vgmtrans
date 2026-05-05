@@ -104,7 +104,7 @@ void SynthInstr::addModulator(ModSource source, ModDest destination,
 }
 
 void SynthInstr::addModulator(ModSource source, ModDest destination,
-                              ParamAmount amount) {
+                              ModAmount amount) {
   if (!amount.valid()) {
     return;
   }
@@ -120,7 +120,7 @@ void SynthInstr::addGlobalGenerator(ModDest destination, int32_t amount) {
   m_globalGenerators.push_back({destination, amount});
 }
 
-void SynthInstr::addGlobalGenerator(ModDest destination, ParamAmount amount) {
+void SynthInstr::addGlobalGenerator(ModDest destination, ModAmount amount) {
   if (!amount.valid()) {
     return;
   }

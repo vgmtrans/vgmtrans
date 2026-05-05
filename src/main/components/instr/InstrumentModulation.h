@@ -31,26 +31,23 @@ enum class ModDest : uint8_t {
   InitialAtten,
 };
 
-class ParamAmount {
+class ModAmount {
 public:
-  static ParamAmount raw(int32_t amount);
-  static ParamAmount cents(double cents);
-
+  static ModAmount raw(int32_t amount);
+  static ModAmount fromCents(double cents);
   // Absolute SF2/DLS LFO frequency units, measured as cents relative to 8.176 Hz.
-  static ParamAmount hertz(double hertz);
-
+  static ModAmount fromHertz(double hertz);
   // A 7-bit unipolar controller range in Hz, scaled so MIDI value 127 reaches maxHertz.
-  static ParamAmount hertzRange(double minHertz, double maxHertz);
-
-  static ParamAmount seconds(double seconds);
-  static ParamAmount centibels(double centibels);
-  static ParamAmount attenuationDb(double decibels);
+  static ModAmount fromHertzRange(double minHertz, double maxHertz);
+  static ModAmount fromSeconds(double seconds);
+  static ModAmount fromCentibels(double centibels);
+  static ModAmount fromDecibels(double decibels);
 
   [[nodiscard]] bool valid() const { return m_valid; }
   [[nodiscard]] int32_t value() const { return m_value; }
 
 private:
-  constexpr ParamAmount(int32_t value, bool valid) : m_value(value), m_valid(valid) {}
+  constexpr ModAmount(int32_t value, bool valid) : m_value(value), m_valid(valid) {}
 
   int32_t m_value;
   bool m_valid;
@@ -62,7 +59,7 @@ struct InstrumentModulator {
 
   // Amount units are the shared SF2/DLS semantic units for the destination:
   // cents for pitch/frequency, timecents for delay, and centibels for volume/attenuation.
-  // Use ParamAmount helpers at call sites when you want more readable units.
+  // Use ModAmount helpers at call sites when you want more readable units.
   int32_t amount;
 };
 
@@ -71,6 +68,6 @@ struct InstrumentGenerator {
 
   // Absolute generator amount in shared SF2/DLS semantic units:
   // cents for pitch/frequency, timecents for delay, and centibels for volume/attenuation.
-  // Use ParamAmount helpers at call sites when you want more readable units.
+  // Use ModAmount helpers at call sites when you want more readable units.
   int32_t amount;
 };
