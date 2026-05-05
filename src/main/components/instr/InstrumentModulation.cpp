@@ -1,5 +1,5 @@
 /*
- * VGMTrans (c) 2002-2024
+ * VGMTrans (c) 2002-2026
  * Licensed under the zlib license,
  * refer to the included LICENSE.txt file
  */
@@ -12,10 +12,6 @@ namespace {
 
 constexpr double kSf2LfoReferenceHz = 8.176;
 
-bool isValidFiniteNumber(double value) {
-  return std::isfinite(value);
-}
-
 int32_t hertzToInstrumentCents(double hertz) {
   return static_cast<int32_t>(std::lround(1200.0 * std::log2(hertz / kSf2LfoReferenceHz)));
 }
@@ -27,7 +23,7 @@ ParamAmount ParamAmount::raw(int32_t amount) {
 }
 
 ParamAmount ParamAmount::cents(double cents) {
-  if (!isValidFiniteNumber(cents)) {
+  if (!std::isfinite(cents)) {
     return ParamAmount(0, false);
   }
 
@@ -35,7 +31,7 @@ ParamAmount ParamAmount::cents(double cents) {
 }
 
 ParamAmount ParamAmount::hertz(double hertz) {
-  if (hertz <= 0.0 || !isValidFiniteNumber(hertz)) {
+  if (hertz <= 0.0 || !std::isfinite(hertz)) {
     return ParamAmount(0, false);
   }
 
@@ -44,7 +40,7 @@ ParamAmount ParamAmount::hertz(double hertz) {
 
 ParamAmount ParamAmount::hertzRange(double minHertz, double maxHertz) {
   if (minHertz <= 0.0 || maxHertz <= 0.0 ||
-      !isValidFiniteNumber(minHertz) || !isValidFiniteNumber(maxHertz)) {
+      !std::isfinite(minHertz) || !std::isfinite(maxHertz)) {
     return ParamAmount(0, false);
   }
 
@@ -59,7 +55,7 @@ ParamAmount ParamAmount::seconds(double seconds) {
 }
 
 ParamAmount ParamAmount::centibels(double centibels) {
-  if (!isValidFiniteNumber(centibels)) {
+  if (!std::isfinite(centibels)) {
     return ParamAmount(0, false);
   }
 
@@ -67,7 +63,7 @@ ParamAmount ParamAmount::centibels(double centibels) {
 }
 
 ParamAmount ParamAmount::attenuationDb(double decibels) {
-  if (!isValidFiniteNumber(decibels)) {
+  if (!std::isfinite(decibels)) {
     return ParamAmount(0, false);
   }
 
