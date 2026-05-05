@@ -87,14 +87,14 @@ public:
                                   double minHertz,
                                   double maxHertz,
                                   TremoloGainMode gainMode);
-  [[nodiscard]] const std::vector<InstrumentModulator>& modulators() const { return m_modulators; }
+  [[nodiscard]] const std::vector<SynthModulator>& modulators() const { return m_modulators; }
 
   // Generator support
-  void addGlobalGenerator(ModDest destination, ModAmount amount);
+  void addGenerator(ModDest destination, ModAmount amount);
   // Helpers for adding specific-generators
   void addGlobalVibratoFrequency(double hertz);
   void addGlobalTremoloFrequency(double hertz);
-  [[nodiscard]] const std::vector<InstrumentGenerator>& globalGenerators() const { return m_globalGenerators; }
+  [[nodiscard]] const std::vector<SynthGenerator>& generators() const { return m_generators; }
 
   virtual bool loadInstr() { return true; }
 
@@ -111,6 +111,6 @@ protected:
 private:
   bool m_auto_add_regions_as_children{true};
   std::vector<VGMRgn*> m_regions;
-  std::vector<InstrumentModulator> m_modulators;
-  std::vector<InstrumentGenerator> m_globalGenerators;
+  std::vector<SynthModulator> m_modulators;
+  std::vector<SynthGenerator> m_generators;
 };

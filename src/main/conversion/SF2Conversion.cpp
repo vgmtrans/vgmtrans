@@ -89,8 +89,8 @@ SynthFile* createSynthFile(
       if (nRgns == 0)  // do not write an instrument if it has no regions
         continue;
       SynthInstr* newInstr = synthfile->addInstr(vgminstr->bank, vgminstr->instrNum, vgminstr->reverb);
-      for (const auto& generator : vgminstr->globalGenerators()) {
-        newInstr->addGlobalGenerator(generator);
+      for (const auto& generator : vgminstr->generators()) {
+        newInstr->addGenerator(generator);
       }
       for (const auto& modulator : vgminstr->modulators()) {
         newInstr->addModulator(modulator);

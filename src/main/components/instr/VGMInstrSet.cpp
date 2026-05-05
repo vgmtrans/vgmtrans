@@ -185,7 +185,7 @@ void VGMInstr::addStandardVibratoHandling(double maxDepthCents,
   addModulator(ModSource::ModWheel, ModDest::VibLfoToPitch, ModAmount::fromCents(maxDepthCents));
   // nullify default channel pressure to vib lfo pitch modulator
   addModulator(ModSource::ChannelPressure, ModDest::VibLfoToPitch, ModAmount::fromCents(0));
-  addGlobalGenerator(ModDest::VibLfoFreq, ModAmount::fromHertz(minHertz));
+  addGenerator(ModDest::VibLfoFreq, ModAmount::fromHertz(minHertz));
   addModulator(ModSource::ChannelPressure, ModDest::VibLfoFreq, ModAmount::fromHertzRange(minHertz, maxHertz));
 }
 
@@ -193,7 +193,7 @@ void VGMInstr::addStandardTremoloHandling(double maxDepthDb,
                                          double minHertz,
                                          double maxHertz,
                                          TremoloGainMode gainMode) {
-  addGlobalGenerator(ModDest::ModLfoFreq, ModAmount::fromHertz(minHertz));
+  addGenerator(ModDest::ModLfoFreq, ModAmount::fromHertz(minHertz));
   addModulator(ModSource::ChannelPressure, ModDest::ModLfoFreq, ModAmount::fromHertzRange(minHertz, maxHertz));
   addModulator(ModSource::ChorusSend, ModDest::ModLfoToVol, ModAmount::fromDecibels(maxDepthDb));
   if (gainMode == TremoloGainMode::NoBoost) {
@@ -203,18 +203,18 @@ void VGMInstr::addStandardTremoloHandling(double maxDepthDb,
 
 // Generator methods
 
-void VGMInstr::addGlobalGenerator(ModDest destination, ModAmount amount) {
+void VGMInstr::addGenerator(ModDest destination, ModAmount amount) {
   if (!amount.valid()) {
     return;
   }
 
-  m_globalGenerators.push_back({destination, amount.value()});
+  m_generators.push_back({destination, amount.value()});
 }
 
 void VGMInstr::addGlobalVibratoFrequency(double hertz) {
-  addGlobalGenerator(ModDest::VibLfoFreq, ModAmount::fromHertz(hertz));
+  addGenerator(ModDest::VibLfoFreq, ModAmount::fromHertz(hertz));
 }
 
 void VGMInstr::addGlobalTremoloFrequency(double hertz) {
-  addGlobalGenerator(ModDest::ModLfoFreq, ModAmount::fromHertz(hertz));
+  addGenerator(ModDest::ModLfoFreq, ModAmount::fromHertz(hertz));
 }

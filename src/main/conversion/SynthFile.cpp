@@ -94,7 +94,7 @@ SynthRgn *SynthInstr::addRgn(const SynthRgn& rgn) {
   return vRgns.back();
 }
 
-void SynthInstr::addModulator(const InstrumentModulator& modulator) {
+void SynthInstr::addModulator(const SynthModulator& modulator) {
   m_modulators.push_back(modulator);
 }
 
@@ -107,16 +107,16 @@ void SynthInstr::addModulator(ModSource source, ModDest destination,
   m_modulators.push_back({source, destination, amount.value()});
 }
 
-void SynthInstr::addGlobalGenerator(const InstrumentGenerator& generator) {
-  m_globalGenerators.push_back(generator);
+void SynthInstr::addGenerator(const SynthGenerator& generator) {
+  m_generators.push_back(generator);
 }
 
-void SynthInstr::addGlobalGenerator(ModDest destination, ModAmount amount) {
+void SynthInstr::addGenerator(ModDest destination, ModAmount amount) {
   if (!amount.valid()) {
     return;
   }
 
-  m_globalGenerators.push_back({destination, amount.value()});
+  m_generators.push_back({destination, amount.value()});
 }
 
 //  ********
