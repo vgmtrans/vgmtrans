@@ -12,6 +12,10 @@ class VGMColl;
 
 constexpr float defaultReverbPercent = 0.25;
 
+// BipolarAroundNominal:
+//   SF2 modLfoToVolume is centered around nominal gain. Tremolo can boost above the note's normal volume.
+// NoBoost:
+//   Adds a matching initialAttenuation offset. Loudest tremolo point is nominal gain; all other points attenuate.
 enum class TremoloGainMode {
   BipolarAroundNominal,
   NoBoost,
