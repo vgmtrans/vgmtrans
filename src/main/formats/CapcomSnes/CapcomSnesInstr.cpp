@@ -109,7 +109,7 @@ bool CapcomSnesInstr::loadInstr() {
   addStandardTremoloHandling(capcom_snes::kTremoloHalfDepthDb,
                              capcom_snes::kTremoloBaseHz,
                              capcom_snes::kTremoloMaxHz,
-                             true);
+                             TremoloGainMode::NoBoost);
 
   uint16_t addrSampStart = readShort(offDirEnt);
 

@@ -6,7 +6,7 @@
 #include <sstream>
 #include "CapcomSnesSeq.h"
 #include "CapcomSnesDefinitions.h"
-#include "InstrumentModulation.h"
+#include "Modulation.h"
 #include "ScaleConversion.h"
 
 DECLARE_FORMAT(CapcomSnes);
