@@ -184,6 +184,14 @@ void CapcomSnesTrack::setLfoOutputsEnabled(bool enabled) {
   }
 }
 
+void CapcomSnesTrack::addVibratoDepthEvent(uint32_t offset, uint32_t length, uint8_t depth) {
+  bool isNewOffset = onEvent(offset, length);
+
+  // Add the event to the UI, but, but don't emit the MIDI event while the driver has the LFO disabled.
+  recordSeqEvent<ModulationSeqEvent>(isNewOffset, getTime(), depth, offset, length, "Vibrato Depth");
+  addModulationNoItem(areLfoOutputsEnabled() ? depth : 0);
+}
+
 void CapcomSnesTrack::handleLfoRateChange(uint8_t lfoRateByte) {
   // Rate 0 gates the active LFOs off without clearing the stored depths.
   if (lfoRateByte == 0 && lastLfoFrequency != 0) {
@@ -753,12 +761,12 @@ bool CapcomSnesTrack::readEvent() {
           case 0:
             // Vibrato Depth
             lastVibratoDepth = lfoAmount & 0x7F;
-            addModulation(beginOffset, curOffset - beginOffset, lastVibratoDepth, "Vibrato Depth");
+            addVibratoDepthEvent(beginOffset, curOffset - beginOffset, lastVibratoDepth);
             break;
           case 1:
             // Tremolo Depth
             lastTremoloDepth = convertTremoloDepthToMidiValue(lfoAmount, parentSeq->version);
-            addControllerEventNoItem(93, lastTremoloDepth);
+            addControllerEventNoItem(93, areLfoOutputsEnabled() ? lastTremoloDepth : 0);
             desc = fmt::format("Amount: {:d}", lfoAmount);
             addGenericEvent(beginOffset, curOffset - beginOffset, "Tremolo Depth", desc, Type::Lfo);
             break;

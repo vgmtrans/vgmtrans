@@ -106,6 +106,8 @@ class CapcomSnesTrack
   void setNoteSlurred(bool slurred);
 
  private:
+  [[nodiscard]] bool areLfoOutputsEnabled() const { return lastLfoFrequency != 0; }
+  void addVibratoDepthEvent(uint32_t offset, uint32_t length, uint8_t depth);
   void setLfoOutputsEnabled(bool enabled);
   void handleLfoRateChange(uint8_t lfoRateByte);
 
