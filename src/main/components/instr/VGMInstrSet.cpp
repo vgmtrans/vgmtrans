@@ -205,7 +205,7 @@ void VGMInstr::addStandardVibratoHandling(double maxDepthCents,
   addPitchModulator(ModSource::ModWheel, ModDest::VibLfoToPitch, maxDepthCents);
   // nullify default channel pressure to vib lfo pitch modulator
   addPitchModulator(ModSource::ChannelPressure, ModDest::VibLfoToPitch, 0);
-  addFrequencyGenerator(ModDest::VibLfoFreq, minHertz);
+  addGlobalGeneratorHertz(ModDest::VibLfoFreq, minHertz);
   addFrequencyRangeModulator(ModSource::ChannelPressure, ModDest::VibLfoFreq, minHertz, maxHertz);
 }
 
@@ -213,7 +213,7 @@ void VGMInstr::addStandardTremoloHandling(double maxDepthDb,
                                          double minHertz,
                                          double maxHertz,
                                          TremoloGainMode gainMode) {
-  addFrequencyGenerator(ModDest::ModLfoFreq, minHertz);
+  addGlobalGeneratorHertz(ModDest::ModLfoFreq, minHertz);
   addFrequencyRangeModulator(ModSource::ChannelPressure, ModDest::ModLfoFreq, minHertz, maxHertz);
   addAttenuationModulator(ModSource::ChorusSend, ModDest::ModLfoToVol, maxDepthDb);
   if (gainMode == TremoloGainMode::NoBoost) {
@@ -235,26 +235,26 @@ void VGMInstr::addGlobalGenerator(ModDest destination, ParamAmount amount) {
   addGlobalGenerator(destination, amount.value());
 }
 
-void VGMInstr::addPitchGenerator(ModDest destination, double cents) {
+void VGMInstr::addGlobalGeneratorCents(ModDest destination, double cents) {
   addGlobalGenerator(destination, ParamAmount::cents(cents));
 }
 
-void VGMInstr::addFrequencyGenerator(ModDest destination, double hertz) {
+void VGMInstr::addGlobalGeneratorHertz(ModDest destination, double hertz) {
   addGlobalGenerator(destination, ParamAmount::hertz(hertz));
 }
 
-void VGMInstr::addDelayGenerator(ModDest destination, double seconds) {
+void VGMInstr::addGlobalGeneratorSeconds(ModDest destination, double seconds) {
   addGlobalGenerator(destination, ParamAmount::seconds(seconds));
 }
 
-void VGMInstr::addAttenuationGenerator(ModDest destination, double decibels) {
+void VGMInstr::addGlobalGeneratorDecibels(ModDest destination, double decibels) {
   addGlobalGenerator(destination, ParamAmount::attenuationDb(decibels));
 }
 
 void VGMInstr::addGlobalVibratoFrequency(double hertz) {
-  addFrequencyGenerator(ModDest::VibLfoFreq, hertz);
+  addGlobalGeneratorHertz(ModDest::VibLfoFreq, hertz);
 }
 
 void VGMInstr::addGlobalTremoloFrequency(double hertz) {
-  addFrequencyGenerator(ModDest::ModLfoFreq, hertz);
+  addGlobalGeneratorHertz(ModDest::ModLfoFreq, hertz);
 }

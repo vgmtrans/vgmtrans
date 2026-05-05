@@ -99,12 +99,12 @@ public:
   // Generator support
   void addGlobalGenerator(ModDest destination, int32_t amount);
   void addGlobalGenerator(ModDest destination, ParamAmount amount);
-
   // Helpers for adding generators using more-intuitive units.
-  void addPitchGenerator(ModDest destination, double cents);
-  void addFrequencyGenerator(ModDest destination, double hertz);
-  void addDelayGenerator(ModDest destination, double seconds);
-  void addAttenuationGenerator(ModDest destination, double decibels);
+  void addGlobalGeneratorCents(ModDest destination, double cents);
+  void addGlobalGeneratorHertz(ModDest destination, double hertz);
+  void addGlobalGeneratorSeconds(ModDest destination, double seconds);
+  void addGlobalGeneratorDecibels(ModDest destination, double decibels);
+  // Helpers for adding specific-generators
   void addGlobalVibratoFrequency(double hertz);
   void addGlobalTremoloFrequency(double hertz);
   [[nodiscard]] const std::vector<InstrumentGenerator>& globalGenerators() const { return m_globalGenerators; }
