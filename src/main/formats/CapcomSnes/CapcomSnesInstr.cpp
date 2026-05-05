@@ -111,7 +111,6 @@ bool CapcomSnesInstr::loadInstr() {
                              capcom_snes::kTremoloMaxHz,
                              true);
 
-
   uint16_t addrSampStart = readShort(offDirEnt);
 
   CapcomSnesRgn *rgn = new CapcomSnesRgn(this, offset());
