@@ -278,12 +278,13 @@ int interpolateVolumeCurve(int curveIndex, int curveFraction) {
   return lower + ((upper - lower) * curveFraction) / 256;
 }
 
-uint8_t calculateCurveVolume(uint8_t sourceVolume) {
+uint8_t calculateVolumeV2(uint8_t sourceVolume) {
+  // Unlike V1, this uses a volume curve table
   const int scaledCurvePosition = sourceVolume * kVolumeCurveLastIndex;
   return interpolateVolumeCurve(scaledCurvePosition >> 8, scaledCurvePosition & 0xff);
 }
 
-int computeV1TremoloScalarAtTrough(int sourceDepth) {
+int calculateTremoloScalarAtTroughV1(int sourceDepth) {
   const int depth = sourceDepth & 0x7f;
 
   if (depth == 0)
@@ -292,7 +293,8 @@ int computeV1TremoloScalarAtTrough(int sourceDepth) {
   return 255 - ((2 * depth * 255) >> 8);
 }
 
-int computeVolumeCurveTremoloScalarAtTrough(int sourceDepth) {
+int calculateTremoloScalarAtTroughV2(int sourceDepth) {
+  // The V2 handler uses the volume curve table
   sourceDepth = std::clamp(sourceDepth, 0, 127);
 
   if (sourceDepth == 0)
@@ -312,11 +314,11 @@ int convertTremoloDepthToMidiValue(int sourceDepth, CapcomSnesVersion version) {
 
   if (version == CAPCOMSNES_V1_BGM_IN_LIST) {
     peakScalar = kTremoloPeakScalarV1;
-    troughScalar = computeV1TremoloScalarAtTrough(sourceDepth);
+    troughScalar = calculateTremoloScalarAtTroughV1(sourceDepth);
   }
   else {
     peakScalar = kTremoloPeakScalarV2;
-    troughScalar = computeVolumeCurveTremoloScalarAtTrough(sourceDepth);
+    troughScalar = calculateTremoloScalarAtTroughV2(sourceDepth);
   }
   double depthCentibels = kTremoloMuteFloorCentibels;
 
@@ -325,12 +327,9 @@ int convertTremoloDepthToMidiValue(int sourceDepth, CapcomSnesVersion version) {
     depthCentibels = std::clamp(depthCentibels, 0.0, kTremoloMuteFloorCentibels);
   }
 
-  // SF2 tremolo depth is expressed as +/- modLfoToVolume around zero, so the
-  // MIDI value needs to map into twice the stored half-range.
+  // SF2 tremolo depth is expressed as +/- modLfoToVolume, so the MIDI value must map to the full range, not just half.
   const int midiValue = static_cast<int>(
-      floor(depthCentibels * 128.0 /
-            (2.0 * static_cast<double>(capcom_snes::kTremoloHalfDepthCentibels)) +
-            0.5));
+      floor(depthCentibels * 128.0 / (2.0 * static_cast<double>(capcom_snes::kTremoloHalfDepthCentibels)) + 0.5));
   return std::clamp(midiValue, 0, 127);
 }
 
@@ -539,7 +538,7 @@ bool CapcomSnesTrack::readEvent() {
         }
         else {
           // V2/V3 drivers shape volume through the engine's 17-point loudness curve.
-          midiVolume = calculateCurveVolume(newVolume);
+          midiVolume = calculateVolumeV2(newVolume);
         }
 
         addVol(beginOffset, curOffset - beginOffset, midiVolume);
@@ -740,7 +739,7 @@ bool CapcomSnesTrack::readEvent() {
         }
         else {
           // Master volume follows the same loudness curve as per-track volume.
-          midiVolume = calculateCurveVolume(newVolume);
+          midiVolume = calculateVolumeV2(newVolume);
         }
 
         addMasterVol(beginOffset, curOffset - beginOffset, midiVolume);
