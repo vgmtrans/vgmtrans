@@ -63,12 +63,12 @@ SFGenerator sf2GeneratorForModDestination(ModDest destination) {
   return endOper;
 }
 
-int16_t sf2AmountForModulator(const Modulator& modulator) {
+int16_t sf2AmountForModulator(const SynthModulator& modulator) {
   return static_cast<int16_t>(std::clamp<int32_t>(
       modulator.amount, std::numeric_limits<int16_t>::min(), std::numeric_limits<int16_t>::max()));
 }
 
-int16_t sf2AmountForGenerator(const Generator& generator) {
+int16_t sf2AmountForGenerator(const SynthGenerator& generator) {
   return static_cast<int16_t>(std::clamp<int32_t>(
       generator.amount, std::numeric_limits<int16_t>::min(), std::numeric_limits<int16_t>::max()));
 }

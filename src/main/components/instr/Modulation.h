@@ -53,7 +53,7 @@ private:
   bool m_valid;
 };
 
-struct Modulator {
+struct SynthModulator {
   ModSource source;
   ModDest destination;
 
@@ -63,7 +63,7 @@ struct Modulator {
   int32_t amount;
 };
 
-struct Generator {
+struct SynthGenerator {
   ModDest destination;
 
   // Absolute generator amount in shared SF2/DLS semantic units:

@@ -46,12 +46,12 @@ class SynthInstr {
   SynthRgn *addRgn();
   SynthRgn *addRgn(const SynthRgn& rgn);
 
-  void addModulator(const Modulator& modulator);
+  void addModulator(const SynthModulator& modulator);
   void addModulator(ModSource source, ModDest destination, ModAmount amount);
-  [[nodiscard]] const std::vector<Modulator>& modulators() const { return m_modulators; }
-  void addGenerator(const Generator& generator);
+  [[nodiscard]] const std::vector<SynthModulator>& modulators() const { return m_modulators; }
+  void addGenerator(const SynthGenerator& generator);
   void addGenerator(ModDest destination, ModAmount amount);
-  [[nodiscard]] const std::vector<Generator>& generators() const { return m_generators; }
+  [[nodiscard]] const std::vector<SynthGenerator>& generators() const { return m_generators; }
 
   uint32_t ulBank;
   uint32_t ulInstrument;
@@ -61,8 +61,8 @@ class SynthInstr {
   std::vector<SynthRgn *> vRgns;
 
 private:
-  std::vector<Modulator> m_modulators;
-  std::vector<Generator> m_generators;
+  std::vector<SynthModulator> m_modulators;
+  std::vector<SynthGenerator> m_generators;
 };
 
 class SynthSampInfo {

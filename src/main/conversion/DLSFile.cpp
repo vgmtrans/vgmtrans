@@ -366,7 +366,7 @@ void DLSArt::addVibrato(int32_t depth, int32_t frequency, int32_t delay) {
       CONN_SRC_NONE, CONN_SRC_NONE, CONN_DST_VIB_STARTDELAY, CONN_TRN_NONE, delay));
 }
 
-void DLSArt::addGenerator(const Generator& generator) {
+void DLSArt::addGenerator(const SynthGenerator& generator) {
   switch (generator.destination) {
     case ModDest::VibLfoToPitch:
       m_blocks.emplace_back(std::make_unique<ConnectionBlock>(
@@ -406,7 +406,7 @@ void DLSArt::addGenerator(const Generator& generator) {
   }
 }
 
-void DLSArt::addModulator(const Modulator& modulator) {
+void DLSArt::addModulator(const SynthModulator& modulator) {
   const uint16_t source = dlsSourceForModSource(modulator.source);
 
   switch (modulator.destination) {
