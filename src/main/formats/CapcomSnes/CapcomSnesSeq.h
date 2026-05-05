@@ -106,6 +106,9 @@ class CapcomSnesTrack
   void setNoteSlurred(bool slurred);
 
  private:
+  void setLfoOutputsEnabled(bool enabled);
+  void handleLfoRateChange(uint8_t lfoRateByte);
+
   uint8_t repeatCount[CAPCOM_SNES_REPEAT_SLOT_MAX];      // repeat count for repeat command
   uint8_t noteAttributes;
   uint8_t durationRate;

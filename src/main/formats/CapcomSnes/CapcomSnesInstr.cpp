@@ -6,18 +6,8 @@
 #include "CapcomSnesInstr.h"
 #include <spdlog/fmt/fmt.h>
 #include "SNESDSP.h"
+#include "CapcomSnesDefinitions.h"
 #include "CapcomSnesFormat.h"
-
-namespace {
-
-constexpr double kCapcomLfoStepHz = 1000.0 / 16384.0;
-constexpr double kCapcomVibratoBaseHz = kCapcomLfoStepHz;
-constexpr double kCapcomVibratoMaxHz = 255.0 * kCapcomLfoStepHz;
-constexpr double kCapcomTremoloBaseHz = 2.0 * kCapcomLfoStepHz;
-constexpr double kCapcomTremoloMaxHz = 510.0 * kCapcomLfoStepHz;
-constexpr double kCapcomTremoloHalfDepthDb = 48.4;
-
-}  // namespace
 
 // ****************
 // CapcomSnesInstrSet
@@ -115,8 +105,11 @@ bool CapcomSnesInstr::loadInstr() {
   // step frequency as the global base and let channel pressure span the full range in Hz.
   // Tremolo runs at twice the base vibrato rate and only attenuates, never boosts.
 
-  addStandardVibratoHandling(1200, kCapcomVibratoBaseHz, kCapcomVibratoMaxHz);
-  addStandardTremoloHandling(kCapcomTremoloHalfDepthDb, kCapcomTremoloBaseHz, kCapcomTremoloMaxHz, true);
+  addStandardVibratoHandling(1200, capcom_snes::kVibratoBaseHz, capcom_snes::kVibratoMaxHz);
+  addStandardTremoloHandling(capcom_snes::kTremoloHalfDepthDb,
+                             capcom_snes::kTremoloBaseHz,
+                             capcom_snes::kTremoloMaxHz,
+                             true);
 
 
   uint16_t addrSampStart = readShort(offDirEnt);
