@@ -12,6 +12,11 @@ class VGMColl;
 
 constexpr float defaultReverbPercent = 0.25;
 
+enum class TremoloGainMode {
+  BipolarAroundNominal,
+  NoBoost,
+};
+
 // ***********
 // VGMInstrSet
 // ***********
@@ -81,7 +86,10 @@ public:
   void addDelayModulator(ModSource source, ModDest destination, double seconds);
   void addAttenuationModulator(ModSource source, ModDest destination, double decibels);
   void addStandardVibratoHandling(double maxDepthCents, double minHertz, double maxHertz);
-  void addStandardTremoloHandling(double maxDepthDb, double minHertz, double maxHertz, bool attenOnly);
+  void addStandardTremoloHandling(double maxDepthDb,
+                                  double minHertz,
+                                  double maxHertz,
+                                  TremoloGainMode gainMode);
   [[nodiscard]] const std::vector<InstrumentModulator>& modulators() const { return m_modulators; }
 
   // Generator support

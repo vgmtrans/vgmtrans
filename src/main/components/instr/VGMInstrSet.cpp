@@ -212,11 +212,11 @@ void VGMInstr::addStandardVibratoHandling(double maxDepthCents,
 void VGMInstr::addStandardTremoloHandling(double maxDepthDb,
                                          double minHertz,
                                          double maxHertz,
-                                         bool attenOnly) {
+                                         TremoloGainMode gainMode) {
   addFrequencyGenerator(ModDest::ModLfoFreq, minHertz);
   addFrequencyRangeModulator(ModSource::ChannelPressure, ModDest::ModLfoFreq, minHertz, maxHertz);
   addAttenuationModulator(ModSource::ChorusSend, ModDest::ModLfoToVol, maxDepthDb);
-  if (attenOnly) {
+  if (gainMode == TremoloGainMode::NoBoost) {
     addAttenuationModulator(ModSource::ChorusSend, ModDest::InitialAtten, maxDepthDb);
   }
 }
