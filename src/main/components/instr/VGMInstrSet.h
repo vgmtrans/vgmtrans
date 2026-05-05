@@ -1,6 +1,6 @@
 #pragma once
 #include "common.h"
-#include "InstrumentModulation.h"
+#include "Modulation.h"
 #include "VGMFile.h"
 
 class VGMSampColl;
@@ -87,14 +87,14 @@ public:
                                   double minHertz,
                                   double maxHertz,
                                   TremoloGainMode gainMode);
-  [[nodiscard]] const std::vector<SynthModulator>& modulators() const { return m_modulators; }
+  [[nodiscard]] const std::vector<Modulator>& modulators() const { return m_modulators; }
 
   // Generator support
   void addGenerator(ModDest destination, ModAmount amount);
   // Helpers for adding specific-generators
   void addGlobalVibratoFrequency(double hertz);
   void addGlobalTremoloFrequency(double hertz);
-  [[nodiscard]] const std::vector<SynthGenerator>& generators() const { return m_generators; }
+  [[nodiscard]] const std::vector<Generator>& generators() const { return m_generators; }
 
   virtual bool loadInstr() { return true; }
 
@@ -111,6 +111,6 @@ protected:
 private:
   bool m_auto_add_regions_as_children{true};
   std::vector<VGMRgn*> m_regions;
-  std::vector<SynthModulator> m_modulators;
-  std::vector<SynthGenerator> m_generators;
+  std::vector<Modulator> m_modulators;
+  std::vector<Generator> m_generators;
 };

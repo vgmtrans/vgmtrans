@@ -94,7 +94,7 @@ SynthRgn *SynthInstr::addRgn(const SynthRgn& rgn) {
   return vRgns.back();
 }
 
-void SynthInstr::addModulator(const SynthModulator& modulator) {
+void SynthInstr::addModulator(const Modulator& modulator) {
   m_modulators.push_back(modulator);
 }
 
@@ -107,7 +107,7 @@ void SynthInstr::addModulator(ModSource source, ModDest destination,
   m_modulators.push_back({source, destination, amount.value()});
 }
 
-void SynthInstr::addGenerator(const SynthGenerator& generator) {
+void SynthInstr::addGenerator(const Generator& generator) {
   m_generators.push_back(generator);
 }
 

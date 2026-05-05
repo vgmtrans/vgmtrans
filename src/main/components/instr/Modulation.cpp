@@ -4,7 +4,7 @@
  * refer to the included LICENSE.txt file
  */
 
-#include "InstrumentModulation.h"
+#include "Modulation.h"
 #include <cmath>
 #include "ScaleConversion.h"
 
