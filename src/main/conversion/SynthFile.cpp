@@ -99,17 +99,12 @@ void SynthInstr::addModulator(const InstrumentModulator& modulator) {
 }
 
 void SynthInstr::addModulator(ModSource source, ModDest destination,
-                              int32_t amount) {
-  m_modulators.push_back({source, destination, amount});
-}
-
-void SynthInstr::addModulator(ModSource source, ModDest destination,
                               ModAmount amount) {
   if (!amount.valid()) {
     return;
   }
 
-  addModulator(source, destination, amount.value());
+  m_modulators.push_back({source, destination, amount.value()});
 }
 
 void SynthInstr::addGlobalGenerator(const InstrumentGenerator& generator) {

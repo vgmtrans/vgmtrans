@@ -47,7 +47,6 @@ class SynthInstr {
   SynthRgn *addRgn(const SynthRgn& rgn);
 
   void addModulator(const InstrumentModulator& modulator);
-  void addModulator(ModSource source, ModDest destination, int32_t amount);
   void addModulator(ModSource source, ModDest destination, ModAmount amount);
   [[nodiscard]] const std::vector<InstrumentModulator>& modulators() const { return m_modulators; }
   void addGlobalGenerator(const InstrumentGenerator& generator);

@@ -81,14 +81,7 @@ public:
                  uint8_t keyHigh = 0x7F, uint8_t velLow = 0, uint8_t velHigh = 0x7F);
 
   // Modulator support
-  void addModulator(ModSource source, ModDest destination, int32_t amount);
   void addModulator(ModSource source, ModDest destination, ModAmount amount);
-
-  // Helpers for adding modulators using more-intuitive units
-  void addPitchModulator(ModSource source, ModDest destination, double cents);
-  void addFrequencyRangeModulator(ModSource source, ModDest destination, double minHertz, double maxHertz);
-  void addDelayModulator(ModSource source, ModDest destination, double seconds);
-  void addAttenuationModulator(ModSource source, ModDest destination, double decibels);
   void addStandardVibratoHandling(double maxDepthCents, double minHertz, double maxHertz);
   void addStandardTremoloHandling(double maxDepthDb,
                                   double minHertz,

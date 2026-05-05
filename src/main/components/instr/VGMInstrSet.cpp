@@ -171,42 +171,22 @@ void VGMInstr::deleteRegions() {
 
 // Modulator methods
 
-void VGMInstr::addModulator(ModSource source, ModDest destination, int32_t amount) {
-  m_modulators.push_back({source, destination, amount});
-}
-
 void VGMInstr::addModulator(ModSource source, ModDest destination, ModAmount amount) {
   if (!amount.valid()) {
     return;
   }
 
-  addModulator(source, destination, amount.value());
-}
-
-void VGMInstr::addPitchModulator(ModSource source, ModDest destination, double cents) {
-  addModulator(source, destination, ModAmount::fromCents(cents));
-}
-
-void VGMInstr::addFrequencyRangeModulator(ModSource source, ModDest destination, double minHertz, double maxHertz) {
-  addModulator(source, destination, ModAmount::fromHertzRange(minHertz, maxHertz));
-}
-
-void VGMInstr::addDelayModulator(ModSource source, ModDest destination, double seconds) {
-  addModulator(source, destination, ModAmount::fromSeconds(seconds));
-}
-
-void VGMInstr::addAttenuationModulator(ModSource source, ModDest destination, double decibels) {
-  addModulator(source, destination, ModAmount::fromDecibels(decibels));
+  m_modulators.push_back({source, destination, amount.value()});
 }
 
 void VGMInstr::addStandardVibratoHandling(double maxDepthCents,
                                          double minHertz,
                                          double maxHertz) {
-  addPitchModulator(ModSource::ModWheel, ModDest::VibLfoToPitch, maxDepthCents);
+  addModulator(ModSource::ModWheel, ModDest::VibLfoToPitch, ModAmount::fromCents(maxDepthCents));
   // nullify default channel pressure to vib lfo pitch modulator
-  addPitchModulator(ModSource::ChannelPressure, ModDest::VibLfoToPitch, 0);
+  addModulator(ModSource::ChannelPressure, ModDest::VibLfoToPitch, ModAmount::fromCents(0));
   addGlobalGenerator(ModDest::VibLfoFreq, ModAmount::fromHertz(minHertz));
-  addFrequencyRangeModulator(ModSource::ChannelPressure, ModDest::VibLfoFreq, minHertz, maxHertz);
+  addModulator(ModSource::ChannelPressure, ModDest::VibLfoFreq, ModAmount::fromHertzRange(minHertz, maxHertz));
 }
 
 void VGMInstr::addStandardTremoloHandling(double maxDepthDb,
@@ -214,10 +194,10 @@ void VGMInstr::addStandardTremoloHandling(double maxDepthDb,
                                          double maxHertz,
                                          TremoloGainMode gainMode) {
   addGlobalGenerator(ModDest::ModLfoFreq, ModAmount::fromHertz(minHertz));
-  addFrequencyRangeModulator(ModSource::ChannelPressure, ModDest::ModLfoFreq, minHertz, maxHertz);
-  addAttenuationModulator(ModSource::ChorusSend, ModDest::ModLfoToVol, maxDepthDb);
+  addModulator(ModSource::ChannelPressure, ModDest::ModLfoFreq, ModAmount::fromHertzRange(minHertz, maxHertz));
+  addModulator(ModSource::ChorusSend, ModDest::ModLfoToVol, ModAmount::fromDecibels(maxDepthDb));
   if (gainMode == TremoloGainMode::NoBoost) {
-    addAttenuationModulator(ModSource::ChorusSend, ModDest::InitialAtten, maxDepthDb);
+    addModulator(ModSource::ChorusSend, ModDest::InitialAtten, ModAmount::fromDecibels(maxDepthDb));
   }
 }
 
