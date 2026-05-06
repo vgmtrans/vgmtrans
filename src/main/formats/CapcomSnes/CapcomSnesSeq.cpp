@@ -279,6 +279,30 @@ constexpr int kTremoloPeakScalarV1 = 255;
 constexpr int kTremoloPeakScalarV2 = 250;
 constexpr double kTremoloMuteFloorCentibels = 960.0;
 
+struct PanConversionResult {
+  uint8_t midiPan;
+  double volumeScale;
+};
+
+int interpolatePanFactor(uint16_t panPosition) {
+  const int panIndex = panPosition >> 8;
+  const int panRate = panPosition & 0xff;
+  const int lower = CapcomSnesSeq::panTable[panIndex];
+  const int upper = CapcomSnesSeq::panTable[panIndex + 1];
+  return lower + ((upper - lower) * panRate >> 8);
+}
+
+PanConversionResult calculatePanV2(uint8_t biasedPan) {
+  const uint16_t rightPanPosition = static_cast<uint16_t>(biasedPan) * 20;
+  const uint16_t leftPanPosition = 0x1400 - rightPanPosition;
+  const double volumeLeft = interpolatePanFactor(leftPanPosition) / 128.0;
+  const double volumeRight = interpolatePanFactor(rightPanPosition) / 128.0;
+
+  PanConversionResult result{};
+  result.midiPan = convertVolumeBalanceToStdMidiPan(volumeLeft, volumeRight, &result.volumeScale);
+  return result;
+}
+
 int interpolateVolumeCurve(int curveIndex, int curveFraction) {
   if (curveIndex >= kVolumeCurveLastIndex) {
     return CapcomSnesSeq::volTable[kVolumeCurveLastIndex];
@@ -734,23 +758,16 @@ bool CapcomSnesTrack::readEvent() {
 
       case EVENT_PAN: {
         uint8_t newPan = readByte(curOffset++) + 0x80; // signed -> unsigned
-        double volumeScale;
-
-        uint8_t panIn7bit;
+        PanConversionResult pan{};
         if (parentSeq->version == CAPCOMSNES_V1_BGM_IN_LIST) {
-          panIn7bit = newPan >> 1;
+          pan.midiPan = convert7bitLinearPercentPanValToStdMidiVal(newPan >> 1, &pan.volumeScale);
         }
         else {
-          // use pan table (with linear interpolation)
-          uint8_t panIndex = (newPan * 20) >> 8;
-          uint8_t panRate = (newPan * 20) & 0xff;
-          panIn7bit = CapcomSnesSeq::panTable[panIndex]
-              + ((CapcomSnesSeq::panTable[panIndex + 1] - CapcomSnesSeq::panTable[panIndex]) * panRate >> 8);
+          pan = calculatePanV2(newPan);
         }
-        uint8_t midiPan = convert7bitLinearPercentPanValToStdMidiVal(panIn7bit, &volumeScale);
 
-        addPan(beginOffset, curOffset - beginOffset, midiPan);
-        addExpressionNoItem(std::round(127.0 * volumeScale));
+        addPan(beginOffset, curOffset - beginOffset, pan.midiPan);
+        addExpressionNoItem(std::round(127.0 * pan.volumeScale));
         break;
       }
 
