@@ -290,16 +290,18 @@ void MdiArea::newView(VGMFile *file) {
 void MdiArea::removeView(const VGMFile *file) {
   // Let's check if we have a VGMFileView to remove
   auto it = fileToWindowMap.find(file);
-  if (it != fileToWindowMap.end()) {
-    // Sanity check
-    if (it->second) {
-      // Close the tab (automatically deletes it)
-      // Workaround for QTBUG-5446 (removeMdiSubWindow would be a better option)
-      it->second->close();
-    }
-    // Get rid of the saved pointers
-    windowToFileMap.erase(it->second);
-    fileToWindowMap.erase(file);
+  if (it == fileToWindowMap.end()) {
+    return; // Already removed
+  }
+
+  QMdiSubWindow *window = it->second;
+  windowToFileMap.erase(window);
+  fileToWindowMap.erase(it);
+
+  if (window) {
+    // Close the tab (automatically deletes it)
+    // Workaround for QTBUG-5446 (removeMdiSubWindow would be a better option)
+    window->close();
   }
 }
 

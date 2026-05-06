@@ -43,9 +43,9 @@ private:
 // ***********************************
 
 class VGMTreeItem : public QTreeWidgetItem {
+public:
   static constexpr auto ItemType = QTreeWidgetItem::UserType + 1;
 
-public:
   VGMTreeItem(QString name, VGMItem *item, QTreeWidget *parent = nullptr,
               VGMItem *item_parent = nullptr)
       : QTreeWidgetItem(parent, ItemType), m_name(std::move(name)), m_item(item),

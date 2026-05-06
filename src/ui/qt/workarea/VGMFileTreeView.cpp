@@ -387,10 +387,13 @@ void VGMFileTreeView::onShowDetailsChanged(bool show) {
 void VGMFileTreeView::updateItemTextRecursively(QTreeWidgetItem* item) {
   if (!item) return;
 
-  VGMTreeItem* vgmTreeItem = static_cast<VGMTreeItem*>(item);
-
-  if (VGMItem* vgmitem = m_treeItemToVGMItem[item]) {
-    setItemText(vgmitem, vgmTreeItem);
+  // The invisibleRootItem() is a plain QTreeWidgetItem, not a VGMTreeItem.
+  if (item->type() == VGMTreeItem::ItemType) {
+    auto* vgmTreeItem = static_cast<VGMTreeItem*>(item);
+    auto it = m_treeItemToVGMItem.find(item);
+    if (it != m_treeItemToVGMItem.end() && it->second) {
+      setItemText(it->second, vgmTreeItem);
+    }
   }
 
   // Recursively update children

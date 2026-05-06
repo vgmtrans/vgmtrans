@@ -31,8 +31,12 @@ void Chunk::setData(const void *src, uint32_t datasize) {
 
 void Chunk::write(uint8_t *buffer) {
   uint32_t padsize = paddedSize(m_size) - m_size;
+
   memcpy(buffer, id, 4);
-  *reinterpret_cast<uint32_t*>(buffer + 4) = m_size + padsize; // Microsoft says the chunkSize doesn't contain padding size, but many software cannot handle the alignment.
+
+  uint32_t value = m_size + padsize;
+  memcpy(buffer + 4, &value, sizeof(value));
+
   memcpy(buffer + 8, data, paddedSize(m_size));
 }
 
@@ -52,19 +56,20 @@ void ListTypeChunk::write(uint8_t *buffer) {
   memcpy(buffer, this->id, 4);
   memcpy(buffer + 8, this->type, 4);
 
-  uint32_t bufOffset = 12;
-  for (auto iter = this->childChunks.begin(); iter != childChunks.end(); ++iter) {
+  size_t bufOffset = 12;
+  for (auto iter = this->childChunks.begin(); iter != this->childChunks.end(); ++iter) {
     (*iter)->write(buffer + bufOffset);
     bufOffset += (*iter)->size();
   }
 
-  uint32_t size = bufOffset;
+  uint32_t size = static_cast<uint32_t>(bufOffset);
   uint32_t padsize = paddedSize(size) - size;
-  *reinterpret_cast<uint32_t*>(buffer + 4) = size + padsize - 8; // Microsoft says the chunkSize doesn't contain padding size, but many software cannot handle the alignment.
 
+  uint32_t value = size + padsize - 8;
+  memcpy(buffer + 4, &value, sizeof(value));
   // Add pad byte
   if (padsize != 0) {
-    memset(data + size, 0, padsize);
+    memset(buffer + size, 0, padsize);
   }
 }
 
@@ -72,3 +77,4 @@ RiffFile::RiffFile(const std::string& file_name, const std::string& form)
     : RIFFChunk(form),
       name(file_name) {
 }
+
