@@ -406,6 +406,7 @@ public:
   PortamentoControlEvent(MidiTrack *prntTrk, uint8_t channel, uint32_t absoluteTime, uint8_t key)
       : ControllerEvent(prntTrk, channel, absoluteTime, 84, key, PRIORITY_MIDDLE) { }
   MidiEventType eventType() override { return MIDIEVENT_PORTAMENTOCONTROL; }
+  uint32_t writeEvent(std::vector<uint8_t> &buf, uint32_t time) override;
 };
 
 class PanEvent
