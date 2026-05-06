@@ -5,6 +5,7 @@
  */
 
 #include "Modulation.h"
+#include <algorithm>
 #include <cmath>
 #include "ScaleConversion.h"
 
@@ -48,6 +49,20 @@ ModAmount ModAmount::fromHertzRange(double minHertz, double maxHertz) {
   const double maxCents = static_cast<double>(hertzToInstrumentCents(maxHertz));
   const double fullScaleRange = (maxCents - minCents) * 128.0 / 127.0;
   return ModAmount(static_cast<int32_t>(std::lround(fullScaleRange)), true);
+}
+
+uint8_t midiValueForHertzInRange(double hertz, double minHertz, double maxHertz) {
+  const ModAmount minAmount = ModAmount::fromHertz(minHertz);
+  const ModAmount rangeAmount = ModAmount::fromHertzRange(minHertz, maxHertz);
+  const ModAmount currentAmount = ModAmount::fromHertz(hertz);
+
+  if (!minAmount.valid() || !rangeAmount.valid() || !currentAmount.valid() || rangeAmount.value() <= 0) {
+    return 0;
+  }
+
+  const int midiValue = static_cast<int>(std::round(
+      128.0 * (currentAmount.value() - minAmount.value()) / static_cast<double>(rangeAmount.value())));
+  return static_cast<uint8_t>(std::clamp(midiValue, 0, 127));
 }
 
 ModAmount ModAmount::fromSeconds(double seconds) {

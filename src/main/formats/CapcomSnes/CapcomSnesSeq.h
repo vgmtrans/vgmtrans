@@ -106,6 +106,11 @@ class CapcomSnesTrack
   void setNoteSlurred(bool slurred);
 
  private:
+  [[nodiscard]] bool areLfoOutputsEnabled() const { return lastLfoFrequency != 0; }
+  void addVibratoDepthEvent(uint32_t offset, uint32_t length, uint8_t depth);
+  void setLfoOutputsEnabled(bool enabled);
+  void handleLfoRateChange(uint8_t lfoRateByte);
+
   uint8_t repeatCount[CAPCOM_SNES_REPEAT_SLOT_MAX];      // repeat count for repeat command
   uint8_t noteAttributes;
   uint8_t durationRate;
@@ -113,6 +118,9 @@ class CapcomSnesTrack
 
   bool lastNoteSlurred;
   int8_t lastKey;
+  uint8_t lastVibratoDepth;
+  uint8_t lastTremoloDepth;
+  uint8_t lastLfoFrequency;
 
   static double getTuningInSemitones(int8_t tuning);
 };
