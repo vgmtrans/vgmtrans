@@ -855,6 +855,19 @@ uint32_t ControllerEvent::writeEvent(std::vector<uint8_t> &buf, uint32_t time) {
   return absTime;
 }
 
+//  **********************
+//  PortamentoControlEvent
+//  **********************
+
+uint32_t PortamentoControlEvent::writeEvent(std::vector<uint8_t> &buf, uint32_t time) {
+  // Add the global transpose into the starting key of the portamento control event
+  u8 originalDataByte = dataByte;
+  dataByte = std::clamp<s16>(dataByte + prntTrk->parentSeq->globalTranspose, 0, 127);
+  u32 result = ControllerEvent::writeEvent(buf, time);
+  dataByte = originalDataByte;
+  return result;
+}
+
 //  **********
 //  SysexEvent
 //  **********

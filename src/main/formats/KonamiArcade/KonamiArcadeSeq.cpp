@@ -388,7 +388,7 @@ bool KonamiArcadeTrack::readEvent() {
       // Slide note
       u8 slideStartNote = note - m_slideModeDepth;
       addNoteByDurNoItem(slideStartNote, linearVel, m_slideModeDelay + 1);
-      insertPortamentoTime14BitNoItem(m_slideModeDuration * m_microsecsPerTick, m_slideModeDelay);
+      insertPortamentoTime14BitNoItem(m_slideModeDuration * m_microsecsPerTick, getTime() + m_slideModeDelay);
       insertPortamentoControlNoItem(slideStartNote, getTime() + m_slideModeDelay);
       insertNoteByDur(beginOffset, curOffset - beginOffset, note, linearVel, actualDuration - m_slideModeDelay, getTime() + m_slideModeDelay);
     } else {
