@@ -305,18 +305,28 @@ PanConversionResult calculatePanV2(uint8_t biasedPan) {
 
 int interpolateVolumeCurve(int curveIndex, int curveFraction) {
   if (curveIndex >= kVolumeCurveLastIndex) {
-    return CapcomSnesSeq::volTable[kVolumeCurveLastIndex];
+    return CapcomSnesSeq::volTable[kVolumeCurveLastIndex]; // 0xff
   }
 
   const int lower = CapcomSnesSeq::volTable[curveIndex];
   const int upper = CapcomSnesSeq::volTable[curveIndex + 1];
-  return lower + ((upper - lower) * curveFraction) / 256;
+  return lower + (((upper - lower) * curveFraction) >> 8);
 }
 
-uint8_t calculateVolumeV2(uint8_t sourceVolume) {
-  // Unlike V1, this uses a volume curve table
-  const int scaledCurvePosition = sourceVolume * kVolumeCurveLastIndex;
-  return interpolateVolumeCurve(scaledCurvePosition >> 8, scaledCurvePosition & 0xff);
+int calculateVolumeScalar(uint8_t sourceVolume) {
+  // The driver's intended range is 0x00..0x80 with 0x80 resolving to full volume.
+  if (sourceVolume >= 0x80) {
+    return CapcomSnesSeq::volTable[kVolumeCurveLastIndex]; // 0xff
+  }
+  const int curveIndex = sourceVolume >> 3;
+  const int curveFraction = ((sourceVolume & 0x07) << 5) | 0x1f;
+
+  return interpolateVolumeCurve(curveIndex, curveFraction);
+}
+
+double calculateVolumeV2(uint8_t sourceVolume) {
+  const int scalar = calculateVolumeScalar(sourceVolume); // 0..255
+  return static_cast<double>(scalar) / 255.0;
 }
 
 int calculateTremoloScalarAtTroughV1(int sourceDepth) {
@@ -579,13 +589,13 @@ bool CapcomSnesTrack::readEvent() {
         if (parentSeq->version == CAPCOMSNES_V1_BGM_IN_LIST) {
           // linear volume
           midiVolume = newVolume >> 1;
+          addVol(beginOffset, curOffset - beginOffset, midiVolume);
         }
         else {
           // V2/V3 drivers shape volume through the engine's 17-point loudness curve.
-          midiVolume = calculateVolumeV2(newVolume);
+          double percentAmp = calculateVolumeV2(newVolume);
+          addVol(beginOffset, curOffset - beginOffset, percentAmp, Resolution::FourteenBit);
         }
-
-        addVol(beginOffset, curOffset - beginOffset, midiVolume);
         break;
       }
 
