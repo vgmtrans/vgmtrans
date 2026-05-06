@@ -12,7 +12,7 @@
 - Added Drum Kit support to the standard N-SPC driver (Nintendo's SNES SDK driver).
 - Added Drum Kit support to the SuzukiSnes driver (Seiken Densetsu 3, Super Mario RPG, etc)
 - Added many improvements to the KonamiSnes driver.
-- Added vibrato, tremolo and more accurate portamento support to the CapcomSnes driver.
+- Added vibrato, tremolo, more accurate portamento support, and fixed pan calculation in the CapcomSnes driver.
 - Improved support for late-era Intelligent Systems SNES/SFC titles (Tetris Attack, Fire Emblem 4, Super Famicom Wars) 
 
 ### Changed
