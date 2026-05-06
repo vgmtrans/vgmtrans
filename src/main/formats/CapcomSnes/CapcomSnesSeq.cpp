@@ -165,10 +165,13 @@ void CapcomSnesTrack::resetVars() {
   durationRate = 0;
   transpose = 0;
   lastNoteSlurred = false;
+  didRest = false;
   lastKey = -1;
   lastVibratoDepth = 0;
   lastTremoloDepth = 0;
   lastLfoFrequency = 0;
+  lastPortamentoTime = 0;
+  portamentoMillisecondsPerCent = 0;
 
   for (uint8_t& i : repeatCount) {
     i = 0;
@@ -392,7 +395,7 @@ bool CapcomSnesTrack::readEvent() {
 
     if (rest) {
       addRest(beginOffset, curOffset - beginOffset, len);
-      lastKey = -1;
+      didRest = true;
     }
     else {
       // calculate duration of note:
@@ -419,16 +422,25 @@ bool CapcomSnesTrack::readEvent() {
 
       uint8_t key = (keyIndex - 1) + (getNoteOctave() * 12) + (isNoteOctaveUp() ? 24 : 0);
       uint8_t vel = 127;
-      if (lastNoteSlurred && key == lastKey) {
+      if (lastNoteSlurred && key == lastKey && !didRest) {
         addTime(dur);
         makePrevDurNoteEnd();
         addTime(len - dur);
         addTie(beginOffset, curOffset - beginOffset, dur, "Tie", desc);
       }
       else {
+        if (portamentoMillisecondsPerCent > 0 && lastKey >= 0) {
+          uint16_t portamentoDurInMillis = (abs(key - lastKey) * 100) * portamentoMillisecondsPerCent;
+          if (portamentoDurInMillis != lastPortamentoTime) {
+            addPortamentoTime14BitNoItem(portamentoDurInMillis);
+            lastPortamentoTime = portamentoDurInMillis;
+          }
+          addPortamentoControlNoItem(lastKey);
+        }
         addNoteByDur(beginOffset, curOffset - beginOffset, key, vel, dur);
         addTime(len);
         lastKey = key;
+        didRest = false;
       }
       lastNoteSlurred = isNoteSlurred();
     }
@@ -587,15 +599,20 @@ bool CapcomSnesTrack::readEvent() {
       }
 
       case EVENT_PORTAMENTO_TIME: {
-        // TODO: calculate portamento time in milliseconds
-        uint8_t newPortamentoTime = readByte(curOffset++);
+        // All tested versions of the format (V1-V3) use the same calculation for portamento time.
+        uint8_t portamentoTimeByte = readByte(curOffset++);
+        uint8_t step = (portamentoTimeByte << 1) & 0xFF;
+        double centsPerUpdate = step * (100.0 / 256.0);
+        // The voice stream/portamento update runs once every other 8 ms timer tick, i.e. about 62.5 updates per second
+        if (centsPerUpdate == 0)
+          portamentoMillisecondsPerCent = 0;
+        else
+          portamentoMillisecondsPerCent = (0.016 / centsPerUpdate) * 1000;
         addGenericEvent(beginOffset,
                         curOffset - beginOffset,
                         "Portamento Time",
-                        fmt::format("Time: {:d}", newPortamentoTime),
+                        fmt::format("cents/ms: {:.2f}", centsPerUpdate * 62.5 / 1000.0),
                         Type::PortamentoTime);
-        addPortamentoTimeNoItem(newPortamentoTime >> 1);
-        addPortamentoNoItem(newPortamentoTime != 0);
         break;
       }
 

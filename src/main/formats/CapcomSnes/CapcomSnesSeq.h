@@ -117,10 +117,13 @@ class CapcomSnesTrack
   //int8_t transpose;
 
   bool lastNoteSlurred;
+  bool didRest;
   int8_t lastKey;
   uint8_t lastVibratoDepth;
   uint8_t lastTremoloDepth;
   uint8_t lastLfoFrequency;
+  uint16_t lastPortamentoTime;
+  double portamentoMillisecondsPerCent;
 
   static double getTuningInSemitones(int8_t tuning);
 };
