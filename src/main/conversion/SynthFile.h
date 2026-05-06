@@ -1,5 +1,6 @@
 #pragma once
 
+#include "Modulation.h"
 #include "RiffFile.h"
 #include <vector>
 
@@ -45,12 +46,23 @@ class SynthInstr {
   SynthRgn *addRgn();
   SynthRgn *addRgn(const SynthRgn& rgn);
 
+  void addModulator(const SynthModulator& modulator);
+  void addModulator(ModSource source, ModDest destination, ModAmount amount);
+  [[nodiscard]] const std::vector<SynthModulator>& modulators() const { return m_modulators; }
+  void addGenerator(const SynthGenerator& generator);
+  void addGenerator(ModDest destination, ModAmount amount);
+  [[nodiscard]] const std::vector<SynthGenerator>& generators() const { return m_generators; }
+
   uint32_t ulBank;
   uint32_t ulInstrument;
   std::string name;
   float reverb;
 
   std::vector<SynthRgn *> vRgns;
+
+private:
+  std::vector<SynthModulator> m_modulators;
+  std::vector<SynthGenerator> m_generators;
 };
 
 class SynthSampInfo {

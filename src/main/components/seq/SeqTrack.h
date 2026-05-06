@@ -213,6 +213,9 @@ private:
   void addPitchBendAsPercent(uint32_t offset, uint32_t length, double percent, const std::string &sEventName = "Pitch Bend");
   void addPitchBendRange(uint32_t offset, uint32_t length, uint16_t cents, const std::string &sEventName = "Pitch Bend Range");
   void addPitchBendRangeNoItem(uint16_t cents) const;
+  void addChannelPressure(uint32_t offset, uint32_t length, uint8_t pressure, const std::string &sEventName = "Channel Pressure");
+  void addChannelPressureNoItem(uint8_t pressure);
+  void insertChannelPressure(uint32_t offset, uint32_t length, uint8_t pressure, uint32_t absTime, const std::string &sEventName = "Channel Pressure");
   void addFineTuning(uint32_t offset, uint32_t length, double cents, const std::string &sEventName = "Fine Tuning");
   void addFineTuningNoItem(double cents);
   void addCoarseTuning(uint32_t offset, uint32_t length, double semitones, const std::string &sEventName = "Coarse Tuning");

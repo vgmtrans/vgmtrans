@@ -1209,6 +1209,34 @@ void SeqTrack::addPitchBendRangeNoItem(uint16_t cents) const {
     pMidiTrack->addPitchBendRange(channel, cents);
 }
 
+void SeqTrack::addChannelPressure(uint32_t offset,
+                                  uint32_t length,
+                                  uint8_t pressure,
+                                  const std::string &sEventName) {
+  bool isNewOffset = onEvent(offset, length);
+
+  recordSeqEvent<ChannelPressureSeqEvent>(isNewOffset, getTime(), pressure, offset, length, sEventName);
+  addChannelPressureNoItem(pressure);
+}
+
+void SeqTrack::addChannelPressureNoItem(uint8_t pressure) {
+  if (readMode == READMODE_CONVERT_TO_MIDI)
+    pMidiTrack->addChannelPressure(channel, pressure);
+}
+
+void SeqTrack::insertChannelPressure(uint32_t offset,
+                                     uint32_t length,
+                                     uint8_t pressure,
+                                     uint32_t absTime,
+                                     const std::string &sEventName) {
+  bool isNewOffset = onEvent(offset, length);
+
+  recordSeqEvent<ChannelPressureSeqEvent>(isNewOffset, absTime, pressure, offset, length, sEventName);
+
+  if (readMode == READMODE_CONVERT_TO_MIDI)
+    pMidiTrack->insertChannelPressure(channel, pressure, absTime);
+}
+
 void SeqTrack::addFineTuning(uint32_t offset, uint32_t length, double cents, const std::string &sEventName) {
   bool isNewOffset = onEvent(offset, length);
 

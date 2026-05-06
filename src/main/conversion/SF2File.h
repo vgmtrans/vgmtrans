@@ -87,21 +87,7 @@ typedef enum: uint16_t {
   endOper                     //                                      60
 } SFGenerator;
 
-typedef enum: uint16_t {
-  /* Start of MIDI modulation operators */
-  cc1_Mod,
-  cc7_Vol,
-  cc10_Pan,
-  cc64_Sustain,
-  cc91_Reverb,
-  cc93_Chorus,
-
-  ccPitchBend,
-  ccIndirectModX,
-  ccIndirectModY,
-
-  endMod
-} SFModulator;
+using SFModulator = uint16_t;
 
 typedef enum: uint16_t {
   linear

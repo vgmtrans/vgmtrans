@@ -423,6 +423,14 @@ void MidiTrack::insertPitchBend(uint8_t channel, int16_t bend, uint32_t absTime)
   aEvents.push_back(new PitchBendEvent(this, channel, absTime, bend));
 }
 
+void MidiTrack::addChannelPressure(uint8_t channel, uint8_t pressure) {
+  aEvents.push_back(new ChannelPressureEvent(this, channel, getDelta(), pressure));
+}
+
+void MidiTrack::insertChannelPressure(uint8_t channel, uint8_t pressure, uint32_t absTime) {
+  aEvents.push_back(new ChannelPressureEvent(this, channel, absTime, pressure));
+}
+
 void MidiTrack::addPitchBendRange(uint8_t channel, uint16_t cents) {
   insertPitchBendRange(channel, cents, getDelta());
 }
@@ -896,6 +904,24 @@ uint32_t PitchBendEvent::writeEvent(std::vector<uint8_t> &buf, uint32_t time) {
   buf.push_back(0xE0 + channel);
   buf.push_back(loByte);
   buf.push_back(hiByte);
+  return absTime;
+}
+
+//  ********************
+//  ChannelPressureEvent
+//  ********************
+
+ChannelPressureEvent::ChannelPressureEvent(MidiTrack *prntTrk,
+                                           uint8_t channel,
+                                           uint32_t absoluteTime,
+                                           uint8_t pressureAmt)
+    : MidiEvent(prntTrk, absoluteTime, channel, PRIORITY_MIDDLE), pressure(pressureAmt) {
+}
+
+uint32_t ChannelPressureEvent::writeEvent(std::vector<uint8_t> &buf, uint32_t time) {
+  writeVarLength(buf, absTime - time);
+  buf.push_back(0xD0 + channel);
+  buf.push_back(pressure & 0x7F);
   return absTime;
 }
 

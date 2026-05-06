@@ -117,6 +117,7 @@ target_sources(vgmtranscore
     components/VGMMultiSectionSeq.cpp
     components/VGMSampColl.cpp
     components/VGMTag.cpp
+        components/instr/Modulation.cpp
     components/instr/VGMInstrSet.cpp
     components/instr/VGMRgn.cpp
     components/instr/VGMSamp.cpp
@@ -487,6 +488,7 @@ target_sources(vgmtranscore
       components/VGMTag.h
     FILE_SET headers_components_instr TYPE HEADERS BASE_DIRS components/instr
     FILES
+        components/instr/Modulation.h
       components/instr/VGMInstrSet.h
       components/instr/VGMRgn.h
       components/instr/VGMSamp.h

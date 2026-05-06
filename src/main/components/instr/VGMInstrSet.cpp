@@ -168,3 +168,53 @@ VGMRgn *VGMInstr::addRgn(uint32_t offset, uint32_t length, int sampNum, uint8_t 
 void VGMInstr::deleteRegions() {
   deleteVect(m_regions);
 }
+
+// Modulator methods
+
+void VGMInstr::addModulator(ModSource source, ModDest destination, ModAmount amount) {
+  if (!amount.valid()) {
+    return;
+  }
+
+  m_modulators.push_back({source, destination, amount.value()});
+}
+
+void VGMInstr::addStandardVibratoHandling(double maxDepthCents,
+                                         double minHertz,
+                                         double maxHertz) {
+  addModulator(ModSource::ModWheel, ModDest::VibLfoToPitch, ModAmount::fromCents(maxDepthCents));
+  // nullify default channel pressure to vib lfo pitch modulator
+  addModulator(ModSource::ChannelPressure, ModDest::VibLfoToPitch, ModAmount::fromCents(0));
+  addGenerator(ModDest::VibLfoFreq, ModAmount::fromHertz(minHertz));
+  addModulator(ModSource::ChannelPressure, ModDest::VibLfoFreq, ModAmount::fromHertzRange(minHertz, maxHertz));
+}
+
+void VGMInstr::addStandardTremoloHandling(double maxDepthDb,
+                                         double minHertz,
+                                         double maxHertz,
+                                         TremoloGainMode gainMode) {
+  addGenerator(ModDest::ModLfoFreq, ModAmount::fromHertz(minHertz));
+  addModulator(ModSource::ChannelPressure, ModDest::ModLfoFreq, ModAmount::fromHertzRange(minHertz, maxHertz));
+  addModulator(ModSource::ChorusSend, ModDest::ModLfoToVol, ModAmount::fromDecibels(maxDepthDb));
+  if (gainMode == TremoloGainMode::NoBoost) {
+    addModulator(ModSource::ChorusSend, ModDest::InitialAtten, ModAmount::fromDecibels(maxDepthDb));
+  }
+}
+
+// Generator methods
+
+void VGMInstr::addGenerator(ModDest destination, ModAmount amount) {
+  if (!amount.valid()) {
+    return;
+  }
+
+  m_generators.push_back({destination, amount.value()});
+}
+
+void VGMInstr::addGlobalVibratoFrequency(double hertz) {
+  addGenerator(ModDest::VibLfoFreq, ModAmount::fromHertz(hertz));
+}
+
+void VGMInstr::addGlobalTremoloFrequency(double hertz) {
+  addGenerator(ModDest::ModLfoFreq, ModAmount::fromHertz(hertz));
+}

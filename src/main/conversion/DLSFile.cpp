@@ -5,10 +5,12 @@
  */
 
 #include <algorithm>
+#include <limits>
 #include <numeric>
 #include <ranges>
 #include <vector>
 #include "DLSFile.h"
+#include "ScaleConversion.h"
 #include "VGMInstrSet.h"
 #include "VGMSamp.h"
 #include "Root.h"
@@ -274,6 +276,40 @@ void DLSRgn::setWaveLinkInfo(uint16_t options, uint16_t phaseGroup, uint32_t the
 //  DLSArt
 //  ******
 
+namespace {
+
+uint16_t dlsSourceForModSource(ModSource source) {
+  switch (source) {
+    case ModSource::ModWheel:
+      return CONN_SRC_CC1;
+    case ModSource::ChannelPressure:
+      return CONN_SRC_CHANNELPRESSURE;
+    case ModSource::PolyPressure:
+      return CONN_SRC_POLYPRESSURE;
+    case ModSource::PitchWheel:
+      return CONN_SRC_PITCHWHEEL;
+    case ModSource::Volume:
+      return CONN_SRC_CC7;
+    case ModSource::Pan:
+      return CONN_SRC_CC10;
+    case ModSource::Expression:
+      return CONN_SRC_CC11;
+    case ModSource::ReverbSend:
+      return CONN_SRC_CC91;
+    case ModSource::ChorusSend:
+      return CONN_SRC_CC93;
+  }
+  return CONN_SRC_NONE;
+}
+
+int32_t toDls16Dot16Scale(int32_t amount) {
+  const int64_t scaled = static_cast<int64_t>(amount) * 65536;
+  return static_cast<int32_t>(std::clamp<int64_t>(
+      scaled, std::numeric_limits<int32_t>::min(), std::numeric_limits<int32_t>::max()));
+}
+
+} // namespace
+
 uint32_t DLSArt::GetSize() const {
   uint32_t size = 0;
   size += LIST_HDR_SIZE;  //"lar2" list
@@ -320,14 +356,96 @@ void DLSArt::addPan(long pan) {
 void DLSArt::addVibrato(int32_t depth, int32_t frequency, int32_t delay) {
   if (depth != 0) {
     m_blocks.emplace_back(std::make_unique<ConnectionBlock>(
-        CONN_SRC_LFO, CONN_SRC_NONE, CONN_DST_PITCH, CONN_TRN_NONE, depth));
+        CONN_SRC_VIBRATO, CONN_SRC_NONE, CONN_DST_PITCH, CONN_TRN_NONE, depth));
   }
 
   m_blocks.emplace_back(std::make_unique<ConnectionBlock>(
-      CONN_SRC_NONE, CONN_SRC_NONE, CONN_DST_LFO_FREQUENCY, CONN_TRN_NONE, frequency));
+      CONN_SRC_NONE, CONN_SRC_NONE, CONN_DST_VIB_FREQUENCY, CONN_TRN_NONE, frequency));
 
   m_blocks.emplace_back(std::make_unique<ConnectionBlock>(
-      CONN_SRC_NONE, CONN_SRC_NONE, CONN_DST_LFO_STARTDELAY, CONN_TRN_NONE, delay));
+      CONN_SRC_NONE, CONN_SRC_NONE, CONN_DST_VIB_STARTDELAY, CONN_TRN_NONE, delay));
+}
+
+void DLSArt::addGenerator(const SynthGenerator& generator) {
+  switch (generator.destination) {
+    case ModDest::VibLfoToPitch:
+      m_blocks.emplace_back(std::make_unique<ConnectionBlock>(
+          CONN_SRC_VIBRATO, CONN_SRC_NONE, CONN_DST_PITCH, CONN_TRN_NONE,
+          centsToDlsPitchScale(generator.amount)));
+      break;
+    case ModDest::VibLfoFreq:
+      m_blocks.emplace_back(std::make_unique<ConnectionBlock>(
+          CONN_SRC_NONE, CONN_SRC_NONE, CONN_DST_VIB_FREQUENCY, CONN_TRN_NONE,
+          centsToDlsPitchScale(generator.amount)));
+      break;
+    case ModDest::VibLfoDelay:
+      m_blocks.emplace_back(std::make_unique<ConnectionBlock>(
+          CONN_SRC_NONE, CONN_SRC_NONE, CONN_DST_VIB_STARTDELAY, CONN_TRN_NONE,
+          toDls16Dot16Scale(generator.amount)));
+      break;
+    case ModDest::ModLfoToVol:
+      m_blocks.emplace_back(std::make_unique<ConnectionBlock>(
+          CONN_SRC_LFO, CONN_SRC_NONE, CONN_DST_ATTENUATION, CONN_TRN_NONE,
+          toDls16Dot16Scale(generator.amount)));
+      break;
+    case ModDest::ModLfoFreq:
+      m_blocks.emplace_back(std::make_unique<ConnectionBlock>(
+          CONN_SRC_NONE, CONN_SRC_NONE, CONN_DST_LFO_FREQUENCY, CONN_TRN_NONE,
+          centsToDlsPitchScale(generator.amount)));
+      break;
+    case ModDest::ModLfoDelay:
+      m_blocks.emplace_back(std::make_unique<ConnectionBlock>(
+          CONN_SRC_NONE, CONN_SRC_NONE, CONN_DST_LFO_STARTDELAY, CONN_TRN_NONE,
+          toDls16Dot16Scale(generator.amount)));
+      break;
+    case ModDest::InitialAtten:
+      m_blocks.emplace_back(std::make_unique<ConnectionBlock>(
+          CONN_SRC_NONE, CONN_SRC_NONE, CONN_DST_ATTENUATION, CONN_TRN_NONE,
+          toDls16Dot16Scale(generator.amount)));
+      break;
+  }
+}
+
+void DLSArt::addModulator(const SynthModulator& modulator) {
+  const uint16_t source = dlsSourceForModSource(modulator.source);
+
+  switch (modulator.destination) {
+    case ModDest::VibLfoToPitch:
+      m_blocks.emplace_back(std::make_unique<ConnectionBlock>(
+          CONN_SRC_VIBRATO, source, CONN_DST_PITCH, CONN_TRN_NONE,
+          centsToDlsPitchScale(modulator.amount)));
+      break;
+    case ModDest::VibLfoFreq:
+      m_blocks.emplace_back(std::make_unique<ConnectionBlock>(
+          source, CONN_SRC_NONE, CONN_DST_VIB_FREQUENCY, CONN_TRN_NONE,
+          centsToDlsPitchScale(modulator.amount)));
+      break;
+    case ModDest::VibLfoDelay:
+      m_blocks.emplace_back(std::make_unique<ConnectionBlock>(
+          source, CONN_SRC_NONE, CONN_DST_VIB_STARTDELAY, CONN_TRN_NONE,
+          toDls16Dot16Scale(modulator.amount)));
+      break;
+    case ModDest::ModLfoFreq:
+      m_blocks.emplace_back(std::make_unique<ConnectionBlock>(
+          source, CONN_SRC_NONE, CONN_DST_LFO_FREQUENCY, CONN_TRN_NONE,
+          centsToDlsPitchScale(modulator.amount)));
+      break;
+    case ModDest::ModLfoDelay:
+      m_blocks.emplace_back(std::make_unique<ConnectionBlock>(
+          source, CONN_SRC_NONE, CONN_DST_LFO_STARTDELAY, CONN_TRN_NONE,
+          toDls16Dot16Scale(modulator.amount)));
+      break;
+    case ModDest::ModLfoToVol:
+      m_blocks.emplace_back(std::make_unique<ConnectionBlock>(
+          CONN_SRC_LFO, source, CONN_DST_ATTENUATION, CONN_TRN_NONE,
+          toDls16Dot16Scale(modulator.amount)));
+      break;
+    case ModDest::InitialAtten:
+      m_blocks.emplace_back(std::make_unique<ConnectionBlock>(
+          source, CONN_SRC_NONE, CONN_DST_ATTENUATION, CONN_TRN_NONE,
+          toDls16Dot16Scale(modulator.amount)));
+      break;
+  }
 }
 
 //  ***************

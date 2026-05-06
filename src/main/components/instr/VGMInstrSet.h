@@ -1,5 +1,6 @@
 #pragma once
 #include "common.h"
+#include "Modulation.h"
 #include "VGMFile.h"
 
 class VGMSampColl;
@@ -10,6 +11,15 @@ class VGMRgnItem;
 class VGMColl;
 
 constexpr float defaultReverbPercent = 0.25;
+
+// BipolarAroundNominal:
+//   SF2 modLfoToVolume is centered around nominal gain. Tremolo can boost above the note's normal volume.
+// NoBoost:
+//   Adds a matching initialAttenuation offset. Loudest tremolo point is nominal gain; all other points attenuate.
+enum class TremoloGainMode {
+  BipolarAroundNominal,
+  NoBoost,
+};
 
 // ***********
 // VGMInstrSet
@@ -70,6 +80,22 @@ public:
   VGMRgn *addRgn(uint32_t offset, uint32_t length, int sampNum, uint8_t keyLow = 0,
                  uint8_t keyHigh = 0x7F, uint8_t velLow = 0, uint8_t velHigh = 0x7F);
 
+  // Modulator support
+  void addModulator(ModSource source, ModDest destination, ModAmount amount);
+  void addStandardVibratoHandling(double maxDepthCents, double minHertz, double maxHertz);
+  void addStandardTremoloHandling(double maxDepthDb,
+                                  double minHertz,
+                                  double maxHertz,
+                                  TremoloGainMode gainMode);
+  [[nodiscard]] const std::vector<SynthModulator>& modulators() const { return m_modulators; }
+
+  // Generator support
+  void addGenerator(ModDest destination, ModAmount amount);
+  // Helpers for adding specific-generators
+  void addGlobalVibratoFrequency(double hertz);
+  void addGlobalTremoloFrequency(double hertz);
+  [[nodiscard]] const std::vector<SynthGenerator>& generators() const { return m_generators; }
+
   virtual bool loadInstr() { return true; }
 
   uint32_t bank;
@@ -85,4 +111,6 @@ protected:
 private:
   bool m_auto_add_regions_as_children{true};
   std::vector<VGMRgn*> m_regions;
+  std::vector<SynthModulator> m_modulators;
+  std::vector<SynthGenerator> m_generators;
 };
