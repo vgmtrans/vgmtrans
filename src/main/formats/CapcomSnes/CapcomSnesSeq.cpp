@@ -585,11 +585,9 @@ bool CapcomSnesTrack::readEvent() {
       case EVENT_VOLUME: {
         uint8_t newVolume = readByte(curOffset++);
 
-        uint8_t midiVolume;
         if (parentSeq->version == CAPCOMSNES_V1_BGM_IN_LIST) {
           // linear volume
-          midiVolume = newVolume >> 1;
-          addVol(beginOffset, curOffset - beginOffset, midiVolume);
+          addVol(beginOffset, curOffset - beginOffset, newVolume >> 1);
         }
         else {
           // V2/V3 drivers shape volume through the engine's 17-point loudness curve.
@@ -784,17 +782,15 @@ bool CapcomSnesTrack::readEvent() {
       case EVENT_MASTER_VOLUME: {
         uint8_t newVolume = readByte(curOffset++);
 
-        uint8_t midiVolume;
         if (parentSeq->version == CAPCOMSNES_V1_BGM_IN_LIST) {
           // linear volume
-          midiVolume = newVolume >> 1;
+          addMasterVol(beginOffset, curOffset - beginOffset, newVolume >> 1);
         }
         else {
           // Master volume follows the same loudness curve as per-track volume.
-          midiVolume = calculateVolumeV2(newVolume);
+          double percentAmp = calculateVolumeV2(newVolume);
+          addMasterVol(beginOffset, curOffset - beginOffset, percentAmp);
         }
-
-        addMasterVol(beginOffset, curOffset - beginOffset, midiVolume);
         break;
       }
 

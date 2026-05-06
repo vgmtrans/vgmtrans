@@ -1039,6 +1039,13 @@ void SeqTrack::addMasterVol(uint32_t offset, uint32_t length, uint8_t newVol, co
   addMasterVolNoItem(newVol);
 }
 
+void SeqTrack::addMasterVol(u32 offset, u32 length, double volPercent, Resolution res, const std::string &sEventName) {
+  bool isNewOffset = onEvent(offset, length);
+
+  recordSeqEvent<MastVolSeqEvent>(isNewOffset, getTime(), volPercent, offset, length, sEventName);
+  addLevelNoItem(volPercent, LevelController::MasterVolume, res, -1);
+}
+
 void SeqTrack::addMasterVolNoItem(uint8_t newVol) {
   addLevelNoItem(newVol / 127.0, LevelController::MasterVolume, Resolution::SevenBit);
 }

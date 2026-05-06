@@ -120,6 +120,13 @@ MastVolSeqEvent::MastVolSeqEvent(SeqTrack *pTrack,
                                  const std::string &name)
     : SeqEvent(pTrack, offset, length, name, Type::MasterVolume), vol(volume) { }
 
+MastVolSeqEvent::MastVolSeqEvent(SeqTrack *pTrack,
+                                 double volume,
+                                 uint32_t offset,
+                                 uint32_t length,
+                                 const std::string &name)
+    : SeqEvent(pTrack, offset, length, name, Type::MasterVolume), percentVol(volume) { }
+
 // ****************
 // MastVolSlideSeqEvent
 // ****************

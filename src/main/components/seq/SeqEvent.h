@@ -195,12 +195,18 @@ class MastVolSeqEvent : public SeqEvent {
  public:
     MastVolSeqEvent(SeqTrack *pTrack, uint8_t volume, uint32_t offset = 0, uint32_t length = 0,
                     const std::string &name = "");
+    MastVolSeqEvent(SeqTrack *pTrack, double volume, uint32_t offset = 0, uint32_t length = 0,
+                    const std::string &name = "");
 
     std::string description() override {
-        return fmt::format("{} - master volume: {}", name(), static_cast<int>(vol));
+      if (percentVol > 0) {
+        return fmt::format("{} - master volume: {:.1f}", name(), percentVol);
+      }
+      return fmt::format("{} - master volume: {}", name(), vol);
     };
 
-  uint8_t vol;
+  uint8_t vol = -1;
+  double percentVol = -1;
 };
 
 //  ****************
