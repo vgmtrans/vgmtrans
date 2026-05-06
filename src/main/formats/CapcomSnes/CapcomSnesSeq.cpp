@@ -429,7 +429,7 @@ bool CapcomSnesTrack::readEvent() {
         addTie(beginOffset, curOffset - beginOffset, dur, "Tie", desc);
       }
       else {
-        if (portamentoMillisecondsPerCent > 0) {
+        if (portamentoMillisecondsPerCent > 0 && lastKey >= 0) {
           uint16_t portamentoDurInMillis = (abs(key - lastKey) * 100) * portamentoMillisecondsPerCent;
           if (portamentoDurInMillis != lastPortamentoTime) {
             addPortamentoTime14BitNoItem(portamentoDurInMillis);
