@@ -471,7 +471,7 @@ bool CapcomSnesTrack::readEvent() {
           }
           addPortamentoControlNoItem(lastKey);
         }
-        addNoteByDur(beginOffset, curOffset - beginOffset, key, vel, dur);
+        addNoteByDur(beginOffset, curOffset - beginOffset, key, vel, dur + (isNoteSlurred() ? 1 : 0));
         addTime(len);
         lastKey = key;
         didRest = false;
@@ -534,6 +534,7 @@ bool CapcomSnesTrack::readEvent() {
 
       case EVENT_TOGGLE_SLUR:
         setNoteSlurred(!isNoteSlurred());
+        addLegatoPedalNoItem(isNoteSlurred());
         addGenericEvent(beginOffset, curOffset - beginOffset, "Toggle Slur/Tie", "", Type::Portamento);
         break;
 
