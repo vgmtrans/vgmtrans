@@ -415,8 +415,8 @@ public:
 class LegatoPedalEvent
     : public ControllerEvent {
 public:
-  LegatoPedalEvent(MidiTrack *prntTrk, uint8_t channel, uint32_t absoluteTime, uint8_t bOn)
-      : ControllerEvent(prntTrk, channel, absoluteTime, 68, (bOn) ? 0x7F : 0, PRIORITY_MIDDLE) { }
+  LegatoPedalEvent(MidiTrack *prntTrk, uint8_t channel, uint32_t absoluteTime, bool bOn)
+      : ControllerEvent(prntTrk, channel, absoluteTime, 68, (bOn) ? 0x7F : 0, PRIORITY_HIGH) { }
   MidiEventType eventType() override { return MIDIEVENT_LEGATOPEDAL; }
 };
 
