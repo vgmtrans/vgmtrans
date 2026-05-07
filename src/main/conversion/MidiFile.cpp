@@ -383,6 +383,14 @@ void MidiTrack::insertMono(uint8_t channel, uint32_t absTime) {
   aEvents.push_back(new MonoEvent(this, channel, absTime));
 }
 
+void MidiTrack::addLegatoPedal(uint8_t channel, bool bOn) {
+  aEvents.push_back(new LegatoPedalEvent(this, channel, getDelta(), bOn));
+}
+
+void MidiTrack::insertLegatoPedal(uint8_t channel, bool bOn, uint32_t absTime) {
+  aEvents.push_back(new LegatoPedalEvent(this, channel, absTime, bOn));
+}
+
 void MidiTrack::addPan(uint8_t channel, uint8_t pan) {
   aEvents.push_back(new PanEvent(this, channel, getDelta(), pan));
 }

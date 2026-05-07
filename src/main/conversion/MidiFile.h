@@ -56,6 +56,7 @@ typedef enum {
   MIDIEVENT_PORTAMENTOTIME,
   MIDIEVENT_PORTAMENTOTIMEFINE,
   MIDIEVENT_PORTAMENTOCONTROL,
+  MIDIEVENT_LEGATOPEDAL,
   MIDIEVENT_MONO,
   MIDIEVENT_LFO,
   MIDIEVENT_VIBRATO,
@@ -129,6 +130,8 @@ class MidiTrack {
   void insertPortamentoControl(uint8_t channel, uint8_t key, uint32_t absTime);
   void addMono(uint8_t channel);
   void insertMono(uint8_t channel, uint32_t absTime);
+  void addLegatoPedal(uint8_t channel, bool bOn);
+  void insertLegatoPedal(uint8_t channel, bool bOn, uint32_t absTime);
 
   void addPitchBend(uint8_t channel, int16_t bend);
   void insertPitchBend(uint8_t channel, short bend, uint32_t absTime);
@@ -407,6 +410,14 @@ public:
       : ControllerEvent(prntTrk, channel, absoluteTime, 84, key, PRIORITY_MIDDLE) { }
   MidiEventType eventType() override { return MIDIEVENT_PORTAMENTOCONTROL; }
   uint32_t writeEvent(std::vector<uint8_t> &buf, uint32_t time) override;
+};
+
+class LegatoPedalEvent
+    : public ControllerEvent {
+public:
+  LegatoPedalEvent(MidiTrack *prntTrk, uint8_t channel, uint32_t absoluteTime, bool bOn)
+      : ControllerEvent(prntTrk, channel, absoluteTime, 68, (bOn) ? 0x7F : 0, PRIORITY_HIGH) { }
+  MidiEventType eventType() override { return MIDIEVENT_LEGATOPEDAL; }
 };
 
 class PanEvent
