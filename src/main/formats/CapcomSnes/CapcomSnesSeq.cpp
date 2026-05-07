@@ -789,7 +789,7 @@ bool CapcomSnesTrack::readEvent() {
         else {
           // Master volume follows the same loudness curve as per-track volume.
           double percentAmp = calculateVolumeV2(newVolume);
-          addMasterVol(beginOffset, curOffset - beginOffset, percentAmp);
+          addMasterVol(beginOffset, curOffset - beginOffset, percentAmp, Resolution::FourteenBit);
         }
         break;
       }
