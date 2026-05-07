@@ -198,6 +198,7 @@ private:
   void insertExpression(uint32_t offset, uint32_t length, uint8_t level, uint32_t absTime, const std::string &sEventName = "Expression");
   void insertExpressionNoItem(uint8_t level, uint32_t absTime);
   void addMasterVol(uint32_t offset, uint32_t length, uint8_t vol, const std::string &sEventName = "Master Volume");
+  void addMasterVol(uint32_t offset, uint32_t length, double volPercent, Resolution res, const std::string &sEventName = "Master Volume");
   void addMasterVolNoItem(uint8_t newVol);
   void addMastVolSlide(uint32_t offset, uint32_t length, uint32_t dur, uint8_t targVol, const std::string &sEventName = "Master Volume Slide");
 
