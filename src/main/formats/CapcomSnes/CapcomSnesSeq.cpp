@@ -402,6 +402,15 @@ bool CapcomSnesTrack::readEvent() {
   bool bContinue = true;
 
   std::string desc;
+  auto applyNoteAttributes = [this](uint8_t attributes) {
+    const bool wasSlurred = isNoteSlurred();
+    noteAttributes &= ~(CAPCOM_SNES_MASK_NOTE_OCTAVE_UP | CAPCOM_SNES_MASK_NOTE_TRIPLET | CAPCOM_SNES_MASK_NOTE_SLURRED);
+    noteAttributes |= attributes;
+
+    if (isNoteSlurred() != wasSlurred) {
+      addLegatoPedalNoItem(isNoteSlurred());
+    }
+  };
 
   if (statusByte >= 0x20) {
     uint8_t keyIndex = statusByte & 0x1f;
@@ -471,7 +480,7 @@ bool CapcomSnesTrack::readEvent() {
           }
           addPortamentoControlNoItem(lastKey);
         }
-        addNoteByDur(beginOffset, curOffset - beginOffset, key, vel, dur);
+        addNoteByDur(beginOffset, curOffset - beginOffset, key, vel, dur + (isNoteSlurred() ? 1 : 0));
         addTime(len);
         lastKey = key;
         didRest = false;
@@ -534,6 +543,7 @@ bool CapcomSnesTrack::readEvent() {
 
       case EVENT_TOGGLE_SLUR:
         setNoteSlurred(!isNoteSlurred());
+        addLegatoPedalNoItem(isNoteSlurred());
         addGenericEvent(beginOffset, curOffset - beginOffset, "Toggle Slur/Tie", "", Type::Portamento);
         break;
 
@@ -549,8 +559,7 @@ bool CapcomSnesTrack::readEvent() {
 
       case EVENT_NOTE_ATTRIBUTES: {
         uint8_t attributes = readByte(curOffset++);
-        noteAttributes &= ~(CAPCOM_SNES_MASK_NOTE_OCTAVE_UP | CAPCOM_SNES_MASK_NOTE_TRIPLET | CAPCOM_SNES_MASK_NOTE_SLURRED);
-        noteAttributes |= attributes;
+        applyNoteAttributes(attributes);
         desc = fmt::format("Triplet: {}  Slur: {}  2-Octave Up: {}",
                         isNoteTriplet() ? "On" : "Off",
                         isNoteSlurred() ? "On" : "Off",
@@ -729,8 +738,7 @@ bool CapcomSnesTrack::readEvent() {
 
         if (repeatCount[repeatSlot] == 1) {
           repeatCount[repeatSlot] = 0;
-          noteAttributes &= ~(CAPCOM_SNES_MASK_NOTE_OCTAVE_UP | CAPCOM_SNES_MASK_NOTE_TRIPLET | CAPCOM_SNES_MASK_NOTE_SLURRED);
-          noteAttributes |= attributes;
+          applyNoteAttributes(attributes);
           curOffset = dest;
         }
 
