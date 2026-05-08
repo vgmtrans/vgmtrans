@@ -115,6 +115,7 @@ class KonamiSnesTrack
  public:
   KonamiSnesTrack(KonamiSnesSeq *parentFile, uint32_t offset = 0, uint32_t length = 0);
   void resetVars() override;
+  void addInitialMidiEvents(int trackNum) override;
   bool readEvent() override;
   void onTickBegin() override;
 

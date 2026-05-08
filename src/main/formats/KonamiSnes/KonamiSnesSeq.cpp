@@ -426,6 +426,14 @@ void KonamiSnesTrack::resetVars(void) {
   currentPitchBend = 0;
 }
 
+void KonamiSnesTrack::addInitialMidiEvents(int trackNum) {
+  SeqTrack::addInitialMidiEvents(trackNum);
+  addModulationNoItem(0);
+  addChannelPressureNoItem(0);
+  addControllerEventNoItem(konami_snes::kVibratoTempoController, 0);
+  addControllerEventNoItem(konami_snes::kVibratoDelayController, 0);
+}
+
 KonamiSnesSeq& KonamiSnesTrack::seq() {
   return *static_cast<KonamiSnesSeq*>(parentSeq);
 }
@@ -513,7 +521,6 @@ void KonamiSnesTrack::onTickBegin() {
         addModulationNoItem(midiDepth);
         vibratoFade.midiDepth = midiDepth;
       }
-      printf("currentDepth: %d. targetDepth: %d.  midiDepth: %d\n", vibratoFade.currentDepth, targetDepth, midiDepth);
     }
   }
 
@@ -1280,6 +1287,11 @@ bool KonamiSnesTrack::readEvent() {
         addChannelPressureNoItem(convertVibratoRateToMidi(vibratoRate, parentSeq.maxVibratoRate));
         addControllerEventNoItem(konami_snes::kVibratoDelayController, convertVibratoDelayToMidi(vibratoDelay));
         syncVibratoTempo();
+      }
+      else {
+        addChannelPressureNoItem(0);
+        addControllerEventNoItem(konami_snes::kVibratoDelayController, 0);
+        addControllerEventNoItem(konami_snes::kVibratoTempoController, 0);
       }
       break;
     }
