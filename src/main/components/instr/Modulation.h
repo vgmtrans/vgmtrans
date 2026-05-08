@@ -40,6 +40,8 @@ public:
   // A 7-bit unipolar controller range in Hz, scaled so MIDI value 127 reaches maxHertz.
   static ModAmount fromHertzRange(double minHertz, double maxHertz);
   static ModAmount fromSeconds(double seconds);
+  // A 7-bit unipolar controller range in timecents, scaled so MIDI value 127 reaches maxSeconds.
+  static ModAmount fromSecondsRange(double minSeconds, double maxSeconds);
   static ModAmount fromCentibels(double centibels);
   static ModAmount fromDecibels(double decibels);
 
@@ -56,6 +58,7 @@ private:
 // Convert an absolute frequency into the 7-bit MIDI value that drives a
 // ParamAmount::hertzRange(minHertz, maxHertz) modulator or generator.
 uint8_t midiValueForHertzInRange(double hertz, double minHertz, double maxHertz);
+uint8_t midiValueForSecondsInRange(double seconds, double minSeconds, double maxSeconds);
 
 struct SynthModulator {
   ModSource source;

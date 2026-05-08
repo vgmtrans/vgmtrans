@@ -17,6 +17,16 @@ int32_t hertzToInstrumentCents(double hertz) {
   return static_cast<int32_t>(std::lround(1200.0 * std::log2(hertz / kSf2LfoReferenceHz)));
 }
 
+uint8_t midiValueForAmountInRange(int32_t currentAmount, int32_t minAmount, int32_t maxAmount) {
+  if (minAmount == maxAmount) {
+    return 0;
+  }
+
+  const int midiValue = static_cast<int>(std::round(
+      128.0 * (currentAmount - minAmount) / static_cast<double>(maxAmount - minAmount)));
+  return static_cast<uint8_t>(std::clamp(midiValue, 0, 127));
+}
+
 }  // namespace
 
 ModAmount ModAmount::raw(int32_t amount) {
@@ -56,17 +66,45 @@ uint8_t midiValueForHertzInRange(double hertz, double minHertz, double maxHertz)
   const ModAmount rangeAmount = ModAmount::fromHertzRange(minHertz, maxHertz);
   const ModAmount currentAmount = ModAmount::fromHertz(hertz);
 
-  if (!minAmount.valid() || !rangeAmount.valid() || !currentAmount.valid() || rangeAmount.value() <= 0) {
+  if (!minAmount.valid() || !rangeAmount.valid() || !currentAmount.valid() || rangeAmount.value() == 0) {
     return 0;
   }
 
-  const int midiValue = static_cast<int>(std::round(
-      128.0 * (currentAmount.value() - minAmount.value()) / static_cast<double>(rangeAmount.value())));
-  return static_cast<uint8_t>(std::clamp(midiValue, 0, 127));
+  return midiValueForAmountInRange(currentAmount.value(),
+                                   minAmount.value(),
+                                   minAmount.value() + rangeAmount.value());
 }
 
 ModAmount ModAmount::fromSeconds(double seconds) {
   return ModAmount(secondsToSf2Timecents(seconds), true);
+}
+
+ModAmount ModAmount::fromSecondsRange(double minSeconds, double maxSeconds) {
+  if (!std::isfinite(minSeconds) || !std::isfinite(maxSeconds)) {
+    return ModAmount(0, false);
+  }
+
+  const ModAmount minAmount = fromSeconds(minSeconds);
+  const ModAmount maxAmount = fromSeconds(maxSeconds);
+  if (!minAmount.valid() || !maxAmount.valid()) {
+    return ModAmount(0, false);
+  }
+
+  const double fullScaleRange = (maxAmount.value() - minAmount.value()) * 128.0 / 127.0;
+  return ModAmount(static_cast<int32_t>(std::lround(fullScaleRange)), true);
+}
+
+uint8_t midiValueForSecondsInRange(double seconds, double minSeconds, double maxSeconds) {
+  const ModAmount minAmount = ModAmount::fromSeconds(minSeconds);
+  const ModAmount maxAmount = ModAmount::fromSeconds(maxSeconds);
+  const ModAmount currentAmount = ModAmount::fromSeconds(seconds);
+
+  if (!minAmount.valid() || !maxAmount.valid() || !currentAmount.valid() ||
+      minAmount.value() == maxAmount.value()) {
+    return 0;
+  }
+
+  return midiValueForAmountInRange(currentAmount.value(), minAmount.value(), maxAmount.value());
 }
 
 ModAmount ModAmount::fromCentibels(double centibels) {
