@@ -84,11 +84,11 @@ uint8_t convertVibratoDepthToMidi(uint8_t targetDepth, uint16_t currentDepth, ui
     return 0;
   }
 
+  const uint8_t clampedMaxDepth = std::max(maxDepth, konami_snes::kMinVibratoMaxDepth);
   const double depthCents = (targetDepth < 0x80)
       ? (currentDepth * (100.0 / (32.0 * 256.0)))
       : (currentDepth * (100.0 / (8.0 * 256.0)));
-  const double maxDepthCents = konami_snes::vibratoDepthCents(
-      maxDepth != 0 ? maxDepth : konami_snes::kDefaultVibratoMaxDepth);
+  const double maxDepthCents = konami_snes::vibratoDepthCents(clampedMaxDepth);
   const int midiValue = static_cast<int>(std::lround(128.0 * depthCents / maxDepthCents));
   return static_cast<uint8_t>(std::clamp(midiValue, 0, 127));
 }
@@ -99,10 +99,10 @@ uint8_t convertVibratoRateToMidi(uint8_t rate, uint8_t maxRate) {
     return 0;
   }
 
+  const uint8_t clampedMaxRate = std::max(maxRate, konami_snes::kMinVibratoMaxRateStep);
   return midiValueForHertzInRange(konami_snes::kVibratoBaseHz * effectiveRate,
                                   konami_snes::kVibratoBaseHz,
-                                  konami_snes::kVibratoBaseHz *
-                                      (maxRate != 0 ? maxRate : konami_snes::kDefaultVibratoMaxRateStep));
+                                  konami_snes::kVibratoBaseHz * clampedMaxRate);
 }
 
 uint8_t convertTempoFactorToMidi(uint8_t tempo) {
@@ -179,8 +179,8 @@ const uint8_t KonamiSnesSeq::VOL_TABLE[] = {
 
 KonamiSnesSeq::KonamiSnesSeq(RawFile *file, KonamiSnesVersion ver, uint32_t seqdataOffset, std::string newName)
     : VGMSeq(KonamiSnesFormat::name, file, seqdataOffset, 0, newName),
-      maxVibratoDepth(0),
-      maxVibratoRate(0),
+      maxVibratoDepth(konami_snes::kMinVibratoMaxDepth),
+      maxVibratoRate(konami_snes::kMinVibratoMaxRateStep),
       version(ver) {
   setAllowDiscontinuousTrackData(true);
   bLoadTickByTick = true;
@@ -200,8 +200,8 @@ void KonamiSnesSeq::resetVars(void) {
   VGMSeq::resetVars();
 
   if (readMode != READMODE_CONVERT_TO_MIDI) {
-    maxVibratoDepth = 0;
-    maxVibratoRate = 0;
+    maxVibratoDepth = konami_snes::kMinVibratoMaxDepth;
+    maxVibratoRate = konami_snes::kMinVibratoMaxRateStep;
   }
 
   // The driver starts from tempo/speed FF unless the sequence overrides it.
@@ -424,14 +424,6 @@ void KonamiSnesTrack::resetVars(void) {
   vibratoFade = {};
   pitchBendRangeCents = KONAMI_SNES_STD_PITCH_BEND_RANGE_CENTS;
   currentPitchBend = 0;
-}
-
-void KonamiSnesTrack::addInitialMidiEvents(int trackNum) {
-  SeqTrack::addInitialMidiEvents(trackNum);
-  addModulationNoItem(0);
-  addChannelPressureNoItem(0);
-  addControllerEventNoItem(konami_snes::kVibratoTempoController, 0);
-  addControllerEventNoItem(konami_snes::kVibratoDelayController, 0);
 }
 
 KonamiSnesSeq& KonamiSnesTrack::seq() {

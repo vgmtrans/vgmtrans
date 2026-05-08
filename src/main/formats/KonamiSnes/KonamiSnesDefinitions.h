@@ -12,6 +12,10 @@ namespace konami_snes {
 inline constexpr double kTimerHz = 250.0;
 inline constexpr uint8_t kDefaultVibratoMaxDepth = 0xff;
 inline constexpr uint8_t kDefaultVibratoMaxRateStep = 0x7f;
+// We define minimum ranges for vibrato depth and rate, in case the sequence uses a very small range
+inline constexpr uint8_t kMinVibratoMaxDepth = 0x10;
+// At the default tempo FF, effective step 09 is the first Konami rate that reaches about 8.176 Hz.
+inline constexpr uint8_t kMinVibratoMaxRateStep = 0x09;
 
 inline constexpr uint8_t effectiveVibratoRateStep(uint8_t rate) {
   return (rate == 0 || rate == 0x80)
