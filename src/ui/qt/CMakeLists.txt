@@ -147,6 +147,7 @@ target_sources(vgmtrans
       workarea/hexview/HexViewRhiRenderer.h
       workarea/hexview/HexViewRhiWidget.h
       workarea/hexview/HexViewRhiWindow.h
+      workarea/rhi/RhiApiSelector.h
 )
 
 if(APPLE)

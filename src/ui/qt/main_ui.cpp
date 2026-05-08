@@ -8,13 +8,13 @@
 #include <QFile>
 #include <QFileOpenEvent>
 #include <QFontDatabase>
-#if defined(Q_OS_LINUX) && QT_CONFIG(vulkan)
-#include <QRhiWidget>
-#endif
 #include <QTimer>
 #include <filesystem>
 #include "MainWindow.h"
 #include "QtVGMRoot.h"
+#if defined(Q_OS_LINUX)
+#include "workarea/rhi/RhiApiSelector.h"
+#endif
 #include "widgets/Windows11ProxyStyle.h"
 
 class VGMTransApplication final : public QApplication {
@@ -67,19 +67,25 @@ int main(int argc, char *argv[]) {
 
   MainWindow window;
 
-#if defined(Q_OS_LINUX) && QT_CONFIG(vulkan)
+#if defined(Q_OS_LINUX)
+  QRhiWidget* rhiPrimer = nullptr;
+  const QRhiWidget::Api rhiApi = QtUi::preferredRhiWidgetApi();
+  if (rhiApi != QRhiWidget::Api::Null) {
   // Prime QRhiWidget once at startup to avoid first-use window re-creation. Not necessary for other platforms
   // where we use a QWindow instead of QRhiWidget.
-  auto* rhiPrimer = new QRhiWidget(nullptr);
-  rhiPrimer->setApi(QRhiWidget::Api::Vulkan);
-  rhiPrimer->setParent(&window);
-  rhiPrimer->hide();
+    rhiPrimer = new QRhiWidget(nullptr);
+    rhiPrimer->setApi(rhiApi);
+    rhiPrimer->setParent(&window);
+    rhiPrimer->hide();
+  }
 #endif
 
   window.show();
 
-#if defined(Q_OS_LINUX) && QT_CONFIG(vulkan)
-  QTimer::singleShot(0, rhiPrimer, &QObject::deleteLater);
+#if defined(Q_OS_LINUX)
+  if (rhiPrimer) {
+    QTimer::singleShot(0, rhiPrimer, &QObject::deleteLater);
+  }
 #endif
 
   const QStringList args = app.arguments();

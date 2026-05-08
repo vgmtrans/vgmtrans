@@ -7,6 +7,7 @@
 #include "HexViewRhiWidget.h"
 
 #include "HexViewRhiRenderer.h"
+#include "workarea/rhi/RhiApiSelector.h"
 
 #include <rhi/qrhi.h>
 
@@ -19,17 +20,7 @@ HexViewRhiWidget::HexViewRhiWidget(HexView* view, HexViewRhiRenderer* renderer,
       m_view(view),
       m_renderer(renderer),
       m_eventForwarder(view, [this]() { update(); }) {
-#if defined(Q_OS_LINUX)
-  setApi(QRhiWidget::Api::Vulkan);
-#elif defined(Q_OS_WIN)
-  setApi(QRhiWidget::Api::Direct3D11);
-#elif defined(Q_OS_MACOS) || defined(Q_OS_IOS)
-  setApi(QRhiWidget::Api::Metal);
-#elif QT_CONFIG(opengl)
-  setApi(QRhiWidget::Api::OpenGL);
-#else
-  setApi(QRhiWidget::Api::Null);
-#endif
+  setApi(QtUi::preferredRhiWidgetApi());
 
   if (parent) {
     setParent(parent);
