@@ -200,6 +200,16 @@ class KonamiSnesTrack
     bool useLength = false;
   };
 
+  struct ActiveVibrato {
+    uint8_t delay = 0;
+    uint8_t rate = 0;
+    uint8_t depth = 0;
+    uint8_t midiDepth = 0;
+    uint8_t midiRate = 0;
+    uint8_t midiTempo = 0;
+    uint8_t midiDelay = 0;
+  };
+
   std::optional<PitchSlide> consumePitchSlide();
   PitchSlide readPitchSlide(KonamiSnesSeqEventType eventType, uint32_t offset);
   void addPitchSlideEvent(const PitchSlide& slide);
@@ -227,6 +237,17 @@ class KonamiSnesTrack
   void beginTempoFade(const TempoFade& fade);
   void clearActiveTempoFade();
   void applyCurrentTempo();
+  void beginVibrato(uint8_t delay, uint8_t rate, uint8_t depth);
+  void applyCurrentVibrato();
+  void refreshAllTrackVibrato();
+  [[nodiscard]] uint8_t currentTempoByte() const;
+  [[nodiscard]] bool hasActiveVibrato() const;
+  static uint8_t effectiveVibratoRateStep(uint8_t rate);
+  static double vibratoDepthCents(uint8_t depth);
+  static uint8_t convertVibratoDepthToMidi(uint8_t depth);
+  static uint8_t convertVibratoRateToMidi(uint8_t rate);
+  static uint8_t convertTempoFactorToMidi(uint8_t tempo);
+  static uint8_t convertVibratoDelayToMidi(uint8_t delay);
   void setPitchBendRange(uint16_t cents);
   void setPitchBend(int16_t bend);
   void applyCurrentPitchBend();
@@ -243,6 +264,7 @@ class KonamiSnesTrack
   ActivePanFade panFade;
   ActiveVolumeSlide volumeFade;
   ActivePitchSlide pitchSlide;
+  ActiveVibrato vibrato;
   uint16_t pitchBendRangeCents;
   int16_t currentPitchBend;
 };

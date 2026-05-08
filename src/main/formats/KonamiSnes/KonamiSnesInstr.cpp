@@ -5,6 +5,7 @@
  */
 
 #include "KonamiSnesInstr.h"
+#include "KonamiSnesDefinitions.h"
 #include "SNESDSP.h"
 #include <algorithm>
 #include <spdlog/fmt/fmt.h>
@@ -216,6 +217,37 @@ KonamiSnesInstr::~KonamiSnesInstr() {
 }
 
 bool KonamiSnesInstr::loadInstr() {
+  // Konami vibrato is driven per track from E4 and is relative to the current tempo, so we split
+  // the SoundFont frequency and delay modulators across separate controller factors:
+  //   CC1  -> depth
+  //   ch. pressure -> rate step
+  //   CC91 -> tempo factor (raises vibrato frequency and shortens delay)
+  //   CC93 -> delay count
+  addModulator(ModSource::ModWheel,
+               ModDest::VibLfoToPitch,
+               ModAmount::fromCents(konami_snes::kVibratoMaxDepthCents));
+  addModulator(ModSource::ChannelPressure, ModDest::VibLfoToPitch, ModAmount::fromCents(0));
+  addGenerator(ModDest::VibLfoFreq, ModAmount::fromHertz(konami_snes::kVibratoBaseHz));
+  addModulator(ModSource::ChannelPressure,
+               ModDest::VibLfoFreq,
+               ModAmount::fromHertzRange(konami_snes::kVibratoBaseHz,
+                                         konami_snes::kVibratoBaseHz * konami_snes::kVibratoMaxRateFactor));
+  addModulator(ModSource::ReverbSend,
+               ModDest::VibLfoFreq,
+               ModAmount::fromHertzRange(konami_snes::kVibratoBaseHz,
+                                         konami_snes::kVibratoBaseHz * konami_snes::kVibratoMaxTempoFactor));
+  addGenerator(ModDest::VibLfoDelay, ModAmount::fromSeconds(konami_snes::kVibratoDelayBaseSeconds));
+  addModulator(ModSource::ChorusSend,
+               ModDest::VibLfoDelay,
+               ModAmount::fromSecondsRange(
+                   konami_snes::kVibratoDelayBaseSeconds,
+                   konami_snes::kVibratoDelayBaseSeconds * konami_snes::kVibratoMaxDelayCountFactor));
+  addModulator(ModSource::ReverbSend,
+               ModDest::VibLfoDelay,
+               ModAmount::fromSecondsRange(
+                   konami_snes::kVibratoDelayBaseSeconds,
+                   konami_snes::kVibratoDelayBaseSeconds / konami_snes::kVibratoMaxTempoFactor));
+
   if (percussion) {
     const auto percussionHeaders = collectPercussionHeaders(rawFile(), version, offset(), spcDirAddr);
     for (const auto &header : percussionHeaders) {
