@@ -93,8 +93,7 @@ uint8_t convertVibratoDepthToMidi(uint8_t depth) {
   }
 
   const double depthCents = (depth < 0x80) ? (depth * (100.0 / 32.0)) : (depth * (100.0 / 8.0));
-  const int midiValue = static_cast<int>(std::lround(
-      128.0 * depthCents / konami_snes::kVibratoMaxDepthCents));
+  const int midiValue = static_cast<int>(std::lround(128.0 * depthCents / konami_snes::kVibratoMaxDepthCents));
   return static_cast<uint8_t>(std::clamp(midiValue, 0, 127));
 }
 
@@ -417,6 +416,7 @@ void KonamiSnesTrack::resetVars(void) {
   vibratoDelay = 0;
   vibratoRate = 0;
   vibratoDepth = 0;
+  vibratoFade = {};
   pitchBendRangeCents = KONAMI_SNES_STD_PITCH_BEND_RANGE_CENTS;
   currentPitchBend = 0;
 }
@@ -487,6 +487,28 @@ void KonamiSnesTrack::onTickBegin() {
       clearActiveVolumeFade();
     }
     applyCurrentVolume();
+  }
+
+  if (vibratoFade.ticksRemaining != 0) {
+    if (vibratoFade.delayRemaining != 0) {
+      vibratoFade.delayRemaining -= 1;
+    }
+    else {
+      const uint16_t targetDepth = static_cast<uint16_t>(vibratoDepth) << 8;
+      vibratoFade.ticksRemaining -= 1;
+      if (vibratoFade.ticksRemaining == 0) {
+        vibratoFade.currentDepth = targetDepth;
+      }
+      else {
+        vibratoFade.currentDepth = std::min<uint16_t>(targetDepth, vibratoFade.currentDepth + vibratoFade.step);
+      }
+
+      const uint8_t midiDepth = convertVibratoDepthToMidi(static_cast<uint8_t>(vibratoFade.currentDepth >> 8));
+      if (midiDepth != vibratoFade.midiDepth) {
+        addModulationNoItem(midiDepth);
+        vibratoFade.midiDepth = midiDepth;
+      }
+    }
   }
 
   if (pitchSlide.length == 0 || !pitchSlide.baseValid) {
@@ -1043,8 +1065,19 @@ bool KonamiSnesTrack::readEvent() {
       const uint32_t noteLengthBytes = curOffset - beginOffset;
       resetPitchForNote(key);
       const auto slide = consumePitchSlide();
+      const bool isTiedNote = prevNoteSlurred && key == prevNoteKey;
 
-      if (prevNoteSlurred && key == prevNoteKey) {
+      if (!isTiedNote && vibratoFade.length != 0 && hasActiveVibrato(vibratoRate, vibratoDepth)) {
+        vibratoFade.delayRemaining = vibratoDelay;
+        vibratoFade.ticksRemaining = vibratoFade.length;
+        vibratoFade.currentDepth = 0;
+        if (vibratoFade.midiDepth != 0) {
+          addModulationNoItem(0);
+          vibratoFade.midiDepth = 0;
+        }
+      }
+
+      if (isTiedNote) {
         // TODO: Note volume can be changed during a tied note
         // See the end of Konami Logo sequence for example
         makePrevDurNoteEnd(getTime() + dur);
@@ -1210,11 +1243,22 @@ bool KonamiSnesTrack::readEvent() {
       desc = fmt::format("Delay: {:d}  Rate: {:d}  Depth: {:d}",
                          newVibratoDelay, newVibratoRate, newVibratoDepth);
       addGenericEvent(beginOffset, curOffset - beginOffset, "Vibrato", desc, Type::Vibrato);
+
+      uint8_t immediateFadeLength = 0;
+      if (readByte(curOffset) == 0xf9) {
+        immediateFadeLength = readByte(curOffset + 1);
+      }
+
       vibratoDelay = newVibratoDelay;
       vibratoRate = newVibratoRate;
       vibratoDepth = newVibratoDepth;
+      vibratoFade = {};
       const bool active = hasActiveVibrato(vibratoRate, vibratoDepth);
-      addModulationNoItem(active ? convertVibratoDepthToMidi(vibratoDepth) : 0);
+      const bool deferDepthForFade = active && immediateFadeLength != 0;
+      const uint8_t midiDepth = deferDepthForFade ? 0 : (active ? convertVibratoDepthToMidi(vibratoDepth) : 0);
+      addModulationNoItem(midiDepth);
+      vibratoFade.currentDepth = static_cast<uint16_t>(deferDepthForFade ? 0 : vibratoDepth) << 8;
+      vibratoFade.midiDepth = midiDepth;
       if (active) {
         addChannelPressureNoItem(convertVibratoRateToMidi(vibratoRate));
         addControllerEventNoItem(konami_snes::kVibratoDelayController, convertVibratoDelayToMidi(vibratoDelay));
@@ -1499,6 +1543,14 @@ bool KonamiSnesTrack::readEvent() {
       desc = fmt::format("Fade Length: {:d}", fadeSpeed);
       addGenericEvent(beginOffset, curOffset - beginOffset, "Vibrato Fade", desc,
                       Type::Vibrato);
+      if (fadeSpeed == 0) {
+        vibratoFade.length = 0;
+        vibratoFade.step = 0;
+      }
+      else {
+        vibratoFade.length = fadeSpeed;
+        vibratoFade.step = static_cast<uint16_t>((static_cast<uint16_t>(vibratoDepth) << 8) / fadeSpeed);
+      }
       break;
     }
 

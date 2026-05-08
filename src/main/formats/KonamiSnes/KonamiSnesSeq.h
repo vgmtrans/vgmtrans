@@ -200,6 +200,15 @@ class KonamiSnesTrack
     bool useLength = false;
   };
 
+  struct ActiveVibratoFade {
+    uint8_t length = 0;
+    uint16_t step = 0;
+    uint8_t delayRemaining = 0;
+    uint8_t ticksRemaining = 0;
+    uint16_t currentDepth = 0;
+    uint8_t midiDepth = 0;
+  };
+
   std::optional<PitchSlide> consumePitchSlide();
   PitchSlide readPitchSlide(KonamiSnesSeqEventType eventType, uint32_t offset);
   void addPitchSlideEvent(const PitchSlide& slide);
@@ -247,6 +256,7 @@ class KonamiSnesTrack
   uint8_t vibratoDelay;
   uint8_t vibratoRate;
   uint8_t vibratoDepth;
+  ActiveVibratoFade vibratoFade;
   uint16_t pitchBendRangeCents;
   int16_t currentPitchBend;
 };
