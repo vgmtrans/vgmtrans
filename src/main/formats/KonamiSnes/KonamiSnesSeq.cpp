@@ -87,12 +87,14 @@ bool hasActiveVibrato(uint8_t rate, uint8_t depth) {
   return depth != 0 && effectiveVibratoRateStep(rate) != 0;
 }
 
-uint8_t convertVibratoDepthToMidi(uint8_t depth) {
-  if (depth == 0) {
+uint8_t convertVibratoDepthToMidi(uint8_t targetDepth, uint16_t currentDepth) {
+  if (targetDepth == 0 || currentDepth == 0) {
     return 0;
   }
 
-  const double depthCents = (depth < 0x80) ? (depth * (100.0 / 32.0)) : (depth * (100.0 / 8.0));
+  const double depthCents = (targetDepth < 0x80)
+      ? (currentDepth * (100.0 / (32.0 * 256.0)))
+      : (currentDepth * (100.0 / (8.0 * 256.0)));
   const int midiValue = static_cast<int>(std::lround(128.0 * depthCents / konami_snes::kVibratoMaxDepthCents));
   return static_cast<uint8_t>(std::clamp(midiValue, 0, 127));
 }
@@ -503,11 +505,12 @@ void KonamiSnesTrack::onTickBegin() {
         vibratoFade.currentDepth = std::min<uint16_t>(targetDepth, vibratoFade.currentDepth + vibratoFade.step);
       }
 
-      const uint8_t midiDepth = convertVibratoDepthToMidi(static_cast<uint8_t>(vibratoFade.currentDepth >> 8));
+      const uint8_t midiDepth = convertVibratoDepthToMidi(vibratoDepth, vibratoFade.currentDepth);
       if (midiDepth != vibratoFade.midiDepth) {
         addModulationNoItem(midiDepth);
         vibratoFade.midiDepth = midiDepth;
       }
+      printf("currentDepth: %d. targetDepth: %d.  midiDepth: %d\n", vibratoFade.currentDepth, targetDepth, midiDepth);
     }
   }
 
@@ -1255,7 +1258,7 @@ bool KonamiSnesTrack::readEvent() {
       vibratoFade = {};
       const bool active = hasActiveVibrato(vibratoRate, vibratoDepth);
       const bool deferDepthForFade = active && immediateFadeLength != 0;
-      const uint8_t midiDepth = deferDepthForFade ? 0 : (active ? convertVibratoDepthToMidi(vibratoDepth) : 0);
+      const uint8_t midiDepth = deferDepthForFade ? 0 : (active ? convertVibratoDepthToMidi(vibratoDepth, static_cast<uint16_t>(vibratoDepth) << 8) : 0);
       addModulationNoItem(midiDepth);
       vibratoFade.currentDepth = static_cast<uint16_t>(deferDepthForFade ? 0 : vibratoDepth) << 8;
       vibratoFade.midiDepth = midiDepth;
