@@ -15,6 +15,20 @@
 #include <string>
 #include <vector>
 #include <filesystem>
+#include <iostream>
+#include <functional>
+
+#ifdef _WIN32
+#include <io.h>
+#define dup _dup
+#define dup2 _dup2
+#define close _close
+#define fileno _fileno
+#define popen _popen
+#define pclose _pclose
+#else
+#include <unistd.h>
+#endif
 
 #include <fmt/base.h>
 #include <fmt/format.h>
@@ -105,6 +119,132 @@ bool helpRequested(int argc, char* argv[]) {
     }
   }
   return false;
+}
+
+std::string captureStdout(const std::function<void()>& fn) {
+  std::cout.flush();
+  std::fflush(stdout);
+
+  FILE* tmp = std::tmpfile();
+  if (!tmp) {
+    fn();
+    return {};
+  }
+
+  int stdoutFd = fileno(stdout);
+  int savedStdout = dup(stdoutFd);
+
+  if (savedStdout == -1) {
+    std::fclose(tmp);
+    fn();
+    return {};
+  }
+
+  int tmpFd = fileno(tmp);
+
+  auto restore = [&]() {
+    std::cout.flush();
+    std::fflush(stdout);
+    dup2(savedStdout, stdoutFd);
+    close(savedStdout);
+  };
+
+  if (dup2(tmpFd, stdoutFd) == -1) {
+    close(savedStdout);
+    std::fclose(tmp);
+    fn();
+    return {};
+  }
+
+  try {
+    fn();
+    restore();
+  } catch (...) {
+    restore();
+    std::fclose(tmp);
+    throw;
+  }
+
+  std::string output;
+  std::fseek(tmp, 0, SEEK_SET);
+
+  char buffer[8192];
+  while (size_t n = std::fread(buffer, 1, sizeof(buffer), tmp)) {
+    output.append(buffer, n);
+  }
+
+  std::fclose(tmp);
+  return output;
+}
+
+bool executableExists(const std::string& cmd) {
+#ifdef _WIN32
+  // On Windows, try to execute in a hidden way
+  std::string checkCmd = cmd + " >nul 2>&1 || (exit /b 1)";
+  return std::system(checkCmd.c_str()) == 0;
+#else
+  // On Unix, use 'command -v' to check if executable exists
+  std::string checkCmd = "command -v " + cmd + " >/dev/null 2>&1";
+  return std::system(checkCmd.c_str()) == 0;
+#endif
+}
+
+std::string defaultPager() {
+#ifdef _WIN32
+  return "more";
+#else
+  if (executableExists("less")) {
+    return "less -R";
+  }
+  if (executableExists("more")) {
+    return "more";
+  }
+  return {};
+#endif
+}
+
+std::string selectPager() {
+  if (const char* pager = std::getenv("PAGER")) {
+    if (*pager != '\0') {
+      return pager;
+    }
+  }
+
+  return defaultPager();
+}
+
+void pageLargeOutput(const std::string& output) {
+  size_t lineCount = 0;
+  for (char c : output) {
+    if (c == '\n') lineCount++;
+  }
+
+  const size_t OUTPUT_SIZE_THRESHOLD = 3000;  // characters
+  const size_t OUTPUT_LINE_THRESHOLD = 40;    // lines
+
+  if (output.size() > OUTPUT_SIZE_THRESHOLD || lineCount > OUTPUT_LINE_THRESHOLD) {
+    std::string pager = selectPager();
+
+    if (pager.empty()) {
+      fmt::print("{}", output);
+      return;
+    }
+
+    FILE* pipe = popen(pager.c_str(), "w");
+    if (!pipe) {
+      fmt::print("{}", output);
+      return;
+    }
+
+    fwrite(output.c_str(), 1, output.size(), pipe);
+
+    int status = pclose(pipe);
+    if (status != 0) {
+      fmt::print("{}", output);
+    }
+  } else {
+    fmt::print("{}", output);
+  }
 }
 
 void printHelp() {
@@ -208,15 +348,22 @@ int main(int argc, char* argv[]) {
 
     auto it = commandRegistry.find(cmdName);
     if (it != commandRegistry.end()) {
-      // Commands with verbs use dispatchVerb, control commands have direct handlers
-      if (!it->second.verbs.empty()) {
-        dispatchVerb(cmdName, args);
-      } else if (cmdName == "help") {
-        cmd_help(args);
-      } else if (cmdName == "exit" || cmdName == "quit") {
+      if (cmdName == "exit" || cmdName == "quit") {
         break;
-      } else if (cmdName == "load") {
-        cmd_load(args);
+      }
+
+      std::string output = captureStdout([&]() {
+        if (!it->second.verbs.empty()) {
+          dispatchVerb(cmdName, args);
+        } else if (cmdName == "help") {
+          cmd_help(args);
+        } else if (cmdName == "load") {
+          cmd_load(args);
+        }
+      });
+
+      if (!output.empty()) {
+        pageLargeOutput(output);
       }
     } else {
       fmt::println("Unknown command. Type 'help'.");
