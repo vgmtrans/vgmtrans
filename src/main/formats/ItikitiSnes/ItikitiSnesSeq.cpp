@@ -20,6 +20,7 @@ ItikitiSnesSeq::ItikitiSnesSeq(RawFile *file, uint32_t offset, std::string new_n
   bLoadTickByTick = true;
   setAllowDiscontinuousTrackData(true);
   setUseLinearAmplitudeScale(true);
+  setUseLinearPanAmplitudeScale(PanVolumeCorrectionMode::kNoVolumeAdjust);
 
   useReverb();
   setAlwaysWriteInitialReverb(0);

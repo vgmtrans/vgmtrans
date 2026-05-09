@@ -17,6 +17,7 @@ NamcoSnesSeq::NamcoSnesSeq(RawFile *file, NamcoSnesVersion ver, uint32_t seqdata
       version(ver) {
   setAllowDiscontinuousTrackData(true);
   VGMSeq::setUseLinearAmplitudeScale(true);
+  VGMSeq::setUseLinearPanAmplitudeScale(PanVolumeCorrectionMode::kNoVolumeAdjust);
 
   setAlwaysWriteInitialTempo(60000000.0 / (SEQ_PPQN * (125 * 0x86)));
 

@@ -802,8 +802,9 @@ double SeqTrack::applyPanVolumeCorrection(double level, LevelController controll
     PanVolumeCorrectionMode relevantCorrectionMode = controller == LevelController::Volume ?
       PanVolumeCorrectionMode::kAdjustVolumeController :
       PanVolumeCorrectionMode::kAdjustExpressionController;
-    if (parentSeq->panVolumeCorrectionMode == relevantCorrectionMode)
-      level *= panVolumeCorrectionRate;
+    if (parentSeq->panVolumeCorrectionMode == relevantCorrectionMode) {
+      level *= usesLinearAmplitudeScale() ? panVolumeCorrectionRate : std::sqrt(panVolumeCorrectionRate);
+    }
   }
   return level;
 }
@@ -1078,7 +1079,7 @@ void SeqTrack::addPan(uint32_t offset, uint32_t length, uint8_t pan, const std::
 
 void SeqTrack::addPanNoItem(uint8_t pan) {
   if (readMode == READMODE_CONVERT_TO_MIDI) {
-    const uint8_t midiPan = usesLinearAmplitudeScale()
+    const uint8_t midiPan = usesLinearPanAmplitudeScale()
       ? convert7bitLinearPercentPanValToStdMidiVal(pan, &panVolumeCorrectionRate)
       : pan;
     pMidiTrack->addPan(channel, midiPan);
@@ -1123,7 +1124,7 @@ void SeqTrack::insertPan(uint32_t offset,
   recordSeqEvent<PanSeqEvent>(isNewOffset, absTime, pan, offset, length, sEventName);
 
   if (readMode == READMODE_CONVERT_TO_MIDI) {
-    const uint8_t midiPan = usesLinearAmplitudeScale()
+    const uint8_t midiPan = usesLinearPanAmplitudeScale()
       ? convert7bitLinearPercentPanValToStdMidiVal(pan, &panVolumeCorrectionRate)
       : pan;
     pMidiTrack->insertPan(channel, midiPan, absTime);

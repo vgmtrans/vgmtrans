@@ -32,6 +32,7 @@ AsciiShuichiSnesSeq::AsciiShuichiSnesSeq(RawFile *file, uint32_t seqHeaderOffset
   bLoadTickByTick = true;
   setAllowDiscontinuousTrackData(true);
   setUseLinearAmplitudeScale(true);
+  setUseLinearPanAmplitudeScale(PanVolumeCorrectionMode::kNoVolumeAdjust);
 
   useReverb();
   setAlwaysWriteInitialReverb(0);

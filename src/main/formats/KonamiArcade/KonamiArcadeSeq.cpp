@@ -22,6 +22,7 @@ KonamiArcadeSeq::KonamiArcadeSeq(
       fmtVer(fmtVer), m_memOffset(ramOffset), m_drums(drums), m_nmiRate(nmiRate) {
   bLoadTickByTick = true;
   setUseLinearAmplitudeScale(true);
+  setUseLinearPanAmplitudeScale(PanVolumeCorrectionMode::kNoVolumeAdjust);
   setAllowDiscontinuousTrackData(true);
   setAlwaysWriteInitialVol(127);
   setAlwaysWriteInitialExpression(127);

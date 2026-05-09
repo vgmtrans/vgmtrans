@@ -181,6 +181,7 @@ KonamiTMNT2Track::KonamiTMNT2Track(
       m_isFmTrack(isFmTrack) {
   synthType = isFmTrack ? SynthType::YM2151 : SynthType::SoundFont;
   setUseLinearAmplitudeScale(!isFmTrack);
+  setUseLinearPanAmplitudeScale(!isFmTrack);
 }
 
 void KonamiTMNT2Track::resetVars() {
