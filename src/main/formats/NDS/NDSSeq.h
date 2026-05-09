@@ -55,10 +55,10 @@ class NDSTrack
   void onNoteStart(uint32_t noteStartTick, uint8_t noteKey);
   static ModTarget toModTarget(uint8_t value);
   static std::string to_string(ModTarget target);
-  void applySweepPitchForNote(uint32_t startTick, uint32_t duration);
-  void emitPitchModRangeAt(uint32_t tick);
-  void emitPitchVibratoParamsAt(uint32_t tick);
-  uint32_t modDelayToMidiTicks(uint16_t delay, uint32_t atTick) const;
+  void applySweepPitchForNote(uint32_t startTick, uint32_t duration, uint8_t noteKey);
+  int32_t currentModRawValue() const;
+  int16_t pitchBendWithLfo(int32_t raw) const;
+  void emitPitchLfoBendAt(uint32_t tick, int32_t raw);
 
   uint8_t modDepth;
   uint8_t modSpeed;
@@ -69,20 +69,20 @@ class NDSTrack
   uint32_t modLastRenderTick;
   uint16_t modPhaseCounter;
   uint16_t modDelayCounter;
-  double modPeriodicRemainder;
-  bool modRangeSent;
+  uint32_t modTempoCounter;
 
-  int lastPitchModCc;
-  int lastPitchVibratoRatePressure;
   int lastExprCc;
   int lastPanCc;
+  int lastPanExprCc;
+  int lastPitchLfoBend;
   int16_t sweepPitch;
   int16_t basePitchBend;
-  uint32_t pitchModEnableTick;
+  uint8_t pitchBendRangeSemitones;
   double currentTempoBpm;
   bool portamentoEnabled;
   uint8_t portamentoControlKey;
   uint8_t portamentoTime;
+  uint8_t prevNoteKey;
   bool tieModeEnabled;
   bool tieNoteActive;
   uint8_t tieNoteKey;

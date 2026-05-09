@@ -3,9 +3,10 @@
 #include <array>
 #include <algorithm>
 #include <cmath>
+#include <limits>
 
-#include "Modulation.h"
 #include "NDSFormat.h"
+#include "ScaleConversion.h"
 
 DECLARE_FORMAT(NDS);
 
@@ -14,6 +15,10 @@ using namespace std;
 namespace {
 uint8_t clampMidi7Bit(int value) {
   return static_cast<uint8_t>(std::clamp(value, 0, 127));
+}
+
+int16_t clampMidiPitchBend(int value) {
+  return static_cast<int16_t>(std::clamp(value, -8192, 8191));
 }
 
 int8_t sineSampleAt(int index) {
@@ -42,21 +47,46 @@ int8_t sineSampleAt(int index) {
 }
 
 constexpr uint8_t kNdsDefaultPortamentoKey = 60;
+constexpr uint8_t kNdsDefaultPitchBendRangeSemitones = 2;
 
-uint8_t speedToVibratoRatePressure(uint8_t speed) {
-  if (speed == 0) {
-    return 0;
+uint16_t maxLevelForResolution(Resolution res) {
+  return res == Resolution::FourteenBit ? 16383 : 127;
+}
+
+uint8_t expressionCcForAmplitudeScale(uint16_t rawExpression,
+                                      Resolution resolution,
+                                      double volumeScale,
+                                      bool usesLinearAmplitudeScale) {
+  const double expressionLevel = rawExpression / static_cast<double>(maxLevelForResolution(resolution));
+  const double correction = usesLinearAmplitudeScale ? volumeScale : std::sqrt(volumeScale);
+  return clampMidi7Bit(static_cast<int>(std::lround(expressionLevel * correction * 127.0)));
+}
+
+int32_t ndsVolumeLfoDbTenths(int32_t raw) {
+  return static_cast<int32_t>((static_cast<int64_t>(raw) * 60) >> 14);
+}
+
+double amplitudeScaleFromDbTenths(int32_t dbTenths) {
+  return std::pow(10.0, static_cast<double>(dbTenths) / 200.0);
+}
+
+uint32_t tempoToNdsCounterStep(double tempoBpm, double fallbackTempoBpm) {
+  double tempo = tempoBpm > 0.0 ? tempoBpm : fallbackTempoBpm;
+  if (tempo <= 0.0) {
+    tempo = 120.0;
   }
-
-  return midiValueForHertzInRange(static_cast<double>(speed) * nds::kLfoSpeedToHz,
-                                  nds::kVibratoBaseHz,
-                                  nds::kVibratoMaxHz);
+  return std::max<uint32_t>(1, static_cast<uint32_t>(std::lround(tempo)));
 }
 } // namespace
 
 NDSSeq::NDSSeq(RawFile *file, uint32_t offset, uint32_t length, string name)
     : VGMSeq(NDSFormat::name, file, offset, length, name) {
   setShouldTrackControlFlowState(true);
+  // NDS pan values are linear balance values. Map the left/right ratio onto
+  // MIDI's equal-power pan curve, then compensate expression so the exported
+  // MIDI keeps NDS's constant-sum pan loudness.
+  setUseLinearPanAmplitudeScale(PanVolumeCorrectionMode::kAdjustExpressionController);
+  setAlwaysWriteInitialPitchBendRange(kNdsDefaultPitchBendRangeSemitones * 100);
 }
 
 void NDSSeq::resetVars() {
@@ -190,21 +220,21 @@ void NDSTrack::resetModState() {
   modLastRenderTick = getTime();
   modPhaseCounter = 0;
   modDelayCounter = 0;
-  modPeriodicRemainder = 0.0;
-  modRangeSent = false;
-  pitchModEnableTick = getTime();
+  modTempoCounter = nds::kBaseTempo;
   currentTempoBpm = static_cast<const NDSSeq*>(parentSeq)->tempoAtTick(getTime());
 
-  lastPitchModCc = -1;
-  lastPitchVibratoRatePressure = -1;
   lastExprCc = -1;
   lastPanCc = -1;
+  lastPanExprCc = -1;
+  lastPitchLfoBend = std::numeric_limits<int>::min();
   sweepPitch = 0;
   basePitchBend = 0;
+  pitchBendRangeSemitones = kNdsDefaultPitchBendRangeSemitones;
   portamentoEnabled = false;
   portamentoControlKey = clampMidi7Bit(static_cast<int>(kNdsDefaultPortamentoKey) +
                                        static_cast<int>(cKeyCorrection) + static_cast<int>(transpose));
   portamentoTime = 0;
+  prevNoteKey = kNdsDefaultPortamentoKey;
   tieModeEnabled = false;
   tieNoteActive = false;
   tieNoteKey = 0;
@@ -255,20 +285,6 @@ std::string NDSTrack::to_string(ModTarget target) {
   }
 }
 
-uint32_t NDSTrack::modDelayToMidiTicks(uint16_t delay, uint32_t atTick) const {
-  if (delay == 0) {
-    return 0;
-  }
-
-  const double tempoAtTick = static_cast<const NDSSeq*>(parentSeq)->tempoAtTick(atTick);
-  const double effectiveTempo = (tempoAtTick > 0.0) ? tempoAtTick : currentTempoBpm;
-
-  const double ticks = (static_cast<double>(delay) * effectiveTempo *
-                        static_cast<double>(parentSeq->ppqn())) /
-                       (60.0 * nds::kPeriodicUpdateHz);
-  return std::max<uint32_t>(1, static_cast<uint32_t>(std::lround(ticks)));
-}
-
 void NDSTrack::onNoteStart(uint32_t noteStartTick, uint8_t noteKey) {
   if (readMode == READMODE_CONVERT_TO_MIDI && portamentoEnabled) {
     addPortamentoControlNoItem(portamentoControlKey);
@@ -279,55 +295,85 @@ void NDSTrack::onNoteStart(uint32_t noteStartTick, uint8_t noteKey) {
   modPhaseCounter = 0;
   modDelayCounter = 0;
 
-  if (toModTarget(modType) != ModTarget::Pitch) {
-    return;
+  switch (toModTarget(modType)) {
+    case ModTarget::Pitch:
+      lastPitchLfoBend = std::numeric_limits<int>::min();
+      break;
+    case ModTarget::Volume:
+      lastExprCc = -1;
+      break;
+    case ModTarget::Pan:
+      lastPanCc = -1;
+      lastPanExprCc = -1;
+      break;
+    case ModTarget::Unknown:
+      return;
   }
 
-  pitchModEnableTick = noteStartTick + modDelayToMidiTicks(modDelay, noteStartTick);
-  if (lastPitchModCc != 0) {
-    lastPitchModCc = -1;
-  }
-  emitPitchVibratoParamsAt(noteStartTick);
+  renderModPoint(noteStartTick);
 }
 
-void NDSTrack::emitPitchModRangeAt(uint32_t tick) {
+int32_t NDSTrack::currentModRawValue() const {
+  if (modDepth == 0 || modDelayCounter < modDelay) {
+    return 0;
+  }
+
+  const int index = (modPhaseCounter >> 8) & 0x7F;
+  return static_cast<int32_t>(sineSampleAt(index)) * static_cast<int32_t>(modDepth) *
+         static_cast<int32_t>(modRange);
+}
+
+int16_t NDSTrack::pitchBendWithLfo(int32_t raw) const {
+  const uint8_t range = std::max<uint8_t>(1, pitchBendRangeSemitones);
+  const int32_t pitchUnits = static_cast<int32_t>((static_cast<int64_t>(raw) * (1 << 6)) >> 14);
+  const int lfoBend = static_cast<int>(std::lround(static_cast<double>(pitchUnits) * 128.0 /
+                                                   static_cast<double>(range)));
+  return clampMidiPitchBend(static_cast<int>(basePitchBend) + lfoBend);
+}
+
+void NDSTrack::emitPitchLfoBendAt(uint32_t tick, int32_t raw) {
   if (readMode != READMODE_CONVERT_TO_MIDI) {
     return;
   }
-  const double semitones = static_cast<double>(modRange);
-  pMidiTrack->insertModulationDepthRange(channel, semitones, tick);
-}
 
-void NDSTrack::emitPitchVibratoParamsAt(uint32_t tick) {
-  if (readMode != READMODE_CONVERT_TO_MIDI) {
-    return;
-  }
-
-  const bool depthEnabled = (tick >= pitchModEnableTick) && (modDepth != 0) && (modSpeed != 0);
-  const int depthCc = depthEnabled ? static_cast<int>(modDepth) : 0;
-  const int ratePressure = static_cast<int>(speedToVibratoRatePressure(modSpeed));
-
-  if (depthCc != lastPitchModCc) {
-    pMidiTrack->insertModulation(channel, static_cast<uint8_t>(depthCc), tick); // CC1
-    lastPitchModCc = depthCc;
-  }
-
-  if (ratePressure != lastPitchVibratoRatePressure) {
-    pMidiTrack->insertChannelPressure(channel, static_cast<uint8_t>(ratePressure), tick);
-    lastPitchVibratoRatePressure = ratePressure;
+  const int16_t bend = pitchBendWithLfo(raw);
+  if (bend != lastPitchLfoBend) {
+    pMidiTrack->insertPitchBend(channel, bend, tick);
+    lastPitchLfoBend = bend;
   }
 }
 
-void NDSTrack::applySweepPitchForNote(uint32_t startTick, uint32_t duration) {
-  if (readMode != READMODE_CONVERT_TO_MIDI || duration == 0 || sweepPitch == 0) {
+void NDSTrack::applySweepPitchForNote(uint32_t startTick, uint32_t duration, uint8_t noteKey) {
+  if (readMode != READMODE_CONVERT_TO_MIDI || duration == 0) {
     return;
   }
 
+  // Calculate effective sweep pitch in pitch units.
+  // It seems that 1 semitone = 64 units.
+  int32_t effectiveSweep = sweepPitch;
+  if (portamentoEnabled) {
+    effectiveSweep += (static_cast<int32_t>(prevNoteKey) - static_cast<int32_t>(noteKey))
+                      << 6;
+  }
+
+  if (effectiveSweep == 0) {
+    return;
+  }
+
+  // Convert from NDS pitch units to MIDI pitch bend units.
+  // NDS: 1 semitone = 64 units
+  // MIDI: pitch bend range (8192 units) = pitchBendRangeSemitones semitones
+  // midiUnits = ndsUnits * 8192 / (range * 64) = ndsUnits * 128 / range
+  const uint8_t range = std::max<uint8_t>(1, pitchBendRangeSemitones);
+  const int32_t sweepMidi = static_cast<int32_t>(
+      std::lround(static_cast<double>(effectiveSweep) * 128.0 / static_cast<double>(range)));
+
+  // Calculate sweep length
+  // When portamentoTime == 0, the sweep lasts the entire note duration.
   uint32_t sweepLength = duration;
   if (portamentoTime != 0) {
-    const uint64_t absSweep = static_cast<uint64_t>(std::abs(static_cast<int32_t>(sweepPitch)));
+    const uint64_t absSweep = static_cast<uint64_t>(std::abs(static_cast<int64_t>(effectiveSweep)));
     const uint64_t t = static_cast<uint64_t>(portamentoTime);
-    // Not 100% confident about this, but I think it's exact!
     sweepLength = static_cast<uint32_t>((t * t * absSweep) >> 11);
   }
 
@@ -340,9 +386,10 @@ void NDSTrack::applySweepPitchForNote(uint32_t startTick, uint32_t duration) {
     return;
   }
 
+  // Emit pitch bend events ramping from (basePitchBend + sweepMidi) down to basePitchBend.
   const uint32_t rampTicks = std::min(duration, sweepLength);
   for (uint32_t i = 0; i <= rampTicks; i++) {
-    const int64_t scaled = static_cast<int64_t>(sweepPitch) * static_cast<int64_t>(sweepLength - i);
+    const int64_t scaled = static_cast<int64_t>(sweepMidi) * static_cast<int64_t>(sweepLength - i);
     const int sweepAtTick = static_cast<int>(scaled / static_cast<int64_t>(sweepLength));
     const int bend = std::clamp(static_cast<int>(basePitchBend) + sweepAtTick, -8192, 8191);
     if (!haveLast || bend != lastBend) {
@@ -363,11 +410,7 @@ void NDSTrack::renderModPoint(uint32_t tick) {
     return;
   }
 
-  int32_t raw = 0;
-  if (modDepth != 0 && modDelayCounter >= modDelay) {
-    const int index = (modPhaseCounter >> 8) & 0x7F;
-    raw = static_cast<int32_t>(sineSampleAt(index)) * static_cast<int32_t>(modDepth) * static_cast<int32_t>(modRange);
-  }
+  const int32_t raw = currentModRawValue();
 
   if (readMode != READMODE_CONVERT_TO_MIDI) {
     return;
@@ -375,16 +418,20 @@ void NDSTrack::renderModPoint(uint32_t tick) {
 
   switch (target) {
     case ModTarget::Pitch: {
-      if (!modRangeSent) {
-        emitPitchModRangeAt(tick);
-        modRangeSent = true;
-      }
-      emitPitchVibratoParamsAt(tick);
+      emitPitchLfoBendAt(tick, raw);
       break;
     }
     case ModTarget::Volume: {
-      const int32_t lfo = (raw * 60) >> 14;
-      const uint8_t cc = clampMidi7Bit(static_cast<int>(expression) + static_cast<int>(lfo));
+      const int32_t lfoDbTenths = ndsVolumeLfoDbTenths(raw);
+      const int32_t maxLfoDbTenths =
+          ndsVolumeLfoDbTenths(static_cast<int32_t>(127) * static_cast<int32_t>(modDepth) *
+                               static_cast<int32_t>(modRange));
+      double amplitudeScale = amplitudeScaleFromDbTenths(lfoDbTenths - maxLfoDbTenths);
+      if (parentSeq->panVolumeCorrectionMode == PanVolumeCorrectionMode::kAdjustExpressionController) {
+        amplitudeScale *= panVolumeCorrectionRate;
+      }
+      const uint8_t cc = expressionCcForAmplitudeScale(
+          expression, expressionResolution, amplitudeScale, usesLinearAmplitudeScale());
       if (cc != lastExprCc) {
         pMidiTrack->insertExpression(channel, cc, tick);
         lastExprCc = cc;
@@ -393,10 +440,22 @@ void NDSTrack::renderModPoint(uint32_t tick) {
     }
     case ModTarget::Pan: {
       const int32_t lfo = (raw * 64) >> 14;
-      const uint8_t cc = clampMidi7Bit(static_cast<int>(prevPan) + static_cast<int>(lfo));
+      const uint8_t pan = clampMidi7Bit(static_cast<int>(prevPan) + static_cast<int>(lfo));
+      double volumeScale = 1.0;
+      const uint8_t cc = usesLinearPanAmplitudeScale()
+                             ? convert7bitLinearPercentPanValToStdMidiVal(pan, &volumeScale)
+                             : pan;
       if (cc != lastPanCc) {
         pMidiTrack->insertPan(channel, cc, tick);
         lastPanCc = cc;
+      }
+      if (parentSeq->panVolumeCorrectionMode == PanVolumeCorrectionMode::kAdjustExpressionController) {
+        const uint8_t exprCc = expressionCcForAmplitudeScale(
+            expression, expressionResolution, volumeScale, usesLinearAmplitudeScale());
+        if (exprCc != lastPanExprCc) {
+          pMidiTrack->insertExpression(channel, exprCc, tick);
+          lastPanExprCc = exprCc;
+        }
       }
       break;
     }
@@ -412,18 +471,23 @@ void NDSTrack::advanceModStateByMidiTicks(uint32_t midiTicks, uint32_t startTick
 
   const auto* ndsSeq = static_cast<const NDSSeq*>(parentSeq);
   for (uint32_t i = 0; i < midiTicks; i++) {
-    const double tempoAtTick = ndsSeq->tempoAtTick(startTick + i);
-    const double effectiveTempo = (tempoAtTick > 0.0) ? tempoAtTick : currentTempoBpm;
-    const double periodicPerMidiTick = (nds::kPeriodicUpdateHz * 60.0) /
-                                       (effectiveTempo * static_cast<double>(parentSeq->ppqn()));
-
-    const double stepsWithRemainder = modPeriodicRemainder + periodicPerMidiTick;
-    const uint32_t wholeSteps = static_cast<uint32_t>(stepsWithRemainder);
-    modPeriodicRemainder = stepsWithRemainder - static_cast<double>(wholeSteps);
-
-    for (uint32_t j = 0; j < wholeSteps; j++) {
-      advanceModStateOnePeriodicTick();
+    // Consume the current sequence tick, then count the
+    // periodic sound updates needed before the next sequence tick becomes due.
+    if (modTempoCounter >= nds::kBaseTempo) {
+      modTempoCounter -= nds::kBaseTempo;
+    } else {
+      modTempoCounter = 0;
     }
+
+    if (modTempoCounter >= nds::kBaseTempo) {
+      continue;
+    }
+
+    const uint32_t tempoStep = tempoToNdsCounterStep(ndsSeq->tempoAtTick(startTick + i), currentTempoBpm);
+    do {
+      modTempoCounter += tempoStep;
+      advanceModStateOnePeriodicTick();
+    } while (modTempoCounter < nds::kBaseTempo);
   }
 }
 
@@ -482,7 +546,8 @@ bool NDSTrack::readEvent(void) {
       }
     }
 
-    applySweepPitchForNote(noteStartTick, dur);
+    applySweepPitchForNote(noteStartTick, dur, status_byte);
+    prevNoteKey = status_byte;
     if (noteWithDelta) {
       addTime(dur);
     }
@@ -608,16 +673,19 @@ bool NDSTrack::readEvent(void) {
 
       // [loveemu] pitch bend (ex: Castlevania Dawn of Sorrow: BGM_BOSS2)
       case 0xC4: {
-        int16_t bend = (signed) readByte(curOffset++) * 64;
+        int16_t bend = static_cast<int16_t>(static_cast<int8_t>(readByte(curOffset++))) * 64;
         basePitchBend = bend;
         addPitchBend(beginOffset, curOffset - beginOffset, bend);
+        lastPitchLfoBend = bend;
         break;
       }
 
       // [loveemu] pitch bend range (ex: Castlevania Dawn of Sorrow: BGM_BOSS2)
       case 0xC5: {
         uint8_t semitones = readByte(curOffset++);
+        pitchBendRangeSemitones = semitones;
         addPitchBendRange(beginOffset, curOffset - beginOffset, semitones * 100);
+        lastPitchLfoBend = std::numeric_limits<int>::min();
         break;
       }
 
@@ -652,6 +720,7 @@ bool NDSTrack::readEvent(void) {
       case 0xC9: {
         uint8_t portKey = readByte(curOffset++);
         portamentoEnabled = true;
+        prevNoteKey = portKey;
         portamentoControlKey = clampMidi7Bit(static_cast<int>(portKey) + static_cast<int>(cKeyCorrection) +
                                              static_cast<int>(transpose));
         if (readMode == READMODE_CONVERT_TO_MIDI) {
@@ -669,10 +738,17 @@ bool NDSTrack::readEvent(void) {
         modDepth = readByte(curOffset++);
         addGenericEvent(beginOffset, curOffset - beginOffset, "Modulation Depth",
                         "Depth=" + std::to_string(modDepth), Type::Lfo);
-        if (modDepth == 0) {
-          lastPitchModCc = -1;
+        const ModTarget target = toModTarget(modType);
+        if (target == ModTarget::Pitch) {
+          lastPitchLfoBend = std::numeric_limits<int>::min();
+          renderModPoint(getTime());
+        } else if (target == ModTarget::Volume) {
           lastExprCc = -1;
+          renderModPoint(getTime());
+        } else if (target == ModTarget::Pan) {
           lastPanCc = -1;
+          lastPanExprCc = -1;
+          renderModPoint(getTime());
         }
         break;
       }
@@ -689,13 +765,22 @@ bool NDSTrack::readEvent(void) {
       // [loveemu] (ex: Children of Mana: SEQ_BGM001)
       case 0xCC: {
         renderModUntil(getTime());
+        const ModTarget oldTarget = toModTarget(modType);
         modType = readByte(curOffset++);
-        modRangeSent = false;
-        lastPitchModCc = -1;
-        lastPitchVibratoRatePressure = -1;
         lastExprCc = -1;
         lastPanCc = -1;
+        lastPanExprCc = -1;
         const ModTarget target = toModTarget(modType);
+        if (oldTarget == ModTarget::Pitch && target != ModTarget::Pitch) {
+          lastPitchLfoBend = std::numeric_limits<int>::min();
+          emitPitchLfoBendAt(getTime(), 0);
+        }
+        if (target == ModTarget::Pitch) {
+          lastPitchLfoBend = std::numeric_limits<int>::min();
+          renderModPoint(getTime());
+        } else if (target == ModTarget::Volume || target == ModTarget::Pan) {
+          renderModPoint(getTime());
+        }
         addGenericEvent(beginOffset, curOffset - beginOffset, "Modulation Type",
                         "Target=" + to_string(target), Type::Lfo);
         break;
@@ -705,7 +790,18 @@ bool NDSTrack::readEvent(void) {
       case 0xCD: {
         renderModUntil(getTime());
         modRange = readByte(curOffset++);
-        modRangeSent = false;
+        const ModTarget target = toModTarget(modType);
+        if (target == ModTarget::Pitch) {
+          lastPitchLfoBend = std::numeric_limits<int>::min();
+          renderModPoint(getTime());
+        } else if (target == ModTarget::Volume) {
+          lastExprCc = -1;
+          renderModPoint(getTime());
+        } else if (target == ModTarget::Pan) {
+          lastPanCc = -1;
+          lastPanExprCc = -1;
+          renderModPoint(getTime());
+        }
         addGenericEvent(beginOffset, curOffset - beginOffset, "Modulation Range",
                         "Range=" + std::to_string(modRange), Type::Lfo);
         break;
@@ -774,10 +870,17 @@ bool NDSTrack::readEvent(void) {
         modDelay = readShort(curOffset);
         curOffset += 2;
         modDelayCounter = 0;
-        if (toModTarget(modType) == ModTarget::Pitch) {
-          pitchModEnableTick = getTime() + modDelayToMidiTicks(modDelay, getTime());
-          lastPitchModCc = -1;
-          emitPitchVibratoParamsAt(getTime());
+        const ModTarget target = toModTarget(modType);
+        if (target == ModTarget::Pitch) {
+          lastPitchLfoBend = std::numeric_limits<int>::min();
+          renderModPoint(getTime());
+        } else if (target == ModTarget::Volume) {
+          lastExprCc = -1;
+          renderModPoint(getTime());
+        } else if (target == ModTarget::Pan) {
+          lastPanCc = -1;
+          lastPanExprCc = -1;
+          renderModPoint(getTime());
         }
         addGenericEvent(beginOffset, curOffset - beginOffset, "Modulation Delay",
                         "Delay=" + std::to_string(modDelay), Type::Lfo);
