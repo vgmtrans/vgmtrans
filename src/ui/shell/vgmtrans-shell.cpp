@@ -94,6 +94,22 @@ void completionHook(const char* buf, linenoiseCompletions* lc) {
   }
 }
 
+bool helpRequested(int argc, char* argv[]) {
+  for (int i = 1; i < argc; ++i) {
+    std::string arg(argv[i]);
+    if (arg == "-h" || arg == "--help") {
+      return true;
+    }
+  }
+  return false;
+}
+
+void printHelp() {
+  std::cout << "VGMTrans shell is an interactive command-line interface for inspecting loaded music data and exporting it." << std::endl;
+  std::cout << std::endl;
+  cmd_help({});
+}
+
 std::filesystem::path configDirectory(const std::string& app_name) {
 #ifdef _WIN32
   if (const char* appdata = std::getenv("APPDATA")) {
@@ -117,6 +133,12 @@ std::filesystem::path configDirectory(const std::string& app_name) {
 }
 
 int main(int argc, char* argv[]) {
+  if (helpRequested(argc, argv)) {
+    registerCommands();
+    printHelp();
+    return 0;
+  }
+
   if (!dbgRoot.init()) {
     std::cerr << "Failed to init VGMRoot" << std::endl;
     return 1;
