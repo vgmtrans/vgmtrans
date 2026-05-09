@@ -5,16 +5,19 @@
  */
 
 #include <cstdio>
+
 #ifndef  _WIN32
 #include <signal.h>
 #endif
 
 #include <csignal>
 #include <cstdlib>
-#include <iostream>
 #include <string>
 #include <vector>
 #include <filesystem>
+
+#include <fmt/base.h>
+#include <fmt/format.h>
 
 #include "DBGVGMRoot.h"
 #include "commands.h"
@@ -105,8 +108,8 @@ bool helpRequested(int argc, char* argv[]) {
 }
 
 void printHelp() {
-  std::cout << "VGMTrans shell is an interactive command-line interface for inspecting loaded music data and exporting it." << std::endl;
-  std::cout << std::endl;
+  fmt::println("VGMTrans shell is an interactive command-line interface for inspecting loaded music data and exporting it.");
+  fmt::println("");
   cmd_help({});
 }
 
@@ -140,7 +143,7 @@ int main(int argc, char* argv[]) {
   }
 
   if (!dbgRoot.init()) {
-    std::cerr << "Failed to init VGMRoot" << std::endl;
+    fmt::println(stderr, "Failed to init VGMRoot");
     return 1;
   }
 
@@ -160,7 +163,7 @@ int main(int argc, char* argv[]) {
   std::filesystem::create_directories(historyFile.parent_path());
   linenoiseHistoryLoad(historyFile.string().c_str());
 
-  std::cout << "Welcome to the VGMTrans shell. Type 'help' for commands." << std::endl;
+  fmt::println("Welcome to the VGMTrans shell. Type 'help' for commands.");
 
   // Auto-load files passed as arguments
   for (int i = 1; i < argc; ++i) {
@@ -174,7 +177,6 @@ int main(int argc, char* argv[]) {
 
     if (g_sigint_received) {
       g_sigint_received = 0;
-      std::cout << "^C" << std::endl;
       if (result)
         linenoiseFree(result);
       continue;
@@ -217,9 +219,10 @@ int main(int argc, char* argv[]) {
         cmd_load(args);
       }
     } else {
-      std::cout << "Unknown command. Type 'help'." << std::endl;
+      fmt::println("Unknown command. Type 'help'.");
     }
   }
 
+  fmt::println("Goodbye!");
   return 0;
 }
