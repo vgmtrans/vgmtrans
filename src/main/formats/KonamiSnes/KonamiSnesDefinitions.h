@@ -27,19 +27,26 @@ inline constexpr double vibratoDepthCents(uint8_t depth) {
   return (depth < 0x80) ? (depth * (100.0 / 32.0)) : (depth * (100.0 / 8.0));
 }
 
+inline constexpr uint16_t kDefaultVibratoMaxRateFactor =
+    static_cast<uint16_t>(kDefaultVibratoMaxRateStep * 0xff);
+inline constexpr uint16_t kMinVibratoMaxRateFactor =
+    static_cast<uint16_t>(kMinVibratoMaxRateStep * 0xff);
+
 // The driver advances vibrato phase by the raw rate byte once per music tick, and music ticks
-// themselves are scaled by the current tempo byte. Splitting the factors this way lets the
-// SoundFont modulators track rate and tempo separately without collapsing all tempos into one
-// coarse controller range.
+// themselves are scaled by the current tempo byte. We fold both factors together on the sequence
+// side and emit the final effective frequency directly.
 inline constexpr double kVibratoBaseHz = kTimerHz / 65536.0;
 inline constexpr double kVibratoMaxTempoFactor = 255.0;
 
-// Konami delays vibrato until the first eligible sustain update after note-on, so even delay 0
-// maps more closely to a one-tick wait than to SF2's instantaneous sentinel.
+// The driver delays vibrato until the first eligible sustain update after note-on, so even delay 0
+// maps more closely to a one-tick wait than to SF2's instantaneous sentinel. We fold the inverse
+// tempo factor into the emitted delay value, so the helper's delay range spans the final absolute
+// delay in seconds.
 inline constexpr double kVibratoDelayBaseSeconds = 256.0 / kTimerHz;
 inline constexpr double kVibratoMaxDelayCountFactor = 256.0;
+inline constexpr double kVibratoMinDelaySeconds = kVibratoDelayBaseSeconds / kVibratoMaxTempoFactor;
+inline constexpr double kVibratoMaxDelaySeconds = kVibratoDelayBaseSeconds * kVibratoMaxDelayCountFactor;
 
-inline constexpr uint8_t kVibratoTempoController = 91;
 inline constexpr uint8_t kVibratoDelayController = 93;
 
 }  // namespace konami_snes

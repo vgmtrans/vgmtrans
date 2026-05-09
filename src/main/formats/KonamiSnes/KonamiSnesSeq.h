@@ -88,7 +88,7 @@ class KonamiSnesSeq
   ActiveTempoFade tempoFade;
   uint32_t tempoFadeLastUpdatedTime;
   uint8_t maxVibratoDepth;
-  uint8_t maxVibratoRate;
+  uint16_t maxVibratoRateFactor;
 
   KonamiSnesVersion version;
   std::map<uint8_t, KonamiSnesSeqEventType> EventMap;
@@ -238,7 +238,7 @@ class KonamiSnesTrack
   void beginTempoFade(const TempoFade& fade);
   void clearActiveTempoFade();
   void applyCurrentTempo();
-  void syncVibratoTempo();
+  void syncVibratoRateAndDelay();
   void setPitchBendRange(uint16_t cents);
   void setPitchBend(int16_t bend);
   void applyCurrentPitchBend();

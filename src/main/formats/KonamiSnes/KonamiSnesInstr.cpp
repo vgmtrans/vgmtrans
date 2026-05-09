@@ -33,11 +33,11 @@ constexpr uint8_t percussionPanLimit(KonamiSnesVersion version) {
   return usesLegacyPanRange(version) ? 0x14 : 0x28;
 }
 
-void applyVibratoExportScaling(KonamiSnesInstrSet* instrSet, uint8_t maxDepth, uint8_t maxRate) {
+void applyVibratoExportScaling(KonamiSnesInstrSet* instrSet, uint8_t maxDepth, uint16_t maxRateFactor) {
   const uint8_t clampedMaxDepth = std::max(maxDepth, konami_snes::kMinVibratoMaxDepth);
-  const uint8_t clampedMaxRate = std::max(maxRate, konami_snes::kMinVibratoMaxRateStep);
+  const uint16_t clampedMaxRateFactor = std::max(maxRateFactor, konami_snes::kMinVibratoMaxRateFactor);
   const double maxDepthCents = konami_snes::vibratoDepthCents(clampedMaxDepth);
-  const double maxRateHz = konami_snes::kVibratoBaseHz * clampedMaxRate;
+  const double maxRateHz = konami_snes::kVibratoBaseHz * clampedMaxRateFactor;
 
   for (auto* instr : instrSet->exportInstrs()) {
     instr->updateModulatorAmount(ModSource::ModWheel,
@@ -129,7 +129,7 @@ KonamiSnesInstrSet::KonamiSnesInstrSet(RawFile *file,
     percInstrOffset(percInstrOffset),
     spcDirAddr(spcDirAddr),
     maxVibratoDepth(konami_snes::kDefaultVibratoMaxDepth),
-    maxVibratoRate(konami_snes::kDefaultVibratoMaxRateStep) {
+    maxVibratoRateFactor(konami_snes::kDefaultVibratoMaxRateFactor) {
 }
 
 KonamiSnesInstrSet::~KonamiSnesInstrSet() {
@@ -217,23 +217,23 @@ bool KonamiSnesInstrSet::parseInstrPointers() {
 
 void KonamiSnesInstrSet::useColl(const VGMColl* coll) {
   maxVibratoDepth = konami_snes::kDefaultVibratoMaxDepth;
-  maxVibratoRate = konami_snes::kDefaultVibratoMaxRateStep;
+  maxVibratoRateFactor = konami_snes::kDefaultVibratoMaxRateFactor;
 
   if (coll != nullptr && coll->seq() != nullptr) {
     const auto* seq = dynamic_cast<const KonamiSnesSeq*>(coll->seq());
     if (seq != nullptr && seq->rawFile() == rawFile() && seq->version == version) {
       maxVibratoDepth = seq->maxVibratoDepth;
-      maxVibratoRate = seq->maxVibratoRate;
+      maxVibratoRateFactor = seq->maxVibratoRateFactor;
     }
   }
 
-  applyVibratoExportScaling(this, maxVibratoDepth, maxVibratoRate);
+  applyVibratoExportScaling(this, maxVibratoDepth, maxVibratoRateFactor);
 }
 
 void KonamiSnesInstrSet::unuseColl() {
   maxVibratoDepth = konami_snes::kDefaultVibratoMaxDepth;
-  maxVibratoRate = konami_snes::kDefaultVibratoMaxRateStep;
-  applyVibratoExportScaling(this, maxVibratoDepth, maxVibratoRate);
+  maxVibratoRateFactor = konami_snes::kDefaultVibratoMaxRateFactor;
+  applyVibratoExportScaling(this, maxVibratoDepth, maxVibratoRateFactor);
 }
 
 // ***************
@@ -258,36 +258,18 @@ KonamiSnesInstr::~KonamiSnesInstr() {
 }
 
 bool KonamiSnesInstr::loadInstr() {
-  // Konami vibrato is driven per track from E4 and is relative to the current tempo, so we split
-  // the SoundFont frequency and delay modulators across separate controller factors:
+  // Konami vibrato is driven per track from E4:
   //   CC1  -> depth
-  //   ch. pressure -> rate step
-  //   CC91 -> tempo factor (raises vibrato frequency and shortens delay)
-  //   CC93 -> delay count
-  addModulator(ModSource::ModWheel,
-               ModDest::VibLfoToPitch,
-               ModAmount::fromCents(konami_snes::vibratoDepthCents(konami_snes::kDefaultVibratoMaxDepth)));
-  addModulator(ModSource::ChannelPressure, ModDest::VibLfoToPitch, ModAmount::fromCents(0));
-  addGenerator(ModDest::VibLfoFreq, ModAmount::fromHertz(konami_snes::kVibratoBaseHz));
-  addModulator(ModSource::ChannelPressure,
-               ModDest::VibLfoFreq,
-               ModAmount::fromHertzRange(konami_snes::kVibratoBaseHz,
-                                         konami_snes::kVibratoBaseHz * konami_snes::kDefaultVibratoMaxRateStep));
-  addModulator(ModSource::ReverbSend,
-               ModDest::VibLfoFreq,
-               ModAmount::fromHertzRange(konami_snes::kVibratoBaseHz,
-                                         konami_snes::kVibratoBaseHz * konami_snes::kVibratoMaxTempoFactor));
-  addGenerator(ModDest::VibLfoDelay, ModAmount::fromSeconds(konami_snes::kVibratoDelayBaseSeconds));
-  addModulator(ModSource::ChorusSend,
-               ModDest::VibLfoDelay,
-               ModAmount::fromSecondsRange(
-                   konami_snes::kVibratoDelayBaseSeconds,
-                   konami_snes::kVibratoDelayBaseSeconds * konami_snes::kVibratoMaxDelayCountFactor));
-  addModulator(ModSource::ReverbSend,
-               ModDest::VibLfoDelay,
-               ModAmount::fromSecondsRange(
-                   konami_snes::kVibratoDelayBaseSeconds,
-                   konami_snes::kVibratoDelayBaseSeconds / konami_snes::kVibratoMaxTempoFactor));
+  //   ch. pressure -> final effective vibrato frequency
+  //   CC93 -> final effective vibrato delay
+  addStandardVibratoHandling(
+      konami_snes::vibratoDepthCents(konami_snes::kDefaultVibratoMaxDepth),
+      konami_snes::kVibratoBaseHz,
+      konami_snes::kVibratoBaseHz * konami_snes::kDefaultVibratoMaxRateFactor,
+      VGMInstr::DelayRange {
+          konami_snes::kVibratoMinDelaySeconds,
+          konami_snes::kVibratoMaxDelaySeconds,
+      });
 
   if (percussion) {
     const auto percussionHeaders = collectPercussionHeaders(rawFile(), version, offset(), spcDirAddr);
