@@ -179,6 +179,20 @@ void VGMInstr::addModulator(ModSource source, ModDest destination, ModAmount amo
   m_modulators.push_back({source, destination, amount.value()});
 }
 
+bool VGMInstr::updateModulatorAmount(ModSource source, ModDest destination, ModAmount amount) {
+  if (!amount.valid()) {
+    return false;
+  }
+
+  for (auto& modulator : m_modulators) {
+    if (modulator.source == source && modulator.destination == destination) {
+      modulator.amount = amount.value();
+      return true;
+    }
+  }
+  return false;
+}
+
 void VGMInstr::addStandardVibratoHandling(double maxDepthCents,
                                          double minHertz,
                                          double maxHertz) {
