@@ -30,21 +30,28 @@ constexpr uint8_t timerFrequency(KonamiSnesVersion version) {
   return version == KONAMISNES_V1 ? 0x20 : 0x40;
 }
 
+// V1/V2 advance the vibrato phase directly by an 8-bit signed-ish step each music tick.
+// Values above 0x80 wrap back around to the same speed in the opposite phase direction.
 constexpr uint8_t legacyVibratoRateStep(uint8_t rate) {
   return (rate == 0 || rate == 0x80)
       ? 0
       : static_cast<uint8_t>((rate < 0x80) ? rate : (0x100 - rate));
 }
 
+// V3-V6 quantize the phase advance into a small set of buckets and use the raw byte as an
+// overflow rate, so the final speed is rate * bucketStep rather than just rate.
 constexpr uint8_t modernVibratoRateStep(uint8_t rate) {
   return (rate == 0xff) ? 16 : (rate >= 0x80) ? 8 : (rate >= 0x40) ? 4 : (rate >= 0x20) ? 2 : 1;
 }
 
+// Later drivers treat any nonzero rate as active. In the legacy driver, some rate bytes still
+// produce a zero phase step, so they should not count as active vibrato
 bool hasActiveVibrato(KonamiSnesVersion version, uint8_t rate, uint8_t depth) {
   return depth != 0 &&
          (konami_snes::usesLegacyVibrato(version) ? (legacyVibratoRateStep(rate) != 0) : (rate != 0));
 }
 
+// Converts a raw vibrato depth byte into the full-scale pitch range for the exported instrument.
 double maxVibratoDepthCents(KonamiSnesVersion version, uint8_t depth) {
   if (konami_snes::usesLegacyVibrato(version)) {
     return (depth < 0x80) ? (depth * (100.0 / 32.0)) : (depth * (100.0 / 8.0));
@@ -54,6 +61,8 @@ double maxVibratoDepthCents(KonamiSnesVersion version, uint8_t depth) {
   return (depth < 0x80) ? (depth * (100.0 / 128.0)) : ((depth - 126.0) * 50.0);
 }
 
+// Converts the current 8.8 fade depth into cents using the same piecewise depth curve as the
+// target depth above, so the fade emits the same shape the driver uses internally.
 double currentVibratoDepthCents(KonamiSnesVersion version, uint8_t targetDepth, uint16_t currentDepth) {
   if (konami_snes::usesLegacyVibrato(version)) {
     return (targetDepth < 0x80)
@@ -66,18 +75,23 @@ double currentVibratoDepthCents(KonamiSnesVersion version, uint8_t targetDepth, 
       : ((currentDepth - (126.0 * 256.0)) * (50.0 / 256.0));
 }
 
+// The tracked first-pass max only needs a floor, not the full default export range.
 uint16_t minVibratoMaxRateFactor(KonamiSnesVersion version) {
   return konami_snes::usesLegacyVibrato(version)
       ? static_cast<uint16_t>(konami_snes::kMinVibratoMaxRateStep * 0xff)
       : konami_snes::kMinVibratoMaxRateStep;
 }
 
+// Both driver families are expressed as "base Hz times a dimensionless factor", but the base unit
+// differs because late-era vibrato uses a 64-step phase with overflow timing.
 double vibratoBaseHz(KonamiSnesVersion version) {
   return konami_snes::usesLegacyVibrato(version)
       ? (konami_snes::kTimerHz / 65536.0)
       : (konami_snes::kTimerHz / 16384.0);
 }
 
+// Produces the factor multiplied by vibratoBaseHz(version) to get the final exported LFO rate.
+// Legacy vibrato folds tempo in here; late-era vibrato does not.
 uint16_t vibratoRateFactor(KonamiSnesVersion version, uint8_t rate, uint8_t tempo) {
   if (konami_snes::usesLegacyVibrato(version)) {
     return static_cast<uint16_t>(legacyVibratoRateStep(rate) * std::max<uint8_t>(tempo, 1));
@@ -86,6 +100,8 @@ uint16_t vibratoRateFactor(KonamiSnesVersion version, uint8_t rate, uint8_t temp
   return (rate == 0) ? 0 : static_cast<uint16_t>(rate * modernVibratoRateStep(rate));
 }
 
+// Legacy delay is measured in music ticks, so real time shrinks as tempo rises. Late-era delay is
+// already based on the fixed 250 Hz update, so it is independent of tempo.
 double vibratoDelaySeconds(KonamiSnesVersion version, uint8_t delay, uint8_t tempo) {
   if (konami_snes::usesLegacyVibrato(version)) {
     const double baseSeconds = 256.0 / konami_snes::kTimerHz;
@@ -112,6 +128,7 @@ uint8_t vibratoDelayFromArg1(KonamiSnesVersion version, uint8_t arg1) {
   return (!konami_snes::usesLegacyVibrato(version) && arg1 >= konami_snes::kLateEraVibratoFadeThreshold) ? 0 : arg1;
 }
 
+// The overloaded V3-V6 E4 argument maps C8-FF to fade lengths 1-56.
 uint8_t vibratoInlineFadeLength(KonamiSnesVersion version, uint8_t arg1) {
   return (!konami_snes::usesLegacyVibrato(version) && arg1 >= konami_snes::kLateEraVibratoFadeThreshold)
       ? static_cast<uint8_t>(arg1 - (konami_snes::kLateEraVibratoFadeThreshold - 1))

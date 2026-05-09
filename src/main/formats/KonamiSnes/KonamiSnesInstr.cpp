@@ -37,6 +37,8 @@ constexpr uint8_t modernVibratoRateStep(uint8_t rate) {
   return (rate == 0xff) ? 16 : (rate >= 0x80) ? 8 : (rate >= 0x40) ? 4 : (rate >= 0x20) ? 2 : 1;
 }
 
+// Mirrors the sequence-side depth curve so the instrument modulator range matches the MIDI values
+// we emit during conversion.
 double maxVibratoDepthCents(KonamiSnesVersion version, uint8_t depth) {
   if (konami_snes::usesLegacyVibrato(version)) {
     return (depth < 0x80) ? (depth * (100.0 / 32.0)) : (depth * (100.0 / 8.0));
@@ -46,6 +48,8 @@ double maxVibratoDepthCents(KonamiSnesVersion version, uint8_t depth) {
   return (depth < 0x80) ? (depth * (100.0 / 128.0)) : ((depth - 126.0) * 50.0);
 }
 
+// Uses the same folded "base Hz * factor" model as the sequence helpers so the tracked maxima can
+// be applied directly during export.
 uint16_t defaultVibratoMaxRateFactor(KonamiSnesVersion version) {
   return konami_snes::usesLegacyVibrato(version)
       ? static_cast<uint16_t>(konami_snes::kDefaultLegacyVibratoMaxRateStep * 0xff)
@@ -80,6 +84,8 @@ double maxVibratoDelaySeconds(KonamiSnesVersion version) {
   return 200.0 / konami_snes::kTimerHz;
 }
 
+// Rewrites the shared vibrato modulators to the sequence-specific maxima collected on the first
+// pass, while keeping the controller mapping itself identical across instrument loads.
 void applyVibratoExportScaling(KonamiSnesInstrSet* instrSet, uint8_t maxDepth, uint16_t maxRateFactor) {
   const auto version = instrSet->version;
   const uint8_t clampedMaxDepth = std::max(maxDepth, konami_snes::kMinVibratoMaxDepth);
