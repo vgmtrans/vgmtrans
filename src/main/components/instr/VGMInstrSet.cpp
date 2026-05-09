@@ -194,13 +194,20 @@ bool VGMInstr::updateModulatorAmount(ModSource source, ModDest destination, ModA
 }
 
 void VGMInstr::addStandardVibratoHandling(double maxDepthCents,
-                                         double minHertz,
-                                         double maxHertz) {
+                                          double minHertz,
+                                          double maxHertz,
+                                          std::optional<DelayRange> delayRange) {
   addModulator(ModSource::ModWheel, ModDest::VibLfoToPitch, ModAmount::fromCents(maxDepthCents));
   // nullify default channel pressure to vib lfo pitch modulator
   addModulator(ModSource::ChannelPressure, ModDest::VibLfoToPitch, ModAmount::fromCents(0));
   addGenerator(ModDest::VibLfoFreq, ModAmount::fromHertz(minHertz));
   addModulator(ModSource::ChannelPressure, ModDest::VibLfoFreq, ModAmount::fromHertzRange(minHertz, maxHertz));
+  if (delayRange.has_value()) {
+    addGenerator(ModDest::VibLfoDelay, ModAmount::fromSeconds(delayRange->minSeconds));
+    addModulator(ModSource::ChorusSend,
+                 ModDest::VibLfoDelay,
+                 ModAmount::fromSecondsRange(delayRange->minSeconds, delayRange->maxSeconds));
+  }
 }
 
 void VGMInstr::addStandardTremoloHandling(double maxDepthDb,
