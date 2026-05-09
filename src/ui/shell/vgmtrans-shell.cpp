@@ -162,6 +162,12 @@ int main(int argc, char* argv[]) {
 
   std::cout << "Welcome to the VGMTrans shell. Type 'help' for commands." << std::endl;
 
+  // Auto-load files passed as arguments
+  for (int i = 1; i < argc; ++i) {
+    std::vector<std::string> loadArgs = {"load", argv[i]};
+    cmd_load(loadArgs);
+  }
+
   char* result;
   while (true) {
     result = linenoise("(vgmt) ");
