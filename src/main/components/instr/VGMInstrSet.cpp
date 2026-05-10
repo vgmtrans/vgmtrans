@@ -203,10 +203,11 @@ void VGMInstr::addStandardVibratoHandling(double maxDepthCents,
   addGenerator(ModDest::VibLfoFreq, ModAmount::fromHertz(minHertz));
   addModulator(ModSource::ChannelPressure, ModDest::VibLfoFreq, ModAmount::fromHertzRange(minHertz, maxHertz));
   if (delayRange.has_value()) {
-    addGenerator(ModDest::VibLfoDelay, ModAmount::fromSeconds(delayRange->minSeconds));
+    const double minDelaySeconds = clampSecondsRangeMinimum(delayRange->minSeconds);
+    addGenerator(ModDest::VibLfoDelay, ModAmount::fromSeconds(minDelaySeconds));
     addModulator(ModSource::ChorusSend,
                  ModDest::VibLfoDelay,
-                 ModAmount::fromSecondsRange(delayRange->minSeconds, delayRange->maxSeconds));
+                 ModAmount::fromSecondsRange(minDelaySeconds, delayRange->maxSeconds));
   }
 }
 

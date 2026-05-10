@@ -19,10 +19,6 @@ int32_t hertzToInstrumentCents(double hertz) {
   return static_cast<int32_t>(std::lround(1200.0 * std::log2(hertz / kSf2LfoReferenceHz)));
 }
 
-double clampSecondsRangeMinimum(double seconds) {
-  return std::max(seconds, kSf2MinNormalDelaySeconds);
-}
-
 // Linearly map an absolute amount in destination units onto a 7-bit unipolar
 // MIDI controller value for the [minAmount, maxAmount] range, clamped to 0..127.
 uint8_t midiValueForAmountInRange(int32_t currentAmount, int32_t minAmount, int32_t maxAmount) {
@@ -36,6 +32,10 @@ uint8_t midiValueForAmountInRange(int32_t currentAmount, int32_t minAmount, int3
 }
 
 }  // namespace
+
+double clampSecondsRangeMinimum(double seconds) {
+  return std::max(seconds, kSf2MinNormalDelaySeconds);
+}
 
 ModAmount ModAmount::raw(int32_t amount) {
   return ModAmount(amount, true);
