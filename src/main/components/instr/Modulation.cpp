@@ -12,9 +12,14 @@
 namespace {
 
 constexpr double kSf2LfoReferenceHz = 8.176;
+constexpr double kSf2MinNormalDelaySeconds = 1.0 / 1024.0;
 
 int32_t hertzToInstrumentCents(double hertz) {
   return static_cast<int32_t>(std::lround(1200.0 * std::log2(hertz / kSf2LfoReferenceHz)));
+}
+
+double clampSecondsRangeMinimum(double seconds) {
+  return std::max(seconds, kSf2MinNormalDelaySeconds);
 }
 
 // Linearly map an absolute amount in destination units onto a 7-bit unipolar
@@ -82,11 +87,11 @@ ModAmount ModAmount::fromSeconds(double seconds) {
 }
 
 ModAmount ModAmount::fromSecondsRange(double minSeconds, double maxSeconds) {
-  if (!std::isfinite(minSeconds) || !std::isfinite(maxSeconds)) {
+  if (maxSeconds <= 0.0 || !std::isfinite(minSeconds) || !std::isfinite(maxSeconds)) {
     return ModAmount(0, false);
   }
 
-  const ModAmount minAmount = fromSeconds(minSeconds);
+  const ModAmount minAmount = fromSeconds(clampSecondsRangeMinimum(minSeconds));
   const ModAmount maxAmount = fromSeconds(maxSeconds);
   if (!minAmount.valid() || !maxAmount.valid()) {
     return ModAmount(0, false);
@@ -97,16 +102,17 @@ ModAmount ModAmount::fromSecondsRange(double minSeconds, double maxSeconds) {
 }
 
 uint8_t midiValueForSecondsInRange(double seconds, double minSeconds, double maxSeconds) {
-  const ModAmount minAmount = ModAmount::fromSeconds(minSeconds);
-  const ModAmount maxAmount = ModAmount::fromSeconds(maxSeconds);
-  const ModAmount currentAmount = ModAmount::fromSeconds(seconds);
+  const ModAmount minAmount = ModAmount::fromSeconds(clampSecondsRangeMinimum(minSeconds));
+  const ModAmount rangeAmount = ModAmount::fromSecondsRange(minSeconds, maxSeconds);
+  const ModAmount currentAmount = ModAmount::fromSeconds(clampSecondsRangeMinimum(seconds));
 
-  if (!minAmount.valid() || !maxAmount.valid() || !currentAmount.valid() ||
-      minAmount.value() == maxAmount.value()) {
+  if (!minAmount.valid() || !rangeAmount.valid() || !currentAmount.valid() || rangeAmount.value() == 0) {
     return 0;
   }
 
-  return midiValueForAmountInRange(currentAmount.value(), minAmount.value(), maxAmount.value());
+  return midiValueForAmountInRange(currentAmount.value(),
+                                   minAmount.value(),
+                                   minAmount.value() + rangeAmount.value());
 }
 
 ModAmount ModAmount::fromCentibels(double centibels) {
