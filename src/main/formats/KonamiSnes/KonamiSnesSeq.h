@@ -138,7 +138,7 @@ class KonamiSnesTrack
   uint8_t instrument;
   int8_t prevNoteKey;
   bool prevNoteSlurred;
-  double seqTuningCents;
+  double commandTuningCents;
 
  private:
   struct PitchSlide {
@@ -242,11 +242,11 @@ class KonamiSnesTrack
   void setPitchBendRange(uint16_t cents);
   void setPitchBend(int16_t bend);
   void applyCurrentPitchBend();
-  double getTuningInSemitones(int8_t tuning);
+  double getCommandTuningCents(int8_t tuning) const;
   uint8_t convertGAINAmountToGAIN(uint8_t gainAmount);
   int16_t getLoopVolumeDelta() const;
   double getLoopPitchDeltaCents() const;
-  void applyEffectiveTuning(uint32_t offset, uint32_t length);
+  void applyEffectiveTuning();
   void addUnknownEvent(uint32_t beginOffset, uint8_t statusByte, uint8_t argCount);
   void resetPanAfterProgramChange();
   KonamiSnesSeq& seq();

@@ -402,7 +402,7 @@ void KonamiSnesTrack::resetVars(void) {
   prevNoteKey = -1;
   prevNoteSlurred = false;
 
-  seqTuningCents = 0.0;
+  commandTuningCents = 0.0;
 
   panFade = {};
   panFade.currentPan = defaultPanValue() << 8;
@@ -425,8 +425,9 @@ const KonamiSnesSeq& KonamiSnesTrack::seq() const {
   return *static_cast<const KonamiSnesSeq*>(parentSeq);
 }
 
-double KonamiSnesTrack::getTuningInSemitones(int8_t tuning) {
-  return tuning * 4 / 256.0;
+double KonamiSnesTrack::getCommandTuningCents(int8_t tuning) const {
+  // F2 stores a signed byte in 1/64-semitone units.
+  return static_cast<double>(tuning) * (100.0 / 64.0);
 }
 
 void KonamiSnesTrack::syncVibratoRateAndDelay() {
@@ -968,8 +969,10 @@ double KonamiSnesTrack::getLoopPitchDeltaCents() const {
   return static_cast<double>(loopPitchDelta + loopPitchDelta2) * (100.0 / 32.0);
 }
 
-void KonamiSnesTrack::applyEffectiveTuning(uint32_t offset, uint32_t length) {
-  const double totalCents = seqTuningCents + getLoopPitchDeltaCents();
+void KonamiSnesTrack::applyEffectiveTuning() {
+  // Notes add the command-level tuning register and the active loop/repeat pitch deltas before
+  // the driver converts the result into its 8.8 semitone pitch value.
+  const double totalCents = commandTuningCents + getLoopPitchDeltaCents();
   const double desiredCoarse = std::trunc(totalCents / 100.0);
   const double desiredFine = totalCents - (desiredCoarse * 100.0);
 
@@ -1070,7 +1073,7 @@ bool KonamiSnesTrack::readEvent() {
         vel = KonamiSnesSeq::VOL_TABLE[vel];
       }
       vel = convertPercentAmpToStdMidiVal(vel / 127.0);
-      applyEffectiveTuning(beginOffset, curOffset - beginOffset);
+      applyEffectiveTuning();
 
       const uint8_t dur = getNoteDuration(len, noteDurationRate);
 
@@ -1153,8 +1156,12 @@ bool KonamiSnesTrack::readEvent() {
         newTuning -= 16;
       }
 
-      seqTuningCents = getTuningInSemitones(newTuning) * 100.0;
-      applyEffectiveTuning(beginOffset, curOffset - beginOffset);
+      commandTuningCents = getCommandTuningCents(newTuning);
+      desc = fmt::format("Tuning: {:.4f} semitones ({:+.4f} cents)",
+                         commandTuningCents / 100.0,
+                         commandTuningCents);
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Instant Tuning", desc, Type::FineTune);
+      applyEffectiveTuning();
       break;
     }
 
@@ -1345,7 +1352,7 @@ bool KonamiSnesTrack::readEvent() {
         curOffset = loopReturnAddr;
         loopVolumeDelta += volumeDelta;
         loopPitchDelta += pitchDelta;
-        applyEffectiveTuning(beginOffset, curOffset - beginOffset);
+        applyEffectiveTuning();
 
         assert(loopReturnAddr != 0);
       }
@@ -1353,7 +1360,7 @@ bool KonamiSnesTrack::readEvent() {
         loopCount = 0;
         loopVolumeDelta = 0;
         loopPitchDelta = 0;
-        applyEffectiveTuning(beginOffset, curOffset - beginOffset);
+        applyEffectiveTuning();
       }
       break;
     }
@@ -1392,7 +1399,7 @@ bool KonamiSnesTrack::readEvent() {
         curOffset = loopReturnAddr2;
         loopVolumeDelta2 += volumeDelta;
         loopPitchDelta2 += pitchDelta;
-        applyEffectiveTuning(beginOffset, curOffset - beginOffset);
+        applyEffectiveTuning();
 
         assert(loopReturnAddr2 != 0);
       }
@@ -1400,7 +1407,7 @@ bool KonamiSnesTrack::readEvent() {
         loopCount2 = 0;
         loopVolumeDelta2 = 0;
         loopPitchDelta2 = 0;
-        applyEffectiveTuning(beginOffset, curOffset - beginOffset);
+        applyEffectiveTuning();
       }
       break;
     }
@@ -1499,8 +1506,12 @@ bool KonamiSnesTrack::readEvent() {
 
     case EVENT_TUNING: {
       int8_t newTuning = (int8_t) readByte(curOffset++);
-      seqTuningCents = getTuningInSemitones(newTuning) * 100.0;
-      applyEffectiveTuning(beginOffset, curOffset - beginOffset);
+      commandTuningCents = getCommandTuningCents(newTuning);
+      desc = fmt::format("Tuning: {:.6f} semitones ({:+.4f} cents)",
+                         commandTuningCents / 100.0,
+                         commandTuningCents);
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Fine Tuning", desc, Type::FineTune);
+      applyEffectiveTuning();
       break;
     }
 
