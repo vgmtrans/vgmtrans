@@ -421,9 +421,8 @@ void DLSArt::addModulator(const SynthModulator& modulator) {
           centsToDlsPitchScale(modulator.amount)));
       break;
     case ModDest::VibLfoDelay:
-      m_blocks.emplace_back(std::make_unique<ConnectionBlock>(
-          source, CONN_SRC_NONE, CONN_DST_VIB_STARTDELAY, CONN_TRN_NONE,
-          toDls16Dot16Scale(modulator.amount)));
+      // DLS does not have a portable equivalent to SF2's controller-driven vibrato delay path.
+      // Keep static vibrato delay generators, but ignore delay modulators.
       break;
     case ModDest::ModLfoFreq:
       m_blocks.emplace_back(std::make_unique<ConnectionBlock>(

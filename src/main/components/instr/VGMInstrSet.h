@@ -2,6 +2,7 @@
 #include "common.h"
 #include "Modulation.h"
 #include "VGMFile.h"
+#include <optional>
 
 class VGMSampColl;
 class VGMInstr;
@@ -67,6 +68,11 @@ private:
 
 class VGMInstr : public VGMItem {
 public:
+  struct DelayRange {
+    double minSeconds;
+    double maxSeconds;
+  };
+
   VGMInstr(VGMInstrSet *parInstrSet, uint32_t offset, uint32_t length, uint32_t bank,
            uint32_t instrNum, std::string name = "Instrument",
            float reverb = defaultReverbPercent);
@@ -82,7 +88,11 @@ public:
 
   // Modulator support
   void addModulator(ModSource source, ModDest destination, ModAmount amount);
-  void addStandardVibratoHandling(double maxDepthCents, double minHertz, double maxHertz);
+  bool updateModulatorAmount(ModSource source, ModDest destination, ModAmount amount);
+  void addStandardVibratoHandling(double maxDepthCents,
+                                  double minHertz,
+                                  double maxHertz,
+                                  std::optional<DelayRange> delayRange = std::nullopt);
   void addStandardTremoloHandling(double maxDepthDb,
                                   double minHertz,
                                   double maxHertz,
