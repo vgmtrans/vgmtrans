@@ -92,7 +92,8 @@ ModAmount ModAmount::fromSeconds(double seconds) {
 
 ModAmount ModAmount::fromSecondsRange(double minSeconds, double maxSeconds) {
   if (maxSeconds <= 0.0 || !std::isfinite(minSeconds) || !std::isfinite(maxSeconds)) {
-    L_WARN("ModAmount::fromSecondsRange received invalid seconds range: minSeconds={}, maxSeconds={}", minSeconds, maxSeconds);
+    L_WARN("ModAmount::fromSecondsRange received invalid seconds range: minSeconds={}, maxSeconds={}",
+           minSeconds, maxSeconds);
     return ModAmount(0, false);
   }
 
