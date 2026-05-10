@@ -5,8 +5,8 @@
  */
 
 #include "KonamiSnesInstr.h"
-#include "KonamiSnesDefinitions.h"
 #include "KonamiSnesSeq.h"
+#include "KonamiSnesVibrato.h"
 #include "SNESDSP.h"
 #include "VGMColl.h"
 #include <algorithm>
@@ -33,65 +33,14 @@ constexpr uint8_t percussionPanLimit(KonamiSnesVersion version) {
   return usesLegacyPanRange(version) ? 0x14 : 0x28;
 }
 
-constexpr uint8_t modernVibratoRateStep(uint8_t rate) {
-  return (rate == 0xff) ? 16 : (rate >= 0x80) ? 8 : (rate >= 0x40) ? 4 : (rate >= 0x20) ? 2 : 1;
-}
-
-// Mirrors the sequence-side depth curve so the instrument modulator range matches the MIDI values
-// we emit during conversion.
-double maxVibratoDepthCents(KonamiSnesVersion version, uint8_t depth) {
-  if (konami_snes::usesLegacyVibrato(version)) {
-    return (depth < 0x80) ? (depth * (100.0 / 32.0)) : (depth * (100.0 / 8.0));
-  }
-
-  // V3-V6 keep the normal range smaller, then jump into a much larger high-depth mode.
-  return (depth < 0x80) ? (depth * (100.0 / 128.0)) : ((depth - 126.0) * 50.0);
-}
-
-// Uses the same folded "base Hz * factor" model as the sequence helpers so the tracked maxima can
-// be applied directly during export.
-uint16_t defaultVibratoMaxRateFactor(KonamiSnesVersion version) {
-  return konami_snes::usesLegacyVibrato(version)
-      ? static_cast<uint16_t>(konami_snes::kDefaultLegacyVibratoMaxRateStep * 0xff)
-      : static_cast<uint16_t>(0xff * modernVibratoRateStep(0xff));
-}
-
-uint16_t minVibratoMaxRateFactor(KonamiSnesVersion version) {
-  return konami_snes::usesLegacyVibrato(version)
-      ? static_cast<uint16_t>(konami_snes::kMinVibratoMaxRateStep * 0xff)
-      : konami_snes::kMinVibratoMaxRateStep;
-}
-
-double vibratoBaseHz(KonamiSnesVersion version) {
-  return konami_snes::usesLegacyVibrato(version)
-      ? (konami_snes::kTimerHz / 65536.0)
-      : (konami_snes::kTimerHz / 16384.0);
-}
-
-double minVibratoDelaySeconds(KonamiSnesVersion version) {
-  if (konami_snes::usesLegacyVibrato(version)) {
-    return (256.0 / konami_snes::kTimerHz) / 0xff;
-  }
-
-  return 1.0 / konami_snes::kTimerHz;
-}
-
-double maxVibratoDelaySeconds(KonamiSnesVersion version) {
-  if (konami_snes::usesLegacyVibrato(version)) {
-    return (256.0 / konami_snes::kTimerHz) * 0x100;
-  }
-
-  return 200.0 / konami_snes::kTimerHz;
-}
-
 // Rewrites the shared vibrato modulators to the sequence-specific maxima collected on the first
 // pass, while keeping the controller mapping itself identical across instrument loads.
 void applyVibratoExportScaling(KonamiSnesInstrSet* instrSet, uint8_t maxDepth, uint16_t maxRateFactor) {
   const auto version = instrSet->version;
   const uint8_t clampedMaxDepth = std::max(maxDepth, konami_snes::kMinVibratoMaxDepth);
-  const uint16_t clampedMaxRateFactor = std::max(maxRateFactor, minVibratoMaxRateFactor(version));
-  const double maxDepthCents = maxVibratoDepthCents(version, clampedMaxDepth);
-  const double baseHz = vibratoBaseHz(version);
+  const uint16_t clampedMaxRateFactor = std::max(maxRateFactor, konami_snes::vibrato::minMaxRateFactor(version));
+  const double maxDepthCents = konami_snes::vibrato::maxDepthCents(version, clampedMaxDepth);
+  const double baseHz = konami_snes::vibrato::baseHz(version);
   const double maxRateHz = baseHz * clampedMaxRateFactor;
 
   for (auto* instr : instrSet->exportInstrs()) {
@@ -182,9 +131,7 @@ KonamiSnesInstrSet::KonamiSnesInstrSet(RawFile *file,
     bankedInstrOffset(bankedInstrOffset),
     firstBankedInstr(firstBankedInstr),
     percInstrOffset(percInstrOffset),
-    spcDirAddr(spcDirAddr),
-    maxVibratoDepth(konami_snes::kDefaultVibratoMaxDepth),
-    maxVibratoRateFactor(defaultVibratoMaxRateFactor(ver)) {
+    spcDirAddr(spcDirAddr) {
 }
 
 KonamiSnesInstrSet::~KonamiSnesInstrSet() {
@@ -271,8 +218,8 @@ bool KonamiSnesInstrSet::parseInstrPointers() {
 }
 
 void KonamiSnesInstrSet::useColl(const VGMColl* coll) {
-  maxVibratoDepth = konami_snes::kDefaultVibratoMaxDepth;
-  maxVibratoRateFactor = defaultVibratoMaxRateFactor(version);
+  uint8_t maxVibratoDepth = konami_snes::kDefaultVibratoMaxDepth;
+  uint16_t maxVibratoRateFactor = konami_snes::vibrato::defaultMaxRateFactor(version);
 
   if (coll != nullptr && coll->seq() != nullptr) {
     const auto* seq = dynamic_cast<const KonamiSnesSeq*>(coll->seq());
@@ -286,9 +233,9 @@ void KonamiSnesInstrSet::useColl(const VGMColl* coll) {
 }
 
 void KonamiSnesInstrSet::unuseColl() {
-  maxVibratoDepth = konami_snes::kDefaultVibratoMaxDepth;
-  maxVibratoRateFactor = defaultVibratoMaxRateFactor(version);
-  applyVibratoExportScaling(this, maxVibratoDepth, maxVibratoRateFactor);
+  applyVibratoExportScaling(this,
+                            konami_snes::kDefaultVibratoMaxDepth,
+                            konami_snes::vibrato::defaultMaxRateFactor(version));
 }
 
 // ***************
@@ -318,12 +265,12 @@ bool KonamiSnesInstr::loadInstr() {
   //   ch. pressure -> final effective vibrato frequency
   //   CC93 -> final effective vibrato delay
   addStandardVibratoHandling(
-      maxVibratoDepthCents(version, konami_snes::kDefaultVibratoMaxDepth),
-      vibratoBaseHz(version),
-      vibratoBaseHz(version) * defaultVibratoMaxRateFactor(version),
+      konami_snes::vibrato::maxDepthCents(version, konami_snes::kDefaultVibratoMaxDepth),
+      konami_snes::vibrato::baseHz(version),
+      konami_snes::vibrato::baseHz(version) * konami_snes::vibrato::defaultMaxRateFactor(version),
       VGMInstr::DelayRange {
-          minVibratoDelaySeconds(version),
-          maxVibratoDelaySeconds(version),
+          konami_snes::vibrato::minDelaySeconds(version),
+          konami_snes::vibrato::maxDelaySeconds(version),
       });
 
   if (percussion) {

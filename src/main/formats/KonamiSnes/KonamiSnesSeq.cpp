@@ -4,9 +4,8 @@
  * refer to the included LICENSE.txt file
  */
 #include "KonamiSnesSeq.h"
-#include "KonamiSnesDefinitions.h"
 #include "KonamiSnesInstr.h"
-#include "Modulation.h"
+#include "KonamiSnesVibrato.h"
 #include "ScaleConversion.h"
 #include "spdlog/fmt/fmt.h"
 #include <algorithm>
@@ -28,111 +27,6 @@ constexpr uint8_t noteDurationRateMax(KonamiSnesVersion version) {
 
 constexpr uint8_t timerFrequency(KonamiSnesVersion version) {
   return version == KONAMISNES_V1 ? 0x20 : 0x40;
-}
-
-// V1/V2 advance the vibrato phase directly by an 8-bit signed-ish step each music tick.
-// Values above 0x80 wrap back around to the same speed in the opposite phase direction.
-constexpr uint8_t legacyVibratoRateStep(uint8_t rate) {
-  return (rate == 0 || rate == 0x80)
-      ? 0
-      : static_cast<uint8_t>((rate < 0x80) ? rate : (0x100 - rate));
-}
-
-// V3-V6 quantize the phase advance into a small set of buckets and use the raw byte as an
-// overflow rate, so the final speed is rate * bucketStep rather than just rate.
-constexpr uint8_t modernVibratoRateStep(uint8_t rate) {
-  return (rate == 0xff) ? 16 : (rate >= 0x80) ? 8 : (rate >= 0x40) ? 4 : (rate >= 0x20) ? 2 : 1;
-}
-
-// Later drivers treat any nonzero rate as active. In the legacy driver, some rate bytes still
-// produce a zero phase step, so they should not count as active vibrato
-bool hasActiveVibrato(KonamiSnesVersion version, uint8_t rate, uint8_t depth) {
-  return depth != 0 &&
-         (konami_snes::usesLegacyVibrato(version) ? (legacyVibratoRateStep(rate) != 0) : (rate != 0));
-}
-
-// Converts a raw vibrato depth byte into the full-scale pitch range for the exported instrument.
-double maxVibratoDepthCents(KonamiSnesVersion version, uint8_t depth) {
-  if (konami_snes::usesLegacyVibrato(version)) {
-    return (depth < 0x80) ? (depth * (100.0 / 32.0)) : (depth * (100.0 / 8.0));
-  }
-
-  // V3-V6 use a narrower normal range and a much larger high-depth mode.
-  return (depth < 0x80) ? (depth * (100.0 / 128.0)) : ((depth - 126.0) * 50.0);
-}
-
-// Converts the current 8.8 fade depth into cents using the same piecewise depth curve as the
-// target depth above, so the fade emits the same shape the driver uses internally.
-double currentVibratoDepthCents(KonamiSnesVersion version, uint8_t targetDepth, uint16_t currentDepth) {
-  if (konami_snes::usesLegacyVibrato(version)) {
-    return (targetDepth < 0x80)
-        ? (currentDepth * (100.0 / (32.0 * 256.0)))
-        : (currentDepth * (100.0 / (8.0 * 256.0)));
-  }
-
-  return (currentDepth < 0x8000)
-      ? (currentDepth * (100.0 / (128.0 * 256.0)))
-      : ((currentDepth - (126.0 * 256.0)) * (50.0 / 256.0));
-}
-
-// The tracked first-pass max only needs a floor, not the full default export range.
-uint16_t minVibratoMaxRateFactor(KonamiSnesVersion version) {
-  return konami_snes::usesLegacyVibrato(version)
-      ? static_cast<uint16_t>(konami_snes::kMinVibratoMaxRateStep * 0xff)
-      : konami_snes::kMinVibratoMaxRateStep;
-}
-
-// Both driver families are expressed as "base Hz times a dimensionless factor", but the base unit
-// differs because late-era vibrato uses a 64-step phase with overflow timing.
-double vibratoBaseHz(KonamiSnesVersion version) {
-  return konami_snes::usesLegacyVibrato(version)
-      ? (konami_snes::kTimerHz / 65536.0)
-      : (konami_snes::kTimerHz / 16384.0);
-}
-
-// Produces the factor multiplied by vibratoBaseHz(version) to get the final exported LFO rate.
-// Legacy vibrato folds tempo in here; late-era vibrato does not.
-uint16_t vibratoRateFactor(KonamiSnesVersion version, uint8_t rate, uint8_t tempo) {
-  if (konami_snes::usesLegacyVibrato(version)) {
-    return static_cast<uint16_t>(legacyVibratoRateStep(rate) * std::max<uint8_t>(tempo, 1));
-  }
-
-  return (rate == 0) ? 0 : static_cast<uint16_t>(rate * modernVibratoRateStep(rate));
-}
-
-// Legacy delay is measured in music ticks, so real time shrinks as tempo rises. Late-era delay is
-// already based on the fixed 250 Hz update, so it is independent of tempo.
-double vibratoDelaySeconds(KonamiSnesVersion version, uint8_t delay, uint8_t tempo) {
-  if (konami_snes::usesLegacyVibrato(version)) {
-    const double baseSeconds = 256.0 / konami_snes::kTimerHz;
-    return (baseSeconds * (delay + 1.0)) / std::max<uint8_t>(tempo, 1);
-  }
-
-  return (delay + 1.0) / konami_snes::kTimerHz;
-}
-
-double minVibratoDelaySeconds(KonamiSnesVersion version) {
-  return konami_snes::usesLegacyVibrato(version)
-      ? vibratoDelaySeconds(version, 0, 0xff)
-      : vibratoDelaySeconds(version, 0, 0);
-}
-
-double maxVibratoDelaySeconds(KonamiSnesVersion version) {
-  return konami_snes::usesLegacyVibrato(version)
-      ? vibratoDelaySeconds(version, 0xff, 1)
-      : vibratoDelaySeconds(version, 0xc7, 0);
-}
-
-uint8_t vibratoDelayFromArg1(KonamiSnesVersion version, uint8_t arg1) {
-  // V3-V6 overload E4 arg1: 00-C7 is delay, C8-FF means inline fade with zero delay.
-  return (!konami_snes::usesLegacyVibrato(version) && arg1 >= konami_snes::kLateEraVibratoFadeThreshold) ? 0 : arg1;
-}
-
-// The overloaded V3-V6 E4 argument maps C8-FF to fade lengths 1-56.
-uint8_t vibratoInlineFadeLength(KonamiSnesVersion version, uint8_t arg1) {
-  return (!konami_snes::usesLegacyVibrato(version) && arg1 >= konami_snes::kLateEraVibratoFadeThreshold)
-      ? static_cast<uint8_t>(arg1 - (konami_snes::kLateEraVibratoFadeThreshold - 1))
-      : 0;
 }
 
 void fillEventRange(std::map<uint8_t, KonamiSnesSeqEventType>& eventMap,
@@ -189,38 +83,31 @@ uint8_t convertVibratoDepthToMidi(KonamiSnesVersion version,
   }
 
   const uint8_t clampedMaxDepth = std::max(maxDepth, konami_snes::kMinVibratoMaxDepth);
-  const double depthCents = currentVibratoDepthCents(version, targetDepth, currentDepth);
-  const double maxDepthCents = maxVibratoDepthCents(version, clampedMaxDepth);
+  const double depthCents = konami_snes::vibrato::currentDepthCents(version, targetDepth, currentDepth);
+  const double maxDepthCents = konami_snes::vibrato::maxDepthCents(version, clampedMaxDepth);
   const int midiValue = static_cast<int>(std::lround(128.0 * depthCents / maxDepthCents));
   return static_cast<uint8_t>(std::clamp(midiValue, 0, 127));
-}
-
-uint16_t effectiveVibratoRateFactor(KonamiSnesVersion version, uint8_t rate, uint8_t tempo) {
-  const uint16_t effectiveRateFactor = vibratoRateFactor(version, rate, tempo);
-  if (effectiveRateFactor == 0) {
-    return 0;
-  }
-
-  return effectiveRateFactor;
 }
 
 uint8_t convertVibratoRateToMidi(KonamiSnesVersion version,
                                  uint8_t rate,
                                  uint8_t tempo,
                                  uint16_t maxRateFactor) {
-  const uint16_t effectiveRateFactor = effectiveVibratoRateFactor(version, rate, tempo);
+  const uint16_t effectiveRateFactor = konami_snes::vibrato::rateFactor(version, rate, tempo);
   if (effectiveRateFactor == 0) {
     return 0;
   }
 
-  const uint16_t clampedMaxRateFactor = std::max(maxRateFactor, minVibratoMaxRateFactor(version));
-  const double baseHz = vibratoBaseHz(version);
+  const uint16_t clampedMaxRateFactor = std::max(maxRateFactor, konami_snes::vibrato::minMaxRateFactor(version));
+  const double baseHz = konami_snes::vibrato::baseHz(version);
   return midiValueForHertzInRange(baseHz * effectiveRateFactor, baseHz, baseHz * clampedMaxRateFactor);
 }
 
 uint8_t convertVibratoDelayToMidi(KonamiSnesVersion version, uint8_t delay, uint8_t tempo) {
-  const double delaySeconds = vibratoDelaySeconds(version, delay, tempo);
-  return midiValueForSecondsInRange(delaySeconds, minVibratoDelaySeconds(version), maxVibratoDelaySeconds(version));
+  const double delaySeconds = konami_snes::vibrato::delaySeconds(version, delay, tempo);
+  return midiValueForSecondsInRange(delaySeconds,
+                                    konami_snes::vibrato::minDelaySeconds(version),
+                                    konami_snes::vibrato::maxDelaySeconds(version));
 }
 }
 
@@ -284,7 +171,7 @@ const uint8_t KonamiSnesSeq::VOL_TABLE[] = {
 KonamiSnesSeq::KonamiSnesSeq(RawFile *file, KonamiSnesVersion ver, uint32_t seqdataOffset, std::string newName)
     : VGMSeq(KonamiSnesFormat::name, file, seqdataOffset, 0, newName),
       maxVibratoDepth(konami_snes::kMinVibratoMaxDepth),
-      maxVibratoRateFactor(minVibratoMaxRateFactor(ver)),
+      maxVibratoRateFactor(konami_snes::vibrato::minMaxRateFactor(ver)),
       version(ver) {
   setAllowDiscontinuousTrackData(true);
   bLoadTickByTick = true;
@@ -305,7 +192,7 @@ void KonamiSnesSeq::resetVars(void) {
 
   if (readMode != READMODE_CONVERT_TO_MIDI) {
     maxVibratoDepth = konami_snes::kMinVibratoMaxDepth;
-    maxVibratoRateFactor = minVibratoMaxRateFactor(version);
+    maxVibratoRateFactor = konami_snes::vibrato::minMaxRateFactor(version);
   }
 
   // The driver starts from tempo/speed FF unless the sequence overrides it.
@@ -543,14 +430,14 @@ double KonamiSnesTrack::getTuningInSemitones(int8_t tuning) {
 }
 
 void KonamiSnesTrack::syncVibratoRateAndDelay() {
-  if (!hasActiveVibrato(seq().version, vibratoRate, vibratoDepth)) {
+  if (!konami_snes::vibrato::isActive(seq().version, vibratoRate, vibratoDepth)) {
     return;
   }
 
   auto &parentSeq = seq();
   if (readMode != READMODE_CONVERT_TO_MIDI) {
     parentSeq.maxVibratoRateFactor = std::max(parentSeq.maxVibratoRateFactor,
-                                              effectiveVibratoRateFactor(parentSeq.version, vibratoRate, parentSeq.tempo));
+                                              konami_snes::vibrato::rateFactor(parentSeq.version, vibratoRate, parentSeq.tempo));
   }
 
   addChannelPressureNoItem(convertVibratoRateToMidi(parentSeq.version,
@@ -1193,7 +1080,7 @@ bool KonamiSnesTrack::readEvent() {
       const bool isTiedNote = prevNoteSlurred && key == prevNoteKey;
 
       if (!isTiedNote && vibratoFade.length != 0 &&
-          hasActiveVibrato(seq().version, vibratoRate, vibratoDepth)) {
+          konami_snes::vibrato::isActive(seq().version, vibratoRate, vibratoDepth)) {
         vibratoFade.delayRemaining = vibratoDelay;
         vibratoFade.ticksRemaining = vibratoFade.length;
         vibratoFade.currentDepth = 0;
@@ -1366,8 +1253,8 @@ bool KonamiSnesTrack::readEvent() {
       uint8_t vibratoArg1 = readByte(curOffset++);
       uint8_t newVibratoRate = readByte(curOffset++);
       uint8_t newVibratoDepth = readByte(curOffset++);
-      const uint8_t builtInFadeLength = vibratoInlineFadeLength(parentSeq.version, vibratoArg1);
-      const uint8_t newVibratoDelay = vibratoDelayFromArg1(parentSeq.version, vibratoArg1);
+      const uint8_t builtInFadeLength = konami_snes::vibrato::inlineFadeLength(parentSeq.version, vibratoArg1);
+      const uint8_t newVibratoDelay = konami_snes::vibrato::delayFromArg1(parentSeq.version, vibratoArg1);
       desc = (builtInFadeLength != 0)
           ? fmt::format("Fade Length: {:d}  Rate: {:d}  Depth: {:d}",
                         builtInFadeLength, newVibratoRate, newVibratoDepth)
@@ -1389,7 +1276,7 @@ bool KonamiSnesTrack::readEvent() {
         vibratoFade.step = static_cast<uint16_t>((static_cast<uint16_t>(vibratoDepth) << 8) / builtInFadeLength);
       }
 
-      const bool active = hasActiveVibrato(parentSeq.version, vibratoRate, vibratoDepth);
+      const bool active = konami_snes::vibrato::isActive(parentSeq.version, vibratoRate, vibratoDepth);
       const bool deferDepthForFade = active && immediateFadeLength != 0;
       if (readMode != READMODE_CONVERT_TO_MIDI && active) {
         parentSeq.maxVibratoDepth = std::max(parentSeq.maxVibratoDepth, vibratoDepth);

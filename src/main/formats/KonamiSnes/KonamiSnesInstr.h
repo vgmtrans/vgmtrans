@@ -38,8 +38,6 @@ class KonamiSnesInstrSet:
   uint32_t percInstrOffset;
   uint32_t spcDirAddr;
   std::vector<uint8_t> usedSRCNs;
-  uint8_t maxVibratoDepth;
-  uint16_t maxVibratoRateFactor;
 };
 
 // ***************
