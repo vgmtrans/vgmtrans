@@ -10,15 +10,25 @@
 namespace konami_snes {
 
 inline constexpr double kTimerHz = 250.0;
+inline constexpr uint8_t kDefaultVibratoMaxDepth = 0xff;
+inline constexpr uint8_t kDefaultVibratoMaxRateStep = 0x7f;
+
+inline constexpr uint8_t effectiveVibratoRateStep(uint8_t rate) {
+  return (rate == 0 || rate == 0x80)
+      ? 0
+      : static_cast<uint8_t>((rate < 0x80) ? rate : (0x100 - rate));
+}
+
+inline constexpr double vibratoDepthCents(uint8_t depth) {
+  return (depth < 0x80) ? (depth * (100.0 / 32.0)) : (depth * (100.0 / 8.0));
+}
 
 // The driver advances vibrato phase by the raw rate byte once per music tick, and music ticks
 // themselves are scaled by the current tempo byte. Splitting the factors this way lets the
 // SoundFont modulators track rate and tempo separately without collapsing all tempos into one
 // coarse controller range.
 inline constexpr double kVibratoBaseHz = kTimerHz / 65536.0;
-inline constexpr double kVibratoMaxRateFactor = 128.0;
 inline constexpr double kVibratoMaxTempoFactor = 255.0;
-inline constexpr double kVibratoMaxDepthCents = 255.0 * 12.5;
 
 // Konami delays vibrato until the first eligible sustain update after note-on, so even delay 0
 // maps more closely to a one-tick wait than to SF2's instantaneous sentinel.

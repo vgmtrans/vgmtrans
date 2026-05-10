@@ -87,6 +87,8 @@ class KonamiSnesSeq
   uint8_t tempo;
   ActiveTempoFade tempoFade;
   uint32_t tempoFadeLastUpdatedTime;
+  uint8_t maxVibratoDepth;
+  uint8_t maxVibratoRate;
 
   KonamiSnesVersion version;
   std::map<uint8_t, KonamiSnesSeqEventType> EventMap;
