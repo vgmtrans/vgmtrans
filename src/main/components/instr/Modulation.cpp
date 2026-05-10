@@ -7,6 +7,7 @@
 #include "Modulation.h"
 #include <algorithm>
 #include <cmath>
+#include "LogManager.h"
 #include "ScaleConversion.h"
 
 namespace {
@@ -42,6 +43,7 @@ ModAmount ModAmount::raw(int32_t amount) {
 
 ModAmount ModAmount::fromCents(double cents) {
   if (!std::isfinite(cents)) {
+    L_WARN("ModAmount::fromCents received invalid cents value: {}", cents);
     return ModAmount(0, false);
   }
 
@@ -50,6 +52,7 @@ ModAmount ModAmount::fromCents(double cents) {
 
 ModAmount ModAmount::fromHertz(double hertz) {
   if (hertz <= 0.0 || !std::isfinite(hertz)) {
+    L_WARN("ModAmount::fromHertz received invalid hertz value: {}", hertz);
     return ModAmount(0, false);
   }
 
@@ -59,6 +62,7 @@ ModAmount ModAmount::fromHertz(double hertz) {
 ModAmount ModAmount::fromHertzRange(double minHertz, double maxHertz) {
   if (minHertz <= 0.0 || maxHertz <= 0.0 ||
       !std::isfinite(minHertz) || !std::isfinite(maxHertz)) {
+    L_WARN("ModAmount::fromHertzRange received invalid hertz range: minHertz={}, maxHertz={}", minHertz, maxHertz);
     return ModAmount(0, false);
   }
 
@@ -88,6 +92,7 @@ ModAmount ModAmount::fromSeconds(double seconds) {
 
 ModAmount ModAmount::fromSecondsRange(double minSeconds, double maxSeconds) {
   if (maxSeconds <= 0.0 || !std::isfinite(minSeconds) || !std::isfinite(maxSeconds)) {
+    L_WARN("ModAmount::fromSecondsRange received invalid seconds range: minSeconds={}, maxSeconds={}", minSeconds, maxSeconds);
     return ModAmount(0, false);
   }
 
@@ -117,6 +122,7 @@ uint8_t midiValueForSecondsInRange(double seconds, double minSeconds, double max
 
 ModAmount ModAmount::fromCentibels(double centibels) {
   if (!std::isfinite(centibels)) {
+    L_WARN("ModAmount::fromCentibels received invalid centibels value: {}", centibels);
     return ModAmount(0, false);
   }
 
@@ -125,6 +131,7 @@ ModAmount ModAmount::fromCentibels(double centibels) {
 
 ModAmount ModAmount::fromDecibels(double decibels) {
   if (!std::isfinite(decibels)) {
+    L_WARN("ModAmount::fromDecibels received invalid decibels value: {}", decibels);
     return ModAmount(0, false);
   }
 
