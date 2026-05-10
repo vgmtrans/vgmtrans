@@ -87,6 +87,8 @@ class KonamiSnesSeq
   uint8_t tempo;
   ActiveTempoFade tempoFade;
   uint32_t tempoFadeLastUpdatedTime;
+  uint8_t maxVibratoDepth;
+  uint16_t maxVibratoRateFactor;
 
   KonamiSnesVersion version;
   std::map<uint8_t, KonamiSnesSeqEventType> EventMap;
@@ -200,6 +202,15 @@ class KonamiSnesTrack
     bool useLength = false;
   };
 
+  struct ActiveVibratoFade {
+    uint8_t length = 0;
+    uint16_t step = 0;
+    uint8_t delayRemaining = 0;
+    uint8_t ticksRemaining = 0;
+    uint16_t currentDepth = 0;
+    uint8_t midiDepth = 0;
+  };
+
   std::optional<PitchSlide> consumePitchSlide();
   PitchSlide readPitchSlide(KonamiSnesSeqEventType eventType, uint32_t offset);
   void addPitchSlideEvent(const PitchSlide& slide);
@@ -227,6 +238,7 @@ class KonamiSnesTrack
   void beginTempoFade(const TempoFade& fade);
   void clearActiveTempoFade();
   void applyCurrentTempo();
+  void syncVibratoRateAndDelay();
   void setPitchBendRange(uint16_t cents);
   void setPitchBend(int16_t bend);
   void applyCurrentPitchBend();
@@ -243,6 +255,10 @@ class KonamiSnesTrack
   ActivePanFade panFade;
   ActiveVolumeSlide volumeFade;
   ActivePitchSlide pitchSlide;
+  uint8_t vibratoDelay;
+  uint8_t vibratoRate;
+  uint8_t vibratoDepth;
+  ActiveVibratoFade vibratoFade;
   uint16_t pitchBendRangeCents;
   int16_t currentPitchBend;
 };

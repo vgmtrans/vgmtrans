@@ -5,6 +5,7 @@
  */
 #include "KonamiSnesSeq.h"
 #include "KonamiSnesInstr.h"
+#include "KonamiSnesVibrato.h"
 #include "ScaleConversion.h"
 #include "spdlog/fmt/fmt.h"
 #include <algorithm>
@@ -18,6 +19,7 @@ constexpr uint16_t SEQ_PPQN = 48;
 constexpr uint16_t KONAMI_SNES_STD_PITCH_BEND_RANGE_CENTS = 200;
 constexpr int16_t MIDI_PITCH_BEND_MIN = -8192;
 constexpr int16_t MIDI_PITCH_BEND_MAX = 8191;
+constexpr uint8_t KONAMI_SNES_DEFAULT_TEMPO = 0xff;
 
 constexpr uint8_t noteDurationRateMax(KonamiSnesVersion version) {
   return version == KONAMISNES_V1 ? 100 : 127;
@@ -70,6 +72,42 @@ FadeStepResult advanceFade(ValueType& current,
   }
 
   return FadeStepResult::Running;
+}
+
+uint8_t convertVibratoDepthToMidi(KonamiSnesVersion version,
+                                  uint8_t targetDepth,
+                                  uint16_t currentDepth,
+                                  uint8_t maxDepth) {
+  if (targetDepth == 0 || currentDepth == 0) {
+    return 0;
+  }
+
+  const uint8_t clampedMaxDepth = std::max(maxDepth, konami_snes::kMinVibratoMaxDepth);
+  const double depthCents = konami_snes::vibrato::currentDepthCents(version, targetDepth, currentDepth);
+  const double maxDepthCents = konami_snes::vibrato::maxDepthCents(version, clampedMaxDepth);
+  const int midiValue = static_cast<int>(std::lround(128.0 * depthCents / maxDepthCents));
+  return static_cast<uint8_t>(std::clamp(midiValue, 0, 127));
+}
+
+uint8_t convertVibratoRateToMidi(KonamiSnesVersion version,
+                                 uint8_t rate,
+                                 uint8_t tempo,
+                                 uint16_t maxRateFactor) {
+  const uint16_t effectiveRateFactor = konami_snes::vibrato::rateFactor(version, rate, tempo);
+  if (effectiveRateFactor == 0) {
+    return 0;
+  }
+
+  const uint16_t clampedMaxRateFactor = std::max(maxRateFactor, konami_snes::vibrato::minMaxRateFactor(version));
+  const double baseHz = konami_snes::vibrato::baseHz(version);
+  return midiValueForHertzInRange(baseHz * effectiveRateFactor, baseHz, baseHz * clampedMaxRateFactor);
+}
+
+uint8_t convertVibratoDelayToMidi(KonamiSnesVersion version, uint8_t delay, uint8_t tempo) {
+  const double delaySeconds = konami_snes::vibrato::delaySeconds(version, delay, tempo);
+  return midiValueForSecondsInRange(delaySeconds,
+                                    konami_snes::vibrato::minDelaySeconds(version),
+                                    konami_snes::vibrato::maxDelaySeconds(version));
 }
 }
 
@@ -131,7 +169,10 @@ const uint8_t KonamiSnesSeq::VOL_TABLE[] = {
 };
 
 KonamiSnesSeq::KonamiSnesSeq(RawFile *file, KonamiSnesVersion ver, uint32_t seqdataOffset, std::string newName)
-    : VGMSeq(KonamiSnesFormat::name, file, seqdataOffset, 0, newName), version(ver) {
+    : VGMSeq(KonamiSnesFormat::name, file, seqdataOffset, 0, newName),
+      maxVibratoDepth(konami_snes::kMinVibratoMaxDepth),
+      maxVibratoRateFactor(konami_snes::vibrato::minMaxRateFactor(ver)),
+      version(ver) {
   setAllowDiscontinuousTrackData(true);
   bLoadTickByTick = true;
 
@@ -149,8 +190,16 @@ KonamiSnesSeq::~KonamiSnesSeq(void) {
 void KonamiSnesSeq::resetVars(void) {
   VGMSeq::resetVars();
 
-  tempo = 0;
+  if (readMode != READMODE_CONVERT_TO_MIDI) {
+    maxVibratoDepth = konami_snes::kMinVibratoMaxDepth;
+    maxVibratoRateFactor = konami_snes::vibrato::minMaxRateFactor(version);
+  }
+
+  // The driver starts from tempo/speed FF unless the sequence overrides it.
+  tempo = KONAMI_SNES_DEFAULT_TEMPO;
   tempoFade = {};
+  tempoFade.currentTempo = tempo << 8;
+  tempoFade.targetTempo = tempoFade.currentTempo;
   tempoFadeLastUpdatedTime = static_cast<uint32_t>(-1);
 }
 
@@ -360,6 +409,10 @@ void KonamiSnesTrack::resetVars(void) {
   panFade.targetPan = panFade.currentPan;
   volumeFade = {};
   pitchSlide = {};
+  vibratoDelay = 0;
+  vibratoRate = 0;
+  vibratoDepth = 0;
+  vibratoFade = {};
   pitchBendRangeCents = KONAMI_SNES_STD_PITCH_BEND_RANGE_CENTS;
   currentPitchBend = 0;
 }
@@ -374,6 +427,25 @@ const KonamiSnesSeq& KonamiSnesTrack::seq() const {
 
 double KonamiSnesTrack::getTuningInSemitones(int8_t tuning) {
   return tuning * 4 / 256.0;
+}
+
+void KonamiSnesTrack::syncVibratoRateAndDelay() {
+  if (!konami_snes::vibrato::isActive(seq().version, vibratoRate, vibratoDepth)) {
+    return;
+  }
+
+  auto &parentSeq = seq();
+  if (readMode != READMODE_CONVERT_TO_MIDI) {
+    parentSeq.maxVibratoRateFactor = std::max(parentSeq.maxVibratoRateFactor,
+                                              konami_snes::vibrato::rateFactor(parentSeq.version, vibratoRate, parentSeq.tempo));
+  }
+
+  addChannelPressureNoItem(convertVibratoRateToMidi(parentSeq.version,
+                                                    vibratoRate,
+                                                    parentSeq.tempo,
+                                                    parentSeq.maxVibratoRateFactor));
+  addControllerEventNoItem(konami_snes::kVibratoDelayController,
+                           convertVibratoDelayToMidi(parentSeq.version, vibratoDelay, parentSeq.tempo));
 }
 
 
@@ -422,6 +494,31 @@ void KonamiSnesTrack::onTickBegin() {
       clearActiveVolumeFade();
     }
     applyCurrentVolume();
+  }
+
+  if (vibratoFade.ticksRemaining != 0) {
+    if (vibratoFade.delayRemaining != 0) {
+      vibratoFade.delayRemaining -= 1;
+    }
+    else {
+      const uint16_t targetDepth = static_cast<uint16_t>(vibratoDepth) << 8;
+      vibratoFade.ticksRemaining -= 1;
+      if (vibratoFade.ticksRemaining == 0) {
+        vibratoFade.currentDepth = targetDepth;
+      }
+      else {
+        vibratoFade.currentDepth = std::min<uint16_t>(targetDepth, vibratoFade.currentDepth + vibratoFade.step);
+      }
+
+      const uint8_t midiDepth = convertVibratoDepthToMidi(seq().version,
+                                                          vibratoDepth,
+                                                          vibratoFade.currentDepth,
+                                                          seq().maxVibratoDepth);
+      if (midiDepth != vibratoFade.midiDepth) {
+        addModulationNoItem(midiDepth);
+        vibratoFade.midiDepth = midiDepth;
+      }
+    }
   }
 
   if (pitchSlide.length == 0 || !pitchSlide.baseValid) {
@@ -854,6 +951,11 @@ void KonamiSnesTrack::applyCurrentTempo() {
   if (newTempo != parentSeq.tempo) {
     parentSeq.tempo = newTempo;
     addTempoBPMNoItem(parentSeq.getTempoInBPM(newTempo));
+    if (konami_snes::usesLegacyVibrato(parentSeq.version)) {
+      for (SeqTrack *track : parentSeq.aTracks) {
+        static_cast<KonamiSnesTrack*>(track)->syncVibratoRateAndDelay();
+      }
+    }
   }
 }
 
@@ -975,8 +1077,20 @@ bool KonamiSnesTrack::readEvent() {
       const uint32_t noteLengthBytes = curOffset - beginOffset;
       resetPitchForNote(key);
       const auto slide = consumePitchSlide();
+      const bool isTiedNote = prevNoteSlurred && key == prevNoteKey;
 
-      if (prevNoteSlurred && key == prevNoteKey) {
+      if (!isTiedNote && vibratoFade.length != 0 &&
+          konami_snes::vibrato::isActive(seq().version, vibratoRate, vibratoDepth)) {
+        vibratoFade.delayRemaining = vibratoDelay;
+        vibratoFade.ticksRemaining = vibratoFade.length;
+        vibratoFade.currentDepth = 0;
+        if (vibratoFade.midiDepth != 0) {
+          addModulationNoItem(0);
+          vibratoFade.midiDepth = 0;
+        }
+      }
+
+      if (isTiedNote) {
         // TODO: Note volume can be changed during a tied note
         // See the end of Konami Logo sequence for example
         makePrevDurNoteEnd(getTime() + dur);
@@ -1136,12 +1250,55 @@ bool KonamiSnesTrack::readEvent() {
     }
 
     case EVENT_VIBRATO: {
-      uint8_t vibratoDelay = readByte(curOffset++);
-      uint8_t vibratoRate = readByte(curOffset++);
-      uint8_t vibratoDepth = readByte(curOffset++);
-      desc = fmt::format("Delay: {:d}  Rate: {:d}  Depth: {:d}",
-                         vibratoDelay, vibratoRate, vibratoDepth);
+      uint8_t vibratoArg1 = readByte(curOffset++);
+      uint8_t newVibratoRate = readByte(curOffset++);
+      uint8_t newVibratoDepth = readByte(curOffset++);
+      const uint8_t builtInFadeLength = konami_snes::vibrato::inlineFadeLength(parentSeq.version, vibratoArg1);
+      const uint8_t newVibratoDelay = konami_snes::vibrato::delayFromArg1(parentSeq.version, vibratoArg1);
+      desc = (builtInFadeLength != 0)
+          ? fmt::format("Fade Length: {:d}  Rate: {:d}  Depth: {:d}",
+                        builtInFadeLength, newVibratoRate, newVibratoDepth)
+          : fmt::format("Delay: {:d}  Rate: {:d}  Depth: {:d}",
+                        newVibratoDelay, newVibratoRate, newVibratoDepth);
       addGenericEvent(beginOffset, curOffset - beginOffset, "Vibrato", desc, Type::Vibrato);
+
+      uint8_t immediateFadeLength = builtInFadeLength;
+      if (readByte(curOffset) == 0xf9) {
+        immediateFadeLength = readByte(curOffset + 1);
+      }
+
+      vibratoDelay = newVibratoDelay;
+      vibratoRate = newVibratoRate;
+      vibratoDepth = newVibratoDepth;
+      vibratoFade = {};
+      if (builtInFadeLength != 0) {
+        vibratoFade.length = builtInFadeLength;
+        vibratoFade.step = static_cast<uint16_t>((static_cast<uint16_t>(vibratoDepth) << 8) / builtInFadeLength);
+      }
+
+      const bool active = konami_snes::vibrato::isActive(parentSeq.version, vibratoRate, vibratoDepth);
+      const bool deferDepthForFade = active && immediateFadeLength != 0;
+      if (readMode != READMODE_CONVERT_TO_MIDI && active) {
+        parentSeq.maxVibratoDepth = std::max(parentSeq.maxVibratoDepth, vibratoDepth);
+      }
+
+      const uint8_t midiDepth = deferDepthForFade
+          ? 0
+          : (active ? convertVibratoDepthToMidi(parentSeq.version,
+                                                vibratoDepth,
+                                                static_cast<uint16_t>(vibratoDepth) << 8,
+                                                parentSeq.maxVibratoDepth)
+                    : 0);
+      addModulationNoItem(midiDepth);
+      vibratoFade.currentDepth = static_cast<uint16_t>(deferDepthForFade ? 0 : vibratoDepth) << 8;
+      vibratoFade.midiDepth = midiDepth;
+      if (active) {
+        syncVibratoRateAndDelay();
+      }
+      else {
+        addChannelPressureNoItem(0);
+        addControllerEventNoItem(konami_snes::kVibratoDelayController, 0);
+      }
       break;
     }
 
@@ -1256,6 +1413,11 @@ bool KonamiSnesTrack::readEvent() {
       clearActiveTempoFade();
       parentSeq.tempo = newTempo;
       addTempoBPM(beginOffset, curOffset - beginOffset, parentSeq.getTempoInBPM(newTempo));
+      if (konami_snes::usesLegacyVibrato(parentSeq.version)) {
+        for (SeqTrack *track : parentSeq.aTracks) {
+          static_cast<KonamiSnesTrack*>(track)->syncVibratoRateAndDelay();
+        }
+      }
       break;
     }
 
@@ -1418,6 +1580,14 @@ bool KonamiSnesTrack::readEvent() {
       desc = fmt::format("Fade Length: {:d}", fadeSpeed);
       addGenericEvent(beginOffset, curOffset - beginOffset, "Vibrato Fade", desc,
                       Type::Vibrato);
+      if (fadeSpeed == 0) {
+        vibratoFade.length = 0;
+        vibratoFade.step = 0;
+      }
+      else {
+        vibratoFade.length = fadeSpeed;
+        vibratoFade.step = static_cast<uint16_t>((static_cast<uint16_t>(vibratoDepth) << 8) / fadeSpeed);
+      }
       break;
     }
 

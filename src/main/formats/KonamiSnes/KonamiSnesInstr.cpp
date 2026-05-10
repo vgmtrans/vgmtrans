@@ -5,7 +5,10 @@
  */
 
 #include "KonamiSnesInstr.h"
+#include "KonamiSnesSeq.h"
+#include "KonamiSnesVibrato.h"
 #include "SNESDSP.h"
+#include "VGMColl.h"
 #include <algorithm>
 #include <spdlog/fmt/fmt.h>
 
@@ -28,6 +31,26 @@ constexpr bool usesLegacyPanRange(KonamiSnesVersion version) {
 
 constexpr uint8_t percussionPanLimit(KonamiSnesVersion version) {
   return usesLegacyPanRange(version) ? 0x14 : 0x28;
+}
+
+// Rewrites the shared vibrato modulators to the sequence-specific maxima collected on the first
+// pass, while keeping the controller mapping itself identical across instrument loads.
+void applyVibratoExportScaling(KonamiSnesInstrSet* instrSet, uint8_t maxDepth, uint16_t maxRateFactor) {
+  const auto version = instrSet->version;
+  const uint8_t clampedMaxDepth = std::max(maxDepth, konami_snes::kMinVibratoMaxDepth);
+  const uint16_t clampedMaxRateFactor = std::max(maxRateFactor, konami_snes::vibrato::minMaxRateFactor(version));
+  const double maxDepthCents = konami_snes::vibrato::maxDepthCents(version, clampedMaxDepth);
+  const double baseHz = konami_snes::vibrato::baseHz(version);
+  const double maxRateHz = baseHz * clampedMaxRateFactor;
+
+  for (auto* instr : instrSet->exportInstrs()) {
+    instr->updateModulatorAmount(ModSource::ModWheel,
+                                 ModDest::VibLfoToPitch,
+                                 ModAmount::fromCents(maxDepthCents));
+    instr->updateModulatorAmount(ModSource::ChannelPressure,
+                                 ModDest::VibLfoFreq,
+                                 ModAmount::fromHertzRange(baseHz, maxRateHz));
+  }
 }
 
 int getPercussionKey(RawFile *file, uint32_t addrInstrHeader) {
@@ -194,6 +217,27 @@ bool KonamiSnesInstrSet::parseInstrPointers() {
   return true;
 }
 
+void KonamiSnesInstrSet::useColl(const VGMColl* coll) {
+  uint8_t maxVibratoDepth = konami_snes::kDefaultVibratoMaxDepth;
+  uint16_t maxVibratoRateFactor = konami_snes::vibrato::defaultMaxRateFactor(version);
+
+  if (coll != nullptr && coll->seq() != nullptr) {
+    const auto* seq = dynamic_cast<const KonamiSnesSeq*>(coll->seq());
+    if (seq != nullptr && seq->rawFile() == rawFile() && seq->version == version) {
+      maxVibratoDepth = seq->maxVibratoDepth;
+      maxVibratoRateFactor = seq->maxVibratoRateFactor;
+    }
+  }
+
+  applyVibratoExportScaling(this, maxVibratoDepth, maxVibratoRateFactor);
+}
+
+void KonamiSnesInstrSet::unuseColl() {
+  applyVibratoExportScaling(this,
+                            konami_snes::kDefaultVibratoMaxDepth,
+                            konami_snes::vibrato::defaultMaxRateFactor(version));
+}
+
 // ***************
 // KonamiSnesInstr
 // ***************
@@ -216,6 +260,19 @@ KonamiSnesInstr::~KonamiSnesInstr() {
 }
 
 bool KonamiSnesInstr::loadInstr() {
+  // Konami vibrato is driven per track from E4:
+  //   CC1  -> depth
+  //   ch. pressure -> final effective vibrato frequency
+  //   CC93 -> final effective vibrato delay
+  addStandardVibratoHandling(
+      konami_snes::vibrato::maxDepthCents(version, konami_snes::kDefaultVibratoMaxDepth),
+      konami_snes::vibrato::baseHz(version),
+      konami_snes::vibrato::baseHz(version) * konami_snes::vibrato::defaultMaxRateFactor(version),
+      VGMInstr::DelayRange {
+          konami_snes::vibrato::minDelaySeconds(version),
+          konami_snes::vibrato::maxDelaySeconds(version),
+      });
+
   if (percussion) {
     const auto percussionHeaders = collectPercussionHeaders(rawFile(), version, offset(), spcDirAddr);
     for (const auto &header : percussionHeaders) {

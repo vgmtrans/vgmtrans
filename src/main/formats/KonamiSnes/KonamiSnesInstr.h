@@ -4,6 +4,8 @@
 #include "VGMRgn.h"
 #include "KonamiSnesFormat.h"
 
+class VGMColl;
+
 // ******************
 // KonamiSnesInstrSet
 // ******************
@@ -25,6 +27,8 @@ class KonamiSnesInstrSet:
 
   virtual bool parseHeader();
   virtual bool parseInstrPointers();
+  void useColl(const VGMColl* coll) override;
+  void unuseColl() override;
 
   KonamiSnesVersion version;
 
