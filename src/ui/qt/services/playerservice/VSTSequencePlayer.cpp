@@ -53,6 +53,9 @@ bool VSTSequencePlayer::loadCollection(const VGMColl *coll, std::function<void()
   state.musicState = MusicState::Unloaded;
 
   auto bgLoadSF2 = [coll, this, onCompletion]() {
+    // SF2 export and MIDI conversion both mutate/read the same VGMSeq state, so keep them on the
+    // same worker thread instead of racing them against each other.
+    prepMidiPlayback(coll);
     sendSF2ToVST(coll);
     sendOpmToVST(coll);
     state.musicState = MusicState::Stopped;
@@ -61,7 +64,6 @@ bool VSTSequencePlayer::loadCollection(const VGMColl *coll, std::function<void()
   std::thread myThread(bgLoadSF2);
   myThread.detach();
 
-  prepMidiPlayback(coll);
   enqueueResetEvent();
   return true;
 }
