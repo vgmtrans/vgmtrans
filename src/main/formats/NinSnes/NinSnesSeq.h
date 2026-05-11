@@ -102,7 +102,13 @@ protected:
   VGMHeader* header;
 
 private:
+  friend class NinSnesTrack;
   void loadEventMap();
+  void resetTempoState(uint8_t newTempo);
+  void setTempoImmediate(uint8_t newTempo);
+  void beginTempoFade(uint8_t targetTempo, uint8_t fadeLength);
+  void syncTrackVibratoToTempo();
+  void applyTempoFadeStep();
   NinSnesIntelliTADrumKitDef buildIntelliTADrumKitDef() const;
 
   uint8_t spcPercussionBaseInit;
@@ -163,7 +169,6 @@ private:
   void setVibratoDepth(uint8_t depth);
   void syncSharedVibratoState();
   void syncVibratoRateAndDelay();
-  void applyCurrentTempo();
 
   uint8_t getEffectiveNoteDuration() const;
   void rememberMelodicProgram(uint32_t progNum,
