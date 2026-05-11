@@ -14,6 +14,8 @@ DECLARE_FORMAT(NinSnes);
 namespace {
 
 constexpr size_t MAX_TRACKS = kNinSnesTrackCount;
+constexpr uint16_t kNinSnesDefaultPitchBendRangeCents =
+    NinSnesTrackState::kDefaultPitchBendRangeCents;
 
 }  // namespace
 
@@ -34,6 +36,7 @@ NinSnesSeq::NinSnesSeq(RawFile* file, NinSnesProfileId profile, uint32_t offset,
 
   useReverb();
   setAlwaysWriteInitialReverb(0);
+  setAlwaysWriteInitialPitchBendRange(kNinSnesDefaultPitchBendRangeCents);
 
   loadEventMap();
 }

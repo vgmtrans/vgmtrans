@@ -7,6 +7,9 @@
 
 namespace {
 
+constexpr uint16_t kNinSnesDefaultPitchBendRangeCents =
+    NinSnesTrackState::kDefaultPitchBendRangeCents;
+
 uint8_t convertVibratoDepthToMidi(uint8_t depth, double maxDepthCents) {
   if (depth == 0) {
     return 0;
@@ -31,7 +34,98 @@ uint8_t convertVibratoDelayToMidi(uint8_t delay, double tempo) {
                                     nin_snes::vibrato::kMaxDelaySeconds);
 }
 
+int32_t notePitch(uint8_t note) {
+  // NinSnes stores slide pitch in semitone units with an 8-bit fractional part.
+  return static_cast<int32_t>(note & 0x7f) << 8;
+}
+
 }  // namespace
+
+NinSnesTrack::PitchSlideEvent NinSnesTrack::readPitchSlide(uint32_t offset) {
+  return PitchSlideEvent {
+    offset,
+    4,
+    readByte(curOffset++),
+    readByte(curOffset++),
+    readByte(curOffset++),
+  };
+}
+
+bool NinSnesTrack::consumeQueuedPitchSlide() {
+  if (state.pitch.motionTicksRemaining() != 0) {
+    return false;
+  }
+
+  const auto statusByte = readByte(curOffset);
+  auto nextEvent = seq().EventMap.find(statusByte);
+  if (nextEvent == seq().EventMap.end() || nextEvent->second != EVENT_PITCH_SLIDE) {
+    return false;
+  }
+
+  const auto slideOffset = curOffset++;
+  auto slide = readPitchSlide(slideOffset);
+  addPitchSlideEvent(slide);
+  beginPitchSlide(slide);
+  return true;
+}
+
+void NinSnesTrack::addPitchSlideEvent(const PitchSlideEvent& slide) {
+  auto desc = fmt::format("Delay: {:d}  Length: {:d}  Target Note: {:d}",
+                          slide.delay,
+                          slide.length,
+                          slide.targetNote & 0x7f);
+  addGenericEvent(slide.offset, slide.eventLength, "Pitch Slide", desc, Type::PitchBendSlide);
+}
+
+void NinSnesTrack::beginPitchSlide(const PitchSlideEvent& slide) {
+  activatePitchMotion(slide.delay, slide.length, notePitch(slide.targetNote));
+}
+
+void NinSnesTrack::activatePitchMotion(uint8_t delay, uint8_t length, int32_t targetPitch) {
+  auto& pitch = state.pitch;
+  pitch.clearMotion();
+  if (!pitch.baseValid() || length == 0) {
+    return;
+  }
+
+  // F1/F2 and F9 all reduce to the same live pitch-motion state: wait for an optional delay,
+  // advance by a signed 8.8 delta each tick, then snap exactly to the stored target.
+  const int32_t currentPitch = pitch.currentPitch();
+  beginPitchBendAutomation(
+      pitch,
+      pitch.motionToTarget(targetPitch, length, delay),
+      pitch.rangeCentsForSlide(currentPitch, targetPitch, kNinSnesDefaultPitchBendRangeCents),
+      kNinSnesDefaultPitchBendRangeCents,
+      true);
+}
+
+void NinSnesTrack::updatePitchSlide() {
+  advancePitchBendAutomation(state.pitch);
+}
+
+void NinSnesTrack::beginNotePitch(uint8_t note) {
+  resetPitchBendForNewNote();
+  state.pitch.beginNote(notePitch(note));
+  activateStoredPitchEnvelope();
+  beginNoteVibrato();
+}
+
+void NinSnesTrack::activateStoredPitchEnvelope() {
+  const auto& pitchEnvelope = state.pitchEnvelope;
+  if (!pitchEnvelope.enabled()) {
+    return;
+  }
+
+  const int32_t semitoneOffset = static_cast<int32_t>(pitchEnvelope.semitones) * 256;
+  int32_t targetPitch = state.pitch.basePitch();
+  if (pitchEnvelope.mode == NinSnesTrackState::StoredPitchEnvelope::Mode::To) {
+    targetPitch += semitoneOffset;
+  } else {
+    state.pitch.setCurrentPitch(state.pitch.basePitch() - semitoneOffset);
+  }
+
+  activatePitchMotion(pitchEnvelope.delay, pitchEnvelope.length, targetPitch);
+}
 
 void NinSnesTrack::beginNoteVibrato() {
   // EVENT_VIBRATO_FADE is a reusable per-note fade-in for the configured E3 vibrato.
@@ -75,6 +169,22 @@ void NinSnesTrack::setVibratoDepth(uint8_t depth) {
 void NinSnesTrack::clearVibratoRateAndDelay() {
   addChannelPressureNoItem(0);
   addControllerEventNoItem(nin_snes::vibrato::kDelayController, 0);
+}
+
+void NinSnesTrack::resetPitchBendForNewNote() {
+  state.pitch.clearMotion();
+  state.pitch.invalidateBase();
+  if (state.pitch.atRest(kNinSnesDefaultPitchBendRangeCents)) {
+    return;
+  }
+
+  if (state.pitchEnvelope.enabled()) {
+    // Recurring pitch envelopes will set or reuse their needed range below.
+    setPitchBendAutomationBend(state.pitch, 0);
+    return;
+  }
+
+  resetPitchBendAutomation(state.pitch, kNinSnesDefaultPitchBendRangeCents);
 }
 
 void NinSnesTrack::syncVibratoRateAndDelay() {

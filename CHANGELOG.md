@@ -9,10 +9,10 @@
 - Added Flatpak builds for Linux. From now on, stable releases will be automatically available on Flathub.
 - Added stitched export for collection chunks: drag collections into a stitch queue, reorder them, and export as a merged MIDI + SF2.
 - Added a search field to the Collections panel
-- Added Drum Kit support to the standard N-SPC driver (Nintendo's SNES SDK driver).
-- Added Drum Kit support to the SuzukiSnes driver (Seiken Densetsu 3, Super Mario RPG, etc)
-- Added many improvements to the KonamiSnes driver.
+- Added drum kit, vibrato, and pitch slide support to the standard N-SPC driver (Nintendo's SNES SDK driver).
+- Added drum kit, portamento, and slide support for volume/pan/pitch to the KonamiSnes driver.
 - Added vibrato, tremolo, more accurate portamento support, and fixed pan calculation in the CapcomSnes driver.
+- Added drum kit support to the SuzukiSnes driver (Seiken Densetsu 3, Super Mario RPG, etc)
 - Improved support for late-era Intelligent Systems SNES/SFC titles (Tetris Attack, Fire Emblem 4, Super Famicom Wars) 
 
 ### Changed

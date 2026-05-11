@@ -192,6 +192,14 @@ public:
 
 class NinSnesTrack : public SeqTrack {
 public:
+  struct PitchSlideEvent {
+    uint32_t offset = 0;
+    uint32_t eventLength = 0;
+    uint8_t delay = 0;
+    uint8_t length = 0;
+    uint8_t targetNote = 0;
+  };
+
   NinSnesTrack(NinSnesSeq* parentSeq, uint32_t offset = 0, uint32_t length = 0,
                const std::string& theName = "NinSnes Track");
 
@@ -229,11 +237,20 @@ private:
                           std::string& desc);
   bool handleIntelliEvent(NinSnesSeqEventType eventType, uint32_t beginOffset, uint8_t statusByte,
                           std::string& desc);
+  PitchSlideEvent readPitchSlide(uint32_t offset);
+  bool consumeQueuedPitchSlide();
+  void addPitchSlideEvent(const PitchSlideEvent& slide);
+  void beginPitchSlide(const PitchSlideEvent& slide);
+  void activatePitchMotion(uint8_t delay, uint8_t length, int32_t targetPitch);
+  void updatePitchSlide();
+  void beginNotePitch(uint8_t note);
+  void activateStoredPitchEnvelope();
   void beginNoteVibrato();
   void updateVibratoFade();
   void applyConfiguredVibrato();
   void clearVibratoRateAndDelay();
   void setVibratoDepth(uint8_t depth);
+  void resetPitchBendForNewNote();
   void addPendingEndEvent(uint8_t statusByte, const std::string& desc);
   void syncVibratoRateAndDelay();
 
