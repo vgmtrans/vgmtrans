@@ -104,6 +104,34 @@ class NinSnesTrackSharedData {
   uint16_t konamiLoopStart;
   uint8_t konamiLoopCount;
 
+  // VGMMultiSectionSeq reinitializes track objects when a new section starts, so stored envelope
+  // definitions and live pitch-motion state have to survive here or the next note may inherit
+  // stale MIDI bend values.
+  struct ActivePitchSlide {
+    uint8_t delayRemaining = 0;
+    uint8_t ticksRemaining = 0;
+    int16_t delta = 0;
+    int32_t targetPitch = 0;
+  };
+
+  // F1/F2 define a reusable note-on envelope, while F9 instantiates the live motion directly.
+  struct StoredPitchEnvelope {
+    enum class Mode : uint8_t {
+      None,
+      To,
+      From,
+    };
+
+    Mode mode = Mode::None;
+    uint8_t delay = 0;
+    uint8_t length = 0;
+    int8_t semitones = 0;
+
+    bool enabled() const {
+      return mode != Mode::None && length != 0;
+    }
+  };
+
   struct VibratoState {
     struct Fade {
       uint8_t length = 0;
@@ -125,6 +153,13 @@ class NinSnesTrackSharedData {
   };
 
   VibratoState vibrato;
+  StoredPitchEnvelope pitchEnvelope;
+  ActivePitchSlide pitchSlide;
+  bool pitchBaseValid;
+  int32_t noteBasePitch;
+  int32_t currentPitch;
+  uint16_t pitchBendRangeCents;
+  int16_t currentPitchBend;
 };
 
 struct NinSnesPercussionDef {
