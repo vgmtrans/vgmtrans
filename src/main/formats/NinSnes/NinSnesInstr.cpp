@@ -19,6 +19,12 @@ struct NinSnesPitchTuning {
   int16_t fineTune = 0;
 };
 
+struct VibratoExportSettings {
+  const NinSnesSeq* seq = nullptr;
+  double maxDepthCents = nin_snes::vibrato::defaultMaxDepthCents();
+  double maxRateHz = nin_snes::vibrato::defaultMaxRateHz();
+};
+
 uint32_t getProgramNumber(const VGMInstr* instr) {
   return (instr->bank << 7) | (instr->instrNum & 0x7f);
 }
@@ -54,6 +60,25 @@ void applyVibratoExportScaling(NinSnesInstrSet* instrSet, double maxDepthCents, 
                                  ModDest::VibLfoFreq,
                                  ModAmount::fromHertzRange(nin_snes::vibrato::minRateHz(), effectiveMaxRateHz));
   }
+}
+
+VibratoExportSettings resolveVibratoExportSettings(const NinSnesInstrSet& instrSet,
+                                                   const VGMColl* coll) {
+  VibratoExportSettings settings;
+
+  const auto* seq = dynamic_cast<const NinSnesSeq*>(coll != nullptr ? coll->seq() : nullptr);
+  if (seq == nullptr || seq->rawFile() != instrSet.rawFile() || seq->profileId != instrSet.profileId) {
+    return settings;
+  }
+
+  settings.seq = seq;
+  if (seq->maxVibratoDepthCents > 0.0) {
+    settings.maxDepthCents = seq->maxVibratoDepthCents;
+  }
+  if (seq->maxVibratoRateHz > 0.0) {
+    settings.maxRateHz = seq->maxVibratoRateHz;
+  }
+  return settings;
 }
 
 VGMInstr* findInstrByProgram(const std::vector<VGMInstr*>& instrs, uint32_t progNum) {
@@ -99,10 +124,10 @@ NinSnesPitchTuning calculatePitchTuning(uint16_t pitchScale) {
   };
 }
 
-VGMRgn* cloneLegacyRgnForDrumKit(VGMInstr* instr,
-                                 VGMRgn* sourceRgn,
-                                 uint8_t noteIndex,
-                                 int8_t globalTranspose) {
+VGMRgn* cloneStandardRgnForDrumKit(VGMInstr* instr,
+                                   VGMRgn* sourceRgn,
+                                   uint8_t noteIndex,
+                                   int8_t globalTranspose) {
   auto* newRgn = new VGMRgn(instr,
                             sourceRgn->offset(),
                             sourceRgn->length(),
@@ -302,111 +327,112 @@ bool NinSnesInstrSet::parseInstrPointers() {
 }
 
 void NinSnesInstrSet::useColl(const VGMColl* coll) {
-  double maxVibratoDepthCents = nin_snes::vibrato::defaultMaxDepthCents();
-  double maxVibratoRateHz = nin_snes::vibrato::defaultMaxRateHz();
-  const auto* seq = dynamic_cast<const NinSnesSeq*>(coll != nullptr ? coll->seq() : nullptr);
-  if (seq == nullptr || seq->rawFile() != rawFile() || seq->profileId != profileId) {
-    applyVibratoExportScaling(this, maxVibratoDepthCents, maxVibratoRateHz);
-    return;
-  }
-
-  if (seq->maxVibratoDepthCents > 0.0) {
-    maxVibratoDepthCents = seq->maxVibratoDepthCents;
-  }
-  if (seq->maxVibratoRateHz > 0.0) {
-    maxVibratoRateHz = seq->maxVibratoRateHz;
-  }
-
-  if (usesIntelliTempDrumKitExport(seq->profileId)) {
-    for (const auto& overrideDef : seq->intelliTAInstrumentOverrides()) {
-      auto* overrideInstr = new VGMInstr(
-          this,
-          0,
-          NinSnesInstr::expectedSize(profileId),
-          overrideDef.progNum >> 7,
-          overrideDef.progNum & 0x7f,
-          fmt::format("Instrument {:d} (Overwrite)", overrideDef.logicalInstrIndex));
-      addVibratoExportHandling(overrideInstr);
-      auto* rgn =
-          createRgnFromHeaderData(overrideInstr, rawFile(), profileId, spcDirAddr, overrideDef.regionData);
-      if (rgn == nullptr) {
-        delete overrideInstr;
-        continue;
-      }
-      overrideInstr->addRgn(rgn);
-      addTempInstr(overrideInstr);
-    }
-
-    for (const auto& drumKitDef : seq->intelliTADrumKitDefs()) {
-      auto* drumKit = new VGMInstr(
-          this, 0, 0, 127, drumKitDef.program, fmt::format("Drum Kit {:d}", drumKitDef.program));
-      addVibratoExportHandling(drumKit);
-
-      for (size_t slot = 0; slot < drumKitDef.slots.size(); slot++) {
-        const auto& slotDef = drumKitDef.slots[slot];
-        if (!slotDef.active) {
-          continue;
-        }
-
-        VGMInstr* sourceInstr = findInstrByProgram(exportInstrs(), slotDef.sourceProgNum);
-        if (sourceInstr == nullptr) {
-          continue;
-        }
-
-        const uint8_t drumKey = static_cast<uint8_t>(0x24 + slot);
-        for (auto* sourceRgn : sourceInstr->regions()) {
-          drumKit->addRgn(
-              cloneIntelliTARgnForDrumKit(drumKit, sourceRgn, drumKey, slotDef.playedNoteByte));
-        }
-      }
-
-      if (drumKit->regions().empty()) {
-        delete drumKit;
-        continue;
-      }
-
-      addTempInstr(drumKit);
-    }
-  } else {
-    const auto& percussionInstrNoteMap = seq->percussionInstrNoteMap();
-    if (!percussionInstrNoteMap.empty()) {
-      auto* drumKit = new VGMInstr(this, 0, 0, 127, 0, "Drum Kit");
-      addVibratoExportHandling(drumKit);
-      for (const auto& [instrIndex, percussionDef] : percussionInstrNoteMap) {
-        VGMInstr* sourceInstr = nullptr;
-        for (auto* instr : aInstrs) {
-          if (instr->instrNum == instrIndex) {
-            sourceInstr = instr;
-            break;
-          }
-        }
-        if (sourceInstr == nullptr) {
-          continue;
-        }
-
-        for (auto* sourceRgn : sourceInstr->regions()) {
-          drumKit->addRgn(cloneLegacyRgnForDrumKit(drumKit,
-                                                   sourceRgn,
-                                                   percussionDef.noteIndex,
-                                                   percussionDef.globalTranspose));
-        }
-      }
-
-      if (drumKit->regions().empty()) {
-        delete drumKit;
-      } else {
-        addTempInstr(drumKit);
-      }
+  const auto exportSettings = resolveVibratoExportSettings(*this, coll);
+  if (exportSettings.seq != nullptr) {
+    if (usesIntelliTempDrumKitExport(exportSettings.seq->profileId)) {
+      addIntelliOverrideInstrs(*exportSettings.seq);
+      addIntelliDrumKits(*exportSettings.seq);
+    } else {
+      addStandardPercussionDrumKit(*exportSettings.seq);
     }
   }
 
-  applyVibratoExportScaling(this, maxVibratoDepthCents, maxVibratoRateHz);
+  applyVibratoExportScaling(this, exportSettings.maxDepthCents, exportSettings.maxRateHz);
 }
 
 void NinSnesInstrSet::unuseColl() {
   applyVibratoExportScaling(this,
                             nin_snes::vibrato::defaultMaxDepthCents(),
                             nin_snes::vibrato::defaultMaxRateHz());
+}
+
+void NinSnesInstrSet::addStandardPercussionDrumKit(const NinSnesSeq& seq) {
+  const auto& percussionInstrNoteMap = seq.percussionInstrNoteMap();
+  if (percussionInstrNoteMap.empty()) {
+    return;
+  }
+
+  auto* drumKit = new VGMInstr(this, 0, 0, 127, 0, "Drum Kit");
+  addVibratoExportHandling(drumKit);
+  for (const auto& [instrIndex, percussionDef] : percussionInstrNoteMap) {
+    VGMInstr* sourceInstr = nullptr;
+    for (auto* instr : aInstrs) {
+      if (instr->instrNum == instrIndex) {
+        sourceInstr = instr;
+        break;
+      }
+    }
+    if (sourceInstr == nullptr) {
+      continue;
+    }
+
+    for (auto* sourceRgn : sourceInstr->regions()) {
+      drumKit->addRgn(cloneStandardRgnForDrumKit(drumKit,
+                                                 sourceRgn,
+                                                 percussionDef.noteIndex,
+                                                 percussionDef.globalTranspose));
+    }
+  }
+
+  if (drumKit->regions().empty()) {
+    delete drumKit;
+  } else {
+    addTempInstr(drumKit);
+  }
+}
+
+void NinSnesInstrSet::addIntelliOverrideInstrs(const NinSnesSeq& seq) {
+  for (const auto& overrideDef : seq.intelliTAInstrumentOverrides()) {
+    auto* overrideInstr = new VGMInstr(this,
+                                       0,
+                                       NinSnesInstr::expectedSize(profileId),
+                                       overrideDef.progNum >> 7,
+                                       overrideDef.progNum & 0x7f,
+                                       fmt::format("Instrument {:d} (Overwrite)",
+                                                   overrideDef.logicalInstrIndex));
+    addVibratoExportHandling(overrideInstr);
+    auto* rgn =
+        createRgnFromHeaderData(overrideInstr, rawFile(), profileId, spcDirAddr, overrideDef.regionData);
+    if (rgn == nullptr) {
+      delete overrideInstr;
+      continue;
+    }
+    overrideInstr->addRgn(rgn);
+    addTempInstr(overrideInstr);
+  }
+}
+
+void NinSnesInstrSet::addIntelliDrumKits(const NinSnesSeq& seq) {
+  for (const auto& drumKitDef : seq.intelliTADrumKitDefs()) {
+    auto* drumKit =
+        new VGMInstr(this, 0, 0, 127, drumKitDef.program, fmt::format("Drum Kit {:d}", drumKitDef.program));
+    addVibratoExportHandling(drumKit);
+
+    for (size_t slot = 0; slot < drumKitDef.slots.size(); slot++) {
+      const auto& slotDef = drumKitDef.slots[slot];
+      if (!slotDef.active) {
+        continue;
+      }
+
+      VGMInstr* sourceInstr = findInstrByProgram(exportInstrs(), slotDef.sourceProgNum);
+      if (sourceInstr == nullptr) {
+        continue;
+      }
+
+      const uint8_t drumKey = static_cast<uint8_t>(0x24 + slot);
+      for (auto* sourceRgn : sourceInstr->regions()) {
+        drumKit->addRgn(
+            cloneIntelliTARgnForDrumKit(drumKit, sourceRgn, drumKey, slotDef.playedNoteByte));
+      }
+    }
+
+    if (drumKit->regions().empty()) {
+      delete drumKit;
+      continue;
+    }
+
+    addTempInstr(drumKit);
+  }
 }
 
 // *************
