@@ -23,6 +23,7 @@ class NinSnesInstrSet:
   bool parseHeader() override;
   bool parseInstrPointers() override;
   void useColl(const VGMColl* coll) override;
+  void unuseColl() override;
 
   NinSnesSignatureId signature;
   NinSnesProfileId profileId;

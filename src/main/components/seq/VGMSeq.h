@@ -39,6 +39,7 @@ class VGMSeq : public VGMFile {
   virtual bool parseHeader();
   virtual bool parseTrackPointers();  // Function to find all of the track pointers.   Returns number of total tracks.
   virtual void resetVars();
+  virtual void onTickEnd() {}
   virtual void useColl(const VGMColl* coll) {}
   virtual MidiFile *convertToMidi(const VGMColl* coll = nullptr);
   virtual MidiTrack *firstMidiTrack();
