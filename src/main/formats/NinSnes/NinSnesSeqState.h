@@ -103,6 +103,28 @@ class NinSnesTrackSharedData {
   // Konami:
   uint16_t konamiLoopStart;
   uint8_t konamiLoopCount;
+
+  struct VibratoState {
+    struct Fade {
+      uint8_t length = 0;
+      uint8_t step = 0;
+      uint8_t delayRemaining = 0;
+      uint8_t ticksRemaining = 0;
+      uint8_t currentDepth = 0;
+      uint8_t midiDepth = 0;
+    };
+
+    uint8_t delay = 0;
+    uint8_t rate = 0;
+    uint8_t depth = 0;
+    Fade fade;
+
+    bool active() const {
+      return rate != 0 && depth != 0;
+    }
+  };
+
+  VibratoState vibrato;
 };
 
 struct NinSnesPercussionDef {

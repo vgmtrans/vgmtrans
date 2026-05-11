@@ -1,7 +1,11 @@
 #include "NinSnesSeq.h"
+#include "NinSnesVibrato.h"
+#include "Modulation.h"
 #include "SeqEvent.h"
 #include "ScaleConversion.h"
 #include "spdlog/fmt/fmt.h"
+#include <algorithm>
+#include <cmath>
 
 DECLARE_FORMAT(NinSnes);
 
@@ -12,12 +16,72 @@ DECLARE_FORMAT(NinSnes);
 #define SEQ_PPQN 48
 #define SEQ_KEYOFS 24
 
+namespace {
+
+enum class FadeStepResult {
+  Inactive,
+  Running,
+  Finished,
+};
+
+FadeStepResult advanceTempoFade(NinSnesSeq::ActiveTempoFade& fade) {
+  if (fade.length == 0) {
+    return FadeStepResult::Inactive;
+  }
+
+  // NinSnes advances the 8.8 tempo first, then decrements the remaining step count, and finally
+  // snaps exactly to the target on the last update.
+  fade.currentTempo += fade.delta;
+  fade.length -= 1;
+  if (fade.length == 0) {
+    fade.currentTempo = fade.targetTempo;
+    return FadeStepResult::Finished;
+  }
+  return FadeStepResult::Running;
+}
+
+uint8_t convertVibratoDepthToMidi(uint8_t depth, double maxDepthCents) {
+  if (depth == 0) {
+    return 0;
+  }
+
+  const double effectiveMaxDepthCents =
+      (maxDepthCents > 0.0) ? maxDepthCents : nin_snes::vibrato::defaultMaxDepthCents();
+  const int midiValue = static_cast<int>(
+      std::lround(128.0 * nin_snes::vibrato::depthCents(depth) / effectiveMaxDepthCents));
+  return static_cast<uint8_t>(std::clamp(midiValue, 0, 127));
+}
+
+uint8_t convertVibratoRateToMidi(uint8_t rate, double tempo, double maxRateHz) {
+  const double currentRateHz = nin_snes::vibrato::rateHz(rate, tempo);
+  if (currentRateHz <= 0.0) {
+    return 0;
+  }
+
+  const double effectiveMaxRateHz =
+      (maxRateHz > 0.0) ? maxRateHz : nin_snes::vibrato::defaultMaxRateHz();
+  return midiValueForHertzInRange(currentRateHz,
+                                  nin_snes::vibrato::minRateHz(),
+                                  effectiveMaxRateHz);
+}
+
+uint8_t convertVibratoDelayToMidi(uint8_t delay, double tempo) {
+  return midiValueForSecondsInRange(nin_snes::vibrato::delaySeconds(delay, tempo),
+                                    nin_snes::vibrato::minDelaySeconds(),
+                                    nin_snes::vibrato::maxDelaySeconds());
+}
+
+}  // namespace
+
 NinSnesSeq::NinSnesSeq(RawFile* file, NinSnesProfileId profile, uint32_t offset,
                        uint8_t percussion_base, const std::vector<uint8_t>& theVolumeTable,
                        const std::vector<uint8_t>& theDurRateTable, std::string theName)
     : VGMMultiSectionSeq(NinSnesFormat::name, file, offset, 0, theName),
       signature(NinSnesSignatureId::None), profileId(profile), header(NULL),
       volumeTable(theVolumeTable), durRateTable(theDurRateTable),
+      tempo(nin_snes::vibrato::kDefaultTempo),
+      maxVibratoDepthCents(nin_snes::vibrato::minMaxDepthCents()),
+      maxVibratoRateHz(nin_snes::vibrato::minMaxRateHz()),
       spcPercussionBaseInit(percussion_base), konamiBaseAddress(0), quintetBGMInstrBase(0),
       falcomBaseOffset(0), m_nextIntelliTAOverrideProgram(0x80) {
   bLoadTickByTick = true;
@@ -53,6 +117,14 @@ void NinSnesSeq::resetVars() {
   spcPercussionBase = spcPercussionBaseInit;
   sectionRepeatCount = 0;
   globalTranspose = 0;
+  tempo = nin_snes::vibrato::kDefaultTempo;
+  tempoFade = {};
+  tempoFade.currentTempo = tempo << 8;
+  tempoFade.targetTempo = tempoFade.currentTempo;
+  if (readMode != READMODE_CONVERT_TO_MIDI) {
+    maxVibratoDepthCents = nin_snes::vibrato::minMaxDepthCents();
+    maxVibratoRateHz = nin_snes::vibrato::minMaxRateHz();
+  }
   m_percussionInstrNoteMap.clear();
 
   // Intelligent Systems:
@@ -265,11 +337,22 @@ void NinSnesSeq::loadEventMap() {
   intelliDurVolTable = definition.intelliDurVolTable;
 }
 
-double NinSnesSeq::getTempoInBPM(uint8_t tempo) {
-  if (tempo != 0) {
-    return (double)60000000 / (SEQ_PPQN * 2000) * ((double)tempo / 256);
+double NinSnesSeq::getTempoInBPM() {
+  return getTempoInBPM(tempo);
+}
+
+double NinSnesSeq::getTempoInBPM(uint8_t tempoValue) {
+  if (tempoValue != 0) {
+    return static_cast<double>(60000000) / (SEQ_PPQN * 2000) *
+           (static_cast<double>(tempoValue) / 256);
   } else {
     return 1.0;  // since tempo 0 cannot be expressed, this function returns a very small value.
+  }
+}
+
+void NinSnesSeq::onTickEnd() {
+  if (advanceTempoFade(tempoFade) != FadeStepResult::Inactive && !aTracks.empty()) {
+    static_cast<NinSnesTrack*>(aTracks[0])->applyCurrentTempo();
   }
 }
 
@@ -376,6 +459,7 @@ void NinSnesTrackSharedData::resetVars(void) {
   // Konami:
   konamiLoopStart = 0;
   konamiLoopCount = 0;
+  vibrato = {};
 }
 
 //  ************
@@ -395,6 +479,9 @@ void NinSnesTrack::resetVars() {
   cKeyCorrection = SEQ_KEYOFS;
   if (shared != NULL) {
     transpose = shared->spcTranspose;
+    vibrato = shared->vibrato;
+  } else {
+    vibrato = {};
   }
   m_lastNoteWasPercussion = false;
   nonPercussionProgram = 0;
@@ -465,6 +552,98 @@ NinSnesSeq& NinSnesTrack::seq() const {
 
 NinSnesIntelliModeId NinSnesTrack::intelliMode() const {
   return seq().profile().intelliMode;
+}
+
+void NinSnesTrack::beginNoteVibrato() {
+  if (!vibrato.active()) {
+    return;
+  }
+
+  // F0 is a reusable per-note fade-in for the currently configured E3 vibrato, so a real note-on
+  // either restarts that fade from zero depth or restores the steady-state depth immediately.
+  if (vibrato.fade.length == 0) {
+    vibrato.fade.delayRemaining = 0;
+    vibrato.fade.ticksRemaining = 0;
+    setVibratoDepth(vibrato.depth);
+  } else {
+    vibrato.fade.delayRemaining = vibrato.delay;
+    vibrato.fade.ticksRemaining = vibrato.fade.length;
+    setVibratoDepth(0);
+  }
+}
+
+void NinSnesTrack::updateVibratoFade() {
+  if (vibrato.fade.ticksRemaining == 0) {
+    return;
+  }
+
+  if (vibrato.fade.delayRemaining > 0) {
+    vibrato.fade.delayRemaining -= 1;
+    syncSharedVibratoState();
+    return;
+  }
+
+  vibrato.fade.ticksRemaining -= 1;
+  const uint8_t depth = (vibrato.fade.ticksRemaining == 0)
+      ? vibrato.depth
+      : std::min<uint8_t>(vibrato.depth, vibrato.fade.currentDepth + vibrato.fade.step);
+  setVibratoDepth(depth);
+}
+
+void NinSnesTrack::setVibratoDepth(uint8_t depth) {
+  vibrato.fade.currentDepth = depth;
+  const uint8_t midiDepth = convertVibratoDepthToMidi(depth, seq().maxVibratoDepthCents);
+  if (midiDepth != vibrato.fade.midiDepth) {
+    addModulationNoItem(midiDepth);
+  }
+  vibrato.fade.midiDepth = midiDepth;
+  syncSharedVibratoState();
+}
+
+void NinSnesTrack::syncSharedVibratoState() {
+  if (shared == nullptr) {
+    return;
+  }
+
+  shared->vibrato = vibrato;
+}
+
+void NinSnesTrack::syncVibratoRateAndDelay() {
+  if (!vibrato.active()) {
+    return;
+  }
+
+  auto& parentSeq = seq();
+  const double currentTempo = parentSeq.tempo;
+  if (readMode != READMODE_CONVERT_TO_MIDI) {
+    // Rate and delay are both tempo-relative, so a sequence-specific max only makes sense once the
+    // current tempo has been folded into the exported Hz value.
+    parentSeq.maxVibratoRateHz =
+        std::max(parentSeq.maxVibratoRateHz, nin_snes::vibrato::rateHz(vibrato.rate, currentTempo));
+  }
+
+  addChannelPressureNoItem(convertVibratoRateToMidi(vibrato.rate, currentTempo,
+                                                    parentSeq.maxVibratoRateHz));
+  addControllerEventNoItem(nin_snes::vibrato::kDelayController,
+                           convertVibratoDelayToMidi(vibrato.delay, currentTempo));
+}
+
+void NinSnesTrack::applyCurrentTempo() {
+  auto& parentSeq = seq();
+  const uint8_t newTempo =
+      static_cast<uint8_t>(std::clamp(parentSeq.tempoFade.currentTempo >> 8, 0, 0xff));
+  if (newTempo == parentSeq.tempo) {
+    return;
+  }
+
+  parentSeq.tempo = newTempo;
+  for (auto* track : parentSeq.aTracks) {
+    static_cast<NinSnesTrack*>(track)->syncVibratoRateAndDelay();
+  }
+}
+
+void NinSnesTrack::onTickBegin() {
+  updateVibratoFade();
 }
 
 void NinSnesTrack::readStandardNoteParam(uint32_t beginOffset, uint8_t statusByte,
@@ -597,6 +776,7 @@ bool NinSnesTrack::handleCoreEvent(NinSnesSeqEventType eventType, uint32_t begin
       const uint8_t noteNumber = statusByte - parentSeq.STATUS_NOTE_MIN;
       const uint8_t duration = getEffectiveNoteDuration();
       restoreNonPercussionProgramIfNeeded();
+      beginNoteVibrato();
       addNoteByDur(beginOffset, curOffset - beginOffset, noteNumber, shared->spcNoteVolume / 2,
                    duration, "Note");
       m_lastNoteWasPercussion = false;
@@ -635,6 +815,7 @@ bool NinSnesTrack::handleCoreEvent(NinSnesSeqEventType eventType, uint32_t begin
       parentSeq.addPercussionInstrNoteMapping(instrIndex, noteIndex, parentSeq.globalTranspose);
 
       switchToPercussionProgramIfNeeded();
+      beginNoteVibrato();
       addPercNoteByDur(beginOffset, curOffset - beginOffset,
                        static_cast<int8_t>(noteIndex - cKeyCorrection - parentSeq.globalTranspose),
                        shared->spcNoteVolume / 2, duration, "Percussion Note");
@@ -702,17 +883,35 @@ bool NinSnesTrack::handleControllerEvent(NinSnesSeqEventType eventType, uint32_t
     }
 
     case EVENT_VIBRATO_ON: {
-      const uint8_t vibratoDelay = readByte(curOffset++);
-      const uint8_t vibratoRate = readByte(curOffset++);
-      const uint8_t vibratoDepth = readByte(curOffset++);
-      desc = fmt::format("Delay: {:d}  Rate: {:d}  Depth: {:d}", vibratoDelay, vibratoRate,
-                         vibratoDepth);
+      vibrato.delay = readByte(curOffset++);
+      vibrato.rate = readByte(curOffset++);
+      vibrato.depth = readByte(curOffset++);
+      vibrato.fade = {};
+      desc = fmt::format("Delay: {:d}  Rate: {:d}  Depth: {:d}", vibrato.delay, vibrato.rate,
+                         vibrato.depth);
       addGenericEvent(beginOffset, curOffset - beginOffset, "Vibrato", desc, Type::Vibrato);
+      if (vibrato.active()) {
+        if (readMode != READMODE_CONVERT_TO_MIDI) {
+          parentSeq.maxVibratoDepthCents =
+              std::max(parentSeq.maxVibratoDepthCents, nin_snes::vibrato::depthCents(vibrato.depth));
+        }
+        setVibratoDepth(vibrato.depth);
+        syncVibratoRateAndDelay();
+      } else {
+        setVibratoDepth(0);
+        addChannelPressureNoItem(0);
+        addControllerEventNoItem(nin_snes::vibrato::kDelayController, 0);
+      }
       return true;
     }
 
     case EVENT_VIBRATO_OFF:
+      vibrato = {};
+      syncSharedVibratoState();
       addGenericEvent(beginOffset, curOffset - beginOffset, "Vibrato Off", desc, Type::Vibrato);
+      addModulationNoItem(0);
+      addChannelPressureNoItem(0);
+      addControllerEventNoItem(nin_snes::vibrato::kDelayController, 0);
       return true;
 
     case EVENT_MASTER_VOLUME: {
@@ -731,7 +930,14 @@ bool NinSnesTrack::handleControllerEvent(NinSnesSeqEventType eventType, uint32_t
 
     case EVENT_TEMPO: {
       const uint8_t newTempo = readByte(curOffset++);
+      parentSeq.tempo = newTempo;
+      parentSeq.tempoFade = {};
+      parentSeq.tempoFade.currentTempo = newTempo << 8;
+      parentSeq.tempoFade.targetTempo = parentSeq.tempoFade.currentTempo;
       addTempoBPM(beginOffset, curOffset - beginOffset, parentSeq.getTempoInBPM(newTempo));
+      for (auto* track : parentSeq.aTracks) {
+        static_cast<NinSnesTrack*>(track)->syncVibratoRateAndDelay();
+      }
       return true;
     }
 
@@ -740,6 +946,21 @@ bool NinSnesTrack::handleControllerEvent(NinSnesSeqEventType eventType, uint32_t
       const uint8_t newTempo = readByte(curOffset++);
       addTempoSlide(beginOffset, curOffset - beginOffset, fadeLength,
                     static_cast<int>(60000000 / parentSeq.getTempoInBPM(newTempo)));
+      if (fadeLength == 0) {
+        parentSeq.tempo = newTempo;
+        parentSeq.tempoFade = {};
+        parentSeq.tempoFade.currentTempo = newTempo << 8;
+        parentSeq.tempoFade.targetTempo = parentSeq.tempoFade.currentTempo;
+        for (auto* track : parentSeq.aTracks) {
+          static_cast<NinSnesTrack*>(track)->syncVibratoRateAndDelay();
+        }
+      } else {
+        parentSeq.tempoFade.currentTempo = parentSeq.tempo << 8;
+        parentSeq.tempoFade.targetTempo = newTempo << 8;
+        parentSeq.tempoFade.delta = static_cast<int16_t>(
+            (parentSeq.tempoFade.targetTempo - parentSeq.tempoFade.currentTempo) / fadeLength);
+        parentSeq.tempoFade.length = fadeLength;
+      }
       return true;
     }
 
@@ -788,6 +1009,14 @@ bool NinSnesTrack::handleControllerEvent(NinSnesSeqEventType eventType, uint32_t
       const uint8_t fadeLength = readByte(curOffset++);
       desc = fmt::format("Length: {:d}", fadeLength);
       addGenericEvent(beginOffset, curOffset - beginOffset, "Vibrato Fade", desc, Type::Vibrato);
+      if (fadeLength == 0) {
+        vibrato.fade.length = 0;
+        vibrato.fade.step = 0;
+      } else {
+        vibrato.fade.length = fadeLength;
+        vibrato.fade.step = vibrato.depth / fadeLength;
+      }
+      syncSharedVibratoState();
       return true;
     }
 

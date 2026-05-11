@@ -11,6 +11,13 @@ struct NinSnesProfile;
 
 class NinSnesSeq : public VGMMultiSectionSeq {
 public:
+  struct ActiveTempoFade {
+    int32_t currentTempo = 0;
+    int32_t targetTempo = 0;
+    int16_t delta = 0;
+    uint8_t length = 0;
+  };
+
   NinSnesSeq(RawFile* file, NinSnesProfileId profile, uint32_t offset, uint8_t percussion_base = 0,
              const std::vector<uint8_t>& theVolumeTable = std::vector<uint8_t>(),
              const std::vector<uint8_t>& theDurRateTable = std::vector<uint8_t>(),
@@ -20,6 +27,7 @@ public:
 
   virtual bool parseHeader();
   virtual void resetVars();
+  void onTickEnd() override;
   virtual bool readEvent(long stopTime);
 
   const NinSnesProfile& profile() const;
@@ -53,6 +61,10 @@ public:
   uint8_t spcPercussionBase;
   uint8_t sectionRepeatCount;
   int8_t globalTranspose;
+  uint8_t tempo;
+  ActiveTempoFade tempoFade;
+  double maxVibratoDepthCents;
+  double maxVibratoRateHz;
 
   // Konami:
   uint16_t konamiBaseAddress;
@@ -115,8 +127,9 @@ public:
   NinSnesTrack(NinSnesSection* parentSection, uint32_t offset = 0, uint32_t length = 0,
                const std::string& theName = "NinSnes Track");
 
-  virtual void resetVars();
-  virtual bool readEvent();
+  void resetVars() override;
+  void onTickBegin() override;
+  bool readEvent() override;
 
   uint16_t convertToApuAddress(uint16_t offset);
   uint16_t getShortAddress(uint32_t offset);
@@ -129,6 +142,7 @@ public:
   bool available = true;
 
 private:
+  friend class NinSnesSeq;
   NinSnesSeq& seq() const;
   NinSnesIntelliModeId intelliMode() const;
   bool handleIntelliPercussionNote(uint32_t beginOffset, uint8_t slot, uint8_t duration);
@@ -144,6 +158,12 @@ private:
   bool handleIntelliEvent(NinSnesSeqEventType eventType, uint32_t beginOffset, uint8_t statusByte,
                           std::string& desc);
   void addPendingEndEvent(uint8_t statusByte, const std::string& desc);
+  void beginNoteVibrato();
+  void updateVibratoFade();
+  void setVibratoDepth(uint8_t depth);
+  void syncSharedVibratoState();
+  void syncVibratoRateAndDelay();
+  void applyCurrentTempo();
 
   uint8_t getEffectiveNoteDuration() const;
   void rememberMelodicProgram(uint32_t progNum,
@@ -162,4 +182,5 @@ private:
   uint8_t currentPercussionProgram = 0;
   std::optional<uint8_t> currentLogicalProgram;
   bool intelliLegato = false;
+  NinSnesTrackSharedData::VibratoState vibrato;
 };
