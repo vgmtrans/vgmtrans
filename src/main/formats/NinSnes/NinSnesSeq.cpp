@@ -809,9 +809,7 @@ void NinSnesTrack::resetPitchBendForNewNote() {
     shared->pitchBendRangeCents = kNinSnesDefaultPitchBendRangeCents;
   }
 
-  if (readMode == READMODE_CONVERT_TO_MIDI) {
-    pMidiTrack->addPitchBend(channel, 0);
-  }
+  addPitchBendNoItem(0);
   shared->currentPitchBend = 0;
 }
 
@@ -836,9 +834,7 @@ void NinSnesTrack::setPitchBend(int16_t bend) {
     return;
   }
 
-  if (readMode == READMODE_CONVERT_TO_MIDI) {
-    pMidiTrack->addPitchBend(channel, bend);
-  }
+  addPitchBendNoItem(bend);
   shared->currentPitchBend = bend;
 }
 

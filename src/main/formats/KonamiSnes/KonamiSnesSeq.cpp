@@ -689,9 +689,7 @@ void KonamiSnesTrack::setPitchBend(int16_t bend) {
     return;
   }
 
-  if (readMode == READMODE_CONVERT_TO_MIDI) {
-    pMidiTrack->addPitchBend(channel, bend);
-  }
+  addPitchBendNoItem(bend);
   currentPitchBend = bend;
 }
 

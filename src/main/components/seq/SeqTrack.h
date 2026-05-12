@@ -212,6 +212,7 @@ private:
   void insertReverb(uint32_t offset, uint32_t length, uint8_t reverb, uint32_t absTime, const std::string &sEventName = "Reverb");
   void addPitchBend(uint32_t offset, uint32_t length, int16_t bend, const std::string &sEventName = "Pitch Bend");
   void addPitchBendAsPercent(uint32_t offset, uint32_t length, double percent, const std::string &sEventName = "Pitch Bend");
+  void addPitchBendNoItem(int16_t bend) const;
   void addPitchBendRange(uint32_t offset, uint32_t length, uint16_t cents, const std::string &sEventName = "Pitch Bend Range");
   void addPitchBendRangeNoItem(uint16_t cents) const;
   void addChannelPressure(uint32_t offset, uint32_t length, uint8_t pressure, const std::string &sEventName = "Channel Pressure");

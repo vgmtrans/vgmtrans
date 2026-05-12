@@ -1190,8 +1190,7 @@ void SeqTrack::addPitchBend(uint32_t offset, uint32_t length, int16_t bend, cons
 
   recordSeqEvent<PitchBendSeqEvent>(isNewOffset, getTime(), bend, offset, length, sEventName);
 
-  if (readMode == READMODE_CONVERT_TO_MIDI)
-    pMidiTrack->addPitchBend(channel, bend);
+  addPitchBendNoItem(bend);
 }
 
 void SeqTrack::addPitchBendAsPercent(uint32_t offset, uint32_t length, double percent, const std::string &sEventName) {
@@ -1200,6 +1199,11 @@ void SeqTrack::addPitchBendAsPercent(uint32_t offset, uint32_t length, double pe
   const s16 bendVal = static_cast<s16>(percent * 8192);
   s16 bend = std::clamp(bendVal, minVal, maxVal);
   addPitchBend(offset, length, bend, sEventName);
+}
+
+void SeqTrack::addPitchBendNoItem(int16_t bend) const {
+  if (readMode == READMODE_CONVERT_TO_MIDI)
+    pMidiTrack->addPitchBend(channel, bend);
 }
 
 void SeqTrack::addPitchBendRange(uint32_t offset, uint32_t length, uint16_t cents, const std::string &sEventName) {
