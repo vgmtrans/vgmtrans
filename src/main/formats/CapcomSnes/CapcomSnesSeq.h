@@ -107,7 +107,7 @@ class CapcomSnesTrack
   void setNoteSlurred(bool slurred);
 
  private:
-  [[nodiscard]] bool areLfoOutputsEnabled() const { return lfo.rate() != 0; }
+  [[nodiscard]] bool areLfoOutputsEnabled() const { return vibrato.rate() != 0; }
   void addVibratoDepthEvent(uint32_t offset, uint32_t length, uint8_t depth);
   void setLfoOutputsEnabled(bool enabled);
   void handleLfoRateChange(uint8_t lfoRateByte);
@@ -120,8 +120,8 @@ class CapcomSnesTrack
   bool lastNoteSlurred;
   bool didRest;
   int8_t lastKey;
-  SeqLfoState lfo;
-  uint8_t lastTremoloDepth;
+  SynthLfoLane vibrato;
+  SynthLfoLane tremolo;
   uint16_t lastPortamentoTime;
   double portamentoMillisecondsPerCent;
 

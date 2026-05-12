@@ -127,9 +127,9 @@ class NinSnesTrackSharedData {
 
   // VGMMultiSectionSeq reinitializes track objects when a new section starts, so the live pitch
   // and vibrato state has to live here rather than on NinSnesTrack.
-  SeqLfoState vibrato;
+  SynthLfoLane vibrato;
   StoredPitchEnvelope pitchEnvelope;
-  SeqPitchBendState<int32_t, int16_t> pitch;
+  PitchBendLane<int32_t, int16_t> pitch {100.0 / 256.0};
 };
 
 struct NinSnesPercussionDef {
