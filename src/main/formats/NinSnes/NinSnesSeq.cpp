@@ -643,8 +643,7 @@ void NinSnesTrack::activatePitchMotion(uint8_t delay, uint8_t length, int32_t ta
                     static_cast<int16_t>((targetPitch - currentPitch) / length),
                     length,
                     delay);
-  setPitchBendRange(
-      pitchBendRangeCentsForSlide(pitch.basePitch(), currentPitch, targetPitch));
+  setPitchBendRange(pitchBendRangeCentsForSlide(pitch.basePitch(), currentPitch, targetPitch));
   applyCurrentPitchBend();
 }
 
@@ -658,7 +657,7 @@ void NinSnesTrack::updatePitchSlide() {
     return;
   }
 
-  pitch.advanceAndApplyBend([this](int16_t bend) { addPitchBendNoItem(bend); });
+  advancePitchBendLane(pitch);
 }
 
 void NinSnesTrack::beginNotePitch(uint8_t note) {
@@ -730,9 +729,7 @@ void NinSnesTrack::setVibratoDepth(uint8_t depth) {
   auto& vibrato = shared->vibrato;
   vibrato.setCurrentDepth(depth);
   const uint8_t midiDepth = convertVibratoDepthToMidi(depth, seq().maxVibratoDepthCents);
-  vibrato.setOutputDepth(midiDepth, [this](uint8_t outputDepth) {
-    addModulationNoItem(outputDepth);
-  });
+  setSynthLfoModulationDepth(vibrato, midiDepth);
 }
 
 void NinSnesTrack::clearVibratoRateAndDelay() {
@@ -747,34 +744,20 @@ void NinSnesTrack::resetPitchBendForNewNote() {
     return;
   }
 
-  shared->pitch.resetRangeAndBend(
-      kNinSnesDefaultPitchBendRangeCents,
-      [this](uint16_t cents) {
-        if (readMode == READMODE_CONVERT_TO_MIDI) {
-          pMidiTrack->addPitchBendRange(channel, cents);
-        }
-      },
-      [this](int16_t bend) { addPitchBendNoItem(bend); });
+  resetPitchBendLane(shared->pitch, kNinSnesDefaultPitchBendRangeCents);
 }
 
 void NinSnesTrack::setPitchBendRange(uint16_t cents) {
   cents = std::max<uint16_t>(kNinSnesDefaultPitchBendRangeCents, cents);
-  shared->pitch.setRange(
-      cents,
-      [this](uint16_t newRange) {
-        if (readMode == READMODE_CONVERT_TO_MIDI) {
-          pMidiTrack->addPitchBendRange(channel, newRange);
-        }
-      },
-      [this](int16_t bend) { addPitchBendNoItem(bend); });
+  setPitchBendLaneRange(shared->pitch, cents);
 }
 
 void NinSnesTrack::setPitchBend(int16_t bend) {
-  shared->pitch.setBend(bend, [this](int16_t newBend) { addPitchBendNoItem(newBend); });
+  setPitchBendLaneBend(shared->pitch, bend);
 }
 
 void NinSnesTrack::applyCurrentPitchBend() {
-  shared->pitch.applyCurrentBend([this](int16_t bend) { addPitchBendNoItem(bend); });
+  applyPitchBendLane(shared->pitch);
 }
 
 void NinSnesTrack::syncVibratoRateAndDelay() {
@@ -793,8 +776,7 @@ void NinSnesTrack::syncVibratoRateAndDelay() {
                  nin_snes::vibrato::rateHz(vibrato.rate(), currentTempo));
   }
 
-  addChannelPressureNoItem(convertVibratoRateToMidi(vibrato.rate(), currentTempo,
-                                                    parentSeq.maxVibratoRateHz));
+  addChannelPressureNoItem(convertVibratoRateToMidi(vibrato.rate(), currentTempo, parentSeq.maxVibratoRateHz));
   addControllerEventNoItem(nin_snes::vibrato::kDelayController,
                            convertVibratoDelayToMidi(vibrato.delay(), currentTempo));
 }

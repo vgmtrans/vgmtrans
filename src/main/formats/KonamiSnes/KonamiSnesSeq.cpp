@@ -434,13 +434,11 @@ void KonamiSnesTrack::onTickBegin() {
                                                         currentDepth,
                                                         seq().maxVibratoDepth);
     vibrato.setCurrentDepth(currentDepth);
-    vibrato.setOutputDepth(midiDepth, [this](uint8_t outputDepth) {
-      addModulationNoItem(outputDepth);
-    });
+    setSynthLfoModulationDepth(vibrato, midiDepth);
   });
 
   if (pitchSlide.motionActive()) {
-    pitchSlide.advanceAndApplyBend([this](int16_t bend) { addPitchBendNoItem(bend); });
+    advancePitchBendLane(pitchSlide);
   }
 }
 
@@ -571,17 +569,15 @@ uint8_t KonamiSnesTrack::getNoteDuration(uint8_t length, uint8_t durationRate) c
 }
 
 void KonamiSnesTrack::setPitchBendRange(uint16_t cents) {
-  pitchSlide.setRange(cents,
-                      [this](uint16_t newRange) { addPitchBendRangeNoItem(newRange); },
-                      [this](int16_t bend) { addPitchBendNoItem(bend); });
+  setPitchBendLaneRange(pitchSlide, cents);
 }
 
 void KonamiSnesTrack::setPitchBend(int16_t bend) {
-  pitchSlide.setBend(bend, [this](int16_t newBend) { addPitchBendNoItem(newBend); });
+  setPitchBendLaneBend(pitchSlide, bend);
 }
 
 void KonamiSnesTrack::applyCurrentPitchBend() {
-  pitchSlide.applyCurrentBend([this](int16_t bend) { addPitchBendNoItem(bend); });
+  applyPitchBendLane(pitchSlide);
 }
 
 void KonamiSnesTrack::beginPitchSlide(const PitchSlide& slide) {
@@ -958,9 +954,7 @@ bool KonamiSnesTrack::readEvent() {
       if (!isTiedNote && vibrato.hasReusableFade() &&
           konami_snes::vibrato::isActive(seq().version, vibrato.rate(), vibrato.depth())) {
         vibrato.startReusableFade(vibrato.delay(), static_cast<uint16_t>(vibrato.depth()) << 8, 0);
-        vibrato.setOutputDepth(0, [this](uint8_t outputDepth) {
-          addModulationNoItem(outputDepth);
-        });
+        setSynthLfoModulationDepth(vibrato, 0);
       }
 
       if (isTiedNote) {
@@ -1164,9 +1158,7 @@ bool KonamiSnesTrack::readEvent() {
                                                 parentSeq.maxVibratoDepth)
                     : 0);
       vibrato.setCurrentDepth(static_cast<uint16_t>(deferDepthForFade ? 0 : vibrato.depth()) << 8);
-      vibrato.setOutputDepth(midiDepth,
-                             [this](uint8_t outputDepth) { addModulationNoItem(outputDepth); },
-                             true);
+      setSynthLfoModulationDepth(vibrato, midiDepth, true);
       if (active) {
         syncVibratoRateAndDelay();
       }

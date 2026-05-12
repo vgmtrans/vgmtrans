@@ -12,6 +12,7 @@
 #include <vector>
 #include "VGMItem.h"
 #include "VGMSeq.h"
+#include "SeqAutomation.h"
 #include <spdlog/common.h>
 #include "LogManager.h"
 #include "SynthType.h"
@@ -271,6 +272,56 @@ private:
   void addEndOfTrack(uint32_t offset, uint32_t length, const std::string &sEventName = "Track End");
   void addEndOfTrackNoItem();
   void addControllerEventNoItem(uint8_t controllerType, uint8_t controllerValue) const;
+
+  template <typename PitchType, typename DeltaType>
+  SeqMotionStep advancePitchBendLane(PitchBendLane<PitchType, DeltaType>& lane) {
+    return lane.advanceAndApplyBend([this](int16_t bend) { addPitchBendNoItem(bend); });
+  }
+
+  template <typename PitchType, typename DeltaType>
+  bool setPitchBendLaneRange(PitchBendLane<PitchType, DeltaType>& lane, uint16_t cents) {
+    return lane.setRange(cents,
+                         [this](uint16_t rangeCents) { addPitchBendRangeNoItem(rangeCents); },
+                         [this](int16_t bend) { addPitchBendNoItem(bend); });
+  }
+
+  template <typename PitchType, typename DeltaType>
+  bool setPitchBendLaneBend(PitchBendLane<PitchType, DeltaType>& lane, int16_t bend) {
+    return lane.setBend(bend, [this](int16_t newBend) { addPitchBendNoItem(newBend); });
+  }
+
+  template <typename PitchType, typename DeltaType>
+  bool applyPitchBendLane(PitchBendLane<PitchType, DeltaType>& lane) {
+    return lane.applyCurrentBend([this](int16_t bend) { addPitchBendNoItem(bend); });
+  }
+
+  template <typename PitchType, typename DeltaType>
+  void resetPitchBendLane(PitchBendLane<PitchType, DeltaType>& lane, uint16_t defaultRangeCents) {
+    lane.resetRangeAndBend(defaultRangeCents,
+                           [this](uint16_t rangeCents) {
+                             addPitchBendRangeNoItem(rangeCents);
+                           },
+                           [this](int16_t bend) { addPitchBendNoItem(bend); });
+  }
+
+  bool setSynthLfoModulationDepth(SynthLfoLane& lane, uint8_t depth, bool force = false) {
+    return lane.setOutputDepth(depth,
+                               [this](uint8_t outputDepth) {
+                                 addModulationNoItem(outputDepth);
+                               },
+                               force);
+  }
+
+  bool setSynthLfoControllerDepth(SynthLfoLane& lane,
+                                  uint8_t controller,
+                                  uint8_t depth,
+                                  bool force = false) {
+    return lane.setOutputDepth(depth,
+                               [this, controller](uint8_t outputDepth) {
+                                 addControllerEventNoItem(controller, outputDepth);
+                               },
+                               force);
+  }
 
   void addGlobalTranspose(uint32_t offset, uint32_t length, int8_t semitones, const std::string &sEventName = "Global Transpose");
   void addMarker(uint32_t offset, uint32_t length, const std::string &markername, uint8_t databyte1, uint8_t databyte2, const std::string &sEventName, int8_t priority = 0, Type type = Type::Misc);

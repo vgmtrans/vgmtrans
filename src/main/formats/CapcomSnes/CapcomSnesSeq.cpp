@@ -17,6 +17,7 @@ DECLARE_FORMAT(CapcomSnes);
 #define MAX_TRACKS  8
 #define SEQ_PPQN    48
 #define SEQ_KEYOFS  0
+static constexpr uint8_t kTremoloDepthController = 93;
 
 // volume table
 const uint8_t CapcomSnesSeq::volTable[] = {
@@ -179,14 +180,12 @@ void CapcomSnesTrack::resetVars() {
 
 void CapcomSnesTrack::setLfoOutputsEnabled(bool enabled) {
   if (vibrato.depth() != 0) {
-    vibrato.setOutputDepth(enabled ? vibrato.depth() : 0, [this](uint8_t depth) {
-      addModulationNoItem(depth);
-    });
+    setSynthLfoModulationDepth(vibrato, enabled ? vibrato.depth() : 0);
   }
   if (tremolo.depth() != 0) {
-    tremolo.setOutputDepth(enabled ? tremolo.depth() : 0, [this](uint8_t depth) {
-      addControllerEventNoItem(93, depth);
-    });
+    setSynthLfoControllerDepth(tremolo,
+                               kTremoloDepthController,
+                               enabled ? tremolo.depth() : 0);
   }
 }
 
@@ -196,9 +195,7 @@ void CapcomSnesTrack::addVibratoDepthEvent(uint32_t offset, uint32_t length, uin
 
   // Add the event to the UI, but, but don't emit the MIDI event while the driver has the LFO disabled.
   recordSeqEvent<ModulationSeqEvent>(isNewOffset, getTime(), depth, offset, length, "Vibrato Depth");
-  vibrato.setOutputDepth(areLfoOutputsEnabled() ? depth : 0,
-                         [this](uint8_t outputDepth) { addModulationNoItem(outputDepth); },
-                         true);
+  setSynthLfoModulationDepth(vibrato, areLfoOutputsEnabled() ? depth : 0, true);
 }
 
 void CapcomSnesTrack::handleLfoRateChange(uint8_t lfoRateByte) {
@@ -824,11 +821,10 @@ bool CapcomSnesTrack::readEvent() {
             tremolo.configure(tremolo.delay(),
                               tremolo.rate(),
                               convertTremoloDepthToMidiValue(lfoAmount, parentSeq->version));
-            tremolo.setOutputDepth(areLfoOutputsEnabled() ? tremolo.depth() : 0,
-                                   [this](uint8_t outputDepth) {
-                                     addControllerEventNoItem(93, outputDepth);
-                                   },
-                                   true);
+            setSynthLfoControllerDepth(tremolo,
+                                       kTremoloDepthController,
+                                       areLfoOutputsEnabled() ? tremolo.depth() : 0,
+                                       true);
             desc = fmt::format("Amount: {:d}", lfoAmount);
             addGenericEvent(beginOffset, curOffset - beginOffset, "Tremolo Depth", desc, Type::Lfo);
             break;
