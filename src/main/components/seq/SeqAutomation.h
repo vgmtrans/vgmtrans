@@ -17,6 +17,9 @@ enum class SeqMotionStep {
   Finished,
 };
 
+// Tick-level linear motion shared by controller, pitch, and LFO automation lanes.
+// It models either a fixed-length motion that snaps to the target on the final tick,
+// or a step-until-target motion for drivers that encode speed instead of duration.
 template <typename ValueType>
 class SeqLinearMotion {
  public:
@@ -157,6 +160,8 @@ class ControllerLane {
   SeqLinearMotion<ValueType> m_motion;
 };
 
+// Controller lane for drivers that store controller fades in fixed-point units, commonly 8.8.
+// Format code deals in raw values; the lane keeps fractional deltas internally between ticks.
 template <typename ValueType = int32_t, unsigned FractionBits = 8>
 class FixedPointControllerLane {
  public:
@@ -257,12 +262,15 @@ class FixedPointControllerLane {
 
 template <typename PitchType>
 struct PitchMotionSpec {
+  // Normalized pitch-slide state after format-specific parsing has already happened.
   PitchType target {};
   PitchType delta {};
   uint32_t length = 0;
   uint32_t delay = 0;
 };
 
+// Tracks logical pitch motion and converts it to MIDI pitch bend only when asked to emit.
+// The lane owns bend range/current-bend caching, while SeqTrack supplies the actual MIDI writers.
 template <typename PitchType>
 class PitchBendLane {
  public:
@@ -344,6 +352,7 @@ class PitchBendLane {
 
   [[nodiscard]] uint16_t rangeCentsForPitchSpan(double pitchUnits,
                                                 uint16_t minimumRangeCents) const {
+    // Pick the smallest MIDI bend range that can cover a driver-space pitch span.
     const auto cents = static_cast<uint16_t>(
         std::ceil(std::abs(pitchUnits) * m_centsPerPitchUnit));
     return std::max<uint16_t>(minimumRangeCents, cents);
@@ -428,6 +437,8 @@ class PitchBendLane {
   double m_centsPerPitchUnit = 100.0;
 };
 
+// Tracks a synth-native LFO controlled by MIDI controllers. The stored config is driver state;
+// m_midiDepth is the last emitted controller depth, so duplicate MIDI events can be skipped.
 class SynthLfoLane {
  public:
   void reset() {
@@ -462,6 +473,7 @@ class SynthLfoLane {
   void setRate(uint8_t rate) { m_rate = rate; }
   void setDepth(uint8_t depth) { m_depth = depth; }
 
+  // Some drivers fade LFO depth in fixed-point units while others use raw depth.
   [[nodiscard]] int32_t configuredDepth(uint8_t fractionalBits = 0) const {
     return static_cast<int32_t>(m_depth) << fractionalBits;
   }
@@ -485,6 +497,7 @@ class SynthLfoLane {
     m_fadeStep = step;
   }
 
+  // Stores a per-note fade-in recipe without starting it; note-on code decides when to apply it.
   void setReusableFadeToTarget(uint32_t length, int32_t targetDepth) {
     setReusableFade(length, length == 0 ? 0 : targetDepth / static_cast<int32_t>(length));
   }
