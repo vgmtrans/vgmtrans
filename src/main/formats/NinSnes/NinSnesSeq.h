@@ -25,10 +25,10 @@ public:
   NinSnesSeq(RawFile* file, const NinSnesScanResult& scanResult);
   virtual ~NinSnesSeq();
 
-  virtual bool parseHeader();
-  virtual void resetVars();
+  bool parseHeader() override;
+  void resetVars() override;
   void onTickEnd() override;
-  virtual bool readEvent(long stopTime);
+  bool readEvent(long stopTime) override;
 
   const NinSnesProfile& profile() const;
   double getTempoInBPM();
@@ -104,11 +104,9 @@ protected:
 private:
   friend class NinSnesTrack;
   void loadEventMap();
-  void resetTempoState(uint8_t newTempo);
-  void setTempoImmediate(uint8_t newTempo);
-  void beginTempoFade(uint8_t targetTempo, uint8_t fadeLength);
-  void syncTrackVibratoToTempo();
-  void applyTempoFadeStep();
+  void setImmediateTempo(uint8_t newTempo);
+  void startTempoFade(uint8_t fadeLength, uint8_t targetTempo);
+  void syncTempoDependentTracks();
   NinSnesIntelliTADrumKitDef buildIntelliTADrumKitDef() const;
 
   uint8_t spcPercussionBaseInit;
@@ -166,8 +164,11 @@ private:
   void addPendingEndEvent(uint8_t statusByte, const std::string& desc);
   void beginNoteVibrato();
   void updateVibratoFade();
+  void applyConfiguredVibrato();
+  void clearVibratoRateAndDelay();
   void setVibratoDepth(uint8_t depth);
   void syncSharedVibratoState();
+  void applyCurrentTempo();
   void syncVibratoRateAndDelay();
 
   uint8_t getEffectiveNoteDuration() const;
