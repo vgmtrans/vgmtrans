@@ -211,6 +211,17 @@ void VGMInstr::addStandardVibratoHandling(double maxDepthCents,
   }
 }
 
+void VGMInstr::updateStandardVibratoHandling(double maxDepthCents,
+                                             double minHertz,
+                                             double maxHertz) {
+  updateModulatorAmount(ModSource::ModWheel,
+                        ModDest::VibLfoToPitch,
+                        ModAmount::fromCents(maxDepthCents));
+  updateModulatorAmount(ModSource::ChannelPressure,
+                        ModDest::VibLfoFreq,
+                        ModAmount::fromHertzRange(minHertz, maxHertz));
+}
+
 void VGMInstr::addStandardTremoloHandling(double maxDepthDb,
                                          double minHertz,
                                          double maxHertz,

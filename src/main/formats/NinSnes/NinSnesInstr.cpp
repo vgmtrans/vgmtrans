@@ -48,12 +48,9 @@ void applyVibratoExportScaling(NinSnesInstrSet* instrSet, double maxDepthCents, 
       (maxRateHz > 0.0) ? maxRateHz : nin_snes::vibrato::defaultMaxRateHz();
 
   for (auto* instr : instrSet->exportInstrs()) {
-    instr->updateModulatorAmount(ModSource::ModWheel,
-                                 ModDest::VibLfoToPitch,
-                                 ModAmount::fromCents(effectiveMaxDepthCents));
-    instr->updateModulatorAmount(ModSource::ChannelPressure,
-                                 ModDest::VibLfoFreq,
-                                 ModAmount::fromHertzRange(nin_snes::vibrato::minRateHz(), effectiveMaxRateHz));
+    instr->updateStandardVibratoHandling(effectiveMaxDepthCents,
+                                         nin_snes::vibrato::minRateHz(),
+                                         effectiveMaxRateHz);
   }
 }
 

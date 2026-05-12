@@ -44,12 +44,7 @@ void applyVibratoExportScaling(KonamiSnesInstrSet* instrSet, uint8_t maxDepth, u
   const double maxRateHz = baseHz * clampedMaxRateFactor;
 
   for (auto* instr : instrSet->exportInstrs()) {
-    instr->updateModulatorAmount(ModSource::ModWheel,
-                                 ModDest::VibLfoToPitch,
-                                 ModAmount::fromCents(maxDepthCents));
-    instr->updateModulatorAmount(ModSource::ChannelPressure,
-                                 ModDest::VibLfoFreq,
-                                 ModAmount::fromHertzRange(baseHz, maxRateHz));
+    instr->updateStandardVibratoHandling(maxDepthCents, baseHz, maxRateHz);
   }
 }
 

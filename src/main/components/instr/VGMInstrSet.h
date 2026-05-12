@@ -93,6 +93,9 @@ public:
                                   double minHertz,
                                   double maxHertz,
                                   std::optional<DelayRange> delayRange = std::nullopt);
+  void updateStandardVibratoHandling(double maxDepthCents,
+                                     double minHertz,
+                                     double maxHertz);
   void addStandardTremoloHandling(double maxDepthDb,
                                   double minHertz,
                                   double maxHertz,

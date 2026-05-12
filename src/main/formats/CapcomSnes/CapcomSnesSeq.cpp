@@ -167,9 +167,8 @@ void CapcomSnesTrack::resetVars() {
   lastNoteSlurred = false;
   didRest = false;
   lastKey = -1;
-  lastVibratoDepth = 0;
+  lfo.reset();
   lastTremoloDepth = 0;
-  lastLfoFrequency = 0;
   lastPortamentoTime = 0;
   portamentoMillisecondsPerCent = 0;
 
@@ -179,8 +178,8 @@ void CapcomSnesTrack::resetVars() {
 }
 
 void CapcomSnesTrack::setLfoOutputsEnabled(bool enabled) {
-  if (lastVibratoDepth != 0) {
-    addModulationNoItem(enabled ? lastVibratoDepth : 0);
+  if (lfo.depth() != 0) {
+    addModulationNoItem(enabled ? lfo.depth() : 0);
   }
   if (lastTremoloDepth != 0) {
     addControllerEventNoItem(93, enabled ? lastTremoloDepth : 0);
@@ -189,6 +188,7 @@ void CapcomSnesTrack::setLfoOutputsEnabled(bool enabled) {
 
 void CapcomSnesTrack::addVibratoDepthEvent(uint32_t offset, uint32_t length, uint8_t depth) {
   bool isNewOffset = onEvent(offset, length);
+  lfo.configure(lfo.delay(), lfo.rate(), depth);
 
   // Add the event to the UI, but, but don't emit the MIDI event while the driver has the LFO disabled.
   recordSeqEvent<ModulationSeqEvent>(isNewOffset, getTime(), depth, offset, length, "Vibrato Depth");
@@ -196,16 +196,18 @@ void CapcomSnesTrack::addVibratoDepthEvent(uint32_t offset, uint32_t length, uin
 }
 
 void CapcomSnesTrack::handleLfoRateChange(uint8_t lfoRateByte) {
+  const bool wasEnabled = areLfoOutputsEnabled();
+  lfo.setRate(lfoRateByte);
+  const bool isEnabled = areLfoOutputsEnabled();
+
   // Rate 0 gates the active LFOs off without clearing the stored depths.
-  if (lfoRateByte == 0 && lastLfoFrequency != 0) {
+  if (!isEnabled && wasEnabled) {
     setLfoOutputsEnabled(false);
   }
-  else if (lfoRateByte != 0 && lastLfoFrequency == 0) {
+  else if (isEnabled && !wasEnabled) {
     // Reactivate vibrato and tremolo if appropriate
     setLfoOutputsEnabled(true);
   }
-
-  lastLfoFrequency = lfoRateByte;
 }
 
 
@@ -808,8 +810,7 @@ bool CapcomSnesTrack::readEvent() {
         switch (lfoType) {
           case 0:
             // Vibrato Depth
-            lastVibratoDepth = lfoAmount & 0x7F;
-            addVibratoDepthEvent(beginOffset, curOffset - beginOffset, lastVibratoDepth);
+            addVibratoDepthEvent(beginOffset, curOffset - beginOffset, lfoAmount & 0x7F);
             break;
           case 1:
             // Tremolo Depth
