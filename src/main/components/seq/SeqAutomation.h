@@ -157,6 +157,112 @@ class ControllerLane {
   SeqLinearMotion<ValueType> m_motion;
 };
 
+template <typename ValueType = int32_t, unsigned FractionBits = 8>
+class FixedPointControllerLane {
+ public:
+  static constexpr ValueType kScale = static_cast<ValueType>(1) << FractionBits;
+
+  static constexpr ValueType toFixed(ValueType value) {
+    return value << FractionBits;
+  }
+
+  static constexpr ValueType toRaw(ValueType value) {
+    return value >> FractionBits;
+  }
+
+  void reset(ValueType currentRaw = {}) { m_lane.reset(toFixed(currentRaw)); }
+  void setCurrent(ValueType currentRaw) { m_lane.setCurrent(toFixed(currentRaw)); }
+  void setCurrentFixed(ValueType currentFixed) { m_lane.setCurrent(currentFixed); }
+  void clear() { m_lane.clear(); }
+
+  [[nodiscard]] bool active() const { return m_lane.active(); }
+  [[nodiscard]] ValueType currentFixed() const { return m_lane.current(); }
+  [[nodiscard]] ValueType currentRaw() const { return toRaw(m_lane.current()); }
+  [[nodiscard]] ValueType targetFixed() const { return m_lane.target(); }
+  [[nodiscard]] ValueType targetRaw() const { return toRaw(m_lane.target()); }
+  [[nodiscard]] ValueType delta() const { return m_lane.delta(); }
+  [[nodiscard]] uint32_t ticksRemaining() const { return m_lane.ticksRemaining(); }
+  [[nodiscard]] bool usesLength() const { return m_lane.usesLength(); }
+
+  [[nodiscard]] ValueType currentRawFixed() const {
+    return toFixed(currentRaw());
+  }
+
+  [[nodiscard]] ValueType deltaToTarget(ValueType targetRaw, uint32_t length) const {
+    if (length == 0) {
+      return {};
+    }
+    return static_cast<ValueType>((toFixed(targetRaw) - currentRawFixed()) /
+                                  static_cast<ValueType>(length));
+  }
+
+  void startToTarget(ValueType targetRaw, uint32_t length, uint32_t delay = 0) {
+    m_lane.setCurrent(currentRawFixed());
+    m_lane.startToTarget(toFixed(targetRaw), deltaToTarget(targetRaw, length), length, delay);
+  }
+
+  void startToTarget(ValueType targetRaw, ValueType delta, uint32_t length, uint32_t delay = 0) {
+    m_lane.setCurrent(currentRawFixed());
+    m_lane.startToTarget(toFixed(targetRaw), delta, length, delay);
+  }
+
+  void startByStep(ValueType targetRaw, ValueType delta, uint32_t delay = 0) {
+    m_lane.setCurrent(currentRawFixed());
+    m_lane.startByStep(toFixed(targetRaw), delta, delay);
+  }
+
+  template <typename Apply>
+  bool beginToTarget(ValueType targetRaw, uint32_t length, Apply&& apply) {
+    if (length == 0) {
+      setCurrent(targetRaw);
+      std::forward<Apply>(apply)(currentRaw());
+      return true;
+    }
+
+    startToTarget(targetRaw, length);
+    return false;
+  }
+
+  template <typename Apply>
+  bool beginByStep(ValueType targetRaw, ValueType delta, Apply&& apply) {
+    if (delta == ValueType {}) {
+      setCurrent(targetRaw);
+      std::forward<Apply>(apply)(currentRaw());
+      return true;
+    }
+
+    startByStep(targetRaw, delta);
+    return false;
+  }
+
+  SeqMotionStep advance() { return m_lane.advance(); }
+
+  template <typename Apply>
+  SeqMotionStep advanceAndApply(Apply&& apply, bool applyDelayedStep = false) {
+    return m_lane.advanceAndApply(std::forward<Apply>(apply), applyDelayedStep);
+  }
+
+  template <typename Apply>
+  SeqMotionStep advanceAndApplyRaw(Apply&& apply, bool applyDelayedStep = false) {
+    return advanceAndApply(
+        [apply = std::forward<Apply>(apply)](ValueType currentFixed) mutable {
+          apply(toRaw(currentFixed));
+        },
+        applyDelayedStep);
+  }
+
+ private:
+  ControllerLane<ValueType> m_lane;
+};
+
+template <typename PitchType>
+struct PitchMotionSpec {
+  PitchType target {};
+  PitchType delta {};
+  uint32_t length = 0;
+  uint32_t delay = 0;
+};
+
 template <typename PitchType>
 class PitchBendLane {
  public:
@@ -190,12 +296,29 @@ class PitchBendLane {
     m_motion.setCurrent(pitch);
   }
 
+  [[nodiscard]] PitchType deltaToTarget(PitchType targetPitch, uint32_t length) const {
+    if (length == 0) {
+      return {};
+    }
+    return static_cast<PitchType>((targetPitch - currentPitch()) / static_cast<PitchType>(length));
+  }
+
+  [[nodiscard]] PitchMotionSpec<PitchType> motionToTarget(PitchType targetPitch,
+                                                          uint32_t length,
+                                                          uint32_t delay = 0) const {
+    return {targetPitch, deltaToTarget(targetPitch, length), length, delay};
+  }
+
   bool startMotion(PitchType targetPitch, PitchType delta, uint32_t length, uint32_t delay = 0) {
     if (!m_baseValid || length == 0) {
       return false;
     }
     m_motion.startToTarget(targetPitch, delta, length, delay);
     return true;
+  }
+
+  bool startMotion(const PitchMotionSpec<PitchType>& motion) {
+    return startMotion(motion.target, motion.delta, motion.length, motion.delay);
   }
 
   SeqMotionStep advanceMotion() {
@@ -218,6 +341,21 @@ class PitchBendLane {
   [[nodiscard]] PitchType currentPitch() const { return m_motion.current(); }
   [[nodiscard]] bool motionActive() const { return m_motion.active(); }
   [[nodiscard]] uint32_t motionTicksRemaining() const { return m_motion.ticksRemaining(); }
+
+  [[nodiscard]] uint16_t rangeCentsForPitchSpan(double pitchUnits,
+                                                uint16_t minimumRangeCents) const {
+    const auto cents = static_cast<uint16_t>(
+        std::ceil(std::abs(pitchUnits) * m_centsPerPitchUnit));
+    return std::max<uint16_t>(minimumRangeCents, cents);
+  }
+
+  [[nodiscard]] uint16_t rangeCentsForSlide(PitchType startPitch,
+                                            PitchType targetPitch,
+                                            uint16_t minimumRangeCents) const {
+    const double startDeviation = std::abs(static_cast<double>(startPitch - m_basePitch));
+    const double targetDeviation = std::abs(static_cast<double>(targetPitch - m_basePitch));
+    return rangeCentsForPitchSpan(std::max(startDeviation, targetDeviation), minimumRangeCents);
+  }
 
   [[nodiscard]] bool atRest(uint16_t defaultRangeCents) const {
     return m_pitchBendRangeCents == defaultRangeCents && m_currentPitchBend == 0;
@@ -322,6 +460,19 @@ class SynthLfoLane {
   [[nodiscard]] uint8_t rate() const { return m_rate; }
   [[nodiscard]] uint8_t depth() const { return m_depth; }
   void setRate(uint8_t rate) { m_rate = rate; }
+  void setDepth(uint8_t depth) { m_depth = depth; }
+
+  [[nodiscard]] int32_t configuredDepth(uint8_t fractionalBits = 0) const {
+    return static_cast<int32_t>(m_depth) << fractionalBits;
+  }
+
+  [[nodiscard]] int32_t clampToConfiguredDepth(int32_t depth, uint8_t fractionalBits = 0) const {
+    return std::min(configuredDepth(fractionalBits), depth);
+  }
+
+  [[nodiscard]] uint8_t outputDepthWhen(bool enabled) const {
+    return enabled ? m_depth : 0;
+  }
 
   void clearReusableFade() {
     m_fadeLength = 0;
@@ -332,6 +483,14 @@ class SynthLfoLane {
   void setReusableFade(uint32_t length, int32_t step) {
     m_fadeLength = length;
     m_fadeStep = step;
+  }
+
+  void setReusableFadeToTarget(uint32_t length, int32_t targetDepth) {
+    setReusableFade(length, length == 0 ? 0 : targetDepth / static_cast<int32_t>(length));
+  }
+
+  void setReusableFadeToConfiguredDepth(uint32_t length, uint8_t fractionalBits = 0) {
+    setReusableFadeToTarget(length, configuredDepth(fractionalBits));
   }
 
   [[nodiscard]] bool hasReusableFade() const { return m_fadeLength != 0; }
@@ -345,6 +504,10 @@ class SynthLfoLane {
     }
     m_fade.setCurrent(initialDepth);
     m_fade.startToTarget(targetDepth, m_fadeStep, m_fadeLength, delay);
+  }
+
+  void startReusableFadeToConfiguredDepth(uint8_t fractionalBits = 0, int32_t initialDepth = 0) {
+    startReusableFade(m_delay, configuredDepth(fractionalBits), initialDepth);
   }
 
   SeqMotionStep advanceFade() { return m_fade.advance(); }
@@ -380,6 +543,14 @@ class SynthLfoLane {
       std::forward<ApplyDepth>(applyDepth)(currentDepth());
     }
     return step;
+  }
+
+  template <typename ApplyDepth>
+  SeqMotionStep advanceFadeAndApplyClamped(uint8_t fractionalBits, ApplyDepth&& applyDepth) {
+    return advanceFadeAndApply(
+        [this, fractionalBits, applyDepth = std::forward<ApplyDepth>(applyDepth)](int32_t depth) mutable {
+          applyDepth(clampToConfiguredDepth(depth, fractionalBits));
+        });
   }
 
  private:
