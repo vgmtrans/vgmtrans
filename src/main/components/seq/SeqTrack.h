@@ -314,30 +314,30 @@ private:
   void addEndOfTrackNoItem();
   void addControllerEventNoItem(uint8_t controllerType, uint8_t controllerValue) const;
 
-  template <typename PitchType, typename DeltaType>
-  SeqMotionStep advancePitchBendLane(PitchBendLane<PitchType, DeltaType>& lane) {
+  template <typename PitchType>
+  SeqMotionStep advancePitchBendLane(PitchBendLane<PitchType>& lane) {
     return lane.advanceAndApplyBend([this](int16_t bend) { addPitchBendNoItem(bend); });
   }
 
-  template <typename PitchType, typename DeltaType>
-  bool setPitchBendLaneRange(PitchBendLane<PitchType, DeltaType>& lane, uint16_t cents) {
+  template <typename PitchType>
+  bool setPitchBendLaneRange(PitchBendLane<PitchType>& lane, uint16_t cents) {
     return lane.setRange(cents,
                          [this](uint16_t rangeCents) { addPitchBendRangeNoItem(rangeCents); },
                          [this](int16_t bend) { addPitchBendNoItem(bend); });
   }
 
-  template <typename PitchType, typename DeltaType>
-  bool setPitchBendLaneBend(PitchBendLane<PitchType, DeltaType>& lane, int16_t bend) {
+  template <typename PitchType>
+  bool setPitchBendLaneBend(PitchBendLane<PitchType>& lane, int16_t bend) {
     return lane.setBend(bend, [this](int16_t newBend) { addPitchBendNoItem(newBend); });
   }
 
-  template <typename PitchType, typename DeltaType>
-  bool applyPitchBendLane(PitchBendLane<PitchType, DeltaType>& lane) {
+  template <typename PitchType>
+  bool applyPitchBendLane(PitchBendLane<PitchType>& lane) {
     return lane.applyCurrentBend([this](int16_t bend) { addPitchBendNoItem(bend); });
   }
 
-  template <typename PitchType, typename DeltaType>
-  void resetPitchBendLane(PitchBendLane<PitchType, DeltaType>& lane, uint16_t defaultRangeCents) {
+  template <typename PitchType>
+  void resetPitchBendLane(PitchBendLane<PitchType>& lane, uint16_t defaultRangeCents) {
     lane.resetRangeAndBend(defaultRangeCents,
                            [this](uint16_t rangeCents) {
                              addPitchBendRangeNoItem(rangeCents);

@@ -17,7 +17,7 @@ enum class SeqMotionStep {
   Finished,
 };
 
-template <typename ValueType, typename DeltaType = ValueType>
+template <typename ValueType>
 class SeqLinearMotion {
  public:
   void reset(ValueType current = {}) {
@@ -46,7 +46,7 @@ class SeqLinearMotion {
     m_useLength = true;
   }
 
-  void startToTarget(ValueType target, DeltaType delta, uint32_t length, uint32_t delay = 0) {
+  void startToTarget(ValueType target, ValueType delta, uint32_t length, uint32_t delay = 0) {
     m_target = target;
     m_delta = delta;
     m_delay = delay;
@@ -54,7 +54,7 @@ class SeqLinearMotion {
     m_useLength = true;
   }
 
-  void startByStep(ValueType target, DeltaType delta, uint32_t delay = 0) {
+  void startByStep(ValueType target, ValueType delta, uint32_t delay = 0) {
     m_target = target;
     m_delta = delta;
     m_delay = delay;
@@ -63,12 +63,12 @@ class SeqLinearMotion {
   }
 
   [[nodiscard]] bool active() const {
-    return m_delay != 0 || (m_useLength ? m_ticksRemaining != 0 : m_delta != DeltaType {});
+    return m_delay != 0 || (m_useLength ? m_ticksRemaining != 0 : m_delta != ValueType {});
   }
 
   [[nodiscard]] ValueType current() const { return m_current; }
   [[nodiscard]] ValueType target() const { return m_target; }
-  [[nodiscard]] DeltaType delta() const { return m_delta; }
+  [[nodiscard]] ValueType delta() const { return m_delta; }
   [[nodiscard]] uint32_t delayRemaining() const { return m_delay; }
   [[nodiscard]] uint32_t ticksRemaining() const { return m_ticksRemaining; }
   [[nodiscard]] bool usesLength() const { return m_useLength; }
@@ -94,13 +94,13 @@ class SeqLinearMotion {
       return SeqMotionStep::Running;
     }
 
-    if (m_delta == DeltaType {}) {
+    if (m_delta == ValueType {}) {
       return SeqMotionStep::Inactive;
     }
 
     m_current = static_cast<ValueType>(m_current + m_delta);
-    if ((m_delta > DeltaType {} && m_current >= m_target) ||
-        (m_delta < DeltaType {} && m_current <= m_target)) {
+    if ((m_delta > ValueType {} && m_current >= m_target) ||
+        (m_delta < ValueType {} && m_current <= m_target)) {
       m_current = m_target;
       m_delta = {};
       return SeqMotionStep::Finished;
@@ -112,13 +112,13 @@ class SeqLinearMotion {
  private:
   ValueType m_current {};
   ValueType m_target {};
-  DeltaType m_delta {};
+  ValueType m_delta {};
   uint32_t m_delay = 0;
   uint32_t m_ticksRemaining = 0;
   bool m_useLength = true;
 };
 
-template <typename ValueType, typename DeltaType = ValueType>
+template <typename ValueType>
 class ControllerLane {
  public:
   void reset(ValueType current = {}) { m_motion.reset(current); }
@@ -126,18 +126,18 @@ class ControllerLane {
   void setCurrentValue(ValueType current) { m_motion.setCurrentValue(current); }
   void clear() { m_motion.clear(); }
 
-  void startToTarget(ValueType target, DeltaType delta, uint32_t length, uint32_t delay = 0) {
+  void startToTarget(ValueType target, ValueType delta, uint32_t length, uint32_t delay = 0) {
     m_motion.startToTarget(target, delta, length, delay);
   }
 
-  void startByStep(ValueType target, DeltaType delta, uint32_t delay = 0) {
+  void startByStep(ValueType target, ValueType delta, uint32_t delay = 0) {
     m_motion.startByStep(target, delta, delay);
   }
 
   [[nodiscard]] bool active() const { return m_motion.active(); }
   [[nodiscard]] ValueType current() const { return m_motion.current(); }
   [[nodiscard]] ValueType target() const { return m_motion.target(); }
-  [[nodiscard]] DeltaType delta() const { return m_motion.delta(); }
+  [[nodiscard]] ValueType delta() const { return m_motion.delta(); }
   [[nodiscard]] uint32_t ticksRemaining() const { return m_motion.ticksRemaining(); }
   [[nodiscard]] bool usesLength() const { return m_motion.usesLength(); }
 
@@ -154,10 +154,10 @@ class ControllerLane {
   }
 
  private:
-  SeqLinearMotion<ValueType, DeltaType> m_motion;
+  SeqLinearMotion<ValueType> m_motion;
 };
 
-template <typename PitchType, typename DeltaType = PitchType>
+template <typename PitchType>
 class PitchBendLane {
  public:
   explicit PitchBendLane(double centsPerPitchUnit = 100.0)
@@ -190,7 +190,7 @@ class PitchBendLane {
     m_motion.setCurrent(pitch);
   }
 
-  bool startMotion(PitchType targetPitch, DeltaType delta, uint32_t length, uint32_t delay = 0) {
+  bool startMotion(PitchType targetPitch, PitchType delta, uint32_t length, uint32_t delay = 0) {
     if (!m_baseValid || length == 0) {
       return false;
     }
@@ -284,7 +284,7 @@ class PitchBendLane {
 
   bool m_baseValid = false;
   PitchType m_basePitch {};
-  SeqLinearMotion<PitchType, DeltaType> m_motion;
+  SeqLinearMotion<PitchType> m_motion;
   uint16_t m_pitchBendRangeCents = 200;
   int16_t m_currentPitchBend = 0;
   double m_centsPerPitchUnit = 100.0;
@@ -386,7 +386,7 @@ class SynthLfoLane {
   uint8_t m_delay = 0;
   uint8_t m_rate = 0;
   uint8_t m_depth = 0;
-  SeqLinearMotion<int32_t, int32_t> m_fade;
+  SeqLinearMotion<int32_t> m_fade;
   uint32_t m_fadeLength = 0;
   int32_t m_fadeStep = 0;
   uint8_t m_midiDepth = 0;
