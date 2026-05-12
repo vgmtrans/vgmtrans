@@ -5,7 +5,10 @@
  */
 #pragma once
 
+#include <algorithm>
+#include <cmath>
 #include <cstdint>
+#include <utility>
 
 enum class SeqMotionStep {
   Inactive,
@@ -115,15 +118,61 @@ class SeqLinearMotion {
   bool m_useLength = true;
 };
 
-template <typename PitchType, typename DeltaType = PitchType>
-class SeqPitchBendState {
+template <typename ValueType, typename DeltaType = ValueType>
+class ControllerLane {
  public:
+  void reset(ValueType current = {}) { m_motion.reset(current); }
+  void setCurrent(ValueType current) { m_motion.setCurrent(current); }
+  void setCurrentValue(ValueType current) { m_motion.setCurrentValue(current); }
+  void clear() { m_motion.clear(); }
+
+  void startToTarget(ValueType target, DeltaType delta, uint32_t length, uint32_t delay = 0) {
+    m_motion.startToTarget(target, delta, length, delay);
+  }
+
+  void startByStep(ValueType target, DeltaType delta, uint32_t delay = 0) {
+    m_motion.startByStep(target, delta, delay);
+  }
+
+  [[nodiscard]] bool active() const { return m_motion.active(); }
+  [[nodiscard]] ValueType current() const { return m_motion.current(); }
+  [[nodiscard]] ValueType target() const { return m_motion.target(); }
+  [[nodiscard]] DeltaType delta() const { return m_motion.delta(); }
+  [[nodiscard]] uint32_t ticksRemaining() const { return m_motion.ticksRemaining(); }
+  [[nodiscard]] bool usesLength() const { return m_motion.usesLength(); }
+
+  SeqMotionStep advance() { return m_motion.advance(); }
+
+  template <typename Apply>
+  SeqMotionStep advanceAndApply(Apply&& apply, bool applyDelayedStep = false) {
+    const SeqMotionStep step = advance();
+    if (step != SeqMotionStep::Inactive &&
+        (applyDelayedStep || step != SeqMotionStep::Delayed)) {
+      std::forward<Apply>(apply)(m_motion.current());
+    }
+    return step;
+  }
+
+ private:
+  SeqLinearMotion<ValueType, DeltaType> m_motion;
+};
+
+template <typename PitchType, typename DeltaType = PitchType>
+class PitchBendLane {
+ public:
+  explicit PitchBendLane(double centsPerPitchUnit = 100.0)
+      : m_centsPerPitchUnit(centsPerPitchUnit) {}
+
   void reset(uint16_t defaultRangeCents) {
     m_baseValid = false;
     m_basePitch = {};
     m_motion.reset();
     m_pitchBendRangeCents = defaultRangeCents;
     m_currentPitchBend = 0;
+  }
+
+  void setCentsPerPitchUnit(double centsPerPitchUnit) {
+    m_centsPerPitchUnit = centsPerPitchUnit;
   }
 
   void beginNote(PitchType basePitch) {
@@ -141,8 +190,12 @@ class SeqPitchBendState {
     m_motion.setCurrent(pitch);
   }
 
-  void startMotion(PitchType targetPitch, DeltaType delta, uint32_t length, uint32_t delay = 0) {
+  bool startMotion(PitchType targetPitch, DeltaType delta, uint32_t length, uint32_t delay = 0) {
+    if (!m_baseValid || length == 0) {
+      return false;
+    }
     m_motion.startToTarget(targetPitch, delta, length, delay);
+    return true;
   }
 
   SeqMotionStep advanceMotion() {
@@ -152,27 +205,92 @@ class SeqPitchBendState {
     return m_motion.advance();
   }
 
+  template <typename EmitBend>
+  SeqMotionStep advanceAndApplyBend(EmitBend&& emitBend) {
+    const SeqMotionStep step = advanceMotion();
+    if (step != SeqMotionStep::Inactive && step != SeqMotionStep::Delayed) {
+      applyCurrentBend(std::forward<EmitBend>(emitBend));
+    }
+    return step;
+  }
+
   [[nodiscard]] PitchType basePitch() const { return m_basePitch; }
   [[nodiscard]] PitchType currentPitch() const { return m_motion.current(); }
-  [[nodiscard]] PitchType targetPitch() const { return m_motion.target(); }
   [[nodiscard]] bool motionActive() const { return m_motion.active(); }
   [[nodiscard]] uint32_t motionTicksRemaining() const { return m_motion.ticksRemaining(); }
 
-  [[nodiscard]] uint16_t pitchBendRangeCents() const { return m_pitchBendRangeCents; }
-  void setPitchBendRangeCents(uint16_t cents) { m_pitchBendRangeCents = cents; }
+  [[nodiscard]] bool atRest(uint16_t defaultRangeCents) const {
+    return m_pitchBendRangeCents == defaultRangeCents && m_currentPitchBend == 0;
+  }
 
-  [[nodiscard]] int16_t currentPitchBend() const { return m_currentPitchBend; }
-  void setCurrentPitchBend(int16_t bend) { m_currentPitchBend = bend; }
+  [[nodiscard]] int16_t bendForPitch(PitchType pitch) const {
+    const auto bend = static_cast<int32_t>(
+        std::lround((((static_cast<double>(pitch - m_basePitch) * m_centsPerPitchUnit) /
+                      m_pitchBendRangeCents) *
+                     8192.0)));
+    return static_cast<int16_t>(std::clamp(bend, kMinMidiPitchBend, kMaxMidiPitchBend));
+  }
+
+  [[nodiscard]] int16_t bendForCurrentPitch() const {
+    return bendForPitch(m_motion.current());
+  }
+
+  template <typename EmitBend>
+  bool setBend(int16_t bend, EmitBend&& emitBend) {
+    if (bend == m_currentPitchBend) {
+      return false;
+    }
+
+    std::forward<EmitBend>(emitBend)(bend);
+    m_currentPitchBend = bend;
+    return true;
+  }
+
+  template <typename EmitBend>
+  bool applyCurrentBend(EmitBend&& emitBend) {
+    if (!m_baseValid) {
+      return setBend(0, std::forward<EmitBend>(emitBend));
+    }
+
+    return setBend(bendForCurrentPitch(), std::forward<EmitBend>(emitBend));
+  }
+
+  template <typename EmitRange, typename EmitBend>
+  bool setRange(uint16_t cents, EmitRange&& emitRange, EmitBend&& emitBend) {
+    if (cents == 0 || cents == m_pitchBendRangeCents) {
+      return false;
+    }
+
+    std::forward<EmitRange>(emitRange)(cents);
+    m_pitchBendRangeCents = cents;
+    if (m_baseValid) {
+      applyCurrentBend(std::forward<EmitBend>(emitBend));
+    }
+    return true;
+  }
+
+  template <typename EmitRange, typename EmitBend>
+  void resetRangeAndBend(uint16_t defaultRangeCents, EmitRange&& emitRange, EmitBend&& emitBend) {
+    if (m_pitchBendRangeCents != defaultRangeCents) {
+      std::forward<EmitRange>(emitRange)(defaultRangeCents);
+      m_pitchBendRangeCents = defaultRangeCents;
+    }
+    setBend(0, std::forward<EmitBend>(emitBend));
+  }
 
  private:
+  static constexpr int32_t kMinMidiPitchBend = -8192;
+  static constexpr int32_t kMaxMidiPitchBend = 8191;
+
   bool m_baseValid = false;
   PitchType m_basePitch {};
   SeqLinearMotion<PitchType, DeltaType> m_motion;
   uint16_t m_pitchBendRangeCents = 200;
   int16_t m_currentPitchBend = 0;
+  double m_centsPerPitchUnit = 100.0;
 };
 
-class SeqLfoState {
+class SynthLfoLane {
  public:
   void reset() {
     m_delay = 0;
@@ -239,6 +357,30 @@ class SeqLfoState {
   [[nodiscard]] int32_t currentDepth() const { return m_fade.current(); }
   [[nodiscard]] uint8_t midiDepth() const { return m_midiDepth; }
   void setMidiDepth(uint8_t depth) { m_midiDepth = depth; }
+
+  template <typename EmitDepth>
+  bool setOutputDepth(uint8_t depth, EmitDepth&& emitDepth, bool force = false) {
+    if (!force && depth == m_midiDepth) {
+      return false;
+    }
+
+    std::forward<EmitDepth>(emitDepth)(depth);
+    m_midiDepth = depth;
+    return true;
+  }
+
+  template <typename ApplyDepth>
+  SeqMotionStep advanceFadeAndApply(ApplyDepth&& applyDepth) {
+    if (!fadeActive()) {
+      return SeqMotionStep::Inactive;
+    }
+
+    const SeqMotionStep step = advanceFade();
+    if (step != SeqMotionStep::Inactive && step != SeqMotionStep::Delayed) {
+      std::forward<ApplyDepth>(applyDepth)(currentDepth());
+    }
+    return step;
+  }
 
  private:
   uint8_t m_delay = 0;
