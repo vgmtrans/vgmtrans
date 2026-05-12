@@ -1086,8 +1086,7 @@ bool KonamiSnesTrack::readEvent() {
         vibrato.setReusableFadeToConfiguredDepth(builtInFadeLength, 8);
       }
 
-      const bool active =
-          konami_snes::vibrato::isActive(parentSeq.version, vibrato.rate(), vibrato.depth());
+      const bool active = konami_snes::vibrato::isActive(parentSeq.version, vibrato.rate(), vibrato.depth());
       const bool deferDepthForFade = active && immediateFadeLength != 0;
       if (readMode != READMODE_CONVERT_TO_MIDI && active) {
         parentSeq.maxVibratoDepth = std::max(parentSeq.maxVibratoDepth, vibrato.depth());
