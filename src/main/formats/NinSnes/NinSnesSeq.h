@@ -25,10 +25,10 @@ public:
   NinSnesSeq(RawFile* file, const NinSnesScanResult& scanResult);
   virtual ~NinSnesSeq();
 
-  virtual bool parseHeader();
-  virtual void resetVars();
+  bool parseHeader() override;
+  void resetVars() override;
   void onTickEnd() override;
-  virtual bool readEvent(long stopTime);
+  bool readEvent(long stopTime) override;
 
   const NinSnesProfile& profile() const;
   double getTempoInBPM();
@@ -102,7 +102,11 @@ protected:
   VGMHeader* header;
 
 private:
+  friend class NinSnesTrack;
   void loadEventMap();
+  void setImmediateTempo(uint8_t newTempo);
+  void startTempoFade(uint8_t fadeLength, uint8_t targetTempo);
+  void syncTempoDependentTracks();
   NinSnesIntelliTADrumKitDef buildIntelliTADrumKitDef() const;
 
   uint8_t spcPercussionBaseInit;
@@ -166,7 +170,7 @@ private:
   bool handleIntelliEvent(NinSnesSeqEventType eventType, uint32_t beginOffset, uint8_t statusByte,
                           std::string& desc);
   PitchSlideEvent readPitchSlide(uint32_t offset);
-  std::optional<PitchSlideEvent> consumeQueuedPitchSlide();
+  bool consumeQueuedPitchSlide();
   void addPitchSlideEvent(const PitchSlideEvent& slide);
   void beginPitchSlide(const PitchSlideEvent& slide);
   void activatePitchMotion(uint8_t delay, uint8_t length, int32_t targetPitch);
@@ -174,8 +178,14 @@ private:
   void updatePitchSlide();
   void beginNotePitch(uint8_t note);
   void activateStoredPitchEnvelope();
+  void setStoredPitchEnvelope(NinSnesTrackSharedData::StoredPitchEnvelope::Mode mode,
+                              uint8_t delay,
+                              uint8_t length,
+                              int8_t semitones);
   void beginNoteVibrato();
   void updateVibratoFade();
+  void applyConfiguredVibrato();
+  void clearVibratoRateAndDelay();
   void setVibratoDepth(uint8_t depth);
   void resetPitchBendForNewNote();
   void setPitchBendRange(uint16_t cents);
