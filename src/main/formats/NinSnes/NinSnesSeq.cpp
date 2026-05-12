@@ -516,7 +516,9 @@ void NinSnesTrackSharedData::resetVars(void) {
 
 NinSnesTrack::NinSnesTrack(NinSnesSection* parentSection, uint32_t offset, uint32_t length,
                            const std::string& theName)
-    : SeqTrack(parentSection->parentSeq, offset, length, theName), parentSection(parentSection) {
+    : SeqTrack(parentSection->parentSeq, offset, length, theName),
+      parentSection(parentSection),
+      shared(&localSharedData) {
   resetVars();
   bDetermineTrackLengthEventByEvent = true;
 }
@@ -525,26 +527,7 @@ void NinSnesTrack::resetVars() {
   SeqTrack::resetVars();
 
   cKeyCorrection = SEQ_KEYOFS;
-  if (shared != nullptr) {
-    transpose = shared->spcTranspose;
-    vibrato = shared->vibrato;
-    pitchEnvelope = shared->pitchEnvelope;
-    pitchSlide = shared->pitchSlide;
-    pitchBaseValid = shared->pitchBaseValid;
-    noteBasePitch = shared->noteBasePitch;
-    currentPitch = shared->currentPitch;
-    pitchBendRangeCents = shared->pitchBendRangeCents;
-    currentPitchBend = shared->currentPitchBend;
-  } else {
-    vibrato = {};
-    pitchEnvelope = {};
-    pitchSlide = {};
-    pitchBaseValid = false;
-    noteBasePitch = 0;
-    currentPitch = 0;
-    pitchBendRangeCents = kNinSnesDefaultPitchBendRangeCents;
-    currentPitchBend = 0;
-  }
+  transpose = shared->spcTranspose;
   m_lastNoteWasPercussion = false;
   nonPercussionProgram = 0;
   currentPercussionProgram = 0;
@@ -559,7 +542,7 @@ void NinSnesTrack::onTickBegin() {
   // NinSnes can queue another F9 directly after the current note. If the active pitch motion
   // finishes before the note does, the driver picks up that waiting slide without advancing the
   // main event stream to the next note boundary.
-  if (deltaTime > 1 && pitchSlide.ticksRemaining == 0) {
+  if (deltaTime > 1 && shared->pitchSlide.ticksRemaining == 0) {
     consumeQueuedPitchSlide();
   }
 }
@@ -639,7 +622,7 @@ NinSnesTrack::PitchSlideEvent NinSnesTrack::readPitchSlide(uint32_t offset) {
 }
 
 bool NinSnesTrack::consumeQueuedPitchSlide() {
-  if (pitchSlide.ticksRemaining != 0) {
+  if (shared->pitchSlide.ticksRemaining != 0) {
     return false;
   }
 
@@ -674,85 +657,76 @@ void NinSnesTrack::beginPitchSlide(const PitchSlideEvent& slide) {
 }
 
 void NinSnesTrack::activatePitchMotion(uint8_t delay, uint8_t length, int32_t targetPitch) {
-  if (!pitchBaseValid || length == 0) {
+  if (!shared->pitchBaseValid || length == 0) {
     return;
   }
 
+  auto& slide = shared->pitchSlide;
   // F1/F2 and F9 all reduce to the same live pitch-motion state: wait for an optional delay,
   // advance by a signed 8.8 delta each tick, then snap exactly to the stored target.
-  pitchSlide.delayRemaining = delay;
-  pitchSlide.ticksRemaining = length;
-  pitchSlide.targetPitch = targetPitch;
-  pitchSlide.delta = static_cast<int16_t>((targetPitch - currentPitch) / length);
-  syncSharedPitchState();
-  setPitchBendRange(pitchBendRangeCentsForSlide(noteBasePitch, currentPitch, targetPitch));
+  slide.delayRemaining = delay;
+  slide.ticksRemaining = length;
+  slide.targetPitch = targetPitch;
+  slide.delta = static_cast<int16_t>((targetPitch - shared->currentPitch) / length);
+  setPitchBendRange(
+      pitchBendRangeCentsForSlide(shared->noteBasePitch, shared->currentPitch, targetPitch));
   applyCurrentPitchBend();
 }
 
 void NinSnesTrack::clearActivePitchSlide() {
-  pitchSlide = {};
-  syncSharedPitchState();
+  shared->pitchSlide = {};
 }
 
 void NinSnesTrack::updatePitchSlide() {
-  if (!pitchBaseValid || pitchSlide.ticksRemaining == 0) {
+  if (!shared->pitchBaseValid || shared->pitchSlide.ticksRemaining == 0) {
     return;
   }
 
-  if (pitchSlide.delayRemaining > 0) {
-    pitchSlide.delayRemaining -= 1;
-    syncSharedPitchState();
+  auto& slide = shared->pitchSlide;
+  if (slide.delayRemaining > 0) {
+    slide.delayRemaining -= 1;
     return;
   }
 
-  pitchSlide.ticksRemaining -= 1;
-  if (pitchSlide.ticksRemaining == 0) {
-    currentPitch = pitchSlide.targetPitch;
+  slide.ticksRemaining -= 1;
+  if (slide.ticksRemaining == 0) {
+    shared->currentPitch = slide.targetPitch;
   } else {
     // Intermediate slide steps truncate in 8.8 pitch units, then the last step snaps exactly.
-    currentPitch += pitchSlide.delta;
+    shared->currentPitch += slide.delta;
   }
 
-  syncSharedPitchState();
   applyCurrentPitchBend();
 }
 
 void NinSnesTrack::beginNotePitch(uint8_t note) {
   resetPitchBendForNewNote();
-  pitchBaseValid = true;
-  noteBasePitch = notePitch(note);
-  currentPitch = noteBasePitch;
-  syncSharedPitchState();
+  shared->pitchBaseValid = true;
+  shared->noteBasePitch = notePitch(note);
+  shared->currentPitch = shared->noteBasePitch;
   activateStoredPitchEnvelope();
   beginNoteVibrato();
 }
 
 void NinSnesTrack::activateStoredPitchEnvelope() {
+  const auto& pitchEnvelope = shared->pitchEnvelope;
   if (!pitchEnvelope.enabled()) {
     return;
   }
 
   const int32_t semitoneOffset = static_cast<int32_t>(pitchEnvelope.semitones) * 256;
-  int32_t targetPitch = noteBasePitch;
+  int32_t targetPitch = shared->noteBasePitch;
   if (pitchEnvelope.mode == NinSnesTrackSharedData::StoredPitchEnvelope::Mode::To) {
     targetPitch += semitoneOffset;
   } else {
-    currentPitch = noteBasePitch - semitoneOffset;
-    syncSharedPitchState();
+    shared->currentPitch = shared->noteBasePitch - semitoneOffset;
   }
 
   activatePitchMotion(pitchEnvelope.delay, pitchEnvelope.length, targetPitch);
 }
 
-void NinSnesTrack::setStoredPitchEnvelope(NinSnesTrackSharedData::StoredPitchEnvelope::Mode mode,
-                                          uint8_t delay,
-                                          uint8_t length,
-                                          int8_t semitones) {
-  pitchEnvelope = {mode, delay, length, semitones};
-  syncSharedPitchState();
-}
-
 void NinSnesTrack::beginNoteVibrato() {
+  auto& vibrato = shared->vibrato;
   if (!vibrato.active()) {
     return;
   }
@@ -770,6 +744,7 @@ void NinSnesTrack::beginNoteVibrato() {
 }
 
 void NinSnesTrack::applyConfiguredVibrato() {
+  auto& vibrato = shared->vibrato;
   if (vibrato.active()) {
     auto& parentSeq = seq();
     if (readMode != READMODE_CONVERT_TO_MIDI) {
@@ -786,13 +761,13 @@ void NinSnesTrack::applyConfiguredVibrato() {
 }
 
 void NinSnesTrack::updateVibratoFade() {
+  auto& vibrato = shared->vibrato;
   if (vibrato.fade.ticksRemaining == 0) {
     return;
   }
 
   if (vibrato.fade.delayRemaining > 0) {
     vibrato.fade.delayRemaining -= 1;
-    syncSharedVibratoState();
     return;
   }
 
@@ -805,13 +780,13 @@ void NinSnesTrack::updateVibratoFade() {
 }
 
 void NinSnesTrack::setVibratoDepth(uint8_t depth) {
+  auto& vibrato = shared->vibrato;
   vibrato.fade.currentDepth = depth;
   const uint8_t midiDepth = convertVibratoDepthToMidi(depth, seq().maxVibratoDepthCents);
   if (midiDepth != vibrato.fade.midiDepth) {
     addModulationNoItem(midiDepth);
   }
   vibrato.fade.midiDepth = midiDepth;
-  syncSharedVibratoState();
 }
 
 void NinSnesTrack::clearVibratoRateAndDelay() {
@@ -821,92 +796,69 @@ void NinSnesTrack::clearVibratoRateAndDelay() {
 
 void NinSnesTrack::resetPitchBendForNewNote() {
   clearActivePitchSlide();
-  pitchBaseValid = false;
-  if (pitchBendRangeCents == kNinSnesDefaultPitchBendRangeCents && currentPitchBend == 0) {
-    syncSharedPitchState();
+  shared->pitchBaseValid = false;
+  if (shared->pitchBendRangeCents == kNinSnesDefaultPitchBendRangeCents &&
+      shared->currentPitchBend == 0) {
     return;
   }
 
-  if (pitchBendRangeCents != kNinSnesDefaultPitchBendRangeCents) {
+  if (shared->pitchBendRangeCents != kNinSnesDefaultPitchBendRangeCents) {
     if (readMode == READMODE_CONVERT_TO_MIDI) {
       pMidiTrack->addPitchBendRange(channel, kNinSnesDefaultPitchBendRangeCents);
     }
-    pitchBendRangeCents = kNinSnesDefaultPitchBendRangeCents;
+    shared->pitchBendRangeCents = kNinSnesDefaultPitchBendRangeCents;
   }
 
   if (readMode == READMODE_CONVERT_TO_MIDI) {
     pMidiTrack->addPitchBend(channel, 0);
   }
-  currentPitchBend = 0;
-  syncSharedPitchState();
+  shared->currentPitchBend = 0;
 }
 
 void NinSnesTrack::setPitchBendRange(uint16_t cents) {
   cents = std::max<uint16_t>(kNinSnesDefaultPitchBendRangeCents, cents);
-  if (cents == pitchBendRangeCents) {
+  if (cents == shared->pitchBendRangeCents) {
     return;
   }
 
   if (readMode == READMODE_CONVERT_TO_MIDI) {
     pMidiTrack->addPitchBendRange(channel, cents);
   }
-  pitchBendRangeCents = cents;
-  syncSharedPitchState();
-  if (pitchBaseValid) {
+  shared->pitchBendRangeCents = cents;
+  if (shared->pitchBaseValid) {
     // Re-emit the current bend after changing the range so the sounding pitch does not jump.
     applyCurrentPitchBend();
   }
 }
 
 void NinSnesTrack::setPitchBend(int16_t bend) {
-  if (bend == currentPitchBend) {
+  if (bend == shared->currentPitchBend) {
     return;
   }
 
   if (readMode == READMODE_CONVERT_TO_MIDI) {
     pMidiTrack->addPitchBend(channel, bend);
   }
-  currentPitchBend = bend;
-  syncSharedPitchState();
+  shared->currentPitchBend = bend;
 }
 
 void NinSnesTrack::applyCurrentPitchBend() {
-  if (!pitchBaseValid) {
+  if (!shared->pitchBaseValid) {
     setPitchBend(0);
     return;
   }
 
   const auto bend = static_cast<int32_t>(
-      std::lround(((static_cast<double>(currentPitch - noteBasePitch) * 100.0) / 256.0)
-                  / pitchBendRangeCents * 8192.0));
+      std::lround(((static_cast<double>(shared->currentPitch - shared->noteBasePitch) * 100.0) /
+                   256.0) /
+                  shared->pitchBendRangeCents * 8192.0));
   setPitchBend(static_cast<int16_t>(std::clamp(bend,
                                                static_cast<int32_t>(kMidiPitchBendMin),
                                                static_cast<int32_t>(kMidiPitchBendMax))));
 }
 
-void NinSnesTrack::syncSharedPitchState() {
-  if (shared == nullptr) {
-    return;
-  }
-
-  shared->pitchEnvelope = pitchEnvelope;
-  shared->pitchSlide = pitchSlide;
-  shared->pitchBaseValid = pitchBaseValid;
-  shared->noteBasePitch = noteBasePitch;
-  shared->currentPitch = currentPitch;
-  shared->pitchBendRangeCents = pitchBendRangeCents;
-  shared->currentPitchBend = currentPitchBend;
-}
-
-void NinSnesTrack::syncSharedVibratoState() {
-  if (shared == nullptr) {
-    return;
-  }
-
-  shared->vibrato = vibrato;
-}
-
 void NinSnesTrack::syncVibratoRateAndDelay() {
+  const auto& vibrato = shared->vibrato;
   if (!vibrato.active()) {
     return;
   }
@@ -1176,6 +1128,7 @@ bool NinSnesTrack::handleControllerEvent(NinSnesSeqEventType eventType, uint32_t
     }
 
     case EVENT_VIBRATO_ON: {
+      auto& vibrato = shared->vibrato;
       vibrato.delay = readByte(curOffset++);
       vibrato.rate = readByte(curOffset++);
       vibrato.depth = readByte(curOffset++);
@@ -1188,8 +1141,7 @@ bool NinSnesTrack::handleControllerEvent(NinSnesSeqEventType eventType, uint32_t
     }
 
     case EVENT_VIBRATO_OFF:
-      vibrato = {};
-      syncSharedVibratoState();
+      shared->vibrato = {};
       addGenericEvent(beginOffset, curOffset - beginOffset, "Vibrato Off", desc, Type::Vibrato);
       addModulationNoItem(0);
       clearVibratoRateAndDelay();
@@ -1276,6 +1228,7 @@ bool NinSnesTrack::handleControllerEvent(NinSnesSeqEventType eventType, uint32_t
     }
 
     case EVENT_VIBRATO_FADE: {
+      auto& vibrato = shared->vibrato;
       const uint8_t fadeLength = readByte(curOffset++);
       desc = fmt::format("Length: {:d}", fadeLength);
       addGenericEvent(beginOffset, curOffset - beginOffset, "Vibrato Fade", desc, Type::Vibrato);
@@ -1286,7 +1239,6 @@ bool NinSnesTrack::handleControllerEvent(NinSnesSeqEventType eventType, uint32_t
         vibrato.fade.length = fadeLength;
         vibrato.fade.step = vibrato.depth / fadeLength;
       }
-      syncSharedVibratoState();
       return true;
     }
 
@@ -1294,10 +1246,12 @@ bool NinSnesTrack::handleControllerEvent(NinSnesSeqEventType eventType, uint32_t
       const uint8_t pitchEnvDelay = readByte(curOffset++);
       const uint8_t pitchEnvLength = readByte(curOffset++);
       const int8_t pitchEnvSemitones = static_cast<int8_t>(readByte(curOffset++));
-      setStoredPitchEnvelope(NinSnesTrackSharedData::StoredPitchEnvelope::Mode::To,
-                             pitchEnvDelay,
-                             pitchEnvLength,
-                             pitchEnvSemitones);
+      shared->pitchEnvelope = {
+        NinSnesTrackSharedData::StoredPitchEnvelope::Mode::To,
+        pitchEnvDelay,
+        pitchEnvLength,
+        pitchEnvSemitones,
+      };
       desc = fmt::format("Delay: {:d}  Length: {:d}  Semitones: {:d}", pitchEnvDelay,
                          pitchEnvLength, pitchEnvSemitones);
       addGenericEvent(beginOffset, curOffset - beginOffset, "Pitch Envelope (To)", desc,
@@ -1309,10 +1263,12 @@ bool NinSnesTrack::handleControllerEvent(NinSnesSeqEventType eventType, uint32_t
       const uint8_t pitchEnvDelay = readByte(curOffset++);
       const uint8_t pitchEnvLength = readByte(curOffset++);
       const int8_t pitchEnvSemitones = static_cast<int8_t>(readByte(curOffset++));
-      setStoredPitchEnvelope(NinSnesTrackSharedData::StoredPitchEnvelope::Mode::From,
-                             pitchEnvDelay,
-                             pitchEnvLength,
-                             pitchEnvSemitones);
+      shared->pitchEnvelope = {
+        NinSnesTrackSharedData::StoredPitchEnvelope::Mode::From,
+        pitchEnvDelay,
+        pitchEnvLength,
+        pitchEnvSemitones,
+      };
       desc = fmt::format("Delay: {:d}  Length: {:d}  Semitones: {:d}", pitchEnvDelay,
                          pitchEnvLength, pitchEnvSemitones);
       addGenericEvent(beginOffset, curOffset - beginOffset, "Pitch Envelope (From)", desc,
@@ -1321,8 +1277,7 @@ bool NinSnesTrack::handleControllerEvent(NinSnesSeqEventType eventType, uint32_t
     }
 
     case EVENT_PITCH_ENVELOPE_OFF:
-      pitchEnvelope = {};
-      syncSharedPitchState();
+      shared->pitchEnvelope = {};
       addGenericEvent(beginOffset, curOffset - beginOffset, "Pitch Envelope Off", desc,
                       Type::PitchEnvelope);
       return true;

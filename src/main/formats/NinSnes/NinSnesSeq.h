@@ -150,6 +150,7 @@ public:
   int8_t calculatePanValue(uint8_t pan, double& volumeScale, bool& reverseLeft, bool& reverseRight);
 
   NinSnesSection* parentSection;
+  // Tracks are constructed before parseTrackPointers wires them to the sequence-owned shared data.
   NinSnesTrackSharedData* shared = nullptr;
   bool available = true;
 
@@ -178,10 +179,6 @@ private:
   void updatePitchSlide();
   void beginNotePitch(uint8_t note);
   void activateStoredPitchEnvelope();
-  void setStoredPitchEnvelope(NinSnesTrackSharedData::StoredPitchEnvelope::Mode mode,
-                              uint8_t delay,
-                              uint8_t length,
-                              int8_t semitones);
   void beginNoteVibrato();
   void updateVibratoFade();
   void applyConfiguredVibrato();
@@ -191,8 +188,6 @@ private:
   void setPitchBendRange(uint16_t cents);
   void setPitchBend(int16_t bend);
   void applyCurrentPitchBend();
-  void syncSharedPitchState();
-  void syncSharedVibratoState();
   void addPendingEndEvent(uint8_t statusByte, const std::string& desc);
   void applyCurrentTempo();
   void syncVibratoRateAndDelay();
@@ -214,12 +209,6 @@ private:
   uint8_t currentPercussionProgram = 0;
   std::optional<uint8_t> currentLogicalProgram;
   bool intelliLegato = false;
-  NinSnesTrackSharedData::VibratoState vibrato;
-  NinSnesTrackSharedData::StoredPitchEnvelope pitchEnvelope;
-  NinSnesTrackSharedData::ActivePitchSlide pitchSlide;
-  bool pitchBaseValid = false;
-  int32_t noteBasePitch = 0;
-  int32_t currentPitch = 0;
-  uint16_t pitchBendRangeCents = 200;
-  int16_t currentPitchBend = 0;
+  // Fallback state used only until the real per-track shared slot is attached.
+  NinSnesTrackSharedData localSharedData;
 };
