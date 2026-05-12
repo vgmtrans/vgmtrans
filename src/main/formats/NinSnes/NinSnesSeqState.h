@@ -129,7 +129,7 @@ class NinSnesTrackSharedData {
   // and vibrato state has to live here rather than on NinSnesTrack.
   SynthLfoLane vibrato;
   StoredPitchEnvelope pitchEnvelope;
-  PitchBendLane<int32_t, int16_t> pitch {100.0 / 256.0};
+  PitchBendLane<int32_t> pitch {100.0 / 256.0};
 };
 
 struct NinSnesPercussionDef {

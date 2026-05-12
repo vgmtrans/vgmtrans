@@ -56,7 +56,7 @@ public:
   uint8_t sectionRepeatCount;
   int8_t globalTranspose;
   uint8_t tempo;
-  ControllerLane<int32_t, int16_t> tempoFade;
+  ControllerLane<int32_t> tempoFade;
   double maxVibratoDepthCents;
   double maxVibratoRateHz;
 

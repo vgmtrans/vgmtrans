@@ -78,7 +78,7 @@ class KonamiSnesSeq
   void resetVars() override;
 
   uint8_t tempo;
-  ControllerLane<int32_t, int16_t> tempoFade;
+  ControllerLane<int32_t> tempoFade;
   uint32_t tempoFadeLastUpdatedTime;
   uint8_t maxVibratoDepth;
   uint16_t maxVibratoRateFactor;
@@ -210,8 +210,8 @@ class KonamiSnesTrack
   KonamiSnesSeq& seq();
   const KonamiSnesSeq& seq() const;
 
-  ControllerLane<int32_t, int16_t> panFade;
-  ControllerLane<int32_t, int16_t> volumeFade;
-  PitchBendLane<double, double> pitchSlide;
+  ControllerLane<int32_t> panFade;
+  ControllerLane<int32_t> volumeFade;
+  PitchBendLane<double> pitchSlide;
   SynthLfoLane vibrato;
 };
