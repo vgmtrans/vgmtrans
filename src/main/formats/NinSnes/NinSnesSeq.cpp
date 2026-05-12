@@ -138,10 +138,7 @@ void NinSnesSeq::resetVars() {
   spcPercussionBase = spcPercussionBaseInit;
   sectionRepeatCount = 0;
   globalTranspose = 0;
-  tempo = nin_snes::vibrato::kDefaultTempo;
-  tempoFade = {};
-  tempoFade.currentTempo = tempo << 8;
-  tempoFade.targetTempo = tempoFade.currentTempo;
+  setImmediateTempo(nin_snes::vibrato::kDefaultTempo);
 
   if (readMode != READMODE_CONVERT_TO_MIDI) {
     maxVibratoDepthCents = nin_snes::vibrato::minMaxDepthCents();
@@ -372,6 +369,26 @@ double NinSnesSeq::getTempoInBPM(uint8_t tempoValue) {
   }
 }
 
+void NinSnesSeq::setImmediateTempo(uint8_t newTempo) {
+  tempo = newTempo;
+  tempoFade = {};
+  tempoFade.currentTempo = newTempo << 8;
+  tempoFade.targetTempo = tempoFade.currentTempo;
+}
+
+void NinSnesSeq::startTempoFade(uint8_t fadeLength, uint8_t targetTempo) {
+  tempoFade.currentTempo = tempo << 8;
+  tempoFade.targetTempo = targetTempo << 8;
+  tempoFade.delta = static_cast<int16_t>((tempoFade.targetTempo - tempoFade.currentTempo) / fadeLength);
+  tempoFade.length = fadeLength;
+}
+
+void NinSnesSeq::syncTempoDependentTracks() {
+  for (auto* track : aTracks) {
+    static_cast<NinSnesTrack*>(track)->syncVibratoRateAndDelay();
+  }
+}
+
 void NinSnesSeq::onTickEnd() {
   // EVENT_TEMPO_FADE applies its first tempo step at the end of the tick that parsed the command.
   if (advanceTempoFade(tempoFade) != FadeStepResult::Inactive && !aTracks.empty()) {
@@ -508,7 +525,7 @@ void NinSnesTrack::resetVars() {
   SeqTrack::resetVars();
 
   cKeyCorrection = SEQ_KEYOFS;
-  if (shared != NULL) {
+  if (shared != nullptr) {
     transpose = shared->spcTranspose;
     vibrato = shared->vibrato;
     pitchEnvelope = shared->pitchEnvelope;
@@ -621,25 +638,26 @@ NinSnesTrack::PitchSlideEvent NinSnesTrack::readPitchSlide(uint32_t offset) {
   };
 }
 
-std::optional<NinSnesTrack::PitchSlideEvent> NinSnesTrack::consumeQueuedPitchSlide() {
+bool NinSnesTrack::consumeQueuedPitchSlide() {
   if (pitchSlide.ticksRemaining != 0) {
-    return std::nullopt;
+    return false;
   }
 
   if (curOffset + 3 >= 0x10000) {
-    return std::nullopt;
+    return false;
   }
 
   const auto statusByte = readByte(curOffset);
   auto nextEvent = seq().EventMap.find(statusByte);
   if (nextEvent == seq().EventMap.end() || nextEvent->second != EVENT_PITCH_SLIDE) {
-    return std::nullopt;
+    return false;
   }
 
-  auto slide = readPitchSlide(curOffset++);
+  const auto slideOffset = curOffset++;
+  auto slide = readPitchSlide(slideOffset);
   addPitchSlideEvent(slide);
   beginPitchSlide(slide);
-  return slide;
+  return true;
 }
 
 void NinSnesTrack::addPitchSlideEvent(const PitchSlideEvent& slide) {
@@ -726,6 +744,14 @@ void NinSnesTrack::activateStoredPitchEnvelope() {
   activatePitchMotion(pitchEnvelope.delay, pitchEnvelope.length, targetPitch);
 }
 
+void NinSnesTrack::setStoredPitchEnvelope(NinSnesTrackSharedData::StoredPitchEnvelope::Mode mode,
+                                          uint8_t delay,
+                                          uint8_t length,
+                                          int8_t semitones) {
+  pitchEnvelope = {mode, delay, length, semitones};
+  syncSharedPitchState();
+}
+
 void NinSnesTrack::beginNoteVibrato() {
   if (!vibrato.active()) {
     return;
@@ -741,6 +767,22 @@ void NinSnesTrack::beginNoteVibrato() {
     vibrato.fade.ticksRemaining = vibrato.fade.length;
   }
   setVibratoDepth(vibrato.fade.length == 0 ? vibrato.depth : 0);
+}
+
+void NinSnesTrack::applyConfiguredVibrato() {
+  if (vibrato.active()) {
+    auto& parentSeq = seq();
+    if (readMode != READMODE_CONVERT_TO_MIDI) {
+      parentSeq.maxVibratoDepthCents =
+          std::max(parentSeq.maxVibratoDepthCents, nin_snes::vibrato::depthCents(vibrato.depth));
+    }
+    setVibratoDepth(vibrato.depth);
+    syncVibratoRateAndDelay();
+    return;
+  }
+
+  setVibratoDepth(0);
+  clearVibratoRateAndDelay();
 }
 
 void NinSnesTrack::updateVibratoFade() {
@@ -770,6 +812,11 @@ void NinSnesTrack::setVibratoDepth(uint8_t depth) {
   }
   vibrato.fade.midiDepth = midiDepth;
   syncSharedVibratoState();
+}
+
+void NinSnesTrack::clearVibratoRateAndDelay() {
+  addChannelPressureNoItem(0);
+  addControllerEventNoItem(nin_snes::vibrato::kDelayController, 0);
 }
 
 void NinSnesTrack::resetPitchBendForNewNote() {
@@ -887,9 +934,7 @@ void NinSnesTrack::applyCurrentTempo() {
 
   parentSeq.tempo = newTempo;
   addTempoBPMNoItem(parentSeq.getTempoInBPM(newTempo));
-  for (auto* track : parentSeq.aTracks) {
-    static_cast<NinSnesTrack*>(track)->syncVibratoRateAndDelay();
-  }
+  parentSeq.syncTempoDependentTracks();
 }
 
 void NinSnesTrack::readStandardNoteParam(uint32_t beginOffset, uint8_t statusByte,
@@ -1138,18 +1183,7 @@ bool NinSnesTrack::handleControllerEvent(NinSnesSeqEventType eventType, uint32_t
       desc = fmt::format("Delay: {:d}  Rate: {:d}  Depth: {:d}", vibrato.delay, vibrato.rate,
                          vibrato.depth);
       addGenericEvent(beginOffset, curOffset - beginOffset, "Vibrato", desc, Type::Vibrato);
-      if (vibrato.active()) {
-        if (readMode != READMODE_CONVERT_TO_MIDI) {
-          parentSeq.maxVibratoDepthCents =
-              std::max(parentSeq.maxVibratoDepthCents, nin_snes::vibrato::depthCents(vibrato.depth));
-        }
-        setVibratoDepth(vibrato.depth);
-        syncVibratoRateAndDelay();
-      } else {
-        setVibratoDepth(0);
-        addChannelPressureNoItem(0);
-        addControllerEventNoItem(nin_snes::vibrato::kDelayController, 0);
-      }
+      applyConfiguredVibrato();
       return true;
     }
 
@@ -1158,8 +1192,7 @@ bool NinSnesTrack::handleControllerEvent(NinSnesSeqEventType eventType, uint32_t
       syncSharedVibratoState();
       addGenericEvent(beginOffset, curOffset - beginOffset, "Vibrato Off", desc, Type::Vibrato);
       addModulationNoItem(0);
-      addChannelPressureNoItem(0);
-      addControllerEventNoItem(nin_snes::vibrato::kDelayController, 0);
+      clearVibratoRateAndDelay();
       return true;
 
     case EVENT_MASTER_VOLUME: {
@@ -1178,14 +1211,9 @@ bool NinSnesTrack::handleControllerEvent(NinSnesSeqEventType eventType, uint32_t
 
     case EVENT_TEMPO: {
       const uint8_t newTempo = readByte(curOffset++);
-      parentSeq.tempo = newTempo;
-      parentSeq.tempoFade = {};
-      parentSeq.tempoFade.currentTempo = newTempo << 8;
-      parentSeq.tempoFade.targetTempo = parentSeq.tempoFade.currentTempo;
+      parentSeq.setImmediateTempo(newTempo);
       addTempoBPM(beginOffset, curOffset - beginOffset, parentSeq.getTempoInBPM(newTempo));
-      for (auto* track : parentSeq.aTracks) {
-        static_cast<NinSnesTrack*>(track)->syncVibratoRateAndDelay();
-      }
+      parentSeq.syncTempoDependentTracks();
       return true;
     }
 
@@ -1193,24 +1221,15 @@ bool NinSnesTrack::handleControllerEvent(NinSnesSeqEventType eventType, uint32_t
       const uint8_t fadeLength = readByte(curOffset++);
       const uint8_t newTempo = readByte(curOffset++);
       if (fadeLength == 0) {
-        parentSeq.tempo = newTempo;
-        parentSeq.tempoFade = {};
-        parentSeq.tempoFade.currentTempo = newTempo << 8;
-        parentSeq.tempoFade.targetTempo = parentSeq.tempoFade.currentTempo;
+        parentSeq.setImmediateTempo(newTempo);
         addTempoBPM(beginOffset, curOffset - beginOffset, parentSeq.getTempoInBPM(newTempo));
-        for (auto* track : parentSeq.aTracks) {
-          static_cast<NinSnesTrack*>(track)->syncVibratoRateAndDelay();
-        }
+        parentSeq.syncTempoDependentTracks();
       } else {
         const bool isNewOffset = onEvent(beginOffset, curOffset - beginOffset);
         recordDurSeqEvent<TempoSlideSeqEvent>(isNewOffset, getTime(), fadeLength,
                                               parentSeq.getTempoInBPM(newTempo), fadeLength,
                                               beginOffset, curOffset - beginOffset, "Tempo Slide");
-        parentSeq.tempoFade.currentTempo = parentSeq.tempo << 8;
-        parentSeq.tempoFade.targetTempo = newTempo << 8;
-        parentSeq.tempoFade.delta = static_cast<int16_t>(
-            (parentSeq.tempoFade.targetTempo - parentSeq.tempoFade.currentTempo) / fadeLength);
-        parentSeq.tempoFade.length = fadeLength;
+        parentSeq.startTempoFade(fadeLength, newTempo);
       }
       return true;
     }
@@ -1275,13 +1294,10 @@ bool NinSnesTrack::handleControllerEvent(NinSnesSeqEventType eventType, uint32_t
       const uint8_t pitchEnvDelay = readByte(curOffset++);
       const uint8_t pitchEnvLength = readByte(curOffset++);
       const int8_t pitchEnvSemitones = static_cast<int8_t>(readByte(curOffset++));
-      pitchEnvelope = {
-        NinSnesTrackSharedData::StoredPitchEnvelope::Mode::To,
-        pitchEnvDelay,
-        pitchEnvLength,
-        pitchEnvSemitones,
-      };
-      syncSharedPitchState();
+      setStoredPitchEnvelope(NinSnesTrackSharedData::StoredPitchEnvelope::Mode::To,
+                             pitchEnvDelay,
+                             pitchEnvLength,
+                             pitchEnvSemitones);
       desc = fmt::format("Delay: {:d}  Length: {:d}  Semitones: {:d}", pitchEnvDelay,
                          pitchEnvLength, pitchEnvSemitones);
       addGenericEvent(beginOffset, curOffset - beginOffset, "Pitch Envelope (To)", desc,
@@ -1293,13 +1309,10 @@ bool NinSnesTrack::handleControllerEvent(NinSnesSeqEventType eventType, uint32_t
       const uint8_t pitchEnvDelay = readByte(curOffset++);
       const uint8_t pitchEnvLength = readByte(curOffset++);
       const int8_t pitchEnvSemitones = static_cast<int8_t>(readByte(curOffset++));
-      pitchEnvelope = {
-        NinSnesTrackSharedData::StoredPitchEnvelope::Mode::From,
-        pitchEnvDelay,
-        pitchEnvLength,
-        pitchEnvSemitones,
-      };
-      syncSharedPitchState();
+      setStoredPitchEnvelope(NinSnesTrackSharedData::StoredPitchEnvelope::Mode::From,
+                             pitchEnvDelay,
+                             pitchEnvLength,
+                             pitchEnvSemitones);
       desc = fmt::format("Delay: {:d}  Length: {:d}  Semitones: {:d}", pitchEnvDelay,
                          pitchEnvLength, pitchEnvSemitones);
       addGenericEvent(beginOffset, curOffset - beginOffset, "Pitch Envelope (From)", desc,
