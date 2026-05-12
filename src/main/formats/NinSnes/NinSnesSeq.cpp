@@ -599,7 +599,7 @@ void NinSnesTrack::beginNoteVibrato() {
     return;
   }
 
-  // F0 is a reusable per-note fade-in for the currently configured E3 vibrato, so a real note-on
+  // EVENT_VIBRATO_FADE is a reusable per-note fade-in for the currently configured E3 vibrato, so a real note-on
   // either restarts that fade from zero depth or restores the steady-state depth immediately.
   if (vibrato.fade.length == 0) {
     vibrato.fade.delayRemaining = 0;
