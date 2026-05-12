@@ -56,7 +56,7 @@ public:
   uint8_t sectionRepeatCount;
   int8_t globalTranspose;
   uint8_t tempo;
-  ControllerLane<int32_t> tempoFade;
+  FixedPointControllerLane<> tempoFade;
   double maxVibratoDepthCents;
   double maxVibratoRateHz;
 
@@ -179,9 +179,6 @@ private:
   void clearVibratoRateAndDelay();
   void setVibratoDepth(uint8_t depth);
   void resetPitchBendForNewNote();
-  void setPitchBendRange(uint16_t cents);
-  void setPitchBend(int16_t bend);
-  void applyCurrentPitchBend();
   void addPendingEndEvent(uint8_t statusByte, const std::string& desc);
   void applyCurrentTempo();
   void syncVibratoRateAndDelay();

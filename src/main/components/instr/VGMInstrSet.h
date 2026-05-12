@@ -73,6 +73,20 @@ public:
     double maxSeconds;
   };
 
+  struct StandardVibratoProfile {
+    double maxDepthCents;
+    double minHertz;
+    double maxHertz;
+    std::optional<DelayRange> delayRange = std::nullopt;
+  };
+
+  struct StandardTremoloProfile {
+    double maxDepthDb;
+    double minHertz;
+    double maxHertz;
+    TremoloGainMode gainMode = TremoloGainMode::BipolarAroundNominal;
+  };
+
   VGMInstr(VGMInstrSet *parInstrSet, uint32_t offset, uint32_t length, uint32_t bank,
            uint32_t instrNum, std::string name = "Instrument",
            float reverb = defaultReverbPercent);
@@ -93,13 +107,16 @@ public:
                                   double minHertz,
                                   double maxHertz,
                                   std::optional<DelayRange> delayRange = std::nullopt);
+  void addStandardVibratoHandling(const StandardVibratoProfile& profile);
   void updateStandardVibratoHandling(double maxDepthCents,
                                      double minHertz,
                                      double maxHertz);
+  void updateStandardVibratoHandling(const StandardVibratoProfile& profile);
   void addStandardTremoloHandling(double maxDepthDb,
                                   double minHertz,
                                   double maxHertz,
                                   TremoloGainMode gainMode);
+  void addStandardTremoloHandling(const StandardTremoloProfile& profile);
   [[nodiscard]] const std::vector<SynthModulator>& modulators() const { return m_modulators; }
 
   // Generator support

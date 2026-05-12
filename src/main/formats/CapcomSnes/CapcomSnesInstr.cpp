@@ -9,6 +9,27 @@
 #include "CapcomSnesDefinitions.h"
 #include "CapcomSnesFormat.h"
 
+namespace {
+
+VGMInstr::StandardVibratoProfile vibratoExportProfile() {
+  return {
+      1200,
+      capcom_snes::kVibratoBaseHz,
+      capcom_snes::kVibratoMaxHz,
+  };
+}
+
+VGMInstr::StandardTremoloProfile tremoloExportProfile() {
+  return {
+      capcom_snes::kTremoloHalfDepthDb,
+      capcom_snes::kTremoloBaseHz,
+      capcom_snes::kTremoloMaxHz,
+      TremoloGainMode::NoBoost,
+  };
+}
+
+}  // namespace
+
 // ****************
 // CapcomSnesInstrSet
 // ****************
@@ -105,11 +126,8 @@ bool CapcomSnesInstr::loadInstr() {
   // step frequency as the global base and let channel pressure span the full range in Hz.
   // Tremolo runs at twice the base vibrato rate and only attenuates, never boosts.
 
-  addStandardVibratoHandling(1200, capcom_snes::kVibratoBaseHz, capcom_snes::kVibratoMaxHz);
-  addStandardTremoloHandling(capcom_snes::kTremoloHalfDepthDb,
-                             capcom_snes::kTremoloBaseHz,
-                             capcom_snes::kTremoloMaxHz,
-                             TremoloGainMode::NoBoost);
+  addStandardVibratoHandling(vibratoExportProfile());
+  addStandardTremoloHandling(tremoloExportProfile());
 
   uint16_t addrSampStart = readShort(offDirEnt);
 

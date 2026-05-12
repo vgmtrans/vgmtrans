@@ -180,22 +180,20 @@ void CapcomSnesTrack::resetVars() {
 
 void CapcomSnesTrack::setLfoOutputsEnabled(bool enabled) {
   if (vibrato.depth() != 0) {
-    setSynthLfoModulationDepth(vibrato, enabled ? vibrato.depth() : 0);
+    setSynthLfoModulationDepth(vibrato, vibrato.outputDepthWhen(enabled));
   }
   if (tremolo.depth() != 0) {
-    setSynthLfoControllerDepth(tremolo,
-                               kTremoloDepthController,
-                               enabled ? tremolo.depth() : 0);
+    setSynthLfoControllerDepth(tremolo, kTremoloDepthController, tremolo.outputDepthWhen(enabled));
   }
 }
 
 void CapcomSnesTrack::addVibratoDepthEvent(uint32_t offset, uint32_t length, uint8_t depth) {
   bool isNewOffset = onEvent(offset, length);
-  vibrato.configure(vibrato.delay(), vibrato.rate(), depth);
+  vibrato.setDepth(depth);
 
   // Add the event to the UI, but, but don't emit the MIDI event while the driver has the LFO disabled.
   recordSeqEvent<ModulationSeqEvent>(isNewOffset, getTime(), depth, offset, length, "Vibrato Depth");
-  setSynthLfoModulationDepth(vibrato, areLfoOutputsEnabled() ? depth : 0, true);
+  setSynthLfoModulationDepth(vibrato, vibrato.outputDepthWhen(areLfoOutputsEnabled()), true);
 }
 
 void CapcomSnesTrack::handleLfoRateChange(uint8_t lfoRateByte) {
@@ -818,12 +816,10 @@ bool CapcomSnesTrack::readEvent() {
             break;
           case 1:
             // Tremolo Depth
-            tremolo.configure(tremolo.delay(),
-                              tremolo.rate(),
-                              convertTremoloDepthToMidiValue(lfoAmount, parentSeq->version));
+            tremolo.setDepth(convertTremoloDepthToMidiValue(lfoAmount, parentSeq->version));
             setSynthLfoControllerDepth(tremolo,
                                        kTremoloDepthController,
-                                       areLfoOutputsEnabled() ? tremolo.depth() : 0,
+                                       tremolo.outputDepthWhen(areLfoOutputsEnabled()),
                                        true);
             desc = fmt::format("Amount: {:d}", lfoAmount);
             addGenericEvent(beginOffset, curOffset - beginOffset, "Tremolo Depth", desc, Type::Lfo);

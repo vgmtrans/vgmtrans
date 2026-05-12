@@ -279,6 +279,24 @@ private:
   }
 
   template <typename PitchType>
+  bool beginPitchBendLaneMotion(PitchBendLane<PitchType>& lane,
+                                const PitchMotionSpec<PitchType>& motion,
+                                uint16_t rangeCents,
+                                bool applyInitialBend = false) {
+    lane.clearMotion();
+    if (!lane.baseValid() || motion.length == 0) {
+      return false;
+    }
+
+    setPitchBendLaneRange(lane, rangeCents);
+    lane.startMotion(motion);
+    if (applyInitialBend) {
+      applyPitchBendLane(lane);
+    }
+    return true;
+  }
+
+  template <typename PitchType>
   bool setPitchBendLaneRange(PitchBendLane<PitchType>& lane, uint16_t cents) {
     return lane.setRange(cents,
                          [this](uint16_t rangeCents) { addPitchBendRangeNoItem(rangeCents); },
