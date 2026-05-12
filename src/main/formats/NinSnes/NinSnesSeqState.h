@@ -3,6 +3,7 @@
 #include <array>
 #include <cstddef>
 #include <cstdint>
+#include "SeqAutomation.h"
 
 enum NinSnesSeqEventType {
   // start enum at 1 because if map[] look up fails, it returns 0, and we don't want that to get
@@ -88,6 +89,8 @@ enum NinSnesSeqEventType {
 
 class NinSnesTrackSharedData {
  public:
+  static constexpr uint16_t kDefaultPitchBendRangeCents = 200;
+
   NinSnesTrackSharedData();
 
   virtual void resetVars();
@@ -103,15 +106,6 @@ class NinSnesTrackSharedData {
   // Konami:
   uint16_t konamiLoopStart;
   uint8_t konamiLoopCount;
-
-  // VGMMultiSectionSeq reinitializes track objects when a new section starts, so the live pitch
-  // and vibrato state has to live here rather than on NinSnesTrack.
-  struct ActivePitchSlide {
-    uint8_t delayRemaining = 0;
-    uint8_t ticksRemaining = 0;
-    int16_t delta = 0;
-    int32_t targetPitch = 0;
-  };
 
   // F1/F2 define a reusable note-on envelope, while F9 instantiates the live motion directly.
   struct StoredPitchEnvelope {
@@ -131,34 +125,11 @@ class NinSnesTrackSharedData {
     }
   };
 
-  struct VibratoState {
-    struct Fade {
-      uint8_t length = 0;
-      uint8_t step = 0;
-      uint8_t delayRemaining = 0;
-      uint8_t ticksRemaining = 0;
-      uint8_t currentDepth = 0;
-      uint8_t midiDepth = 0;
-    };
-
-    uint8_t delay = 0;
-    uint8_t rate = 0;
-    uint8_t depth = 0;
-    Fade fade;
-
-    bool active() const {
-      return rate != 0 && depth != 0;
-    }
-  };
-
-  VibratoState vibrato;
+  // VGMMultiSectionSeq reinitializes track objects when a new section starts, so the live pitch
+  // and vibrato state has to live here rather than on NinSnesTrack.
+  SeqLfoState vibrato;
   StoredPitchEnvelope pitchEnvelope;
-  ActivePitchSlide pitchSlide;
-  bool pitchBaseValid;
-  int32_t noteBasePitch;
-  int32_t currentPitch;
-  uint16_t pitchBendRangeCents;
-  int16_t currentPitchBend;
+  SeqPitchBendState<int32_t, int16_t> pitch;
 };
 
 struct NinSnesPercussionDef {

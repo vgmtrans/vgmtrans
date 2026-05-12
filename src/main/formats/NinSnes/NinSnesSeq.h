@@ -2,6 +2,7 @@
 #include <array>
 #include <optional>
 #include "VGMMultiSectionSeq.h"
+#include "SeqAutomation.h"
 #include "SeqTrack.h"
 #include "NinSnesFormat.h"
 #include "NinSnesScanResult.h"
@@ -11,13 +12,6 @@ struct NinSnesProfile;
 
 class NinSnesSeq : public VGMMultiSectionSeq {
 public:
-  struct ActiveTempoFade {
-    int32_t currentTempo = 0;
-    int32_t targetTempo = 0;
-    int16_t delta = 0;
-    uint8_t length = 0;
-  };
-
   NinSnesSeq(RawFile* file, NinSnesProfileId profile, uint32_t offset, uint8_t percussion_base = 0,
              const std::vector<uint8_t>& theVolumeTable = std::vector<uint8_t>(),
              const std::vector<uint8_t>& theDurRateTable = std::vector<uint8_t>(),
@@ -62,7 +56,7 @@ public:
   uint8_t sectionRepeatCount;
   int8_t globalTranspose;
   uint8_t tempo;
-  ActiveTempoFade tempoFade;
+  SeqLinearMotion<int32_t, int16_t> tempoFade;
   double maxVibratoDepthCents;
   double maxVibratoRateHz;
 
