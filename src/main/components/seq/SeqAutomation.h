@@ -31,10 +31,12 @@ struct ControllerMotionSpec {
   uint32_t length = 0;
   ControllerMotionMode mode = ControllerMotionMode::ToTarget;
 
+  // Target/length commands compute delta from the current lane value when motion starts.
   static ControllerMotionSpec toTarget(ValueType targetValue, uint32_t ticks) {
     return {targetValue, {}, ticks, ControllerMotionMode::ToTarget};
   }
 
+  // Step commands preserve the format-provided delta and run until the target is crossed.
   static ControllerMotionSpec byStep(ValueType targetValue, ValueType step) {
     return {targetValue, step, 0, ControllerMotionMode::ByStep};
   }
@@ -101,6 +103,8 @@ class SeqLinearMotion {
   [[nodiscard]] uint32_t ticksRemaining() const { return m_ticksRemaining; }
   [[nodiscard]] bool usesLength() const { return m_useLength; }
 
+  // One sequencer tick of motion. Delays are consumed before applying a value change; fixed-length
+  // motion snaps to the target on the final tick, while step motion finishes after crossing target.
   SeqMotionStatus advance() {
     if (m_delay != 0) {
       m_delay -= 1;
@@ -228,6 +232,8 @@ class FixedPointControllerLane {
   [[nodiscard]] uint32_t ticksRemaining() const { return m_lane.ticksRemaining(); }
   [[nodiscard]] bool usesLength() const { return m_lane.usesLength(); }
 
+  // Re-quantize through raw units before computing a new fade so successive fades do not inherit
+  // stale fractional residue from the previous fixed-point motion.
   [[nodiscard]] ValueType currentRawFixed() const {
     return toFixed(currentRaw());
   }
@@ -257,6 +263,7 @@ class FixedPointControllerLane {
 
   template <typename Apply>
   bool beginToTarget(ValueType targetRaw, uint32_t length, Apply&& apply) {
+    // Return true when the target was applied immediately and no active motion was started.
     if (length == 0) {
       setCurrent(targetRaw);
       std::forward<Apply>(apply)(currentRaw());
@@ -269,6 +276,7 @@ class FixedPointControllerLane {
 
   template <typename Apply>
   bool beginByStep(ValueType targetRaw, ValueType delta, Apply&& apply) {
+    // Return true when the target was applied immediately and no active motion was started.
     if (delta == ValueType {}) {
       setCurrent(targetRaw);
       std::forward<Apply>(apply)(currentRaw());
@@ -281,6 +289,7 @@ class FixedPointControllerLane {
 
   template <typename Apply>
   bool beginMotion(const ControllerMotionSpec<ValueType>& motion, Apply&& apply) {
+    // Return true when the target was applied immediately and no active motion was started.
     if (motion.usesLength()) {
       return beginToTarget(motion.target, motion.length, std::forward<Apply>(apply));
     }
@@ -318,6 +327,8 @@ struct PitchMotionSpec {
 
 // Tracks logical pitch motion and converts it to MIDI pitch bend only when asked to emit.
 // The lane owns bend range/current-bend caching, while SeqTrack supplies the actual MIDI writers.
+// Pitch values stay in the format's native units until emission so callers can choose an
+// appropriate MIDI bend range before converting the current pitch to a 14-bit bend value.
 template <typename PitchType>
 class PitchBendLane {
  public:
@@ -430,6 +441,7 @@ class PitchBendLane {
 
   template <typename EmitBend>
   bool setBend(int16_t bend, EmitBend&& emitBend) {
+    // Cache the last emitted bend so per-tick callers can ask to apply without duplicating events.
     if (bend == m_currentPitchBend) {
       return false;
     }
@@ -483,8 +495,9 @@ class PitchBendLane {
   double m_centsPerPitchUnit = 100.0;
 };
 
-// Tracks a synth-native LFO controlled by MIDI controllers. The stored config is driver state;
-// m_midiDepth is the last emitted controller depth, so duplicate MIDI events can be skipped.
+// Tracks a synth-native LFO controlled by MIDI controllers. The stored config is driver state,
+// reusable fade settings describe per-note fade-ins, and m_midiDepth is the last emitted
+// controller depth so duplicate MIDI events can be skipped.
 class SynthLfoLane {
  public:
   void reset() {
@@ -543,7 +556,7 @@ class SynthLfoLane {
     m_fadeStep = step;
   }
 
-  // Stores a per-note fade-in recipe without starting it; note-on code decides when to apply it.
+  // Stores reusable fade settings without starting them; note-on code decides when to apply them.
   void setReusableFadeToTarget(uint32_t length, int32_t targetDepth) {
     setReusableFade(length, length == 0 ? 0 : targetDepth / static_cast<int32_t>(length));
   }
@@ -557,6 +570,7 @@ class SynthLfoLane {
   [[nodiscard]] int32_t reusableFadeStep() const { return m_fadeStep; }
 
   void startReusableFade(uint32_t delay, int32_t targetDepth, int32_t initialDepth = 0) {
+    // Apply the reusable fade settings to live fade state for the current note.
     if (m_fadeLength == 0) {
       m_fade.clear();
       return;
