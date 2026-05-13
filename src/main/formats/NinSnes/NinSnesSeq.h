@@ -3,6 +3,7 @@
 #include <array>
 #include <optional>
 #include "VGMSeq.h"
+#include "SeqMotionLanes.h"
 #include "SeqTrack.h"
 #include "NinSnesFormat.h"
 #include "NinSnesScanResult.h"
@@ -26,6 +27,7 @@ public:
   bool load() override;
   bool parseHeader() override;
   void resetVars() override;
+  void onTickEnd() override;
   bool readPlaylistEvent(long stopTime);
 
   const NinSnesProfile& profile() const;
@@ -58,6 +60,9 @@ public:
   uint8_t sectionRepeatCount;
   int8_t globalTranspose;
   uint8_t tempo;
+  FixedPointControllerLane<> tempoFade;
+  double maxVibratoDepthCents;
+  double maxVibratoRateHz;
   uint32_t dwStartOffset;
   uint32_t curOffset;
   std::vector<NinSnesSection *> aSections;
@@ -109,6 +114,8 @@ private:
   NinSnesSection *getSectionAtOffset(uint32_t offset);
   bool addLoopForeverNoItem();
   void setImmediateTempo(uint8_t newTempo);
+  void startTempoFade(uint8_t fadeLength, uint8_t targetTempo);
+  void syncTempoDependentTracks();
   NinSnesIntelliTADrumKitDef buildIntelliTADrumKitDef() const;
 
   uint8_t spcPercussionBaseInit;
@@ -189,6 +196,7 @@ public:
                const std::string& theName = "NinSnes Track");
 
   void resetVars() override;
+  void onTickBegin() override;
   bool readEvent() override;
 
   uint16_t convertToApuAddress(uint16_t offset);
@@ -221,7 +229,14 @@ private:
                           std::string& desc);
   bool handleIntelliEvent(NinSnesSeqEventType eventType, uint32_t beginOffset, uint8_t statusByte,
                           std::string& desc);
+  void beginNoteVibrato();
+  void updateVibratoFade();
+  void applyConfiguredVibrato();
+  void clearVibratoRateAndDelay();
+  void setVibratoDepth(uint8_t depth);
   void addPendingEndEvent(uint8_t statusByte, const std::string& desc);
+  void applyCurrentTempo();
+  void syncVibratoRateAndDelay();
 
   uint8_t getEffectiveNoteDuration() const;
   void rememberMelodicProgram(uint32_t progNum,
