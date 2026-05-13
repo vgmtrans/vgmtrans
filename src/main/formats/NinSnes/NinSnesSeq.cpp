@@ -1,6 +1,7 @@
 #include "NinSnesSeq.h"
 #include "NinSnesVibrato.h"
 #include "Modulation.h"
+#include "Options.h"
 #include "SeqEvent.h"
 #include "ScaleConversion.h"
 #include "spdlog/fmt/fmt.h"
@@ -12,14 +13,14 @@ DECLARE_FORMAT(NinSnes);
 //  **********
 //  NinSnesSeq
 //  **********
-#define MAX_TRACKS 8
 #define SEQ_PPQN 48
 #define SEQ_KEYOFS 24
 
 namespace {
 
+constexpr size_t MAX_TRACKS = kNinSnesTrackCount;
 constexpr uint16_t kNinSnesDefaultPitchBendRangeCents =
-    NinSnesTrackSharedData::kDefaultPitchBendRangeCents;
+    NinSnesTrackState::kDefaultPitchBendRangeCents;
 
 uint8_t convertVibratoDepthToMidi(uint8_t depth, double maxDepthCents) {
   if (depth == 0) {
@@ -62,12 +63,13 @@ int32_t notePitch(uint8_t note) {
 NinSnesSeq::NinSnesSeq(RawFile* file, NinSnesProfileId profile, uint32_t offset,
                        uint8_t percussion_base, const std::vector<uint8_t>& theVolumeTable,
                        const std::vector<uint8_t>& theDurRateTable, std::string theName)
-    : VGMMultiSectionSeq(NinSnesFormat::name, file, offset, 0, theName),
+    : VGMSeq(NinSnesFormat::name, file, offset, 0, theName),
       signature(NinSnesSignatureId::None), profileId(profile),
       volumeTable(theVolumeTable), durRateTable(theDurRateTable),
       tempo(nin_snes::vibrato::kDefaultTempo),
       maxVibratoDepthCents(nin_snes::vibrato::minMaxDepthCents()),
       maxVibratoRateHz(nin_snes::vibrato::minMaxRateHz()),
+      dwStartOffset(offset), curOffset(offset),
       konamiBaseAddress(0), quintetBGMInstrBase(0), falcomBaseOffset(0),
       header(NULL), spcPercussionBaseInit(percussion_base), m_nextIntelliTAOverrideProgram(0x80) {
   bLoadTickByTick = true;
@@ -92,6 +94,25 @@ NinSnesSeq::NinSnesSeq(RawFile* file, const NinSnesScanResult& scanResult)
 }
 
 NinSnesSeq::~NinSnesSeq() {
+  for (auto* track : aTracks) {
+    delete track;
+  }
+  aTracks.clear();
+}
+
+bool NinSnesSeq::load() {
+  readMode = READMODE_ADD_TO_UI;
+
+  if (!parseHeader()) {
+    return false;
+  }
+
+  nNumTracks = static_cast<uint32_t>(aTracks.size());
+  if (nNumTracks == 0) {
+    return false;
+  }
+
+  return loadTracks(readMode);
 }
 
 const NinSnesProfile& NinSnesSeq::profile() const {
@@ -99,10 +120,11 @@ const NinSnesProfile& NinSnesSeq::profile() const {
 }
 
 void NinSnesSeq::resetVars() {
-  VGMMultiSectionSeq::resetVars();
+  VGMSeq::resetVars();
 
   spcPercussionBase = spcPercussionBaseInit;
   sectionRepeatCount = 0;
+  m_sectionForeverLoops = 0;
   globalTranspose = 0;
   setImmediateTempo(nin_snes::vibrato::kDefaultTempo);
 
@@ -123,15 +145,122 @@ void NinSnesSeq::resetVars() {
   for (size_t program = 0; program < intelliInstrumentProgramMap.size(); program++) {
     intelliInstrumentProgramMap[program] = static_cast<uint32_t>(program);
   }
+}
 
-  for (int trackIndex = 0; trackIndex < MAX_TRACKS; trackIndex++) {
-    sharedTrackData[trackIndex].resetVars();
+void NinSnesSeq::createTracks() {
+  if (!aTracks.empty()) {
+    return;
   }
+
+  aTracks.reserve(MAX_TRACKS);
+  for (uint32_t trackIndex = 0; trackIndex < MAX_TRACKS; trackIndex++) {
+    auto trackName = fmt::format("Track {}", trackIndex + 1);
+    aTracks.push_back(new NinSnesTrack(this, dwStartOffset, 0, trackName));
+  }
+}
+
+bool NinSnesSeq::loadTracks(ReadMode readMode, uint32_t stopTime) {
+  this->readMode = readMode;
+  for (auto* track : aTracks) {
+    track->readMode = readMode;
+  }
+
+  curOffset = dwStartOffset;
+
+  if (readMode == READMODE_CONVERT_TO_MIDI) {
+    timedEventIndex().clear();
+  }
+
+  resetVars();
+  for (uint32_t trackNum = 0; trackNum < nNumTracks; trackNum++) {
+    if (!aTracks[trackNum]->loadTrackInit(trackNum, nullptr)) {
+      return false;
+    }
+  }
+
+  const uint32_t stopOffset = vgmFile()->endOffset();
+  while (curOffset < stopOffset && time < stopTime) {
+    if (!readEvent(stopTime)) {
+      break;
+    }
+  }
+
+  return postLoad();
+}
+
+bool NinSnesSeq::postLoad() {
+  if (readMode == READMODE_ADD_TO_UI) {
+    std::ranges::sort(aInstrumentsUsed);
+
+    for (auto* section : aSections) {
+      section->postLoad();
+    }
+
+    addChildren(aSections);
+    setGuessedLength();
+    if (length() == 0) {
+      return false;
+    }
+  } else if (readMode == READMODE_CONVERT_TO_MIDI) {
+    midi->sort();
+    timedEventIndex().finalize();
+  }
+
+  return true;
+}
+
+bool NinSnesSeq::loadSection(NinSnesSection *section, uint32_t stopTime) {
+  assert(aTracks.size() == nNumTracks);
+  for (uint32_t trackNum = 0; trackNum < nNumTracks; trackNum++) {
+    auto* track = static_cast<NinSnesTrack*>(aTracks[trackNum]);
+    track->readMode = readMode;
+    if (!track->loadSectionSegment(*section, trackNum)) {
+      return false;
+    }
+  }
+
+  loadTracksMain(stopTime);
+  if (readMode == READMODE_ADD_TO_UI) {
+    section->markUiEventsLoaded();
+  }
+  return section->postLoad();
+}
+
+void NinSnesSeq::addSection(NinSnesSection *section) {
+  if (offset() > section->offset()) {
+    const uint32_t distance = offset() - section->offset();
+    setOffset(section->offset());
+    if (length() != 0) {
+      setLength(length() + distance);
+    }
+  }
+  aSections.push_back(section);
+}
+
+NinSnesSection *NinSnesSeq::getSectionAtOffset(uint32_t offset) {
+  for (auto* section : aSections) {
+    if (section->offset() == offset) {
+      return section;
+    }
+  }
+  return nullptr;
+}
+
+bool NinSnesSeq::addLoopForeverNoItem() {
+  m_sectionForeverLoops++;
+  if (readMode == READMODE_ADD_TO_UI) {
+    return false;
+  }
+  if (readMode == READMODE_FIND_DELTA_LENGTH) {
+    return m_sectionForeverLoops <= ConversionOptions::the().numSequenceLoops();
+  }
+  return true;
 }
 
 bool NinSnesSeq::parseHeader() {
   setPPQN(SEQ_PPQN);
   nNumTracks = MAX_TRACKS;
+  createTracks();
 
   if (dwStartOffset + 2 > 0x10000) {
     return false;
@@ -176,7 +305,9 @@ bool NinSnesSeq::readEvent(long stopTime) {
     return false;
   }
 
-  if (curOffset < header->offset()) {
+  const bool playlistOffsetVisited = isItemAtOffset(beginOffset, false);
+
+  if (readMode == READMODE_ADD_TO_UI && curOffset < header->offset()) {
     uint32_t distance = header->offset() - curOffset;
     header->setOffset(curOffset);
     if (header->length() != 0) {
@@ -190,7 +321,7 @@ bool NinSnesSeq::readEvent(long stopTime) {
 
   if (sectionAddress == 0) {
     // End
-    if (!isOffsetUsed(beginOffset)) {
+    if (readMode == READMODE_ADD_TO_UI && !playlistOffsetVisited) {
       header->addChild(beginOffset, curOffset - beginOffset, "Section Playlist End");
     }
     bContinue = false;
@@ -204,20 +335,18 @@ bool NinSnesSeq::readEvent(long stopTime) {
     uint16_t dest = getShortAddress(curOffset);
     curOffset += 2;
 
-    bool startNewRepeat = false;
     bool doJump = false;
     bool infiniteLoop = false;
 
     if (profile.playlistModel == NinSnesPlaylistModelId::Tose) {
       if (sectionRepeatCount == 0) {
         // set new repeat count
-        sectionRepeatCount = (uint8_t)repeatCount;
-        startNewRepeat = true;
+        sectionRepeatCount = static_cast<uint8_t>(repeatCount);
         doJump = true;
       } else {
         // infinite loop?
         if (sectionRepeatCount == 0xff) {
-          if (isOffsetUsed(dest)) {
+          if (isItemAtOffset(dest, false)) {
             infiniteLoop = true;
           }
           doJump = true;
@@ -237,21 +366,20 @@ bool NinSnesSeq::readEvent(long stopTime) {
       // check overflow (end of loop)
       if (sectionRepeatCount >= 0x80) {
         // set new repeat count
-        sectionRepeatCount = (uint8_t)repeatCount;
-        startNewRepeat = true;
+        sectionRepeatCount = static_cast<uint8_t>(repeatCount);
       }
 
       // jump if the counter is zero
       if (sectionRepeatCount != 0) {
         doJump = true;
-        if (isOffsetUsed(dest) && sectionRepeatCount > 0x80) {
+        if (isItemAtOffset(dest, false) && sectionRepeatCount > 0x80) {
           infiniteLoop = true;
         }
       }
     }
 
     // add event to sequence
-    if (!isOffsetUsed(beginOffset)) {
+    if (readMode == READMODE_ADD_TO_UI && !playlistOffsetVisited) {
       header->addChild(beginOffset, curOffset - beginOffset, "Playlist Jump");
 
       // add the last event too, if available
@@ -268,7 +396,7 @@ bool NinSnesSeq::readEvent(long stopTime) {
     if (doJump) {
       curOffset = dest;
 
-      if (curOffset < offset()) {
+      if (readMode == READMODE_ADD_TO_UI && curOffset < offset()) {
         uint32_t distance = offset() - curOffset;
         setOffset(curOffset);
         if (length() != 0) {
@@ -280,12 +408,12 @@ bool NinSnesSeq::readEvent(long stopTime) {
     sectionAddress = convertToAPUAddress(sectionAddress);
 
     // Play the section
-    if (!isOffsetUsed(beginOffset)) {
+    if (readMode == READMODE_ADD_TO_UI && !playlistOffsetVisited) {
       header->addChild(beginOffset, curOffset - beginOffset, "Section Pointer");
     }
 
-    NinSnesSection* section = (NinSnesSection*)getSectionAtOffset(sectionAddress);
-    if (section == NULL) {
+    NinSnesSection* section = getSectionAtOffset(sectionAddress);
+    if (section == nullptr) {
       section = new NinSnesSection(this, sectionAddress);
       if (!section->load()) {
         L_ERROR("Failed to load section");
@@ -380,78 +508,119 @@ uint32_t NinSnesSeq::resolveProgramNumber(uint8_t instrumentByte,
 //  **************
 
 NinSnesSection::NinSnesSection(NinSnesSeq* parentFile, uint32_t offset, uint32_t length)
-    : VGMSeqSection(parentFile, offset, length) {
+    : VGMItem(parentFile, offset, length, "Section", Type::Header),
+      parentSeq(parentFile) {
+}
+
+bool NinSnesSection::load() {
+  if (m_loaded) {
+    return true;
+  }
+
+  if (!parseTrackPointers()) {
+    return false;
+  }
+
+  m_loaded = true;
+  return true;
 }
 
 bool NinSnesSection::parseTrackPointers() {
-  NinSnesSeq* parentSeq = (NinSnesSeq*)this->parentSeq;
   uint32_t curOffset = offset();
 
-  VGMHeader* header = addHeader(curOffset, 16);
+  VGMHeader* header = nullptr;
+  if (parentSeq->readMode == READMODE_ADD_TO_UI) {
+    header = addHeader(curOffset, 16);
+  }
+
   uint8_t numActiveTracks = 0;
-  for (int trackIndex = 0; trackIndex < MAX_TRACKS; trackIndex++) {
+  for (size_t trackIndex = 0; trackIndex < MAX_TRACKS; trackIndex++) {
     if (curOffset + 1 >= 0x10000) {
       return false;
     }
 
     uint16_t startAddress = readShort(curOffset);
+    auto& segment = m_trackSegments[trackIndex];
+    segment = {};
+    segment.active = ((startAddress & 0xff00) != 0);
 
-    bool active = ((startAddress & 0xff00) != 0);
-    NinSnesTrack* track;
-    if (active) {
-      startAddress = convertToApuAddress(startAddress);
-
-      // correct sequence address
-      // probably it's not necessary for regular case, but just in case...
-      if (startAddress < offset()) {
-        uint32_t distance = offset() - startAddress;
-        setOffset(startAddress);
-        if (length() != 0) {
-          setLength(length() + (distance));
-        }
-      }
-
-      auto trackName = fmt::format("Track {}", trackIndex + 1);
-      track = new NinSnesTrack(this, startAddress, 0, trackName);
-
-      numActiveTracks++;
-    } else {
-      // add an inactive track
-      track = new NinSnesTrack(this, curOffset, 2, "NULL");
-      track->available = false;
+    if (header != nullptr) {
+      header->addChild(curOffset, 2, fmt::format("Track Pointer #{}", trackIndex + 1));
     }
-    track->shared = &parentSeq->sharedTrackData[trackIndex];
-    aTracks.push_back(track);
 
-    char name[32];
-    snprintf(name, 32, "Track Pointer #%d", trackIndex + 1);
+    if (!segment.active) {
+      segment.startOffset = curOffset;
+      segment.rangeOffset = curOffset;
+      segment.rangeLength = 2;
+      m_tracks[trackIndex] = new NinSnesSectionTrack(parentSeq, curOffset, 2, "NULL");
+      m_tracks[trackIndex]->readMode = parentSeq->readMode;
+      curOffset += 2;
+      continue;
+    }
 
-    header->addChild(curOffset, 2, name);
+    startAddress = convertToApuAddress(startAddress);
+    segment.startOffset = startAddress;
+    segment.rangeOffset = startAddress;
+    m_tracks[trackIndex] = new NinSnesSectionTrack(
+        parentSeq, startAddress, 0, fmt::format("Track {}", trackIndex + 1));
+    m_tracks[trackIndex]->readMode = parentSeq->readMode;
+
+    // Correct section address. Probably not necessary for regular cases, but just in case.
+    if (startAddress < offset()) {
+      const uint32_t distance = offset() - startAddress;
+      setOffset(startAddress);
+      if (length() != 0) {
+        setLength(length() + distance);
+      }
+    }
+
+    numActiveTracks++;
     curOffset += 2;
   }
 
-  if (numActiveTracks == 0) {
-    return false;
+  return numActiveTracks != 0;
+}
+
+bool NinSnesSection::postLoad() {
+  if (parentSeq->readMode == READMODE_ADD_TO_UI) {
+    for (auto* track : m_tracks) {
+      if (track != nullptr) {
+        track->sortChildrenByOffset();
+      }
+    }
+
+    if (!m_tracksAddedToChildren) {
+      for (auto* track : m_tracks) {
+        if (track != nullptr) {
+          addChild(track);
+        }
+      }
+      m_tracksAddedToChildren = true;
+    }
   }
 
   return true;
 }
 
+void NinSnesSection::markUiEventsLoaded() {
+  for (auto& segment : m_trackSegments) {
+    segment.uiEventsLoaded = true;
+  }
+}
+
 uint16_t NinSnesSection::convertToApuAddress(uint16_t offset) {
-  NinSnesSeq* parentSeq = (NinSnesSeq*)this->parentSeq;
   return parentSeq->convertToAPUAddress(offset);
 }
 
 uint16_t NinSnesSection::getShortAddress(uint32_t offset) {
-  NinSnesSeq* parentSeq = (NinSnesSeq*)this->parentSeq;
   return parentSeq->getShortAddress(offset);
 }
 
-NinSnesTrackSharedData::NinSnesTrackSharedData() {
+NinSnesTrackState::NinSnesTrackState() {
   resetVars();
 }
 
-void NinSnesTrackSharedData::resetVars(void) {
+void NinSnesTrackState::resetVars(void) {
   loopCount = 0;
   spcTranspose = 0;
 
@@ -473,25 +642,101 @@ void NinSnesTrackSharedData::resetVars(void) {
 //  NinSnesTrack
 //  ************
 
-NinSnesTrack::NinSnesTrack(NinSnesSection* parentSection, uint32_t offset, uint32_t length,
+NinSnesSectionTrack::NinSnesSectionTrack(NinSnesSeq* parentSeq, uint32_t offset, uint32_t length,
+                                         const std::string& theName)
+    : SeqTrack(parentSeq, offset, length, theName) {
+  bDetermineTrackLengthEventByEvent = true;
+}
+
+NinSnesTrack::NinSnesTrack(NinSnesSeq* parentSeq, uint32_t offset, uint32_t length,
                            const std::string& theName)
-    : SeqTrack(parentSection->parentSeq, offset, length, theName),
-      parentSection(parentSection),
-      shared(&localSharedData) {
+    : SeqTrack(parentSeq, offset, length, theName) {
   resetVars();
   bDetermineTrackLengthEventByEvent = true;
+}
+
+bool NinSnesTrack::loadSectionSegment(NinSnesSection& section, uint32_t trackIndex) {
+  resetTransientSectionState(trackIndex);
+  currentSegment = &section.trackSegment(trackIndex);
+  auto* sectionTrack = section.track(trackIndex);
+  const bool loaded = loadTrackSegmentInit(currentSegment->rangeOffset,
+                                           currentSegment->rangeLength,
+                                           currentSegment->active,
+                                           currentSegment->startOffset);
+  if (sectionTrack != nullptr) {
+    sectionTrack->readMode = readMode;
+    sectionTrack->channel = channel;
+    sectionTrack->channelGroup = channelGroup;
+    setUiEventOwner(sectionTrack);
+  } else {
+    clearUiEventOwner();
+  }
+  setUiEventEmissionEnabled(readMode != READMODE_ADD_TO_UI || !currentSegment->uiEventsLoaded);
+
+  if (!currentSegment->active && m_hasPersistentRange) {
+    setRange(m_persistentRangeStart, m_persistentRangeEnd - m_persistentRangeStart);
+  }
+  return loaded;
+}
+
+void NinSnesTrack::resetTransientSectionState(uint32_t trackIndex) {
+  resetVisitedAddresses();
+  SeqTrack::resetVars();
+
+  cKeyCorrection = SEQ_KEYOFS;
+  transpose = state.spcTranspose;
+  m_lastNoteWasPercussion = false;
+  nonPercussionProgram = 0;
+  currentPercussionProgram = 0;
+  currentLogicalProgram.reset();
+  intelliLegato = false;
+  currentSegment = nullptr;
+  resetPersistentRange();
+  setChannelAndGroupFromTrkNum(static_cast<int>(trackIndex));
+}
+
+void NinSnesTrack::resetPersistentRange() {
+  m_hasPersistentRange = false;
+  m_persistentRangeStart = 0;
+  m_persistentRangeEnd = 0;
+}
+
+void NinSnesTrack::includePersistentRange(uint32_t eventOffset, uint32_t eventLength) {
+  const uint32_t eventEnd = eventOffset + eventLength;
+  if (!m_hasPersistentRange) {
+    m_hasPersistentRange = true;
+    m_persistentRangeStart = eventOffset;
+    m_persistentRangeEnd = eventEnd;
+  } else {
+    m_persistentRangeStart = std::min(m_persistentRangeStart, eventOffset);
+    m_persistentRangeEnd = std::max(m_persistentRangeEnd, eventEnd);
+  }
+
+  setRange(m_persistentRangeStart, m_persistentRangeEnd - m_persistentRangeStart);
+}
+
+bool NinSnesTrack::onEvent(uint32_t offset, uint32_t length) {
+  const bool isNewOffset = SeqTrack::onEvent(offset, length);
+  if (currentSegment != nullptr && readMode == READMODE_ADD_TO_UI) {
+    currentSegment->include(offset, length);
+  }
+  includePersistentRange(offset, length);
+  return isNewOffset;
 }
 
 void NinSnesTrack::resetVars() {
   SeqTrack::resetVars();
 
   cKeyCorrection = SEQ_KEYOFS;
-  transpose = shared->spcTranspose;
+  state.resetVars();
+  transpose = state.spcTranspose;
   m_lastNoteWasPercussion = false;
   nonPercussionProgram = 0;
   currentPercussionProgram = 0;
   currentLogicalProgram.reset();
   intelliLegato = false;
+  currentSegment = nullptr;
+  resetPersistentRange();
 }
 
 void NinSnesTrack::onTickBegin() {
@@ -501,18 +746,19 @@ void NinSnesTrack::onTickBegin() {
   // NinSnes can queue another F9 directly after the current note. If the active pitch motion
   // finishes before the note does, the driver picks up that waiting slide without advancing the
   // main event stream to the next note boundary.
-  if (deltaTime > 1 && shared->pitch.motionTicksRemaining() == 0) {
+  if (deltaTime > 1 && state.pitch.motionTicksRemaining() == 0) {
     consumeQueuedPitchSlide();
   }
 }
 
 uint8_t NinSnesTrack::getEffectiveNoteDuration() const {
   if (intelliLegato) {
-    return shared->spcNoteDuration;
+    return state.spcNoteDuration;
   }
 
-  uint8_t duration = (shared->spcNoteDuration * shared->spcNoteDurRate) >> 8;
-  return std::min(std::max(duration, (uint8_t)1), (uint8_t)(shared->spcNoteDuration - 2));
+  uint8_t duration = (state.spcNoteDuration * state.spcNoteDurRate) >> 8;
+  return std::min(std::max(duration, static_cast<uint8_t>(1)),
+                  static_cast<uint8_t>(state.spcNoteDuration - 2));
 }
 
 // Remembers the melodic program restored after percussion notes.
@@ -581,7 +827,7 @@ NinSnesTrack::PitchSlideEvent NinSnesTrack::readPitchSlide(uint32_t offset) {
 }
 
 bool NinSnesTrack::consumeQueuedPitchSlide() {
-  if (shared->pitch.motionTicksRemaining() != 0) {
+  if (state.pitch.motionTicksRemaining() != 0) {
     return false;
   }
 
@@ -616,7 +862,7 @@ void NinSnesTrack::beginPitchSlide(const PitchSlideEvent& slide) {
 }
 
 void NinSnesTrack::activatePitchMotion(uint8_t delay, uint8_t length, int32_t targetPitch) {
-  auto& pitch = shared->pitch;
+  auto& pitch = state.pitch;
   if (!pitch.baseValid() || length == 0) {
     return;
   }
@@ -632,11 +878,11 @@ void NinSnesTrack::activatePitchMotion(uint8_t delay, uint8_t length, int32_t ta
 }
 
 void NinSnesTrack::clearActivePitchSlide() {
-  shared->pitch.clearMotion();
+  state.pitch.clearMotion();
 }
 
 void NinSnesTrack::updatePitchSlide() {
-  auto& pitch = shared->pitch;
+  auto& pitch = state.pitch;
   if (!pitch.motionActive()) {
     return;
   }
@@ -646,30 +892,30 @@ void NinSnesTrack::updatePitchSlide() {
 
 void NinSnesTrack::beginNotePitch(uint8_t note) {
   resetPitchBendForNewNote();
-  shared->pitch.beginNote(notePitch(note));
+  state.pitch.beginNote(notePitch(note));
   activateStoredPitchEnvelope();
   beginNoteVibrato();
 }
 
 void NinSnesTrack::activateStoredPitchEnvelope() {
-  const auto& pitchEnvelope = shared->pitchEnvelope;
+  const auto& pitchEnvelope = state.pitchEnvelope;
   if (!pitchEnvelope.enabled()) {
     return;
   }
 
   const int32_t semitoneOffset = static_cast<int32_t>(pitchEnvelope.semitones) * 256;
-  int32_t targetPitch = shared->pitch.basePitch();
-  if (pitchEnvelope.mode == NinSnesTrackSharedData::StoredPitchEnvelope::Mode::To) {
+  int32_t targetPitch = state.pitch.basePitch();
+  if (pitchEnvelope.mode == NinSnesTrackState::StoredPitchEnvelope::Mode::To) {
     targetPitch += semitoneOffset;
   } else {
-    shared->pitch.setCurrentPitch(shared->pitch.basePitch() - semitoneOffset);
+    state.pitch.setCurrentPitch(state.pitch.basePitch() - semitoneOffset);
   }
 
   activatePitchMotion(pitchEnvelope.delay, pitchEnvelope.length, targetPitch);
 }
 
 void NinSnesTrack::beginNoteVibrato() {
-  auto& vibrato = shared->vibrato;
+  auto& vibrato = state.vibrato;
   if (!vibrato.active()) {
     return;
   }
@@ -685,7 +931,7 @@ void NinSnesTrack::beginNoteVibrato() {
 }
 
 void NinSnesTrack::applyConfiguredVibrato() {
-  auto& vibrato = shared->vibrato;
+  auto& vibrato = state.vibrato;
   if (vibrato.active()) {
     auto& parentSeq = seq();
     if (readMode != READMODE_CONVERT_TO_MIDI) {
@@ -703,14 +949,14 @@ void NinSnesTrack::applyConfiguredVibrato() {
 }
 
 void NinSnesTrack::updateVibratoFade() {
-  auto& vibrato = shared->vibrato;
+  auto& vibrato = state.vibrato;
   vibrato.advanceFadeAndApplyClamped(0, [this](int32_t depth) {
     setVibratoDepth(static_cast<uint8_t>(depth));
   });
 }
 
 void NinSnesTrack::setVibratoDepth(uint8_t depth) {
-  auto& vibrato = shared->vibrato;
+  auto& vibrato = state.vibrato;
   vibrato.setCurrentDepth(depth);
   const uint8_t midiDepth = convertVibratoDepthToMidi(depth, seq().maxVibratoDepthCents);
   setSynthLfoModulationDepth(vibrato, midiDepth);
@@ -723,16 +969,16 @@ void NinSnesTrack::clearVibratoRateAndDelay() {
 
 void NinSnesTrack::resetPitchBendForNewNote() {
   clearActivePitchSlide();
-  shared->pitch.invalidateBase();
-  if (shared->pitch.atRest(kNinSnesDefaultPitchBendRangeCents)) {
+  state.pitch.invalidateBase();
+  if (state.pitch.atRest(kNinSnesDefaultPitchBendRangeCents)) {
     return;
   }
 
-  resetPitchBendLane(shared->pitch, kNinSnesDefaultPitchBendRangeCents);
+  resetPitchBendLane(state.pitch, kNinSnesDefaultPitchBendRangeCents);
 }
 
 void NinSnesTrack::syncVibratoRateAndDelay() {
-  const auto& vibrato = shared->vibrato;
+  const auto& vibrato = state.vibrato;
   if (!vibrato.active()) {
     return;
   }
@@ -768,20 +1014,20 @@ void NinSnesTrack::applyCurrentTempo() {
 void NinSnesTrack::readStandardNoteParam(uint32_t beginOffset, uint8_t statusByte,
                                          std::string& desc) {
   auto& parentSeq = seq();
-  shared->spcNoteDuration = statusByte;
-  desc = fmt::format("Duration: {:d}", shared->spcNoteDuration);
+  state.spcNoteDuration = statusByte;
+  desc = fmt::format("Duration: {:d}", state.spcNoteDuration);
 
   if (curOffset + 1 < 0x10000 && readByte(curOffset) <= 0x7f) {
     const uint8_t quantizeAndVelocity = readByte(curOffset++);
     const uint8_t durIndex = (quantizeAndVelocity >> 4) & 7;
     const uint8_t velIndex = quantizeAndVelocity & 15;
 
-    shared->spcNoteDurRate = parentSeq.durRateTable[durIndex];
-    shared->spcNoteVolume = parentSeq.volumeTable[velIndex];
+    state.spcNoteDurRate = parentSeq.durRateTable[durIndex];
+    state.spcNoteVolume = parentSeq.volumeTable[velIndex];
 
     fmt::format_to(std::back_inserter(desc),
                    "  Quantize: {:d} ({:d}/256)  Velocity: {:d} ({:d}/256)", durIndex,
-                   shared->spcNoteDurRate, velIndex, shared->spcNoteVolume);
+                   state.spcNoteDurRate, velIndex, state.spcNoteVolume);
   }
 
   addGenericEvent(beginOffset, curOffset - beginOffset, "Note Param", desc, Type::DurationChange);
@@ -789,20 +1035,20 @@ void NinSnesTrack::readStandardNoteParam(uint32_t beginOffset, uint8_t statusByt
 
 void NinSnesTrack::readLemmingsNoteParam(uint32_t beginOffset, uint8_t statusByte,
                                          std::string& desc) {
-  shared->spcNoteDuration = statusByte;
-  desc = fmt::format("Duration: {:d}", shared->spcNoteDuration);
+  state.spcNoteDuration = statusByte;
+  desc = fmt::format("Duration: {:d}", state.spcNoteDuration);
 
   if (curOffset + 1 < 0x10000 && readByte(curOffset) <= 0x7f) {
     const uint8_t durByte = readByte(curOffset++);
-    shared->spcNoteDurRate = (durByte << 1) + (durByte >> 1) + (durByte & 1);
+    state.spcNoteDurRate = (durByte << 1) + (durByte >> 1) + (durByte & 1);
     fmt::format_to(std::back_inserter(desc), "  Quantize: {} ({}/256)", durByte,
-                   shared->spcNoteDurRate);
+                   state.spcNoteDurRate);
 
     if (curOffset + 1 < 0x10000 && readByte(curOffset) <= 0x7f) {
       const uint8_t velByte = readByte(curOffset++);
-      shared->spcNoteVolume = velByte << 1;
+      state.spcNoteVolume = velByte << 1;
       fmt::format_to(std::back_inserter(desc), "  Velocity: {} ({}/256)", velByte,
-                     shared->spcNoteVolume);
+                     state.spcNoteVolume);
     }
   }
 
@@ -866,7 +1112,7 @@ bool NinSnesTrack::handleCoreEvent(NinSnesSeqEventType eventType, uint32_t begin
       return true;
 
     case EVENT_END:
-      if (shared->loopCount == 0) {
+      if (state.loopCount == 0) {
         if (readMode == READMODE_FIND_DELTA_LENGTH) {
           for (size_t trackIndex = 0; trackIndex < parentSeq.aTracks.size(); trackIndex++) {
             parentSeq.aTracks[trackIndex]->totalTicks = getTime();
@@ -881,9 +1127,9 @@ bool NinSnesTrack::handleCoreEvent(NinSnesSeqEventType eventType, uint32_t begin
         continueReading = false;
         parentSeq.bIncTickAfterProcessingTracks = false;
       } else {
-        shared->loopCount--;
+        state.loopCount--;
         curOffset =
-            (shared->loopCount == 0) ? shared->loopReturnAddress : shared->loopStartAddress;
+            (state.loopCount == 0) ? state.loopReturnAddress : state.loopStartAddress;
       }
       return true;
 
@@ -896,27 +1142,27 @@ bool NinSnesTrack::handleCoreEvent(NinSnesSeqEventType eventType, uint32_t begin
       const uint8_t duration = getEffectiveNoteDuration();
       restoreNonPercussionProgramIfNeeded();
       beginNotePitch(noteNumber);
-      addNoteByDur(beginOffset, curOffset - beginOffset, noteNumber, shared->spcNoteVolume / 2,
+      addNoteByDur(beginOffset, curOffset - beginOffset, noteNumber, state.spcNoteVolume / 2,
                    duration, "Note");
       consumeQueuedPitchSlide();
       m_lastNoteWasPercussion = false;
-      addTime(shared->spcNoteDuration);
+      addTime(state.spcNoteDuration);
       return true;
     }
 
     case EVENT_TIE: {
-      uint8_t duration = (shared->spcNoteDuration * shared->spcNoteDurRate) >> 8;
+      uint8_t duration = (state.spcNoteDuration * state.spcNoteDurRate) >> 8;
       duration = std::min(std::max(duration, static_cast<uint8_t>(1)),
-                          static_cast<uint8_t>(shared->spcNoteDuration - 2));
+                          static_cast<uint8_t>(state.spcNoteDuration - 2));
       desc = fmt::format("Duration: {:d}", duration);
       makePrevDurNoteEnd(getTime() + duration);
       addTie(beginOffset, curOffset - beginOffset, duration, "Tie", desc);
-      addTime(shared->spcNoteDuration);
+      addTime(state.spcNoteDuration);
       return true;
     }
 
     case EVENT_REST:
-      addRest(beginOffset, curOffset - beginOffset, shared->spcNoteDuration);
+      addRest(beginOffset, curOffset - beginOffset, state.spcNoteDuration);
       return true;
 
     case EVENT_PERCUSSION_NOTE: {
@@ -938,10 +1184,10 @@ bool NinSnesTrack::handleCoreEvent(NinSnesSeqEventType eventType, uint32_t begin
       beginNotePitch(static_cast<uint8_t>(noteIndex - parentSeq.globalTranspose));
       addPercNoteByDur(beginOffset, curOffset - beginOffset,
                        static_cast<int8_t>(noteIndex - cKeyCorrection - parentSeq.globalTranspose),
-                       shared->spcNoteVolume / 2, duration, "Percussion Note");
+                       state.spcNoteVolume / 2, duration, "Percussion Note");
       consumeQueuedPitchSlide();
       m_lastNoteWasPercussion = true;
-      addTime(shared->spcNoteDuration);
+      addTime(state.spcNoteDuration);
       return true;
     }
 
@@ -959,15 +1205,15 @@ bool NinSnesTrack::handleCoreEvent(NinSnesSeqEventType eventType, uint32_t begin
       curOffset += 2;
       const uint8_t times = readByte(curOffset++);
 
-      shared->loopReturnAddress = curOffset;
-      shared->loopStartAddress = dest;
-      shared->loopCount = times;
+      state.loopReturnAddress = curOffset;
+      state.loopStartAddress = dest;
+      state.loopCount = times;
 
       desc = fmt::format("Destination: ${:04X}  Times: {:d}", dest, times);
       addGenericEvent(beginOffset, curOffset - beginOffset, "Pattern Play", desc,
                       Type::RepeatStart);
       addPendingEndEvent(statusByte, desc);
-      curOffset = shared->loopStartAddress;
+      curOffset = state.loopStartAddress;
       return true;
     }
 
@@ -1004,7 +1250,7 @@ bool NinSnesTrack::handleControllerEvent(NinSnesSeqEventType eventType, uint32_t
     }
 
     case EVENT_VIBRATO_ON: {
-      auto& vibrato = shared->vibrato;
+      auto& vibrato = state.vibrato;
       const uint8_t vibratoDelay = readByte(curOffset++);
       const uint8_t vibratoRate = readByte(curOffset++);
       const uint8_t vibratoDepth = readByte(curOffset++);
@@ -1018,7 +1264,7 @@ bool NinSnesTrack::handleControllerEvent(NinSnesSeqEventType eventType, uint32_t
     }
 
     case EVENT_VIBRATO_OFF:
-      shared->vibrato.clearConfig();
+      state.vibrato.clearConfig();
       addGenericEvent(beginOffset, curOffset - beginOffset, "Vibrato Off", desc, Type::Vibrato);
       addModulationNoItem(0);
       clearVibratoRateAndDelay();
@@ -1072,7 +1318,7 @@ bool NinSnesTrack::handleControllerEvent(NinSnesSeqEventType eventType, uint32_t
 
     case EVENT_TRANSPOSE: {
       const int8_t semitones = readByte(curOffset++);
-      shared->spcTranspose = semitones;
+      state.spcTranspose = semitones;
       addTranspose(beginOffset, curOffset - beginOffset, semitones);
       return true;
     }
@@ -1105,7 +1351,7 @@ bool NinSnesTrack::handleControllerEvent(NinSnesSeqEventType eventType, uint32_t
     }
 
     case EVENT_VIBRATO_FADE: {
-      auto& vibrato = shared->vibrato;
+      auto& vibrato = state.vibrato;
       const uint8_t fadeLength = readByte(curOffset++);
       desc = fmt::format("Length: {:d}", fadeLength);
       addGenericEvent(beginOffset, curOffset - beginOffset, "Vibrato Fade", desc, Type::Vibrato);
@@ -1117,8 +1363,8 @@ bool NinSnesTrack::handleControllerEvent(NinSnesSeqEventType eventType, uint32_t
       const uint8_t pitchEnvDelay = readByte(curOffset++);
       const uint8_t pitchEnvLength = readByte(curOffset++);
       const int8_t pitchEnvSemitones = static_cast<int8_t>(readByte(curOffset++));
-      shared->pitchEnvelope = {
-        NinSnesTrackSharedData::StoredPitchEnvelope::Mode::To,
+      state.pitchEnvelope = {
+        NinSnesTrackState::StoredPitchEnvelope::Mode::To,
         pitchEnvDelay,
         pitchEnvLength,
         pitchEnvSemitones,
@@ -1134,8 +1380,8 @@ bool NinSnesTrack::handleControllerEvent(NinSnesSeqEventType eventType, uint32_t
       const uint8_t pitchEnvDelay = readByte(curOffset++);
       const uint8_t pitchEnvLength = readByte(curOffset++);
       const int8_t pitchEnvSemitones = static_cast<int8_t>(readByte(curOffset++));
-      shared->pitchEnvelope = {
-        NinSnesTrackSharedData::StoredPitchEnvelope::Mode::From,
+      state.pitchEnvelope = {
+        NinSnesTrackState::StoredPitchEnvelope::Mode::From,
         pitchEnvDelay,
         pitchEnvLength,
         pitchEnvSemitones,
@@ -1148,7 +1394,7 @@ bool NinSnesTrack::handleControllerEvent(NinSnesSeqEventType eventType, uint32_t
     }
 
     case EVENT_PITCH_ENVELOPE_OFF:
-      shared->pitchEnvelope = {};
+      state.pitchEnvelope = {};
       addGenericEvent(beginOffset, curOffset - beginOffset, "Pitch Envelope Off", desc,
                       Type::PitchEnvelope);
       return true;
@@ -1247,8 +1493,8 @@ bool NinSnesTrack::handleVariantEvent(NinSnesSeqEventType eventType, uint32_t be
 
     case EVENT_KONAMI_LOOP_START:
       addGenericEvent(beginOffset, curOffset - beginOffset, "Loop Start", desc, Type::RepeatStart);
-      shared->konamiLoopStart = curOffset;
-      shared->konamiLoopCount = 0;
+      state.konamiLoopStart = curOffset;
+      state.konamiLoopCount = 0;
       return true;
 
     case EVENT_KONAMI_LOOP_END: {
@@ -1259,9 +1505,9 @@ bool NinSnesTrack::handleVariantEvent(NinSnesSeqEventType eventType, uint32_t be
                          volumeDelta, pitchDelta);
       addGenericEvent(beginOffset, curOffset - beginOffset, "Loop End", desc, Type::RepeatEnd);
 
-      shared->konamiLoopCount++;
-      if (shared->konamiLoopCount != times) {
-        curOffset = shared->konamiLoopStart;
+      state.konamiLoopCount++;
+      if (state.konamiLoopCount != times) {
+        curOffset = state.konamiLoopStart;
       }
       return true;
     }
@@ -1307,16 +1553,12 @@ void NinSnesTrack::addPendingEndEvent(uint8_t statusByte, const std::string& des
   const auto& parentSeq = seq();
   if (curOffset + 1 <= 0x10000 && statusByte != parentSeq.STATUS_END &&
       readByte(curOffset) == parentSeq.STATUS_END) {
-    addGenericEvent(curOffset, 1, (shared->loopCount == 0) ? "Section End" : "Pattern End", desc,
-                    (shared->loopCount == 0) ? Type::TrackEnd : Type::RepeatEnd);
+    addGenericEvent(curOffset, 1, (state.loopCount == 0) ? "Section End" : "Pattern End", desc,
+                    (state.loopCount == 0) ? Type::TrackEnd : Type::RepeatEnd);
   }
 }
 
 bool NinSnesTrack::readEvent() {
-  if (!available) {
-    return false;
-  }
-
   const auto& parentSeq = seq();
   const uint32_t beginOffset = curOffset;
   if (curOffset >= 0x10000) {

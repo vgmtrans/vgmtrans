@@ -87,11 +87,11 @@ enum NinSnesSeqEventType {
   EVENT_QUINTET_ADSR,
 };
 
-class NinSnesTrackSharedData {
+class NinSnesTrackState {
  public:
   static constexpr uint16_t kDefaultPitchBendRangeCents = 200;
 
-  NinSnesTrackSharedData();
+  NinSnesTrackState();
 
   virtual void resetVars();
 
@@ -125,8 +125,6 @@ class NinSnesTrackSharedData {
     }
   };
 
-  // VGMMultiSectionSeq reinitializes track objects when a new section starts, so the live pitch
-  // and vibrato state has to live here rather than on NinSnesTrack.
   SynthLfoLane vibrato;
   StoredPitchEnvelope pitchEnvelope;
   PitchBendLane<int32_t> pitch {100.0 / 256.0};
