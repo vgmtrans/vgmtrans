@@ -180,7 +180,7 @@ bool NinSnesSeq::loadTracks(ReadMode readMode, uint32_t stopTime) {
 
   const uint32_t stopOffset = vgmFile()->endOffset();
   while (curOffset < stopOffset && time < stopTime) {
-    if (!readEvent(stopTime)) {
+    if (!readPlaylistEvent(stopTime)) {
       break;
     }
   }
@@ -298,7 +298,7 @@ bool NinSnesSeq::parseHeader() {
   return true;
 }
 
-bool NinSnesSeq::readEvent(long stopTime) {
+bool NinSnesSeq::readPlaylistEvent(long stopTime) {
   const auto& profile = this->profile();
   uint32_t beginOffset = curOffset;
   if (curOffset + 1 >= 0x10000) {

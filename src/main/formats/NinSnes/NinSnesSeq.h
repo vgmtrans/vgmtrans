@@ -28,7 +28,7 @@ public:
   bool parseHeader() override;
   void resetVars() override;
   void onTickEnd() override;
-  bool readEvent(long stopTime);
+  bool readPlaylistEvent(long stopTime);
 
   const NinSnesProfile& profile() const;
   double getTempoInBPM();
