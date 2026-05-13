@@ -287,13 +287,11 @@ bool NinSnesTrack::handleIntelliPercussionNote(uint32_t beginOffset, uint8_t slo
   const uint8_t drumKey = static_cast<uint8_t>(0x24 + slot);
 
   switchToPercussionProgramIfNeeded(drumProgram);
-  beginNotePitch(static_cast<uint8_t>(drumKey - parentSeq.globalTranspose));
   addPercNoteByDur(beginOffset, curOffset - beginOffset,
                    static_cast<int8_t>(drumKey - cKeyCorrection - parentSeq.globalTranspose),
-                   state.spcNoteVolume / 2, duration, "Percussion Note");
-  consumeQueuedPitchSlide();
+                   shared->spcNoteVolume / 2, duration, "Percussion Note");
   m_lastNoteWasPercussion = true;
-  addTime(state.spcNoteDuration);
+  addTime(shared->spcNoteDuration);
   return true;
 }
 
@@ -306,21 +304,21 @@ void NinSnesTrack::readIntelliNoteParam(uint32_t beginOffset, uint8_t statusByte
     return;
   }
 
-  state.spcNoteDuration = statusByte;
-  desc = fmt::format("Duration: {:d}", state.spcNoteDuration);
+  shared->spcNoteDuration = statusByte;
+  desc = fmt::format("Duration: {:d}", shared->spcNoteDuration);
 
   while (curOffset + 1 < 0x10000 && readByte(curOffset) <= 0x7f) {
     const uint8_t noteParam = readByte(curOffset++);
     if (noteParam < 0x40) {
       const uint8_t durIndex = noteParam & 0x3f;
-      state.spcNoteDurRate = parentSeq.intelliDurVolTable[durIndex];
+      shared->spcNoteDurRate = parentSeq.intelliDurVolTable[durIndex];
       fmt::format_to(std::back_inserter(desc), "  Quantize: {} ({}/256)", durIndex,
-                     state.spcNoteDurRate);
+                     shared->spcNoteDurRate);
     } else {
       const uint8_t velIndex = noteParam & 0x3f;
-      state.spcNoteVolume = parentSeq.intelliDurVolTable[velIndex];
+      shared->spcNoteVolume = parentSeq.intelliDurVolTable[velIndex];
       fmt::format_to(std::back_inserter(desc), "  Velocity: {} ({}/256)", velIndex,
-                     state.spcNoteVolume);
+                     shared->spcNoteVolume);
     }
   }
 
@@ -498,7 +496,7 @@ bool NinSnesTrack::handleIntelliEvent(NinSnesSeqEventType eventType, uint32_t be
       if (canReadVoiceParam) {
         const auto record = decodeIntelliVoiceParamRecord(parentSeq, currentIntelliMode,
                                                           addrVoiceParam, this->fineTuningCents,
-                                                          state.spcTranspose);
+                                                          shared->spcTranspose);
 
         addVolNoItem(record.volumeByte / 2);
 
@@ -510,7 +508,7 @@ bool NinSnesTrack::handleIntelliEvent(NinSnesSeqEventType eventType, uint32_t be
         addPanNoItem(midiPan);
         addExpressionNoItem(convertPercentAmpToStdMidiVal(volumeScale));
 
-        state.spcTranspose = record.transpose;
+        shared->spcTranspose = record.transpose;
         transpose = record.transpose;
         addFineTuningNoItem(record.fineTuningCents);
 
@@ -550,7 +548,7 @@ bool NinSnesTrack::handleIntelliEvent(NinSnesSeqEventType eventType, uint32_t be
       const uint8_t sustainDurRate = readByte(curOffset++);
       const uint8_t sustainGAIN = readByte(curOffset++);
       if (currentIntelliMode == NinSnesIntelliModeId::Ta) {
-        state.spcNoteDurRate = sustainDurRate;
+        shared->spcNoteDurRate = sustainDurRate;
         desc = fmt::format("Duration Rate: {:d}/256  GAIN: ${:02X}", sustainDurRate, sustainGAIN);
         addGenericEvent(beginOffset, curOffset - beginOffset, "Duration Rate / GAIN", desc,
                         Type::DurationChange);
@@ -566,7 +564,7 @@ bool NinSnesTrack::handleIntelliEvent(NinSnesSeqEventType eventType, uint32_t be
     case EVENT_INTELLI_GAIN_SUSTAIN_TIME: {
       const uint8_t sustainDurRate = readByte(curOffset++);
       if (currentIntelliMode == NinSnesIntelliModeId::Ta) {
-        state.spcNoteDurRate = sustainDurRate;
+        shared->spcNoteDurRate = sustainDurRate;
         desc = fmt::format("Duration Rate: {:d}/256", sustainDurRate);
         addGenericEvent(beginOffset, curOffset - beginOffset, "Duration Rate", desc,
                         Type::DurationChange);
