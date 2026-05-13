@@ -59,10 +59,6 @@ private:
 
 class VGMInstr : public VGMItem {
 public:
-  using DelayRange = ::DelayRange;
-  using StandardVibratoProfile = ::StandardVibratoProfile;
-  using StandardTremoloProfile = ::StandardTremoloProfile;
-
   VGMInstr(VGMInstrSet *parInstrSet, uint32_t offset, uint32_t length, uint32_t bank,
            uint32_t instrNum, std::string name = "Instrument",
            float reverb = defaultReverbPercent);
