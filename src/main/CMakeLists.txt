@@ -225,6 +225,7 @@ target_sources(vgmtranscore
     formats/NinSnes/NinSnesScannerPatterns.cpp
     formats/NinSnes/NinSnesSeq.cpp
     formats/NinSnes/NinSnesSeqIntelli.cpp
+    formats/NinSnes/NinSnesTrackEvents.cpp
     formats/Org/OrgScanner.cpp
     formats/Org/OrgSeq.cpp
     formats/PS1/PS1Seq.cpp
