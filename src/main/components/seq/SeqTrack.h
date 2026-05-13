@@ -86,11 +86,16 @@ class SeqTrack : public VGMItem {
   void setUseLinearAmplitudeScale(bool set) { m_useLinearAmpScale = set; }
 
   virtual bool loadTrackInit(int trackNum, MidiTrack *preparedMidiTrack);
+  virtual bool loadTrackSegmentInit(uint32_t segmentOffset, uint32_t segmentLength,
+                                    bool segmentActive);
+  virtual bool loadTrackSegmentInit(uint32_t segmentOffset, uint32_t segmentLength,
+                                    bool segmentActive, uint32_t initialOffset);
   virtual void loadTrackMainLoop(uint32_t stopOffset, int32_t stopTime);
 
 protected:
   virtual void resetVars();
   void resetVisitedAddresses();
+  void resetSegmentVars();
 
   virtual void setChannelAndGroupFromTrkNum(int theTrackNum);
   virtual void addInitialMidiEvents(int trackNum);
@@ -107,6 +112,13 @@ protected:
 
   virtual bool onEvent(uint32_t offset, uint32_t length);
   virtual SeqEvent* addEvent(SeqEvent *pSeqEvent);
+  // Some parsers emit SeqEvents under a display track that differs from the parser track.
+  void setSeqEventTarget(SeqTrack* target, bool emitEvents = true) {
+    m_seqEventTarget = target;
+    m_emitSeqEvents = emitEvents;
+  }
+  void clearSeqEventTarget() { setSeqEventTarget(nullptr); }
+  SeqTrack* seqEventTarget() { return m_seqEventTarget != nullptr ? m_seqEventTarget : this; }
 
   template <typename EventType, typename... Args>
   void recordSeqEvent(bool isNewOffset, uint32_t startTick, Args&&... args) {
@@ -119,15 +131,17 @@ protected:
                                              uint32_t duration,
                                              Args&&... args) {
     if (readMode == READMODE_ADD_TO_UI) {
-      if (isNewOffset) {
-        auto* event = new EventType(this, std::forward<Args>(args)...);
+      if (isNewOffset && m_emitSeqEvents) {
+        auto* target = seqEventTarget();
+        auto* event = new EventType(target, std::forward<Args>(args)...);
         event->channel = static_cast<uint8_t>(channel);
-        addEvent(event);
+        target->addEvent(event);
       }
       return SeqEventTimeIndex::kInvalidIndex;
     }
     if (readMode == READMODE_CONVERT_TO_MIDI) {
-      if (SeqEvent* existing = findSeqEventAtOffset(m_lastEventOffset, m_lastEventLength)) {
+      if (SeqEvent* existing =
+              seqEventTarget()->findSeqEventAtOffset(m_lastEventOffset, m_lastEventLength)) {
         return parentSeq->timedEventIndex().addEvent(existing, startTick, duration);
       }
     }
@@ -407,6 +421,8 @@ private:
 
   uint32_t m_lastEventOffset = 0;
   uint32_t m_lastEventLength = 0;
+  SeqTrack* m_seqEventTarget = nullptr;
+  bool m_emitSeqEvents = true;
 };
 
 template<typename... Args>
