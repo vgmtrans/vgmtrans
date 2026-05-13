@@ -112,12 +112,13 @@ protected:
 
   virtual bool onEvent(uint32_t offset, uint32_t length);
   virtual SeqEvent* addEvent(SeqEvent *pSeqEvent);
-  // Some drivers parse with one persistent track while displaying events under a
-  // separate UI track that better represents the source data structure.
-  void setUiEventOwner(SeqTrack* owner) { m_uiEventOwner = owner; }
-  void clearUiEventOwner() { m_uiEventOwner = nullptr; }
-  void setUiEventEmissionEnabled(bool enabled) { m_emitUiEvents = enabled; }
-  SeqTrack* uiEventOwner() { return m_uiEventOwner != nullptr ? m_uiEventOwner : this; }
+  // Some parsers emit SeqEvents under a display track that differs from the parser track.
+  void setSeqEventTarget(SeqTrack* target, bool emitEvents = true) {
+    m_seqEventTarget = target;
+    m_emitSeqEvents = emitEvents;
+  }
+  void clearSeqEventTarget() { setSeqEventTarget(nullptr); }
+  SeqTrack* seqEventTarget() { return m_seqEventTarget != nullptr ? m_seqEventTarget : this; }
 
   template <typename EventType, typename... Args>
   void recordSeqEvent(bool isNewOffset, uint32_t startTick, Args&&... args) {
@@ -130,17 +131,17 @@ protected:
                                              uint32_t duration,
                                              Args&&... args) {
     if (readMode == READMODE_ADD_TO_UI) {
-      if (isNewOffset && m_emitUiEvents) {
-        auto* owner = uiEventOwner();
-        auto* event = new EventType(owner, std::forward<Args>(args)...);
+      if (isNewOffset && m_emitSeqEvents) {
+        auto* target = seqEventTarget();
+        auto* event = new EventType(target, std::forward<Args>(args)...);
         event->channel = static_cast<uint8_t>(channel);
-        owner->addEvent(event);
+        target->addEvent(event);
       }
       return SeqEventTimeIndex::kInvalidIndex;
     }
     if (readMode == READMODE_CONVERT_TO_MIDI) {
       if (SeqEvent* existing =
-              uiEventOwner()->findSeqEventAtOffset(m_lastEventOffset, m_lastEventLength)) {
+              seqEventTarget()->findSeqEventAtOffset(m_lastEventOffset, m_lastEventLength)) {
         return parentSeq->timedEventIndex().addEvent(existing, startTick, duration);
       }
     }
@@ -420,8 +421,8 @@ private:
 
   uint32_t m_lastEventOffset = 0;
   uint32_t m_lastEventLength = 0;
-  SeqTrack* m_uiEventOwner = nullptr;
-  bool m_emitUiEvents = true;
+  SeqTrack* m_seqEventTarget = nullptr;
+  bool m_emitSeqEvents = true;
 };
 
 template<typename... Args>

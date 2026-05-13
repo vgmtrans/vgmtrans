@@ -11,7 +11,7 @@
 
 struct NinSnesProfile;
 class NinSnesSection;
-class NinSnesSectionTrack;
+class NinSnesSectionTrackItem;
 
 constexpr size_t kNinSnesTrackCount = 8;
 
@@ -168,7 +168,7 @@ public:
   TrackSegment& trackSegment(size_t index) {
     return m_trackSegments.at(index);
   }
-  NinSnesSectionTrack* track(size_t index) {
+  NinSnesSectionTrackItem* track(size_t index) {
     return m_tracks.at(index);
   }
 
@@ -181,13 +181,13 @@ public:
   bool m_loaded = false;
   bool m_tracksAddedToChildren = false;
   std::array<TrackSegment, kNinSnesTrackCount> m_trackSegments {};
-  std::array<NinSnesSectionTrack*, kNinSnesTrackCount> m_tracks {};
+  std::array<NinSnesSectionTrackItem*, kNinSnesTrackCount> m_tracks {};
 };
 
-class NinSnesSectionTrack : public SeqTrack {
+class NinSnesSectionTrackItem : public SeqTrack {
 public:
-  NinSnesSectionTrack(NinSnesSeq* parentSeq, uint32_t offset, uint32_t length,
-                      const std::string& theName);
+  NinSnesSectionTrackItem(NinSnesSeq* parentSeq, uint32_t offset, uint32_t length,
+                          const std::string& theName);
 };
 
 class NinSnesTrack : public SeqTrack {
@@ -218,7 +218,7 @@ protected:
 
 private:
   friend class NinSnesSeq;
-  bool loadSectionSegment(NinSnesSection& section, uint32_t trackIndex);
+  bool prepareSectionTrack(NinSnesSection& section, uint32_t trackIndex);
   void resetTransientSectionState(uint32_t trackIndex);
   void resetTransientPlaybackState();
   void resetPersistentRange();

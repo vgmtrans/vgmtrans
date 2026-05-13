@@ -61,8 +61,7 @@ void SeqTrack::resetVars() {
   visitedControlFlowStates.clear();
   prevDurEventIndices.clear();
   m_activeNoteEventIndices.clear();
-  clearUiEventOwner();
-  setUiEventEmissionEnabled(true);
+  clearSeqEventTarget();
 }
 
 void SeqTrack::resetSegmentVars() {
@@ -78,8 +77,7 @@ void SeqTrack::resetSegmentVars() {
   m_activeNoteEventIndices.clear();
   m_lastEventOffset = 0;
   m_lastEventLength = 0;
-  clearUiEventOwner();
-  setUiEventEmissionEnabled(true);
+  clearSeqEventTarget();
 }
 
 void SeqTrack::resetVisitedAddresses() {
@@ -117,8 +115,7 @@ bool SeqTrack::loadTrackInit(int trackNum, MidiTrack *preparedMidiTrack) {
   return true;
 }
 
-bool SeqTrack::loadTrackSegmentInit(uint32_t segmentOffset, uint32_t segmentLength,
-                                    bool segmentActive) {
+bool SeqTrack::loadTrackSegmentInit(uint32_t segmentOffset, uint32_t segmentLength, bool segmentActive) {
   return loadTrackSegmentInit(segmentOffset, segmentLength, segmentActive, segmentOffset);
 }
 
@@ -382,11 +379,11 @@ SeqEvent* SeqTrack::addGenericEvent(uint32_t offset,
   bool isNewOffset = onEvent(offset, length);
 
   if (readMode == READMODE_ADD_TO_UI) {
-    if (isNewOffset && m_emitUiEvents) {
-      auto* owner = uiEventOwner();
-      auto* event = new SeqEvent(owner, offset, length, sEventName, type, sEventDesc);
+    if (isNewOffset && m_emitSeqEvents) {
+      auto* target = seqEventTarget();
+      auto* event = new SeqEvent(target, offset, length, sEventName, type, sEventDesc);
       event->channel = static_cast<uint8_t>(channel);
-      return owner->addEvent(event);
+      return target->addEvent(event);
     }
     return nullptr;
   }
