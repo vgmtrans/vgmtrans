@@ -274,7 +274,7 @@ private:
   void addControllerEventNoItem(uint8_t controllerType, uint8_t controllerValue) const;
 
   template <typename PitchType>
-  SeqMotionStep advancePitchBendLane(PitchBendLane<PitchType>& lane) {
+  SeqMotionStatus advancePitchBendLane(PitchBendLane<PitchType>& lane) {
     return lane.advanceAndApplyBend([this](int16_t bend) { addPitchBendNoItem(bend); });
   }
 
