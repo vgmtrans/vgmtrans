@@ -5,6 +5,7 @@
  */
 #include "NinSnesInstr.h"
 #include "NinSnesSeq.h"
+#include "NinSnesVibrato.h"
 #include "SNESDSP.h"
 #include "VGMColl.h"
 #include <spdlog/fmt/fmt.h>
@@ -25,6 +26,24 @@ uint32_t getProgramNumber(const VGMInstr* instr) {
 bool usesIntelliTempDrumKitExport(NinSnesProfileId profileId) {
   const auto intelliMode = getNinSnesProfile(profileId).intelliMode;
   return intelliMode == NinSnesIntelliModeId::Ta || intelliMode == NinSnesIntelliModeId::Fe4;
+}
+
+void addVibratoExportHandling(VGMInstr* instr) {
+  // NinSnes drives vibrato from per-track controllers, so every exportable instrument shares the
+  // same ModWheel/ChannelPressure/CC93 wiring and only the final ranges vary per sequence.
+  instr->addStandardVibratoHandling(nin_snes::vibrato::exportProfile());
+}
+
+void applyVibratoExportScaling(NinSnesInstrSet* instrSet, double maxDepthCents, double maxRateHz) {
+  // Re-target the shared vibrato modulators to the maxima observed in the matched sequence.
+  const double effectiveMaxDepthCents =
+      (maxDepthCents > 0.0) ? maxDepthCents : nin_snes::vibrato::defaultMaxDepthCents();
+  const double effectiveMaxRateHz =
+      (maxRateHz > 0.0) ? maxRateHz : nin_snes::vibrato::defaultMaxRateHz();
+
+  for (auto* instr : instrSet->exportInstrs()) {
+    instr->updateStandardVibratoHandling(nin_snes::vibrato::exportProfile(effectiveMaxDepthCents, effectiveMaxRateHz));
+  }
 }
 
 VGMInstr* findInstrByProgram(const std::vector<VGMInstr*>& instrs, uint32_t progNum) {
@@ -48,9 +67,10 @@ NinSnesPitchTuning calculatePitchTuning(uint16_t pitchScale) {
   double fineTuning;
   double coarseTuning;
 
-  const bool wrapsPercussion = (((uint32_t)0x0217 * pitchScale) >> 8) > 0x3FFF;
+  const bool wrapsPercussion = ((static_cast<uint32_t>(0x0217) * pitchScale) >> 8) > 0x3FFF;
   if (wrapsPercussion) {
-    pitchScale = ((((uint32_t)0x0217 * pitchScale) >> 8) & 0x3FFF) * 256.0 / 0x0217;
+    pitchScale = static_cast<uint16_t>(
+        (((static_cast<uint32_t>(0x0217) * pitchScale) >> 8) & 0x3FFF) * 256.0 / 0x0217);
   }
 
   fineTuning = modf((log(pitchScale * pitchFixer / 256.0) / log(2.0)) * 12.0, &coarseTuning);
@@ -168,9 +188,9 @@ NinSnesInstrSet::NinSnesInstrSet(RawFile *file,
     VGMInstrSet(NinSnesFormat::name, file, offset, 0, name),
     signature(NinSnesSignatureId::None),
     profileId(profile),
-    spcDirAddr(spcDirAddr),
     konamiTuningTableAddress(0),
-    konamiTuningTableSize(0) {
+    konamiTuningTableSize(0),
+    spcDirAddr(spcDirAddr) {
 }
 
 NinSnesInstrSet::NinSnesInstrSet(RawFile* file, const NinSnesScanResult& scanResult)
@@ -221,8 +241,8 @@ bool NinSnesInstrSet::parseInstrPointers() {
     uint16_t addrSampStart = readShort(offDirEnt);
     uint16_t addrLoopStart = readShort(offDirEnt + 2);
 
-    if (addrSampStart == 0x0000 && addrLoopStart == 0x0000 ||
-        addrSampStart == 0xffff && addrLoopStart == 0xffff) {
+    if ((addrSampStart == 0x0000 && addrLoopStart == 0x0000) ||
+        (addrSampStart == 0xffff && addrLoopStart == 0xffff)) {
       // example: Lemmings - Stage Clear (00 00 00 00)
       // example: Yoshi's Island - Bowser (ff ff ff ff)
       continue;
@@ -273,13 +293,19 @@ bool NinSnesInstrSet::parseInstrPointers() {
 }
 
 void NinSnesInstrSet::useColl(const VGMColl* coll) {
-  if (coll->seq() == nullptr) {
+  double maxVibratoDepthCents = nin_snes::vibrato::defaultMaxDepthCents();
+  double maxVibratoRateHz = nin_snes::vibrato::defaultMaxRateHz();
+  const auto* seq = dynamic_cast<const NinSnesSeq*>(coll != nullptr ? coll->seq() : nullptr);
+  if (seq == nullptr || seq->rawFile() != rawFile() || seq->profileId != profileId) {
+    applyVibratoExportScaling(this, maxVibratoDepthCents, maxVibratoRateHz);
     return;
   }
 
-  const auto* seq = dynamic_cast<const NinSnesSeq*>(coll->seq());
-  if (seq == nullptr || seq->rawFile() != rawFile() || seq->profileId != profileId) {
-    return;
+  if (seq->maxVibratoDepthCents > 0.0) {
+    maxVibratoDepthCents = seq->maxVibratoDepthCents;
+  }
+  if (seq->maxVibratoRateHz > 0.0) {
+    maxVibratoRateHz = seq->maxVibratoRateHz;
   }
 
   if (usesIntelliTempDrumKitExport(seq->profileId)) {
@@ -291,6 +317,7 @@ void NinSnesInstrSet::useColl(const VGMColl* coll) {
           overrideDef.progNum >> 7,
           overrideDef.progNum & 0x7f,
           fmt::format("Instrument {:d} (Overwrite)", overrideDef.logicalInstrIndex));
+      addVibratoExportHandling(overrideInstr);
       auto* rgn =
           createRgnFromHeaderData(overrideInstr, rawFile(), profileId, spcDirAddr, overrideDef.regionData);
       if (rgn == nullptr) {
@@ -304,6 +331,7 @@ void NinSnesInstrSet::useColl(const VGMColl* coll) {
     for (const auto& drumKitDef : seq->intelliTADrumKitDefs()) {
       auto* drumKit = new VGMInstr(
           this, 0, 0, 127, drumKitDef.program, fmt::format("Drum Kit {:d}", drumKitDef.program));
+      addVibratoExportHandling(drumKit);
 
       for (size_t slot = 0; slot < drumKitDef.slots.size(); slot++) {
         const auto& slotDef = drumKitDef.slots[slot];
@@ -330,42 +358,47 @@ void NinSnesInstrSet::useColl(const VGMColl* coll) {
 
       addTempInstr(drumKit);
     }
+  } else {
+    const auto& percussionInstrNoteMap = seq->percussionInstrNoteMap();
+    if (!percussionInstrNoteMap.empty()) {
+      // Create the drumkit instrument for percussion note events.
+      auto* drumKit = new VGMInstr(this, 0, 0, 127, 0, "Drum Kit");
+      addVibratoExportHandling(drumKit);
+      for (const auto& [instrIndex, percussionDef] : percussionInstrNoteMap) {
+        VGMInstr* sourceInstr = nullptr;
+        for (auto* instr : aInstrs) {
+          if (instr->instrNum == instrIndex) {
+            sourceInstr = instr;
+            break;
+          }
+        }
+        if (sourceInstr == nullptr) {
+          continue;
+        }
 
-    return;
-  }
+        for (auto* sourceRgn : sourceInstr->regions()) {
+          drumKit->addRgn(cloneLegacyRgnForDrumKit(drumKit,
+                                                   sourceRgn,
+                                                   percussionDef.noteIndex,
+                                                   percussionDef.globalTranspose));
+        }
+      }
 
-  const auto& percussionInstrNoteMap = seq->percussionInstrNoteMap();
-  if (percussionInstrNoteMap.empty()) {
-    return;
-  }
-
-  // Create the drumkit instrument for percussion note events
-  auto* drumKit = new VGMInstr(this, 0, 0, 127, 0, "Drum Kit");
-  for (const auto& [instrIndex, percussionDef] : percussionInstrNoteMap) {
-    // Get the referenced instrument by checking its instrument number
-    VGMInstr* sourceInstr = nullptr;
-    for (auto* instr : aInstrs) {
-      if (instr->instrNum == instrIndex) {
-        sourceInstr = instr;
-        break;
+      if (drumKit->regions().empty()) {
+        delete drumKit;
+      } else {
+        addTempInstr(drumKit);
       }
     }
-    if (sourceInstr == nullptr) {
-      continue;
-    }
-
-    for (auto* sourceRgn : sourceInstr->regions()) {
-      drumKit->addRgn(
-          cloneLegacyRgnForDrumKit(drumKit, sourceRgn, percussionDef.noteIndex, percussionDef.globalTranspose));
-    }
   }
 
-  if (drumKit->regions().empty()) {
-    delete drumKit;
-    return;
-  }
+  applyVibratoExportScaling(this, maxVibratoDepthCents, maxVibratoRateHz);
+}
 
-  addTempInstr(drumKit);
+void NinSnesInstrSet::unuseColl() {
+  applyVibratoExportScaling(this,
+                            nin_snes::vibrato::defaultMaxDepthCents(),
+                            nin_snes::vibrato::defaultMaxRateHz());
 }
 
 // *************
@@ -379,10 +412,11 @@ NinSnesInstr::NinSnesInstr(VGMInstrSet *instrSet,
                            uint32_t theInstrNum,
                            uint32_t spcDirAddr,
                            const std::string &name) :
-    VGMInstr(instrSet, offset, NinSnesInstr::expectedSize(profile), theBank, theInstrNum, name), profileId(profile),
-    spcDirAddr(spcDirAddr),
+    VGMInstr(instrSet, offset, NinSnesInstr::expectedSize(profile), theBank, theInstrNum, name),
+    profileId(profile),
     konamiTuningTableAddress(0),
-    konamiTuningTableSize(0) {
+    konamiTuningTableSize(0),
+    spcDirAddr(spcDirAddr) {
 }
 
 NinSnesInstr::~NinSnesInstr() {
@@ -394,6 +428,8 @@ bool NinSnesInstr::loadInstr() {
   if (offDirEnt + 4 > 0x10000) {
     return false;
   }
+
+  addVibratoExportHandling(this);
 
   uint16_t addrSampStart = readShort(offDirEnt);
 
@@ -465,7 +501,7 @@ NinSnesRgn::NinSnesRgn(NinSnesInstr *instr,
     fine_tune_real += log(4045.0 / 4096.0) / log(2) * 12; // -21.691 cents
 
     unityKey = 71 - coarse_tuning;
-    fineTune = (int16_t) (fine_tune_real * 100.0);
+    fineTune = static_cast<int16_t>(fine_tune_real * 100.0);
 
     addChild(offset + 4, 2, "Tuning (Unused)");
   }
