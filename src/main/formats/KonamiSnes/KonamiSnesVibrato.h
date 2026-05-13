@@ -112,7 +112,7 @@ inline constexpr uint8_t inlineFadeLength(KonamiSnesVersion version, uint8_t arg
       : 0;
 }
 
-inline StandardVibratoProfile exportProfile(
+inline VibratoModulationSpec modulationSpec(
     KonamiSnesVersion version,
     uint8_t maxDepth = kDefaultVibratoMaxDepth,
     uint16_t maxRateFactor = 0) {

@@ -1371,8 +1371,7 @@ bool KonamiSnesTrack::readEvent() {
     case EVENT_VIBRATO_FADE: {
       uint8_t fadeSpeed = readByte(curOffset++);
       desc = fmt::format("Fade Length: {:d}", fadeSpeed);
-      addGenericEvent(beginOffset, curOffset - beginOffset, "Vibrato Fade", desc,
-                      Type::Vibrato);
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Vibrato Fade", desc, Type::Vibrato);
       vibrato.setReusableFadeToConfiguredDepth(fadeSpeed, 8);
       break;
     }
@@ -1455,8 +1454,7 @@ bool KonamiSnesTrack::readEvent() {
 
     case EVENT_END: {
       if (inSubroutine) {
-        addGenericEvent(beginOffset, curOffset - beginOffset, "End Pattern", desc,
-                        Type::RepeatEnd);
+        addGenericEvent(beginOffset, curOffset - beginOffset, "End Pattern", desc, Type::RepeatEnd);
 
         inSubroutine = false;
         curOffset = subReturnAddr;

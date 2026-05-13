@@ -197,60 +197,60 @@ void VGMInstr::addStandardVibratoHandling(double maxDepthCents,
                                           double minHertz,
                                           double maxHertz,
                                           std::optional<DelayRange> delayRange) {
-  addStandardVibratoHandling(StandardVibratoProfile { maxDepthCents, minHertz, maxHertz, delayRange });
+  addStandardVibratoHandling(VibratoModulationSpec { maxDepthCents, minHertz, maxHertz, delayRange });
 }
 
-void VGMInstr::addStandardVibratoHandling(const StandardVibratoProfile& profile) {
-  addModulator(ModSource::ModWheel, ModDest::VibLfoToPitch, ModAmount::fromCents(profile.maxDepthCents));
+void VGMInstr::addStandardVibratoHandling(const VibratoModulationSpec& spec) {
+  addModulator(ModSource::ModWheel, ModDest::VibLfoToPitch, ModAmount::fromCents(spec.maxDepthCents));
   // nullify default channel pressure to vib lfo pitch modulator
   addModulator(ModSource::ChannelPressure, ModDest::VibLfoToPitch, ModAmount::fromCents(0));
-  addGenerator(ModDest::VibLfoFreq, ModAmount::fromHertz(profile.minHertz));
+  addGenerator(ModDest::VibLfoFreq, ModAmount::fromHertz(spec.minHertz));
   addModulator(ModSource::ChannelPressure,
                ModDest::VibLfoFreq,
-               ModAmount::fromHertzRange(profile.minHertz, profile.maxHertz));
-  if (profile.delayRange.has_value()) {
-    const double minDelaySeconds = clampSecondsRangeMinimum(profile.delayRange->minSeconds);
+               ModAmount::fromHertzRange(spec.minHertz, spec.maxHertz));
+  if (spec.delayRange.has_value()) {
+    const double minDelaySeconds = clampSecondsRangeMinimum(spec.delayRange->minSeconds);
     addGenerator(ModDest::VibLfoDelay, ModAmount::fromSeconds(minDelaySeconds));
     addModulator(ModSource::ChorusSend,
                  ModDest::VibLfoDelay,
-                 ModAmount::fromSecondsRange(minDelaySeconds, profile.delayRange->maxSeconds));
+                 ModAmount::fromSecondsRange(minDelaySeconds, spec.delayRange->maxSeconds));
   }
 }
 
 void VGMInstr::updateStandardVibratoHandling(double maxDepthCents,
                                              double minHertz,
                                              double maxHertz) {
-  updateStandardVibratoHandling(StandardVibratoProfile { maxDepthCents, minHertz, maxHertz, });
+  updateStandardVibratoHandling(VibratoModulationSpec { maxDepthCents, minHertz, maxHertz, });
 }
 
-void VGMInstr::updateStandardVibratoHandling(const StandardVibratoProfile& profile) {
+void VGMInstr::updateStandardVibratoHandling(const VibratoModulationSpec& spec) {
   updateModulatorAmount(ModSource::ModWheel,
                         ModDest::VibLfoToPitch,
-                        ModAmount::fromCents(profile.maxDepthCents));
+                        ModAmount::fromCents(spec.maxDepthCents));
   updateModulatorAmount(ModSource::ChannelPressure,
                         ModDest::VibLfoFreq,
-                        ModAmount::fromHertzRange(profile.minHertz, profile.maxHertz));
+                        ModAmount::fromHertzRange(spec.minHertz, spec.maxHertz));
 }
 
 void VGMInstr::addStandardTremoloHandling(double maxDepthDb,
                                          double minHertz,
                                          double maxHertz,
                                          TremoloGainMode gainMode) {
-  addStandardTremoloHandling(StandardTremoloProfile { maxDepthDb, minHertz, maxHertz, gainMode });
+  addStandardTremoloHandling(TremoloModulationSpec { maxDepthDb, minHertz, maxHertz, gainMode });
 }
 
-void VGMInstr::addStandardTremoloHandling(const StandardTremoloProfile& profile) {
-  addGenerator(ModDest::ModLfoFreq, ModAmount::fromHertz(profile.minHertz));
+void VGMInstr::addStandardTremoloHandling(const TremoloModulationSpec& spec) {
+  addGenerator(ModDest::ModLfoFreq, ModAmount::fromHertz(spec.minHertz));
   addModulator(ModSource::ChannelPressure,
                ModDest::ModLfoFreq,
-               ModAmount::fromHertzRange(profile.minHertz, profile.maxHertz));
+               ModAmount::fromHertzRange(spec.minHertz, spec.maxHertz));
   addModulator(ModSource::ChorusSend,
                ModDest::ModLfoToVol,
-               ModAmount::fromDecibels(profile.maxDepthDb));
-  if (profile.gainMode == TremoloGainMode::NoBoost) {
+               ModAmount::fromDecibels(spec.maxDepthDb));
+  if (spec.gainMode == TremoloGainMode::NoBoost) {
     addModulator(ModSource::ChorusSend,
                  ModDest::InitialAtten,
-                 ModAmount::fromDecibels(profile.maxDepthDb));
+                 ModAmount::fromDecibels(spec.maxDepthDb));
   }
 }
 

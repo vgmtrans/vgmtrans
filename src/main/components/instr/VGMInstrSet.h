@@ -79,16 +79,16 @@ public:
                                   double minHertz,
                                   double maxHertz,
                                   std::optional<DelayRange> delayRange = std::nullopt);
-  void addStandardVibratoHandling(const StandardVibratoProfile& profile);
+  void addStandardVibratoHandling(const VibratoModulationSpec& spec);
   void updateStandardVibratoHandling(double maxDepthCents,
                                      double minHertz,
                                      double maxHertz);
-  void updateStandardVibratoHandling(const StandardVibratoProfile& profile);
+  void updateStandardVibratoHandling(const VibratoModulationSpec& spec);
   void addStandardTremoloHandling(double maxDepthDb,
                                   double minHertz,
                                   double maxHertz,
                                   TremoloGainMode gainMode);
-  void addStandardTremoloHandling(const StandardTremoloProfile& profile);
+  void addStandardTremoloHandling(const TremoloModulationSpec& spec);
   [[nodiscard]] const std::vector<SynthModulator>& modulators() const { return m_modulators; }
 
   // Generator support

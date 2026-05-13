@@ -17,7 +17,7 @@ inline constexpr double kTremoloMaxHz = 510.0 * kLfoStepHz;
 inline constexpr int kTremoloHalfDepthCentibels = 484;
 inline constexpr double kTremoloHalfDepthDb = kTremoloHalfDepthCentibels / 10.0;
 
-inline StandardVibratoProfile vibratoExportProfile() {
+inline VibratoModulationSpec vibratoModulationSpec() {
   return {
       1200,
       kVibratoBaseHz,
@@ -25,7 +25,7 @@ inline StandardVibratoProfile vibratoExportProfile() {
   };
 }
 
-inline StandardTremoloProfile tremoloExportProfile() {
+inline TremoloModulationSpec tremoloModulationSpec() {
   return {
       kTremoloHalfDepthDb,
       kTremoloBaseHz,

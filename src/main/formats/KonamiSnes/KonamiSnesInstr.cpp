@@ -36,9 +36,9 @@ constexpr uint8_t percussionPanLimit(KonamiSnesVersion version) {
 // Rewrites the shared vibrato modulators to the sequence-specific maxima collected on the first
 // pass, while keeping the controller mapping itself identical across instrument loads.
 void applyVibratoExportScaling(KonamiSnesInstrSet* instrSet, uint8_t maxDepth, uint16_t maxRateFactor) {
-  const auto profile = konami_snes::vibrato::exportProfile(instrSet->version, maxDepth, maxRateFactor);
+  const auto spec = konami_snes::vibrato::modulationSpec(instrSet->version, maxDepth, maxRateFactor);
   for (auto* instr : instrSet->exportInstrs()) {
-    instr->updateStandardVibratoHandling(profile);
+    instr->updateStandardVibratoHandling(spec);
   }
 }
 
@@ -253,7 +253,7 @@ bool KonamiSnesInstr::loadInstr() {
   //   CC1  -> depth
   //   ch. pressure -> final effective vibrato frequency
   //   CC93 -> final effective vibrato delay
-  addStandardVibratoHandling(konami_snes::vibrato::exportProfile(version));
+  addStandardVibratoHandling(konami_snes::vibrato::modulationSpec(version));
 
   if (percussion) {
     const auto percussionHeaders = collectPercussionHeaders(rawFile(), version, offset(), spcDirAddr);

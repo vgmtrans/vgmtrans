@@ -14,7 +14,7 @@ struct DelayRange {
   double maxSeconds;
 };
 
-struct StandardVibratoProfile {
+struct VibratoModulationSpec {
   double maxDepthCents;
   double minHertz;
   double maxHertz;
@@ -28,7 +28,7 @@ enum class TremoloGainMode {
   NoBoost,
 };
 
-struct StandardTremoloProfile {
+struct TremoloModulationSpec {
   double maxDepthDb;
   double minHertz;
   double maxHertz;
