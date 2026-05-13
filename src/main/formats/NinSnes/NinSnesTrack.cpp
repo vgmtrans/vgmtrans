@@ -28,6 +28,8 @@ void NinSnesTrackState::resetVars() {
   konamiLoopCount = 0;
 
   vibrato.reset();
+  pitchEnvelope = {};
+  pitch.reset(kDefaultPitchBendRangeCents);
 }
 
 //  ************
@@ -130,6 +132,14 @@ void NinSnesTrack::resetVars() {
 
 void NinSnesTrack::onTickBegin() {
   updateVibratoFade();
+  updatePitchSlide();
+
+  // NinSnes can queue another F9 directly after the current note. If the active pitch motion
+  // finishes before the note does, the driver picks up that waiting slide without advancing the
+  // main event stream to the next note boundary.
+  if (deltaTime > 1 && state.pitch.motionTicksRemaining() == 0) {
+    consumeQueuedPitchSlide();
+  }
 }
 
 uint8_t NinSnesTrack::getEffectiveNoteDuration() const {
@@ -327,9 +337,10 @@ bool NinSnesTrack::handleCoreEvent(NinSnesSeqEventType eventType, uint32_t begin
       const uint8_t noteNumber = statusByte - parentSeq.STATUS_NOTE_MIN;
       const uint8_t duration = getEffectiveNoteDuration();
       restoreNonPercussionProgramIfNeeded();
-      beginNoteVibrato();
+      beginNotePitch(noteNumber);
       addNoteByDur(beginOffset, curOffset - beginOffset, noteNumber, state.spcNoteVolume / 2,
                    duration, "Note");
+      consumeQueuedPitchSlide();
       m_lastNoteWasPercussion = false;
       addTime(state.spcNoteDuration);
       return true;
@@ -366,10 +377,11 @@ bool NinSnesTrack::handleCoreEvent(NinSnesSeqEventType eventType, uint32_t begin
       parentSeq.addPercussionInstrNoteMapping(instrIndex, noteIndex, parentSeq.globalTranspose);
 
       switchToPercussionProgramIfNeeded();
-      beginNoteVibrato();
+      beginNotePitch(static_cast<uint8_t>(noteIndex - parentSeq.globalTranspose));
       addPercNoteByDur(beginOffset, curOffset - beginOffset,
                        static_cast<int8_t>(noteIndex - cKeyCorrection - parentSeq.globalTranspose),
                        state.spcNoteVolume / 2, duration, "Percussion Note");
+      consumeQueuedPitchSlide();
       m_lastNoteWasPercussion = true;
       addTime(state.spcNoteDuration);
       return true;
@@ -545,6 +557,12 @@ bool NinSnesTrack::handleControllerEvent(NinSnesSeqEventType eventType, uint32_t
       const uint8_t pitchEnvDelay = readByte(curOffset++);
       const uint8_t pitchEnvLength = readByte(curOffset++);
       const int8_t pitchEnvSemitones = static_cast<int8_t>(readByte(curOffset++));
+      state.pitchEnvelope = {
+        NinSnesTrackState::StoredPitchEnvelope::Mode::To,
+        pitchEnvDelay,
+        pitchEnvLength,
+        pitchEnvSemitones,
+      };
       desc = fmt::format("Delay: {:d}  Length: {:d}  Semitones: {:d}", pitchEnvDelay,
                          pitchEnvLength, pitchEnvSemitones);
       addGenericEvent(beginOffset, curOffset - beginOffset, "Pitch Envelope (To)", desc,
@@ -556,6 +574,12 @@ bool NinSnesTrack::handleControllerEvent(NinSnesSeqEventType eventType, uint32_t
       const uint8_t pitchEnvDelay = readByte(curOffset++);
       const uint8_t pitchEnvLength = readByte(curOffset++);
       const int8_t pitchEnvSemitones = static_cast<int8_t>(readByte(curOffset++));
+      state.pitchEnvelope = {
+        NinSnesTrackState::StoredPitchEnvelope::Mode::From,
+        pitchEnvDelay,
+        pitchEnvLength,
+        pitchEnvSemitones,
+      };
       desc = fmt::format("Delay: {:d}  Length: {:d}  Semitones: {:d}", pitchEnvDelay,
                          pitchEnvLength, pitchEnvSemitones);
       addGenericEvent(beginOffset, curOffset - beginOffset, "Pitch Envelope (From)", desc,
@@ -564,6 +588,7 @@ bool NinSnesTrack::handleControllerEvent(NinSnesSeqEventType eventType, uint32_t
     }
 
     case EVENT_PITCH_ENVELOPE_OFF:
+      state.pitchEnvelope = {};
       addGenericEvent(beginOffset, curOffset - beginOffset, "Pitch Envelope Off", desc,
                       Type::PitchEnvelope);
       return true;
@@ -621,13 +646,9 @@ bool NinSnesTrack::handleControllerEvent(NinSnesSeqEventType eventType, uint32_t
     }
 
     case EVENT_PITCH_SLIDE: {
-      const uint8_t pitchSlideDelay = readByte(curOffset++);
-      const uint8_t pitchSlideLength = readByte(curOffset++);
-      const uint8_t pitchSlideTargetNote = readByte(curOffset++);
-      desc = fmt::format("Delay: {:d}  Length: {:d}  Note: {:d}", pitchSlideDelay,
-                         pitchSlideLength, static_cast<int>(pitchSlideTargetNote - 0x80));
-      addGenericEvent(beginOffset, curOffset - beginOffset, "Pitch Slide", desc,
-                      Type::PitchBendSlide);
+      const auto slide = readPitchSlide(beginOffset);
+      addPitchSlideEvent(slide);
+      beginPitchSlide(slide);
       return true;
     }
 
