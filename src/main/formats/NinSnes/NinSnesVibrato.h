@@ -73,7 +73,7 @@ inline constexpr double maxDelaySeconds() {
   return delaySeconds(0xff, 1);
 }
 
-inline StandardVibratoProfile exportProfile(double maxDepthCents = defaultMaxDepthCents(),
+inline VibratoModulationSpec modulationSpec(double maxDepthCents = defaultMaxDepthCents(),
                                             double maxRateHz = defaultMaxRateHz()) {
   return {
       maxDepthCents,

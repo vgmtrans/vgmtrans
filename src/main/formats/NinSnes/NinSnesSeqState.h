@@ -3,7 +3,7 @@
 #include <array>
 #include <cstddef>
 #include <cstdint>
-#include "SeqAutomation.h"
+#include "SeqMotionLanes.h"
 
 enum NinSnesSeqEventType {
   // start enum at 1 because if map[] look up fails, it returns 0, and we don't want that to get
