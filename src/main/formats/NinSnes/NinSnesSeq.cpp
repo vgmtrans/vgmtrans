@@ -682,7 +682,11 @@ bool NinSnesTrack::loadSectionSegment(NinSnesSection& section, uint32_t trackInd
 void NinSnesTrack::resetTransientSectionState(uint32_t trackIndex) {
   resetVisitedAddresses();
   SeqTrack::resetVars();
+  resetTransientPlaybackState();
+  setChannelAndGroupFromTrkNum(static_cast<int>(trackIndex));
+}
 
+void NinSnesTrack::resetTransientPlaybackState() {
   cKeyCorrection = SEQ_KEYOFS;
   transpose = state.spcTranspose;
   m_lastNoteWasPercussion = false;
@@ -692,7 +696,6 @@ void NinSnesTrack::resetTransientSectionState(uint32_t trackIndex) {
   intelliLegato = false;
   currentSegment = nullptr;
   resetPersistentRange();
-  setChannelAndGroupFromTrkNum(static_cast<int>(trackIndex));
 }
 
 void NinSnesTrack::resetPersistentRange() {
@@ -727,16 +730,8 @@ bool NinSnesTrack::onEvent(uint32_t offset, uint32_t length) {
 void NinSnesTrack::resetVars() {
   SeqTrack::resetVars();
 
-  cKeyCorrection = SEQ_KEYOFS;
   state.resetVars();
-  transpose = state.spcTranspose;
-  m_lastNoteWasPercussion = false;
-  nonPercussionProgram = 0;
-  currentPercussionProgram = 0;
-  currentLogicalProgram.reset();
-  intelliLegato = false;
-  currentSegment = nullptr;
-  resetPersistentRange();
+  resetTransientPlaybackState();
 }
 
 void NinSnesTrack::onTickBegin() {

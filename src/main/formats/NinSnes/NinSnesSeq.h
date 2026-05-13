@@ -220,6 +220,7 @@ private:
   friend class NinSnesSeq;
   bool loadSectionSegment(NinSnesSection& section, uint32_t trackIndex);
   void resetTransientSectionState(uint32_t trackIndex);
+  void resetTransientPlaybackState();
   void resetPersistentRange();
   void includePersistentRange(uint32_t eventOffset, uint32_t eventLength);
   NinSnesSeq& seq() const;
