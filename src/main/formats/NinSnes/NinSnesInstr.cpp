@@ -28,25 +28,10 @@ bool usesIntelliTempDrumKitExport(NinSnesProfileId profileId) {
   return intelliMode == NinSnesIntelliModeId::Ta || intelliMode == NinSnesIntelliModeId::Fe4;
 }
 
-VGMInstr::StandardVibratoProfile vibratoExportProfile(double maxDepthCents =
-                                                          nin_snes::vibrato::defaultMaxDepthCents(),
-                                                      double maxRateHz =
-                                                          nin_snes::vibrato::defaultMaxRateHz()) {
-  return {
-      maxDepthCents,
-      nin_snes::vibrato::minRateHz(),
-      maxRateHz,
-      VGMInstr::DelayRange {
-          nin_snes::vibrato::minDelaySeconds(),
-          nin_snes::vibrato::maxDelaySeconds(),
-      },
-  };
-}
-
 void addVibratoExportHandling(VGMInstr* instr) {
   // NinSnes drives vibrato from per-track controllers, so every exportable instrument shares the
   // same ModWheel/ChannelPressure/CC93 wiring and only the final ranges vary per sequence.
-  instr->addStandardVibratoHandling(vibratoExportProfile());
+  instr->addStandardVibratoHandling(nin_snes::vibrato::exportProfile());
 }
 
 void applyVibratoExportScaling(NinSnesInstrSet* instrSet, double maxDepthCents, double maxRateHz) {
@@ -57,7 +42,7 @@ void applyVibratoExportScaling(NinSnesInstrSet* instrSet, double maxDepthCents, 
       (maxRateHz > 0.0) ? maxRateHz : nin_snes::vibrato::defaultMaxRateHz();
 
   for (auto* instr : instrSet->exportInstrs()) {
-    instr->updateStandardVibratoHandling(vibratoExportProfile(effectiveMaxDepthCents, effectiveMaxRateHz));
+    instr->updateStandardVibratoHandling(nin_snes::vibrato::exportProfile(effectiveMaxDepthCents, effectiveMaxRateHz));
   }
 }
 

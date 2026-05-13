@@ -6,6 +6,7 @@
 #pragma once
 
 #include <cstdint>
+#include "Modulation.h"
 
 namespace nin_snes::vibrato {
 
@@ -70,6 +71,19 @@ inline constexpr double minDelaySeconds() {
 
 inline constexpr double maxDelaySeconds() {
   return delaySeconds(0xff, 1);
+}
+
+inline StandardVibratoProfile exportProfile(double maxDepthCents = defaultMaxDepthCents(),
+                                            double maxRateHz = defaultMaxRateHz()) {
+  return {
+      maxDepthCents,
+      minRateHz(),
+      maxRateHz,
+      DelayRange {
+          minDelaySeconds(),
+          maxDelaySeconds(),
+      },
+  };
 }
 
 }  // namespace nin_snes::vibrato
