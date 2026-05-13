@@ -34,15 +34,10 @@ void addVibratoExportHandling(VGMInstr* instr) {
   instr->addStandardVibratoHandling(nin_snes::vibrato::modulationSpec());
 }
 
-void applyVibratoExportScaling(NinSnesInstrSet* instrSet, double maxDepthCents, double maxRateHz) {
+void applyVibratoExportScaling(NinSnesInstrSet* instrSet, const VibratoModulationSpec& spec) {
   // Re-target the shared vibrato modulators to the maxima observed in the matched sequence.
-  const double effectiveMaxDepthCents =
-      (maxDepthCents > 0.0) ? maxDepthCents : nin_snes::vibrato::defaultMaxDepthCents();
-  const double effectiveMaxRateHz =
-      (maxRateHz > 0.0) ? maxRateHz : nin_snes::vibrato::defaultMaxRateHz();
-
   for (auto* instr : instrSet->exportInstrs()) {
-    instr->updateStandardVibratoHandling(nin_snes::vibrato::modulationSpec(effectiveMaxDepthCents, effectiveMaxRateHz));
+    instr->updateStandardVibratoHandling(spec);
   }
 }
 
@@ -293,19 +288,10 @@ bool NinSnesInstrSet::parseInstrPointers() {
 }
 
 void NinSnesInstrSet::useColl(const VGMColl* coll) {
-  double maxVibratoDepthCents = nin_snes::vibrato::defaultMaxDepthCents();
-  double maxVibratoRateHz = nin_snes::vibrato::defaultMaxRateHz();
   const auto* seq = dynamic_cast<const NinSnesSeq*>(coll != nullptr ? coll->seq() : nullptr);
   if (seq == nullptr || seq->rawFile() != rawFile() || seq->profileId != profileId) {
-    applyVibratoExportScaling(this, maxVibratoDepthCents, maxVibratoRateHz);
+    applyVibratoExportScaling(this, nin_snes::vibrato::modulationSpec());
     return;
-  }
-
-  if (seq->maxVibratoDepthCents > 0.0) {
-    maxVibratoDepthCents = seq->maxVibratoDepthCents;
-  }
-  if (seq->maxVibratoRateHz > 0.0) {
-    maxVibratoRateHz = seq->maxVibratoRateHz;
   }
 
   if (usesIntelliTempDrumKitExport(seq->profileId)) {
@@ -392,13 +378,12 @@ void NinSnesInstrSet::useColl(const VGMColl* coll) {
     }
   }
 
-  applyVibratoExportScaling(this, maxVibratoDepthCents, maxVibratoRateHz);
+  applyVibratoExportScaling(this,
+                            nin_snes::vibrato::modulationSpec(seq->maxVibratoDepthCents, seq->maxVibratoRateHz));
 }
 
 void NinSnesInstrSet::unuseColl() {
-  applyVibratoExportScaling(this,
-                            nin_snes::vibrato::defaultMaxDepthCents(),
-                            nin_snes::vibrato::defaultMaxRateHz());
+  applyVibratoExportScaling(this, nin_snes::vibrato::modulationSpec());
 }
 
 // *************

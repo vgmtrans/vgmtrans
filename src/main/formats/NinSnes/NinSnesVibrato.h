@@ -16,14 +16,6 @@ constexpr uint8_t kDelayController = 93;
 constexpr uint8_t kMinVibratoMaxDepth = 0x80;
 constexpr uint8_t kMinVibratoMaxRate = 0x20;
 
-inline constexpr bool isActive(uint8_t rate, uint8_t depth) {
-  return rate != 0 && depth != 0;
-}
-
-inline constexpr double sanitizedTempo(double tempo) {
-  return (tempo > 0.0) ? tempo : 1.0;
-}
-
 // Depth 00-F0 uses the regular 1/256-semitone path. F1-FF switches to the large-depth mode that
 // reuses the low nibble as a 1-15 semitone multiplier.
 inline constexpr double depthCents(uint8_t depth) {
@@ -35,53 +27,35 @@ inline constexpr double depthCents(uint8_t depth) {
 }
 
 inline constexpr double rateHz(uint8_t rate, double tempo) {
-  return (kTimerHz * sanitizedTempo(tempo) * rate) / 65536.0;
+  const double safeTempo = (tempo > 0.0) ? tempo : 1.0;
+  return (kTimerHz * safeTempo * rate) / 65536.0;
 }
 
 inline constexpr double delaySeconds(uint8_t delay, double tempo) {
-  return (256.0 * delay) / (kTimerHz * sanitizedTempo(tempo));
+  const double safeTempo = (tempo > 0.0) ? tempo : 1.0;
+  return (256.0 * delay) / (kTimerHz * safeTempo);
 }
 
-inline constexpr double minRateHz() {
-  return rateHz(1, 1);
-}
-
-inline constexpr double defaultMaxRateHz() {
-  return rateHz(0xff, 0xff);
-}
-
-inline constexpr double defaultMaxDepthCents() {
-  return depthCents(0xff);
-}
-
+inline constexpr double kMinRateHz = rateHz(1, 1);
+inline constexpr double kDefaultMaxRateHz = rateHz(0xff, 0xff);
+inline constexpr double kDefaultMaxDepthCents = depthCents(0xff);
 // The tracked sequence max only needs a minimum sensible range, not the full format maximum.
-inline constexpr double minMaxDepthCents() {
-  return depthCents(kMinVibratoMaxDepth);
-}
-
-inline constexpr double minMaxRateHz() {
-  return rateHz(kMinVibratoMaxRate, kDefaultTempo);
-}
-
+inline constexpr double kMinMaxDepthCents = depthCents(kMinVibratoMaxDepth);
+inline constexpr double kMinMaxRateHz = rateHz(kMinVibratoMaxRate, kDefaultTempo);
 // Delay 00 is "start immediately". The SF2 export helper clamps that to the smallest normal
 // positive delay it can represent.
-inline constexpr double minDelaySeconds() {
-  return 0.0;
-}
+inline constexpr double kMinDelaySeconds = 0.0;
+inline constexpr double kMaxDelaySeconds = delaySeconds(0xff, 1);
 
-inline constexpr double maxDelaySeconds() {
-  return delaySeconds(0xff, 1);
-}
-
-inline VibratoModulationSpec modulationSpec(double maxDepthCents = defaultMaxDepthCents(),
-                                            double maxRateHz = defaultMaxRateHz()) {
+inline VibratoModulationSpec modulationSpec(double maxDepthCents = kDefaultMaxDepthCents,
+                                            double maxRateHz = kDefaultMaxRateHz) {
   return {
-      maxDepthCents,
-      minRateHz(),
-      maxRateHz,
+      (maxDepthCents > 0.0) ? maxDepthCents : kDefaultMaxDepthCents,
+      kMinRateHz,
+      (maxRateHz > 0.0) ? maxRateHz : kDefaultMaxRateHz,
       DelayRange {
-          minDelaySeconds(),
-          maxDelaySeconds(),
+          kMinDelaySeconds,
+          kMaxDelaySeconds,
       },
   };
 }

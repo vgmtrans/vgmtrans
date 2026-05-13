@@ -24,8 +24,8 @@ NinSnesSeq::NinSnesSeq(RawFile* file, NinSnesProfileId profile, uint32_t offset,
       signature(NinSnesSignatureId::None), profileId(profile),
       volumeTable(theVolumeTable), durRateTable(theDurRateTable),
       tempo(nin_snes::vibrato::kDefaultTempo),
-      maxVibratoDepthCents(nin_snes::vibrato::minMaxDepthCents()),
-      maxVibratoRateHz(nin_snes::vibrato::minMaxRateHz()),
+      maxVibratoDepthCents(nin_snes::vibrato::kMinMaxDepthCents),
+      maxVibratoRateHz(nin_snes::vibrato::kMinMaxRateHz),
       dwStartOffset(offset), curOffset(offset),
       konamiBaseAddress(0), quintetBGMInstrBase(0), falcomBaseOffset(0),
       header(NULL), spcPercussionBaseInit(percussion_base), m_nextIntelliTAOverrideProgram(0x80) {
@@ -85,8 +85,8 @@ void NinSnesSeq::resetVars() {
   setImmediateTempo(nin_snes::vibrato::kDefaultTempo);
 
   if (readMode != READMODE_CONVERT_TO_MIDI) {
-    maxVibratoDepthCents = nin_snes::vibrato::minMaxDepthCents();
-    maxVibratoRateHz = nin_snes::vibrato::minMaxRateHz();
+    maxVibratoDepthCents = nin_snes::vibrato::kMinMaxDepthCents;
+    maxVibratoRateHz = nin_snes::vibrato::kMinMaxRateHz;
   }
   m_percussionInstrNoteMap.clear();
 
@@ -437,10 +437,17 @@ void NinSnesSeq::syncTempoDependentTracks() {
 
 void NinSnesSeq::onTickEnd() {
   // EVENT_TEMPO_FADE applies its first tempo step at the end of the tick that parsed the command.
-  tempoFade.advanceAndApply([this](int32_t) {
-    if (!aTracks.empty()) {
-      static_cast<NinSnesTrack*>(aTracks[0])->applyCurrentTempo();
+  tempoFade.advanceAndApplyRaw([this](int32_t tempoValue) {
+    const auto newTempo = static_cast<uint8_t>(std::clamp(tempoValue, 0, 0xff));
+    if (newTempo == tempo) {
+      return;
     }
+
+    tempo = newTempo;
+    if (!aTracks.empty()) {
+      aTracks[0]->addTempoBPMNoItem(getTempoInBPM(newTempo));
+    }
+    syncTempoDependentTracks();
   });
 }
 
