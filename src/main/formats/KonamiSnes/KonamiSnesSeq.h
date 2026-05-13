@@ -6,7 +6,7 @@
 #pragma once
 #include <optional>
 #include "VGMSeq.h"
-#include "SeqAutomation.h"
+#include "SeqMotionLanes.h"
 #include "SeqTrack.h"
 #include "SeqEvent.h"
 #include "KonamiSnesFormat.h"

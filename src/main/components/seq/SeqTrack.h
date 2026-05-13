@@ -12,7 +12,7 @@
 #include <vector>
 #include "VGMItem.h"
 #include "VGMSeq.h"
-#include "SeqAutomation.h"
+#include "SeqMotionLanes.h"
 #include <spdlog/common.h>
 #include "LogManager.h"
 #include "SynthType.h"
