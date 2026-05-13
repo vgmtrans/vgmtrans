@@ -583,6 +583,15 @@ class SynthLfoLane {
     startReusableFade(m_delay, configuredDepth(fractionalBits), initialDepth);
   }
 
+  [[nodiscard]] bool beginReusableFadeToConfiguredDepth(uint8_t fractionalBits = 0,
+                                                        int32_t initialDepth = 0) {
+    if (!hasReusableFade()) {
+      return false;
+    }
+    startReusableFadeToConfiguredDepth(fractionalBits, initialDepth);
+    return true;
+  }
+
   SeqMotionStatus advanceFade() { return m_fade.advance(); }
   [[nodiscard]] bool fadeActive() const { return m_fade.active(); }
 

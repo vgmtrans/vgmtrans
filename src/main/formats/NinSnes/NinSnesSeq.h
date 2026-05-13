@@ -235,7 +235,6 @@ private:
   void clearVibratoRateAndDelay();
   void setVibratoDepth(uint8_t depth);
   void addPendingEndEvent(uint8_t statusByte, const std::string& desc);
-  void applyCurrentTempo();
   void syncVibratoRateAndDelay();
 
   uint8_t getEffectiveNoteDuration() const;
