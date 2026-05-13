@@ -5,7 +5,6 @@
  */
 #include "NinSnesInstr.h"
 #include "NinSnesSeq.h"
-#include "NinSnesVibrato.h"
 #include "SNESDSP.h"
 #include "VGMColl.h"
 #include <spdlog/fmt/fmt.h>
@@ -26,24 +25,6 @@ uint32_t getProgramNumber(const VGMInstr* instr) {
 bool usesIntelliTempDrumKitExport(NinSnesProfileId profileId) {
   const auto intelliMode = getNinSnesProfile(profileId).intelliMode;
   return intelliMode == NinSnesIntelliModeId::Ta || intelliMode == NinSnesIntelliModeId::Fe4;
-}
-
-void addVibratoExportHandling(VGMInstr* instr) {
-  // NinSnes drives vibrato from per-track controllers, so every exportable instrument shares the
-  // same ModWheel/ChannelPressure/CC93 wiring and only the final ranges vary per sequence.
-  instr->addStandardVibratoHandling(nin_snes::vibrato::modulationSpec());
-}
-
-void applyVibratoExportScaling(NinSnesInstrSet* instrSet, double maxDepthCents, double maxRateHz) {
-  // Re-target the shared vibrato modulators to the maxima observed in the matched sequence.
-  const double effectiveMaxDepthCents =
-      (maxDepthCents > 0.0) ? maxDepthCents : nin_snes::vibrato::defaultMaxDepthCents();
-  const double effectiveMaxRateHz =
-      (maxRateHz > 0.0) ? maxRateHz : nin_snes::vibrato::defaultMaxRateHz();
-
-  for (auto* instr : instrSet->exportInstrs()) {
-    instr->updateStandardVibratoHandling(nin_snes::vibrato::modulationSpec(effectiveMaxDepthCents, effectiveMaxRateHz));
-  }
 }
 
 VGMInstr* findInstrByProgram(const std::vector<VGMInstr*>& instrs, uint32_t progNum) {
@@ -293,19 +274,9 @@ bool NinSnesInstrSet::parseInstrPointers() {
 }
 
 void NinSnesInstrSet::useColl(const VGMColl* coll) {
-  double maxVibratoDepthCents = nin_snes::vibrato::defaultMaxDepthCents();
-  double maxVibratoRateHz = nin_snes::vibrato::defaultMaxRateHz();
   const auto* seq = dynamic_cast<const NinSnesSeq*>(coll != nullptr ? coll->seq() : nullptr);
   if (seq == nullptr || seq->rawFile() != rawFile() || seq->profileId != profileId) {
-    applyVibratoExportScaling(this, maxVibratoDepthCents, maxVibratoRateHz);
     return;
-  }
-
-  if (seq->maxVibratoDepthCents > 0.0) {
-    maxVibratoDepthCents = seq->maxVibratoDepthCents;
-  }
-  if (seq->maxVibratoRateHz > 0.0) {
-    maxVibratoRateHz = seq->maxVibratoRateHz;
   }
 
   if (usesIntelliTempDrumKitExport(seq->profileId)) {
@@ -317,7 +288,6 @@ void NinSnesInstrSet::useColl(const VGMColl* coll) {
           overrideDef.progNum >> 7,
           overrideDef.progNum & 0x7f,
           fmt::format("Instrument {:d} (Overwrite)", overrideDef.logicalInstrIndex));
-      addVibratoExportHandling(overrideInstr);
       auto* rgn =
           createRgnFromHeaderData(overrideInstr, rawFile(), profileId, spcDirAddr, overrideDef.regionData);
       if (rgn == nullptr) {
@@ -331,7 +301,6 @@ void NinSnesInstrSet::useColl(const VGMColl* coll) {
     for (const auto& drumKitDef : seq->intelliTADrumKitDefs()) {
       auto* drumKit = new VGMInstr(
           this, 0, 0, 127, drumKitDef.program, fmt::format("Drum Kit {:d}", drumKitDef.program));
-      addVibratoExportHandling(drumKit);
 
       for (size_t slot = 0; slot < drumKitDef.slots.size(); slot++) {
         const auto& slotDef = drumKitDef.slots[slot];
@@ -363,7 +332,6 @@ void NinSnesInstrSet::useColl(const VGMColl* coll) {
     if (!percussionInstrNoteMap.empty()) {
       // Create the drumkit instrument for percussion note events.
       auto* drumKit = new VGMInstr(this, 0, 0, 127, 0, "Drum Kit");
-      addVibratoExportHandling(drumKit);
       for (const auto& [instrIndex, percussionDef] : percussionInstrNoteMap) {
         VGMInstr* sourceInstr = nullptr;
         for (auto* instr : aInstrs) {
@@ -391,14 +359,9 @@ void NinSnesInstrSet::useColl(const VGMColl* coll) {
       }
     }
   }
-
-  applyVibratoExportScaling(this, maxVibratoDepthCents, maxVibratoRateHz);
 }
 
 void NinSnesInstrSet::unuseColl() {
-  applyVibratoExportScaling(this,
-                            nin_snes::vibrato::defaultMaxDepthCents(),
-                            nin_snes::vibrato::defaultMaxRateHz());
 }
 
 // *************
@@ -428,8 +391,6 @@ bool NinSnesInstr::loadInstr() {
   if (offDirEnt + 4 > 0x10000) {
     return false;
   }
-
-  addVibratoExportHandling(this);
 
   uint16_t addrSampStart = readShort(offDirEnt);
 

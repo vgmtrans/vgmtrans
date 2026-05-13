@@ -3,7 +3,6 @@
 #include <array>
 #include <optional>
 #include "VGMSeq.h"
-#include "SeqMotionLanes.h"
 #include "SeqTrack.h"
 #include "NinSnesFormat.h"
 #include "NinSnesScanResult.h"
@@ -27,7 +26,6 @@ public:
   bool load() override;
   bool parseHeader() override;
   void resetVars() override;
-  void onTickEnd() override;
   bool readPlaylistEvent(long stopTime);
 
   const NinSnesProfile& profile() const;
@@ -60,9 +58,6 @@ public:
   uint8_t sectionRepeatCount;
   int8_t globalTranspose;
   uint8_t tempo;
-  FixedPointControllerLane<> tempoFade;
-  double maxVibratoDepthCents;
-  double maxVibratoRateHz;
   uint32_t dwStartOffset;
   uint32_t curOffset;
   std::vector<NinSnesSection *> aSections;
@@ -114,8 +109,6 @@ private:
   NinSnesSection *getSectionAtOffset(uint32_t offset);
   bool addLoopForeverNoItem();
   void setImmediateTempo(uint8_t newTempo);
-  void startTempoFade(uint8_t fadeLength, uint8_t targetTempo);
-  void syncTempoDependentTracks();
   NinSnesIntelliTADrumKitDef buildIntelliTADrumKitDef() const;
 
   uint8_t spcPercussionBaseInit;
@@ -192,19 +185,10 @@ public:
 
 class NinSnesTrack : public SeqTrack {
 public:
-  struct PitchSlideEvent {
-    uint32_t offset = 0;
-    uint32_t eventLength = 0;
-    uint8_t delay = 0;
-    uint8_t length = 0;
-    uint8_t targetNote = 0;
-  };
-
   NinSnesTrack(NinSnesSeq* parentSeq, uint32_t offset = 0, uint32_t length = 0,
                const std::string& theName = "NinSnes Track");
 
   void resetVars() override;
-  void onTickBegin() override;
   bool readEvent() override;
 
   uint16_t convertToApuAddress(uint16_t offset);
@@ -237,24 +221,7 @@ private:
                           std::string& desc);
   bool handleIntelliEvent(NinSnesSeqEventType eventType, uint32_t beginOffset, uint8_t statusByte,
                           std::string& desc);
-  PitchSlideEvent readPitchSlide(uint32_t offset);
-  bool consumeQueuedPitchSlide();
-  void addPitchSlideEvent(const PitchSlideEvent& slide);
-  void beginPitchSlide(const PitchSlideEvent& slide);
-  void activatePitchMotion(uint8_t delay, uint8_t length, int32_t targetPitch);
-  void clearActivePitchSlide();
-  void updatePitchSlide();
-  void beginNotePitch(uint8_t note);
-  void activateStoredPitchEnvelope();
-  void beginNoteVibrato();
-  void updateVibratoFade();
-  void applyConfiguredVibrato();
-  void clearVibratoRateAndDelay();
-  void setVibratoDepth(uint8_t depth);
-  void resetPitchBendForNewNote();
   void addPendingEndEvent(uint8_t statusByte, const std::string& desc);
-  void applyCurrentTempo();
-  void syncVibratoRateAndDelay();
 
   uint8_t getEffectiveNoteDuration() const;
   void rememberMelodicProgram(uint32_t progNum,
