@@ -26,6 +26,8 @@ void NinSnesTrackState::resetVars() {
   // Konami:
   konamiLoopStart = 0;
   konamiLoopCount = 0;
+
+  vibrato.reset();
 }
 
 //  ************
@@ -124,6 +126,10 @@ void NinSnesTrack::resetVars() {
 
   state.resetVars();
   resetTransientPlaybackState();
+}
+
+void NinSnesTrack::onTickBegin() {
+  updateVibratoFade();
 }
 
 uint8_t NinSnesTrack::getEffectiveNoteDuration() const {
@@ -321,6 +327,7 @@ bool NinSnesTrack::handleCoreEvent(NinSnesSeqEventType eventType, uint32_t begin
       const uint8_t noteNumber = statusByte - parentSeq.STATUS_NOTE_MIN;
       const uint8_t duration = getEffectiveNoteDuration();
       restoreNonPercussionProgramIfNeeded();
+      beginNoteVibrato();
       addNoteByDur(beginOffset, curOffset - beginOffset, noteNumber, state.spcNoteVolume / 2,
                    duration, "Note");
       m_lastNoteWasPercussion = false;
@@ -359,6 +366,7 @@ bool NinSnesTrack::handleCoreEvent(NinSnesSeqEventType eventType, uint32_t begin
       parentSeq.addPercussionInstrNoteMapping(instrIndex, noteIndex, parentSeq.globalTranspose);
 
       switchToPercussionProgramIfNeeded();
+      beginNoteVibrato();
       addPercNoteByDur(beginOffset, curOffset - beginOffset,
                        static_cast<int8_t>(noteIndex - cKeyCorrection - parentSeq.globalTranspose),
                        state.spcNoteVolume / 2, duration, "Percussion Note");
@@ -426,17 +434,24 @@ bool NinSnesTrack::handleControllerEvent(NinSnesSeqEventType eventType, uint32_t
     }
 
     case EVENT_VIBRATO_ON: {
+      auto& vibrato = state.vibrato;
       const uint8_t vibratoDelay = readByte(curOffset++);
       const uint8_t vibratoRate = readByte(curOffset++);
       const uint8_t vibratoDepth = readByte(curOffset++);
-      desc = fmt::format("Delay: {:d}  Rate: {:d}  Depth: {:d}", vibratoDelay, vibratoRate,
-                         vibratoDepth);
+      vibrato.configure(vibratoDelay, vibratoRate, vibratoDepth);
+      vibrato.clearReusableFade();
+      desc = fmt::format("Delay: {:d}  Rate: {:d}  Depth: {:d}", vibrato.delay(), vibrato.rate(),
+                         vibrato.depth());
       addGenericEvent(beginOffset, curOffset - beginOffset, "Vibrato", desc, Type::Vibrato);
+      applyConfiguredVibrato();
       return true;
     }
 
     case EVENT_VIBRATO_OFF:
+      state.vibrato.clearConfig();
       addGenericEvent(beginOffset, curOffset - beginOffset, "Vibrato Off", desc, Type::Vibrato);
+      addModulationNoItem(0);
+      clearVibratoRateAndDelay();
       return true;
 
     case EVENT_MASTER_VOLUME: {
@@ -457,14 +472,24 @@ bool NinSnesTrack::handleControllerEvent(NinSnesSeqEventType eventType, uint32_t
       const uint8_t newTempo = readByte(curOffset++);
       parentSeq.setImmediateTempo(newTempo);
       addTempoBPM(beginOffset, curOffset - beginOffset, parentSeq.getTempoInBPM(newTempo));
+      parentSeq.syncTempoDependentTracks();
       return true;
     }
 
     case EVENT_TEMPO_FADE: {
       const uint8_t fadeLength = readByte(curOffset++);
       const uint8_t newTempo = readByte(curOffset++);
-      addTempoSlide(beginOffset, curOffset - beginOffset, fadeLength,
-                    static_cast<int>(60000000 / parentSeq.getTempoInBPM(newTempo)));
+      if (fadeLength == 0) {
+        parentSeq.setImmediateTempo(newTempo);
+        addTempoBPM(beginOffset, curOffset - beginOffset, parentSeq.getTempoInBPM(newTempo));
+        parentSeq.syncTempoDependentTracks();
+      } else {
+        const bool isNewOffset = onEvent(beginOffset, curOffset - beginOffset);
+        recordDurSeqEvent<TempoSlideSeqEvent>(isNewOffset, getTime(), fadeLength,
+                                              parentSeq.getTempoInBPM(newTempo), fadeLength,
+                                              beginOffset, curOffset - beginOffset, "Tempo Slide");
+        parentSeq.startTempoFade(fadeLength, newTempo);
+      }
       return true;
     }
 
@@ -510,9 +535,11 @@ bool NinSnesTrack::handleControllerEvent(NinSnesSeqEventType eventType, uint32_t
     }
 
     case EVENT_VIBRATO_FADE: {
+      auto& vibrato = state.vibrato;
       const uint8_t fadeLength = readByte(curOffset++);
       desc = fmt::format("Length: {:d}", fadeLength);
       addGenericEvent(beginOffset, curOffset - beginOffset, "Vibrato Fade", desc, Type::Vibrato);
+      vibrato.setReusableFadeToConfiguredDepth(fadeLength);
       return true;
     }
 
