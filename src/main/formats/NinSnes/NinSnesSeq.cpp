@@ -176,7 +176,7 @@ bool NinSnesSeq::loadSection(NinSnesSection *section, uint32_t stopTime) {
   for (uint32_t trackNum = 0; trackNum < nNumTracks; trackNum++) {
     auto* track = static_cast<NinSnesTrack*>(aTracks[trackNum]);
     track->readMode = readMode;
-    if (!track->loadSectionSegment(*section, trackNum)) {
+    if (!track->prepareSectionTrack(*section, trackNum)) {
       return false;
     }
   }
@@ -342,7 +342,8 @@ bool NinSnesSeq::readPlaylistEvent(long stopTime) {
 
     // add event to sequence
     if (readMode == READMODE_ADD_TO_UI && !playlistOffsetVisited) {
-      header->addChild(beginOffset, curOffset - beginOffset, "Playlist Jump");
+      header->addChild(beginOffset, 2, "Repeat Count");
+      header->addChild(beginOffset + 2, 2, "Playlist Jump");
 
       // add the last event too, if available
       if (curOffset + 1 < 0x10000 && readShort(curOffset) == 0x0000) {
@@ -418,8 +419,7 @@ double NinSnesSeq::getTempoInBPM() {
 
 double NinSnesSeq::getTempoInBPM(uint8_t tempoValue) {
   if (tempoValue != 0) {
-    return static_cast<double>(60000000) / (SEQ_PPQN * 2000) *
-           (static_cast<double>(tempoValue) / 256);
+    return static_cast<double>(60000000) / (SEQ_PPQN * 2000) * (static_cast<double>(tempoValue) / 256);
   } else {
     return 1.0;  // since tempo 0 cannot be expressed, this function returns a very small value.
   }
@@ -514,7 +514,7 @@ bool NinSnesSection::parseTrackPointers() {
       segment.startOffset = curOffset;
       segment.rangeOffset = curOffset;
       segment.rangeLength = 2;
-      m_tracks[trackIndex] = new NinSnesSectionTrack(parentSeq, curOffset, 2, "NULL");
+      m_tracks[trackIndex] = new NinSnesSectionTrackItem(parentSeq, curOffset, 2, "NULL");
       m_tracks[trackIndex]->readMode = parentSeq->readMode;
       curOffset += 2;
       continue;
@@ -523,7 +523,7 @@ bool NinSnesSection::parseTrackPointers() {
     startAddress = convertToApuAddress(startAddress);
     segment.startOffset = startAddress;
     segment.rangeOffset = startAddress;
-    m_tracks[trackIndex] = new NinSnesSectionTrack(
+    m_tracks[trackIndex] = new NinSnesSectionTrackItem(
         parentSeq, startAddress, 0, fmt::format("Track {}", trackIndex + 1));
     m_tracks[trackIndex]->readMode = parentSeq->readMode;
 
@@ -582,7 +582,7 @@ NinSnesTrackState::NinSnesTrackState() {
   resetVars();
 }
 
-void NinSnesTrackState::resetVars(void) {
+void NinSnesTrackState::resetVars() {
   loopCount = 0;
   spcTranspose = 0;
 
@@ -604,8 +604,9 @@ void NinSnesTrackState::resetVars(void) {
 //  NinSnesTrack
 //  ************
 
-NinSnesSectionTrack::NinSnesSectionTrack(NinSnesSeq* parentSeq, uint32_t offset, uint32_t length,
-                                         const std::string& theName)
+NinSnesSectionTrackItem::NinSnesSectionTrackItem(NinSnesSeq* parentSeq, uint32_t offset,
+                                                 uint32_t length,
+                                                 const std::string& theName)
     : SeqTrack(parentSeq, offset, length, theName) {
   bDetermineTrackLengthEventByEvent = true;
 }
@@ -617,23 +618,24 @@ NinSnesTrack::NinSnesTrack(NinSnesSeq* parentSeq, uint32_t offset, uint32_t leng
   bDetermineTrackLengthEventByEvent = true;
 }
 
-bool NinSnesTrack::loadSectionSegment(NinSnesSection& section, uint32_t trackIndex) {
+// Prepares the persistent parser track to play one track entry from this section.
+bool NinSnesTrack::prepareSectionTrack(NinSnesSection& section, uint32_t trackIndex) {
   resetTransientSectionState(trackIndex);
   currentSegment = &section.trackSegment(trackIndex);
-  auto* sectionTrack = section.track(trackIndex);
+  auto* sectionTrackItem = section.track(trackIndex);
+  const bool emitSeqEvents = readMode != READMODE_ADD_TO_UI || !currentSegment->uiEventsLoaded;
   const bool loaded = loadTrackSegmentInit(currentSegment->rangeOffset,
                                            currentSegment->rangeLength,
                                            currentSegment->active,
                                            currentSegment->startOffset);
-  if (sectionTrack != nullptr) {
-    sectionTrack->readMode = readMode;
-    sectionTrack->channel = channel;
-    sectionTrack->channelGroup = channelGroup;
-    setUiEventOwner(sectionTrack);
+  if (sectionTrackItem != nullptr) {
+    sectionTrackItem->readMode = readMode;
+    sectionTrackItem->channel = channel;
+    sectionTrackItem->channelGroup = channelGroup;
+    setSeqEventTarget(sectionTrackItem, emitSeqEvents);
   } else {
-    clearUiEventOwner();
+    setSeqEventTarget(nullptr, emitSeqEvents);
   }
-  setUiEventEmissionEnabled(readMode != READMODE_ADD_TO_UI || !currentSegment->uiEventsLoaded);
 
   if (!currentSegment->active && m_hasPersistentRange) {
     setRange(m_persistentRangeStart, m_persistentRangeEnd - m_persistentRangeStart);

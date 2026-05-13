@@ -115,8 +115,7 @@ bool SeqTrack::loadTrackInit(int trackNum, MidiTrack *preparedMidiTrack) {
   return true;
 }
 
-bool SeqTrack::loadTrackSegmentInit(uint32_t segmentOffset, uint32_t segmentLength,
-                                    bool segmentActive) {
+bool SeqTrack::loadTrackSegmentInit(uint32_t segmentOffset, uint32_t segmentLength, bool segmentActive) {
   return loadTrackSegmentInit(segmentOffset, segmentLength, segmentActive, segmentOffset);
 }
 
