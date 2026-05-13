@@ -94,6 +94,10 @@ class SeqTrack : public VGMItem {
   void setUseLinearAmplitudeScale(bool set) { m_useLinearAmpScale = set; }
 
   virtual bool loadTrackInit(int trackNum, MidiTrack *preparedMidiTrack);
+  virtual bool loadTrackSegmentInit(uint32_t segmentOffset, uint32_t segmentLength,
+                                    bool segmentActive);
+  virtual bool loadTrackSegmentInit(uint32_t segmentOffset, uint32_t segmentLength,
+                                    bool segmentActive, uint32_t initialOffset);
   virtual void loadTrackMainLoop(uint32_t stopOffset, int32_t stopTime);
 
 protected:

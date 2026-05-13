@@ -1,7 +1,8 @@
 #pragma once
+#include <algorithm>
 #include <array>
 #include <optional>
-#include "VGMMultiSectionSeq.h"
+#include "VGMSeq.h"
 #include "SeqAutomation.h"
 #include "SeqTrack.h"
 #include "NinSnesFormat.h"
@@ -9,8 +10,12 @@
 #include "NinSnesSeqState.h"
 
 struct NinSnesProfile;
+class NinSnesSection;
+class NinSnesSectionTrack;
 
-class NinSnesSeq : public VGMMultiSectionSeq {
+constexpr size_t kNinSnesTrackCount = 8;
+
+class NinSnesSeq : public VGMSeq {
 public:
   NinSnesSeq(RawFile* file, NinSnesProfileId profile, uint32_t offset, uint8_t percussion_base = 0,
              const std::vector<uint8_t>& theVolumeTable = std::vector<uint8_t>(),
@@ -19,10 +24,11 @@ public:
   NinSnesSeq(RawFile* file, const NinSnesScanResult& scanResult);
   virtual ~NinSnesSeq();
 
+  bool load() override;
   bool parseHeader() override;
   void resetVars() override;
   void onTickEnd() override;
-  bool readEvent(long stopTime) override;
+  bool readEvent(long stopTime);
 
   const NinSnesProfile& profile() const;
   double getTempoInBPM();
@@ -46,8 +52,6 @@ public:
   uint8_t STATUS_PERCUSSION_NOTE_MAX;
   std::map<uint8_t, NinSnesSeqEventType> EventMap;
 
-  NinSnesTrackSharedData sharedTrackData[8];
-
   std::vector<uint8_t> volumeTable;
   std::vector<uint8_t> durRateTable;
   std::vector<uint8_t> panTable;
@@ -59,6 +63,9 @@ public:
   FixedPointControllerLane<> tempoFade;
   double maxVibratoDepthCents;
   double maxVibratoRateHz;
+  uint32_t dwStartOffset;
+  uint32_t curOffset;
+  std::vector<NinSnesSection *> aSections;
 
   // Konami:
   uint16_t konamiBaseAddress;
@@ -79,8 +86,8 @@ public:
   uint16_t falcomBaseOffset;
 
   void addPercussionInstrNoteMapping(uint8_t instrIndex, uint8_t noteIndex,
-                                     int8_t globalTranspose) {
-    m_percussionInstrNoteMap[instrIndex] = {noteIndex, globalTranspose};
+                                     int8_t transposeSemitones) {
+    m_percussionInstrNoteMap[instrIndex] = {noteIndex, transposeSemitones};
   }
   const std::map<uint8_t, NinSnesPercussionDef>& percussionInstrNoteMap() const {
     return m_percussionInstrNoteMap;
@@ -93,31 +100,94 @@ public:
   }
 
 protected:
+  bool loadTracks(ReadMode readMode, uint32_t stopTime = 1000000) override;
+  bool postLoad() override;
+
   VGMHeader* header;
 
 private:
   friend class NinSnesTrack;
   void loadEventMap();
+  void createTracks();
+  bool loadSection(NinSnesSection *section, uint32_t stopTime = 1000000);
+  void addSection(NinSnesSection *section);
+  NinSnesSection *getSectionAtOffset(uint32_t offset);
+  bool addLoopForeverNoItem();
   void setImmediateTempo(uint8_t newTempo);
   void startTempoFade(uint8_t fadeLength, uint8_t targetTempo);
   void syncTempoDependentTracks();
   NinSnesIntelliTADrumKitDef buildIntelliTADrumKitDef() const;
 
   uint8_t spcPercussionBaseInit;
+  int m_sectionForeverLoops = 0;
   std::map<uint8_t, NinSnesPercussionDef> m_percussionInstrNoteMap;
   uint32_t m_nextIntelliTAOverrideProgram;
   std::vector<NinSnesIntelliTAInstrumentOverride> m_intelliTAInstrumentOverrides;
   std::vector<NinSnesIntelliTADrumKitDef> m_intelliTADrumKitDefs;
 };
 
-class NinSnesSection : public VGMSeqSection {
+class NinSnesSection : public VGMItem {
 public:
+  struct TrackSegment {
+    // The pointer target remains the parser entry point. Jumps can expand the
+    // discovered byte range before that address, so the UI/stop range is separate.
+    uint32_t startOffset = 0;
+    uint32_t rangeOffset = 0;
+    uint32_t rangeLength = 0;
+    bool active = false;
+    bool uiEventsLoaded = false;
+
+    [[nodiscard]] uint32_t stopOffset() const {
+      return rangeOffset + rangeLength;
+    }
+
+    void include(uint32_t eventOffset, uint32_t eventLength) {
+      if (rangeLength == 0) {
+        rangeOffset = eventOffset;
+        rangeLength = eventLength;
+        return;
+      }
+
+      const uint32_t start = std::min(rangeOffset, eventOffset);
+      const uint32_t end = std::max(stopOffset(), eventOffset + eventLength);
+      rangeOffset = start;
+      rangeLength = end - start;
+    }
+  };
+
   NinSnesSection(NinSnesSeq* parentFile, uint32_t offset = 0, uint32_t length = 0);
 
-  virtual bool parseTrackPointers();
+  bool load();
+  bool parseTrackPointers();
+  bool postLoad();
+  void markUiEventsLoaded();
+
+  [[nodiscard]] const TrackSegment& trackSegment(size_t index) const {
+    return m_trackSegments.at(index);
+  }
+  TrackSegment& trackSegment(size_t index) {
+    return m_trackSegments.at(index);
+  }
+  NinSnesSectionTrack* track(size_t index) {
+    return m_tracks.at(index);
+  }
 
   uint16_t convertToApuAddress(uint16_t offset);
   uint16_t getShortAddress(uint32_t offset);
+
+  NinSnesSeq* parentSeq;
+
+ private:
+  bool m_loaded = false;
+  bool m_tracksAddedToChildren = false;
+  std::array<TrackSegment, kNinSnesTrackCount> m_trackSegments {};
+  std::array<NinSnesSectionTrack*, kNinSnesTrackCount> m_tracks {};
+};
+
+class NinSnesSectionTrack : public SeqTrack {
+public:
+  NinSnesSectionTrack(NinSnesSeq* parentSeq, uint32_t offset, uint32_t length,
+                      const std::string& theName);
 };
 
 class NinSnesTrack : public SeqTrack {
@@ -130,7 +200,7 @@ public:
     uint8_t targetNote = 0;
   };
 
-  NinSnesTrack(NinSnesSection* parentSection, uint32_t offset = 0, uint32_t length = 0,
+  NinSnesTrack(NinSnesSeq* parentSeq, uint32_t offset = 0, uint32_t length = 0,
                const std::string& theName = "NinSnes Track");
 
   void resetVars() override;
@@ -143,13 +213,15 @@ public:
   uint8_t readPanTable(uint16_t pan);
   int8_t calculatePanValue(uint8_t pan, double& volumeScale, bool& reverseLeft, bool& reverseRight);
 
-  NinSnesSection* parentSection;
-  // Tracks are constructed before parseTrackPointers wires them to the sequence-owned shared data.
-  NinSnesTrackSharedData* shared = nullptr;
-  bool available = true;
+protected:
+  bool onEvent(uint32_t offset, uint32_t length) override;
 
 private:
   friend class NinSnesSeq;
+  bool loadSectionSegment(NinSnesSection& section, uint32_t trackIndex);
+  void resetTransientSectionState(uint32_t trackIndex);
+  void resetPersistentRange();
+  void includePersistentRange(uint32_t eventOffset, uint32_t eventLength);
   NinSnesSeq& seq() const;
   NinSnesIntelliModeId intelliMode() const;
   bool handleIntelliPercussionNote(uint32_t beginOffset, uint8_t slot, uint8_t duration);
@@ -200,6 +272,9 @@ private:
   uint8_t currentPercussionProgram = 0;
   std::optional<uint8_t> currentLogicalProgram;
   bool intelliLegato = false;
-  // Fallback state used only until the real per-track shared slot is attached.
-  NinSnesTrackSharedData localSharedData;
+  NinSnesTrackState state;
+  NinSnesSection::TrackSegment* currentSegment = nullptr;
+  bool m_hasPersistentRange = false;
+  uint32_t m_persistentRangeStart = 0;
+  uint32_t m_persistentRangeEnd = 0;
 };

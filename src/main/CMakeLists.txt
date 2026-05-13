@@ -114,7 +114,6 @@ target_sources(vgmtranscore
     components/VGMFile.cpp
     components/VGMItem.cpp
     components/VGMMiscFile.cpp
-    components/VGMMultiSectionSeq.cpp
     components/VGMSampColl.cpp
     components/VGMTag.cpp
         components/instr/Modulation.cpp
@@ -129,7 +128,6 @@ target_sources(vgmtranscore
     components/seq/SeqTrack.cpp
     components/seq/VGMSeq.cpp
     components/seq/VGMSeqNoTrks.cpp
-    components/seq/VGMSeqSection.cpp
     conversion/DLSConversion.cpp
     conversion/DLSFile.cpp
     conversion/MidiFile.cpp
@@ -483,7 +481,6 @@ target_sources(vgmtranscore
       components/VGMFile.h
       components/VGMItem.h
       components/VGMMiscFile.h
-      components/VGMMultiSectionSeq.h
       components/VGMSampColl.h
       components/VGMTag.h
     FILE_SET headers_components_instr TYPE HEADERS BASE_DIRS components/instr
@@ -511,7 +508,6 @@ target_sources(vgmtranscore
       components/seq/SeqTrack.h
       components/seq/VGMSeq.h
       components/seq/VGMSeqNoTrks.h
-      components/seq/VGMSeqSection.h
     FILE_SET headers_conversion TYPE HEADERS BASE_DIRS conversion
     FILES
       conversion/DLSConversion.h
