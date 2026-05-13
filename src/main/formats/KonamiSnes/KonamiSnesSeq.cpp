@@ -581,18 +581,17 @@ void KonamiSnesTrack::beginPitchSlide(const PitchSlide& slide) {
 }
 
 KonamiSnesTrack::ControllerFade KonamiSnesTrack::readVolumeFade(KonamiSnesSeqEventType eventType, uint32_t offset) const {
-  ControllerFade fade {offset, 0};
+  ControllerFade fade {offset, {}};
 
   switch (eventType) {
     case EVENT_VOLUME_FADE_V1:
-      fade.length = readByte(curOffset);
-      fade.targetValue = readByte(curOffset + 1);
-      fade.useLength = true;
+      fade.motion = ControllerMotionSpec<int32_t>::toTarget(readByte(curOffset + 1), readByte(curOffset));
       break;
 
     case EVENT_VOLUME_FADE_V2:
-      fade.targetValue = readByte(curOffset);
-      fade.delta = static_cast<int16_t>(static_cast<int8_t>(readByte(curOffset + 1)) << 4);
+      fade.motion = ControllerMotionSpec<int32_t>::byStep(
+          readByte(curOffset),
+          static_cast<int16_t>(static_cast<int8_t>(readByte(curOffset + 1)) << 4));
       break;
 
     default:
@@ -604,9 +603,11 @@ KonamiSnesTrack::ControllerFade KonamiSnesTrack::readVolumeFade(KonamiSnesSeqEve
 }
 
 void KonamiSnesTrack::addVolumeFadeEvent(const ControllerFade& fade) {
-  const std::string desc = fade.useLength
-      ? fmt::format("Length: {:d}  Target Volume: {:d}", fade.length, fade.targetValue)
-      : fmt::format("Target Volume: {:d}  Speed: {:.2f}", fade.targetValue, fade.delta / 256.0);
+  const std::string desc = fade.motion.usesLength()
+      ? fmt::format("Length: {:d}  Target Volume: {:d}", fade.motion.length, fade.motion.target)
+      : fmt::format("Target Volume: {:d}  Speed: {:.2f}",
+                    fade.motion.target,
+                    fade.motion.delta / 256.0);
   addGenericEvent(fade.offset, 3, "Volume Fade", desc, Type::VolumeSlide);
 }
 
@@ -624,12 +625,7 @@ void KonamiSnesTrack::applyCurrentVolume() {
 
 void KonamiSnesTrack::beginVolumeFade(const ControllerFade& fade) {
   addVolumeFadeEvent(fade);
-
-  if (fade.useLength) {
-    volumeFade.beginToTarget(fade.targetValue, fade.length, [this](int32_t) { applyCurrentVolume(); });
-  } else {
-    volumeFade.beginByStep(fade.targetValue, fade.delta, [this](int32_t) { applyCurrentVolume(); });
-  }
+  volumeFade.beginMotion(fade.motion, [this](int32_t) { applyCurrentVolume(); });
 }
 
 uint8_t KonamiSnesTrack::defaultPanValue() const {
@@ -668,18 +664,18 @@ uint8_t KonamiSnesTrack::convertPanValueToMidiPan(uint8_t pan) const {
 }
 
 KonamiSnesTrack::ControllerFade KonamiSnesTrack::readPanFade(KonamiSnesSeqEventType eventType, uint32_t offset) const {
-  ControllerFade fade {offset, 0};
+  ControllerFade fade {offset, {}};
 
   switch (eventType) {
     case EVENT_PAN_FADE_V1:
-      fade.length = readByte(curOffset);
-      fade.targetValue = clampPanValue(readByte(curOffset + 1));
-      fade.useLength = true;
+      fade.motion = ControllerMotionSpec<int32_t>::toTarget(clampPanValue(readByte(curOffset + 1)),
+                                                            readByte(curOffset));
       break;
 
     case EVENT_PAN_FADE_V2:
-      fade.targetValue = clampPanValue(readByte(curOffset));
-      fade.delta = static_cast<int16_t>(static_cast<int8_t>(readByte(curOffset + 1)) << 4);
+      fade.motion = ControllerMotionSpec<int32_t>::byStep(
+          clampPanValue(readByte(curOffset)),
+          static_cast<int16_t>(static_cast<int8_t>(readByte(curOffset + 1)) << 4));
       break;
 
     default:
@@ -691,20 +687,17 @@ KonamiSnesTrack::ControllerFade KonamiSnesTrack::readPanFade(KonamiSnesSeqEventT
 }
 
 void KonamiSnesTrack::addPanFadeEvent(const ControllerFade& fade) {
-  const std::string desc = fade.useLength
-      ? fmt::format("Length: {:d}  Target Pan: {:d}", fade.length, fade.targetValue)
-      : fmt::format("Target Pan: {:d}  Speed: {:.2f}", fade.targetValue, fade.delta / 256.0);
+  const std::string desc = fade.motion.usesLength()
+      ? fmt::format("Length: {:d}  Target Pan: {:d}", fade.motion.length, fade.motion.target)
+      : fmt::format("Target Pan: {:d}  Speed: {:.2f}",
+                    fade.motion.target,
+                    fade.motion.delta / 256.0);
   addGenericEvent(fade.offset, 3, "Pan Fade", desc, Type::PanSlide);
 }
 
 void KonamiSnesTrack::beginPanFade(const ControllerFade& fade) {
   addPanFadeEvent(fade);
-
-  if (fade.useLength) {
-    panFade.beginToTarget(fade.targetValue, fade.length, [this](int32_t) { applyCurrentPan(); });
-  } else {
-    panFade.beginByStep(fade.targetValue, fade.delta, [this](int32_t) { applyCurrentPan(); });
-  }
+  panFade.beginMotion(fade.motion, [this](int32_t) { applyCurrentPan(); });
 }
 
 void KonamiSnesTrack::clearActivePanFade() {
@@ -719,18 +712,17 @@ void KonamiSnesTrack::applyCurrentPan() {
 }
 
 KonamiSnesTrack::ControllerFade KonamiSnesTrack::readTempoFade(KonamiSnesSeqEventType eventType, uint32_t offset) const {
-  ControllerFade fade {offset, 0};
+  ControllerFade fade {offset, {}};
 
   switch (eventType) {
     case EVENT_TEMPO_FADE_V1:
-      fade.length = readByte(curOffset);
-      fade.targetValue = readByte(curOffset + 1);
-      fade.useLength = true;
+      fade.motion = ControllerMotionSpec<int32_t>::toTarget(readByte(curOffset + 1), readByte(curOffset));
       break;
 
     case EVENT_TEMPO_FADE_V2:
-      fade.targetValue = readByte(curOffset);
-      fade.delta = static_cast<int16_t>(static_cast<int8_t>(readByte(curOffset + 1)) << 4);
+      fade.motion = ControllerMotionSpec<int32_t>::byStep(
+          readByte(curOffset),
+          static_cast<int16_t>(static_cast<int8_t>(readByte(curOffset + 1)) << 4));
       break;
 
     default:
@@ -742,22 +734,16 @@ KonamiSnesTrack::ControllerFade KonamiSnesTrack::readTempoFade(KonamiSnesSeqEven
 }
 
 void KonamiSnesTrack::addTempoFadeEvent(const ControllerFade& fade) {
-  const auto bpm = seq().getTempoInBPM(fade.targetValue);
-  const std::string desc = fade.useLength
-      ? fmt::format("Length: {:d}  Target BPM: {}", fade.length, bpm)
-      : fmt::format("Target BPM: {}  Speed: {:.2f}", bpm, fade.delta / 256.0);
+  const auto bpm = seq().getTempoInBPM(static_cast<uint8_t>(fade.motion.target));
+  const std::string desc = fade.motion.usesLength()
+      ? fmt::format("Length: {:d}  Target BPM: {}", fade.motion.length, bpm)
+      : fmt::format("Target BPM: {}  Speed: {:.2f}", bpm, fade.motion.delta / 256.0);
   addGenericEvent(fade.offset, 3, "Tempo Fade", desc, Type::Tempo);
 }
 
 void KonamiSnesTrack::beginTempoFade(const ControllerFade& fade) {
   addTempoFadeEvent(fade);
-
-  auto &tempoFade = seq().tempoFade;
-  if (fade.useLength) {
-    tempoFade.beginToTarget(fade.targetValue, fade.length, [this](int32_t) { applyCurrentTempo(); });
-  } else {
-    tempoFade.beginByStep(fade.targetValue, fade.delta, [this](int32_t) { applyCurrentTempo(); });
-  }
+  seq().tempoFade.beginMotion(fade.motion, [this](int32_t) { applyCurrentTempo(); });
 }
 
 void KonamiSnesTrack::clearActiveTempoFade() {

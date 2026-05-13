@@ -147,10 +147,7 @@ class KonamiSnesTrack
 
   struct ControllerFade {
     uint32_t offset;
-    uint8_t targetValue;
-    int32_t delta = 0;
-    uint8_t length = 0;
-    bool useLength = false;
+    ControllerMotionSpec<int32_t> motion;
   };
 
   std::optional<PitchSlide> consumePitchSlide();

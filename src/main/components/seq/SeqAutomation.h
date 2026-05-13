@@ -17,6 +17,31 @@ enum class SeqMotionStep {
   Finished,
 };
 
+enum class ControllerMotionKind {
+  ToTarget,
+  ByStep,
+};
+
+// Format commands usually describe controller motion as either "reach this target over N ticks"
+// or "move by this fixed step until the target is crossed"; lanes handle the tick mechanics.
+template <typename ValueType>
+struct ControllerMotionSpec {
+  ValueType target {};
+  ValueType delta {};
+  uint32_t length = 0;
+  ControllerMotionKind kind = ControllerMotionKind::ToTarget;
+
+  static ControllerMotionSpec toTarget(ValueType targetValue, uint32_t ticks) {
+    return {targetValue, {}, ticks, ControllerMotionKind::ToTarget};
+  }
+
+  static ControllerMotionSpec byStep(ValueType targetValue, ValueType step) {
+    return {targetValue, step, 0, ControllerMotionKind::ByStep};
+  }
+
+  [[nodiscard]] bool usesLength() const { return kind == ControllerMotionKind::ToTarget; }
+};
+
 // Tick-level linear motion shared by controller, pitch, and LFO automation lanes.
 // It models either a fixed-length motion that snaps to the target on the final tick,
 // or a step-until-target motion for drivers that encode speed instead of duration.
@@ -137,6 +162,20 @@ class ControllerLane {
     m_motion.startByStep(target, delta, delay);
   }
 
+  void startMotion(const ControllerMotionSpec<ValueType>& motion, uint32_t delay = 0) {
+    if (motion.usesLength()) {
+      if (motion.length == 0) {
+        setCurrent(motion.target);
+        return;
+      }
+      const auto delta = static_cast<ValueType>(
+          (motion.target - current()) / static_cast<ValueType>(motion.length));
+      startToTarget(motion.target, delta, motion.length, delay);
+    } else {
+      startByStep(motion.target, motion.delta, delay);
+    }
+  }
+
   [[nodiscard]] bool active() const { return m_motion.active(); }
   [[nodiscard]] ValueType current() const { return m_motion.current(); }
   [[nodiscard]] ValueType target() const { return m_motion.target(); }
@@ -238,6 +277,14 @@ class FixedPointControllerLane {
 
     startByStep(targetRaw, delta);
     return false;
+  }
+
+  template <typename Apply>
+  bool beginMotion(const ControllerMotionSpec<ValueType>& motion, Apply&& apply) {
+    if (motion.usesLength()) {
+      return beginToTarget(motion.target, motion.length, std::forward<Apply>(apply));
+    }
+    return beginByStep(motion.target, motion.delta, std::forward<Apply>(apply));
   }
 
   SeqMotionStep advance() { return m_lane.advance(); }
