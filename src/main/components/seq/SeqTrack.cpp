@@ -61,23 +61,6 @@ void SeqTrack::resetVars() {
   visitedControlFlowStates.clear();
   prevDurEventIndices.clear();
   m_activeNoteEventIndices.clear();
-  clearSeqEventTarget();
-}
-
-void SeqTrack::resetSegmentVars() {
-  active = true;
-  bInLoop = false;
-  infiniteLoops = 0;
-  totalTicks = -1;
-  deltaTime = 0;
-  returnOffsets.clear();
-  loopStack.clear();
-  visitedControlFlowStates.clear();
-  prevDurEventIndices.clear();
-  m_activeNoteEventIndices.clear();
-  m_lastEventOffset = 0;
-  m_lastEventLength = 0;
-  clearSeqEventTarget();
 }
 
 void SeqTrack::resetVisitedAddresses() {
@@ -112,25 +95,6 @@ bool SeqTrack::loadTrackInit(int trackNum, MidiTrack *preparedMidiTrack) {
       addInitialMidiEvents(trackNum);
     }
   }
-  return true;
-}
-
-bool SeqTrack::loadTrackSegmentInit(uint32_t segmentOffset, uint32_t segmentLength, bool segmentActive) {
-  return loadTrackSegmentInit(segmentOffset, segmentLength, segmentActive, segmentOffset);
-}
-
-bool SeqTrack::loadTrackSegmentInit(uint32_t segmentOffset, uint32_t segmentLength,
-                                    bool segmentActive, uint32_t initialOffset) {
-  resetVisitedAddresses();
-  resetSegmentVars();
-  active = segmentActive;
-  setRange(segmentOffset, segmentLength);
-  curOffset = initialOffset;
-
-  if (active) {
-    addControlFlowState(curOffset);
-  }
-
   return true;
 }
 
@@ -379,13 +343,8 @@ SeqEvent* SeqTrack::addGenericEvent(uint32_t offset,
   bool isNewOffset = onEvent(offset, length);
 
   if (readMode == READMODE_ADD_TO_UI) {
-    if (isNewOffset && m_emitSeqEvents) {
-      auto* target = seqEventTarget();
-      auto* event = new SeqEvent(target, offset, length, sEventName, type, sEventDesc);
-      event->channel = static_cast<uint8_t>(channel);
-      return target->addEvent(event);
-    }
-    return nullptr;
+    return isNewOffset ? addEvent(new SeqEvent(this, offset, length, sEventName, type, sEventDesc))
+                       : nullptr;
   }
 
   recordSeqEvent<SeqEvent>(isNewOffset, getTime(), offset, length, sEventName, type, sEventDesc);

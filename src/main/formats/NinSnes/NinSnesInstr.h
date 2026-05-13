@@ -5,8 +5,6 @@
 #include "NinSnesFormat.h"
 #include "NinSnesScanResult.h"
 
-class NinSnesSeq;
-
 // ****************
 // NinSnesInstrSet
 // ****************
@@ -25,7 +23,6 @@ class NinSnesInstrSet:
   bool parseHeader() override;
   bool parseInstrPointers() override;
   void useColl(const VGMColl* coll) override;
-  void unuseColl() override;
 
   NinSnesSignatureId signature;
   NinSnesProfileId profileId;
@@ -36,11 +33,6 @@ class NinSnesInstrSet:
  protected:
   uint32_t spcDirAddr;
   std::vector<uint8_t> usedSRCNs;
-
- private:
-  void addStandardPercussionDrumKit(const NinSnesSeq& seq);
-  void addIntelliOverrideInstrs(const NinSnesSeq& seq);
-  void addIntelliDrumKits(const NinSnesSeq& seq);
 };
 
 // *************

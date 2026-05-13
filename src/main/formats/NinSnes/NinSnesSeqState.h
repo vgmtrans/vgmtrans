@@ -3,7 +3,6 @@
 #include <array>
 #include <cstddef>
 #include <cstdint>
-#include "SeqAutomation.h"
 
 enum NinSnesSeqEventType {
   // start enum at 1 because if map[] look up fails, it returns 0, and we don't want that to get
@@ -87,11 +86,9 @@ enum NinSnesSeqEventType {
   EVENT_QUINTET_ADSR,
 };
 
-class NinSnesTrackState {
+class NinSnesTrackSharedData {
  public:
-  static constexpr uint16_t kDefaultPitchBendRangeCents = 200;
-
-  NinSnesTrackState();
+  NinSnesTrackSharedData();
 
   virtual void resetVars();
 
@@ -106,28 +103,6 @@ class NinSnesTrackState {
   // Konami:
   uint16_t konamiLoopStart;
   uint8_t konamiLoopCount;
-
-  // F1/F2 define a reusable note-on envelope, while F9 instantiates the live motion directly.
-  struct StoredPitchEnvelope {
-    enum class Mode : uint8_t {
-      None,
-      To,
-      From,
-    };
-
-    Mode mode = Mode::None;
-    uint8_t delay = 0;
-    uint8_t length = 0;
-    int8_t semitones = 0;
-
-    bool enabled() const {
-      return mode != Mode::None && length != 0;
-    }
-  };
-
-  SynthLfoLane vibrato;
-  StoredPitchEnvelope pitchEnvelope;
-  PitchBendLane<int32_t> pitch {100.0 / 256.0};
 };
 
 struct NinSnesPercussionDef {
