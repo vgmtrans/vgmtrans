@@ -10,14 +10,14 @@
 #include <cstdint>
 #include <utility>
 
-enum class SeqMotionStep {
+enum class SeqMotionStatus {
   Inactive,
   Delayed,
   Running,
   Finished,
 };
 
-enum class ControllerMotionKind {
+enum class ControllerMotionMode {
   ToTarget,
   ByStep,
 };
@@ -29,17 +29,17 @@ struct ControllerMotionSpec {
   ValueType target {};
   ValueType delta {};
   uint32_t length = 0;
-  ControllerMotionKind kind = ControllerMotionKind::ToTarget;
+  ControllerMotionMode mode = ControllerMotionMode::ToTarget;
 
   static ControllerMotionSpec toTarget(ValueType targetValue, uint32_t ticks) {
-    return {targetValue, {}, ticks, ControllerMotionKind::ToTarget};
+    return {targetValue, {}, ticks, ControllerMotionMode::ToTarget};
   }
 
   static ControllerMotionSpec byStep(ValueType targetValue, ValueType step) {
-    return {targetValue, step, 0, ControllerMotionKind::ByStep};
+    return {targetValue, step, 0, ControllerMotionMode::ByStep};
   }
 
-  [[nodiscard]] bool usesLength() const { return kind == ControllerMotionKind::ToTarget; }
+  [[nodiscard]] bool usesLength() const { return mode == ControllerMotionMode::ToTarget; }
 };
 
 // Tick-level linear motion shared by controller, pitch, and LFO automation lanes.
@@ -101,29 +101,29 @@ class SeqLinearMotion {
   [[nodiscard]] uint32_t ticksRemaining() const { return m_ticksRemaining; }
   [[nodiscard]] bool usesLength() const { return m_useLength; }
 
-  SeqMotionStep advance() {
+  SeqMotionStatus advance() {
     if (m_delay != 0) {
       m_delay -= 1;
-      return SeqMotionStep::Delayed;
+      return SeqMotionStatus::Delayed;
     }
 
     if (m_useLength) {
       if (m_ticksRemaining == 0) {
-        return SeqMotionStep::Inactive;
+        return SeqMotionStatus::Inactive;
       }
 
       m_ticksRemaining -= 1;
       if (m_ticksRemaining == 0) {
         m_current = m_target;
-        return SeqMotionStep::Finished;
+        return SeqMotionStatus::Finished;
       }
 
       m_current = static_cast<ValueType>(m_current + m_delta);
-      return SeqMotionStep::Running;
+      return SeqMotionStatus::Running;
     }
 
     if (m_delta == ValueType {}) {
-      return SeqMotionStep::Inactive;
+      return SeqMotionStatus::Inactive;
     }
 
     m_current = static_cast<ValueType>(m_current + m_delta);
@@ -131,10 +131,10 @@ class SeqLinearMotion {
         (m_delta < ValueType {} && m_current <= m_target)) {
       m_current = m_target;
       m_delta = {};
-      return SeqMotionStep::Finished;
+      return SeqMotionStatus::Finished;
     }
 
-    return SeqMotionStep::Running;
+    return SeqMotionStatus::Running;
   }
 
  private:
@@ -183,13 +183,13 @@ class ControllerLane {
   [[nodiscard]] uint32_t ticksRemaining() const { return m_motion.ticksRemaining(); }
   [[nodiscard]] bool usesLength() const { return m_motion.usesLength(); }
 
-  SeqMotionStep advance() { return m_motion.advance(); }
+  SeqMotionStatus advance() { return m_motion.advance(); }
 
   template <typename Apply>
-  SeqMotionStep advanceAndApply(Apply&& apply, bool applyDelayedStep = false) {
-    const SeqMotionStep step = advance();
-    if (step != SeqMotionStep::Inactive &&
-        (applyDelayedStep || step != SeqMotionStep::Delayed)) {
+  SeqMotionStatus advanceAndApply(Apply&& apply, bool applyDelayedStep = false) {
+    const SeqMotionStatus step = advance();
+    if (step != SeqMotionStatus::Inactive &&
+        (applyDelayedStep || step != SeqMotionStatus::Delayed)) {
       std::forward<Apply>(apply)(m_motion.current());
     }
     return step;
@@ -287,15 +287,15 @@ class FixedPointControllerLane {
     return beginByStep(motion.target, motion.delta, std::forward<Apply>(apply));
   }
 
-  SeqMotionStep advance() { return m_lane.advance(); }
+  SeqMotionStatus advance() { return m_lane.advance(); }
 
   template <typename Apply>
-  SeqMotionStep advanceAndApply(Apply&& apply, bool applyDelayedStep = false) {
+  SeqMotionStatus advanceAndApply(Apply&& apply, bool applyDelayedStep = false) {
     return m_lane.advanceAndApply(std::forward<Apply>(apply), applyDelayedStep);
   }
 
   template <typename Apply>
-  SeqMotionStep advanceAndApplyRaw(Apply&& apply, bool applyDelayedStep = false) {
+  SeqMotionStatus advanceAndApplyRaw(Apply&& apply, bool applyDelayedStep = false) {
     return advanceAndApply(
         [apply = std::forward<Apply>(apply)](ValueType currentFixed) mutable {
           apply(toRaw(currentFixed));
@@ -376,17 +376,17 @@ class PitchBendLane {
     return startMotion(motion.target, motion.delta, motion.length, motion.delay);
   }
 
-  SeqMotionStep advanceMotion() {
+  SeqMotionStatus advanceMotion() {
     if (!m_baseValid) {
-      return SeqMotionStep::Inactive;
+      return SeqMotionStatus::Inactive;
     }
     return m_motion.advance();
   }
 
   template <typename EmitBend>
-  SeqMotionStep advanceAndApplyBend(EmitBend&& emitBend) {
-    const SeqMotionStep step = advanceMotion();
-    if (step != SeqMotionStep::Inactive && step != SeqMotionStep::Delayed) {
+  SeqMotionStatus advanceAndApplyBend(EmitBend&& emitBend) {
+    const SeqMotionStatus step = advanceMotion();
+    if (step != SeqMotionStatus::Inactive && step != SeqMotionStatus::Delayed) {
       applyCurrentBend(std::forward<EmitBend>(emitBend));
     }
     return step;
@@ -420,8 +420,7 @@ class PitchBendLane {
   [[nodiscard]] int16_t bendForPitch(PitchType pitch) const {
     const auto bend = static_cast<int32_t>(
         std::lround((((static_cast<double>(pitch - m_basePitch) * m_centsPerPitchUnit) /
-                      m_pitchBendRangeCents) *
-                     8192.0)));
+                      m_pitchBendRangeCents) * 8192.0)));
     return static_cast<int16_t>(std::clamp(bend, kMinMidiPitchBend, kMaxMidiPitchBend));
   }
 
@@ -570,7 +569,7 @@ class SynthLfoLane {
     startReusableFade(m_delay, configuredDepth(fractionalBits), initialDepth);
   }
 
-  SeqMotionStep advanceFade() { return m_fade.advance(); }
+  SeqMotionStatus advanceFade() { return m_fade.advance(); }
   [[nodiscard]] bool fadeActive() const { return m_fade.active(); }
 
   void setCurrentDepth(int32_t depth) {
@@ -593,20 +592,20 @@ class SynthLfoLane {
   }
 
   template <typename ApplyDepth>
-  SeqMotionStep advanceFadeAndApply(ApplyDepth&& applyDepth) {
+  SeqMotionStatus advanceFadeAndApply(ApplyDepth&& applyDepth) {
     if (!fadeActive()) {
-      return SeqMotionStep::Inactive;
+      return SeqMotionStatus::Inactive;
     }
 
-    const SeqMotionStep step = advanceFade();
-    if (step != SeqMotionStep::Inactive && step != SeqMotionStep::Delayed) {
+    const SeqMotionStatus step = advanceFade();
+    if (step != SeqMotionStatus::Inactive && step != SeqMotionStatus::Delayed) {
       std::forward<ApplyDepth>(applyDepth)(currentDepth());
     }
     return step;
   }
 
   template <typename ApplyDepth>
-  SeqMotionStep advanceFadeAndApplyClamped(uint8_t fractionalBits, ApplyDepth&& applyDepth) {
+  SeqMotionStatus advanceFadeAndApplyClamped(uint8_t fractionalBits, ApplyDepth&& applyDepth) {
     return advanceFadeAndApply(
         [this, fractionalBits, applyDepth = std::forward<ApplyDepth>(applyDepth)](int32_t depth) mutable {
           applyDepth(clampToConfiguredDepth(depth, fractionalBits));
