@@ -17,8 +17,6 @@ constexpr size_t MAX_TRACKS = kNinSnesTrackCount;
 constexpr uint16_t kNinSnesDefaultPitchBendRangeCents =
     NinSnesTrackState::kDefaultPitchBendRangeCents;
 
-using NinSnesControllerMotion = SeqFixedPointMotion<int32_t>;
-
 }  // namespace
 
 NinSnesSeq::NinSnesSeq(RawFile* file, NinSnesProfileId profile, uint32_t offset,
@@ -430,7 +428,7 @@ void NinSnesSeq::setImmediateTempo(uint8_t newTempo) {
 }
 
 void NinSnesSeq::startTempoFade(uint8_t fadeLength, uint8_t targetTempo) {
-  tempoFade.begin(NinSnesControllerMotion::toRawTarget(targetTempo, fadeLength));
+  tempoFade.begin(SeqFixedPointMotion<int32_t>::toRawTarget(targetTempo, fadeLength));
 }
 
 void NinSnesSeq::syncTempoDependentTracks() {
