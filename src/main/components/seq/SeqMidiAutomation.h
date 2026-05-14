@@ -42,7 +42,9 @@ class SeqPitchBendAutomation {
 
   void clearMotion() { m_pitch.clearMotion(); }
   void jumpToPitch(PitchType pitch) { m_pitch.jumpTo(pitch); }
-  void setAccumulatorPitch(PitchType pitch) { m_pitch.setAccumulator(pitch); }
+  void setCurrentPitchPreservingMotion(PitchType pitch) {
+    m_pitch.setCurrentPreservingMotion(pitch);
+  }
 
   [[nodiscard]] PitchType basePitch() const { return m_basePitch; }
   [[nodiscard]] PitchType currentPitch() const { return m_pitch.current(); }
@@ -264,14 +266,16 @@ class SeqSynthLfoAutomation {
   }
 
   [[nodiscard]] bool fadeActive() const { return m_fade.active(); }
-  void setCurrentDepth(int32_t depth) { m_fade.setAccumulator(depth); }
+  void setCurrentDepthPreservingMotion(int32_t depth) {
+    m_fade.setCurrentPreservingMotion(depth);
+  }
   [[nodiscard]] int32_t currentDepth() const { return m_fade.current(); }
   [[nodiscard]] uint8_t midiDepth() const { return m_midiDepth.current(); }
-  void setMidiDepth(uint8_t depth) { m_midiDepth.setCurrent(depth); }
+  void setMidiDepth(uint8_t depth) { m_midiDepth.setCachedValue(depth); }
 
   template <typename EmitDepth>
   bool emitDepth(uint8_t depth, EmitDepth&& emitDepth, bool force = false) {
-    return m_midiDepth.emit(depth, std::forward<EmitDepth>(emitDepth), force);
+    return m_midiDepth.emitIfChanged(depth, std::forward<EmitDepth>(emitDepth), force);
   }
 
   template <typename ConvertDepth, typename EmitDepth>
@@ -286,7 +290,7 @@ class SeqSynthLfoAutomation {
     if (motionTick.status != SeqMotionStatus::Inactive &&
         motionTick.status != SeqMotionStatus::Delayed) {
       const int32_t current = clampToConfiguredDepth(motionTick.current, fractionalBits);
-      setCurrentDepth(current);
+      setCurrentDepthPreservingMotion(current);
       const int midiDepth = static_cast<int>(std::forward<ConvertDepth>(convertDepth)(current));
       emitDepth(static_cast<uint8_t>(std::clamp(midiDepth, 0, 127)),
                 std::forward<EmitDepth>(emitValue));

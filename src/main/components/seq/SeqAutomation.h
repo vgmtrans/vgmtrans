@@ -17,7 +17,9 @@ class SeqAutomatedValue {
  public:
   void reset(ValueType current = {}) { m_motion.reset(current); }
   void jumpTo(ValueType current) { m_motion.jumpTo(current); }
-  void setAccumulator(ValueType current) { m_motion.setAccumulator(current); }
+  void setCurrentPreservingMotion(ValueType current) {
+    m_motion.setCurrentPreservingMotion(current);
+  }
   void clearMotion() { m_motion.clear(); }
 
   [[nodiscard]] bool active() const { return m_motion.active(); }
@@ -69,10 +71,10 @@ class SeqCachedEmitter {
  public:
   void reset(ValueType current = {}) { m_current = current; }
   [[nodiscard]] ValueType current() const { return m_current; }
-  void setCurrent(ValueType current) { m_current = current; }
+  void setCachedValue(ValueType current) { m_current = current; }
 
   template <typename Emit>
-  bool emit(ValueType value, Emit&& emitValue, bool force = false) {
+  bool emitIfChanged(ValueType value, Emit&& emitValue, bool force = false) {
     if (!force && value == m_current) {
       return false;
     }
@@ -118,17 +120,85 @@ class SeqMotionPreset {
 };
 
 template <typename ValueType, unsigned FractionBits = 8>
-struct SeqFixedPointMotion {
-  static SeqMotionPlan<ValueType> toRawTarget(ValueType rawTarget,
-                                             uint32_t ticks,
-                                             uint32_t delay = 0) {
-    return SeqMotionPlan<ValueType>::targetOverTicks(rawTarget, ticks, delay);
+struct SeqFixedPointMotionPlan {
+  ValueType targetRaw {};
+  ValueType stepFixed {};
+  uint32_t ticks = 0;
+  uint32_t delay = 0;
+  SeqMotionMode mode = SeqMotionMode::TargetOverTicks;
+  SeqInvalidStepPolicy invalidStepPolicy = SeqInvalidStepPolicy::Reject;
+
+  static SeqFixedPointMotionPlan targetRawOverTicks(ValueType targetValue,
+                                                    uint32_t tickCount,
+                                                    uint32_t delayTicks = 0) {
+    return {targetValue, {}, tickCount, delayTicks, SeqMotionMode::TargetOverTicks};
   }
 
-  static SeqMotionPlan<ValueType> toRawTargetByFixedStep(ValueType rawTarget,
-                                                        ValueType fixedStep,
-                                                        uint32_t delay = 0) {
-    return SeqMotionPlan<ValueType>::targetByStep(rawTarget, fixedStep, delay);
+  static SeqFixedPointMotionPlan targetRawOverTicksWithStepFixed(ValueType targetValue,
+                                                                 ValueType stepValue,
+                                                                 uint32_t tickCount,
+                                                                 uint32_t delayTicks = 0) {
+    return {targetValue,
+            stepValue,
+            tickCount,
+            delayTicks,
+            SeqMotionMode::TargetOverTicksWithStep};
+  }
+
+  static SeqFixedPointMotionPlan targetRawByStepFixed(
+      ValueType targetValue,
+      ValueType stepValue,
+      uint32_t delayTicks = 0,
+      SeqInvalidStepPolicy invalidStepPolicy = SeqInvalidStepPolicy::Reject) {
+    return {targetValue,
+            stepValue,
+            0,
+            delayTicks,
+            SeqMotionMode::TargetByStep,
+            invalidStepPolicy};
+  }
+
+  [[nodiscard]] bool usesTicks() const {
+    return mode != SeqMotionMode::TargetByStep;
+  }
+
+  [[nodiscard]] bool usesStepUntilTarget() const {
+    return mode == SeqMotionMode::TargetByStep;
+  }
+};
+
+enum class SeqFixedPointRetarget {
+  QuantizeToRaw,
+  PreserveAccumulator,
+};
+
+enum class SeqFixedPointRounding {
+  Floor,
+  TowardZero,
+  Nearest,
+};
+
+struct SeqFixedPointPolicy {
+  SeqFixedPointRetarget retarget = SeqFixedPointRetarget::QuantizeToRaw;
+  SeqFixedPointRounding rounding = SeqFixedPointRounding::Floor;
+};
+
+template <typename ValueType, unsigned FractionBits = 8>
+struct SeqFixedPointMotion {
+  using Plan = SeqFixedPointMotionPlan<ValueType, FractionBits>;
+
+  static Plan toRawTarget(ValueType targetRaw,
+                          uint32_t ticks,
+                          uint32_t delay = 0) {
+    return Plan::targetRawOverTicks(targetRaw, ticks, delay);
+  }
+
+  static Plan toRawTargetByFixedStep(
+      ValueType targetRaw,
+      ValueType stepFixed,
+      uint32_t delay = 0,
+      SeqInvalidStepPolicy invalidStepPolicy = SeqInvalidStepPolicy::StartAnyway) {
+    return Plan::targetRawByStepFixed(targetRaw, stepFixed, delay, invalidStepPolicy);
   }
 };
 
@@ -137,58 +207,82 @@ class SeqFixedPointAutomation {
  public:
   static constexpr ValueType kScale = static_cast<ValueType>(1) << FractionBits;
 
+  explicit SeqFixedPointAutomation(SeqFixedPointPolicy policy = {}) : m_policy(policy) {}
+
   static constexpr ValueType toFixed(ValueType rawValue) {
-    return rawValue << FractionBits;
+    return rawValue * kScale;
   }
 
   static constexpr ValueType toRaw(ValueType fixedValue) {
-    return fixedValue >> FractionBits;
+    return fixedToRaw(fixedValue, SeqFixedPointRounding::Floor);
   }
+
+  void setPolicy(SeqFixedPointPolicy policy) { m_policy = policy; }
+  [[nodiscard]] SeqFixedPointPolicy policy() const { return m_policy; }
 
   void reset(ValueType rawCurrent = {}) { m_value.reset(toFixed(rawCurrent)); }
   void jumpToRaw(ValueType rawCurrent) { m_value.jumpTo(toFixed(rawCurrent)); }
-  void setAccumulatorFixed(ValueType fixedCurrent) { m_value.setAccumulator(fixedCurrent); }
+  void setCurrentFixedPreservingMotion(ValueType fixedCurrent) {
+    m_value.setCurrentPreservingMotion(fixedCurrent);
+  }
   void clearMotion() { m_value.clearMotion(); }
 
   [[nodiscard]] bool active() const { return m_value.active(); }
   [[nodiscard]] ValueType currentFixed() const { return m_value.current(); }
-  [[nodiscard]] ValueType currentRaw() const { return toRaw(m_value.current()); }
+  [[nodiscard]] ValueType currentRaw() const { return rawFromFixed(m_value.current()); }
   [[nodiscard]] ValueType targetFixed() const { return m_value.target(); }
-  [[nodiscard]] ValueType targetRaw() const { return toRaw(m_value.target()); }
+  [[nodiscard]] ValueType targetRaw() const { return rawFromFixed(m_value.target()); }
   [[nodiscard]] ValueType step() const { return m_value.step(); }
   [[nodiscard]] uint32_t ticksRemaining() const { return m_value.ticksRemaining(); }
   [[nodiscard]] bool usesTicks() const { return m_value.usesTicks(); }
 
-  [[nodiscard]] ValueType currentRawFixed() const {
+  [[nodiscard]] ValueType quantizedCurrentFixed() const {
     return toFixed(currentRaw());
   }
 
-  [[nodiscard]] ValueType stepToRawTarget(ValueType rawTarget, uint32_t ticks) const {
+  [[nodiscard]] ValueType currentFixedForNewMotion() const {
+    return m_policy.retarget == SeqFixedPointRetarget::PreserveAccumulator
+        ? currentFixed()
+        : quantizedCurrentFixed();
+  }
+
+  [[nodiscard]] ValueType rawFromFixed(ValueType fixedValue) const {
+    return fixedToRaw(fixedValue, m_policy.rounding);
+  }
+
+  [[nodiscard]] ValueType stepFixedToTargetRaw(ValueType targetRaw, uint32_t ticks) const {
     if (ticks == 0) {
       return {};
     }
-    return static_cast<ValueType>((toFixed(rawTarget) - currentRawFixed()) /
+    return static_cast<ValueType>((toFixed(targetRaw) - currentFixedForNewMotion()) /
                                   static_cast<ValueType>(ticks));
   }
 
-  SeqMotionTick<ValueType> begin(const SeqMotionPlan<ValueType>& rawMotion) {
-    m_value.setAccumulator(currentRawFixed());
+  SeqMotionTick<ValueType> begin(const SeqFixedPointMotionPlan<ValueType, FractionBits>& rawMotion) {
+    m_value.setCurrentPreservingMotion(currentFixedForNewMotion());
 
-    SeqMotionPlan<ValueType> fixedMotion = rawMotion;
-    fixedMotion.target = toFixed(rawMotion.target);
+    SeqMotionPlan<ValueType> fixedMotion {
+        toFixed(rawMotion.targetRaw),
+        rawMotion.stepFixed,
+        rawMotion.ticks,
+        rawMotion.delay,
+        rawMotion.mode,
+        rawMotion.invalidStepPolicy,
+    };
     if (rawMotion.mode == SeqMotionMode::TargetOverTicks) {
       fixedMotion.mode = SeqMotionMode::TargetOverTicksWithStep;
-      fixedMotion.step = stepToRawTarget(rawMotion.target, rawMotion.ticks);
+      fixedMotion.step = stepFixedToTargetRaw(rawMotion.targetRaw, rawMotion.ticks);
     }
 
     return m_value.begin(fixedMotion);
   }
 
   template <typename ApplyRaw>
-  SeqMotionTick<ValueType> begin(const SeqMotionPlan<ValueType>& rawMotion, ApplyRaw&& applyRaw) {
+  SeqMotionTick<ValueType> begin(const SeqFixedPointMotionPlan<ValueType, FractionBits>& rawMotion,
+                                 ApplyRaw&& applyRaw) {
     const auto motionTick = begin(rawMotion);
     if (motionTick.status == SeqMotionStatus::Finished && motionTick.changed) {
-      std::forward<ApplyRaw>(applyRaw)(toRaw(motionTick.current));
+      std::forward<ApplyRaw>(applyRaw)(rawFromFixed(motionTick.current));
     }
     return motionTick;
   }
@@ -199,7 +293,7 @@ class SeqFixedPointAutomation {
   SeqMotionTick<ValueType> tickRaw(ApplyRaw&& applyRaw, bool applyDelayedStep = false) {
     const auto motionTick = tick();
     if (motionTick.shouldApply(applyDelayedStep)) {
-      std::forward<ApplyRaw>(applyRaw)(toRaw(motionTick.current));
+      std::forward<ApplyRaw>(applyRaw)(rawFromFixed(motionTick.current));
     }
     return motionTick;
   }
@@ -218,7 +312,28 @@ class SeqFixedPointAutomation {
   }
 
  private:
+  static constexpr ValueType fixedToRaw(ValueType fixedValue, SeqFixedPointRounding rounding) {
+    if (rounding == SeqFixedPointRounding::TowardZero) {
+      return fixedValue / kScale;
+    }
+
+    if (rounding == SeqFixedPointRounding::Nearest) {
+      const ValueType halfScale = kScale / 2;
+      return fixedValue >= ValueType {}
+          ? static_cast<ValueType>((fixedValue + halfScale) / kScale)
+          : static_cast<ValueType>((fixedValue - halfScale) / kScale);
+    }
+
+    if (fixedValue >= ValueType {}) {
+      return fixedValue / kScale;
+    }
+
+    return static_cast<ValueType>(-((static_cast<ValueType>(-fixedValue) + kScale - 1) /
+                                   kScale));
+  }
+
   SeqAutomatedValue<ValueType> m_value;
+  SeqFixedPointPolicy m_policy;
 };
 
 }  // namespace vgmtrans::seq

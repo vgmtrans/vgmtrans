@@ -22,12 +22,28 @@ enum class SeqMotionMode {
   TargetByStep,
 };
 
+enum class SeqMotionStepDirection {
+  NotStepMotion,
+  TowardTarget,
+  AlreadyAtTarget,
+  ZeroStep,
+  AwayFromTarget,
+};
+
+enum class SeqInvalidStepPolicy {
+  Reject,
+  StartAnyway,
+  SnapToTarget,
+};
+
 template <typename ValueType>
 struct SeqMotionTick {
   SeqMotionStatus status = SeqMotionStatus::Inactive;
   ValueType previous {};
   ValueType current {};
   bool changed = false;
+  SeqMotionStepDirection stepDirection = SeqMotionStepDirection::NotStepMotion;
+  bool rejected = false;
 
   [[nodiscard]] bool active() const {
     return status != SeqMotionStatus::Inactive;
@@ -45,6 +61,7 @@ struct SeqMotionPlan {
   uint32_t ticks = 0;
   uint32_t delay = 0;
   SeqMotionMode mode = SeqMotionMode::TargetOverTicks;
+  SeqInvalidStepPolicy invalidStepPolicy = SeqInvalidStepPolicy::Reject;
 
   static SeqMotionPlan targetOverTicks(ValueType targetValue,
                                        uint32_t tickCount,
@@ -61,8 +78,15 @@ struct SeqMotionPlan {
 
   static SeqMotionPlan targetByStep(ValueType targetValue,
                                     ValueType stepValue,
-                                    uint32_t delayTicks = 0) {
-    return {targetValue, stepValue, 0, delayTicks, SeqMotionMode::TargetByStep};
+                                    uint32_t delayTicks = 0,
+                                    SeqInvalidStepPolicy invalidStepPolicy =
+                                        SeqInvalidStepPolicy::Reject) {
+    return {targetValue,
+            stepValue,
+            0,
+            delayTicks,
+            SeqMotionMode::TargetByStep,
+            invalidStepPolicy};
   }
 
   [[nodiscard]] bool usesTicks() const {
@@ -87,7 +111,7 @@ class SeqLinearMotion {
     clear();
   }
 
-  void setAccumulator(ValueType current) {
+  void setCurrentPreservingMotion(ValueType current) {
     m_current = current;
   }
 
@@ -132,15 +156,35 @@ class SeqLinearMotion {
     }
 
     m_step = plan.step;
-    if (!stepCanReachTarget()) {
-      jumpTo(plan.target);
-      return {SeqMotionStatus::Finished, previous, m_current, m_current != previous};
+    const auto stepDirection = directionToTarget(plan.target, plan.step);
+    if (stepDirection != SeqMotionStepDirection::TowardTarget) {
+      if (stepDirection == SeqMotionStepDirection::AlreadyAtTarget) {
+        clear();
+        return {SeqMotionStatus::Finished, previous, m_current, false, stepDirection};
+      }
+
+      if (plan.invalidStepPolicy == SeqInvalidStepPolicy::SnapToTarget ||
+          (plan.invalidStepPolicy == SeqInvalidStepPolicy::StartAnyway &&
+           stepDirection == SeqMotionStepDirection::ZeroStep)) {
+        jumpTo(plan.target);
+        return {SeqMotionStatus::Finished,
+                previous,
+                m_current,
+                m_current != previous,
+                stepDirection};
+      }
+
+      if (plan.invalidStepPolicy == SeqInvalidStepPolicy::Reject) {
+        clear();
+        return {SeqMotionStatus::Inactive, previous, m_current, false, stepDirection, true};
+      }
     }
 
     return {plan.delay != 0 ? SeqMotionStatus::Delayed : SeqMotionStatus::Running,
             previous,
             m_current,
-            false};
+            false,
+            stepDirection};
   }
 
   [[nodiscard]] bool active() const {
@@ -196,13 +240,19 @@ class SeqLinearMotion {
   }
 
  private:
-  [[nodiscard]] bool stepCanReachTarget() const {
-    if (m_current == m_target || m_step == ValueType {}) {
-      return false;
+  [[nodiscard]] SeqMotionStepDirection directionToTarget(ValueType target, ValueType step) const {
+    if (m_current == target) {
+      return SeqMotionStepDirection::AlreadyAtTarget;
+    }
+    if (step == ValueType {}) {
+      return SeqMotionStepDirection::ZeroStep;
     }
 
-    return (m_target > m_current && m_step > ValueType {}) ||
-           (m_target < m_current && m_step < ValueType {});
+    if ((target > m_current && step > ValueType {}) ||
+        (target < m_current && step < ValueType {})) {
+      return SeqMotionStepDirection::TowardTarget;
+    }
+    return SeqMotionStepDirection::AwayFromTarget;
   }
 
   ValueType m_current {};
