@@ -425,7 +425,6 @@ void NinSnesSeq::setImmediateTempo(uint8_t newTempo) {
 }
 
 void NinSnesSeq::startTempoFade(uint8_t fadeLength, uint8_t targetTempo) {
-  tempoFade.setCurrent(tempo);
   tempoFade.startToTarget(targetTempo, fadeLength);
 }
 

@@ -11,8 +11,7 @@ uint8_t convertVibratoDepthToMidi(uint8_t depth, double maxDepthCents) {
     return 0;
   }
 
-  const int midiValue = static_cast<int>(
-      std::lround(128.0 * nin_snes::vibrato::depthCents(depth) / maxDepthCents));
+  const int midiValue = static_cast<int>(std::lround(128.0 * nin_snes::vibrato::depthCents(depth) / maxDepthCents));
   return static_cast<uint8_t>(std::clamp(midiValue, 0, 127));
 }
 
@@ -22,9 +21,7 @@ uint8_t convertVibratoRateToMidi(uint8_t rate, double tempo, double maxRateHz) {
     return 0;
   }
 
-  return midiValueForHertzInRange(currentRateHz,
-                                  nin_snes::vibrato::kMinRateHz,
-                                  maxRateHz);
+  return midiValueForHertzInRange(currentRateHz, nin_snes::vibrato::kMinRateHz, maxRateHz);
 }
 
 uint8_t convertVibratoDelayToMidi(uint8_t delay, double tempo) {
@@ -49,12 +46,11 @@ void NinSnesTrack::applyConfiguredVibrato() {
     auto& parentSeq = seq();
     if (readMode != READMODE_CONVERT_TO_MIDI) {
       parentSeq.maxVibratoDepthCents =
-          std::max(parentSeq.maxVibratoDepthCents,
-                   nin_snes::vibrato::depthCents(vibrato.depth()));
+          std::max(parentSeq.maxVibratoDepthCents, nin_snes::vibrato::depthCents(vibrato.depth()));
     }
   }
 
-  setVibratoDepth(active ? vibrato.depth() : 0);
+  setVibratoDepth(vibrato.outputDepthWhen(active));
   if (active) {
     syncVibratoRateAndDelay();
   } else {
@@ -92,12 +88,10 @@ void NinSnesTrack::syncVibratoRateAndDelay() {
     // Rate and delay are both tempo-relative, so a sequence-specific max only makes sense once the
     // current tempo has been folded into the exported Hz value.
     parentSeq.maxVibratoRateHz =
-        std::max(parentSeq.maxVibratoRateHz,
-                 nin_snes::vibrato::rateHz(vibrato.rate(), currentTempo));
+        std::max(parentSeq.maxVibratoRateHz, nin_snes::vibrato::rateHz(vibrato.rate(), currentTempo));
   }
 
-  addChannelPressureNoItem(convertVibratoRateToMidi(vibrato.rate(), currentTempo,
-                                                    parentSeq.maxVibratoRateHz));
+  addChannelPressureNoItem(convertVibratoRateToMidi(vibrato.rate(), currentTempo, parentSeq.maxVibratoRateHz));
   addControllerEventNoItem(nin_snes::vibrato::kDelayController,
                            convertVibratoDelayToMidi(vibrato.delay(), currentTempo));
 }

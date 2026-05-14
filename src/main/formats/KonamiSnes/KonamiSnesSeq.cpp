@@ -1067,7 +1067,6 @@ bool KonamiSnesTrack::readEvent() {
       }
 
       vibrato.configure(newVibratoDelay, newVibratoRate, newVibratoDepth);
-      vibrato.clearReusableFade();
       if (builtInFadeLength != 0) {
         vibrato.setReusableFadeToConfiguredDepth(builtInFadeLength, 8);
       }

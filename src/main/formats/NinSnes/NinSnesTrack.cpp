@@ -439,7 +439,6 @@ bool NinSnesTrack::handleControllerEvent(NinSnesSeqEventType eventType, uint32_t
       const uint8_t vibratoRate = readByte(curOffset++);
       const uint8_t vibratoDepth = readByte(curOffset++);
       vibrato.configure(vibratoDelay, vibratoRate, vibratoDepth);
-      vibrato.clearReusableFade();
       desc = fmt::format("Delay: {:d}  Rate: {:d}  Depth: {:d}", vibrato.delay(), vibrato.rate(),
                          vibrato.depth());
       addGenericEvent(beginOffset, curOffset - beginOffset, "Vibrato", desc, Type::Vibrato);
@@ -450,8 +449,7 @@ bool NinSnesTrack::handleControllerEvent(NinSnesSeqEventType eventType, uint32_t
     case EVENT_VIBRATO_OFF:
       state.vibrato.clearConfig();
       addGenericEvent(beginOffset, curOffset - beginOffset, "Vibrato Off", desc, Type::Vibrato);
-      addModulationNoItem(0);
-      clearVibratoRateAndDelay();
+      applyConfiguredVibrato();
       return true;
 
     case EVENT_MASTER_VOLUME: {
