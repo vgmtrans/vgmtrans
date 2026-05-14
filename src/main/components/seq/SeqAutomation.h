@@ -121,12 +121,12 @@ class SeqMotionPreset {
 
 template <typename ValueType, unsigned FractionBits = 8>
 struct SeqFixedPointMotionPlan {
+  // Targets are raw controller values; steps are fixed-point deltas.
   ValueType targetRaw {};
   ValueType stepFixed {};
   uint32_t ticks = 0;
   uint32_t delay = 0;
   SeqMotionMode mode = SeqMotionMode::TargetOverTicks;
-  SeqInvalidStepPolicy invalidStepPolicy = SeqInvalidStepPolicy::Reject;
 
   static SeqFixedPointMotionPlan targetRawOverTicks(ValueType targetValue,
                                                     uint32_t tickCount,
@@ -148,14 +148,12 @@ struct SeqFixedPointMotionPlan {
   static SeqFixedPointMotionPlan targetRawByStepFixed(
       ValueType targetValue,
       ValueType stepValue,
-      uint32_t delayTicks = 0,
-      SeqInvalidStepPolicy invalidStepPolicy = SeqInvalidStepPolicy::Reject) {
+      uint32_t delayTicks = 0) {
     return {targetValue,
             stepValue,
             0,
             delayTicks,
-            SeqMotionMode::TargetByStep,
-            invalidStepPolicy};
+            SeqMotionMode::TargetByStep};
   }
 
   [[nodiscard]] bool usesTicks() const {
@@ -196,9 +194,8 @@ struct SeqFixedPointMotion {
   static Plan toRawTargetByFixedStep(
       ValueType targetRaw,
       ValueType stepFixed,
-      uint32_t delay = 0,
-      SeqInvalidStepPolicy invalidStepPolicy = SeqInvalidStepPolicy::StartAnyway) {
-    return Plan::targetRawByStepFixed(targetRaw, stepFixed, delay, invalidStepPolicy);
+      uint32_t delay = 0) {
+    return Plan::targetRawByStepFixed(targetRaw, stepFixed, delay);
   }
 };
 
@@ -267,7 +264,6 @@ class SeqFixedPointAutomation {
         rawMotion.ticks,
         rawMotion.delay,
         rawMotion.mode,
-        rawMotion.invalidStepPolicy,
     };
     if (rawMotion.mode == SeqMotionMode::TargetOverTicks) {
       fixedMotion.mode = SeqMotionMode::TargetOverTicksWithStep;
