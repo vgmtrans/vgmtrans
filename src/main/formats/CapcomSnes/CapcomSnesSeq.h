@@ -1,6 +1,6 @@
 #pragma once
 #include "VGMSeq.h"
-#include "SeqMotionLanes.h"
+#include "SeqMidiAutomation.h"
 #include "SeqTrack.h"
 #include "SeqEvent.h"
 #include "CapcomSnesFormat.h"
@@ -120,8 +120,8 @@ class CapcomSnesTrack
   bool lastNoteSlurred;
   bool didRest;
   int8_t lastKey;
-  SynthLfoLane vibrato;
-  SynthLfoLane tremolo;
+  vgmtrans::seq::SeqSynthLfoAutomation vibrato;
+  vgmtrans::seq::SeqSynthLfoAutomation tremolo;
   uint16_t lastPortamentoTime;
   double portamentoMillisecondsPerCent;
 
