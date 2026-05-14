@@ -120,8 +120,8 @@ class CapcomSnesTrack
   bool lastNoteSlurred;
   bool didRest;
   int8_t lastKey;
-  vgmtrans::seq::SeqSynthLfoAutomation vibrato;
-  vgmtrans::seq::SeqSynthLfoAutomation tremolo;
+  SeqSynthLfoAutomation vibrato;
+  SeqSynthLfoAutomation tremolo;
   uint16_t lastPortamentoTime;
   double portamentoMillisecondsPerCent;
 

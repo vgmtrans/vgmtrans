@@ -505,7 +505,6 @@ target_sources(vgmtranscore
       components/seq/SeqAutomation.h
       components/seq/SeqMidiAutomation.h
       components/seq/SeqMotion.h
-      components/seq/SeqMotionLanes.h
       components/seq/SeqSlider.h
       components/seq/SeqTrack.h
       components/seq/VGMSeq.h

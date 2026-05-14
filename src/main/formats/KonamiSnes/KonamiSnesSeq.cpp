@@ -19,8 +19,8 @@ constexpr uint16_t SEQ_PPQN = 48;
 constexpr uint16_t KONAMI_SNES_STD_PITCH_BEND_RANGE_CENTS = 200;
 constexpr uint8_t KONAMI_SNES_DEFAULT_TEMPO = 0xff;
 
-using KonamiControllerMotion = vgmtrans::seq::SeqFixedPointMotion<int32_t>;
-using KonamiPitchMotion = vgmtrans::seq::SeqMotionPlan<double>;
+using KonamiControllerMotion = SeqFixedPointMotion<int32_t>;
+using KonamiPitchMotion = SeqMotionPlan<double>;
 
 constexpr uint8_t noteDurationRateMax(KonamiSnesVersion version) {
   return version == KONAMISNES_V1 ? 100 : 127;

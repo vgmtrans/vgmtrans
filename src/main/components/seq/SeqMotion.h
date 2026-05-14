@@ -7,8 +7,6 @@
 
 #include <cstdint>
 
-namespace vgmtrans::seq {
-
 enum class SeqMotionStatus {
   Inactive,
   Delayed,
@@ -207,5 +205,3 @@ class SeqLinearMotion {
   uint32_t m_ticksRemaining = 0;
   SeqMotionMode m_mode = SeqMotionMode::TargetOverTicks;
 };
-
-}  // namespace vgmtrans::seq

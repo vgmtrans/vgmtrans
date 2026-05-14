@@ -11,8 +11,6 @@
 #include <cstdint>
 #include <utility>
 
-namespace vgmtrans::seq {
-
 template <typename PitchType>
 class SeqPitchBendAutomation {
  public:
@@ -310,5 +308,3 @@ class SeqSynthLfoAutomation {
   SeqMotionPreset<int32_t> m_reusableFade;
   SeqCachedEmitter<uint8_t> m_midiDepth;
 };
-
-}  // namespace vgmtrans::seq

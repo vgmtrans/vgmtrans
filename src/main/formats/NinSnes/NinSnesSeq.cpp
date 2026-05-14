@@ -17,7 +17,7 @@ constexpr size_t MAX_TRACKS = kNinSnesTrackCount;
 constexpr uint16_t kNinSnesDefaultPitchBendRangeCents =
     NinSnesTrackState::kDefaultPitchBendRangeCents;
 
-using NinSnesControllerMotion = vgmtrans::seq::SeqFixedPointMotion<int32_t>;
+using NinSnesControllerMotion = SeqFixedPointMotion<int32_t>;
 
 }  // namespace
 
