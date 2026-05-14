@@ -242,7 +242,6 @@ private:
   void addPitchSlideEvent(const PitchSlideEvent& slide);
   void beginPitchSlide(const PitchSlideEvent& slide);
   void activatePitchMotion(uint8_t delay, uint8_t length, int32_t targetPitch);
-  void clearActivePitchSlide();
   void updatePitchSlide();
   void beginNotePitch(uint8_t note);
   void activateStoredPitchEnvelope();

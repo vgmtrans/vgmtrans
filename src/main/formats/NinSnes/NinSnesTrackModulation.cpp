@@ -77,7 +77,7 @@ void NinSnesTrack::addPitchSlideEvent(const PitchSlideEvent& slide) {
 }
 
 void NinSnesTrack::beginPitchSlide(const PitchSlideEvent& slide) {
-  clearActivePitchSlide();
+  state.pitch.clearMotion();
   activatePitchMotion(slide.delay, slide.length, notePitch(slide.targetNote));
 }
 
@@ -95,10 +95,6 @@ void NinSnesTrack::activatePitchMotion(uint8_t delay, uint8_t length, int32_t ta
       pitch.motionToTarget(targetPitch, length, delay),
       pitch.rangeCentsForSlide(currentPitch, targetPitch, kNinSnesDefaultPitchBendRangeCents),
       true);
-}
-
-void NinSnesTrack::clearActivePitchSlide() {
-  state.pitch.clearMotion();
 }
 
 void NinSnesTrack::updatePitchSlide() {
@@ -179,7 +175,7 @@ void NinSnesTrack::clearVibratoRateAndDelay() {
 }
 
 void NinSnesTrack::resetPitchBendForNewNote() {
-  clearActivePitchSlide();
+  state.pitch.clearMotion();
   state.pitch.invalidateBase();
   if (state.pitch.atRest(kNinSnesDefaultPitchBendRangeCents)) {
     return;
