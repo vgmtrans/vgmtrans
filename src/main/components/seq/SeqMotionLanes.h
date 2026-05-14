@@ -533,12 +533,7 @@ class PitchBendLane {
 class SynthLfoLane {
  public:
   void reset() {
-    m_delay = 0;
-    m_rate = 0;
-    m_depth = 0;
-    m_fade.reset();
-    m_fadeLength = 0;
-    m_fadeStep = 0;
+    clearConfig();
     m_midiDepth = 0;
   }
 
@@ -546,15 +541,12 @@ class SynthLfoLane {
     m_delay = delay;
     m_rate = rate;
     m_depth = depth;
+    clearReusableFade();
   }
 
   void clearConfig() {
-    m_delay = 0;
-    m_rate = 0;
-    m_depth = 0;
-    clearReusableFade();
-    setCurrentDepth(0);
-    m_midiDepth = 0;
+    configure(0, 0, 0);
+    m_fade.reset();
   }
 
   [[nodiscard]] bool active() const { return m_rate != 0 && m_depth != 0; }
