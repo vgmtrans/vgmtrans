@@ -32,17 +32,15 @@ class SeqPitchBendAutomation {
   void beginNote(PitchType basePitch) {
     m_baseValid = true;
     m_basePitch = basePitch;
-    m_pitch.jumpTo(basePitch);
+    m_pitch.setCurrent(basePitch);
   }
 
   void invalidateBase() { m_baseValid = false; }
   [[nodiscard]] bool baseValid() const { return m_baseValid; }
 
   void clearMotion() { m_pitch.clearMotion(); }
-  void jumpToPitch(PitchType pitch) { m_pitch.jumpTo(pitch); }
-  void setCurrentPitchPreservingMotion(PitchType pitch) {
-    m_pitch.setCurrentPreservingMotion(pitch);
-  }
+  void setCurrentPitch(PitchType pitch) { m_pitch.setCurrent(pitch); }
+  void setCurrentPitchPreservingMotion(PitchType pitch) { m_pitch.setCurrentPreservingMotion(pitch); }
 
   [[nodiscard]] PitchType basePitch() const { return m_basePitch; }
   [[nodiscard]] PitchType currentPitch() const { return m_pitch.current(); }
@@ -254,7 +252,7 @@ class SeqSynthLfoAutomation {
       return;
     }
 
-    m_fade.jumpTo(initialDepth);
+    m_fade.setCurrent(initialDepth);
     m_fade.begin(m_reusableFade.instantiate(targetDepth, delay));
   }
 

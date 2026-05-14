@@ -162,7 +162,7 @@ void KonamiSnesSeq::resetVars(void) {
 
   // The driver starts from tempo/speed FF unless the sequence overrides it.
   tempo = KONAMI_SNES_DEFAULT_TEMPO;
-  tempoFade.jumpToRaw(tempo);
+  tempoFade.setCurrentRaw(tempo);
   tempoFadeLastUpdatedTime = static_cast<uint32_t>(-1);
 }
 
@@ -367,8 +367,8 @@ void KonamiSnesTrack::resetVars(void) {
 
   seqTuningCents = 0.0;
 
-  panFade.jumpToRaw(defaultPanValue());
-  volumeFade.jumpToRaw(0xff);
+  panFade.setCurrentRaw(defaultPanValue());
+  volumeFade.setCurrentRaw(0xff);
   pitchSlide.reset(KONAMI_SNES_STD_PITCH_BEND_RANGE_CENTS);
   vibrato.reset();
 }
@@ -800,7 +800,7 @@ void KonamiSnesTrack::addUnknownEvent(uint32_t beginOffset, uint8_t statusByte, 
 }
 
 void KonamiSnesTrack::resetPanAfterProgramChange() {
-  panFade.jumpToRaw(defaultPanValue());
+  panFade.setCurrentRaw(defaultPanValue());
   addPanNoItem(64); // TODO: apply true pan from instrument table
 }
 
@@ -1044,7 +1044,7 @@ bool KonamiSnesTrack::readEvent() {
       }
       else {
         newPan = clampPanValue(newPan);
-        panFade.jumpToRaw(newPan);
+        panFade.setCurrentRaw(newPan);
         const uint8_t midiPan = convertPanValueToMidiPan(newPan);
         // TODO: apply volume scale
         addPan(beginOffset, curOffset - beginOffset, midiPan);
@@ -1207,7 +1207,7 @@ bool KonamiSnesTrack::readEvent() {
       // actual Konami engine has tempo for each tracks,
       // here we set the song speed as a global tempo
       uint8_t newTempo = readByte(curOffset++);
-      parentSeq.tempoFade.jumpToRaw(newTempo);
+      parentSeq.tempoFade.setCurrentRaw(newTempo);
       parentSeq.tempo = newTempo;
       addTempoBPM(beginOffset, curOffset - beginOffset, parentSeq.getTempoInBPM(newTempo));
       if (konami_snes::usesLegacyVibrato(parentSeq.version)) {
@@ -1248,7 +1248,7 @@ bool KonamiSnesTrack::readEvent() {
 
     case EVENT_VOLUME: {
       uint8_t newVolume = readByte(curOffset++);
-      volumeFade.jumpToRaw(newVolume);
+      volumeFade.setCurrentRaw(newVolume);
       uint8_t midiVolume = convertPercentAmpToStdMidiVal(newVolume / 255.0);
       addVol(beginOffset, curOffset - beginOffset, midiVolume);
       break;
