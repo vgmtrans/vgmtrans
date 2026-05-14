@@ -90,7 +90,7 @@ void NinSnesTrack::activatePitchMotion(uint8_t delay, uint8_t length, int32_t ta
   // F1/F2 and F9 all reduce to the same live pitch-motion state: wait for an optional delay,
   // advance by a signed 8.8 delta each tick, then snap exactly to the stored target.
   const int32_t currentPitch = pitch.currentPitch();
-  beginPitchBendLaneMotion(
+  beginPitchBendAutomation(
       pitch,
       pitch.motionToTarget(targetPitch, length, delay),
       pitch.rangeCentsForSlide(currentPitch, targetPitch, kNinSnesDefaultPitchBendRangeCents),
@@ -107,7 +107,7 @@ void NinSnesTrack::updatePitchSlide() {
     return;
   }
 
-  advancePitchBendLane(pitch);
+  advancePitchBendAutomation(pitch);
 }
 
 void NinSnesTrack::beginNotePitch(uint8_t note) {
@@ -128,7 +128,7 @@ void NinSnesTrack::activateStoredPitchEnvelope() {
   if (pitchEnvelope.mode == NinSnesTrackState::StoredPitchEnvelope::Mode::To) {
     targetPitch += semitoneOffset;
   } else {
-    state.pitch.setCurrentPitch(state.pitch.basePitch() - semitoneOffset);
+    state.pitch.jumpToPitch(state.pitch.basePitch() - semitoneOffset);
   }
 
   activatePitchMotion(pitchEnvelope.delay, pitchEnvelope.length, targetPitch);
@@ -161,14 +161,14 @@ void NinSnesTrack::applyConfiguredVibrato() {
 }
 
 void NinSnesTrack::updateVibratoFade() {
-  state.vibrato.advanceFadeAndApplyClamped(0, [this](int32_t depth) {
-    setVibratoDepth(static_cast<uint8_t>(depth));
+  advanceSynthLfoFadeToModulation(state.vibrato, 0, [this](int32_t depth) {
+    return convertVibratoDepthToMidi(static_cast<uint8_t>(depth), seq().maxVibratoDepthCents);
   });
 }
 
 void NinSnesTrack::setVibratoDepth(uint8_t depth) {
   auto& vibrato = state.vibrato;
-  vibrato.setCurrentDepth(depth);
+  vibrato.setCurrentDepthPreservingMotion(depth);
   const uint8_t midiDepth = convertVibratoDepthToMidi(depth, seq().maxVibratoDepthCents);
   setSynthLfoModulationDepth(vibrato, midiDepth);
 }
@@ -185,7 +185,7 @@ void NinSnesTrack::resetPitchBendForNewNote() {
     return;
   }
 
-  resetPitchBendLane(state.pitch, kNinSnesDefaultPitchBendRangeCents);
+  resetPitchBendAutomation(state.pitch, kNinSnesDefaultPitchBendRangeCents);
 }
 
 void NinSnesTrack::syncVibratoRateAndDelay() {

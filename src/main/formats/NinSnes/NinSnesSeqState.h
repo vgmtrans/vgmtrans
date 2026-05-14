@@ -3,7 +3,7 @@
 #include <array>
 #include <cstddef>
 #include <cstdint>
-#include "SeqMotionLanes.h"
+#include "SeqMidiAutomation.h"
 
 enum NinSnesSeqEventType {
   // start enum at 1 because if map[] look up fails, it returns 0, and we don't want that to get
@@ -125,9 +125,9 @@ class NinSnesTrackState {
     }
   };
 
-  SynthLfoLane vibrato;
+  vgmtrans::seq::SeqSynthLfoAutomation vibrato;
   StoredPitchEnvelope pitchEnvelope;
-  PitchBendLane<int32_t> pitch {100.0 / 256.0};
+  vgmtrans::seq::SeqPitchBendAutomation<int32_t> pitch {100.0 / 256.0};
 };
 
 struct NinSnesPercussionDef {

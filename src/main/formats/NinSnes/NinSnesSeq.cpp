@@ -17,6 +17,8 @@ constexpr size_t MAX_TRACKS = kNinSnesTrackCount;
 constexpr uint16_t kNinSnesDefaultPitchBendRangeCents =
     NinSnesTrackState::kDefaultPitchBendRangeCents;
 
+using NinSnesControllerMotion = vgmtrans::seq::SeqFixedPointMotion<int32_t>;
+
 }  // namespace
 
 NinSnesSeq::NinSnesSeq(RawFile* file, NinSnesProfileId profile, uint32_t offset,
@@ -424,11 +426,11 @@ double NinSnesSeq::getTempoInBPM(uint8_t tempoValue) {
 
 void NinSnesSeq::setImmediateTempo(uint8_t newTempo) {
   tempo = newTempo;
-  tempoFade.setCurrent(newTempo);
+  tempoFade.jumpToRaw(newTempo);
 }
 
 void NinSnesSeq::startTempoFade(uint8_t fadeLength, uint8_t targetTempo) {
-  tempoFade.startToTarget(targetTempo, fadeLength);
+  tempoFade.begin(NinSnesControllerMotion::toRawTarget(targetTempo, fadeLength));
 }
 
 void NinSnesSeq::syncTempoDependentTracks() {
@@ -439,7 +441,7 @@ void NinSnesSeq::syncTempoDependentTracks() {
 
 void NinSnesSeq::onTickEnd() {
   // EVENT_TEMPO_FADE applies its first tempo step at the end of the tick that parsed the command.
-  tempoFade.advanceAndApplyRawIfChanged([this](int32_t tempoValue) {
+  tempoFade.tickRawChanged([this](int32_t tempoValue) {
     tempo = static_cast<uint8_t>(std::clamp(tempoValue, 0, 0xff));
     if (!aTracks.empty()) {
       aTracks[0]->addTempoBPMNoItem(getTempoInBPM(tempo));
