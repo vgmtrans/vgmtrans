@@ -221,6 +221,10 @@ class SeqSynthLfoAutomation {
     return static_cast<int32_t>(m_depth) << fractionalBits;
   }
 
+  [[nodiscard]] uint8_t outputDepthWhen(bool enabled) const {
+    return enabled ? m_depth : 0;
+  }
+
   [[nodiscard]] int32_t clampToConfiguredDepth(int32_t depth, uint8_t fractionalBits = 0) const {
     return std::min(configuredDepth(fractionalBits), depth);
   }
