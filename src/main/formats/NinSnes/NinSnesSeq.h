@@ -3,7 +3,7 @@
 #include <array>
 #include <optional>
 #include "VGMSeq.h"
-#include "SeqMotionLanes.h"
+#include "SeqAutomation.h"
 #include "SeqTrack.h"
 #include "NinSnesFormat.h"
 #include "NinSnesScanResult.h"
@@ -60,7 +60,7 @@ public:
   uint8_t sectionRepeatCount;
   int8_t globalTranspose;
   uint8_t tempo;
-  FixedPointControllerLane<> tempoFade;
+  vgmtrans::seq::SeqFixedPointAutomation<> tempoFade;
   double maxVibratoDepthCents;
   double maxVibratoRateHz;
   uint32_t dwStartOffset;
