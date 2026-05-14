@@ -147,7 +147,7 @@ class KonamiSnesTrack
 
   struct ControllerFade {
     uint32_t offset;
-    vgmtrans::seq::SeqMotionPlan<int32_t> motion;
+    vgmtrans::seq::SeqFixedPointMotionPlan<int32_t> motion;
   };
 
   std::optional<PitchSlide> consumePitchSlide();

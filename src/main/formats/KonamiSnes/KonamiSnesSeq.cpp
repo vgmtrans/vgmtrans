@@ -608,10 +608,10 @@ KonamiSnesTrack::ControllerFade KonamiSnesTrack::readVolumeFade(KonamiSnesSeqEve
 
 void KonamiSnesTrack::addVolumeFadeEvent(const ControllerFade& fade) {
   const std::string desc = fade.motion.usesTicks()
-      ? fmt::format("Length: {:d}  Target Volume: {:d}", fade.motion.ticks, fade.motion.target)
+      ? fmt::format("Length: {:d}  Target Volume: {:d}", fade.motion.ticks, fade.motion.targetRaw)
       : fmt::format("Target Volume: {:d}  Speed: {:.2f}",
-                    fade.motion.target,
-                    fade.motion.step / 256.0);
+                    fade.motion.targetRaw,
+                    fade.motion.stepFixed / 256.0);
   addGenericEvent(fade.offset, 3, "Volume Fade", desc, Type::VolumeSlide);
 }
 
@@ -692,10 +692,10 @@ KonamiSnesTrack::ControllerFade KonamiSnesTrack::readPanFade(KonamiSnesSeqEventT
 
 void KonamiSnesTrack::addPanFadeEvent(const ControllerFade& fade) {
   const std::string desc = fade.motion.usesTicks()
-      ? fmt::format("Length: {:d}  Target Pan: {:d}", fade.motion.ticks, fade.motion.target)
+      ? fmt::format("Length: {:d}  Target Pan: {:d}", fade.motion.ticks, fade.motion.targetRaw)
       : fmt::format("Target Pan: {:d}  Speed: {:.2f}",
-                    fade.motion.target,
-                    fade.motion.step / 256.0);
+                    fade.motion.targetRaw,
+                    fade.motion.stepFixed / 256.0);
   addGenericEvent(fade.offset, 3, "Pan Fade", desc, Type::PanSlide);
 }
 
@@ -738,10 +738,10 @@ KonamiSnesTrack::ControllerFade KonamiSnesTrack::readTempoFade(KonamiSnesSeqEven
 }
 
 void KonamiSnesTrack::addTempoFadeEvent(const ControllerFade& fade) {
-  const auto bpm = seq().getTempoInBPM(static_cast<uint8_t>(fade.motion.target));
+  const auto bpm = seq().getTempoInBPM(static_cast<uint8_t>(fade.motion.targetRaw));
   const std::string desc = fade.motion.usesTicks()
       ? fmt::format("Length: {:d}  Target BPM: {}", fade.motion.ticks, bpm)
-      : fmt::format("Target BPM: {}  Speed: {:.2f}", bpm, fade.motion.step / 256.0);
+      : fmt::format("Target BPM: {}  Speed: {:.2f}", bpm, fade.motion.stepFixed / 256.0);
   addGenericEvent(fade.offset, 3, "Tempo Fade", desc, Type::Tempo);
 }
 
@@ -1088,7 +1088,7 @@ bool KonamiSnesTrack::readEvent() {
                                                 static_cast<uint16_t>(vibrato.depth()) << 8,
                                                 parentSeq.maxVibratoDepth)
                     : 0);
-      vibrato.setCurrentDepth(deferDepthForFade ? 0 : vibrato.configuredDepth(8));
+      vibrato.setCurrentDepthPreservingMotion(deferDepthForFade ? 0 : vibrato.configuredDepth(8));
       setSynthLfoModulationDepth(vibrato, midiDepth, true);
       if (active) {
         syncVibratoRateAndDelay();
