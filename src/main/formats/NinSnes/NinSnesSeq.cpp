@@ -426,7 +426,7 @@ double NinSnesSeq::getTempoInBPM(uint8_t tempoValue) {
 
 void NinSnesSeq::setImmediateTempo(uint8_t newTempo) {
   tempo = newTempo;
-  tempoFade.jumpToRaw(newTempo);
+  tempoFade.setCurrentRaw(newTempo);
 }
 
 void NinSnesSeq::startTempoFade(uint8_t fadeLength, uint8_t targetTempo) {

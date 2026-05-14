@@ -128,7 +128,7 @@ void NinSnesTrack::activateStoredPitchEnvelope() {
   if (pitchEnvelope.mode == NinSnesTrackState::StoredPitchEnvelope::Mode::To) {
     targetPitch += semitoneOffset;
   } else {
-    state.pitch.jumpToPitch(state.pitch.basePitch() - semitoneOffset);
+    state.pitch.setCurrentPitch(state.pitch.basePitch() - semitoneOffset);
   }
 
   activatePitchMotion(pitchEnvelope.delay, pitchEnvelope.length, targetPitch);

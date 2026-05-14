@@ -14,7 +14,7 @@ template <typename ValueType>
 class SeqAutomatedValue {
  public:
   void reset(ValueType current = {}) { m_motion.reset(current); }
-  void jumpTo(ValueType current) { m_motion.jumpTo(current); }
+  void setCurrent(ValueType current) { m_motion.setCurrent(current); }
   void setCurrentPreservingMotion(ValueType current) {
     m_motion.setCurrentPreservingMotion(current);
   }
@@ -216,7 +216,7 @@ class SeqFixedPointAutomation {
   [[nodiscard]] SeqFixedPointPolicy policy() const { return m_policy; }
 
   void reset(ValueType rawCurrent = {}) { m_value.reset(toFixed(rawCurrent)); }
-  void jumpToRaw(ValueType rawCurrent) { m_value.jumpTo(toFixed(rawCurrent)); }
+  void setCurrentRaw(ValueType rawCurrent) { m_value.setCurrent(toFixed(rawCurrent)); }
   void setCurrentFixedPreservingMotion(ValueType fixedCurrent) {
     m_value.setCurrentPreservingMotion(fixedCurrent);
   }

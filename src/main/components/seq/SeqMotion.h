@@ -80,7 +80,7 @@ class SeqLinearMotion {
     clear();
   }
 
-  void jumpTo(ValueType current) {
+  void setCurrent(ValueType current) {
     m_current = current;
     clear();
   }
@@ -106,7 +106,7 @@ class SeqLinearMotion {
 
     if (plan.mode == SeqMotionMode::TargetOverTicks) {
       if (plan.ticks == 0) {
-        jumpTo(plan.target);
+        setCurrent(plan.target);
         return {SeqMotionStatus::Finished, previous, m_current, m_current != previous};
       }
       m_step = static_cast<ValueType>((plan.target - m_current) /
@@ -119,7 +119,7 @@ class SeqLinearMotion {
 
     if (plan.mode == SeqMotionMode::TargetOverTicksWithStep) {
       if (plan.ticks == 0) {
-        jumpTo(plan.target);
+        setCurrent(plan.target);
         return {SeqMotionStatus::Finished, previous, m_current, m_current != previous};
       }
       m_step = plan.step;
@@ -136,7 +136,7 @@ class SeqLinearMotion {
     }
 
     if (m_step == ValueType {}) {
-      jumpTo(plan.target);
+      setCurrent(plan.target);
       return {SeqMotionStatus::Finished, previous, m_current, m_current != previous};
     }
 
