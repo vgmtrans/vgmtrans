@@ -274,9 +274,11 @@ class SeqFixedPointAutomation {
   template <typename ApplyRaw>
   SeqMotionTick<ValueType> begin(const SeqFixedPointMotionPlan<ValueType, FractionBits>& rawMotion,
                                  ApplyRaw&& applyRaw) {
+    const ValueType previousRaw = currentRaw();
     const auto motionTick = begin(rawMotion);
-    if (motionTick.status == SeqMotionStatus::Finished && motionTick.changed) {
-      std::forward<ApplyRaw>(applyRaw)(rawFromFixed(motionTick.current));
+    const ValueType nextRaw = currentRaw();
+    if (motionTick.status == SeqMotionStatus::Finished && nextRaw != previousRaw) {
+      std::forward<ApplyRaw>(applyRaw)(nextRaw);
     }
     return motionTick;
   }
@@ -285,15 +287,6 @@ class SeqFixedPointAutomation {
 
   template <typename ApplyRaw>
   SeqMotionTick<ValueType> tickRaw(ApplyRaw&& applyRaw, bool applyDelayedStep = false) {
-    const auto motionTick = tick();
-    if (motionTick.shouldApply(applyDelayedStep)) {
-      std::forward<ApplyRaw>(applyRaw)(rawFromFixed(motionTick.current));
-    }
-    return motionTick;
-  }
-
-  template <typename ApplyRaw>
-  SeqMotionTick<ValueType> tickRawChanged(ApplyRaw&& applyRaw, bool applyDelayedStep = false) {
     const ValueType previousRaw = currentRaw();
     const auto motionTick = tick();
     if (motionTick.shouldApply(applyDelayedStep)) {

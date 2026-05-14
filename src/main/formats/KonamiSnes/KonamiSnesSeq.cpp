@@ -673,10 +673,7 @@ KonamiSnesTrack::ControllerFade KonamiSnesTrack::readPanFade(KonamiSnesSeqEventT
 }
 
 void KonamiSnesTrack::applyCurrentPan() {
-  const uint8_t midiPan = convertPanValueToMidiPan(clampPanValue(panFade.currentRaw()));
-  if (midiPan != prevPan) {
-    addPanNoItem(midiPan);
-  }
+  addPanNoItem(convertPanValueToMidiPan(clampPanValue(panFade.currentRaw())));
 }
 
 KonamiSnesTrack::ControllerFade KonamiSnesTrack::readTempoFade(KonamiSnesSeqEventType eventType, uint32_t offset) const {
