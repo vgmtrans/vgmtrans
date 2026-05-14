@@ -6,7 +6,7 @@
 #pragma once
 #include <optional>
 #include "VGMSeq.h"
-#include "SeqMotionLanes.h"
+#include "SeqMidiAutomation.h"
 #include "SeqTrack.h"
 #include "SeqEvent.h"
 #include "KonamiSnesFormat.h"
@@ -78,7 +78,7 @@ class KonamiSnesSeq
   void resetVars() override;
 
   uint8_t tempo;
-  FixedPointControllerLane<> tempoFade;
+  vgmtrans::seq::SeqFixedPointAutomation<> tempoFade;
   uint32_t tempoFadeLastUpdatedTime;
   uint8_t maxVibratoDepth;
   uint16_t maxVibratoRateFactor;
@@ -147,7 +147,7 @@ class KonamiSnesTrack
 
   struct ControllerFade {
     uint32_t offset;
-    ControllerMotionSpec<int32_t> motion;
+    vgmtrans::seq::SeqMotionPlan<int32_t> motion;
   };
 
   std::optional<PitchSlide> consumePitchSlide();
@@ -188,8 +188,8 @@ class KonamiSnesTrack
   KonamiSnesSeq& seq();
   const KonamiSnesSeq& seq() const;
 
-  FixedPointControllerLane<> panFade;
-  FixedPointControllerLane<> volumeFade;
-  PitchBendLane<double> pitchSlide;
-  SynthLfoLane vibrato;
+  vgmtrans::seq::SeqFixedPointAutomation<> panFade;
+  vgmtrans::seq::SeqFixedPointAutomation<> volumeFade;
+  vgmtrans::seq::SeqPitchBendAutomation<double> pitchSlide;
+  vgmtrans::seq::SeqSynthLfoAutomation vibrato;
 };

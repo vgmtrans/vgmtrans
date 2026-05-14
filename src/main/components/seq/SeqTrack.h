@@ -13,6 +13,7 @@
 #include "VGMItem.h"
 #include "VGMSeq.h"
 #include "SeqMotionLanes.h"
+#include "SeqMidiAutomation.h"
 #include <spdlog/common.h>
 #include "LogManager.h"
 #include "SynthType.h"
@@ -353,6 +354,91 @@ private:
                                  addControllerEventNoItem(controller, outputDepth);
                                },
                                force);
+  }
+
+  template <typename PitchType>
+  vgmtrans::seq::SeqMotionTick<PitchType> advancePitchBendAutomation(
+      vgmtrans::seq::SeqPitchBendAutomation<PitchType>& automation) {
+    return automation.tickBend([this](int16_t bend) { addPitchBendNoItem(bend); });
+  }
+
+  template <typename PitchType>
+  bool beginPitchBendAutomation(vgmtrans::seq::SeqPitchBendAutomation<PitchType>& automation,
+                                const vgmtrans::seq::SeqMotionPlan<PitchType>& motion,
+                                uint16_t rangeCents,
+                                uint16_t defaultRangeCents,
+                                bool applyInitialBend = false) {
+    return automation.beginSlide(
+        motion,
+        rangeCents,
+        defaultRangeCents,
+        applyInitialBend,
+        [this](uint16_t newRangeCents) { addPitchBendRangeNoItem(newRangeCents); },
+        [this](int16_t bend) { addPitchBendNoItem(bend); });
+  }
+
+  template <typename PitchType>
+  bool setPitchBendAutomationRange(vgmtrans::seq::SeqPitchBendAutomation<PitchType>& automation,
+                                   uint16_t cents) {
+    return automation.setRange(cents,
+                               [this](uint16_t newRangeCents) {
+                                 addPitchBendRangeNoItem(newRangeCents);
+                               },
+                               [this](int16_t bend) { addPitchBendNoItem(bend); });
+  }
+
+  template <typename PitchType>
+  bool setPitchBendAutomationBend(vgmtrans::seq::SeqPitchBendAutomation<PitchType>& automation,
+                                  int16_t bend) {
+    return automation.setBend(bend, [this](int16_t newBend) { addPitchBendNoItem(newBend); });
+  }
+
+  template <typename PitchType>
+  bool applyPitchBendAutomation(vgmtrans::seq::SeqPitchBendAutomation<PitchType>& automation) {
+    return automation.applyCurrentBend([this](int16_t bend) { addPitchBendNoItem(bend); });
+  }
+
+  template <typename PitchType>
+  void resetPitchBendAutomation(vgmtrans::seq::SeqPitchBendAutomation<PitchType>& automation,
+                                uint16_t defaultRangeCents) {
+    automation.resetRangeAndBend(defaultRangeCents,
+                                 [this](uint16_t newRangeCents) {
+                                   addPitchBendRangeNoItem(newRangeCents);
+                                 },
+                                 [this](int16_t bend) { addPitchBendNoItem(bend); });
+  }
+
+  bool setSynthLfoModulationDepth(vgmtrans::seq::SeqSynthLfoAutomation& automation,
+                                  uint8_t depth,
+                                  bool force = false) {
+    return automation.emitDepth(depth,
+                                [this](uint8_t outputDepth) {
+                                  addModulationNoItem(outputDepth);
+                                },
+                                force);
+  }
+
+  bool setSynthLfoControllerDepth(vgmtrans::seq::SeqSynthLfoAutomation& automation,
+                                  uint8_t controller,
+                                  uint8_t depth,
+                                  bool force = false) {
+    return automation.emitDepth(depth,
+                                [this, controller](uint8_t outputDepth) {
+                                  addControllerEventNoItem(controller, outputDepth);
+                                },
+                                force);
+  }
+
+  template <typename ConvertDepth>
+  vgmtrans::seq::SeqMotionTick<int32_t> advanceSynthLfoFadeToModulation(
+      vgmtrans::seq::SeqSynthLfoAutomation& automation,
+      uint8_t fractionalBits,
+      ConvertDepth&& convertDepth) {
+    return automation.tickFadeToDepth(fractionalBits,
+                                      std::forward<ConvertDepth>(convertDepth),
+                                      [this](uint8_t depth) {
+                                        addModulationNoItem(depth);
+                                      });
   }
 
   void addGlobalTranspose(uint32_t offset, uint32_t length, int8_t semitones, const std::string &sEventName = "Global Transpose");

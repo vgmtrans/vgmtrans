@@ -502,6 +502,9 @@ target_sources(vgmtranscore
     FILES
       components/seq/SeqEvent.h
       components/seq/SeqEventTimeIndex.h
+      components/seq/SeqAutomation.h
+      components/seq/SeqMidiAutomation.h
+      components/seq/SeqMotion.h
       components/seq/SeqMotionLanes.h
       components/seq/SeqSlider.h
       components/seq/SeqTrack.h
