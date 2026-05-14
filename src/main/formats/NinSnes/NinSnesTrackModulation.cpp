@@ -181,6 +181,12 @@ void NinSnesTrack::resetPitchBendForNewNote() {
     return;
   }
 
+  if (state.pitchEnvelope.enabled()) {
+    // Recurring pitch envelopes will set or reuse their needed range below.
+    setPitchBendAutomationBend(state.pitch, 0);
+    return;
+  }
+
   resetPitchBendAutomation(state.pitch, kNinSnesDefaultPitchBendRangeCents);
 }
 
