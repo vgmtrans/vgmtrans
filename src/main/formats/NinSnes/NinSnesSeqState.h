@@ -125,9 +125,9 @@ class NinSnesTrackState {
     }
   };
 
-  vgmtrans::seq::SeqSynthLfoAutomation vibrato;
+  SeqSynthLfoAutomation vibrato;
   StoredPitchEnvelope pitchEnvelope;
-  vgmtrans::seq::SeqPitchBendAutomation<int32_t> pitch {100.0 / 256.0};
+  SeqPitchBendAutomation<int32_t> pitch {100.0 / 256.0};
 };
 
 struct NinSnesPercussionDef {

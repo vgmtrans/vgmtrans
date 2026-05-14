@@ -13,7 +13,6 @@
 #include <vector>
 #include "VGMItem.h"
 #include "VGMSeq.h"
-#include "SeqMotionLanes.h"
 #include "SeqMidiAutomation.h"
 #include <spdlog/common.h>
 #include "LogManager.h"
@@ -320,82 +319,13 @@ private:
   void addControllerEventNoItem(uint8_t controllerType, uint8_t controllerValue) const;
 
   template <typename PitchType>
-  SeqMotionStatus advancePitchBendLane(PitchBendLane<PitchType>& lane) {
-    return lane.advanceAndApplyBend([this](int16_t bend) { addPitchBendNoItem(bend); });
-  }
-
-  template <typename PitchType>
-  bool beginPitchBendLaneMotion(PitchBendLane<PitchType>& lane,
-                                const PitchMotionSpec<PitchType>& motion,
-                                uint16_t rangeCents,
-                                bool applyInitialBend = false) {
-    lane.clearMotion();
-    if (!lane.baseValid() || motion.length == 0) {
-      return false;
-    }
-
-    setPitchBendLaneRange(lane, rangeCents);
-    lane.startMotion(motion);
-    if (applyInitialBend) {
-      applyPitchBendLane(lane);
-    }
-    return true;
-  }
-
-  template <typename PitchType>
-  bool setPitchBendLaneRange(PitchBendLane<PitchType>& lane, uint16_t cents) {
-    return lane.setRange(cents,
-                         [this](uint16_t rangeCents) { addPitchBendRangeNoItem(rangeCents); },
-                         [this](int16_t bend) { addPitchBendNoItem(bend); });
-  }
-
-  template <typename PitchType>
-  bool setPitchBendLaneBend(PitchBendLane<PitchType>& lane, int16_t bend) {
-    return lane.setBend(bend, [this](int16_t newBend) { addPitchBendNoItem(newBend); });
-  }
-
-  template <typename PitchType>
-  bool applyPitchBendLane(PitchBendLane<PitchType>& lane) {
-    return lane.applyCurrentBend([this](int16_t bend) { addPitchBendNoItem(bend); });
-  }
-
-  template <typename PitchType>
-  void resetPitchBendLane(PitchBendLane<PitchType>& lane, uint16_t defaultRangeCents) {
-    lane.resetRangeAndBend(defaultRangeCents,
-                           [this](uint16_t rangeCents) {
-                             addPitchBendRangeNoItem(rangeCents);
-                           },
-                           [this](int16_t bend) { addPitchBendNoItem(bend); });
-  }
-
-  bool setSynthLfoModulationDepth(SynthLfoLane& lane, uint8_t depth, bool force = false) {
-    return lane.setOutputDepth(depth,
-                               [this](uint8_t outputDepth) {
-                                 addModulationNoItem(outputDepth);
-                               },
-                               force);
-  }
-
-  bool setSynthLfoControllerDepth(SynthLfoLane& lane,
-                                  uint8_t controller,
-                                  uint8_t depth,
-                                  bool force = false) {
-    return lane.setOutputDepth(depth,
-                               [this, controller](uint8_t outputDepth) {
-                                 addControllerEventNoItem(controller, outputDepth);
-                               },
-                               force);
-  }
-
-  template <typename PitchType>
-  vgmtrans::seq::SeqMotionTick<PitchType> advancePitchBendAutomation(
-      vgmtrans::seq::SeqPitchBendAutomation<PitchType>& automation) {
+  SeqMotionTick<PitchType> advancePitchBendAutomation(SeqPitchBendAutomation<PitchType>& automation) {
     return automation.tickBend([this](int16_t bend) { addPitchBendNoItem(bend); });
   }
 
   template <typename PitchType>
-  bool beginPitchBendAutomation(vgmtrans::seq::SeqPitchBendAutomation<PitchType>& automation,
-                                const vgmtrans::seq::SeqMotionPlan<PitchType>& motion,
+  bool beginPitchBendAutomation(SeqPitchBendAutomation<PitchType>& automation,
+                                const SeqMotionPlan<PitchType>& motion,
                                 uint16_t rangeCents,
                                 uint16_t defaultRangeCents,
                                 bool applyInitialBend = false) {
@@ -409,7 +339,7 @@ private:
   }
 
   template <typename PitchType>
-  bool setPitchBendAutomationRange(vgmtrans::seq::SeqPitchBendAutomation<PitchType>& automation,
+  bool setPitchBendAutomationRange(SeqPitchBendAutomation<PitchType>& automation,
                                    uint16_t cents) {
     return automation.setRange(cents,
                                [this](uint16_t newRangeCents) {
@@ -419,18 +349,18 @@ private:
   }
 
   template <typename PitchType>
-  bool setPitchBendAutomationBend(vgmtrans::seq::SeqPitchBendAutomation<PitchType>& automation,
+  bool setPitchBendAutomationBend(SeqPitchBendAutomation<PitchType>& automation,
                                   int16_t bend) {
     return automation.setBend(bend, [this](int16_t newBend) { addPitchBendNoItem(newBend); });
   }
 
   template <typename PitchType>
-  bool applyPitchBendAutomation(vgmtrans::seq::SeqPitchBendAutomation<PitchType>& automation) {
+  bool applyPitchBendAutomation(SeqPitchBendAutomation<PitchType>& automation) {
     return automation.applyCurrentBend([this](int16_t bend) { addPitchBendNoItem(bend); });
   }
 
   template <typename PitchType>
-  void resetPitchBendAutomation(vgmtrans::seq::SeqPitchBendAutomation<PitchType>& automation,
+  void resetPitchBendAutomation(SeqPitchBendAutomation<PitchType>& automation,
                                 uint16_t defaultRangeCents) {
     automation.resetRangeAndBend(defaultRangeCents,
                                  [this](uint16_t newRangeCents) {
@@ -439,7 +369,7 @@ private:
                                  [this](int16_t bend) { addPitchBendNoItem(bend); });
   }
 
-  bool setSynthLfoModulationDepth(vgmtrans::seq::SeqSynthLfoAutomation& automation,
+  bool setSynthLfoModulationDepth(SeqSynthLfoAutomation& automation,
                                   uint8_t depth,
                                   bool force = false) {
     return automation.emitDepth(depth,
@@ -449,7 +379,7 @@ private:
                                 force);
   }
 
-  bool setSynthLfoControllerDepth(vgmtrans::seq::SeqSynthLfoAutomation& automation,
+  bool setSynthLfoControllerDepth(SeqSynthLfoAutomation& automation,
                                   uint8_t controller,
                                   uint8_t depth,
                                   bool force = false) {
@@ -461,8 +391,8 @@ private:
   }
 
   template <typename ConvertDepth>
-  vgmtrans::seq::SeqMotionTick<int32_t> advanceSynthLfoFadeToModulation(
-      vgmtrans::seq::SeqSynthLfoAutomation& automation,
+  SeqMotionTick<int32_t> advanceSynthLfoFadeToModulation(
+      SeqSynthLfoAutomation& automation,
       uint8_t fractionalBits,
       ConvertDepth&& convertDepth) {
     return automation.tickFadeToDepth(fractionalBits,

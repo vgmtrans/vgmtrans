@@ -10,8 +10,6 @@
 #include <cstdint>
 #include <utility>
 
-namespace vgmtrans::seq {
-
 template <typename ValueType>
 class SeqAutomatedValue {
  public:
@@ -331,5 +329,3 @@ class SeqFixedPointAutomation {
   SeqAutomatedValue<ValueType> m_value;
   SeqFixedPointPolicy m_policy;
 };
-
-}  // namespace vgmtrans::seq

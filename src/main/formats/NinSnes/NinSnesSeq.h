@@ -60,7 +60,7 @@ public:
   uint8_t sectionRepeatCount;
   int8_t globalTranspose;
   uint8_t tempo;
-  vgmtrans::seq::SeqFixedPointAutomation<> tempoFade;
+  SeqFixedPointAutomation<> tempoFade;
   double maxVibratoDepthCents;
   double maxVibratoRateHz;
   uint32_t dwStartOffset;
