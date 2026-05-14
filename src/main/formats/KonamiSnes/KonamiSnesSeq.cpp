@@ -606,30 +606,12 @@ KonamiSnesTrack::ControllerFade KonamiSnesTrack::readVolumeFade(KonamiSnesSeqEve
   return fade;
 }
 
-void KonamiSnesTrack::addVolumeFadeEvent(const ControllerFade& fade) {
-  const std::string desc = fade.motion.usesTicks()
-      ? fmt::format("Length: {:d}  Target Volume: {:d}", fade.motion.ticks, fade.motion.targetRaw)
-      : fmt::format("Target Volume: {:d}  Speed: {:.2f}",
-                    fade.motion.targetRaw,
-                    fade.motion.stepFixed / 256.0);
-  addGenericEvent(fade.offset, 3, "Volume Fade", desc, Type::VolumeSlide);
-}
-
-void KonamiSnesTrack::clearActiveVolumeFade() {
-  volumeFade.clearMotion();
-}
-
 void KonamiSnesTrack::applyCurrentVolume() {
   const uint8_t rawVolume = static_cast<uint8_t>(std::clamp(volumeFade.currentRaw(), 0, 0xff));
   const uint8_t midiVolume = convertPercentAmpToStdMidiVal(rawVolume / 255.0);
   if (midiVolume != vol) {
     addVolNoItem(midiVolume);
   }
-}
-
-void KonamiSnesTrack::beginVolumeFade(const ControllerFade& fade) {
-  addVolumeFadeEvent(fade);
-  volumeFade.begin(fade.motion, [this](int32_t) { applyCurrentVolume(); });
 }
 
 uint8_t KonamiSnesTrack::defaultPanValue() const {
@@ -690,24 +672,6 @@ KonamiSnesTrack::ControllerFade KonamiSnesTrack::readPanFade(KonamiSnesSeqEventT
   return fade;
 }
 
-void KonamiSnesTrack::addPanFadeEvent(const ControllerFade& fade) {
-  const std::string desc = fade.motion.usesTicks()
-      ? fmt::format("Length: {:d}  Target Pan: {:d}", fade.motion.ticks, fade.motion.targetRaw)
-      : fmt::format("Target Pan: {:d}  Speed: {:.2f}",
-                    fade.motion.targetRaw,
-                    fade.motion.stepFixed / 256.0);
-  addGenericEvent(fade.offset, 3, "Pan Fade", desc, Type::PanSlide);
-}
-
-void KonamiSnesTrack::beginPanFade(const ControllerFade& fade) {
-  addPanFadeEvent(fade);
-  panFade.begin(fade.motion, [this](int32_t) { applyCurrentPan(); });
-}
-
-void KonamiSnesTrack::clearActivePanFade() {
-  panFade.clearMotion();
-}
-
 void KonamiSnesTrack::applyCurrentPan() {
   const uint8_t midiPan = convertPanValueToMidiPan(clampPanValue(panFade.currentRaw()));
   if (midiPan != prevPan) {
@@ -735,23 +699,6 @@ KonamiSnesTrack::ControllerFade KonamiSnesTrack::readTempoFade(KonamiSnesSeqEven
   }
 
   return fade;
-}
-
-void KonamiSnesTrack::addTempoFadeEvent(const ControllerFade& fade) {
-  const auto bpm = seq().getTempoInBPM(static_cast<uint8_t>(fade.motion.targetRaw));
-  const std::string desc = fade.motion.usesTicks()
-      ? fmt::format("Length: {:d}  Target BPM: {}", fade.motion.ticks, bpm)
-      : fmt::format("Target BPM: {}  Speed: {:.2f}", bpm, fade.motion.stepFixed / 256.0);
-  addGenericEvent(fade.offset, 3, "Tempo Fade", desc, Type::Tempo);
-}
-
-void KonamiSnesTrack::beginTempoFade(const ControllerFade& fade) {
-  addTempoFadeEvent(fade);
-  seq().tempoFade.begin(fade.motion, [this](int32_t) { applyCurrentTempo(); });
-}
-
-void KonamiSnesTrack::clearActiveTempoFade() {
-  seq().tempoFade.clearMotion();
 }
 
 void KonamiSnesTrack::applyCurrentTempo() {
@@ -1018,7 +965,7 @@ bool KonamiSnesTrack::readEvent() {
 
     case EVENT_PAN: {
       uint8_t newPan = readByte(curOffset++);
-      clearActivePanFade();
+      panFade.clearMotion();
 
       bool instrumentPanOff;
       bool instrumentPanOn;
@@ -1222,7 +1169,12 @@ bool KonamiSnesTrack::readEvent() {
     case EVENT_TEMPO_FADE_V2: {
       const auto fade = readTempoFade(eventType, beginOffset);
       curOffset += 2;
-      beginTempoFade(fade);
+      const auto bpm = parentSeq.getTempoInBPM(static_cast<uint8_t>(fade.motion.targetRaw));
+      desc = fade.motion.usesTicks()
+          ? fmt::format("Length: {:d}  Target BPM: {}", fade.motion.ticks, bpm)
+          : fmt::format("Target BPM: {}  Speed: {:.2f}", bpm, fade.motion.stepFixed / 256.0);
+      addGenericEvent(fade.offset, 3, "Tempo Fade", desc, Type::Tempo);
+      parentSeq.tempoFade.begin(fade.motion, [this](int32_t) { applyCurrentTempo(); });
       break;
     }
 
@@ -1258,7 +1210,13 @@ bool KonamiSnesTrack::readEvent() {
     case EVENT_VOLUME_FADE_V2: {
       const auto fade = readVolumeFade(eventType, beginOffset);
       curOffset += 2;
-      beginVolumeFade(fade);
+      desc = fade.motion.usesTicks()
+          ? fmt::format("Length: {:d}  Target Volume: {:d}", fade.motion.ticks, fade.motion.targetRaw)
+          : fmt::format("Target Volume: {:d}  Speed: {:.2f}",
+                        fade.motion.targetRaw,
+                        fade.motion.stepFixed / 256.0);
+      addGenericEvent(fade.offset, 3, "Volume Fade", desc, Type::VolumeSlide);
+      volumeFade.begin(fade.motion, [this](int32_t) { applyCurrentVolume(); });
       break;
     }
 
@@ -1367,7 +1325,13 @@ bool KonamiSnesTrack::readEvent() {
     case EVENT_PAN_FADE_V2: {
       const auto fade = readPanFade(eventType, beginOffset);
       curOffset += 2;
-      beginPanFade(fade);
+      desc = fade.motion.usesTicks()
+          ? fmt::format("Length: {:d}  Target Pan: {:d}", fade.motion.ticks, fade.motion.targetRaw)
+          : fmt::format("Target Pan: {:d}  Speed: {:.2f}",
+                        fade.motion.targetRaw,
+                        fade.motion.stepFixed / 256.0);
+      addGenericEvent(fade.offset, 3, "Pan Fade", desc, Type::PanSlide);
+      panFade.begin(fade.motion, [this](int32_t) { applyCurrentPan(); });
       break;
     }
 
