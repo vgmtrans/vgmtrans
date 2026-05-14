@@ -199,6 +199,20 @@ class ControllerLane {
     return step;
   }
 
+  template <typename Apply>
+  SeqMotionStatus advanceAndApplyIfChanged(Apply&& apply, bool applyDelayedStep = false) {
+    const ValueType previous = current();
+    const SeqMotionStatus step = advance();
+    if (step != SeqMotionStatus::Inactive &&
+        (applyDelayedStep || step != SeqMotionStatus::Delayed)) {
+      const ValueType next = current();
+      if (next != previous) {
+        std::forward<Apply>(apply)(next);
+      }
+    }
+    return step;
+  }
+
  private:
   SeqLinearMotion<ValueType> m_motion;
 };
@@ -304,10 +318,28 @@ class FixedPointControllerLane {
   }
 
   template <typename Apply>
+  SeqMotionStatus advanceAndApplyIfChanged(Apply&& apply, bool applyDelayedStep = false) {
+    return m_lane.advanceAndApplyIfChanged(std::forward<Apply>(apply), applyDelayedStep);
+  }
+
+  template <typename Apply>
   SeqMotionStatus advanceAndApplyRaw(Apply&& apply, bool applyDelayedStep = false) {
     return advanceAndApply(
         [apply = std::forward<Apply>(apply)](ValueType currentFixed) mutable {
           apply(toRaw(currentFixed));
+        },
+        applyDelayedStep);
+  }
+
+  template <typename Apply>
+  SeqMotionStatus advanceAndApplyRawIfChanged(Apply&& apply, bool applyDelayedStep = false) {
+    const ValueType previousRaw = currentRaw();
+    return advanceAndApplyIfChanged(
+        [previousRaw, apply = std::forward<Apply>(apply)](ValueType currentFixed) mutable {
+          const ValueType newRaw = toRaw(currentFixed);
+          if (newRaw != previousRaw) {
+            apply(newRaw);
+          }
         },
         applyDelayedStep);
   }

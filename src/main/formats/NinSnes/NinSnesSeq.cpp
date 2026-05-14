@@ -437,15 +437,10 @@ void NinSnesSeq::syncTempoDependentTracks() {
 
 void NinSnesSeq::onTickEnd() {
   // EVENT_TEMPO_FADE applies its first tempo step at the end of the tick that parsed the command.
-  tempoFade.advanceAndApplyRaw([this](int32_t tempoValue) {
-    const auto newTempo = static_cast<uint8_t>(std::clamp(tempoValue, 0, 0xff));
-    if (newTempo == tempo) {
-      return;
-    }
-
-    tempo = newTempo;
+  tempoFade.advanceAndApplyRawIfChanged([this](int32_t tempoValue) {
+    tempo = static_cast<uint8_t>(std::clamp(tempoValue, 0, 0xff));
     if (!aTracks.empty()) {
-      aTracks[0]->addTempoBPMNoItem(getTempoInBPM(newTempo));
+      aTracks[0]->addTempoBPMNoItem(getTempoInBPM(tempo));
     }
     syncTempoDependentTracks();
   });
