@@ -5,6 +5,7 @@
  */
 #pragma once
 
+#include <cstdint>
 #include <sstream>
 #include <unordered_map>
 #include <unordered_set>
@@ -12,7 +13,6 @@
 #include <vector>
 #include "VGMItem.h"
 #include "VGMSeq.h"
-#include "automation/SeqMidiAutomation.h"
 #include <spdlog/common.h>
 #include "LogManager.h"
 #include "SynthType.h"
@@ -20,6 +20,13 @@
 class VGMSeq;
 class SeqEvent;
 class MidiTrack;
+class SeqSynthLfoAutomation;
+template <typename ValueType>
+struct SeqMotionPlan;
+template <typename ValueType>
+struct SeqMotionTick;
+template <typename PitchType>
+class SeqPitchBendAutomation;
 
 enum ReadMode : uint8_t;
 
@@ -150,6 +157,29 @@ protected:
   void pushReturnOffset(uint32_t returnOffset);
   bool popReturnOffset(uint32_t &returnOffset);
   SeqEvent* findSeqEventAtOffset(uint32_t offset, uint32_t length);
+
+  template <typename PitchType>
+  SeqMotionTick<PitchType> advancePitchBendAutomation(SeqPitchBendAutomation<PitchType>& automation);
+  template <typename PitchType>
+  bool beginPitchBendAutomation(SeqPitchBendAutomation<PitchType>& automation,
+                                const SeqMotionPlan<PitchType>& motion, uint16_t rangeCents,
+                                uint16_t defaultRangeCents,
+                                bool applyInitialBend = false);
+  template <typename PitchType>
+  bool setPitchBendAutomationRange(SeqPitchBendAutomation<PitchType>& automation, uint16_t cents);
+  template <typename PitchType>
+  bool setPitchBendAutomationBend(SeqPitchBendAutomation<PitchType>& automation, int16_t bend);
+  template <typename PitchType>
+  bool applyPitchBendAutomation(SeqPitchBendAutomation<PitchType>& automation);
+  template <typename PitchType>
+  void resetPitchBendAutomation(SeqPitchBendAutomation<PitchType>& automation, uint16_t defaultRangeCents);
+  bool setSynthLfoModulationDepth(SeqSynthLfoAutomation& automation, uint8_t depth, bool force = false);
+  bool setSynthLfoControllerDepth(SeqSynthLfoAutomation& automation, uint8_t controller, uint8_t depth,
+                                  bool force = false);
+  template <typename ConvertDepth>
+  SeqMotionTick<int32_t> advanceSynthLfoFadeToModulation(SeqSynthLfoAutomation& automation,
+                                                         uint8_t fractionalBits,
+                                                         ConvertDepth&& convertDepth);
 
 private:
   void addControllerSlide(u32 dur, u16 &prevVal, u16 targVal, uint8_t (*scalerFunc)(uint8_t), void (MidiTrack::*insertFunc)(uint8_t, uint8_t, uint32_t)) const;
@@ -282,99 +312,6 @@ private:
   void addEndOfTrack(uint32_t offset, uint32_t length, const std::string &sEventName = "Track End");
   void addEndOfTrackNoItem();
   void addControllerEventNoItem(uint8_t controllerType, uint8_t controllerValue) const;
-
-  // Advance pitch automation and emit any changed MIDI bend on this track.
-  template <typename PitchType>
-  SeqMotionTick<PitchType> advancePitchBendAutomation(SeqPitchBendAutomation<PitchType>& automation) {
-    return automation.tickBend([this](int16_t bend) { addPitchBendNoItem(bend); });
-  }
-
-  // Start a pitch slide and emit any range or initial bend changes on this track.
-  template <typename PitchType>
-  bool beginPitchBendAutomation(SeqPitchBendAutomation<PitchType>& automation,
-                                const SeqMotionPlan<PitchType>& motion,
-                                uint16_t rangeCents,
-                                uint16_t defaultRangeCents,
-                                bool applyInitialBend = false) {
-    return automation.beginSlide(
-        motion,
-        rangeCents,
-        defaultRangeCents,
-        applyInitialBend,
-        [this](uint16_t newRangeCents) { addPitchBendRangeNoItem(newRangeCents); },
-        [this](int16_t bend) { addPitchBendNoItem(bend); });
-  }
-
-  // Set pitch bend range and emit any bend update required by the new range.
-  template <typename PitchType>
-  bool setPitchBendAutomationRange(SeqPitchBendAutomation<PitchType>& automation,
-                                   uint16_t cents) {
-    return automation.setRange(cents,
-                               [this](uint16_t newRangeCents) {
-                                 addPitchBendRangeNoItem(newRangeCents);
-                               },
-                               [this](int16_t bend) { addPitchBendNoItem(bend); });
-  }
-
-  // Emit a raw MIDI bend if it differs from the automation's cached bend.
-  template <typename PitchType>
-  bool setPitchBendAutomationBend(SeqPitchBendAutomation<PitchType>& automation,
-                                  int16_t bend) {
-    return automation.setBend(bend, [this](int16_t newBend) { addPitchBendNoItem(newBend); });
-  }
-
-  // Emit bend for the automation's current source-space pitch if it changed.
-  template <typename PitchType>
-  bool applyPitchBendAutomation(SeqPitchBendAutomation<PitchType>& automation) {
-    return automation.applyCurrentBend([this](int16_t bend) { addPitchBendNoItem(bend); });
-  }
-
-  // Restore the default bend range and emit centered bend if it changed.
-  template <typename PitchType>
-  void resetPitchBendAutomation(SeqPitchBendAutomation<PitchType>& automation,
-                                uint16_t defaultRangeCents) {
-    automation.resetRangeAndBend(defaultRangeCents,
-                                 [this](uint16_t newRangeCents) {
-                                   addPitchBendRangeNoItem(newRangeCents);
-                                 },
-                                 [this](int16_t bend) { addPitchBendNoItem(bend); });
-  }
-
-  // Emit synth vibrato depth through CC1/modulation if it changed.
-  bool setSynthLfoModulationDepth(SeqSynthLfoAutomation& automation,
-                                  uint8_t depth,
-                                  bool force = false) {
-    return automation.emitDepth(depth,
-                                [this](uint8_t outputDepth) {
-                                  addModulationNoItem(outputDepth);
-                                },
-                                force);
-  }
-
-  // Emit synth LFO depth through the given MIDI controller if it changed.
-  bool setSynthLfoControllerDepth(SeqSynthLfoAutomation& automation,
-                                  uint8_t controller,
-                                  uint8_t depth,
-                                  bool force = false) {
-    return automation.emitDepth(depth,
-                                [this, controller](uint8_t outputDepth) {
-                                  addControllerEventNoItem(controller, outputDepth);
-                                },
-                                force);
-  }
-
-  // Advance an LFO fade and emit the converted CC1/modulation depth if it changed.
-  template <typename ConvertDepth>
-  SeqMotionTick<int32_t> advanceSynthLfoFadeToModulation(
-      SeqSynthLfoAutomation& automation,
-      uint8_t fractionalBits,
-      ConvertDepth&& convertDepth) {
-    return automation.tickFadeToDepth(fractionalBits,
-                                      std::forward<ConvertDepth>(convertDepth),
-                                      [this](uint8_t depth) {
-                                        addModulationNoItem(depth);
-                                      });
-  }
 
   void addGlobalTranspose(uint32_t offset, uint32_t length, int8_t semitones, const std::string &sEventName = "Global Transpose");
   void addMarker(uint32_t offset, uint32_t length, const std::string &markername, uint8_t databyte1, uint8_t databyte2, const std::string &sEventName, int8_t priority = 0, Type type = Type::Misc);

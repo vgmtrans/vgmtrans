@@ -7,6 +7,7 @@
 #include "KonamiSnesInstr.h"
 #include "KonamiSnesVibrato.h"
 #include "ScaleConversion.h"
+#include "automation/SeqTrackAutomation.h"
 #include "spdlog/fmt/fmt.h"
 #include <algorithm>
 #include <cmath>

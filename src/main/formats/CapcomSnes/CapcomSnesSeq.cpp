@@ -8,6 +8,7 @@
 #include "CapcomSnesDefinitions.h"
 #include "Modulation.h"
 #include "ScaleConversion.h"
+#include "automation/SeqTrackAutomation.h"
 
 DECLARE_FORMAT(CapcomSnes);
 
