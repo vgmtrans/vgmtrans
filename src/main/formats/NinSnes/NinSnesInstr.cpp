@@ -5,6 +5,7 @@
  */
 #include "NinSnesInstr.h"
 #include "NinSnesSeq.h"
+#include "NinSnesVibrato.h"
 #include "SNESDSP.h"
 #include "VGMColl.h"
 #include <spdlog/fmt/fmt.h>
@@ -25,6 +26,19 @@ uint32_t getProgramNumber(const VGMInstr* instr) {
 bool usesIntelliTempDrumKitExport(NinSnesProfileId profileId) {
   const auto intelliMode = getNinSnesProfile(profileId).intelliMode;
   return intelliMode == NinSnesIntelliModeId::Ta || intelliMode == NinSnesIntelliModeId::Fe4;
+}
+
+void addVibratoHandling(VGMInstr* instr) {
+  // NinSnes drives vibrato from per-track controllers, so every exportable instrument shares the
+  // same ModWheel/ChannelPressure/CC93 wiring and only the final ranges vary per sequence.
+  instr->addStandardVibratoHandling(nin_snes::vibrato::modulationSpec());
+}
+
+void applyVibratoScaling(NinSnesInstrSet* instrSet, const VibratoModulationSpec& spec) {
+  // Re-target the shared vibrato modulators to the maxima observed in the matched sequence.
+  for (auto* instr : instrSet->exportInstrs()) {
+    instr->updateStandardVibratoHandling(spec);
+  }
 }
 
 VGMInstr* findInstrByProgram(const std::vector<VGMInstr*>& instrs, uint32_t progNum) {
@@ -276,6 +290,7 @@ bool NinSnesInstrSet::parseInstrPointers() {
 void NinSnesInstrSet::useColl(const VGMColl* coll) {
   const auto* seq = dynamic_cast<const NinSnesSeq*>(coll != nullptr ? coll->seq() : nullptr);
   if (seq == nullptr || seq->rawFile() != rawFile() || seq->profileId != profileId) {
+    applyVibratoScaling(this, nin_snes::vibrato::modulationSpec());
     return;
   }
 
@@ -288,6 +303,7 @@ void NinSnesInstrSet::useColl(const VGMColl* coll) {
           overrideDef.progNum >> 7,
           overrideDef.progNum & 0x7f,
           fmt::format("Instrument {:d} (Overwrite)", overrideDef.logicalInstrIndex));
+      addVibratoHandling(overrideInstr);
       auto* rgn =
           createRgnFromHeaderData(overrideInstr, rawFile(), profileId, spcDirAddr, overrideDef.regionData);
       if (rgn == nullptr) {
@@ -301,6 +317,7 @@ void NinSnesInstrSet::useColl(const VGMColl* coll) {
     for (const auto& drumKitDef : seq->intelliTADrumKitDefs()) {
       auto* drumKit = new VGMInstr(
           this, 0, 0, 127, drumKitDef.program, fmt::format("Drum Kit {:d}", drumKitDef.program));
+      addVibratoHandling(drumKit);
 
       for (size_t slot = 0; slot < drumKitDef.slots.size(); slot++) {
         const auto& slotDef = drumKitDef.slots[slot];
@@ -332,6 +349,7 @@ void NinSnesInstrSet::useColl(const VGMColl* coll) {
     if (!percussionInstrNoteMap.empty()) {
       // Create the drumkit instrument for percussion note events.
       auto* drumKit = new VGMInstr(this, 0, 0, 127, 0, "Drum Kit");
+      addVibratoHandling(drumKit);
       for (const auto& [instrIndex, percussionDef] : percussionInstrNoteMap) {
         VGMInstr* sourceInstr = nullptr;
         for (auto* instr : aInstrs) {
@@ -359,9 +377,13 @@ void NinSnesInstrSet::useColl(const VGMColl* coll) {
       }
     }
   }
+
+  applyVibratoScaling(this,
+                            nin_snes::vibrato::modulationSpec(seq->maxVibratoDepthCents, seq->maxVibratoRateHz));
 }
 
 void NinSnesInstrSet::unuseColl() {
+  applyVibratoScaling(this, nin_snes::vibrato::modulationSpec());
 }
 
 // *************
@@ -391,6 +413,8 @@ bool NinSnesInstr::loadInstr() {
   if (offDirEnt + 4 > 0x10000) {
     return false;
   }
+
+  addVibratoHandling(this);
 
   uint16_t addrSampStart = readShort(offDirEnt);
 
