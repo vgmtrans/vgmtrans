@@ -6,7 +6,21 @@
 
 #include <spdlog/fmt/fmt.h>
 #include "AkaoSnesInstr.h"
+#include "AkaoSnesModulation.h"
 #include "SNESDSP.h"
+
+namespace {
+
+void addAkaoSnesV4ModulationExportHandling(VGMInstr *instr, AkaoSnesVersion version) {
+  if (version != AKAOSNES_V4) {
+    return;
+  }
+
+  instr->addStandardVibratoHandling(akao_snes::modulation::vibratoSpec());
+  instr->addStandardTremoloHandling(akao_snes::modulation::tremoloSpec());
+}
+
+}  // namespace
 
 // ****************
 // AkaoSnesInstrSet
@@ -132,6 +146,8 @@ bool AkaoSnesInstr::loadInstr() {
     return false;
   }
 
+  addAkaoSnesV4ModulationExportHandling(this, version);
+
   uint16_t addrSampStart = readShort(offDirEnt);
 
   AkaoSnesRgn *rgn = new AkaoSnesRgn(this, version, addrTuningTable);
@@ -171,6 +187,8 @@ bool AkaoSnesDrumKit::loadInstr() {
   if (offDirEnt + 4 > 0x10000) {
     return false;
   }
+
+  addAkaoSnesV4ModulationExportHandling(this, version);
 
   uint8_t NOTE_DUR_TABLE_SIZE;
   switch (version) {

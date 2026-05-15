@@ -298,6 +298,7 @@ target_sources(vgmtranscore
       formats/Akao/AkaoSeq.h
       formats/AkaoSnes/AkaoSnesFormat.h
       formats/AkaoSnes/AkaoSnesInstr.h
+      formats/AkaoSnes/AkaoSnesModulation.h
       formats/AkaoSnes/AkaoSnesScanner.h
       formats/AkaoSnes/AkaoSnesSeq.h
       formats/AsciiShuichiSnes/AsciiShuichiSnesFormat.h

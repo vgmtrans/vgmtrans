@@ -5,7 +5,9 @@
  */
 #include "AkaoSnesSeq.h"
 #include "AkaoSnesInstr.h"
+#include "AkaoSnesModulation.h"
 #include "ScaleConversion.h"
+#include "automation/SeqTrackAutomation.h"
 #include <spdlog/fmt/fmt.h>
 
 DECLARE_FORMAT(AkaoSnes);
@@ -27,6 +29,7 @@ AkaoSnesSeq::AkaoSnesSeq(RawFile *file,
     : VGMSeq(AkaoSnesFormat::name, file, seqdataOffset, 0, std::move(name)),
       version(ver),
       minorVersion(minorVer),
+      tempo(akao_snes::modulation::kDefaultTempo),
       addrAPURelocBase(addrAPURelocBase),
       addrROMRelocBase(addrAPURelocBase),
       addrSequenceEnd(0) {
@@ -44,6 +47,7 @@ AkaoSnesSeq::~AkaoSnesSeq() {}
 
 void AkaoSnesSeq::resetVars() {
   VGMSeq::resetVars();
+  tempo = akao_snes::modulation::kDefaultTempo;
 }
 
 bool AkaoSnesSeq::parseHeader() {
@@ -542,9 +546,9 @@ void AkaoSnesSeq::LoadEventMap() {
   }
 }
 
-double AkaoSnesSeq::getTempoInBPM(uint8_t tempo) const {
-  if (tempo != 0 && TIMER0_FREQUENCY != 0) {
-    return 60000000.0 / (SEQ_PPQN * (125 * TIMER0_FREQUENCY)) * (tempo / 256.0);
+double AkaoSnesSeq::getTempoInBPM(uint8_t tempoValue) const {
+  if (tempoValue != 0 && TIMER0_FREQUENCY != 0) {
+    return 60000000.0 / (SEQ_PPQN * (125 * TIMER0_FREQUENCY)) * (tempoValue / 256.0);
   }
   else {
     // since tempo 0 cannot be expressed, this function returns a very small value.
@@ -584,6 +588,108 @@ void AkaoSnesTrack::resetVars() {
   jumpActivatedByMainCpu = true; // it should be false in the actual driver, but for convenience
 
   ignoreMasterVolumeProgNum = 0xff;
+  vibrato.reset();
+  tremolo.reset();
+}
+
+void AkaoSnesTrack::applyVibrato(uint32_t offset, uint32_t length, uint8_t delay, uint8_t rate, uint8_t depth) {
+  addGenericEvent(offset,
+                  length,
+                  "Vibrato",
+                  fmt::format("Delay: {}  Rate: {}  Depth: {}", delay, rate, depth),
+                  Type::Vibrato);
+
+  if (static_cast<AkaoSnesSeq*>(parentSeq)->version != AKAOSNES_V4) {
+    return;
+  }
+
+  vibrato.configure(delay, rate, depth);
+  setSynthLfoModulationDepth(vibrato, akao_snes::modulation::vibratoDepthMidiValue(rate, depth), true);
+  if (depth != 0) {
+    syncVibratoRateAndDelay();
+  }
+  else {
+    addChannelPressureNoItem(0);
+    addControllerEventNoItem(akao_snes::modulation::kVibratoDelayController, 0);
+  }
+}
+
+void AkaoSnesTrack::clearVibrato(uint32_t offset, uint32_t length) {
+  addGenericEvent(offset, length, "Vibrato Off", "", Type::Vibrato);
+
+  if (static_cast<AkaoSnesSeq*>(parentSeq)->version != AKAOSNES_V4) {
+    return;
+  }
+
+  vibrato.setDepth(0);
+  setSynthLfoModulationDepth(vibrato, 0, true);
+  addChannelPressureNoItem(0);
+  addControllerEventNoItem(akao_snes::modulation::kVibratoDelayController, 0);
+}
+
+void AkaoSnesTrack::syncVibratoRateAndDelay() {
+  const auto *parent = static_cast<AkaoSnesSeq*>(parentSeq);
+  if (parent->version != AKAOSNES_V4 || vibrato.depth() == 0) {
+    return;
+  }
+
+  addChannelPressureNoItem(akao_snes::modulation::rateMidiValue(vibrato.rate(), parent->TIMER0_FREQUENCY));
+  addControllerEventNoItem(akao_snes::modulation::kVibratoDelayController,
+                           akao_snes::modulation::delayMidiValue(vibrato.delay(),
+                                                                 parent->tempo,
+                                                                 parent->TIMER0_FREQUENCY));
+}
+
+void AkaoSnesTrack::applyTremolo(uint32_t offset, uint32_t length, uint8_t delay, uint8_t rate, uint8_t depth) {
+  addGenericEvent(offset,
+                  length,
+                  "Tremolo",
+                  fmt::format("Delay {}  Rate: {}  Depth {}", delay, rate, depth),
+                  Type::Tremelo);
+
+  if (static_cast<AkaoSnesSeq*>(parentSeq)->version != AKAOSNES_V4) {
+    return;
+  }
+
+  tremolo.configure(delay, rate, depth);
+  setSynthLfoControllerDepth(tremolo,
+                             akao_snes::modulation::kTremoloDepthController,
+                             akao_snes::modulation::tremoloDepthMidiValue(rate, depth),
+                             true);
+  if (depth != 0) {
+    syncTremoloRate();
+  }
+  else {
+    addControllerEventNoItem(akao_snes::modulation::kTremoloRateController, 0);
+    addControllerEventNoItem(akao_snes::modulation::kTremoloDelayController, 0);
+  }
+}
+
+void AkaoSnesTrack::clearTremolo(uint32_t offset, uint32_t length) {
+  addGenericEvent(offset, length, "Tremolo Off", "", Type::Tremelo);
+
+  if (static_cast<AkaoSnesSeq*>(parentSeq)->version != AKAOSNES_V4) {
+    return;
+  }
+
+  tremolo.setDepth(0);
+  setSynthLfoControllerDepth(tremolo, akao_snes::modulation::kTremoloDepthController, 0, true);
+  addControllerEventNoItem(akao_snes::modulation::kTremoloRateController, 0);
+  addControllerEventNoItem(akao_snes::modulation::kTremoloDelayController, 0);
+}
+
+void AkaoSnesTrack::syncTremoloRate() {
+  const auto *parent = static_cast<AkaoSnesSeq*>(parentSeq);
+  if (parent->version != AKAOSNES_V4 || tremolo.depth() == 0) {
+    return;
+  }
+
+  addControllerEventNoItem(akao_snes::modulation::kTremoloRateController,
+                           akao_snes::modulation::rateMidiValue(tremolo.rate(), parent->TIMER0_FREQUENCY));
+  addControllerEventNoItem(akao_snes::modulation::kTremoloDelayController,
+                           akao_snes::modulation::delayMidiValue(tremolo.delay(),
+                                                                 parent->tempo,
+                                                                 parent->TIMER0_FREQUENCY));
 }
 
 
@@ -815,20 +921,12 @@ bool AkaoSnesTrack::readEvent(void) {
       uint8_t lfoDelay = readByte(curOffset++);
       uint8_t lfoRate = readByte(curOffset++);
       uint8_t lfoDepth = readByte(curOffset++);
-      addGenericEvent(beginOffset,
-                      curOffset - beginOffset,
-                      "Vibrato",
-                      fmt::format("Delay: {}  Rate: {}  Depth: {}", lfoDelay, lfoRate, lfoDepth),
-                      Type::Vibrato);
+      applyVibrato(beginOffset, curOffset - beginOffset, lfoDelay, lfoRate, lfoDepth);
       break;
     }
 
     case EVENT_VIBRATO_OFF: {
-      addGenericEvent(beginOffset,
-                      curOffset - beginOffset,
-                      "Vibrato Off",
-                      desc,
-                      Type::Vibrato);
+      clearVibrato(beginOffset, curOffset - beginOffset);
       break;
     }
 
@@ -836,20 +934,12 @@ bool AkaoSnesTrack::readEvent(void) {
       uint8_t lfoDelay = readByte(curOffset++);
       uint8_t lfoRate = readByte(curOffset++);
       uint8_t lfoDepth = readByte(curOffset++);
-      addGenericEvent(beginOffset,
-                      curOffset - beginOffset,
-                      "Tremolo",
-                      fmt::format("Delay {}  Rate: {}  Depth {}", lfoDelay, lfoRate, lfoDepth),
-                      Type::Tremelo);
+      applyTremolo(beginOffset, curOffset - beginOffset, lfoDelay, lfoRate, lfoDepth);
       break;
     }
 
     case EVENT_TREMOLO_OFF: {
-      addGenericEvent(beginOffset,
-                      curOffset - beginOffset,
-                      "Tremolo Off",
-                      desc,
-                      Type::Tremelo);
+      clearTremolo(beginOffset, curOffset - beginOffset);
       break;
     }
 
@@ -1219,7 +1309,15 @@ bool AkaoSnesTrack::readEvent(void) {
       if (parentSeq->minorVersion == AKAOSNES_V4_FM || parentSeq->minorVersion == AKAOSNES_V4_CT) {
         newTempo += (newTempo * 0x14) >> 8;
       }
+      parentSeq->tempo = newTempo;
       addTempoBPM(beginOffset, curOffset - beginOffset, parentSeq->getTempoInBPM(newTempo));
+      if (parentSeq->version == AKAOSNES_V4) {
+        for (auto *track : parentSeq->aTracks) {
+          auto *akaoTrack = static_cast<AkaoSnesTrack*>(track);
+          akaoTrack->syncVibratoRateAndDelay();
+          akaoTrack->syncTremoloRate();
+        }
+      }
       break;
     }
 
@@ -1243,7 +1341,15 @@ bool AkaoSnesTrack::readEvent(void) {
         addGenericEvent(beginOffset, curOffset - beginOffset, "Tempo Fade", desc, Type::Tempo);
       }
       else {
+        parentSeq->tempo = newTempo;
         addTempoBPM(beginOffset, curOffset - beginOffset, parentSeq->getTempoInBPM(newTempo));
+        if (parentSeq->version == AKAOSNES_V4) {
+          for (auto *track : parentSeq->aTracks) {
+            auto *akaoTrack = static_cast<AkaoSnesTrack*>(track);
+            akaoTrack->syncVibratoRateAndDelay();
+            akaoTrack->syncTremoloRate();
+          }
+        }
       }
       break;
     }

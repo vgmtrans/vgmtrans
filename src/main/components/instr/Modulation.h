@@ -21,6 +21,22 @@ struct VibratoModulationSpec {
   std::optional<DelayRange> delayRange = std::nullopt;
 };
 
+enum class ModSource : uint8_t {
+  // Keep this list to controllers expressible by both SF2 and DLS2.
+  ModWheel,
+  ChannelPressure,
+  PolyPressure,
+  PitchWheel,
+  Volume,
+  Pan,
+  Expression,
+  ReverbSend,
+  ChorusSend,
+  Effects2Depth,
+  Effects4Depth,
+  Effects5Depth,
+};
+
 enum class TremoloGainMode {
   // SF2 modLfoToVolume is centered around nominal gain, so tremolo can boost above normal volume.
   BipolarAroundNominal,
@@ -33,19 +49,10 @@ struct TremoloModulationSpec {
   double minHertz;
   double maxHertz;
   TremoloGainMode gainMode = TremoloGainMode::BipolarAroundNominal;
-};
-
-enum class ModSource : uint8_t {
-  // Keep this list to controllers expressible by both SF2 and DLS2.
-  ModWheel,
-  ChannelPressure,
-  PolyPressure,
-  PitchWheel,
-  Volume,
-  Pan,
-  Expression,
-  ReverbSend,
-  ChorusSend,
+  std::optional<DelayRange> delayRange = std::nullopt;
+  ModSource rateSource = ModSource::ChannelPressure;
+  ModSource depthSource = ModSource::ChorusSend;
+  ModSource delaySource = ModSource::Effects5Depth;
 };
 
 enum class ModDest : uint8_t {

@@ -39,6 +39,12 @@ SFModulator sf2SourceForModSource(ModSource source) {
       return static_cast<SFModulator>(midiContinuousController | 91);
     case ModSource::ChorusSend:
       return static_cast<SFModulator>(midiContinuousController | 93);
+    case ModSource::Effects2Depth:
+      return static_cast<SFModulator>(midiContinuousController | 92);
+    case ModSource::Effects4Depth:
+      return static_cast<SFModulator>(midiContinuousController | 94);
+    case ModSource::Effects5Depth:
+      return static_cast<SFModulator>(midiContinuousController | 95);
   }
   return 0;
 }

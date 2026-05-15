@@ -1,5 +1,6 @@
 #pragma once
 #include "VGMSeq.h"
+#include "automation/SeqMidiAutomation.h"
 #include "SeqTrack.h"
 #include "AkaoSnesFormat.h"
 
@@ -103,7 +104,7 @@ class AkaoSnesSeq
   bool parseTrackPointers() override;
   void resetVars() override;
 
-  double getTempoInBPM(uint8_t tempo) const;
+  double getTempoInBPM(uint8_t tempoValue) const;
 
   uint16_t romAddressToApuAddress(uint16_t romAddress) const;
   uint16_t getShortAddress(uint32_t offset) const;
@@ -119,6 +120,7 @@ class AkaoSnesSeq
 
   uint8_t TIMER0_FREQUENCY;
   bool PAN_8BIT;
+  uint8_t tempo;
 
   uint32_t addrAPURelocBase;
   uint32_t addrROMRelocBase;
@@ -139,6 +141,13 @@ public:
   uint16_t getShortAddress(uint32_t offset) const;
 
  private:
+  void applyVibrato(uint32_t offset, uint32_t length, uint8_t delay, uint8_t rate, uint8_t depth);
+  void clearVibrato(uint32_t offset, uint32_t length);
+  void syncVibratoRateAndDelay();
+  void applyTremolo(uint32_t offset, uint32_t length, uint8_t delay, uint8_t rate, uint8_t depth);
+  void clearTremolo(uint32_t offset, uint32_t length);
+  void syncTremoloRate();
+
   uint8_t onetimeDuration;
   bool slur;
   bool legato;
@@ -152,4 +161,6 @@ public:
   uint16_t loopStart[AKAOSNES_LOOP_LEVEL_MAX];
 
   uint8_t ignoreMasterVolumeProgNum;
+  SeqSynthLfoAutomation vibrato;
+  SeqSynthLfoAutomation tremolo;
 };

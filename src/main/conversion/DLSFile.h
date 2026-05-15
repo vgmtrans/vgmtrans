@@ -36,7 +36,10 @@ class VGMSamp;
 #define CONN_SRC_CC10 0x008a
 #define CONN_SRC_CC11 0x008b
 #define CONN_SRC_CC91 0x00db
+#define CONN_SRC_CC92 0x00dc
 #define CONN_SRC_CC93 0x00dd
+#define CONN_SRC_CC94 0x00de
+#define CONN_SRC_CC95 0x00df
 
 /* Registered Parameter Numbers */
 #define CONN_SRC_RPN0 0x0100
