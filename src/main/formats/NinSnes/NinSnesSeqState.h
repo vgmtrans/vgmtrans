@@ -86,9 +86,9 @@ enum NinSnesSeqEventType {
   EVENT_QUINTET_ADSR,
 };
 
-class NinSnesTrackSharedData {
+class NinSnesTrackState {
  public:
-  NinSnesTrackSharedData();
+  NinSnesTrackState();
 
   virtual void resetVars();
 
