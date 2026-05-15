@@ -115,6 +115,19 @@ bool SeqTrack::loadTrackInit(int trackNum, MidiTrack *preparedMidiTrack) {
   return true;
 }
 
+void SeqTrack::loadTrackSegmentInit(uint32_t segmentOffset, uint32_t segmentLength,
+                                    bool segmentActive, uint32_t initialOffset) {
+  resetVisitedAddresses();
+  resetSegmentVars();
+  active = segmentActive;
+  setRange(segmentOffset, segmentLength);
+  curOffset = initialOffset;
+
+  if (active) {
+    addControlFlowState(curOffset);
+  }
+}
+
 void SeqTrack::loadTrackMainLoop(uint32_t stopOffset, int32_t stopTime) {
   if (!active) {
     return;

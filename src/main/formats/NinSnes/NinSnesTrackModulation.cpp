@@ -1,6 +1,7 @@
 #include "NinSnesSeq.h"
 #include "NinSnesVibrato.h"
 #include "Modulation.h"
+#include "automation/SeqTrackAutomation.h"
 #include <algorithm>
 #include <cmath>
 
@@ -94,6 +95,7 @@ void NinSnesTrack::activatePitchMotion(uint8_t delay, uint8_t length, int32_t ta
       pitch,
       pitch.motionToTarget(targetPitch, length, delay),
       pitch.rangeCentsForSlide(currentPitch, targetPitch, kNinSnesDefaultPitchBendRangeCents),
+      kNinSnesDefaultPitchBendRangeCents,
       true);
 }
 

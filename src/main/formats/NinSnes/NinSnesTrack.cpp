@@ -56,10 +56,10 @@ bool NinSnesTrack::prepareSectionTrack(NinSnesSection& section, uint32_t trackIn
   currentSegment = &section.trackSegment(trackIndex);
   auto* sectionTrackItem = section.track(trackIndex);
   const bool emitSeqEvents = readMode != READMODE_ADD_TO_UI || !currentSegment->uiEventsLoaded;
-  const bool loaded = loadTrackSegmentInit(currentSegment->rangeOffset,
-                                           currentSegment->rangeLength,
-                                           currentSegment->active,
-                                           currentSegment->startOffset);
+  loadTrackSegmentInit(currentSegment->rangeOffset,
+                       currentSegment->rangeLength,
+                       currentSegment->active,
+                       currentSegment->startOffset);
   if (sectionTrackItem != nullptr) {
     sectionTrackItem->readMode = readMode;
     sectionTrackItem->channel = channel;
@@ -72,7 +72,7 @@ bool NinSnesTrack::prepareSectionTrack(NinSnesSection& section, uint32_t trackIn
   if (!currentSegment->active && m_hasPersistentRange) {
     setRange(m_persistentRangeStart, m_persistentRangeEnd - m_persistentRangeStart);
   }
-  return loaded;
+  return true;
 }
 
 void NinSnesTrack::resetTransientSectionState(uint32_t trackIndex) {

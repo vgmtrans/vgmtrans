@@ -3,7 +3,7 @@
 #include <array>
 #include <optional>
 #include "VGMSeq.h"
-#include "SeqAutomation.h"
+#include "automation/SeqAutomation.h"
 #include "SeqTrack.h"
 #include "NinSnesFormat.h"
 #include "NinSnesScanResult.h"

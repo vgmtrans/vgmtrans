@@ -99,6 +99,8 @@ protected:
   virtual void resetVars();
   void resetVisitedAddresses();
   void resetSegmentVars();
+  void loadTrackSegmentInit(uint32_t segmentOffset, uint32_t segmentLength, bool segmentActive,
+                            uint32_t initialOffset);
 
   virtual void setChannelAndGroupFromTrkNum(int theTrackNum);
   virtual void addInitialMidiEvents(int trackNum);
