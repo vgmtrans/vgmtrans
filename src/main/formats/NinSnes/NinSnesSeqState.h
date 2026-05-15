@@ -89,6 +89,8 @@ enum NinSnesSeqEventType {
 
 class NinSnesTrackState {
  public:
+  static constexpr uint16_t kDefaultPitchBendRangeCents = 200;
+
   NinSnesTrackState();
 
   virtual void resetVars();
@@ -105,7 +107,27 @@ class NinSnesTrackState {
   uint16_t konamiLoopStart;
   uint8_t konamiLoopCount;
 
+  // pitch envelope from/to define a reusable note-on envelope, while pitch slide instantiates the live motion directly.
+  struct StoredPitchEnvelope {
+    enum class Mode : uint8_t {
+      None,
+      To,
+      From,
+    };
+
+    Mode mode = Mode::None;
+    uint8_t delay = 0;
+    uint8_t length = 0;
+    int8_t semitones = 0;
+
+    bool enabled() const {
+      return mode != Mode::None && length != 0;
+    }
+  };
+
   SeqSynthLfoAutomation vibrato;
+  StoredPitchEnvelope pitchEnvelope;
+  SeqPitchBendAutomation<int32_t> pitch {100.0 / 256.0};
 };
 
 struct NinSnesPercussionDef {
