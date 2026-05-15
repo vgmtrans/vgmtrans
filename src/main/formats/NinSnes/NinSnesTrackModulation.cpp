@@ -78,12 +78,12 @@ void NinSnesTrack::addPitchSlideEvent(const PitchSlideEvent& slide) {
 }
 
 void NinSnesTrack::beginPitchSlide(const PitchSlideEvent& slide) {
-  state.pitch.clearMotion();
   activatePitchMotion(slide.delay, slide.length, notePitch(slide.targetNote));
 }
 
 void NinSnesTrack::activatePitchMotion(uint8_t delay, uint8_t length, int32_t targetPitch) {
   auto& pitch = state.pitch;
+  pitch.clearMotion();
   if (!pitch.baseValid() || length == 0) {
     return;
   }
@@ -100,12 +100,7 @@ void NinSnesTrack::activatePitchMotion(uint8_t delay, uint8_t length, int32_t ta
 }
 
 void NinSnesTrack::updatePitchSlide() {
-  auto& pitch = state.pitch;
-  if (!pitch.motionActive()) {
-    return;
-  }
-
-  advancePitchBendAutomation(pitch);
+  advancePitchBendAutomation(state.pitch);
 }
 
 void NinSnesTrack::beginNotePitch(uint8_t note) {
