@@ -287,11 +287,9 @@ bool NinSnesTrack::handleIntelliPercussionNote(uint32_t beginOffset, uint8_t slo
   const uint8_t drumKey = static_cast<uint8_t>(0x24 + slot);
 
   switchToPercussionProgramIfNeeded(drumProgram);
-  beginNotePitch(static_cast<uint8_t>(drumKey - parentSeq.globalTranspose));
   addPercNoteByDur(beginOffset, curOffset - beginOffset,
                    static_cast<int8_t>(drumKey - cKeyCorrection - parentSeq.globalTranspose),
                    state.spcNoteVolume / 2, duration, "Percussion Note");
-  consumeQueuedPitchSlide();
   m_lastNoteWasPercussion = true;
   addTime(state.spcNoteDuration);
   return true;

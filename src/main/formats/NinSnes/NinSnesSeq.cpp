@@ -1,5 +1,4 @@
 #include "NinSnesSeq.h"
-#include "NinSnesVibrato.h"
 #include "Options.h"
 #include "spdlog/fmt/fmt.h"
 #include <algorithm>
@@ -14,8 +13,7 @@ DECLARE_FORMAT(NinSnes);
 namespace {
 
 constexpr size_t MAX_TRACKS = kNinSnesTrackCount;
-constexpr uint16_t kNinSnesDefaultPitchBendRangeCents =
-    NinSnesTrackState::kDefaultPitchBendRangeCents;
+constexpr uint8_t kNinSnesDefaultTempo = 0x20;
 
 }  // namespace
 
@@ -25,9 +23,7 @@ NinSnesSeq::NinSnesSeq(RawFile* file, NinSnesProfileId profile, uint32_t offset,
     : VGMSeq(NinSnesFormat::name, file, offset, 0, theName),
       signature(NinSnesSignatureId::None), profileId(profile),
       volumeTable(theVolumeTable), durRateTable(theDurRateTable),
-      tempo(nin_snes::vibrato::kDefaultTempo),
-      maxVibratoDepthCents(nin_snes::vibrato::kMinMaxDepthCents),
-      maxVibratoRateHz(nin_snes::vibrato::kMinMaxRateHz),
+      tempo(kNinSnesDefaultTempo),
       dwStartOffset(offset), curOffset(offset),
       konamiBaseAddress(0), quintetBGMInstrBase(0), falcomBaseOffset(0),
       header(NULL), spcPercussionBaseInit(percussion_base), m_nextIntelliTAOverrideProgram(0x80) {
@@ -36,7 +32,6 @@ NinSnesSeq::NinSnesSeq(RawFile* file, NinSnesProfileId profile, uint32_t offset,
 
   useReverb();
   setAlwaysWriteInitialReverb(0);
-  setAlwaysWriteInitialPitchBendRange(kNinSnesDefaultPitchBendRangeCents);
 
   loadEventMap();
 }
@@ -85,12 +80,8 @@ void NinSnesSeq::resetVars() {
   sectionRepeatCount = 0;
   m_sectionForeverLoops = 0;
   globalTranspose = 0;
-  setImmediateTempo(nin_snes::vibrato::kDefaultTempo);
+  setImmediateTempo(kNinSnesDefaultTempo);
 
-  if (readMode != READMODE_CONVERT_TO_MIDI) {
-    maxVibratoDepthCents = nin_snes::vibrato::kMinMaxDepthCents;
-    maxVibratoRateHz = nin_snes::vibrato::kMinMaxRateHz;
-  }
   m_percussionInstrNoteMap.clear();
 
   // Intelligent Systems:
@@ -424,28 +415,6 @@ double NinSnesSeq::getTempoInBPM(uint8_t tempoValue) {
 
 void NinSnesSeq::setImmediateTempo(uint8_t newTempo) {
   tempo = newTempo;
-  tempoFade.setCurrentRaw(newTempo);
-}
-
-void NinSnesSeq::startTempoFade(uint8_t fadeLength, uint8_t targetTempo) {
-  tempoFade.begin(SeqFixedPointMotion<int32_t>::toRawTarget(targetTempo, fadeLength));
-}
-
-void NinSnesSeq::syncTempoDependentTracks() {
-  for (auto* track : aTracks) {
-    static_cast<NinSnesTrack*>(track)->syncVibratoRateAndDelay();
-  }
-}
-
-void NinSnesSeq::onTickEnd() {
-  // EVENT_TEMPO_FADE applies its first tempo step at the end of the tick that parsed the command.
-  tempoFade.tickRaw([this](int32_t tempoValue) {
-    tempo = static_cast<uint8_t>(std::clamp(tempoValue, 0, 0xff));
-    if (!aTracks.empty()) {
-      aTracks[0]->addTempoBPMNoItem(getTempoInBPM(tempo));
-    }
-    syncTempoDependentTracks();
-  });
 }
 
 uint16_t NinSnesSeq::convertToAPUAddress(uint16_t offset) {
