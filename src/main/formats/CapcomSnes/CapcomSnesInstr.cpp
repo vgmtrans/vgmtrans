@@ -105,11 +105,8 @@ bool CapcomSnesInstr::loadInstr() {
   // step frequency as the global base and let channel pressure span the full range in Hz.
   // Tremolo runs at twice the base vibrato rate and only attenuates, never boosts.
 
-  addStandardVibratoHandling(1200, capcom_snes::kVibratoBaseHz, capcom_snes::kVibratoMaxHz);
-  addStandardTremoloHandling(capcom_snes::kTremoloHalfDepthDb,
-                             capcom_snes::kTremoloBaseHz,
-                             capcom_snes::kTremoloMaxHz,
-                             TremoloGainMode::NoBoost);
+  addStandardVibratoHandling(capcom_snes::vibratoModulationSpec());
+  addStandardTremoloHandling(capcom_snes::tremoloModulationSpec());
 
   uint16_t addrSampStart = readShort(offDirEnt);
 

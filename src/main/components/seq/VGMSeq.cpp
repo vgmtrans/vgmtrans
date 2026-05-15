@@ -216,6 +216,10 @@ void VGMSeq::loadTracksMain(uint32_t stopTime) {
         itrSlider = itrNextSlider;
       }
 
+      if (hasActiveTracks()) {
+        onTickEnd();
+      }
+
       if (bIncTickAfterProcessingTracks == true) {
         time++;
       }

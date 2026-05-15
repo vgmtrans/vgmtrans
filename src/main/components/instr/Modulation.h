@@ -7,6 +7,33 @@
 #pragma once
 
 #include <cstdint>
+#include <optional>
+
+struct DelayRange {
+  double minSeconds;
+  double maxSeconds;
+};
+
+struct VibratoModulationSpec {
+  double maxDepthCents;
+  double minHertz;
+  double maxHertz;
+  std::optional<DelayRange> delayRange = std::nullopt;
+};
+
+enum class TremoloGainMode {
+  // SF2 modLfoToVolume is centered around nominal gain, so tremolo can boost above normal volume.
+  BipolarAroundNominal,
+  // Adds matching initial attenuation; the loudest tremolo point is nominal gain.
+  NoBoost,
+};
+
+struct TremoloModulationSpec {
+  double maxDepthDb;
+  double minHertz;
+  double maxHertz;
+  TremoloGainMode gainMode = TremoloGainMode::BipolarAroundNominal;
+};
 
 enum class ModSource : uint8_t {
   // Keep this list to controllers expressible by both SF2 and DLS2.

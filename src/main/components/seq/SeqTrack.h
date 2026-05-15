@@ -5,6 +5,7 @@
  */
 #pragma once
 
+#include <cstdint>
 #include <sstream>
 #include <unordered_map>
 #include <unordered_set>
@@ -19,6 +20,13 @@
 class VGMSeq;
 class SeqEvent;
 class MidiTrack;
+class SeqSynthLfoAutomation;
+template <typename ValueType>
+struct SeqMotionPlan;
+template <typename ValueType>
+struct SeqMotionTick;
+template <typename PitchType>
+class SeqPitchBendAutomation;
 
 enum ReadMode : uint8_t;
 
@@ -90,6 +98,7 @@ class SeqTrack : public VGMItem {
 protected:
   virtual void resetVars();
   void resetVisitedAddresses();
+  void resetSegmentVars();
 
   virtual void setChannelAndGroupFromTrkNum(int theTrackNum);
   virtual void addInitialMidiEvents(int trackNum);
@@ -106,6 +115,13 @@ protected:
 
   virtual bool onEvent(uint32_t offset, uint32_t length);
   virtual SeqEvent* addEvent(SeqEvent *pSeqEvent);
+  // Some parsers emit SeqEvents under a display track that differs from the parser track.
+  void setSeqEventTarget(SeqTrack* target, bool emitEvents = true) {
+    m_seqEventTarget = target;
+    m_emitSeqEvents = emitEvents;
+  }
+  void clearSeqEventTarget() { setSeqEventTarget(nullptr); }
+  SeqTrack* seqEventTarget() { return m_seqEventTarget != nullptr ? m_seqEventTarget : this; }
 
   template <typename EventType, typename... Args>
   void recordSeqEvent(bool isNewOffset, uint32_t startTick, Args&&... args) {
@@ -118,15 +134,17 @@ protected:
                                              uint32_t duration,
                                              Args&&... args) {
     if (readMode == READMODE_ADD_TO_UI) {
-      if (isNewOffset) {
-        auto* event = new EventType(this, std::forward<Args>(args)...);
+      if (isNewOffset && m_emitSeqEvents) {
+        auto* target = seqEventTarget();
+        auto* event = new EventType(target, std::forward<Args>(args)...);
         event->channel = static_cast<uint8_t>(channel);
-        addEvent(event);
+        target->addEvent(event);
       }
       return SeqEventTimeIndex::kInvalidIndex;
     }
     if (readMode == READMODE_CONVERT_TO_MIDI) {
-      if (SeqEvent* existing = findSeqEventAtOffset(m_lastEventOffset, m_lastEventLength)) {
+      if (SeqEvent* existing =
+              seqEventTarget()->findSeqEventAtOffset(m_lastEventOffset, m_lastEventLength)) {
         return parentSeq->timedEventIndex().addEvent(existing, startTick, duration);
       }
     }
@@ -139,6 +157,29 @@ protected:
   void pushReturnOffset(uint32_t returnOffset);
   bool popReturnOffset(uint32_t &returnOffset);
   SeqEvent* findSeqEventAtOffset(uint32_t offset, uint32_t length);
+
+  template <typename PitchType>
+  SeqMotionTick<PitchType> advancePitchBendAutomation(SeqPitchBendAutomation<PitchType>& automation);
+  template <typename PitchType>
+  bool beginPitchBendAutomation(SeqPitchBendAutomation<PitchType>& automation,
+                                const SeqMotionPlan<PitchType>& motion, uint16_t rangeCents,
+                                uint16_t defaultRangeCents,
+                                bool applyInitialBend = false);
+  template <typename PitchType>
+  bool setPitchBendAutomationRange(SeqPitchBendAutomation<PitchType>& automation, uint16_t cents);
+  template <typename PitchType>
+  bool setPitchBendAutomationBend(SeqPitchBendAutomation<PitchType>& automation, int16_t bend);
+  template <typename PitchType>
+  bool applyPitchBendAutomation(SeqPitchBendAutomation<PitchType>& automation);
+  template <typename PitchType>
+  void resetPitchBendAutomation(SeqPitchBendAutomation<PitchType>& automation, uint16_t defaultRangeCents);
+  bool setSynthLfoModulationDepth(SeqSynthLfoAutomation& automation, uint8_t depth, bool force = false);
+  bool setSynthLfoControllerDepth(SeqSynthLfoAutomation& automation, uint8_t controller, uint8_t depth,
+                                  bool force = false);
+  template <typename ConvertDepth>
+  SeqMotionTick<int32_t> advanceSynthLfoFadeToModulation(SeqSynthLfoAutomation& automation,
+                                                         uint8_t fractionalBits,
+                                                         ConvertDepth&& convertDepth);
 
 private:
   void addControllerSlide(u32 dur, u16 &prevVal, u16 targVal, uint8_t (*scalerFunc)(uint8_t), void (MidiTrack::*insertFunc)(uint8_t, uint8_t, uint32_t)) const;
@@ -212,6 +253,7 @@ private:
   void insertReverb(uint32_t offset, uint32_t length, uint8_t reverb, uint32_t absTime, const std::string &sEventName = "Reverb");
   void addPitchBend(uint32_t offset, uint32_t length, int16_t bend, const std::string &sEventName = "Pitch Bend");
   void addPitchBendAsPercent(uint32_t offset, uint32_t length, double percent, const std::string &sEventName = "Pitch Bend");
+  void addPitchBendNoItem(int16_t bend) const;
   void addPitchBendRange(uint32_t offset, uint32_t length, uint16_t cents, const std::string &sEventName = "Pitch Bend Range");
   void addPitchBendRangeNoItem(uint16_t cents) const;
   void addChannelPressure(uint32_t offset, uint32_t length, uint8_t pressure, const std::string &sEventName = "Channel Pressure");
@@ -337,6 +379,8 @@ private:
 
   uint32_t m_lastEventOffset = 0;
   uint32_t m_lastEventLength = 0;
+  SeqTrack* m_seqEventTarget = nullptr;
+  bool m_emitSeqEvents = true;
 };
 
 template<typename... Args>

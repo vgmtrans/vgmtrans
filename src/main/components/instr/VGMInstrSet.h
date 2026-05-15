@@ -13,15 +13,6 @@ class VGMColl;
 
 constexpr float defaultReverbPercent = 0.25;
 
-// BipolarAroundNominal:
-//   SF2 modLfoToVolume is centered around nominal gain. Tremolo can boost above the note's normal volume.
-// NoBoost:
-//   Adds a matching initialAttenuation offset. Loudest tremolo point is nominal gain; all other points attenuate.
-enum class TremoloGainMode {
-  BipolarAroundNominal,
-  NoBoost,
-};
-
 // ***********
 // VGMInstrSet
 // ***********
@@ -68,11 +59,6 @@ private:
 
 class VGMInstr : public VGMItem {
 public:
-  struct DelayRange {
-    double minSeconds;
-    double maxSeconds;
-  };
-
   VGMInstr(VGMInstrSet *parInstrSet, uint32_t offset, uint32_t length, uint32_t bank,
            uint32_t instrNum, std::string name = "Instrument",
            float reverb = defaultReverbPercent);
@@ -93,10 +79,16 @@ public:
                                   double minHertz,
                                   double maxHertz,
                                   std::optional<DelayRange> delayRange = std::nullopt);
+  void addStandardVibratoHandling(const VibratoModulationSpec& spec);
+  void updateStandardVibratoHandling(double maxDepthCents,
+                                     double minHertz,
+                                     double maxHertz);
+  void updateStandardVibratoHandling(const VibratoModulationSpec& spec);
   void addStandardTremoloHandling(double maxDepthDb,
                                   double minHertz,
                                   double maxHertz,
                                   TremoloGainMode gainMode);
+  void addStandardTremoloHandling(const TremoloModulationSpec& spec);
   [[nodiscard]] const std::vector<SynthModulator>& modulators() const { return m_modulators; }
 
   // Generator support

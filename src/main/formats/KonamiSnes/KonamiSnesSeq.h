@@ -6,6 +6,7 @@
 #pragma once
 #include <optional>
 #include "VGMSeq.h"
+#include "automation/SeqMidiAutomation.h"
 #include "SeqTrack.h"
 #include "SeqEvent.h"
 #include "KonamiSnesFormat.h"
@@ -68,14 +69,6 @@ enum KonamiSnesSeqEventType {
 class KonamiSnesSeq
     : public VGMSeq {
  public:
-  struct ActiveTempoFade {
-    int32_t currentTempo = 0;
-    int32_t targetTempo = 0;
-    int16_t delta = 0;
-    uint8_t length = 0;
-    bool useLength = false;
-  };
-
   KonamiSnesSeq
       (RawFile *file, KonamiSnesVersion ver, uint32_t seqdataOffset, std::string newName = "Konami SNES Seq");
   ~KonamiSnesSeq() override;
@@ -85,7 +78,7 @@ class KonamiSnesSeq
   void resetVars() override;
 
   uint8_t tempo;
-  ActiveTempoFade tempoFade;
+  SeqFixedPointAutomation<> tempoFade;
   uint32_t tempoFadeLastUpdatedTime;
   uint8_t maxVibratoDepth;
   uint16_t maxVibratoRateFactor;
@@ -152,63 +145,9 @@ class KonamiSnesTrack
     double deltaSemitones = 0.0;
   };
 
-  struct ActivePitchSlide {
-    bool baseValid = false;
-    double baseSemitones = 0.0;
-    double currentSemitones = 0.0;
-    uint8_t delay = 0;
-    uint8_t length = 0;
-    double targetSemitones = 0.0;
-    double deltaSemitones = 0.0;
-  };
-
-  struct VolumeFade {
+  struct ControllerFade {
     uint32_t offset;
-    uint8_t targetVolume;
-    int16_t delta = 0;
-    uint8_t length = 0;
-    bool useLength = false;
-  };
-
-  struct ActiveVolumeSlide {
-    int32_t currentVolume = 0xff00;
-    int32_t targetVolume = 0xff00;
-    int16_t delta = 0;
-    uint8_t length = 0;
-    bool useLength = false;
-  };
-
-  struct ActivePanFade {
-    int32_t currentPan = 0;
-    int32_t targetPan = 0;
-    int16_t delta = 0;
-    uint8_t length = 0;
-    bool useLength = false;
-  };
-
-  struct PanFade {
-    uint32_t offset;
-    uint8_t targetPan;
-    int16_t delta = 0;
-    uint8_t length = 0;
-    bool useLength = false;
-  };
-
-  struct TempoFade {
-    uint32_t offset;
-    uint8_t targetTempo;
-    int16_t delta = 0;
-    uint8_t length = 0;
-    bool useLength = false;
-  };
-
-  struct ActiveVibratoFade {
-    uint8_t length = 0;
-    uint16_t step = 0;
-    uint8_t delayRemaining = 0;
-    uint8_t ticksRemaining = 0;
-    uint16_t currentDepth = 0;
-    uint8_t midiDepth = 0;
+    SeqFixedPointMotionPlan<int32_t> motion;
   };
 
   std::optional<PitchSlide> consumePitchSlide();
@@ -220,28 +159,16 @@ class KonamiSnesTrack
   void beginPitchSlide(const PitchSlide& slide);
   uint16_t pitchSlideRangeCents(const PitchSlide& slide) const;
   uint8_t getNoteDuration(uint8_t length, uint8_t durationRate) const;
-  VolumeFade readVolumeFade(KonamiSnesSeqEventType eventType, uint32_t offset) const;
-  void addVolumeFadeEvent(const VolumeFade& fade);
-  void clearActiveVolumeFade();
+  ControllerFade readVolumeFade(KonamiSnesSeqEventType eventType, uint32_t offset) const;
   void applyCurrentVolume();
-  void beginVolumeFade(const VolumeFade& fade);
   uint8_t defaultPanValue() const;
   uint8_t clampPanValue(uint8_t pan) const;
   uint8_t convertPanValueToMidiPan(uint8_t pan) const;
-  PanFade readPanFade(KonamiSnesSeqEventType eventType, uint32_t offset) const;
-  void addPanFadeEvent(const PanFade& fade);
-  void beginPanFade(const PanFade& fade);
-  void clearActivePanFade();
+  ControllerFade readPanFade(KonamiSnesSeqEventType eventType, uint32_t offset) const;
   void applyCurrentPan();
-  TempoFade readTempoFade(KonamiSnesSeqEventType eventType, uint32_t offset) const;
-  void addTempoFadeEvent(const TempoFade& fade);
-  void beginTempoFade(const TempoFade& fade);
-  void clearActiveTempoFade();
+  ControllerFade readTempoFade(KonamiSnesSeqEventType eventType, uint32_t offset) const;
   void applyCurrentTempo();
   void syncVibratoRateAndDelay();
-  void setPitchBendRange(uint16_t cents);
-  void setPitchBend(int16_t bend);
-  void applyCurrentPitchBend();
   double getTuningInSemitones(int8_t tuning);
   uint8_t convertGAINAmountToGAIN(uint8_t gainAmount);
   int16_t getLoopVolumeDelta() const;
@@ -252,13 +179,8 @@ class KonamiSnesTrack
   KonamiSnesSeq& seq();
   const KonamiSnesSeq& seq() const;
 
-  ActivePanFade panFade;
-  ActiveVolumeSlide volumeFade;
-  ActivePitchSlide pitchSlide;
-  uint8_t vibratoDelay;
-  uint8_t vibratoRate;
-  uint8_t vibratoDepth;
-  ActiveVibratoFade vibratoFade;
-  uint16_t pitchBendRangeCents;
-  int16_t currentPitchBend;
+  SeqFixedPointAutomation<> panFade;
+  SeqFixedPointAutomation<> volumeFade;
+  SeqPitchBendAutomation<double> pitchSlide;
+  SeqSynthLfoAutomation vibrato;
 };

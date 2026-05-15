@@ -36,20 +36,9 @@ constexpr uint8_t percussionPanLimit(KonamiSnesVersion version) {
 // Rewrites the shared vibrato modulators to the sequence-specific maxima collected on the first
 // pass, while keeping the controller mapping itself identical across instrument loads.
 void applyVibratoExportScaling(KonamiSnesInstrSet* instrSet, uint8_t maxDepth, uint16_t maxRateFactor) {
-  const auto version = instrSet->version;
-  const uint8_t clampedMaxDepth = std::max(maxDepth, konami_snes::kMinVibratoMaxDepth);
-  const uint16_t clampedMaxRateFactor = std::max(maxRateFactor, konami_snes::vibrato::minMaxRateFactor(version));
-  const double maxDepthCents = konami_snes::vibrato::maxDepthCents(version, clampedMaxDepth);
-  const double baseHz = konami_snes::vibrato::baseHz(version);
-  const double maxRateHz = baseHz * clampedMaxRateFactor;
-
+  const auto spec = konami_snes::vibrato::modulationSpec(instrSet->version, maxDepth, maxRateFactor);
   for (auto* instr : instrSet->exportInstrs()) {
-    instr->updateModulatorAmount(ModSource::ModWheel,
-                                 ModDest::VibLfoToPitch,
-                                 ModAmount::fromCents(maxDepthCents));
-    instr->updateModulatorAmount(ModSource::ChannelPressure,
-                                 ModDest::VibLfoFreq,
-                                 ModAmount::fromHertzRange(baseHz, maxRateHz));
+    instr->updateStandardVibratoHandling(spec);
   }
 }
 
@@ -264,14 +253,7 @@ bool KonamiSnesInstr::loadInstr() {
   //   CC1  -> depth
   //   ch. pressure -> final effective vibrato frequency
   //   CC93 -> final effective vibrato delay
-  addStandardVibratoHandling(
-      konami_snes::vibrato::maxDepthCents(version, konami_snes::kDefaultVibratoMaxDepth),
-      konami_snes::vibrato::baseHz(version),
-      konami_snes::vibrato::baseHz(version) * konami_snes::vibrato::defaultMaxRateFactor(version),
-      VGMInstr::DelayRange {
-          konami_snes::vibrato::minDelaySeconds(version),
-          konami_snes::vibrato::maxDelaySeconds(version),
-      });
+  addStandardVibratoHandling(konami_snes::vibrato::modulationSpec(version));
 
   if (percussion) {
     const auto percussionHeaders = collectPercussionHeaders(rawFile(), version, offset(), spcDirAddr);

@@ -5,8 +5,10 @@
  */
 #pragma once
 
+#include <algorithm>
 #include <cstdint>
 #include "KonamiSnesDefinitions.h"
+#include "Modulation.h"
 
 namespace konami_snes::vibrato {
 
@@ -108,6 +110,29 @@ inline constexpr uint8_t inlineFadeLength(KonamiSnesVersion version, uint8_t arg
   return (!usesLegacyVibrato(version) && arg1 >= kLateEraVibratoFadeThreshold)
       ? static_cast<uint8_t>(arg1 - (kLateEraVibratoFadeThreshold - 1))
       : 0;
+}
+
+inline VibratoModulationSpec modulationSpec(
+    KonamiSnesVersion version,
+    uint8_t maxDepth = kDefaultVibratoMaxDepth,
+    uint16_t maxRateFactor = 0) {
+  const uint8_t clampedMaxDepth = std::max(maxDepth, kMinVibratoMaxDepth);
+  const uint16_t effectiveMaxRateFactor = (maxRateFactor != 0)
+      ? maxRateFactor
+      : defaultMaxRateFactor(version);
+  const uint16_t clampedMaxRateFactor =
+      std::max(effectiveMaxRateFactor, minMaxRateFactor(version));
+  const double minHertz = baseHz(version);
+
+  return {
+      maxDepthCents(version, clampedMaxDepth),
+      minHertz,
+      minHertz * clampedMaxRateFactor,
+      DelayRange {
+          minDelaySeconds(version),
+          maxDelaySeconds(version),
+      },
+  };
 }
 
 }  // namespace konami_snes::vibrato

@@ -7,6 +7,7 @@
 #include "KonamiSnesInstr.h"
 #include "KonamiSnesVibrato.h"
 #include "ScaleConversion.h"
+#include "automation/SeqTrackAutomation.h"
 #include "spdlog/fmt/fmt.h"
 #include <algorithm>
 #include <cmath>
@@ -17,9 +18,10 @@ namespace {
 constexpr uint32_t MAX_TRACKS = 8;
 constexpr uint16_t SEQ_PPQN = 48;
 constexpr uint16_t KONAMI_SNES_STD_PITCH_BEND_RANGE_CENTS = 200;
-constexpr int16_t MIDI_PITCH_BEND_MIN = -8192;
-constexpr int16_t MIDI_PITCH_BEND_MAX = 8191;
 constexpr uint8_t KONAMI_SNES_DEFAULT_TEMPO = 0xff;
+
+using KonamiControllerMotion = SeqFixedPointMotion<int32_t>;
+using KonamiPitchMotion = SeqMotionPlan<double>;
 
 constexpr uint8_t noteDurationRateMax(KonamiSnesVersion version) {
   return version == KONAMISNES_V1 ? 100 : 127;
@@ -36,42 +38,6 @@ void fillEventRange(std::map<uint8_t, KonamiSnesSeqEventType>& eventMap,
   for (uint8_t statusByte = firstStatusByte; statusByte <= lastStatusByte; statusByte++) {
     eventMap[statusByte] = eventType;
   }
-}
-
-enum class FadeStepResult {
-  Inactive,
-  Running,
-  Finished,
-};
-
-template <typename ValueType>
-FadeStepResult advanceFade(ValueType& current,
-                           ValueType target,
-                           int16_t delta,
-                           uint8_t& length,
-                           bool useLength) {
-  if (useLength) {
-    length -= 1;
-    if (length == 0) {
-      current = target;
-      return FadeStepResult::Finished;
-    }
-
-    current += delta;
-    return FadeStepResult::Running;
-  }
-
-  if (delta == 0) {
-    return FadeStepResult::Inactive;
-  }
-
-  current += delta;
-  if ((delta > 0 && current >= target) || (delta < 0 && current <= target)) {
-    current = target;
-    return FadeStepResult::Finished;
-  }
-
-  return FadeStepResult::Running;
 }
 
 uint8_t convertVibratoDepthToMidi(KonamiSnesVersion version,
@@ -197,9 +163,7 @@ void KonamiSnesSeq::resetVars(void) {
 
   // The driver starts from tempo/speed FF unless the sequence overrides it.
   tempo = KONAMI_SNES_DEFAULT_TEMPO;
-  tempoFade = {};
-  tempoFade.currentTempo = tempo << 8;
-  tempoFade.targetTempo = tempoFade.currentTempo;
+  tempoFade.setCurrentRaw(tempo);
   tempoFadeLastUpdatedTime = static_cast<uint32_t>(-1);
 }
 
@@ -404,17 +368,10 @@ void KonamiSnesTrack::resetVars(void) {
 
   seqTuningCents = 0.0;
 
-  panFade = {};
-  panFade.currentPan = defaultPanValue() << 8;
-  panFade.targetPan = panFade.currentPan;
-  volumeFade = {};
-  pitchSlide = {};
-  vibratoDelay = 0;
-  vibratoRate = 0;
-  vibratoDepth = 0;
-  vibratoFade = {};
-  pitchBendRangeCents = KONAMI_SNES_STD_PITCH_BEND_RANGE_CENTS;
-  currentPitchBend = 0;
+  panFade.setCurrentRaw(defaultPanValue());
+  volumeFade.setCurrentRaw(0xff);
+  pitchSlide.reset(KONAMI_SNES_STD_PITCH_BEND_RANGE_CENTS);
+  vibrato.reset();
 }
 
 KonamiSnesSeq& KonamiSnesTrack::seq() {
@@ -430,22 +387,22 @@ double KonamiSnesTrack::getTuningInSemitones(int8_t tuning) {
 }
 
 void KonamiSnesTrack::syncVibratoRateAndDelay() {
-  if (!konami_snes::vibrato::isActive(seq().version, vibratoRate, vibratoDepth)) {
+  if (!konami_snes::vibrato::isActive(seq().version, vibrato.rate(), vibrato.depth())) {
     return;
   }
 
   auto &parentSeq = seq();
   if (readMode != READMODE_CONVERT_TO_MIDI) {
     parentSeq.maxVibratoRateFactor = std::max(parentSeq.maxVibratoRateFactor,
-                                              konami_snes::vibrato::rateFactor(parentSeq.version, vibratoRate, parentSeq.tempo));
+                                              konami_snes::vibrato::rateFactor(parentSeq.version, vibrato.rate(), parentSeq.tempo));
   }
 
   addChannelPressureNoItem(convertVibratoRateToMidi(parentSeq.version,
-                                                    vibratoRate,
+                                                    vibrato.rate(),
                                                     parentSeq.tempo,
                                                     parentSeq.maxVibratoRateFactor));
   addControllerEventNoItem(konami_snes::kVibratoDelayController,
-                           convertVibratoDelayToMidi(parentSeq.version, vibratoDelay, parentSeq.tempo));
+                           convertVibratoDelayToMidi(parentSeq.version, vibrato.delay(), parentSeq.tempo));
 }
 
 
@@ -467,78 +424,22 @@ void KonamiSnesTrack::onTickBegin() {
   auto &tempoFade = parentSeq.tempoFade;
   if (parentSeq.tempoFadeLastUpdatedTime != getTime()) {
     parentSeq.tempoFadeLastUpdatedTime = getTime();
-
-    const auto tempoResult = advanceFade(tempoFade.currentTempo, tempoFade.targetTempo, tempoFade.delta,
-                                         tempoFade.length, tempoFade.useLength);
-    if (tempoResult != FadeStepResult::Inactive) {
-      if (tempoResult == FadeStepResult::Finished) {
-        clearActiveTempoFade();
-      }
-      applyCurrentTempo();
-    }
+    tempoFade.tickRaw([this](int32_t) { applyCurrentTempo(); });
   }
 
-  const auto panResult = advanceFade(panFade.currentPan, panFade.targetPan, panFade.delta,
-                                     panFade.length, panFade.useLength);
-  if (panResult != FadeStepResult::Inactive) {
-    if (panResult == FadeStepResult::Finished) {
-      clearActivePanFade();
-    }
-    applyCurrentPan();
-  }
+  panFade.tickRaw([this](int32_t) { applyCurrentPan(); });
+  volumeFade.tickRaw([this](int32_t) { applyCurrentVolume(); });
 
-  const auto volumeResult = advanceFade(volumeFade.currentVolume, volumeFade.targetVolume, volumeFade.delta,
-                                        volumeFade.length, volumeFade.useLength);
-  if (volumeResult != FadeStepResult::Inactive) {
-    if (volumeResult == FadeStepResult::Finished) {
-      clearActiveVolumeFade();
-    }
-    applyCurrentVolume();
-  }
+  advanceSynthLfoFadeToModulation(vibrato, 8, [this](int32_t depth) {
+    return convertVibratoDepthToMidi(seq().version,
+                                     vibrato.depth(),
+                                     static_cast<uint16_t>(depth),
+                                     seq().maxVibratoDepth);
+  });
 
-  if (vibratoFade.ticksRemaining != 0) {
-    if (vibratoFade.delayRemaining != 0) {
-      vibratoFade.delayRemaining -= 1;
-    }
-    else {
-      const uint16_t targetDepth = static_cast<uint16_t>(vibratoDepth) << 8;
-      vibratoFade.ticksRemaining -= 1;
-      if (vibratoFade.ticksRemaining == 0) {
-        vibratoFade.currentDepth = targetDepth;
-      }
-      else {
-        vibratoFade.currentDepth = std::min<uint16_t>(targetDepth, vibratoFade.currentDepth + vibratoFade.step);
-      }
-
-      const uint8_t midiDepth = convertVibratoDepthToMidi(seq().version,
-                                                          vibratoDepth,
-                                                          vibratoFade.currentDepth,
-                                                          seq().maxVibratoDepth);
-      if (midiDepth != vibratoFade.midiDepth) {
-        addModulationNoItem(midiDepth);
-        vibratoFade.midiDepth = midiDepth;
-      }
-    }
+  if (pitchSlide.motionActive()) {
+    advancePitchBendAutomation(pitchSlide);
   }
-
-  if (pitchSlide.length == 0 || !pitchSlide.baseValid) {
-    return;
-  }
-
-  if (pitchSlide.delay > 0) {
-    pitchSlide.delay -= 1;
-    return;
-  }
-
-  pitchSlide.length -= 1;
-  if (pitchSlide.length == 0) {
-    pitchSlide.currentSemitones = pitchSlide.targetSemitones;
-  }
-  else {
-    pitchSlide.currentSemitones += pitchSlide.deltaSemitones;
-  }
-
-  applyCurrentPitchBend();
 }
 
 std::optional<KonamiSnesTrack::PitchSlide> KonamiSnesTrack::consumePitchSlide() {
@@ -573,8 +474,8 @@ KonamiSnesTrack::PitchSlide KonamiSnesTrack::readPitchSlide(KonamiSnesSeqEventTy
     case EVENT_PITCH_SLIDE_V1:
       slide.eventLength = 4;
       slide.targetSemitones = noteSemitones(slide.targetNote, true);
-      if (slide.length != 0 && pitchSlide.baseValid) {
-        slide.delta = static_cast<int16_t>(((slide.targetSemitones - pitchSlide.currentSemitones) * 256.0)
+      if (slide.length != 0 && pitchSlide.baseValid()) {
+        slide.delta = static_cast<int16_t>(((slide.targetSemitones - pitchSlide.currentPitch()) * 256.0)
                                            / slide.length);
         slide.deltaSemitones = slide.delta / 256.0;
       }
@@ -609,10 +510,7 @@ KonamiSnesTrack::PitchSlide KonamiSnesTrack::readPitchSlide(KonamiSnesSeqEventTy
 }
 
 void KonamiSnesTrack::clearActivePitchSlide() {
-  pitchSlide.delay = 0;
-  pitchSlide.length = 0;
-  pitchSlide.targetSemitones = 0.0;
-  pitchSlide.deltaSemitones = 0.0;
+  pitchSlide.clearMotion();
 }
 
 void KonamiSnesTrack::addPitchSlideEvent(const PitchSlide& slide) {
@@ -632,26 +530,23 @@ double KonamiSnesTrack::noteSemitones(uint8_t key, bool includeTuning) const {
 
 void KonamiSnesTrack::resetPitchForNote(uint8_t key) {
   clearActivePitchSlide();
-  setPitchBend(0);
-  pitchSlide.baseValid = !percussion;
+  setPitchBendAutomationBend(pitchSlide, 0);
 
-  if (!pitchSlide.baseValid) {
+  if (percussion) {
+    pitchSlide.invalidateBase();
     return;
   }
 
-  pitchSlide.baseSemitones = noteSemitones(key, true);
-  pitchSlide.currentSemitones = pitchSlide.baseSemitones;
+  pitchSlide.beginNote(noteSemitones(key, true));
 }
 
 uint16_t KonamiSnesTrack::pitchSlideRangeCents(const PitchSlide& slide) const {
-  double maxSlideSemitones = std::abs(slide.targetSemitones - pitchSlide.baseSemitones);
+  double maxSlideSemitones = std::abs(slide.targetSemitones - pitchSlide.basePitch());
   if (slide.length > 1) {
     maxSlideSemitones = std::max(maxSlideSemitones, std::abs((slide.length - 1) * slide.deltaSemitones));
   }
 
-  return maxSlideSemitones > 2.0
-      ? static_cast<uint16_t>(std::ceil(maxSlideSemitones) * 100.0)
-      : KONAMI_SNES_STD_PITCH_BEND_RANGE_CENTS;
+  return pitchSlide.rangeCentsForPitchSpan(std::ceil(maxSlideSemitones), KONAMI_SNES_STD_PITCH_BEND_RANGE_CENTS);
 }
 
 uint8_t KonamiSnesTrack::getNoteDuration(uint8_t length, uint8_t durationRate) const {
@@ -671,72 +566,37 @@ uint8_t KonamiSnesTrack::getNoteDuration(uint8_t length, uint8_t durationRate) c
   return std::max<uint8_t>(duration, 1);
 }
 
-void KonamiSnesTrack::setPitchBendRange(uint16_t cents) {
-  if (cents == 0 || cents == pitchBendRangeCents) {
-    return;
-  }
-
-  addPitchBendRangeNoItem(cents);
-  pitchBendRangeCents = cents;
-
-  if (pitchSlide.baseValid) {
-    applyCurrentPitchBend();
-  }
-}
-
-void KonamiSnesTrack::setPitchBend(int16_t bend) {
-  if (bend == currentPitchBend) {
-    return;
-  }
-
-  if (readMode == READMODE_CONVERT_TO_MIDI) {
-    pMidiTrack->addPitchBend(channel, bend);
-  }
-  currentPitchBend = bend;
-}
-
-void KonamiSnesTrack::applyCurrentPitchBend() {
-  const auto bend = static_cast<int32_t>(std::lround(((pitchSlide.currentSemitones - pitchSlide.baseSemitones) * 100.0
-                                                      / pitchBendRangeCents) * 8192.0));
-  setPitchBend(static_cast<int16_t>(std::clamp(bend,
-                                               static_cast<int32_t>(MIDI_PITCH_BEND_MIN),
-                                               static_cast<int32_t>(MIDI_PITCH_BEND_MAX))));
-}
-
 void KonamiSnesTrack::beginPitchSlide(const PitchSlide& slide) {
-  clearActivePitchSlide();
   addPitchSlideEvent(slide);
 
-  if (!pitchSlide.baseValid || slide.length == 0) {
-    setPitchBendRange(KONAMI_SNES_STD_PITCH_BEND_RANGE_CENTS);
+  if (!pitchSlide.baseValid() || slide.length == 0) {
+    clearActivePitchSlide();
+    setPitchBendAutomationRange(pitchSlide, KONAMI_SNES_STD_PITCH_BEND_RANGE_CENTS);
     return;
   }
 
-  setPitchBendRange(pitchSlideRangeCents(slide));
-  pitchSlide.delay = slide.delay;
-  pitchSlide.length = slide.length;
-  pitchSlide.targetSemitones = slide.targetSemitones;
-  pitchSlide.deltaSemitones = slide.deltaSemitones;
+  beginPitchBendAutomation(
+      pitchSlide,
+      KonamiPitchMotion::targetOverTicksWithStep(slide.targetSemitones,
+                                                 slide.deltaSemitones,
+                                                 slide.length,
+                                                 slide.delay),
+      pitchSlideRangeCents(slide),
+      KONAMI_SNES_STD_PITCH_BEND_RANGE_CENTS);
 }
 
-KonamiSnesTrack::VolumeFade KonamiSnesTrack::readVolumeFade(KonamiSnesSeqEventType eventType, uint32_t offset) const {
-  VolumeFade fade {offset, 0};
+KonamiSnesTrack::ControllerFade KonamiSnesTrack::readVolumeFade(KonamiSnesSeqEventType eventType, uint32_t offset) const {
+  ControllerFade fade {offset, {}};
 
   switch (eventType) {
     case EVENT_VOLUME_FADE_V1:
-      fade.length = readByte(curOffset);
-      fade.targetVolume = readByte(curOffset + 1);
-      fade.useLength = true;
-      if (fade.length != 0) {
-        fade.delta = static_cast<int16_t>(((static_cast<int32_t>(fade.targetVolume) << 8)
-                                            - (volumeFade.currentVolume & 0xff00))
-                                           / fade.length);
-      }
+      fade.motion = KonamiControllerMotion::toRawTarget(readByte(curOffset + 1), readByte(curOffset));
       break;
 
     case EVENT_VOLUME_FADE_V2:
-      fade.targetVolume = readByte(curOffset);
-      fade.delta = static_cast<int16_t>(static_cast<int8_t>(readByte(curOffset + 1)) << 4);
+      fade.motion = KonamiControllerMotion::toRawTargetByFixedStep(
+          readByte(curOffset),
+          static_cast<int16_t>(static_cast<int8_t>(readByte(curOffset + 1)) << 4));
       break;
 
     default:
@@ -747,41 +607,11 @@ KonamiSnesTrack::VolumeFade KonamiSnesTrack::readVolumeFade(KonamiSnesSeqEventTy
   return fade;
 }
 
-void KonamiSnesTrack::addVolumeFadeEvent(const VolumeFade& fade) {
-  const std::string desc = fade.useLength
-      ? fmt::format("Length: {:d}  Target Volume: {:d}", fade.length, fade.targetVolume)
-      : fmt::format("Target Volume: {:d}  Speed: {:.2f}", fade.targetVolume, fade.delta / 256.0);
-  addGenericEvent(fade.offset, 3, "Volume Fade", desc, Type::VolumeSlide);
-}
-
-void KonamiSnesTrack::clearActiveVolumeFade() {
-  volumeFade.targetVolume = volumeFade.currentVolume;
-  volumeFade.delta = 0;
-  volumeFade.length = 0;
-  volumeFade.useLength = false;
-}
-
 void KonamiSnesTrack::applyCurrentVolume() {
-  const uint8_t rawVolume = static_cast<uint8_t>(std::clamp(volumeFade.currentVolume >> 8, 0, 0xff));
+  const uint8_t rawVolume = static_cast<uint8_t>(std::clamp(volumeFade.currentRaw(), 0, 0xff));
   const uint8_t midiVolume = convertPercentAmpToStdMidiVal(rawVolume / 255.0);
   if (midiVolume != vol) {
     addVolNoItem(midiVolume);
-  }
-}
-
-void KonamiSnesTrack::beginVolumeFade(const VolumeFade& fade) {
-  addVolumeFadeEvent(fade);
-
-  volumeFade.currentVolume &= 0xff00;
-  volumeFade.targetVolume = fade.targetVolume << 8;
-  volumeFade.delta = fade.delta;
-  volumeFade.length = fade.length;
-  volumeFade.useLength = fade.useLength;
-
-  if ((fade.useLength && fade.length == 0) || (!fade.useLength && fade.delta == 0)) {
-    volumeFade.currentVolume = volumeFade.targetVolume;
-    clearActiveVolumeFade();
-    applyCurrentVolume();
   }
 }
 
@@ -820,22 +650,19 @@ uint8_t KonamiSnesTrack::convertPanValueToMidiPan(uint8_t pan) const {
   return convertLinearPercentPanValToStdMidiVal(static_cast<double>(volumeRight) / (volumeLeft + volumeRight));
 }
 
-KonamiSnesTrack::PanFade KonamiSnesTrack::readPanFade(KonamiSnesSeqEventType eventType, uint32_t offset) const {
-  PanFade fade {offset, 0};
+KonamiSnesTrack::ControllerFade KonamiSnesTrack::readPanFade(KonamiSnesSeqEventType eventType, uint32_t offset) const {
+  ControllerFade fade {offset, {}};
 
   switch (eventType) {
     case EVENT_PAN_FADE_V1:
-      fade.length = readByte(curOffset);
-      fade.targetPan = clampPanValue(readByte(curOffset + 1));
-      fade.useLength = true;
-      if (fade.length != 0) {
-        fade.delta = static_cast<int16_t>(((static_cast<int32_t>(fade.targetPan) << 8) - (panFade.currentPan & 0xff00)) / fade.length);
-      }
+      fade.motion = KonamiControllerMotion::toRawTarget(clampPanValue(readByte(curOffset + 1)),
+                                                        readByte(curOffset));
       break;
 
     case EVENT_PAN_FADE_V2:
-      fade.targetPan = clampPanValue(readByte(curOffset));
-      fade.delta = static_cast<int16_t>(static_cast<int8_t>(readByte(curOffset + 1)) << 4);
+      fade.motion = KonamiControllerMotion::toRawTargetByFixedStep(
+          clampPanValue(readByte(curOffset)),
+          static_cast<int16_t>(static_cast<int8_t>(readByte(curOffset + 1)) << 4));
       break;
 
     default:
@@ -844,64 +671,24 @@ KonamiSnesTrack::PanFade KonamiSnesTrack::readPanFade(KonamiSnesSeqEventType eve
   }
 
   return fade;
-}
-
-void KonamiSnesTrack::addPanFadeEvent(const PanFade& fade) {
-  const std::string desc = fade.useLength
-      ? fmt::format("Length: {:d}  Target Pan: {:d}", fade.length, fade.targetPan)
-      : fmt::format("Target Pan: {:d}  Speed: {:.2f}", fade.targetPan, fade.delta / 256.0);
-  addGenericEvent(fade.offset, 3, "Pan Fade", desc, Type::PanSlide);
-}
-
-void KonamiSnesTrack::beginPanFade(const PanFade& fade) {
-  addPanFadeEvent(fade);
-
-  panFade.currentPan &= 0xff00;
-  panFade.targetPan = fade.targetPan << 8;
-  panFade.delta = fade.delta;
-  panFade.length = fade.length;
-  panFade.useLength = fade.useLength;
-
-  if ((fade.useLength && fade.length == 0) || (!fade.useLength && fade.delta == 0)) {
-    panFade.currentPan = panFade.targetPan;
-    clearActivePanFade();
-    applyCurrentPan();
-  }
-}
-
-void KonamiSnesTrack::clearActivePanFade() {
-  panFade.targetPan = panFade.currentPan;
-  panFade.delta = 0;
-  panFade.length = 0;
-  panFade.useLength = false;
 }
 
 void KonamiSnesTrack::applyCurrentPan() {
-  const uint8_t midiPan = convertPanValueToMidiPan(clampPanValue(panFade.currentPan >> 8));
-  if (midiPan != prevPan) {
-    addPanNoItem(midiPan);
-  }
+  addPanNoItem(convertPanValueToMidiPan(clampPanValue(panFade.currentRaw())));
 }
 
-KonamiSnesTrack::TempoFade KonamiSnesTrack::readTempoFade(KonamiSnesSeqEventType eventType, uint32_t offset) const {
-  const auto &tempoFade = seq().tempoFade;
-  TempoFade fade {offset, 0};
+KonamiSnesTrack::ControllerFade KonamiSnesTrack::readTempoFade(KonamiSnesSeqEventType eventType, uint32_t offset) const {
+  ControllerFade fade {offset, {}};
 
   switch (eventType) {
     case EVENT_TEMPO_FADE_V1:
-      fade.length = readByte(curOffset);
-      fade.targetTempo = readByte(curOffset + 1);
-      fade.useLength = true;
-      if (fade.length != 0) {
-        fade.delta = static_cast<int16_t>(((static_cast<int32_t>(fade.targetTempo) << 8)
-                                           - (tempoFade.currentTempo & 0xff00))
-                                          / fade.length);
-      }
+      fade.motion = KonamiControllerMotion::toRawTarget(readByte(curOffset + 1), readByte(curOffset));
       break;
 
     case EVENT_TEMPO_FADE_V2:
-      fade.targetTempo = readByte(curOffset);
-      fade.delta = static_cast<int16_t>(static_cast<int8_t>(readByte(curOffset + 1)) << 4);
+      fade.motion = KonamiControllerMotion::toRawTargetByFixedStep(
+          readByte(curOffset),
+          static_cast<int16_t>(static_cast<int8_t>(readByte(curOffset + 1)) << 4));
       break;
 
     default:
@@ -910,44 +697,11 @@ KonamiSnesTrack::TempoFade KonamiSnesTrack::readTempoFade(KonamiSnesSeqEventType
   }
 
   return fade;
-}
-
-void KonamiSnesTrack::addTempoFadeEvent(const TempoFade& fade) {
-  const auto bpm = seq().getTempoInBPM(fade.targetTempo);
-  const std::string desc = fade.useLength
-      ? fmt::format("Length: {:d}  Target BPM: {}", fade.length, bpm)
-      : fmt::format("Target BPM: {}  Speed: {:.2f}", bpm, fade.delta / 256.0);
-  addGenericEvent(fade.offset, 3, "Tempo Fade", desc, Type::Tempo);
-}
-
-void KonamiSnesTrack::beginTempoFade(const TempoFade& fade) {
-  addTempoFadeEvent(fade);
-
-  auto &tempoFade = seq().tempoFade;
-  tempoFade.currentTempo &= 0xff00;
-  tempoFade.targetTempo = fade.targetTempo << 8;
-  tempoFade.delta = fade.delta;
-  tempoFade.length = fade.length;
-  tempoFade.useLength = fade.useLength;
-
-  if ((fade.useLength && fade.length == 0) || (!fade.useLength && fade.delta == 0)) {
-    tempoFade.currentTempo = tempoFade.targetTempo;
-    clearActiveTempoFade();
-    applyCurrentTempo();
-  }
-}
-
-void KonamiSnesTrack::clearActiveTempoFade() {
-  auto &tempoFade = seq().tempoFade;
-  tempoFade.targetTempo = tempoFade.currentTempo;
-  tempoFade.delta = 0;
-  tempoFade.length = 0;
-  tempoFade.useLength = false;
 }
 
 void KonamiSnesTrack::applyCurrentTempo() {
   auto &parentSeq = seq();
-  const auto newTempo = static_cast<uint8_t>(std::clamp(parentSeq.tempoFade.currentTempo >> 8, 0, 0xff));
+  const auto newTempo = static_cast<uint8_t>(std::clamp(parentSeq.tempoFade.currentRaw(), 0, 0xff));
   if (newTempo != parentSeq.tempo) {
     parentSeq.tempo = newTempo;
     addTempoBPMNoItem(parentSeq.getTempoInBPM(newTempo));
@@ -991,8 +745,7 @@ void KonamiSnesTrack::addUnknownEvent(uint32_t beginOffset, uint8_t statusByte, 
 }
 
 void KonamiSnesTrack::resetPanAfterProgramChange() {
-  panFade.currentPan = defaultPanValue() << 8;
-  clearActivePanFade();
+  panFade.setCurrentRaw(defaultPanValue());
   addPanNoItem(64); // TODO: apply true pan from instrument table
 }
 
@@ -1079,15 +832,10 @@ bool KonamiSnesTrack::readEvent() {
       const auto slide = consumePitchSlide();
       const bool isTiedNote = prevNoteSlurred && key == prevNoteKey;
 
-      if (!isTiedNote && vibratoFade.length != 0 &&
-          konami_snes::vibrato::isActive(seq().version, vibratoRate, vibratoDepth)) {
-        vibratoFade.delayRemaining = vibratoDelay;
-        vibratoFade.ticksRemaining = vibratoFade.length;
-        vibratoFade.currentDepth = 0;
-        if (vibratoFade.midiDepth != 0) {
-          addModulationNoItem(0);
-          vibratoFade.midiDepth = 0;
-        }
+      if (!isTiedNote && vibrato.hasReusableFade() &&
+          konami_snes::vibrato::isActive(seq().version, vibrato.rate(), vibrato.depth())) {
+        vibrato.beginReusableFadeToConfiguredDepth(8);
+        setSynthLfoModulationDepth(vibrato, 0);
       }
 
       if (isTiedNote) {
@@ -1110,7 +858,7 @@ bool KonamiSnesTrack::readEvent() {
         beginPitchSlide(*slide);
       }
       else {
-        setPitchBendRange(KONAMI_SNES_STD_PITCH_BEND_RANGE_CENTS);
+        setPitchBendAutomationRange(pitchSlide, KONAMI_SNES_STD_PITCH_BEND_RANGE_CENTS);
       }
 
       prevNoteSlurred = (noteDurationRate == parentSeq.NOTE_DUR_RATE_MAX) && !percussion;
@@ -1215,7 +963,7 @@ bool KonamiSnesTrack::readEvent() {
 
     case EVENT_PAN: {
       uint8_t newPan = readByte(curOffset++);
-      clearActivePanFade();
+      panFade.clearMotion();
 
       bool instrumentPanOff;
       bool instrumentPanOn;
@@ -1241,7 +989,7 @@ bool KonamiSnesTrack::readEvent() {
       }
       else {
         newPan = clampPanValue(newPan);
-        panFade.currentPan = newPan << 8;
+        panFade.setCurrentRaw(newPan);
         const uint8_t midiPan = convertPanValueToMidiPan(newPan);
         // TODO: apply volume scale
         addPan(beginOffset, curOffset - beginOffset, midiPan);
@@ -1267,31 +1015,26 @@ bool KonamiSnesTrack::readEvent() {
         immediateFadeLength = readByte(curOffset + 1);
       }
 
-      vibratoDelay = newVibratoDelay;
-      vibratoRate = newVibratoRate;
-      vibratoDepth = newVibratoDepth;
-      vibratoFade = {};
+      vibrato.configure(newVibratoDelay, newVibratoRate, newVibratoDepth);
       if (builtInFadeLength != 0) {
-        vibratoFade.length = builtInFadeLength;
-        vibratoFade.step = static_cast<uint16_t>((static_cast<uint16_t>(vibratoDepth) << 8) / builtInFadeLength);
+        vibrato.setReusableFadeToConfiguredDepth(builtInFadeLength, 8);
       }
 
-      const bool active = konami_snes::vibrato::isActive(parentSeq.version, vibratoRate, vibratoDepth);
+      const bool active = konami_snes::vibrato::isActive(parentSeq.version, vibrato.rate(), vibrato.depth());
       const bool deferDepthForFade = active && immediateFadeLength != 0;
       if (readMode != READMODE_CONVERT_TO_MIDI && active) {
-        parentSeq.maxVibratoDepth = std::max(parentSeq.maxVibratoDepth, vibratoDepth);
+        parentSeq.maxVibratoDepth = std::max(parentSeq.maxVibratoDepth, vibrato.depth());
       }
 
       const uint8_t midiDepth = deferDepthForFade
           ? 0
           : (active ? convertVibratoDepthToMidi(parentSeq.version,
-                                                vibratoDepth,
-                                                static_cast<uint16_t>(vibratoDepth) << 8,
+                                                vibrato.depth(),
+                                                static_cast<uint16_t>(vibrato.depth()) << 8,
                                                 parentSeq.maxVibratoDepth)
                     : 0);
-      addModulationNoItem(midiDepth);
-      vibratoFade.currentDepth = static_cast<uint16_t>(deferDepthForFade ? 0 : vibratoDepth) << 8;
-      vibratoFade.midiDepth = midiDepth;
+      vibrato.setCurrentDepthPreservingMotion(deferDepthForFade ? 0 : vibrato.configuredDepth(8));
+      setSynthLfoModulationDepth(vibrato, midiDepth, true);
       if (active) {
         syncVibratoRateAndDelay();
       }
@@ -1409,8 +1152,7 @@ bool KonamiSnesTrack::readEvent() {
       // actual Konami engine has tempo for each tracks,
       // here we set the song speed as a global tempo
       uint8_t newTempo = readByte(curOffset++);
-      parentSeq.tempoFade.currentTempo = newTempo << 8;
-      clearActiveTempoFade();
+      parentSeq.tempoFade.setCurrentRaw(newTempo);
       parentSeq.tempo = newTempo;
       addTempoBPM(beginOffset, curOffset - beginOffset, parentSeq.getTempoInBPM(newTempo));
       if (konami_snes::usesLegacyVibrato(parentSeq.version)) {
@@ -1425,7 +1167,12 @@ bool KonamiSnesTrack::readEvent() {
     case EVENT_TEMPO_FADE_V2: {
       const auto fade = readTempoFade(eventType, beginOffset);
       curOffset += 2;
-      beginTempoFade(fade);
+      const auto bpm = parentSeq.getTempoInBPM(static_cast<uint8_t>(fade.motion.targetRaw));
+      desc = fade.motion.usesTicks()
+          ? fmt::format("Length: {:d}  Target BPM: {}", fade.motion.ticks, bpm)
+          : fmt::format("Target BPM: {}  Speed: {:.2f}", bpm, fade.motion.stepFixed / 256.0);
+      addGenericEvent(fade.offset, 3, "Tempo Fade", desc, Type::Tempo);
+      parentSeq.tempoFade.begin(fade.motion, [this](int32_t) { applyCurrentTempo(); });
       break;
     }
 
@@ -1451,8 +1198,7 @@ bool KonamiSnesTrack::readEvent() {
 
     case EVENT_VOLUME: {
       uint8_t newVolume = readByte(curOffset++);
-      volumeFade.currentVolume = newVolume << 8;
-      clearActiveVolumeFade();
+      volumeFade.setCurrentRaw(newVolume);
       uint8_t midiVolume = convertPercentAmpToStdMidiVal(newVolume / 255.0);
       addVol(beginOffset, curOffset - beginOffset, midiVolume);
       break;
@@ -1462,7 +1208,13 @@ bool KonamiSnesTrack::readEvent() {
     case EVENT_VOLUME_FADE_V2: {
       const auto fade = readVolumeFade(eventType, beginOffset);
       curOffset += 2;
-      beginVolumeFade(fade);
+      desc = fade.motion.usesTicks()
+          ? fmt::format("Length: {:d}  Target Volume: {:d}", fade.motion.ticks, fade.motion.targetRaw)
+          : fmt::format("Target Volume: {:d}  Speed: {:.2f}",
+                        fade.motion.targetRaw,
+                        fade.motion.stepFixed / 256.0);
+      addGenericEvent(fade.offset, 3, "Volume Fade", desc, Type::VolumeSlide);
+      volumeFade.begin(fade.motion, [this](int32_t) { applyCurrentVolume(); });
       break;
     }
 
@@ -1571,23 +1323,21 @@ bool KonamiSnesTrack::readEvent() {
     case EVENT_PAN_FADE_V2: {
       const auto fade = readPanFade(eventType, beginOffset);
       curOffset += 2;
-      beginPanFade(fade);
+      desc = fade.motion.usesTicks()
+          ? fmt::format("Length: {:d}  Target Pan: {:d}", fade.motion.ticks, fade.motion.targetRaw)
+          : fmt::format("Target Pan: {:d}  Speed: {:.2f}",
+                        fade.motion.targetRaw,
+                        fade.motion.stepFixed / 256.0);
+      addGenericEvent(fade.offset, 3, "Pan Fade", desc, Type::PanSlide);
+      panFade.begin(fade.motion, [this](int32_t) { applyCurrentPan(); });
       break;
     }
 
     case EVENT_VIBRATO_FADE: {
       uint8_t fadeSpeed = readByte(curOffset++);
       desc = fmt::format("Fade Length: {:d}", fadeSpeed);
-      addGenericEvent(beginOffset, curOffset - beginOffset, "Vibrato Fade", desc,
-                      Type::Vibrato);
-      if (fadeSpeed == 0) {
-        vibratoFade.length = 0;
-        vibratoFade.step = 0;
-      }
-      else {
-        vibratoFade.length = fadeSpeed;
-        vibratoFade.step = static_cast<uint16_t>((static_cast<uint16_t>(vibratoDepth) << 8) / fadeSpeed);
-      }
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Vibrato Fade", desc, Type::Vibrato);
+      vibrato.setReusableFadeToConfiguredDepth(fadeSpeed, 8);
       break;
     }
 
@@ -1669,8 +1419,7 @@ bool KonamiSnesTrack::readEvent() {
 
     case EVENT_END: {
       if (inSubroutine) {
-        addGenericEvent(beginOffset, curOffset - beginOffset, "End Pattern", desc,
-                        Type::RepeatEnd);
+        addGenericEvent(beginOffset, curOffset - beginOffset, "End Pattern", desc, Type::RepeatEnd);
 
         inSubroutine = false;
         curOffset = subReturnAddr;
