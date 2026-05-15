@@ -1,6 +1,6 @@
 #pragma once
 #include "VGMSeq.h"
-#include "SeqMidiAutomation.h"
+#include "automation/SeqMidiAutomation.h"
 #include "SeqTrack.h"
 #include "SeqEvent.h"
 #include "CapcomSnesFormat.h"
