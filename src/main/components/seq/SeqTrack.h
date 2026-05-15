@@ -13,7 +13,7 @@
 #include <vector>
 #include "VGMItem.h"
 #include "VGMSeq.h"
-#include "SeqMidiAutomation.h"
+#include "automation/SeqMidiAutomation.h"
 #include <spdlog/common.h>
 #include "LogManager.h"
 #include "SynthType.h"
@@ -314,11 +314,13 @@ private:
   void addEndOfTrackNoItem();
   void addControllerEventNoItem(uint8_t controllerType, uint8_t controllerValue) const;
 
+  // Advance pitch automation and emit any changed MIDI bend on this track.
   template <typename PitchType>
   SeqMotionTick<PitchType> advancePitchBendAutomation(SeqPitchBendAutomation<PitchType>& automation) {
     return automation.tickBend([this](int16_t bend) { addPitchBendNoItem(bend); });
   }
 
+  // Start a pitch slide and emit any range or initial bend changes on this track.
   template <typename PitchType>
   bool beginPitchBendAutomation(SeqPitchBendAutomation<PitchType>& automation,
                                 const SeqMotionPlan<PitchType>& motion,
@@ -334,6 +336,7 @@ private:
         [this](int16_t bend) { addPitchBendNoItem(bend); });
   }
 
+  // Set pitch bend range and emit any bend update required by the new range.
   template <typename PitchType>
   bool setPitchBendAutomationRange(SeqPitchBendAutomation<PitchType>& automation,
                                    uint16_t cents) {
@@ -344,17 +347,20 @@ private:
                                [this](int16_t bend) { addPitchBendNoItem(bend); });
   }
 
+  // Emit a raw MIDI bend if it differs from the automation's cached bend.
   template <typename PitchType>
   bool setPitchBendAutomationBend(SeqPitchBendAutomation<PitchType>& automation,
                                   int16_t bend) {
     return automation.setBend(bend, [this](int16_t newBend) { addPitchBendNoItem(newBend); });
   }
 
+  // Emit bend for the automation's current source-space pitch if it changed.
   template <typename PitchType>
   bool applyPitchBendAutomation(SeqPitchBendAutomation<PitchType>& automation) {
     return automation.applyCurrentBend([this](int16_t bend) { addPitchBendNoItem(bend); });
   }
 
+  // Restore the default bend range and emit centered bend if it changed.
   template <typename PitchType>
   void resetPitchBendAutomation(SeqPitchBendAutomation<PitchType>& automation,
                                 uint16_t defaultRangeCents) {
@@ -365,6 +371,7 @@ private:
                                  [this](int16_t bend) { addPitchBendNoItem(bend); });
   }
 
+  // Emit synth vibrato depth through CC1/modulation if it changed.
   bool setSynthLfoModulationDepth(SeqSynthLfoAutomation& automation,
                                   uint8_t depth,
                                   bool force = false) {
@@ -375,6 +382,7 @@ private:
                                 force);
   }
 
+  // Emit synth LFO depth through the given MIDI controller if it changed.
   bool setSynthLfoControllerDepth(SeqSynthLfoAutomation& automation,
                                   uint8_t controller,
                                   uint8_t depth,
@@ -386,6 +394,7 @@ private:
                                 force);
   }
 
+  // Advance an LFO fade and emit the converted CC1/modulation depth if it changed.
   template <typename ConvertDepth>
   SeqMotionTick<int32_t> advanceSynthLfoFadeToModulation(
       SeqSynthLfoAutomation& automation,
