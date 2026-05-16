@@ -13,6 +13,22 @@
 
 namespace akao_snes::modulation {
 
+/*
+ * These helpers translate the SNES driver's LFO state into MIDI
+ * parameters. The driver writes vibrato as a pitch offset and tremolo as a
+ * volume-scale offset; VGMTrans exports those through the standard modulation
+ * metadata plus controller automation.
+ *
+ * Version summary:
+ * - V1: rate uses the upper 7 bits (rate >> 1), depth is literal, and
+ *   vibrato has a reusable per-note fade-in.
+ * - V2: rate uses the lower 7 bits, depth bit 7 halves the rate, and
+ *   depth bits also encode direction/boost behavior.
+ * - V3: rate is stored as rate + 1 and depth is a 6-bit magnitude scaled
+ *   to an odd range.
+ * - V4: rate zero means 256 frames; depth is a 6-bit magnitude.
+ */
+
 inline constexpr uint8_t kDefaultTempo = 0x20;
 inline constexpr uint8_t kMinTimer0Frequency = 0x24;
 inline constexpr uint8_t kDefaultTimer0Frequency = 0x27;
@@ -41,6 +57,8 @@ inline constexpr bool isLfoActive(AkaoSnesVersion version, uint8_t rate, uint8_t
   }
 
   if (version == AKAOSNES_V2) {
+    // V2 can be active with a zero depth byte because the low six bits are
+    // interpreted as magnitude + 1; only a zero rate counter disables it.
     return v2RateCounter(rate) != 0;
   }
 
@@ -52,6 +70,8 @@ inline constexpr bool isLfoActive(AkaoSnesVersion version, uint8_t rate, uint8_t
 }
 
 inline constexpr uint16_t effectiveRateFrames(AkaoSnesVersion version, uint8_t rate, uint8_t depth) {
+  // All versions produce a half-cycle over this many driver frames. The frame
+  // rate itself is timer0-dependent and is converted to MIDI Hz below.
   if (version == AKAOSNES_V1) {
     return static_cast<uint16_t>(v1RateCounter(rate)) + 1;
   }
@@ -69,6 +89,8 @@ inline constexpr uint16_t effectiveRateFrames(AkaoSnesVersion version, uint8_t r
 }
 
 inline constexpr uint8_t modulationMagnitude(AkaoSnesVersion version, uint8_t depth) {
+  // Convert version-specific depth encoding to the driver's high-byte LFO
+  // amplitude space before mapping it to cents or dB.
   if (version == AKAOSNES_V2) {
     return static_cast<uint8_t>((depth & 0x3f) + 1);
   }
@@ -145,6 +167,8 @@ inline double v2PhaseHighByteAmplitude(uint8_t rate, uint8_t depth) {
     return 0.0;
   }
 
+  // V2 computes a phase step from depth and rate. The high byte of the phase
+  // accumulator is what ultimately becomes pitch/volume modulation magnitude.
   const uint16_t step = static_cast<uint16_t>(512 * modulationMagnitude(AKAOSNES_V2, depth) / frames);
   return std::min(128.0, static_cast<double>((step * frames) >> 8));
 }
@@ -199,9 +223,11 @@ inline double v2VibratoDepthCents(uint8_t rate, uint8_t depth) {
   }
 
   if (depth < 0x40) {
+    // Low-depth V2 vibrato is downward-biased in the driver pitch formula.
     return -1200.0 * std::log2(1.0 - (15.0 * amplitude / 65536.0));
   }
 
+  // Depth bit 6 selects the upward-side scaling.
   return 1200.0 * std::log2(1.0 + (15.0 * amplitude / 32768.0));
 }
 
@@ -243,6 +269,8 @@ inline double v1TremoloDepthDb(uint8_t rate, uint8_t depth) {
   uint8_t minScaleByte = 0xff;
   bool foundAttenuatedSample = false;
 
+  // FF4 tremolo is not a simple symmetric amplitude value. Simulate one full
+  // driver LFO cycle and export the deepest attenuation reached by the scale byte.
   for (uint16_t frame = 0; frame < static_cast<uint16_t>(2 * (counter + 1)); frame++) {
     const uint16_t oldStep = step;
     if (countdown == 0) {
@@ -275,6 +303,7 @@ inline double v2TremoloDepthDb(uint8_t rate, uint8_t depth) {
   }
 
   if (depth >= 0x40 && depth < 0x80) {
+    // This depth range boosts above nominal instead of attenuating below it.
     const double boostScale = 1.0 + (std::min(127.0, amplitude) / 256.0);
     return 20.0 * std::log10(boostScale);
   }
@@ -297,6 +326,7 @@ inline double tremoloDepthDb(AkaoSnesVersion version, uint8_t rate, uint8_t dept
 
 inline constexpr uint8_t delayTicks(AkaoSnesVersion version, uint8_t delay) {
   if (version == AKAOSNES_V1) {
+    // FF4 stores delay + 1 in the driver; a literal $ff wraps to zero.
     return (delay == 0xff) ? 0 : delay;
   }
 
@@ -421,6 +451,8 @@ inline uint32_t v1VibratoRampTicks(uint8_t rate, uint8_t tempo) {
   }
 
   const uint8_t safeTempo = (tempo == 0) ? 1 : tempo;
+  // FF4 derives the fade length from the vibrato rate counter in driver frames,
+  // then the sequencer tempo determines how many music ticks those frames span.
   const double rampFrames = 14.0 * (counter + 1);
   return std::max<uint32_t>(1, static_cast<uint32_t>(std::lround(rampFrames * safeTempo / 256.0)));
 }

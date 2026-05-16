@@ -787,6 +787,8 @@ bool AkaoSnesTrack::readEvent(void) {
       uint8_t pitchEnvelopeDelay;
       uint8_t pitchEnvelopeLength;
 
+      // V1/FF4: D6 dd ll ss. V2/RS1: DB ss dd ll. Both commands install a
+      // persistent per-voice envelope; the next normal note starts the ramp.
       if (parentSeq->version == AKAOSNES_V1) {
         pitchEnvelopeDelay = readByte(curOffset++);
         pitchEnvelopeLength = readByte(curOffset++);
@@ -834,6 +836,8 @@ bool AkaoSnesTrack::readEvent(void) {
       uint8_t pitchSlideTime = readByte(curOffset++);
       int8_t pitchSlideSemitones = static_cast<int8_t>(readByte(curOffset++));
       if (parentSeq->version == AKAOSNES_V3 || parentSeq->version == AKAOSNES_V4) {
+        // V3 D6 and V4 C8 are one-shot pitch-slide setup commands:
+        // tt stores as tt + 1, wrapping $ff to the 256-step case.
         const uint16_t pitchSlideSteps = static_cast<uint16_t>(pitchSlideTime) + 1;
         setPendingPitchSlide(pitchSlideSteps, pitchSlideSemitones);
         desc = fmt::format("Time: {}  Steps: {}  Key: {} semitones",

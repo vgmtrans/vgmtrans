@@ -9,6 +9,18 @@
 #include "automation/SeqTrackAutomation.h"
 #include <spdlog/fmt/fmt.h>
 
+/*
+ * AkaoSnes LFO events cover vibrato and tremolo across all four driver
+ * versions. The event handlers here keep only the live per-track state and
+ * convert it to MIDI automation; the version-specific math lives in
+ * AkaoSnesModulation.h.
+ *
+ * V1/FF4 is the outlier: vibrato has a per-note fade-in behavior that restarts
+ * on normal keyed notes and is not restarted by ties/slur/legato. V2 also uses
+ * a different operand order for the three-byte LFO setup command. V3/V4 share
+ * the later command shape, with V4's rate byte treating zero as 256 frames.
+ */
+
 void AkaoSnesSeq::syncTempoDependentTracks() {
   if (!akao_snes::modulation::supportsLfoAutomation(version)) {
     return;
@@ -21,6 +33,7 @@ void AkaoSnesSeq::syncTempoDependentTracks() {
 
 AkaoSnesTrack::LfoParams AkaoSnesTrack::readLfoParams() {
   const auto *parent = static_cast<AkaoSnesSeq*>(parentSeq);
+  // V2 stores depth, delay, rate. The other supported versions store delay, rate, depth.
   if (parent->version == AKAOSNES_V2) {
     const uint8_t depth = readByte(curOffset++);
     const uint8_t delay = readByte(curOffset++);
@@ -78,6 +91,8 @@ void AkaoSnesTrack::applyLfo(LfoTarget target,
   auto& lfo = isVibrato ? vibrato : tremolo;
   lfo.configure(params.delay, params.rate, params.depth);
   if (isVibrato) {
+    // Only V1 creates reusable note-start vibrato fade state. Later versions
+    // apply the configured vibrato depth directly after the setup command.
     configureVibratoFade();
   }
 
@@ -112,6 +127,7 @@ void AkaoSnesTrack::clearLfo(LfoTarget target, uint32_t offset, uint32_t length)
   auto& lfo = isVibrato ? vibrato : tremolo;
   lfo.setDepth(0);
   if (isVibrato) {
+    // Turning V1 vibrato off also prevents later notes from replaying thestored fade-in ramp.
     vibrato.clearReusableFade();
   }
   setLfoOutputDepth(target, 0, true);
@@ -126,6 +142,9 @@ void AkaoSnesTrack::configureVibratoFade() {
     return;
   }
 
+  // V1/FF4 ramps from zero to the configured vibrato depth over a driver-derived
+  // number of sequencer ticks. The actual MIDI depth is computed during the
+  // fade so tempo changes can keep the reusable shape synchronized.
   vibrato.setReusableFadeToConfiguredDepth(
       akao_snes::modulation::v1VibratoRampTicks(vibrato.rate(), parent->tempo), 8);
 }
@@ -137,6 +156,8 @@ void AkaoSnesTrack::beginVibratoForNote() {
     return;
   }
 
+  // A normal V1 note starts with zero vibrato depth, then updateVibratoFade()
+  // advances it on sequencer ticks. Ties and legato notes skip this call.
   vibrato.beginReusableFade(akao_snes::modulation::delayTicks(parent->version, vibrato.delay()),
                             vibrato.configuredDepth(8));
   setSynthLfoModulationDepth(vibrato, 0, true);
@@ -171,6 +192,8 @@ void AkaoSnesTrack::syncLfoRateAndDelay(LfoTarget target) {
   }
 
   if (isVibrato) {
+    // Tempo changes can alter V1's reusable fade duration, so refresh it when
+    // resending tempo-dependent LFO controller values.
     configureVibratoFade();
   }
 
