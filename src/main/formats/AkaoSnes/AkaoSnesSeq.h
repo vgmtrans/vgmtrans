@@ -197,6 +197,7 @@ public:
     uint8_t length = 0;
     uint16_t progressStep = 0;
     uint8_t activeDelay = 0;
+    uint8_t activeCount = 0;
     uint32_t progress = 0;
     int32_t targetOffset = 0;
   } pitchEnvelope;

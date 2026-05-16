@@ -43,8 +43,24 @@ int32_t akaoSnesPitchSlideStep(AkaoSnesVersion version,
   return diff / static_cast<int32_t>(steps);
 }
 
-uint16_t akaoSnesV2PitchEnvelopeProgressStep(uint8_t length) {
-  return length == 0 ? 0 : static_cast<uint16_t>(0xff00 / length);
+bool akaoSnesSupportsPitchEnvelope(AkaoSnesVersion version) {
+  return version == AKAOSNES_V1 || version == AKAOSNES_V2;
+}
+
+uint16_t akaoSnesPitchEnvelopeProgressStep(AkaoSnesVersion version, uint8_t length) {
+  if (length == 0) {
+    return 0;
+  }
+
+  return static_cast<uint16_t>((version == AKAOSNES_V1 ? 0xffff : 0xff00) / length);
+}
+
+int32_t akaoSnesPitchEnvelopeOffset(int32_t targetOffset, uint8_t progressHigh) {
+  const int32_t targetMagnitude = targetOffset < 0 ? -targetOffset : targetOffset;
+  int32_t currentMagnitude =
+      (targetMagnitude / AKAOSNES_PITCH_FRACTION_SCALE) * progressHigh / 256;
+  currentMagnitude *= AKAOSNES_PITCH_FRACTION_SCALE;
+  return targetOffset < 0 ? -currentMagnitude : currentMagnitude;
 }
 
 double akaoSnesPitchCents(int32_t pitch, int32_t basePitch) {
@@ -71,7 +87,9 @@ void AkaoSnesTrack::updatePitchSlide() {
 
 void AkaoSnesTrack::updatePitchEnvelope() {
   const auto *parentSeq = static_cast<AkaoSnesSeq*>(this->parentSeq);
-  if (parentSeq->version != AKAOSNES_V2 || !pitchEnvelope.active || !pitchSlide.baseValid()) {
+  if (!akaoSnesSupportsPitchEnvelope(parentSeq->version) ||
+      !pitchEnvelope.active ||
+      !pitchSlide.baseValid()) {
     return;
   }
 
@@ -83,22 +101,30 @@ void AkaoSnesTrack::updatePitchEnvelope() {
     pitchEnvelope.activeDelay = 0;
   }
 
-  pitchEnvelope.progress += pitchEnvelope.progressStep;
+  if (parentSeq->version == AKAOSNES_V1 && pitchEnvelope.activeCount == 0) {
+    pitchEnvelope.active = false;
+    return;
+  }
 
   int32_t currentOffset;
-  if (pitchEnvelope.progress > 0xffff) {
+  if (parentSeq->version == AKAOSNES_V1) {
+    pitchEnvelope.activeCount--;
+    pitchEnvelope.progress += pitchEnvelope.progressStep;
+    const uint8_t progressHigh = static_cast<uint8_t>(pitchEnvelope.progress >> 8);
+    currentOffset = akaoSnesPitchEnvelopeOffset(pitchEnvelope.targetOffset, progressHigh);
+    if (pitchEnvelope.activeCount == 0) {
+      pitchEnvelope.active = false;
+    }
+  }
+  else if (pitchEnvelope.progress + pitchEnvelope.progressStep > 0xffff) {
     currentOffset = pitchEnvelope.targetOffset;
     pitchEnvelope.progress = 0x10000;
     pitchEnvelope.active = false;
   }
   else {
+    pitchEnvelope.progress += pitchEnvelope.progressStep;
     const uint8_t progressHigh = static_cast<uint8_t>(pitchEnvelope.progress >> 8);
-    const int32_t targetMagnitude =
-        pitchEnvelope.targetOffset < 0 ? -pitchEnvelope.targetOffset : pitchEnvelope.targetOffset;
-    int32_t currentMagnitude =
-        (targetMagnitude / AKAOSNES_PITCH_FRACTION_SCALE) * progressHigh / 256;
-    currentMagnitude *= AKAOSNES_PITCH_FRACTION_SCALE;
-    currentOffset = pitchEnvelope.targetOffset < 0 ? -currentMagnitude : currentMagnitude;
+    currentOffset = akaoSnesPitchEnvelopeOffset(pitchEnvelope.targetOffset, progressHigh);
   }
 
   pitchSlide.setCurrentPitch(pitchSlide.basePitch() + currentOffset);
@@ -111,7 +137,7 @@ void AkaoSnesTrack::resetPitchBendForNewNote() {
   pitchSlide.invalidateBase();
 
   if (!pitchSlide.atRest(AKAOSNES_DEFAULT_PITCH_BEND_RANGE_CENTS)) {
-    if (parentSeq->version == AKAOSNES_V2 && pitchEnvelope.enabled) {
+    if (akaoSnesSupportsPitchEnvelope(parentSeq->version) && pitchEnvelope.enabled) {
       setPitchBendAutomationBend(pitchSlide, 0);
       return;
     }
@@ -128,6 +154,7 @@ void AkaoSnesTrack::beginNotePitch(uint8_t, bool validForPitchBend) {
 }
 
 void AkaoSnesTrack::setPitchEnvelope(int8_t semitones, uint8_t delay, uint8_t length) {
+  const auto *parentSeq = static_cast<AkaoSnesSeq*>(this->parentSeq);
   if (semitones == 0 || length == 0) {
     clearPitchEnvelope();
     return;
@@ -137,7 +164,7 @@ void AkaoSnesTrack::setPitchEnvelope(int8_t semitones, uint8_t delay, uint8_t le
   pitchEnvelope.semitones = semitones;
   pitchEnvelope.delay = delay;
   pitchEnvelope.length = length;
-  pitchEnvelope.progressStep = akaoSnesV2PitchEnvelopeProgressStep(length);
+  pitchEnvelope.progressStep = akaoSnesPitchEnvelopeProgressStep(parentSeq->version, length);
 }
 
 void AkaoSnesTrack::clearPitchEnvelope() {
@@ -148,13 +175,16 @@ void AkaoSnesTrack::clearPitchEnvelope() {
   pitchEnvelope.length = 0;
   pitchEnvelope.progressStep = 0;
   pitchEnvelope.activeDelay = 0;
+  pitchEnvelope.activeCount = 0;
   pitchEnvelope.progress = 0;
   pitchEnvelope.targetOffset = 0;
 }
 
 void AkaoSnesTrack::beginPitchEnvelopeForNote() {
   const auto *parentSeq = static_cast<AkaoSnesSeq*>(this->parentSeq);
-  if (parentSeq->version != AKAOSNES_V2 || !pitchEnvelope.enabled || !pitchSlide.baseValid()) {
+  if (!akaoSnesSupportsPitchEnvelope(parentSeq->version) ||
+      !pitchEnvelope.enabled ||
+      !pitchSlide.baseValid()) {
     return;
   }
 
@@ -166,6 +196,7 @@ void AkaoSnesTrack::beginPitchEnvelopeForNote() {
       pitchEnvelope.semitones < 0 ? -rawMagnitude : rawMagnitude;
   pitchEnvelope.targetOffset = signedMagnitude * AKAOSNES_PITCH_FRACTION_SCALE;
   pitchEnvelope.activeDelay = pitchEnvelope.delay;
+  pitchEnvelope.activeCount = parentSeq->version == AKAOSNES_V1 ? pitchEnvelope.length : 0;
   pitchEnvelope.progress = 0;
   pitchEnvelope.active = pitchEnvelope.targetOffset != 0 && pitchEnvelope.progressStep != 0;
   pitchSlide.setCurrentPitch(pitchSlide.basePitch());
