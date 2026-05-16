@@ -135,6 +135,7 @@ class AkaoSnesTrack : public SeqTrack {
 public:
   AkaoSnesTrack(AkaoSnesSeq *parentFile, uint32_t offset = 0, uint32_t length = 0);
   void resetVars() override;
+  void onTickBegin() override;
   bool readEvent() override;
 
   uint16_t romAddressToApuAddress(uint16_t romAddress) const;
@@ -143,6 +144,9 @@ public:
  private:
   void applyVibrato(uint32_t offset, uint32_t length, uint8_t delay, uint8_t rate, uint8_t depth);
   void clearVibrato(uint32_t offset, uint32_t length);
+  void configureVibratoFade();
+  void beginVibratoForNote();
+  void updateVibratoFade();
   void syncVibratoRateAndDelay();
   void applyTremolo(uint32_t offset, uint32_t length, uint8_t delay, uint8_t rate, uint8_t depth);
   void clearTremolo(uint32_t offset, uint32_t length);
