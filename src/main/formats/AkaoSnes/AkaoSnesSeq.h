@@ -105,6 +105,7 @@ class AkaoSnesSeq
   void resetVars() override;
 
   double getTempoInBPM(uint8_t tempoValue) const;
+  void syncTempoDependentTracks();
 
   uint16_t romAddressToApuAddress(uint16_t romAddress) const;
   uint16_t getShortAddress(uint32_t offset) const;
@@ -137,20 +138,32 @@ public:
   void resetVars() override;
   void onTickBegin() override;
   bool readEvent() override;
+  void syncTempoDependentLfos();
 
   uint16_t romAddressToApuAddress(uint16_t romAddress) const;
   uint16_t getShortAddress(uint32_t offset) const;
 
  private:
-  void applyVibrato(uint32_t offset, uint32_t length, uint8_t delay, uint8_t rate, uint8_t depth);
-  void clearVibrato(uint32_t offset, uint32_t length);
+  enum class LfoTarget {
+    Vibrato,
+    Tremolo,
+  };
+
+  struct LfoParams {
+    uint8_t delay;
+    uint8_t rate;
+    uint8_t depth;
+  };
+
+  LfoParams readLfoParams();
+  void applyLfo(LfoTarget target, uint32_t offset, uint32_t length, const LfoParams& params);
+  void clearLfo(LfoTarget target, uint32_t offset, uint32_t length);
+  void setLfoOutputDepth(LfoTarget target, uint8_t depth, bool force);
+  void clearLfoRateAndDelay(LfoTarget target);
+  void syncLfoRateAndDelay(LfoTarget target);
   void configureVibratoFade();
   void beginVibratoForNote();
   void updateVibratoFade();
-  void syncVibratoRateAndDelay();
-  void applyTremolo(uint32_t offset, uint32_t length, uint8_t delay, uint8_t rate, uint8_t depth);
-  void clearTremolo(uint32_t offset, uint32_t length);
-  void syncTremoloRate();
 
   uint8_t onetimeDuration;
   bool slur;
