@@ -51,7 +51,7 @@ inline constexpr bool isLfoActive(AkaoSnesVersion version, uint8_t rate, uint8_t
   return version != AKAOSNES_V1 || v1RateCounter(rate) != 0;
 }
 
-inline constexpr uint16_t effectiveRateFrames(AkaoSnesVersion version, uint8_t rate, uint8_t depth = 0) {
+inline constexpr uint16_t effectiveRateFrames(AkaoSnesVersion version, uint8_t rate, uint8_t depth) {
   if (version == AKAOSNES_V1) {
     return static_cast<uint16_t>(v1RateCounter(rate)) + 1;
   }
@@ -91,11 +91,6 @@ inline double frameRateHz(uint8_t timer0Frequency) {
   return 8000.0 / timer0Frequency;
 }
 
-inline double lfoRateHz(AkaoSnesVersion version, uint8_t rate, uint8_t timer0Frequency) {
-  const uint16_t frames = effectiveRateFrames(version, rate);
-  return (frames == 0) ? 0.0 : frameRateHz(timer0Frequency) / (2.0 * frames);
-}
-
 inline double lfoRateHz(AkaoSnesVersion version, uint8_t rate, uint8_t depth, uint8_t timer0Frequency) {
   const uint16_t frames = effectiveRateFrames(version, rate, depth);
   return (frames == 0) ? 0.0 : frameRateHz(timer0Frequency) / (2.0 * frames);
@@ -130,7 +125,7 @@ inline uint16_t v4LfoStep(uint8_t rate, uint8_t depth) {
     return 0;
   }
 
-  const uint16_t frames = effectiveRateFrames(AKAOSNES_V4, rate);
+  const uint16_t frames = effectiveRateFrames(AKAOSNES_V4, rate, depth);
   const uint8_t magnitude = modulationMagnitude(AKAOSNES_V4, depth);
   const uint16_t step = static_cast<uint16_t>(64 * magnitude / frames);
   return static_cast<uint16_t>(4 * std::max<uint16_t>(1, step));
@@ -141,7 +136,7 @@ inline double v4PhaseHighByteAmplitude(uint8_t rate, uint8_t depth) {
     return 0.0;
   }
 
-  return v4LfoStep(rate, depth) * effectiveRateFrames(AKAOSNES_V4, rate) / 256.0;
+  return v4LfoStep(rate, depth) * effectiveRateFrames(AKAOSNES_V4, rate, depth) / 256.0;
 }
 
 inline double v2PhaseHighByteAmplitude(uint8_t rate, uint8_t depth) {
