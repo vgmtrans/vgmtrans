@@ -164,6 +164,12 @@ public:
   void configureVibratoFade();
   void beginVibratoForNote();
   void updateVibratoFade();
+  void beginNotePitch(uint8_t note, bool validForPitchBend);
+  void resetPitchBendForNewNote();
+  void setPendingPitchSlide(uint16_t steps, int8_t semitones);
+  void clearPendingPitchSlide();
+  void beginPendingPitchSlide();
+  void updatePitchSlide();
 
   uint8_t onetimeDuration;
   bool slur;
@@ -178,6 +184,9 @@ public:
   uint16_t loopStart[AKAOSNES_LOOP_LEVEL_MAX];
 
   uint8_t ignoreMasterVolumeProgNum;
+  uint16_t pendingPitchSlideSteps;
+  int8_t pendingPitchSlideSemitones;
+  SeqPitchBendAutomation<int32_t> pitchSlide;
   SeqSynthLfoAutomation vibrato;
   SeqSynthLfoAutomation tremolo;
 };

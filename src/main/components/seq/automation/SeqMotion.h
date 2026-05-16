@@ -47,12 +47,13 @@ struct SeqMotionPlan {
   uint32_t ticks = 0;
   uint32_t delay = 0;
   SeqMotionMode mode = SeqMotionMode::TargetOverTicks;
+  bool snapToTarget = true;
 
   // Compute the per-tick step from the current value when begin() is called.
   static SeqMotionPlan targetOverTicks(ValueType targetValue,
                                        uint32_t tickCount,
                                        uint32_t delayTicks = 0) {
-    return {targetValue, {}, tickCount, delayTicks, SeqMotionMode::TargetOverTicks};
+    return {targetValue, {}, tickCount, delayTicks, SeqMotionMode::TargetOverTicks, true};
   }
 
   // Use the supplied step for tickCount ticks, then snap to target.
@@ -60,14 +61,22 @@ struct SeqMotionPlan {
                                                ValueType stepValue,
                                                uint32_t tickCount,
                                                uint32_t delayTicks = 0) {
-    return {targetValue, stepValue, tickCount, delayTicks, SeqMotionMode::TargetOverTicksWithStep};
+    return {targetValue, stepValue, tickCount, delayTicks, SeqMotionMode::TargetOverTicksWithStep, true};
+  }
+
+  // Use the supplied step for tickCount ticks and leave the final stepped value as-is.
+  static SeqMotionPlan targetOverTicksWithStepNoSnap(ValueType targetValue,
+                                                     ValueType stepValue,
+                                                     uint32_t tickCount,
+                                                     uint32_t delayTicks = 0) {
+    return {targetValue, stepValue, tickCount, delayTicks, SeqMotionMode::TargetOverTicksWithStep, false};
   }
 
   // Use the supplied step as-is until the value reaches or crosses target.
   static SeqMotionPlan targetByStep(ValueType targetValue,
                                     ValueType stepValue,
                                     uint32_t delayTicks = 0) {
-    return {targetValue, stepValue, 0, delayTicks, SeqMotionMode::TargetByStep};
+    return {targetValue, stepValue, 0, delayTicks, SeqMotionMode::TargetByStep, true};
   }
 
   [[nodiscard]] bool usesTicks() const {
@@ -114,6 +123,7 @@ class SeqLinearMotion {
     m_delay = plan.delay;
     m_ticksRemaining = plan.ticks;
     m_mode = plan.mode;
+    m_snapToTarget = plan.snapToTarget;
 
     if (plan.mode == SeqMotionMode::TargetOverTicks) {
       if (plan.ticks == 0) {
@@ -188,7 +198,12 @@ class SeqLinearMotion {
 
       m_ticksRemaining -= 1;
       if (m_ticksRemaining == 0) {
-        m_current = m_target;
+        if (m_snapToTarget) {
+          m_current = m_target;
+        }
+        else {
+          m_current = static_cast<ValueType>(m_current + m_step);
+        }
         return {SeqMotionStatus::Finished, previous, m_current, m_current != previous};
       }
 
@@ -217,4 +232,5 @@ class SeqLinearMotion {
   uint32_t m_delay = 0;
   uint32_t m_ticksRemaining = 0;
   SeqMotionMode m_mode = SeqMotionMode::TargetOverTicks;
+  bool m_snapToTarget = true;
 };

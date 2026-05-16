@@ -9,12 +9,42 @@
 #include "ScaleConversion.h"
 #include "automation/SeqTrackAutomation.h"
 #include <spdlog/fmt/fmt.h>
+#include <cmath>
 
 DECLARE_FORMAT(AkaoSnes);
 
 static constexpr uint16_t SEQ_PPQN = 48;
 static constexpr int MAX_TRACKS = 8;
 static constexpr uint8_t NOTE_VELOCITY = 100;
+static constexpr uint16_t AKAOSNES_DEFAULT_PITCH_BEND_RANGE_CENTS = 200;
+static constexpr int32_t AKAOSNES_NOMINAL_DSP_PITCH = 0x1000;
+static constexpr int32_t AKAOSNES_PITCH_FRACTION_SCALE = 0x100;
+
+namespace {
+// For MIDI bend output, only target/base ratios matter, so normalize every new note to DSP pitch $1000.
+int32_t akaoSnesBasePitch() {
+  return AKAOSNES_NOMINAL_DSP_PITCH * AKAOSNES_PITCH_FRACTION_SCALE;
+}
+
+int32_t akaoSnesPitchForSemitoneOffset(int8_t semitones) {
+  const double pitch =
+      static_cast<double>(AKAOSNES_NOMINAL_DSP_PITCH) *
+      std::pow(2.0, static_cast<double>(semitones) / 12.0);
+  return static_cast<int32_t>(std::lround(pitch)) * AKAOSNES_PITCH_FRACTION_SCALE;
+}
+
+double akaoSnesPitchCents(int32_t pitch, int32_t basePitch) {
+  if (pitch <= 0 || basePitch <= 0) {
+    return 0.0;
+  }
+
+  return 1200.0 * std::log2(static_cast<double>(pitch) / static_cast<double>(basePitch));
+}
+
+uint16_t akaoSnesPitchSlideSteps(uint8_t timeParam) {
+  return static_cast<uint16_t>(timeParam) + 1;
+}
+}
 
 //  **********
 //  AkaoSnesSeq
@@ -598,12 +628,17 @@ void AkaoSnesTrack::resetVars() {
   jumpActivatedByMainCpu = true; // it should be false in the actual driver, but for convenience
 
   ignoreMasterVolumeProgNum = 0xff;
+  pendingPitchSlideSteps = 0;
+  pendingPitchSlideSemitones = 0;
+  pitchSlide.setPitchToCents(akaoSnesPitchCents);
+  pitchSlide.reset(AKAOSNES_DEFAULT_PITCH_BEND_RANGE_CENTS);
   vibrato.reset();
   tremolo.reset();
 }
 
 void AkaoSnesTrack::onTickBegin() {
   updateVibratoFade();
+  updatePitchSlide();
 }
 
 AkaoSnesTrack::LfoParams AkaoSnesTrack::readLfoParams() {
@@ -786,6 +821,68 @@ void AkaoSnesTrack::syncTempoDependentLfos() {
   syncLfoRateAndDelay(LfoTarget::Tremolo);
 }
 
+void AkaoSnesTrack::updatePitchSlide() {
+  advancePitchBendAutomation(pitchSlide);
+}
+
+void AkaoSnesTrack::resetPitchBendForNewNote() {
+  pitchSlide.clearMotion();
+  pitchSlide.invalidateBase();
+
+  if (!pitchSlide.atRest(AKAOSNES_DEFAULT_PITCH_BEND_RANGE_CENTS)) {
+    resetPitchBendAutomation(pitchSlide, AKAOSNES_DEFAULT_PITCH_BEND_RANGE_CENTS);
+  }
+}
+
+void AkaoSnesTrack::beginNotePitch(uint8_t, bool validForPitchBend) {
+  resetPitchBendForNewNote();
+  if (validForPitchBend) {
+    pitchSlide.beginNote(akaoSnesBasePitch());
+  }
+}
+
+void AkaoSnesTrack::setPendingPitchSlide(uint16_t steps, int8_t semitones) {
+  pendingPitchSlideSteps = steps;
+  pendingPitchSlideSemitones = semitones;
+  if (pendingPitchSlideSemitones == 0) {
+    clearPendingPitchSlide();
+  }
+}
+
+void AkaoSnesTrack::clearPendingPitchSlide() {
+  pendingPitchSlideSteps = 0;
+  pendingPitchSlideSemitones = 0;
+}
+
+void AkaoSnesTrack::beginPendingPitchSlide() {
+  if (pendingPitchSlideSteps == 0 || pendingPitchSlideSemitones == 0) {
+    clearPendingPitchSlide();
+    return;
+  }
+
+  const uint16_t steps = pendingPitchSlideSteps;
+  const int8_t semitones = pendingPitchSlideSemitones;
+  clearPendingPitchSlide();
+
+  if (!pitchSlide.baseValid()) {
+    return;
+  }
+
+  const int32_t currentPitch = pitchSlide.currentPitch();
+  const int32_t targetPitch = akaoSnesPitchForSemitoneOffset(semitones);
+  const int32_t step = (targetPitch - currentPitch) / static_cast<int32_t>(steps);
+
+  beginPitchBendAutomation(
+      pitchSlide,
+      pitchSlide.motionToTargetWithStepNoSnap(targetPitch, step, steps),
+      pitchSlide.rangeCentsForSlide(currentPitch, targetPitch, AKAOSNES_DEFAULT_PITCH_BEND_RANGE_CENTS),
+      AKAOSNES_DEFAULT_PITCH_BEND_RANGE_CENTS,
+      true);
+
+  // FF6 applies the first slide increment on the same sequencer tick that consumes C8.
+  updatePitchSlide();
+}
+
 
 bool AkaoSnesTrack::readEvent(void) {
   AkaoSnesSeq *parentSeq = static_cast<AkaoSnesSeq*>(this->parentSeq);
@@ -864,6 +961,9 @@ bool AkaoSnesTrack::readEvent(void) {
 
       if (noteIndex < 12) {
         uint8_t note = octave * 12 + noteIndex;
+        beginNotePitch(note, !percussion);
+        beginPendingPitchSlide();
+
         if (!slur && !legato) {
           beginVibratoForNote();
         }
@@ -878,6 +978,7 @@ bool AkaoSnesTrack::readEvent(void) {
         addTime(len);
       }
       else if (noteIndex == parentSeq->STATUS_NOTEINDEX_TIE) {
+        beginPendingPitchSlide();
         makePrevDurNoteEnd(getTime() + dur);
         addTie(beginOffset, curOffset - beginOffset, dur, "Tie", desc);
         addTime(len);
@@ -1004,12 +1105,25 @@ bool AkaoSnesTrack::readEvent(void) {
     }
 
     case EVENT_PITCH_SLIDE: {
-      uint8_t pitchSlideLength = readByte(curOffset++);
-      int8_t pitchSlideSemitones = readByte(curOffset++);
+      uint8_t pitchSlideTime = readByte(curOffset++);
+      int8_t pitchSlideSemitones = static_cast<int8_t>(readByte(curOffset++));
+      if (parentSeq->version == AKAOSNES_V4) {
+        const uint16_t pitchSlideSteps = akaoSnesPitchSlideSteps(pitchSlideTime);
+        setPendingPitchSlide(pitchSlideSteps, pitchSlideSemitones);
+        desc = fmt::format("Time: {}  Steps: {}  Key: {} semitones",
+                           pitchSlideTime,
+                           pitchSlideSteps,
+                           static_cast<int>(pitchSlideSemitones));
+      }
+      else {
+        desc = fmt::format("Length: {}  Key: {} semitones",
+                           pitchSlideTime,
+                           static_cast<int>(pitchSlideSemitones));
+      }
       addGenericEvent(beginOffset,
                       curOffset - beginOffset,
                       "Pitch Slide",
-                      fmt::format("Length: {}  Key: {} semitones", pitchSlideLength, pitchSlideSemitones),
+                      desc,
                       Type::PitchBendSlide);
       break;
     }
