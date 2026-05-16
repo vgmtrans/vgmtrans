@@ -20,8 +20,8 @@ enum AkaoSnesSeqEventType {
   EVENT_VOLUME_FADE,
   EVENT_PAN,
   EVENT_PAN_FADE,
-  EVENT_PITCH_SLIDE_ON,
-  EVENT_PITCH_SLIDE_OFF,
+  EVENT_PITCH_ENVELOPE_ON,
+  EVENT_PITCH_ENVELOPE_OFF,
   EVENT_PITCH_SLIDE,
   EVENT_VIBRATO_ON,
   EVENT_VIBRATO_OFF,
@@ -171,6 +171,10 @@ public:
   void updateTremoloFade();
   void beginNotePitch(uint8_t note, bool validForPitchBend);
   void resetPitchBendForNewNote();
+  void setPitchEnvelope(int8_t semitones, uint8_t delay, uint8_t length);
+  void clearPitchEnvelope();
+  void beginPitchEnvelopeForNote();
+  void updatePitchEnvelope();
   void setPendingPitchSlide(uint16_t steps, int8_t semitones);
   void clearPendingPitchSlide();
   void beginPendingPitchSlide();
@@ -189,6 +193,17 @@ public:
   uint16_t loopStart[AKAOSNES_LOOP_LEVEL_MAX];
 
   uint8_t ignoreMasterVolumeProgNum;
+  struct PitchEnvelopeState {
+    bool enabled = false;
+    bool active = false;
+    int8_t semitones = 0;
+    uint8_t delay = 0;
+    uint8_t length = 0;
+    uint16_t progressStep = 0;
+    uint8_t activeDelay = 0;
+    uint32_t progress = 0;
+    int32_t targetOffset = 0;
+  } pitchEnvelope;
   uint16_t pendingPitchSlideSteps;
   int8_t pendingPitchSlideSemitones;
   SeqPitchBendAutomation<int32_t> pitchSlide;
