@@ -93,21 +93,38 @@ void AkaoSnesTrack::updatePitchEnvelope() {
     return;
   }
 
+  if (!pitchEnvelopeDelayElapsed()) {
+    return;
+  }
+
+  int32_t currentOffset;
+  if (!advancePitchEnvelopeTick(parentSeq->version, currentOffset)) {
+    return;
+  }
+
+  pitchSlide.setCurrentPitch(pitchSlide.basePitch() + currentOffset);
+  applyPitchBendAutomation(pitchSlide);
+}
+
+bool AkaoSnesTrack::pitchEnvelopeDelayElapsed() {
   if (pitchEnvelope.activeDelay > 1) {
     pitchEnvelope.activeDelay--;
-    return;
+    return false;
   }
   if (pitchEnvelope.activeDelay == 1) {
     pitchEnvelope.activeDelay = 0;
   }
 
-  if (parentSeq->version == AKAOSNES_V1 && pitchEnvelope.activeCount == 0) {
+  return true;
+}
+
+bool AkaoSnesTrack::advancePitchEnvelopeTick(AkaoSnesVersion version, int32_t& currentOffset) {
+  if (version == AKAOSNES_V1 && pitchEnvelope.activeCount == 0) {
     pitchEnvelope.active = false;
-    return;
+    return false;
   }
 
-  int32_t currentOffset;
-  if (parentSeq->version == AKAOSNES_V1) {
+  if (version == AKAOSNES_V1) {
     pitchEnvelope.activeCount--;
     pitchEnvelope.progress += pitchEnvelope.progressStep;
     const uint8_t progressHigh = static_cast<uint8_t>(pitchEnvelope.progress >> 8);
@@ -127,8 +144,7 @@ void AkaoSnesTrack::updatePitchEnvelope() {
     currentOffset = akaoSnesPitchEnvelopeOffset(pitchEnvelope.targetOffset, progressHigh);
   }
 
-  pitchSlide.setCurrentPitch(pitchSlide.basePitch() + currentOffset);
-  applyPitchBendAutomation(pitchSlide);
+  return true;
 }
 
 void AkaoSnesTrack::resetPitchBendForNewNote() {

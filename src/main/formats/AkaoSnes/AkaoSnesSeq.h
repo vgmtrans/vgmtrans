@@ -171,6 +171,8 @@ public:
   void clearPitchEnvelope();
   void beginPitchEnvelopeForNote();
   void updatePitchEnvelope();
+  bool pitchEnvelopeDelayElapsed();
+  bool advancePitchEnvelopeTick(AkaoSnesVersion version, int32_t& currentOffset);
   void setPendingPitchSlide(uint16_t steps, int8_t semitones);
   void clearPendingPitchSlide();
   void beginPendingPitchSlide();
