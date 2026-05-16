@@ -14,7 +14,23 @@ static constexpr uint16_t AKAOSNES_DEFAULT_PITCH_BEND_RANGE_CENTS = 200;
 static constexpr int32_t AKAOSNES_NOMINAL_DSP_PITCH = 0x1000;
 static constexpr int32_t AKAOSNES_PITCH_FRACTION_SCALE = 0x100;
 
-// For MIDI bend output, only target/base ratios matter, so normalize every new note to DSP pitch $1000.
+/*
+ * AkaoSnes has two different families of pitch automation:
+ *
+ * V1 and V2 use persistent pitch envelopes. The setup command stays
+ * active until the matching off command, and every later normal note starts a
+ * fresh ramp from that note's base pitch toward note + signed semitone offset.
+ * Ties do not restart the envelope.
+ *
+ * V3 and V4 use one-shot pitch slides. The command only arms the next
+ * note or tie; rests do not consume it. The slide target is also relative to
+ * the note/tie being initialized, not to the previous note.
+ *
+ * MIDI pitch bend only needs ratios between base and current pitch, so we
+ * normalize each started note to DSP pitch $1000 and express all automation in
+ * that source-space pitch, with an 8-bit fractional scale where needed.
+ */
+
 int32_t akaoSnesBasePitch() {
   return AKAOSNES_NOMINAL_DSP_PITCH * AKAOSNES_PITCH_FRACTION_SCALE;
 }
@@ -31,6 +47,9 @@ int32_t akaoSnesPitchSlideStep(AkaoSnesVersion version,
                                int32_t targetPitch,
                                uint16_t steps) {
   const int32_t diff = targetPitch - currentPitch;
+
+  // V3 steps a signed 16-bit DSP pitch word directly and forces a nonzero
+  // step when the target differs. This can overshoot for tiny long slides.
   if (version == AKAOSNES_V3) {
     const int32_t rawDiff = diff / AKAOSNES_PITCH_FRACTION_SCALE;
     int32_t rawStep = rawDiff / static_cast<int32_t>(steps);
@@ -40,6 +59,8 @@ int32_t akaoSnesPitchSlideStep(AkaoSnesVersion version,
     return rawStep * AKAOSNES_PITCH_FRACTION_SCALE;
   }
 
+  // V4 keeps an 8-bit fractional accumulator, so the truncated step is in
+  // 16.8 pitch units. The driver does not snap to the exact target at the end.
   return diff / static_cast<int32_t>(steps);
 }
 
@@ -52,6 +73,9 @@ uint16_t akaoSnesPitchEnvelopeProgressStep(AkaoSnesVersion version, uint8_t leng
     return 0;
   }
 
+  // V1 runs for exactly length updates with floor(65535 / length), then
+  // holds the last computed offset, which is just short of the target. V2
+  // uses floor($FF00 / length) and clamps to the target when progress overflows.
   return static_cast<uint16_t>((version == AKAOSNES_V1 ? 0xffff : 0xff00) / length);
 }
 
@@ -107,6 +131,9 @@ void AkaoSnesTrack::updatePitchEnvelope() {
 }
 
 bool AkaoSnesTrack::pitchEnvelopeDelayElapsed() {
+  // Both V1 and V2 update on sequencer ticks after note setup. A stored delay
+  // value of 0 or 1 therefore allows the first movement on the next eligible
+  // tick; larger values wait until the countdown reaches 1.
   if (pitchEnvelope.activeDelay > 1) {
     pitchEnvelope.activeDelay--;
     return false;
@@ -171,6 +198,8 @@ void AkaoSnesTrack::beginNotePitch(uint8_t, bool validForPitchBend) {
 
 void AkaoSnesTrack::setPitchEnvelope(int8_t semitones, uint8_t delay, uint8_t length) {
   const auto *parentSeq = static_cast<AkaoSnesSeq*>(this->parentSeq);
+  // An offset of zero disables the persistent envelope. We also treat zero
+  // length as off for MIDI export, matching V2 and avoiding V1's no-motion case.
   if (semitones == 0 || length == 0) {
     clearPitchEnvelope();
     return;
@@ -184,6 +213,9 @@ void AkaoSnesTrack::setPitchEnvelope(int8_t semitones, uint8_t delay, uint8_t le
 }
 
 void AkaoSnesTrack::clearPitchEnvelope() {
+  // The driver off commands stop future envelope updates; they do not generate
+  // a return-to-base bend. The current output naturally gets reset by the next
+  // normal note setup.
   pitchEnvelope.enabled = false;
   pitchEnvelope.active = false;
   pitchEnvelope.semitones = 0;
@@ -204,6 +236,9 @@ void AkaoSnesTrack::beginPitchEnvelopeForNote() {
     return;
   }
 
+  // The target offset is relative to the note being started, after octave and
+  // transpose have produced the current MIDI note. It is not a previous-note
+  // glide. Ties intentionally do not call this path.
   const int32_t targetPitch = akaoSnesPitchForSemitoneOffset(pitchEnvelope.semitones);
   const int32_t rawDiff =
       (targetPitch - pitchSlide.basePitch()) / AKAOSNES_PITCH_FRACTION_SCALE;
@@ -241,6 +276,9 @@ void AkaoSnesTrack::clearPendingPitchSlide() {
 
 void AkaoSnesTrack::beginPendingPitchSlide() {
   const auto *parentSeq = static_cast<AkaoSnesSeq*>(this->parentSeq);
+  // V3/V4 pitch slide commands are pending state. A following normal note
+  // consumes the state after that note establishes its base pitch; a following
+  // tie consumes it against the already-sounding pitch; a rest leaves it primed.
   if (pendingPitchSlideSteps == 0 || pendingPitchSlideSemitones == 0) {
     clearPendingPitchSlide();
     return;

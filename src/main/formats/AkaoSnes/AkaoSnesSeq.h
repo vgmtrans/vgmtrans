@@ -196,6 +196,10 @@ public:
   uint16_t loopStart[AKAOSNES_LOOP_LEVEL_MAX];
 
   uint8_t ignoreMasterVolumeProgNum;
+
+  // Persistent V1/V2 pitch-envelope configuration plus the per-note active
+  // ramp state derived from it. V3/V4 pitch slides use the pending fields below
+  // because their setup commands are consumed by only the next note or tie.
   struct PitchEnvelopeState {
     bool enabled = false;
     bool active = false;
@@ -208,6 +212,9 @@ public:
     uint32_t progress = 0;
     int32_t targetOffset = 0;
   } pitchEnvelope;
+
+  // Pending one-shot V3/V4 pitch-slide setup. A normal note or tie consumes
+  // these fields; rests leave them pending for the next pitch setup path.
   uint16_t pendingPitchSlideSteps;
   int8_t pendingPitchSlideSemitones;
   SeqPitchBendAutomation<int32_t> pitchSlide;
