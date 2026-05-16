@@ -164,6 +164,7 @@ public:
   void configureVibratoFade();
   void beginVibratoForNote();
   void updateVibratoFade();
+  void resetPitchState();
   void beginNotePitch(uint8_t note, bool validForPitchBend);
   void resetPitchBendForNewNote();
   void setPitchEnvelope(int8_t semitones, uint8_t delay, uint8_t length);

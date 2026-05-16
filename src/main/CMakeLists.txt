@@ -146,6 +146,7 @@ target_sources(vgmtranscore
     formats/AkaoSnes/AkaoSnesInstr.cpp
     formats/AkaoSnes/AkaoSnesScanner.cpp
     formats/AkaoSnes/AkaoSnesSeq.cpp
+    formats/AkaoSnes/AkaoSnesTrackPitch.cpp
     formats/AsciiShuichiSnes/AsciiShuichiSnesInstr.cpp
     formats/AsciiShuichiSnes/AsciiShuichiSnesScanner.cpp
     formats/AsciiShuichiSnes/AsciiShuichiSnesSeq.cpp
