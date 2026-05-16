@@ -32,6 +32,23 @@ int32_t akaoSnesPitchForSemitoneOffset(int8_t semitones) {
   return static_cast<int32_t>(std::lround(pitch)) * AKAOSNES_PITCH_FRACTION_SCALE;
 }
 
+int32_t akaoSnesPitchSlideStep(AkaoSnesVersion version,
+                               int32_t currentPitch,
+                               int32_t targetPitch,
+                               uint16_t steps) {
+  const int32_t diff = targetPitch - currentPitch;
+  if (version == AKAOSNES_V3) {
+    const int32_t rawDiff = diff / AKAOSNES_PITCH_FRACTION_SCALE;
+    int32_t rawStep = rawDiff / static_cast<int32_t>(steps);
+    if (rawStep == 0 && rawDiff != 0) {
+      rawStep = (rawDiff > 0) ? 1 : -1;
+    }
+    return rawStep * AKAOSNES_PITCH_FRACTION_SCALE;
+  }
+
+  return diff / static_cast<int32_t>(steps);
+}
+
 double akaoSnesPitchCents(int32_t pitch, int32_t basePitch) {
   if (pitch <= 0 || basePitch <= 0) {
     return 0.0;
@@ -665,6 +682,7 @@ void AkaoSnesTrack::clearPendingPitchSlide() {
 }
 
 void AkaoSnesTrack::beginPendingPitchSlide() {
+  const auto *parentSeq = static_cast<AkaoSnesSeq*>(this->parentSeq);
   if (pendingPitchSlideSteps == 0 || pendingPitchSlideSemitones == 0) {
     clearPendingPitchSlide();
     return;
@@ -680,7 +698,8 @@ void AkaoSnesTrack::beginPendingPitchSlide() {
 
   const int32_t currentPitch = pitchSlide.currentPitch();
   const int32_t targetPitch = akaoSnesPitchForSemitoneOffset(semitones);
-  const int32_t step = (targetPitch - currentPitch) / static_cast<int32_t>(steps);
+  const int32_t step =
+      akaoSnesPitchSlideStep(parentSeq->version, currentPitch, targetPitch, steps);
 
   beginPitchBendAutomation(
       pitchSlide,
@@ -689,7 +708,7 @@ void AkaoSnesTrack::beginPendingPitchSlide() {
       AKAOSNES_DEFAULT_PITCH_BEND_RANGE_CENTS,
       true);
 
-  // FF6 applies the first slide increment on the same sequencer tick that consumes C8.
+  // Apply the first update on the same sequencer tick that consumes the setup command.
   updatePitchSlide();
 }
 
@@ -917,7 +936,7 @@ bool AkaoSnesTrack::readEvent(void) {
     case EVENT_PITCH_SLIDE: {
       uint8_t pitchSlideTime = readByte(curOffset++);
       int8_t pitchSlideSemitones = static_cast<int8_t>(readByte(curOffset++));
-      if (parentSeq->version == AKAOSNES_V4) {
+      if (parentSeq->version == AKAOSNES_V3 || parentSeq->version == AKAOSNES_V4) {
         const uint16_t pitchSlideSteps = akaoSnesPitchSlideSteps(pitchSlideTime);
         setPendingPitchSlide(pitchSlideSteps, pitchSlideSemitones);
         desc = fmt::format("Time: {}  Steps: {}  Key: {} semitones",
