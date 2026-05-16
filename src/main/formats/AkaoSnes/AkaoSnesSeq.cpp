@@ -793,6 +793,9 @@ bool AkaoSnesTrack::readEvent(void) {
         pitchEnvelopeDelay = readByte(curOffset++);
         pitchEnvelopeLength = readByte(curOffset++);
         pitchEnvelopeSemitones = static_cast<int8_t>(readByte(curOffset++));
+        setPitchEnvelope(pitchEnvelopeSemitones,
+                         static_cast<uint8_t>(pitchEnvelopeDelay + 1),
+                         pitchEnvelopeLength);
         desc = fmt::format("Delay: {}  Length: {}  Key: {} semitones",
                            pitchEnvelopeDelay,
                            pitchEnvelopeLength,
@@ -818,7 +821,7 @@ bool AkaoSnesTrack::readEvent(void) {
     }
 
     case EVENT_PITCH_ENVELOPE_OFF: {
-      if (parentSeq->version == AKAOSNES_V2) {
+      if (parentSeq->version == AKAOSNES_V1 || parentSeq->version == AKAOSNES_V2) {
         clearPitchEnvelope();
       }
       addGenericEvent(beginOffset,
