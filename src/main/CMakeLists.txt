@@ -144,6 +144,7 @@ target_sources(vgmtranscore
     formats/Akao/AkaoScanner.cpp
     formats/Akao/AkaoSeq.cpp
     formats/AkaoSnes/AkaoSnesInstr.cpp
+    formats/AkaoSnes/AkaoSnesModulation.cpp
     formats/AkaoSnes/AkaoSnesScanner.cpp
     formats/AkaoSnes/AkaoSnesSeq.cpp
     formats/AkaoSnes/AkaoSnesTrackLfo.cpp

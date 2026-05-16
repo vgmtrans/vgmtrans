@@ -4,6 +4,8 @@
  * refer to the included LICENSE.txt file
  */
 
+#include <algorithm>
+#include <cmath>
 #include <spdlog/fmt/fmt.h>
 #include "AkaoSnesInstr.h"
 #include "AkaoSnesModulation.h"
