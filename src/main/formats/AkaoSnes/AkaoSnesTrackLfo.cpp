@@ -10,10 +10,9 @@
 #include <spdlog/fmt/fmt.h>
 
 /*
- * AkaoSnes LFO events cover vibrato and tremolo across all four driver
- * versions. The event handlers here keep only the live per-track state and
- * convert it to MIDI automation; the version-specific math lives in
- * AkaoSnesModulation.h.
+ * AkaoSnes vibrato events are exported as MIDI LFO automation. The event
+ * handlers here keep only the live per-track state; the version-specific math
+ * lives in AkaoSnesModulation.h.
  *
  * V1/FF4 is the outlier: vibrato has a per-note fade-in behavior that restarts
  * on normal keyed notes and is not restarted by ties/slur/legato. V2 also uses
@@ -47,91 +46,56 @@ AkaoSnesTrack::LfoParams AkaoSnesTrack::readLfoParams() {
   return {delay, rate, depth};
 }
 
-void AkaoSnesTrack::setLfoOutputDepth(LfoTarget target, uint8_t depth, bool force) {
-  auto& lfo = (target == LfoTarget::Vibrato) ? vibrato : tremolo;
-  if (target == LfoTarget::Vibrato) {
-    setSynthLfoModulationDepth(lfo, depth, force);
-  }
-  else {
-    setSynthLfoControllerDepth(lfo, akao_snes::modulation::kTremoloDepthController, depth, force);
-  }
+void AkaoSnesTrack::clearVibratoRateAndDelay() {
+  addChannelPressureNoItem(0);
+  addControllerEventNoItem(akao_snes::modulation::kVibratoDelayController, 0);
 }
 
-void AkaoSnesTrack::clearLfoRateAndDelay(LfoTarget target) {
-  if (target == LfoTarget::Vibrato) {
-    addChannelPressureNoItem(0);
-    addControllerEventNoItem(akao_snes::modulation::kVibratoDelayController, 0);
-  }
-  else {
-    addControllerEventNoItem(akao_snes::modulation::kTremoloRateController, 0);
-    addControllerEventNoItem(akao_snes::modulation::kTremoloDelayController, 0);
-  }
-}
-
-void AkaoSnesTrack::applyLfo(LfoTarget target,
-                             uint32_t offset,
-                             uint32_t length,
-                             const LfoParams& params) {
+void AkaoSnesTrack::applyVibrato(uint32_t offset, uint32_t length, const LfoParams& params) {
   const auto *parent = static_cast<AkaoSnesSeq*>(parentSeq);
-  const bool isVibrato = target == LfoTarget::Vibrato;
   const bool active = akao_snes::modulation::isLfoActive(parent->version, params.rate, params.depth);
 
   addGenericEvent(offset,
                   length,
-                  isVibrato ? "Vibrato" : "Tremolo",
-                  isVibrato
-                      ? fmt::format("Delay: {}  Rate: {}  Depth: {}", params.delay, params.rate, params.depth)
-                      : fmt::format("Delay {}  Rate: {}  Depth {}", params.delay, params.rate, params.depth),
-                  isVibrato ? Type::Vibrato : Type::Tremelo);
+                  "Vibrato",
+                  fmt::format("Delay: {}  Rate: {}  Depth: {}", params.delay, params.rate, params.depth),
+                  Type::Vibrato);
 
   if (!akao_snes::modulation::supportsLfoAutomation(parent->version)) {
     return;
   }
 
-  auto& lfo = isVibrato ? vibrato : tremolo;
-  lfo.configure(params.delay, params.rate, params.depth);
-  if (isVibrato) {
-    // Only V1 creates reusable note-start vibrato fade state. Later versions
-    // apply the configured vibrato depth directly after the setup command.
-    configureVibratoFade();
-  }
+  vibrato.configure(params.delay, params.rate, params.depth);
+  // Only V1 creates reusable note-start vibrato fade state. Later versions
+  // apply the configured vibrato depth directly after the setup command.
+  configureVibratoFade();
 
   const uint8_t midiDepth = active
-      ? (isVibrato
-             ? akao_snes::modulation::vibratoDepthMidiValue(parent->version, params.rate, params.depth)
-             : akao_snes::modulation::tremoloDepthMidiValue(parent->version, params.rate, params.depth))
+      ? akao_snes::modulation::vibratoDepthMidiValue(parent->version, params.rate, params.depth)
       : 0;
-  setLfoOutputDepth(target, midiDepth, true);
+  setSynthLfoModulationDepth(vibrato, midiDepth, true);
   if (active) {
-    syncLfoRateAndDelay(target);
+    syncVibratoRateAndDelay();
   }
   else {
-    clearLfoRateAndDelay(target);
+    clearVibratoRateAndDelay();
   }
 }
 
-void AkaoSnesTrack::clearLfo(LfoTarget target, uint32_t offset, uint32_t length) {
+void AkaoSnesTrack::clearVibrato(uint32_t offset, uint32_t length) {
   const auto *parent = static_cast<AkaoSnesSeq*>(parentSeq);
-  const bool isVibrato = target == LfoTarget::Vibrato;
 
-  addGenericEvent(offset,
-                  length,
-                  isVibrato ? "Vibrato Off" : "Tremolo Off",
-                  "",
-                  isVibrato ? Type::Vibrato : Type::Tremelo);
+  addGenericEvent(offset, length, "Vibrato Off", "", Type::Vibrato);
 
   if (!akao_snes::modulation::supportsLfoAutomation(parent->version)) {
     return;
   }
 
-  auto& lfo = isVibrato ? vibrato : tremolo;
-  lfo.setDepth(0);
-  if (isVibrato) {
-    // Turning V1 vibrato off also prevents later notes from replaying thestored fade-in ramp.
-    vibrato.clearReusableFade();
-  }
-  setLfoOutputDepth(target, 0, true);
-  clearLfoRateAndDelay(target);
+  vibrato.setDepth(0);
+  // Turning V1 vibrato off also prevents later notes from replaying the stored fade-in ramp.
+  vibrato.clearReusableFade();
+  setSynthLfoModulationDepth(vibrato, 0, true);
+  clearVibratoRateAndDelay();
 }
 
 void AkaoSnesTrack::configureVibratoFade() {
@@ -182,42 +146,29 @@ void AkaoSnesTrack::updateVibratoFade() {
   });
 }
 
-void AkaoSnesTrack::syncLfoRateAndDelay(LfoTarget target) {
+void AkaoSnesTrack::syncVibratoRateAndDelay() {
   const auto *parent = static_cast<AkaoSnesSeq*>(parentSeq);
-  const bool isVibrato = target == LfoTarget::Vibrato;
-  auto& lfo = isVibrato ? vibrato : tremolo;
   if (!akao_snes::modulation::supportsLfoAutomation(parent->version) ||
-      !akao_snes::modulation::isLfoActive(parent->version, lfo.rate(), lfo.depth())) {
+      !akao_snes::modulation::isLfoActive(parent->version, vibrato.rate(), vibrato.depth())) {
     return;
   }
 
-  if (isVibrato) {
-    // Tempo changes can alter V1's reusable fade duration, so refresh it when
-    // resending tempo-dependent LFO controller values.
-    configureVibratoFade();
-  }
+  // Tempo changes can alter V1's reusable fade duration, so refresh it when
+  // resending tempo-dependent LFO controller values.
+  configureVibratoFade();
 
   const uint8_t rateMidiValue = akao_snes::modulation::rateMidiValue(parent->version,
-                                                                     lfo.rate(),
-                                                                     lfo.depth(),
+                                                                     vibrato.rate(),
+                                                                     vibrato.depth(),
                                                                      parent->TIMER0_FREQUENCY);
-  if (isVibrato) {
-    addChannelPressureNoItem(rateMidiValue);
-  }
-  else {
-    addControllerEventNoItem(akao_snes::modulation::kTremoloRateController, rateMidiValue);
-  }
-
-  addControllerEventNoItem(isVibrato
-                               ? akao_snes::modulation::kVibratoDelayController
-                               : akao_snes::modulation::kTremoloDelayController,
+  addChannelPressureNoItem(rateMidiValue);
+  addControllerEventNoItem(akao_snes::modulation::kVibratoDelayController,
                            akao_snes::modulation::delayMidiValue(parent->version,
-                                                                 lfo.delay(),
+                                                                 vibrato.delay(),
                                                                  parent->tempo,
                                                                  parent->TIMER0_FREQUENCY));
 }
 
 void AkaoSnesTrack::syncTempoDependentLfos() {
-  syncLfoRateAndDelay(LfoTarget::Vibrato);
-  syncLfoRateAndDelay(LfoTarget::Tremolo);
+  syncVibratoRateAndDelay();
 }

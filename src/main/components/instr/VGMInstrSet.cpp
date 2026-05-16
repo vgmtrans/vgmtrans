@@ -241,23 +241,16 @@ void VGMInstr::addStandardTremoloHandling(double maxDepthDb,
 
 void VGMInstr::addStandardTremoloHandling(const TremoloModulationSpec& spec) {
   addGenerator(ModDest::ModLfoFreq, ModAmount::fromHertz(spec.minHertz));
-  addModulator(spec.rateSource,
+  addModulator(ModSource::ChannelPressure,
                ModDest::ModLfoFreq,
                ModAmount::fromHertzRange(spec.minHertz, spec.maxHertz));
-  addModulator(spec.depthSource,
+  addModulator(ModSource::ChorusSend,
                ModDest::ModLfoToVol,
                ModAmount::fromDecibels(spec.maxDepthDb));
   if (spec.gainMode == TremoloGainMode::NoBoost) {
-    addModulator(spec.depthSource,
+    addModulator(ModSource::ChorusSend,
                  ModDest::InitialAtten,
                  ModAmount::fromDecibels(spec.maxDepthDb));
-  }
-  if (spec.delayRange.has_value()) {
-    const double minDelaySeconds = clampSecondsRangeMinimum(spec.delayRange->minSeconds);
-    addGenerator(ModDest::ModLfoDelay, ModAmount::fromSeconds(minDelaySeconds));
-    addModulator(spec.delaySource,
-                 ModDest::ModLfoDelay,
-                 ModAmount::fromSecondsRange(minDelaySeconds, spec.delayRange->maxSeconds));
   }
 }
 

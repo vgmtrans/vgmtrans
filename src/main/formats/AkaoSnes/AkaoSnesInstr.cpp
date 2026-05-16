@@ -13,13 +13,12 @@
 
 namespace {
 
-void addAkaoSnesModulationExportHandling(VGMInstr *instr, AkaoSnesVersion version) {
+void addAkaoSnesVibratoExportHandling(VGMInstr *instr, AkaoSnesVersion version) {
   if (!akao_snes::modulation::supportsLfoAutomation(version)) {
     return;
   }
 
   instr->addStandardVibratoHandling(akao_snes::modulation::vibratoSpec(version));
-  instr->addStandardTremoloHandling(akao_snes::modulation::tremoloSpec(version));
 }
 
 }  // namespace
@@ -148,7 +147,7 @@ bool AkaoSnesInstr::loadInstr() {
     return false;
   }
 
-  addAkaoSnesModulationExportHandling(this, version);
+  addAkaoSnesVibratoExportHandling(this, version);
 
   uint16_t addrSampStart = readShort(offDirEnt);
 
@@ -190,7 +189,7 @@ bool AkaoSnesDrumKit::loadInstr() {
     return false;
   }
 
-  addAkaoSnesModulationExportHandling(this, version);
+  addAkaoSnesVibratoExportHandling(this, version);
 
   uint8_t NOTE_DUR_TABLE_SIZE;
   switch (version) {

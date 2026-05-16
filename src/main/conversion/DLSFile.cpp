@@ -298,12 +298,6 @@ uint16_t dlsSourceForModSource(ModSource source) {
       return CONN_SRC_CC91;
     case ModSource::ChorusSend:
       return CONN_SRC_CC93;
-    case ModSource::Effects2Depth:
-      return CONN_SRC_CC92;
-    case ModSource::Effects4Depth:
-      return CONN_SRC_CC94;
-    case ModSource::Effects5Depth:
-      return CONN_SRC_CC95;
   }
   return CONN_SRC_NONE;
 }

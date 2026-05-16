@@ -20,8 +20,8 @@ enum AkaoSnesSeqEventType {
   EVENT_VOLUME_FADE,
   EVENT_PAN,
   EVENT_PAN_FADE,
-  EVENT_PITCH_ENVELOPE_ON,
-  EVENT_PITCH_ENVELOPE_OFF,
+  EVENT_PITCH_SLIDE_ON,
+  EVENT_PITCH_SLIDE_OFF,
   EVENT_PITCH_SLIDE,
   EVENT_VIBRATO_ON,
   EVENT_VIBRATO_OFF,
@@ -144,11 +144,6 @@ public:
   uint16_t getShortAddress(uint32_t offset) const;
 
  private:
-  enum class LfoTarget {
-    Vibrato,
-    Tremolo,
-  };
-
   struct LfoParams {
     uint8_t delay;
     uint8_t rate;
@@ -156,27 +151,13 @@ public:
   };
 
   LfoParams readLfoParams();
-  void applyLfo(LfoTarget target, uint32_t offset, uint32_t length, const LfoParams& params);
-  void clearLfo(LfoTarget target, uint32_t offset, uint32_t length);
-  void setLfoOutputDepth(LfoTarget target, uint8_t depth, bool force);
-  void clearLfoRateAndDelay(LfoTarget target);
-  void syncLfoRateAndDelay(LfoTarget target);
+  void applyVibrato(uint32_t offset, uint32_t length, const LfoParams& params);
+  void clearVibrato(uint32_t offset, uint32_t length);
+  void clearVibratoRateAndDelay();
+  void syncVibratoRateAndDelay();
   void configureVibratoFade();
   void beginVibratoForNote();
   void updateVibratoFade();
-  void resetPitchState();
-  void beginNotePitch(uint8_t note, bool validForPitchBend);
-  void resetPitchBendForNewNote();
-  void setPitchEnvelope(int8_t semitones, uint8_t delay, uint8_t length);
-  void clearPitchEnvelope();
-  void beginPitchEnvelopeForNote();
-  void updatePitchEnvelope();
-  bool pitchEnvelopeDelayElapsed();
-  bool advancePitchEnvelopeTick(AkaoSnesVersion version, int32_t& currentOffset);
-  void setPendingPitchSlide(uint16_t steps, int8_t semitones);
-  void clearPendingPitchSlide();
-  void beginPendingPitchSlide();
-  void updatePitchSlide();
 
   uint8_t onetimeDuration;
   bool slur;
@@ -192,27 +173,5 @@ public:
 
   uint8_t ignoreMasterVolumeProgNum;
 
-  // Persistent V1/V2 pitch-envelope configuration plus the per-note active
-  // ramp state derived from it. V3/V4 pitch slides use the pending fields below
-  // because their setup commands are consumed by only the next note or tie.
-  struct PitchEnvelopeState {
-    bool enabled = false;
-    bool active = false;
-    int8_t semitones = 0;
-    uint8_t delay = 0;
-    uint8_t length = 0;
-    uint16_t progressStep = 0;
-    uint8_t activeDelay = 0;
-    uint8_t activeCount = 0;
-    uint32_t progress = 0;
-    int32_t targetOffset = 0;
-  } pitchEnvelope;
-
-  // Pending one-shot V3/V4 pitch-slide setup. A normal note or tie consumes
-  // these fields; rests leave them pending for the next pitch setup path.
-  uint16_t pendingPitchSlideSteps;
-  int8_t pendingPitchSlideSemitones;
-  SeqPitchBendAutomation<int32_t> pitchSlide;
   SeqSynthLfoAutomation vibrato;
-  SeqSynthLfoAutomation tremolo;
 };

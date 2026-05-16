@@ -12,16 +12,15 @@ namespace akao_snes::modulation {
 namespace {
 
 /*
- * These helpers translate the SNES driver's LFO state into MIDI
- * parameters. The driver writes vibrato as a pitch offset and tremolo as a
- * volume-scale offset; VGMTrans exports those through the standard modulation
- * metadata plus controller automation.
+ * These helpers translate the SNES driver's vibrato state into MIDI LFO
+ * parameters. VGMTrans exports those through the standard modulation metadata
+ * plus controller automation.
  *
  * Version summary:
  * - V1: rate uses the upper 7 bits (rate >> 1), depth is literal, and
  *   vibrato has a reusable per-note fade-in.
  * - V2: rate uses the lower 7 bits, depth bit 7 halves the rate, and
- *   depth bits also encode direction/boost behavior.
+ *   depth bits also encode pitch scaling behavior.
  * - V3: rate is stored as rate + 1 and depth is a 6-bit magnitude scaled
  *   to an odd range.
  * - V4: rate zero means 256 frames; depth is a 6-bit magnitude.
@@ -59,7 +58,7 @@ constexpr uint16_t effectiveRateFrames(AkaoSnesVersion version, uint8_t rate, ui
 
 constexpr uint8_t modulationMagnitude(AkaoSnesVersion version, uint8_t depth) {
   // Convert version-specific depth encoding to the driver's high-byte LFO
-  // amplitude space before mapping it to cents or dB.
+  // amplitude space before mapping it to cents.
   if (version == AKAOSNES_V2) {
     return static_cast<uint8_t>((depth & 0x3f) + 1);
   }
@@ -137,7 +136,7 @@ double v2PhaseHighByteAmplitude(uint8_t rate, uint8_t depth) {
   }
 
   // V2 computes a phase step from depth and rate. The high byte of the phase
-  // accumulator is what ultimately becomes pitch/volume modulation magnitude.
+  // accumulator is what ultimately becomes pitch modulation magnitude.
   const uint16_t step = static_cast<uint16_t>(512 * modulationMagnitude(AKAOSNES_V2, depth) / frames);
   return std::min(128.0, static_cast<double>((step * frames) >> 8));
 }
@@ -212,87 +211,6 @@ double vibratoDepthCents(AkaoSnesVersion version, uint8_t rate, uint8_t depth) {
   return vibratoDepthCentsForAmplitude(modulationAmplitude(version, rate, depth));
 }
 
-double tremoloDepthDbForAmplitude(double amplitude) {
-  if (amplitude <= 0.0) {
-    return 0.0;
-  }
-
-  const double troughScale = std::max(1.0 / 1024.0, 1.0 - (amplitude / 128.0));
-  return -20.0 * std::log10(troughScale);
-}
-
-double v1TremoloDepthDb(uint8_t rate, uint8_t depth) {
-  const uint8_t counter = v1RateCounter(rate);
-  if (counter == 0 || depth == 0) {
-    return 0.0;
-  }
-
-  const uint32_t quotient = (256u * depth) / counter;
-  if (quotient == 0) {
-    return 0.0;
-  }
-
-  uint16_t accumulator = 0;
-  uint16_t step = static_cast<uint16_t>((0x10000u - (quotient & 0xffffu)) & 0xffffu);
-  uint8_t countdown = counter;
-  uint8_t minScaleByte = 0xff;
-  bool foundAttenuatedSample = false;
-
-  // FF4 tremolo is not a simple symmetric amplitude value. Simulate one full
-  // driver LFO cycle and export the deepest attenuation reached by the scale byte.
-  for (uint16_t frame = 0; frame < static_cast<uint16_t>(2 * (counter + 1)); frame++) {
-    const uint16_t oldStep = step;
-    if (countdown == 0) {
-      step = static_cast<uint16_t>((0x10000u - step) & 0xffffu);
-      countdown = counter;
-    }
-    else {
-      countdown--;
-    }
-
-    accumulator = static_cast<uint16_t>(accumulator + oldStep);
-    const uint8_t scaleByte = static_cast<uint8_t>(accumulator >> 8);
-    if (scaleByte != 0) {
-      minScaleByte = std::min(minScaleByte, scaleByte);
-      foundAttenuatedSample = true;
-    }
-  }
-
-  if (!foundAttenuatedSample) {
-    return 0.0;
-  }
-
-  return -20.0 * std::log10(minScaleByte / 256.0);
-}
-
-double v2TremoloDepthDb(uint8_t rate, uint8_t depth) {
-  const double amplitude = v2PhaseHighByteAmplitude(rate, depth);
-  if (amplitude <= 0.0) {
-    return 0.0;
-  }
-
-  if (depth >= 0x40 && depth < 0x80) {
-    // This depth range boosts above nominal instead of attenuating below it.
-    const double boostScale = 1.0 + (std::min(127.0, amplitude) / 256.0);
-    return 20.0 * std::log10(boostScale);
-  }
-
-  const double troughScale = (256.0 - std::min(128.0, amplitude)) / 256.0;
-  return -20.0 * std::log10(troughScale);
-}
-
-double tremoloDepthDb(AkaoSnesVersion version, uint8_t rate, uint8_t depth) {
-  if (version == AKAOSNES_V1) {
-    return v1TremoloDepthDb(rate, depth);
-  }
-
-  if (version == AKAOSNES_V2) {
-    return v2TremoloDepthDb(rate, depth);
-  }
-
-  return tremoloDepthDbForAmplitude(modulationAmplitude(version, rate, depth));
-}
-
 double delaySeconds(AkaoSnesVersion version, uint8_t delay, uint8_t tempo, uint8_t timer0Frequency) {
   const uint8_t ticks = delayTicks(version, delay);
   if (ticks == 0) {
@@ -309,10 +227,6 @@ const double kMaxV1VibratoDepthCents = v1VibratoDepthCentsForHighByte(255);
 const double kMaxV2VibratoDepthCents = 1200.0 * std::log2(1.0 + (15.0 * 127.0 / 32768.0));
 const double kMaxV3VibratoDepthCents = vibratoDepthCentsForAmplitude(127.0);
 const double kMaxV4VibratoDepthCents = vibratoDepthCentsForAmplitude(64.0);
-const double kMaxV1TremoloDepthDb = -20.0 * std::log10(1.0 / 256.0);
-const double kMaxV2TremoloDepthDb = -20.0 * std::log10(0.5);
-const double kMaxV3TremoloDepthDb = tremoloDepthDbForAmplitude(127.0);
-const double kMaxV4TremoloDepthDb = tremoloDepthDbForAmplitude(64.0);
 
 double maxVibratoDepthCents(AkaoSnesVersion version) {
   if (version == AKAOSNES_V1) {
@@ -324,18 +238,6 @@ double maxVibratoDepthCents(AkaoSnesVersion version) {
   }
 
   return (version == AKAOSNES_V3) ? kMaxV3VibratoDepthCents : kMaxV4VibratoDepthCents;
-}
-
-double maxTremoloDepthDb(AkaoSnesVersion version) {
-  if (version == AKAOSNES_V1) {
-    return kMaxV1TremoloDepthDb;
-  }
-
-  if (version == AKAOSNES_V2) {
-    return kMaxV2TremoloDepthDb;
-  }
-
-  return (version == AKAOSNES_V3) ? kMaxV3TremoloDepthDb : kMaxV4TremoloDepthDb;
 }
 
 double maxDelaySeconds(AkaoSnesVersion version) {
@@ -388,22 +290,6 @@ VibratoModulationSpec vibratoSpec(AkaoSnesVersion version) {
   };
 }
 
-TremoloModulationSpec tremoloSpec(AkaoSnesVersion version) {
-  return {
-      maxTremoloDepthDb(version),
-      minLfoRateHz(version),
-      maxLfoRateHz(version),
-      version == AKAOSNES_V1 ? TremoloGainMode::NoBoost : TremoloGainMode::BipolarAroundNominal,
-      DelayRange {
-          0.0,
-          maxDelaySeconds(version),
-      },
-      ModSource::Effects4Depth,
-      ModSource::Effects2Depth,
-      ModSource::Effects5Depth,
-  };
-}
-
 uint8_t vibratoDepthMidiValue(AkaoSnesVersion version, uint8_t rate, uint8_t depth) {
   if (!isLfoActive(version, rate, depth)) {
     return 0;
@@ -412,17 +298,6 @@ uint8_t vibratoDepthMidiValue(AkaoSnesVersion version, uint8_t rate, uint8_t dep
   const int midiValue =
       static_cast<int>(std::lround(128.0 * vibratoDepthCents(version, rate, depth) /
                                    maxVibratoDepthCents(version)));
-  return static_cast<uint8_t>(std::clamp(midiValue, 0, 127));
-}
-
-uint8_t tremoloDepthMidiValue(AkaoSnesVersion version, uint8_t rate, uint8_t depth) {
-  if (!isLfoActive(version, rate, depth)) {
-    return 0;
-  }
-
-  const int midiValue =
-      static_cast<int>(std::lround(128.0 * tremoloDepthDb(version, rate, depth) /
-                                   maxTremoloDepthDb(version)));
   return static_cast<uint8_t>(std::clamp(midiValue, 0, 127));
 }
 
