@@ -136,6 +136,7 @@ bool AkaoSnesInstr::loadInstr() {
   }
 
   addStandardVibratoHandling(akao_snes::modulation::vibratoSpec(version));
+  addStandardTremoloHandling(akao_snes::modulation::tremoloSpec(version));
 
   uint16_t addrSampStart = readShort(offDirEnt);
 
@@ -178,6 +179,7 @@ bool AkaoSnesDrumKit::loadInstr() {
   }
 
   addStandardVibratoHandling(akao_snes::modulation::vibratoSpec(version));
+  addStandardTremoloHandling(akao_snes::modulation::tremoloSpec(version));
 
   uint8_t NOTE_DUR_TABLE_SIZE;
   switch (version) {

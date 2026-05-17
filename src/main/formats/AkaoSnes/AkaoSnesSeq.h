@@ -144,6 +144,11 @@ public:
   uint16_t getShortAddress(uint32_t offset) const;
 
  private:
+  enum class LfoTarget {
+    Vibrato,
+    Tremolo,
+  };
+
   struct LfoParams {
     uint8_t delay;
     uint8_t rate;
@@ -151,10 +156,11 @@ public:
   };
 
   LfoParams readLfoParams();
-  void applyVibrato(uint32_t offset, uint32_t length, const LfoParams& params);
-  void clearVibrato(uint32_t offset, uint32_t length);
-  void clearVibratoRateAndDelay();
-  void syncVibratoRateAndDelay();
+  void applyLfo(LfoTarget target, uint32_t offset, uint32_t length, const LfoParams& params);
+  void clearLfo(LfoTarget target, uint32_t offset, uint32_t length);
+  void setLfoOutputDepth(LfoTarget target, uint8_t depth, bool force);
+  void clearLfoRateAndDelay(LfoTarget target);
+  void syncLfoRateAndDelay(LfoTarget target);
   void configureVibratoFade();
   void beginVibratoForNote();
   uint8_t vibratoFadeDepthMidiValue(int32_t depth) const;
@@ -175,4 +181,5 @@ public:
   uint8_t ignoreMasterVolumeProgNum;
 
   SeqSynthLfoAutomation vibrato;
+  SeqSynthLfoAutomation tremolo;
 };
