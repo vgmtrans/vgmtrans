@@ -12,9 +12,8 @@ namespace akao_snes::modulation {
 namespace {
 
 /*
- * These helpers translate the SNES driver's vibrato state into MIDI LFO
- * parameters. VGMTrans exports those through the standard modulation metadata
- * plus controller automation.
+ * These helpers translate the SNES driver's vibrato state into SF2/DLS LFO ranges
+ * plus the MIDI controller values that drive them.
  *
  * Version summary:
  * - V1: rate uses the upper 7 bits (rate >> 1), depth is literal, and
@@ -26,6 +25,7 @@ namespace {
  * - V4: rate zero means 256 frames; depth is a 6-bit magnitude.
  */
 
+// These are timer0 latch bytes, not Hertz values: driver frames run at 8000 / latch.
 constexpr uint8_t kMinTimer0Frequency = 0x24;
 constexpr uint8_t kMaxTimer0Frequency = 0x2a;
 
@@ -38,8 +38,7 @@ constexpr uint8_t v2RateCounter(uint8_t rate) {
 }
 
 constexpr uint16_t effectiveRateFrames(AkaoSnesVersion version, uint8_t rate, uint8_t depth) {
-  // All versions produce a half-cycle over this many driver frames. The frame
-  // rate itself is timer0-dependent and is converted to MIDI Hz below.
+  // All versions produce one half-cycle over this many timer0 frames; lfoRateHz() turns that into cycles/sec.
   if (version == AKAOSNES_V1) {
     return static_cast<uint16_t>(v1RateCounter(rate)) + 1;
   }
@@ -57,8 +56,7 @@ constexpr uint16_t effectiveRateFrames(AkaoSnesVersion version, uint8_t rate, ui
 }
 
 constexpr uint8_t modulationMagnitude(AkaoSnesVersion version, uint8_t depth) {
-  // Convert version-specific depth encoding to the driver's high-byte LFO
-  // amplitude space before mapping it to cents.
+  // Convert version-specific depth bytes to the driver's high-byte LFO amplitude space.
   if (version == AKAOSNES_V2) {
     return static_cast<uint8_t>((depth & 0x3f) + 1);
   }
@@ -78,35 +76,48 @@ constexpr uint8_t modulationMagnitude(AkaoSnesVersion version, uint8_t depth) {
 }
 
 double frameRateHz(uint8_t timer0Frequency) {
+  // SPC timer0 runs from an 8 kHz source divided by the latch byte.
   return 8000.0 / timer0Frequency;
 }
 
 double lfoRateHz(AkaoSnesVersion version, uint8_t rate, uint8_t depth, uint8_t timer0Frequency) {
+  // SF2/DLS vibrato LFO frequency is full triangle cycles/sec, and one full cycle is two ramps.
   const uint16_t frames = effectiveRateFrames(version, rate, depth);
   return (frames == 0) ? 0.0 : frameRateHz(timer0Frequency) / (2.0 * frames);
 }
 
 double minLfoRateHz(AkaoSnesVersion version) {
+  // Lower bound for controller scaling: slowest active half-cycle, using the
+  // slowest timer0 latch when that version family has multiple latches.
   if (version == AKAOSNES_V1) {
+    // V1 always uses timer0 latch $24, and active counters map to 2..128 frames.
     return frameRateHz(kMinTimer0Frequency) / (2.0 * 128.0);
   }
 
   if (version == AKAOSNES_V2) {
-    return frameRateHz(kMinTimer0Frequency) / (4.0 * 127.0);
+    // V2 always uses timer0 latch $24. Depth bit 7 doubles the 1..127 frame counter
+    return frameRateHz(kMinTimer0Frequency) / (2.0 * 2.0 * 127.0);
   }
 
+  // V3/V4 both reach 256-frame half-cycles; V4 titles use timer0 latches up to $2a
   return 8000.0 / kMaxTimer0Frequency / (2.0 * 256.0);
 }
 
 double maxLfoRateHz(AkaoSnesVersion version) {
+  // Upper bound for controller scaling: fastest active half-cycle at the fastest timer0 latch.
   if (version == AKAOSNES_V1) {
+    // V1's rate counter is stored as rate >> 1, then incremented; zero disables
+    // the LFO, so the fastest active half-cycle is 2 frames.
     return frameRateHz(kMinTimer0Frequency) / (2.0 * 2.0);
   }
 
   if (version == AKAOSNES_V2) {
+    // V2's active counter can be 1 frame, provided depth bit 7 is clear.
     return frameRateHz(kMinTimer0Frequency) / 2.0;
   }
 
+  // V3 has rate 0 => 1 frame; V4 reserves rate 0 for 256 frames, but rate 1 is
+  // still a 1-frame half-cycle. Both use $24 as the fastest timer0 latch.
   return 8000.0 / kMinTimer0Frequency / 2.0;
 }
 
@@ -115,6 +126,7 @@ uint16_t v4LfoStep(uint8_t rate, uint8_t depth) {
     return 0;
   }
 
+  // V4 advances a phase accumulator by a quantized step and enforces a minimum nonzero step.
   const uint16_t frames = effectiveRateFrames(AKAOSNES_V4, rate, depth);
   const uint8_t magnitude = modulationMagnitude(AKAOSNES_V4, depth);
   const uint16_t step = static_cast<uint16_t>(64 * magnitude / frames);
@@ -126,6 +138,7 @@ double v4PhaseHighByteAmplitude(uint8_t rate, uint8_t depth) {
     return 0.0;
   }
 
+  // Over one ramp, the high byte reached by the phase accumulator is the pitch amplitude.
   return v4LfoStep(rate, depth) * effectiveRateFrames(AKAOSNES_V4, rate, depth) / 256.0;
 }
 
@@ -142,6 +155,7 @@ double v2PhaseHighByteAmplitude(uint8_t rate, uint8_t depth) {
 }
 
 double modulationAmplitude(AkaoSnesVersion version, uint8_t rate, uint8_t depth) {
+  // Normalize every version to the high-byte amplitude expected by the cents conversion.
   if (version == AKAOSNES_V2) {
     return v2PhaseHighByteAmplitude(rate, depth);
   }
@@ -161,6 +175,7 @@ uint8_t v1VibratoHighByteAmplitude(uint8_t rate, uint8_t depth) {
     return 0;
   }
 
+  // V1 derives amplitude through an 8-bit fractional step; keep the driver's truncation.
   const uint32_t step = (256u * depth) / counter;
   return static_cast<uint8_t>((step * counter) / 256u);
 }
@@ -170,6 +185,7 @@ double vibratoDepthCentsForAmplitude(double amplitude) {
     return 0.0;
   }
 
+  // Later drivers apply amplitude as a pitch ratio delta; convert both sides and keep the larger bend.
   const double ratio = 15.0 * amplitude / 32768.0;
   const double centsUp = 1200.0 * std::log2(1.0 + ratio);
   const double centsDown = -1200.0 * std::log2(1.0 - ratio);
@@ -181,6 +197,7 @@ double v1VibratoDepthCentsForHighByte(uint8_t amplitude) {
     return 0.0;
   }
 
+  // FF4/V1 uses its own pitch scale denominator instead of the later 15/32768 ratio.
   return 1200.0 * std::log2(1.0 + (amplitude / 3072.0));
 }
 
@@ -200,6 +217,7 @@ double v2VibratoDepthCents(uint8_t rate, uint8_t depth) {
 }
 
 double vibratoDepthCents(AkaoSnesVersion version, uint8_t rate, uint8_t depth) {
+  // Reproduce each driver's pitch math first, then report the result as SF2/DLS cents.
   if (version == AKAOSNES_V1) {
     return v1VibratoDepthCentsForHighByte(v1VibratoHighByteAmplitude(rate, depth));
   }
@@ -218,6 +236,7 @@ double delaySeconds(AkaoSnesVersion version, uint8_t delay, uint8_t tempo, uint8
   }
 
   const uint8_t safeTempo = (tempo == 0) ? 1 : tempo;
+  // Delay ticks are tempo-scaled music ticks; one tick is 256 / (driverFramesPerSecond * tempo).
   return ticks * (256.0 / (frameRateHz(timer0Frequency) * safeTempo));
 }
 
@@ -229,6 +248,7 @@ const double kMaxV3VibratoDepthCents = vibratoDepthCentsForAmplitude(127.0);
 const double kMaxV4VibratoDepthCents = vibratoDepthCentsForAmplitude(64.0);
 
 double maxVibratoDepthCents(AkaoSnesVersion version) {
+  // Export range ceiling for the ModWheel-to-vibrato-depth mapping.
   if (version == AKAOSNES_V1) {
     return kMaxV1VibratoDepthCents;
   }
@@ -241,12 +261,14 @@ double maxVibratoDepthCents(AkaoSnesVersion version) {
 }
 
 double maxDelaySeconds(AkaoSnesVersion version) {
+  // Export range ceiling for the delay controller; V1 cannot represent literal $ff as a delay.
   return (version == AKAOSNES_V1) ? kMaxV1DelaySeconds : kMaxDelaySeconds;
 }
 
 }  // namespace
 
 bool supportsLfoAutomation(AkaoSnesVersion version) {
+  // Only the SNES AKAO versions modeled above have enough known LFO behavior to automate.
   return version == AKAOSNES_V1 || version == AKAOSNES_V2 ||
          version == AKAOSNES_V3 || version == AKAOSNES_V4;
 }
@@ -279,6 +301,7 @@ uint8_t delayTicks(AkaoSnesVersion version, uint8_t delay) {
 }
 
 VibratoModulationSpec vibratoSpec(AkaoSnesVersion version) {
+  // Instrument-level SF2/DLS setup: generators define minima, controllers sweep to these maxima.
   return {
       maxVibratoDepthCents(version),
       minLfoRateHz(version),
@@ -295,6 +318,7 @@ uint8_t vibratoDepthMidiValue(AkaoSnesVersion version, uint8_t rate, uint8_t dep
     return 0;
   }
 
+  // ModWheel drives depth, normalized against the largest depth this version can produce.
   const int midiValue =
       static_cast<int>(std::lround(128.0 * vibratoDepthCents(version, rate, depth) /
                                    maxVibratoDepthCents(version)));
@@ -308,6 +332,7 @@ uint8_t rateMidiValue(AkaoSnesVersion version, uint8_t rate, uint8_t depth, uint
 }
 
 uint8_t delayMidiValue(AkaoSnesVersion version, uint8_t delay, uint8_t tempo, uint8_t timer0Frequency) {
+  // CC93 drives LFO delay within the version's exported seconds range.
   return midiValueForSecondsInRange(delaySeconds(version, delay, tempo, timer0Frequency),
                                     0.0,
                                     maxDelaySeconds(version));
