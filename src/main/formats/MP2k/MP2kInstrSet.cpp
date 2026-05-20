@@ -16,11 +16,20 @@
 #include "VGMColl.h"
 #include "VGMRgn.h"
 #include "LogManager.h"
+#include "PSGDSP.h"
+
+namespace {
+constexpr double kPsgDutyRatios[4] = {0.125, 0.25, 0.5, 0.75};
+constexpr const char* kPsgDutyLabels[4] = {"12.5%", "25%", "50%", "75%"};
+constexpr uint8_t kPsgSquareCount = 4;
+constexpr uint8_t kPsgNoiseIndex = kPsgSquareCount;
+constexpr uint8_t kPsgUnityKey = 69;
+}
 
 MP2kInstrSet::MP2kInstrSet(RawFile *file, int rate, size_t offset, int count,
-                           const std::string &name)
+                           VGMSampColl *psg_samples, const std::string &name)
     : VGMInstrSet(MP2kFormat::name, file, offset, count * 12, name), m_count(count),
-      m_operating_rate(rate) {
+      m_operating_rate(rate), m_psg_samples(psg_samples) {
   sampColl = new VGMSampColl(MP2kFormat::name, file, this, offset);
 }
 
@@ -176,6 +185,13 @@ bool MP2kInstr::loadInstr() {
       static constexpr const char *cycles[] = {"12,5%", "25%", "50%", "75%"};
       setName(fmt::format("PSG square {}", m_data.w1 < 4 ? cycles[m_data.w1] : "???"));
       setLength(12);
+      if (auto *psgColl = static_cast<MP2kInstrSet *>(parInstrSet)->psgSampColl(); psgColl) {
+        uint8_t duty = static_cast<uint8_t>(m_data.w1 & 0x03);
+        VGMRgn *rgn = addRgn(offset(), length(), duty);
+        rgn->sampCollPtr = psgColl;
+        rgn->setUnityKey(kPsgUnityKey);
+        setADSR(rgn, m_data.w2);
+      }
       break;
     }
 
@@ -194,6 +210,12 @@ bool MP2kInstr::loadInstr() {
     case 0x0c: {
       setName("PSG noise");
       setLength(12);
+      if (auto *psgColl = static_cast<MP2kInstrSet *>(parInstrSet)->psgSampColl(); psgColl) {
+        VGMRgn *rgn = addRgn(offset(), length(), kPsgNoiseIndex);
+        rgn->sampCollPtr = psgColl;
+        rgn->setUnityKey(kPsgUnityKey);
+        setADSR(rgn, m_data.w2);
+      }
       break;
     }
 
@@ -289,7 +311,13 @@ bool MP2kInstr::loadInstr() {
             setADSR(rgn, rawFile()->get<u32>(off + 8));
           }
         } else if ((type & 0x0f) == 4 || (type & 0x0f) == 12) {
-          /* Make noise sample here... */
+          if (auto *psgColl = static_cast<MP2kInstrSet *>(parInstrSet)->psgSampColl(); psgColl) {
+            VGMRgn *rgn = addRgn(offset(), length(), kPsgNoiseIndex, key, key);
+            rgn->sampCollPtr = psgColl;
+            rgn->setPan(pan);
+            rgn->setUnityKey(kPsgUnityKey);
+            setADSR(rgn, rawFile()->get<u32>(off + 8));
+          }
         }
       }
       break;
@@ -401,4 +429,44 @@ std::vector<uint8_t> MP2kSamp::decodeToNativePcm() {
   }
 
   return buf;
+}
+
+MP2kPSGColl::MP2kPSGColl(RawFile *file, uint32_t sampleRate, uint32_t loopSamples)
+    : VGMSampColl(MP2kFormat::name, file, 0, 0, "MP2k PSG samples"),
+      m_sample_rate(sampleRate),
+      m_loop_samples(loopSamples) {
+}
+
+bool MP2kPSGColl::parseSampleInfo() {
+  for (uint8_t duty = 0; duty < kPsgSquareCount; duty++) {
+    auto name = fmt::format("PSG square {}", kPsgDutyLabels[duty]);
+    auto *sample = new MP2kPSGSamp(this, duty, false, m_sample_rate, m_loop_samples, name);
+    samples.push_back(sample);
+  }
+
+  samples.push_back(new MP2kPSGSamp(this, 0, true, m_sample_rate, m_loop_samples, "PSG noise"));
+  return true;
+}
+
+MP2kPSGSamp::MP2kPSGSamp(VGMSampColl *sampColl, uint8_t dutyIndex, bool noise,
+                         uint32_t sampleRate, uint32_t loopSamples, std::string name)
+    : VGMSamp(sampColl, 0, loopSamples * sizeof(int16_t), 0, loopSamples * sizeof(int16_t), 1,
+              BPS::PCM16, sampleRate, std::move(name)),
+      m_duty_ratio(kPsgDutyRatios[dutyIndex & 0x03]),
+      m_noise(noise) {
+  setLoopStatus(true);
+  setLoopOffset(0);
+  setLoopLength(loopSamples);
+  setLoopStartMeasure(LM_SAMPLES);
+  setLoopLengthMeasure(LM_SAMPLES);
+  unityKey = kPsgUnityKey;
+  ulUncompressedSize = loopSamples * bytesPerSample();
+}
+
+std::vector<uint8_t> MP2kPSGSamp::decodeToNativePcm() {
+  if (m_noise) {
+    return psg::synthesizeNoiseWave(loopLength());
+  }
+
+  return psg::synthesizePulseWave(m_duty_ratio, rate, loopLength());
 }

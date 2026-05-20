@@ -10,10 +10,11 @@
 #include <map>
 #include "VGMInstrSet.h"
 #include "VGMSamp.h"
+#include "VGMSampColl.h"
 
 class MP2kInstrSet final : public VGMInstrSet {
 public:
-  MP2kInstrSet(RawFile *file, int rate, size_t offset, int count,
+  MP2kInstrSet(RawFile *file, int rate, size_t offset, int count, VGMSampColl *psg_samples,
                const std::string &name = "MP2K Instrument bank");
   ~MP2kInstrSet() = default;
 
@@ -21,11 +22,13 @@ public:
   bool parseInstrPointers() override;
   int makeOrGetSample(size_t sample_pointer);
   int sampleRate() const noexcept { return m_operating_rate; };
+  VGMSampColl* psgSampColl() const noexcept { return m_psg_samples; }
 
 private:
   int m_count = 0;
   int m_operating_rate = 22050;
   std::map<size_t, int> m_samples;
+  VGMSampColl* m_psg_samples{};
 };
 
 struct MP2kInstrData {
@@ -61,4 +64,29 @@ public:
 private:
   std::vector<uint8_t> decodeToNativePcm() override;
   MP2kWaveType m_type;
+};
+
+class MP2kPSGColl final : public VGMSampColl {
+public:
+  MP2kPSGColl(RawFile *file, uint32_t sampleRate, uint32_t loopSamples);
+  ~MP2kPSGColl() override = default;
+
+private:
+  bool parseSampleInfo() override;
+
+  uint32_t m_sample_rate;
+  uint32_t m_loop_samples;
+};
+
+class MP2kPSGSamp final : public VGMSamp {
+public:
+  MP2kPSGSamp(VGMSampColl *sampColl, uint8_t dutyIndex, bool noise, uint32_t sampleRate,
+              uint32_t loopSamples, std::string name);
+  ~MP2kPSGSamp() override = default;
+
+private:
+  std::vector<uint8_t> decodeToNativePcm() override;
+
+  double m_duty_ratio;
+  bool m_noise;
 };
