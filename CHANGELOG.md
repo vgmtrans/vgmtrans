@@ -26,6 +26,7 @@
 
 ### Fixed
 
+- Fixed GBA (Sappy aka mp2k) sequences being exported 0.45% faster than they should be.
 - Fixed a crash when removing a collection that was being played.
 - Fixed build issues on Linux.
 - Fixed an issue where scanning certain Nintendo DS (SDAT) files would crash the program or show corrupt sequence names.

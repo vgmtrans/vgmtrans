@@ -25,6 +25,9 @@ constexpr std::array<u8, 0x31> length_table{
     0x1E, 0x20, 0x24, 0x28, 0x2A, 0x2C, 0x30, 0x34, 0x36, 0x38, 0x3C, 0x40, 0x42,
     0x44, 0x48, 0x4C, 0x4E, 0x50, 0x54, 0x58, 0x5A, 0x5C, 0x60};
 
+constexpr double kGbaFrameRateHz = 16777216.0 / 280896.0; // 59.7275005696 Hz
+constexpr double kMp2kTempoScale = 2.0 * (kGbaFrameRateHz / 60.0);
+
 constexpr u8 STATE_NOTE = 0;
 constexpr u8 STATE_TIE = 1;
 constexpr u8 STATE_TIE_END = 2;
@@ -247,8 +250,8 @@ void MP2kTrack::handleSpecialCommand(u32 beginOffset, u8 status_byte) {
     }
 
     case 0xBB: {
-      uint8_t tempo = readByte(curOffset++) * 2;  // tempo in bpm is data byte * 2
-      addTempoBPM(beginOffset, curOffset - beginOffset, tempo);
+      double tempoBpm = static_cast<double>(readByte(curOffset++)) * kMp2kTempoScale;
+      addTempoBPM(beginOffset, curOffset - beginOffset, tempoBpm);
       break;
     }
 
