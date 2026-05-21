@@ -63,12 +63,13 @@ static bool test_pointer_validity(RawFile *file, size_t offset, uint32_t inGBA_l
   /* Compute supposed address of song table and check validity */
   u32 song_tbl_adr = (file->get<u32>(offset + 8) & 0x3FFFFFF) + 12 * file->get<u32>(offset + 4);
   auto valid_table =
-      file->get<u32>(offset + 4) < 256 && ((file->get<u32>(offset) & 0xff000000) == 0);
+      file->get<u32>(offset + 4) < 256 && song_tbl_adr < inGBA_length &&
+      ((file->get<u32>(offset) & 0xff000000) == 0);
 
   return params.valid() && valid_table;
 }
 
-void MP2kScanner::scan(RawFile *file, void *info) {
+void MP2kScanner::scan(RawFile *file, void *) {
   /* Detect if the sound engine is actually MP2K */
   size_t sound_engine_adr = 0;
   if (auto engine = detectMP2K(file); engine.has_value()) {

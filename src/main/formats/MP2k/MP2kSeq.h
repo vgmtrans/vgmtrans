@@ -9,7 +9,6 @@
 #include "SeqTrack.h"
 #include "SeqEvent.h"
 #include "automation/SeqMidiAutomation.h"
-#include "MP2kFormat.h"
 
 class MP2kSeq final : public VGMSeq {
 public:
@@ -62,13 +61,4 @@ private:
   uint8_t modType = 0;
   SeqSynthLfoAutomation vibratoLfo;
   SeqSynthLfoAutomation tremoloLfo;
-};
-
-class MP2kEvent : public SeqEvent {
-public:
-  MP2kEvent(MP2kTrack *pTrack, uint8_t stateType);
-
-private:
-  // Keep record of the state, because otherwise, all 0-0x7F events are ambiguous
-  uint8_t eventState;
 };

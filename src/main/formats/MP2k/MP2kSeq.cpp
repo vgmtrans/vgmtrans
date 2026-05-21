@@ -582,11 +582,3 @@ void MP2kTrack::updateLfoFade() {
         });
   }
 }
-
-//  *********
-//  MP2kEvent
-//  *********
-
-MP2kEvent::MP2kEvent(MP2kTrack *pTrack, uint8_t stateType)
-    : SeqEvent(pTrack), eventState(stateType) {
-}

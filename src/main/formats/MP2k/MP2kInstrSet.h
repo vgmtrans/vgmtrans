@@ -12,9 +12,11 @@
 #include "VGMSamp.h"
 #include "VGMSampColl.h"
 
+class MP2kPSGColl;
+
 class MP2kInstrSet final : public VGMInstrSet {
 public:
-  MP2kInstrSet(RawFile *file, int rate, size_t offset, int count, VGMSampColl *psg_samples,
+  MP2kInstrSet(RawFile *file, int rate, size_t offset, int count, MP2kPSGColl *psg_samples,
                const std::string &name = "MP2K Instrument bank");
   ~MP2kInstrSet() = default;
 
@@ -22,13 +24,13 @@ public:
   bool parseInstrPointers() override;
   int makeOrGetSample(size_t sample_pointer);
   int sampleRate() const noexcept { return m_operating_rate; };
-  VGMSampColl* psgSampColl() const noexcept { return m_psg_samples; }
+  MP2kPSGColl& psgSampColl() const noexcept;
 
 private:
   int m_count = 0;
   int m_operating_rate = 22050;
   std::map<size_t, int> m_samples;
-  VGMSampColl* m_psg_samples{};
+  MP2kPSGColl* m_psg_samples{};
 };
 
 struct MP2kInstrData {
@@ -55,11 +57,17 @@ private:
 
 enum class MP2kWaveType { PCM8, BDPCM };
 
+struct MP2kSampParams {
+  MP2kWaveType type;
+  uint32_t offset;
+  uint32_t length;
+  uint32_t dataOffset;
+  uint32_t dataLength;
+};
+
 class MP2kSamp final : public VGMSamp {
 public:
-  MP2kSamp(VGMSampColl *sampColl, MP2kWaveType type, uint32_t offset = 0, uint32_t length = 0,
-           uint32_t dataOffset = 0, uint32_t dataLength = 0, uint8_t channels = 1,
-           BPS bps = BPS::PCM16, uint32_t rate = 0, uint8_t waveType = 0, std::string name = "Sample");
+  MP2kSamp(VGMSampColl *sampColl, MP2kSampParams params);
   ~MP2kSamp() = default;
 
 private:
