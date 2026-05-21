@@ -5,13 +5,16 @@
  */
 
 #include "SeqTrack.h"
+
+#include <algorithm>
+#include <cmath>
+
+#include "automation/SeqMidiAutomation.h"
 #include "SeqEvent.h"
 #include "ScaleConversion.h"
 #include "Options.h"
 #include "VGMSeqNoTrks.h"
-#include "helper.h"
-#include <algorithm>
-#include <cmath>
+
 
 namespace {
 constexpr uint16_t maxLevelForResolution(Resolution res) {
