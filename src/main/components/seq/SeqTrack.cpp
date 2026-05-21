@@ -298,6 +298,26 @@ void SeqTrack::addControllerSlide(uint32_t dur,
   prevVal = targVal;
 }
 
+// Emit synth vibrato depth through CC1/modulation if it changed.
+bool SeqTrack::setSynthLfoModulationDepth(SeqSynthLfoAutomation& automation, uint8_t depth, bool force) {
+  return automation.emitDepth(depth,
+                              [this](uint8_t outputDepth) {
+                                addModulationNoItem(outputDepth);
+                              },
+                              force);
+}
+
+// Emit synth LFO depth through the given MIDI controller if it changed.
+bool SeqTrack::setSynthLfoControllerDepth(SeqSynthLfoAutomation& automation,
+                                          uint8_t controller, uint8_t depth,
+                                          bool force) {
+  return automation.emitDepth(depth,
+                              [this, controller](uint8_t outputDepth) {
+                                addControllerEventNoItem(controller, outputDepth);
+                              },
+                              force);
+}
+
 
 bool SeqTrack::isOffsetUsed(uint32_t offset) {
   if (offset <= visitedAddressMax) {

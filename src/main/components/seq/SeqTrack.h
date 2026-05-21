@@ -411,3 +411,5 @@ template<typename... Args>
 static std::string describeUnknownSubevent(uint8_t statusByte, Args... args) {
   return logEvent(statusByte, spdlog::level::off, "Unknown Subevent", args...);
 }
+
+#include "automation/SeqTrackAutomation.h"
