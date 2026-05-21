@@ -47,6 +47,7 @@ public:
 
 private:
   void setADSR(VGMRgn *dest, u32 data);
+  void setCgbADSR(VGMRgn *dest, u32 data);
 
   u8 m_type = 0;
   MP2kInstrData m_data;

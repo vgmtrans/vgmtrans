@@ -1,12 +1,12 @@
 /*
- * VGMTrans (c) 2002-2019
- * VGMTransQt (c) 2020
+ * VGMTrans (c) 2002-2026
  * Licensed under the zlib license,
  * refer to the included LICENSE.txt file
  */
 
 #include "MP2kInstrSet.h"
 
+#include <cmath>
 #include <cstring>
 #include <memory>
 #include <spdlog/fmt/fmt.h>
@@ -24,6 +24,48 @@ constexpr const char* kPsgDutyLabels[4] = {"12.5%", "25%", "50%", "75%"};
 constexpr uint8_t kPsgSquareCount = 4;
 constexpr uint8_t kPsgNoiseIndex = kPsgSquareCount;
 constexpr uint8_t kPsgUnityKey = 69;
+constexpr double kMp2kEnvelopeTicksPerSecond = 60.0;
+constexpr double kMp2kEnvelopeMaxLevel = 256.0;
+constexpr double kCgbEnvelopeClockHz = 64.0;
+constexpr double kCgbEnvelopeMaxLevel = 15.0;
+
+double mp2kAttackTimeSeconds(int attack) {
+  if (attack <= 0) {
+    return 0.0;
+  }
+  return kMp2kEnvelopeMaxLevel / (kMp2kEnvelopeTicksPerSecond * attack);
+}
+
+double mp2kEnvelopeRateTimeSeconds(int rate) {
+  if (rate <= 0) {
+    return 0.0;
+  }
+  const double logMaxLevel = std::log(kMp2kEnvelopeMaxLevel);
+  return logMaxLevel / (logMaxLevel - std::log(static_cast<double>(rate))) /
+         kMp2kEnvelopeTicksPerSecond;
+}
+
+double mp2kDecayTimeSeconds(int decay) {
+  return mp2kEnvelopeRateTimeSeconds(decay) * 10.0 / std::log(kMp2kEnvelopeMaxLevel);
+}
+
+double cgbEnvelopeRateTimeSeconds(int rate) {
+  rate &= 0x07;
+  if (rate == 0) {
+    return 0.0;
+  }
+  return kCgbEnvelopeMaxLevel * rate / kCgbEnvelopeClockHz;
+}
+
+double cgbSustainLevel(int sustain) {
+  if (sustain <= 0) {
+    return 0.0;
+  }
+  if (sustain >= kCgbEnvelopeMaxLevel) {
+    return 1.0;
+  }
+  return sustain / kCgbEnvelopeMaxLevel;
+}
 }
 
 MP2kInstrSet::MP2kInstrSet(RawFile *file, int rate, size_t offset, int count,
@@ -190,7 +232,7 @@ bool MP2kInstr::loadInstr() {
         VGMRgn *rgn = addRgn(offset(), length(), duty);
         rgn->sampCollPtr = psgColl;
         rgn->setUnityKey(kPsgUnityKey);
-        setADSR(rgn, m_data.w2);
+        setCgbADSR(rgn, m_data.w2);
       }
       break;
     }
@@ -214,7 +256,7 @@ bool MP2kInstr::loadInstr() {
         VGMRgn *rgn = addRgn(offset(), length(), kPsgNoiseIndex);
         rgn->sampCollPtr = psgColl;
         rgn->setUnityKey(kPsgUnityKey);
-        setADSR(rgn, m_data.w2);
+        setCgbADSR(rgn, m_data.w2);
       }
       break;
     }
@@ -316,7 +358,7 @@ bool MP2kInstr::loadInstr() {
             rgn->sampCollPtr = psgColl;
             rgn->setPan(pan);
             rgn->setUnityKey(kPsgUnityKey);
-            setADSR(rgn, rawFile()->get<u32>(off + 8));
+            setCgbADSR(rgn, rawFile()->get<u32>(off + 8));
           }
         }
       }
@@ -339,38 +381,35 @@ void MP2kInstr::setADSR(VGMRgn *rgn, u32 adsr) {
   int release = adsr >> 24;
 
   if (attack != 0xFF) {
-    double att_time = (256 / 60.0) / attack;
-    double att = 1200 * log2(att_time);
-
-    rgn->attack_time = att_time;
+    rgn->attack_time = mp2kAttackTimeSeconds(attack);
   } else {
     L_INFO("Attack disabled {:#x}", this->offset());
   }
 
   if (sustain != 0xFF) {
-    double sus = 0;
-    if (sustain != 0) {
-      sus = 100 * log(256.0 / sustain);
-    } else {
-      sus = 1000;
-    }
-    rgn->sustain_time = sus;
-
-    double dec_time = (log(256.0) / (log(256) - log(decay))) / 60.0;
-    dec_time *= 10 / log(256);
-    double dec = 1200 * log2(dec_time);
-    rgn->decay_time = dec;
+    rgn->sustain_level = sustain / kMp2kEnvelopeMaxLevel;
+    rgn->decay_time = mp2kDecayTimeSeconds(decay);
   } else {
     L_INFO("Sustain disabled {:#x}", this->offset());
   }
 
   if (release != 0x00) {
-    double rel_time = (log(256.0) / (log(256) - log(release))) / 60.0;
-    double rel = 1200 * log2(rel_time);
-    rgn->release_time = rel;
+    rgn->release_time = mp2kEnvelopeRateTimeSeconds(release);
   } else {
     L_INFO("Release disabled {:#x}", this->offset());
   }
+}
+
+void MP2kInstr::setCgbADSR(VGMRgn *rgn, u32 adsr) {
+  int attack = adsr & 0xFF;
+  int decay = (adsr >> 8) & 0xFF;
+  int sustain = (adsr >> 16) & 0xFF;
+  int release = adsr >> 24;
+
+  rgn->attack_time = cgbEnvelopeRateTimeSeconds(attack);
+  rgn->decay_time = cgbEnvelopeRateTimeSeconds(decay);
+  rgn->sustain_level = cgbSustainLevel(sustain);
+  rgn->release_time = cgbEnvelopeRateTimeSeconds(release);
 }
 
 MP2kSamp::MP2kSamp(VGMSampColl *sampColl, MP2kWaveType type, uint32_t offset, uint32_t length,
