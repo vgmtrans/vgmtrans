@@ -94,6 +94,7 @@ bool MP2kInstrSet::loadInstrs() {
   for (size_t i = 0; i < instrs.size(); i++) {
     VGMInstr *instr = instrs[i];
     if (!instr->loadInstr()) {
+      L_ERROR("Failed to load instrument #{} ({}), cannot load bank {} at offset {:#x}", i, instr->name(), name(), offset());
       delete instr;
       for (size_t j = i + 1; j < instrs.size(); j++) {
         delete instrs[j];
