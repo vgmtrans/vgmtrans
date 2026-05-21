@@ -31,7 +31,17 @@ protected:
   void onTickBegin() override;
 
 private:
-  uint8_t state = 0;
+  enum class State : uint8_t {
+    Note = 0,
+    Tie = 1,
+    TieEnd = 2,
+    Vol = 3,
+    Pan = 4,
+    PitchBend = 5,
+    Modulation = 6,
+  };
+
+  State state = State::Note;
   uint32_t curDuration = 0;
   uint8_t current_vel = 0;
 

@@ -20,7 +20,8 @@
 #include <set>
 #include <span>
 #include <array>
-#include <functional>
+#include <vector>
+#include <spdlog/fmt/fmt.h>
 
 #include "VGMColl.h"
 #include "MP2kSeq.h"
@@ -48,6 +49,11 @@ struct EngineParams {
   const u32 main_vol;
   const u32 sampling_rate_index;
   const u32 dac_bits;
+};
+
+struct MP2kSeqWithIndex {
+  u32 song_index;
+  MP2kSeq *seq;
 };
 
 /* Test if an area of ROM is eligible to be the base pointer */
@@ -93,8 +99,9 @@ void MP2kScanner::scan(RawFile *file, void *info) {
 
   /* First 32 bytes are the pointer, the rest is song info */
   std::set<size_t> soundbanks;
-  std::map<u32, std::vector<MP2kSeq *>> seqs;
+  std::map<u32, std::vector<MP2kSeqWithIndex>> seqs;
   for (auto it = song_entry; it < song_tbl.end(); std::advance(it, 2)) {
+    u32 song_index = static_cast<u32>(std::distance(song_tbl.begin(), it) / 2);
     u32 song_pointer = *it & 0x1FFFFFF;
     if (song_pointer >= file->size()) {
       L_DEBUG("Song pointer is out of bounds {:#x}/{:#x}", *it, file->size());
@@ -109,6 +116,7 @@ void MP2kScanner::scan(RawFile *file, void *info) {
     auto nseq = new MP2kSeq(file, song_pointer);
     if (!nseq->loadVGMFile()) {
       delete nseq;
+      continue;
     }
 
     /* Load the soundbanks later because we need to know the number of instruments in each of
@@ -116,9 +124,9 @@ void MP2kScanner::scan(RawFile *file, void *info) {
     u32 inst_pointer = file->get<u32>(song_pointer + 4) & 0x1FFFFFF;
     soundbanks.insert(inst_pointer);
     if (auto inst = seqs.find(inst_pointer); inst != seqs.end()) {
-      inst->second.emplace_back(nseq);
+      inst->second.push_back({song_index, nseq});
     } else {
-      seqs.insert(std::pair(inst_pointer, std::vector<MP2kSeq *>{nseq}));
+      seqs.insert({inst_pointer, std::vector<MP2kSeqWithIndex>{{song_index, nseq}}});
     }
   }
 
@@ -138,10 +146,12 @@ void MP2kScanner::scan(RawFile *file, void *info) {
       auto seq = seqs.find(*it);
       if (seq != seqs.end()) {
         for (auto seqval : seq->second) {
-          auto coll = new VGMColl("MP2k Collection");
-          coll->useSeq(seqval);
+          auto coll = new VGMColl(fmt::format("MP2k Collection #{}", seqval.song_index));
+          coll->useSeq(seqval.seq);
           coll->addInstrSet(iset);
-          coll->addSampColl(iset->sampColl);
+          if (iset->sampColl != nullptr && !iset->sampColl->samples.empty()) {
+            coll->addSampColl(iset->sampColl);
+          }
           coll->addSampColl(psg_sampcoll);
 
           if (!coll->load()) {

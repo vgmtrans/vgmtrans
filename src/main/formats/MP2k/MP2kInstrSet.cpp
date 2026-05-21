@@ -19,41 +19,34 @@
 #include "PSGDSP.h"
 
 namespace {
-constexpr double kPsgDutyRatios[4] = {0.125, 0.25, 0.5, 0.75};
-constexpr const char* kPsgDutyLabels[4] = {"12.5%", "25%", "50%", "75%"};
 constexpr uint8_t kPsgSquareCount = 4;
 constexpr uint8_t kPsgNoiseIndex = kPsgSquareCount;
 constexpr uint8_t kPsgUnityKey = 69;
 constexpr size_t kGbaRomPointerMask = 0x03FFFFFF;
-constexpr size_t kGbaRomAddressMask = 0x0E000000;
-constexpr size_t kGbaRomAddressMin = 0x08000000;
-constexpr size_t kGbaRomAddressMax = 0x0C000000;
-constexpr uint8_t kCgbWaveRamBytes = 16;
-constexpr uint8_t kCgbWaveRamSamples = kCgbWaveRamBytes * 2;
-constexpr uint32_t kCgbWaveSampleRate = kCgbWaveRamSamples * 440;
-constexpr double kMp2kEnvelopeTicksPerSecond = 60.0;
-constexpr double kMp2kEnvelopeMaxLevel = 256.0;
-constexpr double kCgbEnvelopeClockHz = 64.0;
-constexpr double kCgbEnvelopeMaxLevel = 15.0;
 
 double mp2kAttackTimeSeconds(int attack) {
   if (attack <= 0) {
     return 0.0;
   }
-  return kMp2kEnvelopeMaxLevel / (kMp2kEnvelopeTicksPerSecond * attack);
+  constexpr double kEnvelopeTicksPerSecond = 60.0;
+  constexpr double kEnvelopeMaxLevel = 256.0;
+  return kEnvelopeMaxLevel / (kEnvelopeTicksPerSecond * attack);
 }
 
 double mp2kEnvelopeRateTimeSeconds(int rate) {
   if (rate <= 0) {
     return 0.0;
   }
-  const double logMaxLevel = std::log(kMp2kEnvelopeMaxLevel);
+  constexpr double kEnvelopeTicksPerSecond = 60.0;
+  constexpr double kEnvelopeMaxLevel = 256.0;
+  const double logMaxLevel = std::log(kEnvelopeMaxLevel);
   return logMaxLevel / (logMaxLevel - std::log(static_cast<double>(rate))) /
-         kMp2kEnvelopeTicksPerSecond;
+         kEnvelopeTicksPerSecond;
 }
 
 double mp2kDecayTimeSeconds(int decay) {
-  return mp2kEnvelopeRateTimeSeconds(decay) * 10.0 / std::log(kMp2kEnvelopeMaxLevel);
+  constexpr double kEnvelopeMaxLevel = 256.0;
+  return mp2kEnvelopeRateTimeSeconds(decay) * 10.0 / std::log(kEnvelopeMaxLevel);
 }
 
 double cgbEnvelopeRateTimeSeconds(int rate) {
@@ -61,20 +54,26 @@ double cgbEnvelopeRateTimeSeconds(int rate) {
   if (rate == 0) {
     return 0.0;
   }
-  return kCgbEnvelopeMaxLevel * rate / kCgbEnvelopeClockHz;
+  constexpr double kEnvelopeClockHz = 64.0;
+  constexpr double kEnvelopeMaxLevel = 15.0;
+  return kEnvelopeMaxLevel * rate / kEnvelopeClockHz;
 }
 
 double cgbSustainLevel(int sustain) {
   if (sustain <= 0) {
     return 0.0;
   }
-  if (sustain >= kCgbEnvelopeMaxLevel) {
+  constexpr double kEnvelopeMaxLevel = 15.0;
+  if (sustain >= kEnvelopeMaxLevel) {
     return 1.0;
   }
-  return sustain / kCgbEnvelopeMaxLevel;
+  return sustain / kEnvelopeMaxLevel;
 }
 
 bool isGbaRomPointer(size_t pointer) {
+  constexpr size_t kGbaRomAddressMask = 0x0E000000;
+  constexpr size_t kGbaRomAddressMin = 0x08000000;
+  constexpr size_t kGbaRomAddressMax = 0x0C000000;
   size_t address_space = pointer & kGbaRomAddressMask;
   return address_space >= kGbaRomAddressMin && address_space <= kGbaRomAddressMax;
 }
@@ -88,7 +87,37 @@ MP2kInstrSet::MP2kInstrSet(RawFile *file, int rate, size_t offset, int count,
 }
 
 bool MP2kInstrSet::loadInstrs() {
-  return VGMInstrSet::loadInstrs();
+  auto instrs = std::move(aInstrs);
+  aInstrs.clear();
+  aInstrs.reserve(instrs.size());
+
+  for (size_t i = 0; i < instrs.size(); i++) {
+    VGMInstr *instr = instrs[i];
+    if (!instr->loadInstr()) {
+      delete instr;
+      for (size_t j = i + 1; j < instrs.size(); j++) {
+        delete instrs[j];
+      }
+      for (auto *loadedInstr : aInstrs) {
+        delete loadedInstr;
+      }
+      aInstrs.clear();
+      return false;
+    }
+
+    if (instr->regions().empty()) {
+      delete instr;
+    } else {
+      aInstrs.push_back(instr);
+    }
+  }
+
+  if (sampColl != nullptr && sampColl->samples.empty()) {
+    delete sampColl;
+    sampColl = nullptr;
+  }
+
+  return true;
 }
 
 bool MP2kInstrSet::parseInstrPointers() {
@@ -206,14 +235,12 @@ bool MP2kInstr::loadInstr() {
         L_WARN("Ignoring resampling shenaningans!");
       }
 
-      size_t sample_pointer = m_data.w1 & 0x3FFFFFF;
-      if (sample_pointer == 0) {
+      if (m_data.w1 == 0 || !isGbaRomPointer(m_data.w1)) {
         /* Sometimes the instrument table can have weird values */
-        L_INFO("Tried to load a sample that pointed to nothing for instr @{:#x}", offset());
-        setName(name() + " (invalid)");
         break;
       }
 
+      size_t sample_pointer = m_data.w1 & kGbaRomPointerMask;
       if (auto sample_id =
               static_cast<MP2kInstrSet *>(parInstrSet)->makeOrGetSample(sample_pointer);
           sample_id != -1) {
@@ -264,7 +291,7 @@ bool MP2kInstr::loadInstr() {
           rgn->setUnityKey(kPsgUnityKey);
           setCgbADSR(rgn, m_data.w2);
         } else {
-          L_WARN("No programmable wave could be loaded for {:#x}", m_data.w1);
+          L_DEBUG("No programmable wave could be loaded for {:#x}", m_data.w1);
           setName(name() + " (wave missing)");
         }
       }
@@ -293,6 +320,8 @@ bool MP2kInstr::loadInstr() {
 
       u32 base_pointer = m_data.w1 & 0x3ffffff;
       u32 region_table = m_data.w2 & 0x3ffffff;
+      auto *psgColl =
+          static_cast<MP2kPSGColl *>(static_cast<MP2kInstrSet *>(parInstrSet)->psgSampColl());
 
       std::vector<int8_t> split_list, index_list;
 
@@ -318,24 +347,53 @@ bool MP2kInstr::loadInstr() {
         u32 off = base_pointer + 12 * index_list[i];
 
         auto type = rawFile()->get<u8>(off);
-        if (type & 0x07) {
-          L_WARN("GameBoy instrument in key-split (what game is this?!)");
+        if (type & (0x40 | 0x80)) {
+          L_DEBUG("Recursive split/rhythm instrument in key-split");
           continue;
         }
 
-        u32 sample_pointer = rawFile()->get<u32>(off + 4) & 0x3ffffff;
-        if (sample_pointer == 0) {
-          continue;
-        }
+        u32 raw_sample_pointer = rawFile()->get<u32>(off + 4);
+        u32 sample_pointer = raw_sample_pointer & 0x3ffffff;
+        uint8_t cgb_type = type & 0x07;
 
-        if (auto sample_id = static_cast<MP2kInstrSet *>(parInstrSet)->makeOrGetSample(sample_pointer);
-            sample_id != -1) {
-          VGMRgn *rgn = addRgn(offset(), length(), sample_id, split_list[i], split_list[i + 1] - 1);
+        if (cgb_type == 0) {
+          if (sample_pointer == 0 || !isGbaRomPointer(raw_sample_pointer)) {
+            continue;
+          }
 
-          // rgn->sampCollPtr = static_cast<MP2kInstrSet *>(parInstrSet)->sampColl;
-          setADSR(rgn, rawFile()->get<u32>(off + 8));
-        } else {
-          continue;
+          if (auto sample_id =
+                  static_cast<MP2kInstrSet *>(parInstrSet)->makeOrGetSample(sample_pointer);
+              sample_id != -1) {
+            VGMRgn *rgn = addRgn(off, 12, sample_id, split_list[i], split_list[i + 1] - 1);
+
+            // rgn->sampCollPtr = static_cast<MP2kInstrSet *>(parInstrSet)->sampColl;
+            setADSR(rgn, rawFile()->get<u32>(off + 8));
+          }
+        } else if (cgb_type == 1 || cgb_type == 2) {
+          if (psgColl) {
+            uint8_t duty = static_cast<uint8_t>(raw_sample_pointer & 0x03);
+            VGMRgn *rgn = addRgn(off, 12, duty, split_list[i], split_list[i + 1] - 1);
+            rgn->sampCollPtr = psgColl;
+            rgn->setUnityKey(kPsgUnityKey);
+            setCgbADSR(rgn, rawFile()->get<u32>(off + 8));
+          }
+        } else if (cgb_type == 3) {
+          if (psgColl) {
+            if (auto sample_id = psgColl->makeOrGetProgrammableWave(raw_sample_pointer);
+                sample_id != -1) {
+              VGMRgn *rgn = addRgn(off, 12, sample_id, split_list[i], split_list[i + 1] - 1);
+              rgn->sampCollPtr = psgColl;
+              rgn->setUnityKey(kPsgUnityKey);
+              setCgbADSR(rgn, rawFile()->get<u32>(off + 8));
+            }
+          }
+        } else if (cgb_type == 4) {
+          if (psgColl) {
+            VGMRgn *rgn = addRgn(off, 12, kPsgNoiseIndex, split_list[i], split_list[i + 1] - 1);
+            rgn->sampCollPtr = psgColl;
+            rgn->setUnityKey(kPsgUnityKey);
+            setCgbADSR(rgn, rawFile()->get<u32>(off + 8));
+          }
         }
       }
 
@@ -358,11 +416,12 @@ bool MP2kInstr::loadInstr() {
 
         u32 raw_sample_pointer = rawFile()->get<u32>(off + 4);
         u32 sample_pointer = raw_sample_pointer & 0x3ffffff;
-        if (sample_pointer == 0) {
-          continue;
-        }
 
         if ((type & 0x0f) == 0 || (type & 0x0f) == 8) {
+          if (sample_pointer == 0 || !isGbaRomPointer(raw_sample_pointer)) {
+            continue;
+          }
+
           if (auto sample_id =
                   static_cast<MP2kInstrSet *>(parInstrSet)->makeOrGetSample(sample_pointer);
               sample_id != -1) {
@@ -410,6 +469,13 @@ bool MP2kInstr::loadInstr() {
     }
   }
 
+  if (!regions().empty()) {
+    constexpr double kDefaultLfoFrequencyHz = 60.0 * 22.0 / 256.0;
+    constexpr double kVibratoMaxDepthCents = 127.0 * 4.0 * 100.0 / 64.0;
+    addStandardVibratoHandling(kVibratoMaxDepthCents, kDefaultLfoFrequencyHz,
+                               kDefaultLfoFrequencyHz);
+  }
+
   return true;
 }
 
@@ -418,6 +484,7 @@ void MP2kInstr::setADSR(VGMRgn *rgn, u32 adsr) {
   int decay = (adsr >> 8) & 0xFF;
   int sustain = (adsr >> 16) & 0xFF;
   int release = adsr >> 24;
+  constexpr double kEnvelopeMaxLevel = 256.0;
 
   if (attack != 0xFF) {
     rgn->attack_time = mp2kAttackTimeSeconds(attack);
@@ -426,7 +493,7 @@ void MP2kInstr::setADSR(VGMRgn *rgn, u32 adsr) {
   }
 
   if (sustain != 0xFF) {
-    rgn->sustain_level = sustain / kMp2kEnvelopeMaxLevel;
+    rgn->sustain_level = sustain / kEnvelopeMaxLevel;
     rgn->decay_time = mp2kDecayTimeSeconds(decay);
   } else {
     L_INFO("Sustain disabled {:#x}", this->offset());
@@ -509,6 +576,16 @@ std::vector<uint8_t> MP2kSamp::decodeToNativePcm() {
   return buf;
 }
 
+namespace {
+constexpr uint8_t kCgbWaveRamBytes = 16;
+constexpr uint8_t kCgbWaveRamSamples = kCgbWaveRamBytes * 2;
+
+double psgDutyRatio(uint8_t dutyIndex) {
+  constexpr double kDutyRatios[4] = {0.125, 0.25, 0.5, 0.75};
+  return kDutyRatios[dutyIndex & 0x03];
+}
+}
+
 MP2kPSGColl::MP2kPSGColl(RawFile *file, uint32_t sampleRate, uint32_t loopSamples)
     : VGMSampColl(MP2kFormat::name, file, 0, 0, "MP2k PSG samples"),
       m_sample_rate(sampleRate),
@@ -516,8 +593,9 @@ MP2kPSGColl::MP2kPSGColl(RawFile *file, uint32_t sampleRate, uint32_t loopSample
 }
 
 bool MP2kPSGColl::parseSampleInfo() {
+  constexpr const char* kDutyLabels[4] = {"12.5%", "25%", "50%", "75%"};
   for (uint8_t duty = 0; duty < kPsgSquareCount; duty++) {
-    auto name = fmt::format("PSG square {}", kPsgDutyLabels[duty]);
+    auto name = fmt::format("PSG square {}", kDutyLabels[duty]);
     auto *sample = new MP2kPSGSamp(this, duty, false, m_sample_rate, m_loop_samples, name);
     samples.push_back(sample);
   }
@@ -528,13 +606,13 @@ bool MP2kPSGColl::parseSampleInfo() {
 
 int MP2kPSGColl::makeOrGetProgrammableWave(size_t wavePointer) {
   if (!isGbaRomPointer(wavePointer)) {
-    L_WARN("Invalid programmable wave pointer {:#x}", wavePointer);
+    L_DEBUG("Invalid programmable wave pointer {:#x}", wavePointer);
     return -1;
   }
 
   size_t wave_offset = wavePointer & kGbaRomPointerMask;
   if (wave_offset == 0 || wave_offset + kCgbWaveRamBytes > rawFile()->size()) {
-    L_WARN("Invalid programmable wave pointer {:#x}", wavePointer);
+    L_DEBUG("Invalid programmable wave pointer {:#x}", wavePointer);
     return -1;
   }
 
@@ -544,6 +622,7 @@ int MP2kPSGColl::makeOrGetProgrammableWave(size_t wavePointer) {
 
   int sample_id = static_cast<int>(samples.size());
   auto name = fmt::format("PSG programmable wave {:#x}", wave_offset);
+  constexpr uint32_t kCgbWaveSampleRate = kCgbWaveRamSamples * 440;
   samples.push_back(new MP2kPSGWaveSamp(this, wave_offset, kCgbWaveSampleRate, name));
   m_programmable_waves.emplace(wave_offset, sample_id);
   return sample_id;
@@ -553,7 +632,7 @@ MP2kPSGSamp::MP2kPSGSamp(VGMSampColl *sampColl, uint8_t dutyIndex, bool noise,
                          uint32_t sampleRate, uint32_t loopSamples, std::string name)
     : VGMSamp(sampColl, 0, loopSamples * sizeof(int16_t), 0, loopSamples * sizeof(int16_t), 1,
               BPS::PCM16, sampleRate, std::move(name)),
-      m_duty_ratio(kPsgDutyRatios[dutyIndex & 0x03]),
+      m_duty_ratio(psgDutyRatio(dutyIndex)),
       m_noise(noise) {
   setLoopStatus(true);
   setLoopOffset(0);
