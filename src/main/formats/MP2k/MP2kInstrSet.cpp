@@ -645,10 +645,10 @@ MP2kPSGSamp::MP2kPSGSamp(VGMSampColl *sampColl, uint8_t dutyIndex, bool noise,
 
 std::vector<uint8_t> MP2kPSGSamp::decodeToNativePcm() {
   if (m_noise) {
-    return psg::synthesizeNoiseWave(loopLength());
+    return psg::synthesizeLfsrNoisePCM16(loopLength());
   }
 
-  return psg::synthesizePulseWave(m_duty_ratio, rate, loopLength());
+  return psg::synthesizeBandLimitedPulsePCM16(m_duty_ratio, rate, loopLength());
 }
 
 MP2kPSGWaveSamp::MP2kPSGWaveSamp(VGMSampColl *sampColl, size_t wavePointer,

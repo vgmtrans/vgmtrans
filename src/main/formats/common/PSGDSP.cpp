@@ -13,7 +13,7 @@
 
 namespace psg {
 
-std::vector<uint8_t> synthesizeNoiseWave(uint32_t sampleCount, uint16_t lfsrSeed, uint16_t lfsrTap) {
+std::vector<uint8_t> synthesizeLfsrNoisePCM16(uint32_t sampleCount, uint16_t lfsrSeed, uint16_t lfsrTap) {
   std::vector<uint8_t> samples(sampleCount * sizeof(int16_t));
   if (samples.empty()) {
     return samples;
@@ -36,7 +36,7 @@ std::vector<uint8_t> synthesizeNoiseWave(uint32_t sampleCount, uint16_t lfsrSeed
   return samples;
 }
 
-std::vector<uint8_t> synthesizePulseWave(double dutyCycle, uint32_t sampleRate,
+std::vector<uint8_t> synthesizeBandLimitedPulsePCM16(double dutyCycle, uint32_t sampleRate,
                                          uint32_t sampleCount, double baseFrequencyHz) {
   std::vector<uint8_t> samples(sampleCount * sizeof(int16_t));
   if (samples.empty() || sampleRate == 0 || baseFrequencyHz <= 0.0) {

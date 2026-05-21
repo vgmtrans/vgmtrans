@@ -547,8 +547,8 @@ NDSPSGSamp::NDSPSGSamp(VGMSampColl* sampcoll, uint8_t duty_cycle) : VGMSamp(samp
 
 std::vector<uint8_t> NDSPSGSamp::decodeToNativePcm() {
   if (m_duty_cycle == -1) {
-    return psg::synthesizeNoiseWave(loopLength());
+    return psg::synthesizeLfsrNoisePCM16(loopLength());
   }
 
-  return psg::synthesizePulseWave(m_duty_cycle, rate, loopLength());
+  return psg::synthesizeBandLimitedPulsePCM16(m_duty_cycle, rate, loopLength());
 }
