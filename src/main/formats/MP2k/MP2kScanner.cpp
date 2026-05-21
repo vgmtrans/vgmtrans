@@ -20,7 +20,8 @@
 #include <set>
 #include <span>
 #include <array>
-#include <functional>
+#include <vector>
+#include <spdlog/fmt/fmt.h>
 
 #include "VGMColl.h"
 #include "MP2kSeq.h"
@@ -50,6 +51,11 @@ struct EngineParams {
   const u32 dac_bits;
 };
 
+struct MP2kSeqWithIndex {
+  u32 song_index;
+  MP2kSeq *seq;
+};
+
 /* Test if an area of ROM is eligible to be the base pointer */
 static bool test_pointer_validity(RawFile *file, size_t offset, uint32_t inGBA_length) {
   EngineParams params(file->get<u32>(offset));
@@ -57,12 +63,13 @@ static bool test_pointer_validity(RawFile *file, size_t offset, uint32_t inGBA_l
   /* Compute supposed address of song table and check validity */
   u32 song_tbl_adr = (file->get<u32>(offset + 8) & 0x3FFFFFF) + 12 * file->get<u32>(offset + 4);
   auto valid_table =
-      file->get<u32>(offset + 4) < 256 && ((file->get<u32>(offset) & 0xff000000) == 0);
+      file->get<u32>(offset + 4) < 256 && song_tbl_adr < inGBA_length &&
+      ((file->get<u32>(offset) & 0xff000000) == 0);
 
   return params.valid() && valid_table;
 }
 
-void MP2kScanner::scan(RawFile *file, void *info) {
+void MP2kScanner::scan(RawFile *file, void *) {
   /* Detect if the sound engine is actually MP2K */
   size_t sound_engine_adr = 0;
   if (auto engine = detectMP2K(file); engine.has_value()) {
@@ -72,6 +79,8 @@ void MP2kScanner::scan(RawFile *file, void *info) {
   }
 
   EngineParams engine_settings(file->get<u32>(sound_engine_adr));
+  const int engine_sample_rate = samplerate_LUT[engine_settings.sampling_rate_index];
+  const uint32_t psg_sample_rate = engine_sample_rate > 0 ? static_cast<uint32_t>(engine_sample_rate) : 32768;
 
   /* Compute song table location */
   u32 song_levels = file->get<u32>(sound_engine_adr + 4);  // Read # of song levels
@@ -87,10 +96,14 @@ void MP2kScanner::scan(RawFile *file, void *info) {
     return;
   }
 
+  auto* psg_sampcoll = new MP2kPSGColl(file, psg_sample_rate, psg_sample_rate);
+  psg_sampcoll->loadVGMFile();
+
   /* First 32 bytes are the pointer, the rest is song info */
   std::set<size_t> soundbanks;
-  std::map<u32, std::vector<MP2kSeq *>> seqs;
+  std::map<u32, std::vector<MP2kSeqWithIndex>> seqs;
   for (auto it = song_entry; it < song_tbl.end(); std::advance(it, 2)) {
+    u32 song_index = static_cast<u32>(std::distance(song_tbl.begin(), it) / 2);
     u32 song_pointer = *it & 0x1FFFFFF;
     if (song_pointer >= file->size()) {
       L_DEBUG("Song pointer is out of bounds {:#x}/{:#x}", *it, file->size());
@@ -105,6 +118,7 @@ void MP2kScanner::scan(RawFile *file, void *info) {
     auto nseq = new MP2kSeq(file, song_pointer);
     if (!nseq->loadVGMFile()) {
       delete nseq;
+      continue;
     }
 
     /* Load the soundbanks later because we need to know the number of instruments in each of
@@ -112,9 +126,9 @@ void MP2kScanner::scan(RawFile *file, void *info) {
     u32 inst_pointer = file->get<u32>(song_pointer + 4) & 0x1FFFFFF;
     soundbanks.insert(inst_pointer);
     if (auto inst = seqs.find(inst_pointer); inst != seqs.end()) {
-      inst->second.emplace_back(nseq);
+      inst->second.push_back({song_index, nseq});
     } else {
-      seqs.insert(std::pair(inst_pointer, std::vector<MP2kSeq *>{nseq}));
+      seqs.insert({inst_pointer, std::vector<MP2kSeqWithIndex>{{song_index, nseq}}});
     }
   }
 
@@ -126,17 +140,21 @@ void MP2kScanner::scan(RawFile *file, void *info) {
     }
 
     if (auto iset =
-            new MP2kInstrSet(file, samplerate_LUT[engine_settings.sampling_rate_index], *it, count);
+            new MP2kInstrSet(file, samplerate_LUT[engine_settings.sampling_rate_index], *it, count,
+                              psg_sampcoll);
         !iset->loadVGMFile()) {
       delete iset;
     } else {
       auto seq = seqs.find(*it);
       if (seq != seqs.end()) {
         for (auto seqval : seq->second) {
-          auto coll = new VGMColl("MP2k Collection");
-          coll->useSeq(seqval);
+          auto coll = new VGMColl(fmt::format("MP2k Collection #{}", seqval.song_index));
+          coll->useSeq(seqval.seq);
           coll->addInstrSet(iset);
-          coll->addSampColl(iset->sampColl);
+          if (iset->sampColl != nullptr && !iset->sampColl->samples.empty()) {
+            coll->addSampColl(iset->sampColl);
+          }
+          coll->addSampColl(psg_sampcoll);
 
           if (!coll->load()) {
             delete coll;

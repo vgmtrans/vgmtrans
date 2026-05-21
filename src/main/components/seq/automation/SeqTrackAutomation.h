@@ -65,26 +65,7 @@ void SeqTrack::resetPitchBendAutomation(SeqPitchBendAutomation<PitchType>& autom
                                [this](int16_t bend) { addPitchBendNoItem(bend); });
 }
 
-// Emit synth vibrato depth through CC1/modulation if it changed.
-inline bool SeqTrack::setSynthLfoModulationDepth(SeqSynthLfoAutomation& automation, uint8_t depth,
-                                                 bool force) {
-  return automation.emitDepth(depth,
-                              [this](uint8_t outputDepth) {
-                                addModulationNoItem(outputDepth);
-                              },
-                              force);
-}
-
-// Emit synth LFO depth through the given MIDI controller if it changed.
-inline bool SeqTrack::setSynthLfoControllerDepth(SeqSynthLfoAutomation& automation,
-                                                 uint8_t controller, uint8_t depth,
-                                                 bool force) {
-  return automation.emitDepth(depth,
-                              [this, controller](uint8_t outputDepth) {
-                                addControllerEventNoItem(controller, outputDepth);
-                              },
-                              force);
-}
+// Non-template helper implementations are defined in SeqTrack.cpp
 
 // Advance an LFO fade by one tick and emit converted CC1/modulation depth if it changed.
 template <typename ConvertDepth>

@@ -5,7 +5,6 @@
  */
 
 #include <cmath>
-#include <numeric>
 #include <string>
 #include <vector>
 #include <spdlog/fmt/fmt.h>
@@ -15,6 +14,7 @@
 #include "NDSInstrSet.h"
 #include "VGMRgn.h"
 #include "LogManager.h"
+#include "PSGDSP.h"
 
 // INTR_FREQUENCY is the interval in seconds between updates to the volume envelope.
 // The NDS sound engine updates envelopes every 64 sound timer intervals.
@@ -546,59 +546,9 @@ NDSPSGSamp::NDSPSGSamp(VGMSampColl* sampcoll, uint8_t duty_cycle) : VGMSamp(samp
 }
 
 std::vector<uint8_t> NDSPSGSamp::decodeToNativePcm() {
-  const uint32_t sampleCount = uncompressedSize() / sizeof(int16_t);
-  std::vector<uint8_t> samples(sampleCount * sizeof(int16_t));
-  auto* output = reinterpret_cast<int16_t*>(samples.data());
-
-  /* Noise mode */
   if (m_duty_cycle == -1) {
-    int16_t value = 0x7FFF;
-    output[0] = 0x7FFF;
-    for (int i = 1, len = loopLength(); i < len; i++) {
-      bool carry = value & 0x0001;
-      value >>= 1;
-      if (carry) {
-        output[i] = -0x7FFF;
-        value ^= 0x6000;
-      } else {
-        output[i] = 0x7FFF;
-      }
-    }
-  } else {
-    /*
-     * PSG wave mode
-     * It's band limited so it should sound nice!
-     */
-
-    /* Generate Fourier coefficients */
-    std::vector<double> coefficients = {m_duty_cycle - 0.5};
-    {
-      int i = 1;
-      std::generate_n(std::back_inserter(coefficients), rate / (440 * 2),
-                      [duty_cycle = m_duty_cycle, &i]() {
-                        double val = sin(i * duty_cycle * M_PI) * 2 / (i * M_PI);
-                        i++;
-
-                        return val;
-                      });
-    }
-
-    /* Generate audio */
-    double scale = 440 * M_PI * 2 / rate;
-    for (int i = 0, len = loopLength(); i < len; i++) {
-      int counter = 0;
-      double value = std::accumulate(std::begin(coefficients), std::end(coefficients), 0.0,
-                                     [i, scale, &counter](double sum, double coef) {
-                                       sum += coef * cos(counter++ * scale * i);
-                                       return sum;
-                                     });
-
-      /* We have to go from F64 to S16 */
-      /* Scale by 2.0 to normalize range from [-0.5, 0.5] to [-1.0, 1.0] */
-      int16_t out_value = static_cast<int16_t>(std::clamp(std::round(value * 0x7FFF * 2.0), -32768.0, 32767.0));
-      output[i] = out_value;
-    }
+    return psg::synthesizeLfsrNoisePCM16(loopLength());
   }
 
-  return samples;
+  return psg::synthesizeBandLimitedPulsePCM16(m_duty_cycle, rate, loopLength());
 }

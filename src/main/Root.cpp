@@ -171,7 +171,8 @@ bool VGMRoot::removeRawFile(RawFile *rawfile) {
 
 void VGMRoot::addVGMFile(std::variant<VGMSeq *, VGMInstrSet *, VGMSampColl *, VGMMiscFile *> file) {
   m_vgmfiles.push_back(file);
-  L_INFO("Loaded {} successfully.", variantToVGMFile(file)->name());
+  auto vgmFile = variantToVGMFile(file);
+  L_INFO("Loaded {} ({} bytes at {:x}) successfully.", vgmFile->name(), vgmFile->length(), vgmFile->offset());
   UI_addVGMFile(file);
 }
 

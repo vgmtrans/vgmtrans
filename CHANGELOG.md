@@ -14,6 +14,8 @@
 - Added vibrato, tremolo, more accurate portamento support, and fixed pan calculation in the CapcomSnes driver.
 - Added drum kit support to the SuzukiSnes driver (Seiken Densetsu 3, Super Mario RPG, etc)
 - Improved support for late-era Intelligent Systems SNES/SFC titles (Tetris Attack, Fire Emblem 4, Super Famicom Wars) 
+- Added support for the missing GBA (Sappy aka mp2k) commands (LFO, pitch bend range, transpose, ...)
+- Added support for GBA PSG instruments and programmable wavetables
 
 ### Changed
 
@@ -26,6 +28,8 @@
 
 ### Fixed
 
+- Fixed GBA (Sappy aka mp2k) sequences being exported 0.45% faster than they should be.
+- Fixed GBA (Sappy aka mp2k) instruments potentially having very long release times. 
 - Fixed a crash when removing a collection that was being played.
 - Fixed build issues on Linux.
 - Fixed an issue where scanning certain Nintendo DS (SDAT) files would crash the program or show corrupt sequence names.

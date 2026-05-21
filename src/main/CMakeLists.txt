@@ -263,6 +263,7 @@ target_sources(vgmtranscore
     formats/TriAcePS1/TriAcePS1Seq.cpp
     formats/common/KonamiAdpcm.cpp
     formats/common/OkiAdpcm.cpp
+    formats/common/PSGDSP.cpp
     formats/common/PSXSPU.cpp
     formats/common/SNESDSP.cpp
     formats/common/YM2151InstrSet.cpp
@@ -455,6 +456,7 @@ target_sources(vgmtranscore
     FILES
       formats/common/KonamiAdpcm.h
       formats/common/OkiAdpcm.h
+      formats/common/PSGDSP.h
       formats/common/PSXSPU.h
       formats/common/SNESDSP.h
       formats/common/YM2151.h
