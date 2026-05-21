@@ -459,6 +459,9 @@ bool MP2kInstr::loadInstr() {
     constexpr double kVibratoMaxDepthCents = 127.0 * 4.0 * 100.0 / 64.0;
     addStandardVibratoHandling(kVibratoMaxDepthCents, kDefaultLfoFrequencyHz,
                                kDefaultLfoFrequencyHz);
+    constexpr double kTremoloMaxDepthDb = 6.0;
+    addStandardTremoloHandling(kTremoloMaxDepthDb, kDefaultLfoFrequencyHz,
+                               kDefaultLfoFrequencyHz, TremoloGainMode::NoBoost);
   }
 
   return true;
