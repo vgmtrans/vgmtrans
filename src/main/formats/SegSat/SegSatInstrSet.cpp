@@ -312,8 +312,12 @@ SegSatRgn::SegSatRgn(SegSatInstr* instr, uint32_t offset, const std::string& nam
   release_time = DRTimes[m_releaseRate * 2] / 1000.0;
   double decay2Time = DRTimes[m_decayRate2 * 2] / 1000.0;
 
-  if (((decay_time < 0.5 && sustain_level > 0.7) || sustain_level == 1.0) && decay2Time < 88600) {
+  if (sustain_level == 1.0 && decay2Time < 1000) {
     decay_time = decay2Time;
+    sustain_level = 0;
+  }
+  else if (decay2Time < 2.0) {
+    decay_time += decay2Time;
     sustain_level = 0;
   }
 
