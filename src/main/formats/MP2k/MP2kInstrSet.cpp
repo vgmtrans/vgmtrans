@@ -443,7 +443,7 @@ bool MP2kInstr::loadInstr() {
     }
 
     default: {
-      L_WARN("Unhandled instrument type {}", m_type);
+      L_WARN("{:x}: Unhandled instrument type {}", offset(), m_type);
       return false;
     }
   }
@@ -473,21 +473,15 @@ void MP2kInstr::setADSR(VGMRgn *rgn, u32 adsr) {
 
   if (attack != 0xFF) {
     rgn->attack_time = mp2kAttackTimeSeconds(attack);
-  } else {
-    L_INFO("Attack disabled {:#x}", this->offset());
   }
 
   if (sustain != 0xFF) {
     rgn->sustain_level = sustain / kEnvelopeMaxLevel;
     rgn->decay_time = mp2kDecayTimeSeconds(decay);
-  } else {
-    L_INFO("Sustain disabled {:#x}", this->offset());
   }
 
   if (release != 0x00) {
     rgn->release_time = mp2kEnvelopeRateTimeSeconds(release);
-  } else {
-    L_INFO("Release disabled {:#x}", this->offset());
   }
 }
 
