@@ -1,5 +1,5 @@
 /*
- * VGMTrans (c) 2002-2019
+ * VGMTrans (c) 2002-2026
  * Licensed under the zlib license,
  * refer to the included LICENSE.txt file
  */
@@ -8,6 +8,7 @@
 #include "VGMSeq.h"
 #include "SeqTrack.h"
 #include "SeqEvent.h"
+#include "automation/SeqMidiAutomation.h"
 #include "MP2kFormat.h"
 
 class MP2kSeq final : public VGMSeq {
@@ -25,14 +26,32 @@ public:
 
   bool readEvent() override;
 
+protected:
+  void resetVars() override;
+  void onTickBegin() override;
+
 private:
   uint8_t state = 0;
   uint32_t curDuration = 0;
   uint8_t current_vel = 0;
 
+  void beginNoteLfo();
+  void updateLfoFade();
+  void setLfoSpeed(uint8_t speed);
+  void setLfoDelay(uint8_t delay);
+  void setModulationDepth(uint8_t depth);
+  void setModulationType(uint8_t type);
+  void applyLfoDepth(bool force);
+  void clearLfoOutputs();
+  bool lfoOutputsEnabled() const;
+
   std::vector<uint32_t> loopEndPositions;
   void handleStatusCommand(u32 offset, u8 status);
   void handleSpecialCommand(u32 offset, u8 status);
+
+  uint8_t modType = 0;
+  SeqSynthLfoAutomation vibratoLfo;
+  SeqSynthLfoAutomation tremoloLfo;
 };
 
 class MP2kEvent : public SeqEvent {
