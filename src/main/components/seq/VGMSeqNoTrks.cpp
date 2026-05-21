@@ -138,10 +138,13 @@ void VGMSeqNoTrks::tryExpandMidiTracks(uint32_t numTracks) {
     for (size_t i = initialTrackSize; i < numTracks; i++) {
       auto* midiTrack = midi->addTrack();
       midiTracks.push_back(midiTrack);
-      if (i == 9 && ConversionOptions::the().skipChannel10()) {
-        midiTrack->setChannelGroup(1);
-        midiTrack->addMidiPort(1);
-      }
+
+      if (numTracks < 10)
+        continue;
+
+      int chGroup = i == 9 && ConversionOptions::the().skipChannel10() ? 1 : 0;
+      midiTrack->setChannelGroup(chGroup);
+      midiTrack->addMidiPort(chGroup);
     }
   }
 }
