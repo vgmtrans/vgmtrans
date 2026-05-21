@@ -1,41 +1,77 @@
 # Changelog
 
-
 ## [Unreleased]
 
-### Added
+### Music Formats
 
-- Added an in-app dialog to help with reporting bugs.
-- Added Flatpak builds for Linux. From now on, stable releases will be automatically available on Flathub.
-- Added stitched export for collection chunks: drag collections into a stitch queue, reorder them, and export as a merged MIDI + SF2.
-- Added a search field to the Collections panel
-- Added drum kit, vibrato, and pitch slide support to the standard N-SPC driver (Nintendo's SNES SDK driver).
-- Added drum kit, portamento, and slide support for volume/pan/pitch to the KonamiSnes driver.
-- Added vibrato, tremolo, more accurate portamento support, and fixed pan calculation in the CapcomSnes driver.
-- Added drum kit support to the SuzukiSnes driver (Seiken Densetsu 3, Super Mario RPG, etc)
-- Improved support for late-era Intelligent Systems SNES/SFC titles (Tetris Attack, Fire Emblem 4, Super Famicom Wars) 
-- Added support for the missing GBA (Sappy aka mp2k) commands (LFO, pitch bend range, transpose, ...)
-- Added support for GBA PSG instruments and programmable wavetables
+**SNES (Super Nintendo / SFC)**
 
-### Changed
+* **N-SPC:** Added drum kit, vibrato, and pitch slide support to the standard driver.
+* **N-SPC:** Improved detection of instrument data.
+* **KonamiSnes:** Added drum kit, portamento, and slide support for volume/pan/pitch.
+* **CapcomSnes:** Added vibrato, tremolo, more accurate portamento support, and fixed pan calculation.
+* **SuzukiSnes:** Added drum kit support (Seiken Densetsu 3, Super Mario RPG, etc.).
+* **Intelligent Systems:** Improved support for late-era titles (Tetris Attack, Fire Emblem 4, Super Famicom Wars).
+* **SPC:** Fixed loading of older SPC files that do not have ID666 tags.
 
-- The analysis (HexView) panel was fully rewritten and now uses GPU rendering. Sequence items in the hexview are highlighted as playback progresses. Alt-click on items to seek playback to them.
-- The dock layout and window chrome have been redesigned. Dock layout now persists between app runs and can be reset via a new menu action.
-- Improved accuracy of Nintendo DS (SDAT) instrument ADSR.
-- Improved Wayland support (drag and drop, sandbox).
-- The space-bar hotkey to toggle playback no longer requires clicking on a collection first.
-- Improved detection of N-SPC driver instrument data.
+**Game Boy Advance (GBA)**
 
-### Fixed
+* **Sappy (mp2k):** Added support for missing commands (LFO, pitch bend range, transpose, etc.).
+* **Sappy (mp2k):** Added support for GBA PSG instruments and programmable wavetables.
+* **Sappy (mp2k):** Fixed sequences being exported 0.45% faster than they should be.
+* **Sappy (mp2k):** Fixed instruments potentially having very long release times.
 
-- Fixed GBA (Sappy aka mp2k) sequences being exported 0.45% faster than they should be.
-- Fixed GBA (Sappy aka mp2k) instruments potentially having very long release times. 
-- Fixed a crash when removing a collection that was being played.
-- Fixed build issues on Linux.
-- Fixed an issue where scanning certain Nintendo DS (SDAT) files would crash the program or show corrupt sequence names.
-- Fixed an issue where Nintendo DS (SDAT) PSG instruments were exported too quiet (-4.6dB attenuated).
-- Fixed an issues where samples from Nintendo DS (SDAT) data were being read with the wrong sample rate,
-  resulting in instruments playing at the wrong pitch or seemingly be absent.
-- Fixed CPS3 volume and ADSR bugs.
-- Fixed various memory leaks, most notably one which occurred on collection playback.
-- Fixed loading of older SPC files that do not have ID666 tags.
+**Nintendo DS (SDAT)**
+
+* **Instruments:** Improved accuracy of instrument ADSR.
+* **Instruments:** Fixed an issue where PSG instruments were exported too quiet (-4.6dB attenuated).
+* **Samples:** Fixed an issue where samples were being read with the wrong sample rate, resulting in instruments playing at the wrong pitch or seemingly being absent.
+* **Stability:** Fixed an issue where scanning certain files would crash the program or show corrupt sequence names.
+
+**Arcade (CPS3)**
+
+* **Audio:** Fixed CPS3 volume and ADSR bugs.
+
+### User Interface & Tools
+
+* **Rendering:** The analysis panel was fully rewritten and now uses GPU rendering.
+* **Playback:** Sequence items in the hexview are now highlighted as playback progresses. Alt-click on items to seek playback directly to them.
+* **Dock Layout:** The dock layout and window chrome have been redesigned. The layout now persists between app runs and can be reset via a new menu action.
+* **Collections:** Added a search field to the Collections panel.
+* **Stitched Export:** Added stitched export for collection chunks. You can now drag collections into a stitch queue, reorder them, and export them as a merged MIDI + SF2.
+* **Hotkeys:** The space-bar hotkey to toggle playback no longer requires clicking on a collection first.
+* **Bug Reporting:** Added an in-app dialog to help with reporting bugs.
+
+### General
+
+* **Crash Fix:** Fixed a crash when removing a collection that was currently being played.
+* **Memory Leaks:** Fixed various memory leaks, most notably one which occurred during collection playback.
+
+### Platform Specific Notes
+
+**Linux**
+
+* **Packaging:** Added Flatpak builds. From now on, stable releases will be automatically available on Flathub.
+* **Wayland:** Improved Wayland support (drag and drop, sandbox).
+* **Builds:** Fixed general build issues on Linux.
+
+<!--
+After a release goes out, reset the changelog to this:
+
+# Changelog
+
+## [Version]
+
+### Music Formats
+- **[System/Driver]:** [Change detail]
+
+### User Interface & Tools
+- **[Panel/Element]:** [Change detail]
+
+### General
+- **[Whatever]:** [Change detail]
+
+### Platform Specific Notes
+- **[OS/Package]:** [Change detail]
+
+--!>
