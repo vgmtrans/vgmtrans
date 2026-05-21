@@ -139,7 +139,7 @@ void VGMSeqNoTrks::tryExpandMidiTracks(uint32_t numTracks) {
       auto* midiTrack = midi->addTrack();
       midiTracks.push_back(midiTrack);
 
-      if (numTracks < 10)
+      if (numTracks < 10 || ConversionOptions::the().skipChannel10() == false)
         continue;
 
       int chGroup = i == 9 && ConversionOptions::the().skipChannel10() ? 1 : 0;
