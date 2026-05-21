@@ -15,6 +15,7 @@
 - Added drum kit support to the SuzukiSnes driver (Seiken Densetsu 3, Super Mario RPG, etc)
 - Improved support for late-era Intelligent Systems SNES/SFC titles (Tetris Attack, Fire Emblem 4, Super Famicom Wars) 
 - Added support for the missing GBA (Sappy aka mp2k) commands (LFO, pitch bend range, transpose, ...)
+- Added support for GBA PSG instruments and programmable wavetables
 
 ### Changed
 

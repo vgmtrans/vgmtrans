@@ -72,11 +72,14 @@ public:
   MP2kPSGColl(RawFile *file, uint32_t sampleRate, uint32_t loopSamples);
   ~MP2kPSGColl() override = default;
 
+  int makeOrGetProgrammableWave(size_t wavePointer);
+
 private:
   bool parseSampleInfo() override;
 
   uint32_t m_sample_rate;
   uint32_t m_loop_samples;
+  std::map<size_t, int> m_programmable_waves;
 };
 
 class MP2kPSGSamp final : public VGMSamp {
@@ -90,4 +93,16 @@ private:
 
   double m_duty_ratio;
   bool m_noise;
+};
+
+class MP2kPSGWaveSamp final : public VGMSamp {
+public:
+  MP2kPSGWaveSamp(VGMSampColl *sampColl, size_t wavePointer, uint32_t sampleRate,
+                  std::string name);
+  ~MP2kPSGWaveSamp() override = default;
+
+private:
+  std::vector<uint8_t> decodeToNativePcm() override;
+
+  size_t m_wave_pointer;
 };

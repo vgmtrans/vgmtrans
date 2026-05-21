@@ -24,6 +24,13 @@ constexpr const char* kPsgDutyLabels[4] = {"12.5%", "25%", "50%", "75%"};
 constexpr uint8_t kPsgSquareCount = 4;
 constexpr uint8_t kPsgNoiseIndex = kPsgSquareCount;
 constexpr uint8_t kPsgUnityKey = 69;
+constexpr size_t kGbaRomPointerMask = 0x03FFFFFF;
+constexpr size_t kGbaRomAddressMask = 0x0E000000;
+constexpr size_t kGbaRomAddressMin = 0x08000000;
+constexpr size_t kGbaRomAddressMax = 0x0C000000;
+constexpr uint8_t kCgbWaveRamBytes = 16;
+constexpr uint8_t kCgbWaveRamSamples = kCgbWaveRamBytes * 2;
+constexpr uint32_t kCgbWaveSampleRate = kCgbWaveRamSamples * 440;
 constexpr double kMp2kEnvelopeTicksPerSecond = 60.0;
 constexpr double kMp2kEnvelopeMaxLevel = 256.0;
 constexpr double kCgbEnvelopeClockHz = 64.0;
@@ -65,6 +72,11 @@ double cgbSustainLevel(int sustain) {
     return 1.0;
   }
   return sustain / kCgbEnvelopeMaxLevel;
+}
+
+bool isGbaRomPointer(size_t pointer) {
+  size_t address_space = pointer & kGbaRomAddressMask;
+  return address_space >= kGbaRomAddressMin && address_space <= kGbaRomAddressMax;
 }
 }
 
@@ -243,6 +255,19 @@ bool MP2kInstr::loadInstr() {
     case 0x0b: {
       setName("PSG programmable waveform");
       setLength(12);
+      if (auto *psgColl =
+              static_cast<MP2kPSGColl *>(static_cast<MP2kInstrSet *>(parInstrSet)->psgSampColl());
+          psgColl) {
+        if (auto sample_id = psgColl->makeOrGetProgrammableWave(m_data.w1); sample_id != -1) {
+          VGMRgn *rgn = addRgn(offset(), length(), sample_id);
+          rgn->sampCollPtr = psgColl;
+          rgn->setUnityKey(kPsgUnityKey);
+          setCgbADSR(rgn, m_data.w2);
+        } else {
+          L_WARN("No programmable wave could be loaded for {:#x}", m_data.w1);
+          setName(name() + " (wave missing)");
+        }
+      }
       break;
     }
 
@@ -331,7 +356,8 @@ bool MP2kInstr::loadInstr() {
         u32 keynum = rawFile()->get<u8>(off + 1);
         u32 pan = rawFile()->get<u8>(off + 3);
 
-        u32 sample_pointer = rawFile()->get<u32>(off + 4) & 0x3ffffff;
+        u32 raw_sample_pointer = rawFile()->get<u32>(off + 4);
+        u32 sample_pointer = raw_sample_pointer & 0x3ffffff;
         if (sample_pointer == 0) {
           continue;
         }
@@ -351,6 +377,19 @@ bool MP2kInstr::loadInstr() {
 
             rgn->setUnityKey(rootkey - keynum + key);
             setADSR(rgn, rawFile()->get<u32>(off + 8));
+          }
+        } else if ((type & 0x0f) == 3 || (type & 0x0f) == 11) {
+          if (auto *psgColl = static_cast<MP2kPSGColl *>(
+                  static_cast<MP2kInstrSet *>(parInstrSet)->psgSampColl());
+              psgColl) {
+            if (auto sample_id = psgColl->makeOrGetProgrammableWave(raw_sample_pointer);
+                sample_id != -1) {
+              VGMRgn *rgn = addRgn(offset(), length(), sample_id, key, key);
+              rgn->sampCollPtr = psgColl;
+              rgn->setPan(pan);
+              rgn->setUnityKey(kPsgUnityKey);
+              setCgbADSR(rgn, rawFile()->get<u32>(off + 8));
+            }
           }
         } else if ((type & 0x0f) == 4 || (type & 0x0f) == 12) {
           if (auto *psgColl = static_cast<MP2kInstrSet *>(parInstrSet)->psgSampColl(); psgColl) {
@@ -487,6 +526,29 @@ bool MP2kPSGColl::parseSampleInfo() {
   return true;
 }
 
+int MP2kPSGColl::makeOrGetProgrammableWave(size_t wavePointer) {
+  if (!isGbaRomPointer(wavePointer)) {
+    L_WARN("Invalid programmable wave pointer {:#x}", wavePointer);
+    return -1;
+  }
+
+  size_t wave_offset = wavePointer & kGbaRomPointerMask;
+  if (wave_offset == 0 || wave_offset + kCgbWaveRamBytes > rawFile()->size()) {
+    L_WARN("Invalid programmable wave pointer {:#x}", wavePointer);
+    return -1;
+  }
+
+  if (auto elem = m_programmable_waves.find(wave_offset); elem != m_programmable_waves.end()) {
+    return elem->second;
+  }
+
+  int sample_id = static_cast<int>(samples.size());
+  auto name = fmt::format("PSG programmable wave {:#x}", wave_offset);
+  samples.push_back(new MP2kPSGWaveSamp(this, wave_offset, kCgbWaveSampleRate, name));
+  m_programmable_waves.emplace(wave_offset, sample_id);
+  return sample_id;
+}
+
 MP2kPSGSamp::MP2kPSGSamp(VGMSampColl *sampColl, uint8_t dutyIndex, bool noise,
                          uint32_t sampleRate, uint32_t loopSamples, std::string name)
     : VGMSamp(sampColl, 0, loopSamples * sizeof(int16_t), 0, loopSamples * sizeof(int16_t), 1,
@@ -508,4 +570,34 @@ std::vector<uint8_t> MP2kPSGSamp::decodeToNativePcm() {
   }
 
   return psg::synthesizePulseWave(m_duty_ratio, rate, loopLength());
+}
+
+MP2kPSGWaveSamp::MP2kPSGWaveSamp(VGMSampColl *sampColl, size_t wavePointer,
+                                 uint32_t sampleRate, std::string name)
+    : VGMSamp(sampColl, static_cast<uint32_t>(wavePointer), kCgbWaveRamBytes,
+              static_cast<uint32_t>(wavePointer), kCgbWaveRamBytes, 1, BPS::PCM16, sampleRate,
+              std::move(name)),
+      m_wave_pointer(wavePointer) {
+  setLoopStatus(true);
+  setLoopOffset(0);
+  setLoopLength(kCgbWaveRamSamples);
+  setLoopStartMeasure(LM_SAMPLES);
+  setLoopLengthMeasure(LM_SAMPLES);
+  unityKey = kPsgUnityKey;
+  ulUncompressedSize = kCgbWaveRamSamples * bytesPerSample();
+}
+
+std::vector<uint8_t> MP2kPSGWaveSamp::decodeToNativePcm() {
+  std::vector<uint8_t> samples(kCgbWaveRamSamples * sizeof(int16_t));
+  auto *output = reinterpret_cast<int16_t *>(samples.data());
+
+  for (uint8_t i = 0; i < kCgbWaveRamBytes; i++) {
+    uint8_t packed = readByte(m_wave_pointer + i);
+    uint8_t high = packed >> 4;
+    uint8_t low = packed & 0x0F;
+    output[i * 2] = static_cast<int16_t>(high * 0x1111 - 0x8000);
+    output[i * 2 + 1] = static_cast<int16_t>(low * 0x1111 - 0x8000);
+  }
+
+  return samples;
 }
