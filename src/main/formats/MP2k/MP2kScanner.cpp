@@ -80,8 +80,6 @@ void MP2kScanner::scan(RawFile *file, void *info) {
   EngineParams engine_settings(file->get<u32>(sound_engine_adr));
   const int engine_sample_rate = samplerate_LUT[engine_settings.sampling_rate_index];
   const uint32_t psg_sample_rate = engine_sample_rate > 0 ? static_cast<uint32_t>(engine_sample_rate) : 32768;
-  auto* psg_sampcoll = new MP2kPSGColl(file, psg_sample_rate, psg_sample_rate);
-  psg_sampcoll->loadVGMFile();
 
   /* Compute song table location */
   u32 song_levels = file->get<u32>(sound_engine_adr + 4);  // Read # of song levels
@@ -96,6 +94,9 @@ void MP2kScanner::scan(RawFile *file, void *info) {
   if (song_entry == song_tbl.end()) {
     return;
   }
+
+  auto* psg_sampcoll = new MP2kPSGColl(file, psg_sample_rate, psg_sample_rate);
+  psg_sampcoll->loadVGMFile();
 
   /* First 32 bytes are the pointer, the rest is song info */
   std::set<size_t> soundbanks;
