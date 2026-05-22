@@ -102,7 +102,12 @@ double minLfoRateHz(AkaoSnesVersion version) {
     return frameRateHz(kMinTimer0Frequency) / (2.0 * 2.0 * 127.0);
   }
 
-  // V3/V4 both reach 256-frame half-cycles; V4 titles use timer0 latches up to $2a
+  if (version == AKAOSNES_V3) {
+    // V3 always uses timer0 latch $24.
+    return frameRateHz(kMinTimer0Frequency) / (2.0 * 256.0);
+  }
+
+  // V4 reaches 256-frame half-cycles and some titles use timer0 latches up to $2a.
   return 8000.0 / kMaxTimer0Frequency / (2.0 * 256.0);
 }
 
@@ -167,9 +172,14 @@ double modulationAmplitude(AkaoSnesVersion version, uint8_t rate, uint8_t depth)
     return 0.0;
   }
 
-  return (version == AKAOSNES_V3)
-      ? modulationMagnitude(version, depth)
-      : v4PhaseHighByteAmplitude(rate, depth);
+  if (version == AKAOSNES_V3) {
+    const double magnitude = modulationMagnitude(version, depth);
+    // One-sided V3 modes alternate between 0 and +/-m. A centered SF2 LFO cannot
+    // reproduce the DC offset, so approximate the pitch movement with half depth.
+    return ((depth & 0xc0) == 0xc0) ? magnitude : magnitude / 2.0;
+  }
+
+  return v4PhaseHighByteAmplitude(rate, depth);
 }
 
 uint8_t v1VibratoHighByteAmplitude(uint8_t rate, uint8_t depth) {
@@ -325,7 +335,7 @@ uint8_t vibratoDepthMidiValue(AkaoSnesVersion version, uint8_t rate, uint8_t dep
   const int midiValue =
       static_cast<int>(std::lround(128.0 * vibratoDepthCents(version, rate, depth) /
                                    maxVibratoDepthCents(version)));
-  return static_cast<uint8_t>(std::clamp(midiValue, 0, 127));
+  return static_cast<uint8_t>(std::clamp(midiValue, version == AKAOSNES_V3 ? 1 : 0, 127));
 }
 
 uint8_t rateMidiValue(AkaoSnesVersion version, uint8_t rate, uint8_t depth, uint8_t timer0Frequency) {
