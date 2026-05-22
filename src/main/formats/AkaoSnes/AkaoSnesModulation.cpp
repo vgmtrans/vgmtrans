@@ -87,6 +87,9 @@ double lfoRateHz(AkaoSnesVersion version, uint8_t rate, uint8_t depth, uint8_t t
 }
 
 double minLfoRateHz(AkaoSnesVersion version) {
+  // TODO: use the more precise minimum rates when we migrate off of BASS MIDI
+  return 1.0 / 16.0;
+
   // Lower bound for controller scaling: slowest active half-cycle, using the
   // slowest timer0 latch when that version family has multiple latches.
   if (version == AKAOSNES_V1) {
