@@ -14,7 +14,6 @@ namespace akao_snes::modulation {
 inline constexpr uint8_t kDefaultTempo = 0x20;
 inline constexpr uint8_t kVibratoDelayController = 93;
 
-bool supportsLfoAutomation(AkaoSnesVersion version);
 bool isLfoActive(AkaoSnesVersion version, uint8_t rate, uint8_t depth);
 uint8_t delayTicks(AkaoSnesVersion version, uint8_t delay);
 

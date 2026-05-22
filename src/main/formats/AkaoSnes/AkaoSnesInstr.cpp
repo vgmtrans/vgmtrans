@@ -14,10 +14,6 @@
 namespace {
 
 void addAkaoSnesVibratoExportHandling(VGMInstr *instr, AkaoSnesVersion version) {
-  if (!akao_snes::modulation::supportsLfoAutomation(version)) {
-    return;
-  }
-
   instr->addStandardVibratoHandling(akao_snes::modulation::vibratoSpec(version));
 }
 

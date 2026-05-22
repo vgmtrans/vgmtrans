@@ -285,17 +285,7 @@ double maxDelaySeconds(AkaoSnesVersion version) {
 
 }  // namespace
 
-bool supportsLfoAutomation(AkaoSnesVersion version) {
-  // Only the SNES AKAO versions modeled above have enough known LFO behavior to automate.
-  return version == AKAOSNES_V1 || version == AKAOSNES_V2 ||
-         version == AKAOSNES_V3 || version == AKAOSNES_V4;
-}
-
 bool isLfoActive(AkaoSnesVersion version, uint8_t rate, uint8_t depth) {
-  if (!supportsLfoAutomation(version)) {
-    return false;
-  }
-
   if (version == AKAOSNES_V2) {
     // V2 can be active with a zero depth byte because the low six bits are
     // interpreted as magnitude + 1; only a zero rate counter disables it.

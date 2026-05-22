@@ -22,10 +22,6 @@
  */
 
 void AkaoSnesSeq::syncTempoDependentTracks() {
-  if (!akao_snes::modulation::supportsLfoAutomation(version)) {
-    return;
-  }
-
   for (auto *track : aTracks) {
     static_cast<AkaoSnesTrack*>(track)->syncTempoDependentLfos();
   }
@@ -62,10 +58,6 @@ void AkaoSnesTrack::applyVibrato(uint32_t offset, uint32_t length, const LfoPara
                   fmt::format("Delay: {}  Rate: {}  Depth: {}", params.delay, params.rate, params.depth),
                   Type::Vibrato);
 
-  if (!akao_snes::modulation::supportsLfoAutomation(parent->version)) {
-    return;
-  }
-
   vibrato.configure(params.delay, params.rate, params.depth);
   configureVibratoFade();
 
@@ -91,10 +83,6 @@ void AkaoSnesTrack::clearVibrato(uint32_t offset, uint32_t length) {
   const auto *parent = static_cast<AkaoSnesSeq*>(parentSeq);
 
   addGenericEvent(offset, length, "Vibrato Off", "", Type::Vibrato);
-
-  if (!akao_snes::modulation::supportsLfoAutomation(parent->version)) {
-    return;
-  }
 
   vibrato.setDepth(0);
   // Turning vibrato off also prevents later notes from replaying the stored fade-in ramp.
@@ -188,8 +176,7 @@ void AkaoSnesTrack::updateVibratoFade() {
 
 void AkaoSnesTrack::syncVibratoRateAndDelay() {
   const auto *parent = static_cast<AkaoSnesSeq*>(parentSeq);
-  if (!akao_snes::modulation::supportsLfoAutomation(parent->version) ||
-      !akao_snes::modulation::isLfoActive(parent->version, vibrato.rate(), vibrato.depth())) {
+  if (!akao_snes::modulation::isLfoActive(parent->version, vibrato.rate(), vibrato.depth())) {
     return;
   }
 
