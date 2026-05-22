@@ -140,8 +140,7 @@ void AkaoSnesTrack::configureVibratoFade() {
 void AkaoSnesTrack::beginVibratoForNote() {
   const auto *parent = static_cast<AkaoSnesSeq*>(parentSeq);
   const bool supportsNoteStartFade =
-      parent->version == AKAOSNES_V1 || parent->version == AKAOSNES_V3 ||
-      parent->version == AKAOSNES_V4;
+      parent->version == AKAOSNES_V1 || parent->version == AKAOSNES_V3 || parent->version == AKAOSNES_V4;
   if (!supportsNoteStartFade || !vibrato.hasReusableFade() ||
       !akao_snes::modulation::isLfoActive(parent->version, vibrato.rate(), vibrato.depth())) {
     return;
