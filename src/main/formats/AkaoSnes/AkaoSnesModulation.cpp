@@ -253,7 +253,14 @@ double delaySeconds(AkaoSnesVersion version, uint8_t delay, uint8_t tempo, uint8
   return ticks * (256.0 / (frameRateHz(timer0Frequency) * safeTempo));
 }
 
+uint32_t driverFramesToTicks(double frames, uint8_t tempo) {
+  // Tempo 0 stops music ticks; export automation still needs finite timing, so use the slowest nonzero tempo.
+  const uint8_t safeTempo = (tempo == 0) ? 1 : tempo;
+  return std::max<uint32_t>(1, static_cast<uint32_t>(std::lround(frames * safeTempo / 256.0)));
+}
+
 constexpr double kMaxV1DelaySeconds = 254.0 * 256.0 / (8000.0 / kMinTimer0Frequency);
+constexpr double kMaxV4DelaySeconds = 254.0 * 256.0 / ((8000.0 / kMaxTimer0Frequency) * 1.0);
 constexpr double kMaxDelaySeconds = 255.0 * 256.0 / ((8000.0 / kMaxTimer0Frequency) * 1.0);
 const double kMaxV1VibratoDepthCents = v1VibratoDepthCentsForHighByte(255);
 const double kMaxV2VibratoDepthCents = 1200.0 * std::log2(1.0 + (15.0 * 127.0 / 32768.0));
@@ -274,23 +281,18 @@ double maxVibratoDepthCents(AkaoSnesVersion version) {
 }
 
 double maxDelaySeconds(AkaoSnesVersion version) {
-  // Export range ceiling for the delay controller; V1 cannot represent literal $ff as a delay.
-  return (version == AKAOSNES_V1) ? kMaxV1DelaySeconds : kMaxDelaySeconds;
+  // Export range ceiling for the delay controller; V1 wraps $ff and V4 decrements
+  // the active delay during the setup tick, so neither uses the full 255 ticks.
+  if (version == AKAOSNES_V1) {
+    return kMaxV1DelaySeconds;
+  }
+
+  return (version == AKAOSNES_V4) ? kMaxV4DelaySeconds : kMaxDelaySeconds;
 }
 
 }  // namespace
 
-bool supportsLfoAutomation(AkaoSnesVersion version) {
-  // Only the SNES AKAO versions modeled above have enough known LFO behavior to automate.
-  return version == AKAOSNES_V1 || version == AKAOSNES_V2 ||
-         version == AKAOSNES_V3 || version == AKAOSNES_V4;
-}
-
 bool isLfoActive(AkaoSnesVersion version, uint8_t rate, uint8_t depth) {
-  if (!supportsLfoAutomation(version)) {
-    return false;
-  }
-
   if (version == AKAOSNES_V2) {
     // V2 can be active with a zero depth byte because the low six bits are
     // interpreted as magnitude + 1; only a zero rate counter disables it.
@@ -308,6 +310,12 @@ uint8_t delayTicks(AkaoSnesVersion version, uint8_t delay) {
   if (version == AKAOSNES_V1) {
     // FF4 stores delay + 1 in the driver; a literal $ff wraps to zero.
     return (delay == 0xff) ? 0 : delay;
+  }
+
+  if (version == AKAOSNES_V4) {
+    // FF6-family drivers decrement delay during the same sequencer pass that
+    // initializes vibrato, so $01 enables fade-in with no audible pre-delay.
+    return (delay == 0) ? 0 : static_cast<uint8_t>(delay - 1);
   }
 
   return delay;
@@ -357,11 +365,24 @@ uint32_t v1VibratoRampTicks(uint8_t rate, uint8_t tempo) {
     return 0;
   }
 
-  const uint8_t safeTempo = (tempo == 0) ? 1 : tempo;
   // FF4 derives the fade length from the vibrato rate counter in driver frames,
   // then the sequencer tempo determines how many music ticks those frames span.
   const double rampFrames = 14.0 * (counter + 1);
-  return std::max<uint32_t>(1, static_cast<uint32_t>(std::lround(rampFrames * safeTempo / 256.0)));
+  return driverFramesToTicks(rampFrames, tempo);
+}
+
+uint32_t v3VibratoRampTicks(uint8_t rate, uint8_t tempo) {
+  // V3's delayed note-start ramp reaches the first full-depth sample after six
+  // LFO update intervals; export that as one smooth SF2 depth fade.
+  const double rampFrames = 6.0 * effectiveRateFrames(AKAOSNES_V3, rate, 0);
+  return driverFramesToTicks(rampFrames, tempo);
+}
+
+uint32_t v4VibratoRampTicks(uint8_t rate, uint8_t tempo) {
+  // V4 starts delayed vibrato at quarter slope and reaches full depth after
+  // seven rate intervals. Approximate that slope ramp as one smooth depth fade.
+  const double rampFrames = 7.0 * effectiveRateFrames(AKAOSNES_V4, rate, 0);
+  return driverFramesToTicks(rampFrames, tempo);
 }
 
 }  // namespace akao_snes::modulation
