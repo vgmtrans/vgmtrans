@@ -254,6 +254,7 @@ double delaySeconds(AkaoSnesVersion version, uint8_t delay, uint8_t tempo, uint8
 }
 
 uint32_t driverFramesToTicks(double frames, uint8_t tempo) {
+  // Tempo 0 stops music ticks; export automation still needs finite timing, so use the slowest nonzero tempo.
   const uint8_t safeTempo = (tempo == 0) ? 1 : tempo;
   return std::max<uint32_t>(1, static_cast<uint32_t>(std::lround(frames * safeTempo / 256.0)));
 }
