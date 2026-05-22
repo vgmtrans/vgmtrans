@@ -253,6 +253,11 @@ double delaySeconds(AkaoSnesVersion version, uint8_t delay, uint8_t tempo, uint8
   return ticks * (256.0 / (frameRateHz(timer0Frequency) * safeTempo));
 }
 
+uint32_t driverFramesToMusicTicks(double frames, uint8_t tempo) {
+  const uint8_t safeTempo = (tempo == 0) ? 1 : tempo;
+  return std::max<uint32_t>(1, static_cast<uint32_t>(std::lround(frames * safeTempo / 256.0)));
+}
+
 constexpr double kMaxV1DelaySeconds = 254.0 * 256.0 / (8000.0 / kMinTimer0Frequency);
 constexpr double kMaxDelaySeconds = 255.0 * 256.0 / ((8000.0 / kMaxTimer0Frequency) * 1.0);
 const double kMaxV1VibratoDepthCents = v1VibratoDepthCentsForHighByte(255);
@@ -357,11 +362,17 @@ uint32_t v1VibratoRampTicks(uint8_t rate, uint8_t tempo) {
     return 0;
   }
 
-  const uint8_t safeTempo = (tempo == 0) ? 1 : tempo;
   // FF4 derives the fade length from the vibrato rate counter in driver frames,
   // then the sequencer tempo determines how many music ticks those frames span.
   const double rampFrames = 14.0 * (counter + 1);
-  return std::max<uint32_t>(1, static_cast<uint32_t>(std::lround(rampFrames * safeTempo / 256.0)));
+  return driverFramesToMusicTicks(rampFrames, tempo);
+}
+
+uint32_t v3VibratoRampTicks(uint8_t rate, uint8_t tempo) {
+  // V3's delayed note-start ramp reaches the first full-depth sample after six
+  // LFO update intervals; export that as one smooth SF2 depth fade.
+  const double rampFrames = 6.0 * effectiveRateFrames(AKAOSNES_V3, rate, 0);
+  return driverFramesToMusicTicks(rampFrames, tempo);
 }
 
 }  // namespace akao_snes::modulation

@@ -14,10 +14,10 @@
  * handlers here keep only the live per-track state; the version-specific math
  * lives in AkaoSnesModulation.h.
  *
- * V1/FF4 is the outlier: vibrato has a per-note fade-in behavior that restarts
- * on normal keyed notes and is not restarted by ties/slur/legato. V2 also uses
- * a different operand order for the three-byte LFO setup command. V3/V4 share
- * the later command shape, with V4's rate byte treating zero as 256 frames.
+ * V1/FF4 and V3 have per-note fade-in behavior that restarts on normal keyed
+ * notes and is not restarted by ties/slur/legato. V2 uses a different operand
+ * order for the three-byte LFO setup command. V3/V4 share the later command
+ * shape, with V4's rate byte treating zero as 256 frames.
  */
 
 void AkaoSnesSeq::syncTempoDependentTracks() {
@@ -100,28 +100,41 @@ void AkaoSnesTrack::clearVibrato(uint32_t offset, uint32_t length) {
 
 void AkaoSnesTrack::configureVibratoFade() {
   const auto *parent = static_cast<AkaoSnesSeq*>(parentSeq);
-  if (parent->version != AKAOSNES_V1 ||
-      !akao_snes::modulation::isLfoActive(parent->version, vibrato.rate(), vibrato.depth())) {
+  if (!akao_snes::modulation::isLfoActive(parent->version, vibrato.rate(), vibrato.depth())) {
     vibrato.clearReusableFade();
     return;
   }
 
-  // V1/FF4 ramps from zero to the configured vibrato depth over a driver-derived
-  // number of sequencer ticks. The actual MIDI depth is computed during the
-  // fade so tempo changes can keep the reusable shape synchronized.
-  vibrato.setReusableFadeToConfiguredDepth(
-      akao_snes::modulation::v1VibratoRampTicks(vibrato.rate(), parent->tempo), 8);
+  if (parent->version == AKAOSNES_V1) {
+    // V1/FF4 ramps from zero to the configured vibrato depth over a driver-derived
+    // number of sequencer ticks. The actual MIDI depth is computed during the
+    // fade so tempo changes can keep the reusable shape synchronized.
+    vibrato.setReusableFadeToConfiguredDepth(
+        akao_snes::modulation::v1VibratoRampTicks(vibrato.rate(), parent->tempo), 8);
+    return;
+  }
+
+  if (parent->version == AKAOSNES_V3 && vibrato.delay() != 0) {
+    vibrato.setReusableFadeToConfiguredDepth(
+        akao_snes::modulation::v3VibratoRampTicks(vibrato.rate(), parent->tempo), 8);
+    return;
+  }
+
+  vibrato.clearReusableFade();
 }
 
 void AkaoSnesTrack::beginVibratoForNote() {
   const auto *parent = static_cast<AkaoSnesSeq*>(parentSeq);
-  if (parent->version != AKAOSNES_V1 || !vibrato.hasReusableFade() ||
+  const bool supportsNoteStartFade =
+      parent->version == AKAOSNES_V1 || parent->version == AKAOSNES_V3;
+  if (!supportsNoteStartFade || !vibrato.hasReusableFade() ||
       !akao_snes::modulation::isLfoActive(parent->version, vibrato.rate(), vibrato.depth())) {
     return;
   }
 
-  // A normal V1 note starts with zero vibrato depth, then updateVibratoFade()
-  // advances it on sequencer ticks. Ties and legato notes skip this call.
+  // Normal notes with a reusable fade start at zero vibrato depth, then
+  // updateVibratoFade() advances them on sequencer ticks. Ties and legato notes
+  // skip this call.
   vibrato.beginReusableFade(akao_snes::modulation::delayTicks(parent->version, vibrato.delay()),
                             vibrato.configuredDepth(8));
   setSynthLfoModulationDepth(vibrato, 0, true);
@@ -129,7 +142,7 @@ void AkaoSnesTrack::beginVibratoForNote() {
 
 void AkaoSnesTrack::updateVibratoFade() {
   const auto *parent = static_cast<AkaoSnesSeq*>(parentSeq);
-  if (parent->version != AKAOSNES_V1) {
+  if (parent->version != AKAOSNES_V1 && parent->version != AKAOSNES_V3) {
     return;
   }
 
