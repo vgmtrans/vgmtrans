@@ -5,8 +5,10 @@
  */
 #include "AkaoSnesSeq.h"
 #include "AkaoSnesInstr.h"
+#include "AkaoSnesModulation.h"
 #include "ScaleConversion.h"
 #include <spdlog/fmt/fmt.h>
+#include <cmath>
 
 DECLARE_FORMAT(AkaoSnes);
 
@@ -27,6 +29,7 @@ AkaoSnesSeq::AkaoSnesSeq(RawFile *file,
     : VGMSeq(AkaoSnesFormat::name, file, seqdataOffset, 0, std::move(name)),
       version(ver),
       minorVersion(minorVer),
+      tempo(akao_snes::modulation::kDefaultTempo),
       addrAPURelocBase(addrAPURelocBase),
       addrROMRelocBase(addrAPURelocBase),
       addrSequenceEnd(0) {
@@ -44,6 +47,7 @@ AkaoSnesSeq::~AkaoSnesSeq() {}
 
 void AkaoSnesSeq::resetVars() {
   VGMSeq::resetVars();
+  tempo = akao_snes::modulation::kDefaultTempo;
 }
 
 bool AkaoSnesSeq::parseHeader() {
@@ -273,10 +277,10 @@ void AkaoSnesSeq::LoadEventMap() {
     EventMap[0xda] = EVENT_TRANSPOSE_ABS;
     EventMap[0xdb] = EVENT_PITCH_SLIDE_ON;
     EventMap[0xdc] = EVENT_PITCH_SLIDE_OFF;
-    EventMap[0xdd] = EVENT_TREMOLO_ON;
-    EventMap[0xde] = EVENT_TREMOLO_OFF;
-    EventMap[0xdf] = EVENT_VIBRATO_ON;
-    EventMap[0xe0] = EVENT_VIBRATO_OFF;
+    EventMap[0xdd] = EVENT_VIBRATO_ON;
+    EventMap[0xde] = EVENT_VIBRATO_OFF;
+    EventMap[0xdf] = EVENT_TREMOLO_ON;
+    EventMap[0xe0] = EVENT_TREMOLO_OFF;
     EventMap[0xe1] = EVENT_NOISE_FREQ;
     EventMap[0xe2] = EVENT_NOISE_ON;
     EventMap[0xe3] = EVENT_NOISE_OFF;
@@ -542,9 +546,9 @@ void AkaoSnesSeq::LoadEventMap() {
   }
 }
 
-double AkaoSnesSeq::getTempoInBPM(uint8_t tempo) const {
-  if (tempo != 0 && TIMER0_FREQUENCY != 0) {
-    return 60000000.0 / (SEQ_PPQN * (125 * TIMER0_FREQUENCY)) * (tempo / 256.0);
+double AkaoSnesSeq::getTempoInBPM(uint8_t tempoValue) const {
+  if (tempoValue != 0 && TIMER0_FREQUENCY != 0) {
+    return 60000000.0 / (SEQ_PPQN * (125 * TIMER0_FREQUENCY)) * (tempoValue / 256.0);
   }
   else {
     // since tempo 0 cannot be expressed, this function returns a very small value.
@@ -584,8 +588,12 @@ void AkaoSnesTrack::resetVars() {
   jumpActivatedByMainCpu = true; // it should be false in the actual driver, but for convenience
 
   ignoreMasterVolumeProgNum = 0xff;
+  vibrato.reset();
 }
 
+void AkaoSnesTrack::onTickBegin() {
+  updateVibratoFade();
+}
 
 bool AkaoSnesTrack::readEvent(void) {
   AkaoSnesSeq *parentSeq = static_cast<AkaoSnesSeq*>(this->parentSeq);
@@ -664,6 +672,10 @@ bool AkaoSnesTrack::readEvent(void) {
 
       if (noteIndex < 12) {
         uint8_t note = octave * 12 + noteIndex;
+
+        if (!slur && !legato) {
+          beginVibratoForNote();
+        }
 
         if (percussion) {
           addNoteByDur(beginOffset, curOffset - beginOffset, noteIndex + AkaoSnesDrumKitRgn::KEY_BIAS - transpose, NOTE_VELOCITY, dur, "Percussion Note with Duration");
@@ -812,23 +824,13 @@ bool AkaoSnesTrack::readEvent(void) {
     }
 
     case EVENT_VIBRATO_ON: {
-      uint8_t lfoDelay = readByte(curOffset++);
-      uint8_t lfoRate = readByte(curOffset++);
-      uint8_t lfoDepth = readByte(curOffset++);
-      addGenericEvent(beginOffset,
-                      curOffset - beginOffset,
-                      "Vibrato",
-                      fmt::format("Delay: {}  Rate: {}  Depth: {}", lfoDelay, lfoRate, lfoDepth),
-                      Type::Vibrato);
+      const auto lfoParams = readLfoParams();
+      applyVibrato(beginOffset, curOffset - beginOffset, lfoParams);
       break;
     }
 
     case EVENT_VIBRATO_OFF: {
-      addGenericEvent(beginOffset,
-                      curOffset - beginOffset,
-                      "Vibrato Off",
-                      desc,
-                      Type::Vibrato);
+      clearVibrato(beginOffset, curOffset - beginOffset);
       break;
     }
 
@@ -1219,7 +1221,9 @@ bool AkaoSnesTrack::readEvent(void) {
       if (parentSeq->minorVersion == AKAOSNES_V4_FM || parentSeq->minorVersion == AKAOSNES_V4_CT) {
         newTempo += (newTempo * 0x14) >> 8;
       }
+      parentSeq->tempo = newTempo;
       addTempoBPM(beginOffset, curOffset - beginOffset, parentSeq->getTempoInBPM(newTempo));
+      parentSeq->syncTempoDependentTracks();
       break;
     }
 
@@ -1243,7 +1247,9 @@ bool AkaoSnesTrack::readEvent(void) {
         addGenericEvent(beginOffset, curOffset - beginOffset, "Tempo Fade", desc, Type::Tempo);
       }
       else {
+        parentSeq->tempo = newTempo;
         addTempoBPM(beginOffset, curOffset - beginOffset, parentSeq->getTempoInBPM(newTempo));
+        parentSeq->syncTempoDependentTracks();
       }
       break;
     }

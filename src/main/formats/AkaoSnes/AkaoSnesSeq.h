@@ -1,5 +1,6 @@
 #pragma once
 #include "VGMSeq.h"
+#include "automation/SeqMidiAutomation.h"
 #include "SeqTrack.h"
 #include "AkaoSnesFormat.h"
 
@@ -103,7 +104,8 @@ class AkaoSnesSeq
   bool parseTrackPointers() override;
   void resetVars() override;
 
-  double getTempoInBPM(uint8_t tempo) const;
+  double getTempoInBPM(uint8_t tempoValue) const;
+  void syncTempoDependentTracks();
 
   uint16_t romAddressToApuAddress(uint16_t romAddress) const;
   uint16_t getShortAddress(uint32_t offset) const;
@@ -119,6 +121,7 @@ class AkaoSnesSeq
 
   uint8_t TIMER0_FREQUENCY;
   bool PAN_8BIT;
+  uint8_t tempo;
 
   uint32_t addrAPURelocBase;
   uint32_t addrROMRelocBase;
@@ -133,12 +136,29 @@ class AkaoSnesTrack : public SeqTrack {
 public:
   AkaoSnesTrack(AkaoSnesSeq *parentFile, uint32_t offset = 0, uint32_t length = 0);
   void resetVars() override;
+  void onTickBegin() override;
   bool readEvent() override;
+  void syncTempoDependentLfos();
 
   uint16_t romAddressToApuAddress(uint16_t romAddress) const;
   uint16_t getShortAddress(uint32_t offset) const;
 
  private:
+  struct LfoParams {
+    uint8_t delay;
+    uint8_t rate;
+    uint8_t depth;
+  };
+
+  LfoParams readLfoParams();
+  void applyVibrato(uint32_t offset, uint32_t length, const LfoParams& params);
+  void clearVibrato(uint32_t offset, uint32_t length);
+  void clearVibratoRateAndDelay();
+  void syncVibratoRateAndDelay();
+  void configureVibratoFade();
+  void beginVibratoForNote();
+  void updateVibratoFade();
+
   uint8_t onetimeDuration;
   bool slur;
   bool legato;
@@ -152,4 +172,6 @@ public:
   uint16_t loopStart[AKAOSNES_LOOP_LEVEL_MAX];
 
   uint8_t ignoreMasterVolumeProgNum;
+
+  SeqSynthLfoAutomation vibrato;
 };

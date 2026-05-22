@@ -144,8 +144,10 @@ target_sources(vgmtranscore
     formats/Akao/AkaoScanner.cpp
     formats/Akao/AkaoSeq.cpp
     formats/AkaoSnes/AkaoSnesInstr.cpp
+    formats/AkaoSnes/AkaoSnesModulation.cpp
     formats/AkaoSnes/AkaoSnesScanner.cpp
     formats/AkaoSnes/AkaoSnesSeq.cpp
+    formats/AkaoSnes/AkaoSnesTrackLfo.cpp
     formats/AsciiShuichiSnes/AsciiShuichiSnesInstr.cpp
     formats/AsciiShuichiSnes/AsciiShuichiSnesScanner.cpp
     formats/AsciiShuichiSnes/AsciiShuichiSnesSeq.cpp
@@ -298,6 +300,7 @@ target_sources(vgmtranscore
       formats/Akao/AkaoSeq.h
       formats/AkaoSnes/AkaoSnesFormat.h
       formats/AkaoSnes/AkaoSnesInstr.h
+      formats/AkaoSnes/AkaoSnesModulation.h
       formats/AkaoSnes/AkaoSnesScanner.h
       formats/AkaoSnes/AkaoSnesSeq.h
       formats/AsciiShuichiSnes/AsciiShuichiSnesFormat.h

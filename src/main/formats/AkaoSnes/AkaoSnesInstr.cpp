@@ -4,9 +4,24 @@
  * refer to the included LICENSE.txt file
  */
 
+#include <algorithm>
+#include <cmath>
 #include <spdlog/fmt/fmt.h>
 #include "AkaoSnesInstr.h"
+#include "AkaoSnesModulation.h"
 #include "SNESDSP.h"
+
+namespace {
+
+void addAkaoSnesVibratoExportHandling(VGMInstr *instr, AkaoSnesVersion version) {
+  if (!akao_snes::modulation::supportsLfoAutomation(version)) {
+    return;
+  }
+
+  instr->addStandardVibratoHandling(akao_snes::modulation::vibratoSpec(version));
+}
+
+}  // namespace
 
 // ****************
 // AkaoSnesInstrSet
@@ -132,6 +147,8 @@ bool AkaoSnesInstr::loadInstr() {
     return false;
   }
 
+  addAkaoSnesVibratoExportHandling(this, version);
+
   uint16_t addrSampStart = readShort(offDirEnt);
 
   AkaoSnesRgn *rgn = new AkaoSnesRgn(this, version, addrTuningTable);
@@ -171,6 +188,8 @@ bool AkaoSnesDrumKit::loadInstr() {
   if (offDirEnt + 4 > 0x10000) {
     return false;
   }
+
+  addAkaoSnesVibratoExportHandling(this, version);
 
   uint8_t NOTE_DUR_TABLE_SIZE;
   switch (version) {

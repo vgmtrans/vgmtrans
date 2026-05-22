@@ -10,6 +10,7 @@
 * **N-SPC:** Improved detection of instrument data.
 * **KonamiSnes:** Added drum kit, portamento, and slide support for volume/pan/pitch.
 * **CapcomSnes:** Added vibrato, tremolo, more accurate portamento support, and fixed pan calculation.
+* **AkaoSnes:** Added vibrato support.
 * **SuzukiSnes:** Added drum kit support (Seiken Densetsu 3, Super Mario RPG, etc.).
 * **Intelligent Systems:** Improved support for late-era titles (Tetris Attack, Fire Emblem 4, Super Famicom Wars).
 * **SPC:** Fixed loading of older SPC files that do not have ID666 tags.
