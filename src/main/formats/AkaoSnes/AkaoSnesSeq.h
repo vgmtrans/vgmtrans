@@ -157,6 +157,7 @@ public:
   void syncVibratoRateAndDelay();
   void configureVibratoFade();
   void beginVibratoForNote();
+  uint8_t vibratoFadeDepthMidiValue(int32_t depth) const;
   void updateVibratoFade();
 
   uint8_t onetimeDuration;

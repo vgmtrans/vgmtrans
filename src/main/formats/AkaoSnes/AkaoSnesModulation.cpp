@@ -315,6 +315,12 @@ uint8_t delayTicks(AkaoSnesVersion version, uint8_t delay) {
     return (delay == 0xff) ? 0 : delay;
   }
 
+  if (version == AKAOSNES_V4) {
+    // FF6-family drivers decrement delay during the same sequencer pass that
+    // initializes vibrato, so $01 enables fade-in with no audible pre-delay.
+    return (delay == 0) ? 0 : static_cast<uint8_t>(delay - 1);
+  }
+
   return delay;
 }
 
@@ -372,6 +378,13 @@ uint32_t v3VibratoRampTicks(uint8_t rate, uint8_t tempo) {
   // V3's delayed note-start ramp reaches the first full-depth sample after six
   // LFO update intervals; export that as one smooth SF2 depth fade.
   const double rampFrames = 6.0 * effectiveRateFrames(AKAOSNES_V3, rate, 0);
+  return driverFramesToMusicTicks(rampFrames, tempo);
+}
+
+uint32_t v4VibratoRampTicks(uint8_t rate, uint8_t tempo) {
+  // V4 starts delayed vibrato at quarter slope and reaches full depth after
+  // seven rate intervals. Approximate that slope ramp as one smooth depth fade.
+  const double rampFrames = 7.0 * effectiveRateFrames(AKAOSNES_V4, rate, 0);
   return driverFramesToMusicTicks(rampFrames, tempo);
 }
 

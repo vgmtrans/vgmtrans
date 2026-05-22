@@ -25,5 +25,6 @@ uint8_t rateMidiValue(AkaoSnesVersion version, uint8_t rate, uint8_t depth, uint
 uint8_t delayMidiValue(AkaoSnesVersion version, uint8_t delay, uint8_t tempo, uint8_t timer0Frequency);
 uint32_t v1VibratoRampTicks(uint8_t rate, uint8_t tempo);
 uint32_t v3VibratoRampTicks(uint8_t rate, uint8_t tempo);
+uint32_t v4VibratoRampTicks(uint8_t rate, uint8_t tempo);
 
 }  // namespace akao_snes::modulation
