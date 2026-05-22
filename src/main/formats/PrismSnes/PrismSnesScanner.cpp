@@ -4,10 +4,11 @@
  * refer to the included LICENSE.txt file
  */
 
+#include "PrismSnesScanner.h"
+
 #include "PrismSnesInstr.h"
 #include "PrismSnesSeq.h"
 #include "ScannerManager.h"
-
 namespace vgmtrans::scanners {
 ScannerRegistration<PrismSnesScanner> s_prism_snes("PrismSnes", {"spc"});
 }

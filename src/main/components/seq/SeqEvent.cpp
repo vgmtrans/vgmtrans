@@ -4,8 +4,8 @@
  * refer to the included LICENSE.txt file
  */
 #include "SeqEvent.h"
-#include "SeqTrack.h"
 
+#include "SeqTrack.h"
 //  ********
 //  SeqEvent
 //  ********

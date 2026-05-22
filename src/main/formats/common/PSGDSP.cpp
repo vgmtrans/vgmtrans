@@ -10,7 +10,6 @@
 #include <cmath>
 #include <iterator>
 #include <numeric>
-
 namespace psg {
 
 std::vector<uint8_t> synthesizeLfsrNoisePCM16(uint32_t sampleCount, uint16_t lfsrSeed, uint16_t lfsrTap) {

@@ -4,10 +4,10 @@
  * refer to the included LICENSE.txt file
  */
 
-#include "Root.h"
 #include "VGMFile.h"
-#include "Format.h"
 
+#include "Format.h"
+#include "Root.h"
 VGMFile::VGMFile(std::string fmt, RawFile *theRawFile, uint32_t offset,
                  uint32_t length, std::string name)
     : VGMItem(this, offset, length, std::move(name)),

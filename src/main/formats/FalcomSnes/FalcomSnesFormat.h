@@ -1,9 +1,7 @@
 #pragma once
-#include "Format.h"
-#include "FilegroupMatcher.h"
 #include "FalcomSnesScanner.h"
-
-
+#include "FilegroupMatcher.h"
+#include "Format.h"
 // ****************
 // FalcomSnesFormat
 // ****************

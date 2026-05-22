@@ -1,9 +1,7 @@
 #pragma once
-#include "Format.h"
 #include "FilegroupMatcher.h"
+#include "Format.h"
 #include "SuzukiSnesScanner.h"
-
-
 // **************
 // SuzukiSnesFormat
 // **************

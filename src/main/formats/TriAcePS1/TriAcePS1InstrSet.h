@@ -3,9 +3,6 @@
 #include "TriAcePS1Format.h"
 #include "VGMInstrSet.h"
 #include "VGMSampColl.h"
-
-
-
 // *****************
 // TriAcePS1InstrSet
 // *****************

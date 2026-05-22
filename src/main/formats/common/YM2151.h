@@ -5,8 +5,13 @@
  */
 #pragma once
 
-#include <spdlog/fmt/fmt.h>
+#include <cstdint>
+#include <iterator>
+#include <string>
 
+#include <fmt/format.h>
+
+#include "common.h"
 struct OPMData {
   struct LFO {
     uint8_t LFRQ;

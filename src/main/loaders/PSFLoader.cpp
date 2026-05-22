@@ -6,16 +6,18 @@
 
 #include "PSFLoader.h"
 
-#include <unordered_map>
-#include <vector>
 #include <filesystem>
 #include <optional>
+#include <unordered_map>
+#include <vector>
+
 #include <spdlog/fmt/fmt.h>
 
+#include "LoaderManager.h"
 #include "LogManager.h"
 #include "PSFFile.h"
-#include "LoaderManager.h"
-
+#include "RawFile.h"
+#include "Root.h"
 namespace vgmtrans::loaders {
 LoaderRegistration<PSFLoader> psf{"PSF"};
 }

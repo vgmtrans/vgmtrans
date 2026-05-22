@@ -1,10 +1,9 @@
 #pragma once
+#include <algorithm>
+#include <functional>
 #include <string>
 #include <unordered_map>
 #include <vector>
-#include <algorithm>
-#include <functional>
-
 class FileLoader;
 using loaderSpawner = std::function<std::shared_ptr<FileLoader>()>;
 

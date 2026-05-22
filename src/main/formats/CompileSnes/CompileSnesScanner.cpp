@@ -4,10 +4,11 @@
  * refer to the included LICENSE.txt file
  */
 
+#include "CompileSnesScanner.h"
+
 #include "CompileSnesInstr.h"
 #include "CompileSnesSeq.h"
 #include "ScannerManager.h"
-
 namespace vgmtrans::scanners {
 ScannerRegistration<CompileSnesScanner> s_compile_snes("CompileSnes", {"spc"});
 }

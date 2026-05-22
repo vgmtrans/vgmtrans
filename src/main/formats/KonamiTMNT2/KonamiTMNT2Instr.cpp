@@ -5,15 +5,16 @@
  */
 
 #include "KonamiTMNT2Instr.h"
-#include "KonamiTMNT2Format.h"
-#include "KonamiAdpcm.h"
-#include "KonamiTMNT2Definitions.h"
-#include "VGMRgn.h"
 
 #include <set>
 #include <tuple>
+
 #include <spdlog/fmt/fmt.h>
 
+#include "KonamiAdpcm.h"
+#include "KonamiTMNT2Definitions.h"
+#include "KonamiTMNT2Format.h"
+#include "VGMRgn.h"
 KonamiTMNT2SampleInstrSet::KonamiTMNT2SampleInstrSet(
   RawFile *file,
   u32 offset,

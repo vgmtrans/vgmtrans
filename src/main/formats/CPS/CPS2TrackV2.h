@@ -1,11 +1,11 @@
 #pragma once
-#include "VGMSeq.h"
-#include "SeqTrack.h"
+
+#include <cstdint>
+
+#include "CPS2FormatVersion.h"
 #include "CPS2Seq.h"
-
-enum CPS2FormatVer: uint8_t;
-
-
+#include "SeqTrack.h"
+#include "VGMSeq.h"
 enum CPSv2SeqEventType {
   EVENT_NOP = 0xC0,
   C1_TEMPO,

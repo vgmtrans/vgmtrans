@@ -1,8 +1,6 @@
 #pragma once
 #include "Format.h"
 #include "OrgScanner.h"
-
-
 // *********
 // OrgFormat
 // *********

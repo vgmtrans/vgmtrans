@@ -1,5 +1,4 @@
 #include "CPS1TrackV1.h"
-
 CPS1TrackV1::CPS1TrackV1(CPS1Seq *parentSeq, CPSSynth channelSynth, uint32_t offset, uint32_t length)
     : SeqTrack(parentSeq, offset, length), channelSynth(channelSynth) {
   if (channelSynth == CPSSynth::YM2151) {

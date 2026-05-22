@@ -4,10 +4,9 @@
  * refer to the included LICENSE.txt file
  */
 #pragma once
-#include "VGMSeq.h"
-#include "SeqTrack.h"
 #include "SeqEvent.h"
-
+#include "SeqTrack.h"
+#include "VGMSeq.h"
 class VGMSeqNoTrks : public VGMSeq, public SeqTrack {
 public:
   VGMSeqNoTrks(const std::string &format, RawFile *file, uint32_t offset,

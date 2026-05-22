@@ -6,9 +6,9 @@
 // The original code is available at:
 //  https://github.com/mamedev/mame/blob/master/src/devices/sound/okiadpcm.cpp
 
-#include <cmath>
 #include "OkiAdpcm.h"
 
+#include <cmath>
 //**************************************************************************
 //  ADPCM STATE HELPER
 //**************************************************************************

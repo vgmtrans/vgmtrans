@@ -1,8 +1,7 @@
 #pragma once
+#include "AkaoSnesFormat.h"
 #include "VGMInstrSet.h"
 #include "VGMRgn.h"
-#include "AkaoSnesFormat.h"
-
 // ****************
 // AkaoSnesInstrSet
 // ****************

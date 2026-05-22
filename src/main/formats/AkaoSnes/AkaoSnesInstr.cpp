@@ -4,10 +4,10 @@
  * refer to the included LICENSE.txt file
  */
 
-#include <algorithm>
-#include <cmath>
-#include <spdlog/fmt/fmt.h>
 #include "AkaoSnesInstr.h"
+
+#include <spdlog/fmt/fmt.h>
+
 #include "AkaoSnesModulation.h"
 #include "SNESDSP.h"
 
@@ -22,7 +22,6 @@ void addAkaoSnesVibratoExportHandling(VGMInstr *instr, AkaoSnesVersion version) 
 }
 
 }  // namespace
-
 // ****************
 // AkaoSnesInstrSet
 // ****************

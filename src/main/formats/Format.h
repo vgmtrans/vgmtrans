@@ -5,12 +5,11 @@
  */
 #pragma once
 
-#include <variant>
-#include <string>
 #include <map>
+#include <string>
 #include <vector>
-#include "Scanner.h"
 
+#include "VGMFileVariant.h"
 class VGMColl;
 class Matcher;
 class VGMScanner;
@@ -69,8 +68,8 @@ public:
   VGMScanner &getScanner() const { return *scanner; }
   virtual Matcher *newMatcher() { return nullptr; }
   virtual VGMColl *newCollection();
-  virtual bool onNewFile(std::variant<VGMSeq *, VGMInstrSet *, VGMSampColl *, VGMMiscFile *> file);
-  virtual bool onCloseFile(std::variant<VGMSeq *, VGMInstrSet *, VGMSampColl *, VGMMiscFile *> file);
+  virtual bool onNewFile(VGMFileVariant file);
+  virtual bool onCloseFile(VGMFileVariant file);
   virtual bool onMatch(std::vector<VGMFile *> &) { return true; }
   virtual bool usesCollectionDataForSeqConversion() { return false; }
 

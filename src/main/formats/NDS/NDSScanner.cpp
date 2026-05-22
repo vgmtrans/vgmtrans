@@ -12,10 +12,9 @@
 
 #include <fmt/format.h>
 
-#include "ScannerManager.h"
-#include "NDSSeq.h"
 #include "NDSInstrSet.h"
-
+#include "NDSSeq.h"
+#include "ScannerManager.h"
 namespace vgmtrans::scanners {
   ScannerRegistration<NDSScanner> s_nds("NDS", {"nds", "sdat", "mini2sf", "2sf", "2sflib"});
 }

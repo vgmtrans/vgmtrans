@@ -1,8 +1,7 @@
 #pragma once
-#include "VGMSeqNoTrks.h"
-#include "SeqTrack.h"
 #include "NamcoSnesFormat.h"
-
+#include "SeqTrack.h"
+#include "VGMSeqNoTrks.h"
 enum NamcoSnesSeqEventType {
   //start enum at 1 because if map[] look up fails, it returns 0, and we don't want that to get confused with a legit event
   EVENT_UNKNOWN0 = 1,

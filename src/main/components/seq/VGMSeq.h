@@ -5,16 +5,19 @@
  */
 #pragma once
 
-#include "VGMFile.h"
-#include "RawFile.h"
-#include "MidiFile.h"
-#include "SeqEventTimeIndex.h"
-#include <set>
+#include <cstdint>
 #include <filesystem>
+#include <set>
+#include <string>
+#include <vector>
 
+#include "SeqEventTimeIndex.h"
+#include "VGMFile.h"
 class SeqTrack;
 class SeqEvent;
 class ISeqSlider;
+class MidiFile;
+class MidiTrack;
 
 enum ReadMode : uint8_t {
   READMODE_ADD_TO_UI,

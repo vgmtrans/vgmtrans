@@ -4,8 +4,8 @@
  * refer to the included LICENSE.txt file
  */
 #include "FFTSeq.h"
-#include "FFTFormat.h"
 
+#include "FFTFormat.h"
 DECLARE_FORMAT(FFT);
 
 using namespace std;

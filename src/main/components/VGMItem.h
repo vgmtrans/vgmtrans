@@ -1,10 +1,10 @@
 #pragma once
 
-#include "common.h"
 #include <algorithm>
-#include <vector>
 #include <ranges>
+#include <vector>
 
+#include "common.h"
 template <class T>
 class Menu;
 class RawFile;

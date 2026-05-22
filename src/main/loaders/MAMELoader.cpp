@@ -4,6 +4,13 @@
  * refer to the included LICENSE.txt file
  */
 
+#include "MAMELoader.h"
+
+#include <cstdlib>
+#include <filesystem>
+#include <fstream>
+#include <ranges>
+
 #if defined(_WIN32) || defined(WIN32)
   #include <ioapi.h>
   #include <unzip.h>
@@ -11,17 +18,13 @@
 #endif
 #include <nlohmann/json.hpp>
 #include <spdlog/fmt/std.h>
-#include <filesystem>
-#include <cstdlib>
-#include <fstream>
-#include <ranges>
 
-#include "MAMELoader.h"
+#include "CPS3Decrypt.h"
 #include "Format.h"
 #include "KabukiDecrypt.h"
-#include "CPS3Decrypt.h"
 #include "LoaderManager.h"
 #include "LogManager.h"
+#include "RawFile.h"
 #include "Root.h"
 #include "Scanner.h"
 #include "helper.h"

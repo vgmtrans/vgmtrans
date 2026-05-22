@@ -4,9 +4,8 @@
  * refer to the included LICENSE.txt file
  */
 #pragma once
-#include "Scanner.h"
 #include "BytePattern.h"
-
+#include "Scanner.h"
 class PandoraBoxSnesScanner : public VGMScanner {
  public:
   explicit PandoraBoxSnesScanner(Format* format) : VGMScanner(format) {}

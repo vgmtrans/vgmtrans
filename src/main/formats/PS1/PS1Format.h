@@ -4,12 +4,11 @@
  * refer to the included LICENSE.txt file
  */
 #pragma once
-#include "Format.h"
 #include "FilegroupMatcher.h"
-#include "PS1Seq.h"
+#include "Format.h"
 #include "formats/PS1/Vab.h"
+#include "PS1Seq.h"
 #include "PS1SeqScanner.h"
-
 // *********
 // PS1Format
 // *********

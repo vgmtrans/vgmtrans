@@ -4,9 +4,10 @@
  * refer to the included LICENSE.txt file
  */
 #include "CompileSnesSeq.h"
-#include "ScaleConversion.h"
+
 #include <spdlog/fmt/fmt.h>
 
+#include "ScaleConversion.h"
 DECLARE_FORMAT(CompileSnes);
 
 //  **************

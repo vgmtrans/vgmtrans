@@ -1,8 +1,7 @@
 #pragma once
+#include "HeartBeatSnesFormat.h"
 #include "VGMInstrSet.h"
 #include "VGMRgn.h"
-#include "HeartBeatSnesFormat.h"
-
 // *********************
 // HeartBeatSnesInstrSet
 // *********************

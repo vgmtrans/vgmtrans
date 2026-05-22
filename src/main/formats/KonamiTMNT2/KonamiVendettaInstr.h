@@ -5,12 +5,12 @@
  */
 #pragma once
 
-#include "common.h"
-#include "VGMInstrSet.h"
-#include "KonamiTMNT2Instr.h"
-#include "KonamiTMNT2OPMInstr.h"
 #include <unordered_map>
 
+#include "common.h"
+#include "KonamiTMNT2Instr.h"
+#include "KonamiTMNT2OPMInstr.h"
+#include "VGMInstrSet.h"
 class RawFile;
 class VGMItem;
 enum KonamiTMNT2FormatVer : uint8_t;

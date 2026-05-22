@@ -7,9 +7,9 @@
 
 #include <algorithm>
 #include <cstdint>
+
 #include "KonamiSnesDefinitions.h"
 #include "Modulation.h"
-
 namespace konami_snes::vibrato {
 
 // V1/V2 advance the phase directly once per music tick. Rates above 0x80 wrap around to the same

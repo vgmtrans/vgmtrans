@@ -5,14 +5,13 @@
  */
 #pragma once
 
-#include "VGMSeq.h"
-#include "SeqTrack.h"
+#include <string>
+#include <vector>
+
 #include "KonamiTMNT2Format.h"
 #include "KonamiTMNT2Instr.h"
-
-#include <vector>
-#include <string>
-
+#include "SeqTrack.h"
+#include "VGMSeq.h"
 struct konami_tmnt2_instr_info;
 class VGMInstr;
 enum KonamiTMNT2FormatVer : u8;

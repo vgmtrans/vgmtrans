@@ -5,9 +5,8 @@
  */
 #pragma once
 
-#include "VGMItem.h"
 #include "RawFile.h"
-
+#include "VGMItem.h"
 class VGMColl;
 class Format;
 

@@ -6,9 +6,9 @@
 
 #pragma once
 
-#include "Matcher.h"
 #include <list>
 
+#include "Matcher.h"
 class VGMSeq;
 class VGMInstrSet;
 class VGMSampColl;

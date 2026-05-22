@@ -1,8 +1,7 @@
 #pragma once
-#include "VGMSeq.h"
-#include "SeqTrack.h"
 #include "ChunSnesFormat.h"
-
+#include "SeqTrack.h"
+#include "VGMSeq.h"
 #define CHUNSNES_SUBLEVEL_MAX   3
 
 enum ChunSnesSeqEventType {

@@ -3,9 +3,6 @@
 #include "HOSAFormat.h"
 #include "VGMInstrSet.h"
 #include "VGMSampColl.h"
-
-
-
 // *****************
 // HOSAInstrSet
 // *****************

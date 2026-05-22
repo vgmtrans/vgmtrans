@@ -7,7 +7,6 @@
 
 #include "Format.h"
 #include "KonamiTMNT2Scanner.h"
-
 BEGIN_FORMAT(KonamiTMNT2)
   USING_SCANNER(KonamiTMNT2Scanner)
   USES_COLLECTION_FOR_SEQ_CONVERSION()

@@ -1,12 +1,11 @@
 #include "NinSnesProfile.h"
 
-#include <array>
 #include <algorithm>
+#include <array>
 #include <utility>
 
-#include "SNESDSP.h"
 #include "io/RawFile.h"
-
+#include "SNESDSP.h"
 namespace {
 
 template <size_t N>

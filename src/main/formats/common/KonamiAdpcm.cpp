@@ -6,7 +6,6 @@
 #include "KonamiAdpcm.h"
 
 #include <algorithm>
-
 static const s16 K054539_DPCM_TABLE[16] = {
     0,      256,    512,    1024,
     2048,   4096,   8192,   16384,

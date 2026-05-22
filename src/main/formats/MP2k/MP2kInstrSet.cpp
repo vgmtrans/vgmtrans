@@ -11,15 +11,15 @@
 #include <cstdint>
 #include <cstring>
 #include <memory>
+
 #include <spdlog/fmt/fmt.h>
 
+#include "LogManager.h"
 #include "MP2kFormat.h"
-#include "VGMSampColl.h"
+#include "PSGDSP.h"
 #include "VGMColl.h"
 #include "VGMRgn.h"
-#include "LogManager.h"
-#include "PSGDSP.h"
-
+#include "VGMSampColl.h"
 namespace {
 constexpr uint8_t kPsgSquareCount = 4;
 constexpr uint8_t kPsgNoiseIndex = kPsgSquareCount;

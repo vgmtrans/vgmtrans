@@ -6,7 +6,6 @@
 #pragma once
 
 #include "VGMSamp.h"
-
 enum class KonamiAdpcmChip {
   K054539,
   K053260

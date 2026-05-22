@@ -3,17 +3,18 @@
  * Licensed under the zlib license,
  * refer to the included LICENSE.txt file
  */
+#include "SF2File.h"
+
 #include <algorithm>
 #include <cmath>
 #include <limits>
-#include "SF2File.h"
+
+#include "Root.h"
+#include "ScaleConversion.h"
+#include "SynthFile.h"
 #include "version.h"
 #include "VGMInstrSet.h"
-#include "SynthFile.h"
-#include "ScaleConversion.h"
-#include "Root.h"
 #include "VGMRgn.h"
-
 namespace {
 
 SFModulator sf2SourceForModSource(ModSource source) {

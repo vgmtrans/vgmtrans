@@ -4,9 +4,10 @@
  * refer to the included LICENSE.txt file
  */
 
+#include "OrgScanner.h"
+
 #include "OrgSeq.h"
 #include "ScannerManager.h"
-
 namespace vgmtrans::scanners {
 ScannerRegistration<OrgScanner> s_org("Org");
 }

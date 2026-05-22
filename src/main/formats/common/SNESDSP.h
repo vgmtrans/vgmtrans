@@ -1,10 +1,9 @@
 #pragma once
 
-#include "VGMSampColl.h"
-#include "VGMSamp.h"
-#include "VGMItem.h"
 #include "ScaleConversion.h"
-
+#include "VGMItem.h"
+#include "VGMSamp.h"
+#include "VGMSampColl.h"
 class VGMInstrSet;
 
 typedef struct _BRRBlk                //Sample Block

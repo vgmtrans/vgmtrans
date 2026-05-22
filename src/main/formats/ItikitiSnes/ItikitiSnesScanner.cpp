@@ -4,11 +4,11 @@
  * refer to the included LICENSE.txt file
  */
 #include "ItikitiSnesScanner.h"
-#include "ItikitiSnesSeq.h"
-#include "ItikitiSnesInstr.h"
-#include "BytePattern.h"
-#include "ScannerManager.h"
 
+#include "BytePattern.h"
+#include "ItikitiSnesInstr.h"
+#include "ItikitiSnesSeq.h"
+#include "ScannerManager.h"
 namespace vgmtrans::scanners {
 ScannerRegistration<ItikitiSnesScanner> s_itikiti_snes("ItikitiSnes", {"spc"});
 }

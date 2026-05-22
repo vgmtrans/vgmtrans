@@ -1,9 +1,8 @@
 #pragma once
-#include "VGMSeq.h"
-#include "SeqTrack.h"
-#include "SeqEvent.h"
 #include "KonamiPS1Format.h"
-
+#include "SeqEvent.h"
+#include "SeqTrack.h"
+#include "VGMSeq.h"
 class KonamiPS1Seq : public VGMSeq {
 public:
     static constexpr uint32_t kHeaderSize = 16;

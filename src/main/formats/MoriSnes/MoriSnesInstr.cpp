@@ -4,9 +4,10 @@
  * refer to the included LICENSE.txt file
  */
 #include "MoriSnesInstr.h"
-#include "SNESDSP.h"
+
 #include <spdlog/fmt/fmt.h>
 
+#include "SNESDSP.h"
 // ****************
 // MoriSnesInstrSet
 // ****************

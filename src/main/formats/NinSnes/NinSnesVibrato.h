@@ -6,8 +6,8 @@
 #pragma once
 
 #include <cstdint>
-#include "Modulation.h"
 
+#include "Modulation.h"
 namespace nin_snes::vibrato {
 
 constexpr double kTimerHz = 500.0;

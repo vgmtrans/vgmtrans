@@ -1,7 +1,8 @@
 #include "PandoraBoxSnesSeq.h"
-#include "ScaleConversion.h"
+
 #include <spdlog/fmt/fmt.h>
 
+#include "ScaleConversion.h"
 DECLARE_FORMAT(PandoraBoxSnes);
 
 static constexpr int MAX_TRACKS = 8;

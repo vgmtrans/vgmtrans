@@ -7,7 +7,6 @@
 #pragma once
 
 #include "FileLoader.h"
-
 class SPC2Loader : public FileLoader {
 public:
   SPC2Loader() = default;

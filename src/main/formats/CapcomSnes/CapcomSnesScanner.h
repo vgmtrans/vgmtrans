@@ -1,7 +1,10 @@
 #pragma once
-#include "Scanner.h"
-#include "BytePattern.h"
 
+#include <cstdint>
+#include <map>
+
+#include "BytePattern.h"
+#include "Scanner.h"
 enum CapcomSnesVersion: uint8_t; // see CapcomSnesFormat.h
 
 class CapcomSnesScanner:

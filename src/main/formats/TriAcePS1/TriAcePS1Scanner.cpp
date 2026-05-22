@@ -4,13 +4,15 @@
  * refer to the included LICENSE.txt file
  */
 
-#include "TriAcePS1Seq.h"
-#include "TriAcePS1InstrSet.h"
-#include "VGMColl.h"
+#include "TriAcePS1Scanner.h"
 
 #include <memory>
-#include "ScannerManager.h"
 
+#include "Root.h"
+#include "ScannerManager.h"
+#include "TriAcePS1InstrSet.h"
+#include "TriAcePS1Seq.h"
+#include "VGMColl.h"
 namespace vgmtrans::scanners {
 ScannerRegistration<TriAcePS1Scanner> s_triace_ps1("TriAcePS1");
 }

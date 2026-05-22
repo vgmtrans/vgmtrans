@@ -3,13 +3,14 @@
  * Licensed under the zlib license,
  * refer to the included LICENSE.txt file
  */
-#include <sstream>
 #include "CapcomSnesSeq.h"
+
+#include <sstream>
+
+#include "automation/SeqTrackAutomation.h"
 #include "CapcomSnesDefinitions.h"
 #include "Modulation.h"
 #include "ScaleConversion.h"
-#include "automation/SeqTrackAutomation.h"
-
 DECLARE_FORMAT(CapcomSnes);
 
 //  **********

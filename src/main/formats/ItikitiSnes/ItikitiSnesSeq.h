@@ -4,12 +4,12 @@
  * refer to the included LICENSE.txt file
  */
 #pragma once
-#include <unordered_map>
 #include <array>
-#include "VGMSeq.h"
-#include "SeqTrack.h"
-#include "ItikitiSnesFormat.h"
+#include <unordered_map>
 
+#include "ItikitiSnesFormat.h"
+#include "SeqTrack.h"
+#include "VGMSeq.h"
 constexpr uint16_t kItikitiSnesSeqTimebase = 48;
 constexpr uint8_t kItikitiSnesSeqTimerFreq = 0x27;
 

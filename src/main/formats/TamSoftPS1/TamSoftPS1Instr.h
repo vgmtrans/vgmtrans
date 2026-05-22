@@ -1,9 +1,8 @@
 #pragma once
-#include "VGMInstrSet.h"
-#include "VGMSampColl.h"
-#include "VGMRgn.h"
 #include "TamSoftPS1Format.h"
-
+#include "VGMInstrSet.h"
+#include "VGMRgn.h"
+#include "VGMSampColl.h"
 // ******************
 // TamSoftPS1InstrSet
 // ******************

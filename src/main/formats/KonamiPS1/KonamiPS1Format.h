@@ -4,10 +4,9 @@
  * refer to the included LICENSE.txt file
  */
 #pragma once
-#include "Format.h"
 #include "FilegroupMatcher.h"
+#include "Format.h"
 #include "KonamiPS1Scanner.h"
-
 // ***************
 // KonamiPS1Format
 // ***************

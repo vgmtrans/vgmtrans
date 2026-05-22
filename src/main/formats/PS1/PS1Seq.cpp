@@ -5,9 +5,10 @@
  */
 
 #include "PS1Seq.h"
-#include "Options.h"
-#include "formats/PS1/PS1Format.h"
 
+#include "formats/PS1/PS1Format.h"
+#include "MidiFile.h"
+#include "Options.h"
 DECLARE_FORMAT(PS1)
 
 PS1Seq::PS1Seq(RawFile *file, uint32_t offset) : VGMSeqNoTrks(PS1Format::name, file, offset, "PS1 Seq") {

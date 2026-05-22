@@ -4,9 +4,10 @@
  * refer to the included LICENSE.txt file
  */
 #include "ItikitiSnesInstr.h"
-#include "SNESDSP.h"
+
 #include <spdlog/fmt/fmt.h>
 
+#include "SNESDSP.h"
 ItikitiSnesInstrSet::ItikitiSnesInstrSet(RawFile *file, uint32_t tuning_offset,
                                          uint32_t adsr_offset, uint16_t spc_dir_offset,
                                          std::string name)

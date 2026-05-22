@@ -1,9 +1,8 @@
 #pragma once
-#include "VGMSeq.h"
-#include "SeqTrack.h"
-#include "SeqEvent.h"
 #include "GraphResSnesFormat.h"
-
+#include "SeqEvent.h"
+#include "SeqTrack.h"
+#include "VGMSeq.h"
 #define GRAPHRESSNES_CALLSTACK_SIZE 2
 #define GRAPHRESSNES_LOOP_LEVEL_MAX 4
 

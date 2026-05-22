@@ -4,11 +4,12 @@
  * refer to the included LICENSE.txt file
  */
 #include "SPCFile.h"
+
+#include <stdexcept>
+
 #include "LogManager.h"
 #include "RawFile.h"
 #include "VGMTag.h"
-#include <stdexcept>
-
 VGMTag SPCFile::tagFromSPCFile(const SPCFile& spc) {
   const auto& id666 = spc.id666Tag();
   const auto& dsp = spc.dsp();

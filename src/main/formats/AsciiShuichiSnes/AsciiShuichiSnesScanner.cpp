@@ -4,10 +4,11 @@
  * refer to the included LICENSE.txt file
  */
 
-#include "AsciiShuichiSnesSeq.h"
-#include "AsciiShuichiSnesInstr.h"
-#include "ScannerManager.h"
+#include "AsciiShuichiSnesScanner.h"
 
+#include "AsciiShuichiSnesInstr.h"
+#include "AsciiShuichiSnesSeq.h"
+#include "ScannerManager.h"
 namespace vgmtrans::scanners {
 ScannerRegistration<AsciiShuichiSnesScanner> s_ascii_shuichi_snes("AsciiShuichiSnes", {"spc"});
 }

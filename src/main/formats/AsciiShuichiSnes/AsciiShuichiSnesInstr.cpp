@@ -5,11 +5,12 @@
  */
 
 #include "AsciiShuichiSnesInstr.h"
+
 #include <spdlog/fmt/fmt.h>
-#include "SNESDSP.h"
+
 #include "AsciiShuichiSnesFormat.h"
 #include "LogManager.h"
-
+#include "SNESDSP.h"
 // ************************
 // AsciiShuichiSnesInstrSet
 // ************************

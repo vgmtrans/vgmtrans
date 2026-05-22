@@ -1,10 +1,9 @@
 #pragma once
 #include "common.h"
-#include "VGMInstrSet.h"
-#include "VGMSampColl.h"
-#include "VGMRgn.h"
 #include "SonyPS2Format.h"
-
+#include "VGMInstrSet.h"
+#include "VGMRgn.h"
+#include "VGMSampColl.h"
 //FORWARD_DECLARE_TYPEDEF_STRUCT(ProgParam);
 
 

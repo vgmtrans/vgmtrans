@@ -5,9 +5,9 @@
  */
 #pragma once
 
-#include "common.h"
 #include <vector>
 
+#include "common.h"
 class VGMSeq;
 class VGMInstrSet;
 class VGMSampColl;

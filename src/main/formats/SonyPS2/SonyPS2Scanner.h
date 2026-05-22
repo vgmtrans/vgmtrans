@@ -5,7 +5,6 @@
  */
 #pragma once
 #include "Scanner.h"
-
 class SonyPS2Scanner : public VGMScanner {
  public:
   explicit SonyPS2Scanner(Format* format) : VGMScanner(format) {}

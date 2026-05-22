@@ -1,9 +1,9 @@
 #pragma once
 
-#include "common.h"
-#include "RiffFile.h"
 #include <filesystem>
 
+#include "common.h"
+#include "RiffFile.h"
 typedef enum: uint16_t {
   // Oscillator
   startAddrsOffset,       //sample start address -4 (0 to 0xffffff)   0

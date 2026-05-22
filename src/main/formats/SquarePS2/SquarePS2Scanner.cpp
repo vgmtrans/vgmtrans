@@ -4,9 +4,11 @@
  * refer to the included LICENSE.txt file
  */
 
+#include "SquarePS2Scanner.h"
+
+#include "ScannerManager.h"
 #include "SquarePS2Seq.h"
 #include "WD.h"
-#include "ScannerManager.h"
 namespace vgmtrans::scanners {
 ScannerRegistration<SquarePS2Scanner> s_squareps2("SquarePS2");
 }

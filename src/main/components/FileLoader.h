@@ -2,8 +2,7 @@
 
 #include <deque>
 #include <vector>
-
-#include "RawFile.h"
+class RawFile;
 
 class FileLoader {
    public:

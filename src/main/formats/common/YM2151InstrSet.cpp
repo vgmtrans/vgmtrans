@@ -4,11 +4,11 @@
  * refer to the included LICENSE.txt file
  */
 #include "YM2151InstrSet.h"
-#include "Root.h"
-#include "version.h"
 
 #include <sstream>
 
+#include "Root.h"
+#include "version.h"
 YM2151InstrSet::YM2151InstrSet(const std::string& format,
                                RawFile* file,
                                uint32_t offset,

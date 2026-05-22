@@ -5,11 +5,9 @@
  */
 
 #pragma once
-#include "Format.h"
 #include "FilegroupMatcher.h"
+#include "Format.h"
 #include "SegSatScanner.h"
-
-
 // ************
 // SegSatFormat
 // ************

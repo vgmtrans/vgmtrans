@@ -4,7 +4,6 @@
  * refer to the included LICENSE.txt file
  */
 #include "Scanner.h"
-
 VGMScanner::VGMScanner(Format *format): m_format(format) {}
 
 bool VGMScanner::init() {

@@ -7,7 +7,6 @@
 #pragma once
 #include "components/FileLoader.h"
 #include "LoaderManager.h"
-
 class PSF2Loader final : public FileLoader {
  public:
     ~PSF2Loader() override = default;

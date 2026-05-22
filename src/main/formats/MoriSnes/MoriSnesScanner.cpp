@@ -4,6 +4,8 @@
  * refer to the included LICENSE.txt file
  */
 
+#include "MoriSnesScanner.h"
+
 #include "MoriSnesSeq.h"
 #include "ScannerManager.h"
 namespace vgmtrans::scanners {

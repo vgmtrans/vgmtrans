@@ -6,7 +6,6 @@
 
 #include "NinSnesSeqState.h"
 #include "NinSnesTypes.h"
-
 class RawFile;
 
 struct NinSnesProfile {

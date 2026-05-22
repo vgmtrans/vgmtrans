@@ -1,8 +1,7 @@
 #pragma once
+#include "CompileSnesFormat.h"
 #include "VGMInstrSet.h"
 #include "VGMRgn.h"
-#include "CompileSnesFormat.h"
-
 // *******************
 // CompileSnesInstrSet
 // *******************

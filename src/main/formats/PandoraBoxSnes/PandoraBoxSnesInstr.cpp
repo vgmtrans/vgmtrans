@@ -4,9 +4,10 @@
  * refer to the included LICENSE.txt file
  */
 #include "PandoraBoxSnesInstr.h"
-#include "SNESDSP.h"
+
 #include <spdlog/fmt/fmt.h>
 
+#include "SNESDSP.h"
 // **********************
 // PandoraBoxSnesInstrSet
 // **********************

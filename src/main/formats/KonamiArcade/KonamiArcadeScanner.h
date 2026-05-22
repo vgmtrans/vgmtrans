@@ -4,11 +4,10 @@
  * refer to the included LICENSE.txt file
  */
 #pragma once
-#include "Scanner.h"
 #include "BytePattern.h"
-#include "KonamiArcadeInstr.h"
 #include "common.h"
-
+#include "KonamiArcadeInstr.h"
+#include "Scanner.h"
 struct MAMEGame;
 class KonamiArcadeSeq;
 

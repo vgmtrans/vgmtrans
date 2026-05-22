@@ -4,14 +4,15 @@
  * refer to the included LICENSE.txt file
  */
 #include "CPS2Seq.h"
+
 #include "CPS1TrackV1.h"
+#include "CPS2Instr.h"
 #include "CPS2TrackV1.h"
 #include "CPS2TrackV2.h"
-#include "CPS2Instr.h"
 #include "CPSCommon.h"
+#include "MidiFile.h"
 #include "ScaleConversion.h"
 #include "SeqEvent.h"
-
 DECLARE_FORMAT(CPS1);
 DECLARE_FORMAT(CPS2);
 

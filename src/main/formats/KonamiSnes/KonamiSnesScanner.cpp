@@ -4,10 +4,11 @@
  * refer to the included LICENSE.txt file
  */
 
-#include "KonamiSnesSeq.h"
-#include "KonamiSnesInstr.h"
-#include "ScannerManager.h"
+#include "KonamiSnesScanner.h"
 
+#include "KonamiSnesInstr.h"
+#include "KonamiSnesSeq.h"
+#include "ScannerManager.h"
 namespace vgmtrans::scanners {
 ScannerRegistration<KonamiSnesScanner> s_konami_snes("KonamiSnes", {"spc"});
 }

@@ -1,9 +1,7 @@
 #pragma once
-#include "Format.h"
-#include "FilegroupMatcher.h"
 #include "ChunSnesScanner.h"
-
-
+#include "FilegroupMatcher.h"
+#include "Format.h"
 // **************
 // ChunSnesFormat
 // **************

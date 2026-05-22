@@ -5,11 +5,11 @@
  */
 
 #include "AkaoInstr.h"
-#include "AkaoSeq.h"
-#include "VGMSamp.h"
-#include "VGMColl.h"
-#include "PSXSPU.h"
 
+#include "AkaoSeq.h"
+#include "PSXSPU.h"
+#include "VGMColl.h"
+#include "VGMSamp.h"
 // ************
 // AkaoInstrSet
 // ************

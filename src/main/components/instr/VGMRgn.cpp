@@ -3,10 +3,10 @@
  * Licensed under the zlib license,
  * refer to the included LICENSE.txt file
  */
-#include "ScaleConversion.h"
 #include "VGMRgn.h"
-#include "VGMInstrSet.h"
 
+#include "ScaleConversion.h"
+#include "VGMInstrSet.h"
 // ******
 // VGMRgn
 // ******

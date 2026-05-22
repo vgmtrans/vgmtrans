@@ -1,9 +1,9 @@
 #pragma once
 
-#include "Modulation.h"
-#include "RiffFile.h"
 #include <vector>
 
+#include "Modulation.h"
+#include "RiffFile.h"
 struct Loop;
 class VGMSamp;
 

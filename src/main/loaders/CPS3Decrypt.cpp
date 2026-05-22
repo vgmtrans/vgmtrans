@@ -1,6 +1,6 @@
-#include "common.h"
 #include "CPS3Decrypt.h"
 
+#include "common.h"
 // The following code comes directly from MAME
 
 uint16_t CPS3Decrypt::rotate_left(uint16_t value, int n)

@@ -4,7 +4,6 @@
 #include <vector>
 
 #include "NinSnesProfile.h"
-
 struct NinSnesScanResult {
   NinSnesSignatureId signature = NinSnesSignatureId::None;
   NinSnesProfileId profile = NinSnesProfileId::Unknown;

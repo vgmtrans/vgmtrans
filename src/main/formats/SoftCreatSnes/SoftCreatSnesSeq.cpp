@@ -1,6 +1,6 @@
 #include "SoftCreatSnesSeq.h"
-#include <spdlog/fmt/fmt.h>
 
+#include <spdlog/fmt/fmt.h>
 DECLARE_FORMAT(SoftCreatSnes);
 
 //  ****************

@@ -1,8 +1,7 @@
 #pragma once
-#include "VGMSeq.h"
-#include "SeqTrack.h"
 #include "NDSFormat.h"
-
+#include "SeqTrack.h"
+#include "VGMSeq.h"
 class NDSSeq:
     public VGMSeq {
  public:

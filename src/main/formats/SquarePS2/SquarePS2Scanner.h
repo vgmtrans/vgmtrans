@@ -5,7 +5,6 @@
  */
 #pragma once
 #include "Scanner.h"
-
 class SquarePS2Scanner : public VGMScanner {
  public:
   explicit SquarePS2Scanner(Format* format) : VGMScanner(format) {}

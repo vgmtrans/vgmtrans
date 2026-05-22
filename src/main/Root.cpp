@@ -11,10 +11,10 @@
 
 #include <spdlog/fmt/std.h>
 
+#include "common.h"
 #include "FileLoader.h"
 #include "Format.h"
 #include "helper.h"
-#include "common.h"
 #include "LoaderManager.h"
 #include "LogManager.h"
 #include "Matcher.h"
@@ -28,7 +28,6 @@
 #include "VGMSamp.h"
 #include "VGMSampColl.h"
 #include "VGMSeq.h"
-
 VGMRoot *pRoot;
 
 VGMFile* variantToVGMFile(VGMFileVariant variant) {

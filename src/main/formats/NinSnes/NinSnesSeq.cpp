@@ -1,9 +1,12 @@
 #include "NinSnesSeq.h"
-#include "NinSnesVibrato.h"
-#include "Options.h"
-#include "spdlog/fmt/fmt.h"
+
 #include <algorithm>
 
+#include "spdlog/fmt/fmt.h"
+
+#include "MidiFile.h"
+#include "NinSnesVibrato.h"
+#include "Options.h"
 DECLARE_FORMAT(NinSnes);
 
 //  **********

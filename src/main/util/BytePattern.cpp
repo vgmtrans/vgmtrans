@@ -7,11 +7,11 @@
 // Byte pattern class for flexible byte sequence search
 // Heavily inspired by SigScan at GameDeception.net
 
-#include <assert.h>
-#include <memory>
-#include <cstring>
 #include "BytePattern.h"
 
+#include <assert.h>
+#include <cstring>
+#include <memory>
 BytePattern::BytePattern() :
     ptn_str(NULL),
     ptn_mask(NULL),

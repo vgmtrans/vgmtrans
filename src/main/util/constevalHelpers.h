@@ -1,7 +1,6 @@
 #pragma once
 
 #include <cmath>
-
 namespace ct {
 
 /// Absolute value – helper for compile‑time algorithms

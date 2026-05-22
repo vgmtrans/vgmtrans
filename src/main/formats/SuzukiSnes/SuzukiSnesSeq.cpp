@@ -1,7 +1,8 @@
 #include "SuzukiSnesSeq.h"
-#include "SuzukiSnesInstr.h"
+
 #include "spdlog/fmt/fmt.h"
 
+#include "SuzukiSnesInstr.h"
 DECLARE_FORMAT(SuzukiSnes);
 
 static constexpr int MAX_TRACKS = 8;

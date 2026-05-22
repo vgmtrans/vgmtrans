@@ -5,7 +5,6 @@
  */
 #pragma once
 #include "components/FileLoader.h"
-
 class PSFFile;
 
 class PSFLoader : public FileLoader {

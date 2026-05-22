@@ -4,10 +4,12 @@
  * refer to the included LICENSE.txt file
  */
 
-#include "KonamiPS1Seq.h"
-#include <spdlog/fmt/fmt.h>
-#include "ScannerManager.h"
+#include "KonamiPS1Scanner.h"
 
+#include <spdlog/fmt/fmt.h>
+
+#include "KonamiPS1Seq.h"
+#include "ScannerManager.h"
 namespace vgmtrans::scanners {
 ScannerRegistration<KonamiPS1Scanner> s_konami_ps1("KonamiPS1");
 }

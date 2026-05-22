@@ -5,12 +5,13 @@
  */
 
 #include "SegSatSeq.h"
+
+#include "MidiFile.h"
 #include "ScaleConversion.h"
 #include "SegSatFormat.h"
 #include "SegSatInstrSet.h"
-#include "VGMColl.h"
 #include "util/MidiConstants.h"
-
+#include "VGMColl.h"
 DECLARE_FORMAT(SegSat);
 
 SegSatSeq::SegSatSeq(RawFile *file, uint32_t offset, std::string name)

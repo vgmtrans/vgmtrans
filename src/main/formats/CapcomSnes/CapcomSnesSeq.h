@@ -1,10 +1,9 @@
 #pragma once
-#include "VGMSeq.h"
 #include "automation/SeqMidiAutomation.h"
-#include "SeqTrack.h"
-#include "SeqEvent.h"
 #include "CapcomSnesFormat.h"
-
+#include "SeqEvent.h"
+#include "SeqTrack.h"
+#include "VGMSeq.h"
 #define CAPCOM_SNES_REPEAT_SLOT_MAX 4
 
 #define CAPCOM_SNES_MASK_NOTE_OCTAVE    0x07

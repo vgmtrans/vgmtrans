@@ -1,9 +1,8 @@
 #pragma once
-#include "VGMSeq.h"
-#include "SeqTrack.h"
 #include "SeqEvent.h"
+#include "SeqTrack.h"
 #include "TamSoftPS1Format.h"
-
+#include "VGMSeq.h"
 class TamSoftPS1Seq:
     public VGMSeq {
  public:

@@ -1,8 +1,7 @@
 #pragma once
-#include "VGMSeq.h"
 #include "SeqTrack.h"
 #include "SuzukiSnesFormat.h"
-
+#include "VGMSeq.h"
 #define SUZUKISNES_LOOP_LEVEL_MAX   10
 
 enum SuzukiSnesSeqEventType {

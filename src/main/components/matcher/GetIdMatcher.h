@@ -7,7 +7,6 @@
 #pragma once
 
 #include "SimpleMatcher.h"
-
 class GetIdMatcher : public SimpleMatcher<uint32_t> {
 public:
   explicit GetIdMatcher(Format *format, bool bRequiresSampColl = false)

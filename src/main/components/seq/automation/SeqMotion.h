@@ -6,7 +6,6 @@
 #pragma once
 
 #include <cstdint>
-
 // Low-level, MIDI-agnostic primitives for one value changing over driver ticks.
 // Higher-level automation classes add source-format policy and MIDI output.
 enum class SeqMotionStatus {

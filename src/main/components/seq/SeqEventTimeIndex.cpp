@@ -5,11 +5,12 @@
  */
 
 #include "SeqEventTimeIndex.h"
-#include "SeqEvent.h"
+
 #include <algorithm>
 #include <numeric>
 #include <utility>
 
+#include "SeqEvent.h"
 SeqEventTimeIndex::~SeqEventTimeIndex() = default;
 
 SeqEventTimeIndex::Index SeqEventTimeIndex::addEvent(SeqEvent* event,

@@ -2,9 +2,9 @@
 // author of so2mml. The code is based on his write-up of the format specifications.  Many thanks to him.
 
 #include "TriAcePS1Seq.h"
-#include "SeqEvent.h"
-#include "helper.h"
 
+#include "helper.h"
+#include "SeqEvent.h"
 DECLARE_FORMAT(TriAcePS1);
 
 // ************

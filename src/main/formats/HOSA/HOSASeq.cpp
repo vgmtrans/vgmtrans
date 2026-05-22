@@ -1,6 +1,6 @@
 #include "HOSASeq.h"
-#include "HOSAFormat.h"
 
+#include "HOSAFormat.h"
 DECLARE_FORMAT(HOSA);
 
 

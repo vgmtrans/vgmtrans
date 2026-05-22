@@ -4,10 +4,10 @@
  * refer to the included LICENSE.txt file
  */
 #pragma once
-#include "VGMTag.h"
-#include "common.h"
 #include <array>
 
+#include "common.h"
+#include "VGMTag.h"
 class RawFile;
 class SPCFile;
 

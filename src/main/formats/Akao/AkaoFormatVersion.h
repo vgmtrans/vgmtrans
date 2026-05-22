@@ -6,6 +6,7 @@
 
 #pragma once
 
+#include <cstdint>
 enum class AkaoPs1Version : uint8_t {
   UNKNOWN = 0,
 

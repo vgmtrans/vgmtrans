@@ -4,12 +4,13 @@
  * refer to the included LICENSE.txt file
  */
 
+#include "TamSoftPS1Seq.h"
+
 #include <iomanip>
 
 #include <spdlog/fmt/fmt.h>
-#include "ScaleConversion.h"
-#include "TamSoftPS1Seq.h"
 
+#include "ScaleConversion.h"
 DECLARE_FORMAT(TamSoftPS1);
 
 static constexpr int MAX_TRACKS_PS1 = 24;

@@ -3,15 +3,15 @@
  * Licensed under the zlib license,
  * refer to the included LICENSE.txt file
  */
-#include "common.h"
 #include "CPS1Scanner.h"
+
+#include "common.h"
+#include "CPS1Instr.h"
 #include "CPS1Seq.h"
 #include "CPS2Seq.h"
-#include "CPS1Instr.h"
 #include "MAMELoader.h"
-#include "VGMMiscFile.h"
 #include "VGMColl.h"
-
+#include "VGMMiscFile.h"
 class CPS1SampleInstrSet;
 
 CPS1FormatVer cps1VersionEnum(const std::string &versionStr) {

@@ -5,9 +5,9 @@
  */
 
 #include "HeartBeatPS1Scanner.h"
+
 #include "HeartBeatPS1Format.h"
 #include "ScannerManager.h"
-
 namespace vgmtrans::scanners {
 ScannerRegistration<HeartBeatPS1Scanner> s_heartbeat_ps1("HeartBeatPS1");
 }

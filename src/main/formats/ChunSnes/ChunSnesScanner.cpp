@@ -4,10 +4,11 @@
  * refer to the included LICENSE.txt file
  */
 
-#include "ChunSnesSeq.h"
-#include "ChunSnesInstr.h"
-#include "ScannerManager.h"
+#include "ChunSnesScanner.h"
 
+#include "ChunSnesInstr.h"
+#include "ChunSnesSeq.h"
+#include "ScannerManager.h"
 namespace vgmtrans::scanners {
 ScannerRegistration<ChunSnesScanner> s_chun_snes("ChunSnes", {"spc"});
 }

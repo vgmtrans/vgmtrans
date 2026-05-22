@@ -2,7 +2,6 @@
 
 #include <cstdint>
 #include <vector>
-
 namespace psg {
 
 constexpr double kDefaultBaseFrequencyHz = 440.0;

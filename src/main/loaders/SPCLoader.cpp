@@ -5,10 +5,11 @@
  */
 
 #include "SPCLoader.h"
-#include "LogManager.h"
-#include "LoaderManager.h"
-#include "SPCFile.h"
 
+#include "LoaderManager.h"
+#include "LogManager.h"
+#include "RawFile.h"
+#include "SPCFile.h"
 namespace vgmtrans::loaders {
 LoaderRegistration<SPCLoader> _spc{"SPC"};
 }

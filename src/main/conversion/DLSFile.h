@@ -6,11 +6,11 @@
 
 #pragma once
 
+#include <filesystem>
+
 #include "common.h"
 #include "Modulation.h"
 #include "RiffFile.h"
-#include <filesystem>
-
 struct Loop;
 class VGMSamp;
 

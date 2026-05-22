@@ -1,6 +1,5 @@
 #pragma once
 #include "VGMSeqNoTrks.h"
-
 class SegSatRgn;
 class SegSatInstr;
 class SegSatInstrSet;

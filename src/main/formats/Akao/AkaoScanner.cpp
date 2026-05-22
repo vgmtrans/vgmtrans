@@ -4,10 +4,11 @@
  * refer to the included LICENSE.txt file
  */
 
-#include "AkaoSeq.h"
-#include "AkaoInstr.h"
-#include "ScannerManager.h"
+#include "AkaoScanner.h"
 
+#include "AkaoInstr.h"
+#include "AkaoSeq.h"
+#include "ScannerManager.h"
 namespace vgmtrans::scanners {
 ScannerRegistration<AkaoScanner> s_akao("Akao");
 }

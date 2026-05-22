@@ -1,9 +1,8 @@
 #pragma once
-#include "VGMSeq.h"
+#include "AkaoSnesFormat.h"
 #include "automation/SeqMidiAutomation.h"
 #include "SeqTrack.h"
-#include "AkaoSnesFormat.h"
-
+#include "VGMSeq.h"
 #define AKAOSNES_LOOP_LEVEL_MAX 4
 
 enum AkaoSnesSeqEventType {

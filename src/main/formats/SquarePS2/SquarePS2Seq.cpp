@@ -1,5 +1,4 @@
 #include "SquarePS2Seq.h"
-
 DECLARE_FORMAT(SquarePS2);
 
 using namespace std;

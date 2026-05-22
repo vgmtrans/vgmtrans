@@ -4,10 +4,12 @@
  * refer to the included LICENSE.txt file
  */
 
-#include "SonyPS2Seq.h"
-#include "SonyPS2InstrSet.h"
-#include "ScannerManager.h"
+#include "SonyPS2Scanner.h"
 
+#include "Root.h"
+#include "ScannerManager.h"
+#include "SonyPS2InstrSet.h"
+#include "SonyPS2Seq.h"
 namespace vgmtrans::scanners {
 ScannerRegistration<SonyPS2Scanner> s_sonyps2("SonyPS2", {"sq", "hd", "bd"});
 }

@@ -4,8 +4,10 @@
  * refer to the included LICENSE.txt file
  */
 #pragma once
-#include "Scanner.h"
 
+#include <cstdint>
+
+#include "Scanner.h"
 class HOSASeq;
 class HOSAInstrSet;
 class PSXSampColl;

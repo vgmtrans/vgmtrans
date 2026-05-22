@@ -4,13 +4,14 @@
  * refer to the included LICENSE.txt file
  */
 
-#include "NinSnesInstr.h"
-#include "NinSnesSeq.h"
-#include "ScannerManager.h"
+#include "NinSnesScanner.h"
 
 #include <array>
 #include <optional>
 
+#include "NinSnesInstr.h"
+#include "NinSnesSeq.h"
+#include "ScannerManager.h"
 namespace vgmtrans::scanners {
 ScannerRegistration<NinSnesScanner> s_nin_snes("NinSnes", {"spc"});
 }

@@ -5,9 +5,12 @@
  */
 
 #pragma once
-#include "Scanner.h"
-#include "BytePattern.h"
 
+#include <cstdint>
+#include <map>
+
+#include "BytePattern.h"
+#include "Scanner.h"
 class GraphResSnesScanner : public VGMScanner {
  public:
   explicit GraphResSnesScanner(Format* format) : VGMScanner(format) {}

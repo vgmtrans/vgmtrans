@@ -1,9 +1,7 @@
 #pragma once
-#include "Format.h"
-#include "FilegroupMatcher.h"
 #include "AkaoSnesScanner.h"
-
-
+#include "FilegroupMatcher.h"
+#include "Format.h"
 // **************
 // AkaoSnesFormat
 // **************

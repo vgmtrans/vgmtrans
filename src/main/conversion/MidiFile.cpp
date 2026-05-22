@@ -4,14 +4,17 @@
  * refer to the included LICENSE.txt file
  */
 
-#include <ranges>
+#include "MidiFile.h"
+
 #include <filesystem>
+#include <ranges>
+
 #include <spdlog/fmt/fmt.h>
-#include "VGMSeq.h"
-#include "Root.h"
+
 #include "helper.h"
 #include "LogManager.h"
-
+#include "Root.h"
+#include "VGMSeq.h"
 MidiFile::MidiFile(VGMSeq *theAssocSeq)
     : assocSeq(theAssocSeq),
       globalTrack(this, false),

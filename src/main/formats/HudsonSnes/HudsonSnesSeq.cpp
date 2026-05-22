@@ -4,8 +4,8 @@
  * refer to the included LICENSE.txt file
  */
 #include "HudsonSnesSeq.h"
-#include "spdlog/fmt/fmt.h"
 
+#include "spdlog/fmt/fmt.h"
 DECLARE_FORMAT(HudsonSnes);
 
 static constexpr int MAX_TRACKS = 8;

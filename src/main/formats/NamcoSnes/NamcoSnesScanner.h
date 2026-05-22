@@ -4,9 +4,12 @@
  * refer to the included LICENSE.txt file
  */
 #pragma once
-#include "Scanner.h"
-#include "BytePattern.h"
 
+#include <cstdint>
+#include <map>
+
+#include "BytePattern.h"
+#include "Scanner.h"
 enum NamcoSnesVersion : uint8_t;  // see NamcoSnesFormat.h
 
 class NamcoSnesScanner : public VGMScanner {

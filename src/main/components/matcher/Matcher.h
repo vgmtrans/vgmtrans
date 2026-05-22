@@ -7,7 +7,6 @@
 #pragma once
 
 #include <variant>
-
 class Format;
 class RawFile;
 class VGMSeq;

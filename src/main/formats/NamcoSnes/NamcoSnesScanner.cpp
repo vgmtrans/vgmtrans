@@ -4,10 +4,11 @@
  * refer to the included LICENSE.txt file
  */
 
+#include "NamcoSnesScanner.h"
+
 #include "NamcoSnesInstr.h"
 #include "NamcoSnesSeq.h"
 #include "ScannerManager.h"
-
 namespace vgmtrans::scanners {
 ScannerRegistration<NamcoSnesScanner> s_namco_snes("NamcoSnes", {"spc"});
 }

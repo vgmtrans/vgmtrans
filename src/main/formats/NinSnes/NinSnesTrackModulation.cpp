@@ -1,10 +1,11 @@
 #include "NinSnesSeq.h"
-#include "NinSnesVibrato.h"
-#include "Modulation.h"
-#include "automation/SeqTrackAutomation.h"
+
 #include <algorithm>
 #include <cmath>
 
+#include "automation/SeqTrackAutomation.h"
+#include "Modulation.h"
+#include "NinSnesVibrato.h"
 namespace {
 
 constexpr uint16_t kNinSnesDefaultPitchBendRangeCents =

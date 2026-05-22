@@ -6,7 +6,6 @@
 #pragma once
 
 #include "components/FileLoader.h"
-
 class SPCLoader : public FileLoader {
  public:
     ~SPCLoader() override = default;

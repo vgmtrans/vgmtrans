@@ -4,7 +4,6 @@
  * refer to the included LICENSE.txt file
  */
 #include "SeqSlider.h"
-
 template<typename TNumber>
 SeqSlider<TNumber>::SeqSlider(SeqTrack *track,
                               uint32_t time,

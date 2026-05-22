@@ -1,8 +1,7 @@
 #pragma once
+#include "Loop.h"
 #include "SynthFile.h"
 #include "VGMItem.h"
-#include "Loop.h"
-
 class VGMInstr;
 class VGMRgnItem;
 class VGMSampColl;

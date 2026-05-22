@@ -5,7 +5,6 @@
  */
 
 #include "Matcher.h"
-
 Matcher::Matcher(Format *format) {
   fmt = format;
 }

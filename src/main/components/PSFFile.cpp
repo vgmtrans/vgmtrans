@@ -6,9 +6,8 @@
 
 #include "PSFFile.h"
 
-#include "util/decompression.h"
 #include "io/RawFile.h"
-
+#include "util/decompression.h"
 constexpr auto PSF_TAG_SIG = "[TAG]";
 constexpr auto PSF_TAG_SIG_LEN = 5;
 

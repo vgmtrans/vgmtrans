@@ -4,6 +4,8 @@
  * refer to the included LICENSE.txt file
  */
 
+#include "AkaoSnesScanner.h"
+
 #include "AkaoSnesInstr.h"
 #include "AkaoSnesSeq.h"
 #include "ScannerManager.h"

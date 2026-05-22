@@ -5,7 +5,6 @@
  */
 #pragma once
 #include "Scanner.h"
-
 class OrgScanner : public VGMScanner {
  public:
   explicit OrgScanner(Format* format) : VGMScanner(format) {}

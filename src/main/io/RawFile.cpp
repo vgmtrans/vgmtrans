@@ -6,10 +6,9 @@
 
 #include "RawFile.h"
 
-#include "LogManager.h"
 #include "components/VGMFile.h"
+#include "LogManager.h"
 #include "util/BytePattern.h"
-
 /* RawFile */
 
 /* FIXME: we own the VGMFile, should use unique_ptr instead */

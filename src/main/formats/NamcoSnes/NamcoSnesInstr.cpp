@@ -5,9 +5,10 @@
  */
 
 #include "NamcoSnesInstr.h"
-#include <spdlog/fmt/fmt.h>
-#include "SNESDSP.h"
 
+#include <spdlog/fmt/fmt.h>
+
+#include "SNESDSP.h"
 // *****************
 // NamcoSnesInstrSet
 // *****************

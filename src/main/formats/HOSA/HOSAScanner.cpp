@@ -4,13 +4,15 @@
  * refer to the included LICENSE.txt file
  */
 
-#include "HOSASeq.h"
-#include "HOSAInstr.h"
-#include "VGMColl.h"
-#include "PSXSPU.h"
-#include "ScannerManager.h"
-#include "VGMMiscFile.h"
+#include "HOSAScanner.h"
 
+#include "HOSAInstr.h"
+#include "HOSASeq.h"
+#include "PSXSPU.h"
+#include "Root.h"
+#include "ScannerManager.h"
+#include "VGMColl.h"
+#include "VGMMiscFile.h"
 namespace vgmtrans::scanners {
 ScannerRegistration<HOSAScanner> s_hosa("HOSA");
 }

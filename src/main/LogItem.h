@@ -1,7 +1,6 @@
 #pragma once
 
 #include <string>
-
 enum LogLevel : int { LOG_LEVEL_ERR, LOG_LEVEL_WARN, LOG_LEVEL_INFO, LOG_LEVEL_DEBUG };
 
 class LogItem {

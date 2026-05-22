@@ -8,7 +8,6 @@
 
 #include <cstdint>
 #include <optional>
-
 struct DelayRange {
   double minSeconds;
   double maxSeconds;

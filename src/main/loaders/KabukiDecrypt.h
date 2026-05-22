@@ -1,6 +1,5 @@
 #pragma once
 #include <cstdint>
-
 class KabukiDecrypter {
  public:
   static void kabuki_decode(const uint8_t *src, uint8_t *dest_op, uint8_t *dest_data,

@@ -4,12 +4,13 @@
  * refer to the included LICENSE.txt file
  */
 #include "AkaoSnesSeq.h"
+
+#include <cmath>
+#include <spdlog/fmt/fmt.h>
+
 #include "AkaoSnesInstr.h"
 #include "AkaoSnesModulation.h"
 #include "ScaleConversion.h"
-#include <spdlog/fmt/fmt.h>
-#include <cmath>
-
 DECLARE_FORMAT(AkaoSnes);
 
 static constexpr uint16_t SEQ_PPQN = 48;

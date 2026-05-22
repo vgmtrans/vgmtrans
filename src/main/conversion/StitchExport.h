@@ -10,7 +10,6 @@
 #include <vector>
 
 #include "MidiMerge.h"
-
 namespace conversion {
 
 struct StitchedExportResult {

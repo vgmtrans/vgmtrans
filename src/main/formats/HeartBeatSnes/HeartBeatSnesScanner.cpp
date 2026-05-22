@@ -4,10 +4,11 @@
  * refer to the included LICENSE.txt file
  */
 
-#include "HeartBeatSnesSeq.h"
-#include "HeartBeatSnesInstr.h"
-#include "ScannerManager.h"
+#include "HeartBeatSnesScanner.h"
 
+#include "HeartBeatSnesInstr.h"
+#include "HeartBeatSnesSeq.h"
+#include "ScannerManager.h"
 namespace vgmtrans::scanners {
 ScannerRegistration<HeartBeatSnesScanner> s_heartbeat_snes("HeartBeatSnes", {"spc"});
 }

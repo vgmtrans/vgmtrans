@@ -6,7 +6,6 @@
 #pragma once
 
 #include "FileLoader.h"
-
 class CHDLoader : public FileLoader {
  public:
   ~CHDLoader() override = default;

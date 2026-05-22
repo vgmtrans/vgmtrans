@@ -7,8 +7,8 @@
 #include "SynthFile.h"
 
 #include <spdlog/fmt/fmt.h>
-#include "VGMSamp.h"
 
+#include "VGMSamp.h"
 //  **********************************************************************************
 //  SynthFile - An intermediate class to lay out all of the the data necessary for Coll conversion
 //				to DLS or SF2 formats.  Currently, the structure is identical to DLS.

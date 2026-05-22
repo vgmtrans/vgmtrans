@@ -5,9 +5,10 @@
  */
 
 #include "AsciiShuichiSnesSeq.h"
+
+#include "MidiFile.h"
 #include "ScaleConversion.h"
 #include "SeqEvent.h"
-
 using namespace std;
 
 DECLARE_FORMAT(AsciiShuichiSnes);

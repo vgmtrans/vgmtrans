@@ -6,8 +6,8 @@
 #pragma once
 
 #include <cstdint>
-#include "KonamiSnesFormat.h"
 
+#include "KonamiSnesFormat.h"
 namespace konami_snes {
 
 inline constexpr double kTimerHz = 250.0;

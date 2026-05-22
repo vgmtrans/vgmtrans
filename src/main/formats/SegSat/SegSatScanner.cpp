@@ -5,13 +5,14 @@
  */
 
 #include "SegSatScanner.h"
-#include "SegSatSeq.h"
-#include "ScannerManager.h"
-#include "SegSatInstrSet.h"
-#include "VGMColl.h"
-#include "VGMMiscFile.h"
+
 #include <array>
 
+#include "ScannerManager.h"
+#include "SegSatInstrSet.h"
+#include "SegSatSeq.h"
+#include "VGMColl.h"
+#include "VGMMiscFile.h"
 namespace vgmtrans::scanners {
 ScannerRegistration<SegSatScanner> s_segsat("SegSat");
 }

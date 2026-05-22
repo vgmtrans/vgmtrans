@@ -1,8 +1,7 @@
 #pragma once
 #include "Format.h"
-#include "SquarePS2Scanner.h"
 #include "GetIdMatcher.h"
-
+#include "SquarePS2Scanner.h"
 // ***************
 // SquarePS2Format
 // ***************

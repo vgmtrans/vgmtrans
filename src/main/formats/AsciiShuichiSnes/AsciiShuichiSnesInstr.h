@@ -1,7 +1,6 @@
 #pragma once
 #include "VGMInstrSet.h"
 #include "VGMRgn.h"
-
 // ************************
 // AsciiShuichiSnesInstrSet
 // ************************

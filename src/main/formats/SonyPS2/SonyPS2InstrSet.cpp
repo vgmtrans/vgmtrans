@@ -1,6 +1,7 @@
 #include "SonyPS2InstrSet.h"
-#include "PSXSPU.h"
 
+#include "PSXSPU.h"
+#include "Root.h"
 using namespace std;
 
 // ***************

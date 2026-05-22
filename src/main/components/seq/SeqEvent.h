@@ -5,10 +5,10 @@
  */
 
 #pragma once
-#include "VGMItem.h"
-#include "MidiFile.h"
 #include <spdlog/fmt/fmt.h>
 
+#include "MidiFile.h"
+#include "VGMItem.h"
 class SeqTrack;
 
 class SeqEvent:

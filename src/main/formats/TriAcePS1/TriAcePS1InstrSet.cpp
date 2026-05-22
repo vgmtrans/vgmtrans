@@ -1,7 +1,7 @@
 #include "TriAcePS1InstrSet.h"
-#include "VGMRgn.h"
-#include "PSXSPU.h"
 
+#include "PSXSPU.h"
+#include "VGMRgn.h"
 // *****************
 // TriAcePS1InstrSet
 // *****************

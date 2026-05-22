@@ -1,7 +1,8 @@
 #include "FalcomSnesSeq.h"
-#include "ScaleConversion.h"
+
 #include <spdlog/fmt/fmt.h>
 
+#include "ScaleConversion.h"
 DECLARE_FORMAT(FalcomSnes);
 
 static constexpr int MAX_TRACKS = 8;

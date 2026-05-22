@@ -4,15 +4,21 @@
  * refer to the included LICENSE.txt file
  */
 
-#include "common.h"
 #include "CHDLoader.h"
-#include "FileLoader.h"
-#include "LoaderManager.h"
-#include "LogManager.h"
+
+#include <algorithm>
+#include <cstddef>
+#include <cstdint>
+#include <cstring>
+#include <vector>
 
 extern "C" {
 #include <libchdr/chd.h>
 }
+
+#include "LoaderManager.h"
+#include "LogManager.h"
+#include "RawFile.h"
 
 namespace vgmtrans::loaders {
 LoaderRegistration<CHDLoader> _chd{"CHD"};

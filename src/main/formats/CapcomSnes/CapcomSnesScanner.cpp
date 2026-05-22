@@ -4,10 +4,11 @@
  * refer to the included LICENSE.txt file
  */
 
-#include "CapcomSnesSeq.h"
-#include "CapcomSnesInstr.h"
-#include "ScannerManager.h"
+#include "CapcomSnesScanner.h"
 
+#include "CapcomSnesInstr.h"
+#include "CapcomSnesSeq.h"
+#include "ScannerManager.h"
 namespace vgmtrans::scanners {
 ScannerRegistration<CapcomSnesScanner> s_capcom_snes("CapcomSnes", {"spc"});
 }

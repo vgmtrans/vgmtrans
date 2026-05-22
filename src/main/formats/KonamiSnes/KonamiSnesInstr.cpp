@@ -5,13 +5,15 @@
  */
 
 #include "KonamiSnesInstr.h"
+
+#include <algorithm>
+
+#include <spdlog/fmt/fmt.h>
+
 #include "KonamiSnesSeq.h"
 #include "KonamiSnesVibrato.h"
 #include "SNESDSP.h"
 #include "VGMColl.h"
-#include <algorithm>
-#include <spdlog/fmt/fmt.h>
-
 namespace {
 constexpr uint8_t kKonamiSnesPercussionNoteCount = 0x60;
 constexpr uint8_t kKonamiSnesPercussionBaseNote = 0x3c;

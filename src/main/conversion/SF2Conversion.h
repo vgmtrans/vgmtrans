@@ -6,7 +6,6 @@
 #pragma once
 
 #include <vector>
-
 class SF2File;
 class VGMColl;
 class VGMInstrSet;

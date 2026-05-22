@@ -4,10 +4,9 @@
  * refer to the included LICENSE.txt file
  */
 #pragma once
-#include "VGMSeq.h"
-#include "SeqTrack.h"
 #include "HudsonSnesFormat.h"
-
+#include "SeqTrack.h"
+#include "VGMSeq.h"
 #define HUDSONSNES_CALLSTACK_SIZE   0x10
 #define HUDSONSNES_USERRAM_SIZE     0x08
 

@@ -10,7 +10,6 @@
 
 #include "common.h"
 #include "VGMSamp.h"
-
 class VGMSampColl;
 class VGMInstrSet;
 

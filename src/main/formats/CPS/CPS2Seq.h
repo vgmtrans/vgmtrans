@@ -1,10 +1,13 @@
 #pragma once
-#include "VGMSeq.h"
-#include "SeqTrack.h"
+
+#include <cstdint>
+#include <string>
+#include <vector>
+
 #include "CPS2Format.h"
-
-enum CPS2FormatVer: uint8_t;
-
+#include "CPS2FormatVersion.h"
+#include "SeqTrack.h"
+#include "VGMSeq.h"
 class CPS2Seq:
     public VGMSeq {
 public:

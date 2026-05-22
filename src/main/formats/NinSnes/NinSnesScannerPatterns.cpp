@@ -8,7 +8,6 @@
 
 #include <array>
 #include <cstring>
-
 namespace {
 
 template <size_t N>

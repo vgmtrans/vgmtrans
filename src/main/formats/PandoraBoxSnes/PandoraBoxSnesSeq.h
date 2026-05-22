@@ -1,9 +1,8 @@
 #pragma once
-#include "VGMSeq.h"
-#include "SeqTrack.h"
-#include "SeqEvent.h"
 #include "PandoraBoxSnesFormat.h"
-
+#include "SeqEvent.h"
+#include "SeqTrack.h"
+#include "VGMSeq.h"
 #define PANDORABOXSNES_CALLSTACK_SIZE   40
 
 enum PandoraBoxSnesSeqEventType {

@@ -4,9 +4,10 @@
  * refer to the included LICENSE.txt file
  */
 #include "GraphResSnesSeq.h"
-#include "ScaleConversion.h"
+
 #include <spdlog/fmt/fmt.h>
 
+#include "ScaleConversion.h"
 using namespace std;
 
 DECLARE_FORMAT(GraphResSnes);

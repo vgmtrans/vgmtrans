@@ -4,9 +4,10 @@
  * refer to the included LICENSE.txt file
  */
 #include "ItikitiSnesSeq.h"
-#include "ScaleConversion.h"
+
 #include <spdlog/fmt/fmt.h>
 
+#include "ScaleConversion.h"
 DECLARE_FORMAT(ItikitiSnes);
 
 static constexpr uint8_t NOTE_VELOCITY = 100;

@@ -1,7 +1,9 @@
 #include "PrismSnesSeq.h"
-#include "ScaleConversion.h"
+
 #include <spdlog/fmt/fmt.h>
 
+#include "MidiFile.h"
+#include "ScaleConversion.h"
 // TODO: Fix envelope event length
 
 DECLARE_FORMAT(PrismSnes);

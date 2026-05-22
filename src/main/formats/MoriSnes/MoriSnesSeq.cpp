@@ -4,8 +4,8 @@
  * refer to the included LICENSE.txt file
  */
 #include "MoriSnesSeq.h"
-#include "spdlog/fmt/fmt.h"
 
+#include "spdlog/fmt/fmt.h"
 DECLARE_FORMAT(MoriSnes);
 
 //  ***********

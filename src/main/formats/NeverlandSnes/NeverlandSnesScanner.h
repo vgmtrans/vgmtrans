@@ -4,9 +4,8 @@
  * refer to the included LICENSE.txt file
  */
 #pragma once
-#include "Scanner.h"
 #include "BytePattern.h"
-
+#include "Scanner.h"
 class NeverlandSnesScanner : public VGMScanner {
  public:
   explicit NeverlandSnesScanner(Format* format) : VGMScanner(format) {}

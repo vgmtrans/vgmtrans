@@ -5,10 +5,10 @@
  */
 #pragma once
 
-#include "SeqTrack.h"
-#include "SeqMidiAutomation.h"
 #include <utility>
 
+#include "SeqMidiAutomation.h"
+#include "SeqTrack.h"
 // SeqTrack helper methods that connect automation objects to this track's MIDI writers.
 
 // Advance pitch automation by one tick and emit MIDI bend if the bend changed.

@@ -4,10 +4,11 @@
  * refer to the included LICENSE.txt file
  */
 
-#include "GraphResSnesSeq.h"
-#include "GraphResSnesInstr.h"
-#include "ScannerManager.h"
+#include "GraphResSnesScanner.h"
 
+#include "GraphResSnesInstr.h"
+#include "GraphResSnesSeq.h"
+#include "ScannerManager.h"
 namespace vgmtrans::scanners {
 ScannerRegistration<GraphResSnesScanner> s_graph_snes("GraphResSnes", {"spc"});
 }

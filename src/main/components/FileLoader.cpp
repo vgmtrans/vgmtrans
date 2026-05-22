@@ -2,7 +2,6 @@
 
 #include <algorithm>
 #include <ranges>
-
 std::vector<RawFile*> FileLoader::results() {
   std::vector<RawFile*> res;
 

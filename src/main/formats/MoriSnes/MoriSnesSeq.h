@@ -1,9 +1,8 @@
 #pragma once
-#include "VGMSeq.h"
-#include "SeqTrack.h"
 #include "MoriSnesFormat.h"
 #include "MoriSnesInstr.h"
-
+#include "SeqTrack.h"
+#include "VGMSeq.h"
 #define MORISNES_CALLSTACK_SIZE 10
 
 enum MoriSnesSeqEventType {

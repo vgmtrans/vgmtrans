@@ -7,7 +7,6 @@
 #pragma once
 #include "common.h"
 #include "Scanner.h"
-
 class ItikitiSnesScanner: public VGMScanner {
  public:
   explicit ItikitiSnesScanner(Format* format) : VGMScanner(format) {}

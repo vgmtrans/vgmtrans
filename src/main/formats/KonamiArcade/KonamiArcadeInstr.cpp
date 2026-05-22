@@ -4,14 +4,14 @@
  * refer to the included LICENSE.txt file
  */
 #include "KonamiArcadeInstr.h"
-#include "KonamiAdpcm.h"
-#include "LogManager.h"
-#include "VGMRgn.h"
-#include "KonamiArcadeDefinitions.h"
-#include "KonamiArcadeFormat.h"
 
 #include <spdlog/fmt/fmt.h>
 
+#include "KonamiAdpcm.h"
+#include "KonamiArcadeDefinitions.h"
+#include "KonamiArcadeFormat.h"
+#include "LogManager.h"
+#include "VGMRgn.h"
 // The driver doesn't define an envelope at the instrument level. Instead, it sets release time
 // via sequence events, which are currently unhandled. Adding artificial release times generally
 // makes things sound better.

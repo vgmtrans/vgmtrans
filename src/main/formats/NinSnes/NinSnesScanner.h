@@ -4,10 +4,9 @@
  * refer to the included LICENSE.txt file
  */
 #pragma once
-#include "Scanner.h"
 #include "BytePattern.h"
 #include "NinSnesScanResult.h"
-
+#include "Scanner.h"
 class NinSnesScanner : public VGMScanner {
 public:
   explicit NinSnesScanner(Format* format) : VGMScanner(format) {}

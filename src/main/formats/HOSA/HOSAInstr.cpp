@@ -4,9 +4,9 @@
  * refer to the included LICENSE.txt file
  */
 #include "HOSAInstr.h"
-#include "VGMRgn.h"
-#include "PSXSPU.h"
 
+#include "PSXSPU.h"
+#include "VGMRgn.h"
 /****************************************************************/
 /*																*/
 /*			Instrument Set		(Bank全体)						*/

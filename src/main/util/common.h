@@ -6,13 +6,11 @@
 
 #pragma once
 
-#include <string>
-#include <string_view>
 #include <cassert>
 #include <cstdint>
-#include <variant>
 #include <filesystem>
-
+#include <string>
+#include <string_view>
 #ifdef __FILE_NAME__
 #define THIS_FILE_NAME __FILE_NAME__
 #else
@@ -44,13 +42,6 @@ using u16 = std::uint16_t;
 using u32 = std::uint32_t;
 using u64 = std::uint64_t;
 using uptr = std::uintptr_t;
-
-class VGMSeq;
-class VGMInstrSet;
-class VGMSampColl;
-class VGMMiscFile;
-
-using VGMFileVariant = std::variant<VGMSeq*, VGMInstrSet*, VGMSampColl*, VGMMiscFile*>;
 
 std::string toUpper(const std::string& input);
 std::string toLower(const std::string& input);

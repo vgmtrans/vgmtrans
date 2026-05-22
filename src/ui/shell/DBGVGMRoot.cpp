@@ -5,7 +5,9 @@
  */
 
 #include "DBGVGMRoot.h"
+#include <filesystem>
 #include <iostream>
+#include "LogItem.h"
 #include "LogManager.h"
 #include "VGMFile.h"
 

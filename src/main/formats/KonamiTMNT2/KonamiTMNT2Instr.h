@@ -1,7 +1,6 @@
 #pragma once
-#include "VGMSampColl.h"
 #include "VGMInstrSet.h"
-
+#include "VGMSampColl.h"
 enum KonamiTMNT2FormatVer : uint8_t;
 class RawFile;
 struct konami_tmnt2_instr_info {

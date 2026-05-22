@@ -4,20 +4,21 @@
  * refer to the included LICENSE.txt file
  */
 #include "KonamiTMNT2Scanner.h"
-#include "KonamiTMNT2Seq.h"
-#include "MAMELoader.h"
-#include "BytePattern.h"
-#include "KonamiTMNT2Instr.h"
-#include "KonamiTMNT2OPMInstr.h"
-#include "KonamiVendettaInstr.h"
-#include "VGMColl.h"
-#include "VGMMiscFile.h"
 
 #include <optional>
 #include <utility>
-#include <spdlog/fmt/fmt.h>
 #include <vector>
 
+#include <spdlog/fmt/fmt.h>
+
+#include "BytePattern.h"
+#include "KonamiTMNT2Instr.h"
+#include "KonamiTMNT2OPMInstr.h"
+#include "KonamiTMNT2Seq.h"
+#include "KonamiVendettaInstr.h"
+#include "MAMELoader.h"
+#include "VGMColl.h"
+#include "VGMMiscFile.h"
 KonamiTMNT2FormatVer konamiTMNT2VersionEnum(const std::string &versionStr) {
   static const std::unordered_map<std::string, KonamiTMNT2FormatVer> versionMap = {
     {"tmnt2", TMNT2},

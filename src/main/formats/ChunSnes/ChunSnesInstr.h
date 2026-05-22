@@ -1,8 +1,7 @@
 #pragma once
+#include "ChunSnesFormat.h"
 #include "VGMInstrSet.h"
 #include "VGMRgn.h"
-#include "ChunSnesFormat.h"
-
 // ****************
 // ChunSnesInstrSet
 // ****************

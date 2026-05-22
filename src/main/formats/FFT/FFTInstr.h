@@ -6,7 +6,6 @@
 #pragma once
 #include "VGMInstrSet.h"
 #include "VGMRgn.h"
-
 /****************************************************************/
 /*																*/
 /*					Define of structs							*/

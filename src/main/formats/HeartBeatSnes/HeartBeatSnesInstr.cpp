@@ -5,9 +5,10 @@
  */
 
 #include "HeartBeatSnesInstr.h"
-#include <spdlog/fmt/fmt.h>
-#include "SNESDSP.h"
 
+#include <spdlog/fmt/fmt.h>
+
+#include "SNESDSP.h"
 // *********************
 // HeartBeatSnesInstrSet
 // *********************

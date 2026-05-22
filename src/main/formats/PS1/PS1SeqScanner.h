@@ -4,10 +4,9 @@
  * refer to the included LICENSE.txt file
  */
 #pragma once
-#include "Scanner.h"
-#include "PS1Seq.h"
 #include "formats/PS1/Vab.h"
-
+#include "PS1Seq.h"
+#include "Scanner.h"
 class PS1SeqScanner : public VGMScanner {
  public:
   explicit PS1SeqScanner(Format* format) : VGMScanner(format) {}

@@ -5,11 +5,10 @@
  */
 #pragma once
 
-#include "VGMSeq.h"
-#include "SeqTrack.h"
-#include "SeqEvent.h"
 #include "automation/SeqMidiAutomation.h"
-
+#include "SeqEvent.h"
+#include "SeqTrack.h"
+#include "VGMSeq.h"
 class MP2kSeq final : public VGMSeq {
 public:
   MP2kSeq(RawFile *file, uint32_t offset, std::string name = "MP2kSeq");

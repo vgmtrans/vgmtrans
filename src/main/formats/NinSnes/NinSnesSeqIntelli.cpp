@@ -1,9 +1,9 @@
 #include "NinSnesSeq.h"
 
-#include "ScaleConversion.h"
-#include "SeqEvent.h"
 #include "spdlog/fmt/fmt.h"
 
+#include "ScaleConversion.h"
+#include "SeqEvent.h"
 namespace {
 struct NinSnesIntelliPercussionNoteState {
   uint8_t instrumentByte = 0;

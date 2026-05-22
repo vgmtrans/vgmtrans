@@ -5,11 +5,12 @@
  */
 
 #include "SuzukiSnesInstr.h"
-#include "SuzukiSnesSeq.h"
-#include "SNESDSP.h"
-#include "VGMColl.h"
+
 #include <spdlog/fmt/fmt.h>
 
+#include "SNESDSP.h"
+#include "SuzukiSnesSeq.h"
+#include "VGMColl.h"
 namespace {
 constexpr uint8_t kSuzukiSnesSrcnCount = 0x40;
 constexpr uint16_t kSuzukiSnesSd3DrumKitOffset = 16;

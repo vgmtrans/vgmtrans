@@ -5,12 +5,11 @@
  */
 #pragma once
 
-#include "Scanner.h"
-#include "BytePattern.h"
-#include "KonamiVendettaInstr.h"
-
 #include <vector>
 
+#include "BytePattern.h"
+#include "KonamiVendettaInstr.h"
+#include "Scanner.h"
 class KonamiTMNT2Seq;
 class MAMEGame;
 struct MAMERomGroup;

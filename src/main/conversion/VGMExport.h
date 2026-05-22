@@ -6,13 +6,12 @@
 #pragma once
 
 #include "common.h"
+#include "DLSConversion.h"
 #include "DLSFile.h"
+#include "SF2Conversion.h"
 #include "SF2File.h"
 #include "VGMColl.h"
 #include "VGMSeq.h"
-#include "SF2Conversion.h"
-#include "DLSConversion.h"
-
 /*
  * The following free functions implement
  * saving various formats to disk

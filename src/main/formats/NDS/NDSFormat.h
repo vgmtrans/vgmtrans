@@ -2,7 +2,6 @@
 #include "Format.h"
 #include "NDSScanner.h"
 #include "VGMColl.h"
-
 // *********
 // NDSFormat
 // *********

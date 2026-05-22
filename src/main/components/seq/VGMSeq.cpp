@@ -4,17 +4,18 @@
  * refer to the included LICENSE.txt file
  */
 
+#include "VGMSeq.h"
+
 #include <climits>
 #include <ranges>
 
-#include "VGMSeq.h"
-#include "SeqEvent.h"
-#include "SeqSlider.h"
-#include "Options.h"
-#include "Root.h"
 #include "Format.h"
 #include "helper.h"
-
+#include "MidiFile.h"
+#include "Options.h"
+#include "Root.h"
+#include "SeqEvent.h"
+#include "SeqSlider.h"
 VGMSeq::VGMSeq(const std::string &format, RawFile *file, uint32_t offset, uint32_t length, std::string name)
     : VGMFile(format, file, offset, length, std::move(name)),
       midi(nullptr),

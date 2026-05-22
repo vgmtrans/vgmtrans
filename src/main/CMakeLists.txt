@@ -290,6 +290,7 @@ target_sources(vgmtranscore
       Loop.h
       Options.h
       Root.h
+      VGMFileVariant.h
     FILE_SET headers_formats TYPE HEADERS BASE_DIRS formats
     FILES
       formats/Akao/AkaoFormat.h
@@ -313,6 +314,7 @@ target_sources(vgmtranscore
       formats/CPS/CPS1TrackV1.h
       formats/CPS/CPS1TrackV2.h
       formats/CPS/CPS2Format.h
+      formats/CPS/CPS2FormatVersion.h
       formats/CPS/CPS2Instr.h
       formats/CPS/CPS2Scanner.h
       formats/CPS/CPS2Seq.h

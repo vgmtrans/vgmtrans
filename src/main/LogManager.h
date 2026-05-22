@@ -6,35 +6,22 @@
 
 #pragma once
 
-#include <spdlog/spdlog.h>
-#include <spdlog/sinks/base_sink.h>
+#include <memory>
+#include <string>
+#include <utility>
+
 #include <spdlog/fmt/fmt.h>
-#include "Root.h"
-#include "LogItem.h"
+#include <spdlog/spdlog.h>
+
+#include "common.h"
+enum LogLevel : int;
 
 LogLevel convertSpdlogLevel(spdlog::level::level_enum level);
-
-// Custom sink to interface with UI logging
-template<typename Mutex>
-class UISink : public spdlog::sinks::base_sink<Mutex> {
-protected:
-  void sink_it_(const spdlog::details::log_msg& msg) override {
-    auto level = convertSpdlogLevel(msg.level);
-    auto logItem = new LogItem( fmt::to_string(msg.payload), level, msg.source.filename);
-    pRoot->log(logItem);
-    delete logItem;
-  }
-
-  void flush_() override {}
-};
 
 // Singleton LogManager class
 class LogManager {
 public:
-  static LogManager& the() {
-    static LogManager instance;
-    return instance;
-  }
+  static LogManager& the();
 
   template<typename... Args>
   void log(spdlog::level::level_enum lvl, const char* file, int line, fmt::format_string<Args...> fmt, Args&&... args) const {
@@ -52,14 +39,8 @@ public:
 private:
   std::shared_ptr<spdlog::logger> logger_;
 
-  LogManager() {
-    auto ui_sink = std::make_shared<UISink<std::mutex>>();
-    logger_ = std::make_shared<spdlog::logger>("ui_logger", ui_sink);
-    logger_->set_level(spdlog::level::trace);
-    logger_->flush_on(spdlog::level::trace);
-  }
-
-  ~LogManager() = default;
+  LogManager();
+  ~LogManager();
 
   LogManager(const LogManager&) = delete;
   LogManager& operator=(const LogManager&) = delete;

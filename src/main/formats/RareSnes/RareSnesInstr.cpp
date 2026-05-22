@@ -5,10 +5,11 @@
  */
 
 #include "RareSnesInstr.h"
-#include "SNESDSP.h"
-#include "RareSnesFormat.h"
+
 #include <spdlog/fmt/fmt.h>
 
+#include "RareSnesFormat.h"
+#include "SNESDSP.h"
 // ****************
 // RareSnesInstrSet
 // ****************

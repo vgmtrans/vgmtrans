@@ -4,11 +4,11 @@
  * refer to the included LICENSE.txt file
  */
 #pragma once
-#include "common.h"
-#include "Scanner.h"
-#include "BytePattern.h"
 #include <vector>
 
+#include "BytePattern.h"
+#include "common.h"
+#include "Scanner.h"
 class SegSatSeq;
 class SegSatInstrSet;
 

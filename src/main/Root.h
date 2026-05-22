@@ -5,12 +5,15 @@
  */
 #pragma once
 
-#include <variant>
-#include <memory>
+#include <cstdint>
+#include <filesystem>
+#include <string>
+#include <string_view>
+#include <vector>
 
 #include "common.h"
+#include "VGMFileVariant.h"
 #include "VGMTag.h"
-
 class VGMScanner;
 class VGMColl;
 class VGMItem;
@@ -23,15 +26,6 @@ class VGMMiscFile;
 class LogItem;
 
 constexpr int DEFAULT_TOAST_DURATION = 8000;
-
-template <typename T>
-T* variantToType(VGMFileVariant variant) {
-  T* vgmFilePtr = nullptr;
-  std::visit([&vgmFilePtr](auto *vgm) { vgmFilePtr = dynamic_cast<T*>(vgm); }, variant);
-  return vgmFilePtr;
-}
-VGMFile* variantToVGMFile(VGMFileVariant variant);
-VGMFileVariant vgmFileToVariant(VGMFile* vgmfile);
 
 enum class ToastType { Info, Warning, Error, Success };
 

@@ -4,10 +4,10 @@
  * refer to the included LICENSE.txt file
 */
 #pragma once
-#include "Matcher.h"
-#include <vector>
 #include <unordered_map>
+#include <vector>
 
+#include "Matcher.h"
 class VGMSeq;
 class VGMInstrSet;
 class VGMSampColl;

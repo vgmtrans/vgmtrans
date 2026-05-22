@@ -1,8 +1,8 @@
-#include <string.h>
-#include <algorithm>
-#include <filesystem>
 #include "common.h"
 
+#include <algorithm>
+#include <filesystem>
+#include <string.h>
 std::string toUpper(const std::string& input) {
   std::string output = input;
   std::transform(output.begin(), output.end(), output.begin(),

@@ -8,10 +8,10 @@
 #pragma once
 
 #include <map>
+
 #include "VGMInstrSet.h"
 #include "VGMSamp.h"
 #include "VGMSampColl.h"
-
 class MP2kPSGColl;
 
 class MP2kInstrSet final : public VGMInstrSet {

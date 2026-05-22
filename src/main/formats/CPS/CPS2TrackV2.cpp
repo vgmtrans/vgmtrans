@@ -4,9 +4,11 @@
  * refer to the included LICENSE.txt file
  */
 #include "CPS2TrackV2.h"
+
+#include <cstring>
+
+#include "MidiFile.h"
 #include "ScaleConversion.h"
-
-
 CPS2TrackV2::CPS2TrackV2(CPS2Seq *parentSeq, uint32_t offset, uint32_t length)
     : SeqTrack(parentSeq, offset, length) {
   CPS2TrackV2::resetVars();

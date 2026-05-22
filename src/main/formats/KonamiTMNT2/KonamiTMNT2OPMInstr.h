@@ -6,7 +6,6 @@
 #pragma once
 
 #include "YM2151InstrSet.h"
-
 enum KonamiTMNT2FormatVer : u8;
 
 struct konami_tmnt2_ym2151_instr {

@@ -8,7 +8,6 @@
 
 #include "SimpleMatcher.h"
 #include "util/common.h"
-
 class FilenameMatcher : public SimpleMatcher<std::string> {
 public:
   explicit FilenameMatcher(Format *format, bool bRequiresSampColl = false)

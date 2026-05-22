@@ -5,10 +5,9 @@
  */
 #pragma once
 
-#include "Scanner.h"
-
 #include <cstdint>
 
+#include "Scanner.h"
 class NDSScanner : public VGMScanner {
  public:
   explicit NDSScanner(Format* format) : VGMScanner(format) {}

@@ -6,12 +6,12 @@
 
 #pragma once
 
-#include "VGMInstrSet.h"
-#include "VGMSampColl.h"
-#include "VGMRgn.h"
-#include "SegSatFormat.h"
 #include <unordered_set>
 
+#include "SegSatFormat.h"
+#include "VGMInstrSet.h"
+#include "VGMRgn.h"
+#include "VGMSampColl.h"
 //Envelope times in ms, taken from MAME's SCSP implementation
 static const double ARTimes[64] = {100000,100000,8100.0,6900.0,6000.0,4800.0,4000.0,3400.0,3000.0,2400.0,2000.0,1700.0,1500.0,
           1200.0,1000.0,860.0,760.0,600.0,500.0,430.0,380.0,300.0,250.0,220.0,190.0,150.0,130.0,110.0,95.0,

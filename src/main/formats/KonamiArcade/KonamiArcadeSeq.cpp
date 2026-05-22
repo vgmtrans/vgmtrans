@@ -1,8 +1,10 @@
 #include "KonamiArcadeSeq.h"
-#include "KonamiArcadeDefinitions.h"
-#include "ScaleConversion.h"
+
 #include <spdlog/fmt/fmt.h>
 
+#include "KonamiArcadeDefinitions.h"
+#include "MidiFile.h"
+#include "ScaleConversion.h"
 DECLARE_FORMAT(KonamiArcade);
 
 // ***************

@@ -6,18 +6,21 @@
 
 #include "commands.h"
 
-#include <fstream>
-#include <string>
 #include <algorithm>
 #include <cctype>
+#include <filesystem>
+#include <fstream>
+#include <string>
 
-#include <fmt/format.h>
 #include <fmt/color.h>
+#include <fmt/format.h>
 
 #include "DBGVGMRoot.h"
+#include "MidiFile.h"
 #include "RawFile.h"
 #include "SeqTrack.h"
 #include "StitchExport.h"
+#include "VGMExport.h"
 #include "VGMColl.h"
 #include "VGMFile.h"
 #include "VGMInstrSet.h"
@@ -26,7 +29,6 @@
 #include "VGMSamp.h"
 #include "VGMSampColl.h"
 #include "VGMSeq.h"
-#include "VGMExport.h"
 
 std::map<std::string, Command> commandRegistry;
 

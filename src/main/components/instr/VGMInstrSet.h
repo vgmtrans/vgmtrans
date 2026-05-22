@@ -1,9 +1,9 @@
 #pragma once
+#include <optional>
+
 #include "common.h"
 #include "Modulation.h"
 #include "VGMFile.h"
-#include <optional>
-
 class VGMSampColl;
 class VGMInstr;
 class VGMRgn;

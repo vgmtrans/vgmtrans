@@ -1,8 +1,7 @@
 #pragma once
-#include "VGMSeqNoTrks.h"
 #include "SeqTrack.h"
 #include "SonyPS2Format.h"
-
+#include "VGMSeqNoTrks.h"
 #define COMP_KEYON2POLY        1        //compression mode
 
 class SonyPS2Seq:

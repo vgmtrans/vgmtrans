@@ -4,11 +4,13 @@
  * refer to the included LICENSE.txt file
  */
 
-#include "TamSoftPS1Seq.h"
+#include "TamSoftPS1Scanner.h"
 
 #include <spdlog/fmt/fmt.h>
-#include "TamSoftPS1Instr.h"
+
 #include "ScannerManager.h"
+#include "TamSoftPS1Instr.h"
+#include "TamSoftPS1Seq.h"
 namespace vgmtrans::scanners {
 ScannerRegistration<TamSoftPS1Scanner> s_tamsoft_ps1("TamSoftPS1", {"tsq", "tvb"});
 }

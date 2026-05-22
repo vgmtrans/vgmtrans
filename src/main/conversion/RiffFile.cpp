@@ -5,7 +5,6 @@
  */
 
 #include "RiffFile.h"
-
 uint32_t Chunk::size() {
   return 8 + paddedSize(m_size);
 }

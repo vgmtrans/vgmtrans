@@ -4,10 +4,11 @@
  * refer to the included LICENSE.txt file
  */
 
+#include "HudsonSnesScanner.h"
+
 #include "HudsonSnesInstr.h"
 #include "HudsonSnesSeq.h"
 #include "ScannerManager.h"
-
 namespace vgmtrans::scanners {
 ScannerRegistration<HudsonSnesScanner> s_hudson_snes("HudsonSnes", {"spc"});
 }

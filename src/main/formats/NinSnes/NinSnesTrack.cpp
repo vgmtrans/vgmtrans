@@ -1,10 +1,11 @@
 #include "NinSnesSeq.h"
 
-#include "SeqEvent.h"
-#include "ScaleConversion.h"
-#include "spdlog/fmt/fmt.h"
 #include <algorithm>
 
+#include "spdlog/fmt/fmt.h"
+
+#include "ScaleConversion.h"
+#include "SeqEvent.h"
 namespace {
 constexpr size_t MAX_TRACKS = kNinSnesTrackCount;
 constexpr uint8_t SEQ_KEYOFS = 24;

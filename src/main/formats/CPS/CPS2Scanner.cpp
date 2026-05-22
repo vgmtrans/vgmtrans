@@ -3,14 +3,14 @@
  * Licensed under the zlib license,
  * refer to the included LICENSE.txt file
  */
-#include "Root.h"
 #include "CPS2Scanner.h"
-#include "CPS2Seq.h"
-#include "CPS2Instr.h"
-#include "MAMELoader.h"
-#include "CPS2Format.h"
-#include "VGMColl.h"
 
+#include "CPS2Format.h"
+#include "CPS2Instr.h"
+#include "CPS2Seq.h"
+#include "MAMELoader.h"
+#include "Root.h"
+#include "VGMColl.h"
 CPS2FormatVer cps2VersionEnum(const std::string &versionStr) {
     static const std::unordered_map<std::string, CPS2FormatVer> versionMap = {
         {"CPS2_V1.00", CPS2_V100},

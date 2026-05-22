@@ -5,15 +5,15 @@
  */
 #pragma once
 
-#include "VGMTag.h"
+#include <cassert>
+#include <climits>
 #include <cstdint>
-#include <vector>
 #include <map>
 #include <span>
 #include <string>
-#include <cassert>
-#include <climits>
+#include <vector>
 
+#include "VGMTag.h"
 class RawFile;
 class PSFFile;
 

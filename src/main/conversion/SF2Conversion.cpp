@@ -4,16 +4,16 @@
  * refer to the included LICENSE.txt file
 */
 #include "SF2Conversion.h"
+
+#include "LogManager.h"
+#include "ScaleConversion.h"
 #include "SF2File.h"
 #include "SynthFile.h"
 #include "VGMColl.h"
 #include "VGMInstrSet.h"
-#include "VGMSampColl.h"
-#include "VGMSamp.h"
 #include "VGMRgn.h"
-#include "ScaleConversion.h"
-#include "LogManager.h"
-
+#include "VGMSamp.h"
+#include "VGMSampColl.h"
 namespace conversion {
 
 SF2File* createSF2File(const VGMColl& coll) {

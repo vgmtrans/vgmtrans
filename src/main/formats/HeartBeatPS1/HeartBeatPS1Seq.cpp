@@ -8,8 +8,9 @@
 // check seqq2mid tool created by loveemu <https://code.google.com/p/loveemu/>
 
 #include "HeartBeatPS1Seq.h"
-#include "HeartBeatPS1Format.h"
 
+#include "HeartBeatPS1Format.h"
+#include "MidiFile.h"
 DECLARE_FORMAT(HeartBeatPS1)
 
 HeartBeatPS1Seq::HeartBeatPS1Seq(RawFile *file, uint32_t offset, uint32_t length, const std::string &name)

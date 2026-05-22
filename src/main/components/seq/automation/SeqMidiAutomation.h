@@ -5,12 +5,12 @@
  */
 #pragma once
 
-#include "SeqAutomation.h"
 #include <algorithm>
 #include <cmath>
 #include <cstdint>
 #include <utility>
 
+#include "SeqAutomation.h"
 // Stores source-space pitch and converts it to MIDI pitch bend when emitting.
 template <typename PitchType>
 class SeqPitchBendAutomation {

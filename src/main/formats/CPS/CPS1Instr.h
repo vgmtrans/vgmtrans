@@ -1,12 +1,12 @@
 #pragma once
 
-#include "VGMInstrSet.h"
+#include <sstream>
+
 #include "CPS1Scanner.h"
+#include "VGMInstrSet.h"
 #include "VGMSampColl.h"
 #include "YM2151.h"
 #include "YM2151InstrSet.h"
-#include <sstream>
-
 // ******************
 // CPS1SampleInstrSet
 // ******************

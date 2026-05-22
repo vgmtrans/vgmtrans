@@ -4,9 +4,11 @@
  * refer to the included LICENSE.txt file
  */
 
+#include "SuzukiSnesScanner.h"
+
+#include "ScannerManager.h"
 #include "SuzukiSnesInstr.h"
 #include "SuzukiSnesSeq.h"
-#include "ScannerManager.h"
 namespace vgmtrans::scanners {
 ScannerRegistration<SuzukiSnesScanner> s_suzuki_snes("SuzukiSnes", {"spc"});
 }

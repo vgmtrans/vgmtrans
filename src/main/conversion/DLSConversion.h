@@ -6,7 +6,6 @@
 #pragma once
 
 #include <vector>
-
 class DLSFile;
 class VGMInstrSet;
 class VGMSampColl;

@@ -1,5 +1,6 @@
 #include "OrgSeq.h"
 
+#include "MidiFile.h"
 DECLARE_FORMAT(Org);
 
 OrgSeq::OrgSeq(RawFile *file, uint32_t offset)

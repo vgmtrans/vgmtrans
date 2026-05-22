@@ -5,15 +5,15 @@
  */
 #include "KonamiTMNT2Seq.h"
 
+#include <array>
+#include <utility>
+
+#include <spdlog/fmt/fmt.h>
+
 #include "KonamiTMNT2Definitions.h"
 #include "KonamiTMNT2Instr.h"
 #include "ScaleConversion.h"
 #include "VGMColl.h"
-
-#include <utility>
-#include <array>
-#include <spdlog/fmt/fmt.h>
-
 DECLARE_FORMAT(KonamiTMNT2);
 
 namespace {

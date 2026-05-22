@@ -1,5 +1,4 @@
 #include "NDSSeq.h"
-
 DECLARE_FORMAT(NDS);
 
 using namespace std;

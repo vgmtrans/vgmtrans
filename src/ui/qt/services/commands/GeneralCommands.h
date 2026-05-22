@@ -7,6 +7,7 @@
 #pragma once
 
 #include "MdiArea.h"
+#include "Root.h"
 #include "services/commands/Command.h"
 #include "VGMFile.h"
 #include "helper.h"

@@ -7,7 +7,6 @@
 #pragma once
 
 #include "FileLoader.h"
-
 class RSNLoader: public FileLoader {
 public:
   RSNLoader() = default;

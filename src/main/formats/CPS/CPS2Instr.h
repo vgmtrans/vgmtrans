@@ -1,11 +1,13 @@
 #pragma once
+
+#include <cstdint>
+#include <string>
+
+#include "CPS2FormatVersion.h"
 #include "VGMInstrSet.h"
-#include "VGMSampColl.h"
 #include "VGMMiscFile.h"
-
+#include "VGMSampColl.h"
 class CPS2Instr;
-
-enum CPS2FormatVer: uint8_t;
 
 // ex: Punisher
 struct qs_prog_info_ver_101 {

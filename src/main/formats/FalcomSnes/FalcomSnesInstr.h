@@ -1,8 +1,7 @@
 #pragma once
+#include "FalcomSnesFormat.h"
 #include "VGMInstrSet.h"
 #include "VGMRgn.h"
-#include "FalcomSnesFormat.h"
-
 class FalcomSnesInstrSet;
 class FalcomSnesInstr;
 class FalcomSnesRgn;

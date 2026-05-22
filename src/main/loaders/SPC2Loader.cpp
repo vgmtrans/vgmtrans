@@ -11,7 +11,7 @@
 #include "common.h"
 #include "LoaderManager.h"
 #include "LogManager.h"
-
+#include "RawFile.h"
 // SPC2 file specs available here: http://blog.kevtris.org/blogfiles/spc2_file_specification_v1.txt
 
 namespace vgmtrans::loaders {

@@ -4,12 +4,13 @@
  * refer to the included LICENSE.txt file
  */
 
-#include <vector>
+#include "NeverlandSnesScanner.h"
+
 #include <map>
+#include <vector>
 
 #include "NeverlandSnesSeq.h"
 #include "ScannerManager.h"
-
 namespace vgmtrans::scanners {
 ScannerRegistration<NeverlandSnesScanner> s_neverland_snes("NeverlandSnes", {"spc"});
 }

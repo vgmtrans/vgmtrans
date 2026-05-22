@@ -12,7 +12,6 @@
 
 #include "LogManager.h"
 #include "MidiFile.h"
-
 namespace conversion {
 namespace {
 

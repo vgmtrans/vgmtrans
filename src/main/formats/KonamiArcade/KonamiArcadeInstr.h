@@ -5,10 +5,10 @@
  */
 #pragma once
 
-#include "VGMSampColl.h"
-#include "VGMInstrSet.h"
 #include <array>
 
+#include "VGMInstrSet.h"
+#include "VGMSampColl.h"
 // Mystic Warrior driver sample info
 
 enum KonamiArcadeFormatVer : uint8_t;

@@ -5,7 +5,6 @@
  */
 #pragma once
 #include "Scanner.h"
-
 class FFTScanner : public VGMScanner {
  public:
   explicit FFTScanner(Format* format) : VGMScanner(format) {}

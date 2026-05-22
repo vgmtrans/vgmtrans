@@ -3,8 +3,8 @@
 // Also, thanks to Antires for his ADPCM decompression routine.
 
 #include "PSXSPU.h"
-#include "formats/PS1/PS1Format.h"
 
+#include "formats/PS1/PS1Format.h"
 using namespace std;
 
 

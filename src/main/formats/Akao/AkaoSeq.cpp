@@ -4,12 +4,14 @@
  * refer to the included LICENSE.txt file
  */
 
-#include <bitset>
 #include "AkaoSeq.h"
-#include "AkaoInstr.h"
-#include "LogManager.h"
+
+#include <bitset>
+
 #include "spdlog/fmt/fmt.h"
 
+#include "AkaoInstr.h"
+#include "LogManager.h"
 DECLARE_FORMAT(Akao);
 
 using namespace std;

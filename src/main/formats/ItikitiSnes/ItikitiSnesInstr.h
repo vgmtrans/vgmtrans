@@ -1,9 +1,8 @@
 #pragma once
-#include "VGMInstrSet.h"
-#include "VGMSampColl.h"
-#include "VGMRgn.h"
 #include "ItikitiSnesFormat.h"
-
+#include "VGMInstrSet.h"
+#include "VGMRgn.h"
+#include "VGMSampColl.h"
 class ItikitiSnesInstrSet;
 class ItikitiSnesInstr;
 class ItikitiSnesRgn;

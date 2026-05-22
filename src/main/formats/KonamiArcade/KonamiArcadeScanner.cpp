@@ -1,12 +1,11 @@
-#include "KonamiArcadeDefinitions.h"
 #include "KonamiArcadeScanner.h"
-#include "KonamiArcadeSeq.h"
+
+#include "KonamiArcadeDefinitions.h"
 #include "KonamiArcadeInstr.h"
-#include "VGMColl.h"
+#include "KonamiArcadeSeq.h"
 #include "MAMELoader.h"
+#include "VGMColl.h"
 #include "VGMMiscFile.h"
-
-
 KonamiArcadeFormatVer konamiArcadeVersionEnum(const std::string &versionStr) {
   static const std::unordered_map<std::string, KonamiArcadeFormatVer> versionMap = {
     {"MysticWarrior", MysticWarrior},

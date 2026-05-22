@@ -1,9 +1,8 @@
 #pragma once
-#include "VGMSeq.h"
-#include "SeqTrack.h"
 #include "CPS1Seq.h"
 #include "CPS2Format.h"
-
+#include "SeqTrack.h"
+#include "VGMSeq.h"
 class CPS1TrackV1
     : public SeqTrack {
 public:

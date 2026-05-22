@@ -5,10 +5,12 @@
  */
 
 #include "PSF2Loader.h"
-#include <zlib.h>
-#include "LogManager.h"
-#include "components/PSFFile.h"
 
+#include <zlib.h>
+
+#include "components/PSFFile.h"
+#include "LogManager.h"
+#include "RawFile.h"
 namespace vgmtrans::loaders {
 LoaderRegistration<PSF2Loader> _psf2("PSF2");
 }

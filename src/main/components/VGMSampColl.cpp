@@ -5,11 +5,10 @@
  */
 #include "VGMSampColl.h"
 
-#include "VGMSamp.h"
-#include "Root.h"
 #include "Format.h"
 #include "helper.h"
-
+#include "Root.h"
+#include "VGMSamp.h"
 // ***********
 // VGMSampColl
 // ***********

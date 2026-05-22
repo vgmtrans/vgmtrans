@@ -5,10 +5,11 @@
  */
 
 #include "WD.h"
-#include "SquarePS2Format.h"
-#include "PSXSPU.h"
+
 #include <spdlog/fmt/fmt.h>
 
+#include "PSXSPU.h"
+#include "SquarePS2Format.h"
 static constexpr int finetune_table[] = {
     0x10000, 0x1000E, 0x1001D, 0x1002C, 0x1003B, 0x10049, 0x10058, 0x10067, 0x10076, 0x10085,
     0x10094, 0x100A2, 0x100B1, 0x100C0, 0x100CF, 0x100DE, 0x100ED, 0x100FB, 0x1010A, 0x10119,

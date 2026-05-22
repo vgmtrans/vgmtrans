@@ -4,9 +4,8 @@
  * refer to the included LICENSE.txt file
  */
 #pragma once
-#include "Scanner.h"
 #include "BytePattern.h"
-
+#include "Scanner.h"
 class FalcomSnesScanner : public VGMScanner {
  public:
   explicit FalcomSnesScanner(Format* format) : VGMScanner(format) {}

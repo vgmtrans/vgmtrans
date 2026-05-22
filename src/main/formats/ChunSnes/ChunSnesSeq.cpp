@@ -4,9 +4,11 @@
  * refer to the included LICENSE.txt file
  */
 #include "ChunSnesSeq.h"
-#include "ScaleConversion.h"
+
 #include <spdlog/fmt/fmt.h>
 
+#include "MidiFile.h"
+#include "ScaleConversion.h"
 DECLARE_FORMAT(ChunSnes);
 
 static constexpr int MAX_TRACKS = 8;

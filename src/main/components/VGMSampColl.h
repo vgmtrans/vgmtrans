@@ -2,7 +2,6 @@
 
 #include "VGMFile.h"
 #include "VGMSamp.h"
-
 class VGMInstrSet;
 class VGMSamp;
 

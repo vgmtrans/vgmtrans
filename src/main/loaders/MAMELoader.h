@@ -5,12 +5,17 @@
  */
 #pragma once
 
-#include <sstream>
-#include <unzip.h>
+#include <cassert>
+#include <cstdint>
 #include <list>
+#include <map>
+#include <sstream>
+#include <string>
+#include <utility>
+
+#include <unzip.h>
 
 #include "components/FileLoader.h"
-
 class VirtFile;
 
 enum class LoadMethod { APPEND, APPEND_SWAP16, DEINTERLACE, DEINTERLACE_PAIRS };

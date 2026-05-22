@@ -5,7 +5,6 @@
  */
 #pragma once
 #include "VGMSeqNoTrks.h"
-
 class HeartBeatPS1Seq:
     public VGMSeqNoTrks {
  public:

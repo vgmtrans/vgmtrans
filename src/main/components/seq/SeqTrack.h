@@ -11,12 +11,13 @@
 #include <unordered_set>
 #include <utility>
 #include <vector>
-#include "VGMItem.h"
-#include "VGMSeq.h"
+
 #include <spdlog/common.h>
+
 #include "LogManager.h"
 #include "SynthType.h"
-
+#include "VGMItem.h"
+#include "VGMSeq.h"
 class VGMSeq;
 class SeqEvent;
 class MidiTrack;

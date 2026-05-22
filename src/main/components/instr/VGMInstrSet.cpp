@@ -5,16 +5,17 @@
  */
 
 #include "VGMInstrSet.h"
-#include <spdlog/fmt/fmt.h>
-#include "VGMSampColl.h"
-#include "VGMSamp.h"
-#include "VGMRgn.h"
-#include "VGMColl.h"
-#include "Root.h"
-#include "Format.h"
-#include "LogManager.h"
-#include "helper.h"
 
+#include <spdlog/fmt/fmt.h>
+
+#include "Format.h"
+#include "helper.h"
+#include "LogManager.h"
+#include "Root.h"
+#include "VGMColl.h"
+#include "VGMRgn.h"
+#include "VGMSamp.h"
+#include "VGMSampColl.h"
 // ***********
 // VGMInstrSet
 // ***********

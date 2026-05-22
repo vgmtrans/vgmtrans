@@ -5,12 +5,12 @@
  */
 
 #include "KonamiVendettaInstr.h"
-#include "KonamiTMNT2Instr.h"
-#include "KonamiTMNT2Format.h"
+
 #include "KonamiAdpcm.h"
+#include "KonamiTMNT2Format.h"
+#include "KonamiTMNT2Instr.h"
 #include "LogManager.h"
 #include "VGMRgn.h"
-
 KonamiVendettaSampleInstrSet::KonamiVendettaSampleInstrSet(
   RawFile *file,
   u32 offset,

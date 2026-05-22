@@ -1,8 +1,9 @@
-#include "formats/PS1/Vab.h"
-#include "Format.h"			//include PS1-specific format header file when it is ready
-#include "PSXSPU.h"
-#include "formats/PS1/PS1Format.h"
+#include "Vab.h"
 
+#include "Format.h"			//include PS1-specific format header file when it is ready
+#include "formats/PS1/PS1Format.h"
+#include "formats/PS1/Vab.h"
+#include "PSXSPU.h"
 using namespace std;
 
 Vab::Vab(RawFile *file, uint32_t offset)

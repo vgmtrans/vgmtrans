@@ -1,7 +1,9 @@
 #include "NamcoSnesSeq.h"
-#include "ScaleConversion.h"
+
 #include <spdlog/fmt/fmt.h>
 
+#include "MidiFile.h"
+#include "ScaleConversion.h"
 DECLARE_FORMAT(NamcoSnes);
 
 static constexpr int MAX_TRACKS = 8;

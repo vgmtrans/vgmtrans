@@ -5,13 +5,14 @@
 */
 
 #include "FilegroupMatcher.h"
-#include "Format.h"
-#include "VGMSeq.h"
-#include "VGMInstrSet.h"
-#include "VGMSampColl.h"
-#include "VGMColl.h"
+
 #include <regex>
 
+#include "Format.h"
+#include "VGMColl.h"
+#include "VGMInstrSet.h"
+#include "VGMSampColl.h"
+#include "VGMSeq.h"
 FilegroupMatcher::FilegroupMatcher(Format *format) : Matcher(format) {}
 
 

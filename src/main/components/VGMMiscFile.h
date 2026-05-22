@@ -6,7 +6,6 @@
 #pragma once
 
 #include "VGMFile.h"
-
 // ***********
 // VGMMiscFile
 // ***********

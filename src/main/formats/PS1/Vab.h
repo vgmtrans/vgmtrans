@@ -1,9 +1,8 @@
 #pragma once
 #include "VGMInstrSet.h"
-#include "VGMSampColl.h"
 #include "VGMRgn.h"
 #include "VGMSamp.h"
-
+#include "VGMSampColl.h"
 // VAB Header
 struct VabHdr {
   int32_t form;

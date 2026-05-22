@@ -4,11 +4,13 @@
  * refer to the included LICENSE.txt file
  */
 
-#include <vector>
-#include "AkaoSeq.h"
-#include "AkaoInstr.h"
-#include "PSXSPU.h"
+#include "AkaoFormat.h"
 
+#include <vector>
+
+#include "AkaoInstr.h"
+#include "AkaoSeq.h"
+#include "PSXSPU.h"
 // Generate maps to help route the relationships to and from articulations, especially for games
 // that load more than one sample collection at a time.
 std::tuple<std::unordered_map<int, AkaoArt *>, std::unordered_map<int, int>,

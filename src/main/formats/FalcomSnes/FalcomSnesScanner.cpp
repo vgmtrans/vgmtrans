@@ -4,10 +4,11 @@
  * refer to the included LICENSE.txt file
  */
 
-#include "FalcomSnesSeq.h"
-#include "FalcomSnesInstr.h"
-#include "ScannerManager.h"
+#include "FalcomSnesScanner.h"
 
+#include "FalcomSnesInstr.h"
+#include "FalcomSnesSeq.h"
+#include "ScannerManager.h"
 namespace vgmtrans::scanners {
 ScannerRegistration<FalcomSnesScanner> s_falcom_snes("FalcomSnes", {"spc"});
 }

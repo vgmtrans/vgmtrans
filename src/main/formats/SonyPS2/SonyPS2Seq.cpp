@@ -1,5 +1,4 @@
 #include "SonyPS2Seq.h"
-
 DECLARE_FORMAT(SonyPS2);
 
 using namespace std;

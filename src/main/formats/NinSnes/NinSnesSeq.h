@@ -2,13 +2,13 @@
 #include <algorithm>
 #include <array>
 #include <optional>
-#include "VGMSeq.h"
+
 #include "automation/SeqAutomation.h"
-#include "SeqTrack.h"
 #include "NinSnesFormat.h"
 #include "NinSnesScanResult.h"
 #include "NinSnesSeqState.h"
-
+#include "SeqTrack.h"
+#include "VGMSeq.h"
 struct NinSnesProfile;
 class NinSnesSection;
 class NinSnesSectionTrackItem;

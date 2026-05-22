@@ -6,8 +6,8 @@
 #include "GraphResSnesInstr.h"
 
 #include <spdlog/fmt/fmt.h>
-#include "SNESDSP.h"
 
+#include "SNESDSP.h"
 // ********************
 // GraphResSnesInstrSet
 // ********************

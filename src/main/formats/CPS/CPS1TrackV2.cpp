@@ -4,10 +4,10 @@
  * refer to the included LICENSE.txt file
  */
 #include "CPS1TrackV2.h"
+
 #include "CPSCommon.h"
 #include "ScaleConversion.h"
 #include "SeqEvent.h"
-
 // ***********
 // CPS1TrackV2
 // ***********

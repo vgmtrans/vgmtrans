@@ -7,7 +7,6 @@
 #pragma once
 
 #include "common.h"
-
 enum LoopMeasure {
   LM_SAMPLES,
   LM_BYTES

@@ -1,8 +1,7 @@
 #pragma once
+#include "GraphResSnesFormat.h"
 #include "VGMInstrSet.h"
 #include "VGMRgn.h"
-#include "GraphResSnesFormat.h"
-
 // ********************
 // GraphResSnesInstrSet
 // ********************

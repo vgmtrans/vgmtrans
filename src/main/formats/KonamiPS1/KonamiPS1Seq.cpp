@@ -8,6 +8,7 @@
 
 #include <spdlog/fmt/fmt.h>
 
+#include "MidiFile.h"
 DECLARE_FORMAT(KonamiPS1);
 
 //  ************

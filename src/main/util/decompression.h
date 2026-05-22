@@ -7,10 +7,12 @@
 #pragma once
 
 #define ZLIB_CONST
-#include <zlib.h>
-#include <stdexcept>
 #include <array>
+#include <cassert>
+#include <stdexcept>
+#include <vector>
 
+#include <zlib.h>
 template <typename T>
 std::vector<unsigned char> zdecompress(T src) {
   std::vector<unsigned char> result;

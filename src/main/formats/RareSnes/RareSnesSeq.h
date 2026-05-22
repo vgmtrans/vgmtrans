@@ -1,9 +1,8 @@
 #pragma once
-#include "VGMSeq.h"
-#include "SeqTrack.h"
-#include "SeqEvent.h"
 #include "RareSnesFormat.h"
-
+#include "SeqEvent.h"
+#include "SeqTrack.h"
+#include "VGMSeq.h"
 #define RARESNES_RPTNESTMAX 8
 
 enum RareSnesSeqEventType {

@@ -7,8 +7,8 @@
 #include "HudsonSnesInstr.h"
 
 #include <spdlog/fmt/fmt.h>
-#include "SNESDSP.h"
 
+#include "SNESDSP.h"
 // ******************
 // HudsonSnesInstrSet
 // ******************

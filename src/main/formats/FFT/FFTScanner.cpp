@@ -4,11 +4,11 @@
  * refer to the included LICENSE.txt file
  */
 
-#include "FFTSeq.h"
-#include "FFTInstr.h"
 #include "FFTScanner.h"
-#include "ScannerManager.h"
 
+#include "FFTInstr.h"
+#include "FFTSeq.h"
+#include "ScannerManager.h"
 namespace vgmtrans::scanners {
 ScannerRegistration<FFTScanner> s_fft_snes("FFT");
 }

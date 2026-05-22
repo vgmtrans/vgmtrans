@@ -11,6 +11,7 @@
 #include "bass.h"
 #include "bassmidi.h"
 #include "VGMColl.h"
+#include "MidiFile.h"
 #include "SF2File.h"
 #include "VGMSeq.h"
 #include "LogManager.h"

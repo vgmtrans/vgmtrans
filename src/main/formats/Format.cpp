@@ -5,10 +5,10 @@
  */
 
 #include "Format.h"
-#include "Scanner.h"
-#include "Matcher.h"
-#include "VGMColl.h"
 
+#include "Matcher.h"
+#include "Scanner.h"
+#include "VGMColl.h"
 FormatMap &Format::registry() {
   static FormatMap registry;
   return registry;
@@ -30,7 +30,7 @@ Format *Format::formatFromName(const std::string &name) {
   return (*findIt).second;
 }
 
-bool Format::onNewFile(std::variant<VGMSeq *, VGMInstrSet *, VGMSampColl *, VGMMiscFile *> file) {
+bool Format::onNewFile(VGMFileVariant file) {
   if (!matcher) {
     return false;
   }
@@ -41,7 +41,7 @@ VGMColl *Format::newCollection() {
   return new VGMColl();
 }
 
-bool Format::onCloseFile(std::variant<VGMSeq *, VGMInstrSet *, VGMSampColl *, VGMMiscFile *> file) {
+bool Format::onCloseFile(VGMFileVariant file) {
   if (!matcher) {
     return false;
   }

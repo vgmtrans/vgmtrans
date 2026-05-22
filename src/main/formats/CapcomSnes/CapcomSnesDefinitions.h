@@ -6,7 +6,6 @@
 #pragma once
 
 #include "Modulation.h"
-
 namespace capcom_snes {
 
 inline constexpr double kLfoStepHz = 1000.0 / 16384.0;

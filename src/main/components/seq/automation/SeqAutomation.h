@@ -5,11 +5,11 @@
  */
 #pragma once
 
-#include "SeqMotion.h"
 #include <algorithm>
 #include <cstdint>
 #include <utility>
 
+#include "SeqMotion.h"
 // Wraps SeqLinearMotion with apply callbacks. This layer is still MIDI-agnostic;
 // callers decide what applying a value means.
 template <typename ValueType>

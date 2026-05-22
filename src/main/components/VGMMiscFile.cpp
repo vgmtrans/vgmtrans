@@ -5,9 +5,9 @@
  */
 
 #include "VGMMiscFile.h"
-#include "Root.h"
-#include "Format.h"
 
+#include "Format.h"
+#include "Root.h"
 // ***********
 // VGMMiscFile
 // ***********

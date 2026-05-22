@@ -4,12 +4,12 @@
  * refer to the included LICENSE.txt file
  */
 #pragma once
-#include "VGMInstrSet.h"
 #include <set>
-#include "VGMSampColl.h"
-#include "VGMRgn.h"
-#include "AkaoFormat.h"
 
+#include "AkaoFormat.h"
+#include "VGMInstrSet.h"
+#include "VGMRgn.h"
+#include "VGMSampColl.h"
 struct AkaoInstrDatLocation {
   uint32_t instrAllOffset;
   uint32_t instrDatOffset;

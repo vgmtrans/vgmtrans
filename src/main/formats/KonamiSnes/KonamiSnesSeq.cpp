@@ -4,14 +4,16 @@
  * refer to the included LICENSE.txt file
  */
 #include "KonamiSnesSeq.h"
-#include "KonamiSnesInstr.h"
-#include "KonamiSnesVibrato.h"
-#include "ScaleConversion.h"
-#include "automation/SeqTrackAutomation.h"
-#include "spdlog/fmt/fmt.h"
+
 #include <algorithm>
 #include <cmath>
 
+#include "spdlog/fmt/fmt.h"
+
+#include "automation/SeqTrackAutomation.h"
+#include "KonamiSnesInstr.h"
+#include "KonamiSnesVibrato.h"
+#include "ScaleConversion.h"
 DECLARE_FORMAT(KonamiSnes);
 
 namespace {

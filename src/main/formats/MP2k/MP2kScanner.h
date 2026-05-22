@@ -6,10 +6,10 @@
 
 #pragma once
 
-#include "Scanner.h"
-#include "common.h"
 #include <optional>
 
+#include "common.h"
+#include "Scanner.h"
 /* Scanner for the MP2K (aka Sappy) GBA format */
 class MP2kScanner final : public VGMScanner {
 public:

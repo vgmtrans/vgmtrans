@@ -1,7 +1,8 @@
 #include "RareSnesSeq.h"
-#include "ScaleConversion.h"
+
 #include "spdlog/fmt/fmt.h"
 
+#include "ScaleConversion.h"
 using namespace std;
 
 DECLARE_FORMAT(RareSnes);

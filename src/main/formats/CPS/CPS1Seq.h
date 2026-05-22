@@ -2,7 +2,6 @@
 
 #include "CPS1Scanner.h"
 #include "VGMSeq.h"
-
 class CPS1Seq:
     public VGMSeq {
 public:

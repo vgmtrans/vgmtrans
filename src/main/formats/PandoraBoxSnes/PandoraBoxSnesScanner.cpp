@@ -4,10 +4,11 @@
  * refer to the included LICENSE.txt file
  */
 
-#include "PandoraBoxSnesSeq.h"
-#include "PandoraBoxSnesInstr.h"
-#include "ScannerManager.h"
+#include "PandoraBoxSnesScanner.h"
 
+#include "PandoraBoxSnesInstr.h"
+#include "PandoraBoxSnesSeq.h"
+#include "ScannerManager.h"
 namespace vgmtrans::scanners {
 ScannerRegistration<PandoraBoxSnesScanner> s_pandorabox_snes("PandoraBoxSnes", {"spc"});
 }

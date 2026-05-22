@@ -4,9 +4,10 @@
  * refer to the included LICENSE.txt file
  */
 
-#include "SoftCreatSnesSeq.h"
-#include "ScannerManager.h"
+#include "SoftCreatSnesScanner.h"
 
+#include "ScannerManager.h"
+#include "SoftCreatSnesSeq.h"
 namespace vgmtrans::scanners {
 ScannerRegistration<SoftCreatSnesScanner> s_softcreat_snes("SoftCreatSnes", {"spc"});
 }

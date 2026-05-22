@@ -1,6 +1,5 @@
 #pragma once
 #include "VGMSeqNoTrks.h"
-
 class PS1Seq:
     public VGMSeqNoTrks {
  public:

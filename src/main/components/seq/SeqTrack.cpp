@@ -10,12 +10,11 @@
 #include <cmath>
 
 #include "automation/SeqMidiAutomation.h"
-#include "SeqEvent.h"
-#include "ScaleConversion.h"
+#include "MidiFile.h"
 #include "Options.h"
+#include "ScaleConversion.h"
+#include "SeqEvent.h"
 #include "VGMSeqNoTrks.h"
-
-
 namespace {
 constexpr uint16_t maxLevelForResolution(Resolution res) {
   return res == Resolution::FourteenBit ? 16383 : 127;

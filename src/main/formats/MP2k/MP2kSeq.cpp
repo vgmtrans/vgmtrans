@@ -14,10 +14,11 @@
 #include "MP2kSeq.h"
 
 #include <array>
+
 #include <spdlog/fmt/fmt.h>
+
 #include "MidiFile.h"
 #include "MP2kFormat.h"
-
 DECLARE_FORMAT(MP2k);
 
 constexpr uint8_t kMp2kModTypeVibrato = 0;

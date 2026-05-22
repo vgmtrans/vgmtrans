@@ -8,7 +8,6 @@
 #include <algorithm>
 #include <memory>
 #include <string_view>
-
 struct OptionStore {
   struct Group {
     virtual ~Group() = default;

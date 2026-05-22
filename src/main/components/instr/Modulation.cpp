@@ -5,11 +5,12 @@
  */
 
 #include "Modulation.h"
+
 #include <algorithm>
 #include <cmath>
+
 #include "LogManager.h"
 #include "ScaleConversion.h"
-
 namespace {
 
 constexpr double kSf2LfoReferenceHz = 8.176;

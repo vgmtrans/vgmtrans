@@ -3,18 +3,19 @@
  * Licensed under the zlib license
  * See the included LICENSE for more information
 */
-#include <cassert>
 #include "DLSConversion.h"
-#include "VGMInstrSet.h"
-#include "VGMRgn.h"
-#include "VGMSampColl.h"
-#include "VGMSamp.h"
-#include "VGMColl.h"
+
+#include <cassert>
+
 #include "DLSFile.h"
+#include "LogManager.h"
 #include "Options.h"
 #include "ScaleConversion.h"
-#include "LogManager.h"
-
+#include "VGMColl.h"
+#include "VGMInstrSet.h"
+#include "VGMRgn.h"
+#include "VGMSamp.h"
+#include "VGMSampColl.h"
 namespace conversion {
 
 void unpackSampColl(DLSFile &dls, const VGMSampColl *sampColl, std::vector<VGMSamp *> &finalSamps) {

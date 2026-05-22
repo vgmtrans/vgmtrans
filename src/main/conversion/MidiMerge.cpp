@@ -25,7 +25,6 @@
 #include "VGMColl.h"
 #include "VGMInstrSet.h"
 #include "VGMSeq.h"
-
 namespace conversion {
 
 namespace {

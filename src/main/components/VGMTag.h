@@ -7,10 +7,9 @@
 #pragma once
 
 #include <cstdint>
-#include <string>
 #include <map>
+#include <string>
 #include <vector>
-
 class VGMTag {
 public:
   VGMTag() = default;

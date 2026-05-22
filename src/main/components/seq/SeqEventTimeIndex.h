@@ -10,8 +10,8 @@
 #include <limits>
 #include <unordered_map>
 #include <vector>
-#include "common.h"
 
+#include "common.h"
 class SeqEvent;
 
 struct SeqTimedEvent {

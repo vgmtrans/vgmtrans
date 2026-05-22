@@ -6,12 +6,11 @@
 
 #pragma once
 
-#include <vector>
-#include <map>
-#include <list>
-#include <string>
 #include <cstdint>
-
+#include <list>
+#include <map>
+#include <string>
+#include <vector>
 template <class T>
 void deleteVect(std::vector<T *> &vect) {
   for (auto p : vect) {

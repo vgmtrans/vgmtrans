@@ -5,9 +5,8 @@
  */
 
 #pragma once
-#include "Scanner.h"
 #include "BytePattern.h"
-
+#include "Scanner.h"
 class AsciiShuichiSnesScanner : public VGMScanner {
  public:
   explicit AsciiShuichiSnesScanner(Format* format) : VGMScanner(format) {}

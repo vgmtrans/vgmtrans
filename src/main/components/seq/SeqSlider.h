@@ -1,6 +1,5 @@
 #pragma once
 #include "SeqTrack.h"
-
 class ISeqSlider {
  public:
   virtual ~ISeqSlider() { }

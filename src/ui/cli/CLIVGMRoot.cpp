@@ -4,19 +4,20 @@
  * See the included LICENSE for more information
  */
 
-#include <iostream>
 #include <filesystem>
+#include <iostream>
 
-#include <version.h>
-#include "Format.h"
 #include "CLIVGMRoot.h"
+#include <version.h>
+#include "DLSConversion.h"
 #include "DLSFile.h"
+#include "Format.h"
+#include "LogItem.h"
 #include "LogManager.h"
+#include "SF2Conversion.h"
 #include "SF2File.h"
 #include "VGMColl.h"
 #include "VGMSeq.h"
-#include "SF2Conversion.h"
-#include "DLSConversion.h"
 
 using namespace std;
 namespace fs = std::filesystem;

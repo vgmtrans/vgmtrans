@@ -1,10 +1,10 @@
 #include "VGMItem.h"
+
+#include "helper.h"
 #include "LogManager.h"
 #include "RawFile.h"
-#include "VGMFile.h"
 #include "Root.h"
-#include "helper.h"
-
+#include "VGMFile.h"
 VGMItem::VGMItem() : type(Type::Unknown), m_vgmfile(nullptr), m_offset(0), m_length(0) {
 }
 

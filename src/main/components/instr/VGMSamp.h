@@ -5,12 +5,12 @@
  */
 
 #pragma once
-#include "VGMItem.h"
-#include "Loop.h"
 #include <cstddef>
 #include <filesystem>
 #include <vector>
 
+#include "Loop.h"
+#include "VGMItem.h"
 class VGMSampColl;
 
 enum class BPS : int {

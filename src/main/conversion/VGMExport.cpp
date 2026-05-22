@@ -3,18 +3,19 @@
  * Licensed under the zlib license,
  * refer to the included LICENSE.txt file
  */
-#include <spdlog/fmt/fmt.h>
-#include <fstream>
-#include <algorithm>
-
 #include "VGMExport.h"
-#include "helper.h"
-#include "VGMInstrSet.h"
-#include "VGMSampColl.h"
-#include "VGMSamp.h"
-#include "VGMColl.h"
-#include "SynthFile.h"
 
+#include <algorithm>
+#include <fstream>
+
+#include <spdlog/fmt/fmt.h>
+
+#include "helper.h"
+#include "SynthFile.h"
+#include "VGMColl.h"
+#include "VGMInstrSet.h"
+#include "VGMSamp.h"
+#include "VGMSampColl.h"
 namespace fs = std::filesystem;
 
 namespace conversion {
