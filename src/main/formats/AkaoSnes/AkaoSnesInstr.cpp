@@ -11,14 +11,6 @@
 #include "AkaoSnesModulation.h"
 #include "SNESDSP.h"
 
-namespace {
-
-void addAkaoSnesVibratoExportHandling(VGMInstr *instr, AkaoSnesVersion version) {
-  instr->addStandardVibratoHandling(akao_snes::modulation::vibratoSpec(version));
-}
-
-}  // namespace
-
 // ****************
 // AkaoSnesInstrSet
 // ****************
@@ -143,7 +135,7 @@ bool AkaoSnesInstr::loadInstr() {
     return false;
   }
 
-  addAkaoSnesVibratoExportHandling(this, version);
+  addStandardVibratoHandling(akao_snes::modulation::vibratoSpec(version));
 
   uint16_t addrSampStart = readShort(offDirEnt);
 
@@ -185,7 +177,7 @@ bool AkaoSnesDrumKit::loadInstr() {
     return false;
   }
 
-  addAkaoSnesVibratoExportHandling(this, version);
+  addStandardVibratoHandling(akao_snes::modulation::vibratoSpec(version));
 
   uint8_t NOTE_DUR_TABLE_SIZE;
   switch (version) {

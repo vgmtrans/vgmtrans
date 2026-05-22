@@ -16,9 +16,9 @@
  * lives in AkaoSnesModulation.h.
  *
  * V1/FF4, V3, and V4 have per-note fade-in behavior that restarts on normal
- * keyed notes and is not restarted by ties/slur/legato. V2 uses a different
- * operand order for the three-byte LFO setup command. V3/V4 share the later
- * command shape, with V4's rate byte treating zero as 256 frames.
+ * keyed notes and is not restarted by ties/slur/legato. V2 is the only
+ * supported version that orders the three-byte LFO setup as depth, delay, rate;
+ * the others use delay, rate, depth.
  */
 
 void AkaoSnesSeq::syncTempoDependentTracks() {
@@ -80,8 +80,6 @@ void AkaoSnesTrack::applyVibrato(uint32_t offset, uint32_t length, const LfoPara
 }
 
 void AkaoSnesTrack::clearVibrato(uint32_t offset, uint32_t length) {
-  const auto *parent = static_cast<AkaoSnesSeq*>(parentSeq);
-
   addGenericEvent(offset, length, "Vibrato Off", "", Type::Vibrato);
 
   vibrato.setDepth(0);

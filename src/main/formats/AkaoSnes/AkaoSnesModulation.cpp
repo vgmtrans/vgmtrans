@@ -259,6 +259,7 @@ uint32_t driverFramesToTicks(double frames, uint8_t tempo) {
 }
 
 constexpr double kMaxV1DelaySeconds = 254.0 * 256.0 / (8000.0 / kMinTimer0Frequency);
+constexpr double kMaxV4DelaySeconds = 254.0 * 256.0 / ((8000.0 / kMaxTimer0Frequency) * 1.0);
 constexpr double kMaxDelaySeconds = 255.0 * 256.0 / ((8000.0 / kMaxTimer0Frequency) * 1.0);
 const double kMaxV1VibratoDepthCents = v1VibratoDepthCentsForHighByte(255);
 const double kMaxV2VibratoDepthCents = 1200.0 * std::log2(1.0 + (15.0 * 127.0 / 32768.0));
@@ -279,8 +280,13 @@ double maxVibratoDepthCents(AkaoSnesVersion version) {
 }
 
 double maxDelaySeconds(AkaoSnesVersion version) {
-  // Export range ceiling for the delay controller; V1 cannot represent literal $ff as a delay.
-  return (version == AKAOSNES_V1) ? kMaxV1DelaySeconds : kMaxDelaySeconds;
+  // Export range ceiling for the delay controller; V1 wraps $ff and V4 decrements
+  // the active delay during the setup tick, so neither uses the full 255 ticks.
+  if (version == AKAOSNES_V1) {
+    return kMaxV1DelaySeconds;
+  }
+
+  return (version == AKAOSNES_V4) ? kMaxV4DelaySeconds : kMaxDelaySeconds;
 }
 
 }  // namespace
