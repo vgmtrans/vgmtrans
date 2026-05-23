@@ -26,10 +26,6 @@
 
 #define F_EPSILON 0.00001
 
-#define FORWARD_DECLARE_TYPEDEF_STRUCT(type) \
-    struct _##type;    \
-    typedef _##type type
-
 /* Type aliases to save some typing */
 using size_t = std::size_t;
 

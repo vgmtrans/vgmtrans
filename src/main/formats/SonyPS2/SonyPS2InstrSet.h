@@ -5,9 +5,6 @@
 #include "VGMRgn.h"
 #include "SonyPS2Format.h"
 
-//FORWARD_DECLARE_TYPEDEF_STRUCT(ProgParam);
-
-
 #define SCEHD_LFO_NON        0
 #define SCEHD_LFO_SAWUP      1
 #define SCEHD_LFO_SAWDOWN    2
