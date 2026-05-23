@@ -25,6 +25,9 @@ constexpr uint8_t kPsgSquareCount = 4;
 constexpr uint8_t kPsgNoiseIndex = kPsgSquareCount;
 constexpr uint8_t kPsgUnityKey = 69;
 constexpr size_t kGbaRomPointerMask = 0x03FFFFFF;
+constexpr uint8_t kMP2kTypeSplit = 0x40;
+constexpr uint8_t kMP2kTypeRhythm = 0x80;
+constexpr uint8_t kMP2kAggregateTypeMask = kMP2kTypeSplit | kMP2kTypeRhythm;
 
 double mp2kAttackTimeSeconds(int attack) {
   if (attack <= 0) {
@@ -78,6 +81,28 @@ bool isGbaRomPointer(size_t pointer) {
   constexpr size_t kGbaRomAddressMax = 0x0C000000;
   size_t address_space = pointer & kGbaRomAddressMask;
   return address_space >= kGbaRomAddressMin && address_space <= kGbaRomAddressMax;
+}
+
+bool hasAggregateType(uint8_t type) {
+  return (type & kMP2kAggregateTypeMask) != 0;
+}
+
+bool isPlausibleAggregateReference(uint8_t type, uint8_t key, uint8_t len, uint8_t panOrSweep,
+                                   uint32_t tablePointer, uint32_t splitTablePointer) {
+  const uint8_t aggregateType = type & kMP2kAggregateTypeMask;
+  if (aggregateType == 0 || (type & ~kMP2kAggregateTypeMask) != 0) {
+    return false;
+  }
+
+  if (key != 0 || len != 0 || panOrSweep != 0 || !isGbaRomPointer(tablePointer)) {
+    return false;
+  }
+
+  if ((aggregateType & kMP2kTypeSplit) && !isGbaRomPointer(splitTablePointer)) {
+    return false;
+  }
+
+  return true;
 }
 }
 
@@ -155,6 +180,12 @@ int MP2kInstrSet::makeOrGetSample(size_t sample_pointer) {
   auto pitch = rawFile()->get<u32>(sample_pointer + 4);
   auto loop_pos = rawFile()->get<u32>(sample_pointer + 8);
   auto len = rawFile()->get<u32>(sample_pointer + 12);
+
+  if (loop != 0x00 && loop != 0x01 && loop != 0x40) {
+    L_WARN("Invalid MP2k sample header at {:#x}: marker {:#x}", sample_pointer, loop);
+    return -1;
+  }
+
   /* Filter out samples with invalid lengths */
   if (len < 16 || len > 0x3FFFFF) {
     return -1;
@@ -162,7 +193,7 @@ int MP2kInstrSet::makeOrGetSample(size_t sample_pointer) {
 
   /* Rectify illegal loop point */
   if (loop_pos > len - 8) {
-    L_WARN("Illegal loop positioning: {}", loop_pos);
+    L_WARN("Instrument {} (ofs {:#x}): illegal loop positioning {} (bounds: 0-{})", name(), sample_pointer, loop_pos, len - 8);
     loop_pos = 0;
     loop = 0;
   }
@@ -350,12 +381,19 @@ bool MP2kInstr::loadInstr() {
         u32 off = base_pointer + 12 * index_list[i];
 
         auto type = rawFile()->get<u8>(off);
-        if (type & (0x40 | 0x80)) {
-          L_DEBUG("Recursive split/rhythm instrument in key-split");
+        uint8_t keynum = rawFile()->get<u8>(off + 1);
+        uint8_t len = rawFile()->get<u8>(off + 2);
+        uint8_t pan = rawFile()->get<u8>(off + 3);
+        uint32_t raw_sample_pointer = rawFile()->get<u32>(off + 4);
+        uint32_t adsr_or_split_table = rawFile()->get<u32>(off + 8);
+        if (hasAggregateType(type)) {
+          if (isPlausibleAggregateReference(type, keynum, len, pan, raw_sample_pointer,
+                                            adsr_or_split_table)) {
+            L_DEBUG("Skipping nested split/rhythm instrument in key-split at {:#x}", off);
+          }
           continue;
         }
 
-        u32 raw_sample_pointer = rawFile()->get<u32>(off + 4);
         u32 sample_pointer = raw_sample_pointer & 0x3ffffff;
         uint8_t cgb_type = type & 0x07;
 
@@ -370,20 +408,22 @@ bool MP2kInstr::loadInstr() {
             VGMRgn *rgn = addRgn(off, 12, sample_id, split_list[i], split_list[i + 1] - 1);
 
             // rgn->sampCollPtr = static_cast<MP2kInstrSet *>(parInstrSet)->sampColl;
-            setADSR(rgn, rawFile()->get<u32>(off + 8));
+            setADSR(rgn, adsr_or_split_table);
           }
         } else if (cgb_type == 1 || cgb_type == 2) {
           uint8_t duty = static_cast<uint8_t>(raw_sample_pointer & 0x03);
-          addPsgRgn(psgSampColl, duty, rawFile()->get<u32>(off + 8), split_list[i],
-                    split_list[i + 1] - 1);
+          addPsgRgn(psgSampColl, duty, adsr_or_split_table, split_list[i], split_list[i + 1] - 1);
         } else if (cgb_type == 3) {
+          if (!isGbaRomPointer(raw_sample_pointer)) {
+            continue;
+          }
           if (auto sample_id = psgSampColl.makeOrGetProgrammableWave(raw_sample_pointer);
               sample_id != -1) {
-            addPsgRgn(psgSampColl, sample_id, rawFile()->get<u32>(off + 8), split_list[i],
+            addPsgRgn(psgSampColl, sample_id, adsr_or_split_table, split_list[i],
                       split_list[i + 1] - 1);
           }
         } else if (cgb_type == 4) {
-          addPsgRgn(psgSampColl, kPsgNoiseIndex, rawFile()->get<u32>(off + 8), split_list[i],
+          addPsgRgn(psgSampColl, kPsgNoiseIndex, adsr_or_split_table, split_list[i],
                     split_list[i + 1] - 1);
         }
       }
@@ -403,10 +443,23 @@ bool MP2kInstr::loadInstr() {
 
         u32 type = rawFile()->get<u8>(off);
         u32 keynum = rawFile()->get<u8>(off + 1);
+        u32 len = rawFile()->get<u8>(off + 2);
         u32 pan = rawFile()->get<u8>(off + 3);
 
         u32 raw_sample_pointer = rawFile()->get<u32>(off + 4);
+        u32 adsr_or_split_table = rawFile()->get<u32>(off + 8);
         u32 sample_pointer = raw_sample_pointer & 0x3ffffff;
+
+        if (hasAggregateType(type)) {
+          if (isPlausibleAggregateReference(static_cast<uint8_t>(type),
+                                            static_cast<uint8_t>(keynum),
+                                            static_cast<uint8_t>(len),
+                                            static_cast<uint8_t>(pan), raw_sample_pointer,
+                                            adsr_or_split_table)) {
+            L_DEBUG("Skipping nested split/rhythm instrument in rhythm table at {:#x}", off);
+          }
+          continue;
+        }
 
         if ((type & 0x0f) == 0 || (type & 0x0f) == 8) {
           if (sample_pointer == 0 || !isGbaRomPointer(raw_sample_pointer)) {
@@ -426,16 +479,19 @@ bool MP2kInstr::loadInstr() {
             int rootkey = 60 + int(round(delta_note));
 
             rgn->setUnityKey(rootkey - keynum + key);
-            setADSR(rgn, rawFile()->get<u32>(off + 8));
+            setADSR(rgn, adsr_or_split_table);
           }
         } else if ((type & 0x0f) == 3 || (type & 0x0f) == 11) {
+          if (!isGbaRomPointer(raw_sample_pointer)) {
+            continue;
+          }
           if (auto sample_id = psgSampColl.makeOrGetProgrammableWave(raw_sample_pointer);
               sample_id != -1) {
-            auto rgn = addPsgRgn(psgSampColl, sample_id, rawFile()->get<u32>(off + 8), key, key);
+            auto rgn = addPsgRgn(psgSampColl, sample_id, adsr_or_split_table, key, key);
             rgn->setPan(pan);
           }
         } else if ((type & 0x0f) == 4 || (type & 0x0f) == 12) {
-          auto rgn = addPsgRgn(psgSampColl, kPsgNoiseIndex, rawFile()->get<u32>(off + 8), key, key);
+          auto rgn = addPsgRgn(psgSampColl, kPsgNoiseIndex, adsr_or_split_table, key, key);
           rgn->setPan(pan);
         }
       }
