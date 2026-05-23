@@ -24,8 +24,6 @@
 #define MEGABYTE (KILOBYTE*1024)
 #define GIGABYTE (MEGABYTE*1024)
 
-#define F_EPSILON 0.00001
-
 /* Type aliases to save some typing */
 using size_t = std::size_t;
 
