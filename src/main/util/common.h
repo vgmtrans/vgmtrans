@@ -21,7 +21,6 @@
 
 
 #define KILOBYTE 1024
-#define MEGABYTE (KILOBYTE*1024)
 
 /* Type aliases to save some typing */
 using size_t = std::size_t;
