@@ -13,12 +13,6 @@
 #include <variant>
 #include <filesystem>
 
-#ifdef __FILE_NAME__
-#define THIS_FILE_NAME __FILE_NAME__
-#else
-#define THIS_FILE_NAME ""
-#endif
-
 /* Type aliases to save some typing */
 using size_t = std::size_t;
 
