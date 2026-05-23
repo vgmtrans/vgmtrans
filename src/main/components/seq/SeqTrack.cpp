@@ -331,7 +331,7 @@ void SeqTrack::addModSourceNoItem(ModSource source, uint8_t value) const {
 
 void SeqTrack::addModDestSourceNoItem(ModDest destination, uint8_t value) const {
   const auto target = ConversionOptions::the().midiModulationSourceTarget();
-  addModSourceNoItem(ConversionOptions::the().modSourceFor(target, destination), value);
+  addModSourceNoItem(ConversionOptions::the().modSourceMap(target).sourceFor(destination), value);
 }
 
 void SeqTrack::addLfoModulationEvent(ModDest destination,

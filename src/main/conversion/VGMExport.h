@@ -41,7 +41,7 @@ bool saveAsOriginal(const RawFile& rawfile, const std::filesystem::path& filepat
 
 template <Target options>
 void saveAs(const VGMColl &coll, const std::filesystem::path &dir_path) {
-  const ConversionOptions::ScopedMidiModulationSourceTarget scopedModulationTarget(
+  const ScopedMidiModulationSourceTarget scopedModulationTarget(
       (options & Target::DLS) != 0 ? ModulationSourceTarget::DLS : ModulationSourceTarget::SoundFont);
 
   auto filename = makeSafeFileName(coll.name());
