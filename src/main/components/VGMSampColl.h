@@ -30,15 +30,16 @@ class VGMSampColl : public VGMFile {
   bool shouldLoadOnInstrSetMatch() const { return m_should_load_on_instr_set_match; }
 
 public:
-  uint32_t sampDataOffset;        // offset of the beginning of the sample data.  Used for rgn->sampOffset matching
-  VGMInstrSet *parInstrSet;
+  uint32_t sampDataOffset = 0;        // offset of the beginning of the sample data.  Used for rgn->sampOffset matching
+  VGMInstrSet *parInstrSet = nullptr;
   std::vector<VGMSamp *> samples;
 
 protected:
   void setShouldLoadOnInstrSetMatch(bool should_load) { m_should_load_on_instr_set_match = should_load; }
 
 private:
-  bool m_should_load_on_instr_set_match, bLoaded;
+  bool m_should_load_on_instr_set_match = false;
+  bool bLoaded = false;
 };
 
 namespace conversion {
