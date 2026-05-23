@@ -49,7 +49,6 @@ class SynthInstr {
   void addModulator(const SynthModulator& modulator);
   void addModulator(ModSource source, ModDest destination, ModAmount amount);
   void addModulator(ModDest destination, ModAmount amount);
-  void addModulator(ModDest sourceMappingKey, ModDest destination, ModAmount amount);
   [[nodiscard]] const std::vector<SynthModulator>& modulators() const { return m_modulators; }
   void addGenerator(const SynthGenerator& generator);
   void addGenerator(ModDest destination, ModAmount amount);

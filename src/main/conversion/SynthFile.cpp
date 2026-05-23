@@ -115,15 +115,6 @@ void SynthInstr::addModulator(ModDest destination, ModAmount amount) {
   m_modulators.emplace_back(destination, amount.value());
 }
 
-void SynthInstr::addModulator(ModDest sourceMappingKey, ModDest destination,
-                              ModAmount amount) {
-  if (!amount.valid()) {
-    return;
-  }
-
-  m_modulators.emplace_back(sourceMappingKey, destination, amount.value());
-}
-
 void SynthInstr::addGenerator(const SynthGenerator& generator) {
   m_generators.push_back(generator);
 }

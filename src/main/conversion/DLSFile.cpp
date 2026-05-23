@@ -319,7 +319,7 @@ ModSource sourceForModulator(const SynthModulator& modulator) {
   return modulator.source.value_or(
       ConversionOptions::the()
           .modSourceMap(ModulationSourceTarget::DLS)
-          .sourceFor(modulator.sourceMappingKey));
+          .sourceFor(modulator.destination));
 }
 
 int32_t toDls16Dot16Scale(int32_t amount) {

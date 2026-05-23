@@ -187,14 +187,6 @@ void VGMInstr::addModulator(ModDest destination, ModAmount amount) {
   m_modulators.emplace_back(destination, amount.value());
 }
 
-void VGMInstr::addModulator(ModDest sourceMappingKey, ModDest destination, ModAmount amount) {
-  if (!amount.valid()) {
-    return;
-  }
-
-  m_modulators.emplace_back(sourceMappingKey, destination, amount.value());
-}
-
 bool VGMInstr::updateModulatorAmount(ModSource source, ModDest destination, ModAmount amount) {
   if (!amount.valid()) {
     return false;
@@ -267,29 +259,19 @@ void VGMInstr::addStandardTremoloHandling(double maxDepthDb,
 }
 
 void VGMInstr::addStandardTremoloHandling(const TremoloModulationSpec& spec) {
-  const ModDest lfoFreqSourceDestination = spec.lfoMode == TremoloLfoMode::ShareVibratoLfo
-      ? ModDest::VibLfoFreq
-      : ModDest::ModLfoFreq;
-  const ModDest lfoDelaySourceDestination = spec.lfoMode == TremoloLfoMode::ShareVibratoLfo
-      ? ModDest::VibLfoDelay
-      : ModDest::ModLfoDelay;
-
   addGenerator(ModDest::ModLfoFreq, ModAmount::fromHertz(spec.minHertz));
-  addModulator(lfoFreqSourceDestination,
-               ModDest::ModLfoFreq,
+  addModulator(ModDest::ModLfoFreq,
                ModAmount::fromHertzRange(spec.minHertz, spec.maxHertz));
   if (spec.delayRange.has_value()) {
     const double minDelaySeconds = clampSecondsRangeMinimum(spec.delayRange->minSeconds);
     addGenerator(ModDest::ModLfoDelay, ModAmount::fromSeconds(minDelaySeconds));
-    addModulator(lfoDelaySourceDestination,
-                 ModDest::ModLfoDelay,
+    addModulator(ModDest::ModLfoDelay,
                  ModAmount::fromSecondsRange(minDelaySeconds, spec.delayRange->maxSeconds));
   }
   addModulator(ModDest::ModLfoToVol,
                ModAmount::fromDecibels(spec.maxDepthDb));
   if (spec.gainMode == TremoloGainMode::NoBoost) {
-    addModulator(ModDest::ModLfoToVol,
-                 ModDest::InitialAtten,
+    addModulator(ModDest::InitialAtten,
                  ModAmount::fromDecibels(spec.maxDepthDb));
   }
 }

@@ -30,18 +30,12 @@ enum class TremoloGainMode {
   NoBoost,
 };
 
-enum class TremoloLfoMode {
-  Independent,
-  ShareVibratoLfo,
-};
-
 struct TremoloModulationSpec {
   double maxDepthDb;
   double minHertz;
   double maxHertz;
   TremoloGainMode gainMode = TremoloGainMode::BipolarAroundNominal;
   std::optional<DelayRange> delayRange = std::nullopt;
-  TremoloLfoMode lfoMode = TremoloLfoMode::Independent;
 };
 
 enum class ModulationSourceTarget : uint8_t {
@@ -147,27 +141,16 @@ uint8_t midiValueForSecondsInRange(double seconds, double minSeconds, double max
 struct SynthModulator {
   SynthModulator(ModSource explicitSource, ModDest destination, int32_t amount)
       : source(explicitSource),
-        sourceMappingKey(destination),
         destination(destination),
         amount(amount) {}
 
   SynthModulator(ModDest destination, int32_t amount)
       : source(std::nullopt),
-        sourceMappingKey(destination),
         destination(destination),
         amount(amount) {}
 
-  SynthModulator(ModDest sourceMappingKey, ModDest destination, int32_t amount)
-      : source(std::nullopt),
-        sourceMappingKey(sourceMappingKey),
-        destination(destination),
-        amount(amount) {}
-
-  // If source is empty, exporters resolve it from settings using sourceMappingKey.
-  // sourceMappingKey usually matches destination; it differs for shared controls, for example
-  // when ModLfoFreq uses VibLfoFreq because of TremoloLfoMode::ShareVibratoLfo.
+  // If source is empty, exporters resolve it from settings using destination.
   std::optional<ModSource> source;
-  ModDest sourceMappingKey;
   ModDest destination;
 
   // Amount units are the shared SF2/DLS semantic units for the destination:

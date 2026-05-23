@@ -384,7 +384,7 @@ int convertTremoloDepthToMidiValue(int sourceDepth, CapcomSnesVersion version) {
 
 uint8_t convertLfoRateByteToMidiVal(uint8_t freqByte) {
   if (freqByte == 0)
-    return 0; // this is a special-case that disables vibrato
+    return 0; // this is a special-case that disables the LFO
 
   // The driver stores rate as a multiple of a fixed LFO step; the shared helper
   // handles the Hz -> 7-bit MIDI mapping that matches the instrument modulator.
@@ -821,14 +821,17 @@ bool CapcomSnesTrack::readEvent() {
             desc = fmt::format("Amount: {:d}", lfoAmount);
             addGenericEvent(beginOffset, curOffset - beginOffset, "Tremolo Depth", desc, Type::Lfo);
             break;
-          case 2:
+          case 2: {
             // LFO Rate
             handleLfoRateChange(lfoAmount);
+            const uint8_t lfoRateMidiValue = convertLfoRateByteToMidiVal(lfoAmount);
             addVibratoFrequency(beginOffset,
                                 curOffset - beginOffset,
-                                convertLfoRateByteToMidiVal(lfoAmount),
+                                lfoRateMidiValue,
                                 "LFO Rate");
+            addTremoloFrequencyNoItem(lfoRateMidiValue);
             break;
+          }
           case 3:
             // Flag to reset LFO phase on note activation. 1 enables. 0 disables. V1: off by default, V2+: on by default
             // SoundFont 2 and DLS always reset LFO phase when a note is activated. This cannot be changed.

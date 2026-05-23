@@ -44,7 +44,7 @@ ModSource sourceForModulator(const SynthModulator& modulator) {
   return modulator.source.value_or(
       ConversionOptions::the()
           .modSourceMap(ModulationSourceTarget::SoundFont)
-          .sourceFor(modulator.sourceMappingKey));
+          .sourceFor(modulator.destination));
 }
 
 SFGenerator sf2GeneratorForModDestination(ModDest destination) {
