@@ -397,12 +397,11 @@ void KonamiSnesTrack::syncVibratoRateAndDelay() {
                                               konami_snes::vibrato::rateFactor(parentSeq.version, vibrato.rate(), parentSeq.tempo));
   }
 
-  addChannelPressureNoItem(convertVibratoRateToMidi(parentSeq.version,
-                                                    vibrato.rate(),
-                                                    parentSeq.tempo,
-                                                    parentSeq.maxVibratoRateFactor));
-  addControllerEventNoItem(konami_snes::kVibratoDelayController,
-                           convertVibratoDelayToMidi(parentSeq.version, vibrato.delay(), parentSeq.tempo));
+  addVibratoFrequencyNoItem(convertVibratoRateToMidi(parentSeq.version,
+                                                     vibrato.rate(),
+                                                     parentSeq.tempo,
+                                                     parentSeq.maxVibratoRateFactor));
+  addVibratoDelayNoItem(convertVibratoDelayToMidi(parentSeq.version, vibrato.delay(), parentSeq.tempo));
 }
 
 
@@ -430,7 +429,7 @@ void KonamiSnesTrack::onTickBegin() {
   panFade.tickRaw([this](int32_t) { applyCurrentPan(); });
   volumeFade.tickRaw([this](int32_t) { applyCurrentVolume(); });
 
-  advanceSynthLfoFadeToModulation(vibrato, 8, [this](int32_t depth) {
+  advanceVibratoDepthFade(vibrato, 8, [this](int32_t depth) {
     return convertVibratoDepthToMidi(seq().version,
                                      vibrato.depth(),
                                      static_cast<uint16_t>(depth),
@@ -835,7 +834,7 @@ bool KonamiSnesTrack::readEvent() {
       if (!isTiedNote && vibrato.hasReusableFade() &&
           konami_snes::vibrato::isActive(seq().version, vibrato.rate(), vibrato.depth())) {
         vibrato.beginReusableFadeToConfiguredDepth(8);
-        setSynthLfoModulationDepth(vibrato, 0);
+        emitVibratoDepth(vibrato, 0);
       }
 
       if (isTiedNote) {
@@ -1034,13 +1033,13 @@ bool KonamiSnesTrack::readEvent() {
                                                 parentSeq.maxVibratoDepth)
                     : 0);
       vibrato.setCurrentDepthPreservingMotion(deferDepthForFade ? 0 : vibrato.configuredDepth(8));
-      setSynthLfoModulationDepth(vibrato, midiDepth, true);
+      emitVibratoDepth(vibrato, midiDepth, true);
       if (active) {
         syncVibratoRateAndDelay();
       }
       else {
-        addChannelPressureNoItem(0);
-        addControllerEventNoItem(konami_snes::kVibratoDelayController, 0);
+        addVibratoFrequencyNoItem(0);
+        addVibratoDelayNoItem(0);
       }
       break;
     }

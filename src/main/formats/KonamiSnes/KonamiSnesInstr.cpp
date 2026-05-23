@@ -249,10 +249,7 @@ KonamiSnesInstr::~KonamiSnesInstr() {
 }
 
 bool KonamiSnesInstr::loadInstr() {
-  // Konami vibrato is driven per track from E4:
-  //   CC1  -> depth
-  //   ch. pressure -> final effective vibrato frequency
-  //   CC93 -> final effective vibrato delay
+  // Konami vibrato is driven per track from E4 through the configured vibrato MIDI sources.
   addStandardVibratoHandling(konami_snes::vibrato::modulationSpec(version));
 
   if (percussion) {

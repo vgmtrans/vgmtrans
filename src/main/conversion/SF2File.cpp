@@ -8,6 +8,7 @@
 #include <limits>
 #include "SF2File.h"
 #include "version.h"
+#include "Options.h"
 #include "VGMInstrSet.h"
 #include "SynthFile.h"
 #include "ScaleConversion.h"
@@ -20,27 +21,28 @@ SFModulator sf2SourceForModSource(ModSource source) {
   constexpr uint16_t midiContinuousController = 1u << 7;
   constexpr uint16_t bipolar = 1u << 9;
 
+  if (auto controller = midiControllerForModSource(source)) {
+    return static_cast<SFModulator>(midiContinuousController | *controller);
+  }
+
   switch (source) {
-    case ModSource::ModWheel:
-      return static_cast<SFModulator>(midiContinuousController | 1);
     case ModSource::ChannelPressure:
       return 13;
     case ModSource::PolyPressure:
       return 10;
     case ModSource::PitchWheel:
       return static_cast<SFModulator>(bipolar | 14);
-    case ModSource::Volume:
-      return static_cast<SFModulator>(midiContinuousController | 7);
-    case ModSource::Pan:
-      return static_cast<SFModulator>(midiContinuousController | 10);
-    case ModSource::Expression:
-      return static_cast<SFModulator>(midiContinuousController | 11);
-    case ModSource::ReverbSend:
-      return static_cast<SFModulator>(midiContinuousController | 91);
-    case ModSource::ChorusSend:
-      return static_cast<SFModulator>(midiContinuousController | 93);
+    case ModSource::None:
+      return 0;
+    default:
+      break;
   }
   return 0;
+}
+
+ModSource sourceForModulator(const SynthModulator& modulator) {
+  return modulator.source.value_or(
+      ConversionOptions::the().modSourceFor(ModulationSourceTarget::SoundFont, modulator.sourceMappingKey));
 }
 
 SFGenerator sf2GeneratorForModDestination(ModDest destination) {
@@ -346,7 +348,7 @@ SF2File::SF2File(SynthFile *synthfile)
   for (const auto instr : synthfile->vInstrs) {
     for (const auto& modulator : instr->modulators()) {
       sfInstModList instModList{};
-      instModList.sfModSrcOper = sf2SourceForModSource(modulator.source);
+      instModList.sfModSrcOper = sf2SourceForModSource(sourceForModulator(modulator));
       instModList.sfModDestOper = sf2GeneratorForModDestination(modulator.destination);
       instModList.modAmount = sf2AmountForModulator(modulator);
       instModList.sfModAmtSrcOper = 0;

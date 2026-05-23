@@ -18,7 +18,6 @@ DECLARE_FORMAT(CapcomSnes);
 #define MAX_TRACKS  8
 #define SEQ_PPQN    48
 #define SEQ_KEYOFS  0
-static constexpr uint8_t kTremoloDepthController = 93;
 
 // volume table
 const uint8_t CapcomSnesSeq::volTable[] = {
@@ -181,10 +180,10 @@ void CapcomSnesTrack::resetVars() {
 
 void CapcomSnesTrack::setLfoOutputsEnabled(bool enabled) {
   if (vibrato.depth() != 0) {
-    setSynthLfoModulationDepth(vibrato, vibrato.outputDepthWhen(enabled));
+    emitVibratoDepth(vibrato, vibrato.outputDepthWhen(enabled));
   }
   if (tremolo.depth() != 0) {
-    setSynthLfoControllerDepth(tremolo, kTremoloDepthController, tremolo.outputDepthWhen(enabled));
+    emitTremoloDepth(tremolo, tremolo.outputDepthWhen(enabled));
   }
 }
 
@@ -192,9 +191,9 @@ void CapcomSnesTrack::addVibratoDepthEvent(uint32_t offset, uint32_t length, uin
   bool isNewOffset = onEvent(offset, length);
   vibrato.setDepth(depth);
 
-  // Add the event to the UI, but, but don't emit the MIDI event while the driver has the LFO disabled.
+  // Record the stored depth, but emit zero while the driver has the LFO disabled.
   recordSeqEvent<ModulationSeqEvent>(isNewOffset, getTime(), depth, offset, length, "Vibrato Depth");
-  setSynthLfoModulationDepth(vibrato, vibrato.outputDepthWhen(areLfoOutputsEnabled()), true);
+  emitVibratoDepth(vibrato, vibrato.outputDepthWhen(areLfoOutputsEnabled()), true);
 }
 
 void CapcomSnesTrack::handleLfoRateChange(uint8_t lfoRateByte) {
@@ -818,20 +817,17 @@ bool CapcomSnesTrack::readEvent() {
           case 1:
             // Tremolo Depth
             tremolo.setDepth(convertTremoloDepthToMidiValue(lfoAmount, parentSeq->version));
-            setSynthLfoControllerDepth(tremolo,
-                                       kTremoloDepthController,
-                                       tremolo.outputDepthWhen(areLfoOutputsEnabled()),
-                                       true);
+            emitTremoloDepth(tremolo, tremolo.outputDepthWhen(areLfoOutputsEnabled()), true);
             desc = fmt::format("Amount: {:d}", lfoAmount);
             addGenericEvent(beginOffset, curOffset - beginOffset, "Tremolo Depth", desc, Type::Lfo);
             break;
           case 2:
             // LFO Rate
             handleLfoRateChange(lfoAmount);
-            addChannelPressure(beginOffset,
-                               curOffset - beginOffset,
-                               convertLfoRateByteToMidiVal(lfoAmount),
-                               "LFO Rate");
+            addVibratoFrequency(beginOffset,
+                                curOffset - beginOffset,
+                                convertLfoRateByteToMidiVal(lfoAmount),
+                                "LFO Rate");
             break;
           case 3:
             // Flag to reset LFO phase on note activation. 1 enables. 0 disables. V1: off by default, V2+: on by default

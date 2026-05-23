@@ -13,6 +13,7 @@
 #include <vector>
 #include "VGMItem.h"
 #include "VGMSeq.h"
+#include "Modulation.h"
 #include <spdlog/common.h>
 #include "LogManager.h"
 #include "SynthType.h"
@@ -175,16 +176,27 @@ protected:
   bool applyPitchBendAutomation(SeqPitchBendAutomation<PitchType>& automation);
   template <typename PitchType>
   void resetPitchBendAutomation(SeqPitchBendAutomation<PitchType>& automation, uint16_t defaultRangeCents);
-  bool setSynthLfoModulationDepth(SeqSynthLfoAutomation& automation, uint8_t depth, bool force = false);
-  bool setSynthLfoControllerDepth(SeqSynthLfoAutomation& automation, uint8_t controller, uint8_t depth,
-                                  bool force = false);
+  bool emitVibratoDepth(SeqSynthLfoAutomation& automation, uint8_t depth, bool force = false);
+  bool emitTremoloDepth(SeqSynthLfoAutomation& automation, uint8_t depth, bool force = false);
   template <typename ConvertDepth>
-  SeqMotionTick<int32_t> advanceSynthLfoFadeToModulation(SeqSynthLfoAutomation& automation,
-                                                         uint8_t fractionalBits,
-                                                         ConvertDepth&& convertDepth);
+  SeqMotionTick<int32_t> advanceVibratoDepthFade(SeqSynthLfoAutomation& automation,
+                                                 uint8_t fractionalBits,
+                                                 ConvertDepth&& convertDepth);
+  template <typename ConvertDepth>
+  SeqMotionTick<int32_t> advanceTremoloDepthFade(SeqSynthLfoAutomation& automation,
+                                                 uint8_t fractionalBits,
+                                                 ConvertDepth&& convertDepth);
 
 private:
   void addControllerSlide(u32 dur, u16 &prevVal, u16 targVal, uint8_t (*scalerFunc)(uint8_t), void (MidiTrack::*insertFunc)(uint8_t, uint8_t, uint32_t)) const;
+  void addModSourceNoItem(ModSource source, uint8_t value) const;
+  void addModDestSourceNoItem(ModDest destination, uint8_t value) const;
+  void addLfoModulationEvent(ModDest destination,
+                             uint32_t offset,
+                             uint32_t length,
+                             uint8_t value,
+                             const std::string& eventName,
+                             Type type);
   double applyPanVolumeCorrection(double level, LevelController controller) const;
   void addLevelNoItem(double level, LevelController controller, Resolution res, int absTime = -1);
   void reapplyStoredLevelNoItem(LevelController controller, int absTime = -1);
@@ -275,6 +287,18 @@ private:
   void addBreath(uint32_t offset, uint32_t length, uint8_t depth, const std::string &sEventName = "Breath Depth");
   void addBreathNoItem(uint8_t depth);
   void insertBreath(uint32_t offset, uint32_t length, uint8_t depth, uint32_t absTime, const std::string &sEventName = "Breath Depth");
+  void addVibratoDepth(uint32_t offset, uint32_t length, uint8_t depth, const std::string& sEventName = "Vibrato Depth");
+  void addVibratoDepthNoItem(uint8_t depth) const;
+  void addVibratoFrequency(uint32_t offset, uint32_t length, uint8_t frequency, const std::string& sEventName = "Vibrato Frequency");
+  void addVibratoFrequencyNoItem(uint8_t frequency) const;
+  void addVibratoDelay(uint32_t offset, uint32_t length, uint8_t delay, const std::string& sEventName = "Vibrato Delay");
+  void addVibratoDelayNoItem(uint8_t delay) const;
+  void addTremoloDepth(uint32_t offset, uint32_t length, uint8_t depth, const std::string& sEventName = "Tremolo Depth");
+  void addTremoloDepthNoItem(uint8_t depth) const;
+  void addTremoloFrequency(uint32_t offset, uint32_t length, uint8_t frequency, const std::string& sEventName = "Tremolo Frequency");
+  void addTremoloFrequencyNoItem(uint8_t frequency) const;
+  void addTremoloDelay(uint32_t offset, uint32_t length, uint8_t delay, const std::string& sEventName = "Tremolo Delay");
+  void addTremoloDelayNoItem(uint8_t delay) const;
 
   void addSustainEvent(uint32_t offset, uint32_t length, uint8_t depth, const std::string &sEventName = "Sustain");
   void insertSustainEvent(uint32_t offset, uint32_t length, uint8_t depth, uint32_t absTime, const std::string &sEventName = "Sustain");

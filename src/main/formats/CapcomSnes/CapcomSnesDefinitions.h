@@ -6,6 +6,7 @@
 #pragma once
 
 #include "Modulation.h"
+#include <optional>
 
 namespace capcom_snes {
 
@@ -31,6 +32,8 @@ inline TremoloModulationSpec tremoloModulationSpec() {
       kTremoloBaseHz,
       kTremoloMaxHz,
       TremoloGainMode::NoBoost,
+      std::nullopt,
+      TremoloLfoMode::ShareVibratoLfo,
   };
 }
 

@@ -301,26 +301,72 @@ void SeqTrack::addControllerSlide(uint32_t dur,
   prevVal = targVal;
 }
 
-// Emit synth vibrato depth through CC1/modulation if it changed.
-bool SeqTrack::setSynthLfoModulationDepth(SeqSynthLfoAutomation& automation, uint8_t depth, bool force) {
+void SeqTrack::addModSourceNoItem(ModSource source, uint8_t value) const {
+  if (readMode != READMODE_CONVERT_TO_MIDI) {
+    return;
+  }
+
+  if (auto controller = midiControllerForModSource(source)) {
+    pMidiTrack->addControllerEvent(channel, *controller, value);
+    return;
+  }
+
+  switch (source) {
+    case ModSource::ChannelPressure:
+      pMidiTrack->addChannelPressure(channel, value);
+      break;
+    case ModSource::PitchWheel: {
+      const auto bend = static_cast<int16_t>(std::clamp<int>((static_cast<int>(value) * 128) - 8192,
+                                                             -8192,
+                                                             8191));
+      pMidiTrack->addPitchBend(channel, bend);
+      break;
+    }
+    case ModSource::None:
+    case ModSource::PolyPressure:
+    default:
+      break;
+  }
+}
+
+void SeqTrack::addModDestSourceNoItem(ModDest destination, uint8_t value) const {
+  const auto target = ConversionOptions::the().midiModulationSourceTarget();
+  addModSourceNoItem(ConversionOptions::the().modSourceFor(target, destination), value);
+}
+
+void SeqTrack::addLfoModulationEvent(ModDest destination,
+                                     uint32_t offset,
+                                     uint32_t length,
+                                     uint8_t value,
+                                     const std::string& eventName,
+                                     Type type) {
+  const bool isNewOffset = onEvent(offset, length);
+  recordSeqEvent<SeqEvent>(isNewOffset,
+                           getTime(),
+                           offset,
+                           length,
+                           eventName,
+                           type,
+                           fmt::format("Value: {:d}", value));
+  addModDestSourceNoItem(destination, value);
+}
+
+// Emit synth vibrato depth through the configured ModDest source if it changed.
+bool SeqTrack::emitVibratoDepth(SeqSynthLfoAutomation& automation, uint8_t depth, bool force) {
   return automation.emitDepth(depth,
                               [this](uint8_t outputDepth) {
-                                addModulationNoItem(outputDepth);
+                                addVibratoDepthNoItem(outputDepth);
                               },
                               force);
 }
 
-// Emit synth LFO depth through the given MIDI controller if it changed.
-bool SeqTrack::setSynthLfoControllerDepth(SeqSynthLfoAutomation& automation,
-                                          uint8_t controller, uint8_t depth,
-                                          bool force) {
+bool SeqTrack::emitTremoloDepth(SeqSynthLfoAutomation& automation, uint8_t depth, bool force) {
   return automation.emitDepth(depth,
-                              [this, controller](uint8_t outputDepth) {
-                                addControllerEventNoItem(controller, outputDepth);
+                              [this](uint8_t outputDepth) {
+                                addTremoloDepthNoItem(outputDepth);
                               },
                               force);
 }
-
 
 bool SeqTrack::isOffsetUsed(uint32_t offset) {
   if (offset <= visitedAddressMax) {
@@ -1410,6 +1456,74 @@ void SeqTrack::insertBreath(uint32_t offset,
 
   if (readMode == READMODE_CONVERT_TO_MIDI)
     pMidiTrack->insertBreath(channel, depth, absTime);
+}
+
+void SeqTrack::addVibratoDepth(uint32_t offset,
+                               uint32_t length,
+                               uint8_t depth,
+                               const std::string& sEventName) {
+  const bool isNewOffset = onEvent(offset, length);
+  recordSeqEvent<ModulationSeqEvent>(isNewOffset, getTime(), depth, offset, length, sEventName);
+  addVibratoDepthNoItem(depth);
+}
+
+void SeqTrack::addVibratoDepthNoItem(uint8_t depth) const {
+  addModDestSourceNoItem(ModDest::VibLfoToPitch, depth);
+}
+
+void SeqTrack::addVibratoFrequency(uint32_t offset,
+                                   uint32_t length,
+                                   uint8_t frequency,
+                                   const std::string& sEventName) {
+  addLfoModulationEvent(ModDest::VibLfoFreq, offset, length, frequency, sEventName, Type::Vibrato);
+}
+
+void SeqTrack::addVibratoFrequencyNoItem(uint8_t frequency) const {
+  addModDestSourceNoItem(ModDest::VibLfoFreq, frequency);
+}
+
+void SeqTrack::addVibratoDelay(uint32_t offset,
+                               uint32_t length,
+                               uint8_t delay,
+                               const std::string& sEventName) {
+  addLfoModulationEvent(ModDest::VibLfoDelay, offset, length, delay, sEventName, Type::Vibrato);
+}
+
+void SeqTrack::addVibratoDelayNoItem(uint8_t delay) const {
+  addModDestSourceNoItem(ModDest::VibLfoDelay, delay);
+}
+
+void SeqTrack::addTremoloDepth(uint32_t offset,
+                               uint32_t length,
+                               uint8_t depth,
+                               const std::string& sEventName) {
+  addLfoModulationEvent(ModDest::ModLfoToVol, offset, length, depth, sEventName, Type::Tremelo);
+}
+
+void SeqTrack::addTremoloDepthNoItem(uint8_t depth) const {
+  addModDestSourceNoItem(ModDest::ModLfoToVol, depth);
+}
+
+void SeqTrack::addTremoloFrequency(uint32_t offset,
+                                   uint32_t length,
+                                   uint8_t frequency,
+                                   const std::string& sEventName) {
+  addLfoModulationEvent(ModDest::ModLfoFreq, offset, length, frequency, sEventName, Type::Tremelo);
+}
+
+void SeqTrack::addTremoloFrequencyNoItem(uint8_t frequency) const {
+  addModDestSourceNoItem(ModDest::ModLfoFreq, frequency);
+}
+
+void SeqTrack::addTremoloDelay(uint32_t offset,
+                               uint32_t length,
+                               uint8_t delay,
+                               const std::string& sEventName) {
+  addLfoModulationEvent(ModDest::ModLfoDelay, offset, length, delay, sEventName, Type::Tremelo);
+}
+
+void SeqTrack::addTremoloDelayNoItem(uint8_t delay) const {
+  addModDestSourceNoItem(ModDest::ModLfoDelay, delay);
 }
 
 void SeqTrack::addSustainEvent(uint32_t offset, uint32_t length, uint8_t depth, const std::string &sEventName) {

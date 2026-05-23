@@ -30,7 +30,7 @@ bool usesIntelliTempDrumKitExport(NinSnesProfileId profileId) {
 
 void addVibratoHandling(VGMInstr* instr) {
   // NinSnes drives vibrato from per-track controllers, so every exportable instrument shares the
-  // same ModWheel/ChannelPressure/CC93 wiring and only the final ranges vary per sequence.
+  // same settings-backed controller wiring and only the final ranges vary per sequence.
   instr->addStandardVibratoHandling(nin_snes::vibrato::modulationSpec());
 }
 

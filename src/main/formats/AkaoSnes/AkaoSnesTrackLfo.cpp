@@ -44,8 +44,8 @@ AkaoSnesTrack::LfoParams AkaoSnesTrack::readLfoParams() {
 }
 
 void AkaoSnesTrack::clearVibratoRateAndDelay() {
-  addChannelPressureNoItem(0);
-  addControllerEventNoItem(akao_snes::modulation::kVibratoDelayController, 0);
+  addVibratoFrequencyNoItem(0);
+  addVibratoDelayNoItem(0);
 }
 
 void AkaoSnesTrack::applyVibrato(uint32_t offset, uint32_t length, const LfoParams& params) {
@@ -70,7 +70,7 @@ void AkaoSnesTrack::applyVibrato(uint32_t offset, uint32_t length, const LfoPara
     vibrato.beginReusableFade(delay, vibrato.configuredDepth(8), initialDepth);
     midiDepth = (delay == 0) ? vibratoFadeDepthMidiValue(initialDepth) : 0;
   }
-  setSynthLfoModulationDepth(vibrato, midiDepth, true);
+  emitVibratoDepth(vibrato, midiDepth, true);
   if (active) {
     syncVibratoRateAndDelay();
   }
@@ -85,7 +85,7 @@ void AkaoSnesTrack::clearVibrato(uint32_t offset, uint32_t length) {
   vibrato.setDepth(0);
   // Turning vibrato off also prevents later notes from replaying the stored fade-in ramp.
   vibrato.clearReusableFade();
-  setSynthLfoModulationDepth(vibrato, 0, true);
+  emitVibratoDepth(vibrato, 0, true);
   clearVibratoRateAndDelay();
 }
 
@@ -138,9 +138,9 @@ void AkaoSnesTrack::beginVibratoForNote() {
       ? vibrato.configuredDepth(8) / 4
       : 0;
   vibrato.beginReusableFade(delay, vibrato.configuredDepth(8), initialDepth);
-  setSynthLfoModulationDepth(vibrato,
-                             (delay == 0) ? vibratoFadeDepthMidiValue(initialDepth) : 0,
-                             true);
+  emitVibratoDepth(vibrato,
+                   (delay == 0) ? vibratoFadeDepthMidiValue(initialDepth) : 0,
+                   true);
 }
 
 uint8_t AkaoSnesTrack::vibratoFadeDepthMidiValue(int32_t depth) const {
@@ -164,7 +164,7 @@ void AkaoSnesTrack::updateVibratoFade() {
     return;
   }
 
-  advanceSynthLfoFadeToModulation(vibrato, 8, [this](int32_t depth) {
+  advanceVibratoDepthFade(vibrato, 8, [this](int32_t depth) {
     return vibratoFadeDepthMidiValue(depth);
   });
 }
@@ -183,12 +183,11 @@ void AkaoSnesTrack::syncVibratoRateAndDelay() {
                                                                      vibrato.rate(),
                                                                      vibrato.depth(),
                                                                      parent->TIMER0_FREQUENCY);
-  addChannelPressureNoItem(rateMidiValue);
-  addControllerEventNoItem(akao_snes::modulation::kVibratoDelayController,
-                           akao_snes::modulation::delayMidiValue(parent->version,
-                                                                 vibrato.delay(),
-                                                                 parent->tempo,
-                                                                 parent->TIMER0_FREQUENCY));
+  addVibratoFrequencyNoItem(rateMidiValue);
+  addVibratoDelayNoItem(akao_snes::modulation::delayMidiValue(parent->version,
+                                                              vibrato.delay(),
+                                                              parent->tempo,
+                                                              parent->TIMER0_FREQUENCY));
 }
 
 void AkaoSnesTrack::syncTempoDependentLfos() {

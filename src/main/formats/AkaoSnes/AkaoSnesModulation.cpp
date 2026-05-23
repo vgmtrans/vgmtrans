@@ -339,7 +339,7 @@ uint8_t vibratoDepthMidiValue(AkaoSnesVersion version, uint8_t rate, uint8_t dep
     return 0;
   }
 
-  // ModWheel drives depth, normalized against the largest depth this version can produce.
+  // The configured vibrato depth source is normalized against the largest depth this version can produce.
   const int midiValue =
       static_cast<int>(std::lround(128.0 * vibratoDepthCents(version, rate, depth) /
                                    maxVibratoDepthCents(version)));
@@ -353,7 +353,7 @@ uint8_t rateMidiValue(AkaoSnesVersion version, uint8_t rate, uint8_t depth, uint
 }
 
 uint8_t delayMidiValue(AkaoSnesVersion version, uint8_t delay, uint8_t tempo, uint8_t timer0Frequency) {
-  // CC93 drives LFO delay within the version's exported seconds range.
+  // The configured vibrato delay source drives LFO delay within the version's exported seconds range.
   return midiValueForSecondsInRange(delaySeconds(version, delay, tempo, timer0Frequency),
                                     0.0,
                                     maxDelaySeconds(version));

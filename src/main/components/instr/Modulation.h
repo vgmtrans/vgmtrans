@@ -6,6 +6,8 @@
 
 #pragma once
 
+#include <array>
+#include <cstddef>
 #include <cstdint>
 #include <optional>
 
@@ -28,24 +30,47 @@ enum class TremoloGainMode {
   NoBoost,
 };
 
+enum class TremoloLfoMode {
+  Independent,
+  ShareVibratoLfo,
+};
+
 struct TremoloModulationSpec {
   double maxDepthDb;
   double minHertz;
   double maxHertz;
   TremoloGainMode gainMode = TremoloGainMode::BipolarAroundNominal;
+  std::optional<DelayRange> delayRange = std::nullopt;
+  TremoloLfoMode lfoMode = TremoloLfoMode::Independent;
 };
 
-enum class ModSource : uint8_t {
-  // Keep this list to controllers expressible by both SF2 and DLS2.
-  ModWheel,
-  ChannelPressure,
-  PolyPressure,
-  PitchWheel,
-  Volume,
-  Pan,
-  Expression,
-  ReverbSend,
-  ChorusSend,
+enum class ModulationSourceTarget : uint8_t {
+  SoundFont,
+  DLS,
+};
+
+enum class ModSource : int16_t {
+  None = -1,
+
+  // Values 0..127 represent MIDI continuous controllers. SF2 can use any CC;
+  // DLS2 only accepts a strict subset.
+  ModWheel = 1,
+  Breath = 2,
+  Volume = 7,
+  Pan = 10,
+  Expression = 11,
+  SoundController6 = 75,
+  VibratoRate = 76,
+  VibratoDepth = 77,
+  VibratoDelay = 78,
+  SoundController10 = 79,
+  ReverbSend = 91,
+  TremoloDepth = 92,
+  ChorusSend = 93,
+
+  ChannelPressure = 128,
+  PolyPressure = 129,
+  PitchWheel = 130,
 };
 
 enum class ModDest : uint8_t {
@@ -57,6 +82,35 @@ enum class ModDest : uint8_t {
   ModLfoDelay,
   InitialAtten,
 };
+
+inline constexpr std::array<ModDest, 7> kModDests {
+    ModDest::VibLfoToPitch,
+    ModDest::VibLfoFreq,
+    ModDest::VibLfoDelay,
+    ModDest::ModLfoToVol,
+    ModDest::ModLfoFreq,
+    ModDest::ModLfoDelay,
+    ModDest::InitialAtten,
+};
+
+constexpr size_t modDestIndex(ModDest destination) {
+  return static_cast<size_t>(destination);
+}
+
+constexpr ModSource modSourceForMidiController(uint8_t controller) {
+  return static_cast<ModSource>(controller);
+}
+
+constexpr bool isMidiControllerModSource(ModSource source) {
+  const int sourceValue = static_cast<int>(source);
+  return sourceValue >= 0 && sourceValue <= 127;
+}
+
+constexpr std::optional<uint8_t> midiControllerForModSource(ModSource source) {
+  return isMidiControllerModSource(source)
+      ? std::optional<uint8_t>(static_cast<uint8_t>(source))
+      : std::nullopt;
+}
 
 class ModAmount {
 public:
@@ -91,7 +145,29 @@ double clampSecondsRangeMinimum(double seconds);
 uint8_t midiValueForSecondsInRange(double seconds, double minSeconds, double maxSeconds);
 
 struct SynthModulator {
-  ModSource source;
+  SynthModulator(ModSource explicitSource, ModDest destination, int32_t amount)
+      : source(explicitSource),
+        sourceMappingKey(destination),
+        destination(destination),
+        amount(amount) {}
+
+  SynthModulator(ModDest destination, int32_t amount)
+      : source(std::nullopt),
+        sourceMappingKey(destination),
+        destination(destination),
+        amount(amount) {}
+
+  SynthModulator(ModDest sourceMappingKey, ModDest destination, int32_t amount)
+      : source(std::nullopt),
+        sourceMappingKey(sourceMappingKey),
+        destination(destination),
+        amount(amount) {}
+
+  // If source is empty, exporters resolve it from settings using sourceMappingKey.
+  // sourceMappingKey usually matches destination; it differs for shared controls, for example
+  // when ModLfoFreq uses VibLfoFreq because of TremoloLfoMode::ShareVibratoLfo.
+  std::optional<ModSource> source;
+  ModDest sourceMappingKey;
   ModDest destination;
 
   // Amount units are the shared SF2/DLS semantic units for the destination:

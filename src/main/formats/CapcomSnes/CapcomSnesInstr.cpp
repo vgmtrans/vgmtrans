@@ -102,7 +102,7 @@ bool CapcomSnesInstr::loadInstr() {
 
   // Vibrato has a full +/- octave range of 1200 cents (max depth value evaluates to 127/128 of range, just like SF2)
   // Vibrato frequency is a unipolar sweep from one Capcom LFO step up to 255 steps, so we use the
-  // step frequency as the global base and let channel pressure span the full range in Hz.
+  // step frequency as the global base and let the configured vibrato frequency source span the full range in Hz.
   // Tremolo runs at twice the base vibrato rate and only attenuates, never boosts.
 
   addStandardVibratoHandling(capcom_snes::vibratoModulationSpec());
