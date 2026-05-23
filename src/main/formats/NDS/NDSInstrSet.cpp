@@ -131,7 +131,7 @@ bool NDSInstr::loadInstr() {
       uint8_t highKey = readByte(offset() + 1);
       uint8_t nRgns = (highKey - lowKey) + 1;
       for (uint8_t i = 0; i < nRgns; i++) {
-        u32 rgnOff = offset() + 2 + i * 12;
+        uint32_t rgnOff = offset() + 2 + i * 12;
         VGMRgn* rgn = addRgn(rgnOff, 12, readShort(rgnOff + 2), lowKey + i, lowKey + i);
         getSampCollPtr(rgn, readShort(rgnOff + 4));
         getArticData(rgn, rgnOff + 6);
@@ -158,7 +158,7 @@ bool NDSInstr::loadInstr() {
       }
 
       for (int i = 0; i < nRgns; i++) {
-        u32 rgnOff = offset() + 8 + i * 12;
+        uint32_t rgnOff = offset() + 8 + i * 12;
         VGMRgn* rgn = addRgn(rgnOff, 12, readShort(rgnOff + 2), (i == 0) ? 0 : keyRanges[i - 1] + 1,
                              keyRanges[i]);
         getSampCollPtr(rgn, readShort(rgnOff + 4));

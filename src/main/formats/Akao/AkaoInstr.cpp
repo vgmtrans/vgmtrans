@@ -73,8 +73,8 @@ bool AkaoInstrSet::parseInstrPointers() {
   if (bMelInstrs) {
     VGMHeader *SSEQHdr = addHeader(instrSetOff, 0x10, "Instr Ptr Table");
     for (int i = 0; i < 16; ++i) {
-      u32 ptrOff = instrSetOff + (i * 2);
-      u16 instrPtr = readShort(ptrOff);
+      uint32_t ptrOff = instrSetOff + (i * 2);
+      uint16_t instrPtr = readShort(ptrOff);
       if (instrPtr == 0xFFFF || (instrPtr == 0 && i != 0))
         continue;
       SSEQHdr->addChild(ptrOff, 2, "Instr Pointer");

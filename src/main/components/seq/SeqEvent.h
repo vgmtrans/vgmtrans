@@ -233,8 +233,8 @@ class MastVolSlideSeqEvent : public SeqEvent {
 
 class ExpressionSeqEvent : public SeqEvent {
  public:
-  ExpressionSeqEvent(SeqTrack *pTrack, u8 level, u32 offset = 0, u32 length = 0, const std::string &name = "");
-  ExpressionSeqEvent(SeqTrack *pTrack, double level, u32 offset = 0, u32 length = 0, const std::string &name = "");
+  ExpressionSeqEvent(SeqTrack *pTrack, uint8_t level, uint32_t offset = 0, uint32_t length = 0, const std::string &name = "");
+  ExpressionSeqEvent(SeqTrack *pTrack, double level, uint32_t offset = 0, uint32_t length = 0, const std::string &name = "");
 
   std::string description() override {
     if (percentLevel > 0) {
@@ -244,7 +244,7 @@ class ExpressionSeqEvent : public SeqEvent {
   };
 
  public:
-  u8 level = -1;
+  uint8_t level = -1;
   double percentLevel = -1;
 };
 

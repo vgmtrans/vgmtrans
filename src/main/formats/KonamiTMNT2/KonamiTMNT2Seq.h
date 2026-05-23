@@ -15,34 +15,34 @@
 
 struct konami_tmnt2_instr_info;
 class VGMInstr;
-enum KonamiTMNT2FormatVer : u8;
+enum KonamiTMNT2FormatVer : uint8_t;
 
 class KonamiTMNT2Seq : public VGMSeq {
  public:
-  enum SeqType : u8 { ALL_CHANS = 0, RESERVE_CHANS = 1, ALL_CHANS_2 = 2 };
+  enum SeqType : uint8_t { ALL_CHANS = 0, RESERVE_CHANS = 1, ALL_CHANS_2 = 2 };
 
   KonamiTMNT2Seq(RawFile *file,
                  KonamiTMNT2FormatVer fmtVer,
                  uint32_t offset,
-                 std::vector<u32> ym2151TrackOffsets,
-                 std::vector<u32> k053260TrackOffsets,
-                 u8 defaultTickSkipInterval,
-                 u8 clkb,
+                 std::vector<uint32_t> ym2151TrackOffsets,
+                 std::vector<uint32_t> k053260TrackOffsets,
+                 uint8_t defaultTickSkipInterval,
+                 uint8_t clkb,
                  const std::string &name = std::string("Konami TMNT2 Seq"));
 
   void resetVars() override;
   bool parseTrackPointers() override;
   void useColl(const VGMColl* coll) override;
   KonamiTMNT2FormatVer fmtVersion() { return m_fmtVer; }
-  u8 clkb() { return m_clkb; }
+  uint8_t clkb() { return m_clkb; }
 
-  void setGlobalTranspose(s8 semitones) { m_globalTranspose = semitones; }
-  s8 globalTranspose() { return m_globalTranspose; }
+  void setGlobalTranspose(int8_t semitones) { m_globalTranspose = semitones; }
+  int8_t globalTranspose() { return m_globalTranspose; }
 
-  void setMasterAttenuationYM2151(s8 val) { m_masterAttenYM2151 = val; }
-  s8 masterAttenuationYM2151() { return m_masterAttenYM2151; }
-  void setMasterAttenuationK053260(s8 val) { m_masterAttenK053260 = val; }
-  s8 masterAttenuationK053260() { return m_masterAttenK053260; }
+  void setMasterAttenuationYM2151(int8_t val) { m_masterAttenYM2151 = val; }
+  int8_t masterAttenuationYM2151() { return m_masterAttenYM2151; }
+  void setMasterAttenuationK053260(int8_t val) { m_masterAttenK053260 = val; }
+  int8_t masterAttenuationK053260() { return m_masterAttenK053260; }
 
   std::optional<konami_tmnt2_instr_info> instrInfo(int idx) {
     if (m_collContext.instrInfos.size() <= idx)
@@ -51,7 +51,7 @@ class KonamiTMNT2Seq : public VGMSeq {
     return std::optional {m_collContext.instrInfos[idx]};
   }
   std::optional<konami_tmnt2_drum_info> drumInfo(int tableIdx, int keyIdx) {
-    u8 key = (tableIdx * 16) + keyIdx;
+    uint8_t key = (tableIdx * 16) + keyIdx;
     if (!m_collContext.drumKeyMap.contains(key))
       return std::nullopt;
     return m_collContext.drumKeyMap[key];
@@ -60,20 +60,20 @@ class KonamiTMNT2Seq : public VGMSeq {
  private:
   struct CollContext {
     std::vector<konami_tmnt2_instr_info> instrInfos;
-    std::unordered_map<u8, konami_tmnt2_drum_info> drumKeyMap;
+    std::unordered_map<uint8_t, konami_tmnt2_drum_info> drumKeyMap;
   };
   CollContext m_collContext;
 
   KonamiTMNT2FormatVer m_fmtVer;
-  std::vector<u32> m_ym2151TrackOffsets;
-  std::vector<u32> m_k053260TrackOffsets;
-  u8 m_defaultTickSkipInterval;
-  u8 m_clkb;
+  std::vector<uint32_t> m_ym2151TrackOffsets;
+  std::vector<uint32_t> m_k053260TrackOffsets;
+  uint8_t m_defaultTickSkipInterval;
+  uint8_t m_clkb;
 
   // state
-  s8 m_globalTranspose;
-  s8 m_masterAttenYM2151;
-  s8 m_masterAttenK053260;
+  int8_t m_globalTranspose;
+  int8_t m_masterAttenYM2151;
+  int8_t m_masterAttenK053260;
 };
 
 class KonamiTMNT2Track : public SeqTrack {
@@ -86,15 +86,15 @@ class KonamiTMNT2Track : public SeqTrack {
     std::string name = "Track"
   );
 
-  double calculateVol(u8 baseVol);
+  double calculateVol(uint8_t baseVol);
   void handleProgramChangeK053260();
-  u8 calculatePan();
+  uint8_t calculatePan();
   void updatePan();
   void onNoteBegin(int noteDur);
   KonamiTMNT2FormatVer fmtVersion() {
     return static_cast<KonamiTMNT2Seq*>(parentSeq)->fmtVersion();
   }
-  u8 clkb() {
+  uint8_t clkb() {
     return static_cast<KonamiTMNT2Seq*>(parentSeq)->clkb();
   }
 
@@ -123,48 +123,48 @@ private:
   }
   bool percussionMode() const { return (m_state & 2) > 0; }
 
-  s8 globalTranspose() {
+  int8_t globalTranspose() {
     return static_cast<KonamiTMNT2Seq*>(parentSeq)->globalTranspose();
   }
 
-  void setGlobalTranspose(s8 semitones) {
+  void setGlobalTranspose(int8_t semitones) {
     static_cast<KonamiTMNT2Seq*>(parentSeq)->setGlobalTranspose(semitones);
   }
 
-  s8 masterAttenuation() {
+  int8_t masterAttenuation() {
     if (m_isFmTrack)
       return static_cast<KonamiTMNT2Seq*>(parentSeq)->masterAttenuationYM2151();
     return static_cast<KonamiTMNT2Seq*>(parentSeq)->masterAttenuationK053260();
   }
-  void setMasterAttenuationYM2151(s8 val) {
+  void setMasterAttenuationYM2151(int8_t val) {
     static_cast<KonamiTMNT2Seq*>(parentSeq)->setMasterAttenuationYM2151(val);
   }
-  void setMasterAttenuationK053260(s8 val) {
+  void setMasterAttenuationK053260(int8_t val) {
     static_cast<KonamiTMNT2Seq*>(parentSeq)->setMasterAttenuationK053260(val);
   }
 
   bool m_isFmTrack = false;
-  u8 m_program = 0;
-  u8 m_state = 0;
-  u8 m_rawBaseDur = 0;
+  uint8_t m_program = 0;
+  uint8_t m_state = 0;
+  uint8_t m_rawBaseDur = 0;
   float m_baseDur = 0;
   float m_baseDurHalveBackup = 0;
-  u8 m_extendDur = 0;
-  u8 m_durSubtract = 0;
-  u8 m_noteDurPercent = 0;
-  u8 m_baseVol = 0;
-  u8 m_dxAtten = 0;
-  u8 m_dxAttenMultiplier = 1;
-  u8 m_noteOffset = 0;
-  s8 m_transpose = 0;
-  s8 m_addedToNote = 0;
-  u8 m_drumBank = 0;
-  u8 m_loopCounter[2];
-  u32 m_loopStartOffset[2];
-  u8 m_warpCounter = 0;
-  u16 m_warpOrigin = 0;
-  u16 m_warpDest = 0;
-  u16 m_callOrigin[2];
+  uint8_t m_extendDur = 0;
+  uint8_t m_durSubtract = 0;
+  uint8_t m_noteDurPercent = 0;
+  uint8_t m_baseVol = 0;
+  uint8_t m_dxAtten = 0;
+  uint8_t m_dxAttenMultiplier = 1;
+  uint8_t m_noteOffset = 0;
+  int8_t m_transpose = 0;
+  int8_t m_addedToNote = 0;
+  uint8_t m_drumBank = 0;
+  uint8_t m_loopCounter[2];
+  uint32_t m_loopStartOffset[2];
+  uint8_t m_warpCounter = 0;
+  uint16_t m_warpOrigin = 0;
+  uint16_t m_warpDest = 0;
+  uint16_t m_callOrigin[2];
 
   int m_noteCountdown = 0;
 
@@ -174,11 +174,11 @@ private:
   int m_lfoRampStepTicks = 0;      // ticks that must elapse before stepping LFO ramp
   int m_lfoRampStepCountdown = 0;  // decremented each tick. At 0, increments m_lfoRampValue and
                                    // resets to m_lfoRampStepTicks.
-  u8 m_lfoRampValue = 0;           // PMS/AMS is updated from this every time it is incremented,
+  uint8_t m_lfoRampValue = 0;           // PMS/AMS is updated from this every time it is incremented,
                                    // increases until note-off or maximum PMS/AMS is reached
 
   // k053260-specific state
-  u8 m_attenuation = 0;
-  u8 m_pan = 0;
-  u8 m_instrPan = 0;
+  uint8_t m_attenuation = 0;
+  uint8_t m_pan = 0;
+  uint8_t m_instrPan = 0;
 };

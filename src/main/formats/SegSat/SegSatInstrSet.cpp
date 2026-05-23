@@ -13,7 +13,7 @@ static const float SDLT[8] = { 1000000.0f, 36.0f, 30.0f, 24.0f, 18.0f, 12.0f, 6.
 
 struct PanLinAmp { double lPan, rPan; };
 
-constexpr PanLinAmp panToAmp(u8 pan) {
+constexpr PanLinAmp panToAmp(uint8_t pan) {
   int iPAN = pan;
   float SegaDB = 0.0f;
   float PAN;
@@ -56,14 +56,14 @@ bool SegSatInstrSet::parseHeader() {
   addChild(offset() + 4, 2, "PEG Tables Pointer");
   addChild(offset() + 6, 2, "PLFO Tables Pointer");
 
-  u32 mixerTablesOffset = readShortBE(offset()) + offset();
-  u32 vlTablesOffset = readShortBE(offset() + 2) + offset();
-  u32 pegTablesOffset = readShortBE(offset() + 4) + offset();
-  u32 plfoTablesOffset = readShortBE(offset() + 6) + offset();
-  u32 firstInstrOffset = readShortBE(offset() + 8) + offset();
+  uint32_t mixerTablesOffset = readShortBE(offset()) + offset();
+  uint32_t vlTablesOffset = readShortBE(offset() + 2) + offset();
+  uint32_t pegTablesOffset = readShortBE(offset() + 4) + offset();
+  uint32_t plfoTablesOffset = readShortBE(offset() + 6) + offset();
+  uint32_t firstInstrOffset = readShortBE(offset() + 8) + offset();
 
   // Parse Mixer Tables
-  u32 offset = mixerTablesOffset;
+  uint32_t offset = mixerTablesOffset;
   int i = 0;
   do {
     SegSatMixerTable mixerTable;
@@ -127,8 +127,8 @@ bool SegSatInstrSet::parseInstrPointers() {
   size_t off = offset() + 8;
   auto instrList = addChild(off, m_numInstrs * 2, "Instrument Pointers");
   for (int i = 0; i < m_numInstrs; i++) {
-    u32 instrOff = rawFile()->getBE<u16>(off + (i * 2)) + offset();
-    u8 numRgns = rawFile()->readByte(instrOff + 2) + 1;
+    uint32_t instrOff = rawFile()->getBE<uint16_t>(off + (i * 2)) + offset();
+    uint8_t numRgns = rawFile()->readByte(instrOff + 2) + 1;
     size_t instrSize = 4 + numRgns * 0x20;
     auto name = fmt::format("Instrument {:d}", i);
     aInstrs.push_back(new SegSatInstr(this, instrOff, instrSize, 0, i, name));
@@ -138,7 +138,7 @@ bool SegSatInstrSet::parseInstrPointers() {
   return true;
 }
 
-void SegSatInstrSet::assignBankNumber(u8 bankNum) {
+void SegSatInstrSet::assignBankNumber(uint8_t bankNum) {
   for (auto instr : aInstrs) {
     instr->bank = bankNum;
   }
@@ -149,7 +149,7 @@ void SegSatInstrSet::assignBankNumber(u8 bankNum) {
 // SegSatInstr
 // ***********
 
-SegSatInstr::SegSatInstr(SegSatInstrSet* set, size_t offset, size_t length, u32 bank, u32 number, const std::string &name)
+SegSatInstr::SegSatInstr(SegSatInstrSet* set, size_t offset, size_t length, uint32_t bank, uint32_t number, const std::string &name)
     : VGMInstr(set, offset, length, bank, number, name) {
 }
 
@@ -160,12 +160,12 @@ bool SegSatInstr::loadInstr() {
   addChild(offset()+3, 1, "Volume Bias");
   m_pitchBendRange = rawFile()->readByte(offset());
   m_portamento = rawFile()->readByte(offset() + 1);
-  u8 numRgns = rawFile()->readByte(offset() + 2) + 1;
+  uint8_t numRgns = rawFile()->readByte(offset() + 2) + 1;
   m_volBias = rawFile()->readByte(offset() + 3);
 
   auto sampColl = parInstrSet->sampColl;
   for (int i = 0; i < numRgns; ++i) {
-    u32 rgnOff = offset() + 4 + (i * 0x20);
+    uint32_t rgnOff = offset() + 4 + (i * 0x20);
     auto name = fmt::format("Region {:d}", i);
     auto rgn = new SegSatRgn(this, rgnOff, name);
     if (!rgn->isRegionValid()) {
@@ -175,13 +175,13 @@ bool SegSatInstr::loadInstr() {
     addRgn(rgn);
 
     // Add sample
-    u32 sampLength = rgn->sampleLoopEnd();
+    uint32_t sampLength = rgn->sampleLoopEnd();
     BPS bps = rgn->sampleType() == SegSatRgn::SampleType::PCM16 ? BPS::PCM16 : BPS::PCM8;
     auto instrSet = static_cast<SegSatInstrSet*>(parInstrSet);
     // check if a sample at the offset was already added
     bool inserted = instrSet->sampleOffsets.insert(rgn->sampOffset).second;
 
-    u32 sampOffset = rgn->sampOffset;
+    uint32_t sampOffset = rgn->sampOffset;
     if (inserted) {
       auto sample = sampColl->addSamp(
        sampOffset,
@@ -228,7 +228,7 @@ bool SegSatInstr::loadInstr() {
 ///   - Increments to overflow     = (255 - TIMx)
 ///   - Period                     = ((2^TxCTL) / Fs) * (255 - TIMx)
 ///   - Frequency                  =  Fs / ( (2^TxCTL) * (255 - TIMx) )
-constexpr double calculateScspIrqHz(double Fs, u32 TxCTL, u32 TIMx) {
+constexpr double calculateScspIrqHz(double Fs, uint32_t TxCTL, uint32_t TIMx) {
   const std::uint32_t steps = 255u - (TIMx & 0xffu);
   if (steps == 0) return 0.0;
   const std::uint32_t prescaler = 1u << (TxCTL & 7u);
@@ -266,19 +266,19 @@ SegSatRgn::SegSatRgn(SegSatInstr* instr, uint32_t offset, const std::string& nam
   addKeyLow(readByte(offset), offset, 1);
   addKeyHigh(readByte(offset+1), offset+1, 1);
 
-  u8 pitchFlags = readByte(offset+2);
+  uint8_t pitchFlags = readByte(offset+2);
   m_enablePeg = pitchFlags >> 7;
   m_enablePlfo = (pitchFlags >> 6) & 1;
   addChild(offset + 2, 1, "Enable PEG / PLFO Flags");
 
 
-  u8 loopFlag = (readByte(offset + 3) >> 5) & 3;
+  uint8_t loopFlag = (readByte(offset + 3) >> 5) & 3;
   m_loopType = static_cast<LoopType>(loopFlag);
   m_sampleType = static_cast<SampleType>((readByte(offset + 3) >> 4) & 1);
 
-  u8 bytesPerSamp = m_sampleType == SampleType::PCM16 ? 2 : 1;
+  uint8_t bytesPerSamp = m_sampleType == SampleType::PCM16 ? 2 : 1;
 
-  u32 instrSetOffset = parInstr->parInstrSet->offset();
+  uint32_t instrSetOffset = parInstr->parInstrSet->offset();
   sampOffset = (getWordBE(offset + 2) & 0x7FFFF);
   if (m_sampleType == SampleType::PCM16)
     sampOffset = sampOffset & ~1;
@@ -291,12 +291,12 @@ SegSatRgn::SegSatRgn(SegSatInstr* instr, uint32_t offset, const std::string& nam
   addChild(offset + 6, 2, "Loop Start");
   addChild(offset + 8, 2, "Loop End");
 
-  u16 adsr1 = getShortBE(offset + 10);
+  uint16_t adsr1 = getShortBE(offset + 10);
   m_attackRate = adsr1 & 0x1F;
   m_decayRate1 = (adsr1 >> 6) & 0x1F;
   m_decayRate2 = (adsr1 >> 11) & 0x1F;
   addADSRValue(offset + 10, 2, "Attack Rate, Decay Rate, Sustain Rate");
-  u16 adsr2 = getShortBE(offset + 12);
+  uint16_t adsr2 = getShortBE(offset + 12);
   m_releaseRate = adsr2 & 0x1F;
   m_decayLevel = (adsr2 >> 5) & 0x1F;
   m_keyRateScale = (adsr2 >> 10) & 0x1F;
@@ -321,7 +321,7 @@ SegSatRgn::SegSatRgn(SegSatInstr* instr, uint32_t offset, const std::string& nam
     sustain_level = 0;
   }
 
-  u8 enableModFlags = readByte(offset + 14);
+  uint8_t enableModFlags = readByte(offset + 14);
   m_enableLfoModulation = (enableModFlags >> 7) & 1;
   m_enablePegModulation = (enableModFlags >> 6) & 1;
   m_enablePlfoModulation = (enableModFlags >> 5) & 1;
@@ -334,11 +334,11 @@ SegSatRgn::SegSatRgn(SegSatInstr* instr, uint32_t offset, const std::string& nam
   m_enableTotalLevelModulation = (readByte(offset + 18) >> 2) & 1;
   addChild(offset + 18, 1, "Enable Total Level Modulation");
 
-  u8 lfoResetFreqAndWave = readByte(offset + 20);
+  uint8_t lfoResetFreqAndWave = readByte(offset + 20);
   m_lfoReset = (lfoResetFreqAndWave & 0x80) > 0;
   m_lfoFreq = (lfoResetFreqAndWave >> 2) & 0x1F;
-  u8 lfoWave1 = (lfoResetFreqAndWave) & 1;
-  u8 lfoWave2 = (readByte(offset + 21) >> 3) & 3;
+  uint8_t lfoWave1 = (lfoResetFreqAndWave) & 1;
+  uint8_t lfoWave2 = (readByte(offset + 21) >> 3) & 3;
 
   // The pitch LFO wave selection is split across non-contiguous bits. Weird.
   if (lfoWave1 == 1)
@@ -351,23 +351,23 @@ SegSatRgn::SegSatRgn(SegSatInstr* instr, uint32_t offset, const std::string& nam
     m_pitchLfoWave = LFOWave::SawTooth;
   addChild(offset + 20, 1, "LFO Frequency, LFO Reset, Pitch LFO Wave");
 
-  u8 lfoPitchDepthAmpWaveAmpDepth = readByte(offset + 21);
+  uint8_t lfoPitchDepthAmpWaveAmpDepth = readByte(offset + 21);
   m_pitchLfoDepth = (lfoPitchDepthAmpWaveAmpDepth >> 5) & 7;
-  u8 ampLfoWave = (lfoPitchDepthAmpWaveAmpDepth >> 3) & 3;
+  uint8_t ampLfoWave = (lfoPitchDepthAmpWaveAmpDepth >> 3) & 3;
   m_ampLfoWave = static_cast<LFOWave>(ampLfoWave);
   m_ampLfoDepth = lfoPitchDepthAmpWaveAmpDepth & 0x7;
 
   addChild(offset + 21, 1, "Pitch LFO Depth, Amp LFO Depth, Amp LFO Wave");
   addChild(offset + 23, 1, "Effect Select, Effect Send");
 
-  u8 disdl_dipan = readByte(offset + 24);
+  uint8_t disdl_dipan = readByte(offset + 24);
   m_directLevel = (disdl_dipan >> 5) & 0x7;
   m_directPan = disdl_dipan & 0x1F;
   addChild(offset + 24, 1, "Direct Level, Direct Pan");
 
   addUnityKey(readByte(offset + 25), offset + 0x19, 1);
-  s8 fineTuneByte = static_cast<s8>(readByte(offset + 26));
-  s16 fineTuneCents = (fineTuneByte / 128.0) * 50;
+  int8_t fineTuneByte = static_cast<int8_t>(readByte(offset + 26));
+  int16_t fineTuneCents = (fineTuneByte / 128.0) * 50;
   addFineTune(fineTuneCents, offset + 26, 1);
 
   m_vlTableIndex = readByte(offset + 29);
@@ -416,7 +416,7 @@ SegSatRgn::SegSatRgn(SegSatInstr* instr, uint32_t offset, const std::string& nam
       // Also, weirdly, fade time scales the depth when it's non-zero.
       // This algorithm is reversed from the 1.33 driver. Later versions seem to use different logic.
       double amp = (plfo.amp * plfo.amp * freqSq) / ((8192 * 256) / 100.0);
-      u32 fadeDepthModifier =  (plfo.fadeTime * plfo.fadeTime) >> 6;
+      uint32_t fadeDepthModifier =  (plfo.fadeTime * plfo.fadeTime) >> 6;
       if (fadeDepthModifier > 0) {
         amp *= 2.0 * fadeDepthModifier;
       }
@@ -439,7 +439,7 @@ SegSatRgn::SegSatRgn(SegSatInstr* instr, uint32_t offset, const std::string& nam
 bool SegSatRgn::isRegionValid() {
   if (keyLow == 0xFF) return false;
   if (keyLow > keyHigh) return false;
-  u32 instrSetOffset = parInstr->parInstrSet->offset();
+  uint32_t instrSetOffset = parInstr->parInstrSet->offset();
   if (sampOffset == instrSetOffset) return false;
   if (sampOffset >= instrSetOffset + 0x7FFFE) return false;
   return true;

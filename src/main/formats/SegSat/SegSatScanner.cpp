@@ -22,8 +22,8 @@ bool isSsfFile(RawFile* file) {
          file->extension() == "ssflib";
 }
 
-std::array<u8, 4> uint32ToBytes(u32 num) {
-  std::array<u8, 4> bytes;
+std::array<uint8_t, 4> uint32ToBytes(uint32_t num) {
+  std::array<uint8_t, 4> bytes;
   bytes[0] = (num >> 24) & 0xFF;
   bytes[1] = (num >> 16) & 0xFF;
   bytes[2] = (num >> 8) & 0xFF;
@@ -68,7 +68,7 @@ void SegSatScanner::scan(RawFile *file, void *info) {
 }
 
 SegSatDriverVer SegSatScanner::determineVersion(RawFile* file) {
-  u32 ptnOff;
+  uint32_t ptnOff;
   if (file->searchBytePattern(ptn_v1_28_handle_8_slots_per_irq, ptnOff)) {
     return SegSatDriverVer::V1_28;
   }
@@ -89,13 +89,13 @@ void SegSatScanner::handleSsfFile(RawFile* file) {
   SegSatDriverVer ver = SegSatDriverVer::Unknown;
   auto instrSets = searchForInstrSets(file, ver, false);
 
-  std::map<u8, SegSatInstrSet*> banks;
+  std::map<uint8_t, SegSatInstrSet*> banks;
   if (instrSets.size() > 1) {
-    for (u32 i = 0x500; i < 0x600; i+= 8) {
-      u32 bankNumAndPtr = file->readWordBE(i);
+    for (uint32_t i = 0x500; i < 0x600; i+= 8) {
+      uint32_t bankNumAndPtr = file->readWordBE(i);
       // The 4 bytes after offset are bank size, but we don't use it
-      u8 bankNum = bankNumAndPtr >> 24;
-      u32 bankPtr = bankNumAndPtr & 0x00FFFFFF;
+      uint8_t bankNum = bankNumAndPtr >> 24;
+      uint32_t bankPtr = bankNumAndPtr & 0x00FFFFFF;
       if (bankNum == 0xFF || bankPtr >= file->size() + 8)
         break;
       if (banks.contains(bankNum))
@@ -141,14 +141,14 @@ void SegSatScanner::handleSsfFile(RawFile* file) {
 }
 
 std::vector<SegSatSeq*> SegSatScanner::searchForSeqs(RawFile *file, bool useMatcher) {
-  constexpr u32 minSeqSize = 16;
+  constexpr uint32_t minSeqSize = 16;
 
-  u32 fileLength = file->size();
+  uint32_t fileLength = file->size();
   std::vector<SegSatSeq*> seqs;
   int seqTableCounter = 0;
 
-  for (u32 i = 0; i + 0x20 < fileLength; i++) {
-    u32 firstWord = file->readWordBE(i);
+  for (uint32_t i = 0; i + 0x20 < fileLength; i++) {
+    uint32_t firstWord = file->readWordBE(i);
     // If the first word is 0, skip the first 3 bytes
     if (firstWord == 0) {
       i += 2;
@@ -166,20 +166,20 @@ std::vector<SegSatSeq*> SegSatScanner::searchForSeqs(RawFile *file, bool useMatc
       continue;
 
     // Calculate if the size of the header + a miniscule single sequence would exceed the file size.
-    u16 numSeqs = firstWordBytes[1];
+    uint16_t numSeqs = firstWordBytes[1];
     if (2 + (numSeqs * 4) + minSeqSize > fileLength)
       continue;
 
     // We expect the first seq offset to be immediately after the header
-    u32 firstSeqPtr = file->readWordBE(i + 2);
+    uint32_t firstSeqPtr = file->readWordBE(i + 2);
     if (firstSeqPtr != 2 + (numSeqs * 4))
       continue;
 
     // Check that sequence pointers don't exceed file size and that they are ordered
-    u32 prevSeqPtr = 0;
+    uint32_t prevSeqPtr = 0;
     bool bInvalid = false;
-    for (u16 s = 0; s < numSeqs; s++) {
-      u32 seqPtr = file->readWordBE(i + 2 + (s * 4));
+    for (uint16_t s = 0; s < numSeqs; s++) {
+      uint32_t seqPtr = file->readWordBE(i + 2 + (s * 4));
       if (seqPtr <= prevSeqPtr || (i + seqPtr + minSeqSize) > fileLength) {
         bInvalid = true;
         break;
@@ -191,11 +191,11 @@ std::vector<SegSatSeq*> SegSatScanner::searchForSeqs(RawFile *file, bool useMatc
 
     bool bParsedSeq = false;
     for (int n = 0; n < numSeqs; ++n) {
-      u32 seqPtr = file->readWordBE(i + 2 + (n * 4));
-      u16 tempoTrkPtr = 8;
-      u16 numTempoEvents = file->readShortBE(i + seqPtr + 2);
-      u16 firstNonTempoTrkPtr = file->readShortBE(i + seqPtr + 4);
-      u16 loopedTempoEventPtr = file->readShortBE(i + seqPtr + 6);
+      uint32_t seqPtr = file->readWordBE(i + 2 + (n * 4));
+      uint16_t tempoTrkPtr = 8;
+      uint16_t numTempoEvents = file->readShortBE(i + seqPtr + 2);
+      uint16_t firstNonTempoTrkPtr = file->readShortBE(i + seqPtr + 4);
+      uint16_t loopedTempoEventPtr = file->readShortBE(i + seqPtr + 6);
       if (loopedTempoEventPtr >= firstNonTempoTrkPtr ||
           tempoTrkPtr + (numTempoEvents * 8) != firstNonTempoTrkPtr) {
         L_DEBUG("Unexpected tempo track pointer in prospective SegSat sequence");
@@ -222,7 +222,7 @@ std::vector<SegSatSeq*> SegSatScanner::searchForSeqs(RawFile *file, bool useMatc
       seqTableCounter += 1;
     }
 
-    u32 lastSeqPtr = file->readWordBE(i + 2 + ((numSeqs-1) * 4));
+    uint32_t lastSeqPtr = file->readWordBE(i + 2 + ((numSeqs-1) * 4));
     // Sanity check the pointer
     if (lastSeqPtr > fileLength)
       break;
@@ -232,16 +232,16 @@ std::vector<SegSatSeq*> SegSatScanner::searchForSeqs(RawFile *file, bool useMatc
 }
 
 // Return true if a valid Sega Saturn instrument bank header/table is at `base`.
-bool SegSatScanner::validateBankAt(RawFile* file, u32 base) {
-  const u32 n = file->size();
+bool SegSatScanner::validateBankAt(RawFile* file, uint32_t base) {
+  const uint32_t n = file->size();
   if (base + 8 > n) return false;
 
   // Read header (big-endian)
-  const u16 ptrMixes = file->readShortBE(base + 0);
-  const u16 ptrVel   = file->readShortBE(base + 2);
-  const u16 ptrPegs  = file->readShortBE(base + 4);
-  const u16 ptrPlfo  = file->readShortBE(base + 6);
-  const u16 ptrInstr0  = file->readShortBE(base + 8);
+  const uint16_t ptrMixes = file->readShortBE(base + 0);
+  const uint16_t ptrVel   = file->readShortBE(base + 2);
+  const uint16_t ptrPegs  = file->readShortBE(base + 4);
+  const uint16_t ptrPlfo  = file->readShortBE(base + 6);
+  const uint16_t ptrInstr0  = file->readShortBE(base + 8);
 
   // Fast rejects on the first four words
   // 1) Even alignment is cheap to test and catches lots of junk.
@@ -254,10 +254,10 @@ bool SegSatScanner::validateBankAt(RawFile* file, u32 base) {
   if (!(ptrMixes < ptrVel && ptrVel < ptrPegs && ptrPegs < ptrPlfo)) return false;
 
   // 3) Unit-size (“multiple of _”) checks on the first 3 gaps.
-  const u32 d0 = static_cast<u32>(ptrVel  ) - ptrMixes;  // vel - mixes
-  const u32 d1 = static_cast<u32>(ptrPegs ) - ptrVel;    // pegs - vel
-  const u32 d2 = static_cast<u32>(ptrPlfo ) - ptrPegs;   // plfo - pegs
-  const u32 d3 = static_cast<u32>(ptrInstr0 ) - ptrPlfo; // instr0 - plfo
+  const uint32_t d0 = static_cast<uint32_t>(ptrVel  ) - ptrMixes;  // vel - mixes
+  const uint32_t d1 = static_cast<uint32_t>(ptrPegs ) - ptrVel;    // pegs - vel
+  const uint32_t d2 = static_cast<uint32_t>(ptrPlfo ) - ptrPegs;   // plfo - pegs
+  const uint32_t d3 = static_cast<uint32_t>(ptrInstr0 ) - ptrPlfo; // instr0 - plfo
   if ((d0 % 0x12u) != 0) return false;
   if ((d1 % 0x0Au) != 0) return false;
   if ((d2 % 0x0Au) != 0) return false;
@@ -282,16 +282,16 @@ bool SegSatScanner::validateBankAt(RawFile* file, u32 base) {
   if (numInstrs > kMaxInstrs) return false;
 
   // Ensure the instrument-pointer table itself is in-bounds.
-  const u32 instrTblEnd = base + 8u + static_cast<u32>(numInstrs) * 2u;
+  const uint32_t instrTblEnd = base + 8u + static_cast<uint32_t>(numInstrs) * 2u;
   if (instrTblEnd > n) return false;
 
   // Now check the remaining gaps between instruments
   // Instrument gap rule: (delta % 0x20) == 0x04  -> use bit-test: (delta & 0x1F) == 0x04
-  u32 prev = file->readShortBE(base + 8) - 4;
+  uint32_t prev = file->readShortBE(base + 8) - 4;
   for (int j = 0; j < numInstrs; ++j) {
-    const u16 v = file->readShortBE(base + 8 + j * 2);
+    const uint16_t v = file->readShortBE(base + 8 + j * 2);
     if (v <= prev) return false;
-    const u32 delta = static_cast<u32>(v) - prev;
+    const uint32_t delta = static_cast<uint32_t>(v) - prev;
     if ( (delta & 0x1Fu) != 0x04u ) return false;
     prev = v;
   }
@@ -300,44 +300,44 @@ bool SegSatScanner::validateBankAt(RawFile* file, u32 base) {
 }
 
 std::vector<SegSatInstrSet*> SegSatScanner::searchForInstrSets(RawFile* file, SegSatDriverVer& ver, bool useMatcher) {
-  const u32 fileLength = file->size();
+  const uint32_t fileLength = file->size();
   if (fileLength < 10) return {};
 
   std::vector<SegSatInstrSet*> instrSets;
-  for (u32 base = 0; base + 8 <= fileLength; /* increment at bottom */) {
+  for (uint32_t base = 0; base + 8 <= fileLength; /* increment at bottom */) {
     // Heuristic skip #1: early out on long zero runs.
-    const u32 firstWord = (base + 4 <= fileLength) ? file->readWordBE(base) : 0;
+    const uint32_t firstWord = (base + 4 <= fileLength) ? file->readWordBE(base) : 0;
     if (firstWord == 0) { base += 2; continue; }
     if (firstWord <= 0xFF) { base += 1; continue; }
 
     // Cheap header gates before full validation:
-    const u16 ptrMixes = file->readShortBE(base + 0);
+    const uint16_t ptrMixes = file->readShortBE(base + 0);
     if (ptrMixes < 0x000A || (ptrMixes & 1)) { ++base; continue; }
 
-    const u16 ptrVel = (base + 2 + 2 <= fileLength) ? file->readShortBE(base + 2) : 0;
+    const uint16_t ptrVel = (base + 2 + 2 <= fileLength) ? file->readShortBE(base + 2) : 0;
     if (ptrVel <= ptrMixes) { ++base; continue; }
 
     // Quick check that header pointers are monotonic
-    const u16 ptrPegs = (base + 4 + 2 <= fileLength) ? file->readShortBE(base + 4) : 0;
-    const u16 ptrPlfo = (base + 6 + 2 <= fileLength) ? file->readShortBE(base + 6) : 0;
-    const u16 ptrInstr0 = (base + 8 + 2 <= fileLength) ? file->readShortBE(base + 8) : 0;
+    const uint16_t ptrPegs = (base + 4 + 2 <= fileLength) ? file->readShortBE(base + 4) : 0;
+    const uint16_t ptrPlfo = (base + 6 + 2 <= fileLength) ? file->readShortBE(base + 6) : 0;
+    const uint16_t ptrInstr0 = (base + 8 + 2 <= fileLength) ? file->readShortBE(base + 8) : 0;
     if (!(ptrMixes < ptrVel && ptrVel < ptrPegs && ptrPegs < ptrPlfo && ptrPlfo < ptrInstr0)) {
       ++base;
       continue;
     }
 
     // Fast unit-size checks on header gaps before full pass
-    const u32 d0 = static_cast<u32>(ptrVel)  - ptrMixes;
-    const u32 d1 = static_cast<u32>(ptrPegs) - ptrVel;
-    const u32 d2 = static_cast<u32>(ptrPlfo) - ptrPegs;
-    const u32 d3 = static_cast<u32>(ptrInstr0) - ptrPlfo;
+    const uint32_t d0 = static_cast<uint32_t>(ptrVel)  - ptrMixes;
+    const uint32_t d1 = static_cast<uint32_t>(ptrPegs) - ptrVel;
+    const uint32_t d2 = static_cast<uint32_t>(ptrPlfo) - ptrPegs;
+    const uint32_t d3 = static_cast<uint32_t>(ptrInstr0) - ptrPlfo;
     if ((d0 % 0x12u) | (d1 % 0x0Au) | (d2 % 0x0Au) | (d3 % 0x04u)) { ++base; continue; }
 
     // Full validation (read instrument table lazily and bail early on mismatch)
     if (validateBankAt(file, base)) {
       if (ver == SegSatDriverVer::Unknown)
         ver = determineVersion(file);
-      u32 numInstrs = ((ptrMixes - 8) / 2);
+      uint32_t numInstrs = ((ptrMixes - 8) / 2);
       auto instrSet = new SegSatInstrSet(file, base, numInstrs, ver);
       if (useMatcher ? !instrSet->loadVGMFile() : !instrSet->load())
         delete instrSet;

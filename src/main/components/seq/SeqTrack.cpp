@@ -270,8 +270,8 @@ uint32_t SeqTrack::readVarLen(uint32_t &offset) const {
 }
 
 void SeqTrack::addControllerSlide(uint32_t dur,
-                                  u16 &prevVal,
-                                  u16 targVal,
+                                  uint16_t &prevVal,
+                                  uint16_t targVal,
                                   uint8_t(*scalerFunc)(uint8_t),
                                   void (MidiTrack::*insertFunc)(uint8_t, uint8_t, uint32_t)) const {
   if (readMode != READMODE_CONVERT_TO_MIDI)
@@ -869,7 +869,7 @@ double SeqTrack::applyPanVolumeCorrection(double level, LevelController controll
 void SeqTrack::addLevelNoItem(double level, LevelController controller, Resolution res, int absTime) {
   level = std::clamp(level, 0.0, 1.0);
   const uint16_t maxLevel = maxLevelForResolution(res);
-  const u16 origLevel = static_cast<u16>(std::lround(level * maxLevel));
+  const uint16_t origLevel = static_cast<uint16_t>(std::lround(level * maxLevel));
   switch (controller) {
     case LevelController::Volume:
       vol = origLevel;
@@ -889,9 +889,9 @@ void SeqTrack::addLevelNoItem(double level, LevelController controller, Resoluti
   level = std::clamp(level, 0.0, 1.0);
   switch (res) {
     case Resolution::SevenBit: {
-      const u8 midiLevel = usesLinearAmplitudeScale()
+      const uint8_t midiLevel = usesLinearAmplitudeScale()
         ? convertPercentAmpToStdMidiVal(level)
-        : static_cast<u8>(std::lround(level * maxLevel));
+        : static_cast<uint8_t>(std::lround(level * maxLevel));
       switch (controller) {
         case LevelController::Volume:
           if (readMode == READMODE_CONVERT_TO_MIDI) {
@@ -924,11 +924,11 @@ void SeqTrack::addLevelNoItem(double level, LevelController controller, Resoluti
       break;
     }
     case Resolution::FourteenBit: {
-      const u16 midiLevel = usesLinearAmplitudeScale()
+      const uint16_t midiLevel = usesLinearAmplitudeScale()
         ? convertPercentAmpToStd14BitMidiVal(level)
-        : static_cast<u16>(std::lround(level * maxLevel));
-      const u8 levelHi = static_cast<uint8_t>((midiLevel >> 7) & 0x7F);
-      const u8 levelLo = static_cast<uint8_t>(midiLevel & 0x7F);
+        : static_cast<uint16_t>(std::lround(level * maxLevel));
+      const uint8_t levelHi = static_cast<uint8_t>((midiLevel >> 7) & 0x7F);
+      const uint8_t levelLo = static_cast<uint8_t>(midiLevel & 0x7F);
       switch (controller) {
         case LevelController::Volume:
           if (readMode == READMODE_CONVERT_TO_MIDI) {
@@ -988,7 +988,7 @@ void SeqTrack::reapplyStoredLevelNoItem(LevelController controller, int absTime)
   addLevelNoItem(normalizedLevelFromRaw(rawLevel, resolution), controller, resolution, absTime);
 }
 
-void SeqTrack::addVol(u32 offset, u32 length, double volPercent, Resolution res, const std::string &sEventName) {
+void SeqTrack::addVol(uint32_t offset, uint32_t length, double volPercent, Resolution res, const std::string &sEventName) {
   bool isNewOffset = onEvent(offset, length);
 
   recordSeqEvent<VolSeqEvent>(isNewOffset, getTime(), volPercent, offset, length, sEventName);
@@ -1036,7 +1036,7 @@ void SeqTrack::insertVol(uint32_t offset,
   addLevelNoItem(newVol / 127.0, LevelController::Volume, Resolution::SevenBit, absTime);
 }
 
-void SeqTrack::addExpression(u32 offset, u32 length, double levelPercent, Resolution res, const std::string &sEventName) {
+void SeqTrack::addExpression(uint32_t offset, uint32_t length, double levelPercent, Resolution res, const std::string &sEventName) {
   bool isNewOffset = onEvent(offset, length);
 
   recordSeqEvent<ExpressionSeqEvent>(isNewOffset, getTime(), levelPercent, offset, length, sEventName);
@@ -1097,7 +1097,7 @@ void SeqTrack::addMasterVol(uint32_t offset, uint32_t length, uint8_t newVol, co
   addMasterVolNoItem(newVol);
 }
 
-void SeqTrack::addMasterVol(u32 offset, u32 length, double volPercent, Resolution res, const std::string &sEventName) {
+void SeqTrack::addMasterVol(uint32_t offset, uint32_t length, double volPercent, Resolution res, const std::string &sEventName) {
   bool isNewOffset = onEvent(offset, length);
 
   recordSeqEvent<MastVolSeqEvent>(isNewOffset, getTime(), volPercent, offset, length, sEventName);
@@ -1252,10 +1252,10 @@ void SeqTrack::addPitchBend(uint32_t offset, uint32_t length, int16_t bend, cons
 }
 
 void SeqTrack::addPitchBendAsPercent(uint32_t offset, uint32_t length, double percent, const std::string &sEventName) {
-  const s16 minVal = -8192;
-  const s16 maxVal = 8191;
-  const s16 bendVal = static_cast<s16>(percent * 8192);
-  s16 bend = std::clamp(bendVal, minVal, maxVal);
+  const int16_t minVal = -8192;
+  const int16_t maxVal = 8191;
+  const int16_t bendVal = static_cast<int16_t>(percent * 8192);
+  int16_t bend = std::clamp(bendVal, minVal, maxVal);
   addPitchBend(offset, length, bend, sEventName);
 }
 
@@ -1833,7 +1833,7 @@ bool SeqTrack::shouldTrackControlFlowState() const {
   return parentSeq != nullptr && parentSeq->shouldTrackControlFlowState();
 }
 
-void SeqTrack::addControlFlowState(u32 destinationOffset) {
+void SeqTrack::addControlFlowState(uint32_t destinationOffset) {
   if (!shouldTrackControlFlowState()) {
     return;
   }
@@ -1844,7 +1844,7 @@ void SeqTrack::addControlFlowState(u32 destinationOffset) {
 
 // Check if a tentative control flow state for a given offset has been visited. If it hasn't,
 // increment the infiniteLoops counter and return a bool indicating whether to continue parsing.
-bool SeqTrack::checkControlStateForInfiniteLoop(u32 offset) {
+bool SeqTrack::checkControlStateForInfiniteLoop(uint32_t offset) {
   // We handle READMODE_FIND_DELTA_LENGTH to determine total time WITH loops.
   // We handle READMODE_ADD_TO_UI so that we stop adding events when the first infinite loop point is reached.
   // We ignore READMODE_CONVERT_TO_MIDI as we use stopTime to determine when to stop parsing.
@@ -1880,11 +1880,11 @@ bool SeqTrack::checkControlStateForInfiniteLoop(u32 offset) {
   return true;
 }
 
-void SeqTrack::pushReturnOffset(u32 returnOffset) {
+void SeqTrack::pushReturnOffset(uint32_t returnOffset) {
   returnOffsets.push_back(returnOffset);
 }
 
-bool SeqTrack::popReturnOffset(u32 &returnOffset) {
+bool SeqTrack::popReturnOffset(uint32_t &returnOffset) {
   if (returnOffsets.empty()) {
     return false;
   }
@@ -1895,7 +1895,7 @@ bool SeqTrack::popReturnOffset(u32 &returnOffset) {
 }
 
 // A jump event simply moves the current track offset. It can create infinite loops.
-bool SeqTrack::addJump(u32 offset, u32 length, u32 destination, const std::string &sEventName) {
+bool SeqTrack::addJump(uint32_t offset, uint32_t length, uint32_t destination, const std::string &sEventName) {
   bool isNewOffset = onEvent(offset, length);
   curOffset = destination;
 
@@ -1905,7 +1905,7 @@ bool SeqTrack::addJump(u32 offset, u32 length, u32 destination, const std::strin
 }
 
 // A call event jumps to an offset and records a return offset (for a return event).
-bool SeqTrack::addCall(u32 offset, u32 length, u32 destination, u32 returnOffset, const std::string &sEventName) {
+bool SeqTrack::addCall(uint32_t offset, uint32_t length, uint32_t destination, uint32_t returnOffset, const std::string &sEventName) {
   bool isNewOffset = onEvent(offset, length);
   curOffset = destination;
 
@@ -1917,7 +1917,7 @@ bool SeqTrack::addCall(u32 offset, u32 length, u32 destination, u32 returnOffset
 }
 
 // A return event marks the end of a call - we jump back to after the call event offset.
-bool SeqTrack::addReturn(u32 offset, u32 length, const std::string &sEventName) {
+bool SeqTrack::addReturn(uint32_t offset, uint32_t length, const std::string &sEventName) {
   bool isNewOffset = onEvent(offset, length);
 
   uint32_t destination = 0;

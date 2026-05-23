@@ -14,25 +14,25 @@
 enum KonamiArcadeFormatVer : uint8_t;
 
 struct konami_mw_sample_info {
-  enum class sample_type: u8 {
+  enum class sample_type: uint8_t {
     PCM_8 = 0,
     PCM_16 = 4,
     ADPCM = 8,
   };
 
-  u8 loop_lsb;
-  u8 loop_mid;
-  u8 loop_msb;
-  u8 start_lsb;
-  u8 start_mid;
-  u8 start_msb;
-  u8 flags;
+  uint8_t loop_lsb;
+  uint8_t loop_mid;
+  uint8_t loop_msb;
+  uint8_t start_lsb;
+  uint8_t start_mid;
+  uint8_t start_msb;
+  uint8_t flags;
   bool loops;
-  u8 attenuation;
+  uint8_t attenuation;
 
 private:
-  static constexpr u8 mask_sample_type = 0b0000'1100;  // bits 2-3
-  static constexpr u8 mask_reverse     = 0b0010'0000;  // bit 5
+  static constexpr uint8_t mask_sample_type = 0b0000'1100;  // bits 2-3
+  static constexpr uint8_t mask_reverse     = 0b0010'0000;  // bit 5
 
 public:
   [[nodiscard]] constexpr sample_type type() const noexcept {
@@ -52,32 +52,32 @@ class KonamiArcadeInstrSet
     : public VGMInstrSet {
 public:
   struct drum {
-    u8 samp_num;
-    u8 unity_key;
-    s8 pitch_bend;
-    u8 pan;
-    u8 unknown_0;
-    u8 unknown_1;
-    u8 default_duration;
-    u8 attenuation;
+    uint8_t samp_num;
+    uint8_t unity_key;
+    int8_t pitch_bend;
+    uint8_t pan;
+    uint8_t unknown_0;
+    uint8_t unknown_1;
+    uint8_t default_duration;
+    uint8_t attenuation;
   };
 
   KonamiArcadeInstrSet(RawFile *file,
-                       u32 offset,
+                       uint32_t offset,
                        std::string name,
-                       u32 drumTableOffset,
-                       u32 drumSampleTableOffset,
+                       uint32_t drumTableOffset,
+                       uint32_t drumSampleTableOffset,
                        KonamiArcadeFormatVer fmtVer);
   ~KonamiArcadeInstrSet() override = default;
 
-  void addSampleInfoChildren(VGMItem* sampInfoItem, u32 off);
+  void addSampleInfoChildren(VGMItem* sampInfoItem, uint32_t off);
   bool parseInstrPointers() override;
   const std::array<drum, 46>& drums() { return m_drums;}
 
 private:
   KonamiArcadeFormatVer m_fmtVer;
-  u32 m_drumTableOffset;
-  u32 m_drumSampleTableOffset;
+  uint32_t m_drumTableOffset;
+  uint32_t m_drumSampleTableOffset;
   std::array<drum, 46> m_drums;
 };
 
@@ -92,15 +92,15 @@ public:
     RawFile* file,
     KonamiArcadeInstrSet* instrset,
     const std::vector<konami_mw_sample_info>& sampInfos,
-    u32 offset,
-    u32 length = 0,
+    uint32_t offset,
+    uint32_t length = 0,
     std::string name = std::string("Konami MW Sample Collection")
   );
   bool parseHeader() override;
   bool parseSampleInfo() override;
 
 private:
-  u32 determineSampleSize(u32 startOffset, konami_mw_sample_info::sample_type type, bool reverse);
+  uint32_t determineSampleSize(uint32_t startOffset, konami_mw_sample_info::sample_type type, bool reverse);
 
   std::vector<VGMItem*> samplePointers;
   KonamiArcadeInstrSet *instrset;

@@ -36,20 +36,20 @@ static bool bRateTableInitialized = false;
 //VAG format -----------------------------------
 //File Header
 typedef struct _VAGHdr {
-  u32 id;       // ID - "VAGp"
-  u32 ver;      // Version - 0x20
-  u32 __r1;
-  u32 len;      // Length of data
-  u32 rate;     // Sample rate
-  u32 __r2[3];
-  s8 title[32];
+  uint32_t id;       // ID - "VAGp"
+  uint32_t ver;      // Version - 0x20
+  uint32_t __r1;
+  uint32_t len;      // Length of data
+  uint32_t rate;     // Sample rate
+  uint32_t __r2[3];
+  int8_t title[32];
 } VAGHdr;
 
 // Sample Block
 typedef struct _VAGBlk {
   struct {
-    u8 range : 4;
-    u8 filter : 4;
+    uint8_t range : 4;
+    uint8_t filter : 4;
   };
 
   struct {
@@ -58,7 +58,7 @@ typedef struct _VAGBlk {
     b8 loop : 1;     //Loop start point
   } flag;
 
-  s8 brr[14];  //Compressed samples
+  int8_t brr[14];  //Compressed samples
 } VAGBlk;
 
 
@@ -355,7 +355,7 @@ class PSXSamp : public VGMSamp {
 
  private:
   std::vector<uint8_t> decodeToNativePcm() override;
-  static void decompVAGBlk(s16 *pSmp, const VAGBlk* pVBlk, s32 prev[2]);
+  static void decompVAGBlk(int16_t *pSmp, const VAGBlk* pVBlk, int32_t prev[2]);
 
  public:
   bool bSetLoopOnConversion{false};

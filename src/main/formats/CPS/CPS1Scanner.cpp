@@ -60,18 +60,18 @@ void CPS1Scanner::loadCPS1(MAMEGame *gameentry, CPS1FormatVer fmt_ver) {
   if (!seqRomGroupEntry || !seqRomGroupEntry->file)
     return;
   RawFile *programFile = seqRomGroupEntry->file;
-  u32 seq_table_offset;
-  u32 seq_table_length;
-  u32 opm_instr_table_offset;
-  u32 opm_instr_table_length;
-  u32 sample_instr_table_offset = 0;
+  uint32_t seq_table_offset;
+  uint32_t seq_table_length;
+  uint32_t opm_instr_table_offset;
+  uint32_t opm_instr_table_length;
+  uint32_t sample_instr_table_offset = 0;
 
-  u32 tables_offset;
+  uint32_t tables_offset;
   if (!seqRomGroupEntry->getHexAttribute("tables", &tables_offset))
     return;
 
-  u8 numSeqs;
-  u8 masterVol;
+  uint8_t numSeqs;
+  uint8_t masterVol;
   switch (fmt_ver) {
     case CPS1_V100:
       numSeqs = programFile->readByte(tables_offset + 0);
@@ -101,7 +101,7 @@ void CPS1Scanner::loadCPS1(MAMEGame *gameentry, CPS1FormatVer fmt_ver) {
     case CPS1_V500: {
       opm_instr_table_length = programFile->readShortBE(tables_offset);
       opm_instr_table_offset = tables_offset + 2;
-      u32 seq_info_offset = opm_instr_table_offset + opm_instr_table_length;
+      uint32_t seq_info_offset = opm_instr_table_offset + opm_instr_table_length;
       numSeqs = programFile->readByte(seq_info_offset);
       masterVol = programFile->readByte(seq_info_offset + 1);
       seq_table_offset = seq_info_offset + 2;
@@ -110,7 +110,7 @@ void CPS1Scanner::loadCPS1(MAMEGame *gameentry, CPS1FormatVer fmt_ver) {
     case CPS1_V502: {
       opm_instr_table_length = programFile->readShortBE(tables_offset);
       opm_instr_table_offset = tables_offset + 2;
-      u32 seq_info_offset = opm_instr_table_offset + opm_instr_table_length;
+      uint32_t seq_info_offset = opm_instr_table_offset + opm_instr_table_length;
       numSeqs = programFile->readShortBE(seq_info_offset);
       masterVol = programFile->readByte(seq_info_offset + 2);
       seq_table_offset = seq_info_offset + 4;
@@ -120,7 +120,7 @@ void CPS1Scanner::loadCPS1(MAMEGame *gameentry, CPS1FormatVer fmt_ver) {
       L_ERROR("Unknown version of CPS1 format");
       return;
   }
-  seq_table_length = numSeqs * sizeof(u16);
+  seq_table_length = numSeqs * sizeof(uint16_t);
 
   // Load the YM2151 Instrument Set
   auto instrset_name = fmt::format("{} YM2151 instrument set", gameentry->name);
@@ -128,7 +128,7 @@ void CPS1Scanner::loadCPS1(MAMEGame *gameentry, CPS1FormatVer fmt_ver) {
 
   switch (fmt_ver) {
     case CPS1_V200:
-      opmInstrsetLength = 127 * static_cast<u32>(sizeof(CPS1OPMInstrDataV2_00));
+      opmInstrsetLength = 127 * static_cast<uint32_t>(sizeof(CPS1OPMInstrDataV2_00));
       opmInstrset = new CPS1OPMInstrSet(programFile,
                                         fmt_ver, masterVol, opm_instr_table_offset,
                                         opmInstrsetLength,
@@ -137,7 +137,7 @@ void CPS1Scanner::loadCPS1(MAMEGame *gameentry, CPS1FormatVer fmt_ver) {
 
     case CPS1_V500:
     case CPS1_V502:
-      opmInstrsetLength = 127 * static_cast<u32>(sizeof(CPS1OPMInstrDataV5_02));
+      opmInstrsetLength = 127 * static_cast<uint32_t>(sizeof(CPS1OPMInstrDataV5_02));
       opmInstrset = new CPS1OPMInstrSet(programFile,
                                         fmt_ver, masterVol, opm_instr_table_offset,
                                         opmInstrsetLength,
@@ -146,14 +146,14 @@ void CPS1Scanner::loadCPS1(MAMEGame *gameentry, CPS1FormatVer fmt_ver) {
 
     case CPS1_V100:
     case CPS1_V350:
-      opmInstrsetLength = 127 * static_cast<u32>(sizeof(CPS1OPMInstrDataV4_25));
+      opmInstrsetLength = 127 * static_cast<uint32_t>(sizeof(CPS1OPMInstrDataV4_25));
       opmInstrset = new CPS1OPMInstrSet(programFile,
                                       fmt_ver, masterVol, opm_instr_table_offset,
                                       opmInstrsetLength,
                                       instrset_name);
       break;
     case CPS1_V425:
-      opmInstrsetLength = std::min(127 * static_cast<u32>(sizeof(CPS1OPMInstrDataV4_25)), sample_instr_table_offset);
+      opmInstrsetLength = std::min(127 * static_cast<uint32_t>(sizeof(CPS1OPMInstrDataV4_25)), sample_instr_table_offset);
       opmInstrset = new CPS1OPMInstrSet(programFile,
                                         fmt_ver, masterVol, opm_instr_table_offset,
                                         opmInstrsetLength,
@@ -197,7 +197,7 @@ void CPS1Scanner::loadCPS1(MAMEGame *gameentry, CPS1FormatVer fmt_ver) {
   }
 
   // Create instrument transpose table
-  std::vector<s8> instrTransposeTable;
+  std::vector<int8_t> instrTransposeTable;
   if (opmInstrset && fmt_ver == CPS1_V425 || opmInstrset && fmt_ver == CPS1_V350 ||
     opmInstrset && fmt_ver == CPS1_V100) {
     instrTransposeTable.reserve(opmInstrset->aInstrs.size());
@@ -208,16 +208,16 @@ void CPS1Scanner::loadCPS1(MAMEGame *gameentry, CPS1FormatVer fmt_ver) {
     }
   }
 
-  for (u32 seqId = 0; seqId < numSeqs; ++seqId) {
+  for (uint32_t seqId = 0; seqId < numSeqs; ++seqId) {
     uint32_t seqPointer = (fmt_ver > CPS1_V100) ?
-      programFile->readShortBE(seq_table_offset + (seqId * sizeof(u16))) :
-      programFile->readShort(seq_table_offset + (seqId * sizeof(u16)));
+      programFile->readShortBE(seq_table_offset + (seqId * sizeof(uint16_t))) :
+      programFile->readShort(seq_table_offset + (seqId * sizeof(uint16_t)));
 
     if (seqPointer == 0) {
       continue;
     }
 
-    seqTable->addChild(seq_table_offset + (seqId * sizeof(u16)), sizeof(u16), "Sequence Pointer");
+    seqTable->addChild(seq_table_offset + (seqId * sizeof(uint16_t)), sizeof(uint16_t), "Sequence Pointer");
 
     auto seqName = fmt::format("{} seq {}", gameentry->name, seqId);
     VGMSeq* newSeq;

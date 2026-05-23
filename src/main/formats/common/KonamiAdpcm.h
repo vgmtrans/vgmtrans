@@ -16,10 +16,10 @@ class KonamiAdpcmSamp : public VGMSamp {
 public:
   KonamiAdpcmSamp(
       VGMSampColl* sampColl,
-      u32 offset,
-      u32 length,
+      uint32_t offset,
+      uint32_t length,
       KonamiAdpcmChip chip,
-      u32 theRate,
+      uint32_t theRate,
       std::string name
   );
 
@@ -28,5 +28,5 @@ public:
 private:
   std::vector<uint8_t> decodeToNativePcm() override;
   KonamiAdpcmChip m_chip;
-  const s16* m_stepTable;
+  const int16_t* m_stepTable;
 };

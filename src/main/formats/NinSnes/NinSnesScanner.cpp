@@ -601,7 +601,7 @@ void NinSnesScanner::searchForNinSnesFromARAM(RawFile* file) {
       return static_cast<uint16_t>(file->readByte(ofsSetDIR + 1) << 8);
     }
     if (file->searchBytePattern(ptnSetDIRVS, ofsSetDIR)) {
-      const u16 spcDirAddrPtr = file->readShort(ofsSetDIR + 1);
+      const uint16_t spcDirAddrPtr = file->readShort(ofsSetDIR + 1);
       return static_cast<uint16_t>(file->readByte(spcDirAddrPtr) << 8);
     }
     if (file->searchBytePattern(ptnSetDIRSMW, ofsSetDIR)) {
@@ -626,7 +626,7 @@ void NinSnesScanner::searchForNinSnesFromARAM(RawFile* file) {
     if (file->searchBytePattern(ptnLoadInstrTableAddress, ofsLoadInstrTableAddressASM)) {
       info.tableAddress = file->readByte(ofsLoadInstrTableAddressASM + 7) |
                           (file->readByte(ofsLoadInstrTableAddressASM + 10) << 8);
-      const u32 firstWord = file->readWord(info.tableAddress);
+      const uint32_t firstWord = file->readWord(info.tableAddress);
       if (firstWord == 0 || firstWord == 0xFFFFFFFF) {
         info.tableAddress += 4;
       }

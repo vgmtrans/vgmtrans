@@ -19,30 +19,30 @@ void PSF2Loader::apply(const RawFile *file) {
       return;
 }
 
-    u32 sig = file->readWord(0);
+    uint32_t sig = file->readWord(0);
     if ((sig & 0x00FFFFFF) == 0x465350 && ((sig & 0xFF000000) == 0x02000000)) {
-        auto dircount = file->get<u32>(0x10);
+        auto dircount = file->get<uint32_t>(0x10);
         psf2unpack(file, 0x14, dircount);
   }
 }
 
-static u32 get32lsb(const u8 *src) {
-    return (((static_cast<u32>(src[0])) & 0xFF) << 0) | (((static_cast<u32>(src[1])) & 0xFF) << 8) |
-           (((static_cast<u32>(src[2])) & 0xFF) << 16) | (((static_cast<u32>(src[3])) & 0xFF) << 24);
+static uint32_t get32lsb(const uint8_t *src) {
+    return (((static_cast<uint32_t>(src[0])) & 0xFF) << 0) | (((static_cast<uint32_t>(src[1])) & 0xFF) << 8) |
+           (((static_cast<uint32_t>(src[2])) & 0xFF) << 16) | (((static_cast<uint32_t>(src[3])) & 0xFF) << 24);
 }
 
 int PSF2Loader::psf2_decompress_block(const RawFile *file, unsigned fileoffset,
                                       unsigned blocknumber, unsigned numblocks,
                                       unsigned char *decompressedblock, unsigned blocksize) {
   unsigned long destlen;
-  u8 *blocks = new u8[numblocks * 4];
+  uint8_t *blocks = new uint8_t[numblocks * 4];
 
   file->readBytes(fileoffset, numblocks * 4, blocks);
   unsigned long current_block = get32lsb(blocks + (blocknumber * 4));
-  u8 *zblock = new u8[current_block];
+  uint8_t *zblock = new uint8_t[current_block];
 
   int tempOffset = fileoffset + numblocks * 4;
-  for (u32 i = 0; i < blocknumber; i++)
+  for (uint32_t i = 0; i < blocknumber; i++)
     tempOffset += get32lsb(blocks + (i * 4));
   file->readBytes(tempOffset, current_block, zblock);
 
@@ -69,7 +69,7 @@ int PSF2Loader::psf2unpack(const RawFile *file, unsigned long fileoffset, unsign
 
   memset(filename, 0, std::size(filename));
 
-  for (u32 i = 0; i < dircount; i++) {
+  for (uint32_t i = 0; i < dircount; i++) {
     file->readBytes(i * 48 + fileoffset, 36, filename);
     file->readBytes(i * 48 + fileoffset + 36, 4, &offset);
     file->readBytes(i * 48 + fileoffset + 36 + 4, 4, &filesize);
@@ -83,18 +83,18 @@ int PSF2Loader::psf2unpack(const RawFile *file, unsigned long fileoffset, unsign
         return -1;
       }
     } else {
-      u32 blockcount = ((filesize + buffersize) - 1) / buffersize;
+      uint32_t blockcount = ((filesize + buffersize) - 1) / buffersize;
 
-      u8 *newdataBuf = new u8[filesize];
-      u32 actualFileSize = filesize;
-      u32 k = 0;
+      uint8_t *newdataBuf = new uint8_t[filesize];
+      uint32_t actualFileSize = filesize;
+      uint32_t k = 0;
 
       std::ptrdiff_t test = 4;
       uint16_t test2 = test;
 
-      u8 *dblock = new u8[buffersize];
+      uint8_t *dblock = new uint8_t[buffersize];
 
-      for (u32 j = 0; j < blockcount; j++) {
+      for (uint32_t j = 0; j < blockcount; j++) {
         r = psf2_decompress_block(file, offset + 0x10, j, blockcount, dblock, buffersize);
 
         if (r) {

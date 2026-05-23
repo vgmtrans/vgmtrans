@@ -235,6 +235,6 @@ class AkaoTrack final
   std::vector<uint32_t> conditional_jump_destinations;
 
  private:
-  void logUnknownEvent(u32 beginOffset) const;
+  void logUnknownEvent(uint32_t beginOffset) const;
   [[nodiscard]] bool anyUnvisitedJumpDestinations();
 };

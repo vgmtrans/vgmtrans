@@ -12,8 +12,8 @@ DECLARE_FORMAT(KonamiArcade);
 KonamiArcadeSeq::KonamiArcadeSeq(
   RawFile *file,
   KonamiArcadeFormatVer fmtVer,
-  u32 offset,
-  u32 ramOffset,
+  uint32_t offset,
+  uint32_t ramOffset,
   const std::array<KonamiArcadeInstrSet::drum, 46>& drums,
   float nmiRate,
   const std::string& name
@@ -31,7 +31,7 @@ KonamiArcadeSeq::KonamiArcadeSeq(
 
 void KonamiArcadeSeq::resetVars() {
   VGMSeq::resetVars();
-  u8 m_tempoSlideDuration = 0;
+  uint8_t m_tempoSlideDuration = 0;
   double m_tempoSlideIncrement = 0;
 }
 
@@ -41,7 +41,7 @@ bool KonamiArcadeSeq::parseHeader() {
 }
 
 bool KonamiArcadeSeq::parseTrackPointers() {
-  u32 pos = offset();
+  uint32_t pos = offset();
   int numTracks = 16;
 
   auto trackPtrTableItem = addChild(offset(), numTracks * 2, "Track Pointer Table");
@@ -58,10 +58,10 @@ bool KonamiArcadeSeq::parseTrackPointers() {
     }
 
     for (int i = 0; i < numTracks; i++) {
-      u16 memTrackOffset = readShort(pos);
+      uint16_t memTrackOffset = readShort(pos);
       if (memTrackOffset == 0) continue;
 
-      u32 romTrackOffset = offset() + (memTrackOffset - m_memOffset);
+      uint32_t romTrackOffset = offset() + (memTrackOffset - m_memOffset);
 
       trackPtrTableItem->addChild(pos, 2, fmt::format("Track {} Pointer", i));
 
@@ -70,7 +70,7 @@ bool KonamiArcadeSeq::parseTrackPointers() {
     }
   } else {
     for (int i = 0; i < numTracks; i++) {
-      u32 trackOffset = readWordBE(pos);
+      uint32_t trackOffset = readWordBE(pos);
       if (trackOffset == 0) continue;
 
       // Racin' Force has jumps to sequence data that precede the start of the sequence
@@ -137,7 +137,7 @@ void KonamiArcadeTrack::resetVars() {
   SeqTrack::resetVars();
 }
 
-u8 KonamiArcadeTrack::calculateMidiPanForK054539(u8 pan) {
+uint8_t KonamiArcadeTrack::calculateMidiPanForK054539(uint8_t pan) {
   if (pan >= 0x81 && pan <= 0x8f)
     pan -= 0x81;
   else if (pan >= 0x11 && pan <= 0x1f)
@@ -147,7 +147,7 @@ u8 KonamiArcadeTrack::calculateMidiPanForK054539(u8 pan) {
   double rightPan = panTable[pan];
   double leftPan = panTable[0xE - pan];
   double volumeScale;
-  u8 newPan = convertVolumeBalanceToStdMidiPan(leftPan, rightPan, &volumeScale);
+  uint8_t newPan = convertVolumeBalanceToStdMidiPan(leftPan, rightPan, &volumeScale);
   return newPan;
 }
 
@@ -168,7 +168,7 @@ void KonamiArcadeTrack::disablePercussion(bool& flag) {
     return;
 
   if (m_pan == 0) {
-    u8 midiPan = calculateMidiPanForK054539(0);
+    uint8_t midiPan = calculateMidiPanForK054539(0);
     if (midiPan != prevPan)
       addPanNoItem(midiPan);
   }
@@ -231,11 +231,11 @@ void KonamiArcadeTrack::onTickBegin() {
       m_vol = m_volSlideTarget;
     } else {
       m_vol += m_volSlideIncrement;
-      m_vol = std::max<s16>(m_vol, 0);
+      m_vol = std::max<int16_t>(m_vol, 0);
     }
-    u8 volByte = m_vol >> 8;
-    u8 volIndex = ~volByte & 0x7F;
-    u8 linearVol = volTable[volIndex] * 0x7F;
+    uint8_t volByte = m_vol >> 8;
+    uint8_t volIndex = ~volByte & 0x7F;
+    uint8_t linearVol = volTable[volIndex] * 0x7F;
     if (linearVol != vol) {
       addVolNoItem(linearVol);
     }
@@ -248,10 +248,10 @@ void KonamiArcadeTrack::onTickBegin() {
       m_actualPan = m_panSlideTarget;
     } else {
       m_actualPan += m_panSlideIncrement;
-      m_actualPan = std::clamp<s16>(m_actualPan, 0x100, 0x1F00);
+      m_actualPan = std::clamp<int16_t>(m_actualPan, 0x100, 0x1F00);
     }
-    u8 panByte = m_actualPan >> 8;
-    u8 midiPan = calculateMidiPanForK054539(panByte | 0x10);
+    uint8_t panByte = m_actualPan >> 8;
+    uint8_t midiPan = calculateMidiPanForK054539(panByte | 0x10);
     if (midiPan != prevPan) {
       addPanNoItem(midiPan);
     }
@@ -308,10 +308,10 @@ bool KonamiArcadeTrack::readEvent() {
     else {
       vel = durOrVel - 0x80;
     }
-    s16 atten = 0x7f - vel + m_loopAtten[0] + m_loopAtten[1];
-    atten = std::clamp<s16>(atten, 0, 255);
+    int16_t atten = 0x7f - vel + m_loopAtten[0] + m_loopAtten[1];
+    atten = std::clamp<int16_t>(atten, 0, 255);
 
-    u8 linearVel = std::round(std::max(0.0, volTable[atten]) * 0x7F);
+    uint8_t linearVel = std::round(std::max(0.0, volTable[atten]) * 0x7F);
 
     // TODO: fix duration calculation. It uses dur as index to table at 0x1F0 in viostorm.
     // Something like this - need to verify the + 0.5 rounding thing
@@ -319,7 +319,7 @@ bool KonamiArcadeTrack::readEvent() {
     // if (m_duration > 0 && m_duration < 100) {
     //   durNumerator = durationTable[m_duration];
     //   durFraction = (durNumerator / 255.0)
-    //   u8 actualDuration = (u8)(durFraction * delta + 0.5)
+    //   uint8_t actualDuration = (uint8_t)(durFraction * delta + 0.5)
     //   // Adjust the result if numerator is even and greater than 128
     //   if (durNumerator > 128 && (durNumerator % 2) == 0) {
     //     actualDuration -= 1;
@@ -333,12 +333,12 @@ bool KonamiArcadeTrack::readEvent() {
       if (percussionEnabled() && (note - 24) < 46) {
         auto seq = static_cast<KonamiArcadeSeq*>(parentSeq);
         auto& drum = seq->drums()[note-24];
-        u8 defaultDrumDur = drum.default_duration;
+        uint8_t defaultDrumDur = drum.default_duration;
         actualDuration = (delta * defaultDrumDur) / 100;
 
         // Drums provide their own pan, but this is only applied when the channel pan value is 0
         if (m_pan == 0) {
-          u8 midiPan = calculateMidiPanForK054539(drum.pan | 0x10);
+          uint8_t midiPan = calculateMidiPanForK054539(drum.pan | 0x10);
           if (midiPan != prevPan)
             addPanNoItem(midiPan);
         }
@@ -386,7 +386,7 @@ bool KonamiArcadeTrack::readEvent() {
       }
     } else if (m_slideModeDepth != 0 && m_slideModeDuration > 0 && actualDuration > (m_slideModeDelay + 1)) {
       // Slide note
-      u8 slideStartNote = note - m_slideModeDepth;
+      uint8_t slideStartNote = note - m_slideModeDepth;
       addNoteByDurNoItem(slideStartNote, linearVel, m_slideModeDelay + 1);
       insertPortamentoTime14BitNoItem(m_slideModeDuration * m_microsecsPerTick, getTime() + m_slideModeDelay);
       insertPortamentoControlNoItem(slideStartNote, getTime() + m_slideModeDelay);
@@ -543,7 +543,7 @@ bool KonamiArcadeTrack::readEvent() {
     case 0xE3: {
       m_pan = (readByte(curOffset++));
       m_actualPan = m_pan << 8;
-      u8 midiPan = calculateMidiPanForK054539(m_pan | 0x10);
+      uint8_t midiPan = calculateMidiPanForK054539(m_pan | 0x10);
       addPan(beginOffset, curOffset - beginOffset, midiPan);
       m_panSlideDuration = 0;
       break;
@@ -551,9 +551,9 @@ bool KonamiArcadeTrack::readEvent() {
 
     // LFO settings (or perhaps just vibrato)
     case 0xE4: {
-      u8 depth = readByte(curOffset++); // lower seems to result in more effect. 7F turns off all vibrato regardless of amplitude.
-      u8 freq = readByte(curOffset++);  // higher results in faster fluctuation
-      u8 amplitude = readByte(curOffset++); // higher results in greater LFO effect
+      uint8_t depth = readByte(curOffset++); // lower seems to result in more effect. 7F turns off all vibrato regardless of amplitude.
+      uint8_t freq = readByte(curOffset++);  // higher results in faster fluctuation
+      uint8_t amplitude = readByte(curOffset++); // higher results in greater LFO effect
       addUnknown(beginOffset, curOffset - beginOffset, "Vibrato?");
       break;
     }
@@ -583,9 +583,9 @@ bool KonamiArcadeTrack::readEvent() {
     case 0xE9: {
       loopNum = 1;
     doLoop:
-      u8 loopCount = readByte(curOffset++);
-      s8 initialLoopAtten = -readByte(curOffset++);
-      s8 initialLoopTranspose = readByte(curOffset++);
+      uint8_t loopCount = readByte(curOffset++);
+      int8_t initialLoopAtten = -readByte(curOffset++);
+      int8_t initialLoopTranspose = readByte(curOffset++);
       if (m_loopCounter[loopNum] == 0) {
         if (loopCount == 1) {
           m_loopAtten[loopNum] = 0;
@@ -663,9 +663,9 @@ bool KonamiArcadeTrack::readEvent() {
 
     // Volume
     case 0xEE: {
-      u8 volByte = readByte(curOffset++);
-      u8 volIndex = ~volByte & 0x7F;
-      u8 linearVol = volTable[volIndex] * 0x7F;
+      uint8_t volByte = readByte(curOffset++);
+      uint8_t volIndex = ~volByte & 0x7F;
+      uint8_t linearVol = volTable[volIndex] * 0x7F;
       addVol(beginOffset, curOffset - beginOffset, linearVol);
       m_vol = volByte << 8;
       m_volSlideDuration = 0;
@@ -688,7 +688,7 @@ bool KonamiArcadeTrack::readEvent() {
       m_slideModeDuration = 0;
 
       if (m_portamentoTime > 0) {
-        u16 actualPortamentoTime = m_portamentoTime * m_microsecsPerTick;
+        uint16_t actualPortamentoTime = m_portamentoTime * m_microsecsPerTick;
         addPortamentoTime14BitNoItem(actualPortamentoTime);
         auto desc = fmt::format("Portamento Time: {:d} milliseconds", actualPortamentoTime);
         addGenericEvent(beginOffset, curOffset - beginOffset, "Portamento On", desc, Type::Portamento);
@@ -714,7 +714,7 @@ bool KonamiArcadeTrack::readEvent() {
 
     // Pitch Bend
     case 0xF2: {
-      s8 pitchBend = readByte(curOffset++);
+      int8_t pitchBend = readByte(curOffset++);
       // data byte of 0x40 == 1 semitone. Equivalent to 4096 in MIDI when range is default 2 semitones
       addPitchBend(beginOffset, curOffset - beginOffset, pitchBend * 64);
       break;
@@ -722,9 +722,9 @@ bool KonamiArcadeTrack::readEvent() {
 
     // Pitch Slide
     case 0xF3: {
-      u8 delay = readByte(curOffset++);
-      u8 duration = readByte(curOffset++);
-      u8 targetNote = readByte(curOffset++);
+      uint8_t delay = readByte(curOffset++);
+      uint8_t duration = readByte(curOffset++);
+      uint8_t targetNote = readByte(curOffset++);
       delay = delay == 0 ? 1 : delay;
       targetNote += 24;
       auto desc = fmt::format("Delay: {:d}  Duration: {:d}  Target Note: {:d}",
@@ -750,7 +750,7 @@ bool KonamiArcadeTrack::readEvent() {
       makeTrulyPrevDurNoteEnd(m_prevNoteAbsTime + delay + 1);  // add one to ensure the notes overlap to trigger portamento effect
       insertPortamentoTime14BitNoItem(duration * m_microsecsPerTick, m_prevNoteAbsTime + delay);
       insertPortamentoControlNoItem(m_prevFinalKey, m_prevNoteAbsTime + delay);
-      u32 newNoteDur = m_prevNoteDur - delay;
+      uint32_t newNoteDur = m_prevNoteDur - delay;
       insertNoteByDurNoItem(targetNote, prevVel, newNoteDur, m_prevNoteAbsTime + delay);
       if (m_portamentoTime > 0) {
         insertPortamentoTime14BitNoItem(m_portamentoTime * m_microsecsPerTick, m_prevNoteAbsTime + m_prevNoteDur);
@@ -795,7 +795,7 @@ bool KonamiArcadeTrack::readEvent() {
     }
 
     case 0xF9: {
-      u8 data = readByte(curOffset++);
+      uint8_t data = readByte(curOffset++);
       addUnknown(beginOffset, curOffset - beginOffset);
       break;
     }
@@ -811,10 +811,10 @@ bool KonamiArcadeTrack::readEvent() {
     // Jump
     case 0xFD: {
       auto seq = static_cast<KonamiArcadeSeq*>(parentSeq);
-      u32 dest;
+      uint32_t dest;
       int eventLength = seq->fmtVer == MysticWarrior ? 3 : 5;
       if (seq->fmtVer == MysticWarrior) {
-        u16 memJumpOffset = readShort(curOffset);
+        uint16_t memJumpOffset = readShort(curOffset);
         dest = seq->offset() + (memJumpOffset - seq->memOffset());
       } else {
         dest = getWordBE(curOffset);
@@ -837,11 +837,11 @@ bool KonamiArcadeTrack::readEvent() {
     // Call
     case 0xFE: {
       m_inJump = true;
-      u32 dest;
+      uint32_t dest;
       auto seq = static_cast<KonamiArcadeSeq*>(parentSeq);
       if (seq->fmtVer == MysticWarrior) {
         m_jumpReturnOffset = curOffset + 2;
-        u16 memJumpOffset = readShort(curOffset);
+        uint16_t memJumpOffset = readShort(curOffset);
         dest = seq->offset() + (memJumpOffset - seq->memOffset());
       } else {
         m_jumpReturnOffset = curOffset + 4;

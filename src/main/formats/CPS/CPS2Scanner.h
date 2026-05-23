@@ -4,7 +4,7 @@
 
 struct MAMEGame;
 
-enum CPS2FormatVer: u8 {
+enum CPS2FormatVer: uint8_t {
   CPS2_VERSION_UNDEFINED,
   CPS2_V100,
   CPS2_V101,

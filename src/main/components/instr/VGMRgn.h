@@ -55,20 +55,20 @@ class VGMRgn : public VGMItem {
 
 public:
   VGMInstr *parInstr;
-  u8 keyLow       {0};
-  u8 keyHigh      {0x7F};
-  u8 velLow       {0};
-  u8 velHigh      {0x7F};
+  uint8_t keyLow       {0};
+  uint8_t keyHigh      {0x7F};
+  uint8_t velLow       {0};
+  uint8_t velHigh      {0x7F};
 
-  s8 unityKey     {-1};
-  s16 coarseTune  {0};     // in semitones
-  s16 fineTune    {0};     // in cents
+  int8_t unityKey     {-1};
+  int16_t coarseTune  {0};     // in semitones
+  int16_t fineTune    {0};     // in cents
 
   Loop loop;
 
-  u32 sampNum        {0};
-  s32 sampOffset     {-1};  // optional value. If a sample offset is provided, then find the sample
-  s32 sampDataLength {-1};  // optional value. Refines sample matching in case of collisions.
+  uint32_t sampNum        {0};
+  int32_t sampOffset     {-1};  // optional value. If a sample offset is provided, then find the sample
+  int32_t sampDataLength {-1};  // optional value. Refines sample matching in case of collisions.
   // number based on this offset. It will match a sample with an identical absolute offset, or
   // sample's offset relative to the beginning of sample data (VGMSampColl::sampDataOffset)
 
@@ -77,12 +77,12 @@ public:
 
   double pan            {0.5};   // percentage.  0 = full left. 0.5 = center.  1 = full right
   double attack_time    {0};     // in seconds
-  u16 attack_transform  {no_transform};
+  uint16_t attack_transform  {no_transform};
   double hold_time      {0};     // in seconds
   double decay_time     {0};     // in seconds
   double sustain_level  {-1};    // as a percentage of amplitude
   double sustain_time   {0};     // in seconds (we don't support positive rate here, as is possible on psx)
-  u16 release_transform {no_transform};
+  uint16_t release_transform {no_transform};
   double release_time   {0};     // in seconds
 
 private:

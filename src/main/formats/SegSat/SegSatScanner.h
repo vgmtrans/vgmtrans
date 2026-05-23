@@ -27,7 +27,7 @@ class SegSatScanner : public VGMScanner {
   SegSatDriverVer determineVersion(RawFile* file);
   void handleSsfFile(RawFile* file);
   std::vector<SegSatSeq *> searchForSeqs(RawFile *file, bool useMatcher);
-  bool validateBankAt(RawFile *file, u32 base);
+  bool validateBankAt(RawFile *file, uint32_t base);
   std::vector<SegSatInstrSet *> searchForInstrSets(RawFile *file, SegSatDriverVer& ver, bool useMatcher);
 
 private:

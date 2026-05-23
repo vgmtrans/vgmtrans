@@ -17,11 +17,11 @@ struct ID666Tag {
   std::string nameOfDumper;
   std::string comments;
   std::string dateDumped;
-  u32 secondsToPlay;
-  u32 fadeLength;
+  uint32_t secondsToPlay;
+  uint32_t fadeLength;
   std::string artist;
-  u8 defaultChannelDisables;
-  u8 emulatorUsed;
+  uint8_t defaultChannelDisables;
+  uint8_t emulatorUsed;
 };
 
 class SPCFile {
@@ -31,17 +31,17 @@ public:
 
   static VGMTag tagFromSPCFile(const SPCFile&);
 
-  [[nodiscard]] const std::array<u8, 64 * 1024>& ram() const { return m_ram; }
-  [[nodiscard]] const std::array<u8, 128>& dsp() const { return m_dspRegisters; }
-  [[nodiscard]] const std::array<u8, 64>& extraRam() const { return m_extraRam; }
+  [[nodiscard]] const std::array<uint8_t, 64 * 1024>& ram() const { return m_ram; }
+  [[nodiscard]] const std::array<uint8_t, 128>& dsp() const { return m_dspRegisters; }
+  [[nodiscard]] const std::array<uint8_t, 64>& extraRam() const { return m_extraRam; }
   [[nodiscard]] const ID666Tag& id666Tag() const { return m_id666Tag; }
 
 private:
   bool m_hasID666Tag;
   uint8_t m_versionMinor;
-  std::array<u8, 64 * 1024> m_ram;
-  std::array<u8, 128> m_dspRegisters;
-  std::array<u8, 64> m_extraRam;
+  std::array<uint8_t, 64 * 1024> m_ram;
+  std::array<uint8_t, 128> m_dspRegisters;
+  std::array<uint8_t, 64> m_extraRam;
   ID666Tag m_id666Tag;
 
   void loadID666Tag(const RawFile& file);

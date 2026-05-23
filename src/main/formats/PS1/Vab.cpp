@@ -247,7 +247,7 @@ bool VabRgn::loadRgn() {
   // If it exceeds 127, driver clips the value and it will become 127. (In Hokuto no Ken, at least)
   // I am not sure if the interpretation of this value depends on a driver or VAB version.
   uint8_t ft = readByte(offset() + 5);
-  ft = std::min(ft, static_cast<u8>(127));
+  ft = std::min(ft, static_cast<uint8_t>(127));
   double cents = ft * 100.0 / 128.0;
   setFineTune((int16_t) cents);
 

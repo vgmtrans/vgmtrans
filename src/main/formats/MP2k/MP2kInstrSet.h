@@ -34,24 +34,24 @@ private:
 };
 
 struct MP2kInstrData {
-  u32 w0;
-  u32 w1;
-  u32 w2;
+  uint32_t w0;
+  uint32_t w1;
+  uint32_t w2;
 };
 
 class MP2kInstr final : public VGMInstr {
 public:
-  MP2kInstr(MP2kInstrSet *set, size_t offset, size_t length, u32 bank, u32 number,
+  MP2kInstr(MP2kInstrSet *set, size_t offset, size_t length, uint32_t bank, uint32_t number,
             MP2kInstrData data);
   ~MP2kInstr() = default;
 
   bool loadInstr() override;
 
 private:
-  void setADSR(VGMRgn *dest, u32 data);
-  void setCgbADSR(VGMRgn *dest, u32 data);
+  void setADSR(VGMRgn *dest, uint32_t data);
+  void setCgbADSR(VGMRgn *dest, uint32_t data);
 
-  u8 m_type = 0;
+  uint8_t m_type = 0;
   MP2kInstrData m_data;
 };
 

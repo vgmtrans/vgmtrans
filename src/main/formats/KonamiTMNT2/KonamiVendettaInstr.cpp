@@ -13,12 +13,12 @@
 
 KonamiVendettaSampleInstrSet::KonamiVendettaSampleInstrSet(
   RawFile *file,
-  u32 offset,
-  u32 instrTableOffsetYM2151,
-  u32 instrTableOffsetK053260,
-  u32 sampInfosOffset,
-  u32 drumBanksOffset,
-  u32 drumsOffset,
+  uint32_t offset,
+  uint32_t instrTableOffsetYM2151,
+  uint32_t instrTableOffsetK053260,
+  uint32_t sampInfosOffset,
+  uint32_t drumBanksOffset,
+  uint32_t drumsOffset,
   vendetta_sub_offsets subOffsets,
   const std::vector<konami_vendetta_instr_k053260>& instrs,
   const std::vector<konami_vendetta_sample_info>& sampInfos,
@@ -37,9 +37,9 @@ KonamiVendettaSampleInstrSet::KonamiVendettaSampleInstrSet(
 {
 }
 
-void KonamiVendettaSampleInstrSet::addInstrInfoChildren(VGMItem* instrInfoItem, u32 off) {
+void KonamiVendettaSampleInstrSet::addInstrInfoChildren(VGMItem* instrInfoItem, uint32_t off) {
   std::string sampleTypeStr;
-  u8 flagsByte = readByte(off);
+  uint8_t flagsByte = readByte(off);
   sampleTypeStr = (flagsByte & 0x10) ? "KADPCM" : "PCM 8";
 
   if (flagsByte & 0x08) {
@@ -63,7 +63,7 @@ void KonamiVendettaSampleInstrSet::addSampleInfoItems() {
     "Sample Infos"
   );
   for (int i = 0; i < numSampInfos; ++i) {
-    u32 offset = m_sampInfosOffset + i * sizeof(konami_vendetta_sample_info);
+    uint32_t offset = m_sampInfosOffset + i * sizeof(konami_vendetta_sample_info);
     auto sampInfo = sampInfosItem->addChild(
       offset,
       sizeof(konami_vendetta_sample_info),
@@ -91,8 +91,8 @@ bool KonamiVendettaSampleInstrSet::parseInstrPointers() {
 
 bool KonamiVendettaSampleInstrSet::parseMelodicInstrs() {
   auto instrTableItem = addChild(m_instrTableOffsetK053260, m_instrsK053260.size() * 2, "Instrument Table");
-  u16 minInstrOffset = -1;
-  u16 maxInstrOffset = 0;
+  uint16_t minInstrOffset = -1;
+  uint16_t maxInstrOffset = 0;
   for (int i = 0; i < m_instrsK053260.size(); ++i) {
     minInstrOffset = std::min(minInstrOffset, readShort(m_instrTableOffsetK053260 + i * 2));
     maxInstrOffset = std::max(maxInstrOffset, readShort(m_instrTableOffsetK053260 + i * 2));
@@ -106,7 +106,7 @@ bool KonamiVendettaSampleInstrSet::parseMelodicInstrs() {
   );
   int instrNum = 0;
   for (auto& instrInfo : m_instrsK053260) {
-    u32 offset = readShort(m_instrTableOffsetK053260 + instrNum * 2);
+    uint32_t offset = readShort(m_instrTableOffsetK053260 + instrNum * 2);
 
     // Add the UI Items
     auto instrItem = instrsItem->addChild(offset, 3, fmt::format("Instrument {}", instrNum));
@@ -148,9 +148,9 @@ bool KonamiVendettaSampleInstrSet::parseDrums() {
   // Load Drums. Drums end at YM2151 Instr Table
   VGMItem* drumsItem = new VGMItem(nullptr, m_drumsOffset, 0, "Drums");
 
-  std::map<u16, int> drumOffsetToIdx;
+  std::map<uint16_t, int> drumOffsetToIdx;
   int drumIdx = 0;
-  for (u16 i = m_drumsOffset; i < m_instrTableOffsetYM2151; ) {
+  for (uint16_t i = m_drumsOffset; i < m_instrTableOffsetYM2151; ) {
     VGMItem* drumItem = drumsItem->addChild(i, 0, fmt::format("Drum {}", drumIdx));
     auto instrData = drumItem->addChild(i, 3, "Instrument Data");
     instrData->addChild(i, 1, "Sample Info Index");
@@ -166,7 +166,7 @@ bool KonamiVendettaSampleInstrSet::parseDrums() {
 
   if (drumInfos.size() == 0)
     return false;
-  u16 drumsOffset = drumOffsetToIdx.begin()->first - 3;
+  uint16_t drumsOffset = drumOffsetToIdx.begin()->first - 3;
   int numDrumTables = (drumsOffset - m_drumBanksOffset) / 0x20;
 
   auto drumBanksItem = addChild(m_drumBanksOffset, numDrumTables * 0x20, "Drum Banks");
@@ -174,12 +174,12 @@ bool KonamiVendettaSampleInstrSet::parseDrums() {
   VGMInstr* drumKit = new VGMInstr(this, offset(), length(), 1, 0, "Drum Kit");
 
   int drumNum = 0;
-  for (u32 i = 0; i < numDrumTables; ++i) {
-    u16 drumBankPtr = m_drumBanksOffset + (i * 0x20);
+  for (uint32_t i = 0; i < numDrumTables; ++i) {
+    uint16_t drumBankPtr = m_drumBanksOffset + (i * 0x20);
     auto drumBankItem = drumBanksItem->addChild(drumBankPtr, 0x20, fmt::format("Drum Bank {}", i));
     for (int j = 0; j < 16; ++j) {
-      u32 ptrOffset = drumBankPtr + j * 2;
-      u16 ptr = readShort(ptrOffset);
+      uint32_t ptrOffset = drumBankPtr + j * 2;
+      uint16_t ptr = readShort(ptrOffset);
 
       if (ptr == 0)
         continue;
@@ -195,12 +195,12 @@ bool KonamiVendettaSampleInstrSet::parseDrums() {
       auto sampInfo = m_sampInfos[sampInfoIdx];
       rgn->sampOffset = sampInfo.start();
       rgn->sampDataLength = sampInfo.length();
-      u8 key = (i * 16) + j;
+      uint8_t key = (i * 16) + j;
       rgn->keyLow = key;
       rgn->keyHigh = key;
       rgn->unityKey = key;
 
-      s16 pitch = drumInfo.pitch != -1 ? drumInfo.pitch : (sampInfo.pitch_hi << 8) + sampInfo.pitch_lo;
+      int16_t pitch = drumInfo.pitch != -1 ? drumInfo.pitch : (sampInfo.pitch_hi << 8) + sampInfo.pitch_lo;
       double relativePitchCents = k053260_pitch_cents(pitch);
       rgn->coarseTune = relativePitchCents / 100;
       rgn->fineTune = static_cast<int>(relativePitchCents) % 100;
@@ -215,7 +215,7 @@ bool KonamiVendettaSampleInstrSet::parseDrums() {
 
 konami_vendetta_drum_info KonamiVendettaSampleInstrSet::parseVendettaDrum(
   RawFile* programRom,
-  u16& offset,
+  uint16_t& offset,
   const vendetta_sub_offsets& subOffsets,
   VGMItem* drumItem
 ) {
@@ -223,10 +223,10 @@ konami_vendetta_drum_info KonamiVendettaSampleInstrSet::parseVendettaDrum(
   // We will store the meaning of those instructions in a konami_vendetta_drum_info instance.
   konami_vendetta_drum_info drumInfo;
   offset += sizeof(konami_vendetta_instr_k053260);
-  u16 hl = 0;
-  u8 a = 0;
+  uint16_t hl = 0;
+  uint8_t a = 0;
   while (offset < programRom->size()) {
-    u8 opcode = programRom->readByte(offset);
+    uint8_t opcode = programRom->readByte(offset);
     switch (opcode) {
       case 0x21:    // LD HL <data> - loads the instr table offset or the pitch
         hl = programRom->readShort(offset + 1);
@@ -242,7 +242,7 @@ konami_vendetta_drum_info KonamiVendettaSampleInstrSet::parseVendettaDrum(
 
       case 0xCD: {
         // CALL <addr> - calls a subroutine
-        u16 dest = programRom->readShort(offset + 1);
+        uint16_t dest = programRom->readShort(offset + 1);
         if (dest == subOffsets.load_instr) {
           programRom->readBytes(hl, sizeof(konami_vendetta_instr_k053260), &drumInfo.instr);
           drumItem->addChild(offset, 3, fmt::format("Instruction - CALL load_instrument"));
@@ -261,7 +261,7 @@ konami_vendetta_drum_info KonamiVendettaSampleInstrSet::parseVendettaDrum(
 
       case 0xC3: {
         // JP - sets the drum ptr to state and we're done
-        u16 dest = programRom->readShort(offset + 1);
+        uint16_t dest = programRom->readShort(offset + 1);
         drumItem->addChild(offset, 3, fmt::format("Instruction - JP {:02X}", dest));
         offset += 3;
         drumItem->setLength(offset - drumItem->offset());

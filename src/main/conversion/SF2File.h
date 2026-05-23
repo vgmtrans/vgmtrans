@@ -244,7 +244,7 @@ class SF2StringChunk: public Chunk {
  public:
   SF2StringChunk(const std::string& ckSig, const std::string& info)
       : Chunk(ckSig) {
-    setData(info.c_str(), static_cast<u32>(info.length()));
+    setData(info.c_str(), static_cast<uint32_t>(info.length()));
   }
 };
 

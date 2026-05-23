@@ -362,7 +362,7 @@ SF2File::SF2File(SynthFile *synthfile)
   //***********
   // igen chunk
   //***********
-  u32 numTotalGens = 1;
+  uint32_t numTotalGens = 1;
   for (const auto instr : synthfile->vInstrs) {
     numTotalGens += static_cast<uint32_t>(instr->generators().size());
     for (const auto rgn : instr->vRgns) {
@@ -406,7 +406,7 @@ SF2File::SF2File(SynthFile *synthfile)
 
       // initialAttenuation
       instGenList.sfGenOper = initialAttenuation;
-      u16 atten = static_cast<u16>(std::clamp(
+      uint16_t atten = static_cast<uint16_t>(std::clamp(
         std::round((rgn->attenDb + rgn->sampinfo->attenuation) * 10.0),
         0.0, 1440.0));
       instGenList.genAmount.wAmount = atten;

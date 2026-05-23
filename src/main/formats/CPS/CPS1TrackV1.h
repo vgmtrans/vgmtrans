@@ -14,24 +14,24 @@ public:
 
 private:
   CPSSynth channelSynth;
-  u8 noteDuration = 0;
-  s8 key;
-  s8 progNum = -1;
-  s8 instrTranspose = 0;
-  s8 cps0transpose = 0;
+  uint8_t noteDuration = 0;
+  int8_t key;
+  int8_t progNum = -1;
+  int8_t instrTranspose = 0;
+  int8_t cps0transpose = 0;
   bool restFlag = false;
   bool extendDeltaFlag = false;
   bool tieNoteFlag = false;
-  u8 shortenDeltaCounter = 0;
-  u8 tieNoteCounter = 0;
+  uint8_t shortenDeltaCounter = 0;
+  uint8_t tieNoteCounter = 0;
 
   bool bPrevNoteTie = false;
-  u8 prevTieNote = 0;
-  u8 curDeltaTable;
-  u8 noteState;
-  u8 bank;
-  u8 loop[3];
-  u32 loopOffset[3];
-  s16 portamentoCentsPerSec;
-  u16 prevPortamentoDuration;
+  uint8_t prevTieNote = 0;
+  uint8_t curDeltaTable;
+  uint8_t noteState;
+  uint8_t bank;
+  uint8_t loop[3];
+  uint32_t loopOffset[3];
+  int16_t portamentoCentsPerSec;
+  uint16_t prevPortamentoDuration;
 };

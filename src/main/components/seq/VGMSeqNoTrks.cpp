@@ -149,7 +149,7 @@ void VGMSeqNoTrks::tryExpandMidiTracks(uint32_t numTracks) {
   }
 }
 
-void VGMSeqNoTrks::setChannel(u8 newChannel) {
+void VGMSeqNoTrks::setChannel(uint8_t newChannel) {
   setCurTrack(newChannel);
   if (newChannel == 9 && ConversionOptions::the().skipChannel10())
     channel = 0;

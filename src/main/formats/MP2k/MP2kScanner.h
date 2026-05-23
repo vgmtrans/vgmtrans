@@ -19,7 +19,7 @@ public:
 
 private:
   std::optional<size_t> detectMP2K(RawFile *file);
-  static bool isValidOffset(u32 offset, u32 romsize);
-  static bool isGbaRomAddress(u32 address);
-  static u32 gbaAddressToOffset(u32 address);
+  static bool isValidOffset(uint32_t offset, uint32_t romsize);
+  static bool isGbaRomAddress(uint32_t address);
+  static uint32_t gbaAddressToOffset(uint32_t address);
 };

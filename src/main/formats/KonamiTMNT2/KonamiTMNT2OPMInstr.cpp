@@ -10,7 +10,7 @@
 KonamiTMNT2OPMInstrSet::KonamiTMNT2OPMInstrSet(
   RawFile *file,
   KonamiTMNT2FormatVer fmtVer,
-  u32 offset,
+  uint32_t offset,
   std::string name
 )
   : YM2151InstrSet(KonamiTMNT2Format::name, file, offset, 0, std::move(name)),
@@ -21,8 +21,8 @@ KonamiTMNT2OPMInstrSet::KonamiTMNT2OPMInstrSet(
 bool KonamiTMNT2OPMInstrSet::parseInstrPointers() {
   auto instrTableItem = addChild(offset(), 0, "Instrument Table");
   for (int i = 0; ; ++i) {
-    u32 instrPtrOff = offset() + (i * 2);
-    u16 instrPtr = readShort(instrPtrOff);
+    uint32_t instrPtrOff = offset() + (i * 2);
+    uint16_t instrPtr = readShort(instrPtrOff);
     if (instrPtr < offset() || instrPtr > offset() + 0x2000)
       break;
     instrTableItem->addChild(instrPtrOff, 2, fmt::format("Instrument {} Pointer", i));

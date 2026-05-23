@@ -80,8 +80,8 @@ bool AkaoColl::loadMain() {
       }
 
       // TODO: confirm the actual logic. This is simply a guess.
-      u16 adsr1 = art->ADSR1;
-      u16 adsr2 = art->ADSR2;
+      uint16_t adsr1 = art->ADSR1;
+      uint16_t adsr2 = art->ADSR2;
       adsr1 &= ~0x7F00;
       adsr1 |= (rgn->attackRate & 0x7F) << 8;
       adsr2 &= ~0xFFDF;

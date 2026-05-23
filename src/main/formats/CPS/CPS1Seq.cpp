@@ -3,7 +3,7 @@
 #include "CPS1TrackV1.h"
 #include "CPS1TrackV2.h"
 
-CPS1Seq::CPS1Seq(RawFile *file, uint32_t offset, CPS1FormatVer fmtVersion, std::string name, std::vector<s8> instrTransposeTable)
+CPS1Seq::CPS1Seq(RawFile *file, uint32_t offset, CPS1FormatVer fmtVersion, std::string name, std::vector<int8_t> instrTransposeTable)
     : VGMSeq(CPS1Format::name, file, offset, 0, std::move(name)),
       fmtVersion(fmtVersion),
       instrTransposeTable(instrTransposeTable) {
@@ -26,7 +26,7 @@ bool CPS1Seq::parseTrackPointers() {
   if ((readByte(offset()) & 0x80) > 0)
     return false;
 
-  std::function<u16(u32)> read16;
+  std::function<uint16_t(uint32_t)> read16;
   if (fmtVersion == CPS1_V100) {
     read16 = [this](uint32_t offset) { return this->readShort(offset); };
   } else {
@@ -72,7 +72,7 @@ bool CPS1Seq::parseTrackPointers() {
 }
 
 
-s8 CPS1Seq::transposeForInstr(u8 instrIndex) {
+int8_t CPS1Seq::transposeForInstr(uint8_t instrIndex) {
   if (instrIndex >= instrTransposeTable.size()) {
     return 0;
   }

@@ -305,16 +305,16 @@ void MidiTrack::insertVolumeFine(uint8_t channel, uint8_t volume_lsb, uint32_t a
 
 //TODO: Master Volume sysex events are meant to be global to device, not per channel.
 // For per channel master volume, we should add a system for normalizing controller vol events.
-void MidiTrack::addMasterVol(uint8_t channel, u8 volMsb, u8 volLsb) {
+void MidiTrack::addMasterVol(uint8_t channel, uint8_t volMsb, uint8_t volLsb) {
   MidiEvent *newEvent = new MasterVolEvent(this, channel, getDelta(), volMsb, volLsb);
   aEvents.push_back(newEvent);
 }
 
-void MidiTrack::insertMasterVol(uint8_t channel, u8 volMsb, uint32_t absTime) {
+void MidiTrack::insertMasterVol(uint8_t channel, uint8_t volMsb, uint32_t absTime) {
   insertMasterVol(channel, volMsb, 0, absTime);
 }
 
-void MidiTrack::insertMasterVol(uint8_t channel, u8 volMsb, u8 volLsb, uint32_t absTime) {
+void MidiTrack::insertMasterVol(uint8_t channel, uint8_t volMsb, uint8_t volLsb, uint32_t absTime) {
   MidiEvent *newEvent = new MasterVolEvent(this, channel, absTime, volMsb, volLsb);
   aEvents.push_back(newEvent);
 }
@@ -869,9 +869,9 @@ uint32_t ControllerEvent::writeEvent(std::vector<uint8_t> &buf, uint32_t time) {
 
 uint32_t PortamentoControlEvent::writeEvent(std::vector<uint8_t> &buf, uint32_t time) {
   // Add the global transpose into the starting key of the portamento control event
-  u8 originalDataByte = dataByte;
-  dataByte = std::clamp<s16>(dataByte + prntTrk->parentSeq->globalTranspose, 0, 127);
-  u32 result = ControllerEvent::writeEvent(buf, time);
+  uint8_t originalDataByte = dataByte;
+  dataByte = std::clamp<int16_t>(dataByte + prntTrk->parentSeq->globalTranspose, 0, 127);
+  uint32_t result = ControllerEvent::writeEvent(buf, time);
   dataByte = originalDataByte;
   return result;
 }

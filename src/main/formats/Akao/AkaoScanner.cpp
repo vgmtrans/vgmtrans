@@ -30,7 +30,7 @@ void AkaoScanner::scan(RawFile* file, void* /*info*/) {
       if (version == AkaoPs1Version::UNKNOWN)
         version = AkaoSeq::guessVersion(file, offset);
 
-      u16 id = file->readShort(offset + 4);
+      uint16_t id = file->readShort(offset + 4);
       auto name = fmt::format("Akao Seq {:02X}", id);
 
       AkaoSeq *seq = new AkaoSeq(file, offset, version, name);
@@ -54,7 +54,7 @@ void AkaoScanner::scan(RawFile* file, void* /*info*/) {
       if (version == AkaoPs1Version::UNKNOWN)
         version = AkaoSampColl::guessVersion(file, offset);
 
-      u16 id = file->readShort(offset + 4);
+      uint16_t id = file->readShort(offset + 4);
       auto name = fmt::format("Akao Sample Collection {:02X}", id);
 
       AkaoSampColl *sampColl = new AkaoSampColl(file, offset, version, name);

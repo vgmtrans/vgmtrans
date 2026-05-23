@@ -36,7 +36,7 @@ static constexpr int samplerate_LUT[16] = {-1,    5734,  7884,  10512, 13379, 15
                                            26758, 31536, 36314, 40137, 42048, -1,    -1,    -1};
 
 struct EngineParams {
-  EngineParams(u32 data)
+  EngineParams(uint32_t data)
       : polyphony((data & 0x000F00) >> 8), main_vol((data & 0x00F000) >> 12),
         sampling_rate_index((data & 0x0F0000) >> 16), dac_bits(17 - ((data & 0xF00000) >> 20)){};
 
@@ -45,26 +45,26 @@ struct EngineParams {
            sampling_rate_index >= 1 && sampling_rate_index <= 12;
   }
 
-  const u32 polyphony;
-  const u32 main_vol;
-  const u32 sampling_rate_index;
-  const u32 dac_bits;
+  const uint32_t polyphony;
+  const uint32_t main_vol;
+  const uint32_t sampling_rate_index;
+  const uint32_t dac_bits;
 };
 
 struct MP2kSeqWithIndex {
-  u32 song_index;
+  uint32_t song_index;
   MP2kSeq *seq;
 };
 
 /* Test if an area of ROM is eligible to be the base pointer */
 static bool test_pointer_validity(RawFile *file, size_t offset, uint32_t inGBA_length) {
-  EngineParams params(file->get<u32>(offset));
+  EngineParams params(file->get<uint32_t>(offset));
 
   /* Compute supposed address of song table and check validity */
-  u32 song_tbl_adr = (file->get<u32>(offset + 8) & 0x3FFFFFF) + 12 * file->get<u32>(offset + 4);
+  uint32_t song_tbl_adr = (file->get<uint32_t>(offset + 8) & 0x3FFFFFF) + 12 * file->get<uint32_t>(offset + 4);
   auto valid_table =
-      file->get<u32>(offset + 4) < 256 && song_tbl_adr < inGBA_length &&
-      ((file->get<u32>(offset) & 0xff000000) == 0);
+      file->get<uint32_t>(offset + 4) < 256 && song_tbl_adr < inGBA_length &&
+      ((file->get<uint32_t>(offset) & 0xff000000) == 0);
 
   return params.valid() && valid_table;
 }
@@ -78,20 +78,20 @@ void MP2kScanner::scan(RawFile *file, void *) {
     return;
   }
 
-  EngineParams engine_settings(file->get<u32>(sound_engine_adr));
+  EngineParams engine_settings(file->get<uint32_t>(sound_engine_adr));
   const int engine_sample_rate = samplerate_LUT[engine_settings.sampling_rate_index];
   const uint32_t psg_sample_rate = engine_sample_rate > 0 ? static_cast<uint32_t>(engine_sample_rate) : 32768;
 
   /* Compute song table location */
-  u32 song_levels = file->get<u32>(sound_engine_adr + 4);  // Read # of song levels
-  u32 song_tbl_ptr = (file->get<u32>(sound_engine_adr + 8) & 0x1FFFFFF) + 12 * song_levels;
-  auto song_tbl = std::span<const u32>(reinterpret_cast<const u32 *>(file->begin() + song_tbl_ptr),
-                                       reinterpret_cast<const u32 *>(file->end()));
+  uint32_t song_levels = file->get<uint32_t>(sound_engine_adr + 4);  // Read # of song levels
+  uint32_t song_tbl_ptr = (file->get<uint32_t>(sound_engine_adr + 8) & 0x1FFFFFF) + 12 * song_levels;
+  auto song_tbl = std::span<const uint32_t>(reinterpret_cast<const uint32_t *>(file->begin() + song_tbl_ptr),
+                                       reinterpret_cast<const uint32_t *>(file->end()));
 
   /* Sometimes the song table contains null-pointers (e.g. Fire Emblem).
    * We will ignore those entries */
   auto song_entry =
-      std::find_if(song_tbl.begin(), song_tbl.end(), [](u32 pointer) { return pointer != 0; });
+      std::find_if(song_tbl.begin(), song_tbl.end(), [](uint32_t pointer) { return pointer != 0; });
   if (song_entry == song_tbl.end()) {
     return;
   }
@@ -101,10 +101,10 @@ void MP2kScanner::scan(RawFile *file, void *) {
 
   /* First 32 bytes are the pointer, the rest is song info */
   std::set<size_t> soundbanks;
-  std::map<u32, std::vector<MP2kSeqWithIndex>> seqs;
+  std::map<uint32_t, std::vector<MP2kSeqWithIndex>> seqs;
   for (auto it = song_entry; it < song_tbl.end(); std::advance(it, 2)) {
-    u32 song_index = static_cast<u32>(std::distance(song_tbl.begin(), it) / 2);
-    u32 song_pointer = *it & 0x1FFFFFF;
+    uint32_t song_index = static_cast<uint32_t>(std::distance(song_tbl.begin(), it) / 2);
+    uint32_t song_pointer = *it & 0x1FFFFFF;
     if (song_pointer >= file->size()) {
       L_DEBUG("Song pointer is out of bounds {:#x}/{:#x}", *it, file->size());
       break;
@@ -123,7 +123,7 @@ void MP2kScanner::scan(RawFile *file, void *) {
 
     /* Load the soundbanks later because we need to know the number of instruments in each of
      * them */
-    u32 inst_pointer = file->get<u32>(song_pointer + 4) & 0x1FFFFFF;
+    uint32_t inst_pointer = file->get<uint32_t>(song_pointer + 4) & 0x1FFFFFF;
     soundbanks.insert(inst_pointer);
     if (auto inst = seqs.find(inst_pointer); inst != seqs.end()) {
       inst->second.push_back({song_index, nseq});
@@ -167,12 +167,12 @@ void MP2kScanner::scan(RawFile *file, void *) {
 }
 
 static auto MP2KPatternSearch(RawFile *file, const char *offset) {
-  static constexpr std::array<u8, 0x1E> SONGSELECT_PATTERN = {
+  static constexpr std::array<uint8_t, 0x1E> SONGSELECT_PATTERN = {
       0x00, 0xB5, 0x00, 0x04, 0x07, 0x4A, 0x08, 0x49, 0x40, 0x0B, 0x40, 0x18, 0x83, 0x88, 0x59,
       0x00, 0xC9, 0x18, 0x89, 0x00, 0x89, 0x18, 0x0A, 0x68, 0x01, 0x68, 0x10, 0x1C, 0x00, 0xF0,
   };
 
-  static constexpr std::array<u8, 0x1E> SONGSELECT_PATTERN_V2 = {
+  static constexpr std::array<uint8_t, 0x1E> SONGSELECT_PATTERN_V2 = {
       0x00, 0xB5, 0x00, 0x04, 0x07, 0x4B, 0x08, 0x49, 0x40, 0x0B, 0x40, 0x18, 0x82, 0x88, 0x51,
       0x00, 0x89, 0x18, 0x89, 0x00, 0xC9, 0x18, 0x0A, 0x68, 0x01, 0x68, 0x10, 0x1C, 0x00, 0xF0,
   };
@@ -183,8 +183,8 @@ static auto MP2KPatternSearch(RawFile *file, const char *offset) {
   static const auto v2_searcher = std::boyer_moore_horspool_searcher(SONGSELECT_PATTERN_V2.begin(),
                                                                      SONGSELECT_PATTERN_V2.end());
 
-  auto off = reinterpret_cast<const u8 *>(offset);
-  auto end = reinterpret_cast<const u8 *>(file->end());
+  auto off = reinterpret_cast<const uint8_t *>(offset);
+  auto end = reinterpret_cast<const uint8_t *>(file->end());
 
   /* Scan for the song selection code pattern */
   auto select_song = std::search(off, end, v1_searcher);
@@ -200,28 +200,28 @@ static auto MP2KPatternSearch(RawFile *file, const char *offset) {
 std::optional<size_t> MP2kScanner::detectMP2K(RawFile *file) {
   auto select_song = MP2KPatternSearch(file, file->begin());
 
-  constexpr u32 M4A_OFFSET_SONGTABLE = 40;
+  constexpr uint32_t M4A_OFFSET_SONGTABLE = 40;
   while (select_song != file->end()) {
-    u32 songtable_addr = file->get<u32>(select_song - file->begin() + M4A_OFFSET_SONGTABLE);
+    uint32_t songtable_addr = file->get<uint32_t>(select_song - file->begin() + M4A_OFFSET_SONGTABLE);
     if (!isGbaRomAddress(songtable_addr)) {
       select_song = MP2KPatternSearch(file, std::next(select_song));
       continue;
     }
 
-    u32 songtable_ofs_tmp = gbaAddressToOffset(songtable_addr);
+    uint32_t songtable_ofs_tmp = gbaAddressToOffset(songtable_addr);
     if (!isValidOffset(songtable_ofs_tmp + 4 - 1, file->size())) {
       select_song = MP2KPatternSearch(file, std::next(select_song));
       continue;
     }
 
-    u32 validsongcount = 0;
-    for (u32 songindex = 0; validsongcount < 1; songindex++) {
-      u32 songaddroffset = songtable_ofs_tmp + (songindex * 8);
+    uint32_t validsongcount = 0;
+    for (uint32_t songindex = 0; validsongcount < 1; songindex++) {
+      uint32_t songaddroffset = songtable_ofs_tmp + (songindex * 8);
       if (!isValidOffset(songaddroffset + 4 - 1, file->size())) {
         break;
       }
 
-      u32 songaddr = file->readWord(songaddroffset);
+      uint32_t songaddr = file->readWord(songaddroffset);
       if (songaddr == 0) {
         continue;
       }
@@ -250,16 +250,16 @@ std::optional<size_t> MP2kScanner::detectMP2K(RawFile *file) {
     return std::nullopt;
   }
 
-  u32 main_ofs_tmp = select_song - file->begin();
+  uint32_t main_ofs_tmp = select_song - file->begin();
   if (!isValidOffset(main_ofs_tmp + 2 - 1, file->size())) {
     return std::nullopt;
   }
 
   /* Pick the very first instance of the code pattern */
-  u32 main_ofs = 0;
+  uint32_t main_ofs = 0;
   while (main_ofs_tmp > 0 &&
-         main_ofs_tmp > (static_cast<u32>(select_song - file->begin()) - 0x20)) {
-    if (file->get<u16>(main_ofs_tmp) == 0xB500) {
+         main_ofs_tmp > (static_cast<uint32_t>(select_song - file->begin()) - 0x20)) {
+    if (file->get<uint16_t>(main_ofs_tmp) == 0xB500) {
       main_ofs = main_ofs_tmp;
     }
 
@@ -280,16 +280,16 @@ std::optional<size_t> MP2kScanner::detectMP2K(RawFile *file) {
   return main_ofs - (valid_m16 ? 16 : 32);
 }
 
-bool MP2kScanner::isValidOffset(u32 offset, u32 romsize) {
+bool MP2kScanner::isValidOffset(uint32_t offset, uint32_t romsize) {
   return (offset < romsize);
 }
 
-bool MP2kScanner::isGbaRomAddress(u32 address) {
-  u8 region = (address >> 24) & 0xFE;
+bool MP2kScanner::isGbaRomAddress(uint32_t address) {
+  uint8_t region = (address >> 24) & 0xFE;
   return (region == 8);
 }
 
-u32 MP2kScanner::gbaAddressToOffset(u32 address) {
+uint32_t MP2kScanner::gbaAddressToOffset(uint32_t address) {
   if (!isGbaRomAddress(address)) {
     L_WARN("Address {:#x} is not a ROM address", address);
   }

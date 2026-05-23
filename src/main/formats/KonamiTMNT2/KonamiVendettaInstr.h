@@ -16,26 +16,26 @@ class VGMItem;
 enum KonamiTMNT2FormatVer : uint8_t;
 
 struct konami_vendetta_instr_k053260 {
-  u8 samp_info_idx;
-  u8 attenuation;
-  u8 unknown;
+  uint8_t samp_info_idx;
+  uint8_t attenuation;
+  uint8_t unknown;
 };
 
 struct konami_vendetta_sample_info {
-  u8 pitch_lo;
-  u8 pitch_hi;
-  u8 length_lo;
-  u8 length_hi;
-  u8 start_lo;
-  u8 start_mid;
-  u8 start_hi;
-  u8 is_kapdcm;
+  uint8_t pitch_lo;
+  uint8_t pitch_hi;
+  uint8_t length_lo;
+  uint8_t length_hi;
+  uint8_t start_lo;
+  uint8_t start_mid;
+  uint8_t start_hi;
+  uint8_t is_kapdcm;
 
-  constexpr u32 start() const noexcept {
+  constexpr uint32_t start() const noexcept {
     return (start_hi << 16) + (start_mid << 8) + start_lo;
   }
 
-  constexpr u32 length() const noexcept {
+  constexpr uint32_t length() const noexcept {
     return (length_hi << 8) | length_lo;
   }
 
@@ -45,15 +45,15 @@ struct konami_vendetta_sample_info {
 
 struct konami_vendetta_drum_info {
   konami_vendetta_instr_k053260 instr;
-  s8 pan = -1;
-  s16 pitch = -1;
+  int8_t pan = -1;
+  int16_t pitch = -1;
 };
 
 struct vendetta_sub_offsets {
-  u32 load_instr;
-  u32 set_pan;
-  u32 set_pitch;
-  u32 note_on;
+  uint32_t load_instr;
+  uint32_t set_pan;
+  uint32_t set_pitch;
+  uint32_t note_on;
 };
 
 
@@ -62,12 +62,12 @@ class KonamiVendettaSampleInstrSet
 public:
 
   KonamiVendettaSampleInstrSet(RawFile *file,
-                               u32 offset,
-                               u32 instrTableOffsetYM2151,
-                               u32 instrTableOffsetK053260,
-                               u32 sampInfosOffset,
-                               u32 drumBanksOffset,
-                               u32 drumsOffset,
+                               uint32_t offset,
+                               uint32_t instrTableOffsetYM2151,
+                               uint32_t instrTableOffsetK053260,
+                               uint32_t sampInfosOffset,
+                               uint32_t drumBanksOffset,
+                               uint32_t drumsOffset,
                                vendetta_sub_offsets subOffsets,
                                const std::vector<konami_vendetta_instr_k053260>& instrs,
                                const std::vector<konami_vendetta_sample_info>& sampInfos,
@@ -75,7 +75,7 @@ public:
                                KonamiTMNT2FormatVer fmtVer);
   ~KonamiVendettaSampleInstrSet() override = default;
 
-  void addInstrInfoChildren(VGMItem* instrInfoItem, u32 off);
+  void addInstrInfoChildren(VGMItem* instrInfoItem, uint32_t off);
   void addSampleInfoItems();
   bool parseInstrPointers() override;
 
@@ -84,7 +84,7 @@ public:
 
   konami_vendetta_drum_info parseVendettaDrum(
     RawFile* programRom,
-    u16& offset,
+    uint16_t& offset,
     const vendetta_sub_offsets& subOffsets,
     VGMItem* drumItem
   );
@@ -92,19 +92,19 @@ public:
   const std::vector<konami_vendetta_instr_k053260> instrsK053260() { return m_instrsK053260; }
   const std::vector<konami_tmnt2_ym2151_instr> instrsYM2151() { return m_instrsYM2151; }
   const std::vector<konami_vendetta_sample_info> sampleInfos() { return m_sampInfos; }
-  const std::unordered_map<u8, konami_vendetta_drum_info> drumKeyMap() { return m_drumKeyMap; }
+  const std::unordered_map<uint8_t, konami_vendetta_drum_info> drumKeyMap() { return m_drumKeyMap; }
 
 private:
-  u32 m_instrTableOffsetYM2151;
-  u32 m_instrTableOffsetK053260;
-  u32 m_sampInfosOffset;
-  u32 m_drumBanksOffset;
-  u32 m_drumsOffset;
+  uint32_t m_instrTableOffsetYM2151;
+  uint32_t m_instrTableOffsetK053260;
+  uint32_t m_sampInfosOffset;
+  uint32_t m_drumBanksOffset;
+  uint32_t m_drumsOffset;
   vendetta_sub_offsets m_subOffsets;
   std::vector<konami_tmnt2_ym2151_instr> m_instrsYM2151;
   std::vector<konami_vendetta_instr_k053260> m_instrsK053260;
   std::vector<konami_vendetta_sample_info> m_sampInfos;
-  std::unordered_map<u8, konami_vendetta_drum_info> m_drumKeyMap;
+  std::unordered_map<uint8_t, konami_vendetta_drum_info> m_drumKeyMap;
 
   KonamiTMNT2FormatVer m_fmtVer;
 };

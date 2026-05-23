@@ -55,8 +55,8 @@ private:
   bool lfoOutputsEnabled() const;
 
   std::vector<uint32_t> loopEndPositions;
-  void handleStatusCommand(u32 offset, u8 status);
-  void handleSpecialCommand(u32 offset, u8 status);
+  void handleStatusCommand(uint32_t offset, uint8_t status);
+  void handleSpecialCommand(uint32_t offset, uint8_t status);
 
   uint8_t modType = 0;
   SeqSynthLfoAutomation vibratoLfo;

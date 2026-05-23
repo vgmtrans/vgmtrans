@@ -18,21 +18,21 @@ class SegSatSeq:
   bool readEvent() override;
 
  private:
-  const SegSatRgn* resolveRegion(u8 bank, u8 progNum, u8 noteNum);
+  const SegSatRgn* resolveRegion(uint8_t bank, uint8_t progNum, uint8_t noteNum);
   constexpr double tlDB(uint8_t tl);
-  u8 resolveVelocity(u8 vel, const SegSatRgn& rgn, s8 volBias, u8 ch);
+  uint8_t resolveVelocity(uint8_t vel, const SegSatRgn& rgn, int8_t volBias, uint8_t ch);
 
   struct CollContext {
     std::vector<SegSatVLTable> m_vlTables;
     std::vector<SegSatInstr> instrs;
   };
   CollContext m_collContext;
-  u32 m_normalTrackOffset;
+  uint32_t m_normalTrackOffset;
   int m_remainingNotesInLoop = 0;
-  u32 m_loopEndPos = -1;
-  u32 m_foreverLoopStart = -1;
-  u32 m_durationAccumulator = 0;
-  u8 m_vol[16];
-  u8 m_bank[16];
-  u8 m_progNum[16];
+  uint32_t m_loopEndPos = -1;
+  uint32_t m_foreverLoopStart = -1;
+  uint32_t m_durationAccumulator = 0;
+  uint8_t m_vol[16];
+  uint8_t m_bank[16];
+  uint8_t m_progNum[16];
 };

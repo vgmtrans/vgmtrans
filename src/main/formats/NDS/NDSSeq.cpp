@@ -124,7 +124,7 @@ bool NDSTrack::readEvent(void) {
         break;
 
       case 0x94: {
-        u32 jumpAddr = readByte(curOffset) + (readByte(curOffset + 1) << 8)
+        uint32_t jumpAddr = readByte(curOffset) + (readByte(curOffset + 1) << 8)
             + (readByte(curOffset + 2) << 16) + parentSeq->offset() + 0x1C;
         curOffset += 3;
 
@@ -132,10 +132,10 @@ bool NDSTrack::readEvent(void) {
       }
 
       case 0x95: {
-        u32 destination = readByte(curOffset) + (readByte(curOffset + 1) << 8)
+        uint32_t destination = readByte(curOffset) + (readByte(curOffset + 1) << 8)
             + (readByte(curOffset + 2) << 16) + parentSeq->offset() + 0x1C;
         curOffset += 3;
-        u32 returnOffset = curOffset;
+        uint32_t returnOffset = curOffset;
         return addCall(beginOffset, curOffset - beginOffset, destination, returnOffset, "Call");
       }
 

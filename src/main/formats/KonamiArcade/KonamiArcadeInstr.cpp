@@ -23,21 +23,21 @@ const double drumReleaseTime = 0.7;
 // ********************
 
 KonamiArcadeInstrSet::KonamiArcadeInstrSet(RawFile *file,
-                                           u32 offset,
+                                           uint32_t offset,
                                            std::string name,
-                                           u32 drumTableOffset,
-                                           u32 drumSampleTableOffset,
+                                           uint32_t drumTableOffset,
+                                           uint32_t drumSampleTableOffset,
                                            KonamiArcadeFormatVer fmtVer)
     : VGMInstrSet(KonamiArcadeFormat::name, file, offset, 0, std::move(name)),
       m_drumTableOffset(drumTableOffset), m_drumSampleTableOffset(drumSampleTableOffset),
       m_fmtVer(fmtVer) {
 }
 
-void KonamiArcadeInstrSet::addSampleInfoChildren(VGMItem* sampInfoItem, u32 off) {
+void KonamiArcadeInstrSet::addSampleInfoChildren(VGMItem* sampInfoItem, uint32_t off) {
   sampInfoItem->addChild(off, 3, "Loop Offset");
   sampInfoItem->addChild(off + 3, 3, "Sample Offset");
   std::string sampleTypeStr;
-  u8 flagsByte = readByte(off + 6);
+  uint8_t flagsByte = readByte(off + 6);
   switch (flagsByte & 0xc) {
     case static_cast<int>(konami_mw_sample_info::sample_type::PCM_8):
       sampleTypeStr = "PCM 8";
@@ -59,15 +59,15 @@ void KonamiArcadeInstrSet::addSampleInfoChildren(VGMItem* sampInfoItem, u32 off)
 
 bool KonamiArcadeInstrSet::parseInstrPointers() {
 
-  u32 instrSampleTableOffset = m_fmtVer == MysticWarrior ? readShort(offset()) : readWordBE(offset());
-  u32 sfxSampleTableOffset = m_fmtVer == MysticWarrior ? readShort(offset() + 2) : readWordBE(offset() + 4);
+  uint32_t instrSampleTableOffset = m_fmtVer == MysticWarrior ? readShort(offset()) : readWordBE(offset());
+  uint32_t sfxSampleTableOffset = m_fmtVer == MysticWarrior ? readShort(offset() + 2) : readWordBE(offset() + 4);
 
   disableAutoAddInstrumentsAsChildren();
 
   auto instrSampInfos = addChild(instrSampleTableOffset, sfxSampleTableOffset - instrSampleTableOffset,
                                       "Instrument Sample Infos");
   int sampNum = 0;
-  for (u32 off = instrSampleTableOffset; off < sfxSampleTableOffset; off += sizeof(konami_mw_sample_info)) {
+  for (uint32_t off = instrSampleTableOffset; off < sfxSampleTableOffset; off += sizeof(konami_mw_sample_info)) {
     int bank = sampNum > 127 ? 1 : 0;
     int instrNum = sampNum > 127 ? sampNum - 128 : sampNum;
     std::string name = fmt::format("Instrument {} Bank {}", instrNum, bank);
@@ -92,7 +92,7 @@ bool KonamiArcadeInstrSet::parseInstrPointers() {
   auto drumSampInfos = addChild(m_drumSampleTableOffset, m_drumTableOffset - m_drumSampleTableOffset,
                                       "Drum Sample Infos");
   sampNum = 0;
-  for (u32 off = m_drumSampleTableOffset; off < m_drumTableOffset; off += sizeof(konami_mw_sample_info)) {
+  for (uint32_t off = m_drumSampleTableOffset; off < m_drumTableOffset; off += sizeof(konami_mw_sample_info)) {
     auto drumSampInfoItem = drumSampInfos->addChild(off, sizeof(konami_mw_sample_info),
                                                     fmt::format("Drum Sample Info {}", sampNum++));
     addSampleInfoChildren(drumSampInfoItem, off);
@@ -112,7 +112,7 @@ bool KonamiArcadeInstrSet::parseInstrPointers() {
   std::vector<VGMInstr *> aDrumKit;
   for (int i = 0; i < sizeof(m_drums) / sizeof(drum); ++i) {
     drum& d = m_drums[i];
-    u32 off = m_drumTableOffset + i * sizeof(drum);
+    uint32_t off = m_drumTableOffset + i * sizeof(drum);
     int sampNum = numMelodicInstrs + d.samp_num;
 
     if (d.unity_key >= 0x60) {
@@ -154,8 +154,8 @@ KonamiArcadeSampColl::KonamiArcadeSampColl(
     RawFile* file,
     KonamiArcadeInstrSet* instrset,
     const std::vector<konami_mw_sample_info>& sampInfos,
-    u32 offset,
-    u32 length,
+    uint32_t offset,
+    uint32_t length,
     std::string name)
     : VGMSampColl(KonamiArcadeFormat::name, file, offset, length, std::move(name)),
       instrset(instrset), sampInfos(sampInfos) {
@@ -165,12 +165,12 @@ bool KonamiArcadeSampColl::parseHeader() {
   return true;
 }
 
-u32 KonamiArcadeSampColl::determineSampleSize(u32 startOffset,
+uint32_t KonamiArcadeSampColl::determineSampleSize(uint32_t startOffset,
   konami_mw_sample_info::sample_type sampleType, bool reverse) {
   // Each sample type uses a slightly different sentinel value.
   // In practice, we find that each sample ends with multiple sample values. The smallest pattern
   // being ADPCM with 4 0x88 bytes in a row.
-  u16 endMarker;
+  uint16_t endMarker;
   int inc = 1;
   switch (sampleType) {
     case konami_mw_sample_info::sample_type::PCM_8:
@@ -190,14 +190,14 @@ u32 KonamiArcadeSampColl::determineSampleSize(u32 startOffset,
   }
 
   if (reverse) {
-    for (u32 off = startOffset-2; off >= offset() + 2; off -= inc) {
+    for (uint32_t off = startOffset-2; off >= offset() + 2; off -= inc) {
       if (readShort(off) == endMarker) {
         return startOffset - off;
       }
     }
     return startOffset;
   }
-  for (u32 off = startOffset; off < length() + 2; off += inc) {
+  for (uint32_t off = startOffset; off < length() + 2; off += inc) {
     if (readShort(off) == endMarker) {
       return off - startOffset;
     }
@@ -213,10 +213,10 @@ bool KonamiArcadeSampColl::parseSampleInfo() {
 
   int sampNum = 0;
   for (auto sampInfo : sampInfos) {
-    u32 sampleOffset = sampInfo.start_msb << 16 | sampInfo.start_mid << 8 | sampInfo.start_lsb;
-    u32 sampleLoopOffset = sampInfo.loop_msb << 16 | sampInfo.loop_mid << 8 | sampInfo.loop_lsb;
-    s32 relativeLoopOffset = sampleLoopOffset - sampleOffset;
-    u32 sampleSize = determineSampleSize(sampleOffset, sampInfo.type(), sampInfo.reverse());
+    uint32_t sampleOffset = sampInfo.start_msb << 16 | sampInfo.start_mid << 8 | sampInfo.start_lsb;
+    uint32_t sampleLoopOffset = sampInfo.loop_msb << 16 | sampInfo.loop_mid << 8 | sampInfo.loop_lsb;
+    int32_t relativeLoopOffset = sampleLoopOffset - sampleOffset;
+    uint32_t sampleSize = determineSampleSize(sampleOffset, sampInfo.type(), sampInfo.reverse());
     if (sampInfo.reverse()) {
       sampleOffset = sampleOffset - sampleSize;
       relativeLoopOffset = -relativeLoopOffset;

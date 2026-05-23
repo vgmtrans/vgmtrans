@@ -57,7 +57,7 @@ bool CPS1TrackV2::readEvent() {
   uint32_t beginOffset = curOffset;
   uint8_t status_byte = readByte(curOffset++);
   auto cpsSeq = static_cast<CPS1Seq*>(parentSeq);
-  u8 masterVol = cpsSeq->masterVolume();
+  uint8_t masterVol = cpsSeq->masterVolume();
 
   if (status_byte >= 0x20) {
 
@@ -75,11 +75,11 @@ bool CPS1TrackV2::readEvent() {
 
     //if it's not a rest
     if ((status_byte & 0x1F) != 0) {
-      u8 absDur = static_cast<u8>(static_cast<u16>(delta * noteDuration) >> 8);
+      uint8_t absDur = static_cast<uint8_t>(static_cast<uint16_t>(delta * noteDuration) >> 8);
 
       if (channelSynth == CPSSynth::OKIM6295) {
         if (version() >= CPS1_V500) {
-          s8 newProgNum = (status_byte & 0x1F) + octave_table[noteState & 0x0F] - 1;
+          int8_t newProgNum = (status_byte & 0x1F) + octave_table[noteState & 0x0F] - 1;
           if (progNum != newProgNum) {
             progNum = newProgNum;
             addProgramChangeNoItem(newProgNum, false);

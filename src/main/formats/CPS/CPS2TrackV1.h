@@ -18,16 +18,16 @@ private:
   CPS2FormatVer version() const { return (static_cast<CPS2Seq*>(this->parentSeq))->fmt_version; }
   void calculateAndAddPortamentoTimeNoItem(int8_t noteDistance);
 
-  u8 noteDuration;
-  s8 key;
-  s8 progNum = -1;
+  uint8_t noteDuration;
+  int8_t key;
+  int8_t progNum = -1;
   bool bPrevNoteTie;
-  u8 prevTieNote;
-  u8 curDeltaTable;
-  u8 noteState;
-  u8 bank;
-  u8 loop[4];
-  u32 loopOffset[4];
-  s16 portamentoCentsPerSec;
-  u16 prevPortamentoDuration;
+  uint8_t prevTieNote;
+  uint8_t curDeltaTable;
+  uint8_t noteState;
+  uint8_t bank;
+  uint8_t loop[4];
+  uint32_t loopOffset[4];
+  int16_t portamentoCentsPerSec;
+  uint16_t prevPortamentoDuration;
 };

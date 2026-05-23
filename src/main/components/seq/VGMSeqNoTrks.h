@@ -45,7 +45,7 @@ public:
   void setTime(uint32_t newTime) override;
   void addTime(uint32_t delta) override;
 
-  void setChannel(u8 newChannel);
+  void setChannel(uint8_t newChannel);
   void tryExpandMidiTracks(uint32_t numTracks);
 
   bool load() override;  // Function to load all the information about the sequence

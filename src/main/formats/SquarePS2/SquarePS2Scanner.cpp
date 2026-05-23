@@ -22,8 +22,8 @@ void SquarePS2Scanner::searchForBGMSeq(RawFile *file) {
   uint32_t nFileLength;
   nFileLength = file->size();
   for (uint32_t i = 0; i + 4 < nFileLength; i++) {
-    if (file->get<u8>(i) == 'B' && file->get<u8>(i + 1) == 'G' && file->get<u8>(i + 2) == 'M' &&
-      file->get<u8>(i + 3) == ' ') {
+    if (file->get<uint8_t>(i) == 'B' && file->get<uint8_t>(i + 1) == 'G' && file->get<uint8_t>(i + 2) == 'M' &&
+      file->get<uint8_t>(i + 3) == ' ') {
       if (file->readWord(i + 0x14) == 0 && file->readWord(i + 0x18) == 0 &&
         file->readWord(i + 0x1C) == 0) {
         uint8_t nNumTracks = (*file)[i + 8];
@@ -52,7 +52,7 @@ void SquarePS2Scanner::searchForWDSet(RawFile *file) {
 
   size_t nFileLength = file->size();
   for (uint32_t i = 0; i + 0x3000 < nFileLength; i++) {
-    if (file->get<u8>(i) == 'W' && file->get<u8>(i + 1) == 'D' && file->get<u8>(i + 3) < 0x03) {
+    if (file->get<uint8_t>(i) == 'W' && file->get<uint8_t>(i + 1) == 'D' && file->get<uint8_t>(i + 3) < 0x03) {
       if (file->readWord(i + 0x14) == 0 && file->readWord(i + 0x18) == 0 &&
         file->readWord(i + 0x1C) == 0) {
         // check the data at the offset of the first region entry's sample pointer. It should be

@@ -251,7 +251,7 @@ BytePattern KonamiSnesScanner::ptnSetDIRCNTR3(
 //17de: f6 8a 05  mov   a,$058a+y
 //17e1: c4 04     mov   $04,a
 //17e3: f6 8b 05  mov   a,$058b+y
-//17e6: c4 05     mov   $05,a             ; sample map = *(u16)($058a + bank_offset)
+//17e6: c4 05     mov   $05,a             ; sample map = *(uint16_t)($058a + bank_offset)
 //17e8: ae        pop   a
 //17e9: 3f f5 17  call  $17f5
 //17ec: 5f 12 15  jmp   $1512
@@ -292,7 +292,7 @@ BytePattern KonamiSnesScanner::ptnLoadInstrJOP(
 //13f9: f6 58 05  mov   a,$0558+y
 //13fc: c4 04     mov   $04,a
 //13fe: f6 59 05  mov   a,$0559+y
-//1401: c4 05     mov   $05,a             ; sample map = *(u16)($0558 + bank_offset)
+//1401: c4 05     mov   $05,a             ; sample map = *(uint16_t)($0558 + bank_offset)
 //1403: ae        pop   a
 //1404: 3f 31 14  call  $1431
 //1407: 5f 45 11  jmp   $1145
@@ -333,7 +333,7 @@ BytePattern KonamiSnesScanner::ptnLoadInstrGP(
 //1bb4: f6 20 0a  mov   a,$0a20+y
 //1bb7: c4 04     mov   $04,a
 //1bb9: f6 21 0a  mov   a,$0a21+y
-//1bbc: c4 05     mov   $05,a             ; sample map = *(u16)($0a20 + bank_offset)
+//1bbc: c4 05     mov   $05,a             ; sample map = *(uint16_t)($0a20 + bank_offset)
 //1bbe: ae        pop   a
 //1bbf: 3f ee 1b  call  $1bee
 //1bc2: 5f e2 18  jmp   $18e2
@@ -372,7 +372,7 @@ BytePattern KonamiSnesScanner::ptnLoadInstrGG4(
 //1327: f6 f4 06  mov   a,$06f4+y
 //132a: c4 04     mov   $04,a
 //132c: f6 f5 06  mov   a,$06f5+y
-//132f: c4 05     mov   $05,a             ; sample map = *(u16)($0a20 + bank_offset)
+//132f: c4 05     mov   $05,a             ; sample map = *(uint16_t)($0a20 + bank_offset)
 //1331: ae        pop   a
 //1332: 3f 3e 13  call  $133e
 //1335: 5f 61 10  jmp   $1061
@@ -430,7 +430,7 @@ BytePattern KonamiSnesScanner::ptnLoadInstrPNTB(
 //0f15: f6 28 06  mov   a,$0628+y
 //0f18: c4 04     mov   $04,a
 //0f1a: f6 29 06  mov   a,$0629+y
-//0f1d: c4 05     mov   $05,a             ; sample map = *(u16)($0628 + bank * 2)
+//0f1d: c4 05     mov   $05,a             ; sample map = *(uint16_t)($0628 + bank * 2)
 //0f1f: f5 97 02  mov   a,$0297+x         ; instrument #
 //0f22: 80        setc
 //0f23: a8 14     sbc   a,#$14            ; patch -= 0x14

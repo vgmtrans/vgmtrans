@@ -53,7 +53,7 @@ class CPS1OPMInstrSet
 public:
   CPS1OPMInstrSet(RawFile *file,
                  CPS1FormatVer fmt_version,
-                 u8 masterVol,
+                 uint8_t masterVol,
                  uint32_t offset,
                  uint32_t length,
                  const std::string& name);
@@ -62,7 +62,7 @@ public:
   bool parseInstrPointers() override;
 public:
   CPS1FormatVer fmt_version;
-  u8 masterVol;
+  uint8_t masterVol;
 };
 
 // ************
@@ -85,13 +85,13 @@ struct CPS1OPMInstrDataV2_00 {
   uint8_t DT2_D2R[4];
   uint8_t D1L_RR[4];
 
-  u8 volToAttenuation(u8 instrVol) const {
-    u8 m = instrVol >> 4;
-    u8 attenuation = 17 + (instrVol & 0x0F) - 2 * m - (m == 0 ? 1 : 0);
+  uint8_t volToAttenuation(uint8_t instrVol) const {
+    uint8_t m = instrVol >> 4;
+    uint8_t attenuation = 17 + (instrVol & 0x0F) - 2 * m - (m == 0 ? 1 : 0);
     return attenuation > 0x7F ? 0x7F : attenuation;
   }
 
-  OPMData convertToOPMData(u8 masterVol, const std::string& name) const {
+  OPMData convertToOPMData(uint8_t masterVol, const std::string& name) const {
     // LFO
     OPMData::LFO lfo{};
     if (useLFO) {
@@ -115,7 +115,7 @@ struct CPS1OPMInstrDataV2_00 {
     // OP
     uint8_t CON_limits[4] = { 7, 5, 4, 0 };
     OPMData::OP op[4];
-    u8 masterVolumeAtten = 0x7F - masterVol;
+    uint8_t masterVolumeAtten = 0x7F - masterVol;
     for (int i = 0; i < 4; i ++) {
       auto conLimit = CON_limits[i];
       auto& opx = op[i];
@@ -158,30 +158,30 @@ struct CPS1OPMInstrDataV4_25 {
   uint8_t DT2_D2R[4];
   uint8_t D1L_RR[4];
 
-  u8 volToAttenuation(u8 instrVol) const {
-    u16 uVar4 = (((u16)instrVol << 8) | (instrVol >> 4)) & 0xF07;
+  uint8_t volToAttenuation(uint8_t instrVol) const {
+    uint16_t uVar4 = (((uint16_t)instrVol << 8) | (instrVol >> 4)) & 0xF07;
 
-    u8 key_scale_atten = (char)(uVar4 >> 8);
+    uint8_t key_scale_atten = (char)(uVar4 >> 8);
 
-    u8 bVar3 = 0x7f << 1;
-    u8 bVar2 = bVar3;
-    bVar2 = (((bVar2 << 1 | bVar2 >> 7) & 0xf0) >> 4) * (((s8)uVar4 << 1) & 0x0f);
+    uint8_t bVar3 = 0x7f << 1;
+    uint8_t bVar2 = bVar3;
+    bVar2 = (((bVar2 << 1 | bVar2 >> 7) & 0xf0) >> 4) * (((int8_t)uVar4 << 1) & 0x0f);
     bVar2 = bVar2 >> 4;
     if ((bVar3 & 0x80) != 0) {
       bVar2 = -bVar2;
     }
-    s8 cVar1 = bVar2 + 0x10 + key_scale_atten;
+    int8_t cVar1 = bVar2 + 0x10 + key_scale_atten;
     return cVar1 > 0x7f ? 0x7F : cVar1;
   }
 
   // Simplified implementation, but might have to revisit the first when we add key scale
-  // u8 volToAttenuation(u8 instrVol) const {
-  //   u8 m = instrVol >> 4;
-  //   u8 attenuation = 17 + (instrVol & 0x0F) - 2 * m - (m == 0 ? 1 : 0);
+  // uint8_t volToAttenuation(uint8_t instrVol) const {
+  //   uint8_t m = instrVol >> 4;
+  //   uint8_t attenuation = 17 + (instrVol & 0x0F) - 2 * m - (m == 0 ? 1 : 0);
   //   return attenuation > 0x7F ? 0x7F : attenuation;
   // }
 
-  OPMData convertToOPMData(u8 masterVol, const std::string& name) const {
+  OPMData convertToOPMData(uint8_t masterVol, const std::string& name) const {
     bool enableLFO = (LFO_ENABLE_AND_WF & 0x80) != 0;
     // LFO
     OPMData::LFO lfo{};
@@ -215,12 +215,12 @@ struct CPS1OPMInstrDataV4_25 {
       opx.RR = D1L_RR[i] & 0b1111;
       opx.D1L = D1L_RR[i] >> 4;
       if (ch.CON < conLimit) {
-        u8 atten = volToAttenuation(volData[i].vol);
+        uint8_t atten = volToAttenuation(volData[i].vol);
         opx.TL = (atten + volData[i].extra_atten) & 0x7F;
       } else {
-        u8 masterVolumeAtten = 0x7F - masterVol;
-        u8 atten = volToAttenuation(volData[i].vol);
-        u32 finalAtten = (atten + masterVolumeAtten) + volData[i].extra_atten;
+        uint8_t masterVolumeAtten = 0x7F - masterVol;
+        uint8_t atten = volToAttenuation(volData[i].vol);
+        uint32_t finalAtten = (atten + masterVolumeAtten) + volData[i].extra_atten;
         opx.TL = std::min(finalAtten, 0x7FU);
       }
       opx.KS = KS_AR[i] >> 6;
@@ -250,30 +250,30 @@ struct CPS1OPMInstrDataV5_02 {
   uint8_t D1L_RR[4];
   uint8_t op_vol[4];
 
-  u8 volToAttenuation(u8 instrVol) const {
-    u16 uVar4 = (((u16)instrVol << 8) | (instrVol >> 4)) & 0xF07;
+  uint8_t volToAttenuation(uint8_t instrVol) const {
+    uint16_t uVar4 = (((uint16_t)instrVol << 8) | (instrVol >> 4)) & 0xF07;
 
-    u8 key_scale_atten = (char)(uVar4 >> 8);
+    uint8_t key_scale_atten = (char)(uVar4 >> 8);
 
-    u8 bVar3 = 0x7f << 1;
-    u8 bVar2 = bVar3;
-    bVar2 = (((bVar2 << 1 | bVar2 >> 7) & 0xf0) >> 4) * (((s8)uVar4 << 1) & 0x0f);
+    uint8_t bVar3 = 0x7f << 1;
+    uint8_t bVar2 = bVar3;
+    bVar2 = (((bVar2 << 1 | bVar2 >> 7) & 0xf0) >> 4) * (((int8_t)uVar4 << 1) & 0x0f);
     bVar2 = bVar2 >> 4;
     if ((bVar3 & 0x80) != 0) {
       bVar2 = -bVar2;
     }
-    s8 cVar1 = bVar2 + 0x10 + key_scale_atten;
+    int8_t cVar1 = bVar2 + 0x10 + key_scale_atten;
     return cVar1 > 0x7f ? 0x7F : cVar1;
   }
 
   // Simplified implementation, but might have to revisit the first when we add key scale
-  u8 volToAttenuation2(u8 instrVol) const {
-    u8 m = instrVol >> 4;
-    u8 attenuation = 17 + (instrVol & 0x0F) - 2 * m - (m == 0 ? 1 : 0);
+  uint8_t volToAttenuation2(uint8_t instrVol) const {
+    uint8_t m = instrVol >> 4;
+    uint8_t attenuation = 17 + (instrVol & 0x0F) - 2 * m - (m == 0 ? 1 : 0);
     return attenuation > 0x7F ? 0x7F : attenuation;
   }
 
-  OPMData convertToOPMData(u8 masterVol, const std::string& name) const {
+  OPMData convertToOPMData(uint8_t masterVol, const std::string& name) const {
     bool enableLFO = (LFO_ENABLE_AND_WF & 0x80) != 0;
     // LFO
     OPMData::LFO lfo{};
@@ -298,7 +298,7 @@ struct CPS1OPMInstrDataV5_02 {
     // OP
     uint8_t CON_limits[4] = { 7, 5, 4, 0 };
     OPMData::OP op[4];
-    u8 masterVolumeAtten = 0x7F - masterVol;
+    uint8_t masterVolumeAtten = 0x7F - masterVol;
     for (int i = 0; i < 4; i ++) {
       auto conLimit = CON_limits[i];
       auto& opx = op[i];
@@ -325,7 +325,7 @@ template <class OPMType>
 class CPS1OPMInstr : public VGMInstr {
 public:
   CPS1OPMInstr(VGMInstrSet *instrSet,
-               u8 masterVol,
+               uint8_t masterVol,
                uint32_t offset,
                uint32_t length,
                uint32_t theBank,
@@ -339,11 +339,11 @@ public:
     return true;
   }
 
-  s8 getTranspose() const { return opmData.transpose; }
+  int8_t getTranspose() const { return opmData.transpose; }
 
 private:
   OPMType opmData;
   int info_ptr;        //pointer to start of instrument set block
   int nNumRegions;
-  u8 masterVol;
+  uint8_t masterVol;
 };

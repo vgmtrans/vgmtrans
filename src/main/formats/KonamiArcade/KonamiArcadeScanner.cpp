@@ -70,10 +70,10 @@ void KonamiArcadeScanner::scan(RawFile *file, void *info) {
   MAMERomGroup *sampsRomGroupEntry = gameentry->getRomGroupOfType("sound");
   if (!seqRomGroupEntry || !sampsRomGroupEntry)
     return;
-  u32 seq_table_offset = 0;
-  u32 samp_tables_offset = 0;
-  u32 drum_samp_table_offset = 0;
-  u32 drum_table = 0;
+  uint32_t seq_table_offset = 0;
+  uint32_t samp_tables_offset = 0;
+  uint32_t drum_samp_table_offset = 0;
+  uint32_t drum_table = 0;
   if (!seqRomGroupEntry->file || !sampsRomGroupEntry->file)
     return;
 
@@ -91,23 +91,23 @@ void KonamiArcadeScanner::scan(RawFile *file, void *info) {
     // the driver after processing an NMI. It effectively serves as a divisor for the NMI rate.
     // For example: Mystic Warriors skips 3 NMIs, so only every 4th NMI is handled. For each
     // non-handled NMI, the code enters an infinite loop while waiting for the next NMI.
-    u32 nmiSkipCountAddr;
+    uint32_t nmiSkipCountAddr;
     if (!codeFile->searchBytePattern(ptn_MW_NmiSkip, nmiSkipCountAddr))
       return;
-    u8 nmiSkipCount = codeFile->readByte(nmiSkipCountAddr + 1);
+    uint8_t nmiSkipCount = codeFile->readByte(nmiSkipCountAddr + 1);
 
     // The NMI rate is the byte sent to K054539 mem addr 0x227 which controls the rate at which the
     // K054539 sends non-maskable interrupt signals to the Z80. It is a key variable in the formula
     // for converting tempo values into real time units.
-    u32 setNmiRateAddr;
+    uint32_t setNmiRateAddr;
     if (!codeFile->searchBytePattern(ptn_MW_SetNmiRate, setNmiRateAddr))
       return;
-    u8 nmiTimerByte = codeFile->readByte(setNmiRateAddr + 1);
+    uint8_t nmiTimerByte = codeFile->readByte(setNmiRateAddr + 1);
     nmiRate = NMI_TIMER_HERZ(nmiTimerByte, nmiSkipCount);
   } else {    // GX
     // Same explanation as above.
-    u32 setNmiRateAddr;
-    u8 nmiTimerByte;
+    uint32_t setNmiRateAddr;
+    uint8_t nmiTimerByte;
     if (codeFile->searchBytePattern(ptn_GX_SetNmiRate, setNmiRateAddr)) {
       nmiTimerByte = codeFile->readByte(setNmiRateAddr + 3);
     } else {
@@ -120,16 +120,16 @@ void KonamiArcadeScanner::scan(RawFile *file, void *info) {
     nmiRate = NMI_TIMER_HERZ(nmiTimerByte, 1);
 
     if (seq_table_offset == 0) {
-      u32 setSeqTableTableAddr;
+      uint32_t setSeqTableTableAddr;
       if (!codeFile->searchBytePattern(ptn_GX_setSeqPlaylistTable, setSeqTableTableAddr))
         return;
-      u32 seq_table_table_offset = codeFile->readWordBE(setSeqTableTableAddr + 2);
-      u32 seq_playlist_offset = codeFile->readWordBE(seq_table_table_offset + 4);
+      uint32_t seq_table_table_offset = codeFile->readWordBE(setSeqTableTableAddr + 2);
+      uint32_t seq_playlist_offset = codeFile->readWordBE(seq_table_table_offset + 4);
       seq_table_offset = codeFile->readWordBE(seq_playlist_offset);
     }
 
     if (samp_tables_offset == 0) {
-      u32 sampInfoSetPtrTableAddr;
+      uint32_t sampInfoSetPtrTableAddr;
       if (!codeFile->searchBytePattern(ptn_GX_setSampInfoSetPtrTable, sampInfoSetPtrTableAddr))
         return;
       samp_tables_offset = codeFile->readWordBE(sampInfoSetPtrTableAddr + 2);
@@ -137,7 +137,7 @@ void KonamiArcadeScanner::scan(RawFile *file, void *info) {
 
     // Some later games of the format don't use drumkits
     if (drum_samp_table_offset == 0 || drum_table == 0) {
-      u32 setDrumKitPtrsAddr;
+      uint32_t setDrumKitPtrsAddr;
       if (codeFile->searchBytePattern(ptn_GX_setDrumkitPtrs, setDrumKitPtrsAddr)) {
         drum_samp_table_offset = codeFile->readWordBE(setDrumKitPtrsAddr + 10);
         drum_table = codeFile->readWordBE(setDrumKitPtrsAddr + 18);
@@ -194,21 +194,21 @@ void KonamiArcadeScanner::scan(RawFile *file, void *info) {
 }
 
 struct sequence_table_entry {
-  u8 unknown[7];
-  u8 bank;
-  u8 memDestinationLow;
-  u8 memDestinationHigh;
-  u8 unknown2[4];
+  uint8_t unknown[7];
+  uint8_t bank;
+  uint8_t memDestinationLow;
+  uint8_t memDestinationHigh;
+  uint8_t unknown2[4];
 };
 
 struct sequence_table_entry_gx {
-  u8 unknown[8];
-  u32 seqPointer;
+  uint8_t unknown[8];
+  uint32_t seqPointer;
 };
 
 const std::vector<KonamiArcadeSeq*> KonamiArcadeScanner::loadSeqTable(
   RawFile *file,
-  u32 offset,
+  uint32_t offset,
   const std::array<KonamiArcadeInstrSet::drum, 46>& drums,
   float nmiRate,
   std::string gameName,
@@ -227,15 +227,15 @@ const std::vector<KonamiArcadeSeq*> KonamiArcadeScanner::loadSeqTable(
   int seqCounter = 0;
   if (fmtVer == GX) {
     int entryLength = 12;
-    u32 testLong = file->readWordBE(offset + 12);
+    uint32_t testLong = file->readWordBE(offset + 12);
     if (testLong > 0x1000 && testLong < 0x20000)
       entryLength = 16;
 
     while (offset < nFileLength) {
-      u32 unknown = file->readWordBE(offset);
+      uint32_t unknown = file->readWordBE(offset);
       if (unknown >= 0x5000)
         break;
-      u32 seqPointer = file->readWordBE(offset + 8);
+      uint32_t seqPointer = file->readWordBE(offset + 8);
       if (seqPointer == 0 || seqPointer >= nFileLength)
         break;
       auto name = fmt::format("{} {:d}", gameName, seqCounter++);
@@ -260,8 +260,8 @@ const std::vector<KonamiArcadeSeq*> KonamiArcadeScanner::loadSeqTable(
       }
       sequence_table_entry entry;
       file->readBytes(offset, sizeof(sequence_table_entry), &entry);
-      u16 dest = (entry.memDestinationHigh << 8) | entry.memDestinationLow;
-      u32 seqOffset = (entry.bank * 0x400) + (dest - 0x8000);
+      uint16_t dest = (entry.memDestinationHigh << 8) | entry.memDestinationLow;
+      uint32_t seqOffset = (entry.bank * 0x400) + (dest - 0x8000);
       if (seqOffset == 0 || seqOffset >= nFileLength)
         break;
       auto name = fmt::format("{} {:d}", gameName, seqCounter++);
@@ -288,22 +288,22 @@ const std::vector<KonamiArcadeSeq*> KonamiArcadeScanner::loadSeqTable(
 
 const std::vector<konami_mw_sample_info> KonamiArcadeScanner::loadSampleInfos(
   RawFile *file,
-  u32 tablesOffset,
-  u32 drumSampTableOffset,
-  u32 drumInstrTableOffset,
+  uint32_t tablesOffset,
+  uint32_t drumSampTableOffset,
+  uint32_t drumInstrTableOffset,
   KonamiArcadeFormatVer fmtVer
 ) {
   std::vector<konami_mw_sample_info> sampInfos;
-  u32 instrSampleTableOffset = fmtVer == MysticWarrior ? file->readShort(tablesOffset) : file->readWordBE(tablesOffset);
-  u32 sfxSampleTableOffset = fmtVer == MysticWarrior ? file->readShort(tablesOffset+2) : file->readWordBE(tablesOffset+4);
+  uint32_t instrSampleTableOffset = fmtVer == MysticWarrior ? file->readShort(tablesOffset) : file->readWordBE(tablesOffset);
+  uint32_t sfxSampleTableOffset = fmtVer == MysticWarrior ? file->readShort(tablesOffset+2) : file->readWordBE(tablesOffset+4);
 
-  for (u32 off = instrSampleTableOffset; off < sfxSampleTableOffset; off += sizeof(konami_mw_sample_info)) {
+  for (uint32_t off = instrSampleTableOffset; off < sfxSampleTableOffset; off += sizeof(konami_mw_sample_info)) {
     konami_mw_sample_info info;
     file->readBytes(off, sizeof(konami_mw_sample_info), &info);
     sampInfos.push_back(info);
   }
   if (drumSampTableOffset != 0) {
-    for (u32 off = drumSampTableOffset; off < drumInstrTableOffset; off += sizeof(konami_mw_sample_info)) {
+    for (uint32_t off = drumSampTableOffset; off < drumInstrTableOffset; off += sizeof(konami_mw_sample_info)) {
       konami_mw_sample_info info;
       file->readBytes(off, sizeof(konami_mw_sample_info), &info);
       sampInfos.push_back(info);

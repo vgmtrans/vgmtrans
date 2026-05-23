@@ -132,8 +132,8 @@ bool MP2kInstrSet::loadInstrs() {
 bool MP2kInstrSet::parseInstrPointers() {
   for (int i = 0; i < m_count; i++) {
     size_t cur_ofs = offset() + i * 12;
-    MP2kInstrData data{rawFile()->get<u32>(cur_ofs), rawFile()->get<u32>(cur_ofs + 4),
-                       rawFile()->get<u32>(cur_ofs + 8)};
+    MP2kInstrData data{rawFile()->get<uint32_t>(cur_ofs), rawFile()->get<uint32_t>(cur_ofs + 4),
+                       rawFile()->get<uint32_t>(cur_ofs + 8)};
     aInstrs.push_back(new MP2kInstr(this, cur_ofs, 0, 0, i, data));
   }
 
@@ -151,10 +151,10 @@ int MP2kInstrSet::makeOrGetSample(size_t sample_pointer) {
   }
 
   /* First 3 bytes are unused */
-  auto loop = rawFile()->getBE<u32>(sample_pointer);
-  auto pitch = rawFile()->get<u32>(sample_pointer + 4);
-  auto loop_pos = rawFile()->get<u32>(sample_pointer + 8);
-  auto len = rawFile()->get<u32>(sample_pointer + 12);
+  auto loop = rawFile()->getBE<uint32_t>(sample_pointer);
+  auto pitch = rawFile()->get<uint32_t>(sample_pointer + 4);
+  auto loop_pos = rawFile()->get<uint32_t>(sample_pointer + 8);
+  auto len = rawFile()->get<uint32_t>(sample_pointer + 12);
   /* Filter out samples with invalid lengths */
   if (len < 16 || len > 0x3FFFFF) {
     return -1;
@@ -213,7 +213,7 @@ int MP2kInstrSet::makeOrGetSample(size_t sample_pointer) {
   return sampColl->samples.size() - 1;
 }
 
-MP2kInstr::MP2kInstr(MP2kInstrSet *set, size_t offset, size_t length, u32 bank, u32 number,
+MP2kInstr::MP2kInstr(MP2kInstrSet *set, size_t offset, size_t length, uint32_t bank, uint32_t number,
                      MP2kInstrData data)
     : VGMInstr(set, offset, length, bank, number), m_type(data.w0 & 0xFF), m_data(data) {
 }
@@ -325,15 +325,15 @@ bool MP2kInstr::loadInstr() {
       setName("Multi-region instrument");
       setLength(12);
 
-      u32 base_pointer = m_data.w1 & 0x3ffffff;
-      u32 region_table = m_data.w2 & 0x3ffffff;
+      uint32_t base_pointer = m_data.w1 & 0x3ffffff;
+      uint32_t region_table = m_data.w2 & 0x3ffffff;
 
       std::vector<uint8_t> split_list, index_list;
 
       int prev_index = -1;
       /* Scan the whole table for changes and keep track of splits */
       for (uint8_t key = 0; key < 128; key++) {
-        uint8_t current_index = rawFile()->get<u8>(region_table + key);
+        uint8_t current_index = rawFile()->get<uint8_t>(region_table + key);
 
         if (prev_index != current_index) {
           split_list.push_back(key);
@@ -347,16 +347,16 @@ bool MP2kInstr::loadInstr() {
       split_list.push_back(0x80);
 
       for (size_t i = 0; i < index_list.size(); i++) {
-        u32 off = base_pointer + 12 * index_list[i];
+        uint32_t off = base_pointer + 12 * index_list[i];
 
-        auto type = rawFile()->get<u8>(off);
+        auto type = rawFile()->get<uint8_t>(off);
         if (type & (0x40 | 0x80)) {
           L_DEBUG("Recursive split/rhythm instrument in key-split");
           continue;
         }
 
-        u32 raw_sample_pointer = rawFile()->get<u32>(off + 4);
-        u32 sample_pointer = raw_sample_pointer & 0x3ffffff;
+        uint32_t raw_sample_pointer = rawFile()->get<uint32_t>(off + 4);
+        uint32_t sample_pointer = raw_sample_pointer & 0x3ffffff;
         uint8_t cgb_type = type & 0x07;
 
         if (cgb_type == 0) {
@@ -370,20 +370,20 @@ bool MP2kInstr::loadInstr() {
             VGMRgn *rgn = addRgn(off, 12, sample_id, split_list[i], split_list[i + 1] - 1);
 
             // rgn->sampCollPtr = static_cast<MP2kInstrSet *>(parInstrSet)->sampColl;
-            setADSR(rgn, rawFile()->get<u32>(off + 8));
+            setADSR(rgn, rawFile()->get<uint32_t>(off + 8));
           }
         } else if (cgb_type == 1 || cgb_type == 2) {
           uint8_t duty = static_cast<uint8_t>(raw_sample_pointer & 0x03);
-          addPsgRgn(psgSampColl, duty, rawFile()->get<u32>(off + 8), split_list[i],
+          addPsgRgn(psgSampColl, duty, rawFile()->get<uint32_t>(off + 8), split_list[i],
                     split_list[i + 1] - 1);
         } else if (cgb_type == 3) {
           if (auto sample_id = psgSampColl.makeOrGetProgrammableWave(raw_sample_pointer);
               sample_id != -1) {
-            addPsgRgn(psgSampColl, sample_id, rawFile()->get<u32>(off + 8), split_list[i],
+            addPsgRgn(psgSampColl, sample_id, rawFile()->get<uint32_t>(off + 8), split_list[i],
                       split_list[i + 1] - 1);
           }
         } else if (cgb_type == 4) {
-          addPsgRgn(psgSampColl, kPsgNoiseIndex, rawFile()->get<u32>(off + 8), split_list[i],
+          addPsgRgn(psgSampColl, kPsgNoiseIndex, rawFile()->get<uint32_t>(off + 8), split_list[i],
                     split_list[i + 1] - 1);
         }
       }
@@ -396,17 +396,17 @@ bool MP2kInstr::loadInstr() {
       setName("Full-keyboard instrument");
       setLength(12);
 
-      u32 base_pointer = m_data.w1 & 0x3ffffff;
+      uint32_t base_pointer = m_data.w1 & 0x3ffffff;
 
       for (int key = 0; key < 128; key++) {
-        u32 off = base_pointer + 12 * key;
+        uint32_t off = base_pointer + 12 * key;
 
-        u32 type = rawFile()->get<u8>(off);
-        u32 keynum = rawFile()->get<u8>(off + 1);
-        u32 pan = rawFile()->get<u8>(off + 3);
+        uint32_t type = rawFile()->get<uint8_t>(off);
+        uint32_t keynum = rawFile()->get<uint8_t>(off + 1);
+        uint32_t pan = rawFile()->get<uint8_t>(off + 3);
 
-        u32 raw_sample_pointer = rawFile()->get<u32>(off + 4);
-        u32 sample_pointer = raw_sample_pointer & 0x3ffffff;
+        uint32_t raw_sample_pointer = rawFile()->get<uint32_t>(off + 4);
+        uint32_t sample_pointer = raw_sample_pointer & 0x3ffffff;
 
         if ((type & 0x0f) == 0 || (type & 0x0f) == 8) {
           if (sample_pointer == 0 || !isGbaRomPointer(raw_sample_pointer)) {
@@ -420,22 +420,22 @@ bool MP2kInstr::loadInstr() {
             // rgn->sampCollPtr = static_cast<MP2kInstrSet *>(parInstrSet)->sampColl;
             rgn->setPan(pan);
 
-            u32 pitch = rawFile()->get<u32>(sample_pointer + 4);
+            uint32_t pitch = rawFile()->get<uint32_t>(sample_pointer + 4);
             double delta_note = 12.0 * log2(static_cast<MP2kInstrSet *>(parInstrSet)->sampleRate() *
                                             1024.0 / pitch);
             int rootkey = 60 + int(round(delta_note));
 
             rgn->setUnityKey(rootkey - keynum + key);
-            setADSR(rgn, rawFile()->get<u32>(off + 8));
+            setADSR(rgn, rawFile()->get<uint32_t>(off + 8));
           }
         } else if ((type & 0x0f) == 3 || (type & 0x0f) == 11) {
           if (auto sample_id = psgSampColl.makeOrGetProgrammableWave(raw_sample_pointer);
               sample_id != -1) {
-            auto rgn = addPsgRgn(psgSampColl, sample_id, rawFile()->get<u32>(off + 8), key, key);
+            auto rgn = addPsgRgn(psgSampColl, sample_id, rawFile()->get<uint32_t>(off + 8), key, key);
             rgn->setPan(pan);
           }
         } else if ((type & 0x0f) == 4 || (type & 0x0f) == 12) {
-          auto rgn = addPsgRgn(psgSampColl, kPsgNoiseIndex, rawFile()->get<u32>(off + 8), key, key);
+          auto rgn = addPsgRgn(psgSampColl, kPsgNoiseIndex, rawFile()->get<uint32_t>(off + 8), key, key);
           rgn->setPan(pan);
         }
       }
@@ -464,7 +464,7 @@ bool MP2kInstr::loadInstr() {
   return true;
 }
 
-void MP2kInstr::setADSR(VGMRgn *rgn, u32 adsr) {
+void MP2kInstr::setADSR(VGMRgn *rgn, uint32_t adsr) {
   int attack = adsr & 0xFF;
   int decay = (adsr >> 8) & 0xFF;
   int sustain = (adsr >> 16) & 0xFF;
@@ -485,7 +485,7 @@ void MP2kInstr::setADSR(VGMRgn *rgn, u32 adsr) {
   }
 }
 
-void MP2kInstr::setCgbADSR(VGMRgn *rgn, u32 adsr) {
+void MP2kInstr::setCgbADSR(VGMRgn *rgn, uint32_t adsr) {
   int attack = adsr & 0xFF;
   int decay = (adsr >> 8) & 0xFF;
   int sustain = (adsr >> 16) & 0xFF;

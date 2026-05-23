@@ -35,7 +35,7 @@ void NDSScanner::searchForSDAT(RawFile *file) {
     std::boyer_moore_searcher(signature.begin(), signature.end()));
   while (it != file->end()) {
     size_t offset = it - file->begin();
-    if (file->get<u32>(offset + 0x10) < 0x10000) {
+    if (file->get<uint32_t>(offset + 0x10) < 0x10000) {
       loadFromSDAT(file, offset);
     }
 

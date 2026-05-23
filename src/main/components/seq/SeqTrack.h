@@ -155,7 +155,7 @@ protected:
 
   bool shouldTrackControlFlowState() const;
   void addControlFlowState(uint32_t destinationOffset);
-  bool checkControlStateForInfiniteLoop(u32 offset);
+  bool checkControlStateForInfiniteLoop(uint32_t offset);
   void pushReturnOffset(uint32_t returnOffset);
   bool popReturnOffset(uint32_t &returnOffset);
   SeqEvent* findSeqEventAtOffset(uint32_t offset, uint32_t length);
@@ -184,7 +184,7 @@ protected:
                                                          ConvertDepth&& convertDepth);
 
 private:
-  void addControllerSlide(u32 dur, u16 &prevVal, u16 targVal, uint8_t (*scalerFunc)(uint8_t), void (MidiTrack::*insertFunc)(uint8_t, uint8_t, uint32_t)) const;
+  void addControllerSlide(uint32_t dur, uint16_t &prevVal, uint16_t targVal, uint8_t (*scalerFunc)(uint8_t), void (MidiTrack::*insertFunc)(uint8_t, uint8_t, uint32_t)) const;
   double applyPanVolumeCorrection(double level, LevelController controller) const;
   void addLevelNoItem(double level, LevelController controller, Resolution res, int absTime = -1);
   void reapplyStoredLevelNoItem(LevelController controller, int absTime = -1);
@@ -231,11 +231,11 @@ private:
   void limitPrevDurNoteEnd(uint32_t absTime) const;
   void addVol(uint32_t offset, uint32_t length, uint8_t vol, const std::string &sEventName = "Volume");
   void addVolNoItem(uint8_t vol);
-  void addVol(u32 offset, u32 length, double volPercent, Resolution res, const std::string &sEventName = "Volume");
+  void addVol(uint32_t offset, uint32_t length, double volPercent, Resolution res, const std::string &sEventName = "Volume");
   void addVolSlide(uint32_t offset, uint32_t length, uint32_t dur, uint8_t targVol, const std::string &sEventName = "Volume Slide");
   void insertVol(uint32_t offset, uint32_t length, uint8_t vol, uint32_t absTime, const std::string &sEventName = "Volume");
   void addExpression(uint32_t offset, uint32_t length, uint8_t level, const std::string &sEventName = "Expression");
-  void addExpression(u32 offset, u32 length, double levelPercent, Resolution res, const std::string &sEventName = "Expression");
+  void addExpression(uint32_t offset, uint32_t length, double levelPercent, Resolution res, const std::string &sEventName = "Expression");
   void addExpressionNoItem(uint8_t level);
   void addExpressionSlide(uint32_t offset, uint32_t length, uint32_t dur, uint8_t targExpr, const std::string &sEventName = "Expression Slide");
   void insertExpression(uint32_t offset, uint32_t length, uint8_t level, uint32_t absTime, const std::string &sEventName = "Expression");
@@ -321,9 +321,9 @@ private:
   void insertMarkerNoItem(uint32_t absTime, const std::string &markername, uint8_t databyte1, uint8_t databyte2, int8_t priority) const;
 
   bool addLoopForever(uint32_t offset, uint32_t length, const std::string &sEventName = "Loop Forever");
-  bool addJump(u32 offset, u32 length, u32 destination, const std::string &sEventName = "Jump");
-  bool addCall(u32 offset, u32 length, u32 destination, u32 returnOffset, const std::string &sEventName = "Call");
-  bool addReturn(u32 offset, u32 length, const std::string &sEventName = "Return");
+  bool addJump(uint32_t offset, uint32_t length, uint32_t destination, const std::string &sEventName = "Jump");
+  bool addCall(uint32_t offset, uint32_t length, uint32_t destination, uint32_t returnOffset, const std::string &sEventName = "Call");
+  bool addReturn(uint32_t offset, uint32_t length, const std::string &sEventName = "Return");
 
  public:
   uint32_t dwStartOffset;
@@ -346,14 +346,14 @@ private:
   uint8_t prevKey;
   uint8_t prevVel;
   uint8_t octave;
-  u16 vol;
+  uint16_t vol;
   Resolution volResolution;
-  u16 expression;
+  uint16_t expression;
   Resolution expressionResolution;
-  u16 mastVol;
+  uint16_t mastVol;
   Resolution masterVolResolution;
   double panVolumeCorrectionRate; // as percentage of original volume (default: 1.0)
-  u16 prevPan;
+  uint16_t prevPan;
   uint8_t prevReverb;
   int8_t transpose;
   double fineTuningCents;

@@ -22,7 +22,7 @@ static const double DRTimes[64] = {100000,100000,118200.0,101300.0,88600.0,70900
           920.0,790.0,690.0,550.0,460.0,390.0,340.0,270.0,230.0,200.0,170.0,140.0,110.0,98.0,85.0,68.0,57.0,49.0,43.0,34.0,
           28.0,25.0,22.0,18.0,14.0,12.0,11.0,8.5,7.1,6.1,5.4,4.3,3.6,3.1};
 
-constexpr double tlToDB(u8 tl) {
+constexpr double tlToDB(uint8_t tl) {
   // The hardware level method for calculating dB attenuation is to translate each TL bit to a dB
   // weight. Specifically, the weights for bit0..bit7 are:
   // { 0.4, 0.8, 1.5, 3.0, 6.0, 12.0, 24.0, 48.0 }
@@ -35,27 +35,27 @@ constexpr double tlToDB(u8 tl) {
 
 // Velocity Level Table, defines a curve to transform note velocity
 struct SegSatVLTable {
-  u8 rate0, point0, level0;
-  u8 rate1, point1, level1;
-  u8 rate2, point2, level2;
-  u8 rate3;
+  uint8_t rate0, point0, level0;
+  uint8_t rate1, point1, level1;
+  uint8_t rate2, point2, level2;
+  uint8_t rate3;
 };
 
 struct SegSatMixerTable {
-  u8 data[18];
-  [[nodiscard]] u8 effLevel(int idx) const {
+  uint8_t data[18];
+  [[nodiscard]] uint8_t effLevel(int idx) const {
     return data[idx] >> 5;
   }
-  [[nodiscard]] u8 effPan(int idx) const {
+  [[nodiscard]] uint8_t effPan(int idx) const {
     return data[idx] & 0x1F;
   }
 };
 
 struct SegSatPlfoTable {
-  u8 delay;
-  u8 amp;
-  u8 frequency;
-  u8 fadeTime;
+  uint8_t delay;
+  uint8_t amp;
+  uint8_t frequency;
+  uint8_t fadeTime;
 };
 
 // **************
@@ -72,7 +72,7 @@ public:
 
   virtual bool parseHeader();
   virtual bool parseInstrPointers();
-  void assignBankNumber(u8 bankNum);
+  void assignBankNumber(uint8_t bankNum);
   [[nodiscard]] SegSatDriverVer driverVer() const { return m_driverVer; }
 
   std::vector<SegSatMixerTable> mixerTables() { return m_mixerTables; }
@@ -97,19 +97,19 @@ private:
 class SegSatInstr
     : public VGMInstr {
 public:
-  SegSatInstr(SegSatInstrSet* set, size_t offset, size_t length, u32 bank, u32 number, const std::string &name = "SegSatInstr");
+  SegSatInstr(SegSatInstrSet* set, size_t offset, size_t length, uint32_t bank, uint32_t number, const std::string &name = "SegSatInstr");
   ~SegSatInstr() = default;
 
   virtual bool loadInstr();
 
-  u8 pitchBendRange() { return m_pitchBendRange; }
-  s8 volBias()        { return m_volBias; }
-  u8 portamento()     { return m_portamento; }
+  uint8_t pitchBendRange() { return m_pitchBendRange; }
+  int8_t volBias()        { return m_volBias; }
+  uint8_t portamento()     { return m_portamento; }
 
 private:
-  u8 m_pitchBendRange;
-  s8 m_volBias;
-  u8 m_portamento;
+  uint8_t m_pitchBendRange;
+  int8_t m_volBias;
+  uint8_t m_portamento;
 };
 
 // *********
@@ -117,53 +117,53 @@ private:
 // *********
 class SegSatRgn : public VGMRgn {
 public:
-  enum class LoopType : u8 {
+  enum class LoopType : uint8_t {
     Off = 0,
     Forward = 1,
     Reverse = 2,
     PingPong = 3,
   };
 
-  enum class LFOWave : u8 {
+  enum class LFOWave : uint8_t {
     SawTooth = 0,
     Square = 1,
     Triangle = 2,
     Noise = 3,
   };
 
-  enum class SampleType : u8 { PCM16 = 0, PCM8 = 1 };
+  enum class SampleType : uint8_t { PCM16 = 0, PCM8 = 1 };
 
   SegSatRgn(SegSatInstr* instr, uint32_t offset, const std::string& name);
   ~SegSatRgn() = default;
 
   bool isRegionValid();
-  u32 sampleLoopStart() const { return m_sampLoopStart; }
-  u32 sampleLoopEnd() const { return m_sampLoopEnd; }
-  u32 sampleLoopLength() const { return m_sampLoopEnd - m_sampLoopStart; }
+  uint32_t sampleLoopStart() const { return m_sampLoopStart; }
+  uint32_t sampleLoopEnd() const { return m_sampLoopEnd; }
+  uint32_t sampleLoopLength() const { return m_sampLoopEnd - m_sampLoopStart; }
   SampleType sampleType() const { return m_sampleType; }
   LoopType loopType() const { return m_loopType; }
-  u8 vlTableIndex() const { return m_vlTableIndex; }
-  u8 totalLevel() const { return m_totalLevel; }
+  uint8_t vlTableIndex() const { return m_vlTableIndex; }
+  uint8_t totalLevel() const { return m_totalLevel; }
 
 private:
-  u8 m_attackRate;
-  u8 m_decayRate1;
-  u8 m_decayRate2;
-  u8 m_decayLevel;
-  u8 m_releaseRate;
-  u8 m_keyRateScale;
+  uint8_t m_attackRate;
+  uint8_t m_decayRate1;
+  uint8_t m_decayRate2;
+  uint8_t m_decayLevel;
+  uint8_t m_releaseRate;
+  uint8_t m_keyRateScale;
   SampleType m_sampleType;
-  u32 m_sampLoopStart;
-  u32 m_sampLoopEnd;
+  uint32_t m_sampLoopStart;
+  uint32_t m_sampLoopEnd;
   LoopType m_loopType;
   LFOWave m_pitchLfoWave;
   LFOWave m_ampLfoWave;
   bool m_lfoReset;
-  u8 m_lfoFreq;
-  u8 m_pitchLfoDepth;
-  u8 m_ampLfoDepth;
-  u8 m_directLevel;
-  u8 m_directPan;
+  uint8_t m_lfoFreq;
+  uint8_t m_pitchLfoDepth;
+  uint8_t m_ampLfoDepth;
+  uint8_t m_directLevel;
+  uint8_t m_directPan;
 
   bool m_enableLfoModulation;
   bool m_enablePeg;
@@ -172,10 +172,10 @@ private:
   bool m_enablePlfoModulation;
   bool m_soundDirectEnable;
 
-  u8 m_totalLevel;
+  uint8_t m_totalLevel;
   bool m_enableTotalLevelModulation;
 
-  u8 m_vlTableIndex;
-  u8 m_PegIndex;
-  u8 m_plfoIndex;
+  uint8_t m_vlTableIndex;
+  uint8_t m_PegIndex;
+  uint8_t m_plfoIndex;
 };

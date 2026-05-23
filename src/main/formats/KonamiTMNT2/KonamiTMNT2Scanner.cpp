@@ -123,10 +123,10 @@ void KonamiTMNT2Scanner::scan(RawFile * /*file*/, void *info) {
 
 std::vector<KonamiTMNT2Seq*> KonamiTMNT2Scanner::loadSeqTable(
   RawFile* programRom,
-  u32 seqTableAddr,
+  uint32_t seqTableAddr,
   KonamiTMNT2FormatVer fmtVer,
-  u8 defaultTickSkipInterval,
-  u8 clkb,
+  uint8_t defaultTickSkipInterval,
+  uint8_t clkb,
   const std::string& gameName
 ) {
   VGMMiscFile *seqTable = new VGMMiscFile(
@@ -136,9 +136,9 @@ std::vector<KonamiTMNT2Seq*> KonamiTMNT2Scanner::loadSeqTable(
     0,
     "Sequence Table"
   );
-  std::set<u16> seqPtrs;
-  for (u32 i = seqTableAddr; !seqPtrs.contains(i); i += 2) {
-    const u16 seqPtr = programRom->readShort(i);
+  std::set<uint16_t> seqPtrs;
+  for (uint32_t i = seqTableAddr; !seqPtrs.contains(i); i += 2) {
+    const uint16_t seqPtr = programRom->readShort(i);
     if (fmtVer == VENDETTA && seqPtrs.contains(seqPtr))
       break;
     seqPtrs.insert(seqPtr);
@@ -147,8 +147,8 @@ std::vector<KonamiTMNT2Seq*> KonamiTMNT2Scanner::loadSeqTable(
 
   std::vector<KonamiTMNT2Seq*> seqs;
   int i = 0;
-  for (u16 seqPtr : seqPtrs) {
-    auto getTrackCounts = [&](KonamiTMNT2FormatVer version, u16 seqOffset) {
+  for (uint16_t seqPtr : seqPtrs) {
+    auto getTrackCounts = [&](KonamiTMNT2FormatVer version, uint16_t seqOffset) {
       if (version == VENDETTA) {
         return std::pair{8, 4};
       }
@@ -168,28 +168,28 @@ std::vector<KonamiTMNT2Seq*> KonamiTMNT2Scanner::loadSeqTable(
     };
 
     auto [numYM3151Tracks, numK053260Tracks] = getTrackCounts(fmtVer, seqPtr);
-    u32 seqTypeLength = (fmtVer == VENDETTA) ? 0 : 1;
+    uint32_t seqTypeLength = (fmtVer == VENDETTA) ? 0 : 1;
     auto totalTracks = numYM3151Tracks + numK053260Tracks;
     auto trkList = seqTable->addChild(seqPtr, seqTypeLength + (totalTracks * 2), "Seq Track List");
     if (seqTypeLength)
       trkList->addChild(seqPtr, 1, "Seq Type");
-    std::vector<u32> ym2151TrkPtrs = {};
-    std::vector<u32> k053260TrkPtrs;
+    std::vector<uint32_t> ym2151TrkPtrs = {};
+    std::vector<uint32_t> k053260TrkPtrs;
     ym2151TrkPtrs.reserve(numYM3151Tracks);
     k053260TrkPtrs.reserve(numK053260Tracks);
     for (int i = 0; i < numYM3151Tracks; ++i) {
-      u16 offset = seqPtr + seqTypeLength + (i * 2);
+      uint16_t offset = seqPtr + seqTypeLength + (i * 2);
       trkList->addChild(offset, 2, "YM2151 Track Pointer");
       ym2151TrkPtrs.push_back(programRom->readShort(offset));
     }
     for (int i = 0; i < numK053260Tracks; ++i) {
-      u16 offset = seqPtr + seqTypeLength + ((numYM3151Tracks + i) * 2);
+      uint16_t offset = seqPtr + seqTypeLength + ((numYM3151Tracks + i) * 2);
       trkList->addChild(offset, 2, "K053260 Track Pointer");
       k053260TrkPtrs.push_back(programRom->readShort(offset));
     }
 
     const std::string sequenceName = fmt::format("{} seq {}", gameName, i++);
-    u16 start = std::min(
+    uint16_t start = std::min(
       std::ranges::min(ym2151TrkPtrs),
       std::ranges::min(k053260TrkPtrs)
     );
@@ -220,18 +220,18 @@ std::vector<KonamiTMNT2Seq*> KonamiTMNT2Scanner::loadSeqTable(
 
 std::vector<std::vector<konami_tmnt2_drum_info>> KonamiTMNT2Scanner::loadDrumTablesTMNT2(
   RawFile* programRom,
-  std::vector<u32> drumTablePtrs,
-  u32 minDrumPtr
+  std::vector<uint32_t> drumTablePtrs,
+  uint32_t minDrumPtr
 ) {
   std::vector<std::vector<konami_tmnt2_drum_info>> drumTables;
   std::unordered_set drumTablePtrSet(drumTablePtrs.begin(), drumTablePtrs.end());
-  std::unordered_set<u32> drumInfoPtrSet {};
+  std::unordered_set<uint32_t> drumInfoPtrSet {};
   for (auto drumTablePtr : drumTablePtrs) {
     std::vector<konami_tmnt2_drum_info> drumInfos;
-    minDrumPtr =  std::numeric_limits<u32>::max();
-    u32 i = drumTablePtr;
+    minDrumPtr =  std::numeric_limits<uint32_t>::max();
+    uint32_t i = drumTablePtr;
     do {
-      u32 drumInfoPtr = programRom->readShort(i);
+      uint32_t drumInfoPtr = programRom->readShort(i);
       if (drumInfoPtr > i + 0x1000)
         break;
       if (i >= minDrumPtr)
@@ -257,16 +257,16 @@ void KonamiTMNT2Scanner::scanTMNT2(
   RawFile* programRom = programRomGroup->file;
   RawFile* samplesRom = sampsRomGroup->file;
 
-  auto readTableAddr = [&](const BytePattern &pattern, u32 offset, u16 addend = 0)
-    -> std::optional<u16> {
-    u32 matchOffset;
+  auto readTableAddr = [&](const BytePattern &pattern, uint32_t offset, uint16_t addend = 0)
+    -> std::optional<uint16_t> {
+    uint32_t matchOffset;
     if (!programRom->searchBytePattern(pattern, matchOffset)) {
       return std::nullopt;
     }
-    return static_cast<u16>(programRom->readShort(matchOffset + offset) + addend);
+    return static_cast<uint16_t>(programRom->readShort(matchOffset + offset) + addend);
   };
 
-  std::optional<u16> seqTableAddr = readTableAddr(ptn_tmnt2_LoadSeqTable, 1);
+  std::optional<uint16_t> seqTableAddr = readTableAddr(ptn_tmnt2_LoadSeqTable, 1);
   if (!seqTableAddr)
     seqTableAddr = readTableAddr(ptn_simp_LoadSeqTable, 4, 0x100);
   if (!seqTableAddr)
@@ -275,9 +275,9 @@ void KonamiTMNT2Scanner::scanTMNT2(
     return;
   }
 
-  u32 defaultTickSkipInterval = 0;
+  uint32_t defaultTickSkipInterval = 0;
   programRomGroup->getHexAttribute("default_tick_skip_interval", &defaultTickSkipInterval);
-  u32 clkb = 0xF2;
+  uint32_t clkb = 0xF2;
   programRomGroup->getHexAttribute("CLKB", &clkb);
 
   auto seqs = loadSeqTable(
@@ -289,7 +289,7 @@ void KonamiTMNT2Scanner::scanTMNT2(
     name
   );
 
-  u32 instrTableAddrK053260, drumTableAddr, instrTableAddrYM2151;
+  uint32_t instrTableAddrK053260, drumTableAddr, instrTableAddrYM2151;
   if (!programRomGroup->getHexAttribute("k053260_instr_table", &instrTableAddrK053260)) {
     instrTableAddrK053260 = readTableAddr(ptn_tmnt2_LoadInstrTable, 3).value_or(0);
   }
@@ -305,18 +305,18 @@ void KonamiTMNT2Scanner::scanTMNT2(
   if (instrTableAddrK053260 == 0 || drumTableAddr == 0 || instrTableAddrYM2151 == 0) {
     return;
   }
-  std::vector<u32> instrPtrs;
-  std::vector<u32> drumTablePtrs;
-  u32 minInstrPtr = std::numeric_limits<u32>::max();
-  u32 minDrumPtr =  std::numeric_limits<u32>::max();
+  std::vector<uint32_t> instrPtrs;
+  std::vector<uint32_t> drumTablePtrs;
+  uint32_t minInstrPtr = std::numeric_limits<uint32_t>::max();
+  uint32_t minDrumPtr =  std::numeric_limits<uint32_t>::max();
   for (int i = instrTableAddrK053260; i < minInstrPtr && i < drumTableAddr; i += 2) {
-    u32 instrInfoPtr = programRom->readShort(i);
+    uint32_t instrInfoPtr = programRom->readShort(i);
     minInstrPtr = std::min(minInstrPtr, instrInfoPtr);
     instrPtrs.push_back(instrInfoPtr);
   }
 
   for (int i = drumTableAddr;; i += 2) {
-    u32 drumInfoPtr = programRom->readShort(i);
+    uint32_t drumInfoPtr = programRom->readShort(i);
     minDrumPtr = std::min(minDrumPtr, drumInfoPtr);
     if (i == minDrumPtr)
       break;
@@ -325,7 +325,7 @@ void KonamiTMNT2Scanner::scanTMNT2(
 
   std::vector<konami_tmnt2_instr_info> instrInfos;
   instrInfos.reserve(instrPtrs.size());
-  for (u32 instrInfoPtr : instrPtrs) {
+  for (uint32_t instrInfoPtr : instrPtrs) {
     konami_tmnt2_instr_info info;
     programRom->readBytes(instrInfoPtr, sizeof(konami_tmnt2_instr_info), &info);
     instrInfos.push_back(info);
@@ -412,7 +412,7 @@ void KonamiTMNT2Scanner::scanVendetta(
   RawFile* programRom = programRomGroup->file;
   RawFile* samplesRom = sampsRomGroup->file;
 
-  u32 seqTableAddr = 0, instrTableOffsetK053260 = 0, sampInfoTableOffset = 0, drumBanksOffset = 0,
+  uint32_t seqTableAddr = 0, instrTableOffsetK053260 = 0, sampInfoTableOffset = 0, drumBanksOffset = 0,
       drumsOffset = 0, instrTableOffsetYM2151 = 0;
   programRomGroup->getHexAttribute("seq_table", &seqTableAddr);
   programRomGroup->getHexAttribute("ym2151_instr_table", &instrTableOffsetYM2151);
@@ -426,7 +426,7 @@ void KonamiTMNT2Scanner::scanVendetta(
     return;
   }
 
-  u32 loadInstrSub = 0, setPanSub = 0, setPitchSub = 0, noteOnSub = 0;
+  uint32_t loadInstrSub = 0, setPanSub = 0, setPitchSub = 0, noteOnSub = 0;
   programRomGroup->getHexAttribute("load_instr_sub", &loadInstrSub);
   programRomGroup->getHexAttribute("set_pan_sub", &setPanSub);
   programRomGroup->getHexAttribute("set_pitch_sub", &setPitchSub);
@@ -435,9 +435,9 @@ void KonamiTMNT2Scanner::scanVendetta(
   if (!loadInstrSub || !setPanSub || !setPitchSub || !noteOnSub)
     return;
 
-  u32 defaultTickSkipInterval = 0;
+  uint32_t defaultTickSkipInterval = 0;
   programRomGroup->getHexAttribute("default_tick_skip_interval", &defaultTickSkipInterval);
-  u32 clkb = 0xF9;
+  uint32_t clkb = 0xF9;
   programRomGroup->getHexAttribute("CLKB", &clkb);
 
   auto seqs = loadSeqTable(
@@ -452,12 +452,12 @@ void KonamiTMNT2Scanner::scanVendetta(
   std::vector<konami_vendetta_instr_k053260> instrs;
   std::vector<konami_vendetta_sample_info> sampInfos;
 
-  std::vector<u32> instrPtrs;
+  std::vector<uint32_t> instrPtrs;
 
   // First gather the instrument pointers from the instrument table
-  u32 minInstrPtr = std::numeric_limits<u32>::max();
+  uint32_t minInstrPtr = std::numeric_limits<uint32_t>::max();
   for (int i = instrTableOffsetK053260; i < minInstrPtr; i += 2) {
-    u32 instrInfoPtr = programRom->readShort(i);
+    uint32_t instrInfoPtr = programRom->readShort(i);
     minInstrPtr = std::min(minInstrPtr, instrInfoPtr);
     instrPtrs.push_back(instrInfoPtr);
   }
@@ -469,16 +469,16 @@ void KonamiTMNT2Scanner::scanVendetta(
     instrs.emplace_back(instr);
   }
 
-  u8 lastDrumSampInfoIdx = 0;
-  for (u16 i = drumBanksOffset; i < drumsOffset; i += 2) {
-    u16 drumPtr = programRom->readShort(i);
+  uint8_t lastDrumSampInfoIdx = 0;
+  for (uint16_t i = drumBanksOffset; i < drumsOffset; i += 2) {
+    uint16_t drumPtr = programRom->readShort(i);
     if (drumPtr) {
       lastDrumSampInfoIdx = std::max(lastDrumSampInfoIdx, programRom->readByte(drumPtr));
     }
   }
 
   // Find the last used sample info among all instruments and drums
-  u8 lastSampInfoIdx = 0;
+  uint8_t lastSampInfoIdx = 0;
   for (auto instr : instrs) {
     lastSampInfoIdx = std::max(lastSampInfoIdx, instr.samp_info_idx);
   }

@@ -77,30 +77,30 @@ std::vector<uint8_t> VGMSamp::toPcm(Signedness targetSignedness,
                : int32_t(int16_t(u));
     } else {
       const uint8_t u = src[i];
-      const int32_t s8 = (m_signedness == Signedness::Unsigned)
+      const int32_t sample8 = (m_signedness == Signedness::Unsigned)
                            ? (int32_t(u) - 128)
                            : int32_t(int8_t(u));
-      return s8 * 256;
+      return sample8 * 256;
     }
   };
 
   for (std::size_t i = 0; i < sampleCount; ++i) {
     const std::size_t oi = m_reverse ? (sampleCount - 1 - i) : i;
 
-    int32_t s16 = readS16(i);
-    s16 = std::clamp(s16, -32768, 32767);
+    int32_t sample16 = readS16(i);
+    sample16 = std::clamp(sample16, -32768, 32767);
 
     if (isDst16) {
       const uint16_t u = (targetSignedness == Signedness::Unsigned)
-                           ? uint16_t(s16 + 0x8000)
-                           : uint16_t(int16_t(s16));
+                           ? uint16_t(sample16 + 0x8000)
+                           : uint16_t(int16_t(sample16));
       write16(oi, u);
     } else {
-      int32_t s8 = (s16 >> 8);                       // assumes arithmetic shift (typical)
-      s8 = std::clamp(s8, -128, 127);
+      int32_t sample8 = (sample16 >> 8);                       // assumes arithmetic shift (typical)
+      sample8 = std::clamp(sample8, -128, 127);
       out[oi] = (targetSignedness == Signedness::Unsigned)
-                  ? uint8_t(s8 + 128)
-                  : uint8_t(int8_t(s8));
+                  ? uint8_t(sample8 + 128)
+                  : uint8_t(int8_t(sample8));
     }
   }
 

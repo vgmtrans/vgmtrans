@@ -9,8 +9,8 @@ public:
   KonamiArcadeSeq(
     RawFile *file,
     KonamiArcadeFormatVer fmt_version,
-    u32 offset,
-    u32 memOffset,
+    uint32_t offset,
+    uint32_t memOffset,
     const std::array<KonamiArcadeInstrSet::drum, 46>& drums,
     float nmiRate,
     const std::string& name
@@ -19,23 +19,23 @@ public:
   bool parseHeader() override;
   bool parseTrackPointers() override;
 
-  u32 memOffset() { return m_memOffset; }
+  uint32_t memOffset() { return m_memOffset; }
   const std::array<KonamiArcadeInstrSet::drum, 46>& drums() { return m_drums; }
   float nmiRate() { return m_nmiRate; }
 
 public:
   KonamiArcadeFormatVer fmtVer;
-  u8 getTempoSlideDuration() { return m_tempoSlideDuration; }
-  void setTempoSlideDuration(u8 dur) { m_tempoSlideDuration = dur; }
+  uint8_t getTempoSlideDuration() { return m_tempoSlideDuration; }
+  void setTempoSlideDuration(uint8_t dur) { m_tempoSlideDuration = dur; }
   double getTempoSlideIncrement() { return m_tempoSlideIncrement; }
   void setTempoSlideIncrement(double increment) { m_tempoSlideIncrement = increment; }
 
 private:
-  u32 m_memOffset;
+  uint32_t m_memOffset;
   const std::array<KonamiArcadeInstrSet::drum, 46> m_drums;
   float m_nmiRate;
 
-  u8 m_tempoSlideDuration;
+  uint8_t m_tempoSlideDuration;
   double m_tempoSlideIncrement;
 };
 
@@ -53,7 +53,7 @@ private:
   void makeTrulyPrevDurNoteEnd(uint32_t absTime) const;
   std::pair<double, double> calculateTempo(double tempoByte);
 
-  u8 calculateMidiPanForK054539(u8 pan);
+  uint8_t calculateMidiPanForK054539(uint8_t pan);
   void enablePercussion(bool& flag);
   void disablePercussion(bool& flag);
   bool percussionEnabled();
@@ -62,40 +62,40 @@ private:
   bool m_inJump;
   bool m_percussionFlag1;
   bool m_percussionFlag2;
-  u32 m_prevNoteAbsTime;
-  u32 m_prevNoteDur;
-  u32 m_prevNoteDelta;
-  u8 m_prevFinalKey;
+  uint32_t m_prevNoteAbsTime;
+  uint32_t m_prevNoteDur;
+  uint32_t m_prevNoteDelta;
+  uint8_t m_prevFinalKey;
   bool m_tiePrevNote;
   bool m_didCancelDurTie;
   double m_tempo;
   double m_microsecsPerTick;
 
-  u8 m_volSlideDuration;
-  s16 m_volSlideTarget;
-  s16 m_volSlideIncrement;
-  u8 m_panSlideDuration;
-  s16 m_panSlideTarget;
-  s16 m_panSlideIncrement;
-  u8 m_portamentoTime;
-  u8 m_slideModeDelay;
-  u8 m_slideModeDuration;
-  s8 m_slideModeDepth;
-  s8 m_driverTranspose;
-  u8 m_releaseRate;
-  u8 m_curProg;
-  u32 m_loopMarker[2] = {};
+  uint8_t m_volSlideDuration;
+  int16_t m_volSlideTarget;
+  int16_t m_volSlideIncrement;
+  uint8_t m_panSlideDuration;
+  int16_t m_panSlideTarget;
+  int16_t m_panSlideIncrement;
+  uint8_t m_portamentoTime;
+  uint8_t m_slideModeDelay;
+  uint8_t m_slideModeDuration;
+  int8_t m_slideModeDepth;
+  int8_t m_driverTranspose;
+  uint8_t m_releaseRate;
+  uint8_t m_curProg;
+  uint32_t m_loopMarker[2] = {};
   int m_loopCounter[2] = {};
-  s16 m_loopAtten[2] = {};
-  s16 m_loopTranspose[2] = {};
-  u8 m_prevDelta;
-  u8 m_duration;
-  s16 m_vol;
-  u8 m_pan;
-  s16 m_actualPan;
-  u32 m_subroutineOffset;
-  u32 m_subroutineReturnOffset;
+  int16_t m_loopAtten[2] = {};
+  int16_t m_loopTranspose[2] = {};
+  uint8_t m_prevDelta;
+  uint8_t m_duration;
+  int16_t m_vol;
+  uint8_t m_pan;
+  int16_t m_actualPan;
+  uint32_t m_subroutineOffset;
+  uint32_t m_subroutineReturnOffset;
   bool m_needsSubroutineEnd = false;
   bool m_inSubRoutine = false;
-  u32 m_jumpReturnOffset;
+  uint32_t m_jumpReturnOffset;
 };

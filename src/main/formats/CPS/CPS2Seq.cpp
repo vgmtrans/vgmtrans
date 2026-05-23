@@ -19,7 +19,7 @@ DECLARE_FORMAT(CPS2);
 // CPSSeq
 // ******
 
-CPS2Seq::CPS2Seq(RawFile *file, uint32_t offset, CPS2FormatVer fmtVersion, std::string name, std::vector<s8> instrTransposeTable)
+CPS2Seq::CPS2Seq(RawFile *file, uint32_t offset, CPS2FormatVer fmtVersion, std::string name, std::vector<int8_t> instrTransposeTable)
     : VGMSeq(CPS2Format::name, file, offset, 0, std::move(name)),
       fmt_version(fmtVersion), instrTransposeTable(instrTransposeTable) {
   setUsesMonophonicTracks();
@@ -259,7 +259,7 @@ bool CPS2Seq::postLoad() {
   return succeeded;
 }
 
-s8 CPS2Seq::transposeForInstr(u8 instrIndex) {
+int8_t CPS2Seq::transposeForInstr(uint8_t instrIndex) {
   if (instrIndex >= instrTransposeTable.size()) {
     return 0;
   }

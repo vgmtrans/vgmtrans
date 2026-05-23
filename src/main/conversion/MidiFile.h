@@ -103,9 +103,9 @@ class MidiTrack {
   void insertVol(uint8_t channel, uint8_t vol, uint32_t absTime/*, int8_t priority = PRIORITY_MIDDLE*/);
   void addVolumeFine(uint8_t channel, uint8_t volume_lsb);
   void insertVolumeFine(uint8_t channel, uint8_t volume_lsb, uint32_t absTime);
-  void addMasterVol(uint8_t channel, u8 volMsb, u8 volLsb = 0);
-  void insertMasterVol(uint8_t channel, u8 volMsb, uint32_t absTime);
-  void insertMasterVol(uint8_t channel, u8 volMsb, u8 volLsb, uint32_t absTime);
+  void addMasterVol(uint8_t channel, uint8_t volMsb, uint8_t volLsb = 0);
+  void insertMasterVol(uint8_t channel, uint8_t volMsb, uint32_t absTime);
+  void insertMasterVol(uint8_t channel, uint8_t volMsb, uint8_t volLsb, uint32_t absTime);
   void addPan(uint8_t channel, uint8_t pan);
   void insertPan(uint8_t channel, uint8_t pan, uint32_t absTime);
   void addExpression(uint8_t channel, uint8_t expression);
@@ -486,7 +486,7 @@ public:
 class MasterVolEvent
     : public SysexEvent {
 public:
-  MasterVolEvent(MidiTrack *prntTrk, uint8_t /* channel */, uint32_t absoluteTime, u8 msb, u8 lsb)
+  MasterVolEvent(MidiTrack *prntTrk, uint8_t /* channel */, uint32_t absoluteTime, uint8_t msb, uint8_t lsb)
       : SysexEvent(prntTrk, absoluteTime, {0x07, 0x7F, 0x7F, 0x04, 0x01, lsb, msb }, PRIORITY_HIGHER) { }
   MidiEventType eventType() override { return MIDIEVENT_MASTERVOL; }
 };

@@ -34,9 +34,9 @@ public:
   );
   const std::vector<konami_mw_sample_info> loadSampleInfos(
     RawFile *file,
-    u32 tablesOffset,
-    u32 drumSampTableOffset,
-    u32 drumInstrTableOffset,
+    uint32_t tablesOffset,
+    uint32_t drumSampTableOffset,
+    uint32_t drumInstrTableOffset,
     KonamiArcadeFormatVer fmtVer
   );
 

@@ -30,8 +30,8 @@ class KonamiTMNT2Scanner : public VGMScanner {
 
   std::vector<std::vector<konami_tmnt2_drum_info>> loadDrumTablesTMNT2(
     RawFile* programRom,
-    std::vector<u32> drumTablePtrs,
-    u32 minDrumPtr
+    std::vector<uint32_t> drumTablePtrs,
+    uint32_t minDrumPtr
   );
 
   void scan(RawFile *file, void *info) override;
@@ -39,10 +39,10 @@ class KonamiTMNT2Scanner : public VGMScanner {
 private:
   std::vector<KonamiTMNT2Seq*> loadSeqTable(
     RawFile* programRom,
-    u32 seqTableAddr,
+    uint32_t seqTableAddr,
     KonamiTMNT2FormatVer fmtVer,
-    u8 defaultTickSkipInterval,
-    u8 clkb,
+    uint8_t defaultTickSkipInterval,
+    uint8_t clkb,
     const std::string& gameName
   );
   void scanTMNT2(

@@ -61,7 +61,7 @@ class RawFile {
 
         T value = 0;
         for (size_t i = 0; i < sizeof(T); i++) {
-            value |= (static_cast<u8>(operator[](ind + i)) << (i * CHAR_BIT));
+            value |= (static_cast<uint8_t>(operator[](ind + i)) << (i * CHAR_BIT));
         }
 
         return value;
@@ -73,7 +73,7 @@ class RawFile {
 
         T value = 0u;
         for (size_t i = 0; i < sizeof(T); i++) {
-            value |= (static_cast<u8>(operator[](ind + i)) << ((sizeof(T) - i - 1) * CHAR_BIT));
+            value |= (static_cast<uint8_t>(operator[](ind + i)) << ((sizeof(T) - i - 1) * CHAR_BIT));
         }
 
         return value;
@@ -149,10 +149,10 @@ class DiskFile final : public RawFile {
     const char *data() const override { return m_data.data(); }
     const char &operator[](size_t offset) const override { return m_data[offset]; }
     uint8_t readByte(size_t offset) const override { return m_data[offset]; }
-    uint16_t readShort(size_t offset) const override { return get<u16>(offset); }
-    uint32_t readWord(size_t offset) const override { return get<u32>(offset); }
-    uint16_t readShortBE(size_t offset) const override { return getBE<u16>(offset); }
-    uint32_t readWordBE(size_t offset) const override { return getBE<u32>(offset); }
+    uint16_t readShort(size_t offset) const override { return get<uint16_t>(offset); }
+    uint32_t readWord(size_t offset) const override { return get<uint32_t>(offset); }
+    uint16_t readShortBE(size_t offset) const override { return getBE<uint16_t>(offset); }
+    uint32_t readWordBE(size_t offset) const override { return getBE<uint32_t>(offset); }
 
    private:
     mio::mmap_source m_data;
@@ -197,10 +197,10 @@ class VirtFile final : public RawFile {
     const char *data() const override { return m_data.data(); }
     const char &operator[](size_t offset) const override { return m_data[offset]; }
     uint8_t readByte(size_t offset) const override { return m_data[offset]; }
-    uint16_t readShort(size_t offset) const override { return get<u16>(offset); }
-    uint32_t readWord(size_t offset) const override { return get<u32>(offset); }
-    uint16_t readShortBE(size_t offset) const override { return getBE<u16>(offset); }
-    uint32_t readWordBE(size_t offset) const override { return getBE<u32>(offset); }
+    uint16_t readShort(size_t offset) const override { return get<uint16_t>(offset); }
+    uint32_t readWord(size_t offset) const override { return get<uint32_t>(offset); }
+    uint16_t readShortBE(size_t offset) const override { return getBE<uint16_t>(offset); }
+    uint32_t readWordBE(size_t offset) const override { return getBE<uint32_t>(offset); }
 
    private:
     std::vector<char> m_data;

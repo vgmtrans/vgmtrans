@@ -1580,9 +1580,9 @@ bool AkaoTrack::readEvent() {
   return true;
 }
 
-void AkaoTrack::logUnknownEvent(u32 beginOffset) const {
-  const u8 status_byte = readByte(beginOffset);
-  const u8 data_byte = readByte(beginOffset + 1);
+void AkaoTrack::logUnknownEvent(uint32_t beginOffset) const {
+  const uint8_t status_byte = readByte(beginOffset);
+  const uint8_t data_byte = readByte(beginOffset + 1);
   auto opcode_str = curOffset - beginOffset > 1 ?
     fmt::format("0x{:02X}  0x{:02X}", status_byte, data_byte) :
     fmt::format("0x{:02X}", status_byte);

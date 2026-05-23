@@ -67,7 +67,7 @@ bool MP2kSeq::parseHeader() {
 
   uint32_t dwInstPtr = readWord(offset() + 4);
   seqHdr->addPointer(offset() + 4, 4, dwInstPtr - 0x8000000, true, "Instrument pointer");
-  for (u32 i = 0; i < nNumTracks; i++) {
+  for (uint32_t i = 0; i < nNumTracks; i++) {
     uint32_t dwTrackPtrOffset = offset() + 8 + i * 4;
     uint32_t dwTrackPtr = readWord(dwTrackPtrOffset);
     seqHdr->addPointer(dwTrackPtrOffset, 4, dwTrackPtr - 0x8000000, true, "Track pointer");
@@ -127,7 +127,7 @@ void MP2kTrack::onTickBegin() {
 }
 
 bool MP2kTrack::readEvent() {
-  static constexpr std::array<u8, 0x31> kLengthTable{
+  static constexpr std::array<uint8_t, 0x31> kLengthTable{
       0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0A, 0x0B, 0x0C,
       0x0D, 0x0E, 0x0F, 0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17, 0x18, 0x1C,
       0x1E, 0x20, 0x24, 0x28, 0x2A, 0x2C, 0x30, 0x34, 0x36, 0x38, 0x3C, 0x40, 0x42,
@@ -186,7 +186,7 @@ bool MP2kTrack::readEvent() {
   return bContinue;
 }
 
-void MP2kTrack::handleStatusCommand(u32 beginOffset, u8 status_byte) {
+void MP2kTrack::handleStatusCommand(uint32_t beginOffset, uint8_t status_byte) {
   switch (state) {
     case State::Note: {
       /* Velocity update might be needed */
@@ -268,7 +268,7 @@ void MP2kTrack::handleStatusCommand(u32 beginOffset, u8 status_byte) {
   }
 }
 
-void MP2kTrack::handleSpecialCommand(u32 beginOffset, u8 status_byte) {
+void MP2kTrack::handleSpecialCommand(uint32_t beginOffset, uint8_t status_byte) {
   switch (status_byte) {
     // Branch
     case 0xB3: {

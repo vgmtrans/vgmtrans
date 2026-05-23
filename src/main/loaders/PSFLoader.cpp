@@ -38,12 +38,12 @@ namespace {
 struct Image {
   uint32_t start = 0;
   uint32_t end = 0;
-  std::vector<u8> data;
+  std::vector<uint8_t> data;
 };
 
 constexpr int MAX_RECURSION = 10;
 
-void overlay(Image &img, uint32_t addr, const u8 *data, size_t size) {
+void overlay(Image &img, uint32_t addr, const uint8_t *data, size_t size) {
   if (!size)
     return;
   if (img.data.empty()) {
@@ -109,7 +109,7 @@ void load_with_libs(const PSFFile &psf, const std::filesystem::path &basepath, I
                                                  : psf.getExe<uint32_t>(0);
     size_t off = data_offset.at(psf.version());
     overlay(img, addr,
-            reinterpret_cast<const u8 *>(psf.exe().data()) + off,
+            reinterpret_cast<const uint8_t *>(psf.exe().data()) + off,
             psf.exe().size() - off);
   }
 
@@ -127,7 +127,7 @@ void PSFLoader::apply(const RawFile *file) {
   if (file->size() <= 16)
     return;
   if (std::equal(file->begin(), file->begin() + 3, "PSF")) {
-    uint8_t version = file->get<u8>(3);
+    uint8_t version = file->get<uint8_t>(3);
     if (data_offset.contains(version)) {
       psf_read_exe(file);
     }

@@ -34,10 +34,10 @@ void CPS1TrackV1::addInitialMidiEvents(int trackNum) {
 }
 
 bool CPS1TrackV1::readEvent() {
-  u32 beginOffset = curOffset;
-  u8 statusByte = readByte(curOffset++);
+  uint32_t beginOffset = curOffset;
+  uint8_t statusByte = readByte(curOffset++);
   auto cpsSeq = static_cast<CPS1Seq*>(parentSeq);
-  u8 masterVol = cpsSeq->masterVolume();
+  uint8_t masterVol = cpsSeq->masterVolume();
 
   if (statusByte >= 0x40) {
     int shiftAmount = ((statusByte >> 5) & 0x07) - 2;
@@ -53,7 +53,7 @@ bool CPS1TrackV1::readEvent() {
       extendDeltaFlag = false;
     }
 
-    u8 absDur = static_cast<u8>(static_cast<u16>(delta * noteDuration) >> 8);
+    uint8_t absDur = static_cast<uint8_t>(static_cast<uint16_t>(delta * noteDuration) >> 8);
     absDur += 1;
 
     // We must provide some time between sequential notes to allow the YM2151 envelope to reset.
@@ -131,8 +131,8 @@ bool CPS1TrackV1::readEvent() {
   int loopNum;
   switch (statusByte) {
     case 0x00: {  // tempo
-      u8 tempoByte = readByte(curOffset++);
-      u16 newTempo = (((u8)(tempoByte + 0x80U) >> 3) << 8) | (((u8)(tempoByte + 0x80U) >> 2) << 7);
+      uint8_t tempoByte = readByte(curOffset++);
+      uint16_t newTempo = (((uint8_t)(tempoByte + 0x80U) >> 3) << 8) | (((uint8_t)(tempoByte + 0x80U) >> 2) << 7);
       const uint32_t micros_per_beat = newTempo << 7;
       addTempo(beginOffset, curOffset - beginOffset, micros_per_beat);
 
@@ -168,8 +168,8 @@ bool CPS1TrackV1::readEvent() {
       goto doLoop;
 
     doLoop: {
-      u8 numLoops = readByte(curOffset++);
-      u16 offset = readShort(curOffset);
+      uint8_t numLoops = readByte(curOffset++);
+      uint16_t offset = readShort(curOffset);
       // If the num loops is 0, then loop forever
       if (numLoops == 0) {
         bool should_continue = addLoopForever(beginOffset, 4);
@@ -254,7 +254,7 @@ bool CPS1TrackV1::readEvent() {
     }
 
     case 0x0D: {      // Set Volume
-      s8 vol = 0x7f + readByte(curOffset++);
+      int8_t vol = 0x7f + readByte(curOffset++);
       addVol(beginOffset, curOffset - beginOffset, vol);
       break;
     }

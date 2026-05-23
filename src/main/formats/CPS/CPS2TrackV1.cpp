@@ -8,7 +8,7 @@
 #include "ScaleConversion.h"
 #include "SeqEvent.h"
 
-static const u16 vol_table[128] = {
+static const uint16_t vol_table[128] = {
   0, 0xA, 0x18, 0x26, 0x34, 0x42, 0x51, 0x5F, 0x6E, 0x7D, 0x8C, 0x9B, 0xAA,
   0xBA, 0xC9, 0xD9, 0xE9, 0xF8, 0x109, 0x119, 0x129, 0x13A, 0x14A, 0x15B,
   0x16C, 0x17D, 0x18E, 0x1A0, 0x1B2, 0x1C3, 0x1D5, 0x1E8, 0x1FC, 0x20D, 0x21F,
@@ -71,7 +71,7 @@ bool CPS2TrackV1::readEvent() {
   uint32_t beginOffset = curOffset;
   uint8_t status_byte = readByte(curOffset++);
   auto cpsSeq = static_cast<CPS2Seq*>(parentSeq);
-  u8 masterVol = cpsSeq->masterVolume();
+  uint8_t masterVol = cpsSeq->masterVolume();
 
   if (status_byte >= 0x20) {
 
@@ -90,7 +90,7 @@ bool CPS2TrackV1::readEvent() {
 
     //if it's not a rest
     if ((status_byte & 0x1F) != 0) {
-      u8 absDur = static_cast<u8>(static_cast<u16>(delta * noteDuration) >> 8);
+      uint8_t absDur = static_cast<uint8_t>(static_cast<uint16_t>(delta * noteDuration) >> 8);
       key = (status_byte & 0x1F) + octave_table[noteState & 0x0F] - 1;
 
       // Tie note
@@ -211,7 +211,7 @@ bool CPS2TrackV1::readEvent() {
         break;
 
       case 0x07 : {
-        u8 volIndex = readByte(curOffset++);
+        uint8_t volIndex = readByte(curOffset++);
         double volPercent = vol_table[volIndex] / static_cast<double>(0x1FFF);
         addVol(beginOffset, curOffset - beginOffset, volPercent, Resolution::FourteenBit);
         break;
@@ -356,7 +356,7 @@ bool CPS2TrackV1::readEvent() {
           noteState &= 0x97;
           noteState |= readByte(curOffset++);
           {
-            u16 jump = getShortBE(curOffset);
+            uint16_t jump = getShortBE(curOffset);
             curOffset += 2;
             addGenericEvent(beginOffset, curOffset - beginOffset, "Loop Break", "", Type::Loop);
             curOffset += static_cast<int16_t>(jump);
