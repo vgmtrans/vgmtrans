@@ -189,8 +189,8 @@ protected:
 
 private:
   void addControllerSlide(u32 dur, u16 &prevVal, u16 targVal, uint8_t (*scalerFunc)(uint8_t), void (MidiTrack::*insertFunc)(uint8_t, uint8_t, uint32_t)) const;
-  void addModSourceNoItem(ModSource source, uint8_t value) const;
-  void addModDestSourceNoItem(ModDest destination, uint8_t value) const;
+  void addForModSourceNoItem(ModSource source, uint8_t value) const;
+  void addForModDestNoItem(ModDest destination, uint8_t value) const;
   void addLfoModulationEvent(ModDest destination,
                              uint32_t offset,
                              uint32_t length,

@@ -41,6 +41,7 @@ bool saveAsOriginal(const RawFile& rawfile, const std::filesystem::path& filepat
 
 template <Target options>
 void saveAs(const VGMColl &coll, const std::filesystem::path &dir_path) {
+  // ScopedMidiModulationSourceTarget uses RAII to set whether we're exporting for SF2 or DLS in ConversionOptions.
   const ScopedMidiModulationSourceTarget scopedModulationTarget(
       (options & Target::DLS) != 0 ? ModulationSourceTarget::DLS : ModulationSourceTarget::SoundFont);
 

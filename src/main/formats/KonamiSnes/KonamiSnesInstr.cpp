@@ -249,7 +249,6 @@ KonamiSnesInstr::~KonamiSnesInstr() {
 }
 
 bool KonamiSnesInstr::loadInstr() {
-  // Konami vibrato is driven per track from E4 through the configured vibrato MIDI sources.
   addStandardVibratoHandling(konami_snes::vibrato::modulationSpec(version));
 
   if (percussion) {

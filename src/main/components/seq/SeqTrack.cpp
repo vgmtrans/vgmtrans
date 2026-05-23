@@ -301,7 +301,7 @@ void SeqTrack::addControllerSlide(uint32_t dur,
   prevVal = targVal;
 }
 
-void SeqTrack::addModSourceNoItem(ModSource source, uint8_t value) const {
+void SeqTrack::addForModSourceNoItem(ModSource source, uint8_t value) const {
   if (readMode != READMODE_CONVERT_TO_MIDI) {
     return;
   }
@@ -316,9 +316,7 @@ void SeqTrack::addModSourceNoItem(ModSource source, uint8_t value) const {
       pMidiTrack->addChannelPressure(channel, value);
       break;
     case ModSource::PitchWheel: {
-      const auto bend = static_cast<int16_t>(std::clamp<int>((static_cast<int>(value) * 128) - 8192,
-                                                             -8192,
-                                                             8191));
+      const auto bend = static_cast<int16_t>(std::clamp<int>((static_cast<int>(value) * 128) - 8192, -8192, 8191));
       pMidiTrack->addPitchBend(channel, bend);
       break;
     }
@@ -329,9 +327,9 @@ void SeqTrack::addModSourceNoItem(ModSource source, uint8_t value) const {
   }
 }
 
-void SeqTrack::addModDestSourceNoItem(ModDest destination, uint8_t value) const {
+void SeqTrack::addForModDestNoItem(ModDest destination, uint8_t value) const {
   const auto target = ConversionOptions::the().midiModulationSourceTarget();
-  addModSourceNoItem(ConversionOptions::the().modSourceMap(target).sourceFor(destination), value);
+  addForModSourceNoItem(ConversionOptions::the().modSourceMap(target).sourceFor(destination), value);
 }
 
 void SeqTrack::addLfoModulationEvent(ModDest destination,
@@ -348,7 +346,7 @@ void SeqTrack::addLfoModulationEvent(ModDest destination,
                            eventName,
                            type,
                            fmt::format("Value: {:d}", value));
-  addModDestSourceNoItem(destination, value);
+  addForModDestNoItem(destination, value);
 }
 
 // Emit synth vibrato depth through the configured ModDest source if it changed.
@@ -1468,7 +1466,7 @@ void SeqTrack::addVibratoDepth(uint32_t offset,
 }
 
 void SeqTrack::addVibratoDepthNoItem(uint8_t depth) const {
-  addModDestSourceNoItem(ModDest::VibLfoToPitch, depth);
+  addForModDestNoItem(ModDest::VibLfoToPitch, depth);
 }
 
 void SeqTrack::addVibratoFrequency(uint32_t offset,
@@ -1479,7 +1477,7 @@ void SeqTrack::addVibratoFrequency(uint32_t offset,
 }
 
 void SeqTrack::addVibratoFrequencyNoItem(uint8_t frequency) const {
-  addModDestSourceNoItem(ModDest::VibLfoFreq, frequency);
+  addForModDestNoItem(ModDest::VibLfoFreq, frequency);
 }
 
 void SeqTrack::addVibratoDelay(uint32_t offset,
@@ -1490,7 +1488,7 @@ void SeqTrack::addVibratoDelay(uint32_t offset,
 }
 
 void SeqTrack::addVibratoDelayNoItem(uint8_t delay) const {
-  addModDestSourceNoItem(ModDest::VibLfoDelay, delay);
+  addForModDestNoItem(ModDest::VibLfoDelay, delay);
 }
 
 void SeqTrack::addTremoloDepth(uint32_t offset,
@@ -1501,7 +1499,7 @@ void SeqTrack::addTremoloDepth(uint32_t offset,
 }
 
 void SeqTrack::addTremoloDepthNoItem(uint8_t depth) const {
-  addModDestSourceNoItem(ModDest::ModLfoToVol, depth);
+  addForModDestNoItem(ModDest::ModLfoToVol, depth);
 }
 
 void SeqTrack::addTremoloFrequency(uint32_t offset,
@@ -1512,7 +1510,7 @@ void SeqTrack::addTremoloFrequency(uint32_t offset,
 }
 
 void SeqTrack::addTremoloFrequencyNoItem(uint8_t frequency) const {
-  addModDestSourceNoItem(ModDest::ModLfoFreq, frequency);
+  addForModDestNoItem(ModDest::ModLfoFreq, frequency);
 }
 
 void SeqTrack::addTremoloDelay(uint32_t offset,
@@ -1523,7 +1521,7 @@ void SeqTrack::addTremoloDelay(uint32_t offset,
 }
 
 void SeqTrack::addTremoloDelayNoItem(uint8_t delay) const {
-  addModDestSourceNoItem(ModDest::ModLfoDelay, delay);
+  addForModDestNoItem(ModDest::ModLfoDelay, delay);
 }
 
 void SeqTrack::addSustainEvent(uint32_t offset, uint32_t length, uint8_t depth, const std::string &sEventName) {

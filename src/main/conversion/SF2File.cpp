@@ -41,6 +41,7 @@ SFModulator sf2SourceForModSource(ModSource source) {
 }
 
 ModSource sourceForModulator(const SynthModulator& modulator) {
+  // Use the explicitly set source if defined, otherwise use the dest->source mapping configured in ConversionOptions
   return modulator.source.value_or(
       ConversionOptions::the()
           .modSourceMap(ModulationSourceTarget::SoundFont)
