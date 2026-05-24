@@ -33,6 +33,12 @@
 
 * **Audio:** Fixed CPS3 volume and ADSR bugs.
 
+**PS1 (VAB)**
+
+* **Breath of Fire 3:** Fixed delay effects playing at too high volume.
+* **Stability:** Fixed a crash when loading certain PS1 music files
+
+
 ### User Interface & Tools
 
 * **Rendering:** The analysis panel was fully rewritten and now uses GPU rendering.
@@ -45,6 +51,7 @@
 
 ### General
 
+* **SF2:** Compensated SF2 attenuation to improve sound compatibility with most synths and players.
 * **Crash Fix:** Fixed a crash when removing a collection that was currently being played.
 * **Memory Leaks:** Fixed various memory leaks, most notably one which occurred during collection playback.
 
