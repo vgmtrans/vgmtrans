@@ -189,7 +189,7 @@ void SeqTrack::setChannelAndGroupFromTrkNum(int trk) {
   constexpr int kChannelsPerBank = 16;
   constexpr int kSkippedChannel  = 9;
 
-  if (ConversionOptions::the().skipChannel10()) {
+  if (parentSeq->conversionContext().skipChannel10) {
     // Pack tracks into 15 usable slots per 16-channel bank, skipping 9.
     constexpr int kUsablePerBank = kChannelsPerBank - 1; // 15
     const int group  = trk / kUsablePerBank;
@@ -330,8 +330,7 @@ void SeqTrack::addForModSourceNoItem(ModSource source, uint8_t value) const {
 }
 
 void SeqTrack::addForModDestNoItem(ModDest destination, uint8_t value) const {
-  const auto target = ConversionOptions::the().midiModulationSourceTarget();
-  addForModSourceNoItem(ConversionOptions::the().modSourceMap(target).sourceFor(destination), value);
+  addForModSourceNoItem(parentSeq->conversionContext().midiSourceFor(destination), value);
 }
 
 void SeqTrack::addLfoModulationEvent(ModDest destination,
@@ -778,7 +777,7 @@ void SeqTrack::addPercNoteByDur(uint32_t offset,
                                 uint32_t dur,
                                 const std::string &sEventName) {
   uint8_t origChan = channel;
-  if (!ConversionOptions::the().skipChannel10())
+  if (!parentSeq->conversionContext().skipChannel10)
     channel = 9;
   int8_t origDrumNote = cDrumNote;
   cDrumNote = -1;
@@ -1724,7 +1723,7 @@ void SeqTrack::addProgramChange(uint32_t offset,
 void SeqTrack::addProgramChangeNoItem(uint32_t progNum, bool requireBank) const {
   if (readMode == READMODE_CONVERT_TO_MIDI) {
     if (requireBank) {
-      if (auto style = ConversionOptions::the().bankSelectStyle();
+      if (auto style = parentSeq->conversionContext().bankSelectStyle;
           style == BankSelectStyle::GS) {
         pMidiTrack->addBankSelect(channel, (progNum >> 7) & 0x7f);
       } else if (style == BankSelectStyle::MMA) {
@@ -1748,7 +1747,7 @@ void SeqTrack::addBankSelect(uint32_t offset, uint32_t length, uint8_t bank, con
 
 void SeqTrack::addBankSelectNoItem(uint8_t bank) const {
   if (readMode == READMODE_CONVERT_TO_MIDI) {
-    if (auto style = ConversionOptions::the().bankSelectStyle();
+    if (auto style = parentSeq->conversionContext().bankSelectStyle;
         style == BankSelectStyle::GS) {
       pMidiTrack->addBankSelect(channel, bank & 0x7f);
     } else if (style == BankSelectStyle::MMA) {
@@ -1986,7 +1985,7 @@ bool SeqTrack::checkControlStateForInfiniteLoop(u32 offset) {
     return false;
   }
   // When we've hit the maximum number of sequence loops, quit parsing
-  if (infiniteLoops > ConversionOptions::the().numSequenceLoops()) {
+  if (infiniteLoops > parentSeq->conversionContext().sequenceLoops) {
     return false;
   }
   // Otherwise, clear control flow states to allow another full loop of conversion
@@ -2058,7 +2057,7 @@ bool SeqTrack::addLoopForever(uint32_t offset, uint32_t length, const std::strin
   }
   else if (readMode == READMODE_FIND_DELTA_LENGTH) {
     totalTicks = getTime();
-    return (this->infiniteLoops <= ConversionOptions::the().numSequenceLoops());
+    return (this->infiniteLoops <= parentSeq->conversionContext().sequenceLoops);
   }
   return true;
 

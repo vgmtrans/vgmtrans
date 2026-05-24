@@ -10,13 +10,8 @@ ModSourceMap& ConversionOptions::modSourceMap(ModulationSourceTarget target) {
   return target == ModulationSourceTarget::DLS ? m_dls_mod_sources : m_sf2_mod_sources;
 }
 
-ScopedMidiModulationSourceTarget::ScopedMidiModulationSourceTarget(ModulationSourceTarget target)
-    : m_previous(ConversionOptions::the().midiModulationSourceTarget()) {
-  ConversionOptions::the().setMidiModulationSourceTarget(target);
-}
-
-ScopedMidiModulationSourceTarget::~ScopedMidiModulationSourceTarget() {
-  ConversionOptions::the().setMidiModulationSourceTarget(m_previous);
+const ModSourceMap& ConversionOptions::modSourceMap(ModulationSourceTarget target) const {
+  return target == ModulationSourceTarget::DLS ? m_dls_mod_sources : m_sf2_mod_sources;
 }
 
 void ConversionOptions::load(OptionStore& store) {

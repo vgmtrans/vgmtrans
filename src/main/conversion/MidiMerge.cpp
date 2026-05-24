@@ -16,9 +16,9 @@
 #include <utility>
 
 #include "common.h"
+#include "ConversionContext.h"
 #include "LogManager.h"
 #include "MidiFile.h"
-#include "Options.h"
 #include "SF2Conversion.h"
 #include "SF2File.h"
 #include "SynthFile.h"
@@ -86,12 +86,13 @@ void retimeTrack(MidiTrack* track, uint16_t srcPPQN, uint16_t dstPPQN, uint32_t 
 
 bool applyBankOffsetToTrack(MidiTrack* track,
                             uint8_t bankOffset,
-                            uint32_t startTick) {
+                            uint32_t startTick,
+                            const ConversionContext& context) {
   if (!track) {
     return true;
   }
 
-  const bool useMmaBanks = ConversionOptions::the().bankSelectStyle() == BankSelectStyle::MMA;
+  const bool useMmaBanks = context.bankSelectStyle == BankSelectStyle::MMA;
   std::array<bool, 16> usedChannels {};
   std::array<uint16_t, 16> sourceBanks {};
   auto updateSourceBank = [useMmaBanks](uint16_t& sourceBank,
@@ -321,6 +322,8 @@ std::unique_ptr<MidiFile> mergeMidiSequences(const std::vector<MidiMergeEntry>& 
   std::vector<ConvertedPart> parts;
   parts.reserve(entries.size());
 
+  const auto context = ConversionContext::fromOptions(ConversionOptions::the(), ModulationSourceTarget::SoundFont);
+
   uint16_t targetPPQN = 0;
 
   for (size_t i = 0; i < entries.size(); ++i) {
@@ -337,7 +340,7 @@ std::unique_ptr<MidiFile> mergeMidiSequences(const std::vector<MidiMergeEntry>& 
       return nullptr;
     }
 
-    std::unique_ptr<MidiFile> midi(seq->convertToMidi(coll));
+    std::unique_ptr<MidiFile> midi(seq->convertToMidi(coll, context));
     if (!midi) {
       L_ERROR("Failed to convert one of the source sequences to MIDI.");
       return nullptr;
@@ -419,7 +422,7 @@ std::unique_ptr<MidiFile> mergeMidiSequences(const std::vector<MidiMergeEntry>& 
 
       retimeTrack(track, sourcePPQN, targetPPQN, startTick);
       if (!options.bankOffsets.empty() &&
-          !applyBankOffsetToTrack(track, bankOffset, startTick)) {
+          !applyBankOffsetToTrack(track, bankOffset, startTick, context)) {
         return nullptr;
       }
 
@@ -453,6 +456,7 @@ bool saveMergedSoundfont(const std::vector<MidiMergeEntry>& entries,
   }
 
   auto mergedSynth = std::make_unique<SynthFile>("Merged Chunk Soundfont");
+  const auto context = ConversionContext::fromOptions(ConversionOptions::the(), ModulationSourceTarget::SoundFont);
   std::set<const VGMColl*> processedColls;
 
   for (size_t i = 0; i < entries.size(); ++i) {
@@ -522,7 +526,7 @@ bool saveMergedSoundfont(const std::vector<MidiMergeEntry>& entries,
     return false;
   }
 
-  SF2File sf2(mergedSynth.get());
+  SF2File sf2(mergedSynth.get(), context);
   const bool success = sf2.saveSF2File(filepath);
   if (!success) {
     L_ERROR("Failed to save merged SF2 file.");

@@ -7,9 +7,9 @@
 #include <cmath>
 #include <limits>
 #include <optional>
+#include "ConversionContext.h"
 #include "SF2File.h"
 #include "version.h"
-#include "Options.h"
 #include "VGMInstrSet.h"
 #include "SynthFile.h"
 #include "ScaleConversion.h"
@@ -41,15 +41,12 @@ std::optional<SFModulator> sf2SourceForModSource(ModSource source) {
   return std::nullopt;
 }
 
-ModSource sourceForModulator(const SynthModulator& modulator) {
-  return modulator.source.value_or(
-      ConversionOptions::the()
-          .modSourceMap(ModulationSourceTarget::SoundFont)
-          .sourceFor(modulator.destination));
+ModSource sourceForModulator(const SynthModulator& modulator, const ConversionContext& context) {
+  return modulator.source.value_or(context.synthSourceFor(ModulationSourceTarget::SoundFont, modulator.destination));
 }
 
-std::optional<SFModulator> sf2SourceForModulator(const SynthModulator& modulator) {
-  return sf2SourceForModSource(sourceForModulator(modulator));
+std::optional<SFModulator> sf2SourceForModulator(const SynthModulator& modulator, const ConversionContext& context) {
+  return sf2SourceForModSource(sourceForModulator(modulator, context));
 }
 
 SFGenerator sf2GeneratorForModDestination(ModDest destination) {
@@ -82,14 +79,14 @@ int16_t sf2AmountForGenerator(const SynthGenerator& generator) {
       generator.amount, std::numeric_limits<int16_t>::min(), std::numeric_limits<int16_t>::max()));
 }
 
-size_t numSf2ModulatorsForInstr(const SynthInstr* instr) {
-  return std::ranges::count_if(instr->modulators(), [](const auto& modulator) {
-    return sf2SourceForModulator(modulator).has_value();
+size_t numSf2ModulatorsForInstr(const SynthInstr* instr, const ConversionContext& context) {
+  return std::ranges::count_if(instr->modulators(), [&context](const auto& modulator) {
+    return sf2SourceForModulator(modulator, context).has_value();
   });
 }
 
-bool hasInstrumentGlobalZone(const SynthInstr* instr) {
-  return !instr->generators().empty() || numSf2ModulatorsForInstr(instr) != 0;
+bool hasInstrumentGlobalZone(const SynthInstr* instr, const ConversionContext& context) {
+  return !instr->generators().empty() || numSf2ModulatorsForInstr(instr, context) != 0;
 }
 
 } // namespace
@@ -129,6 +126,10 @@ int SF2File::numOfGeneratorsForRgn(SynthRgn* rgn) {
 }
 
 SF2File::SF2File(SynthFile *synthfile)
+    : SF2File(synthfile,
+              ConversionContext::fromOptions(ConversionOptions::the(), ModulationSourceTarget::SoundFont)) {}
+
+SF2File::SF2File(SynthFile* synthfile, const ConversionContext& context)
     : RiffFile(synthfile->m_name, "sfbk") {
 
   //***********
@@ -283,7 +284,7 @@ SF2File::SF2File(SynthFile *synthfile)
     memcpy(inst.achInstName, instr->name.c_str(), std::min(instr->name.length(), static_cast<size_t>(20)));
     inst.wInstBagNdx = instBagCounter;
     instBagCounter += static_cast<uint16_t>(instr->vRgns.size());
-    if (hasInstrumentGlobalZone(instr)) {
+    if (hasInstrumentGlobalZone(instr, context)) {
       instBagCounter++;
     }
 
@@ -304,7 +305,7 @@ SF2File::SF2File(SynthFile *synthfile)
   for (size_t i = 0; i < numInstrs; i++) {
     SynthInstr *instr = synthfile->vInstrs[i];
     numTotalInstBags += static_cast<uint32_t>(instr->vRgns.size());
-    if (hasInstrumentGlobalZone(instr)) {
+    if (hasInstrumentGlobalZone(instr, context)) {
       numTotalInstBags++;
     }
   }
@@ -318,12 +319,12 @@ SF2File::SF2File(SynthFile *synthfile)
   for (size_t i = 0; i < numInstrs; i++) {
     SynthInstr *instr = synthfile->vInstrs[i];
 
-    if (hasInstrumentGlobalZone(instr)) {
+    if (hasInstrumentGlobalZone(instr, context)) {
       sfInstBag globalInstBag{};
       globalInstBag.wInstGenNdx = static_cast<uint16_t>(instGenCounter);
       globalInstBag.wInstModNdx = static_cast<uint16_t>(instModCounter);
       instGenCounter += static_cast<int>(instr->generators().size());
-      instModCounter += static_cast<int>(numSf2ModulatorsForInstr(instr));
+      instModCounter += static_cast<int>(numSf2ModulatorsForInstr(instr, context));
       memcpy(ibagCk->data + (instBagCounter++ * sizeof(sfInstBag)), &globalInstBag, sizeof(sfInstBag));
     }
 
@@ -349,8 +350,8 @@ SF2File::SF2File(SynthFile *synthfile)
   //***********
   uint32_t numTotalMods = 1;
   for (const auto instr : synthfile->vInstrs) {
-    if (hasInstrumentGlobalZone(instr)) {
-      numTotalMods += static_cast<uint32_t>(numSf2ModulatorsForInstr(instr));
+    if (hasInstrumentGlobalZone(instr, context)) {
+      numTotalMods += static_cast<uint32_t>(numSf2ModulatorsForInstr(instr, context));
     }
   }
 
@@ -360,7 +361,7 @@ SF2File::SF2File(SynthFile *synthfile)
   dataPtr = 0;
   for (const auto instr : synthfile->vInstrs) {
     for (const auto& modulator : instr->modulators()) {
-      const auto source = sf2SourceForModulator(modulator);
+      const auto source = sf2SourceForModulator(modulator, context);
       if (!source.has_value()) {
         continue;
       }

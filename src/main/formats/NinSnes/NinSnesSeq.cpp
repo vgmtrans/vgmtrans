@@ -211,7 +211,7 @@ bool NinSnesSeq::addLoopForeverNoItem() {
     return false;
   }
   if (readMode == READMODE_FIND_DELTA_LENGTH) {
-    return m_sectionForeverLoops <= ConversionOptions::the().numSequenceLoops();
+    return m_sectionForeverLoops <= conversionContext().sequenceLoops;
   }
   return true;
 }

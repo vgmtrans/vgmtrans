@@ -59,14 +59,7 @@ public:
   void setSkipChannel10(bool should) { m_skip_channel_10 = should; }
 
   [[nodiscard]] ModSourceMap& modSourceMap(ModulationSourceTarget target);
-
-  [[nodiscard]] ModulationSourceTarget midiModulationSourceTarget() const {
-    return m_midi_modulation_source_target;
-  }
-
-  void setMidiModulationSourceTarget(ModulationSourceTarget target) {
-    m_midi_modulation_source_target = target;
-  }
+  [[nodiscard]] const ModSourceMap& modSourceMap(ModulationSourceTarget target) const;
 
   void load(OptionStore& store);
   void save(OptionStore& store) const;
@@ -79,20 +72,4 @@ private:
   bool m_skip_channel_10{true};
   ModSourceMap m_sf2_mod_sources{ModulationSourceTarget::SoundFont};
   ModSourceMap m_dls_mod_sources{ModulationSourceTarget::DLS};
-  ModulationSourceTarget m_midi_modulation_source_target{ModulationSourceTarget::SoundFont};
-};
-
-// RAII helper which updates ConversionOptions::m_midi_modulation_source_target.
-// Sets the active MIDI modulation-source target for SeqTrack controller emission,
-// then restores the previous ConversionOptions value when the scope exits.
-class ScopedMidiModulationSourceTarget {
-public:
-  explicit ScopedMidiModulationSourceTarget(ModulationSourceTarget target);
-  ~ScopedMidiModulationSourceTarget();
-
-  ScopedMidiModulationSourceTarget(const ScopedMidiModulationSourceTarget&) = delete;
-  ScopedMidiModulationSourceTarget& operator=(const ScopedMidiModulationSourceTarget&) = delete;
-
-private:
-  ModulationSourceTarget m_previous;
 };
