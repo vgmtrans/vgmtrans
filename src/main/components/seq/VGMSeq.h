@@ -5,6 +5,7 @@
  */
 #pragma once
 
+#include "ConversionContext.h"
 #include "VGMFile.h"
 #include "RawFile.h"
 #include "MidiFile.h"
@@ -42,6 +43,7 @@ class VGMSeq : public VGMFile {
   virtual void onTickEnd() {}
   virtual void useColl(const VGMColl* coll) {}
   virtual MidiFile *convertToMidi(const VGMColl* coll = nullptr);
+  virtual MidiFile *convertToMidi(const VGMColl* coll, const ConversionContext& context);
   virtual MidiTrack *firstMidiTrack();
   void setPPQN(uint16_t ppqn);
   [[nodiscard]] uint16_t ppqn() const;
@@ -102,6 +104,8 @@ class VGMSeq : public VGMFile {
   [[nodiscard]] bool shouldTrackControlFlowState() const { return m_track_control_flow_state; }
 
   bool saveAsMidi(const std::filesystem::path &filepath, const VGMColl* coll = nullptr);
+  bool saveAsMidi(const std::filesystem::path& filepath, const VGMColl* coll, const ConversionContext& context);
+  [[nodiscard]] const ConversionContext& conversionContext() const { return m_conversionContext; }
 
   void deactivateAllTracks();
 
@@ -117,6 +121,8 @@ class VGMSeq : public VGMFile {
   SeqEventTimeIndex& timedEventIndex() { return m_timedEvents; }
 
  protected:
+  void setConversionContext(const ConversionContext& context) { m_conversionContext = context; }
+
   virtual bool loadTracks(ReadMode readMode, uint32_t stopTime = 1000000);
   virtual void loadTracksMain(uint32_t stopTime);
   virtual bool postLoad();
@@ -157,6 +163,7 @@ private:
   std::vector<ISeqSlider *> aSliders;
 
 private:
+  ConversionContext m_conversionContext;
   std::set<uint16_t> m_referencedBanks;
 
   // Timeline of sequence events emitted during MIDI conversion.

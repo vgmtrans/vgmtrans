@@ -20,6 +20,7 @@ namespace fs = std::filesystem;
 namespace conversion {
 
 bool saveAsDLS(VGMInstrSet &set, const fs::path &filepath) {
+  const auto context = ConversionContext::fromOptions(ConversionOptions::the(), SynthTarget::DLS);
   VGMColl* coll = !set.assocColls.empty() ? set.assocColls.front() : nullptr;
   if (!coll && !set.sampColl)
     return false;
@@ -34,13 +35,14 @@ bool saveAsDLS(VGMInstrSet &set, const fs::path &filepath) {
   }
 
   DLSFile dlsfile;
-  if (createDLSFile(dlsfile, instrsets, sampcolls, coll)) {
+  if (createDLSFile(dlsfile, instrsets, sampcolls, coll, context)) {
     return dlsfile.saveDLSFile(filepath);
   }
   return false;
 }
 
 bool saveAsSF2(VGMInstrSet &set, const fs::path &filepath) {
+  const auto context = ConversionContext::fromOptions(ConversionOptions::the(), SynthTarget::SoundFont);
   VGMColl* coll = !set.assocColls.empty() ? set.assocColls.front() : nullptr;
   if (!coll && !set.sampColl)
     return false;
@@ -54,7 +56,7 @@ bool saveAsSF2(VGMInstrSet &set, const fs::path &filepath) {
     instrsets.emplace_back(&set);
   }
 
-  if (auto sf2file = createSF2File(instrsets, sampcolls, coll); sf2file) {
+  if (auto sf2file = createSF2File(instrsets, sampcolls, coll, context); sf2file) {
     bool bResult = sf2file->saveSF2File(filepath);
     delete sf2file;
     return bResult;
@@ -64,7 +66,8 @@ bool saveAsSF2(VGMInstrSet &set, const fs::path &filepath) {
 }
 
 bool saveAsSF2(const VGMColl &coll, const fs::path &filepath) {
-  if (auto sf2file = createSF2File(coll.instrSets(), coll.sampColls(), &coll); sf2file) {
+  const auto context = ConversionContext::fromOptions(ConversionOptions::the(), SynthTarget::SoundFont);
+  if (auto sf2file = createSF2File(coll.instrSets(), coll.sampColls(), &coll, context); sf2file) {
     bool bResult = sf2file->saveSF2File(filepath);
     delete sf2file;
     return bResult;

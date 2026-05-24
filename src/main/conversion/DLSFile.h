@@ -13,6 +13,7 @@
 
 struct Loop;
 class VGMSamp;
+struct ConversionContext;
 
 /*
    Articulation connection graph definitions
@@ -202,7 +203,7 @@ public:
   void addPan(long pan);
   void addVibrato(int32_t depth, int32_t frequency, int32_t delay);
   void addGenerator(const SynthGenerator& generator);
-  void addModulator(const SynthModulator& modulator);
+  void addModulator(const SynthModulator& modulator, const ConversionContext& context);
 
   uint32_t GetSize() const;
   void Write(std::vector<uint8_t> &buf) const;

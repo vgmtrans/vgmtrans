@@ -10,8 +10,8 @@
 #include <optional>
 #include <ranges>
 #include <vector>
+#include "ConversionContext.h"
 #include "DLSFile.h"
-#include "Options.h"
 #include "ScaleConversion.h"
 #include "VGMInstrSet.h"
 #include "VGMSamp.h"
@@ -315,11 +315,8 @@ std::optional<uint16_t> dlsSourceForModSource(ModSource source) {
   return std::nullopt;
 }
 
-ModSource sourceForModulator(const SynthModulator& modulator) {
-  return modulator.source.value_or(
-      ConversionOptions::the()
-          .modSourceMap(ModulationSourceTarget::DLS)
-          .sourceFor(modulator.destination));
+ModSource sourceForModulator(const SynthModulator& modulator, const ConversionContext& context) {
+  return modulator.source.value_or(context.synthSourceFor(SynthTarget::DLS, modulator.destination));
 }
 
 int32_t toDls16Dot16Scale(int32_t amount) {
@@ -426,8 +423,8 @@ void DLSArt::addGenerator(const SynthGenerator& generator) {
   }
 }
 
-void DLSArt::addModulator(const SynthModulator& modulator) {
-  const auto source = dlsSourceForModSource(sourceForModulator(modulator));
+void DLSArt::addModulator(const SynthModulator& modulator, const ConversionContext& context) {
+  const auto source = dlsSourceForModSource(sourceForModulator(modulator, context));
   if (!source.has_value()) {
     return;
   }

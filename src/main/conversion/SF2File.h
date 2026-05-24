@@ -260,10 +260,11 @@ class SF2sdtaChunk: public LISTChunk {
 
 class SynthFile;
 class SynthRgn;
+struct ConversionContext;
 
 class SF2File: public RiffFile {
  public:
-  SF2File(SynthFile *synthfile);
+  SF2File(SynthFile* synthfile, const ConversionContext& context);
   ~SF2File() override = default;
 
   static int numOfGeneratorsForRgn(SynthRgn* rgn);

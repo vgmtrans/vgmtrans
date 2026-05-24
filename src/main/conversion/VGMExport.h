@@ -12,6 +12,7 @@
 #include "VGMSeq.h"
 #include "SF2Conversion.h"
 #include "DLSConversion.h"
+#include "ConversionContext.h"
 #include "Options.h"
 
 /*
@@ -31,6 +32,16 @@ inline constexpr uint32_t operator&(Target a, Target b) {
   return static_cast<uint32_t>(a) & static_cast<uint32_t>(b);
 }
 
+inline constexpr bool hasTarget(Target options, Target target) {
+  return (options & target) != 0;
+}
+
+inline constexpr SynthTarget modulationSynthTargetFor(Target options) {
+  return hasTarget(options, Target::DLS)
+      ? SynthTarget::DLS
+      : SynthTarget::SoundFont;
+}
+
 bool saveAsDLS(VGMInstrSet &set, const std::filesystem::path &filepath);
 bool saveAsSF2(VGMInstrSet &set, const std::filesystem::path &filepath);
 
@@ -43,29 +54,25 @@ template <Target options>
 void saveAs(const VGMColl &coll, const std::filesystem::path &dir_path) {
   auto filename = makeSafeFileName(coll.name());
   auto filepath = dir_path / filename;
+  const auto context = ConversionContext::fromOptions(ConversionOptions::the(), modulationSynthTargetFor(options));
 
-  if constexpr ((options & Target::MIDI) != 0) {
-    // ScopedMidiModulationSourceTarget uses RAII to set whether we're exporting for SF2 or DLS in ConversionOptions.
-    constexpr auto midiModulationTarget =
-        (options & Target::DLS) != 0 ? ModulationSourceTarget::DLS : ModulationSourceTarget::SoundFont;
-    const ScopedMidiModulationSourceTarget scopedModulationTarget(midiModulationTarget);
-
+  if constexpr (hasTarget(options, Target::MIDI)) {
     auto midiPath = filepath;
     midiPath.replace_extension(".mid");
-    coll.seq()->saveAsMidi(midiPath, &coll);
+    coll.seq()->saveAsMidi(midiPath, &coll, context);
   }
 
-  if constexpr ((options & Target::DLS) != 0) {
+  if constexpr (hasTarget(options, Target::DLS)) {
     DLSFile dlsfile;
-    if (createDLSFile(dlsfile, coll)) {
+    if (createDLSFile(dlsfile, coll, context)) {
       auto dlsPath = filepath;
       dlsPath.replace_extension(".dls");
       dlsfile.saveDLSFile(dlsPath);
     }
   }
 
-  if constexpr ((options & Target::SF2) != 0) {
-    if (SF2File *sf2file = createSF2File(coll)) {
+  if constexpr (hasTarget(options, Target::SF2)) {
+    if (SF2File *sf2file = createSF2File(coll, context)) {
       auto sf2Path = filepath;
       sf2Path.replace_extension(".sf2");
       sf2file->saveSF2File(sf2Path);

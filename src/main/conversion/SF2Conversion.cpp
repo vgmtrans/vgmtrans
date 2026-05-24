@@ -4,6 +4,8 @@
  * refer to the included LICENSE.txt file
 */
 #include "SF2Conversion.h"
+#include "ConversionContext.h"
+#include "Options.h"
 #include "SF2File.h"
 #include "SynthFile.h"
 #include "VGMColl.h"
@@ -17,13 +19,19 @@
 namespace conversion {
 
 SF2File* createSF2File(const VGMColl& coll) {
-  return createSF2File(coll.instrSets(), coll.sampColls(), &coll);
+  const auto context = ConversionContext::fromOptions(ConversionOptions::the(), SynthTarget::SoundFont);
+  return createSF2File(coll, context);
+}
+
+SF2File* createSF2File(const VGMColl& coll, const ConversionContext& context) {
+  return createSF2File(coll.instrSets(), coll.sampColls(), &coll, context);
 }
 
 SF2File* createSF2File(
   const std::vector<VGMInstrSet*>& instrsets,
   const std::vector<VGMSampColl*>& sampcolls,
-  const VGMColl* coll
+  const VGMColl* coll,
+  const ConversionContext& context
 ) {
   for (auto* instrset : instrsets) {
     instrset->prepareForExport(coll);
@@ -38,7 +46,7 @@ SF2File* createSF2File(
     L_ERROR("SF2 conversion failed");
     return nullptr;
   }
-  SF2File *sf2file = new SF2File(synthfile);
+  SF2File *sf2file = new SF2File(synthfile, context);
   delete synthfile;
   return sf2file;
 }

@@ -13,14 +13,17 @@ class VGMInstrSet;
 class VGMSampColl;
 class SynthFile;
 class VGMSamp;
+struct ConversionContext;
 
 namespace conversion {
 
 SF2File* createSF2File(const VGMColl& coll);
+SF2File* createSF2File(const VGMColl& coll, const ConversionContext& context);
 SF2File* createSF2File(
   const std::vector<VGMInstrSet*>& instrsets,
   const std::vector<VGMSampColl*>& sampcolls,
-  const VGMColl* coll
+  const VGMColl* coll,
+  const ConversionContext& context
 );
 SynthFile* createSynthFile(
   const std::vector<VGMInstrSet*>& instrsets,

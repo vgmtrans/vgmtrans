@@ -4,14 +4,15 @@
  * See the included LICENSE for more information
 */
 #include <cassert>
+#include "ConversionContext.h"
 #include "DLSConversion.h"
+#include "Options.h"
 #include "VGMInstrSet.h"
 #include "VGMRgn.h"
 #include "VGMSampColl.h"
 #include "VGMSamp.h"
 #include "VGMColl.h"
 #include "DLSFile.h"
-#include "Options.h"
 #include "ScaleConversion.h"
 #include "LogManager.h"
 
@@ -41,20 +42,27 @@ void unpackSampColl(DLSFile &dls, const VGMSampColl *sampColl, std::vector<VGMSa
 }
 
 bool createDLSFile(DLSFile& dls, const VGMColl& coll) {
-  return createDLSFile(dls, coll.instrSets(), coll.sampColls(), &coll);
+  const auto context = ConversionContext::fromOptions(ConversionOptions::the(), SynthTarget::DLS);
+  return createDLSFile(dls, coll, context);
 }
+
+bool createDLSFile(DLSFile& dls, const VGMColl& coll, const ConversionContext& context) {
+  return createDLSFile(dls, coll.instrSets(), coll.sampColls(), &coll, context);
+}
+
 bool createDLSFile(
   DLSFile& dls,
   const std::vector<VGMInstrSet*>& instrsets,
   const std::vector<VGMSampColl*>& sampcolls,
-  const VGMColl* coll
+  const VGMColl* coll,
+  const ConversionContext& context
 ) {
   bool result = true;
   for (auto* instrset : instrsets) {
     instrset->prepareForExport(coll);
   }
 
-  result &= mainDLSCreation(dls, instrsets, sampcolls);
+  result &= mainDLSCreation(dls, instrsets, sampcolls, context);
 
   for (auto* instrset : instrsets) {
     instrset->cleanupAfterExport();
@@ -65,7 +73,8 @@ bool createDLSFile(
 bool mainDLSCreation(
   DLSFile& dls,
   const std::vector<VGMInstrSet*>& m_instrsets,
-  const std::vector<VGMSampColl*>& m_sampcolls
+  const std::vector<VGMSampColl*>& m_sampcolls,
+  const ConversionContext& context
 ) {
   if (m_instrsets.empty()) {
     L_ERROR("No instrument sets available to create DLS");
@@ -110,7 +119,7 @@ bool mainDLSCreation(
       * where F = 0 if the instrument is melodic, 1 otherwise
       * (length of each CC is 7 bits, obviously)
       */
-      if (auto bs = ConversionOptions::the().bankSelectStyle(); bs == BankSelectStyle::GS) {
+      if (auto bs = context.bankSelectStyle; bs == BankSelectStyle::GS) {
         bank_no &= 0x7f;
         bank_no = bank_no << 8;
       } else if (bs == BankSelectStyle::MMA) {
@@ -273,7 +282,7 @@ bool mainDLSCreation(
           newArt->addGenerator(generator);
         }
         for (const auto& modulator : vgminstr->modulators()) {
-          newArt->addModulator(modulator);
+          newArt->addModulator(modulator, context);
         }
 
         newWsmp->setPitchInfo(realUnityKey, totalFineTune, totalAttenuation);

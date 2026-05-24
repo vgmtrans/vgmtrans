@@ -104,6 +104,7 @@ add_library(vgmtranscore OBJECT)
 target_sources(vgmtranscore
   PRIVATE
     LogManager.cpp
+    ConversionContext.cpp
     ModSourceMap.cpp
     Options.cpp
     Root.cpp
@@ -288,6 +289,8 @@ target_sources(vgmtranscore
     FILES
       LogItem.h
       LogManager.h
+      ConversionContext.h
+      ConversionTypes.h
       Loop.h
       ModSourceMap.h
       Options.h

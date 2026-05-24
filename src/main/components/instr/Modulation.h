@@ -38,11 +38,6 @@ struct TremoloModulationSpec {
   std::optional<DelayRange> delayRange = std::nullopt;
 };
 
-enum class ModulationSourceTarget : uint8_t {
-  SoundFont,
-  DLS,
-};
-
 enum class ModSource : int16_t {
   None = -1,
 

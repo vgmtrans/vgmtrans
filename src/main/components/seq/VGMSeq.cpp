@@ -40,6 +40,7 @@ VGMSeq::VGMSeq(const std::string &format, RawFile *file, uint32_t offset, uint32
       initialTempoBPM(120),
       m_use_reverb(false),
       m_track_control_flow_state(false) {
+  setConversionContext(ConversionContext::fromOptions(ConversionOptions::the(), SynthTarget::SoundFont));
 }
 
 VGMSeq::~VGMSeq() {
@@ -48,6 +49,8 @@ VGMSeq::~VGMSeq() {
 }
 
 bool VGMSeq::loadVGMFile(bool useMatcher) {
+  setConversionContext(ConversionContext::fromOptions(ConversionOptions::the(), SynthTarget::SoundFont));
+
   if (!load()) {
     return false;
   }
@@ -66,6 +69,12 @@ bool VGMSeq::loadVGMFile(bool useMatcher) {
 }
 
 MidiFile *VGMSeq::convertToMidi(const VGMColl* coll) {
+  const auto context = ConversionContext::fromOptions(ConversionOptions::the(), SynthTarget::SoundFont);
+  return convertToMidi(coll, context);
+}
+
+MidiFile *VGMSeq::convertToMidi(const VGMColl* coll, const ConversionContext& context) {
+  setConversionContext(context);
   size_t numTracks = aTracks.size();
 
   if (!loadTracks(READMODE_FIND_DELTA_LENGTH)) {
@@ -233,8 +242,7 @@ void VGMSeq::loadTracksMain(uint32_t stopTime) {
       }
 
       // check loop count
-      const int desiredLoopRepeats =
-          (readMode == READMODE_ADD_TO_UI) ? 0 : ConversionOptions::the().numSequenceLoops();
+      const int desiredLoopRepeats = (readMode == READMODE_ADD_TO_UI) ? 0 : conversionContext().sequenceLoops;
       const int requiredPlayThroughs = desiredLoopRepeats + 1;  // include the initial playthrough
       if (foreverLoopCount() >= requiredPlayThroughs) {
         deactivateAllTracks();
@@ -332,7 +340,14 @@ const std::set<uint16_t>& VGMSeq::referencedBanks() const {
 }
 
 bool VGMSeq::saveAsMidi(const std::filesystem::path &filepath, const VGMColl* coll) {
-  MidiFile *midi = this->convertToMidi(coll);
+  const auto context = ConversionContext::fromOptions(ConversionOptions::the(), SynthTarget::SoundFont);
+  return saveAsMidi(filepath, coll, context);
+}
+
+bool VGMSeq::saveAsMidi(const std::filesystem::path& filepath,
+                        const VGMColl* coll,
+                        const ConversionContext& context) {
+  MidiFile *midi = this->convertToMidi(coll, context);
   if (!midi)
     return false;
   bool result = midi->saveMidiFile(filepath);

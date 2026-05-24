@@ -8,17 +8,18 @@
 
 #include <array>
 
+#include "ConversionTypes.h"
 #include "Modulation.h"
 
 struct OptionStore;
 
 class ModSourceMap {
 public:
-  explicit ModSourceMap(ModulationSourceTarget target = ModulationSourceTarget::SoundFont);
+  explicit ModSourceMap(SynthTarget target = SynthTarget::SoundFont);
 
-  void resetToDefaults(ModulationSourceTarget target);
-  void load(OptionStore& store, ModulationSourceTarget target);
-  void save(OptionStore& store, ModulationSourceTarget target) const;
+  void resetToDefaults(SynthTarget target);
+  void load(OptionStore& store, SynthTarget target);
+  void save(OptionStore& store, SynthTarget target) const;
 
   [[nodiscard]] ModSource sourceFor(ModDest destination) const;
   void setSourceFor(ModDest destination, ModSource source);

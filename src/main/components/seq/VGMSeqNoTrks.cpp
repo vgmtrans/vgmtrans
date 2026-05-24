@@ -88,6 +88,12 @@ bool VGMSeqNoTrks::loadEvents(long stopTime) {
 }
 
 MidiFile *VGMSeqNoTrks::convertToMidi(const VGMColl* coll) {
+  const auto context = ConversionContext::fromOptions(ConversionOptions::the(), SynthTarget::SoundFont);
+  return convertToMidi(coll, context);
+}
+
+MidiFile *VGMSeqNoTrks::convertToMidi(const VGMColl* coll, const ConversionContext& context) {
+  setConversionContext(context);
   this->SeqTrack::readMode = this->VGMSeq::readMode = READMODE_FIND_DELTA_LENGTH;
 
   useColl(coll);
@@ -139,10 +145,10 @@ void VGMSeqNoTrks::tryExpandMidiTracks(uint32_t numTracks) {
       auto* midiTrack = midi->addTrack();
       midiTracks.push_back(midiTrack);
 
-      if (numTracks < 10 || ConversionOptions::the().skipChannel10() == false)
+      if (numTracks < 10 || conversionContext().skipChannel10 == false)
         continue;
 
-      int chGroup = i == 9 && ConversionOptions::the().skipChannel10() ? 1 : 0;
+      int chGroup = i == 9 && conversionContext().skipChannel10 ? 1 : 0;
       midiTrack->setChannelGroup(chGroup);
       midiTrack->addMidiPort(chGroup);
     }
@@ -151,7 +157,7 @@ void VGMSeqNoTrks::tryExpandMidiTracks(uint32_t numTracks) {
 
 void VGMSeqNoTrks::setChannel(u8 newChannel) {
   setCurTrack(newChannel);
-  if (newChannel == 9 && ConversionOptions::the().skipChannel10())
+  if (newChannel == 9 && conversionContext().skipChannel10)
     channel = 0;
   else
     channel = newChannel;
