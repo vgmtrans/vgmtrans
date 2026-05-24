@@ -30,15 +30,15 @@ namespace {
 constexpr uint8_t kMinTimer0Frequency = 0x24;
 constexpr uint8_t kMaxTimer0Frequency = 0x2a;
 
-uint8_t v1RateCounter(uint8_t rate) {
+constexpr uint8_t v1RateCounter(uint8_t rate) {
   return static_cast<uint8_t>(rate >> 1);
 }
 
-uint8_t v2RateCounter(uint8_t rate) {
+constexpr uint8_t v2RateCounter(uint8_t rate) {
   return static_cast<uint8_t>(rate & 0x7f);
 }
 
-uint16_t effectiveRateFrames(AkaoSnesVersion version, uint8_t rate, uint8_t depth) {
+constexpr uint16_t effectiveRateFrames(AkaoSnesVersion version, uint8_t rate, uint8_t depth) {
   // All versions produce one half-cycle over this many timer0 frames; lfoRateHz() turns that into cycles/sec.
   if (version == AKAOSNES_V1) {
     return static_cast<uint16_t>(v1RateCounter(rate)) + 1;
