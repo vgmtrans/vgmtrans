@@ -216,9 +216,13 @@ constexpr u32 BACK_SCAN_LIMIT           = 0x5000;
 
 /// Check for a sequence of 16 null bytes - an empty ADPCM frame
 static inline bool isZero16(const RawFile* f, u32 ofs) {
-  if (!f->isValidOffset(ofs + 15)) return false;
-  const u64* blk = reinterpret_cast<const u64*>(f->data() + ofs);
-  return blk[0] == 0 && blk[1] == 0;
+  if (ofs > f->size() || f->size() - ofs < 16) return false;
+  for (u32 i = 0; i < 16; i++) {
+    if (f->readByte(ofs + i) != 0) {
+      return false;
+    }
+  }
+  return true;
 }
 
 static inline bool isValidFilterShiftByte(u8 b) {
@@ -351,7 +355,7 @@ std::vector<PSXSampColl*> PSXSampColl::searchForPSXADPCMs(RawFile* file, const s
     u32 origOffset = i;
     u32 start   = i;
     u32 scanned = 16;
-    while (start - scanned >= 16 && scanned < BACK_SCAN_LIMIT)
+    while (scanned < BACK_SCAN_LIMIT && i >= scanned + 16)
     {
       const u32 offset = i - scanned;
       scanned += 16;
