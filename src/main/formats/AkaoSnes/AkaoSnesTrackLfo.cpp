@@ -249,6 +249,7 @@ void AkaoSnesTrack::updateVibratoFade() {
 
 void AkaoSnesTrack::updateTremoloFade() {
   const auto *parent = static_cast<AkaoSnesSeq*>(parentSeq);
+  // Only V3 implements a tremolo fade.
   if (parent->version != AKAOSNES_V3) {
     return;
   }
