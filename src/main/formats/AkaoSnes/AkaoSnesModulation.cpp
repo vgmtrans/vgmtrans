@@ -377,27 +377,31 @@ const double kMaxV4TremoloDepthDb = tremoloDepthDbForAmplitude(64.0);
 
 double maxVibratoDepthCents(AkaoSnesVersion version) {
   // Export range ceiling for the ModWheel-to-vibrato-depth mapping.
-  if (version == AKAOSNES_V1) {
-    return kMaxV1VibratoDepthCents;
+  switch (version) {
+    case AKAOSNES_V1:
+      return kMaxV1VibratoDepthCents;
+    case AKAOSNES_V2:
+      return kMaxV2VibratoDepthCents;
+    case AKAOSNES_V3:
+      return kMaxV3VibratoDepthCents;
+    case AKAOSNES_V4:
+    default:
+      return kMaxV4VibratoDepthCents;
   }
-
-  if (version == AKAOSNES_V2) {
-    return kMaxV2VibratoDepthCents;
-  }
-
-  return (version == AKAOSNES_V3) ? kMaxV3VibratoDepthCents : kMaxV4VibratoDepthCents;
 }
 
 double maxTremoloDepthDb(AkaoSnesVersion version) {
-  if (version == AKAOSNES_V1) {
-    return kMaxV1TremoloDepthDb;
+  switch (version) {
+    case AKAOSNES_V1:
+      return kMaxV1TremoloDepthDb;
+    case AKAOSNES_V2:
+      return kMaxV2TremoloDepthDb;
+    case AKAOSNES_V3:
+      return kMaxV3TremoloDepthDb;
+    case AKAOSNES_V4:
+    default:
+      return kMaxV4TremoloDepthDb;
   }
-
-  if (version == AKAOSNES_V2) {
-    return kMaxV2TremoloDepthDb;
-  }
-
-  return (version == AKAOSNES_V3) ? kMaxV3TremoloDepthDb : kMaxV4TremoloDepthDb;
 }
 
 double maxDelaySeconds(AkaoSnesVersion version) {
