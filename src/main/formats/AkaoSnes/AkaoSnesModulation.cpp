@@ -484,22 +484,19 @@ uint8_t tremoloDepthMidiValue(AkaoSnesVersion version, uint8_t rate, uint8_t dep
     return 0;
   }
 
+  double depthDb = 0.0;
   if (version == AKAOSNES_V3) {
-    return midiValueForDepthRange(kV3SteppedTremoloSmoothLfoCompensation * v3TremoloPeakToTroughDb(depth),
-                                  maxTremoloDepthDb(version));
+    depthDb = kV3SteppedTremoloSmoothLfoCompensation * v3TremoloPeakToTroughDb(depth);
   }
-
-  if (version == AKAOSNES_V4 && delay != 0) {
+  else if (version == AKAOSNES_V4 && delay != 0) {
     // V4 delayed tremolo runs at one-quarter step and does not ramp to full depth.
-    return midiValueForDepthRange(tremoloDepthDbForAmplitude(v4PhaseHighByteAmplitude(rate, depth) / 4.0),
-                                  maxTremoloDepthDb(version));
+    depthDb = tremoloDepthDbForAmplitude(v4PhaseHighByteAmplitude(rate, depth) / 4.0);
+  }
+  else {
+    depthDb = tremoloDepthDb(version, rate, depth);
   }
 
-  return midiValueForDepthRange(tremoloDepthDb(version, rate, depth), maxTremoloDepthDb(version));
-}
-
-uint8_t tremoloDepthMidiValue(AkaoSnesVersion version, uint8_t rate, uint8_t depth) {
-  return tremoloDepthMidiValue(version, rate, depth, 0);
+  return midiValueForDepthRange(depthDb, maxTremoloDepthDb(version));
 }
 
 uint8_t rateMidiValue(AkaoSnesVersion version, uint8_t rate, uint8_t depth, uint8_t timer0Frequency) {

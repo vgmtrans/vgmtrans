@@ -197,13 +197,11 @@ void AkaoSnesTrack::beginVibratoForNote() {
 
 void AkaoSnesTrack::beginTremoloForNote() {
   const auto *parent = static_cast<AkaoSnesSeq*>(parentSeq);
-  if (parent->version != AKAOSNES_V3 || !tremolo.hasReusableFade() ||
-      !akao_snes::modulation::isLfoActive(parent->version, tremolo.rate(), tremolo.depth())) {
+  if (parent->version != AKAOSNES_V3 || !tremolo.hasReusableFade()) {
     return;
   }
 
-  const uint32_t delay = akao_snes::modulation::delayTicks(parent->version, tremolo.delay());
-  tremolo.beginReusableFade(delay, tremolo.configuredDepth(8));
+  tremolo.beginReusableFadeToConfiguredDepth(8);
   emitTremoloDepth(tremolo, 0, true);
 }
 
