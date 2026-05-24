@@ -123,8 +123,8 @@ void AkaoSnesTrack::clearLfo(LfoTarget target, uint32_t offset, uint32_t length)
 
   auto& lfo = isVibrato ? vibrato : tremolo;
   lfo.setDepth(0);
-  // Off commands disable future LFO updates. The MIDI export still clears depth
-  // so later notes do not inherit the synth LFO.
+  // V3 off commands stop future LFO updates without immediately clearing the current output.
+  // Converted synth LFOs cannot freeze at the last output value, so stop modulation here by emitting depth 0.
   lfo.clearReusableFade();
   setLfoOutputDepth(target, 0, true);
 }
