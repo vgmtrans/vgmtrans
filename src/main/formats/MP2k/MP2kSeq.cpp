@@ -15,6 +15,7 @@
 
 #include <array>
 #include <spdlog/fmt/fmt.h>
+#include "automation/SeqTrackAutomation.h"
 #include "MidiFile.h"
 #include "MP2kFormat.h"
 
@@ -567,16 +568,12 @@ void MP2kTrack::updateLfoFade() {
   }
 
   if (modType == kMp2kModTypeVibrato) {
-    vibratoLfo.tickFadeToDepth(
-        0,
-        [](int32_t depth) { return depth; },
-        [this](uint8_t depth) { addModulationNoItem(depth); });
+    advanceVibratoDepthFade(vibratoLfo, 0, [](int32_t depth) {
+      return depth;
+    });
   } else if (modType == kMp2kModTypeTremolo) {
-    tremoloLfo.tickFadeToDepth(
-        0,
-        [](int32_t depth) { return depth; },
-        [this](uint8_t depth) {
-          addTremoloDepthNoItem(depth);
-        });
+    advanceTremoloDepthFade(tremoloLfo, 0, [](int32_t depth) {
+      return depth;
+    });
   }
 }
