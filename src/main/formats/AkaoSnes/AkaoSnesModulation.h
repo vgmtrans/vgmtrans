@@ -17,6 +17,7 @@ bool isLfoActive(AkaoSnesVersion version, uint8_t rate, uint8_t depth);
 uint8_t delayTicks(AkaoSnesVersion version, uint8_t delay);
 
 VibratoModulationSpec vibratoSpec(AkaoSnesVersion version);
+bool exportsTremolo(AkaoSnesVersion version);
 TremoloModulationSpec tremoloSpec(AkaoSnesVersion version);
 
 uint8_t vibratoDepthMidiValue(AkaoSnesVersion version, uint8_t rate, uint8_t depth);

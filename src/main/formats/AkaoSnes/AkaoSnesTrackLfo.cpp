@@ -71,7 +71,8 @@ void AkaoSnesTrack::applyLfo(LfoTarget target,
                              const LfoParams& params) {
   const auto *parent = static_cast<AkaoSnesSeq*>(parentSeq);
   const bool isVibrato = target == LfoTarget::Vibrato;
-  const bool active = akao_snes::modulation::isLfoActive(parent->version, params.rate, params.depth);
+  const bool supported = isVibrato || akao_snes::modulation::exportsTremolo(parent->version);
+  const bool active = supported && akao_snes::modulation::isLfoActive(parent->version, params.rate, params.depth);
 
   addGenericEvent(offset,
                   length,
