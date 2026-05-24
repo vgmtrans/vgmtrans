@@ -568,12 +568,8 @@ void MP2kTrack::updateLfoFade() {
   }
 
   if (modType == kMp2kModTypeVibrato) {
-    advanceVibratoDepthFade(vibratoLfo, 0, [](int32_t depth) {
-      return depth;
-    });
+    advanceVibratoDepthFade(vibratoLfo, 0, [](int32_t depth) { return depth; });
   } else if (modType == kMp2kModTypeTremolo) {
-    advanceTremoloDepthFade(tremoloLfo, 0, [](int32_t depth) {
-      return depth;
-    });
+    advanceTremoloDepthFade(tremoloLfo, 0, [](int32_t depth) { return depth; });
   }
 }
