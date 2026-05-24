@@ -224,9 +224,9 @@ void VGMInstr::addStandardVibratoHandling(double maxDepthCents,
 }
 
 void VGMInstr::addStandardVibratoHandling(const VibratoModulationSpec& spec) {
-  addModulator(ModDest::VibLfoToPitch, ModAmount::fromCents(spec.maxDepthCents));
   // nullify default channel pressure to vib lfo pitch modulator
   addModulator(ModSource::ChannelPressure, ModDest::VibLfoToPitch, ModAmount::fromCents(0));
+  addModulator(ModDest::VibLfoToPitch, ModAmount::fromCents(spec.maxDepthCents));
   addGenerator(ModDest::VibLfoFreq, ModAmount::fromHertz(spec.minHertz));
   addModulator(ModDest::VibLfoFreq,
                ModAmount::fromHertzRange(spec.minHertz, spec.maxHertz));

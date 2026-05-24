@@ -41,14 +41,15 @@ bool saveAsOriginal(const RawFile& rawfile, const std::filesystem::path& filepat
 
 template <Target options>
 void saveAs(const VGMColl &coll, const std::filesystem::path &dir_path) {
-  // ScopedMidiModulationSourceTarget uses RAII to set whether we're exporting for SF2 or DLS in ConversionOptions.
-  const ScopedMidiModulationSourceTarget scopedModulationTarget(
-      (options & Target::DLS) != 0 ? ModulationSourceTarget::DLS : ModulationSourceTarget::SoundFont);
-
   auto filename = makeSafeFileName(coll.name());
   auto filepath = dir_path / filename;
 
   if constexpr ((options & Target::MIDI) != 0) {
+    // ScopedMidiModulationSourceTarget uses RAII to set whether we're exporting for SF2 or DLS in ConversionOptions.
+    constexpr auto midiModulationTarget =
+        (options & Target::DLS) != 0 ? ModulationSourceTarget::DLS : ModulationSourceTarget::SoundFont;
+    const ScopedMidiModulationSourceTarget scopedModulationTarget(midiModulationTarget);
+
     auto midiPath = filepath;
     midiPath.replace_extension(".mid");
     coll.seq()->saveAsMidi(midiPath, &coll);

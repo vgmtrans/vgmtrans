@@ -302,7 +302,7 @@ std::optional<uint16_t> dlsSourceForModSource(ModSource source) {
 
   switch (source) {
     case ModSource::None:
-      return CONN_SRC_NONE;
+      return std::nullopt;
     case ModSource::ChannelPressure:
       return CONN_SRC_CHANNELPRESSURE;
     case ModSource::PolyPressure:
