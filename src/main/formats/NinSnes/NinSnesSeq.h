@@ -249,7 +249,7 @@ private:
   void updateVibratoFade();
   void applyConfiguredVibrato();
   void clearVibratoRateAndDelay();
-  void setVibratoDepth(uint8_t depth);
+  void setConfiguredVibratoDepth(uint8_t depth);
   void resetPitchBendForNewNote();
   void addPendingEndEvent(uint8_t statusByte, const std::string& desc);
   void syncVibratoRateAndDelay();

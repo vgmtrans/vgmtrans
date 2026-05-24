@@ -67,14 +67,25 @@ void SeqTrack::resetPitchBendAutomation(SeqPitchBendAutomation<PitchType>& autom
 
 // Non-template helper implementations are defined in SeqTrack.cpp
 
-// Advance an LFO fade by one tick and emit converted CC1/modulation depth if it changed.
+// Advance an LFO fade by one tick and emit converted vibrato depth if it changed.
 template <typename ConvertDepth>
-SeqMotionTick<int32_t> SeqTrack::advanceSynthLfoFadeToModulation(SeqSynthLfoAutomation& automation,
-                                                                 uint8_t fractionalBits,
-                                                                 ConvertDepth&& convertDepth) {
+SeqMotionTick<int32_t> SeqTrack::advanceVibratoDepthFade(SeqSynthLfoAutomation& automation,
+                                                         uint8_t fractionalBits,
+                                                         ConvertDepth&& convertDepth) {
   return automation.tickFadeToDepth(fractionalBits,
                                     std::forward<ConvertDepth>(convertDepth),
                                     [this](uint8_t depth) {
-                                      addModulationNoItem(depth);
+                                      addVibratoDepthNoItem(depth);
+                                    });
+}
+
+template <typename ConvertDepth>
+SeqMotionTick<int32_t> SeqTrack::advanceTremoloDepthFade(SeqSynthLfoAutomation& automation,
+                                                         uint8_t fractionalBits,
+                                                         ConvertDepth&& convertDepth) {
+  return automation.tickFadeToDepth(fractionalBits,
+                                    std::forward<ConvertDepth>(convertDepth),
+                                    [this](uint8_t depth) {
+                                      addTremoloDepthNoItem(depth);
                                     });
 }

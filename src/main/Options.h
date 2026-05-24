@@ -5,9 +5,10 @@
  */
 
 #pragma once
-#include <algorithm>
 #include <memory>
 #include <string_view>
+
+#include "ModSourceMap.h"
 
 struct OptionStore {
   struct Group {
@@ -52,28 +53,23 @@ public:
   void setBankSelectStyle(BankSelectStyle style) { m_bs_style = style; }
 
   int numSequenceLoops() const { return m_sequence_loops; }
-  void setNumSequenceLoops(int numLoops) {
-    m_sequence_loops = std::clamp(numLoops, 0, kMaxSequenceLoops);
-  }
+  void setNumSequenceLoops(int numLoops);
 
   bool skipChannel10() const { return m_skip_channel_10; }
   void setSkipChannel10(bool should) { m_skip_channel_10 = should; }
 
-  void load(OptionStore& store) {
-    auto g = store.beginGroup("ConversionOptions");
-    const int bs = store.getInt("bankSelectStyle", static_cast<int>(BankSelectStyle::GS));
-    m_bs_style = (bs == static_cast<int>(BankSelectStyle::MMA)) ? BankSelectStyle::MMA
-                                                                : BankSelectStyle::GS;
-    m_sequence_loops = std::clamp(store.getInt("sequenceLoops", 1), 0, kMaxSequenceLoops);
-    m_skip_channel_10 = store.getBool("skipChannel10", true);
+  [[nodiscard]] ModSourceMap& modSourceMap(ModulationSourceTarget target);
+
+  [[nodiscard]] ModulationSourceTarget midiModulationSourceTarget() const {
+    return m_midi_modulation_source_target;
   }
 
-  void save(OptionStore& store) const {
-    auto g = store.beginGroup("ConversionOptions");
-    store.setInt("bankSelectStyle", static_cast<int>(m_bs_style));
-    store.setInt("sequenceLoops",   m_sequence_loops);
-    store.setBool("skipChannel10", m_skip_channel_10);
+  void setMidiModulationSourceTarget(ModulationSourceTarget target) {
+    m_midi_modulation_source_target = target;
   }
+
+  void load(OptionStore& store);
+  void save(OptionStore& store) const;
 
 private:
   ConversionOptions() = default;
@@ -81,4 +77,22 @@ private:
   BankSelectStyle m_bs_style{BankSelectStyle::GS};
   int m_sequence_loops{0};
   bool m_skip_channel_10{true};
+  ModSourceMap m_sf2_mod_sources{ModulationSourceTarget::SoundFont};
+  ModSourceMap m_dls_mod_sources{ModulationSourceTarget::DLS};
+  ModulationSourceTarget m_midi_modulation_source_target{ModulationSourceTarget::SoundFont};
+};
+
+// RAII helper which updates ConversionOptions::m_midi_modulation_source_target.
+// Sets the active MIDI modulation-source target for SeqTrack controller emission,
+// then restores the previous ConversionOptions value when the scope exits.
+class ScopedMidiModulationSourceTarget {
+public:
+  explicit ScopedMidiModulationSourceTarget(ModulationSourceTarget target);
+  ~ScopedMidiModulationSourceTarget();
+
+  ScopedMidiModulationSourceTarget(const ScopedMidiModulationSourceTarget&) = delete;
+  ScopedMidiModulationSourceTarget& operator=(const ScopedMidiModulationSourceTarget&) = delete;
+
+private:
+  ModulationSourceTarget m_previous;
 };

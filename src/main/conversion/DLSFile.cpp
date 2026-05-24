@@ -7,9 +7,11 @@
 #include <algorithm>
 #include <limits>
 #include <numeric>
+#include <optional>
 #include <ranges>
 #include <vector>
 #include "DLSFile.h"
+#include "Options.h"
 #include "ScaleConversion.h"
 #include "VGMInstrSet.h"
 #include "VGMSamp.h"
@@ -278,28 +280,46 @@ void DLSRgn::setWaveLinkInfo(uint16_t options, uint16_t phaseGroup, uint32_t the
 
 namespace {
 
-uint16_t dlsSourceForModSource(ModSource source) {
+std::optional<uint16_t> dlsSourceForModSource(ModSource source) {
+  if (auto controller = midiControllerForModSource(source)) {
+    switch (*controller) {
+      case 1:
+        return CONN_SRC_CC1;
+      case 7:
+        return CONN_SRC_CC7;
+      case 10:
+        return CONN_SRC_CC10;
+      case 11:
+        return CONN_SRC_CC11;
+      case 91:
+        return CONN_SRC_CC91;
+      case 93:
+        return CONN_SRC_CC93;
+      default:
+        return std::nullopt;
+    }
+  }
+
   switch (source) {
-    case ModSource::ModWheel:
-      return CONN_SRC_CC1;
+    case ModSource::None:
+      return std::nullopt;
     case ModSource::ChannelPressure:
       return CONN_SRC_CHANNELPRESSURE;
     case ModSource::PolyPressure:
       return CONN_SRC_POLYPRESSURE;
     case ModSource::PitchWheel:
       return CONN_SRC_PITCHWHEEL;
-    case ModSource::Volume:
-      return CONN_SRC_CC7;
-    case ModSource::Pan:
-      return CONN_SRC_CC10;
-    case ModSource::Expression:
-      return CONN_SRC_CC11;
-    case ModSource::ReverbSend:
-      return CONN_SRC_CC91;
-    case ModSource::ChorusSend:
-      return CONN_SRC_CC93;
+    default:
+      break;
   }
-  return CONN_SRC_NONE;
+  return std::nullopt;
+}
+
+ModSource sourceForModulator(const SynthModulator& modulator) {
+  return modulator.source.value_or(
+      ConversionOptions::the()
+          .modSourceMap(ModulationSourceTarget::DLS)
+          .sourceFor(modulator.destination));
 }
 
 int32_t toDls16Dot16Scale(int32_t amount) {
@@ -407,17 +427,20 @@ void DLSArt::addGenerator(const SynthGenerator& generator) {
 }
 
 void DLSArt::addModulator(const SynthModulator& modulator) {
-  const uint16_t source = dlsSourceForModSource(modulator.source);
+  const auto source = dlsSourceForModSource(sourceForModulator(modulator));
+  if (!source.has_value()) {
+    return;
+  }
 
   switch (modulator.destination) {
     case ModDest::VibLfoToPitch:
       m_blocks.emplace_back(std::make_unique<ConnectionBlock>(
-          CONN_SRC_VIBRATO, source, CONN_DST_PITCH, CONN_TRN_NONE,
+          CONN_SRC_VIBRATO, *source, CONN_DST_PITCH, CONN_TRN_NONE,
           centsToDlsPitchScale(modulator.amount)));
       break;
     case ModDest::VibLfoFreq:
       m_blocks.emplace_back(std::make_unique<ConnectionBlock>(
-          source, CONN_SRC_NONE, CONN_DST_VIB_FREQUENCY, CONN_TRN_NONE,
+          *source, CONN_SRC_NONE, CONN_DST_VIB_FREQUENCY, CONN_TRN_NONE,
           centsToDlsPitchScale(modulator.amount)));
       break;
     case ModDest::VibLfoDelay:
@@ -426,22 +449,22 @@ void DLSArt::addModulator(const SynthModulator& modulator) {
       break;
     case ModDest::ModLfoFreq:
       m_blocks.emplace_back(std::make_unique<ConnectionBlock>(
-          source, CONN_SRC_NONE, CONN_DST_LFO_FREQUENCY, CONN_TRN_NONE,
+          *source, CONN_SRC_NONE, CONN_DST_LFO_FREQUENCY, CONN_TRN_NONE,
           centsToDlsPitchScale(modulator.amount)));
       break;
     case ModDest::ModLfoDelay:
       m_blocks.emplace_back(std::make_unique<ConnectionBlock>(
-          source, CONN_SRC_NONE, CONN_DST_LFO_STARTDELAY, CONN_TRN_NONE,
+          *source, CONN_SRC_NONE, CONN_DST_LFO_STARTDELAY, CONN_TRN_NONE,
           toDls16Dot16Scale(modulator.amount)));
       break;
     case ModDest::ModLfoToVol:
       m_blocks.emplace_back(std::make_unique<ConnectionBlock>(
-          CONN_SRC_LFO, source, CONN_DST_ATTENUATION, CONN_TRN_NONE,
+          CONN_SRC_LFO, *source, CONN_DST_ATTENUATION, CONN_TRN_NONE,
           toDls16Dot16Scale(modulator.amount)));
       break;
     case ModDest::InitialAtten:
       m_blocks.emplace_back(std::make_unique<ConnectionBlock>(
-          source, CONN_SRC_NONE, CONN_DST_ATTENUATION, CONN_TRN_NONE,
+          *source, CONN_SRC_NONE, CONN_DST_ATTENUATION, CONN_TRN_NONE,
           toDls16Dot16Scale(modulator.amount)));
       break;
   }

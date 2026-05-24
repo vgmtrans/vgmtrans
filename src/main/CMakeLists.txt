@@ -104,6 +104,7 @@ add_library(vgmtranscore OBJECT)
 target_sources(vgmtranscore
   PRIVATE
     LogManager.cpp
+    ModSourceMap.cpp
     Options.cpp
     Root.cpp
     components/FileLoader.cpp
@@ -288,6 +289,7 @@ target_sources(vgmtranscore
       LogItem.h
       LogManager.h
       Loop.h
+      ModSourceMap.h
       Options.h
       Root.h
     FILE_SET headers_formats TYPE HEADERS BASE_DIRS formats

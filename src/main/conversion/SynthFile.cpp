@@ -98,13 +98,22 @@ void SynthInstr::addModulator(const SynthModulator& modulator) {
   m_modulators.push_back(modulator);
 }
 
-void SynthInstr::addModulator(ModSource source, ModDest destination,
-                              ModAmount amount) {
+// Add a modulator using a specific ModSource. This will bypass the ModDest->ModSource mapping in ConversionOptions
+void SynthInstr::addModulator(ModSource source, ModDest destination, ModAmount amount) {
   if (!amount.valid()) {
     return;
   }
 
-  m_modulators.push_back({source, destination, amount.value()});
+  m_modulators.emplace_back(source, destination, amount.value());
+}
+
+// Add a modulator without specifying the ModSource. The ModDest->ModSource mapping in ConversionOptions will be used
+void SynthInstr::addModulator(ModDest destination, ModAmount amount) {
+  if (!amount.valid()) {
+    return;
+  }
+
+  m_modulators.emplace_back(destination, amount.value());
 }
 
 void SynthInstr::addGenerator(const SynthGenerator& generator) {

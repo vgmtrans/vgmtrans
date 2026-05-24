@@ -74,7 +74,9 @@ public:
 
   // Modulator support
   void addModulator(ModSource source, ModDest destination, ModAmount amount);
+  void addModulator(ModDest destination, ModAmount amount);
   bool updateModulatorAmount(ModSource source, ModDest destination, ModAmount amount);
+  bool updateModulatorAmount(ModDest destination, ModAmount amount);
   void addStandardVibratoHandling(double maxDepthCents,
                                   double minHertz,
                                   double maxHertz,

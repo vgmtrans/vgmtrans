@@ -28,12 +28,6 @@ bool usesIntelliTempDrumKitExport(NinSnesProfileId profileId) {
   return intelliMode == NinSnesIntelliModeId::Ta || intelliMode == NinSnesIntelliModeId::Fe4;
 }
 
-void addVibratoHandling(VGMInstr* instr) {
-  // NinSnes drives vibrato from per-track controllers, so every exportable instrument shares the
-  // same ModWheel/ChannelPressure/CC93 wiring and only the final ranges vary per sequence.
-  instr->addStandardVibratoHandling(nin_snes::vibrato::modulationSpec());
-}
-
 void applyVibratoScaling(NinSnesInstrSet* instrSet, const VibratoModulationSpec& spec) {
   // Re-target the shared vibrato modulators to the maxima observed in the matched sequence.
   for (auto* instr : instrSet->exportInstrs()) {
@@ -303,7 +297,7 @@ void NinSnesInstrSet::useColl(const VGMColl* coll) {
           overrideDef.progNum >> 7,
           overrideDef.progNum & 0x7f,
           fmt::format("Instrument {:d} (Overwrite)", overrideDef.logicalInstrIndex));
-      addVibratoHandling(overrideInstr);
+      overrideInstr->addStandardVibratoHandling(nin_snes::vibrato::modulationSpec());
       auto* rgn =
           createRgnFromHeaderData(overrideInstr, rawFile(), profileId, spcDirAddr, overrideDef.regionData);
       if (rgn == nullptr) {
@@ -317,7 +311,7 @@ void NinSnesInstrSet::useColl(const VGMColl* coll) {
     for (const auto& drumKitDef : seq->intelliTADrumKitDefs()) {
       auto* drumKit = new VGMInstr(
           this, 0, 0, 127, drumKitDef.program, fmt::format("Drum Kit {:d}", drumKitDef.program));
-      addVibratoHandling(drumKit);
+      drumKit->addStandardVibratoHandling(nin_snes::vibrato::modulationSpec());
 
       for (size_t slot = 0; slot < drumKitDef.slots.size(); slot++) {
         const auto& slotDef = drumKitDef.slots[slot];
@@ -349,7 +343,7 @@ void NinSnesInstrSet::useColl(const VGMColl* coll) {
     if (!percussionInstrNoteMap.empty()) {
       // Create the drumkit instrument for percussion note events.
       auto* drumKit = new VGMInstr(this, 0, 0, 127, 0, "Drum Kit");
-      addVibratoHandling(drumKit);
+      drumKit->addStandardVibratoHandling(nin_snes::vibrato::modulationSpec());
       for (const auto& [instrIndex, percussionDef] : percussionInstrNoteMap) {
         VGMInstr* sourceInstr = nullptr;
         for (auto* instr : aInstrs) {
@@ -414,7 +408,7 @@ bool NinSnesInstr::loadInstr() {
     return false;
   }
 
-  addVibratoHandling(this);
+  addStandardVibratoHandling(nin_snes::vibrato::modulationSpec());
 
   uint16_t addrSampStart = readShort(offDirEnt);
 

@@ -130,7 +130,7 @@ void NinSnesTrack::activateStoredPitchEnvelope() {
 void NinSnesTrack::beginNoteVibrato() {
   // EVENT_VIBRATO_FADE is a reusable per-note fade-in for the configured E3 vibrato.
   if (state.vibrato.active() && state.vibrato.beginReusableFadeToConfiguredDepth()) {
-    setVibratoDepth(0);
+    setConfiguredVibratoDepth(0);
   }
 }
 
@@ -145,7 +145,7 @@ void NinSnesTrack::applyConfiguredVibrato() {
     }
   }
 
-  setVibratoDepth(vibrato.outputDepthWhen(active));
+  setConfiguredVibratoDepth(vibrato.outputDepthWhen(active));
   if (active) {
     syncVibratoRateAndDelay();
   } else {
@@ -154,21 +154,21 @@ void NinSnesTrack::applyConfiguredVibrato() {
 }
 
 void NinSnesTrack::updateVibratoFade() {
-  advanceSynthLfoFadeToModulation(state.vibrato, 0, [this](int32_t depth) {
+  advanceVibratoDepthFade(state.vibrato, 0, [this](int32_t depth) {
     return convertVibratoDepthToMidi(static_cast<uint8_t>(depth), seq().maxVibratoDepthCents);
   });
 }
 
-void NinSnesTrack::setVibratoDepth(uint8_t depth) {
+void NinSnesTrack::setConfiguredVibratoDepth(uint8_t depth) {
   auto& vibrato = state.vibrato;
   vibrato.setCurrentDepthPreservingMotion(depth);
   const uint8_t midiDepth = convertVibratoDepthToMidi(depth, seq().maxVibratoDepthCents);
-  setSynthLfoModulationDepth(vibrato, midiDepth);
+  emitVibratoDepth(vibrato, midiDepth);
 }
 
 void NinSnesTrack::clearVibratoRateAndDelay() {
-  addChannelPressureNoItem(0);
-  addControllerEventNoItem(nin_snes::vibrato::kDelayController, 0);
+  addVibratoFrequencyNoItem(0);
+  addVibratoDelayNoItem(0);
 }
 
 void NinSnesTrack::resetPitchBendForNewNote() {
@@ -202,7 +202,6 @@ void NinSnesTrack::syncVibratoRateAndDelay() {
         std::max(parentSeq.maxVibratoRateHz, nin_snes::vibrato::rateHz(vibrato.rate(), currentTempo));
   }
 
-  addChannelPressureNoItem(convertVibratoRateToMidi(vibrato.rate(), currentTempo, parentSeq.maxVibratoRateHz));
-  addControllerEventNoItem(nin_snes::vibrato::kDelayController,
-                           convertVibratoDelayToMidi(vibrato.delay(), currentTempo));
+  addVibratoFrequencyNoItem(convertVibratoRateToMidi(vibrato.rate(), currentTempo, parentSeq.maxVibratoRateHz));
+  addVibratoDelayNoItem(convertVibratoDelayToMidi(vibrato.delay(), currentTempo));
 }

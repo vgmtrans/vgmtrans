@@ -15,6 +15,7 @@
 
 #include <array>
 #include <spdlog/fmt/fmt.h>
+#include "automation/SeqTrackAutomation.h"
 #include "MidiFile.h"
 #include "MP2kFormat.h"
 
@@ -23,7 +24,6 @@ DECLARE_FORMAT(MP2k);
 constexpr uint8_t kMp2kModTypeVibrato = 0;
 constexpr uint8_t kMp2kModTypeTremolo = 1;
 constexpr uint8_t kMp2kModTypePan = 2;
-constexpr uint8_t kMp2kTremoloDepthController = 93;
 
 const char* mp2kModTypeName(uint8_t type) {
   switch (type) {
@@ -478,8 +478,8 @@ bool MP2kTrack::lfoOutputsEnabled() const {
 }
 
 void MP2kTrack::clearLfoOutputs() {
-  setSynthLfoModulationDepth(vibratoLfo, 0, true);
-  setSynthLfoControllerDepth(tremoloLfo, kMp2kTremoloDepthController, 0, true);
+  emitVibratoDepth(vibratoLfo, 0, true);
+  emitTremoloDepth(tremoloLfo, 0, true);
 }
 
 void MP2kTrack::applyLfoDepth(bool force) {
@@ -490,13 +490,12 @@ void MP2kTrack::applyLfoDepth(bool force) {
 
   switch (modType) {
     case kMp2kModTypeVibrato:
-      setSynthLfoModulationDepth(vibratoLfo, vibratoLfo.depth(), force);
-      setSynthLfoControllerDepth(tremoloLfo, kMp2kTremoloDepthController, 0, true);
+      emitVibratoDepth(vibratoLfo, vibratoLfo.depth(), force);
+      emitTremoloDepth(tremoloLfo, 0, true);
       break;
     case kMp2kModTypeTremolo:
-      setSynthLfoControllerDepth(tremoloLfo, kMp2kTremoloDepthController, tremoloLfo.depth(),
-                                 force);
-      setSynthLfoModulationDepth(vibratoLfo, 0, true);
+      emitTremoloDepth(tremoloLfo, tremoloLfo.depth(), force);
+      emitVibratoDepth(vibratoLfo, 0, true);
       break;
     default:
       clearLfoOutputs();
@@ -553,11 +552,11 @@ void MP2kTrack::beginNoteLfo() {
   }
 
   if (modType == kMp2kModTypeVibrato) {
-    setSynthLfoModulationDepth(vibratoLfo, 0, false);
+    emitVibratoDepth(vibratoLfo, 0, false);
     vibratoLfo.setReusableFadeToConfiguredDepth(1);
     vibratoLfo.beginReusableFadeToConfiguredDepth();
   } else if (modType == kMp2kModTypeTremolo) {
-    setSynthLfoControllerDepth(tremoloLfo, kMp2kTremoloDepthController, 0, false);
+    emitTremoloDepth(tremoloLfo, 0, false);
     tremoloLfo.setReusableFadeToConfiguredDepth(1);
     tremoloLfo.beginReusableFadeToConfiguredDepth();
   }
@@ -569,16 +568,8 @@ void MP2kTrack::updateLfoFade() {
   }
 
   if (modType == kMp2kModTypeVibrato) {
-    vibratoLfo.tickFadeToDepth(
-        0,
-        [](int32_t depth) { return depth; },
-        [this](uint8_t depth) { addModulationNoItem(depth); });
+    advanceVibratoDepthFade(vibratoLfo, 0, [](int32_t depth) { return depth; });
   } else if (modType == kMp2kModTypeTremolo) {
-    tremoloLfo.tickFadeToDepth(
-        0,
-        [](int32_t depth) { return depth; },
-        [this](uint8_t depth) {
-          addControllerEventNoItem(kMp2kTremoloDepthController, depth);
-        });
+    advanceTremoloDepthFade(tremoloLfo, 0, [](int32_t depth) { return depth; });
   }
 }
