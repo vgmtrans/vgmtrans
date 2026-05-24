@@ -8,7 +8,7 @@
 #include <memory>
 #include <string_view>
 
-#include "BankSelectStyle.h"
+#include "ConversionTypes.h"
 #include "ModSourceMap.h"
 
 struct OptionStore {
@@ -52,8 +52,8 @@ public:
   bool skipChannel10() const { return m_skip_channel_10; }
   void setSkipChannel10(bool should) { m_skip_channel_10 = should; }
 
-  [[nodiscard]] ModSourceMap& modSourceMap(ModulationSourceTarget target);
-  [[nodiscard]] const ModSourceMap& modSourceMap(ModulationSourceTarget target) const;
+  [[nodiscard]] ModSourceMap& modSourceMap(SynthTarget target);
+  [[nodiscard]] const ModSourceMap& modSourceMap(SynthTarget target) const;
 
   void load(OptionStore& store);
   void save(OptionStore& store) const;
@@ -64,6 +64,6 @@ private:
   BankSelectStyle m_bs_style{BankSelectStyle::GS};
   int m_sequence_loops{0};
   bool m_skip_channel_10{true};
-  ModSourceMap m_sf2_mod_sources{ModulationSourceTarget::SoundFont};
-  ModSourceMap m_dls_mod_sources{ModulationSourceTarget::DLS};
+  ModSourceMap m_sf2_mod_sources{SynthTarget::SoundFont};
+  ModSourceMap m_dls_mod_sources{SynthTarget::DLS};
 };

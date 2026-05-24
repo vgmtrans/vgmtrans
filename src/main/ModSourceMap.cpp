@@ -69,14 +69,12 @@ constexpr std::array<ModSourceSettingSpec, kModDests.size()> kModSourceSettings 
     },
 }};
 
-constexpr const char* settingKeyFor(const ModSourceSettingSpec& spec,
-                                    ModulationSourceTarget target) {
-  return target == ModulationSourceTarget::DLS ? spec.dlsKey : spec.sf2Key;
+constexpr const char* settingKeyFor(const ModSourceSettingSpec& spec, SynthTarget target) {
+  return target == SynthTarget::DLS ? spec.dlsKey : spec.sf2Key;
 }
 
-constexpr ModSource defaultSourceFor(const ModSourceSettingSpec& spec,
-                                     ModulationSourceTarget target) {
-  return target == ModulationSourceTarget::DLS ? spec.dlsDefault : spec.sf2Default;
+constexpr ModSource defaultSourceFor(const ModSourceSettingSpec& spec, SynthTarget target) {
+  return target == SynthTarget::DLS ? spec.dlsDefault : spec.sf2Default;
 }
 
 constexpr int settingValueFor(ModSource source) {
@@ -93,17 +91,17 @@ constexpr ModSource sourceFromSettingValue(int value, ModSource fallback) {
 
 }  // namespace
 
-ModSourceMap::ModSourceMap(ModulationSourceTarget target) {
+ModSourceMap::ModSourceMap(SynthTarget target) {
   resetToDefaults(target);
 }
 
-void ModSourceMap::resetToDefaults(ModulationSourceTarget target) {
+void ModSourceMap::resetToDefaults(SynthTarget target) {
   for (const auto& spec : kModSourceSettings) {
     m_sources[modDestIndex(spec.destination)] = defaultSourceFor(spec, target);
   }
 }
 
-void ModSourceMap::load(OptionStore& store, ModulationSourceTarget target) {
+void ModSourceMap::load(OptionStore& store, SynthTarget target) {
   resetToDefaults(target);
   for (const auto& spec : kModSourceSettings) {
     const auto index = modDestIndex(spec.destination);
@@ -113,7 +111,7 @@ void ModSourceMap::load(OptionStore& store, ModulationSourceTarget target) {
   }
 }
 
-void ModSourceMap::save(OptionStore& store, ModulationSourceTarget target) const {
+void ModSourceMap::save(OptionStore& store, SynthTarget target) const {
   for (const auto& spec : kModSourceSettings) {
     store.setInt(settingKeyFor(spec, target),
                  settingValueFor(m_sources[modDestIndex(spec.destination)]));

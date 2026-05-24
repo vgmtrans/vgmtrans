@@ -289,8 +289,8 @@ target_sources(vgmtranscore
     FILES
       LogItem.h
       LogManager.h
-      BankSelectStyle.h
       ConversionContext.h
+      ConversionTypes.h
       Loop.h
       ModSourceMap.h
       Options.h

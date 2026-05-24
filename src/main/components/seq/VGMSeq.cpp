@@ -40,7 +40,7 @@ VGMSeq::VGMSeq(const std::string &format, RawFile *file, uint32_t offset, uint32
       initialTempoBPM(120),
       m_use_reverb(false),
       m_track_control_flow_state(false) {
-  setConversionContext(ConversionContext::fromOptions(ConversionOptions::the(), ModulationSourceTarget::SoundFont));
+  setConversionContext(ConversionContext::fromOptions(ConversionOptions::the(), SynthTarget::SoundFont));
 }
 
 VGMSeq::~VGMSeq() {
@@ -67,7 +67,7 @@ bool VGMSeq::loadVGMFile(bool useMatcher) {
 }
 
 MidiFile *VGMSeq::convertToMidi(const VGMColl* coll) {
-  const auto context = ConversionContext::fromOptions(ConversionOptions::the(), ModulationSourceTarget::SoundFont);
+  const auto context = ConversionContext::fromOptions(ConversionOptions::the(), SynthTarget::SoundFont);
   return convertToMidi(coll, context);
 }
 
@@ -103,7 +103,7 @@ MidiTrack *VGMSeq::firstMidiTrack() {
 }
 
 bool VGMSeq::load() {
-  setConversionContext(ConversionContext::fromOptions(ConversionOptions::the(), ModulationSourceTarget::SoundFont));
+  setConversionContext(ConversionContext::fromOptions(ConversionOptions::the(), SynthTarget::SoundFont));
   readMode = READMODE_ADD_TO_UI;
 
   if (!parseHeader())
@@ -339,7 +339,7 @@ const std::set<uint16_t>& VGMSeq::referencedBanks() const {
 }
 
 bool VGMSeq::saveAsMidi(const std::filesystem::path &filepath, const VGMColl* coll) {
-  const auto context = ConversionContext::fromOptions(ConversionOptions::the(), ModulationSourceTarget::SoundFont);
+  const auto context = ConversionContext::fromOptions(ConversionOptions::the(), SynthTarget::SoundFont);
   return saveAsMidi(filepath, coll, context);
 }
 

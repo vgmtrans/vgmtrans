@@ -42,7 +42,7 @@ std::optional<SFModulator> sf2SourceForModSource(ModSource source) {
 }
 
 ModSource sourceForModulator(const SynthModulator& modulator, const ConversionContext& context) {
-  return modulator.source.value_or(context.synthSourceFor(ModulationSourceTarget::SoundFont, modulator.destination));
+  return modulator.source.value_or(context.synthSourceFor(SynthTarget::SoundFont, modulator.destination));
 }
 
 std::optional<SFModulator> sf2SourceForModulator(const SynthModulator& modulator, const ConversionContext& context) {

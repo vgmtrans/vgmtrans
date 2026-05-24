@@ -6,7 +6,7 @@
 
 #pragma once
 
-#include "BankSelectStyle.h"
+#include "ConversionTypes.h"
 #include "ModSourceMap.h"
 
 class ConversionOptions;
@@ -18,18 +18,18 @@ struct ConversionContext {
                     bool skipChannel10,
                     const ModSourceMap& sf2ModSources,
                     const ModSourceMap& dlsModSources,
-                    ModulationSourceTarget midiModulationTarget);
+                    SynthTarget midiModulationSynthTarget);
 
-  static ConversionContext fromOptions(const ConversionOptions& options, ModulationSourceTarget midiModulationTarget);
+  static ConversionContext fromOptions(const ConversionOptions& options, SynthTarget midiModulationSynthTarget);
 
-  [[nodiscard]] const ModSourceMap& modSourceMap(ModulationSourceTarget target) const;
+  [[nodiscard]] const ModSourceMap& modSourceMap(SynthTarget target) const;
   [[nodiscard]] ModSource midiSourceFor(ModDest destination) const;
-  [[nodiscard]] ModSource synthSourceFor(ModulationSourceTarget target, ModDest destination) const;
+  [[nodiscard]] ModSource synthSourceFor(SynthTarget target, ModDest destination) const;
 
   BankSelectStyle bankSelectStyle;
   int sequenceLoops;
   bool skipChannel10;
   ModSourceMap sf2ModSources;
   ModSourceMap dlsModSources;
-  ModulationSourceTarget midiModulationTarget;
+  SynthTarget midiModulationSynthTarget;
 };

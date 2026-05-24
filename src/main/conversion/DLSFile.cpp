@@ -316,7 +316,7 @@ std::optional<uint16_t> dlsSourceForModSource(ModSource source) {
 }
 
 ModSource sourceForModulator(const SynthModulator& modulator, const ConversionContext& context) {
-  return modulator.source.value_or(context.synthSourceFor(ModulationSourceTarget::DLS, modulator.destination));
+  return modulator.source.value_or(context.synthSourceFor(SynthTarget::DLS, modulator.destination));
 }
 
 int32_t toDls16Dot16Scale(int32_t amount) {

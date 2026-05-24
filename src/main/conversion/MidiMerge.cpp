@@ -323,7 +323,7 @@ std::unique_ptr<MidiFile> mergeMidiSequences(const std::vector<MidiMergeEntry>& 
   std::vector<ConvertedPart> parts;
   parts.reserve(entries.size());
 
-  const auto context = ConversionContext::fromOptions(ConversionOptions::the(), ModulationSourceTarget::SoundFont);
+  const auto context = ConversionContext::fromOptions(ConversionOptions::the(), SynthTarget::SoundFont);
 
   uint16_t targetPPQN = 0;
 
@@ -457,7 +457,7 @@ bool saveMergedSoundfont(const std::vector<MidiMergeEntry>& entries,
   }
 
   auto mergedSynth = std::make_unique<SynthFile>("Merged Chunk Soundfont");
-  const auto context = ConversionContext::fromOptions(ConversionOptions::the(), ModulationSourceTarget::SoundFont);
+  const auto context = ConversionContext::fromOptions(ConversionOptions::the(), SynthTarget::SoundFont);
   std::set<const VGMColl*> processedColls;
 
   for (size_t i = 0; i < entries.size(); ++i) {

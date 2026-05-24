@@ -42,7 +42,7 @@ void unpackSampColl(DLSFile &dls, const VGMSampColl *sampColl, std::vector<VGMSa
 }
 
 bool createDLSFile(DLSFile& dls, const VGMColl& coll) {
-  const auto context = ConversionContext::fromOptions(ConversionOptions::the(), ModulationSourceTarget::DLS);
+  const auto context = ConversionContext::fromOptions(ConversionOptions::the(), SynthTarget::DLS);
   return createDLSFile(dls, coll, context);
 }
 

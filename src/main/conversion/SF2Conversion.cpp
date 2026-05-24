@@ -19,7 +19,7 @@
 namespace conversion {
 
 SF2File* createSF2File(const VGMColl& coll) {
-  const auto context = ConversionContext::fromOptions(ConversionOptions::the(), ModulationSourceTarget::SoundFont);
+  const auto context = ConversionContext::fromOptions(ConversionOptions::the(), SynthTarget::SoundFont);
   return createSF2File(coll, context);
 }
 
