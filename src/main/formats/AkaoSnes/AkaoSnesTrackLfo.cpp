@@ -16,10 +16,10 @@
  * convert it to MIDI automation; the version-specific math lives in
  * AkaoSnesModulation.cpp.
  *
- * V1/FF4, V3, and V4 have per-note fade-in behavior that restarts on normal
- * keyed notes and is not restarted by ties/slur/legato. V2 is the only
- * supported version that orders the three-byte LFO setup as depth, delay, rate;
- * the others use delay, rate, depth.
+ * V1/FF4 and V3 have per-note fade-in behavior that restarts on normal keyed
+ * notes and is not restarted by ties/slur/legato. V4 keeps that behavior for
+ * vibrato only; delayed V4 tremolo runs at quarter depth. V2 is the only
+ * supported version that orders the three-byte LFO setup as depth, delay, rate.
  */
 
 void AkaoSnesSeq::syncTempoDependentTracks() {
@@ -91,7 +91,10 @@ void AkaoSnesTrack::applyLfo(LfoTarget target,
   uint8_t midiDepth = active
       ? (isVibrato
              ? akao_snes::modulation::vibratoDepthMidiValue(parent->version, params.rate, params.depth)
-             : akao_snes::modulation::tremoloDepthMidiValue(parent->version, params.rate, params.depth))
+             : akao_snes::modulation::tremoloDepthMidiValue(parent->version,
+                                                            params.rate,
+                                                            params.depth,
+                                                            params.delay))
       : 0;
   if (isVibrato && parent->version == AKAOSNES_V4 && active && vibrato.hasReusableFade()) {
     const uint32_t delay = akao_snes::modulation::delayTicks(parent->version, vibrato.delay());

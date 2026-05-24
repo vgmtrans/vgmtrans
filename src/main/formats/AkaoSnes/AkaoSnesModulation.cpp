@@ -479,7 +479,7 @@ uint8_t vibratoDepthMidiValue(AkaoSnesVersion version, uint8_t rate, uint8_t dep
   return static_cast<uint8_t>(std::clamp(midiValue, version == AKAOSNES_V3 ? 1 : 0, 127));
 }
 
-uint8_t tremoloDepthMidiValue(AkaoSnesVersion version, uint8_t rate, uint8_t depth) {
+uint8_t tremoloDepthMidiValue(AkaoSnesVersion version, uint8_t rate, uint8_t depth, uint8_t delay) {
   if (!isLfoActive(version, rate, depth)) {
     return 0;
   }
@@ -489,7 +489,17 @@ uint8_t tremoloDepthMidiValue(AkaoSnesVersion version, uint8_t rate, uint8_t dep
                                   maxTremoloDepthDb(version));
   }
 
+  if (version == AKAOSNES_V4 && delay != 0) {
+    // V4 delayed tremolo runs at one-quarter step and does not ramp to full depth.
+    return midiValueForDepthRange(tremoloDepthDbForAmplitude(v4PhaseHighByteAmplitude(rate, depth) / 4.0),
+                                  maxTremoloDepthDb(version));
+  }
+
   return midiValueForDepthRange(tremoloDepthDb(version, rate, depth), maxTremoloDepthDb(version));
+}
+
+uint8_t tremoloDepthMidiValue(AkaoSnesVersion version, uint8_t rate, uint8_t depth) {
+  return tremoloDepthMidiValue(version, rate, depth, 0);
 }
 
 uint8_t rateMidiValue(AkaoSnesVersion version, uint8_t rate, uint8_t depth, uint8_t timer0Frequency) {
