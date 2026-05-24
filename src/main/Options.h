@@ -8,6 +8,7 @@
 #include <memory>
 #include <string_view>
 
+#include "ConversionTypes.h"
 #include "ModSourceMap.h"
 
 struct OptionStore {
@@ -24,13 +25,6 @@ struct OptionStore {
   virtual void setInt(std::string_view key, int value) = 0;
   virtual int getBool(std::string_view key, bool def) const = 0;
   virtual void setBool(std::string_view key, bool value) = 0;
-};
-
-enum class BankSelectStyle {
-  /* CC0 MSB (default) */
-  GS,
-  /* CC0 * 128 + CC32 */
-  MMA
 };
 
 class ConversionOptions {

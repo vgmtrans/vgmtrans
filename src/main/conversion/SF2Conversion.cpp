@@ -5,6 +5,7 @@
 */
 #include "SF2Conversion.h"
 #include "ConversionContext.h"
+#include "Options.h"
 #include "SF2File.h"
 #include "SynthFile.h"
 #include "VGMColl.h"
@@ -24,15 +25,6 @@ SF2File* createSF2File(const VGMColl& coll) {
 
 SF2File* createSF2File(const VGMColl& coll, const ConversionContext& context) {
   return createSF2File(coll.instrSets(), coll.sampColls(), &coll, context);
-}
-
-SF2File* createSF2File(
-  const std::vector<VGMInstrSet*>& instrsets,
-  const std::vector<VGMSampColl*>& sampcolls,
-  const VGMColl* coll
-) {
-  const auto context = ConversionContext::fromOptions(ConversionOptions::the(), ModulationSourceTarget::SoundFont);
-  return createSF2File(instrsets, sampcolls, coll, context);
 }
 
 SF2File* createSF2File(

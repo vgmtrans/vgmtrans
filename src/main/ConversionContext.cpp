@@ -5,6 +5,7 @@
  */
 
 #include "ConversionContext.h"
+#include "Options.h"
 
 ConversionContext::ConversionContext()
     : bankSelectStyle(BankSelectStyle::GS),

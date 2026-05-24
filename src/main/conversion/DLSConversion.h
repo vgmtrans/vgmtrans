@@ -22,19 +22,8 @@ bool createDLSFile(
   DLSFile& dls,
   const std::vector<VGMInstrSet*>& instrsets,
   const std::vector<VGMSampColl*>& sampcolls,
-  const VGMColl* coll
-);
-bool createDLSFile(
-  DLSFile& dls,
-  const std::vector<VGMInstrSet*>& instrsets,
-  const std::vector<VGMSampColl*>& sampcolls,
   const VGMColl* coll,
   const ConversionContext& context
-);
-bool mainDLSCreation(
-  DLSFile& dls,
-  const std::vector<VGMInstrSet*>& instrsets,
-  const std::vector<VGMSampColl*>& sampcolls
 );
 bool mainDLSCreation(
   DLSFile& dls,

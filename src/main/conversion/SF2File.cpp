@@ -125,10 +125,6 @@ int SF2File::numOfGeneratorsForRgn(SynthRgn* rgn) {
   return numOfGenerators;
 }
 
-SF2File::SF2File(SynthFile *synthfile)
-    : SF2File(synthfile,
-              ConversionContext::fromOptions(ConversionOptions::the(), ModulationSourceTarget::SoundFont)) {}
-
 SF2File::SF2File(SynthFile* synthfile, const ConversionContext& context)
     : RiffFile(synthfile->m_name, "sfbk") {
 

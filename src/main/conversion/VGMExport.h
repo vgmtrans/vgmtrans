@@ -13,6 +13,7 @@
 #include "SF2Conversion.h"
 #include "DLSConversion.h"
 #include "ConversionContext.h"
+#include "Options.h"
 
 /*
  * The following free functions implement

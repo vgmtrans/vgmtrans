@@ -6,8 +6,10 @@
 
 #pragma once
 
+#include "ConversionTypes.h"
 #include "ModSourceMap.h"
-#include "Options.h"
+
+class ConversionOptions;
 
 struct ConversionContext {
   ConversionContext();

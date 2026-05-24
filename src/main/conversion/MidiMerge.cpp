@@ -19,6 +19,7 @@
 #include "ConversionContext.h"
 #include "LogManager.h"
 #include "MidiFile.h"
+#include "Options.h"
 #include "SF2Conversion.h"
 #include "SF2File.h"
 #include "SynthFile.h"

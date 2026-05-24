@@ -6,6 +6,7 @@
 #include <cassert>
 #include "ConversionContext.h"
 #include "DLSConversion.h"
+#include "Options.h"
 #include "VGMInstrSet.h"
 #include "VGMRgn.h"
 #include "VGMSampColl.h"
@@ -53,16 +54,6 @@ bool createDLSFile(
   DLSFile& dls,
   const std::vector<VGMInstrSet*>& instrsets,
   const std::vector<VGMSampColl*>& sampcolls,
-  const VGMColl* coll
-) {
-  const auto context = ConversionContext::fromOptions(ConversionOptions::the(), ModulationSourceTarget::DLS);
-  return createDLSFile(dls, instrsets, sampcolls, coll, context);
-}
-
-bool createDLSFile(
-  DLSFile& dls,
-  const std::vector<VGMInstrSet*>& instrsets,
-  const std::vector<VGMSampColl*>& sampcolls,
   const VGMColl* coll,
   const ConversionContext& context
 ) {
@@ -77,15 +68,6 @@ bool createDLSFile(
     instrset->cleanupAfterExport();
   }
   return result;
-}
-
-bool mainDLSCreation(
-  DLSFile& dls,
-  const std::vector<VGMInstrSet*>& m_instrsets,
-  const std::vector<VGMSampColl*>& m_sampcolls
-) {
-  const auto context = ConversionContext::fromOptions(ConversionOptions::the(), ModulationSourceTarget::DLS);
-  return mainDLSCreation(dls, m_instrsets, m_sampcolls, context);
 }
 
 bool mainDLSCreation(

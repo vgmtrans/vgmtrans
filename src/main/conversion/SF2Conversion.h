@@ -22,11 +22,6 @@ SF2File* createSF2File(const VGMColl& coll, const ConversionContext& context);
 SF2File* createSF2File(
   const std::vector<VGMInstrSet*>& instrsets,
   const std::vector<VGMSampColl*>& sampcolls,
-  const VGMColl* coll
-);
-SF2File* createSF2File(
-  const std::vector<VGMInstrSet*>& instrsets,
-  const std::vector<VGMSampColl*>& sampcolls,
   const VGMColl* coll,
   const ConversionContext& context
 );

@@ -106,7 +106,6 @@ class VGMSeq : public VGMFile {
   bool saveAsMidi(const std::filesystem::path &filepath, const VGMColl* coll = nullptr);
   bool saveAsMidi(const std::filesystem::path& filepath, const VGMColl* coll, const ConversionContext& context);
   [[nodiscard]] const ConversionContext& conversionContext() const { return m_conversionContext; }
-  void setConversionContext(const ConversionContext& context) { m_conversionContext = context; }
 
   void deactivateAllTracks();
 
@@ -122,6 +121,8 @@ class VGMSeq : public VGMFile {
   SeqEventTimeIndex& timedEventIndex() { return m_timedEvents; }
 
  protected:
+  void setConversionContext(const ConversionContext& context) { m_conversionContext = context; }
+
   virtual bool loadTracks(ReadMode readMode, uint32_t stopTime = 1000000);
   virtual void loadTracksMain(uint32_t stopTime);
   virtual bool postLoad();

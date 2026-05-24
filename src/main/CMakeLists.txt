@@ -290,6 +290,7 @@ target_sources(vgmtranscore
       LogItem.h
       LogManager.h
       ConversionContext.h
+      ConversionTypes.h
       Loop.h
       ModSourceMap.h
       Options.h

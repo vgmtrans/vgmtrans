@@ -423,11 +423,6 @@ void DLSArt::addGenerator(const SynthGenerator& generator) {
   }
 }
 
-void DLSArt::addModulator(const SynthModulator& modulator) {
-  const auto context = ConversionContext::fromOptions(ConversionOptions::the(), ModulationSourceTarget::DLS);
-  addModulator(modulator, context);
-}
-
 void DLSArt::addModulator(const SynthModulator& modulator, const ConversionContext& context) {
   const auto source = dlsSourceForModSource(sourceForModulator(modulator, context));
   if (!source.has_value()) {
