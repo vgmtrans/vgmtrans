@@ -36,7 +36,7 @@ inline constexpr bool hasTarget(Target options, Target target) {
   return (options & target) != 0;
 }
 
-inline constexpr SynthTarget midiModulationSynthTargetFor(Target options) {
+inline constexpr SynthTarget modulationSynthTargetFor(Target options) {
   return hasTarget(options, Target::DLS)
       ? SynthTarget::DLS
       : SynthTarget::SoundFont;
@@ -54,7 +54,7 @@ template <Target options>
 void saveAs(const VGMColl &coll, const std::filesystem::path &dir_path) {
   auto filename = makeSafeFileName(coll.name());
   auto filepath = dir_path / filename;
-  const auto context = ConversionContext::fromOptions(ConversionOptions::the(), midiModulationSynthTargetFor(options));
+  const auto context = ConversionContext::fromOptions(ConversionOptions::the(), modulationSynthTargetFor(options));
 
   if constexpr (hasTarget(options, Target::MIDI)) {
     auto midiPath = filepath;

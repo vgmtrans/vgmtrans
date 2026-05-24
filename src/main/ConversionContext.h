@@ -18,9 +18,9 @@ struct ConversionContext {
                     bool skipChannel10,
                     const ModSourceMap& sf2ModSources,
                     const ModSourceMap& dlsModSources,
-                    SynthTarget midiModulationSynthTarget);
+                    SynthTarget modulationSynthTarget);
 
-  static ConversionContext fromOptions(const ConversionOptions& options, SynthTarget midiModulationSynthTarget);
+  static ConversionContext fromOptions(const ConversionOptions& options, SynthTarget modulationSynthTarget);
 
   [[nodiscard]] const ModSourceMap& modSourceMap(SynthTarget target) const;
   [[nodiscard]] ModSource midiSourceFor(ModDest destination) const;
@@ -31,5 +31,5 @@ struct ConversionContext {
   bool skipChannel10;
   ModSourceMap sf2ModSources;
   ModSourceMap dlsModSources;
-  SynthTarget midiModulationSynthTarget;
+  SynthTarget modulationSynthTarget;
 };

@@ -13,31 +13,31 @@ ConversionContext::ConversionContext()
       skipChannel10(true),
       sf2ModSources(SynthTarget::SoundFont),
       dlsModSources(SynthTarget::DLS),
-      midiModulationSynthTarget(SynthTarget::SoundFont) {}
+      modulationSynthTarget(SynthTarget::SoundFont) {}
 
 ConversionContext::ConversionContext(BankSelectStyle bankSelectStyle,
                                      int sequenceLoops,
                                      bool skipChannel10,
                                      const ModSourceMap& sf2ModSources,
                                      const ModSourceMap& dlsModSources,
-                                     SynthTarget midiModulationSynthTarget)
+                                     SynthTarget modulationSynthTarget)
     : bankSelectStyle(bankSelectStyle),
       sequenceLoops(sequenceLoops),
       skipChannel10(skipChannel10),
       sf2ModSources(sf2ModSources),
       dlsModSources(dlsModSources),
-      midiModulationSynthTarget(midiModulationSynthTarget) {}
+      modulationSynthTarget(modulationSynthTarget) {}
 
 ConversionContext ConversionContext::fromOptions(
     const ConversionOptions& options,
-    SynthTarget midiModulationSynthTarget) {
+    SynthTarget modulationSynthTarget) {
   return {
       options.bankSelectStyle(),
       options.numSequenceLoops(),
       options.skipChannel10(),
       options.modSourceMap(SynthTarget::SoundFont),
       options.modSourceMap(SynthTarget::DLS),
-      midiModulationSynthTarget,
+      modulationSynthTarget,
   };
 }
 
@@ -46,7 +46,7 @@ const ModSourceMap& ConversionContext::modSourceMap(SynthTarget target) const {
 }
 
 ModSource ConversionContext::midiSourceFor(ModDest destination) const {
-  return modSourceMap(midiModulationSynthTarget).sourceFor(destination);
+  return modSourceMap(modulationSynthTarget).sourceFor(destination);
 }
 
 ModSource ConversionContext::synthSourceFor(SynthTarget target, ModDest destination) const {
