@@ -66,6 +66,20 @@ private:
 };
 
 // Logging Macros
+#ifndef HAS__FILE_NAME__
+#ifdef __FILE_NAME__
+#define HAS__FILE_NAME__ 1
+#else
+#define HAS__FILE_NAME__ 0
+#endif
+#endif
+
+#if HAS__FILE_NAME__
+#define THIS_FILE_NAME __FILE_NAME__
+#else
+#define THIS_FILE_NAME __FILE__
+#endif
+
 #define L_LOG(level, ...) LogManager::the().log(level, THIS_FILE_NAME, __LINE__, __VA_ARGS__)
 #define L_ERROR(...) L_LOG(spdlog::level::err, __VA_ARGS__)
 #define L_WARN(...) L_LOG(spdlog::level::warn, __VA_ARGS__)

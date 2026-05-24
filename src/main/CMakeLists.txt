@@ -549,6 +549,16 @@ target_link_libraries(
 )
 target_compile_features(vgmtranscore PUBLIC cxx_std_20)
 
+include(CheckCXXSourceCompiles)
+check_cxx_source_compiles(
+  "int main() { const char *file_name = __FILE_NAME__; return file_name[0]; }"
+  HAS__FILE_NAME__)
+target_compile_definitions(vgmtranscore PUBLIC HAS__FILE_NAME__=$<BOOL:${HAS__FILE_NAME__}>)
+
+if(NOT HAS__FILE_NAME__ AND CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+  target_compile_options(vgmtranscore PUBLIC "$<$<COMPILE_LANGUAGE:CXX>:-fmacro-prefix-map=${PROJECT_SOURCE_DIR}/=>")
+endif()
+
 configure_file(${PROJECT_SOURCE_DIR}/bin/mame_roms.json mame_roms.json COPYONLY)
 target_compile_definitions(vgmtranscore PUBLIC "DEV_ENV_BUILD_TREE=\"${CMAKE_CURRENT_BINARY_DIR}\"")
 
