@@ -27,7 +27,6 @@ void VGMSeqNoTrks::resetVars() {
 
 // LoadMain() - loads all sequence data into the class
 bool VGMSeqNoTrks::load() {
-  setConversionContext(ConversionContext::fromOptions(ConversionOptions::the(), SynthTarget::SoundFont));
   this->SeqTrack::readMode = READMODE_ADD_TO_UI;
   this->VGMSeq::readMode = READMODE_ADD_TO_UI;
   if (!parseHeader())

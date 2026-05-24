@@ -49,6 +49,8 @@ VGMSeq::~VGMSeq() {
 }
 
 bool VGMSeq::loadVGMFile(bool useMatcher) {
+  setConversionContext(ConversionContext::fromOptions(ConversionOptions::the(), SynthTarget::SoundFont));
+
   if (!load()) {
     return false;
   }
@@ -103,7 +105,6 @@ MidiTrack *VGMSeq::firstMidiTrack() {
 }
 
 bool VGMSeq::load() {
-  setConversionContext(ConversionContext::fromOptions(ConversionOptions::the(), SynthTarget::SoundFont));
   readMode = READMODE_ADD_TO_UI;
 
   if (!parseHeader())
