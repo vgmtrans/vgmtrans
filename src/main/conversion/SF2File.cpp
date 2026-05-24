@@ -18,6 +18,10 @@
 
 namespace {
 
+constexpr double kEmu8000InitialAttenuationScale = 2.5;
+constexpr double kSoundFontCentibelsPerDecibel = 10.0;
+constexpr double kSoundFontMaxInitialAttenuationCentibels = 1440.0;
+
 std::optional<SFModulator> sf2SourceForModSource(ModSource source) {
   constexpr uint16_t midiContinuousController = 1u << 7;
   constexpr uint16_t bipolar = 1u << 9;
@@ -423,9 +427,14 @@ SF2File::SF2File(SynthFile* synthfile, const ConversionContext& context)
 
       // initialAttenuation
       instGenList.sfGenOper = initialAttenuation;
+      // INFO.isng declares EMU8000. EMU-compatible SF2 synths apply a 0.4
+      // factor to generator 48, so store the reciprocal to preserve SynthFile's
+      // dB attenuation.
       u16 atten = static_cast<u16>(std::clamp(
-        std::round((rgn->attenDb + rgn->sampinfo->attenuation) * 10.0),
-        0.0, 1440.0));
+        std::round((rgn->attenDb + rgn->sampinfo->attenuation) *
+                   kSoundFontCentibelsPerDecibel *
+                   kEmu8000InitialAttenuationScale),
+        0.0, kSoundFontMaxInitialAttenuationCentibels));
       instGenList.genAmount.wAmount = atten;
       memcpy(igenCk->data + dataPtr, &instGenList, sizeof(sfInstGenList));
       dataPtr += sizeof(sfInstGenList);
