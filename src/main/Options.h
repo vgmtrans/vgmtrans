@@ -8,7 +8,7 @@
 #include <memory>
 #include <string_view>
 
-#include "ConversionTypes.h"
+#include "BankSelectStyle.h"
 #include "ModSourceMap.h"
 
 struct OptionStore {

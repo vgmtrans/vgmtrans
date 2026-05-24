@@ -6,7 +6,7 @@
 
 #pragma once
 
-#include "ConversionTypes.h"
+#include "BankSelectStyle.h"
 #include "ModSourceMap.h"
 
 class ConversionOptions;
