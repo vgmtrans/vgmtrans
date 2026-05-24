@@ -589,10 +589,12 @@ void AkaoSnesTrack::resetVars() {
 
   ignoreMasterVolumeProgNum = 0xff;
   vibrato.reset();
+  tremolo.reset();
 }
 
 void AkaoSnesTrack::onTickBegin() {
   updateVibratoFade();
+  updateTremoloFade();
 }
 
 bool AkaoSnesTrack::readEvent(void) {
@@ -675,6 +677,7 @@ bool AkaoSnesTrack::readEvent(void) {
 
         if (!slur && !legato) {
           beginVibratoForNote();
+          beginTremoloForNote();
         }
 
         if (percussion) {
@@ -825,33 +828,23 @@ bool AkaoSnesTrack::readEvent(void) {
 
     case EVENT_VIBRATO_ON: {
       const auto lfoParams = readLfoParams();
-      applyVibrato(beginOffset, curOffset - beginOffset, lfoParams);
+      applyLfo(LfoTarget::Vibrato, beginOffset, curOffset - beginOffset, lfoParams);
       break;
     }
 
     case EVENT_VIBRATO_OFF: {
-      clearVibrato(beginOffset, curOffset - beginOffset);
+      clearLfo(LfoTarget::Vibrato, beginOffset, curOffset - beginOffset);
       break;
     }
 
     case EVENT_TREMOLO_ON: {
-      uint8_t lfoDelay = readByte(curOffset++);
-      uint8_t lfoRate = readByte(curOffset++);
-      uint8_t lfoDepth = readByte(curOffset++);
-      addGenericEvent(beginOffset,
-                      curOffset - beginOffset,
-                      "Tremolo",
-                      fmt::format("Delay {}  Rate: {}  Depth {}", lfoDelay, lfoRate, lfoDepth),
-                      Type::Tremelo);
+      const auto lfoParams = readLfoParams();
+      applyLfo(LfoTarget::Tremolo, beginOffset, curOffset - beginOffset, lfoParams);
       break;
     }
 
     case EVENT_TREMOLO_OFF: {
-      addGenericEvent(beginOffset,
-                      curOffset - beginOffset,
-                      "Tremolo Off",
-                      desc,
-                      Type::Tremelo);
+      clearLfo(LfoTarget::Tremolo, beginOffset, curOffset - beginOffset);
       break;
     }
 
