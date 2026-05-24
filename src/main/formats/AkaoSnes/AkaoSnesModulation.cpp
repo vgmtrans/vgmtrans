@@ -29,6 +29,9 @@ namespace {
 // These are timer0 latch bytes, not Hertz values: driver frames run at 8000 / latch.
 constexpr uint8_t kMinTimer0Frequency = 0x24;
 constexpr uint8_t kMaxTimer0Frequency = 0x2a;
+// V3 holds each tremolo value for a full rate interval, but SF2/DLS exports it
+// through a smooth synth LFO. This compensates for that weaker approximation.
+constexpr double kV3SteppedTremoloSmoothLfoCompensation = 2.0;
 
 constexpr uint8_t v1RateCounter(uint8_t rate) {
   return static_cast<uint8_t>(rate >> 1);
@@ -310,6 +313,27 @@ double v2TremoloDepthDb(uint8_t rate, uint8_t depth) {
   return -20.0 * std::log10(troughScale);
 }
 
+uint8_t midiValueForDepthRange(double value, double maxValue) {
+  if (maxValue <= 0.0) {
+    return 0;
+  }
+
+  const int midiValue = static_cast<int>(std::lround(128.0 * value / maxValue));
+  return static_cast<uint8_t>(std::clamp(midiValue, 0, 127));
+}
+
+double v3TremoloPeakToTroughDb(uint8_t depth) {
+  if (depth == 0) {
+    return 0.0;
+  }
+
+  const double magnitude = modulationMagnitude(AKAOSNES_V3, depth);
+  // SF2/DLS cannot reproduce V3's signed stepped tremolo shapes. Preserve the
+  // control byte's magnitude as attenuation-equivalent depth for every shape.
+  const double troughScale = (128.0 - std::min(127.0, magnitude)) / 128.0;
+  return -20.0 * std::log10(troughScale);
+}
+
 double tremoloDepthDb(AkaoSnesVersion version, uint8_t rate, uint8_t depth) {
   if (version == AKAOSNES_V1) {
     return v1TremoloDepthDb(rate, depth);
@@ -460,10 +484,12 @@ uint8_t tremoloDepthMidiValue(AkaoSnesVersion version, uint8_t rate, uint8_t dep
     return 0;
   }
 
-  const int midiValue =
-      static_cast<int>(std::lround(128.0 * tremoloDepthDb(version, rate, depth) /
-                                   maxTremoloDepthDb(version)));
-  return static_cast<uint8_t>(std::clamp(midiValue, 0, 127));
+  if (version == AKAOSNES_V3) {
+    return midiValueForDepthRange(kV3SteppedTremoloSmoothLfoCompensation * v3TremoloPeakToTroughDb(depth),
+                                  maxTremoloDepthDb(version));
+  }
+
+  return midiValueForDepthRange(tremoloDepthDb(version, rate, depth), maxTremoloDepthDb(version));
 }
 
 uint8_t rateMidiValue(AkaoSnesVersion version, uint8_t rate, uint8_t depth, uint8_t timer0Frequency) {
@@ -491,9 +517,9 @@ uint32_t v1VibratoRampTicks(uint8_t rate, uint8_t tempo) {
   return driverFramesToTicks(rampFrames, tempo);
 }
 
-uint32_t v3VibratoRampTicks(uint8_t rate, uint8_t tempo) {
-  // V3's delayed note-start ramp reaches the first full-depth sample after six
-  // LFO update intervals; export that as one smooth SF2 depth fade.
+uint32_t v3LfoRampTicks(uint8_t rate, uint8_t tempo) {
+  // V3's delayed note-start ramp reaches full depth after six LFO update
+  // intervals; export that as one smooth SF2/DLS depth fade.
   const double rampFrames = 6.0 * effectiveRateFrames(AKAOSNES_V3, rate, 0);
   return driverFramesToTicks(rampFrames, tempo);
 }

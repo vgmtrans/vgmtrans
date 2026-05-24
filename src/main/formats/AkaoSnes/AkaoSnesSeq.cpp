@@ -594,6 +594,7 @@ void AkaoSnesTrack::resetVars() {
 
 void AkaoSnesTrack::onTickBegin() {
   updateVibratoFade();
+  updateTremoloFade();
 }
 
 bool AkaoSnesTrack::readEvent(void) {
@@ -676,6 +677,7 @@ bool AkaoSnesTrack::readEvent(void) {
 
         if (!slur && !legato) {
           beginVibratoForNote();
+          beginTremoloForNote();
         }
 
         if (percussion) {

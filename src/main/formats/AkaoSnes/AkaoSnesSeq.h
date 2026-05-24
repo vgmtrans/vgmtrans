@@ -162,9 +162,13 @@ public:
   void clearLfoRateAndDelay(LfoTarget target);
   void syncLfoRateAndDelay(LfoTarget target);
   void configureVibratoFade();
+  void configureTremoloFade();
   void beginVibratoForNote();
+  void beginTremoloForNote();
   uint8_t vibratoFadeDepthMidiValue(int32_t depth) const;
+  uint8_t tremoloFadeDepthMidiValue(int32_t depth) const;
   void updateVibratoFade();
+  void updateTremoloFade();
 
   uint8_t onetimeDuration;
   bool slur;
