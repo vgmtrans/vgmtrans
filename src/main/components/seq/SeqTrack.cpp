@@ -321,7 +321,9 @@ void SeqTrack::addForModSourceNoItem(ModSource source, uint8_t value) const {
       break;
     }
     case ModSource::None:
+      [[fallthrough]];
     case ModSource::PolyPressure:
+      [[fallthrough]];
     default:
       break;
   }
