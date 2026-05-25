@@ -11,9 +11,9 @@
 
 namespace {
 
-static constexpr uint16_t AKAOSNES_DEFAULT_PITCH_BEND_RANGE_CENTS = 200;
-static constexpr int32_t AKAOSNES_NOMINAL_DSP_PITCH = 0x1000;
-static constexpr int32_t AKAOSNES_PITCH_FRACTION_SCALE = 0x100;
+static constexpr uint16_t kDefaultPitchBendRangeCents = 200;
+static constexpr int32_t kNominalDspPitch = 0x1000;
+static constexpr int32_t kPitchFractionScale = 0x100;
 
 /*
  * AkaoSnes has two different families of pitch automation:
@@ -32,18 +32,14 @@ static constexpr int32_t AKAOSNES_PITCH_FRACTION_SCALE = 0x100;
  * that source-space pitch, with an 8-bit fractional scale where needed.
  */
 
-int32_t akaoSnesBasePitch() {
-  return AKAOSNES_NOMINAL_DSP_PITCH * AKAOSNES_PITCH_FRACTION_SCALE;
-}
-
 int16_t akaoSnesCorrectedNote(uint8_t note, int8_t transpose) {
   return static_cast<int16_t>(note) + static_cast<int16_t>(transpose) - 10;
 }
 
 int32_t akaoSnesPitchForSemitoneOffset(int semitones) {
   const double pitch =
-      static_cast<double>(AKAOSNES_NOMINAL_DSP_PITCH) * std::pow(2.0, static_cast<double>(semitones) / 12.0);
-  return static_cast<int32_t>(std::lround(pitch)) * AKAOSNES_PITCH_FRACTION_SCALE;
+      static_cast<double>(kNominalDspPitch) * std::pow(2.0, static_cast<double>(semitones) / 12.0);
+  return static_cast<int32_t>(std::lround(pitch)) * kPitchFractionScale;
 }
 
 int32_t akaoSnesPitchSlideStep(AkaoSnesVersion version,
@@ -55,12 +51,12 @@ int32_t akaoSnesPitchSlideStep(AkaoSnesVersion version,
   // V3 steps a signed 16-bit DSP pitch word directly and forces a nonzero
   // step when the target differs. This can overshoot for tiny long slides.
   if (version == AKAOSNES_V3) {
-    const int32_t rawDiff = diff / AKAOSNES_PITCH_FRACTION_SCALE;
+    const int32_t rawDiff = diff / kPitchFractionScale;
     int32_t rawStep = rawDiff / static_cast<int32_t>(steps);
     if (rawStep == 0 && rawDiff != 0) {
       rawStep = (rawDiff > 0) ? 1 : -1;
     }
-    return rawStep * AKAOSNES_PITCH_FRACTION_SCALE;
+    return rawStep * kPitchFractionScale;
   }
 
   // V4 keeps an 8-bit fractional accumulator, so the truncated step is in
@@ -85,8 +81,8 @@ uint16_t akaoSnesPitchEnvelopeProgressStep(AkaoSnesVersion version, uint8_t leng
 
 int32_t akaoSnesPitchEnvelopeOffset(int32_t targetOffset, uint8_t progressHigh) {
   const int32_t targetMagnitude = targetOffset < 0 ? -targetOffset : targetOffset;
-  int32_t currentMagnitude = (targetMagnitude / AKAOSNES_PITCH_FRACTION_SCALE) * progressHigh / 256;
-  currentMagnitude *= AKAOSNES_PITCH_FRACTION_SCALE;
+  int32_t currentMagnitude = (targetMagnitude / kPitchFractionScale) * progressHigh / 256;
+  currentMagnitude *= kPitchFractionScale;
   return targetOffset < 0 ? -currentMagnitude : currentMagnitude;
 }
 
@@ -108,7 +104,7 @@ void AkaoSnesTrack::resetPitchState() {
   pitchSlideBaseNote = 0;
   pitchSlideCurrentNote = 0;
   pitchSlide.setPitchToCents(akaoSnesPitchCents);
-  pitchSlide.reset(AKAOSNES_DEFAULT_PITCH_BEND_RANGE_CENTS);
+  pitchSlide.reset(kDefaultPitchBendRangeCents);
 }
 
 void AkaoSnesTrack::updatePitchSlide() {
@@ -186,12 +182,12 @@ void AkaoSnesTrack::resetPitchBendForNewNote() {
   pitchSlide.invalidateBase();
   pitchSlideNoteValid = false;
 
-  if (!pitchSlide.atRest(AKAOSNES_DEFAULT_PITCH_BEND_RANGE_CENTS)) {
+  if (!pitchSlide.atRest(kDefaultPitchBendRangeCents)) {
     if (akaoSnesSupportsPitchEnvelope(parentSeq->version) && pitchEnvelope.enabled) {
       setPitchBendAutomationBend(pitchSlide, 0);
       return;
     }
-    resetPitchBendAutomation(pitchSlide, AKAOSNES_DEFAULT_PITCH_BEND_RANGE_CENTS);
+    resetPitchBendAutomation(pitchSlide, kDefaultPitchBendRangeCents);
   }
 }
 
@@ -201,7 +197,7 @@ void AkaoSnesTrack::beginNotePitch(uint8_t note, bool validForPitchBend) {
     pitchSlideBaseNote = akaoSnesCorrectedNote(note, transpose);
     pitchSlideCurrentNote = pitchSlideBaseNote;
     pitchSlideNoteValid = true;
-    pitchSlide.beginNote(akaoSnesBasePitch());
+    pitchSlide.beginNote(kNominalDspPitch * kPitchFractionScale);
     beginPitchEnvelopeForNote();
   }
 }
@@ -241,10 +237,10 @@ void AkaoSnesTrack::beginPitchEnvelopeForNote() {
   // transpose have produced the current MIDI note. It is not a previous-note
   // glide. Ties intentionally do not call this path.
   const int32_t targetPitch = akaoSnesPitchForSemitoneOffset(pitchEnvelope.semitones);
-  const int32_t rawDiff = (targetPitch - pitchSlide.basePitch()) / AKAOSNES_PITCH_FRACTION_SCALE;
+  const int32_t rawDiff = (targetPitch - pitchSlide.basePitch()) / kPitchFractionScale;
   const int32_t rawMagnitude = rawDiff < 0 ? -rawDiff : rawDiff;
   const int32_t signedMagnitude = pitchEnvelope.semitones < 0 ? -rawMagnitude : rawMagnitude;
-  pitchEnvelope.targetOffset = signedMagnitude * AKAOSNES_PITCH_FRACTION_SCALE;
+  pitchEnvelope.targetOffset = signedMagnitude * kPitchFractionScale;
   pitchEnvelope.activeDelay = pitchEnvelope.delay;
   pitchEnvelope.activeCount = parentSeq->version == AKAOSNES_V1 ? pitchEnvelope.length : 0;
   pitchEnvelope.progress = 0;
@@ -256,7 +252,7 @@ void AkaoSnesTrack::beginPitchEnvelopeForNote() {
         pitchSlide,
         pitchSlide.rangeCentsForSlide(pitchSlide.basePitch(),
                                       pitchSlide.basePitch() + pitchEnvelope.targetOffset,
-                                      AKAOSNES_DEFAULT_PITCH_BEND_RANGE_CENTS));
+                                      kDefaultPitchBendRangeCents));
   }
 }
 
@@ -297,14 +293,14 @@ void AkaoSnesTrack::beginPendingPitchSlide() {
   const int32_t step = akaoSnesPitchSlideStep(parentSeq->version, currentPitch, targetPitch, steps);
   const int32_t finalPitch = currentPitch + (step * static_cast<int32_t>(steps));
   const uint16_t rangeCents = std::max(
-      pitchSlide.rangeCentsForSlide(currentPitch, targetPitch, AKAOSNES_DEFAULT_PITCH_BEND_RANGE_CENTS),
-      pitchSlide.rangeCentsForSlide(currentPitch, finalPitch, AKAOSNES_DEFAULT_PITCH_BEND_RANGE_CENTS));
+      pitchSlide.rangeCentsForSlide(currentPitch, targetPitch, kDefaultPitchBendRangeCents),
+      pitchSlide.rangeCentsForSlide(currentPitch, finalPitch, kDefaultPitchBendRangeCents));
 
   beginPitchBendAutomation(
       pitchSlide,
       SeqMotionPlan<int32_t>::targetOverTicksWithStep(finalPitch, step, steps),
       rangeCents,
-      AKAOSNES_DEFAULT_PITCH_BEND_RANGE_CENTS,
+      kDefaultPitchBendRangeCents,
       true);
 
   // Apply the first update on the same sequencer tick that consumes the setup command.
