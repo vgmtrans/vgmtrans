@@ -795,6 +795,7 @@ bool AkaoSnesTrack::readEvent(void) {
         pitchEnvelopeDelay = readByte(curOffset++);
         pitchEnvelopeLength = readByte(curOffset++);
         pitchEnvelopeSemitones = static_cast<int8_t>(readByte(curOffset++));
+        // FF4 stores dd + 1 in an 8-bit counter; dd=$ff intentionally wraps to zero.
         setPitchEnvelope(pitchEnvelopeSemitones,
                          static_cast<uint8_t>(pitchEnvelopeDelay + 1),
                          pitchEnvelopeLength);
