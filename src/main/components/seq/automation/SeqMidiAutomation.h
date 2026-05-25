@@ -15,7 +15,7 @@
 template <typename PitchType>
 class SeqPitchBendAutomation {
  public:
-  using PitchToCents = double (*)(PitchType pitch, PitchType basePitch);
+  using PitchToCents = std::function<double(PitchType, PitchType)>;
 
   explicit SeqPitchBendAutomation(double centsPerPitchUnit = 100.0)
       : m_centsPerPitchUnit(centsPerPitchUnit) {}
