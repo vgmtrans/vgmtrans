@@ -9,6 +9,7 @@
 #include <algorithm>
 #include <cmath>
 #include <cstdint>
+#include <functional>
 #include <utility>
 
 // Stores source-space pitch and converts it to MIDI pitch bend when emitting.
@@ -85,7 +86,7 @@ class SeqPitchBendAutomation {
   [[nodiscard]] uint16_t rangeCentsForSlide(PitchType startPitch,
                                             PitchType targetPitch,
                                             uint16_t minimumRangeCents) const {
-    if (m_pitchToCents != nullptr) {
+    if (m_pitchToCents) {
       const double startDeviation = std::abs(centsForPitch(startPitch));
       const double targetDeviation = std::abs(centsForPitch(targetPitch));
       return std::max<uint16_t>(
@@ -208,7 +209,7 @@ class SeqPitchBendAutomation {
   static constexpr int32_t kMaxMidiPitchBend = 8191;
 
   [[nodiscard]] double centsForPitch(PitchType pitch) const {
-    if (m_pitchToCents != nullptr) {
+    if (m_pitchToCents) {
       return m_pitchToCents(pitch, m_basePitch);
     }
 
@@ -221,7 +222,7 @@ class SeqPitchBendAutomation {
   uint16_t m_pitchBendRangeCents = 200;
   int16_t m_currentPitchBend = 0;
   double m_centsPerPitchUnit = 100.0;
-  PitchToCents m_pitchToCents = nullptr;
+  PitchToCents m_pitchToCents {};
 };
 
 // Manages synth LFO state: stored delay/rate/depth and optional per-note fade-ins.
