@@ -38,8 +38,7 @@ int32_t akaoSnesBasePitch() {
 
 int32_t akaoSnesPitchForSemitoneOffset(int8_t semitones) {
   const double pitch =
-      static_cast<double>(AKAOSNES_NOMINAL_DSP_PITCH) *
-      std::pow(2.0, static_cast<double>(semitones) / 12.0);
+      static_cast<double>(AKAOSNES_NOMINAL_DSP_PITCH) * std::pow(2.0, static_cast<double>(semitones) / 12.0);
   return static_cast<int32_t>(std::lround(pitch)) * AKAOSNES_PITCH_FRACTION_SCALE;
 }
 
@@ -82,8 +81,7 @@ uint16_t akaoSnesPitchEnvelopeProgressStep(AkaoSnesVersion version, uint8_t leng
 
 int32_t akaoSnesPitchEnvelopeOffset(int32_t targetOffset, uint8_t progressHigh) {
   const int32_t targetMagnitude = targetOffset < 0 ? -targetOffset : targetOffset;
-  int32_t currentMagnitude =
-      (targetMagnitude / AKAOSNES_PITCH_FRACTION_SCALE) * progressHigh / 256;
+  int32_t currentMagnitude = (targetMagnitude / AKAOSNES_PITCH_FRACTION_SCALE) * progressHigh / 256;
   currentMagnitude *= AKAOSNES_PITCH_FRACTION_SCALE;
   return targetOffset < 0 ? -currentMagnitude : currentMagnitude;
 }
@@ -232,11 +230,9 @@ void AkaoSnesTrack::beginPitchEnvelopeForNote() {
   // transpose have produced the current MIDI note. It is not a previous-note
   // glide. Ties intentionally do not call this path.
   const int32_t targetPitch = akaoSnesPitchForSemitoneOffset(pitchEnvelope.semitones);
-  const int32_t rawDiff =
-      (targetPitch - pitchSlide.basePitch()) / AKAOSNES_PITCH_FRACTION_SCALE;
+  const int32_t rawDiff = (targetPitch - pitchSlide.basePitch()) / AKAOSNES_PITCH_FRACTION_SCALE;
   const int32_t rawMagnitude = rawDiff < 0 ? -rawDiff : rawDiff;
-  const int32_t signedMagnitude =
-      pitchEnvelope.semitones < 0 ? -rawMagnitude : rawMagnitude;
+  const int32_t signedMagnitude = pitchEnvelope.semitones < 0 ? -rawMagnitude : rawMagnitude;
   pitchEnvelope.targetOffset = signedMagnitude * AKAOSNES_PITCH_FRACTION_SCALE;
   pitchEnvelope.activeDelay = pitchEnvelope.delay;
   pitchEnvelope.activeCount = parentSeq->version == AKAOSNES_V1 ? pitchEnvelope.length : 0;
