@@ -204,12 +204,20 @@ VabRgn::VabRgn(VabInstr *instr, uint32_t offset)
 
 bool VabRgn::loadRgn() {
   VabInstr *instr = (VabInstr *) parInstr;
+  Vab *vab = static_cast<Vab *>(instr->parInstrSet);
   setLength(0x20);
   readBytes(offset(), 0x20, &attr);
 
   addGeneralItem(offset(), 1, "Priority");
   addGeneralItem(offset() + 1, 1, "Mode (use reverb?)");
-  addVolume((readByte(offset() + 2) * instr->masterVol) / (127.0 * 127.0), offset() + 2, 1);
+  const uint8_t toneVol = readByte(offset() + 2);
+  const double combinedVolume =
+    (static_cast<double>(vab->hdr.mvol) / 127.0) *
+    (static_cast<double>(instr->masterVol) / 127.0) *
+    (static_cast<double>(toneVol) / 127.0);
+  // libsnd squares the final left/right voice volume after applying VAB master,
+  // program, tone, and pan factors.
+  addVolume(combinedVolume * combinedVolume, offset() + 2, 1);
   addPan(readByte(offset() + 3), offset() + 3);
   addUnityKey(readByte(offset() + 4), offset() + 4);
   addGeneralItem(offset() + 5, 1, "Pitch Tune");
@@ -247,9 +255,9 @@ bool VabRgn::loadRgn() {
   // If it exceeds 127, driver clips the value and it will become 127. (In Hokuto no Ken, at least)
   // I am not sure if the interpretation of this value depends on a driver or VAB version.
   uint8_t ft = readByte(offset() + 5);
-  ft = std::min(ft, static_cast<u8>(127));
+  ft = std::min(ft, static_cast<uint8_t>(127));
   double cents = ft * 100.0 / 128.0;
-  setFineTune((int16_t) cents);
+  setFineTune(static_cast<int16_t>(cents));
 
   psxConvADSR<VabRgn>(this, ADSR1, ADSR2, false);
   return true;
