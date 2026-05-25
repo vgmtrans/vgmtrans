@@ -677,7 +677,7 @@ bool AkaoSnesTrack::readEvent(void) {
 
       if (noteIndex < 12) {
         uint8_t note = octave * 12 + noteIndex;
-        beginNotePitch(note, !percussion);
+        beginNotePitch(!percussion);
         beginPendingPitchSlide();
 
         if (!slur && !legato) {
@@ -837,21 +837,14 @@ bool AkaoSnesTrack::readEvent(void) {
     case EVENT_PITCH_SLIDE: {
       uint8_t pitchSlideTime = readByte(curOffset++);
       int8_t pitchSlideSemitones = static_cast<int8_t>(readByte(curOffset++));
-      if (parentSeq->version == AKAOSNES_V3 || parentSeq->version == AKAOSNES_V4) {
-        // V3 D6 and V4 C8 are one-shot pitch-slide setup commands:
-        // tt stores as tt + 1, wrapping $ff to the 256-step case.
-        const uint16_t pitchSlideSteps = static_cast<uint16_t>(pitchSlideTime) + 1;
-        setPendingPitchSlide(pitchSlideSteps, pitchSlideSemitones);
-        desc = fmt::format("Time: {}  Steps: {}  Key: {} semitones",
-                           pitchSlideTime,
-                           pitchSlideSteps,
-                           static_cast<int>(pitchSlideSemitones));
-      }
-      else {
-        desc = fmt::format("Length: {}  Key: {} semitones",
-                           pitchSlideTime,
-                           static_cast<int>(pitchSlideSemitones));
-      }
+      // V3 D6 and V4 C8 are one-shot pitch-slide setup commands:
+      // tt stores as tt + 1, wrapping $ff to the 256-step case.
+      const uint16_t pitchSlideSteps = static_cast<uint16_t>(pitchSlideTime) + 1;
+      setPendingPitchSlide(pitchSlideSteps, pitchSlideSemitones);
+      desc = fmt::format("Time: {}  Steps: {}  Key: {} semitones",
+                         pitchSlideTime,
+                         pitchSlideSteps,
+                         static_cast<int>(pitchSlideSemitones));
       addGenericEvent(beginOffset,
                       curOffset - beginOffset,
                       "Pitch Slide",

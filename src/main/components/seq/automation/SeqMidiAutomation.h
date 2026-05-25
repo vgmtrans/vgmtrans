@@ -73,14 +73,6 @@ class SeqPitchBendAutomation {
     return SeqMotionPlan<PitchType>::targetOverTicks(targetPitch, ticks, delay);
   }
 
-  // Build a target-over-ticks motion that applies the supplied step on the final tick instead of snapping.
-  [[nodiscard]] SeqMotionPlan<PitchType> motionToTargetWithStepNoSnap(PitchType targetPitch,
-                                                                      PitchType step,
-                                                                      uint32_t ticks,
-                                                                      uint32_t delay = 0) const {
-    return SeqMotionPlan<PitchType>::targetOverTicksWithStepNoSnap(targetPitch, step, ticks, delay);
-  }
-
   // Return a MIDI bend range large enough for pitchUnits, but not below minimumRangeCents.
   [[nodiscard]] uint16_t rangeCentsForPitchSpan(double pitchUnits,
                                                 uint16_t minimumRangeCents) const {

@@ -6,6 +6,7 @@
 
 #include "AkaoSnesSeq.h"
 #include "automation/SeqTrackAutomation.h"
+#include <algorithm>
 #include <cmath>
 
 namespace {
@@ -188,7 +189,7 @@ void AkaoSnesTrack::resetPitchBendForNewNote() {
   }
 }
 
-void AkaoSnesTrack::beginNotePitch(uint8_t, bool validForPitchBend) {
+void AkaoSnesTrack::beginNotePitch(bool validForPitchBend) {
   resetPitchBendForNewNote();
   if (validForPitchBend) {
     pitchSlide.beginNote(akaoSnesBasePitch());
@@ -216,16 +217,7 @@ void AkaoSnesTrack::clearPitchEnvelope() {
   // The driver off commands stop future envelope updates; they do not generate
   // a return-to-base bend. The current output naturally gets reset by the next
   // normal note setup.
-  pitchEnvelope.enabled = false;
-  pitchEnvelope.active = false;
-  pitchEnvelope.semitones = 0;
-  pitchEnvelope.delay = 0;
-  pitchEnvelope.length = 0;
-  pitchEnvelope.progressStep = 0;
-  pitchEnvelope.activeDelay = 0;
-  pitchEnvelope.activeCount = 0;
-  pitchEnvelope.progress = 0;
-  pitchEnvelope.targetOffset = 0;
+  pitchEnvelope = {};
 }
 
 void AkaoSnesTrack::beginPitchEnvelopeForNote() {
@@ -294,13 +286,16 @@ void AkaoSnesTrack::beginPendingPitchSlide() {
 
   const int32_t currentPitch = pitchSlide.currentPitch();
   const int32_t targetPitch = akaoSnesPitchForSemitoneOffset(semitones);
-  const int32_t step =
-      akaoSnesPitchSlideStep(parentSeq->version, currentPitch, targetPitch, steps);
+  const int32_t step = akaoSnesPitchSlideStep(parentSeq->version, currentPitch, targetPitch, steps);
+  const int32_t finalPitch = currentPitch + (step * static_cast<int32_t>(steps));
+  const uint16_t rangeCents = std::max(
+      pitchSlide.rangeCentsForSlide(currentPitch, targetPitch, AKAOSNES_DEFAULT_PITCH_BEND_RANGE_CENTS),
+      pitchSlide.rangeCentsForSlide(currentPitch, finalPitch, AKAOSNES_DEFAULT_PITCH_BEND_RANGE_CENTS));
 
   beginPitchBendAutomation(
       pitchSlide,
-      pitchSlide.motionToTargetWithStepNoSnap(targetPitch, step, steps),
-      pitchSlide.rangeCentsForSlide(currentPitch, targetPitch, AKAOSNES_DEFAULT_PITCH_BEND_RANGE_CENTS),
+      SeqMotionPlan<int32_t>::targetOverTicksWithStep(finalPitch, step, steps),
+      rangeCents,
       AKAOSNES_DEFAULT_PITCH_BEND_RANGE_CENTS,
       true);
 

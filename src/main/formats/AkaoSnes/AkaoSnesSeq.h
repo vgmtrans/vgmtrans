@@ -170,7 +170,7 @@ public:
   void updateVibratoFade();
   void updateTremoloFade();
   void resetPitchState();
-  void beginNotePitch(uint8_t note, bool validForPitchBend);
+  void beginNotePitch(bool validForPitchBend);
   void resetPitchBendForNewNote();
   void setPitchEnvelope(int8_t semitones, uint8_t delay, uint8_t length);
   void clearPitchEnvelope();
