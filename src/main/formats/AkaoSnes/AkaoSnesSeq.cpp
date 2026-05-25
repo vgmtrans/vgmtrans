@@ -677,7 +677,7 @@ bool AkaoSnesTrack::readEvent(void) {
 
       if (noteIndex < 12) {
         uint8_t note = octave * 12 + noteIndex;
-        beginNotePitch(!percussion);
+        beginNotePitch(note, !percussion);
         beginPendingPitchSlide();
 
         if (!slur && !legato) {

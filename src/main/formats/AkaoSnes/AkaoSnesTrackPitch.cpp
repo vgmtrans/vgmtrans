@@ -36,7 +36,11 @@ int32_t akaoSnesBasePitch() {
   return AKAOSNES_NOMINAL_DSP_PITCH * AKAOSNES_PITCH_FRACTION_SCALE;
 }
 
-int32_t akaoSnesPitchForSemitoneOffset(int8_t semitones) {
+int16_t akaoSnesCorrectedNote(uint8_t note, int8_t transpose) {
+  return static_cast<int16_t>(note) + static_cast<int16_t>(transpose) - 10;
+}
+
+int32_t akaoSnesPitchForSemitoneOffset(int semitones) {
   const double pitch =
       static_cast<double>(AKAOSNES_NOMINAL_DSP_PITCH) * std::pow(2.0, static_cast<double>(semitones) / 12.0);
   return static_cast<int32_t>(std::lround(pitch)) * AKAOSNES_PITCH_FRACTION_SCALE;
@@ -100,6 +104,9 @@ void AkaoSnesTrack::resetPitchState() {
   pitchEnvelope = {};
   pendingPitchSlideSteps = 0;
   pendingPitchSlideSemitones = 0;
+  pitchSlideNoteValid = false;
+  pitchSlideBaseNote = 0;
+  pitchSlideCurrentNote = 0;
   pitchSlide.setPitchToCents(akaoSnesPitchCents);
   pitchSlide.reset(AKAOSNES_DEFAULT_PITCH_BEND_RANGE_CENTS);
 }
@@ -177,6 +184,7 @@ void AkaoSnesTrack::resetPitchBendForNewNote() {
   const auto *parentSeq = static_cast<AkaoSnesSeq*>(this->parentSeq);
   pitchSlide.clearMotion();
   pitchSlide.invalidateBase();
+  pitchSlideNoteValid = false;
 
   if (!pitchSlide.atRest(AKAOSNES_DEFAULT_PITCH_BEND_RANGE_CENTS)) {
     if (akaoSnesSupportsPitchEnvelope(parentSeq->version) && pitchEnvelope.enabled) {
@@ -187,9 +195,12 @@ void AkaoSnesTrack::resetPitchBendForNewNote() {
   }
 }
 
-void AkaoSnesTrack::beginNotePitch(bool validForPitchBend) {
+void AkaoSnesTrack::beginNotePitch(uint8_t note, bool validForPitchBend) {
   resetPitchBendForNewNote();
   if (validForPitchBend) {
+    pitchSlideBaseNote = akaoSnesCorrectedNote(note, transpose);
+    pitchSlideCurrentNote = pitchSlideBaseNote;
+    pitchSlideNoteValid = true;
     pitchSlide.beginNote(akaoSnesBasePitch());
     beginPitchEnvelopeForNote();
   }
@@ -276,12 +287,13 @@ void AkaoSnesTrack::beginPendingPitchSlide() {
   const int8_t semitones = pendingPitchSlideSemitones;
   clearPendingPitchSlide();
 
-  if (!pitchSlide.baseValid()) {
+  if (!pitchSlide.baseValid() || !pitchSlideNoteValid) {
     return;
   }
 
+  pitchSlideCurrentNote = static_cast<int16_t>(pitchSlideCurrentNote + semitones);
   const int32_t currentPitch = pitchSlide.currentPitch();
-  const int32_t targetPitch = akaoSnesPitchForSemitoneOffset(semitones);
+  const int32_t targetPitch = akaoSnesPitchForSemitoneOffset(pitchSlideCurrentNote - pitchSlideBaseNote);
   const int32_t step = akaoSnesPitchSlideStep(parentSeq->version, currentPitch, targetPitch, steps);
   const int32_t finalPitch = currentPitch + (step * static_cast<int32_t>(steps));
   const uint16_t rangeCents = std::max(

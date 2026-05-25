@@ -170,7 +170,7 @@ public:
   void updateVibratoFade();
   void updateTremoloFade();
   void resetPitchState();
-  void beginNotePitch(bool validForPitchBend);
+  void beginNotePitch(uint8_t note, bool validForPitchBend);
   void resetPitchBendForNewNote();
   void setPitchEnvelope(int8_t semitones, uint8_t delay, uint8_t length);
   void clearPitchEnvelope();
@@ -217,6 +217,12 @@ public:
   // these fields; rests leave them pending for the next pitch setup path.
   uint16_t pendingPitchSlideSteps;
   int8_t pendingPitchSlideSemitones;
+  // V3/V4 slide targets mutate the driver's stored corrected-note byte. The
+  // base note anchors MIDI pitch bend to the current sounding note; the current
+  // note advances cumulatively through tied slide chains.
+  bool pitchSlideNoteValid;
+  int16_t pitchSlideBaseNote;
+  int16_t pitchSlideCurrentNote;
   SeqPitchBendAutomation<int32_t> pitchSlide;
   SeqSynthLfoAutomation vibrato;
   SeqSynthLfoAutomation tremolo;
