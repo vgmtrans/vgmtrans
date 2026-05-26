@@ -67,27 +67,27 @@ double linearAmpDecayTimeToLinDBDecayTime(double secondsToFullAtten,
   return secondsToFullAtten * (w * k_short + (1.0 - w) * k_long);
 }
 
-uint8_t convert7bitPercentAmpToStdMidiVal(uint8_t percentVal) {
+u8 convert7bitPercentAmpToStdMidiVal(u8 percentVal) {
   return convertPercentAmpToStdMidiVal(percentVal / 127.0);
 }
 
 // Takes a percentage amplitude value - one using a -20*log10(percent) scale for db attenuation
 // and converts it to a standard midi value that uses -40*log10(x/127) for db attenuation
-uint8_t convertPercentAmpToStdMidiVal(double percent) {
+u8 convertPercentAmpToStdMidiVal(double percent) {
   return std::round(127.0 * sqrt(percent));
 }
 
 // Takes a percentage amplitude value - one using a -20*log10(percent) scale for db attenuation
 // and converts it to a standard 14 bit midi value that uses -40*log10(x/16383) for db attenuation
-uint16_t convertPercentAmpToStd14BitMidiVal(double percent) {
+u16 convertPercentAmpToStd14BitMidiVal(double percent) {
   return std::round(16383.0 * sqrt(percent));
 }
 
 // dbAtten is positive for attenuation: 3.2 => -3.2 dB level
-uint8_t convertDBAttenuationToStdMidiVal(double dbAtten) {
+u8 convertDBAttenuationToStdMidiVal(double dbAtten) {
   const double amp = std::pow(10.0, -dbAtten / 40.0);
   int vi = (int)std::lround(amp * 127.0);
-  return (uint8_t)std::clamp(vi, 0, 127);
+  return (u8)std::clamp(vi, 0, 127);
 }
 
 // Convert a linear amplitude multiplier to attenuation in decibels.
@@ -105,64 +105,64 @@ double dbToAmp(double db) {
   return std::pow(10.0, -db / 20.0);
 }
 
-int16_t secondsToSf2Timecents(double seconds) {
+s16 secondsToSf2Timecents(double seconds) {
   // SF2 convention: -32768 indicates instantaneous / no delay (depending on generator)
   if (seconds <= 0.0 || !std::isfinite(seconds))
-    return std::numeric_limits<int16_t>::min(); // -32768
+    return std::numeric_limits<s16>::min(); // -32768
 
   double tc = 1200.0 * std::log2(seconds);
   double rounded = std::round(tc);
-  if (rounded > (double)std::numeric_limits<int16_t>::max())
-    return std::numeric_limits<int16_t>::max();
+  if (rounded > (double)std::numeric_limits<s16>::max())
+    return std::numeric_limits<s16>::max();
 
-  return (int16_t)rounded;
+  return (s16)rounded;
 }
 
-int32_t secondsToDlsTimecents(double seconds) {
+s32 secondsToDlsTimecents(double seconds) {
   // DLS "absolute zero" sentinel for 0 seconds
   if (seconds <= 0.0 || !std::isfinite(seconds))
-    return std::numeric_limits<int32_t>::min();  // 0x80000000
+    return std::numeric_limits<s32>::min();  // 0x80000000
 
   double tc = 1200.0 * std::log2(seconds);
   double rounded = std::round(tc * 65536.0);
-  if (rounded > (double)std::numeric_limits<int32_t>::max())
-    return std::numeric_limits<int32_t>::max();
+  if (rounded > (double)std::numeric_limits<s32>::max())
+    return std::numeric_limits<s32>::max();
 
-  return (int32_t)rounded;
+  return (s32)rounded;
 }
 
-int32_t centsToDlsPitchScale(double cents) {
+s32 centsToDlsPitchScale(double cents) {
   if (!std::isfinite(cents))
     return 0;
 
   double scaled = std::round(cents * 65536.0);
-  if (scaled > (double)std::numeric_limits<int32_t>::max())
-    return std::numeric_limits<int32_t>::max();
-  if (scaled < (double)std::numeric_limits<int32_t>::min())
-    return std::numeric_limits<int32_t>::min();
-  return static_cast<int32_t>(scaled);
+  if (scaled > (double)std::numeric_limits<s32>::max())
+    return std::numeric_limits<s32>::max();
+  if (scaled < (double)std::numeric_limits<s32>::min())
+    return std::numeric_limits<s32>::min();
+  return static_cast<s32>(scaled);
 }
 
-int32_t hertzToDlsPitch(double hz) {
+s32 hertzToDlsPitch(double hz) {
   if (hz <= 0.0 || !std::isfinite(hz))
     return 0;
 
   // Pitch = (1200*log2(hz/440) + 6900) * 65536
   double v = (1200.0 * std::log2(hz / 440.0) + 6900.0) * 65536.0;
 
-  if (v > (double)std::numeric_limits<int32_t>::max())
-    return std::numeric_limits<int32_t>::max();
+  if (v > (double)std::numeric_limits<s32>::max())
+    return std::numeric_limits<s32>::max();
 
   // Avoid accidentally producing the "absolute zero" sentinel by rounding
-  if (v <= (double)std::numeric_limits<int32_t>::min())
-    return std::numeric_limits<int32_t>::min() + 1;
+  if (v <= (double)std::numeric_limits<s32>::min())
+    return std::numeric_limits<s32>::min() + 1;
 
-  return (int32_t)v;
+  return (s32)v;
 }
 
 // Convert percent pan to midi pan (with no scale conversion)
-uint8_t convertPercentPanValToStdMidiVal(double percent) {
-  uint8_t midiPan = std::round(percent * 126.0);
+u8 convertPercentPanValToStdMidiVal(double percent) {
+  u8 midiPan = std::round(percent * 126.0);
   if (midiPan != 0) {
     midiPan++;
   }
@@ -170,8 +170,8 @@ uint8_t convertPercentPanValToStdMidiVal(double percent) {
 }
 
 // Convert linear percent pan to midi pan (with scale conversion)
-uint8_t convertLinearPercentPanValToStdMidiVal(double percent, double *ptrVolumeScale) {
-  uint8_t midiPan;
+u8 convertLinearPercentPanValToStdMidiVal(double percent, double *ptrVolumeScale) {
+  u8 midiPan;
   double volumeScale;
 
   if (percent == 0) {
@@ -202,7 +202,7 @@ uint8_t convertLinearPercentPanValToStdMidiVal(double percent, double *ptrVolume
   return midiPan;
 }
 
-uint8_t convert7bitLinearPercentPanValToStdMidiVal(uint8_t percentVal, double *ptrVolumeScale) {
+u8 convert7bitLinearPercentPanValToStdMidiVal(u8 percentVal, double *ptrVolumeScale) {
   // how to calculate volume balance from 7 bit pan depends on each music engines
   // the method below is one of the common method, but it's not always correct
   if (percentVal == 127) {
@@ -212,7 +212,7 @@ uint8_t convert7bitLinearPercentPanValToStdMidiVal(uint8_t percentVal, double *p
 }
 
 // Convert midi pan to L/R volume balance
-void convertStdMidiPanToVolumeBalance(uint8_t midiPan, double &percentLeft, double &percentRight) {
+void convertStdMidiPanToVolumeBalance(u8 midiPan, double &percentLeft, double &percentRight) {
   if (midiPan == 0 || midiPan == 1) {
     // left
     percentLeft = 1.0;
@@ -238,8 +238,8 @@ void convertStdMidiPanToVolumeBalance(uint8_t midiPan, double &percentLeft, doub
 }
 
 // Convert L/R volume balance (0.0..1.0) to midi pan
-uint8_t convertVolumeBalanceToStdMidiPan(double percentLeft, double percentRight, double *ptrVolumeScale) {
-  uint8_t midiPan;
+u8 convertVolumeBalanceToStdMidiPan(double percentLeft, double percentRight, double *ptrVolumeScale) {
+  u8 midiPan;
   if (percentRight == 0) {
     midiPan = 0;
   }
@@ -270,7 +270,7 @@ uint8_t convertVolumeBalanceToStdMidiPan(double percentLeft, double percentRight
 // 0 is hard left, 0.5 is center, and 1 is hard right. Also writes volume attenuation as a
 // linear amplitude multiplier via the ptrVolumeScale param
 double convertVolumeBalanceToStdMidiPercentPan(double percentLeft, double percentRight, double *ptrVolumeScale) {
-  uint8_t midiPan;
+  u8 midiPan;
   double percentPan;
   if (percentRight == 0) {
     midiPan = 0;

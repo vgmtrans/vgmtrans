@@ -1,4 +1,6 @@
 #pragma once
+
+#include "util/types.h"
 #include "VGMInstrSet.h"
 #include "VGMSampColl.h"
 #include "VGMRgn.h"
@@ -13,11 +15,11 @@ class PandoraBoxSnesInstrSet:
  public:
   PandoraBoxSnesInstrSet(RawFile *file,
                          PandoraBoxSnesVersion ver,
-                         uint32_t spcDirAddr,
-                         uint16_t addrLocalInstrTable,
-                         uint16_t addrGlobalInstrTable,
-                         uint8_t globalInstrumentCount,
-                         const std::map<uint8_t, uint16_t> &instrADSRHints = std::map<uint8_t, uint16_t>(),
+                         u32 spcDirAddr,
+                         u16 addrLocalInstrTable,
+                         u16 addrGlobalInstrTable,
+                         u8 globalInstrumentCount,
+                         const std::map<u8, u16> &instrADSRHints = std::map<u8, u16>(),
                          const std::string &name = "PandoraBoxSnesInstrSet");
   virtual ~PandoraBoxSnesInstrSet();
 
@@ -27,13 +29,13 @@ class PandoraBoxSnesInstrSet:
   PandoraBoxSnesVersion version;
 
  protected:
-  uint32_t spcDirAddr;
-  uint16_t addrLocalInstrTable;
-  uint16_t addrGlobalInstrTable;
-  uint8_t globalInstrumentCount;
-  std::vector<uint8_t> globalInstrTable;
-  std::map<uint8_t, uint16_t> instrADSRHints;
-  std::vector<uint8_t> usedSRCNs;
+  u32 spcDirAddr;
+  u16 addrLocalInstrTable;
+  u16 addrGlobalInstrTable;
+  u8 globalInstrumentCount;
+  std::vector<u8> globalInstrTable;
+  std::map<u8, u16> instrADSRHints;
+  std::vector<u8> usedSRCNs;
 };
 
 // *******************
@@ -45,11 +47,11 @@ class PandoraBoxSnesInstr
  public:
   PandoraBoxSnesInstr(VGMInstrSet *instrSet,
                       PandoraBoxSnesVersion ver,
-                      uint32_t offset,
-                      uint8_t theInstrNum,
-                      uint8_t srcn,
-                      uint32_t spcDirAddr,
-                      uint16_t adsr = 0x8fe0,
+                      u32 offset,
+                      u8 theInstrNum,
+                      u8 srcn,
+                      u32 spcDirAddr,
+                      u16 adsr = 0x8fe0,
                       const std::string &name = "PandoraBoxSnesInstr");
   virtual ~PandoraBoxSnesInstr();
 
@@ -58,9 +60,9 @@ class PandoraBoxSnesInstr
   PandoraBoxSnesVersion version;
 
  protected:
-  uint32_t spcDirAddr;
-  uint8_t srcn;
-  uint16_t adsr;
+  u32 spcDirAddr;
+  u8 srcn;
+  u16 adsr;
 };
 
 // *****************
@@ -72,10 +74,10 @@ class PandoraBoxSnesRgn
  public:
   PandoraBoxSnesRgn(PandoraBoxSnesInstr *instr,
                     PandoraBoxSnesVersion ver,
-                    uint32_t offset,
-                    uint8_t srcn,
-                    uint32_t spcDirAddr,
-                    uint16_t adsr = 0x8fe0);
+                    u32 offset,
+                    u8 srcn,
+                    u32 spcDirAddr,
+                    u16 adsr = 0x8fe0);
   virtual ~PandoraBoxSnesRgn();
 
   virtual bool loadRgn();

@@ -80,8 +80,8 @@ public:
 public:
   VGMItem();
   VGMItem(VGMFile *vgmfile,
-          uint32_t offset,
-          uint32_t length = 0,
+          u32 offset,
+          u32 length = 0,
           std::string name = "",
           Type type = Type::Unknown);
   virtual ~VGMItem();
@@ -97,24 +97,24 @@ public:
   [[nodiscard]] VGMFile* vgmFile() const { return m_vgmfile; }
   [[nodiscard]] RawFile* rawFile() const;
 
-  virtual bool isItemAtOffset(uint32_t offset, bool matchStartOffset = false);
-  VGMItem* getItemAtOffset(uint32_t offset, bool matchStartOffset = false);
+  virtual bool isItemAtOffset(u32 offset, bool matchStartOffset = false);
+  VGMItem* getItemAtOffset(u32 offset, bool matchStartOffset = false);
 
-  virtual uint32_t guessLength() const;
+  virtual u32 guessLength() const;
   virtual void setGuessedLength();
   virtual std::string description() { return ""; }
   virtual void addToUI(VGMItem *parent, void *UI_specific);
 
   const std::vector<VGMItem*>& children() { return m_children; }
-  [[nodiscard]] uint32_t offset() const noexcept { return m_offset; }
-  [[nodiscard]] uint32_t length() const noexcept { return m_length; }
-  void setOffset(uint32_t offset);
-  void setLength(uint32_t length);
-  void setRange(uint32_t offset, uint32_t length);
+  [[nodiscard]] u32 offset() const noexcept { return m_offset; }
+  [[nodiscard]] u32 length() const noexcept { return m_length; }
+  void setOffset(u32 offset);
+  void setLength(u32 length);
+  void setRange(u32 offset, u32 length);
   VGMItem* addChild(VGMItem* child);
-  VGMItem* addChild(uint32_t offset, uint32_t length, const std::string &name);
-  VGMItem* addUnknownChild(uint32_t offset, uint32_t length);
-  VGMHeader* addHeader(uint32_t offset, uint32_t length, const std::string &name = "Header");
+  VGMItem* addChild(u32 offset, u32 length, const std::string &name);
+  VGMItem* addUnknownChild(u32 offset, u32 length);
+  VGMHeader* addHeader(u32 offset, u32 length, const std::string &name = "Header");
   void removeChildren();
   void transferChildren(VGMItem* destination);
 
@@ -132,13 +132,13 @@ public:
   void sortChildrenByOffset();
 
 protected:
-  uint32_t readBytes(uint32_t index, uint32_t count, void *buffer) const;
-  [[nodiscard]] uint8_t readByte(uint32_t offset) const;
-  [[nodiscard]] uint16_t readShort(uint32_t offset) const;
-  [[nodiscard]] uint32_t getWord(uint32_t offset) const;
-  [[nodiscard]] uint16_t getShortBE(uint32_t offset) const;
-  [[nodiscard]] uint32_t getWordBE(uint32_t offset) const;
-  bool isValidOffset(uint32_t offset) const;
+  u32 readBytes(u32 index, u32 count, void *buffer) const;
+  [[nodiscard]] u8 readByte(u32 offset) const;
+  [[nodiscard]] u16 readShort(u32 offset) const;
+  [[nodiscard]] u32 getWord(u32 offset) const;
+  [[nodiscard]] u16 getShortBE(u32 offset) const;
+  [[nodiscard]] u32 getWordBE(u32 offset) const;
+  bool isValidOffset(u32 offset) const;
   // FIXME: clearChildren() is a workaround for VGMSeqNoTrks' multiple inheritance diamond problem
 
 public:
@@ -148,11 +148,11 @@ private:
   std::vector<VGMItem *> m_children;
   // Maintains sort + prefix-max end cache for fast offset lookups.
   bool m_childrenSorted = true;
-  std::vector<uint64_t> m_childrenPrefixMaxEnd;
+  std::vector<u64> m_childrenPrefixMaxEnd;
   VGMFile *m_vgmfile;
   VGMItem *m_parent = nullptr;
-  uint32_t m_offset;  // offset in the pDoc data buffer
-  uint32_t m_length;  // num of bytes the event engulfs
+  u32 m_offset;  // offset in the pDoc data buffer
+  u32 m_length;  // num of bytes the event engulfs
 
   void ensureChildrenSorted();
   void rebuildChildPrefixMaxEnd();

@@ -1,5 +1,7 @@
 #pragma once
 
+#include "util/types.h"
+
 #include "VGMFile.h"
 #include "VGMSamp.h"
 
@@ -12,10 +14,10 @@ class VGMSamp;
 
 class VGMSampColl : public VGMFile {
  public:
-  VGMSampColl(const std::string &format, RawFile *rawfile, uint32_t offset, uint32_t length = 0,
+  VGMSampColl(const std::string &format, RawFile *rawfile, u32 offset, u32 length = 0,
               std::string theName = "VGMSampColl");
-  VGMSampColl(const std::string &format, RawFile *rawfile, VGMInstrSet *instrset, uint32_t offset,
-                uint32_t length = 0, std::string theName = "VGMSampColl");
+  VGMSampColl(const std::string &format, RawFile *rawfile, VGMInstrSet *instrset, u32 offset,
+                u32 length = 0, std::string theName = "VGMSampColl");
   void useInstrSet(VGMInstrSet *instrset) { parInstrSet = instrset; }
 
   bool loadVGMFile(bool useMatcher = true) override;
@@ -23,14 +25,14 @@ class VGMSampColl : public VGMFile {
   virtual bool parseHeader();        // retrieve any header data
   virtual bool parseSampleInfo();        // retrieve sample info, including pointers to data, # channels, rate, etc.
 
-  VGMSamp *addSamp(uint32_t offset, uint32_t length, uint32_t dataOffset, uint32_t dataLength,
-                   uint8_t nChannels = 1, BPS bps = BPS::PCM16, uint32_t theRate = 0,
+  VGMSamp *addSamp(u32 offset, u32 length, u32 dataOffset, u32 dataLength,
+                   u8 nChannels = 1, BPS bps = BPS::PCM16, u32 theRate = 0,
                    std::string name = "Sample");
 
   bool shouldLoadOnInstrSetMatch() const { return m_should_load_on_instr_set_match; }
 
 public:
-  uint32_t sampDataOffset;        // offset of the beginning of the sample data.  Used for rgn->sampOffset matching
+  u32 sampDataOffset;        // offset of the beginning of the sample data.  Used for rgn->sampOffset matching
   VGMInstrSet *parInstrSet;
   std::vector<VGMSamp *> samples;
 

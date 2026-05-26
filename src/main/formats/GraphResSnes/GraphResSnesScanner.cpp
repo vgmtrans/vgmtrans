@@ -4,6 +4,7 @@
  * refer to the included LICENSE.txt file
  */
 
+#include "util/types.h"
 #include "GraphResSnesSeq.h"
 #include "GraphResSnesInstr.h"
 #include "ScannerManager.h"
@@ -72,8 +73,8 @@ void GraphResSnesScanner::searchForGraphResSnesFromARAM(RawFile *file) {
   std::string name = file->tag.hasTitle() ? file->tag.title : file->stem();
 
   // search song header
-  uint32_t ofsLoadSeq;
-  uint16_t addrSeqHeader;
+  u32 ofsLoadSeq;
+  u16 addrSeqHeader;
   if (file->searchBytePattern(ptnLoadSeq, ofsLoadSeq)) {
     addrSeqHeader = file->readByte(ofsLoadSeq + 4) | (file->readByte(ofsLoadSeq + 8) << 8);
   } else {
@@ -89,12 +90,12 @@ void GraphResSnesScanner::searchForGraphResSnesFromARAM(RawFile *file) {
   }
 
   // get sample map address from DIR register value
-  std::map<uint8_t, uint8_t> dspRegMap = getInitDspRegMap(file);
-  std::map<uint8_t, uint8_t>::iterator itSpcDIR = dspRegMap.find(0x5d);
+  std::map<u8, u8> dspRegMap = getInitDspRegMap(file);
+  std::map<u8, u8>::iterator itSpcDIR = dspRegMap.find(0x5d);
   if (itSpcDIR == dspRegMap.end()) {
     return;
   }
-  uint16_t spcDirAddr = itSpcDIR->second << 8;
+  u16 spcDirAddr = itSpcDIR->second << 8;
 
   // scan SRCN table
   GraphResSnesInstrSet *newInstrSet = new GraphResSnesInstrSet(file, version, spcDirAddr, newSeq->instrADSRHints);
@@ -104,12 +105,12 @@ void GraphResSnesScanner::searchForGraphResSnesFromARAM(RawFile *file) {
   }
 }
 
-std::map<uint8_t, uint8_t> GraphResSnesScanner::getInitDspRegMap(const RawFile *file) {
-  std::map<uint8_t, uint8_t> dspRegMap;
+std::map<u8, u8> GraphResSnesScanner::getInitDspRegMap(const RawFile *file) {
+  std::map<u8, u8> dspRegMap;
 
   // find a code block which initializes dsp registers
-  uint32_t ofsDspRegInitASM;
-  uint32_t addrDspRegList;
+  u32 ofsDspRegInitASM;
+  u32 addrDspRegList;
   if (file->searchBytePattern(ptnDspRegInit, ofsDspRegInitASM)) {
     addrDspRegList = file->readShort(ofsDspRegInitASM + 7);
   } else {
@@ -117,18 +118,18 @@ std::map<uint8_t, uint8_t> GraphResSnesScanner::getInitDspRegMap(const RawFile *
   }
 
   // store dsp reg/value pairs to map
-  uint16_t curOffset = addrDspRegList;
+  u16 curOffset = addrDspRegList;
   while (true) {
     if (curOffset + 2 > 0x10000) {
       break;
     }
 
-    uint8_t dspReg = file->readByte(curOffset++);
+    u8 dspReg = file->readByte(curOffset++);
     if (dspReg == 0xff) {
       break;
     }
 
-    uint8_t dspValue = file->readByte(curOffset++);
+    u8 dspValue = file->readByte(curOffset++);
     dspRegMap[dspReg] = dspValue;
   }
 

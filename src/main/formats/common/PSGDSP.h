@@ -1,5 +1,7 @@
 #pragma once
 
+#include "util/types.h"
+
 #include <cstdint>
 #include <vector>
 
@@ -15,8 +17,8 @@ constexpr double kDefaultBaseFrequencyHz = 440.0;
  * @param baseFrequencyHz The base frequency in Hz.
  * @return A vector of bytes representing the synthesized pulse wave.
  */
-std::vector<uint8_t> synthesizeBandLimitedPulsePCM16(double dutyCycle, uint32_t sampleRate,
-                                         uint32_t sampleCount,
+std::vector<u8> synthesizeBandLimitedPulsePCM16(double dutyCycle, u32 sampleRate,
+                                         u32 sampleCount,
                                          double baseFrequencyHz = kDefaultBaseFrequencyHz);
 /**
  * Synthesizes a noise wave using a linear-feedback shift register algorithm.
@@ -25,7 +27,7 @@ std::vector<uint8_t> synthesizeBandLimitedPulsePCM16(double dutyCycle, uint32_t 
  * @param lfsrTap The tap position for the LFSR.
  * @return PCM16-encoded noise wave data.
  */
-std::vector<uint8_t> synthesizeLfsrNoisePCM16(uint32_t sampleCount, uint16_t lfsrSeed = 0x7FFF,
-                                         uint16_t lfsrTap = 0x6000);
+std::vector<u8> synthesizeLfsrNoisePCM16(u32 sampleCount, u16 lfsrSeed = 0x7FFF,
+                                         u16 lfsrTap = 0x6000);
 
 }  // namespace psg

@@ -1,4 +1,6 @@
 #pragma once
+
+#include "util/types.h"
 #include "Format.h"
 #include "FilegroupMatcher.h"
 #include "NamcoSnesScanner.h"
@@ -13,7 +15,7 @@ BEGIN_FORMAT(NamcoSnes)
   USING_MATCHER(FilegroupMatcher)
 END_FORMAT()
 
-enum NamcoSnesVersion: uint8_t {
+enum NamcoSnesVersion: u8 {
   NAMCOSNES_NONE = 0,              // Unknown Version
   NAMCOSNES_STANDARD,              // Wagyan Paradise etc.
 };

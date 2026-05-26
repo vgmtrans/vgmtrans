@@ -1,3 +1,4 @@
+#include "util/types.h"
 #include "NinSnesSeq.h"
 #include "NinSnesVibrato.h"
 #include "Modulation.h"
@@ -7,19 +8,19 @@
 
 namespace {
 
-constexpr uint16_t kNinSnesDefaultPitchBendRangeCents =
+constexpr u16 kNinSnesDefaultPitchBendRangeCents =
     NinSnesTrackState::kDefaultPitchBendRangeCents;
 
-uint8_t convertVibratoDepthToMidi(uint8_t depth, double maxDepthCents) {
+u8 convertVibratoDepthToMidi(u8 depth, double maxDepthCents) {
   if (depth == 0) {
     return 0;
   }
 
   const int midiValue = static_cast<int>(std::lround(128.0 * nin_snes::vibrato::depthCents(depth) / maxDepthCents));
-  return static_cast<uint8_t>(std::clamp(midiValue, 0, 127));
+  return static_cast<u8>(std::clamp(midiValue, 0, 127));
 }
 
-uint8_t convertVibratoRateToMidi(uint8_t rate, double tempo, double maxRateHz) {
+u8 convertVibratoRateToMidi(u8 rate, double tempo, double maxRateHz) {
   const double currentRateHz = nin_snes::vibrato::rateHz(rate, tempo);
   if (currentRateHz <= 0.0) {
     return 0;
@@ -28,20 +29,20 @@ uint8_t convertVibratoRateToMidi(uint8_t rate, double tempo, double maxRateHz) {
   return midiValueForHertzInRange(currentRateHz, nin_snes::vibrato::kMinRateHz, maxRateHz);
 }
 
-uint8_t convertVibratoDelayToMidi(uint8_t delay, double tempo) {
+u8 convertVibratoDelayToMidi(u8 delay, double tempo) {
   return midiValueForSecondsInRange(nin_snes::vibrato::delaySeconds(delay, tempo),
                                     nin_snes::vibrato::kMinDelaySeconds,
                                     nin_snes::vibrato::kMaxDelaySeconds);
 }
 
-int32_t notePitch(uint8_t note) {
+s32 notePitch(u8 note) {
   // NinSnes stores slide pitch in semitone units with an 8-bit fractional part.
-  return static_cast<int32_t>(note & 0x7f) << 8;
+  return static_cast<s32>(note & 0x7f) << 8;
 }
 
 }  // namespace
 
-NinSnesTrack::PitchSlideEvent NinSnesTrack::readPitchSlide(uint32_t offset) {
+NinSnesTrack::PitchSlideEvent NinSnesTrack::readPitchSlide(u32 offset) {
   return PitchSlideEvent {
     offset,
     4,
@@ -81,7 +82,7 @@ void NinSnesTrack::beginPitchSlide(const PitchSlideEvent& slide) {
   activatePitchMotion(slide.delay, slide.length, notePitch(slide.targetNote));
 }
 
-void NinSnesTrack::activatePitchMotion(uint8_t delay, uint8_t length, int32_t targetPitch) {
+void NinSnesTrack::activatePitchMotion(u8 delay, u8 length, s32 targetPitch) {
   auto& pitch = state.pitch;
   pitch.clearMotion();
   if (!pitch.baseValid() || length == 0) {
@@ -90,7 +91,7 @@ void NinSnesTrack::activatePitchMotion(uint8_t delay, uint8_t length, int32_t ta
 
   // F1/F2 and F9 all reduce to the same live pitch-motion state: wait for an optional delay,
   // advance by a signed 8.8 delta each tick, then snap exactly to the stored target.
-  const int32_t currentPitch = pitch.currentPitch();
+  const s32 currentPitch = pitch.currentPitch();
   beginPitchBendAutomation(
       pitch,
       pitch.motionToTarget(targetPitch, length, delay),
@@ -103,7 +104,7 @@ void NinSnesTrack::updatePitchSlide() {
   advancePitchBendAutomation(state.pitch);
 }
 
-void NinSnesTrack::beginNotePitch(uint8_t note) {
+void NinSnesTrack::beginNotePitch(u8 note) {
   resetPitchBendForNewNote();
   state.pitch.beginNote(notePitch(note));
   activateStoredPitchEnvelope();
@@ -116,8 +117,8 @@ void NinSnesTrack::activateStoredPitchEnvelope() {
     return;
   }
 
-  const int32_t semitoneOffset = static_cast<int32_t>(pitchEnvelope.semitones) * 256;
-  int32_t targetPitch = state.pitch.basePitch();
+  const s32 semitoneOffset = static_cast<s32>(pitchEnvelope.semitones) * 256;
+  s32 targetPitch = state.pitch.basePitch();
   if (pitchEnvelope.mode == NinSnesTrackState::StoredPitchEnvelope::Mode::To) {
     targetPitch += semitoneOffset;
   } else {
@@ -154,15 +155,15 @@ void NinSnesTrack::applyConfiguredVibrato() {
 }
 
 void NinSnesTrack::updateVibratoFade() {
-  advanceVibratoDepthFade(state.vibrato, 0, [this](int32_t depth) {
-    return convertVibratoDepthToMidi(static_cast<uint8_t>(depth), seq().maxVibratoDepthCents);
+  advanceVibratoDepthFade(state.vibrato, 0, [this](s32 depth) {
+    return convertVibratoDepthToMidi(static_cast<u8>(depth), seq().maxVibratoDepthCents);
   });
 }
 
-void NinSnesTrack::setConfiguredVibratoDepth(uint8_t depth) {
+void NinSnesTrack::setConfiguredVibratoDepth(u8 depth) {
   auto& vibrato = state.vibrato;
   vibrato.setCurrentDepthPreservingMotion(depth);
-  const uint8_t midiDepth = convertVibratoDepthToMidi(depth, seq().maxVibratoDepthCents);
+  const u8 midiDepth = convertVibratoDepthToMidi(depth, seq().maxVibratoDepthCents);
   emitVibratoDepth(vibrato, midiDepth);
 }
 

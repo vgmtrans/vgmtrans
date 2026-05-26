@@ -15,20 +15,20 @@
 class SeqEvent;
 
 struct SeqTimedEvent {
-  uint32_t startTick;
-  uint32_t duration;
+  u32 startTick;
+  u32 duration;
   SeqEvent* event;
 
   // Zero duration is treated as a 1-tick event for range math
-  [[nodiscard]] uint32_t endTickExclusive() const noexcept {
+  [[nodiscard]] u32 endTickExclusive() const noexcept {
     return startTick + (duration == 0 ? 1u : duration);
   }
 
-  [[nodiscard]] bool isActiveAt(uint32_t tick) const noexcept {
+  [[nodiscard]] bool isActiveAt(u32 tick) const noexcept {
     return startTick <= tick && tick < endTickExclusive();
   }
 
-  [[nodiscard]] bool overlapsRange(uint32_t rangeStart, uint32_t rangeEnd) const noexcept {
+  [[nodiscard]] bool overlapsRange(u32 rangeStart, u32 rangeEnd) const noexcept {
     return startTick <= rangeEnd && endTickExclusive() > rangeStart;
   }
 };
@@ -46,7 +46,7 @@ class SeqEventTimeIndex {
   SeqEventTimeIndex(SeqEventTimeIndex&&) = default;
   SeqEventTimeIndex& operator=(SeqEventTimeIndex&&) = default;
 
-  Index addEvent(SeqEvent* event, uint32_t startTick, uint32_t duration);
+  Index addEvent(SeqEvent* event, u32 startTick, u32 duration);
   void clear();     // clears all events and data structures
 
   // finalize() builds the data structures needed for Cursor::advanceTo(). It should be called
@@ -58,25 +58,25 @@ class SeqEventTimeIndex {
 
   [[nodiscard]] const SeqTimedEvent& event(Index idx) const { return m_events.at(idx); }
   [[nodiscard]] SeqTimedEvent& event(Index idx) { return m_events.at(idx); }
-  [[nodiscard]] uint32_t endTickExclusive(Index idx) const { return m_events.at(idx).endTickExclusive(); }
-  [[nodiscard]] bool firstStartTick(const SeqEvent* event, uint32_t& outTick) const noexcept;
+  [[nodiscard]] u32 endTickExclusive(Index idx) const { return m_events.at(idx).endTickExclusive(); }
+  [[nodiscard]] bool firstStartTick(const SeqEvent* event, u32& outTick) const noexcept;
 
   // Convenience queries. For repeated sequential queries, prefer Cursor
-  void getActiveAt(uint32_t tick, std::vector<const SeqTimedEvent*>& out) const;
-  void getActiveInRange(uint32_t startTick, uint32_t endTick, std::vector<const SeqTimedEvent*>& out) const;
+  void getActiveAt(u32 tick, std::vector<const SeqTimedEvent*>& out) const;
+  void getActiveInRange(u32 startTick, u32 endTick, std::vector<const SeqTimedEvent*>& out) const;
 
   class Cursor {
    public:
     explicit Cursor(const SeqEventTimeIndex& index);
 
-    void reset(uint32_t tick = 0);
-    void seek(uint32_t tick);
-    void getActiveAt(uint32_t tick, std::vector<const SeqTimedEvent*>& out);
-    void getActiveInRange(uint32_t startTick, uint32_t endTick, std::vector<const SeqTimedEvent*>& out);
+    void reset(u32 tick = 0);
+    void seek(u32 tick);
+    void getActiveAt(u32 tick, std::vector<const SeqTimedEvent*>& out);
+    void getActiveInRange(u32 startTick, u32 endTick, std::vector<const SeqTimedEvent*>& out);
 
    private:
     void rebuildActiveIndex();
-    void advanceTo(uint32_t tick);
+    void advanceTo(u32 tick);
     void addActive(Index idx);
     void removeActive(Index idx);
     [[nodiscard]] bool isReady() const noexcept;
@@ -84,13 +84,13 @@ class SeqEventTimeIndex {
     const SeqEventTimeIndex* m_index = nullptr;
     size_t m_nextStart = 0;  // Next candidate in m_byStart
     size_t m_nextEnd = 0;    // Next candidate in m_byEnd
-    uint32_t m_currentTick = 0;
+    u32 m_currentTick = 0;
 
     std::vector<Index> m_active;  // the compact list of currently active event indices
 
     // m_activePositions is a reverse index: for each event index idx, it stores the position of
     // idx in m_active, or -1 if the event is not active.
-    std::vector<int32_t> m_activePositions;
+    std::vector<s32> m_activePositions;
   };
 
  private:
@@ -99,6 +99,6 @@ class SeqEventTimeIndex {
   std::vector<Index> m_byEnd;    // Event indices sorted by end tick
   // m_firstStart maps the earliest start time per event. Events may run multiple times due to
   // looping, so we only concern ourselves with the first time of execution for simplicity.
-  std::unordered_map<const SeqEvent*, uint32_t> m_firstStart;
+  std::unordered_map<const SeqEvent*, u32> m_firstStart;
   bool m_finalized = false;
 };

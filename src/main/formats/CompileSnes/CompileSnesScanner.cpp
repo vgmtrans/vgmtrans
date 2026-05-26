@@ -4,6 +4,7 @@
  * refer to the included LICENSE.txt file
  */
 
+#include "util/types.h"
 #include "CompileSnesInstr.h"
 #include "CompileSnesSeq.h"
 #include "ScannerManager.h"
@@ -56,19 +57,19 @@ void CompileSnesScanner::searchForCompileSnesFromARAM(RawFile *file) {
   std::string name = file->tag.hasTitle() ? file->tag.title : basefilename;
 
   // scan for table pointer initialize code
-  uint32_t ofsSetSongListAddress;
+  u32 ofsSetSongListAddress;
   if (!file->searchBytePattern(ptnSetSongListAddress, ofsSetSongListAddress)) {
     return;
   }
 
   // determine the header address of Compile SPC engine
-  uint16_t addrEngineHeader = file->readShort(ofsSetSongListAddress + 1);
+  u16 addrEngineHeader = file->readShort(ofsSetSongListAddress + 1);
   if (addrEngineHeader < 0x0100 && addrEngineHeader + 18 > 0x10000) {
     return;
   }
 
   // classify engine version
-  uint8_t addrSongListReg = file->readByte(ofsSetSongListAddress + 4);
+  u8 addrSongListReg = file->readByte(ofsSetSongListAddress + 4);
   if (addrSongListReg == 0x4e) {
     if (file->readShortBE(ofsSetSongListAddress - 4) == 0x280c) { // and a,#$0c
       version = COMPILESNES_JAKICRUSH;
@@ -87,18 +88,18 @@ void CompileSnesScanner::searchForCompileSnesFromARAM(RawFile *file) {
   }
 
   // determine the song list address
-  uint16_t addrSongList = file->readShort(addrEngineHeader);
+  u16 addrSongList = file->readShort(addrEngineHeader);
 
   // TODO: guess song index
-  int8_t guessedSongIndex = -1;
+  s8 guessedSongIndex = -1;
   if (addrSongList + 4 <= 0x10000) {
     guessedSongIndex = 1;
   }
 
-  uint32_t addrSongHeaderPtr = addrSongList + guessedSongIndex * 2;
+  u32 addrSongHeaderPtr = addrSongList + guessedSongIndex * 2;
   if (addrSongHeaderPtr + 2 <= 0x10000) {
-    uint16_t addrSongHeader = file->readShort(addrSongHeaderPtr);
-    uint8_t numTracks = file->readByte(addrSongHeader);
+    u16 addrSongHeader = file->readShort(addrSongHeaderPtr);
+    u8 numTracks = file->readByte(addrSongHeader);
     if (numTracks > 0 && numTracks <= 8) {
       CompileSnesSeq *newSeq = new CompileSnesSeq(file, version, addrSongHeader, name);
       if (!newSeq->loadVGMFile()) {
@@ -108,10 +109,10 @@ void CompileSnesScanner::searchForCompileSnesFromARAM(RawFile *file) {
     }
   }
 
-  uint16_t spcDirAddr = file->readByte(addrEngineHeader + 0x0e) << 8;
+  u16 spcDirAddr = file->readByte(addrEngineHeader + 0x0e) << 8;
 
-  uint16_t addrTuningTable = file->readShort(addrEngineHeader + 0x12);
-  uint16_t addrPitchTablePtrs = 0;
+  u16 addrTuningTable = file->readShort(addrEngineHeader + 0x12);
+  u16 addrPitchTablePtrs = 0;
   if (version != COMPILESNES_ALESTE && version != COMPILESNES_JAKICRUSH) {
     addrPitchTablePtrs = file->readShort(addrEngineHeader + 0x16);
   }

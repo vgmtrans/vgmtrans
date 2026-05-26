@@ -4,6 +4,8 @@
  * refer to the included LICENSE.txt file
  */
 #pragma once
+
+#include "util/types.h"
 #include "Format.h"
 #include "FilegroupMatcher.h"
 #include "HudsonSnesScanner.h"
@@ -17,7 +19,7 @@ BEGIN_FORMAT(HudsonSnes)
   USING_MATCHER(FilegroupMatcher)
 END_FORMAT()
 
-enum HudsonSnesVersion: uint8_t {
+enum HudsonSnesVersion: u8 {
   HUDSONSNES_NONE = 0,              // Unknown Version
   // Earlier Version:
   // Super Bomberman 2, Hagane

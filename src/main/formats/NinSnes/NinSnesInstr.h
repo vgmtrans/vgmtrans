@@ -1,4 +1,6 @@
 #pragma once
+
+#include "util/types.h"
 #include "VGMInstrSet.h"
 #include "VGMSampColl.h"
 #include "VGMRgn.h"
@@ -16,8 +18,8 @@ class NinSnesInstrSet:
  public:
   NinSnesInstrSet(RawFile *file,
                   NinSnesProfileId profile,
-                  uint32_t offset,
-                  uint32_t spcDirAddr,
+                  u32 offset,
+                  u32 spcDirAddr,
                   const std::string &name = "NinSnesInstrSet");
   NinSnesInstrSet(RawFile *file, const NinSnesScanResult& scanResult);
   virtual ~NinSnesInstrSet();
@@ -30,12 +32,12 @@ class NinSnesInstrSet:
   NinSnesSignatureId signature;
   NinSnesProfileId profileId;
 
-  uint16_t konamiTuningTableAddress;
-  uint8_t konamiTuningTableSize;
+  u16 konamiTuningTableAddress;
+  u8 konamiTuningTableSize;
 
  protected:
-  uint32_t spcDirAddr;
-  std::vector<uint8_t> usedSRCNs;
+  u32 spcDirAddr;
+  std::vector<u8> usedSRCNs;
 
  private:
   void addStandardPercussionDrumKit(const NinSnesSeq& seq);
@@ -52,26 +54,26 @@ class NinSnesInstr
  public:
   NinSnesInstr(VGMInstrSet *instrSet,
                NinSnesProfileId profile,
-               uint32_t offset,
-               uint32_t theBank,
-               uint32_t theInstrNum,
-               uint32_t spcDirAddr,
+               u32 offset,
+               u32 theBank,
+               u32 theInstrNum,
+               u32 spcDirAddr,
                const std::string &name = "NinSnesInstr");
   virtual ~NinSnesInstr();
 
   virtual bool loadInstr();
 
   static bool isValidHeader
-      (RawFile *file, NinSnesProfileId profileId, uint32_t addrInstrHeader, uint32_t spcDirAddr, bool validateSample);
-  static uint32_t expectedSize(NinSnesProfileId profileId);
+      (RawFile *file, NinSnesProfileId profileId, u32 addrInstrHeader, u32 spcDirAddr, bool validateSample);
+  static u32 expectedSize(NinSnesProfileId profileId);
 
   NinSnesProfileId profileId;
 
-  uint16_t konamiTuningTableAddress;
-  uint8_t konamiTuningTableSize;
+  u16 konamiTuningTableAddress;
+  u8 konamiTuningTableSize;
 
  protected:
-  uint32_t spcDirAddr;
+  u32 spcDirAddr;
 };
 
 // ***********
@@ -83,9 +85,9 @@ class NinSnesRgn
  public:
   NinSnesRgn(NinSnesInstr *instr,
              NinSnesProfileId profileId,
-             uint32_t offset,
-             uint16_t konamiTuningTableAddress = 0,
-             uint8_t konamiTuningTableSize = 0);
+             u32 offset,
+             u16 konamiTuningTableAddress = 0,
+             u8 konamiTuningTableSize = 0);
   virtual ~NinSnesRgn();
 
   virtual bool loadRgn();

@@ -4,6 +4,7 @@
  * refer to the included LICENSE.txt file
  */
 
+#include "util/types.h"
 #include "RareSnesInstr.h"
 #include "SNESDSP.h"
 #include "RareSnesFormat.h"
@@ -13,7 +14,7 @@
 // RareSnesInstrSet
 // ****************
 
-RareSnesInstrSet::RareSnesInstrSet(RawFile *file, uint32_t offset, uint32_t spcDirAddr, const std::string &name) :
+RareSnesInstrSet::RareSnesInstrSet(RawFile *file, u32 offset, u32 spcDirAddr, const std::string &name) :
     VGMInstrSet(RareSnesFormat::name, file, offset, 0, name),
     spcDirAddr(spcDirAddr),
     maxSRCNValue(255) {
@@ -21,11 +22,11 @@ RareSnesInstrSet::RareSnesInstrSet(RawFile *file, uint32_t offset, uint32_t spcD
 }
 
 RareSnesInstrSet::RareSnesInstrSet(RawFile *file,
-                                   uint32_t offset,
-                                   uint32_t spcDirAddr,
-                                   const std::map<uint8_t, int8_t> &instrUnityKeyHints,
-                                   const std::map<uint8_t, int16_t> &instrPitchHints,
-                                   const std::map<uint8_t, uint16_t> &instrADSRHints,
+                                   u32 offset,
+                                   u32 spcDirAddr,
+                                   const std::map<u8, s8> &instrUnityKeyHints,
+                                   const std::map<u8, s16> &instrPitchHints,
+                                   const std::map<u8, u16> &instrADSRHints,
                                    const std::string &name) :
     VGMInstrSet(RareSnesFormat::name, file, offset, 0, name),
     spcDirAddr(spcDirAddr),
@@ -39,8 +40,8 @@ RareSnesInstrSet::RareSnesInstrSet(RawFile *file,
 RareSnesInstrSet::~RareSnesInstrSet() {}
 
 void RareSnesInstrSet::Initialize() {
-  for (uint32_t srcn = 0; srcn < 256; srcn++) {
-    uint32_t offDirEnt = spcDirAddr + (srcn * 4);
+  for (u32 srcn = 0; srcn < 256; srcn++) {
+    u32 offDirEnt = spcDirAddr + (srcn * 4);
     if (offDirEnt + 4 > 0x10000) {
       maxSRCNValue = srcn - 1;
       break;
@@ -63,8 +64,8 @@ void RareSnesInstrSet::ScanAvailableInstruments() {
   availInstruments.clear();
 
   bool firstZero = true;
-  for (uint32_t inst = 0; inst < length(); inst++) {
-    uint8_t srcn = readByte(offset() + inst);
+  for (u32 inst = 0; inst < length(); inst++) {
+    u8 srcn = readByte(offset() + inst);
 
     if (srcn == 0) {
       if (firstZero) {
@@ -75,7 +76,7 @@ void RareSnesInstrSet::ScanAvailableInstruments() {
       }
     }
 
-    uint32_t offDirEnt = spcDirAddr + (srcn * 4);
+    u32 offDirEnt = spcDirAddr + (srcn * 4);
     if (offDirEnt + 4 > 0x10000) {
       continue;
     }
@@ -87,8 +88,8 @@ void RareSnesInstrSet::ScanAvailableInstruments() {
       continue;
     }
 
-    uint16_t addrSampStart = readShort(offDirEnt);
-    uint16_t addrSampLoop = readShort(offDirEnt + 2);
+    u16 addrSampStart = readShort(offDirEnt);
+    u16 addrSampLoop = readShort(offDirEnt + 2);
     // not in DIR table
     if (addrSampStart < spcDirAddr + (inst * 4)) {
       continue;
@@ -114,43 +115,43 @@ bool RareSnesInstrSet::parseInstrPointers() {
   // make a loopup table for duplicated instruments,
   // to give them appropriate instrument metadata
   // (it's a workaround for wrong instrument tuning)
-  std::map<uint16_t, uint8_t> addrToInstrLookups;
+  std::map<u16, u8> addrToInstrLookups;
   for (auto itr = instrUnityKeyHints.begin(); itr != instrUnityKeyHints.end(); ++itr) {
-    uint8_t inst = (*itr).first;
-    uint8_t srcn = readByte(offset() + inst);
+    u8 inst = (*itr).first;
+    u8 srcn = readByte(offset() + inst);
 
-    uint32_t offDirEnt = spcDirAddr + (srcn * 4);
+    u32 offDirEnt = spcDirAddr + (srcn * 4);
     if (addrToInstrLookups.count(offDirEnt) == 0) {
       addrToInstrLookups[offDirEnt] = inst;
     }
   }
 
-  for (std::vector<uint8_t>::iterator itr = availInstruments.begin(); itr != availInstruments.end(); ++itr) {
-    uint8_t inst = (*itr);
-    uint8_t srcn = readByte(offset() + inst);
+  for (std::vector<u8>::iterator itr = availInstruments.begin(); itr != availInstruments.end(); ++itr) {
+    u8 inst = (*itr);
+    u8 srcn = readByte(offset() + inst);
 
-    uint8_t inst_remapped = inst;
-    uint32_t offDirEnt = spcDirAddr + (srcn * 4);
+    u8 inst_remapped = inst;
+    u32 offDirEnt = spcDirAddr + (srcn * 4);
     if (addrToInstrLookups.count(offDirEnt) != 0) {
       inst_remapped = addrToInstrLookups[offDirEnt];
     }
 
-    int8_t transpose = 0;
-    std::map<uint8_t, int8_t>::iterator itrKey;
+    s8 transpose = 0;
+    std::map<u8, s8>::iterator itrKey;
     itrKey = this->instrUnityKeyHints.find(inst_remapped);
     if (itrKey != instrUnityKeyHints.end()) {
       transpose = itrKey->second;
     }
 
-    int16_t pitch = 0;
-    std::map<uint8_t, int16_t>::iterator itrPitch;
+    s16 pitch = 0;
+    std::map<u8, s16>::iterator itrPitch;
     itrPitch = this->instrPitchHints.find(inst_remapped);
     if (itrPitch != instrPitchHints.end()) {
       pitch = itrPitch->second;
     }
 
-    uint16_t adsr = 0x8FE0;
-    std::map<uint8_t, uint16_t>::iterator itrADSR;
+    u16 adsr = 0x8FE0;
+    std::map<u8, u16>::iterator itrADSR;
     itrADSR = this->instrADSRHints.find(inst_remapped);
     if (itrADSR != instrADSRHints.end()) {
       adsr = itrADSR->second;
@@ -164,7 +165,7 @@ bool RareSnesInstrSet::parseInstrPointers() {
   return aInstrs.size() != 0;
 }
 
-const std::vector<uint8_t> &RareSnesInstrSet::getAvailableInstruments() {
+const std::vector<u8> &RareSnesInstrSet::getAvailableInstruments() {
   return availInstruments;
 }
 
@@ -173,13 +174,13 @@ const std::vector<uint8_t> &RareSnesInstrSet::getAvailableInstruments() {
 // *************
 
 RareSnesInstr::RareSnesInstr(VGMInstrSet *instrSet,
-                             uint32_t offset,
-                             uint32_t theBank,
-                             uint32_t theInstrNum,
-                             uint32_t spcDirAddr,
-                             int8_t transpose,
-                             int16_t pitch,
-                             uint16_t adsr,
+                             u32 offset,
+                             u32 theBank,
+                             u32 theInstrNum,
+                             u32 spcDirAddr,
+                             s8 transpose,
+                             s16 pitch,
+                             u16 adsr,
                              const std::string &name) :
     VGMInstr(instrSet, offset, 1, theBank, theInstrNum, name),
     spcDirAddr(spcDirAddr),
@@ -192,13 +193,13 @@ RareSnesInstr::~RareSnesInstr() {
 }
 
 bool RareSnesInstr::loadInstr() {
-  uint8_t srcn = readByte(offset());
-  uint32_t offDirEnt = spcDirAddr + (srcn * 4);
+  u8 srcn = readByte(offset());
+  u32 offDirEnt = spcDirAddr + (srcn * 4);
   if (offDirEnt + 4 > 0x10000) {
     return false;
   }
 
-  uint16_t addrSampStart = readShort(offDirEnt);
+  u16 addrSampStart = readShort(offDirEnt);
 
   RareSnesRgn *rgn = new RareSnesRgn(this, offset(), transpose, pitch, adsr);
   rgn->sampOffset = addrSampStart - spcDirAddr;
@@ -210,15 +211,15 @@ bool RareSnesInstr::loadInstr() {
 // RareSnesRgn
 // ***********
 
-RareSnesRgn::RareSnesRgn(RareSnesInstr *instr, uint32_t offset, int8_t transpose, int16_t pitch, uint16_t adsr) :
+RareSnesRgn::RareSnesRgn(RareSnesInstr *instr, u32 offset, s8 transpose, s16 pitch, u16 adsr) :
     VGMRgn(instr, offset, 1),
     transpose(transpose),
     pitch(pitch),
     adsr(adsr) {
   // normalize (it is needed especially since SF2 pitch correction is signed 8-bit)
-  int16_t pitchKeyShift = (pitch / 100);
-  int8_t realTranspose = transpose + pitchKeyShift;
-  int16_t realPitch = pitch - (pitchKeyShift * 100);
+  s16 pitchKeyShift = (pitch / 100);
+  s8 realTranspose = transpose + pitchKeyShift;
+  s16 realPitch = pitch - (pitchKeyShift * 100);
 
   // NOTE_PITCH_TABLE[73] == 0x1000
   // 0x80 + (73 - 36) = 0xA5

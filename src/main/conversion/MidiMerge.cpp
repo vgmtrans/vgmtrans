@@ -31,24 +31,24 @@ namespace conversion {
 
 namespace {
 
-uint8_t normalizeSf2Bank(uint32_t bank) {
-  const uint16_t bank16 = static_cast<uint16_t>(bank);
+u8 normalizeSf2Bank(u32 bank) {
+  const u16 bank16 = static_cast<u16>(bank);
   if (bank16 > 128) {
-    return static_cast<uint8_t>((bank16 >> 8) & 0x7F);
+    return static_cast<u8>((bank16 >> 8) & 0x7F);
   }
-  return static_cast<uint8_t>(bank16 & 0x7F);
+  return static_cast<u8>(bank16 & 0x7F);
 }
 
-uint64_t rescaleTick(uint32_t tick, uint16_t srcPPQN, uint16_t dstPPQN) {
+u64 rescaleTick(u32 tick, u16 srcPPQN, u16 dstPPQN) {
   if (srcPPQN == 0 || dstPPQN == 0 || srcPPQN == dstPPQN) {
     return tick;
   }
 
-  return (static_cast<uint64_t>(tick) * static_cast<uint64_t>(dstPPQN) + (srcPPQN / 2u)) / srcPPQN;
+  return (static_cast<u64>(tick) * static_cast<u64>(dstPPQN) + (srcPPQN / 2u)) / srcPPQN;
 }
 
-uint32_t getMidiDurationTicks(const MidiFile& midi) {
-  uint32_t maxTick = 0;
+u32 getMidiDurationTicks(const MidiFile& midi) {
+  u32 maxTick = 0;
 
   for (const MidiTrack* track : midi.aTracks) {
     if (!track) {
@@ -71,7 +71,7 @@ uint32_t getMidiDurationTicks(const MidiFile& midi) {
   return maxTick;
 }
 
-void retimeTrack(MidiTrack* track, uint16_t srcPPQN, uint16_t dstPPQN, uint32_t startTick) {
+void retimeTrack(MidiTrack* track, u16 srcPPQN, u16 dstPPQN, u32 startTick) {
   if (!track) {
     return;
   }
@@ -81,13 +81,13 @@ void retimeTrack(MidiTrack* track, uint16_t srcPPQN, uint16_t dstPPQN, uint32_t 
       continue;
     }
 
-    event->absTime = static_cast<uint32_t>(rescaleTick(event->absTime, srcPPQN, dstPPQN) + startTick);
+    event->absTime = static_cast<u32>(rescaleTick(event->absTime, srcPPQN, dstPPQN) + startTick);
   }
 }
 
 bool applyBankOffsetToTrack(MidiTrack* track,
-                            uint8_t bankOffset,
-                            uint32_t startTick,
+                            u8 bankOffset,
+                            u32 startTick,
                             const ConversionContext& context) {
   if (!track) {
     return true;
@@ -95,10 +95,10 @@ bool applyBankOffsetToTrack(MidiTrack* track,
 
   const bool useMmaBanks = context.bankSelectStyle == BankSelectStyle::MMA;
   std::array<bool, 16> usedChannels {};
-  std::array<uint16_t, 16> sourceBanks {};
-  auto updateSourceBank = [useMmaBanks](uint16_t& sourceBank,
+  std::array<u16, 16> sourceBanks {};
+  auto updateSourceBank = [useMmaBanks](u16& sourceBank,
                                         MidiEventType eventType,
-                                        uint8_t dataByte) {
+                                        u8 dataByte) {
     if (!useMmaBanks) {
       if (eventType == MIDIEVENT_BANKSELECT) {
         sourceBank = dataByte;
@@ -107,21 +107,21 @@ bool applyBankOffsetToTrack(MidiTrack* track,
     }
 
     if (eventType == MIDIEVENT_BANKSELECT) {
-      sourceBank = static_cast<uint16_t>((dataByte << 7) | (sourceBank & 0x7F));
+      sourceBank = static_cast<u16>((dataByte << 7) | (sourceBank & 0x7F));
     } else {
-      sourceBank = static_cast<uint16_t>((sourceBank & 0x3F80) | dataByte);
+      sourceBank = static_cast<u16>((sourceBank & 0x3F80) | dataByte);
     }
   };
-  auto remapBankByte = [useMmaBanks, bankOffset](uint16_t sourceBank,
+  auto remapBankByte = [useMmaBanks, bankOffset](u16 sourceBank,
                                                  MidiEventType eventType,
-                                                 uint8_t& dataByte) {
-    const uint16_t remappedBank = static_cast<uint16_t>(sourceBank + bankOffset);
+                                                 u8& dataByte) {
+    const u16 remappedBank = static_cast<u16>(sourceBank + bankOffset);
     if (useMmaBanks) {
       if (remappedBank > 0x3FFF) {
         L_ERROR("Bank remap overflowed the MIDI bank-select range.");
         return false;
       }
-      dataByte = static_cast<uint8_t>(
+      dataByte = static_cast<u8>(
           eventType == MIDIEVENT_BANKSELECT ? ((remappedBank >> 7) & 0x7F) : (remappedBank & 0x7F));
       return true;
     }
@@ -130,7 +130,7 @@ bool applyBankOffsetToTrack(MidiTrack* track,
       L_ERROR("Bank remap overflowed the MIDI/SF2 bank range.");
       return false;
     }
-    dataByte = static_cast<uint8_t>(eventType == MIDIEVENT_BANKSELECT ? remappedBank : 0);
+    dataByte = static_cast<u8>(eventType == MIDIEVENT_BANKSELECT ? remappedBank : 0);
     return true;
   };
 
@@ -153,7 +153,7 @@ bool applyBankOffsetToTrack(MidiTrack* track,
       continue;
     }
 
-    const uint8_t channel = controller->channel & 0x0F;
+    const u8 channel = controller->channel & 0x0F;
     updateSourceBank(sourceBanks[channel], eventType, controller->dataByte);
     if (!remapBankByte(sourceBanks[channel], eventType, controller->dataByte)) {
       return false;
@@ -162,14 +162,14 @@ bool applyBankOffsetToTrack(MidiTrack* track,
 
   std::vector<MidiEvent*> injectedBankEvents;
   injectedBankEvents.reserve(32);
-  uint8_t remappedBankMsb = 0;
-  uint8_t remappedBankLsb = 0;
+  u8 remappedBankMsb = 0;
+  u8 remappedBankLsb = 0;
   if (!remapBankByte(0, MIDIEVENT_BANKSELECT, remappedBankMsb) ||
       !remapBankByte(0, MIDIEVENT_BANKSELECTFINE, remappedBankLsb)) {
     return false;
   }
 
-  for (uint8_t channel = 0; channel < 16; ++channel) {
+  for (u8 channel = 0; channel < 16; ++channel) {
     if (!usedChannels[channel]) {
       continue;
     }
@@ -206,7 +206,7 @@ private:
   std::vector<VGMInstrSet*> m_instrsets;
 };
 
-bool computeMaxCollectionBank(const VGMColl* coll, uint8_t& outMaxBank) {
+bool computeMaxCollectionBank(const VGMColl* coll, u8& outMaxBank) {
   if (!coll) {
     L_ERROR("Missing collection while planning bank remap.");
     return false;
@@ -219,7 +219,7 @@ bool computeMaxCollectionBank(const VGMColl* coll, uint8_t& outMaxBank) {
   }
 
   ExportPrepGuard guard(instrsets, coll);
-  uint8_t maxBank = 0;
+  u8 maxBank = 0;
 
   for (VGMInstrSet* instrset : instrsets) {
     if (!instrset) {
@@ -240,7 +240,7 @@ bool computeMaxCollectionBank(const VGMColl* coll, uint8_t& outMaxBank) {
 }  // namespace
 
 bool planChunkBankOffsets(const std::vector<MidiMergeEntry>& entries,
-                          std::vector<uint8_t>& bankOffsets) {
+                          std::vector<u8>& bankOffsets) {
   if (entries.empty()) {
     L_ERROR("No sequences were provided for bank planning.");
     return false;
@@ -249,8 +249,8 @@ bool planChunkBankOffsets(const std::vector<MidiMergeEntry>& entries,
   bankOffsets.clear();
   bankOffsets.reserve(entries.size());
 
-  uint16_t nextBankBase = 0;
-  std::unordered_map<const VGMColl*, uint8_t> collToBankBase;
+  u16 nextBankBase = 0;
+  std::unordered_map<const VGMColl*, u8> collToBankBase;
 
   for (const MidiMergeEntry& entry : entries) {
     const VGMColl* coll = entry.collection;
@@ -265,7 +265,7 @@ bool planChunkBankOffsets(const std::vector<MidiMergeEntry>& entries,
       continue;
     }
 
-    uint8_t maxBank = 0;
+    u8 maxBank = 0;
     if (!computeMaxCollectionBank(coll, maxBank)) {
       return false;
     }
@@ -275,10 +275,10 @@ bool planChunkBankOffsets(const std::vector<MidiMergeEntry>& entries,
       return false;
     }
 
-    const uint8_t assignedBase = static_cast<uint8_t>(nextBankBase);
+    const u8 assignedBase = static_cast<u8>(nextBankBase);
     collToBankBase.emplace(coll, assignedBase);
     bankOffsets.push_back(assignedBase);
-    nextBankBase += static_cast<uint16_t>(maxBank) + 1;
+    nextBankBase += static_cast<u16>(maxBank) + 1;
   }
 
   return true;
@@ -316,8 +316,8 @@ std::unique_ptr<MidiFile> mergeMidiSequences(const std::vector<MidiMergeEntry>& 
 
   struct ConvertedPart {
     std::unique_ptr<MidiFile> midi;
-    uint16_t ppqn = 0;
-    uint32_t durationTicks = 0;
+    u16 ppqn = 0;
+    u32 durationTicks = 0;
   };
 
   std::vector<ConvertedPart> parts;
@@ -325,7 +325,7 @@ std::unique_ptr<MidiFile> mergeMidiSequences(const std::vector<MidiMergeEntry>& 
 
   const auto context = ConversionContext::fromOptions(ConversionOptions::the(), SynthTarget::SoundFont);
 
-  uint16_t targetPPQN = 0;
+  u16 targetPPQN = 0;
 
   for (size_t i = 0; i < entries.size(); ++i) {
     const MidiMergeEntry& entry = entries[i];
@@ -347,7 +347,7 @@ std::unique_ptr<MidiFile> mergeMidiSequences(const std::vector<MidiMergeEntry>& 
       return nullptr;
     }
 
-    uint16_t ppqn = static_cast<uint16_t>(midi->ppqn());
+    u16 ppqn = static_cast<u16>(midi->ppqn());
     if (ppqn == 0) {
       ppqn = 48;
       midi->setPPQN(ppqn);
@@ -356,9 +356,9 @@ std::unique_ptr<MidiFile> mergeMidiSequences(const std::vector<MidiMergeEntry>& 
     if (targetPPQN == 0) {
       targetPPQN = ppqn;
     } else {
-      const uint64_t lcm = std::lcm(static_cast<uint64_t>(targetPPQN), static_cast<uint64_t>(ppqn));
+      const u64 lcm = std::lcm(static_cast<u64>(targetPPQN), static_cast<u64>(ppqn));
       if (lcm <= 1920) {
-        targetPPQN = static_cast<uint16_t>(lcm);
+        targetPPQN = static_cast<u16>(lcm);
       } else {
         targetPPQN = std::max(targetPPQN, ppqn);
       }
@@ -375,22 +375,22 @@ std::unique_ptr<MidiFile> mergeMidiSequences(const std::vector<MidiMergeEntry>& 
     targetPPQN = 48;
   }
 
-  std::vector<uint32_t> startTicks(entries.size(), 0);
+  std::vector<u32> startTicks(entries.size(), 0);
   if (!options.startTimes.empty()) {
     startTicks = options.startTimes;
   } else {
-    uint64_t cursor = 0;
+    u64 cursor = 0;
     for (size_t i = 0; i < parts.size(); ++i) {
-      if (cursor > std::numeric_limits<uint32_t>::max()) {
+      if (cursor > std::numeric_limits<u32>::max()) {
         L_ERROR("Merged MIDI exceeds maximum 32-bit tick duration.");
         return nullptr;
       }
-      startTicks[i] = static_cast<uint32_t>(cursor);
-      const uint64_t durationInTarget = rescaleTick(parts[i].durationTicks, parts[i].ppqn, targetPPQN);
+      startTicks[i] = static_cast<u32>(cursor);
+      const u64 durationInTarget = rescaleTick(parts[i].durationTicks, parts[i].ppqn, targetPPQN);
       cursor += durationInTarget;
       cursor += options.sequentialGapTicks;
     }
-    if (cursor > std::numeric_limits<uint32_t>::max()) {
+    if (cursor > std::numeric_limits<u32>::max()) {
       L_ERROR("Merged MIDI exceeds maximum 32-bit tick duration.");
       return nullptr;
     }
@@ -401,9 +401,9 @@ std::unique_ptr<MidiFile> mergeMidiSequences(const std::vector<MidiMergeEntry>& 
 
   for (size_t i = 0; i < parts.size(); ++i) {
     MidiFile* source = parts[i].midi.get();
-    const uint16_t sourcePPQN = parts[i].ppqn;
-    const uint32_t startTick = startTicks[i];
-    const uint8_t bankOffset = options.bankOffsets.empty() ? 0 : options.bankOffsets[i];
+    const u16 sourcePPQN = parts[i].ppqn;
+    const u32 startTick = startTicks[i];
+    const u8 bankOffset = options.bankOffsets.empty() ? 0 : options.bankOffsets[i];
 
     retimeTrack(&source->globalTrack, sourcePPQN, targetPPQN, startTick);
     for (MidiEvent* event : source->globalTrack.aEvents) {
@@ -444,7 +444,7 @@ std::unique_ptr<MidiFile> mergeMidiSequences(const std::vector<MidiMergeEntry>& 
 }
 
 bool saveMergedSoundfont(const std::vector<MidiMergeEntry>& entries,
-                         const std::vector<uint8_t>& bankOffsets,
+                         const std::vector<u8>& bankOffsets,
                          const std::filesystem::path& filepath) {
   if (entries.empty()) {
     L_ERROR("No sequences were provided for merged SF2 export.");
@@ -487,12 +487,12 @@ bool saveMergedSoundfont(const std::vector<MidiMergeEntry>& entries,
       return false;
     }
 
-    const uint8_t bankOffset = bankOffsets[i];
+    const u8 bankOffset = bankOffsets[i];
     for (SynthInstr* instr : partSynth->vInstrs) {
       if (!instr) {
         continue;
       }
-      const uint16_t remapped = static_cast<uint16_t>(normalizeSf2Bank(instr->ulBank)) + bankOffset;
+      const u16 remapped = static_cast<u16>(normalizeSf2Bank(instr->ulBank)) + bankOffset;
       if (remapped > 127) {
         L_ERROR("Bank remap overflowed while assembling the merged SF2.");
         return false;
@@ -500,7 +500,7 @@ bool saveMergedSoundfont(const std::vector<MidiMergeEntry>& entries,
       instr->ulBank = remapped;
     }
 
-    const uint32_t waveOffset = static_cast<uint32_t>(mergedSynth->vWaves.size());
+    const u32 waveOffset = static_cast<u32>(mergedSynth->vWaves.size());
 
     for (SynthInstr* instr : partSynth->vInstrs) {
       if (!instr) {

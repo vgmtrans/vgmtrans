@@ -3,6 +3,7 @@
  * Licensed under the zlib license,
  * refer to the included LICENSE.txt file
  */
+#include "util/types.h"
 #include "KonamiTMNT2Scanner.h"
 #include "KonamiTMNT2Seq.h"
 #include "MAMELoader.h"
@@ -371,7 +372,7 @@ void KonamiTMNT2Scanner::scanTMNT2(
     samplesRom,
     sampInfos,
     0,
-    static_cast<uint32_t>(samplesRom->size()),
+    static_cast<u32>(samplesRom->size()),
     sampCollName
   );
   if (!sampcoll->loadVGMFile()) {
@@ -521,7 +522,7 @@ void KonamiTMNT2Scanner::scanVendetta(
     samplesRom,
     commonSampInfos,
     0,
-    static_cast<uint32_t>(samplesRom->size()),
+    static_cast<u32>(samplesRom->size()),
     sampCollName
   );
   if (!sampcoll->loadVGMFile()) {

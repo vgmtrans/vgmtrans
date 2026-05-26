@@ -13,7 +13,7 @@
 
 class RawFile;
 class VGMItem;
-enum KonamiTMNT2FormatVer : uint8_t;
+enum KonamiTMNT2FormatVer : u8;
 
 struct konami_vendetta_instr_k053260 {
   u8 samp_info_idx;

@@ -3,6 +3,7 @@
  * Licensed under the zlib license,
  * refer to the included LICENSE.txt file
  */
+#include "util/types.h"
 #include "Root.h"
 #include "CPS2Scanner.h"
 #include "CPS2Seq.h"
@@ -54,14 +55,14 @@ void CPS2Scanner::scan(RawFile* /*file*/, void* info) {
   MAMERomGroup *sampsRomGroupEntry = gameentry->getRomGroupOfType("qsound");
   if (!seqRomGroupEntry || !sampsRomGroupEntry)
     return;
-  uint32_t seq_table_offset;
-  uint32_t seq_table_length;
-  uint32_t instr_table_offset;
-  uint32_t samp_table_offset;
-  uint32_t samp_table_length = 0;
-  uint32_t artic_table_offset = 0;
-  uint32_t artic_table_length = 0x800;
-  uint32_t num_instr_banks;
+  u32 seq_table_offset;
+  u32 seq_table_length;
+  u32 instr_table_offset;
+  u32 samp_table_offset;
+  u32 samp_table_length = 0;
+  u32 artic_table_offset = 0;
+  u32 artic_table_length = 0x800;
+  u32 num_instr_banks;
   if (!seqRomGroupEntry->file || !sampsRomGroupEntry->file ||
       !seqRomGroupEntry->getHexAttribute("seq_table", &seq_table_offset) ||
       !seqRomGroupEntry->getHexAttribute("samp_table", &samp_table_offset) ||
@@ -104,7 +105,7 @@ void CPS2Scanner::scan(RawFile* /*file*/, void* info) {
         return;
       break;
     default:
-      L_ERROR("Unknown version of CPS2 format: {}", static_cast<uint8_t>(fmt_ver));
+      L_ERROR("Unknown version of CPS2 format: {}", static_cast<u8>(fmt_ver));
       return;
   }
 
@@ -165,7 +166,7 @@ void CPS2Scanner::scan(RawFile* /*file*/, void* info) {
   //  Set the seq table length to be the distance to the first seq pointer
   //  as sequences seem to immediately follow the seq table.
   unsigned int k = 0;
-  uint32_t seqPointer = 0;
+  u32 seqPointer = 0;
   while (seqPointer == 0)
     seqPointer = programFile->readWordBE(seq_table_offset + (k++ * 4)) & 0x0FFFFF;
   if (fmt_ver == CPS3) {

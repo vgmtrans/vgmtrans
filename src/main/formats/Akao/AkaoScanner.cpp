@@ -4,6 +4,7 @@
  * refer to the included LICENSE.txt file
  */
 
+#include "util/types.h"
 #include "AkaoSeq.h"
 #include "AkaoInstr.h"
 #include "ScannerManager.h"
@@ -15,12 +16,12 @@ ScannerRegistration<AkaoScanner> s_akao("Akao");
 void AkaoScanner::scan(RawFile* file, void* /*info*/) {
   const AkaoPs1Version file_version = determineVersionFromTag(file);
 
-  for (uint32_t offset = 0; offset + 0x60 < file->size(); offset++) {
+  for (u32 offset = 0; offset + 0x60 < file->size(); offset++) {
     //sig must match ascii characters "AKAO"
     if (file->readWordBE(offset) != 0x414B414F)
       continue;
 
-    const uint16_t seq_length = file->readShort(offset + 6);
+    const u16 seq_length = file->readShort(offset + 6);
     if (seq_length != 0) {
       // Sequence
       if (!AkaoSeq::isPossibleAkaoSeq(file, offset))

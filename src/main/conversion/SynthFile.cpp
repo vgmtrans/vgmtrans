@@ -4,6 +4,7 @@
  * refer to the included LICENSE.txt file
  */
 
+#include "util/types.h"
 #include "SynthFile.h"
 
 #include <spdlog/fmt/fmt.h>
@@ -22,25 +23,25 @@ SynthFile::~SynthFile() {
   deleteVect(vWaves);
 }
 
-SynthInstr *SynthFile::addInstr(uint32_t bank, uint32_t instrNum, float reverb) {
+SynthInstr *SynthFile::addInstr(u32 bank, u32 instrNum, float reverb) {
   auto str = fmt::format("Instr bnk {} num {}", bank, instrNum);
   vInstrs.insert(vInstrs.end(), new SynthInstr(bank, instrNum, str, reverb));
   return vInstrs.back();
 }
 
-SynthInstr *SynthFile::addInstr(uint32_t bank, uint32_t instrNum, std::string name, float reverb) {
+SynthInstr *SynthFile::addInstr(u32 bank, u32 instrNum, std::string name, float reverb) {
   vInstrs.insert(vInstrs.end(), new SynthInstr(bank, instrNum, std::move(name), reverb));
   return vInstrs.back();
 }
 
-SynthWave *SynthFile::addWave(uint16_t formatTag,
-                              uint16_t channels,
+SynthWave *SynthFile::addWave(u16 formatTag,
+                              u16 channels,
                               int samplesPerSec,
                               int aveBytesPerSec,
-                              uint16_t blockAlign,
-                              uint16_t bitsPerSample,
-                              uint32_t waveDataSize,
-                              std::vector<uint8_t> waveData,
+                              u16 blockAlign,
+                              u16 bitsPerSample,
+                              u32 waveDataSize,
+                              std::vector<u8> waveData,
                               std::string name) {
   vWaves.insert(vWaves.end(),
                 new SynthWave(formatTag,
@@ -60,18 +61,18 @@ SynthWave *SynthFile::addWave(uint16_t formatTag,
 //  **********
 
 
-SynthInstr::SynthInstr(uint32_t bank, uint32_t instrument, float reverb)
+SynthInstr::SynthInstr(u32 bank, u32 instrument, float reverb)
     : ulBank(bank), ulInstrument(instrument), reverb(reverb) {
   name = fmt::format("Instr bnk {} num {}", bank, instrument);
   //RiffFile::AlignName(name);
 }
 
-SynthInstr::SynthInstr(uint32_t bank, uint32_t instrument, std::string instrName, float reverb)
+SynthInstr::SynthInstr(u32 bank, u32 instrument, std::string instrName, float reverb)
     : ulBank(bank), ulInstrument(instrument), name(std::move(instrName)), reverb(reverb)  {
   //RiffFile::AlignName(name);
 }
 
-SynthInstr::SynthInstr(uint32_t bank, uint32_t instrument, std::string instrName,
+SynthInstr::SynthInstr(u32 bank, u32 instrument, std::string instrName,
                        const std::vector<SynthRgn *>& listRgns, float reverb)
     : ulBank(bank), ulInstrument(instrument), name(std::move(instrName)), reverb(reverb)  {
   //RiffFile::AlignName(name);
@@ -147,21 +148,21 @@ SynthSampInfo *SynthRgn::addSampInfo() {
   return sampinfo;
 }
 
-void SynthRgn::setRanges(uint16_t keyLow, uint16_t keyHigh, uint16_t velLow, uint16_t velHigh) {
+void SynthRgn::setRanges(u16 keyLow, u16 keyHigh, u16 velLow, u16 velHigh) {
   usKeyLow = keyLow;
   usKeyHigh = keyHigh;
   usVelLow = velLow;
   usVelHigh = velHigh;
 }
 
-void SynthRgn::setWaveLinkInfo(uint16_t options, uint16_t phaseGroup, uint32_t theChannel, uint32_t theTableIndex) {
+void SynthRgn::setWaveLinkInfo(u16 options, u16 phaseGroup, u32 theChannel, u32 theTableIndex) {
   fusOptions = options;
   usPhaseGroup = phaseGroup;
   channel = theChannel;
   tableIndex = theTableIndex;
 }
 
-void SynthRgn::setFineTune(int16_t semitones, int16_t cents) {
+void SynthRgn::setFineTune(s16 semitones, s16 cents) {
   coarseTuneSemitones = semitones;
   fineTuneCents = cents;
 }
@@ -210,14 +211,14 @@ void SynthSampInfo::setLoopInfo(Loop &loop, VGMSamp *samp) {
   cSampleLoops = loop.loopStatus;
   ulLoopType = loop.loopType;
   ulLoopStart = (loop.loopStartMeasure == LM_BYTES)
-                  ? static_cast<uint32_t>((loop.loopStart * compressionRatio) / origFormatBytesPerSamp)
+                  ? static_cast<u32>((loop.loopStart * compressionRatio) / origFormatBytesPerSamp)
                   : loop.loopStart;
   ulLoopLength = (loop.loopLengthMeasure == LM_BYTES)
-                   ? static_cast<uint32_t>((loop.loopLength * compressionRatio) / origFormatBytesPerSamp)
+                   ? static_cast<u32>((loop.loopLength * compressionRatio) / origFormatBytesPerSamp)
                    : loop.loopLength;
 }
 
-void SynthSampInfo::setPitchInfo(uint16_t unityNote, short fineTune, double atten) {
+void SynthSampInfo::setPitchInfo(u16 unityNote, short fineTune, double atten) {
   usUnityNote = unityNote;
   sFineTune = fineTune;
   attenuation = atten;
@@ -233,12 +234,12 @@ void SynthWave::convertTo16bit() {
     wBlockAlign = 16 / 8 * wChannels;
     dwAveBytesPerSec *= 2;
 
-    std::vector<uint8_t> newData(dataSize * 2u);
-    for (uint32_t i = 0; i < dataSize; i++) {
-      const int16_t sample = static_cast<int16_t>(data[i]) << 8;
-      const uint16_t u = static_cast<uint16_t>(sample);
-      newData[i * 2] = static_cast<uint8_t>(u & 0xFF);
-      newData[i * 2 + 1] = static_cast<uint8_t>((u >> 8) & 0xFF);
+    std::vector<u8> newData(dataSize * 2u);
+    for (u32 i = 0; i < dataSize; i++) {
+      const s16 sample = static_cast<s16>(data[i]) << 8;
+      const u16 u = static_cast<u16>(sample);
+      newData[i * 2] = static_cast<u8>(u & 0xFF);
+      newData[i * 2 + 1] = static_cast<u8>((u >> 8) & 0xFF);
     }
     data = std::move(newData);
     dataSize *= 2;

@@ -4,6 +4,7 @@
  * refer to the included LICENSE.txt file
  */
 
+#include "util/types.h"
 #include "NamcoSnesInstr.h"
 #include <spdlog/fmt/fmt.h>
 #include "SNESDSP.h"
@@ -14,8 +15,8 @@
 
 NamcoSnesInstrSet::NamcoSnesInstrSet(RawFile *file,
                                      NamcoSnesVersion ver,
-                                     uint32_t spcDirAddr,
-                                     uint16_t addrTuningTable,
+                                     u32 spcDirAddr,
+                                     u16 addrTuningTable,
                                      const std::string &name) :
     VGMInstrSet(NamcoSnesFormat::name, file, addrTuningTable, 0, name), version(ver),
     spcDirAddr(spcDirAddr),
@@ -30,33 +31,33 @@ bool NamcoSnesInstrSet::parseHeader() {
 }
 
 bool NamcoSnesInstrSet::parseInstrPointers() {
-  uint8_t maxSampCount = 0x80;
+  u8 maxSampCount = 0x80;
   if (spcDirAddr < addrTuningTable) {
-    uint16_t sampCountCandidate = (addrTuningTable - spcDirAddr) / 4;
+    u16 sampCountCandidate = (addrTuningTable - spcDirAddr) / 4;
     if (sampCountCandidate < maxSampCount) {
-      maxSampCount = (uint8_t) sampCountCandidate;
+      maxSampCount = (u8) sampCountCandidate;
     }
   }
 
   usedSRCNs.clear();
-  for (uint8_t srcn = 0; srcn < maxSampCount; srcn++) {
-    uint32_t addrDIRentry = spcDirAddr + (srcn * 4);
+  for (u8 srcn = 0; srcn < maxSampCount; srcn++) {
+    u32 addrDIRentry = spcDirAddr + (srcn * 4);
     if (!SNESSampColl::isValidSampleDir(rawFile(), addrDIRentry, true)) {
       continue;
     }
 
-    uint16_t addrSampStart = readShort(addrDIRentry);
+    u16 addrSampStart = readShort(addrDIRentry);
     if (addrSampStart < spcDirAddr) {
       continue;
     }
 
-    uint32_t ofsTuningEntry;
+    u32 ofsTuningEntry;
     ofsTuningEntry = addrTuningTable + (srcn * 2);
     if (ofsTuningEntry + 2 > 0x10000) {
       break;
     }
 
-    uint16_t sampleRate = readShort(ofsTuningEntry);
+    u16 sampleRate = readShort(ofsTuningEntry);
     if (sampleRate == 0 || sampleRate == 0xffff) {
       continue;
     }
@@ -88,9 +89,9 @@ fmt::format("Instrument {}", srcn));
 
 NamcoSnesInstr::NamcoSnesInstr(VGMInstrSet *instrSet,
                                NamcoSnesVersion ver,
-                               uint8_t srcn,
-                               uint32_t spcDirAddr,
-                               uint16_t addrTuningEntry,
+                               u8 srcn,
+                               u32 spcDirAddr,
+                               u16 addrTuningEntry,
                                const std::string &name) :
     VGMInstr(instrSet, addrTuningEntry, 0, 0, srcn, name), version(ver),
     spcDirAddr(spcDirAddr),
@@ -101,12 +102,12 @@ NamcoSnesInstr::~NamcoSnesInstr() {
 }
 
 bool NamcoSnesInstr::loadInstr() {
-  uint32_t offDirEnt = spcDirAddr + (instrNum * 4);
+  u32 offDirEnt = spcDirAddr + (instrNum * 4);
   if (offDirEnt + 4 > 0x10000) {
     return false;
   }
 
-  uint16_t addrSampStart = readShort(offDirEnt);
+  u16 addrSampStart = readShort(offDirEnt);
 
   NamcoSnesRgn *rgn = new NamcoSnesRgn(this, version, instrNum, spcDirAddr, addrTuningEntry);
   rgn->sampOffset = addrSampStart - spcDirAddr;
@@ -122,12 +123,12 @@ bool NamcoSnesInstr::loadInstr() {
 
 NamcoSnesRgn::NamcoSnesRgn(NamcoSnesInstr *instr,
                            NamcoSnesVersion ver,
-                           uint8_t srcn,
-                           uint32_t spcDirAddr,
-                           uint16_t addrTuningEntry) :
+                           u8 srcn,
+                           u32 spcDirAddr,
+                           u16 addrTuningEntry) :
     VGMRgn(instr, addrTuningEntry, 0),
     version(ver) {
-  int16_t pitch_scale = getShortBE(addrTuningEntry);
+  s16 pitch_scale = getShortBE(addrTuningEntry);
 
   const double pitch_fixer = 4032.0 / 4096.0;
   double fine_tuning;
@@ -146,11 +147,11 @@ NamcoSnesRgn::NamcoSnesRgn(NamcoSnesInstr *instr,
 
   addChild(addrTuningEntry, 2, "Sample Rate");
   unityKey = 71 - (int) coarse_tuning;
-  fineTune = (int16_t) (fine_tuning * 100.0);
+  fineTune = (s16) (fine_tuning * 100.0);
 
-  uint8_t adsr1 = 0x8f;
-  uint8_t adsr2 = 0xe0;
-  uint8_t gain = 0;
+  u8 adsr1 = 0x8f;
+  u8 adsr2 = 0xe0;
+  u8 gain = 0;
   snesConvADSR<VGMRgn>(this, adsr1, adsr2, gain);
 
   setGuessedLength();

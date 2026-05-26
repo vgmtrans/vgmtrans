@@ -1,9 +1,11 @@
 #pragma once
+
+#include "util/types.h"
 #include <cstdint>
 
 class KabukiDecrypter {
  public:
-  static void kabuki_decode(const uint8_t *src, uint8_t *dest_op, uint8_t *dest_data,
+  static void kabuki_decode(const u8 *src, u8 *dest_op, u8 *dest_data,
                             int base_addr, int length, int swap_key1, int swap_key2, int addr_key, int xor_key);
 
  private:

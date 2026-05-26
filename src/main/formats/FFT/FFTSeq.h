@@ -1,4 +1,6 @@
 #pragma once
+
+#include "util/types.h"
 #include "VGMSeq.h"
 #include "SeqTrack.h"
 
@@ -6,36 +8,36 @@ static const unsigned char delta_time_table[] = {0, 192, 144, 96, 72, 64, 48, 36
 
 class FFTSeq : public VGMSeq {
  public:
-  FFTSeq(RawFile *file, uint32_t offset);
+  FFTSeq(RawFile *file, u32 offset);
   ~FFTSeq() override;
 
   bool parseHeader() override;
   bool parseTrackPointers() override;
-  uint32_t id() const override { return assocWdsID; }
+  u32 id() const override { return assocWdsID; }
 
  protected:
-  uint16_t seqID;
-  uint16_t assocWdsID;
+  u16 seqID;
+  u16 assocWdsID;
 };
 
 
 class FFTTrack
     : public SeqTrack {
  public:
-  FFTTrack(FFTSeq *parentFile, uint32_t offset = 0, uint32_t length = 0);
+  FFTTrack(FFTSeq *parentFile, u32 offset = 0, u32 length = 0);
   void resetVars() override;
   bool readEvent() override;
 
  public:
   bool bNoteOn;
-  uint32_t infiniteLoopPt;
-  uint8_t infiniteLoopOctave;
-  uint32_t loopID[5];
+  u32 infiniteLoopPt;
+  u8 infiniteLoopOctave;
+  u32 loopID[5];
   int loop_counter[5];
   int loop_repeats[5];
   int loop_layer;
-  uint32_t loop_begin_loc[5];
-  uint32_t loop_end_loc[5];
-  uint8_t loop_octave[5];        //1,Sep.2009 revise
-  uint8_t loop_end_octave[5];    //1,Sep.2009 revise
+  u32 loop_begin_loc[5];
+  u32 loop_end_loc[5];
+  u8 loop_octave[5];        //1,Sep.2009 revise
+  u8 loop_end_octave[5];    //1,Sep.2009 revise
 };

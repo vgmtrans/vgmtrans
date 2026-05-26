@@ -1,4 +1,6 @@
 #pragma once
+
+#include "util/types.h"
 #include "VGMInstrSet.h"
 #include "VGMSampColl.h"
 #include "VGMRgn.h"
@@ -15,13 +17,13 @@ struct MoriSnesInstrHint {
       pan(0) {
   }
 
-  uint16_t startAddress;
-  uint16_t size;
-  uint16_t seqAddress;
-  uint16_t seqSize;
-  uint16_t rgnAddress;
-  int8_t transpose;
-  int8_t pan;
+  u16 startAddress;
+  u16 size;
+  u16 seqAddress;
+  u16 seqSize;
+  u16 rgnAddress;
+  s8 transpose;
+  s8 pan;
 };
 
 struct MoriSnesInstrHintDir {
@@ -31,8 +33,8 @@ struct MoriSnesInstrHintDir {
       percussion(false) {
   }
 
-  uint16_t startAddress;
-  uint16_t size;
+  u16 startAddress;
+  u16 size;
 
   bool percussion;
   MoriSnesInstrHint instrHint;
@@ -48,9 +50,9 @@ class MoriSnesInstrSet:
  public:
   MoriSnesInstrSet(RawFile *file,
                    MoriSnesVersion ver,
-                   uint32_t spcDirAddr,
-                   std::vector<uint16_t> instrumentAddresses,
-                   std::map<uint16_t, MoriSnesInstrHintDir> instrumentHints,
+                   u32 spcDirAddr,
+                   std::vector<u16> instrumentAddresses,
+                   std::map<u16, MoriSnesInstrHintDir> instrumentHints,
                    const std::string &name = "MoriSnesInstrSet");
   virtual ~MoriSnesInstrSet();
 
@@ -60,10 +62,10 @@ class MoriSnesInstrSet:
   MoriSnesVersion version;
 
  protected:
-  uint32_t spcDirAddr;
-  std::vector<uint16_t> instrumentAddresses;
-  std::map<uint16_t, MoriSnesInstrHintDir> instrumentHints;
-  std::vector<uint8_t> usedSRCNs;
+  u32 spcDirAddr;
+  std::vector<u16> instrumentAddresses;
+  std::map<u16, MoriSnesInstrHintDir> instrumentHints;
+  std::vector<u8> usedSRCNs;
 };
 
 // *************
@@ -75,8 +77,8 @@ class MoriSnesInstr
  public:
   MoriSnesInstr(VGMInstrSet *instrSet,
                 MoriSnesVersion ver,
-                uint8_t instrNum,
-                uint32_t spcDirAddr,
+                u8 instrNum,
+                u32 spcDirAddr,
                 const MoriSnesInstrHintDir &instrHintDir,
                 const std::string &name = "MoriSnesInstr");
   virtual ~MoriSnesInstr();
@@ -86,7 +88,7 @@ class MoriSnesInstr
   MoriSnesVersion version;
 
  protected:
-  uint32_t spcDirAddr;
+  u32 spcDirAddr;
   MoriSnesInstrHintDir instrHintDir;
 };
 
@@ -99,9 +101,9 @@ class MoriSnesRgn
  public:
   MoriSnesRgn(MoriSnesInstr *instr,
               MoriSnesVersion ver,
-              uint32_t spcDirAddr,
+              u32 spcDirAddr,
               const MoriSnesInstrHint &instrHint,
-              int8_t percNoteKey = -1);
+              s8 percNoteKey = -1);
   virtual ~MoriSnesRgn();
 
   virtual bool loadRgn();

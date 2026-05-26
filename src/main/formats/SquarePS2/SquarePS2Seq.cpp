@@ -1,3 +1,4 @@
+#include "util/types.h"
 #include "SquarePS2Seq.h"
 
 DECLARE_FORMAT(SquarePS2);
@@ -8,7 +9,7 @@ using namespace std;
 // BGMSeq
 // ******
 
-BGMSeq::BGMSeq(RawFile *file, uint32_t offset)
+BGMSeq::BGMSeq(RawFile *file, u32 offset)
     : VGMSeq(SquarePS2Format::name, file, offset) {
   setUseLinearAmplitudeScale(true);
   useReverb();
@@ -39,13 +40,13 @@ bool BGMSeq::parseHeader() {
 }
 
 bool BGMSeq::parseTrackPointers() {
-  uint32_t pos = offset() + 0x20;    //start at first track (fixed offset)
+  u32 pos = offset() + 0x20;    //start at first track (fixed offset)
   for (unsigned int i = 0; i < nNumTracks; i++) {
     //HACK FOR TRUNCATED BGMS (ex. FFXII 113 Eastersand.psf2)
     if (pos >= rawFile()->size())
       return true;
     //END HACK
-    uint32_t trackSize = readWord(pos);        //get the track size (first word before track data)
+    u32 trackSize = readWord(pos);        //get the track size (first word before track data)
     aTracks.push_back(new BGMTrack(this, pos + 4, trackSize));
     pos += trackSize + 4;                //jump to the next track
   }
@@ -57,7 +58,7 @@ bool BGMSeq::parseTrackPointers() {
 // ********
 
 
-BGMTrack::BGMTrack(BGMSeq *parentSeq, uint32_t offset, uint32_t length)
+BGMTrack::BGMTrack(BGMSeq *parentSeq, u32 offset, u32 length)
     : SeqTrack(parentSeq, offset, length) {
 }
 
@@ -65,7 +66,7 @@ BGMTrack::BGMTrack(BGMSeq *parentSeq, uint32_t offset, uint32_t length)
 bool BGMTrack::readEvent(void) {
   int value1;
 
-  uint32_t beginOffset = curOffset;
+  u32 beginOffset = curOffset;
   addTime(readVarLen(curOffset));
 
   // address range check for safety
@@ -76,7 +77,7 @@ bool BGMTrack::readEvent(void) {
     return false;
   }
 
-  uint8_t status_byte = readByte(curOffset++);
+  u8 status_byte = readByte(curOffset++);
 
   switch (status_byte) {
     //end of track
@@ -109,7 +110,7 @@ bool BGMTrack::readEvent(void) {
 
     //set tempo
     case 0x08 : {
-      uint8_t bpm = readByte(curOffset++);
+      u8 bpm = readByte(curOffset++);
       addTempoBPM(beginOffset, curOffset - beginOffset, bpm);
       break;
     }
@@ -129,9 +130,9 @@ bool BGMTrack::readEvent(void) {
     //time signature?
     case 0x0C :
     {
-      uint8_t numer = readByte(curOffset++);
-      uint8_t denom = readByte(curOffset++);
-      addTimeSig(beginOffset, curOffset - beginOffset, numer, denom, (uint8_t) parentSeq->ppqn());
+      u8 numer = readByte(curOffset++);
+      u8 denom = readByte(curOffset++);
+      addTimeSig(beginOffset, curOffset - beginOffset, numer, denom, (u8) parentSeq->ppqn());
 
       //for (value3 = 0; ((value2&1) != TRUE) && (value3 < 8); ++value3)	//while
       //	value2 >>= 1;
@@ -185,7 +186,7 @@ bool BGMTrack::readEvent(void) {
 
     // program change
     case 0x20 : {
-      uint8_t progNum = readByte(curOffset++);
+      u8 progNum = readByte(curOffset++);
       addProgramChange(beginOffset, curOffset - beginOffset, progNum);
       break;
     }
@@ -199,14 +200,14 @@ bool BGMTrack::readEvent(void) {
 
     //expression
     case 0x24 : {
-      uint8_t expression = readByte(curOffset++);            //expression value
+      u8 expression = readByte(curOffset++);            //expression value
       addExpression(beginOffset, curOffset - beginOffset, expression);
       break;
     }
 
     //pan?
     case 0x26 : {
-      uint8_t pan = readByte(curOffset++);
+      u8 pan = readByte(curOffset++);
       addPan(beginOffset, curOffset - beginOffset, pan);
       break;
     }
@@ -232,8 +233,8 @@ bool BGMTrack::readEvent(void) {
 
     //pitch bend		I SHOULD GO BACK AND VERIFY THE RANGE OF THE PITCH BEND
     case 0x5C : {
-      uint8_t lsb = readByte(curOffset++);
-      uint8_t msb = readByte(curOffset++);
+      u8 lsb = readByte(curOffset++);
+      u8 msb = readByte(curOffset++);
       addPitchBendMidiFormat(beginOffset, curOffset - beginOffset, lsb, msb);
       break;
     }

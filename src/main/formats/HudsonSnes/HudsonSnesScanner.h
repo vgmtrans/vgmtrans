@@ -4,10 +4,12 @@
  * refer to the included LICENSE.txt file
  */
 #pragma once
+
+#include "util/types.h"
 #include "Scanner.h"
 #include "BytePattern.h"
 
-enum HudsonSnesVersion : uint8_t;  // see HudsonSnesFormat.h
+enum HudsonSnesVersion : u8;  // see HudsonSnesFormat.h
 
 class HudsonSnesScanner : public VGMScanner {
  public:

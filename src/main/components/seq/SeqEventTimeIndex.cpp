@@ -4,6 +4,7 @@
  * refer to the included LICENSE.txt file
  */
 
+#include "util/types.h"
 #include "SeqEventTimeIndex.h"
 #include "SeqEvent.h"
 #include <algorithm>
@@ -13,8 +14,8 @@
 SeqEventTimeIndex::~SeqEventTimeIndex() = default;
 
 SeqEventTimeIndex::Index SeqEventTimeIndex::addEvent(SeqEvent* event,
-                                                     uint32_t startTick,
-                                                     uint32_t duration) {
+                                                     u32 startTick,
+                                                     u32 duration) {
   m_events.push_back(SeqTimedEvent{startTick, duration, event});
   auto it = m_firstStart.find(event);
   if (it == m_firstStart.end() || startTick < it->second) {
@@ -71,7 +72,7 @@ void SeqEventTimeIndex::finalize() {
   m_finalized = true;
 }
 
-bool SeqEventTimeIndex::firstStartTick(const SeqEvent* event, uint32_t& outTick) const noexcept {
+bool SeqEventTimeIndex::firstStartTick(const SeqEvent* event, u32& outTick) const noexcept {
   if (!event) {
     return false;
   }
@@ -81,7 +82,7 @@ bool SeqEventTimeIndex::firstStartTick(const SeqEvent* event, uint32_t& outTick)
     return true;
   }
   bool found = false;
-  uint32_t minTick = 0;
+  u32 minTick = 0;
   for (const auto& timed : m_events) {
     if (timed.event != event) {
       continue;
@@ -97,13 +98,13 @@ bool SeqEventTimeIndex::firstStartTick(const SeqEvent* event, uint32_t& outTick)
   return found;
 }
 
-void SeqEventTimeIndex::getActiveAt(uint32_t tick, std::vector<const SeqTimedEvent*>& out) const {
+void SeqEventTimeIndex::getActiveAt(u32 tick, std::vector<const SeqTimedEvent*>& out) const {
   Cursor cursor(*this);
   cursor.getActiveAt(tick, out);
 }
 
-void SeqEventTimeIndex::getActiveInRange(uint32_t startTick,
-                                         uint32_t endTick,
+void SeqEventTimeIndex::getActiveInRange(u32 startTick,
+                                         u32 endTick,
                                          std::vector<const SeqTimedEvent*>& out) const {
   Cursor cursor(*this);
   cursor.getActiveInRange(startTick, endTick, out);
@@ -113,17 +114,17 @@ SeqEventTimeIndex::Cursor::Cursor(const SeqEventTimeIndex& index) : m_index(&ind
   reset(0);
 }
 
-void SeqEventTimeIndex::Cursor::reset(uint32_t tick) {
+void SeqEventTimeIndex::Cursor::reset(u32 tick) {
   m_nextStart = 0;
   m_nextEnd = 0;
-  m_currentTick = std::numeric_limits<uint32_t>::max();
+  m_currentTick = std::numeric_limits<u32>::max();
   rebuildActiveIndex();
   if (isReady()) {
     advanceTo(tick);
   }
 }
 
-void SeqEventTimeIndex::Cursor::seek(uint32_t tick) {
+void SeqEventTimeIndex::Cursor::seek(u32 tick) {
   if (!isReady()) {
     return;
   }
@@ -136,7 +137,7 @@ void SeqEventTimeIndex::Cursor::seek(uint32_t tick) {
   advanceTo(tick);
 }
 
-void SeqEventTimeIndex::Cursor::getActiveAt(uint32_t tick, std::vector<const SeqTimedEvent*>& out) {
+void SeqEventTimeIndex::Cursor::getActiveAt(u32 tick, std::vector<const SeqTimedEvent*>& out) {
   out.clear();
   if (!isReady()) {
     return;
@@ -149,8 +150,8 @@ void SeqEventTimeIndex::Cursor::getActiveAt(uint32_t tick, std::vector<const Seq
   }
 }
 
-void SeqEventTimeIndex::Cursor::getActiveInRange(uint32_t startTick,
-                                                 uint32_t endTick,
+void SeqEventTimeIndex::Cursor::getActiveInRange(u32 startTick,
+                                                 u32 endTick,
                                                  std::vector<const SeqTimedEvent*>& out) {
   out.clear();
   if (!isReady()) {
@@ -191,7 +192,7 @@ void SeqEventTimeIndex::Cursor::rebuildActiveIndex() {
   m_activePositions.assign(m_index->size(), -1);
 }
 
-void SeqEventTimeIndex::Cursor::advanceTo(uint32_t tick) {
+void SeqEventTimeIndex::Cursor::advanceTo(u32 tick) {
   if (m_index == nullptr) {
     return;
   }
@@ -232,7 +233,7 @@ void SeqEventTimeIndex::Cursor::addActive(Index idx) {
   if (idx >= m_activePositions.size() || m_activePositions[idx] >= 0) {
     return;
   }
-  m_activePositions[idx] = static_cast<int32_t>(m_active.size());
+  m_activePositions[idx] = static_cast<s32>(m_active.size());
   m_active.push_back(idx);
 }
 
@@ -240,7 +241,7 @@ void SeqEventTimeIndex::Cursor::removeActive(Index idx) {
   if (idx >= m_activePositions.size()) {
     return;
   }
-  int32_t pos = m_activePositions[idx];
+  s32 pos = m_activePositions[idx];
   if (pos < 0) {
     return;
   }

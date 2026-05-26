@@ -1,4 +1,6 @@
 #pragma once
+
+#include "util/types.h"
 #include "VGMSeq.h"
 #include "SeqTrack.h"
 #include "SuzukiSnesFormat.h"
@@ -74,21 +76,21 @@ class SuzukiSnesSeq
     : public VGMSeq {
  public:
   SuzukiSnesSeq
-      (RawFile *file, SuzukiSnesVersion ver, uint32_t seqdataOffset, std::string newName = "Square SUZUKI SNES Seq");
+      (RawFile *file, SuzukiSnesVersion ver, u32 seqdataOffset, std::string newName = "Square SUZUKI SNES Seq");
   virtual ~SuzukiSnesSeq();
 
   virtual bool parseHeader();
   virtual bool parseTrackPointers();
   virtual void resetVars();
 
-  double getTempoInBPM(uint8_t tempo);
+  double getTempoInBPM(u8 tempo);
 
   SuzukiSnesVersion version;
-  std::map<uint8_t, SuzukiSnesSeqEventType> EventMap;
+  std::map<u8, SuzukiSnesSeqEventType> EventMap;
 
-  static const uint8_t NOTE_DUR_TABLE[13];
+  static const u8 NOTE_DUR_TABLE[13];
 
-  uint8_t spcTempo;
+  u8 spcTempo;
 
  private:
   void loadEventMap();
@@ -98,20 +100,20 @@ class SuzukiSnesSeq
 class SuzukiSnesTrack
     : public SeqTrack {
  public:
-  SuzukiSnesTrack(SuzukiSnesSeq *parentFile, uint32_t offset = 0, uint32_t length = 0);
+  SuzukiSnesTrack(SuzukiSnesSeq *parentFile, u32 offset = 0, u32 length = 0);
   virtual void resetVars();
   virtual bool readEvent();
 
  private:
-  uint16_t infiniteLoopPoint;
+  u16 infiniteLoopPoint;
 
-  uint8_t spcVolume;
+  u8 spcVolume;
   bool percussion;
-  uint8_t nonPercussionProgram;
+  u8 nonPercussionProgram;
 
-  uint8_t loopLevel;
-  uint8_t loopCount[SUZUKISNES_LOOP_LEVEL_MAX];
-  uint16_t loopStart[SUZUKISNES_LOOP_LEVEL_MAX];
-  uint16_t loopEnd[SUZUKISNES_LOOP_LEVEL_MAX];
-  uint8_t loopOctave[SUZUKISNES_LOOP_LEVEL_MAX];
+  u8 loopLevel;
+  u8 loopCount[SUZUKISNES_LOOP_LEVEL_MAX];
+  u16 loopStart[SUZUKISNES_LOOP_LEVEL_MAX];
+  u16 loopEnd[SUZUKISNES_LOOP_LEVEL_MAX];
+  u8 loopOctave[SUZUKISNES_LOOP_LEVEL_MAX];
 };

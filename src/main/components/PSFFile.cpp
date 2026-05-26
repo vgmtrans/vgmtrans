@@ -4,6 +4,7 @@
  * refer to the included LICENSE.txt file
  */
 
+#include "util/types.h"
 #include "PSFFile.h"
 
 #include "util/decompression.h"
@@ -33,7 +34,7 @@ PSFFile::PSFFile(const RawFile &file) {
     }
 
     m_version = file[3];
-    uint32_t reservedarea_size = file.readWord(4);
+    u32 reservedarea_size = file.readWord(4);
     if (reservedarea_size) {
         m_reserved_data.resize(reservedarea_size);
         file.readBytes(16, reservedarea_size, m_reserved_data.data());
@@ -51,7 +52,7 @@ PSFFile::PSFFile(const RawFile &file) {
         auto exe_begin = file.begin() + 16 + reservedarea_size;
 
         if (m_exe_CRC !=
-            crc32(crc32(0L, nullptr, 0), reinterpret_cast<const Bytef *>(exe_begin), static_cast<uint32_t>(exe_size))) {
+            crc32(crc32(0L, nullptr, 0), reinterpret_cast<const Bytef *>(exe_begin), static_cast<u32>(exe_size))) {
             throw std::runtime_error("CRC32 mismatch, data is corrupt");
         }
 

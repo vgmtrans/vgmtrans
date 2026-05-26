@@ -4,6 +4,7 @@
  * See the included LICENSE for more information
  */
 
+#include "util/types.h"
 #include <cmath>
 #include <string>
 #include <vector>
@@ -23,7 +24,7 @@
 constexpr double INTR_FREQUENCY = (2728.0 * 64.0) / 33513982.0;
 
 // Maps 0-127 sustain value to dB attenuation (in 10ths of dB)
-static const int16_t DECIBEL_SQUARE_TABLE[128] = {
+static const s16 DECIBEL_SQUARE_TABLE[128] = {
     -481, -480, -480, -480, -480, -480, -480, -480, -480, -460, -442, -425, -410, -396, -383, -371,
     -360, -349, -339, -330, -321, -313, -305, -297, -289, -282, -276, -269, -263, -257, -251, -245,
     -239, -234, -229, -224, -219, -214, -210, -205, -201, -196, -192, -188, -184, -180, -176, -173,
@@ -33,7 +34,7 @@ static const int16_t DECIBEL_SQUARE_TABLE[128] = {
     -49,  -47,  -45,  -43,  -42,  -40,  -38,  -36,  -35,  -33,  -31,  -30,  -28,  -27,  -25,  -23,
     -22,  -20,  -19,  -17,  -16,  -14,  -13,  -11,  -10,  -8,   -7,   -6,   -4,   -3,   -1,   0};
 
-static const uint8_t ATTACK_TIME_TABLE[19] = {0x00, 0x01, 0x05, 0x0E, 0x1A, 0x26, 0x33,
+static const u8 ATTACK_TIME_TABLE[19] = {0x00, 0x01, 0x05, 0x0E, 0x1A, 0x26, 0x33,
                                               0x3F, 0x49, 0x54, 0x5C, 0x64, 0x6D, 0x74,
                                               0x7B, 0x7F, 0x84, 0x89, 0x8F};
 
@@ -41,25 +42,25 @@ static const uint8_t ATTACK_TIME_TABLE[19] = {0x00, 0x01, 0x05, 0x0E, 0x1A, 0x26
 // NDSInstrSet
 // ***********
 
-NDSInstrSet::NDSInstrSet(RawFile* file, uint32_t offset, uint32_t length, VGMSampColl* psg_samples,
+NDSInstrSet::NDSInstrSet(RawFile* file, u32 offset, u32 length, VGMSampColl* psg_samples,
                          std::string name)
     : VGMInstrSet(NDSFormat::name, file, offset, length, std::move(name)),
       m_psg_samples(psg_samples) {
 }
 
 bool NDSInstrSet::parseInstrPointers() {
-  uint32_t nInstruments = readWord(offset() + 0x38);
+  u32 nInstruments = readWord(offset() + 0x38);
   VGMHeader* instrptrHdr = addHeader(offset() + 0x38, nInstruments * 4 + 4, "Instrument Pointers");
 
-  for (uint32_t i = 0; i < nInstruments; i++) {
-    uint32_t instrPtrOff = offset() + 0x3C + i * 4;
-    uint32_t temp = readWord(instrPtrOff);
+  for (u32 i = 0; i < nInstruments; i++) {
+    u32 instrPtrOff = offset() + 0x3C + i * 4;
+    u32 temp = readWord(instrPtrOff);
     if (temp == 0) {
       continue;
     }
 
-    uint8_t instrType = temp & 0xFF;
-    uint32_t pInstr = temp >> 8;
+    u8 instrType = temp & 0xFF;
+    u32 pInstr = temp >> 8;
     aInstrs.push_back(new NDSInstr(this, pInstr + offset(), 0, 0, i, instrType));
 
     VGMHeader* hdr = instrptrHdr->addHeader(instrPtrOff, 4, "Pointer");
@@ -74,8 +75,8 @@ bool NDSInstrSet::parseInstrPointers() {
 // NDSInstr
 // ********
 
-NDSInstr::NDSInstr(NDSInstrSet* instrSet, uint32_t offset, uint32_t length, uint32_t theBank,
-                   uint32_t theInstrNum, uint8_t theInstrType)
+NDSInstr::NDSInstr(NDSInstrSet* instrSet, u32 offset, u32 length, u32 theBank,
+                   u32 theInstrNum, u8 theInstrType)
     : VGMInstr(instrSet, offset, length, theBank, theInstrNum, "Instrument", 0),
       instrType(theInstrType) {
 }
@@ -96,7 +97,7 @@ bool NDSInstr::loadInstr() {
 
     case 0x02: {
       /* PSG Tone */
-      uint8_t dutyCycle = readByte(offset()) & 0x07;
+      u8 dutyCycle = readByte(offset()) & 0x07;
       std::string dutyCycles[8] = {"12.5%", "25%", "37.5%", "50%", "62.5%", "75%", "87.5%", "0%"};
       setName("PSG Wave (" + dutyCycles[dutyCycle] + ")");
       setLength(10);
@@ -127,10 +128,10 @@ bool NDSInstr::loadInstr() {
     case 0x10: {
       setName("Drumset");
 
-      uint8_t lowKey = readByte(offset());
-      uint8_t highKey = readByte(offset() + 1);
-      uint8_t nRgns = (highKey - lowKey) + 1;
-      for (uint8_t i = 0; i < nRgns; i++) {
+      u8 lowKey = readByte(offset());
+      u8 highKey = readByte(offset() + 1);
+      u8 nRgns = (highKey - lowKey) + 1;
+      for (u8 i = 0; i < nRgns; i++) {
         u32 rgnOff = offset() + 2 + i * 12;
         VGMRgn* rgn = addRgn(rgnOff, 12, readShort(rgnOff + 2), lowKey + i, lowKey + i);
         getSampCollPtr(rgn, readShort(rgnOff + 4));
@@ -145,8 +146,8 @@ bool NDSInstr::loadInstr() {
 
     case 0x11: {
       setName("Multi-Region Instrument");
-      uint8_t keyRanges[8];
-      uint8_t nRgns = 0;
+      u8 keyRanges[8];
+      u8 nRgns = 0;
       for (int i = 0; i < 8; i++) {
         keyRanges[i] = readByte(offset() + i);
         if (keyRanges[i] != 0) {
@@ -179,13 +180,13 @@ void NDSInstr::getSampCollPtr(VGMRgn* rgn, int waNum) const {
   rgn->sampCollPtr = static_cast<NDSInstrSet*>(parInstrSet)->sampCollWAList[waNum];
 }
 
-void NDSInstr::getArticData(VGMRgn* rgn, uint32_t offset) const {
+void NDSInstr::getArticData(VGMRgn* rgn, u32 offset) const {
   rgn->addUnityKey(readByte(offset), offset, 1);
-  uint8_t AttackTime = readByte(offset + 1);
-  uint8_t DecayTime = readByte(offset + 2);
-  uint8_t SustainLev = readByte(offset + 3);
-  uint8_t ReleaseTime = readByte(offset + 4);
-  uint8_t Pan = readByte(offset + 5);
+  u8 AttackTime = readByte(offset + 1);
+  u8 DecayTime = readByte(offset + 2);
+  u8 SustainLev = readByte(offset + 3);
+  u8 ReleaseTime = readByte(offset + 4);
+  u8 Pan = readByte(offset + 5);
 
   rgn->addADSRValue(offset + 1, 1, "Attack Rate");
   rgn->addADSRValue(offset + 2, 1, "Decay Rate");
@@ -193,7 +194,7 @@ void NDSInstr::getArticData(VGMRgn* rgn, uint32_t offset) const {
   rgn->addADSRValue(offset + 4, 1, "Release Time");
   rgn->addChild(offset + 5, 1, "Pan");
 
-  uint8_t realAttack = 0xFF - AttackTime;
+  u8 realAttack = 0xFF - AttackTime;
   if (AttackTime >= 0x6D) {
     realAttack = ATTACK_TIME_TABLE[0x7F - AttackTime];
   }
@@ -246,8 +247,8 @@ void NDSInstr::getArticData(VGMRgn* rgn, uint32_t offset) const {
     rgn->pan = static_cast<double>(Pan) / 127;
 }
 
-uint16_t NDSInstr::getFallingRate(uint8_t DecayTime) const {
-  uint32_t realDecay;
+u16 NDSInstr::getFallingRate(u8 DecayTime) const {
+  u32 realDecay;
   if (DecayTime == 0x7F)
     realDecay = 0xFFFF;
   else if (DecayTime == 0x7E)
@@ -263,14 +264,14 @@ uint16_t NDSInstr::getFallingRate(uint8_t DecayTime) const {
                              // have tested all cases
     realDecay &= 0xFFFF;
   }
-  return static_cast<uint16_t>(realDecay);
+  return static_cast<u16>(realDecay);
 }
 
 // ***********
 // NDSWaveArch
 // ***********
 
-NDSWaveArch::NDSWaveArch(RawFile* file, uint32_t offset, uint32_t length, std::string name)
+NDSWaveArch::NDSWaveArch(RawFile* file, u32 offset, u32 length, std::string name)
     : VGMSampColl(NDSFormat::name, file, offset, length, std::move(name)) {
 }
 
@@ -280,23 +281,23 @@ bool NDSWaveArch::parseHeader() {
 }
 
 bool NDSWaveArch::parseSampleInfo() {
-  uint32_t nSamples = readWord(offset() + 0x38);
-  for (uint32_t i = 0; i < nSamples; i++) {
-    uint32_t pSample = readWord(offset() + 0x3C + i * 4) + offset();
+  u32 nSamples = readWord(offset() + 0x38);
+  for (u32 i = 0; i < nSamples; i++) {
+    u32 pSample = readWord(offset() + 0x3C + i * 4) + offset();
     int nChannels = 1;
-    uint8_t waveType = readByte(pSample);
+    u8 waveType = readByte(pSample);
     bool bLoops = (readByte(pSample + 1) != 0);
-    uint32_t rate = readShort(pSample + 2);
+    u32 rate = readShort(pSample + 2);
 
     // Use the Period (Time) field (offset 0x04) to determine the hardware playback rate.
     // This field represents the ARM7 clock divisor: Time = (ARM7_CLOCK / 2) / SampleRate
     // ARM7_CLOCK / 2 is approximately 16,756,991 Hz.
-    uint16_t timerVal = readShort(pSample + 4);
+    u16 timerVal = readShort(pSample + 4);
     if (timerVal > 0) {
       rate = 16756991 / timerVal;
     }
     BPS bps;
-    // uint8_t multiplier;
+    // u8 multiplier;
     switch (waveType) {
       case NDSSamp::PCM8:
         bps = BPS::PCM8;
@@ -312,13 +313,13 @@ bool NDSWaveArch::parseSampleInfo() {
         bps = BPS::PCM16;
         break;
     }
-    uint32_t loopOff =
+    u32 loopOff =
         (readShort(pSample + 6)) *
         4;  //*multiplier; //represents loop point in words, excluding header supposedly
-    uint32_t nonLoopLength =
+    u32 nonLoopLength =
         readShort(pSample + 8) * 4;  // if IMA-ADPCM, subtract one for the ADPCM header
 
-    uint32_t dataStart, dataLength;
+    u32 dataStart, dataLength;
     if (waveType == NDSSamp::IMA_ADPCM) {
       dataStart = pSample + 0x10;
       dataLength = loopOff + nonLoopLength - 4;
@@ -353,7 +354,7 @@ NDSPSG::NDSPSG(RawFile* file) : VGMSampColl(NDSFormat::name, file, 0, 0, "NDS PS
 
 bool NDSPSG::parseSampleInfo() {
   /* 8 waves + noise */
-  for (uint8_t i = 0; i <= 8; i++) {
+  for (u8 i = 0; i <= 8; i++) {
     samples.push_back(new NDSPSGSamp(this, i));
   }
 
@@ -364,9 +365,9 @@ bool NDSPSG::parseSampleInfo() {
 // NDSSamp
 // *******
 
-NDSSamp::NDSSamp(VGMSampColl* sampColl, uint32_t offset, uint32_t length, uint32_t dataOffset,
-                 uint32_t dataLen, uint8_t nChannels, BPS bps, uint32_t theRate,
-                 uint8_t theWaveType, std::string name)
+NDSSamp::NDSSamp(VGMSampColl* sampColl, u32 offset, u32 length, u32 dataOffset,
+                 u32 dataLen, u8 nChannels, BPS bps, u32 theRate,
+                 u8 theWaveType, std::string name)
     : VGMSamp(sampColl, offset, length, dataOffset, dataLen, nChannels, bps, theRate,
               std::move(name)),
       waveType(theWaveType) {
@@ -380,7 +381,7 @@ double NDSSamp::compressionRatio() const {
   return 1.0;
 }
 
-std::vector<uint8_t> NDSSamp::decodeToNativePcm() {
+std::vector<u8> NDSSamp::decodeToNativePcm() {
   if (waveType == IMA_ADPCM) {
     return decodeImaAdpcm();
   }
@@ -400,25 +401,25 @@ std::vector<uint8_t> NDSSamp::decodeToNativePcm() {
 // it clamps min (and max?) sample values differently (see below).  I really don't know how much of
 // a difference it makes, but this implementation is, to my knowledge, the proper way of doing
 // things for NDS.
-std::vector<uint8_t> NDSSamp::decodeImaAdpcm() {
-  const uint32_t sampleCount = uncompressedSize() / sizeof(int16_t);
-  std::vector<uint8_t> samples(sampleCount * sizeof(int16_t));
-  auto* output = reinterpret_cast<int16_t*>(samples.data());
-  uint32_t destOff = 0;
-  uint32_t sampHeader = getWord(dataOff - 4);
+std::vector<u8> NDSSamp::decodeImaAdpcm() {
+  const u32 sampleCount = uncompressedSize() / sizeof(s16);
+  std::vector<u8> samples(sampleCount * sizeof(s16));
+  auto* output = reinterpret_cast<s16*>(samples.data());
+  u32 destOff = 0;
+  u32 sampHeader = getWord(dataOff - 4);
   int decompSample = sampHeader & 0xFFFF;
   int stepIndex = (sampHeader >> 16) & 0x7F;
 
-  uint32_t curOffset = dataOff;
-  output[destOff++] = (int16_t)decompSample;
+  u32 curOffset = dataOff;
+  output[destOff++] = (s16)decompSample;
 
-  uint8_t compByte;
+  u8 compByte;
   while (curOffset < dataOff + dataLength) {
     compByte = readByte(curOffset++);
     process_nibble(compByte, stepIndex, decompSample);
-    output[destOff++] = (int16_t)decompSample;
+    output[destOff++] = (s16)decompSample;
     process_nibble((compByte & 0xF0) >> 4, stepIndex, decompSample);
-    output[destOff++] = (int16_t)decompSample;
+    output[destOff++] = (s16)decompSample;
   }
 
   return samples;
@@ -489,7 +490,7 @@ void NDSSamp::clamp_sample(int& decompSample) {
     decompSample = 32767;
 }
 
-NDSPSGSamp::NDSPSGSamp(VGMSampColl* sampcoll, uint8_t duty_cycle) : VGMSamp(sampcoll) {
+NDSPSGSamp::NDSPSGSamp(VGMSampColl* sampcoll, u8 duty_cycle) : VGMSamp(sampcoll) {
   switch (duty_cycle) {
     case 7: {
       m_duty_cycle = 0;
@@ -545,7 +546,7 @@ NDSPSGSamp::NDSPSGSamp(VGMSampColl* sampcoll, uint8_t duty_cycle) : VGMSamp(samp
   setName("PSG_duty_" + std::to_string(duty_cycle));
 }
 
-std::vector<uint8_t> NDSPSGSamp::decodeToNativePcm() {
+std::vector<u8> NDSPSGSamp::decodeToNativePcm() {
   if (m_duty_cycle == -1) {
     return psg::synthesizeLfsrNoisePCM16(loopLength());
   }

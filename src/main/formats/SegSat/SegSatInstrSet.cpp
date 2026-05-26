@@ -4,6 +4,7 @@
  * refer to the included LICENSE.txt file
  */
 
+#include "util/types.h"
 #include "SegSatInstrSet.h"
 #include "ScaleConversion.h"
 #include "VGMSamp.h"
@@ -45,7 +46,7 @@ constexpr PanLinAmp panToAmp(u8 pan) {
 // SegSatInstrSet
 // **************
 
-SegSatInstrSet::SegSatInstrSet(RawFile* file, uint32_t offset, int numInstrs, SegSatDriverVer ver, const std::string& name) :
+SegSatInstrSet::SegSatInstrSet(RawFile* file, u32 offset, int numInstrs, SegSatDriverVer ver, const std::string& name) :
     VGMInstrSet(SegSatFormat::name, file, offset, 0, name), m_numInstrs(numInstrs), m_driverVer(ver) {
   sampColl = new VGMSampColl(SegSatFormat::name, file, this, offset);
 }
@@ -229,9 +230,9 @@ bool SegSatInstr::loadInstr() {
 ///   - Period                     = ((2^TxCTL) / Fs) * (255 - TIMx)
 ///   - Frequency                  =  Fs / ( (2^TxCTL) * (255 - TIMx) )
 constexpr double calculateScspIrqHz(double Fs, u32 TxCTL, u32 TIMx) {
-  const std::uint32_t steps = 255u - (TIMx & 0xffu);
+  const u32 steps = 255u - (TIMx & 0xffu);
   if (steps == 0) return 0.0;
-  const std::uint32_t prescaler = 1u << (TxCTL & 7u);
+  const u32 prescaler = 1u << (TxCTL & 7u);
   return Fs / (static_cast<double>(prescaler) * static_cast<double>(steps));
 }
 
@@ -246,7 +247,7 @@ double calculateDriverHz(SegSatDriverVer driverVer) {
 }
 
 // Calculate the total fade (in) given PLFO freq and fade bytes, and the rate of driver updates (Hz)
-double calculatePlfoFadeTimeSeconds(uint8_t freq, uint8_t fade, double R)
+double calculatePlfoFadeTimeSeconds(u8 freq, u8 fade, double R)
 {
   int x = fade * fade;       // x = fade^2
   x >>= 6;                   // x = floor(fade^2 / 64)
@@ -261,7 +262,7 @@ double calculatePlfoFadeTimeSeconds(uint8_t freq, uint8_t fade, double R)
 }
 
 
-SegSatRgn::SegSatRgn(SegSatInstr* instr, uint32_t offset, const std::string& name) :
+SegSatRgn::SegSatRgn(SegSatInstr* instr, u32 offset, const std::string& name) :
   VGMRgn(instr, offset, 0x20, name) {
   addKeyLow(readByte(offset), offset, 1);
   addKeyHigh(readByte(offset+1), offset+1, 1);

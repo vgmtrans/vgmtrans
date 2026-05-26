@@ -5,6 +5,8 @@
  */
 
 #pragma once
+
+#include "util/types.h"
 #include "TableView.h"
 
 class QItemSelection;
@@ -20,7 +22,7 @@ public:
   QVariant data(const QModelIndex &index, int role = Qt::DisplayRole) const override;
 
 private:
-  enum Property : uint8_t { Name = 0, ContainedFiles = 1 };
+  enum Property : u8 { Name = 0, ContainedFiles = 1 };
   size_t filesBeforeLoad;
 };
 

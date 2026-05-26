@@ -4,6 +4,7 @@
 * refer to the included LICENSE.txt file
  */
 
+#include "util/types.h"
 #include "NotificationCenter.h"
 #include "VGMItem.h"
 #include "Helpers.h"
@@ -11,7 +12,7 @@
 NotificationCenter::NotificationCenter(QObject *parent) : QObject(parent) {
 }
 
-void NotificationCenter::updateStatus(const QString& name, const QString& description, const QIcon* icon, uint32_t offset, uint32_t size) {
+void NotificationCenter::updateStatus(const QString& name, const QString& description, const QIcon* icon, u32 offset, u32 size) {
   emit statusUpdated(name, description, icon, offset, size);
 }
 

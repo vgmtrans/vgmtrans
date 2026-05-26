@@ -4,6 +4,7 @@
  * refer to the included LICENSE.txt file
  */
 
+#include "util/types.h"
 #include "VGMMiscFile.h"
 #include "Root.h"
 #include "Format.h"
@@ -12,7 +13,7 @@
 // VGMMiscFile
 // ***********
 
-VGMMiscFile::VGMMiscFile(const std::string &format, RawFile *file, uint32_t offset, uint32_t length,
+VGMMiscFile::VGMMiscFile(const std::string &format, RawFile *file, u32 offset, u32 length,
                          std::string name)
     : VGMFile(format, file, offset, length, std::move(name)) {
 }

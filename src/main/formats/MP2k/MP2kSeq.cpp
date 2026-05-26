@@ -11,6 +11,7 @@
  * http://www.romhacking.net/documents/%5B462%5Dsappy.txt
  */
 
+#include "util/types.h"
 #include "MP2kSeq.h"
 
 #include <array>
@@ -21,11 +22,11 @@
 
 DECLARE_FORMAT(MP2k);
 
-constexpr uint8_t kMp2kModTypeVibrato = 0;
-constexpr uint8_t kMp2kModTypeTremolo = 1;
-constexpr uint8_t kMp2kModTypePan = 2;
+constexpr u8 kMp2kModTypeVibrato = 0;
+constexpr u8 kMp2kModTypeTremolo = 1;
+constexpr u8 kMp2kModTypePan = 2;
 
-const char* mp2kModTypeName(uint8_t type) {
+const char* mp2kModTypeName(u8 type) {
   switch (type) {
     case kMp2kModTypeVibrato:
       return "Vibrato";
@@ -38,7 +39,7 @@ const char* mp2kModTypeName(uint8_t type) {
   }
 }
 
-MP2kSeq::MP2kSeq(RawFile *file, uint32_t offset, std::string name)
+MP2kSeq::MP2kSeq(RawFile *file, u32 offset, std::string name)
     : VGMSeq(MP2kFormat::name, file, offset, 0, std::move(name)) {
   setAllowDiscontinuousTrackData(true);
 }
@@ -65,11 +66,11 @@ bool MP2kSeq::parseHeader() {
   seqHdr->addChild(offset() + 2, 1, "Priority");
   seqHdr->addChild(offset() + 3, 1, "Reverb");
 
-  uint32_t dwInstPtr = readWord(offset() + 4);
+  u32 dwInstPtr = readWord(offset() + 4);
   seqHdr->addPointer(offset() + 4, 4, dwInstPtr - 0x8000000, true, "Instrument pointer");
   for (u32 i = 0; i < nNumTracks; i++) {
-    uint32_t dwTrackPtrOffset = offset() + 8 + i * 4;
-    uint32_t dwTrackPtr = readWord(dwTrackPtrOffset);
+    u32 dwTrackPtrOffset = offset() + 8 + i * 4;
+    u32 dwTrackPtr = readWord(dwTrackPtrOffset);
     seqHdr->addPointer(dwTrackPtrOffset, 4, dwTrackPtr - 0x8000000, true, "Track pointer");
   }
 
@@ -81,8 +82,8 @@ bool MP2kSeq::parseHeader() {
 bool MP2kSeq::parseTrackPointers(void) {
   // Add each tracks
   for (unsigned int i = 0; i < nNumTracks; i++) {
-    uint32_t dwTrackPtrOffset = offset() + 8 + i * 4;
-    uint32_t dwTrackPtr = readWord(dwTrackPtrOffset);
+    u32 dwTrackPtrOffset = offset() + 8 + i * 4;
+    u32 dwTrackPtr = readWord(dwTrackPtrOffset);
     aTracks.push_back(new MP2kTrack(this, dwTrackPtr - 0x8000000));
   }
 
@@ -104,7 +105,7 @@ bool MP2kSeq::parseTrackPointers(void) {
 //  MP2kTrack
 //  *********
 
-MP2kTrack::MP2kTrack(MP2kSeq *parentFile, uint32_t offset, uint32_t length)
+MP2kTrack::MP2kTrack(MP2kSeq *parentFile, u32 offset, u32 length)
     : SeqTrack(parentFile, offset, length) {
 }
 
@@ -117,7 +118,7 @@ void MP2kTrack::resetVars() {
   modType = kMp2kModTypeVibrato;
   vibratoLfo.reset();
   tremoloLfo.reset();
-  constexpr uint8_t kDefaultLfoSpeed = 22;
+  constexpr u8 kDefaultLfoSpeed = 22;
   vibratoLfo.configure(0, kDefaultLfoSpeed, 0);
   tremoloLfo.configure(0, kDefaultLfoSpeed, 0);
 }
@@ -132,8 +133,8 @@ bool MP2kTrack::readEvent() {
       0x0D, 0x0E, 0x0F, 0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17, 0x18, 0x1C,
       0x1E, 0x20, 0x24, 0x28, 0x2A, 0x2C, 0x30, 0x34, 0x36, 0x38, 0x3C, 0x40, 0x42,
       0x44, 0x48, 0x4C, 0x4E, 0x50, 0x54, 0x58, 0x5A, 0x5C, 0x60};
-  uint32_t beginOffset = curOffset;
-  uint8_t status_byte = readByte(curOffset++);
+  u32 beginOffset = curOffset;
+  u8 status_byte = readByte(curOffset++);
   bool bContinue = true;
 
   /* Status change event (note, vel (fade), vol, ...) */
@@ -158,10 +159,10 @@ bool MP2kTrack::readEvent() {
     addEndOfTrack(beginOffset, curOffset - beginOffset);
     return false;
   } else if (status_byte == 0xB2) { /* Goto */
-    uint32_t destOffset = getWord(curOffset) - 0x8000000;
+    u32 destOffset = getWord(curOffset) - 0x8000000;
     curOffset += 4;
-    uint32_t length = curOffset - beginOffset;
-    uint32_t dwEndTrackOffset = curOffset;
+    u32 length = curOffset - beginOffset;
+    u32 dwEndTrackOffset = curOffset;
 
     curOffset = destOffset;
     if (!isOffsetUsed(destOffset) || loopEndPositions.size() != 0) {
@@ -173,7 +174,7 @@ bool MP2kTrack::readEvent() {
     // Add next end of track event
     if (readMode == READMODE_ADD_TO_UI) {
       if (dwEndTrackOffset < this->parentSeq->vgmFile()->endOffset()) {
-        uint8_t nextCmdByte = readByte(dwEndTrackOffset);
+        u8 nextCmdByte = readByte(dwEndTrackOffset);
         if (nextCmdByte == 0xB1) {
           addEndOfTrack(dwEndTrackOffset, 1);
         }
@@ -232,12 +233,12 @@ void MP2kTrack::handleStatusCommand(u32 beginOffset, u8 status_byte) {
     }
 
     case State::PitchBend: {
-      addPitchBend(beginOffset, curOffset - beginOffset, static_cast<int16_t>(status_byte - 0x40) * 128);
+      addPitchBend(beginOffset, curOffset - beginOffset, static_cast<s16>(status_byte - 0x40) * 128);
       break;
     }
 
     case State::Modulation: {
-      const uint8_t depth = status_byte;
+      const u8 depth = status_byte;
       const auto desc = fmt::format("Depth: {}", depth);
       setModulationDepth(depth);
       switch (modType) {
@@ -262,7 +263,7 @@ void MP2kTrack::handleStatusCommand(u32 beginOffset, u8 status_byte) {
     }
 
     default: {
-      L_WARN("Illegal status {} {}", static_cast<uint8_t>(state), status_byte);
+      L_WARN("Illegal status {} {}", static_cast<u8>(state), status_byte);
       break;
     }
   }
@@ -272,7 +273,7 @@ void MP2kTrack::handleSpecialCommand(u32 beginOffset, u8 status_byte) {
   switch (status_byte) {
     // Branch
     case 0xB3: {
-      uint32_t destOffset = getWord(curOffset);
+      u32 destOffset = getWord(curOffset);
       curOffset += 4;
       loopEndPositions.push_back(curOffset);
       addGenericEvent(beginOffset, curOffset - beginOffset, "Pattern Play", "", Type::Loop);
@@ -291,7 +292,7 @@ void MP2kTrack::handleSpecialCommand(u32 beginOffset, u8 status_byte) {
     }
 
     case 0xBA: {
-      const uint8_t priority = readByte(curOffset++);
+      const u8 priority = readByte(curOffset++);
       const auto desc = fmt::format("Priority: {}", priority);
       addGenericEvent(beginOffset, curOffset - beginOffset, "Priority", desc, Type::Priority);
       break;
@@ -306,13 +307,13 @@ void MP2kTrack::handleSpecialCommand(u32 beginOffset, u8 status_byte) {
     }
 
     case 0xBC: {
-      const int8_t keyShift = static_cast<int8_t>(readByte(curOffset++));
+      const s8 keyShift = static_cast<s8>(readByte(curOffset++));
       addTranspose(beginOffset, curOffset - beginOffset, keyShift, "Key Shift");
       break;
     }
 
     case 0xBD: {
-      uint8_t progNum = readByte(curOffset++);
+      u8 progNum = readByte(curOffset++);
       addProgramChange(beginOffset, curOffset - beginOffset, progNum);
       break;
     }
@@ -340,14 +341,14 @@ void MP2kTrack::handleSpecialCommand(u32 beginOffset, u8 status_byte) {
 
     // pitch bend range
     case 0xC1: {
-      const uint8_t semitones = readByte(curOffset++);
-      addPitchBendRange(beginOffset, curOffset - beginOffset, static_cast<uint16_t>(semitones) * 100);
+      const u8 semitones = readByte(curOffset++);
+      addPitchBendRange(beginOffset, curOffset - beginOffset, static_cast<u16>(semitones) * 100);
       break;
     }
 
     // lfo speed
     case 0xC2: {
-      const uint8_t speed = readByte(curOffset++);
+      const u8 speed = readByte(curOffset++);
       setLfoSpeed(speed);
       const auto desc = fmt::format("Speed: {}", speed);
       addGenericEvent(beginOffset, curOffset - beginOffset, "LFO Speed", desc, Type::Lfo);
@@ -356,7 +357,7 @@ void MP2kTrack::handleSpecialCommand(u32 beginOffset, u8 status_byte) {
 
     // lfo delay
     case 0xC3: {
-      const uint8_t delay = readByte(curOffset++);
+      const u8 delay = readByte(curOffset++);
       setLfoDelay(delay);
       const auto desc = fmt::format("Delay: {} clocks", delay);
       addGenericEvent(beginOffset, curOffset - beginOffset, "LFO Delay", desc, Type::Lfo);
@@ -374,7 +375,7 @@ void MP2kTrack::handleSpecialCommand(u32 beginOffset, u8 status_byte) {
 
     // modulation type
     case 0xC5: {
-      const uint8_t type = readByte(curOffset++);
+      const u8 type = readByte(curOffset++);
       setModulationType(type);
       const auto desc = fmt::format("Type: {} ({})", mp2kModTypeName(type), type);
       addGenericEvent(beginOffset, curOffset - beginOffset, "Modulation Type", desc,
@@ -383,7 +384,7 @@ void MP2kTrack::handleSpecialCommand(u32 beginOffset, u8 status_byte) {
     }
 
     case 0xC8: {
-      const int16_t tune = static_cast<int16_t>(readByte(curOffset++)) - 0x40;
+      const s16 tune = static_cast<s16>(readByte(curOffset++)) - 0x40;
       const double cents = static_cast<double>(tune) * (100.0 / 64.0);
       addFineTuning(beginOffset, curOffset - beginOffset, cents, "Microtune");
       break;
@@ -397,8 +398,8 @@ void MP2kTrack::handleSpecialCommand(u32 beginOffset, u8 status_byte) {
       //
       // Probably, some games extend this command by their own code.
 
-      uint8_t subCommand = readByte(curOffset++);
-      uint8_t subParam = readByte(curOffset);
+      u8 subCommand = readByte(curOffset++);
+      u8 subParam = readByte(curOffset);
       auto addEchoTextNoItem = [this](const std::string &name, const std::string &desc) {
         if (readMode == READMODE_CONVERT_TO_MIDI && !bWriteGenericEventAsTextEvent) {
           pMidiTrack->addText(fmt::format("{} - {}", name, desc));
@@ -503,30 +504,30 @@ void MP2kTrack::applyLfoDepth(bool force) {
   }
 }
 
-void MP2kTrack::setLfoSpeed(uint8_t speed) {
-  const uint8_t delay = vibratoLfo.delay();
-  const uint8_t depth = vibratoLfo.depth();
+void MP2kTrack::setLfoSpeed(u8 speed) {
+  const u8 delay = vibratoLfo.delay();
+  const u8 depth = vibratoLfo.depth();
   vibratoLfo.configure(delay, speed, depth);
   tremoloLfo.configure(delay, speed, depth);
   applyLfoDepth(true);
 }
 
-void MP2kTrack::setLfoDelay(uint8_t delay) {
-  const uint8_t rate = vibratoLfo.rate();
-  const uint8_t depth = vibratoLfo.depth();
+void MP2kTrack::setLfoDelay(u8 delay) {
+  const u8 rate = vibratoLfo.rate();
+  const u8 depth = vibratoLfo.depth();
   vibratoLfo.configure(delay, rate, depth);
   tremoloLfo.configure(delay, rate, depth);
 }
 
-void MP2kTrack::setModulationDepth(uint8_t depth) {
-  const uint8_t delay = vibratoLfo.delay();
-  const uint8_t rate = vibratoLfo.rate();
+void MP2kTrack::setModulationDepth(u8 depth) {
+  const u8 delay = vibratoLfo.delay();
+  const u8 rate = vibratoLfo.rate();
   vibratoLfo.configure(delay, rate, depth);
   tremoloLfo.configure(delay, rate, depth);
   applyLfoDepth(true);
 }
 
-void MP2kTrack::setModulationType(uint8_t type) {
+void MP2kTrack::setModulationType(u8 type) {
   if (modType == type) {
     return;
   }
@@ -545,7 +546,7 @@ void MP2kTrack::beginNoteLfo() {
     return;
   }
 
-  const uint8_t delay = vibratoLfo.delay();
+  const u8 delay = vibratoLfo.delay();
   if (delay == 0) {
     applyLfoDepth(false);
     return;
@@ -568,8 +569,8 @@ void MP2kTrack::updateLfoFade() {
   }
 
   if (modType == kMp2kModTypeVibrato) {
-    advanceVibratoDepthFade(vibratoLfo, 0, [](int32_t depth) { return depth; });
+    advanceVibratoDepthFade(vibratoLfo, 0, [](s32 depth) { return depth; });
   } else if (modType == kMp2kModTypeTremolo) {
-    advanceTremoloDepthFade(tremoloLfo, 0, [](int32_t depth) { return depth; });
+    advanceTremoloDepthFade(tremoloLfo, 0, [](s32 depth) { return depth; });
   }
 }

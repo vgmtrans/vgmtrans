@@ -5,6 +5,8 @@
  */
 #pragma once
 
+#include "util/types.h"
+
 #include "Scanner.h"
 
 #include <cstdint>
@@ -15,5 +17,5 @@ class NDSScanner : public VGMScanner {
 
   virtual void scan(RawFile *file, void *info = 0);
   void searchForSDAT(RawFile *file);
-  uint32_t loadFromSDAT(RawFile *file, uint32_t offset);
+  u32 loadFromSDAT(RawFile *file, u32 offset);
 };

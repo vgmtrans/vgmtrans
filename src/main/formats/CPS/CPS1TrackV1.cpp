@@ -1,6 +1,7 @@
+#include "util/types.h"
 #include "CPS1TrackV1.h"
 
-CPS1TrackV1::CPS1TrackV1(CPS1Seq *parentSeq, CPSSynth channelSynth, uint32_t offset, uint32_t length)
+CPS1TrackV1::CPS1TrackV1(CPS1Seq *parentSeq, CPSSynth channelSynth, u32 offset, u32 length)
     : SeqTrack(parentSeq, offset, length), channelSynth(channelSynth) {
   if (channelSynth == CPSSynth::YM2151) {
     synthType = SynthType::YM2151;
@@ -42,7 +43,7 @@ bool CPS1TrackV1::readEvent() {
   if (statusByte >= 0x40) {
     int shiftAmount = ((statusByte >> 5) & 0x07) - 2;
     shiftAmount = shiftAmount < 0 ? 0 : shiftAmount;
-    uint32_t delta = (3 << shiftAmount);
+    u32 delta = (3 << shiftAmount);
 
     if (shortenDeltaCounter > 0) {
       delta /= 1.5;
@@ -133,7 +134,7 @@ bool CPS1TrackV1::readEvent() {
     case 0x00: {  // tempo
       u8 tempoByte = readByte(curOffset++);
       u16 newTempo = (((u8)(tempoByte + 0x80U) >> 3) << 8) | (((u8)(tempoByte + 0x80U) >> 2) << 7);
-      const uint32_t micros_per_beat = newTempo << 7;
+      const u32 micros_per_beat = newTempo << 7;
       addTempo(beginOffset, curOffset - beginOffset, micros_per_beat);
 
       // if (some status byte == 0) {
@@ -221,7 +222,7 @@ bool CPS1TrackV1::readEvent() {
     }
 
     case 0x08: {      // set some state
-      uint8_t pitchbend = readByte(curOffset++);
+      u8 pitchbend = readByte(curOffset++);
       pitchbend >>= 2;
       double cents = pitchbend * 1.587301587301587;
       if (pitchbend >= 32) {
@@ -245,7 +246,7 @@ bool CPS1TrackV1::readEvent() {
       break;
 
     case 0x0C: {      // Program Change
-      uint8_t progNum = readByte(curOffset++);
+      u8 progNum = readByte(curOffset++);
       addProgramChange(beginOffset, curOffset - beginOffset, progNum % 128);
       if (channelSynth == CPSSynth::YM2151) {
         instrTranspose = cpsSeq->transposeForInstr(progNum);

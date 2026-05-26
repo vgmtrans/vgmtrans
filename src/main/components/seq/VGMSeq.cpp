@@ -4,6 +4,7 @@
  * refer to the included LICENSE.txt file
  */
 
+#include "util/types.h"
 #include <climits>
 #include <ranges>
 
@@ -15,7 +16,7 @@
 #include "Format.h"
 #include "helper.h"
 
-VGMSeq::VGMSeq(const std::string &format, RawFile *file, uint32_t offset, uint32_t length, std::string name)
+VGMSeq::VGMSeq(const std::string &format, RawFile *file, u32 offset, u32 length, std::string name)
     : VGMFile(format, file, offset, length, std::move(name)),
       midi(nullptr),
       nNumTracks(0),
@@ -111,7 +112,7 @@ bool VGMSeq::load() {
     return false;
   if (!parseTrackPointers())
     return false;
-  nNumTracks = static_cast<uint32_t>(aTracks.size());
+  nNumTracks = static_cast<u32>(aTracks.size());
   if (nNumTracks == 0)
     return false;
 
@@ -139,10 +140,10 @@ bool VGMSeq::postLoad() {
   return true;
 }
 
-bool VGMSeq::loadTracks(ReadMode readMode, uint32_t stopTime) {
+bool VGMSeq::loadTracks(ReadMode readMode, u32 stopTime) {
   // set read mode
   this->readMode = readMode;
-  for (uint32_t trackNum = 0; trackNum < nNumTracks; trackNum++) {
+  for (u32 trackNum = 0; trackNum < nNumTracks; trackNum++) {
     aTracks[trackNum]->readMode = readMode;
   }
 
@@ -152,7 +153,7 @@ bool VGMSeq::loadTracks(ReadMode readMode, uint32_t stopTime) {
 
   // reset variables
   resetVars();
-  for (uint32_t trackNum = 0; trackNum < nNumTracks; trackNum++) {
+  for (u32 trackNum = 0; trackNum < nNumTracks; trackNum++) {
     if (!aTracks[trackNum]->loadTrackInit(trackNum, nullptr))
       return false;
   }
@@ -162,10 +163,10 @@ bool VGMSeq::loadTracks(ReadMode readMode, uint32_t stopTime) {
   return postLoad();
 }
 
-void VGMSeq::loadTracksMain(uint32_t stopTime) {
+void VGMSeq::loadTracksMain(u32 stopTime) {
   // determine the stop offsets
-  uint32_t *aStopOffset = new uint32_t[nNumTracks];
-  for (uint32_t trackNum = 0; trackNum < nNumTracks; trackNum++) {
+  u32 *aStopOffset = new u32[nNumTracks];
+  for (u32 trackNum = 0; trackNum < nNumTracks; trackNum++) {
     if (readMode == READMODE_ADD_TO_UI) {
       aStopOffset[trackNum] = endOffset();
       if (length() != 0) {
@@ -173,7 +174,7 @@ void VGMSeq::loadTracksMain(uint32_t stopTime) {
       } else {
         if (!m_allow_discontinuous_track_data) {
           // set length from the next track by offset
-          for (uint32_t j = 0; j < nNumTracks; j++) {
+          for (u32 j = 0; j < nNumTracks; j++) {
             if (aTracks[j]->offset() > aTracks[trackNum]->offset() &&
                 aTracks[j]->offset() < aStopOffset[trackNum]) {
               aStopOffset[trackNum] = aTracks[j]->offset();
@@ -200,7 +201,7 @@ void VGMSeq::loadTracksMain(uint32_t stopTime) {
       }
 
       // process tracks
-      for (uint32_t trackNum = 0; trackNum < nNumTracks; trackNum++) {
+      for (u32 trackNum = 0; trackNum < nNumTracks; trackNum++) {
         if (!aTracks[trackNum]->active)
           continue;
 
@@ -234,7 +235,7 @@ void VGMSeq::loadTracksMain(uint32_t stopTime) {
       }
       bIncTickAfterProcessingTracks = true;
       if (readMode == READMODE_CONVERT_TO_MIDI) {
-        for (uint32_t trackNum = 0; trackNum < nNumTracks; trackNum++) {
+        for (u32 trackNum = 0; trackNum < nNumTracks; trackNum++) {
           if (aTracks.at(trackNum)->pMidiTrack != nullptr) {
             aTracks[trackNum]->pMidiTrack->setDelta(time);
           }
@@ -250,10 +251,10 @@ void VGMSeq::loadTracksMain(uint32_t stopTime) {
       }
     }
   } else {
-    uint32_t initialTime = time;  // preserve current time for multi section sequence
+    u32 initialTime = time;  // preserve current time for multi section sequence
 
     // load track by track
-    for (uint32_t trackNum = 0; trackNum < nNumTracks && trackNum < aTracks.size(); trackNum++) {
+    for (u32 trackNum = 0; trackNum < nNumTracks && trackNum < aTracks.size(); trackNum++) {
       time = initialTime;
 
       aTracks[trackNum]->loadTrackMainLoop(aStopOffset[trackNum], stopTime);
@@ -264,7 +265,7 @@ void VGMSeq::loadTracksMain(uint32_t stopTime) {
 }
 
 bool VGMSeq::hasActiveTracks() {
-  for (uint32_t trackNum = 0; trackNum < nNumTracks; trackNum++) {
+  for (u32 trackNum = 0; trackNum < nNumTracks; trackNum++) {
     if (aTracks[trackNum]->active)
       return true;
   }
@@ -272,7 +273,7 @@ bool VGMSeq::hasActiveTracks() {
 }
 
 void VGMSeq::deactivateAllTracks() {
-  for (uint32_t trackNum = 0; trackNum < nNumTracks; trackNum++) {
+  for (u32 trackNum = 0; trackNum < nNumTracks; trackNum++) {
     aTracks[trackNum]->active = false;
   }
 }
@@ -282,7 +283,7 @@ int VGMSeq::foreverLoopCount() {
     return 0;
 
   int foreverLoops = INT_MAX;
-  for (uint32_t trackNum = 0; trackNum < nNumTracks; trackNum++) {
+  for (u32 trackNum = 0; trackNum < nNumTracks; trackNum++) {
     if (!aTracks[trackNum]->active)
       continue;
 
@@ -314,28 +315,28 @@ void VGMSeq::resetVars() {
   }
 }
 
-void VGMSeq::setPPQN(uint16_t ppqn) {
+void VGMSeq::setPPQN(u16 ppqn) {
   this->m_ppqn = ppqn;
   if (readMode == READMODE_CONVERT_TO_MIDI)
     midi->setPPQN(ppqn);
 }
 
-uint16_t VGMSeq::ppqn() const {
+u16 VGMSeq::ppqn() const {
   return this->m_ppqn;
   //return midi->GetPPQN();
 }
 
-void VGMSeq::addInstrumentRef(uint32_t progNum) {
+void VGMSeq::addInstrumentRef(u32 progNum) {
   if (std::ranges::find(aInstrumentsUsed, progNum) == aInstrumentsUsed.end()) {
     aInstrumentsUsed.push_back(progNum);
   }
 }
 
-void VGMSeq::addBankReference(uint16_t bank) {
+void VGMSeq::addBankReference(u16 bank) {
   m_referencedBanks.insert(bank);
 }
 
-const std::set<uint16_t>& VGMSeq::referencedBanks() const {
+const std::set<u16>& VGMSeq::referencedBanks() const {
   return m_referencedBanks;
 }
 

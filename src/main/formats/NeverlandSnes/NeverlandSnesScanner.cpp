@@ -4,6 +4,7 @@
  * refer to the included LICENSE.txt file
  */
 
+#include "util/types.h"
 #include <vector>
 #include <map>
 
@@ -77,8 +78,8 @@ void NeverlandSnesScanner::searchForNeverlandSnesFromARAM(RawFile *file) {
   std::string basefilename = file->stem();
   std::string name = file->tag.hasTitle() ? file->tag.title : basefilename;
 
-  uint32_t ofsLoadSong;
-  uint16_t addrSeqHeader;
+  u32 ofsLoadSong;
+  u16 addrSeqHeader;
   if (file->searchBytePattern(ptnLoadSongS2C, ofsLoadSong)) {
     addrSeqHeader = file->readByte(ofsLoadSong + 4) << 8;
     version = NEVERLANDSNES_S2C;

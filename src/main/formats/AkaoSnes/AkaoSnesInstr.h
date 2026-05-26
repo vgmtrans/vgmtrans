@@ -1,4 +1,6 @@
 #pragma once
+
+#include "util/types.h"
 #include "VGMInstrSet.h"
 #include "VGMRgn.h"
 #include "AkaoSnesFormat.h"
@@ -10,14 +12,14 @@
 class AkaoSnesInstrSet:
     public VGMInstrSet {
  public:
-  static constexpr uint32_t DRUMKIT_PROGRAM = (0x7F << 7);
+  static constexpr u32 DRUMKIT_PROGRAM = (0x7F << 7);
 
   AkaoSnesInstrSet(RawFile *file,
                    AkaoSnesVersion ver,
-                   uint32_t spcDirAddr,
-                   uint16_t addrTuningTable,
-                   uint16_t addrADSRTable,
-                   uint16_t addrDrumKitTable,
+                   u32 spcDirAddr,
+                   u16 addrTuningTable,
+                   u16 addrADSRTable,
+                   u16 addrDrumKitTable,
                    const std::string &name = "AkaoSnesInstrSet");
   ~AkaoSnesInstrSet() override;
 
@@ -27,11 +29,11 @@ class AkaoSnesInstrSet:
   AkaoSnesVersion version;
 
  protected:
-  uint32_t spcDirAddr;
-  uint16_t addrTuningTable;
-  uint16_t addrADSRTable;
-  uint16_t addrDrumKitTable;
-  std::vector<uint8_t> usedSRCNs;
+  u32 spcDirAddr;
+  u16 addrTuningTable;
+  u16 addrADSRTable;
+  u16 addrDrumKitTable;
+  std::vector<u8> usedSRCNs;
 };
 
 // *************
@@ -43,10 +45,10 @@ class AkaoSnesInstr
  public:
   AkaoSnesInstr(VGMInstrSet *instrSet,
                 AkaoSnesVersion ver,
-                uint8_t srcn,
-                uint32_t spcDirAddr,
-                uint16_t addrTuningTable,
-                uint16_t addrADSRTable,
+                u8 srcn,
+                u32 spcDirAddr,
+                u16 addrTuningTable,
+                u16 addrADSRTable,
                 const std::string &name = "AkaoSnesInstr");
   ~AkaoSnesInstr() override;
 
@@ -55,9 +57,9 @@ class AkaoSnesInstr
   AkaoSnesVersion version;
 
  protected:
-  uint32_t spcDirAddr;
-  uint16_t addrTuningTable;
-  uint16_t addrADSRTable;
+  u32 spcDirAddr;
+  u16 addrTuningTable;
+  u16 addrADSRTable;
 };
 
 // *************
@@ -69,11 +71,11 @@ class AkaoSnesDrumKit
 public:
   AkaoSnesDrumKit(VGMInstrSet *instrSet,
                   AkaoSnesVersion ver,
-                  uint32_t programNum,
-                  uint32_t spcDirAddr,
-                  uint16_t addrTuningTable,
-                  uint16_t addrADSRTable,
-                  uint16_t addrDrumKitTable,
+                  u32 programNum,
+                  u32 spcDirAddr,
+                  u16 addrTuningTable,
+                  u16 addrADSRTable,
+                  u16 addrDrumKitTable,
                   const std::string &name = "AkaoSnesDrumKit");
   ~AkaoSnesDrumKit() override;
 
@@ -82,10 +84,10 @@ public:
   AkaoSnesVersion version;
 
 protected:
-  uint32_t spcDirAddr;
-  uint16_t addrTuningTable;
-  uint16_t addrADSRTable;
-  uint16_t addrDrumKitTable;
+  u32 spcDirAddr;
+  u16 addrTuningTable;
+  u16 addrADSRTable;
+  u16 addrDrumKitTable;
 };
 
 // ***********
@@ -97,12 +99,12 @@ class AkaoSnesRgn
  public:
   AkaoSnesRgn(VGMInstr *instr,
               AkaoSnesVersion ver,
-              uint16_t addrTuningTable);
+              u16 addrTuningTable);
   ~AkaoSnesRgn() override;
 
-  bool initializeRegion(uint8_t srcn,
-                        uint32_t spcDirAddr,
-                        uint16_t addrADSRTable);
+  bool initializeRegion(u8 srcn,
+                        u32 spcDirAddr,
+                        u16 addrADSRTable);
   bool loadRgn() override;
 
   AkaoSnesVersion version;
@@ -120,15 +122,15 @@ public:
   // This value can be anything from 0 to 127, but being near the middle of
   // the range gives it a decent chance of not going out of range in either
   // direction.
-  static constexpr uint8_t KEY_BIAS = 60;
+  static constexpr u8 KEY_BIAS = 60;
 
   AkaoSnesDrumKitRgn(AkaoSnesDrumKit *instr,
                      AkaoSnesVersion ver,
-                     uint16_t addrTuningTable);
+                     u16 addrTuningTable);
   ~AkaoSnesDrumKitRgn() override;
 
-  bool initializePercussionRegion(uint8_t srcn,
-                                  uint32_t spcDirAddr,
-                                  uint16_t addrADSRTable,
-                                  uint16_t addrDrumKitTable);
+  bool initializePercussionRegion(u8 srcn,
+                                  u32 spcDirAddr,
+                                  u16 addrADSRTable,
+                                  u16 addrDrumKitTable);
 };

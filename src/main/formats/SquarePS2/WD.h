@@ -1,4 +1,6 @@
 #pragma once
+
+#include "util/types.h"
 #include "VGMInstrSet.h"
 #include "VGMSampColl.h"
 #include "VGMRgn.h"
@@ -9,15 +11,15 @@
 
 class WDInstrSet : public VGMInstrSet {
  public:
-  WDInstrSet(RawFile *file, uint32_t offset);
+  WDInstrSet(RawFile *file, u32 offset);
   ~WDInstrSet() override = default;
 
   bool parseHeader() override;
   bool parseInstrPointers() override;
 
-  uint32_t dwSampSectSize{};
-  uint32_t dwNumInstrs{};
-  uint32_t dwTotalRegions{};
+  u32 dwSampSectSize{};
+  u32 dwNumInstrs{};
+  u32 dwTotalRegions{};
 };
 
 // *******
@@ -26,8 +28,8 @@ class WDInstrSet : public VGMInstrSet {
 
 class WDInstr : public VGMInstr {
  public:
-  WDInstr(VGMInstrSet *instrSet, uint32_t offset, uint32_t length, uint32_t theBank,
-          uint32_t theInstrNum, const std::string& name);
+  WDInstr(VGMInstrSet *instrSet, u32 offset, u32 length, u32 theBank,
+          u32 theInstrNum, const std::string& name);
   ~WDInstr() override = default;
   bool loadInstr() override;
 };
@@ -38,13 +40,13 @@ class WDInstr : public VGMInstr {
 
 class WDRgn : public VGMRgn {
  public:
-  WDRgn(WDInstr *instr, uint32_t offset);
+  WDRgn(WDInstr *instr, u32 offset);
   ~WDRgn() override = default;
 
-  uint16_t ADSR1{};  // raw ps2 ADSR1 value (articulation data)
-  uint16_t ADSR2{};  // raw ps2 ADSR2 value (articulation data)
-  uint8_t bStereoRegion{};
-  uint8_t bFirstRegion{};
-  uint8_t bLastRegion{};
-  uint8_t bUnknownFlag2{};
+  u16 ADSR1{};  // raw ps2 ADSR1 value (articulation data)
+  u16 ADSR2{};  // raw ps2 ADSR2 value (articulation data)
+  u8 bStereoRegion{};
+  u8 bFirstRegion{};
+  u8 bLastRegion{};
+  u8 bUnknownFlag2{};
 };

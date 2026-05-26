@@ -3,6 +3,7 @@
  * Licensed under the zlib license,
  * refer to the included LICENSE.txt file
  */
+#include "util/types.h"
 #include <spdlog/fmt/fmt.h>
 #include <fstream>
 #include <algorithm>
@@ -84,7 +85,7 @@ void saveAllAsWav(const VGMSampColl &coll, const fs::path &save_dir) {
   }
 }
 
-bool saveDataToFile(const char* begin, uint32_t length, const fs::path& filepath) {
+bool saveDataToFile(const char* begin, u32 length, const fs::path& filepath) {
   std::ofstream out(filepath, std::ios::out | std::ios::binary);
 
   if (!out) {

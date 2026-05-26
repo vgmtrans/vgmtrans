@@ -4,6 +4,7 @@
  * refer to the included LICENSE.txt file
  */
 
+#include "util/types.h"
 #include "MoriSnesSeq.h"
 #include "ScannerManager.h"
 namespace vgmtrans::scanners {
@@ -58,8 +59,8 @@ void MoriSnesScanner::searchForMoriSnesFromARAM(RawFile *file) {
   std::string name = file->tag.hasTitle() ? file->tag.title : file->stem();
 
   // scan for song list table
-  uint32_t ofsLoadSeq;
-  uint16_t addrSongList;
+  u32 ofsLoadSeq;
+  u16 addrSongList;
   if (file->searchBytePattern(ptnLoadSeq, ofsLoadSeq)) {
     addrSongList = file->readShort(ofsLoadSeq + 3);
   } else {
@@ -72,21 +73,21 @@ void MoriSnesScanner::searchForMoriSnesFromARAM(RawFile *file) {
   // Example: Shien The Blade Chaser (Shien's Revenge)
 
   // TODO: guess song index
-  int8_t guessedSongIndex = -1;
+  s8 guessedSongIndex = -1;
   if (addrSongList + 2 <= 0x10000) {
     guessedSongIndex = 1;
   }
 
   // scan DIR address
-  uint32_t ofsSetDIR;
-  uint16_t spcDirAddr = 0;
+  u32 ofsSetDIR;
+  u16 spcDirAddr = 0;
   if (file->searchBytePattern(ptnSetDIR, ofsSetDIR)) {
     spcDirAddr = file->readByte(ofsSetDIR + 1) << 8;
   }
 
-  uint32_t addrSongHeaderPtr = addrSongList + guessedSongIndex * 2;
+  u32 addrSongHeaderPtr = addrSongList + guessedSongIndex * 2;
   if (addrSongHeaderPtr + 2 <= 0x10000) {
-    uint16_t addrSongHeader = file->readShort(addrSongHeaderPtr);
+    u16 addrSongHeader = file->readShort(addrSongHeaderPtr);
 
     MoriSnesSeq *newSeq = new MoriSnesSeq(file, version, addrSongHeader, name);
     if (!newSeq->loadVGMFile()) {

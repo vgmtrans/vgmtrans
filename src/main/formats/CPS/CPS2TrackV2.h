@@ -1,9 +1,11 @@
 #pragma once
+
+#include "util/types.h"
 #include "VGMSeq.h"
 #include "SeqTrack.h"
 #include "CPS2Seq.h"
 
-enum CPS2FormatVer: uint8_t;
+enum CPS2FormatVer: u8;
 
 
 enum CPSv2SeqEventType {
@@ -57,16 +59,16 @@ enum CPSv2SeqEventType {
 class CPS2TrackV2
     : public SeqTrack {
 public:
-  CPS2TrackV2(CPS2Seq *parentSeq, uint32_t offset = 0, uint32_t length = 0);
+  CPS2TrackV2(CPS2Seq *parentSeq, u32 offset = 0, u32 length = 0);
   void resetVars() override;
   bool readEvent() override;
 
 private:
   CPS2FormatVer version() const { return static_cast<CPS2Seq*>(this->parentSeq)->fmt_version; }
-  uint32_t readVarLength();
+  u32 readVarLength();
 
-  uint8_t m_volume{0};
-  uint8_t m_expression{0x40};
-  int8_t loopCounter[4];
-  uint32_t loopOffset[4];    //used for detecting infinite loops
+  u8 m_volume{0};
+  u8 m_expression{0x40};
+  s8 loopCounter[4];
+  u32 loopOffset[4];    //used for detecting infinite loops
 };

@@ -17,5 +17,5 @@ class ItikitiSnesScanner: public VGMScanner {
   static void scanFromRom(RawFile *file);
 
  private:
-  static bool scanSongHeader(RawFile *file, uint32_t &song_header_offset);
+  static bool scanSongHeader(RawFile *file, u32 &song_header_offset);
 };

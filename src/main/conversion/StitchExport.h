@@ -6,6 +6,8 @@
 
 #pragma once
 
+#include "util/types.h"
+
 #include <filesystem>
 #include <vector>
 
@@ -15,7 +17,7 @@ namespace conversion {
 
 struct StitchedExportResult {
   MidiMergeResult mergeResult;
-  std::vector<uint8_t> bankOffsets;
+  std::vector<u8> bankOffsets;
 };
 
 bool exportStitchedMidiAndSf2(const std::vector<MidiMergeEntry> &entries,

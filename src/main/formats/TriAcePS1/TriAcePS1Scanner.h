@@ -4,6 +4,8 @@
  * refer to the included LICENSE.txt file
  */
 #pragma once
+
+#include "util/types.h"
 #include "Scanner.h"
 
 class TriAcePS1Seq;
@@ -16,5 +18,5 @@ class TriAcePS1Scanner : public VGMScanner {
   virtual void scan(RawFile *file, void *info = 0);
   void searchForSLZSeq(RawFile *file);
   void searchForInstrSet(RawFile *file, std::vector<TriAcePS1InstrSet *> &instrsets);
-  TriAcePS1Seq *decompressTriAceSLZFile(RawFile *file, uint32_t cfOff);
+  TriAcePS1Seq *decompressTriAceSLZFile(RawFile *file, u32 cfOff);
 };

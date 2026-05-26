@@ -12,7 +12,7 @@
 struct MAMEGame;
 class KonamiArcadeSeq;
 
-enum KonamiArcadeFormatVer: uint8_t {
+enum KonamiArcadeFormatVer: u8 {
   VERSION_UNDEFINED,
   MysticWarrior,
   GX
@@ -26,7 +26,7 @@ public:
   virtual void scan(RawFile *file, void *info);
   const std::vector<KonamiArcadeSeq*> loadSeqTable(
     RawFile *file,
-    uint32_t offset,
+    u32 offset,
     const std::array<KonamiArcadeInstrSet::drum, 46>& drums,
     float nmiRate,
     std::string gameName,

@@ -5,6 +5,8 @@
  */
 #pragma once
 
+#include "util/types.h"
+
 #include <cstdint>
 
 // Low-level, MIDI-agnostic primitives for one value changing over driver ticks.
@@ -44,29 +46,29 @@ template <typename ValueType>
 struct SeqMotionPlan {
   ValueType target {};
   ValueType step {};
-  uint32_t ticks = 0;
-  uint32_t delay = 0;
+  u32 ticks = 0;
+  u32 delay = 0;
   SeqMotionMode mode = SeqMotionMode::TargetOverTicks;
 
   // Compute the per-tick step from the current value when begin() is called.
   static SeqMotionPlan targetOverTicks(ValueType targetValue,
-                                       uint32_t tickCount,
-                                       uint32_t delayTicks = 0) {
+                                       u32 tickCount,
+                                       u32 delayTicks = 0) {
     return {targetValue, {}, tickCount, delayTicks, SeqMotionMode::TargetOverTicks};
   }
 
   // Use the supplied step for tickCount ticks, then snap to target.
   static SeqMotionPlan targetOverTicksWithStep(ValueType targetValue,
                                                ValueType stepValue,
-                                               uint32_t tickCount,
-                                               uint32_t delayTicks = 0) {
+                                               u32 tickCount,
+                                               u32 delayTicks = 0) {
     return {targetValue, stepValue, tickCount, delayTicks, SeqMotionMode::TargetOverTicksWithStep};
   }
 
   // Use the supplied step as-is until the value reaches or crosses target.
   static SeqMotionPlan targetByStep(ValueType targetValue,
                                     ValueType stepValue,
-                                    uint32_t delayTicks = 0) {
+                                    u32 delayTicks = 0) {
     return {targetValue, stepValue, 0, delayTicks, SeqMotionMode::TargetByStep};
   }
 
@@ -166,8 +168,8 @@ class SeqLinearMotion {
   [[nodiscard]] ValueType current() const { return m_current; }
   [[nodiscard]] ValueType target() const { return m_target; }
   [[nodiscard]] ValueType step() const { return m_step; }
-  [[nodiscard]] uint32_t delayRemaining() const { return m_delay; }
-  [[nodiscard]] uint32_t ticksRemaining() const { return m_ticksRemaining; }
+  [[nodiscard]] u32 delayRemaining() const { return m_delay; }
+  [[nodiscard]] u32 ticksRemaining() const { return m_ticksRemaining; }
   [[nodiscard]] SeqMotionMode mode() const { return m_mode; }
   [[nodiscard]] bool usesTicks() const { return m_mode != SeqMotionMode::TargetByStep; }
 
@@ -214,7 +216,7 @@ class SeqLinearMotion {
   ValueType m_current {};
   ValueType m_target {};
   ValueType m_step {};
-  uint32_t m_delay = 0;
-  uint32_t m_ticksRemaining = 0;
+  u32 m_delay = 0;
+  u32 m_ticksRemaining = 0;
   SeqMotionMode m_mode = SeqMotionMode::TargetOverTicks;
 };

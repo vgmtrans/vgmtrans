@@ -23,19 +23,19 @@ public:
   oki_adpcm_state() { compute_tables(); reset(); }
 
   void reset();
-  int16_t clock(uint8_t nibble);
-  int16_t output() const { return m_signal; }
+  s16 clock(u8 nibble);
+  s16 output() const { return m_signal; }
   void save();
   void restore();
 
-  int32_t   m_signal;
-  int32_t   m_step;
-  int32_t   m_loop_signal;
-  int32_t   m_loop_step;
+  s32   m_signal;
+  s32   m_step;
+  s32   m_loop_signal;
+  s32   m_loop_step;
   bool      m_saved;
 
 private:
-  static const int8_t s_index_shift[8];
+  static const s8 s_index_shift[8];
   static int s_diff_lookup[49*16];
 
   static void compute_tables();
@@ -47,7 +47,7 @@ class DialogicAdpcmSamp
 public:
 
   DialogicAdpcmSamp(
-      VGMSampColl *sampColl, uint32_t offset, uint32_t length, uint32_t theRate, float gain, std::string name
+      VGMSampColl *sampColl, u32 offset, u32 length, u32 theRate, float gain, std::string name
   );
   ~DialogicAdpcmSamp() override;
 
@@ -56,6 +56,6 @@ public:
   float gain;
 
 private:
-  std::vector<uint8_t> decodeToNativePcm() override;
+  std::vector<u8> decodeToNativePcm() override;
   static oki_adpcm_state okiAdpcmState;
 };

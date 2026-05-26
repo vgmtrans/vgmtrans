@@ -1,3 +1,4 @@
+#include "util/types.h"
 #include <spdlog/fmt/fmt.h>
 #include "CPS1Instr.h"
 #include "CPS2Format.h"
@@ -11,7 +12,7 @@
 
 CPS1SampleInstrSet::CPS1SampleInstrSet(RawFile *file,
                                        CPS1FormatVer version,
-                                       uint32_t offset,
+                                       u32 offset,
                                        std::string name)
     : VGMInstrSet(CPS1Format::name, file, offset, 0, std::move(name)),
       fmt_version(version) {
@@ -63,8 +64,8 @@ bool CPS1SampleInstrSet::parseInstrPointers() {
 
 CPS1SampColl::CPS1SampColl(RawFile *file,
                            CPS1SampleInstrSet *theinstrset,
-                           uint32_t offset,
-                           uint32_t length,
+                           u32 offset,
+                           u32 length,
                            std::string name)
     : VGMSampColl(CPS1Format::name, file, offset, length, std::move(name)),
       instrset(theinstrset) {
@@ -159,7 +160,7 @@ bool CPS1OPMInstrSet::parseInstrPointers() {
     switch (fmt_version) {
       case CPS1_V200: {
         CPS1OPMInstrDataV2_00 instrData{};
-        readBytes(instrOff, static_cast<uint32_t>(instrSize), &instrData);
+        readBytes(instrOff, static_cast<u32>(instrSize), &instrData);
         auto instr = new CPS1OPMInstr<CPS1OPMInstrDataV2_00>(this, masterVol, instrOff, instrSize, 0, i, name);
         aInstrs.push_back(instr);
         addOPMInstrument(instrData.convertToOPMData(masterVol, name));
@@ -168,7 +169,7 @@ bool CPS1OPMInstrSet::parseInstrPointers() {
       case CPS1_V500:
       case CPS1_V502: {
         CPS1OPMInstrDataV5_02 instrData{};
-        readBytes(instrOff, static_cast<uint32_t>(instrSize), &instrData);
+        readBytes(instrOff, static_cast<u32>(instrSize), &instrData);
         auto instr = new CPS1OPMInstr<CPS1OPMInstrDataV5_02>(this, masterVol, instrOff, instrSize, 0, i, name);
         aInstrs.push_back(instr);
         addOPMInstrument(instrData.convertToOPMData(masterVol, name));
@@ -178,12 +179,12 @@ bool CPS1OPMInstrSet::parseInstrPointers() {
       case CPS1_V350:
       case CPS1_V425: {
         CPS1OPMInstrDataV4_25 instrData{};
-        readBytes(instrOff, static_cast<uint32_t>(instrSize), &instrData);
+        readBytes(instrOff, static_cast<u32>(instrSize), &instrData);
         auto instr = new CPS1OPMInstr<CPS1OPMInstrDataV4_25>(this, masterVol, instrOff, instrSize, 0, i, name);
         aInstrs.push_back(instr);
-        std::vector<uint8_t> driverData;
-        uint8_t enableLfo = instrData.LFO_ENABLE_AND_WF >> 7;
-        uint8_t resetLfo = (instrData.LFO_ENABLE_AND_WF >> 1) & 1;
+        std::vector<u8> driverData;
+        u8 enableLfo = instrData.LFO_ENABLE_AND_WF >> 7;
+        u8 resetLfo = (instrData.LFO_ENABLE_AND_WF >> 1) & 1;
         driverData.push_back(enableLfo);
         driverData.push_back(resetLfo);
         for (int i = 0; i < 4; i ++) {

@@ -4,6 +4,7 @@
  * refer to the included LICENSE.txt file
  */
 
+#include "util/types.h"
 #include "HOSASeq.h"
 #include "HOSAInstr.h"
 #include "VGMColl.h"
@@ -64,7 +65,7 @@ HOSASeq *HOSAScanner::searchForHOSASeq(RawFile *file) {
   std::string name = file->tag.hasTitle() ? file->tag.title : file->stem();
 
   size_t nFileLength = file->size();
-  for (uint32_t i = 0; i + 4 < nFileLength; i++) {
+  for (u32 i = 0; i + 4 < nFileLength; i++) {
     // Signature must match
     if (file->readWordBE(i) != 0x484F5341 || file->readByte(i + 4) != 'V')  //"HOSAV"
       continue;
@@ -72,7 +73,7 @@ HOSASeq *HOSAScanner::searchForHOSASeq(RawFile *file) {
     if (file->readByte(i + 6) > 24)
       continue;
     // First track pointer must != 0
-    uint16_t firstTrkPtr = file->readShort(i + 0x50);
+    u16 firstTrkPtr = file->readShort(i + 0x50);
     if (firstTrkPtr == 0)
       continue;
     // First track pointer must be > second track pointer (if more than one track)
@@ -99,12 +100,12 @@ HOSAInstrSet *HOSAScanner::searchForHOSAInstrSet(RawFile *file, const PSXSampCol
     return nullptr;
   }
 
-  uint32_t *sampOffsets = new uint32_t[numSamples];
+  u32 *sampOffsets = new u32[numSamples];
   for (int i = 0; i < numSamples; i++)
     sampOffsets[i] = sampcoll->samples[i]->offset() - sampcoll->offset();
 
   size_t nFileLength = file->size();
-  for (uint32_t i = 0x20; i + 0x14 < nFileLength; i++) {
+  for (u32 i = 0x20; i + 0x14 < nFileLength; i++) {
     if (recursiveRgnCompare(file, i, 0, numSamples, 0, sampOffsets)) {
       for (; i >= 0x20; i -= 4) {
         if ((file->readWord(i + 4) != 0) || (file->readWord(i) != 0))
@@ -130,16 +131,16 @@ bool HOSAScanner::recursiveRgnCompare(RawFile *file,
                                       int sampNum,
                                       int numSamples,
                                       int numFinds,
-                                      uint32_t *sampOffsets) {
-  if (i < 0 || static_cast<uint32_t>(i + 0x14) >= file->size())
+                                      u32 *sampOffsets) {
+  if (i < 0 || static_cast<u32>(i + 0x14) >= file->size())
     return false;
   if (sampNum >= numSamples - 1)
     return (numFinds >= MIN_SAMPLES_MATCH);
   // i+0 would be sample pointer of next region of same instr
   // i+4 would be sample pointer of first region in new instr
-  uint32_t word1 = file->readWord(i);
-  uint32_t word2 = file->readWord(i + 4);
-  uint32_t sampOffset = sampOffsets[sampNum];
+  u32 word1 = file->readWord(i);
+  u32 word2 = file->readWord(i + 4);
+  u32 sampOffset = sampOffsets[sampNum];
   if (word1 == sampOffset)
     return recursiveRgnCompare(file, i + 0x10, sampNum + 1, numSamples, numFinds + 1, sampOffsets);
   else if (word1 == 0)

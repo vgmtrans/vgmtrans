@@ -1,3 +1,4 @@
+#include "util/types.h"
 #include "HOSASeq.h"
 #include "HOSAFormat.h"
 
@@ -10,7 +11,7 @@ DECLARE_FORMAT(HOSA);
 //==============================================================
 //		Constructor
 //==============================================================
-HOSASeq::HOSASeq(RawFile *file, uint32_t offset, const std::string &name)
+HOSASeq::HOSASeq(RawFile *file, u32 offset, const std::string &name)
     : VGMSeq(HOSAFormat::name, file, offset, 0, name) {
   useReverb();
   setUseLinearAmplitudeScale(true);
@@ -36,7 +37,7 @@ HOSASeq::~HOSASeq(void) {
 bool HOSASeq::parseHeader(void) {
 //	About the length(), if (length() == 0, 
 //	"VGMSeq::LoadMain()" will calculate the length() after "SeqTrack::LoadTrack()".
-  nNumTracks = readByte(offset() + 0x06);    //uint8_t (8bit)
+  nNumTracks = readByte(offset() + 0x06);    //u8 (8bit)
   assocHOSA_ID = 0x00;
 
 //	Add the new object "VGMHeader" in this object "HOSASeq"（Super class："VGMContainerItem")
@@ -79,7 +80,7 @@ bool HOSASeq::parseTrackPointers(void) {
 //	Output
 //		Nothing
 //==============================================================
-HOSATrack::HOSATrack(HOSASeq *parentFile, uint32_t offset, uint32_t length) :
+HOSATrack::HOSATrack(HOSASeq *parentFile, u32 offset, u32 length) :
     SeqTrack(parentFile, offset, length),
     iDeltaTimeCom(0),         //Default delta time for Command
     iDeltaTimeNote(0),        //Default delta time for Note
@@ -105,12 +106,12 @@ bool HOSATrack::readEvent(void) {
   //==================================
   //	[ Local 変数 ]
   //----------------------------------
-  const uint32_t beginOffset = curOffset;           //start offset point
+  const u32 beginOffset = curOffset;           //start offset point
 
-  const uint8_t cCommand = readByte(curOffset++);    //command (op-code)
-  const uint8_t cCom_bit0 = (cCommand & 0x1F);      //length / contents
-  const uint8_t cCom_bit5 = (cCommand & 0x60) >> 5; //Delta times
-  const uint8_t cCom_bit7 = (cCommand & 0x80) >> 7; //0=Notes / 1=Controls
+  const u8 cCommand = readByte(curOffset++);    //command (op-code)
+  const u8 cCom_bit0 = (cCommand & 0x1F);      //length / contents
+  const u8 cCom_bit5 = (cCommand & 0x60) >> 5; //Delta times
+  const u8 cCom_bit7 = (cCommand & 0x80) >> 7; //0=Notes / 1=Controls
 
 //	unsigned 	int					iMinLengthCounter;				//デルタタイム最小値
 //				int					i;		//general
@@ -278,7 +279,7 @@ bool HOSATrack::readEvent(void) {
 
       //--------
       //[3]Delta time
-      uint32_t beginOffset2 = curOffset;
+      u32 beginOffset2 = curOffset;
       ReadDeltaTime(cCom_bit5, &iDeltaTimeCom);
       if (curOffset != beginOffset2) {
         addGenericEvent(beginOffset2, curOffset - beginOffset2, "Delta time", "", Type::ChangeState);
@@ -368,9 +369,9 @@ unsigned int        HOSATrack::decodeVariable() {
   //==================================
   //	[ Local 変数 ]
   //----------------------------------
-  uint32_t iVariable = 0;    // Result of decode
-  uint32_t count = 4;        // for counter
-  uint8_t cFread;            // for reading
+  u32 iVariable = 0;    // Result of decode
+  u32 count = 4;        // for counter
+  u8 cFread;            // for reading
 
   //==================================
   //	[ Read Variable ]

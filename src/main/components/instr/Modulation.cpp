@@ -4,6 +4,7 @@
  * refer to the included LICENSE.txt file
  */
 
+#include "util/types.h"
 #include "Modulation.h"
 #include <algorithm>
 #include <cmath>
@@ -15,20 +16,20 @@ namespace {
 constexpr double kSf2LfoReferenceHz = 8.176;
 constexpr double kSf2MinNormalDelaySeconds = 1.0 / 1024.0;
 
-int32_t hertzToInstrumentCents(double hertz) {
-  return static_cast<int32_t>(std::lround(1200.0 * std::log2(hertz / kSf2LfoReferenceHz)));
+s32 hertzToInstrumentCents(double hertz) {
+  return static_cast<s32>(std::lround(1200.0 * std::log2(hertz / kSf2LfoReferenceHz)));
 }
 
 // Linearly map an absolute amount in destination units onto a 7-bit unipolar
 // MIDI controller value for the [minAmount, maxAmount] range, clamped to 0..127.
-uint8_t midiValueForAmountInRange(int32_t currentAmount, int32_t minAmount, int32_t maxAmount) {
+u8 midiValueForAmountInRange(s32 currentAmount, s32 minAmount, s32 maxAmount) {
   if (minAmount == maxAmount) {
     return 0;
   }
 
   const int midiValue = static_cast<int>(std::round(
       128.0 * (currentAmount - minAmount) / static_cast<double>(maxAmount - minAmount)));
-  return static_cast<uint8_t>(std::clamp(midiValue, 0, 127));
+  return static_cast<u8>(std::clamp(midiValue, 0, 127));
 }
 
 }  // namespace
@@ -37,7 +38,7 @@ double clampSecondsRangeMinimum(double seconds) {
   return std::max(seconds, kSf2MinNormalDelaySeconds);
 }
 
-ModAmount ModAmount::raw(int32_t amount) {
+ModAmount ModAmount::raw(s32 amount) {
   return ModAmount(amount, true);
 }
 
@@ -47,7 +48,7 @@ ModAmount ModAmount::fromCents(double cents) {
     return ModAmount(0, false);
   }
 
-  return ModAmount(static_cast<int32_t>(std::lround(cents)), true);
+  return ModAmount(static_cast<s32>(std::lround(cents)), true);
 }
 
 ModAmount ModAmount::fromHertz(double hertz) {
@@ -69,10 +70,10 @@ ModAmount ModAmount::fromHertzRange(double minHertz, double maxHertz) {
   const double minCents = static_cast<double>(hertzToInstrumentCents(minHertz));
   const double maxCents = static_cast<double>(hertzToInstrumentCents(maxHertz));
   const double fullScaleRange = (maxCents - minCents) * 128.0 / 127.0;
-  return ModAmount(static_cast<int32_t>(std::lround(fullScaleRange)), true);
+  return ModAmount(static_cast<s32>(std::lround(fullScaleRange)), true);
 }
 
-uint8_t midiValueForHertzInRange(double hertz, double minHertz, double maxHertz) {
+u8 midiValueForHertzInRange(double hertz, double minHertz, double maxHertz) {
   const ModAmount minAmount = ModAmount::fromHertz(minHertz);
   const ModAmount rangeAmount = ModAmount::fromHertzRange(minHertz, maxHertz);
   const ModAmount currentAmount = ModAmount::fromHertz(hertz);
@@ -104,10 +105,10 @@ ModAmount ModAmount::fromSecondsRange(double minSeconds, double maxSeconds) {
   }
 
   const double fullScaleRange = (maxAmount.value() - minAmount.value()) * 128.0 / 127.0;
-  return ModAmount(static_cast<int32_t>(std::lround(fullScaleRange)), true);
+  return ModAmount(static_cast<s32>(std::lround(fullScaleRange)), true);
 }
 
-uint8_t midiValueForSecondsInRange(double seconds, double minSeconds, double maxSeconds) {
+u8 midiValueForSecondsInRange(double seconds, double minSeconds, double maxSeconds) {
   const ModAmount minAmount = ModAmount::fromSeconds(clampSecondsRangeMinimum(minSeconds));
   const ModAmount rangeAmount = ModAmount::fromSecondsRange(minSeconds, maxSeconds);
   const ModAmount currentAmount = ModAmount::fromSeconds(clampSecondsRangeMinimum(seconds));
@@ -127,7 +128,7 @@ ModAmount ModAmount::fromCentibels(double centibels) {
     return ModAmount(0, false);
   }
 
-  return ModAmount(static_cast<int32_t>(std::lround(centibels)), true);
+  return ModAmount(static_cast<s32>(std::lround(centibels)), true);
 }
 
 ModAmount ModAmount::fromDecibels(double decibels) {
@@ -136,5 +137,5 @@ ModAmount ModAmount::fromDecibels(double decibels) {
     return ModAmount(0, false);
   }
 
-  return ModAmount(static_cast<int32_t>(std::lround(decibels * 10.0)), true);
+  return ModAmount(static_cast<s32>(std::lround(decibels * 10.0)), true);
 }

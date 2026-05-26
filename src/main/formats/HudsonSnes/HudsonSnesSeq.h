@@ -4,6 +4,8 @@
  * refer to the included LICENSE.txt file
  */
 #pragma once
+
+#include "util/types.h"
 #include "VGMSeq.h"
 #include "SeqTrack.h"
 #include "HudsonSnesFormat.h"
@@ -104,32 +106,32 @@ class HudsonSnesSeq
     : public VGMSeq {
  public:
   HudsonSnesSeq
-      (RawFile *file, HudsonSnesVersion ver, uint32_t seqdataOffset, std::string newName = "Hudson SNES Seq");
+      (RawFile *file, HudsonSnesVersion ver, u32 seqdataOffset, std::string newName = "Hudson SNES Seq");
   ~HudsonSnesSeq() override = default;
 
   bool parseHeader() override;
-  bool parseTrackPointersInHeader(VGMHeader *header, uint32_t &offset);
+  bool parseTrackPointersInHeader(VGMHeader *header, u32 &offset);
   bool parseTrackPointers() override;
   void resetVars() override;
 
   HudsonSnesVersion version;
-  std::map<uint8_t, HudsonSnesSeqEventType> EventMap;
-  std::map<uint8_t, HudsonSnesSeqSubEventType> SubEventMap;
-  std::map<uint8_t, HudsonSnesSeqHeaderEventType> HeaderEventMap;
+  std::map<u8, HudsonSnesSeqEventType> EventMap;
+  std::map<u8, HudsonSnesSeqSubEventType> SubEventMap;
+  std::map<u8, HudsonSnesSeqHeaderEventType> HeaderEventMap;
 
-  uint8_t TimebaseShift;
-  uint8_t TrackAvailableBits;
-  uint16_t TrackAddresses[8];
-  uint16_t InstrumentTableAddress;
-  uint8_t InstrumentTableSize;
-  uint16_t PercussionTableAddress;
-  uint8_t PercussionTableSize;
+  u8 TimebaseShift;
+  u8 TrackAvailableBits;
+  u16 TrackAddresses[8];
+  u16 InstrumentTableAddress;
+  u8 InstrumentTableSize;
+  u16 PercussionTableAddress;
+  u8 PercussionTableSize;
 
   bool NoteEventHasVelocity;
   bool DisableNoteVelocity;
 
-  uint8_t UserRAM[HUDSONSNES_USERRAM_SIZE];
-  uint8_t UserCmpReg;
+  u8 UserRAM[HUDSONSNES_USERRAM_SIZE];
+  u8 UserCmpReg;
   bool UserCarry;
 
  private:
@@ -140,18 +142,18 @@ class HudsonSnesSeq
 class HudsonSnesTrack
     : public SeqTrack {
  public:
-  HudsonSnesTrack(HudsonSnesSeq *parentFile, uint32_t offset = 0, uint32_t length = 0);
+  HudsonSnesTrack(HudsonSnesSeq *parentFile, u32 offset = 0, u32 length = 0);
   void resetVars() override;
   bool readEvent() override;
 
  private:
-  uint8_t vel;
-  int8_t prevNoteKey;
+  u8 vel;
+  s8 prevNoteKey;
   bool prevNoteSlurred;
-  uint16_t infiniteLoopPoint;
+  u16 infiniteLoopPoint;
   bool loopPointOnceProcessed;
-  uint8_t spcNoteQuantize;
-  uint8_t spcVolume;
-  uint8_t spcCallStack[HUDSONSNES_CALLSTACK_SIZE]; // shared by multiple commands
-  uint8_t spcCallStackPtr;
+  u8 spcNoteQuantize;
+  u8 spcVolume;
+  u8 spcCallStack[HUDSONSNES_CALLSTACK_SIZE]; // shared by multiple commands
+  u8 spcCallStackPtr;
 };

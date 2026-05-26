@@ -4,6 +4,7 @@
  * refer to the included LICENSE.txt file
  */
 
+#include "util/types.h"
 #include "AkaoSnesSeq.h"
 #include "AkaoSnesModulation.h"
 #include "automation/SeqTrackAutomation.h"
@@ -32,19 +33,19 @@ AkaoSnesTrack::LfoParams AkaoSnesTrack::readLfoParams() {
   const auto *parent = static_cast<AkaoSnesSeq*>(parentSeq);
   // V2 stores depth, delay, rate. The other supported versions store delay, rate, depth.
   if (parent->version == AKAOSNES_V2) {
-    const uint8_t depth = readByte(curOffset++);
-    const uint8_t delay = readByte(curOffset++);
-    const uint8_t rate = readByte(curOffset++);
+    const u8 depth = readByte(curOffset++);
+    const u8 delay = readByte(curOffset++);
+    const u8 rate = readByte(curOffset++);
     return {delay, rate, depth};
   }
 
-  const uint8_t delay = readByte(curOffset++);
-  const uint8_t rate = readByte(curOffset++);
-  const uint8_t depth = readByte(curOffset++);
+  const u8 delay = readByte(curOffset++);
+  const u8 rate = readByte(curOffset++);
+  const u8 depth = readByte(curOffset++);
   return {delay, rate, depth};
 }
 
-void AkaoSnesTrack::setLfoOutputDepth(LfoTarget target, uint8_t depth, bool force) {
+void AkaoSnesTrack::setLfoOutputDepth(LfoTarget target, u8 depth, bool force) {
   auto& lfo = (target == LfoTarget::Vibrato) ? vibrato : tremolo;
   if (target == LfoTarget::Vibrato) {
     emitVibratoDepth(lfo, depth, force);
@@ -66,8 +67,8 @@ void AkaoSnesTrack::clearLfoRateAndDelay(LfoTarget target) {
 }
 
 void AkaoSnesTrack::applyLfo(LfoTarget target,
-                             uint32_t offset,
-                             uint32_t length,
+                             u32 offset,
+                             u32 length,
                              const LfoParams& params) {
   const auto *parent = static_cast<AkaoSnesSeq*>(parentSeq);
   const bool isVibrato = target == LfoTarget::Vibrato;
@@ -89,7 +90,7 @@ void AkaoSnesTrack::applyLfo(LfoTarget target,
     configureTremoloFade();
   }
 
-  uint8_t midiDepth = active
+  u8 midiDepth = active
       ? (isVibrato
              ? akao_snes::modulation::vibratoDepthMidiValue(parent->version, params.rate, params.depth)
              : akao_snes::modulation::tremoloDepthMidiValue(parent->version,
@@ -98,8 +99,8 @@ void AkaoSnesTrack::applyLfo(LfoTarget target,
                                                             params.delay))
       : 0;
   if (isVibrato && parent->version == AKAOSNES_V4 && active && vibrato.hasReusableFade()) {
-    const uint32_t delay = akao_snes::modulation::delayTicks(parent->version, vibrato.delay());
-    const int32_t initialDepth = vibrato.configuredDepth(8) / 4;
+    const u32 delay = akao_snes::modulation::delayTicks(parent->version, vibrato.delay());
+    const s32 initialDepth = vibrato.configuredDepth(8) / 4;
     vibrato.beginReusableFade(delay, vibrato.configuredDepth(8), initialDepth);
     midiDepth = (delay == 0) ? vibratoFadeDepthMidiValue(initialDepth) : 0;
   }
@@ -112,7 +113,7 @@ void AkaoSnesTrack::applyLfo(LfoTarget target,
   }
 }
 
-void AkaoSnesTrack::clearLfo(LfoTarget target, uint32_t offset, uint32_t length) {
+void AkaoSnesTrack::clearLfo(LfoTarget target, u32 offset, u32 length) {
   const bool isVibrato = target == LfoTarget::Vibrato;
 
   addGenericEvent(offset,
@@ -152,10 +153,10 @@ void AkaoSnesTrack::configureVibratoFade() {
   }
 
   if (parent->version == AKAOSNES_V4 && vibrato.delay() != 0) {
-    const uint32_t ticks = akao_snes::modulation::v4VibratoRampTicks(vibrato.rate(), parent->tempo);
-    const int32_t targetDepth = vibrato.configuredDepth(8);
-    const int32_t initialDepth = targetDepth / 4;
-    const int32_t step = ticks == 0 ? 0 : (targetDepth - initialDepth) / static_cast<int32_t>(ticks);
+    const u32 ticks = akao_snes::modulation::v4VibratoRampTicks(vibrato.rate(), parent->tempo);
+    const s32 targetDepth = vibrato.configuredDepth(8);
+    const s32 initialDepth = targetDepth / 4;
+    const s32 step = ticks == 0 ? 0 : (targetDepth - initialDepth) / static_cast<s32>(ticks);
     vibrato.setReusableFade(ticks, step);
     return;
   }
@@ -186,8 +187,8 @@ void AkaoSnesTrack::beginVibratoForNote() {
   // Normal notes with a reusable fade restart the exported depth ramp. V4 begins
   // at quarter depth when there is no effective pre-delay; the others begin at
   // zero. Ties and legato notes skip this call.
-  const uint32_t delay = akao_snes::modulation::delayTicks(parent->version, vibrato.delay());
-  const int32_t initialDepth = (parent->version == AKAOSNES_V4)
+  const u32 delay = akao_snes::modulation::delayTicks(parent->version, vibrato.delay());
+  const s32 initialDepth = (parent->version == AKAOSNES_V4)
       ? vibrato.configuredDepth(8) / 4
       : 0;
   vibrato.beginReusableFade(delay, vibrato.configuredDepth(8), initialDepth);
@@ -206,9 +207,9 @@ void AkaoSnesTrack::beginTremoloForNote() {
   emitTremoloDepth(tremolo, 0, true);
 }
 
-uint8_t AkaoSnesTrack::vibratoFadeDepthMidiValue(int32_t depth) const {
+u8 AkaoSnesTrack::vibratoFadeDepthMidiValue(s32 depth) const {
   const auto *parent = static_cast<AkaoSnesSeq*>(parentSeq);
-  const int32_t targetDepth = vibrato.configuredDepth(8);
+  const s32 targetDepth = vibrato.configuredDepth(8);
   if (targetDepth <= 0) {
     return 0;
   }
@@ -216,14 +217,14 @@ uint8_t AkaoSnesTrack::vibratoFadeDepthMidiValue(int32_t depth) const {
   const int fullDepth = akao_snes::modulation::vibratoDepthMidiValue(parent->version,
                                                                      vibrato.rate(),
                                                                      vibrato.depth());
-  return static_cast<uint8_t>(std::clamp<int>((fullDepth * depth + (targetDepth / 2)) / targetDepth,
+  return static_cast<u8>(std::clamp<int>((fullDepth * depth + (targetDepth / 2)) / targetDepth,
                                               0,
                                               127));
 }
 
-uint8_t AkaoSnesTrack::tremoloFadeDepthMidiValue(int32_t depth) const {
+u8 AkaoSnesTrack::tremoloFadeDepthMidiValue(s32 depth) const {
   const auto *parent = static_cast<AkaoSnesSeq*>(parentSeq);
-  const int32_t targetDepth = tremolo.configuredDepth(8);
+  const s32 targetDepth = tremolo.configuredDepth(8);
   if (targetDepth <= 0) {
     return 0;
   }
@@ -231,7 +232,7 @@ uint8_t AkaoSnesTrack::tremoloFadeDepthMidiValue(int32_t depth) const {
   const int fullDepth = akao_snes::modulation::tremoloDepthMidiValue(parent->version,
                                                                      tremolo.rate(),
                                                                      tremolo.depth());
-  return static_cast<uint8_t>(std::clamp<int>((fullDepth * depth + (targetDepth / 2)) / targetDepth,
+  return static_cast<u8>(std::clamp<int>((fullDepth * depth + (targetDepth / 2)) / targetDepth,
                                               0,
                                               127));
 }
@@ -242,7 +243,7 @@ void AkaoSnesTrack::updateVibratoFade() {
     return;
   }
 
-  advanceVibratoDepthFade(vibrato, 8, [this](int32_t depth) {
+  advanceVibratoDepthFade(vibrato, 8, [this](s32 depth) {
     return vibratoFadeDepthMidiValue(depth);
   });
 }
@@ -254,7 +255,7 @@ void AkaoSnesTrack::updateTremoloFade() {
     return;
   }
 
-  advanceTremoloDepthFade(tremolo, 8, [this](int32_t depth) {
+  advanceTremoloDepthFade(tremolo, 8, [this](s32 depth) {
     return tremoloFadeDepthMidiValue(depth);
   });
 }
@@ -276,11 +277,11 @@ void AkaoSnesTrack::syncLfoRateAndDelay(LfoTarget target) {
     configureTremoloFade();
   }
 
-  const uint8_t rateMidiValue = akao_snes::modulation::rateMidiValue(parent->version,
+  const u8 rateMidiValue = akao_snes::modulation::rateMidiValue(parent->version,
                                                                      lfo.rate(),
                                                                      lfo.depth(),
                                                                      parent->TIMER0_FREQUENCY);
-  const uint8_t delayMidiValue = akao_snes::modulation::delayMidiValue(parent->version,
+  const u8 delayMidiValue = akao_snes::modulation::delayMidiValue(parent->version,
                                                                        lfo.delay(),
                                                                        parent->tempo,
                                                                        parent->TIMER0_FREQUENCY);

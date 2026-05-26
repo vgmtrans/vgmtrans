@@ -4,6 +4,7 @@
 * refer to the included LICENSE.txt file
 */
 
+#include "util/types.h"
 #include "StitchExport.h"
 
 #include <exception>
@@ -46,7 +47,7 @@ bool exportStitchedMidiAndSf2(const std::vector<MidiMergeEntry> &entries,
     return false;
   }
 
-  std::vector<uint8_t> bankOffsets;
+  std::vector<u8> bankOffsets;
   if (!planChunkBankOffsets(entries, bankOffsets)) {
     L_ERROR("Failed to plan chunk bank remap.");
     return false;

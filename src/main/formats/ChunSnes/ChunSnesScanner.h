@@ -4,10 +4,12 @@
  * refer to the included LICENSE.txt file
  */
 #pragma once
+
+#include "util/types.h"
 #include "Scanner.h"
 #include "BytePattern.h"
 
-enum ChunSnesVersion : uint8_t;  // see ChunSnesFormat.h
+enum ChunSnesVersion : u8;  // see ChunSnesFormat.h
 
 class ChunSnesScanner : public VGMScanner {
  public:

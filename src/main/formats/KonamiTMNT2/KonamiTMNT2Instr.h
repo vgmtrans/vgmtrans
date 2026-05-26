@@ -1,8 +1,10 @@
 #pragma once
+
+#include "util/types.h"
 #include "VGMSampColl.h"
 #include "VGMInstrSet.h"
 
-enum KonamiTMNT2FormatVer : uint8_t;
+enum KonamiTMNT2FormatVer : u8;
 class RawFile;
 struct konami_tmnt2_instr_info {
   u8 flags;
@@ -67,7 +69,7 @@ struct konami_tmnt2_drum_info {
 };
 
 
-double k053260_pitch_cents(uint16_t pitch_word);
+double k053260_pitch_cents(u16 pitch_word);
 
 class KonamiTMNT2SampleInstrSet
     : public VGMInstrSet {

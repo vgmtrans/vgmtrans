@@ -6,6 +6,8 @@
 
 #pragma once
 
+#include "util/types.h"
+
 #include <cstdint>
 #include <string>
 #include <map>
@@ -28,7 +30,7 @@ public:
   std::string artist;
   std::string album;
   std::string comment;
-  std::map<std::string, std::vector<uint8_t>> binaries;
+  std::map<std::string, std::vector<u8>> binaries;
 
   /* Track number */
   int track_number = 0;

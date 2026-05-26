@@ -107,16 +107,16 @@ public:
 
   DLSInstr *addInstr(unsigned long bank, unsigned long instrNum);
   DLSInstr *addInstr(unsigned long bank, unsigned long instrNum, std::string Name);
-  DLSWave *addWave(uint16_t formatTag, uint16_t channels, int samplesPerSec, int aveBytesPerSec,
-                   uint16_t blockAlign, uint16_t bitsPerSample, uint32_t waveDataSize,
-                   uint8_t *waveData, std::string name = "Unnamed Wave");
+  DLSWave *addWave(u16 formatTag, u16 channels, int samplesPerSec, int aveBytesPerSec,
+                   u16 blockAlign, u16 bitsPerSample, u32 waveDataSize,
+                   u8 *waveData, std::string name = "Unnamed Wave");
 
   std::vector<DLSInstr *> instruments();
   std::vector<DLSWave *> waves();
 
-  uint32_t size() override;
+  u32 size() override;
 
-  int writeDLSToBuffer(std::vector<uint8_t> &buf);
+  int writeDLSToBuffer(std::vector<u8> &buf);
   bool saveDLSFile(const std::filesystem::path &filepath);
 
 private:
@@ -127,17 +127,17 @@ private:
 class DLSInstr {
 public:
   DLSInstr() = default;
-  DLSInstr(uint32_t bank, uint32_t instrument);
-  DLSInstr(uint32_t bank, uint32_t instrument, std::string instrName);
+  DLSInstr(u32 bank, u32 instrument);
+  DLSInstr(u32 bank, u32 instrument, std::string instrName);
 
   DLSRgn *addRgn();
 
-  uint32_t size() const;
-  void write(std::vector<uint8_t> &buf);
+  u32 size() const;
+  void write(std::vector<u8> &buf);
 
 private:
-  uint32_t ulBank;
-  uint32_t ulInstrument;
+  u32 ulBank;
+  u32 ulInstrument;
 
   std::vector<std::unique_ptr<DLSRgn>> m_regions;
   std::string m_name;
@@ -146,30 +146,30 @@ private:
 class DLSRgn {
 public:
   DLSRgn() = default;
-  DLSRgn(uint16_t keyLow, uint16_t keyHigh, uint16_t velLow, uint16_t velHigh)
+  DLSRgn(u16 keyLow, u16 keyHigh, u16 velLow, u16 velHigh)
       : usKeyLow(keyLow), usKeyHigh(keyHigh), usVelLow(velLow), usVelHigh(velHigh),
         fusOptions(0), usPhaseGroup(0), channel(0), tableIndex(0) {}
 
   DLSArt *addArt();
   DLSWsmp *addWsmp();
-  void setRanges(uint16_t keyLow = 0, uint16_t keyHigh = 0x7F, uint16_t velLow = 0,
-                 uint16_t velHigh = 0x7F);
-  void setWaveLinkInfo(uint16_t options, uint16_t phaseGroup, uint32_t theChannel,
-                       uint32_t theTableIndex);
+  void setRanges(u16 keyLow = 0, u16 keyHigh = 0x7F, u16 velLow = 0,
+                 u16 velHigh = 0x7F);
+  void setWaveLinkInfo(u16 options, u16 phaseGroup, u32 theChannel,
+                       u32 theTableIndex);
 
-  uint32_t size() const;
-  void write(std::vector<uint8_t> &buf) const;
+  u32 size() const;
+  void write(std::vector<u8> &buf) const;
 
 private:
-  uint16_t usKeyLow;
-  uint16_t usKeyHigh;
-  uint16_t usVelLow;
-  uint16_t usVelHigh;
+  u16 usKeyLow;
+  u16 usKeyHigh;
+  u16 usVelLow;
+  u16 usVelHigh;
 
-  uint16_t fusOptions;
-  uint16_t usPhaseGroup;
-  uint32_t channel;
-  uint32_t tableIndex;
+  u16 fusOptions;
+  u16 usPhaseGroup;
+  u32 channel;
+  u32 tableIndex;
 
   std::unique_ptr<DLSWsmp> m_wsmp;
   std::unique_ptr<DLSArt> m_art;
@@ -177,36 +177,36 @@ private:
 
 class ConnectionBlock {
 public:
-  ConnectionBlock(uint16_t source, uint16_t control, uint16_t destination, uint16_t transform,
-                  int32_t scale)
+  ConnectionBlock(u16 source, u16 control, u16 destination, u16 transform,
+                  s32 scale)
       : usSource(source), usControl(control), usDestination(destination), usTransform(transform),
         lScale(scale) {}
   ~ConnectionBlock() {}
 
-  static uint32_t size() { return 12; }
-  void write(std::vector<uint8_t> &buf) const;
+  static u32 size() { return 12; }
+  void write(std::vector<u8> &buf) const;
 
 private:
-  uint16_t usSource;
-  uint16_t usControl;
-  uint16_t usDestination;
-  uint16_t usTransform;
-  int32_t lScale;
+  u16 usSource;
+  u16 usControl;
+  u16 usDestination;
+  u16 usTransform;
+  s32 lScale;
 };
 
 class DLSArt {
 public:
   DLSArt() = default;
 
-  void addADSR(long attack_time, uint16_t atk_transform, long hold_time, long decay_time,
-               long sustain_lev, long release_time, uint16_t rls_transform);
+  void addADSR(long attack_time, u16 atk_transform, long hold_time, long decay_time,
+               long sustain_lev, long release_time, u16 rls_transform);
   void addPan(long pan);
-  void addVibrato(int32_t depth, int32_t frequency, int32_t delay);
+  void addVibrato(s32 depth, s32 frequency, s32 delay);
   void addGenerator(const SynthGenerator& generator);
   void addModulator(const SynthModulator& modulator, const ConversionContext& context);
 
-  uint32_t GetSize() const;
-  void Write(std::vector<uint8_t> &buf) const;
+  u32 GetSize() const;
+  void Write(std::vector<u8> &buf) const;
 
 private:
   std::vector<std::unique_ptr<ConnectionBlock>> m_blocks;
@@ -217,27 +217,27 @@ public:
   DLSWsmp() = default;
 
   void setLoopInfo(Loop &loop, VGMSamp *samp);
-  void setPitchInfo(uint16_t unityNote, int16_t fineTune, int32_t attenuation);
+  void setPitchInfo(u16 unityNote, s16 fineTune, s32 attenuation);
 
-  [[nodiscard]] uint32_t size() const;
-  void write(std::vector<uint8_t> &buf) const;
+  [[nodiscard]] u32 size() const;
+  void write(std::vector<u8> &buf) const;
 
 private:
-  uint16_t usUnityNote;
-  int16_t sFineTune;
-  int32_t lAttenuation;
-  int8_t cSampleLoops;
+  u16 usUnityNote;
+  s16 sFineTune;
+  s32 lAttenuation;
+  s8 cSampleLoops;
 
-  uint32_t ulLoopType;
-  uint32_t ulLoopStart;
-  uint32_t ulLoopLength;
+  u32 ulLoopType;
+  u32 ulLoopStart;
+  u32 ulLoopLength;
 };
 
 class DLSWave {
 public:
-  DLSWave(uint16_t formatTag, uint16_t channels, uint32_t samplesPerSec, uint32_t aveBytesPerSec,
-          uint16_t blockAlign, uint16_t bitsPerSample, uint32_t waveDataSize,
-          uint8_t* waveData, std::string waveName = "Untitled wave")
+  DLSWave(u16 formatTag, u16 channels, u32 samplesPerSec, u32 aveBytesPerSec,
+          u16 blockAlign, u16 bitsPerSample, u32 waveDataSize,
+          u8* waveData, std::string waveName = "Untitled wave")
       : wFormatTag(formatTag), wChannels(channels), dwSamplesPerSec(samplesPerSec),
         dwAveBytesPerSec(aveBytesPerSec), wBlockAlign(blockAlign), wBitsPerSample(bitsPerSample),
         m_name(std::move(waveName)), m_wave_data(waveData, waveData + waveDataSize) {
@@ -252,17 +252,17 @@ public:
     else
       return m_wave_data.size();
   }
-  uint32_t size() const;
-  void write(std::vector<uint8_t> &buf);
+  u32 size() const;
+  void write(std::vector<u8> &buf);
 
 private:
-  uint16_t wFormatTag;
-  uint16_t wChannels;
-  uint32_t dwSamplesPerSec;
-  uint32_t dwAveBytesPerSec;
-  uint16_t wBlockAlign;
-  uint16_t wBitsPerSample;
+  u16 wFormatTag;
+  u16 wChannels;
+  u32 dwSamplesPerSec;
+  u32 dwAveBytesPerSec;
+  u16 wBlockAlign;
+  u16 wBitsPerSample;
 
   std::string m_name{"Untitled wave"};
-  std::vector<uint8_t> m_wave_data;
+  std::vector<u8> m_wave_data;
 };

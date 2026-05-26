@@ -6,6 +6,8 @@
 
 #pragma once
 
+#include "util/types.h"
+
 #include <QColor>
 #include <QImage>
 #include <QPointF>
@@ -22,19 +24,19 @@ class VGMFile;
 namespace HexViewFrame {
 
 struct SelectionRange {
-  uint32_t offset = 0;
-  uint32_t length = 0;
+  u32 offset = 0;
+  u32 length = 0;
 };
 
 struct PlaybackSelection {
-  uint32_t offset = 0;
-  uint32_t length = 0;
+  u32 offset = 0;
+  u32 length = 0;
   QColor glowColor;
 };
 
 struct FadePlaybackSelection {
   PlaybackSelection range;
-  int64_t startMs = 0;
+  s64 startMs = 0;
   float alpha = 0.0f;
 };
 
@@ -46,7 +48,7 @@ struct Style {
 struct GlyphAtlasView {
   const QImage* image = nullptr;
   const std::array<QRectF, 128>* uvTable = nullptr;
-  uint64_t version = 0;
+  u64 version = 0;
 };
 
 struct Data {
@@ -73,7 +75,7 @@ struct Data {
 
   QColor windowColor;
   QColor windowTextColor;
-  std::span<const uint16_t> styleIds;
+  std::span<const u16> styleIds;
   std::span<const Style> styles;
   std::span<const SelectionRange> selections;
   std::span<const SelectionRange> fadeSelections;

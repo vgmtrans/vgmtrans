@@ -3,6 +3,7 @@
  * Licensed under the zlib license,
  * refer to the included LICENSE.txt file
  */
+#include "util/types.h"
 #include <sstream>
 #include "CapcomSnesSeq.h"
 #include "CapcomSnesDefinitions.h"
@@ -20,14 +21,14 @@ DECLARE_FORMAT(CapcomSnes);
 #define SEQ_KEYOFS  0
 
 // volume table
-const uint8_t CapcomSnesSeq::volTable[] = {
+const u8 CapcomSnesSeq::volTable[] = {
     0x00, 0x0c, 0x19, 0x26, 0x33, 0x40, 0x4c, 0x59,
     0x66, 0x73, 0x80, 0x8c, 0x99, 0xb3, 0xcc, 0xe6,
     0xff,
 };
 
 // pan table (compatible with Nintendo engine)
-const uint8_t CapcomSnesSeq::panTable[] = {
+const u8 CapcomSnesSeq::panTable[] = {
     0x00, 0x01, 0x03, 0x07, 0x0d, 0x15, 0x1e, 0x29,
     0x34, 0x42, 0x51, 0x5e, 0x67, 0x6e, 0x73, 0x77,
     0x7a, 0x7c, 0x7d, 0x7e, 0x7f, 0x7f,
@@ -35,7 +36,7 @@ const uint8_t CapcomSnesSeq::panTable[] = {
 
 CapcomSnesSeq::CapcomSnesSeq(RawFile *file,
                              CapcomSnesVersion ver,
-                             uint32_t seqdataOffset,
+                             u32 seqdataOffset,
                              bool priorityInHeader,
                              std::string name)
     : VGMSeq(CapcomSnesFormat::name, file, seqdataOffset, 0, std::move(name)), version(ver),
@@ -62,7 +63,7 @@ bool CapcomSnesSeq::parseHeader() {
   setPPQN(SEQ_PPQN);
 
   VGMHeader *seqHeader = addHeader(offset(), (priorityInHeader ? 1 : 0) + MAX_TRACKS * 2, "Sequence Header");
-  uint32_t curHeaderOffset = offset();
+  u32 curHeaderOffset = offset();
 
   if (priorityInHeader) {
     seqHeader->addChild(curHeaderOffset, 1, "Priority");
@@ -70,7 +71,7 @@ bool CapcomSnesSeq::parseHeader() {
   }
 
   for (int i = 0; i < MAX_TRACKS; i++) {
-    uint16_t trkOff = readShortBE(curHeaderOffset);
+    u16 trkOff = readShortBE(curHeaderOffset);
     seqHeader->addPointer(curHeaderOffset, 2, trkOff, true, "Track Pointer");
     curHeaderOffset += 2;
   }
@@ -80,7 +81,7 @@ bool CapcomSnesSeq::parseHeader() {
 
 bool CapcomSnesSeq::parseTrackPointers() {
   for (int i = MAX_TRACKS - 1; i >= 0; i--) {
-    uint16_t trkOff = readShortBE(offset() + (priorityInHeader ? 1 : 0) + i * 2);
+    u16 trkOff = readShortBE(offset() + (priorityInHeader ? 1 : 0) + i * 2);
     if (trkOff != 0)
       aTracks.push_back(new CapcomSnesTrack(this, trkOff));
   }
@@ -136,7 +137,7 @@ double CapcomSnesSeq::getTempoInBPM() const {
   return getTempoInBPM(tempo);
 }
 
-double CapcomSnesSeq::getTempoInBPM(uint16_t tempo) {
+double CapcomSnesSeq::getTempoInBPM(u16 tempo) {
   if (tempo != 0) {
     return 60000000.0 / (SEQ_PPQN * (125 * 0x40) * 2) * (tempo / 256.0);
   }
@@ -150,7 +151,7 @@ double CapcomSnesSeq::getTempoInBPM(uint16_t tempo) {
 //  CapcomSnesTrack
 //  ************
 
-CapcomSnesTrack::CapcomSnesTrack(CapcomSnesSeq *parentFile, uint32_t offset, uint32_t length)
+CapcomSnesTrack::CapcomSnesTrack(CapcomSnesSeq *parentFile, u32 offset, u32 length)
     : SeqTrack(parentFile, offset, length) {
   CapcomSnesTrack::resetVars();
   bDetermineTrackLengthEventByEvent = true;
@@ -173,7 +174,7 @@ void CapcomSnesTrack::resetVars() {
   lastPortamentoTime = 0;
   portamentoMillisecondsPerCent = 0;
 
-  for (uint8_t& i : repeatCount) {
+  for (u8& i : repeatCount) {
     i = 0;
   }
 }
@@ -187,7 +188,7 @@ void CapcomSnesTrack::setLfoOutputsEnabled(bool enabled) {
   }
 }
 
-void CapcomSnesTrack::addVibratoDepthEvent(uint32_t offset, uint32_t length, uint8_t depth) {
+void CapcomSnesTrack::addVibratoDepthEvent(u32 offset, u32 length, u8 depth) {
   bool isNewOffset = onEvent(offset, length);
   vibrato.setDepth(depth);
 
@@ -196,7 +197,7 @@ void CapcomSnesTrack::addVibratoDepthEvent(uint32_t offset, uint32_t length, uin
   emitVibratoDepth(vibrato, vibrato.outputDepthWhen(areLfoOutputsEnabled()), true);
 }
 
-void CapcomSnesTrack::handleLfoRateChange(uint8_t lfoRateByte) {
+void CapcomSnesTrack::handleLfoRateChange(u8 lfoRateByte) {
   const bool wasEnabled = areLfoOutputsEnabled();
   vibrato.setRate(lfoRateByte);
   tremolo.setRate(lfoRateByte);
@@ -213,11 +214,11 @@ void CapcomSnesTrack::handleLfoRateChange(uint8_t lfoRateByte) {
 }
 
 
-uint8_t CapcomSnesTrack::getNoteOctave() const {
+u8 CapcomSnesTrack::getNoteOctave() const {
   return noteAttributes & CAPCOM_SNES_MASK_NOTE_OCTAVE;
 }
 
-void CapcomSnesTrack::setNoteOctave(uint8_t octave) {
+void CapcomSnesTrack::setNoteOctave(u8 octave) {
   noteAttributes = (noteAttributes & ~CAPCOM_SNES_MASK_NOTE_OCTAVE) | (octave & CAPCOM_SNES_MASK_NOTE_OCTAVE);
 }
 
@@ -273,7 +274,7 @@ void CapcomSnesTrack::setNoteSlurred(bool slurred) {
   }
 }
 
-double CapcomSnesTrack::getTuningInSemitones(int8_t tuning) {
+double CapcomSnesTrack::getTuningInSemitones(s8 tuning) {
   return tuning / 256.0;
 }
 namespace {
@@ -284,11 +285,11 @@ constexpr int kTremoloPeakScalarV2 = 250;
 constexpr double kTremoloMuteFloorCentibels = 960.0;
 
 struct PanConversionResult {
-  uint8_t midiPan;
+  u8 midiPan;
   double volumeScale;
 };
 
-int interpolatePanFactor(uint16_t panPosition) {
+int interpolatePanFactor(u16 panPosition) {
   const int panIndex = panPosition >> 8;
   const int panRate = panPosition & 0xff;
   const int lower = CapcomSnesSeq::panTable[panIndex];
@@ -296,9 +297,9 @@ int interpolatePanFactor(uint16_t panPosition) {
   return lower + ((upper - lower) * panRate >> 8);
 }
 
-PanConversionResult calculatePanV2(uint8_t biasedPan) {
-  const uint16_t rightPanPosition = static_cast<uint16_t>(biasedPan) * 20;
-  const uint16_t leftPanPosition = 0x1400 - rightPanPosition;
+PanConversionResult calculatePanV2(u8 biasedPan) {
+  const u16 rightPanPosition = static_cast<u16>(biasedPan) * 20;
+  const u16 leftPanPosition = 0x1400 - rightPanPosition;
   const double volumeLeft = interpolatePanFactor(leftPanPosition) / 128.0;
   const double volumeRight = interpolatePanFactor(rightPanPosition) / 128.0;
 
@@ -317,7 +318,7 @@ int interpolateVolumeCurve(int curveIndex, int curveFraction) {
   return lower + (((upper - lower) * curveFraction) >> 8);
 }
 
-int calculateVolumeScalar(uint8_t sourceVolume) {
+int calculateVolumeScalar(u8 sourceVolume) {
   // The driver's intended range is 0x00..0x80 with 0x80 resolving to full volume.
   if (sourceVolume >= 0x80) {
     return CapcomSnesSeq::volTable[kVolumeCurveLastIndex]; // 0xff
@@ -328,7 +329,7 @@ int calculateVolumeScalar(uint8_t sourceVolume) {
   return interpolateVolumeCurve(curveIndex, curveFraction);
 }
 
-double calculateVolumeV2(uint8_t sourceVolume) {
+double calculateVolumeV2(u8 sourceVolume) {
   const int scalar = calculateVolumeScalar(sourceVolume); // 0..255
   return static_cast<double>(scalar) / 255.0;
 }
@@ -382,7 +383,7 @@ int convertTremoloDepthToMidiValue(int sourceDepth, CapcomSnesVersion version) {
   return std::clamp(midiValue, 0, 127);
 }
 
-uint8_t convertLfoRateByteToMidiVal(uint8_t freqByte) {
+u8 convertLfoRateByteToMidiVal(u8 freqByte) {
   if (freqByte == 0)
     return 0; // this is a special-case that disables the LFO
 
@@ -397,16 +398,16 @@ uint8_t convertLfoRateByteToMidiVal(uint8_t freqByte) {
 
 bool CapcomSnesTrack::readEvent() {
   CapcomSnesSeq *parentSeq = static_cast<CapcomSnesSeq*>(this->parentSeq);
-  uint32_t beginOffset = curOffset;
+  u32 beginOffset = curOffset;
   if (curOffset >= 0x10000) {
     return false;
   }
 
-  uint8_t statusByte = readByte(curOffset++);
+  u8 statusByte = readByte(curOffset++);
   bool bContinue = true;
 
   std::string desc;
-  auto applyNoteAttributes = [this](uint8_t attributes) {
+  auto applyNoteAttributes = [this](u8 attributes) {
     const bool wasSlurred = isNoteSlurred();
     noteAttributes &= ~(CAPCOM_SNES_MASK_NOTE_OCTAVE_UP | CAPCOM_SNES_MASK_NOTE_TRIPLET | CAPCOM_SNES_MASK_NOTE_SLURRED);
     noteAttributes |= attributes;
@@ -417,14 +418,14 @@ bool CapcomSnesTrack::readEvent() {
   };
 
   if (statusByte >= 0x20) {
-    uint8_t keyIndex = statusByte & 0x1f;
-    uint8_t lenIndex = statusByte >> 5;
+    u8 keyIndex = statusByte & 0x1f;
+    u8 lenIndex = statusByte >> 5;
     bool rest = (keyIndex == 0);
 
     // calcurate actual note length:
     // actual music engine acquires the length from a table,
     // but it can be calculated quite easily. Here it is.
-    uint8_t len = 192 >> (7 - lenIndex);
+    u8 len = 192 >> (7 - lenIndex);
     if (isNoteDotted()) {
       if (len % 2 == 0 && len < 0x80) {
         len = len + (len / 2);
@@ -447,7 +448,7 @@ bool CapcomSnesTrack::readEvent() {
     else {
       // calculate duration of note:
       // actual music engine does it in 16 bit precision, because of tempo handling.
-      uint16_t dur = len * durationRate;
+      u16 dur = len * durationRate;
 
       if (isNoteSlurred()) {
         // slurred/tied note must be full-length.
@@ -467,8 +468,8 @@ bool CapcomSnesTrack::readEvent() {
         dur = 1;
       }
 
-      uint8_t key = (keyIndex - 1) + (getNoteOctave() * 12) + (isNoteOctaveUp() ? 24 : 0);
-      uint8_t vel = 127;
+      u8 key = (keyIndex - 1) + (getNoteOctave() * 12) + (isNoteOctaveUp() ? 24 : 0);
+      u8 vel = 127;
       if (lastNoteSlurred && key == lastKey && !didRest) {
         addTime(dur);
         makePrevDurNoteEnd();
@@ -477,7 +478,7 @@ bool CapcomSnesTrack::readEvent() {
       }
       else {
         if (portamentoMillisecondsPerCent > 0 && lastKey >= 0) {
-          uint16_t portamentoDurInMillis = (abs(key - lastKey) * 100) * portamentoMillisecondsPerCent;
+          u16 portamentoDurInMillis = (abs(key - lastKey) * 100) * portamentoMillisecondsPerCent;
           if (portamentoDurInMillis != lastPortamentoTime) {
             addPortamentoTime14BitNoItem(portamentoDurInMillis);
             lastPortamentoTime = portamentoDurInMillis;
@@ -494,7 +495,7 @@ bool CapcomSnesTrack::readEvent() {
   }
   else {
     CapcomSnesSeqEventType eventType = static_cast<CapcomSnesSeqEventType>(0);
-    std::map<uint8_t, CapcomSnesSeqEventType>::iterator pEventType = parentSeq->EventMap.find(statusByte);
+    std::map<u8, CapcomSnesSeqEventType>::iterator pEventType = parentSeq->EventMap.find(statusByte);
     if (pEventType != parentSeq->EventMap.end()) {
       eventType = pEventType->second;
     }
@@ -507,34 +508,34 @@ bool CapcomSnesTrack::readEvent() {
       }
 
       case EVENT_UNKNOWN1: {
-        uint8_t arg1 = readByte(curOffset++);
+        u8 arg1 = readByte(curOffset++);
         auto descr = describeUnknownEvent(statusByte, arg1);
         addUnknown(beginOffset, curOffset - beginOffset, "Unknown Event", descr);
         break;
       }
 
       case EVENT_UNKNOWN2: {
-        uint8_t arg1 = readByte(curOffset++);
-        uint8_t arg2 = readByte(curOffset++);
+        u8 arg1 = readByte(curOffset++);
+        u8 arg2 = readByte(curOffset++);
         auto descr = describeUnknownEvent(statusByte, arg1, arg2);
         addUnknown(beginOffset, curOffset - beginOffset, "Unknown Event", descr);
         break;
       }
 
       case EVENT_UNKNOWN3: {
-        uint8_t arg1 = readByte(curOffset++);
-        uint8_t arg2 = readByte(curOffset++);
-        uint8_t arg3 = readByte(curOffset++);
+        u8 arg1 = readByte(curOffset++);
+        u8 arg2 = readByte(curOffset++);
+        u8 arg3 = readByte(curOffset++);
         auto descr = describeUnknownEvent(statusByte, arg1, arg2, arg3);
         addUnknown(beginOffset, curOffset - beginOffset, "Unknown Event", descr);
         break;
       }
 
       case EVENT_UNKNOWN4: {
-        uint8_t arg1 = readByte(curOffset++);
-        uint8_t arg2 = readByte(curOffset++);
-        uint8_t arg3 = readByte(curOffset++);
-        uint8_t arg4 = readByte(curOffset++);
+        u8 arg1 = readByte(curOffset++);
+        u8 arg2 = readByte(curOffset++);
+        u8 arg3 = readByte(curOffset++);
+        u8 arg4 = readByte(curOffset++);
         auto descr = describeUnknownEvent(statusByte, arg1, arg2, arg3, arg4);
         addUnknown(beginOffset, curOffset - beginOffset, "Unknown Event", descr);
         break;
@@ -562,7 +563,7 @@ bool CapcomSnesTrack::readEvent() {
         break;
 
       case EVENT_NOTE_ATTRIBUTES: {
-        uint8_t attributes = readByte(curOffset++);
+        u8 attributes = readByte(curOffset++);
         applyNoteAttributes(attributes);
         desc = fmt::format("Triplet: {}  Slur: {}  2-Octave Up: {}",
                         isNoteTriplet() ? "On" : "Off",
@@ -577,7 +578,7 @@ bool CapcomSnesTrack::readEvent() {
       }
 
       case EVENT_TEMPO: {
-        uint16_t newTempo = getShortBE(curOffset);
+        u16 newTempo = getShortBE(curOffset);
         curOffset += 2;
         parentSeq->tempo = newTempo;
         addTempoBPM(beginOffset, curOffset - beginOffset, parentSeq->getTempoInBPM());
@@ -585,7 +586,7 @@ bool CapcomSnesTrack::readEvent() {
       }
 
       case EVENT_DURATION: {
-        uint8_t newDurationRate = readByte(curOffset++);
+        u8 newDurationRate = readByte(curOffset++);
         durationRate = newDurationRate;
         addGenericEvent(beginOffset,
                         curOffset - beginOffset,
@@ -596,7 +597,7 @@ bool CapcomSnesTrack::readEvent() {
       }
 
       case EVENT_VOLUME: {
-        uint8_t newVolume = readByte(curOffset++);
+        u8 newVolume = readByte(curOffset++);
 
         if (parentSeq->version == CAPCOMSNES_V1_BGM_IN_LIST) {
           // linear volume
@@ -611,13 +612,13 @@ bool CapcomSnesTrack::readEvent() {
       }
 
       case EVENT_PROGRAM_CHANGE: {
-        uint8_t newProg = readByte(curOffset++);
+        u8 newProg = readByte(curOffset++);
         addProgramChange(beginOffset, curOffset - beginOffset, newProg, true);
         break;
       }
 
       case EVENT_OCTAVE: {
-        uint8_t newOctave = readByte(curOffset++);
+        u8 newOctave = readByte(curOffset++);
         desc = fmt::format("Octave: {}", newOctave);
         setNoteOctave(newOctave);
         addGenericEvent(beginOffset, curOffset - beginOffset, "Octave", desc, Type::Octave);
@@ -625,19 +626,19 @@ bool CapcomSnesTrack::readEvent() {
       }
 
       case EVENT_GLOBAL_TRANSPOSE: {
-        int8_t newTranspose = readByte(curOffset++);
+        s8 newTranspose = readByte(curOffset++);
         addGlobalTranspose(beginOffset, curOffset - beginOffset, newTranspose);
         break;
       }
 
       case EVENT_TRANSPOSE: {
-        int8_t newTranspose = readByte(curOffset++);
+        s8 newTranspose = readByte(curOffset++);
         addTranspose(beginOffset, curOffset - beginOffset, newTranspose);
         break;
       }
 
       case EVENT_TUNING: {
-        int8_t newTuning = static_cast<int8_t>(readByte(curOffset++));
+        s8 newTuning = static_cast<s8>(readByte(curOffset++));
         double cents = getTuningInSemitones(newTuning) * 100.0;
         addFineTuning(beginOffset, curOffset - beginOffset, cents);
         break;
@@ -645,8 +646,8 @@ bool CapcomSnesTrack::readEvent() {
 
       case EVENT_PORTAMENTO_TIME: {
         // All tested versions of the format (V1-V3) use the same calculation for portamento time.
-        uint8_t portamentoTimeByte = readByte(curOffset++);
-        uint8_t step = (portamentoTimeByte << 1) & 0xFF;
+        u8 portamentoTimeByte = readByte(curOffset++);
+        u8 step = (portamentoTimeByte << 1) & 0xFF;
         double centsPerUpdate = step * (100.0 / 256.0);
         // The voice stream/portamento update runs once every other 8 ms timer tick, i.e. about 62.5 updates per second
         if (centsPerUpdate == 0)
@@ -665,11 +666,11 @@ bool CapcomSnesTrack::readEvent() {
       case EVENT_REPEAT_UNTIL_2:
       case EVENT_REPEAT_UNTIL_3:
       case EVENT_REPEAT_UNTIL_4: {
-        uint8_t times = readByte(curOffset++);
-        uint16_t dest = getShortBE(curOffset);
+        u8 times = readByte(curOffset++);
+        u16 dest = getShortBE(curOffset);
         curOffset += 2;
 
-        uint8_t repeatSlot;
+        u8 repeatSlot;
         const char* repeatEventName;
         switch (eventType) {
 			case EVENT_REPEAT_UNTIL_1: repeatSlot = 0; repeatEventName = "Repeat Until #1"; break;
@@ -716,11 +717,11 @@ bool CapcomSnesTrack::readEvent() {
       case EVENT_REPEAT_BREAK_2:
       case EVENT_REPEAT_BREAK_3:
       case EVENT_REPEAT_BREAK_4: {
-        uint8_t attributes = readByte(curOffset++);
-        uint16_t dest = getShortBE(curOffset);
+        u8 attributes = readByte(curOffset++);
+        u16 dest = getShortBE(curOffset);
         curOffset += 2;
 
-        uint8_t repeatSlot;
+        u8 repeatSlot;
         const char* repeatEventName;
         switch (eventType) {
 			case EVENT_REPEAT_BREAK_1: repeatSlot = 0; repeatEventName = "Repeat Break #1"; break;
@@ -750,10 +751,10 @@ bool CapcomSnesTrack::readEvent() {
       }
 
       case EVENT_GOTO: {
-        uint16_t dest = getShortBE(curOffset);
+        u16 dest = getShortBE(curOffset);
         curOffset += 2;
         desc = fmt::format("Destination: ${:04X}", dest);
-        uint32_t length = curOffset - beginOffset;
+        u32 length = curOffset - beginOffset;
 
         if (!isOffsetUsed(dest)) {
           addGenericEvent(beginOffset, length, "Jump", desc, Type::LoopForever);
@@ -777,7 +778,7 @@ bool CapcomSnesTrack::readEvent() {
         break;
 
       case EVENT_PAN: {
-        uint8_t newPan = readByte(curOffset++) + 0x80; // signed -> unsigned
+        u8 newPan = readByte(curOffset++) + 0x80; // signed -> unsigned
         PanConversionResult pan{};
         if (parentSeq->version == CAPCOMSNES_V1_BGM_IN_LIST) {
           pan.midiPan = convert7bitLinearPercentPanValToStdMidiVal(newPan >> 1, &pan.volumeScale);
@@ -792,7 +793,7 @@ bool CapcomSnesTrack::readEvent() {
       }
 
       case EVENT_MASTER_VOLUME: {
-        uint8_t newVolume = readByte(curOffset++);
+        u8 newVolume = readByte(curOffset++);
 
         if (parentSeq->version == CAPCOMSNES_V1_BGM_IN_LIST) {
           // linear volume
@@ -807,8 +808,8 @@ bool CapcomSnesTrack::readEvent() {
       }
 
       case EVENT_LFO: {
-        uint8_t lfoType = readByte(curOffset++);
-        uint8_t lfoAmount = readByte(curOffset++);
+        u8 lfoType = readByte(curOffset++);
+        u8 lfoAmount = readByte(curOffset++);
         switch (lfoType) {
           case 0:
             // Vibrato Depth
@@ -824,7 +825,7 @@ bool CapcomSnesTrack::readEvent() {
           case 2: {
             // LFO Rate
             handleLfoRateChange(lfoAmount);
-            const uint8_t lfoRateMidiValue = convertLfoRateByteToMidiVal(lfoAmount);
+            const u8 lfoRateMidiValue = convertLfoRateByteToMidiVal(lfoAmount);
             addVibratoFrequency(beginOffset,
                                 curOffset - beginOffset,
                                 lfoRateMidiValue,
@@ -843,8 +844,8 @@ bool CapcomSnesTrack::readEvent() {
       }
 
       case EVENT_ECHO_PARAM: {
-        uint8_t echoArg1 = readByte(curOffset++);
-        uint8_t echoPreset = readByte(curOffset++);
+        u8 echoArg1 = readByte(curOffset++);
+        u8 echoPreset = readByte(curOffset++);
         desc = fmt::format("Arg1: {:d}  Preset: {:d}", echoArg1, echoPreset);
         addGenericEvent(beginOffset,
                         curOffset - beginOffset,
@@ -865,7 +866,7 @@ bool CapcomSnesTrack::readEvent() {
       }
 
       case EVENT_RELEASE_RATE: {
-        uint8_t gain = readByte(curOffset++) | 0xa0;
+        u8 gain = readByte(curOffset++) | 0xa0;
         addGenericEvent(beginOffset,
                         curOffset - beginOffset,
                         "Release Rate",

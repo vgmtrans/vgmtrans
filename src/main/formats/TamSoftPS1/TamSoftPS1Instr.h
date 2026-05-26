@@ -1,4 +1,6 @@
 #pragma once
+
+#include "util/types.h"
 #include "VGMInstrSet.h"
 #include "VGMSampColl.h"
 #include "VGMRgn.h"
@@ -11,7 +13,7 @@
 class TamSoftPS1InstrSet:
     public VGMInstrSet {
  public:
-  TamSoftPS1InstrSet(RawFile *file, uint32_t offset, bool ps2, const std::string &name = "TamSoftPS1InstrSet");
+  TamSoftPS1InstrSet(RawFile *file, u32 offset, bool ps2, const std::string &name = "TamSoftPS1InstrSet");
   virtual ~TamSoftPS1InstrSet();
 
   virtual bool parseHeader();
@@ -27,14 +29,14 @@ class TamSoftPS1InstrSet:
 class TamSoftPS1Instr
     : public VGMInstr {
  public:
-  TamSoftPS1Instr(TamSoftPS1InstrSet *instrSet, uint8_t instrNum, const std::string &name = "TamSoftPS1Instr");
+  TamSoftPS1Instr(TamSoftPS1InstrSet *instrSet, u8 instrNum, const std::string &name = "TamSoftPS1Instr");
   virtual ~TamSoftPS1Instr();
 
   virtual bool loadInstr();
 
  protected:
-  uint32_t spcDirAddr;
-  uint32_t addrSampTuningTable;
+  u32 spcDirAddr;
+  u32 addrSampTuningTable;
 };
 
 // *************
@@ -44,7 +46,7 @@ class TamSoftPS1Instr
 class TamSoftPS1Rgn
     : public VGMRgn {
  public:
-  TamSoftPS1Rgn(TamSoftPS1Instr *instr, uint32_t offset, bool ps2);
+  TamSoftPS1Rgn(TamSoftPS1Instr *instr, u32 offset, bool ps2);
   virtual ~TamSoftPS1Rgn();
 
   virtual bool loadRgn();

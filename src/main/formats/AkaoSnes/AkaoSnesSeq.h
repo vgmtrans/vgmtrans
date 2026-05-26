@@ -1,4 +1,6 @@
 #pragma once
+
+#include "util/types.h"
 #include "VGMSeq.h"
 #include "automation/SeqMidiAutomation.h"
 #include "SeqTrack.h"
@@ -95,8 +97,8 @@ class AkaoSnesSeq
   AkaoSnesSeq(RawFile *file,
               AkaoSnesVersion ver,
               AkaoSnesMinorVersion minorVer,
-              uint32_t seqdataOffset,
-              uint32_t addrAPURelocBase,
+              u32 seqdataOffset,
+              u32 addrAPURelocBase,
               std::string newName = "Square AKAO SNES Seq");
   ~AkaoSnesSeq() override;
 
@@ -104,28 +106,28 @@ class AkaoSnesSeq
   bool parseTrackPointers() override;
   void resetVars() override;
 
-  double getTempoInBPM(uint8_t tempoValue) const;
+  double getTempoInBPM(u8 tempoValue) const;
   void syncTempoDependentTracks();
 
-  uint16_t romAddressToApuAddress(uint16_t romAddress) const;
-  uint16_t getShortAddress(uint32_t offset) const;
+  u16 romAddressToApuAddress(u16 romAddress) const;
+  u16 getShortAddress(u32 offset) const;
 
   AkaoSnesVersion version;
   AkaoSnesMinorVersion minorVersion;
-  std::map<uint8_t, AkaoSnesSeqEventType> EventMap;
+  std::map<u8, AkaoSnesSeqEventType> EventMap;
 
-  uint8_t STATUS_NOTE_MAX;
-  uint8_t STATUS_NOTEINDEX_TIE;
-  uint8_t STATUS_NOTEINDEX_REST;
-  std::vector<uint8_t> NOTE_DUR_TABLE;
+  u8 STATUS_NOTE_MAX;
+  u8 STATUS_NOTEINDEX_TIE;
+  u8 STATUS_NOTEINDEX_REST;
+  std::vector<u8> NOTE_DUR_TABLE;
 
-  uint8_t TIMER0_FREQUENCY;
+  u8 TIMER0_FREQUENCY;
   bool PAN_8BIT;
-  uint8_t tempo;
+  u8 tempo;
 
-  uint32_t addrAPURelocBase;
-  uint32_t addrROMRelocBase;
-  uint32_t addrSequenceEnd;
+  u32 addrAPURelocBase;
+  u32 addrROMRelocBase;
+  u32 addrSequenceEnd;
 
  private:
   void LoadEventMap(void);
@@ -134,14 +136,14 @@ class AkaoSnesSeq
 
 class AkaoSnesTrack : public SeqTrack {
 public:
-  AkaoSnesTrack(AkaoSnesSeq *parentFile, uint32_t offset = 0, uint32_t length = 0);
+  AkaoSnesTrack(AkaoSnesSeq *parentFile, u32 offset = 0, u32 length = 0);
   void resetVars() override;
   void onTickBegin() override;
   bool readEvent() override;
   void syncTempoDependentLfos();
 
-  uint16_t romAddressToApuAddress(uint16_t romAddress) const;
-  uint16_t getShortAddress(uint32_t offset) const;
+  u16 romAddressToApuAddress(u16 romAddress) const;
+  u16 getShortAddress(u32 offset) const;
 
  private:
   enum class LfoTarget {
@@ -150,52 +152,52 @@ public:
   };
 
   struct LfoParams {
-    uint8_t delay;
-    uint8_t rate;
-    uint8_t depth;
+    u8 delay;
+    u8 rate;
+    u8 depth;
   };
 
   LfoParams readLfoParams();
-  void applyLfo(LfoTarget target, uint32_t offset, uint32_t length, const LfoParams& params);
-  void clearLfo(LfoTarget target, uint32_t offset, uint32_t length);
-  void setLfoOutputDepth(LfoTarget target, uint8_t depth, bool force);
+  void applyLfo(LfoTarget target, u32 offset, u32 length, const LfoParams& params);
+  void clearLfo(LfoTarget target, u32 offset, u32 length);
+  void setLfoOutputDepth(LfoTarget target, u8 depth, bool force);
   void clearLfoRateAndDelay(LfoTarget target);
   void syncLfoRateAndDelay(LfoTarget target);
   void configureVibratoFade();
   void configureTremoloFade();
   void beginVibratoForNote();
   void beginTremoloForNote();
-  uint8_t vibratoFadeDepthMidiValue(int32_t depth) const;
-  uint8_t tremoloFadeDepthMidiValue(int32_t depth) const;
+  u8 vibratoFadeDepthMidiValue(s32 depth) const;
+  u8 tremoloFadeDepthMidiValue(s32 depth) const;
   void updateVibratoFade();
   void updateTremoloFade();
   void resetPitchState();
-  void beginNotePitch(uint8_t note, bool validForPitchBend);
+  void beginNotePitch(u8 note, bool validForPitchBend);
   void resetPitchBendForNewNote();
-  void setPitchEnvelope(int8_t semitones, uint8_t delay, uint8_t length);
+  void setPitchEnvelope(s8 semitones, u8 delay, u8 length);
   void clearPitchEnvelope();
   void beginPitchEnvelopeForNote();
   void updatePitchEnvelope();
   bool pitchEnvelopeDelayElapsed();
-  bool advancePitchEnvelopeTick(AkaoSnesVersion version, int32_t& currentOffset);
-  void setPendingPitchSlide(uint16_t steps, int8_t semitones);
+  bool advancePitchEnvelopeTick(AkaoSnesVersion version, s32& currentOffset);
+  void setPendingPitchSlide(u16 steps, s8 semitones);
   void clearPendingPitchSlide();
   void beginPendingPitchSlide();
   void updatePitchSlide();
 
-  uint8_t onetimeDuration;
+  u8 onetimeDuration;
   bool slur;
   bool legato;
   bool percussion;
-  uint8_t nonPercussionProgram;
+  u8 nonPercussionProgram;
   bool jumpActivatedByMainCpu;
 
-  uint8_t loopLevel;
-  uint8_t loopIncCount[AKAOSNES_LOOP_LEVEL_MAX];
-  uint8_t loopDecCount[AKAOSNES_LOOP_LEVEL_MAX];
-  uint16_t loopStart[AKAOSNES_LOOP_LEVEL_MAX];
+  u8 loopLevel;
+  u8 loopIncCount[AKAOSNES_LOOP_LEVEL_MAX];
+  u8 loopDecCount[AKAOSNES_LOOP_LEVEL_MAX];
+  u16 loopStart[AKAOSNES_LOOP_LEVEL_MAX];
 
-  uint8_t ignoreMasterVolumeProgNum;
+  u8 ignoreMasterVolumeProgNum;
 
   // Persistent V1/V2 pitch-envelope configuration plus the per-note active
   // ramp state derived from it. V3/V4 pitch slides use the pending fields below
@@ -203,27 +205,27 @@ public:
   struct PitchEnvelopeState {
     bool enabled = false;
     bool active = false;
-    int8_t semitones = 0;
-    uint8_t delay = 0;
-    uint8_t length = 0;
-    uint16_t progressStep = 0;
-    uint8_t activeDelay = 0;
-    uint8_t activeCount = 0;
-    uint32_t progress = 0;
-    int32_t targetOffset = 0;
+    s8 semitones = 0;
+    u8 delay = 0;
+    u8 length = 0;
+    u16 progressStep = 0;
+    u8 activeDelay = 0;
+    u8 activeCount = 0;
+    u32 progress = 0;
+    s32 targetOffset = 0;
   } pitchEnvelope;
 
   // Pending one-shot V3/V4 pitch-slide setup. A normal note or tie consumes
   // these fields; rests leave them pending for the next pitch setup path.
-  uint16_t pendingPitchSlideSteps;
-  int8_t pendingPitchSlideSemitones;
+  u16 pendingPitchSlideSteps;
+  s8 pendingPitchSlideSemitones;
   // V3/V4 slide targets mutate the driver's stored corrected-note byte. The
   // base note anchors MIDI pitch bend to the current sounding note; the current
   // note advances cumulatively through tied slide chains.
   bool pitchSlideNoteValid;
-  int16_t pitchSlideBaseNote;
-  int16_t pitchSlideCurrentNote;
-  SeqPitchBendAutomation<int32_t> pitchSlide;
+  s16 pitchSlideBaseNote;
+  s16 pitchSlideCurrentNote;
+  SeqPitchBendAutomation<s32> pitchSlide;
   SeqSynthLfoAutomation vibrato;
   SeqSynthLfoAutomation tremolo;
 };

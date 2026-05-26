@@ -4,6 +4,7 @@
  * refer to the included LICENSE.txt file
  */
 
+#include "util/types.h"
 #include "AsciiShuichiSnesInstr.h"
 #include <spdlog/fmt/fmt.h>
 #include "SNESDSP.h"
@@ -14,9 +15,9 @@
 // AsciiShuichiSnesInstrSet
 // ************************
 
-AsciiShuichiSnesInstrSet::AsciiShuichiSnesInstrSet(RawFile *file, uint32_t offset,
-                                                   uint32_t fineTuningTableAddress,
-                                                   uint32_t spcDirAddress, const std::string &name)
+AsciiShuichiSnesInstrSet::AsciiShuichiSnesInstrSet(RawFile *file, u32 offset,
+                                                   u32 fineTuningTableAddress,
+                                                   u32 spcDirAddress, const std::string &name)
     :
     VGMInstrSet(AsciiShuichiSnesFormat::name, file, offset, 0, name),
     fineTuningTableAddress(fineTuningTableAddress),
@@ -30,7 +31,7 @@ bool AsciiShuichiSnesInstrSet::parseHeader() {
 bool AsciiShuichiSnesInstrSet::parseInstrPointers() {
   usedSRCNs.clear();
   for (int instr = 0; instr < 0x40; instr++) {
-    const uint32_t instrHeaderAddress = offset() + (4 * instr);
+    const u32 instrHeaderAddress = offset() + (4 * instr);
     if (instrHeaderAddress + 4 > 0x10000) {
       return false;
     }
@@ -39,7 +40,7 @@ bool AsciiShuichiSnesInstrSet::parseInstrPointers() {
       continue;
     }
 
-    const uint8_t srcn = readByte(instrHeaderAddress);
+    const u8 srcn = readByte(instrHeaderAddress);
     auto itrSRCN = std::ranges::find(usedSRCNs, srcn);
     if (itrSRCN == usedSRCNs.end()) {
       usedSRCNs.push_back(srcn);
@@ -69,11 +70,11 @@ bool AsciiShuichiSnesInstrSet::parseInstrPointers() {
 // *********************
 
 AsciiShuichiSnesInstr::AsciiShuichiSnesInstr(VGMInstrSet *instrSet,
-                                 uint32_t offset,
-                                 uint32_t theBank,
-                                 uint32_t theInstrNum,
-                                 uint32_t spcDirAddress,
-                                 uint32_t fineTuningTableAddress,
+                                 u32 offset,
+                                 u32 theBank,
+                                 u32 theInstrNum,
+                                 u32 spcDirAddress,
+                                 u32 fineTuningTableAddress,
                                  const std::string &name) :
     VGMInstr(instrSet, offset, 6, theBank, theInstrNum, name),
     spcDirAddress(spcDirAddress),
@@ -81,18 +82,18 @@ AsciiShuichiSnesInstr::AsciiShuichiSnesInstr(VGMInstrSet *instrSet,
 }
 
 bool AsciiShuichiSnesInstr::loadInstr() {
-  const uint8_t srcn = readByte(offset());
-  const uint32_t dirEntryOffset = spcDirAddress + (srcn * 4);
+  const u8 srcn = readByte(offset());
+  const u32 dirEntryOffset = spcDirAddress + (srcn * 4);
   if (dirEntryOffset + 4 > 0x10000) {
     return false;
   }
 
-  const uint16_t sampleStartAddress = readShort(dirEntryOffset);
+  const u16 sampleStartAddress = readShort(dirEntryOffset);
 
   if (fineTuningTableAddress + srcn > 0x10000) {
     return false;
   }
-  const auto spcFineTuning = static_cast<int8_t>(readByte(fineTuningTableAddress + srcn));
+  const auto spcFineTuning = static_cast<s8>(readByte(fineTuningTableAddress + srcn));
 
   const auto rgn = new AsciiShuichiSnesRgn(this, offset(), spcFineTuning);
   rgn->sampOffset = sampleStartAddress - spcDirAddress;
@@ -101,26 +102,26 @@ bool AsciiShuichiSnesInstr::loadInstr() {
   return true;
 }
 
-bool AsciiShuichiSnesInstr::isValidHeader(const RawFile *file, uint32_t instrHeaderAddress, uint32_t spcDirAddress) {
+bool AsciiShuichiSnesInstr::isValidHeader(const RawFile *file, u32 instrHeaderAddress, u32 spcDirAddress) {
   if (instrHeaderAddress + 4 > 0x10000) {
     return false;
   }
 
-  const uint8_t srcn = file->readByte(instrHeaderAddress);
-  const uint8_t adsr1 = file->readByte(instrHeaderAddress + 1);
-  const uint8_t gain = file->readByte(instrHeaderAddress + 3);
+  const u8 srcn = file->readByte(instrHeaderAddress);
+  const u8 adsr1 = file->readByte(instrHeaderAddress + 1);
+  const u8 gain = file->readByte(instrHeaderAddress + 3);
 
   if (srcn >= 0x80 || (adsr1 == 0 && gain == 0)) {
     return false;
   }
 
-  const uint32_t dirEntryAddress = spcDirAddress + (srcn * 4);
+  const u32 dirEntryAddress = spcDirAddress + (srcn * 4);
   if (!SNESSampColl::isValidSampleDir(file, dirEntryAddress, false)) {
     return false;
   }
 
-  const uint16_t srcAddress = file->readShort(dirEntryAddress);
-  const uint16_t loopStartAddress = file->readShort(dirEntryAddress + 2);
+  const u16 srcAddress = file->readShort(dirEntryAddress);
+  const u16 loopStartAddress = file->readShort(dirEntryAddress + 2);
   if (srcAddress > loopStartAddress || (loopStartAddress - srcAddress) % 9 != 0) {
     return false;
   }
@@ -132,12 +133,12 @@ bool AsciiShuichiSnesInstr::isValidHeader(const RawFile *file, uint32_t instrHea
 // AsciiShuichiSnesRgn
 // *******************
 
-AsciiShuichiSnesRgn::AsciiShuichiSnesRgn(AsciiShuichiSnesInstr *instr, uint32_t offset, int8_t spcFineTuning) :
+AsciiShuichiSnesRgn::AsciiShuichiSnesRgn(AsciiShuichiSnesInstr *instr, u32 offset, s8 spcFineTuning) :
     VGMRgn(instr, offset, 4) {
-  const uint8_t srcn = readByte(offset);
-  const uint8_t adsr1 = readByte(offset + 1);
-  const uint8_t adsr2 = readByte(offset + 2);
-  const uint8_t gain = readByte(offset + 3);
+  const u8 srcn = readByte(offset);
+  const u8 adsr1 = readByte(offset + 1);
+  const u8 adsr2 = readByte(offset + 2);
+  const u8 gain = readByte(offset + 3);
 
   addSampNum(srcn, offset, 1);
   addChild(offset + 1, 1, "ADSR1");
@@ -146,12 +147,12 @@ AsciiShuichiSnesRgn::AsciiShuichiSnesRgn(AsciiShuichiSnesInstr *instr, uint32_t 
 
   // pitchTable[57] is 0x1000 then
   setUnityKey(57 + 24);
-  setFineTune(static_cast<int16_t>(pitchScaleToCents(1.0 + (spcFineTuning / 4096.0))));
+  setFineTune(static_cast<s16>(pitchScaleToCents(1.0 + (spcFineTuning / 4096.0))));
 
   snesConvADSR<VGMRgn>(this, adsr1, adsr2, gain);
 
-  const uint8_t sl = (adsr2 >> 5);
-  emulateSDSPGAIN(gain, static_cast<int16_t>((sl << 8) | 0xff), 0, nullptr, &release_time);
+  const u8 sl = (adsr2 >> 5);
+  emulateSDSPGAIN(gain, static_cast<s16>((sl << 8) | 0xff), 0, nullptr, &release_time);
 }
 
 bool AsciiShuichiSnesRgn::loadRgn() {

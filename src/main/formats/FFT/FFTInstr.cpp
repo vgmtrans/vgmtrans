@@ -1,3 +1,4 @@
+#include "util/types.h"
 #include "FFTFormat.h"
 #include "FFTInstr.h"
 #include "VGMSamp.h"
@@ -13,7 +14,7 @@ const float defaultFFTReverbPercent = 0.5;
 //==============================================================
 //		Constructor
 //--------------------------------------------------------------
-WdsInstrSet::WdsInstrSet(RawFile *file, uint32_t offset) :
+WdsInstrSet::WdsInstrSet(RawFile *file, u32 offset) :
     VGMInstrSet(FFTFormat::name, file, offset) {
 }
 
@@ -76,7 +77,7 @@ bool WdsInstrSet::parseHeader() {
 //==============================================================
 bool    WdsInstrSet::parseInstrPointers() {
 
-  uint32_t iOffset = offset() + sizeof(WdsHdr);    //pointer of attribute table
+  u32 iOffset = offset() + sizeof(WdsHdr);    //pointer of attribute table
 
   //音色数だけ繰り返す。
   for (unsigned int i = 0; i <= hdr.iNumInstrs; i++) {
@@ -100,7 +101,7 @@ bool    WdsInstrSet::parseInstrPointers() {
 //==============================================================
 //		Constructor
 //--------------------------------------------------------------
-WdsInstr::WdsInstr(VGMInstrSet *instrSet, uint32_t offset, uint32_t length, uint32_t theBank, uint32_t theInstrNum) :
+WdsInstr::WdsInstr(VGMInstrSet *instrSet, u32 offset, u32 length, u32 theBank, u32 theInstrNum) :
     VGMInstr(instrSet, offset, length, theBank, theInstrNum) {}
 
 //==============================================================
@@ -124,35 +125,35 @@ bool WdsInstr::loadInstr() {
   rgn->unityKey = 0x3C - rgndata.iSemiToneTune;
   // an iFineTune value of 256 should equal 100 cents, and linear scaling seems to do the trick.
   // see the declaration of iFineTune for info on where to find the actual code and table for this in FFT
-  rgn->fineTune = static_cast<int16_t>(rgndata.iFineTune * (100.0 / 256.0));
+  rgn->fineTune = static_cast<s16>(rgndata.iFineTune * (100.0 / 256.0));
 
-  rgn->addGeneralItem(offset() + 0x00, sizeof(uint32_t), "Sample Offset");
-  rgn->addGeneralItem(offset() + 0x04, sizeof(uint16_t), "Loop Offset");
-  rgn->addGeneralItem(offset() + 0x06, sizeof(uint16_t), "Pitch Fine Tune");
+  rgn->addGeneralItem(offset() + 0x00, sizeof(u32), "Sample Offset");
+  rgn->addGeneralItem(offset() + 0x04, sizeof(u16), "Loop Offset");
+  rgn->addGeneralItem(offset() + 0x06, sizeof(u16), "Pitch Fine Tune");
 
   if (parInstrSet->version == WdsInstrSet::VERSION_WDS) {
-    uint32_t adsr_rate = getWord(offset() + 0x08);
-    uint16_t adsr_mode = readShort(offset() + 0x0c);
+    u32 adsr_rate = getWord(offset() + 0x08);
+    u16 adsr_mode = readShort(offset() + 0x0c);
 
     // Xenogears: function 0x8003e5bc
     // These values will be set to SPU by function 0x8003e900
-    uint8_t Ar = adsr_rate & 0x7f;
-    uint8_t Dr = (adsr_rate >> 8) & 0x0f;
-    uint8_t Sl = (adsr_rate >> 12) & 0x0f;
-    uint8_t Sr = (adsr_rate >> 16) & 0x7f;
-    uint8_t Rr = (adsr_rate >> 24) & 0x1f;
-    uint8_t Am = adsr_mode & 0x07;
-    uint8_t Sm = (adsr_mode >> 4) & 0x07;
-    uint8_t Rm = (adsr_mode >> 8) & 0x07;
+    u8 Ar = adsr_rate & 0x7f;
+    u8 Dr = (adsr_rate >> 8) & 0x0f;
+    u8 Sl = (adsr_rate >> 12) & 0x0f;
+    u8 Sr = (adsr_rate >> 16) & 0x7f;
+    u8 Rr = (adsr_rate >> 24) & 0x1f;
+    u8 Am = adsr_mode & 0x07;
+    u8 Sm = (adsr_mode >> 4) & 0x07;
+    u8 Rm = (adsr_mode >> 8) & 0x07;
 
-    rgn->addADSRValue(offset() + 0x08, sizeof(uint8_t), "ADSR Attack Rate");
-    rgn->addADSRValue(offset() + 0x09, sizeof(uint8_t), "ADSR Decay Rate & Sustain Level");
-    rgn->addADSRValue(offset() + 0x0a, sizeof(uint8_t), "ADSR Sustain Rate");
-    rgn->addADSRValue(offset() + 0x0b, sizeof(uint8_t), "ADSR Release Rate");
-    rgn->addADSRValue(offset() + 0x0c, sizeof(uint8_t), "ADSR Attack Mode & Sustain Mode / Direction");
-    rgn->addADSRValue(offset() + 0x0d, sizeof(uint8_t), "ADSR Release Mode");
-    rgn->addUnknown(offset() + 0x0e, sizeof(uint8_t));
-    rgn->addUnknown(offset() + 0x0f, sizeof(uint8_t));
+    rgn->addADSRValue(offset() + 0x08, sizeof(u8), "ADSR Attack Rate");
+    rgn->addADSRValue(offset() + 0x09, sizeof(u8), "ADSR Decay Rate & Sustain Level");
+    rgn->addADSRValue(offset() + 0x0a, sizeof(u8), "ADSR Sustain Rate");
+    rgn->addADSRValue(offset() + 0x0b, sizeof(u8), "ADSR Release Rate");
+    rgn->addADSRValue(offset() + 0x0c, sizeof(u8), "ADSR Attack Mode & Sustain Mode / Direction");
+    rgn->addADSRValue(offset() + 0x0d, sizeof(u8), "ADSR Release Mode");
+    rgn->addUnknown(offset() + 0x0e, sizeof(u8));
+    rgn->addUnknown(offset() + 0x0f, sizeof(u8));
 
     psxConvADSR(rgn, Am >> 2, Ar, Dr, Sl, Sm >> 2, (Sm >> 1) & 1, Sr, Rm >> 2, Rr, false);
     addRgn(rgn);
@@ -161,14 +162,14 @@ bool WdsInstr::loadInstr() {
     psxConvADSR(rgn, rgndata.Am > 1, rgndata.Ar, rgndata.Dr, rgndata.Sl, 1, 1, rgndata.Sr, 1, rgndata.Rr, false);
     addRgn(rgn);
 
-    rgn->addADSRValue(offset() + 0x08, sizeof(uint8_t), "Attack Rate");
-    rgn->addADSRValue(offset() + 0x09, sizeof(uint8_t), "Decay Rate");
-    rgn->addADSRValue(offset() + 0x0A, sizeof(uint8_t), "Sustain Rate");
-    rgn->addADSRValue(offset() + 0x0B, sizeof(uint8_t), "Release Rate");
-    rgn->addADSRValue(offset() + 0x0C, sizeof(uint8_t), "Sustain Level");
-    rgn->addADSRValue(offset() + 0x0D, sizeof(uint8_t), "Attack Rate Mode?");
-    rgn->addUnknown(offset() + 0x0E, sizeof(uint8_t));
-    rgn->addUnknown(offset() + 0x0F, sizeof(uint8_t));
+    rgn->addADSRValue(offset() + 0x08, sizeof(u8), "Attack Rate");
+    rgn->addADSRValue(offset() + 0x09, sizeof(u8), "Decay Rate");
+    rgn->addADSRValue(offset() + 0x0A, sizeof(u8), "Sustain Rate");
+    rgn->addADSRValue(offset() + 0x0B, sizeof(u8), "Release Rate");
+    rgn->addADSRValue(offset() + 0x0C, sizeof(u8), "Sustain Level");
+    rgn->addADSRValue(offset() + 0x0D, sizeof(u8), "Attack Rate Mode?");
+    rgn->addUnknown(offset() + 0x0E, sizeof(u8));
+    rgn->addUnknown(offset() + 0x0F, sizeof(u8));
   }
 
   return true;

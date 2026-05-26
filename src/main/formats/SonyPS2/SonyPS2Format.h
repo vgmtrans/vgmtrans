@@ -1,16 +1,18 @@
 #pragma once
+
+#include "util/types.h"
 #include "Format.h"
 #include "SonyPS2Scanner.h"
 #include "FilenameMatcher.h"
 #include "VGMColl.h"
 
 typedef struct _VersCk {
-  uint32_t Creator;
-  uint32_t Type;
-  uint32_t chunkSize;
-  uint16_t reserved;
-  uint8_t versionMajor;
-  uint8_t versionMinor;
+  u32 Creator;
+  u32 Type;
+  u32 chunkSize;
+  u16 reserved;
+  u8 versionMajor;
+  u8 versionMinor;
 } VersCk;
 
 // ***********

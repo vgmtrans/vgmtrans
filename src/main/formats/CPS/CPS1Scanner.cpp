@@ -180,7 +180,7 @@ void CPS1Scanner::loadCPS1(MAMEGame *gameentry, CPS1FormatVer fmt_ver) {
       sampleInstrset = nullptr;
     }
 
-    sampcoll = new CPS1SampColl(samplesFile, sampleInstrset, 0, static_cast<uint32_t>(samplesFile->size()), sampcoll_name);
+    sampcoll = new CPS1SampColl(samplesFile, sampleInstrset, 0, static_cast<u32>(samplesFile->size()), sampcoll_name);
     if (!sampcoll->loadVGMFile()) {
       delete sampcoll;
       sampcoll = nullptr;
@@ -209,7 +209,7 @@ void CPS1Scanner::loadCPS1(MAMEGame *gameentry, CPS1FormatVer fmt_ver) {
   }
 
   for (u32 seqId = 0; seqId < numSeqs; ++seqId) {
-    uint32_t seqPointer = (fmt_ver > CPS1_V100) ?
+    u32 seqPointer = (fmt_ver > CPS1_V100) ?
       programFile->readShortBE(seq_table_offset + (seqId * sizeof(u16))) :
       programFile->readShort(seq_table_offset + (seqId * sizeof(u16)));
 

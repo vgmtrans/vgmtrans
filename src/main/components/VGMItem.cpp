@@ -1,3 +1,4 @@
+#include "util/types.h"
 #include "VGMItem.h"
 #include "LogManager.h"
 #include "RawFile.h"
@@ -8,7 +9,7 @@
 VGMItem::VGMItem() : type(Type::Unknown), m_vgmfile(nullptr), m_offset(0), m_length(0) {
 }
 
-VGMItem::VGMItem(VGMFile *vgmfile, uint32_t offset, uint32_t length, std::string name, Type type)
+VGMItem::VGMItem(VGMFile *vgmfile, u32 offset, u32 length, std::string name, Type type)
     : type(type),
       m_vgmfile(vgmfile),
       m_offset(offset),
@@ -40,11 +41,11 @@ RawFile *VGMItem::rawFile() const {
   return m_vgmfile->rawFile();
 }
 
-bool VGMItem::isItemAtOffset(uint32_t offset, bool matchStartOffset) {
+bool VGMItem::isItemAtOffset(u32 offset, bool matchStartOffset) {
   return getItemAtOffset(offset, matchStartOffset) != nullptr;
 }
 
-VGMItem* VGMItem::getItemAtOffset(uint32_t offset, bool matchStartOffset) {
+VGMItem* VGMItem::getItemAtOffset(u32 offset, bool matchStartOffset) {
   if (m_children.empty()) {
     if ((matchStartOffset ? offset == m_offset : offset >= m_offset) && (offset < m_offset + m_length)) {
       return this;
@@ -59,7 +60,7 @@ VGMItem* VGMItem::getItemAtOffset(uint32_t offset, bool matchStartOffset) {
   const auto begin = m_children.begin();
   const auto end = m_children.end();
   auto it = std::upper_bound(begin, end, offset,
-      [](uint32_t off, const VGMItem* child) { return off < child->offset(); });
+      [](u32 off, const VGMItem* child) { return off < child->offset(); });
 
   for (auto idx = static_cast<size_t>(it - begin); idx > 0; --idx) {
     VGMItem* child = m_children[idx - 1];
@@ -67,7 +68,7 @@ VGMItem* VGMItem::getItemAtOffset(uint32_t offset, bool matchStartOffset) {
       return foundItem;
     }
     if (!m_childrenPrefixMaxEnd.empty() &&
-        m_childrenPrefixMaxEnd[idx - 1] <= static_cast<uint64_t>(offset)) {
+        m_childrenPrefixMaxEnd[idx - 1] <= static_cast<u64>(offset)) {
       break;
     }
   }
@@ -75,7 +76,7 @@ VGMItem* VGMItem::getItemAtOffset(uint32_t offset, bool matchStartOffset) {
   return nullptr;
 }
 
-void VGMItem::setOffset(uint32_t offset) {
+void VGMItem::setOffset(u32 offset) {
   if (m_offset == offset) {
     return;
   }
@@ -83,7 +84,7 @@ void VGMItem::setOffset(uint32_t offset) {
   invalidateParentCache(true);
 }
 
-void VGMItem::setLength(uint32_t length) {
+void VGMItem::setLength(u32 length) {
   if (m_length == length) {
     return;
   }
@@ -91,7 +92,7 @@ void VGMItem::setLength(uint32_t length) {
   invalidateParentCache(false);
 }
 
-void VGMItem::setRange(uint32_t offset, uint32_t length) {
+void VGMItem::setRange(u32 offset, u32 length) {
   const bool offsetChanged = (m_offset != offset);
   const bool lengthChanged = (m_length != length);
   if (!offsetChanged && !lengthChanged) {
@@ -110,33 +111,33 @@ void VGMItem::addToUI(VGMItem *parent, void *UI_specific) {
   }
 }
 
-uint32_t VGMItem::readBytes(uint32_t nIndex, uint32_t nCount, void *pBuffer) const {
+u32 VGMItem::readBytes(u32 nIndex, u32 nCount, void *pBuffer) const {
   return m_vgmfile->readBytes(nIndex, nCount, pBuffer);
 }
 
-uint8_t VGMItem::readByte(uint32_t offset) const {
+u8 VGMItem::readByte(u32 offset) const {
   return m_vgmfile->readByte(offset);
 }
 
-uint16_t VGMItem::readShort(uint32_t offset) const {
+u16 VGMItem::readShort(u32 offset) const {
   return m_vgmfile->readShort(offset);
 }
 
-uint32_t VGMItem::getWord(uint32_t offset) const {
+u32 VGMItem::getWord(u32 offset) const {
   return m_vgmfile->readWord(offset);
 }
 
 // GetShort Big Endian
-uint16_t VGMItem::getShortBE(uint32_t offset) const {
+u16 VGMItem::getShortBE(u32 offset) const {
   return m_vgmfile->readShortBE(offset);
 }
 
 // GetWord Big Endian
-uint32_t VGMItem::getWordBE(uint32_t offset) const {
+u32 VGMItem::getWordBE(u32 offset) const {
   return m_vgmfile->readWordBE(offset);
 }
 
-bool VGMItem::isValidOffset(uint32_t offset) const {
+bool VGMItem::isValidOffset(u32 offset) const {
   return m_vgmfile->isValidOffset(offset);
 }
 
@@ -149,7 +150,7 @@ VGMItem* VGMItem::addChild(VGMItem *item) {
   return item;
 }
 
-VGMItem* VGMItem::addChild(uint32_t offset, uint32_t length, const std::string &name) {
+VGMItem* VGMItem::addChild(u32 offset, u32 length, const std::string &name) {
   auto child = new VGMItem(vgmFile(), offset, length, name, Type::Header);
   child->m_parent = this;
   m_children.emplace_back(child);
@@ -158,7 +159,7 @@ VGMItem* VGMItem::addChild(uint32_t offset, uint32_t length, const std::string &
   return child;
 }
 
-VGMItem* VGMItem::addUnknownChild(uint32_t offset, uint32_t length) {
+VGMItem* VGMItem::addUnknownChild(u32 offset, u32 length) {
   auto child = new VGMItem(vgmFile(), offset, length, "Unknown");
   child->m_parent = this;
   m_children.emplace_back(child);
@@ -167,7 +168,7 @@ VGMItem* VGMItem::addUnknownChild(uint32_t offset, uint32_t length) {
   return child;
 }
 
-VGMHeader* VGMItem::addHeader(uint32_t offset, uint32_t length, const std::string &name) {
+VGMHeader* VGMItem::addHeader(u32 offset, u32 length, const std::string &name) {
   auto *header = new VGMHeader(this, offset, length, name);
   header->m_parent = this;
   m_children.emplace_back(header);
@@ -209,15 +210,15 @@ void VGMItem::ensureChildrenSorted() {
 void VGMItem::rebuildChildPrefixMaxEnd() {
   m_childrenPrefixMaxEnd.clear();
   m_childrenPrefixMaxEnd.reserve(m_children.size());
-  uint64_t maxEnd = 0;
+  u64 maxEnd = 0;
   for (const auto* child : m_children) {
     assert(child->length() != 0);
     if (child->length() == 0) {
       L_WARN("getItemAtOffset() called on an item with a child of length 0 - could screw up prefix max cache. "
              "Item: {}. Child: {} at offset: {:X}", name(), child->name(), child->offset());
     }
-    const uint32_t span = (child->length() != 0) ? child->length() : child->guessLength();
-    const uint64_t end = static_cast<uint64_t>(child->offset()) + span;
+    const u32 span = (child->length() != 0) ? child->length() : child->guessLength();
+    const u64 end = static_cast<u64>(child->offset()) + span;
     maxEnd = std::max(maxEnd, end);
     m_childrenPrefixMaxEnd.push_back(maxEnd);
   }
@@ -249,21 +250,21 @@ void VGMItem::sortChildrenByOffset() {
 }
 
 // Guess length of a container from its descendants
-uint32_t VGMItem::guessLength() const {
+u32 VGMItem::guessLength() const {
   if (m_children.empty()) {
     return m_length;
   }
   // NOTE: child items can sometimes overlap each other
-  uint32_t guessedLength = 0;
+  u32 guessedLength = 0;
   for (const auto child : m_children) {
     assert(m_offset <= child->offset());
 
-    uint32_t itemLength = child->length();
+    u32 itemLength = child->length();
     if (m_length == 0) {
       itemLength = child->guessLength();
     }
 
-    uint32_t expectedLength = child->offset() + itemLength - m_offset;
+    u32 expectedLength = child->offset() + itemLength - m_offset;
     if (guessedLength < expectedLength) {
       guessedLength = expectedLength;
     }

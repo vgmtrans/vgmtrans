@@ -4,6 +4,7 @@
  * refer to the included LICENSE.txt file
  */
 
+#include "util/types.h"
 #include <QApplication>
 #include <QShortcut>
 #include <QtGlobal>
@@ -189,7 +190,7 @@ void VGMFileView::seekToEvent(VGMItem* item) const {
   if (!timeline.finalized()) {
     return;
   }
-  uint32_t tick = 0;
+  u32 tick = 0;
   if (!timeline.firstStartTick(event, tick)) {
     return;
   }

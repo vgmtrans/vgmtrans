@@ -3,6 +3,7 @@
  * Licensed under the zlib license,
  * refer to the included LICENSE.txt file
  */
+#include "util/types.h"
 #include "MoriSnesInstr.h"
 #include "SNESDSP.h"
 #include <spdlog/fmt/fmt.h>
@@ -13,9 +14,9 @@
 
 MoriSnesInstrSet::MoriSnesInstrSet(RawFile *file,
                                    MoriSnesVersion ver,
-                                   uint32_t spcDirAddr,
-                                   std::vector<uint16_t> instrumentAddresses,
-                                   std::map<uint16_t, MoriSnesInstrHintDir> instrumentHints,
+                                   u32 spcDirAddr,
+                                   std::vector<u16> instrumentAddresses,
+                                   std::map<u16, MoriSnesInstrHintDir> instrumentHints,
                                    const std::string &name) :
     VGMInstrSet(MoriSnesFormat::name, file, 0, 0, name), version(ver),
     spcDirAddr(spcDirAddr),
@@ -37,13 +38,13 @@ bool MoriSnesInstrSet::parseInstrPointers() {
   }
 
   // calculate whole instrument collection size
-  uint16_t instrSetStartAddress = 0xffff;
-  uint16_t instrSetEndAddress = 0;
-  for (uint8_t instrNum = 0; instrNum < instrumentAddresses.size(); instrNum++) {
-    uint16_t instrAddress = instrumentAddresses[instrNum];
+  u16 instrSetStartAddress = 0xffff;
+  u16 instrSetEndAddress = 0;
+  for (u8 instrNum = 0; instrNum < instrumentAddresses.size(); instrNum++) {
+    u16 instrAddress = instrumentAddresses[instrNum];
 
-    uint16_t instrStartAddress = instrAddress;
-    uint16_t instrEndAddress = instrAddress;
+    u16 instrStartAddress = instrAddress;
+    u16 instrEndAddress = instrAddress;
     if (!instrumentHints[instrAddress].percussion) {
       MoriSnesInstrHint *instrHint = &instrumentHints[instrAddress].instrHint;
       if (instrHint->startAddress < instrStartAddress) {
@@ -54,7 +55,7 @@ bool MoriSnesInstrSet::parseInstrPointers() {
       }
     }
     else {
-      for (uint8_t percNoteKey = 0; percNoteKey < instrumentHints[instrAddress].percHints.size(); percNoteKey++) {
+      for (u8 percNoteKey = 0; percNoteKey < instrumentHints[instrAddress].percHints.size(); percNoteKey++) {
         MoriSnesInstrHint *instrHint = &instrumentHints[instrAddress].percHints[percNoteKey];
         if (instrHint->startAddress < instrStartAddress) {
           instrStartAddress = instrHint->startAddress;
@@ -78,34 +79,34 @@ bool MoriSnesInstrSet::parseInstrPointers() {
   setLength(instrSetEndAddress - instrSetStartAddress);
 
   // load each instruments
-  for (uint8_t instrNum = 0; instrNum < instrumentAddresses.size(); instrNum++) {
-    uint16_t instrAddress = instrumentAddresses[instrNum];
+  for (u8 instrNum = 0; instrNum < instrumentAddresses.size(); instrNum++) {
+    u16 instrAddress = instrumentAddresses[instrNum];
 
     if (!instrumentHints[instrAddress].percussion) {
       MoriSnesInstrHint *instrHint = &instrumentHints[instrAddress].instrHint;
 
-      uint16_t rgnAddress = instrHint->rgnAddress;
+      u16 rgnAddress = instrHint->rgnAddress;
       if (rgnAddress == 0 || rgnAddress + 7 > 0x10000) {
         continue;
       }
 
-      uint8_t srcn = readByte(rgnAddress);
-      std::vector<uint8_t>::iterator itrSRCN = find(usedSRCNs.begin(), usedSRCNs.end(), srcn);
+      u8 srcn = readByte(rgnAddress);
+      std::vector<u8>::iterator itrSRCN = find(usedSRCNs.begin(), usedSRCNs.end(), srcn);
       if (itrSRCN == usedSRCNs.end()) {
         usedSRCNs.push_back(srcn);
       }
     }
     else {
-      for (uint8_t percNoteKey = 0; percNoteKey < instrumentHints[instrAddress].percHints.size(); percNoteKey++) {
+      for (u8 percNoteKey = 0; percNoteKey < instrumentHints[instrAddress].percHints.size(); percNoteKey++) {
         MoriSnesInstrHint *instrHint = &instrumentHints[instrAddress].percHints[percNoteKey];
 
-        uint16_t rgnAddress = instrHint->rgnAddress;
+        u16 rgnAddress = instrHint->rgnAddress;
         if (rgnAddress == 0 || rgnAddress + 7 > 0x10000) {
           continue;
         }
 
-        uint8_t srcn = readByte(rgnAddress);
-        std::vector<uint8_t>::iterator itrSRCN = find(usedSRCNs.begin(), usedSRCNs.end(), srcn);
+        u8 srcn = readByte(rgnAddress);
+        std::vector<u8>::iterator itrSRCN = find(usedSRCNs.begin(), usedSRCNs.end(), srcn);
         if (itrSRCN == usedSRCNs.end()) {
           usedSRCNs.push_back(srcn);
         }
@@ -138,8 +139,8 @@ bool MoriSnesInstrSet::parseInstrPointers() {
 
 MoriSnesInstr::MoriSnesInstr(VGMInstrSet *instrSet,
                              MoriSnesVersion ver,
-                             uint8_t instrNum,
-                             uint32_t spcDirAddr,
+                             u8 instrNum,
+                             u32 spcDirAddr,
                              const MoriSnesInstrHintDir &instrHintDir,
                              const std::string &name) :
     VGMInstr(instrSet, instrHintDir.startAddress, instrHintDir.size, 0, instrNum, name), version(ver),
@@ -155,26 +156,26 @@ bool MoriSnesInstr::loadInstr() {
 
   if (!instrHintDir.percussion) {
     MoriSnesInstrHint *instrHint = &instrHintDir.instrHint;
-    uint8_t srcn = readByte(instrHint->rgnAddress);
+    u8 srcn = readByte(instrHint->rgnAddress);
 
-    uint32_t offDirEnt = spcDirAddr + (srcn * 4);
+    u32 offDirEnt = spcDirAddr + (srcn * 4);
     if (offDirEnt + 4 > 0x10000) {
       return false;
     }
 
     addChild(instrHint->seqAddress, instrHint->seqSize, "Envelope Sequence");
 
-    uint16_t addrSampStart = readShort(offDirEnt);
+    u16 addrSampStart = readShort(offDirEnt);
     MoriSnesRgn *rgn = new MoriSnesRgn(this, version, spcDirAddr, *instrHint);
     rgn->sampOffset = addrSampStart - spcDirAddr;
     addRgn(rgn);
   }
   else {
-    for (uint8_t percNoteKey = 0; percNoteKey < instrHintDir.percHints.size(); percNoteKey++) {
+    for (u8 percNoteKey = 0; percNoteKey < instrHintDir.percHints.size(); percNoteKey++) {
       MoriSnesInstrHint *instrHint = &instrHintDir.percHints[percNoteKey];
-      uint8_t srcn = readByte(instrHint->rgnAddress);
+      u8 srcn = readByte(instrHint->rgnAddress);
 
-      uint32_t offDirEnt = spcDirAddr + (srcn * 4);
+      u32 offDirEnt = spcDirAddr + (srcn * 4);
       if (offDirEnt + 4 > 0x10000) {
         return false;
       }
@@ -185,7 +186,7 @@ bool MoriSnesInstr::loadInstr() {
       auto seqName = fmt::format("Envelope Sequence {}", percNoteKey);
       addChild(instrHint->seqAddress, instrHint->seqSize, seqName);
 
-      uint16_t addrSampStart = readShort(offDirEnt);
+      u16 addrSampStart = readShort(offDirEnt);
       MoriSnesRgn *rgn = new MoriSnesRgn(this, version, spcDirAddr, *instrHint, percNoteKey);
       rgn->sampOffset = addrSampStart - spcDirAddr;
       addRgn(rgn);
@@ -201,21 +202,21 @@ bool MoriSnesInstr::loadInstr() {
 
 MoriSnesRgn::MoriSnesRgn(MoriSnesInstr *instr,
                          MoriSnesVersion ver,
-                         uint32_t /*spcDirAddr*/,
+                         u32 /*spcDirAddr*/,
                          const MoriSnesInstrHint &instrHint,
-                         int8_t percNoteKey) :
+                         s8 percNoteKey) :
     VGMRgn(instr, instrHint.rgnAddress, 7),
     version(ver) {
-  uint16_t rgnAddress = instrHint.rgnAddress;
-  uint16_t curOffset = rgnAddress;
+  u16 rgnAddress = instrHint.rgnAddress;
+  u16 curOffset = rgnAddress;
 
-  uint8_t srcn = readByte(curOffset++);
-  uint8_t adsr1 = readByte(curOffset++);
-  uint8_t adsr2 = readByte(curOffset++);
-  uint8_t gain = readByte(curOffset++);
-  uint8_t keyOffDelay = readByte(curOffset++);
-  int8_t key = readByte(curOffset++);
-  uint8_t tuning = readByte(curOffset++);
+  u8 srcn = readByte(curOffset++);
+  u8 adsr1 = readByte(curOffset++);
+  u8 adsr2 = readByte(curOffset++);
+  u8 gain = readByte(curOffset++);
+  u8 keyOffDelay = readByte(curOffset++);
+  s8 key = readByte(curOffset++);
+  u8 tuning = readByte(curOffset++);
 
   double fine_tuning;
   double coarse_tuning;
@@ -238,13 +239,13 @@ MoriSnesRgn::MoriSnesRgn(MoriSnesInstr *instr,
   addChild(rgnAddress + 3, 1, "GAIN");
   addChild(rgnAddress + 4, 1, "Key-Off Delay");
   addUnityKey(72 - (int) (coarse_tuning), rgnAddress + 5, 1);
-  addFineTune((int16_t) (fine_tuning * 100.0), rgnAddress + 6, 1);
+  addFineTune((s16) (fine_tuning * 100.0), rgnAddress + 6, 1);
   if (instrHint.pan > 0) {
     pan = instrHint.pan / 32.0;
   }
   if (percNoteKey >= 0) {
-    int8_t unityKeyCandidate = percNoteKey - (instrHint.transpose - unityKey); // correct?
-    int8_t negativeUnityKeyAmount = 0;
+    s8 unityKeyCandidate = percNoteKey - (instrHint.transpose - unityKey); // correct?
+    s8 negativeUnityKeyAmount = 0;
     if (unityKeyCandidate < 0) {
       negativeUnityKeyAmount = -unityKeyCandidate;
       unityKeyCandidate = 0;

@@ -1,3 +1,4 @@
+#include "util/types.h"
 #include "KonamiArcadeDefinitions.h"
 #include "KonamiArcadeScanner.h"
 #include "KonamiArcadeSeq.h"
@@ -166,7 +167,7 @@ void KonamiArcadeScanner::scan(RawFile *file, void *info) {
   std::string sampCollName = fmt::format("{} sample collection", gameentry->name);
 
   auto sampcoll = new KonamiArcadeSampColl(samplesFile, instrSet, sampInfos, 0,
-    static_cast<uint32_t>(samplesFile->size()), sampCollName);
+    static_cast<u32>(samplesFile->size()), sampCollName);
   if (!sampcoll->loadVGMFile()) {
     delete sampcoll;
     sampcoll = nullptr;
@@ -222,7 +223,7 @@ const std::vector<KonamiArcadeSeq*> KonamiArcadeScanner::loadSeqTable(
     return {};
   }
   std::vector<KonamiArcadeSeq*> seqs;
-  uint32_t nFileLength = static_cast<uint32_t>(file->size());
+  u32 nFileLength = static_cast<u32>(file->size());
 
   int seqCounter = 0;
   if (fmtVer == GX) {

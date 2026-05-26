@@ -4,6 +4,7 @@
  * refer to the included LICENSE.txt file
  */
 
+#include "util/types.h"
 #include "TriAcePS1Seq.h"
 #include "TriAcePS1InstrSet.h"
 #include "VGMColl.h"
@@ -24,9 +25,9 @@ void TriAcePS1Scanner::scan(RawFile *file, void *info) {
 
 void TriAcePS1Scanner::searchForSLZSeq(RawFile *file) {
   size_t nFileLength = file->size();
-  for (uint32_t i = 0; i + 0x40 < nFileLength; i++) {
-    uint32_t sig1 = file->readWordBE(i);
-    uint8_t mode;
+  for (u32 i = 0; i + 0x40 < nFileLength; i++) {
+    u32 sig1 = file->readWordBE(i);
+    u8 mode;
 
     mode = sig1 & 0xFF;
     sig1 >>= 8;
@@ -36,14 +37,14 @@ void TriAcePS1Scanner::searchForSLZSeq(RawFile *file) {
       continue;    // only SLZ v0-3 is supported
     // Note: SLZ v2 is used by a few tracks in Valkyrie Profile.
 
-    uint16_t headerBytes = file->readShort(i + 0x11);
+    u16 headerBytes = file->readShort(i + 0x11);
 
     if (headerBytes != 0xFFFF)        //First two bytes of the sequence is always 0xFFFF
       continue;
 
-    uint32_t size1 = file->readWord(i + 4);     //unknown.  compressed size or something
-    uint32_t size2 = file->readWord(i + 8);     //uncompressed file size (size of resulting file after decompression)
-    uint32_t size3 = file->readWord(i + 12);    //unknown compressed file size or something
+    u32 size1 = file->readWord(i + 4);     //unknown.  compressed size or something
+    u32 size2 = file->readWord(i + 8);     //uncompressed file size (size of resulting file after decompression)
+    u32 size3 = file->readWord(i + 12);    //unknown compressed file size or something
 
     if (size1 > 0x30000 || size2 > 0x30000 || size3 > 0x30000)    //sanity check.  Sequences won't be > 0x30000 bytes
       continue;
@@ -61,7 +62,7 @@ void TriAcePS1Scanner::searchForSLZSeq(RawFile *file) {
     std::vector<TriAcePS1InstrSet *> instrsets;
     searchForInstrSet(file, instrsets);
 
-    //uint32_t cfSize = file->GetWord(i-4);
+    //u32 cfSize = file->GetWord(i-4);
     //TriAcePS1InstrSet* instrset = new TriAcePS1InstrSet(file, i-4 + cfSize);
     //if (!instrset->LoadVGMFile())
     //{
@@ -74,7 +75,7 @@ void TriAcePS1Scanner::searchForSLZSeq(RawFile *file) {
     std::string name = file->tag.hasTitle() ? file->tag.title : file->stem();
     VGMColl *coll = new VGMColl(name);
     coll->useSeq(seq);
-    for (uint32_t i = 0; i < instrsets.size(); i++)
+    for (u32 i = 0; i < instrsets.size(); i++)
       coll->addInstrSet(instrsets[i]);
     if (!coll->load()) {
       delete coll;
@@ -84,8 +85,8 @@ void TriAcePS1Scanner::searchForSLZSeq(RawFile *file) {
 
 void TriAcePS1Scanner::searchForInstrSet(RawFile *file, std::vector<TriAcePS1InstrSet *> &instrsets) {
   size_t nFileLength = file->size();
-  for (uint32_t i = 4; i + 0x800 < nFileLength; i++) {
-    uint8_t precedingByte = file->readByte(i + 3);
+  for (u32 i = 4; i + 0x800 < nFileLength; i++) {
+    u8 precedingByte = file->readByte(i + 3);
     if (precedingByte != 0)
       continue;
 
@@ -93,7 +94,7 @@ void TriAcePS1Scanner::searchForInstrSet(RawFile *file, std::vector<TriAcePS1Ins
     if (file->readWord(i + 8) > 0xFF)
       continue;
 
-    uint16_t instrSectSize = file->readShort(i + 4);
+    u16 instrSectSize = file->readShort(i + 4);
     // The instrSectSize should be more than the size of one instrdata block and not insanely large
     if (instrSectSize <= 0x20 || instrSectSize > 0x4000)
       continue;
@@ -101,7 +102,7 @@ void TriAcePS1Scanner::searchForInstrSet(RawFile *file, std::vector<TriAcePS1Ins
     if (i + instrSectSize > file->size() - 0x100)
       continue;
 
-    uint32_t instrSetSize = file->readWord(i);
+    u32 instrSetSize = file->readWord(i);
     if (instrSetSize < 0x1000)
       continue;
     // The entire InstrSet size must be larger than the instrdata region, of course
@@ -128,19 +129,19 @@ void TriAcePS1Scanner::searchForInstrSet(RawFile *file, std::vector<TriAcePS1Ins
 
 
 // file is RawFile containing the compressed seq.  cfOff is the compressed file offset.
-TriAcePS1Seq *TriAcePS1Scanner::decompressTriAceSLZFile(RawFile *file, uint32_t cfOff) {
-  uint8_t cmode = file->readByte(cfOff + 3);                //compression mode
-  uint32_t cfSize = file->readWord(cfOff + 4);            //compressed file size
-  uint32_t ufSize =
+TriAcePS1Seq *TriAcePS1Scanner::decompressTriAceSLZFile(RawFile *file, u32 cfOff) {
+  u8 cmode = file->readByte(cfOff + 3);                //compression mode
+  u32 cfSize = file->readWord(cfOff + 4);            //compressed file size
+  u32 ufSize =
       file->readWord(cfOff + 8);            //uncompressed file size (size of resulting file after decompression)
-  uint32_t blockSize = file->readWord(cfOff + 12);        //size of entire compressed block (slightly larger than cfSize)
+  u32 blockSize = file->readWord(cfOff + 12);        //size of entire compressed block (slightly larger than cfSize)
 
   if (ufSize == 0)
     ufSize = DEFAULT_UFSIZE;
 
-  uint8_t *uf = new uint8_t[ufSize];
+  u8 *uf = new u8[ufSize];
 
-  uint32_t ufOff = 0;
+  u32 ufOff = 0;
   cfOff += 0x10;
   if (cmode == 0) {
     ufOff += file->readBytes(cfOff, ufSize, uf);
@@ -150,7 +151,7 @@ TriAcePS1Seq *TriAcePS1Scanner::decompressTriAceSLZFile(RawFile *file, uint32_t 
     bool bDone = false;
     int bits = (cmode == 3) ? 16 : 8;
     while (ufOff < ufSize && !bDone) {
-      uint16_t cFlags;
+      u16 cFlags;
       if (bits == 8)
         cFlags = file->readByte(cfOff++);
       else {
@@ -166,15 +167,15 @@ TriAcePS1Seq *TriAcePS1Scanner::decompressTriAceSLZFile(RawFile *file, uint32_t 
         }
         else  //compressed section
         {
-          uint8_t byte1 = file->readByte(cfOff);
-          uint8_t byte2 = file->readByte(cfOff + 1);
+          u8 byte1 = file->readByte(cfOff);
+          u8 byte2 = file->readByte(cfOff + 1);
           if (byte1 == 0 && byte2 == 0) {
             bDone = true;
             break;
           }
           cfOff += 2;
 
-          uint8_t bytesToRead;
+          u8 bytesToRead;
           if (cmode == 2 && byte2 >= 0xF0) {
             if (byte2 == 0xF0) {
               bytesToRead = byte1 + 0x13;
@@ -185,7 +186,7 @@ TriAcePS1Seq *TriAcePS1Scanner::decompressTriAceSLZFile(RawFile *file, uint32_t 
             for (; bytesToRead > 0; bytesToRead--)
               uf[ufOff++] = byte1;
           } else {
-            uint32_t backPtr = ufOff - (((byte2 & 0x0F) << 8) + byte1);
+            u32 backPtr = ufOff - (((byte2 & 0x0F) << 8) + byte1);
             bytesToRead = (byte2 >> 4) + 3;
 
             for (; bytesToRead > 0; bytesToRead--)
@@ -202,7 +203,7 @@ TriAcePS1Seq *TriAcePS1Scanner::decompressTriAceSLZFile(RawFile *file, uint32_t 
   // If we had to use DEFAULT_UFSIZE because the uncompressed file size was not given (Valkyrie Profile),
   // then create a new buffer of the correct size now that we know it, and delete the old one.
   if (ufSize == DEFAULT_UFSIZE) {
-    uint8_t *newUF = new uint8_t[ufOff];
+    u8 *newUF = new u8[ufOff];
     memcpy(newUF, uf, ufOff);
     delete[] uf;
     uf = newUF;

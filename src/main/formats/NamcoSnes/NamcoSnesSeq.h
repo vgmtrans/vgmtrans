@@ -1,4 +1,6 @@
 #pragma once
+
+#include "util/types.h"
 #include "VGMSeqNoTrks.h"
 #include "SeqTrack.h"
 #include "NamcoSnesFormat.h"
@@ -49,7 +51,7 @@ enum NamcoSnesSeqNoteType {
 class NamcoSnesSeq
     : public VGMSeqNoTrks {
  public:
-  NamcoSnesSeq(RawFile *file, NamcoSnesVersion ver, uint32_t seqdataOffset, std::string newName = "Namco SNES Seq");
+  NamcoSnesSeq(RawFile *file, NamcoSnesVersion ver, u32 seqdataOffset, std::string newName = "Namco SNES Seq");
   virtual ~NamcoSnesSeq();
 
   virtual bool parseHeader();
@@ -58,25 +60,25 @@ class NamcoSnesSeq
   virtual bool postLoad();
 
   NamcoSnesVersion version;
-  std::map<uint8_t, NamcoSnesSeqEventType> EventMap;
-  std::map<uint8_t, NamcoSnesSeqControlType> ControlChangeMap;
+  std::map<u8, NamcoSnesSeqEventType> EventMap;
+  std::map<u8, NamcoSnesSeqControlType> ControlChangeMap;
   std::map<NamcoSnesSeqControlType, std::string> ControlChangeNames;
 
  private:
   void loadEventMap();
   void keyOffAllNotes();
 
-  uint8_t NOTE_NUMBER_REST;
-  uint8_t NOTE_NUMBER_NOISE_MIN;
-  uint8_t NOTE_NUMBER_PERCUSSION_MIN;
+  u8 NOTE_NUMBER_REST;
+  u8 NOTE_NUMBER_NOISE_MIN;
+  u8 NOTE_NUMBER_PERCUSSION_MIN;
 
-  int8_t prevNoteKey[8];
+  s8 prevNoteKey[8];
   NamcoSnesSeqNoteType prevNoteType[8];
-  int8_t instrNum[8];
+  s8 instrNum[8];
 
-  uint8_t spcDeltaTime;
-  uint8_t spcDeltaTimeScale;
-  uint16_t subReturnAddress;
-  uint8_t loopCount;
-  uint8_t loopCountAlt;
+  u8 spcDeltaTime;
+  u8 spcDeltaTimeScale;
+  u16 subReturnAddress;
+  u8 loopCount;
+  u8 loopCountAlt;
 };

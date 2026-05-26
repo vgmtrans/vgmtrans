@@ -4,6 +4,7 @@
  * refer to the included LICENSE.txt file
  */
 
+#include "util/types.h"
 #include "HudsonSnesInstr.h"
 
 #include <spdlog/fmt/fmt.h>
@@ -15,10 +16,10 @@
 
 HudsonSnesInstrSet::HudsonSnesInstrSet(RawFile *file,
                                        HudsonSnesVersion ver,
-                                       uint32_t offset,
-                                       uint32_t length,
-                                       uint32_t spcDirAddr,
-                                       uint32_t addrSampTuningTable,
+                                       u32 offset,
+                                       u32 length,
+                                       u32 spcDirAddr,
+                                       u32 addrSampTuningTable,
                                        const std::string &name) :
     VGMInstrSet(HudsonSnesFormat::name, file, offset, length, name), version(ver),
     spcDirAddr(spcDirAddr),
@@ -34,19 +35,19 @@ bool HudsonSnesInstrSet::parseHeader() {
 
 bool HudsonSnesInstrSet::parseInstrPointers() {
   usedSRCNs.clear();
-  for (uint8_t instrNum = 0; instrNum < length() / 4; instrNum++) {
-    uint32_t ofsInstrEntry = offset() + (instrNum * 4);
+  for (u8 instrNum = 0; instrNum < length() / 4; instrNum++) {
+    u32 ofsInstrEntry = offset() + (instrNum * 4);
     if (ofsInstrEntry + 4 > 0x10000) {
       break;
     }
-    uint8_t srcn = readByte(ofsInstrEntry);
+    u8 srcn = readByte(ofsInstrEntry);
 
-    uint32_t addrDIRentry = spcDirAddr + (srcn * 4);
+    u32 addrDIRentry = spcDirAddr + (srcn * 4);
     if (!SNESSampColl::isValidSampleDir(rawFile(), addrDIRentry, true)) {
       continue;
     }
 
-    uint32_t ofsTuningEnt = addrSampTuningTable + srcn * 4;
+    u32 ofsTuningEnt = addrSampTuningTable + srcn * 4;
     if (ofsTuningEnt + 4 > 0x10000) {
       continue;
     }
@@ -78,10 +79,10 @@ bool HudsonSnesInstrSet::parseInstrPointers() {
 
 HudsonSnesInstr::HudsonSnesInstr(VGMInstrSet *instrSet,
                                  HudsonSnesVersion ver,
-                                 uint32_t offset,
-                                 uint8_t instrNum,
-                                 uint32_t spcDirAddr,
-                                 uint32_t addrSampTuningTable,
+                                 u32 offset,
+                                 u8 instrNum,
+                                 u32 spcDirAddr,
+                                 u32 addrSampTuningTable,
                                  const std::string &name) :
     VGMInstr(instrSet, offset, 4, 0, instrNum, name), version(ver),
     spcDirAddr(spcDirAddr),
@@ -92,16 +93,16 @@ HudsonSnesInstr::~HudsonSnesInstr() {
 }
 
 bool HudsonSnesInstr::loadInstr() {
-  uint8_t srcn = readByte(offset());
+  u8 srcn = readByte(offset());
 
-  uint32_t offDirEnt = spcDirAddr + (srcn * 4);
+  u32 offDirEnt = spcDirAddr + (srcn * 4);
   if (offDirEnt + 4 > 0x10000) {
     return false;
   }
 
-  uint16_t addrSampStart = readShort(offDirEnt);
+  u16 addrSampStart = readShort(offDirEnt);
 
-  uint32_t ofsTuningEnt = addrSampTuningTable + srcn * 4;
+  u32 ofsTuningEnt = addrSampTuningTable + srcn * 4;
   if (ofsTuningEnt + 4 > 0x10000) {
     return false;
   }
@@ -119,14 +120,14 @@ bool HudsonSnesInstr::loadInstr() {
 
 HudsonSnesRgn::HudsonSnesRgn(HudsonSnesInstr *instr,
                              HudsonSnesVersion ver,
-                             uint32_t offset,
-                             uint32_t addrTuningEntry) :
+                             u32 offset,
+                             u32 addrTuningEntry) :
     VGMRgn(instr, offset, 4),
     version(ver) {
-//  uint8_t srcn = GetByte(offset());
-  uint8_t adsr1 = readByte(offset + 1);
-  uint8_t adsr2 = readByte(offset + 2);
-  uint8_t gain = readByte(offset + 3);
+//  u8 srcn = GetByte(offset());
+  u8 adsr1 = readByte(offset + 1);
+  u8 adsr2 = readByte(offset + 2);
+  u8 gain = readByte(offset + 3);
 
   addChild(offset, 1, "SRCN");
   addChild(offset + 1, 1, "ADSR(1)");
@@ -138,8 +139,8 @@ HudsonSnesRgn::HudsonSnesRgn(HudsonSnesInstr *instr,
   double coarse_tuning;
   double fine_tuning = modf((log(pitch_scale * pitch_fixer) / log(2.0)) * 12.0, &coarse_tuning);
 
-  const int8_t coarse_tuning_byte = readByte(addrTuningEntry + 2);
-  const int8_t fine_tuning_byte = readByte(addrTuningEntry + 3);
+  const s8 coarse_tuning_byte = readByte(addrTuningEntry + 2);
+  const s8 fine_tuning_byte = readByte(addrTuningEntry + 3);
   coarse_tuning += coarse_tuning_byte;
   fine_tuning += fine_tuning_byte / 256.0;
 
@@ -155,7 +156,7 @@ HudsonSnesRgn::HudsonSnesRgn(HudsonSnesInstr *instr,
   }
 
   unityKey = 72 - static_cast<int>(coarse_tuning);
-  fineTune = static_cast<int16_t>(fine_tuning * 100.0);
+  fineTune = static_cast<s16>(fine_tuning * 100.0);
 
   addChild(addrTuningEntry, 2, "Pitch Multiplier");
   addChild(addrTuningEntry + 2, 1, "Coarse Tune");

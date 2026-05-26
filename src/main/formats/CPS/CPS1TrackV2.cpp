@@ -3,6 +3,7 @@
  * Licensed under the zlib license,
  * refer to the included LICENSE.txt file
  */
+#include "util/types.h"
 #include "CPS1TrackV2.h"
 #include "CPSCommon.h"
 #include "ScaleConversion.h"
@@ -12,7 +13,7 @@
 // CPS1TrackV2
 // ***********
 
-CPS1TrackV2::CPS1TrackV2(VGMSeq *parentSeq, CPSSynth channelSynth, uint32_t offset, uint32_t length)
+CPS1TrackV2::CPS1TrackV2(VGMSeq *parentSeq, CPSSynth channelSynth, u32 offset, u32 length)
     : SeqTrack(parentSeq, offset, length), channelSynth(channelSynth) {
   if (channelSynth == CPSSynth::YM2151) {
     synthType = SynthType::YM2151;
@@ -39,11 +40,11 @@ void CPS1TrackV2::addInitialMidiEvents(int trackNum) {
   addPortamentoTime14BitNoItem(0);
 }
 
-void CPS1TrackV2::calculateAndAddPortamentoTimeNoItem(int8_t noteDistance) {
+void CPS1TrackV2::calculateAndAddPortamentoTimeNoItem(s8 noteDistance) {
   // Portamento time will be expressed in milliseconds
-  uint16_t durationInMillis = 0;
+  u16 durationInMillis = 0;
   if (portamentoCentsPerSec > 0) {
-    uint16_t centDistance = abs(noteDistance) * 100;
+    u16 centDistance = abs(noteDistance) * 100;
     durationInMillis = (static_cast<double>(centDistance) / static_cast<double>(portamentoCentsPerSec)) * 1000.0;
   }
   if (durationInMillis == prevPortamentoDuration) {
@@ -54,8 +55,8 @@ void CPS1TrackV2::calculateAndAddPortamentoTimeNoItem(int8_t noteDistance) {
 }
 
 bool CPS1TrackV2::readEvent() {
-  uint32_t beginOffset = curOffset;
-  uint8_t status_byte = readByte(curOffset++);
+  u32 beginOffset = curOffset;
+  u8 status_byte = readByte(curOffset++);
   auto cpsSeq = static_cast<CPS1Seq*>(parentSeq);
   u8 masterVol = cpsSeq->masterVolume();
 
@@ -71,7 +72,7 @@ bool CPS1TrackV2::readEvent() {
     }
 
     // effectively, use the highest 3 bits of the status byte as index to delta_table.
-    uint32_t delta = delta_table[curDeltaTable][((status_byte >> 5) & 7) - 1];
+    u32 delta = delta_table[curDeltaTable][((status_byte >> 5) & 7) - 1];
 
     //if it's not a rest
     if ((status_byte & 0x1F) != 0) {
@@ -177,11 +178,11 @@ bool CPS1TrackV2::readEvent() {
 
       case 0x05 : {
         // See the tempo event handler in CPS2TrackV1.cpp for details on how this is calculated.
-        uint16_t ticks_per_iteration = getShortBE(curOffset);
+        u16 ticks_per_iteration = getShortBE(curOffset);
         curOffset += 2;
         auto internal_ppqn = parentSeq->ppqn() << 8;
         auto iterations_per_beat = static_cast<double>(internal_ppqn) / ticks_per_iteration;
-        const uint32_t micros_per_beat = lround((iterations_per_beat / CPS2_DRIVER_RATE_HZ) * 1000000);
+        const u32 micros_per_beat = lround((iterations_per_beat / CPS2_DRIVER_RATE_HZ) * 1000000);
         addTempo(beginOffset, curOffset - beginOffset, micros_per_beat);
         break;
       }
@@ -194,7 +195,7 @@ bool CPS1TrackV2::readEvent() {
       case 0x07 :
         switch (channelSynth) {
           case OKIM6295: {
-            constexpr uint8_t okiAttenTable[16] = { 32, 22, 16, 11, 8, 6, 4, 3, 2, 0, 0, 0, 0, 0, 0, 0};
+            constexpr u8 okiAttenTable[16] = { 32, 22, 16, 11, 8, 6, 4, 3, 2, 0, 0, 0, 0, 0, 0, 0};
             vol = 8 - readByte(curOffset++);
             vol = convertPercentAmpToStdMidiVal(static_cast<double>(okiAttenTable[vol & 0xF]/32.0));
             this->addVol(beginOffset, curOffset - beginOffset, vol);
@@ -209,7 +210,7 @@ bool CPS1TrackV2::readEvent() {
         break;
 
       case 0x08 : {
-        uint8_t progNum = readByte(curOffset++);
+        u8 progNum = readByte(curOffset++);
         addProgramChange(beginOffset, curOffset - beginOffset, progNum % 128);
         if (channelSynth == CPSSynth::YM2151) {
           cKeyCorrection = cpsSeq->transposeForInstr(progNum);
@@ -226,7 +227,7 @@ bool CPS1TrackV2::readEvent() {
 
       // Global Transpose
       case 0x0A : {
-        int8_t globalTranspose = readByte(curOffset++);
+        s8 globalTranspose = readByte(curOffset++);
         addGlobalTranspose(beginOffset, curOffset - beginOffset, globalTranspose);
         break;
       }
@@ -239,7 +240,7 @@ bool CPS1TrackV2::readEvent() {
 
       // Pitch Bend - this value will be sent to the YM2151 Key Fraction register.
       case 0x0C : {
-        uint8_t pitchbend = readByte(curOffset++);
+        u8 pitchbend = readByte(curOffset++);
         pitchbend >>= 2;
         double cents = pitchbend * 1.587301587301587;
         if (pitchbend >= 32) {
@@ -249,7 +250,7 @@ bool CPS1TrackV2::readEvent() {
         break;
       }
       case 0x0D : {
-        uint8_t portamentoRate = readByte(curOffset++);
+        u8 portamentoRate = readByte(curOffset++);
         addGenericEvent(beginOffset, curOffset - beginOffset, "Portamento Time", "", Type::PortamentoTime);
         break;
       }
@@ -290,7 +291,7 @@ bool CPS1TrackV2::readEvent() {
         }
 
         {
-          uint32_t jump;
+          u32 jump;
           if (version() <= CPS1_V425) {
             jump = getShortBE(curOffset);
             curOffset += 2;
@@ -303,10 +304,10 @@ bool CPS1TrackV2::readEvent() {
           }
           else {
             if ((readByte(curOffset) & 0x80) == 0) {
-              uint8_t jumpByte = readByte(curOffset++);
+              u8 jumpByte = readByte(curOffset++);
               jump = curOffset - jumpByte;
             } else {
-              jump = curOffset + 2 + static_cast<int16_t>(getShortBE(curOffset));
+              jump = curOffset + 2 + static_cast<s16>(getShortBE(curOffset));
               curOffset += 2;
             }
           }
@@ -346,7 +347,7 @@ bool CPS1TrackV2::readEvent() {
           noteState &= 0x97;
           noteState |= readByte(curOffset++);
           {
-            uint16_t jump = getShortBE(curOffset);
+            u16 jump = getShortBE(curOffset);
             curOffset += 2;
             addGenericEvent(beginOffset, curOffset - beginOffset, "Loop Break", "", Type::Loop);
 
@@ -354,7 +355,7 @@ bool CPS1TrackV2::readEvent() {
               curOffset = jump;
             }
             else {
-              curOffset += static_cast<int16_t>(jump);
+              curOffset += static_cast<s16>(jump);
             }
           }
         }
@@ -364,12 +365,12 @@ bool CPS1TrackV2::readEvent() {
 
       // Loop Always
       case 0x16 : {
-        uint32_t jump;
+        u32 jump;
         if (version() <= CPS1_V425) {
           jump = getShortBE(curOffset);
         }
         else {
-          jump = curOffset + 2 + static_cast<int16_t>(getShortBE(curOffset));
+          jump = curOffset + 2 + static_cast<s16>(getShortBE(curOffset));
         }
         bool should_continue = addLoopForever(beginOffset, 3);
         if (jump == 0)
@@ -391,7 +392,7 @@ bool CPS1TrackV2::readEvent() {
       // pan
       case 0x18 : {
         //the pan value is b/w 0 and 0x20.  0 - hard left, 0x10 - center, 0x20 - hard right
-        uint8_t pan = readByte(curOffset++) * 4;
+        u8 pan = readByte(curOffset++) * 4;
         if (pan != 0)
           pan--;
         this->addPan(beginOffset, curOffset - beginOffset, pan);
@@ -404,7 +405,7 @@ bool CPS1TrackV2::readEvent() {
         break;
 
       case 0x1A : {
-        uint8_t masterVol = readByte(curOffset++);
+        u8 masterVol = readByte(curOffset++);
         addGenericEvent(beginOffset, curOffset - beginOffset, "Master Volume", "", Type::Unknown);
         cpsSeq->setMasterVolume(masterVol);
         break;

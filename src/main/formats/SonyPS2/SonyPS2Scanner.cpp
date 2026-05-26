@@ -4,6 +4,7 @@
  * refer to the included LICENSE.txt file
  */
 
+#include "util/types.h"
 #include "SonyPS2Seq.h"
 #include "SonyPS2InstrSet.h"
 #include "ScannerManager.h"
@@ -22,9 +23,9 @@ void SonyPS2Scanner::scan(RawFile *file, void *info) {
 
 void SonyPS2Scanner::searchForSeq(RawFile *file) {
   size_t nFileLength = file->size();
-  for (uint32_t i = 0; i + 0x40 < nFileLength; i++) {
-    uint32_t sig1 = file->readWord(i);
-    uint32_t sig2 = file->readWord(i + 4);
+  for (u32 i = 0; i + 0x40 < nFileLength; i++) {
+    u32 sig1 = file->readWord(i);
+    u32 sig2 = file->readWord(i + 4);
     if (sig1 != 0x53434549 || sig2 != 0x56657273)  // "SCEIVers" in ASCII
       continue;
 
@@ -46,9 +47,9 @@ void SonyPS2Scanner::searchForSeq(RawFile *file) {
 
 void SonyPS2Scanner::searchForInstrSet(RawFile *file) {
   size_t nFileLength = file->size();
-  for (uint32_t i = 0; i + 0x40 < nFileLength; i++) {
-    uint32_t sig1 = file->readWord(i);
-    uint32_t sig2 = file->readWord(i + 4);
+  for (u32 i = 0; i + 0x40 < nFileLength; i++) {
+    u32 sig1 = file->readWord(i);
+    u32 sig2 = file->readWord(i + 4);
     if (sig1 != 0x53434549 || sig2 != 0x56657273)  // "SCEIVers" in ASCII
       continue;
 
@@ -79,8 +80,8 @@ void SonyPS2Scanner::searchForSampColl(RawFile *file) {
     // correct formating
     int num = std::count(file->begin(), file->begin() + 16, 0);
     if (num != 16) {
-      uint32_t newFileSize = file->size() + 16;
-      uint8_t *newdataBuf = new uint8_t[newFileSize];
+      u32 newFileSize = file->size() + 16;
+      u8 *newdataBuf = new u8[newFileSize];
       file->readBytes(0, file->size(), newdataBuf + 16);
       memset(newdataBuf, 0, 16);
       pRoot->createVirtFile(newdataBuf, newFileSize, file->name(), file->path());

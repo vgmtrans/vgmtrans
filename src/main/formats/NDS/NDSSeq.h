@@ -1,4 +1,6 @@
 #pragma once
+
+#include "util/types.h"
 #include "VGMSeq.h"
 #include "SeqTrack.h"
 #include "NDSFormat.h"
@@ -6,7 +8,7 @@
 class NDSSeq:
     public VGMSeq {
  public:
-  NDSSeq(RawFile *file, uint32_t offset, uint32_t length = 0, std::string theName = "NDSSeq");
+  NDSSeq(RawFile *file, u32 offset, u32 length = 0, std::string theName = "NDSSeq");
 
   virtual bool parseHeader();
   virtual bool parseTrackPointers();
@@ -17,10 +19,10 @@ class NDSSeq:
 class NDSTrack
     : public SeqTrack {
  public:
-  NDSTrack(NDSSeq *parentFile, uint32_t offset = 0, uint32_t length = 0);
+  NDSTrack(NDSSeq *parentFile, u32 offset = 0, u32 length = 0);
   void resetVars();
   virtual bool readEvent();
 
-  uint32_t dur;
+  u32 dur;
   bool noteWithDelta;
 };

@@ -3,6 +3,7 @@
  * Licensed under the zlib license,
  * refer to the included LICENSE.txt file
  */
+#include "util/types.h"
 #include "CPS2TrackV1.h"
 #include "CPSCommon.h"
 #include "ScaleConversion.h"
@@ -28,7 +29,7 @@ static const u16 vol_table[128] = {
 // *************
 
 
-CPS2TrackV1::CPS2TrackV1(VGMSeq *parentSeq, uint32_t offset, uint32_t length)
+CPS2TrackV1::CPS2TrackV1(VGMSeq *parentSeq, u32 offset, u32 length)
     : SeqTrack(parentSeq, offset, length) {
   CPS2TrackV1::resetVars();
 }
@@ -53,11 +54,11 @@ void CPS2TrackV1::addInitialMidiEvents(int trackNum) {
   addPortamentoTime14BitNoItem(0);
 }
 
-void CPS2TrackV1::calculateAndAddPortamentoTimeNoItem(int8_t noteDistance) {
+void CPS2TrackV1::calculateAndAddPortamentoTimeNoItem(s8 noteDistance) {
   // Portamento time will be expressed in milliseconds
-  uint16_t durationInMillis = 0;
+  u16 durationInMillis = 0;
   if (portamentoCentsPerSec > 0) {
-    uint16_t centDistance = abs(noteDistance) * 100;
+    u16 centDistance = abs(noteDistance) * 100;
     durationInMillis = (static_cast<double>(centDistance) / static_cast<double>(portamentoCentsPerSec)) * 1000.0;
   }
   if (durationInMillis == prevPortamentoDuration) {
@@ -68,8 +69,8 @@ void CPS2TrackV1::calculateAndAddPortamentoTimeNoItem(int8_t noteDistance) {
 }
 
 bool CPS2TrackV1::readEvent() {
-  uint32_t beginOffset = curOffset;
-  uint8_t status_byte = readByte(curOffset++);
+  u32 beginOffset = curOffset;
+  u8 status_byte = readByte(curOffset++);
   auto cpsSeq = static_cast<CPS2Seq*>(parentSeq);
   u8 masterVol = cpsSeq->masterVolume();
 
@@ -86,7 +87,7 @@ bool CPS2TrackV1::readEvent() {
 
     // effectively, use the highest 3 bits of the status byte as index to delta_table.
     // this code starts at 0xBB3 in sfa2
-    uint32_t delta = delta_table[curDeltaTable][((status_byte >> 5) & 7) - 1];
+    u32 delta = delta_table[curDeltaTable][((status_byte >> 5) & 7) - 1];
 
     //if it's not a rest
     if ((status_byte & 0x1F) != 0) {
@@ -182,7 +183,7 @@ bool CPS2TrackV1::readEvent() {
           // This byte is clearly the desired BPM, however there is a loss of resolution when the driver
           // converts this value because it is represented with 16 bits... See the table in sfa3 at 0x3492.
           // I've decided to keep the desired BPM rather than use the exact tempo value from the table
-          uint8_t tempo = readByte(curOffset++);
+          u8 tempo = readByte(curOffset++);
           addTempoBPM(beginOffset, curOffset - beginOffset, tempo);
         }
         else {
@@ -195,11 +196,11 @@ bool CPS2TrackV1::readEvent() {
           // First we calculate the iterations per beat: (48 << 8) / ticks per iteration
           // Then we calculate the seconds per beat: iterations per beat / DRIVER_RATE_IN_HZ
           // Convert to microseconds and we're good to go.
-          uint16_t ticks_per_iteration = getShortBE(curOffset);
+          u16 ticks_per_iteration = getShortBE(curOffset);
           curOffset += 2;
           auto internal_ppqn = parentSeq->ppqn() << 8;
           auto iterations_per_beat = static_cast<double>(internal_ppqn) / ticks_per_iteration;
-          const uint32_t micros_per_beat = lround((iterations_per_beat / CPS2_DRIVER_RATE_HZ) * 1000000);
+          const u32 micros_per_beat = lround((iterations_per_beat / CPS2_DRIVER_RATE_HZ) * 1000000);
           addTempo(beginOffset, curOffset - beginOffset, micros_per_beat);
         }
         break;
@@ -218,7 +219,7 @@ bool CPS2TrackV1::readEvent() {
       }
 
       case 0x08 : {
-        uint8_t progNum = readByte(curOffset++);
+        u8 progNum = readByte(curOffset++);
         addBankSelectNoItem((bank * 2) + (progNum / 128));
         addProgramChange(beginOffset, curOffset - beginOffset, progNum % 128);
         break;
@@ -233,7 +234,7 @@ bool CPS2TrackV1::readEvent() {
 
       // Global Transpose
       case 0x0A : {
-        int8_t globalTranspose = readByte(curOffset++);
+        s8 globalTranspose = readByte(curOffset++);
         addGlobalTranspose(beginOffset, curOffset - beginOffset, globalTranspose);
         break;
       }
@@ -247,7 +248,7 @@ bool CPS2TrackV1::readEvent() {
       //Pitch bend - only gets applied at Note-on, but don't care.  It's used mostly as a detune for chorus effect
       // pitch bend value is a signed byte with a range of +/- 50 cents.
       case 0x0C : {
-        uint8_t pitchbend = readByte(curOffset++);
+        u8 pitchbend = readByte(curOffset++);
         addMarker(beginOffset,
                   curOffset - beginOffset,
                   std::string("pitchbend"),
@@ -261,9 +262,9 @@ bool CPS2TrackV1::readEvent() {
       case 0x0D : {
         // Portamento: take the rate value, left shift it 1.  This value * (100/256) is increment in cents every 1/(250/4) seconds until we hit target key.
         // A portamento rate value of 0 means instantaneous slide
-        uint8_t portamentoRate = readByte(curOffset++);
+        u8 portamentoRate = readByte(curOffset++);
         if (portamentoRate != 0) {
-          auto centsPerSecond = static_cast<uint16_t>(static_cast<double>(portamentoRate) * 2 * (100.0/256.0) * (256.0/4.0));
+          auto centsPerSecond = static_cast<u16>(static_cast<double>(portamentoRate) * 2 * (100.0/256.0) * (256.0/4.0));
           portamentoCentsPerSec = centsPerSecond;
         } else {
           portamentoCentsPerSec = 0;
@@ -312,12 +313,12 @@ bool CPS2TrackV1::readEvent() {
         }
 
         {
-          uint32_t jump;
+          u32 jump;
           if ((readByte(curOffset) & 0x80) == 0) {
-            uint8_t jumpByte = readByte(curOffset++);
+            u8 jumpByte = readByte(curOffset++);
             jump = curOffset - jumpByte;
           } else {
-            jump = curOffset + 2 + static_cast<int16_t>(getShortBE(curOffset));
+            jump = curOffset + 2 + static_cast<s16>(getShortBE(curOffset));
             curOffset += 2;
           }
 
@@ -359,7 +360,7 @@ bool CPS2TrackV1::readEvent() {
             u16 jump = getShortBE(curOffset);
             curOffset += 2;
             addGenericEvent(beginOffset, curOffset - beginOffset, "Loop Break", "", Type::Loop);
-            curOffset += static_cast<int16_t>(jump);
+            curOffset += static_cast<s16>(jump);
           }
         }
         else
@@ -368,8 +369,8 @@ bool CPS2TrackV1::readEvent() {
 
       // Loop Always
       case 0x16 : {
-        uint32_t jump;
-        jump = curOffset + 2 + static_cast<int16_t>(getShortBE(curOffset));
+        u32 jump;
+        jump = curOffset + 2 + static_cast<s16>(getShortBE(curOffset));
         bool should_continue = addLoopForever(beginOffset, 3);
         if (readMode == READMODE_ADD_TO_UI) {
           curOffset += 2;
@@ -388,7 +389,7 @@ bool CPS2TrackV1::readEvent() {
       // pan
       case 0x18 : {
         //the pan value is b/w 0 and 0x20.  0 - hard left, 0x10 - center, 0x20 - hard right
-        uint8_t pan = readByte(curOffset++) * 4;
+        u8 pan = readByte(curOffset++) * 4;
         if (pan != 0)
           pan--;
         this->addPan(beginOffset, curOffset - beginOffset, pan);
@@ -401,7 +402,7 @@ bool CPS2TrackV1::readEvent() {
         break;
 
       case 0x1A : {
-        uint8_t masterVol = readByte(curOffset++);
+        u8 masterVol = readByte(curOffset++);
         addGenericEvent(beginOffset, curOffset - beginOffset, "Master Volume", "", Type::Unknown);
         // addMasterVol(beginOffset, curOffset-beginOffset, masterVol);
         break;
@@ -410,7 +411,7 @@ bool CPS2TrackV1::readEvent() {
       //Vibrato depth...
       case 0x1B :
         if (version() < CPS2_V171) {
-          uint8_t vibratoDepth = readByte(curOffset++);
+          u8 vibratoDepth = readByte(curOffset++);
           addMarker(beginOffset,
                     curOffset - beginOffset,
                     std::string("vibrato"),
@@ -422,8 +423,8 @@ bool CPS2TrackV1::readEvent() {
         }
         else {
           // First data byte defines behavior 0-3
-          uint8_t type = readByte(curOffset++);
-          uint8_t data = readByte(curOffset++);
+          u8 type = readByte(curOffset++);
+          u8 data = readByte(curOffset++);
           switch (type) {
             // vibrato
             case 0:
@@ -479,7 +480,7 @@ bool CPS2TrackV1::readEvent() {
         break;
       case 0x1C:
         if (version() < CPS2_V171) {
-          const uint8_t tremeloDepth = readByte(curOffset++);
+          const u8 tremeloDepth = readByte(curOffset++);
           addMarker(beginOffset,
                     curOffset - beginOffset,
                     std::string("tremelo"),
@@ -498,7 +499,7 @@ bool CPS2TrackV1::readEvent() {
 
       // LFO rate (for versions < 1.71)
       case 0x1D : {
-        uint8_t rate = readByte(curOffset++);
+        u8 rate = readByte(curOffset++);
         if (version() < CPS2_V171)
           addMarker(beginOffset,
                     curOffset - beginOffset,
@@ -515,7 +516,7 @@ bool CPS2TrackV1::readEvent() {
 
       // Reset LFO state (for versions < 1.71)
       case 0x1E : {
-        uint8_t data = readByte(curOffset++);
+        u8 data = readByte(curOffset++);
         if (version() < CPS2_V171)
           addMarker(beginOffset,
                     curOffset - beginOffset,
@@ -530,7 +531,7 @@ bool CPS2TrackV1::readEvent() {
       }
       break;
       case 0x1F : {
-        uint8_t value = readByte(curOffset++);
+        u8 value = readByte(curOffset++);
         if (version() < CPS2_V116) {
           addBankSelectNoItem(2 + (value / 128));
           addProgramChange(beginOffset, curOffset - beginOffset, value % 128);

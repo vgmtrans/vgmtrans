@@ -4,6 +4,7 @@
  * refer to the included LICENSE.txt file
  */
 
+#include "util/types.h"
 #include "RawFile.h"
 
 #include "LogManager.h"
@@ -26,12 +27,12 @@ void RawFile::removeContainedVGMFile(std::variant<VGMSeq *, VGMInstrSet *, VGMSa
     }
 }
 
-uint32_t RawFile::readBytes(size_t offset, uint32_t nCount, void *pBuffer) const {
+u32 RawFile::readBytes(size_t offset, u32 nCount, void *pBuffer) const {
     memcpy(pBuffer, data() + offset, nCount);
     return nCount;
 }
 
-bool RawFile::matchBytes(const uint8_t *pattern, size_t offset, size_t nCount) const {
+bool RawFile::matchBytes(const u8 *pattern, size_t offset, size_t nCount) const {
     return memcmp(data() + offset, pattern, nCount) == 0;
 }
 
@@ -39,8 +40,8 @@ bool RawFile::matchBytePattern(const BytePattern &pattern, size_t offset) const 
     return pattern.match(data() + offset, pattern.length());
 }
 
-bool RawFile::searchBytePattern(const BytePattern &pattern, uint32_t &nMatchOffset,
-                                uint32_t nSearchOffset, uint32_t nSearchSize) const {
+bool RawFile::searchBytePattern(const BytePattern &pattern, u32 &nMatchOffset,
+                                u32 nSearchOffset, u32 nSearchSize) const {
     if (nSearchOffset >= size())
         return false;
 
@@ -81,7 +82,7 @@ VirtFile::VirtFile(const RawFile &file, size_t offset, size_t limit)
     std::copy_n(file.data() + offset, limit, std::back_inserter(m_data));
 }
 
-VirtFile::VirtFile(const uint8_t *data, uint32_t fileSize, std::string name,
+VirtFile::VirtFile(const u8 *data, u32 fileSize, std::string name,
                    std::filesystem::path parent_fullpath, const VGMTag& tag)
     : m_name(std::move(name)), m_lpath(std::move(parent_fullpath)) {
   std::copy_n(data, fileSize, std::back_inserter(m_data));

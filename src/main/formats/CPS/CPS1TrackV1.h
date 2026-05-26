@@ -1,4 +1,6 @@
 #pragma once
+
+#include "util/types.h"
 #include "VGMSeq.h"
 #include "SeqTrack.h"
 #include "CPS1Seq.h"
@@ -7,7 +9,7 @@
 class CPS1TrackV1
     : public SeqTrack {
 public:
-  CPS1TrackV1(CPS1Seq *parentSeq, CPSSynth channelSynth, uint32_t offset = 0, uint32_t length = 0);
+  CPS1TrackV1(CPS1Seq *parentSeq, CPSSynth channelSynth, u32 offset = 0, u32 length = 0);
   void resetVars() override;
   void addInitialMidiEvents(int trackNum) override;
   bool readEvent() override;

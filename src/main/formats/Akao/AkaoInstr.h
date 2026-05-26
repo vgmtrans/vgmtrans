@@ -4,6 +4,8 @@
  * refer to the included LICENSE.txt file
  */
 #pragma once
+
+#include "util/types.h"
 #include "VGMInstrSet.h"
 #include <set>
 #include "VGMSampColl.h"
@@ -11,14 +13,14 @@
 #include "AkaoFormat.h"
 
 struct AkaoInstrDatLocation {
-  uint32_t instrAllOffset;
-  uint32_t instrDatOffset;
-  uint32_t startingArticulationId;
-  uint32_t numArticulations;
+  u32 instrAllOffset;
+  u32 instrDatOffset;
+  u32 startingArticulationId;
+  u32 numArticulations;
 
   AkaoInstrDatLocation() noexcept : instrAllOffset(0), instrDatOffset(0), startingArticulationId(0), numArticulations(0) {}
 
-  AkaoInstrDatLocation(uint32_t instrAllOffset, uint32_t instrDatOffset, uint32_t startingArticulationId, uint32_t numArticulations) noexcept
+  AkaoInstrDatLocation(u32 instrAllOffset, u32 instrDatOffset, u32 startingArticulationId, u32 numArticulations) noexcept
     : instrAllOffset(instrAllOffset), instrDatOffset(instrDatOffset), startingArticulationId(startingArticulationId), numArticulations(numArticulations) {}
 };
 
@@ -29,28 +31,28 @@ struct AkaoInstrDatLocation {
 class AkaoInstrSet final : public VGMInstrSet {
  public:
   AkaoInstrSet(RawFile *file,
-               uint32_t length,
+               u32 length,
                AkaoPs1Version version,
-               uint32_t instrOff,
-               uint32_t dkitOff,
-               uint32_t id,
+               u32 instrOff,
+               u32 dkitOff,
+               u32 id,
                std::string name = "Akao Instrument Bank");
-  AkaoInstrSet(RawFile *file, uint32_t end_boundary_offset, AkaoPs1Version version,
-    const std::set<uint32_t>& custom_instrument_addresses, const std::set<uint32_t>& drum_instrument_addresses,
-    uint32_t id, std::string name = "Akao Instrument Bank");
-  AkaoInstrSet(RawFile *file, uint32_t offset, uint32_t end_boundary_offset, AkaoPs1Version version,
-    uint32_t id, std::string name = "Akao Instrument Bank (Dummy)");
+  AkaoInstrSet(RawFile *file, u32 end_boundary_offset, AkaoPs1Version version,
+    const std::set<u32>& custom_instrument_addresses, const std::set<u32>& drum_instrument_addresses,
+    u32 id, std::string name = "Akao Instrument Bank");
+  AkaoInstrSet(RawFile *file, u32 offset, u32 end_boundary_offset, AkaoPs1Version version,
+    u32 id, std::string name = "Akao Instrument Bank (Dummy)");
   bool parseInstrPointers() override;
   void useColl(const VGMColl* coll) override;
 
   [[nodiscard]] AkaoPs1Version version() const noexcept { return version_; }
 
   bool bMelInstrs, bDrumKit;
-  uint32_t instrSetOff;
-  uint32_t drumkitOff;
-  uint32_t end_boundary_offset;
-  std::set<uint32_t> custom_instrument_addresses;
-  std::set<uint32_t> drum_instrument_addresses;
+  u32 instrSetOff;
+  u32 drumkitOff;
+  u32 end_boundary_offset;
+  std::set<u32> custom_instrument_addresses;
+  std::set<u32> drum_instrument_addresses;
 
  private:
   AkaoPs1Version version_;
@@ -64,10 +66,10 @@ class AkaoInstrSet final : public VGMInstrSet {
 class AkaoInstr: public VGMInstr {
  public:
   AkaoInstr(AkaoInstrSet *instrSet,
-            uint32_t offset,
-            uint32_t length,
-            uint32_t bank,
-            uint32_t instrNum,
+            u32 offset,
+            u32 length,
+            u32 bank,
+            u32 instrNum,
             std::string name = "Instrument");
   bool loadInstr() override;
 
@@ -85,7 +87,7 @@ class AkaoInstr: public VGMInstr {
 
 class AkaoDrumKit final : public AkaoInstr {
  public:
-  AkaoDrumKit(AkaoInstrSet *instrSet, uint32_t offset, uint32_t length, uint32_t bank, uint32_t instrNum);
+  AkaoDrumKit(AkaoInstrSet *instrSet, u32 offset, u32 length, u32 bank, u32 instrNum);
   bool loadInstr() override;
 };
 
@@ -97,20 +99,20 @@ class AkaoDrumKit final : public AkaoInstr {
 class AkaoRgn final :
     public VGMRgn {
  public:
-  AkaoRgn(VGMInstr *instr, uint32_t offset, uint32_t length = 0, std::string name = "Region");
-  AkaoRgn(VGMInstr *instr, uint32_t offset, uint32_t length, uint8_t keyLow, uint8_t keyHigh,
-          uint8_t artIDNum, std::string name = "Region");
+  AkaoRgn(VGMInstr *instr, u32 offset, u32 length = 0, std::string name = "Region");
+  AkaoRgn(VGMInstr *instr, u32 offset, u32 length, u8 keyLow, u8 keyHigh,
+          u8 artIDNum, std::string name = "Region");
 
   bool loadRgn() override;
 
   unsigned short adsr1;  //raw psx ADSR1 value (articulation data)
   unsigned short adsr2;  //raw psx ADSR2 value (articulation data)
-  uint8_t artNum;
-  uint8_t drumRelUnityKey;
-  uint8_t attackRate;
-  uint8_t sustainRate;
-  uint8_t sustainMode;
-  uint8_t releaseRate;
+  u8 artNum;
+  u8 drumRelUnityKey;
+  u8 attackRate;
+  u8 sustainRate;
+  u8 sustainMode;
+  u8 releaseRate;
 };
 
 
@@ -119,13 +121,13 @@ class AkaoRgn final :
 // ***********
 
 struct AkaoArt {
-  uint8_t unityKey;
+  u8 unityKey;
   short fineTune;
-  uint32_t sample_offset;
-  uint32_t loop_point;
-  uint16_t ADSR1;
-  uint16_t ADSR2;
-  uint32_t artID;
+  u32 sample_offset;
+  u32 loop_point;
+  u16 ADSR1;
+  u16 ADSR2;
+  u32 artID;
   int sample_num;
 
   AkaoArt() : unityKey(0), fineTune(0), sample_offset(0), loop_point(0), ADSR1(0), ADSR2(0), artID(0), sample_num(0){}
@@ -135,7 +137,7 @@ struct AkaoArt {
 class AkaoSampColl final :
     public VGMSampColl {
  public:
-   AkaoSampColl(RawFile *file, uint32_t offset, AkaoPs1Version version, std::string name = "Akao Sample Collection");
+   AkaoSampColl(RawFile *file, u32 offset, AkaoPs1Version version, std::string name = "Akao Sample Collection");
    AkaoSampColl(RawFile *file, AkaoInstrDatLocation file_location, std::string name = "Akao Sample Collection");
 
   bool parseHeader() override;
@@ -143,19 +145,19 @@ class AkaoSampColl final :
 
   [[nodiscard]] AkaoPs1Version version() const noexcept { return version_; }
 
-  [[nodiscard]] static bool isPossibleAkaoSampColl(const RawFile *file, uint32_t offset);
-  [[nodiscard]] static AkaoPs1Version guessVersion(const RawFile *file, uint32_t offset);
+  [[nodiscard]] static bool isPossibleAkaoSampColl(const RawFile *file, u32 offset);
+  [[nodiscard]] static AkaoPs1Version guessVersion(const RawFile *file, u32 offset);
 
   std::vector<AkaoArt> akArts;
-  uint32_t starting_art_id;
-  uint32_t ending_art_id;
-  uint32_t nNumArts;
-  uint16_t sample_set_id;
+  u32 starting_art_id;
+  u32 ending_art_id;
+  u32 nNumArts;
+  u16 sample_set_id;
 
  private:
   AkaoPs1Version version_;
-  uint32_t sample_section_size;
-  uint32_t arts_offset;
-  uint32_t sample_section_offset;
+  u32 sample_section_size;
+  u32 arts_offset;
+  u32 sample_section_offset;
   AkaoInstrDatLocation file_location;
 };

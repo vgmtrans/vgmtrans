@@ -5,6 +5,8 @@
  */
 #pragma once
 
+#include "util/types.h"
+
 #include "VGMSeq.h"
 #include "SeqTrack.h"
 #include "KonamiTMNT2Format.h"
@@ -23,7 +25,7 @@ class KonamiTMNT2Seq : public VGMSeq {
 
   KonamiTMNT2Seq(RawFile *file,
                  KonamiTMNT2FormatVer fmtVer,
-                 uint32_t offset,
+                 u32 offset,
                  std::vector<u32> ym2151TrackOffsets,
                  std::vector<u32> k053260TrackOffsets,
                  u8 defaultTickSkipInterval,
@@ -81,8 +83,8 @@ class KonamiTMNT2Track : public SeqTrack {
   KonamiTMNT2Track(
     bool isFmTrack,
     KonamiTMNT2Seq *parentSeq,
-    uint32_t offset = 0,
-    uint32_t length = 0,
+    u32 offset = 0,
+    u32 length = 0,
     std::string name = "Track"
   );
 

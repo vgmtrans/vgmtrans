@@ -1,4 +1,6 @@
 #pragma once
+
+#include "util/types.h"
 #include "VGMSeq.h"
 #include "SeqTrack.h"
 #include "SeqEvent.h"
@@ -16,7 +18,7 @@ enum NeverlandSnesSeqEventType {
 class NeverlandSnesSeq
     : public VGMSeq {
  public:
-  NeverlandSnesSeq(RawFile *file, NeverlandSnesVersion ver, uint32_t seqdataOffset);
+  NeverlandSnesSeq(RawFile *file, NeverlandSnesVersion ver, u32 seqdataOffset);
   virtual ~NeverlandSnesSeq();
 
   virtual bool parseHeader();
@@ -24,10 +26,10 @@ class NeverlandSnesSeq
   virtual void resetVars();
 
   NeverlandSnesVersion version;
-  std::map<uint8_t, NeverlandSnesSeqEventType> EventMap;
+  std::map<u8, NeverlandSnesSeqEventType> EventMap;
 
-  uint16_t convertToApuAddress(uint16_t off);
-  uint16_t getShortAddress(uint32_t offset);
+  u16 convertToApuAddress(u16 off);
+  u16 getShortAddress(u32 offset);
 
  private:
   void loadEventMap();
@@ -37,10 +39,10 @@ class NeverlandSnesSeq
 class NeverlandSnesTrack
     : public SeqTrack {
  public:
-  NeverlandSnesTrack(NeverlandSnesSeq *parentFile, uint32_t offset = 0, uint32_t length = 0);
+  NeverlandSnesTrack(NeverlandSnesSeq *parentFile, u32 offset = 0, u32 length = 0);
   virtual void resetVars();
   virtual bool readEvent();
 
-  uint16_t convertToApuAddress(uint16_t offset);
-  uint16_t getShortAddress(uint32_t offset);
+  u16 convertToApuAddress(u16 offset);
+  u16 getShortAddress(u32 offset);
 };

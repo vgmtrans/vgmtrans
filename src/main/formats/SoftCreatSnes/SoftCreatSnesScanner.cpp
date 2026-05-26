@@ -4,6 +4,7 @@
  * refer to the included LICENSE.txt file
  */
 
+#include "util/types.h"
 #include "SoftCreatSnesSeq.h"
 #include "ScannerManager.h"
 
@@ -75,10 +76,10 @@ void SoftCreatSnesScanner::searchForSoftCreatSnesFromARAM(RawFile *file) {
   std::string name = file->tag.hasTitle() ? file->tag.title : file->stem();
 
   // search song list
-  uint32_t ofsLoadSeq;
-  uint16_t addrSeqList;
-  uint8_t songIndexMax;
-  uint8_t headerAlignSize;
+  u32 ofsLoadSeq;
+  u16 addrSeqList;
+  u8 songIndexMax;
+  u8 headerAlignSize;
   if (file->searchBytePattern(ptnLoadSeq, ofsLoadSeq)) {
     addrSeqList = file->readShort(ofsLoadSeq + 16);
 
@@ -87,8 +88,8 @@ void SoftCreatSnesScanner::searchForSoftCreatSnesFromARAM(RawFile *file) {
       return;
     }
 
-    uint16_t addrStartLow = file->readByte(ofsLoadSeq + 16);
-    uint16_t addrStartHigh = file->readByte(ofsLoadSeq + 9);
+    u16 addrStartLow = file->readByte(ofsLoadSeq + 16);
+    u16 addrStartHigh = file->readByte(ofsLoadSeq + 9);
     if (addrStartLow > addrStartHigh || addrStartHigh - addrStartLow > songIndexMax) {
       return;
     }
@@ -98,9 +99,9 @@ void SoftCreatSnesScanner::searchForSoftCreatSnesFromARAM(RawFile *file) {
   }
 
   // search vcmd address table for version check
-  uint32_t ofsVCmdExec;
-  uint8_t VCMD_CUTOFF;
-  uint16_t addrVCmdAddressTable;
+  u32 ofsVCmdExec;
+  u8 VCMD_CUTOFF;
+  u16 addrVCmdAddressTable;
   if (file->searchBytePattern(ptnVCmdExec, ofsVCmdExec)) {
     VCMD_CUTOFF = file->readByte(ofsVCmdExec + 6);
     addrVCmdAddressTable = file->readByte(ofsVCmdExec + 16);
@@ -135,9 +136,9 @@ void SoftCreatSnesScanner::searchForSoftCreatSnesFromARAM(RawFile *file) {
   }
 
   // TODO: guess song index
-  int8_t songIndex = 1;
+  s8 songIndex = 1;
 
-  uint32_t addrSeqHeader = addrSeqList + songIndex;
+  u32 addrSeqHeader = addrSeqList + songIndex;
   SoftCreatSnesSeq *newSeq = new SoftCreatSnesSeq(file, version, addrSeqHeader, headerAlignSize, name);
   if (!newSeq->loadVGMFile()) {
     delete newSeq;

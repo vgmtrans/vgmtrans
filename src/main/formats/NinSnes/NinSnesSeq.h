@@ -1,4 +1,6 @@
 #pragma once
+
+#include "util/types.h"
 #include <algorithm>
 #include <array>
 #include <optional>
@@ -17,9 +19,9 @@ constexpr size_t kNinSnesTrackCount = 8;
 
 class NinSnesSeq : public VGMSeq {
 public:
-  NinSnesSeq(RawFile* file, NinSnesProfileId profile, uint32_t offset, uint8_t percussion_base = 0,
-             const std::vector<uint8_t>& theVolumeTable = std::vector<uint8_t>(),
-             const std::vector<uint8_t>& theDurRateTable = std::vector<uint8_t>(),
+  NinSnesSeq(RawFile* file, NinSnesProfileId profile, u32 offset, u8 percussion_base = 0,
+             const std::vector<u8>& theVolumeTable = std::vector<u8>(),
+             const std::vector<u8>& theDurRateTable = std::vector<u8>(),
              std::string theName = "NinSnes Seq");
   NinSnesSeq(RawFile* file, const NinSnesScanResult& scanResult);
   virtual ~NinSnesSeq();
@@ -32,64 +34,64 @@ public:
 
   const NinSnesProfile& profile() const;
   double getTempoInBPM();
-  double getTempoInBPM(uint8_t tempo);
+  double getTempoInBPM(u8 tempo);
 
-  uint16_t convertToAPUAddress(uint16_t offset);
-  uint16_t getShortAddress(uint32_t offset);
-  uint32_t resolveProgramNumber(uint8_t instrumentByte, uint8_t* logicalInstrIndex = nullptr) const;
-  uint32_t registerIntelliTAInstrumentOverride(uint8_t logicalInstrIndex,
-                                               const std::array<uint8_t, 6>& regionData);
-  uint8_t ensureIntelliTADrumKitProgram();
+  u16 convertToAPUAddress(u16 offset);
+  u16 getShortAddress(u32 offset);
+  u32 resolveProgramNumber(u8 instrumentByte, u8* logicalInstrIndex = nullptr) const;
+  u32 registerIntelliTAInstrumentOverride(u8 logicalInstrIndex,
+                                               const std::array<u8, 6>& regionData);
+  u8 ensureIntelliTADrumKitProgram();
   bool usesIntelliCustomPercTable() const;
   void setIntelliCustomPercTableEnabled(bool enabled);
 
   NinSnesSignatureId signature;
   NinSnesProfileId profileId;
-  uint8_t STATUS_END;
-  uint8_t STATUS_NOTE_MIN;
-  uint8_t STATUS_NOTE_MAX;
-  uint8_t STATUS_PERCUSSION_NOTE_MIN;
-  uint8_t STATUS_PERCUSSION_NOTE_MAX;
-  std::map<uint8_t, NinSnesSeqEventType> EventMap;
+  u8 STATUS_END;
+  u8 STATUS_NOTE_MIN;
+  u8 STATUS_NOTE_MAX;
+  u8 STATUS_PERCUSSION_NOTE_MIN;
+  u8 STATUS_PERCUSSION_NOTE_MAX;
+  std::map<u8, NinSnesSeqEventType> EventMap;
 
-  std::vector<uint8_t> volumeTable;
-  std::vector<uint8_t> durRateTable;
-  std::vector<uint8_t> panTable;
+  std::vector<u8> volumeTable;
+  std::vector<u8> durRateTable;
+  std::vector<u8> panTable;
 
-  uint8_t spcPercussionBase;
-  uint8_t sectionRepeatCount;
-  int8_t globalTranspose;
-  uint8_t tempo;
+  u8 spcPercussionBase;
+  u8 sectionRepeatCount;
+  s8 globalTranspose;
+  u8 tempo;
   SeqFixedPointAutomation<> tempoFade;
   double maxVibratoDepthCents;
   double maxVibratoRateHz;
-  uint32_t dwStartOffset;
-  uint32_t curOffset;
+  u32 dwStartOffset;
+  u32 curOffset;
   std::vector<NinSnesSection *> aSections;
 
   // Konami:
-  uint16_t konamiBaseAddress;
+  u16 konamiBaseAddress;
 
   // Intelligent Systems:
-  std::vector<uint8_t> intelliDurVolTable;
+  std::vector<u8> intelliDurVolTable;
   bool intelliUseCustomNoteParam;
   bool intelliUseCustomPercTable;
   NinSnesIntelliVoiceParamState intelliVoiceParam;
   NinSnesIntelliPercussionState intelliPerc;
-  std::array<uint32_t, 0x80> intelliInstrumentProgramMap;
+  std::array<u32, 0x80> intelliInstrumentProgramMap;
 
   // Quintet
-  uint8_t quintetBGMInstrBase;
-  uint16_t quintetAddrBGMInstrLookup;
+  u8 quintetBGMInstrBase;
+  u16 quintetAddrBGMInstrLookup;
 
   // Falcom:
-  uint16_t falcomBaseOffset;
+  u16 falcomBaseOffset;
 
-  void addPercussionInstrNoteMapping(uint8_t instrIndex, uint8_t noteIndex,
-                                     int8_t transposeSemitones) {
+  void addPercussionInstrNoteMapping(u8 instrIndex, u8 noteIndex,
+                                     s8 transposeSemitones) {
     m_percussionInstrNoteMap[instrIndex] = {noteIndex, transposeSemitones};
   }
-  const std::map<uint8_t, NinSnesPercussionDef>& percussionInstrNoteMap() const {
+  const std::map<u8, NinSnesPercussionDef>& percussionInstrNoteMap() const {
     return m_percussionInstrNoteMap;
   }
   const std::vector<NinSnesIntelliTAInstrumentOverride>& intelliTAInstrumentOverrides() const {
@@ -100,7 +102,7 @@ public:
   }
 
 protected:
-  bool loadTracks(ReadMode readMode, uint32_t stopTime = 1000000) override;
+  bool loadTracks(ReadMode readMode, u32 stopTime = 1000000) override;
   bool postLoad() override;
 
   VGMHeader* header;
@@ -109,19 +111,19 @@ private:
   friend class NinSnesTrack;
   void loadEventMap();
   void createTracks();
-  bool loadSection(NinSnesSection *section, uint32_t stopTime = 1000000);
+  bool loadSection(NinSnesSection *section, u32 stopTime = 1000000);
   void addSection(NinSnesSection *section);
-  NinSnesSection *getSectionAtOffset(uint32_t offset);
+  NinSnesSection *getSectionAtOffset(u32 offset);
   bool addLoopForeverNoItem();
-  void setImmediateTempo(uint8_t newTempo);
-  void startTempoFade(uint8_t fadeLength, uint8_t targetTempo);
+  void setImmediateTempo(u8 newTempo);
+  void startTempoFade(u8 fadeLength, u8 targetTempo);
   void syncTempoDependentTracks();
   NinSnesIntelliTADrumKitDef buildIntelliTADrumKitDef() const;
 
-  uint8_t spcPercussionBaseInit;
+  u8 spcPercussionBaseInit;
   int m_sectionForeverLoops = 0;
-  std::map<uint8_t, NinSnesPercussionDef> m_percussionInstrNoteMap;
-  uint32_t m_nextIntelliTAOverrideProgram;
+  std::map<u8, NinSnesPercussionDef> m_percussionInstrNoteMap;
+  u32 m_nextIntelliTAOverrideProgram;
   std::vector<NinSnesIntelliTAInstrumentOverride> m_intelliTAInstrumentOverrides;
   std::vector<NinSnesIntelliTADrumKitDef> m_intelliTADrumKitDefs;
 };
@@ -131,31 +133,31 @@ public:
   struct TrackSegment {
     // The pointer target remains the parser entry point. Jumps can expand the
     // discovered byte range before that address, so the UI/stop range is separate.
-    uint32_t startOffset = 0;
-    uint32_t rangeOffset = 0;
-    uint32_t rangeLength = 0;
+    u32 startOffset = 0;
+    u32 rangeOffset = 0;
+    u32 rangeLength = 0;
     bool active = false;
     bool uiEventsLoaded = false;
 
-    [[nodiscard]] uint32_t stopOffset() const {
+    [[nodiscard]] u32 stopOffset() const {
       return rangeOffset + rangeLength;
     }
 
-    void include(uint32_t eventOffset, uint32_t eventLength) {
+    void include(u32 eventOffset, u32 eventLength) {
       if (rangeLength == 0) {
         rangeOffset = eventOffset;
         rangeLength = eventLength;
         return;
       }
 
-      const uint32_t start = std::min(rangeOffset, eventOffset);
-      const uint32_t end = std::max(stopOffset(), eventOffset + eventLength);
+      const u32 start = std::min(rangeOffset, eventOffset);
+      const u32 end = std::max(stopOffset(), eventOffset + eventLength);
       rangeOffset = start;
       rangeLength = end - start;
     }
   };
 
-  NinSnesSection(NinSnesSeq* parentFile, uint32_t offset = 0, uint32_t length = 0);
+  NinSnesSection(NinSnesSeq* parentFile, u32 offset = 0, u32 length = 0);
 
   bool load();
   bool parseTrackPointers();
@@ -172,8 +174,8 @@ public:
     return m_tracks.at(index);
   }
 
-  uint16_t convertToApuAddress(uint16_t offset);
-  uint16_t getShortAddress(uint32_t offset);
+  u16 convertToApuAddress(u16 offset);
+  u16 getShortAddress(u32 offset);
 
   NinSnesSeq* parentSeq;
 
@@ -186,94 +188,94 @@ public:
 
 class NinSnesSectionTrackItem : public SeqTrack {
 public:
-  NinSnesSectionTrackItem(NinSnesSeq* parentSeq, uint32_t offset, uint32_t length,
+  NinSnesSectionTrackItem(NinSnesSeq* parentSeq, u32 offset, u32 length,
                           const std::string& theName);
 };
 
 class NinSnesTrack : public SeqTrack {
 public:
   struct PitchSlideEvent {
-    uint32_t offset = 0;
-    uint32_t eventLength = 0;
-    uint8_t delay = 0;
-    uint8_t length = 0;
-    uint8_t targetNote = 0;
+    u32 offset = 0;
+    u32 eventLength = 0;
+    u8 delay = 0;
+    u8 length = 0;
+    u8 targetNote = 0;
   };
 
-  NinSnesTrack(NinSnesSeq* parentSeq, uint32_t offset = 0, uint32_t length = 0,
+  NinSnesTrack(NinSnesSeq* parentSeq, u32 offset = 0, u32 length = 0,
                const std::string& theName = "NinSnes Track");
 
   void resetVars() override;
   void onTickBegin() override;
   bool readEvent() override;
 
-  uint16_t convertToApuAddress(uint16_t offset);
-  uint16_t getShortAddress(uint32_t offset);
-  void getVolumeBalance(uint16_t pan, double& volumeLeft, double& volumeRight);
-  uint8_t readPanTable(uint16_t pan);
-  int8_t calculatePanValue(uint8_t pan, double& volumeScale, bool& reverseLeft, bool& reverseRight);
+  u16 convertToApuAddress(u16 offset);
+  u16 getShortAddress(u32 offset);
+  void getVolumeBalance(u16 pan, double& volumeLeft, double& volumeRight);
+  u8 readPanTable(u16 pan);
+  s8 calculatePanValue(u8 pan, double& volumeScale, bool& reverseLeft, bool& reverseRight);
 
 protected:
-  bool onEvent(uint32_t offset, uint32_t length) override;
+  bool onEvent(u32 offset, u32 length) override;
 
 private:
   friend class NinSnesSeq;
-  bool prepareSectionTrack(NinSnesSection& section, uint32_t trackIndex);
-  void resetTransientSectionState(uint32_t trackIndex);
+  bool prepareSectionTrack(NinSnesSection& section, u32 trackIndex);
+  void resetTransientSectionState(u32 trackIndex);
   void resetTransientPlaybackState();
   void resetPersistentRange();
-  void includePersistentRange(uint32_t eventOffset, uint32_t eventLength);
+  void includePersistentRange(u32 eventOffset, u32 eventLength);
   NinSnesSeq& seq() const;
   NinSnesIntelliModeId intelliMode() const;
-  bool handleIntelliPercussionNote(uint32_t beginOffset, uint8_t slot, uint8_t duration);
-  void readStandardNoteParam(uint32_t beginOffset, uint8_t statusByte, std::string& desc);
-  void readLemmingsNoteParam(uint32_t beginOffset, uint8_t statusByte, std::string& desc);
-  void readIntelliNoteParam(uint32_t beginOffset, uint8_t statusByte, std::string& desc);
-  bool handleCoreEvent(NinSnesSeqEventType eventType, uint32_t beginOffset, uint8_t statusByte,
+  bool handleIntelliPercussionNote(u32 beginOffset, u8 slot, u8 duration);
+  void readStandardNoteParam(u32 beginOffset, u8 statusByte, std::string& desc);
+  void readLemmingsNoteParam(u32 beginOffset, u8 statusByte, std::string& desc);
+  void readIntelliNoteParam(u32 beginOffset, u8 statusByte, std::string& desc);
+  bool handleCoreEvent(NinSnesSeqEventType eventType, u32 beginOffset, u8 statusByte,
                        std::string& desc, bool& continueReading);
-  bool handleControllerEvent(NinSnesSeqEventType eventType, uint32_t beginOffset,
+  bool handleControllerEvent(NinSnesSeqEventType eventType, u32 beginOffset,
                              std::string& desc);
-  bool handleVariantEvent(NinSnesSeqEventType eventType, uint32_t beginOffset, uint8_t statusByte,
+  bool handleVariantEvent(NinSnesSeqEventType eventType, u32 beginOffset, u8 statusByte,
                           std::string& desc);
-  bool handleIntelliEvent(NinSnesSeqEventType eventType, uint32_t beginOffset, uint8_t statusByte,
+  bool handleIntelliEvent(NinSnesSeqEventType eventType, u32 beginOffset, u8 statusByte,
                           std::string& desc);
-  PitchSlideEvent readPitchSlide(uint32_t offset);
+  PitchSlideEvent readPitchSlide(u32 offset);
   bool consumeQueuedPitchSlide();
   void addPitchSlideEvent(const PitchSlideEvent& slide);
   void beginPitchSlide(const PitchSlideEvent& slide);
-  void activatePitchMotion(uint8_t delay, uint8_t length, int32_t targetPitch);
+  void activatePitchMotion(u8 delay, u8 length, s32 targetPitch);
   void updatePitchSlide();
-  void beginNotePitch(uint8_t note);
+  void beginNotePitch(u8 note);
   void activateStoredPitchEnvelope();
   void beginNoteVibrato();
   void updateVibratoFade();
   void applyConfiguredVibrato();
   void clearVibratoRateAndDelay();
-  void setConfiguredVibratoDepth(uint8_t depth);
+  void setConfiguredVibratoDepth(u8 depth);
   void resetPitchBendForNewNote();
-  void addPendingEndEvent(uint8_t statusByte, const std::string& desc);
+  void addPendingEndEvent(u8 statusByte, const std::string& desc);
   void syncVibratoRateAndDelay();
 
-  uint8_t getEffectiveNoteDuration() const;
-  void rememberMelodicProgram(uint32_t progNum,
-                              std::optional<uint8_t> logicalProgram = std::nullopt);
+  u8 getEffectiveNoteDuration() const;
+  void rememberMelodicProgram(u32 progNum,
+                              std::optional<u8> logicalProgram = std::nullopt);
   void restoreNonPercussionProgramIfNeeded();
-  void switchToPercussionProgramIfNeeded(uint8_t program = 0);
-  void applyIntelliPercussionSlotState(uint8_t instrumentByte,
-                                       std::optional<uint8_t> panByte = std::nullopt,
-                                       std::optional<uint8_t> reverbLevel = std::nullopt);
-  void addProgramChangeEvent(uint32_t offset, uint32_t length, uint32_t progNum, bool requireBank,
+  void switchToPercussionProgramIfNeeded(u8 program = 0);
+  void applyIntelliPercussionSlotState(u8 instrumentByte,
+                                       std::optional<u8> panByte = std::nullopt,
+                                       std::optional<u8> reverbLevel = std::nullopt);
+  void addProgramChangeEvent(u32 offset, u32 length, u32 progNum, bool requireBank,
                              const std::string& eventName = "Program Change",
-                             std::optional<uint8_t> logicalProgram = std::nullopt);
+                             std::optional<u8> logicalProgram = std::nullopt);
 
   bool m_lastNoteWasPercussion = false;
-  uint32_t nonPercussionProgram = 0;
-  uint8_t currentPercussionProgram = 0;
-  std::optional<uint8_t> currentLogicalProgram;
+  u32 nonPercussionProgram = 0;
+  u8 currentPercussionProgram = 0;
+  std::optional<u8> currentLogicalProgram;
   bool intelliLegato = false;
   NinSnesTrackState state;
   NinSnesSection::TrackSegment* currentSegment = nullptr;
   bool m_hasPersistentRange = false;
-  uint32_t m_persistentRangeStart = 0;
-  uint32_t m_persistentRangeEnd = 0;
+  u32 m_persistentRangeStart = 0;
+  u32 m_persistentRangeEnd = 0;
 };

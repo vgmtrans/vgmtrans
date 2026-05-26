@@ -1,14 +1,16 @@
 #pragma once
+
+#include "util/types.h"
 #include "VGMSeq.h"
 #include "SeqTrack.h"
 #include "CPS2Format.h"
 
-enum CPS2FormatVer: uint8_t;
+enum CPS2FormatVer: u8;
 
 class CPS2Seq:
     public VGMSeq {
 public:
-  CPS2Seq(RawFile *file, uint32_t offset, CPS2FormatVer fmt_version, std::string name, std::vector<s8> instrTransposeTable = {});
+  CPS2Seq(RawFile *file, u32 offset, CPS2FormatVer fmt_version, std::string name, std::vector<s8> instrTransposeTable = {});
   ~CPS2Seq() override;
 
   bool parseHeader() override;

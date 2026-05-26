@@ -6,6 +6,7 @@
 // The original code is available at:
 //  https://github.com/mamedev/mame/blob/master/src/devices/sound/okiadpcm.cpp
 
+#include "util/types.h"
 #include <cmath>
 #include "OkiAdpcm.h"
 
@@ -15,7 +16,7 @@
 
 // ADPCM state and tables
 bool oki_adpcm_state::s_tables_computed = false;
-const int8_t oki_adpcm_state::s_index_shift[8] = { -1, -1, -1, -1, 2, 4, 6, 8 };
+const s8 oki_adpcm_state::s_index_shift[8] = { -1, -1, -1, -1, 2, 4, 6, 8 };
 int oki_adpcm_state::s_diff_lookup[49*16];
 
 //-------------------------------------------------
@@ -36,7 +37,7 @@ void oki_adpcm_state::reset()
 //  ADPCM output
 //-------------------------------------------------
 
-int16_t oki_adpcm_state::clock(uint8_t nibble)
+s16 oki_adpcm_state::clock(u8 nibble)
 {
   // update the signal
   m_signal += s_diff_lookup[m_step * 16 + (nibble & 15)];
@@ -99,7 +100,7 @@ void oki_adpcm_state::compute_tables()
   s_tables_computed = true;
 
   // nibble to bit map
-  static const int8_t nbl2bit[16][4] =
+  static const s8 nbl2bit[16][4] =
       {
           { 1, 0, 0, 0}, { 1, 0, 0, 1}, { 1, 0, 1, 0}, { 1, 0, 1, 1},
           { 1, 1, 0, 0}, { 1, 1, 0, 1}, { 1, 1, 1, 0}, { 1, 1, 1, 1},
@@ -133,8 +134,8 @@ void oki_adpcm_state::compute_tables()
 
 oki_adpcm_state DialogicAdpcmSamp::okiAdpcmState;
 
-DialogicAdpcmSamp::DialogicAdpcmSamp(VGMSampColl *sampColl, uint32_t offset, uint32_t length,
-                                     uint32_t theRate, float gain, std::string name)
+DialogicAdpcmSamp::DialogicAdpcmSamp(VGMSampColl *sampColl, u32 offset, u32 length,
+                                     u32 theRate, float gain, std::string name)
     : VGMSamp(sampColl, offset, length, offset, length, 1, BPS::PCM16, theRate,
          std::move(name)), gain(gain) {}
 
@@ -144,28 +145,28 @@ double DialogicAdpcmSamp::compressionRatio() const {
   return (16.0 / 4); // 4 bit samples converted up to 16 bit samples
 }
 
-std::vector<uint8_t> DialogicAdpcmSamp::decodeToNativePcm() {
-  const int16_t maxValue = std::numeric_limits<int16_t>::max();
-  const int16_t minValue = std::numeric_limits<int16_t>::min();
+std::vector<u8> DialogicAdpcmSamp::decodeToNativePcm() {
+  const s16 maxValue = std::numeric_limits<s16>::max();
+  const s16 minValue = std::numeric_limits<s16>::min();
 
-  const uint32_t sampleCount = uncompressedSize() / sizeof(int16_t);
-  std::vector<uint8_t> samples(sampleCount * sizeof(int16_t));
-  auto* uncompBuf = reinterpret_cast<int16_t*>(samples.data());
+  const u32 sampleCount = uncompressedSize() / sizeof(s16);
+  std::vector<u8> samples(sampleCount * sizeof(s16));
+  auto* uncompBuf = reinterpret_cast<s16*>(samples.data());
 
   DialogicAdpcmSamp::okiAdpcmState.reset();
 
   int sampleNum = 0;
-  for (uint32_t off = offset(); off < (offset() + length()); ++off) {
-    uint8_t byte = readByte(off);
+  for (u32 off = offset(); off < (offset() + length()); ++off) {
+    u8 byte = readByte(off);
 
     for (int n = 0; n < 2; ++n) {
-      uint8_t nibble = byte >> (((n & 1) << 2) ^ 4);
-      int16_t sample = DialogicAdpcmSamp::okiAdpcmState.clock(nibble);
-      int32_t amplifiedSample = static_cast<int32_t>(sample) * gain;
-      sample = static_cast<int16_t>(
+      u8 nibble = byte >> (((n & 1) << 2) ^ 4);
+      s16 sample = DialogicAdpcmSamp::okiAdpcmState.clock(nibble);
+      s32 amplifiedSample = static_cast<s32>(sample) * gain;
+      sample = static_cast<s16>(
         std::clamp(amplifiedSample,
-          static_cast<int32_t>(minValue),
-          static_cast<int32_t>(maxValue)
+          static_cast<s32>(minValue),
+          static_cast<s32>(maxValue)
         )
       );
       uncompBuf[sampleNum++] = sample;

@@ -1,4 +1,6 @@
 #pragma once
+
+#include "util/types.h"
 #include "VGMSeq.h"
 #include "SeqTrack.h"
 #include "SeqEvent.h"
@@ -46,7 +48,7 @@ class GraphResSnesSeq
     : public VGMSeq {
  public:
   GraphResSnesSeq
-      (RawFile *file, GraphResSnesVersion ver, uint32_t seqdata_offset, std::string newName = "GraphRes SNES Seq");
+      (RawFile *file, GraphResSnesVersion ver, u32 seqdata_offset, std::string newName = "GraphRes SNES Seq");
   ~GraphResSnesSeq() override;
 
   bool parseHeader() override;
@@ -54,9 +56,9 @@ class GraphResSnesSeq
   void resetVars() override;
 
   GraphResSnesVersion version;
-  std::map<uint8_t, GraphResSnesSeqEventType> EventMap;
+  std::map<u8, GraphResSnesSeqEventType> EventMap;
 
-  std::map<uint8_t, uint16_t> instrADSRHints;
+  std::map<u8, u16> instrADSRHints;
 
  private:
   void loadEventMap();
@@ -66,22 +68,22 @@ class GraphResSnesSeq
 class GraphResSnesTrack
     : public SeqTrack {
  public:
-  GraphResSnesTrack(GraphResSnesSeq *parentFile, uint32_t offset = 0, uint32_t length = 0);
+  GraphResSnesTrack(GraphResSnesSeq *parentFile, u32 offset = 0, u32 length = 0);
   void resetVars() override;
   bool readEvent() override;
 
  private:
-  int8_t prevNoteKey;
+  s8 prevNoteKey;
   bool prevNoteSlurred;
-  uint8_t durationRate;
-  uint8_t defaultNoteLength;
-  int8_t spcPan;
-  uint8_t spcInstr;
-  uint16_t spcADSR;
-  uint16_t callStack[GRAPHRESSNES_CALLSTACK_SIZE];
-  uint8_t callStackPtr;
+  u8 durationRate;
+  u8 defaultNoteLength;
+  s8 spcPan;
+  u8 spcInstr;
+  u16 spcADSR;
+  u16 callStack[GRAPHRESSNES_CALLSTACK_SIZE];
+  u8 callStackPtr;
 
-  uint8_t loopStackPtr;
-  int8_t loopCount[GRAPHRESSNES_LOOP_LEVEL_MAX];
-  uint16_t loopEnd[GRAPHRESSNES_LOOP_LEVEL_MAX];
+  u8 loopStackPtr;
+  s8 loopCount[GRAPHRESSNES_LOOP_LEVEL_MAX];
+  u16 loopEnd[GRAPHRESSNES_LOOP_LEVEL_MAX];
 };

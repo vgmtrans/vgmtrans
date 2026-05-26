@@ -4,6 +4,7 @@
  * refer to the included LICENSE.txt file
  */
 
+#include "util/types.h"
 #include <iomanip>
 
 #include <spdlog/fmt/fmt.h>
@@ -14,16 +15,16 @@ DECLARE_FORMAT(TamSoftPS1);
 
 static constexpr int MAX_TRACKS_PS1 = 24;
 static constexpr int MAX_TRACKS_PS2 = 48;
-static constexpr uint16_t SEQ_PPQN = 24;
-static constexpr uint8_t NOTE_VELOCITY = 100;
-static constexpr uint32_t HEADER_SIZE_PS1 = (4 * MAX_TRACKS_PS1);
-static constexpr uint32_t HEADER_SIZE_PS2 = (4 * MAX_TRACKS_PS2);
+static constexpr u16 SEQ_PPQN = 24;
+static constexpr u8 NOTE_VELOCITY = 100;
+static constexpr u32 HEADER_SIZE_PS1 = (4 * MAX_TRACKS_PS1);
+static constexpr u32 HEADER_SIZE_PS2 = (4 * MAX_TRACKS_PS2);
 
 //  *************
 //  TamSoftPS1Seq
 //  *************
 
-const uint16_t TamSoftPS1Seq::PITCH_TABLE[73] = {
+const u16 TamSoftPS1Seq::PITCH_TABLE[73] = {
     0x0100, 0x010F, 0x011F, 0x0130, 0x0142, 0x0155, 0x016A, 0x017F,
     0x0196, 0x01AE, 0x01C8, 0x01E3, 0x0200, 0x021E, 0x023E, 0x0260,
     0x0285, 0x02AB, 0x02D4, 0x02FF, 0x032C, 0x035D, 0x0390, 0x03C6,
@@ -36,7 +37,7 @@ const uint16_t TamSoftPS1Seq::PITCH_TABLE[73] = {
     0x3FFF,
 };
 
-TamSoftPS1Seq::TamSoftPS1Seq(RawFile *file, uint32_t offset, uint8_t theSong, const std::string &name)
+TamSoftPS1Seq::TamSoftPS1Seq(RawFile *file, u32 offset, u8 theSong, const std::string &name)
     : VGMSeq(TamSoftPS1Format::name, file, offset, 0, name), song(theSong), ps2(false), type(0) {
   bLoadTickByTick = true;
   setUseLinearAmplitudeScale(true);
@@ -60,13 +61,13 @@ void TamSoftPS1Seq::resetVars() {
 bool TamSoftPS1Seq::parseHeader() {
   setPPQN(SEQ_PPQN);
 
-  uint32_t dwSongItemOffset = offset() + 4 * song;
+  u32 dwSongItemOffset = offset() + 4 * song;
   if (dwSongItemOffset + 4 > vgmFile()->endOffset()) {
     return false;
   }
 
   type = readShort(dwSongItemOffset);
-  uint16_t seqHeaderRelOffset = readShort(dwSongItemOffset + 2);
+  u16 seqHeaderRelOffset = readShort(dwSongItemOffset + 2);
 
   std::string songTableItemName = fmt::format("Song {}", song);
   VGMHeader *songTableItem = addHeader(dwSongItemOffset, 4, songTableItemName);
@@ -79,22 +80,22 @@ bool TamSoftPS1Seq::parseHeader() {
 
   if (type == 0) {
     // BGM
-    uint32_t dwHeaderOffset = offset() + seqHeaderRelOffset;
+    u32 dwHeaderOffset = offset() + seqHeaderRelOffset;
 
     // ignore (corrupted) silence sequence
     if (readWord(dwHeaderOffset) != 0xfffff0) {
-      uint32_t headerSize;
-      uint8_t maxTracks;
+      u32 headerSize;
+      u8 maxTracks;
 
       // PS2 version?
       ps2 = false;
       if (dwHeaderOffset + HEADER_SIZE_PS2 <= vgmFile()->endOffset()) {
         ps2 = true;
-        for (uint8_t trackIndex = 0; trackIndex < MAX_TRACKS_PS2; trackIndex++) {
-          uint32_t dwTrackHeaderOffset = dwHeaderOffset + 4 * trackIndex;
+        for (u8 trackIndex = 0; trackIndex < MAX_TRACKS_PS2; trackIndex++) {
+          u32 dwTrackHeaderOffset = dwHeaderOffset + 4 * trackIndex;
 
-          uint8_t live = readByte(dwTrackHeaderOffset);
-          uint32_t dwRelTrackOffset = readShort(dwTrackHeaderOffset + 2);
+          u8 live = readByte(dwTrackHeaderOffset);
+          u32 dwRelTrackOffset = readShort(dwTrackHeaderOffset + 2);
           if ((live & 0x7f) != 0 || ((live & 0x80) != 0 && dwRelTrackOffset < HEADER_SIZE_PS2)) {
             ps2 = false;
             break;
@@ -116,14 +117,14 @@ bool TamSoftPS1Seq::parseHeader() {
       }
 
       VGMHeader *seqHeader = addHeader(dwHeaderOffset, headerSize);
-      for (uint8_t trackIndex = 0; trackIndex < maxTracks; trackIndex++) {
-        uint32_t dwTrackHeaderOffset = dwHeaderOffset + 4 * trackIndex;
+      for (u8 trackIndex = 0; trackIndex < maxTracks; trackIndex++) {
+        u32 dwTrackHeaderOffset = dwHeaderOffset + 4 * trackIndex;
 
         auto trackHeaderName = fmt::format("Track {}", trackIndex + 1);
         VGMHeader *trackHeader = seqHeader->addHeader(dwTrackHeaderOffset, 4, trackHeaderName);
 
-        uint8_t live = readByte(dwTrackHeaderOffset);
-        uint32_t dwRelTrackOffset = readShort(dwTrackHeaderOffset + 2);
+        u8 live = readByte(dwTrackHeaderOffset);
+        u32 dwRelTrackOffset = readShort(dwTrackHeaderOffset + 2);
         trackHeader->addChild(dwTrackHeaderOffset, 1, "Active/Inactive");
         trackHeader->addChild(dwTrackHeaderOffset + 1, 1, "Padding");
         trackHeader->addChild(dwTrackHeaderOffset + 2, 2, "Track Offset");
@@ -142,7 +143,7 @@ bool TamSoftPS1Seq::parseHeader() {
   }
   else {
     // SFX (single track)
-    uint32_t dwTrackOffset = offset() + seqHeaderRelOffset;
+    u32 dwTrackOffset = offset() + seqHeaderRelOffset;
 
     // ignore silence sequence
     if (readShort(dwTrackOffset) != 0xfff0) {
@@ -162,7 +163,7 @@ bool TamSoftPS1Seq::parseTrackPointers() {
 //  TamSoftPS1Track
 //  ***************
 
-TamSoftPS1Track::TamSoftPS1Track(TamSoftPS1Seq *parentFile, uint32_t offset)
+TamSoftPS1Track::TamSoftPS1Track(TamSoftPS1Seq *parentFile, u32 offset)
     : SeqTrack(parentFile, offset) {
   TamSoftPS1Track::resetVars();
   bDetermineTrackLengthEventByEvent = true;
@@ -178,13 +179,13 @@ void TamSoftPS1Track::resetVars() {
 bool TamSoftPS1Track::readEvent() {
   TamSoftPS1Seq *parentSeq = (TamSoftPS1Seq *)this->parentSeq;
 
-  uint32_t beginOffset = curOffset;
+  u32 beginOffset = curOffset;
   if (curOffset >= vgmFile()->endOffset()) {
     finalizeAllNotes();
     return false;
   }
 
-  uint8_t statusByte = readByte(curOffset++);
+  u8 statusByte = readByte(curOffset++);
   bool bContinue = true;
 
   std::string desc;
@@ -196,7 +197,7 @@ bool TamSoftPS1Track::readEvent() {
     addTime(statusByte);
   }
   else if (statusByte >= 0x80 && statusByte <= 0xdf) {
-    uint8_t key = statusByte & 0x7f;
+    u8 key = statusByte & 0x7f;
     desc = fmt::format("Key: {:d}", key);
 
     if (lastNoteKey >= 0) {
@@ -215,17 +216,17 @@ bool TamSoftPS1Track::readEvent() {
   else {
     switch (statusByte) {
       case 0xE0: {
-        uint8_t vol = readByte(curOffset++) / 2;
+        u8 vol = readByte(curOffset++) / 2;
         addVol(beginOffset, curOffset - beginOffset, vol);
         break;
       }
 
       case 0xE1: {
-        uint8_t volumeBalanceLeft = readByte(curOffset++);
-        uint8_t volumeBalanceRight = readByte(curOffset++);
+        u8 volumeBalanceLeft = readByte(curOffset++);
+        u8 volumeBalanceRight = readByte(curOffset++);
 
         double volumeScale;
-        uint8_t midiPan = convertVolumeBalanceToStdMidiPan(volumeBalanceLeft / 256.0, volumeBalanceRight / 256.0, &volumeScale);
+        u8 midiPan = convertVolumeBalanceToStdMidiPan(volumeBalanceLeft / 256.0, volumeBalanceRight / 256.0, &volumeScale);
 
         desc = fmt::format("Left Volume: {:d}  Right Volume: {:d}", volumeBalanceLeft, volumeBalanceRight);
         addGenericEvent(beginOffset, curOffset - beginOffset, "Volume Balance", desc, Type::Pan);
@@ -234,13 +235,13 @@ bool TamSoftPS1Track::readEvent() {
       }
 
       case 0xE2: {
-        uint8_t progNum = readByte(curOffset++);
+        u8 progNum = readByte(curOffset++);
         addProgramChange(beginOffset, curOffset - beginOffset, progNum, true);
         break;
       }
 
       case 0xE3: {
-        uint16_t a1 = readShort(curOffset);
+        u16 a1 = readShort(curOffset);
         curOffset += 2;
         addUnknown(beginOffset, curOffset - beginOffset, "NOP", desc);
         break;
@@ -248,7 +249,7 @@ bool TamSoftPS1Track::readEvent() {
 
       case 0xE4: {
         // pitch bend
-        uint16_t pitchRegValue = readShort(curOffset);
+        u16 pitchRegValue = readShort(curOffset);
         curOffset += 2;
         desc = fmt::format("Pitch: {:d}", pitchRegValue);
 
@@ -264,7 +265,7 @@ bool TamSoftPS1Track::readEvent() {
 
       case 0xE5: {
         // pitch bend that updates volume/ADSR registers too?
-        uint16_t pitchRegValue = readShort(curOffset);
+        u16 pitchRegValue = readShort(curOffset);
         curOffset += 2;
         desc = fmt::format("Pitch: {:d}", pitchRegValue);
 
@@ -279,14 +280,14 @@ bool TamSoftPS1Track::readEvent() {
       }
 
       case 0xE6: {
-        uint8_t mode = readByte(curOffset++);
+        u8 mode = readByte(curOffset++);
         desc = fmt::format("Reverb Mode: {:d}", mode);
         addGenericEvent(beginOffset, curOffset - beginOffset, "Reverb Mode", desc, Type::Reverb);
         break;
       }
 
       case 0xE7: {
-        uint8_t depth = readByte(curOffset++);
+        u8 depth = readByte(curOffset++);
         desc = fmt::format("Reverb Depth: {:d}", depth);
         parentSeq->reverbDepth = depth << 8;
         addGenericEvent(beginOffset, curOffset - beginOffset, "Reverb Depth", desc, Type::Reverb);
@@ -294,7 +295,7 @@ bool TamSoftPS1Track::readEvent() {
       }
 
       case 0xE8: {
-        uint8_t midiReverb = std::round(fabs(parentSeq->reverbDepth / 32768.0) * 127.0);
+        u8 midiReverb = std::round(fabs(parentSeq->reverbDepth / 32768.0) * 127.0);
         addReverb(beginOffset, curOffset - beginOffset, midiReverb, "Reverb On");
         break;
       }
@@ -305,7 +306,7 @@ bool TamSoftPS1Track::readEvent() {
       }
 
       case 0xEA: {
-        uint16_t pitchScale = readShort(curOffset);
+        u16 pitchScale = readShort(curOffset);
         curOffset += 2;
         double cents = pitchScaleToCents(pitchScale / 4096.0);
         addFineTuning(beginOffset, curOffset - beginOffset, cents);
@@ -319,19 +320,19 @@ bool TamSoftPS1Track::readEvent() {
       }
 
       case 0xF1: {
-        uint16_t a1 = readByte(curOffset++);
+        u16 a1 = readByte(curOffset++);
         desc = fmt::format("Arg1: {:d}", a1);
         addUnknown(beginOffset, curOffset - beginOffset, "Unknown Event F1", desc);
         break;
       }
 
       case 0xF8: {
-        int16_t relOffset = readShort(curOffset);
+        s16 relOffset = readShort(curOffset);
         curOffset += 2;
 
-        uint32_t dest = curOffset + relOffset;
+        u32 dest = curOffset + relOffset;
         desc = fmt::format("Destination: ${:04X}", dest);
-        uint32_t length = curOffset - beginOffset;
+        u32 length = curOffset - beginOffset;
 
         curOffset = dest;
         if (!isOffsetUsed(dest)) {

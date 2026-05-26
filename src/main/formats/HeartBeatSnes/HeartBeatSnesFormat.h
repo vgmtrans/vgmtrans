@@ -1,4 +1,6 @@
 #pragma once
+
+#include "util/types.h"
 #include "Format.h"
 #include "FilegroupMatcher.h"
 #include "HeartBeatSnesScanner.h"
@@ -13,7 +15,7 @@ BEGIN_FORMAT(HeartBeatSnes)
   USING_MATCHER(FilegroupMatcher)
 END_FORMAT()
 
-enum HeartBeatSnesVersion: uint8_t {
+enum HeartBeatSnesVersion: u8 {
   HEARTBEATSNES_NONE = 0,              // Unknown Version
   HEARTBEATSNES_STANDARD,              // Dragon Quest 6 and 3
 };

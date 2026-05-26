@@ -4,6 +4,7 @@
  * refer to the included LICENSE.txt file
  */
 
+#include "util/types.h"
 #include "ChunSnesSeq.h"
 #include "ChunSnesInstr.h"
 #include "ScannerManager.h"
@@ -409,8 +410,8 @@ void ChunSnesScanner::searchForChunSnesFromARAM(RawFile *file) {
   std::string name = file->tag.hasTitle() ? file->tag.title : file->stem();
 
   // search song list and detect engine version
-  uint32_t ofsLoadSeq;
-  uint16_t addrSongList;
+  u32 ofsLoadSeq;
+  u16 addrSongList;
   if (file->searchBytePattern(ptnLoadSeqWinterV3, ofsLoadSeq)) {
     addrSongList = file->readByte(ofsLoadSeq + 8) | (file->readByte(ofsLoadSeq + 11) << 8);
     version = CHUNSNES_WINTER;
@@ -422,7 +423,7 @@ void ChunSnesScanner::searchForChunSnesFromARAM(RawFile *file) {
     minorVersion = CHUNSNES_WINTER_V1; // TODO: classify V1/V2
   }
   else if (file->searchBytePattern(ptnLoadSeqSummerV2, ofsLoadSeq)) {
-    uint16_t addrSongListPtr = file->readShort(ofsLoadSeq + 8);
+    u16 addrSongListPtr = file->readShort(ofsLoadSeq + 8);
     if (addrSongListPtr + 2 > 0x10000) {
       return;
     }
@@ -436,8 +437,8 @@ void ChunSnesScanner::searchForChunSnesFromARAM(RawFile *file) {
   }
 
   // summer/winter const definitions
-  uint8_t CHUNSNES_SEQENT_SIZE;
-  uint8_t CHUNSNES_SEQENT_OFFSET_OF_HEADER;
+  u8 CHUNSNES_SEQENT_SIZE;
+  u8 CHUNSNES_SEQENT_OFFSET_OF_HEADER;
   if (version == CHUNSNES_SUMMER) {
     CHUNSNES_SEQENT_SIZE = 2;
     CHUNSNES_SEQENT_OFFSET_OF_HEADER = 0;
@@ -448,41 +449,41 @@ void ChunSnesScanner::searchForChunSnesFromARAM(RawFile *file) {
   }
 
   // guess song index
-  int8_t songIndex = -1;
-  uint32_t ofsSaveSongIndex;
+  s8 songIndex = -1;
+  u32 ofsSaveSongIndex;
   if (file->searchBytePattern(ptnSaveSongIndexSummerV2, ofsSaveSongIndex)) {
-    uint16_t addrSongIndexArray = file->readShort(ofsSaveSongIndex + 6);
-    uint16_t addrSongSlotIndex = file->readShort(ofsSaveSongIndex + 9);
-    uint8_t songSlotIndex = file->readByte(addrSongSlotIndex);
+    u16 addrSongIndexArray = file->readShort(ofsSaveSongIndex + 6);
+    u16 addrSongSlotIndex = file->readShort(ofsSaveSongIndex + 9);
+    u8 songSlotIndex = file->readByte(addrSongSlotIndex);
     songIndex = file->readByte(addrSongIndexArray + songSlotIndex);
   }
   else {
     // read voice stream pointer value of the first track
-    uint16_t addrCurrentPos = file->readShort(0x0000);
-    uint16_t bestDistance = 0xffff;
+    u16 addrCurrentPos = file->readShort(0x0000);
+    u16 bestDistance = 0xffff;
 
     // search the nearest address
     if (addrCurrentPos != 0) {
-      int8_t guessedSongIndex = -1;
+      s8 guessedSongIndex = -1;
 
-      for (int8_t songIndexCandidate = 0; songIndexCandidate < 0x7f; songIndexCandidate++) {
-        uint16_t addrSeqEntry = addrSongList + (songIndexCandidate * CHUNSNES_SEQENT_SIZE);
+      for (s8 songIndexCandidate = 0; songIndexCandidate < 0x7f; songIndexCandidate++) {
+        u16 addrSeqEntry = addrSongList + (songIndexCandidate * CHUNSNES_SEQENT_SIZE);
         if ((addrSeqEntry & 0xff00) == 0 || (addrSeqEntry & 0xff00) == 0xff00) {
           continue;
         }
 
-        uint16_t addrSeqHeader = file->readShort(addrSeqEntry + CHUNSNES_SEQENT_OFFSET_OF_HEADER);
+        u16 addrSeqHeader = file->readShort(addrSeqEntry + CHUNSNES_SEQENT_OFFSET_OF_HEADER);
         if ((addrSeqHeader & 0xff00) == 0 || (addrSeqHeader & 0xff00) == 0xff00) {
           continue;
         }
 
-        uint8_t nNumTracks = file->readByte(addrSeqHeader + 1);
+        u8 nNumTracks = file->readByte(addrSeqHeader + 1);
         if (nNumTracks == 0 || nNumTracks > 8) {
           continue;
         }
 
-        uint16_t ofsTrackStart = file->readShort(addrSeqHeader + 2);
-        uint16_t addrTrackStart;
+        u16 ofsTrackStart = file->readShort(addrSeqHeader + 2);
+        u16 addrTrackStart;
         if (version == CHUNSNES_SUMMER) {
           addrTrackStart = ofsTrackStart;
         }
@@ -494,7 +495,7 @@ void ChunSnesScanner::searchForChunSnesFromARAM(RawFile *file) {
           continue;
         }
 
-        uint16_t distance = addrCurrentPos - addrTrackStart;
+        u16 distance = addrCurrentPos - addrTrackStart;
         if (distance < bestDistance) {
           bestDistance = distance;
           guessedSongIndex = songIndexCandidate;
@@ -511,20 +512,20 @@ void ChunSnesScanner::searchForChunSnesFromARAM(RawFile *file) {
     songIndex = 1;
   }
 
-  uint16_t addrSeqEntry = addrSongList + (songIndex * CHUNSNES_SEQENT_SIZE);
+  u16 addrSeqEntry = addrSongList + (songIndex * CHUNSNES_SEQENT_SIZE);
   if (addrSeqEntry + CHUNSNES_SEQENT_SIZE > 0x10000) {
     return;
   }
 
-  uint16_t addrSeqHeader = file->readShort(addrSeqEntry + CHUNSNES_SEQENT_OFFSET_OF_HEADER);
+  u16 addrSeqHeader = file->readShort(addrSeqEntry + CHUNSNES_SEQENT_OFFSET_OF_HEADER);
   ChunSnesSeq *newSeq = new ChunSnesSeq(file, version, minorVersion, addrSeqHeader, name);
   if (!newSeq->loadVGMFile()) {
     delete newSeq;
     return;
   }
 
-  uint32_t ofsDSPInitTable;
-  uint16_t spcDirAddr;
+  u32 ofsDSPInitTable;
+  u16 spcDirAddr;
   if (file->searchBytePattern(ptnDSPInitTable, ofsDSPInitTable)) {
     spcDirAddr = file->readByte(ofsDSPInitTable + 29) << 8;
   }
@@ -532,52 +533,52 @@ void ChunSnesScanner::searchForChunSnesFromARAM(RawFile *file) {
     return;
   }
 
-  uint32_t ofsProgChangeVCmd;
-  uint16_t addrInstrSetTable;
-  uint16_t addrSampNumTable;
-  uint16_t addrSampleTable;
-  uint8_t songSlotIndex;
-  uint8_t instrSetIndex;
+  u32 ofsProgChangeVCmd;
+  u16 addrInstrSetTable;
+  u16 addrSampNumTable;
+  u16 addrSampleTable;
+  u8 songSlotIndex;
+  u8 instrSetIndex;
   if (file->searchBytePattern(ptnProgChangeVCmdSummer, ofsProgChangeVCmd)) {
     addrInstrSetTable = file->readByte(ofsProgChangeVCmd + 14) | (file->readByte(ofsProgChangeVCmd + 17) << 8);
     addrSampNumTable = file->readShort(ofsProgChangeVCmd + 47);
     addrSampleTable = file->readByte(ofsProgChangeVCmd + 67) | (file->readByte(ofsProgChangeVCmd + 70) << 8);
 
-    uint16_t addrTrackSlotLookupPtr = file->readShort(ofsProgChangeVCmd + 5);
+    u16 addrTrackSlotLookupPtr = file->readShort(ofsProgChangeVCmd + 5);
     songSlotIndex = file->readByte(addrTrackSlotLookupPtr);
     if (songSlotIndex == 0xff) {
       songSlotIndex = 0;
     }
 
-    uint16_t addrInstrSetLookupPtr = file->readShort(ofsProgChangeVCmd + 9);
+    u16 addrInstrSetLookupPtr = file->readShort(ofsProgChangeVCmd + 9);
     instrSetIndex = file->readByte(addrInstrSetLookupPtr + songSlotIndex);
   }
   else if (file->searchBytePattern(ptnProgChangeVCmdWinter, ofsProgChangeVCmd)) {
-    uint16_t addrInstrumentTablePtr = file->readShort(ofsProgChangeVCmd + 14);
+    u16 addrInstrumentTablePtr = file->readShort(ofsProgChangeVCmd + 14);
     addrInstrSetTable = file->readShort(addrInstrumentTablePtr);
     addrSampNumTable = file->readShort(ofsProgChangeVCmd + 58);
     addrSampleTable = file->readByte(ofsProgChangeVCmd + 97) | (file->readByte(ofsProgChangeVCmd + 100) << 8);
 
-    uint16_t addrTrackSlotLookupPtr = file->readShort(ofsProgChangeVCmd + 5);
+    u16 addrTrackSlotLookupPtr = file->readShort(ofsProgChangeVCmd + 5);
     songSlotIndex = file->readByte(addrTrackSlotLookupPtr);
     if (songSlotIndex == 0xff) {
       songSlotIndex = 0;
     }
 
-    uint16_t addrInstrSetLookupPtr = file->readShort(ofsProgChangeVCmd + 9);
+    u16 addrInstrSetLookupPtr = file->readShort(ofsProgChangeVCmd + 9);
     instrSetIndex = file->readByte(addrInstrSetLookupPtr + songSlotIndex);
   }
   else {
     return;
   }
 
-  uint32_t addrInstrSet = addrInstrSetTable;
-  for (uint8_t i = 0; i < instrSetIndex; i++) {
+  u32 addrInstrSet = addrInstrSetTable;
+  for (u8 i = 0; i < instrSetIndex; i++) {
     if (addrInstrSet + 2 > 0x10000) {
       return;
     }
 
-    uint8_t nNumInstrs = file->readByte(addrInstrSet);
+    u8 nNumInstrs = file->readByte(addrInstrSet);
     if (version == CHUNSNES_SUMMER) {
       addrInstrSet += 1;
     }

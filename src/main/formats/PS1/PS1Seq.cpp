@@ -4,13 +4,14 @@
  * refer to the included LICENSE.txt file
  */
 
+#include "util/types.h"
 #include "PS1Seq.h"
 #include "Options.h"
 #include "formats/PS1/PS1Format.h"
 
 DECLARE_FORMAT(PS1)
 
-PS1Seq::PS1Seq(RawFile *file, uint32_t offset) : VGMSeqNoTrks(PS1Format::name, file, offset, "PS1 Seq") {
+PS1Seq::PS1Seq(RawFile *file, u32 offset) : VGMSeqNoTrks(PS1Format::name, file, offset, "PS1 Seq") {
   useReverb();
   //bWriteInitialTempo = false; // false, because the initial tempo is added by tempo event
 }
@@ -23,8 +24,8 @@ bool PS1Seq::parseHeader() {
   setPPQN(readShortBE(offset() + 8));
   nNumTracks = 16;
 
-  uint8_t numer = readByte(offset() + 0x0D);
-  uint8_t denom = readByte(offset() + 0x0E);
+  u8 numer = readByte(offset() + 0x0D);
+  u8 denom = readByte(offset() + 0x0E);
   if (numer == 0 || numer > 32)                //sanity check
     return false;
 
@@ -60,24 +61,24 @@ bool PS1Seq::parseHeader() {
 void PS1Seq::resetVars() {
   VGMSeqNoTrks::resetVars();
 
-  uint32_t initialTempo = (readShortBE(offset() + 10) << 8) | readByte(offset() + 12);
+  u32 initialTempo = (readShortBE(offset() + 10) << 8) | readByte(offset() + 12);
   addTempo(offset() + 10, 3, initialTempo);
 
-  uint8_t numer = readByte(offset() + 0x0D);
-  uint8_t denom = readByte(offset() + 0x0E);
-  addTimeSig(offset() + 0x0D, 2, numer, 1 << denom, (uint8_t) ppqn());
+  u8 numer = readByte(offset() + 0x0D);
+  u8 denom = readByte(offset() + 0x0E);
+  addTimeSig(offset() + 0x0D, 2, numer, 1 << denom, (u8) ppqn());
   std::ranges::fill(m_hasSetProgramForChannel, false);
   m_loopStart = 0;
 }
 
 bool PS1Seq::readEvent() {
-  uint32_t beginOffset = curOffset;
-  uint32_t delta = readVarLen(curOffset);
+  u32 beginOffset = curOffset;
+  u32 delta = readVarLen(curOffset);
   if (curOffset >= rawFile()->size())
     return false;
   addTime(delta);
 
-  uint8_t status_byte = readByte(curOffset++);
+  u8 status_byte = readByte(curOffset++);
 
   //if (status_byte == 0)				//Jump Relative
   //{
@@ -90,8 +91,8 @@ bool PS1Seq::readEvent() {
   //	curOffset += 2;
   //	AddTempo(curOffset, 3, GetWordBE(curOffset-1) & 0xFFFFFF);
   //	curOffset += 3;
-  //	uint8_t numer = GetByte(curOffset++);
-  //	uint8_t denom = GetByte(curOffset++);
+  //	u8 numer = GetByte(curOffset++);
+  //	u8 denom = GetByte(curOffset++);
   //	if (numer == 0 || numer > 32)				//sanity check
   //		return false;
   //	AddTimeSig(curOffset-2, 2, numer, 1<<denom, GetPPQN());
@@ -149,8 +150,8 @@ bool PS1Seq::readEvent() {
     }
 
     case 0xB0 : {
-      uint8_t controlNum = readByte(curOffset++);
-      uint8_t value = readByte(curOffset++);
+      u8 controlNum = readByte(curOffset++);
+      u8 value = readByte(curOffset++);
       switch (controlNum)
       {
         //bank select
@@ -274,15 +275,15 @@ bool PS1Seq::readEvent() {
       break;
 
     case 0xC0 : {
-      uint8_t progNum = readByte(curOffset++);
+      u8 progNum = readByte(curOffset++);
       addProgramChange(beginOffset, curOffset - beginOffset, progNum);
       m_hasSetProgramForChannel[channel] = true;
     }
       break;
 
     case 0xE0 : {
-      uint8_t hi = readByte(curOffset++);
-      uint8_t lo = readByte(curOffset++);
+      u8 hi = readByte(curOffset++);
+      u8 lo = readByte(curOffset++);
       addPitchBendMidiFormat(beginOffset, curOffset - beginOffset, hi, lo);
     }
       break;

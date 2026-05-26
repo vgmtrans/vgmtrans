@@ -6,6 +6,8 @@
 
 #pragma once
 
+#include "util/types.h"
+
 #include <vector>
 #include <map>
 #include <list>
@@ -37,18 +39,18 @@ void deleteMap(std::map<T1, T2 *> &container) {
 }
 
 template <class T>
-inline void pushTypeOnVect(std::vector<uint8_t> &theVector, T unit) {
-  theVector.insert(theVector.end(), reinterpret_cast<uint8_t *>(&unit),
-                   reinterpret_cast<uint8_t *>(&unit) + sizeof(T));
+inline void pushTypeOnVect(std::vector<u8> &theVector, T unit) {
+  theVector.insert(theVector.end(), reinterpret_cast<u8 *>(&unit),
+                   reinterpret_cast<u8 *>(&unit) + sizeof(T));
 }
 
 template <class T>
-inline void pushTypeOnVectBE(std::vector<uint8_t> &theVector, T unit) {
-  for (uint32_t i = 0; i < sizeof(T); i++) {
-    theVector.push_back(*(reinterpret_cast<uint8_t *>(&unit) - i + sizeof(T) - 1));
+inline void pushTypeOnVectBE(std::vector<u8> &theVector, T unit) {
+  for (u32 i = 0; i < sizeof(T); i++) {
+    theVector.push_back(*(reinterpret_cast<u8 *>(&unit) - i + sizeof(T) - 1));
   }
 }
 
-inline void pushBackStringOnVector(std::vector<uint8_t> &theVector, std::string &str) {
+inline void pushBackStringOnVector(std::vector<u8> &theVector, std::string &str) {
   theVector.insert(theVector.end(), str.data(), str.data() + str.length());
 }

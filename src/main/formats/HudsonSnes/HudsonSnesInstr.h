@@ -1,4 +1,6 @@
 #pragma once
+
+#include "util/types.h"
 #include "VGMInstrSet.h"
 #include "VGMSampColl.h"
 #include "VGMRgn.h"
@@ -13,10 +15,10 @@ class HudsonSnesInstrSet:
  public:
   HudsonSnesInstrSet(RawFile *file,
                      HudsonSnesVersion ver,
-                     uint32_t offset,
-                     uint32_t length,
-                     uint32_t spcDirAddr,
-                     uint32_t addrSampTuningTable,
+                     u32 offset,
+                     u32 length,
+                     u32 spcDirAddr,
+                     u32 addrSampTuningTable,
                      const std::string &name = "HudsonSnesInstrSet");
   virtual ~HudsonSnesInstrSet();
 
@@ -26,9 +28,9 @@ class HudsonSnesInstrSet:
   HudsonSnesVersion version;
 
  protected:
-  uint32_t spcDirAddr;
-  uint32_t addrSampTuningTable;
-  std::vector<uint8_t> usedSRCNs;
+  u32 spcDirAddr;
+  u32 addrSampTuningTable;
+  std::vector<u8> usedSRCNs;
 };
 
 // ***************
@@ -40,10 +42,10 @@ class HudsonSnesInstr
  public:
   HudsonSnesInstr(VGMInstrSet *instrSet,
                   HudsonSnesVersion ver,
-                  uint32_t offset,
-                  uint8_t instrNum,
-                  uint32_t spcDirAddr,
-                  uint32_t addrSampTuningTable,
+                  u32 offset,
+                  u8 instrNum,
+                  u32 spcDirAddr,
+                  u32 addrSampTuningTable,
                   const std::string &name = "HudsonSnesInstr");
   virtual ~HudsonSnesInstr();
 
@@ -52,8 +54,8 @@ class HudsonSnesInstr
   HudsonSnesVersion version;
 
  protected:
-  uint32_t spcDirAddr;
-  uint32_t addrSampTuningTable;
+  u32 spcDirAddr;
+  u32 addrSampTuningTable;
 };
 
 // *************
@@ -63,7 +65,7 @@ class HudsonSnesInstr
 class HudsonSnesRgn
     : public VGMRgn {
  public:
-  HudsonSnesRgn(HudsonSnesInstr *instr, HudsonSnesVersion ver, uint32_t offset, uint32_t addrTuningEntry);
+  HudsonSnesRgn(HudsonSnesInstr *instr, HudsonSnesVersion ver, u32 offset, u32 addrTuningEntry);
   virtual ~HudsonSnesRgn();
 
   virtual bool loadRgn();

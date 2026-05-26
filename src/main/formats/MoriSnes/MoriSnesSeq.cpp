@@ -3,6 +3,7 @@
  * Licensed under the zlib license,
  * refer to the included LICENSE.txt file
  */
+#include "util/types.h"
 #include "MoriSnesSeq.h"
 #include "spdlog/fmt/fmt.h"
 
@@ -14,7 +15,7 @@ DECLARE_FORMAT(MoriSnes);
 #define MAX_TRACKS  10
 #define SEQ_PPQN    48
 
-MoriSnesSeq::MoriSnesSeq(RawFile *file, MoriSnesVersion ver, uint32_t seqdataOffset, std::string name)
+MoriSnesSeq::MoriSnesSeq(RawFile *file, MoriSnesVersion ver, u32 seqdataOffset, std::string name)
     : VGMSeq(MoriSnesFormat::name, file, seqdataOffset, 0, std::move(name)),
       version(ver) {
   bLoadTickByTick = true;
@@ -43,25 +44,25 @@ void MoriSnesSeq::resetVars() {
 bool MoriSnesSeq::parseHeader() {
   setPPQN(SEQ_PPQN);
 
-  uint32_t curOffset = offset();
+  u32 curOffset = offset();
   VGMHeader *header = addHeader(offset(), 0);
 
   // reset track start addresses
-  for (uint8_t trackIndex = 0; trackIndex < MAX_TRACKS; trackIndex++) {
+  for (u8 trackIndex = 0; trackIndex < MAX_TRACKS; trackIndex++) {
     TrackStartAddress[trackIndex] = 0;
   }
 
   // parse header events
   while (true) {
-    uint32_t beginOffset = curOffset;
-    uint8_t statusByte = readByte(curOffset++);
+    u32 beginOffset = curOffset;
+    u8 statusByte = readByte(curOffset++);
     if (statusByte == 0xff) {
       header->addChild(beginOffset, curOffset - beginOffset, "Header End");
       break;
     }
 
     if (statusByte <= 0x7f) {
-      uint8_t trackIndex = statusByte;
+      u8 trackIndex = statusByte;
       if (trackIndex > MAX_TRACKS) {
         // out of range
         return false;
@@ -71,7 +72,7 @@ bool MoriSnesSeq::parseHeader() {
         return false;
       }
 
-      uint16_t ofsTrackStart = readShort(curOffset);
+      u16 ofsTrackStart = readShort(curOffset);
       curOffset += 2;
       TrackStartAddress[trackIndex] = curOffset + ofsTrackStart;
 
@@ -93,7 +94,7 @@ bool MoriSnesSeq::parseHeader() {
 }
 
 bool MoriSnesSeq::parseTrackPointers() {
-  for (uint8_t trackIndex = 0; trackIndex < MAX_TRACKS; trackIndex++) {
+  for (u8 trackIndex = 0; trackIndex < MAX_TRACKS; trackIndex++) {
     if (TrackStartAddress[trackIndex] != 0) {
       MoriSnesTrack *track = new MoriSnesTrack(this, TrackStartAddress[trackIndex]);
       aTracks.push_back(track);
@@ -158,7 +159,7 @@ void MoriSnesSeq::loadEventMap() {
   EventMap[0xe6] = EVENT_TIMEBASE;
 }
 
-double MoriSnesSeq::getTempoInBPM(uint8_t tempo, bool fastTempo) {
+double MoriSnesSeq::getTempoInBPM(u8 tempo, bool fastTempo) {
   if (tempo != 0) {
     return 60000000.0 / ((SEQ_PPQN / (fastTempo ? 2 : 1)) * (125 * 0x4f)) * (tempo / 256.0);
   }
@@ -171,7 +172,7 @@ double MoriSnesSeq::getTempoInBPM(uint8_t tempo, bool fastTempo) {
 //  MoriSnesTrack
 //  ***************
 
-MoriSnesTrack::MoriSnesTrack(MoriSnesSeq *parentFile, uint32_t offset, uint32_t length)
+MoriSnesTrack::MoriSnesTrack(MoriSnesSeq *parentFile, u32 offset, u32 length)
     : SeqTrack(parentFile, offset, length) {
   MoriSnesTrack::resetVars();
   bDetermineTrackLengthEventByEvent = true;
@@ -196,18 +197,18 @@ void MoriSnesTrack::resetVars() {
 bool MoriSnesTrack::readEvent() {
   MoriSnesSeq *parentSeq = static_cast<MoriSnesSeq*>(this->parentSeq);
 
-  uint32_t beginOffset = curOffset;
+  u32 beginOffset = curOffset;
   if (curOffset >= 0x10000) {
     return false;
   }
 
-  uint8_t statusByte = readByte(curOffset++);
+  u8 statusByte = readByte(curOffset++);
   bool bContinue = true;
 
   std::string desc;
 
   // note param
-  uint8_t newDelta = spcDeltaTime;
+  u8 newDelta = spcDeltaTime;
   if (statusByte < 0x80) {
     newDelta = statusByte;
     desc = fmt::format("Delta Time: {:d}", newDelta);
@@ -241,7 +242,7 @@ bool MoriSnesTrack::readEvent() {
   }
 
   MoriSnesSeqEventType eventType = (MoriSnesSeqEventType) 0;
-  std::map<uint8_t, MoriSnesSeqEventType>::iterator pEventType = parentSeq->EventMap.find(statusByte);
+  std::map<u8, MoriSnesSeqEventType>::iterator pEventType = parentSeq->EventMap.find(statusByte);
   if (pEventType != parentSeq->EventMap.end()) {
     eventType = pEventType->second;
   }
@@ -253,24 +254,24 @@ bool MoriSnesTrack::readEvent() {
       break;
 
     case EVENT_UNKNOWN1: {
-      uint8_t arg1 = readByte(curOffset++);
+      u8 arg1 = readByte(curOffset++);
       desc = fmt::format("Event: 0x{:02X}  Arg1: {:d}", statusByte, arg1);
       addUnknown(beginOffset, curOffset - beginOffset, "Unknown Event", desc);
       break;
     }
 
     case EVENT_UNKNOWN2: {
-      uint8_t arg1 = readByte(curOffset++);
-      uint8_t arg2 = readByte(curOffset++);
+      u8 arg1 = readByte(curOffset++);
+      u8 arg2 = readByte(curOffset++);
       desc = fmt::format("Event: 0x{:02X}  Arg1: {:d}  Arg2: {:d}", statusByte, arg1, arg2);
       addUnknown(beginOffset, curOffset - beginOffset, "Unknown Event", desc);
       break;
     }
 
     case EVENT_UNKNOWN3: {
-      uint8_t arg1 = readByte(curOffset++);
-      uint8_t arg2 = readByte(curOffset++);
-      uint8_t arg3 = readByte(curOffset++);
+      u8 arg1 = readByte(curOffset++);
+      u8 arg2 = readByte(curOffset++);
+      u8 arg3 = readByte(curOffset++);
       desc = fmt::format("Event: 0x{:02X}  Arg1: {:d}  Arg2: {:d}  Arg3: {:d}",
                          statusByte, arg1, arg2, arg3);
       addUnknown(beginOffset, curOffset - beginOffset, "Unknown Event", desc);
@@ -278,10 +279,10 @@ bool MoriSnesTrack::readEvent() {
     }
 
     case EVENT_UNKNOWN4: {
-      uint8_t arg1 = readByte(curOffset++);
-      uint8_t arg2 = readByte(curOffset++);
-      uint8_t arg3 = readByte(curOffset++);
-      uint8_t arg4 = readByte(curOffset++);
+      u8 arg1 = readByte(curOffset++);
+      u8 arg2 = readByte(curOffset++);
+      u8 arg3 = readByte(curOffset++);
+      u8 arg4 = readByte(curOffset++);
       desc = fmt::format("Event: 0x{:02X}  Arg1: {:d}  Arg2: {:d}  Arg3: {:d}  Arg4: {:d}",
                          statusByte, arg1, arg2, arg3, arg4);
       addUnknown(beginOffset, curOffset - beginOffset, "Unknown Event", desc);
@@ -290,11 +291,11 @@ bool MoriSnesTrack::readEvent() {
 
     case EVENT_NOTE:
     case EVENT_NOTE_WITH_PARAM: {
-      uint8_t keyOffset = statusByte & 0x1f;
+      u8 keyOffset = statusByte & 0x1f;
 
       const char* eventName;
       if (eventType == EVENT_NOTE_WITH_PARAM) {
-        uint8_t noteParam = readByte(curOffset++);
+        u8 noteParam = readByte(curOffset++);
         if (noteParam <= 0x7f) {
           spcNoteDuration = noteParam;
           eventName = "Note with Duration";
@@ -309,12 +310,12 @@ bool MoriSnesTrack::readEvent() {
       }
 
       bool tied = (spcNoteDuration == 0);
-      uint8_t dur = spcNoteDuration;
+      u8 dur = spcNoteDuration;
       if (tied) {
         dur = spcDeltaTime;
       }
 
-      int8_t key = spcNoteNumberBase + keyOffset;
+      s8 key = spcNoteNumberBase + keyOffset;
       auto prevTiedNoteIter = std::find(tiedNoteKeys.begin(), tiedNoteKeys.end(), key);
       if (prevTiedNoteIter != tiedNoteKeys.end()) {
         makePrevDurNoteEnd(getTime() + dur);
@@ -337,12 +338,12 @@ bool MoriSnesTrack::readEvent() {
     }
 
     case EVENT_PROGCHANGE: {
-      int16_t instrOffset = readShort(curOffset);
+      s16 instrOffset = readShort(curOffset);
       curOffset += 2;
-      uint16_t instrAddress = curOffset + instrOffset;
+      u16 instrAddress = curOffset + instrOffset;
       desc = fmt::format("Envelope: ${:04X}", instrAddress);
 
-      uint8_t instrNum;
+      u8 instrNum;
       for (instrNum = 0; instrNum < parentSeq->InstrumentAddresses.size(); instrNum++) {
         if (parentSeq->InstrumentAddresses[instrNum] == instrAddress) {
           break;
@@ -365,14 +366,14 @@ bool MoriSnesTrack::readEvent() {
     }
 
     case EVENT_PAN: {
-      int8_t newPan = readByte(curOffset++);
+      s8 newPan = readByte(curOffset++);
       if (newPan >= 0) {
         if (newPan > 32) {
           // out of range (unexpected behavior)
           newPan = 32;
         }
 
-        uint8_t midiPan = std::min(newPan * 4, 127);
+        u8 midiPan = std::min(newPan * 4, 127);
         addPan(beginOffset, curOffset - beginOffset, midiPan);
       }
       else {
@@ -382,28 +383,28 @@ bool MoriSnesTrack::readEvent() {
     }
 
     case EVENT_TEMPO: {
-      uint8_t newTempo = readByte(curOffset++);
+      u8 newTempo = readByte(curOffset++);
       parentSeq->spcTempo = newTempo;
       addTempoBPM(beginOffset, curOffset - beginOffset, parentSeq->getTempoInBPM(newTempo, parentSeq->fastTempo));
       break;
     }
 
     case EVENT_VOLUME: {
-      uint8_t newVolume = readByte(curOffset++);
+      u8 newVolume = readByte(curOffset++);
       spcVolume = newVolume;
       addVol(beginOffset, curOffset - beginOffset, spcVolume / 2);
       break;
     }
 
     case EVENT_PRIORITY: {
-      uint8_t newPriority = readByte(curOffset++);
+      u8 newPriority = readByte(curOffset++);
       desc = fmt::format("Priority: {:d}", newPriority);
       addGenericEvent(beginOffset, curOffset - beginOffset, "Priority", desc, Type::Priority);
       break;
     }
 
     case EVENT_TUNING: {
-      uint8_t newTuning = readByte(curOffset++);
+      u8 newTuning = readByte(curOffset++);
       spcTuning = newTuning;
 
       double semitones = spcTuning / 256.0;
@@ -424,10 +425,10 @@ bool MoriSnesTrack::readEvent() {
     }
 
     case EVENT_ECHO_PARAM: {
-      uint8_t delay = readByte(curOffset++);
-      int8_t volume = readByte(curOffset++);
-      int8_t feedback = readByte(curOffset++);
-      uint8_t filterIndex = readByte(curOffset++);
+      u8 delay = readByte(curOffset++);
+      s8 volume = readByte(curOffset++);
+      s8 feedback = readByte(curOffset++);
+      u8 filterIndex = readByte(curOffset++);
       desc = fmt::format("Delay: {:d}  FIR: {:d}  volume: {:d}  FIR: {:d}", delay, volume, feedback,
                          filterIndex);
       addGenericEvent(beginOffset,
@@ -439,11 +440,11 @@ bool MoriSnesTrack::readEvent() {
     }
 
     case EVENT_GOTO: {
-      uint16_t dest = readShort(curOffset);
+      u16 dest = readShort(curOffset);
       curOffset += 2;
       dest += curOffset; // relative offset to address
       desc = fmt::format("Destination: ${:04X}", dest);
-      uint32_t length = curOffset - beginOffset;
+      u32 length = curOffset - beginOffset;
 
       curOffset = dest;
       if (!isOffsetUsed(dest)) {
@@ -456,7 +457,7 @@ bool MoriSnesTrack::readEvent() {
     }
 
     case EVENT_CALL: {
-      uint16_t dest = readShort(curOffset);
+      u16 dest = readShort(curOffset);
       curOffset += 2;
       dest += curOffset; // relative offset to address
       desc = fmt::format("Destination: ${:04X}", dest);
@@ -499,7 +500,7 @@ bool MoriSnesTrack::readEvent() {
     }
 
     case EVENT_LOOP_START: {
-      uint8_t count = readByte(curOffset++);
+      u8 count = readByte(curOffset++);
       desc = fmt::format("Loop Count: {:d}", count);
       addGenericEvent(beginOffset, curOffset - beginOffset, "Loop Start", desc, Type::RepeatStart);
 
@@ -526,7 +527,7 @@ bool MoriSnesTrack::readEvent() {
         break;
       }
 
-      uint8_t count = spcCallStack[spcCallStackPtr - 1];
+      u8 count = spcCallStack[spcCallStackPtr - 1];
       if (--count == 0) {
         // repeat end, fall through
         spcCallStackPtr -= 3;
@@ -547,7 +548,7 @@ bool MoriSnesTrack::readEvent() {
     }
 
     case EVENT_NOTE_NUMBER: {
-      int8_t newNoteNumber = readByte(curOffset++);
+      s8 newNoteNumber = readByte(curOffset++);
       spcNoteNumberBase = newNoteNumber;
       addGenericEvent(beginOffset, curOffset - beginOffset, "Note Number Base", desc, Type::NoteOn);
       break;
@@ -575,7 +576,7 @@ bool MoriSnesTrack::readEvent() {
     }
 
     case EVENT_PITCHBENDRANGE: {
-      uint8_t newRangeSemitones = readByte(curOffset++); // actual range is value/8
+      u8 newRangeSemitones = readByte(curOffset++); // actual range is value/8
       addPitchBendRange(beginOffset,
                         curOffset - beginOffset,
                         (newRangeSemitones / 8) * 100); // range <= 24 is recommended in General MIDI spec
@@ -583,20 +584,20 @@ bool MoriSnesTrack::readEvent() {
     }
 
     case EVENT_TRANSPOSE: {
-      int8_t newTranspose = readByte(curOffset++);
+      s8 newTranspose = readByte(curOffset++);
       spcTranspose = newTranspose;
       addTranspose(beginOffset, curOffset - beginOffset, spcTranspose);
     }
 
     case EVENT_TRANSPOSE_REL: {
-      int8_t delta = readByte(curOffset++);
+      s8 delta = readByte(curOffset++);
       spcTranspose += delta;
       addTranspose(beginOffset, curOffset - beginOffset, spcTranspose, "Transpose (Relative)");
       break;
     }
 
     case EVENT_TUNING_REL: {
-      int8_t delta = readByte(curOffset++);
+      s8 delta = readByte(curOffset++);
       spcTuning += delta;
 
       double semitones = spcTuning / 256.0;
@@ -615,7 +616,7 @@ bool MoriSnesTrack::readEvent() {
     }
 
     case EVENT_VOLUME_REL: {
-      int8_t delta = readByte(curOffset++);
+      s8 delta = readByte(curOffset++);
 
       int newVolume = std::min(std::max(spcVolume + delta, 0), 0xff);
       spcVolume += newVolume;
@@ -625,7 +626,7 @@ bool MoriSnesTrack::readEvent() {
     }
 
     case EVENT_PITCHBEND: {
-      int8_t pitch = readByte(curOffset++);
+      s8 pitch = readByte(curOffset++);
       addPitchBend(beginOffset, curOffset - beginOffset, pitch * 64);
       break;
     }
@@ -664,10 +665,10 @@ bool MoriSnesTrack::readEvent() {
   return bContinue;
 }
 
-void MoriSnesTrack::parseInstrument(uint16_t instrAddress, uint8_t instrNum) {
+void MoriSnesTrack::parseInstrument(u16 instrAddress, u8 instrNum) {
   MoriSnesSeq *parentSeq = (MoriSnesSeq *) this->parentSeq;
 
-  uint16_t curOffset = instrAddress;
+  u16 curOffset = instrAddress;
 
   bool percussion = ((readByte(curOffset++) & 1) != 0);
   parentSeq->InstrumentHints[instrAddress].percussion = percussion;
@@ -676,13 +677,13 @@ void MoriSnesTrack::parseInstrument(uint16_t instrAddress, uint8_t instrNum) {
     parseInstrumentEvents(curOffset, instrNum);
   }
   else {
-    int16_t instrOffset;
-    uint16_t instrPtrAddressMax = 0xffff;
-    uint8_t percNoteKey = 0;
+    s16 instrOffset;
+    u16 instrPtrAddressMax = 0xffff;
+    u8 percNoteKey = 0;
     while (curOffset < instrPtrAddressMax) {
       instrOffset = readShort(curOffset);
       curOffset += 2;
-      uint16_t percInstrAddress = curOffset + instrOffset;
+      u16 percInstrAddress = curOffset + instrOffset;
       if (percInstrAddress < instrPtrAddressMax) {
         instrPtrAddressMax = percInstrAddress;
       }
@@ -693,9 +694,9 @@ void MoriSnesTrack::parseInstrument(uint16_t instrAddress, uint8_t instrNum) {
   }
 }
 
-void MoriSnesTrack::parseInstrumentEvents(uint16_t offset, uint8_t instrNum, bool percussion, uint8_t percNoteKey) {
+void MoriSnesTrack::parseInstrumentEvents(u16 offset, u8 instrNum, bool percussion, u8 percNoteKey) {
   MoriSnesSeq *parentSeq = (MoriSnesSeq *) this->parentSeq;
-  uint16_t instrAddress = parentSeq->InstrumentAddresses[instrNum];
+  u16 instrAddress = parentSeq->InstrumentAddresses[instrNum];
 
   MoriSnesInstrHint *instrHint;
   if (!percussion) {
@@ -707,13 +708,13 @@ void MoriSnesTrack::parseInstrumentEvents(uint16_t offset, uint8_t instrNum, boo
   }
 
   bool bContinue = true;
-  uint32_t curOffset = offset;
-  uint32_t seqStartAddress = curOffset;
-  uint32_t seqEndAddress = curOffset;
+  u32 curOffset = offset;
+  u32 seqStartAddress = curOffset;
+  u32 seqEndAddress = curOffset;
 
-  // uint8_t instrDeltaTime = 0;
-  uint8_t instrCallStackPtr = 0;
-  uint8_t instrCallStack[MORISNES_CALLSTACK_SIZE];
+  // u8 instrDeltaTime = 0;
+  u8 instrCallStackPtr = 0;
+  u8 instrCallStack[MORISNES_CALLSTACK_SIZE];
 
   while (bContinue) {
     if (curOffset >= 0xffff) {
@@ -724,9 +725,9 @@ void MoriSnesTrack::parseInstrumentEvents(uint16_t offset, uint8_t instrNum, boo
       seqStartAddress = curOffset;
     }
 
-    uint8_t statusByte = readByte(curOffset++);
+    u8 statusByte = readByte(curOffset++);
 
-    // uint8_t newDelta = instrDeltaTime;
+    // u8 newDelta = instrDeltaTime;
     if (statusByte < 0x80) {
       // newDelta = statusByte;
       // if (newDelta != 0) {
@@ -760,7 +761,7 @@ void MoriSnesTrack::parseInstrumentEvents(uint16_t offset, uint8_t instrNum, boo
     }
 
     MoriSnesSeqEventType eventType = (MoriSnesSeqEventType) 0;
-    std::map<uint8_t, MoriSnesSeqEventType>::iterator pEventType = parentSeq->EventMap.find(statusByte);
+    std::map<u8, MoriSnesSeqEventType>::iterator pEventType = parentSeq->EventMap.find(statusByte);
     if (pEventType != parentSeq->EventMap.end()) {
       eventType = pEventType->second;
     }
@@ -799,7 +800,7 @@ void MoriSnesTrack::parseInstrumentEvents(uint16_t offset, uint8_t instrNum, boo
       }
 
       case EVENT_PAN: {
-        int8_t newPan = readByte(curOffset++);
+        s8 newPan = readByte(curOffset++);
         if (newPan > 32) {
           newPan = 32;
         }
@@ -816,7 +817,7 @@ void MoriSnesTrack::parseInstrumentEvents(uint16_t offset, uint8_t instrNum, boo
         break;
 
       case EVENT_GOTO: {
-        uint16_t dest = readShort(curOffset);
+        u16 dest = readShort(curOffset);
         curOffset += 2;
         dest += curOffset; // relative offset to address
 
@@ -833,7 +834,7 @@ void MoriSnesTrack::parseInstrumentEvents(uint16_t offset, uint8_t instrNum, boo
       }
 
       case EVENT_CALL: {
-        uint16_t dest = readShort(curOffset);
+        u16 dest = readShort(curOffset);
         curOffset += 2;
         dest += curOffset; // relative offset to address
 
@@ -864,7 +865,7 @@ void MoriSnesTrack::parseInstrumentEvents(uint16_t offset, uint8_t instrNum, boo
       }
 
       case EVENT_LOOP_START: {
-        uint8_t count = readByte(curOffset++);
+        u8 count = readByte(curOffset++);
 
         if (instrCallStackPtr + 3 > MORISNES_CALLSTACK_SIZE) {
           // stack overflow
@@ -887,7 +888,7 @@ void MoriSnesTrack::parseInstrumentEvents(uint16_t offset, uint8_t instrNum, boo
           break;
         }
 
-        uint8_t count = instrCallStack[instrCallStackPtr - 1];
+        u8 count = instrCallStack[instrCallStackPtr - 1];
         if (--count == 0) {
           // repeat end, fall through
           instrCallStackPtr -= 3;
@@ -910,7 +911,7 @@ void MoriSnesTrack::parseInstrumentEvents(uint16_t offset, uint8_t instrNum, boo
         break;
 
       case EVENT_TRANSPOSE_REL: {
-        int8_t delta = readByte(curOffset++);
+        s8 delta = readByte(curOffset++);
         instrHint->transpose += delta;
         break;
       }
@@ -930,9 +931,9 @@ void MoriSnesTrack::parseInstrumentEvents(uint16_t offset, uint8_t instrNum, boo
         break;
 
       case EVENT_INSTR: {
-        int16_t rgnOffset = readShort(curOffset);
+        s16 rgnOffset = readShort(curOffset);
         curOffset += 2;
-        uint16_t rgnAddress = curOffset + rgnOffset;
+        u16 rgnAddress = curOffset + rgnOffset;
         instrHint->rgnAddress = rgnAddress;
         break;
       }

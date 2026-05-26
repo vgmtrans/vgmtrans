@@ -5,6 +5,8 @@
  */
 #pragma once
 
+#include "util/types.h"
+
 #include "YM2151InstrSet.h"
 
 enum KonamiTMNT2FormatVer : u8;

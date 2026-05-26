@@ -4,12 +4,14 @@
  * refer to the included LICENSE.txt file
  */
 #pragma once
+
+#include "util/types.h"
 #include "Scanner.h"
 #include "CPS2Scanner.h"
 
 struct MAMEGame;
 
-enum CPS1FormatVer: uint8_t {
+enum CPS1FormatVer: u8 {
   CPS1_VERSION_UNDEFINED,
   CPS1_V100,
   CPS1_V200,

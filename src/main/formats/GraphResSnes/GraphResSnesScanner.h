@@ -5,6 +5,8 @@
  */
 
 #pragma once
+
+#include "util/types.h"
 #include "Scanner.h"
 #include "BytePattern.h"
 
@@ -16,7 +18,7 @@ class GraphResSnesScanner : public VGMScanner {
   static void searchForGraphResSnesFromARAM(RawFile *file);
 
  private:
-  static std::map<uint8_t, uint8_t> getInitDspRegMap(const RawFile *file);
+  static std::map<u8, u8> getInitDspRegMap(const RawFile *file);
 
   static BytePattern ptnLoadSeq;
   static BytePattern ptnDspRegInit;

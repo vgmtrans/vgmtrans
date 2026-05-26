@@ -1,4 +1,6 @@
 #pragma once
+
+#include "util/types.h"
 #include "VGMInstrSet.h"
 #include "VGMSampColl.h"
 #include "VGMRgn.h"
@@ -13,11 +15,11 @@ class PrismSnesInstrSet:
  public:
   PrismSnesInstrSet(RawFile *file,
                     PrismSnesVersion ver,
-                    uint32_t spcDirAddr,
-                    uint16_t addrADSR1Table,
-                    uint16_t addrADSR2Table,
-                    uint16_t addrTuningTableHigh,
-                    uint16_t addrTuningTableLow,
+                    u32 spcDirAddr,
+                    u16 addrADSR1Table,
+                    u16 addrADSR2Table,
+                    u16 addrTuningTableHigh,
+                    u16 addrTuningTableLow,
                     const std::string &name = "PrismSnesInstrSet");
   virtual ~PrismSnesInstrSet();
 
@@ -27,12 +29,12 @@ class PrismSnesInstrSet:
   PrismSnesVersion version;
 
  protected:
-  uint32_t spcDirAddr;
-  uint16_t addrADSR1Table;
-  uint16_t addrADSR2Table;
-  uint16_t addrTuningTableHigh;
-  uint16_t addrTuningTableLow;
-  std::vector<uint8_t> usedSRCNs;
+  u32 spcDirAddr;
+  u16 addrADSR1Table;
+  u16 addrADSR2Table;
+  u16 addrTuningTableHigh;
+  u16 addrTuningTableLow;
+  std::vector<u8> usedSRCNs;
 };
 
 // **************
@@ -44,12 +46,12 @@ class PrismSnesInstr
  public:
   PrismSnesInstr(VGMInstrSet *instrSet,
                  PrismSnesVersion ver,
-                 uint8_t srcn,
-                 uint32_t spcDirAddr,
-                 uint16_t addrADSR1Entry,
-                 uint16_t addrADSR2Entry,
-                 uint16_t addrTuningEntryHigh,
-                 uint16_t addrTuningEntryLow,
+                 u8 srcn,
+                 u32 spcDirAddr,
+                 u16 addrADSR1Entry,
+                 u16 addrADSR2Entry,
+                 u16 addrTuningEntryHigh,
+                 u16 addrTuningEntryLow,
                  const std::string &name = "PrismSnesInstr");
   virtual ~PrismSnesInstr();
 
@@ -58,12 +60,12 @@ class PrismSnesInstr
   PrismSnesVersion version;
 
  protected:
-  uint8_t srcn;
-  uint32_t spcDirAddr;
-  uint16_t addrADSR1Entry;
-  uint16_t addrADSR2Entry;
-  uint16_t addrTuningEntryHigh;
-  uint16_t addrTuningEntryLow;
+  u8 srcn;
+  u32 spcDirAddr;
+  u16 addrADSR1Entry;
+  u16 addrADSR2Entry;
+  u16 addrTuningEntryHigh;
+  u16 addrTuningEntryLow;
 };
 
 // ************
@@ -75,12 +77,12 @@ class PrismSnesRgn
  public:
   PrismSnesRgn(PrismSnesInstr *instr,
                PrismSnesVersion ver,
-               uint8_t srcn,
-               uint32_t spcDirAddr,
-               uint16_t addrADSR1Entry,
-               uint16_t addrADSR2Entry,
-               uint16_t addrTuningEntryHigh,
-               uint16_t addrTuningEntryLow);
+               u8 srcn,
+               u32 spcDirAddr,
+               u16 addrADSR1Entry,
+               u16 addrADSR2Entry,
+               u16 addrTuningEntryHigh,
+               u16 addrTuningEntryLow);
   virtual ~PrismSnesRgn();
 
   virtual bool loadRgn();

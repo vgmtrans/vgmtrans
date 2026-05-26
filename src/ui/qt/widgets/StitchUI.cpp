@@ -89,7 +89,7 @@ std::string buildExportSuccessMessage(const std::filesystem::path &midiPath,
                                       const std::filesystem::path &sf2Path,
                                       const conversion::MidiMergeResult &mergeResult,
                                       const std::vector<conversion::MidiMergeEntry> &entries,
-                                      const std::vector<uint8_t> &bankOffsets) {
+                                      const std::vector<u8> &bankOffsets) {
   std::string message = "Stitched export created:\n";
   message += "MIDI: " + midiPath.string() + "\n";
   message += "SF2: " + sf2Path.string();

@@ -4,6 +4,7 @@
  * refer to the included LICENSE.txt file
  */
 
+#include "util/types.h"
 #include <vector>
 #include "AkaoSeq.h"
 #include "AkaoInstr.h"

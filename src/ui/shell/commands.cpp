@@ -4,6 +4,7 @@
  * See the included LICENSE for more information
  */
 
+#include "util/types.h"
 #include "commands.h"
 
 #include <fstream>
@@ -118,7 +119,7 @@ VGMColl* getVGMColl(const std::string& indexStr) {
   return nullptr;
 }
 
-void printHexDump(const uint8_t* data, size_t length) {
+void printHexDump(const u8* data, size_t length) {
   for (size_t i = 0; i < length; i += 16) {
     fmt::print("{:08x}: ", i);
     for (size_t j = 0; j < 16; ++j) {
@@ -239,7 +240,7 @@ void rawfile_read(const std::vector<std::string>& args) {
       size_t offset = std::stoul(args[3], nullptr, 16);
       size_t length = std::stoul(args[4], nullptr, 16);
       if (offset + length <= file->size()) {
-        const uint8_t* data = reinterpret_cast<const uint8_t*>(file->data());
+        const u8* data = reinterpret_cast<const u8*>(file->data());
         printHexDump(data + offset, length);
       } else {
         fmt::println("Range out of bounds");
@@ -291,7 +292,7 @@ void vgmfile_read(const std::vector<std::string>& args) {
       size_t length = std::stoul(args[4], nullptr, 16);
       if (relOffset + length <= file->size()) {
         const char* rawData = file->rawFile()->data();
-        const uint8_t* data = reinterpret_cast<const uint8_t*>(rawData + file->startOffset());
+        const u8* data = reinterpret_cast<const u8*>(rawData + file->startOffset());
         printHexDump(data + relOffset, length);
       } else {
         fmt::println("Range out of bounds (file size: 0x{:x})", file->size());
@@ -511,7 +512,7 @@ void samplecollection_inspect(const std::vector<std::string>& args) {
                  fmt::styled(fmt::format("0x{:x}", samp->dataLength), fmt::fg(fmt::color::yellow)),
                  fmt::styled(std::to_string(samp->dataLength), fmt::fg(fmt::color::yellow)));
 
-      uint32_t totalSamples = 0;
+      u32 totalSamples = 0;
       if (samp->bytesPerSample() > 0) {
         totalSamples = samp->uncompressedSize() / samp->bytesPerSample();
       }
@@ -687,11 +688,11 @@ void collection_stitch(const std::vector<std::string>& args) {
         chunkName = "(unknown)";
       }
     }
-    const uint32_t startTick =
+    const u32 startTick =
         (i < exportResult.mergeResult.startTimes.size())
             ? exportResult.mergeResult.startTimes[i]
             : 0;
-    const uint32_t bankOffset =
+    const u32 bankOffset =
         (i < exportResult.bankOffsets.size()) ? exportResult.bankOffsets[i] : 0;
     fmt::println("  part {} (#{} '{}'): start tick {} bank +{}", i + 1, collectionIndices[i], chunkName,
                  startTick, bankOffset);

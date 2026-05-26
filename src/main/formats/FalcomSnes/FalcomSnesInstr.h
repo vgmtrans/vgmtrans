@@ -1,4 +1,6 @@
 #pragma once
+
+#include "util/types.h"
 #include "VGMInstrSet.h"
 #include "VGMRgn.h"
 #include "FalcomSnesFormat.h"
@@ -19,10 +21,10 @@ class FalcomSnesInstrSet:
 
   FalcomSnesInstrSet(RawFile *file,
                      FalcomSnesVersion ver,
-                     uint32_t offset,
-                     uint32_t addrSampToInstrTable,
-                     uint32_t spcDirAddr,
-                     const std::map<uint8_t, uint16_t> &instrADSRHints,
+                     u32 offset,
+                     u32 addrSampToInstrTable,
+                     u32 spcDirAddr,
+                     const std::map<u8, u16> &instrADSRHints,
                      const std::string &name = "FalcomSnesInstrSet");
   ~FalcomSnesInstrSet() override;
 
@@ -32,10 +34,10 @@ class FalcomSnesInstrSet:
   FalcomSnesVersion version;
 
  protected:
-  uint32_t spcDirAddr;
-  uint32_t addrSampToInstrTable;
-  std::vector<uint8_t> usedSRCNs;
-  std::map<uint8_t, uint16_t> instrADSRHints;
+  u32 spcDirAddr;
+  u32 addrSampToInstrTable;
+  std::vector<u8> usedSRCNs;
+  std::map<u8, u16> instrADSRHints;
 };
 
 // *************
@@ -47,11 +49,11 @@ class FalcomSnesInstr
  public:
   FalcomSnesInstr(VGMInstrSet *instrSet,
                   FalcomSnesVersion ver,
-                  uint32_t offset,
-                  uint32_t theBank,
-                  uint32_t theInstrNum,
-                  uint8_t srcn,
-                  uint32_t spcDirAddr,
+                  u32 offset,
+                  u32 theBank,
+                  u32 theInstrNum,
+                  u8 srcn,
+                  u32 spcDirAddr,
                   const std::string &name = "FalcomSnesInstr");
   ~FalcomSnesInstr() override;
 
@@ -60,8 +62,8 @@ class FalcomSnesInstr
   FalcomSnesVersion version;
 
  protected:
-  uint8_t srcn;
-  uint32_t spcDirAddr;
+  u8 srcn;
+  u32 spcDirAddr;
 };
 
 // ***********
@@ -73,8 +75,8 @@ class FalcomSnesRgn
  public:
   FalcomSnesRgn(FalcomSnesInstr *instr,
              FalcomSnesVersion ver,
-             uint32_t offset,
-             uint8_t srcn);
+             u32 offset,
+             u8 srcn);
   ~FalcomSnesRgn() override;
 
   bool loadRgn() override;

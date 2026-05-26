@@ -3,6 +3,7 @@
  * Licensed under the zlib license,
  * refer to the included LICENSE.txt file
  */
+#include "util/types.h"
 #include "SPCFile.h"
 #include "LogManager.h"
 #include "RawFile.h"
@@ -79,9 +80,9 @@ void SPCFile::loadExtendedID666Tag(const RawFile& file, size_t offset) {
 
   size_t currentOffset = offset + 8;
   while (currentOffset < chunkEnd) {
-    uint8_t id = file.readByte(currentOffset);
-    uint8_t type = file.readByte(currentOffset + 1);
-    uint16_t headerData = file.readShort(currentOffset + 2);
+    u8 id = file.readByte(currentOffset);
+    u8 type = file.readByte(currentOffset + 1);
+    u16 headerData = file.readShort(currentOffset + 2);
 
     switch (type) {
       case 0:

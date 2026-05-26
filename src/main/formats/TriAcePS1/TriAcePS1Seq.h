@@ -1,4 +1,6 @@
 #pragma once
+
+#include "util/types.h"
 #include "VGMSeq.h"
 #include "SeqTrack.h"
 #include "TriAcePS1Format.h"
@@ -9,13 +11,13 @@ class TriAcePS1Seq:
     public VGMSeq {
  public:
   typedef struct _TrkInfo {
-    uint16_t unknown1;
-    uint16_t unknown2;
-    uint16_t trkOffset;
+    u16 unknown1;
+    u16 unknown2;
+    u16 trkOffset;
   } TrkInfo;
 
 
-  TriAcePS1Seq(RawFile *file, uint32_t offset, const std::string &name = std::string("TriAce Seq"));
+  TriAcePS1Seq(RawFile *file, u32 offset, const std::string &name = std::string("TriAce Seq"));
 
   bool parseHeader() override;
   bool parseTrackPointers() override;
@@ -27,14 +29,14 @@ class TriAcePS1Seq:
   TrkInfo TrkInfos[32];
   std::vector<TriAcePS1ScorePattern *> aScorePatterns;
   TriAcePS1ScorePattern *curScorePattern;
-  std::map<uint32_t, TriAcePS1ScorePattern *> patternMap;
-  uint8_t initialTempoBPM;
+  std::map<u32, TriAcePS1ScorePattern *> patternMap;
+  u8 initialTempoBPM;
 };
 
 class TriAcePS1ScorePattern
     : public VGMItem {
  public:
-  TriAcePS1ScorePattern(TriAcePS1Seq *parentSeq, uint32_t offset)
+  TriAcePS1ScorePattern(TriAcePS1Seq *parentSeq, u32 offset)
       : VGMItem(parentSeq, offset, 0, "Score Pattern") { }
 };
 
@@ -42,14 +44,14 @@ class TriAcePS1ScorePattern
 class TriAcePS1Track
     : public SeqTrack {
  public:
-  TriAcePS1Track(TriAcePS1Seq *parentSeq, uint32_t offset = 0, uint32_t length = 0);
+  TriAcePS1Track(TriAcePS1Seq *parentSeq, u32 offset = 0, u32 length = 0);
 
-  virtual void loadTrackMainLoop(uint32_t stopOffset, int32_t stopTime);
-  uint32_t readScorePattern(uint32_t offset);
-  virtual bool isOffsetUsed(uint32_t offset);
+  virtual void loadTrackMainLoop(u32 stopOffset, s32 stopTime);
+  u32 readScorePattern(u32 offset);
+  virtual bool isOffsetUsed(u32 offset);
   virtual SeqEvent* addEvent(SeqEvent *pSeqEvent);
   virtual bool readEvent();
 
-  uint8_t impliedNoteDur;
-  uint8_t impliedVelocity;
+  u8 impliedNoteDur;
+  u8 impliedVelocity;
 };

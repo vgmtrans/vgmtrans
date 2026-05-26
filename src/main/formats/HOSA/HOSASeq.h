@@ -1,4 +1,6 @@
 #pragma once
+
+#include "util/types.h"
 #include "VGMSeq.h"
 #include "SeqTrack.h"
 #include "Format.h"			//Replace with MP2k-specific format header when that's ready
@@ -9,16 +11,16 @@
 //--------------------------------------------------------------
 class HOSASeq: public VGMSeq {
  public:
-  HOSASeq(RawFile *file, uint32_t offset, const std::string &name = "HOSA Seq");
+  HOSASeq(RawFile *file, u32 offset, const std::string &name = "HOSA Seq");
   ~HOSASeq() override;
 
   bool parseHeader() override;
   bool parseTrackPointers() override;
-  uint32_t id() const override { return assocHOSA_ID; }
+  u32 id() const override { return assocHOSA_ID; }
 
  protected:
-  uint16_t seqID;
-  uint16_t assocHOSA_ID;
+  u16 seqID;
+  u16 assocHOSA_ID;
 };
 
 
@@ -27,24 +29,24 @@ class HOSASeq: public VGMSeq {
 //--------------------------------------------------------------
 class HOSATrack: public SeqTrack {
  public:
-  HOSATrack(HOSASeq *parentFile, uint32_t offset = 0, uint32_t length = 0);
+  HOSATrack(HOSASeq *parentFile, u32 offset = 0, u32 length = 0);
 
   bool readEvent() override;
   void ReadDeltaTime(unsigned char cCom_bit5, unsigned int *iVariable);
-  uint32_t decodeVariable();    //Decode of 可変長
+  u32 decodeVariable();    //Decode of 可変長
 
  public:
-  uint32_t iDeltaTimeCom;     //Default delta time for Command
-  uint32_t iDeltaTimeNote;    //Default delta time for Note
-  uint32_t iLengthTimeNote;   //Default length for Note
+  u32 iDeltaTimeCom;     //Default delta time for Command
+  u32 iDeltaTimeNote;    //Default delta time for Note
+  u32 iLengthTimeNote;   //Default length for Note
 //  unsigned int iDeltaTimeCounter;	//Counter of delta time for note/command.
 //  vector<char> listNote;		//Key On Note
 //  vector<unsigned int> listLength;		//
-  int8_t cVelocity;           //Default velocity
-  int8_t cNoteNum;            //Default Note Number
-  uint8_t cTempo{};           //Tempo
-  uint8_t cInstrument{};
-  uint8_t cVolume{};
-  uint8_t cPanpot{};
-  uint8_t cExpression{};
+  s8 cVelocity;           //Default velocity
+  s8 cNoteNum;            //Default Note Number
+  u8 cTempo{};           //Tempo
+  u8 cInstrument{};
+  u8 cVolume{};
+  u8 cPanpot{};
+  u8 cExpression{};
 };

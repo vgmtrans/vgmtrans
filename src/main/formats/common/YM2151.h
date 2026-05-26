@@ -5,39 +5,41 @@
  */
 #pragma once
 
+#include "util/types.h"
+
 #include <spdlog/fmt/fmt.h>
 
 struct OPMData {
   struct LFO {
-    uint8_t LFRQ;
-    uint8_t AMD;
-    uint8_t PMD;
-    uint8_t WF;
-    uint8_t NFRQ;
+    u8 LFRQ;
+    u8 AMD;
+    u8 PMD;
+    u8 WF;
+    u8 NFRQ;
   };
 
   struct CH {
-    uint8_t PAN;
-    uint8_t FL;
-    uint8_t CON;
-    uint8_t AMS;
-    uint8_t PMS;
-    uint8_t SLOT_MASK;
-    uint8_t NE;
+    u8 PAN;
+    u8 FL;
+    u8 CON;
+    u8 AMS;
+    u8 PMS;
+    u8 SLOT_MASK;
+    u8 NE;
   };
 
   struct OP {
-    uint8_t AR;
-    uint8_t D1R;
-    uint8_t D2R;
-    uint8_t RR;
-    uint8_t D1L;
-    uint8_t TL;
-    uint8_t KS;
-    uint8_t MUL;
-    uint8_t DT1;
-    uint8_t DT2;
-    uint8_t AMS_EN;
+    u8 AR;
+    u8 D1R;
+    u8 D2R;
+    u8 RR;
+    u8 D1L;
+    u8 TL;
+    u8 KS;
+    u8 MUL;
+    u8 DT1;
+    u8 DT2;
+    u8 AMS_EN;
   };
 
   std::string name;

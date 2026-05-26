@@ -1,4 +1,6 @@
 #pragma once
+
+#include "util/types.h"
 #include "VGMSampColl.h"
 #include "VGMSamp.h"
 #include "VGMItem.h"
@@ -68,9 +70,9 @@ static void initADSR()
   // build the rate table according to Neill's rules
   memset(RateTable, 0, sizeof(unsigned long) * 160);
 
-  uint32_t r = 3;
-  uint32_t rs = 1;
-  uint32_t rd = 0;
+  u32 r = 3;
+  u32 rs = 1;
+  u32 rd = 0;
 
   // we start at pos 32 with the real values... everything before is 0
   for (int i = 32; i < 160; i++) {
@@ -95,29 +97,29 @@ inline int roundToZero(int val) {
   return val;
 }
 
-inline constexpr uint16_t composePSXADSR1(uint8_t am, uint8_t ar, uint8_t dr, uint8_t sl) {
+inline constexpr u16 composePSXADSR1(u8 am, u8 ar, u8 dr, u8 sl) {
   return ((am & 1) << 15) | ((ar & 0x7f) << 8) | ((dr & 0xf) << 4) | (sl & 0x0f);
 }
 
-inline constexpr uint16_t composePSXADSR2(uint8_t sm, uint8_t sd, uint8_t sr, uint8_t rm,
-                                         uint8_t rr) {
+inline constexpr u16 composePSXADSR2(u8 sm, u8 sd, u8 sr, u8 rm,
+                                         u8 rr) {
   return ((sm & 1) << 15) | ((sd & 1) << 14) | ((sr & 0x7f) << 6) | ((rm & 1) << 5) | (rr & 0x1f);
 }
 
 template<class T>
 void psxConvADSR(T *realADSR, unsigned short ADSR1, unsigned short ADSR2, bool bPS2) {
 
-  uint8_t Am = (ADSR1 & 0x8000) >> 15;    // if 1, then Exponential, else linear
-  uint8_t Ar = (ADSR1 & 0x7F00) >> 8;
-  uint8_t Dr = (ADSR1 & 0x00F0) >> 4;
-  uint8_t Sl = ADSR1 & 0x000F;
-  uint8_t Rm = (ADSR2 & 0x0020) >> 5;
-  uint8_t Rr = ADSR2 & 0x001F;
+  u8 Am = (ADSR1 & 0x8000) >> 15;    // if 1, then Exponential, else linear
+  u8 Ar = (ADSR1 & 0x7F00) >> 8;
+  u8 Dr = (ADSR1 & 0x00F0) >> 4;
+  u8 Sl = ADSR1 & 0x000F;
+  u8 Rm = (ADSR2 & 0x0020) >> 5;
+  u8 Rr = ADSR2 & 0x001F;
 
   // The following are unimplemented in conversion (because DLS and SF2 do not support Sustain Rate)
-  uint8_t Sm = (ADSR2 & 0x8000) >> 15;
-  uint8_t Sd = (ADSR2 & 0x4000) >> 14;
-  uint8_t Sr = (ADSR2 >> 6) & 0x7F;
+  u8 Sm = (ADSR2 & 0x8000) >> 15;
+  u8 Sd = (ADSR2 & 0x4000) >> 14;
+  u8 Sr = (ADSR2 >> 6) & 0x7F;
 
   psxConvADSR(realADSR, Am, Ar, Dr, Sl, Sm, Sd, Sr, Rm, Rr, bPS2);
 }
@@ -125,8 +127,8 @@ void psxConvADSR(T *realADSR, unsigned short ADSR1, unsigned short ADSR2, bool b
 
 template<class T>
 void psxConvADSR(T *realADSR,
-                 uint8_t Am, uint8_t Ar, uint8_t Dr, uint8_t Sl,
-                 uint8_t Sm, uint8_t Sd, uint8_t Sr, uint8_t Rm, uint8_t Rr, bool bPS2) {
+                 u8 Am, u8 Ar, u8 Dr, u8 Sl,
+                 u8 Sm, u8 Sd, u8 Sr, u8 Rm, u8 Rr, bool bPS2) {
   // Make sure all the ADSR values are within the valid ranges
   if (((Am & ~0x01) != 0) ||
       ((Ar & ~0x7F) != 0) ||
@@ -166,12 +168,12 @@ void psxConvADSR(T *realADSR,
     Ar = 0;
   // if linear Ar Mode
   if (Am == 0) {
-    uint32_t rate = RateTable[roundToZero((Ar ^ 0x7F) - 0x10) + 32];
+    u32 rate = RateTable[roundToZero((Ar ^ 0x7F) - 0x10) + 32];
     samples = ceil(0x7FFFFFFF / static_cast<double>(rate));
   } else if (Am == 1) {
-    uint32_t rate = RateTable[roundToZero((Ar ^ 0x7F) - 0x10) + 32];
+    u32 rate = RateTable[roundToZero((Ar ^ 0x7F) - 0x10) + 32];
     samples = 0x60000000 / rate;
-    uint32_t remainder = 0x60000000 % rate;
+    u32 remainder = 0x60000000 % rate;
     rate = RateTable[roundToZero((Ar ^ 0x7F) - 0x18) + 32];
     samples += ceil(fmax(0, 0x1FFFFFFF - remainder) / static_cast<double>(rate));
   }
@@ -183,7 +185,7 @@ void psxConvADSR(T *realADSR,
   long envelope_level = 0x7FFFFFFF;
 
   bool bSustainLevFound = false;
-  uint32_t realSustainLevel{0};
+  u32 realSustainLevel{0};
   // DLS decay rate value is to -96db (silence) not the sustain level
   for (l = 0; envelope_level > 0; l++) {
     if (4 * (Dr ^ 0x1F) < 0x18)
@@ -219,7 +221,7 @@ void psxConvADSR(T *realADSR,
     else {
       // linear
       if (Sm == 0) {
-        uint32_t rate = RateTable[roundToZero((Sr ^ 0x7F) - 0x0F) + 32];
+        u32 rate = RateTable[roundToZero((Sr ^ 0x7F) - 0x0F) + 32];
         samples = ceil(0x7FFFFFFF / static_cast<double>(rate));
       } else {
         l = 0;
@@ -274,7 +276,7 @@ void psxConvADSR(T *realADSR,
 
   // if linear Rr Mode
   if (Rm == 0) {
-    uint32_t rate = RateTable[roundToZero((4 * (Rr ^ 0x1F)) - 0x0C) + 32];
+    u32 rate = RateTable[roundToZero((4 * (Rr ^ 0x1F)) - 0x0C) + 32];
 
     if (rate != 0)
       samples = ceil(static_cast<double>(envelope_level) / rate);
@@ -323,12 +325,12 @@ void psxConvADSR(T *realADSR,
 
 class PSXSampColl : public VGMSampColl {
  public:
-  PSXSampColl(const std::string &format, RawFile *rawfile, uint32_t offset, uint32_t length = 0);
-  PSXSampColl(const std::string &format, VGMInstrSet *instrset, uint32_t offset, uint32_t length = 0);
+  PSXSampColl(const std::string &format, RawFile *rawfile, u32 offset, u32 length = 0);
+  PSXSampColl(const std::string &format, VGMInstrSet *instrset, u32 offset, u32 length = 0);
   PSXSampColl(const std::string &format,
               VGMInstrSet *instrset,
-              uint32_t offset,
-              uint32_t length,
+              u32 offset,
+              u32 length,
               const std::vector<SizeOffsetPair> &vagLocations);
 
   bool parseSampleInfo() override;        //retrieve sample info, including pointers to data, # channels, rate, etc.
@@ -341,9 +343,9 @@ class PSXSampColl : public VGMSampColl {
 
 class PSXSamp : public VGMSamp {
  public:
-  PSXSamp(VGMSampColl *sampColl, uint32_t offset, uint32_t length, uint32_t dataOffset,
-          uint32_t dataLen, uint8_t nChannels, BPS theBPS,
-          uint32_t theRate, std::string name, bool bSetLoopOnConversion = true);
+  PSXSamp(VGMSampColl *sampColl, u32 offset, u32 length, u32 dataOffset,
+          u32 dataLen, u8 nChannels, BPS theBPS,
+          u32 theRate, std::string name, bool bSetLoopOnConversion = true);
   ~PSXSamp() override;
 
   // ratio of space conserved.  should generally be > 1
@@ -351,15 +353,15 @@ class PSXSamp : public VGMSamp {
   double compressionRatio() const override;
   void SetLoopOnConversion(bool bDoIt) { bSetLoopOnConversion = bDoIt; }
 
-  static uint32_t getSampleLength(const RawFile *file, uint32_t offset, uint32_t endOffset, bool &loop);
+  static u32 getSampleLength(const RawFile *file, u32 offset, u32 endOffset, bool &loop);
 
  private:
-  std::vector<uint8_t> decodeToNativePcm() override;
+  std::vector<u8> decodeToNativePcm() override;
   static void decompVAGBlk(s16 *pSmp, const VAGBlk* pVBlk, s32 prev[2]);
 
  public:
   bool bSetLoopOnConversion{false};
-  uint32_t dwCompSize{0};
-  uint32_t dwUncompSize{0};
+  u32 dwCompSize{0};
+  u32 dwUncompSize{0};
   bool bLoops{false};
 };

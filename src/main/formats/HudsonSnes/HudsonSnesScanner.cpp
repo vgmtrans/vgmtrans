@@ -4,6 +4,7 @@
  * refer to the included LICENSE.txt file
  */
 
+#include "util/types.h"
 #include "HudsonSnesInstr.h"
 #include "HudsonSnesSeq.h"
 #include "ScannerManager.h"
@@ -125,7 +126,7 @@ void HudsonSnesScanner::searchForHudsonSnesFromARAM(RawFile *file) {
   std::string name = file->tag.hasTitle() ? file->tag.title : file->stem();
 
   // search for note length table
-  uint32_t ofsNoteLenTable;
+  u32 ofsNoteLenTable;
   if (!file->searchBytePattern(ptnNoteLenTable, ofsNoteLenTable)) {
     return;
   }
@@ -133,9 +134,9 @@ void HudsonSnesScanner::searchForHudsonSnesFromARAM(RawFile *file) {
   // TODO: fix "An American Tail: Fievel Goes West"
 
   // search song list and detect engine version
-  uint32_t ofsGetSeqTableAddr;
-  uint16_t addrEngineHeader;
-  uint16_t addrSongList;
+  u32 ofsGetSeqTableAddr;
+  u16 addrEngineHeader;
+  u16 addrSongList;
   if (file->searchBytePattern(ptnGetSeqTableAddrV1V2, ofsGetSeqTableAddr)) {
     addrEngineHeader = file->readShort(ofsGetSeqTableAddr + 1);
 
@@ -149,7 +150,7 @@ void HudsonSnesScanner::searchForHudsonSnesFromARAM(RawFile *file) {
       return;
     }
 
-    uint16_t addrSongListTable = file->readShort(addrEngineHeader);
+    u16 addrSongListTable = file->readShort(addrEngineHeader);
     if (addrSongListTable + 2 > 0x10000) {
       return;
     }
@@ -161,8 +162,8 @@ void HudsonSnesScanner::searchForHudsonSnesFromARAM(RawFile *file) {
     }
   }
   else if (file->searchBytePattern(ptnGetSeqTableAddrV0, ofsGetSeqTableAddr)) {
-    uint8_t addrSongListPtr = file->readByte(ofsGetSeqTableAddr + 4);
-    uint16_t addrSongListTable = file->readShort(addrSongListPtr);
+    u8 addrSongListPtr = file->readByte(ofsGetSeqTableAddr + 4);
+    u16 addrSongListTable = file->readShort(addrSongListPtr);
     if (addrSongListTable + 2 > 0x10000) {
       return;
     }
@@ -181,10 +182,10 @@ void HudsonSnesScanner::searchForHudsonSnesFromARAM(RawFile *file) {
   }
 
   // guess song count
-  uint8_t songListLength = 1;
-  uint16_t addrSongListCutoff = 0xffff;
-  for (uint8_t songIndex = 0; songIndex <= 0x7f; songIndex++) {
-    uint32_t ofsSongPtr = addrSongList + songIndex * 2;
+  u8 songListLength = 1;
+  u16 addrSongListCutoff = 0xffff;
+  for (u8 songIndex = 0; songIndex <= 0x7f; songIndex++) {
+    u32 ofsSongPtr = addrSongList + songIndex * 2;
 
     if (ofsSongPtr + 2 > 0x10000) {
       break;
@@ -194,7 +195,7 @@ void HudsonSnesScanner::searchForHudsonSnesFromARAM(RawFile *file) {
       break;
     }
 
-    uint16_t addrSongPtr = file->readShort(ofsSongPtr);
+    u16 addrSongPtr = file->readShort(ofsSongPtr);
     if (addrSongPtr < addrSongListCutoff) {
       addrSongListCutoff = addrSongPtr;
     }
@@ -207,11 +208,11 @@ void HudsonSnesScanner::searchForHudsonSnesFromARAM(RawFile *file) {
   // Each sequences must not be crossover each other.
   // Here we load the global loop address of current song,
   // and search a sequence contains that address.
-  uint32_t ofsLoadTrackAddress;
-  uint16_t addrCurrentLoopPoint;
+  u32 ofsLoadTrackAddress;
+  u16 addrCurrentLoopPoint;
   if (file->searchBytePattern(ptnLoadTrackAddress, ofsLoadTrackAddress)) {
-    uint16_t addrCurrentLoopPointPtrLo = file->readShort(ofsLoadTrackAddress + 20);
-    uint16_t addrCurrentLoopPointPtrHi = file->readShort(ofsLoadTrackAddress + 29);
+    u16 addrCurrentLoopPointPtrLo = file->readShort(ofsLoadTrackAddress + 20);
+    u16 addrCurrentLoopPointPtrHi = file->readShort(ofsLoadTrackAddress + 29);
 
     addrCurrentLoopPoint = file->readByte(addrCurrentLoopPointPtrLo) | (file->readByte(addrCurrentLoopPointPtrHi) << 8);
   }
@@ -220,18 +221,18 @@ void HudsonSnesScanner::searchForHudsonSnesFromARAM(RawFile *file) {
   }
 
   // guess song index
-  int8_t songIndexCandidate = 0;
+  s8 songIndexCandidate = 0;
   if (addrCurrentLoopPoint != 0 && addrCurrentLoopPoint != 0xffff) {
-    uint16_t bestLoopPointDistance = 0xffff;
-    for (uint8_t songIndex = 0; songIndex <= songListLength; songIndex++) {
-      uint32_t ofsSongPtr = addrSongList + songIndex * 2;
-      uint16_t addrSongPtr = file->readShort(ofsSongPtr);
+    u16 bestLoopPointDistance = 0xffff;
+    for (u8 songIndex = 0; songIndex <= songListLength; songIndex++) {
+      u32 ofsSongPtr = addrSongList + songIndex * 2;
+      u16 addrSongPtr = file->readShort(ofsSongPtr);
 
       if (addrSongPtr > addrCurrentLoopPoint) {
         continue;
       }
 
-      uint16_t loopPointDistance = addrCurrentLoopPoint - addrSongPtr;
+      u16 loopPointDistance = addrCurrentLoopPoint - addrSongPtr;
       if (loopPointDistance < bestLoopPointDistance) {
         bestLoopPointDistance = loopPointDistance;
         songIndexCandidate = songIndex;
@@ -239,11 +240,11 @@ void HudsonSnesScanner::searchForHudsonSnesFromARAM(RawFile *file) {
     }
   }
 
-  int8_t guessedSongIndex = songIndexCandidate;
+  s8 guessedSongIndex = songIndexCandidate;
 
   // load song
-  uint16_t addrSeqHeaderPtr = addrSongList + guessedSongIndex * 2;
-  uint16_t addrSeqHeader = file->readShort(addrSeqHeaderPtr);
+  u16 addrSeqHeaderPtr = addrSongList + guessedSongIndex * 2;
+  u16 addrSeqHeader = file->readShort(addrSeqHeaderPtr);
   HudsonSnesSeq *newSeq = new HudsonSnesSeq(file, version, addrSeqHeader, name);
   if (!newSeq->loadVGMFile()) {
     delete newSeq;
@@ -252,15 +253,15 @@ void HudsonSnesScanner::searchForHudsonSnesFromARAM(RawFile *file) {
 
   // load instrument set if available
   if (newSeq->InstrumentTableSize != 0) {
-    uint16_t spcDirAddr;
-    uint16_t addrSampTuningTable;
+    u16 spcDirAddr;
+    u16 addrSampTuningTable;
     if (version == HUDSONSNES_V0) {
-      uint32_t ofsLoadDIR;
+      u32 ofsLoadDIR;
       if (file->searchBytePattern(ptnLoadDIRV0, ofsLoadDIR)) {
-        uint8_t addrDIRPtr = file->readByte(ofsLoadDIR + 1);
+        u8 addrDIRPtr = file->readByte(ofsLoadDIR + 1);
         spcDirAddr = file->readByte(0x100 + addrDIRPtr) << 8;
 
-        uint16_t addrSampRegionPtr = file->readShort(ofsGetSeqTableAddr + 30);
+        u16 addrSampRegionPtr = file->readShort(ofsGetSeqTableAddr + 30);
         addrSampTuningTable = (file->readByte(addrSampRegionPtr) + 1) << 8;
       }
       else {

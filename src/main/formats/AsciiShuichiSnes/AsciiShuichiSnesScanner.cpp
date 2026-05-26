@@ -4,6 +4,7 @@
  * refer to the included LICENSE.txt file
  */
 
+#include "util/types.h"
 #include "AsciiShuichiSnesSeq.h"
 #include "AsciiShuichiSnesInstr.h"
 #include "ScannerManager.h"
@@ -83,10 +84,10 @@ void AsciiShuichiSnesScanner::scanFromARAM(RawFile *file) {
   const std::string name = file->tag.hasTitle() ? file->tag.title : file->stem();
 
   // search song header
-  uint32_t ofsLoadSeq;
+  u32 ofsLoadSeq;
   if (!file->searchBytePattern(ptnLoadSeq, ofsLoadSeq))
     return;
-  const uint16_t seqHeaderAddress = file->readShort(ofsLoadSeq + 6);
+  const u16 seqHeaderAddress = file->readShort(ofsLoadSeq + 6);
 
   const auto newSeq = new AsciiShuichiSnesSeq(file, seqHeaderAddress, name);
   if (!newSeq->loadVGMFile()) {
@@ -95,24 +96,24 @@ void AsciiShuichiSnesScanner::scanFromARAM(RawFile *file) {
   }
 
   // search instrument loader
-  uint32_t ofsLoadInstr;
+  u32 ofsLoadInstr;
   if (!file->searchBytePattern(ptnLoadInstr, ofsLoadInstr))
     return;
-  const uint8_t instrTablePtrAddress = file->readByte(ofsLoadInstr + 12);
-  const uint16_t instrTableAddress = file->readShort(instrTablePtrAddress);
+  const u8 instrTablePtrAddress = file->readByte(ofsLoadInstr + 12);
+  const u16 instrTableAddress = file->readShort(instrTablePtrAddress);
   L_DEBUG("{}: found instrument table {:#04x} via {:#02x}", "AsciiShuichiSnesScanner",
           instrTableAddress, instrTablePtrAddress);
 
-  const uint8_t instrTuningTablePtrAddress = file->readByte(ofsLoadInstr + 21);
-  const uint16_t instrTuningTableAddress = file->readShort(instrTuningTablePtrAddress);
+  const u8 instrTuningTablePtrAddress = file->readByte(ofsLoadInstr + 21);
+  const u16 instrTuningTableAddress = file->readShort(instrTuningTablePtrAddress);
   L_DEBUG("{}: found instrument tuning table {:#04x} via {:#02x}", "AsciiShuichiSnesScanner",
           instrTuningTableAddress, instrTuningTablePtrAddress);
 
   // search DIR address
-  uint32_t ofsLoadDIR;
+  u32 ofsLoadDIR;
   if (!file->searchBytePattern(ptnLoadDIR, ofsLoadDIR))
     return;
-  const auto sampleDirAddress = static_cast<uint16_t>(file->readByte(ofsLoadDIR + 3) << 8);
+  const auto sampleDirAddress = static_cast<u16>(file->readByte(ofsLoadDIR + 3) << 8);
   L_DEBUG("{}: found sample DIR address {:#04x}", "AsciiShuichiSnesScanner", sampleDirAddress);
 
   const auto newInstrSet = new AsciiShuichiSnesInstrSet(file, instrTableAddress,

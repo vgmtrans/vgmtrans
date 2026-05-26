@@ -4,6 +4,7 @@
  * refer to the included LICENSE.txt file
  */
 
+#include "util/types.h"
 #include <ranges>
 #include <filesystem>
 #include <spdlog/fmt/fmt.h>
@@ -32,7 +33,7 @@ MidiTrack *MidiFile::addTrack() {
   return aTracks.back();
 }
 
-MidiTrack *MidiFile::insertTrack(uint32_t trackNum) {
+MidiTrack *MidiFile::insertTrack(u32 trackNum) {
   if (trackNum + 1 > aTracks.size())
     aTracks.resize(trackNum + 1, nullptr);
 
@@ -49,16 +50,16 @@ int MidiFile::getMidiTrackIndex(const MidiTrack *midiTrack) {
   }
 }
 
-void MidiFile::setPPQN(uint16_t ppqn) {
+void MidiFile::setPPQN(u16 ppqn) {
   this->m_ppqn = ppqn;
 }
 
-uint32_t MidiFile::ppqn() const {
+u32 MidiFile::ppqn() const {
   return m_ppqn;
 }
 
 void MidiFile::sort() {
-  for (uint32_t i = 0; i < aTracks.size(); i++) {
+  for (u32 i = 0; i < aTracks.size(); i++) {
     if (aTracks[i]) {
       if (aTracks[i]->aEvents.empty()) {
         delete aTracks[i];
@@ -70,12 +71,12 @@ void MidiFile::sort() {
 }
 
 bool MidiFile::saveMidiFile(const std::filesystem::path &filepath) {
-  std::vector<uint8_t> midiBuf;
+  std::vector<u8> midiBuf;
   writeMidiToBuffer(midiBuf);
   return pRoot->UI_writeBufferToFile(filepath, &midiBuf[0], midiBuf.size());
 }
 
-void MidiFile::writeMidiToBuffer(std::vector<uint8_t> &buf) {
+void MidiFile::writeMidiToBuffer(std::vector<u8> &buf) {
   size_t nNumTracks = aTracks.size();
   buf.push_back('M');
   buf.push_back('T');
@@ -96,7 +97,7 @@ void MidiFile::writeMidiToBuffer(std::vector<uint8_t> &buf) {
 
   for (auto& aTrack : aTracks) {
     if (aTrack) {
-      std::vector<uint8_t> trackBuf;
+      std::vector<u8> trackBuf;
       globalTranspose = 0;
       aTrack->writeTrack(trackBuf);
       buf.insert(buf.end(), trackBuf.begin(), trackBuf.end());
@@ -132,7 +133,7 @@ void MidiTrack::sort() {
   }
 }
 
-void MidiTrack::writeTrack(std::vector<uint8_t> &buf) const {
+void MidiTrack::writeTrack(std::vector<u8> &buf) const {
   buf.push_back('M');
   buf.push_back('T');
   buf.push_back('r');
@@ -141,7 +142,7 @@ void MidiTrack::writeTrack(std::vector<uint8_t> &buf) const {
   buf.push_back(0);
   buf.push_back(0);
   buf.push_back(0);
-  uint32_t time = 0;  // start at 0 ticks
+  u32 time = 0;  // start at 0 ticks
 
   std::vector<MidiEvent *> finalEvents(aEvents);
   std::vector<MidiEvent *> &globEvents = parentSeq->globalTrack.aEvents;
@@ -157,10 +158,10 @@ void MidiTrack::writeTrack(std::vector<uint8_t> &buf) const {
     time = finalEvents[i]->writeEvent(buf, time);  // write all events into the buffer
 
   size_t trackSize = buf.size() - 8;  // -8 for MTrk and size that shouldn't be accounted for
-  buf[4] = static_cast<uint8_t>((trackSize & 0xFF000000) >> 24);
-  buf[5] = static_cast<uint8_t>((trackSize & 0x00FF0000) >> 16);
-  buf[6] = static_cast<uint8_t>((trackSize & 0x0000FF00) >> 8);
-  buf[7] = static_cast<uint8_t>(trackSize & 0x000000FF);
+  buf[4] = static_cast<u8>((trackSize & 0xFF000000) >> 24);
+  buf[5] = static_cast<u8>((trackSize & 0x00FF0000) >> 16);
+  buf[6] = static_cast<u8>((trackSize & 0x0000FF00) >> 8);
+  buf[7] = static_cast<u8>(trackSize & 0x000000FF);
 }
 
 void MidiTrack::setChannelGroup(int theChannelGroup) {
@@ -168,19 +169,19 @@ void MidiTrack::setChannelGroup(int theChannelGroup) {
 }
 
 // Delta Time Functions
-uint32_t MidiTrack::getDelta() const {
+u32 MidiTrack::getDelta() const {
   return DeltaTime;
 }
 
-void MidiTrack::setDelta(uint32_t NewDelta) {
+void MidiTrack::setDelta(u32 NewDelta) {
   DeltaTime = NewDelta;
 }
 
-void MidiTrack::addDelta(uint32_t AddDelta) {
+void MidiTrack::addDelta(u32 AddDelta) {
   DeltaTime += AddDelta;
 }
 
-void MidiTrack::subtractDelta(uint32_t SubtractDelta) {
+void MidiTrack::subtractDelta(u32 SubtractDelta) {
   DeltaTime -= SubtractDelta;
 }
 
@@ -188,23 +189,23 @@ void MidiTrack::resetDelta() {
   DeltaTime = 0;
 }
 
-void MidiTrack::addNoteOn(uint8_t channel, int8_t key, int8_t vel) {
+void MidiTrack::addNoteOn(u8 channel, s8 key, s8 vel) {
   aEvents.push_back(new NoteEvent(this, channel, getDelta(), true, key, vel));
 }
 
-void MidiTrack::insertNoteOn(uint8_t channel, int8_t key, int8_t vel, uint32_t absTime) {
+void MidiTrack::insertNoteOn(u8 channel, s8 key, s8 vel, u32 absTime) {
   aEvents.push_back(new NoteEvent(this, channel, absTime, true, key, vel));
 }
 
-void MidiTrack::addNoteOff(uint8_t channel, int8_t key) {
+void MidiTrack::addNoteOff(u8 channel, s8 key) {
   aEvents.push_back(new NoteEvent(this, channel, getDelta(), false, key));
 }
 
-void MidiTrack::insertNoteOff(uint8_t channel, int8_t key, uint32_t absTime) {
+void MidiTrack::insertNoteOff(u8 channel, s8 key, u32 absTime) {
   aEvents.push_back(new NoteEvent(this, channel, absTime, false, key));
 }
 
-void MidiTrack::addNoteByDur(uint8_t channel, int8_t key, int8_t vel, uint32_t duration) {
+void MidiTrack::addNoteByDur(u8 channel, s8 key, s8 vel, u32 duration) {
   purgePrevNoteOffs(getDelta());
   aEvents.push_back(new NoteEvent(this, channel, getDelta(), true, key, vel));  // add note on
   NoteEvent *prevDurNoteOff = new NoteEvent(this, channel, getDelta() + duration, false, key);
@@ -213,8 +214,8 @@ void MidiTrack::addNoteByDur(uint8_t channel, int8_t key, int8_t vel, uint32_t d
 }
 
 //TODO: MOVE! This definitely doesn't belong here.
-void MidiTrack::addNoteByDur_TriAce(uint8_t channel, int8_t key, int8_t vel, uint32_t duration) {
-  uint32_t CurDelta = getDelta();
+void MidiTrack::addNoteByDur_TriAce(u8 channel, s8 key, s8 vel, u32 duration) {
+  u32 CurDelta = getDelta();
   size_t nNumEvents = aEvents.size();
 
   NoteEvent* ContNote = nullptr;  // Continuted Note
@@ -249,7 +250,7 @@ void MidiTrack::addNoteByDur_TriAce(uint8_t channel, int8_t key, int8_t vel, uin
   }
 }
 
-void MidiTrack::insertNoteByDur(uint8_t channel, int8_t key, int8_t vel, uint32_t duration, uint32_t absTime) {
+void MidiTrack::insertNoteByDur(u8 channel, s8 key, s8 vel, u32 duration, u32 absTime) {
   purgePrevNoteOffs(std::max(getDelta(), absTime));
   aEvents.push_back(new NoteEvent(this, channel, absTime, true, key, vel));  // add note on
   NoteEvent *prevDurNoteOff = new NoteEvent(this, channel, absTime + duration, false, key);
@@ -261,191 +262,191 @@ void MidiTrack::purgePrevNoteOffs() {
   prevDurNoteOffs.clear();
 }
 
-void MidiTrack::purgePrevNoteOffs(uint32_t absTime) {
+void MidiTrack::purgePrevNoteOffs(u32 absTime) {
   prevDurNoteOffs.erase(std::remove_if(prevDurNoteOffs.begin(), prevDurNoteOffs.end(),
     [absTime](const NoteEvent *e) { return e && e->absTime <= absTime; }),
     prevDurNoteOffs.end());
 }
 
-/*void MidiTrack::AddVolMarker(uint8_t channel, uint8_t vol, int8_t priority)
+/*void MidiTrack::AddVolMarker(u8 channel, u8 vol, s8 priority)
 {
 	MidiEvent* newEvent = new VolMarkerEvent(this, channel, GetDelta(), vol);
 	aEvents.push_back(newEvent);
 }
 
-void MidiTrack::InsertVolMarker(uint8_t channel, uint8_t vol, uint32_t absTime, int8_t priority)
+void MidiTrack::InsertVolMarker(u8 channel, u8 vol, u32 absTime, s8 priority)
 {
 	MidiEvent* newEvent = new VolMarkerEvent(this, channel, absTime, vol);
 	aEvents.push_back(newEvent);
 }*/
 
-void MidiTrack::addControllerEvent(uint8_t channel, uint8_t controllerNum, uint8_t theDataByte) {
+void MidiTrack::addControllerEvent(u8 channel, u8 controllerNum, u8 theDataByte) {
   aEvents.push_back(new ControllerEvent(this, channel, getDelta(), controllerNum, theDataByte));
 }
 
-void MidiTrack::insertControllerEvent(uint8_t channel, uint8_t controllerNum, uint8_t theDataByte, uint32_t absTime) {
+void MidiTrack::insertControllerEvent(u8 channel, u8 controllerNum, u8 theDataByte, u32 absTime) {
   aEvents.push_back(new ControllerEvent(this, channel, absTime, controllerNum, theDataByte));
 }
 
-void MidiTrack::addVol(uint8_t channel, uint8_t vol) {
+void MidiTrack::addVol(u8 channel, u8 vol) {
   aEvents.push_back(new VolumeEvent(this, channel, getDelta(), vol));
 }
 
-void MidiTrack::insertVol(uint8_t channel, uint8_t vol, uint32_t absTime) {
+void MidiTrack::insertVol(u8 channel, u8 vol, u32 absTime) {
   aEvents.push_back(new VolumeEvent(this, channel, absTime, vol));
 }
 
-void MidiTrack::addVolumeFine(uint8_t channel, uint8_t volume_lsb) {
+void MidiTrack::addVolumeFine(u8 channel, u8 volume_lsb) {
   aEvents.push_back(new VolumeFineEvent(this, channel, getDelta(), volume_lsb));
 }
 
-void MidiTrack::insertVolumeFine(uint8_t channel, uint8_t volume_lsb, uint32_t absTime) {
+void MidiTrack::insertVolumeFine(u8 channel, u8 volume_lsb, u32 absTime) {
   aEvents.push_back(new VolumeFineEvent(this, channel, absTime, volume_lsb));
 }
 
 //TODO: Master Volume sysex events are meant to be global to device, not per channel.
 // For per channel master volume, we should add a system for normalizing controller vol events.
-void MidiTrack::addMasterVol(uint8_t channel, u8 volMsb, u8 volLsb) {
+void MidiTrack::addMasterVol(u8 channel, u8 volMsb, u8 volLsb) {
   MidiEvent *newEvent = new MasterVolEvent(this, channel, getDelta(), volMsb, volLsb);
   aEvents.push_back(newEvent);
 }
 
-void MidiTrack::insertMasterVol(uint8_t channel, u8 volMsb, uint32_t absTime) {
+void MidiTrack::insertMasterVol(u8 channel, u8 volMsb, u32 absTime) {
   insertMasterVol(channel, volMsb, 0, absTime);
 }
 
-void MidiTrack::insertMasterVol(uint8_t channel, u8 volMsb, u8 volLsb, uint32_t absTime) {
+void MidiTrack::insertMasterVol(u8 channel, u8 volMsb, u8 volLsb, u32 absTime) {
   MidiEvent *newEvent = new MasterVolEvent(this, channel, absTime, volMsb, volLsb);
   aEvents.push_back(newEvent);
 }
 
-void MidiTrack::addExpression(uint8_t channel, uint8_t expression) {
+void MidiTrack::addExpression(u8 channel, u8 expression) {
   aEvents.push_back(new ExpressionEvent(this, channel, getDelta(), expression));
 }
 
-void MidiTrack::insertExpression(uint8_t channel, uint8_t expression, uint32_t absTime) {
+void MidiTrack::insertExpression(u8 channel, u8 expression, u32 absTime) {
   aEvents.push_back(new ExpressionEvent(this, channel, absTime, expression));
 }
 
-void MidiTrack::addExpressionFine(uint8_t channel, uint8_t expression_lsb) {
+void MidiTrack::addExpressionFine(u8 channel, u8 expression_lsb) {
   aEvents.push_back(new ExpressionFineEvent(this, channel, getDelta(), expression_lsb));
 }
 
-void MidiTrack::insertExpressionFine(uint8_t channel, uint8_t expression_lsb, uint32_t absTime) {
+void MidiTrack::insertExpressionFine(u8 channel, u8 expression_lsb, u32 absTime) {
   aEvents.push_back(new ExpressionFineEvent(this, channel, absTime, expression_lsb));
 }
 
-void MidiTrack::addSustain(uint8_t channel, uint8_t depth) {
+void MidiTrack::addSustain(u8 channel, u8 depth) {
   aEvents.push_back(new SustainEvent(this, channel, getDelta(), depth));
 }
 
-void MidiTrack::insertSustain(uint8_t channel, uint8_t depth, uint32_t absTime) {
+void MidiTrack::insertSustain(u8 channel, u8 depth, u32 absTime) {
   aEvents.push_back(new SustainEvent(this, channel, absTime, depth));
 }
 
-void MidiTrack::addPortamento(uint8_t channel, bool bOn) {
+void MidiTrack::addPortamento(u8 channel, bool bOn) {
   aEvents.push_back(new PortamentoEvent(this, channel, getDelta(), bOn));
 }
 
-void MidiTrack::insertPortamento(uint8_t channel, bool bOn, uint32_t absTime) {
+void MidiTrack::insertPortamento(u8 channel, bool bOn, u32 absTime) {
   aEvents.push_back(new PortamentoEvent(this, channel, absTime, bOn));
 }
 
-void MidiTrack::addPortamentoTime(uint8_t channel, uint8_t time) {
+void MidiTrack::addPortamentoTime(u8 channel, u8 time) {
   aEvents.push_back(new PortamentoTimeEvent(this, channel, getDelta(), time));
 }
 
-void MidiTrack::insertPortamentoTime(uint8_t channel, uint8_t time, uint32_t absTime) {
+void MidiTrack::insertPortamentoTime(u8 channel, u8 time, u32 absTime) {
   aEvents.push_back(new PortamentoTimeEvent(this, channel, absTime, time));
 }
 
-void MidiTrack::addPortamentoTimeFine(uint8_t channel, uint8_t time) {
+void MidiTrack::addPortamentoTimeFine(u8 channel, u8 time) {
   aEvents.push_back(new PortamentoTimeFineEvent(this, channel, getDelta(), time));
 }
 
-void MidiTrack::insertPortamentoTimeFine(uint8_t channel, uint8_t time, uint32_t absTime) {
+void MidiTrack::insertPortamentoTimeFine(u8 channel, u8 time, u32 absTime) {
   aEvents.push_back(new PortamentoTimeFineEvent(this, channel, absTime, time));
 }
 
-void MidiTrack::addPortamentoControl(uint8_t channel, uint8_t key) {
+void MidiTrack::addPortamentoControl(u8 channel, u8 key) {
   aEvents.push_back(new PortamentoControlEvent(this, channel, getDelta(), key));
 }
 
-void MidiTrack::insertPortamentoControl(uint8_t channel, uint8_t key, uint32_t absTime) {
+void MidiTrack::insertPortamentoControl(u8 channel, u8 key, u32 absTime) {
   aEvents.push_back(new PortamentoControlEvent(this, channel, absTime, key));
 }
 
-void MidiTrack::addMono(uint8_t channel) {
+void MidiTrack::addMono(u8 channel) {
   aEvents.push_back(new MonoEvent(this, channel, getDelta()));
 }
 
-void MidiTrack::insertMono(uint8_t channel, uint32_t absTime) {
+void MidiTrack::insertMono(u8 channel, u32 absTime) {
   aEvents.push_back(new MonoEvent(this, channel, absTime));
 }
 
-void MidiTrack::addLegatoPedal(uint8_t channel, bool bOn) {
+void MidiTrack::addLegatoPedal(u8 channel, bool bOn) {
   aEvents.push_back(new LegatoPedalEvent(this, channel, getDelta(), bOn));
 }
 
-void MidiTrack::insertLegatoPedal(uint8_t channel, bool bOn, uint32_t absTime) {
+void MidiTrack::insertLegatoPedal(u8 channel, bool bOn, u32 absTime) {
   aEvents.push_back(new LegatoPedalEvent(this, channel, absTime, bOn));
 }
 
-void MidiTrack::addPan(uint8_t channel, uint8_t pan) {
+void MidiTrack::addPan(u8 channel, u8 pan) {
   aEvents.push_back(new PanEvent(this, channel, getDelta(), pan));
 }
 
-void MidiTrack::insertPan(uint8_t channel, uint8_t pan, uint32_t absTime) {
+void MidiTrack::insertPan(u8 channel, u8 pan, u32 absTime) {
   aEvents.push_back(new PanEvent(this, channel, absTime, pan));
 }
 
-void MidiTrack::addReverb(uint8_t channel, uint8_t reverb) {
+void MidiTrack::addReverb(u8 channel, u8 reverb) {
   aEvents.push_back(new ControllerEvent(this, channel, getDelta(), 91, reverb));
 }
 
-void MidiTrack::insertReverb(uint8_t channel, uint8_t reverb, uint32_t absTime) {
+void MidiTrack::insertReverb(u8 channel, u8 reverb, u32 absTime) {
   aEvents.push_back(new ControllerEvent(this, channel, absTime, 91, reverb));
 }
 
-void MidiTrack::addModulation(uint8_t channel, uint8_t depth) {
+void MidiTrack::addModulation(u8 channel, u8 depth) {
   aEvents.push_back(new ModulationEvent(this, channel, getDelta(), depth));
 }
 
-void MidiTrack::insertModulation(uint8_t channel, uint8_t depth, uint32_t absTime) {
+void MidiTrack::insertModulation(u8 channel, u8 depth, u32 absTime) {
   aEvents.push_back(new ControllerEvent(this, channel, absTime, 1, depth));
 }
 
-void MidiTrack::addBreath(uint8_t channel, uint8_t depth) {
+void MidiTrack::addBreath(u8 channel, u8 depth) {
   aEvents.push_back(new BreathEvent(this, channel, getDelta(), depth));
 }
 
-void MidiTrack::insertBreath(uint8_t channel, uint8_t depth, uint32_t absTime) {
+void MidiTrack::insertBreath(u8 channel, u8 depth, u32 absTime) {
   aEvents.push_back(new ControllerEvent(this, channel, absTime, 2, depth));
 }
 
-void MidiTrack::addPitchBend(uint8_t channel, int16_t bend) {
+void MidiTrack::addPitchBend(u8 channel, s16 bend) {
   aEvents.push_back(new PitchBendEvent(this, channel, getDelta(), bend));
 }
 
-void MidiTrack::insertPitchBend(uint8_t channel, int16_t bend, uint32_t absTime) {
+void MidiTrack::insertPitchBend(u8 channel, s16 bend, u32 absTime) {
   aEvents.push_back(new PitchBendEvent(this, channel, absTime, bend));
 }
 
-void MidiTrack::addChannelPressure(uint8_t channel, uint8_t pressure) {
+void MidiTrack::addChannelPressure(u8 channel, u8 pressure) {
   aEvents.push_back(new ChannelPressureEvent(this, channel, getDelta(), pressure));
 }
 
-void MidiTrack::insertChannelPressure(uint8_t channel, uint8_t pressure, uint32_t absTime) {
+void MidiTrack::insertChannelPressure(u8 channel, u8 pressure, u32 absTime) {
   aEvents.push_back(new ChannelPressureEvent(this, channel, absTime, pressure));
 }
 
-void MidiTrack::addPitchBendRange(uint8_t channel, uint16_t cents) {
+void MidiTrack::addPitchBendRange(u8 channel, u16 cents) {
   insertPitchBendRange(channel, cents, getDelta());
 }
 
-void MidiTrack::insertPitchBendRange(uint8_t channel, uint16_t cents, uint32_t absTime) {
-  uint8_t semitones = cents / 100;
-  uint8_t finetune_cents = cents % 100;
+void MidiTrack::insertPitchBendRange(u8 channel, u16 cents, u32 absTime) {
+  u8 semitones = cents / 100;
+  u8 finetune_cents = cents % 100;
   // We push the LSB controller event first as somee virtual instruments only react upon receiving MSB
   aEvents.push_back(new ControllerEvent(this, channel, absTime, 101, 0, PRIORITY_HIGHER - 1));
   aEvents.push_back(new ControllerEvent(this, channel, absTime, 100, 0, PRIORITY_HIGHER - 1));
@@ -453,11 +454,11 @@ void MidiTrack::insertPitchBendRange(uint8_t channel, uint16_t cents, uint32_t a
   aEvents.push_back(new ControllerEvent(this, channel, absTime, 6, semitones, PRIORITY_HIGHER - 1));
 }
 
-void MidiTrack::addFineTuning(uint8_t channel, uint8_t msb, uint8_t lsb) {
+void MidiTrack::addFineTuning(u8 channel, u8 msb, u8 lsb) {
   insertFineTuning(channel, msb, lsb, getDelta());
 }
 
-void MidiTrack::insertFineTuning(uint8_t channel, uint8_t msb, uint8_t lsb, uint32_t absTime) {
+void MidiTrack::insertFineTuning(u8 channel, u8 msb, u8 lsb, u32 absTime) {
   // We push the LSB controller event first as somee virtual instruments only react upon receiving MSB
   aEvents.push_back(new ControllerEvent(this, channel, absTime, 101, 0, PRIORITY_HIGHER - 1));
   aEvents.push_back(new ControllerEvent(this, channel, absTime, 100, 1, PRIORITY_HIGHER - 1));
@@ -465,111 +466,111 @@ void MidiTrack::insertFineTuning(uint8_t channel, uint8_t msb, uint8_t lsb, uint
   aEvents.push_back(new ControllerEvent(this, channel, absTime, 6, msb, PRIORITY_HIGHER - 1));
 }
 
-void MidiTrack::addFineTuning(uint8_t channel, double cents) {
+void MidiTrack::addFineTuning(u8 channel, double cents) {
   insertFineTuning(channel, cents, getDelta());
 }
 
-void MidiTrack::insertFineTuning(uint8_t channel, double cents, uint32_t absTime) {
+void MidiTrack::insertFineTuning(u8 channel, double cents, u32 absTime) {
   double semitones = std::max(-1.0, std::min(1.0, cents / 100.0));
-  int16_t midiTuning = std::min(static_cast<int>(lround(8192 * semitones)), 8191) + 8192;
+  s16 midiTuning = std::min(static_cast<int>(lround(8192 * semitones)), 8191) + 8192;
 
   insertFineTuning(channel, midiTuning >> 7, midiTuning & 0x7f, absTime);
 }
 
-void MidiTrack::addCoarseTuning(uint8_t channel, uint8_t msb, uint8_t lsb) {
+void MidiTrack::addCoarseTuning(u8 channel, u8 msb, u8 lsb) {
   insertCoarseTuning(channel, msb, lsb, getDelta());
 }
 
-void MidiTrack::insertCoarseTuning(uint8_t channel, uint8_t msb, uint8_t lsb, uint32_t absTime) {
+void MidiTrack::insertCoarseTuning(u8 channel, u8 msb, u8 lsb, u32 absTime) {
   aEvents.push_back(new ControllerEvent(this, channel, absTime, 101, 0, PRIORITY_HIGHER - 1));
   aEvents.push_back(new ControllerEvent(this, channel, absTime, 100, 2, PRIORITY_HIGHER - 1));
   aEvents.push_back(new ControllerEvent(this, channel, absTime, 38, lsb, PRIORITY_HIGHER - 1));
   aEvents.push_back(new ControllerEvent(this, channel, absTime, 6, msb, PRIORITY_HIGHER - 1));
 }
 
-void MidiTrack::addCoarseTuning(uint8_t channel, double semitones) {
+void MidiTrack::addCoarseTuning(u8 channel, double semitones) {
   insertCoarseTuning(channel, semitones, getDelta());
 }
 
-void MidiTrack::insertCoarseTuning(uint8_t channel, double semitones, uint32_t absTime) {
+void MidiTrack::insertCoarseTuning(u8 channel, double semitones, u32 absTime) {
   semitones = std::max(-64.0, std::min(64.0, semitones));
-  int16_t midiTuning = std::min(static_cast<int>(lround(128 * semitones)), 8191) + 8192;
+  s16 midiTuning = std::min(static_cast<int>(lround(128 * semitones)), 8191) + 8192;
   insertCoarseTuning(channel, midiTuning >> 7, midiTuning & 0x7f, absTime);
 }
 
-void MidiTrack::addModulationDepthRange(uint8_t channel, uint8_t msb, uint8_t lsb) {
+void MidiTrack::addModulationDepthRange(u8 channel, u8 msb, u8 lsb) {
   insertModulationDepthRange(channel, msb, lsb, getDelta());
 }
 
-void MidiTrack::insertModulationDepthRange(uint8_t channel, uint8_t msb, uint8_t lsb, uint32_t absTime) {
+void MidiTrack::insertModulationDepthRange(u8 channel, u8 msb, u8 lsb, u32 absTime) {
   aEvents.push_back(new ControllerEvent(this, channel, absTime, 101, 0, PRIORITY_HIGHER - 1));
   aEvents.push_back(new ControllerEvent(this, channel, absTime, 100, 5, PRIORITY_HIGHER - 1));
   aEvents.push_back(new ControllerEvent(this, channel, absTime, 38, lsb, PRIORITY_HIGHER - 1));
   aEvents.push_back(new ControllerEvent(this, channel, absTime, 6, msb, PRIORITY_HIGHER - 1));
 }
 
-void MidiTrack::addModulationDepthRange(uint8_t channel, double semitones) {
+void MidiTrack::addModulationDepthRange(u8 channel, double semitones) {
   insertModulationDepthRange(channel, semitones, getDelta());
 }
 
-void MidiTrack::insertModulationDepthRange(uint8_t channel, double semitones, uint32_t absTime) {
+void MidiTrack::insertModulationDepthRange(u8 channel, double semitones, u32 absTime) {
   semitones = std::max(-64.0, std::min(64.0, semitones));
-  int16_t midiTuning = std::min(static_cast<int>(lround(128 * semitones)), 8191) + 8192;
+  s16 midiTuning = std::min(static_cast<int>(lround(128 * semitones)), 8191) + 8192;
   insertFineTuning(channel, midiTuning >> 7, midiTuning & 0x7f, absTime);
 }
 
-void MidiTrack::addProgramChange(uint8_t channel, uint8_t progNum) {
+void MidiTrack::addProgramChange(u8 channel, u8 progNum) {
   aEvents.push_back(new ProgChangeEvent(this, channel, getDelta(), progNum));
 }
 
-void MidiTrack::addBankSelect(uint8_t channel, uint8_t bank) {
+void MidiTrack::addBankSelect(u8 channel, u8 bank) {
   aEvents.push_back(new BankSelectEvent(this, channel, getDelta(), bank));
 }
 
-void MidiTrack::addBankSelectFine(uint8_t channel, uint8_t lsb) {
+void MidiTrack::addBankSelectFine(u8 channel, u8 lsb) {
   aEvents.push_back(new BankSelectFineEvent(this, channel, getDelta(), lsb));
 }
 
-void MidiTrack::insertBankSelect(uint8_t channel, uint8_t bank, uint32_t absTime) {
+void MidiTrack::insertBankSelect(u8 channel, u8 bank, u32 absTime) {
   aEvents.push_back(new ControllerEvent(this, channel, absTime, 0, bank));
 }
 
-void MidiTrack::addTempo(uint32_t microSeconds) {
+void MidiTrack::addTempo(u32 microSeconds) {
   aEvents.push_back(new TempoEvent(this, getDelta(), microSeconds));
   //bAddedTempo = true;
 }
 
 void MidiTrack::addTempoBPM(double BPM) {
-  uint32_t microSecs = static_cast<uint32_t>(std::round(60000000.0 / BPM));
+  u32 microSecs = static_cast<u32>(std::round(60000000.0 / BPM));
   aEvents.push_back(new TempoEvent(this, getDelta(), microSecs));
   //bAddedTempo = true;
 }
 
-void MidiTrack::insertTempo(uint32_t microSeconds, uint32_t absTime) {
+void MidiTrack::insertTempo(u32 microSeconds, u32 absTime) {
   aEvents.push_back(new TempoEvent(this, absTime, microSeconds));
   //bAddedTempo = true;
 }
 
-void MidiTrack::insertTempoBPM(double BPM, uint32_t absTime) {
-  uint32_t microSecs = static_cast<uint32_t>(std::round(60000000.0 / BPM));
+void MidiTrack::insertTempoBPM(double BPM, u32 absTime) {
+  u32 microSecs = static_cast<u32>(std::round(60000000.0 / BPM));
   aEvents.push_back(new TempoEvent(this, absTime, microSecs));
   //bAddedTempo = true;
 }
 
-void MidiTrack::addMidiPort(uint8_t port) {
+void MidiTrack::addMidiPort(u8 port) {
   aEvents.push_back(new MidiPortEvent(this, getDelta(), port));
 }
 
-void MidiTrack::insertMidiPort(uint8_t port, uint32_t absTime) {
+void MidiTrack::insertMidiPort(u8 port, u32 absTime) {
   aEvents.push_back(new MidiPortEvent(this, absTime, port));
 }
 
-void MidiTrack::addTimeSig(uint8_t numer, uint8_t denom, uint8_t ticksPerQuarter) {
+void MidiTrack::addTimeSig(u8 numer, u8 denom, u8 ticksPerQuarter) {
   aEvents.push_back(new TimeSigEvent(this, getDelta(), numer, denom, ticksPerQuarter));
   //bAddedTimeSig = true;
 }
 
-void MidiTrack::insertTimeSig(uint8_t numer, uint8_t denom, uint8_t ticksPerQuarter, uint32_t absTime) {
+void MidiTrack::insertTimeSig(u8 numer, u8 denom, u8 ticksPerQuarter, u32 absTime) {
   aEvents.push_back(new TimeSigEvent(this, absTime, numer, denom, ticksPerQuarter));
   //bAddedTimeSig = true;
 }
@@ -579,7 +580,7 @@ void MidiTrack::addEndOfTrack() {
   bHasEndOfTrack = true;
 }
 
-void MidiTrack::insertEndOfTrack(uint32_t absTime) {
+void MidiTrack::insertEndOfTrack(u32 absTime) {
   aEvents.push_back(new EndOfTrackEvent(this, absTime));
   bHasEndOfTrack = true;
 }
@@ -588,7 +589,7 @@ void MidiTrack::addText(const std::string &str) {
   aEvents.push_back(new TextEvent(this, getDelta(), str));
 }
 
-void MidiTrack::insertText(const std::string &str, uint32_t absTime) {
+void MidiTrack::insertText(const std::string &str, u32 absTime) {
   aEvents.push_back(new TextEvent(this, absTime, str));
 }
 
@@ -596,7 +597,7 @@ void MidiTrack::addSeqName(const std::string &str) {
   aEvents.push_back(new SeqNameEvent(this, getDelta(), str));
 }
 
-void MidiTrack::insertSeqName(const std::string &str, uint32_t absTime) {
+void MidiTrack::insertSeqName(const std::string &str, u32 absTime) {
   aEvents.push_back(new SeqNameEvent(this, absTime, str));
 }
 
@@ -604,7 +605,7 @@ void MidiTrack::addTrackName(const std::string &str) {
   aEvents.push_back(new TrackNameEvent(this, getDelta(), str));
 }
 
-void MidiTrack::insertTrackName(const std::string &str, uint32_t absTime) {
+void MidiTrack::insertTrackName(const std::string &str, u32 absTime) {
   aEvents.push_back(new TrackNameEvent(this, absTime, str));
 }
 
@@ -612,7 +613,7 @@ void MidiTrack::addGMReset() {
   aEvents.push_back(new GMResetEvent(this, getDelta()));
 }
 
-void MidiTrack::insertGMReset(uint32_t absTime) {
+void MidiTrack::insertGMReset(u32 absTime) {
   aEvents.push_back(new GMResetEvent(this, absTime));
 }
 
@@ -620,7 +621,7 @@ void MidiTrack::addGM2Reset() {
   aEvents.push_back(new GM2ResetEvent(this, getDelta()));
 }
 
-void MidiTrack::insertGM2Reset(uint32_t absTime) {
+void MidiTrack::insertGM2Reset(u32 absTime) {
   aEvents.push_back(new GM2ResetEvent(this, absTime));
 }
 
@@ -628,7 +629,7 @@ void MidiTrack::addGSReset() {
   aEvents.push_back(new GSResetEvent(this, getDelta()));
 }
 
-void MidiTrack::insertGSReset(uint32_t absTime) {
+void MidiTrack::insertGSReset(u32 absTime) {
   aEvents.push_back(new GSResetEvent(this, absTime));
 }
 
@@ -636,7 +637,7 @@ void MidiTrack::addXGReset() {
   aEvents.push_back(new XGResetEvent(this, getDelta()));
 }
 
-void MidiTrack::insertXGReset(uint32_t absTime) {
+void MidiTrack::insertXGReset(u32 absTime) {
   aEvents.push_back(new XGResetEvent(this, absTime));
 }
 
@@ -645,30 +646,30 @@ void MidiTrack::insertXGReset(uint32_t absTime) {
 // Transpose events offset the key when we write the Midi file.
 //  used to implement global transpose events found in QSound
 
-//void MidiTrack::AddTranspose(int8_t semitones)
+//void MidiTrack::AddTranspose(s8 semitones)
 //{
 //	aEvents.push_back(new TransposeEvent(this, GetDelta(), semitones));
 //}
 
-void MidiTrack::insertGlobalTranspose(uint32_t absTime, int8_t semitones) {
+void MidiTrack::insertGlobalTranspose(u32 absTime, s8 semitones) {
   aEvents.push_back(new GlobalTransposeEvent(this, absTime, semitones));
 }
 
 
-void MidiTrack::addMarker(uint8_t channel,
+void MidiTrack::addMarker(u8 channel,
                           const std::string &markername,
-                          uint8_t databyte1,
-                          uint8_t databyte2,
-                          int8_t priority) {
+                          u8 databyte1,
+                          u8 databyte2,
+                          s8 priority) {
   aEvents.push_back(new MarkerEvent(this, channel, getDelta(), markername, databyte1, databyte2, priority));
 }
 
-void MidiTrack::insertMarker(uint8_t channel,
+void MidiTrack::insertMarker(u8 channel,
                   const std::string &markername,
-                  uint8_t databyte1,
-                  uint8_t databyte2,
-                  int8_t priority,
-                  uint32_t absTime) {
+                  u8 databyte1,
+                  u8 databyte2,
+                  s8 priority,
+                  u32 absTime) {
   aEvents.push_back(new MarkerEvent(this, channel, absTime, markername, databyte1, databyte2, priority));
 }
 
@@ -676,7 +677,7 @@ void MidiTrack::insertMarker(uint8_t channel,
 //  MidiEvent
 //  *********
 
-MidiEvent::MidiEvent(MidiTrack *thePrntTrk, uint32_t absoluteTime, uint8_t theChannel, int8_t thePriority)
+MidiEvent::MidiEvent(MidiTrack *thePrntTrk, u32 absoluteTime, u8 theChannel, s8 thePriority)
     : prntTrk(thePrntTrk), channel(theChannel), absTime(absoluteTime), priority(thePriority) {
 }
 
@@ -695,8 +696,8 @@ bool MidiEvent::isSysexEvent() {
          type == MIDIEVENT_RESET;
 }
 
-void MidiEvent::writeVarLength(std::vector<uint8_t> &buf, uint32_t value) {
-  uint32_t buffer = value & 0x7F;
+void MidiEvent::writeVarLength(std::vector<u8> &buf, u32 value) {
+  u32 buffer = value & 0x7F;
 
   while ((value >>= 7)) {
     buffer <<= 8;
@@ -704,7 +705,7 @@ void MidiEvent::writeVarLength(std::vector<uint8_t> &buf, uint32_t value) {
   }
 
   while (true) {
-    buf.push_back(static_cast<uint8_t>(buffer));
+    buf.push_back(static_cast<u8>(buffer));
     if (buffer & 0x80)
       buffer >>= 8;
     else
@@ -712,23 +713,23 @@ void MidiEvent::writeVarLength(std::vector<uint8_t> &buf, uint32_t value) {
   }
 }
 
-uint32_t MidiEvent::writeMetaEvent(std::vector<uint8_t> &buf,
-                                   uint32_t time,
-                                   uint8_t metaType,
-                                   const uint8_t* data,
+u32 MidiEvent::writeMetaEvent(std::vector<u8> &buf,
+                                   u32 time,
+                                   u8 metaType,
+                                   const u8* data,
                                    size_t dataSize) const {
   writeVarLength(buf, absTime - time);
   buf.push_back(0xFF);
   buf.push_back(metaType);
-  writeVarLength(buf, static_cast<uint32_t>(dataSize));
+  writeVarLength(buf, static_cast<u32>(dataSize));
   for (size_t dataIndex = 0; dataIndex < dataSize; dataIndex++) {
     buf.push_back(data[dataIndex]);
   }
   return absTime;
 }
 
-uint32_t MidiEvent::writeMetaTextEvent(std::vector<uint8_t> &buf, uint32_t time, uint8_t metaType, const std::string& str) const {
-  return writeMetaEvent(buf, time, metaType, (uint8_t *)str.c_str(), str.length());
+u32 MidiEvent::writeMetaTextEvent(std::vector<u8> &buf, u32 time, u8 metaType, const std::string& str) const {
+  return writeMetaEvent(buf, time, metaType, (u8 *)str.c_str(), str.length());
 }
 
 std::string MidiEvent::getNoteName(int noteNumber) {
@@ -762,21 +763,21 @@ bool MidiEvent::operator>(const MidiEvent &theMidiEvent) const {
 
 
 NoteEvent::NoteEvent(MidiTrack *prntTrk,
-                     uint8_t channel,
-                     uint32_t absoluteTime,
+                     u8 channel,
+                     u32 absoluteTime,
                      bool bNoteDown,
-                     uint8_t theKey,
-                     uint8_t theVel)
+                     u8 theKey,
+                     u8 theVel)
     : MidiEvent(prntTrk, absoluteTime, channel, PRIORITY_LOWER),
       bNoteDown(bNoteDown),
       key(theKey),
       vel(theVel) {
 }
 
-uint32_t NoteEvent::writeEvent(std::vector<uint8_t> &buf, uint32_t time) {
+u32 NoteEvent::writeEvent(std::vector<u8> &buf, u32 time) {
   writeVarLength(buf, absTime - time);
 
-  uint8_t finalKey = key + ((channel == 9) ? 0 : prntTrk->parentSeq->globalTranspose);
+  u8 finalKey = key + ((channel == 9) ? 0 : prntTrk->parentSeq->globalTranspose);
 
   if (bNoteDown) {
     buf.push_back(0x90 + channel);
@@ -807,7 +808,7 @@ uint32_t NoteEvent::writeEvent(std::vector<uint8_t> &buf, uint32_t time) {
 //  DurNoteEvent
 //  ************
 
-//DurNoteEvent::DurNoteEvent(MidiTrack* prntTrk, uint8_t channel, uint32_t absoluteTime, uint8_t theKey, uint8_t theVel, uint32_t theDur)
+//DurNoteEvent::DurNoteEvent(MidiTrack* prntTrk, u8 channel, u32 absoluteTime, u8 theKey, u8 theVel, u32 theDur)
 //: MidiEvent(prntTrk, absoluteTime, channel, PRIORITY_LOWER), key(theKey), vel(theVel), duration(theDur)
 //{
 //}
@@ -823,7 +824,7 @@ DurNoteEvent* DurNoteEvent::MakeCopy()
 	prntTrk->aEvents.push_back(new NoteEvent(prntTrk, channel, AbsTime+duration, false, key, vel));  //add note off at end of dur
 }*/
 
-//uint32_t DurNoteEvent::WriteEvent(vector<uint8_t> & buf, uint32_t time)		//we do note use WriteEvent on DurNoteEvents... this is what PrepareWrite is for, to create NoteEvents in substitute
+//u32 DurNoteEvent::WriteEvent(vector<u8> & buf, u32 time)		//we do note use WriteEvent on DurNoteEvents... this is what PrepareWrite is for, to create NoteEvents in substitute
 //{
 //	return false;
 //}
@@ -832,7 +833,7 @@ DurNoteEvent* DurNoteEvent::MakeCopy()
 //  VolEvent
 //  ********
 
-/*VolEvent::VolEvent(MidiTrack *prntTrk, uint8_t channel, uint32_t absoluteTime, uint8_t theVol, int8_t thePriority)
+/*VolEvent::VolEvent(MidiTrack *prntTrk, u8 channel, u32 absoluteTime, u8 theVol, s8 thePriority)
 : ControllerEvent(prntTrk, channel, absoluteTime, 7), vol(theVol)
 {
 }
@@ -847,15 +848,15 @@ VolEvent* VolEvent::MakeCopy()
 //  ***************
 
 ControllerEvent::ControllerEvent(MidiTrack *prntTrk,
-                                 uint8_t channel,
-                                 uint32_t absoluteTime,
-                                 uint8_t controllerNum,
-                                 uint8_t theDataByte,
-                                 int8_t thePriority)
+                                 u8 channel,
+                                 u32 absoluteTime,
+                                 u8 controllerNum,
+                                 u8 theDataByte,
+                                 s8 thePriority)
     : MidiEvent(prntTrk, absoluteTime, channel, thePriority), controlNum(controllerNum), dataByte(theDataByte) {
 }
 
-uint32_t ControllerEvent::writeEvent(std::vector<uint8_t> &buf, uint32_t time) {
+u32 ControllerEvent::writeEvent(std::vector<u8> &buf, u32 time) {
   writeVarLength(buf, absTime - time);
   buf.push_back(0xB0 + channel);
   buf.push_back(controlNum & 0x7F);
@@ -867,7 +868,7 @@ uint32_t ControllerEvent::writeEvent(std::vector<uint8_t> &buf, uint32_t time) {
 //  PortamentoControlEvent
 //  **********************
 
-uint32_t PortamentoControlEvent::writeEvent(std::vector<uint8_t> &buf, uint32_t time) {
+u32 PortamentoControlEvent::writeEvent(std::vector<u8> &buf, u32 time) {
   // Add the global transpose into the starting key of the portamento control event
   u8 originalDataByte = dataByte;
   dataByte = std::clamp<s16>(dataByte + prntTrk->parentSeq->globalTranspose, 0, 127);
@@ -881,13 +882,13 @@ uint32_t PortamentoControlEvent::writeEvent(std::vector<uint8_t> &buf, uint32_t 
 //  **********
 
 SysexEvent::SysexEvent(MidiTrack *prntTrk,
-                       uint32_t absoluteTime,
-                       const std::vector<uint8_t>& sysexData,
-                       int8_t thePriority)
+                       u32 absoluteTime,
+                       const std::vector<u8>& sysexData,
+                       s8 thePriority)
     : MidiEvent(prntTrk, absoluteTime, 0, thePriority), sysexData(sysexData) {
 }
 
-uint32_t SysexEvent::writeEvent(std::vector<uint8_t> &buf, uint32_t time) {
+u32 SysexEvent::writeEvent(std::vector<u8> &buf, u32 time) {
   writeVarLength(buf, absTime - time);
   buf.push_back(0xF0);
   buf.insert(buf.end(), sysexData.begin(), sysexData.end());
@@ -899,11 +900,11 @@ uint32_t SysexEvent::writeEvent(std::vector<uint8_t> &buf, uint32_t time) {
 //  ProgChangeEvent
 //  ***************
 
-ProgChangeEvent::ProgChangeEvent(MidiTrack *prntTrk, uint8_t channel, uint32_t absoluteTime, uint8_t progNum)
+ProgChangeEvent::ProgChangeEvent(MidiTrack *prntTrk, u8 channel, u32 absoluteTime, u8 progNum)
     : MidiEvent(prntTrk, absoluteTime, channel, PRIORITY_HIGH), programNum(progNum) {
 }
 
-uint32_t ProgChangeEvent::writeEvent(std::vector<uint8_t> &buf, uint32_t time) {
+u32 ProgChangeEvent::writeEvent(std::vector<u8> &buf, u32 time) {
   writeVarLength(buf, absTime - time);
   buf.push_back(0xC0 + channel);
   buf.push_back(programNum & 0x7F);
@@ -914,13 +915,13 @@ uint32_t ProgChangeEvent::writeEvent(std::vector<uint8_t> &buf, uint32_t time) {
 //  PitchBendEvent
 //  **************
 
-PitchBendEvent::PitchBendEvent(MidiTrack *prntTrk, uint8_t channel, uint32_t absoluteTime, int16_t bendAmt)
+PitchBendEvent::PitchBendEvent(MidiTrack *prntTrk, u8 channel, u32 absoluteTime, s16 bendAmt)
     : MidiEvent(prntTrk, absoluteTime, channel, PRIORITY_MIDDLE), bend(bendAmt) {
 }
 
-uint32_t PitchBendEvent::writeEvent(std::vector<uint8_t> &buf, uint32_t time) {
-  uint8_t loByte = (bend + 0x2000) & 0x7F;
-  uint8_t hiByte = ((bend + 0x2000) & 0x3F80) >> 7;
+u32 PitchBendEvent::writeEvent(std::vector<u8> &buf, u32 time) {
+  u8 loByte = (bend + 0x2000) & 0x7F;
+  u8 hiByte = ((bend + 0x2000) & 0x3F80) >> 7;
   writeVarLength(buf, absTime - time);
   buf.push_back(0xE0 + channel);
   buf.push_back(loByte);
@@ -933,13 +934,13 @@ uint32_t PitchBendEvent::writeEvent(std::vector<uint8_t> &buf, uint32_t time) {
 //  ********************
 
 ChannelPressureEvent::ChannelPressureEvent(MidiTrack *prntTrk,
-                                           uint8_t channel,
-                                           uint32_t absoluteTime,
-                                           uint8_t pressureAmt)
+                                           u8 channel,
+                                           u32 absoluteTime,
+                                           u8 pressureAmt)
     : MidiEvent(prntTrk, absoluteTime, channel, PRIORITY_MIDDLE), pressure(pressureAmt) {
 }
 
-uint32_t ChannelPressureEvent::writeEvent(std::vector<uint8_t> &buf, uint32_t time) {
+u32 ChannelPressureEvent::writeEvent(std::vector<u8> &buf, u32 time) {
   writeVarLength(buf, absTime - time);
   buf.push_back(0xD0 + channel);
   buf.push_back(pressure & 0x7F);
@@ -950,15 +951,15 @@ uint32_t ChannelPressureEvent::writeEvent(std::vector<uint8_t> &buf, uint32_t ti
 //  TempoEvent
 //  **********
 
-TempoEvent::TempoEvent(MidiTrack *prntTrk, uint32_t absoluteTime, uint32_t microSeconds)
+TempoEvent::TempoEvent(MidiTrack *prntTrk, u32 absoluteTime, u32 microSeconds)
     : MidiEvent(prntTrk, absoluteTime, 0, PRIORITY_HIGHEST), microSecs(microSeconds) {
 }
 
-uint32_t TempoEvent::writeEvent(std::vector<uint8_t> &buf, uint32_t time) {
-  uint8_t data[3] = {
-      static_cast<uint8_t>((microSecs & 0xFF0000) >> 16),
-      static_cast<uint8_t>((microSecs & 0x00FF00) >> 8),
-      static_cast<uint8_t>(microSecs & 0x0000FF)
+u32 TempoEvent::writeEvent(std::vector<u8> &buf, u32 time) {
+  u8 data[3] = {
+      static_cast<u8>((microSecs & 0xFF0000) >> 16),
+      static_cast<u8>((microSecs & 0x00FF00) >> 8),
+      static_cast<u8>(microSecs & 0x0000FF)
   };
   return writeMetaEvent(buf, time, 0x51, data, 3);
 }
@@ -968,11 +969,11 @@ uint32_t TempoEvent::writeEvent(std::vector<uint8_t> &buf, uint32_t time) {
 //  MidiPortEvent
 //  *************
 
-MidiPortEvent::MidiPortEvent(MidiTrack *prntTrk, uint32_t absoluteTime, uint8_t port)
+MidiPortEvent::MidiPortEvent(MidiTrack *prntTrk, u32 absoluteTime, u8 port)
     : MidiEvent(prntTrk, absoluteTime, 0, PRIORITY_HIGHEST), port(port) {
 }
 
-uint32_t MidiPortEvent::writeEvent(std::vector<uint8_t> &buf, uint32_t time) {
+u32 MidiPortEvent::writeEvent(std::vector<u8> &buf, u32 time) {
   return writeMetaEvent(buf, time, 0x21, &port, 1);
 }
 
@@ -982,19 +983,19 @@ uint32_t MidiPortEvent::writeEvent(std::vector<uint8_t> &buf, uint32_t time) {
 //  ************
 
 TimeSigEvent::TimeSigEvent(MidiTrack *prntTrk,
-                           uint32_t absoluteTime,
-                           uint8_t numerator,
-                           uint8_t denominator,
-                           uint8_t clicksPerQuarter)
+                           u32 absoluteTime,
+                           u8 numerator,
+                           u8 denominator,
+                           u8 clicksPerQuarter)
     : MidiEvent(prntTrk, absoluteTime, 0, PRIORITY_HIGHEST), numer(numerator), denom(denominator),
       ticksPerQuarter(clicksPerQuarter) {
 }
 
-uint32_t TimeSigEvent::writeEvent(std::vector<uint8_t> &buf, uint32_t time) {
+u32 TimeSigEvent::writeEvent(std::vector<u8> &buf, u32 time) {
   //denom is expressed in power of 2... so if we have 6/8 time.  it's 6 = 2^x  ==  ln6 / ln2
-  uint8_t data[4] = {
+  u8 data[4] = {
       numer,
-      static_cast<uint8_t>(log(static_cast<double>(denom)) / 0.69314718055994530941723212145818),
+      static_cast<u8>(log(static_cast<double>(denom)) / 0.69314718055994530941723212145818),
       ticksPerQuarter,
       8
   };
@@ -1005,12 +1006,12 @@ uint32_t TimeSigEvent::writeEvent(std::vector<uint8_t> &buf, uint32_t time) {
 //  EndOfTrackEvent
 //  ***************
 
-EndOfTrackEvent::EndOfTrackEvent(MidiTrack *prntTrk, uint32_t absoluteTime)
+EndOfTrackEvent::EndOfTrackEvent(MidiTrack *prntTrk, u32 absoluteTime)
     : MidiEvent(prntTrk, absoluteTime, 0, PRIORITY_LOWEST) {
 }
 
 
-uint32_t EndOfTrackEvent::writeEvent(std::vector<uint8_t> &buf, uint32_t time) {
+u32 EndOfTrackEvent::writeEvent(std::vector<u8> &buf, u32 time) {
   return writeMetaEvent(buf, time, 0x2F, nullptr, 0);
 }
 
@@ -1018,11 +1019,11 @@ uint32_t EndOfTrackEvent::writeEvent(std::vector<uint8_t> &buf, uint32_t time) {
 //  TextEvent
 //  *********
 
-TextEvent::TextEvent(MidiTrack *prntTrk, uint32_t absoluteTime, std::string str)
+TextEvent::TextEvent(MidiTrack *prntTrk, u32 absoluteTime, std::string str)
     : MidiEvent(prntTrk, absoluteTime, 0, PRIORITY_LOWEST), text(std::move(str)) {
 }
 
-uint32_t TextEvent::writeEvent(std::vector<uint8_t> &buf, uint32_t time) {
+u32 TextEvent::writeEvent(std::vector<u8> &buf, u32 time) {
   return writeMetaTextEvent(buf, time, 0x01, text);
 }
 
@@ -1030,11 +1031,11 @@ uint32_t TextEvent::writeEvent(std::vector<uint8_t> &buf, uint32_t time) {
 //  SeqNameEvent
 //  ************
 
-SeqNameEvent::SeqNameEvent(MidiTrack *prntTrk, uint32_t absoluteTime, std::string str)
+SeqNameEvent::SeqNameEvent(MidiTrack *prntTrk, u32 absoluteTime, std::string str)
     : MidiEvent(prntTrk, absoluteTime, 0, PRIORITY_LOWEST), text(std::move(str)) {
 }
 
-uint32_t SeqNameEvent::writeEvent(std::vector<uint8_t> &buf, uint32_t time) {
+u32 SeqNameEvent::writeEvent(std::vector<u8> &buf, u32 time) {
   return writeMetaTextEvent(buf, time, 0x03, text);
 }
 
@@ -1042,11 +1043,11 @@ uint32_t SeqNameEvent::writeEvent(std::vector<uint8_t> &buf, uint32_t time) {
 //  TrackNameEvent
 //  **************
 
-TrackNameEvent::TrackNameEvent(MidiTrack *prntTrk, uint32_t absoluteTime, std::string str)
+TrackNameEvent::TrackNameEvent(MidiTrack *prntTrk, u32 absoluteTime, std::string str)
     : MidiEvent(prntTrk, absoluteTime, 0, PRIORITY_LOWEST), text(std::move(str)) {
 }
 
-uint32_t TrackNameEvent::writeEvent(std::vector<uint8_t> &buf, uint32_t time) {
+u32 TrackNameEvent::writeEvent(std::vector<u8> &buf, u32 time) {
   return writeMetaTextEvent(buf, time, 0x03, text);
 }
 
@@ -1059,12 +1060,12 @@ uint32_t TrackNameEvent::writeEvent(std::vector<uint8_t> &buf, uint32_t time) {
 //  **************
 
 
-GlobalTransposeEvent::GlobalTransposeEvent(MidiTrack *prntTrk, uint32_t absoluteTime, int8_t theSemitones)
+GlobalTransposeEvent::GlobalTransposeEvent(MidiTrack *prntTrk, u32 absoluteTime, s8 theSemitones)
     : MidiEvent(prntTrk, absoluteTime, 0, PRIORITY_HIGHEST) {
   semitones = theSemitones;
 }
 
-uint32_t GlobalTransposeEvent::writeEvent(std::vector<uint8_t>& /*buf*/, uint32_t time) {
+u32 GlobalTransposeEvent::writeEvent(std::vector<u8>& /*buf*/, u32 time) {
   this->prntTrk->parentSeq->globalTranspose = this->semitones;
   return time;
 }

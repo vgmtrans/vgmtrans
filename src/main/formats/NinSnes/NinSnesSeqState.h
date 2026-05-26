@@ -1,5 +1,7 @@
 #pragma once
 
+#include "util/types.h"
+
 #include <array>
 #include <cstddef>
 #include <cstdint>
@@ -89,36 +91,36 @@ enum NinSnesSeqEventType {
 
 class NinSnesTrackState {
  public:
-  static constexpr uint16_t kDefaultPitchBendRangeCents = 200;
+  static constexpr u16 kDefaultPitchBendRangeCents = 200;
 
   NinSnesTrackState();
 
   virtual void resetVars();
 
-  uint8_t spcNoteDuration;
-  uint8_t spcNoteDurRate;
-  uint8_t spcNoteVolume;
-  int8_t spcTranspose;
-  uint16_t loopReturnAddress;
-  uint16_t loopStartAddress;
-  uint8_t loopCount;
+  u8 spcNoteDuration;
+  u8 spcNoteDurRate;
+  u8 spcNoteVolume;
+  s8 spcTranspose;
+  u16 loopReturnAddress;
+  u16 loopStartAddress;
+  u8 loopCount;
 
   // Konami:
-  uint16_t konamiLoopStart;
-  uint8_t konamiLoopCount;
+  u16 konamiLoopStart;
+  u8 konamiLoopCount;
 
   // pitch envelope from/to define a reusable note-on envelope, while pitch slide instantiates the live motion directly.
   struct StoredPitchEnvelope {
-    enum class Mode : uint8_t {
+    enum class Mode : u8 {
       None,
       To,
       From,
     };
 
     Mode mode = Mode::None;
-    uint8_t delay = 0;
-    uint8_t length = 0;
-    int8_t semitones = 0;
+    u8 delay = 0;
+    u8 length = 0;
+    s8 semitones = 0;
 
     bool enabled() const {
       return mode != Mode::None && length != 0;
@@ -127,25 +129,25 @@ class NinSnesTrackState {
 
   SeqSynthLfoAutomation vibrato;
   StoredPitchEnvelope pitchEnvelope;
-  SeqPitchBendAutomation<int32_t> pitch {100.0 / 256.0};
+  SeqPitchBendAutomation<s32> pitch {100.0 / 256.0};
 };
 
 struct NinSnesPercussionDef {
-  uint8_t noteIndex;
-  int8_t globalTranspose;
+  u8 noteIndex;
+  s8 globalTranspose;
 };
 
 constexpr size_t NINSNES_INTELLI_TA_PERCUSSION_SLOT_COUNT = 16;
 
 struct NinSnesIntelliTACustomPercEntry {
-  uint8_t patchByte = 0;
-  uint8_t noteByte = 0;
-  uint8_t panByte = 0;
+  u8 patchByte = 0;
+  u8 noteByte = 0;
+  u8 panByte = 0;
 };
 
 struct NinSnesIntelliVoiceParamState {
-  uint16_t addr = 0;
-  uint8_t size = 0;
+  u16 addr = 0;
+  u8 size = 0;
   bool defined = false;
 
   void clear() {
@@ -157,8 +159,8 @@ struct NinSnesIntelliVoiceParamState {
 
 struct NinSnesIntelliPercussionState {
   std::array<NinSnesIntelliTACustomPercEntry, NINSNES_INTELLI_TA_PERCUSSION_SLOT_COUNT> table {};
-  uint8_t flags = 0;
-  uint8_t unknownByte = 0;
+  u8 flags = 0;
+  u8 unknownByte = 0;
 
   void clear() {
     table = {};
@@ -168,20 +170,20 @@ struct NinSnesIntelliPercussionState {
 };
 
 struct NinSnesIntelliTAInstrumentOverride {
-  uint8_t logicalInstrIndex = 0;
-  uint32_t progNum = 0;
-  std::array<uint8_t, 6> regionData {};
+  u8 logicalInstrIndex = 0;
+  u32 progNum = 0;
+  std::array<u8, 6> regionData {};
 };
 
 struct NinSnesIntelliTADrumKitSlot {
   bool active = false;
-  uint32_t sourceProgNum = 0;
-  uint8_t playedNoteByte = 0xa4;
+  u32 sourceProgNum = 0;
+  u8 playedNoteByte = 0xa4;
 
   bool operator==(const NinSnesIntelliTADrumKitSlot& other) const = default;
 };
 
 struct NinSnesIntelliTADrumKitDef {
-  uint8_t program = 0;
+  u8 program = 0;
   std::array<NinSnesIntelliTADrumKitSlot, NINSNES_INTELLI_TA_PERCUSSION_SLOT_COUNT> slots {};
 };

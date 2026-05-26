@@ -4,6 +4,7 @@
  * refer to the included LICENSE.txt file
  */
 
+#include "util/types.h"
 #include "PrismSnesInstr.h"
 #include "PrismSnesSeq.h"
 #include "ScannerManager.h"
@@ -137,16 +138,16 @@ void PrismSnesScanner::searchForPrismSnesFromARAM(RawFile *file) {
   std::string name = file->tag.hasTitle() ? file->tag.title : file->stem();
 
   // search song list
-  uint32_t ofsLoadSeq;
-  uint16_t addrSeqList;
+  u32 ofsLoadSeq;
+  u16 addrSeqList;
   if (file->searchBytePattern(ptnLoadSeq, ofsLoadSeq)) {
     addrSeqList = file->readShort(ofsLoadSeq + 1);
   } else {
     return;
   }
 
-  uint32_t ofsExecVCmd;
-  uint16_t addrVoiceCmdAddressTable;
+  u32 ofsExecVCmd;
+  u16 addrVoiceCmdAddressTable;
   if (file->searchBytePattern(ptnExecVCmd, ofsExecVCmd)) {
     addrVoiceCmdAddressTable = file->readShort(ofsExecVCmd + 18);
     if (addrVoiceCmdAddressTable + (2 * 0x40) > 0x10000) {
@@ -167,20 +168,20 @@ void PrismSnesScanner::searchForPrismSnesFromARAM(RawFile *file) {
   }
 
   // TODO: guess song index
-  int8_t songIndex = 0;
+  s8 songIndex = 0;
 
-  uint32_t addrSeqHeaderPtr = addrSeqList + (songIndex * 2);
-  uint32_t addrSeqHeader = file->readShort(addrSeqHeaderPtr);
+  u32 addrSeqHeaderPtr = addrSeqList + (songIndex * 2);
+  u32 addrSeqHeader = file->readShort(addrSeqHeaderPtr);
   PrismSnesSeq *newSeq = new PrismSnesSeq(file, version, addrSeqHeader, name);
   if (!newSeq->loadVGMFile()) {
     delete newSeq;
     return;
   }
 
-  uint32_t ofsSetDSPd;
-  uint16_t spcDirAddr;
+  u32 ofsSetDSPd;
+  u16 spcDirAddr;
   if (file->searchBytePattern(ptnSetDSPd, ofsSetDSPd)) {
-    uint16_t addrDspRegTabled = file->readByte(ofsSetDSPd + 3) | (file->readByte(ofsSetDSPd + 1) << 8);
+    u16 addrDspRegTabled = file->readByte(ofsSetDSPd + 3) | (file->readByte(ofsSetDSPd + 1) << 8);
     if (addrDspRegTabled + 8 > 0x10000) {
       return;
     }
@@ -189,9 +190,9 @@ void PrismSnesScanner::searchForPrismSnesFromARAM(RawFile *file) {
     return;
   }
 
-  uint32_t ofsLoadInstr;
-  uint16_t addrADSR1Table;
-  uint16_t addrADSR2Table;
+  u32 ofsLoadInstr;
+  u16 addrADSR1Table;
+  u16 addrADSR2Table;
   if (file->searchBytePattern(ptnLoadInstr, ofsLoadInstr)) {
     addrADSR1Table = file->readShort(ofsLoadInstr + 11);
     addrADSR2Table = file->readShort(ofsLoadInstr + 17);
@@ -199,9 +200,9 @@ void PrismSnesScanner::searchForPrismSnesFromARAM(RawFile *file) {
     return;
   }
 
-  uint32_t ofsLoadInstrTuning;
-  uint16_t adsrTuningTableHigh;
-  uint16_t adsrTuningTableLow;
+  u32 ofsLoadInstrTuning;
+  u16 adsrTuningTableHigh;
+  u16 adsrTuningTableLow;
   if (file->searchBytePattern(ptnLoadInstrTuning, ofsLoadInstrTuning)) {
     adsrTuningTableHigh = file->readShort(ofsLoadInstrTuning + 3);
     adsrTuningTableLow = file->readShort(ofsLoadInstrTuning + 11);

@@ -3,6 +3,7 @@
  * Licensed under the zlib license
  * See the included LICENSE for more information
 */
+#include "util/types.h"
 #include <cassert>
 #include "ConversionContext.h"
 #include "DLSConversion.h"
@@ -26,16 +27,16 @@ void unpackSampColl(DLSFile &dls, const VGMSampColl *sampColl, std::vector<VGMSa
     VGMSamp *samp = sampColl->samples[i];
 
     BPS targetBps = samp->bps();
-    std::vector<uint8_t> uncompSampBuf = samp->toPcm(
+    std::vector<u8> uncompSampBuf = samp->toPcm(
       targetBps == BPS::PCM8 ? Signedness::Unsigned : Signedness::Signed,
       Endianness::Little,
       targetBps
     );
 
-    uint16_t bitsPerSample = static_cast<uint16_t>(samp->bitsPerSample());
-    uint16_t blockAlign = bitsPerSample / 8 * samp->channels;
+    u16 bitsPerSample = static_cast<u16>(samp->bitsPerSample());
+    u16 blockAlign = bitsPerSample / 8 * samp->channels;
     dls.addWave(1, samp->channels, samp->rate, samp->rate * blockAlign, blockAlign,
-                bitsPerSample, static_cast<uint32_t>(uncompSampBuf.size()), uncompSampBuf.data(),
+                bitsPerSample, static_cast<u32>(uncompSampBuf.size()), uncompSampBuf.data(),
                 samp->name());
     finalSamps.push_back(samp);
   }
@@ -123,12 +124,12 @@ bool mainDLSCreation(
         bank_no &= 0x7f;
         bank_no = bank_no << 8;
       } else if (bs == BankSelectStyle::MMA) {
-        const uint8_t bank_msb = (bank_no >> 7) & 0x7f;
-        const uint8_t bank_lsb = bank_no & 0x7f;
+        const u8 bank_msb = (bank_no >> 7) & 0x7f;
+        const u8 bank_lsb = bank_no & 0x7f;
         bank_no = (bank_msb << 8) | bank_lsb;
       }
       DLSInstr *newInstr = dls.addInstr(bank_no, vgminstr->instrNum, name);
-      for (uint32_t j = 0; j < nRgns; j++) {
+      for (u32 j = 0; j < nRgns; j++) {
         VGMRgn *rgn = vgminstr->regions()[j];
         //				if (rgn->sampNum+1 > sampColl->samples.size())	//does thereferenced sample exist?
         //					continue;
@@ -151,7 +152,7 @@ bool mainDLSCreation(
         // see sampOffset declaration in header file for more info.
         if (rgn->sampOffset != -1) {
           bool bFoundIt = false;
-          for (uint32_t s = 0; s < sampColl->samples.size(); s++) {             //for every sample
+          for (u32 s = 0; s < sampColl->samples.size(); s++) {             //for every sample
             if (rgn->sampOffset == sampColl->samples[s]->offset() ||
                 rgn->sampOffset == sampColl->samples[s]->offset() - sampColl->offset() - sampColl->sampDataOffset) {
               realSampNum = s;
@@ -189,7 +190,7 @@ bool mainDLSCreation(
         //if (rgn->sampCollNum == -1)	//if a sampCollPtr is defined
         //{
         //	// find the sampColl's index in samplecolls (the sampCollNum, effectively)
-        //	for (uint32_t i=0; i < finalSampColls.size(); i++)
+        //	for (u32 i=0; i < finalSampColls.size(); i++)
         //	{
         //		if (finalSampColls[i] == sampColl)
         //			rgn->sampCollNum = i;
@@ -208,7 +209,7 @@ bool mainDLSCreation(
 
         DLSRgn *newRgn = newInstr->addRgn();
         newRgn->setRanges(rgn->keyLow, rgn->keyHigh, rgn->velLow, rgn->velHigh);
-        newRgn->setWaveLinkInfo(0, 0, 1, static_cast<uint32_t>(realSampNum));
+        newRgn->setWaveLinkInfo(0, 0, 1, static_cast<u32>(realSampNum));
 
         VGMSamp *samp = finalSamps[realSampNum]; //sampColl->samples[rgn->sampNum];
         DLSWsmp *newWsmp = newRgn->addWsmp();
@@ -239,7 +240,7 @@ bool mainDLSCreation(
         } else
           newWsmp->setLoopInfo(rgn->loop, samp);
 
-        int8_t realUnityKey;
+        s8 realUnityKey;
         if (rgn->unityKey == -1)
           realUnityKey = samp->unityKey;
         else
@@ -253,7 +254,7 @@ bool mainDLSCreation(
         // method just adds region and sample finetune / attenuation and puts it into a region WSMP
         // block. This works and is DLS1 compatible.
         short totalFineTune = samp->fineTune + rgn->fineTune;
-        long totalAttenuation = -static_cast<int32_t>((samp->attenDb() + rgn->attenDb()) * DLS_DECIBEL_UNIT * 10);
+        long totalAttenuation = -static_cast<s32>((samp->attenDb() + rgn->attenDb()) * DLS_DECIBEL_UNIT * 10);
 
         long convAttack = secondsToDlsTimecents(rgn->attack_time);
         long convHold = secondsToDlsTimecents(rgn->hold_time);
@@ -273,9 +274,9 @@ bool mainDLSCreation(
         newArt->addPan(convertPercentPanTo10thPercentUnits(rgn->pan) * 65536);
         newArt->addADSR(convAttack, 0, convHold, convDecay, convSustainLev, convRelease, 0);
         if (rgn->lfoVibDepthCents() > 0 && rgn->lfoVibFreqHz() > 0) {
-          int32_t vibDepth = centsToDlsPitchScale(rgn->lfoVibDepthCents());
-          int32_t vibFreq = hertzToDlsPitch(rgn->lfoVibFreqHz());
-          int32_t vibDelay = secondsToDlsTimecents(rgn->lfoVibDelaySeconds());
+          s32 vibDepth = centsToDlsPitchScale(rgn->lfoVibDepthCents());
+          s32 vibFreq = hertzToDlsPitch(rgn->lfoVibFreqHz());
+          s32 vibDelay = secondsToDlsTimecents(rgn->lfoVibDelaySeconds());
           newArt->addVibrato(vibDepth, vibFreq, vibDelay);
         }
         for (const auto& generator : vgminstr->generators()) {

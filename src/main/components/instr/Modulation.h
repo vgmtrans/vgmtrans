@@ -6,6 +6,8 @@
 
 #pragma once
 
+#include "util/types.h"
+
 #include <array>
 #include <cstddef>
 #include <cstdint>
@@ -38,7 +40,7 @@ struct TremoloModulationSpec {
   std::optional<DelayRange> delayRange = std::nullopt;
 };
 
-enum class ModSource : int16_t {
+enum class ModSource : s16 {
   None = -1,
 
   // Values 0..127 represent MIDI continuous controllers. SF2 can use any CC;
@@ -62,7 +64,7 @@ enum class ModSource : int16_t {
   PitchWheel = 130,
 };
 
-enum class ModDest : uint8_t {
+enum class ModDest : u8 {
   VibLfoToPitch,
   VibLfoFreq,
   VibLfoDelay,
@@ -86,7 +88,7 @@ constexpr size_t modDestIndex(ModDest destination) {
   return static_cast<size_t>(destination);
 }
 
-constexpr ModSource modSourceForMidiController(uint8_t controller) {
+constexpr ModSource modSourceForMidiController(u8 controller) {
   return static_cast<ModSource>(controller);
 }
 
@@ -95,15 +97,15 @@ constexpr bool isMidiControllerModSource(ModSource source) {
   return sourceValue >= 0 && sourceValue <= 127;
 }
 
-constexpr std::optional<uint8_t> midiControllerForModSource(ModSource source) {
+constexpr std::optional<u8> midiControllerForModSource(ModSource source) {
   return isMidiControllerModSource(source)
-      ? std::optional<uint8_t>(static_cast<uint8_t>(source))
+      ? std::optional<u8>(static_cast<u8>(source))
       : std::nullopt;
 }
 
 class ModAmount {
 public:
-  static ModAmount raw(int32_t amount);
+  static ModAmount raw(s32 amount);
   static ModAmount fromCents(double cents);
   // Absolute SF2/DLS LFO frequency units, measured as cents relative to 8.176 Hz.
   static ModAmount fromHertz(double hertz);
@@ -118,28 +120,28 @@ public:
   static ModAmount fromDecibels(double decibels);
 
   [[nodiscard]] bool valid() const { return m_valid; }
-  [[nodiscard]] int32_t value() const { return m_value; }
+  [[nodiscard]] s32 value() const { return m_value; }
 
 private:
-  constexpr ModAmount(int32_t value, bool valid) : m_value(value), m_valid(valid) {}
+  constexpr ModAmount(s32 value, bool valid) : m_value(value), m_valid(valid) {}
 
-  int32_t m_value;
+  s32 m_value;
   bool m_valid;
 };
 
 // Convert an absolute frequency into the 7-bit MIDI value that drives a
 // ParamAmount::hertzRange(minHertz, maxHertz) modulator or generator.
-uint8_t midiValueForHertzInRange(double hertz, double minHertz, double maxHertz);
+u8 midiValueForHertzInRange(double hertz, double minHertz, double maxHertz);
 double clampSecondsRangeMinimum(double seconds);
-uint8_t midiValueForSecondsInRange(double seconds, double minSeconds, double maxSeconds);
+u8 midiValueForSecondsInRange(double seconds, double minSeconds, double maxSeconds);
 
 struct SynthModulator {
-  SynthModulator(ModSource explicitSource, ModDest destination, int32_t amount)
+  SynthModulator(ModSource explicitSource, ModDest destination, s32 amount)
       : source(explicitSource),
         destination(destination),
         amount(amount) {}
 
-  SynthModulator(ModDest destination, int32_t amount)
+  SynthModulator(ModDest destination, s32 amount)
       : source(std::nullopt),
         destination(destination),
         amount(amount) {}
@@ -151,7 +153,7 @@ struct SynthModulator {
   // Amount units are the shared SF2/DLS semantic units for the destination:
   // cents for pitch/frequency, timecents for delay, and centibels for volume/attenuation.
   // Use ModAmount helpers at call sites when you want more readable units.
-  int32_t amount;
+  s32 amount;
 };
 
 struct SynthGenerator {
@@ -160,5 +162,5 @@ struct SynthGenerator {
   // Absolute generator amount in shared SF2/DLS semantic units:
   // cents for pitch/frequency, timecents for delay, and centibels for volume/attenuation.
   // Use ModAmount helpers at call sites when you want more readable units.
-  int32_t amount;
+  s32 amount;
 };

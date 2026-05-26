@@ -3,6 +3,7 @@
  * Licensed under the zlib license,
  * refer to the included LICENSE.txt file
  */
+#include "util/types.h"
 #include "KonamiTMNT2Seq.h"
 
 #include "KonamiTMNT2Definitions.h"
@@ -40,7 +41,7 @@ constexpr std::array<std::array<int, 2>, 8> K053260_PAN_MUL = {{
 constexpr double K053260_PAN_SCALE = 65536.0;
 
 constexpr double calculateTempo(
-  std::uint8_t clkb,
+  u8 clkb,
   double clockHz,
   int ppqn,
   int tickSkipInterval,
@@ -106,7 +107,7 @@ bool KonamiTMNT2Seq::parseTrackPointers() {
     aTracks.push_back(track);
   }
 
-  nNumTracks = static_cast<uint32_t>(aTracks.size());
+  nNumTracks = static_cast<u32>(aTracks.size());
   return nNumTracks > 0;
 }
 
@@ -173,8 +174,8 @@ void KonamiTMNT2Seq::useColl(const VGMColl* coll) {
 KonamiTMNT2Track::KonamiTMNT2Track(
   bool isFmTrack,
   KonamiTMNT2Seq *parentSeq,
-  uint32_t offset,
-  uint32_t length,
+  u32 offset,
+  u32 length,
   std::string name
 )
     : SeqTrack(parentSeq, offset, length, std::move(name)),
@@ -326,8 +327,8 @@ bool KonamiTMNT2Track::readEvent() {
     return false;
   }
 
-  uint32_t beginOffset = curOffset;
-  uint8_t opcode = readByte(curOffset++);
+  u32 beginOffset = curOffset;
+  u8 opcode = readByte(curOffset++);
 
   if (opcode < 0xD0) {
     // determine duration

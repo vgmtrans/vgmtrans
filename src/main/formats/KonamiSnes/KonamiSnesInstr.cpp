@@ -4,6 +4,7 @@
  * refer to the included LICENSE.txt file
  */
 
+#include "util/types.h"
 #include "KonamiSnesInstr.h"
 #include "KonamiSnesSeq.h"
 #include "KonamiSnesVibrato.h"
@@ -13,12 +14,12 @@
 #include <spdlog/fmt/fmt.h>
 
 namespace {
-constexpr uint8_t kKonamiSnesPercussionNoteCount = 0x60;
-constexpr uint8_t kKonamiSnesPercussionBaseNote = 0x3c;
+constexpr u8 kKonamiSnesPercussionNoteCount = 0x60;
+constexpr u8 kKonamiSnesPercussionBaseNote = 0x3c;
 
 struct PercussionHeader {
-  uint8_t note;
-  uint32_t offset;
+  u8 note;
+  u32 offset;
 };
 
 constexpr bool usesLegacyInstrumentLayout(KonamiSnesVersion version) {
@@ -29,22 +30,22 @@ constexpr bool usesLegacyPanRange(KonamiSnesVersion version) {
   return version == KONAMISNES_V1 || version == KONAMISNES_V2;
 }
 
-constexpr uint8_t percussionPanLimit(KonamiSnesVersion version) {
+constexpr u8 percussionPanLimit(KonamiSnesVersion version) {
   return usesLegacyPanRange(version) ? 0x14 : 0x28;
 }
 
 // Rewrites the shared vibrato modulators to the sequence-specific maxima collected on the first
 // pass, while keeping the controller mapping itself identical across instrument loads.
-void applyVibratoExportScaling(KonamiSnesInstrSet* instrSet, uint8_t maxDepth, uint16_t maxRateFactor) {
+void applyVibratoExportScaling(KonamiSnesInstrSet* instrSet, u8 maxDepth, u16 maxRateFactor) {
   const auto spec = konami_snes::vibrato::modulationSpec(instrSet->version, maxDepth, maxRateFactor);
   for (auto* instr : instrSet->exportInstrs()) {
     instr->updateStandardVibratoHandling(spec);
   }
 }
 
-int getPercussionKey(RawFile *file, uint32_t addrInstrHeader) {
-  const int8_t rawKey = file->readByte(addrInstrHeader + 1);
-  const int8_t tuning = file->readByte(addrInstrHeader + 2);
+int getPercussionKey(RawFile *file, u32 addrInstrHeader) {
+  const s8 rawKey = file->readByte(addrInstrHeader + 1);
+  const s8 tuning = file->readByte(addrInstrHeader + 2);
   return (tuning >= 0) ? rawKey : (rawKey - 1);
 }
 
@@ -52,34 +53,34 @@ int getPercussionKey(RawFile *file, uint32_t addrInstrHeader) {
 // to entries that still look like sane drum definitions so we do not run into SPC code.
 bool isValidPercussionHeader(RawFile *file,
                              KonamiSnesVersion version,
-                             uint32_t addrInstrHeader,
-                             uint32_t spcDirAddr) {
+                             u32 addrInstrHeader,
+                             u32 spcDirAddr) {
   if (!KonamiSnesInstr::isValidHeader(file, version, addrInstrHeader, spcDirAddr, true)) {
     return false;
   }
 
   const bool legacyLayout = usesLegacyInstrumentLayout(version);
-  const uint8_t pan = file->readByte(addrInstrHeader + (legacyLayout ? 6 : 5));
-  const uint8_t vol = file->readByte(addrInstrHeader + (legacyLayout ? 7 : 6));
+  const u8 pan = file->readByte(addrInstrHeader + (legacyLayout ? 6 : 5));
+  const u8 vol = file->readByte(addrInstrHeader + (legacyLayout ? 7 : 6));
   return pan <= percussionPanLimit(version) && vol <= 0x7f;
 }
 
 std::vector<PercussionHeader> collectPercussionHeaders(RawFile *file,
                                                        KonamiSnesVersion version,
-                                                       uint32_t tableOffset,
-                                                       uint32_t spcDirAddr) {
+                                                       u32 tableOffset,
+                                                       u32 spcDirAddr) {
   std::vector<PercussionHeader> headers;
   headers.reserve(kKonamiSnesPercussionNoteCount);
-  const uint32_t instrItemSize = KonamiSnesInstr::expectedSize(version);
-  for (uint8_t percussionNote = 0; percussionNote < kKonamiSnesPercussionNoteCount; percussionNote++) {
-    const uint32_t addrInstrHeader = tableOffset + (instrItemSize * percussionNote);
+  const u32 instrItemSize = KonamiSnesInstr::expectedSize(version);
+  for (u8 percussionNote = 0; percussionNote < kKonamiSnesPercussionNoteCount; percussionNote++) {
+    const u32 addrInstrHeader = tableOffset + (instrItemSize * percussionNote);
     if (addrInstrHeader + instrItemSize > 0x10000) {
       break;
     }
 
     if (!isValidPercussionHeader(file, version, addrInstrHeader, spcDirAddr)) {
       const bool legacyLayout = usesLegacyInstrumentLayout(version);
-      const uint8_t pan = file->readByte(addrInstrHeader + (legacyLayout ? 6 : 5));
+      const u8 pan = file->readByte(addrInstrHeader + (legacyLayout ? 6 : 5));
       // Bad SRCNs can appear inside a real drum table, but once pan goes out of range
       // or the key on a bad header becomes implausible, we have likely hit non-table data.
       if (pan > percussionPanLimit(version)) {
@@ -110,11 +111,11 @@ std::vector<PercussionHeader> collectPercussionHeaders(RawFile *file,
 // KonamiSnesInstrSet tries to load all these samples to merge them into a single DLS.
 KonamiSnesInstrSet::KonamiSnesInstrSet(RawFile *file,
                                        KonamiSnesVersion ver,
-                                       uint32_t offset,
-                                       uint32_t bankedInstrOffset,
-                                       uint8_t firstBankedInstr,
-                                       uint32_t percInstrOffset,
-                                       uint32_t spcDirAddr,
+                                       u32 offset,
+                                       u32 bankedInstrOffset,
+                                       u8 firstBankedInstr,
+                                       u32 percInstrOffset,
+                                       u32 spcDirAddr,
                                        const std::string &name) :
     VGMInstrSet(KonamiSnesFormat::name, file, offset, 0, name), version(ver),
     bankedInstrOffset(bankedInstrOffset),
@@ -132,15 +133,15 @@ bool KonamiSnesInstrSet::parseHeader() {
 
 bool KonamiSnesInstrSet::parseInstrPointers() {
   usedSRCNs.clear();
-  auto addUsedSRCN = [this](uint8_t srcn) {
+  auto addUsedSRCN = [this](u8 srcn) {
     if (std::find(usedSRCNs.begin(), usedSRCNs.end(), srcn) == usedSRCNs.end()) {
       usedSRCNs.push_back(srcn);
     }
   };
-  const uint32_t instrItemSize = KonamiSnesInstr::expectedSize(version);
+  const u32 instrItemSize = KonamiSnesInstr::expectedSize(version);
 
   for (int instr = 0; instr <= 0xff; instr++) {
-    const uint32_t addrInstrHeader = (instr < firstBankedInstr)
+    const u32 addrInstrHeader = (instr < firstBankedInstr)
                                          ? offset() + (instrItemSize * instr)
                                          : bankedInstrOffset + (instrItemSize * (instr - firstBankedInstr));
     if (addrInstrHeader + instrItemSize > 0x10000) {
@@ -159,10 +160,10 @@ bool KonamiSnesInstrSet::parseInstrPointers() {
       continue;
     }
 
-    uint8_t srcn = readByte(addrInstrHeader);
+    u8 srcn = readByte(addrInstrHeader);
 
-    uint32_t offDirEnt = spcDirAddr + (srcn * 4);
-    uint16_t addrSampStart = readShort(offDirEnt);
+    u32 offDirEnt = spcDirAddr + (srcn * 4);
+    u16 addrSampStart = readShort(offDirEnt);
     if (addrSampStart < offDirEnt + 4) {
       continue;
     }
@@ -207,8 +208,8 @@ bool KonamiSnesInstrSet::parseInstrPointers() {
 }
 
 void KonamiSnesInstrSet::useColl(const VGMColl* coll) {
-  uint8_t maxVibratoDepth = konami_snes::kDefaultVibratoMaxDepth;
-  uint16_t maxVibratoRateFactor = konami_snes::vibrato::defaultMaxRateFactor(version);
+  u8 maxVibratoDepth = konami_snes::kDefaultVibratoMaxDepth;
+  u16 maxVibratoRateFactor = konami_snes::vibrato::defaultMaxRateFactor(version);
 
   if (coll != nullptr && coll->seq() != nullptr) {
     const auto* seq = dynamic_cast<const KonamiSnesSeq*>(coll->seq());
@@ -233,10 +234,10 @@ void KonamiSnesInstrSet::unuseColl() {
 
 KonamiSnesInstr::KonamiSnesInstr(VGMInstrSet *instrSet,
                                  KonamiSnesVersion ver,
-                                 uint32_t offset,
-                                 uint32_t theBank,
-                                 uint32_t theInstrNum,
-                                 uint32_t spcDirAddr,
+                                 u32 offset,
+                                 u32 theBank,
+                                 u32 theInstrNum,
+                                 u32 spcDirAddr,
                                  bool percussion,
                                  const std::string &name) :
     VGMInstr(instrSet, offset, KonamiSnesInstr::expectedSize(ver), theBank, theInstrNum, name),
@@ -254,9 +255,9 @@ bool KonamiSnesInstr::loadInstr() {
   if (percussion) {
     const auto percussionHeaders = collectPercussionHeaders(rawFile(), version, offset(), spcDirAddr);
     for (const auto &header : percussionHeaders) {
-      const uint8_t srcn = readByte(header.offset);
-      const uint32_t offDirEnt = spcDirAddr + (srcn * 4);
-      const uint16_t addrSampStart = readShort(offDirEnt);
+      const u8 srcn = readByte(header.offset);
+      const u32 offDirEnt = spcDirAddr + (srcn * 4);
+      const u16 addrSampStart = readShort(offDirEnt);
 
       auto *rgn = new KonamiSnesRgn(this, version, header.offset, true, header.note);
       rgn->sampOffset = addrSampStart - spcDirAddr;
@@ -271,13 +272,13 @@ bool KonamiSnesInstr::loadInstr() {
     return !percussionHeaders.empty() && !regions().empty();
   }
 
-  uint8_t srcn = readByte(offset());
-  uint32_t offDirEnt = spcDirAddr + (srcn * 4);
+  u8 srcn = readByte(offset());
+  u32 offDirEnt = spcDirAddr + (srcn * 4);
   if (offDirEnt + 4 > 0x10000) {
     return false;
   }
 
-  uint16_t addrSampStart = readShort(offDirEnt);
+  u16 addrSampStart = readShort(offDirEnt);
 
   KonamiSnesRgn *rgn = new KonamiSnesRgn(this, version, offset(), percussion);
   rgn->sampOffset = addrSampStart - spcDirAddr;
@@ -289,8 +290,8 @@ bool KonamiSnesInstr::loadInstr() {
 
 bool KonamiSnesInstr::isValidHeader(RawFile *file,
                                     KonamiSnesVersion version,
-                                    uint32_t addrInstrHeader,
-                                    uint32_t spcDirAddr,
+                                    u32 addrInstrHeader,
+                                    u32 spcDirAddr,
                                     bool validateSample) {
   size_t instrItemSize = KonamiSnesInstr::expectedSize(version);
 
@@ -298,19 +299,19 @@ bool KonamiSnesInstr::isValidHeader(RawFile *file,
     return false;
   }
 
-  uint8_t srcn = file->readByte(addrInstrHeader);
+  u8 srcn = file->readByte(addrInstrHeader);
   if (srcn == 0xff) // SRCN:FF is false-positive in 99.999999% of cases
   {
     return false;
   }
 
-  uint32_t addrDIRentry = spcDirAddr + (srcn * 4);
+  u32 addrDIRentry = spcDirAddr + (srcn * 4);
   if (!SNESSampColl::isValidSampleDir(file, addrDIRentry, validateSample)) {
     return false;
   }
 
-  uint16_t srcAddr = file->readShort(addrDIRentry);
-  uint16_t loopStartAddr = file->readShort(addrDIRentry + 2);
+  u16 srcAddr = file->readShort(addrDIRentry);
+  u16 loopStartAddr = file->readShort(addrDIRentry + 2);
   if (srcAddr > loopStartAddr || (loopStartAddr - srcAddr) % 9 != 0) {
     return false;
   }
@@ -318,7 +319,7 @@ bool KonamiSnesInstr::isValidHeader(RawFile *file,
   return true;
 }
 
-uint32_t KonamiSnesInstr::expectedSize(KonamiSnesVersion version) {
+u32 KonamiSnesInstr::expectedSize(KonamiSnesVersion version) {
   return usesLegacyInstrumentLayout(version) ? 8 : 7;
 }
 
@@ -328,23 +329,23 @@ uint32_t KonamiSnesInstr::expectedSize(KonamiSnesVersion version) {
 
 KonamiSnesRgn::KonamiSnesRgn(KonamiSnesInstr *instr,
                              KonamiSnesVersion ver,
-                             uint32_t offset,
+                             u32 offset,
                              bool percussion,
-                             uint8_t percussionNote) :
+                             u8 percussionNote) :
     VGMRgn(instr, offset, KonamiSnesInstr::expectedSize(ver)) {
   const bool legacyLayout = usesLegacyInstrumentLayout(ver);
-  const uint8_t srcn = readByte(offset);
-  const int8_t raw_key = readByte(offset + 1);
-  const int8_t tuning = readByte(offset + 2);
-  const uint8_t adsr1 = readByte(offset + 3);
-  const uint8_t adsr2 = readByte(offset + 4);
-  const uint8_t gain = legacyLayout ? readByte(offset + 5) : adsr2;
-  const uint32_t panOffset = legacyLayout ? offset + 6 : offset + 5;
-  const uint32_t volOffset = legacyLayout ? offset + 7 : offset + 6;
-  const uint8_t vol = readByte(volOffset);
+  const u8 srcn = readByte(offset);
+  const s8 raw_key = readByte(offset + 1);
+  const s8 tuning = readByte(offset + 2);
+  const u8 adsr1 = readByte(offset + 3);
+  const u8 adsr2 = readByte(offset + 4);
+  const u8 gain = legacyLayout ? readByte(offset + 5) : adsr2;
+  const u32 panOffset = legacyLayout ? offset + 6 : offset + 5;
+  const u32 volOffset = legacyLayout ? offset + 7 : offset + 6;
+  const u8 vol = readByte(volOffset);
 
-  const int8_t key = (tuning >= 0) ? raw_key : (raw_key - 1);
-  const int16_t full_tuning = static_cast<int16_t>((static_cast<uint8_t>(key) << 8) | static_cast<uint8_t>(tuning));
+  const s8 key = (tuning >= 0) ? raw_key : (raw_key - 1);
+  const s16 full_tuning = static_cast<s16>((static_cast<u8>(key) << 8) | static_cast<u8>(tuning));
 
   const bool use_adsr = ((adsr1 & 0x80) != 0);
 
@@ -372,8 +373,8 @@ KonamiSnesRgn::KonamiSnesRgn(KonamiSnesInstr *instr,
     // so move the exported drumkit region's unity key by the slot index delta.
     unityKey += static_cast<int>(percussionNote) - kKonamiSnesPercussionBaseNote;
   }
-  addUnityKey(static_cast<uint8_t>(std::clamp(unityKey, 0, 127)), offset + 1, 1);
-  addFineTune((int16_t) (fine_tuning * 100.0), offset + 2, 1);
+  addUnityKey(static_cast<u8>(std::clamp(unityKey, 0, 127)), offset + 1, 1);
+  addFineTune((s16) (fine_tuning * 100.0), offset + 2, 1);
   addChild(offset + 3, 1, "ADSR1");
   if (legacyLayout) {
     addChild(offset + 4, 1, "ADSR2");

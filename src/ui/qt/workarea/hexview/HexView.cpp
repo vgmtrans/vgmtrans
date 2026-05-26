@@ -4,6 +4,7 @@
 * refer to the included LICENSE.txt file
 */
 
+#include "util/types.h"
 #include "HexView.h"
 #include "Helpers.h"
 #include "HexViewInput.h"
@@ -60,7 +61,7 @@ constexpr float PLAYBACK_GLOW_STRENGTH = 0.75f;
 constexpr float PLAYBACK_GLOW_RADIUS = 1.8f;
 constexpr float PLAYBACK_GLOW_EDGE_CURVE = 0.85f;
 const QColor PLAYBACK_GLOW_FALLBACK(230, 230, 230);
-constexpr uint16_t STYLE_UNASSIGNED = std::numeric_limits<uint16_t>::max();
+constexpr u16 STYLE_UNASSIGNED = std::numeric_limits<u16>::max();
 
 struct WidgetLayoutMetrics {
   qreal dpr = 1.0;
@@ -318,22 +319,22 @@ void blitGlyphAlpha(QImage& dst, int dstX, int dstY, const QImage& src) {
 }  // namespace
 
 // Pack selection offset/length into a stable 64-bit key for set membership checks.
-uint64_t HexView::selectionKey(uint32_t offset, uint32_t length) {
-  return (static_cast<uint64_t>(offset) << 32) | length;
+u64 HexView::selectionKey(u32 offset, u32 length) {
+  return (static_cast<u64>(offset) << 32) | length;
 }
 
 // Overload for plain selection ranges.
-uint64_t HexView::selectionKey(const SelectionRange& range) {
+u64 HexView::selectionKey(const SelectionRange& range) {
   return selectionKey(range.offset, range.length);
 }
 
 // Overload for colored playback ranges (keyed only by byte span).
-uint64_t HexView::selectionKey(const PlaybackSelection& range) {
+u64 HexView::selectionKey(const PlaybackSelection& range) {
   return selectionKey(range.offset, range.length);
 }
 
 // Overload for fade playback selections (keyed by underlying range).
-uint64_t HexView::selectionKey(const FadePlaybackSelection& selection) {
+u64 HexView::selectionKey(const FadePlaybackSelection& selection) {
   return selectionKey(selection.range);
 }
 
@@ -684,7 +685,7 @@ void HexView::setSelectedItems(const std::vector<const VGMItem*>& items,
 
   std::vector<SelectionRange> selections;
   selections.reserve(items.size());
-  std::unordered_set<uint64_t> keys;
+  std::unordered_set<u64> keys;
   keys.reserve(items.size() * 2 + 1);
 
   for (const auto* item : items) {
@@ -692,7 +693,7 @@ void HexView::setSelectedItems(const std::vector<const VGMItem*>& items,
       continue;
     }
     // Zero-length items still need a visible caret-width highlight in the hex view, so normalize them to a one-byte range.
-    const uint32_t length = item->length() > 0 ? item->length() : 1u;
+    const u32 length = item->length() > 0 ? item->length() : 1u;
     const SelectionRange range{item->offset(), length};
     // Ignore duplicate ranges so the renderer and highlight animation only see one entry per distinct byte span.
     if (keys.insert(selectionKey(range)).second) {
@@ -756,13 +757,13 @@ void HexView::setPlaybackSelectionsForItems(const std::vector<const VGMItem*>& i
     if (!item) {
       continue;
     }
-    const uint32_t length = item->length() > 0 ? item->length() : 1u;
+    const u32 length = item->length() > 0 ? item->length() : 1u;
     const QColor glowColor = (i < glowColors.size() && glowColors[i].isValid()) ? glowColors[i] : PLAYBACK_GLOW_FALLBACK;
     next.push_back({item->offset(), length, glowColor});
   }
 
   // Track incoming active playback ranges for fast membership checks below.
-  std::unordered_set<uint64_t> nextKeys;
+  std::unordered_set<u64> nextKeys;
   nextKeys.reserve(next.size() * 2 + 1);
   for (const auto& selection : next) {
     nextKeys.insert(selectionKey(selection));
@@ -779,7 +780,7 @@ void HexView::setPlaybackSelectionsForItems(const std::vector<const VGMItem*>& i
   }
 
   // Seed fade entries only for ranges that were active and are now gone.
-  std::unordered_set<uint64_t> fadeKeys;
+  std::unordered_set<u64> fadeKeys;
   fadeKeys.reserve(m_fadePlaybackSelections.size() * 2 + 1);
   for (const auto& selection : m_fadePlaybackSelections) {
     fadeKeys.insert(selectionKey(selection));
@@ -790,7 +791,7 @@ void HexView::setPlaybackSelectionsForItems(const std::vector<const VGMItem*>& i
   if (fadeEnabled) {
     const qint64 now = playbackNowMs();
     for (const auto& selection : m_playbackSelections) {
-      const uint64_t key = selectionKey(selection);
+      const u64 key = selectionKey(selection);
       if (nextKeys.find(key) == nextKeys.end() && fadeKeys.insert(key).second) {
         m_fadePlaybackSelections.push_back({selection, now, 1.0f});
         addedFade = true;
@@ -820,13 +821,13 @@ void HexView::clearPlaybackSelections(bool fade) {
   if (fade && PLAYBACK_FADE_DURATION_MS > 0) {
     // Convert the current active set into fade-out entries in one step.
     const qint64 now = playbackNowMs();
-    std::unordered_set<uint64_t> fadeKeys;
+    std::unordered_set<u64> fadeKeys;
     fadeKeys.reserve(m_fadePlaybackSelections.size() * 2 + 1);
     for (const auto& selection : m_fadePlaybackSelections) {
       fadeKeys.insert(selectionKey(selection));
     }
     for (const auto& selection : m_playbackSelections) {
-      const uint64_t key = selectionKey(selection);
+      const u64 key = selectionKey(selection);
       if (fadeKeys.insert(key).second) {
         m_fadePlaybackSelections.push_back({selection, now, 1.0f});
       }
@@ -882,12 +883,12 @@ void HexView::rebuildStyleMap() {
     return;
   }
 
-  const uint32_t length = m_vgmfile->length();
+  const u32 length = m_vgmfile->length();
   // Start with "unassigned" markers so we can preserve first-write wins below.
   m_styleIds.assign(length, STYLE_UNASSIGNED);
 
   // Deduplicate styles by item type and keep a compact style table for the renderer.
-  auto styleIdForType = [&](VGMItem::Type type) -> uint16_t {
+  auto styleIdForType = [&](VGMItem::Type type) -> u16 {
     const int key = static_cast<int>(type);
     auto it = m_typeToStyleId.find(key);
     if (it != m_typeToStyleId.end()) {
@@ -896,7 +897,7 @@ void HexView::rebuildStyleMap() {
     Style style;
     style.bg = colorForItemType(type);
     style.fg = textColorForItemType(type);
-    uint16_t id = static_cast<uint16_t>(m_styles.size());
+    u16 id = static_cast<u16>(m_styles.size());
     m_styles.push_back(style);
     m_typeToStyleId.emplace(key, id);
     return id;
@@ -926,13 +927,13 @@ void HexView::rebuildStyleMap() {
     if (item->offset() < m_vgmfile->offset()) {
       continue;
     }
-    const uint32_t start = item->offset() - m_vgmfile->offset();
+    const u32 start = item->offset() - m_vgmfile->offset();
     if (start >= length) {
       continue;
     }
-    const uint32_t end = std::min<uint32_t>(start + item->length(), length);
-    const uint16_t styleId = styleIdForType(item->type);
-    for (uint32_t i = start; i < end; ++i) {
+    const u32 end = std::min<u32>(start + item->length(), length);
+    const u16 styleId = styleIdForType(item->type);
+    for (u32 i = start; i < end; ++i) {
       if (m_styleIds[i] == STYLE_UNASSIGNED) {
         m_styleIds[i] = styleId;
       }
@@ -1194,7 +1195,7 @@ void HexView::keyPressEvent(QKeyEvent* event) {
     return;
   }
 
-  uint32_t newOffset = 0;
+  u32 newOffset = 0;
   switch (event->key()) {
     case Qt::Key_Up:
       newOffset = m_selectedOffset - BYTES_PER_LINE;

@@ -4,10 +4,12 @@
  * refer to the included LICENSE.txt file
  */
 #pragma once
+
+#include "util/types.h"
 #include "Scanner.h"
 #include "BytePattern.h"
 
-enum NamcoSnesVersion : uint8_t;  // see NamcoSnesFormat.h
+enum NamcoSnesVersion : u8;  // see NamcoSnesFormat.h
 
 class NamcoSnesScanner : public VGMScanner {
  public:
@@ -17,7 +19,7 @@ class NamcoSnesScanner : public VGMScanner {
   void searchForNamcoSnesFromARAM(RawFile *file);
 
  private:
-  std::map<uint8_t, uint8_t> getInitDspRegMap(RawFile *file);
+  std::map<u8, u8> getInitDspRegMap(RawFile *file);
 
   static BytePattern ptnReadSongList;
   static BytePattern ptnStartSong;

@@ -3,6 +3,7 @@
  * Licensed under the zlib license,
  * refer to the included LICENSE.txt file
  */
+#include "util/types.h"
 #include "CapcomSnesInstr.h"
 #include <spdlog/fmt/fmt.h>
 #include "SNESDSP.h"
@@ -13,7 +14,7 @@
 // CapcomSnesInstrSet
 // ****************
 
-CapcomSnesInstrSet::CapcomSnesInstrSet(RawFile *file, uint32_t offset, uint32_t spcDirAddr, const std::string &name) :
+CapcomSnesInstrSet::CapcomSnesInstrSet(RawFile *file, u32 offset, u32 spcDirAddr, const std::string &name) :
     VGMInstrSet(CapcomSnesFormat::name, file, offset, 0, name),
     spcDirAddr(spcDirAddr) {
 }
@@ -28,15 +29,15 @@ bool CapcomSnesInstrSet::parseHeader() {
 bool CapcomSnesInstrSet::parseInstrPointers() {
   usedSRCNs.clear();
   for (int instr = 0; instr <= 0xff; instr++) {
-    uint32_t addrInstrHeader = offset() + (6 * instr);
+    u32 addrInstrHeader = offset() + (6 * instr);
     if (addrInstrHeader + 6 > 0x10000) {
       return false;
     }
 
     // skip blank slot (Mega Man X2, Super Street Fighter II Turbo)
     bool empty_garbage = true;
-    for (uint32_t off = addrInstrHeader; off < addrInstrHeader + 6; off++) {
-      const uint8_t v = readByte(off);
+    for (u32 off = addrInstrHeader; off < addrInstrHeader + 6; off++) {
+      const u8 v = readByte(off);
       if (v != 0 && v != 0xff) {
         empty_garbage = false;
         break;
@@ -53,8 +54,8 @@ bool CapcomSnesInstrSet::parseInstrPointers() {
       continue;
     }
 
-    uint8_t srcn = readByte(addrInstrHeader);
-    std::vector<uint8_t>::iterator itrSRCN = std::ranges::find(usedSRCNs, srcn);
+    u8 srcn = readByte(addrInstrHeader);
+    std::vector<u8>::iterator itrSRCN = std::ranges::find(usedSRCNs, srcn);
     if (itrSRCN == usedSRCNs.end()) {
       usedSRCNs.push_back(srcn);
     }
@@ -83,10 +84,10 @@ bool CapcomSnesInstrSet::parseInstrPointers() {
 // *************
 
 CapcomSnesInstr::CapcomSnesInstr(VGMInstrSet *instrSet,
-                                 uint32_t offset,
-                                 uint32_t theBank,
-                                 uint32_t theInstrNum,
-                                 uint32_t spcDirAddr,
+                                 u32 offset,
+                                 u32 theBank,
+                                 u32 theInstrNum,
+                                 u32 spcDirAddr,
                                  const std::string &name) :
     VGMInstr(instrSet, offset, 6, theBank, theInstrNum, name), spcDirAddr(spcDirAddr) {
 }
@@ -94,8 +95,8 @@ CapcomSnesInstr::CapcomSnesInstr(VGMInstrSet *instrSet,
 CapcomSnesInstr::~CapcomSnesInstr() {}
 
 bool CapcomSnesInstr::loadInstr() {
-  uint8_t srcn = readByte(offset());
-  uint32_t offDirEnt = spcDirAddr + (srcn * 4);
+  u8 srcn = readByte(offset());
+  u32 offDirEnt = spcDirAddr + (srcn * 4);
   if (offDirEnt + 4 > 0x10000) {
     return false;
   }
@@ -108,7 +109,7 @@ bool CapcomSnesInstr::loadInstr() {
   addStandardVibratoHandling(capcom_snes::vibratoModulationSpec());
   addStandardTremoloHandling(capcom_snes::tremoloModulationSpec());
 
-  uint16_t addrSampStart = readShort(offDirEnt);
+  u16 addrSampStart = readShort(offDirEnt);
 
   CapcomSnesRgn *rgn = new CapcomSnesRgn(this, offset());
   rgn->sampOffset = addrSampStart - spcDirAddr;
@@ -117,28 +118,28 @@ bool CapcomSnesInstr::loadInstr() {
   return true;
 }
 
-bool CapcomSnesInstr::isValidHeader(RawFile *file, uint32_t addrInstrHeader, uint32_t spcDirAddr, bool validateSample) {
+bool CapcomSnesInstr::isValidHeader(RawFile *file, u32 addrInstrHeader, u32 spcDirAddr, bool validateSample) {
   if (addrInstrHeader + 6 > 0x10000) {
     return false;
   }
 
-  uint8_t srcn = file->readByte(addrInstrHeader);
-  uint8_t adsr1 = file->readByte(addrInstrHeader + 1);
-//  uint8_t adsr2 = file->GetByte(addrInstrHeader + 2);
-  uint8_t gain = file->readByte(addrInstrHeader + 3);
-//  int16_t pitch_scale = file->GetShortBE(addrInstrHeader + 4);
+  u8 srcn = file->readByte(addrInstrHeader);
+  u8 adsr1 = file->readByte(addrInstrHeader + 1);
+//  u8 adsr2 = file->GetByte(addrInstrHeader + 2);
+  u8 gain = file->readByte(addrInstrHeader + 3);
+//  s16 pitch_scale = file->GetShortBE(addrInstrHeader + 4);
 
   if (srcn >= 0x80 || (adsr1 == 0 && gain == 0)) {
     return false;
   }
 
-  uint32_t addrDIRentry = spcDirAddr + (srcn * 4);
+  u32 addrDIRentry = spcDirAddr + (srcn * 4);
   if (!SNESSampColl::isValidSampleDir(file, addrDIRentry, validateSample)) {
     return false;
   }
 
-  uint16_t srcAddr = file->readShort(addrDIRentry);
-  uint16_t loopStartAddr = file->readShort(addrDIRentry + 2);
+  u16 srcAddr = file->readShort(addrDIRentry);
+  u16 loopStartAddr = file->readShort(addrDIRentry + 2);
   if (srcAddr > loopStartAddr || (loopStartAddr - srcAddr) % 9 != 0) {
     return false;
   }
@@ -150,13 +151,13 @@ bool CapcomSnesInstr::isValidHeader(RawFile *file, uint32_t addrInstrHeader, uin
 // CapcomSnesRgn
 // ***********
 
-CapcomSnesRgn::CapcomSnesRgn(CapcomSnesInstr *instr, uint32_t offset) :
+CapcomSnesRgn::CapcomSnesRgn(CapcomSnesInstr *instr, u32 offset) :
     VGMRgn(instr, offset, 6) {
-  uint8_t srcn = readByte(offset);
-  uint8_t adsr1 = readByte(offset + 1);
-  uint8_t adsr2 = readByte(offset + 2);
-  uint8_t gain = readByte(offset + 3);
-  int16_t pitchScale = getShortBE(offset + 4);
+  u8 srcn = readByte(offset);
+  u8 adsr1 = readByte(offset + 1);
+  u8 adsr2 = readByte(offset + 2);
+  u8 gain = readByte(offset + 3);
+  s16 pitchScale = getShortBE(offset + 4);
 
   addSampNum(srcn, offset, 1);
   addChild(offset + 1, 1, "ADSR1");
@@ -182,10 +183,10 @@ CapcomSnesRgn::CapcomSnesRgn(CapcomSnesInstr *instr, uint32_t offset) :
   }
 
   addUnityKey(baseUnityKey - coarse, offset + 4, 1);
-  addFineTune(static_cast<int16_t>(fine), offset + 5, 1);
+  addFineTune(static_cast<s16>(fine), offset + 5, 1);
   snesConvADSR<VGMRgn>(this, adsr1, adsr2, gain);
 
-  uint8_t sl = (adsr2 >> 5);
+  u8 sl = (adsr2 >> 5);
   emulateSDSPGAIN(gain, (sl << 8) | 0xff, 0, nullptr, &release_time);
 }
 

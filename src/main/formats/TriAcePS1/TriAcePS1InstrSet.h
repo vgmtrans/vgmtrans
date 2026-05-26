@@ -14,7 +14,7 @@ class TriAcePS1InstrSet
     : public VGMInstrSet {
 
  public:
-  TriAcePS1InstrSet(RawFile *file, uint32_t offset);
+  TriAcePS1InstrSet(RawFile *file, u32 offset);
   virtual ~TriAcePS1InstrSet();
 
   virtual bool parseHeader();
@@ -26,21 +26,21 @@ class TriAcePS1InstrSet
   //1,Sep.2009 revise		to do こうしたい。
   //-----------------------
   typedef struct _InstrHeader {
-    uint32_t FileSize;    //
-    uint16_t InstSize;    //End of Instruction information
-    uint16_t unk_06;        //
-    uint16_t unk_08;        //
-    uint16_t unk_0A;        //
+    u32 FileSize;    //
+    u16 InstSize;    //End of Instruction information
+    u16 unk_06;        //
+    u16 unk_08;        //
+    u16 unk_0A;        //
   } InstrHeader;
   //	↑　↑　↑
-  uint16_t instrSectionSize;        // to do delete
-  uint8_t numInstrs;                // to do delete
+  u16 instrSectionSize;        // to do delete
+  u8 numInstrs;                // to do delete
   //-----------------------
 
-  //uint32_t dwSampSectOffset;
-  //uint32_t dwSampSectSize;
-  //uint32_t dwNumInstrs;
-  //uint32_t dwTotalRegions;
+  //u32 dwSampSectOffset;
+  //u32 dwSampSectSize;
+  //u32 dwNumInstrs;
+  //u32 dwTotalRegions;
 };
 
 
@@ -53,31 +53,31 @@ class TriAcePS1Instr
  public:
 
   typedef struct _RgnInfo {
-    uint8_t note_range_low;        //These ranges only seem to kick in when the instr has more than 1 rgn
-    uint8_t note_range_high;
-    uint8_t vel_range_low;
-    uint8_t vel_range_high;
-    uint32_t sampOffset;
-    uint32_t loopOffset;
-    uint8_t attenuation;
-    int8_t pitchTuneSemitones;
-    int8_t pitchTuneFine;
-    uint8_t unk_17;
-    uint32_t unk_18;
+    u8 note_range_low;        //These ranges only seem to kick in when the instr has more than 1 rgn
+    u8 note_range_high;
+    u8 vel_range_low;
+    u8 vel_range_high;
+    u32 sampOffset;
+    u32 loopOffset;
+    u8 attenuation;
+    s8 pitchTuneSemitones;
+    s8 pitchTuneFine;
+    u8 unk_17;
+    u32 unk_18;
   } RgnInfo;
 
   typedef struct _InstrInfo {
-    uint8_t progNum;
-    uint8_t bankNum;
-    uint16_t ADSR1;
-    uint16_t ADSR2;
-    uint8_t unk_06;
-    uint8_t numRgns;
+    u8 progNum;
+    u8 bankNum;
+    u16 ADSR1;
+    u16 ADSR2;
+    u8 unk_06;
+    u8 numRgns;
   } InstrInfo;
 
 
  public:
-  TriAcePS1Instr(VGMInstrSet *instrSet, uint32_t offset, uint32_t length, uint32_t theBank, uint32_t theInstrNum);
+  TriAcePS1Instr(VGMInstrSet *instrSet, u32 offset, u32 length, u32 theBank, u32 theInstrNum);
   ~TriAcePS1Instr() { if (rgns) delete[] rgns; }
   virtual bool loadInstr();
 

@@ -5,6 +5,8 @@
  */
 
 #pragma once
+
+#include "util/types.h"
 #include "VGMInstrSet.h"
 #include "VGMSampColl.h"
 #include "VGMSamp.h"
@@ -18,7 +20,7 @@ class NDSInstr;
 
 class NDSInstrSet : public VGMInstrSet {
 public:
-  NDSInstrSet(RawFile *file, uint32_t offset, uint32_t length, VGMSampColl *psg_samples,
+  NDSInstrSet(RawFile *file, u32 offset, u32 length, VGMSampColl *psg_samples,
               std::string name = "NDS Instrument Bank");
   bool parseInstrPointers() override;
 
@@ -35,17 +37,17 @@ private:
 
 class NDSInstr : public VGMInstr {
 public:
-  NDSInstr(NDSInstrSet *instrSet, uint32_t offset, uint32_t length, uint32_t bank,
-           uint32_t instrNum, uint8_t instrType);
+  NDSInstr(NDSInstrSet *instrSet, u32 offset, u32 length, u32 bank,
+           u32 instrNum, u8 instrType);
 
   bool loadInstr() override;
 
   void getSampCollPtr(VGMRgn *rgn, int waNum) const;
-  void getArticData(VGMRgn *rgn, uint32_t offset) const;
-  uint16_t getFallingRate(uint8_t DecayTime) const;
+  void getArticData(VGMRgn *rgn, u32 offset) const;
+  u16 getFallingRate(u8 DecayTime) const;
 
 private:
-  uint8_t instrType;
+  u8 instrType;
 };
 
 // ***********
@@ -72,7 +74,7 @@ static constexpr int IMA_IndexTable[9] = {-1, -1, -1, -1, 2, 4, 6, 8};
 
 class NDSWaveArch : public VGMSampColl {
 public:
-  NDSWaveArch(RawFile *file, uint32_t offset, uint32_t length,
+  NDSWaveArch(RawFile *file, u32 offset, u32 length,
               std::string name = "NDS Wave Archive");
   ~NDSWaveArch() override = default;
 
@@ -95,13 +97,13 @@ private:
 
 class NDSSamp : public VGMSamp {
 public:
-  NDSSamp(VGMSampColl *sampColl, uint32_t offset = 0, uint32_t length = 0, uint32_t dataOffset = 0,
-          uint32_t dataLength = 0, uint8_t channels = 1, BPS bps = BPS::PCM16, uint32_t rate = 0,
-          uint8_t waveType = 0, std::string name = "Sample");
+  NDSSamp(VGMSampColl *sampColl, u32 offset = 0, u32 length = 0, u32 dataOffset = 0,
+          u32 dataLength = 0, u8 channels = 1, BPS bps = BPS::PCM16, u32 rate = 0,
+          u8 waveType = 0, std::string name = "Sample");
 
   double compressionRatio() const override;  // ratio of space conserved.  should generally be > 1
 
-  std::vector<uint8_t> decodeImaAdpcm();
+  std::vector<u8> decodeImaAdpcm();
 
   static inline void clamp_step_index(int &stepIndex);
   static inline void clamp_sample(int &decompSample);
@@ -109,19 +111,19 @@ public:
 
   enum { PCM8, PCM16, IMA_ADPCM };
 
-  uint8_t waveType;
+  u8 waveType;
 
 private:
-  std::vector<uint8_t> decodeToNativePcm() override;
+  std::vector<u8> decodeToNativePcm() override;
 };
 
 class NDSPSGSamp : public VGMSamp {
 public:
-  NDSPSGSamp(VGMSampColl *sampcoll, uint8_t duty_cycle);
+  NDSPSGSamp(VGMSampColl *sampcoll, u8 duty_cycle);
   ~NDSPSGSamp() override = default;
 
 private:
-  std::vector<uint8_t> decodeToNativePcm() override;
+  std::vector<u8> decodeToNativePcm() override;
 
   /* We use -1 to indicate noise */
   double m_duty_cycle{-1};

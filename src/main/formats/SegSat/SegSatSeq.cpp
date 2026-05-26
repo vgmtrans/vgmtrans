@@ -4,6 +4,7 @@
  * refer to the included LICENSE.txt file
  */
 
+#include "util/types.h"
 #include "SegSatSeq.h"
 #include "ScaleConversion.h"
 #include "SegSatFormat.h"
@@ -13,7 +14,7 @@
 
 DECLARE_FORMAT(SegSat);
 
-SegSatSeq::SegSatSeq(RawFile *file, uint32_t offset, std::string name)
+SegSatSeq::SegSatSeq(RawFile *file, u32 offset, std::string name)
     : VGMSeqNoTrks(SegSatFormat::name, file, offset, std::move(name)) {
   VGMSeq::setUseLinearAmplitudeScale(false);
   setInitialVolume(0x7F);
@@ -180,8 +181,8 @@ bool SegSatSeq::readEvent() {
     return true;
   }
 
-  uint32_t beginOffset = curOffset;
-  uint8_t status_byte = readByte(curOffset++);
+  u32 beginOffset = curOffset;
+  u8 status_byte = readByte(curOffset++);
 
   if (status_byte <= 0x7F) {            // note on
     u8 ch = status_byte & 0x0F;
@@ -231,7 +232,7 @@ bool SegSatSeq::readEvent() {
         case Midi::EXPRESSION_MSB:
         case Midi::VOLUME_MSB: {
           m_vol[ch] = controllerValue;
-          u8 scsp_tl = (uint8_t)std::max(0, (254 - 2*controllerValue));
+          u8 scsp_tl = (u8)std::max(0, (254 - 2*controllerValue));
           if (scsp_tl > 0)
             --scsp_tl;
           double attenDb = tlToDB(scsp_tl);
@@ -299,7 +300,7 @@ bool SegSatSeq::readEvent() {
             curOffset += 3;
             return false;
           }
-          uint32_t loopOffset = m_normalTrackOffset + readShortBE(curOffset);
+          u32 loopOffset = m_normalTrackOffset + readShortBE(curOffset);
           curOffset += 2;
           m_remainingNotesInLoop = readByte(curOffset++);
           m_loopEndPos = curOffset;

@@ -5,6 +5,8 @@
  */
 #pragma once
 
+#include "util/types.h"
+
 #include "VGMTag.h"
 #include <cstdint>
 #include <vector>
@@ -24,7 +26,7 @@ class PSFFile {
 
     static VGMTag tagFromPSFFile(const PSFFile& psf);
 
-    [[nodiscard]] uint8_t version() const noexcept { return m_version; }
+    [[nodiscard]] u8 version() const noexcept { return m_version; }
     [[nodiscard]] const std::map<std::string, std::string> &tags() const noexcept { return m_tags; }
     [[nodiscard]] const std::vector<unsigned char> &exe() const noexcept { return m_exe_data; }
     [[nodiscard]] const std::vector<unsigned char> &reservedSection() const noexcept { return m_reserved_data; }
@@ -53,8 +55,8 @@ class PSFFile {
     }
 
    private:
-    uint8_t m_version;
-    uint32_t m_exe_CRC;
+    u8 m_version;
+    u32 m_exe_CRC;
     std::vector<unsigned char> m_exe_data;
     std::vector<unsigned char> m_reserved_data;
     std::map<std::string, std::string> m_tags;

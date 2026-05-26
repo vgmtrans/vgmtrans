@@ -4,6 +4,7 @@
  * refer to the included LICENSE.txt file
  */
 
+#include "util/types.h"
 #include "KonamiTMNT2Instr.h"
 #include "KonamiTMNT2Format.h"
 #include "KonamiAdpcm.h"
@@ -111,8 +112,8 @@ bool KonamiTMNT2SampleInstrSet::parseMelodicInstrs() {
   return true;
 }
 
-double k053260_pitch_cents(uint16_t pitch_word) {
-  uint16_t P = pitch_word & 0x0FFF;
+double k053260_pitch_cents(u16 pitch_word) {
+  u16 P = pitch_word & 0x0FFF;
   double ratio = TIM2_COUNT / (4096.0 - (double)P);
   return 1200.0 * log2(ratio);      // cents relative to 31,960 Hz @ B3
 }

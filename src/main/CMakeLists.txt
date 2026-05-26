@@ -479,6 +479,7 @@ target_sources(vgmtranscore
       util/constevalHelpers.h
       util/decompression.h
       util/helper.h
+      util/types.h
     FILE_SET headers_io TYPE HEADERS BASE_DIRS io
     FILES
       io/RawFile.h

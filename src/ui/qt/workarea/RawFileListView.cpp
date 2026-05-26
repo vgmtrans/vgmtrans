@@ -3,6 +3,7 @@
  * Licensed under the zlib license,
  * refer to the included LICENSE.txt file
  */
+#include "util/types.h"
 #include <ranges>
 
 #include <QKeyEvent>
@@ -226,5 +227,5 @@ void RawFileListView::updateStatusBar() const {
   }
   RawFile* file = qtVGMRoot.rawFiles()[currentIndex().row()];
   QString name = QString::fromStdString(file->name());
-  NotificationCenter::the()->updateStatus(name, "", &fileIcon(), -1, static_cast<uint32_t>(file->size()));
+  NotificationCenter::the()->updateStatus(name, "", &fileIcon(), -1, static_cast<u32>(file->size()));
 }

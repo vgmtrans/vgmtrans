@@ -4,6 +4,8 @@
  * refer to the included LICENSE.txt file
  */
 #pragma once
+
+#include "util/types.h"
 #include "Scanner.h"
 #include "BytePattern.h"
 #include "NinSnesScanResult.h"
@@ -17,14 +19,14 @@ public:
 
 private:
   void loadFromScanResult(RawFile* file, const NinSnesScanResult& scanResult);
-  static BytePattern makeInitSectionPtrPattern(uint8_t addrSectionPtr);
-  static BytePattern makeInitSectionPtrYIPattern(uint8_t addrSectionPtr);
-  static BytePattern makeInitSectionPtrSMWPattern(uint8_t addrSectionPtr);
-  static BytePattern makeInitSectionPtrGD3Pattern(uint8_t addrSectionPtr);
-  static BytePattern makeInitSectionPtrYSFRPattern(uint8_t addrSectionPtr);
-  static BytePattern makeInitSectionPtrTSPattern(uint8_t addrSectionPtr);
-  static BytePattern makeInitSectionPtrYs4Pattern(uint8_t addrSectionPtr);
-  static BytePattern makeInitSongListPtrYSFRPattern(uint8_t addrSongListPtr);
+  static BytePattern makeInitSectionPtrPattern(u8 addrSectionPtr);
+  static BytePattern makeInitSectionPtrYIPattern(u8 addrSectionPtr);
+  static BytePattern makeInitSectionPtrSMWPattern(u8 addrSectionPtr);
+  static BytePattern makeInitSectionPtrGD3Pattern(u8 addrSectionPtr);
+  static BytePattern makeInitSectionPtrYSFRPattern(u8 addrSectionPtr);
+  static BytePattern makeInitSectionPtrTSPattern(u8 addrSectionPtr);
+  static BytePattern makeInitSectionPtrYs4Pattern(u8 addrSectionPtr);
+  static BytePattern makeInitSongListPtrYSFRPattern(u8 addrSongListPtr);
 
   static BytePattern ptnBranchForVcmd;
   static BytePattern ptnBranchForVcmdReadahead;

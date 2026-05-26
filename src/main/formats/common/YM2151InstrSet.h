@@ -5,6 +5,8 @@
  */
 #pragma once
 
+#include "util/types.h"
+
 #include "VGMInstrSet.h"
 #include "YM2151.h"
 #include <filesystem>
@@ -16,7 +18,7 @@
 struct OPMInstrument {
   OPMData data;
   std::string driverName;
-  std::vector<uint8_t> driverData;
+  std::vector<u8> driverData;
 
   std::string toOPMString(int index) const;
 };
@@ -25,8 +27,8 @@ class YM2151InstrSet : public VGMInstrSet {
 public:
   YM2151InstrSet(const std::string& format,
                  RawFile* file,
-                 uint32_t offset,
-                 uint32_t length,
+                 u32 offset,
+                 u32 length,
                  std::string name);
 
   virtual std::string generateOPMFile() const;
@@ -36,7 +38,7 @@ protected:
   void addOPMInstrument(OPMInstrument instrument);
   void addOPMInstrument(OPMData data,
                         std::string driverName = std::string(),
-                        std::vector<uint8_t> driverData = {});
+                        std::vector<u8> driverData = {});
 
 private:
   std::vector<OPMInstrument> m_opmInstruments;

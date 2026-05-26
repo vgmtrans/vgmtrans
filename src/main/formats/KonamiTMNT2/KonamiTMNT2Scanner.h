@@ -5,6 +5,8 @@
  */
 #pragma once
 
+#include "util/types.h"
+
 #include "Scanner.h"
 #include "BytePattern.h"
 #include "KonamiVendettaInstr.h"
@@ -16,7 +18,7 @@ class MAMEGame;
 struct MAMERomGroup;
 struct konami_tmnt2_drum_info;
 
-enum KonamiTMNT2FormatVer: uint8_t {
+enum KonamiTMNT2FormatVer: u8 {
   VERSION_UNDEFINED,
   TMNT2,
   SSRIDERS,

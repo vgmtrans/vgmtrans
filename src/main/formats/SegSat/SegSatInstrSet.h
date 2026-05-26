@@ -6,6 +6,8 @@
 
 #pragma once
 
+#include "util/types.h"
+
 #include "VGMInstrSet.h"
 #include "VGMSampColl.h"
 #include "VGMRgn.h"
@@ -62,12 +64,12 @@ struct SegSatPlfoTable {
 // SegSatInstrSet
 // **************
 
-enum class SegSatDriverVer : uint8_t;
+enum class SegSatDriverVer : u8;
 
 class SegSatInstrSet:
     public VGMInstrSet {
 public:
-  SegSatInstrSet(RawFile* file, uint32_t offset, int numInstrs, SegSatDriverVer ver, const std::string& name = "SegSatInstrSet");
+  SegSatInstrSet(RawFile* file, u32 offset, int numInstrs, SegSatDriverVer ver, const std::string& name = "SegSatInstrSet");
   ~SegSatInstrSet() = default;
 
   virtual bool parseHeader();
@@ -79,7 +81,7 @@ public:
   std::vector<SegSatVLTable> vlTables() { return  m_vlTables; }
   std::vector<SegSatPlfoTable> plfoTables() { return  m_plfoTables; }
 
-  std::unordered_set<uint32_t> sampleOffsets;
+  std::unordered_set<u32> sampleOffsets;
 
 
 private:
@@ -133,7 +135,7 @@ public:
 
   enum class SampleType : u8 { PCM16 = 0, PCM8 = 1 };
 
-  SegSatRgn(SegSatInstr* instr, uint32_t offset, const std::string& name);
+  SegSatRgn(SegSatInstr* instr, u32 offset, const std::string& name);
   ~SegSatRgn() = default;
 
   bool isRegionValid();

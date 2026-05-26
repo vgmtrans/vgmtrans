@@ -4,6 +4,7 @@
  * See the included LICENSE for more information
  */
 
+#include "util/types.h"
 #include "SequencePlayer.h"
 #include <algorithm>
 #include <cstddef>
@@ -23,7 +24,7 @@
 namespace MemFile {
 struct DataBlob {
   QWORD index{};
-  std::vector<uint8_t> data;
+  std::vector<u8> data;
 };
 
 static DWORD mem_read(void *buf, DWORD count, void *handle) {
@@ -213,7 +214,7 @@ bool SequencePlayer::loadCollection(const VGMColl *coll, bool startPlaying) {
     L_ERROR("Failed to convert sequence to MIDI");
     return false;
   }
-  std::vector<uint8_t> raw_midi;
+  std::vector<u8> raw_midi;
   midi->writeMidiToBuffer(raw_midi);
   /* Set up the MIDI stream */
   HSTREAM midi_stream =

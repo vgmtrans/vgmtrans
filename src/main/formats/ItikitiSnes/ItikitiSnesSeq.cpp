@@ -3,19 +3,20 @@
  * Licensed under the zlib license,
  * refer to the included LICENSE.txt file
  */
+#include "util/types.h"
 #include "ItikitiSnesSeq.h"
 #include "ScaleConversion.h"
 #include <spdlog/fmt/fmt.h>
 
 DECLARE_FORMAT(ItikitiSnes);
 
-static constexpr uint8_t NOTE_VELOCITY = 100;
-static constexpr std::array<uint8_t, 16> kMasterNoteLengths = {
+static constexpr u8 NOTE_VELOCITY = 100;
+static constexpr std::array<u8, 16> kMasterNoteLengths = {
     0xc0, 0x90, 0x60, 0x48, 0x40, 0x30, 0x24, 0x20, 0x18, 0x12, 0x10, 0x0c, 0x08, 0x06, 0x04, 0x03};
-static constexpr std::array<uint8_t, 7> kDefaultNoteLengths = {0xc0, 0x60, 0x48, 0x30,
+static constexpr std::array<u8, 7> kDefaultNoteLengths = {0xc0, 0x60, 0x48, 0x30,
                                                                0x24, 0x18, 0x0c};
 
-ItikitiSnesSeq::ItikitiSnesSeq(RawFile *file, uint32_t offset, std::string new_name)
+ItikitiSnesSeq::ItikitiSnesSeq(RawFile *file, u32 offset, std::string new_name)
     : VGMSeq(ItikitiSnesFormat::name, file, offset, 0, std::move(new_name)) {
   bLoadTickByTick = true;
   setAllowDiscontinuousTrackData(true);
@@ -42,14 +43,14 @@ bool ItikitiSnesSeq::parseHeader() {
   if (nNumTracks == 0 || nNumTracks > 8)
     return false;
 
-  const uint16_t first_offset = readShort(offset() + 2);
+  const u16 first_offset = readShort(offset() + 2);
   const auto first_address = offset() + 2 + (2 * nNumTracks);
-  m_base_offset = static_cast<uint16_t>(first_address) - first_offset;
+  m_base_offset = static_cast<u16>(first_address) - first_offset;
 
   for (unsigned int track_index = 0; track_index < nNumTracks; track_index++) {
     std::string track_name = fmt::format("Track {}", track_index + 1);
 
-    const uint32_t offset_to_pointer = offset() + 2 + (2 * track_index);
+    const u32 offset_to_pointer = offset() + 2 + (2 * track_index);
     header->addChild(offset_to_pointer, 2, track_name);
   }
 
@@ -60,19 +61,19 @@ bool ItikitiSnesSeq::parseHeader() {
 
 bool ItikitiSnesSeq::parseTrackPointers() {
   for (unsigned int track_index = 0; track_index < nNumTracks; track_index++) {
-    const uint32_t offset_to_pointer = offset() + 2 + (2 * track_index);
-    const uint32_t offset = readDecodedOffset(offset_to_pointer);
+    const u32 offset_to_pointer = offset() + 2 + (2 * track_index);
+    const u32 offset = readDecodedOffset(offset_to_pointer);
     auto track = std::make_unique<ItikitiSnesTrack>(this, offset);
     aTracks.push_back(track.release());
   }
   return true;
 }
 
-void ItikitiSnesSeq::loadEventMap(std::unordered_map<uint8_t, ItikitiSnesSeqEventType> &event_map) {
+void ItikitiSnesSeq::loadEventMap(std::unordered_map<u8, ItikitiSnesSeqEventType> &event_map) {
   event_map.clear();
 
   for (unsigned int command = kItikitiSnesSeqMinNoteByte; command <= 0xff; command++) {
-    event_map[static_cast<uint8_t>(command)] = ItikitiSnesSeqEventType::EVENT_NOTE;
+    event_map[static_cast<u8>(command)] = ItikitiSnesSeqEventType::EVENT_NOTE;
   }
 
   event_map[0x00] = ItikitiSnesSeqEventType::EVENT_END;
@@ -125,7 +126,7 @@ void ItikitiSnesSeq::loadEventMap(std::unordered_map<uint8_t, ItikitiSnesSeqEven
   event_map[0x2f] = ItikitiSnesSeqEventType::EVENT_LOOP_BREAK;
 }
 
-ItikitiSnesTrack::ItikitiSnesTrack(ItikitiSnesSeq *seq, uint32_t offset, uint32_t length)
+ItikitiSnesTrack::ItikitiSnesTrack(ItikitiSnesSeq *seq, u32 offset, u32 length)
     : SeqTrack(seq, offset, length) {
   bDetermineTrackLengthEventByEvent = true;
   bWriteGenericEventAsTextEvent = false;
@@ -146,7 +147,7 @@ bool ItikitiSnesTrack::readEvent() {
   if (curOffset >= 0x10000)
     return false;
 
-  const uint8_t command = readByte(curOffset++);
+  const u8 command = readByte(curOffset++);
   const auto event_type = seq->getEventType(command);
 
   bool stop_parser = false;
@@ -182,15 +183,15 @@ bool ItikitiSnesTrack::readEvent() {
     }
 
     case ItikitiSnesSeqEventType::EVENT_NOTE: {
-      const uint8_t len_index = command & 7;
+      const u8 len_index = command & 7;
 
-      uint8_t len;
+      u8 len;
       if (len_index == 7)
         len = readByte(curOffset++);
       else
         len = m_note_length_table[len_index];
 
-      const uint8_t dur = len - 2;
+      const u8 dur = len - 2;
 
       const bool rest = command >= 0xf8;
       const bool tie = command >= 0xf0 && command <= 0xf7;
@@ -201,8 +202,8 @@ bool ItikitiSnesTrack::readEvent() {
         addTie(start, curOffset - start, dur, "Tie", desc);
         addTime(len);
       } else {
-        const uint8_t key_index = command >> 3;
-        const int8_t key = static_cast<int8_t>(kItikitiSnesSeqNoteKeyBias + key_index - 6 + m_note_number_base);
+        const u8 key_index = command >> 3;
+        const s8 key = static_cast<s8>(kItikitiSnesSeqNoteKeyBias + key_index - 6 + m_note_number_base);
         addNoteByDur(start, curOffset - start, key, NOTE_VELOCITY, dur);
         addTime(len);
       }
@@ -216,56 +217,56 @@ bool ItikitiSnesTrack::readEvent() {
     }
 
     case ItikitiSnesSeqEventType::EVENT_MASTER_VOLUME: {
-      const uint8_t vol = readByte(curOffset++);
+      const u8 vol = readByte(curOffset++);
       desc = fmt::format("Volume: {:d}", vol);
       addGenericEvent(start, curOffset - start, "Master Volume", desc, Type::MasterVolume);
       break;
     }
 
     case ItikitiSnesSeqEventType::EVENT_ECHO_VOLUME: {
-      const uint8_t vol = readByte(curOffset++);
+      const u8 vol = readByte(curOffset++);
       desc = fmt::format("Volume: {:d}", vol);
       addGenericEvent(start, curOffset - start, "Echo Volume", desc, Type::Reverb);
       break;
     }
 
     case ItikitiSnesSeqEventType::EVENT_CHANNEL_VOLUME: {
-      const uint8_t vol = readByte(curOffset++);
+      const u8 vol = readByte(curOffset++);
       addVol(start, curOffset - start, vol >> 1);
       break;
     }
 
     case ItikitiSnesSeqEventType::EVENT_ECHO_FEEDBACK_FIR: {
-      const int8_t feedback = static_cast<int8_t>(readByte(curOffset++));
-      const uint8_t filter_index = readByte(curOffset++);
+      const s8 feedback = static_cast<s8>(readByte(curOffset++));
+      const u8 filter_index = readByte(curOffset++);
       desc = fmt::format("Feedback: {:d}  FIR: {:d}", feedback, filter_index);
       addGenericEvent(start, curOffset - start, "Echo Feedback & FIR", desc, Type::Reverb);
       break;
     }
 
     case ItikitiSnesSeqEventType::EVENT_TEMPO: {
-      const uint8_t tempo = readByte(curOffset++);
+      const u8 tempo = readByte(curOffset++);
       addTempoBPM(start, curOffset - start, seq->getTempoInBpm(tempo));
       break;
     }
 
     case ItikitiSnesSeqEventType::EVENT_TEMPO_FADE: {
-      const uint8_t fade_length = readByte(curOffset++);
-      const uint8_t tempo = readByte(curOffset++);
+      const u8 fade_length = readByte(curOffset++);
+      const u8 tempo = readByte(curOffset++);
       addTempoBPMSlide(start, curOffset - start, fade_length, seq->getTempoInBpm(tempo));
       break;
     }
 
     case ItikitiSnesSeqEventType::EVENT_NOISE_FREQ: {
       // Driver bug: This command sets the noise frequency for the next track from the current.
-      const uint8_t nck = readByte(curOffset++) & 0x1f;
+      const u8 nck = readByte(curOffset++) & 0x1f;
       desc = fmt::format("Noise Frequency (NCK): {:d}", nck);
       addGenericEvent(start, curOffset - start, "Noise Frequency", desc, Type::Noise);
       break;
     }
 
     case ItikitiSnesSeqEventType::EVENT_SELECT_NOTE_LENGTH_PATTERN: {
-      const uint16_t bits = readShort(curOffset);
+      const u16 bits = readShort(curOffset);
       curOffset += 2;
       desc = fmt::format("Length Bits: 0x{:04X}", bits);
       addGenericEvent(start, curOffset - start, "Note Length Pattern", desc, Type::DurationNote);
@@ -273,7 +274,7 @@ bool ItikitiSnesTrack::readEvent() {
       size_t size_written = 0;
       for (unsigned int index = 0; index < 16 && size_written < m_note_length_table.size();
            index++) {
-        if (const uint16_t bit = static_cast<uint16_t>(0x8000) >> index; (bits & bit) != 0) {
+        if (const u16 bit = static_cast<u16>(0x8000) >> index; (bits & bit) != 0) {
           m_note_length_table[size_written] = kMasterNoteLengths[index];
           size_written++;
         }
@@ -282,13 +283,13 @@ bool ItikitiSnesTrack::readEvent() {
     }
 
     case ItikitiSnesSeqEventType::EVENT_CUSTOM_NOTE_LENGTH_PATTERN: {
-      const uint8_t arg1 = readByte(curOffset++);
-      const uint8_t arg2 = readByte(curOffset++);
-      const uint8_t arg3 = readByte(curOffset++);
-      const uint8_t arg4 = readByte(curOffset++);
-      const uint8_t arg5 = readByte(curOffset++);
-      const uint8_t arg6 = readByte(curOffset++);
-      const uint8_t arg7 = readByte(curOffset++);
+      const u8 arg1 = readByte(curOffset++);
+      const u8 arg2 = readByte(curOffset++);
+      const u8 arg3 = readByte(curOffset++);
+      const u8 arg4 = readByte(curOffset++);
+      const u8 arg5 = readByte(curOffset++);
+      const u8 arg6 = readByte(curOffset++);
+      const u8 arg7 = readByte(curOffset++);
       desc = fmt::format("Lengths: {:d}, {:d}, {:d}, {:d}, {:d}, {:d}, {:d}",
                                arg1, arg2, arg3, arg4, arg5, arg6, arg7);
       addGenericEvent(start, curOffset - start, "Custom Note Length Pattern", desc,
@@ -305,7 +306,7 @@ bool ItikitiSnesTrack::readEvent() {
     }
 
     case ItikitiSnesSeqEventType::EVENT_NOTE_NUMBER_BASE: {
-      const uint8_t note_number = readByte(curOffset++);
+      const u8 note_number = readByte(curOffset++);
       desc = fmt::format("Note Number: {:d}", note_number);
       addGenericEvent(start, curOffset - start, "Note Number Base", desc, Type::ChangeState);
       m_note_number_base = note_number;
@@ -313,71 +314,71 @@ bool ItikitiSnesTrack::readEvent() {
     }
 
     case ItikitiSnesSeqEventType::EVENT_VOLUME: {
-      const uint8_t vol = readByte(curOffset++);
+      const u8 vol = readByte(curOffset++);
       addExpression(start, curOffset - start, vol >> 1);
       break;
     }
 
     case ItikitiSnesSeqEventType::EVENT_VOLUME_FADE: {
-      const uint8_t fade_length = readByte(curOffset++);
-      const uint8_t vol = readByte(curOffset++);
+      const u8 fade_length = readByte(curOffset++);
+      const u8 vol = readByte(curOffset++);
       addExpressionSlide(start, curOffset - start, fade_length, vol >> 1);
       break;
     }
 
     case ItikitiSnesSeqEventType::EVENT_PAN: {
-      const uint8_t pan = readByte(curOffset++);
-      const uint8_t midi_pan = convertLinearPercentPanValToStdMidiVal(pan / 255.0);
+      const u8 pan = readByte(curOffset++);
+      const u8 midi_pan = convertLinearPercentPanValToStdMidiVal(pan / 255.0);
       addPan(start, curOffset - start, midi_pan);
       // TODO: apply volume scale
       break;
     }
 
     case ItikitiSnesSeqEventType::EVENT_PAN_FADE: {
-      const uint8_t fade_length = readByte(curOffset++);
-      const uint8_t pan = readByte(curOffset++);
-      const uint8_t midi_pan = convertLinearPercentPanValToStdMidiVal(pan / 255.0);
+      const u8 fade_length = readByte(curOffset++);
+      const u8 pan = readByte(curOffset++);
+      const u8 midi_pan = convertLinearPercentPanValToStdMidiVal(pan / 255.0);
       addPanSlide(start, curOffset - start, fade_length, midi_pan); // TODO: fix pan curve
       // TODO: apply volume scale
       break;
     }
 
     case ItikitiSnesSeqEventType::EVENT_PROGRAM_CHANGE: {
-      const uint8_t instrument = readByte(curOffset++);
+      const u8 instrument = readByte(curOffset++);
       addProgramChange(start, curOffset - start, instrument);
       break;
     }
 
     case ItikitiSnesSeqEventType::EVENT_TUNING: {
-      const int8_t tuning = static_cast<int8_t>(readByte(curOffset++));
+      const s8 tuning = static_cast<s8>(readByte(curOffset++));
       const double semitones = tuning / 128.0; // not very well verified
       addFineTuning(start, curOffset - start, semitones * 100.0);
       break;
     }
 
     case ItikitiSnesSeqEventType::EVENT_ADSR_AR: {
-      const uint8_t ar = readByte(curOffset++) & 15;
+      const u8 ar = readByte(curOffset++) & 15;
       desc = fmt::format("AR: {:d}", ar);
       addGenericEvent(start, curOffset - start, "ADSR Attack Rate", desc, Type::Adsr);
       break;
     }
 
     case ItikitiSnesSeqEventType::EVENT_ADSR_DR: {
-      const uint8_t dr = readByte(curOffset++) & 7;
+      const u8 dr = readByte(curOffset++) & 7;
       desc = fmt::format("DR: {:d}", dr);
       addGenericEvent(start, curOffset - start, "ADSR Decay Rate", desc, Type::Adsr);
       break;
     }
 
     case ItikitiSnesSeqEventType::EVENT_ADSR_SL: {
-      const uint8_t sl = readByte(curOffset++) & 7;
+      const u8 sl = readByte(curOffset++) & 7;
       desc = fmt::format("SL: {:d}", sl);
       addGenericEvent(start, curOffset - start, "ADSR Sustain Level", desc, Type::Adsr);
       break;
     }
 
     case ItikitiSnesSeqEventType::EVENT_ADSR_SR: {
-      const uint8_t sr = readByte(curOffset++) & 15;
+      const u8 sr = readByte(curOffset++) & 15;
       desc = fmt::format("SR: {:d}", sr);
       addGenericEvent(start, curOffset - start, "ADSR Sustain Rate", desc, Type::Adsr);
       break;
@@ -389,22 +390,22 @@ bool ItikitiSnesTrack::readEvent() {
     }
 
     case ItikitiSnesSeqEventType::EVENT_TRANSPOSE_ABS: {
-      const int8_t transpose = static_cast<int8_t>(readByte(curOffset++));
+      const s8 transpose = static_cast<s8>(readByte(curOffset++));
       addTranspose(start, curOffset - start, transpose);
       break;
     }
 
     case ItikitiSnesSeqEventType::EVENT_TRANSPOSE_REL: {
-      const int8_t transpose_amount = static_cast<int8_t>(readByte(curOffset++));
-      const int8_t new_transpose = static_cast<int8_t>(std::max(-128, std::min(127, transpose + transpose_amount)));
+      const s8 transpose_amount = static_cast<s8>(readByte(curOffset++));
+      const s8 new_transpose = static_cast<s8>(std::max(-128, std::min(127, transpose + transpose_amount)));
       addTranspose(start, curOffset - start, new_transpose, "Transpose (Relative)");
       break;
     }
 
     case ItikitiSnesSeqEventType::EVENT_VIBRATO_ON: {
-        const uint8_t delay = readByte(curOffset++);
-        const uint8_t rate = readByte(curOffset++);
-        const uint8_t depth = readByte(curOffset++);
+        const u8 delay = readByte(curOffset++);
+        const u8 rate = readByte(curOffset++);
+        const u8 depth = readByte(curOffset++);
         desc = fmt::format("Delay: {:d}  Rate: {:d}  Depth: {:d}", delay, rate, depth);
         addGenericEvent(start, curOffset - start, "Vibrato", desc, Type::Vibrato);
         break;
@@ -418,9 +419,9 @@ bool ItikitiSnesTrack::readEvent() {
 
 
     case ItikitiSnesSeqEventType::EVENT_TREMOLO_ON: {
-      const uint8_t delay = readByte(curOffset++);
-      const uint8_t rate = readByte(curOffset++);
-      const uint8_t depth = readByte(curOffset++);
+      const u8 delay = readByte(curOffset++);
+      const u8 rate = readByte(curOffset++);
+      const u8 depth = readByte(curOffset++);
       desc = fmt::format("Delay: {:d}  Rate: {:d}  Depth: {:d}", delay, rate, depth);
       addGenericEvent(start, curOffset - start, "Tremolo", desc, Type::Tremelo);
       break;
@@ -432,8 +433,8 @@ bool ItikitiSnesTrack::readEvent() {
     }
 
     case ItikitiSnesSeqEventType::EVENT_PAN_LFO_ON: {
-      const uint8_t depth = readByte(curOffset++);
-      const uint8_t rate = readByte(curOffset++);
+      const u8 depth = readByte(curOffset++);
+      const u8 rate = readByte(curOffset++);
       desc = fmt::format("Depth: {:d}  Rate: {:d}", depth, rate);
       addGenericEvent(start, curOffset - start, "Pan LFO", desc, Type::PanLfo);
       break;
@@ -477,7 +478,7 @@ bool ItikitiSnesTrack::readEvent() {
     }
 
     case ItikitiSnesSeqEventType::EVENT_PORTAMENTO_ON: {
-      const uint8_t speed = readByte(curOffset++); // in ticks
+      const u8 speed = readByte(curOffset++); // in ticks
       addPortamentoTime(start, curOffset - start, speed, "Portamento");
       addPortamentoNoItem(true);
       break;
@@ -489,7 +490,7 @@ bool ItikitiSnesTrack::readEvent() {
     }
 
     case ItikitiSnesSeqEventType::EVENT_SPECIAL: {
-      const uint8_t value = readByte(curOffset++);
+      const u8 value = readByte(curOffset++);
       if (value <= 0x7f) {
         desc = fmt::format("Range: {:d} semitones", value);
         addGenericEvent(start, curOffset - start, "Note Randomization On", desc,
@@ -512,15 +513,15 @@ bool ItikitiSnesTrack::readEvent() {
     }
 
     case ItikitiSnesSeqEventType::EVENT_PITCH_SLIDE: {
-      const uint8_t length = readByte(curOffset++); // in ticks
-      const int8_t semitones = static_cast<int8_t>(readByte(curOffset++));
+      const u8 length = readByte(curOffset++); // in ticks
+      const s8 semitones = static_cast<s8>(readByte(curOffset++));
       desc = fmt::format("Length: {:d}  Key: {:d} semitones", length, semitones);
       addGenericEvent(start, curOffset - start, "Pitch Slide", desc, Type::PitchBendSlide);
       break;
     }
 
     case ItikitiSnesSeqEventType::EVENT_LOOP_START: {
-      const uint8_t count = readByte(curOffset++);
+      const u8 count = readByte(curOffset++);
       desc = (count == 0) ? std::string("Repeat Count: Infinite")
                                  : fmt::format("Repeat Count: {:d}", count + 1);
       addGenericEvent(start, curOffset - start, "Loop Start", desc, Type::RepeatStart);
@@ -532,13 +533,13 @@ bool ItikitiSnesTrack::readEvent() {
       }
       m_loop_level++;
       m_loop_counts[m_loop_level] = (count == 0) ? 0 : count + 1;
-      m_loop_start_addresses[m_loop_level] = static_cast<uint16_t>(curOffset);
+      m_loop_start_addresses[m_loop_level] = static_cast<u16>(curOffset);
       m_alt_loop_count = 0;
       break;
     }
 
     case ItikitiSnesSeqEventType::EVENT_GOTO: {
-      const uint16_t dest = readDecodedOffset(curOffset);
+      const u16 dest = readDecodedOffset(curOffset);
       curOffset += 2;
       desc = fmt::format("Destination: ${:04X}", dest);
       const auto length = curOffset - start;
@@ -573,8 +574,8 @@ bool ItikitiSnesTrack::readEvent() {
     }
 
     case ItikitiSnesSeqEventType::EVENT_LOOP_BREAK: {
-      const uint8_t target_count = readByte(curOffset++);
-      const uint16_t dest = readDecodedOffset(curOffset);
+      const u8 target_count = readByte(curOffset++);
+      const u16 dest = readDecodedOffset(curOffset);
       curOffset += 2;
 
       desc = fmt::format("Count: {:d}  Destination: ${:04X}", target_count, dest);

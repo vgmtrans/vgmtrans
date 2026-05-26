@@ -3,6 +3,7 @@
  * Licensed under the zlib license,
  * refer to the included LICENSE.txt file
  */
+#include "util/types.h"
 #include "KonamiAdpcm.h"
 
 #include <algorithm>
@@ -47,9 +48,9 @@ double KonamiAdpcmSamp::compressionRatio() const {
   return (16.0 / 4); // 4 bit samples converted up to 16 bit samples
 }
 
-std::vector<uint8_t> KonamiAdpcmSamp::decodeToNativePcm() {
-  const uint32_t sampleCount = uncompressedSize() / sizeof(int16_t);
-  std::vector<uint8_t> samples(sampleCount * sizeof(int16_t));
+std::vector<u8> KonamiAdpcmSamp::decodeToNativePcm() {
+  const u32 sampleCount = uncompressedSize() / sizeof(s16);
+  std::vector<u8> samples(sampleCount * sizeof(s16));
   auto* uncompBuf = reinterpret_cast<s16*>(samples.data());
 
   size_t sampleNum = 0;          // write index in the PCM buffer

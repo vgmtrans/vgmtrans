@@ -4,10 +4,12 @@
  * refer to the included LICENSE.txt file
  */
 #pragma once
+
+#include "util/types.h"
 #include "Scanner.h"
 #include "BytePattern.h"
 
-enum SuzukiSnesVersion : uint8_t;  // see SuzukiSnesFormat.h
+enum SuzukiSnesVersion : u8;  // see SuzukiSnesFormat.h
 
 class SuzukiSnesScanner : public VGMScanner {
  public:
