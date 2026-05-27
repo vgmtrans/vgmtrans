@@ -93,6 +93,11 @@ class SeqTrack : public VGMItem {
   }
   void setUseLinearAmplitudeScale(bool set) { m_useLinearAmpScale = set; }
 
+  [[nodiscard]] bool usesLinearPanAmplitudeScale() const {
+    return m_useLinearPanAmpScale || parentSeq->usesLinearPanAmplitudeScale();
+  }
+  void setUseLinearPanAmplitudeScale(bool set) { m_useLinearPanAmpScale = set; }
+
   virtual bool loadTrackInit(int trackNum, MidiTrack *preparedMidiTrack);
   virtual void loadTrackMainLoop(uint32_t stopOffset, int32_t stopTime);
 
@@ -393,6 +398,7 @@ private:
   bool bDetermineTrackLengthEventByEvent;
   bool bWriteGenericEventAsTextEvent;
   bool m_useLinearAmpScale = false;
+  bool m_useLinearPanAmpScale = false;
 
   std::unordered_set<uint32_t> visitedAddresses;
   uint32_t visitedAddressMax;

@@ -20,6 +20,7 @@ MoriSnesSeq::MoriSnesSeq(RawFile *file, MoriSnesVersion ver, uint32_t seqdataOff
   bLoadTickByTick = true;
   setAllowDiscontinuousTrackData(true);
   setUseLinearAmplitudeScale(true);
+  setUseLinearPanAmplitudeScale(PanVolumeCorrectionMode::kNoVolumeAdjust);
 
   useReverb();
   setAlwaysWriteInitialReverb(0);

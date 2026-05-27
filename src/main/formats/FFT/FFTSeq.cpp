@@ -19,6 +19,7 @@ FFTSeq::FFTSeq(RawFile *file, uint32_t offset)
     : VGMSeq(FFTFormat::name, file, offset) {
   setAlwaysWriteInitialVol(127);
   setUseLinearAmplitudeScale(true);
+  setUseLinearPanAmplitudeScale(PanVolumeCorrectionMode::kNoVolumeAdjust);
   useReverb();
 }
 
