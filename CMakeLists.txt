@@ -91,7 +91,6 @@ set_property(
 # ~~~
 
 option(ENABLE_UI_QT "Build the UI (Qt)" ON)
-option(ENABLE_CLI "Build the CLI application" ON)
 option(ENABLE_SHELL "Build the shell application" ON)
 
 option(NO_QT_DEPLOY "Don't run the Qt deploy script during install (useful for system/Flatpak packaging)" OFF)

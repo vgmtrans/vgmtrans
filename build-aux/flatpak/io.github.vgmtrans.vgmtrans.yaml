@@ -18,7 +18,6 @@ modules:
     config-opts:
       - -DCMAKE_BUILD_TYPE=Release
       - -DENABLE_UI_QT=ON
-      - -DENABLE_CLI=OFF
       - -DENABLE_SHELL=OFF
       - -DNO_QT_DEPLOY=ON
       - -DINSTALL_CHANGELOG=ON
