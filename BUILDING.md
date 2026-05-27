@@ -2,10 +2,12 @@
 
 > [!TIP]
 > **Building from source is usually not necessary.**
-> Precompiled binaries for macOS, Windows, and Linux are available on the [GitHub Releases](https://github.com/vgmtrans/vgmtrans/releases) page and for each commit on [GitHub Actions](https://github.com/vgmtrans/vgmtrans/actions).
+> See the repository [README](README.md) for information
+> about automated builds
 
 This document provides instructions for building VGMTrans from source if you wish to contribute or need a custom build.
-We generally accept patches to fix build issues on platforms we don't have easy access to, but we cannot guarantee that we will be able to test them.
+We generally accept patches to fix build issues on platforms we don't have easy access to, however, we cannot guarantee that they won't break
+again in the future.
 
 ## Prerequisites
 
@@ -36,7 +38,7 @@ pip install aqtinstall
 aqt install-qt mac desktop 6.8.3 clang_64 -m qtshadertools --archives qtbase qtsvg --outputdir ./my_qt
 
 # Example for Windows MSVC
-aqt install-qt windows desktop 6.8.3 win64_msvc2022_64 -m qtshadertools --archives qtbase qtsvg --outputdir ./my_qt
+aqt install-qt windows desktop 6.9 win64_msvc2022_64 -m qtshadertools --archives qtbase qtsvg --outputdir ./my_qt
 ```
 
 Make sure to set your `CMAKE_PREFIX_PATH` to the installed Qt directory (e.g., `-DCMAKE_PREFIX_PATH=./my_qt/6.8.3/macos`) when configuring CMake.
@@ -133,7 +135,7 @@ As a compiler, both Xcode's Clang and clang from Homebrew should work.
 
 ### Windows
 
-- **MSVC**: Ensure you have Visual Studio 2022 with the "Desktop development with C++" workload installed.
+- **MSVC**: Ensure you have Visual Studio with the "Desktop development with C++" workload installed.
 - **Clang**: You can use the `win-x64-clang` preset if you have LLVM installed. Note that Clang on Windows requires at least Build Tools for Visual Studio or a `/winsysroot`
 - **Qt**: You can use the official Qt Online Installer, or [aqtinstall](https://github.com/miurahr/aqtinstall) for installing without an account.
   Instead of setting `Qt6_DIR`, it is often much easier to set `CMAKE_PREFIX_PATH` to the root of the installed Qt version folder (e.g., `C:\Qt\6.8.0\msvc2022_64`). CMake will then automatically find all the Qt6 modules inside it. You may also need to set your `QT_PLUGIN_PATH` environment variable if you get errors about missing platform plugins.
@@ -155,11 +157,10 @@ sudo apt install build-essential cmake ninja-build qt6-base-dev \
 
 You can toggle specific application components using CMake options during configuration:
 
-- `ENABLE_UI_QT`: Build the Qt-based GUI (Default: `ON`).
-- `ENABLE_CLI`: Build the command-line interface (Default: `ON`).
-- `ENABLE_SHELL`: Build the interactive shell (Default: `ON`).
+- `ENABLE_UI_QT`: Build the main application, a Qt-based GUI (Default: `ON`).
+- `ENABLE_SHELL`: Build the interactive shell (Default: `ON`). This is useful for CLI-only environments, scripting, other forms of automation.
 
-Example of building only the CLI and Shell:
+This following command, for example, will disable the Qt UI:
 ```bash
 cmake --preset <preset-name> -DENABLE_UI_QT=OFF
 ```
