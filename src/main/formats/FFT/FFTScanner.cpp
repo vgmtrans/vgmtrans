@@ -4,7 +4,7 @@
  * refer to the included LICENSE.txt file
  */
 
-#include "base/types.h"
+#include "base/Types.h"
 #include "FFTSeq.h"
 #include "FFTInstr.h"
 #include "FFTScanner.h"

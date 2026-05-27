@@ -8,7 +8,7 @@
 
 #include <cstring>
 
-#include "base/types.h"
+#include "base/Types.h"
 #include "LoaderManager.h"
 #include "LogManager.h"
 

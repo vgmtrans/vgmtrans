@@ -1,6 +1,6 @@
 #pragma once
 
-#include "base/types.h"
+#include "base/Types.h"
 #include "VGMInstrSet.h"
 #include "VGMRgn.h"
 #include "HeartBeatSnesFormat.h"

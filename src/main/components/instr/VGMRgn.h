@@ -1,6 +1,6 @@
 #pragma once
 
-#include "base/types.h"
+#include "base/Types.h"
 #include "SynthFile.h"
 #include "VGMItem.h"
 #include "Loop.h"

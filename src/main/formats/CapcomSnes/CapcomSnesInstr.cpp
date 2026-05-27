@@ -3,7 +3,7 @@
  * Licensed under the zlib license,
  * refer to the included LICENSE.txt file
  */
-#include "base/types.h"
+#include "base/Types.h"
 #include "CapcomSnesInstr.h"
 #include <spdlog/fmt/fmt.h>
 #include "SNESDSP.h"

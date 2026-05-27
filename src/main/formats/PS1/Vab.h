@@ -1,7 +1,7 @@
 #pragma once
 
-#include "util/size_offset_pair.h"
-#include "base/types.h"
+#include "util/SizeOffsetPair.h"
+#include "base/Types.h"
 #include "VGMInstrSet.h"
 #include "VGMSampColl.h"
 #include "VGMRgn.h"

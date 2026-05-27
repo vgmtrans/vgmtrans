@@ -9,12 +9,12 @@
 #include "services/commands/Command.h"
 #include <filesystem>
 #include <QMenu>
-#include "base/types.h"
-#include "util/path.h"
+#include "base/Types.h"
+#include "util/Path.h"
 #include "Root.h"
 #include "UIHelpers.h"
 #include "LogManager.h"
-#include "helper.h"
+#include "Helper.h"
 
 namespace fs = std::filesystem;
 

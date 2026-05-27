@@ -2,8 +2,8 @@
 
 #include <cassert>
 #include <cstring>
-#include "base/types.h"
-#include "helper.h"
+#include "base/Types.h"
+#include "Helper.h"
 
 
 //////////////////////////////////////////////

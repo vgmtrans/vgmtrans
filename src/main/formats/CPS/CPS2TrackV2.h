@@ -1,6 +1,6 @@
 #pragma once
 
-#include "base/types.h"
+#include "base/Types.h"
 #include "VGMSeq.h"
 #include "SeqTrack.h"
 #include "CPS2Seq.h"

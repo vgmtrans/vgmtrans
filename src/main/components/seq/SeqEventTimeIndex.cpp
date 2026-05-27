@@ -4,7 +4,7 @@
  * refer to the included LICENSE.txt file
  */
 
-#include "base/types.h"
+#include "base/Types.h"
 #include "SeqEventTimeIndex.h"
 #include "SeqEvent.h"
 #include <algorithm>

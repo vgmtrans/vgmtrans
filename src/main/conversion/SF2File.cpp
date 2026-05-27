@@ -3,7 +3,7 @@
  * Licensed under the zlib license,
  * refer to the included LICENSE.txt file
  */
-#include "base/types.h"
+#include "base/Types.h"
 #include <algorithm>
 #include <cmath>
 #include <limits>
@@ -13,7 +13,7 @@
 #include "version.h"
 #include "VGMInstrSet.h"
 #include "SynthFile.h"
-#include "scale_conversion.h"
+#include "ScaleConversion.h"
 #include "Root.h"
 #include "VGMRgn.h"
 

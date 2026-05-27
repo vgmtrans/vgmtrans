@@ -13,7 +13,7 @@
  * Sappy sound engine detector (c) 2014 by Bregalad, loveemu
  */
 
-#include "base/types.h"
+#include "base/Types.h"
 #include "MP2kScanner.h"
 
 #include <optional>

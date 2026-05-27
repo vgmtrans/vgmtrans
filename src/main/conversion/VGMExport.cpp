@@ -3,13 +3,13 @@
  * Licensed under the zlib license,
  * refer to the included LICENSE.txt file
  */
-#include "base/types.h"
+#include "base/Types.h"
 #include <spdlog/fmt/fmt.h>
 #include <fstream>
 #include <algorithm>
 
 #include "VGMExport.h"
-#include "helper.h"
+#include "Helper.h"
 #include "VGMInstrSet.h"
 #include "VGMSampColl.h"
 #include "VGMSamp.h"

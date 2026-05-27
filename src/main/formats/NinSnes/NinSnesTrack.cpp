@@ -1,8 +1,8 @@
-#include "base/types.h"
+#include "base/Types.h"
 #include "NinSnesSeq.h"
 
 #include "SeqEvent.h"
-#include "scale_conversion.h"
+#include "ScaleConversion.h"
 #include "spdlog/fmt/fmt.h"
 #include <algorithm>
 

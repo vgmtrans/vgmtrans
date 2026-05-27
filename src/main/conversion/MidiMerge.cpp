@@ -15,7 +15,7 @@
 #include <unordered_map>
 #include <utility>
 
-#include "base/types.h"
+#include "base/Types.h"
 #include "ConversionContext.h"
 #include "LogManager.h"
 #include "MidiFile.h"

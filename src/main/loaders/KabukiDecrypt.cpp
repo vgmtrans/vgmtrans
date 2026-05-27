@@ -1,4 +1,4 @@
-#include "base/types.h"
+#include "base/Types.h"
 #include "KabukiDecrypt.h"
 
 // The following is taken directly from the MAME source code in kabuki.c

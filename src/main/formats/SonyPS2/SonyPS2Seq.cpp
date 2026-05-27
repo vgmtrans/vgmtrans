@@ -1,4 +1,4 @@
-#include "base/types.h"
+#include "base/Types.h"
 #include "SonyPS2Seq.h"
 
 DECLARE_FORMAT(SonyPS2);

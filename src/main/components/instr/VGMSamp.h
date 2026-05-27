@@ -6,8 +6,8 @@
 
 #pragma once
 
-#include "base/binary.h"
-#include "base/types.h"
+#include "base/Binary.h"
+#include "base/Types.h"
 #include "VGMItem.h"
 #include "Loop.h"
 #include <cstddef>

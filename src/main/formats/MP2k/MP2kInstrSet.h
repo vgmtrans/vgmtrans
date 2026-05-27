@@ -7,7 +7,7 @@
 
 #pragma once
 
-#include "base/types.h"
+#include "base/Types.h"
 
 #include <map>
 #include "VGMInstrSet.h"

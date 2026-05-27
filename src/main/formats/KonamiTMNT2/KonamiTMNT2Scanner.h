@@ -5,10 +5,10 @@
  */
 #pragma once
 
-#include "base/types.h"
+#include "base/Types.h"
 
 #include "Scanner.h"
-#include "byte_pattern.h"
+#include "BytePattern.h"
 #include "KonamiVendettaInstr.h"
 
 #include <vector>

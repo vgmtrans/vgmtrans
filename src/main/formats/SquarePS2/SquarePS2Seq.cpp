@@ -1,4 +1,4 @@
-#include "base/types.h"
+#include "base/Types.h"
 #include "SquarePS2Seq.h"
 
 DECLARE_FORMAT(SquarePS2);

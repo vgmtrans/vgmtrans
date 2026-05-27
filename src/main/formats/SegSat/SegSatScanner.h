@@ -4,9 +4,9 @@
  * refer to the included LICENSE.txt file
  */
 #pragma once
-#include "base/types.h"
+#include "base/Types.h"
 #include "Scanner.h"
-#include "byte_pattern.h"
+#include "BytePattern.h"
 #include <vector>
 
 class SegSatSeq;

@@ -1,8 +1,8 @@
 #pragma once
 
-#include "base/types.h"
+#include "base/Types.h"
 #include "Scanner.h"
-#include "byte_pattern.h"
+#include "BytePattern.h"
 
 enum CapcomSnesVersion: u8; // see CapcomSnesFormat.h
 

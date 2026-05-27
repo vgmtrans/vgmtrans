@@ -1,6 +1,6 @@
 #pragma once
 
-#include "base/types.h"
+#include "base/Types.h"
 #include "Format.h"
 #include "SonyPS2Scanner.h"
 #include "FilenameMatcher.h"

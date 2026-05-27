@@ -10,7 +10,7 @@
 #include <assert.h>
 #include <memory>
 #include <cstring>
-#include "byte_pattern.h"
+#include "BytePattern.h"
 
 BytePattern::BytePattern() :
     ptn_str(NULL),

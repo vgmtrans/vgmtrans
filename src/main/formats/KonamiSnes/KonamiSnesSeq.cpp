@@ -3,11 +3,11 @@
  * Licensed under the zlib license,
  * refer to the included LICENSE.txt file
  */
-#include "base/types.h"
+#include "base/Types.h"
 #include "KonamiSnesSeq.h"
 #include "KonamiSnesInstr.h"
 #include "KonamiSnesVibrato.h"
-#include "scale_conversion.h"
+#include "ScaleConversion.h"
 #include "automation/SeqTrackAutomation.h"
 #include "spdlog/fmt/fmt.h"
 #include <algorithm>

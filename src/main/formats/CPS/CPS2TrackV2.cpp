@@ -3,9 +3,9 @@
  * Licensed under the zlib license,
  * refer to the included LICENSE.txt file
  */
-#include "base/types.h"
+#include "base/Types.h"
 #include "CPS2TrackV2.h"
-#include "scale_conversion.h"
+#include "ScaleConversion.h"
 
 
 CPS2TrackV2::CPS2TrackV2(CPS2Seq *parentSeq, u32 offset, u32 length)

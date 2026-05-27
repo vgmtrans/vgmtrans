@@ -7,7 +7,7 @@
 // If you want to convert it without losing any events,
 // check seqq2mid tool created by loveemu <https://code.google.com/p/loveemu/>
 
-#include "base/types.h"
+#include "base/Types.h"
 #include "HeartBeatPS1Seq.h"
 #include "HeartBeatPS1Format.h"
 

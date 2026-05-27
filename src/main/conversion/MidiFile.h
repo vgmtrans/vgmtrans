@@ -10,7 +10,7 @@
 #include <unordered_map>
 #include <filesystem>
 
-#include "base/types.h"
+#include "base/Types.h"
 
 class VGMSeq;
 

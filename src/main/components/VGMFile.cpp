@@ -4,7 +4,7 @@
  * refer to the included LICENSE.txt file
  */
 
-#include "base/types.h"
+#include "base/Types.h"
 #include "Root.h"
 #include "VGMFile.h"
 #include "Format.h"

@@ -3,11 +3,11 @@
  * Licensed under the zlib license,
  * refer to the included LICENSE.txt file
  */
-#include "base/types.h"
+#include "base/Types.h"
 #include "KonamiTMNT2Scanner.h"
 #include "KonamiTMNT2Seq.h"
 #include "MAMELoader.h"
-#include "byte_pattern.h"
+#include "BytePattern.h"
 #include "KonamiTMNT2Instr.h"
 #include "KonamiTMNT2OPMInstr.h"
 #include "KonamiVendettaInstr.h"

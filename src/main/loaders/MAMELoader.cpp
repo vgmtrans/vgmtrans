@@ -5,7 +5,7 @@
  */
 
 #if defined(_WIN32) || defined(WIN32)
-#include "base/types.h"
+#include "base/Types.h"
   #include <ioapi.h>
   #include <unzip.h>
   #include "iowin32.h"
@@ -25,7 +25,7 @@
 #include "LogManager.h"
 #include "Root.h"
 #include "Scanner.h"
-#include "helper.h"
+#include "Helper.h"
 
 namespace vgmtrans::loaders {
 LoaderRegistration<MAMELoader> _mame("MAME");

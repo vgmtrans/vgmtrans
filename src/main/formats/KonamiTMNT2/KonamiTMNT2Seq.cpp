@@ -3,12 +3,12 @@
  * Licensed under the zlib license,
  * refer to the included LICENSE.txt file
  */
-#include "base/types.h"
+#include "base/Types.h"
 #include "KonamiTMNT2Seq.h"
 
 #include "KonamiTMNT2Definitions.h"
 #include "KonamiTMNT2Instr.h"
-#include "scale_conversion.h"
+#include "ScaleConversion.h"
 #include "VGMColl.h"
 
 #include <utility>

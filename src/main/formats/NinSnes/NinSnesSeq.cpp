@@ -1,4 +1,4 @@
-#include "base/types.h"
+#include "base/Types.h"
 #include "NinSnesSeq.h"
 #include "NinSnesVibrato.h"
 #include "Options.h"

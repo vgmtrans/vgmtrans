@@ -1,4 +1,4 @@
-#include "base/types.h"
+#include "base/Types.h"
 #include "SuzukiSnesSeq.h"
 #include "SuzukiSnesInstr.h"
 #include "spdlog/fmt/fmt.h"

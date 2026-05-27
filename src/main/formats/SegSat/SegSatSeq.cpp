@@ -4,13 +4,13 @@
  * refer to the included LICENSE.txt file
  */
 
-#include "base/types.h"
+#include "base/Types.h"
 #include "SegSatSeq.h"
-#include "scale_conversion.h"
+#include "ScaleConversion.h"
 #include "SegSatFormat.h"
 #include "SegSatInstrSet.h"
 #include "VGMColl.h"
-#include "util/midi_constants.h"
+#include "util/MidiConstants.h"
 
 DECLARE_FORMAT(SegSat);
 

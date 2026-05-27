@@ -13,8 +13,8 @@
 
 #include "FileLoader.h"
 #include "Format.h"
-#include "helper.h"
-#include "base/types.h"
+#include "Helper.h"
+#include "base/Types.h"
 #include "LoaderManager.h"
 #include "LogManager.h"
 #include "Matcher.h"

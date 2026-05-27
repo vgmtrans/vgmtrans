@@ -1,10 +1,10 @@
-#include "base/types.h"
+#include "base/Types.h"
 #include <sstream>
 #include <cmath>
 #include <spdlog/fmt/fmt.h>
 #include "VGMSamp.h"
 #include "VGMRgn.h"
-#include "scale_conversion.h"
+#include "ScaleConversion.h"
 #include "CPS2Format.h"
 #include "CPS2Instr.h"
 #include "OkiAdpcm.h"

@@ -11,7 +11,7 @@
 #include <vector>
 
 #include "components/VGMFileVariant.h"
-#include "base/types.h"
+#include "base/Types.h"
 #include "VGMTag.h"
 
 class VGMScanner;

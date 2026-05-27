@@ -4,7 +4,7 @@
  * See the included LICENSE for more information
  */
 
-#include "base/types.h"
+#include "base/Types.h"
 #include "SequencePlayer.h"
 #include <algorithm>
 #include <cstddef>

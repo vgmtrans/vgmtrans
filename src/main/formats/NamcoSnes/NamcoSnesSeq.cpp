@@ -1,6 +1,6 @@
-#include "base/types.h"
+#include "base/Types.h"
 #include "NamcoSnesSeq.h"
-#include "scale_conversion.h"
+#include "ScaleConversion.h"
 #include <spdlog/fmt/fmt.h>
 
 DECLARE_FORMAT(NamcoSnes);

@@ -1,5 +1,5 @@
 #pragma once
-#include "base/types.h"
+#include "base/Types.h"
 #include "Modulation.h"
 #include "VGMFile.h"
 #include <optional>

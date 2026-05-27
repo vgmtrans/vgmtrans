@@ -1,7 +1,7 @@
-#include "base/types.h"
+#include "base/Types.h"
 #include "NinSnesSeq.h"
 
-#include "scale_conversion.h"
+#include "ScaleConversion.h"
 #include "SeqEvent.h"
 #include "spdlog/fmt/fmt.h"
 

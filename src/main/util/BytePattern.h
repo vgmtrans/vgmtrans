@@ -2,7 +2,7 @@
 // Heavily inspired by SigScan at GameDeception.net
 
 #pragma once
-#include "base/types.h"
+#include "base/Types.h"
 
 class BytePattern {
  private:

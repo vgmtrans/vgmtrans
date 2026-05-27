@@ -6,7 +6,7 @@
 
 #pragma once
 
-#include "base/types.h"
+#include "base/Types.h"
 #include "VGMItem.h"
 #include "MidiFile.h"
 #include <spdlog/fmt/fmt.h>

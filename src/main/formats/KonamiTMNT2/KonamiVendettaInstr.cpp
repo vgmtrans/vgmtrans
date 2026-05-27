@@ -4,7 +4,7 @@
  * refer to the included LICENSE.txt file
  */
 
-#include "base/types.h"
+#include "base/Types.h"
 #include "KonamiVendettaInstr.h"
 #include "KonamiTMNT2Instr.h"
 #include "KonamiTMNT2Format.h"

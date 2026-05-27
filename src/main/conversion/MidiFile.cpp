@@ -4,13 +4,13 @@
  * refer to the included LICENSE.txt file
  */
 
-#include "base/types.h"
+#include "base/Types.h"
 #include <ranges>
 #include <filesystem>
 #include <spdlog/fmt/fmt.h>
 #include "VGMSeq.h"
 #include "Root.h"
-#include "helper.h"
+#include "Helper.h"
 #include "LogManager.h"
 
 MidiFile::MidiFile(VGMSeq *theAssocSeq)
