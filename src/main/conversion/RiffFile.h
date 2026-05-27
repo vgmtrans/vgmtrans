@@ -1,7 +1,8 @@
 #pragma once
 
+#include <cassert>
 #include <cstring>
-#include "common.h"
+#include "util/types.h"
 #include "helper.h"
 
 

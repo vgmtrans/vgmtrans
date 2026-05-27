@@ -13,6 +13,7 @@
 #include "Root.h"
 #include "ScaleConversion.h"
 #include "helper.h"
+#include "util/path.h"
 
 // *******
 // VGMSamp

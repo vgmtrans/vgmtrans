@@ -4,7 +4,7 @@
 * refer to the included LICENSE.txt file
  */
 
-#include "common.h"
+#include "util/types.h"
 #include "RSNLoader.h"
 #include "FileLoader.h"
 #include "LogManager.h"

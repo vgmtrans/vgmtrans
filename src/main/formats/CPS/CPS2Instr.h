@@ -1,5 +1,6 @@
 #pragma once
 
+#include "util/binary.h"
 #include "util/types.h"
 #include "VGMInstrSet.h"
 #include "VGMSampColl.h"

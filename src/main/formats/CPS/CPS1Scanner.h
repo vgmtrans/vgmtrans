@@ -5,6 +5,8 @@
  */
 #pragma once
 
+#include <string>
+
 #include "util/types.h"
 #include "Scanner.h"
 #include "CPS2Scanner.h"

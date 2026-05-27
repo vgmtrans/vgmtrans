@@ -7,7 +7,7 @@
 #include "Scanner.h"
 #include "BytePattern.h"
 #include "KonamiArcadeInstr.h"
-#include "common.h"
+#include "util/types.h"
 
 struct MAMEGame;
 class KonamiArcadeSeq;

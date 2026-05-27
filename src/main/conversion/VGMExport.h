@@ -5,7 +5,8 @@
  */
 #pragma once
 
-#include "common.h"
+#include "util/types.h"
+#include "util/path.h"
 #include "DLSFile.h"
 #include "SF2File.h"
 #include "VGMColl.h"

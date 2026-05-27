@@ -14,7 +14,7 @@
 #include "FileLoader.h"
 #include "Format.h"
 #include "helper.h"
-#include "common.h"
+#include "util/types.h"
 #include "LoaderManager.h"
 #include "LogManager.h"
 #include "Matcher.h"

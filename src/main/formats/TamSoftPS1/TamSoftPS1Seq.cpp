@@ -6,6 +6,7 @@
 
 #include "util/types.h"
 #include <iomanip>
+#include <iterator>
 
 #include <spdlog/fmt/fmt.h>
 #include "ScaleConversion.h"
@@ -207,7 +208,7 @@ bool TamSoftPS1Track::readEvent() {
     lastNoteTime = getTime();
 
     lastNotePitch = 0;
-    if (key < countof(TamSoftPS1Seq::PITCH_TABLE)) {
+    if (key < std::size(TamSoftPS1Seq::PITCH_TABLE)) {
       lastNotePitch = TamSoftPS1Seq::PITCH_TABLE[key];
     }
 

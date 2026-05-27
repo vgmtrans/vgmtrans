@@ -5,10 +5,13 @@
  */
 #pragma once
 
-#include <variant>
+#include <filesystem>
 #include <memory>
+#include <string>
+#include <vector>
 
-#include "common.h"
+#include "components/VGMFileVariant.h"
+#include "util/types.h"
 #include "VGMTag.h"
 
 class VGMScanner;

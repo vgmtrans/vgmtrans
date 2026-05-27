@@ -1,5 +1,6 @@
 #pragma once
 
+#include "util/SizeOffsetPair.h"
 #include "util/types.h"
 #include "VGMSampColl.h"
 #include "VGMSamp.h"

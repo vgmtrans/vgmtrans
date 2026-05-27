@@ -6,6 +6,8 @@
 
 #pragma once
 
+#include "components/VGMFileVariant.h"
+
 #include <QColor>
 #include <QIcon>
 #include <VGMFile.h>

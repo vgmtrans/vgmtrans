@@ -284,7 +284,8 @@ target_sources(vgmtranscore
     loaders/SPCLoader.cpp
     util/BytePattern.cpp
     util/ScaleConversion.cpp
-    util/common.cpp
+    util/path.cpp
+    util/text.cpp
   PUBLIC
     FILE_SET HEADERS
     FILES
@@ -474,11 +475,14 @@ target_sources(vgmtranscore
     FILES
       util/BytePattern.h
       util/MidiConstants.h
+      util/SizeOffsetPair.h
       util/ScaleConversion.h
-      util/common.h
+      util/binary.h
       util/constevalHelpers.h
       util/decompression.h
       util/helper.h
+      util/path.h
+      util/text.h
       util/types.h
     FILE_SET headers_io TYPE HEADERS BASE_DIRS io
     FILES
@@ -491,6 +495,7 @@ target_sources(vgmtranscore
       components/Scanner.h
       components/ScannerManager.h
       components/SynthType.h
+      components/VGMFileVariant.h
       components/VGMColl.h
       components/VGMFile.h
       components/VGMItem.h

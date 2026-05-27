@@ -5,7 +5,7 @@
  */
 
 #pragma once
-#include "common.h"
+#include "util/types.h"
 #include "Scanner.h"
 
 class ItikitiSnesScanner: public VGMScanner {

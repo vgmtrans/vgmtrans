@@ -1,4 +1,5 @@
-#include "common.h"
+#include "util/types.h"
+#include "util/binary.h"
 #include "CPS3Decrypt.h"
 
 // The following code comes directly from MAME

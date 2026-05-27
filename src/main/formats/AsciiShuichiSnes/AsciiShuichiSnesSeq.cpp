@@ -9,6 +9,8 @@
 #include "ScaleConversion.h"
 #include "SeqEvent.h"
 
+#include <iterator>
+
 using namespace std;
 
 DECLARE_FORMAT(AsciiShuichiSnes);
@@ -506,7 +508,7 @@ bool AsciiShuichiSnesTrack::readEvent() {
       const u8 pan = readByte(curOffset++);
       spcVolume = volume;
 
-      const auto desc = fmt::format("Volume: {:d}, pan: {:d}/{:d}", volume, pan, countof(panTable));
+      const auto desc = fmt::format("Volume: {:d}, pan: {:d}/{:d}", volume, pan, std::size(panTable));
       addGenericEvent(beginOffset, curOffset - beginOffset, "Volume & Pan", desc, Type::Volume);
 
       addVolNoItem(spcVolume / 2);
@@ -548,7 +550,7 @@ bool AsciiShuichiSnesTrack::readEvent() {
     case EVENT_PAN: {
       const u8 pan = readByte(curOffset++);
 
-      const auto desc = fmt::format("Pan: {:d}/{:d}", pan, countof(panTable));
+      const auto desc = fmt::format("Pan: {:d}/{:d}", pan, std::size(panTable));
       addGenericEvent(beginOffset, curOffset - beginOffset, "Pan", desc, Type::Pan);
 
       const s8 midiPan = calcMidiPanValue(pan);
@@ -670,7 +672,7 @@ bool AsciiShuichiSnesTrack::readEvent() {
 
       const auto desc =
           fmt::format("Instrument: {:d}, volume: {:d}, pan: {:d}/{:d}, transpose: {:d}",
-                      newProgramNumber, volume, pan, countof(panTable), newTranspose);
+                      newProgramNumber, volume, pan, std::size(panTable), newTranspose);
       addGenericEvent(beginOffset, curOffset - beginOffset, "Instrument, Volume, Pan, Transpose",
                       desc, Type::ProgramChange);
 
@@ -707,7 +709,7 @@ bool AsciiShuichiSnesTrack::readEvent() {
 }
 
 void AsciiShuichiSnesTrack::getVolumeBalance(u8 pan, double &volumeLeft, double &volumeRight) {
-  if (pan < countof(panTable)) {
+  if (pan < std::size(panTable)) {
     const u8 vl = panTable[pan];
     const u8 vr = panTable[30 - pan];
     volumeLeft = vl / 256.0;

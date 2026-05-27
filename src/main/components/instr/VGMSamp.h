@@ -6,6 +6,7 @@
 
 #pragma once
 
+#include "util/binary.h"
 #include "util/types.h"
 #include "VGMItem.h"
 #include "Loop.h"

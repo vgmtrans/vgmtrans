@@ -9,7 +9,8 @@
 #include "services/commands/Command.h"
 #include <filesystem>
 #include <QMenu>
-#include "common.h"
+#include "util/types.h"
+#include "util/path.h"
 #include "Root.h"
 #include "UIHelpers.h"
 #include "LogManager.h"

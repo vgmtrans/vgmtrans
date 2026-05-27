@@ -7,7 +7,7 @@
 #pragma once
 
 #include "Scanner.h"
-#include "common.h"
+#include "util/types.h"
 #include <optional>
 
 /* Scanner for the MP2K (aka Sappy) GBA format */
