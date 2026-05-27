@@ -3,8 +3,8 @@
  * Licensed under the zlib license,
  * refer to the included LICENSE.txt file
  */
-#include "Types.h"
-#include "ScaleConversion.h"
+#include "base/types.h"
+#include "scale_conversion.h"
 #include "VGMRgn.h"
 #include "VGMInstrSet.h"
 

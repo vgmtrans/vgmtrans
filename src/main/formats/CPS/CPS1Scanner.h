@@ -7,7 +7,7 @@
 
 #include <string>
 
-#include "Types.h"
+#include "base/types.h"
 #include "Scanner.h"
 #include "CPS2Scanner.h"
 

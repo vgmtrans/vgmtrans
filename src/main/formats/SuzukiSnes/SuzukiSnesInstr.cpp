@@ -4,7 +4,7 @@
  * refer to the included LICENSE.txt file
  */
 
-#include "Types.h"
+#include "base/types.h"
 #include "SuzukiSnesInstr.h"
 #include "SuzukiSnesSeq.h"
 #include "SNESDSP.h"

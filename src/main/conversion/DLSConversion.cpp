@@ -3,7 +3,7 @@
  * Licensed under the zlib license
  * See the included LICENSE for more information
 */
-#include "Types.h"
+#include "base/types.h"
 #include <cassert>
 #include "ConversionContext.h"
 #include "DLSConversion.h"
@@ -14,7 +14,7 @@
 #include "VGMSamp.h"
 #include "VGMColl.h"
 #include "DLSFile.h"
-#include "ScaleConversion.h"
+#include "scale_conversion.h"
 #include "LogManager.h"
 
 namespace conversion {

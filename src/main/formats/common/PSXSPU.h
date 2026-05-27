@@ -1,11 +1,11 @@
 #pragma once
 
-#include "util/SizeOffsetPair.h"
-#include "Types.h"
+#include "util/size_offset_pair.h"
+#include "base/types.h"
 #include "VGMSampColl.h"
 #include "VGMSamp.h"
 #include "VGMItem.h"
-#include "ScaleConversion.h"
+#include "scale_conversion.h"
 #include "LogManager.h"
 
 // All of the ADSR calculations herein (except where inaccurate) are derived from Neill Corlett's work in

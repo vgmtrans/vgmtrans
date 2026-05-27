@@ -5,7 +5,7 @@
  */
 
 #if defined(_WIN32) || defined(WIN32)
-#include "Types.h"
+#include "base/types.h"
   #include <ioapi.h>
   #include <unzip.h>
   #include "iowin32.h"

@@ -5,9 +5,9 @@
  */
 #pragma once
 
-#include "Types.h"
+#include "base/types.h"
 #include "Scanner.h"
-#include "BytePattern.h"
+#include "byte_pattern.h"
 
 enum CompileSnesVersion : u8;  // see CompileSnesFormat.h
 

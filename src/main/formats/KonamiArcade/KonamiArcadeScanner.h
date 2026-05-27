@@ -5,9 +5,9 @@
  */
 #pragma once
 #include "Scanner.h"
-#include "BytePattern.h"
+#include "byte_pattern.h"
 #include "KonamiArcadeInstr.h"
-#include "Types.h"
+#include "base/types.h"
 
 struct MAMEGame;
 class KonamiArcadeSeq;

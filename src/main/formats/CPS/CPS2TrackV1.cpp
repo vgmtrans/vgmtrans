@@ -3,10 +3,10 @@
  * Licensed under the zlib license,
  * refer to the included LICENSE.txt file
  */
-#include "Types.h"
+#include "base/types.h"
 #include "CPS2TrackV1.h"
 #include "CPSCommon.h"
-#include "ScaleConversion.h"
+#include "scale_conversion.h"
 #include "SeqEvent.h"
 
 static const u16 vol_table[128] = {

@@ -6,9 +6,9 @@
 
 #pragma once
 
-#include "Types.h"
+#include "base/types.h"
 #include "Scanner.h"
-#include "BytePattern.h"
+#include "byte_pattern.h"
 
 class GraphResSnesScanner : public VGMScanner {
  public:

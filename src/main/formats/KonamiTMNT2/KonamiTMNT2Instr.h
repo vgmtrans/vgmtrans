@@ -1,6 +1,6 @@
 #pragma once
 
-#include "Types.h"
+#include "base/types.h"
 #include "VGMSampColl.h"
 #include "VGMInstrSet.h"
 

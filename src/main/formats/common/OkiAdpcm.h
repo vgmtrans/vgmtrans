@@ -8,7 +8,7 @@
 
 #pragma once
 
-#include "Types.h"
+#include "base/types.h"
 #include "VGMSamp.h"
 
 class VGMSampColl;

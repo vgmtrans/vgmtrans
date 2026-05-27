@@ -1,6 +1,6 @@
 #pragma once
 
-#include "constevalHelpers.h"
+#include "consteval_helpers.h"
 #include <array>
 
 constexpr int K054539_CLOCK_RATE = 18'432'000;

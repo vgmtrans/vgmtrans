@@ -3,7 +3,7 @@
  * Licensed under the zlib license,
  * refer to the included LICENSE.txt file
 */
-#include "Types.h"
+#include "base/types.h"
 #include "SF2Conversion.h"
 #include "ConversionContext.h"
 #include "Options.h"
@@ -14,7 +14,7 @@
 #include "VGMSampColl.h"
 #include "VGMSamp.h"
 #include "VGMRgn.h"
-#include "ScaleConversion.h"
+#include "scale_conversion.h"
 #include "LogManager.h"
 
 namespace conversion {

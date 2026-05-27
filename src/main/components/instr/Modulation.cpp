@@ -4,12 +4,12 @@
  * refer to the included LICENSE.txt file
  */
 
-#include "Types.h"
+#include "base/types.h"
 #include "Modulation.h"
 #include <algorithm>
 #include <cmath>
 #include "LogManager.h"
-#include "ScaleConversion.h"
+#include "scale_conversion.h"
 
 namespace {
 

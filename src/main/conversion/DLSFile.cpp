@@ -4,7 +4,7 @@
  * See the included LICENSE for more information
  */
 
-#include "Types.h"
+#include "base/types.h"
 #include <algorithm>
 #include <limits>
 #include <numeric>
@@ -13,7 +13,7 @@
 #include <vector>
 #include "ConversionContext.h"
 #include "DLSFile.h"
-#include "ScaleConversion.h"
+#include "scale_conversion.h"
 #include "VGMInstrSet.h"
 #include "VGMSamp.h"
 #include "Root.h"

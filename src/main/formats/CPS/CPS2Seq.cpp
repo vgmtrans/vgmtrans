@@ -3,14 +3,14 @@
  * Licensed under the zlib license,
  * refer to the included LICENSE.txt file
  */
-#include "Types.h"
+#include "base/types.h"
 #include "CPS2Seq.h"
 #include "CPS1TrackV1.h"
 #include "CPS2TrackV1.h"
 #include "CPS2TrackV2.h"
 #include "CPS2Instr.h"
 #include "CPSCommon.h"
-#include "ScaleConversion.h"
+#include "scale_conversion.h"
 #include "SeqEvent.h"
 
 DECLARE_FORMAT(CPS1);

@@ -6,7 +6,7 @@
 
 #pragma once
 
-#include "Types.h"
+#include "base/types.h"
 
 #define ZLIB_CONST
 #include <zlib.h>

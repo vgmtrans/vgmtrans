@@ -3,11 +3,11 @@
  * Licensed under the zlib license,
  * refer to the included LICENSE.txt file
  */
-#include "Types.h"
+#include "base/types.h"
 #include "AkaoSnesSeq.h"
 #include "AkaoSnesInstr.h"
 #include "AkaoSnesModulation.h"
-#include "ScaleConversion.h"
+#include "scale_conversion.h"
 #include <spdlog/fmt/fmt.h>
 #include <cmath>
 

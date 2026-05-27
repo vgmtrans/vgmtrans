@@ -3,7 +3,7 @@
  * Licensed under the zlib license,
  * refer to the included LICENSE.txt file
  */
-#include "Types.h"
+#include "base/types.h"
 #include "YM2151InstrSet.h"
 #include "Root.h"
 #include "version.h"

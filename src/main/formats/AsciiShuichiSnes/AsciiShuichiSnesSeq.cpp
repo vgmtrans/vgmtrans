@@ -4,9 +4,9 @@
  * refer to the included LICENSE.txt file
  */
 
-#include "Types.h"
+#include "base/types.h"
 #include "AsciiShuichiSnesSeq.h"
-#include "ScaleConversion.h"
+#include "scale_conversion.h"
 #include "SeqEvent.h"
 
 #include <iterator>

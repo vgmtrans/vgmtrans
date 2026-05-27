@@ -1,5 +1,5 @@
 #pragma once
-#include "Types.h"
+#include "base/types.h"
 
 static const u8 delta_table[3][7] = {2, 4, 8, 0x10, 0x20, 0x40, 0x80,
                                           3, 6, 0xC, 0x18, 0x30, 0x60, 0xC0,

@@ -11,7 +11,7 @@
  * http://www.romhacking.net/documents/%5B462%5Dsappy.txt
  */
 
-#include "Types.h"
+#include "base/types.h"
 #include "MP2kSeq.h"
 
 #include <array>

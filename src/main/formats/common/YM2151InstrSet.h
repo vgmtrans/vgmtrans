@@ -5,7 +5,7 @@
  */
 #pragma once
 
-#include "Types.h"
+#include "base/types.h"
 
 #include "VGMInstrSet.h"
 #include "YM2151.h"

@@ -4,7 +4,7 @@
  * refer to the included LICENSE.txt file
  */
 
-#include "Types.h"
+#include "base/types.h"
 #include "HeartBeatPS1Scanner.h"
 #include "HeartBeatPS1Format.h"
 #include "ScannerManager.h"

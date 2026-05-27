@@ -4,7 +4,7 @@
  * refer to the included LICENSE.txt file
  */
 
-#include "Types.h"
+#include "base/types.h"
 #include <QApplication>
 #include <QShortcut>
 #include <QtGlobal>

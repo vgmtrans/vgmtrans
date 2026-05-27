@@ -3,7 +3,7 @@
  * Licensed under the zlib license,
  * refer to the included LICENSE.txt file
  */
-#include "Types.h"
+#include "base/types.h"
 #include "MoriSnesInstr.h"
 #include "SNESDSP.h"
 #include <spdlog/fmt/fmt.h>

@@ -2,7 +2,7 @@
 // Most of the code below is based on his work.
 // Also, thanks to Antires for his ADPCM decompression routine.
 
-#include "Types.h"
+#include "base/types.h"
 #include "PSXSPU.h"
 #include "formats/PS1/PS1Format.h"
 

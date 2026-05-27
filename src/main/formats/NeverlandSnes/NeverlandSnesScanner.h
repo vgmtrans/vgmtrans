@@ -5,7 +5,7 @@
  */
 #pragma once
 #include "Scanner.h"
-#include "BytePattern.h"
+#include "byte_pattern.h"
 
 class NeverlandSnesScanner : public VGMScanner {
  public:

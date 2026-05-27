@@ -14,7 +14,7 @@
 #include "VGMExport.h"
 #include "VGMColl.h"
 #include "formats/common/YM2151InstrSet.h"
-#include "util/Path.h"
+#include "util/path.h"
 
 namespace fs = std::filesystem;
 using MenuPath = Command::MenuPath;

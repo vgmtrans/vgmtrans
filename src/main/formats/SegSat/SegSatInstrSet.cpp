@@ -4,9 +4,9 @@
  * refer to the included LICENSE.txt file
  */
 
-#include "Types.h"
+#include "base/types.h"
 #include "SegSatInstrSet.h"
-#include "ScaleConversion.h"
+#include "scale_conversion.h"
 #include "VGMSamp.h"
 #include <spdlog/fmt/fmt.h>
 

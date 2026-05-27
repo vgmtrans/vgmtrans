@@ -1,4 +1,4 @@
-#include "Types.h"
+#include "base/types.h"
 #include "NinSnesProfile.h"
 
 #include <array>

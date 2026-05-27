@@ -3,11 +3,11 @@
  * Licensed under the zlib license,
  * refer to the included LICENSE.txt file
  */
-#include "Types.h"
+#include "base/types.h"
 #include "ItikitiSnesScanner.h"
 #include "ItikitiSnesSeq.h"
 #include "ItikitiSnesInstr.h"
-#include "BytePattern.h"
+#include "byte_pattern.h"
 #include "ScannerManager.h"
 
 namespace vgmtrans::scanners {

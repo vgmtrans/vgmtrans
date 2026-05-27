@@ -5,7 +5,7 @@
  */
 // Many thanks to bsnes and snes9x.
 
-#include "Types.h"
+#include "base/types.h"
 #include "SNESDSP.h"
 #include "VGMInstrSet.h"
 #include "LogManager.h"

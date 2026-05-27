@@ -4,7 +4,7 @@
  * refer to the included LICENSE.txt file
  */
 
-#include "Types.h"
+#include "base/types.h"
 #include "SeqTrack.h"
 
 #include <algorithm>
@@ -12,7 +12,7 @@
 
 #include "automation/SeqMidiAutomation.h"
 #include "SeqEvent.h"
-#include "ScaleConversion.h"
+#include "scale_conversion.h"
 #include "Options.h"
 #include "VGMSeqNoTrks.h"
 

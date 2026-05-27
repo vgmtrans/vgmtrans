@@ -1,5 +1,5 @@
 #pragma once
-#include "Types.h"
+#include "base/types.h"
 #include "TriAcePS1Format.h"
 #include "VGMInstrSet.h"
 #include "VGMSampColl.h"

@@ -6,7 +6,7 @@
 
 #pragma once
 
-#include "Types.h"
+#include "base/types.h"
 #include "VGMInstrSet.h"
 #include "VGMSampColl.h"
 #include "VGMSamp.h"

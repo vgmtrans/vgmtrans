@@ -1,11 +1,11 @@
 #pragma once
 
-#include "Types.h"
+#include "base/types.h"
 
 #include "VGMSampColl.h"
 #include "VGMSamp.h"
 #include "VGMItem.h"
-#include "ScaleConversion.h"
+#include "scale_conversion.h"
 
 class VGMInstrSet;
 

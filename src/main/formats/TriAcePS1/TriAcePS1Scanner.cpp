@@ -4,7 +4,7 @@
  * refer to the included LICENSE.txt file
  */
 
-#include "Types.h"
+#include "base/types.h"
 #include "TriAcePS1Seq.h"
 #include "TriAcePS1InstrSet.h"
 #include "VGMColl.h"

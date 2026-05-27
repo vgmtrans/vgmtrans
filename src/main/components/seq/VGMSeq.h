@@ -5,7 +5,7 @@
  */
 #pragma once
 
-#include "Types.h"
+#include "base/types.h"
 
 #include "ConversionContext.h"
 #include "VGMFile.h"

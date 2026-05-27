@@ -5,7 +5,7 @@
  */
 #pragma once
 
-#include "Types.h"
+#include "base/types.h"
 #include "VGMInstrSet.h"
 #include "KonamiTMNT2Instr.h"
 #include "KonamiTMNT2OPMInstr.h"

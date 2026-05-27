@@ -4,7 +4,7 @@
  * refer to the included LICENSE.txt file
  */
 
-#include "Types.h"
+#include "base/types.h"
 #include "KonamiSnesInstr.h"
 #include "KonamiSnesSeq.h"
 #include "KonamiSnesVibrato.h"
