@@ -5,11 +5,17 @@
  */
 #pragma once
 
-#include <sstream>
-#include <unzip.h>
-#include <list>
-
+#include "base/Types.h"
 #include "components/FileLoader.h"
+
+#include <cassert>
+#include <list>
+#include <map>
+#include <sstream>
+#include <string>
+#include <utility>
+
+#include <unzip.h>
 
 class VirtFile;
 
@@ -39,7 +45,7 @@ struct MAMERomGroup {
         fromString(strValue, out);
         return true;
     }
-    bool getHexAttribute(const std::string &attrName, uint32_t *out) const;
+    bool getHexAttribute(const std::string &attrName, u32 *out) const;
 
     LoadMethod loadmethod{LoadMethod::APPEND};
     LoadOrder load_order{LoadOrder::NORMAL};
@@ -70,7 +76,7 @@ class MAMELoader : public FileLoader {
    private:
     static VirtFile *loadRomGroup(const MAMERomGroup &romgroup, const std::string &format,
                                   const unzFile &cur_file);
-    static void deleteBuffers(const std::list<std::pair<uint8_t *, uint32_t>> &buffers);
+    static void deleteBuffers(const std::list<std::pair<u8 *, u32>> &buffers);
 
     bool loadJSON();
 

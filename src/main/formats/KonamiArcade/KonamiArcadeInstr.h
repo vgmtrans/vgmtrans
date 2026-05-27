@@ -5,13 +5,17 @@
  */
 #pragma once
 
-#include "VGMSampColl.h"
+#include "base/Types.h"
 #include "VGMInstrSet.h"
+#include "VGMSampColl.h"
+
 #include <array>
+#include <string>
+#include <vector>
 
 // Mystic Warrior driver sample info
 
-enum KonamiArcadeFormatVer : uint8_t;
+enum KonamiArcadeFormatVer : u8;
 
 struct konami_mw_sample_info {
   enum class sample_type: u8 {

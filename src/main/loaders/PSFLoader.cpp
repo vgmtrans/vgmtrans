@@ -6,15 +6,17 @@
 
 #include "PSFLoader.h"
 
-#include <unordered_map>
-#include <vector>
-#include <filesystem>
-#include <optional>
-#include <spdlog/fmt/fmt.h>
-
+#include "base/Types.h"
+#include "LoaderManager.h"
 #include "LogManager.h"
 #include "PSFFile.h"
-#include "LoaderManager.h"
+
+#include <filesystem>
+#include <optional>
+#include <unordered_map>
+#include <vector>
+
+#include <spdlog/fmt/fmt.h>
 
 namespace vgmtrans::loaders {
 LoaderRegistration<PSFLoader> psf{"PSF"};
@@ -36,24 +38,24 @@ const std::unordered_map<int, size_t> data_offset = {{PSF1_VERSION, 0x800},
 namespace {
 
 struct Image {
-  uint32_t start = 0;
-  uint32_t end = 0;
+  u32 start = 0;
+  u32 end = 0;
   std::vector<u8> data;
 };
 
 constexpr int MAX_RECURSION = 10;
 
-void overlay(Image &img, uint32_t addr, const u8 *data, size_t size) {
+void overlay(Image &img, u32 addr, const u8 *data, size_t size) {
   if (!size)
     return;
   if (img.data.empty()) {
     img.start = addr;
-    img.end = addr + static_cast<uint32_t>(size);
+    img.end = addr + static_cast<u32>(size);
     img.data.assign(data, data + size);
     return;
   }
-  uint32_t new_start = std::min(img.start, addr);
-  uint32_t new_end = std::max(img.end, addr + static_cast<uint32_t>(size));
+  u32 new_start = std::min(img.start, addr);
+  u32 new_end = std::max(img.end, addr + static_cast<u32>(size));
   if (new_start != img.start) {
     img.data.insert(img.data.begin(), img.start - new_start, 0);
     img.start = new_start;
@@ -105,8 +107,8 @@ void load_with_libs(const PSFFile &psf, const std::filesystem::path &basepath, I
     tryOpenLib(*lib);
 
   if (!psf.exe().empty()) {
-    uint32_t addr = psf.version() == PSF1_VERSION ? psf.getExe<uint32_t>(0x18)
-                                                 : psf.getExe<uint32_t>(0);
+    u32 addr = psf.version() == PSF1_VERSION ? psf.getExe<u32>(0x18)
+                                                 : psf.getExe<u32>(0);
     size_t off = data_offset.at(psf.version());
     overlay(img, addr,
             reinterpret_cast<const u8 *>(psf.exe().data()) + off,
@@ -127,7 +129,7 @@ void PSFLoader::apply(const RawFile *file) {
   if (file->size() <= 16)
     return;
   if (std::equal(file->begin(), file->begin() + 3, "PSF")) {
-    uint8_t version = file->get<u8>(3);
+    u8 version = file->get<u8>(3);
     if (data_offset.contains(version)) {
       psf_read_exe(file);
     }

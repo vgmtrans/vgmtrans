@@ -4,10 +4,12 @@
  * refer to the included LICENSE.txt file
  */
 #pragma once
-#include "Scanner.h"
-#include "BytePattern.h"
 
-enum KonamiSnesVersion : uint8_t;  // see KonamiSnesFormat.h
+#include "base/Types.h"
+#include "BytePattern.h"
+#include "Scanner.h"
+
+enum KonamiSnesVersion : u8;  // see KonamiSnesFormat.h
 
 class KonamiSnesScanner : public VGMScanner {
  public:

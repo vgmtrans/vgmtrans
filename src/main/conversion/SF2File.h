@@ -1,10 +1,13 @@
 #pragma once
 
-#include "common.h"
+#include "base/Types.h"
 #include "RiffFile.h"
-#include <filesystem>
 
-typedef enum: uint16_t {
+#include <filesystem>
+#include <string>
+#include <vector>
+
+typedef enum: u16 {
   // Oscillator
   startAddrsOffset,       //sample start address -4 (0 to 0xffffff)   0
   endAddrsOffset,
@@ -87,9 +90,9 @@ typedef enum: uint16_t {
   endOper                     //                                      60
 } SFGenerator;
 
-using SFModulator = uint16_t;
+using SFModulator = u16;
 
-typedef enum: uint16_t {
+typedef enum: u16 {
   linear
 } SFTransform;
 
@@ -148,42 +151,42 @@ typedef enum: uint16_t {
 #pragma pack(2)     /* set alignment to 2 byte boundary */
 
 struct sfVersionTag {
-  uint16_t wMajor;
-  uint16_t wMinor;
+  u16 wMajor;
+  u16 wMinor;
 };
 
 struct sfPresetHeader {
   char achPresetName[20];
-  uint16_t wPreset;
-  uint16_t wBank;
-  uint16_t wPresetBagNdx;
-  uint32_t dwLibrary;
-  uint32_t dwGenre;
-  uint32_t dwMorphology;
+  u16 wPreset;
+  u16 wBank;
+  u16 wPresetBagNdx;
+  u32 dwLibrary;
+  u32 dwGenre;
+  u32 dwMorphology;
 };
 
 struct sfPresetBag {
-  uint16_t wGenNdx;
-  uint16_t wModNdx;
+  u16 wGenNdx;
+  u16 wModNdx;
 };
 
 struct sfModList {
   SFModulator sfModSrcOper;
   SFGenerator sfModDestOper;
-  int16_t modAmount;
+  s16 modAmount;
   SFModulator sfModAmtSrcOper;
   SFTransform sfModTransOper;
 };
 
 typedef struct {
-  uint8_t byLo;
-  uint8_t byHi;
+  u8 byLo;
+  u8 byHi;
 } rangesType;
 
 typedef union {
   rangesType ranges;
-  int16_t shAmount;
-  uint16_t wAmount;
+  s16 shAmount;
+  u16 wAmount;
 } genAmountType;
 
 struct sfGenList {
@@ -194,7 +197,7 @@ struct sfGenList {
 struct sfInstModList {
   SFModulator sfModSrcOper;
   SFGenerator sfModDestOper;
-  int16_t modAmount;
+  s16 modAmount;
   SFModulator sfModAmtSrcOper;
   SFTransform sfModTransOper;
 };
@@ -206,15 +209,15 @@ struct sfInstGenList {
 
 struct sfInst {
   char achInstName[20];
-  uint16_t wInstBagNdx;
+  u16 wInstBagNdx;
 };
 
 struct sfInstBag {
-  uint16_t wInstGenNdx;
-  uint16_t wInstModNdx;
+  u16 wInstGenNdx;
+  u16 wInstModNdx;
 };
 
-typedef enum: uint16_t {
+typedef enum: u16 {
   monoSample = 1,
   rightSample = 2,
   leftSample = 4,
@@ -227,14 +230,14 @@ typedef enum: uint16_t {
 
 struct sfSample {
   char achSampleName[20];
-  uint32_t dwStart;
-  uint32_t dwEnd;
-  uint32_t dwStartloop;
-  uint32_t dwEndloop;
-  uint32_t dwSampleRate;
-  uint8_t byOriginalKey;
+  u32 dwStart;
+  u32 dwEnd;
+  u32 dwStartloop;
+  u32 dwEndloop;
+  u32 dwSampleRate;
+  u8 byOriginalKey;
   char chCorrection;
-  uint16_t wSampleLink;
+  u16 wSampleLink;
   SFSampleLink sfSampleType;
 };
 
@@ -269,6 +272,6 @@ class SF2File: public RiffFile {
 
   static int numOfGeneratorsForRgn(SynthRgn* rgn);
 
-  std::vector<uint8_t> saveToMem();
+  std::vector<u8> saveToMem();
   bool saveSF2File(const std::filesystem::path &filepath);
 };

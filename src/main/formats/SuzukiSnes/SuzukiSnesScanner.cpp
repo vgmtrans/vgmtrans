@@ -4,9 +4,11 @@
  * refer to the included LICENSE.txt file
  */
 
+#include "base/Types.h"
+#include "ScannerManager.h"
 #include "SuzukiSnesInstr.h"
 #include "SuzukiSnesSeq.h"
-#include "ScannerManager.h"
+
 namespace vgmtrans::scanners {
 ScannerRegistration<SuzukiSnesScanner> s_suzuki_snes("SuzukiSnes", {"spc"});
 }
@@ -161,8 +163,8 @@ void SuzukiSnesScanner::searchForSuzukiSnesFromARAM(RawFile *file) {
   std::string name = file->tag.hasTitle() ? file->tag.title : file->stem();
 
   // search for note length table
-  uint32_t ofsSongLoad;
-  uint16_t addrSeqHeader;
+  u32 ofsSongLoad;
+  u16 addrSeqHeader;
   if (file->searchBytePattern(ptnLoadSongSD3, ofsSongLoad)) {
     addrSeqHeader = file->readShort(ofsSongLoad + 16);
     version = SUZUKISNES_SD3;
@@ -174,8 +176,8 @@ void SuzukiSnesScanner::searchForSuzukiSnesFromARAM(RawFile *file) {
   }
 
   // search for vcmd length table
-  uint32_t ofsExecVCmd;
-  uint16_t addrVCmdLengthTable;
+  u32 ofsExecVCmd;
+  u16 addrVCmdLengthTable;
   if (file->searchBytePattern(ptnExecVCmdBL, ofsExecVCmd)) {
     addrVCmdLengthTable = file->readShort(ofsExecVCmd + 6);
     if (addrVCmdLengthTable + 60 > 0x10000) {
@@ -183,7 +185,7 @@ void SuzukiSnesScanner::searchForSuzukiSnesFromARAM(RawFile *file) {
     }
 
     // detect Super Mario RPG
-    uint8_t vcmdFCLength = file->readByte(addrVCmdLengthTable + 56);
+    u8 vcmdFCLength = file->readByte(addrVCmdLengthTable + 56);
     if (version == SUZUKISNES_BL && vcmdFCLength == 4) {
       version = SUZUKISNES_SMR;
     }
@@ -196,19 +198,19 @@ void SuzukiSnesScanner::searchForSuzukiSnesFromARAM(RawFile *file) {
     return;
   }
 
-  uint32_t ofsLoadDIR;
-  uint16_t spcDirAddr;
+  u32 ofsLoadDIR;
+  u16 spcDirAddr;
   if (file->searchBytePattern(ptnLoadDIR, ofsLoadDIR)) {
     spcDirAddr = file->readByte(ofsLoadDIR + 4) << 8;
   } else {
     return;
   }
 
-  uint32_t ofsLoadInstr;
-  uint16_t addrSRCNTable;
-  uint16_t addrVolumeTable;
-  uint16_t addrTuningTable;
-  uint16_t addrADSRTable;
+  u32 ofsLoadInstr;
+  u16 addrSRCNTable;
+  u16 addrVolumeTable;
+  u16 addrTuningTable;
+  u16 addrADSRTable;
   if (file->searchBytePattern(ptnLoadInstr, ofsLoadInstr)) {
     addrSRCNTable = file->readShort(ofsLoadInstr + 5);
     addrVolumeTable = file->readShort(ofsLoadInstr + 10);

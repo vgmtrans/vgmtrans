@@ -1,7 +1,9 @@
 #pragma once
 
-#include "constevalHelpers.h"
+#include "ConstevalHelpers.h"
+
 #include <array>
+#include <cstddef>
 
 constexpr int K054539_CLOCK_RATE = 18'432'000;
 #define NMI_TIMER_HERZ(data, skipCount) \

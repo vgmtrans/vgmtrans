@@ -6,6 +6,8 @@
 
 #pragma once
 
+#include "base/Types.h"
+
 #include <cstdint>
 
 enum class BankSelectStyle {
@@ -15,7 +17,7 @@ enum class BankSelectStyle {
   MMA
 };
 
-enum class SynthTarget : uint8_t {
+enum class SynthTarget : u8 {
   SoundFont,
   DLS,
 };

@@ -3,17 +3,20 @@
  * Licensed under the zlib license,
  * refer to the included LICENSE.txt file
  */
-#include <spdlog/fmt/fmt.h>
-#include <fstream>
-#include <algorithm>
-
 #include "VGMExport.h"
-#include "helper.h"
-#include "VGMInstrSet.h"
-#include "VGMSampColl.h"
-#include "VGMSamp.h"
-#include "VGMColl.h"
+
+#include "base/Types.h"
 #include "SynthFile.h"
+#include "util/Path.h"
+#include "VGMColl.h"
+#include "VGMInstrSet.h"
+#include "VGMSamp.h"
+#include "VGMSampColl.h"
+
+#include <algorithm>
+#include <fstream>
+
+#include <spdlog/fmt/fmt.h>
 
 namespace fs = std::filesystem;
 
@@ -84,7 +87,7 @@ void saveAllAsWav(const VGMSampColl &coll, const fs::path &save_dir) {
   }
 }
 
-bool saveDataToFile(const char* begin, uint32_t length, const fs::path& filepath) {
+bool saveDataToFile(const char* begin, u32 length, const fs::path& filepath) {
   std::ofstream out(filepath, std::ios::out | std::ios::binary);
 
   if (!out) {

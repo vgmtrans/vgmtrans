@@ -6,13 +6,14 @@
 
 #include "services/commands/StitchCommands.h"
 
-#include <vector>
-#include <QApplication>
-
 #include "Root.h"
 #include "VGMColl.h"
 #include "VGMSeq.h"
 #include "widgets/StitchUI.h"
+
+#include <vector>
+
+#include <QApplication>
 
 void StitchSequencesCommand::executeItems(std::vector<VGMFile*> vgmfiles) const {
   std::vector<VGMColl*> collections;

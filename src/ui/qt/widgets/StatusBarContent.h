@@ -6,8 +6,8 @@
 
 #pragma once
 
-#include <QWidget>
 #include <QLabel>
+#include <QWidget>
 
 class StatusBarContent : public QWidget {
   Q_OBJECT

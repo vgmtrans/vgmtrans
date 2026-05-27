@@ -4,9 +4,11 @@
  * refer to the included LICENSE.txt file
  */
 #pragma once
+#include "base/Types.h"
 #include "VGMTag.h"
-#include "common.h"
+
 #include <array>
+#include <string>
 
 class RawFile;
 class SPCFile;
@@ -38,7 +40,7 @@ public:
 
 private:
   bool m_hasID666Tag;
-  uint8_t m_versionMinor;
+  u8 m_versionMinor;
   std::array<u8, 64 * 1024> m_ram;
   std::array<u8, 128> m_dspRegisters;
   std::array<u8, 64> m_extraRam;

@@ -6,11 +6,16 @@
 
 #pragma once
 
-#include <spdlog/spdlog.h>
-#include <spdlog/sinks/base_sink.h>
-#include <spdlog/fmt/fmt.h>
-#include "Root.h"
 #include "LogItem.h"
+#include "Root.h"
+
+#include <memory>
+#include <string>
+#include <utility>
+
+#include <spdlog/fmt/fmt.h>
+#include <spdlog/sinks/base_sink.h>
+#include <spdlog/spdlog.h>
 
 LogLevel convertSpdlogLevel(spdlog::level::level_enum level);
 

@@ -7,7 +7,9 @@
 #pragma once
 
 #include "SimpleMatcher.h"
-#include "util/common.h"
+#include "util/Path.h"
+
+#include <string>
 
 class FilenameMatcher : public SimpleMatcher<std::string> {
 public:

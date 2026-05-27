@@ -1,8 +1,12 @@
 #pragma once
-#include "VGMInstrSet.h"
-#include "VGMSampColl.h"
-#include "VGMRgn.h"
+
+#include "base/Types.h"
 #include "SuzukiSnesFormat.h"
+#include "VGMInstrSet.h"
+#include "VGMRgn.h"
+#include "VGMSampColl.h"
+
+#include <string>
 
 // ******************
 // SuzukiSnesInstrSet
@@ -11,15 +15,15 @@
 class SuzukiSnesInstrSet:
     public VGMInstrSet {
  public:
-  static constexpr uint32_t DRUMKIT_PROGRAM = (0x7F << 7);
+  static constexpr u32 DRUMKIT_PROGRAM = (0x7F << 7);
 
   SuzukiSnesInstrSet(RawFile *file,
                      SuzukiSnesVersion ver,
-                     uint32_t spcDirAddr,
-                     uint16_t addrSRCNTable,
-                     uint16_t addrVolumeTable,
-                     uint16_t addrADSRTable,
-                     uint16_t addrTuningTable,
+                     u32 spcDirAddr,
+                     u16 addrSRCNTable,
+                     u16 addrVolumeTable,
+                     u16 addrADSRTable,
+                     u16 addrTuningTable,
                      const std::string &name = "SuzukiSnesInstrSet");
   ~SuzukiSnesInstrSet() override = default;
 
@@ -30,11 +34,11 @@ class SuzukiSnesInstrSet:
   SuzukiSnesVersion version;
 
  protected:
-  uint32_t spcDirAddr;
-  uint16_t addrSRCNTable;
-  uint16_t addrVolumeTable;
-  uint16_t addrTuningTable;
-  uint16_t addrADSRTable;
+  u32 spcDirAddr;
+  u16 addrSRCNTable;
+  u16 addrVolumeTable;
+  u16 addrTuningTable;
+  u16 addrADSRTable;
 };
 
 // *************
@@ -46,12 +50,12 @@ class SuzukiSnesInstr
  public:
   SuzukiSnesInstr(VGMInstrSet *instrSet,
                   SuzukiSnesVersion ver,
-                  uint8_t instrNum,
-                  uint32_t spcDirAddr,
-                  uint16_t addrSRCNTable,
-                  uint16_t addrVolumeTable,
-                  uint16_t addrADSRTable,
-                  uint16_t addrTuningTable,
+                  u8 instrNum,
+                  u32 spcDirAddr,
+                  u16 addrSRCNTable,
+                  u16 addrVolumeTable,
+                  u16 addrADSRTable,
+                  u16 addrTuningTable,
                   const std::string &name = "SuzukiSnesInstr");
   virtual ~SuzukiSnesInstr();
 
@@ -60,11 +64,11 @@ class SuzukiSnesInstr
   SuzukiSnesVersion version;
 
  protected:
-  uint32_t spcDirAddr;
-  uint16_t addrSRCNTable;
-  uint16_t addrVolumeTable;
-  uint16_t addrTuningTable;
-  uint16_t addrADSRTable;
+  u32 spcDirAddr;
+  u16 addrSRCNTable;
+  u16 addrVolumeTable;
+  u16 addrTuningTable;
+  u16 addrADSRTable;
 };
 
 // *****************
@@ -76,12 +80,12 @@ class SuzukiSnesDrumKit
 public:
   SuzukiSnesDrumKit(VGMInstrSet *instrSet,
                     SuzukiSnesVersion ver,
-                    uint32_t programNum,
-                    uint32_t spcDirAddr,
-                    uint16_t addrSRCNTable,
-                    uint16_t addrTuningTable,
-                    uint16_t addrADSRTable,
-                    uint16_t addrDrumKitTable,
+                    u32 programNum,
+                    u32 spcDirAddr,
+                    u16 addrSRCNTable,
+                    u16 addrTuningTable,
+                    u16 addrADSRTable,
+                    u16 addrDrumKitTable,
                   const std::string &name = "SuzukiSnesDrumKit");
   ~SuzukiSnesDrumKit() override = default;
 
@@ -90,11 +94,11 @@ public:
   SuzukiSnesVersion version;
 
 protected:
-  uint32_t spcDirAddr;
-  uint16_t addrSRCNTable;
-  uint16_t addrTuningTable;
-  uint16_t addrADSRTable;
-  uint16_t addrDrumKitTable;
+  u32 spcDirAddr;
+  u16 addrSRCNTable;
+  u16 addrTuningTable;
+  u16 addrADSRTable;
+  u16 addrDrumKitTable;
 };
 
 // *************
@@ -106,14 +110,14 @@ class SuzukiSnesRgn
  public:
   SuzukiSnesRgn(VGMInstr *instr,
                 SuzukiSnesVersion ver,
-                uint16_t addrSRCNTable);
+                u16 addrSRCNTable);
    virtual ~SuzukiSnesRgn();
 
-  bool initializeCommonRegion(uint8_t srcn,
-                              uint32_t spcDirAddr,
-                              uint16_t addrADSRTable,
-                              uint16_t addrTuningTable);
-  bool initializeNonPercussionRegion(uint8_t instrNum, uint16_t addrVolumeTable);
+  bool initializeCommonRegion(u8 srcn,
+                              u32 spcDirAddr,
+                              u16 addrADSRTable,
+                              u16 addrTuningTable);
+  bool initializeNonPercussionRegion(u8 instrNum, u16 addrVolumeTable);
   virtual bool loadRgn();
 
   SuzukiSnesVersion version;
@@ -131,16 +135,16 @@ public:
   // This value can be anything from 0 to 127, but being near the middle of
   // the range gives it a decent chance of not going out of range in either
   // direction.
-  static constexpr uint8_t KEY_BIAS = 60;
+  static constexpr u8 KEY_BIAS = 60;
 
   SuzukiSnesDrumKitRgn(SuzukiSnesDrumKit *instr,
                        SuzukiSnesVersion ver,
-                       uint16_t addrDrumKitTable);
+                       u16 addrDrumKitTable);
   ~SuzukiSnesDrumKitRgn() override;
 
-  bool initializePercussionRegion(uint16_t noteOffset,
-                                  uint32_t spcDirAddr,
-                                  uint16_t addrSRCNTable,
-                                  uint16_t addrADSRTable,
-                                  uint16_t addrTuningTable);
+  bool initializePercussionRegion(u16 noteOffset,
+                                  u32 spcDirAddr,
+                                  u16 addrSRCNTable,
+                                  u16 addrADSRTable,
+                                  u16 addrTuningTable);
 };

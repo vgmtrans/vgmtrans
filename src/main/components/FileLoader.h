@@ -1,9 +1,9 @@
 #pragma once
 
+#include "RawFile.h"
+
 #include <deque>
 #include <vector>
-
-#include "RawFile.h"
 
 class FileLoader {
    public:

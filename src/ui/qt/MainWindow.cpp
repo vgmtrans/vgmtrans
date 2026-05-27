@@ -4,17 +4,54 @@
  * See the included LICENSE for more information
  */
 
+#include "MainWindow.h"
+
+#include "About.h"
+#include "Logger.h"
+#include "LogManager.h"
+#include "MainWindowDockLayout.h"
+#include "ManualCollectionDialog.h"
+#include "MenuBar.h"
+#include "PlaybackControls.h"
+#include "QtVGMRoot.h"
+#include "SequencePlayer.h"
+#include "services/commands/StitchCommands.h"
+#include "services/NotificationCenter.h"
+#include "services/Settings.h"
+#include "StatusBarContent.h"
+#include "TitleBar.h"
+#include "util/ColorHelpers.h"
+#include "util/UIHelpers.h"
+#include <version.h>
+#include "widgets/StitchUI.h"
+#include "widgets/ToastHost.h"
+#include "widgets/WindowBar.h"
+#include "workarea/hexview/HexViewInput.h"
+#include "workarea/MdiArea.h"
+#include "workarea/RawFileListView.h"
+#include "workarea/VGMCollListView.h"
+#include "workarea/VGMCollView.h"
+#include "workarea/VGMFileListView.h"
+
+#include <filesystem>
+
+#include <QAction>
+#include <QApplication>
+#include <QCloseEvent>
+#if defined(Q_OS_LINUX)
+#include <QDBusConnection>
+#include <QDBusMessage>
+#include <QDBusReply>
+#include <QVariantMap>
+#endif
+#include <QDockWidget>
 #include <QDragEnterEvent>
 #include <QDragLeaveEvent>
 #include <QDragMoveEvent>
 #include <QDropEvent>
 #include <QFileDialog>
-#include <QFont>
-#include <QAction>
-#include <QDockWidget>
-#include <QApplication>
-#include <QCloseEvent>
 #include <QFileInfo>
+#include <QFont>
 #include <QHBoxLayout>
 #include <QKeyEvent>
 #include <QLineEdit>
@@ -28,41 +65,7 @@
 #include <QTimer>
 #include <QToolButton>
 #include <QVBoxLayout>
-#if defined(Q_OS_LINUX)
-#include <QDBusConnection>
-#include <QDBusMessage>
-#include <QDBusReply>
-#include <QVariantMap>
-#endif
-#include <filesystem>
-#include <version.h>
 #include <QWKWidgets/widgetwindowagent.h>
-#include "MainWindow.h"
-#include "MainWindowDockLayout.h"
-#include "QtVGMRoot.h"
-#include "MenuBar.h"
-#include "PlaybackControls.h"
-#include "About.h"
-#include "Logger.h"
-#include "ManualCollectionDialog.h"
-#include "SequencePlayer.h"
-#include "services/commands/StitchCommands.h"
-#include "widgets/StitchUI.h"
-#include "services/NotificationCenter.h"
-#include "services/Settings.h"
-#include "util/ColorHelpers.h"
-#include "util/UIHelpers.h"
-#include "workarea/RawFileListView.h"
-#include "workarea/VGMFileListView.h"
-#include "workarea/VGMCollListView.h"
-#include "workarea/VGMCollView.h"
-#include "workarea/hexview/HexViewInput.h"
-#include "workarea/MdiArea.h"
-#include "TitleBar.h"
-#include "StatusBarContent.h"
-#include "LogManager.h"
-#include "widgets/WindowBar.h"
-#include "widgets/ToastHost.h"
 
 namespace {
 constexpr auto MIME_PORTAL_FILETRANSFER = "application/vnd.portal.filetransfer";

@@ -6,15 +6,10 @@
 
 #include "Root.h"
 
-#include <filesystem>
-#include <fstream>
-
-#include <spdlog/fmt/std.h>
-
+#include "base/Types.h"
 #include "FileLoader.h"
 #include "Format.h"
-#include "helper.h"
-#include "common.h"
+#include "Helper.h"
 #include "LoaderManager.h"
 #include "LogManager.h"
 #include "Matcher.h"
@@ -28,6 +23,14 @@
 #include "VGMSamp.h"
 #include "VGMSampColl.h"
 #include "VGMSeq.h"
+
+#include <cassert>
+#include <filesystem>
+#include <fstream>
+#include <string>
+#include <variant>
+
+#include <spdlog/fmt/std.h>
 
 VGMRoot *pRoot;
 
@@ -76,7 +79,7 @@ bool VGMRoot::openRawFile(const std::filesystem::path &filePath) {
 }
 
 /* Creates a new file backed by RAM */
-bool VGMRoot::createVirtFile(const uint8_t *databuf, uint32_t fileSize, const std::string& filename,
+bool VGMRoot::createVirtFile(const u8 *databuf, u32 fileSize, const std::string& filename,
                              const std::filesystem::path &parRawFileFullPath, const VGMTag& tag) {
   assert(fileSize != 0);
 
@@ -325,7 +328,7 @@ void VGMRoot::UI_addVGMFile(std::variant<VGMSeq *, VGMInstrSet *, VGMSampColl *,
 
 // Given a pointer to a buffer of data, size, and a filename, this function writes the data
 // into a file on the filesystem.
-bool VGMRoot::UI_writeBufferToFile(const std::filesystem::path &filepath, uint8_t *buf, size_t size) {
+bool VGMRoot::UI_writeBufferToFile(const std::filesystem::path &filepath, u8 *buf, size_t size) {
   std::ofstream outfile(filepath, std::ios::out | std::ios::trunc | std::ios::binary);
 
   if (!outfile.is_open()) {

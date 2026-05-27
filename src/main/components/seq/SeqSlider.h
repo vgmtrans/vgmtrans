@@ -1,56 +1,58 @@
 #pragma once
+
+#include "base/Types.h"
 #include "SeqTrack.h"
 
 class ISeqSlider {
  public:
   virtual ~ISeqSlider() { }
 
-  virtual void write(uint32_t time) const = 0;
-  virtual bool isStarted(uint32_t time) const = 0;
-  virtual bool isActive(uint32_t time) const = 0;
+  virtual void write(u32 time) const = 0;
+  virtual bool isStarted(u32 time) const = 0;
+  virtual bool isActive(u32 time) const = 0;
 };
 
 template<typename TNumber>
 class SeqSlider: public ISeqSlider {
  public:
-  SeqSlider(SeqTrack *track, uint32_t time, uint32_t duration, TNumber initialValue, TNumber targetValue);
+  SeqSlider(SeqTrack *track, u32 time, u32 duration, TNumber initialValue, TNumber targetValue);
   ~SeqSlider() override = default;
 
-  virtual TNumber get(uint32_t time) const;
-  void write(uint32_t time) const override;
+  virtual TNumber get(u32 time) const;
+  void write(u32 time) const override;
   virtual void writeMessage(TNumber value) const = 0;
-  virtual bool changesAt(uint32_t time) const;
-  bool isStarted(uint32_t time) const override;
-  bool isActive(uint32_t m_time) const override;
+  virtual bool changesAt(u32 time) const;
+  bool isStarted(u32 time) const override;
+  bool isActive(u32 m_time) const override;
 
  protected:
   SeqTrack *m_track;
-  uint32_t m_time;
-  uint32_t m_duration;
+  u32 m_time;
+  u32 m_duration;
   TNumber m_initialValue;
   TNumber m_targetValue;
 };
 
-class VolSlider: public SeqSlider<uint8_t> {
+class VolSlider: public SeqSlider<u8> {
  public:
-  VolSlider(SeqTrack *track, uint32_t time, uint32_t duration, uint8_t initialValue, uint8_t targetValue);
-  void writeMessage(uint8_t value) const override;
+  VolSlider(SeqTrack *track, u32 time, u32 duration, u8 initialValue, u8 targetValue);
+  void writeMessage(u8 value) const override;
 };
 
-class MasterVolSlider: public SeqSlider<uint8_t> {
+class MasterVolSlider: public SeqSlider<u8> {
  public:
-  MasterVolSlider(SeqTrack *track, uint32_t time, uint32_t duration, uint8_t initialValue, uint8_t targetValue);
-  void writeMessage(uint8_t value) const override;
+  MasterVolSlider(SeqTrack *track, u32 time, u32 duration, u8 initialValue, u8 targetValue);
+  void writeMessage(u8 value) const override;
 };
 
-class ExpressionSlider: public SeqSlider<uint8_t> {
+class ExpressionSlider: public SeqSlider<u8> {
  public:
-  ExpressionSlider(SeqTrack *track, uint32_t time, uint32_t duration, uint8_t initialValue, uint8_t targetValue);
-  void writeMessage(uint8_t value) const override;
+  ExpressionSlider(SeqTrack *track, u32 time, u32 duration, u8 initialValue, u8 targetValue);
+  void writeMessage(u8 value) const override;
 };
 
-class PanSlider: public SeqSlider<uint8_t> {
+class PanSlider: public SeqSlider<u8> {
  public:
-  PanSlider(SeqTrack *track, uint32_t time, uint32_t duration, uint8_t initialValue, uint8_t targetValue);
-  void writeMessage(uint8_t value) const override;
+  PanSlider(SeqTrack *track, u32 time, u32 duration, u8 initialValue, u8 targetValue);
+  void writeMessage(u8 value) const override;
 };

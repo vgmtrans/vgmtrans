@@ -4,10 +4,12 @@
  * refer to the included LICENSE.txt file
  */
 #pragma once
-#include "Scanner.h"
-#include "BytePattern.h"
 
-enum CompileSnesVersion : uint8_t;  // see CompileSnesFormat.h
+#include "base/Types.h"
+#include "BytePattern.h"
+#include "Scanner.h"
+
+enum CompileSnesVersion : u8;  // see CompileSnesFormat.h
 
 class CompileSnesScanner : public VGMScanner {
  public:

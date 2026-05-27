@@ -4,11 +4,13 @@
  * refer to the included LICENSE.txt file
  */
 #include "KonamiArcadeInstr.h"
+
+#include "base/Types.h"
 #include "KonamiAdpcm.h"
-#include "LogManager.h"
-#include "VGMRgn.h"
 #include "KonamiArcadeDefinitions.h"
 #include "KonamiArcadeFormat.h"
+#include "LogManager.h"
+#include "VGMRgn.h"
 
 #include <spdlog/fmt/fmt.h>
 

@@ -6,32 +6,32 @@
 
 #include "MdiArea.h"
 
+#include "InstructionHintLayout.h"
+#include "Metrics.h"
+#include "QtVGMRoot.h"
+#include "services/NotificationCenter.h"
+#include "UIHelpers.h"
+#include <VGMColl.h>
+#include <VGMFile.h>
+#include "VGMFileView.h"
+
+#include <algorithm>
+#include <cmath>
+#include <utility>
+#include <vector>
+
 #include <QApplication>
 #include <QBrush>
 #include <QColor>
 #include <QEvent>
 #include <QFontMetrics>
 #include <QIcon>
-#include <QPaintEvent>
 #include <QPainter>
+#include <QPaintEvent>
 #include <QPalette>
 #include <QPixmap>
 #include <QShortcut>
 #include <QTabBar>
-#include <algorithm>
-#include <cmath>
-#include <utility>
-#include <vector>
-
-#include <VGMFile.h>
-#include <VGMColl.h>
-
-#include "VGMFileView.h"
-#include "InstructionHintLayout.h"
-#include "Metrics.h"
-#include "QtVGMRoot.h"
-#include "UIHelpers.h"
-#include "services/NotificationCenter.h"
 
 namespace {
 

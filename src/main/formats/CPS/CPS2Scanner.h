@@ -1,6 +1,9 @@
 #pragma once
+
+#include "base/Types.h"
 #include "Scanner.h"
-#include "common.h"
+
+#include <string>
 
 struct MAMEGame;
 
@@ -38,5 +41,4 @@ public:
 
   void scan(RawFile* file, void *info) override;
 };
-
 

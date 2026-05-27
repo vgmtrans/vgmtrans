@@ -4,10 +4,12 @@
  * refer to the included LICENSE.txt file
  */
 #pragma once
-#include "Scanner.h"
-#include "BytePattern.h"
 
-enum AkaoSnesVersion : uint8_t;  // see AkaoSnesFormat.h
+#include "base/Types.h"
+#include "BytePattern.h"
+#include "Scanner.h"
+
+enum AkaoSnesVersion : u8;  // see AkaoSnesFormat.h
 
 class AkaoSnesScanner : public VGMScanner {
  public:

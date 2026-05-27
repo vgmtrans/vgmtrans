@@ -6,7 +6,11 @@
 
 #include "WindowBar.h"
 
+#include "ColorHelpers.h"
+#include "UIHelpers.h"
+
 #include <cmath>
+
 #include <QAction>
 #include <QEvent>
 #include <QHBoxLayout>
@@ -14,8 +18,6 @@
 #include <QShowEvent>
 #include <QStyle>
 #include <QToolButton>
-#include "ColorHelpers.h"
-#include "UIHelpers.h"
 
 namespace {
 constexpr int kTitleBarHeight = 40;

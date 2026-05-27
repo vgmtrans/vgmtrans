@@ -1,8 +1,13 @@
 #pragma once
-#include "VGMInstrSet.h"
-#include "VGMSampColl.h"
-#include "VGMRgn.h"
+
+#include "base/Types.h"
 #include "KonamiSnesFormat.h"
+#include "VGMInstrSet.h"
+#include "VGMRgn.h"
+#include "VGMSampColl.h"
+
+#include <string>
+#include <vector>
 
 class VGMColl;
 
@@ -13,15 +18,15 @@ class VGMColl;
 class KonamiSnesInstrSet:
     public VGMInstrSet {
  public:
-  static constexpr uint32_t DRUMKIT_PROGRAM = (0x7F << 7);
+  static constexpr u32 DRUMKIT_PROGRAM = (0x7F << 7);
 
   KonamiSnesInstrSet(RawFile *file,
                      KonamiSnesVersion ver,
-                     uint32_t offset,
-                     uint32_t bankedInstrOffset,
-                     uint8_t firstBankedInstr,
-                     uint32_t percInstrOffset,
-                     uint32_t spcDirAddr,
+                     u32 offset,
+                     u32 bankedInstrOffset,
+                     u8 firstBankedInstr,
+                     u32 percInstrOffset,
+                     u32 spcDirAddr,
                      const std::string &name = "KonamiSnesInstrSet");
   virtual ~KonamiSnesInstrSet();
 
@@ -33,11 +38,11 @@ class KonamiSnesInstrSet:
   KonamiSnesVersion version;
 
  protected:
-  uint32_t bankedInstrOffset;
-  uint8_t firstBankedInstr;
-  uint32_t percInstrOffset;
-  uint32_t spcDirAddr;
-  std::vector<uint8_t> usedSRCNs;
+  u32 bankedInstrOffset;
+  u8 firstBankedInstr;
+  u32 percInstrOffset;
+  u32 spcDirAddr;
+  std::vector<u8> usedSRCNs;
 };
 
 // ***************
@@ -49,10 +54,10 @@ class KonamiSnesInstr
  public:
   KonamiSnesInstr(VGMInstrSet *instrSet,
                   KonamiSnesVersion ver,
-                  uint32_t offset,
-                  uint32_t theBank,
-                  uint32_t theInstrNum,
-                  uint32_t spcDirAddr,
+                  u32 offset,
+                  u32 theBank,
+                  u32 theInstrNum,
+                  u32 spcDirAddr,
                   bool percussion,
                   const std::string &name = "KonamiSnesInstr");
   virtual ~KonamiSnesInstr();
@@ -60,13 +65,13 @@ class KonamiSnesInstr
   virtual bool loadInstr();
 
   static bool isValidHeader
-      (RawFile *file, KonamiSnesVersion version, uint32_t addrInstrHeader, uint32_t spcDirAddr, bool validateSample);
-  static uint32_t expectedSize(KonamiSnesVersion version);
+      (RawFile *file, KonamiSnesVersion version, u32 addrInstrHeader, u32 spcDirAddr, bool validateSample);
+  static u32 expectedSize(KonamiSnesVersion version);
 
   KonamiSnesVersion version;
 
  protected:
-  uint32_t spcDirAddr;
+  u32 spcDirAddr;
   bool percussion;
 };
 
@@ -79,9 +84,9 @@ class KonamiSnesRgn
  public:
   KonamiSnesRgn(KonamiSnesInstr *instr,
                 KonamiSnesVersion ver,
-                uint32_t offset,
+                u32 offset,
                 bool percussion,
-                uint8_t percussionNote = 0);
+                u8 percussionNote = 0);
   virtual ~KonamiSnesRgn();
 
   virtual bool loadRgn();

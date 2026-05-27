@@ -6,8 +6,9 @@
 
 #pragma once
 
-#include <QWidget>
 #include "Metrics.h"
+
+#include <QWidget>
 
 class QToolButton;
 

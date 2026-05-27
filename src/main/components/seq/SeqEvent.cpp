@@ -4,6 +4,8 @@
  * refer to the included LICENSE.txt file
  */
 #include "SeqEvent.h"
+
+#include "base/Types.h"
 #include "SeqTrack.h"
 
 //  ********
@@ -11,8 +13,8 @@
 //  ********
 
 SeqEvent::SeqEvent(SeqTrack *pTrack,
-                   uint32_t offset,
-                   uint32_t length,
+                   u32 offset,
+                   u32 length,
                    const std::string &name,
                    Type type,
                    const std::string &desc)
@@ -24,11 +26,11 @@ SeqEvent::SeqEvent(SeqTrack *pTrack,
 // ***************
 
 DurNoteSeqEvent::DurNoteSeqEvent(SeqTrack *pTrack,
-                                 uint8_t absoluteKey,
-                                 uint8_t velocity,
-                                 uint32_t duration,
-                                 uint32_t offset,
-                                 uint32_t length,
+                                 u8 absoluteKey,
+                                 u8 velocity,
+                                 u32 duration,
+                                 u32 offset,
+                                 u32 length,
                                  const std::string &name)
     : SeqEvent(pTrack, offset, length, name, Type::DurationNote), absKey(absoluteKey), vel(velocity), dur(duration) { }
 
@@ -38,10 +40,10 @@ DurNoteSeqEvent::DurNoteSeqEvent(SeqTrack *pTrack,
 // ************
 
 NoteOnSeqEvent::NoteOnSeqEvent(SeqTrack *pTrack,
-                               uint8_t absoluteKey,
-                               uint8_t velocity,
-                               uint32_t offset,
-                               uint32_t length,
+                               u8 absoluteKey,
+                               u8 velocity,
+                               u32 offset,
+                               u32 length,
                                const std::string &name)
     : SeqEvent(pTrack, offset, length, name, Type::NoteOn), absKey(absoluteKey), vel(velocity) { }
 
@@ -52,9 +54,9 @@ NoteOnSeqEvent::NoteOnSeqEvent(SeqTrack *pTrack,
 // ************
 
 NoteOffSeqEvent::NoteOffSeqEvent(SeqTrack *pTrack,
-                                 uint8_t absoluteKey,
-                                 uint32_t offset,
-                                 uint32_t length,
+                                 u8 absoluteKey,
+                                 u32 offset,
+                                 u32 length,
                                  const std::string &name)
     : SeqEvent(pTrack, offset, length, name, Type::NoteOff), absKey(absoluteKey) { }
 
@@ -63,9 +65,9 @@ NoteOffSeqEvent::NoteOffSeqEvent(SeqTrack *pTrack,
 // ************
 
 RestSeqEvent::RestSeqEvent(SeqTrack *pTrack,
-                           uint32_t duration,
-                           uint32_t offset,
-                           uint32_t length,
+                           u32 duration,
+                           u32 offset,
+                           u32 length,
                            const std::string &name)
     : SeqEvent(pTrack, offset, length, name, Type::Rest), dur(duration) { }
 
@@ -74,9 +76,9 @@ RestSeqEvent::RestSeqEvent(SeqTrack *pTrack,
 // *****************
 
 SetOctaveSeqEvent::SetOctaveSeqEvent(SeqTrack *pTrack,
-                                     uint8_t theOctave,
-                                     uint32_t offset,
-                                     uint32_t length,
+                                     u8 theOctave,
+                                     u32 offset,
+                                     u32 length,
                                      const std::string &name)
     : SeqEvent(pTrack, offset, length, name, Type::ChangeState), octave(theOctave) { }
 
@@ -84,17 +86,17 @@ SetOctaveSeqEvent::SetOctaveSeqEvent(SeqTrack *pTrack,
 // VolSeqEvent
 // ***********
 
-VolSeqEvent::VolSeqEvent(SeqTrack *pTrack, uint8_t volume, uint32_t offset, uint32_t length, const std::string &name)
+VolSeqEvent::VolSeqEvent(SeqTrack *pTrack, u8 volume, u32 offset, u32 length, const std::string &name)
     : SeqEvent(pTrack, offset, length, name, Type::Volume), vol(volume) { }
 
-VolSeqEvent::VolSeqEvent(SeqTrack *pTrack, double volume, uint32_t offset, uint32_t length, const std::string &name)
+VolSeqEvent::VolSeqEvent(SeqTrack *pTrack, double volume, u32 offset, u32 length, const std::string &name)
     : SeqEvent(pTrack, offset, length, name, Type::Volume), percentVol(volume) { }
 
 // ***********
 // Volume14BitSeqEvent
 // ***********
 
-Volume14BitSeqEvent::Volume14BitSeqEvent(SeqTrack *pTrack, uint16_t volume, uint32_t offset, uint32_t length, const std::string &name)
+Volume14BitSeqEvent::Volume14BitSeqEvent(SeqTrack *pTrack, u16 volume, u32 offset, u32 length, const std::string &name)
     : SeqEvent(pTrack, offset, length, name, Type::Volume), m_volume(volume) { }
 
 // ****************
@@ -102,10 +104,10 @@ Volume14BitSeqEvent::Volume14BitSeqEvent(SeqTrack *pTrack, uint16_t volume, uint
 // ****************
 
 VolSlideSeqEvent::VolSlideSeqEvent(SeqTrack *pTrack,
-                                   uint8_t targetVolume,
-                                   uint32_t duration,
-                                   uint32_t offset,
-                                   uint32_t length,
+                                   u8 targetVolume,
+                                   u32 duration,
+                                   u32 offset,
+                                   u32 length,
                                    const std::string &name)
     : SeqEvent(pTrack, offset, length, name, Type::VolumeSlide), targVol(targetVolume), dur(duration) { }
 
@@ -114,16 +116,16 @@ VolSlideSeqEvent::VolSlideSeqEvent(SeqTrack *pTrack,
 // ***********
 
 MastVolSeqEvent::MastVolSeqEvent(SeqTrack *pTrack,
-                                 uint8_t volume,
-                                 uint32_t offset,
-                                 uint32_t length,
+                                 u8 volume,
+                                 u32 offset,
+                                 u32 length,
                                  const std::string &name)
     : SeqEvent(pTrack, offset, length, name, Type::MasterVolume), vol(volume) { }
 
 MastVolSeqEvent::MastVolSeqEvent(SeqTrack *pTrack,
                                  double volume,
-                                 uint32_t offset,
-                                 uint32_t length,
+                                 u32 offset,
+                                 u32 length,
                                  const std::string &name)
     : SeqEvent(pTrack, offset, length, name, Type::MasterVolume), percentVol(volume) { }
 
@@ -132,10 +134,10 @@ MastVolSeqEvent::MastVolSeqEvent(SeqTrack *pTrack,
 // ****************
 
 MastVolSlideSeqEvent::MastVolSlideSeqEvent(SeqTrack *pTrack,
-                                           uint8_t targetVolume,
-                                           uint32_t duration,
-                                           uint32_t offset,
-                                           uint32_t length,
+                                           u8 targetVolume,
+                                           u32 duration,
+                                           u32 offset,
+                                           u32 length,
                                            const std::string &name)
     : SeqEvent(pTrack, offset, length, name, Type::MasterVolumeSlide), targVol(targetVolume), dur(duration) { }
 
@@ -154,10 +156,10 @@ ExpressionSeqEvent::ExpressionSeqEvent(SeqTrack *pTrack, double level, u32 offse
 // ***********************
 
 ExpressionSlideSeqEvent::ExpressionSlideSeqEvent(SeqTrack *pTrack,
-                                                 uint8_t targetExpression,
-                                                 uint32_t duration,
-                                                 uint32_t offset,
-                                                 uint32_t length,
+                                                 u8 targetExpression,
+                                                 u32 duration,
+                                                 u32 offset,
+                                                 u32 length,
                                                  const std::string &name)
     : SeqEvent(pTrack, offset, length, name, Type::ExpressionSlide), targExpr(targetExpression), dur(duration) { }
 
@@ -167,7 +169,7 @@ ExpressionSlideSeqEvent::ExpressionSlideSeqEvent(SeqTrack *pTrack,
 // PanSeqEvent
 // ***********
 
-PanSeqEvent::PanSeqEvent(SeqTrack *pTrack, uint8_t thePan, uint32_t offset, uint32_t length, const std::string &name)
+PanSeqEvent::PanSeqEvent(SeqTrack *pTrack, u8 thePan, u32 offset, u32 length, const std::string &name)
     : SeqEvent(pTrack, offset, length, name, Type::Pan), pan(thePan) { }
 
 // ****************
@@ -175,10 +177,10 @@ PanSeqEvent::PanSeqEvent(SeqTrack *pTrack, uint8_t thePan, uint32_t offset, uint
 // ****************
 
 PanSlideSeqEvent::PanSlideSeqEvent(SeqTrack *pTrack,
-                                   uint8_t targetPan,
-                                   uint32_t duration,
-                                   uint32_t offset,
-                                   uint32_t length,
+                                   u8 targetPan,
+                                   u32 duration,
+                                   u32 offset,
+                                   u32 length,
                                    const std::string &name)
     : SeqEvent(pTrack, offset, length, name, Type::PanSlide), targPan(targetPan), dur(duration) { }
 
@@ -187,9 +189,9 @@ PanSlideSeqEvent::PanSlideSeqEvent(SeqTrack *pTrack,
 // **************
 
 ReverbSeqEvent::ReverbSeqEvent(SeqTrack *pTrack,
-                               uint8_t theReverb,
-                               uint32_t offset,
-                               uint32_t length,
+                               u8 theReverb,
+                               u32 offset,
+                               u32 length,
                                const std::string &name)
     : SeqEvent(pTrack, offset, length, name, Type::Reverb), reverb(theReverb) { }
 
@@ -199,8 +201,8 @@ ReverbSeqEvent::ReverbSeqEvent(SeqTrack *pTrack,
 
 PitchBendSeqEvent::PitchBendSeqEvent(SeqTrack *pTrack,
                                      short thePitchBend,
-                                     uint32_t offset,
-                                     uint32_t length,
+                                     u32 offset,
+                                     u32 length,
                                      const std::string &name)
     : SeqEvent(pTrack, offset, length, name, Type::PitchBend), pitchbend(thePitchBend) { }
 
@@ -209,9 +211,9 @@ PitchBendSeqEvent::PitchBendSeqEvent(SeqTrack *pTrack,
 // ***********************
 
 ChannelPressureSeqEvent::ChannelPressureSeqEvent(SeqTrack *pTrack,
-                                                 uint8_t thePressure,
-                                                 uint32_t offset,
-                                                 uint32_t length,
+                                                 u8 thePressure,
+                                                 u32 offset,
+                                                 u32 length,
                                                  const std::string &name)
     : SeqEvent(pTrack, offset, length, name, Type::ChannelPressure), pressure(thePressure) { }
 
@@ -219,8 +221,8 @@ ChannelPressureSeqEvent::ChannelPressureSeqEvent(SeqTrack *pTrack,
 // PitchBendRangeSeqEvent
 // **********************
 
-PitchBendRangeSeqEvent::PitchBendRangeSeqEvent(SeqTrack *pTrack, uint16_t cents,
-                                               uint32_t offset, uint32_t length, const std::string &name)
+PitchBendRangeSeqEvent::PitchBendRangeSeqEvent(SeqTrack *pTrack, u16 cents,
+                                               u32 offset, u32 length, const std::string &name)
     : SeqEvent(pTrack, offset, length, name, Type::PitchBendRange), m_cents(cents) { }
 
 // ******************
@@ -228,7 +230,7 @@ PitchBendRangeSeqEvent::PitchBendRangeSeqEvent(SeqTrack *pTrack, uint16_t cents,
 // ******************
 
 FineTuningSeqEvent::FineTuningSeqEvent(SeqTrack *pTrack, double cents,
-                                       uint32_t offset, uint32_t length, const std::string &name)
+                                       u32 offset, u32 length, const std::string &name)
     : SeqEvent(pTrack, offset, length, name, Type::Misc), m_cents(cents) { }
 
 // ********************
@@ -236,7 +238,7 @@ FineTuningSeqEvent::FineTuningSeqEvent(SeqTrack *pTrack, double cents,
 // ********************
 
 CoarseTuningSeqEvent::CoarseTuningSeqEvent(SeqTrack *pTrack, double semitones,
-                                       uint32_t offset, uint32_t length, const std::string &name)
+                                       u32 offset, u32 length, const std::string &name)
     : SeqEvent(pTrack, offset, length, name, Type::Misc), m_semitones(semitones) { }
 
 // ****************************
@@ -244,7 +246,7 @@ CoarseTuningSeqEvent::CoarseTuningSeqEvent(SeqTrack *pTrack, double semitones,
 // ****************************
 
 ModulationDepthRangeSeqEvent::ModulationDepthRangeSeqEvent(SeqTrack *pTrack, double semitones,
-                                                           uint32_t offset, uint32_t length, const std::string &name)
+                                                           u32 offset, u32 length, const std::string &name)
     : SeqEvent(pTrack, offset, length, name, Type::Misc), m_semitones(semitones) { }
 
 // *****************
@@ -253,8 +255,8 @@ ModulationDepthRangeSeqEvent::ModulationDepthRangeSeqEvent(SeqTrack *pTrack, dou
 
 TransposeSeqEvent::TransposeSeqEvent(SeqTrack *pTrack,
                                      int theTranspose,
-                                     uint32_t offset,
-                                     uint32_t length,
+                                     u32 offset,
+                                     u32 length,
                                      const std::string &name)
     : SeqEvent(pTrack, offset, length, name, Type::Transpose), m_transpose(theTranspose) { }
 
@@ -263,9 +265,9 @@ TransposeSeqEvent::TransposeSeqEvent(SeqTrack *pTrack,
 // ******************
 
 ModulationSeqEvent::ModulationSeqEvent(SeqTrack *pTrack,
-                                       uint8_t theDepth,
-                                       uint32_t offset,
-                                       uint32_t length,
+                                       u8 theDepth,
+                                       u32 offset,
+                                       u32 length,
                                        const std::string &name)
     : SeqEvent(pTrack, offset, length, name, Type::Modulation), depth(theDepth) { }
 
@@ -274,9 +276,9 @@ ModulationSeqEvent::ModulationSeqEvent(SeqTrack *pTrack,
 // **************
 
 BreathSeqEvent::BreathSeqEvent(SeqTrack *pTrack,
-                               uint8_t theDepth,
-                               uint32_t offset,
-                               uint32_t length,
+                               u8 theDepth,
+                               u32 offset,
+                               u32 length,
                                const std::string &name)
     : SeqEvent(pTrack, offset, length, name, Type::Modulation), depth(theDepth) { }
 
@@ -285,9 +287,9 @@ BreathSeqEvent::BreathSeqEvent(SeqTrack *pTrack,
 // ***************
 
 SustainSeqEvent::SustainSeqEvent(SeqTrack *pTrack,
-                                 uint8_t theDepth,
-                                 uint32_t offset,
-                                 uint32_t length,
+                                 u8 theDepth,
+                                 u32 offset,
+                                 u32 length,
                                  const std::string &name)
     : SeqEvent(pTrack, offset, length, name, Type::Sustain), depth(theDepth) { }
 
@@ -297,8 +299,8 @@ SustainSeqEvent::SustainSeqEvent(SeqTrack *pTrack,
 
 PortamentoSeqEvent::PortamentoSeqEvent(SeqTrack *pTrack,
                                        bool bPortamento,
-                                       uint32_t offset,
-                                       uint32_t length,
+                                       u32 offset,
+                                       u32 length,
                                        const std::string &name)
     : SeqEvent(pTrack, offset, length, name, Type::Portamento), bOn(bPortamento) { }
 
@@ -307,9 +309,9 @@ PortamentoSeqEvent::PortamentoSeqEvent(SeqTrack *pTrack,
 // **********************
 
 PortamentoTimeSeqEvent::PortamentoTimeSeqEvent(SeqTrack *pTrack,
-                                               uint8_t theTime,
-                                               uint32_t offset,
-                                               uint32_t length,
+                                               u8 theTime,
+                                               u32 offset,
+                                               u32 length,
                                                const std::string &name)
     : SeqEvent(pTrack, offset, length, name, Type::PortamentoTime), time(theTime) { }
 
@@ -318,9 +320,9 @@ PortamentoTimeSeqEvent::PortamentoTimeSeqEvent(SeqTrack *pTrack,
 // ******************
 
 ProgChangeSeqEvent::ProgChangeSeqEvent(SeqTrack *pTrack,
-                                       uint32_t programNumber,
-                                       uint32_t offset,
-                                       uint32_t length,
+                                       u32 programNumber,
+                                       u32 offset,
+                                       u32 length,
                                        const std::string &name)
     : SeqEvent(pTrack, offset, length, name, Type::ProgramChange), progNum(programNumber) { }
 
@@ -329,9 +331,9 @@ ProgChangeSeqEvent::ProgChangeSeqEvent(SeqTrack *pTrack,
 // ******************
 
 BankSelectSeqEvent::BankSelectSeqEvent(SeqTrack *pTrack,
-                                       uint32_t bank,
-                                       uint32_t offset,
-                                       uint32_t length,
+                                       u32 bank,
+                                       u32 offset,
+                                       u32 length,
                                        const std::string &name)
     : SeqEvent(pTrack, offset, length, name, Type::BankSelect), bank(bank) { }
 
@@ -341,8 +343,8 @@ BankSelectSeqEvent::BankSelectSeqEvent(SeqTrack *pTrack,
 
 TempoSeqEvent::TempoSeqEvent(SeqTrack *pTrack,
                              double beatsperminute,
-                             uint32_t offset,
-                             uint32_t length,
+                             u32 offset,
+                             u32 length,
                              const std::string &name)
     : SeqEvent(pTrack, offset, length, name, Type::Tempo), bpm(beatsperminute) { }
 
@@ -352,9 +354,9 @@ TempoSeqEvent::TempoSeqEvent(SeqTrack *pTrack,
 
 TempoSlideSeqEvent::TempoSlideSeqEvent(SeqTrack *pTrack,
                                        double targBPM,
-                                       uint32_t duration,
-                                       uint32_t offset,
-                                       uint32_t length,
+                                       u32 duration,
+                                       u32 offset,
+                                       u32 length,
                                        const std::string &name)
     : SeqEvent(pTrack, offset, length, name, Type::Tempo), targbpm(targBPM), dur(duration) { }
 
@@ -363,11 +365,11 @@ TempoSlideSeqEvent::TempoSlideSeqEvent(SeqTrack *pTrack,
 // ***************
 
 TimeSigSeqEvent::TimeSigSeqEvent(SeqTrack *pTrack,
-                                 uint8_t numerator,
-                                 uint8_t denominator,
-                                 uint8_t theTicksPerQuarter,
-                                 uint32_t offset,
-                                 uint32_t length,
+                                 u8 numerator,
+                                 u8 denominator,
+                                 u8 theTicksPerQuarter,
+                                 u32 offset,
+                                 u32 length,
                                  const std::string &name)
     : SeqEvent(pTrack, offset, length, name, Type::TimeSignature), numer(numerator), denom(denominator),
       ticksPerQuarter(theTicksPerQuarter) { }

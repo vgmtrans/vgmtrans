@@ -4,16 +4,18 @@
  * refer to the included LICENSE.txt file
  */
 
+#include "base/Types.h"
 #include "KonamiPS1Seq.h"
-#include <spdlog/fmt/fmt.h>
 #include "ScannerManager.h"
+
+#include <spdlog/fmt/fmt.h>
 
 namespace vgmtrans::scanners {
 ScannerRegistration<KonamiPS1Scanner> s_konami_ps1("KonamiPS1");
 }
 
 void KonamiPS1Scanner::scan(RawFile *file, void *info) {
-  uint32_t offset = 0;
+  u32 offset = 0;
   int numSeqFiles = 0;
   while (offset < file->size()) {
     if (KonamiPS1Seq::isKDT1Seq(file, offset)) {

@@ -5,7 +5,9 @@
  */
 #pragma once
 
+#include "base/Types.h"
 #include "SeqMotion.h"
+
 #include <algorithm>
 #include <cstdint>
 #include <utility>
@@ -27,7 +29,7 @@ class SeqAutomatedValue {
   [[nodiscard]] ValueType current() const { return m_motion.current(); }
   [[nodiscard]] ValueType target() const { return m_motion.target(); }
   [[nodiscard]] ValueType step() const { return m_motion.step(); }
-  [[nodiscard]] uint32_t ticksRemaining() const { return m_motion.ticksRemaining(); }
+  [[nodiscard]] u32 ticksRemaining() const { return m_motion.ticksRemaining(); }
   [[nodiscard]] bool usesTicks() const { return m_motion.usesTicks(); }
 
   SeqMotionTick<ValueType> begin(const SeqMotionPlan<ValueType>& motion) {
@@ -107,28 +109,28 @@ class SeqMotionPreset {
     m_step = {};
   }
 
-  void set(uint32_t ticks, ValueType step) {
+  void set(u32 ticks, ValueType step) {
     m_ticks = ticks;
     m_step = step;
   }
 
   // Set the preset step needed to move from zero to targetFromZero.
-  void setToTarget(uint32_t ticks, ValueType targetFromZero) {
+  void setToTarget(u32 ticks, ValueType targetFromZero) {
     set(ticks, ticks == 0 ? ValueType {} : static_cast<ValueType>(targetFromZero /
                                                                   static_cast<ValueType>(ticks)));
   }
 
   [[nodiscard]] bool active() const { return m_ticks != 0; }
-  [[nodiscard]] uint32_t ticks() const { return m_ticks; }
+  [[nodiscard]] u32 ticks() const { return m_ticks; }
   [[nodiscard]] ValueType step() const { return m_step; }
 
   // Create a motion using the stored step and ticks; completion snaps to target.
-  [[nodiscard]] SeqMotionPlan<ValueType> instantiate(ValueType target, uint32_t delay = 0) const {
+  [[nodiscard]] SeqMotionPlan<ValueType> instantiate(ValueType target, u32 delay = 0) const {
     return SeqMotionPlan<ValueType>::targetOverTicksWithStep(target, m_step, m_ticks, delay);
   }
 
  private:
-  uint32_t m_ticks = 0;
+  u32 m_ticks = 0;
   ValueType m_step {};
 };
 
@@ -137,22 +139,22 @@ struct SeqFixedPointMotionPlan {
   // Targets are raw controller values; steps are fixed-point deltas.
   ValueType targetRaw {};
   ValueType stepFixed {};
-  uint32_t ticks = 0;
-  uint32_t delay = 0;
+  u32 ticks = 0;
+  u32 delay = 0;
   SeqMotionMode mode = SeqMotionMode::TargetOverTicks;
 
   // Move to a raw target over tickCount ticks; begin() computes the fixed-point step.
   static SeqFixedPointMotionPlan targetRawOverTicks(ValueType targetValue,
-                                                    uint32_t tickCount,
-                                                    uint32_t delayTicks = 0) {
+                                                    u32 tickCount,
+                                                    u32 delayTicks = 0) {
     return {targetValue, {}, tickCount, delayTicks, SeqMotionMode::TargetOverTicks};
   }
 
   // Use the supplied fixed-point step for tickCount ticks, then snap to the raw target.
   static SeqFixedPointMotionPlan targetRawOverTicksWithStepFixed(ValueType targetValue,
                                                                  ValueType stepValue,
-                                                                 uint32_t tickCount,
-                                                                 uint32_t delayTicks = 0) {
+                                                                 u32 tickCount,
+                                                                 u32 delayTicks = 0) {
     return {targetValue,
             stepValue,
             tickCount,
@@ -164,7 +166,7 @@ struct SeqFixedPointMotionPlan {
   static SeqFixedPointMotionPlan targetRawByStepFixed(
       ValueType targetValue,
       ValueType stepValue,
-      uint32_t delayTicks = 0) {
+      u32 delayTicks = 0) {
     return {targetValue,
             stepValue,
             0,
@@ -204,20 +206,20 @@ struct SeqFixedPointMotion {
   using Plan = SeqFixedPointMotionPlan<ValueType, FractionBits>;
 
   static Plan toRawTarget(ValueType targetRaw,
-                          uint32_t ticks,
-                          uint32_t delay = 0) {
+                          u32 ticks,
+                          u32 delay = 0) {
     return Plan::targetRawOverTicks(targetRaw, ticks, delay);
   }
 
   static Plan toRawTargetByFixedStep(
       ValueType targetRaw,
       ValueType stepFixed,
-      uint32_t delay = 0) {
+      u32 delay = 0) {
     return Plan::targetRawByStepFixed(targetRaw, stepFixed, delay);
   }
 };
 
-template <typename ValueType = int32_t, unsigned FractionBits = 8>
+template <typename ValueType = s32, unsigned FractionBits = 8>
 class SeqFixedPointAutomation {
  public:
   static constexpr ValueType kScale = static_cast<ValueType>(1) << FractionBits;
@@ -249,7 +251,7 @@ class SeqFixedPointAutomation {
   [[nodiscard]] ValueType targetFixed() const { return m_value.target(); }
   [[nodiscard]] ValueType targetRaw() const { return rawFromFixed(m_value.target()); }
   [[nodiscard]] ValueType step() const { return m_value.step(); }
-  [[nodiscard]] uint32_t ticksRemaining() const { return m_value.ticksRemaining(); }
+  [[nodiscard]] u32 ticksRemaining() const { return m_value.ticksRemaining(); }
   [[nodiscard]] bool usesTicks() const { return m_value.usesTicks(); }
 
   // Return currentRaw() converted back to fixed point, discarding any fraction.
@@ -270,7 +272,7 @@ class SeqFixedPointAutomation {
   }
 
   // Compute the fixed-point step from currentFixedForNewMotion() to targetRaw.
-  [[nodiscard]] ValueType stepFixedToTargetRaw(ValueType targetRaw, uint32_t ticks) const {
+  [[nodiscard]] ValueType stepFixedToTargetRaw(ValueType targetRaw, u32 ticks) const {
     if (ticks == 0) {
       return {};
     }

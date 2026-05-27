@@ -7,13 +7,21 @@
 #pragma once
 
 #include "Format.h"
+#include "formats/common/YM2151InstrSet.h"
 #include "services/MenuManager.h"
-#include "VGMSeq.h"
+#include "util/Path.h"
+#include "VGMColl.h"
+#include "VGMExport.h"
 #include "VGMInstrSet.h"
 #include "VGMSampColl.h"
-#include "VGMExport.h"
-#include "VGMColl.h"
-#include "formats/common/YM2151InstrSet.h"
+#include "VGMSeq.h"
+
+#include <filesystem>
+#include <memory>
+#include <optional>
+#include <string>
+#include <utility>
+#include <vector>
 
 namespace fs = std::filesystem;
 using MenuPath = Command::MenuPath;

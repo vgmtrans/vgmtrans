@@ -4,10 +4,11 @@
  * refer to the included LICENSE.txt file
  */
 
-#include "RareSnesSeq.h"
+#include "base/Types.h"
 #include "RareSnesInstr.h"
-#include "SNESDSP.h"
+#include "RareSnesSeq.h"
 #include "ScannerManager.h"
+#include "SNESDSP.h"
 
 namespace vgmtrans::scanners {
 ScannerRegistration<RareSnesScanner> s_raresnes("RareSnes", {"spc"});
@@ -119,10 +120,10 @@ void RareSnesScanner::scan(RawFile *file, void *info) {
 
 void RareSnesScanner::searchForRareSnesFromARAM(RawFile *file) {
   RareSnesVersion version = RARESNES_NONE;
-  uint32_t ofsSongLoadASM;
-  uint32_t ofsVCmdExecASM;
-  uint32_t addrSeqHeader;
-  uint32_t addrVCmdTable;
+  u32 ofsSongLoadASM;
+  u32 ofsVCmdExecASM;
+  u32 addrSeqHeader;
+  u32 addrVCmdTable;
   std::string name = file->tag.hasTitle() ? file->tag.title : file->stem();
 
   // find a sequence
@@ -162,21 +163,21 @@ void RareSnesScanner::searchForRareSnesFromARAM(RawFile *file) {
   }
 
   // Rare engine has a instrument # <--> SRCN # table, find it
-  uint32_t ofsReadSRCNASM;
+  u32 ofsReadSRCNASM;
   if (!file->searchBytePattern(ptnReadSRCNTable, ofsReadSRCNASM)) {
     return;
   }
-  uint32_t addrSRCNTable = file->readShort(ofsReadSRCNASM + 5);
+  u32 addrSRCNTable = file->readShort(ofsReadSRCNASM + 5);
   if (addrSRCNTable + 0x100 > 0x10000) {
     return;
   }
 
   // find DIR address
-  uint32_t ofsSetDIRASM;
+  u32 ofsSetDIRASM;
   if (!file->searchBytePattern(ptnLoadDIR, ofsSetDIRASM)) {
     return;
   }
-  uint32_t spcDirAddr = file->readByte(ofsSetDIRASM + 4) << 8;
+  u32 spcDirAddr = file->readByte(ofsSetDIRASM + 4) << 8;
 
   // scan SRCN table
     RareSnesInstrSet *newInstrSet = new RareSnesInstrSet(
@@ -188,18 +189,18 @@ void RareSnesScanner::searchForRareSnesFromARAM(RawFile *file) {
   }
 
   // get SRCN # range
-  uint8_t maxSRCN = 0;
-  std::vector<uint8_t> usedSRCNs;
-  const std::vector<uint8_t> &availInstruments = newInstrSet->getAvailableInstruments();
-  for (std::vector<uint8_t>::const_iterator itr = availInstruments.begin(); itr != availInstruments.end(); ++itr) {
-    uint8_t inst = (*itr);
-    uint8_t srcn = file->readByte(addrSRCNTable + inst);
+  u8 maxSRCN = 0;
+  std::vector<u8> usedSRCNs;
+  const std::vector<u8> &availInstruments = newInstrSet->getAvailableInstruments();
+  for (std::vector<u8>::const_iterator itr = availInstruments.begin(); itr != availInstruments.end(); ++itr) {
+    u8 inst = (*itr);
+    u8 srcn = file->readByte(addrSRCNTable + inst);
 
     if (maxSRCN < srcn) {
       maxSRCN = srcn;
     }
 
-    std::vector<uint8_t>::iterator itrSRCN = find(usedSRCNs.begin(), usedSRCNs.end(), srcn);
+    std::vector<u8>::iterator itrSRCN = find(usedSRCNs.begin(), usedSRCNs.end(), srcn);
     if (itrSRCN == usedSRCNs.end()) {
       usedSRCNs.push_back(srcn);
     }

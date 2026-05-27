@@ -5,11 +5,12 @@
  */
 
 #include "VGMColl.h"
-#include "VGMSeq.h"
-#include "VGMInstrSet.h"
-#include "VGMSampColl.h"
+
 #include "Root.h"
+#include "VGMInstrSet.h"
 #include "VGMMiscFile.h"
+#include "VGMSampColl.h"
+#include "VGMSeq.h"
 
 VGMColl::VGMColl(std::string theName) : m_name(std::move(theName)) {}
 

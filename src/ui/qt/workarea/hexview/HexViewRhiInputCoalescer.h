@@ -6,9 +6,10 @@
 
 #pragma once
 
+#include "HexView.h"
+
 #include <QPoint>
 #include <QWheelEvent>
-#include "HexView.h"
 
 class HexViewRhiInputCoalescer final {
 public:

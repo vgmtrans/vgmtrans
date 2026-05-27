@@ -1,8 +1,13 @@
 #pragma once
-#include "VGMInstrSet.h"
-#include "VGMSampColl.h"
-#include "VGMRgn.h"
+
+#include "base/Types.h"
 #include "NamcoSnesFormat.h"
+#include "VGMInstrSet.h"
+#include "VGMRgn.h"
+#include "VGMSampColl.h"
+
+#include <string>
+#include <vector>
 
 // *****************
 // NamcoSnesInstrSet
@@ -13,8 +18,8 @@ class NamcoSnesInstrSet:
  public:
   NamcoSnesInstrSet(RawFile *file,
                     NamcoSnesVersion ver,
-                    uint32_t spcDirAddr,
-                    uint16_t addrTuningTable,
+                    u32 spcDirAddr,
+                    u16 addrTuningTable,
                     const std::string &name = "NamcoSnesInstrSet");
   virtual ~NamcoSnesInstrSet();
 
@@ -24,9 +29,9 @@ class NamcoSnesInstrSet:
   NamcoSnesVersion version;
 
  protected:
-  uint32_t spcDirAddr;
-  uint16_t addrTuningTable;
-  std::vector<uint8_t> usedSRCNs;
+  u32 spcDirAddr;
+  u16 addrTuningTable;
+  std::vector<u8> usedSRCNs;
 };
 
 // **************
@@ -38,9 +43,9 @@ class NamcoSnesInstr
  public:
   NamcoSnesInstr(VGMInstrSet *instrSet,
                  NamcoSnesVersion ver,
-                 uint8_t srcn,
-                 uint32_t spcDirAddr,
-                 uint16_t addrTuningEntry,
+                 u8 srcn,
+                 u32 spcDirAddr,
+                 u16 addrTuningEntry,
                  const std::string &name = "NamcoSnesInstr");
   virtual ~NamcoSnesInstr();
 
@@ -49,8 +54,8 @@ class NamcoSnesInstr
   NamcoSnesVersion version;
 
  protected:
-  uint32_t spcDirAddr;
-  uint16_t addrTuningEntry;
+  u32 spcDirAddr;
+  u16 addrTuningEntry;
 };
 
 // ************
@@ -61,7 +66,7 @@ class NamcoSnesRgn
     : public VGMRgn {
  public:
   NamcoSnesRgn
-      (NamcoSnesInstr *instr, NamcoSnesVersion ver, uint8_t srcn, uint32_t spcDirAddr, uint16_t addrTuningEntry);
+      (NamcoSnesInstr *instr, NamcoSnesVersion ver, u8 srcn, u32 spcDirAddr, u16 addrTuningEntry);
   virtual ~NamcoSnesRgn();
 
   virtual bool loadRgn();

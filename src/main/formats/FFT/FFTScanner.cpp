@@ -4,9 +4,11 @@
  * refer to the included LICENSE.txt file
  */
 
-#include "FFTSeq.h"
-#include "FFTInstr.h"
 #include "FFTScanner.h"
+
+#include "base/Types.h"
+#include "FFTInstr.h"
+#include "FFTSeq.h"
 #include "ScannerManager.h"
 
 namespace vgmtrans::scanners {
@@ -28,7 +30,7 @@ void FFTScanner::scan(RawFile *file, void *info) {
 //--------------------------------------------------------------
 void FFTScanner::searchForFFTSeq(RawFile *file) {
   size_t nFileLength = file->size();
-  for (uint32_t i = 0; i + 4 < nFileLength; i++) {
+  for (u32 i = 0; i + 4 < nFileLength; i++) {
     if (file->readWordBE(i) != 0x736D6473)
       continue;
     if (file->readShort(i + 10) != 0 && file->readShort(i + 16) != 0)
@@ -48,8 +50,8 @@ void FFTScanner::searchForFFTSeq(RawFile *file) {
 //--------------------------------------------------------------
 void FFTScanner::searchForFFTwds(RawFile *file) {
   size_t nFileLength = file->size();
-  for (uint32_t i = 0; i + 0x30 < nFileLength; i++) {
-    uint32_t sig = file->readWordBE(i);
+  for (u32 i = 0; i + 0x30 < nFileLength; i++) {
+    u32 sig = file->readWordBE(i);
     if (sig != 0x64776473 && sig != 0x77647320)
       continue;
 
@@ -57,7 +59,7 @@ void FFTScanner::searchForFFTwds(RawFile *file) {
     if (file->readWord(i + 0x14) > 0x100000)
       continue;
 
-    uint32_t hdrSize = file->readWord(i + 0x10);
+    u32 hdrSize = file->readWord(i + 0x10);
     // First 0x10 bytes of sample section should be 0s
     if (file->readWord(i + hdrSize) != 0 || file->readWord(i + hdrSize + 4) != 0 ||
         file->readWord(i + hdrSize + 8) != 0 || file->readWord(i + hdrSize + 12) != 0)

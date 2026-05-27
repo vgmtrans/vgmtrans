@@ -1,5 +1,7 @@
 #include "SonyPS2Seq.h"
 
+#include "base/Types.h"
+
 DECLARE_FORMAT(SonyPS2);
 
 using namespace std;
@@ -8,7 +10,7 @@ using namespace std;
 // BGMSeq
 // ******
 
-SonyPS2Seq::SonyPS2Seq(RawFile *file, uint32_t offset, std::string name)
+SonyPS2Seq::SonyPS2Seq(RawFile *file, u32 offset, std::string name)
     : VGMSeqNoTrks(SonyPS2Format::name, file, offset, std::move(name)),
       compOption(0),
       bSkipDeltaTime(0) {
@@ -17,7 +19,7 @@ SonyPS2Seq::SonyPS2Seq(RawFile *file, uint32_t offset, std::string name)
 }
 
 bool SonyPS2Seq::parseHeader() {
-  uint32_t curOffset = offset();
+  u32 curOffset = offset();
   //read the version chunk
   readBytes(curOffset, 0x10, &versCk);
   VGMHeader *versCkHdr = VGMSeq::addHeader(curOffset, versCk.chunkSize, "Version Chunk");
@@ -38,7 +40,7 @@ bool SonyPS2Seq::parseHeader() {
   midiOffsetAddr = readWord(curOffset + 16) + curOffset;
   curOffset = midiOffsetAddr;
   //Now we're at the Midi Data Block
-  uint32_t sequenceOffset = readWord(curOffset);        //read sequence offset
+  u32 sequenceOffset = readWord(curOffset);        //read sequence offset
   setEventsOffset(curOffset + sequenceOffset);
   setPPQN(readShort(curOffset + 4));                    //read ppqn value
 
@@ -54,8 +56,8 @@ bool SonyPS2Seq::parseHeader() {
 
 
 bool SonyPS2Seq::readEvent(void) {
-  uint32_t beginOffset = curOffset;
-  uint32_t deltaTime;
+  u32 beginOffset = curOffset;
+  u32 deltaTime;
   if (bSkipDeltaTime)
     deltaTime = 0;
   else
@@ -66,7 +68,7 @@ bool SonyPS2Seq::readEvent(void) {
 
   bSkipDeltaTime = false;
 
-  uint8_t status_byte = readByte(curOffset++);
+  u8 status_byte = readByte(curOffset++);
 
   // Running Status
   if (status_byte <= 0x7F) {
@@ -104,8 +106,8 @@ bool SonyPS2Seq::readEvent(void) {
     }
 
     case 0xB0 : {
-      uint8_t controlNum = readByte(curOffset++);
-      uint8_t value = getDataByte(curOffset++);
+      u8 controlNum = readByte(curOffset++);
+      u8 value = getDataByte(curOffset++);
 
       //control number
       switch (controlNum) {
@@ -159,14 +161,14 @@ bool SonyPS2Seq::readEvent(void) {
       break;
 
     case 0xC0 : {
-      uint8_t progNum = getDataByte(curOffset++);
+      u8 progNum = getDataByte(curOffset++);
       addProgramChange(beginOffset, curOffset - beginOffset, progNum);
     }
       break;
 
     case 0xE0 : {
-      uint8_t hi = readByte(curOffset++);
-      uint8_t lo = getDataByte(curOffset++);
+      u8 hi = readByte(curOffset++);
+      u8 lo = getDataByte(curOffset++);
       addPitchBendMidiFormat(beginOffset, curOffset - beginOffset, hi, lo);
     }
       break;
@@ -176,7 +178,7 @@ bool SonyPS2Seq::readEvent(void) {
         switch (readByte(curOffset++)) {
           //tempo. identical to SMF
           case 0x51 : {
-            uint32_t microsPerQuarter = readWordBE(curOffset) & 0x00FFFFFF;    //mask out the hi byte 0x03
+            u32 microsPerQuarter = readWordBE(curOffset) & 0x00FFFFFF;    //mask out the hi byte 0x03
             addTempo(beginOffset, curOffset + 4 - beginOffset, microsPerQuarter);
             curOffset += 4;
             break;
@@ -201,8 +203,8 @@ bool SonyPS2Seq::readEvent(void) {
   return true;
 }
 
-uint8_t SonyPS2Seq::getDataByte(uint32_t offset) {
-  uint8_t dataByte = readByte(offset);
+u8 SonyPS2Seq::getDataByte(u32 offset) {
+  u8 dataByte = readByte(offset);
   if (dataByte & 0x80) {
     bSkipDeltaTime = true;
     dataByte &= 0x7F;

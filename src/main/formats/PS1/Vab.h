@@ -1,111 +1,117 @@
 #pragma once
+
+#include "base/Types.h"
+#include "util/SizeOffsetPair.h"
 #include "VGMInstrSet.h"
-#include "VGMSampColl.h"
 #include "VGMRgn.h"
 #include "VGMSamp.h"
+#include "VGMSampColl.h"
+
+#include <string>
+#include <vector>
 
 // VAB Header
 struct VabHdr {
-  int32_t form;
+  s32 form;
   /*always "VABp"*/
-  int32_t ver;
+  s32 ver;
   /*format version number*/
-  int32_t id;
+  s32 id;
   /*bank ID*/
-  uint32_t fsize;
+  u32 fsize;
   /*file size*/
-  uint16_t reserved0;
+  u16 reserved0;
   /*system reserved*/
-  uint16_t ps;
+  u16 ps;
   /*total number of programs in this bank*/
-  uint16_t ts;
+  u16 ts;
   /*total number of effective tones*/
-  uint16_t vs;
+  u16 vs;
   /*number of waveforms (VAG)*/
-  uint8_t mvol;
+  u8 mvol;
   /*master volume*/
-  uint8_t pan;
+  u8 pan;
   /*master pan*/
-  uint8_t attr1;
+  u8 attr1;
   /*bank attribute*/
-  uint8_t attr2;
+  u8 attr2;
   /*bank attribute*/
-  uint32_t reserved1; /*system reserved*/
+  u32 reserved1; /*system reserved*/
 };
 
 
 //Program Attributes
 struct ProgAtr {
-  uint8_t tones;
+  u8 tones;
   /*number of effective tones which compose the program*/
-  uint8_t mvol;
+  u8 mvol;
   /*program volume*/
-  uint8_t prior;
+  u8 prior;
   /*program priority*/
-  uint8_t mode;
+  u8 mode;
   /*program mode*/
-  uint8_t mpan;
+  u8 mpan;
   /*program pan*/
-  int8_t reserved0;
+  s8 reserved0;
   /*system reserved*/
-  int16_t attr;
+  s16 attr;
   /*program attribute*/
-  uint32_t reserved1;
+  u32 reserved1;
   /*system reserved*/
-  uint32_t reserved2; /*system reserved*/
+  u32 reserved2; /*system reserved*/
 };
 
 
 //Tone Attributes
 struct VagAtr {
-  uint8_t prior;
+  u8 prior;
   /*tone priority (0 - 127); used for controlling allocation when more voices than can be keyed on are requested*/
-  uint8_t mode;
+  u8 mode;
   /*tone mode (0 = normal; 4 = reverb applied */
-  uint8_t vol;
+  u8 vol;
   /*tone volume*/
-  uint8_t pan;
+  u8 pan;
   /*tone pan*/
-  uint8_t center;
+  u8 center;
   /*center note (0~127)*/
-  uint8_t shift;
+  u8 shift;
   /*pitch correction (0~127,cent units)*/
-  uint8_t min;
+  u8 min;
   /*minimum note limit (0~127)*/
-  uint8_t max;
+  u8 max;
   /*maximum note limit (0~127, provided min < max)*/
-  uint8_t vibW;
+  u8 vibW;
   /*vibrato width (1/128 rate,0~127)*/
-  uint8_t vibT;
+  u8 vibT;
   /*1 cycle time of vibrato (tick units)*/
-  uint8_t porW;
+  u8 porW;
   /*portamento width (1/128 rate, 0~127)*/
-  uint8_t porT;
+  u8 porT;
   /*portamento holding time (tick units)*/
-  uint8_t pbmin;
+  u8 pbmin;
   /*pitch bend (-0~127, 127 = 1 octave)*/
-  uint8_t pbmax;
+  u8 pbmax;
   /*pitch bend (+0~127, 127 = 1 octave)*/
-  uint8_t reserved1;
+  u8 reserved1;
   /*system reserved*/
-  uint8_t reserved2;
+  u8 reserved2;
   /*system reserved*/
-  uint16_t adsr1;
+  u16 adsr1;
   /*ADSR1*/
-  uint16_t adsr2;
+  u16 adsr2;
   /*ADSR2*/
-  int16_t prog;
+  s16 prog;
   /*parent program*/
-  int16_t vag;
+  s16 vag;
   /*waveform (VAG) used*/
-  int16_t reserved[4]; /*system reserved*/
+  s16 reserved[4]; /*system reserved*/
 };
 
 
 class Vab:
     public VGMInstrSet {
  public:
-  Vab(RawFile *file, uint32_t offset);
+  Vab(RawFile *file, u32 offset);
   virtual ~Vab();
 
   virtual bool parseHeader();
@@ -128,10 +134,10 @@ class VabInstr
     : public VGMInstr {
  public:
   VabInstr(VGMInstrSet *instrSet,
-           uint32_t offset,
-           uint32_t length,
-           uint32_t theBank,
-           uint32_t theInstrNum,
+           u32 offset,
+           u32 length,
+           u32 theBank,
+           u32 theInstrNum,
            const std::string &name = "Instrument");
   virtual ~VabInstr();
 
@@ -139,7 +145,7 @@ class VabInstr
 
  public:
   ProgAtr attr;
-  uint8_t masterVol;
+  u8 masterVol;
 };
 
 
@@ -150,19 +156,19 @@ class VabInstr
 class VabRgn
     : public VGMRgn {
  public:
-  VabRgn(VabInstr *instr, uint32_t offset);
+  VabRgn(VabInstr *instr, u32 offset);
 
   virtual bool loadRgn();
 
  public:
-  uint16_t ADSR1;                //raw ps2 ADSR1 value (articulation data)
-  uint16_t ADSR2;                //raw ps2 ADSR2 value (articulation data)
-  uint8_t bStereoRegion;
-  uint8_t StereoPairOrder;
-  uint8_t bFirstRegion;
-  uint8_t bLastRegion;
-  uint8_t bUnknownFlag2;
-  uint32_t sample_offset;
+  u16 ADSR1;                //raw ps2 ADSR1 value (articulation data)
+  u16 ADSR2;                //raw ps2 ADSR2 value (articulation data)
+  u8 bStereoRegion;
+  u8 StereoPairOrder;
+  u8 bFirstRegion;
+  u8 bLastRegion;
+  u8 bUnknownFlag2;
+  u32 sample_offset;
 
   VagAtr attr;
 };

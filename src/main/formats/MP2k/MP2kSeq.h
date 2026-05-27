@@ -5,14 +5,18 @@
  */
 #pragma once
 
-#include "VGMSeq.h"
-#include "SeqTrack.h"
-#include "SeqEvent.h"
 #include "automation/SeqMidiAutomation.h"
+#include "base/Types.h"
+#include "SeqEvent.h"
+#include "SeqTrack.h"
+#include "VGMSeq.h"
+
+#include <string>
+#include <vector>
 
 class MP2kSeq final : public VGMSeq {
 public:
-  MP2kSeq(RawFile *file, uint32_t offset, std::string name = "MP2kSeq");
+  MP2kSeq(RawFile *file, u32 offset, std::string name = "MP2kSeq");
   ~MP2kSeq() = default;
 
   bool parseHeader() override;
@@ -21,7 +25,7 @@ public:
 
 class MP2kTrack final : public SeqTrack {
 public:
-  MP2kTrack(MP2kSeq *parentSeq, uint32_t offset = 0, uint32_t length = 0);
+  MP2kTrack(MP2kSeq *parentSeq, u32 offset = 0, u32 length = 0);
 
   bool readEvent() override;
 
@@ -30,7 +34,7 @@ protected:
   void onTickBegin() override;
 
 private:
-  enum class State : uint8_t {
+  enum class State : u8 {
     Note = 0,
     Tie = 1,
     TieEnd = 2,
@@ -41,24 +45,24 @@ private:
   };
 
   State state = State::Note;
-  uint32_t curDuration = 0;
-  uint8_t current_vel = 0;
+  u32 curDuration = 0;
+  u8 current_vel = 0;
 
   void beginNoteLfo();
   void updateLfoFade();
-  void setLfoSpeed(uint8_t speed);
-  void setLfoDelay(uint8_t delay);
-  void setModulationDepth(uint8_t depth);
-  void setModulationType(uint8_t type);
+  void setLfoSpeed(u8 speed);
+  void setLfoDelay(u8 delay);
+  void setModulationDepth(u8 depth);
+  void setModulationType(u8 type);
   void applyLfoDepth(bool force);
   void clearLfoOutputs();
   bool lfoOutputsEnabled() const;
 
-  std::vector<uint32_t> loopEndPositions;
+  std::vector<u32> loopEndPositions;
   void handleStatusCommand(u32 offset, u8 status);
   void handleSpecialCommand(u32 offset, u8 status);
 
-  uint8_t modType = 0;
+  u8 modType = 0;
   SeqSynthLfoAutomation vibratoLfo;
   SeqSynthLfoAutomation tremoloLfo;
 };

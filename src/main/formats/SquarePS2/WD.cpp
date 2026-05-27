@@ -5,8 +5,11 @@
  */
 
 #include "WD.h"
-#include "SquarePS2Format.h"
+
+#include "base/Types.h"
 #include "PSXSPU.h"
+#include "SquarePS2Format.h"
+
 #include <spdlog/fmt/fmt.h>
 
 static constexpr int finetune_table[] = {
@@ -45,7 +48,7 @@ static constexpr float defaultWDReverbPercent = 0.5;
 // WDInstrSet
 // **********
 
-WDInstrSet::WDInstrSet(RawFile *file, uint32_t offset)
+WDInstrSet::WDInstrSet(RawFile *file, u32 offset)
     : VGMInstrSet(SquarePS2Format::name, file, offset) {}
 
 bool WDInstrSet::parseHeader() {
@@ -65,7 +68,7 @@ bool WDInstrSet::parseHeader() {
 
   setName(fmt::format("WD {}", id()));
 
-  uint32_t sampCollOff = offset() + readWord(offset() + 0x20) + (dwTotalRegions * 0x20);
+  u32 sampCollOff = offset() + readWord(offset() + 0x20) + (dwTotalRegions * 0x20);
 
   sampColl = new PSXSampColl(SquarePS2Format::name, this, sampCollOff, dwSampSectSize);
   setLength(sampCollOff + dwSampSectSize - offset());
@@ -74,16 +77,16 @@ bool WDInstrSet::parseHeader() {
 }
 
 bool WDInstrSet::parseInstrPointers() {
-  uint32_t j = 0x20 + offset();
+  u32 j = 0x20 + offset();
 
   // check for bouncer WDs with 0xFFFFFFFF as the last instr pointer.  If it's there ignore it
-  for (uint32_t i = 0; i < dwNumInstrs; i++) {
+  for (u32 i = 0; i < dwNumInstrs; i++) {
     if (readWord(j + i * 4) == 0xFFFFFFFF)
       dwNumInstrs = i;
   }
 
-  for (uint32_t i = 0; i < dwNumInstrs; i++) {
-    uint32_t instrLength;
+  for (u32 i = 0; i < dwNumInstrs; i++) {
+    u32 instrLength;
     if (i != dwNumInstrs - 1)  // while not the last instr
       instrLength = readWord(j + ((i + 1) * 4)) - readWord(j + (i * 4));
     else
@@ -100,8 +103,8 @@ bool WDInstrSet::parseInstrPointers() {
 // WDInstr
 // *******
 
-WDInstr::WDInstr(VGMInstrSet *instrSet, uint32_t offset, uint32_t length, uint32_t theBank,
-                 uint32_t theInstrNum, const std::string& name)
+WDInstr::WDInstr(VGMInstrSet *instrSet, u32 offset, u32 length, u32 theBank,
+                 u32 theInstrNum, const std::string& name)
     : VGMInstr(instrSet, offset, length, theBank, theInstrNum, name, defaultWDReverbPercent) {
 }
 
@@ -137,7 +140,7 @@ bool WDInstr::loadInstr() {
     rgn->unityKey = 0x3A - readByte(k * 0x20 + 0x13 + offset());
     rgn->keyHigh = readByte(k * 0x20 + 0x14 + offset());
 
-    uint8_t vol = readByte(k * 0x20 + 0x16 + offset());
+    u8 vol = readByte(k * 0x20 + 0x16 + offset());
     rgn->setVolume(vol / 127.0);
 
     rgn->pan = (double) readByte(k * 0x20 + 0x17 + offset());        //need to convert
@@ -187,6 +190,6 @@ bool WDInstr::loadInstr() {
 // WDRgn
 // *****
 
-WDRgn::WDRgn(WDInstr *instr, uint32_t offset)
+WDRgn::WDRgn(WDInstr *instr, u32 offset)
     : VGMRgn(instr, offset, 0x20) {}
  

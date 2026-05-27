@@ -1,10 +1,13 @@
 #pragma once
 
-#include <array>
-
-#include "VGMSeq.h"
-#include "SeqTrack.h"
 #include "AsciiShuichiSnesFormat.h"
+#include "base/Types.h"
+#include "SeqTrack.h"
+#include "VGMSeq.h"
+
+#include <array>
+#include <map>
+#include <string>
 
 enum AsciiShuichiSnesSeqEventType {
   //start enum at 1 because if map[] look up fails, it returns 0, and we don't want that to get confused with a legit event
@@ -55,18 +58,18 @@ class AsciiShuichiSnesSeq
     : public VGMSeq {
  public:
   AsciiShuichiSnesSeq
-      (RawFile *file, uint32_t seqHeaderOffset, std::string newName = "ASCII Shuichi Ukai SNES Seq");
+      (RawFile *file, u32 seqHeaderOffset, std::string newName = "ASCII Shuichi Ukai SNES Seq");
 
   bool parseHeader() override;
   bool parseTrackPointers() override;
   void resetVars() override;
 
-  std::map<uint8_t, AsciiShuichiSnesSeqEventType> EventMap;
+  std::map<u8, AsciiShuichiSnesSeqEventType> EventMap;
 
-  uint8_t tempo;
+  u8 tempo;
 
   [[nodiscard]] double getTempoInBPM() const;
-  static double getTempoInBPM(uint8_t tempo);
+  static double getTempoInBPM(u8 tempo);
 
  private:
   void loadEventMap();
@@ -76,28 +79,28 @@ class AsciiShuichiSnesSeq
 class AsciiShuichiSnesTrack
     : public SeqTrack {
  public:
-  AsciiShuichiSnesTrack(AsciiShuichiSnesSeq *parentFile, uint32_t offset = 0, uint32_t length = 0);
+  AsciiShuichiSnesTrack(AsciiShuichiSnesSeq *parentFile, u32 offset = 0, u32 length = 0);
   void resetVars() override;
   bool readEvent() override;
 
-  static void getVolumeBalance(uint8_t pan, double &volumeLeft, double &volumeRight);
-  static int8_t calcMidiPanValue(uint8_t pan);
+  static void getVolumeBalance(u8 pan, double &volumeLeft, double &volumeRight);
+  static s8 calcMidiPanValue(u8 pan);
 
  private:
-  uint8_t spcVolume;
-  uint16_t infiniteLoopPoint;
-  int8_t lastNoteKey;
-  uint8_t rawNoteLength;
-  uint8_t noteDuration;
-  uint8_t noteDurationRate;
+  u8 spcVolume;
+  u16 infiniteLoopPoint;
+  s8 lastNoteKey;
+  u8 rawNoteLength;
+  u8 noteDuration;
+  u8 noteDurationRate;
   bool slurDeferred;
   bool useNoteDurationRate;
   bool reachedRepeatBreakBefore;
-  uint8_t repeatStartNestLevel;
-  uint8_t repeatEndNestLevel;
-  uint8_t callNestLevel;
-  std::array<uint16_t, 3> repeatStartAddressStack;
-  std::array<uint16_t, 3> repeatEndAddressStack;
-  std::array<uint8_t, 3> repeatCountStack;
-  std::array<uint16_t, 3> callStack;
+  u8 repeatStartNestLevel;
+  u8 repeatEndNestLevel;
+  u8 callNestLevel;
+  std::array<u16, 3> repeatStartAddressStack;
+  std::array<u16, 3> repeatEndAddressStack;
+  std::array<u8, 3> repeatCountStack;
+  std::array<u16, 3> callStack;
 };

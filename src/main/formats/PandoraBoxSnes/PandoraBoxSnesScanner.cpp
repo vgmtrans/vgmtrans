@@ -4,8 +4,9 @@
  * refer to the included LICENSE.txt file
  */
 
-#include "PandoraBoxSnesSeq.h"
+#include "base/Types.h"
 #include "PandoraBoxSnesInstr.h"
+#include "PandoraBoxSnesSeq.h"
 #include "ScannerManager.h"
 
 namespace vgmtrans::scanners {
@@ -102,15 +103,15 @@ void PandoraBoxSnesScanner::searchForPandoraBoxSnesFromARAM(RawFile *file) {
   PandoraBoxSnesVersion version = PANDORABOXSNES_NONE;
   std::string name = file->tag.hasTitle() ? file->tag.title : file->stem();
 
-  uint32_t ofsLoadSeq;
-  uint16_t addrSeqHeader;
+  u32 ofsLoadSeq;
+  u16 addrSeqHeader;
   if (file->searchBytePattern(ptnLoadSeqTSP, ofsLoadSeq)) {
-    uint8_t addrSeqHeaderPtr = file->readByte(ofsLoadSeq + 7);
+    u8 addrSeqHeaderPtr = file->readByte(ofsLoadSeq + 7);
     addrSeqHeader = file->readShort(addrSeqHeaderPtr);
     version = PANDORABOXSNES_V2;
   }
   else if (file->searchBytePattern(ptnLoadSeqKKO, ofsLoadSeq)) {
-    uint8_t addrSeqHeaderPtr = file->readByte(ofsLoadSeq + 4);
+    u8 addrSeqHeaderPtr = file->readByte(ofsLoadSeq + 4);
     addrSeqHeader = file->readShort(addrSeqHeaderPtr);
     version = PANDORABOXSNES_V1;
   }
@@ -125,8 +126,8 @@ void PandoraBoxSnesScanner::searchForPandoraBoxSnesFromARAM(RawFile *file) {
   }
 
   // scan for DIR address
-  uint16_t spcDirAddr;
-  uint32_t ofsSetDIR;
+  u16 spcDirAddr;
+  u32 ofsSetDIR;
   if (file->searchBytePattern(ptnSetDIR, ofsSetDIR)) {
     spcDirAddr = file->readByte(ofsSetDIR + 1) << 8;
   } else {
@@ -134,12 +135,12 @@ void PandoraBoxSnesScanner::searchForPandoraBoxSnesFromARAM(RawFile *file) {
   }
 
   // scan for instrument table
-  uint32_t ofsLoadSRCN;
-  uint16_t addrLocalInstrTable;
-  uint16_t addrGlobalInstrTable;
-  uint8_t globalInstrumentCount;
+  u32 ofsLoadSRCN;
+  u16 addrLocalInstrTable;
+  u16 addrGlobalInstrTable;
+  u8 globalInstrumentCount;
   if (file->searchBytePattern(ptnLoadSRCN, ofsLoadSRCN)) {
-    uint8_t ofsLocalInstrTable = file->readByte(addrSeqHeader + 12);
+    u8 ofsLocalInstrTable = file->readByte(addrSeqHeader + 12);
     if (addrSeqHeader + ofsLocalInstrTable >= 0x10000) {
       return;
     }
@@ -147,7 +148,7 @@ void PandoraBoxSnesScanner::searchForPandoraBoxSnesFromARAM(RawFile *file) {
 
     addrGlobalInstrTable = file->readShort(ofsLoadSRCN + 14) + 1;
 
-    uint16_t availInstrCountPtr = file->readShort(ofsLoadSRCN + 9);
+    u16 availInstrCountPtr = file->readShort(ofsLoadSRCN + 9);
     globalInstrumentCount = file->readByte(availInstrCountPtr);
   } else {
     return;

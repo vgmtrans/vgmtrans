@@ -4,12 +4,17 @@
  * refer to the included LICENSE.txt file
  */
 #pragma once
-#include <optional>
-#include "VGMSeq.h"
+
 #include "automation/SeqMidiAutomation.h"
-#include "SeqTrack.h"
-#include "SeqEvent.h"
+#include "base/Types.h"
 #include "KonamiSnesFormat.h"
+#include "SeqEvent.h"
+#include "SeqTrack.h"
+#include "VGMSeq.h"
+
+#include <map>
+#include <optional>
+#include <string>
 
 enum KonamiSnesSeqEventType {
   //start enum at 1 because if map[] look up fails, it returns 0, and we don't want that to get confused with a legit event
@@ -70,33 +75,33 @@ class KonamiSnesSeq
     : public VGMSeq {
  public:
   KonamiSnesSeq
-      (RawFile *file, KonamiSnesVersion ver, uint32_t seqdataOffset, std::string newName = "Konami SNES Seq");
+      (RawFile *file, KonamiSnesVersion ver, u32 seqdataOffset, std::string newName = "Konami SNES Seq");
   ~KonamiSnesSeq() override;
 
   bool parseHeader() override;
   bool parseTrackPointers() override;
   void resetVars() override;
 
-  uint8_t tempo;
+  u8 tempo;
   SeqFixedPointAutomation<> tempoFade;
-  uint32_t tempoFadeLastUpdatedTime;
-  uint8_t maxVibratoDepth;
-  uint16_t maxVibratoRateFactor;
+  u32 tempoFadeLastUpdatedTime;
+  u8 maxVibratoDepth;
+  u16 maxVibratoRateFactor;
 
   KonamiSnesVersion version;
-  std::map<uint8_t, KonamiSnesSeqEventType> EventMap;
+  std::map<u8, KonamiSnesSeqEventType> EventMap;
 
-  static const uint8_t PAN_VOLUME_LEFT_V1[];
-  static const uint8_t PAN_VOLUME_RIGHT_V1[];
-  static const uint8_t PAN_VOLUME_LEFT_V2[];
-  static const uint8_t PAN_VOLUME_RIGHT_V2[];
-  static const uint8_t PAN_TABLE[];
-  static const uint8_t VOL_TABLE[];
+  static const u8 PAN_VOLUME_LEFT_V1[];
+  static const u8 PAN_VOLUME_RIGHT_V1[];
+  static const u8 PAN_VOLUME_LEFT_V2[];
+  static const u8 PAN_VOLUME_RIGHT_V2[];
+  static const u8 PAN_TABLE[];
+  static const u8 VOL_TABLE[];
 
-  uint8_t NOTE_DUR_RATE_MAX;
+  u8 NOTE_DUR_RATE_MAX;
 
   double getTempoInBPM();
-  double getTempoInBPM(uint8_t tempo);
+  double getTempoInBPM(u8 tempo);
 
  private:
   void loadEventMap();
@@ -106,75 +111,75 @@ class KonamiSnesSeq
 class KonamiSnesTrack
     : public SeqTrack {
  public:
-  KonamiSnesTrack(KonamiSnesSeq *parentFile, uint32_t offset = 0, uint32_t length = 0);
+  KonamiSnesTrack(KonamiSnesSeq *parentFile, u32 offset = 0, u32 length = 0);
   void resetVars() override;
   bool readEvent() override;
   void onTickBegin() override;
 
-  uint8_t noteLength;
-  uint8_t noteDurationRate;
+  u8 noteLength;
+  u8 noteDurationRate;
   bool inSubroutine;
-  uint16_t subReturnAddr;
-  uint16_t loopReturnAddr;
-  uint8_t loopCount;
-  int16_t loopVolumeDelta;
-  int16_t loopPitchDelta;
-  uint16_t loopReturnAddr2;
-  uint8_t loopCount2;
-  int16_t loopVolumeDelta2;
-  int16_t loopPitchDelta2;
-  uint16_t voltaLoopStart;
-  uint16_t voltaLoopEnd;
+  u16 subReturnAddr;
+  u16 loopReturnAddr;
+  u8 loopCount;
+  s16 loopVolumeDelta;
+  s16 loopPitchDelta;
+  u16 loopReturnAddr2;
+  u8 loopCount2;
+  s16 loopVolumeDelta2;
+  s16 loopPitchDelta2;
+  u16 voltaLoopStart;
+  u16 voltaLoopEnd;
   bool voltaEndMeansPlayFromStart;
   bool voltaEndMeansPlayNextVolta;
   bool percussion;
-  uint8_t instrument;
-  int8_t prevNoteKey;
+  u8 instrument;
+  s8 prevNoteKey;
   bool prevNoteSlurred;
   double seqTuningCents;
 
  private:
   struct PitchSlide {
-    uint32_t offset;
-    uint8_t eventLength;
-    uint8_t delay;
-    uint8_t length;
-    uint8_t targetNote;
+    u32 offset;
+    u8 eventLength;
+    u8 delay;
+    u8 length;
+    u8 targetNote;
     double targetSemitones = 0.0;
-    int16_t delta = 0;
+    s16 delta = 0;
     double deltaSemitones = 0.0;
   };
 
   struct ControllerFade {
-    uint32_t offset;
-    SeqFixedPointMotionPlan<int32_t> motion;
+    u32 offset;
+    SeqFixedPointMotionPlan<s32> motion;
   };
 
   std::optional<PitchSlide> consumePitchSlide();
-  PitchSlide readPitchSlide(KonamiSnesSeqEventType eventType, uint32_t offset);
+  PitchSlide readPitchSlide(KonamiSnesSeqEventType eventType, u32 offset);
   void addPitchSlideEvent(const PitchSlide& slide);
   void clearActivePitchSlide();
-  double noteSemitones(uint8_t key, bool includeTuning) const;
-  void resetPitchForNote(uint8_t key);
+  double noteSemitones(u8 key, bool includeTuning) const;
+  void resetPitchForNote(u8 key);
   void beginPitchSlide(const PitchSlide& slide);
-  uint16_t pitchSlideRangeCents(const PitchSlide& slide) const;
-  uint8_t getNoteDuration(uint8_t length, uint8_t durationRate) const;
-  ControllerFade readVolumeFade(KonamiSnesSeqEventType eventType, uint32_t offset) const;
+  u16 pitchSlideRangeCents(const PitchSlide& slide) const;
+  u8 getNoteDuration(u8 length, u8 durationRate) const;
+  ControllerFade readVolumeFade(KonamiSnesSeqEventType eventType, u32 offset) const;
   void applyCurrentVolume();
-  uint8_t defaultPanValue() const;
-  uint8_t clampPanValue(uint8_t pan) const;
-  uint8_t convertPanValueToMidiPan(uint8_t pan) const;
-  ControllerFade readPanFade(KonamiSnesSeqEventType eventType, uint32_t offset) const;
+  u8 defaultPanValue() const;
+  u8 clampPanValue(u8 pan) const;
+  u8 convertPanValueToMidiPan(u8 pan) const;
+  ControllerFade readPanFade(KonamiSnesSeqEventType eventType, u32 offset) const;
   void applyCurrentPan();
-  ControllerFade readTempoFade(KonamiSnesSeqEventType eventType, uint32_t offset) const;
+  ControllerFade readTempoFade(KonamiSnesSeqEventType eventType, u32 offset) const;
   void applyCurrentTempo();
   void syncVibratoRateAndDelay();
-  double getTuningInSemitones(int8_t tuning);
-  uint8_t convertGAINAmountToGAIN(uint8_t gainAmount);
-  int16_t getLoopVolumeDelta() const;
+  double getTuningInSemitones(s8 tuning);
+  u8 convertGAINAmountToGAIN(u8 gainAmount);
+  s16 getLoopVolumeDelta() const;
   double getLoopPitchDeltaCents() const;
-  void applyEffectiveTuning(uint32_t offset, uint32_t length);
-  void addUnknownEvent(uint32_t beginOffset, uint8_t statusByte, uint8_t argCount);
+  void applyEffectiveTuning(u32 offset, u32 length);
+  void addUnknownEvent(u32 beginOffset, u8 statusByte, u8 argCount);
   void resetPanAfterProgramChange();
   KonamiSnesSeq& seq();
   const KonamiSnesSeq& seq() const;

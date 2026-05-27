@@ -6,11 +6,12 @@
 
 #include "PS1SeqScanner.h"
 
-#include <algorithm>
-#include <functional>
 #include "formats/PS1/PS1Format.h"
 #include "PSXSPU.h"
 #include "ScannerManager.h"
+
+#include <algorithm>
+#include <functional>
 
 namespace vgmtrans::scanners {
 ScannerRegistration<PS1SeqScanner> s_ps1seq("PS1");

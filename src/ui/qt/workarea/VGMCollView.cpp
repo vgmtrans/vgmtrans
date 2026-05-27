@@ -6,26 +6,27 @@
 
 #include "VGMCollView.h"
 
-#include <algorithm>
-#include <QPainter>
-#include <QVBoxLayout>
-#include <QListView>
-#include <QKeyEvent>
-#include <QStyleOptionViewItem>
-
-#include <VGMFile.h>
-#include <VGMInstrSet.h>
-#include <VGMSeq.h>
-#include <VGMSampColl.h>
-#include <VGMMiscFile.h>
-#include <VGMColl.h>
-#include "widgets/FixedHeightListDelegate.h"
-#include "widgets/ItemViewDensity.h"
-#include "QtVGMRoot.h"
 #include "Helpers.h"
 #include "MdiArea.h"
-#include "services/NotificationCenter.h"
+#include "QtVGMRoot.h"
 #include "services/MenuManager.h"
+#include "services/NotificationCenter.h"
+#include <VGMColl.h>
+#include <VGMFile.h>
+#include <VGMInstrSet.h>
+#include <VGMMiscFile.h>
+#include <VGMSampColl.h>
+#include <VGMSeq.h>
+#include "widgets/FixedHeightListDelegate.h"
+#include "widgets/ItemViewDensity.h"
+
+#include <algorithm>
+
+#include <QKeyEvent>
+#include <QListView>
+#include <QPainter>
+#include <QStyleOptionViewItem>
+#include <QVBoxLayout>
 
 namespace {
 const QIcon &VGMCollIcon() {

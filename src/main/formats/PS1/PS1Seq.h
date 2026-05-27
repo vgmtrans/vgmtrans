@@ -1,10 +1,12 @@
 #pragma once
+
+#include "base/Types.h"
 #include "VGMSeqNoTrks.h"
 
 class PS1Seq:
     public VGMSeqNoTrks {
  public:
-  PS1Seq(RawFile *file, uint32_t offset);
+  PS1Seq(RawFile *file, u32 offset);
   virtual ~PS1Seq();
 
   virtual bool parseHeader();

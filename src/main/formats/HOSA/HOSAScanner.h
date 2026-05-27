@@ -4,6 +4,8 @@
  * refer to the included LICENSE.txt file
  */
 #pragma once
+
+#include "base/Types.h"
 #include "Scanner.h"
 
 class HOSASeq;
@@ -17,5 +19,5 @@ class HOSAScanner : public VGMScanner {
   void scan(RawFile *file, void *info) override;
   static HOSASeq* searchForHOSASeq(RawFile *file);
   static HOSAInstrSet* searchForHOSAInstrSet(RawFile *file, const PSXSampColl *sampcoll);
-  static bool recursiveRgnCompare(RawFile *file, int i, int sampNum, int numSamples, int numFinds, uint32_t *sampOffsets);
+  static bool recursiveRgnCompare(RawFile *file, int i, int sampNum, int numSamples, int numFinds, u32 *sampOffsets);
 };

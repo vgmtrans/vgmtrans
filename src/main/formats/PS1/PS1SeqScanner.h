@@ -4,9 +4,11 @@
  * refer to the included LICENSE.txt file
  */
 #pragma once
-#include "Scanner.h"
-#include "PS1Seq.h"
 #include "formats/PS1/Vab.h"
+#include "PS1Seq.h"
+#include "Scanner.h"
+
+#include <vector>
 
 class PS1SeqScanner : public VGMScanner {
  public:

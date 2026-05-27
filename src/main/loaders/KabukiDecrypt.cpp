@@ -1,5 +1,7 @@
 #include "KabukiDecrypt.h"
 
+#include "base/Types.h"
+
 // The following is taken directly from the MAME source code in kabuki.c
 
 /***************************************************************************
@@ -136,9 +138,9 @@ int KabukiDecrypter::bytedecode(int src, int swap_key1, int swap_key2, int xor_k
   return src;
 }
 
-void KabukiDecrypter::kabuki_decode(const uint8_t *src,
-                                    uint8_t *dest_op,
-                                    uint8_t *dest_data,
+void KabukiDecrypter::kabuki_decode(const u8 *src,
+                                    u8 *dest_op,
+                                    u8 *dest_data,
                                     int base_addr,
                                     int length,
                                     int swap_key1,

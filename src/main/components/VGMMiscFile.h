@@ -5,7 +5,10 @@
  */
 #pragma once
 
+#include "base/Types.h"
 #include "VGMFile.h"
+
+#include <string>
 
 // ***********
 // VGMMiscFile
@@ -15,7 +18,7 @@ class RawFile;
 
 class VGMMiscFile : public VGMFile {
 public:
-  VGMMiscFile(const std::string &format, RawFile *file, uint32_t offset, uint32_t length = 0,
+  VGMMiscFile(const std::string &format, RawFile *file, u32 offset, u32 length = 0,
               std::string name = "VGMMiscFile");
 
   bool loadVGMFile(bool useMatcher = true) override;

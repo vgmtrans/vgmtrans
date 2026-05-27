@@ -6,12 +6,16 @@
 
 #include "HexViewRhiRenderer.h"
 
+#include "base/Types.h"
 #include "HexView.h"
 #include "LogManager.h"
 #include "VGMFile.h"
 
-#include <rhi/qrhi.h>
-#include <rhi/qshader.h>
+#include <algorithm>
+#include <array>
+#include <cmath>
+#include <unordered_map>
+#include <utility>
 
 #include <QColor>
 #include <QDebug>
@@ -21,12 +25,8 @@
 #include <QRectF>
 #include <QString>
 #include <QVector4D>
-
-#include <algorithm>
-#include <array>
-#include <cmath>
-#include <unordered_map>
-#include <utility>
+#include <rhi/qrhi.h>
+#include <rhi/qshader.h>
 
 namespace {
 constexpr int NUM_ADDRESS_NIBBLES = 8;
@@ -55,7 +55,7 @@ QVector4D toVec4(const QColor& color) {
   return QVector4D(color.redF(), color.greenF(), color.blueF(), color.alphaF());
 }
 
-bool isPrintable(uint8_t value) {
+bool isPrintable(u8 value) {
   return value >= 0x20 && value <= 0x7E;
 }
 
@@ -899,19 +899,19 @@ void HexViewRhiRenderer::ensureItemIdTexture(QRhiResourceUpdateBatch* u, int sta
   QImage img(size, QImage::Format_RGBA8888);
   img.fill(Qt::transparent);
 
-  std::unordered_map<const VGMItem*, uint16_t> idMap;
+  std::unordered_map<const VGMItem*, u16> idMap;
   idMap.reserve(static_cast<size_t>(size.width() * size.height()));
-  uint16_t nextId = 1;
+  u16 nextId = 1;
 
-  const uint32_t baseOffset = frame.vgmfile->offset();
-  const uint32_t endOffset = frame.vgmfile->offset() + frame.vgmfile->length();
+  const u32 baseOffset = frame.vgmfile->offset();
+  const u32 endOffset = frame.vgmfile->offset() + frame.vgmfile->length();
 
   for (int row = 0; row < size.height(); ++row) {
     const int lineIndex = padStart + row;
     uchar* dst = img.scanLine(row);
     for (int byte = 0; byte < kBytesPerLine; ++byte) {
-      const uint32_t offset = baseOffset + static_cast<uint32_t>(lineIndex * kBytesPerLine + byte);
-      uint16_t id = 0;
+      const u32 offset = baseOffset + static_cast<u32>(lineIndex * kBytesPerLine + byte);
+      u16 id = 0;
       if (offset < endOffset) {
         if (VGMItem* item = frame.vgmfile->getItemAtOffset(offset, false)) {
           if (item->children().empty()) {
@@ -1104,28 +1104,28 @@ void HexViewRhiRenderer::updateInstanceBuffers(QRhiResourceUpdateBatch* u) {
 }
 
 void HexViewRhiRenderer::populateVisibleLineByteCounts(int startLine, int endLine,
-                                                       std::vector<uint8_t>& lineBytes) const {
+                                                       std::vector<u8>& lineBytes) const {
   lineBytes.assign(static_cast<size_t>(std::max(0, endLine - startLine + 1)), 0);
   for (int line = startLine; line <= endLine; ++line) {
     const CachedLine* entry = cachedLineFor(line);
     if (entry && entry->bytes > 0) {
       lineBytes[static_cast<size_t>(line - startLine)] =
-          static_cast<uint8_t>(std::min(entry->bytes, kBytesPerLine));
+          static_cast<u8>(std::min(entry->bytes, kBytesPerLine));
     }
   }
 }
 
-uint16_t HexViewRhiRenderer::spanMaskBits(int startCol, int endCol) {
+u16 HexViewRhiRenderer::spanMaskBits(int startCol, int endCol) {
   const int start = std::clamp(startCol, 0, kBytesPerLine);
   const int end = std::clamp(endCol, 0, kBytesPerLine);
   if (end <= start) {
     return 0;
   }
-  const uint32_t lowMask = (start > 0) ? ((uint32_t(1) << start) - 1u) : 0u;
-  const uint32_t highMask = (end >= kBytesPerLine)
+  const u32 lowMask = (start > 0) ? ((u32(1) << start) - 1u) : 0u;
+  const u32 highMask = (end >= kBytesPerLine)
                                 ? 0xFFFFu
-                                : ((uint32_t(1) << end) - 1u);
-  return static_cast<uint16_t>(highMask & ~lowMask);
+                                : ((u32(1) << end) - 1u);
+  return static_cast<u16>(highMask & ~lowMask);
 }
 
 // Resolve atlas UVs for a character, with '.' as a fallback glyph.
@@ -1247,8 +1247,8 @@ void HexViewRhiRenderer::rebuildCacheWindow(const HexViewFrame::Data& frame) {
     return;
   }
 
-  const uint32_t fileLength = frame.vgmfile->length();
-  const auto* baseData = reinterpret_cast<const uint8_t*>(frame.vgmfile->data());
+  const u32 fileLength = frame.vgmfile->length();
+  const auto* baseData = reinterpret_cast<const u8*>(frame.vgmfile->data());
   const auto styleIds = frame.styleIds;
   const size_t count = static_cast<size_t>(m_cacheEndLine - m_cacheStartLine + 1);
   m_cachedLines.reserve(count);
@@ -1311,7 +1311,7 @@ void HexViewRhiRenderer::buildBaseInstances(const HexViewFrame::Data& frame,
 
   const auto styles = frame.styles;
   const HexViewFrame::Style fallbackStyle{clearColor, frame.windowTextColor};
-  auto styleFor = [&](uint16_t styleId) -> const HexViewFrame::Style& {
+  auto styleFor = [&](u16 styleId) -> const HexViewFrame::Style& {
     if (styleId < styles.size()) {
       return styles[styleId];
     }
@@ -1335,12 +1335,12 @@ void HexViewRhiRenderer::buildBaseInstances(const HexViewFrame::Data& frame,
 
   for (const auto& entry : m_cachedLines) {
     LineRange range{};
-    range.rectStart = static_cast<uint32_t>(m_baseRectInstances.size());
-    range.glyphStart = static_cast<uint32_t>(m_baseGlyphInstances.size());
+    range.rectStart = static_cast<u32>(m_baseRectInstances.size());
+    range.glyphStart = static_cast<u32>(m_baseGlyphInstances.size());
     const float y = entry.line * lineHeight;
 
     if (frame.shouldDrawOffset) {
-      uint32_t address = frame.vgmfile->offset() + (entry.line * kBytesPerLine);
+      u32 address = frame.vgmfile->offset() + (entry.line * kBytesPerLine);
       if (frame.addressAsHex) {
         char buf[NUM_ADDRESS_NIBBLES];
         for (int i = NUM_ADDRESS_NIBBLES - 1; i >= 0; --i) {
@@ -1365,7 +1365,7 @@ void HexViewRhiRenderer::buildBaseInstances(const HexViewFrame::Data& frame,
     }
 
     int spanStart = 0;
-    uint16_t spanStyle = entry.styles[0];
+    u16 spanStyle = entry.styles[0];
     // Emit one background rect per contiguous style run, instead of per byte.
     for (int i = 1; i <= entry.bytes; ++i) {
       if (i == entry.bytes || entry.styles[i] != spanStyle) {
@@ -1391,7 +1391,7 @@ void HexViewRhiRenderer::buildBaseInstances(const HexViewFrame::Data& frame,
       const auto& style = styleFor(entry.styles[i]);
       const QVector4D textColor = toVec4(style.fg);
 
-      const uint8_t value = entry.data[i];
+      const u8 value = entry.data[i];
       const float hexX = hexGlyphStartX + i * 3.0f * charWidth;
       appendGlyph(m_baseGlyphInstances, hexX, y, charWidth, lineHeight, hexUvs[value >> 4], textColor);
       appendGlyph(m_baseGlyphInstances, hexX + charWidth, y, charWidth, lineHeight,
@@ -1400,7 +1400,7 @@ void HexViewRhiRenderer::buildBaseInstances(const HexViewFrame::Data& frame,
                   spaceUv, textColor);
 
       if (frame.shouldDrawAscii) {
-        const uint8_t asciiChar = isPrintable(value) ? value : static_cast<uint8_t>('.');
+        const u8 asciiChar = isPrintable(value) ? value : static_cast<u8>('.');
         const float asciiX = asciiStartX + i * charWidth;
         appendGlyph(m_baseGlyphInstances,
                     asciiX,
@@ -1412,8 +1412,8 @@ void HexViewRhiRenderer::buildBaseInstances(const HexViewFrame::Data& frame,
       }
     }
 
-    range.rectCount = static_cast<uint32_t>(m_baseRectInstances.size()) - range.rectStart;
-    range.glyphCount = static_cast<uint32_t>(m_baseGlyphInstances.size()) - range.glyphStart;
+    range.rectCount = static_cast<u32>(m_baseRectInstances.size()) - range.rectStart;
+    range.glyphCount = static_cast<u32>(m_baseGlyphInstances.size()) - range.glyphStart;
     m_lineRanges.push_back(range);
   }
 }
@@ -1503,18 +1503,18 @@ void HexViewRhiRenderer::buildSelectionEffectInstances(int startLine, int endLin
 
   for (int line = ctx.startLine; line <= ctx.endLine; ++line) {
     const size_t lineIndex = static_cast<size_t>(line - ctx.startLine);
-    const uint16_t maskBits = m_maskScratchA[lineIndex];
+    const u16 maskBits = m_maskScratchA[lineIndex];
     const int lineByteCount = static_cast<int>(m_lineByteScratch[lineIndex]);
     int col = 0;
     while (col < lineByteCount) {
-      while (col < lineByteCount && (maskBits & static_cast<uint16_t>(1u << col)) == 0u) {
+      while (col < lineByteCount && (maskBits & static_cast<u16>(1u << col)) == 0u) {
         ++col;
       }
       if (col >= lineByteCount) {
         break;
       }
       const int startCol = col;
-      while (col < lineByteCount && (maskBits & static_cast<uint16_t>(1u << col)) != 0u) {
+      while (col < lineByteCount && (maskBits & static_cast<u16>(1u << col)) != 0u) {
         ++col;
       }
       const int endCol = col;
@@ -1580,7 +1580,7 @@ void HexViewRhiRenderer::buildPlaybackEffectInstances(int startLine, int endLine
   };
   auto populatePlaybackField =
       [&](const HexViewFrame::PlaybackSelection& selection,
-          std::vector<uint16_t>& masks,
+          std::vector<u16>& masks,
           std::vector<std::array<QVector4D, kBytesPerLine>>* colors,
           std::vector<std::array<float, kBytesPerLine>>* alphas,
           float alphaValue) {
@@ -1630,7 +1630,7 @@ void HexViewRhiRenderer::buildPlaybackEffectInstances(int startLine, int endLine
           }
 
           for (int col = clampedStart; col < clampedEnd; ++col) {
-            masks[lineIndex] |= static_cast<uint16_t>(1u << col);
+            masks[lineIndex] |= static_cast<u16>(1u << col);
             if (colors) {
               (*colors)[lineIndex][static_cast<size_t>(col)] = tint;
             }
@@ -1641,21 +1641,21 @@ void HexViewRhiRenderer::buildPlaybackEffectInstances(int startLine, int endLine
           }
         }
       };
-  auto emitMaskSpans = [&](const std::vector<uint16_t>& masks, const QVector4D& color) {
+  auto emitMaskSpans = [&](const std::vector<u16>& masks, const QVector4D& color) {
     for (int line = ctx.startLine; line <= ctx.endLine; ++line) {
       const size_t lineIndex = static_cast<size_t>(line - ctx.startLine);
-      const uint16_t maskBits = masks[lineIndex];
+      const u16 maskBits = masks[lineIndex];
       const int lineByteCount = static_cast<int>(m_lineByteScratch[lineIndex]);
       int col = 0;
       while (col < lineByteCount) {
-        while (col < lineByteCount && (maskBits & static_cast<uint16_t>(1u << col)) == 0u) {
+        while (col < lineByteCount && (maskBits & static_cast<u16>(1u << col)) == 0u) {
           ++col;
         }
         if (col >= lineByteCount) {
           break;
         }
         const int startCol = col;
-        while (col < lineByteCount && (maskBits & static_cast<uint16_t>(1u << col)) != 0u) {
+        while (col < lineByteCount && (maskBits & static_cast<u16>(1u << col)) != 0u) {
           ++col;
         }
         appendMaskSpan(m_playbackMaskRectInstances, ctx, line, startCol, col, color);
@@ -1692,7 +1692,7 @@ void HexViewRhiRenderer::buildPlaybackEffectInstances(int startLine, int endLine
     }
   };
   auto emitTintedEdgeSpans =
-      [&](const std::vector<uint16_t>& masks,
+      [&](const std::vector<u16>& masks,
           const std::vector<std::array<QVector4D, kBytesPerLine>>& colors,
           const QVector4D& flags,
           float pad) {
@@ -1701,11 +1701,11 @@ void HexViewRhiRenderer::buildPlaybackEffectInstances(int startLine, int endLine
         }
         for (int line = ctx.startLine; line <= ctx.endLine; ++line) {
           const size_t lineIndex = static_cast<size_t>(line - ctx.startLine);
-          const uint16_t maskBits = masks[lineIndex];
+          const u16 maskBits = masks[lineIndex];
           const int lineByteCount = static_cast<int>(m_lineByteScratch[lineIndex]);
           int col = 0;
           while (col < lineByteCount) {
-            while (col < lineByteCount && (maskBits & static_cast<uint16_t>(1u << col)) == 0u) {
+            while (col < lineByteCount && (maskBits & static_cast<u16>(1u << col)) == 0u) {
               ++col;
             }
             if (col >= lineByteCount) {
@@ -1715,7 +1715,7 @@ void HexViewRhiRenderer::buildPlaybackEffectInstances(int startLine, int endLine
             const QVector4D tint = colors[lineIndex][static_cast<size_t>(col)];
             ++col;
             while (col < lineByteCount &&
-                   (maskBits & static_cast<uint16_t>(1u << col)) != 0u &&
+                   (maskBits & static_cast<u16>(1u << col)) != 0u &&
                    sameTint(colors[lineIndex][static_cast<size_t>(col)], tint)) {
               ++col;
             }

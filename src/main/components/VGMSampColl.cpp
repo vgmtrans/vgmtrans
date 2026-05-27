@@ -5,16 +5,16 @@
  */
 #include "VGMSampColl.h"
 
-#include "VGMSamp.h"
-#include "Root.h"
+#include "base/Types.h"
 #include "Format.h"
-#include "helper.h"
+#include "Root.h"
+#include "VGMSamp.h"
 
 // ***********
 // VGMSampColl
 // ***********
 
-VGMSampColl::VGMSampColl(const std::string &format, RawFile *rawfile, uint32_t offset, uint32_t length,
+VGMSampColl::VGMSampColl(const std::string &format, RawFile *rawfile, u32 offset, u32 length,
                          std::string theName)
     : VGMFile(format, rawfile, offset, length, std::move(theName)),
       m_should_load_on_instr_set_match(false),
@@ -24,7 +24,7 @@ VGMSampColl::VGMSampColl(const std::string &format, RawFile *rawfile, uint32_t o
 }
 
 VGMSampColl::VGMSampColl(const std::string &format, RawFile *rawfile, VGMInstrSet *instrset,
-                         uint32_t offset, uint32_t length, std::string theName)
+                         u32 offset, u32 length, std::string theName)
     : VGMFile(format, rawfile, offset, length, std::move(theName)),
       m_should_load_on_instr_set_match(false),
       bLoaded(false),
@@ -99,9 +99,9 @@ bool VGMSampColl::parseSampleInfo() {
   return true;
 }
 
-VGMSamp *VGMSampColl::addSamp(uint32_t offset, uint32_t length, uint32_t dataOffset,
-                              uint32_t dataLength, uint8_t nChannels, BPS bps,
-                              uint32_t theRate, std::string name) {
+VGMSamp *VGMSampColl::addSamp(u32 offset, u32 length, u32 dataOffset,
+                              u32 dataLength, u8 nChannels, BPS bps,
+                              u32 theRate, std::string name) {
   VGMSamp *newSamp = new VGMSamp(this, offset, length, dataOffset, dataLength, nChannels, bps, theRate, std::move(name));
   samples.push_back(newSamp);
   return newSamp;

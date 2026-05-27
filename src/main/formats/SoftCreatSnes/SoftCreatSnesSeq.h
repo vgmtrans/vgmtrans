@@ -1,8 +1,13 @@
 #pragma once
-#include "VGMSeq.h"
-#include "SeqTrack.h"
+
+#include "base/Types.h"
 #include "SeqEvent.h"
+#include "SeqTrack.h"
 #include "SoftCreatSnesFormat.h"
+#include "VGMSeq.h"
+
+#include <map>
+#include <string>
 
 enum SoftCreatSnesSeqEventType {
   //start enum at 1 because if map[] look up fails, it returns 0, and we don't want that to get confused with a legit event
@@ -18,8 +23,8 @@ class SoftCreatSnesSeq
  public:
   SoftCreatSnesSeq(RawFile *file,
                    SoftCreatSnesVersion ver,
-                   uint32_t seqdata_offset,
-                   uint8_t headerAlignSize,
+                   u32 seqdata_offset,
+                   u8 headerAlignSize,
                    std::string newName = "SoftCreat SNES Seq");
   virtual ~SoftCreatSnesSeq();
 
@@ -28,19 +33,19 @@ class SoftCreatSnesSeq
   virtual void resetVars();
 
   SoftCreatSnesVersion version;
-  std::map<uint8_t, SoftCreatSnesSeqEventType> EventMap;
+  std::map<u8, SoftCreatSnesSeqEventType> EventMap;
 
  private:
   void loadEventMap();
 
-  uint8_t headerAlignSize;
+  u8 headerAlignSize;
 };
 
 
 class SoftCreatSnesTrack
     : public SeqTrack {
  public:
-  SoftCreatSnesTrack(SoftCreatSnesSeq *parentFile, uint32_t offset = 0, uint32_t length = 0);
+  SoftCreatSnesTrack(SoftCreatSnesSeq *parentFile, u32 offset = 0, u32 length = 0);
   virtual void resetVars();
   virtual bool readEvent();
 };

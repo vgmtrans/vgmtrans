@@ -2,8 +2,9 @@
 // author of so2mml. The code is based on his write-up of the format specifications.  Many thanks to him.
 
 #include "TriAcePS1Seq.h"
+
+#include "base/Types.h"
 #include "SeqEvent.h"
-#include "helper.h"
 
 DECLARE_FORMAT(TriAcePS1);
 
@@ -11,7 +12,7 @@ DECLARE_FORMAT(TriAcePS1);
 // TriAcePS1Seq
 // ************
 
-TriAcePS1Seq::TriAcePS1Seq(RawFile *file, uint32_t offset, const std::string &name)
+TriAcePS1Seq::TriAcePS1Seq(RawFile *file, u32 offset, const std::string &name)
     : VGMSeq(TriAcePS1Format::name, file, offset, 0, name) {
   setUseLinearAmplitudeScale(true);
   useReverb();
@@ -62,14 +63,14 @@ bool TriAcePS1Seq::postLoad() {
 // TriAcePS1Track
 // **************
 
-TriAcePS1Track::TriAcePS1Track(TriAcePS1Seq *parentSeq, uint32_t offset, uint32_t length)
+TriAcePS1Track::TriAcePS1Track(TriAcePS1Seq *parentSeq, u32 offset, u32 length)
     : SeqTrack(parentSeq, offset, length) {
 }
 
-void TriAcePS1Track::loadTrackMainLoop(uint32_t stopOffset, int32_t stopTime) {
+void TriAcePS1Track::loadTrackMainLoop(u32 stopOffset, s32 stopTime) {
   TriAcePS1Seq *seq = (TriAcePS1Seq *) parentSeq;
-  uint32_t scorePatternPtrOffset = offset();
-  uint16_t scorePatternOffset = readShort(scorePatternPtrOffset);
+  u32 scorePatternPtrOffset = offset();
+  u16 scorePatternOffset = readShort(scorePatternPtrOffset);
   while (scorePatternOffset != 0xFFFF) {
     if (seq->patternMap[scorePatternOffset])
       seq->curScorePattern = NULL;
@@ -79,7 +80,7 @@ void TriAcePS1Track::loadTrackMainLoop(uint32_t stopOffset, int32_t stopTime) {
       seq->curScorePattern = pattern;
       seq->aScorePatterns.push_back(pattern);
     }
-    uint32_t endOffset = readScorePattern(scorePatternOffset);
+    u32 endOffset = readScorePattern(scorePatternOffset);
     if (seq->curScorePattern)
       seq->curScorePattern->setLength(endOffset - seq->curScorePattern->offset());
     addChild(scorePatternPtrOffset, 2, "Score Pattern Ptr");
@@ -91,7 +92,7 @@ void TriAcePS1Track::loadTrackMainLoop(uint32_t stopOffset, int32_t stopTime) {
 }
 
 
-uint32_t TriAcePS1Track::readScorePattern(uint32_t offset) {
+u32 TriAcePS1Track::readScorePattern(u32 offset) {
   curOffset = offset;    //start at beginning of track
   impliedNoteDur = 0;    //reset the implied values (from event 0x9E)
   impliedVelocity = 0;
@@ -100,16 +101,16 @@ uint32_t TriAcePS1Track::readScorePattern(uint32_t offset) {
 }
 
 bool TriAcePS1Track::readEvent(void) {
-  uint32_t beginOffset = curOffset;
+  u32 beginOffset = curOffset;
 
-  uint8_t status_byte = readByte(curOffset++);
-  uint8_t event_dur = 0;
+  u8 status_byte = readByte(curOffset++);
+  u8 event_dur = 0;
 
   //0-0x7F is a note event
   if (status_byte <= 0x7F) {
     event_dur = readByte(curOffset++); //Delta time from "Note on" to "Next command(op-code)".
-    uint8_t note_dur;
-    uint8_t velocity;
+    u8 note_dur;
+    u8 velocity;
     if (!impliedNoteDur) note_dur = readByte(curOffset++);  //Delta time from "Note on" to "Note off".
     else note_dur = impliedNoteDur;
     if (!impliedVelocity) velocity = readByte(curOffset++);
@@ -139,10 +140,10 @@ bool TriAcePS1Track::readEvent(void) {
       //program change
       case 0x83 : {
         event_dur = readByte(curOffset++);
-        uint8_t progNum = readByte(curOffset++);
-        uint8_t bankNum = readByte(curOffset++);
+        u8 progNum = readByte(curOffset++);
+        u8 bankNum = readByte(curOffset++);
 
-        uint8_t bank = (bankNum * 2) + ((progNum > 0x7F) ? 1 : 0);
+        u8 bank = (bankNum * 2) + ((progNum > 0x7F) ? 1 : 0);
         if (progNum > 0x7F)
           progNum -= 0x80;
 
@@ -162,7 +163,7 @@ bool TriAcePS1Track::readEvent(void) {
       //volume
       case 0x85 : {
         event_dur = readByte(curOffset++);
-        uint8_t val = readByte(curOffset++);
+        u8 val = readByte(curOffset++);
         addVol(beginOffset, curOffset - beginOffset, val);
         break;
       }
@@ -170,7 +171,7 @@ bool TriAcePS1Track::readEvent(void) {
       //expression
       case 0x86 : {
         event_dur = readByte(curOffset++);
-        uint8_t val = readByte(curOffset++);
+        u8 val = readByte(curOffset++);
         addExpression(beginOffset, curOffset - beginOffset, val);
         break;
       }
@@ -178,7 +179,7 @@ bool TriAcePS1Track::readEvent(void) {
       case 0x87 :            //pan
       {
         event_dur = readByte(curOffset++);
-        uint8_t pan = readByte(curOffset++);
+        u8 pan = readByte(curOffset++);
         addPan(beginOffset, curOffset - beginOffset, pan);
       }
         break;
@@ -192,7 +193,7 @@ bool TriAcePS1Track::readEvent(void) {
       //damper pedal
       case 0x89 : {
         event_dur = readByte(curOffset++);
-        uint8_t val = readByte(curOffset++);
+        u8 val = readByte(curOffset++);
         addSustainEvent(beginOffset, curOffset - beginOffset, val);
         break;
       }
@@ -200,7 +201,7 @@ bool TriAcePS1Track::readEvent(void) {
       //unknown (tempo?)
       case 0x8A : {
         event_dur = readByte(curOffset++);
-        uint8_t val = readByte(curOffset++);
+        u8 val = readByte(curOffset++);
         addUnknown(beginOffset, curOffset - beginOffset, "Unknown Event (tempo?)");
         break;
       }
@@ -218,7 +219,7 @@ bool TriAcePS1Track::readEvent(void) {
 
       //rest
       case 0x8F : {
-        uint8_t rest = readByte(curOffset++);
+        u8 rest = readByte(curOffset++);
         addRest(beginOffset, curOffset - beginOffset, rest);
         break;
       }
@@ -261,7 +262,7 @@ bool TriAcePS1Track::readEvent(void) {
       //Pitch Bend Range
       case 0x96 : {
         event_dur = readByte(curOffset++);
-        uint8_t semitones = readByte(curOffset++);
+        u8 semitones = readByte(curOffset++);
         addPitchBendRange(beginOffset, curOffset - beginOffset, semitones * 100);
         break;
       }
@@ -313,7 +314,7 @@ bool TriAcePS1Track::readEvent(void) {
 }
 
 // The following two functions are overridden so that events become children of the Score Patterns and not the tracks.
-bool TriAcePS1Track::isOffsetUsed(uint32_t offset) {
+bool TriAcePS1Track::isOffsetUsed(u32 offset) {
   return false;
 }
 

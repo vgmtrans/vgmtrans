@@ -7,10 +7,14 @@
 
 #pragma once
 
-#include <map>
+#include "base/Types.h"
 #include "VGMInstrSet.h"
 #include "VGMSamp.h"
 #include "VGMSampColl.h"
+
+#include <map>
+#include <string>
+#include <vector>
 
 class MP2kPSGColl;
 
@@ -59,10 +63,10 @@ enum class MP2kWaveType { PCM8, BDPCM };
 
 struct MP2kSampParams {
   MP2kWaveType type;
-  uint32_t offset;
-  uint32_t length;
-  uint32_t dataOffset;
-  uint32_t dataLength;
+  u32 offset;
+  u32 length;
+  u32 dataOffset;
+  u32 dataLength;
 };
 
 class MP2kSamp final : public VGMSamp {
@@ -71,13 +75,13 @@ public:
   ~MP2kSamp() = default;
 
 private:
-  std::vector<uint8_t> decodeToNativePcm() override;
+  std::vector<u8> decodeToNativePcm() override;
   MP2kWaveType m_type;
 };
 
 class MP2kPSGColl final : public VGMSampColl {
 public:
-  MP2kPSGColl(RawFile *file, uint32_t sampleRate, uint32_t loopSamples);
+  MP2kPSGColl(RawFile *file, u32 sampleRate, u32 loopSamples);
   ~MP2kPSGColl() override = default;
 
   int makeOrGetProgrammableWave(size_t wavePointer);
@@ -85,19 +89,19 @@ public:
 private:
   bool parseSampleInfo() override;
 
-  uint32_t m_sample_rate;
-  uint32_t m_loop_samples;
+  u32 m_sample_rate;
+  u32 m_loop_samples;
   std::map<size_t, int> m_programmable_waves;
 };
 
 class MP2kPSGSamp final : public VGMSamp {
 public:
-  MP2kPSGSamp(VGMSampColl *sampColl, uint8_t dutyIndex, bool noise, uint32_t sampleRate,
-              uint32_t loopSamples, std::string name);
+  MP2kPSGSamp(VGMSampColl *sampColl, u8 dutyIndex, bool noise, u32 sampleRate,
+              u32 loopSamples, std::string name);
   ~MP2kPSGSamp() override = default;
 
 private:
-  std::vector<uint8_t> decodeToNativePcm() override;
+  std::vector<u8> decodeToNativePcm() override;
 
   double m_duty_ratio;
   bool m_noise;
@@ -105,12 +109,12 @@ private:
 
 class MP2kPSGWaveSamp final : public VGMSamp {
 public:
-  MP2kPSGWaveSamp(VGMSampColl *sampColl, size_t wavePointer, uint32_t sampleRate,
+  MP2kPSGWaveSamp(VGMSampColl *sampColl, size_t wavePointer, u32 sampleRate,
                   std::string name);
   ~MP2kPSGWaveSamp() override = default;
 
 private:
-  std::vector<uint8_t> decodeToNativePcm() override;
+  std::vector<u8> decodeToNativePcm() override;
 
   size_t m_wave_pointer;
 };

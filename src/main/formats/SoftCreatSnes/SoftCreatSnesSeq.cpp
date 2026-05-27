@@ -1,4 +1,7 @@
 #include "SoftCreatSnesSeq.h"
+
+#include "base/Types.h"
+
 #include <spdlog/fmt/fmt.h>
 
 DECLARE_FORMAT(SoftCreatSnes);
@@ -11,8 +14,8 @@ DECLARE_FORMAT(SoftCreatSnes);
 
 SoftCreatSnesSeq::SoftCreatSnesSeq(RawFile *file,
                                    SoftCreatSnesVersion ver,
-                                   uint32_t seqdataOffset,
-                                   uint8_t headerAlignSize,
+                                   u32 seqdataOffset,
+                                   u8 headerAlignSize,
                                    std::string newName)
     : VGMSeq(SoftCreatSnesFormat::name, file, seqdataOffset, 0, newName), version(ver),
       headerAlignSize(headerAlignSize) {
@@ -41,9 +44,9 @@ bool SoftCreatSnesSeq::parseHeader(void) {
     return false;
   }
 
-  for (uint8_t trackIndex = 0; trackIndex < MAX_TRACKS; trackIndex++) {
-    uint32_t addrTrackLowPtr = offset() + (trackIndex * 2 * headerAlignSize);
-    uint32_t addrTrackHighPtr = addrTrackLowPtr + headerAlignSize;
+  for (u8 trackIndex = 0; trackIndex < MAX_TRACKS; trackIndex++) {
+    u32 addrTrackLowPtr = offset() + (trackIndex * 2 * headerAlignSize);
+    u32 addrTrackHighPtr = addrTrackLowPtr + headerAlignSize;
     if (addrTrackLowPtr + 1 > 0x10000 || addrTrackHighPtr + 1 > 0x10000) {
       return false;
     }
@@ -52,7 +55,7 @@ bool SoftCreatSnesSeq::parseHeader(void) {
     header->addChild(addrTrackLowPtr, 1, trackName + " (LSB)");
     header->addChild(addrTrackHighPtr, 1, trackName + " (MSB)");
 
-    uint16_t addrTrackStart = readByte(addrTrackLowPtr) | (readByte(addrTrackHighPtr) << 8);
+    u16 addrTrackStart = readByte(addrTrackLowPtr) | (readByte(addrTrackHighPtr) << 8);
     if (addrTrackStart != 0xffff) {
       SoftCreatSnesTrack *track = new SoftCreatSnesTrack(this, addrTrackStart);
       aTracks.push_back(track);
@@ -79,7 +82,7 @@ void SoftCreatSnesSeq::loadEventMap() {
 //  SoftCreatSnesTrack
 //  ******************
 
-SoftCreatSnesTrack::SoftCreatSnesTrack(SoftCreatSnesSeq *parentFile, uint32_t offset, uint32_t length)
+SoftCreatSnesTrack::SoftCreatSnesTrack(SoftCreatSnesSeq *parentFile, u32 offset, u32 length)
     : SeqTrack(parentFile, offset, length) {
   resetVars();
   bDetermineTrackLengthEventByEvent = true;
@@ -93,17 +96,17 @@ void SoftCreatSnesTrack::resetVars(void) {
 bool SoftCreatSnesTrack::readEvent(void) {
   SoftCreatSnesSeq *parentSeq = (SoftCreatSnesSeq *) this->parentSeq;
 
-  uint32_t beginOffset = curOffset;
+  u32 beginOffset = curOffset;
   if (curOffset >= 0x10000) {
     return false;
   }
 
-  uint8_t statusByte = readByte(curOffset++);
+  u8 statusByte = readByte(curOffset++);
   bool bContinue = true;
 
 
   SoftCreatSnesSeqEventType eventType = (SoftCreatSnesSeqEventType) 0;
-  std::map<uint8_t, SoftCreatSnesSeqEventType>::iterator pEventType = parentSeq->EventMap.find(statusByte);
+  std::map<u8, SoftCreatSnesSeqEventType>::iterator pEventType = parentSeq->EventMap.find(statusByte);
   if (pEventType != parentSeq->EventMap.end()) {
     eventType = pEventType->second;
   }
@@ -117,24 +120,24 @@ bool SoftCreatSnesTrack::readEvent(void) {
       break;
 
     case EVENT_UNKNOWN1: {
-      uint8_t arg1 = readByte(curOffset++);
+      u8 arg1 = readByte(curOffset++);
       desc = fmt::format("Event: 0x{:02X}  Arg1: {:d}", statusByte, arg1);
       addUnknown(beginOffset, curOffset - beginOffset, "Unknown Event", desc);
       break;
     }
 
     case EVENT_UNKNOWN2: {
-      uint8_t arg1 = readByte(curOffset++);
-      uint8_t arg2 = readByte(curOffset++);
+      u8 arg1 = readByte(curOffset++);
+      u8 arg2 = readByte(curOffset++);
       desc = fmt::format("Event: 0x{:02X}  Arg1: {:d}  Arg2: {:d}", statusByte, arg1, arg2);
       addUnknown(beginOffset, curOffset - beginOffset, "Unknown Event", desc);
       break;
     }
 
     case EVENT_UNKNOWN3: {
-      uint8_t arg1 = readByte(curOffset++);
-      uint8_t arg2 = readByte(curOffset++);
-      uint8_t arg3 = readByte(curOffset++);
+      u8 arg1 = readByte(curOffset++);
+      u8 arg2 = readByte(curOffset++);
+      u8 arg3 = readByte(curOffset++);
       desc = fmt::format("Event: 0x{:02X}  Arg1: {:d}  Arg2: {:d}  Arg3: {:d}",
                          statusByte, arg1, arg2, arg3);
       addUnknown(beginOffset, curOffset - beginOffset, "Unknown Event", desc);
@@ -142,10 +145,10 @@ bool SoftCreatSnesTrack::readEvent(void) {
     }
 
     case EVENT_UNKNOWN4: {
-      uint8_t arg1 = readByte(curOffset++);
-      uint8_t arg2 = readByte(curOffset++);
-      uint8_t arg3 = readByte(curOffset++);
-      uint8_t arg4 = readByte(curOffset++);
+      u8 arg1 = readByte(curOffset++);
+      u8 arg2 = readByte(curOffset++);
+      u8 arg3 = readByte(curOffset++);
+      u8 arg4 = readByte(curOffset++);
       desc = fmt::format("Event: 0x{:02X}  Arg1: {:d}  Arg2: {:d}  Arg3: {:d}  Arg4: {:d}",
                          statusByte, arg1, arg2, arg3, arg4);
       addUnknown(beginOffset, curOffset - beginOffset, "Unknown Event", desc);

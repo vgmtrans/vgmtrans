@@ -4,11 +4,13 @@
  * refer to the included LICENSE.txt file
  */
 #pragma once
-#include "Format.h"
+
+#include "base/Types.h"
 #include "FilegroupMatcher.h"
+#include "Format.h"
 #include "ItikitiSnesScanner.h"
 
-constexpr uint8_t kItikitiSnesSeqNoteKeyBias = 24;
+constexpr u8 kItikitiSnesSeqNoteKeyBias = 24;
 
 BEGIN_FORMAT(ItikitiSnes)
   USING_SCANNER(ItikitiSnesScanner)

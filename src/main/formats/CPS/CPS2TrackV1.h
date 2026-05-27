@@ -1,22 +1,24 @@
 #pragma once
-#include "VGMSeq.h"
-#include "SeqTrack.h"
-#include "CPS2Seq.h"
-#include "CPS2Format.h"
 
-enum CPS2FormatVer: uint8_t;
+#include "base/Types.h"
+#include "CPS2Format.h"
+#include "CPS2Seq.h"
+#include "SeqTrack.h"
+#include "VGMSeq.h"
+
+enum CPS2FormatVer: u8;
 
 class CPS2TrackV1
     : public SeqTrack {
 public:
-  CPS2TrackV1(VGMSeq *parentSeq, uint32_t offset = 0, uint32_t length = 0);
+  CPS2TrackV1(VGMSeq *parentSeq, u32 offset = 0, u32 length = 0);
   void resetVars() override;
   void addInitialMidiEvents(int trackNum) override;
   bool readEvent() override;
 
 private:
   CPS2FormatVer version() const { return (static_cast<CPS2Seq*>(this->parentSeq))->fmt_version; }
-  void calculateAndAddPortamentoTimeNoItem(int8_t noteDistance);
+  void calculateAndAddPortamentoTimeNoItem(s8 noteDistance);
 
   u8 noteDuration;
   s8 key;

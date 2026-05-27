@@ -4,6 +4,12 @@
  * See the included LICENSE for more information
  */
 
+#include "MainWindow.h"
+#include "QtVGMRoot.h"
+#include "widgets/Windows11ProxyStyle.h"
+
+#include <filesystem>
+
 #include <QApplication>
 #include <QFile>
 #include <QFileOpenEvent>
@@ -12,10 +18,6 @@
 #include <QRhiWidget>
 #endif
 #include <QTimer>
-#include <filesystem>
-#include "MainWindow.h"
-#include "QtVGMRoot.h"
-#include "widgets/Windows11ProxyStyle.h"
 
 class VGMTransApplication final : public QApplication {
 public:

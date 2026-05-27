@@ -4,10 +4,12 @@
  * refer to the included LICENSE.txt file
  */
 #pragma once
-#include "Scanner.h"
-#include "BytePattern.h"
 
-enum MoriSnesVersion : uint8_t;  // see MoriSnesFormat.h
+#include "base/Types.h"
+#include "BytePattern.h"
+#include "Scanner.h"
+
+enum MoriSnesVersion : u8;  // see MoriSnesFormat.h
 
 class MoriSnesScanner : public VGMScanner {
  public:

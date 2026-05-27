@@ -6,11 +6,15 @@
 
 #pragma once
 
-#include "VGMInstrSet.h"
-#include "VGMSampColl.h"
-#include "VGMRgn.h"
+#include "base/Types.h"
 #include "SegSatFormat.h"
+#include "VGMInstrSet.h"
+#include "VGMRgn.h"
+#include "VGMSampColl.h"
+
+#include <string>
 #include <unordered_set>
+#include <vector>
 
 //Envelope times in ms, taken from MAME's SCSP implementation
 static const double ARTimes[64] = {100000,100000,8100.0,6900.0,6000.0,4800.0,4000.0,3400.0,3000.0,2400.0,2000.0,1700.0,1500.0,
@@ -62,12 +66,12 @@ struct SegSatPlfoTable {
 // SegSatInstrSet
 // **************
 
-enum class SegSatDriverVer : uint8_t;
+enum class SegSatDriverVer : u8;
 
 class SegSatInstrSet:
     public VGMInstrSet {
 public:
-  SegSatInstrSet(RawFile* file, uint32_t offset, int numInstrs, SegSatDriverVer ver, const std::string& name = "SegSatInstrSet");
+  SegSatInstrSet(RawFile* file, u32 offset, int numInstrs, SegSatDriverVer ver, const std::string& name = "SegSatInstrSet");
   ~SegSatInstrSet() = default;
 
   virtual bool parseHeader();
@@ -79,7 +83,7 @@ public:
   std::vector<SegSatVLTable> vlTables() { return  m_vlTables; }
   std::vector<SegSatPlfoTable> plfoTables() { return  m_plfoTables; }
 
-  std::unordered_set<uint32_t> sampleOffsets;
+  std::unordered_set<u32> sampleOffsets;
 
 
 private:
@@ -133,7 +137,7 @@ public:
 
   enum class SampleType : u8 { PCM16 = 0, PCM8 = 1 };
 
-  SegSatRgn(SegSatInstr* instr, uint32_t offset, const std::string& name);
+  SegSatRgn(SegSatInstr* instr, u32 offset, const std::string& name);
   ~SegSatRgn() = default;
 
   bool isRegionValid();

@@ -1,10 +1,8 @@
 #pragma once
-#include "common.h"
+#include "base/Types.h"
 #include "HOSAFormat.h"
 #include "VGMInstrSet.h"
 #include "VGMSampColl.h"
-
-
 
 // *****************
 // HOSAInstrSet
@@ -14,7 +12,7 @@ class HOSAInstrSet
     : public VGMInstrSet {
 
  public:
-  HOSAInstrSet(RawFile *file, uint32_t offset);
+  HOSAInstrSet(RawFile *file, u32 offset);
   ~HOSAInstrSet() override;
 
   bool parseHeader() override;
@@ -24,7 +22,7 @@ class HOSAInstrSet
 
   typedef struct _InstrHeader {
     char strHeader[8];
-    uint32_t numInstr;
+    u32 numInstr;
   } InstrHeader;
 
  public:
@@ -41,27 +39,27 @@ class HOSAInstr
  public:
 
   typedef struct _InstrInfo {
-    uint32_t numRgns;
+    u32 numRgns;
   } InstrInfo;
 
   typedef struct _RgnInfo {
-    uint32_t sampOffset;
-    uint8_t volume;           //percent volume 0-0xFF
-    uint8_t note_range_high;
-    uint8_t iSemiToneTune;    //unity key
-    uint8_t iFineTune;        //unknown - definitely not finetune
-    uint8_t ADSR_unk;         //the nibbles get read individually.  Conditional code related to this gets 0'd out in PSF file
+    u32 sampOffset;
+    u8 volume;           //percent volume 0-0xFF
+    u8 note_range_high;
+    u8 iSemiToneTune;    //unity key
+    u8 iFineTune;        //unknown - definitely not finetune
+    u8 ADSR_unk;         //the nibbles get read individually.  Conditional code related to this gets 0'd out in PSF file
                               //I disassembled (removed during optimization), so I can't see what it does. probably determines
                               //Sm and Sd, so not terribly important.
-    uint8_t ADSR_Am;          // Determines ADSR Attack Mode value.
-    uint8_t unk_A;
-    uint8_t iPan;             //pan 0x80 - hard left    0xFF - hard right.  anything below results in center (but may be undefined)
-    uint32_t ADSR_vals;       //The ordering is all messed up.  The code which loads these values is at 8007D8EC
+    u8 ADSR_Am;          // Determines ADSR Attack Mode value.
+    u8 unk_A;
+    u8 iPan;             //pan 0x80 - hard left    0xFF - hard right.  anything below results in center (but may be undefined)
+    u32 ADSR_vals;       //The ordering is all messed up.  The code which loads these values is at 8007D8EC
   } RgnInfo;
 
 
  public:
-  HOSAInstr(VGMInstrSet *instrSet, uint32_t offset, uint32_t length, uint32_t theBank, uint32_t theInstrNum);
+  HOSAInstr(VGMInstrSet *instrSet, u32 offset, u32 length, u32 theBank, u32 theInstrNum);
   ~HOSAInstr() override { if (rgns) delete[] rgns; }
   bool loadInstr() override;
 

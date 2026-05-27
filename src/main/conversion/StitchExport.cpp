@@ -6,12 +6,13 @@
 
 #include "StitchExport.h"
 
+#include "base/Types.h"
+#include "LogManager.h"
+#include "MidiFile.h"
+
 #include <exception>
 #include <memory>
 #include <utility>
-
-#include "LogManager.h"
-#include "MidiFile.h"
 
 namespace conversion {
 namespace {
@@ -46,7 +47,7 @@ bool exportStitchedMidiAndSf2(const std::vector<MidiMergeEntry> &entries,
     return false;
   }
 
-  std::vector<uint8_t> bankOffsets;
+  std::vector<u8> bankOffsets;
   if (!planChunkBankOffsets(entries, bankOffsets)) {
     L_ERROR("Failed to plan chunk bank remap.");
     return false;

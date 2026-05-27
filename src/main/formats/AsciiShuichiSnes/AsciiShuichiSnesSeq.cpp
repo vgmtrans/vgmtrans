@@ -5,18 +5,22 @@
  */
 
 #include "AsciiShuichiSnesSeq.h"
+
+#include "base/Types.h"
 #include "ScaleConversion.h"
 #include "SeqEvent.h"
+
+#include <iterator>
 
 using namespace std;
 
 DECLARE_FORMAT(AsciiShuichiSnes);
 
 static constexpr int MAX_TRACKS = 8;
-static constexpr uint16_t SEQ_PPQN = 48;
+static constexpr u16 SEQ_PPQN = 48;
 static constexpr int SEQ_KEY_OFFSET = 36;
 
-static constexpr uint8_t panTable[] = {
+static constexpr u8 panTable[] = {
   0x80, 0x80, 0x7f, 0x7f, 0x7d, 0x7c, 0x7a, 0x78,
   0x76, 0x73, 0x70, 0x6d, 0x69, 0x65, 0x61, 0x5d,
   0x58, 0x54, 0x4f, 0x49, 0x44, 0x3e, 0x39, 0x33,
@@ -27,7 +31,7 @@ static constexpr uint8_t panTable[] = {
 //  AsciiShuichiSnesSeq
 //  ***************
 
-AsciiShuichiSnesSeq::AsciiShuichiSnesSeq(RawFile *file, uint32_t seqHeaderOffset, string name)
+AsciiShuichiSnesSeq::AsciiShuichiSnesSeq(RawFile *file, u32 seqHeaderOffset, string name)
     : VGMSeq(AsciiShuichiSnesFormat::name, file, seqHeaderOffset, 0, move(name)) {
   bLoadTickByTick = true;
   setAllowDiscontinuousTrackData(true);
@@ -53,7 +57,7 @@ bool AsciiShuichiSnesSeq::parseHeader() {
     return false;
   }
 
-  for (uint8_t trackIndex = 0; trackIndex < MAX_TRACKS; trackIndex++) {
+  for (u8 trackIndex = 0; trackIndex < MAX_TRACKS; trackIndex++) {
     string trackNameLow = fmt::format("Track Pointer {:d} (Low)", trackIndex + 1);
     string trackNameHigh = fmt::format("Track Pointer {:d} (High)", trackIndex + 1);
 
@@ -66,10 +70,10 @@ bool AsciiShuichiSnesSeq::parseHeader() {
 
 
 bool AsciiShuichiSnesSeq::parseTrackPointers() {
-  for (uint8_t trackIndex = 0; trackIndex < MAX_TRACKS; trackIndex++) {
-    const uint8_t lo = readByte(offset() + trackIndex);
-    const uint8_t hi = readByte(offset() + MAX_TRACKS + trackIndex);
-    const auto trackStartAddress = static_cast<uint16_t>(lo | (hi << 8));
+  for (u8 trackIndex = 0; trackIndex < MAX_TRACKS; trackIndex++) {
+    const u8 lo = readByte(offset() + trackIndex);
+    const u8 hi = readByte(offset() + MAX_TRACKS + trackIndex);
+    const auto trackStartAddress = static_cast<u16>(lo | (hi << 8));
 
     const auto track = new AsciiShuichiSnesTrack(this, trackStartAddress);
     aTracks.push_back(track);
@@ -80,7 +84,7 @@ bool AsciiShuichiSnesSeq::parseTrackPointers() {
 
 void AsciiShuichiSnesSeq::loadEventMap() {
   for (int statusByte = 0xac; statusByte <= 0xff; statusByte++) {
-    EventMap[static_cast<uint8_t>(statusByte)] = EVENT_NOTE;
+    EventMap[static_cast<u8>(statusByte)] = EVENT_NOTE;
   }
 
   EventMap[0x80] = EVENT_END;
@@ -133,7 +137,7 @@ double AsciiShuichiSnesSeq::getTempoInBPM() const {
   return getTempoInBPM(tempo);
 }
 
-double AsciiShuichiSnesSeq::getTempoInBPM(uint8_t tempo) {
+double AsciiShuichiSnesSeq::getTempoInBPM(u8 tempo) {
   if (tempo == 0) {
     tempo = 1;
   }
@@ -147,7 +151,7 @@ double AsciiShuichiSnesSeq::getTempoInBPM(uint8_t tempo) {
 //  AsciiShuichiSnesTrack
 //  *****************
 
-AsciiShuichiSnesTrack::AsciiShuichiSnesTrack(AsciiShuichiSnesSeq *parentFile, uint32_t offset, uint32_t length)
+AsciiShuichiSnesTrack::AsciiShuichiSnesTrack(AsciiShuichiSnesSeq *parentFile, u32 offset, u32 length)
     : SeqTrack(parentFile, offset, length) {
   AsciiShuichiSnesTrack::resetVars();
   bDetermineTrackLengthEventByEvent = true;
@@ -180,12 +184,12 @@ void AsciiShuichiSnesTrack::resetVars() {
 bool AsciiShuichiSnesTrack::readEvent() {
   const auto parentSeq = dynamic_cast<AsciiShuichiSnesSeq*>(this->parentSeq);
 
-  const uint32_t beginOffset = curOffset;
+  const u32 beginOffset = curOffset;
   if (curOffset >= 0x10000) {
     return false;
   }
 
-  const uint8_t statusByte = readByte(curOffset++);
+  const u8 statusByte = readByte(curOffset++);
   bool bContinue = true;
 
   auto eventType = static_cast<AsciiShuichiSnesSeqEventType>(0);
@@ -242,14 +246,14 @@ bool AsciiShuichiSnesTrack::readEvent() {
     }
 
     case EVENT_NOTE: {
-      const auto key = static_cast<int8_t>(statusByte - 0xac);
+      const auto key = static_cast<s8>(statusByte - 0xac);
       const bool isSlurEvent = (statusByte == 0xff);  // slur/tie
 
-      const uint8_t maybeLength = readByte(curOffset);
+      const u8 maybeLength = readByte(curOffset);
       if (maybeLength < 0x80) {
         rawNoteLength = maybeLength;
         if (useNoteDurationRate) {
-          noteDuration = static_cast<uint8_t>(
+          noteDuration = static_cast<u8>(
               rawNoteLength * (noteDurationRate == 0 ? 256 : noteDurationRate) / 256);
         }
         curOffset++;
@@ -287,7 +291,7 @@ bool AsciiShuichiSnesTrack::readEvent() {
     }
 
     case EVENT_INFINITE_LOOP_START: {
-      infiniteLoopPoint = static_cast<uint16_t>(curOffset);
+      infiniteLoopPoint = static_cast<u16>(curOffset);
       addGenericEvent(beginOffset, curOffset - beginOffset, "Infinite Loop Point",
                       "", Type::RepeatStart);
       break;
@@ -301,12 +305,12 @@ bool AsciiShuichiSnesTrack::readEvent() {
 
     case EVENT_LOOP_START:
       addGenericEvent(beginOffset, curOffset - beginOffset, "Loop Start", "", Type::RepeatStart);
-      repeatStartAddressStack[repeatStartNestLevel] = static_cast<uint16_t>(curOffset);
+      repeatStartAddressStack[repeatStartNestLevel] = static_cast<u16>(curOffset);
       repeatStartNestLevel++;
       break;
 
     case EVENT_LOOP_END: {
-      const uint8_t count = readByte(curOffset++);
+      const u8 count = readByte(curOffset++);
       const int realLoopCount = (count == 0) ? 256 : count;
 
       const auto desc = fmt::format("Loop count: {:d}", realLoopCount);
@@ -324,7 +328,7 @@ bool AsciiShuichiSnesTrack::readEvent() {
         } else {
           // repeat N times
           repeatCountStack[repeatEndNestLevel] = count - 1;
-          repeatEndAddressStack[repeatEndNestLevel] = static_cast<uint16_t>(curOffset);
+          repeatEndAddressStack[repeatEndNestLevel] = static_cast<u16>(curOffset);
           repeatEndNestLevel++;
           shouldRepeatAgain = true;
         }
@@ -378,7 +382,7 @@ bool AsciiShuichiSnesTrack::readEvent() {
     }
 
     case EVENT_CALL: {
-      uint16_t dest = readShort(curOffset);
+      u16 dest = readShort(curOffset);
       curOffset += 2;
 
       const auto desc = fmt::format("Destination: {:#04x}", dest);
@@ -391,7 +395,7 @@ bool AsciiShuichiSnesTrack::readEvent() {
       }
 
       // save loop start address and repeat count
-      callStack[callNestLevel++] = static_cast<uint16_t>(curOffset);
+      callStack[callNestLevel++] = static_cast<u16>(curOffset);
 
       // jump to subroutine address
       curOffset = dest;
@@ -413,27 +417,27 @@ bool AsciiShuichiSnesTrack::readEvent() {
     }
 
     case EVENT_PROGCHANGE: {
-      const uint8_t newProgramNumber = readByte(curOffset++);
+      const u8 newProgramNumber = readByte(curOffset++);
       addProgramChange(beginOffset, curOffset - beginOffset, newProgramNumber, true);
       break;
     }
 
     case EVENT_RELEASE_ADSR: {
-      const uint8_t adsr2 = readByte(curOffset++);
+      const u8 adsr2 = readByte(curOffset++);
       const auto desc = fmt::format("ADSR(2): {:#02x}", adsr2);
       addGenericEvent(beginOffset, curOffset - beginOffset, "Release ADSR", desc, Type::Adsr);
       break;
     }
 
     case EVENT_TEMPO: {
-      const uint8_t newTempo = readByte(curOffset++);
+      const u8 newTempo = readByte(curOffset++);
       parentSeq->tempo = newTempo;
       addTempoBPM(beginOffset, curOffset - beginOffset, parentSeq->getTempoInBPM());
       break;
     }
 
     case EVENT_TRANSPOSE_ABS: {
-      const auto newTranspose = static_cast<int8_t>(readByte(curOffset++));
+      const auto newTranspose = static_cast<s8>(readByte(curOffset++));
       addTranspose(beginOffset, curOffset - beginOffset, newTranspose);
 
       // use coarse tuning instead
@@ -445,8 +449,8 @@ bool AsciiShuichiSnesTrack::readEvent() {
     }
 
     case EVENT_TRANSPOSE_REL: {
-      const auto transposeDelta = static_cast<int8_t>(readByte(curOffset++));
-      const auto newTranspose = static_cast<int8_t>(transpose + transposeDelta);
+      const auto transposeDelta = static_cast<s8>(readByte(curOffset++));
+      const auto newTranspose = static_cast<s8>(transpose + transposeDelta);
       addTranspose(beginOffset, curOffset - beginOffset, transposeDelta, "Transpose (Relative)");
 
       // use coarse tuning instead
@@ -458,15 +462,15 @@ bool AsciiShuichiSnesTrack::readEvent() {
     }
 
     case EVENT_TUNING: {
-      const auto newTuning = static_cast<int8_t>(readByte(curOffset++));
+      const auto newTuning = static_cast<s8>(readByte(curOffset++));
       const double cents = pitchScaleToCents(1.0 + (newTuning / 4096.0));
       addFineTuning(beginOffset, curOffset - beginOffset, cents);
       break;
     }
 
     case EVENT_PITCH_BEND_SLIDE: {
-      const uint8_t arg1 = readByte(curOffset++);
-      const uint8_t arg2 = readByte(curOffset++);
+      const u8 arg1 = readByte(curOffset++);
+      const u8 arg2 = readByte(curOffset++);
 
       const auto desc = logEvent(statusByte, spdlog::level::off, "Event", static_cast<int>(arg1),
                       static_cast<int>(arg2));
@@ -476,11 +480,11 @@ bool AsciiShuichiSnesTrack::readEvent() {
     }
 
     case EVENT_DURATION_RATE: {
-      const uint8_t rate = readByte(curOffset++);
+      const u8 rate = readByte(curOffset++);
       useNoteDurationRate = true;
       noteDurationRate = rate;
 
-      noteDuration = static_cast<uint8_t>(rawNoteLength *
+      noteDuration = static_cast<u8>(rawNoteLength *
                                           (noteDurationRate == 0 ? 256 : noteDurationRate) / 256);
 
       const int actualRate = (rate == 0) ? 256 : rate;
@@ -491,7 +495,7 @@ bool AsciiShuichiSnesTrack::readEvent() {
     }
 
     case EVENT_DURATION_TICKS: {
-      const uint8_t ticks = readByte(curOffset++);
+      const u8 ticks = readByte(curOffset++);
       useNoteDurationRate = false;
       noteDuration = ticks;
 
@@ -501,22 +505,22 @@ bool AsciiShuichiSnesTrack::readEvent() {
     }
 
     case EVENT_VOLUME_AND_PAN: {
-      const uint8_t volume = readByte(curOffset++);
-      const uint8_t pan = readByte(curOffset++);
+      const u8 volume = readByte(curOffset++);
+      const u8 pan = readByte(curOffset++);
       spcVolume = volume;
 
-      const auto desc = fmt::format("Volume: {:d}, pan: {:d}/{:d}", volume, pan, countof(panTable));
+      const auto desc = fmt::format("Volume: {:d}, pan: {:d}/{:d}", volume, pan, std::size(panTable));
       addGenericEvent(beginOffset, curOffset - beginOffset, "Volume & Pan", desc, Type::Volume);
 
       addVolNoItem(spcVolume / 2);
 
-      const int8_t midiPan = calcMidiPanValue(pan);
+      const s8 midiPan = calcMidiPanValue(pan);
       addPanNoItem(midiPan); // TODO: apply volume scale
       break;
     }
 
     case EVENT_VOLUME: {
-      const uint8_t volume = readByte(curOffset++);
+      const u8 volume = readByte(curOffset++);
       spcVolume = volume;
 
       const auto desc = fmt::format("Volume: {:d}", volume);
@@ -526,7 +530,7 @@ bool AsciiShuichiSnesTrack::readEvent() {
     }
 
     case EVENT_VOLUME_REL: {
-      const auto volumeDelta = static_cast<int8_t>(readByte(curOffset++));
+      const auto volumeDelta = static_cast<s8>(readByte(curOffset++));
       spcVolume += volumeDelta;
 
       const auto desc = fmt::format("Volume delta: {:d}", volumeDelta);
@@ -536,7 +540,7 @@ bool AsciiShuichiSnesTrack::readEvent() {
     }
 
     case EVENT_VOLUME_REL_TEMP: {
-      const auto volumeDelta = static_cast<int8_t>(readByte(curOffset++));
+      const auto volumeDelta = static_cast<s8>(readByte(curOffset++));
 
       const auto desc = fmt::format("Volume delta: {:d}", volumeDelta);
       addGenericEvent(beginOffset, curOffset - beginOffset, "Volume (One-Shot)", desc, Type::Volume);
@@ -545,20 +549,20 @@ bool AsciiShuichiSnesTrack::readEvent() {
     }
 
     case EVENT_PAN: {
-      const uint8_t pan = readByte(curOffset++);
+      const u8 pan = readByte(curOffset++);
 
-      const auto desc = fmt::format("Pan: {:d}/{:d}", pan, countof(panTable));
+      const auto desc = fmt::format("Pan: {:d}/{:d}", pan, std::size(panTable));
       addGenericEvent(beginOffset, curOffset - beginOffset, "Pan", desc, Type::Pan);
 
-      const int8_t midiPan = calcMidiPanValue(pan);
+      const s8 midiPan = calcMidiPanValue(pan);
       addPanNoItem(midiPan);  // TODO: apply volume scale
       break;
     }
 
     case EVENT_PAN_FADE: {
-      const uint8_t arg1 = readByte(curOffset++);
-      const uint8_t arg2 = readByte(curOffset++);
-      const uint8_t arg3 = readByte(curOffset++);
+      const u8 arg1 = readByte(curOffset++);
+      const u8 arg2 = readByte(curOffset++);
+      const u8 arg3 = readByte(curOffset++);
 
       const auto desc = logEvent(statusByte, spdlog::level::off, "Event", static_cast<int>(arg1),
                       static_cast<int>(arg2), static_cast<int>(arg3));
@@ -567,10 +571,10 @@ bool AsciiShuichiSnesTrack::readEvent() {
     }
 
     case EVENT_VOLUME_FADE: {
-      const uint8_t delay = readByte(curOffset++);
-      const uint8_t rate = readByte(curOffset++);
-      const uint8_t depth = readByte(curOffset++);
-      const uint8_t stepLength = readByte(curOffset++);
+      const u8 delay = readByte(curOffset++);
+      const u8 rate = readByte(curOffset++);
+      const u8 depth = readByte(curOffset++);
+      const u8 stepLength = readByte(curOffset++);
 
       const auto desc =
           fmt::format("Volume Fade - delay: {:d}, rate: {:d}, depth: {:d}, step length: {:d}",
@@ -581,8 +585,8 @@ bool AsciiShuichiSnesTrack::readEvent() {
     }
 
     case EVENT_MASTER_VOLUME: {
-      const auto newVolL = static_cast<int8_t>(readByte(curOffset++));
-      const auto newVolR = static_cast<int8_t>(readByte(curOffset++));
+      const auto newVolL = static_cast<s8>(readByte(curOffset++));
+      const auto newVolR = static_cast<s8>(readByte(curOffset++));
 
 
       const auto desc = fmt::format("Master Volume - left: {:d}, right: {:d}", newVolL, newVolR);
@@ -591,9 +595,9 @@ bool AsciiShuichiSnesTrack::readEvent() {
     }
 
     case EVENT_ECHO_PARAM: {
-      const uint8_t delay = readByte(curOffset++);
-      const uint8_t feedback = readByte(curOffset++);
-      const uint8_t arg3 = readByte(curOffset++);
+      const u8 delay = readByte(curOffset++);
+      const u8 feedback = readByte(curOffset++);
+      const u8 arg3 = readByte(curOffset++);
       
       const auto desc = fmt::format("Echo delay: {:d}, feedback: {:d}, arg3: {:d}", delay, feedback, arg3);
       addGenericEvent(beginOffset, curOffset - beginOffset, "Echo Delay & Feedback", desc,
@@ -602,7 +606,7 @@ bool AsciiShuichiSnesTrack::readEvent() {
     }
 
     case EVENT_ECHO_CHANNELS: {
-      const uint8_t dspEchoOn = readByte(curOffset++);
+      const u8 dspEchoOn = readByte(curOffset++);
 
       const auto desc = fmt::format("Echo channels: {:#02x}", dspEchoOn);
       addGenericEvent(beginOffset, curOffset - beginOffset, "Echo Channels", desc, Type::Reverb);
@@ -612,10 +616,10 @@ bool AsciiShuichiSnesTrack::readEvent() {
     }
 
     case EVENT_VIBRATO: {
-      const uint8_t delay = readByte(curOffset++);
-      const uint8_t rate = readByte(curOffset++);
-      const uint8_t depth = readByte(curOffset++);
-      const uint8_t stepLength = readByte(curOffset++);
+      const u8 delay = readByte(curOffset++);
+      const u8 rate = readByte(curOffset++);
+      const u8 depth = readByte(curOffset++);
+      const u8 stepLength = readByte(curOffset++);
 
       const auto desc =
           fmt::format("Vibrato delay: {:d}, rate: {:d}, depth: {:d}, step length: {:d}", delay,
@@ -630,11 +634,11 @@ bool AsciiShuichiSnesTrack::readEvent() {
     }
 
     case EVENT_REST: {
-      const uint8_t maybeLength = readByte(curOffset);
+      const u8 maybeLength = readByte(curOffset);
       if (maybeLength < 0x80) {
         rawNoteLength = maybeLength;
         if (useNoteDurationRate) {
-          noteDuration = static_cast<uint8_t>(
+          noteDuration = static_cast<u8>(
               rawNoteLength * (noteDurationRate == 0 ? 256 : noteDurationRate) / 256);
         }
         curOffset++;
@@ -654,7 +658,7 @@ bool AsciiShuichiSnesTrack::readEvent() {
       break;
 
     case EVENT_MUTE_CHANNELS: {
-      const uint8_t channels = readByte(curOffset++);
+      const u8 channels = readByte(curOffset++);
 
       const auto desc = fmt::format("Mute channels: {:#02x}", channels);
       addGenericEvent(beginOffset, curOffset - beginOffset, "Mute Channels", desc, Type::Mute);
@@ -662,14 +666,14 @@ bool AsciiShuichiSnesTrack::readEvent() {
     }
 
     case EVENT_INSTRUMENT_VOLUME_PAN_TRANSPOSE: {
-      const uint8_t newProgramNumber = readByte(curOffset++);
-      const uint8_t volume = readByte(curOffset++);
-      const uint8_t pan = readByte(curOffset++);
-      const auto newTranspose = static_cast<int8_t>(readByte(curOffset++));
+      const u8 newProgramNumber = readByte(curOffset++);
+      const u8 volume = readByte(curOffset++);
+      const u8 pan = readByte(curOffset++);
+      const auto newTranspose = static_cast<s8>(readByte(curOffset++));
 
       const auto desc =
           fmt::format("Instrument: {:d}, volume: {:d}, pan: {:d}/{:d}, transpose: {:d}",
-                      newProgramNumber, volume, pan, countof(panTable), newTranspose);
+                      newProgramNumber, volume, pan, std::size(panTable), newTranspose);
       addGenericEvent(beginOffset, curOffset - beginOffset, "Instrument, Volume, Pan, Transpose",
                       desc, Type::ProgramChange);
 
@@ -678,7 +682,7 @@ bool AsciiShuichiSnesTrack::readEvent() {
       spcVolume = volume;
       addVolNoItem(spcVolume / 2);
 
-      const int8_t midiPan = calcMidiPanValue(pan);
+      const s8 midiPan = calcMidiPanValue(pan);
       addPanNoItem(midiPan);  // TODO: apply volume scale
 
       if (readMode == READMODE_CONVERT_TO_MIDI) {
@@ -688,7 +692,7 @@ bool AsciiShuichiSnesTrack::readEvent() {
     }
 
     case EVENT_WRITE_TO_PORT: {
-      const uint8_t value = readByte(curOffset++);
+      const u8 value = readByte(curOffset++);
       const auto desc = fmt::format("APUI02: {:d} ({:#02x})", value, value);
       addGenericEvent(beginOffset, curOffset - beginOffset, "Write to I/O Port", desc, Type::Misc);
       break;
@@ -705,10 +709,10 @@ bool AsciiShuichiSnesTrack::readEvent() {
   return bContinue;
 }
 
-void AsciiShuichiSnesTrack::getVolumeBalance(uint8_t pan, double &volumeLeft, double &volumeRight) {
-  if (pan < countof(panTable)) {
-    const uint8_t vl = panTable[pan];
-    const uint8_t vr = panTable[30 - pan];
+void AsciiShuichiSnesTrack::getVolumeBalance(u8 pan, double &volumeLeft, double &volumeRight) {
+  if (pan < std::size(panTable)) {
+    const u8 vl = panTable[pan];
+    const u8 vr = panTable[30 - pan];
     volumeLeft = vl / 256.0;
     volumeRight = vr / 256.0;
   } else {
@@ -718,9 +722,9 @@ void AsciiShuichiSnesTrack::getVolumeBalance(uint8_t pan, double &volumeLeft, do
   }
 }
 
-int8_t AsciiShuichiSnesTrack::calcMidiPanValue(uint8_t pan) {
+s8 AsciiShuichiSnesTrack::calcMidiPanValue(u8 pan) {
   double volumeLeft;
   double volumeRight;
   getVolumeBalance(pan, volumeLeft, volumeRight);
-  return static_cast<int8_t>(convertVolumeBalanceToStdMidiPan(volumeLeft, volumeRight));
+  return static_cast<s8>(convertVolumeBalanceToStdMidiPan(volumeLeft, volumeRight));
 }

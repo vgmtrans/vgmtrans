@@ -4,72 +4,76 @@
  * refer to the included LICENSE.txt file
  */
 #include "KonamiSnesSeq.h"
+
+#include "automation/SeqTrackAutomation.h"
+#include "base/Types.h"
 #include "KonamiSnesInstr.h"
 #include "KonamiSnesVibrato.h"
 #include "ScaleConversion.h"
-#include "automation/SeqTrackAutomation.h"
-#include "spdlog/fmt/fmt.h"
+
 #include <algorithm>
 #include <cmath>
+
+#include "spdlog/fmt/fmt.h"
 
 DECLARE_FORMAT(KonamiSnes);
 
 namespace {
-constexpr uint32_t MAX_TRACKS = 8;
-constexpr uint16_t SEQ_PPQN = 48;
-constexpr uint16_t KONAMI_SNES_STD_PITCH_BEND_RANGE_CENTS = 200;
-constexpr uint8_t KONAMI_SNES_DEFAULT_TEMPO = 0xff;
+constexpr u32 MAX_TRACKS = 8;
+constexpr u16 SEQ_PPQN = 48;
+constexpr u16 KONAMI_SNES_STD_PITCH_BEND_RANGE_CENTS = 200;
+constexpr u8 KONAMI_SNES_DEFAULT_TEMPO = 0xff;
 
-using KonamiControllerMotion = SeqFixedPointMotion<int32_t>;
+using KonamiControllerMotion = SeqFixedPointMotion<s32>;
 using KonamiPitchMotion = SeqMotionPlan<double>;
 
-constexpr uint8_t noteDurationRateMax(KonamiSnesVersion version) {
+constexpr u8 noteDurationRateMax(KonamiSnesVersion version) {
   return version == KONAMISNES_V1 ? 100 : 127;
 }
 
-constexpr uint8_t timerFrequency(KonamiSnesVersion version) {
+constexpr u8 timerFrequency(KonamiSnesVersion version) {
   return version == KONAMISNES_V1 ? 0x20 : 0x40;
 }
 
-void fillEventRange(std::map<uint8_t, KonamiSnesSeqEventType>& eventMap,
-                    uint8_t firstStatusByte,
-                    uint8_t lastStatusByte,
+void fillEventRange(std::map<u8, KonamiSnesSeqEventType>& eventMap,
+                    u8 firstStatusByte,
+                    u8 lastStatusByte,
                     KonamiSnesSeqEventType eventType) {
-  for (uint8_t statusByte = firstStatusByte; statusByte <= lastStatusByte; statusByte++) {
+  for (u8 statusByte = firstStatusByte; statusByte <= lastStatusByte; statusByte++) {
     eventMap[statusByte] = eventType;
   }
 }
 
-uint8_t convertVibratoDepthToMidi(KonamiSnesVersion version,
-                                  uint8_t targetDepth,
-                                  uint16_t currentDepth,
-                                  uint8_t maxDepth) {
+u8 convertVibratoDepthToMidi(KonamiSnesVersion version,
+                                  u8 targetDepth,
+                                  u16 currentDepth,
+                                  u8 maxDepth) {
   if (targetDepth == 0 || currentDepth == 0) {
     return 0;
   }
 
-  const uint8_t clampedMaxDepth = std::max(maxDepth, konami_snes::kMinVibratoMaxDepth);
+  const u8 clampedMaxDepth = std::max(maxDepth, konami_snes::kMinVibratoMaxDepth);
   const double depthCents = konami_snes::vibrato::currentDepthCents(version, targetDepth, currentDepth);
   const double maxDepthCents = konami_snes::vibrato::maxDepthCents(version, clampedMaxDepth);
   const int midiValue = static_cast<int>(std::lround(128.0 * depthCents / maxDepthCents));
-  return static_cast<uint8_t>(std::clamp(midiValue, 0, 127));
+  return static_cast<u8>(std::clamp(midiValue, 0, 127));
 }
 
-uint8_t convertVibratoRateToMidi(KonamiSnesVersion version,
-                                 uint8_t rate,
-                                 uint8_t tempo,
-                                 uint16_t maxRateFactor) {
-  const uint16_t effectiveRateFactor = konami_snes::vibrato::rateFactor(version, rate, tempo);
+u8 convertVibratoRateToMidi(KonamiSnesVersion version,
+                                 u8 rate,
+                                 u8 tempo,
+                                 u16 maxRateFactor) {
+  const u16 effectiveRateFactor = konami_snes::vibrato::rateFactor(version, rate, tempo);
   if (effectiveRateFactor == 0) {
     return 0;
   }
 
-  const uint16_t clampedMaxRateFactor = std::max(maxRateFactor, konami_snes::vibrato::minMaxRateFactor(version));
+  const u16 clampedMaxRateFactor = std::max(maxRateFactor, konami_snes::vibrato::minMaxRateFactor(version));
   const double baseHz = konami_snes::vibrato::baseHz(version);
   return midiValueForHertzInRange(baseHz * effectiveRateFactor, baseHz, baseHz * clampedMaxRateFactor);
 }
 
-uint8_t convertVibratoDelayToMidi(KonamiSnesVersion version, uint8_t delay, uint8_t tempo) {
+u8 convertVibratoDelayToMidi(KonamiSnesVersion version, u8 delay, u8 tempo) {
   const double delaySeconds = konami_snes::vibrato::delaySeconds(version, delay, tempo);
   return midiValueForSecondsInRange(delaySeconds,
                                     konami_snes::vibrato::minDelaySeconds(version),
@@ -80,32 +84,32 @@ uint8_t convertVibratoDelayToMidi(KonamiSnesVersion version, uint8_t delay, uint
 //  **********
 //  KonamiSnesSeq
 //  **********
-const uint8_t KonamiSnesSeq::PAN_VOLUME_LEFT_V1[] = {
+const u8 KonamiSnesSeq::PAN_VOLUME_LEFT_V1[] = {
     0x00, 0x05, 0x0c, 0x14, 0x1e, 0x28, 0x32, 0x3c,
     0x46, 0x50, 0x59, 0x62, 0x69, 0x6f, 0x74, 0x78,
     0x7b, 0x7d, 0x7e, 0x7e, 0x7f
 };
 
-const uint8_t KonamiSnesSeq::PAN_VOLUME_RIGHT_V1[] = {
+const u8 KonamiSnesSeq::PAN_VOLUME_RIGHT_V1[] = {
     0x7f, 0x7e, 0x7e, 0x7d, 0x7b, 0x78, 0x74, 0x6f,
     0x69, 0x62, 0x59, 0x50, 0x46, 0x3c, 0x32, 0x28,
     0x1e, 0x14, 0x0c, 0x05, 0x00
 };
 
-const uint8_t KonamiSnesSeq::PAN_VOLUME_LEFT_V2[] = {
+const u8 KonamiSnesSeq::PAN_VOLUME_LEFT_V2[] = {
     0x00, 0x0a, 0x18, 0x28, 0x3c, 0x50, 0x64, 0x78,
     0x8c, 0xa0, 0xb2, 0xc4, 0xd2, 0xde, 0xe8, 0xf0,
     0xf6, 0xfa, 0xfc, 0xfc, 0xfe
 };
 
-const uint8_t KonamiSnesSeq::PAN_VOLUME_RIGHT_V2[] = {
+const u8 KonamiSnesSeq::PAN_VOLUME_RIGHT_V2[] = {
     0xfe, 0xfc, 0xfc, 0xfa, 0xf6, 0xf0, 0xe8, 0xde,
     0xd2, 0xc4, 0xb2, 0xa0, 0x8c, 0x78, 0x64, 0x50,
     0x3c, 0x28, 0x18, 0x0a, 0x00
 };
 
 // pan table (compatible with Nintendo engine)
-const uint8_t KonamiSnesSeq::PAN_TABLE[] = {
+const u8 KonamiSnesSeq::PAN_TABLE[] = {
     0x00, 0x04, 0x08, 0x0e, 0x14, 0x1a, 0x20, 0x28,
     0x30, 0x38, 0x40, 0x48, 0x50, 0x5a, 0x64, 0x6e,
     0x78, 0x82, 0x8c, 0x96, 0xa0, 0xa8, 0xb0, 0xb8,
@@ -115,7 +119,7 @@ const uint8_t KonamiSnesSeq::PAN_TABLE[] = {
 };
 
 // volume curve table
-const uint8_t KonamiSnesSeq::VOL_TABLE[] = {
+const u8 KonamiSnesSeq::VOL_TABLE[] = {
   0x00, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01,
   0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01,
   0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01,
@@ -134,7 +138,7 @@ const uint8_t KonamiSnesSeq::VOL_TABLE[] = {
   0x62, 0x66, 0x6b, 0x6f, 0x73, 0x77, 0x7b, 0x7f
 };
 
-KonamiSnesSeq::KonamiSnesSeq(RawFile *file, KonamiSnesVersion ver, uint32_t seqdataOffset, std::string newName)
+KonamiSnesSeq::KonamiSnesSeq(RawFile *file, KonamiSnesVersion ver, u32 seqdataOffset, std::string newName)
     : VGMSeq(KonamiSnesFormat::name, file, seqdataOffset, 0, newName),
       maxVibratoDepth(konami_snes::kMinVibratoMaxDepth),
       maxVibratoRateFactor(konami_snes::vibrato::minMaxRateFactor(ver)),
@@ -164,7 +168,7 @@ void KonamiSnesSeq::resetVars(void) {
   // The driver starts from tempo/speed FF unless the sequence overrides it.
   tempo = KONAMI_SNES_DEFAULT_TEMPO;
   tempoFade.setCurrentRaw(tempo);
-  tempoFadeLastUpdatedTime = static_cast<uint32_t>(-1);
+  tempoFadeLastUpdatedTime = static_cast<u32>(-1);
 }
 
 bool KonamiSnesSeq::parseHeader(void) {
@@ -175,13 +179,13 @@ bool KonamiSnesSeq::parseHeader(void) {
   nNumTracks = MAX_TRACKS;
 
   VGMHeader *seqHeader = addHeader(offset(), nNumTracks * 2, "Sequence Header");
-  for (uint32_t trackNumber = 0; trackNumber < nNumTracks; trackNumber++) {
-    uint32_t trackPointerOffset = offset() + (trackNumber * 2);
+  for (u32 trackNumber = 0; trackNumber < nNumTracks; trackNumber++) {
+    u32 trackPointerOffset = offset() + (trackNumber * 2);
     if (trackPointerOffset + 2 > 0x10000) {
       return false;
     }
 
-    uint16_t trkOff = readShort(trackPointerOffset);
+    u16 trkOff = readShort(trackPointerOffset);
     seqHeader->addPointer(trackPointerOffset, 2, trkOff, true, "Track Pointer");
 
     assert(trkOff >= offset());
@@ -197,8 +201,8 @@ bool KonamiSnesSeq::parseHeader(void) {
 
 
 bool KonamiSnesSeq::parseTrackPointers(void) {
-  for (uint32_t trackNumber = 0; trackNumber < nNumTracks; trackNumber++) {
-    uint16_t trkOff = readShort(offset() + trackNumber * 2);
+  for (u32 trackNumber = 0; trackNumber < nNumTracks; trackNumber++) {
+    u16 trkOff = readShort(offset() + trackNumber * 2);
     aTracks.push_back(new KonamiSnesTrack(this, trkOff));
   }
   return true;
@@ -207,7 +211,7 @@ bool KonamiSnesSeq::parseTrackPointers(void) {
 void KonamiSnesSeq::loadEventMap() {
   NOTE_DUR_RATE_MAX = noteDurationRateMax(version);
 
-  for (uint8_t statusByte = 0x00; statusByte <= 0x5f; statusByte++) {
+  for (u8 statusByte = 0x00; statusByte <= 0x5f; statusByte++) {
     EventMap[statusByte] = EVENT_NOTE;
     EventMap[statusByte | 0x80] = EVENT_NOTE;
   }
@@ -289,7 +293,7 @@ void KonamiSnesSeq::loadEventMap() {
 
     case KONAMISNES_V4:
       EventMap[0xed] = EVENT_UNKNOWN3;
-      EventMap[0xf1] = EVENT_PITCH_ENVELOPE_V2;
+      EventMap[0xf1] = EVENT_PITCH_ENVELOPE_V1;
       EventMap[0xf3] = EVENT_PITCH_SLIDE_V2;
       EventMap[0xfa] = EVENT_ADSR_GAIN;
       EventMap[0xfb] = EVENT_ADSR2;
@@ -320,7 +324,7 @@ double KonamiSnesSeq::getTempoInBPM() {
   return getTempoInBPM(tempo);
 }
 
-double KonamiSnesSeq::getTempoInBPM(uint8_t tempo) {
+double KonamiSnesSeq::getTempoInBPM(u8 tempo) {
   if (tempo == 0) {
     return 1.0; // since tempo 0 cannot be expressed, this function returns a very small value.
   }
@@ -333,7 +337,7 @@ double KonamiSnesSeq::getTempoInBPM(uint8_t tempo) {
 //  KonamiSnesTrack
 //  ************
 
-KonamiSnesTrack::KonamiSnesTrack(KonamiSnesSeq *parentFile, uint32_t offset, uint32_t length)
+KonamiSnesTrack::KonamiSnesTrack(KonamiSnesSeq *parentFile, u32 offset, u32 length)
     : SeqTrack(parentFile, offset, length) {
   resetVars();
   bDetermineTrackLengthEventByEvent = true;
@@ -382,7 +386,7 @@ const KonamiSnesSeq& KonamiSnesTrack::seq() const {
   return *static_cast<const KonamiSnesSeq*>(parentSeq);
 }
 
-double KonamiSnesTrack::getTuningInSemitones(int8_t tuning) {
+double KonamiSnesTrack::getTuningInSemitones(s8 tuning) {
   return tuning * 4 / 256.0;
 }
 
@@ -405,8 +409,8 @@ void KonamiSnesTrack::syncVibratoRateAndDelay() {
 }
 
 
-uint8_t KonamiSnesTrack::convertGAINAmountToGAIN(uint8_t gainAmount) {
-  uint8_t gain = gainAmount;
+u8 KonamiSnesTrack::convertGAINAmountToGAIN(u8 gainAmount) {
+  u8 gain = gainAmount;
   if (gainAmount >= 200) {
     // exponential decrease
     gain = 0x80 | ((gainAmount - 200) & 0x1f);
@@ -423,16 +427,16 @@ void KonamiSnesTrack::onTickBegin() {
   auto &tempoFade = parentSeq.tempoFade;
   if (parentSeq.tempoFadeLastUpdatedTime != getTime()) {
     parentSeq.tempoFadeLastUpdatedTime = getTime();
-    tempoFade.tickRaw([this](int32_t) { applyCurrentTempo(); });
+    tempoFade.tickRaw([this](s32) { applyCurrentTempo(); });
   }
 
-  panFade.tickRaw([this](int32_t) { applyCurrentPan(); });
-  volumeFade.tickRaw([this](int32_t) { applyCurrentVolume(); });
+  panFade.tickRaw([this](s32) { applyCurrentPan(); });
+  volumeFade.tickRaw([this](s32) { applyCurrentVolume(); });
 
-  advanceVibratoDepthFade(vibrato, 8, [this](int32_t depth) {
+  advanceVibratoDepthFade(vibrato, 8, [this](s32 depth) {
     return convertVibratoDepthToMidi(seq().version,
                                      vibrato.depth(),
-                                     static_cast<uint16_t>(depth),
+                                     static_cast<u16>(depth),
                                      seq().maxVibratoDepth);
   });
 
@@ -460,7 +464,7 @@ std::optional<KonamiSnesTrack::PitchSlide> KonamiSnesTrack::consumePitchSlide() 
   }
 }
 
-KonamiSnesTrack::PitchSlide KonamiSnesTrack::readPitchSlide(KonamiSnesSeqEventType eventType, uint32_t offset) {
+KonamiSnesTrack::PitchSlide KonamiSnesTrack::readPitchSlide(KonamiSnesSeqEventType eventType, u32 offset) {
   PitchSlide slide {
     offset,
     0,
@@ -474,7 +478,7 @@ KonamiSnesTrack::PitchSlide KonamiSnesTrack::readPitchSlide(KonamiSnesSeqEventTy
       slide.eventLength = 4;
       slide.targetSemitones = noteSemitones(slide.targetNote, true);
       if (slide.length != 0 && pitchSlide.baseValid()) {
-        slide.delta = static_cast<int16_t>(((slide.targetSemitones - pitchSlide.currentPitch()) * 256.0)
+        slide.delta = static_cast<s16>(((slide.targetSemitones - pitchSlide.currentPitch()) * 256.0)
                                            / slide.length);
         slide.deltaSemitones = slide.delta / 256.0;
       }
@@ -486,7 +490,7 @@ KonamiSnesTrack::PitchSlide KonamiSnesTrack::readPitchSlide(KonamiSnesSeqEventTy
       if (slide.length != 0) {
         slide.eventLength = 7;
         curOffset += 1;
-        slide.delta = static_cast<int16_t>(readShort(curOffset));
+        slide.delta = static_cast<s16>(readShort(curOffset));
         slide.deltaSemitones = slide.delta / 256.0;
         curOffset += 2;
       }
@@ -495,9 +499,9 @@ KonamiSnesTrack::PitchSlide KonamiSnesTrack::readPitchSlide(KonamiSnesSeqEventTy
     case EVENT_PITCH_SLIDE_V3:
       slide.eventLength = 6;
       slide.targetSemitones = noteSemitones(slide.targetNote, false);
-      slide.delta = static_cast<int16_t>(readShort(curOffset));
+      slide.delta = static_cast<s16>(readShort(curOffset));
       slide.deltaSemitones = (slide.delta / 256.0)
-                             * (256.0 / std::max<uint8_t>(seq().tempo, 1));
+                             * (256.0 / std::max<u8>(seq().tempo, 1));
       curOffset += 2;
       break;
 
@@ -513,13 +517,13 @@ void KonamiSnesTrack::clearActivePitchSlide() {
 }
 
 void KonamiSnesTrack::addPitchSlideEvent(const PitchSlide& slide) {
-  const uint8_t pitchSlideNoteNumber = (slide.targetNote & 0x7f) + transpose;
+  const u8 pitchSlideNoteNumber = (slide.targetNote & 0x7f) + transpose;
   const auto desc = fmt::format("Delay: {:d}  Length: {:d}  Final Note: {:d}  Delta: {:.1f} semitones",
                                 slide.delay, slide.length, pitchSlideNoteNumber, slide.delta / 256.0);
   addGenericEvent(slide.offset, slide.eventLength, "Pitch Slide", desc, Type::PitchBendSlide);
 }
 
-double KonamiSnesTrack::noteSemitones(uint8_t key, bool includeTuning) const {
+double KonamiSnesTrack::noteSemitones(u8 key, bool includeTuning) const {
   double semitones = (key & 0x7f) + cKeyCorrection + transpose;
   if (includeTuning) {
     semitones += coarseTuningSemitones + (fineTuningCents / 100.0);
@@ -527,7 +531,7 @@ double KonamiSnesTrack::noteSemitones(uint8_t key, bool includeTuning) const {
   return semitones;
 }
 
-void KonamiSnesTrack::resetPitchForNote(uint8_t key) {
+void KonamiSnesTrack::resetPitchForNote(u8 key) {
   clearActivePitchSlide();
   setPitchBendAutomationBend(pitchSlide, 0);
 
@@ -539,7 +543,7 @@ void KonamiSnesTrack::resetPitchForNote(uint8_t key) {
   pitchSlide.beginNote(noteSemitones(key, true));
 }
 
-uint16_t KonamiSnesTrack::pitchSlideRangeCents(const PitchSlide& slide) const {
+u16 KonamiSnesTrack::pitchSlideRangeCents(const PitchSlide& slide) const {
   double maxSlideSemitones = std::abs(slide.targetSemitones - pitchSlide.basePitch());
   if (slide.length > 1) {
     maxSlideSemitones = std::max(maxSlideSemitones, std::abs((slide.length - 1) * slide.deltaSemitones));
@@ -548,13 +552,13 @@ uint16_t KonamiSnesTrack::pitchSlideRangeCents(const PitchSlide& slide) const {
   return pitchSlide.rangeCentsForPitchSpan(std::ceil(maxSlideSemitones), KONAMI_SNES_STD_PITCH_BEND_RANGE_CENTS);
 }
 
-uint8_t KonamiSnesTrack::getNoteDuration(uint8_t length, uint8_t durationRate) const {
+u8 KonamiSnesTrack::getNoteDuration(u8 length, u8 durationRate) const {
   const auto &parentSeq = seq();
   if (durationRate == parentSeq.NOTE_DUR_RATE_MAX) {
     return length;
   }
 
-  uint8_t duration = 0;
+  u8 duration = 0;
   if (parentSeq.version == KONAMISNES_V1) {
     duration = (length * durationRate) / 100;
   }
@@ -562,7 +566,7 @@ uint8_t KonamiSnesTrack::getNoteDuration(uint8_t length, uint8_t durationRate) c
     duration = (length * (durationRate << 1)) >> 8;
   }
 
-  return std::max<uint8_t>(duration, 1);
+  return std::max<u8>(duration, 1);
 }
 
 void KonamiSnesTrack::beginPitchSlide(const PitchSlide& slide) {
@@ -584,7 +588,7 @@ void KonamiSnesTrack::beginPitchSlide(const PitchSlide& slide) {
       KONAMI_SNES_STD_PITCH_BEND_RANGE_CENTS);
 }
 
-KonamiSnesTrack::ControllerFade KonamiSnesTrack::readVolumeFade(KonamiSnesSeqEventType eventType, uint32_t offset) const {
+KonamiSnesTrack::ControllerFade KonamiSnesTrack::readVolumeFade(KonamiSnesSeqEventType eventType, u32 offset) const {
   ControllerFade fade {offset, {}};
 
   switch (eventType) {
@@ -595,7 +599,7 @@ KonamiSnesTrack::ControllerFade KonamiSnesTrack::readVolumeFade(KonamiSnesSeqEve
     case EVENT_VOLUME_FADE_V2:
       fade.motion = KonamiControllerMotion::toRawTargetByFixedStep(
           readByte(curOffset),
-          static_cast<int16_t>(static_cast<int8_t>(readByte(curOffset + 1)) << 4));
+          static_cast<s16>(static_cast<s8>(readByte(curOffset + 1)) << 4));
       break;
 
     default:
@@ -607,40 +611,40 @@ KonamiSnesTrack::ControllerFade KonamiSnesTrack::readVolumeFade(KonamiSnesSeqEve
 }
 
 void KonamiSnesTrack::applyCurrentVolume() {
-  const uint8_t rawVolume = static_cast<uint8_t>(std::clamp(volumeFade.currentRaw(), 0, 0xff));
-  const uint8_t midiVolume = convertPercentAmpToStdMidiVal(rawVolume / 255.0);
+  const u8 rawVolume = static_cast<u8>(std::clamp(volumeFade.currentRaw(), 0, 0xff));
+  const u8 midiVolume = convertPercentAmpToStdMidiVal(rawVolume / 255.0);
   if (midiVolume != vol) {
     addVolNoItem(midiVolume);
   }
 }
 
-uint8_t KonamiSnesTrack::defaultPanValue() const {
+u8 KonamiSnesTrack::defaultPanValue() const {
   return seq().version <= KONAMISNES_V2 ? 10 : 20;
 }
 
-uint8_t KonamiSnesTrack::clampPanValue(uint8_t pan) const {
-  return std::min(pan, seq().version <= KONAMISNES_V2 ? uint8_t {20} : uint8_t {40});
+u8 KonamiSnesTrack::clampPanValue(u8 pan) const {
+  return std::min(pan, seq().version <= KONAMISNES_V2 ? u8 {20} : u8 {40});
 }
 
-uint8_t KonamiSnesTrack::convertPanValueToMidiPan(uint8_t pan) const {
+u8 KonamiSnesTrack::convertPanValueToMidiPan(u8 pan) const {
   const auto version = seq().version;
-  uint8_t volumeLeft;
-  uint8_t volumeRight;
+  u8 volumeLeft;
+  u8 volumeRight;
   switch (version) {
     case KONAMISNES_V1:
-      pan = std::min(pan, static_cast<uint8_t>(20));
+      pan = std::min(pan, static_cast<u8>(20));
       volumeLeft = KonamiSnesSeq::PAN_VOLUME_LEFT_V1[pan];
       volumeRight = KonamiSnesSeq::PAN_VOLUME_RIGHT_V1[pan];
       break;
 
     case KONAMISNES_V2:
-      pan = std::min(pan, static_cast<uint8_t>(20));
+      pan = std::min(pan, static_cast<u8>(20));
       volumeLeft = KonamiSnesSeq::PAN_VOLUME_LEFT_V2[pan];
       volumeRight = KonamiSnesSeq::PAN_VOLUME_RIGHT_V2[pan];
       break;
 
     default:
-      pan = std::min(pan, static_cast<uint8_t>(40));
+      pan = std::min(pan, static_cast<u8>(40));
       volumeLeft = KonamiSnesSeq::PAN_TABLE[40 - pan];
       volumeRight = KonamiSnesSeq::PAN_TABLE[pan];
       break;
@@ -649,7 +653,7 @@ uint8_t KonamiSnesTrack::convertPanValueToMidiPan(uint8_t pan) const {
   return convertLinearPercentPanValToStdMidiVal(static_cast<double>(volumeRight) / (volumeLeft + volumeRight));
 }
 
-KonamiSnesTrack::ControllerFade KonamiSnesTrack::readPanFade(KonamiSnesSeqEventType eventType, uint32_t offset) const {
+KonamiSnesTrack::ControllerFade KonamiSnesTrack::readPanFade(KonamiSnesSeqEventType eventType, u32 offset) const {
   ControllerFade fade {offset, {}};
 
   switch (eventType) {
@@ -661,7 +665,7 @@ KonamiSnesTrack::ControllerFade KonamiSnesTrack::readPanFade(KonamiSnesSeqEventT
     case EVENT_PAN_FADE_V2:
       fade.motion = KonamiControllerMotion::toRawTargetByFixedStep(
           clampPanValue(readByte(curOffset)),
-          static_cast<int16_t>(static_cast<int8_t>(readByte(curOffset + 1)) << 4));
+          static_cast<s16>(static_cast<s8>(readByte(curOffset + 1)) << 4));
       break;
 
     default:
@@ -676,7 +680,7 @@ void KonamiSnesTrack::applyCurrentPan() {
   addPanNoItem(convertPanValueToMidiPan(clampPanValue(panFade.currentRaw())));
 }
 
-KonamiSnesTrack::ControllerFade KonamiSnesTrack::readTempoFade(KonamiSnesSeqEventType eventType, uint32_t offset) const {
+KonamiSnesTrack::ControllerFade KonamiSnesTrack::readTempoFade(KonamiSnesSeqEventType eventType, u32 offset) const {
   ControllerFade fade {offset, {}};
 
   switch (eventType) {
@@ -687,7 +691,7 @@ KonamiSnesTrack::ControllerFade KonamiSnesTrack::readTempoFade(KonamiSnesSeqEven
     case EVENT_TEMPO_FADE_V2:
       fade.motion = KonamiControllerMotion::toRawTargetByFixedStep(
           readByte(curOffset),
-          static_cast<int16_t>(static_cast<int8_t>(readByte(curOffset + 1)) << 4));
+          static_cast<s16>(static_cast<s8>(readByte(curOffset + 1)) << 4));
       break;
 
     default:
@@ -700,7 +704,7 @@ KonamiSnesTrack::ControllerFade KonamiSnesTrack::readTempoFade(KonamiSnesSeqEven
 
 void KonamiSnesTrack::applyCurrentTempo() {
   auto &parentSeq = seq();
-  const auto newTempo = static_cast<uint8_t>(std::clamp(parentSeq.tempoFade.currentRaw(), 0, 0xff));
+  const auto newTempo = static_cast<u8>(std::clamp(parentSeq.tempoFade.currentRaw(), 0, 0xff));
   if (newTempo != parentSeq.tempo) {
     parentSeq.tempo = newTempo;
     addTempoBPMNoItem(parentSeq.getTempoInBPM(newTempo));
@@ -712,7 +716,7 @@ void KonamiSnesTrack::applyCurrentTempo() {
   }
 }
 
-int16_t KonamiSnesTrack::getLoopVolumeDelta() const {
+s16 KonamiSnesTrack::getLoopVolumeDelta() const {
   return loopVolumeDelta + loopVolumeDelta2;
 }
 
@@ -721,7 +725,7 @@ double KonamiSnesTrack::getLoopPitchDeltaCents() const {
   return static_cast<double>(loopPitchDelta + loopPitchDelta2) * (100.0 / 32.0);
 }
 
-void KonamiSnesTrack::applyEffectiveTuning(uint32_t offset, uint32_t length) {
+void KonamiSnesTrack::applyEffectiveTuning(u32 offset, u32 length) {
   const double totalCents = seqTuningCents + getLoopPitchDeltaCents();
   const double desiredCoarse = std::trunc(totalCents / 100.0);
   const double desiredFine = totalCents - (desiredCoarse * 100.0);
@@ -734,9 +738,9 @@ void KonamiSnesTrack::applyEffectiveTuning(uint32_t offset, uint32_t length) {
   }
 }
 
-void KonamiSnesTrack::addUnknownEvent(uint32_t beginOffset, uint8_t statusByte, uint8_t argCount) {
+void KonamiSnesTrack::addUnknownEvent(u32 beginOffset, u8 statusByte, u8 argCount) {
   std::string desc = fmt::format("Event: 0x{:02X}", statusByte);
-  for (uint8_t argIndex = 0; argIndex < argCount; argIndex++) {
+  for (u8 argIndex = 0; argIndex < argCount; argIndex++) {
     desc += fmt::format("  Arg{}: {:d}", argIndex + 1, readByte(curOffset++));
   }
 
@@ -750,12 +754,12 @@ void KonamiSnesTrack::resetPanAfterProgramChange() {
 
 bool KonamiSnesTrack::readEvent() {
   auto &parentSeq = seq();
-  uint32_t beginOffset = curOffset;
+  u32 beginOffset = curOffset;
   if (curOffset >= 0x10000) {
     return false;
   }
 
-  uint8_t statusByte = readByte(curOffset++);
+  u8 statusByte = readByte(curOffset++);
   bool bContinue = true;
 
   std::string desc;
@@ -793,9 +797,9 @@ bool KonamiSnesTrack::readEvent() {
 
     case EVENT_NOTE: {
       bool hasNoteLength = ((statusByte & 0x80) == 0);
-      uint8_t key = statusByte & 0x7f;
+      u8 key = statusByte & 0x7f;
 
-      uint8_t len;
+      u8 len;
       if (hasNoteLength) {
         len = readByte(curOffset++);
         noteLength = len;
@@ -804,7 +808,7 @@ bool KonamiSnesTrack::readEvent() {
         len = noteLength;
       }
 
-      uint8_t vel;
+      u8 vel;
       vel = readByte(curOffset++);
       bool hasNoteDuration = ((vel & 0x80) == 0);
       if (hasNoteDuration) {
@@ -817,16 +821,16 @@ bool KonamiSnesTrack::readEvent() {
         vel = 1; // TODO: verification
       }
 
-      vel = static_cast<uint8_t>(std::clamp<int>(vel + getLoopVolumeDelta(), 1, 127));
+      vel = static_cast<u8>(std::clamp<int>(vel + getLoopVolumeDelta(), 1, 127));
       if (seq().version != KONAMISNES_V1) {
         vel = KonamiSnesSeq::VOL_TABLE[vel];
       }
       vel = convertPercentAmpToStdMidiVal(vel / 127.0);
       applyEffectiveTuning(beginOffset, curOffset - beginOffset);
 
-      const uint8_t dur = getNoteDuration(len, noteDurationRate);
+      const u8 dur = getNoteDuration(len, noteDurationRate);
 
-      const uint32_t noteLengthBytes = curOffset - beginOffset;
+      const u32 noteLengthBytes = curOffset - beginOffset;
       resetPitchForNote(key);
       const auto slide = consumePitchSlide();
       const bool isTiedNote = prevNoteSlurred && key == prevNoteKey;
@@ -885,8 +889,8 @@ bool KonamiSnesTrack::readEvent() {
     }
 
     case EVENT_GAIN: {
-      uint8_t newGAINAmount = readByte(curOffset++);
-      uint8_t newGAIN = convertGAINAmountToGAIN(newGAINAmount);
+      u8 newGAINAmount = readByte(curOffset++);
+      u8 newGAIN = convertGAINAmountToGAIN(newGAINAmount);
 
       desc = fmt::format("GAIN: {} (${:02X})", newGAINAmount, newGAIN);
       addGenericEvent(beginOffset, curOffset - beginOffset, "GAIN", desc, Type::Adsr);
@@ -894,7 +898,7 @@ bool KonamiSnesTrack::readEvent() {
     }
 
     case EVENT_INSTANT_TUNING: {
-      int8_t newTuning = statusByte & 0x0f;
+      s8 newTuning = statusByte & 0x0f;
       if (newTuning > 8) {
         // extend sign
         newTuning -= 16;
@@ -908,7 +912,7 @@ bool KonamiSnesTrack::readEvent() {
     case EVENT_REST: {
       noteLength = readByte(curOffset++);
 
-      const uint32_t restLengthBytes = curOffset - beginOffset;
+      const u32 restLengthBytes = curOffset - beginOffset;
       const auto slide = consumePitchSlide();
 
       addRest(beginOffset, restLengthBytes, noteLength);
@@ -924,7 +928,7 @@ bool KonamiSnesTrack::readEvent() {
       noteDurationRate = readByte(curOffset++);
       noteDurationRate = std::min(noteDurationRate, parentSeq.NOTE_DUR_RATE_MAX);
       if (prevNoteSlurred) {
-        const uint8_t dur = getNoteDuration(noteLength, noteDurationRate);
+        const u8 dur = getNoteDuration(noteLength, noteDurationRate);
 
         makePrevDurNoteEnd(getTime() + dur);
         addTie(beginOffset, curOffset - beginOffset, dur, "Tie", desc);
@@ -939,7 +943,7 @@ bool KonamiSnesTrack::readEvent() {
     }
 
     case EVENT_PROGCHANGE: {
-      uint8_t newProg = readByte(curOffset++);
+      u8 newProg = readByte(curOffset++);
 
       instrument = newProg;
       addProgramChange(beginOffset, curOffset - beginOffset, newProg, true);
@@ -948,20 +952,20 @@ bool KonamiSnesTrack::readEvent() {
     }
 
     case EVENT_PROGCHANGEVOL: {
-      uint8_t newVolume = readByte(curOffset++);
-      uint8_t newProg = readByte(curOffset++);
+      u8 newVolume = readByte(curOffset++);
+      u8 newProg = readByte(curOffset++);
 
       instrument = newProg;
       addProgramChange(beginOffset, curOffset - beginOffset, newProg, true);
 
-      uint8_t midiVolume = convertPercentAmpToStdMidiVal(newVolume / 255.0);
+      u8 midiVolume = convertPercentAmpToStdMidiVal(newVolume / 255.0);
       addVolNoItem(midiVolume);
       resetPanAfterProgramChange();
       break;
     }
 
     case EVENT_PAN: {
-      uint8_t newPan = readByte(curOffset++);
+      u8 newPan = readByte(curOffset++);
       panFade.clearMotion();
 
       bool instrumentPanOff;
@@ -989,7 +993,7 @@ bool KonamiSnesTrack::readEvent() {
       else {
         newPan = clampPanValue(newPan);
         panFade.setCurrentRaw(newPan);
-        const uint8_t midiPan = convertPanValueToMidiPan(newPan);
+        const u8 midiPan = convertPanValueToMidiPan(newPan);
         // TODO: apply volume scale
         addPan(beginOffset, curOffset - beginOffset, midiPan);
       }
@@ -997,11 +1001,11 @@ bool KonamiSnesTrack::readEvent() {
     }
 
     case EVENT_VIBRATO: {
-      uint8_t vibratoArg1 = readByte(curOffset++);
-      uint8_t newVibratoRate = readByte(curOffset++);
-      uint8_t newVibratoDepth = readByte(curOffset++);
-      const uint8_t builtInFadeLength = konami_snes::vibrato::inlineFadeLength(parentSeq.version, vibratoArg1);
-      const uint8_t newVibratoDelay = konami_snes::vibrato::delayFromArg1(parentSeq.version, vibratoArg1);
+      u8 vibratoArg1 = readByte(curOffset++);
+      u8 newVibratoRate = readByte(curOffset++);
+      u8 newVibratoDepth = readByte(curOffset++);
+      const u8 builtInFadeLength = konami_snes::vibrato::inlineFadeLength(parentSeq.version, vibratoArg1);
+      const u8 newVibratoDelay = konami_snes::vibrato::delayFromArg1(parentSeq.version, vibratoArg1);
       desc = (builtInFadeLength != 0)
           ? fmt::format("Fade Length: {:d}  Rate: {:d}  Depth: {:d}",
                         builtInFadeLength, newVibratoRate, newVibratoDepth)
@@ -1009,7 +1013,7 @@ bool KonamiSnesTrack::readEvent() {
                         newVibratoDelay, newVibratoRate, newVibratoDepth);
       addGenericEvent(beginOffset, curOffset - beginOffset, "Vibrato", desc, Type::Vibrato);
 
-      uint8_t immediateFadeLength = builtInFadeLength;
+      u8 immediateFadeLength = builtInFadeLength;
       if (readByte(curOffset) == 0xf9) {
         immediateFadeLength = readByte(curOffset + 1);
       }
@@ -1025,11 +1029,11 @@ bool KonamiSnesTrack::readEvent() {
         parentSeq.maxVibratoDepth = std::max(parentSeq.maxVibratoDepth, vibrato.depth());
       }
 
-      const uint8_t midiDepth = deferDepthForFade
+      const u8 midiDepth = deferDepthForFade
           ? 0
           : (active ? convertVibratoDepthToMidi(parentSeq.version,
                                                 vibrato.depth(),
-                                                static_cast<uint16_t>(vibrato.depth()) << 8,
+                                                static_cast<u16>(vibrato.depth()) << 8,
                                                 parentSeq.maxVibratoDepth)
                     : 0);
       vibrato.setCurrentDepthPreservingMotion(deferDepthForFade ? 0 : vibrato.configuredDepth(8));
@@ -1045,8 +1049,8 @@ bool KonamiSnesTrack::readEvent() {
     }
 
     case EVENT_RANDOM_PITCH: {
-      uint8_t envRate = readByte(curOffset++);
-      uint16_t envPitchMask = readShort(curOffset);
+      u8 envRate = readByte(curOffset++);
+      u16 envPitchMask = readShort(curOffset);
       curOffset += 2;
       desc = fmt::format("Rate: {:d}  Pitch Mask: ${:04X}", envRate, envPitchMask);
       addGenericEvent(beginOffset, curOffset - beginOffset, "Random Pitch", desc, Type::Modulation);
@@ -1060,9 +1064,9 @@ bool KonamiSnesTrack::readEvent() {
     }
 
     case EVENT_LOOP_END: {
-      uint8_t times = readByte(curOffset++);
-      int8_t volumeDelta = readByte(curOffset++);
-      int8_t pitchDelta = readByte(curOffset++);
+      u8 times = readByte(curOffset++);
+      s8 volumeDelta = readByte(curOffset++);
+      s8 pitchDelta = readByte(curOffset++);
 
       desc = fmt::format("Times: {:d}  Volume Delta: {:d}  Pitch Delta: {:d}",
                          times, volumeDelta, pitchDelta);
@@ -1107,9 +1111,9 @@ bool KonamiSnesTrack::readEvent() {
     }
 
     case EVENT_LOOP_END_2: {
-      uint8_t times = readByte(curOffset++);
-      int8_t volumeDelta = readByte(curOffset++);
-      int8_t pitchDelta = readByte(curOffset++);
+      u8 times = readByte(curOffset++);
+      s8 volumeDelta = readByte(curOffset++);
+      s8 pitchDelta = readByte(curOffset++);
 
       desc = fmt::format("Times: {:d}  Volume Delta: {:d}  Pitch Delta: {:d}",
                          times, volumeDelta, pitchDelta);
@@ -1150,7 +1154,7 @@ bool KonamiSnesTrack::readEvent() {
     case EVENT_TEMPO: {
       // actual Konami engine has tempo for each tracks,
       // here we set the song speed as a global tempo
-      uint8_t newTempo = readByte(curOffset++);
+      u8 newTempo = readByte(curOffset++);
       parentSeq.tempoFade.setCurrentRaw(newTempo);
       parentSeq.tempo = newTempo;
       addTempoBPM(beginOffset, curOffset - beginOffset, parentSeq.getTempoInBPM(newTempo));
@@ -1166,39 +1170,39 @@ bool KonamiSnesTrack::readEvent() {
     case EVENT_TEMPO_FADE_V2: {
       const auto fade = readTempoFade(eventType, beginOffset);
       curOffset += 2;
-      const auto bpm = parentSeq.getTempoInBPM(static_cast<uint8_t>(fade.motion.targetRaw));
+      const auto bpm = parentSeq.getTempoInBPM(static_cast<u8>(fade.motion.targetRaw));
       desc = fade.motion.usesTicks()
           ? fmt::format("Length: {:d}  Target BPM: {}", fade.motion.ticks, bpm)
           : fmt::format("Target BPM: {}  Speed: {:.2f}", bpm, fade.motion.stepFixed / 256.0);
       addGenericEvent(fade.offset, 3, "Tempo Fade", desc, Type::Tempo);
-      parentSeq.tempoFade.begin(fade.motion, [this](int32_t) { applyCurrentTempo(); });
+      parentSeq.tempoFade.begin(fade.motion, [this](s32) { applyCurrentTempo(); });
       break;
     }
 
     case EVENT_TRANSPABS: {
-      int8_t newTransp = (int8_t) readByte(curOffset++);
+      s8 newTransp = (s8) readByte(curOffset++);
       addTranspose(beginOffset, curOffset - beginOffset, newTransp);
       break;
     }
 
     case EVENT_ADSR1: {
-      uint8_t newADSR1 = readByte(curOffset++);
+      u8 newADSR1 = readByte(curOffset++);
       desc = fmt::format("ADSR(1): ${:02X}", newADSR1);
       addGenericEvent(beginOffset, curOffset - beginOffset, "ADSR(1)", desc, Type::Adsr);
       break;
     }
 
     case EVENT_ADSR2: {
-      uint8_t newADSR2 = readByte(curOffset++);
+      u8 newADSR2 = readByte(curOffset++);
       desc = fmt::format("ADSR(2): ${:02X}", newADSR2);
       addGenericEvent(beginOffset, curOffset - beginOffset, "ADSR(2)", desc, Type::Adsr);
       break;
     }
 
     case EVENT_VOLUME: {
-      uint8_t newVolume = readByte(curOffset++);
+      u8 newVolume = readByte(curOffset++);
       volumeFade.setCurrentRaw(newVolume);
-      uint8_t midiVolume = convertPercentAmpToStdMidiVal(newVolume / 255.0);
+      u8 midiVolume = convertPercentAmpToStdMidiVal(newVolume / 255.0);
       addVol(beginOffset, curOffset - beginOffset, midiVolume);
       break;
     }
@@ -1213,21 +1217,21 @@ bool KonamiSnesTrack::readEvent() {
                         fade.motion.targetRaw,
                         fade.motion.stepFixed / 256.0);
       addGenericEvent(fade.offset, 3, "Volume Fade", desc, Type::VolumeSlide);
-      volumeFade.begin(fade.motion, [this](int32_t) { applyCurrentVolume(); });
+      volumeFade.begin(fade.motion, [this](s32) { applyCurrentVolume(); });
       break;
     }
 
     case EVENT_PORTAMENTO: {
-      uint8_t portamentoSpeed = readByte(curOffset++);
+      u8 portamentoSpeed = readByte(curOffset++);
       desc = fmt::format("Portamento Speed: {:d}", portamentoSpeed);
       addGenericEvent(beginOffset, curOffset - beginOffset, "Portamento", desc, Type::Portamento);
       break;
     }
 
     case EVENT_PITCH_ENVELOPE_V1: {
-      uint8_t pitchEnvDelay = readByte(curOffset++);
-      uint8_t pitchEnvSpeed = readByte(curOffset++);
-      uint8_t pitchEnvDepth = readByte(curOffset++);
+      u8 pitchEnvDelay = readByte(curOffset++);
+      u8 pitchEnvSpeed = readByte(curOffset++);
+      u8 pitchEnvDepth = readByte(curOffset++);
       desc = fmt::format("Delay: {:d}  Speed: {:d}  Depth: {:d}",
                          pitchEnvDelay, pitchEnvSpeed, -pitchEnvDepth);
       addGenericEvent(beginOffset, curOffset - beginOffset, "Pitch Envelope", desc,
@@ -1236,10 +1240,10 @@ bool KonamiSnesTrack::readEvent() {
     }
 
     case EVENT_PITCH_ENVELOPE_V2: {
-      uint8_t pitchEnvDelay = readByte(curOffset++);
-      uint8_t pitchEnvLength = readByte(curOffset++);
-      uint8_t pitchEnvOffset = readByte(curOffset++);
-      int16_t pitchDelta = readShort(curOffset);
+      u8 pitchEnvDelay = readByte(curOffset++);
+      u8 pitchEnvLength = readByte(curOffset++);
+      u8 pitchEnvOffset = readByte(curOffset++);
+      s16 pitchDelta = readShort(curOffset);
       curOffset += 2;
       desc = fmt::format("Delay: {:d}  Length: {:d}  Offset: {:d} semitones  Delta: {:.1f} semitones",
                          pitchEnvDelay, pitchEnvLength, -pitchEnvOffset, pitchDelta / 256.0);
@@ -1249,7 +1253,7 @@ bool KonamiSnesTrack::readEvent() {
     }
 
     case EVENT_TUNING: {
-      int8_t newTuning = (int8_t) readByte(curOffset++);
+      s8 newTuning = (s8) readByte(curOffset++);
       seqTuningCents = getTuningInSemitones(newTuning) * 100.0;
       applyEffectiveTuning(beginOffset, curOffset - beginOffset);
       break;
@@ -1262,9 +1266,9 @@ bool KonamiSnesTrack::readEvent() {
       break;
 
     case EVENT_ECHO: {
-      uint8_t echoChannels = readByte(curOffset++);
-      uint8_t echoVolumeL = readByte(curOffset++);
-      uint8_t echoVolumeR = readByte(curOffset++);
+      u8 echoChannels = readByte(curOffset++);
+      u8 echoVolumeL = readByte(curOffset++);
+      u8 echoVolumeR = readByte(curOffset++);
 
       desc = fmt::format("EON: {:d}  EVOL(L): {:d}  EVOL(R): {:d}",
                          echoChannels, echoVolumeL, echoVolumeR);
@@ -1274,9 +1278,9 @@ bool KonamiSnesTrack::readEvent() {
     }
 
     case EVENT_ECHO_PARAM: {
-      uint8_t echoDelay = readByte(curOffset++);
-      uint8_t echoFeedback = readByte(curOffset++);
-      uint8_t echoArg3 = readByte(curOffset++);
+      u8 echoDelay = readByte(curOffset++);
+      u8 echoFeedback = readByte(curOffset++);
+      u8 echoArg3 = readByte(curOffset++);
 
       desc = fmt::format("EDL: {:d}  EFB: {:d}  Arg3: {:d}", echoDelay, echoFeedback, echoArg3);
 
@@ -1328,12 +1332,12 @@ bool KonamiSnesTrack::readEvent() {
                         fade.motion.targetRaw,
                         fade.motion.stepFixed / 256.0);
       addGenericEvent(fade.offset, 3, "Pan Fade", desc, Type::PanSlide);
-      panFade.begin(fade.motion, [this](int32_t) { applyCurrentPan(); });
+      panFade.begin(fade.motion, [this](s32) { applyCurrentPan(); });
       break;
     }
 
     case EVENT_VIBRATO_FADE: {
-      uint8_t fadeSpeed = readByte(curOffset++);
+      u8 fadeSpeed = readByte(curOffset++);
       desc = fmt::format("Fade Length: {:d}", fadeSpeed);
       addGenericEvent(beginOffset, curOffset - beginOffset, "Vibrato Fade", desc, Type::Vibrato);
       vibrato.setReusableFadeToConfiguredDepth(fadeSpeed, 8);
@@ -1341,10 +1345,10 @@ bool KonamiSnesTrack::readEvent() {
     }
 
     case EVENT_ADSR_GAIN: {
-      uint8_t newADSR1 = readByte(curOffset++);
-      uint8_t newADSR2 = readByte(curOffset++);
-      uint8_t newGAINAmount = readByte(curOffset++);
-      uint8_t newGAIN = convertGAINAmountToGAIN(newGAINAmount);
+      u8 newADSR1 = readByte(curOffset++);
+      u8 newADSR2 = readByte(curOffset++);
+      u8 newGAINAmount = readByte(curOffset++);
+      u8 newGAIN = convertGAINAmountToGAIN(newGAINAmount);
 
       desc = fmt::format("ADSR(1): ${:02X}  ADSR(2): ${:02X}  GAIN: ${:02X}",
                          newADSR1, newADSR2, newGAIN);
@@ -1353,9 +1357,9 @@ bool KonamiSnesTrack::readEvent() {
     }
 
     case EVENT_CONDITIONAL_JUMP_V1: {
-      uint16_t dest = readShort(curOffset);
+      u16 dest = readShort(curOffset);
       curOffset += 2;
-      const uint16_t altDest = readShort(curOffset);
+      const u16 altDest = readShort(curOffset);
       desc = fmt::format("Destination: ${:04X}  Alternate Destination: ${:04X}", dest, altDest);
       addGenericEvent(beginOffset, curOffset - beginOffset, "Conditional Jump", desc,
                       Type::JumpConditional);
@@ -1368,10 +1372,10 @@ bool KonamiSnesTrack::readEvent() {
     }
 
     case EVENT_LINEAR_PITCH_ENVELOPE_V2: {
-      const uint8_t deltaFraction = readByte(curOffset++);
-      const uint8_t deltaInteger = readByte(curOffset++);
-      const int16_t pitchDelta = static_cast<int16_t>(
-          static_cast<uint16_t>(deltaFraction) | (static_cast<uint16_t>(deltaInteger) << 8));
+      const u8 deltaFraction = readByte(curOffset++);
+      const u8 deltaInteger = readByte(curOffset++);
+      const s16 pitchDelta = static_cast<s16>(
+          static_cast<u16>(deltaFraction) | (static_cast<u16>(deltaInteger) << 8));
       desc = fmt::format("Delta: {:.1f} semitones", pitchDelta / 256.0);
       addGenericEvent(beginOffset, curOffset - beginOffset, "Linear Pitch Envelope", desc,
                       Type::PitchEnvelope);
@@ -1379,10 +1383,10 @@ bool KonamiSnesTrack::readEvent() {
     }
 
     case EVENT_GOTO: {
-      uint16_t dest = readShort(curOffset);
+      u16 dest = readShort(curOffset);
       curOffset += 2;
       desc = fmt::format("Destination: ${:04X}", dest);
-      uint32_t length = curOffset - beginOffset;
+      u32 length = curOffset - beginOffset;
 
       assert(dest >= offset());
 
@@ -1401,7 +1405,7 @@ bool KonamiSnesTrack::readEvent() {
     }
 
     case EVENT_CALL: {
-      uint16_t dest = readShort(curOffset);
+      u16 dest = readShort(curOffset);
       curOffset += 2;
 
       desc = fmt::format("Destination: ${:04X}", dest);

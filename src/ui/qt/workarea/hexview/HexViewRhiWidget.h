@@ -6,9 +6,9 @@
 
 #pragma once
 
-#include <QRhiWidget>
-
 #include "HexViewRhiEventForwarder.h"
+
+#include <QRhiWidget>
 
 class QEvent;
 class QResizeEvent;

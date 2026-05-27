@@ -6,11 +6,12 @@
 
 #include "SPC2Loader.h"
 
-#include <cstring>
-
-#include "common.h"
+#include "base/Types.h"
 #include "LoaderManager.h"
 #include "LogManager.h"
+
+#include <cstring>
+#include <string>
 
 // SPC2 file specs available here: http://blog.kevtris.org/blogfiles/spc2_file_specification_v1.txt
 
@@ -38,7 +39,7 @@ void SPC2Loader::apply(const RawFile* file) {
   }
 
   // Read header
-  uint8_t header[HEADER_SIZE];
+  u8 header[HEADER_SIZE];
   file->readBytes(0, HEADER_SIZE, header);
 
   // Check for header signature. Support major revision 1.
@@ -47,17 +48,17 @@ void SPC2Loader::apply(const RawFile* file) {
   }
 
   // Extract number of SPCs
-  uint16_t numSPCs = header[7] | (header[8] << 8);
+  u16 numSPCs = header[7] | (header[8] << 8);
 
   // Iterate over each SPC data block
-  for (uint16_t i = 0; i < numSPCs; ++i) {
+  for (u16 i = 0; i < numSPCs; ++i) {
     // Read SPC data block
-    uint8_t spcDataBlock[SPC_DATA_BLOCK_SIZE];
+    u8 spcDataBlock[SPC_DATA_BLOCK_SIZE];
     size_t spcBlockOffset = HEADER_SIZE + (i * SPC_DATA_BLOCK_SIZE);
     file->readBytes(spcBlockOffset, SPC_DATA_BLOCK_SIZE, spcDataBlock);
 
     // Reconstruct the SPC file's RAM
-    auto* spcFile = new uint8_t[SPC_FILE_SIZE];
+    auto* spcFile = new u8[SPC_FILE_SIZE];
     memset(spcFile, 0, SPC_FILE_SIZE);
 
     // Extract spc file name
@@ -80,8 +81,8 @@ void SPC2Loader::apply(const RawFile* file) {
 
     // Reconstruct the SPC file's RAM
     for (int j = 0; j < 256; ++j) {
-      uint16_t blockIndex = spcDataBlock[j * 2] | (spcDataBlock[j * 2 + 1] << 8);
-      uint8_t ramBlock[RAM_BLOCK_SIZE];
+      u16 blockIndex = spcDataBlock[j * 2] | (spcDataBlock[j * 2 + 1] << 8);
+      u8 ramBlock[RAM_BLOCK_SIZE];
       size_t ramBlockOffset = 16 + (numSPCs * SPC_DATA_BLOCK_SIZE) + (blockIndex * RAM_BLOCK_SIZE);
       file->readBytes(ramBlockOffset, RAM_BLOCK_SIZE, ramBlock);
       std::copy_n(ramBlock, RAM_BLOCK_SIZE, spcFile + SPC_HEADER_SIZE + (j * RAM_BLOCK_SIZE));

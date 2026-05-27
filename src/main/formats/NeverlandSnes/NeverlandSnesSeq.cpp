@@ -1,4 +1,7 @@
 #include "NeverlandSnesSeq.h"
+
+#include "base/Types.h"
+
 #include <spdlog/fmt/fmt.h>
 
 DECLARE_FORMAT(NeverlandSnes);
@@ -9,7 +12,7 @@ DECLARE_FORMAT(NeverlandSnes);
 #define MAX_TRACKS  8
 #define SEQ_PPQN    48
 
-NeverlandSnesSeq::NeverlandSnesSeq(RawFile *file, NeverlandSnesVersion ver, uint32_t seqdataOffset)
+NeverlandSnesSeq::NeverlandSnesSeq(RawFile *file, NeverlandSnesVersion ver, u32 seqdataOffset)
     : VGMSeq(NeverlandSnesFormat::name, file, seqdataOffset), version(ver) {
   bLoadTickByTick = true;
   setAllowDiscontinuousTrackData(true);
@@ -67,16 +70,16 @@ bool NeverlandSnesSeq::parseHeader(void) {
     setName("NeverlandSnesSeq");
   }
 
-  for (uint8_t trackIndex = 0; trackIndex < MAX_TRACKS; trackIndex++) {
-    uint16_t trackSignPtr = offset() + 0x10 + trackIndex;
-    uint8_t trackSign = readByte(trackSignPtr);
+  for (u8 trackIndex = 0; trackIndex < MAX_TRACKS; trackIndex++) {
+    u16 trackSignPtr = offset() + 0x10 + trackIndex;
+    u8 trackSign = readByte(trackSignPtr);
 
     auto trackSignName = fmt::format("Track {:d} Entry", trackIndex + 1);
     header->addChild(trackSignPtr, 1, trackSignName);
 
-    uint16_t sectionListOffsetPtr = offset() + 0x20 + (trackIndex * 2);
+    u16 sectionListOffsetPtr = offset() + 0x20 + (trackIndex * 2);
     if (trackSign != 0xff) {
-      uint16_t sectionListAddress = getShortAddress(sectionListOffsetPtr);
+      u16 sectionListAddress = getShortAddress(sectionListOffsetPtr);
 
       auto playlistName = fmt::format("Track {:d} Playlist Pointer", trackIndex + 1);
       header->addChild(sectionListOffsetPtr, 2, playlistName);
@@ -100,7 +103,7 @@ void NeverlandSnesSeq::loadEventMap() {
   // TODO: NeverlandSnesSeq::LoadEventMap
 }
 
-uint16_t NeverlandSnesSeq::convertToApuAddress(uint16_t off) {
+u16 NeverlandSnesSeq::convertToApuAddress(u16 off) {
   if (version == NEVERLANDSNES_S2C) {
     return offset() + off;
   }
@@ -109,7 +112,7 @@ uint16_t NeverlandSnesSeq::convertToApuAddress(uint16_t off) {
   }
 }
 
-uint16_t NeverlandSnesSeq::getShortAddress(uint32_t offset) {
+u16 NeverlandSnesSeq::getShortAddress(u32 offset) {
   return convertToApuAddress(readShort(offset));
 }
 
@@ -117,7 +120,7 @@ uint16_t NeverlandSnesSeq::getShortAddress(uint32_t offset) {
 //  NeverlandSnesTrack
 //  ******************
 
-NeverlandSnesTrack::NeverlandSnesTrack(NeverlandSnesSeq *parentFile, uint32_t offset, uint32_t length)
+NeverlandSnesTrack::NeverlandSnesTrack(NeverlandSnesSeq *parentFile, u32 offset, u32 length)
     : SeqTrack(parentFile, offset, length) {
   resetVars();
   bDetermineTrackLengthEventByEvent = true;
@@ -131,18 +134,18 @@ void NeverlandSnesTrack::resetVars(void) {
 bool NeverlandSnesTrack::readEvent(void) {
   NeverlandSnesSeq *parentSeq = (NeverlandSnesSeq *) this->parentSeq;
 
-  uint32_t beginOffset = curOffset;
+  u32 beginOffset = curOffset;
   if (curOffset >= 0x10000) {
     return false;
   }
 
-  uint8_t statusByte = readByte(curOffset++);
+  u8 statusByte = readByte(curOffset++);
   bool bContinue = true;
 
   std::string desc;
 
   NeverlandSnesSeqEventType eventType = (NeverlandSnesSeqEventType) 0;
-  std::map<uint8_t, NeverlandSnesSeqEventType>::iterator pEventType = parentSeq->EventMap.find(statusByte);
+  std::map<u8, NeverlandSnesSeqEventType>::iterator pEventType = parentSeq->EventMap.find(statusByte);
   if (pEventType != parentSeq->EventMap.end()) {
     eventType = pEventType->second;
   }
@@ -154,34 +157,34 @@ bool NeverlandSnesTrack::readEvent(void) {
       break;
 
     case EVENT_UNKNOWN1: {
-      uint8_t arg1 = readByte(curOffset++);
+      u8 arg1 = readByte(curOffset++);
       desc = fmt::format("Event: 0x{:02X}  Arg1: {:d}", statusByte, arg1);
       addUnknown(beginOffset, curOffset - beginOffset, "Unknown Event", desc);
       break;
     }
 
     case EVENT_UNKNOWN2: {
-      uint8_t arg1 = readByte(curOffset++);
-      uint8_t arg2 = readByte(curOffset++);
+      u8 arg1 = readByte(curOffset++);
+      u8 arg2 = readByte(curOffset++);
       desc = fmt::format("Event: 0x{:02X}  Arg1: {:d}  Arg2: {:d}", statusByte, arg1, arg2);
       addUnknown(beginOffset, curOffset - beginOffset, "Unknown Event", desc);
       break;
     }
 
     case EVENT_UNKNOWN3: {
-      uint8_t arg1 = readByte(curOffset++);
-      uint8_t arg2 = readByte(curOffset++);
-      uint8_t arg3 = readByte(curOffset++);
+      u8 arg1 = readByte(curOffset++);
+      u8 arg2 = readByte(curOffset++);
+      u8 arg3 = readByte(curOffset++);
       desc = fmt::format("Event: 0x{:02X}  Arg1: {:d}  Arg2: {:d}  Arg3: {:d}", statusByte, arg1, arg2, arg3);
       addUnknown(beginOffset, curOffset - beginOffset, "Unknown Event", desc);
       break;
     }
 
     case EVENT_UNKNOWN4: {
-      uint8_t arg1 = readByte(curOffset++);
-      uint8_t arg2 = readByte(curOffset++);
-      uint8_t arg3 = readByte(curOffset++);
-      uint8_t arg4 = readByte(curOffset++);
+      u8 arg1 = readByte(curOffset++);
+      u8 arg2 = readByte(curOffset++);
+      u8 arg3 = readByte(curOffset++);
+      u8 arg4 = readByte(curOffset++);
       desc = fmt::format("Event: 0x{:02X}  Arg1: {:d}  Arg2: {:d}  Arg3: {:d}  Arg4: {:d}",
                          statusByte, arg1, arg2, arg3, arg4);
       addUnknown(beginOffset, curOffset - beginOffset, "Unknown Event", desc);
@@ -203,12 +206,12 @@ bool NeverlandSnesTrack::readEvent(void) {
   return bContinue;
 }
 
-uint16_t NeverlandSnesTrack::convertToApuAddress(uint16_t offset) {
+u16 NeverlandSnesTrack::convertToApuAddress(u16 offset) {
   NeverlandSnesSeq *parentSeq = (NeverlandSnesSeq *) this->parentSeq;
   return parentSeq->convertToApuAddress(offset);
 }
 
-uint16_t NeverlandSnesTrack::getShortAddress(uint32_t offset) {
+u16 NeverlandSnesTrack::getShortAddress(u32 offset) {
   NeverlandSnesSeq *parentSeq = (NeverlandSnesSeq *) this->parentSeq;
   return parentSeq->getShortAddress(offset);
 }

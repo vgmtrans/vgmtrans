@@ -1,7 +1,12 @@
 #pragma once
-#include "VGMSeq.h"
-#include "SeqTrack.h"
+
+#include "base/Types.h"
 #include "ChunSnesFormat.h"
+#include "SeqTrack.h"
+#include "VGMSeq.h"
+
+#include <map>
+#include <string>
 
 #define CHUNSNES_SUBLEVEL_MAX   3
 
@@ -63,7 +68,7 @@ class ChunSnesSeq
   ChunSnesSeq(RawFile *file,
               ChunSnesVersion ver,
               ChunSnesMinorVersion minorVer,
-              uint32_t seqdataOffset,
+              u32 seqdataOffset,
               std::string newName = "Chun SNES Seq");
   ~ChunSnesSeq() override;
 
@@ -71,15 +76,15 @@ class ChunSnesSeq
   bool parseTrackPointers() override;
   void resetVars() override;
 
-  static double getTempoInBPM(uint8_t tempo);
+  static double getTempoInBPM(u8 tempo);
 
   ChunSnesVersion version;
   ChunSnesMinorVersion minorVersion;
-  std::map<uint8_t, ChunSnesSeqEventType> EventMap;
-  std::map<uint8_t, ChunSnesSeqPresetType> PresetMap;
+  std::map<u8, ChunSnesSeqEventType> EventMap;
+  std::map<u8, ChunSnesSeqPresetType> PresetMap;
 
-  uint8_t initialTempo;
-  uint8_t conditionVar;
+  u8 initialTempo;
+  u8 conditionVar;
 
  private:
   void loadEventMap();
@@ -89,26 +94,26 @@ class ChunSnesSeq
 class ChunSnesTrack
     : public SeqTrack {
  public:
-  ChunSnesTrack(ChunSnesSeq *parentFile, uint32_t offset = 0, uint32_t length = 0);
+  ChunSnesTrack(ChunSnesSeq *parentFile, u32 offset = 0, u32 length = 0);
   void resetVars() override;
   bool readEvent() override;
 
   void syncNoteLengthWithPriorTrack();
-  static uint8_t multiply8bit(uint8_t multiplicand, uint8_t multiplier);
-  static void getVolumeBalance(int8_t pan, double &volumeLeft, double &volumeRight);
-  static int8_t calcPanValue(int8_t pan, double &volumeScale);
-  static double calcTuningValue(int8_t tuning);
+  static u8 multiply8bit(u8 multiplicand, u8 multiplier);
+  static void getVolumeBalance(s8 pan, double &volumeLeft, double &volumeRight);
+  static s8 calcPanValue(s8 pan, double &volumeScale);
+  static double calcTuningValue(s8 tuning);
 
-  uint8_t index;
-  int8_t prevNoteKey;
+  u8 index;
+  s8 prevNoteKey;
   bool prevNoteSlurred;
 
-  uint8_t noteLength;
-  uint8_t noteDurationRate;
+  u8 noteLength;
+  u8 noteDurationRate;
   bool syncNoteLen;
 
-  uint8_t loopCount;
-  uint8_t loopCountAlt;
-  uint8_t subNestLevel;
-  uint16_t subReturnAddr[CHUNSNES_SUBLEVEL_MAX];
+  u8 loopCount;
+  u8 loopCountAlt;
+  u8 subNestLevel;
+  u16 subReturnAddr[CHUNSNES_SUBLEVEL_MAX];
 };

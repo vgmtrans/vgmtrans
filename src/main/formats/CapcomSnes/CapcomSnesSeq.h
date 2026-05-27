@@ -1,9 +1,14 @@
 #pragma once
-#include "VGMSeq.h"
+
 #include "automation/SeqMidiAutomation.h"
-#include "SeqTrack.h"
-#include "SeqEvent.h"
+#include "base/Types.h"
 #include "CapcomSnesFormat.h"
+#include "SeqEvent.h"
+#include "SeqTrack.h"
+#include "VGMSeq.h"
+
+#include <map>
+#include <string>
 
 #define CAPCOM_SNES_REPEAT_SLOT_MAX 4
 
@@ -58,7 +63,7 @@ class CapcomSnesSeq
  public:
   CapcomSnesSeq(RawFile *file,
                 CapcomSnesVersion ver,
-                uint32_t seqdata_offset,
+                u32 seqdata_offset,
                 bool priorityInHeader,
                 std::string newName = "Capcom SNES Seq");
   ~CapcomSnesSeq() override = default;
@@ -68,18 +73,18 @@ class CapcomSnesSeq
   void resetVars() override;
 
   CapcomSnesVersion version;
-  std::map<uint8_t, CapcomSnesSeqEventType> EventMap;
+  std::map<u8, CapcomSnesSeqEventType> EventMap;
 
   bool priorityInHeader;
-  int8_t transpose;
-  uint16_t tempo;
-  uint8_t midiReverb;
+  s8 transpose;
+  u16 tempo;
+  u8 midiReverb;
 
-  static const uint8_t volTable[];
-  static const uint8_t panTable[];
+  static const u8 volTable[];
+  static const u8 panTable[];
 
   double getTempoInBPM() const;
-  static double getTempoInBPM(uint16_t tempo);
+  static double getTempoInBPM(u16 tempo);
 
  private:
   void loadEventMap();
@@ -89,14 +94,14 @@ class CapcomSnesSeq
 class CapcomSnesTrack
     : public SeqTrack {
  public:
-  CapcomSnesTrack(CapcomSnesSeq *parentFile, uint32_t offset = 0, uint32_t length = 0);
+  CapcomSnesTrack(CapcomSnesSeq *parentFile, u32 offset = 0, u32 length = 0);
   void resetVars() override;
   bool readEvent() override;
   void onTickBegin() override;
   void onTickEnd() override;
 
-  uint8_t getNoteOctave() const;
-  void setNoteOctave(uint8_t octave);
+  u8 getNoteOctave() const;
+  void setNoteOctave(u8 octave);
   bool isNoteOctaveUp() const;
   void setNoteOctaveUp(bool octave_up);
   bool isNoteDotted() const;
@@ -108,22 +113,22 @@ class CapcomSnesTrack
 
  private:
   [[nodiscard]] bool areLfoOutputsEnabled() const { return vibrato.rate() != 0; }
-  void addVibratoDepthEvent(uint32_t offset, uint32_t length, uint8_t depth);
+  void addVibratoDepthEvent(u32 offset, u32 length, u8 depth);
   void setLfoOutputsEnabled(bool enabled);
-  void handleLfoRateChange(uint8_t lfoRateByte);
+  void handleLfoRateChange(u8 lfoRateByte);
 
-  uint8_t repeatCount[CAPCOM_SNES_REPEAT_SLOT_MAX];      // repeat count for repeat command
-  uint8_t noteAttributes;
-  uint8_t durationRate;
-  //int8_t transpose;
+  u8 repeatCount[CAPCOM_SNES_REPEAT_SLOT_MAX];      // repeat count for repeat command
+  u8 noteAttributes;
+  u8 durationRate;
+  //s8 transpose;
 
   bool lastNoteSlurred;
   bool didRest;
-  int8_t lastKey;
+  s8 lastKey;
   SeqSynthLfoAutomation vibrato;
   SeqSynthLfoAutomation tremolo;
-  uint16_t lastPortamentoTime;
+  u16 lastPortamentoTime;
   double portamentoMillisecondsPerCent;
 
-  static double getTuningInSemitones(int8_t tuning);
+  static double getTuningInSemitones(s8 tuning);
 };

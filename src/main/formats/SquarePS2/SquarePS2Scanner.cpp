@@ -4,9 +4,11 @@
  * refer to the included LICENSE.txt file
  */
 
+#include "base/Types.h"
+#include "ScannerManager.h"
 #include "SquarePS2Seq.h"
 #include "WD.h"
-#include "ScannerManager.h"
+
 namespace vgmtrans::scanners {
 ScannerRegistration<SquarePS2Scanner> s_squareps2("SquarePS2");
 }
@@ -19,18 +21,18 @@ void SquarePS2Scanner::scan(RawFile *file, void *info) {
 }
 
 void SquarePS2Scanner::searchForBGMSeq(RawFile *file) {
-  uint32_t nFileLength;
+  u32 nFileLength;
   nFileLength = file->size();
-  for (uint32_t i = 0; i + 4 < nFileLength; i++) {
+  for (u32 i = 0; i + 4 < nFileLength; i++) {
     if (file->get<u8>(i) == 'B' && file->get<u8>(i + 1) == 'G' && file->get<u8>(i + 2) == 'M' &&
       file->get<u8>(i + 3) == ' ') {
       if (file->readWord(i + 0x14) == 0 && file->readWord(i + 0x18) == 0 &&
         file->readWord(i + 0x1C) == 0) {
-        uint8_t nNumTracks = (*file)[i + 8];
-        uint32_t pos = i + 0x20;  //start at first track (fixed offset)
+        u8 nNumTracks = (*file)[i + 8];
+        u32 pos = i + 0x20;  //start at first track (fixed offset)
         bool bValid = true;
         for (int j = 0; j < nNumTracks; j++) {
-          uint32_t trackSize = file->readWord(pos);  //get the track size (first word before track data)
+          u32 trackSize = file->readWord(pos);  //get the track size (first word before track data)
           if (trackSize + pos + j > nFileLength || trackSize == 0 || trackSize > 0xFFFF) {
             bValid = false;
             break;
@@ -48,10 +50,10 @@ void SquarePS2Scanner::searchForBGMSeq(RawFile *file) {
 }
 
 void SquarePS2Scanner::searchForWDSet(RawFile *file) {
-  uint32_t numRegions, firstRgnPtr;
+  u32 numRegions, firstRgnPtr;
 
   size_t nFileLength = file->size();
-  for (uint32_t i = 0; i + 0x3000 < nFileLength; i++) {
+  for (u32 i = 0; i + 0x3000 < nFileLength; i++) {
     if (file->get<u8>(i) == 'W' && file->get<u8>(i + 1) == 'D' && file->get<u8>(i + 3) < 0x03) {
       if (file->readWord(i + 0x14) == 0 && file->readWord(i + 0x18) == 0 &&
         file->readWord(i + 0x1C) == 0) {
@@ -66,7 +68,7 @@ void SquarePS2Scanner::searchForWDSet(RawFile *file) {
 
         if (firstRgnPtr <= 0x1000) {
           bool bValid = true;
-          uint32_t offsetOfFirstSamp = i + firstRgnPtr + numRegions * 0x20;
+          u32 offsetOfFirstSamp = i + firstRgnPtr + numRegions * 0x20;
 
           int zeroOffsetCounter = 0;
 
@@ -74,11 +76,11 @@ void SquarePS2Scanner::searchForWDSet(RawFile *file) {
           // sample are 0
           for (unsigned int curRgn = 0; curRgn < numRegions; curRgn++) {
             // ignore the first nibble, it varies between versions but will be consistent this way
-            uint32_t relativeRgnSampOffset =
+            u32 relativeRgnSampOffset =
               file->readWord(i + firstRgnPtr + curRgn * 0x20 + 4) & 0xFFFFFFF0;
             if (relativeRgnSampOffset < 0x10)
               relativeRgnSampOffset = 0;
-            uint32_t rgnSampOffset = relativeRgnSampOffset + offsetOfFirstSamp;
+            u32 rgnSampOffset = relativeRgnSampOffset + offsetOfFirstSamp;
 
             if (relativeRgnSampOffset == 0)
               zeroOffsetCounter++;

@@ -1,19 +1,23 @@
-#include <sstream>
-#include <cmath>
-#include <spdlog/fmt/fmt.h>
-#include "VGMSamp.h"
-#include "VGMRgn.h"
-#include "ScaleConversion.h"
-#include "CPS2Format.h"
 #include "CPS2Instr.h"
+
+#include "base/Types.h"
+#include "CPS2Format.h"
 #include "OkiAdpcm.h"
+#include "ScaleConversion.h"
+#include "VGMRgn.h"
+#include "VGMSamp.h"
+
+#include <cmath>
+#include <sstream>
+
+#include <spdlog/fmt/fmt.h>
 
 // ****************
 // CPSArticTable
 // ****************
 
 
-CPSArticTable::CPSArticTable(RawFile *file, std::string name, uint32_t offset, uint32_t length)
+CPSArticTable::CPSArticTable(RawFile *file, std::string name, u32 offset, u32 length)
     : VGMMiscFile(CPS2Format::name, file, offset, length, std::move(name)) {
 }
 
@@ -23,10 +27,10 @@ CPSArticTable::~CPSArticTable() {
 }
 
 bool CPSArticTable::loadMain() {
-  uint32_t off = offset();
+  u32 off = offset();
   for (int i = 0; off < offset() + length(); i++, off += sizeof(qs_artic_info)) {
-    uint32_t test1 = readWord(off);
-    uint32_t test2 = readWord(off + 4);
+    u32 test1 = readWord(off);
+    u32 test2 = readWord(off + 4);
     if ((test1 == 0 && test2 == 0) || (test1 == 0xFFFFFFFF && test2 == 0xFFFFFFFF))
       continue;
 
@@ -55,8 +59,8 @@ bool CPSArticTable::loadMain() {
 
 CPSSampleInfoTable::CPSSampleInfoTable(RawFile *file,
                                        std::string name,
-                                       uint32_t offset,
-                                       uint32_t length)
+                                       u32 offset,
+                                       u32 length)
     : VGMMiscFile(CPS2Format::name, file, offset, length, std::move(name)) {
 }
 
@@ -69,14 +73,14 @@ CPSSampleInfoTable::~CPSSampleInfoTable() {
 
 CPS2SampleInfoTable::CPS2SampleInfoTable(RawFile *file,
                                          std::string name,
-                                         uint32_t offset,
-                                         uint32_t length)
+                                         u32 offset,
+                                         u32 length)
     : CPSSampleInfoTable(file, std::move(name), offset, length) {
 }
 
 bool CPS2SampleInfoTable::loadMain() {
-  uint32_t off = offset();
-  uint32_t test1 = 1, test2 = 1;
+  u32 off = offset();
+  u32 test1 = 1, test2 = 1;
   if (length() == 0) {
     setLength(0xFFFFFFFF - offset());
   }
@@ -102,16 +106,16 @@ bool CPS2SampleInfoTable::loadMain() {
 
   for (off = 0; off < numSamples * 8; off += 8) {
 
-    uint8_t bank = readByte(offset() + off + 0);
-    uint16_t start_addr = readShort(offset() + off + 1);
-    uint16_t loop_offset= readShort(offset() + off + 3);
-    uint16_t end_addr = readShort(offset() + off + 5);
-    uint8_t unity_key = readByte(offset() + off + 7);
+    u8 bank = readByte(offset() + off + 0);
+    u16 start_addr = readShort(offset() + off + 1);
+    u16 loop_offset= readShort(offset() + off + 3);
+    u16 end_addr = readShort(offset() + off + 5);
+    u8 unity_key = readByte(offset() + off + 7);
 
     sample_info& info = infos[off/8];
     info.start_addr = (bank << 16) | (start_addr);
     info.loop_offset =  (bank << 16) | loop_offset;
-    info.end_addr =  static_cast<uint32_t>(end_addr) + (end_addr == 0 ? (bank + 1) << 16 : bank << 16);
+    info.end_addr =  static_cast<u32>(end_addr) + (end_addr == 0 ? (bank + 1) << 16 : bank << 16);
     info.unity_key = unity_key;
 
     // D&D SOM has a sample with end_addr < start addr at index 290.
@@ -130,8 +134,8 @@ bool CPS2SampleInfoTable::loadMain() {
 
 CPS3SampleInfoTable::CPS3SampleInfoTable(RawFile *file,
                                          std::string name,
-                                         uint32_t offset,
-                                         uint32_t length)
+                                         u32 offset,
+                                         u32 length)
     : CPSSampleInfoTable(file, std::move(name), offset, length) {
 }
 
@@ -142,7 +146,7 @@ bool CPS3SampleInfoTable::loadMain() {
   infos = new sample_info[numSamples];
 
   int i=0;
-  for (uint32_t off = offset(); off < offset() + length(); off += 16) {
+  for (u32 off = offset(); off < offset() + length(); off += 16) {
 
     auto name = fmt::format("Sample Info: {:d}", i);
 
@@ -157,7 +161,7 @@ bool CPS3SampleInfoTable::loadMain() {
     info.start_addr = readWordBE(off + 0);
     info.loop_offset = readWordBE(off + 4);
     info.end_addr = readWordBE(off + 8);
-    info.unity_key = static_cast<uint8_t>(readWordBE(off + 12));
+    info.unity_key = static_cast<u8>(readWordBE(off + 12));
 
     i++;
   }
@@ -170,7 +174,7 @@ bool CPS3SampleInfoTable::loadMain() {
 
 CPS2InstrSet::CPS2InstrSet(RawFile *file,
                          CPS2FormatVer version,
-                         uint32_t offset,
+                         u32 offset,
                          int numInstrBanks,
                          CPSSampleInfoTable *theSampInfoTable,
                          CPSArticTable *theArticTable,
@@ -196,8 +200,8 @@ bool CPS2InstrSet::parseInstrPointers() {
 
     //offset() is the offset to the instr_info_table
 
-    for (uint32_t bank = 0; bank < num_instr_banks; bank++)
-      for (uint32_t i = 0; i < 256; i++) {
+    for (u32 bank = 0; bank < num_instr_banks; bank++)
+      for (u32 i = 0; i < 256; i++) {
         auto name = fmt::format("Instrument: bank {:d}  num {:d}", bank * 256, i);
         aInstrs.push_back(new CPS2Instr(this,
                                        offset() + i * 8 + (bank * 256 * 8),
@@ -208,7 +212,7 @@ bool CPS2InstrSet::parseInstrPointers() {
       }
   }
   else {
-    uint8_t instr_info_length = sizeof(qs_prog_info_ver_130);
+    u8 instr_info_length = sizeof(qs_prog_info_ver_130);
     if (fmt_version < CPS2_V130 || fmt_version == CPS2_V200 || fmt_version == CPS2_V201B) {
       instr_info_length = sizeof(qs_prog_info_ver_103);        //1.16 (Xmen vs SF) is like this
     }
@@ -216,7 +220,7 @@ bool CPS2InstrSet::parseInstrPointers() {
       instr_info_length = 12;     // qs_prog_info_ver_cps3
     }
 
-    std::vector<uint32_t> instr_table_ptrs;
+    std::vector<u32> instr_table_ptrs;
     for (unsigned int i = 0; i < num_instr_banks; i++) {
       if (fmt_version == CPS3) {
         instr_table_ptrs.push_back(readWordBE(offset() + i * 4));    //get the instr table ptrs
@@ -226,23 +230,23 @@ bool CPS2InstrSet::parseInstrPointers() {
       }
     }
     int totalInstrs = 0;
-    for (uint8_t i = 0; i < instr_table_ptrs.size(); i++) {
+    for (u8 i = 0; i < instr_table_ptrs.size(); i++) {
 
       if (fmt_version == CPS3) {
-        uint8_t bank = i;
-        uint32_t bankOff = instr_table_ptrs[bank] - 0x6000000;
+        u8 bank = i;
+        u32 bankOff = instr_table_ptrs[bank] - 0x6000000;
 
         auto pointersName = fmt::format("Bank {:d} Instrument Pointers", bank);
         auto instrPointersItem = new VGMItem(vgmFile(), bankOff, 128*2, pointersName, Type::Header);
 
         // For each bank, iterate over all instr ptrs and create instruments
-        for (uint8_t j = 0; j < 128; j++) {
-          uint16_t instrPtrOffset = readShortBE(bankOff + (j*2));
-          uint32_t instrPtr = instrPtrOffset + bankOff;
+        for (u8 j = 0; j < 128; j++) {
+          u16 instrPtrOffset = readShortBE(bankOff + (j*2));
+          u32 instrPtr = instrPtrOffset + bankOff;
           // We are not guaranteed a 0xFFFF separator sequence between instruments, so instead we
           // calculate length of each using the next instr pointer if possible.
-          uint32_t nextInstrPtrOffset = readShortBE(bankOff + ((j+1)*2));
-          uint32_t instrLength = nextInstrPtrOffset == 0 || j == 127 ? 0 : nextInstrPtrOffset - instrPtrOffset;
+          u32 nextInstrPtrOffset = readShortBE(bankOff + ((j+1)*2));
+          u32 instrLength = nextInstrPtrOffset == 0 || j == 127 ? 0 : nextInstrPtrOffset - instrPtrOffset;
           if (instrPtrOffset == 0) {
             continue;
           }
@@ -259,7 +263,7 @@ bool CPS2InstrSet::parseInstrPointers() {
       }
 
       int k = 0;
-      uint16_t endOffset;
+      u16 endOffset;
       // The following is actually incorrect.  There is a max of 256 instruments per bank
       if (i + 1 < instr_table_ptrs.size() && instr_table_ptrs[i] < instr_table_ptrs[i+1])
         endOffset = instr_table_ptrs[i + 1];
@@ -285,10 +289,10 @@ bool CPS2InstrSet::parseInstrPointers() {
 // ***********
 
 CPS2Instr::CPS2Instr(VGMInstrSet *instrSet,
-                     uint32_t offset,
-                     uint32_t length,
-                     uint32_t theBank,
-                     uint32_t theInstrNum,
+                     u32 offset,
+                     u32 length,
+                     u32 theBank,
+                     u32 theInstrNum,
                      std::string name)
     : VGMInstr(instrSet, offset, length, theBank, theInstrNum, std::move(name)) {
 }
@@ -296,11 +300,11 @@ CPS2Instr::CPS2Instr(VGMInstrSet *instrSet,
 bool CPS2Instr::loadInstr() {
   struct CPSRgnInfo {
     VGMRgn* rgn;
-    uint8_t attack_rate;
-    uint8_t decay_rate;
-    uint8_t sustain_level;
-    uint8_t sustain_rate;
-    uint8_t release_rate;
+    u8 attack_rate;
+    u8 decay_rate;
+    u8 sustain_level;
+    u8 sustain_rate;
+    u8 release_rate;
   };
 
   std::vector<CPSRgnInfo> rgns;
@@ -332,7 +336,7 @@ bool CPS2Instr::loadInstr() {
     readBytes(offset(), sizeof(qs_prog_info_ver_103), &progInfo);
 
     rgn->addSampNum(progInfo.sample_index, this->offset(), 2);
-    rgn->addFineTune( static_cast<int16_t>((progInfo.fine_tune / 256.0) * 100), this->offset() + 2, 1);
+    rgn->addFineTune( static_cast<s16>((progInfo.fine_tune / 256.0) * 100), this->offset() + 2, 1);
     rgn->addChild(this->offset() + 3, 1, "Attack Rate");
     rgn->addChild(this->offset() + 4, 1, "Decay Rate");
     rgn->addChild(this->offset() + 5, 1, "Sustain Level");
@@ -347,8 +351,8 @@ bool CPS2Instr::loadInstr() {
                     progInfo.release_rate});
   }
   else if (formatVer == CPS3) {
-    uint8_t prevKeyHigh = 0;
-    uint32_t off;
+    u8 prevKeyHigh = 0;
+    u32 off;
     for (off = offset(); readShort(off) != 0xFFFF; off += 12) {
       if (length() != 0 && off >= offset() + length())
         break;
@@ -364,7 +368,7 @@ bool CPS2Instr::loadInstr() {
 
       // When the region pan value != -1, the CPS3 driver completely overrides the track state pan
       // (otherwise it's ignored). SF2 and DLS don't do this; they combine region pan with track pan.
-      uint8_t pan = progInfo.pan_override == -1 ? 64 : progInfo.pan_override;
+      u8 pan = progInfo.pan_override == -1 ? 64 : progInfo.pan_override;
       rgn->addPan(pan, off+1, 1, "Pan Override");
 
       double volume_percent = ((64 + progInfo.volume_adjustment) & 0x7F) / 64.0;
@@ -375,7 +379,7 @@ bool CPS2Instr::loadInstr() {
       rgn->addUnknown(off+3, 1);
       rgn->addSampNum((progInfo.sample_index_hi << 8) + progInfo.sample_index_lo, off+4, 2);
 
-      auto fine_tune_cents = static_cast<int16_t>(std::lround((progInfo.fine_tune / 128.0) * 100));
+      auto fine_tune_cents = static_cast<s16>(std::lround((progInfo.fine_tune / 128.0) * 100));
       rgn->addFineTune(fine_tune_cents, off+6, 1);
 
       rgn->addChild(off + 7, 1, "Attack Rate");
@@ -399,7 +403,7 @@ bool CPS2Instr::loadInstr() {
     readBytes(offset(), sizeof(qs_prog_info_ver_130), &progInfo);
 
     rgn->addChild(this->offset(),     2, "Sample Info Index");
-    rgn->addFineTune( static_cast<int16_t>((progInfo.fine_tune / 256.0) * 100), this->offset() + 2, 1);
+    rgn->addFineTune( static_cast<s16>((progInfo.fine_tune / 256.0) * 100), this->offset() + 2, 1);
     rgn->addChild(this->offset() + 3, 1, "Articulation Index");
 
     const CPSArticTable* articTable = static_cast<CPS2InstrSet*>(this->parInstrSet)->articTable;
@@ -424,11 +428,11 @@ bool CPS2Instr::loadInstr() {
     if (rgn->sampNum >= static_cast<CPS2InstrSet*>(parInstrSet)->sampInfoTable->numSamples)
       rgn->sampNum = 0;
 
-    uint16_t Ar = attack_rate_table[std::min<u8>(rgnInfo.attack_rate, 63)];
-    uint16_t Dr = decay_rate_table[std::min<u8>(rgnInfo.decay_rate, 63)];
-    uint16_t Sl = sustain_level_table[std::min<u8>(rgnInfo.sustain_level, 127)];
-    uint16_t Sr = decay_rate_table[std::min<u8>(rgnInfo.sustain_rate, 63)];
-    uint16_t Rr = decay_rate_table[std::min<u8>(rgnInfo.release_rate, 63)];
+    u16 Ar = attack_rate_table[std::min<u8>(rgnInfo.attack_rate, 63)];
+    u16 Dr = decay_rate_table[std::min<u8>(rgnInfo.decay_rate, 63)];
+    u16 Sl = sustain_level_table[std::min<u8>(rgnInfo.sustain_level, 127)];
+    u16 Sr = decay_rate_table[std::min<u8>(rgnInfo.sustain_rate, 63)];
+    u16 Rr = decay_rate_table[std::min<u8>(rgnInfo.release_rate, 63)];
 
     const double UPDATE_RATE_IN_HZ = formatVer == CPS3 ? CPS3_DRIVER_RATE_HZ : CPS2_DRIVER_RATE_HZ;
     // The rate values are all measured from max to min, as the SF2 and DLS specs call for.
@@ -490,8 +494,8 @@ bool CPS2Instr::loadInstr() {
 
 CPS2SampColl::CPS2SampColl(RawFile *file, CPS2InstrSet *theinstrset,
                          CPSSampleInfoTable *sampinfotable,
-                         uint32_t offset,
-                         uint32_t length,
+                         u32 offset,
+                         u32 length,
                          std::string name)
     : VGMSampColl(CPS2Format::name, file, offset, length, std::move(name)),
       instrset(theinstrset),
@@ -501,24 +505,24 @@ CPS2SampColl::CPS2SampColl(RawFile *file, CPS2InstrSet *theinstrset,
 
 
 bool CPS2SampColl::parseHeader() {
-  setLength(static_cast<uint32_t>(this->rawFile()->size()));
+  setLength(static_cast<u32>(this->rawFile()->size()));
   return true;
 }
 
 bool CPS2SampColl::parseSampleInfo() {
 
-  uint32_t numSamples = instrset->sampInfoTable->numSamples;
-  uint32_t baseOffset = 0;
+  u32 numSamples = instrset->sampInfoTable->numSamples;
+  u32 baseOffset = 0;
 
-  for (uint32_t i = 0; i < numSamples; i++) {
+  for (u32 i = 0; i < numSamples; i++) {
 
     auto& [start_addr, loop_offset, end_addr, unity_key] = sampInfoTable->infos[i];
     // Base address correction for Strider2, which maps qsound start address to 200000h.
     // We assume first bank listed is base address.
     if (i == 0)
       baseOffset = start_addr & 0xFF0000;
-    uint32_t sampOffset = start_addr - baseOffset;
-    uint32_t sampLength = end_addr - start_addr;
+    u32 sampOffset = start_addr - baseOffset;
+    u32 sampLength = end_addr - start_addr;
 
     // Sanity check
     if (sampOffset > length())
@@ -529,7 +533,7 @@ bool CPS2SampColl::parseSampleInfo() {
       sampLength = 16;
     }
 
-    uint32_t relativeLoopOffset = loop_offset - sampOffset;
+    u32 relativeLoopOffset = loop_offset - sampOffset;
 
     if (relativeLoopOffset > sampLength)
       relativeLoopOffset = sampLength;
@@ -537,7 +541,7 @@ bool CPS2SampColl::parseSampleInfo() {
 
     // CPS3 frequency is (42954545 hz / 3) / 384) ~= 37287
     // CPS2 frequency is (60 MHz / 2 / 1248) ~= 24038
-    uint32_t frequency = instrset->fmt_version == CPS3 ? 37287 : 24038;
+    u32 frequency = instrset->fmt_version == CPS3 ? 37287 : 24038;
     VGMSamp *newSamp = addSamp(sampOffset,
                                sampLength,
                                sampOffset,

@@ -4,9 +4,11 @@
  * refer to the included LICENSE.txt file
  */
 #pragma once
-#include "Scanner.h"
-#include "HeartBeatPS1Seq.h"
 #include "formats/PS1/Vab.h"
+#include "HeartBeatPS1Seq.h"
+#include "Scanner.h"
+
+#include <vector>
 
 class HeartBeatPS1Scanner : public VGMScanner {
  public:

@@ -5,20 +5,22 @@
  */
 #pragma once
 
-#include <cstdint>
+#include "base/Types.h"
 #include "Modulation.h"
+
+#include <cstdint>
 
 namespace nin_snes::vibrato {
 
 constexpr double kTimerHz = 500.0;
-constexpr uint8_t kDefaultTempo = 0x20;
-constexpr uint8_t kDelayController = 93;
-constexpr uint8_t kMinVibratoMaxDepth = 0x80;
-constexpr uint8_t kMinVibratoMaxRate = 0x20;
+constexpr u8 kDefaultTempo = 0x20;
+constexpr u8 kDelayController = 93;
+constexpr u8 kMinVibratoMaxDepth = 0x80;
+constexpr u8 kMinVibratoMaxRate = 0x20;
 
 // Depth 00-F0 uses the regular 1/256-semitone path. F1-FF switches to the large-depth mode that
 // reuses the low nibble as a 1-15 semitone multiplier.
-inline constexpr double depthCents(uint8_t depth) {
+inline constexpr double depthCents(u8 depth) {
   const double centsPerPitchUnit = 100.0 / 256.0;
   if (depth <= 0xf0) {
     return ((0xffu * depth) >> 8) * centsPerPitchUnit;
@@ -26,12 +28,12 @@ inline constexpr double depthCents(uint8_t depth) {
   return (0xffu * (depth & 0x0fu)) * centsPerPitchUnit;
 }
 
-inline constexpr double rateHz(uint8_t rate, double tempo) {
+inline constexpr double rateHz(u8 rate, double tempo) {
   const double safeTempo = (tempo > 0.0) ? tempo : 1.0;
   return (kTimerHz * safeTempo * rate) / 65536.0;
 }
 
-inline constexpr double delaySeconds(uint8_t delay, double tempo) {
+inline constexpr double delaySeconds(u8 delay, double tempo) {
   const double safeTempo = (tempo > 0.0) ? tempo : 1.0;
   return (256.0 * delay) / (kTimerHz * safeTempo);
 }

@@ -4,6 +4,8 @@
  * refer to the included LICENSE.txt file
  */
 #include "FFTSeq.h"
+
+#include "base/Types.h"
 #include "FFTFormat.h"
 
 DECLARE_FORMAT(FFT);
@@ -15,7 +17,7 @@ using namespace std;
 //  ******
 
 
-FFTSeq::FFTSeq(RawFile *file, uint32_t offset)
+FFTSeq::FFTSeq(RawFile *file, u32 offset)
     : VGMSeq(FFTFormat::name, file, offset) {
   setAlwaysWriteInitialVol(127);
   setUseLinearAmplitudeScale(true);
@@ -33,11 +35,11 @@ bool FFTSeq::parseHeader(void) {
 //	2009. 6.30 (Thu.)
 //-----------------------------------------------------------
   setLength(readShort(offset() + 0x08));
-  nNumTracks = readByte(offset() + 0x14);    //uint8_t (8bit)		GetWord() から修正
-  // uint8_t cNumPercussion = GetByte(offset() + 0x15);    //uint8_t (8bit)	Quantity of Percussion struct
-  assocWdsID = readShort(offset() + 0x16);    //uint16_t (16bit)	Default program bank No.
-  uint16_t ptSongTitle = readShort(offset() + 0x1E);    //uint16_t (16bit)	Pointer of music title (AscII strings)
-  uint16_t ptPercussionTbl = readShort(offset() + 0x20);    //uint16_t (16bit)	Pointer of Percussion struct
+  nNumTracks = readByte(offset() + 0x14);    //u8 (8bit)		GetWord() から修正
+  // u8 cNumPercussion = GetByte(offset() + 0x15);    //u8 (8bit)	Quantity of Percussion struct
+  assocWdsID = readShort(offset() + 0x16);    //u16 (16bit)	Default program bank No.
+  u16 ptSongTitle = readShort(offset() + 0x1E);    //u16 (16bit)	Pointer of music title (AscII strings)
+  u16 ptPercussionTbl = readShort(offset() + 0x20);    //u16 (16bit)	Pointer of Percussion struct
 
   int titleLength = ptPercussionTbl - ptSongTitle;
   char *songtitle = new char[titleLength];
@@ -92,7 +94,7 @@ bool FFTSeq::parseTrackPointers(void) {
 //  FFTTrack
 //  ********
 
-FFTTrack::FFTTrack(FFTSeq *parentFile, uint32_t offset, uint32_t length)
+FFTTrack::FFTTrack(FFTSeq *parentFile, u32 offset, u32 length)
     : SeqTrack(parentFile, offset, length) {
   FFTTrack::resetVars();
 }
@@ -121,17 +123,17 @@ void FFTTrack::resetVars() {
 //						Add un-known command(op-code).
 //--------------------------------------------------
 bool FFTTrack::readEvent() {
-  uint32_t beginOffset = curOffset;
-  uint8_t status_byte = readByte(curOffset++);
+  u32 beginOffset = curOffset;
+  u8 status_byte = readByte(curOffset++);
 
   std::string desc;
 
   if (status_byte < 0x80) //then it's a note on event
   {
-    uint8_t data_byte = readByte(curOffset++);
-    uint8_t vel = status_byte;                            //Velocity
-    uint8_t relative_key = (data_byte / 19);                        //Note
-    uint32_t iDeltaTime = delta_time_table[data_byte % 19];        //Delta Time
+    u8 data_byte = readByte(curOffset++);
+    u8 vel = status_byte;                            //Velocity
+    u8 relative_key = (data_byte / 19);                        //Note
+    u32 iDeltaTime = delta_time_table[data_byte % 19];        //Delta Time
 
     if (iDeltaTime == 0)
       iDeltaTime = readByte(curOffset++);        //Delta time
@@ -150,7 +152,7 @@ bool FFTTrack::readEvent() {
 
       //rest + noteOff
       case 0x80: {
-        uint8_t restTicks = readByte(curOffset++);
+        u8 restTicks = readByte(curOffset++);
         if (bNoteOn)
           addNoteOffNoItem(prevKey);
         addRest(beginOffset, curOffset - beginOffset, restTicks);
@@ -160,7 +162,7 @@ bool FFTTrack::readEvent() {
 
         //hold (Tie)
       case 0x81: {
-        uint8_t tieDur = readByte(curOffset++);
+        u8 tieDur = readByte(curOffset++);
         addTime(tieDur);
         addTie(beginOffset, curOffset - beginOffset, tieDur, "Tie");
         break;
@@ -192,7 +194,7 @@ bool FFTTrack::readEvent() {
 
         //Set octave
       case 0x94: {
-        uint8_t newOctave = readByte(curOffset++);
+        u8 newOctave = readByte(curOffset++);
         addSetOctave(beginOffset, curOffset - beginOffset, newOctave);
         break;
       }
@@ -210,9 +212,9 @@ bool FFTTrack::readEvent() {
         //--------
         //Time signature
       case 0x97: {
-        uint8_t numer = readByte(curOffset++);
-        uint8_t denom = readByte(curOffset++);
-        addTimeSig(beginOffset, curOffset - beginOffset, numer, denom, static_cast<uint8_t>(parentSeq->ppqn()));
+        u8 numer = readByte(curOffset++);
+        u8 denom = readByte(curOffset++);
+        addTimeSig(beginOffset, curOffset - beginOffset, numer, denom, static_cast<u8>(parentSeq->ppqn()));
         break;
       }
 
@@ -222,7 +224,7 @@ bool FFTTrack::readEvent() {
         //Repeat Begin
       case 0x98: {
         bInLoop = false;
-        uint8_t loopCount = readByte(curOffset++);
+        u8 loopCount = readByte(curOffset++);
         loop_layer++;
         loop_begin_loc[loop_layer] = curOffset;
         loop_counter[loop_layer] = 0;
@@ -284,15 +286,15 @@ bool FFTTrack::readEvent() {
 
         //set tempo
       case 0xA0: {
-        uint8_t cTempo = (readByte(curOffset++) * 256) / 218;
+        u8 cTempo = (readByte(curOffset++) * 256) / 218;
         addTempoBPM(beginOffset, curOffset - beginOffset, cTempo);
         break;
       }
 
         //tempo slide
       case 0xA2: {
-        uint8_t cTempoSlideTimes = readByte(curOffset++);        //slide times [ticks]
-        uint8_t cTempoSlideTarget = (readByte(curOffset++) * 256) / 218;        //Target Panpot
+        u8 cTempoSlideTimes = readByte(curOffset++);        //slide times [ticks]
+        u8 cTempoSlideTarget = (readByte(curOffset++) * 256) / 218;        //Target Panpot
         L_INFO("Found tempo slide event at {:X}. Not fully implemented. Duration: {:d}  Target BPM: {:d}", curOffset - 2, cTempoSlideTimes, cTempoSlideTarget);
         addTempoBPM(beginOffset, curOffset - beginOffset, cTempoSlideTarget, "Tempo slide");
         break;
@@ -306,7 +308,7 @@ bool FFTTrack::readEvent() {
 
         //program change
       case 0xAC: {
-        uint8_t progNum = readByte(curOffset++);
+        u8 progNum = readByte(curOffset++);
         // to do:	Bank select(op-code:0xFE)
         //			Default bank number is "assocWdsID".
         addBankSelectNoItem(progNum / 128);
@@ -462,8 +464,8 @@ bool FFTTrack::readEvent() {
 
         //Portamento (Pitch bend slide)
       case 0xD4: {
-        uint8_t cPitchSlideTimes = readByte(curOffset++);        //slide times [ticks]
-        uint8_t cPitchSlideDepth = readByte(curOffset++);        //Target Panpot
+        u8 cPitchSlideTimes = readByte(curOffset++);        //slide times [ticks]
+        u8 cPitchSlideDepth = readByte(curOffset++);        //Target Panpot
         desc = fmt::format("Duration: {:d} ticks  Target: {:d}", cPitchSlideTimes, cPitchSlideDepth);
         addGenericEvent(beginOffset, curOffset - beginOffset, "Portamento", desc, Type::Portamento);
         break;
@@ -479,7 +481,7 @@ bool FFTTrack::readEvent() {
 
         // LFO Depth
       case 0xD7: {
-        uint8_t cPitchLFO_Depth = readByte(curOffset++);        //slide times [ticks]
+        u8 cPitchLFO_Depth = readByte(curOffset++);        //slide times [ticks]
         desc = fmt::format("Depth: {:d}", cPitchLFO_Depth);
         addGenericEvent(beginOffset, curOffset - beginOffset, "LFO Depth (Pitch bend)", desc, Type::Lfo);
         break;
@@ -487,9 +489,9 @@ bool FFTTrack::readEvent() {
 
         // LFO Length
       case 0xD8: {
-        uint8_t cPitchLFO_Decay2 = readByte(curOffset++);
-        uint8_t cPitchLFO_Cycle = readByte(curOffset++);
-        uint8_t cPitchLFO_Decay1 = readByte(curOffset++);
+        u8 cPitchLFO_Decay2 = readByte(curOffset++);
+        u8 cPitchLFO_Cycle = readByte(curOffset++);
+        u8 cPitchLFO_Decay1 = readByte(curOffset++);
         desc = fmt::format("decay2: {:d}  cycle: {:d}  decay1: {:d}", cPitchLFO_Decay2, cPitchLFO_Cycle, cPitchLFO_Decay1);
         addGenericEvent(beginOffset, curOffset - beginOffset, "LFO Length (Pitch bend)", desc, Type::Lfo);
         break;
@@ -515,7 +517,7 @@ bool FFTTrack::readEvent() {
 
         // Volume
       case 0xE0: {
-        uint8_t volByte = readByte(curOffset++);
+        u8 volByte = readByte(curOffset++);
         addVol(beginOffset, curOffset - beginOffset, volByte);
         break;
       }
@@ -530,15 +532,15 @@ bool FFTTrack::readEvent() {
 
         // Volume slide
       case 0xE2: {
-        uint8_t dur = readByte(curOffset++);        //slide duration (ticks)
-        uint8_t targVol = readByte(curOffset++);        //target volume
+        u8 dur = readByte(curOffset++);        //slide duration (ticks)
+        u8 targVol = readByte(curOffset++);        //target volume
         addVolSlide(beginOffset, curOffset - beginOffset, dur, targVol);
         break;
       }
 
         // LFO Depth
       case 0xE3: {
-        uint8_t cVolLFO_Depth = readByte(curOffset++);        //
+        u8 cVolLFO_Depth = readByte(curOffset++);        //
         desc = fmt::format("Depth: {:d}", cVolLFO_Depth);
         addGenericEvent(beginOffset, curOffset - beginOffset, "LFO Depth (Volume)", desc, Type::Lfo);
         break;
@@ -546,9 +548,9 @@ bool FFTTrack::readEvent() {
 
         // LFO Length
       case 0xE4: {
-        uint8_t cVolLFO_Decay2 = readByte(curOffset++);
-        uint8_t cVolLFO_Cycle = readByte(curOffset++);
-        uint8_t cVolLFO_Decay1 = readByte(curOffset++);
+        u8 cVolLFO_Decay2 = readByte(curOffset++);
+        u8 cVolLFO_Cycle = readByte(curOffset++);
+        u8 cVolLFO_Decay1 = readByte(curOffset++);
         desc = fmt::format("decay2: {:d}  cycle: {:d}  decay1: {:d}", cVolLFO_Decay2, cVolLFO_Cycle, cVolLFO_Decay1);
         addGenericEvent(beginOffset, curOffset - beginOffset, "LFO Length (Volume)", desc, Type::Lfo);
         break;
@@ -574,14 +576,14 @@ bool FFTTrack::readEvent() {
 
         // Panpot
       case 0xE8: {
-        uint8_t panpotByte = readByte(curOffset++);
+        u8 panpotByte = readByte(curOffset++);
         addPan(beginOffset, curOffset - beginOffset, panpotByte);
         break;
       }
 
         // unknown
       case 0xE9: {
-        uint8_t arg1 = readByte(curOffset++);
+        u8 arg1 = readByte(curOffset++);
         desc = describeUnknownEvent(status_byte, arg1);
         addUnknown(beginOffset, curOffset - beginOffset, "Unknown Event", desc);
         break;
@@ -589,15 +591,15 @@ bool FFTTrack::readEvent() {
 
         // Panpot slide
       case 0xEA: {
-        uint8_t dur = readByte(curOffset++);        //slide duration (ticks)
-        uint8_t targPan = readByte(curOffset++);        //target panpot
+        u8 dur = readByte(curOffset++);        //slide duration (ticks)
+        u8 targPan = readByte(curOffset++);        //target panpot
         addPanSlide(beginOffset, curOffset - beginOffset, dur, targPan);
         break;
       }
 
         // LFO Depth
       case 0xEB: {
-        uint8_t cPanLFO_Depth = readByte(curOffset++);
+        u8 cPanLFO_Depth = readByte(curOffset++);
         desc = fmt::format("Depth: {:d}", cPanLFO_Depth);
         addGenericEvent(beginOffset, curOffset - beginOffset, "LFO Depth (Panpot)", desc, Type::Lfo);
         break;
@@ -605,9 +607,9 @@ bool FFTTrack::readEvent() {
 
         // LFO Length
       case 0xEC: {
-        uint8_t cPanLFO_Decay2 = readByte(curOffset++);
-        uint8_t cPanLFO_Cycle = readByte(curOffset++);
-        uint8_t cPanLFO_Decay1 = readByte(curOffset++);
+        u8 cPanLFO_Decay2 = readByte(curOffset++);
+        u8 cPanLFO_Cycle = readByte(curOffset++);
+        u8 cPanLFO_Decay1 = readByte(curOffset++);
         desc = fmt::format("decay2: {:d}  cycle: {:d}  decay1: {:d}", cPanLFO_Decay2, cPanLFO_Cycle, cPanLFO_Decay1);
         addGenericEvent(beginOffset, curOffset - beginOffset, "LFO Length (Panpot)", desc, Type::Lfo);
         break;
@@ -678,7 +680,7 @@ bool FFTTrack::readEvent() {
 
         // Program(WDS) bank select
       case 0xFE: {
-        uint8_t cProgBankNum = readByte(curOffset++);        //Bank Number [ticks]
+        u8 cProgBankNum = readByte(curOffset++);        //Bank Number [ticks]
         desc = fmt::format(" Bank: {:d}", cProgBankNum);
         addGenericEvent(beginOffset, curOffset - beginOffset, "Program bank select", desc, Type::ProgramChange);
         break;

@@ -6,23 +6,23 @@
 
 #pragma once
 
-#include <QActionGroup>
-#include <QList>
-#include <QString>
-#include <QMap>
-#include <QMenu>
-#include <QMenuBar>
-#include <QPointer>
+#include "RawFile.h"
+#include "services/MenuManager.h"
+#include "VGMColl.h"
+#include "VGMFile.h"
 
 #include <algorithm>
 #include <map>
 #include <memory>
 #include <vector>
 
-#include "services/MenuManager.h"
-#include "VGMFile.h"
-#include "VGMColl.h"
-#include "RawFile.h"
+#include <QActionGroup>
+#include <QList>
+#include <QMap>
+#include <QMenu>
+#include <QMenuBar>
+#include <QPointer>
+#include <QString>
 
 class QDockWidget;
 class VGMFileView;

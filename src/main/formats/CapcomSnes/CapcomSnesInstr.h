@@ -1,7 +1,12 @@
 #pragma once
+
+#include "base/Types.h"
 #include "VGMInstrSet.h"
-#include "VGMSampColl.h"
 #include "VGMRgn.h"
+#include "VGMSampColl.h"
+
+#include <string>
+#include <vector>
 
 // ****************
 // CapcomSnesInstrSet
@@ -11,15 +16,15 @@ class CapcomSnesInstrSet:
     public VGMInstrSet {
  public:
   CapcomSnesInstrSet
-      (RawFile *file, uint32_t offset, uint32_t spcDirAddr, const std::string &name = "CapcomSnesInstrSet");
+      (RawFile *file, u32 offset, u32 spcDirAddr, const std::string &name = "CapcomSnesInstrSet");
   ~CapcomSnesInstrSet() override;
 
   bool parseHeader() override;
   bool parseInstrPointers() override;
 
  protected:
-  uint32_t spcDirAddr;
-  std::vector<uint8_t> usedSRCNs;
+  u32 spcDirAddr;
+  std::vector<u8> usedSRCNs;
 };
 
 // *************
@@ -30,19 +35,19 @@ class CapcomSnesInstr
     : public VGMInstr {
  public:
   CapcomSnesInstr(VGMInstrSet *instrSet,
-                  uint32_t offset,
-                  uint32_t theBank,
-                  uint32_t theInstrNum,
-                  uint32_t spcDirAddr,
+                  u32 offset,
+                  u32 theBank,
+                  u32 theInstrNum,
+                  u32 spcDirAddr,
                   const std::string &name = "CapcomSnesInstr");
   ~CapcomSnesInstr() override;
 
   bool loadInstr() override;
 
-  static bool isValidHeader(RawFile *file, uint32_t addrInstrHeader, uint32_t spcDirAddr, bool validateSample);
+  static bool isValidHeader(RawFile *file, u32 addrInstrHeader, u32 spcDirAddr, bool validateSample);
 
  protected:
-  uint32_t spcDirAddr;
+  u32 spcDirAddr;
 };
 
 // ***********
@@ -52,7 +57,7 @@ class CapcomSnesInstr
 class CapcomSnesRgn
     : public VGMRgn {
  public:
-  CapcomSnesRgn(CapcomSnesInstr *instr, uint32_t offset);
+  CapcomSnesRgn(CapcomSnesInstr *instr, u32 offset);
   ~CapcomSnesRgn() override;
 
   bool loadRgn() override;

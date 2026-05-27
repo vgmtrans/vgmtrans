@@ -8,11 +8,13 @@
 // check seqq2mid tool created by loveemu <https://code.google.com/p/loveemu/>
 
 #include "HeartBeatPS1Seq.h"
+
+#include "base/Types.h"
 #include "HeartBeatPS1Format.h"
 
 DECLARE_FORMAT(HeartBeatPS1)
 
-HeartBeatPS1Seq::HeartBeatPS1Seq(RawFile *file, uint32_t offset, uint32_t length, const std::string &name)
+HeartBeatPS1Seq::HeartBeatPS1Seq(RawFile *file, u32 offset, u32 length, const std::string &name)
     : VGMSeqNoTrks(HeartBeatPS1Format::name, file, offset, name) {
   setLength(length);
 
@@ -23,9 +25,9 @@ HeartBeatPS1Seq::~HeartBeatPS1Seq() {
 }
 
 bool HeartBeatPS1Seq::parseHeader() {
-  uint32_t curOffset = offset();
+  u32 curOffset = offset();
 
-  uint32_t seq_size = readWord(curOffset);
+  u32 seq_size = readWord(curOffset);
   if (seq_size < 0x13) {
     return false;
   }
@@ -41,10 +43,10 @@ bool HeartBeatPS1Seq::parseHeader() {
   curOffset += 0x0c;
 
   // validate instrument header
-  uint32_t total_instr_size = 0;
-  for (uint8_t instrset_index = 0; instrset_index < 4; instrset_index++) {
-    uint32_t sampcoll_size = readWord(curOffset);
-    uint32_t instrset_size = readWord(curOffset + 0x04);
+  u32 total_instr_size = 0;
+  for (u8 instrset_index = 0; instrset_index < 4; instrset_index++) {
+    u32 sampcoll_size = readWord(curOffset);
+    u32 instrset_size = readWord(curOffset + 0x04);
 
     std::ostringstream instrHeaderName;
     instrHeaderName << "Instrument Set " << (instrset_index + 1);
@@ -62,7 +64,7 @@ bool HeartBeatPS1Seq::parseHeader() {
   }
 
   // check total file size
-  uint32_t total_size = HEARTBEATPS1_SND_HEADER_SIZE + total_instr_size + seq_size;
+  u32 total_size = HEARTBEATPS1_SND_HEADER_SIZE + total_instr_size + seq_size;
   if (total_size > 0x200000 || offset() + total_size > rawFile()->size()) {
     return false;
   }
@@ -88,13 +90,13 @@ bool HeartBeatPS1Seq::parseHeader() {
   setPPQN(readShortBE(seqHeaderOffset + 8));
   nNumTracks = 16;
 
-  uint8_t numer = readByte(seqHeaderOffset + 0x0D);
-  // uint8_t denom = GetByte(seqHeaderOffset + 0x0E);
+  u8 numer = readByte(seqHeaderOffset + 0x0D);
+  // u8 denom = GetByte(seqHeaderOffset + 0x0E);
   if (numer == 0 || numer > 32) {                //sanity check
     return false;
   }
 
-  uint8_t trackCount = readByte(seqHeaderOffset + 0x0F);
+  u8 trackCount = readByte(seqHeaderOffset + 0x0F);
   if (trackCount > 0 && trackCount <= 16) {
     nNumTracks = trackCount;
   }
@@ -107,16 +109,16 @@ bool HeartBeatPS1Seq::parseHeader() {
 void HeartBeatPS1Seq::resetVars() {
   VGMSeqNoTrks::resetVars();
 
-  uint32_t initialTempo = (readShortBE(seqHeaderOffset + 10) << 8) | readByte(seqHeaderOffset + 10 + 2);
+  u32 initialTempo = (readShortBE(seqHeaderOffset + 10) << 8) | readByte(seqHeaderOffset + 10 + 2);
   addTempoNoItem(initialTempo);
 
-  uint8_t numer = readByte(seqHeaderOffset + 0x0D);
-  uint8_t denom = readByte(seqHeaderOffset + 0x0E);
-  addTimeSigNoItem(numer, 1 << denom, static_cast<uint8_t>(ppqn()));
+  u8 numer = readByte(seqHeaderOffset + 0x0D);
+  u8 denom = readByte(seqHeaderOffset + 0x0E);
+  addTimeSigNoItem(numer, 1 << denom, static_cast<u8>(ppqn()));
 }
 
 bool HeartBeatPS1Seq::readEvent() {
-  uint32_t beginOffset = curOffset;
+  u32 beginOffset = curOffset;
 
   // in this format, end of track (FF 2F 00) comes without delta-time.
   // so handle that crazy sequence the first.
@@ -130,12 +132,12 @@ bool HeartBeatPS1Seq::readEvent() {
     }
   }
 
-  uint32_t delta = readVarLen(curOffset);
+  u32 delta = readVarLen(curOffset);
   if (curOffset >= rawFile()->size())
     return false;
   addTime(delta);
 
-  uint8_t status_byte = readByte(curOffset++);
+  u8 status_byte = readByte(curOffset++);
 
   // Running Status
   if (status_byte <= 0x7F) {
@@ -174,8 +176,8 @@ bool HeartBeatPS1Seq::readEvent() {
       return false;
 
     case 0xB0 : {
-      uint8_t controlNum = readByte(curOffset++);
-      uint8_t value = readByte(curOffset++);
+      u8 controlNum = readByte(curOffset++);
+      u8 value = readByte(curOffset++);
       switch (controlNum)        //control number
       {
         case 1:
@@ -467,7 +469,7 @@ bool HeartBeatPS1Seq::readEvent() {
       break;
 
     case 0xC0 : {
-      uint8_t progNum = readByte(curOffset++);
+      u8 progNum = readByte(curOffset++);
       addProgramChange(beginOffset, curOffset - beginOffset, progNum);
     }
       break;
@@ -477,8 +479,8 @@ bool HeartBeatPS1Seq::readEvent() {
       return false;
 
     case 0xE0 : {
-      uint8_t lo = readByte(curOffset++);
-      uint8_t hi = readByte(curOffset++);
+      u8 lo = readByte(curOffset++);
+      u8 hi = readByte(curOffset++);
       addPitchBendMidiFormat(beginOffset, curOffset - beginOffset, lo, hi);
       break;
     }
@@ -488,8 +490,8 @@ bool HeartBeatPS1Seq::readEvent() {
         if (curOffset + 1 > rawFile()->size())
           return false;
 
-        uint8_t metaNum = readByte(curOffset++);
-        uint32_t metaLen = readVarLen(curOffset);
+        u8 metaNum = readByte(curOffset++);
+        u32 metaLen = readVarLen(curOffset);
         if (curOffset + metaLen > rawFile()->size())
           return false;
 
@@ -502,9 +504,9 @@ bool HeartBeatPS1Seq::readEvent() {
             break;
 
           case 0x58 : {
-            uint8_t numer = readByte(curOffset);
-            uint8_t denom = readByte(curOffset + 1);
-            addTimeSig(beginOffset, curOffset + metaLen - beginOffset, numer, 1 << denom, static_cast<uint8_t>(ppqn()));
+            u8 numer = readByte(curOffset);
+            u8 denom = readByte(curOffset + 1);
+            addTimeSig(beginOffset, curOffset + metaLen - beginOffset, numer, 1 << denom, static_cast<u8>(ppqn()));
             curOffset += metaLen;
             break;
           }

@@ -6,6 +6,8 @@
 
 #pragma once
 
+#include "base/Types.h"
+
 #include <QList>
 #include <QObject>
 
@@ -32,8 +34,8 @@ public:
   void updateStatus(const QString& name,
                     const QString& description,
                     const QIcon* icon = nullptr,
-                    uint32_t offset = -1,
-                    uint32_t size = -1);
+                    u32 offset = -1,
+                    u32 size = -1);
   void updateStatusForItem(VGMItem* item);
   void selectVGMFile(VGMFile* vgmfile, QWidget* caller);
   void selectVGMColl(VGMColl* coll, QWidget* caller);

@@ -3,21 +3,23 @@
  * Licensed under the zlib license,
  * refer to the included LICENSE.txt file
  */
-#include "ScaleConversion.h"
 #include "VGMRgn.h"
+
+#include "base/Types.h"
+#include "ScaleConversion.h"
 #include "VGMInstrSet.h"
 
 // ******
 // VGMRgn
 // ******
 
-VGMRgn::VGMRgn(VGMInstr *instr, uint32_t offset, uint32_t length, std::string name)
+VGMRgn::VGMRgn(VGMInstr *instr, u32 offset, u32 length, std::string name)
     : VGMItem(instr->parInstrSet, offset, length, std::move(name)),
       parInstr(instr)
 {}
 
-VGMRgn::VGMRgn(VGMInstr *instr, uint32_t offset, uint32_t length, uint8_t theKeyLow, uint8_t theKeyHigh,
-               uint8_t theVelLow, uint8_t theVelHigh, int theSampNum, std::string name)
+VGMRgn::VGMRgn(VGMInstr *instr, u32 offset, u32 length, u8 theKeyLow, u8 theKeyHigh,
+               u8 theVelLow, u8 theVelHigh, int theSampNum, std::string name)
     : VGMItem(instr->parInstrSet, offset, length, std::move(name)),
       parInstr(instr),
       keyLow(theKeyLow),
@@ -27,22 +29,22 @@ VGMRgn::VGMRgn(VGMInstr *instr, uint32_t offset, uint32_t length, uint8_t theKey
       sampNum(theSampNum)
 {}
 
-void VGMRgn::setRanges(uint8_t theKeyLow, uint8_t theKeyHigh, uint8_t theVelLow, uint8_t theVelHigh) {
+void VGMRgn::setRanges(u8 theKeyLow, u8 theKeyHigh, u8 theVelLow, u8 theVelHigh) {
   keyLow = theKeyLow;
   keyHigh = theKeyHigh;
   velLow = theVelLow;
   velHigh = theVelHigh;
 }
 
-void VGMRgn::setUnityKey(uint8_t theUnityKey) {
+void VGMRgn::setUnityKey(u8 theUnityKey) {
   unityKey = theUnityKey;
 }
 
-void VGMRgn::setSampNum(uint8_t sampNumber) {
+void VGMRgn::setSampNum(u8 sampNumber) {
   sampNum = sampNumber;
 }
 
-void VGMRgn::setPan(uint8_t p) {
+void VGMRgn::setPan(u8 p) {
   //pan = thePan;
   pan = p;
   if (pan == 127)
@@ -55,15 +57,15 @@ void VGMRgn::setPan(uint8_t p) {
     pan = pan / static_cast<double>(127);
 }
 
-void VGMRgn::setLoopInfo(int theLoopStatus, uint32_t theLoopStart, uint32_t theLoopLength) {
+void VGMRgn::setLoopInfo(int theLoopStatus, u32 theLoopStart, u32 theLoopLength) {
   loop.loopStatus = theLoopStatus;
   loop.loopStart = theLoopStart;
   loop.loopLength = theLoopLength;
 }
 
 
-void VGMRgn::setADSR(long attackTime, uint16_t atkTransform, long decayTime, long sustainLev,
-                     uint16_t rlsTransform, long releaseTime) {
+void VGMRgn::setADSR(long attackTime, u16 atkTransform, long decayTime, long sustainLev,
+                     u16 rlsTransform, long releaseTime) {
   attack_time = attackTime;
   attack_transform = atkTransform;
   decay_time = decayTime;
@@ -72,16 +74,16 @@ void VGMRgn::setADSR(long attackTime, uint16_t atkTransform, long decayTime, lon
   release_time = releaseTime;
 }
 
-void VGMRgn::addGeneralItem(uint32_t offset, uint32_t length, const std::string &name) {
+void VGMRgn::addGeneralItem(u32 offset, u32 length, const std::string &name) {
   addChild(new VGMRgnItem(this, VGMRgnItem::RIT_GENERIC, offset, length, name));
 }
 
-void VGMRgn::addUnknown(uint32_t offset, uint32_t length) {
+void VGMRgn::addUnknown(u32 offset, u32 length) {
   addChild(new VGMRgnItem(this, VGMRgnItem::RIT_UNKNOWN, offset, length, "Unknown"));
 }
 
 //assumes pan is given as 0-127 value, converts it to our double -1.0 to 1.0 format
-void VGMRgn::addPan(uint8_t p, uint32_t offset, uint32_t length, const std::string& name) {
+void VGMRgn::addPan(u8 p, u32 offset, u32 length, const std::string& name) {
   setPan(p);
   addChild(new VGMRgnItem(this, VGMRgnItem::RIT_PAN, offset, length, name));
 }
@@ -94,57 +96,57 @@ void VGMRgn::setAttenuation(double attenDb) {
   m_attenDb = attenDb;
 }
 
-void VGMRgn::addVolume(double vol, uint32_t offset, uint32_t length) {
+void VGMRgn::addVolume(double vol, u32 offset, u32 length) {
   setVolume(vol);
   addChild(new VGMRgnItem(this, VGMRgnItem::RIT_VOL, offset, length, "Volume"));
 }
 
-void VGMRgn::addAttenuation(double attenDb, uint32_t offset, uint32_t length) {
+void VGMRgn::addAttenuation(double attenDb, u32 offset, u32 length) {
   setAttenuation(attenDb);
   addChild(new VGMRgnItem(this, VGMRgnItem::RIT_VOL, offset, length, "Attenuation"));
 }
 
-void VGMRgn::addUnityKey(uint8_t uk, uint32_t offset, uint32_t length) {
+void VGMRgn::addUnityKey(u8 uk, u32 offset, u32 length) {
   this->unityKey = uk;
   addChild(new VGMRgnItem(this, VGMRgnItem::RIT_UNITYKEY, offset, length, "Unity Key"));
 }
 
-void VGMRgn::addCoarseTune(int16_t relativeSemitones, uint32_t offset, uint32_t length) {
+void VGMRgn::addCoarseTune(s16 relativeSemitones, u32 offset, u32 length) {
   this->coarseTune = relativeSemitones;
   addChild(new VGMRgnItem(this, VGMRgnItem::RIT_FINETUNE, offset, length, "Coarse Tune"));
 }
 
-void VGMRgn::addFineTune(int16_t relativePitchCents, uint32_t offset, uint32_t length) {
+void VGMRgn::addFineTune(s16 relativePitchCents, u32 offset, u32 length) {
   this->fineTune = relativePitchCents;
   addChild(new VGMRgnItem(this, VGMRgnItem::RIT_FINETUNE, offset, length, "Fine Tune"));
 }
 
-void VGMRgn::addKeyLow(uint8_t kl, uint32_t offset, uint32_t length) {
+void VGMRgn::addKeyLow(u8 kl, u32 offset, u32 length) {
   keyLow = kl;
   addChild(new VGMRgnItem(this, VGMRgnItem::RIT_KEYLOW, offset, length, "Note Range: Low Key"));
 }
 
-void VGMRgn::addKeyHigh(uint8_t kh, uint32_t offset, uint32_t length) {
+void VGMRgn::addKeyHigh(u8 kh, u32 offset, u32 length) {
   keyHigh = kh;
   addChild(new VGMRgnItem(this, VGMRgnItem::RIT_KEYHIGH, offset, length, "Note Range: High Key"));
 }
 
-void VGMRgn::addVelLow(uint8_t vl, uint32_t offset, uint32_t length) {
+void VGMRgn::addVelLow(u8 vl, u32 offset, u32 length) {
   velLow = vl;
   addChild(new VGMRgnItem(this, VGMRgnItem::RIT_VELLOW, offset, length, "Vel Range: Low"));
 }
 
-void VGMRgn::addVelHigh(uint8_t vh, uint32_t offset, uint32_t length) {
+void VGMRgn::addVelHigh(u8 vh, u32 offset, u32 length) {
   velHigh = vh;
   addChild(new VGMRgnItem(this, VGMRgnItem::RIT_VELHIGH, offset, length, "Vel Range: High"));
 }
 
-void VGMRgn::addSampNum(int sn, uint32_t offset, uint32_t length) {
+void VGMRgn::addSampNum(int sn, u32 offset, u32 length) {
   sampNum = sn;
   addChild(new VGMRgnItem(this, VGMRgnItem::RIT_SAMPNUM, offset, length, "Sample Number"));
 }
 
-void VGMRgn::addADSRValue(uint32_t offset, uint32_t length, const std::string& name) {
+void VGMRgn::addADSRValue(u32 offset, u32 length, const std::string& name) {
   addChild(new VGMRgnItem(this, VGMRgnItem::RIT_ADSR, offset, length, name));
 }
 
@@ -153,6 +155,6 @@ void VGMRgn::addADSRValue(uint32_t offset, uint32_t length, const std::string& n
 // VGMRgnItem
 // **********
 
-VGMRgnItem::VGMRgnItem(const VGMRgn *rgn, RgnItemType rgnItemType, uint32_t offset, uint32_t length, std::string name)
+VGMRgnItem::VGMRgnItem(const VGMRgn *rgn, RgnItemType rgnItemType, u32 offset, u32 length, std::string name)
     : VGMItem(rgn->vgmFile(), offset, length, std::move(name), resolveType(rgnItemType)) {
 }

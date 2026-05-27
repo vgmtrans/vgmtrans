@@ -1,7 +1,11 @@
 #pragma once
+
+#include "base/Types.h"
+#include "Loop.h"
 #include "SynthFile.h"
 #include "VGMItem.h"
-#include "Loop.h"
+
+#include <string>
 
 class VGMInstr;
 class VGMRgnItem;
@@ -13,38 +17,38 @@ class VGMSampColl;
 
 class VGMRgn : public VGMItem {
  public:
-  VGMRgn(VGMInstr *instr, uint32_t offset, uint32_t length = 0, std::string name = "Region");
-  VGMRgn(VGMInstr *instr, uint32_t offset, uint32_t length, uint8_t keyLow, uint8_t keyHigh, uint8_t velLow,
-         uint8_t velHigh, int sampNum, std::string name = "Region");
+  VGMRgn(VGMInstr *instr, u32 offset, u32 length = 0, std::string name = "Region");
+  VGMRgn(VGMInstr *instr, u32 offset, u32 length, u8 keyLow, u8 keyHigh, u8 velLow,
+         u8 velHigh, int sampNum, std::string name = "Region");
 
   virtual bool loadRgn() { return true; }
 
-  void setRanges(uint8_t keyLow, uint8_t keyHigh, uint8_t velLow = 0, uint8_t velHigh = 0x7F);
-  void setUnityKey(uint8_t unityNote);
-  void setSampNum(uint8_t sampNumber);
-  void setLoopInfo(int theLoopStatus, uint32_t theLoopStart, uint32_t theLoopLength);
-  void setADSR(long attack_time, uint16_t atk_transform, long decay_time, long sustain_lev,
-               uint16_t rls_transform, long release_time);
+  void setRanges(u8 keyLow, u8 keyHigh, u8 velLow = 0, u8 velHigh = 0x7F);
+  void setUnityKey(u8 unityNote);
+  void setSampNum(u8 sampNumber);
+  void setLoopInfo(int theLoopStatus, u32 theLoopStart, u32 theLoopLength);
+  void setADSR(long attack_time, u16 atk_transform, long decay_time, long sustain_lev,
+               u16 rls_transform, long release_time);
 
-  void addGeneralItem(uint32_t offset, uint32_t length, const std::string &name);
-  void addUnknown(uint32_t offset, uint32_t length);
-  void setFineTune(int16_t relativePitchCents) { fineTune = relativePitchCents; }
-  void setPan(uint8_t pan);
-  void addPan(uint8_t pan, uint32_t offset, uint32_t length = 1, const std::string& name = "Pan");
+  void addGeneralItem(u32 offset, u32 length, const std::string &name);
+  void addUnknown(u32 offset, u32 length);
+  void setFineTune(s16 relativePitchCents) { fineTune = relativePitchCents; }
+  void setPan(u8 pan);
+  void addPan(u8 pan, u32 offset, u32 length = 1, const std::string& name = "Pan");
   void setVolume(double volume);
   void setAttenuation(double decibels);
   double attenDb() { return m_attenDb; }
-  void addVolume(double volume, uint32_t offset, uint32_t length = 1);
-  void addAttenuation(double decibels, uint32_t offset, uint32_t length = 1);
-  void addUnityKey(uint8_t unityKey, uint32_t offset, uint32_t length = 1);
-  void addCoarseTune(int16_t relativeSemitones, uint32_t offset, uint32_t length = 1);
-  void addFineTune(int16_t relativePitchCents, uint32_t offset, uint32_t length = 1);
-  void addKeyLow(uint8_t keyLow, uint32_t offset, uint32_t length = 1);
-  void addKeyHigh(uint8_t keyHigh, uint32_t offset, uint32_t length = 1);
-  void addVelLow(uint8_t velLow, uint32_t offset, uint32_t length = 1);
-  void addVelHigh(uint8_t velHigh, uint32_t offset, uint32_t length = 1);
-  void addSampNum(int sampNum, uint32_t offset, uint32_t length = 1);
-  void addADSRValue(uint32_t offset, uint32_t length, const std::string& name);
+  void addVolume(double volume, u32 offset, u32 length = 1);
+  void addAttenuation(double decibels, u32 offset, u32 length = 1);
+  void addUnityKey(u8 unityKey, u32 offset, u32 length = 1);
+  void addCoarseTune(s16 relativeSemitones, u32 offset, u32 length = 1);
+  void addFineTune(s16 relativePitchCents, u32 offset, u32 length = 1);
+  void addKeyLow(u8 keyLow, u32 offset, u32 length = 1);
+  void addKeyHigh(u8 keyHigh, u32 offset, u32 length = 1);
+  void addVelLow(u8 velLow, u32 offset, u32 length = 1);
+  void addVelHigh(u8 velHigh, u32 offset, u32 length = 1);
+  void addSampNum(int sampNum, u32 offset, u32 length = 1);
+  void addADSRValue(u32 offset, u32 length, const std::string& name);
 
   void setLfoVibFreqHz(double freq) { m_lfoVibFreqHz = freq; }
   void setLfoVibDepthCents(double cents) { m_lfoVibDepthCents = cents; }
@@ -116,7 +120,7 @@ class VGMRgnItem : public VGMItem {
     RIT_ADSR,
   };
 
-  VGMRgnItem(const VGMRgn *rgn, RgnItemType theType, uint32_t offset, uint32_t length, std::string name);
+  VGMRgnItem(const VGMRgn *rgn, RgnItemType theType, u32 offset, u32 length, std::string name);
 
 private:
   static Type resolveType(RgnItemType rgnItemType) {

@@ -6,7 +6,9 @@
 
 #pragma once
 
-enum class AkaoPs1Version : uint8_t {
+#include "base/Types.h"
+
+enum class AkaoPs1Version : u8 {
   UNKNOWN = 0,
 
   // Final Fantasy 7

@@ -6,15 +6,16 @@
 
 #pragma once
 
+#include "HexView.h"
+#include "HexViewRhiInputCoalescer.h"
+
 #include <functional>
+#include <utility>
 
 #include <QCoreApplication>
 #include <QEvent>
 #include <QMouseEvent>
 #include <QWheelEvent>
-
-#include "HexView.h"
-#include "HexViewRhiInputCoalescer.h"
 
 class HexViewRhiEventForwarder final {
 public:

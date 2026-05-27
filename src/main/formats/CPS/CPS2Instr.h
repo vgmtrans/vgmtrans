@@ -1,94 +1,98 @@
 #pragma once
+
+#include "base/Binary.h"
+#include "base/Types.h"
+#include "CPS2Scanner.h"
 #include "VGMInstrSet.h"
-#include "VGMSampColl.h"
 #include "VGMMiscFile.h"
+#include "VGMSampColl.h"
+
+#include <string>
 
 class CPS2Instr;
 
-enum CPS2FormatVer: uint8_t;
-
 // ex: Punisher
 struct qs_prog_info_ver_101 {
-  uint8_t sample_index;
-  uint8_t ignored;        //only seen used in slammast, but the game never reads the val
-  uint8_t attack_rate;
-  uint8_t decay_rate;
-  uint8_t sustain_level;
-  uint8_t sustain_rate;
-  uint8_t release_rate;
-  uint8_t unknown;
+  u8 sample_index;
+  u8 ignored;        //only seen used in slammast, but the game never reads the val
+  u8 attack_rate;
+  u8 decay_rate;
+  u8 sustain_level;
+  u8 sustain_rate;
+  u8 release_rate;
+  u8 unknown;
 };
 
 // ex: Super Street Fighter 2
 struct qs_prog_info_ver_103 {
-  uint16_t sample_index;
-  int8_t fine_tune;
-  uint8_t attack_rate;
-  uint8_t decay_rate;
-  uint8_t sustain_level;
-  uint8_t sustain_rate;
-  uint8_t release_rate;
+  u16 sample_index;
+  s8 fine_tune;
+  u8 attack_rate;
+  u8 decay_rate;
+  u8 sustain_level;
+  u8 sustain_rate;
+  u8 release_rate;
 };
 
 struct qs_prog_info_ver_130 {
-  uint16_t sample_index;
-  int8_t fine_tune;
-  uint8_t artic_index;
+  u16 sample_index;
+  s8 fine_tune;
+  u8 artic_index;
 };
 
 struct qs_prog_info_ver_cps3 {
-  uint8_t key_high;
-  int8_t pan_override;      // overrides sequence pan value if not set to -1
-  int8_t volume_adjustment;  // range of -64 to +63, where -64 is silence and +63 (almost) doubles the volume
-  uint8_t unknown3;
-  uint8_t sample_index_hi;
-  uint8_t sample_index_lo;
-  int8_t fine_tune;
-  uint8_t attack_rate;
-  uint8_t decay_rate;
-  uint8_t sustain_level;
-  uint8_t sustain_rate;
-  uint8_t release_rate;
+  u8 key_high;
+  s8 pan_override;      // overrides sequence pan value if not set to -1
+  s8 volume_adjustment;  // range of -64 to +63, where -64 is silence and +63 (almost) doubles the volume
+  u8 unknown3;
+  u8 sample_index_hi;
+  u8 sample_index_lo;
+  s8 fine_tune;
+  u8 attack_rate;
+  u8 decay_rate;
+  u8 sustain_level;
+  u8 sustain_rate;
+  u8 release_rate;
 };
 
 struct qs_artic_info {
-  uint8_t attack_rate;
-  uint8_t decay_rate;
-  uint8_t sustain_level;
-  uint8_t sustain_rate;
-  uint8_t release_rate;
-  uint8_t unknown_5;
-  uint8_t unknown_6;
-  uint8_t unknown_7;
+  u8 attack_rate;
+  u8 decay_rate;
+  u8 sustain_level;
+  u8 sustain_rate;
+  u8 release_rate;
+  u8 unknown_5;
+  u8 unknown_6;
+  u8 unknown_7;
 };
 
 struct sample_info {
-  uint32_t start_addr;
-  uint32_t loop_offset;
-  uint32_t end_addr;
-  uint8_t unity_key;
+  u32 start_addr;
+  u32 loop_offset;
+  u32 end_addr;
+  u8 unity_key;
 };
 
 struct qs_samp_info_cps2 {
-  uint8_t bank;
-  uint16_t start_addr;
-  uint16_t loop_offset;
-  uint16_t end_addr;
-  uint8_t unity_key;
+  u8 bank;
+  u16 start_addr;
+  u16 loop_offset;
+  u16 end_addr;
+  u8 unity_key;
 };// qs_samp_info_cps2;
 
 struct qs_samp_info_cps3 {
-  uint32_t start_addr;
-  uint32_t loop_offset;
-  uint32_t end_addr;
-  uint32_t unity_key;
+  u32 start_addr;
+  u32 loop_offset;
+  u32 end_addr;
+  u32 unity_key;
 };
 
 struct qs_samp_info {
-  uint32_t start_addr;
-  uint32_t loop_offset;
-  uint32_t end_addr;
-  uint8_t unity_key;
+  u32 start_addr;
+  u32 loop_offset;
+  u32 end_addr;
+  u8 unity_key;
 
   qs_samp_info() = default;
 
@@ -103,14 +107,14 @@ struct qs_samp_info {
     this->start_addr = swap_bytes32(cps3->start_addr);
     this->loop_offset = swap_bytes32(cps3->loop_offset);
     this->end_addr = swap_bytes32(cps3->end_addr);
-    this->unity_key = static_cast<uint8_t>(swap_bytes32(cps3->unity_key));
+    this->unity_key = static_cast<u8>(swap_bytes32(cps3->unity_key));
   }
 };
 
 // The following tables are used by all versions of sample-based CPS drivers, with the
 // exception of the sustain level table not present in CPS3 (but it's virtually linear).
 
-const uint16_t sustain_level_table[128] = {
+const u16 sustain_level_table[128] = {
     0, 0x3FF, 0x5FE, 0x7FF, 0x9FE, 0xBFE, 0xDFD, 0xFFF, 0x11FE, 0x13FE,
     0x15FD, 0x17FE, 0x19FD, 0x1BFD, 0x1DFC, 0x1FFF, 0x21FD, 0x23FE, 0x25FD,
     0x27FE, 0x29FD, 0x2BFD, 0x2DFC, 0x2FFE, 0x31FD, 0x33FD, 0x35FC, 0x37FD,
@@ -128,7 +132,7 @@ const uint16_t sustain_level_table[128] = {
     0xF5FA, 0xF7FB, 0xF9FA, 0xFBFA, 0xFDF9, 0xFFFE
 };
 
-const uint16_t attack_rate_table[64] = {
+const u16 attack_rate_table[64] = {
     0, 0, 1, 1, 2, 2, 3, 3, 4, 5, 6, 7, 8, 9, 0x0B, 0x0D, 0x0F,
     0x11, 0x22, 0x33, 0x44, 0x55, 0x64, 0x84, 0x0A4, 0x0C5, 0x0E6, 0x107, 0x149,
     0x18B, 0x1CC, 0x20E, 0x292, 0x315, 0x398, 0x41C, 0x523, 0x62A, 0x731, 0x838,
@@ -137,7 +141,7 @@ const uint16_t attack_rate_table[64] = {
     0xE61C, 0xEFFF, 0xF3FF, 0xF9FF, 0xFCFF, 0xFFFF
 };
 
-const uint16_t decay_rate_table[64] = {
+const u16 decay_rate_table[64] = {
     0, 1, 2, 2, 3, 3, 4, 4, 5, 6, 8, 0x0A, 0x0C, 0x0E, 0x11, 0x13,
     0x18, 0x1D, 0x21, 0x26, 0x30, 0x39, 0x43, 0x4C, 0x5F, 0x72, 0x85, 0x98, 0x0BE,
     0x0E4, 0x10A, 0x130, 0x17D, 0x1C9, 0x215, 0x260, 0x2F9, 0x391, 0x42A, 0x4C1,
@@ -153,7 +157,7 @@ const uint16_t decay_rate_table[64] = {
 class CPSArticTable
     : public VGMMiscFile {
 public:
-  CPSArticTable(RawFile *file, std::string name, uint32_t offset, uint32_t length);
+  CPSArticTable(RawFile *file, std::string name, u32 offset, u32 length);
   ~CPSArticTable() override;
 
   bool loadMain() override;
@@ -169,19 +173,19 @@ public:
 class CPSSampleInfoTable
     : public VGMMiscFile {
 public:
-  CPSSampleInfoTable(RawFile *file, std::string name, uint32_t offset, uint32_t length = 0);
+  CPSSampleInfoTable(RawFile *file, std::string name, u32 offset, u32 length = 0);
   ~CPSSampleInfoTable() override;
 
 public:
   sample_info* infos{nullptr};
 
-  uint32_t numSamples{};
+  u32 numSamples{};
 };
 
 class CPS2SampleInfoTable
     : public CPSSampleInfoTable {
 public:
-  CPS2SampleInfoTable(RawFile *file, std::string name, uint32_t offset, uint32_t length = 0);
+  CPS2SampleInfoTable(RawFile *file, std::string name, u32 offset, u32 length = 0);
 
   bool loadMain() override;
 };
@@ -189,7 +193,7 @@ public:
 class CPS3SampleInfoTable
     : public CPSSampleInfoTable {
 public:
-  CPS3SampleInfoTable(RawFile *file, std::string name, uint32_t offset, uint32_t length = 0);
+  CPS3SampleInfoTable(RawFile *file, std::string name, u32 offset, u32 length = 0);
 
   bool loadMain() override;
 };
@@ -202,7 +206,7 @@ class CPS2InstrSet : public VGMInstrSet {
 public:
   CPS2InstrSet(RawFile *file,
               CPS2FormatVer fmt_version,
-              uint32_t offset,
+              u32 offset,
               int numInstrBanks,
               CPSSampleInfoTable *sampInfoTable,
               CPSArticTable *articTable,
@@ -214,7 +218,7 @@ public:
 
 public:
   CPS2FormatVer fmt_version{CPS2_VERSION_UNDEFINED};
-  uint32_t num_instr_banks{};
+  u32 num_instr_banks{};
   CPSSampleInfoTable *sampInfoTable;
   CPSArticTable *articTable;
 };
@@ -227,10 +231,10 @@ public:
 class CPS2Instr : public VGMInstr {
 public:
   CPS2Instr(VGMInstrSet *instrSet,
-           uint32_t offset,
-           uint32_t length,
-           uint32_t theBank,
-           uint32_t theInstrNum,
+           u32 offset,
+           u32 length,
+           u32 theBank,
+           u32 theInstrNum,
            std::string name);
   ~CPS2Instr() override = default;
   bool loadInstr() override;
@@ -249,8 +253,8 @@ protected:
 class CPS2SampColl
     : public VGMSampColl {
 public:
-  CPS2SampColl(RawFile *file, CPS2InstrSet *instrset, CPSSampleInfoTable *sampinfotable, uint32_t offset,
-              uint32_t length = 0, std::string name = std::string("QSound Sample Collection"));
+  CPS2SampColl(RawFile *file, CPS2InstrSet *instrset, CPSSampleInfoTable *sampinfotable, u32 offset,
+              u32 length = 0, std::string name = std::string("QSound Sample Collection"));
   bool parseHeader() override;
   bool parseSampleInfo() override;
 

@@ -4,15 +4,16 @@
  * refer to the included LICENSE.txt file
  */
 #pragma once
-#include "common.h"
-#include "Scanner.h"
+#include "base/Types.h"
 #include "BytePattern.h"
+#include "Scanner.h"
+
 #include <vector>
 
 class SegSatSeq;
 class SegSatInstrSet;
 
-enum class SegSatDriverVer: uint8_t {
+enum class SegSatDriverVer: u8 {
   Unknown,
   V1_28,
   V2_08,

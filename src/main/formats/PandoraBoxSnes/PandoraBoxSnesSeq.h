@@ -1,8 +1,13 @@
 #pragma once
-#include "VGMSeq.h"
-#include "SeqTrack.h"
-#include "SeqEvent.h"
+
+#include "base/Types.h"
 #include "PandoraBoxSnesFormat.h"
+#include "SeqEvent.h"
+#include "SeqTrack.h"
+#include "VGMSeq.h"
+
+#include <map>
+#include <string>
 
 #define PANDORABOXSNES_CALLSTACK_SIZE   40
 
@@ -46,7 +51,7 @@ class PandoraBoxSnesSeq
  public:
   PandoraBoxSnesSeq(RawFile *file,
                     PandoraBoxSnesVersion ver,
-                    uint32_t seqdata_offset,
+                    u32 seqdata_offset,
                     std::string newName = "PandoraBox SNES Seq");
   virtual ~PandoraBoxSnesSeq();
 
@@ -54,12 +59,12 @@ class PandoraBoxSnesSeq
   virtual bool parseTrackPointers();
   virtual void resetVars();
 
-  static const uint8_t VOLUME_TABLE[16];
+  static const u8 VOLUME_TABLE[16];
 
   PandoraBoxSnesVersion version;
-  std::map<uint8_t, PandoraBoxSnesSeqEventType> EventMap;
+  std::map<u8, PandoraBoxSnesSeqEventType> EventMap;
 
-  std::map<uint8_t, uint16_t> instrADSRHints;
+  std::map<u8, u16> instrADSRHints;
 
  private:
   void loadEventMap();
@@ -69,20 +74,20 @@ class PandoraBoxSnesSeq
 class PandoraBoxSnesTrack
     : public SeqTrack {
  public:
-  PandoraBoxSnesTrack(PandoraBoxSnesSeq *parentFile, uint32_t offset = 0, uint32_t length = 0);
+  PandoraBoxSnesTrack(PandoraBoxSnesSeq *parentFile, u32 offset = 0, u32 length = 0);
   virtual void resetVars();
   virtual bool readEvent();
 
  private:
-  uint8_t getVolume(uint8_t volumeIndex);
+  u8 getVolume(u8 volumeIndex);
 
-  int8_t prevNoteKey;
+  s8 prevNoteKey;
   bool prevNoteSlurred;
-  uint8_t spcNoteLength;
-  uint8_t spcNoteQuantize;
-  uint8_t spcVolumeIndex;
-  uint8_t spcInstr;
-  uint16_t spcADSR;
-  uint8_t spcCallStack[PANDORABOXSNES_CALLSTACK_SIZE];
-  uint8_t spcCallStackPtr;
+  u8 spcNoteLength;
+  u8 spcNoteQuantize;
+  u8 spcVolumeIndex;
+  u8 spcInstr;
+  u16 spcADSR;
+  u8 spcCallStack[PANDORABOXSNES_CALLSTACK_SIZE];
+  u8 spcCallStackPtr;
 };

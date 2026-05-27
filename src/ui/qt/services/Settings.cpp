@@ -5,6 +5,7 @@
  */
 
 #include "Settings.h"
+
 #include "NotificationCenter.h"
 
 SettingsGroup::SettingsGroup(Settings* parent) : parent(parent), settings(parent->settings) {

@@ -1,11 +1,13 @@
 #include "TamSoftPS1Instr.h"
+
+#include "base/Types.h"
 #include "PSXSPU.h"
 
 // ******************
 // TamSoftPS1InstrSet
 // ******************
 
-TamSoftPS1InstrSet::TamSoftPS1InstrSet(RawFile *file, uint32_t offset, bool ps2, const std::string &name) :
+TamSoftPS1InstrSet::TamSoftPS1InstrSet(RawFile *file, u32 offset, bool ps2, const std::string &name) :
     VGMInstrSet(TamSoftPS1Format::name, file, offset, 0, name), ps2(ps2) {
 }
 
@@ -17,7 +19,7 @@ bool TamSoftPS1InstrSet::parseHeader() {
     return false;
   }
 
-  uint32_t sampCollSize = readWord(0x3fc);
+  u32 sampCollSize = readWord(0x3fc);
   if (offset() + 0x800 + sampCollSize > vgmFile()->endOffset()) {
     return false;
   }
@@ -29,9 +31,9 @@ bool TamSoftPS1InstrSet::parseHeader() {
 bool TamSoftPS1InstrSet::parseInstrPointers() {
   std::vector<SizeOffsetPair> vagLocations;
 
-  for (uint32_t instrNum = 0; instrNum < 256; instrNum++) {
+  for (u32 instrNum = 0; instrNum < 256; instrNum++) {
     bool vagLoop;
-    uint32_t vagOffset = 0x800 + readWord(offset() + 4 * instrNum);
+    u32 vagOffset = 0x800 + readWord(offset() + 4 * instrNum);
     if (vagOffset < length()) {
       SizeOffsetPair vagLocation(vagOffset - 0x800, PSXSamp::getSampleLength(rawFile(), vagOffset, offset() + length(), vagLoop));
       vagLocations.push_back(vagLocation);
@@ -54,7 +56,7 @@ bool TamSoftPS1InstrSet::parseInstrPointers() {
 // TamSoftPS1Instr
 // ***************
 
-TamSoftPS1Instr::TamSoftPS1Instr(TamSoftPS1InstrSet *instrSet, uint8_t instrNum, const std::string &name) :
+TamSoftPS1Instr::TamSoftPS1Instr(TamSoftPS1InstrSet *instrSet, u8 instrNum, const std::string &name) :
     VGMInstr(instrSet, instrSet->offset() + 4 * instrNum, 0x400 + 4, 0, instrNum, name) {
 }
 
@@ -76,14 +78,14 @@ bool TamSoftPS1Instr::loadInstr() {
 // TamSoftPS1Rgn
 // *************
 
-TamSoftPS1Rgn::TamSoftPS1Rgn(TamSoftPS1Instr *instr, uint32_t offset, bool ps2) :
+TamSoftPS1Rgn::TamSoftPS1Rgn(TamSoftPS1Instr *instr, u32 offset, bool ps2) :
     VGMRgn(instr, offset, 4) {
   unityKey = TAMSOFTPS1_KEY_OFFSET + 48;
   addChild(offset, 2, "ADSR1");
   addChild(offset + 2, 2, "ADSR2");
 
-  uint16_t adsr1 = readShort(offset);
-  uint16_t adsr2 = readShort(offset + 2);
+  u16 adsr1 = readShort(offset);
+  u16 adsr2 = readShort(offset + 2);
   if (ps2) {
     // Choro Q HG2 default ADSR (set by progInitWork)
     adsr1 = 0x13FF;

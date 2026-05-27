@@ -4,19 +4,22 @@
  * refer to the included LICENSE.txt file
  */
 #include "KonamiTMNT2Scanner.h"
-#include "KonamiTMNT2Seq.h"
-#include "MAMELoader.h"
+
+#include "base/Types.h"
 #include "BytePattern.h"
 #include "KonamiTMNT2Instr.h"
 #include "KonamiTMNT2OPMInstr.h"
+#include "KonamiTMNT2Seq.h"
 #include "KonamiVendettaInstr.h"
+#include "MAMELoader.h"
 #include "VGMColl.h"
 #include "VGMMiscFile.h"
 
 #include <optional>
 #include <utility>
-#include <spdlog/fmt/fmt.h>
 #include <vector>
+
+#include <spdlog/fmt/fmt.h>
 
 KonamiTMNT2FormatVer konamiTMNT2VersionEnum(const std::string &versionStr) {
   static const std::unordered_map<std::string, KonamiTMNT2FormatVer> versionMap = {
@@ -371,7 +374,7 @@ void KonamiTMNT2Scanner::scanTMNT2(
     samplesRom,
     sampInfos,
     0,
-    static_cast<uint32_t>(samplesRom->size()),
+    static_cast<u32>(samplesRom->size()),
     sampCollName
   );
   if (!sampcoll->loadVGMFile()) {
@@ -521,7 +524,7 @@ void KonamiTMNT2Scanner::scanVendetta(
     samplesRom,
     commonSampInfos,
     0,
-    static_cast<uint32_t>(samplesRom->size()),
+    static_cast<u32>(samplesRom->size()),
     sampCollName
   );
   if (!sampcoll->loadVGMFile()) {

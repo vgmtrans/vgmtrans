@@ -5,21 +5,24 @@
  */
 
 #include "VGMInstrSet.h"
-#include <spdlog/fmt/fmt.h>
-#include "VGMSampColl.h"
-#include "VGMSamp.h"
-#include "VGMRgn.h"
-#include "VGMColl.h"
-#include "Root.h"
+
+#include "base/Types.h"
 #include "Format.h"
+#include "Helper.h"
 #include "LogManager.h"
-#include "helper.h"
+#include "Root.h"
+#include "VGMColl.h"
+#include "VGMRgn.h"
+#include "VGMSamp.h"
+#include "VGMSampColl.h"
+
+#include <spdlog/fmt/fmt.h>
 
 // ***********
 // VGMInstrSet
 // ***********
 
-VGMInstrSet::VGMInstrSet(const std::string &format, RawFile *file, uint32_t offset, uint32_t length,
+VGMInstrSet::VGMInstrSet(const std::string &format, RawFile *file, u32 offset, u32 length,
                          std::string name, VGMSampColl *theSampColl)
     : VGMFile(format, file, offset, length, std::move(name)),
       sampColl(theSampColl) {
@@ -30,8 +33,8 @@ VGMInstrSet::~VGMInstrSet() {
   delete sampColl;
 }
 
-VGMInstr *VGMInstrSet::addInstr(uint32_t offset, uint32_t length, uint32_t bank,
-                                uint32_t instrNum, const std::string &instrName) {
+VGMInstr *VGMInstrSet::addInstr(u32 offset, u32 length, u32 bank,
+                                u32 instrNum, const std::string &instrName) {
   VGMInstr *instr =
       new VGMInstr(this, offset, length, bank, instrNum,
                    instrName.empty() ? fmt::format("Instrument {}", aInstrs.size()) : instrName);
@@ -135,17 +138,17 @@ void VGMInstrSet::addTempInstr(VGMInstr* instr) {
 // VGMInstr
 // ********
 
-VGMInstr::VGMInstr(VGMInstrSet *instrSet, uint32_t offset, uint32_t length, uint32_t theBank,
-                   uint32_t theInstrNum, std::string name, float reverb)
+VGMInstr::VGMInstr(VGMInstrSet *instrSet, u32 offset, u32 length, u32 theBank,
+                   u32 theInstrNum, std::string name, float reverb)
     : VGMItem(instrSet, offset, length, std::move(name), Type::Instrument),
       bank(theBank), instrNum(theInstrNum), parInstrSet(instrSet), reverb(reverb) {
 }
 
-void VGMInstr::setBank(uint32_t bankNum) {
+void VGMInstr::setBank(u32 bankNum) {
   bank = bankNum;
 }
 
-void VGMInstr::setInstrNum(uint32_t theInstrNum) {
+void VGMInstr::setInstrNum(u32 theInstrNum) {
   instrNum = theInstrNum;
 }
 
@@ -156,8 +159,8 @@ VGMRgn *VGMInstr::addRgn(VGMRgn *rgn) {
   return rgn;
 }
 
-VGMRgn *VGMInstr::addRgn(uint32_t offset, uint32_t length, int sampNum, uint8_t keyLow,
-                         uint8_t keyHigh, uint8_t velLow, uint8_t velHigh) {
+VGMRgn *VGMInstr::addRgn(u32 offset, u32 length, int sampNum, u8 keyLow,
+                         u8 keyHigh, u8 velLow, u8 velHigh) {
   VGMRgn *newRgn = new VGMRgn(this, offset, length, keyLow, keyHigh, velLow, velHigh, sampNum);
   m_regions.emplace_back(newRgn);
   if (m_auto_add_regions_as_children)

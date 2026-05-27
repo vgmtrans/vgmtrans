@@ -4,19 +4,17 @@
  * See the included LICENSE for more information
  */
 
+#include <csignal>
 #include <cstdio>
-
+#include <cstdlib>
+#include <filesystem>
+#include <functional>
+#include <iostream>
 #ifndef  _WIN32
 #include <signal.h>
 #endif
-
-#include <csignal>
-#include <cstdlib>
 #include <string>
 #include <vector>
-#include <filesystem>
-#include <iostream>
-#include <functional>
 
 #ifdef _WIN32
 #include <io.h>

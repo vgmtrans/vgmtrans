@@ -6,10 +6,11 @@
 
 #pragma once
 
+#include "VGMColl.h"
+
 #include <QAbstractListModel>
 #include <QItemSelectionModel>
 #include <QWidget>
-#include "VGMColl.h"
 
 class VGMFile;
 class QLabel;

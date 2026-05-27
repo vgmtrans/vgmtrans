@@ -1,8 +1,7 @@
 #pragma once
-#include "Format.h"
 #include "FilegroupMatcher.h"
+#include "Format.h"
 #include "TamSoftPS1Scanner.h"
-
 
 // ****************
 // TamSoftPS1Format

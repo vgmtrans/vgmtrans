@@ -6,9 +6,11 @@
 
 #pragma once
 
-#include <vector>
-
 #include "services/commands/GeneralCommands.h"
+
+#include <optional>
+#include <string>
+#include <vector>
 
 class QWidget;
 class VGMColl;

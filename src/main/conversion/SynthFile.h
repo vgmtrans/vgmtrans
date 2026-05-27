@@ -1,7 +1,11 @@
 #pragma once
 
+#include "base/Types.h"
 #include "Modulation.h"
 #include "RiffFile.h"
+
+#include <string>
+#include <utility>
 #include <vector>
 
 struct Loop;
@@ -23,11 +27,11 @@ class SynthFile {
   SynthFile(std::string synth_name = "Instrument Set");
   ~SynthFile();
 
-  SynthInstr *addInstr(uint32_t bank, uint32_t instrNum, float reverb);
-  SynthInstr *addInstr(uint32_t bank, uint32_t instrNum, std::string Name, float reverb);
-  SynthWave *addWave(uint16_t formatTag, uint16_t channels, int samplesPerSec, int aveBytesPerSec,
-                     uint16_t blockAlign, uint16_t bitsPerSample, uint32_t waveDataSize,
-                     std::vector<uint8_t> waveData,
+  SynthInstr *addInstr(u32 bank, u32 instrNum, float reverb);
+  SynthInstr *addInstr(u32 bank, u32 instrNum, std::string Name, float reverb);
+  SynthWave *addWave(u16 formatTag, u16 channels, int samplesPerSec, int aveBytesPerSec,
+                     u16 blockAlign, u16 bitsPerSample, u32 waveDataSize,
+                     std::vector<u8> waveData,
                      std::string name = "Unnamed Wave");
 
   std::vector<SynthInstr *> vInstrs;
@@ -37,9 +41,9 @@ class SynthFile {
 
 class SynthInstr {
  public:
-  SynthInstr(uint32_t bank, uint32_t instrument, float reverb);
-  SynthInstr(uint32_t bank, uint32_t instrument, std::string instrName, float reverb);
-  SynthInstr(uint32_t bank, uint32_t instrument, std::string instrName,
+  SynthInstr(u32 bank, u32 instrument, float reverb);
+  SynthInstr(u32 bank, u32 instrument, std::string instrName, float reverb);
+  SynthInstr(u32 bank, u32 instrument, std::string instrName,
              const std::vector<SynthRgn *>& listRgns, float reverb);
   ~SynthInstr();
 
@@ -54,8 +58,8 @@ class SynthInstr {
   void addGenerator(ModDest destination, ModAmount amount);
   [[nodiscard]] const std::vector<SynthGenerator>& generators() const { return m_generators; }
 
-  uint32_t ulBank;
-  uint32_t ulInstrument;
+  u32 ulBank;
+  u32 ulInstrument;
   std::string name;
   float reverb;
 
@@ -69,43 +73,43 @@ private:
 class SynthSampInfo {
 public:
   SynthSampInfo() = default;
-  SynthSampInfo(uint16_t unityNote,
-                int16_t fineTune,
+  SynthSampInfo(u16 unityNote,
+                s16 fineTune,
                 double atten,
-                int8_t sampleLoops,
-                uint32_t loopType,
-                uint32_t loopStart,
-                uint32_t loopLength)
+                s8 sampleLoops,
+                u32 loopType,
+                u32 loopStart,
+                u32 loopLength)
       : usUnityNote(unityNote), sFineTune(fineTune), attenuation(atten), cSampleLoops(sampleLoops),
         ulLoopType(loopType),
         ulLoopStart(loopStart), ulLoopLength(loopLength) { }
   ~SynthSampInfo() = default;
 
   void setLoopInfo(Loop &loop, VGMSamp *samp);
-  void setPitchInfo(uint16_t unityNote, int16_t fineTune, double attenuation);
+  void setPitchInfo(u16 unityNote, s16 fineTune, double attenuation);
 
-  uint16_t usUnityNote{0x3C};
-  int16_t sFineTune{0};
+  u16 usUnityNote{0x3C};
+  s16 sFineTune{0};
   double attenuation{0};  // in decibels.
-  int8_t cSampleLoops{0};
+  s8 cSampleLoops{0};
 
-  uint32_t ulLoopType{0};
-  uint32_t ulLoopStart{0};
-  uint32_t ulLoopLength{0};
+  u32 ulLoopType{0};
+  u32 ulLoopStart{0};
+  u32 ulLoopLength{0};
 };
 
 class SynthRgn {
  public:
   SynthRgn() = default;
-  SynthRgn(uint16_t keyLow, uint16_t keyHigh, uint16_t velLow, uint16_t velHigh)
+  SynthRgn(u16 keyLow, u16 keyHigh, u16 velLow, u16 velHigh)
       : usKeyLow(keyLow), usKeyHigh(keyHigh), usVelLow(velLow), usVelHigh(velHigh) {}
   ~SynthRgn();
 
   SynthArt *addArt();
   SynthSampInfo *addSampInfo();
-  void setRanges(uint16_t keyLow = 0, uint16_t keyHigh = 0x7F, uint16_t velLow = 0, uint16_t velHigh = 0x7F);
-  void setWaveLinkInfo(uint16_t options, uint16_t phaseGroup, uint32_t theChannel, uint32_t theTableIndex);
-  void setFineTune(int16_t semitones, int16_t fineTune);
+  void setRanges(u16 keyLow = 0, u16 keyHigh = 0x7F, u16 velLow = 0, u16 velHigh = 0x7F);
+  void setWaveLinkInfo(u16 options, u16 phaseGroup, u32 theChannel, u32 theTableIndex);
+  void setFineTune(s16 semitones, s16 fineTune);
   void setAttenuationDb(double attenuation);
 
   void setLfoVibFreqHz(double freq) { m_lfoVibFreqHz = freq; }
@@ -115,18 +119,18 @@ class SynthRgn {
   [[nodiscard]] double lfoVibDepthCents() const { return m_lfoVibDepthCents; }
   [[nodiscard]] double lfoVibDelaySeconds() const { return m_lfoVibDelaySeconds; }
 
-  uint16_t usKeyLow {0};
-  uint16_t usKeyHigh {0x7F};
-  uint16_t usVelLow {0};
-  uint16_t usVelHigh {0x7F};
+  u16 usKeyLow {0};
+  u16 usKeyHigh {0x7F};
+  u16 usVelLow {0};
+  u16 usVelHigh {0x7F};
 
-  uint16_t fusOptions {0};    // would be used for DLS conversion
-  uint16_t usPhaseGroup {0};  // ''
-  uint32_t channel {1};       // ''
-  uint32_t tableIndex {0};
+  u16 fusOptions {0};    // would be used for DLS conversion
+  u16 usPhaseGroup {0};  // ''
+  u32 channel {1};       // ''
+  u32 tableIndex {0};
 
-  int16_t coarseTuneSemitones {0};
-  int16_t fineTuneCents {0};
+  s16 coarseTuneSemitones {0};
+  s16 fineTuneCents {0};
 
   double attenDb {0};   // attenuation in decibels
 
@@ -162,8 +166,8 @@ class SynthArt {
 
 class SynthWave {
  public:
-  SynthWave(uint16_t formatTag, uint16_t channels, int samplesPerSec, int aveBytesPerSec, uint16_t blockAlign,
-            uint16_t bitsPerSample, uint32_t waveDataSize, std::vector<uint8_t> waveData,
+  SynthWave(u16 formatTag, u16 channels, int samplesPerSec, int aveBytesPerSec, u16 blockAlign,
+            u16 bitsPerSample, u32 waveDataSize, std::vector<u8> waveData,
             std::string waveName = "Untitled Wave")
       : sampinfo(nullptr),
         wFormatTag(formatTag),
@@ -176,7 +180,7 @@ class SynthWave {
         data(std::move(waveData)),
         name(std::move(waveName)) {
     RiffFile::alignName(name);
-    dataSize = static_cast<uint32_t>(data.size());
+    dataSize = static_cast<u32>(data.size());
   }
   ~SynthWave();
 
@@ -187,15 +191,15 @@ class SynthWave {
  public:
   SynthSampInfo *sampinfo;
 
-  uint16_t wFormatTag;
-  uint16_t wChannels;
-  uint32_t dwSamplesPerSec;
-  uint32_t dwAveBytesPerSec;
-  uint16_t wBlockAlign;
-  uint16_t wBitsPerSample;
+  u16 wFormatTag;
+  u16 wChannels;
+  u32 dwSamplesPerSec;
+  u32 dwAveBytesPerSec;
+  u16 wBlockAlign;
+  u16 wBitsPerSample;
 
-  uint32_t dataSize;
-  std::vector<uint8_t> data;
+  u32 dataSize;
+  std::vector<u8> data;
 
   std::string name;
 };

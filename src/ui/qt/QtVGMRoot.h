@@ -6,8 +6,13 @@
 
 #pragma once
 
-#include <QObject>
 #include "Root.h"
+
+#include <filesystem>
+#include <string>
+#include <string_view>
+
+#include <QObject>
 
 class QtVGMRoot final : public QObject, public VGMRoot {
   Q_OBJECT

@@ -1,38 +1,40 @@
 #pragma once
-#include "VGMSeq.h"
-#include "SeqTrack.h"
+
+#include "base/Types.h"
 #include "OrgFormat.h"
 #include "OrgScanner.h"
+#include "SeqTrack.h"
+#include "VGMSeq.h"
 
 class OrgSeq:
     public VGMSeq {
  public:
-  OrgSeq(RawFile *file, uint32_t offset);
+  OrgSeq(RawFile *file, u32 offset);
  public:
   virtual ~OrgSeq();
 
   virtual bool parseHeader();
 
  public:
-  uint16_t waitTime;        //I believe this is the millis per tick
-  uint8_t beatsPerMeasure;
+  u16 waitTime;        //I believe this is the millis per tick
+  u8 beatsPerMeasure;
 };
 
 
 class OrgTrack
     : public SeqTrack {
  public:
-  OrgTrack(OrgSeq *parentFile, uint32_t offset, uint32_t length, uint8_t realTrk);
+  OrgTrack(OrgSeq *parentFile, u32 offset, u32 length, u8 realTrk);
 
-  virtual bool loadTrack(uint32_t trackNum, uint32_t stopOffset, long stopDelta);
+  virtual bool loadTrack(u32 trackNum, u32 stopOffset, long stopDelta);
   virtual bool readEvent();
 
  public:
-  uint8_t prevPan;
+  u8 prevPan;
 
-  uint16_t curNote;
-  uint8_t realTrkNum;
-  uint16_t freq;
-  uint8_t waveNum;
-  uint16_t numNotes;
+  u16 curNote;
+  u8 realTrkNum;
+  u16 freq;
+  u8 waveNum;
+  u16 numNotes;
 };

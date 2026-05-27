@@ -6,6 +6,8 @@
 
 #pragma once
 
+#include <functional>
+
 #include <QDragEnterEvent>
 #include <QDragLeaveEvent>
 #include <QDragMoveEvent>
@@ -13,8 +15,6 @@
 #include <QEvent>
 #include <QMimeData>
 #include <QUrl>
-
-#include <functional>
 
 namespace QtUi {
 

@@ -1,8 +1,14 @@
 #pragma once
-#include "VGMSeq.h"
-#include "SeqTrack.h"
-#include "SeqEvent.h"
+
+#include "base/Types.h"
 #include "PrismSnesFormat.h"
+#include "SeqEvent.h"
+#include "SeqTrack.h"
+#include "VGMSeq.h"
+
+#include <map>
+#include <string>
+#include <vector>
 
 enum PrismSnesSeqEventType {
   EVENT_UNKNOWN0 =
@@ -72,7 +78,7 @@ enum PrismSnesSeqEventType {
 class PrismSnesSeq
     : public VGMSeq {
  public:
-  PrismSnesSeq(RawFile *file, PrismSnesVersion ver, uint32_t seqdataOffset, std::string newName = "I'Max SNES Seq");
+  PrismSnesSeq(RawFile *file, PrismSnesVersion ver, u32 seqdataOffset, std::string newName = "I'Max SNES Seq");
   virtual ~PrismSnesSeq();
 
   virtual bool parseHeader();
@@ -80,17 +86,17 @@ class PrismSnesSeq
   virtual void resetVars();
 
   PrismSnesVersion version;
-  std::map<uint8_t, PrismSnesSeqEventType> EventMap;
+  std::map<u8, PrismSnesSeqEventType> EventMap;
 
   VGMHeader *envContainer;
-  void demandEnvelopeContainer(uint32_t offset);
+  void demandEnvelopeContainer(u32 offset);
 
-  static const uint8_t PAN_TABLE_1[21];
-  static const uint8_t PAN_TABLE_2[21];
+  static const u8 PAN_TABLE_1[21];
+  static const u8 PAN_TABLE_2[21];
 
   bool conditionSwitch;
 
-  double getTempoInBPM(uint8_t tempo);
+  double getTempoInBPM(u8 tempo);
 
  private:
   void loadEventMap();
@@ -100,31 +106,31 @@ class PrismSnesSeq
 class PrismSnesTrack
     : public SeqTrack {
  public:
-  PrismSnesTrack(PrismSnesSeq *parentFile, uint32_t offset = 0, uint32_t length = 0);
+  PrismSnesTrack(PrismSnesSeq *parentFile, u32 offset = 0, u32 length = 0);
   virtual void resetVars();
   virtual bool readEvent();
 
-  std::vector<uint8_t> panTable;
+  std::vector<u8> panTable;
 
  private:
-  uint8_t defaultLength;
+  u8 defaultLength;
   bool slur; // bit $01
   bool manualDuration; // bit $10
   bool prevNoteSlurred; // bit $20
-  int8_t prevNoteKey;
-  uint8_t autoDurationThreshold;
-  uint8_t spcVolume;
-  uint8_t loopCount;
-  uint8_t loopCountAlt;
-  uint16_t subReturnAddr;
+  s8 prevNoteKey;
+  u8 autoDurationThreshold;
+  u8 spcVolume;
+  u8 loopCount;
+  u8 loopCountAlt;
+  u16 subReturnAddr;
 
-  bool readDeltaTime(uint32_t &curOffset, uint8_t &len);
-  bool readDuration(uint32_t &curOffset, uint8_t len, uint8_t &durDelta);
-  uint8_t getDuration(uint32_t curOffset, uint8_t len, uint8_t durDelta);
+  bool readDeltaTime(u32 &curOffset, u8 &len);
+  bool readDuration(u32 &curOffset, u8 len, u8 &durDelta);
+  u8 getDuration(u32 curOffset, u8 len, u8 durDelta);
 
-  void addVolumeEnvelope(uint16_t envelopeAddress);
-  void addPanEnvelope(uint16_t envelopeAddress);
-  void addEchoVolumeEnvelope(uint16_t envelopeAddress);
-  void addGAINEnvelope(uint16_t envelopeAddress);
-  void addPanTable(uint16_t panTableAddress);
+  void addVolumeEnvelope(u16 envelopeAddress);
+  void addPanEnvelope(u16 envelopeAddress);
+  void addEchoVolumeEnvelope(u16 envelopeAddress);
+  void addGAINEnvelope(u16 envelopeAddress);
+  void addPanTable(u16 panTableAddress);
 };

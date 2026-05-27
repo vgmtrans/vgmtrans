@@ -6,10 +6,10 @@
 
 #pragma once
 
-#include <array>
-
 #include "ConversionTypes.h"
 #include "Modulation.h"
+
+#include <array>
 
 struct OptionStore;
 

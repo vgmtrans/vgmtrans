@@ -5,13 +5,15 @@
  */
 
 #include "NotificationCenter.h"
-#include "VGMItem.h"
+
+#include "base/Types.h"
 #include "Helpers.h"
+#include "VGMItem.h"
 
 NotificationCenter::NotificationCenter(QObject *parent) : QObject(parent) {
 }
 
-void NotificationCenter::updateStatus(const QString& name, const QString& description, const QIcon* icon, uint32_t offset, uint32_t size) {
+void NotificationCenter::updateStatus(const QString& name, const QString& description, const QIcon* icon, u32 offset, u32 size) {
   emit statusUpdated(name, description, icon, offset, size);
 }
 

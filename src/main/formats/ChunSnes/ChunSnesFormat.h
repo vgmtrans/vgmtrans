@@ -1,8 +1,9 @@
 #pragma once
-#include "Format.h"
-#include "FilegroupMatcher.h"
-#include "ChunSnesScanner.h"
 
+#include "base/Types.h"
+#include "ChunSnesScanner.h"
+#include "FilegroupMatcher.h"
+#include "Format.h"
 
 // **************
 // ChunSnesFormat
@@ -13,13 +14,13 @@ BEGIN_FORMAT(ChunSnes)
   USING_MATCHER(FilegroupMatcher)
 END_FORMAT()
 
-enum ChunSnesVersion: uint8_t {
+enum ChunSnesVersion: u8 {
   CHUNSNES_NONE = 0,              // Unknown Version
   CHUNSNES_SUMMER,                // Otogirisou
   CHUNSNES_WINTER,                // Dragon Quest 5 etc.
 };
 
-enum ChunSnesMinorVersion: uint8_t {
+enum ChunSnesMinorVersion: u8 {
   CHUNSNES_NOMINORVERSION = 0,    // Unknown Minor Version
   CHUNSNES_SUMMER_V2,             // Otogirisou
   CHUNSNES_WINTER_V1,             // Dragon Quest 5

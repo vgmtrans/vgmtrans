@@ -5,9 +5,11 @@
  */
 
 #include "KonamiVendettaInstr.h"
-#include "KonamiTMNT2Instr.h"
-#include "KonamiTMNT2Format.h"
+
+#include "base/Types.h"
 #include "KonamiAdpcm.h"
+#include "KonamiTMNT2Format.h"
+#include "KonamiTMNT2Instr.h"
 #include "LogManager.h"
 #include "VGMRgn.h"
 

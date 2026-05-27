@@ -1,12 +1,16 @@
 #pragma once
 
+#include "base/Types.h"
 #include "CPS1Scanner.h"
 #include "VGMSeq.h"
+
+#include <string>
+#include <vector>
 
 class CPS1Seq:
     public VGMSeq {
 public:
-  CPS1Seq(RawFile *file, uint32_t offset, CPS1FormatVer fmtVersion, std::string name = {}, std::vector<s8> instrTransposeTable = {});
+  CPS1Seq(RawFile *file, u32 offset, CPS1FormatVer fmtVersion, std::string name = {}, std::vector<s8> instrTransposeTable = {});
   ~CPS1Seq() = default;
 
   bool parseHeader() override;
@@ -18,6 +22,6 @@ public:
 
 private:
   std::vector<s8> instrTransposeTable;
-  uint8_t masterVol = 0x7F;
+  u8 masterVol = 0x7F;
   CPS1FormatVer fmtVersion;
 };

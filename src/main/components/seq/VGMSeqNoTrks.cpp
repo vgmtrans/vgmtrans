@@ -5,9 +5,11 @@
  */
 
 #include "VGMSeqNoTrks.h"
+
+#include "base/Types.h"
 #include "Options.h"
 
-VGMSeqNoTrks::VGMSeqNoTrks(const std::string &format, RawFile *file, uint32_t offset, std::string name)
+VGMSeqNoTrks::VGMSeqNoTrks(const std::string &format, RawFile *file, u32 offset, std::string name)
     : VGMSeq(format, file, offset, 0, std::move(name)), SeqTrack(this) {
   VGMSeqNoTrks::resetVars();
 }
@@ -136,7 +138,7 @@ MidiTrack *VGMSeqNoTrks::firstMidiTrack() {
 // checks whether or not we have already created the given number of MidiTracks.  If not, it appends
 // the extra tracks. doesn't ever need to be called directly by format code, since SetCurMidiTrack
 // does so automatically.
-void VGMSeqNoTrks::tryExpandMidiTracks(uint32_t numTracks) {
+void VGMSeqNoTrks::tryExpandMidiTracks(u32 numTracks) {
   if (VGMSeq::readMode != READMODE_CONVERT_TO_MIDI)
     return;
   if (midiTracks.size() < numTracks) {
@@ -163,7 +165,7 @@ void VGMSeqNoTrks::setChannel(u8 newChannel) {
     channel = newChannel;
 }
 
-void VGMSeqNoTrks::setCurTrack(uint32_t trackNum) {
+void VGMSeqNoTrks::setCurTrack(u32 trackNum) {
   if (VGMSeq::readMode != READMODE_CONVERT_TO_MIDI)
     return;
 
@@ -171,17 +173,17 @@ void VGMSeqNoTrks::setCurTrack(uint32_t trackNum) {
   pMidiTrack = midiTracks[trackNum];
 }
 
-void VGMSeqNoTrks::setTime(uint32_t newTime) {
+void VGMSeqNoTrks::setTime(u32 newTime) {
   time = newTime;
   if (VGMSeq::readMode == READMODE_CONVERT_TO_MIDI)
-    for (uint32_t i = 0; i < midiTracks.size(); i++)
+    for (u32 i = 0; i < midiTracks.size(); i++)
       pMidiTrack->setDelta(newTime);
 }
 
-void VGMSeqNoTrks::addTime(uint32_t delta) {
+void VGMSeqNoTrks::addTime(u32 delta) {
   time += delta;
   if (VGMSeq::readMode == READMODE_CONVERT_TO_MIDI) {
-    for (uint32_t i = 0; i < midiTracks.size(); i++)
+    for (u32 i = 0; i < midiTracks.size(); i++)
       midiTracks[i]->addDelta(delta);
   }
 }

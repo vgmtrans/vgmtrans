@@ -4,10 +4,12 @@
  * refer to the included LICENSE.txt file
  */
 #pragma once
-#include "Scanner.h"
-#include "BytePattern.h"
 
-enum HeartBeatSnesVersion : uint8_t;  // see HeartBeatSnesFormat.h
+#include "base/Types.h"
+#include "BytePattern.h"
+#include "Scanner.h"
+
+enum HeartBeatSnesVersion : u8;  // see HeartBeatSnesFormat.h
 
 class HeartBeatSnesScanner : public VGMScanner {
  public:

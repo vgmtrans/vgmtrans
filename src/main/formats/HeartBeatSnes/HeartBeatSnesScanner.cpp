@@ -4,8 +4,9 @@
  * refer to the included LICENSE.txt file
  */
 
-#include "HeartBeatSnesSeq.h"
+#include "base/Types.h"
 #include "HeartBeatSnesInstr.h"
+#include "HeartBeatSnesSeq.h"
 #include "ScannerManager.h"
 
 namespace vgmtrans::scanners {
@@ -116,10 +117,10 @@ void HeartBeatSnesScanner::searchForHeartBeatSnesFromARAM(RawFile *file) {
   std::string name = file->tag.hasTitle() ? file->tag.title : file->stem();
 
   // search song list
-  uint32_t ofsReadSongList;
-  uint16_t addrSongListLo;
-  uint16_t addrSongListHi;
-  int8_t maxSongIndex;
+  u32 ofsReadSongList;
+  u16 addrSongListLo;
+  u16 addrSongListHi;
+  s8 maxSongIndex;
   if (file->searchBytePattern(ptnReadSongList, ofsReadSongList)) {
     addrSongListLo = file->readShort(ofsReadSongList + 2);
     addrSongListHi = file->readShort(ofsReadSongList + 7);
@@ -139,8 +140,8 @@ void HeartBeatSnesScanner::searchForHeartBeatSnesFromARAM(RawFile *file) {
     return;
   }
 
-  uint32_t ofsSaveSeqHeaderAddress;
-  uint8_t addrSeqHeaderPtr;
+  u32 ofsSaveSeqHeaderAddress;
+  u8 addrSeqHeaderPtr;
   if (file->searchBytePattern(ptnSaveSeqHeaderAddress, ofsSaveSeqHeaderAddress)) {
     addrSeqHeaderPtr = file->readByte(ofsSaveSeqHeaderAddress + 10);
   }
@@ -149,15 +150,15 @@ void HeartBeatSnesScanner::searchForHeartBeatSnesFromARAM(RawFile *file) {
   }
 
   // guess song index
-  int8_t songIndex = -1;
-  for (int8_t songIndexCandidate = 0; songIndexCandidate < maxSongIndex; songIndexCandidate++) {
-    uint16_t addrSeqHeader =
+  s8 songIndex = -1;
+  for (s8 songIndexCandidate = 0; songIndexCandidate < maxSongIndex; songIndexCandidate++) {
+    u16 addrSeqHeader =
         file->readByte(addrSongListLo + songIndexCandidate) | (file->readByte(addrSongListHi + songIndexCandidate) << 8);
     if (addrSeqHeader == 0) {
       break;
     }
 
-    uint16_t addrTargetSeqHeader = file->readShort(addrSeqHeaderPtr);
+    u16 addrTargetSeqHeader = file->readShort(addrSeqHeaderPtr);
     if (addrSeqHeader == addrTargetSeqHeader) {
       songIndex = songIndexCandidate;
       break;
@@ -169,20 +170,20 @@ void HeartBeatSnesScanner::searchForHeartBeatSnesFromARAM(RawFile *file) {
   }
 
   // search DIR address
-  uint32_t ofsSetDIR;
-  uint16_t spcDirAddr = 0;
+  u32 ofsSetDIR;
+  u16 spcDirAddr = 0;
   if (file->searchBytePattern(ptnSetDIR, ofsSetDIR)) {
     spcDirAddr = file->readByte(ofsSetDIR + 1) << 8;
   }
 
   // search SRCN lookup table
-  uint32_t ofsLoadSRCN;
-  uint16_t addrSRCNTable = 0;
+  u32 ofsLoadSRCN;
+  u16 addrSRCNTable = 0;
   if (file->searchBytePattern(ptnLoadSRCN, ofsLoadSRCN)) {
     addrSRCNTable = file->readShort(ofsLoadSRCN + 31);
   }
 
-  uint16_t addrSeqHeader = file->readByte(addrSongListLo + songIndex) | (file->readByte(addrSongListHi + songIndex) << 8);
+  u16 addrSeqHeader = file->readByte(addrSongListLo + songIndex) | (file->readByte(addrSongListHi + songIndex) << 8);
   HeartBeatSnesSeq *newSeq = new HeartBeatSnesSeq(file, version, addrSeqHeader, name);
   if (!newSeq->loadVGMFile()) {
     delete newSeq;
@@ -193,18 +194,18 @@ void HeartBeatSnesScanner::searchForHeartBeatSnesFromARAM(RawFile *file) {
     return;
   }
 
-  uint16_t ofsInstrTable = file->readShort(addrSeqHeader);
-  uint16_t ofsFirstTrack = file->readShort(addrSeqHeader + 2);
+  u16 ofsInstrTable = file->readShort(addrSeqHeader);
+  u16 ofsFirstTrack = file->readShort(addrSeqHeader + 2);
   if (ofsInstrTable >= ofsFirstTrack || addrSeqHeader + ofsInstrTable >= 0x10000) {
     return;
   }
 
-  uint16_t addrInstrTable = addrSeqHeader + ofsInstrTable;
-  uint16_t instrTableSize = ofsFirstTrack - ofsInstrTable;
+  u16 addrInstrTable = addrSeqHeader + ofsInstrTable;
+  u16 instrTableSize = ofsFirstTrack - ofsInstrTable;
 
   // we sometimes need to shorten the expected table size
   // example: Dragon Quest 6 - Through the Fields
-  for (uint16_t newTableSize = 0; newTableSize < instrTableSize; newTableSize++) {
+  for (u16 newTableSize = 0; newTableSize < instrTableSize; newTableSize++) {
     if (newSeq->isItemAtOffset(addrInstrTable + newTableSize, false)) {
       instrTableSize = newTableSize;
       break;

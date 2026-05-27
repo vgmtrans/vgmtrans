@@ -1,6 +1,9 @@
 #include "KonamiArcadeSeq.h"
+
+#include "base/Types.h"
 #include "KonamiArcadeDefinitions.h"
 #include "ScaleConversion.h"
+
 #include <spdlog/fmt/fmt.h>
 
 DECLARE_FORMAT(KonamiArcade);
@@ -92,7 +95,7 @@ bool KonamiArcadeSeq::parseTrackPointers() {
 // *****************
 
 
-KonamiArcadeTrack::KonamiArcadeTrack(KonamiArcadeSeq *parentSeq, uint32_t offset, uint32_t length)
+KonamiArcadeTrack::KonamiArcadeTrack(KonamiArcadeSeq *parentSeq, u32 offset, u32 length)
     : SeqTrack(parentSeq, offset, length), m_inJump(false) {
 }
 
@@ -202,7 +205,7 @@ void KonamiArcadeTrack::applyTranspose() {
   }
 }
 
-void KonamiArcadeTrack::makeTrulyPrevDurNoteEnd(uint32_t absTime) const {
+void KonamiArcadeTrack::makeTrulyPrevDurNoteEnd(u32 absTime) const {
   if (readMode == READMODE_CONVERT_TO_MIDI) {
     if (pMidiTrack->prevDurNoteOffs.size() > 0) {
       auto prevDurNoteOff = pMidiTrack->prevDurNoteOffs.back();
@@ -271,8 +274,8 @@ void KonamiArcadeTrack::onTickBegin() {
 }
 
 bool KonamiArcadeTrack::readEvent() {
-  uint32_t beginOffset = curOffset;
-  uint8_t status_byte = readByte(curOffset++);
+  u32 beginOffset = curOffset;
+  u8 status_byte = readByte(curOffset++);
 
   if (status_byte == 0x60) {
     addGenericEvent(beginOffset, curOffset - beginOffset, "Percussion On", "", Type::ChangeState);
@@ -288,7 +291,7 @@ bool KonamiArcadeTrack::readEvent() {
 
   // Note
   if (status_byte < 0xC0) {
-    uint8_t note, delta;
+    u8 note, delta;
     if (status_byte < 0x60) {
       note = status_byte;
       delta = readByte(curOffset++);
@@ -299,8 +302,8 @@ bool KonamiArcadeTrack::readEvent() {
       note = status_byte - 0x62;
     }
 
-    uint8_t durOrVel = readByte(curOffset++);
-    uint8_t vel;
+    u8 durOrVel = readByte(curOffset++);
+    u8 vel;
     if (durOrVel < 0x80) {
       m_duration = durOrVel;
       vel = readByte(curOffset++);
@@ -328,7 +331,7 @@ bool KonamiArcadeTrack::readEvent() {
 
     note += 24;
 
-    uint32_t actualDuration;
+    u32 actualDuration;
     if (m_duration == 0) {
       if (percussionEnabled() && (note - 24) < 46) {
         auto seq = static_cast<KonamiArcadeSeq*>(parentSeq);
@@ -489,7 +492,7 @@ bool KonamiArcadeTrack::readEvent() {
 
     // 0xDE sets a flag distinct from the 0x60/0x61 percussion flag, but still checked to enable percussion
     case 0xDE: {
-      uint8_t bEnablePercussion = readByte(curOffset++);
+      u8 bEnablePercussion = readByte(curOffset++);
       if (bEnablePercussion != 0) {
         addGenericEvent(beginOffset, curOffset - beginOffset, "Enable Percussion", "", Type::UseDrumKit);
         enablePercussion(m_percussionFlag2);
@@ -507,7 +510,7 @@ bool KonamiArcadeTrack::readEvent() {
 
     // Rest
     case 0xE0: {
-      uint8_t delta = readByte(curOffset++);
+      u8 delta = readByte(curOffset++);
       addRest(beginOffset, curOffset-beginOffset, delta);
       m_prevDelta = delta;
       m_didCancelDurTie = true;
@@ -516,9 +519,9 @@ bool KonamiArcadeTrack::readEvent() {
 
     // Hold
     case 0xE1: {
-      uint8_t delta = readByte(curOffset++);
-      uint8_t dur = readByte(curOffset++);
-      uint32_t newdur = (delta * dur) / 0x64;
+      u8 delta = readByte(curOffset++);
+      u8 dur = readByte(curOffset++);
+      u32 newdur = (delta * dur) / 0x64;
       addTime(newdur);
       makePrevDurNoteEnd();
       addTime(delta - newdur);

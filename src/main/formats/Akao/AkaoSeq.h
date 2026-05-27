@@ -6,11 +6,16 @@
 
 #pragma once
 
-#include <set>
-#include <array>
-#include "VGMSeq.h"
-#include "SeqTrack.h"
 #include "AkaoFormatVersion.h"
+#include "base/Types.h"
+#include "SeqTrack.h"
+#include "VGMSeq.h"
+
+#include <array>
+#include <map>
+#include <set>
+#include <string>
+#include <vector>
 
 class AkaoSeq;
 class AkaoTrack;
@@ -143,7 +148,7 @@ enum AkaoSeqEventType {
 class AkaoSeq final :
     public VGMSeq {
  public:
-  explicit AkaoSeq(RawFile *file, uint32_t offset, AkaoPs1Version version, std::string name);
+  explicit AkaoSeq(RawFile *file, u32 offset, AkaoPs1Version version, std::string name);
 
   void resetVars() override;
   bool parseHeader() override;
@@ -152,15 +157,15 @@ class AkaoSeq final :
   [[nodiscard]] AkaoPs1Version version() const noexcept { return version_; }
 
   [[nodiscard]] std::string readTimestampAsText() const;
-  [[nodiscard]] double getTempoInBPM(uint16_t tempo) const;
+  [[nodiscard]] double getTempoInBPM(u16 tempo) const;
   [[nodiscard]] bool usesIndividualArts() const noexcept { return bUsesIndividualArts; }
 
   [[nodiscard]] AkaoInstrSet* newInstrSet() const;
 
-  [[nodiscard]] static bool isPossibleAkaoSeq(const RawFile *file, uint32_t offset);
-  [[nodiscard]] static AkaoPs1Version guessVersion(const RawFile *file, uint32_t offset);
+  [[nodiscard]] static bool isPossibleAkaoSeq(const RawFile *file, u32 offset);
+  [[nodiscard]] static AkaoPs1Version guessVersion(const RawFile *file, u32 offset);
 
-  [[nodiscard]] static uint32_t getTrackAllocationBitsOffset(AkaoPs1Version version) noexcept {
+  [[nodiscard]] static u32 getTrackAllocationBitsOffset(AkaoPs1Version version) noexcept {
     switch (version)
     {
     case AkaoPs1Version::VERSION_1_0:
@@ -180,28 +185,28 @@ class AkaoSeq final :
   void LoadEventMap();
 
  public:
-  uint16_t seq_id;
+  u16 seq_id;
   bool bUsesIndividualArts;
 
-  [[nodiscard]] uint32_t instrument_set_offset() const noexcept { return instrument_set_offset_; }
+  [[nodiscard]] u32 instrument_set_offset() const noexcept { return instrument_set_offset_; }
   [[nodiscard]] bool has_instrument_set_offset() const noexcept { return instrument_set_offset_ != 0; }
-  void set_instrument_set_offset(uint32_t offset) noexcept { instrument_set_offset_ = offset; }
-  [[nodiscard]] uint32_t drum_set_offset() const noexcept { return drum_set_offset_; }
+  void set_instrument_set_offset(u32 offset) noexcept { instrument_set_offset_ = offset; }
+  [[nodiscard]] u32 drum_set_offset() const noexcept { return drum_set_offset_; }
   [[nodiscard]] bool has_drum_set_offset() const noexcept { return drum_set_offset_ != 0; }
-  void set_drum_set_offset(uint32_t offset) noexcept { drum_set_offset_ = offset; }
+  void set_drum_set_offset(u32 offset) noexcept { drum_set_offset_ = offset; }
 
  private:
   AkaoPs1Version version_;
-  uint32_t instrument_set_offset_;
-  uint32_t drum_set_offset_;
+  u32 instrument_set_offset_;
+  u32 drum_set_offset_;
 
-  std::set<uint32_t> custom_instrument_addresses;
-  std::set<uint32_t> drum_instrument_addresses;
+  std::set<u32> custom_instrument_addresses;
+  std::set<u32> drum_instrument_addresses;
 
-  std::map<uint8_t, AkaoSeqEventType> event_map;
-  std::map<uint8_t, AkaoSeqEventType> sub_event_map;
+  std::map<u8, AkaoSeqEventType> event_map;
+  std::map<u8, AkaoSeqEventType> sub_event_map;
 
-  uint8_t condition;
+  u8 condition;
 
   friend AkaoTrack;
 };
@@ -209,7 +214,7 @@ class AkaoSeq final :
 class AkaoTrack final
     : public SeqTrack {
  public:
-  explicit AkaoTrack(AkaoSeq *parentFile, uint32_t offset = 0, uint32_t length = 0);
+  explicit AkaoTrack(AkaoSeq *parentFile, u32 offset = 0, u32 length = 0);
 
   void resetVars() override;
   bool readEvent() override;
@@ -223,16 +228,16 @@ class AkaoTrack final
   bool legato;
   bool portamento;
   bool drum;
-  uint32_t pattern_return_offset;
-  std::array<uint32_t, 4> loop_begin_loc;
-  uint16_t loop_layer;
-  std::array<uint16_t, 4> loop_counter;
-  uint16_t last_delta_time;
+  u32 pattern_return_offset;
+  std::array<u32, 4> loop_begin_loc;
+  u16 loop_layer;
+  std::array<u16, 4> loop_counter;
+  u16 last_delta_time;
   bool use_one_time_delta_time;
-  uint8_t one_time_delta_time;
-  uint16_t delta_time_overwrite;
-  int8_t tuning;
-  std::vector<uint32_t> conditional_jump_destinations;
+  u8 one_time_delta_time;
+  u16 delta_time_overwrite;
+  s8 tuning;
+  std::vector<u32> conditional_jump_destinations;
 
  private:
   void logUnknownEvent(u32 beginOffset) const;

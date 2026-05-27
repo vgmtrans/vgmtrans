@@ -5,6 +5,10 @@
  */
 
 #include "TitleBar.h"
+
+#include "Metrics.h"
+#include "UIHelpers.h"
+
 #include <QApplication>
 #include <QDockWidget>
 #include <QEvent>
@@ -14,8 +18,6 @@
 #include <QPropertyAnimation>
 #include <QSizePolicy>
 #include <QToolButton>
-#include "Metrics.h"
-#include "UIHelpers.h"
 
 namespace {
 constexpr int kTitleBarButtonWidth = 22;

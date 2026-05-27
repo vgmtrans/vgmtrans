@@ -1,27 +1,28 @@
 #include "NinSnesProfile.h"
 
-#include <array>
-#include <algorithm>
-#include <utility>
-
-#include "SNESDSP.h"
+#include "base/Types.h"
 #include "io/RawFile.h"
+#include "SNESDSP.h"
+
+#include <algorithm>
+#include <array>
+#include <utility>
 
 namespace {
 
 template <size_t N>
-std::vector<uint8_t> defaultTable(const std::array<uint8_t, N>& values) {
+std::vector<u8> defaultTable(const std::array<u8, N>& values) {
   return {values.begin(), values.end()};
 }
 
 template <size_t N>
-void assignDefaultTableIfEmpty(std::vector<uint8_t>& table, const std::array<uint8_t, N>& values) {
+void assignDefaultTableIfEmpty(std::vector<u8>& table, const std::array<u8, N>& values) {
   if (table.empty()) {
     table = defaultTable(values);
   }
 }
 
-void loadStandardVcmdMap(std::map<uint8_t, NinSnesSeqEventType>& eventMap, uint8_t statusByte) {
+void loadStandardVcmdMap(std::map<u8, NinSnesSeqEventType>& eventMap, u8 statusByte) {
   eventMap[statusByte + 0x00] = EVENT_PROGCHANGE;
   eventMap[statusByte + 0x01] = EVENT_PAN;
   eventMap[statusByte + 0x02] = EVENT_PAN_FADE;
@@ -51,48 +52,48 @@ void loadStandardVcmdMap(std::map<uint8_t, NinSnesSeqEventType>& eventMap, uint8
   eventMap[statusByte + 0x1a] = EVENT_PERCUSSION_PATCH_BASE;
 }
 
-constexpr std::array<uint8_t, 16> kVolumeTableEarlier = {
+constexpr std::array<u8, 16> kVolumeTableEarlier = {
     0x08, 0x12, 0x1b, 0x24, 0x2c, 0x35, 0x3e, 0x47, 0x51, 0x5a, 0x62, 0x6b, 0x7d, 0x8f, 0xa1, 0xb3,
 };
 
-constexpr std::array<uint8_t, 8> kDurTableEarlier = {
+constexpr std::array<u8, 8> kDurTableEarlier = {
     0x33, 0x66, 0x80, 0x99, 0xb3, 0xcc, 0xe6, 0xff,
 };
 
-constexpr std::array<uint8_t, 21> kPanTableEarlier = {
+constexpr std::array<u8, 21> kPanTableEarlier = {
     0x00, 0x01, 0x03, 0x07, 0x0d, 0x15, 0x1e, 0x29, 0x34, 0x42, 0x51,
     0x5e, 0x67, 0x6e, 0x73, 0x77, 0x7a, 0x7c, 0x7d, 0x7e, 0x7f,
 };
 
-constexpr std::array<uint8_t, 16> kVolumeTableStandard = {
+constexpr std::array<u8, 16> kVolumeTableStandard = {
     0x19, 0x33, 0x4c, 0x66, 0x72, 0x7f, 0x8c, 0x99, 0xa5, 0xb2, 0xbf, 0xcc, 0xd8, 0xe5, 0xf2, 0xfc,
 };
 
-constexpr std::array<uint8_t, 8> kDurTableStandard = {
+constexpr std::array<u8, 8> kDurTableStandard = {
     0x33, 0x66, 0x7f, 0x99, 0xb2, 0xcc, 0xe5, 0xfc,
 };
 
-constexpr std::array<uint8_t, 21> kPanTableStandard = {
+constexpr std::array<u8, 21> kPanTableStandard = {
     0x00, 0x01, 0x03, 0x07, 0x0d, 0x15, 0x1e, 0x29, 0x34, 0x42, 0x51,
     0x5e, 0x67, 0x6e, 0x73, 0x77, 0x7a, 0x7c, 0x7d, 0x7e, 0x7f,
 };
 
-constexpr std::array<uint8_t, 16> kVolumeTableIntelli = {
+constexpr std::array<u8, 16> kVolumeTableIntelli = {
     0x19, 0x32, 0x4c, 0x65, 0x72, 0x7f, 0x8c, 0x98, 0xa5, 0xb2, 0xbf, 0xcb, 0xd8, 0xe5, 0xf2, 0xfc,
 };
 
-constexpr std::array<uint8_t, 8> kDurTableIntelli = {
+constexpr std::array<u8, 8> kDurTableIntelli = {
     0x32, 0x65, 0x7f, 0x98, 0xb2, 0xcb, 0xe5, 0xfc,
 };
 
-constexpr std::array<uint8_t, 64> kDurVolTableIntelliFe3 = {
+constexpr std::array<u8, 64> kDurVolTableIntelliFe3 = {
     0x00, 0x0c, 0x19, 0x26, 0x33, 0x3f, 0x4c, 0x59, 0x66, 0x72, 0x75, 0x77, 0x70, 0x7c, 0x7f, 0x82,
     0x84, 0x87, 0x89, 0x8c, 0x8e, 0x91, 0x93, 0x96, 0x99, 0x9b, 0x9e, 0xa0, 0xa3, 0xa5, 0xa8, 0xaa,
     0xad, 0xaf, 0xb2, 0xb5, 0xb7, 0xba, 0xbc, 0xbf, 0xc1, 0xc4, 0xc6, 0xc9, 0xcc, 0xce, 0xd1, 0xd3,
     0xd6, 0xd8, 0xdb, 0xdd, 0xe0, 0xe2, 0xe5, 0xe8, 0xea, 0xed, 0xef, 0xf2, 0xf4, 0xf7, 0xf9, 0xfc,
 };
 
-constexpr std::array<uint8_t, 64> kDurVolTableIntelliFe4 = {
+constexpr std::array<u8, 64> kDurVolTableIntelliFe4 = {
     0x19, 0x26, 0x33, 0x3f, 0x4c, 0x59, 0x66, 0x6d, 0x70, 0x72, 0x75, 0x77, 0x70, 0x7c, 0x7f, 0x82,
     0x84, 0x87, 0x89, 0x8c, 0x8e, 0x91, 0x93, 0x96, 0x99, 0x9b, 0x9e, 0xa0, 0xa3, 0xa5, 0xa8, 0xaa,
     0xad, 0xaf, 0xb2, 0xb5, 0xb7, 0xba, 0xbc, 0xbf, 0xc1, 0xc4, 0xc6, 0xc9, 0xcc, 0xce, 0xd1, 0xd3,
@@ -107,12 +108,12 @@ void initializeSeqDefinition(NinSnesSeqDefinition& definition, const NinSnesProf
   definition.eventMap[0x00] = EVENT_END;
 
   for (int statusByte = 0x01; statusByte < definition.status.noteMin; statusByte++) {
-    definition.eventMap[static_cast<uint8_t>(statusByte)] = EVENT_NOTE_PARAM;
+    definition.eventMap[static_cast<u8>(statusByte)] = EVENT_NOTE_PARAM;
   }
 
   for (int statusByte = definition.status.noteMin; statusByte <= definition.status.noteMax;
        statusByte++) {
-    definition.eventMap[static_cast<uint8_t>(statusByte)] = EVENT_NOTE;
+    definition.eventMap[static_cast<u8>(statusByte)] = EVENT_NOTE;
   }
 
   definition.eventMap[definition.status.noteMax + 1] = EVENT_TIE;
@@ -120,7 +121,7 @@ void initializeSeqDefinition(NinSnesSeqDefinition& definition, const NinSnesProf
 
   for (int statusByte = definition.status.percussionNoteMin;
        statusByte <= definition.status.percussionNoteMax; statusByte++) {
-    definition.eventMap[static_cast<uint8_t>(statusByte)] = EVENT_PERCUSSION_NOTE;
+    definition.eventMap[static_cast<u8>(statusByte)] = EVENT_PERCUSSION_NOTE;
   }
 }
 
@@ -164,7 +165,7 @@ void applyStandardSeqDialect(NinSnesSeqDefinition& definition) {
 
 void applyIntelliFe3SeqDialect(NinSnesSeqDefinition& definition) {
   for (int statusByte = 0x01; statusByte < definition.status.noteMin; statusByte++) {
-    definition.eventMap[static_cast<uint8_t>(statusByte)] = EVENT_INTELLI_NOTE_PARAM;
+    definition.eventMap[static_cast<u8>(statusByte)] = EVENT_INTELLI_NOTE_PARAM;
   }
   loadStandardVcmdMap(definition.eventMap, 0xd6);
   definition.eventMap[0xf1] = EVENT_INTELLI_ECHO_ON;
@@ -206,7 +207,7 @@ void applyIntelliTaSeqDialect(NinSnesSeqDefinition& definition) {
 
 void applyIntelliFe4SeqDialect(NinSnesSeqDefinition& definition) {
   for (int statusByte = 0x01; statusByte < definition.status.noteMin; statusByte++) {
-    definition.eventMap[static_cast<uint8_t>(statusByte)] = EVENT_INTELLI_NOTE_PARAM;
+    definition.eventMap[static_cast<u8>(statusByte)] = EVENT_INTELLI_NOTE_PARAM;
   }
   loadStandardVcmdMap(definition.eventMap, 0xda);
   definition.eventMap[0xf5] = EVENT_INTELLI_ECHO_ON;
@@ -284,7 +285,7 @@ void applyDerivedSeqOverrides(NinSnesSeqDefinition& definition, const NinSnesPro
 
     case NinSnesProfileId::Lemmings:
       for (int statusByte = 0x01; statusByte < definition.status.noteMin; statusByte++) {
-        definition.eventMap[static_cast<uint8_t>(statusByte)] = EVENT_LEMMINGS_NOTE_PARAM;
+        definition.eventMap[static_cast<u8>(statusByte)] = EVENT_LEMMINGS_NOTE_PARAM;
       }
       definition.eventMap[0xe5] = EVENT_UNKNOWN1;
       definition.eventMap[0xe6] = EVENT_UNKNOWN2;
@@ -451,14 +452,14 @@ const NinSnesProfile& getNinSnesProfile(NinSnesProfileId id) {
 
   return kUnknownProfile;
 }
-uint16_t convertNinSnesAddress(const NinSnesProfile& profile, uint16_t rawAddress,
-                               uint16_t konamiBaseAddress, uint16_t falcomBaseOffset) {
+u16 convertNinSnesAddress(const NinSnesProfile& profile, u16 rawAddress,
+                               u16 konamiBaseAddress, u16 falcomBaseOffset) {
   switch (profile.addressModel) {
     case NinSnesAddressModelId::KonamiBase:
-      return static_cast<uint16_t>(konamiBaseAddress + rawAddress);
+      return static_cast<u16>(konamiBaseAddress + rawAddress);
 
     case NinSnesAddressModelId::FalcomBaseOffset:
-      return static_cast<uint16_t>(falcomBaseOffset + rawAddress);
+      return static_cast<u16>(falcomBaseOffset + rawAddress);
 
     case NinSnesAddressModelId::Direct:
     default:
@@ -466,27 +467,27 @@ uint16_t convertNinSnesAddress(const NinSnesProfile& profile, uint16_t rawAddres
   }
 }
 
-uint16_t readNinSnesAddress(const NinSnesProfile& profile, const RawFile* file, uint32_t offset,
-                            uint16_t konamiBaseAddress, uint16_t falcomBaseOffset) {
+u16 readNinSnesAddress(const NinSnesProfile& profile, const RawFile* file, u32 offset,
+                            u16 konamiBaseAddress, u16 falcomBaseOffset) {
   return convertNinSnesAddress(profile, file->readShort(offset), konamiBaseAddress,
                                falcomBaseOffset);
 }
 
-uint32_t getNinSnesInstrumentHeaderSize(const NinSnesProfile& profile) {
+u32 getNinSnesInstrumentHeaderSize(const NinSnesProfile& profile) {
   return profile.instrumentLayout == NinSnesInstrumentLayoutId::Earlier5Byte ? 5 : 6;
 }
 
-uint16_t getNinSnesInstrumentSlotCount(const NinSnesProfile& profile) {
+u16 getNinSnesInstrumentSlotCount(const NinSnesProfile& profile) {
   if (profile.instrTableAddressModel == NinSnesInstrTableAddressModelId::Human) {
-    return static_cast<uint16_t>((0x200 / getNinSnesInstrumentHeaderSize(profile)) + 1);
+    return static_cast<u16>((0x200 / getNinSnesInstrumentHeaderSize(profile)) + 1);
   }
 
   return 0x80;
 }
 
 bool isBlankNinSnesInstrumentSlot(const NinSnesProfile& profile, const RawFile* file,
-                                  uint32_t addrInstrHeader) {
-  const uint32_t instrItemSize = getNinSnesInstrumentHeaderSize(profile);
+                                  u32 addrInstrHeader) {
+  const u32 instrItemSize = getNinSnesInstrumentHeaderSize(profile);
   if (addrInstrHeader + instrItemSize > 0x10000) {
     return false;
   }
@@ -497,8 +498,8 @@ bool isBlankNinSnesInstrumentSlot(const NinSnesProfile& profile, const RawFile* 
 
   bool allZero = true;
   bool allFF = true;
-  for (uint32_t i = 0; i < instrItemSize; i++) {
-    const uint8_t b = file->readByte(addrInstrHeader + i);
+  for (u32 i = 0; i < instrItemSize; i++) {
+    const u8 b = file->readByte(addrInstrHeader + i);
     allZero &= (b == 0x00);
     allFF &= (b == 0xFF);
   }
@@ -506,34 +507,34 @@ bool isBlankNinSnesInstrumentSlot(const NinSnesProfile& profile, const RawFile* 
 }
 
 bool isValidNinSnesInstrumentHeader(const NinSnesProfile& profile, const RawFile* file,
-                                    uint32_t addrInstrHeader, uint32_t spcDirAddr,
+                                    u32 addrInstrHeader, u32 spcDirAddr,
                                     bool validateSample) {
-  const uint32_t instrItemSize = getNinSnesInstrumentHeaderSize(profile);
+  const u32 instrItemSize = getNinSnesInstrumentHeaderSize(profile);
   if (addrInstrHeader + instrItemSize > 0x10000) {
     return false;
   }
 
-  std::vector<uint8_t> instrHeader(instrItemSize);
+  std::vector<u8> instrHeader(instrItemSize);
   file->readBytes(addrInstrHeader, instrItemSize, instrHeader.data());
   if (std::all_of(instrHeader.cbegin(), instrHeader.cend(),
-                  [](uint8_t b) { return b == 0x00 || b == 0xFF; })) {
+                  [](u8 b) { return b == 0x00 || b == 0xFF; })) {
     return false;
   }
 
-  const uint8_t srcn = instrHeader[0];
-  const uint8_t adsr1 = instrHeader[1];
-  const uint8_t gain = instrHeader[3];
+  const u8 srcn = instrHeader[0];
+  const u8 adsr1 = instrHeader[1];
+  const u8 gain = instrHeader[3];
   if (srcn >= 0x80 || (adsr1 == 0 && gain == 0)) {
     return false;
   }
 
-  const uint32_t addrDIRentry = spcDirAddr + (srcn * 4);
+  const u32 addrDIRentry = spcDirAddr + (srcn * 4);
   if (!SNESSampColl::isValidSampleDir(file, addrDIRentry, validateSample)) {
     return false;
   }
 
-  const uint16_t srcAddr = file->readShort(addrDIRentry);
-  const uint16_t loopStartAddr = file->readShort(addrDIRentry + 2);
+  const u16 srcAddr = file->readShort(addrDIRentry);
+  const u16 loopStartAddr = file->readShort(addrDIRentry + 2);
   if (srcAddr > loopStartAddr || (loopStartAddr - srcAddr) % 9 != 0) {
     return false;
   }
@@ -550,22 +551,22 @@ bool loadsFullNinSnesSampleDirectory(const NinSnesProfile& profile) {
   return profile.intelliMode == NinSnesIntelliModeId::Ta;
 }
 
-uint32_t resolveNinSnesProgramNumber(const NinSnesProfile& profile, const RawFile* file,
-                                     uint8_t instrumentByte, uint8_t percussionStatusMin,
-                                     uint8_t percussionBase, uint8_t quintetBgmInstrBase,
-                                     uint16_t quintetInstrLookupAddr,
-                                     const std::array<uint32_t, 0x80>* intelliInstrumentProgramMap,
-                                     uint8_t* logicalProgram) {
-  uint8_t resolvedLogicalProgram = instrumentByte;
+u32 resolveNinSnesProgramNumber(const NinSnesProfile& profile, const RawFile* file,
+                                     u8 instrumentByte, u8 percussionStatusMin,
+                                     u8 percussionBase, u8 quintetBgmInstrBase,
+                                     u16 quintetInstrLookupAddr,
+                                     const std::array<u32, 0x80>* intelliInstrumentProgramMap,
+                                     u8* logicalProgram) {
+  u8 resolvedLogicalProgram = instrumentByte;
 
   if (profile.programResolver != NinSnesProgramResolverId::Direct && instrumentByte >= 0x80) {
     resolvedLogicalProgram =
-        static_cast<uint8_t>((instrumentByte - percussionStatusMin) + percussionBase);
+        static_cast<u8>((instrumentByte - percussionStatusMin) + percussionBase);
   }
 
   switch (profile.programResolver) {
     case NinSnesProgramResolverId::QuintetActRBase:
-      resolvedLogicalProgram = static_cast<uint8_t>(resolvedLogicalProgram + quintetBgmInstrBase);
+      resolvedLogicalProgram = static_cast<u8>(resolvedLogicalProgram + quintetBgmInstrBase);
       break;
 
     case NinSnesProgramResolverId::QuintetLookup:
@@ -595,7 +596,7 @@ uint32_t resolveNinSnesProgramNumber(const NinSnesProfile& profile, const RawFil
 }
 
 bool usesNinSnesIntelliCustomPercTable(const NinSnesProfile& profile, bool runtimeCustomPercTable,
-                                       uint8_t intelliPercFlags) {
+                                       u8 intelliPercFlags) {
   if (profile.intelliMode == NinSnesIntelliModeId::Ta ||
       profile.intelliMode == NinSnesIntelliModeId::Fe4) {
     return (intelliPercFlags & 0x40) != 0;
@@ -606,13 +607,13 @@ bool usesNinSnesIntelliCustomPercTable(const NinSnesProfile& profile, bool runti
 
 void setNinSnesIntelliCustomPercTableEnabled(const NinSnesProfile& profile, bool enabled,
                                              bool& runtimeCustomPercTable,
-                                             uint8_t& intelliPercFlags) {
+                                             u8& intelliPercFlags) {
   if (profile.intelliMode == NinSnesIntelliModeId::Ta ||
       profile.intelliMode == NinSnesIntelliModeId::Fe4) {
     if (enabled) {
       intelliPercFlags |= 0x40;
     } else {
-      intelliPercFlags &= static_cast<uint8_t>(~0x40);
+      intelliPercFlags &= static_cast<u8>(~0x40);
     }
     return;
   }
@@ -620,8 +621,8 @@ void setNinSnesIntelliCustomPercTableEnabled(const NinSnesProfile& profile, bool
   runtimeCustomPercTable = enabled;
 }
 
-uint8_t readNinSnesPanTable(const NinSnesProfile& profile, const std::vector<uint8_t>& panTable,
-                            uint16_t pan) {
+u8 readNinSnesPanTable(const NinSnesProfile& profile, const std::vector<u8>& panTable,
+                            u16 pan) {
   if (profile.panModel == NinSnesPanModelId::ToseLinear) {
     return 0;
   }
@@ -630,25 +631,25 @@ uint8_t readNinSnesPanTable(const NinSnesProfile& profile, const std::vector<uin
     return 0;
   }
 
-  uint8_t panIndex = pan >> 8;
-  uint8_t panFraction = pan & 0xff;
+  u8 panIndex = pan >> 8;
+  u8 panFraction = pan & 0xff;
 
-  uint8_t panMaxIndex = static_cast<uint8_t>(panTable.size() - 1);
+  u8 panMaxIndex = static_cast<u8>(panTable.size() - 1);
   if (panIndex > panMaxIndex) {
     panIndex = panMaxIndex;
     panFraction = 0;
   }
 
-  uint8_t volumeRate = panTable[panIndex];
-  uint8_t nextVolumeRate = (panIndex < panMaxIndex) ? panTable[panIndex + 1] : volumeRate;
-  uint8_t volumeRateDelta = nextVolumeRate - volumeRate;
+  u8 volumeRate = panTable[panIndex];
+  u8 nextVolumeRate = (panIndex < panMaxIndex) ? panTable[panIndex + 1] : volumeRate;
+  u8 volumeRateDelta = nextVolumeRate - volumeRate;
   volumeRate += (volumeRateDelta * panFraction) >> 8;
   return volumeRate;
 }
 
-void getNinSnesVolumeBalance(const NinSnesProfile& profile, const std::vector<uint8_t>& panTable,
-                             uint16_t pan, double& volumeLeft, double& volumeRight) {
-  uint8_t panIndex = pan >> 8;
+void getNinSnesVolumeBalance(const NinSnesProfile& profile, const std::vector<u8>& panTable,
+                             u16 pan, double& volumeLeft, double& volumeRight) {
+  u8 panIndex = pan >> 8;
   if (profile.panModel == NinSnesPanModelId::ToseLinear) {
     if (panIndex <= 10) {
       volumeLeft = (255 - 25 * std::max(10 - panIndex, 0)) / 256.0;
@@ -666,7 +667,7 @@ void getNinSnesVolumeBalance(const NinSnesProfile& profile, const std::vector<ui
     return;
   }
 
-  uint8_t panMaxIndex = static_cast<uint8_t>(panTable.size() - 1);
+  u8 panMaxIndex = static_cast<u8>(panTable.size() - 1);
   if (panIndex > panMaxIndex) {
     pan = panMaxIndex << 8;
     panIndex = panMaxIndex;
@@ -680,23 +681,23 @@ void getNinSnesVolumeBalance(const NinSnesProfile& profile, const std::vector<ui
   }
 }
 
-NinSnesPanState decodeNinSnesPanValue(const NinSnesProfile& profile, uint8_t pan) {
+NinSnesPanState decodeNinSnesPanValue(const NinSnesProfile& profile, u8 pan) {
   if (profile.panModel == NinSnesPanModelId::ToseLinear) {
     return {pan, false, false};
   }
 
   return {
-      static_cast<uint8_t>(pan & 0x1f),
+      static_cast<u8>(pan & 0x1f),
       (pan & 0x80) != 0,
       (pan & 0x40) != 0,
   };
 }
 
 NinSnesSeqDefinition buildNinSnesSeqDefinition(NinSnesProfileId profileId,
-                                               const std::vector<uint8_t>& volumeTable,
-                                               const std::vector<uint8_t>& durRateTable,
-                                               const std::vector<uint8_t>& panTable,
-                                               const std::vector<uint8_t>& intelliDurVolTable) {
+                                               const std::vector<u8>& volumeTable,
+                                               const std::vector<u8>& durRateTable,
+                                               const std::vector<u8>& panTable,
+                                               const std::vector<u8>& intelliDurVolTable) {
   const auto& profile = getNinSnesProfile(profileId);
   NinSnesSeqDefinition definition;
   definition.volumeTable = volumeTable;

@@ -1,8 +1,14 @@
 #pragma once
-#include "VGMSeq.h"
-#include "SeqTrack.h"
+
+#include "base/Types.h"
 #include "MoriSnesFormat.h"
 #include "MoriSnesInstr.h"
+#include "SeqTrack.h"
+#include "VGMSeq.h"
+
+#include <map>
+#include <string>
+#include <vector>
 
 #define MORISNES_CALLSTACK_SIZE 10
 
@@ -49,23 +55,23 @@ enum MoriSnesSeqEventType {
 
 class MoriSnesSeq : public VGMSeq {
  public:
-  MoriSnesSeq(RawFile *file, MoriSnesVersion ver, uint32_t seqdataOffset, std::string name = "Mint SNES Seq");
+  MoriSnesSeq(RawFile *file, MoriSnesVersion ver, u32 seqdataOffset, std::string name = "Mint SNES Seq");
   virtual ~MoriSnesSeq();
 
   virtual bool parseHeader();
   virtual bool parseTrackPointers();
   virtual void resetVars();
 
-  double getTempoInBPM(uint8_t tempo, bool fastTempo);
+  double getTempoInBPM(u8 tempo, bool fastTempo);
 
   MoriSnesVersion version;
-  std::map<uint8_t, MoriSnesSeqEventType> EventMap;
+  std::map<u8, MoriSnesSeqEventType> EventMap;
 
-  uint16_t TrackStartAddress[10];
-  std::vector<uint16_t> InstrumentAddresses;
-  std::map<uint16_t, MoriSnesInstrHintDir> InstrumentHints;
+  u16 TrackStartAddress[10];
+  std::vector<u16> InstrumentAddresses;
+  std::map<u16, MoriSnesInstrHintDir> InstrumentHints;
 
-  uint8_t spcTempo;
+  u8 spcTempo;
   bool fastTempo;
 
  private:
@@ -75,24 +81,24 @@ class MoriSnesSeq : public VGMSeq {
 class MoriSnesTrack
     : public SeqTrack {
  public:
-  MoriSnesTrack(MoriSnesSeq *parentFile, uint32_t offset = 0, uint32_t length = 0);
+  MoriSnesTrack(MoriSnesSeq *parentFile, u32 offset = 0, u32 length = 0);
   virtual void resetVars();
   virtual bool readEvent();
 
-  void parseInstrument(uint16_t instrAddress, uint8_t instrNum);
-  void parseInstrumentEvents(uint16_t offset, uint8_t instrNum, bool percussion = false, uint8_t percNoteKey = 0);
+  void parseInstrument(u16 instrAddress, u8 instrNum);
+  void parseInstrumentEvents(u16 offset, u8 instrNum, bool percussion = false, u8 percNoteKey = 0);
 
  private:
-  std::list<int8_t> tiedNoteKeys;
+  std::list<s8> tiedNoteKeys;
 
-  uint8_t spcDeltaTime;
-  int8_t spcNoteNumberBase;
-  uint8_t spcNoteDuration;
-  uint8_t spcNoteVelocity;
-  uint8_t spcVolume;
-  int8_t spcTranspose;
-  uint8_t spcTuning;
+  u8 spcDeltaTime;
+  s8 spcNoteNumberBase;
+  u8 spcNoteDuration;
+  u8 spcNoteVelocity;
+  u8 spcVolume;
+  s8 spcTranspose;
+  u8 spcTuning;
 
-  uint8_t spcCallStack[MORISNES_CALLSTACK_SIZE]; // shared by multiple commands
-  uint8_t spcCallStackPtr;
+  u8 spcCallStack[MORISNES_CALLSTACK_SIZE]; // shared by multiple commands
+  u8 spcCallStackPtr;
 };

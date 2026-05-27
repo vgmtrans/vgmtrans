@@ -5,10 +5,12 @@
  */
 #pragma once
 
-#include "Scanner.h"
+#include "base/Types.h"
 #include "BytePattern.h"
 #include "KonamiVendettaInstr.h"
+#include "Scanner.h"
 
+#include <string>
 #include <vector>
 
 class KonamiTMNT2Seq;
@@ -16,7 +18,7 @@ class MAMEGame;
 struct MAMERomGroup;
 struct konami_tmnt2_drum_info;
 
-enum KonamiTMNT2FormatVer: uint8_t {
+enum KonamiTMNT2FormatVer: u8 {
   VERSION_UNDEFINED,
   TMNT2,
   SSRIDERS,

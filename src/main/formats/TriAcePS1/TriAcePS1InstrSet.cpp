@@ -1,12 +1,14 @@
 #include "TriAcePS1InstrSet.h"
-#include "VGMRgn.h"
+
+#include "base/Types.h"
 #include "PSXSPU.h"
+#include "VGMRgn.h"
 
 // *****************
 // TriAcePS1InstrSet
 // *****************
 
-TriAcePS1InstrSet::TriAcePS1InstrSet(RawFile *file, uint32_t offset)
+TriAcePS1InstrSet::TriAcePS1InstrSet(RawFile *file, u32 offset)
     : VGMInstrSet(TriAcePS1Format::name, file, offset, 0, "TriAce InstrSet") {
 }
 
@@ -51,10 +53,10 @@ bool TriAcePS1InstrSet::parseHeader() {
 //==============================================================
 bool TriAcePS1InstrSet::parseInstrPointers() {
 
-  uint32_t firstWord = readWord(offset() + sizeof(TriAcePS1InstrSet::_InstrHeader));        //1,Sep.2009 revise
+  u32 firstWord = readWord(offset() + sizeof(TriAcePS1InstrSet::_InstrHeader));        //1,Sep.2009 revise
 
   //0xFFFFFFFFになるまで繰り返す。
-  for (uint32_t i = offset() + sizeof(TriAcePS1InstrSet::_InstrHeader);                    //1,Sep.2009 revise
+  for (u32 i = offset() + sizeof(TriAcePS1InstrSet::_InstrHeader);                    //1,Sep.2009 revise
        ((firstWord != 0xFFFFFFFF) && (i < offset() + length()));
        i += sizeof(TriAcePS1Instr::InstrInfo), firstWord = readWord(i)) {
     TriAcePS1Instr *newInstr = new TriAcePS1Instr(this, i, 0, 0, 0);
@@ -76,10 +78,10 @@ bool TriAcePS1InstrSet::parseInstrPointers() {
 // **************
 
 TriAcePS1Instr::TriAcePS1Instr(VGMInstrSet *instrSet,
-                               uint32_t offset,
-                               uint32_t length,
-                               uint32_t theBank,
-                               uint32_t theInstrNum)
+                               u32 offset,
+                               u32 length,
+                               u32 theBank,
+                               u32 theInstrNum)
     : VGMInstr(instrSet, offset, length, theBank, theInstrNum),
       rgns(NULL) {
 }
@@ -126,7 +128,7 @@ bool TriAcePS1Instr::loadInstr() {
     //rgn->loop.loopStatus = (rgninfo->loopOffset != rgninfo->sampOffset) && (rgninfo->loopOffset != 0);
     rgn->loop.loopStart = rgninfo->loopOffset;
     rgn->addChild(rgn->offset() + 12, 1, "Attenuation");
-    rgn->addUnityKey((int8_t) 0x3B - rgninfo->pitchTuneSemitones,
+    rgn->addUnityKey((s8) 0x3B - rgninfo->pitchTuneSemitones,
                      rgn->offset() + 13);  //You would think it would be 0x3C (middle c)
     rgn->addChild(rgn->offset() + 14, 1, "Pitch Fine Tune");
     const int kTuningOffset = 22; // approx. 21.500638 from pitch table (0x10be vs 0x1000)

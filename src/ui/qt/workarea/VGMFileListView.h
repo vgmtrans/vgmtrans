@@ -6,12 +6,13 @@
 
 #pragma once
 
+#include "base/Types.h"
+#include "TableView.h"
+#include "VGMFile.h"
+
 #include <QAbstractTableModel>
 #include <QKeyEvent>
 #include <QSortFilterProxyModel>
-#include "TableView.h"
-
-#include "VGMFile.h"
 
 class QItemSelection;
 class VGMFileListModel : public QAbstractTableModel {
@@ -24,7 +25,7 @@ public:
   int columnCount(const QModelIndex &parent) const override;
 
 private:
-  enum Property : uint8_t { Name = 0, Format = 1 };
+  enum Property : u8 { Name = 0, Format = 1 };
   size_t filesBeforeLoad;
 };
 

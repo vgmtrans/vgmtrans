@@ -6,24 +6,26 @@
 
 #include "VGMCollListView.h"
 
+#include "QtVGMRoot.h"
+#include "SequencePlayer.h"
+#include "services/MenuManager.h"
+#include "services/NotificationCenter.h"
+#include "util/Colors.h"
+#include "util/UIHelpers.h"
+#include <VGMColl.h>
+#include <VGMExport.h>
+#include <VGMSeq.h>
+#include "widgets/EmptyStateWidget.h"
+#include "widgets/ItemViewDensity.h"
+#include "workarea/MdiArea.h"
+
 #include <algorithm>
-#include <QStringView>
+
 #include <QLineEdit>
 #include <QPainter>
 #include <QPixmap>
 #include <QResizeEvent>
-#include <VGMColl.h>
-#include <VGMExport.h>
-#include <VGMSeq.h>
-#include "SequencePlayer.h"
-#include "widgets/EmptyStateWidget.h"
-#include "widgets/ItemViewDensity.h"
-#include "workarea/MdiArea.h"
-#include "QtVGMRoot.h"
-#include "services/MenuManager.h"
-#include "services/NotificationCenter.h"
-#include "util/UIHelpers.h"
-#include "util/Colors.h"
+#include <QStringView>
 
 static constexpr int kSearchEmptyCompactHeightThreshold = 170;
 

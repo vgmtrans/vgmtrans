@@ -5,8 +5,12 @@
  */
 
 #pragma once
-#include "Scanner.h"
+
+#include "base/Types.h"
 #include "BytePattern.h"
+#include "Scanner.h"
+
+#include <map>
 
 class GraphResSnesScanner : public VGMScanner {
  public:
@@ -16,7 +20,7 @@ class GraphResSnesScanner : public VGMScanner {
   static void searchForGraphResSnesFromARAM(RawFile *file);
 
  private:
-  static std::map<uint8_t, uint8_t> getInitDspRegMap(const RawFile *file);
+  static std::map<u8, u8> getInitDspRegMap(const RawFile *file);
 
   static BytePattern ptnLoadSeq;
   static BytePattern ptnDspRegInit;

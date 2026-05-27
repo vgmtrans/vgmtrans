@@ -6,24 +6,37 @@
 
 #include "widgets/StitchUI.h"
 
+#include "base/Types.h"
 #include "ColorHelpers.h"
+#include "QtVGMRoot.h"
+#include "Root.h"
+#include "services/NotificationCenter.h"
+#include "StitchExport.h"
+#include "util/Path.h"
+#include "util/UIHelpers.h"
+#include "VGMColl.h"
+#include "VGMSeq.h"
+#include "widgets/EmptyStateWidget.h"
+#include "workarea/MdiArea.h"
+#include "workarea/VGMCollListView.h"
 
 #include <algorithm>
 #include <cstdint>
 #include <filesystem>
 #include <functional>
+#include <string>
 #include <unordered_set>
 #include <vector>
 
-#include <QAbstractItemView>
 #include <QAbstractButton>
+#include <QAbstractItemView>
 #include <QApplication>
 #include <QDragEnterEvent>
 #include <QDragMoveEvent>
 #include <QDropEvent>
 #include <QFrame>
-#include <QHideEvent>
 #include <QHBoxLayout>
+#include <QHideEvent>
 #include <QKeyEvent>
 #include <QLabel>
 #include <QListWidget>
@@ -31,23 +44,11 @@
 #include <QPointer>
 #include <QPushButton>
 #include <QScreen>
-#include <QSignalBlocker>
 #include <QShowEvent>
+#include <QSignalBlocker>
 #include <QToolButton>
 #include <QVBoxLayout>
 #include <QWindow>
-
-#include "common.h"
-#include "Root.h"
-#include "QtVGMRoot.h"
-#include "StitchExport.h"
-#include "VGMColl.h"
-#include "VGMSeq.h"
-#include "services/NotificationCenter.h"
-#include "util/UIHelpers.h"
-#include "widgets/EmptyStateWidget.h"
-#include "workarea/VGMCollListView.h"
-#include "workarea/MdiArea.h"
 
 namespace {
 
@@ -89,7 +90,7 @@ std::string buildExportSuccessMessage(const std::filesystem::path &midiPath,
                                       const std::filesystem::path &sf2Path,
                                       const conversion::MidiMergeResult &mergeResult,
                                       const std::vector<conversion::MidiMergeEntry> &entries,
-                                      const std::vector<uint8_t> &bankOffsets) {
+                                      const std::vector<u8> &bankOffsets) {
   std::string message = "Stitched export created:\n";
   message += "MIDI: " + midiPath.string() + "\n";
   message += "SF2: " + sf2Path.string();

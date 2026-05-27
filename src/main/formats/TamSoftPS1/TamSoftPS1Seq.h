@@ -1,13 +1,17 @@
 #pragma once
-#include "VGMSeq.h"
-#include "SeqTrack.h"
+
+#include "base/Types.h"
 #include "SeqEvent.h"
+#include "SeqTrack.h"
 #include "TamSoftPS1Format.h"
+#include "VGMSeq.h"
+
+#include <string>
 
 class TamSoftPS1Seq:
     public VGMSeq {
  public:
-  TamSoftPS1Seq(RawFile *file, uint32_t offset, uint8_t theSong, const std::string &name = "TamSoftPS1Seq");
+  TamSoftPS1Seq(RawFile *file, u32 offset, u8 theSong, const std::string &name = "TamSoftPS1Seq");
   virtual ~TamSoftPS1Seq();
 
   virtual bool parseHeader();
@@ -15,11 +19,11 @@ class TamSoftPS1Seq:
   virtual void resetVars();
 
  public:
-  static const uint16_t PITCH_TABLE[73];
+  static const u16 PITCH_TABLE[73];
 
-  uint8_t song;
-  uint16_t type;
-  int16_t reverbDepth;
+  u8 song;
+  u16 type;
+  s16 reverbDepth;
   bool ps2;
 };
 
@@ -27,7 +31,7 @@ class TamSoftPS1Seq:
 class TamSoftPS1Track
     : public SeqTrack {
  public:
-  TamSoftPS1Track(TamSoftPS1Seq *parentSeq, uint32_t offset);
+  TamSoftPS1Track(TamSoftPS1Seq *parentSeq, u32 offset);
 
   virtual void resetVars();
   virtual bool readEvent();
@@ -35,7 +39,7 @@ class TamSoftPS1Track
  protected:
   void finalizeAllNotes();
 
-  uint32_t lastNoteTime;
-  uint16_t lastNotePitch;
-  int8_t lastNoteKey;
+  u32 lastNoteTime;
+  u16 lastNotePitch;
+  s8 lastNoteKey;
 };

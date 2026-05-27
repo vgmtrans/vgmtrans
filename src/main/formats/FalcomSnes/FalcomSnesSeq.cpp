@@ -1,19 +1,22 @@
 #include "FalcomSnesSeq.h"
+
+#include "base/Types.h"
 #include "ScaleConversion.h"
+
 #include <spdlog/fmt/fmt.h>
 
 DECLARE_FORMAT(FalcomSnes);
 
 static constexpr int MAX_TRACKS = 8;
-static constexpr uint16_t SEQ_PPQN = 48;
+static constexpr u16 SEQ_PPQN = 48;
 static constexpr int SEQ_KEY_OFFSET = 25;
-static constexpr uint8_t NOTE_VELOCITY = 100;
+static constexpr u8 NOTE_VELOCITY = 100;
 
 //  *************
 //  FalcomSnesSeq
 //  *************
 
-const uint8_t FalcomSnesSeq::VOLUME_TABLE[129] = {
+const u8 FalcomSnesSeq::VOLUME_TABLE[129] = {
   64, 64, 64, 64, 64, 64, 64, 64,
   64, 64, 64, 64, 64, 64, 64, 64,
   64, 64, 64, 64, 64, 64, 64, 64,
@@ -35,7 +38,7 @@ const uint8_t FalcomSnesSeq::VOLUME_TABLE[129] = {
 
 FalcomSnesSeq::FalcomSnesSeq(RawFile *file,
                                      FalcomSnesVersion ver,
-                                     uint32_t seqdataOffset,
+                                     u32 seqdataOffset,
                                      std::string name)
     : VGMSeq(FalcomSnesFormat::name, file, seqdataOffset, 0, std::move(name)), version(ver) {
   bLoadTickByTick = true;
@@ -65,9 +68,9 @@ bool FalcomSnesSeq::parseHeader() {
     return false;
   }
 
-  uint32_t curOffset = offset();
-  for (uint8_t trackIndex = 0; trackIndex < MAX_TRACKS; trackIndex++) {
-    uint16_t ofsTrackStart = readShort(curOffset);
+  u32 curOffset = offset();
+  for (u8 trackIndex = 0; trackIndex < MAX_TRACKS; trackIndex++) {
+    u16 ofsTrackStart = readShort(curOffset);
     if (ofsTrackStart != 0) {
       auto trackName = fmt::format("Track Pointer {}", trackIndex + 1);
       header->addChild(curOffset, 2, trackName);
@@ -79,7 +82,7 @@ bool FalcomSnesSeq::parseHeader() {
   }
 
   header->addChild(offset() + 0x18, 7, "Duration Table");
-  for (uint8_t off = 0; off < 7; off++) {
+  for (u8 off = 0; off < 7; off++) {
     NoteDurTable.push_back(readByte(offset() + 0x18 + off));
   }
 
@@ -87,12 +90,12 @@ bool FalcomSnesSeq::parseHeader() {
 }
 
 bool FalcomSnesSeq::parseTrackPointers() {
-  uint32_t curOffset = offset();
-  for (uint8_t trackIndex = 0; trackIndex < MAX_TRACKS; trackIndex++) {
-    uint16_t ofsTrackStart = readShort(curOffset);
+  u32 curOffset = offset();
+  for (u8 trackIndex = 0; trackIndex < MAX_TRACKS; trackIndex++) {
+    u16 ofsTrackStart = readShort(curOffset);
     curOffset += 2;
     if (ofsTrackStart != 0) {
-      uint16_t addrTrackStart = offset() + ofsTrackStart;
+      u16 addrTrackStart = offset() + ofsTrackStart;
       FalcomSnesTrack *track = new FalcomSnesTrack(this, addrTrackStart);
       aTracks.push_back(track);
     }
@@ -151,7 +154,7 @@ void FalcomSnesSeq::loadEventMap() {
   EventMap[0xfc] = EVENT_GOTO;
 }
 
-double FalcomSnesSeq::getTempoInBPM(uint8_t tempo) {
+double FalcomSnesSeq::getTempoInBPM(u8 tempo) {
   if (tempo != 0) {
     return 60000000.0 / (SEQ_PPQN * (125 * 0x25)) * (tempo / 256.0);
   }
@@ -165,7 +168,7 @@ double FalcomSnesSeq::getTempoInBPM(uint8_t tempo) {
 //  FalcomSnesTrack
 //  ***************
 
-FalcomSnesTrack::FalcomSnesTrack(FalcomSnesSeq *parentFile, uint32_t offset, uint32_t length)
+FalcomSnesTrack::FalcomSnesTrack(FalcomSnesSeq *parentFile, u32 offset, u32 length)
     : SeqTrack(parentFile, offset, length) {
   FalcomSnesTrack::resetVars();
   bDetermineTrackLengthEventByEvent = true;
@@ -187,15 +190,15 @@ void FalcomSnesTrack::resetVars() {
   spcPan = 0x40;
 }
 
-int8_t FalcomSnesTrack::calculatePanValue(uint8_t pan, double &volumeScale) {
+s8 FalcomSnesTrack::calculatePanValue(u8 pan, double &volumeScale) {
   pan &= 0x7f; // value must not be greater than 127
 
-  uint8_t volL = FalcomSnesSeq::VOLUME_TABLE[pan];
-  uint8_t volR = FalcomSnesSeq::VOLUME_TABLE[(0x7f - pan + 1) & 0x7f];
+  u8 volL = FalcomSnesSeq::VOLUME_TABLE[pan];
+  u8 volR = FalcomSnesSeq::VOLUME_TABLE[(0x7f - pan + 1) & 0x7f];
   double volumeLeft = volL / 64.0;
   double volumeRight = volR / 64.0;
 
-  int8_t midiPan = convertVolumeBalanceToStdMidiPan(volumeLeft, volumeRight, &volumeScale);
+  s8 midiPan = convertVolumeBalanceToStdMidiPan(volumeLeft, volumeRight, &volumeScale);
   volumeScale /= sqrt(2);
 
   return midiPan;
@@ -204,18 +207,18 @@ int8_t FalcomSnesTrack::calculatePanValue(uint8_t pan, double &volumeScale) {
 bool FalcomSnesTrack::readEvent() {
   FalcomSnesSeq *parentSeq = static_cast<FalcomSnesSeq*>(this->parentSeq);
 
-  uint32_t beginOffset = curOffset;
+  u32 beginOffset = curOffset;
   if (curOffset >= 0x10000) {
     return false;
   }
 
-  uint8_t statusByte = readByte(curOffset++);
+  u8 statusByte = readByte(curOffset++);
   bool bContinue = true;
 
   std::string desc;
 
   FalcomSnesSeqEventType eventType = static_cast<FalcomSnesSeqEventType>(0);
-  std::map<uint8_t, FalcomSnesSeqEventType>::iterator pEventType = parentSeq->EventMap.find(statusByte);
+  std::map<u8, FalcomSnesSeqEventType>::iterator pEventType = parentSeq->EventMap.find(statusByte);
   if (pEventType != parentSeq->EventMap.end()) {
     eventType = pEventType->second;
   }
@@ -227,61 +230,61 @@ bool FalcomSnesTrack::readEvent() {
       break;
 
     case EVENT_UNKNOWN1: {
-      uint8_t arg1 = readByte(curOffset++);
+      u8 arg1 = readByte(curOffset++);
       desc = describeUnknownEvent(statusByte, arg1);
       addUnknown(beginOffset, curOffset - beginOffset, "Unknown Event", desc);
       break;
     }
 
     case EVENT_UNKNOWN2: {
-      uint8_t arg1 = readByte(curOffset++);
-      uint8_t arg2 = readByte(curOffset++);
+      u8 arg1 = readByte(curOffset++);
+      u8 arg2 = readByte(curOffset++);
       desc = describeUnknownEvent(statusByte, arg1, arg2);
       addUnknown(beginOffset, curOffset - beginOffset, "Unknown Event", desc);
       break;
     }
 
     case EVENT_UNKNOWN3: {
-      uint8_t arg1 = readByte(curOffset++);
-      uint8_t arg2 = readByte(curOffset++);
-      uint8_t arg3 = readByte(curOffset++);
+      u8 arg1 = readByte(curOffset++);
+      u8 arg2 = readByte(curOffset++);
+      u8 arg3 = readByte(curOffset++);
       desc = describeUnknownEvent(statusByte, arg1, arg2, arg3);
       addUnknown(beginOffset, curOffset - beginOffset, "Unknown Event", desc);
       break;
     }
 
     case EVENT_UNKNOWN4: {
-      uint8_t arg1 = readByte(curOffset++);
-      uint8_t arg2 = readByte(curOffset++);
-      uint8_t arg3 = readByte(curOffset++);
-      uint8_t arg4 = readByte(curOffset++);
+      u8 arg1 = readByte(curOffset++);
+      u8 arg2 = readByte(curOffset++);
+      u8 arg3 = readByte(curOffset++);
+      u8 arg4 = readByte(curOffset++);
       desc = describeUnknownEvent(statusByte, arg1, arg2, arg3, arg4);
       addUnknown(beginOffset, curOffset - beginOffset, "Unknown Event", desc);
       break;
     }
 
     case EVENT_NOP1: {
-      uint8_t arg1 = readByte(curOffset++);
+      u8 arg1 = readByte(curOffset++);
       desc = describeUnknownEvent(statusByte, arg1);
       addGenericEvent(beginOffset, curOffset - beginOffset, "NOP.1", desc, Type::Nop);
       break;
     }
 
     case EVENT_NOP3: {
-      uint8_t arg1 = readByte(curOffset++);
-      uint8_t arg2 = readByte(curOffset++);
-      uint8_t arg3 = readByte(curOffset++);
+      u8 arg1 = readByte(curOffset++);
+      u8 arg2 = readByte(curOffset++);
+      u8 arg3 = readByte(curOffset++);
       desc = describeUnknownEvent(statusByte, arg1, arg2, arg3);
       addUnknown(beginOffset, curOffset - beginOffset, "NOP.3", desc);
       break;
     }
 
     case EVENT_NOTE: {
-      uint8_t lenIndex = statusByte & 7;
+      u8 lenIndex = statusByte & 7;
       bool noKeyoff = (statusByte & 8) != 0; // i.e. slur/tie
-      uint8_t keyIndex = statusByte >> 4;
+      u8 keyIndex = statusByte >> 4;
 
-      uint8_t len;
+      u8 len;
       if (lenIndex != 0) {
         len = parentSeq->NoteDurTable[lenIndex - 1];
       }
@@ -289,13 +292,13 @@ bool FalcomSnesTrack::readEvent() {
         len = readByte(curOffset++);
       }
 
-      uint8_t dur;
+      u8 dur;
       if (noKeyoff || spcNoteQuantize == 0) {
         // slur/tie = full-length
         dur = len;
       }
       else {
-        uint8_t durDelta = (len * spcNoteQuantize) >> 8;
+        u8 durDelta = (len * spcNoteQuantize) >> 8;
         dur = len - durDelta;
       }
 
@@ -309,7 +312,7 @@ bool FalcomSnesTrack::readEvent() {
           parentSeq->instrADSRHints[spcInstr] = spcADSR;
         }
 
-        int8_t key = (octave * 12) + (keyIndex - 1);
+        s8 key = (octave * 12) + (keyIndex - 1);
         if (prevNoteSlurred && key == prevNoteKey) {
           // tie
           makePrevDurNoteEnd(getTime() + dur);
@@ -328,19 +331,19 @@ bool FalcomSnesTrack::readEvent() {
     }
 
     case EVENT_OCTAVE: {
-      uint8_t newOctave = statusByte - 0xd0;
+      u8 newOctave = statusByte - 0xd0;
       addSetOctave(beginOffset, curOffset - beginOffset, newOctave);
       break;
     }
 
     case EVENT_TEMPO: {
-      uint8_t newTempo = readByte(curOffset++); // default value: 120
+      u8 newTempo = readByte(curOffset++); // default value: 120
       addTempoBPM(beginOffset, curOffset - beginOffset, parentSeq->getTempoInBPM(newTempo));
       break;
     }
 
     case EVENT_PROGCHANGE: {
-      uint8_t instrNum = readByte(curOffset++);
+      u8 instrNum = readByte(curOffset++);
       spcInstr = instrNum;
 	    spcADSR = 0; // use default
       addProgramChange(beginOffset, curOffset - beginOffset, instrNum);
@@ -348,9 +351,9 @@ bool FalcomSnesTrack::readEvent() {
     }
 
     case EVENT_VIBRATO: {
-      uint8_t vibratoDelay = readByte(curOffset++);
-      uint8_t vibratoDepth = readByte(curOffset++);
-      uint8_t vibratoRate = readByte(curOffset++);
+      u8 vibratoDelay = readByte(curOffset++);
+      u8 vibratoDepth = readByte(curOffset++);
+      u8 vibratoRate = readByte(curOffset++);
 
       desc = fmt::format("Delay: {:d}  Depth: {:d}  Rate: {:d}", vibratoDelay, vibratoDepth, vibratoRate);
       addGenericEvent(beginOffset, curOffset - beginOffset, "Vibrato", desc, Type::Vibrato);
@@ -366,7 +369,7 @@ bool FalcomSnesTrack::readEvent() {
     }
 
     case EVENT_QUANTIZE: {
-      uint8_t newQuantize = readByte(curOffset++);
+      u8 newQuantize = readByte(curOffset++);
 
       desc = fmt::format("Duration Rate: 1.0 - {:d}/256", newQuantize);
       addGenericEvent(beginOffset, curOffset - beginOffset, "Duration Rate", desc, Type::DurationNote);
@@ -375,25 +378,25 @@ bool FalcomSnesTrack::readEvent() {
     }
 
     case EVENT_VOLUME: {
-      uint8_t newVolume = readByte(curOffset++);
+      u8 newVolume = readByte(curOffset++);
       spcVolume = newVolume;
 
       // actual engine does not limit value here,
       // but the volume value must not be greater than 127
-      uint8_t midiVolume = std::min(newVolume, static_cast<uint8_t>(127));
+      u8 midiVolume = std::min(newVolume, static_cast<u8>(127));
       addVol(beginOffset, curOffset - beginOffset, midiVolume);
       break;
     }
 
     case EVENT_VOLUME_DEC: {
-      uint8_t amounts[] = { 8, 1, 2, 4 };
-      uint8_t amount = amounts[statusByte - 0xdf];
+      u8 amounts[] = { 8, 1, 2, 4 };
+      u8 amount = amounts[statusByte - 0xdf];
 
       desc = fmt::format("Decrease Volume by : {:d}", amount);
       addGenericEvent(beginOffset, curOffset - beginOffset, desc, "", Type::Volume);
 
       // add MIDI events only if updated
-      uint8_t newVolume = static_cast<uint8_t>(std::max(static_cast<int8_t>(spcVolume) - amount, 0));
+      u8 newVolume = static_cast<u8>(std::max(static_cast<s8>(spcVolume) - amount, 0));
       if (newVolume != spcVolume) {
         spcVolume = newVolume;
         addVolNoItem(spcVolume);
@@ -402,14 +405,14 @@ bool FalcomSnesTrack::readEvent() {
     }
 
     case EVENT_VOLUME_INC: {
-      uint8_t amounts[] = { 8, 1, 2, 4 };
-      uint8_t amount = amounts[statusByte - 0xe3];
+      u8 amounts[] = { 8, 1, 2, 4 };
+      u8 amount = amounts[statusByte - 0xe3];
 
       desc = fmt::format("Increase Volume by : {:d}", amount);
       addGenericEvent(beginOffset, curOffset - beginOffset, desc, "", Type::Volume);
 
       // add MIDI events only if updated
-      uint8_t newVolume = static_cast<uint8_t>(std::min(spcVolume + amount, 0x7f));
+      u8 newVolume = static_cast<u8>(std::min(spcVolume + amount, 0x7f));
       if (newVolume != spcVolume) {
         spcVolume = newVolume;
         addVolNoItem(spcVolume);
@@ -418,29 +421,29 @@ bool FalcomSnesTrack::readEvent() {
     }
 
     case EVENT_PAN: {
-      uint8_t newPan = readByte(curOffset++);
+      u8 newPan = readByte(curOffset++);
       spcPan = newPan;
 
       double volumeScale;
-      int8_t midiPan = calculatePanValue(newPan, volumeScale);
+      s8 midiPan = calculatePanValue(newPan, volumeScale);
       addPan(beginOffset, curOffset - beginOffset, midiPan);
       addExpressionNoItem(convertPercentAmpToStdMidiVal(volumeScale));
       break;
     }
 
     case EVENT_PAN_DEC: {
-      uint8_t amount = 8;
+      u8 amount = 8;
 
       desc = fmt::format("Decrease Pan by : {:d}", amount);
       addGenericEvent(beginOffset, curOffset - beginOffset, desc, "", Type::Pan);
 
       // add MIDI events only if updated
-      uint8_t newPan = static_cast<uint8_t>(std::max(static_cast<int8_t>(spcPan) - amount, 0));
+      u8 newPan = static_cast<u8>(std::max(static_cast<s8>(spcPan) - amount, 0));
       if (newPan != spcPan) {
         spcPan = newPan;
 
         double volumeScale;
-        int8_t midiPan = calculatePanValue(newPan, volumeScale);
+        s8 midiPan = calculatePanValue(newPan, volumeScale);
         addPanNoItem(midiPan);
         addExpressionNoItem(convertPercentAmpToStdMidiVal(volumeScale));
       }
@@ -448,18 +451,18 @@ bool FalcomSnesTrack::readEvent() {
     }
 
     case EVENT_PAN_INC: {
-      uint8_t amount = 8;
+      u8 amount = 8;
 
       desc = fmt::format("Increase Pan by : {:d}", amount);
       addGenericEvent(beginOffset, curOffset - beginOffset, desc, "", Type::Pan);
 
       // add MIDI events only if updated
-      uint8_t newPan = static_cast<uint8_t>(std::min(spcPan + amount, 0x7f));
+      u8 newPan = static_cast<u8>(std::min(spcPan + amount, 0x7f));
       if (newPan != spcPan) {
         spcPan = newPan;
 
         double volumeScale;
-        int8_t midiPan = calculatePanValue(newPan, volumeScale);
+        s8 midiPan = calculatePanValue(newPan, volumeScale);
         addPanNoItem(midiPan);
         addExpressionNoItem(convertPercentAmpToStdMidiVal(volumeScale));
       }
@@ -467,9 +470,9 @@ bool FalcomSnesTrack::readEvent() {
     }
 
     case EVENT_PAN_LFO: {
-      uint8_t lfoDelay = readByte(curOffset++);
-      uint8_t lfoDepth = readByte(curOffset++);
-      uint8_t lfoRate = readByte(curOffset++);
+      u8 lfoDelay = readByte(curOffset++);
+      u8 lfoDepth = readByte(curOffset++);
+      u8 lfoRate = readByte(curOffset++);
 
       desc = fmt::format("Delay: {:d}  Depth: {:d}  Rate: {:d}", lfoDelay, lfoDepth, lfoRate);
       addGenericEvent(beginOffset, curOffset - beginOffset, "Pan LFO", desc, Type::PanLfo);
@@ -485,7 +488,7 @@ bool FalcomSnesTrack::readEvent() {
     }
 
     case EVENT_TUNING: {
-      int8_t newTuning = readByte(curOffset++);
+      s8 newTuning = readByte(curOffset++);
 
       desc = fmt::format("Herz: {}{}Hz", newTuning >= 0 ? "+" : "-", newTuning);
       addGenericEvent(beginOffset, curOffset - beginOffset, "Fine Tuning", desc, Type::FineTune);
@@ -496,10 +499,10 @@ bool FalcomSnesTrack::readEvent() {
     }
 
     case EVENT_LOOP_START: {
-      uint8_t count = readByte(curOffset++);
+      u8 count = readByte(curOffset++);
 
       desc = fmt::format("Loop Count {:d}", count);
-      uint16_t repeatCountAddr = curOffset++;
+      u16 repeatCountAddr = curOffset++;
       addGenericEvent(beginOffset, curOffset - beginOffset, "Loop Start", desc, Type::RepeatStart);
 
       // save the repeat count
@@ -508,11 +511,11 @@ bool FalcomSnesTrack::readEvent() {
     }
 
     case EVENT_LOOP_BREAK: {
-      int16_t destOffset = readShort(curOffset);
+      s16 destOffset = readShort(curOffset);
       curOffset += 2;
-      uint16_t dest = curOffset + destOffset;
-      int16_t repeatCountOffset = readShort(dest - 2);
-      uint16_t repeatCountAddr = dest + repeatCountOffset;
+      u16 dest = curOffset + destOffset;
+      s16 repeatCountOffset = readShort(dest - 2);
+      u16 repeatCountAddr = dest + repeatCountOffset;
       desc = fmt::format("Destination: ${:04X}  Loop Count Address: ${:04X}", dest, repeatCountAddr);
       addGenericEvent(beginOffset, curOffset - beginOffset, "Loop Break", desc, Type::LoopBreak);
 
@@ -529,10 +532,10 @@ bool FalcomSnesTrack::readEvent() {
     }
 
     case EVENT_LOOP_END: {
-      int16_t destOffset = readShort(curOffset);
+      s16 destOffset = readShort(curOffset);
       curOffset += 2;
-      uint16_t repeatCountAddr = curOffset + destOffset;
-      uint16_t dest = repeatCountAddr + 1;
+      u16 repeatCountAddr = curOffset + destOffset;
+      u16 dest = repeatCountAddr + 1;
       desc = fmt::format("Destination: ${:04X}", dest);
       addGenericEvent(beginOffset, curOffset - beginOffset, "Loop End", desc, Type::RepeatEnd);
 
@@ -551,9 +554,9 @@ bool FalcomSnesTrack::readEvent() {
     }
 
     case EVENT_PITCH_ENVELOPE: {
-      uint8_t pitchEnvelopeDelay = readByte(curOffset++);
-      uint8_t pitchEnvelopeDepth = readByte(curOffset++);
-      uint8_t pitchEnvelopeRate = readByte(curOffset++);
+      u8 pitchEnvelopeDelay = readByte(curOffset++);
+      u8 pitchEnvelopeDepth = readByte(curOffset++);
+      u8 pitchEnvelopeRate = readByte(curOffset++);
 
       desc = fmt::format("Delay: {:d}  Depth: {:d}  Rate: {:d}", pitchEnvelopeDelay, pitchEnvelopeDepth, pitchEnvelopeRate);
       addGenericEvent(beginOffset, curOffset - beginOffset, "Pitch Envelope", desc, Type::PitchEnvelope);
@@ -569,8 +572,8 @@ bool FalcomSnesTrack::readEvent() {
     }
 
     case EVENT_ADSR: {
-      uint8_t adsr1 = readByte(curOffset++);
-      uint8_t adsr2 = readByte(curOffset++);
+      u8 adsr1 = readByte(curOffset++);
+      u8 adsr2 = readByte(curOffset++);
 	    spcADSR = adsr1 | (adsr2 << 8);
       desc = fmt::format("ADSR(1): ${:02X}  ADSR(2): ${:02X}", adsr1, adsr2);
       addGenericEvent(beginOffset, curOffset - beginOffset, "ADSR", desc, Type::Adsr);
@@ -579,7 +582,7 @@ bool FalcomSnesTrack::readEvent() {
 
     case EVENT_GAIN: {
       // Note: This command doesn't work properly on Ys V
-      uint8_t newGAIN = readByte(curOffset++);
+      u8 newGAIN = readByte(curOffset++);
 
       desc = fmt::format("GAIN: ${:02X}", newGAIN);
       addGenericEvent(beginOffset, curOffset - beginOffset, "GAIN", desc, Type::Adsr);
@@ -587,7 +590,7 @@ bool FalcomSnesTrack::readEvent() {
     }
 
     case EVENT_NOISE_FREQ: {
-      uint8_t newNCK = readByte(curOffset++) & 0x1f;
+      u8 newNCK = readByte(curOffset++) & 0x1f;
 
       desc = fmt::format("Noise Frequency (NCK): {:d}", newNCK);
       addGenericEvent(beginOffset, curOffset - beginOffset, "Noise Frequency", desc, Type::Noise);
@@ -612,9 +615,9 @@ bool FalcomSnesTrack::readEvent() {
     }
 
     case EVENT_ECHO_PARAM: {
-      uint8_t spcEDL = readByte(curOffset++);
-      uint8_t spcEFB = readByte(curOffset++);
-      uint8_t spcFIR = readByte(curOffset++);
+      u8 spcEDL = readByte(curOffset++);
+      u8 spcEFB = readByte(curOffset++);
+      u8 spcFIR = readByte(curOffset++);
 
       desc = fmt::format("Delay: {:d}  Feedback: {:d}  FIR: {:d}", spcEDL, spcEFB, spcFIR);
       addGenericEvent(beginOffset, curOffset - beginOffset, "Echo Param", desc, Type::Reverb);
@@ -633,8 +636,8 @@ bool FalcomSnesTrack::readEvent() {
     }
 
     case EVENT_ECHO_VOLUME: {
-      int8_t echoVolumeLeft = readByte(curOffset++);
-      int8_t echoVolumeRight = readByte(curOffset++);
+      s8 echoVolumeLeft = readByte(curOffset++);
+      s8 echoVolumeRight = readByte(curOffset++);
 
       desc = fmt::format("Echo Volume Left: {:d}  Echo Volume Right: {:d}", echoVolumeLeft, echoVolumeRight);
       addGenericEvent(beginOffset, curOffset - beginOffset, "Echo Volume", desc, Type::Reverb);
@@ -642,7 +645,7 @@ bool FalcomSnesTrack::readEvent() {
     }
 
     case EVENT_ECHO_FIR_OVERWRITE: {
-      uint8_t presetNo = readByte(curOffset++);
+      u8 presetNo = readByte(curOffset++);
       curOffset += 8; // FIR C0-C7
 
       desc = fmt::format("Preset: #{:d}", presetNo);
@@ -651,7 +654,7 @@ bool FalcomSnesTrack::readEvent() {
     }
 
     case EVENT_GOTO: {
-      int16_t destOffset = readShort(curOffset);
+      s16 destOffset = readShort(curOffset);
       curOffset += 2;
 
       if (destOffset == 0) {
@@ -659,9 +662,9 @@ bool FalcomSnesTrack::readEvent() {
         bContinue = false;
       }
       else {
-        uint16_t dest = curOffset + destOffset;
+        u16 dest = curOffset + destOffset;
         desc = fmt::format("Destination: ${:04X}", dest);
-        uint32_t length = curOffset - beginOffset;
+        u32 length = curOffset - beginOffset;
 
         curOffset = dest;
         if (!isOffsetUsed(dest)) {

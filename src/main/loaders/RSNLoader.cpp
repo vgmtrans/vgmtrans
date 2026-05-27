@@ -4,12 +4,14 @@
 * refer to the included LICENSE.txt file
  */
 
-#include "common.h"
 #include "RSNLoader.h"
+
+#include "base/Types.h"
 #include "FileLoader.h"
-#include "LogManager.h"
-#include "unarr.h"
 #include "LoaderManager.h"
+#include "LogManager.h"
+
+#include "unarr.h"
 
 namespace vgmtrans::loaders {
 LoaderRegistration<RSNLoader> _rsn("RSN");
@@ -23,7 +25,7 @@ void RSNLoader::apply(const RawFile *file) {
     return;
 
   // Read header
-  uint8_t rarHeader[FILE_SIGNATURE_SIZE];
+  u8 rarHeader[FILE_SIGNATURE_SIZE];
   file->readBytes(0, FILE_SIGNATURE_SIZE, rarHeader);
 
   if (memcmp(rarHeader, reinterpret_cast<const void *>("Rar!\x1A\x07\x00"), FILE_SIGNATURE_SIZE) != 0) {
@@ -46,7 +48,7 @@ void RSNLoader::apply(const RawFile *file) {
     } else {
       continue;
     }
-    auto buffer = new uint8_t[size];
+    auto buffer = new u8[size];
     if (!ar_entry_uncompress(ar, buffer, size)) {
       L_ERROR("Error decompressing file from rar archive: {}", raw_filename);
       delete[] buffer;
@@ -54,7 +56,7 @@ void RSNLoader::apply(const RawFile *file) {
       ar_close(stream);
       return;
     }
-    auto virtFile = new VirtFile(buffer, static_cast<uint32_t>(size), raw_filename, "", file->tag);
+    auto virtFile = new VirtFile(buffer, static_cast<u32>(size), raw_filename, "", file->tag);
     enqueue(virtFile);
     delete[] buffer;
   }

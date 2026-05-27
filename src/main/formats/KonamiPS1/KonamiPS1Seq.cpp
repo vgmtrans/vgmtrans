@@ -6,6 +6,8 @@
 
 #include "KonamiPS1Seq.h"
 
+#include "base/Types.h"
+
 #include <spdlog/fmt/fmt.h>
 
 DECLARE_FORMAT(KonamiPS1);
@@ -14,7 +16,7 @@ DECLARE_FORMAT(KonamiPS1);
 //  KonamiPS1Seq
 //  ************
 
-KonamiPS1Seq::KonamiPS1Seq(RawFile *file, uint32_t offset, const std::string &name)
+KonamiPS1Seq::KonamiPS1Seq(RawFile *file, u32 offset, const std::string &name)
     : VGMSeq(KonamiPS1Format::name, file, offset, kHeaderSize + file->readWord(offset + 4), name) {
   bLoadTickByTick = true;
 
@@ -37,9 +39,9 @@ bool KonamiPS1Seq::parseHeader() {
   setPPQN(readWord(offset() + kOffsetToTimebase));
   header->addChild(offset() + kOffsetToTrackCount, 4, "Number Of Tracks");
 
-  uint32_t numTracks = readWord(offset() + kOffsetToTrackCount);
+  u32 numTracks = readWord(offset() + kOffsetToTrackCount);
   VGMHeader *trackSizeHeader = addHeader(offset() + kHeaderSize, 2 * numTracks, "Track Size");
-  for (uint32_t trackIndex = 0; trackIndex < numTracks; trackIndex++) {
+  for (u32 trackIndex = 0; trackIndex < numTracks; trackIndex++) {
     std::string itemName = fmt::format("Track {} size", trackIndex + 1);
     trackSizeHeader->addChild(trackSizeHeader->offset() + (trackIndex * 2), 2, itemName);
   }
@@ -48,10 +50,10 @@ bool KonamiPS1Seq::parseHeader() {
 }
 
 bool KonamiPS1Seq::parseTrackPointers() {
-  uint32_t numTracks = readWord(offset() + kOffsetToTrackCount);
-  uint32_t trackStart = offset() + kHeaderSize + (numTracks * 2);
-  for (uint32_t trackIndex = 0; trackIndex < numTracks; trackIndex++) {
-    uint16_t trackSize = readShort(offset() + kHeaderSize + (trackIndex * 2));
+  u32 numTracks = readWord(offset() + kOffsetToTrackCount);
+  u32 trackStart = offset() + kHeaderSize + (numTracks * 2);
+  for (u32 trackIndex = 0; trackIndex < numTracks; trackIndex++) {
+    u16 trackSize = readShort(offset() + kHeaderSize + (trackIndex * 2));
     KonamiPS1Track *track = new KonamiPS1Track(this, trackStart, trackSize);
     aTracks.push_back(track);
     trackStart += trackSize;
@@ -60,7 +62,7 @@ bool KonamiPS1Seq::parseTrackPointers() {
   return true;
 }
 
-bool KonamiPS1Seq::isKDT1Seq(RawFile *file, uint32_t offset) {
+bool KonamiPS1Seq::isKDT1Seq(RawFile *file, u32 offset) {
   if (offset + kHeaderSize >= file->size()) {
     return false;
   }
@@ -70,18 +72,18 @@ bool KonamiPS1Seq::isKDT1Seq(RawFile *file, uint32_t offset) {
     return false;
   }
 
-  uint32_t dataSize = file->readWord(offset + kOffsetToFileSize);
-  uint32_t fileSize = kHeaderSize + dataSize;
+  u32 dataSize = file->readWord(offset + kOffsetToFileSize);
+  u32 fileSize = kHeaderSize + dataSize;
   if (offset + fileSize >= file->size()) {
     return false;
   }
 
-  uint32_t numTracks = file->readWord(offset + kOffsetToTrackCount);
+  u32 numTracks = file->readWord(offset + kOffsetToTrackCount);
   if (numTracks == 0 || offset + kHeaderSize + (numTracks * 2) >= file->size()) {
     return false;
   }
 
-  uint32_t trackSize = 0;
+  u32 trackSize = 0;
   for (size_t trackIndex = 0; trackIndex < numTracks; trackIndex++) {
     trackSize += file->readShort(offset + kHeaderSize + (trackIndex * 2));
   }
@@ -100,7 +102,7 @@ bool KonamiPS1Seq::isKDT1Seq(RawFile *file, uint32_t offset) {
 //  KonamiPS1Track
 //  ***************
 
-KonamiPS1Track::KonamiPS1Track(KonamiPS1Seq *parentFile, uint32_t offset, uint32_t length)
+KonamiPS1Track::KonamiPS1Track(KonamiPS1Seq *parentFile, u32 offset, u32 length)
     : SeqTrack(parentFile, offset, length) {
   resetVars();
   // bDetermineTrackLengthEventByEvent = true;
@@ -116,13 +118,13 @@ void KonamiPS1Track::resetVars() {
 bool KonamiPS1Track::readEvent() {
   KonamiPS1Seq *parentSeq = (KonamiPS1Seq *)this->parentSeq;
 
-  uint32_t beginOffset = curOffset;
+  u32 beginOffset = curOffset;
   if (curOffset >= vgmFile()->endOffset()) {
     return false;
   }
 
   if (!skipDeltaTime) {
-    uint32_t delta = readVarLen(curOffset);
+    u32 delta = readVarLen(curOffset);
     addTime(delta);
 
     std::string description = fmt::format("Duration: {:d}", delta);
@@ -133,15 +135,15 @@ bool KonamiPS1Track::readEvent() {
     return true;
   }
 
-  uint8_t statusByte = readByte(curOffset++);
-  uint8_t command = statusByte & 0x7f;
+  u8 statusByte = readByte(curOffset++);
+  u8 command = statusByte & 0x7f;
   bool note = (statusByte & 0x80) == 0;
 
   bool bContinue = true;
   if (note) {
-    uint8_t noteNumber = command;
-    uint8_t paramByte = readByte(curOffset++);
-    uint8_t velocity = paramByte & 0x7f;
+    u8 noteNumber = command;
+    u8 paramByte = readByte(curOffset++);
+    u8 velocity = paramByte & 0x7f;
     skipDeltaTime = (paramByte & 0x80) != 0;
 
     addNoteOn(beginOffset, curOffset - beginOffset, noteNumber, velocity);
@@ -150,7 +152,7 @@ bool KonamiPS1Track::readEvent() {
   } else {
     std::string description;
 
-    uint8_t paramByte;
+    u8 paramByte;
     if (command == 0x4a) {
       // Note Off (Reset Running Status)
       skipDeltaTime = false;
@@ -225,7 +227,7 @@ bool KonamiPS1Track::readEvent() {
         // In the KCET driver for Silent Hill 2 (PlayStation 2), the equation was changed to
         // ((x * 2) + 10), which appears to give a more accurate real-world tempo, so I've
         // decided to use it universally.
-        uint8_t bpm = static_cast<uint8_t>(std::min<unsigned int>(paramByte * 2 + 10, 255));
+        u8 bpm = static_cast<u8>(std::min<unsigned int>(paramByte * 2 + 10, 255));
         addTempoBPM(beginOffset, curOffset - beginOffset, bpm,
                     "Tempo (10-255 BPM, divisible by two)");
         break;
@@ -233,7 +235,7 @@ bool KonamiPS1Track::readEvent() {
 
       case 72:
         addPitchBend(beginOffset, curOffset - beginOffset,
-                     static_cast<int16_t>(paramByte << 7) - 8192);
+                     static_cast<s16>(paramByte << 7) - 8192);
         break;
 
       case 73:

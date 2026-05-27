@@ -4,11 +4,13 @@
  * refer to the included LICENSE.txt file
  */
 
+#include "base/Types.h"
+#include "ScannerManager.h"
+#include "TamSoftPS1Instr.h"
 #include "TamSoftPS1Seq.h"
 
 #include <spdlog/fmt/fmt.h>
-#include "TamSoftPS1Instr.h"
-#include "ScannerManager.h"
+
 namespace vgmtrans::scanners {
 ScannerRegistration<TamSoftPS1Scanner> s_tamsoft_ps1("TamSoftPS1", {"tsq", "tvb"});
 }
@@ -18,15 +20,15 @@ void TamSoftPS1Scanner::scan(RawFile *file, void *info) {
   std::string extension(file->extension());
 
   if (extension == "tsq") {
-    uint8_t numSongs = 0;
-    uint32_t seqHeaderBoundaryOffset = 0xffffffff;
+    u8 numSongs = 0;
+    u32 seqHeaderBoundaryOffset = 0xffffffff;
     for (numSongs = 0; numSongs < 128; numSongs++) {
-      uint32_t dwSongItemOffset = numSongs * 4;
+      u32 dwSongItemOffset = numSongs * 4;
       if (dwSongItemOffset >= seqHeaderBoundaryOffset) {
         break;
       }
 
-      uint32_t a32 = file->readWord(dwSongItemOffset);
+      u32 a32 = file->readWord(dwSongItemOffset);
       if (a32 == 0xfffff0) {
         break;
       }
@@ -34,13 +36,13 @@ void TamSoftPS1Scanner::scan(RawFile *file, void *info) {
         continue;
       }
 
-      uint16_t seqHeaderRelOffset = file->readWord(dwSongItemOffset + 2);
+      u16 seqHeaderRelOffset = file->readWord(dwSongItemOffset + 2);
       if (seqHeaderBoundaryOffset > seqHeaderRelOffset) {
         seqHeaderBoundaryOffset = seqHeaderRelOffset;
       }
     }
 
-    for (uint8_t songIndex = 0; songIndex < numSongs; songIndex++) {
+    for (u8 songIndex = 0; songIndex < numSongs; songIndex++) {
       std::string seqname = fmt::format("{} ({})", basename, songIndex);
       TamSoftPS1Seq *newSeq = new TamSoftPS1Seq(file, 0, songIndex, seqname);
       if (newSeq->loadVGMFile()) {

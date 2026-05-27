@@ -5,11 +5,12 @@
  */
 #pragma once
 
-#include <variant>
-#include <string>
-#include <map>
-#include <vector>
 #include "Scanner.h"
+
+#include <map>
+#include <string>
+#include <variant>
+#include <vector>
 
 class VGMColl;
 class Matcher;

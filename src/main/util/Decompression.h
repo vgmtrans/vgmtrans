@@ -6,10 +6,14 @@
 
 #pragma once
 
+#include "base/Types.h"
+
 #define ZLIB_CONST
 #include <zlib.h>
+#include <cassert>
 #include <stdexcept>
 #include <array>
+#include <vector>
 
 template <typename T>
 std::vector<unsigned char> zdecompress(T src) {
@@ -27,7 +31,7 @@ std::vector<unsigned char> zdecompress(T src) {
     throw std::runtime_error("Failed to init decompression");
   }
 
-  strm.avail_in = static_cast<uint32_t>(src.size());
+  strm.avail_in = static_cast<u32>(src.size());
   strm.next_in = reinterpret_cast<z_const Bytef *>(src.data());
 
   unsigned actual_size = 0;

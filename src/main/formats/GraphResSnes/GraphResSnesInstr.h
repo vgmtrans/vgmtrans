@@ -1,7 +1,13 @@
 #pragma once
+
+#include "base/Types.h"
+#include "GraphResSnesFormat.h"
 #include "VGMInstrSet.h"
 #include "VGMRgn.h"
-#include "GraphResSnesFormat.h"
+
+#include <map>
+#include <string>
+#include <vector>
 
 // ********************
 // GraphResSnesInstrSet
@@ -11,8 +17,8 @@ class GraphResSnesInstrSet : public VGMInstrSet {
  public:
   GraphResSnesInstrSet(RawFile *file,
                        GraphResSnesVersion ver,
-                       uint32_t spcDirAddr,
-                       const std::map<uint8_t, uint16_t> &instrADSRHints = std::map<uint8_t, uint16_t>(),
+                       u32 spcDirAddr,
+                       const std::map<u8, u16> &instrADSRHints = std::map<u8, u16>(),
                        const std::string &name = "GraphResSnesInstrSet");
   ~GraphResSnesInstrSet() override;
 
@@ -22,9 +28,9 @@ class GraphResSnesInstrSet : public VGMInstrSet {
   GraphResSnesVersion version;
 
  protected:
-  uint32_t spcDirAddr;
-  std::map<uint8_t, uint16_t> instrADSRHints;
-  std::vector<uint8_t> usedSRCNs;
+  u32 spcDirAddr;
+  std::map<u8, u16> instrADSRHints;
+  std::vector<u8> usedSRCNs;
 };
 
 // *****************
@@ -35,9 +41,9 @@ class GraphResSnesInstr : public VGMInstr {
  public:
   GraphResSnesInstr(VGMInstrSet *instrSet,
                     GraphResSnesVersion ver,
-                    uint8_t srcn,
-                    uint32_t spcDirAddr,
-                    uint16_t adsr = 0x8fe0,
+                    u8 srcn,
+                    u32 spcDirAddr,
+                    u16 adsr = 0x8fe0,
                     const std::string &name = "GraphResSnesInstr");
   ~GraphResSnesInstr() override;
 
@@ -46,8 +52,8 @@ class GraphResSnesInstr : public VGMInstr {
   GraphResSnesVersion version;
 
  protected:
-  uint32_t spcDirAddr;
-  uint16_t adsr;
+  u32 spcDirAddr;
+  u16 adsr;
 };
 
 // ***************
@@ -57,7 +63,7 @@ class GraphResSnesInstr : public VGMInstr {
 class GraphResSnesRgn : public VGMRgn {
  public:
   GraphResSnesRgn
-      (GraphResSnesInstr *instr, GraphResSnesVersion ver, uint8_t srcn, uint32_t spcDirAddr, uint16_t adsr = 0x8fe0);
+      (GraphResSnesInstr *instr, GraphResSnesVersion ver, u8 srcn, u32 spcDirAddr, u16 adsr = 0x8fe0);
   ~GraphResSnesRgn() override;
 
   bool loadRgn() override;

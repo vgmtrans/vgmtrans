@@ -5,15 +5,18 @@
  */
 #pragma once
 
-#include "common.h"
-#include "VGMInstrSet.h"
+#include "base/Types.h"
 #include "KonamiTMNT2Instr.h"
 #include "KonamiTMNT2OPMInstr.h"
+#include "VGMInstrSet.h"
+
+#include <string>
 #include <unordered_map>
+#include <vector>
 
 class RawFile;
 class VGMItem;
-enum KonamiTMNT2FormatVer : uint8_t;
+enum KonamiTMNT2FormatVer : u8;
 
 struct konami_vendetta_instr_k053260 {
   u8 samp_info_idx;

@@ -15,19 +15,22 @@
 
 #include "MP2kScanner.h"
 
-#include <optional>
+#include "base/Types.h"
+#include "LogManager.h"
+#include "MP2kInstrSet.h"
+#include "MP2kSeq.h"
+#include "ScannerManager.h"
+#include "VGMColl.h"
+
+#include <array>
 #include <functional>
+#include <optional>
 #include <set>
 #include <span>
-#include <array>
 #include <vector>
+
 #include <spdlog/fmt/fmt.h>
 
-#include "VGMColl.h"
-#include "MP2kSeq.h"
-#include "MP2kInstrSet.h"
-#include "LogManager.h"
-#include "ScannerManager.h"
 namespace vgmtrans::scanners {
 ScannerRegistration<MP2kScanner> s_mp2k("MP2k", {"gba", "gsf", "minigsf", "gsflib"});
 }
@@ -57,7 +60,7 @@ struct MP2kSeqWithIndex {
 };
 
 /* Test if an area of ROM is eligible to be the base pointer */
-static bool test_pointer_validity(RawFile *file, size_t offset, uint32_t inGBA_length) {
+static bool test_pointer_validity(RawFile *file, size_t offset, u32 inGBA_length) {
   EngineParams params(file->get<u32>(offset));
 
   /* Compute supposed address of song table and check validity */
@@ -80,7 +83,7 @@ void MP2kScanner::scan(RawFile *file, void *) {
 
   EngineParams engine_settings(file->get<u32>(sound_engine_adr));
   const int engine_sample_rate = samplerate_LUT[engine_settings.sampling_rate_index];
-  const uint32_t psg_sample_rate = engine_sample_rate > 0 ? static_cast<uint32_t>(engine_sample_rate) : 32768;
+  const u32 psg_sample_rate = engine_sample_rate > 0 ? static_cast<u32>(engine_sample_rate) : 32768;
 
   /* Compute song table location */
   u32 song_levels = file->get<u32>(sound_engine_adr + 4);  // Read # of song levels

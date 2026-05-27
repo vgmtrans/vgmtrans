@@ -6,8 +6,8 @@
 #pragma once
 
 #include <QDockWidget>
-#include <QVector>
 #include <QString>
+#include <QVector>
 
 class QPlainTextEdit;
 class QTimer;

@@ -5,14 +5,17 @@
  */
 
 #include "SuzukiSnesInstr.h"
-#include "SuzukiSnesSeq.h"
+
+#include "base/Types.h"
 #include "SNESDSP.h"
+#include "SuzukiSnesSeq.h"
 #include "VGMColl.h"
+
 #include <spdlog/fmt/fmt.h>
 
 namespace {
-constexpr uint8_t kSuzukiSnesSrcnCount = 0x40;
-constexpr uint16_t kSuzukiSnesSd3DrumKitOffset = 16;
+constexpr u8 kSuzukiSnesSrcnCount = 0x40;
+constexpr u16 kSuzukiSnesSd3DrumKitOffset = 16;
 }
 
 // ******************
@@ -21,11 +24,11 @@ constexpr uint16_t kSuzukiSnesSd3DrumKitOffset = 16;
 
 SuzukiSnesInstrSet::SuzukiSnesInstrSet(RawFile *file,
                                        SuzukiSnesVersion ver,
-                                       uint32_t spcDirAddr,
-                                       uint16_t addrSRCNTable,
-                                       uint16_t addrVolumeTable,
-                                       uint16_t addrADSRTable,
-                                       uint16_t addrTuningTable,
+                                       u32 spcDirAddr,
+                                       u16 addrSRCNTable,
+                                       u16 addrVolumeTable,
+                                       u16 addrADSRTable,
+                                       u16 addrTuningTable,
                                        const std::string &name) :
     VGMInstrSet(SuzukiSnesFormat::name, file, addrSRCNTable, 0, name), version(ver),
     spcDirAddr(spcDirAddr),
@@ -40,32 +43,32 @@ bool SuzukiSnesInstrSet::parseHeader() {
 }
 
 bool SuzukiSnesInstrSet::parseInstrPointers() {
-  for (uint8_t instrNum = 0; instrNum <= 0x7f; instrNum++) {
-    uint32_t ofsSRCNEntry = addrSRCNTable + instrNum;
+  for (u8 instrNum = 0; instrNum <= 0x7f; instrNum++) {
+    u32 ofsSRCNEntry = addrSRCNTable + instrNum;
     if (ofsSRCNEntry + 1 > 0x10000) {
       continue;
     }
-    uint8_t srcn = readByte(ofsSRCNEntry);
+    u8 srcn = readByte(ofsSRCNEntry);
     if (srcn >= kSuzukiSnesSrcnCount) {
       continue;
     }
 
-    uint32_t addrDIRentry = spcDirAddr + (srcn * 4);
+    u32 addrDIRentry = spcDirAddr + (srcn * 4);
     if (!SNESSampColl::isValidSampleDir(rawFile(), addrDIRentry, true)) {
       continue;
     }
 
-    uint16_t addrSampStart = readShort(addrDIRentry);
+    u16 addrSampStart = readShort(addrDIRentry);
     if (addrSampStart < spcDirAddr) {
       continue;
     }
 
-    uint32_t ofsVolumeEntry = addrVolumeTable + srcn * 2;
+    u32 ofsVolumeEntry = addrVolumeTable + srcn * 2;
     if (ofsVolumeEntry + 1 > 0x10000) {
       break;
     }
 
-    uint32_t ofsADSREntry = addrADSRTable + srcn * 2;
+    u32 ofsADSREntry = addrADSRTable + srcn * 2;
     if (ofsADSREntry + 2 > 0x10000) {
       break;
     }
@@ -74,7 +77,7 @@ bool SuzukiSnesInstrSet::parseInstrPointers() {
       break;
     }
 
-    uint32_t ofsTuningEntry = addrTuningTable + srcn * 2;
+    u32 ofsTuningEntry = addrTuningTable + srcn * 2;
     if (ofsTuningEntry + 2 > 0x10000) {
       break;
     }
@@ -113,7 +116,7 @@ void SuzukiSnesInstrSet::useColl(const VGMColl* coll) {
     return;
   }
 
-  uint16_t addrDrumKitTable = static_cast<uint16_t>(seq->offset());
+  u16 addrDrumKitTable = static_cast<u16>(seq->offset());
   if (version == SUZUKISNES_SD3) {
     addrDrumKitTable += kSuzukiSnesSd3DrumKitOffset;
   }
@@ -137,12 +140,12 @@ void SuzukiSnesInstrSet::useColl(const VGMColl* coll) {
 
 SuzukiSnesInstr::SuzukiSnesInstr(VGMInstrSet *instrSet,
                                  SuzukiSnesVersion ver,
-                                 uint8_t instrNum,
-                                 uint32_t spcDirAddr,
-                                 uint16_t addrSRCNTable,
-                                 uint16_t addrVolumeTable,
-                                 uint16_t addrADSRTable,
-                                 uint16_t addrTuningTable,
+                                 u8 instrNum,
+                                 u32 spcDirAddr,
+                                 u16 addrSRCNTable,
+                                 u16 addrVolumeTable,
+                                 u16 addrADSRTable,
+                                 u16 addrTuningTable,
                                  const std::string &name) :
     VGMInstr(instrSet, addrSRCNTable, 0, 0, instrNum, name), version(ver),
     spcDirAddr(spcDirAddr),
@@ -156,18 +159,18 @@ SuzukiSnesInstr::~SuzukiSnesInstr() {
 }
 
 bool SuzukiSnesInstr::loadInstr() {
-  uint32_t ofsADSREntry = addrSRCNTable + instrNum;
+  u32 ofsADSREntry = addrSRCNTable + instrNum;
   if (ofsADSREntry + 1 > 0x10000) {
     return false;
   }
-  uint8_t srcn = readByte(ofsADSREntry);
+  u8 srcn = readByte(ofsADSREntry);
 
-  uint32_t offDirEnt = spcDirAddr + (srcn * 4);
+  u32 offDirEnt = spcDirAddr + (srcn * 4);
   if (offDirEnt + 4 > 0x10000) {
     return false;
   }
 
-  uint16_t addrSampStart = readShort(offDirEnt);
+  u16 addrSampStart = readShort(offDirEnt);
 
   SuzukiSnesRgn *rgn = new SuzukiSnesRgn(this, version, addrSRCNTable);
   rgn->sampOffset = addrSampStart - spcDirAddr;
@@ -186,12 +189,12 @@ bool SuzukiSnesInstr::loadInstr() {
 
 SuzukiSnesDrumKit::SuzukiSnesDrumKit(VGMInstrSet *instrSet,
                                      SuzukiSnesVersion ver,
-                                     uint32_t programNum,
-                                     uint32_t spcDirAddr,
-                                     uint16_t addrSRCNTable,
-                                     uint16_t addrTuningTable,
-                                     uint16_t addrADSRTable,
-                                     uint16_t addrDrumKitTable,
+                                     u32 programNum,
+                                     u32 spcDirAddr,
+                                     u16 addrSRCNTable,
+                                     u16 addrTuningTable,
+                                     u16 addrADSRTable,
+                                     u16 addrDrumKitTable,
                                      const std::string &name) :
   VGMInstr(instrSet, addrDrumKitTable, 0, programNum >> 7, programNum & 0x7F, name), version(ver),
   spcDirAddr(spcDirAddr),
@@ -202,9 +205,9 @@ SuzukiSnesDrumKit::SuzukiSnesDrumKit(VGMInstrSet *instrSet,
 }
 
 bool SuzukiSnesDrumKit::loadInstr() {
-  uint16_t addr = addrDrumKitTable;
+  u16 addr = addrDrumKitTable;
 
-  for (uint16_t i = addr; readByte(i) < 0x80; i += 5) {
+  for (u16 i = addr; readByte(i) < 0x80; i += 5) {
     SuzukiSnesDrumKitRgn *rgn = new SuzukiSnesDrumKitRgn(this, version, addrDrumKitTable);
 
     if (!rgn->initializePercussionRegion(i, spcDirAddr, addrSRCNTable, addrADSRTable, addrTuningTable)) {
@@ -216,13 +219,13 @@ bool SuzukiSnesDrumKit::loadInstr() {
       return false;
     }
 
-    uint32_t rgnOffDirEnt = spcDirAddr + (rgn->sampNum * 4);
+    u32 rgnOffDirEnt = spcDirAddr + (rgn->sampNum * 4);
     if (rgnOffDirEnt + 4 > 0x10000) {
       delete rgn;
       return false;
     }
 
-    uint16_t addrSampStart = readShort(rgnOffDirEnt);
+    u16 addrSampStart = readShort(rgnOffDirEnt);
 
     rgn->sampOffset = addrSampStart - spcDirAddr;
 
@@ -240,32 +243,32 @@ bool SuzukiSnesDrumKit::loadInstr() {
 
 SuzukiSnesRgn::SuzukiSnesRgn(VGMInstr *instr,
                              SuzukiSnesVersion ver,
-                             uint16_t addrSRCNTable) :
+                             u16 addrSRCNTable) :
     VGMRgn(instr, addrSRCNTable, 0),
     version(ver) {
 }
 
-bool SuzukiSnesRgn::initializeNonPercussionRegion(uint8_t instrNum, uint16_t addrVolumeTable) {
-  uint16_t addrSRCNTable = offset();
-  uint8_t srcn = readByte(addrSRCNTable + instrNum);
-  uint8_t vol = readByte(addrVolumeTable + srcn * 2);
+bool SuzukiSnesRgn::initializeNonPercussionRegion(u8 instrNum, u16 addrVolumeTable) {
+  u16 addrSRCNTable = offset();
+  u8 srcn = readByte(addrSRCNTable + instrNum);
+  u8 vol = readByte(addrVolumeTable + srcn * 2);
   addSampNum(srcn, addrSRCNTable + instrNum, 1);
   addVolume(vol / 256.0, addrVolumeTable + srcn * 2, 1);
   return true;
 }
 
-bool SuzukiSnesRgn::initializeCommonRegion(uint8_t srcn,
-                                           uint32_t /*spcDirAddr*/,
-                                           uint16_t addrADSRTable,
-                                           uint16_t addrTuningTable) {
-  uint8_t adsr1 = readByte(addrADSRTable + srcn * 2);
-  uint8_t adsr2 = readByte(addrADSRTable + srcn * 2 + 1);
-  uint8_t fine_tuning = readByte(addrTuningTable + srcn * 2);
-  int8_t coarse_tuning = readByte(addrTuningTable + srcn * 2 + 1);
+bool SuzukiSnesRgn::initializeCommonRegion(u8 srcn,
+                                           u32 /*spcDirAddr*/,
+                                           u16 addrADSRTable,
+                                           u16 addrTuningTable) {
+  u8 adsr1 = readByte(addrADSRTable + srcn * 2);
+  u8 adsr2 = readByte(addrADSRTable + srcn * 2 + 1);
+  u8 fine_tuning = readByte(addrTuningTable + srcn * 2);
+  s8 coarse_tuning = readByte(addrTuningTable + srcn * 2 + 1);
 
   addChild(addrADSRTable + srcn * 2, 1, "ADSR1");
   addChild(addrADSRTable + srcn * 2 + 1, 1, "ADSR2");
-  addFineTune((int16_t) (fine_tuning / 256.0 * 100.0), addrTuningTable + srcn * 2, 1);
+  addFineTune((s16) (fine_tuning / 256.0 * 100.0), addrTuningTable + srcn * 2, 1);
   addUnityKey(69 - coarse_tuning, addrTuningTable + srcn * 2 + 1, 1);
   snesConvADSR<VGMRgn>(this, adsr1, adsr2, 0);
 
@@ -287,27 +290,27 @@ bool SuzukiSnesRgn::loadRgn() {
 
 SuzukiSnesDrumKitRgn::SuzukiSnesDrumKitRgn(SuzukiSnesDrumKit *instr,
                                            SuzukiSnesVersion ver,
-                                           uint16_t addrDrumKitTable) :
+                                           u16 addrDrumKitTable) :
   SuzukiSnesRgn(instr, ver, addrDrumKitTable) {}
 
-bool SuzukiSnesDrumKitRgn::initializePercussionRegion(uint16_t noteOffset,
-                                                      uint32_t spcDirAddr,
-                                                      uint16_t addrSRCNTable,
-                                                      uint16_t addrADSRTable,
-                                                      uint16_t addrTuningTable)
+bool SuzukiSnesDrumKitRgn::initializePercussionRegion(u16 noteOffset,
+                                                      u32 spcDirAddr,
+                                                      u16 addrSRCNTable,
+                                                      u16 addrADSRTable,
+                                                      u16 addrTuningTable)
 {
-  uint16_t instrOffset = noteOffset + 1;
-  uint16_t keyOffset = noteOffset + 2;
-  uint16_t volumeOffset = noteOffset + 3;
-  uint16_t panOffset = noteOffset + 4;
+  u16 instrOffset = noteOffset + 1;
+  u16 keyOffset = noteOffset + 2;
+  u16 volumeOffset = noteOffset + 3;
+  u16 panOffset = noteOffset + 4;
 
-  uint8_t instrNum = readByte(instrOffset);
+  u8 instrNum = readByte(instrOffset);
   addChild(instrOffset, 1, "Instrument");
 
-  uint8_t srcn = readByte(addrSRCNTable + instrNum);
+  u8 srcn = readByte(addrSRCNTable + instrNum);
   initializeCommonRegion(srcn, spcDirAddr, addrADSRTable, addrTuningTable);
 
-  uint8_t percussionIndex = readByte(noteOffset);
+  u8 percussionIndex = readByte(noteOffset);
   setName(fmt::format("Drum {}", percussionIndex));
   keyLow = keyHigh = percussionIndex + KEY_BIAS;
 
@@ -319,7 +322,7 @@ bool SuzukiSnesDrumKitRgn::initializePercussionRegion(uint16_t noteOffset,
 
   addVolume(readByte(volumeOffset) / 256.0, volumeOffset, 1);
 
-  uint8_t panValue = readByte(panOffset);
+  u8 panValue = readByte(panOffset);
   if (panValue < 0x80) {
     addPan(panValue, panOffset);
   }

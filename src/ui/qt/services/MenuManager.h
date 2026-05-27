@@ -6,14 +6,21 @@
 
 #pragma once
 
-#include "services/commands/Command.h"
-#include <filesystem>
-#include <QMenu>
-#include "common.h"
-#include "Root.h"
-#include "UIHelpers.h"
 #include "LogManager.h"
-#include "helper.h"
+#include "Root.h"
+#include "services/commands/Command.h"
+#include "UIHelpers.h"
+#include "util/Path.h"
+
+#include <filesystem>
+#include <functional>
+#include <map>
+#include <memory>
+#include <string>
+#include <utility>
+#include <vector>
+
+#include <QMenu>
 
 namespace fs = std::filesystem;
 

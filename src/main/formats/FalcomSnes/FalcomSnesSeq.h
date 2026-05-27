@@ -1,8 +1,14 @@
 #pragma once
-#include "VGMSeq.h"
-#include "SeqTrack.h"
-#include "SeqEvent.h"
+
+#include "base/Types.h"
 #include "FalcomSnesFormat.h"
+#include "SeqEvent.h"
+#include "SeqTrack.h"
+#include "VGMSeq.h"
+
+#include <map>
+#include <string>
+#include <vector>
 
 enum FalcomSnesSeqEventType {
   //start enum at 1 because if map[] look up fails, it returns 0, and we don't want that to get confused with a legit event
@@ -51,7 +57,7 @@ class FalcomSnesSeq
  public:
   FalcomSnesSeq(RawFile *file,
                     FalcomSnesVersion ver,
-                    uint32_t seqdata_offset,
+                    u32 seqdata_offset,
                     std::string newName = "Falcom SNES Seq");
   ~FalcomSnesSeq() override;
 
@@ -59,17 +65,17 @@ class FalcomSnesSeq
   bool parseTrackPointers() override;
   void resetVars() override;
 
-  static const uint8_t VOLUME_TABLE[129];
+  static const u8 VOLUME_TABLE[129];
 
   FalcomSnesVersion version;
-  std::map<uint8_t, FalcomSnesSeqEventType> EventMap;
+  std::map<u8, FalcomSnesSeqEventType> EventMap;
 
-  std::vector<uint8_t> NoteDurTable;
+  std::vector<u8> NoteDurTable;
 
-  std::map<uint16_t, uint8_t> repeatCountMap;
-  std::map<uint8_t, uint16_t> instrADSRHints;
+  std::map<u16, u8> repeatCountMap;
+  std::map<u8, u16> instrADSRHints;
 
-  static double getTempoInBPM(uint8_t tempo);
+  static double getTempoInBPM(u8 tempo);
 
  private:
   void loadEventMap();
@@ -79,18 +85,18 @@ class FalcomSnesSeq
 class FalcomSnesTrack
     : public SeqTrack {
  public:
-  FalcomSnesTrack(FalcomSnesSeq *parentFile, uint32_t offset = 0, uint32_t length = 0);
+  FalcomSnesTrack(FalcomSnesSeq *parentFile, u32 offset = 0, u32 length = 0);
   void resetVars() override;
   bool readEvent() override;
 
-  static int8_t calculatePanValue(uint8_t pan, double &volumeScale);
+  static s8 calculatePanValue(u8 pan, double &volumeScale);
 
  private:
-  int8_t prevNoteKey;
+  s8 prevNoteKey;
   bool prevNoteSlurred;
-  uint8_t spcNoteQuantize;
-  uint8_t spcInstr;
-  uint16_t spcADSR;
-  uint8_t spcVolume;
-  uint8_t spcPan;
+  u8 spcNoteQuantize;
+  u8 spcInstr;
+  u16 spcADSR;
+  u8 spcVolume;
+  u8 spcPan;
 };

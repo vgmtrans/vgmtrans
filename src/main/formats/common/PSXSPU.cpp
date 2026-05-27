@@ -3,6 +3,8 @@
 // Also, thanks to Antires for his ADPCM decompression routine.
 
 #include "PSXSPU.h"
+
+#include "base/Types.h"
 #include "formats/PS1/PS1Format.h"
 
 using namespace std;
@@ -17,18 +19,18 @@ static bool isValidFlagByte(u8 b);
 // PSXSampColl
 // ***********
 
-PSXSampColl::PSXSampColl(const string &format, RawFile *rawfile, uint32_t offset, uint32_t length)
+PSXSampColl::PSXSampColl(const string &format, RawFile *rawfile, u32 offset, u32 length)
     : VGMSampColl(format, rawfile, offset, length, "PSX Sample Collection") {
 }
 
-PSXSampColl::PSXSampColl(const string &format, VGMInstrSet *instrset, uint32_t offset, uint32_t length)
+PSXSampColl::PSXSampColl(const string &format, VGMInstrSet *instrset, u32 offset, u32 length)
     : VGMSampColl(format, instrset->rawFile(), instrset, offset, length, "PSX Sample Collection") {
 }
 
 PSXSampColl::PSXSampColl(const string &format,
                          VGMInstrSet *instrset,
-                         uint32_t offset,
-                         uint32_t length,
+                         u32 offset,
+                         u32 length,
                          const std::vector<SizeOffsetPair> &vagLocations)
     : VGMSampColl(format, instrset->rawFile(), instrset, offset, length, "PSX Sample Collection"),
       vagLocations(vagLocations) {
@@ -58,10 +60,10 @@ bool PSXSampColl::parseSampleInfo() {
         // so here is a dirty hack for it.
         // (Dragon Quest VII, for example)
         int countOfContinue = 0;
-        uint8_t continueByte = 0xff;
+        u8 continueByte = 0xff;
         bool badBlock = false;
         while (i + (countOfContinue * 16) + 16 <= nEndOffset) {
-          uint8_t keyFlagByte = readByte(i + (countOfContinue * 16) + 1);
+          u8 keyFlagByte = readByte(i + (countOfContinue * 16) + 1);
 
           if ((keyFlagByte & 0xF8) != 0) {
             badBlock = true;
@@ -165,7 +167,7 @@ bool PSXSampColl::parseSampleInfo() {
     setLength(i - offset());
   }
   else {
-    uint32_t sampleIndex = 0;
+    u32 sampleIndex = 0;
 
     if (!isValidSampleStart(rawFile(), offset(), true))
       return false;
@@ -174,9 +176,9 @@ bool PSXSampColl::parseSampleInfo() {
       if (it->offset == 0 && it->size == 0)
         continue;
 
-      uint32_t offSampStart = offset() + it->offset;
-      uint32_t offDataEnd = offSampStart + it->size;
-      uint32_t offSampEnd = offSampStart;
+      u32 offSampStart = offset() + it->offset;
+      u32 offDataEnd = offSampStart + it->size;
+      u32 offSampEnd = offSampStart;
 
       // detect loop end and ignore garbages like 00 07 77 77 77 77 77 etc.
       bool lastBlock;
@@ -396,9 +398,9 @@ std::vector<PSXSampColl*> PSXSampColl::searchForPSXADPCMs(RawFile* file, const s
 //  PSXSamp
 //  *******
 
-PSXSamp::PSXSamp(VGMSampColl *sampColl, uint32_t offset, uint32_t length, uint32_t dataOffset,
-                 uint32_t dataLen, uint8_t nChannels, BPS theBPS,
-                 uint32_t theRate, string name, bool bSetloopOnConversion)
+PSXSamp::PSXSamp(VGMSampColl *sampColl, u32 offset, u32 length, u32 dataOffset,
+                 u32 dataLen, u8 nChannels, BPS theBPS,
+                 u32 theRate, string name, bool bSetloopOnConversion)
     : VGMSamp(sampColl, offset, length, dataOffset, dataLen, nChannels, theBPS, theRate, std::move(name)),
       bSetLoopOnConversion(bSetloopOnConversion) {
   bPSXLoopInfoPrioritizing = true;
@@ -411,9 +413,9 @@ double PSXSamp::compressionRatio() const {
   return ((28.0 / 16.0) * 2);
 }
 
-std::vector<uint8_t> PSXSamp::decodeToNativePcm() {
-  const uint32_t sampleCount = uncompressedSize() / sizeof(int16_t);
-  std::vector<uint8_t> samples(sampleCount * sizeof(int16_t));
+std::vector<u8> PSXSamp::decodeToNativePcm() {
+  const u32 sampleCount = uncompressedSize() / sizeof(s16);
+  std::vector<u8> samples(sampleCount * sizeof(s16));
   auto *uncompBuf = reinterpret_cast<s16 *>(samples.data());
   VAGBlk theBlock;
   s32  prev[2] = {0, 0};
@@ -459,10 +461,10 @@ std::vector<uint8_t> PSXSamp::decodeToNativePcm() {
   return samples;
 }
 
-uint32_t PSXSamp::getSampleLength(const RawFile *file, uint32_t offset, uint32_t endOffset, bool &loop) {
-  uint32_t curOffset = offset;
+u32 PSXSamp::getSampleLength(const RawFile *file, u32 offset, u32 endOffset, bool &loop) {
+  u32 curOffset = offset;
   while (curOffset < endOffset) {
-    uint8_t keyFlagByte = file->readByte(curOffset + 1);
+    u8 keyFlagByte = file->readByte(curOffset + 1);
 
     curOffset += 16;
 

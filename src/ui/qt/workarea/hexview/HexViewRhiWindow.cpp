@@ -11,22 +11,19 @@
 #include "LogManager.h"
 #include "workarea/rhi/RhiWindowDragDropEvents.h"
 
-#include <rhi/qrhi.h>
-#include <rhi/qrhi_platform.h>
-
 #include <QEvent>
 #include <QExposeEvent>
-#include <QResizeEvent>
-#include <QScrollBar>
-
 #if QT_CONFIG(opengl)
 #include <QOffscreenSurface>
 #include <QSurfaceFormat>
 #endif
-
+#include <QResizeEvent>
+#include <QScrollBar>
 #if QT_CONFIG(vulkan)
 #include <QVulkanInstance>
 #endif
+#include <rhi/qrhi.h>
+#include <rhi/qrhi_platform.h>
 
 namespace {
 constexpr int SCROLLBAR_FRAME_MS = 16;

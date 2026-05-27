@@ -6,14 +6,16 @@
 
 #pragma once
 
-#include <QElapsedTimer>
-#include <QSize>
-#include <QVector4D>
+#include "base/Types.h"
+#include "HexViewFrameData.h"
+
 #include <array>
 #include <cstdint>
 #include <vector>
 
-#include "HexViewFrameData.h"
+#include <QElapsedTimer>
+#include <QSize>
+#include <QVector4D>
 
 class QChar;
 class QRectF;
@@ -111,15 +113,15 @@ private:
     int line = 0;
     int bytes = 0;
     // Cached copy of file bytes/styles for one logical line in the cache window.
-    std::array<uint8_t, kBytesPerLine> data{};
-    std::array<uint16_t, kBytesPerLine> styles{};
+    std::array<u8, kBytesPerLine> data{};
+    std::array<u16, kBytesPerLine> styles{};
   };
 
   struct LineRange {
-    uint32_t rectStart = 0;
-    uint32_t rectCount = 0;
-    uint32_t glyphStart = 0;
-    uint32_t glyphCount = 0;
+    u32 rectStart = 0;
+    u32 rectCount = 0;
+    u32 glyphStart = 0;
+    u32 glyphCount = 0;
   };
   struct SelectionBuildContext {
     // Visible range and geometry needed when converting byte selections into
@@ -127,8 +129,8 @@ private:
     int startLine = 0;
     int endLine = -1;
     int visibleCount = 0;
-    uint32_t fileBaseOffset = 0;
-    uint32_t fileLength = 0;
+    u32 fileBaseOffset = 0;
+    u32 fileLength = 0;
     float lineHeight = 0.0f;
     float charWidth = 0.0f;
     float hexStartX = 0.0f;
@@ -160,8 +162,8 @@ private:
                       const HexViewFrame::Data& frame, const LayoutMetrics& layout);
   bool ensureInstanceBuffer(QRhiBuffer*& buffer, int bytes);
   void updateInstanceBuffers(QRhiResourceUpdateBatch* u);
-  void populateVisibleLineByteCounts(int startLine, int endLine, std::vector<uint8_t>& lineBytes) const;
-  static uint16_t spanMaskBits(int startCol, int endCol);
+  void populateVisibleLineByteCounts(int startLine, int endLine, std::vector<u8>& lineBytes) const;
+  static u16 spanMaskBits(int startCol, int endCol);
 
   QRectF glyphUv(const QChar& ch, const HexViewFrame::Data& frame) const;
   void appendRect(std::vector<RectInstance>& rects, float x, float y, float w, float h,
@@ -228,7 +230,7 @@ private:
   QRhiGraphicsPipeline* m_outputRectPso = nullptr;
   QRhiGraphicsPipeline* m_outputGlyphPso = nullptr;
   int m_sampleCount = 1;
-  uint64_t m_glyphAtlasVersion = 0;
+  u64 m_glyphAtlasVersion = 0;
   bool m_staticBuffersUploaded = false;
   bool m_pipelinesDirty = true;
   bool m_supportsBaseInstance = false;
@@ -244,9 +246,9 @@ private:
   std::vector<EdgeInstance> m_selectionEdgeRectInstances;
   std::vector<RectInstance> m_playbackMaskRectInstances;
   std::vector<EdgeInstance> m_playbackEdgeRectInstances;
-  std::vector<uint8_t> m_lineByteScratch;
-  std::vector<uint16_t> m_maskScratchA;
-  std::vector<uint16_t> m_maskScratchB;
+  std::vector<u8> m_lineByteScratch;
+  std::vector<u16> m_maskScratchA;
+  std::vector<u16> m_maskScratchB;
   std::vector<std::array<QVector4D, kBytesPerLine>> m_colorScratchA;
   std::vector<std::array<QVector4D, kBytesPerLine>> m_colorScratchB;
   std::vector<std::array<float, kBytesPerLine>> m_alphaScratch;

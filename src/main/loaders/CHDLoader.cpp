@@ -4,8 +4,9 @@
  * refer to the included LICENSE.txt file
  */
 
-#include "common.h"
 #include "CHDLoader.h"
+
+#include "base/Types.h"
 #include "FileLoader.h"
 #include "LoaderManager.h"
 #include "LogManager.h"
@@ -23,7 +24,7 @@ struct MemoryCoreFileCtx {
   size_t pos;
 };
 
-static uint64_t mem_fsize(core_file *fp) {
+static u64 mem_fsize(core_file *fp) {
   auto ctx = reinterpret_cast<MemoryCoreFileCtx *>(fp->argp);
   return ctx->file->size();
 }
@@ -41,7 +42,7 @@ static size_t mem_fread(void *ptr, size_t size, size_t nmemb, core_file *fp) {
 
 static int mem_fclose(core_file *) { return 0; }
 
-static int mem_fseek(core_file *fp, int64_t offset, int whence) {
+static int mem_fseek(core_file *fp, s64 offset, int whence) {
   auto ctx = reinterpret_cast<MemoryCoreFileCtx *>(fp->argp);
   size_t newpos = 0;
   switch (whence) {
@@ -82,10 +83,10 @@ void CHDLoader::apply(const RawFile *file) {
     return;
   }
 
-  std::vector<uint8_t> data(static_cast<size_t>(hdr->logicalbytes));
-  std::vector<uint8_t> hunkbuf(hdr->hunkbytes);
+  std::vector<u8> data(static_cast<size_t>(hdr->logicalbytes));
+  std::vector<u8> hunkbuf(hdr->hunkbytes);
   size_t offset = 0;
-  for (uint32_t h = 0; h < hdr->hunkcount; ++h) {
+  for (u32 h = 0; h < hdr->hunkcount; ++h) {
     err = chd_read(chd, h, hunkbuf.data());
     if (err != CHDERR_NONE) {
       L_ERROR("CHD read error: {}", chd_error_string(err));
@@ -98,7 +99,7 @@ void CHDLoader::apply(const RawFile *file) {
   }
   chd_close(chd);
 
-  auto virtFile = new VirtFile(data.data(), static_cast<uint32_t>(data.size()),
+  auto virtFile = new VirtFile(data.data(), static_cast<u32>(data.size()),
                                file->name(), file->path(), file->tag);
   enqueue(virtFile);
 }

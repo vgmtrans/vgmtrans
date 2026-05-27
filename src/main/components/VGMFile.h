@@ -5,15 +5,19 @@
  */
 #pragma once
 
-#include "VGMItem.h"
+#include "base/Types.h"
 #include "RawFile.h"
+#include "VGMItem.h"
+
+#include <string>
+#include <vector>
 
 class VGMColl;
 class Format;
 
 class VGMFile : public VGMItem {
 public:
-  VGMFile(std::string format, RawFile *theRawFile, uint32_t offset, uint32_t length = 0,
+  VGMFile(std::string format, RawFile *theRawFile, u32 offset, u32 length = 0,
           std::string name = "VGM File");
   ~VGMFile() override = default;
 
@@ -26,8 +30,8 @@ public:
   Format* format() const;
   [[nodiscard]] std::string formatName();
 
-  virtual uint32_t id() const { return m_id; }
-  void setId(uint32_t newId) { m_id = newId; }
+  virtual u32 id() const { return m_id; }
+  void setId(u32 newId) { m_id = newId; }
 
   void addCollAssoc(VGMColl *coll);
   void removeCollAssoc(VGMColl *coll);
@@ -35,22 +39,22 @@ public:
 
   [[nodiscard]] size_t size() const noexcept { return length(); }
 
-  uint32_t readBytes(uint32_t nIndex, uint32_t nCount, void *pBuffer) const;
+  u32 readBytes(u32 nIndex, u32 nCount, void *pBuffer) const;
 
-  inline uint8_t readByte(uint32_t offset) const { return m_rawfile->readByte(offset); }
-  inline uint16_t readShort(uint32_t offset) const { return m_rawfile->readShort(offset); }
-  inline uint32_t readWord(uint32_t offset) const { return m_rawfile->readWord(offset); }
-  inline uint16_t readShortBE(uint32_t offset) const { return m_rawfile->readShortBE(offset); }
-  inline uint32_t readWordBE(uint32_t offset) const { return m_rawfile->readWordBE(offset); }
-  inline bool isValidOffset(uint32_t offset) const { return m_rawfile->isValidOffset(offset); }
+  inline u8 readByte(u32 offset) const { return m_rawfile->readByte(offset); }
+  inline u16 readShort(u32 offset) const { return m_rawfile->readShort(offset); }
+  inline u32 readWord(u32 offset) const { return m_rawfile->readWord(offset); }
+  inline u16 readShortBE(u32 offset) const { return m_rawfile->readShortBE(offset); }
+  inline u32 readWordBE(u32 offset) const { return m_rawfile->readWordBE(offset); }
+  inline bool isValidOffset(u32 offset) const { return m_rawfile->isValidOffset(offset); }
 
-  uint32_t startOffset() const { return offset(); }
+  u32 startOffset() const { return offset(); }
   /*
    * For whatever reason, you can create null-length VGMItems.
    * The only safe way for now is to
    * assume maximum length
    */
-  uint32_t endOffset() const { return static_cast<uint32_t>(m_rawfile->size()); }
+  u32 endOffset() const { return static_cast<u32>(m_rawfile->size()); }
 
   [[nodiscard]] const char *data() const { return m_rawfile->data() + offset(); }
 
@@ -59,7 +63,7 @@ public:
 private:
   RawFile* m_rawfile;
   std::string m_format;
-  uint32_t m_id;
+  u32 m_id;
 };
 
 // *********
@@ -68,14 +72,14 @@ private:
 
 class VGMHeader : public VGMItem {
 public:
-  VGMHeader(const VGMItem *parItem, uint32_t offset = 0, uint32_t length = 0,
+  VGMHeader(const VGMItem *parItem, u32 offset = 0, u32 length = 0,
             const std::string &name = "Header");
   ~VGMHeader() override;
 
-  void addPointer(uint32_t offset, uint32_t length, uint32_t destAddress, bool notNull,
+  void addPointer(u32 offset, u32 length, u32 destAddress, bool notNull,
                   const std::string &name = "Pointer");
-  void addTempo(uint32_t offset, uint32_t length, const std::string &name = "Tempo");
-  void addSig(uint32_t offset, uint32_t length, const std::string &name = "Signature");
+  void addTempo(u32 offset, u32 length, const std::string &name = "Tempo");
+  void addSig(u32 offset, u32 length, const std::string &name = "Signature");
 };
 
 // *************
@@ -92,7 +96,7 @@ public:
     HIT_UNKNOWN
   };  // HIT = Header Item Type
 
-  VGMHeaderItem(const VGMHeader *hdr, HdrItemType headerType, uint32_t offset, uint32_t length,
+  VGMHeaderItem(const VGMHeader *hdr, HdrItemType headerType, u32 offset, u32 length,
                 const std::string &name);
 
 private:

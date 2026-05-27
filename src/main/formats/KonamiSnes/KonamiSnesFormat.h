@@ -4,10 +4,11 @@
  * refer to the included LICENSE.txt file
  */
 #pragma once
-#include "Format.h"
-#include "FilegroupMatcher.h"
-#include "KonamiSnesScanner.h"
 
+#include "base/Types.h"
+#include "FilegroupMatcher.h"
+#include "Format.h"
+#include "KonamiSnesScanner.h"
 
 // ***************
 // KonamiSnesFormat
@@ -19,7 +20,7 @@ BEGIN_FORMAT(KonamiSnes)
 END_FORMAT()
 
 
-enum KonamiSnesVersion: uint8_t {
+enum KonamiSnesVersion: u8 {
   KONAMISNES_NONE = 0,        // Unknown Version
   KONAMISNES_V1,              // Contra 3, etc.
   KONAMISNES_V2,              // Madara 2, etc.

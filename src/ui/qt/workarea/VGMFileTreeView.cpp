@@ -4,21 +4,22 @@
  * refer to the included LICENSE.txt file
  */
 #include "VGMFileTreeView.h"
-#include "VGMFileView.h"
-#include "ColorHelpers.h"
-#include "hexview/HexViewInput.h"
 
-#include <QAbstractTextDocumentLayout>
-#include <QTextDocument>
-#include <QPainter>
-#include <QApplication>
-#include <QAccessible>
-#include <QScrollBar>
-#include <QCheckBox>
+#include "ColorHelpers.h"
 #include "Helpers.h"
+#include "hexview/HexViewInput.h"
 #include "Metrics.h"
 #include "services/NotificationCenter.h"
 #include "services/Settings.h"
+#include "VGMFileView.h"
+
+#include <QAbstractTextDocumentLayout>
+#include <QAccessible>
+#include <QApplication>
+#include <QCheckBox>
+#include <QPainter>
+#include <QScrollBar>
+#include <QTextDocument>
 
 // ***********************************
 // VMGFileTreeHeaderView

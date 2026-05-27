@@ -4,12 +4,14 @@
  * refer to the included LICENSE.txt file
  */
 
-#include "Root.h"
 #include "VGMFile.h"
-#include "Format.h"
 
-VGMFile::VGMFile(std::string fmt, RawFile *theRawFile, uint32_t offset,
-                 uint32_t length, std::string name)
+#include "base/Types.h"
+#include "Format.h"
+#include "Root.h"
+
+VGMFile::VGMFile(std::string fmt, RawFile *theRawFile, u32 offset,
+                 u32 length, std::string name)
     : VGMItem(this, offset, length, std::move(name)),
       m_rawfile(theRawFile),
       m_format(std::move(fmt)),
@@ -53,11 +55,11 @@ RawFile *VGMFile::rawFile() const {
   return m_rawfile;
 }
 
-uint32_t VGMFile::readBytes(uint32_t nIndex, uint32_t nCount, void *pBuffer) const {
+u32 VGMFile::readBytes(u32 nIndex, u32 nCount, void *pBuffer) const {
   // if length() != 0, verify that we're within the bounds of the file, and truncate num read
   // bytes to end of file
   if (length() != 0) {
-    uint32_t endOff = offset() + length();
+    u32 endOff = offset() + length();
     assert(nIndex >= offset() && nIndex < endOff);
     if (nIndex + nCount > endOff)
       nCount = endOff - nIndex;
@@ -70,21 +72,21 @@ uint32_t VGMFile::readBytes(uint32_t nIndex, uint32_t nCount, void *pBuffer) con
 // VGMHeader
 // *********
 
-VGMHeader::VGMHeader(const VGMItem *parItem, uint32_t offset, uint32_t length, const std::string &name)
+VGMHeader::VGMHeader(const VGMItem *parItem, u32 offset, u32 length, const std::string &name)
     : VGMItem(parItem->vgmFile(), offset, length, name) {}
 
 VGMHeader::~VGMHeader() = default;
 
-void VGMHeader::addPointer(uint32_t offset, uint32_t length, uint32_t /*destAddress*/, bool /*notNull*/,
+void VGMHeader::addPointer(u32 offset, u32 length, u32 /*destAddress*/, bool /*notNull*/,
                            const std::string &name) {
   addChild(new VGMHeaderItem(this, VGMHeaderItem::HIT_POINTER, offset, length, name));
 }
 
-void VGMHeader::addTempo(uint32_t offset, uint32_t length, const std::string &name) {
+void VGMHeader::addTempo(u32 offset, u32 length, const std::string &name) {
   addChild(new VGMHeaderItem(this, VGMHeaderItem::HIT_TEMPO, offset, length, name));
 }
 
-void VGMHeader::addSig(uint32_t offset, uint32_t length, const std::string &name) {
+void VGMHeader::addSig(u32 offset, u32 length, const std::string &name) {
   addChild(new VGMHeaderItem(this, VGMHeaderItem::HIT_SIG, offset, length, name));
 }
 
@@ -92,7 +94,7 @@ void VGMHeader::addSig(uint32_t offset, uint32_t length, const std::string &name
 // VGMHeaderItem
 // *************
 
-VGMHeaderItem::VGMHeaderItem(const VGMHeader *hdr, HdrItemType headerType, uint32_t offset, uint32_t length,
+VGMHeaderItem::VGMHeaderItem(const VGMHeader *hdr, HdrItemType headerType, u32 offset, u32 length,
                              const std::string &name)
     : VGMItem(hdr->vgmFile(), offset, length, name, resolveType(headerType)) {
 }

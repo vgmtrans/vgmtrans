@@ -6,24 +6,26 @@
 
 #include "MP2kInstrSet.h"
 
+#include "base/Types.h"
+#include "LogManager.h"
+#include "MP2kFormat.h"
+#include "PSGDSP.h"
+#include "VGMColl.h"
+#include "VGMRgn.h"
+#include "VGMSampColl.h"
+
 #include <cassert>
 #include <cmath>
 #include <cstdint>
 #include <cstring>
 #include <memory>
+
 #include <spdlog/fmt/fmt.h>
 
-#include "MP2kFormat.h"
-#include "VGMSampColl.h"
-#include "VGMColl.h"
-#include "VGMRgn.h"
-#include "LogManager.h"
-#include "PSGDSP.h"
-
 namespace {
-constexpr uint8_t kPsgSquareCount = 4;
-constexpr uint8_t kPsgNoiseIndex = kPsgSquareCount;
-constexpr uint8_t kPsgUnityKey = 69;
+constexpr u8 kPsgSquareCount = 4;
+constexpr u8 kPsgNoiseIndex = kPsgSquareCount;
+constexpr u8 kPsgUnityKey = 69;
 constexpr size_t kGbaRomPointerMask = 0x03FFFFFF;
 
 double mp2kAttackTimeSeconds(int attack) {
@@ -169,9 +171,9 @@ int MP2kInstrSet::makeOrGetSample(size_t sample_pointer) {
 
   MP2kSamp *samp = new MP2kSamp(sampColl, {
       .type = loop == 0x01 ? MP2kWaveType::BDPCM : MP2kWaveType::PCM8,
-      .offset = static_cast<uint32_t>(sample_pointer),
+      .offset = static_cast<u32>(sample_pointer),
       .length = 16 + len,
-      .dataOffset = static_cast<uint32_t>(sample_pointer + 16),
+      .dataOffset = static_cast<u32>(sample_pointer + 16),
       .dataLength = len,
   });
 
@@ -226,8 +228,8 @@ bool MP2kInstr::loadInstr() {
 
   auto& psgSampColl = static_cast<MP2kInstrSet *>(parInstrSet)->psgSampColl();
 
-  auto addPsgRgn = [this](VGMSampColl &psgColl, uint8_t sampNum, uint32_t adsr,
-                          uint8_t keyLow = 0, uint8_t keyHigh = 127) {
+  auto addPsgRgn = [this](VGMSampColl &psgColl, u8 sampNum, u32 adsr,
+                          u8 keyLow = 0, u8 keyHigh = 127) {
     VGMRgn* rgn = this->addRgn(offset(), length(), sampNum, keyLow, keyHigh);
     rgn->sampCollPtr = &psgColl;
     rgn->setUnityKey(kPsgUnityKey);
@@ -290,7 +292,7 @@ bool MP2kInstr::loadInstr() {
       static constexpr const char *cycles[] = {"12,5%", "25%", "50%", "75%"};
       setName(fmt::format("PSG square {}", m_data.w1 < 4 ? cycles[m_data.w1] : "???"));
       setLength(12);
-      uint8_t duty = static_cast<uint8_t>(m_data.w1 & 0x03);
+      u8 duty = static_cast<u8>(m_data.w1 & 0x03);
       addPsgRgn(psgSampColl, duty, m_data.w2);
       break;
     }
@@ -328,12 +330,12 @@ bool MP2kInstr::loadInstr() {
       u32 base_pointer = m_data.w1 & 0x3ffffff;
       u32 region_table = m_data.w2 & 0x3ffffff;
 
-      std::vector<uint8_t> split_list, index_list;
+      std::vector<u8> split_list, index_list;
 
       int prev_index = -1;
       /* Scan the whole table for changes and keep track of splits */
-      for (uint8_t key = 0; key < 128; key++) {
-        uint8_t current_index = rawFile()->get<u8>(region_table + key);
+      for (u8 key = 0; key < 128; key++) {
+        u8 current_index = rawFile()->get<u8>(region_table + key);
 
         if (prev_index != current_index) {
           split_list.push_back(key);
@@ -357,7 +359,7 @@ bool MP2kInstr::loadInstr() {
 
         u32 raw_sample_pointer = rawFile()->get<u32>(off + 4);
         u32 sample_pointer = raw_sample_pointer & 0x3ffffff;
-        uint8_t cgb_type = type & 0x07;
+        u8 cgb_type = type & 0x07;
 
         if (cgb_type == 0) {
           if (sample_pointer == 0 || !isGbaRomPointer(raw_sample_pointer)) {
@@ -373,7 +375,7 @@ bool MP2kInstr::loadInstr() {
             setADSR(rgn, rawFile()->get<u32>(off + 8));
           }
         } else if (cgb_type == 1 || cgb_type == 2) {
-          uint8_t duty = static_cast<uint8_t>(raw_sample_pointer & 0x03);
+          u8 duty = static_cast<u8>(raw_sample_pointer & 0x03);
           addPsgRgn(psgSampColl, duty, rawFile()->get<u32>(off + 8), split_list[i],
                     split_list[i + 1] - 1);
         } else if (cgb_type == 3) {
@@ -502,8 +504,8 @@ MP2kSamp::MP2kSamp(VGMSampColl *sampColl, MP2kSampParams params)
               1, BPS::PCM16, 0, "Sample"),
       m_type(params.type){};
 
-std::vector<uint8_t> MP2kSamp::decodeToNativePcm() {
-  std::vector<uint8_t> buf(uncompressedSize());
+std::vector<u8> MP2kSamp::decodeToNativePcm() {
+  std::vector<u8> buf(uncompressedSize());
   switch (m_type) {
     case MP2kWaveType::PCM8: {
       readBytes(dataOff, dataLength, buf.data());
@@ -511,7 +513,7 @@ std::vector<uint8_t> MP2kSamp::decodeToNativePcm() {
     }
 
     case MP2kWaveType::BDPCM: {
-      static constexpr int8_t delta_lut[] = {0,   1,   4,   9,   16,  25, 36, 49,
+      static constexpr s8 delta_lut[] = {0,   1,   4,   9,   16,  25, 36, 49,
                                              -64, -49, -36, -25, -16, -9, -4, -1};
       /*
        * A block consists of an initial signed 8 bit PCM byte
@@ -533,12 +535,12 @@ std::vector<uint8_t> MP2kSamp::decodeToNativePcm() {
       auto blocks = reinterpret_cast<char(*)[33]>(data.get());
 
       for (unsigned int block = 0; block < nblocks; ++block) {
-        int8_t sample = blocks[block][0];
+        s8 sample = blocks[block][0];
         buf[64 * block] = sample << 8;
         sample += delta_lut[blocks[block][1] & 0xf];
         buf[64 * block + 1] = sample << 8;
         for (unsigned int j = 1; j < 32; ++j) {
-          uint8_t d = blocks[block][j + 1];
+          u8 d = blocks[block][j + 1];
           sample += delta_lut[d >> 4];
           buf[64 * block + 2 * j] = sample << 8;
           sample += delta_lut[d & 0xf];
@@ -555,16 +557,16 @@ std::vector<uint8_t> MP2kSamp::decodeToNativePcm() {
 }
 
 namespace {
-constexpr uint8_t kCgbWaveRamBytes = 16;
-constexpr uint8_t kCgbWaveRamSamples = kCgbWaveRamBytes * 2;
+constexpr u8 kCgbWaveRamBytes = 16;
+constexpr u8 kCgbWaveRamSamples = kCgbWaveRamBytes * 2;
 
-double psgDutyRatio(uint8_t dutyIndex) {
+double psgDutyRatio(u8 dutyIndex) {
   constexpr double kDutyRatios[4] = {0.125, 0.25, 0.5, 0.75};
   return kDutyRatios[dutyIndex & 0x03];
 }
 }
 
-MP2kPSGColl::MP2kPSGColl(RawFile *file, uint32_t sampleRate, uint32_t loopSamples)
+MP2kPSGColl::MP2kPSGColl(RawFile *file, u32 sampleRate, u32 loopSamples)
     : VGMSampColl(MP2kFormat::name, file, 0, 0, "MP2k PSG samples"),
       m_sample_rate(sampleRate),
       m_loop_samples(loopSamples) {
@@ -572,7 +574,7 @@ MP2kPSGColl::MP2kPSGColl(RawFile *file, uint32_t sampleRate, uint32_t loopSample
 
 bool MP2kPSGColl::parseSampleInfo() {
   constexpr const char* kDutyLabels[4] = {"12.5%", "25%", "50%", "75%"};
-  for (uint8_t duty = 0; duty < kPsgSquareCount; duty++) {
+  for (u8 duty = 0; duty < kPsgSquareCount; duty++) {
     auto name = fmt::format("PSG square {}", kDutyLabels[duty]);
     auto *sample = new MP2kPSGSamp(this, duty, false, m_sample_rate, m_loop_samples, name);
     samples.push_back(sample);
@@ -600,15 +602,15 @@ int MP2kPSGColl::makeOrGetProgrammableWave(size_t wavePointer) {
 
   int sample_id = static_cast<int>(samples.size());
   auto name = fmt::format("PSG programmable wave {:#x}", wave_offset);
-  constexpr uint32_t kCgbWaveSampleRate = kCgbWaveRamSamples * 440;
+  constexpr u32 kCgbWaveSampleRate = kCgbWaveRamSamples * 440;
   samples.push_back(new MP2kPSGWaveSamp(this, wave_offset, kCgbWaveSampleRate, name));
   m_programmable_waves.emplace(wave_offset, sample_id);
   return sample_id;
 }
 
-MP2kPSGSamp::MP2kPSGSamp(VGMSampColl *sampColl, uint8_t dutyIndex, bool noise,
-                         uint32_t sampleRate, uint32_t loopSamples, std::string name)
-    : VGMSamp(sampColl, 0, loopSamples * sizeof(int16_t), 0, loopSamples * sizeof(int16_t), 1,
+MP2kPSGSamp::MP2kPSGSamp(VGMSampColl *sampColl, u8 dutyIndex, bool noise,
+                         u32 sampleRate, u32 loopSamples, std::string name)
+    : VGMSamp(sampColl, 0, loopSamples * sizeof(s16), 0, loopSamples * sizeof(s16), 1,
               BPS::PCM16, sampleRate, std::move(name)),
       m_duty_ratio(psgDutyRatio(dutyIndex)),
       m_noise(noise) {
@@ -621,7 +623,7 @@ MP2kPSGSamp::MP2kPSGSamp(VGMSampColl *sampColl, uint8_t dutyIndex, bool noise,
   ulUncompressedSize = loopSamples * bytesPerSample();
 }
 
-std::vector<uint8_t> MP2kPSGSamp::decodeToNativePcm() {
+std::vector<u8> MP2kPSGSamp::decodeToNativePcm() {
   if (m_noise) {
     return psg::synthesizeLfsrNoisePCM16(loopLength());
   }
@@ -630,9 +632,9 @@ std::vector<uint8_t> MP2kPSGSamp::decodeToNativePcm() {
 }
 
 MP2kPSGWaveSamp::MP2kPSGWaveSamp(VGMSampColl *sampColl, size_t wavePointer,
-                                 uint32_t sampleRate, std::string name)
-    : VGMSamp(sampColl, static_cast<uint32_t>(wavePointer), kCgbWaveRamBytes,
-              static_cast<uint32_t>(wavePointer), kCgbWaveRamBytes, 1, BPS::PCM16, sampleRate,
+                                 u32 sampleRate, std::string name)
+    : VGMSamp(sampColl, static_cast<u32>(wavePointer), kCgbWaveRamBytes,
+              static_cast<u32>(wavePointer), kCgbWaveRamBytes, 1, BPS::PCM16, sampleRate,
               std::move(name)),
       m_wave_pointer(wavePointer) {
   setLoopStatus(true);
@@ -644,16 +646,16 @@ MP2kPSGWaveSamp::MP2kPSGWaveSamp(VGMSampColl *sampColl, size_t wavePointer,
   ulUncompressedSize = kCgbWaveRamSamples * bytesPerSample();
 }
 
-std::vector<uint8_t> MP2kPSGWaveSamp::decodeToNativePcm() {
-  std::vector<uint8_t> samples(kCgbWaveRamSamples * sizeof(int16_t));
-  auto *output = reinterpret_cast<int16_t *>(samples.data());
+std::vector<u8> MP2kPSGWaveSamp::decodeToNativePcm() {
+  std::vector<u8> samples(kCgbWaveRamSamples * sizeof(s16));
+  auto *output = reinterpret_cast<s16 *>(samples.data());
 
-  for (uint8_t i = 0; i < kCgbWaveRamBytes; i++) {
-    uint8_t packed = readByte(m_wave_pointer + i);
-    uint8_t high = packed >> 4;
-    uint8_t low = packed & 0x0F;
-    output[i * 2] = static_cast<int16_t>(high * 0x1111 - 0x8000);
-    output[i * 2 + 1] = static_cast<int16_t>(low * 0x1111 - 0x8000);
+  for (u8 i = 0; i < kCgbWaveRamBytes; i++) {
+    u8 packed = readByte(m_wave_pointer + i);
+    u8 high = packed >> 4;
+    u8 low = packed & 0x0F;
+    output[i * 2] = static_cast<s16>(high * 0x1111 - 0x8000);
+    output[i * 2 + 1] = static_cast<s16>(low * 0x1111 - 0x8000);
   }
 
   return samples;

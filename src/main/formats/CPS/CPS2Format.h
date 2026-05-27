@@ -1,7 +1,7 @@
 #pragma once
-#include "Format.h"
-#include "CPS2Scanner.h"
 #include "CPS1Scanner.h"
+#include "CPS2Scanner.h"
+#include "Format.h"
 
 enum CPSSynth {
   OKIM6295,

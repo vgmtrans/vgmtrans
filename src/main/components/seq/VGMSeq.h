@@ -5,25 +5,29 @@
  */
 #pragma once
 
+#include "base/Types.h"
 #include "ConversionContext.h"
-#include "VGMFile.h"
-#include "RawFile.h"
 #include "MidiFile.h"
+#include "RawFile.h"
 #include "SeqEventTimeIndex.h"
-#include <set>
+#include "VGMFile.h"
+
 #include <filesystem>
+#include <set>
+#include <string>
+#include <vector>
 
 class SeqTrack;
 class SeqEvent;
 class ISeqSlider;
 
-enum ReadMode : uint8_t {
+enum ReadMode : u8 {
   READMODE_ADD_TO_UI,
   READMODE_CONVERT_TO_MIDI,
   READMODE_FIND_DELTA_LENGTH
 };
 
-enum class PanVolumeCorrectionMode : uint8_t {
+enum class PanVolumeCorrectionMode : u8 {
   kNoVolumeAdjust,
   kAdjustVolumeController,
   kAdjustExpressionController
@@ -31,7 +35,7 @@ enum class PanVolumeCorrectionMode : uint8_t {
 
 class VGMSeq : public VGMFile {
  public:
-  VGMSeq(const std::string &format, RawFile *file, uint32_t offset, uint32_t length = 0,
+  VGMSeq(const std::string &format, RawFile *file, u32 offset, u32 length = 0,
          std::string name = "VGM Sequence");
   ~VGMSeq() override;
 
@@ -45,12 +49,12 @@ class VGMSeq : public VGMFile {
   virtual MidiFile *convertToMidi(const VGMColl* coll = nullptr);
   virtual MidiFile *convertToMidi(const VGMColl* coll, const ConversionContext& context);
   virtual MidiTrack *firstMidiTrack();
-  void setPPQN(uint16_t ppqn);
-  [[nodiscard]] uint16_t ppqn() const;
-  // void setTimeSignature(uint8_t numer, denom);
-  void addInstrumentRef(uint32_t progNum);
-  void addBankReference(uint16_t bank);
-  [[nodiscard]] const std::set<uint16_t>& referencedBanks() const;
+  void setPPQN(u16 ppqn);
+  [[nodiscard]] u16 ppqn() const;
+  // void setTimeSignature(u8 numer, denom);
+  void addInstrumentRef(u32 progNum);
+  void addBankReference(u16 bank);
+  [[nodiscard]] const std::set<u16>& referencedBanks() const;
 
   void useReverb() { m_use_reverb = true; }
 
@@ -67,24 +71,24 @@ class VGMSeq : public VGMFile {
   }
 
   [[nodiscard]] bool alwaysWriteInitialVol() const { return m_always_write_initial_vol; }
-  void setAlwaysWriteInitialVol(uint8_t theVol = 100) {
+  void setAlwaysWriteInitialVol(u8 theVol = 100) {
     m_always_write_initial_vol = true;
     m_initial_volume = theVol;
   }
   [[nodiscard]] bool alwaysWriteInitialExpression() const { return m_always_write_initial_expression; }
-  void setAlwaysWriteInitialExpression(uint8_t level = 127) {
+  void setAlwaysWriteInitialExpression(u8 level = 127) {
     m_always_write_initial_expression = true;
     m_initial_expression = level;
   }
 
   [[nodiscard]] bool alwaysWriteInitialReverb() const { return m_always_write_initial_reverb; }
-  void setAlwaysWriteInitialReverb(uint8_t level = 127) {
+  void setAlwaysWriteInitialReverb(u8 level = 127) {
     m_always_write_initial_reverb = true;
     m_initial_reverb_level = level;
   }
 
   [[nodiscard]] bool alwaysWriteInitialPitchBendRange() const { return m_always_write_initial_pitch_bend_range; }
-  void setAlwaysWriteInitialPitchBendRange(uint16_t cents) {
+  void setAlwaysWriteInitialPitchBendRange(u16 cents) {
     m_always_write_initial_pitch_bend_range = true;
     m_initial_pitch_bend_range_cents = cents;
   }
@@ -109,22 +113,22 @@ class VGMSeq : public VGMFile {
 
   void deactivateAllTracks();
 
-  [[nodiscard]] uint8_t initialVolume() const { return m_initial_volume; }
-  void setInitialVolume(uint8_t volume) { m_initial_volume = volume; }
-  [[nodiscard]] uint8_t initialExpression() const { return m_initial_expression; }
-  void setInitialExpression(uint8_t expression) { m_initial_expression = expression; }
-  [[nodiscard]] uint8_t initialReverbLevel() const { return m_initial_reverb_level; }
-  void setInitialReverbLevel(uint8_t reverb_level) { m_initial_reverb_level = reverb_level; }
-  [[nodiscard]] uint16_t initialPitchBendRange() const { return m_initial_pitch_bend_range_cents; }
-  void setInitialPitchBendRange(uint16_t cents) { m_initial_pitch_bend_range_cents = cents; }
+  [[nodiscard]] u8 initialVolume() const { return m_initial_volume; }
+  void setInitialVolume(u8 volume) { m_initial_volume = volume; }
+  [[nodiscard]] u8 initialExpression() const { return m_initial_expression; }
+  void setInitialExpression(u8 expression) { m_initial_expression = expression; }
+  [[nodiscard]] u8 initialReverbLevel() const { return m_initial_reverb_level; }
+  void setInitialReverbLevel(u8 reverb_level) { m_initial_reverb_level = reverb_level; }
+  [[nodiscard]] u16 initialPitchBendRange() const { return m_initial_pitch_bend_range_cents; }
+  void setInitialPitchBendRange(u16 cents) { m_initial_pitch_bend_range_cents = cents; }
 
   SeqEventTimeIndex& timedEventIndex() { return m_timedEvents; }
 
  protected:
   void setConversionContext(const ConversionContext& context) { m_conversionContext = context; }
 
-  virtual bool loadTracks(ReadMode readMode, uint32_t stopTime = 1000000);
-  virtual void loadTracksMain(uint32_t stopTime);
+  virtual bool loadTracks(ReadMode readMode, u32 stopTime = 1000000);
+  virtual void loadTracksMain(u32 stopTime);
   virtual bool postLoad();
 
 private:
@@ -133,10 +137,10 @@ private:
 
  public:
   MidiFile *midi;
-  uint32_t nNumTracks;
+  u32 nNumTracks;
   ReadMode readMode;
   double tempoBPM;
-  uint32_t time;                // absolute current time (ticks)
+  u32 time;                // absolute current time (ticks)
 
   PanVolumeCorrectionMode panVolumeCorrectionMode{PanVolumeCorrectionMode::kNoVolumeAdjust};
 
@@ -158,23 +162,23 @@ private:
   double initialTempoBPM;
 
   std::vector<SeqTrack *> aTracks;  // array of track pointers
-  std::vector<uint32_t> aInstrumentsUsed;
+  std::vector<u32> aInstrumentsUsed;
 
   std::vector<ISeqSlider *> aSliders;
 
 private:
   ConversionContext m_conversionContext;
-  std::set<uint16_t> m_referencedBanks;
+  std::set<u16> m_referencedBanks;
 
   // Timeline of sequence events emitted during MIDI conversion.
   SeqEventTimeIndex m_timedEvents;
 
-  uint16_t m_ppqn;
+  u16 m_ppqn;
 
-  uint8_t m_initial_volume;
-  uint8_t m_initial_expression;
-  uint8_t m_initial_reverb_level;
-  uint16_t m_initial_pitch_bend_range_cents;
+  u8 m_initial_volume;
+  u8 m_initial_expression;
+  u8 m_initial_reverb_level;
+  u16 m_initial_pitch_bend_range_cents;
 
   bool m_always_write_initial_tempo;
   bool m_always_write_initial_vol;
@@ -200,4 +204,4 @@ private:
 
 };
 
-extern uint8_t mode;
+extern u8 mode;

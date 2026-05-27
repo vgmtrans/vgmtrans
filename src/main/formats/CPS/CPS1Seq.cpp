@@ -1,9 +1,11 @@
 #include "CPS1Seq.h"
-#include "CPS2Format.h"
+
+#include "base/Types.h"
 #include "CPS1TrackV1.h"
 #include "CPS1TrackV2.h"
+#include "CPS2Format.h"
 
-CPS1Seq::CPS1Seq(RawFile *file, uint32_t offset, CPS1FormatVer fmtVersion, std::string name, std::vector<s8> instrTransposeTable)
+CPS1Seq::CPS1Seq(RawFile *file, u32 offset, CPS1FormatVer fmtVersion, std::string name, std::vector<s8> instrTransposeTable)
     : VGMSeq(CPS1Format::name, file, offset, 0, std::move(name)),
       fmtVersion(fmtVersion),
       instrTransposeTable(instrTransposeTable) {
@@ -28,9 +30,9 @@ bool CPS1Seq::parseTrackPointers() {
 
   std::function<u16(u32)> read16;
   if (fmtVersion == CPS1_V100) {
-    read16 = [this](uint32_t offset) { return this->readShort(offset); };
+    read16 = [this](u32 offset) { return this->readShort(offset); };
   } else {
-    read16 = [this](uint32_t offset) { return this->readShortBE(offset); };
+    read16 = [this](u32 offset) { return this->readShortBE(offset); };
   }
 
   this->addHeader(offset(), 1, "Sequence Flags");
@@ -39,7 +41,7 @@ bool CPS1Seq::parseTrackPointers() {
   const int maxTracks = fmtVersion == CPS1_V100 ? 8 : 12;
 
   for (int i = 0; i < maxTracks; i++) {
-    uint32_t trkOff = read16(offset() + 1 + i * 2);
+    u32 trkOff = read16(offset() + 1 + i * 2);
     if (trkOff == 0) {
       header->addChild(offset() + 1 + (i * 2), 2, "No Track");
       continue;

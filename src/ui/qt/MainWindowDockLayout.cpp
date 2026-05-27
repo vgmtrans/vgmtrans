@@ -1,5 +1,15 @@
 #include "MainWindowDockLayout.h"
 
+#include "MainWindow.h"
+#include "services/Settings.h"
+#include "util/Metrics.h"
+#include "util/UIHelpers.h"
+#include "widgets/ItemViewDensity.h"
+#include "workarea/VGMCollListView.h"
+
+#include <algorithm>
+#include <utility>
+
 #include <QAction>
 #include <QApplication>
 #include <QDockWidget>
@@ -10,14 +20,6 @@
 #include <QSize>
 #include <QTimer>
 #include <QWidget>
-#include <algorithm>
-#include <utility>
-#include "MainWindow.h"
-#include "services/Settings.h"
-#include "util/Metrics.h"
-#include "util/UIHelpers.h"
-#include "widgets/ItemViewDensity.h"
-#include "workarea/VGMCollListView.h"
 
 namespace {
 constexpr int kDockLayoutStateVersion = 2;

@@ -1,11 +1,13 @@
 #include "formats/PS1/Vab.h"
+
+#include "base/Types.h"
 #include "Format.h"			//include PS1-specific format header file when it is ready
-#include "PSXSPU.h"
 #include "formats/PS1/PS1Format.h"
+#include "PSXSPU.h"
 
 using namespace std;
 
-Vab::Vab(RawFile *file, uint32_t offset)
+Vab::Vab(RawFile *file, u32 offset)
     : VGMInstrSet(PS1Format::name, file, offset, 0, "VAB") {
 }
 
@@ -14,8 +16,8 @@ Vab::~Vab() {
 
 
 bool Vab::parseHeader() {
-  uint32_t nEndOffset = endOffset();
-  uint32_t nMaxLength = nEndOffset - offset();
+  u32 nEndOffset = endOffset();
+  u32 nMaxLength = nEndOffset - offset();
 
   if (nMaxLength < 0x20) {
     return false;
@@ -42,16 +44,16 @@ bool Vab::parseHeader() {
 }
 
 bool Vab::parseInstrPointers() {
-  uint32_t nEndOffset = endOffset();
+  u32 nEndOffset = endOffset();
 
-  uint32_t offProgs = offset() + 0x20;
-  uint32_t offToneAttrs = offProgs + (16 * 128);
+  u32 offProgs = offset() + 0x20;
+  u32 offToneAttrs = offProgs + (16 * 128);
 
-  uint16_t numPrograms = readShort(offset() + 0x12);
-  uint16_t numTones = readShort(offset() + 0x14);
-  uint16_t numVAGs = readShort(offset() + 0x16);
+  u16 numPrograms = readShort(offset() + 0x12);
+  u16 numTones = readShort(offset() + 0x14);
+  u16 numVAGs = readShort(offset() + 0x16);
 
-  uint32_t offVAGOffsets = offToneAttrs + (32 * 16 * numPrograms);
+  u32 offVAGOffsets = offToneAttrs + (32 * 16 * numPrograms);
 
   VGMHeader *progsHdr = addHeader(offProgs, 16 * 128, "Program Table");
   VGMHeader *toneAttrsHdr = addHeader(offToneAttrs, 32 * 16, "Tone Attributes Table");
@@ -74,16 +76,16 @@ bool Vab::parseInstrPointers() {
   // Rule 2. Do not load programs more than number of programs. Even if a program table value is provided.
   // Otherwise an out-of-order access can be caused in Tone Attributes Table.
   // See the swimming event BGM of Aitakute... ~your smiles in my heart~ for example. (github issue #115)
-  uint32_t numProgramsLoaded = 0;
-  for (uint32_t progIndex = 0; progIndex < 128 && numProgramsLoaded < numPrograms; progIndex++) {
-    uint32_t offCurrProg = offProgs + (progIndex * 16);
-    uint32_t offCurrToneAttrs = offToneAttrs + (uint32_t) (aInstrs.size() * 32 * 16);
+  u32 numProgramsLoaded = 0;
+  for (u32 progIndex = 0; progIndex < 128 && numProgramsLoaded < numPrograms; progIndex++) {
+    u32 offCurrProg = offProgs + (progIndex * 16);
+    u32 offCurrToneAttrs = offToneAttrs + (u32) (aInstrs.size() * 32 * 16);
 
     if (offCurrToneAttrs + (32 * 16) > nEndOffset) {
       break;
     }
 
-    uint8_t numTonesPerInstr = readByte(offCurrProg);
+    u8 numTonesPerInstr = readByte(offCurrProg);
     if (numTonesPerInstr > 32) {
       L_WARN("Too many tones {} in Program #{}.", numTonesPerInstr, progIndex);
     }
@@ -115,14 +117,14 @@ bool Vab::parseInstrPointers() {
 
   if ((offVAGOffsets + 2 * 256) <= nEndOffset) {
     char name[256];
-    uint32_t totalVAGSize = 0;
+    u32 totalVAGSize = 0;
     VGMHeader *vagOffsetHdr = addHeader(offVAGOffsets, 2 * 256, "VAG Pointer Table");
 
-    uint32_t vagStartOffset = offVAGOffsets + 2 * 256;
-    uint32_t vagOffset = 0;
+    u32 vagStartOffset = offVAGOffsets + 2 * 256;
+    u32 vagOffset = 0;
 
-    for (uint32_t i = 1; i < numVAGs + 1; i++) {
-      uint32_t vagSize = readShort(offVAGOffsets + i * 2) * 8;
+    for (u32 i = 1; i < numVAGs + 1; i++) {
+      u32 vagSize = readShort(offVAGOffsets + i * 2) * 8;
 
       snprintf(name, 256, "VAG Size /8 #%u", i);
       vagOffsetHdr->addChild(offVAGOffsets + i * 2, 2, name);
@@ -168,10 +170,10 @@ bool Vab::isViableSampCollMatch(VGMSampColl* sampColl) {
 // ********
 
 VabInstr::VabInstr(VGMInstrSet *instrSet,
-                   uint32_t offset,
-                   uint32_t length,
-                   uint32_t theBank,
-                   uint32_t theInstrNum,
+                   u32 offset,
+                   u32 length,
+                   u32 theBank,
+                   u32 theInstrNum,
                    const string &name)
     : VGMInstr(instrSet, offset, length, theBank, theInstrNum, name),
       masterVol(127) {
@@ -182,7 +184,7 @@ VabInstr::~VabInstr() {
 
 
 bool VabInstr::loadInstr() {
-  int8_t numRgns = attr.tones;
+  s8 numRgns = attr.tones;
   for (int i = 0; i < numRgns; i++) {
     VabRgn *rgn = new VabRgn(this, offset() + i * 0x20);
     if (!rgn->loadRgn()) {
@@ -198,7 +200,7 @@ bool VabInstr::loadInstr() {
 // VabRgn
 // ******
 
-VabRgn::VabRgn(VabInstr *instr, uint32_t offset)
+VabRgn::VabRgn(VabInstr *instr, u32 offset)
     : VGMRgn(instr, offset) {
 }
 
@@ -210,7 +212,7 @@ bool VabRgn::loadRgn() {
 
   addGeneralItem(offset(), 1, "Priority");
   addGeneralItem(offset() + 1, 1, "Mode (use reverb?)");
-  const uint8_t toneVol = readByte(offset() + 2);
+  const u8 toneVol = readByte(offset() + 2);
   const double combinedVolume =
     (static_cast<double>(vab->hdr.mvol) / 127.0) *
     (static_cast<double>(instr->masterVol) / 127.0) *
@@ -254,10 +256,10 @@ bool VabRgn::loadRgn() {
   // gocha: AFAIK, the valid range of pitch is 0-127. It must not be negative.
   // If it exceeds 127, driver clips the value and it will become 127. (In Hokuto no Ken, at least)
   // I am not sure if the interpretation of this value depends on a driver or VAB version.
-  uint8_t ft = readByte(offset() + 5);
-  ft = std::min(ft, static_cast<uint8_t>(127));
+  u8 ft = readByte(offset() + 5);
+  ft = std::min(ft, static_cast<u8>(127));
   double cents = ft * 100.0 / 128.0;
-  setFineTune(static_cast<int16_t>(cents));
+  setFineTune(static_cast<s16>(cents));
 
   psxConvADSR<VabRgn>(this, ADSR1, ADSR2, false);
   return true;

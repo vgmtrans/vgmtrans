@@ -6,10 +6,12 @@
 
 #pragma once
 
-#include <QColor>
-#include <QIcon>
+#include "components/VGMFileVariant.h"
 #include <VGMFile.h>
 #include <VGMItem.h>
+
+#include <QColor>
+#include <QIcon>
 
 class QUrl;
 class QWidget;

@@ -4,8 +4,9 @@
  * refer to the included LICENSE.txt file
  */
 
-#include "FalcomSnesSeq.h"
+#include "base/Types.h"
 #include "FalcomSnesInstr.h"
+#include "FalcomSnesSeq.h"
 #include "ScannerManager.h"
 
 namespace vgmtrans::scanners {
@@ -92,10 +93,10 @@ void FalcomSnesScanner::searchForFalcomSnesFromARAM(RawFile *file) {
   FalcomSnesVersion version;
   std::string name = file->tag.hasTitle() ? file->tag.title : file->stem();
 
-  uint32_t ofsLoadSeq;
-  uint16_t addrSeqHeader;
+  u32 ofsLoadSeq;
+  u16 addrSeqHeader;
   if (file->searchBytePattern(ptnLoadSeq, ofsLoadSeq)) {
-    uint8_t addrSeqHeaderPtr = file->readByte(ofsLoadSeq + 3);
+    u8 addrSeqHeaderPtr = file->readByte(ofsLoadSeq + 3);
     addrSeqHeader = file->readShort(addrSeqHeaderPtr);
     version = FALCOMSNES_YS5;
   } else {
@@ -109,8 +110,8 @@ void FalcomSnesScanner::searchForFalcomSnesFromARAM(RawFile *file) {
   }
 
   // scan for DIR address
-  uint16_t spcDirAddr;
-  uint32_t ofsSetDIR;
+  u16 spcDirAddr;
+  u32 ofsSetDIR;
   if (file->searchBytePattern(ptnSetDIR, ofsSetDIR)) {
     spcDirAddr = file->readByte(ofsSetDIR + 1) << 8;
   } else {
@@ -118,9 +119,9 @@ void FalcomSnesScanner::searchForFalcomSnesFromARAM(RawFile *file) {
   }
 
   // scan for instrument tables
-  uint32_t ofsLoadInstr;
-  uint16_t addrSampToInstrTable;
-  uint16_t addrInstrTable;
+  u32 ofsLoadInstr;
+  u16 addrSampToInstrTable;
+  u16 addrInstrTable;
   if (file->searchBytePattern(ptnLoadInstr, ofsLoadInstr)) {
     addrSampToInstrTable = file->readShort(ofsLoadInstr + 3);
     addrInstrTable = file->readShort(ofsLoadInstr + 21);

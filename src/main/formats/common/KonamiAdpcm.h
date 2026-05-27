@@ -5,7 +5,11 @@
  */
 #pragma once
 
+#include "base/Types.h"
 #include "VGMSamp.h"
+
+#include <string>
+#include <vector>
 
 enum class KonamiAdpcmChip {
   K054539,
@@ -26,7 +30,7 @@ public:
   double compressionRatio() const override;
 
 private:
-  std::vector<uint8_t> decodeToNativePcm() override;
+  std::vector<u8> decodeToNativePcm() override;
   KonamiAdpcmChip m_chip;
   const s16* m_stepTable;
 };

@@ -6,9 +6,11 @@
 
 #pragma once
 
+#include "base/Types.h"
+
 #include <cstdint>
-#include <string>
 #include <map>
+#include <string>
 #include <vector>
 
 class VGMTag {
@@ -28,7 +30,7 @@ public:
   std::string artist;
   std::string album;
   std::string comment;
-  std::map<std::string, std::vector<uint8_t>> binaries;
+  std::map<std::string, std::vector<u8>> binaries;
 
   /* Track number */
   int track_number = 0;

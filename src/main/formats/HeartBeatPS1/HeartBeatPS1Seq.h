@@ -4,12 +4,16 @@
  * refer to the included LICENSE.txt file
  */
 #pragma once
+
+#include "base/Types.h"
 #include "VGMSeqNoTrks.h"
+
+#include <string>
 
 class HeartBeatPS1Seq:
     public VGMSeqNoTrks {
  public:
-  HeartBeatPS1Seq(RawFile *file, uint32_t offset, uint32_t length = 0, const std::string &name = "HeartBeatPS1Seq");
+  HeartBeatPS1Seq(RawFile *file, u32 offset, u32 length = 0, const std::string &name = "HeartBeatPS1Seq");
   ~HeartBeatPS1Seq() override;
 
   bool parseHeader() override;
@@ -17,7 +21,7 @@ class HeartBeatPS1Seq:
   bool readEvent() override;
 
  private:
-  uint8_t key;
-  uint32_t seqHeaderOffset;
-  uint8_t runningStatus;
+  u8 key;
+  u32 seqHeaderOffset;
+  u8 runningStatus;
 };

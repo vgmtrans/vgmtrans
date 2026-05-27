@@ -5,9 +5,12 @@
  */
 
 #include "PSF2Loader.h"
-#include <zlib.h>
-#include "LogManager.h"
+
+#include "base/Types.h"
 #include "components/PSFFile.h"
+#include "LogManager.h"
+
+#include <zlib.h>
 
 namespace vgmtrans::loaders {
 LoaderRegistration<PSF2Loader> _psf2("PSF2");
@@ -90,7 +93,7 @@ int PSF2Loader::psf2unpack(const RawFile *file, unsigned long fileoffset, unsign
       u32 k = 0;
 
       std::ptrdiff_t test = 4;
-      uint16_t test2 = test;
+      u16 test2 = test;
 
       u8 *dblock = new u8[buffersize];
 

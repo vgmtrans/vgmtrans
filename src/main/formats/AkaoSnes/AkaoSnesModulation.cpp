@@ -5,6 +5,9 @@
  */
 
 #include "AkaoSnesModulation.h"
+
+#include "base/Types.h"
+
 #include <algorithm>
 #include <cmath>
 
@@ -27,39 +30,39 @@ namespace {
  */
 
 // These are timer0 latch bytes, not Hertz values: driver frames run at 8000 / latch.
-constexpr uint8_t kMinTimer0Frequency = 0x24;
-constexpr uint8_t kMaxTimer0Frequency = 0x2a;
+constexpr u8 kMinTimer0Frequency = 0x24;
+constexpr u8 kMaxTimer0Frequency = 0x2a;
 
-constexpr uint8_t v1RateCounter(uint8_t rate) {
-  return static_cast<uint8_t>(rate >> 1);
+constexpr u8 v1RateCounter(u8 rate) {
+  return static_cast<u8>(rate >> 1);
 }
 
-constexpr uint8_t v2RateCounter(uint8_t rate) {
-  return static_cast<uint8_t>(rate & 0x7f);
+constexpr u8 v2RateCounter(u8 rate) {
+  return static_cast<u8>(rate & 0x7f);
 }
 
-constexpr uint16_t effectiveRateFrames(AkaoSnesVersion version, uint8_t rate, uint8_t depth) {
+constexpr u16 effectiveRateFrames(AkaoSnesVersion version, u8 rate, u8 depth) {
   // All versions produce one half-cycle over this many timer0 frames; lfoRateHz() turns that into cycles/sec.
   if (version == AKAOSNES_V1) {
-    return static_cast<uint16_t>(v1RateCounter(rate)) + 1;
+    return static_cast<u16>(v1RateCounter(rate)) + 1;
   }
 
   if (version == AKAOSNES_V2) {
-    const uint16_t frames = v2RateCounter(rate);
-    return static_cast<uint16_t>((depth & 0x80) != 0 ? frames * 2 : frames);
+    const u16 frames = v2RateCounter(rate);
+    return static_cast<u16>((depth & 0x80) != 0 ? frames * 2 : frames);
   }
 
   if (version == AKAOSNES_V3) {
-    return static_cast<uint16_t>(rate) + 1;
+    return static_cast<u16>(rate) + 1;
   }
 
   return (rate == 0) ? 256 : rate;
 }
 
-uint8_t modulationMagnitude(AkaoSnesVersion version, uint8_t depth) {
+u8 modulationMagnitude(AkaoSnesVersion version, u8 depth) {
   // Convert version-specific depth bytes to the driver's high-byte LFO amplitude space.
   if (version == AKAOSNES_V2) {
-    return static_cast<uint8_t>((depth & 0x3f) + 1);
+    return static_cast<u8>((depth & 0x3f) + 1);
   }
 
   if (depth == 0) {
@@ -70,20 +73,20 @@ uint8_t modulationMagnitude(AkaoSnesVersion version, uint8_t depth) {
     return depth;
   }
 
-  const uint8_t magnitude = static_cast<uint8_t>(depth & 0x3f);
+  const u8 magnitude = static_cast<u8>(depth & 0x3f);
   return (version == AKAOSNES_V3)
-      ? static_cast<uint8_t>((magnitude * 2) + 1)
-      : static_cast<uint8_t>(magnitude + 1);
+      ? static_cast<u8>((magnitude * 2) + 1)
+      : static_cast<u8>(magnitude + 1);
 }
 
-double frameRateHz(uint8_t timer0Frequency) {
+double frameRateHz(u8 timer0Frequency) {
   // SPC timer0 runs from an 8 kHz source divided by the latch byte.
   return 8000.0 / timer0Frequency;
 }
 
-double lfoRateHz(AkaoSnesVersion version, uint8_t rate, uint8_t depth, uint8_t timer0Frequency) {
+double lfoRateHz(AkaoSnesVersion version, u8 rate, u8 depth, u8 timer0Frequency) {
   // SF2/DLS vibrato LFO frequency is full triangle cycles/sec, and one full cycle is two ramps.
-  const uint16_t frames = effectiveRateFrames(version, rate, depth);
+  const u16 frames = effectiveRateFrames(version, rate, depth);
   return (frames == 0) ? 0.0 : frameRateHz(timer0Frequency) / (2.0 * frames);
 }
 
@@ -130,19 +133,19 @@ double maxLfoRateHz(AkaoSnesVersion version) {
   return 8000.0 / kMinTimer0Frequency / 2.0;
 }
 
-uint16_t v4LfoStep(uint8_t rate, uint8_t depth) {
+u16 v4LfoStep(u8 rate, u8 depth) {
   if (depth == 0) {
     return 0;
   }
 
   // V4 advances a phase accumulator by a quantized step and enforces a minimum nonzero step.
-  const uint16_t frames = effectiveRateFrames(AKAOSNES_V4, rate, depth);
-  const uint8_t magnitude = modulationMagnitude(AKAOSNES_V4, depth);
-  const uint16_t step = static_cast<uint16_t>(64 * magnitude / frames);
-  return static_cast<uint16_t>(4 * std::max<uint16_t>(1, step));
+  const u16 frames = effectiveRateFrames(AKAOSNES_V4, rate, depth);
+  const u8 magnitude = modulationMagnitude(AKAOSNES_V4, depth);
+  const u16 step = static_cast<u16>(64 * magnitude / frames);
+  return static_cast<u16>(4 * std::max<u16>(1, step));
 }
 
-double v4PhaseHighByteAmplitude(uint8_t rate, uint8_t depth) {
+double v4PhaseHighByteAmplitude(u8 rate, u8 depth) {
   if (depth == 0) {
     return 0.0;
   }
@@ -151,18 +154,18 @@ double v4PhaseHighByteAmplitude(uint8_t rate, uint8_t depth) {
   return v4LfoStep(rate, depth) * effectiveRateFrames(AKAOSNES_V4, rate, depth) / 256.0;
 }
 
-double v2PhaseHighByteAmplitude(uint8_t rate, uint8_t depth) {
-  const uint8_t frames = v2RateCounter(rate);
+double v2PhaseHighByteAmplitude(u8 rate, u8 depth) {
+  const u8 frames = v2RateCounter(rate);
   if (frames == 0) {
     return 0.0;
   }
 
   // V2 computes a phase step from depth and rate. The accumulator high byte becomes pitch/volume magnitude.
-  const uint16_t step = static_cast<uint16_t>(512 * modulationMagnitude(AKAOSNES_V2, depth) / frames);
+  const u16 step = static_cast<u16>(512 * modulationMagnitude(AKAOSNES_V2, depth) / frames);
   return std::min(128.0, static_cast<double>((step * frames) >> 8));
 }
 
-double modulationAmplitude(AkaoSnesVersion version, uint8_t rate, uint8_t depth) {
+double modulationAmplitude(AkaoSnesVersion version, u8 rate, u8 depth) {
   // Normalize every version to the high-byte amplitude expected by the cents conversion.
   if (version == AKAOSNES_V2) {
     return v2PhaseHighByteAmplitude(rate, depth);
@@ -182,15 +185,15 @@ double modulationAmplitude(AkaoSnesVersion version, uint8_t rate, uint8_t depth)
   return v4PhaseHighByteAmplitude(rate, depth);
 }
 
-uint8_t v1VibratoHighByteAmplitude(uint8_t rate, uint8_t depth) {
-  const uint8_t counter = v1RateCounter(rate);
+u8 v1VibratoHighByteAmplitude(u8 rate, u8 depth) {
+  const u8 counter = v1RateCounter(rate);
   if (counter == 0 || depth == 0) {
     return 0;
   }
 
   // V1 derives amplitude through an 8-bit fractional step; keep the driver's truncation.
-  const uint32_t step = (256u * depth) / counter;
-  return static_cast<uint8_t>((step * counter) / 256u);
+  const u32 step = (256u * depth) / counter;
+  return static_cast<u8>((step * counter) / 256u);
 }
 
 double vibratoDepthCentsForAmplitude(double amplitude) {
@@ -205,7 +208,7 @@ double vibratoDepthCentsForAmplitude(double amplitude) {
   return std::max(centsUp, centsDown);
 }
 
-double v1VibratoDepthCentsForHighByte(uint8_t amplitude) {
+double v1VibratoDepthCentsForHighByte(u8 amplitude) {
   if (amplitude == 0) {
     return 0.0;
   }
@@ -214,7 +217,7 @@ double v1VibratoDepthCentsForHighByte(uint8_t amplitude) {
   return 1200.0 * std::log2(1.0 + (amplitude / 3072.0));
 }
 
-double v2VibratoDepthCents(uint8_t rate, uint8_t depth) {
+double v2VibratoDepthCents(u8 rate, u8 depth) {
   const double amplitude = std::min(127.0, v2PhaseHighByteAmplitude(rate, depth));
   if (amplitude <= 0.0) {
     return 0.0;
@@ -229,7 +232,7 @@ double v2VibratoDepthCents(uint8_t rate, uint8_t depth) {
   return 1200.0 * std::log2(1.0 + (15.0 * amplitude / 32768.0));
 }
 
-double vibratoDepthCents(AkaoSnesVersion version, uint8_t rate, uint8_t depth) {
+double vibratoDepthCents(AkaoSnesVersion version, u8 rate, u8 depth) {
   // Reproduce each driver's pitch math first, then report the result as SF2/DLS cents.
   if (version == AKAOSNES_V1) {
     return v1VibratoDepthCentsForHighByte(v1VibratoHighByteAmplitude(rate, depth));
@@ -251,7 +254,7 @@ double tremoloDepthDbForAmplitude(double amplitude) {
   return -20.0 * std::log10(troughScale);
 }
 
-double v3TremoloPeakToTroughDb(uint8_t depth) {
+double v3TremoloPeakToTroughDb(u8 depth) {
   if (depth == 0) {
     return 0.0;
   }
@@ -263,21 +266,21 @@ double v3TremoloPeakToTroughDb(uint8_t depth) {
   return -20.0 * std::log10(troughScale);
 }
 
-double delaySeconds(AkaoSnesVersion version, uint8_t delay, uint8_t tempo, uint8_t timer0Frequency) {
-  const uint8_t ticks = delayTicks(version, delay);
+double delaySeconds(AkaoSnesVersion version, u8 delay, u8 tempo, u8 timer0Frequency) {
+  const u8 ticks = delayTicks(version, delay);
   if (ticks == 0) {
     return 0.0;
   }
 
-  const uint8_t safeTempo = (tempo == 0) ? 1 : tempo;
+  const u8 safeTempo = (tempo == 0) ? 1 : tempo;
   // Delay ticks are tempo-scaled music ticks; one tick is 256 / (driverFramesPerSecond * tempo).
   return ticks * (256.0 / (frameRateHz(timer0Frequency) * safeTempo));
 }
 
-uint32_t driverFramesToTicks(double frames, uint8_t tempo) {
+u32 driverFramesToTicks(double frames, u8 tempo) {
   // Tempo 0 stops music ticks; export automation still needs finite timing, so use the slowest nonzero tempo.
-  const uint8_t safeTempo = (tempo == 0) ? 1 : tempo;
-  return std::max<uint32_t>(1, static_cast<uint32_t>(std::lround(frames * safeTempo / 256.0)));
+  const u8 safeTempo = (tempo == 0) ? 1 : tempo;
+  return std::max<u32>(1, static_cast<u32>(std::lround(frames * safeTempo / 256.0)));
 }
 
 constexpr double kMaxV1DelaySeconds = 254.0 * 256.0 / (8000.0 / kMinTimer0Frequency);
@@ -328,18 +331,18 @@ double maxDelaySeconds(AkaoSnesVersion version) {
   return (version == AKAOSNES_V4) ? kMaxV4DelaySeconds : kMaxDelaySeconds;
 }
 
-uint8_t midiValueForDepthRange(double value, double maxValue) {
+u8 midiValueForDepthRange(double value, double maxValue) {
   if (maxValue <= 0.0) {
     return 0;
   }
 
   const int midiValue = static_cast<int>(std::lround(128.0 * value / maxValue));
-  return static_cast<uint8_t>(std::clamp(midiValue, 0, 127));
+  return static_cast<u8>(std::clamp(midiValue, 0, 127));
 }
 
 }  // namespace
 
-bool isLfoActive(AkaoSnesVersion version, uint8_t rate, uint8_t depth) {
+bool isLfoActive(AkaoSnesVersion version, u8 rate, u8 depth) {
   if (version == AKAOSNES_V2) {
     // V2 can be active with a zero depth byte because the low six bits are
     // interpreted as magnitude + 1; only a zero rate counter disables it.
@@ -353,7 +356,7 @@ bool isLfoActive(AkaoSnesVersion version, uint8_t rate, uint8_t depth) {
   return version != AKAOSNES_V1 || v1RateCounter(rate) != 0;
 }
 
-uint8_t delayTicks(AkaoSnesVersion version, uint8_t delay) {
+u8 delayTicks(AkaoSnesVersion version, u8 delay) {
   if (version == AKAOSNES_V1) {
     // FF4 stores delay + 1 in the driver; a literal $ff wraps to zero.
     return (delay == 0xff) ? 0 : delay;
@@ -362,7 +365,7 @@ uint8_t delayTicks(AkaoSnesVersion version, uint8_t delay) {
   if (version == AKAOSNES_V4) {
     // FF6-family drivers decrement delay during the same sequencer pass that
     // initializes vibrato, so $01 enables fade-in with no audible pre-delay.
-    return (delay == 0) ? 0 : static_cast<uint8_t>(delay - 1);
+    return (delay == 0) ? 0 : static_cast<u8>(delay - 1);
   }
 
   return delay;
@@ -398,7 +401,7 @@ TremoloModulationSpec tremoloSpec(AkaoSnesVersion version) {
   };
 }
 
-uint8_t vibratoDepthMidiValue(AkaoSnesVersion version, uint8_t rate, uint8_t depth) {
+u8 vibratoDepthMidiValue(AkaoSnesVersion version, u8 rate, u8 depth) {
   if (!isLfoActive(version, rate, depth)) {
     return 0;
   }
@@ -407,10 +410,10 @@ uint8_t vibratoDepthMidiValue(AkaoSnesVersion version, uint8_t rate, uint8_t dep
   const int midiValue =
       static_cast<int>(std::lround(128.0 * vibratoDepthCents(version, rate, depth) /
                                    maxVibratoDepthCents(version)));
-  return static_cast<uint8_t>(std::clamp(midiValue, version == AKAOSNES_V3 ? 1 : 0, 127));
+  return static_cast<u8>(std::clamp(midiValue, version == AKAOSNES_V3 ? 1 : 0, 127));
 }
 
-uint8_t tremoloDepthMidiValue(AkaoSnesVersion version, uint8_t rate, uint8_t depth, uint8_t delay) {
+u8 tremoloDepthMidiValue(AkaoSnesVersion version, u8 rate, u8 depth, u8 delay) {
   if (!exportsTremolo(version) || !isLfoActive(version, rate, depth)) {
     return 0;
   }
@@ -431,21 +434,21 @@ uint8_t tremoloDepthMidiValue(AkaoSnesVersion version, uint8_t rate, uint8_t dep
   return midiValueForDepthRange(depthDb, maxTremoloDepthDb(version));
 }
 
-uint8_t rateMidiValue(AkaoSnesVersion version, uint8_t rate, uint8_t depth, uint8_t timer0Frequency) {
+u8 rateMidiValue(AkaoSnesVersion version, u8 rate, u8 depth, u8 timer0Frequency) {
   return midiValueForHertzInRange(lfoRateHz(version, rate, depth, timer0Frequency),
                                   minLfoRateHz(version),
                                   maxLfoRateHz(version));
 }
 
-uint8_t delayMidiValue(AkaoSnesVersion version, uint8_t delay, uint8_t tempo, uint8_t timer0Frequency) {
+u8 delayMidiValue(AkaoSnesVersion version, u8 delay, u8 tempo, u8 timer0Frequency) {
   // The configured vibrato delay source drives LFO delay within the version's exported seconds range.
   return midiValueForSecondsInRange(delaySeconds(version, delay, tempo, timer0Frequency),
                                     0.0,
                                     maxDelaySeconds(version));
 }
 
-uint32_t v1VibratoRampTicks(uint8_t rate, uint8_t tempo) {
-  const uint8_t counter = v1RateCounter(rate);
+u32 v1VibratoRampTicks(u8 rate, u8 tempo) {
+  const u8 counter = v1RateCounter(rate);
   if (counter == 0) {
     return 0;
   }
@@ -456,14 +459,14 @@ uint32_t v1VibratoRampTicks(uint8_t rate, uint8_t tempo) {
   return driverFramesToTicks(rampFrames, tempo);
 }
 
-uint32_t v3LfoRampTicks(uint8_t rate, uint8_t tempo) {
+u32 v3LfoRampTicks(u8 rate, u8 tempo) {
   // V3's delayed note-start ramp reaches full depth after six LFO update
   // intervals; export that as one smooth SF2/DLS depth fade.
   const double rampFrames = 6.0 * effectiveRateFrames(AKAOSNES_V3, rate, 0);
   return driverFramesToTicks(rampFrames, tempo);
 }
 
-uint32_t v4VibratoRampTicks(uint8_t rate, uint8_t tempo) {
+u32 v4VibratoRampTicks(u8 rate, u8 tempo) {
   // V4 starts delayed vibrato at quarter slope and reaches full depth after
   // seven rate intervals. Approximate that slope ramp as one smooth depth fade.
   const double rampFrames = 7.0 * effectiveRateFrames(AKAOSNES_V4, rate, 0);

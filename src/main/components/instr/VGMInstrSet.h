@@ -1,8 +1,11 @@
 #pragma once
-#include "common.h"
+#include "base/Types.h"
 #include "Modulation.h"
 #include "VGMFile.h"
+
 #include <optional>
+#include <string>
+#include <vector>
 
 class VGMSampColl;
 class VGMInstr;
@@ -19,7 +22,7 @@ constexpr float defaultReverbPercent = 0.25;
 
 class VGMInstrSet : public VGMFile {
 public:
-  VGMInstrSet(const std::string &format, RawFile *file, uint32_t offset, uint32_t length = 0,
+  VGMInstrSet(const std::string &format, RawFile *file, u32 offset, u32 length = 0,
               std::string name = "VGMInstrSet", VGMSampColl *theSampColl = nullptr);
   ~VGMInstrSet() override;
 
@@ -37,7 +40,7 @@ public:
 
   const std::vector<VGMInstr*>& exportInstrs() const;
 
-  VGMInstr *addInstr(uint32_t offset, uint32_t length, uint32_t bank, uint32_t instrNum,
+  VGMInstr *addInstr(u32 offset, u32 length, u32 bank, u32 instrNum,
                      const std::string &instrName = "");
 
   std::vector<VGMInstr *> aInstrs;
@@ -59,18 +62,18 @@ private:
 
 class VGMInstr : public VGMItem {
 public:
-  VGMInstr(VGMInstrSet *parInstrSet, uint32_t offset, uint32_t length, uint32_t bank,
-           uint32_t instrNum, std::string name = "Instrument",
+  VGMInstr(VGMInstrSet *parInstrSet, u32 offset, u32 length, u32 bank,
+           u32 instrNum, std::string name = "Instrument",
            float reverb = defaultReverbPercent);
 
   const std::vector<VGMRgn*>& regions() { return m_regions; }
 
-  inline void setBank(uint32_t bankNum);
-  inline void setInstrNum(uint32_t theInstrNum);
+  inline void setBank(u32 bankNum);
+  inline void setInstrNum(u32 theInstrNum);
 
   VGMRgn *addRgn(VGMRgn *rgn);
-  VGMRgn *addRgn(uint32_t offset, uint32_t length, int sampNum, uint8_t keyLow = 0,
-                 uint8_t keyHigh = 0x7F, uint8_t velLow = 0, uint8_t velHigh = 0x7F);
+  VGMRgn *addRgn(u32 offset, u32 length, int sampNum, u8 keyLow = 0,
+                 u8 keyHigh = 0x7F, u8 velLow = 0, u8 velHigh = 0x7F);
 
   // Modulator support
   void addModulator(ModSource source, ModDest destination, ModAmount amount);
@@ -102,8 +105,8 @@ public:
 
   virtual bool loadInstr() { return true; }
 
-  uint32_t bank;
-  uint32_t instrNum;
+  u32 bank;
+  u32 instrNum;
   VGMInstrSet *parInstrSet;
   float reverb;
 

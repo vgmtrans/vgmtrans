@@ -1,7 +1,12 @@
 #pragma once
+
+#include "base/Types.h"
+#include "CompileSnesFormat.h"
 #include "VGMInstrSet.h"
 #include "VGMRgn.h"
-#include "CompileSnesFormat.h"
+
+#include <string>
+#include <vector>
 
 // *******************
 // CompileSnesInstrSet
@@ -12,9 +17,9 @@ class CompileSnesInstrSet:
  public:
   CompileSnesInstrSet(RawFile *file,
                       CompileSnesVersion ver,
-                      uint16_t addrTuningTable,
-                      uint16_t addrPitchTablePtrs,
-                      uint32_t spcDirAddr,
+                      u16 addrTuningTable,
+                      u16 addrPitchTablePtrs,
+                      u32 spcDirAddr,
                       const std::string &name = "CompileSnesInstrSet");
   ~CompileSnesInstrSet() override;
 
@@ -24,10 +29,10 @@ class CompileSnesInstrSet:
   CompileSnesVersion version;
 
  protected:
-  uint16_t addrTuningTable;
-  uint16_t addrPitchTablePtrs;
-  uint32_t spcDirAddr;
-  std::vector<uint8_t> usedSRCNs;
+  u16 addrTuningTable;
+  u16 addrPitchTablePtrs;
+  u32 spcDirAddr;
+  std::vector<u8> usedSRCNs;
 };
 
 // ****************
@@ -39,22 +44,22 @@ class CompileSnesInstr
  public:
   CompileSnesInstr(VGMInstrSet *instrSet,
                    CompileSnesVersion ver,
-                   uint16_t addrTuningTableItem,
-                   uint16_t addrPitchTablePtrs,
-                   uint8_t srcn,
-                   uint32_t spcDirAddr,
+                   u16 addrTuningTableItem,
+                   u16 addrPitchTablePtrs,
+                   u8 srcn,
+                   u32 spcDirAddr,
                    const std::string &name = "CompileSnesInstr");
   ~CompileSnesInstr() override;
 
   bool loadInstr() override;
 
-  static uint32_t expectedSize(CompileSnesVersion version);
+  static u32 expectedSize(CompileSnesVersion version);
 
   CompileSnesVersion version;
 
  protected:
-  uint16_t addrPitchTablePtrs;
-  uint32_t spcDirAddr;
+  u16 addrPitchTablePtrs;
+  u32 spcDirAddr;
 };
 
 // **************
@@ -66,8 +71,8 @@ class CompileSnesRgn
  public:
   CompileSnesRgn(CompileSnesInstr *instr,
                  CompileSnesVersion ver,
-                 uint16_t addrTuningTableItem,
-                 uint16_t addrPitchTablePtrs);
+                 u16 addrTuningTableItem,
+                 u16 addrPitchTablePtrs);
   ~CompileSnesRgn() override;
 
   bool loadRgn() override;

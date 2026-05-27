@@ -5,10 +5,15 @@
  */
 
 #pragma once
-#include "VGMItem.h"
+
+#include "base/Binary.h"
+#include "base/Types.h"
 #include "Loop.h"
+#include "VGMItem.h"
+
 #include <cstddef>
 #include <filesystem>
+#include <string>
 #include <vector>
 
 class VGMSampColl;
@@ -20,26 +25,26 @@ enum class BPS : int {
 
 class VGMSamp : public VGMItem {
 public:
-  VGMSamp(VGMSampColl *sampColl, uint32_t offset = 0, uint32_t length = 0, uint32_t dataOffset = 0,
-          uint32_t dataLength = 0, uint8_t channels = 1, BPS bps = BPS::PCM16, uint32_t rate = 0,
+  VGMSamp(VGMSampColl *sampColl, u32 offset = 0, u32 length = 0, u32 dataOffset = 0,
+          u32 dataLength = 0, u8 channels = 1, BPS bps = BPS::PCM16, u32 rate = 0,
           std::string name = "Sample");
   ~VGMSamp() override = default;
 
   virtual double compressionRatio() const;  // ratio of space conserved.  should generally be > 1
-  std::vector<uint8_t> toPcm(Signedness targetSignedness,
+  std::vector<u8> toPcm(Signedness targetSignedness,
                              Endianness targetEndianness,
                              BPS targetBps);
 
   inline void setBPS(BPS theBps) { m_bps = theBps; }
-  inline void setRate(uint32_t theRate) { rate = theRate; }
-  inline void setNumChannels(uint8_t nChannels) { channels = nChannels; }
-  inline void setDataOffset(uint32_t theDataOff) { dataOff = theDataOff; }
-  inline void setDataLength(uint32_t theDataLength) { dataLength = theDataLength; }
+  inline void setRate(u32 theRate) { rate = theRate; }
+  inline void setNumChannels(u8 nChannels) { channels = nChannels; }
+  inline void setDataOffset(u32 theDataOff) { dataOff = theDataOff; }
+  inline void setDataLength(u32 theDataLength) { dataLength = theDataLength; }
   inline int loopStatus() const { return loop.loopStatus; }
   inline void setLoopStatus(int loopStat) { loop.loopStatus = loopStat; }
-  inline void setLoopOffset(uint32_t loopStart) { loop.loopStart = loopStart; }
+  inline void setLoopOffset(u32 loopStart) { loop.loopStart = loopStart; }
   inline int loopLength() const { return loop.loopLength; }
-  inline void setLoopLength(uint32_t theLoopLength) { loop.loopLength = theLoopLength; }
+  inline void setLoopLength(u32 theLoopLength) { loop.loopLength = theLoopLength; }
   inline void setLoopStartMeasure(LoopMeasure measure) { loop.loopStartMeasure = measure; }
   inline void setLoopLengthMeasure(LoopMeasure measure) { loop.loopLengthMeasure = measure; }
   inline double attenDb() const { return m_attenDb; }
@@ -54,23 +59,23 @@ public:
   inline BPS bps() const { return m_bps; }
   inline int bitsPerSample() const { return static_cast<int>(m_bps); }
   inline int bytesPerSample() const { return bitsPerSample() / 8; }
-  uint32_t uncompressedSize() const;
+  u32 uncompressedSize() const;
 
   bool onSaveAsWav();
   bool saveAsWav(const std::filesystem::path &filepath);
 
 public:
-  uint32_t dataOff;  // offset of original sample data
-  uint32_t dataLength;
-  uint32_t rate;     // sample rate in herz (samples per second)
-  uint8_t channels;  // mono or stereo?
-  uint32_t ulUncompressedSize{0};
+  u32 dataOff;  // offset of original sample data
+  u32 dataLength;
+  u32 rate;     // sample rate in herz (samples per second)
+  u8 channels;  // mono or stereo?
+  u32 ulUncompressedSize{0};
 
   bool bPSXLoopInfoPrioritizing = false;
   Loop loop;
 
   /* FIXME: these placeholders value are not so clean... */
-  int8_t unityKey {-1};
+  s8 unityKey {-1};
   short fineTune {0};
 
   long pan{0};
@@ -85,7 +90,7 @@ private:
   Signedness m_signedness = Signedness::Signed;
 
 protected:
-  virtual std::vector<uint8_t> decodeToNativePcm();
+  virtual std::vector<u8> decodeToNativePcm();
 };
 
 
@@ -93,7 +98,7 @@ class EmptySamp : public VGMSamp {
 public:
   EmptySamp(VGMSampColl* sampColl): VGMSamp(sampColl, 0, 0, 0, 16, 1, BPS::PCM16) {}
 protected:
-  std::vector<uint8_t> decodeToNativePcm() override {
-    return std::vector<uint8_t>(dataLength, 0);
+  std::vector<u8> decodeToNativePcm() override {
+    return std::vector<u8>(dataLength, 0);
   }
 };

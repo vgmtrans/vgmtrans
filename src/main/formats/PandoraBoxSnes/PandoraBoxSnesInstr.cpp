@@ -4,7 +4,10 @@
  * refer to the included LICENSE.txt file
  */
 #include "PandoraBoxSnesInstr.h"
+
+#include "base/Types.h"
 #include "SNESDSP.h"
+
 #include <spdlog/fmt/fmt.h>
 
 // **********************
@@ -13,11 +16,11 @@
 
 PandoraBoxSnesInstrSet::PandoraBoxSnesInstrSet(RawFile *file,
                                                PandoraBoxSnesVersion ver,
-                                               uint32_t spcDirAddr,
-                                               uint16_t addrLocalInstrTable,
-                                               uint16_t addrGlobalInstrTable,
-                                               uint8_t globalInstrumentCount,
-                                               const std::map<uint8_t, uint16_t> &instrADSRHints,
+                                               u32 spcDirAddr,
+                                               u16 addrLocalInstrTable,
+                                               u16 addrGlobalInstrTable,
+                                               u8 globalInstrumentCount,
+                                               const std::map<u8, u16> &instrADSRHints,
                                                const std::string &name) :
     VGMInstrSet(PandoraBoxSnesFormat::name, file, addrLocalInstrTable, 0, name), version(ver),
     spcDirAddr(spcDirAddr),
@@ -40,7 +43,7 @@ bool PandoraBoxSnesInstrSet::parseHeader() {
   }
 
   // read global instrument table into vector
-  for (uint8_t globalInstrNum = 0; globalInstrNum < globalInstrumentCount; globalInstrNum++) {
+  for (u8 globalInstrNum = 0; globalInstrNum < globalInstrumentCount; globalInstrNum++) {
     globalInstrTable.push_back(readByte(addrGlobalInstrTable + globalInstrNum));
   }
 
@@ -50,13 +53,13 @@ bool PandoraBoxSnesInstrSet::parseHeader() {
 bool PandoraBoxSnesInstrSet::parseInstrPointers() {
   usedSRCNs.clear();
 
-  for (uint8_t instrNum = 0; instrNum <= 0x7f; instrNum++) {
-    uint32_t addrLocalInstrItem = addrLocalInstrTable + instrNum;
+  for (u8 instrNum = 0; instrNum <= 0x7f; instrNum++) {
+    u32 addrLocalInstrItem = addrLocalInstrTable + instrNum;
     if (addrLocalInstrItem >= 0x10000) {
       break;
     }
 
-    uint8_t globalInstrNum = readByte(addrLocalInstrItem);
+    u8 globalInstrNum = readByte(addrLocalInstrItem);
 
     // search instrument number and get SRCN
     // note: actual engine do backward search, but I do not care
@@ -66,19 +69,19 @@ bool PandoraBoxSnesInstrSet::parseInstrPointers() {
       // actual music engine will use SRCN 0 for such case
       break;
     }
-    uint8_t srcn = std::distance(globalInstrTable.begin(), iterInstrItem);
+    u8 srcn = std::distance(globalInstrTable.begin(), iterInstrItem);
 
-    uint32_t addrDIRentry = spcDirAddr + (srcn * 4);
+    u32 addrDIRentry = spcDirAddr + (srcn * 4);
     if (!SNESSampColl::isValidSampleDir(rawFile(), addrDIRentry, true)) {
       break;
     }
 
-    std::vector<uint8_t>::iterator itrSRCN = find(usedSRCNs.begin(), usedSRCNs.end(), srcn);
+    std::vector<u8>::iterator itrSRCN = find(usedSRCNs.begin(), usedSRCNs.end(), srcn);
     if (itrSRCN == usedSRCNs.end()) {
       usedSRCNs.push_back(srcn);
     }
 
-    uint16_t adsr = 0x8fe0;
+    u16 adsr = 0x8fe0;
     if (instrADSRHints.count(srcn)) {
       adsr = instrADSRHints[srcn];
     }
@@ -109,11 +112,11 @@ bool PandoraBoxSnesInstrSet::parseInstrPointers() {
 
 PandoraBoxSnesInstr::PandoraBoxSnesInstr(VGMInstrSet *instrSet,
                                          PandoraBoxSnesVersion ver,
-                                         uint32_t offset,
-                                         uint8_t theInstrNum,
-                                         uint8_t srcn,
-                                         uint32_t spcDirAddr,
-                                         uint16_t adsr,
+                                         u32 offset,
+                                         u8 theInstrNum,
+                                         u8 srcn,
+                                         u32 spcDirAddr,
+                                         u16 adsr,
                                          const std::string &name) :
     VGMInstr(instrSet, offset, 1, 0, theInstrNum, name), version(ver),
     spcDirAddr(spcDirAddr),
@@ -125,12 +128,12 @@ PandoraBoxSnesInstr::~PandoraBoxSnesInstr() {
 }
 
 bool PandoraBoxSnesInstr::loadInstr() {
-  uint32_t offDirEnt = spcDirAddr + (srcn * 4);
+  u32 offDirEnt = spcDirAddr + (srcn * 4);
   if (offDirEnt + 4 > 0x10000) {
     return false;
   }
 
-  uint16_t addrSampStart = readShort(offDirEnt);
+  u16 addrSampStart = readShort(offDirEnt);
 
   PandoraBoxSnesRgn *rgn = new PandoraBoxSnesRgn(this, version, offset(), srcn, spcDirAddr, adsr);
   rgn->sampOffset = addrSampStart - spcDirAddr;
@@ -146,14 +149,14 @@ bool PandoraBoxSnesInstr::loadInstr() {
 
 PandoraBoxSnesRgn::PandoraBoxSnesRgn(PandoraBoxSnesInstr *instr,
                                      PandoraBoxSnesVersion ver,
-                                     uint32_t offset,
-                                     uint8_t srcn,
-                                     uint32_t spcDirAddr,
-                                     uint16_t adsr) :
+                                     u32 offset,
+                                     u8 srcn,
+                                     u32 spcDirAddr,
+                                     u16 adsr) :
     VGMRgn(instr, offset, 1),
     version(ver) {
-  uint8_t adsr1 = adsr >> 8;
-  uint8_t adsr2 = adsr & 0xff;
+  u8 adsr1 = adsr >> 8;
+  u8 adsr2 = adsr & 0xff;
 
   addChild(offset, 1, "Global Instrument #");
 

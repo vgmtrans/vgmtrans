@@ -5,6 +5,7 @@
  */
 
 #include "MenuManager.h"
+
 #include "commands/VGMCollCommands.h"
 #include "services/commands/GeneralCommands.h"
 #include "services/commands/SaveCommands.h"

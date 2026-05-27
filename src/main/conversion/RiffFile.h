@@ -1,9 +1,12 @@
 #pragma once
 
-#include <cstring>
-#include "common.h"
-#include "helper.h"
+#include "base/Types.h"
+#include "Helper.h"
 
+#include <cassert>
+#include <cstring>
+#include <string>
+#include <vector>
 
 //////////////////////////////////////////////
 // Chunk		- Riff format chunk
@@ -11,7 +14,7 @@
 class Chunk {
  public:
   char id[4];        //  A chunk ID identifies the type of data within the chunk.
-  uint8_t *data;        //  The actual data not including a possible pad byte to word align
+  u8 *data;        //  The actual data not including a possible pad byte to word align
 
  public:
   Chunk(const std::string& theId)
@@ -25,19 +28,19 @@ class Chunk {
       data = nullptr;
     }
   }
-  void setData(const void *src, uint32_t datasize);
-  virtual uint32_t size();    //  Returns the size of the chunk in bytes, including any pad byte.
-  void setSize(uint32_t size) { m_size = size; }
+  void setData(const void *src, u32 datasize);
+  virtual u32 size();    //  Returns the size of the chunk in bytes, including any pad byte.
+  void setSize(u32 size) { m_size = size; }
 
-  virtual void write(uint8_t *buffer);
+  virtual void write(u8 *buffer);
 
  protected:
-  static inline uint32_t paddedSize(uint32_t size) {
+  static inline u32 paddedSize(u32 size) {
     return size + (size % 2);
   }
 
 private:
-  uint32_t m_size;        //  The size of the chunk data in bytes, excluding any pad byte.
+  u32 m_size;        //  The size of the chunk data in bytes, excluding any pad byte.
 };
 
 
@@ -61,8 +64,8 @@ class ListTypeChunk: public Chunk {
   }
 
   Chunk *addChildChunk(Chunk *ck);
-  uint32_t size() override;    //  Returns the size of the chunk in bytes, including any pad byte.
-  void write(uint8_t *buffer) override;
+  u32 size() override;    //  Returns the size of the chunk in bytes, including any pad byte.
+  void write(u8 *buffer) override;
 };
 
 ////////////////////////////////////////////////////////////////////////////
@@ -89,10 +92,10 @@ class RiffFile: public RIFFChunk {
  public:
   RiffFile(const std::string& file_name, const std::string& form);
 
-  static void writeLIST(std::vector<uint8_t> &buf, uint32_t listName, uint32_t listSize) {
-    pushTypeOnVectBE<uint32_t>(buf, 0x4C495354);    //write "LIST"
-    pushTypeOnVect<uint32_t>(buf, listSize);
-    pushTypeOnVectBE<uint32_t>(buf, listName);
+  static void writeLIST(std::vector<u8> &buf, u32 listName, u32 listSize) {
+    pushTypeOnVectBE<u32>(buf, 0x4C495354);    //write "LIST"
+    pushTypeOnVect<u32>(buf, listSize);
+    pushTypeOnVectBE<u32>(buf, listName);
   }
 
   //Adds a null byte and ensures 16 bit alignment of a text string

@@ -6,7 +6,7 @@
 
 #pragma once
 
-#include "common.h"
+#include "base/Types.h"
 
 enum LoopMeasure {
   LM_SAMPLES,

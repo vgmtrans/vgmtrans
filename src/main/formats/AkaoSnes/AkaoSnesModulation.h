@@ -5,27 +5,29 @@
  */
 #pragma once
 
-#include <cstdint>
 #include "AkaoSnesFormat.h"
+#include "base/Types.h"
 #include "Modulation.h"
+
+#include <cstdint>
 
 namespace akao_snes::modulation {
 
-inline constexpr uint8_t kDefaultTempo = 0x20;
+inline constexpr u8 kDefaultTempo = 0x20;
 
-bool isLfoActive(AkaoSnesVersion version, uint8_t rate, uint8_t depth);
-uint8_t delayTicks(AkaoSnesVersion version, uint8_t delay);
+bool isLfoActive(AkaoSnesVersion version, u8 rate, u8 depth);
+u8 delayTicks(AkaoSnesVersion version, u8 delay);
 
 VibratoModulationSpec vibratoSpec(AkaoSnesVersion version);
 bool exportsTremolo(AkaoSnesVersion version);
 TremoloModulationSpec tremoloSpec(AkaoSnesVersion version);
 
-uint8_t vibratoDepthMidiValue(AkaoSnesVersion version, uint8_t rate, uint8_t depth);
-uint8_t tremoloDepthMidiValue(AkaoSnesVersion version, uint8_t rate, uint8_t depth, uint8_t delay = 0);
-uint8_t rateMidiValue(AkaoSnesVersion version, uint8_t rate, uint8_t depth, uint8_t timer0Frequency);
-uint8_t delayMidiValue(AkaoSnesVersion version, uint8_t delay, uint8_t tempo, uint8_t timer0Frequency);
-uint32_t v1VibratoRampTicks(uint8_t rate, uint8_t tempo);
-uint32_t v3LfoRampTicks(uint8_t rate, uint8_t tempo);
-uint32_t v4VibratoRampTicks(uint8_t rate, uint8_t tempo);
+u8 vibratoDepthMidiValue(AkaoSnesVersion version, u8 rate, u8 depth);
+u8 tremoloDepthMidiValue(AkaoSnesVersion version, u8 rate, u8 depth, u8 delay = 0);
+u8 rateMidiValue(AkaoSnesVersion version, u8 rate, u8 depth, u8 timer0Frequency);
+u8 delayMidiValue(AkaoSnesVersion version, u8 delay, u8 tempo, u8 timer0Frequency);
+u32 v1VibratoRampTicks(u8 rate, u8 tempo);
+u32 v3LfoRampTicks(u8 rate, u8 tempo);
+u32 v4VibratoRampTicks(u8 rate, u8 tempo);
 
 }  // namespace akao_snes::modulation

@@ -1,8 +1,13 @@
 #pragma once
-#include "VGMSeq.h"
-#include "SeqTrack.h"
-#include "SeqEvent.h"
+
+#include "base/Types.h"
 #include "CompileSnesFormat.h"
+#include "SeqEvent.h"
+#include "SeqTrack.h"
+#include "VGMSeq.h"
+
+#include <map>
+#include <string>
 
 enum CompileSnesSeqEventType {
   EVENT_UNKNOWN0 =
@@ -44,7 +49,7 @@ class CompileSnesSeq
     : public VGMSeq {
  public:
   CompileSnesSeq
-      (RawFile *file, CompileSnesVersion ver, uint32_t seqdataOffset, std::string name = "Compile SNES Seq");
+      (RawFile *file, CompileSnesVersion ver, u32 seqdataOffset, std::string name = "Compile SNES Seq");
   ~CompileSnesSeq() override;
 
   bool parseHeader() override;
@@ -52,17 +57,17 @@ class CompileSnesSeq
   void resetVars() override;
 
   CompileSnesVersion version;
-  std::map<uint8_t, CompileSnesSeqEventType> EventMap;
+  std::map<u8, CompileSnesSeqEventType> EventMap;
 
-  uint8_t STATUS_PERCUSSION_NOTE_MIN;
-  uint8_t STATUS_PERCUSSION_NOTE_MAX;
-  uint8_t STATUS_DURATION_DIRECT;
-  uint8_t STATUS_DURATION_MIN;
-  uint8_t STATUS_DURATION_MAX;
+  u8 STATUS_PERCUSSION_NOTE_MIN;
+  u8 STATUS_PERCUSSION_NOTE_MAX;
+  u8 STATUS_DURATION_DIRECT;
+  u8 STATUS_DURATION_MIN;
+  u8 STATUS_DURATION_MAX;
 
-  static const uint8_t noteDurTable[];
+  static const u8 noteDurTable[];
 
-  static double getTempoInBPM(uint8_t tempo);
+  static double getTempoInBPM(u8 tempo);
 
  private:
   void loadEventMap();
@@ -72,29 +77,29 @@ class CompileSnesSeq
 class CompileSnesTrack
     : public SeqTrack {
  public:
-  CompileSnesTrack(CompileSnesSeq *parentFile, uint32_t offset = 0, uint32_t length = 0);
+  CompileSnesTrack(CompileSnesSeq *parentFile, u32 offset = 0, u32 length = 0);
   void resetVars() override;
   void addInitialMidiEvents(int trackNum) override;
   bool readEvent() override;
 
-  uint8_t spcNoteDuration{};
-  uint8_t spcFlags{};
-  uint8_t spcVolume{};
-  int8_t spcTranspose{};
-  uint8_t spcTempo{};
-  uint8_t spcSRCN{};
-  int8_t spcPan{};
+  u8 spcNoteDuration{};
+  u8 spcFlags{};
+  u8 spcVolume{};
+  s8 spcTranspose{};
+  u8 spcTempo{};
+  u8 spcSRCN{};
+  s8 spcPan{};
 
-  uint8_t spcInitialFlags{};
-  uint8_t spcInitialVolume{};
-  int8_t spcInitialTranspose{};
-  uint8_t spcInitialTempo{};
-  uint8_t spcInitialSRCN{};
-  int8_t spcInitialPan{};
+  u8 spcInitialFlags{};
+  u8 spcInitialVolume{};
+  s8 spcInitialTranspose{};
+  u8 spcInitialTempo{};
+  u8 spcInitialSRCN{};
+  s8 spcInitialPan{};
 
-  uint16_t subReturnAddress{};
-  uint8_t repeatCount[256]{};
+  u16 subReturnAddress{};
+  u8 repeatCount[256]{};
 
  private:
-  bool readDurationBytes(uint32_t& offset, uint8_t& duration) const;
+  bool readDurationBytes(u32& offset, u8& duration) const;
 };

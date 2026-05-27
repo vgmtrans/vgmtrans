@@ -4,9 +4,11 @@
  * refer to the included LICENSE.txt file
  */
 #include "ItikitiSnesScanner.h"
-#include "ItikitiSnesSeq.h"
-#include "ItikitiSnesInstr.h"
+
+#include "base/Types.h"
 #include "BytePattern.h"
+#include "ItikitiSnesInstr.h"
+#include "ItikitiSnesSeq.h"
 #include "ScannerManager.h"
 
 namespace vgmtrans::scanners {
@@ -24,7 +26,7 @@ void ItikitiSnesScanner::scanFromApuRam(RawFile *file) {
   std::string name =
       file->tag.hasTitle() ? file->tag.title : file->stem();
 
-  uint32_t song_header_offset{};
+  u32 song_header_offset{};
   if (!scanSongHeader(file, song_header_offset))
     return;
 
@@ -42,7 +44,7 @@ void ItikitiSnesScanner::scanFromApuRam(RawFile *file) {
 void ItikitiSnesScanner::scanFromRom(RawFile *file) {
 }
 
-bool ItikitiSnesScanner::scanSongHeader(RawFile *file, uint32_t &song_header_offset) {
+bool ItikitiSnesScanner::scanSongHeader(RawFile *file, u32 &song_header_offset) {
   //; Rudra no Hihou SPC
   // 0eb5: ed        notc
   // 0eb6: 6b de     ror   $de
@@ -58,19 +60,19 @@ bool ItikitiSnesScanner::scanSongHeader(RawFile *file, uint32_t &song_header_off
       "\xed\x6b\xde\xf8\xa1\xf5\x80\xed\xc4\x02\xf5\x81\xed\xc4\x03\x8d\x01\xe4\xef\x77\x02",
       "xx?x?x??x?x??x?xxx?x?", 21);
 
-  uint32_t code_offset{};
+  u32 code_offset{};
   if (!file->searchBytePattern(pattern_for_header, code_offset))
     return false;
 
-  const uint16_t header_pointer_address = file->readShort(code_offset + 6);
+  const u16 header_pointer_address = file->readShort(code_offset + 6);
 
   // The pointer points to the end of header, not the start. I don't know why.
-  const uint16_t header_end = file->readShort(header_pointer_address);
+  const u16 header_end = file->readShort(header_pointer_address);
   if (header_end < 0x200)
     return false; // direct pages should not be used
 
   // TODO: improve the algorithm for the header location
-  uint16_t header_start;
+  u16 header_start;
   if (file->readByte(header_end - 18 + 1) == 8) // 8 tracks
     header_start = header_end - 18;
   else if (file->readByte(header_end - 16 + 1) == 7) // 7 tracks

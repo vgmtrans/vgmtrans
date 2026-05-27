@@ -6,16 +6,21 @@
 
 #pragma once
 
-#include <filesystem>
-#include <vector>
-#include <climits>
-#include <cassert>
-#include <variant>
-#include "mio.hpp"
-
-#include "Root.h"
-#include "util/common.h"
+#include "base/Types.h"
 #include "components/VGMTag.h"
+#include "Root.h"
+#include "util/Path.h"
+#include "util/Text.h"
+
+#include <cassert>
+#include <climits>
+#include <filesystem>
+#include <memory>
+#include <string>
+#include <variant>
+#include <vector>
+
+#include "mio.hpp"
 
 class VGMFile;
 class VGMItem;
@@ -36,7 +41,7 @@ class RawFile {
     [[nodiscard]] virtual std::string stem() const noexcept = 0;
     [[nodiscard]] virtual std::string extension() const = 0;
 
-    [[nodiscard]] bool isValidOffset(uint32_t ofs) const noexcept { return ofs < size(); }
+    [[nodiscard]] bool isValidOffset(u32 ofs) const noexcept { return ofs < size(); }
 
     [[nodiscard]] bool useLoaders() const noexcept { return m_flags & UseLoaders; }
     void setUseLoaders(bool enable) noexcept {
@@ -90,18 +95,18 @@ class RawFile {
     virtual const char *data() const = 0;
 
     virtual const char &operator[](size_t i) const = 0;
-    virtual uint8_t readByte(size_t offset) const = 0;
-    virtual uint16_t readShort(size_t offset) const = 0;
-    virtual uint32_t readWord(size_t offset) const = 0;
-    virtual uint16_t readShortBE(size_t offset) const = 0;
-    virtual uint32_t readWordBE(size_t offset) const = 0;
+    virtual u8 readByte(size_t offset) const = 0;
+    virtual u16 readShort(size_t offset) const = 0;
+    virtual u32 readWord(size_t offset) const = 0;
+    virtual u16 readShortBE(size_t offset) const = 0;
+    virtual u32 readWordBE(size_t offset) const = 0;
     std::string readNullTerminatedString(size_t offset, size_t maxLength) const;
 
-    uint32_t readBytes(size_t offset, uint32_t nCount, void *pBuffer) const;
-    bool matchBytes(const uint8_t *pattern, size_t offset, size_t nCount) const;
+    u32 readBytes(size_t offset, u32 nCount, void *pBuffer) const;
+    bool matchBytes(const u8 *pattern, size_t offset, size_t nCount) const;
     bool matchBytePattern(const BytePattern &pattern, size_t offset) const;
-    bool searchBytePattern(const BytePattern &pattern, uint32_t &nMatchOffset,
-                           uint32_t nSearchOffset = 0, uint32_t nSearchSize = static_cast<uint32_t>(-1)) const;
+    bool searchBytePattern(const BytePattern &pattern, u32 &nMatchOffset,
+                           u32 nSearchOffset = 0, u32 nSearchSize = static_cast<u32>(-1)) const;
 
     [[nodiscard]] const auto &containedVGMFiles() const noexcept {
         return m_vgmfiles;
@@ -148,11 +153,11 @@ class DiskFile final : public RawFile {
 
     const char *data() const override { return m_data.data(); }
     const char &operator[](size_t offset) const override { return m_data[offset]; }
-    uint8_t readByte(size_t offset) const override { return m_data[offset]; }
-    uint16_t readShort(size_t offset) const override { return get<u16>(offset); }
-    uint32_t readWord(size_t offset) const override { return get<u32>(offset); }
-    uint16_t readShortBE(size_t offset) const override { return getBE<u16>(offset); }
-    uint32_t readWordBE(size_t offset) const override { return getBE<u32>(offset); }
+    u8 readByte(size_t offset) const override { return m_data[offset]; }
+    u16 readShort(size_t offset) const override { return get<u16>(offset); }
+    u32 readWord(size_t offset) const override { return get<u32>(offset); }
+    u16 readShortBE(size_t offset) const override { return getBE<u16>(offset); }
+    u32 readWordBE(size_t offset) const override { return getBE<u32>(offset); }
 
    private:
     mio::mmap_source m_data;
@@ -164,7 +169,7 @@ class VirtFile final : public RawFile {
     VirtFile() = default;
     VirtFile(const RawFile &, size_t offset = 0);
     VirtFile(const RawFile &, size_t offset, size_t limit);
-    VirtFile(const uint8_t *data, uint32_t size, std::string name, std::filesystem::path parent_fullpath = "",
+    VirtFile(const u8 *data, u32 size, std::string name, std::filesystem::path parent_fullpath = "",
              const VGMTag& tag = VGMTag());
     ~VirtFile() override = default;
 
@@ -196,11 +201,11 @@ class VirtFile final : public RawFile {
 
     const char *data() const override { return m_data.data(); }
     const char &operator[](size_t offset) const override { return m_data[offset]; }
-    uint8_t readByte(size_t offset) const override { return m_data[offset]; }
-    uint16_t readShort(size_t offset) const override { return get<u16>(offset); }
-    uint32_t readWord(size_t offset) const override { return get<u32>(offset); }
-    uint16_t readShortBE(size_t offset) const override { return getBE<u16>(offset); }
-    uint32_t readWordBE(size_t offset) const override { return getBE<u32>(offset); }
+    u8 readByte(size_t offset) const override { return m_data[offset]; }
+    u16 readShort(size_t offset) const override { return get<u16>(offset); }
+    u32 readWord(size_t offset) const override { return get<u32>(offset); }
+    u16 readShortBE(size_t offset) const override { return getBE<u16>(offset); }
+    u32 readWordBE(size_t offset) const override { return getBE<u32>(offset); }
 
    private:
     std::vector<char> m_data;

@@ -4,6 +4,8 @@
  * refer to the included LICENSE.txt file
  */
 #include "YM2151InstrSet.h"
+
+#include "base/Types.h"
 #include "Root.h"
 #include "version.h"
 
@@ -11,8 +13,8 @@
 
 YM2151InstrSet::YM2151InstrSet(const std::string& format,
                                RawFile* file,
-                               uint32_t offset,
-                               uint32_t length,
+                               u32 offset,
+                               u32 length,
                                std::string name)
   : VGMInstrSet(format, file, offset, length, std::move(name)) {}
 
@@ -48,7 +50,7 @@ std::string YM2151InstrSet::generateOPMFile() const {
 
 bool YM2151InstrSet::saveAsOPMFile(const std::filesystem::path &filepath) const {
   auto content = generateOPMFile();
-  pRoot->UI_writeBufferToFile(filepath, reinterpret_cast<uint8_t*>(const_cast<char*>(content.data())), static_cast<uint32_t>(content.size()));
+  pRoot->UI_writeBufferToFile(filepath, reinterpret_cast<u8*>(const_cast<char*>(content.data())), static_cast<u32>(content.size()));
   return true;
 }
 
@@ -58,6 +60,6 @@ void YM2151InstrSet::addOPMInstrument(OPMInstrument instrument) {
 
 void YM2151InstrSet::addOPMInstrument(OPMData data,
                                       std::string driverName,
-                                      std::vector<uint8_t> driverData) {
+                                      std::vector<u8> driverData) {
   m_opmInstruments.push_back(OPMInstrument{std::move(data), std::move(driverName), std::move(driverData)});
 }

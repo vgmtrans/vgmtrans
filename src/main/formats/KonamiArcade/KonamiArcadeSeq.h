@@ -1,7 +1,13 @@
 #pragma once
-#include "VGMSeq.h"
-#include "SeqTrack.h"
+
+#include "base/Types.h"
 #include "KonamiArcadeFormat.h"
+#include "SeqTrack.h"
+#include "VGMSeq.h"
+
+#include <array>
+#include <string>
+#include <utility>
 
 class KonamiArcadeSeq:
     public VGMSeq {
@@ -43,14 +49,14 @@ private:
 class KonamiArcadeTrack
     : public SeqTrack {
 public:
-  KonamiArcadeTrack(KonamiArcadeSeq *parentSeq, uint32_t offset = 0, uint32_t length = 0);
+  KonamiArcadeTrack(KonamiArcadeSeq *parentSeq, u32 offset = 0, u32 length = 0);
 
   void resetVars() override;
   bool readEvent() override;
   void onTickBegin() override;
 
 private:
-  void makeTrulyPrevDurNoteEnd(uint32_t absTime) const;
+  void makeTrulyPrevDurNoteEnd(u32 absTime) const;
   std::pair<double, double> calculateTempo(double tempoByte);
 
   u8 calculateMidiPanForK054539(u8 pan);

@@ -1,7 +1,12 @@
 #pragma once
-#include "VGMSeq.h"
-#include "SeqTrack.h"
+
+#include "base/Types.h"
 #include "HeartBeatSnesFormat.h"
+#include "SeqTrack.h"
+#include "VGMSeq.h"
+
+#include <map>
+#include <string>
 
 enum HeartBeatSnesSeqEventType {
   //start enum at 1 because if map[] look up fails, it returns 0, and we don't want that to get confused with a legit event
@@ -72,22 +77,22 @@ class HeartBeatSnesSeq
     : public VGMSeq {
  public:
   HeartBeatSnesSeq
-      (RawFile *file, HeartBeatSnesVersion ver, uint32_t seqdataOffset, std::string newName = "HeartBeat SNES Seq");
+      (RawFile *file, HeartBeatSnesVersion ver, u32 seqdataOffset, std::string newName = "HeartBeat SNES Seq");
   ~HeartBeatSnesSeq() override;
 
   bool parseHeader() override;
   bool parseTrackPointers() override;
   void resetVars() override;
 
-  static double getTempoInBPM(uint8_t tempo);
+  static double getTempoInBPM(u8 tempo);
 
   HeartBeatSnesVersion version;
-  std::map<uint8_t, HeartBeatSnesSeqEventType> EventMap;
-  std::map<uint8_t, HeartBeatSnesSeqSubEventType> SubEventMap;
+  std::map<u8, HeartBeatSnesSeqEventType> EventMap;
+  std::map<u8, HeartBeatSnesSeqSubEventType> SubEventMap;
 
-  static const uint8_t NOTE_DUR_TABLE[16];
-  static const uint8_t NOTE_VEL_TABLE[16];
-  static const uint8_t PAN_TABLE[22];
+  static const u8 NOTE_DUR_TABLE[16];
+  static const u8 NOTE_VEL_TABLE[16];
+  static const u8 PAN_TABLE[22];
 
  private:
   void loadEventMap();
@@ -97,15 +102,15 @@ class HeartBeatSnesSeq
 class HeartBeatSnesTrack
     : public SeqTrack {
  public:
-  HeartBeatSnesTrack(HeartBeatSnesSeq *parentFile, uint32_t offset = 0, uint32_t length = 0);
+  HeartBeatSnesTrack(HeartBeatSnesSeq *parentFile, u32 offset = 0, u32 length = 0);
   void resetVars() override;
   bool readEvent() override;
 
  private:
-  uint8_t spcNoteDuration;
-  uint8_t spcNoteDurRate;
-  uint8_t spcNoteVolume;
-  int16_t subReturnOffset;
-  uint8_t loopCount;
+  u8 spcNoteDuration;
+  u8 spcNoteDurRate;
+  u8 spcNoteVolume;
+  s16 subReturnOffset;
+  u8 loopCount;
   bool slur;
 };

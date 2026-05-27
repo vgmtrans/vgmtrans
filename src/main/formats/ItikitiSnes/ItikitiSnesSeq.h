@@ -4,17 +4,21 @@
  * refer to the included LICENSE.txt file
  */
 #pragma once
-#include <unordered_map>
-#include <array>
-#include "VGMSeq.h"
-#include "SeqTrack.h"
+
+#include "base/Types.h"
 #include "ItikitiSnesFormat.h"
+#include "SeqTrack.h"
+#include "VGMSeq.h"
 
-constexpr uint16_t kItikitiSnesSeqTimebase = 48;
-constexpr uint8_t kItikitiSnesSeqTimerFreq = 0x27;
+#include <array>
+#include <string>
+#include <unordered_map>
 
-constexpr uint8_t kItikitiSnesSeqMinNoteByte = 0x30;
-constexpr uint8_t kItikitiSnesSeqMaxLoopLevel = 4;
+constexpr u16 kItikitiSnesSeqTimebase = 48;
+constexpr u8 kItikitiSnesSeqTimerFreq = 0x27;
+
+constexpr u8 kItikitiSnesSeqMinNoteByte = 0x30;
+constexpr u8 kItikitiSnesSeqMaxLoopLevel = 4;
 
 enum class ItikitiSnesSeqEventType {
   EVENT_UNDEFINED = 0,
@@ -72,19 +76,19 @@ enum class ItikitiSnesSeqEventType {
 
 class ItikitiSnesSeq : public VGMSeq {
  public:
-  ItikitiSnesSeq(RawFile *file, uint32_t offset, std::string new_name = "Square ITIKITI SNES Seq");
+  ItikitiSnesSeq(RawFile *file, u32 offset, std::string new_name = "Square ITIKITI SNES Seq");
 
   bool parseHeader() override;
   bool parseTrackPointers() override;
   void resetVars() override;
 
-  [[nodiscard]] uint16_t base_offset() const { return m_base_offset; }
-  [[nodiscard]] uint16_t decode_offset(uint16_t offset) const { return offset + m_base_offset; }
-  [[nodiscard]] uint16_t readDecodedOffset(uint32_t offset) {
+  [[nodiscard]] u16 base_offset() const { return m_base_offset; }
+  [[nodiscard]] u16 decode_offset(u16 offset) const { return offset + m_base_offset; }
+  [[nodiscard]] u16 readDecodedOffset(u32 offset) {
     return decode_offset(readShort(offset));
   }
 
-  [[nodiscard]] static double getTempoInBpm(uint8_t tempo) {
+  [[nodiscard]] static double getTempoInBpm(u8 tempo) {
     constexpr auto ppqn = kItikitiSnesSeqTimebase;
     constexpr auto timer_freq = kItikitiSnesSeqTimerFreq;
     if (tempo == 0) {
@@ -94,21 +98,21 @@ class ItikitiSnesSeq : public VGMSeq {
     return 60000000.0 / (ppqn * (125 * timer_freq)) * (tempo / 256.0);
   }
 
-  [[nodiscard]] ItikitiSnesSeqEventType getEventType(uint8_t command) const {
+  [[nodiscard]] ItikitiSnesSeqEventType getEventType(u8 command) const {
     const auto event_type_iterator = m_event_map.find(command);
     return event_type_iterator != m_event_map.end() ? event_type_iterator->second
                                                     : ItikitiSnesSeqEventType::EVENT_UNDEFINED;
   }
 
  private:
-  static void loadEventMap(std::unordered_map<uint8_t, ItikitiSnesSeqEventType> &event_map);
-  std::unordered_map<uint8_t, ItikitiSnesSeqEventType> m_event_map{};
-  uint16_t m_base_offset{};
+  static void loadEventMap(std::unordered_map<u8, ItikitiSnesSeqEventType> &event_map);
+  std::unordered_map<u8, ItikitiSnesSeqEventType> m_event_map{};
+  u16 m_base_offset{};
 };
 
 class ItikitiSnesTrack : public SeqTrack {
  public:
-  ItikitiSnesTrack(ItikitiSnesSeq *seq, uint32_t offset = 0, uint32_t length = 0);
+  ItikitiSnesTrack(ItikitiSnesSeq *seq, u32 offset = 0, u32 length = 0);
   void resetVars() override;
   bool readEvent() override;
 
@@ -116,17 +120,17 @@ class ItikitiSnesTrack : public SeqTrack {
     return reinterpret_cast<ItikitiSnesSeq *>(parentSeq);
   }
 
-  [[nodiscard]] uint16_t decode_offset(uint16_t offset) const { return seq()->decode_offset(offset); }
-  [[nodiscard]] uint16_t readDecodedOffset(uint32_t offset) const {
+  [[nodiscard]] u16 decode_offset(u16 offset) const { return seq()->decode_offset(offset); }
+  [[nodiscard]] u16 readDecodedOffset(u32 offset) const {
     return seq()->readDecodedOffset(offset);
   }
 
  private:
-  uint8_t m_note_number_base{};
-  std::array<uint8_t, 7> m_note_length_table{};
+  u8 m_note_number_base{};
+  std::array<u8, 7> m_note_length_table{};
 
-  int8_t m_loop_level{};
-  std::array<uint8_t, kItikitiSnesSeqMaxLoopLevel> m_loop_counts{};
-  std::array<uint16_t, kItikitiSnesSeqMaxLoopLevel> m_loop_start_addresses{};
-  uint8_t m_alt_loop_count{};
+  s8 m_loop_level{};
+  std::array<u8, kItikitiSnesSeqMaxLoopLevel> m_loop_counts{};
+  std::array<u16, kItikitiSnesSeqMaxLoopLevel> m_loop_start_addresses{};
+  u8 m_alt_loop_count{};
 };

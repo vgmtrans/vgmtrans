@@ -1,8 +1,9 @@
 #pragma once
-#include "Format.h"
-#include "FilegroupMatcher.h"
-#include "CompileSnesScanner.h"
 
+#include "base/Types.h"
+#include "CompileSnesScanner.h"
+#include "FilegroupMatcher.h"
+#include "Format.h"
 
 // *****************
 // CompileSnesFormat
@@ -14,7 +15,7 @@ BEGIN_FORMAT(CompileSnes)
 END_FORMAT()
 
 
-enum CompileSnesVersion: uint8_t {
+enum CompileSnesVersion: u8 {
   COMPILESNES_NONE = 0,       // Unknown Version
   COMPILESNES_ALESTE,         // Super Aleste (Space Megaforce)
   COMPILESNES_JAKICRUSH,      // Jaki Crush

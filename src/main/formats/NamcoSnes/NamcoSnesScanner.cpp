@@ -4,6 +4,7 @@
  * refer to the included LICENSE.txt file
  */
 
+#include "base/Types.h"
 #include "NamcoSnesInstr.h"
 #include "NamcoSnesSeq.h"
 #include "ScannerManager.h"
@@ -131,8 +132,8 @@ void NamcoSnesScanner::searchForNamcoSnesFromARAM(RawFile *file) {
   std::string name = file->tag.hasTitle() ? file->tag.title : file->stem();
 
   // search song list
-  uint32_t ofsReadSongList;
-  uint16_t addrSongList;
+  u32 ofsReadSongList;
+  u16 addrSongList;
   if (file->searchBytePattern(ptnReadSongList, ofsReadSongList)) {
     addrSongList = file->readByte(ofsReadSongList + 5) | (file->readByte(ofsReadSongList + 9) << 8);
     version = NAMCOSNES_STANDARD;
@@ -141,9 +142,9 @@ void NamcoSnesScanner::searchForNamcoSnesFromARAM(RawFile *file) {
   }
 
   // search song start sequence
-  uint32_t ofsStartSong;
-  uint8_t addrSongIndexArray;
-  uint8_t addrSongSlotIndex;
+  u32 ofsStartSong;
+  u8 addrSongIndexArray;
+  u8 addrSongSlotIndex;
   if (file->searchBytePattern(ptnStartSong, ofsStartSong)) {
     addrSongIndexArray = file->readByte(ofsStartSong + 11);
     addrSongSlotIndex = file->readByte(ofsStartSong + 15);
@@ -152,9 +153,9 @@ void NamcoSnesScanner::searchForNamcoSnesFromARAM(RawFile *file) {
   }
 
   // determine song index
-  uint8_t songSlot = file->readByte(addrSongSlotIndex); // 0..3
-  uint8_t songIndex = file->readByte(addrSongIndexArray + songSlot);
-  uint16_t addrSeqHeader = addrSongList + (songIndex * 3);
+  u8 songSlot = file->readByte(addrSongSlotIndex); // 0..3
+  u8 songIndex = file->readByte(addrSongIndexArray + songSlot);
+  u16 addrSeqHeader = addrSongList + (songIndex * 3);
   if (addrSeqHeader + 3 < 0x10000) {
     if (file->readByte(addrSeqHeader) > 3 || (file->readShort(addrSeqHeader + 1) & 0xff00) == 0) {
       songIndex = 1;
@@ -165,7 +166,7 @@ void NamcoSnesScanner::searchForNamcoSnesFromARAM(RawFile *file) {
     return;
   }
 
-  uint16_t addrEventStart = file->readShort(addrSeqHeader + 1);
+  u16 addrEventStart = file->readShort(addrSeqHeader + 1);
   if (addrEventStart + 1 > 0x10000) {
     return;
   }
@@ -176,8 +177,8 @@ void NamcoSnesScanner::searchForNamcoSnesFromARAM(RawFile *file) {
     return;
   }
 
-  uint32_t ofsLoadInstrTuning;
-  uint16_t addrTuningTable;
+  u32 ofsLoadInstrTuning;
+  u16 addrTuningTable;
   if (file->searchBytePattern(ptnLoadInstrTuning, ofsLoadInstrTuning)) {
         addrTuningTable =
             file->readByte(ofsLoadInstrTuning + 8) | (file->readByte(ofsLoadInstrTuning + 12) << 8);
@@ -185,11 +186,11 @@ void NamcoSnesScanner::searchForNamcoSnesFromARAM(RawFile *file) {
     return;
   }
 
-  std::map<uint8_t, uint8_t> dspRegMap = getInitDspRegMap(file);
+  std::map<u8, u8> dspRegMap = getInitDspRegMap(file);
   if (dspRegMap.count(0x5d) == 0) {
     return;
   }
-  uint16_t spcDirAddr = dspRegMap[0x5d] << 8;
+  u16 spcDirAddr = dspRegMap[0x5d] << 8;
 
   NamcoSnesInstrSet *newInstrSet = new NamcoSnesInstrSet(file, version, spcDirAddr, addrTuningTable);
   if (!newInstrSet->loadVGMFile()) {
@@ -198,13 +199,13 @@ void NamcoSnesScanner::searchForNamcoSnesFromARAM(RawFile *file) {
   }
 }
 
-std::map<uint8_t, uint8_t> NamcoSnesScanner::getInitDspRegMap(RawFile *file) {
-  std::map<uint8_t, uint8_t> dspRegMap;
+std::map<u8, u8> NamcoSnesScanner::getInitDspRegMap(RawFile *file) {
+  std::map<u8, u8> dspRegMap;
 
   // find a code block which initializes dsp registers
-  uint32_t ofsDspRegInit;
-  uint8_t dspRegCount;
-  uint16_t addrDspRegValueList;
+  u32 ofsDspRegInit;
+  u8 dspRegCount;
+  u16 addrDspRegValueList;
   if (file->searchBytePattern(ptnDspRegInit, ofsDspRegInit)) {
     dspRegCount = file->readByte(ofsDspRegInit + 15) / 2;
     addrDspRegValueList = file->readShort(ofsDspRegInit + 3);
@@ -218,9 +219,9 @@ std::map<uint8_t, uint8_t> NamcoSnesScanner::getInitDspRegMap(RawFile *file) {
   }
 
   // store dsp reg/value pairs to map
-  for (uint8_t regIndex = 0; regIndex < dspRegCount; regIndex++) {
-    uint8_t dspReg = file->readByte(addrDspRegValueList + (regIndex * 2));
-    uint8_t dspValue = file->readByte(addrDspRegValueList + (regIndex * 2) + 1);
+  for (u8 regIndex = 0; regIndex < dspRegCount; regIndex++) {
+    u8 dspReg = file->readByte(addrDspRegValueList + (regIndex * 2));
+    u8 dspValue = file->readByte(addrDspRegValueList + (regIndex * 2) + 1);
     dspRegMap[dspReg] = dspValue;
   }
 

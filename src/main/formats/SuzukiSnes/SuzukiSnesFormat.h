@@ -1,8 +1,9 @@
 #pragma once
-#include "Format.h"
-#include "FilegroupMatcher.h"
-#include "SuzukiSnesScanner.h"
 
+#include "base/Types.h"
+#include "FilegroupMatcher.h"
+#include "Format.h"
+#include "SuzukiSnesScanner.h"
 
 // **************
 // SuzukiSnesFormat
@@ -14,7 +15,7 @@ BEGIN_FORMAT(SuzukiSnes)
 END_FORMAT()
 
 
-enum SuzukiSnesVersion: uint8_t {
+enum SuzukiSnesVersion: u8 {
   SUZUKISNES_NONE = 0,              // Unknown Version
   SUZUKISNES_SD3,                   // Seiken Densetsu 3
   SUZUKISNES_BL,                    // Bahamut Lagoon

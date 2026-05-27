@@ -5,6 +5,8 @@
  */
 #pragma once
 
+#include "base/Types.h"
+
 #include <cstdint>
 #include <filesystem>
 #include <memory>
@@ -16,7 +18,7 @@ class MidiFile;
 
 namespace conversion {
 
-enum class MidiMergeMode : uint8_t {
+enum class MidiMergeMode : u8 {
   Sequential
 };
 
@@ -27,15 +29,15 @@ struct MidiMergeEntry {
 
 struct MidiMergeOptions {
   MidiMergeMode mode = MidiMergeMode::Sequential;
-  uint32_t sequentialGapTicks = 0;
-  std::vector<uint32_t> startTimes;
-  std::vector<uint8_t> bankOffsets;
+  u32 sequentialGapTicks = 0;
+  std::vector<u32> startTimes;
+  std::vector<u8> bankOffsets;
 };
 
 struct MidiMergeResult {
-  uint16_t ppqn = 0;
-  std::vector<uint32_t> startTimes;
-  std::vector<uint8_t> bankOffsets;
+  u16 ppqn = 0;
+  std::vector<u32> startTimes;
+  std::vector<u8> bankOffsets;
 };
 
 std::unique_ptr<MidiFile> mergeMidiSequences(const std::vector<MidiMergeEntry>& entries,
@@ -43,10 +45,10 @@ std::unique_ptr<MidiFile> mergeMidiSequences(const std::vector<MidiMergeEntry>& 
                                              MidiMergeResult* result = nullptr);
 
 bool planChunkBankOffsets(const std::vector<MidiMergeEntry>& entries,
-                          std::vector<uint8_t>& bankOffsets);
+                          std::vector<u8>& bankOffsets);
 
 bool saveMergedSoundfont(const std::vector<MidiMergeEntry>& entries,
-                         const std::vector<uint8_t>& bankOffsets,
+                         const std::vector<u8>& bankOffsets,
                          const std::filesystem::path& filepath);
 
 }  // namespace conversion

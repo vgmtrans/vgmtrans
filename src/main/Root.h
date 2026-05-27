@@ -5,11 +5,16 @@
  */
 #pragma once
 
-#include <variant>
-#include <memory>
-
-#include "common.h"
+#include "base/Types.h"
+#include "components/VGMFileVariant.h"
 #include "VGMTag.h"
+
+#include <filesystem>
+#include <memory>
+#include <string>
+#include <string_view>
+#include <variant>
+#include <vector>
 
 class VGMScanner;
 class VGMColl;
@@ -42,7 +47,7 @@ public:
 
   virtual bool init();
   virtual bool openRawFile(const std::filesystem::path& filePath);
-  bool createVirtFile(const uint8_t* databuf, uint32_t fileSize, const std::string& filename,
+  bool createVirtFile(const u8* databuf, u32 fileSize, const std::string& filename,
                       const std::filesystem::path& parRawFileFullPath = {}, const VGMTag& tag = VGMTag());
   bool loadRawFile(RawFile* newRawFile);
   bool removeRawFile(RawFile *targFile);
@@ -91,7 +96,7 @@ public:
   virtual std::filesystem::path UI_getSaveFilePath(const std::string& suggestedFilename,
                                          const std::string &extension = "") = 0;
   virtual std::filesystem::path UI_getSaveDirPath(const std::filesystem::path& suggestedDir = {}) = 0;
-  virtual bool UI_writeBufferToFile(const std::filesystem::path& filepath, uint8_t *buf, size_t size);
+  virtual bool UI_writeBufferToFile(const std::filesystem::path& filepath, u8 *buf, size_t size);
 
   virtual void UI_log(LogItem *) { }
   virtual void UI_toast(std::string_view message, ToastType type = ToastType::Info,

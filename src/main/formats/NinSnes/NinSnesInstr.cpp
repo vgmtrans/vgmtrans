@@ -4,22 +4,25 @@
  * refer to the included LICENSE.txt file
  */
 #include "NinSnesInstr.h"
+
+#include "base/Types.h"
 #include "NinSnesSeq.h"
 #include "NinSnesVibrato.h"
 #include "SNESDSP.h"
 #include "VGMColl.h"
+
 #include <spdlog/fmt/fmt.h>
 
 namespace {
 
-constexpr uint8_t kNinSnesMidiKeyCorrection = 24;
+constexpr u8 kNinSnesMidiKeyCorrection = 24;
 
 struct NinSnesPitchTuning {
   int unityKey = 96;
-  int16_t fineTune = 0;
+  s16 fineTune = 0;
 };
 
-uint32_t getProgramNumber(const VGMInstr* instr) {
+u32 getProgramNumber(const VGMInstr* instr) {
   return (instr->bank << 7) | (instr->instrNum & 0x7f);
 }
 
@@ -35,7 +38,7 @@ void applyVibratoScaling(NinSnesInstrSet* instrSet, const VibratoModulationSpec&
   }
 }
 
-VGMInstr* findInstrByProgram(const std::vector<VGMInstr*>& instrs, uint32_t progNum) {
+VGMInstr* findInstrByProgram(const std::vector<VGMInstr*>& instrs, u32 progNum) {
   for (auto* instr : instrs) {
     if (getProgramNumber(instr) == progNum) {
       return instr;
@@ -44,22 +47,22 @@ VGMInstr* findInstrByProgram(const std::vector<VGMInstr*>& instrs, uint32_t prog
   return nullptr;
 }
 
-uint16_t readPitchScale(const NinSnesProfile& profile, uint8_t pitchHigh, uint8_t pitchLow) {
+u16 readPitchScale(const NinSnesProfile& profile, u8 pitchHigh, u8 pitchLow) {
   if (profile.instrumentLayout == NinSnesInstrumentLayoutId::Earlier5Byte) {
-    return static_cast<uint16_t>(static_cast<int8_t>(pitchHigh) * 256);
+    return static_cast<u16>(static_cast<s8>(pitchHigh) * 256);
   }
-  return static_cast<uint16_t>((pitchHigh << 8) | pitchLow);
+  return static_cast<u16>((pitchHigh << 8) | pitchLow);
 }
 
-NinSnesPitchTuning calculatePitchTuning(uint16_t pitchScale) {
+NinSnesPitchTuning calculatePitchTuning(u16 pitchScale) {
   const double pitchFixer = 4286.0 / 4096.0;
   double fineTuning;
   double coarseTuning;
 
-  const bool wrapsPercussion = ((static_cast<uint32_t>(0x0217) * pitchScale) >> 8) > 0x3FFF;
+  const bool wrapsPercussion = ((static_cast<u32>(0x0217) * pitchScale) >> 8) > 0x3FFF;
   if (wrapsPercussion) {
-    pitchScale = static_cast<uint16_t>(
-        (((static_cast<uint32_t>(0x0217) * pitchScale) >> 8) & 0x3FFF) * 256.0 / 0x0217);
+    pitchScale = static_cast<u16>(
+        (((static_cast<u32>(0x0217) * pitchScale) >> 8) & 0x3FFF) * 256.0 / 0x0217);
   }
 
   fineTuning = modf((log(pitchScale * pitchFixer / 256.0) / log(2.0)) * 12.0, &coarseTuning);
@@ -75,14 +78,14 @@ NinSnesPitchTuning calculatePitchTuning(uint16_t pitchScale) {
 
   return {
       .unityKey = 96 - static_cast<int>(coarseTuning),
-      .fineTune = static_cast<int16_t>(fineTuning * 100.0),
+      .fineTune = static_cast<s16>(fineTuning * 100.0),
   };
 }
 
 VGMRgn* cloneLegacyRgnForDrumKit(VGMInstr* instr,
                                  VGMRgn* sourceRgn,
-                                 uint8_t noteIndex,
-                                 int8_t globalTranspose) {
+                                 u8 noteIndex,
+                                 s8 globalTranspose) {
   auto* newRgn = new VGMRgn(instr,
                             sourceRgn->offset(),
                             sourceRgn->length(),
@@ -105,8 +108,8 @@ VGMRgn* cloneLegacyRgnForDrumKit(VGMInstr* instr,
 
 VGMRgn* cloneIntelliTARgnForDrumKit(VGMInstr* instr,
                                     VGMRgn* sourceRgn,
-                                    uint8_t drumKey,
-                                    uint8_t playedNoteByte) {
+                                    u8 drumKey,
+                                    u8 playedNoteByte) {
   auto* newRgn = new VGMRgn(instr,
                             sourceRgn->offset(),
                             sourceRgn->length(),
@@ -139,14 +142,14 @@ VGMRgn* cloneIntelliTARgnForDrumKit(VGMInstr* instr,
 VGMRgn* createRgnFromHeaderData(VGMInstr* instr,
                                 RawFile* rawFile,
                                 NinSnesProfileId profileId,
-                                uint32_t spcDirAddr,
-                                const std::array<uint8_t, 6>& regionData) {
+                                u32 spcDirAddr,
+                                const std::array<u8, 6>& regionData) {
   const auto& profile = getNinSnesProfile(profileId);
-  const uint8_t srcn = regionData[0];
-  const uint8_t adsr1 = regionData[1];
-  const uint8_t adsr2 = regionData[2];
-  const uint8_t gain = regionData[3];
-  const uint16_t offDirEnt = spcDirAddr + (srcn * 4);
+  const u8 srcn = regionData[0];
+  const u8 adsr1 = regionData[1];
+  const u8 adsr2 = regionData[2];
+  const u8 gain = regionData[3];
+  const u16 offDirEnt = spcDirAddr + (srcn * 4);
 
   if (offDirEnt + 4 > 0x10000 || !SNESSampColl::isValidSampleDir(rawFile, offDirEnt, true)) {
     return nullptr;
@@ -171,8 +174,8 @@ VGMRgn* createRgnFromHeaderData(VGMInstr* instr,
 
 NinSnesInstrSet::NinSnesInstrSet(RawFile *file,
                                  NinSnesProfileId profile,
-                                 uint32_t offset,
-                                 uint32_t spcDirAddr,
+                                 u32 offset,
+                                 u32 spcDirAddr,
                                  const std::string &name) :
     VGMInstrSet(NinSnesFormat::name, file, offset, 0, name),
     signature(NinSnesSignatureId::None),
@@ -203,15 +206,15 @@ bool NinSnesInstrSet::parseHeader() {
 
 bool NinSnesInstrSet::parseInstrPointers() {
   const auto& profile = getNinSnesProfile(profileId);
-  const uint16_t instrCount = getNinSnesInstrumentSlotCount(profile);
+  const u16 instrCount = getNinSnesInstrumentSlotCount(profile);
   if (instrCount == 0) {
     return false;
   }
 
   usedSRCNs.clear();
-  for (uint16_t instr = 0; instr < instrCount; instr++) {
-    uint32_t instrItemSize = NinSnesInstr::expectedSize(profileId);
-    uint32_t addrInstrHeader = offset() + (instrItemSize * instr);
+  for (u16 instr = 0; instr < instrCount; instr++) {
+    u32 instrItemSize = NinSnesInstr::expectedSize(profileId);
+    u32 addrInstrHeader = offset() + (instrItemSize * instr);
     if (addrInstrHeader + instrItemSize > 0x10000) {
       return false;
     }
@@ -220,15 +223,15 @@ bool NinSnesInstrSet::parseInstrPointers() {
       continue;
     }
 
-    uint8_t srcn = readByte(addrInstrHeader);
+    u8 srcn = readByte(addrInstrHeader);
 
-    uint32_t offDirEnt = spcDirAddr + (srcn * 4);
+    u32 offDirEnt = spcDirAddr + (srcn * 4);
     if (offDirEnt + 4 > 0x10000) {
       break;
     }
 
-    uint16_t addrSampStart = readShort(offDirEnt);
-    uint16_t addrLoopStart = readShort(offDirEnt + 2);
+    u16 addrSampStart = readShort(offDirEnt);
+    u16 addrLoopStart = readShort(offDirEnt + 2);
 
     if ((addrSampStart == 0x0000 && addrLoopStart == 0x0000) ||
         (addrSampStart == 0xffff && addrLoopStart == 0xffff)) {
@@ -249,7 +252,7 @@ bool NinSnesInstrSet::parseInstrPointers() {
       }
     }
 
-    std::vector<uint8_t>::iterator itrSRCN = find(usedSRCNs.begin(), usedSRCNs.end(), srcn);
+    std::vector<u8>::iterator itrSRCN = find(usedSRCNs.begin(), usedSRCNs.end(), srcn);
     if (itrSRCN == usedSRCNs.end()) {
       usedSRCNs.push_back(srcn);
     }
@@ -324,7 +327,7 @@ void NinSnesInstrSet::useColl(const VGMColl* coll) {
           continue;
         }
 
-        const uint8_t drumKey = static_cast<uint8_t>(0x24 + slot);
+        const u8 drumKey = static_cast<u8>(0x24 + slot);
         for (auto* sourceRgn : sourceInstr->regions()) {
           drumKit->addRgn(
               cloneIntelliTARgnForDrumKit(drumKit, sourceRgn, drumKey, slotDef.playedNoteByte));
@@ -386,10 +389,10 @@ void NinSnesInstrSet::unuseColl() {
 
 NinSnesInstr::NinSnesInstr(VGMInstrSet *instrSet,
                            NinSnesProfileId profile,
-                           uint32_t offset,
-                           uint32_t theBank,
-                           uint32_t theInstrNum,
-                           uint32_t spcDirAddr,
+                           u32 offset,
+                           u32 theBank,
+                           u32 theInstrNum,
+                           u32 spcDirAddr,
                            const std::string &name) :
     VGMInstr(instrSet, offset, NinSnesInstr::expectedSize(profile), theBank, theInstrNum, name),
     profileId(profile),
@@ -402,15 +405,15 @@ NinSnesInstr::~NinSnesInstr() {
 }
 
 bool NinSnesInstr::loadInstr() {
-  uint8_t srcn = readByte(offset());
-  uint32_t offDirEnt = spcDirAddr + (srcn * 4);
+  u8 srcn = readByte(offset());
+  u32 offDirEnt = spcDirAddr + (srcn * 4);
   if (offDirEnt + 4 > 0x10000) {
     return false;
   }
 
   addStandardVibratoHandling(nin_snes::vibrato::modulationSpec());
 
-  uint16_t addrSampStart = readShort(offDirEnt);
+  u16 addrSampStart = readShort(offDirEnt);
 
   NinSnesRgn *rgn = new NinSnesRgn(this, profileId, offset(), konamiTuningTableAddress, konamiTuningTableSize);
   rgn->sampOffset = addrSampStart - spcDirAddr;
@@ -421,14 +424,14 @@ bool NinSnesInstr::loadInstr() {
 
 bool NinSnesInstr::isValidHeader(RawFile *file,
                                  NinSnesProfileId profileId,
-                                 uint32_t addrInstrHeader,
-                                 uint32_t spcDirAddr,
+                                 u32 addrInstrHeader,
+                                 u32 spcDirAddr,
                                  bool validateSample) {
   return isValidNinSnesInstrumentHeader(
       getNinSnesProfile(profileId), file, addrInstrHeader, spcDirAddr, validateSample);
 }
 
-uint32_t NinSnesInstr::expectedSize(NinSnesProfileId profileId) {
+u32 NinSnesInstr::expectedSize(NinSnesProfileId profileId) {
   return getNinSnesInstrumentHeaderSize(getNinSnesProfile(profileId));
 }
 
@@ -438,18 +441,18 @@ uint32_t NinSnesInstr::expectedSize(NinSnesProfileId profileId) {
 
 NinSnesRgn::NinSnesRgn(NinSnesInstr *instr,
                        NinSnesProfileId profileId,
-                       uint32_t offset,
-                       uint16_t konamiTuningTableAddress,
-                       uint8_t konamiTuningTableSize) :
+                       u32 offset,
+                       u16 konamiTuningTableAddress,
+                       u8 konamiTuningTableSize) :
     VGMRgn(instr, offset, NinSnesInstr::expectedSize(profileId)) {
   const auto& profile = getNinSnesProfile(profileId);
-  uint8_t srcn = readByte(offset);
-  uint8_t adsr1 = readByte(offset + 1);
-  uint8_t adsr2 = readByte(offset + 2);
-  uint8_t gain = readByte(offset + 3);
-  const uint8_t pitchHigh = readByte(offset + 4);
+  u8 srcn = readByte(offset);
+  u8 adsr1 = readByte(offset + 1);
+  u8 adsr2 = readByte(offset + 2);
+  u8 gain = readByte(offset + 3);
+  const u8 pitchHigh = readByte(offset + 4);
   const bool earlierLayout = profile.instrumentLayout == NinSnesInstrumentLayoutId::Earlier5Byte;
-  const uint8_t pitchLow = earlierLayout ? 0 : readByte(offset + 5);
+  const u8 pitchLow = earlierLayout ? 0 : readByte(offset + 5);
   const auto tuning = calculatePitchTuning(readPitchScale(profile, pitchHigh, pitchLow));
 
   addSampNum(srcn, offset, 1);
@@ -462,11 +465,11 @@ NinSnesRgn::NinSnesRgn(NinSnesInstr *instr,
   }
   else if (profile.instrumentLayout == NinSnesInstrumentLayoutId::KonamiTuningTable &&
            konamiTuningTableAddress != 0) {
-    uint16_t addrTuningTableCoarse = konamiTuningTableAddress;
-    uint16_t addrTuningTableFine = konamiTuningTableAddress + konamiTuningTableSize;
+    u16 addrTuningTableCoarse = konamiTuningTableAddress;
+    u16 addrTuningTableFine = konamiTuningTableAddress + konamiTuningTableSize;
 
-    int8_t coarse_tuning;
-    uint8_t fine_tuning;
+    s8 coarse_tuning;
+    u8 fine_tuning;
     if (srcn < konamiTuningTableSize) {
       coarse_tuning = readByte(addrTuningTableCoarse + srcn);
       fine_tuning = readByte(addrTuningTableFine + srcn);
@@ -480,7 +483,7 @@ NinSnesRgn::NinSnesRgn(NinSnesInstr *instr,
     fine_tune_real += log(4045.0 / 4096.0) / log(2) * 12; // -21.691 cents
 
     unityKey = 71 - coarse_tuning;
-    fineTune = static_cast<int16_t>(fine_tune_real * 100.0);
+    fineTune = static_cast<s16>(fine_tune_real * 100.0);
 
     addChild(offset + 4, 2, "Tuning (Unused)");
   }

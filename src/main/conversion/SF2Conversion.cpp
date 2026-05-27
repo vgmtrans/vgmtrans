@@ -4,17 +4,19 @@
  * refer to the included LICENSE.txt file
 */
 #include "SF2Conversion.h"
+
+#include "base/Types.h"
 #include "ConversionContext.h"
+#include "LogManager.h"
 #include "Options.h"
+#include "ScaleConversion.h"
 #include "SF2File.h"
 #include "SynthFile.h"
 #include "VGMColl.h"
 #include "VGMInstrSet.h"
-#include "VGMSampColl.h"
-#include "VGMSamp.h"
 #include "VGMRgn.h"
-#include "ScaleConversion.h"
-#include "LogManager.h"
+#include "VGMSamp.h"
+#include "VGMSampColl.h"
 
 namespace conversion {
 
@@ -103,7 +105,7 @@ SynthFile* createSynthFile(
       for (const auto& modulator : vgminstr->modulators()) {
         newInstr->addModulator(modulator);
       }
-      for (uint32_t j = 0; j < nRgns; j++) {
+      for (u32 j = 0; j < nRgns; j++) {
         VGMRgn* rgn = vgminstr->regions()[j];
         //				if (rgn->sampNum+1 > sampColl->samples.size())	//does thereferenced sample exist?
         //					continue;
@@ -125,7 +127,7 @@ SynthFile* createSynthFile(
         // see sampOffset declaration in header file for more info.
         if (rgn->sampOffset != -1) {
           bool bFoundIt = false;
-          for (uint32_t s = 0; s < sampColl->samples.size(); s++) {  //for every sample
+          for (u32 s = 0; s < sampColl->samples.size(); s++) {  //for every sample
             auto sample = sampColl->samples[s];
             if (rgn->sampOffset == sample->offset() ||
                 rgn->sampOffset == sample->offset() - sampColl->offset() - sampColl->sampDataOffset) {
@@ -164,7 +166,7 @@ SynthFile* createSynthFile(
         }
         // now we add the number of samples from the preceding SampColls to the value to
         // get the real sampNum in the final DLS file.
-        for (uint32_t k = 0; k < sampCollNum; k++)
+        for (u32 k = 0; k < sampCollNum; k++)
           realSampNum += finalSampColls[k]->samples.size();
 
         if (realSampNum >= finalSamps.size()) {
@@ -175,7 +177,7 @@ SynthFile* createSynthFile(
 
         SynthRgn *newRgn = newInstr->addRgn();
         newRgn->setRanges(rgn->keyLow, rgn->keyHigh, rgn->velLow, rgn->velHigh);
-        newRgn->setWaveLinkInfo(0, 0, 1, static_cast<uint32_t>(realSampNum));
+        newRgn->setWaveLinkInfo(0, 0, 1, static_cast<u32>(realSampNum));
         newRgn->setFineTune(rgn->coarseTune, rgn->fineTune);
         newRgn->setAttenuationDb(rgn->attenDb());
         newRgn->setLfoVibFreqHz(rgn->lfoVibFreqHz());
@@ -220,7 +222,7 @@ SynthFile* createSynthFile(
         } else
           sampInfo->setLoopInfo(rgn->loop, samp);
 
-        int8_t realUnityKey;
+        s8 realUnityKey;
         if (rgn->unityKey == -1)
           realUnityKey = samp->unityKey;
         else
@@ -257,11 +259,11 @@ void unpackSampColl(SynthFile &synthfile, const VGMSampColl *sampColl, std::vect
   for (size_t i = 0; i < nSamples; i++) {
     VGMSamp *samp = sampColl->samples[i];
 
-    std::vector<uint8_t> uncompSampBuf = samp->toPcm(Signedness::Signed, Endianness::Little, BPS::PCM16);
+    std::vector<u8> uncompSampBuf = samp->toPcm(Signedness::Signed, Endianness::Little, BPS::PCM16);
 
-    uint16_t blockAlign = 2 * samp->channels;
+    u16 blockAlign = 2 * samp->channels;
     SynthWave *wave = synthfile.addWave(1, samp->channels, samp->rate, samp->rate * blockAlign, blockAlign,
-                                        16, static_cast<uint32_t>(uncompSampBuf.size()),
+                                        16, static_cast<u32>(uncompSampBuf.size()),
                                         std::move(uncompSampBuf), samp->name());
     finalSamps.push_back(samp);
 
@@ -278,7 +280,7 @@ void unpackSampColl(SynthFile &synthfile, const VGMSampColl *sampColl, std::vect
     } else
       sampInfo->setLoopInfo(samp->loop, samp);
 
-    uint8_t unityKey = (samp->unityKey != -1) ? samp->unityKey : 0x3C;
+    u8 unityKey = (samp->unityKey != -1) ? samp->unityKey : 0x3C;
     sampInfo->setPitchInfo(unityKey, samp->fineTune, samp->attenDb());
   }
 }

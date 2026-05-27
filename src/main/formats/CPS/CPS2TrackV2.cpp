@@ -4,10 +4,11 @@
  * refer to the included LICENSE.txt file
  */
 #include "CPS2TrackV2.h"
+
+#include "base/Types.h"
 #include "ScaleConversion.h"
 
-
-CPS2TrackV2::CPS2TrackV2(CPS2Seq *parentSeq, uint32_t offset, uint32_t length)
+CPS2TrackV2::CPS2TrackV2(CPS2Seq *parentSeq, u32 offset, u32 length)
     : SeqTrack(parentSeq, offset, length) {
   CPS2TrackV2::resetVars();
 }
@@ -20,9 +21,9 @@ void CPS2TrackV2::resetVars() {
   SeqTrack::resetVars();
 }
 
-uint32_t CPS2TrackV2::readVarLength() {
-  uint32_t delta = 0;
-  uint8_t byte;
+u32 CPS2TrackV2::readVarLength() {
+  u32 delta = 0;
+  u8 byte;
   do {
     byte = readByte(curOffset++);
     delta <<= 7;
@@ -33,14 +34,14 @@ uint32_t CPS2TrackV2::readVarLength() {
 }
 
 bool CPS2TrackV2::readEvent() {
-  uint32_t beginOffset = curOffset;
-  uint8_t status_byte = readByte(curOffset++);
+  u32 beginOffset = curOffset;
+  u8 status_byte = readByte(curOffset++);
 
   // Rest opcodes are [0x00 - 0x7F]
   if (status_byte < 0x80) {
 
-    uint32_t delta = 0;
-    uint32_t byte = status_byte;
+    u32 delta = 0;
+    u32 byte = status_byte;
 
     // Rest values are var length. They carry to the next byte if the highest bit is NOT set.
     while ((byte & 0x80) == 0) {
@@ -56,10 +57,10 @@ bool CPS2TrackV2::readEvent() {
 
   // Note opcodes are [0x80 - 0xBF]
   if (status_byte < 0xC0) {
-    uint8_t velocity = status_byte & 0x3F;
+    u8 velocity = status_byte & 0x3F;
     velocity = (static_cast<double>(velocity) / static_cast<double>(0x3F)) * 127.0;
-    uint8_t note = readByte(curOffset++) & 0x7F;
-    uint32_t duration = readVarLength();
+    u8 note = readByte(curOffset++) & 0x7F;
+    u32 duration = readVarLength();
     addNoteByDur(beginOffset, curOffset - beginOffset, note, velocity, duration);
     return true;
   }
@@ -72,13 +73,13 @@ bool CPS2TrackV2::readEvent() {
 
     case C1_TEMPO: {
       // Shares same logic as version < 1.40.  See comment on tempo in CPSTrackV1 for explanation.
-      uint16_t ticks_per_iteration = getShortBE(curOffset);
+      u16 ticks_per_iteration = getShortBE(curOffset);
       curOffset += 2;
       auto internal_ppqn = parentSeq->ppqn() << 8;
       auto iterations_per_beat = static_cast<double>(internal_ppqn) / ticks_per_iteration;
       auto fmt_version = static_cast<CPS2Seq*>(parentSeq)->fmt_version;
       const double ITERATIONS_PER_SEC = fmt_version == CPS3 ? CPS3_DRIVER_RATE_HZ : CPS2_DRIVER_RATE_HZ;
-      const uint32_t micros_per_beat = lround((iterations_per_beat / ITERATIONS_PER_SEC) * 1000000);
+      const u32 micros_per_beat = lround((iterations_per_beat / ITERATIONS_PER_SEC) * 1000000);
       addTempo(beginOffset, curOffset - beginOffset, micros_per_beat);
       break;
     }
@@ -89,7 +90,7 @@ bool CPS2TrackV2::readEvent() {
       break;
 
     case C3_PITCHBEND: {
-      int8_t pitch = readByte(curOffset++);
+      s8 pitch = readByte(curOffset++);
       addMarker(beginOffset,
                 curOffset - beginOffset,
                 "pitchbend",
@@ -102,13 +103,13 @@ bool CPS2TrackV2::readEvent() {
     }
 
     case C4_PROGCHANGE: {
-      uint8_t program = readByte(curOffset++);
+      u8 program = readByte(curOffset++);
       addProgramChange(beginOffset, curOffset - beginOffset, program);
       break;
     }
 
     case C5_VIBRATO: {
-      uint8_t vibratoDepth = readByte(curOffset++);
+      u8 vibratoDepth = readByte(curOffset++);
       addMarker(beginOffset,
                 curOffset - beginOffset,
                 std::string("vibrato"),
@@ -130,7 +131,7 @@ bool CPS2TrackV2::readEvent() {
     }
 
     case C7_PAN: {
-      uint8_t pan = readByte(curOffset++);
+      u8 pan = readByte(curOffset++);
       addPan(beginOffset, curOffset - beginOffset, pan);
       break;
     }
@@ -168,7 +169,7 @@ bool CPS2TrackV2::readEvent() {
       break;
 
     case CE_GOTO: {
-      int16_t relative_offset = static_cast<int16_t>(getShortBE(curOffset));
+      s16 relative_offset = static_cast<s16>(getShortBE(curOffset));
       curOffset += 2;
       auto should_continue = addLoopForever(beginOffset, curOffset - beginOffset);
       if (readMode == READMODE_ADD_TO_UI) {
@@ -209,7 +210,7 @@ bool CPS2TrackV2::readEvent() {
     case D7_LOOP_4: loopNum = 3;
     handleLoop: {
 
-      uint8_t loopCount = readByte(curOffset++);
+      u8 loopCount = readByte(curOffset++);
       if (loopCount == 0) {
         auto should_continue = addLoopForever(beginOffset, curOffset - beginOffset);
         if (readMode == READMODE_ADD_TO_UI) {
@@ -242,7 +243,7 @@ bool CPS2TrackV2::readEvent() {
     loopBreak:
       if (loopCounter[loopNum] - 1 == 0) {
         loopCounter[loopNum] = 0;
-        uint16_t jump = getShortBE(curOffset);
+        u16 jump = getShortBE(curOffset);
         addGenericEvent(beginOffset, (curOffset+2) - beginOffset, "Loop Break", "", Type::Loop);
         curOffset += jump + 2;
       }
@@ -257,7 +258,7 @@ bool CPS2TrackV2::readEvent() {
       break;
 
     case DD_TRANSPOSE:
-      transpose += static_cast<int8_t>(readByte(curOffset++));
+      transpose += static_cast<s8>(readByte(curOffset++));
       addGenericEvent(beginOffset, curOffset - beginOffset, "Transpose", "", Type::ChangeState);
       break;
 
@@ -273,7 +274,7 @@ bool CPS2TrackV2::readEvent() {
 
     case E0_RESET_LFO: {
       //TODO: Go back and tweak this logic. It's doing something more.
-      uint8_t data = readByte(curOffset++);
+      u8 data = readByte(curOffset++);
       addMarker(beginOffset,
                 curOffset - beginOffset,
                 "resetlfo",
@@ -286,7 +287,7 @@ bool CPS2TrackV2::readEvent() {
     }
 
     case E1_LFO_RATE: {
-      uint8_t rate = readByte(curOffset++);
+      u8 rate = readByte(curOffset++);
       addMarker(beginOffset,
                 curOffset - beginOffset,
                 "lfo",
@@ -299,7 +300,7 @@ bool CPS2TrackV2::readEvent() {
     }
 
     case E2_TREMELO: {
-      uint8_t tremeloDepth = readByte(curOffset++);
+      u8 tremeloDepth = readByte(curOffset++);
       addMarker(beginOffset,
                 curOffset - beginOffset,
                 "tremelo",
@@ -333,7 +334,7 @@ bool CPS2TrackV2::readEvent() {
 
     // NEW IN CPS3 (maybe sfiii2 specifically)
     case E7_FINE_TUNE: {
-      const int8_t fine_tune = readByte(curOffset++);
+      const s8 fine_tune = readByte(curOffset++);
       auto cents = ((fine_tune - 64)/ 64.0) * 100;
       addFineTuning(beginOffset, curOffset-beginOffset, cents);
       break;
@@ -344,8 +345,8 @@ bool CPS2TrackV2::readEvent() {
     // sfiii3's intro animation sequence which is timed to the music. It also determines at what
     // point in a sequence to transition to the variant sequence for round 2 and 3.
     case E8_META_EVENT: {
-      uint8_t slot = readByte(curOffset++);
-      uint8_t value = readByte(curOffset++);
+      u8 slot = readByte(curOffset++);
+      u8 value = readByte(curOffset++);
       auto description = fmt::format("Slot: {:d} Value: {:d}", slot, value);
       addGenericEvent(beginOffset, curOffset - beginOffset, "Meta Event", description, Type::Marker);
       break;

@@ -1,5 +1,10 @@
 #pragma once
+
+#include "base/Types.h"
 #include "VGMSeqNoTrks.h"
+
+#include <string>
+#include <vector>
 
 class SegSatRgn;
 class SegSatInstr;
@@ -9,7 +14,7 @@ struct SegSatVLTable;
 class SegSatSeq:
     public VGMSeqNoTrks {
  public:
-  SegSatSeq(RawFile *file, uint32_t offset, std::string name);
+  SegSatSeq(RawFile *file, u32 offset, std::string name);
   ~SegSatSeq() override = default;
 
   void resetVars() override;
@@ -19,7 +24,7 @@ class SegSatSeq:
 
  private:
   const SegSatRgn* resolveRegion(u8 bank, u8 progNum, u8 noteNum);
-  constexpr double tlDB(uint8_t tl);
+  constexpr double tlDB(u8 tl);
   u8 resolveVelocity(u8 vel, const SegSatRgn& rgn, s8 volBias, u8 ch);
 
   struct CollContext {

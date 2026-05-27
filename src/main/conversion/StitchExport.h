@@ -6,16 +6,17 @@
 
 #pragma once
 
+#include "base/Types.h"
+#include "MidiMerge.h"
+
 #include <filesystem>
 #include <vector>
-
-#include "MidiMerge.h"
 
 namespace conversion {
 
 struct StitchedExportResult {
   MidiMergeResult mergeResult;
-  std::vector<uint8_t> bankOffsets;
+  std::vector<u8> bankOffsets;
 };
 
 bool exportStitchedMidiAndSf2(const std::vector<MidiMergeEntry> &entries,

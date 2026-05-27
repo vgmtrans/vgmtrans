@@ -1,11 +1,16 @@
 #pragma once
 
-#include "VGMInstrSet.h"
+#include "base/Types.h"
 #include "CPS1Scanner.h"
+#include "VGMInstrSet.h"
 #include "VGMSampColl.h"
 #include "YM2151.h"
 #include "YM2151InstrSet.h"
+
+#include <algorithm>
 #include <sstream>
+#include <string>
+#include <vector>
 
 // ******************
 // CPS1SampleInstrSet
@@ -16,7 +21,7 @@ class CPS1SampleInstrSet
 public:
   CPS1SampleInstrSet(RawFile *file,
                      CPS1FormatVer fmt_version,
-                     uint32_t offset,
+                     u32 offset,
                      std::string name);
   ~CPS1SampleInstrSet() override = default;
 
@@ -33,8 +38,8 @@ public:
 class CPS1SampColl
     : public VGMSampColl {
 public:
-  CPS1SampColl(RawFile *file, CPS1SampleInstrSet *instrset, uint32_t offset,
-               uint32_t length = 0, std::string name = std::string("CPS1 Sample Collection"));
+  CPS1SampColl(RawFile *file, CPS1SampleInstrSet *instrset, u32 offset,
+               u32 length = 0, std::string name = std::string("CPS1 Sample Collection"));
   bool parseHeader() override;
   bool parseSampleInfo() override;
 
@@ -54,8 +59,8 @@ public:
   CPS1OPMInstrSet(RawFile *file,
                  CPS1FormatVer fmt_version,
                  u8 masterVol,
-                 uint32_t offset,
-                 uint32_t length,
+                 u32 offset,
+                 u32 length,
                  const std::string& name);
   ~CPS1OPMInstrSet() override = default;
 
@@ -70,20 +75,20 @@ public:
 // ************
 
 struct CPS1OPMInstrDataV2_00 {
-  uint8_t SLOT_MASK;
-  uint8_t useLFO;
-  uint8_t LFO_WAVEFORM = 0;
-  uint8_t LFRQ = 0;
-  uint8_t PMD = 0;
-  uint8_t AMD = 0;
-  uint8_t PMS_AMS = 0;
-  uint8_t FL_CON;
-  uint8_t DT1_MUL[4];
-  uint8_t op_vol[4];
-  uint8_t KS_AR[4];
-  uint8_t AMSEN_D1R[4];
-  uint8_t DT2_D2R[4];
-  uint8_t D1L_RR[4];
+  u8 SLOT_MASK;
+  u8 useLFO;
+  u8 LFO_WAVEFORM = 0;
+  u8 LFRQ = 0;
+  u8 PMD = 0;
+  u8 AMD = 0;
+  u8 PMS_AMS = 0;
+  u8 FL_CON;
+  u8 DT1_MUL[4];
+  u8 op_vol[4];
+  u8 KS_AR[4];
+  u8 AMSEN_D1R[4];
+  u8 DT2_D2R[4];
+  u8 D1L_RR[4];
 
   u8 volToAttenuation(u8 instrVol) const {
     u8 m = instrVol >> 4;
@@ -113,7 +118,7 @@ struct CPS1OPMInstrDataV2_00 {
     ch.NE = 0;
 
     // OP
-    uint8_t CON_limits[4] = { 7, 5, 4, 0 };
+    u8 CON_limits[4] = { 7, 5, 4, 0 };
     OPMData::OP op[4];
     u8 masterVolumeAtten = 0x7F - masterVol;
     for (int i = 0; i < 4; i ++) {
@@ -137,26 +142,26 @@ struct CPS1OPMInstrDataV2_00 {
 };
 
 struct CPS1OPMVolData4_25 {
-  uint8_t extra_atten;
-  uint8_t key_scale;
-  uint8_t vol;
+  u8 extra_atten;
+  u8 key_scale;
+  u8 vol;
 };
 
 struct CPS1OPMInstrDataV4_25 {
-  int8_t transpose;
-  uint8_t LFO_ENABLE_AND_WF;  // bit 7: enable LFO, bit 5-6: WF, bit 1: reset LFO
-  uint8_t LFRQ;
-  uint8_t PMD;
-  uint8_t AMD;
-  uint8_t FL_CON;
-  uint8_t PMS_AMS;
-  uint8_t SLOT_MASK;
+  s8 transpose;
+  u8 LFO_ENABLE_AND_WF;  // bit 7: enable LFO, bit 5-6: WF, bit 1: reset LFO
+  u8 LFRQ;
+  u8 PMD;
+  u8 AMD;
+  u8 FL_CON;
+  u8 PMS_AMS;
+  u8 SLOT_MASK;
   CPS1OPMVolData4_25 volData[4];
-  uint8_t DT1_MUL[4];
-  uint8_t KS_AR[4];
-  uint8_t AMSEN_D1R[4];
-  uint8_t DT2_D2R[4];
-  uint8_t D1L_RR[4];
+  u8 DT1_MUL[4];
+  u8 KS_AR[4];
+  u8 AMSEN_D1R[4];
+  u8 DT2_D2R[4];
+  u8 D1L_RR[4];
 
   u8 volToAttenuation(u8 instrVol) const {
     u16 uVar4 = (((u16)instrVol << 8) | (instrVol >> 4)) & 0xF07;
@@ -204,7 +209,7 @@ struct CPS1OPMInstrDataV4_25 {
     ch.NE = 0;
 
     // OP
-    uint8_t CON_limits[4] = { 7, 5, 4, 0 };
+    u8 CON_limits[4] = { 7, 5, 4, 0 };
     OPMData::OP op[4];
     for (int i = 0; i < 4; i ++) {
       auto conLimit = CON_limits[i];
@@ -235,20 +240,20 @@ struct CPS1OPMInstrDataV4_25 {
 };
 
 struct CPS1OPMInstrDataV5_02 {
-  uint8_t SLOT_MASK;  // bit 7: enable LFO, bit 5-6: WF, bit 1: reset LFO
-  uint8_t LFO_ENABLE_AND_WF;  // bit 7: enable LFO, bit 5-6: WF, bit 1: reset LFO
-  uint8_t LFRQ;
-  uint8_t PMD;
-  uint8_t AMD;
-  uint8_t unknown;
-  uint8_t PMS_AMS;
-  uint8_t FL_CON;
-  uint8_t DT1_MUL[4];
-  uint8_t KS_AR[4];
-  uint8_t AMSEN_D1R[4];
-  uint8_t DT2_D2R[4];
-  uint8_t D1L_RR[4];
-  uint8_t op_vol[4];
+  u8 SLOT_MASK;  // bit 7: enable LFO, bit 5-6: WF, bit 1: reset LFO
+  u8 LFO_ENABLE_AND_WF;  // bit 7: enable LFO, bit 5-6: WF, bit 1: reset LFO
+  u8 LFRQ;
+  u8 PMD;
+  u8 AMD;
+  u8 unknown;
+  u8 PMS_AMS;
+  u8 FL_CON;
+  u8 DT1_MUL[4];
+  u8 KS_AR[4];
+  u8 AMSEN_D1R[4];
+  u8 DT2_D2R[4];
+  u8 D1L_RR[4];
+  u8 op_vol[4];
 
   u8 volToAttenuation(u8 instrVol) const {
     u16 uVar4 = (((u16)instrVol << 8) | (instrVol >> 4)) & 0xF07;
@@ -296,7 +301,7 @@ struct CPS1OPMInstrDataV5_02 {
     ch.NE = 0;
 
     // OP
-    uint8_t CON_limits[4] = { 7, 5, 4, 0 };
+    u8 CON_limits[4] = { 7, 5, 4, 0 };
     OPMData::OP op[4];
     u8 masterVolumeAtten = 0x7F - masterVol;
     for (int i = 0; i < 4; i ++) {
@@ -326,10 +331,10 @@ class CPS1OPMInstr : public VGMInstr {
 public:
   CPS1OPMInstr(VGMInstrSet *instrSet,
                u8 masterVol,
-               uint32_t offset,
-               uint32_t length,
-               uint32_t theBank,
-               uint32_t theInstrNum,
+               u32 offset,
+               u32 length,
+               u32 theBank,
+               u32 theInstrNum,
                const std::string& name)
     : VGMInstr(instrSet, offset, length, theBank, theInstrNum, name), masterVol(masterVol) {}
   ~CPS1OPMInstr() override = default;

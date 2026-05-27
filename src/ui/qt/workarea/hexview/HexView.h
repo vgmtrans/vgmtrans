@@ -6,22 +6,25 @@
 
 #pragma once
 
+#include "base/Types.h"
+#include "HexViewFrameData.h"
+#include "workarea/SplitterSnapProvider.h"
+
+#include <array>
+#include <cstdint>
+#include <memory>
+#include <unordered_map>
+#include <vector>
+
 #include <QAbstractScrollArea>
 #include <QBasicTimer>
 #include <QColor>
 #include <QElapsedTimer>
 #include <QFont>
 #include <QImage>
-#include <QSize>
 #include <QPointF>
 #include <QRectF>
-#include <array>
-#include <cstdint>
-#include <memory>
-#include <unordered_map>
-#include <vector>
-#include "HexViewFrameData.h"
-#include "workarea/SplitterSnapProvider.h"
+#include <QSize>
 
 class QParallelAnimationGroup;
 class QWidget;
@@ -99,14 +102,14 @@ private:
     qreal dpr = 0.0;
     int glyphWidth = 0;
     int glyphHeight = 0;
-    uint64_t version = 0;
+    u64 version = 0;
     QFont font;
   };
 
-  static uint64_t selectionKey(uint32_t offset, uint32_t length);
-  static uint64_t selectionKey(const SelectionRange& range);
-  static uint64_t selectionKey(const PlaybackSelection& range);
-  static uint64_t selectionKey(const FadePlaybackSelection& selection);
+  static u64 selectionKey(u32 offset, u32 length);
+  static u64 selectionKey(const SelectionRange& range);
+  static u64 selectionKey(const PlaybackSelection& range);
+  static u64 selectionKey(const FadePlaybackSelection& selection);
 
   int hexXOffset() const;
   static DragMode dragModeForModifiers(Qt::KeyboardModifiers mods);
@@ -149,7 +152,7 @@ private:
   VGMFile* m_vgmfile = nullptr;
   // Interaction state.
   VGMItem* m_selectedItem = nullptr;
-  uint32_t m_selectedOffset = 0;
+  u32 m_selectedOffset = 0;
   bool m_isDragging = false;
   bool m_seekModifierActive = false;
   VGMItem* m_tooltipItem = nullptr;
@@ -169,8 +172,8 @@ private:
   // Compact style table used by renderer; index 0 is the default/fallback style.
   std::vector<Style> m_styles;
   // Style id for each byte in the current file data; each entry indexes into m_styles.
-  std::vector<uint16_t> m_styleIds;
-  std::unordered_map<int, uint16_t> m_typeToStyleId;
+  std::vector<u16> m_styleIds;
+  std::unordered_map<int, u16> m_typeToStyleId;
 
   QParallelAnimationGroup* m_selectionAnimation = nullptr;
   qreal m_overlayOpacity = 0.0;

@@ -5,15 +5,18 @@
  */
 #pragma once
 
-#include "common.h"
+#include "base/Types.h"
+#include "ConversionContext.h"
+#include "DLSConversion.h"
 #include "DLSFile.h"
+#include "Options.h"
+#include "SF2Conversion.h"
 #include "SF2File.h"
+#include "util/Path.h"
 #include "VGMColl.h"
 #include "VGMSeq.h"
-#include "SF2Conversion.h"
-#include "DLSConversion.h"
-#include "ConversionContext.h"
-#include "Options.h"
+
+#include <filesystem>
 
 /*
  * The following free functions implement
@@ -22,14 +25,14 @@
 
 namespace conversion {
 
-enum class Target : uint32_t { MIDI = 1u << 0u, DLS = 1u << 1u, SF2 = 1u << 2u };
+enum class Target : u32 { MIDI = 1u << 0u, DLS = 1u << 1u, SF2 = 1u << 2u };
 
 inline constexpr Target operator|(Target a, Target b) {
-  return static_cast<Target>(static_cast<uint32_t>(a) | static_cast<uint32_t>(b));
+  return static_cast<Target>(static_cast<u32>(a) | static_cast<u32>(b));
 }
 
-inline constexpr uint32_t operator&(Target a, Target b) {
-  return static_cast<uint32_t>(a) & static_cast<uint32_t>(b);
+inline constexpr u32 operator&(Target a, Target b) {
+  return static_cast<u32>(a) & static_cast<u32>(b);
 }
 
 inline constexpr bool hasTarget(Target options, Target target) {

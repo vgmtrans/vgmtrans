@@ -5,7 +5,7 @@
  */
 #pragma once
 
-#include "common.h"
+#include <string>
 #include <vector>
 
 class VGMSeq;

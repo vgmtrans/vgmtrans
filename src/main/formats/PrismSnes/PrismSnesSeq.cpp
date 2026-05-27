@@ -1,5 +1,8 @@
 #include "PrismSnesSeq.h"
+
+#include "base/Types.h"
 #include "ScaleConversion.h"
+
 #include <spdlog/fmt/fmt.h>
 
 // TODO: Fix envelope event length
@@ -7,26 +10,26 @@
 DECLARE_FORMAT(PrismSnes);
 
 static constexpr int MAX_TRACKS = 24;
-static constexpr uint16_t SEQ_PPQN = 48;
-static constexpr uint8_t NOTE_VELOCITY = 100;
+static constexpr u16 SEQ_PPQN = 48;
+static constexpr u8 NOTE_VELOCITY = 100;
 
 //  ************
 //  PrismSnesSeq
 //  ************
 
-const uint8_t PrismSnesSeq::PAN_TABLE_1[21] = {
+const u8 PrismSnesSeq::PAN_TABLE_1[21] = {
     0x00, 0x01, 0x03, 0x07, 0x0d, 0x15, 0x1e, 0x29,
     0x34, 0x42, 0x51, 0x5e, 0x67, 0x6e, 0x73, 0x77,
     0x7a, 0x7c, 0x7d, 0x7e, 0x7f,
 };
 
-const uint8_t PrismSnesSeq::PAN_TABLE_2[21] = {
+const u8 PrismSnesSeq::PAN_TABLE_2[21] = {
     0x1e, 0x28, 0x32, 0x3c, 0x46, 0x50, 0x5a, 0x64,
     0x6e, 0x78, 0x7f, 0x7f, 0x7f, 0x7f, 0x7f, 0x7f,
     0x7f, 0x7f, 0x7f, 0x7f, 0x7f,
 };
 
-PrismSnesSeq::PrismSnesSeq(RawFile *file, PrismSnesVersion ver, uint32_t seqdataOffset, std::string newName)
+PrismSnesSeq::PrismSnesSeq(RawFile *file, PrismSnesVersion ver, u32 seqdataOffset, std::string newName)
     : VGMSeq(PrismSnesFormat::name, file, seqdataOffset, 0, newName), version(ver),
       envContainer(NULL) {
   bLoadTickByTick = true;
@@ -43,7 +46,7 @@ PrismSnesSeq::PrismSnesSeq(RawFile *file, PrismSnesVersion ver, uint32_t seqdata
 PrismSnesSeq::~PrismSnesSeq() {
 }
 
-void PrismSnesSeq::demandEnvelopeContainer(uint32_t offset) {
+void PrismSnesSeq::demandEnvelopeContainer(u32 offset) {
   if (envContainer == NULL) {
     envContainer = addHeader(offset, 0, "Envelopes");
   }
@@ -67,13 +70,13 @@ bool PrismSnesSeq::parseHeader() {
 
   VGMHeader *header = addHeader(offset(), 0);
 
-  uint32_t curOffset = offset();
-  for (uint8_t trackIndex = 0; trackIndex < MAX_TRACKS + 1; trackIndex++) {
+  u32 curOffset = offset();
+  for (u8 trackIndex = 0; trackIndex < MAX_TRACKS + 1; trackIndex++) {
     if (curOffset + 1 > 0x10000) {
       return false;
     }
 
-    uint8_t channel = readByte(curOffset);
+    u8 channel = readByte(curOffset);
     if (channel >= 0x80) {
       header->addChild(curOffset, 1, "Header End");
       break;
@@ -88,11 +91,11 @@ bool PrismSnesSeq::parseHeader() {
     trackHeader->addChild(curOffset, 1, "Logical Channel");
     curOffset++;
 
-    uint8_t a01 = readByte(curOffset);
+    u8 a01 = readByte(curOffset);
     trackHeader->addChild(curOffset, 1, "Physical Channel + Flags");
     curOffset++;
 
-    uint16_t addrTrackStart = readShort(curOffset);
+    u16 addrTrackStart = readShort(curOffset);
     trackHeader->addChild(curOffset, 2, "Track Pointer");
     curOffset += 2;
 
@@ -211,7 +214,7 @@ void PrismSnesSeq::loadEventMap() {
   }
 }
 
-double PrismSnesSeq::getTempoInBPM(uint8_t tempo) {
+double PrismSnesSeq::getTempoInBPM(u8 tempo) {
   if (tempo != 0) {
     return 60000000.0 / (SEQ_PPQN * (125 * tempo));
   }
@@ -224,7 +227,7 @@ double PrismSnesSeq::getTempoInBPM(uint8_t tempo) {
 //  PrismSnesTrack
 //  **************
 
-PrismSnesTrack::PrismSnesTrack(PrismSnesSeq *parentFile, uint32_t offset, uint32_t length)
+PrismSnesTrack::PrismSnesTrack(PrismSnesSeq *parentFile, u32 offset, u32 length)
     : SeqTrack(parentFile, offset, length) {
   resetVars();
   bDetermineTrackLengthEventByEvent = true;
@@ -250,18 +253,18 @@ void PrismSnesTrack::resetVars() {
 bool PrismSnesTrack::readEvent() {
   PrismSnesSeq *parentSeq = (PrismSnesSeq *) this->parentSeq;
 
-  uint32_t beginOffset = curOffset;
+  u32 beginOffset = curOffset;
   if (curOffset >= 0x10000) {
     return false;
   }
 
-  uint8_t statusByte = readByte(curOffset++);
+  u8 statusByte = readByte(curOffset++);
   bool bContinue = true;
 
   std::string desc;
 
   PrismSnesSeqEventType eventType = (PrismSnesSeqEventType) 0;
-  std::map<uint8_t, PrismSnesSeqEventType>::iterator pEventType = parentSeq->EventMap.find(statusByte);
+  std::map<u8, PrismSnesSeqEventType>::iterator pEventType = parentSeq->EventMap.find(statusByte);
   if (pEventType != parentSeq->EventMap.end()) {
     eventType = pEventType->second;
   }
@@ -273,34 +276,34 @@ bool PrismSnesTrack::readEvent() {
       break;
 
     case EVENT_UNKNOWN1: {
-      uint8_t arg1 = readByte(curOffset++);
+      u8 arg1 = readByte(curOffset++);
       desc = describeUnknownEvent(statusByte, arg1);
       addUnknown(beginOffset, curOffset - beginOffset, "Unknown Event", desc);
       break;
     }
 
     case EVENT_UNKNOWN2: {
-      uint8_t arg1 = readByte(curOffset++);
-      uint8_t arg2 = readByte(curOffset++);
+      u8 arg1 = readByte(curOffset++);
+      u8 arg2 = readByte(curOffset++);
       desc = describeUnknownEvent(statusByte, arg1, arg2);
       addUnknown(beginOffset, curOffset - beginOffset, "Unknown Event", desc);
       break;
     }
 
     case EVENT_UNKNOWN3: {
-      uint8_t arg1 = readByte(curOffset++);
-      uint8_t arg2 = readByte(curOffset++);
-      uint8_t arg3 = readByte(curOffset++);
+      u8 arg1 = readByte(curOffset++);
+      u8 arg2 = readByte(curOffset++);
+      u8 arg3 = readByte(curOffset++);
       desc = describeUnknownEvent(statusByte, arg1, arg2, arg3);
       addUnknown(beginOffset, curOffset - beginOffset, "Unknown Event", desc);
       break;
     }
 
     case EVENT_UNKNOWN4: {
-      uint8_t arg1 = readByte(curOffset++);
-      uint8_t arg2 = readByte(curOffset++);
-      uint8_t arg3 = readByte(curOffset++);
-      uint8_t arg4 = readByte(curOffset++);
+      u8 arg1 = readByte(curOffset++);
+      u8 arg2 = readByte(curOffset++);
+      u8 arg3 = readByte(curOffset++);
+      u8 arg4 = readByte(curOffset++);
       desc = describeUnknownEvent(statusByte, arg1, arg2, arg3, arg4);
       addUnknown(beginOffset, curOffset - beginOffset, "Unknown Event", desc);
       break;
@@ -314,19 +317,19 @@ bool PrismSnesTrack::readEvent() {
 
     case EVENT_NOTE:
     case EVENT_NOISE_NOTE: {
-      uint8_t key = statusByte & 0x7f;
+      u8 key = statusByte & 0x7f;
 
-      uint8_t len;
+      u8 len;
       if (!readDeltaTime(curOffset, len)) {
         return false;
       }
 
-      uint8_t durDelta;
+      u8 durDelta;
       if (!readDuration(curOffset, len, durDelta)) {
         return false;
       }
 
-      uint8_t dur = getDuration(curOffset, len, durDelta);
+      u8 dur = getDuration(curOffset, len, durDelta);
 
       if (slur) {
         prevNoteSlurred = true;
@@ -354,23 +357,23 @@ bool PrismSnesTrack::readEvent() {
     }
 
     case EVENT_PITCH_SLIDE: {
-      uint8_t noteFrom = readByte(curOffset++);
-      uint8_t noteTo = readByte(curOffset++);
+      u8 noteFrom = readByte(curOffset++);
+      u8 noteTo = readByte(curOffset++);
 
-      uint8_t noteNumberFrom = noteFrom & 0x7f;
-      uint8_t noteNumberTo = noteTo & 0x7f;
+      u8 noteNumberFrom = noteFrom & 0x7f;
+      u8 noteNumberTo = noteTo & 0x7f;
 
-      uint8_t len;
+      u8 len;
       if (!readDeltaTime(curOffset, len)) {
         return false;
       }
 
-      uint8_t durDelta;
+      u8 durDelta;
       if (!readDuration(curOffset, len, durDelta)) {
         return false;
       }
 
-      uint8_t dur = getDuration(curOffset, len, durDelta);
+      u8 dur = getDuration(curOffset, len, durDelta);
 
       auto nameFrom = ((noteFrom & 0x80) != 0 ? "Noise" : MidiEvent::getNoteName(noteNumberFrom));
       auto nameTo = ((noteTo & 0x80) != 0 ? "Noise" : MidiEvent::getNoteName(noteNumberTo));
@@ -385,17 +388,17 @@ bool PrismSnesTrack::readEvent() {
     }
 
     case EVENT_TIE_WITH_DUR: {
-      uint8_t len;
+      u8 len;
       if (!readDeltaTime(curOffset, len)) {
         return false;
       }
 
-      uint8_t durDelta;
+      u8 durDelta;
       if (!readDuration(curOffset, len, durDelta)) {
         return false;
       }
 
-      uint8_t dur = getDuration(curOffset, len, durDelta);
+      u8 dur = getDuration(curOffset, len, durDelta);
 
       desc = fmt::format("Length: {:d}  Duration: {:d}", len, dur);
       addTie(beginOffset, curOffset - beginOffset, dur, "Tie with Duration", desc);
@@ -411,8 +414,8 @@ bool PrismSnesTrack::readEvent() {
     }
 
     case EVENT_UNKNOWN_EVENT_ED: {
-      uint8_t arg1 = readByte(curOffset++);
-      uint16_t arg2 = readShort(curOffset);
+      u8 arg1 = readByte(curOffset++);
+      u16 arg2 = readShort(curOffset);
       curOffset += 2;
       desc = fmt::format("Arg1: {:d}  Arg2: ${:04X}", arg1, arg2);
       addUnknown(beginOffset, curOffset - beginOffset, "Unknown Event", desc);
@@ -420,7 +423,7 @@ bool PrismSnesTrack::readEvent() {
     }
 
     case EVENT_REST: {
-      uint8_t len;
+      u8 len;
       if (!readDeltaTime(curOffset, len)) {
         return false;
       }
@@ -432,13 +435,13 @@ bool PrismSnesTrack::readEvent() {
     }
 
     case EVENT_TEMPO: {
-      uint8_t newTempo = readByte(curOffset++);
+      u8 newTempo = readByte(curOffset++);
       addTempoBPM(beginOffset, curOffset - beginOffset, parentSeq->getTempoInBPM(newTempo));
       break;
     }
 
     case EVENT_CONDITIONAL_JUMP: {
-      uint16_t dest = readShort(curOffset);
+      u16 dest = readShort(curOffset);
       curOffset += 2;
       desc = fmt::format("Destination: ${:04X}", dest);
       addGenericEvent(beginOffset, curOffset - beginOffset, "Conditional Jump", desc, Type::Loop);
@@ -478,7 +481,7 @@ bool PrismSnesTrack::readEvent() {
     }
 
     case EVENT_VOLUME_ENVELOPE: {
-      uint16_t envelopeAddress = readShort(curOffset);
+      u16 envelopeAddress = readShort(curOffset);
       curOffset += 2;
       desc = fmt::format("Envelope: ${:04X}", envelopeAddress);
       addGenericEvent(beginOffset, curOffset - beginOffset, "Volume Envelope", desc, Type::VolumeEnvelope);
@@ -509,36 +512,36 @@ bool PrismSnesTrack::readEvent() {
     }
 
     case EVENT_PLAY_SONG_3: {
-      uint8_t songIndex = readByte(curOffset++);
+      u8 songIndex = readByte(curOffset++);
       desc = fmt::format("Song Index: {:d}", songIndex);
       addGenericEvent(beginOffset, curOffset - beginOffset, "Play Song (3)", desc, Type::ChangeState);
       break;
     }
 
     case EVENT_PLAY_SONG_2: {
-      uint8_t songIndex = readByte(curOffset++);
+      u8 songIndex = readByte(curOffset++);
       desc = fmt::format("Song Index: {:d}", songIndex);
       addGenericEvent(beginOffset, curOffset - beginOffset, "Play Song (2)", desc, Type::ChangeState);
       break;
     }
 
     case EVENT_PLAY_SONG_1: {
-      uint8_t songIndex = readByte(curOffset++);
+      u8 songIndex = readByte(curOffset++);
       desc = fmt::format("Song Index: {:d}", songIndex);
       addGenericEvent(beginOffset, curOffset - beginOffset, "Play Song (1)", desc, Type::ChangeState);
       break;
     }
 
     case EVENT_TRANSPOSE_REL: {
-      int8_t delta = readByte(curOffset++);
+      s8 delta = readByte(curOffset++);
       addTranspose(beginOffset, curOffset - beginOffset, transpose + delta, "Transpose (Relative)");
       break;
     }
 
     case EVENT_PAN_ENVELOPE: {
-      uint16_t envelopeAddress = readShort(curOffset);
+      u16 envelopeAddress = readShort(curOffset);
       curOffset += 2;
-      uint16_t envelopeSpeed = readByte(curOffset++);
+      u16 envelopeSpeed = readByte(curOffset++);
       desc = fmt::format("Envelope: ${:04X}  Speed: {:d}", envelopeAddress, envelopeSpeed);
       addGenericEvent(beginOffset, curOffset - beginOffset, "Pan Envelope", desc, Type::PanEnvelope);
       addPanEnvelope(envelopeAddress);
@@ -546,14 +549,14 @@ bool PrismSnesTrack::readEvent() {
     }
 
     case EVENT_PAN_TABLE: {
-      uint16_t panTableAddress = readShort(curOffset);
+      u16 panTableAddress = readShort(curOffset);
       curOffset += 2;
       desc = fmt::format("Pan Table: ${:04X}", panTableAddress);
       addGenericEvent(beginOffset, curOffset - beginOffset, "Pan Table", desc, Type::Control);
 
       // update pan table
       if (panTableAddress + 21 <= 0x10000) {
-        uint8_t newPanTable[21];
+        u8 newPanTable[21];
         readBytes(panTableAddress, 21, newPanTable);
         panTable.assign(std::begin(newPanTable), std::end(newPanTable));
       }
@@ -576,8 +579,8 @@ bool PrismSnesTrack::readEvent() {
     }
 
     case EVENT_LOOP_UNTIL: {
-      uint8_t count = readByte(curOffset++);
-      uint16_t dest = readShort(curOffset);
+      u8 count = readByte(curOffset++);
+      u16 dest = readShort(curOffset);
       curOffset += 2;
       desc = fmt::format("Loop Count: {:d}  Destination: ${:04X}", count, dest);
       addGenericEvent(beginOffset, curOffset - beginOffset, "Loop Until", desc, Type::RepeatEnd);
@@ -605,8 +608,8 @@ bool PrismSnesTrack::readEvent() {
     }
 
     case EVENT_LOOP_UNTIL_ALT: {
-      uint8_t count = readByte(curOffset++);
-      uint16_t dest = readShort(curOffset);
+      u8 count = readByte(curOffset++);
+      u16 dest = readShort(curOffset);
       curOffset += 2;
       desc = fmt::format("Loop Count: {:d}  Destination: ${:04X}", count, dest);
       addGenericEvent(beginOffset, curOffset - beginOffset, "Loop Until (Alt)", desc, Type::RepeatEnd);
@@ -645,7 +648,7 @@ bool PrismSnesTrack::readEvent() {
     }
 
     case EVENT_CALL: {
-      uint16_t dest = readShort(curOffset);
+      u16 dest = readShort(curOffset);
       curOffset += 2;
       desc = fmt::format("Destination: ${:04X}", dest);
       addGenericEvent(beginOffset, curOffset - beginOffset, "Pattern Play", desc, Type::RepeatStart);
@@ -657,10 +660,10 @@ bool PrismSnesTrack::readEvent() {
     }
 
     case EVENT_GOTO: {
-      uint16_t dest = readShort(curOffset);
+      u16 dest = readShort(curOffset);
       curOffset += 2;
       desc = fmt::format("Destination: ${:04X}", dest);
-      uint32_t length = curOffset - beginOffset;
+      u32 length = curOffset - beginOffset;
 
       if (curOffset < 0x10000 && readByte(curOffset) == 0xff) {
         addGenericEvent(curOffset, 1, "End of Track", "", Type::TrackEnd);
@@ -682,20 +685,20 @@ bool PrismSnesTrack::readEvent() {
     }
 
     case EVENT_TRANSPOSE: {
-      int8_t newTranspose = readByte(curOffset++);
+      s8 newTranspose = readByte(curOffset++);
       addTranspose(beginOffset, curOffset - beginOffset, newTranspose);
       break;
     }
 
     case EVENT_TUNING: {
-      uint8_t newTuning = readByte(curOffset++);
+      u8 newTuning = readByte(curOffset++);
       double semitones = newTuning / 256.0;
       addFineTuning(beginOffset, curOffset - beginOffset, semitones * 100.0);
       break;
     }
 
     case EVENT_VIBRATO_DELAY: {
-      uint8_t lfoDelay = readByte(curOffset++);
+      u8 lfoDelay = readByte(curOffset++);
       desc = fmt::format("Delay: {:d}", lfoDelay);
       addGenericEvent(beginOffset, curOffset - beginOffset, "Vibrato Delay", desc, Type::Vibrato);
       break;
@@ -707,16 +710,16 @@ bool PrismSnesTrack::readEvent() {
     }
 
     case EVENT_VIBRATO: {
-      uint8_t lfoDelay = readByte(curOffset++);
-      uint8_t arg2 = readByte(curOffset++);
-      uint8_t arg3 = readByte(curOffset++);
+      u8 lfoDelay = readByte(curOffset++);
+      u8 arg2 = readByte(curOffset++);
+      u8 arg3 = readByte(curOffset++);
       desc = fmt::format("Delay: {:d}  Arg2: {:d}  Arg3: {:d}", lfoDelay, arg2, arg3);
       addGenericEvent(beginOffset, curOffset - beginOffset, "Vibrato", desc, Type::Vibrato);
       break;
     }
 
     case EVENT_VOLUME_REL: {
-      int8_t delta = readByte(curOffset++);
+      s8 delta = readByte(curOffset++);
       if (spcVolume + delta > 255) {
         spcVolume = 255;
       }
@@ -731,7 +734,7 @@ bool PrismSnesTrack::readEvent() {
     }
 
     case EVENT_PAN: {
-      uint8_t newPan = readByte(curOffset++);
+      u8 newPan = readByte(curOffset++);
       if (newPan > 20) {
         // unexpected value
         newPan = 20;
@@ -746,7 +749,7 @@ bool PrismSnesTrack::readEvent() {
 
       // TODO: fix volume scale when L+R > 1.0?
       double volumeScale;
-      int8_t midiPan = convertVolumeBalanceToStdMidiPan(volumeLeft, volumeRight, &volumeScale);
+      s8 midiPan = convertVolumeBalanceToStdMidiPan(volumeLeft, volumeRight, &volumeScale);
       volumeScale = std::min(volumeScale, 1.0); // workaround
 
       addPan(beginOffset, curOffset - beginOffset, midiPan);
@@ -755,14 +758,14 @@ bool PrismSnesTrack::readEvent() {
     }
 
     case EVENT_VOLUME: {
-      uint8_t newVolume = readByte(curOffset++);
+      u8 newVolume = readByte(curOffset++);
       spcVolume = newVolume;
       addVol(beginOffset, curOffset - beginOffset, spcVolume / 2);
       break;
     }
 
     case EVENT_GAIN_ENVELOPE_REST: {
-      uint16_t envelopeAddress = readShort(curOffset);
+      u16 envelopeAddress = readShort(curOffset);
       curOffset += 2;
       desc = fmt::format("Envelope: ${:04X}", envelopeAddress);
       addGenericEvent(beginOffset, curOffset - beginOffset, "GAIN Envelope (Rest)", desc, Type::Adsr);
@@ -771,8 +774,8 @@ bool PrismSnesTrack::readEvent() {
     }
 
     case EVENT_GAIN_ENVELOPE_DECAY_TIME: {
-      uint8_t dur = readByte(curOffset++);
-      uint8_t gain = readByte(curOffset++);
+      u8 dur = readByte(curOffset++);
+      u8 gain = readByte(curOffset++);
       desc = fmt::format("Duration: Full-Length - {:d}  GAIN: ${:02X}", dur, gain);
       addGenericEvent(beginOffset, curOffset - beginOffset, "GAIN Envelope Decay Time", desc, Type::Adsr);
       break;
@@ -799,7 +802,7 @@ bool PrismSnesTrack::readEvent() {
     }
 
     case EVENT_GAIN_ENVELOPE_SUSTAIN: {
-      uint16_t envelopeAddress = readShort(curOffset);
+      u16 envelopeAddress = readShort(curOffset);
       curOffset += 2;
       desc = fmt::format("Envelope: ${:04X}", envelopeAddress);
       addGenericEvent(beginOffset, curOffset - beginOffset, "GAIN Envelope (Sustain)", desc, Type::Adsr);
@@ -808,7 +811,7 @@ bool PrismSnesTrack::readEvent() {
     }
 
     case EVENT_ECHO_VOLUME_ENVELOPE: {
-      uint16_t envelopeAddress = readShort(curOffset);
+      u16 envelopeAddress = readShort(curOffset);
       curOffset += 2;
       desc = fmt::format("Envelope: ${:04X}", envelopeAddress);
       addGenericEvent(beginOffset, curOffset - beginOffset, "Echo Volume Envelope", desc, Type::Reverb);
@@ -817,9 +820,9 @@ bool PrismSnesTrack::readEvent() {
     }
 
     case EVENT_ECHO_VOLUME: {
-      int8_t echoVolumeLeft = readByte(curOffset++);
-      int8_t echoVolumeRight = readByte(curOffset++);
-      int8_t echoVolumeMono = readByte(curOffset++);
+      s8 echoVolumeLeft = readByte(curOffset++);
+      s8 echoVolumeRight = readByte(curOffset++);
+      s8 echoVolumeMono = readByte(curOffset++);
       desc = fmt::format("Left Volume: {:d}  Right Volume: {:d}  Mono Volume: {:d}",
                          echoVolumeLeft, echoVolumeRight, echoVolumeMono);
       addGenericEvent(beginOffset, curOffset - beginOffset, "Echo Volume", desc, Type::Reverb);
@@ -837,10 +840,10 @@ bool PrismSnesTrack::readEvent() {
     }
 
     case EVENT_ECHO_PARAM: {
-      int8_t echoFeedback = readByte(curOffset++);
-      int8_t echoVolumeLeft = readByte(curOffset++);
-      int8_t echoVolumeRight = readByte(curOffset++);
-      int8_t echoVolumeMono = readByte(curOffset++);
+      s8 echoFeedback = readByte(curOffset++);
+      s8 echoVolumeLeft = readByte(curOffset++);
+      s8 echoVolumeRight = readByte(curOffset++);
+      s8 echoVolumeMono = readByte(curOffset++);
       desc = fmt::format("Feedback: {:d}  Left Volume: {:d}  Right Volume: {:d}  Mono Volume: {:d}",
                          echoFeedback, echoVolumeLeft, echoVolumeRight, echoVolumeMono);
       addGenericEvent(beginOffset, curOffset - beginOffset, "Echo Param", desc, Type::Reverb);
@@ -848,13 +851,13 @@ bool PrismSnesTrack::readEvent() {
     }
 
     case EVENT_ADSR: {
-      uint8_t param = readByte(curOffset);
+      u8 param = readByte(curOffset);
       if (param >= 0x80) {
-        uint8_t adsr1 = readByte(curOffset++);
-        uint8_t adsr2 = readByte(curOffset++);
+        u8 adsr1 = readByte(curOffset++);
+        u8 adsr2 = readByte(curOffset++);
         desc = fmt::format("ADSR(1): ${:02X}  ADSR(2): ${:02X}", adsr1, adsr2);
       } else {
-        uint8_t instrNum = readByte(curOffset++);
+        u8 instrNum = readByte(curOffset++);
         desc = fmt::format("Instrument: {:d}", instrNum);
       }
       addGenericEvent(beginOffset, curOffset - beginOffset, "ADSR", desc, Type::Adsr);
@@ -862,7 +865,7 @@ bool PrismSnesTrack::readEvent() {
     }
 
     case EVENT_GAIN_ENVELOPE_DECAY: {
-      uint16_t envelopeAddress = readShort(curOffset);
+      u16 envelopeAddress = readShort(curOffset);
       curOffset += 2;
       desc = fmt::format("Envelope: ${:04X}", envelopeAddress);
       addGenericEvent(beginOffset, curOffset - beginOffset, "GAIN Envelope (Decay)", desc, Type::Adsr);
@@ -871,7 +874,7 @@ bool PrismSnesTrack::readEvent() {
     }
 
     case EVENT_INSTRUMENT: {
-      uint8_t instrNum = readByte(curOffset++);
+      u8 instrNum = readByte(curOffset++);
       addProgramChange(beginOffset, curOffset - beginOffset, instrNum, true);
       break;
     }
@@ -899,7 +902,7 @@ bool PrismSnesTrack::readEvent() {
   return bContinue;
 }
 
-bool PrismSnesTrack::readDeltaTime(uint32_t &curOffset, uint8_t &len) {
+bool PrismSnesTrack::readDeltaTime(u32 &curOffset, u8 &len) {
   if (curOffset + 1 > 0x10000) {
     return false;
   }
@@ -913,7 +916,7 @@ bool PrismSnesTrack::readDeltaTime(uint32_t &curOffset, uint8_t &len) {
   return true;
 }
 
-bool PrismSnesTrack::readDuration(uint32_t &curOffset, uint8_t len, uint8_t &durDelta) {
+bool PrismSnesTrack::readDuration(u32 &curOffset, u8 len, u8 &durDelta) {
   if (curOffset + 1 > 0x10000) {
     return false;
   }
@@ -936,10 +939,10 @@ bool PrismSnesTrack::readDuration(uint32_t &curOffset, uint8_t len, uint8_t &dur
   return true;
 }
 
-uint8_t PrismSnesTrack::getDuration(uint32_t curOffset, uint8_t len, uint8_t durDelta) {
+u8 PrismSnesTrack::getDuration(u32 curOffset, u8 len, u8 durDelta) {
   // TODO: adjust duration for slur/tie
   if (curOffset + 1 <= 0x10000) {
-    uint8_t nextStatusByte = readByte(curOffset);
+    u8 nextStatusByte = readByte(curOffset);
     if (nextStatusByte == 0xee || nextStatusByte == 0xf4 || nextStatusByte == 0xce || nextStatusByte == 0xf5) {
       durDelta = 0;
     }
@@ -953,7 +956,7 @@ uint8_t PrismSnesTrack::getDuration(uint32_t curOffset, uint8_t len, uint8_t dur
   return len - durDelta;
 }
 
-void PrismSnesTrack::addVolumeEnvelope(uint16_t envelopeAddress) {
+void PrismSnesTrack::addVolumeEnvelope(u16 envelopeAddress) {
   PrismSnesSeq *parentSeq = (PrismSnesSeq *) this->parentSeq;
   parentSeq->demandEnvelopeContainer(envelopeAddress);
 
@@ -961,15 +964,15 @@ void PrismSnesTrack::addVolumeEnvelope(uint16_t envelopeAddress) {
     auto envelopeName = fmt::format("Volume Envelope (${:04X})", envelopeAddress);
     VGMHeader *envHeader = parentSeq->envContainer->addHeader(envelopeAddress, 0, envelopeName);
 
-    uint16_t envOffset = 0;
+    u16 envOffset = 0;
     while (envelopeAddress + envOffset + 2 <= 0x10000) {
       std::string eventName;
 
-      uint8_t volumeFrom = readByte(envelopeAddress + envOffset);
-      int8_t volumeDelta = readByte(envelopeAddress + envOffset + 1);
+      u8 volumeFrom = readByte(envelopeAddress + envOffset);
+      s8 volumeDelta = readByte(envelopeAddress + envOffset + 1);
       if (volumeFrom == 0 && volumeDelta == 0) {
         // $00 $00 $xx $yy sets offset to $yyxx
-        uint16_t newAddress = readByte(envelopeAddress + envOffset + 2);
+        u16 newAddress = readByte(envelopeAddress + envOffset + 2);
 
         eventName = fmt::format("Jump to ${:04X}", newAddress);
         envHeader->addChild(envelopeAddress + envOffset, 4, eventName);
@@ -977,8 +980,8 @@ void PrismSnesTrack::addVolumeEnvelope(uint16_t envelopeAddress) {
         break;
       }
 
-      uint8_t envelopeSpeed = readByte(envelopeAddress + envOffset + 2);
-      uint8_t deltaTime = readByte(envelopeAddress + envOffset + 3);
+      u8 envelopeSpeed = readByte(envelopeAddress + envOffset + 2);
+      u8 deltaTime = readByte(envelopeAddress + envOffset + 3);
       eventName = fmt::format("Volume: {:d}  Volume Delta: {:d}  Envelope Speed: {:d}  Delta-Time: {:d}",
                               volumeFrom, volumeDelta, envelopeSpeed, deltaTime);
       envHeader->addChild(envelopeAddress + envOffset, 4, eventName);
@@ -992,7 +995,7 @@ void PrismSnesTrack::addVolumeEnvelope(uint16_t envelopeAddress) {
   }
 }
 
-void PrismSnesTrack::addPanEnvelope(uint16_t envelopeAddress) {
+void PrismSnesTrack::addPanEnvelope(u16 envelopeAddress) {
   PrismSnesSeq *parentSeq = (PrismSnesSeq *) this->parentSeq;
   parentSeq->demandEnvelopeContainer(envelopeAddress);
 
@@ -1000,14 +1003,14 @@ void PrismSnesTrack::addPanEnvelope(uint16_t envelopeAddress) {
     auto envelopeName = fmt::format("Pan Envelope (${:04X})", envelopeAddress);
     VGMHeader *envHeader = parentSeq->envContainer->addHeader(envelopeAddress, 0, envelopeName);
 
-    uint16_t envOffset = 0;
+    u16 envOffset = 0;
     while (envOffset < 0x100) {
       std::string eventName;
 
-      uint8_t newPan = readByte(envelopeAddress + envOffset);
+      u8 newPan = readByte(envelopeAddress + envOffset);
       if (newPan >= 0x80) {
         // $ff $xx sets offset to $xx
-        uint8_t newOffset = readByte(envelopeAddress + envOffset + 1);
+        u8 newOffset = readByte(envelopeAddress + envOffset + 1);
 
         eventName = fmt::format("Jump to ${:04X}", envelopeAddress + newOffset);
         envHeader->addChild(envelopeAddress + envOffset, 2, eventName);
@@ -1027,7 +1030,7 @@ void PrismSnesTrack::addPanEnvelope(uint16_t envelopeAddress) {
   }
 }
 
-void PrismSnesTrack::addEchoVolumeEnvelope(uint16_t envelopeAddress) {
+void PrismSnesTrack::addEchoVolumeEnvelope(u16 envelopeAddress) {
   PrismSnesSeq *parentSeq = (PrismSnesSeq *) this->parentSeq;
   parentSeq->demandEnvelopeContainer(envelopeAddress);
 
@@ -1035,14 +1038,14 @@ void PrismSnesTrack::addEchoVolumeEnvelope(uint16_t envelopeAddress) {
     auto envelopeName = fmt::format("Echo Volume Envelope (${:04X})", envelopeAddress);
     VGMHeader *envHeader = parentSeq->envContainer->addHeader(envelopeAddress, 0, envelopeName);
 
-    uint16_t envOffset = 0;
+    u16 envOffset = 0;
     while (envOffset < 0x100) {
       std::string eventName;
 
-      uint8_t deltaTime = readByte(envelopeAddress + envOffset);
+      u8 deltaTime = readByte(envelopeAddress + envOffset);
       if (deltaTime == 0xff) {
         // $ff $xx sets offset to $xx
-        uint8_t newOffset = readByte(envelopeAddress + envOffset + 1);
+        u8 newOffset = readByte(envelopeAddress + envOffset + 1);
 
         eventName = fmt::format("Jump to ${:04X}", envelopeAddress + newOffset);
         envHeader->addChild(envelopeAddress + envOffset, 2, eventName);
@@ -1050,9 +1053,9 @@ void PrismSnesTrack::addEchoVolumeEnvelope(uint16_t envelopeAddress) {
         break;
       }
 
-      int8_t echoVolumeLeft = readByte(envelopeAddress + envOffset + 1);
-      int8_t echoVolumeRight = readByte(envelopeAddress + envOffset + 2);
-      int8_t echoVolumeMono = readByte(envelopeAddress + envOffset + 3);
+      s8 echoVolumeLeft = readByte(envelopeAddress + envOffset + 1);
+      s8 echoVolumeRight = readByte(envelopeAddress + envOffset + 2);
+      s8 echoVolumeMono = readByte(envelopeAddress + envOffset + 3);
       eventName = fmt::format(
           "Delta-Time: {:d}  Left Volume: {:d}  Right Volume: {:d}  Mono Volume: {:d}",
           deltaTime, echoVolumeLeft, echoVolumeRight, echoVolumeMono);
@@ -1067,7 +1070,7 @@ void PrismSnesTrack::addEchoVolumeEnvelope(uint16_t envelopeAddress) {
   }
 }
 
-void PrismSnesTrack::addGAINEnvelope(uint16_t envelopeAddress) {
+void PrismSnesTrack::addGAINEnvelope(u16 envelopeAddress) {
   PrismSnesSeq *parentSeq = (PrismSnesSeq *) this->parentSeq;
   parentSeq->demandEnvelopeContainer(envelopeAddress);
 
@@ -1075,14 +1078,14 @@ void PrismSnesTrack::addGAINEnvelope(uint16_t envelopeAddress) {
     auto envelopeName = fmt::format("GAIN Envelope (${:04X})", envelopeAddress);
     VGMHeader *envHeader = parentSeq->envContainer->addHeader(envelopeAddress, 0, envelopeName);
 
-    uint16_t envOffset = 0;
+    u16 envOffset = 0;
     while (envOffset < 0x100) {
       std::string eventName;
 
-      uint8_t gain = readByte(envelopeAddress + envOffset);
+      u8 gain = readByte(envelopeAddress + envOffset);
       if (gain == 0xff) {
         // $ff $xx sets offset to $xx
-        uint8_t newOffset = readByte(envelopeAddress + envOffset + 1);
+        u8 newOffset = readByte(envelopeAddress + envOffset + 1);
 
         eventName = fmt::format("Jump to ${:04X}", envelopeAddress + newOffset);
         envHeader->addChild(envelopeAddress + envOffset, 2, eventName);
@@ -1090,7 +1093,7 @@ void PrismSnesTrack::addGAINEnvelope(uint16_t envelopeAddress) {
         break;
       }
 
-      uint8_t deltaTime = readByte(envelopeAddress + envOffset + 1);
+      u8 deltaTime = readByte(envelopeAddress + envOffset + 1);
       eventName = fmt::format("GAIN: ${:02X}, Delta-Time: {:d}", gain, deltaTime);
       envHeader->addChild(envelopeAddress + envOffset, 2, eventName);
       envOffset += 2;
@@ -1103,7 +1106,7 @@ void PrismSnesTrack::addGAINEnvelope(uint16_t envelopeAddress) {
   }
 }
 
-void PrismSnesTrack::addPanTable(uint16_t panTableAddress) {
+void PrismSnesTrack::addPanTable(u16 panTableAddress) {
   PrismSnesSeq *parentSeq = (PrismSnesSeq *) this->parentSeq;
   parentSeq->demandEnvelopeContainer(panTableAddress);
 

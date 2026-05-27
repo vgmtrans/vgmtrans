@@ -1,7 +1,12 @@
 #pragma once
+
+#include "base/Types.h"
+#include "ChunSnesFormat.h"
 #include "VGMInstrSet.h"
 #include "VGMRgn.h"
-#include "ChunSnesFormat.h"
+
+#include <string>
+#include <vector>
 
 // ****************
 // ChunSnesInstrSet
@@ -12,10 +17,10 @@ class ChunSnesInstrSet:
  public:
   ChunSnesInstrSet(RawFile *file,
                    ChunSnesVersion ver,
-                   uint16_t addrInstrSetTable,
-                   uint16_t addrSampNumTable,
-                   uint16_t addrSampleTable,
-                   uint32_t spcDirAddr,
+                   u16 addrInstrSetTable,
+                   u16 addrSampNumTable,
+                   u16 addrSampleTable,
+                   u32 spcDirAddr,
                    const std::string &name = "ChunSnesInstrSet");
   ~ChunSnesInstrSet() override;
 
@@ -25,10 +30,10 @@ class ChunSnesInstrSet:
   ChunSnesVersion version;
 
  protected:
-  uint16_t addrSampNumTable;
-  uint16_t addrSampleTable;
-  uint32_t spcDirAddr;
-  std::vector<uint8_t> usedSRCNs;
+  u16 addrSampNumTable;
+  u16 addrSampleTable;
+  u32 spcDirAddr;
+  std::vector<u8> usedSRCNs;
 };
 
 // *************
@@ -40,10 +45,10 @@ class ChunSnesInstr
  public:
   ChunSnesInstr(VGMInstrSet *instrSet,
                 ChunSnesVersion ver,
-                uint8_t theInstrNum,
-                uint16_t addrInstr,
-                uint16_t addrSampleTable,
-                uint32_t spcDirAddr,
+                u8 theInstrNum,
+                u16 addrInstr,
+                u16 addrSampleTable,
+                u32 spcDirAddr,
                 const std::string &name = "ChunSnesInstr");
   ~ChunSnesInstr() override;
 
@@ -52,8 +57,8 @@ class ChunSnesInstr
   ChunSnesVersion version;
 
  protected:
-  uint16_t addrSampleTable;
-  uint32_t spcDirAddr;
+  u16 addrSampleTable;
+  u32 spcDirAddr;
 };
 
 // ***********
@@ -63,7 +68,7 @@ class ChunSnesInstr
 class ChunSnesRgn
     : public VGMRgn {
  public:
-  ChunSnesRgn(ChunSnesInstr *instr, ChunSnesVersion ver, uint8_t srcn, uint16_t addrRgn, uint32_t spcDirAddr);
+  ChunSnesRgn(ChunSnesInstr *instr, ChunSnesVersion ver, u8 srcn, u16 addrRgn, u32 spcDirAddr);
   ~ChunSnesRgn() override;
 
   bool loadRgn() override;
