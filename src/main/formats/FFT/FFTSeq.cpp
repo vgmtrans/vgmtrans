@@ -3,8 +3,9 @@
  * Licensed under the zlib license,
  * refer to the included LICENSE.txt file
  */
-#include "base/Types.h"
 #include "FFTSeq.h"
+
+#include "base/Types.h"
 #include "FFTFormat.h"
 
 DECLARE_FORMAT(FFT);

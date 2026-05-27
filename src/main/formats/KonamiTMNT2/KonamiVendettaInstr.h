@@ -6,11 +6,13 @@
 #pragma once
 
 #include "base/Types.h"
-#include "VGMInstrSet.h"
 #include "KonamiTMNT2Instr.h"
 #include "KonamiTMNT2OPMInstr.h"
+#include "VGMInstrSet.h"
+
 #include <string>
 #include <unordered_map>
+#include <vector>
 
 class RawFile;
 class VGMItem;

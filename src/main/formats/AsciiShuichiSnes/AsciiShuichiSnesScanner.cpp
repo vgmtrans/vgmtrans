@@ -4,9 +4,9 @@
  * refer to the included LICENSE.txt file
  */
 
-#include "base/Types.h"
-#include "AsciiShuichiSnesSeq.h"
 #include "AsciiShuichiSnesInstr.h"
+#include "AsciiShuichiSnesSeq.h"
+#include "base/Types.h"
 #include "ScannerManager.h"
 
 namespace vgmtrans::scanners {

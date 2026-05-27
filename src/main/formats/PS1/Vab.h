@@ -1,11 +1,14 @@
 #pragma once
 
-#include "util/SizeOffsetPair.h"
 #include "base/Types.h"
+#include "util/SizeOffsetPair.h"
 #include "VGMInstrSet.h"
-#include "VGMSampColl.h"
 #include "VGMRgn.h"
 #include "VGMSamp.h"
+#include "VGMSampColl.h"
+
+#include <string>
+#include <vector>
 
 // VAB Header
 struct VabHdr {

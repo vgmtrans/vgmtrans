@@ -1,10 +1,11 @@
 #pragma once
 
 #include "base/Types.h"
-#include "VGMSeq.h"
-#include "SeqTrack.h"
 #include "Format.h"			//Replace with MP2k-specific format header when that's ready
+#include "SeqTrack.h"
+#include "VGMSeq.h"
 
+#include <string>
 
 //--------------------------------------------------------------
 //		HOSASeq

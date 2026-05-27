@@ -5,13 +5,15 @@
  */
 
 #include "base/Types.h"
-#include <ranges>
-#include <filesystem>
-#include <spdlog/fmt/fmt.h>
-#include "VGMSeq.h"
-#include "Root.h"
 #include "Helper.h"
 #include "LogManager.h"
+#include "Root.h"
+#include "VGMSeq.h"
+
+#include <filesystem>
+#include <ranges>
+
+#include <spdlog/fmt/fmt.h>
 
 MidiFile::MidiFile(VGMSeq *theAssocSeq)
     : assocSeq(theAssocSeq),

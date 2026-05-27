@@ -6,17 +6,17 @@
 
 #include "PlaybackControls.h"
 
+#include "ColorHelpers.h"
+#include "SeekBar.h"
+#include "SequencePlayer.h"
+#include "services/NotificationCenter.h"
+#include "UIHelpers.h"
+
 #include <QEvent>
-#include <QLayout>
 #include <QHBoxLayout>
+#include <QLayout>
 #include <QToolButton>
 #include <QWhatsThis>
-
-#include "services/NotificationCenter.h"
-#include "SequencePlayer.h"
-#include "SeekBar.h"
-#include "UIHelpers.h"
-#include "ColorHelpers.h"
 
 namespace {
 constexpr int kTransportControlHeight = 32;

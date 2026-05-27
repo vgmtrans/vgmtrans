@@ -1,9 +1,12 @@
 #pragma once
 
 #include "base/Types.h"
-#include "VGMSeq.h"
-#include "SeqTrack.h"
 #include "CPS2Format.h"
+#include "SeqTrack.h"
+#include "VGMSeq.h"
+
+#include <string>
+#include <vector>
 
 enum CPS2FormatVer: u8;
 

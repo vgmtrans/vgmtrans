@@ -6,9 +6,9 @@
 #pragma once
 
 #include "base/Types.h"
-
-#include "SeqTrack.h"
 #include "SeqMidiAutomation.h"
+#include "SeqTrack.h"
+
 #include <utility>
 
 // SeqTrack helper methods that connect automation objects to this track's MIDI writers.

@@ -5,12 +5,12 @@
  */
 
 #include "base/Types.h"
-#include "TriAcePS1Seq.h"
+#include "ScannerManager.h"
 #include "TriAcePS1InstrSet.h"
+#include "TriAcePS1Seq.h"
 #include "VGMColl.h"
 
 #include <memory>
-#include "ScannerManager.h"
 
 namespace vgmtrans::scanners {
 ScannerRegistration<TriAcePS1Scanner> s_triace_ps1("TriAcePS1");

@@ -4,10 +4,11 @@
 * refer to the included LICENSE.txt file
  */
 
-#include "base/Types.h"
 #include "NotificationCenter.h"
-#include "VGMItem.h"
+
+#include "base/Types.h"
 #include "Helpers.h"
+#include "VGMItem.h"
 
 NotificationCenter::NotificationCenter(QObject *parent) : QObject(parent) {
 }

@@ -6,26 +6,26 @@
 
 #include "ManualCollectionDialog.h"
 
-#include <QMessageBox>
-#include <QLabel>
-#include <QPushButton>
-#include <QLineEdit>
-#include <QHBoxLayout>
-#include <QListWidget>
-#include <QComboBox>
-#include <QRadioButton>
-#include <QCheckBox>
-#include <memory>
-#include <vector>
-
-#include "QtVGMRoot.h"
 #include "Format.h"
-
-#include <VGMSeq.h>
+#include "QtVGMRoot.h"
 #include <VGMColl.h>
 #include <VGMFile.h>
 #include <VGMInstrSet.h>
 #include <VGMSampColl.h>
+#include <VGMSeq.h>
+
+#include <memory>
+#include <vector>
+
+#include <QCheckBox>
+#include <QComboBox>
+#include <QHBoxLayout>
+#include <QLabel>
+#include <QLineEdit>
+#include <QListWidget>
+#include <QMessageBox>
+#include <QPushButton>
+#include <QRadioButton>
 
 ManualCollectionDialog::ManualCollectionDialog(QWidget *parent) : QDialog(parent) {
   setWindowTitle("Manual collection creation");

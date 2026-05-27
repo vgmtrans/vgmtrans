@@ -5,8 +5,9 @@
  */
 
 #include "Format.h"
-#include "Scanner.h"
+
 #include "Matcher.h"
+#include "Scanner.h"
 #include "VGMColl.h"
 
 FormatMap &Format::registry() {

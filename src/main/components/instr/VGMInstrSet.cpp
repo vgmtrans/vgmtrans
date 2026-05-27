@@ -4,17 +4,19 @@
  * refer to the included LICENSE.txt file
  */
 
-#include "base/Types.h"
 #include "VGMInstrSet.h"
-#include <spdlog/fmt/fmt.h>
-#include "VGMSampColl.h"
-#include "VGMSamp.h"
-#include "VGMRgn.h"
-#include "VGMColl.h"
-#include "Root.h"
+
+#include "base/Types.h"
 #include "Format.h"
-#include "LogManager.h"
 #include "Helper.h"
+#include "LogManager.h"
+#include "Root.h"
+#include "VGMColl.h"
+#include "VGMRgn.h"
+#include "VGMSamp.h"
+#include "VGMSampColl.h"
+
+#include <spdlog/fmt/fmt.h>
 
 // ***********
 // VGMInstrSet

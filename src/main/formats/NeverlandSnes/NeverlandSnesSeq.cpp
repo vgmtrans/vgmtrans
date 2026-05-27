@@ -1,5 +1,7 @@
-#include "base/Types.h"
 #include "NeverlandSnesSeq.h"
+
+#include "base/Types.h"
+
 #include <spdlog/fmt/fmt.h>
 
 DECLARE_FORMAT(NeverlandSnes);

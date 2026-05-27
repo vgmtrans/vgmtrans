@@ -5,11 +5,11 @@
  */
 #pragma once
 
-#include <string>
-
 #include "base/Types.h"
-#include "Scanner.h"
 #include "CPS2Scanner.h"
+#include "Scanner.h"
+
+#include <string>
 
 struct MAMEGame;
 

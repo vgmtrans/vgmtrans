@@ -6,12 +6,12 @@
 
 #include "SPC2Loader.h"
 
-#include <cstring>
-#include <string>
-
 #include "base/Types.h"
 #include "LoaderManager.h"
 #include "LogManager.h"
+
+#include <cstring>
+#include <string>
 
 // SPC2 file specs available here: http://blog.kevtris.org/blogfiles/spc2_file_specification_v1.txt
 

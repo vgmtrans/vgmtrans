@@ -4,13 +4,16 @@
  * refer to the included LICENSE.txt file
  */
 
-#include "base/Types.h"
 #include "KonamiSnesInstr.h"
+
+#include "base/Types.h"
 #include "KonamiSnesSeq.h"
 #include "KonamiSnesVibrato.h"
 #include "SNESDSP.h"
 #include "VGMColl.h"
+
 #include <algorithm>
+
 #include <spdlog/fmt/fmt.h>
 
 namespace {

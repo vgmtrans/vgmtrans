@@ -7,8 +7,11 @@
 #pragma once
 
 #include "base/Types.h"
-#include "VGMItem.h"
 #include "MidiFile.h"
+#include "VGMItem.h"
+
+#include <string>
+
 #include <spdlog/fmt/fmt.h>
 
 class SeqTrack;

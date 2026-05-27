@@ -1,12 +1,12 @@
-#include "base/Types.h"
 #include "NinSnesProfile.h"
 
-#include <array>
-#include <algorithm>
-#include <utility>
-
-#include "SNESDSP.h"
+#include "base/Types.h"
 #include "io/RawFile.h"
+#include "SNESDSP.h"
+
+#include <algorithm>
+#include <array>
+#include <utility>
 
 namespace {
 

@@ -3,15 +3,18 @@
  * Licensed under the zlib license,
  * refer to the included LICENSE.txt file
  */
-#include "base/Types.h"
 #include "KonamiSnesSeq.h"
+
+#include "automation/SeqTrackAutomation.h"
+#include "base/Types.h"
 #include "KonamiSnesInstr.h"
 #include "KonamiSnesVibrato.h"
 #include "ScaleConversion.h"
-#include "automation/SeqTrackAutomation.h"
-#include "spdlog/fmt/fmt.h"
+
 #include <algorithm>
 #include <cmath>
+
+#include "spdlog/fmt/fmt.h"
 
 DECLARE_FORMAT(KonamiSnes);
 

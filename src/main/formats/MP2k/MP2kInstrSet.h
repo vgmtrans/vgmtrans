@@ -8,11 +8,13 @@
 #pragma once
 
 #include "base/Types.h"
-
-#include <map>
 #include "VGMInstrSet.h"
 #include "VGMSamp.h"
 #include "VGMSampColl.h"
+
+#include <map>
+#include <string>
+#include <vector>
 
 class MP2kPSGColl;
 

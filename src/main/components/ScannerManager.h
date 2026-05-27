@@ -1,13 +1,15 @@
 #pragma once
-#include <string>
-#include <unordered_map>
-#include <vector>
-#include <algorithm>
-#include <functional>
-#include <memory>
-#include <initializer_list>
 #include "Format.h"
 #include "Scanner.h"
+
+#include <algorithm>
+#include <functional>
+#include <initializer_list>
+#include <memory>
+#include <string>
+#include <unordered_map>
+#include <utility>
+#include <vector>
 
 using scannerSpawner = std::function<std::shared_ptr<VGMScanner>()>;
 

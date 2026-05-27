@@ -4,15 +4,17 @@
  * refer to the included LICENSE.txt file
  */
 
-#include "base/Types.h"
 #include "KonamiTMNT2Instr.h"
-#include "KonamiTMNT2Format.h"
+
+#include "base/Types.h"
 #include "KonamiAdpcm.h"
 #include "KonamiTMNT2Definitions.h"
+#include "KonamiTMNT2Format.h"
 #include "VGMRgn.h"
 
 #include <set>
 #include <tuple>
+
 #include <spdlog/fmt/fmt.h>
 
 KonamiTMNT2SampleInstrSet::KonamiTMNT2SampleInstrSet(

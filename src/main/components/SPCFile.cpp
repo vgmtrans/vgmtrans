@@ -3,11 +3,13 @@
  * Licensed under the zlib license,
  * refer to the included LICENSE.txt file
  */
-#include "base/Types.h"
 #include "SPCFile.h"
+
+#include "base/Types.h"
 #include "LogManager.h"
 #include "RawFile.h"
 #include "VGMTag.h"
+
 #include <stdexcept>
 
 VGMTag SPCFile::tagFromSPCFile(const SPCFile& spc) {

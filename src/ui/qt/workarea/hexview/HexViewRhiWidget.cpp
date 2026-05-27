@@ -8,10 +8,9 @@
 
 #include "HexViewRhiRenderer.h"
 
-#include <rhi/qrhi.h>
-
 #include <QEvent>
 #include <QResizeEvent>
+#include <rhi/qrhi.h>
 
 HexViewRhiWidget::HexViewRhiWidget(HexView* view, HexViewRhiRenderer* renderer,
                                    QWidget* parent)

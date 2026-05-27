@@ -1,6 +1,8 @@
-#include "base/Types.h"
 #include "RareSnesSeq.h"
+
+#include "base/Types.h"
 #include "ScaleConversion.h"
+
 #include "spdlog/fmt/fmt.h"
 
 using namespace std;

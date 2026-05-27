@@ -2,8 +2,10 @@
 
 #include "base/Types.h"
 #include "RiffFile.h"
+
 #include <filesystem>
 #include <string>
+#include <vector>
 
 typedef enum: u16 {
   // Oscillator

@@ -9,8 +9,8 @@
 #include "base/Types.h"
 
 #include <cstdint>
-#include <string>
 #include <map>
+#include <string>
 #include <vector>
 
 class VGMTag {

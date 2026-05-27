@@ -4,28 +4,29 @@
  * refer to the included LICENSE.txt file
  */
 
-#if defined(_WIN32) || defined(WIN32)
-#include "base/Types.h"
-  #include <ioapi.h>
-  #include <unzip.h>
-  #include "iowin32.h"
-#endif
-#include <nlohmann/json.hpp>
-#include <spdlog/fmt/std.h>
-#include <filesystem>
-#include <cstdlib>
-#include <fstream>
-#include <ranges>
-
 #include "MAMELoader.h"
-#include "Format.h"
-#include "KabukiDecrypt.h"
+
 #include "CPS3Decrypt.h"
+#include "Format.h"
+#include "Helper.h"
+#include "KabukiDecrypt.h"
 #include "LoaderManager.h"
 #include "LogManager.h"
 #include "Root.h"
 #include "Scanner.h"
-#include "Helper.h"
+
+#include <cstdlib>
+#include <filesystem>
+#include <fstream>
+#include <ranges>
+
+#if defined(_WIN32) || defined(WIN32)
+#include <ioapi.h>
+#include "iowin32.h"
+#include <unzip.h>
+#endif
+#include <nlohmann/json.hpp>
+#include <spdlog/fmt/std.h>
 
 namespace vgmtrans::loaders {
 LoaderRegistration<MAMELoader> _mame("MAME");

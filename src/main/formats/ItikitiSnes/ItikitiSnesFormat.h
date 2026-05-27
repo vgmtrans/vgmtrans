@@ -6,8 +6,8 @@
 #pragma once
 
 #include "base/Types.h"
-#include "Format.h"
 #include "FilegroupMatcher.h"
+#include "Format.h"
 #include "ItikitiSnesScanner.h"
 
 constexpr u8 kItikitiSnesSeqNoteKeyBias = 24;

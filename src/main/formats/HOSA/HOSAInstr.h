@@ -4,8 +4,6 @@
 #include "VGMInstrSet.h"
 #include "VGMSampColl.h"
 
-
-
 // *****************
 // HOSAInstrSet
 // *****************

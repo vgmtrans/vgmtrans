@@ -1,9 +1,9 @@
 #pragma once
 
-#include <string>
-
-#include "Scanner.h"
 #include "base/Types.h"
+#include "Scanner.h"
+
+#include <string>
 
 struct MAMEGame;
 

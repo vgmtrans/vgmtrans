@@ -6,12 +6,11 @@
 #pragma once
 
 #include "base/Types.h"
-
 #include "VGMInstrSet.h"
 #include "YM2151.h"
-#include <filesystem>
 
 #include <cstdint>
+#include <filesystem>
 #include <string>
 #include <vector>
 

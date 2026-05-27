@@ -6,8 +6,9 @@
 
 #include "base/Types.h"
 #include "KonamiPS1Seq.h"
-#include <spdlog/fmt/fmt.h>
 #include "ScannerManager.h"
+
+#include <spdlog/fmt/fmt.h>
 
 namespace vgmtrans::scanners {
 ScannerRegistration<KonamiPS1Scanner> s_konami_ps1("KonamiPS1");

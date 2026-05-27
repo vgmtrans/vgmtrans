@@ -4,18 +4,21 @@
  * See the included LICENSE for more information
  */
 
+#include "NDSInstrSet.h"
+
 #include "base/Types.h"
+#include "LogManager.h"
+#include "Loop.h"
+#include "NDSFormat.h"
+#include "PSGDSP.h"
+#include "VGMRgn.h"
+#include "VGMSampColl.h"
+
 #include <cmath>
 #include <string>
 #include <vector>
+
 #include <spdlog/fmt/fmt.h>
-#include "Loop.h"
-#include "NDSFormat.h"
-#include "VGMSampColl.h"
-#include "NDSInstrSet.h"
-#include "VGMRgn.h"
-#include "LogManager.h"
-#include "PSGDSP.h"
 
 // INTR_FREQUENCY is the interval in seconds between updates to the volume envelope.
 // The NDS sound engine updates envelopes every 64 sound timer intervals.

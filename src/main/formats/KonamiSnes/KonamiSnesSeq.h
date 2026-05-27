@@ -5,13 +5,16 @@
  */
 #pragma once
 
-#include "base/Types.h"
-#include <optional>
-#include "VGMSeq.h"
 #include "automation/SeqMidiAutomation.h"
-#include "SeqTrack.h"
-#include "SeqEvent.h"
+#include "base/Types.h"
 #include "KonamiSnesFormat.h"
+#include "SeqEvent.h"
+#include "SeqTrack.h"
+#include "VGMSeq.h"
+
+#include <map>
+#include <optional>
+#include <string>
 
 enum KonamiSnesSeqEventType {
   //start enum at 1 because if map[] look up fails, it returns 0, and we don't want that to get confused with a legit event

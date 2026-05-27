@@ -6,28 +6,29 @@
 
 #include "ReportDialog.h"
 
-#include <QVBoxLayout>
-#include <QHBoxLayout>
+#include "RawFile.h"
+#include "Root.h"
+#include "util/Helpers.h"
+#include <version.h>
+#include "VGMFile.h"
+
+#include <QCryptographicHash>
 #include <QFrame>
+#include <QGroupBox>
+#include <QHBoxLayout>
+#include <QLabel>
 #include <QLineEdit>
-#include <QPlainTextEdit>
-#include <QScrollArea>
 #include <QListWidget>
+#include <QPlainTextEdit>
+#include <QPushButton>
+#include <QScrollArea>
+#include <QSysInfo>
+#include <QTimer>
 #include <QTreeWidget>
 #include <QTreeWidgetItemIterator>
-#include <QPushButton>
-#include <QLabel>
-#include <QGroupBox>
 #include <QUrl>
 #include <QUrlQuery>
-#include <QSysInfo>
-#include <QCryptographicHash>
-#include <QTimer>
-#include <version.h>
-#include "Root.h"
-#include "RawFile.h"
-#include "VGMFile.h"
-#include "util/Helpers.h"
+#include <QVBoxLayout>
 
 ReportDialog::ReportDialog(QWidget* parent) : QWidget(parent) {
   setWindowFlags(Qt::Window);

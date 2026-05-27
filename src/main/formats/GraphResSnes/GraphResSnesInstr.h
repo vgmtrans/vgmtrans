@@ -1,9 +1,13 @@
 #pragma once
 
 #include "base/Types.h"
+#include "GraphResSnesFormat.h"
 #include "VGMInstrSet.h"
 #include "VGMRgn.h"
-#include "GraphResSnesFormat.h"
+
+#include <map>
+#include <string>
+#include <vector>
 
 // ********************
 // GraphResSnesInstrSet

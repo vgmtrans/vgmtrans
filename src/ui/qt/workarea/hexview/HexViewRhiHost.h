@@ -6,9 +6,11 @@
 
 #pragma once
 
-#include <QWidget>
-#include <memory>
 #include "HexViewRhiRenderer.h"
+
+#include <memory>
+
+#include <QWidget>
 
 class HexView;
 class QResizeEvent;

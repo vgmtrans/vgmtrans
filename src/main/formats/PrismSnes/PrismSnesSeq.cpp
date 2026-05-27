@@ -1,6 +1,8 @@
-#include "base/Types.h"
 #include "PrismSnesSeq.h"
+
+#include "base/Types.h"
 #include "ScaleConversion.h"
+
 #include <spdlog/fmt/fmt.h>
 
 // TODO: Fix envelope event length

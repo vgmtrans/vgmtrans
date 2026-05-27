@@ -1,8 +1,11 @@
 #pragma once
 
 #include "base/Types.h"
-#include "VGMSampColl.h"
 #include "VGMInstrSet.h"
+#include "VGMSampColl.h"
+
+#include <string>
+#include <vector>
 
 enum KonamiTMNT2FormatVer : u8;
 class RawFile;

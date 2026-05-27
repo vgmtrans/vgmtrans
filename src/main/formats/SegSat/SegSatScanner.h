@@ -5,8 +5,9 @@
  */
 #pragma once
 #include "base/Types.h"
-#include "Scanner.h"
 #include "BytePattern.h"
+#include "Scanner.h"
+
 #include <vector>
 
 class SegSatSeq;

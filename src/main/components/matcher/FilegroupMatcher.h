@@ -7,6 +7,7 @@
 #pragma once
 
 #include "Matcher.h"
+
 #include <list>
 
 class VGMSeq;

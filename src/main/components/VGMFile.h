@@ -6,9 +6,11 @@
 #pragma once
 
 #include "base/Types.h"
-
-#include "VGMItem.h"
 #include "RawFile.h"
+#include "VGMItem.h"
+
+#include <string>
+#include <vector>
 
 class VGMColl;
 class Format;

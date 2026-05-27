@@ -4,14 +4,21 @@
 * refer to the included LICENSE.txt file
 */
 
-#include "base/Types.h"
 #include "HexView.h"
+
+#include "base/Types.h"
 #include "Helpers.h"
 #include "HexViewInput.h"
 #include "HexViewRhiHost.h"
-#include "util/NonTransientScrollBarStyle.h"
 #include "services/NotificationCenter.h"
+#include "util/NonTransientScrollBarStyle.h"
 #include "VGMFile.h"
+
+#include <algorithm>
+#include <cmath>
+#include <functional>
+#include <limits>
+#include <unordered_set>
 
 #include <QApplication>
 #include <QBuffer>
@@ -22,23 +29,17 @@
 #include <QImage>
 #include <QKeyEvent>
 #include <QMouseEvent>
-#include <QPixmap>
-#include <QRawFont>
 #include <QPainter>
 #include <QParallelAnimationGroup>
+#include <QPixmap>
 #include <QPropertyAnimation>
+#include <QRawFont>
 #include <QRectF>
 #include <QResizeEvent>
 #include <QScrollBar>
 #include <QTimerEvent>
 #include <QToolTip>
 #include <QWidget>
-
-#include <algorithm>
-#include <cmath>
-#include <functional>
-#include <limits>
-#include <unordered_set>
 
 namespace {
 constexpr int BYTES_PER_LINE = 16;

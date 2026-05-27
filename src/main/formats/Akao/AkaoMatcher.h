@@ -5,8 +5,9 @@
 */
 #pragma once
 #include "Matcher.h"
-#include <vector>
+
 #include <unordered_map>
+#include <vector>
 
 class VGMSeq;
 class VGMInstrSet;

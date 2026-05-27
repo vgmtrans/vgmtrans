@@ -1,13 +1,16 @@
 #pragma once
 
 #include "base/Types.h"
-
-#include "VGMInstrSet.h"
 #include "CPS1Scanner.h"
+#include "VGMInstrSet.h"
 #include "VGMSampColl.h"
 #include "YM2151.h"
 #include "YM2151InstrSet.h"
+
+#include <algorithm>
 #include <sstream>
+#include <string>
+#include <vector>
 
 // ******************
 // CPS1SampleInstrSet

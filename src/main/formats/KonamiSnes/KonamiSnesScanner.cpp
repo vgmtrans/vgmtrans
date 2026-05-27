@@ -5,8 +5,8 @@
  */
 
 #include "base/Types.h"
-#include "KonamiSnesSeq.h"
 #include "KonamiSnesInstr.h"
+#include "KonamiSnesSeq.h"
 #include "ScannerManager.h"
 
 namespace vgmtrans::scanners {

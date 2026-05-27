@@ -8,10 +8,12 @@
 
 #include "base/Binary.h"
 #include "base/Types.h"
-#include "VGMItem.h"
 #include "Loop.h"
+#include "VGMItem.h"
+
 #include <cstddef>
 #include <filesystem>
+#include <string>
 #include <vector>
 
 class VGMSampColl;

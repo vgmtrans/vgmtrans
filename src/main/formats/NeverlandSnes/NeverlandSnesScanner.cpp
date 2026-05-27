@@ -5,11 +5,11 @@
  */
 
 #include "base/Types.h"
-#include <vector>
-#include <map>
-
 #include "NeverlandSnesSeq.h"
 #include "ScannerManager.h"
+
+#include <map>
+#include <vector>
 
 namespace vgmtrans::scanners {
 ScannerRegistration<NeverlandSnesScanner> s_neverland_snes("NeverlandSnes", {"spc"});

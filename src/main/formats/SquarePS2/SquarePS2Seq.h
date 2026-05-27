@@ -1,9 +1,9 @@
 #pragma once
 
 #include "base/Types.h"
-#include "VGMSeq.h"
 #include "SeqTrack.h"
 #include "SquarePS2Format.h"
+#include "VGMSeq.h"
 
 class BGMSeq : public VGMSeq {
  public:

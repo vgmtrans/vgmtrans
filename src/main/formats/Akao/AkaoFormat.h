@@ -1,8 +1,13 @@
 #pragma once
-#include "Format.h"
-#include "AkaoScanner.h"
-#include "VGMColl.h"
 #include "AkaoMatcher.h"
+#include "AkaoScanner.h"
+#include "Format.h"
+#include "VGMColl.h"
+
+#include <string>
+#include <tuple>
+#include <unordered_map>
+#include <utility>
 
 class AkaoInstrSet;
 class AkaoArt;

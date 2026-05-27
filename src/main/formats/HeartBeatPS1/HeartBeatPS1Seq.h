@@ -8,6 +8,8 @@
 #include "base/Types.h"
 #include "VGMSeqNoTrks.h"
 
+#include <string>
+
 class HeartBeatPS1Seq:
     public VGMSeqNoTrks {
  public:

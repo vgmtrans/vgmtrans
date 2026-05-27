@@ -7,11 +7,10 @@
 #pragma once
 
 #include "base/Types.h"
+#include "MidiMerge.h"
 
 #include <filesystem>
 #include <vector>
-
-#include "MidiMerge.h"
 
 namespace conversion {
 

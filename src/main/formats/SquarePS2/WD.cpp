@@ -4,10 +4,12 @@
  * refer to the included LICENSE.txt file
  */
 
-#include "base/Types.h"
 #include "WD.h"
-#include "SquarePS2Format.h"
+
+#include "base/Types.h"
 #include "PSXSPU.h"
+#include "SquarePS2Format.h"
+
 #include <spdlog/fmt/fmt.h>
 
 static constexpr int finetune_table[] = {

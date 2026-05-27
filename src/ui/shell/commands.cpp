@@ -4,22 +4,15 @@
  * See the included LICENSE for more information
  */
 
-#include "base/Types.h"
 #include "commands.h"
 
-#include <fstream>
-#include <string>
-#include <algorithm>
-#include <cctype>
-
-#include <fmt/format.h>
-#include <fmt/color.h>
-
+#include "base/Types.h"
 #include "DBGVGMRoot.h"
 #include "RawFile.h"
 #include "SeqTrack.h"
 #include "StitchExport.h"
 #include "VGMColl.h"
+#include "VGMExport.h"
 #include "VGMFile.h"
 #include "VGMInstrSet.h"
 #include "VGMMiscFile.h"
@@ -27,7 +20,14 @@
 #include "VGMSamp.h"
 #include "VGMSampColl.h"
 #include "VGMSeq.h"
-#include "VGMExport.h"
+
+#include <algorithm>
+#include <cctype>
+#include <fstream>
+#include <string>
+
+#include <fmt/color.h>
+#include <fmt/format.h>
 
 std::map<std::string, Command> commandRegistry;
 

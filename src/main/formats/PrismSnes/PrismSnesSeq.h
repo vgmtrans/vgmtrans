@@ -1,10 +1,14 @@
 #pragma once
 
 #include "base/Types.h"
-#include "VGMSeq.h"
-#include "SeqTrack.h"
-#include "SeqEvent.h"
 #include "PrismSnesFormat.h"
+#include "SeqEvent.h"
+#include "SeqTrack.h"
+#include "VGMSeq.h"
+
+#include <map>
+#include <string>
+#include <vector>
 
 enum PrismSnesSeqEventType {
   EVENT_UNKNOWN0 =

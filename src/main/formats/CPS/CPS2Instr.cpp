@@ -1,13 +1,16 @@
-#include "base/Types.h"
-#include <sstream>
-#include <cmath>
-#include <spdlog/fmt/fmt.h>
-#include "VGMSamp.h"
-#include "VGMRgn.h"
-#include "ScaleConversion.h"
-#include "CPS2Format.h"
 #include "CPS2Instr.h"
+
+#include "base/Types.h"
+#include "CPS2Format.h"
 #include "OkiAdpcm.h"
+#include "ScaleConversion.h"
+#include "VGMRgn.h"
+#include "VGMSamp.h"
+
+#include <cmath>
+#include <sstream>
+
+#include <spdlog/fmt/fmt.h>
 
 // ****************
 // CPSArticTable

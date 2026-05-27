@@ -1,6 +1,8 @@
-#include "base/Types.h"
 #include "FalcomSnesSeq.h"
+
+#include "base/Types.h"
 #include "ScaleConversion.h"
+
 #include <spdlog/fmt/fmt.h>
 
 DECLARE_FORMAT(FalcomSnes);

@@ -6,10 +6,9 @@
 #pragma once
 
 #include "base/Types.h"
-#include "Format.h"
 #include "FilegroupMatcher.h"
+#include "Format.h"
 #include "KonamiSnesScanner.h"
-
 
 // ***************
 // KonamiSnesFormat

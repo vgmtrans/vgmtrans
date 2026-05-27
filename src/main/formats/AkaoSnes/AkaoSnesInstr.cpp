@@ -4,13 +4,16 @@
  * refer to the included LICENSE.txt file
  */
 
+#include "AkaoSnesInstr.h"
+
+#include "AkaoSnesModulation.h"
 #include "base/Types.h"
+#include "SNESDSP.h"
+
 #include <algorithm>
 #include <cmath>
+
 #include <spdlog/fmt/fmt.h>
-#include "AkaoSnesInstr.h"
-#include "AkaoSnesModulation.h"
-#include "SNESDSP.h"
 
 // ****************
 // AkaoSnesInstrSet

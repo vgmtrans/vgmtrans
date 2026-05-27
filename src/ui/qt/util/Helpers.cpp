@@ -7,6 +7,7 @@
 #include "Helpers.h"
 
 #include <QUrl>
+
 #ifdef __APPLE__
 void qtOpenUrlNative(const QByteArray& encodedUrl);
 #else

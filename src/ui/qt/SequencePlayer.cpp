@@ -4,19 +4,21 @@
  * See the included LICENSE for more information
  */
 
-#include "base/Types.h"
 #include "SequencePlayer.h"
+
+#include "base/Types.h"
+#include "LogManager.h"
+#include "QtVGMRoot.h"
+#include "SF2Conversion.h"
+#include "SF2File.h"
+#include "VGMColl.h"
+#include "VGMSeq.h"
+
 #include <algorithm>
 #include <cstddef>
 
 #include "bass.h"
 #include "bassmidi.h"
-#include "VGMColl.h"
-#include "SF2File.h"
-#include "VGMSeq.h"
-#include "LogManager.h"
-#include "SF2Conversion.h"
-#include "QtVGMRoot.h"
 
 /**
  * @brief Routines to read file data from memory.

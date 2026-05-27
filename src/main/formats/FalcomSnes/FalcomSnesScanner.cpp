@@ -5,8 +5,8 @@
  */
 
 #include "base/Types.h"
-#include "FalcomSnesSeq.h"
 #include "FalcomSnesInstr.h"
+#include "FalcomSnesSeq.h"
 #include "ScannerManager.h"
 
 namespace vgmtrans::scanners {

@@ -1,5 +1,6 @@
-#include "base/Types.h"
 #include "NDSSeq.h"
+
+#include "base/Types.h"
 
 DECLARE_FORMAT(NDS);
 

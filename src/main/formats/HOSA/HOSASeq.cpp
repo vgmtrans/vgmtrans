@@ -1,5 +1,6 @@
-#include "base/Types.h"
 #include "HOSASeq.h"
+
+#include "base/Types.h"
 #include "HOSAFormat.h"
 
 DECLARE_FORMAT(HOSA);

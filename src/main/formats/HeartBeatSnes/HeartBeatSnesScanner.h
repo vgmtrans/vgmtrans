@@ -6,8 +6,8 @@
 #pragma once
 
 #include "base/Types.h"
-#include "Scanner.h"
 #include "BytePattern.h"
+#include "Scanner.h"
 
 enum HeartBeatSnesVersion : u8;  // see HeartBeatSnesFormat.h
 

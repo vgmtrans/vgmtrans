@@ -3,12 +3,14 @@
  * Licensed under the zlib license,
  * refer to the included LICENSE.txt file
  */
-#include "base/Types.h"
 #include "CapcomSnesInstr.h"
-#include <spdlog/fmt/fmt.h>
-#include "SNESDSP.h"
+
+#include "base/Types.h"
 #include "CapcomSnesDefinitions.h"
 #include "CapcomSnesFormat.h"
+#include "SNESDSP.h"
+
+#include <spdlog/fmt/fmt.h>
 
 // ****************
 // CapcomSnesInstrSet

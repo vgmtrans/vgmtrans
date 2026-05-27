@@ -3,14 +3,15 @@
  * Licensed under the zlib license,
  * refer to the included LICENSE.txt file
  */
-#include "base/Types.h"
 #include "CPS1Scanner.h"
+
+#include "base/Types.h"
+#include "CPS1Instr.h"
 #include "CPS1Seq.h"
 #include "CPS2Seq.h"
-#include "CPS1Instr.h"
 #include "MAMELoader.h"
-#include "VGMMiscFile.h"
 #include "VGMColl.h"
+#include "VGMMiscFile.h"
 
 #include <string>
 

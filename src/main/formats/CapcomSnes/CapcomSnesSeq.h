@@ -1,11 +1,14 @@
 #pragma once
 
-#include "base/Types.h"
-#include "VGMSeq.h"
 #include "automation/SeqMidiAutomation.h"
-#include "SeqTrack.h"
-#include "SeqEvent.h"
+#include "base/Types.h"
 #include "CapcomSnesFormat.h"
+#include "SeqEvent.h"
+#include "SeqTrack.h"
+#include "VGMSeq.h"
+
+#include <map>
+#include <string>
 
 #define CAPCOM_SNES_REPEAT_SLOT_MAX 4
 

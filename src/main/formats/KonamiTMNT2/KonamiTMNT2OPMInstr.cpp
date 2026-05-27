@@ -3,9 +3,11 @@
  * Licensed under the zlib license,
  * refer to the included LICENSE.txt file
  */
-#include "base/Types.h"
 #include "KonamiTMNT2OPMInstr.h"
+
+#include "base/Types.h"
 #include "KonamiTMNT2Format.h"
+
 #include <spdlog/fmt/fmt.h>
 
 KonamiTMNT2OPMInstrSet::KonamiTMNT2OPMInstrSet(

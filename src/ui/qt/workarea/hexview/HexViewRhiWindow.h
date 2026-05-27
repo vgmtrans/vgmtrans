@@ -6,13 +6,14 @@
 
 #pragma once
 
+#include "HexViewRhiEventForwarder.h"
+
+#include <memory>
+
 #include <QList>
 #include <QTimer>
 #include <QUrl>
 #include <QWindow>
-#include <memory>
-
-#include "HexViewRhiEventForwarder.h"
 
 class QEvent;
 class QExposeEvent;

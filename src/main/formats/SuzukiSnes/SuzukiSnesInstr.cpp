@@ -4,11 +4,13 @@
  * refer to the included LICENSE.txt file
  */
 
-#include "base/Types.h"
 #include "SuzukiSnesInstr.h"
-#include "SuzukiSnesSeq.h"
+
+#include "base/Types.h"
 #include "SNESDSP.h"
+#include "SuzukiSnesSeq.h"
 #include "VGMColl.h"
+
 #include <spdlog/fmt/fmt.h>
 
 namespace {

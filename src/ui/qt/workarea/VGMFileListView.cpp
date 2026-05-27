@@ -4,21 +4,22 @@
  * refer to the included LICENSE.txt file
  */
 
-#include <ranges>
-
-#include <QHeaderView>
-
 #include "VGMFileListView.h"
+
 #include "Helpers.h"
-#include "QtVGMRoot.h"
 #include "MdiArea.h"
+#include "QtVGMRoot.h"
+#include "services/MenuManager.h"
 #include "services/NotificationCenter.h"
 #include "VGMFile.h"
 #include "VGMInstrSet.h"
-#include "VGMSeq.h"
 #include "VGMMiscFile.h"
 #include "VGMSampColl.h"
-#include "services/MenuManager.h"
+#include "VGMSeq.h"
+
+#include <ranges>
+
+#include <QHeaderView>
 
 /*
  *  VGMFileListModel

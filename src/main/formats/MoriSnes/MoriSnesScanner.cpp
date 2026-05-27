@@ -7,6 +7,7 @@
 #include "base/Types.h"
 #include "MoriSnesSeq.h"
 #include "ScannerManager.h"
+
 namespace vgmtrans::scanners {
 ScannerRegistration<MoriSnesScanner> s_mori_snes("MoriSnes", {"spc"});
 }

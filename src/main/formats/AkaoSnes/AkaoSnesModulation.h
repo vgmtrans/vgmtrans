@@ -5,11 +5,11 @@
  */
 #pragma once
 
+#include "AkaoSnesFormat.h"
 #include "base/Types.h"
+#include "Modulation.h"
 
 #include <cstdint>
-#include "AkaoSnesFormat.h"
-#include "Modulation.h"
 
 namespace akao_snes::modulation {
 

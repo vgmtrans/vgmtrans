@@ -6,30 +6,31 @@
 
 #include "MenuBar.h"
 
-#include <array>
-#include <QDockWidget>
-#include <QDesktopServices>
-#include <QUrl>
-#include <QUrlQuery>
-#include <QtGlobal>
-#include <QInputDialog>
-#include <QSignalBlocker>
-#include <QDir>
-#include <version.h>
-#include "ReportDialog.h"
-#include "Options.h"
-#include "Root.h"
 #include "LogManager.h"
+#include "Options.h"
+#include "RawFile.h"
+#include "ReportDialog.h"
+#include "Root.h"
 #include "services/MenuManager.h"
-#include "services/Settings.h"
 #include "services/NotificationCenter.h"
-#include "VGMItem.h"
+#include "services/Settings.h"
+#include <version.h>
 #include "VGMColl.h"
 #include "VGMFile.h"
-#include "RawFile.h"
+#include "VGMItem.h"
 #include "workarea/MdiArea.h"
 #include "workarea/VGMFileView.h"
 
+#include <array>
+
+#include <QDesktopServices>
+#include <QDir>
+#include <QDockWidget>
+#include <QInputDialog>
+#include <QSignalBlocker>
+#include <QtGlobal>
+#include <QUrl>
+#include <QUrlQuery>
 
 MenuBar::MenuBar(QWidget *parent, const QList<QDockWidget *> &dockWidgets) : QMenuBar(parent) {
   appendFileMenu();

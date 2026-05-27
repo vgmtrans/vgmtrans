@@ -7,7 +7,6 @@
 #pragma once
 
 #include "base/Types.h"
-
 #include "SimpleMatcher.h"
 
 class GetIdMatcher : public SimpleMatcher<u32> {

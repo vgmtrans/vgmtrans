@@ -4,9 +4,9 @@
  * refer to the included LICENSE.txt file
  */
 
-#include "base/Types.h"
-#include "AkaoSeq.h"
 #include "AkaoInstr.h"
+#include "AkaoSeq.h"
+#include "base/Types.h"
 #include "ScannerManager.h"
 
 namespace vgmtrans::scanners {

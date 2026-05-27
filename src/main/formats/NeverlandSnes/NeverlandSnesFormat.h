@@ -1,7 +1,7 @@
 #pragma once
+#include "FilegroupMatcher.h"
 #include "Format.h"
 #include "NeverlandSnesScanner.h"
-#include "FilegroupMatcher.h"
 
 // *************
 // NeverlandSnesFormat

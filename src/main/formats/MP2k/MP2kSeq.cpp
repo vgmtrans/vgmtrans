@@ -11,14 +11,16 @@
  * http://www.romhacking.net/documents/%5B462%5Dsappy.txt
  */
 
-#include "base/Types.h"
 #include "MP2kSeq.h"
 
-#include <array>
-#include <spdlog/fmt/fmt.h>
 #include "automation/SeqTrackAutomation.h"
+#include "base/Types.h"
 #include "MidiFile.h"
 #include "MP2kFormat.h"
+
+#include <array>
+
+#include <spdlog/fmt/fmt.h>
 
 DECLARE_FORMAT(MP2k);
 

@@ -1,10 +1,14 @@
 #pragma once
 
 #include "base/Types.h"
-#include "VGMInstrSet.h"
-#include "VGMSampColl.h"
-#include "VGMRgn.h"
 #include "MoriSnesFormat.h"
+#include "VGMInstrSet.h"
+#include "VGMRgn.h"
+#include "VGMSampColl.h"
+
+#include <map>
+#include <string>
+#include <vector>
 
 struct MoriSnesInstrHint {
   MoriSnesInstrHint() :

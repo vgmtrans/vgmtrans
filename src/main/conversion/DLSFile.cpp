@@ -4,19 +4,21 @@
  * See the included LICENSE for more information
  */
 
+#include "DLSFile.h"
+
 #include "base/Types.h"
+#include "ConversionContext.h"
+#include "Root.h"
+#include "ScaleConversion.h"
+#include "VGMInstrSet.h"
+#include "VGMSamp.h"
+
 #include <algorithm>
 #include <limits>
 #include <numeric>
 #include <optional>
 #include <ranges>
 #include <vector>
-#include "ConversionContext.h"
-#include "DLSFile.h"
-#include "ScaleConversion.h"
-#include "VGMInstrSet.h"
-#include "VGMSamp.h"
-#include "Root.h"
 
 //  *******
 //  DLSFile

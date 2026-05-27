@@ -6,8 +6,10 @@
 #pragma once
 
 #include "base/Types.h"
-
 #include "VGMSamp.h"
+
+#include <string>
+#include <vector>
 
 enum class KonamiAdpcmChip {
   K054539,

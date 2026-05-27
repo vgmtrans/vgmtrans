@@ -4,16 +4,18 @@
  * See the included LICENSE for more information
  */
 
+#include "VGMSamp.h"
+
 #include "base/Types.h"
+#include "Helper.h"
+#include "Root.h"
+#include "ScaleConversion.h"
+#include "util/Path.h"
+#include "VGMSampColl.h"
+
 #include <algorithm>
 #include <cmath>
 #include <utility>
-#include "VGMSamp.h"
-#include "VGMSampColl.h"
-#include "Root.h"
-#include "ScaleConversion.h"
-#include "Helper.h"
-#include "util/Path.h"
 
 // *******
 // VGMSamp

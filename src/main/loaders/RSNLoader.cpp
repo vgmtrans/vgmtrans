@@ -4,12 +4,14 @@
 * refer to the included LICENSE.txt file
  */
 
-#include "base/Types.h"
 #include "RSNLoader.h"
+
+#include "base/Types.h"
 #include "FileLoader.h"
-#include "LogManager.h"
-#include "unarr.h"
 #include "LoaderManager.h"
+#include "LogManager.h"
+
+#include "unarr.h"
 
 namespace vgmtrans::loaders {
 LoaderRegistration<RSNLoader> _rsn("RSN");

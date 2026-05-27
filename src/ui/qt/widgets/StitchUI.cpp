@@ -6,7 +6,19 @@
 
 #include "widgets/StitchUI.h"
 
+#include "base/Types.h"
 #include "ColorHelpers.h"
+#include "QtVGMRoot.h"
+#include "Root.h"
+#include "services/NotificationCenter.h"
+#include "StitchExport.h"
+#include "util/Path.h"
+#include "util/UIHelpers.h"
+#include "VGMColl.h"
+#include "VGMSeq.h"
+#include "widgets/EmptyStateWidget.h"
+#include "workarea/MdiArea.h"
+#include "workarea/VGMCollListView.h"
 
 #include <algorithm>
 #include <cstdint>
@@ -16,15 +28,15 @@
 #include <unordered_set>
 #include <vector>
 
-#include <QAbstractItemView>
 #include <QAbstractButton>
+#include <QAbstractItemView>
 #include <QApplication>
 #include <QDragEnterEvent>
 #include <QDragMoveEvent>
 #include <QDropEvent>
 #include <QFrame>
-#include <QHideEvent>
 #include <QHBoxLayout>
+#include <QHideEvent>
 #include <QKeyEvent>
 #include <QLabel>
 #include <QListWidget>
@@ -32,24 +44,11 @@
 #include <QPointer>
 #include <QPushButton>
 #include <QScreen>
-#include <QSignalBlocker>
 #include <QShowEvent>
+#include <QSignalBlocker>
 #include <QToolButton>
 #include <QVBoxLayout>
 #include <QWindow>
-
-#include "base/Types.h"
-#include "Root.h"
-#include "QtVGMRoot.h"
-#include "StitchExport.h"
-#include "VGMColl.h"
-#include "VGMSeq.h"
-#include "util/Path.h"
-#include "services/NotificationCenter.h"
-#include "util/UIHelpers.h"
-#include "widgets/EmptyStateWidget.h"
-#include "workarea/VGMCollListView.h"
-#include "workarea/MdiArea.h"
 
 namespace {
 

@@ -9,8 +9,12 @@
 #include "base/Types.h"
 #include "Modulation.h"
 #include "RiffFile.h"
+
 #include <filesystem>
+#include <memory>
 #include <string>
+#include <utility>
+#include <vector>
 
 struct Loop;
 class VGMSamp;

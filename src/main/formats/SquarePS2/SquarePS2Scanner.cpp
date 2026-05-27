@@ -5,9 +5,10 @@
  */
 
 #include "base/Types.h"
+#include "ScannerManager.h"
 #include "SquarePS2Seq.h"
 #include "WD.h"
-#include "ScannerManager.h"
+
 namespace vgmtrans::scanners {
 ScannerRegistration<SquarePS2Scanner> s_squareps2("SquarePS2");
 }

@@ -6,16 +6,19 @@
 
 #pragma once
 
-#include <QTreeWidget>
-#include <QTreeWidgetItem>
-#include <QStyledItemDelegate>
-#include <QHeaderView>
-#include <QBrush>
+#include "VGMFile.h"
+
+#include <string>
 #include <unordered_map>
 #include <unordered_set>
 #include <utility>
 #include <vector>
-#include "VGMFile.h"
+
+#include <QBrush>
+#include <QHeaderView>
+#include <QStyledItemDelegate>
+#include <QTreeWidget>
+#include <QTreeWidgetItem>
 
 class VGMFile;
 class QCheckBox;

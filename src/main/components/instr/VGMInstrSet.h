@@ -2,8 +2,10 @@
 #include "base/Types.h"
 #include "Modulation.h"
 #include "VGMFile.h"
+
 #include <optional>
 #include <string>
+#include <vector>
 
 class VGMSampColl;
 class VGMInstr;

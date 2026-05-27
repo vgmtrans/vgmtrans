@@ -1,7 +1,9 @@
-#include "base/Types.h"
 #include "KonamiArcadeSeq.h"
+
+#include "base/Types.h"
 #include "KonamiArcadeDefinitions.h"
 #include "ScaleConversion.h"
+
 #include <spdlog/fmt/fmt.h>
 
 DECLARE_FORMAT(KonamiArcade);

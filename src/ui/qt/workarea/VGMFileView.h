@@ -5,13 +5,15 @@
  */
 
 #pragma once
+#include "SeqEventTimeIndex.h"
+
 #include <memory>
 #include <unordered_map>
+#include <vector>
+
 #include <QColor>
 #include <QFont>
 #include <QMdiSubWindow>
-#include <vector>
-#include "SeqEventTimeIndex.h"
 
 class MidiTrack;
 class SnappingSplitter;

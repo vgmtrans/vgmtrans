@@ -5,15 +5,18 @@
  */
 
 #include "About.h"
-#include <algorithm>
-#include <QVBoxLayout>
-#include <QLabel>
-#include <QPushButton>
+
 #include <version.h>
-#include <QListWidget>
-#include <QTextEdit>
+
+#include <algorithm>
+
 #include <QDir>
 #include <QHash>
+#include <QLabel>
+#include <QListWidget>
+#include <QPushButton>
+#include <QTextEdit>
+#include <QVBoxLayout>
 
 About::About(QWidget *parent) : QDialog(parent) {
   setWindowTitle("About VGMTrans");

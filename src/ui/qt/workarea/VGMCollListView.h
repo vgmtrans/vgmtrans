@@ -5,14 +5,16 @@
  */
 
 #pragma once
+#include "widgets/FixedHeightListDelegate.h"
+
+#include <vector>
+
 #include <QAbstractListModel>
 #include <QHash>
+#include <QKeyEvent>
 #include <QList>
 #include <QListView>
-#include <QKeyEvent>
 #include <QString>
-#include <vector>
-#include "widgets/FixedHeightListDelegate.h"
 
 class VGMColl;
 class VGMFile;

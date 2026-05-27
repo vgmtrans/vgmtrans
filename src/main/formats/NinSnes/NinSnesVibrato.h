@@ -6,9 +6,9 @@
 #pragma once
 
 #include "base/Types.h"
+#include "Modulation.h"
 
 #include <cstdint>
-#include "Modulation.h"
 
 namespace nin_snes::vibrato {
 

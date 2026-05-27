@@ -5,17 +5,17 @@
  */
 
 #include "SeekBar.h"
+
 #include "UIHelpers.h"
 
+#include <algorithm>
 #include <cmath>
 
 #include <QGraphicsDropShadowEffect>
 #include <QMouseEvent>
-#include <QPalette>
 #include <QPainter>
+#include <QPalette>
 #include <QShowEvent>
-
-#include <algorithm>
 
 namespace {
 constexpr qreal TRACK_THICKNESS = 4.0;

@@ -1,10 +1,9 @@
 #pragma once
 
 #include "base/Types.h"
-#include "Format.h"
-#include "FilegroupMatcher.h"
 #include "CompileSnesScanner.h"
-
+#include "FilegroupMatcher.h"
+#include "Format.h"
 
 // *****************
 // CompileSnesFormat

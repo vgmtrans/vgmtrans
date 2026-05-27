@@ -3,10 +3,11 @@
  * Licensed under the zlib license,
  * refer to the included LICENSE.txt file
  */
-#include "base/Types.h"
 #include "HOSAInstr.h"
-#include "VGMRgn.h"
+
+#include "base/Types.h"
 #include "PSXSPU.h"
+#include "VGMRgn.h"
 
 /****************************************************************/
 /*																*/

@@ -6,9 +6,12 @@
 #pragma once
 
 #include "base/Types.h"
-#include "VGMSeq.h"
-#include "SeqTrack.h"
 #include "HudsonSnesFormat.h"
+#include "SeqTrack.h"
+#include "VGMSeq.h"
+
+#include <map>
+#include <string>
 
 #define HUDSONSNES_CALLSTACK_SIZE   0x10
 #define HUDSONSNES_USERRAM_SIZE     0x08

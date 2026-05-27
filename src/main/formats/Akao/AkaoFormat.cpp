@@ -4,11 +4,12 @@
  * refer to the included LICENSE.txt file
  */
 
-#include "base/Types.h"
-#include <vector>
-#include "AkaoSeq.h"
 #include "AkaoInstr.h"
+#include "AkaoSeq.h"
+#include "base/Types.h"
 #include "PSXSPU.h"
+
+#include <vector>
 
 // Generate maps to help route the relationships to and from articulations, especially for games
 // that load more than one sample collection at a time.

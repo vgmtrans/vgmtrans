@@ -1,9 +1,11 @@
 #pragma once
 
 #include "base/Types.h"
-
 #include "CPS1Scanner.h"
 #include "VGMSeq.h"
+
+#include <string>
+#include <vector>
 
 class CPS1Seq:
     public VGMSeq {

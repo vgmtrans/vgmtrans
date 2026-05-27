@@ -1,9 +1,9 @@
 #pragma once
 #include "base/Types.h"
-#include "VGMInstrSet.h"
-#include "VGMSampColl.h"
-#include "VGMRgn.h"
 #include "SonyPS2Format.h"
+#include "VGMInstrSet.h"
+#include "VGMRgn.h"
+#include "VGMSampColl.h"
 
 #define SCEHD_LFO_NON        0
 #define SCEHD_LFO_SAWUP      1

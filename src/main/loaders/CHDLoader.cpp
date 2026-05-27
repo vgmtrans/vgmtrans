@@ -4,8 +4,9 @@
  * refer to the included LICENSE.txt file
  */
 
-#include "base/Types.h"
 #include "CHDLoader.h"
+
+#include "base/Types.h"
 #include "FileLoader.h"
 #include "LoaderManager.h"
 #include "LogManager.h"

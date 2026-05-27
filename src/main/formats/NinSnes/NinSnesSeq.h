@@ -1,15 +1,19 @@
 #pragma once
 
-#include "base/Types.h"
-#include <algorithm>
-#include <array>
-#include <optional>
-#include "VGMSeq.h"
 #include "automation/SeqAutomation.h"
-#include "SeqTrack.h"
+#include "base/Types.h"
 #include "NinSnesFormat.h"
 #include "NinSnesScanResult.h"
 #include "NinSnesSeqState.h"
+#include "SeqTrack.h"
+#include "VGMSeq.h"
+
+#include <algorithm>
+#include <array>
+#include <map>
+#include <optional>
+#include <string>
+#include <vector>
 
 struct NinSnesProfile;
 class NinSnesSection;

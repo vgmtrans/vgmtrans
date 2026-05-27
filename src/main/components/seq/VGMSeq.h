@@ -6,14 +6,16 @@
 #pragma once
 
 #include "base/Types.h"
-
 #include "ConversionContext.h"
-#include "VGMFile.h"
-#include "RawFile.h"
 #include "MidiFile.h"
+#include "RawFile.h"
 #include "SeqEventTimeIndex.h"
-#include <set>
+#include "VGMFile.h"
+
 #include <filesystem>
+#include <set>
+#include <string>
+#include <vector>
 
 class SeqTrack;
 class SeqEvent;

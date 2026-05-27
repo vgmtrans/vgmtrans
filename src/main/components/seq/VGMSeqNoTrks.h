@@ -6,9 +6,12 @@
 #pragma once
 
 #include "base/Types.h"
-#include "VGMSeq.h"
-#include "SeqTrack.h"
 #include "SeqEvent.h"
+#include "SeqTrack.h"
+#include "VGMSeq.h"
+
+#include <string>
+#include <vector>
 
 class VGMSeqNoTrks : public VGMSeq, public SeqTrack {
 public:

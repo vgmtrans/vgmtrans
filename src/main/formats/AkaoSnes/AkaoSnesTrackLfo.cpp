@@ -4,11 +4,13 @@
  * refer to the included LICENSE.txt file
  */
 
-#include "base/Types.h"
-#include "AkaoSnesSeq.h"
 #include "AkaoSnesModulation.h"
+#include "AkaoSnesSeq.h"
 #include "automation/SeqTrackAutomation.h"
+#include "base/Types.h"
+
 #include <algorithm>
+
 #include <spdlog/fmt/fmt.h>
 
 /*

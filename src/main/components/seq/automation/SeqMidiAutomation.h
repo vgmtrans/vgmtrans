@@ -6,8 +6,8 @@
 #pragma once
 
 #include "base/Types.h"
-
 #include "SeqAutomation.h"
+
 #include <algorithm>
 #include <cmath>
 #include <cstdint>

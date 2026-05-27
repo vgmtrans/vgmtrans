@@ -5,11 +5,11 @@
  */
 
 #include "base/Types.h"
-#include "HOSASeq.h"
 #include "HOSAInstr.h"
-#include "VGMColl.h"
+#include "HOSASeq.h"
 #include "PSXSPU.h"
 #include "ScannerManager.h"
+#include "VGMColl.h"
 #include "VGMMiscFile.h"
 
 namespace vgmtrans::scanners {

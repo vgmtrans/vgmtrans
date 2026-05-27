@@ -1,5 +1,6 @@
-#include "base/Types.h"
 #include "TamSoftPS1Instr.h"
+
+#include "base/Types.h"
 #include "PSXSPU.h"
 
 // ******************

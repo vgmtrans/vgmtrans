@@ -3,13 +3,16 @@
  * Licensed under the zlib license,
  * refer to the included LICENSE.txt file
  */
-#include "base/Types.h"
 #include "AkaoSnesSeq.h"
+
 #include "AkaoSnesInstr.h"
 #include "AkaoSnesModulation.h"
+#include "base/Types.h"
 #include "ScaleConversion.h"
-#include <spdlog/fmt/fmt.h>
+
 #include <cmath>
+
+#include <spdlog/fmt/fmt.h>
 
 DECLARE_FORMAT(AkaoSnes);
 

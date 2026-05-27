@@ -6,12 +6,16 @@
 #pragma once
 
 #include "base/Types.h"
-
-#include <sstream>
-#include <unzip.h>
-#include <list>
-
 #include "components/FileLoader.h"
+
+#include <cassert>
+#include <list>
+#include <map>
+#include <sstream>
+#include <string>
+#include <utility>
+
+#include <unzip.h>
 
 class VirtFile;
 

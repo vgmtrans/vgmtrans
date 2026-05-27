@@ -6,19 +6,22 @@
 #pragma once
 
 #include "base/Types.h"
+#include "LogManager.h"
+#include "Modulation.h"
+#include "SynthType.h"
+#include "VGMItem.h"
+#include "VGMSeq.h"
 
+#include <cstddef>
 #include <cstdint>
 #include <sstream>
+#include <string>
 #include <unordered_map>
 #include <unordered_set>
 #include <utility>
 #include <vector>
-#include "VGMItem.h"
-#include "VGMSeq.h"
-#include "Modulation.h"
+
 #include <spdlog/common.h>
-#include "LogManager.h"
-#include "SynthType.h"
 
 class VGMSeq;
 class SeqEvent;

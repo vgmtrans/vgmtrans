@@ -4,11 +4,11 @@
  * refer to the included LICENSE.txt file
  */
 
-#include "base/Types.h"
 #include "PSFFile.h"
 
-#include "util/Decompression.h"
+#include "base/Types.h"
 #include "io/RawFile.h"
+#include "util/Decompression.h"
 
 constexpr auto PSF_TAG_SIG = "[TAG]";
 constexpr auto PSF_TAG_SIG_LEN = 5;

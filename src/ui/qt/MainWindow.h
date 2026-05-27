@@ -6,10 +6,11 @@
 
 #pragma once
 
+#include "Root.h"
+
 #include <QList>
 #include <QMainWindow>
 #include <QUrl>
-#include "Root.h"
 
 class QWidget;
 class QDockWidget;

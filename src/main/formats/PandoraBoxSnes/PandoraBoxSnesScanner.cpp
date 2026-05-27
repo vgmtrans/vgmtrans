@@ -5,8 +5,8 @@
  */
 
 #include "base/Types.h"
-#include "PandoraBoxSnesSeq.h"
 #include "PandoraBoxSnesInstr.h"
+#include "PandoraBoxSnesSeq.h"
 #include "ScannerManager.h"
 
 namespace vgmtrans::scanners {

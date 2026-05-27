@@ -1,9 +1,13 @@
 #pragma once
 
 #include "base/Types.h"
-#include "VGMSeq.h"
-#include "SeqTrack.h"
 #include "KonamiArcadeFormat.h"
+#include "SeqTrack.h"
+#include "VGMSeq.h"
+
+#include <array>
+#include <string>
+#include <utility>
 
 class KonamiArcadeSeq:
     public VGMSeq {

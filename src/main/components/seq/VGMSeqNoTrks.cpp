@@ -4,8 +4,9 @@
  * refer to the included LICENSE.txt file
  */
 
-#include "base/Types.h"
 #include "VGMSeqNoTrks.h"
+
+#include "base/Types.h"
 #include "Options.h"
 
 VGMSeqNoTrks::VGMSeqNoTrks(const std::string &format, RawFile *file, u32 offset, std::string name)

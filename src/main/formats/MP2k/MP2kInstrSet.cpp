@@ -4,22 +4,23 @@
  * refer to the included LICENSE.txt file
  */
 
-#include "base/Types.h"
 #include "MP2kInstrSet.h"
+
+#include "base/Types.h"
+#include "LogManager.h"
+#include "MP2kFormat.h"
+#include "PSGDSP.h"
+#include "VGMColl.h"
+#include "VGMRgn.h"
+#include "VGMSampColl.h"
 
 #include <cassert>
 #include <cmath>
 #include <cstdint>
 #include <cstring>
 #include <memory>
-#include <spdlog/fmt/fmt.h>
 
-#include "MP2kFormat.h"
-#include "VGMSampColl.h"
-#include "VGMColl.h"
-#include "VGMRgn.h"
-#include "LogManager.h"
-#include "PSGDSP.h"
+#include <spdlog/fmt/fmt.h>
 
 namespace {
 constexpr u8 kPsgSquareCount = 4;

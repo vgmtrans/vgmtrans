@@ -1,8 +1,9 @@
+#include "automation/SeqTrackAutomation.h"
 #include "base/Types.h"
+#include "Modulation.h"
 #include "NinSnesSeq.h"
 #include "NinSnesVibrato.h"
-#include "Modulation.h"
-#include "automation/SeqTrackAutomation.h"
+
 #include <algorithm>
 #include <cmath>
 

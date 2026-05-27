@@ -7,10 +7,13 @@
 #pragma once
 
 #include "base/Types.h"
-#include "VGMInstrSet.h"
-#include "VGMSampColl.h"
-#include "VGMSamp.h"
 #include "NDSFormat.h"
+#include "VGMInstrSet.h"
+#include "VGMSamp.h"
+#include "VGMSampColl.h"
+
+#include <string>
+#include <vector>
 
 class NDSInstr;
 

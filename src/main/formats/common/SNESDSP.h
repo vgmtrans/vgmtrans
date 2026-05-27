@@ -1,11 +1,13 @@
 #pragma once
 
 #include "base/Types.h"
-
-#include "VGMSampColl.h"
-#include "VGMSamp.h"
-#include "VGMItem.h"
 #include "ScaleConversion.h"
+#include "VGMItem.h"
+#include "VGMSamp.h"
+#include "VGMSampColl.h"
+
+#include <string>
+#include <vector>
 
 class VGMInstrSet;
 

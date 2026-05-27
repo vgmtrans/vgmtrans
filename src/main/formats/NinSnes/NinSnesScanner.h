@@ -6,9 +6,9 @@
 #pragma once
 
 #include "base/Types.h"
-#include "Scanner.h"
 #include "BytePattern.h"
 #include "NinSnesScanResult.h"
+#include "Scanner.h"
 
 class NinSnesScanner : public VGMScanner {
 public:

@@ -3,8 +3,9 @@
  * Licensed under the zlib license,
  * refer to the included LICENSE.txt file
  */
-#include "base/Types.h"
 #include "CPS2TrackV1.h"
+
+#include "base/Types.h"
 #include "CPSCommon.h"
 #include "ScaleConversion.h"
 #include "SeqEvent.h"

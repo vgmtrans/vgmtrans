@@ -4,13 +4,15 @@
  * refer to the included LICENSE.txt file
  */
 
+#include "TamSoftPS1Seq.h"
+
 #include "base/Types.h"
+#include "ScaleConversion.h"
+
 #include <iomanip>
 #include <iterator>
 
 #include <spdlog/fmt/fmt.h>
-#include "ScaleConversion.h"
-#include "TamSoftPS1Seq.h"
 
 DECLARE_FORMAT(TamSoftPS1);
 

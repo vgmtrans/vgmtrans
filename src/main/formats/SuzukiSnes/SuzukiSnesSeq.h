@@ -1,9 +1,12 @@
 #pragma once
 
 #include "base/Types.h"
-#include "VGMSeq.h"
 #include "SeqTrack.h"
 #include "SuzukiSnesFormat.h"
+#include "VGMSeq.h"
+
+#include <map>
+#include <string>
 
 #define SUZUKISNES_LOOP_LEVEL_MAX   10
 

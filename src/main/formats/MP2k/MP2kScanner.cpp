@@ -13,22 +13,24 @@
  * Sappy sound engine detector (c) 2014 by Bregalad, loveemu
  */
 
-#include "base/Types.h"
 #include "MP2kScanner.h"
 
-#include <optional>
+#include "base/Types.h"
+#include "LogManager.h"
+#include "MP2kInstrSet.h"
+#include "MP2kSeq.h"
+#include "ScannerManager.h"
+#include "VGMColl.h"
+
+#include <array>
 #include <functional>
+#include <optional>
 #include <set>
 #include <span>
-#include <array>
 #include <vector>
+
 #include <spdlog/fmt/fmt.h>
 
-#include "VGMColl.h"
-#include "MP2kSeq.h"
-#include "MP2kInstrSet.h"
-#include "LogManager.h"
-#include "ScannerManager.h"
 namespace vgmtrans::scanners {
 ScannerRegistration<MP2kScanner> s_mp2k("MP2k", {"gba", "gsf", "minigsf", "gsflib"});
 }

@@ -1,12 +1,13 @@
 #pragma once
 
+#include "AsciiShuichiSnesFormat.h"
 #include "base/Types.h"
+#include "SeqTrack.h"
+#include "VGMSeq.h"
 
 #include <array>
-
-#include "VGMSeq.h"
-#include "SeqTrack.h"
-#include "AsciiShuichiSnesFormat.h"
+#include <map>
+#include <string>
 
 enum AsciiShuichiSnesSeqEventType {
   //start enum at 1 because if map[] look up fails, it returns 0, and we don't want that to get confused with a legit event

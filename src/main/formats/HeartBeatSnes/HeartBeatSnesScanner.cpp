@@ -5,8 +5,8 @@
  */
 
 #include "base/Types.h"
-#include "HeartBeatSnesSeq.h"
 #include "HeartBeatSnesInstr.h"
+#include "HeartBeatSnesSeq.h"
 #include "ScannerManager.h"
 
 namespace vgmtrans::scanners {

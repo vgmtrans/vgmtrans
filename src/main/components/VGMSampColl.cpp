@@ -3,12 +3,12 @@
  * Licensed under the zlib license,
  * refer to the included LICENSE.txt file
  */
-#include "base/Types.h"
 #include "VGMSampColl.h"
 
-#include "VGMSamp.h"
-#include "Root.h"
+#include "base/Types.h"
 #include "Format.h"
+#include "Root.h"
+#include "VGMSamp.h"
 
 // ***********
 // VGMSampColl

@@ -6,11 +6,11 @@
 #pragma once
 
 #include "base/Types.h"
+#include "KonamiSnesDefinitions.h"
+#include "Modulation.h"
 
 #include <algorithm>
 #include <cstdint>
-#include "KonamiSnesDefinitions.h"
-#include "Modulation.h"
 
 namespace konami_snes::vibrato {
 

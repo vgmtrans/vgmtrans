@@ -6,8 +6,9 @@
 #pragma once
 
 #include "base/Types.h"
-
 #include "VGMFile.h"
+
+#include <string>
 
 // ***********
 // VGMMiscFile

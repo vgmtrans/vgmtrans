@@ -3,11 +3,12 @@
  * Licensed under the zlib license,
  * refer to the included LICENSE.txt file
  */
-#include "base/Types.h"
 #include "GraphResSnesInstr.h"
 
-#include <spdlog/fmt/fmt.h>
+#include "base/Types.h"
 #include "SNESDSP.h"
+
+#include <spdlog/fmt/fmt.h>
 
 // ********************
 // GraphResSnesInstrSet

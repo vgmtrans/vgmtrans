@@ -4,10 +4,12 @@
  * refer to the included LICENSE.txt file
  */
 
-#include "base/Types.h"
 #include "RareSnesInstr.h"
-#include "SNESDSP.h"
+
+#include "base/Types.h"
 #include "RareSnesFormat.h"
+#include "SNESDSP.h"
+
 #include <spdlog/fmt/fmt.h>
 
 // ****************

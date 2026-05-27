@@ -1,10 +1,14 @@
 #pragma once
 
-#include "base/Types.h"
-#include "VGMSeq.h"
-#include "automation/SeqMidiAutomation.h"
-#include "SeqTrack.h"
 #include "AkaoSnesFormat.h"
+#include "automation/SeqMidiAutomation.h"
+#include "base/Types.h"
+#include "SeqTrack.h"
+#include "VGMSeq.h"
+
+#include <map>
+#include <string>
+#include <vector>
 
 #define AKAOSNES_LOOP_LEVEL_MAX 4
 

@@ -1,9 +1,11 @@
 #pragma once
 
 #include "base/Types.h"
-#include "VGMSeq.h"
-#include "SeqTrack.h"
 #include "NDSFormat.h"
+#include "SeqTrack.h"
+#include "VGMSeq.h"
+
+#include <string>
 
 class NDSSeq:
     public VGMSeq {

@@ -4,10 +4,11 @@
  * refer to the included LICENSE.txt file
  */
 
-#include "base/Types.h"
-#include "FFTSeq.h"
-#include "FFTInstr.h"
 #include "FFTScanner.h"
+
+#include "base/Types.h"
+#include "FFTInstr.h"
+#include "FFTSeq.h"
 #include "ScannerManager.h"
 
 namespace vgmtrans::scanners {

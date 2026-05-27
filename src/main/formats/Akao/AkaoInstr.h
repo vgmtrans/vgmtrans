@@ -5,12 +5,15 @@
  */
 #pragma once
 
+#include "AkaoFormat.h"
 #include "base/Types.h"
 #include "VGMInstrSet.h"
-#include <set>
-#include "VGMSampColl.h"
 #include "VGMRgn.h"
-#include "AkaoFormat.h"
+#include "VGMSampColl.h"
+
+#include <set>
+#include <string>
+#include <vector>
 
 struct AkaoInstrDatLocation {
   u32 instrAllOffset;

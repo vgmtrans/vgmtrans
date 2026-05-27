@@ -4,18 +4,19 @@
  * refer to the included LICENSE.txt file
  */
 
-#include "base/Types.h"
 #include "PSFLoader.h"
 
-#include <unordered_map>
-#include <vector>
-#include <filesystem>
-#include <optional>
-#include <spdlog/fmt/fmt.h>
-
+#include "base/Types.h"
+#include "LoaderManager.h"
 #include "LogManager.h"
 #include "PSFFile.h"
-#include "LoaderManager.h"
+
+#include <filesystem>
+#include <optional>
+#include <unordered_map>
+#include <vector>
+
+#include <spdlog/fmt/fmt.h>
 
 namespace vgmtrans::loaders {
 LoaderRegistration<PSFLoader> psf{"PSF"};

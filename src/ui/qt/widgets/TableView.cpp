@@ -5,7 +5,9 @@
 */
 
 #include "TableView.h"
+
 #include "ItemViewDensity.h"
+
 #include <QHeaderView>
 
 TableView::TableView(QWidget *parent) : QTableView(parent) {

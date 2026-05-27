@@ -8,16 +8,15 @@
 
 #include "HexView.h"
 #include "HexViewRhiRenderer.h"
-#include "workarea/rhi/RhiWindowMainWindowLocator.h"
-
 #if defined(Q_OS_LINUX)
 #include "HexViewRhiWidget.h"
 #else
 #include "HexViewRhiWindow.h"
 #endif
+#include "workarea/rhi/RhiWindowMainWindowLocator.h"
 
-#include <QWindow>
 #include <QResizeEvent>
+#include <QWindow>
 
 HexViewRhiHost::HexViewRhiHost(HexView* view, QWidget* parent)
     : QWidget(parent) {

@@ -4,11 +4,13 @@
  * refer to the included LICENSE.txt file
  */
 
-#include "base/Types.h"
 #include "PSF2Loader.h"
-#include <zlib.h>
-#include "LogManager.h"
+
+#include "base/Types.h"
 #include "components/PSFFile.h"
+#include "LogManager.h"
+
+#include <zlib.h>
 
 namespace vgmtrans::loaders {
 LoaderRegistration<PSF2Loader> _psf2("PSF2");

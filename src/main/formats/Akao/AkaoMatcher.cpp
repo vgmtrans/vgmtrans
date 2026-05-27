@@ -1,6 +1,7 @@
 #include "AkaoMatcher.h"
-#include "AkaoSeq.h"
+
 #include "AkaoInstr.h"
+#include "AkaoSeq.h"
 
 bool isPsfFile(RawFile* file) {
   return file->extension() == "psf" ||

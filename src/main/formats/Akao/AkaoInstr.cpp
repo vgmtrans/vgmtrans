@@ -4,12 +4,13 @@
  * refer to the included LICENSE.txt file
  */
 
-#include "base/Types.h"
 #include "AkaoInstr.h"
+
 #include "AkaoSeq.h"
-#include "VGMSamp.h"
-#include "VGMColl.h"
+#include "base/Types.h"
 #include "PSXSPU.h"
+#include "VGMColl.h"
+#include "VGMSamp.h"
 
 // ************
 // AkaoInstrSet

@@ -6,7 +6,6 @@
 #pragma once
 
 #include "base/Types.h"
-
 #include "Scanner.h"
 
 #include <cstdint>

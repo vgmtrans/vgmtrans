@@ -4,10 +4,11 @@
  * refer to the included LICENSE.txt file
  */
 
-#include "base/Types.h"
 #include "PS1Seq.h"
-#include "Options.h"
+
+#include "base/Types.h"
 #include "formats/PS1/PS1Format.h"
+#include "Options.h"
 
 DECLARE_FORMAT(PS1)
 

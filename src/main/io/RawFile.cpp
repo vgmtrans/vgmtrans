@@ -4,11 +4,11 @@
  * refer to the included LICENSE.txt file
  */
 
-#include "base/Types.h"
 #include "RawFile.h"
 
-#include "LogManager.h"
+#include "base/Types.h"
 #include "components/VGMFile.h"
+#include "LogManager.h"
 #include "util/BytePattern.h"
 
 /* RawFile */

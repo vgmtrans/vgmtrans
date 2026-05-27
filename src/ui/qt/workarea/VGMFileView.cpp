@@ -4,25 +4,28 @@
  * refer to the included LICENSE.txt file
  */
 
+#include "VGMFileView.h"
+
 #include "base/Types.h"
+#include "Helpers.h"
+#include "hexview/HexView.h"
+#include "MdiArea.h"
+#include "Root.h"
+#include "SeqEvent.h"
+#include "SeqTrack.h"
+#include "SequencePlayer.h"
+#include "SnappingSplitter.h"
+#include "VGMColl.h"
+#include "VGMFile.h"
+#include "VGMFileTreeView.h"
+#include "VGMSeq.h"
+
+#include <algorithm>
+#include <cmath>
+
 #include <QApplication>
 #include <QShortcut>
 #include <QtGlobal>
-#include <algorithm>
-#include <cmath>
-#include "VGMFileView.h"
-#include "VGMFile.h"
-#include "VGMSeq.h"
-#include "VGMColl.h"
-#include "SeqTrack.h"
-#include "SeqEvent.h"
-#include "hexview/HexView.h"
-#include "VGMFileTreeView.h"
-#include "MdiArea.h"
-#include "SequencePlayer.h"
-#include "SnappingSplitter.h"
-#include "Helpers.h"
-#include "Root.h"
 
 VGMFileView::VGMFileView(VGMFile *vgmfile)
     : QMdiSubWindow(), m_vgmfile(vgmfile), m_hexview(new HexView(vgmfile)) {

@@ -4,15 +4,15 @@
 * refer to the included LICENSE.txt file
 */
 
-#include "base/Types.h"
 #include "StitchExport.h"
+
+#include "base/Types.h"
+#include "LogManager.h"
+#include "MidiFile.h"
 
 #include <exception>
 #include <memory>
 #include <utility>
-
-#include "LogManager.h"
-#include "MidiFile.h"
 
 namespace conversion {
 namespace {

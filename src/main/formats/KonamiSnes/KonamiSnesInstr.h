@@ -1,10 +1,13 @@
 #pragma once
 
 #include "base/Types.h"
-#include "VGMInstrSet.h"
-#include "VGMSampColl.h"
-#include "VGMRgn.h"
 #include "KonamiSnesFormat.h"
+#include "VGMInstrSet.h"
+#include "VGMRgn.h"
+#include "VGMSampColl.h"
+
+#include <string>
+#include <vector>
 
 class VGMColl;
 

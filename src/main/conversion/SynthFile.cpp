@@ -4,11 +4,12 @@
  * refer to the included LICENSE.txt file
  */
 
-#include "base/Types.h"
 #include "SynthFile.h"
 
-#include <spdlog/fmt/fmt.h>
+#include "base/Types.h"
 #include "VGMSamp.h"
+
+#include <spdlog/fmt/fmt.h>
 
 //  **********************************************************************************
 //  SynthFile - An intermediate class to lay out all of the the data necessary for Coll conversion

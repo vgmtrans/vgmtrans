@@ -4,8 +4,9 @@
  * refer to the included LICENSE.txt file
  */
 
-#include "base/Types.h"
 #include "RiffFile.h"
+
+#include "base/Types.h"
 
 u32 Chunk::size() {
   return 8 + paddedSize(m_size);

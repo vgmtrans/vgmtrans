@@ -1,10 +1,12 @@
-#include "base/Types.h"
-#include <spdlog/fmt/fmt.h>
 #include "CPS1Instr.h"
+
+#include "base/Types.h"
 #include "CPS2Format.h"
-#include "VGMRgn.h"
 #include "OkiAdpcm.h"
 #include "version.h"
+#include "VGMRgn.h"
+
+#include <spdlog/fmt/fmt.h>
 
 // ******************
 // CPS1SampleInstrSet

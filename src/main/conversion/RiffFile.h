@@ -1,11 +1,12 @@
 #pragma once
 
-#include <cassert>
-#include <cstring>
-#include <string>
 #include "base/Types.h"
 #include "Helper.h"
 
+#include <cassert>
+#include <cstring>
+#include <string>
+#include <vector>
 
 //////////////////////////////////////////////
 // Chunk		- Riff format chunk

@@ -1,6 +1,8 @@
-#include "base/Types.h"
 #include "SuzukiSnesSeq.h"
+
+#include "base/Types.h"
 #include "SuzukiSnesInstr.h"
+
 #include "spdlog/fmt/fmt.h"
 
 DECLARE_FORMAT(SuzukiSnes);

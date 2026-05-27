@@ -5,8 +5,9 @@
  */
 
 #include "MarqueeLabel.h"
-#include <QPainter>
+
 #include <QApplication>
+#include <QPainter>
 
 MarqueeLabel::MarqueeLabel(QWidget *parent) : QWidget(parent) {
   m_static_text.setTextFormat(Qt::PlainText);

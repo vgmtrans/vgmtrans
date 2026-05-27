@@ -4,8 +4,9 @@
  * refer to the included LICENSE.txt file
  */
 #pragma once
-#include "VGMTag.h"
 #include "base/Types.h"
+#include "VGMTag.h"
+
 #include <array>
 #include <string>
 

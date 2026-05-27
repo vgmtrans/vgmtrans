@@ -5,8 +5,8 @@
  */
 
 #pragma once
-#include <QWidget>
 #include <QTimer>
+#include <QWidget>
 
 class QLabel;
 class QPushButton;

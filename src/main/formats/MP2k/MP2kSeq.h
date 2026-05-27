@@ -5,12 +5,14 @@
  */
 #pragma once
 
-#include "base/Types.h"
-
-#include "VGMSeq.h"
-#include "SeqTrack.h"
-#include "SeqEvent.h"
 #include "automation/SeqMidiAutomation.h"
+#include "base/Types.h"
+#include "SeqEvent.h"
+#include "SeqTrack.h"
+#include "VGMSeq.h"
+
+#include <string>
+#include <vector>
 
 class MP2kSeq final : public VGMSeq {
 public:

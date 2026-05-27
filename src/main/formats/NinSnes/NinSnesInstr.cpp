@@ -3,12 +3,14 @@
  * Licensed under the zlib license,
  * refer to the included LICENSE.txt file
  */
-#include "base/Types.h"
 #include "NinSnesInstr.h"
+
+#include "base/Types.h"
 #include "NinSnesSeq.h"
 #include "NinSnesVibrato.h"
 #include "SNESDSP.h"
 #include "VGMColl.h"
+
 #include <spdlog/fmt/fmt.h>
 
 namespace {

@@ -3,19 +3,21 @@
  * Licensed under the zlib license
  * See the included LICENSE for more information
 */
-#include "base/Types.h"
-#include <cassert>
-#include "ConversionContext.h"
 #include "DLSConversion.h"
+
+#include "base/Types.h"
+#include "ConversionContext.h"
+#include "DLSFile.h"
+#include "LogManager.h"
 #include "Options.h"
+#include "ScaleConversion.h"
+#include "VGMColl.h"
 #include "VGMInstrSet.h"
 #include "VGMRgn.h"
-#include "VGMSampColl.h"
 #include "VGMSamp.h"
-#include "VGMColl.h"
-#include "DLSFile.h"
-#include "ScaleConversion.h"
-#include "LogManager.h"
+#include "VGMSampColl.h"
+
+#include <cassert>
 
 namespace conversion {
 

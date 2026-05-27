@@ -1,9 +1,11 @@
 #pragma once
 
 #include "base/Types.h"
-
 #include "Modulation.h"
 #include "RiffFile.h"
+
+#include <string>
+#include <utility>
 #include <vector>
 
 struct Loop;

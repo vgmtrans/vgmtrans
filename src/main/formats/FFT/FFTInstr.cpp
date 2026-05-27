@@ -1,8 +1,9 @@
+#include "FFTInstr.h"
+
 #include "base/Types.h"
 #include "FFTFormat.h"
-#include "FFTInstr.h"
-#include "VGMSamp.h"
 #include "PSXSPU.h"
+#include "VGMSamp.h"
 
 const float defaultFFTReverbPercent = 0.5;
 

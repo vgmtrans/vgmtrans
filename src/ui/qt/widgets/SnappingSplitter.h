@@ -6,8 +6,8 @@
 
 #pragma once
 
-#include <QSplitter>
 #include <QList>
+#include <QSplitter>
 
 class QMouseEvent;
 

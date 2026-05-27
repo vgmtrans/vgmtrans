@@ -10,6 +10,11 @@
 #include "services/commands/Command.h"
 #include "VGMFile.h"
 
+#include <memory>
+#include <optional>
+#include <string>
+#include <vector>
+
 using MenuPath = Command::MenuPath;
 
 /**

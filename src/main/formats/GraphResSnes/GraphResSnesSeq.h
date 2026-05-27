@@ -1,10 +1,13 @@
 #pragma once
 
 #include "base/Types.h"
-#include "VGMSeq.h"
-#include "SeqTrack.h"
-#include "SeqEvent.h"
 #include "GraphResSnesFormat.h"
+#include "SeqEvent.h"
+#include "SeqTrack.h"
+#include "VGMSeq.h"
+
+#include <map>
+#include <string>
 
 #define GRAPHRESSNES_CALLSTACK_SIZE 2
 #define GRAPHRESSNES_LOOP_LEVEL_MAX 4

@@ -1,9 +1,11 @@
 #pragma once
 
 #include "base/Types.h"
+#include "Loop.h"
 #include "SynthFile.h"
 #include "VGMItem.h"
-#include "Loop.h"
+
+#include <string>
 
 class VGMInstr;
 class VGMRgnItem;

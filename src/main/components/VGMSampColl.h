@@ -1,9 +1,11 @@
 #pragma once
 
 #include "base/Types.h"
-
 #include "VGMFile.h"
 #include "VGMSamp.h"
+
+#include <string>
+#include <vector>
 
 class VGMInstrSet;
 class VGMSamp;

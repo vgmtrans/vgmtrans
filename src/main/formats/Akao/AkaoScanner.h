@@ -5,8 +5,8 @@
  */
 
 #pragma once
-#include "Scanner.h"
 #include "AkaoFormatVersion.h"
+#include "Scanner.h"
 
 class AkaoScanner final : public VGMScanner {
  public:

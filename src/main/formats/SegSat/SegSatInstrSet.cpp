@@ -4,10 +4,12 @@
  * refer to the included LICENSE.txt file
  */
 
-#include "base/Types.h"
 #include "SegSatInstrSet.h"
+
+#include "base/Types.h"
 #include "ScaleConversion.h"
 #include "VGMSamp.h"
+
 #include <spdlog/fmt/fmt.h>
 
 static const float SDLT[8] = { 1000000.0f, 36.0f, 30.0f, 24.0f, 18.0f, 12.0f, 6.0f, 0.0f };

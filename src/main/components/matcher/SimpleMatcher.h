@@ -6,14 +6,15 @@
 
 #pragma once
 
-#include <map>
-
-#include "Matcher.h"
 #include "Format.h"
-#include "VGMSeq.h"
+#include "Matcher.h"
+#include "VGMColl.h"
 #include "VGMInstrSet.h"
 #include "VGMSampColl.h"
-#include "VGMColl.h"
+#include "VGMSeq.h"
+
+#include <map>
+#include <utility>
 
 // *************
 // SimpleMatcher

@@ -1,8 +1,8 @@
 #include "base/Types.h"
 #include "NinSnesSeq.h"
-
 #include "ScaleConversion.h"
 #include "SeqEvent.h"
+
 #include "spdlog/fmt/fmt.h"
 
 namespace {

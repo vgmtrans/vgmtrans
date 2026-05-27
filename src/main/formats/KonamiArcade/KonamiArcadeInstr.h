@@ -6,10 +6,12 @@
 #pragma once
 
 #include "base/Types.h"
-
-#include "VGMSampColl.h"
 #include "VGMInstrSet.h"
+#include "VGMSampColl.h"
+
 #include <array>
+#include <string>
+#include <vector>
 
 // Mystic Warrior driver sample info
 

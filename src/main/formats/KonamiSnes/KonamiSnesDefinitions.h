@@ -6,9 +6,9 @@
 #pragma once
 
 #include "base/Types.h"
+#include "KonamiSnesFormat.h"
 
 #include <cstdint>
-#include "KonamiSnesFormat.h"
 
 namespace konami_snes {
 

@@ -6,16 +6,6 @@
 
 #include "MidiMerge.h"
 
-#include <algorithm>
-#include <array>
-#include <filesystem>
-#include <limits>
-#include <memory>
-#include <numeric>
-#include <set>
-#include <unordered_map>
-#include <utility>
-
 #include "base/Types.h"
 #include "ConversionContext.h"
 #include "LogManager.h"
@@ -27,6 +17,16 @@
 #include "VGMColl.h"
 #include "VGMInstrSet.h"
 #include "VGMSeq.h"
+
+#include <algorithm>
+#include <array>
+#include <filesystem>
+#include <limits>
+#include <memory>
+#include <numeric>
+#include <set>
+#include <unordered_map>
+#include <utility>
 
 namespace conversion {
 

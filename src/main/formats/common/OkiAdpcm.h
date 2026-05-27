@@ -12,6 +12,7 @@
 #include "VGMSamp.h"
 
 #include <string>
+#include <vector>
 
 class VGMSampColl;
 class VGMInstrSet;

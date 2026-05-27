@@ -6,8 +6,8 @@
 
 #pragma once
 
-#include <QWidget>
 #include <QUrl>
+#include <QWidget>
 
 class QLineEdit;
 class QPlainTextEdit;

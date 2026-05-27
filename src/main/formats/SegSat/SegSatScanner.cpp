@@ -4,13 +4,15 @@
  * refer to the included LICENSE.txt file
  */
 
-#include "base/Types.h"
 #include "SegSatScanner.h"
-#include "SegSatSeq.h"
+
+#include "base/Types.h"
 #include "ScannerManager.h"
 #include "SegSatInstrSet.h"
+#include "SegSatSeq.h"
 #include "VGMColl.h"
 #include "VGMMiscFile.h"
+
 #include <array>
 
 namespace vgmtrans::scanners {

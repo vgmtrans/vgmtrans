@@ -4,11 +4,13 @@
  * refer to the included LICENSE.txt file
  */
 
-#include <cmath>
-#include <algorithm>
-#include <limits>
-#include "base/Types.h"
 #include "ScaleConversion.h"
+
+#include "base/Types.h"
+
+#include <algorithm>
+#include <cmath>
+#include <limits>
 
 #ifndef M_PI_2
 #define M_PI_2 1.57079632679489661923132169163975144 /* pi/2           */

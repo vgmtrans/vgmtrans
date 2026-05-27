@@ -3,18 +3,20 @@
  * Licensed under the zlib license,
  * refer to the included LICENSE.txt file
  */
-#include "base/Types.h"
-#include <spdlog/fmt/fmt.h>
-#include <fstream>
-#include <algorithm>
-
 #include "VGMExport.h"
-#include "util/Path.h"
-#include "VGMInstrSet.h"
-#include "VGMSampColl.h"
-#include "VGMSamp.h"
-#include "VGMColl.h"
+
+#include "base/Types.h"
 #include "SynthFile.h"
+#include "util/Path.h"
+#include "VGMColl.h"
+#include "VGMInstrSet.h"
+#include "VGMSamp.h"
+#include "VGMSampColl.h"
+
+#include <algorithm>
+#include <fstream>
+
+#include <spdlog/fmt/fmt.h>
 
 namespace fs = std::filesystem;
 

@@ -3,6 +3,9 @@
 #include "base/Types.h"
 #include "VGMSeqNoTrks.h"
 
+#include <string>
+#include <vector>
+
 class SegSatRgn;
 class SegSatInstr;
 class SegSatInstrSet;

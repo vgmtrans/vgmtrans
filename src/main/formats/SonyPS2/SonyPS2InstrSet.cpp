@@ -1,5 +1,6 @@
-#include "base/Types.h"
 #include "SonyPS2InstrSet.h"
+
+#include "base/Types.h"
 #include "PSXSPU.h"
 
 using namespace std;

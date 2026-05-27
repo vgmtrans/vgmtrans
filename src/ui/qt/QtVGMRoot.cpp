@@ -4,13 +4,16 @@
  * refer to the included LICENSE.txt file
  */
 
-#include "VGMFileTreeView.h"
+#include "QtVGMRoot.h"
+
 #include "UIHelpers.h"
+#include "VGMFileTreeView.h"
+
+#include <filesystem>
+
 #include <QApplication>
 #include <QFileDialog>
 #include <QString>
-#include <filesystem>
-#include "QtVGMRoot.h"
 
 QtVGMRoot qtVGMRoot;
 

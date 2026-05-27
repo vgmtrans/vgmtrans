@@ -1,11 +1,11 @@
 #pragma once
 
+#include "automation/SeqMidiAutomation.h"
 #include "base/Types.h"
 
 #include <array>
 #include <cstddef>
 #include <cstdint>
-#include "automation/SeqMidiAutomation.h"
 
 enum NinSnesSeqEventType {
   // start enum at 1 because if map[] look up fails, it returns 0, and we don't want that to get

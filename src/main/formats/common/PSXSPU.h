@@ -1,12 +1,15 @@
 #pragma once
 
-#include "util/SizeOffsetPair.h"
 #include "base/Types.h"
-#include "VGMSampColl.h"
-#include "VGMSamp.h"
-#include "VGMItem.h"
-#include "ScaleConversion.h"
 #include "LogManager.h"
+#include "ScaleConversion.h"
+#include "util/SizeOffsetPair.h"
+#include "VGMItem.h"
+#include "VGMSamp.h"
+#include "VGMSampColl.h"
+
+#include <string>
+#include <vector>
 
 // All of the ADSR calculations herein (except where inaccurate) are derived from Neill Corlett's work in
 // reverse-engineering the Playstation 1/2 SPU unit.

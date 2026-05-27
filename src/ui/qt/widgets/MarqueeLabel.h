@@ -6,9 +6,9 @@
 
 #pragma once
 
-#include <QWidget>
 #include <QStaticText>
 #include <QTimer>
+#include <QWidget>
 
 /* Loosely based on https://stackoverflow.com/a/10655396 */
 class MarqueeLabel : public QWidget {

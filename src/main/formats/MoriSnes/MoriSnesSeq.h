@@ -1,10 +1,14 @@
 #pragma once
 
 #include "base/Types.h"
-#include "VGMSeq.h"
-#include "SeqTrack.h"
 #include "MoriSnesFormat.h"
 #include "MoriSnesInstr.h"
+#include "SeqTrack.h"
+#include "VGMSeq.h"
+
+#include <map>
+#include <string>
+#include <vector>
 
 #define MORISNES_CALLSTACK_SIZE 10
 

@@ -6,24 +6,25 @@
 
 #include "Logger.h"
 
+#include <LogItem.h>
+#include "QtVGMRoot.h"
+#include "TitleBar.h"
+#include "util/UIHelpers.h"
+
 #include <QActionGroup>
 #include <QColor>
 #include <QFileDialog>
 #include <QFontDatabase>
 #include <QFrame>
 #include <QMenu>
+#include <QPalette>
 #include <QPlainTextEdit>
 #include <QSaveFile>
 #include <QTextCharFormat>
 #include <QTextCursor>
 #include <QTimer>
 #include <QToolButton>
-#include <QPalette>
 #include <QWidget>
-#include <LogItem.h>
-#include "QtVGMRoot.h"
-#include "TitleBar.h"
-#include "util/UIHelpers.h"
 
 static Logger *s_instance = nullptr;
 

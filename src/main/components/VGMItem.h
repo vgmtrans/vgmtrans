@@ -1,10 +1,12 @@
 #pragma once
 
 #include "base/Types.h"
+
 #include <algorithm>
+#include <iterator>
+#include <ranges>
 #include <string>
 #include <vector>
-#include <ranges>
 
 template <class T>
 class Menu;

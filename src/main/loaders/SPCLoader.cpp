@@ -5,8 +5,9 @@
  */
 
 #include "SPCLoader.h"
-#include "LogManager.h"
+
 #include "LoaderManager.h"
+#include "LogManager.h"
 #include "SPCFile.h"
 
 namespace vgmtrans::loaders {

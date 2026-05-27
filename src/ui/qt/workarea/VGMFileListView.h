@@ -7,13 +7,12 @@
 #pragma once
 
 #include "base/Types.h"
+#include "TableView.h"
+#include "VGMFile.h"
 
 #include <QAbstractTableModel>
 #include <QKeyEvent>
 #include <QSortFilterProxyModel>
-#include "TableView.h"
-
-#include "VGMFile.h"
 
 class QItemSelection;
 class VGMFileListModel : public QAbstractTableModel {

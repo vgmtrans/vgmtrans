@@ -7,8 +7,10 @@
 #pragma once
 
 #include "Root.h"
-#include <vector>
+
 #include <filesystem>
+#include <string>
+#include <vector>
 
 class DBGVGMRoot : public VGMRoot {
 public:

@@ -6,11 +6,13 @@
 #pragma once
 
 #include "base/Types.h"
-#include <unordered_map>
-#include <array>
-#include "VGMSeq.h"
-#include "SeqTrack.h"
 #include "ItikitiSnesFormat.h"
+#include "SeqTrack.h"
+#include "VGMSeq.h"
+
+#include <array>
+#include <string>
+#include <unordered_map>
 
 constexpr u16 kItikitiSnesSeqTimebase = 48;
 constexpr u8 kItikitiSnesSeqTimerFreq = 0x27;

@@ -3,19 +3,20 @@
  * Licensed under the zlib license,
  * refer to the included LICENSE.txt file
  */
+#include "RawFileListView.h"
+
 #include "base/Types.h"
+#include "LogManager.h"
+#include "QtVGMRoot.h"
+#include "RawFile.h"
+#include "services/MenuManager.h"
+#include "services/NotificationCenter.h"
+#include "VGMExport.h"
+#include "VGMFile.h"
+
 #include <ranges>
 
 #include <QKeyEvent>
-#include "RawFileListView.h"
-
-#include "LogManager.h"
-#include "RawFile.h"
-#include "VGMFile.h"
-#include "QtVGMRoot.h"
-#include "services/NotificationCenter.h"
-#include "services/MenuManager.h"
-#include "VGMExport.h"
 
 static const QIcon& fileIcon() {
   static QIcon fileIcon(":/icons/file-outline.svg");

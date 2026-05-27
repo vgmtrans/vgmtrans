@@ -1,9 +1,12 @@
 #pragma once
 
 #include "base/Types.h"
+#include "HeartBeatSnesFormat.h"
 #include "VGMInstrSet.h"
 #include "VGMRgn.h"
-#include "HeartBeatSnesFormat.h"
+
+#include <string>
+#include <vector>
 
 // *********************
 // HeartBeatSnesInstrSet

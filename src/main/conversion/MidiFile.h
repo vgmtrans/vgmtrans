@@ -4,13 +4,13 @@
  * refer to the included LICENSE.txt file
  */
 #pragma once
-#include <string>
-#include <vector>
-#include <list>
-#include <unordered_map>
-#include <filesystem>
-
 #include "base/Types.h"
+
+#include <filesystem>
+#include <list>
+#include <string>
+#include <unordered_map>
+#include <vector>
 
 class VGMSeq;
 

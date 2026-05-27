@@ -7,6 +7,9 @@
 
 #include "base/Types.h"
 
+#include <iterator>
+#include <string>
+
 #include <spdlog/fmt/fmt.h>
 
 struct OPMData {

@@ -1,10 +1,12 @@
 #pragma once
 
 #include "base/Types.h"
+#include "FilenameMatcher.h"
 #include "Format.h"
 #include "SonyPS2Scanner.h"
-#include "FilenameMatcher.h"
 #include "VGMColl.h"
+
+#include <string>
 
 typedef struct _VersCk {
   u32 Creator;

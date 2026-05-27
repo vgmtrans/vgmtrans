@@ -6,6 +6,7 @@
 
 #include "AkaoSnesSeq.h"
 #include "automation/SeqTrackAutomation.h"
+
 #include <algorithm>
 #include <cmath>
 

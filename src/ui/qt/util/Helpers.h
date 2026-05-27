@@ -7,11 +7,11 @@
 #pragma once
 
 #include "components/VGMFileVariant.h"
+#include <VGMFile.h>
+#include <VGMItem.h>
 
 #include <QColor>
 #include <QIcon>
-#include <VGMFile.h>
-#include <VGMItem.h>
 
 class QUrl;
 class QWidget;

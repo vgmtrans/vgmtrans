@@ -7,15 +7,15 @@
 #pragma once
 
 #include "base/Types.h"
+#include "HexViewFrameData.h"
 
-#include <QElapsedTimer>
-#include <QSize>
-#include <QVector4D>
 #include <array>
 #include <cstdint>
 #include <vector>
 
-#include "HexViewFrameData.h"
+#include <QElapsedTimer>
+#include <QSize>
+#include <QVector4D>
 
 class QChar;
 class QRectF;

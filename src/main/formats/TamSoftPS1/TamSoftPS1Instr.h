@@ -1,10 +1,12 @@
 #pragma once
 
 #include "base/Types.h"
-#include "VGMInstrSet.h"
-#include "VGMSampColl.h"
-#include "VGMRgn.h"
 #include "TamSoftPS1Format.h"
+#include "VGMInstrSet.h"
+#include "VGMRgn.h"
+#include "VGMSampColl.h"
+
+#include <string>
 
 // ******************
 // TamSoftPS1InstrSet

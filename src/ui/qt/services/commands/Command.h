@@ -7,11 +7,14 @@
 #pragma once
 
 #include <filesystem>
+#include <map>
+#include <memory>
 #include <optional>
+#include <string>
 #include <typeindex>
 #include <variant>
 #include <vector>
-#include <map>
+
 #include <QKeySequence>
 #include <QList>
 

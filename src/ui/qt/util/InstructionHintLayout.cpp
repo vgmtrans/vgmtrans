@@ -6,6 +6,8 @@
 
 #include "util/InstructionHintLayout.h"
 
+#include "util/UIHelpers.h"
+
 #include <algorithm>
 #include <cmath>
 
@@ -13,8 +15,6 @@
 #include <QIcon>
 #include <QPainter>
 #include <QPixmap>
-
-#include "util/UIHelpers.h"
 
 QFont prepareInstructionFont(const QFont &base, qreal scale,
                              QFont::Weight weight,

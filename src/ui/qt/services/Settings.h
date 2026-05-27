@@ -7,6 +7,10 @@
 #pragma once
 
 #include "Options.h"
+
+#include <memory>
+#include <string_view>
+
 #include <QByteArray>
 #include <QObject>
 #include <QSettings>

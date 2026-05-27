@@ -6,13 +6,16 @@
 
 #pragma once
 
-#include "base/Types.h"
-
-#include <set>
-#include <array>
-#include "VGMSeq.h"
-#include "SeqTrack.h"
 #include "AkaoFormatVersion.h"
+#include "base/Types.h"
+#include "SeqTrack.h"
+#include "VGMSeq.h"
+
+#include <array>
+#include <map>
+#include <set>
+#include <string>
+#include <vector>
 
 class AkaoSeq;
 class AkaoTrack;

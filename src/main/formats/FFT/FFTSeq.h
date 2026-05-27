@@ -1,8 +1,8 @@
 #pragma once
 
 #include "base/Types.h"
-#include "VGMSeq.h"
 #include "SeqTrack.h"
+#include "VGMSeq.h"
 
 static const unsigned char delta_time_table[] = {0, 192, 144, 96, 72, 64, 48, 36, 32, 24, 18, 16, 12, 9, 8, 6, 4, 3, 2};
 

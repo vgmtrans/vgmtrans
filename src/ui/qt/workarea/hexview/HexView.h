@@ -7,6 +7,14 @@
 #pragma once
 
 #include "base/Types.h"
+#include "HexViewFrameData.h"
+#include "workarea/SplitterSnapProvider.h"
+
+#include <array>
+#include <cstdint>
+#include <memory>
+#include <unordered_map>
+#include <vector>
 
 #include <QAbstractScrollArea>
 #include <QBasicTimer>
@@ -14,16 +22,9 @@
 #include <QElapsedTimer>
 #include <QFont>
 #include <QImage>
-#include <QSize>
 #include <QPointF>
 #include <QRectF>
-#include <array>
-#include <cstdint>
-#include <memory>
-#include <unordered_map>
-#include <vector>
-#include "HexViewFrameData.h"
-#include "workarea/SplitterSnapProvider.h"
+#include <QSize>
 
 class QParallelAnimationGroup;
 class QWidget;

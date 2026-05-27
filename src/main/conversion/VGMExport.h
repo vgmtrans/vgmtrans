@@ -5,18 +5,18 @@
  */
 #pragma once
 
-#include <filesystem>
-
 #include "base/Types.h"
-#include "util/Path.h"
+#include "ConversionContext.h"
+#include "DLSConversion.h"
 #include "DLSFile.h"
+#include "Options.h"
+#include "SF2Conversion.h"
 #include "SF2File.h"
+#include "util/Path.h"
 #include "VGMColl.h"
 #include "VGMSeq.h"
-#include "SF2Conversion.h"
-#include "DLSConversion.h"
-#include "ConversionContext.h"
-#include "Options.h"
+
+#include <filesystem>
 
 /*
  * The following free functions implement

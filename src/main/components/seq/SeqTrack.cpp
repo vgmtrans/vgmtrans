@@ -4,18 +4,17 @@
  * refer to the included LICENSE.txt file
  */
 
-#include "base/Types.h"
 #include "SeqTrack.h"
+
+#include "automation/SeqMidiAutomation.h"
+#include "base/Types.h"
+#include "Options.h"
+#include "ScaleConversion.h"
+#include "SeqEvent.h"
+#include "VGMSeqNoTrks.h"
 
 #include <algorithm>
 #include <cmath>
-
-#include "automation/SeqMidiAutomation.h"
-#include "SeqEvent.h"
-#include "ScaleConversion.h"
-#include "Options.h"
-#include "VGMSeqNoTrks.h"
-
 
 namespace {
 constexpr u16 maxLevelForResolution(Resolution res) {

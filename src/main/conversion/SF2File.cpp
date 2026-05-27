@@ -3,19 +3,21 @@
  * Licensed under the zlib license,
  * refer to the included LICENSE.txt file
  */
+#include "SF2File.h"
+
 #include "base/Types.h"
+#include "ConversionContext.h"
+#include "Root.h"
+#include "ScaleConversion.h"
+#include "SynthFile.h"
+#include "version.h"
+#include "VGMInstrSet.h"
+#include "VGMRgn.h"
+
 #include <algorithm>
 #include <cmath>
 #include <limits>
 #include <optional>
-#include "ConversionContext.h"
-#include "SF2File.h"
-#include "version.h"
-#include "VGMInstrSet.h"
-#include "SynthFile.h"
-#include "ScaleConversion.h"
-#include "Root.h"
-#include "VGMRgn.h"
 
 namespace {
 

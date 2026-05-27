@@ -4,6 +4,9 @@
 #include "VGMInstrSet.h"
 #include "VGMRgn.h"
 
+#include <string>
+#include <vector>
+
 // ************************
 // AsciiShuichiSnesInstrSet
 // ************************

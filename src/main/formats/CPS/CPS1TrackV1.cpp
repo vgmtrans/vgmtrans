@@ -1,5 +1,6 @@
-#include "base/Types.h"
 #include "CPS1TrackV1.h"
+
+#include "base/Types.h"
 
 CPS1TrackV1::CPS1TrackV1(CPS1Seq *parentSeq, CPSSynth channelSynth, u32 offset, u32 length)
     : SeqTrack(parentSeq, offset, length), channelSynth(channelSynth) {

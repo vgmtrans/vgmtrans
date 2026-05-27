@@ -6,11 +6,12 @@
 
 #pragma once
 
+#include "base/Types.h"
+
 #include <cstdint>
 #include <limits>
 #include <unordered_map>
 #include <vector>
-#include "base/Types.h"
 
 class SeqEvent;
 

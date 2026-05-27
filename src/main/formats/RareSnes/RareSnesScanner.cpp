@@ -5,10 +5,10 @@
  */
 
 #include "base/Types.h"
-#include "RareSnesSeq.h"
 #include "RareSnesInstr.h"
-#include "SNESDSP.h"
+#include "RareSnesSeq.h"
 #include "ScannerManager.h"
+#include "SNESDSP.h"
 
 namespace vgmtrans::scanners {
 ScannerRegistration<RareSnesScanner> s_raresnes("RareSnes", {"spc"});

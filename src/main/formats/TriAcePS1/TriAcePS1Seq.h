@@ -1,9 +1,13 @@
 #pragma once
 
 #include "base/Types.h"
-#include "VGMSeq.h"
 #include "SeqTrack.h"
 #include "TriAcePS1Format.h"
+#include "VGMSeq.h"
+
+#include <map>
+#include <string>
+#include <vector>
 
 class TriAcePS1ScorePattern;
 

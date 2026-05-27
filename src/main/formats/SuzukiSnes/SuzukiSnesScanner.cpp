@@ -5,9 +5,10 @@
  */
 
 #include "base/Types.h"
+#include "ScannerManager.h"
 #include "SuzukiSnesInstr.h"
 #include "SuzukiSnesSeq.h"
-#include "ScannerManager.h"
+
 namespace vgmtrans::scanners {
 ScannerRegistration<SuzukiSnesScanner> s_suzuki_snes("SuzukiSnes", {"spc"});
 }

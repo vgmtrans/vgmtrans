@@ -4,15 +4,18 @@
 * refer to the included LICENSE.txt file
 */
 
-#include "base/Types.h"
 #include "HexViewRhiRenderer.h"
 
+#include "base/Types.h"
 #include "HexView.h"
 #include "LogManager.h"
 #include "VGMFile.h"
 
-#include <rhi/qrhi.h>
-#include <rhi/qshader.h>
+#include <algorithm>
+#include <array>
+#include <cmath>
+#include <unordered_map>
+#include <utility>
 
 #include <QColor>
 #include <QDebug>
@@ -22,12 +25,8 @@
 #include <QRectF>
 #include <QString>
 #include <QVector4D>
-
-#include <algorithm>
-#include <array>
-#include <cmath>
-#include <unordered_map>
-#include <utility>
+#include <rhi/qrhi.h>
+#include <rhi/qshader.h>
 
 namespace {
 constexpr int NUM_ADDRESS_NIBBLES = 8;

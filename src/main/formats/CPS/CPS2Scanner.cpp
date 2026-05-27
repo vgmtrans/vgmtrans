@@ -3,13 +3,14 @@
  * Licensed under the zlib license,
  * refer to the included LICENSE.txt file
  */
-#include "base/Types.h"
-#include "Root.h"
 #include "CPS2Scanner.h"
-#include "CPS2Seq.h"
-#include "CPS2Instr.h"
-#include "MAMELoader.h"
+
+#include "base/Types.h"
 #include "CPS2Format.h"
+#include "CPS2Instr.h"
+#include "CPS2Seq.h"
+#include "MAMELoader.h"
+#include "Root.h"
 #include "VGMColl.h"
 
 CPS2FormatVer cps2VersionEnum(const std::string &versionStr) {

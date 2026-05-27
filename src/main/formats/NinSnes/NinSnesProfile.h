@@ -1,13 +1,12 @@
 #pragma once
 
 #include "base/Types.h"
+#include "NinSnesSeqState.h"
+#include "NinSnesTypes.h"
 
 #include <array>
 #include <map>
 #include <vector>
-
-#include "NinSnesSeqState.h"
-#include "NinSnesTypes.h"
 
 class RawFile;
 

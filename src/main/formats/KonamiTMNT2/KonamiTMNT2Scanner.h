@@ -6,11 +6,11 @@
 #pragma once
 
 #include "base/Types.h"
-
-#include "Scanner.h"
 #include "BytePattern.h"
 #include "KonamiVendettaInstr.h"
+#include "Scanner.h"
 
+#include <string>
 #include <vector>
 
 class KonamiTMNT2Seq;

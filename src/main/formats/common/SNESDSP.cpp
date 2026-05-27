@@ -5,10 +5,11 @@
  */
 // Many thanks to bsnes and snes9x.
 
-#include "base/Types.h"
 #include "SNESDSP.h"
-#include "VGMInstrSet.h"
+
+#include "base/Types.h"
 #include "LogManager.h"
+#include "VGMInstrSet.h"
 
 // *************
 // SNES Envelope

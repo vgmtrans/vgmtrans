@@ -4,12 +4,14 @@
  * refer to the included LICENSE.txt file
  */
 
-#include "base/Types.h"
 #include "AsciiShuichiSnesInstr.h"
-#include <spdlog/fmt/fmt.h>
-#include "SNESDSP.h"
+
 #include "AsciiShuichiSnesFormat.h"
+#include "base/Types.h"
 #include "LogManager.h"
+#include "SNESDSP.h"
+
+#include <spdlog/fmt/fmt.h>
 
 // ************************
 // AsciiShuichiSnesInstrSet

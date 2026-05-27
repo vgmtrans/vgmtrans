@@ -1,7 +1,8 @@
-#include "base/Types.h"
 #include "TriAcePS1InstrSet.h"
-#include "VGMRgn.h"
+
+#include "base/Types.h"
 #include "PSXSPU.h"
+#include "VGMRgn.h"
 
 // *****************
 // TriAcePS1InstrSet

@@ -4,10 +4,11 @@
  * refer to the included LICENSE.txt file
  */
 
-#include "base/Types.h"
 #include "AkaoSnesInstr.h"
 #include "AkaoSnesSeq.h"
+#include "base/Types.h"
 #include "ScannerManager.h"
+
 namespace vgmtrans::scanners {
 ScannerRegistration<AkaoSnesScanner> s_akao_snes("AkaoSnes", {"spc"});
 }

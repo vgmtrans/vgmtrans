@@ -5,22 +5,23 @@
 */
 
 #include "UIHelpers.h"
+
 #include "ColorHelpers.h"
 #include "TintableSvgIconEngine.h"
 
+#include <QApplication>
+#include <QFileDialog>
+#include <QGraphicsPixmapItem>
+#include <QGraphicsScene>
 #include <QIcon>
-#include <QWidget>
+#include <QPainter>
+#include <QPixmap>
 #include <QScrollArea>
 #include <QScrollBar>
-#include <QToolButton>
-#include <QStyle>
-#include <QGraphicsScene>
-#include <QGraphicsPixmapItem>
-#include <QPainter>
-#include <QFileDialog>
 #include <QStandardPaths>
-#include <QApplication>
-#include <QPixmap>
+#include <QStyle>
+#include <QToolButton>
+#include <QWidget>
 
 QScrollArea* getContainingScrollArea(const QWidget* widget) {
   QWidget* viewport = widget->parentWidget();

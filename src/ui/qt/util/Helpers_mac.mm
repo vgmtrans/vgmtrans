@@ -1,9 +1,9 @@
 #import <CoreFoundation/CoreFoundation.h>
 #import <AppKit/AppKit.h>
-#include <QWidget>
-#include <QUrl>
-
 #include "LogManager.h"
+
+#include <QUrl>
+#include <QWidget>
 
 void qtOpenUrlNative(const QByteArray& encodedUrl) {
   @autoreleasepool {

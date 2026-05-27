@@ -1,9 +1,12 @@
 #pragma once
 
 #include "base/Types.h"
+#include "ChunSnesFormat.h"
 #include "VGMInstrSet.h"
 #include "VGMRgn.h"
-#include "ChunSnesFormat.h"
+
+#include <string>
+#include <vector>
 
 // ****************
 // ChunSnesInstrSet

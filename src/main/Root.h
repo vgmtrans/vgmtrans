@@ -5,15 +5,16 @@
  */
 #pragma once
 
+#include "base/Types.h"
+#include "components/VGMFileVariant.h"
+#include "VGMTag.h"
+
 #include <filesystem>
 #include <memory>
 #include <string>
 #include <string_view>
+#include <variant>
 #include <vector>
-
-#include "components/VGMFileVariant.h"
-#include "base/Types.h"
-#include "VGMTag.h"
 
 class VGMScanner;
 class VGMColl;

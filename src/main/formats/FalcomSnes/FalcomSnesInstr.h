@@ -1,9 +1,13 @@
 #pragma once
 
 #include "base/Types.h"
+#include "FalcomSnesFormat.h"
 #include "VGMInstrSet.h"
 #include "VGMRgn.h"
-#include "FalcomSnesFormat.h"
+
+#include <map>
+#include <string>
+#include <vector>
 
 class FalcomSnesInstrSet;
 class FalcomSnesInstr;

@@ -1,8 +1,9 @@
-#include "base/Types.h"
 #include "CPS1Seq.h"
-#include "CPS2Format.h"
+
+#include "base/Types.h"
 #include "CPS1TrackV1.h"
 #include "CPS1TrackV2.h"
+#include "CPS2Format.h"
 
 CPS1Seq::CPS1Seq(RawFile *file, u32 offset, CPS1FormatVer fmtVersion, std::string name, std::vector<s8> instrTransposeTable)
     : VGMSeq(CPS1Format::name, file, offset, 0, std::move(name)),

@@ -2,13 +2,14 @@
 
 #include "base/Binary.h"
 #include "base/Types.h"
+#include "CPS2Scanner.h"
 #include "VGMInstrSet.h"
-#include "VGMSampColl.h"
 #include "VGMMiscFile.h"
+#include "VGMSampColl.h"
+
+#include <string>
 
 class CPS2Instr;
-
-enum CPS2FormatVer: u8;
 
 // ex: Punisher
 struct qs_prog_info_ver_101 {

@@ -8,6 +8,8 @@
 #include "base/Types.h"
 #include "Scanner.h"
 
+#include <vector>
+
 class TriAcePS1Seq;
 class TriAcePS1InstrSet;
 

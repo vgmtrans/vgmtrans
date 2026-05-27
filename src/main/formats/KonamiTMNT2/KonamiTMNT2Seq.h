@@ -6,14 +6,15 @@
 #pragma once
 
 #include "base/Types.h"
-
-#include "VGMSeq.h"
-#include "SeqTrack.h"
 #include "KonamiTMNT2Format.h"
 #include "KonamiTMNT2Instr.h"
+#include "SeqTrack.h"
+#include "VGMSeq.h"
 
-#include <vector>
+#include <optional>
 #include <string>
+#include <unordered_map>
+#include <vector>
 
 struct konami_tmnt2_instr_info;
 class VGMInstr;

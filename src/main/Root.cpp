@@ -6,18 +6,10 @@
 
 #include "Root.h"
 
-#include <cassert>
-#include <filesystem>
-#include <fstream>
-#include <string>
-#include <variant>
-
-#include <spdlog/fmt/std.h>
-
+#include "base/Types.h"
 #include "FileLoader.h"
 #include "Format.h"
 #include "Helper.h"
-#include "base/Types.h"
 #include "LoaderManager.h"
 #include "LogManager.h"
 #include "Matcher.h"
@@ -31,6 +23,14 @@
 #include "VGMSamp.h"
 #include "VGMSampColl.h"
 #include "VGMSeq.h"
+
+#include <cassert>
+#include <filesystem>
+#include <fstream>
+#include <string>
+#include <variant>
+
+#include <spdlog/fmt/std.h>
 
 VGMRoot *pRoot;
 

@@ -5,6 +5,7 @@
  */
 
 #include "ToastHost.h"
+
 #include "Toast.h"
 
 #include <QEvent>

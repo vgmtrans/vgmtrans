@@ -8,16 +8,16 @@
 
 #include "base/Types.h"
 
+#include <array>
+#include <cstdint>
+#include <span>
+#include <vector>
+
 #include <QColor>
 #include <QImage>
 #include <QPointF>
 #include <QRectF>
 #include <QSize>
-
-#include <array>
-#include <cstdint>
-#include <span>
-#include <vector>
 
 class VGMFile;
 

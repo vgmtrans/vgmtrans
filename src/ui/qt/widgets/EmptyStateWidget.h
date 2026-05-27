@@ -6,12 +6,12 @@
 
 #pragma once
 
+#include "util/InstructionHintLayout.h"
+
 #include <concepts>
 
 #include <QString>
 #include <QWidget>
-
-#include "util/InstructionHintLayout.h"
 
 class QEvent;
 class QBoxLayout;

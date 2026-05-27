@@ -1,9 +1,12 @@
 #pragma once
 
 #include "base/Types.h"
+#include "CompileSnesFormat.h"
 #include "VGMInstrSet.h"
 #include "VGMRgn.h"
-#include "CompileSnesFormat.h"
+
+#include <string>
+#include <vector>
 
 // *******************
 // CompileSnesInstrSet

@@ -6,15 +6,15 @@
 #pragma once
 
 #include "base/Types.h"
-
 #include "VGMTag.h"
+
+#include <cassert>
+#include <climits>
 #include <cstdint>
-#include <vector>
 #include <map>
 #include <span>
 #include <string>
-#include <cassert>
-#include <climits>
+#include <vector>
 
 class RawFile;
 class PSFFile;

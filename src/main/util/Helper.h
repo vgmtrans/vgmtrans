@@ -8,10 +8,10 @@
 
 #include "base/Types.h"
 
-#include <vector>
-#include <map>
 #include <list>
+#include <map>
 #include <string>
+#include <vector>
 
 template <class T>
 void deleteVect(std::vector<T *> &vect) {

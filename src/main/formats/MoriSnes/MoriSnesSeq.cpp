@@ -3,8 +3,10 @@
  * Licensed under the zlib license,
  * refer to the included LICENSE.txt file
  */
-#include "base/Types.h"
 #include "MoriSnesSeq.h"
+
+#include "base/Types.h"
+
 #include "spdlog/fmt/fmt.h"
 
 DECLARE_FORMAT(MoriSnes);

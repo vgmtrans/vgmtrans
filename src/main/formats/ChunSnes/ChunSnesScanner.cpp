@@ -5,8 +5,8 @@
  */
 
 #include "base/Types.h"
-#include "ChunSnesSeq.h"
 #include "ChunSnesInstr.h"
+#include "ChunSnesSeq.h"
 #include "ScannerManager.h"
 
 namespace vgmtrans::scanners {

@@ -6,20 +6,21 @@
 
 #pragma once
 
-#include <filesystem>
-#include <memory>
-#include <string>
-#include <vector>
-#include <climits>
-#include <cassert>
-#include <variant>
-#include "mio.hpp"
-
+#include "base/Types.h"
+#include "components/VGMTag.h"
 #include "Root.h"
 #include "util/Path.h"
 #include "util/Text.h"
-#include "base/Types.h"
-#include "components/VGMTag.h"
+
+#include <cassert>
+#include <climits>
+#include <filesystem>
+#include <memory>
+#include <string>
+#include <variant>
+#include <vector>
+
+#include "mio.hpp"
 
 class VGMFile;
 class VGMItem;

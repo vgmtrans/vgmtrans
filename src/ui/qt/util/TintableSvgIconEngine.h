@@ -1,12 +1,14 @@
 #pragma once
 
 #include <cmath>
+#include <utility>
+
+#include <qguiapplication.h>
+#include <QHash>
 #include <QIconEngine>
 #include <QLinearGradient>
 #include <QPainter>
 #include <QSvgRenderer>
-#include <QHash>
-#include <qguiapplication.h>
 #include <QtMath>
 
 class TintableSvgIconEngine : public QIconEngine

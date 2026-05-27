@@ -4,8 +4,10 @@
  * refer to the included LICENSE.txt file
  */
 
-#include "base/Types.h"
 #include "AkaoSnesModulation.h"
+
+#include "base/Types.h"
+
 #include <algorithm>
 #include <cmath>
 

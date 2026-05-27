@@ -6,6 +6,9 @@
 
 #include "Toast.h"
 
+#include "Helpers.h"
+#include "UIHelpers.h"
+
 #include <QColor>
 #include <QGraphicsOpacityEffect>
 #include <QIcon>
@@ -14,9 +17,6 @@
 #include <QSizePolicy>
 #include <QVariantAnimation>
 #include <QVBoxLayout>
-
-#include "Helpers.h"
-#include "UIHelpers.h"
 
 static constexpr const char* kInfoIcon    = ":/icons/toast_info.svg";
 static constexpr const char* kWarnIcon    = ":/icons/toast_warning.svg";

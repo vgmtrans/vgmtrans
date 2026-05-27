@@ -6,8 +6,11 @@
 
 #include "EmptyStateWidget.h"
 
-#include <QColor>
+#include "util/ColorHelpers.h"
+#include "util/UIHelpers.h"
+
 #include <QBoxLayout>
+#include <QColor>
 #include <QEvent>
 #include <QIcon>
 #include <QLabel>
@@ -16,9 +19,6 @@
 #include <QSizePolicy>
 #include <QStackedLayout>
 #include <QVBoxLayout>
-
-#include "util/ColorHelpers.h"
-#include "util/UIHelpers.h"
 
 static constexpr int kEmptyStateHorizontalInset = 24;
 static constexpr int kEmptyStateVerticalInset = 24;

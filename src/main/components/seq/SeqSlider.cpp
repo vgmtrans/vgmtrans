@@ -3,8 +3,9 @@
  * Licensed under the zlib license,
  * refer to the included LICENSE.txt file
  */
-#include "base/Types.h"
 #include "SeqSlider.h"
+
+#include "base/Types.h"
 
 template<typename TNumber>
 SeqSlider<TNumber>::SeqSlider(SeqTrack *track,

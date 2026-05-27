@@ -1,5 +1,6 @@
-#include "base/Types.h"
 #include "OrgSeq.h"
+
+#include "base/Types.h"
 
 DECLARE_FORMAT(Org);
 

@@ -1,9 +1,12 @@
 #pragma once
 
+#include "AkaoSnesFormat.h"
 #include "base/Types.h"
 #include "VGMInstrSet.h"
 #include "VGMRgn.h"
-#include "AkaoSnesFormat.h"
+
+#include <string>
+#include <vector>
 
 // ****************
 // AkaoSnesInstrSet

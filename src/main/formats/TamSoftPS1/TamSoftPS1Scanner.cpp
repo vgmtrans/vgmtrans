@@ -5,11 +5,12 @@
  */
 
 #include "base/Types.h"
+#include "ScannerManager.h"
+#include "TamSoftPS1Instr.h"
 #include "TamSoftPS1Seq.h"
 
 #include <spdlog/fmt/fmt.h>
-#include "TamSoftPS1Instr.h"
-#include "ScannerManager.h"
+
 namespace vgmtrans::scanners {
 ScannerRegistration<TamSoftPS1Scanner> s_tamsoft_ps1("TamSoftPS1", {"tsq", "tvb"});
 }

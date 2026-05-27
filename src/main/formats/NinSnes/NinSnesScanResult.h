@@ -1,11 +1,10 @@
 #pragma once
 
 #include "base/Types.h"
+#include "NinSnesProfile.h"
 
 #include <string>
 #include <vector>
-
-#include "NinSnesProfile.h"
 
 struct NinSnesScanResult {
   NinSnesSignatureId signature = NinSnesSignatureId::None;

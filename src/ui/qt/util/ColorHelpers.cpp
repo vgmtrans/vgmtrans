@@ -5,11 +5,13 @@
 */
 
 #include "ColorHelpers.h"
+
 #include "Colors.h"
 
 #include <algorithm>
 #include <array>
 #include <cmath>
+
 #include <QHash>
 
 namespace {
