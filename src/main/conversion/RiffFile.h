@@ -2,6 +2,7 @@
 
 #include <cassert>
 #include <cstring>
+#include <string>
 #include "base/Types.h"
 #include "Helper.h"
 

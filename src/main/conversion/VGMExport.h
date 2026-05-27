@@ -5,6 +5,8 @@
  */
 #pragma once
 
+#include <filesystem>
+
 #include "base/Types.h"
 #include "util/Path.h"
 #include "DLSFile.h"

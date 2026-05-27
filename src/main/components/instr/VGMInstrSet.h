@@ -3,6 +3,7 @@
 #include "Modulation.h"
 #include "VGMFile.h"
 #include <optional>
+#include <string>
 
 class VGMSampColl;
 class VGMInstr;

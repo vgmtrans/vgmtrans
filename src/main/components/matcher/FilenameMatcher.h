@@ -6,6 +6,8 @@
 
 #pragma once
 
+#include <string>
+
 #include "SimpleMatcher.h"
 #include "util/Path.h"
 

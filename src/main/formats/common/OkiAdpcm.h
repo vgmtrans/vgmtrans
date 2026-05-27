@@ -11,6 +11,8 @@
 #include "base/Types.h"
 #include "VGMSamp.h"
 
+#include <string>
+
 class VGMSampColl;
 class VGMInstrSet;
 

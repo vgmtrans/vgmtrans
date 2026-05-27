@@ -2,6 +2,7 @@
 
 #include "base/Types.h"
 #include <algorithm>
+#include <string>
 #include <vector>
 #include <ranges>
 

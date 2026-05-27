@@ -12,6 +12,8 @@
 #include "VGMMiscFile.h"
 #include "VGMColl.h"
 
+#include <string>
+
 class CPS1SampleInstrSet;
 
 CPS1FormatVer cps1VersionEnum(const std::string &versionStr) {
@@ -244,4 +246,3 @@ void CPS1Scanner::loadCPS1(MAMEGame *gameentry, CPS1FormatVer fmt_ver) {
     }
   }
 }
-

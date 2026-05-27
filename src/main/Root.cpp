@@ -6,8 +6,11 @@
 
 #include "Root.h"
 
+#include <cassert>
 #include <filesystem>
 #include <fstream>
+#include <string>
+#include <variant>
 
 #include <spdlog/fmt/std.h>
 

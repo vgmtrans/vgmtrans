@@ -7,6 +7,8 @@
 #pragma once
 
 #include <filesystem>
+#include <memory>
+#include <string>
 #include <vector>
 #include <climits>
 #include <cassert>

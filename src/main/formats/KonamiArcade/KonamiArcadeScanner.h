@@ -9,6 +9,8 @@
 #include "KonamiArcadeInstr.h"
 #include "base/Types.h"
 
+#include <string>
+
 struct MAMEGame;
 class KonamiArcadeSeq;
 

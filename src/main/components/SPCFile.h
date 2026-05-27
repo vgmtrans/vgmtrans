@@ -7,6 +7,7 @@
 #include "VGMTag.h"
 #include "base/Types.h"
 #include <array>
+#include <string>
 
 class RawFile;
 class SPCFile;

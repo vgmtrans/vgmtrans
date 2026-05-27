@@ -8,6 +8,7 @@
 
 #include "services/commands/Command.h"
 #include <filesystem>
+#include <string>
 #include <QMenu>
 #include "util/Path.h"
 #include "Root.h"

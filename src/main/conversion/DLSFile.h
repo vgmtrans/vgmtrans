@@ -10,6 +10,7 @@
 #include "Modulation.h"
 #include "RiffFile.h"
 #include <filesystem>
+#include <string>
 
 struct Loop;
 class VGMSamp;

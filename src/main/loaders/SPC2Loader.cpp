@@ -7,6 +7,7 @@
 #include "SPC2Loader.h"
 
 #include <cstring>
+#include <string>
 
 #include "base/Types.h"
 #include "LoaderManager.h"
