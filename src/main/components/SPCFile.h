@@ -5,7 +5,7 @@
  */
 #pragma once
 #include "VGMTag.h"
-#include "util/types.h"
+#include "Types.h"
 #include <array>
 
 class RawFile;

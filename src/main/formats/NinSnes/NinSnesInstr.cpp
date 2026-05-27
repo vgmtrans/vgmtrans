@@ -3,7 +3,7 @@
  * Licensed under the zlib license,
  * refer to the included LICENSE.txt file
  */
-#include "util/types.h"
+#include "Types.h"
 #include "NinSnesInstr.h"
 #include "NinSnesSeq.h"
 #include "NinSnesVibrato.h"

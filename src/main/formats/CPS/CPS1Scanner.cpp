@@ -3,7 +3,7 @@
  * Licensed under the zlib license,
  * refer to the included LICENSE.txt file
  */
-#include "util/types.h"
+#include "Types.h"
 #include "CPS1Scanner.h"
 #include "CPS1Seq.h"
 #include "CPS2Seq.h"

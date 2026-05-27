@@ -1,4 +1,4 @@
-#include "util/types.h"
+#include "Types.h"
 #include "KonamiArcadeDefinitions.h"
 #include "KonamiArcadeScanner.h"
 #include "KonamiArcadeSeq.h"

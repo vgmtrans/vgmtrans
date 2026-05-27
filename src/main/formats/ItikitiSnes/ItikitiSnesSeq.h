@@ -5,7 +5,7 @@
  */
 #pragma once
 
-#include "util/types.h"
+#include "Types.h"
 #include <unordered_map>
 #include <array>
 #include "VGMSeq.h"

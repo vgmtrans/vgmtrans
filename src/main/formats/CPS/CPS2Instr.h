@@ -1,7 +1,7 @@
 #pragma once
 
-#include "util/binary.h"
-#include "util/types.h"
+#include "util/Binary.h"
+#include "Types.h"
 #include "VGMInstrSet.h"
 #include "VGMSampColl.h"
 #include "VGMMiscFile.h"

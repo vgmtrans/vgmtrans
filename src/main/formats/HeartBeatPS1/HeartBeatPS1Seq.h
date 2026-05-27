@@ -5,7 +5,7 @@
  */
 #pragma once
 
-#include "util/types.h"
+#include "Types.h"
 #include "VGMSeqNoTrks.h"
 
 class HeartBeatPS1Seq:

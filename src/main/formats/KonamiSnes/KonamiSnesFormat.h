@@ -5,7 +5,7 @@
  */
 #pragma once
 
-#include "util/types.h"
+#include "Types.h"
 #include "Format.h"
 #include "FilegroupMatcher.h"
 #include "KonamiSnesScanner.h"

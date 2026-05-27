@@ -3,7 +3,7 @@
  * Licensed under the zlib license,
  * refer to the included LICENSE.txt file
  */
-#include "util/types.h"
+#include "Types.h"
 #include "KonamiTMNT2Scanner.h"
 #include "KonamiTMNT2Seq.h"
 #include "MAMELoader.h"

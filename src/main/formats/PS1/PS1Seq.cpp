@@ -4,7 +4,7 @@
  * refer to the included LICENSE.txt file
  */
 
-#include "util/types.h"
+#include "Types.h"
 #include "PS1Seq.h"
 #include "Options.h"
 #include "formats/PS1/PS1Format.h"

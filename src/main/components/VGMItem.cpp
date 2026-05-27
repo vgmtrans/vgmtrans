@@ -1,4 +1,4 @@
-#include "util/types.h"
+#include "Types.h"
 #include "VGMItem.h"
 #include "LogManager.h"
 #include "RawFile.h"

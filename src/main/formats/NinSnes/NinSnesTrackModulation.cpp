@@ -1,4 +1,4 @@
-#include "util/types.h"
+#include "Types.h"
 #include "NinSnesSeq.h"
 #include "NinSnesVibrato.h"
 #include "Modulation.h"

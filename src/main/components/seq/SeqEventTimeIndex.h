@@ -10,7 +10,7 @@
 #include <limits>
 #include <unordered_map>
 #include <vector>
-#include "util/types.h"
+#include "Types.h"
 
 class SeqEvent;
 

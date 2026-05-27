@@ -7,7 +7,7 @@
 #include <cmath>
 #include <algorithm>
 #include <limits>
-#include "util/types.h"
+#include "Types.h"
 #include "ScaleConversion.h"
 
 #ifndef M_PI_2

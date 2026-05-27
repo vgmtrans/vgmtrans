@@ -5,7 +5,7 @@
  */
 #pragma once
 
-#include "util/types.h"
+#include "Types.h"
 #include "VGMSeq.h"
 #include "SeqTrack.h"
 #include "SeqEvent.h"

@@ -5,7 +5,7 @@
  */
 #pragma once
 
-#include "util/types.h"
+#include "Types.h"
 #include <optional>
 #include "VGMSeq.h"
 #include "automation/SeqMidiAutomation.h"

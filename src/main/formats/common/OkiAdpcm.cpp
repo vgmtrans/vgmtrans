@@ -6,7 +6,7 @@
 // The original code is available at:
 //  https://github.com/mamedev/mame/blob/master/src/devices/sound/okiadpcm.cpp
 
-#include "util/types.h"
+#include "Types.h"
 #include <cmath>
 #include "OkiAdpcm.h"
 

@@ -284,8 +284,8 @@ target_sources(vgmtranscore
     loaders/SPCLoader.cpp
     util/BytePattern.cpp
     util/ScaleConversion.cpp
-    util/path.cpp
-    util/text.cpp
+    util/Path.cpp
+    util/Text.cpp
   PUBLIC
     FILE_SET HEADERS
     FILES
@@ -297,6 +297,7 @@ target_sources(vgmtranscore
       ModSourceMap.h
       Options.h
       Root.h
+      Types.h
     FILE_SET headers_formats TYPE HEADERS BASE_DIRS formats
     FILES
       formats/Akao/AkaoFormat.h
@@ -477,13 +478,12 @@ target_sources(vgmtranscore
       util/MidiConstants.h
       util/SizeOffsetPair.h
       util/ScaleConversion.h
-      util/binary.h
+      util/Binary.h
       util/constevalHelpers.h
       util/decompression.h
       util/helper.h
-      util/path.h
-      util/text.h
-      util/types.h
+      util/Path.h
+      util/Text.h
     FILE_SET headers_io TYPE HEADERS BASE_DIRS io
     FILES
       io/RawFile.h

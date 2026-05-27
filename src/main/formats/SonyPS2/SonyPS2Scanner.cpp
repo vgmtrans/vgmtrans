@@ -4,7 +4,7 @@
  * refer to the included LICENSE.txt file
  */
 
-#include "util/types.h"
+#include "Types.h"
 #include "SonyPS2Seq.h"
 #include "SonyPS2InstrSet.h"
 #include "ScannerManager.h"

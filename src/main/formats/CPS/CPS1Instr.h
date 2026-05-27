@@ -1,6 +1,6 @@
 #pragma once
 
-#include "util/types.h"
+#include "Types.h"
 
 #include "VGMInstrSet.h"
 #include "CPS1Scanner.h"

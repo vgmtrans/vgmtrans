@@ -4,7 +4,7 @@
  * refer to the included LICENSE.txt file
  */
 #pragma once
-#include "util/types.h"
+#include "Types.h"
 #include "Scanner.h"
 #include "BytePattern.h"
 #include <vector>

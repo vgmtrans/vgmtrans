@@ -1,6 +1,6 @@
 #pragma once
 
-#include "util/types.h"
+#include "Types.h"
 #include "VGMSeqNoTrks.h"
 #include "SeqTrack.h"
 #include "SonyPS2Format.h"

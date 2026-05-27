@@ -3,7 +3,7 @@
  * Licensed under the zlib license,
  * refer to the included LICENSE.txt file
  */
-#include "util/types.h"
+#include "Types.h"
 #include "PandoraBoxSnesInstr.h"
 #include "SNESDSP.h"
 #include <spdlog/fmt/fmt.h>

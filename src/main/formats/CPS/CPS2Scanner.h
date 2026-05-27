@@ -3,7 +3,7 @@
 #include <string>
 
 #include "Scanner.h"
-#include "util/types.h"
+#include "Types.h"
 
 struct MAMEGame;
 

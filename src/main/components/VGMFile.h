@@ -5,7 +5,7 @@
  */
 #pragma once
 
-#include "util/types.h"
+#include "Types.h"
 
 #include "VGMItem.h"
 #include "RawFile.h"

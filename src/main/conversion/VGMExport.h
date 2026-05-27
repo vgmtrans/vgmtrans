@@ -5,8 +5,8 @@
  */
 #pragma once
 
-#include "util/types.h"
-#include "util/path.h"
+#include "Types.h"
+#include "util/Path.h"
 #include "DLSFile.h"
 #include "SF2File.h"
 #include "VGMColl.h"

@@ -4,7 +4,7 @@
  * refer to the included LICENSE.txt file
  */
 
-#include "util/types.h"
+#include "Types.h"
 #include "RareSnesSeq.h"
 #include "RareSnesInstr.h"
 #include "SNESDSP.h"

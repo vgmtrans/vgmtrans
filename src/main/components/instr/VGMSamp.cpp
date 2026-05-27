@@ -4,7 +4,7 @@
  * See the included LICENSE for more information
  */
 
-#include "util/types.h"
+#include "Types.h"
 #include <algorithm>
 #include <cmath>
 #include <utility>
@@ -13,7 +13,7 @@
 #include "Root.h"
 #include "ScaleConversion.h"
 #include "helper.h"
-#include "util/path.h"
+#include "util/Path.h"
 
 // *******
 // VGMSamp

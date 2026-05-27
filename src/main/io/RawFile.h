@@ -14,9 +14,9 @@
 #include "mio.hpp"
 
 #include "Root.h"
-#include "util/path.h"
-#include "util/text.h"
-#include "util/types.h"
+#include "util/Path.h"
+#include "util/Text.h"
+#include "Types.h"
 #include "components/VGMTag.h"
 
 class VGMFile;

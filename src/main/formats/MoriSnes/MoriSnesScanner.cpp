@@ -4,7 +4,7 @@
  * refer to the included LICENSE.txt file
  */
 
-#include "util/types.h"
+#include "Types.h"
 #include "MoriSnesSeq.h"
 #include "ScannerManager.h"
 namespace vgmtrans::scanners {

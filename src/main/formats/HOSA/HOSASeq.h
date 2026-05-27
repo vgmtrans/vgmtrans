@@ -1,6 +1,6 @@
 #pragma once
 
-#include "util/types.h"
+#include "Types.h"
 #include "VGMSeq.h"
 #include "SeqTrack.h"
 #include "Format.h"			//Replace with MP2k-specific format header when that's ready

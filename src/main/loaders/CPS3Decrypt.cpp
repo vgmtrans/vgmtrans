@@ -1,5 +1,5 @@
-#include "util/types.h"
-#include "util/binary.h"
+#include "Types.h"
+#include "util/Binary.h"
 #include "CPS3Decrypt.h"
 
 // The following code comes directly from MAME

@@ -6,7 +6,7 @@
 
 #pragma once
 
-#include "util/types.h"
+#include "Types.h"
 
 enum class AkaoPs1Version : u8 {
   UNKNOWN = 0,

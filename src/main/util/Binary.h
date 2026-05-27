@@ -6,7 +6,7 @@
 
 #pragma once
 
-#include "types.h"
+#include "Types.h"
 
 enum class Endianness { Little, Big };
 enum class Signedness { Signed, Unsigned };

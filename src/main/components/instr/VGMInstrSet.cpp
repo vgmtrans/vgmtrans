@@ -4,7 +4,7 @@
  * refer to the included LICENSE.txt file
  */
 
-#include "util/types.h"
+#include "Types.h"
 #include "VGMInstrSet.h"
 #include <spdlog/fmt/fmt.h>
 #include "VGMSampColl.h"

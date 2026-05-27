@@ -37,13 +37,13 @@
 #include <QVBoxLayout>
 #include <QWindow>
 
-#include "util/types.h"
+#include "Types.h"
 #include "Root.h"
 #include "QtVGMRoot.h"
 #include "StitchExport.h"
 #include "VGMColl.h"
 #include "VGMSeq.h"
-#include "util/path.h"
+#include "util/Path.h"
 #include "services/NotificationCenter.h"
 #include "util/UIHelpers.h"
 #include "widgets/EmptyStateWidget.h"
