@@ -7,8 +7,6 @@
 
 #include "base/Types.h"
 
-#include <cstdint>
-
 double linearAmpDecayTimeToLinDBDecayTime(double secondsToFullAtten,
                                           double targetDb_LeastSquares = 70,
                                           double targetDb_InitialSlope = 140);

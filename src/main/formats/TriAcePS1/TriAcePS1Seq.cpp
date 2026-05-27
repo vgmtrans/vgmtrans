@@ -4,7 +4,6 @@
 #include "base/Types.h"
 #include "TriAcePS1Seq.h"
 #include "SeqEvent.h"
-#include "Helper.h"
 
 DECLARE_FORMAT(TriAcePS1);
 

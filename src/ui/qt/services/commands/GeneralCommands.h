@@ -9,7 +9,6 @@
 #include "MdiArea.h"
 #include "services/commands/Command.h"
 #include "VGMFile.h"
-#include "Helper.h"
 
 using MenuPath = Command::MenuPath;
 

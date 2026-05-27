@@ -9,7 +9,6 @@
 #include "VGMSamp.h"
 #include "Root.h"
 #include "Format.h"
-#include "Helper.h"
 
 // ***********
 // VGMSampColl

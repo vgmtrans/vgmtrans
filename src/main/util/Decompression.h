@@ -10,8 +10,10 @@
 
 #define ZLIB_CONST
 #include <zlib.h>
+#include <cassert>
 #include <stdexcept>
 #include <array>
+#include <vector>
 
 template <typename T>
 std::vector<unsigned char> zdecompress(T src) {

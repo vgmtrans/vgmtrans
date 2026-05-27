@@ -9,7 +9,7 @@
 #include <algorithm>
 
 #include "VGMExport.h"
-#include "Helper.h"
+#include "util/Path.h"
 #include "VGMInstrSet.h"
 #include "VGMSampColl.h"
 #include "VGMSamp.h"
