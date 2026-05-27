@@ -222,7 +222,7 @@ void AkaoSnesSeq::LoadEventMap() {
     EventMap[0xd3] = EVENT_NOP1;
     EventMap[0xd4] = EVENT_ECHO_VOLUME;
     EventMap[0xd5] = EVENT_ECHO_FEEDBACK_FIR;
-    EventMap[0xd6] = EVENT_PITCH_SLIDE_ON;
+    EventMap[0xd6] = EVENT_PITCH_ENVELOPE_ON;
     EventMap[0xd7] = EVENT_TREMOLO_ON;
     EventMap[0xd8] = EVENT_VIBRATO_ON;
     EventMap[0xd9] = EVENT_PAN_LFO_ON_WITH_DELAY;
@@ -238,7 +238,7 @@ void AkaoSnesSeq::LoadEventMap() {
     EventMap[0xe3] = EVENT_NOP;
     EventMap[0xe4] = EVENT_NOP;
     EventMap[0xe5] = EVENT_NOP;
-    EventMap[0xe6] = EVENT_PITCH_SLIDE_OFF;
+    EventMap[0xe6] = EVENT_PITCH_ENVELOPE_OFF;
     EventMap[0xe7] = EVENT_TREMOLO_OFF;
     EventMap[0xe8] = EVENT_VIBRATO_OFF;
     EventMap[0xe9] = EVENT_PAN_LFO_OFF;
@@ -275,8 +275,8 @@ void AkaoSnesSeq::LoadEventMap() {
     EventMap[0xd8] = EVENT_ECHO_VOLUME;
     EventMap[0xd9] = EVENT_ECHO_VOLUME_FADE;
     EventMap[0xda] = EVENT_TRANSPOSE_ABS;
-    EventMap[0xdb] = EVENT_PITCH_SLIDE_ON;
-    EventMap[0xdc] = EVENT_PITCH_SLIDE_OFF;
+    EventMap[0xdb] = EVENT_PITCH_ENVELOPE_ON;
+    EventMap[0xdc] = EVENT_PITCH_ENVELOPE_OFF;
     EventMap[0xdd] = EVENT_VIBRATO_ON;
     EventMap[0xde] = EVENT_VIBRATO_OFF;
     EventMap[0xdf] = EVENT_TREMOLO_ON;
@@ -588,6 +588,7 @@ void AkaoSnesTrack::resetVars() {
   jumpActivatedByMainCpu = true; // it should be false in the actual driver, but for convenience
 
   ignoreMasterVolumeProgNum = 0xff;
+  resetPitchState();
   vibrato.reset();
   tremolo.reset();
 }
@@ -595,6 +596,8 @@ void AkaoSnesTrack::resetVars() {
 void AkaoSnesTrack::onTickBegin() {
   updateVibratoFade();
   updateTremoloFade();
+  updatePitchSlide();
+  updatePitchEnvelope();
 }
 
 bool AkaoSnesTrack::readEvent(void) {
@@ -674,6 +677,8 @@ bool AkaoSnesTrack::readEvent(void) {
 
       if (noteIndex < 12) {
         uint8_t note = octave * 12 + noteIndex;
+        beginNotePitch(note, !percussion);
+        beginPendingPitchSlide();
 
         if (!slur && !legato) {
           beginVibratoForNote();
@@ -690,6 +695,7 @@ bool AkaoSnesTrack::readEvent(void) {
         addTime(len);
       }
       else if (noteIndex == parentSeq->STATUS_NOTEINDEX_TIE) {
+        beginPendingPitchSlide();
         makePrevDurNoteEnd(getTime() + dur);
         addTie(beginOffset, curOffset - beginOffset, dur, "Tie", desc);
         addTime(len);
@@ -778,50 +784,72 @@ bool AkaoSnesTrack::readEvent(void) {
       break;
     }
 
-    case EVENT_PITCH_SLIDE_ON: {
-      int8_t pitchSlideSemitones;
-      uint8_t pitchSlideDelay;
-      uint8_t pitchSlideLength;
+    case EVENT_PITCH_ENVELOPE_ON: {
+      int8_t pitchEnvelopeSemitones;
+      uint8_t pitchEnvelopeDelay;
+      uint8_t pitchEnvelopeLength;
 
+      // V1/FF4: D6 dd ll ss. V2/RS1: DB ss dd ll. Both commands install a
+      // persistent per-voice envelope; the next normal note starts the ramp.
       if (parentSeq->version == AKAOSNES_V1) {
-        pitchSlideDelay = readByte(curOffset++);
-        pitchSlideLength = readByte(curOffset++);
-        pitchSlideSemitones = readByte(curOffset++);
-        desc = fmt::format("Delay: {}  Length: {}  Key: {} semitones", pitchSlideDelay,
-          pitchSlideLength, pitchSlideSemitones);
+        pitchEnvelopeDelay = readByte(curOffset++);
+        pitchEnvelopeLength = readByte(curOffset++);
+        pitchEnvelopeSemitones = static_cast<int8_t>(readByte(curOffset++));
+        // FF4 stores dd + 1 in an 8-bit counter; dd=$ff intentionally wraps to zero.
+        setPitchEnvelope(pitchEnvelopeSemitones,
+                         static_cast<uint8_t>(pitchEnvelopeDelay + 1),
+                         pitchEnvelopeLength);
+        desc = fmt::format("Delay: {}  Length: {}  Key: {} semitones",
+                           pitchEnvelopeDelay,
+                           pitchEnvelopeLength,
+                           static_cast<int>(pitchEnvelopeSemitones));
       }
       else { // AKAOSNES_V2
-        pitchSlideSemitones = readByte(curOffset++);
-        pitchSlideDelay = readByte(curOffset++);
-        pitchSlideLength = readByte(curOffset++);
-        desc = fmt::format("Key: {} semitones  Delay: {}  Length: {}", pitchSlideSemitones,
-          pitchSlideDelay, pitchSlideLength);
+        pitchEnvelopeSemitones = static_cast<int8_t>(readByte(curOffset++));
+        pitchEnvelopeDelay = readByte(curOffset++);
+        pitchEnvelopeLength = readByte(curOffset++);
+        setPitchEnvelope(pitchEnvelopeSemitones, pitchEnvelopeDelay, pitchEnvelopeLength);
+        desc = fmt::format("Key: {} semitones  Delay: {}  Length: {}",
+                           static_cast<int>(pitchEnvelopeSemitones),
+                           pitchEnvelopeDelay,
+                           pitchEnvelopeLength);
       }
 
       addGenericEvent(beginOffset,
                       curOffset - beginOffset,
-                      "Pitch Slide On",
+                      "Pitch Envelope On",
                       desc,
-                      Type::PitchBendSlide);
+                      Type::PitchEnvelope);
       break;
     }
 
-    case EVENT_PITCH_SLIDE_OFF: {
+    case EVENT_PITCH_ENVELOPE_OFF: {
+      if (parentSeq->version == AKAOSNES_V1 || parentSeq->version == AKAOSNES_V2) {
+        clearPitchEnvelope();
+      }
       addGenericEvent(beginOffset,
                       curOffset - beginOffset,
-                      "Pitch Slide Off",
+                      "Pitch Envelope Off",
                       desc,
-                      Type::PitchBendSlide);
+                      Type::PitchEnvelope);
       break;
     }
 
     case EVENT_PITCH_SLIDE: {
-      uint8_t pitchSlideLength = readByte(curOffset++);
-      int8_t pitchSlideSemitones = readByte(curOffset++);
+      uint8_t pitchSlideTime = readByte(curOffset++);
+      int8_t pitchSlideSemitones = static_cast<int8_t>(readByte(curOffset++));
+      // V3 D6 and V4 C8 are one-shot pitch-slide setup commands:
+      // tt stores as tt + 1, wrapping $ff to the 256-step case.
+      const uint16_t pitchSlideSteps = static_cast<uint16_t>(pitchSlideTime) + 1;
+      setPendingPitchSlide(pitchSlideSteps, pitchSlideSemitones);
+      desc = fmt::format("Time: {}  Steps: {}  Key: {} semitones",
+                         pitchSlideTime,
+                         pitchSlideSteps,
+                         static_cast<int>(pitchSlideSemitones));
       addGenericEvent(beginOffset,
                       curOffset - beginOffset,
                       "Pitch Slide",
-                      fmt::format("Length: {}  Key: {} semitones", pitchSlideLength, pitchSlideSemitones),
+                      desc,
                       Type::PitchBendSlide);
       break;
     }

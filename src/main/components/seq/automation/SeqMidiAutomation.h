@@ -9,12 +9,15 @@
 #include <algorithm>
 #include <cmath>
 #include <cstdint>
+#include <functional>
 #include <utility>
 
 // Stores source-space pitch and converts it to MIDI pitch bend when emitting.
 template <typename PitchType>
 class SeqPitchBendAutomation {
  public:
+  using PitchToCents = std::function<double(PitchType, PitchType)>;
+
   explicit SeqPitchBendAutomation(double centsPerPitchUnit = 100.0)
       : m_centsPerPitchUnit(centsPerPitchUnit) {}
 
@@ -28,6 +31,10 @@ class SeqPitchBendAutomation {
 
   void setCentsPerPitchUnit(double centsPerPitchUnit) {
     m_centsPerPitchUnit = centsPerPitchUnit;
+  }
+
+  void setPitchToCents(PitchToCents pitchToCents) {
+    m_pitchToCents = pitchToCents;
   }
 
   // Set the note-relative base pitch and reset current pitch to that base.
@@ -79,6 +86,14 @@ class SeqPitchBendAutomation {
   [[nodiscard]] uint16_t rangeCentsForSlide(PitchType startPitch,
                                             PitchType targetPitch,
                                             uint16_t minimumRangeCents) const {
+    if (m_pitchToCents) {
+      const double startDeviation = std::abs(centsForPitch(startPitch));
+      const double targetDeviation = std::abs(centsForPitch(targetPitch));
+      return std::max<uint16_t>(
+          minimumRangeCents,
+          static_cast<uint16_t>(std::ceil(std::max(startDeviation, targetDeviation))));
+    }
+
     const double startDeviation = std::abs(static_cast<double>(startPitch - m_basePitch));
     const double targetDeviation = std::abs(static_cast<double>(targetPitch - m_basePitch));
     return rangeCentsForPitchSpan(std::max(startDeviation, targetDeviation), minimumRangeCents);
@@ -91,8 +106,7 @@ class SeqPitchBendAutomation {
   // Convert source-space pitch to MIDI bend using the current bend range.
   [[nodiscard]] int16_t bendForPitch(PitchType pitch) const {
     const auto bend = static_cast<int32_t>(
-        std::lround((((static_cast<double>(pitch - m_basePitch) * m_centsPerPitchUnit) /
-                      m_pitchBendRangeCents) * 8192.0)));
+        std::lround(((centsForPitch(pitch) / m_pitchBendRangeCents) * 8192.0)));
     return static_cast<int16_t>(std::clamp(bend, kMinMidiPitchBend, kMaxMidiPitchBend));
   }
 
@@ -194,12 +208,21 @@ class SeqPitchBendAutomation {
   static constexpr int32_t kMinMidiPitchBend = -8192;
   static constexpr int32_t kMaxMidiPitchBend = 8191;
 
+  [[nodiscard]] double centsForPitch(PitchType pitch) const {
+    if (m_pitchToCents) {
+      return m_pitchToCents(pitch, m_basePitch);
+    }
+
+    return static_cast<double>(pitch - m_basePitch) * m_centsPerPitchUnit;
+  }
+
   bool m_baseValid = false;
   PitchType m_basePitch {};
   SeqAutomatedValue<PitchType> m_pitch;
   uint16_t m_pitchBendRangeCents = 200;
   int16_t m_currentPitchBend = 0;
   double m_centsPerPitchUnit = 100.0;
+  PitchToCents m_pitchToCents {};
 };
 
 // Manages synth LFO state: stored delay/rate/depth and optional per-note fade-ins.
