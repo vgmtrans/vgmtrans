@@ -22,16 +22,16 @@
 
 namespace conversion {
 
-SF2File* createSF2File(const VGMColl& coll) {
+std::unique_ptr<SF2File> createSF2File(const VGMColl& coll) {
   const auto context = ConversionContext::fromOptions(ConversionOptions::the(), SynthTarget::SoundFont);
   return createSF2File(coll, context);
 }
 
-SF2File* createSF2File(const VGMColl& coll, const ConversionContext& context) {
+std::unique_ptr<SF2File> createSF2File(const VGMColl& coll, const ConversionContext& context) {
   return createSF2File(coll.instrSets(), coll.sampColls(), &coll, context);
 }
 
-SF2File* createSF2File(
+std::unique_ptr<SF2File> createSF2File(
   const std::vector<VGMInstrSet*>& instrsets,
   const std::vector<VGMSampColl*>& sampcolls,
   const VGMColl* coll,
@@ -41,7 +41,7 @@ SF2File* createSF2File(
     instrset->prepareForExport(coll);
   }
 
-  SynthFile *synthfile = createSynthFile(instrsets, sampcolls);
+  auto synthfile = createSynthFile(instrsets, sampcolls);
 
   for (auto* instrset : instrsets) {
     instrset->cleanupAfterExport();
@@ -50,12 +50,10 @@ SF2File* createSF2File(
     L_ERROR("SF2 conversion failed");
     return nullptr;
   }
-  SF2File *sf2file = new SF2File(synthfile, context);
-  delete synthfile;
-  return sf2file;
+  return std::make_unique<SF2File>(synthfile.get(), context);
 }
 
-SynthFile* createSynthFile(
+std::unique_ptr<SynthFile> createSynthFile(
   const std::vector<VGMInstrSet*>& m_instrsets,
   const std::vector<VGMSampColl*>& m_sampcolls
 ) {
@@ -64,8 +62,7 @@ SynthFile* createSynthFile(
     return nullptr;
   }
 
-  /* FIXME: shared_ptr eventually */
-  SynthFile *synthfile = new SynthFile("SynthFile");
+  auto synthfile = std::make_unique<SynthFile>("SynthFile");
 
   std::vector<VGMSamp *> finalSamps;
   std::vector<const VGMSampColl *> finalSampColls;
@@ -87,7 +84,6 @@ SynthFile* createSynthFile(
 
   if (finalSamps.empty()) {
     L_ERROR("No sample collection available to create a SynthFile.");
-    delete synthfile;
     return nullptr;
   }
 
@@ -208,7 +204,6 @@ SynthFile* createSynthFile(
               sampInfo->setLoopInfo(rgn->loop, samp);
             }
           } else {
-            delete synthfile;
             throw;
           }
         }
@@ -218,7 +213,6 @@ SynthFile* createSynthFile(
           if (samp->loop.loopStatus != -1)
             sampInfo->setLoopInfo(samp->loop, samp);
           else {
-            delete synthfile;
             throw;
           }
         } else

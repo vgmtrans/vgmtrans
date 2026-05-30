@@ -12,6 +12,7 @@
 #include "VGMSampColl.h"
 #include "VGMSeq.h"
 
+#include <memory>
 #include <regex>
 
 FilegroupMatcher::FilegroupMatcher(Format *format) : Matcher(format) {}
@@ -133,7 +134,7 @@ void FilegroupMatcher::lookForMatch() {
   for (VGMSeq* seq : seqs) {
     const InstrAssoc& assoc = *assocIt;
 
-    VGMColl* coll = fmt->newCollection();
+    std::unique_ptr<VGMColl> coll(fmt->newCollection());
     coll->setName(seq->name());
     coll->useSeq(seq);
     coll->addInstrSet(assoc.instrSet);
@@ -142,8 +143,9 @@ void FilegroupMatcher::lookForMatch() {
     }
 
     if (!coll->load()) {
-      delete coll;
+      return;
     }
+    coll.release();
 
     // advance through the association list; keep using the last one once we run out
     if (std::next(assocIt) != instrAssocs.end()) {

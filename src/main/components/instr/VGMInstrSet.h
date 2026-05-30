@@ -3,6 +3,7 @@
 #include "Modulation.h"
 #include "VGMFile.h"
 
+#include <memory>
 #include <optional>
 #include <string>
 #include <vector>
@@ -42,6 +43,8 @@ public:
 
   VGMInstr *addInstr(u32 offset, u32 length, u32 bank, u32 instrNum,
                      const std::string &instrName = "");
+  void adoptSampColl(VGMSampColl* newSampColl);
+  void clearSampColl();
 
   std::vector<VGMInstr *> aInstrs;
   VGMSampColl *sampColl;
@@ -52,8 +55,10 @@ protected:
 
 private:
    bool m_auto_add_instruments_as_children{true};
+   bool m_instruments_owned_by_children{false};
    std::vector<VGMInstr*> m_exportInstrs;
-   std::vector<VGMInstr*> m_tempInstrs;
+   std::vector<std::unique_ptr<VGMInstr>> m_tempInstrs;
+   std::unique_ptr<VGMSampColl> m_ownedSampColl;
 };
 
 // ********
@@ -65,6 +70,8 @@ public:
   VGMInstr(VGMInstrSet *parInstrSet, u32 offset, u32 length, u32 bank,
            u32 instrNum, std::string name = "Instrument",
            float reverb = defaultReverbPercent);
+  VGMInstr(const VGMInstr& other);
+  ~VGMInstr() override;
 
   const std::vector<VGMRgn*>& regions() { return m_regions; }
   const std::vector<VGMRgn*>& regions() const { return m_regions; }
@@ -119,6 +126,7 @@ protected:
 private:
   bool m_auto_add_regions_as_children{true};
   std::vector<VGMRgn*> m_regions;
+  std::vector<std::unique_ptr<VGMRgn>> m_ownedRegions;
   std::vector<SynthModulator> m_modulators;
   std::vector<SynthGenerator> m_generators;
 };

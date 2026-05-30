@@ -16,6 +16,7 @@
 
 #include <climits>
 #include <ranges>
+#include <vector>
 
 VGMSeq::VGMSeq(const std::string &format, RawFile *file, u32 offset, u32 length, std::string name)
     : VGMFile(format, file, offset, length, std::move(name)),
@@ -49,7 +50,6 @@ VGMSeq::VGMSeq(const std::string &format, RawFile *file, u32 offset, u32 length,
 
 VGMSeq::~VGMSeq() {
   deleteVect<ISeqSlider>(aSliders);
-  delete midi;
 }
 
 bool VGMSeq::loadVGMFile(bool useMatcher) {
@@ -59,8 +59,7 @@ bool VGMSeq::loadVGMFile(bool useMatcher) {
     return false;
   }
 
-  rawFile()->addContainedVGMFile(std::make_shared<std::variant<VGMSeq *, VGMInstrSet *, VGMSampColl *,
-    VGMMiscFile *>>(this));
+  rawFile()->addContainedVGMFile(this);
   pRoot->addVGMFile(this);
 
   if (useMatcher) {
@@ -72,12 +71,12 @@ bool VGMSeq::loadVGMFile(bool useMatcher) {
   return true;
 }
 
-MidiFile *VGMSeq::convertToMidi(const VGMColl* coll) {
+std::unique_ptr<MidiFile> VGMSeq::convertToMidi(const VGMColl* coll) {
   const auto context = ConversionContext::fromOptions(ConversionOptions::the(), SynthTarget::SoundFont);
   return convertToMidi(coll, context);
 }
 
-MidiFile *VGMSeq::convertToMidi(const VGMColl* coll, const ConversionContext& context) {
+std::unique_ptr<MidiFile> VGMSeq::convertToMidi(const VGMColl* coll, const ConversionContext& context) {
   setConversionContext(context);
   size_t numTracks = aTracks.size();
 
@@ -92,16 +91,15 @@ MidiFile *VGMSeq::convertToMidi(const VGMColl* coll, const ConversionContext& co
   for (size_t i = 0; i < numTracks; i++)
     stopTime = std::max(stopTime, aTracks[i]->totalTicks);
 
-  auto *newmidi = new MidiFile(this);
-  this->midi = newmidi;
+  auto newMidi = std::make_unique<MidiFile>(this);
+  this->midi = newMidi.get();
   if (!loadTracks(READMODE_CONVERT_TO_MIDI, stopTime)) {
-    delete midi;
     this->midi = nullptr;
     m_timedEvents.clear();
     return nullptr;
   }
   this->midi = nullptr;
-  return newmidi;
+  return newMidi;
 }
 
 MidiTrack *VGMSeq::firstMidiTrack() {
@@ -168,7 +166,7 @@ bool VGMSeq::loadTracks(ReadMode seqReadMode, u32 stopTime) {
 
 void VGMSeq::loadTracksMain(u32 stopTime) {
   // determine the stop offsets
-  u32 *aStopOffset = new u32[nNumTracks];
+  std::vector<u32> aStopOffset(nNumTracks);
   for (u32 trackNum = 0; trackNum < nNumTracks; trackNum++) {
     if (readMode == READMODE_ADD_TO_UI) {
       aStopOffset[trackNum] = endOffset();
@@ -264,7 +262,6 @@ void VGMSeq::loadTracksMain(u32 stopTime) {
       aTracks[trackNum]->active = false;
     }
   }
-  delete[] aStopOffset;
 }
 
 bool VGMSeq::hasActiveTracks() {
@@ -351,10 +348,9 @@ bool VGMSeq::saveAsMidi(const std::filesystem::path &filepath, const VGMColl* co
 bool VGMSeq::saveAsMidi(const std::filesystem::path& filepath,
                         const VGMColl* coll,
                         const ConversionContext& context) {
-  MidiFile *midiFile = this->convertToMidi(coll, context);
+  auto midiFile = this->convertToMidi(coll, context);
   if (!midiFile)
     return false;
   bool result = midiFile->saveMidiFile(filepath);
-  delete midiFile;
   return result;
 }

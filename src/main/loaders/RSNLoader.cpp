@@ -11,6 +11,9 @@
 #include "LoaderManager.h"
 #include "LogManager.h"
 
+#include <memory>
+#include <vector>
+
 #include "unarr.h"
 
 namespace vgmtrans::loaders {
@@ -48,17 +51,14 @@ void RSNLoader::apply(const RawFile *file) {
     } else {
       continue;
     }
-    auto buffer = new u8[size];
-    if (!ar_entry_uncompress(ar, buffer, size)) {
+    std::vector<u8> buffer(size);
+    if (!ar_entry_uncompress(ar, buffer.data(), size)) {
       L_ERROR("Error decompressing file from rar archive: {}", raw_filename);
-      delete[] buffer;
       ar_close_archive(ar);
       ar_close(stream);
       return;
     }
-    auto virtFile = new VirtFile(buffer, static_cast<u32>(size), raw_filename, "", file->tag);
-    enqueue(virtFile);
-    delete[] buffer;
+    enqueue(std::make_unique<VirtFile>(buffer.data(), static_cast<u32>(size), raw_filename, "", file->tag));
   }
   ar_close_archive(ar);
   ar_close(stream);

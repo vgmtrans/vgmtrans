@@ -75,11 +75,10 @@ void saveAs(const VGMColl &coll, const std::filesystem::path &dir_path) {
   }
 
   if constexpr (hasTarget(options, Target::SF2)) {
-    if (SF2File *sf2file = createSF2File(coll, context)) {
+    if (auto sf2file = createSF2File(coll, context)) {
       auto sf2Path = filepath;
       sf2Path.replace_extension(".sf2");
       sf2file->saveSF2File(sf2Path);
-      delete sf2file;
     }
   }
 }

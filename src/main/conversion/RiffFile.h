@@ -5,6 +5,7 @@
 
 #include <cassert>
 #include <cstring>
+#include <memory>
 #include <string>
 #include <vector>
 
@@ -14,7 +15,7 @@
 class Chunk {
  public:
   char id[4];        //  A chunk ID identifies the type of data within the chunk.
-  u8 *data;        //  The actual data not including a possible pad byte to word align
+  std::unique_ptr<u8[]> data;        //  The actual data not including a possible pad byte to word align
 
  public:
   Chunk(const std::string& id)
@@ -22,12 +23,7 @@ class Chunk {
     assert(id.length() == 4);
     memcpy(this->id, id.c_str(), 4);
   }
-  virtual ~Chunk() {
-    if (data != nullptr) {
-      delete[] data;
-      data = nullptr;
-    }
-  }
+  virtual ~Chunk() = default;
   void setData(const void *src, u32 datasize);
   virtual u32 size();    //  Returns the size of the chunk in bytes, including any pad byte.
   void setSize(u32 size) { m_size = size; }
@@ -51,7 +47,7 @@ private:
 class ListTypeChunk: public Chunk {
  public:
   char type[4];    // 4 byte sig that begins the data field, "LIST" or "sfbk" for ex
-  std::list<Chunk *> childChunks;
+  std::list<std::unique_ptr<Chunk>> childChunks;
 
  public:
   ListTypeChunk(const std::string& id, const std::string& type)
@@ -59,9 +55,7 @@ class ListTypeChunk: public Chunk {
     assert(type.length() == 4);
     memcpy(this->type, type.c_str(), 4);
   }
-  ~ListTypeChunk() override {
-    deleteList(childChunks);
-  }
+  ~ListTypeChunk() override = default;
 
   Chunk *addChildChunk(Chunk *ck);
   u32 size() override;    //  Returns the size of the chunk in bytes, including any pad byte.

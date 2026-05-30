@@ -15,7 +15,6 @@
 #include <cassert>
 #include <climits>
 #include <filesystem>
-#include <memory>
 #include <string>
 #include <variant>
 #include <vector>
@@ -116,19 +115,19 @@ class RawFile {
     [[nodiscard]] const std::vector<T*> containedVGMFilesOfType() const noexcept {
       std::vector<T*> files = {};
       for (const auto& vgmfile : m_vgmfiles) {
-        if (T* fileOfType = variantToType<T>(*vgmfile)) {
+        if (T* fileOfType = variantToType<T>(vgmfile)) {
           files.emplace_back(fileOfType);
         }
       }
       return files;
     }
-    void addContainedVGMFile(std::shared_ptr<std::variant<VGMSeq *, VGMInstrSet *, VGMSampColl *, VGMMiscFile *>>);
-    void removeContainedVGMFile(std::variant<VGMSeq *, VGMInstrSet *, VGMSampColl *, VGMMiscFile *>);
+    void addContainedVGMFile(VGMFileVariant);
+    void removeContainedVGMFile(VGMFileVariant);
 
     VGMTag tag;
 
    private:
-    std::vector<std::shared_ptr<std::variant<VGMSeq *, VGMInstrSet *, VGMSampColl *, VGMMiscFile *>>> m_vgmfiles;
+    std::vector<VGMFileVariant> m_vgmfiles;
     enum ProcessFlags { UseLoaders = 1, UseScanners = 2 };
     unsigned m_flags = UseLoaders | UseScanners;
 };

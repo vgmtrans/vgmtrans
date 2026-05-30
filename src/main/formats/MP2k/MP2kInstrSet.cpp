@@ -88,7 +88,7 @@ MP2kInstrSet::MP2kInstrSet(RawFile *file, int rate, size_t offset, int count,
     : VGMInstrSet(MP2kFormat::name, file, offset, count * 12, name), m_count(count),
       m_operating_rate(rate), m_psg_samples(psg_samples) {
   assert(m_psg_samples != nullptr);
-  sampColl = new VGMSampColl(MP2kFormat::name, file, this, offset);
+  adoptSampColl(new VGMSampColl(MP2kFormat::name, file, this, offset));
 }
 
 MP2kPSGColl& MP2kInstrSet::psgSampColl() const noexcept {
@@ -124,8 +124,7 @@ bool MP2kInstrSet::loadInstrs() {
   }
 
   if (sampColl != nullptr && sampColl->samples.empty()) {
-    delete sampColl;
-    sampColl = nullptr;
+    clearSampColl();
   }
 
   return true;

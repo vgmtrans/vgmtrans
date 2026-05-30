@@ -13,13 +13,12 @@
 
 /* RawFile */
 
-/* FIXME: we own the VGMFile, should use unique_ptr instead */
-void RawFile::addContainedVGMFile(std::shared_ptr<std::variant<VGMSeq *, VGMInstrSet *, VGMSampColl *, VGMMiscFile *>> vgmfile) {
+void RawFile::addContainedVGMFile(VGMFileVariant vgmfile) {
     m_vgmfiles.emplace_back(vgmfile);
 }
 
-void RawFile::removeContainedVGMFile(std::variant<VGMSeq *, VGMInstrSet *, VGMSampColl *, VGMMiscFile *> vgmfile) {
-    auto iter = std::ranges::find_if(m_vgmfiles, [vgmfile](auto file) { return *file == vgmfile; });
+void RawFile::removeContainedVGMFile(VGMFileVariant vgmfile) {
+    auto iter = std::ranges::find(m_vgmfiles, vgmfile);
     if (iter != m_vgmfiles.end())
         m_vgmfiles.erase(iter);
     else {

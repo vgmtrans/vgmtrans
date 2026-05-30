@@ -8,8 +8,10 @@
 
 #include <filesystem>
 #include <list>
+#include <memory>
 #include <string>
 #include <unordered_map>
+#include <utility>
 #include <vector>
 
 class VGMSeq;
@@ -73,6 +75,14 @@ class MidiTrack {
 
   void sort();
   void writeTrack(std::vector<u8> &buf) const;
+  MidiEvent* adoptEvent(std::unique_ptr<MidiEvent> event);
+  void prependEvents(std::vector<std::unique_ptr<MidiEvent>> events);
+  std::vector<std::unique_ptr<MidiEvent>> releaseEvents();
+
+  template <class EventType, class... Args>
+  EventType* addEvent(Args&&... args) {
+    return static_cast<EventType*>(adoptEvent(std::make_unique<EventType>(std::forward<Args>(args)...)));
+  }
 
   //void setChannel(int theChannel);
   void setChannelGroup(int theChannelGroup);
@@ -213,6 +223,9 @@ class MidiTrack {
   // the correct note off events when a global transpose event occurs amidst live note on events,
   // and also allows us to warn about unpaired note on/off events.
   std::unordered_map<u8, u8> activeNotes;
+
+ private:
+  std::vector<std::unique_ptr<MidiEvent>> m_ownedEvents;
 };
 
 class MidiFile {
@@ -221,6 +234,8 @@ class MidiFile {
   ~MidiFile();
   MidiTrack *addTrack();
   MidiTrack *insertTrack(u32 trackNum);
+  MidiTrack* adoptTrack(std::unique_ptr<MidiTrack> track);
+  std::vector<std::unique_ptr<MidiTrack>> releaseTracks();
   int getMidiTrackIndex(const MidiTrack *midiTrack);
   void setPPQN(u16 ppqn);
   u32 ppqn() const;
@@ -242,6 +257,7 @@ class MidiFile {
 
 private:
   u16 m_ppqn;
+  std::vector<std::unique_ptr<MidiTrack>> m_ownedTracks;
 };
 
 class MidiEvent {

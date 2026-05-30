@@ -20,6 +20,7 @@ class VGMSampColl : public VGMFile {
               std::string name = "VGMSampColl");
   VGMSampColl(const std::string &format, RawFile *rawfile, VGMInstrSet *instrset, u32 offset,
                 u32 length = 0, std::string name = "VGMSampColl");
+  ~VGMSampColl() override;
   void useInstrSet(VGMInstrSet *instrset) { parInstrSet = instrset; }
 
   bool loadVGMFile(bool useMatcher = true) override;
@@ -43,6 +44,7 @@ protected:
 
 private:
   bool m_should_load_on_instr_set_match, bLoaded;
+  bool m_samples_owned_by_children{false};
 };
 
 namespace conversion {

@@ -5,11 +5,11 @@
  */
 
 #include "base/Types.h"
-#include "Helper.h"
 #include "LogManager.h"
 #include "Root.h"
 #include "VGMSeq.h"
 
+#include <algorithm>
 #include <filesystem>
 #include <ranges>
 
@@ -26,21 +26,43 @@ MidiFile::MidiFile(VGMSeq *assocSeq)
   this->m_ppqn = assocSeq->ppqn();
 }
 
-MidiFile::~MidiFile() {
-  deleteVect<MidiTrack>(aTracks);
-}
+MidiFile::~MidiFile() = default;
 
 MidiTrack *MidiFile::addTrack() {
-  aTracks.push_back(new MidiTrack(this, bMonophonicTracks));
-  return aTracks.back();
+  return adoptTrack(std::make_unique<MidiTrack>(this, bMonophonicTracks));
 }
 
 MidiTrack *MidiFile::insertTrack(u32 trackNum) {
   if (trackNum + 1 > aTracks.size())
     aTracks.resize(trackNum + 1, nullptr);
 
-  aTracks[trackNum] = new MidiTrack(this, bMonophonicTracks);
-  return aTracks[trackNum];
+  if (aTracks[trackNum]) {
+    std::erase_if(m_ownedTracks, [track = aTracks[trackNum]](const auto& ownedTrack) {
+      return ownedTrack.get() == track;
+    });
+  }
+
+  auto track = std::make_unique<MidiTrack>(this, bMonophonicTracks);
+  auto* rawTrack = track.get();
+  m_ownedTracks.push_back(std::move(track));
+  aTracks[trackNum] = rawTrack;
+  return rawTrack;
+}
+
+MidiTrack* MidiFile::adoptTrack(std::unique_ptr<MidiTrack> track) {
+  if (!track) {
+    return nullptr;
+  }
+
+  auto* rawTrack = track.get();
+  m_ownedTracks.push_back(std::move(track));
+  aTracks.push_back(rawTrack);
+  return rawTrack;
+}
+
+std::vector<std::unique_ptr<MidiTrack>> MidiFile::releaseTracks() {
+  aTracks.clear();
+  return std::move(m_ownedTracks);
 }
 
 int MidiFile::getMidiTrackIndex(const MidiTrack *midiTrack) {
@@ -64,7 +86,9 @@ void MidiFile::sort() {
   for (u32 i = 0; i < aTracks.size(); i++) {
     if (aTracks[i]) {
       if (aTracks[i]->aEvents.empty()) {
-        delete aTracks[i];
+        std::erase_if(m_ownedTracks, [track = aTracks[i]](const auto& ownedTrack) {
+          return ownedTrack.get() == track;
+        });
         aTracks.erase(aTracks.begin() + i--);
       } else
         aTracks[i]->sort();
@@ -121,8 +145,39 @@ MidiTrack::MidiTrack(MidiFile *parentSeq, bool monophonic)
       prevDurEvent(nullptr),
       bSustain(false) {}
 
-MidiTrack::~MidiTrack() {
-  deleteVect<MidiEvent>(aEvents);
+MidiTrack::~MidiTrack() = default;
+
+MidiEvent* MidiTrack::adoptEvent(std::unique_ptr<MidiEvent> event) {
+  if (!event) {
+    return nullptr;
+  }
+
+  auto* rawEvent = event.get();
+  m_ownedEvents.push_back(std::move(event));
+  aEvents.push_back(rawEvent);
+  return rawEvent;
+}
+
+void MidiTrack::prependEvents(std::vector<std::unique_ptr<MidiEvent>> events) {
+  std::vector<MidiEvent*> rawEvents;
+  rawEvents.reserve(events.size());
+
+  for (auto& event : events) {
+    if (!event) {
+      continue;
+    }
+    rawEvents.push_back(event.get());
+    m_ownedEvents.push_back(std::move(event));
+  }
+
+  aEvents.insert(aEvents.begin(), rawEvents.begin(), rawEvents.end());
+}
+
+std::vector<std::unique_ptr<MidiEvent>> MidiTrack::releaseEvents() {
+  prevDurEvent = nullptr;
+  prevDurNoteOffs.clear();
+  aEvents.clear();
+  return std::move(m_ownedEvents);
 }
 
 void MidiTrack::sort() {
@@ -130,7 +185,7 @@ void MidiTrack::sort() {
   std::ranges::stable_sort(aEvents, AbsTimeCmp());  // Sort all the events by absolute time,
                                                              // so that delta times can be recorded correctly
   if (!bHasEndOfTrack && !aEvents.empty()) {
-    aEvents.push_back(new EndOfTrackEvent(this, aEvents.back()->absTime));
+    addEvent<EndOfTrackEvent>(this, aEvents.back()->absTime);
     bHasEndOfTrack = true;
   }
 }
@@ -192,27 +247,26 @@ void MidiTrack::resetDelta() {
 }
 
 void MidiTrack::addNoteOn(u8 channel, s8 key, s8 vel) {
-  aEvents.push_back(new NoteEvent(this, channel, getDelta(), true, key, vel));
+  addEvent<NoteEvent>(this, channel, getDelta(), true, key, vel);
 }
 
 void MidiTrack::insertNoteOn(u8 channel, s8 key, s8 vel, u32 absTime) {
-  aEvents.push_back(new NoteEvent(this, channel, absTime, true, key, vel));
+  addEvent<NoteEvent>(this, channel, absTime, true, key, vel);
 }
 
 void MidiTrack::addNoteOff(u8 channel, s8 key) {
-  aEvents.push_back(new NoteEvent(this, channel, getDelta(), false, key));
+  addEvent<NoteEvent>(this, channel, getDelta(), false, key);
 }
 
 void MidiTrack::insertNoteOff(u8 channel, s8 key, u32 absTime) {
-  aEvents.push_back(new NoteEvent(this, channel, absTime, false, key));
+  addEvent<NoteEvent>(this, channel, absTime, false, key);
 }
 
 void MidiTrack::addNoteByDur(u8 channel, s8 key, s8 vel, u32 duration) {
   purgePrevNoteOffs(getDelta());
-  aEvents.push_back(new NoteEvent(this, channel, getDelta(), true, key, vel));  // add note on
-  NoteEvent *prevDurNoteOff = new NoteEvent(this, channel, getDelta() + duration, false, key);
+  addEvent<NoteEvent>(this, channel, getDelta(), true, key, vel);  // add note on
+  NoteEvent *prevDurNoteOff = addEvent<NoteEvent>(this, channel, getDelta() + duration, false, key);
   prevDurNoteOffs.push_back(prevDurNoteOff);
-  aEvents.push_back(prevDurNoteOff);  // add note off at end of dur
 }
 
 //TODO: MOVE! This definitely doesn't belong here.
@@ -243,10 +297,9 @@ void MidiTrack::addNoteByDur_TriAce(u8 channel, s8 key, s8 vel, u32 duration) {
 
   if (ContNote == nullptr) {
     purgePrevNoteOffs(CurDelta);
-    aEvents.push_back(new NoteEvent(this, channel, CurDelta, true, key, vel));  // add note on
-    NoteEvent *prevDurNoteOff = new NoteEvent(this, channel, CurDelta + duration, false, key);
+    addEvent<NoteEvent>(this, channel, CurDelta, true, key, vel);  // add note on
+    NoteEvent *prevDurNoteOff = addEvent<NoteEvent>(this, channel, CurDelta + duration, false, key);
     prevDurNoteOffs.push_back(prevDurNoteOff);
-    aEvents.push_back(prevDurNoteOff);  // add note off at end of dur
   } else {
     ContNote->absTime = CurDelta + duration;  // fix DeltaTime of the already inserted NoteOff event
   }
@@ -254,10 +307,9 @@ void MidiTrack::addNoteByDur_TriAce(u8 channel, s8 key, s8 vel, u32 duration) {
 
 void MidiTrack::insertNoteByDur(u8 channel, s8 key, s8 vel, u32 duration, u32 absTime) {
   purgePrevNoteOffs(std::max(getDelta(), absTime));
-  aEvents.push_back(new NoteEvent(this, channel, absTime, true, key, vel));  // add note on
-  NoteEvent *prevDurNoteOff = new NoteEvent(this, channel, absTime + duration, false, key);
+  addEvent<NoteEvent>(this, channel, absTime, true, key, vel);  // add note on
+  NoteEvent *prevDurNoteOff = addEvent<NoteEvent>(this, channel, absTime + duration, false, key);
   prevDurNoteOffs.push_back(prevDurNoteOff);
-  aEvents.push_back(prevDurNoteOff);  // add note off at end of dur
 }
 
 void MidiTrack::purgePrevNoteOffs() {
@@ -283,34 +335,33 @@ void MidiTrack::InsertVolMarker(u8 channel, u8 vol, u32 absTime, s8 priority)
 }*/
 
 void MidiTrack::addControllerEvent(u8 channel, u8 controllerNum, u8 theDataByte) {
-  aEvents.push_back(new ControllerEvent(this, channel, getDelta(), controllerNum, theDataByte));
+  addEvent<ControllerEvent>(this, channel, getDelta(), controllerNum, theDataByte);
 }
 
 void MidiTrack::insertControllerEvent(u8 channel, u8 controllerNum, u8 theDataByte, u32 absTime) {
-  aEvents.push_back(new ControllerEvent(this, channel, absTime, controllerNum, theDataByte));
+  addEvent<ControllerEvent>(this, channel, absTime, controllerNum, theDataByte);
 }
 
 void MidiTrack::addVol(u8 channel, u8 vol) {
-  aEvents.push_back(new VolumeEvent(this, channel, getDelta(), vol));
+  addEvent<VolumeEvent>(this, channel, getDelta(), vol);
 }
 
 void MidiTrack::insertVol(u8 channel, u8 vol, u32 absTime) {
-  aEvents.push_back(new VolumeEvent(this, channel, absTime, vol));
+  addEvent<VolumeEvent>(this, channel, absTime, vol);
 }
 
 void MidiTrack::addVolumeFine(u8 channel, u8 volume_lsb) {
-  aEvents.push_back(new VolumeFineEvent(this, channel, getDelta(), volume_lsb));
+  addEvent<VolumeFineEvent>(this, channel, getDelta(), volume_lsb);
 }
 
 void MidiTrack::insertVolumeFine(u8 channel, u8 volume_lsb, u32 absTime) {
-  aEvents.push_back(new VolumeFineEvent(this, channel, absTime, volume_lsb));
+  addEvent<VolumeFineEvent>(this, channel, absTime, volume_lsb);
 }
 
 //TODO: Master Volume sysex events are meant to be global to device, not per channel.
 // For per channel master volume, we should add a system for normalizing controller vol events.
 void MidiTrack::addMasterVol(u8 channel, u8 volMsb, u8 volLsb) {
-  MidiEvent *newEvent = new MasterVolEvent(this, channel, getDelta(), volMsb, volLsb);
-  aEvents.push_back(newEvent);
+  addEvent<MasterVolEvent>(this, channel, getDelta(), volMsb, volLsb);
 }
 
 void MidiTrack::insertMasterVol(u8 channel, u8 volMsb, u32 absTime) {
@@ -318,128 +369,127 @@ void MidiTrack::insertMasterVol(u8 channel, u8 volMsb, u32 absTime) {
 }
 
 void MidiTrack::insertMasterVol(u8 channel, u8 volMsb, u8 volLsb, u32 absTime) {
-  MidiEvent *newEvent = new MasterVolEvent(this, channel, absTime, volMsb, volLsb);
-  aEvents.push_back(newEvent);
+  addEvent<MasterVolEvent>(this, channel, absTime, volMsb, volLsb);
 }
 
 void MidiTrack::addExpression(u8 channel, u8 expression) {
-  aEvents.push_back(new ExpressionEvent(this, channel, getDelta(), expression));
+  addEvent<ExpressionEvent>(this, channel, getDelta(), expression);
 }
 
 void MidiTrack::insertExpression(u8 channel, u8 expression, u32 absTime) {
-  aEvents.push_back(new ExpressionEvent(this, channel, absTime, expression));
+  addEvent<ExpressionEvent>(this, channel, absTime, expression);
 }
 
 void MidiTrack::addExpressionFine(u8 channel, u8 expression_lsb) {
-  aEvents.push_back(new ExpressionFineEvent(this, channel, getDelta(), expression_lsb));
+  addEvent<ExpressionFineEvent>(this, channel, getDelta(), expression_lsb);
 }
 
 void MidiTrack::insertExpressionFine(u8 channel, u8 expression_lsb, u32 absTime) {
-  aEvents.push_back(new ExpressionFineEvent(this, channel, absTime, expression_lsb));
+  addEvent<ExpressionFineEvent>(this, channel, absTime, expression_lsb);
 }
 
 void MidiTrack::addSustain(u8 channel, u8 depth) {
-  aEvents.push_back(new SustainEvent(this, channel, getDelta(), depth));
+  addEvent<SustainEvent>(this, channel, getDelta(), depth);
 }
 
 void MidiTrack::insertSustain(u8 channel, u8 depth, u32 absTime) {
-  aEvents.push_back(new SustainEvent(this, channel, absTime, depth));
+  addEvent<SustainEvent>(this, channel, absTime, depth);
 }
 
 void MidiTrack::addPortamento(u8 channel, bool bOn) {
-  aEvents.push_back(new PortamentoEvent(this, channel, getDelta(), bOn));
+  addEvent<PortamentoEvent>(this, channel, getDelta(), bOn);
 }
 
 void MidiTrack::insertPortamento(u8 channel, bool bOn, u32 absTime) {
-  aEvents.push_back(new PortamentoEvent(this, channel, absTime, bOn));
+  addEvent<PortamentoEvent>(this, channel, absTime, bOn);
 }
 
 void MidiTrack::addPortamentoTime(u8 channel, u8 time) {
-  aEvents.push_back(new PortamentoTimeEvent(this, channel, getDelta(), time));
+  addEvent<PortamentoTimeEvent>(this, channel, getDelta(), time);
 }
 
 void MidiTrack::insertPortamentoTime(u8 channel, u8 time, u32 absTime) {
-  aEvents.push_back(new PortamentoTimeEvent(this, channel, absTime, time));
+  addEvent<PortamentoTimeEvent>(this, channel, absTime, time);
 }
 
 void MidiTrack::addPortamentoTimeFine(u8 channel, u8 time) {
-  aEvents.push_back(new PortamentoTimeFineEvent(this, channel, getDelta(), time));
+  addEvent<PortamentoTimeFineEvent>(this, channel, getDelta(), time);
 }
 
 void MidiTrack::insertPortamentoTimeFine(u8 channel, u8 time, u32 absTime) {
-  aEvents.push_back(new PortamentoTimeFineEvent(this, channel, absTime, time));
+  addEvent<PortamentoTimeFineEvent>(this, channel, absTime, time);
 }
 
 void MidiTrack::addPortamentoControl(u8 channel, u8 key) {
-  aEvents.push_back(new PortamentoControlEvent(this, channel, getDelta(), key));
+  addEvent<PortamentoControlEvent>(this, channel, getDelta(), key);
 }
 
 void MidiTrack::insertPortamentoControl(u8 channel, u8 key, u32 absTime) {
-  aEvents.push_back(new PortamentoControlEvent(this, channel, absTime, key));
+  addEvent<PortamentoControlEvent>(this, channel, absTime, key);
 }
 
 void MidiTrack::addMono(u8 channel) {
-  aEvents.push_back(new MonoEvent(this, channel, getDelta()));
+  addEvent<MonoEvent>(this, channel, getDelta());
 }
 
 void MidiTrack::insertMono(u8 channel, u32 absTime) {
-  aEvents.push_back(new MonoEvent(this, channel, absTime));
+  addEvent<MonoEvent>(this, channel, absTime);
 }
 
 void MidiTrack::addLegatoPedal(u8 channel, bool bOn) {
-  aEvents.push_back(new LegatoPedalEvent(this, channel, getDelta(), bOn));
+  addEvent<LegatoPedalEvent>(this, channel, getDelta(), bOn);
 }
 
 void MidiTrack::insertLegatoPedal(u8 channel, bool bOn, u32 absTime) {
-  aEvents.push_back(new LegatoPedalEvent(this, channel, absTime, bOn));
+  addEvent<LegatoPedalEvent>(this, channel, absTime, bOn);
 }
 
 void MidiTrack::addPan(u8 channel, u8 pan) {
-  aEvents.push_back(new PanEvent(this, channel, getDelta(), pan));
+  addEvent<PanEvent>(this, channel, getDelta(), pan);
 }
 
 void MidiTrack::insertPan(u8 channel, u8 pan, u32 absTime) {
-  aEvents.push_back(new PanEvent(this, channel, absTime, pan));
+  addEvent<PanEvent>(this, channel, absTime, pan);
 }
 
 void MidiTrack::addReverb(u8 channel, u8 reverb) {
-  aEvents.push_back(new ControllerEvent(this, channel, getDelta(), 91, reverb));
+  addEvent<ControllerEvent>(this, channel, getDelta(), 91, reverb);
 }
 
 void MidiTrack::insertReverb(u8 channel, u8 reverb, u32 absTime) {
-  aEvents.push_back(new ControllerEvent(this, channel, absTime, 91, reverb));
+  addEvent<ControllerEvent>(this, channel, absTime, 91, reverb);
 }
 
 void MidiTrack::addModulation(u8 channel, u8 depth) {
-  aEvents.push_back(new ModulationEvent(this, channel, getDelta(), depth));
+  addEvent<ModulationEvent>(this, channel, getDelta(), depth);
 }
 
 void MidiTrack::insertModulation(u8 channel, u8 depth, u32 absTime) {
-  aEvents.push_back(new ControllerEvent(this, channel, absTime, 1, depth));
+  addEvent<ControllerEvent>(this, channel, absTime, 1, depth);
 }
 
 void MidiTrack::addBreath(u8 channel, u8 depth) {
-  aEvents.push_back(new BreathEvent(this, channel, getDelta(), depth));
+  addEvent<BreathEvent>(this, channel, getDelta(), depth);
 }
 
 void MidiTrack::insertBreath(u8 channel, u8 depth, u32 absTime) {
-  aEvents.push_back(new ControllerEvent(this, channel, absTime, 2, depth));
+  addEvent<ControllerEvent>(this, channel, absTime, 2, depth);
 }
 
 void MidiTrack::addPitchBend(u8 channel, s16 bend) {
-  aEvents.push_back(new PitchBendEvent(this, channel, getDelta(), bend));
+  addEvent<PitchBendEvent>(this, channel, getDelta(), bend);
 }
 
 void MidiTrack::insertPitchBend(u8 channel, s16 bend, u32 absTime) {
-  aEvents.push_back(new PitchBendEvent(this, channel, absTime, bend));
+  addEvent<PitchBendEvent>(this, channel, absTime, bend);
 }
 
 void MidiTrack::addChannelPressure(u8 channel, u8 pressure) {
-  aEvents.push_back(new ChannelPressureEvent(this, channel, getDelta(), pressure));
+  addEvent<ChannelPressureEvent>(this, channel, getDelta(), pressure);
 }
 
 void MidiTrack::insertChannelPressure(u8 channel, u8 pressure, u32 absTime) {
-  aEvents.push_back(new ChannelPressureEvent(this, channel, absTime, pressure));
+  addEvent<ChannelPressureEvent>(this, channel, absTime, pressure);
 }
 
 void MidiTrack::addPitchBendRange(u8 channel, u16 cents) {
@@ -450,10 +500,10 @@ void MidiTrack::insertPitchBendRange(u8 channel, u16 cents, u32 absTime) {
   u8 semitones = cents / 100;
   u8 finetune_cents = cents % 100;
   // We push the LSB controller event first as somee virtual instruments only react upon receiving MSB
-  aEvents.push_back(new ControllerEvent(this, channel, absTime, 101, 0, PRIORITY_HIGHER - 1));
-  aEvents.push_back(new ControllerEvent(this, channel, absTime, 100, 0, PRIORITY_HIGHER - 1));
-  aEvents.push_back(new ControllerEvent(this, channel, absTime, 38, finetune_cents, PRIORITY_HIGHER - 1));
-  aEvents.push_back(new ControllerEvent(this, channel, absTime, 6, semitones, PRIORITY_HIGHER - 1));
+  addEvent<ControllerEvent>(this, channel, absTime, 101, 0, PRIORITY_HIGHER - 1);
+  addEvent<ControllerEvent>(this, channel, absTime, 100, 0, PRIORITY_HIGHER - 1);
+  addEvent<ControllerEvent>(this, channel, absTime, 38, finetune_cents, PRIORITY_HIGHER - 1);
+  addEvent<ControllerEvent>(this, channel, absTime, 6, semitones, PRIORITY_HIGHER - 1);
 }
 
 void MidiTrack::addFineTuning(u8 channel, u8 msb, u8 lsb) {
@@ -462,10 +512,10 @@ void MidiTrack::addFineTuning(u8 channel, u8 msb, u8 lsb) {
 
 void MidiTrack::insertFineTuning(u8 channel, u8 msb, u8 lsb, u32 absTime) {
   // We push the LSB controller event first as somee virtual instruments only react upon receiving MSB
-  aEvents.push_back(new ControllerEvent(this, channel, absTime, 101, 0, PRIORITY_HIGHER - 1));
-  aEvents.push_back(new ControllerEvent(this, channel, absTime, 100, 1, PRIORITY_HIGHER - 1));
-  aEvents.push_back(new ControllerEvent(this, channel, absTime, 38, lsb, PRIORITY_HIGHER - 1));
-  aEvents.push_back(new ControllerEvent(this, channel, absTime, 6, msb, PRIORITY_HIGHER - 1));
+  addEvent<ControllerEvent>(this, channel, absTime, 101, 0, PRIORITY_HIGHER - 1);
+  addEvent<ControllerEvent>(this, channel, absTime, 100, 1, PRIORITY_HIGHER - 1);
+  addEvent<ControllerEvent>(this, channel, absTime, 38, lsb, PRIORITY_HIGHER - 1);
+  addEvent<ControllerEvent>(this, channel, absTime, 6, msb, PRIORITY_HIGHER - 1);
 }
 
 void MidiTrack::addFineTuning(u8 channel, double cents) {
@@ -484,10 +534,10 @@ void MidiTrack::addCoarseTuning(u8 channel, u8 msb, u8 lsb) {
 }
 
 void MidiTrack::insertCoarseTuning(u8 channel, u8 msb, u8 lsb, u32 absTime) {
-  aEvents.push_back(new ControllerEvent(this, channel, absTime, 101, 0, PRIORITY_HIGHER - 1));
-  aEvents.push_back(new ControllerEvent(this, channel, absTime, 100, 2, PRIORITY_HIGHER - 1));
-  aEvents.push_back(new ControllerEvent(this, channel, absTime, 38, lsb, PRIORITY_HIGHER - 1));
-  aEvents.push_back(new ControllerEvent(this, channel, absTime, 6, msb, PRIORITY_HIGHER - 1));
+  addEvent<ControllerEvent>(this, channel, absTime, 101, 0, PRIORITY_HIGHER - 1);
+  addEvent<ControllerEvent>(this, channel, absTime, 100, 2, PRIORITY_HIGHER - 1);
+  addEvent<ControllerEvent>(this, channel, absTime, 38, lsb, PRIORITY_HIGHER - 1);
+  addEvent<ControllerEvent>(this, channel, absTime, 6, msb, PRIORITY_HIGHER - 1);
 }
 
 void MidiTrack::addCoarseTuning(u8 channel, double semitones) {
@@ -505,10 +555,10 @@ void MidiTrack::addModulationDepthRange(u8 channel, u8 msb, u8 lsb) {
 }
 
 void MidiTrack::insertModulationDepthRange(u8 channel, u8 msb, u8 lsb, u32 absTime) {
-  aEvents.push_back(new ControllerEvent(this, channel, absTime, 101, 0, PRIORITY_HIGHER - 1));
-  aEvents.push_back(new ControllerEvent(this, channel, absTime, 100, 5, PRIORITY_HIGHER - 1));
-  aEvents.push_back(new ControllerEvent(this, channel, absTime, 38, lsb, PRIORITY_HIGHER - 1));
-  aEvents.push_back(new ControllerEvent(this, channel, absTime, 6, msb, PRIORITY_HIGHER - 1));
+  addEvent<ControllerEvent>(this, channel, absTime, 101, 0, PRIORITY_HIGHER - 1);
+  addEvent<ControllerEvent>(this, channel, absTime, 100, 5, PRIORITY_HIGHER - 1);
+  addEvent<ControllerEvent>(this, channel, absTime, 38, lsb, PRIORITY_HIGHER - 1);
+  addEvent<ControllerEvent>(this, channel, absTime, 6, msb, PRIORITY_HIGHER - 1);
 }
 
 void MidiTrack::addModulationDepthRange(u8 channel, double semitones) {
@@ -522,125 +572,125 @@ void MidiTrack::insertModulationDepthRange(u8 channel, double semitones, u32 abs
 }
 
 void MidiTrack::addProgramChange(u8 channel, u8 progNum) {
-  aEvents.push_back(new ProgChangeEvent(this, channel, getDelta(), progNum));
+  addEvent<ProgChangeEvent>(this, channel, getDelta(), progNum);
 }
 
 void MidiTrack::addBankSelect(u8 channel, u8 bank) {
-  aEvents.push_back(new BankSelectEvent(this, channel, getDelta(), bank));
+  addEvent<BankSelectEvent>(this, channel, getDelta(), bank);
 }
 
 void MidiTrack::addBankSelectFine(u8 channel, u8 lsb) {
-  aEvents.push_back(new BankSelectFineEvent(this, channel, getDelta(), lsb));
+  addEvent<BankSelectFineEvent>(this, channel, getDelta(), lsb);
 }
 
 void MidiTrack::insertBankSelect(u8 channel, u8 bank, u32 absTime) {
-  aEvents.push_back(new ControllerEvent(this, channel, absTime, 0, bank));
+  addEvent<ControllerEvent>(this, channel, absTime, 0, bank);
 }
 
 void MidiTrack::addTempo(u32 microSeconds) {
-  aEvents.push_back(new TempoEvent(this, getDelta(), microSeconds));
+  addEvent<TempoEvent>(this, getDelta(), microSeconds);
   //bAddedTempo = true;
 }
 
 void MidiTrack::addTempoBPM(double BPM) {
   u32 microSecs = static_cast<u32>(std::round(60000000.0 / BPM));
-  aEvents.push_back(new TempoEvent(this, getDelta(), microSecs));
+  addEvent<TempoEvent>(this, getDelta(), microSecs);
   //bAddedTempo = true;
 }
 
 void MidiTrack::insertTempo(u32 microSeconds, u32 absTime) {
-  aEvents.push_back(new TempoEvent(this, absTime, microSeconds));
+  addEvent<TempoEvent>(this, absTime, microSeconds);
   //bAddedTempo = true;
 }
 
 void MidiTrack::insertTempoBPM(double BPM, u32 absTime) {
   u32 microSecs = static_cast<u32>(std::round(60000000.0 / BPM));
-  aEvents.push_back(new TempoEvent(this, absTime, microSecs));
+  addEvent<TempoEvent>(this, absTime, microSecs);
   //bAddedTempo = true;
 }
 
 void MidiTrack::addMidiPort(u8 port) {
-  aEvents.push_back(new MidiPortEvent(this, getDelta(), port));
+  addEvent<MidiPortEvent>(this, getDelta(), port);
 }
 
 void MidiTrack::insertMidiPort(u8 port, u32 absTime) {
-  aEvents.push_back(new MidiPortEvent(this, absTime, port));
+  addEvent<MidiPortEvent>(this, absTime, port);
 }
 
 void MidiTrack::addTimeSig(u8 numer, u8 denom, u8 ticksPerQuarter) {
-  aEvents.push_back(new TimeSigEvent(this, getDelta(), numer, denom, ticksPerQuarter));
+  addEvent<TimeSigEvent>(this, getDelta(), numer, denom, ticksPerQuarter);
   //bAddedTimeSig = true;
 }
 
 void MidiTrack::insertTimeSig(u8 numer, u8 denom, u8 ticksPerQuarter, u32 absTime) {
-  aEvents.push_back(new TimeSigEvent(this, absTime, numer, denom, ticksPerQuarter));
+  addEvent<TimeSigEvent>(this, absTime, numer, denom, ticksPerQuarter);
   //bAddedTimeSig = true;
 }
 
 void MidiTrack::addEndOfTrack() {
-  aEvents.push_back(new EndOfTrackEvent(this, getDelta()));
+  addEvent<EndOfTrackEvent>(this, getDelta());
   bHasEndOfTrack = true;
 }
 
 void MidiTrack::insertEndOfTrack(u32 absTime) {
-  aEvents.push_back(new EndOfTrackEvent(this, absTime));
+  addEvent<EndOfTrackEvent>(this, absTime);
   bHasEndOfTrack = true;
 }
 
 void MidiTrack::addText(const std::string &str) {
-  aEvents.push_back(new TextEvent(this, getDelta(), str));
+  addEvent<TextEvent>(this, getDelta(), str);
 }
 
 void MidiTrack::insertText(const std::string &str, u32 absTime) {
-  aEvents.push_back(new TextEvent(this, absTime, str));
+  addEvent<TextEvent>(this, absTime, str);
 }
 
 void MidiTrack::addSeqName(const std::string &str) {
-  aEvents.push_back(new SeqNameEvent(this, getDelta(), str));
+  addEvent<SeqNameEvent>(this, getDelta(), str);
 }
 
 void MidiTrack::insertSeqName(const std::string &str, u32 absTime) {
-  aEvents.push_back(new SeqNameEvent(this, absTime, str));
+  addEvent<SeqNameEvent>(this, absTime, str);
 }
 
 void MidiTrack::addTrackName(const std::string &str) {
-  aEvents.push_back(new TrackNameEvent(this, getDelta(), str));
+  addEvent<TrackNameEvent>(this, getDelta(), str);
 }
 
 void MidiTrack::insertTrackName(const std::string &str, u32 absTime) {
-  aEvents.push_back(new TrackNameEvent(this, absTime, str));
+  addEvent<TrackNameEvent>(this, absTime, str);
 }
 
 void MidiTrack::addGMReset() {
-  aEvents.push_back(new GMResetEvent(this, getDelta()));
+  addEvent<GMResetEvent>(this, getDelta());
 }
 
 void MidiTrack::insertGMReset(u32 absTime) {
-  aEvents.push_back(new GMResetEvent(this, absTime));
+  addEvent<GMResetEvent>(this, absTime);
 }
 
 void MidiTrack::addGM2Reset() {
-  aEvents.push_back(new GM2ResetEvent(this, getDelta()));
+  addEvent<GM2ResetEvent>(this, getDelta());
 }
 
 void MidiTrack::insertGM2Reset(u32 absTime) {
-  aEvents.push_back(new GM2ResetEvent(this, absTime));
+  addEvent<GM2ResetEvent>(this, absTime);
 }
 
 void MidiTrack::addGSReset() {
-  aEvents.push_back(new GSResetEvent(this, getDelta()));
+  addEvent<GSResetEvent>(this, getDelta());
 }
 
 void MidiTrack::insertGSReset(u32 absTime) {
-  aEvents.push_back(new GSResetEvent(this, absTime));
+  addEvent<GSResetEvent>(this, absTime);
 }
 
 void MidiTrack::addXGReset() {
-  aEvents.push_back(new XGResetEvent(this, getDelta()));
+  addEvent<XGResetEvent>(this, getDelta());
 }
 
 void MidiTrack::insertXGReset(u32 absTime) {
-  aEvents.push_back(new XGResetEvent(this, absTime));
+  addEvent<XGResetEvent>(this, absTime);
 }
 
 // SPECIAL NON-MIDI EVENTS
@@ -650,11 +700,11 @@ void MidiTrack::insertXGReset(u32 absTime) {
 
 //void MidiTrack::AddTranspose(s8 semitones)
 //{
-//	aEvents.push_back(new TransposeEvent(this, GetDelta(), semitones));
+//	addEvent<TransposeEvent>(this, GetDelta(), semitones);
 //}
 
 void MidiTrack::insertGlobalTranspose(u32 absTime, s8 semitones) {
-  aEvents.push_back(new GlobalTransposeEvent(this, absTime, semitones));
+  addEvent<GlobalTransposeEvent>(this, absTime, semitones);
 }
 
 
@@ -663,7 +713,7 @@ void MidiTrack::addMarker(u8 channel,
                           u8 databyte1,
                           u8 databyte2,
                           s8 priority) {
-  aEvents.push_back(new MarkerEvent(this, channel, getDelta(), markername, databyte1, databyte2, priority));
+  addEvent<MarkerEvent>(this, channel, getDelta(), markername, databyte1, databyte2, priority);
 }
 
 void MidiTrack::insertMarker(u8 channel,
@@ -672,7 +722,7 @@ void MidiTrack::insertMarker(u8 channel,
                   u8 databyte2,
                   s8 priority,
                   u32 absTime) {
-  aEvents.push_back(new MarkerEvent(this, channel, absTime, markername, databyte1, databyte2, priority));
+  addEvent<MarkerEvent>(this, channel, absTime, markername, databyte1, databyte2, priority);
 }
 
 //  *********
@@ -822,8 +872,8 @@ DurNoteEvent* DurNoteEvent::MakeCopy()
 
 /*void DurNoteEvent::PrepareWrite(vector<MidiEvent*> & aEvents)
 {
-	prntTrk->aEvents.push_back(new NoteEvent(prntTrk, channel, AbsTime, true, key, vel));	//add note on
-	prntTrk->aEvents.push_back(new NoteEvent(prntTrk, channel, AbsTime+duration, false, key, vel));  //add note off at end of dur
+	prntTrk->addEvent<NoteEvent>(prntTrk, channel, AbsTime, true, key, vel);	//add note on
+	prntTrk->addEvent<NoteEvent>(prntTrk, channel, AbsTime+duration, false, key, vel);  //add note off at end of dur
 }*/
 
 //u32 DurNoteEvent::WriteEvent(vector<u8> & buf, u32 time)		//we do note use WriteEvent on DurNoteEvents... this is what PrepareWrite is for, to create NoteEvents in substitute

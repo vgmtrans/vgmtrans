@@ -12,6 +12,7 @@
 #include "PSFFile.h"
 
 #include <filesystem>
+#include <memory>
 #include <optional>
 #include <unordered_map>
 #include <vector>
@@ -143,8 +144,7 @@ void PSFLoader::psf_read_exe(const RawFile *file) {
     load_with_libs(psf, file->path().parent_path(), img);
     if (!img.data.empty()) {
       auto tag = PSFFile::tagFromPSFFile(psf);
-      auto virt = new VirtFile(img.data.data(), img.data.size(), file->name(), file->path(), tag);
-      enqueue(virt);
+      enqueue(std::make_unique<VirtFile>(img.data.data(), img.data.size(), file->name(), file->path(), tag));
     }
   } catch (std::exception &e) {
     L_ERROR(e.what());

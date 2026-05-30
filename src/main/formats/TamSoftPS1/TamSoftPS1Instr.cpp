@@ -48,7 +48,7 @@ bool TamSoftPS1InstrSet::parseInstrPointers() {
     return false;
   }
 
-  sampColl = new PSXSampColl(TamSoftPS1Format::name, this, offset() + 0x800, length() - 0x800, vagLocations);
+  adoptSampColl(new PSXSampColl(TamSoftPS1Format::name, this, offset() + 0x800, length() - 0x800, vagLocations));
   return true;
 }
 

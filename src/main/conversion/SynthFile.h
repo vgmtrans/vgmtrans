@@ -4,6 +4,7 @@
 #include "Modulation.h"
 #include "RiffFile.h"
 
+#include <memory>
 #include <string>
 #include <utility>
 #include <vector>
@@ -29,14 +30,22 @@ class SynthFile {
 
   SynthInstr *addInstr(u32 bank, u32 instrNum, float reverb);
   SynthInstr *addInstr(u32 bank, u32 instrNum, std::string Name, float reverb);
+  void adoptInstr(std::unique_ptr<SynthInstr> instr);
+  std::vector<std::unique_ptr<SynthInstr>> releaseInstrs();
   SynthWave *addWave(u16 formatTag, u16 channels, int samplesPerSec, int aveBytesPerSec,
                      u16 blockAlign, u16 bitsPerSample, u32 waveDataSize,
                      std::vector<u8> waveData,
                      std::string name = "Unnamed Wave");
+  void adoptWave(std::unique_ptr<SynthWave> wave);
+  std::vector<std::unique_ptr<SynthWave>> releaseWaves();
 
   std::vector<SynthInstr *> vInstrs;
   std::vector<SynthWave *> vWaves;
   std::string m_name;
+
+private:
+  std::vector<std::unique_ptr<SynthInstr>> m_instrs;
+  std::vector<std::unique_ptr<SynthWave>> m_waves;
 };
 
 class SynthInstr {
@@ -48,6 +57,8 @@ class SynthInstr {
   ~SynthInstr();
 
   SynthRgn *addRgn();
+  SynthRgn *addRgn(const SynthRgn& rgn);
+  void adoptRgn(std::unique_ptr<SynthRgn> rgn);
 
   void addModulator(const SynthModulator& modulator);
   void addModulator(ModSource source, ModDest destination, ModAmount amount);
@@ -65,6 +76,7 @@ class SynthInstr {
   std::vector<SynthRgn *> vRgns;
 
 private:
+  std::vector<std::unique_ptr<SynthRgn>> m_regions;
   std::vector<SynthModulator> m_modulators;
   std::vector<SynthGenerator> m_generators;
 };
@@ -101,7 +113,11 @@ class SynthRgn {
   SynthRgn() = default;
   SynthRgn(u16 keyLow, u16 keyHigh, u16 velLow, u16 velHigh)
       : usKeyLow(keyLow), usKeyHigh(keyHigh), usVelLow(velLow), usVelHigh(velHigh) {}
-  ~SynthRgn();
+  SynthRgn(const SynthRgn& other);
+  SynthRgn(SynthRgn&& other) noexcept;
+  SynthRgn& operator=(const SynthRgn& other);
+  SynthRgn& operator=(SynthRgn&& other) noexcept;
+  ~SynthRgn() = default;
 
   SynthArt *addArt();
   SynthSampInfo *addSampInfo();
@@ -136,6 +152,8 @@ class SynthRgn {
   SynthArt *art {nullptr};
 
 private:
+  std::unique_ptr<SynthSampInfo> m_sampinfo;
+  std::unique_ptr<SynthArt> m_art;
   double m_lfoVibFreqHz       {0};
   double m_lfoVibDepthCents   {0};
   double m_lfoVibDelaySeconds {0};
@@ -166,8 +184,7 @@ class SynthWave {
   SynthWave(u16 formatTag, u16 channels, int samplesPerSec, int aveBytesPerSec, u16 blockAlign,
             u16 bitsPerSample, u32 waveDataSize, std::vector<u8> waveData,
             std::string waveName = "Untitled Wave")
-      : sampinfo(nullptr),
-        wFormatTag(formatTag),
+      : wFormatTag(formatTag),
         wChannels(channels),
         dwSamplesPerSec(samplesPerSec),
         dwAveBytesPerSec(aveBytesPerSec),
@@ -179,14 +196,14 @@ class SynthWave {
     RiffFile::alignName(name);
     dataSize = static_cast<u32>(data.size());
   }
-  ~SynthWave();
+  ~SynthWave() = default;
 
   SynthSampInfo *addSampInfo();
 
   void convertTo16bit();
 
- public:
-  SynthSampInfo *sampinfo;
+public:
+  SynthSampInfo *sampinfo {nullptr};
 
   u16 wFormatTag;
   u16 wChannels;
@@ -199,4 +216,7 @@ class SynthWave {
   std::vector<u8> data;
 
   std::string name;
+
+private:
+  std::unique_ptr<SynthSampInfo> m_sampinfo;
 };

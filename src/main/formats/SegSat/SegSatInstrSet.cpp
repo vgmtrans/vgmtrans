@@ -52,7 +52,7 @@ constexpr PanLinAmp panToAmp(u8 pan) {
 
 SegSatInstrSet::SegSatInstrSet(RawFile* file, u32 offset, int numInstrs, SegSatDriverVer ver, const std::string& name) :
     VGMInstrSet(SegSatFormat::name, file, offset, 0, name), m_numInstrs(numInstrs), m_driverVer(ver) {
-  sampColl = new VGMSampColl(SegSatFormat::name, file, this, offset);
+  adoptSampColl(new VGMSampColl(SegSatFormat::name, file, this, offset));
 }
 
 bool SegSatInstrSet::parseHeader() {

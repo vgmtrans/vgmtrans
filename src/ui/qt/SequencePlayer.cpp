@@ -190,14 +190,13 @@ bool SequencePlayer::loadCollection(const VGMColl *coll, bool startPlaying) {
     return false;
   }
 
-  SF2File *sf2 = conversion::createSF2File(*coll);
+  auto sf2 = conversion::createSF2File(*coll);
   if (!sf2) {
     L_ERROR("Failed to play collection as a soundfont file could not be produced.");
     return false;
   }
 
   auto rawSF2 = sf2->saveToMem();
-  delete sf2;
   /* Deleted by MemFile::mem_close */
   auto sf2_data_blob = std::make_unique<MemFile::DataBlob>(MemFile::DataBlob{0, std::move(rawSF2)});
 
@@ -211,7 +210,7 @@ bool SequencePlayer::loadCollection(const VGMColl *coll, bool startPlaying) {
   }
   sf2_data_blob.release();
 
-  auto midi = std::unique_ptr<MidiFile>(seq->convertToMidi(coll));
+  auto midi = seq->convertToMidi(coll);
   if (!midi) {
     BASS_MIDI_FontFree(sf2_handle);
     L_ERROR("Failed to convert sequence to MIDI");

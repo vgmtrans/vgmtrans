@@ -5,6 +5,7 @@
 */
 #pragma once
 
+#include <memory>
 #include <vector>
 
 class SF2File;
@@ -17,15 +18,15 @@ struct ConversionContext;
 
 namespace conversion {
 
-SF2File* createSF2File(const VGMColl& coll);
-SF2File* createSF2File(const VGMColl& coll, const ConversionContext& context);
-SF2File* createSF2File(
+std::unique_ptr<SF2File> createSF2File(const VGMColl& coll);
+std::unique_ptr<SF2File> createSF2File(const VGMColl& coll, const ConversionContext& context);
+std::unique_ptr<SF2File> createSF2File(
   const std::vector<VGMInstrSet*>& instrsets,
   const std::vector<VGMSampColl*>& sampcolls,
   const VGMColl* coll,
   const ConversionContext& context
 );
-SynthFile* createSynthFile(
+std::unique_ptr<SynthFile> createSynthFile(
   const std::vector<VGMInstrSet*>& instrsets,
   const std::vector<VGMSampColl*>& sampcolls
 );

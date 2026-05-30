@@ -9,6 +9,8 @@
 #include "base/Types.h"
 #include "VGMSamp.h"
 
+#include <utility>
+
 #include <spdlog/fmt/fmt.h>
 
 //  **********************************************************************************
@@ -19,20 +21,31 @@
 SynthFile::SynthFile(std::string name)
     : m_name(std::move(name)) {}
 
-SynthFile::~SynthFile() {
-  deleteVect(vInstrs);
-  deleteVect(vWaves);
-}
+SynthFile::~SynthFile() = default;
 
 SynthInstr *SynthFile::addInstr(u32 bank, u32 instrNum, float reverb) {
   auto str = fmt::format("Instr bnk {} num {}", bank, instrNum);
-  vInstrs.insert(vInstrs.end(), new SynthInstr(bank, instrNum, str, reverb));
-  return vInstrs.back();
+  auto instr = std::make_unique<SynthInstr>(bank, instrNum, str, reverb);
+  auto *rawInstr = instr.get();
+  adoptInstr(std::move(instr));
+  return rawInstr;
 }
 
 SynthInstr *SynthFile::addInstr(u32 bank, u32 instrNum, std::string name, float reverb) {
-  vInstrs.insert(vInstrs.end(), new SynthInstr(bank, instrNum, std::move(name), reverb));
-  return vInstrs.back();
+  auto instr = std::make_unique<SynthInstr>(bank, instrNum, std::move(name), reverb);
+  auto *rawInstr = instr.get();
+  adoptInstr(std::move(instr));
+  return rawInstr;
+}
+
+void SynthFile::adoptInstr(std::unique_ptr<SynthInstr> instr) {
+  vInstrs.push_back(instr.get());
+  m_instrs.push_back(std::move(instr));
+}
+
+std::vector<std::unique_ptr<SynthInstr>> SynthFile::releaseInstrs() {
+  vInstrs.clear();
+  return std::exchange(m_instrs, {});
 }
 
 SynthWave *SynthFile::addWave(u16 formatTag,
@@ -44,17 +57,28 @@ SynthWave *SynthFile::addWave(u16 formatTag,
                               u32 waveDataSize,
                               std::vector<u8> waveData,
                               std::string name) {
-  vWaves.insert(vWaves.end(),
-                new SynthWave(formatTag,
-                              channels,
-                              samplesPerSec,
-                              aveBytesPerSec,
-                              blockAlign,
-                              bitsPerSample,
-                              waveDataSize,
-                              std::move(waveData),
-                              std::move(name)));
-  return vWaves.back();
+  auto wave = std::make_unique<SynthWave>(formatTag,
+                                          channels,
+                                          samplesPerSec,
+                                          aveBytesPerSec,
+                                          blockAlign,
+                                          bitsPerSample,
+                                          waveDataSize,
+                                          std::move(waveData),
+                                          std::move(name));
+  auto *rawWave = wave.get();
+  adoptWave(std::move(wave));
+  return rawWave;
+}
+
+void SynthFile::adoptWave(std::unique_ptr<SynthWave> wave) {
+  vWaves.push_back(wave.get());
+  m_waves.push_back(std::move(wave));
+}
+
+std::vector<std::unique_ptr<SynthWave>> SynthFile::releaseWaves() {
+  vWaves.clear();
+  return std::exchange(m_waves, {});
 }
 
 //  **********
@@ -77,16 +101,30 @@ SynthInstr::SynthInstr(u32 bank, u32 instrument, std::string instrName,
                        const std::vector<SynthRgn *>& listRgns, float reverb)
     : ulBank(bank), ulInstrument(instrument), name(std::move(instrName)), reverb(reverb)  {
   //RiffFile::AlignName(name);
-  vRgns = listRgns;
+  for (auto *rgn : listRgns) {
+    adoptRgn(std::unique_ptr<SynthRgn>(rgn));
+  }
 }
 
-SynthInstr::~SynthInstr() {
-  deleteVect(vRgns);
-}
+SynthInstr::~SynthInstr() = default;
 
 SynthRgn *SynthInstr::addRgn() {
-  vRgns.insert(vRgns.end(), new SynthRgn());
-  return vRgns.back();
+  auto rgn = std::make_unique<SynthRgn>();
+  auto *rawRgn = rgn.get();
+  adoptRgn(std::move(rgn));
+  return rawRgn;
+}
+
+SynthRgn *SynthInstr::addRgn(const SynthRgn& rgn) {
+  auto newRgn = std::make_unique<SynthRgn>(rgn);
+  auto *rawRgn = newRgn.get();
+  adoptRgn(std::move(newRgn));
+  return rawRgn;
+}
+
+void SynthInstr::adoptRgn(std::unique_ptr<SynthRgn> rgn) {
+  vRgns.push_back(rgn.get());
+  m_regions.push_back(std::move(rgn));
 }
 
 void SynthInstr::addModulator(const SynthModulator& modulator) {
@@ -127,18 +165,120 @@ void SynthInstr::addGenerator(ModDest destination, ModAmount amount) {
 //  SynthRgn
 //  ********
 
-SynthRgn::~SynthRgn() {
-  delete sampinfo;
-  delete art;
+SynthRgn::SynthRgn(const SynthRgn& other)
+    : usKeyLow(other.usKeyLow),
+      usKeyHigh(other.usKeyHigh),
+      usVelLow(other.usVelLow),
+      usVelHigh(other.usVelHigh),
+      fusOptions(other.fusOptions),
+      usPhaseGroup(other.usPhaseGroup),
+      channel(other.channel),
+      tableIndex(other.tableIndex),
+      coarseTuneSemitones(other.coarseTuneSemitones),
+      fineTuneCents(other.fineTuneCents),
+      attenDb(other.attenDb),
+      m_lfoVibFreqHz(other.m_lfoVibFreqHz),
+      m_lfoVibDepthCents(other.m_lfoVibDepthCents),
+      m_lfoVibDelaySeconds(other.m_lfoVibDelaySeconds) {
+  if (other.sampinfo) {
+    m_sampinfo = std::make_unique<SynthSampInfo>(*other.sampinfo);
+    sampinfo = m_sampinfo.get();
+  }
+  if (other.art) {
+    m_art = std::make_unique<SynthArt>(*other.art);
+    art = m_art.get();
+  }
+}
+
+SynthRgn::SynthRgn(SynthRgn&& other) noexcept
+    : usKeyLow(other.usKeyLow),
+      usKeyHigh(other.usKeyHigh),
+      usVelLow(other.usVelLow),
+      usVelHigh(other.usVelHigh),
+      fusOptions(other.fusOptions),
+      usPhaseGroup(other.usPhaseGroup),
+      channel(other.channel),
+      tableIndex(other.tableIndex),
+      coarseTuneSemitones(other.coarseTuneSemitones),
+      fineTuneCents(other.fineTuneCents),
+      attenDb(other.attenDb),
+      m_sampinfo(std::move(other.m_sampinfo)),
+      m_art(std::move(other.m_art)),
+      m_lfoVibFreqHz(other.m_lfoVibFreqHz),
+      m_lfoVibDepthCents(other.m_lfoVibDepthCents),
+      m_lfoVibDelaySeconds(other.m_lfoVibDelaySeconds) {
+  sampinfo = m_sampinfo.get();
+  art = m_art.get();
+  other.sampinfo = nullptr;
+  other.art = nullptr;
+}
+
+SynthRgn& SynthRgn::operator=(const SynthRgn& other) {
+  if (this == &other) {
+    return *this;
+  }
+
+  usKeyLow = other.usKeyLow;
+  usKeyHigh = other.usKeyHigh;
+  usVelLow = other.usVelLow;
+  usVelHigh = other.usVelHigh;
+  fusOptions = other.fusOptions;
+  usPhaseGroup = other.usPhaseGroup;
+  channel = other.channel;
+  tableIndex = other.tableIndex;
+  coarseTuneSemitones = other.coarseTuneSemitones;
+  fineTuneCents = other.fineTuneCents;
+  attenDb = other.attenDb;
+  m_lfoVibFreqHz = other.m_lfoVibFreqHz;
+  m_lfoVibDepthCents = other.m_lfoVibDepthCents;
+  m_lfoVibDelaySeconds = other.m_lfoVibDelaySeconds;
+
+  m_sampinfo = other.sampinfo ? std::make_unique<SynthSampInfo>(*other.sampinfo) : nullptr;
+  sampinfo = m_sampinfo.get();
+  m_art = other.art ? std::make_unique<SynthArt>(*other.art) : nullptr;
+  art = m_art.get();
+
+  return *this;
+}
+
+SynthRgn& SynthRgn::operator=(SynthRgn&& other) noexcept {
+  if (this == &other) {
+    return *this;
+  }
+
+  usKeyLow = other.usKeyLow;
+  usKeyHigh = other.usKeyHigh;
+  usVelLow = other.usVelLow;
+  usVelHigh = other.usVelHigh;
+  fusOptions = other.fusOptions;
+  usPhaseGroup = other.usPhaseGroup;
+  channel = other.channel;
+  tableIndex = other.tableIndex;
+  coarseTuneSemitones = other.coarseTuneSemitones;
+  fineTuneCents = other.fineTuneCents;
+  attenDb = other.attenDb;
+  m_lfoVibFreqHz = other.m_lfoVibFreqHz;
+  m_lfoVibDepthCents = other.m_lfoVibDepthCents;
+  m_lfoVibDelaySeconds = other.m_lfoVibDelaySeconds;
+  m_sampinfo = std::move(other.m_sampinfo);
+  m_art = std::move(other.m_art);
+  sampinfo = m_sampinfo.get();
+  art = m_art.get();
+  other.sampinfo = nullptr;
+  other.art = nullptr;
+
+  return *this;
 }
 
 SynthArt *SynthRgn::addArt() {
-  art = new SynthArt();
+  m_art = std::make_unique<SynthArt>();
+  art = m_art.get();
   return art;
 }
 
 SynthSampInfo *SynthRgn::addSampInfo() {
-  sampinfo = new SynthSampInfo();
+  m_sampinfo = std::make_unique<SynthSampInfo>();
+  sampinfo = m_sampinfo.get();
   return sampinfo;
 }
 
@@ -232,11 +372,8 @@ void SynthWave::convertTo16bit() {
   }
 }
 
-SynthWave::~SynthWave() {
-  delete sampinfo;
-}
-
 SynthSampInfo *SynthWave::addSampInfo() {
-  sampinfo = new SynthSampInfo();
+  m_sampinfo = std::make_unique<SynthSampInfo>();
+  sampinfo = m_sampinfo.get();
   return sampinfo;
 }

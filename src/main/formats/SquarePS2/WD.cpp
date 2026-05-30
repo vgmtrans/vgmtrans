@@ -70,7 +70,7 @@ bool WDInstrSet::parseHeader() {
 
   u32 sampCollOff = offset() + readWord(offset() + 0x20) + (dwTotalRegions * 0x20);
 
-  sampColl = new PSXSampColl(SquarePS2Format::name, this, sampCollOff, dwSampSectSize);
+  adoptSampColl(new PSXSampColl(SquarePS2Format::name, this, sampCollOff, dwSampSectSize));
   setLength(sampCollOff + dwSampSectSize - offset());
 
   return true;

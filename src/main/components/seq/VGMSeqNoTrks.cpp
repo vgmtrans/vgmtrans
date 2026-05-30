@@ -89,12 +89,12 @@ bool VGMSeqNoTrks::loadEvents(long stopTime) {
   return true;
 }
 
-MidiFile *VGMSeqNoTrks::convertToMidi(const VGMColl* coll) {
+std::unique_ptr<MidiFile> VGMSeqNoTrks::convertToMidi(const VGMColl* coll) {
   const auto context = ConversionContext::fromOptions(ConversionOptions::the(), SynthTarget::SoundFont);
   return convertToMidi(coll, context);
 }
 
-MidiFile *VGMSeqNoTrks::convertToMidi(const VGMColl* coll, const ConversionContext& context) {
+std::unique_ptr<MidiFile> VGMSeqNoTrks::convertToMidi(const VGMColl* coll, const ConversionContext& context) {
   setConversionContext(context);
   this->SeqTrack::readMode = this->VGMSeq::readMode = READMODE_FIND_DELTA_LENGTH;
 
@@ -107,24 +107,22 @@ MidiFile *VGMSeqNoTrks::convertToMidi(const VGMColl* coll, const ConversionConte
 
   long stopTime = totalTicks;
 
-  MidiFile *newmidi = new MidiFile(this);
-  this->midi = newmidi;
+  auto newMidi = std::make_unique<MidiFile>(this);
+  this->midi = newMidi.get();
   this->SeqTrack::readMode = this->VGMSeq::readMode = READMODE_CONVERT_TO_MIDI;
   timedEventIndex().clear();
   if (!loadEvents(stopTime)) {
-    delete midi;
     this->midi = nullptr;
     timedEventIndex().clear();
     return nullptr;
   }
   if (!postLoad()) {
-    delete midi;
     this->midi = nullptr;
     timedEventIndex().clear();
     return nullptr;
   }
   this->midi = nullptr;
-  return newmidi;
+  return newMidi;
 }
 
 MidiTrack *VGMSeqNoTrks::firstMidiTrack() {

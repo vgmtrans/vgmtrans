@@ -55,8 +55,8 @@ public:
 
   bool load() override;  // Function to load all the information about the sequence
   virtual bool loadEvents(long stopTime = 1000000);
-  MidiFile *convertToMidi(const VGMColl* coll) override;
-  MidiFile *convertToMidi(const VGMColl* coll, const ConversionContext& context) override;
+  std::unique_ptr<MidiFile> convertToMidi(const VGMColl* coll) override;
+  std::unique_ptr<MidiFile> convertToMidi(const VGMColl* coll, const ConversionContext& context) override;
   MidiTrack *firstMidiTrack() override;
 
   u32 dwEventsOffset;

@@ -61,7 +61,6 @@ bool saveAsSF2(VGMInstrSet &set, const fs::path &filepath) {
 
   if (auto sf2file = createSF2File(instrsets, sampcolls, coll, context); sf2file) {
     bool bResult = sf2file->saveSF2File(filepath);
-    delete sf2file;
     return bResult;
   }
 
@@ -72,7 +71,6 @@ bool saveAsSF2(const VGMColl &coll, const fs::path &filepath) {
   const auto context = ConversionContext::fromOptions(ConversionOptions::the(), SynthTarget::SoundFont);
   if (auto sf2file = createSF2File(coll.instrSets(), coll.sampColls(), &coll, context); sf2file) {
     bool bResult = sf2file->saveSF2File(filepath);
-    delete sf2file;
     return bResult;
   }
 

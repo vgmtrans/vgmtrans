@@ -10,6 +10,8 @@
 #include "LogManager.h"
 #include "SPCFile.h"
 
+#include <memory>
+
 namespace vgmtrans::loaders {
 LoaderRegistration<SPCLoader> _spc{"SPC"};
 }
@@ -29,8 +31,7 @@ void SPCLoader::apply(const RawFile *file) {
 
     auto tag = SPCFile::tagFromSPCFile(spc);
     std::string name = fmt::format("{} - ram", file->name());
-    auto newfile = new VirtFile(spc.ram().data(), spc.ram().size(), name, file->path(), tag);
-    enqueue(newfile);
+    enqueue(std::make_unique<VirtFile>(spc.ram().data(), spc.ram().size(), name, file->path(), tag));
   } catch (const std::exception& e) {
     L_ERROR(e.what());
   }

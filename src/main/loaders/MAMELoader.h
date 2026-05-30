@@ -11,9 +11,11 @@
 #include <cassert>
 #include <list>
 #include <map>
+#include <memory>
 #include <sstream>
 #include <string>
 #include <utility>
+#include <vector>
 
 #include <unzip.h>
 
@@ -65,7 +67,7 @@ struct MAMEGame {
     std::list<MAMERomGroup> romgroupentries;
 };
 
-typedef std::map<std::string, MAMEGame *> GameMap;
+typedef std::map<std::string, std::unique_ptr<MAMEGame>> GameMap;
 
 class MAMELoader : public FileLoader {
    public:
@@ -74,10 +76,8 @@ class MAMELoader : public FileLoader {
     void apply(const RawFile *theFile) override;
 
    private:
-    static VirtFile *loadRomGroup(const MAMERomGroup &romgroup, const std::string &format,
-                                  const unzFile &cur_file);
-    static void deleteBuffers(const std::list<std::pair<u8 *, u32>> &buffers);
-
+    static std::unique_ptr<VirtFile> loadRomGroup(const MAMERomGroup &romgroup, const std::string &format,
+                                                  const unzFile &cur_file);
     bool loadJSON();
 
     GameMap gamemap;

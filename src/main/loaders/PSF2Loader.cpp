@@ -10,6 +10,9 @@
 #include "components/PSFFile.h"
 #include "LogManager.h"
 
+#include <memory>
+#include <vector>
+
 #include <zlib.h>
 
 namespace vgmtrans::loaders {
@@ -38,27 +41,23 @@ int PSF2Loader::psf2_decompress_block(const RawFile *file, unsigned fileoffset,
                                       unsigned blocknumber, unsigned numblocks,
                                       unsigned char *decompressedblock, unsigned blocksize) {
   unsigned long destlen;
-  u8 *blocks = new u8[numblocks * 4];
+  std::vector<u8> blocks(numblocks * 4);
 
-  file->readBytes(fileoffset, numblocks * 4, blocks);
-  unsigned long current_block = get32lsb(blocks + (blocknumber * 4));
-  u8 *zblock = new u8[current_block];
+  file->readBytes(fileoffset, numblocks * 4, blocks.data());
+  unsigned long current_block = get32lsb(blocks.data() + (blocknumber * 4));
+  std::vector<u8> zblock(current_block);
 
   int tempOffset = fileoffset + numblocks * 4;
   for (u32 i = 0; i < blocknumber; i++)
-    tempOffset += get32lsb(blocks + (i * 4));
-  file->readBytes(tempOffset, current_block, zblock);
+    tempOffset += get32lsb(blocks.data() + (i * 4));
+  file->readBytes(tempOffset, current_block, zblock.data());
 
   destlen = blocksize;
-  if (uncompress(decompressedblock, &destlen, zblock, current_block) != Z_OK) {
+  if (uncompress(decompressedblock, &destlen, zblock.data(), current_block) != Z_OK) {
     L_ERROR("Decompression failed");
-    delete[] zblock;
-    delete[] blocks;
     return -1;
   }
 
-  delete[] zblock;
-  delete[] blocks;
   return 0;
 }
 
@@ -88,34 +87,30 @@ int PSF2Loader::psf2unpack(const RawFile *file, unsigned long fileoffset, unsign
     } else {
       u32 blockcount = ((filesize + buffersize) - 1) / buffersize;
 
-      u8 *newdataBuf = new u8[filesize];
       u32 actualFileSize = filesize;
+      std::vector<u8> newdataBuf(actualFileSize);
       u32 k = 0;
 
-      u8 *dblock = new u8[buffersize];
+      std::vector<u8> dblock(buffersize);
 
       for (u32 j = 0; j < blockcount; j++) {
-        r = psf2_decompress_block(file, offset + 0x10, j, blockcount, dblock, buffersize);
+        r = psf2_decompress_block(file, offset + 0x10, j, blockcount, dblock.data(), buffersize);
 
         if (r) {
           //string.Format("File %s failed to decompress",filename);
-          delete[] dblock;
-          delete[] newdataBuf;
           return -1;
         }
         if (filesize > buffersize) {
           filesize -= buffersize;
-          memcpy(newdataBuf + k, dblock, buffersize);
+          memcpy(newdataBuf.data() + k, dblock.data(), buffersize);
           k += buffersize;
         } else {
-          memcpy(newdataBuf + k, dblock, filesize);
+          memcpy(newdataBuf.data() + k, dblock.data(), filesize);
           k += filesize;
         }
       }
 
-      enqueue(new VirtFile(newdataBuf, actualFileSize, filename, file->path()));
-      delete[] dblock;
-      delete[] newdataBuf;
+      enqueue(std::make_unique<VirtFile>(newdataBuf.data(), actualFileSize, filename, file->path()));
     }
   }
 

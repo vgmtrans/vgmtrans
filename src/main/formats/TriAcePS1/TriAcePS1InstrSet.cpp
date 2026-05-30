@@ -39,7 +39,7 @@ bool TriAcePS1InstrSet::parseHeader() {
 
 
   //sampColl = new TriAcePS1SampColl(this, offset()+instrSectionSize, length()-instrSectionSize);
-  sampColl = new PSXSampColl(TriAcePS1Format::name, this, offset() + instrSectionSize, length() - instrSectionSize);
+  adoptSampColl(new PSXSampColl(TriAcePS1Format::name, this, offset() + instrSectionSize, length() - instrSectionSize));
 
 
   return true;

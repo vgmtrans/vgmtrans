@@ -60,7 +60,7 @@ bool WdsInstrSet::parseHeader() {
   wdsHeader->addUnknownChild(offset() + 0x2C, sizeof(long));
 
   //波形objectの生成
-  sampColl = new PSXSampColl(FFTFormat::name, this, offset() + hdr.szHeader1, hdr.szSampColl);
+  adoptSampColl(new PSXSampColl(FFTFormat::name, this, offset() + hdr.szHeader1, hdr.szSampColl));
 //	sampColl->Load();				//VGMInstrSet::Load()関数内でやっている。
 //	sampColl->UseInstrSet(this);	//"WD.cpp"では、同様の事をやっている。
 

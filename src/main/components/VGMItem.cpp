@@ -18,9 +18,32 @@ VGMItem::VGMItem(VGMFile *vgmfile, u32 offset, u32 length, std::string name, Typ
       m_name(std::move(name)) {
 }
 
-VGMItem::~VGMItem() {
-  deleteVect(m_children);
+VGMItem::VGMItem(const VGMItem& other)
+    : type(other.type),
+      m_vgmfile(other.m_vgmfile),
+      m_offset(other.m_offset),
+      m_length(other.m_length),
+      m_name(other.m_name) {
 }
+
+VGMItem::VGMItem(VGMItem&& other) noexcept
+    : type(other.type),
+      m_ownedChildren(std::move(other.m_ownedChildren)),
+      m_children(std::move(other.m_children)),
+      m_childrenSorted(other.m_childrenSorted),
+      m_childrenPrefixMaxEnd(std::move(other.m_childrenPrefixMaxEnd)),
+      m_vgmfile(other.m_vgmfile),
+      m_offset(other.m_offset),
+      m_length(other.m_length),
+      m_name(std::move(other.m_name)) {
+  for (auto *child : m_children) {
+    child->m_parent = this;
+  }
+  other.m_children.clear();
+  other.m_childrenPrefixMaxEnd.clear();
+}
+
+VGMItem::~VGMItem() = default;
 
 bool operator>(const VGMItem &item1, const VGMItem &item2) {
   return item1.offset() > item2.offset();
@@ -142,56 +165,58 @@ bool VGMItem::isValidOffset(u32 offset) const {
   return m_vgmfile->isValidOffset(offset);
 }
 
-VGMItem* VGMItem::addChild(VGMItem *item) {
-  item->m_vgmfile = vgmFile();
-  item->m_parent = this;
-  m_children.emplace_back(item);
+VGMItem* VGMItem::addChild(std::unique_ptr<VGMItem> item) {
+  auto *rawChild = item.get();
+  rawChild->m_vgmfile = vgmFile();
+  rawChild->m_parent = this;
+  m_children.emplace_back(rawChild);
+  m_ownedChildren.emplace_back(std::move(item));
   m_childrenSorted = false;
   m_childrenPrefixMaxEnd.clear();
-  return item;
+  return rawChild;
+}
+
+VGMItem* VGMItem::addChild(VGMItem *item) {
+  return addChild(std::unique_ptr<VGMItem>(item));
 }
 
 VGMItem* VGMItem::addChild(u32 offset, u32 length, const std::string &name) {
-  auto child = new VGMItem(vgmFile(), offset, length, name, Type::Header);
-  child->m_parent = this;
-  m_children.emplace_back(child);
-  m_childrenSorted = false;
-  m_childrenPrefixMaxEnd.clear();
-  return child;
+  return addChild(std::make_unique<VGMItem>(vgmFile(), offset, length, name, Type::Header));
 }
 
 VGMItem* VGMItem::addUnknownChild(u32 offset, u32 length) {
-  auto child = new VGMItem(vgmFile(), offset, length, "Unknown");
-  child->m_parent = this;
-  m_children.emplace_back(child);
-  m_childrenSorted = false;
-  m_childrenPrefixMaxEnd.clear();
-  return child;
+  return addChild(std::make_unique<VGMItem>(vgmFile(), offset, length, "Unknown"));
 }
 
 VGMHeader* VGMItem::addHeader(u32 offset, u32 length, const std::string &name) {
-  auto *header = new VGMHeader(this, offset, length, name);
-  header->m_parent = this;
-  m_children.emplace_back(header);
-  m_childrenSorted = false;
-  m_childrenPrefixMaxEnd.clear();
-  return header;
+  auto header = std::make_unique<VGMHeader>(this, offset, length, name);
+  auto *rawHeader = header.get();
+  addChild(std::move(header));
+  return rawHeader;
 }
 
 void VGMItem::removeChildren() {
   for (auto *child : m_children) {
     child->m_parent = nullptr;
   }
+  m_ownedChildren.clear();
   m_children.clear();
   m_childrenSorted = true;
   m_childrenPrefixMaxEnd.clear();
 }
 
 void VGMItem::transferChildren(VGMItem* destination) {
-  destination->addChildren(m_children);
+  destination->m_children.insert(destination->m_children.end(), m_children.begin(), m_children.end());
+  for (auto *child : m_children) {
+    child->m_parent = destination;
+  }
+  std::ranges::move(m_ownedChildren, std::back_inserter(destination->m_ownedChildren));
+  m_ownedChildren.clear();
   m_children.clear();
   m_childrenSorted = true;
   m_childrenPrefixMaxEnd.clear();
+  destination->m_childrenSorted = false;
+  destination->m_childrenPrefixMaxEnd.clear();
 }
 
 void VGMItem::ensureChildrenSorted() {

@@ -161,7 +161,7 @@ bool applyBankOffsetToTrack(MidiTrack* track,
     }
   }
 
-  std::vector<MidiEvent*> injectedBankEvents;
+  std::vector<std::unique_ptr<MidiEvent>> injectedBankEvents;
   injectedBankEvents.reserve(32);
   u8 remappedBankMsb = 0;
   u8 remappedBankLsb = 0;
@@ -174,12 +174,12 @@ bool applyBankOffsetToTrack(MidiTrack* track,
     if (!usedChannels[channel]) {
       continue;
     }
-    injectedBankEvents.push_back(new BankSelectEvent(track, channel, startTick, remappedBankMsb));
-    injectedBankEvents.push_back(new BankSelectFineEvent(track, channel, startTick, remappedBankLsb));
+    injectedBankEvents.push_back(std::make_unique<BankSelectEvent>(track, channel, startTick, remappedBankMsb));
+    injectedBankEvents.push_back(std::make_unique<BankSelectFineEvent>(track, channel, startTick, remappedBankLsb));
   }
 
   // Keep injected bank selects ahead of same-tick program changes when priorities are equal
-  track->aEvents.insert(track->aEvents.begin(), injectedBankEvents.begin(), injectedBankEvents.end());
+  track->prependEvents(std::move(injectedBankEvents));
 
   return true;
 }
@@ -342,7 +342,7 @@ std::unique_ptr<MidiFile> mergeMidiSequences(const std::vector<MidiMergeEntry>& 
       return nullptr;
     }
 
-    std::unique_ptr<MidiFile> midi(seq->convertToMidi(coll, context));
+    auto midi = seq->convertToMidi(coll, context);
     if (!midi) {
       L_ERROR("Failed to convert one of the source sequences to MIDI.");
       return nullptr;
@@ -407,32 +407,31 @@ std::unique_ptr<MidiFile> mergeMidiSequences(const std::vector<MidiMergeEntry>& 
     const u8 bankOffset = options.bankOffsets.empty() ? 0 : options.bankOffsets[i];
 
     retimeTrack(&source->globalTrack, sourcePPQN, targetPPQN, startTick);
-    for (MidiEvent* event : source->globalTrack.aEvents) {
+    auto globalEvents = source->globalTrack.releaseEvents();
+    for (auto& event : globalEvents) {
       if (!event) {
         continue;
       }
 
       event->prntTrk = &mergedMidi->globalTrack;
-      mergedMidi->globalTrack.aEvents.push_back(event);
+      mergedMidi->globalTrack.adoptEvent(std::move(event));
     }
-    source->globalTrack.aEvents.clear();
 
-    for (MidiTrack*& track : source->aTracks) {
+    auto tracks = source->releaseTracks();
+    for (auto& track : tracks) {
       if (!track) {
         continue;
       }
 
-      retimeTrack(track, sourcePPQN, targetPPQN, startTick);
+      retimeTrack(track.get(), sourcePPQN, targetPPQN, startTick);
       if (!options.bankOffsets.empty() &&
-          !applyBankOffsetToTrack(track, bankOffset, startTick, context)) {
+          !applyBankOffsetToTrack(track.get(), bankOffset, startTick, context)) {
         return nullptr;
       }
 
       track->parentSeq = mergedMidi.get();
-      mergedMidi->aTracks.push_back(track);
-      track = nullptr;
+      mergedMidi->adoptTrack(std::move(track));
     }
-    source->aTracks.clear();
   }
 
   if (result) {
@@ -482,14 +481,17 @@ bool saveMergedSoundfont(const std::vector<MidiMergeEntry>& entries,
     }
 
     ExportPrepGuard guard(instrsets, coll);
-    std::unique_ptr<SynthFile> partSynth(createSynthFile(instrsets, sampcolls));
+    auto partSynth = createSynthFile(instrsets, sampcolls);
     if (!partSynth) {
       L_ERROR("Failed to build a temporary SynthFile for one stitched chunk.");
       return false;
     }
 
     const u8 bankOffset = bankOffsets[i];
-    for (SynthInstr* instr : partSynth->vInstrs) {
+    auto partInstrs = partSynth->releaseInstrs();
+    auto partWaves = partSynth->releaseWaves();
+
+    for (const auto& instr : partInstrs) {
       if (!instr) {
         continue;
       }
@@ -503,7 +505,7 @@ bool saveMergedSoundfont(const std::vector<MidiMergeEntry>& entries,
 
     const u32 waveOffset = static_cast<u32>(mergedSynth->vWaves.size());
 
-    for (SynthInstr* instr : partSynth->vInstrs) {
+    for (auto& instr : partInstrs) {
       if (!instr) {
         continue;
       }
@@ -512,15 +514,13 @@ bool saveMergedSoundfont(const std::vector<MidiMergeEntry>& entries,
           rgn->tableIndex += waveOffset;
         }
       }
-      mergedSynth->vInstrs.push_back(instr);
+      mergedSynth->adoptInstr(std::move(instr));
     }
-    for (SynthWave* wave : partSynth->vWaves) {
+    for (auto& wave : partWaves) {
       if (wave) {
-        mergedSynth->vWaves.push_back(wave);
+        mergedSynth->adoptWave(std::move(wave));
       }
     }
-    partSynth->vInstrs.clear();
-    partSynth->vWaves.clear();
   }
 
   if (mergedSynth->vInstrs.empty() || mergedSynth->vWaves.empty()) {

@@ -7,6 +7,7 @@
 
 #include "base/Types.h"
 #include "Format.h"
+#include "Helper.h"
 #include "Root.h"
 #include "VGMSamp.h"
 
@@ -21,6 +22,12 @@ VGMSampColl::VGMSampColl(const std::string &format, RawFile *rawfile, u32 offset
       parInstrSet(nullptr),
       m_should_load_on_instr_set_match(false),
       bLoaded(false) {
+}
+
+VGMSampColl::~VGMSampColl() {
+  if (!m_samples_owned_by_children) {
+    deleteVect(samples);
+  }
 }
 
 VGMSampColl::VGMSampColl(const std::string &format, RawFile *rawfile, VGMInstrSet *instrset,
@@ -60,6 +67,7 @@ bool VGMSampColl::load() {
     return false;
 
   addChildren(samples);
+  m_samples_owned_by_children = true;
 
   if (length() == 0) {
     for (std::vector<VGMSamp *>::iterator itr = samples.begin(); itr != samples.end(); ++itr) {
@@ -83,7 +91,7 @@ bool VGMSampColl::load() {
   }
 
   if (!parInstrSet) {
-    rawFile()->addContainedVGMFile(std::make_shared<std::variant<VGMSeq *, VGMInstrSet *, VGMSampColl *, VGMMiscFile *>>(this));
+    rawFile()->addContainedVGMFile(this);
     pRoot->addVGMFile(this);
   }
 

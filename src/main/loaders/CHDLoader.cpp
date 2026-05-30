@@ -11,6 +11,8 @@
 #include "LoaderManager.h"
 #include "LogManager.h"
 
+#include <memory>
+
 extern "C" {
 #include <libchdr/chd.h>
 }
@@ -99,7 +101,6 @@ void CHDLoader::apply(const RawFile *file) {
   }
   chd_close(chd);
 
-  auto virtFile = new VirtFile(data.data(), static_cast<u32>(data.size()),
-                               file->name(), file->path(), file->tag);
-  enqueue(virtFile);
+  enqueue(std::make_unique<VirtFile>(data.data(), static_cast<u32>(data.size()),
+                                     file->name(), file->path(), file->tag));
 }

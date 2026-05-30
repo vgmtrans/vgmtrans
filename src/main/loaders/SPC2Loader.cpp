@@ -10,7 +10,9 @@
 #include "LoaderManager.h"
 #include "LogManager.h"
 
+#include <array>
 #include <cstring>
+#include <memory>
 #include <string>
 
 // SPC2 file specs available here: http://blog.kevtris.org/blogfiles/spc2_file_specification_v1.txt
@@ -58,8 +60,7 @@ void SPC2Loader::apply(const RawFile* file) {
     file->readBytes(spcBlockOffset, SPC_DATA_BLOCK_SIZE, spcDataBlock);
 
     // Reconstruct the SPC file's RAM
-    auto* spcFile = new u8[SPC_FILE_SIZE];
-    memset(spcFile, 0, SPC_FILE_SIZE);
+    std::array<u8, SPC_FILE_SIZE> spcFile{};
 
     // Extract spc file name
     // Find the length of the string up to the first null byte or 28 characters, whichever comes
@@ -71,13 +72,13 @@ void SPC2Loader::apply(const RawFile* file) {
 
     // Construct SPC file header
     const char* headerTitle = "SNES-SPC700 Sound File Data v0.30\x1A\x1A";
-    std::memcpy(spcFile, headerTitle, std::strlen(headerTitle));  // Copy header title
+    std::memcpy(spcFile.data(), headerTitle, std::strlen(headerTitle));  // Copy header title
 
     // Copy SPC700 registers from SPC2 file to SPC header
-    std::memcpy(spcFile + 0x25, spcDataBlock + 704, 9);  // Copy PC, A, X, Y, PSW, SP
+    std::memcpy(spcFile.data() + 0x25, spcDataBlock + 704, 9);  // Copy PC, A, X, Y, PSW, SP
 
     // Copy the id666 tags
-    std::memcpy(spcFile + 0x2E, spcDataBlock + 768, 224);
+    std::memcpy(spcFile.data() + 0x2E, spcDataBlock + 768, 224);
 
     // Reconstruct the SPC file's RAM
     for (int j = 0; j < 256; ++j) {
@@ -85,14 +86,13 @@ void SPC2Loader::apply(const RawFile* file) {
       u8 ramBlock[RAM_BLOCK_SIZE];
       size_t ramBlockOffset = 16 + (numSPCs * SPC_DATA_BLOCK_SIZE) + (blockIndex * RAM_BLOCK_SIZE);
       file->readBytes(ramBlockOffset, RAM_BLOCK_SIZE, ramBlock);
-      std::copy_n(ramBlock, RAM_BLOCK_SIZE, spcFile + SPC_HEADER_SIZE + (j * RAM_BLOCK_SIZE));
+      std::copy_n(ramBlock, RAM_BLOCK_SIZE, spcFile.data() + SPC_HEADER_SIZE + (j * RAM_BLOCK_SIZE));
     }
 
     // Add DSP Registers
-    std::copy(spcDataBlock + 512, spcDataBlock + 640, spcFile + SPC_HEADER_SIZE + SPC_RAM_SIZE);
+    std::copy(spcDataBlock + 512, spcDataBlock + 640, spcFile.data() + SPC_HEADER_SIZE + SPC_RAM_SIZE);
 
     // Save the reconstructed SPC file
-    auto virtFile = new VirtFile(spcFile, SPC_FILE_SIZE, originalSpcFilename, "", file->tag);
-    enqueue(virtFile);
+    enqueue(std::make_unique<VirtFile>(spcFile.data(), SPC_FILE_SIZE, originalSpcFilename, "", file->tag));
   }
 }

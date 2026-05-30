@@ -13,6 +13,7 @@
 #include "VGMFile.h"
 
 #include <filesystem>
+#include <memory>
 #include <set>
 #include <string>
 #include <vector>
@@ -46,8 +47,8 @@ class VGMSeq : public VGMFile {
   virtual void resetVars();
   virtual void onTickEnd() {}
   virtual void useColl(const VGMColl* coll) {}
-  virtual MidiFile *convertToMidi(const VGMColl* coll = nullptr);
-  virtual MidiFile *convertToMidi(const VGMColl* coll, const ConversionContext& context);
+  virtual std::unique_ptr<MidiFile> convertToMidi(const VGMColl* coll = nullptr);
+  virtual std::unique_ptr<MidiFile> convertToMidi(const VGMColl* coll, const ConversionContext& context);
   virtual MidiTrack *firstMidiTrack();
   void setPPQN(u16 ppqn);
   [[nodiscard]] u16 ppqn() const;

@@ -8,6 +8,7 @@
 #include "Scanner.h"
 
 #include <map>
+#include <memory>
 #include <string>
 #include <variant>
 #include <vector>
@@ -75,8 +76,8 @@ public:
   virtual bool onMatch(std::vector<VGMFile *> &) { return true; }
   virtual bool usesCollectionDataForSeqConversion() { return false; }
 
-  Matcher *matcher;
-  VGMScanner *scanner;
+  std::unique_ptr<Matcher> matcher;
+  std::unique_ptr<VGMScanner> scanner;
 
 protected:
     static FormatMap &registry();

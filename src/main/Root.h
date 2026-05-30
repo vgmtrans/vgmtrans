@@ -42,8 +42,8 @@ enum class ToastType { Info, Warning, Error, Success };
 
 class VGMRoot {
 public:
-  VGMRoot() = default;
-  virtual ~VGMRoot() = default;
+  VGMRoot();
+  virtual ~VGMRoot();
 
   virtual bool init();
   virtual bool openRawFile(const std::filesystem::path& filePath);
@@ -114,8 +114,11 @@ private:
   int vgmFileRemoveStack = 0;
   int vgmCollRemoveStack = 0;
 
+  std::vector<std::unique_ptr<RawFile>> m_ownedRawFiles;
   std::vector<RawFile *> m_rawfiles;
+  std::vector<std::unique_ptr<VGMFile>> m_ownedVGMFiles;
   std::vector<VGMFileVariant> m_vgmfiles;
+  std::vector<std::unique_ptr<VGMColl>> m_ownedVGMColls;
   std::vector<VGMColl *> m_vgmcolls;
 };
 

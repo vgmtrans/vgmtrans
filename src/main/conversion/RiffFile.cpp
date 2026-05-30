@@ -17,17 +17,13 @@ void Chunk::setData(const void *src, u32 datasize) {
 
   // set the size and copy from the data source
   datasize = paddedSize(m_size);
-  if (data != nullptr) {
-    delete[] data;
-    data = nullptr;
-  }
-  data = new u8[datasize];
-  memcpy(data, src, m_size);
+  data = std::make_unique<u8[]>(datasize);
+  memcpy(data.get(), src, m_size);
 
   // Add pad byte
   u32 padsize = datasize - m_size;
   if (padsize != 0) {
-    memset(data + m_size, 0, padsize);
+    memset(data.get() + m_size, 0, padsize);
   }
 }
 
@@ -39,11 +35,11 @@ void Chunk::write(u8 *buffer) {
   u32 value = m_size + padsize;
   memcpy(buffer + 4, &value, sizeof(value));
 
-  memcpy(buffer + 8, data, paddedSize(m_size));
+  memcpy(buffer + 8, data.get(), paddedSize(m_size));
 }
 
 Chunk *ListTypeChunk::addChildChunk(Chunk *ck) {
-  childChunks.push_back(ck);
+  childChunks.emplace_back(ck);
   return ck;
 }
 
