@@ -228,7 +228,7 @@ void MenuBar::appendOptionsMenu() {
 
   QAction *customLoopsAction = addLoopOption(tr("Custom..."), -1);
 
-  auto updateLoopMenu = [this, presetLoopActions, customLoopsAction, loopsGroup]() mutable {
+  auto updateLoopMenu = [presetLoopActions, customLoopsAction, loopsGroup]() mutable {
     const int currentLoops = Settings::the()->conversion.numSequenceLoops();
     QSignalBlocker blocker(loopsGroup);
 
@@ -241,7 +241,7 @@ void MenuBar::appendOptionsMenu() {
     }
   };
 
-  connect(loopsGroup, &QActionGroup::triggered, this, [this, presetLoopActions, customLoopsAction, loopsGroup, updateLoopMenu](QAction *action) mutable {
+  connect(loopsGroup, &QActionGroup::triggered, this, [this, updateLoopMenu](QAction *action) mutable {
     const int selectedLoops = action->data().toInt();
     if (selectedLoops >= 0) {
       if (selectedLoops != Settings::the()->conversion.numSequenceLoops()) {

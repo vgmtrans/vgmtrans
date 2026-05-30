@@ -16,8 +16,7 @@ KonamiTMNT2OPMInstrSet::KonamiTMNT2OPMInstrSet(
   u32 offset,
   std::string name
 )
-  : YM2151InstrSet(KonamiTMNT2Format::name, file, offset, 0, std::move(name)),
-    m_fmtVer(fmtVer)
+  : YM2151InstrSet(KonamiTMNT2Format::name, file, offset, 0, std::move(name))
 {
 }
 

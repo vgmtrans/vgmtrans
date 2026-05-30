@@ -322,7 +322,6 @@ bool SonyPS2Instr::loadInstr() {
   SonyPS2InstrSet::ProgCk &progCk = instrset->progCk;
   SonyPS2InstrSet::SampSetCk &sampSetCk = instrset->sampSetCk;
   SonyPS2InstrSet::SampCk &sampCk = instrset->sampCk;
-  SonyPS2InstrSet::VAGInfoCk &vagInfoCk = instrset->vagInfoCk;
   ProgParam &progParam = progCk.progParamBlock[this->instrNum];
   u8 nSplits = progParam.nSplit;
   for (u8 i = 0; i < nSplits; i++) {
@@ -331,7 +330,6 @@ bool SonyPS2Instr::loadInstr() {
 
     for (u8 j = 0; j < sampSetParam.nSample; j++) {
       SonyPS2InstrSet::SampleParam &sampParam = sampCk.sampleParam[sampSetParam.sampleIndex[j]];
-      SonyPS2InstrSet::VAGInfoParam &vagInfoParam = vagInfoCk.vagInfoParam[sampParam.VagIndex];
       // WE ARE ASSUMING THE VAG SAMPLES ARE STORED CONSECUTIVELY
       int sampNum = sampParam.VagIndex;
       u8 noteLow = splitblock.splitRangeLow;

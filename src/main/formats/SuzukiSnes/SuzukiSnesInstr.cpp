@@ -151,8 +151,8 @@ SuzukiSnesInstr::SuzukiSnesInstr(VGMInstrSet *instrSet,
     spcDirAddr(spcDirAddr),
     addrSRCNTable(addrSRCNTable),
     addrVolumeTable(addrVolumeTable),
-    addrADSRTable(addrADSRTable),
-    addrTuningTable(addrTuningTable) {
+    addrTuningTable(addrTuningTable),
+    addrADSRTable(addrADSRTable) {
 }
 
 SuzukiSnesInstr::~SuzukiSnesInstr() {

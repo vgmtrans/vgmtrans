@@ -40,7 +40,5 @@ public:
   bool parseInstrPointers() override;
 
 private:
-  KonamiTMNT2FormatVer m_fmtVer;
-
   [[nodiscard]] OPMData convertToOPMData(const konami_tmnt2_ym2151_instr& instr, const std::string& name) const;
 };

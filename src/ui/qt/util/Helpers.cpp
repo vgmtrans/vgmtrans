@@ -354,6 +354,7 @@ QColor colorForItemType(VGMItem::Type type) {
   switch (type) {
     case VGMItem::Type::Adsr:              return EventColors::CLR_GRAY;
     case VGMItem::Type::BankSelect:        return EventColors::CLR_PERIWINKLE;
+    case VGMItem::Type::ChannelPressure:   return EventColors::CLR_GRAY;
     case VGMItem::Type::ChangeState:       return EventColors::CLR_GRAY;
     case VGMItem::Type::Control:           return EventColors::CLR_GRAY;
     case VGMItem::Type::DurationChange:    return EventColors::CLR_GRAY;

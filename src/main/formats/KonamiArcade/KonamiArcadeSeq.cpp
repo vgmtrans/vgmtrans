@@ -34,8 +34,8 @@ KonamiArcadeSeq::KonamiArcadeSeq(
 
 void KonamiArcadeSeq::resetVars() {
   VGMSeq::resetVars();
-  u8 m_tempoSlideDuration = 0;
-  double m_tempoSlideIncrement = 0;
+  m_tempoSlideDuration = 0;
+  m_tempoSlideIncrement = 0;
 }
 
 bool KonamiArcadeSeq::parseHeader() {
@@ -554,9 +554,7 @@ bool KonamiArcadeTrack::readEvent() {
 
     // LFO settings (or perhaps just vibrato)
     case 0xE4: {
-      u8 depth = readByte(curOffset++); // lower seems to result in more effect. 7F turns off all vibrato regardless of amplitude.
-      u8 freq = readByte(curOffset++);  // higher results in faster fluctuation
-      u8 amplitude = readByte(curOffset++); // higher results in greater LFO effect
+      curOffset += 3;
       addUnknown(beginOffset, curOffset - beginOffset, "Vibrato?");
       break;
     }
@@ -798,7 +796,7 @@ bool KonamiArcadeTrack::readEvent() {
     }
 
     case 0xF9: {
-      u8 data = readByte(curOffset++);
+      curOffset++;
       addUnknown(beginOffset, curOffset - beginOffset);
       break;
     }

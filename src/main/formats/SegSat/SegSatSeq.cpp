@@ -279,7 +279,7 @@ bool SegSatSeq::readEvent() {
     }
     else if ((status_byte & 0xF0) == 0xD0) {
       setChannel(status_byte & 0x0F);
-      u8 dataByte = readByte(curOffset++);
+      curOffset++;
       u16 deltaBit8 = 0; //(dataByte & 0x80) << 1;
       addTime(readByte(curOffset++) | deltaBit8);
       // TODO: add channel pressure events to SeqTrack and MidiFile

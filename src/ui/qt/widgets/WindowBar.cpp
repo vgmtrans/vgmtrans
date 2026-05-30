@@ -28,6 +28,7 @@ constexpr int kDockControlsLeadingGap = 28;
 constexpr int kTitleBarToggleButtonWidth = 30;
 constexpr int kTitleBarToggleButtonHeight = 25;
 constexpr int kTitleBarToggleIconSize = 19;
+#if !defined(Q_OS_MACOS) && !defined(Q_OS_MAC)
 constexpr int kCustomWindowIconButtonWidth = 36;
 constexpr int kCustomWindowButtonWidth = 46;
 constexpr int kCustomWindowIconSize = 18;
@@ -43,9 +44,11 @@ constexpr bool kLinuxCustomChrome = true;
 #else
 constexpr bool kLinuxCustomChrome = false;
 #endif
+#endif
 constexpr qreal kPlaybackControlsFreeWidthFraction = 0.55;
 constexpr qreal kFreeWidthThreshold = 0.3;
 
+#if defined(Q_OS_WIN) || defined(Q_OS_LINUX)
 QIcon multiStateStencilIcon(const QString &iconPath, const QColor &normalColor,
                             const QColor &activeColor, const QColor &disabledColor,
                             const QSize &size) {
@@ -61,6 +64,7 @@ QIcon multiStateStencilIcon(const QString &iconPath, const QColor &normalColor,
   addMode(QIcon::Disabled, disabledColor);
   return icon;
 }
+#endif
 
 }
 

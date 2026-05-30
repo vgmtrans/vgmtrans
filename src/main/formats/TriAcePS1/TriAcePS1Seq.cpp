@@ -42,7 +42,7 @@ bool TriAcePS1Seq::parseTrackPointers() {
     if (TrkInfos[i].trkOffset != 0) {
       aTracks.push_back(new TriAcePS1Track(this, TrkInfos[i].trkOffset, 0));
 
-      VGMHeader *TrkInfoBlock = TrkInfoHeader->addHeader(offset() + 0x16 + 6 * i, 6, "Track Info");
+      TrkInfoHeader->addHeader(offset() + 0x16 + 6 * i, 6, "Track Info");
     }
   return true;
 }
@@ -201,7 +201,7 @@ bool TriAcePS1Track::readEvent(void) {
       //unknown (tempo?)
       case 0x8A : {
         event_dur = readByte(curOffset++);
-        u8 val = readByte(curOffset++);
+        curOffset++;
         addUnknown(beginOffset, curOffset - beginOffset, "Unknown Event (tempo?)");
         break;
       }

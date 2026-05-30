@@ -102,8 +102,6 @@ private:
   u32 m_drumTableAddr;
   const std::vector<konami_tmnt2_instr_info> m_instrInfos;
   const std::vector<std::vector<konami_tmnt2_drum_info>> m_drumTables;
-
-  KonamiTMNT2FormatVer m_fmtVer;
 };
 
 class KonamiTMNT2SampColl

@@ -121,6 +121,8 @@ void KonamiTMNT2Scanner::scan(RawFile * /*file*/, void *info) {
       break;
     case XEXEX:
       break;
+    case VERSION_UNDEFINED:
+      return;
   }
 }
 
@@ -159,12 +161,11 @@ std::vector<KonamiTMNT2Seq*> KonamiTMNT2Scanner::loadSeqTable(
       auto seqType = static_cast<KonamiTMNT2Seq::SeqType>(programRom->readByte(seqOffset));
       if (version == SSRIDERS) {
         switch (seqType) {
-          case 0: return std::pair{6, 2};
-          case 1: return std::pair{7, 3};
-          case 2: return std::pair{8, 3};
-          case 3:
-          default: return std::pair{8, 4};
+          case KonamiTMNT2Seq::ALL_CHANS: return std::pair{6, 2};
+          case KonamiTMNT2Seq::RESERVE_CHANS: return std::pair{7, 3};
+          case KonamiTMNT2Seq::ALL_CHANS_2: return std::pair{8, 3};
         }
+        return std::pair{8, 4};
       }
 
       return seqType == 0 ? std::pair{8, 4} : std::pair{6, 3};

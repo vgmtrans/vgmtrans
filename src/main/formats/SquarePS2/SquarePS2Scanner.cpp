@@ -40,6 +40,8 @@ void SquarePS2Scanner::searchForBGMSeq(RawFile *file) {
           // jump to the next track
           pos += trackSize + 4;
         }
+        if (!bValid)
+          continue;
 
         BGMSeq *NewBGMSeq = new BGMSeq(file, i);
         if (!NewBGMSeq->loadVGMFile())

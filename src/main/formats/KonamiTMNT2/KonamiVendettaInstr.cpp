@@ -175,7 +175,6 @@ bool KonamiVendettaSampleInstrSet::parseDrums() {
 
   VGMInstr* drumKit = new VGMInstr(this, offset(), length(), 1, 0, "Drum Kit");
 
-  int drumNum = 0;
   for (u32 i = 0; i < numDrumTables; ++i) {
     u16 drumBankPtr = m_drumBanksOffset + (i * 0x20);
     auto drumBankItem = drumBanksItem->addChild(drumBankPtr, 0x20, fmt::format("Drum Bank {}", i));
@@ -208,7 +207,6 @@ bool KonamiVendettaSampleInstrSet::parseDrums() {
       rgn->fineTune = static_cast<int>(relativePitchCents) % 100;
 
       drumKit->addRgn(rgn);
-      drumNum += 1;
     }
   }
   aInstrs.emplace_back(drumKit);

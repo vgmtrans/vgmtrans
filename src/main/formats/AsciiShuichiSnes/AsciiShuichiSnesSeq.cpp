@@ -32,7 +32,7 @@ static constexpr u8 panTable[] = {
 //  ***************
 
 AsciiShuichiSnesSeq::AsciiShuichiSnesSeq(RawFile *file, u32 seqHeaderOffset, string name)
-    : VGMSeq(AsciiShuichiSnesFormat::name, file, seqHeaderOffset, 0, move(name)) {
+    : VGMSeq(AsciiShuichiSnesFormat::name, file, seqHeaderOffset, 0, std::move(name)) {
   bLoadTickByTick = true;
   setAllowDiscontinuousTrackData(true);
   setUseLinearAmplitudeScale(true);

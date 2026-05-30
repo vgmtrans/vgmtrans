@@ -101,10 +101,8 @@ void SoftCreatSnesScanner::searchForSoftCreatSnesFromARAM(RawFile *file) {
   // search vcmd address table for version check
   u32 ofsVCmdExec;
   u8 VCMD_CUTOFF;
-  u16 addrVCmdAddressTable;
   if (file->searchBytePattern(ptnVCmdExec, ofsVCmdExec)) {
     VCMD_CUTOFF = file->readByte(ofsVCmdExec + 6);
-    addrVCmdAddressTable = file->readByte(ofsVCmdExec + 16);
   } else {
     return;
   }

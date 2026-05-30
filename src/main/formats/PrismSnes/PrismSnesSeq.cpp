@@ -91,7 +91,6 @@ bool PrismSnesSeq::parseHeader() {
     trackHeader->addChild(curOffset, 1, "Logical Channel");
     curOffset++;
 
-    u8 a01 = readByte(curOffset);
     trackHeader->addChild(curOffset, 1, "Physical Channel + Flags");
     curOffset++;
 

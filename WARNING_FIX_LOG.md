@@ -27,3 +27,10 @@ This log records significant warning-policy and warning-fix changes made during 
 - Removed private parser state fields and local constants that had no readers, including stale sequence-loop, heartbeat-key, PS1 scanner, and FFT reverb placeholders.
 - Added missing undefined-version handling in CPS switch statements so enum switches are exhaustive under the warning policy.
 - Preserved useful decoded values in event descriptions where the warning revealed that the parser was reading data but formatting a different field.
+
+## Additional Warning Cleanup
+
+- Fixed Konami Arcade tempo-slide reset to update sequence members rather than declaring unused locals.
+- Kept Square PS2 BGM header validation effective by honoring the existing `bValid` flag before constructing a sequence.
+- Removed redundant direct `fmt::fmt` linkage from the shell target; `vgmtranscore` already provides the needed transitive fmt dependency through spdlog.
+- Scoped custom title-bar constants and icon helpers to platforms that use them so macOS builds do not carry dead UI declarations.

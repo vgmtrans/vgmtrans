@@ -116,8 +116,6 @@ void KonamiPS1Track::resetVars() {
 }
 
 bool KonamiPS1Track::readEvent() {
-  KonamiPS1Seq *parentSeq = (KonamiPS1Seq *)this->parentSeq;
-
   u32 beginOffset = curOffset;
   if (curOffset >= vgmFile()->endOffset()) {
     return false;

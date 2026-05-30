@@ -92,9 +92,6 @@ int PSF2Loader::psf2unpack(const RawFile *file, unsigned long fileoffset, unsign
       u32 actualFileSize = filesize;
       u32 k = 0;
 
-      std::ptrdiff_t test = 4;
-      u16 test2 = test;
-
       u8 *dblock = new u8[buffersize];
 
       for (u32 j = 0; j < blockcount; j++) {

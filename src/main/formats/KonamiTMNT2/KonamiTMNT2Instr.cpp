@@ -29,7 +29,7 @@ KonamiTMNT2SampleInstrSet::KonamiTMNT2SampleInstrSet(
 )
   : VGMInstrSet(KonamiTMNT2Format::name, file, offset, 0, std::move(name)),
     m_instrTableAddr(instrTableAddr), m_drumTableAddr(drumTableAddr),
-    m_instrInfos(instrInfos), m_drumTables(drumTables), m_fmtVer(fmtVer)
+    m_instrInfos(instrInfos), m_drumTables(drumTables)
 {
 }
 

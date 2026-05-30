@@ -162,6 +162,8 @@ void CPS1Scanner::loadCPS1(MAMEGame *gameentry, CPS1FormatVer fmt_ver) {
                                         opmInstrsetLength,
                                         instrset_name);
       break;
+    case CPS1_VERSION_UNDEFINED:
+      return;
   }
   if (!opmInstrset->loadVGMFile()) {
     delete opmInstrset;
