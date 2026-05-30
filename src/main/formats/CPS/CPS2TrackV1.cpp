@@ -220,9 +220,9 @@ bool CPS2TrackV1::readEvent() {
       }
 
       case 0x08 : {
-        u8 progNum = readByte(curOffset++);
-        addBankSelectNoItem((bank * 2) + (progNum / 128));
-        addProgramChange(beginOffset, curOffset - beginOffset, progNum % 128);
+        u8 prog = readByte(curOffset++);
+        addBankSelectNoItem((bank * 2) + (prog / 128));
+        addProgramChange(beginOffset, curOffset - beginOffset, prog % 128);
         break;
       }
 

@@ -187,8 +187,8 @@ bool KonamiVendettaSampleInstrSet::parseDrums() {
 
       drumBankItem->addChild(ptrOffset, 2, "Drum Pointer");
 
-      int drumIdx = drumOffsetToIdx[ptr];
-      const konami_vendetta_drum_info& drumInfo = drumInfos[drumIdx];
+      int drumNum = drumOffsetToIdx[ptr];
+      const konami_vendetta_drum_info& drumInfo = drumInfos[drumNum];
       m_drumKeyMap[(i * 16) + j] = drumInfo;
 
       VGMRgn* rgn = new VGMRgn(drumKit, ptr - 3, 3);

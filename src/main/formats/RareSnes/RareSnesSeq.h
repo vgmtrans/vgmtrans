@@ -111,7 +111,7 @@ class RareSnesSeq
   s8 presetVolR[5];                           // volume preset R
   u16 presetADSR[5];                       // ADSR preset
 
-  double getTempoInBPM(u8 tempo, u8 timerFreq);
+  double getTempoInBPM(u8 seqTempo, u8 seqTimer);
 
  private:
   void loadEventMap();
@@ -129,10 +129,10 @@ class RareSnesTrack
 
   void addVolLR(u32 offset,
                 u32 length,
-                s8 spcVolL,
-                s8 spcVolR,
+                s8 volL,
+                s8 volR,
                 const std::string &sEventName = "Volume L/R");
-  void addVolLRNoItem(s8 spcVolL, s8 spcVolR);
+  void addVolLRNoItem(s8 volL, s8 volR);
 
  private:
   u8 rptNestLevel;                          // nest level for repeat-subroutine command

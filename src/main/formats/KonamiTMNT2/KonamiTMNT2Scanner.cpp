@@ -181,13 +181,13 @@ std::vector<KonamiTMNT2Seq*> KonamiTMNT2Scanner::loadSeqTable(
     std::vector<u32> k053260TrkPtrs;
     ym2151TrkPtrs.reserve(numYM3151Tracks);
     k053260TrkPtrs.reserve(numK053260Tracks);
-    for (int i = 0; i < numYM3151Tracks; ++i) {
-      u16 offset = seqPtr + seqTypeLength + (i * 2);
+    for (int trk = 0; trk < numYM3151Tracks; ++trk) {
+      u16 offset = seqPtr + seqTypeLength + (trk * 2);
       trkList->addChild(offset, 2, "YM2151 Track Pointer");
       ym2151TrkPtrs.push_back(programRom->readShort(offset));
     }
-    for (int i = 0; i < numK053260Tracks; ++i) {
-      u16 offset = seqPtr + seqTypeLength + ((numYM3151Tracks + i) * 2);
+    for (int trk = 0; trk < numK053260Tracks; ++trk) {
+      u16 offset = seqPtr + seqTypeLength + ((numYM3151Tracks + trk) * 2);
       trkList->addChild(offset, 2, "K053260 Track Pointer");
       k053260TrkPtrs.push_back(programRom->readShort(offset));
     }

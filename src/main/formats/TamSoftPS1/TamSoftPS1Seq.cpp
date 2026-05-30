@@ -283,8 +283,8 @@ bool TamSoftPS1Track::readEvent() {
       }
 
       case 0xE6: {
-        u8 mode = readByte(curOffset++);
-        desc = fmt::format("Reverb Mode: {:d}", mode);
+        u8 rvbMode = readByte(curOffset++);
+        desc = fmt::format("Reverb Mode: {:d}", rvbMode);
         addGenericEvent(beginOffset, curOffset - beginOffset, "Reverb Mode", desc, Type::Reverb);
         break;
       }

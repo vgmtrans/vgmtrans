@@ -6,8 +6,8 @@ This log records significant warning-policy and warning-fix changes made during 
 
 - Moved VGMTrans warning flags out of platform toolchain files and into `cmake/VGMTransWarnings.cmake`, applied only to VGMTrans-owned targets. This keeps third-party code under `lib/` from inheriting project warning flags.
 - Added `VGMTRANS_WARNINGS_AS_ERRORS` as an opt-in CMake option instead of forcing warnings-as-errors by default. This matches the common maintainer/CI pattern while keeping local dependency/compiler drift from breaking ordinary builds.
-- Chose a GCC/Clang/AppleClang policy centered on `-Wall`, `-Wextra`, `-Wcast-align`, `-Wnull-dereference`, and `-Woverloaded-virtual`, with `-Wno-unused-parameter` because this codebase has intentional virtual/default callback parameters.
-- Suppressed sign-compare and shadow diagnostics for project targets. VGMTrans has many parser offsets, sentinel values, and local parser-state names where those warnings were mostly noise; keeping them on would obscure higher-signal diagnostics.
+- Chose a GCC/Clang/AppleClang policy centered on `-Wall`, `-Wextra`, `-Wcast-align`, `-Wnull-dereference`, `-Wshadow`, and `-Woverloaded-virtual`, with `-Wno-unused-parameter` because this codebase has intentional virtual/default callback parameters.
+- Suppressed sign-compare diagnostics for project targets. VGMTrans has many parser offsets and sentinel values where those warnings were mostly noise; keeping them on would obscure higher-signal diagnostics.
 - Left `-Wpedantic` out of the project policy because project code uses compiler-supported extensions such as anonymous structs in binary-layout helpers.
 - Left `-Wold-style-cast` out of the project policy. It is useful in small modernized projects, but in VGMTrans it produced noise around C APIs and vendored macro expansions without a proportional bug-finding payoff for this cleanup.
 - For C sources, omitted `-Wpedantic` because `src/ui/shell/linenoise.c` uses common C variadic macro patterns that are not worth rewriting as part of the C++ warning policy.
@@ -34,3 +34,10 @@ This log records significant warning-policy and warning-fix changes made during 
 - Kept Square PS2 BGM header validation effective by honoring the existing `bValid` flag before constructing a sequence.
 - Removed redundant direct `fmt::fmt` linkage from the shell target; `vgmtranscore` already provides the needed transitive fmt dependency through spdlog.
 - Scoped custom title-bar constants and icon helpers to platforms that use them so macOS builds do not carry dead UI declarations.
+
+## Shadow Warning Cleanup
+
+- Enabled `-Wshadow` for VGMTrans-owned C and C++ targets while keeping dependency targets under `lib/` on their own warning settings.
+- Renamed short parser locals and loop counters that hid outer parser state, including CPS, Konami, Rare SNES, Square PS2, TamSoft PS1, and Tri-Ace PS1 helpers.
+- Renamed member-shadowing parameters in sequence tempo and volume helpers so function arguments remain clear without hiding stored sequence state.
+- Renamed a repeated OPM operator reference in `YM2151.h` so every translation unit including the header is clean under `-Wshadow`.

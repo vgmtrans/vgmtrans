@@ -233,9 +233,9 @@ void RareSnesSeq::loadEventMap() {
   }
 }
 
-double RareSnesSeq::getTempoInBPM(u8 tempo, u8 timerFreq) {
-  if (timerFreq != 0 && tempo != 0) {
-    return (double) 60000000 / (SEQ_PPQN * (125 * timerFreq)) * ((double) tempo / 256);
+double RareSnesSeq::getTempoInBPM(u8 seqTempo, u8 seqTimer) {
+  if (seqTimer != 0 && seqTempo != 0) {
+    return (double) 60000000 / (SEQ_PPQN * (125 * seqTimer)) * ((double) seqTempo / 256);
   }
   else {
     return 1.0; // since tempo 0 cannot be expressed, this function returns a very small value.
@@ -301,7 +301,7 @@ bool RareSnesTrack::readEvent(void) {
   u8 newMidiVol, newMidiPan;
   bool bContinue = true;
 
-  std::string desc;
+  std::string eventDesc;
 
   if (statusByte >= 0x80) {
     u8 noteByte = statusByte;
@@ -749,16 +749,16 @@ bool RareSnesTrack::readEvent(void) {
 
       case EVENT_SETALTNOTE1:
         altNoteByte1 = readByte(curOffset++);
-        desc = fmt::format("Note: {:02X}", altNoteByte1);
+        eventDesc = fmt::format("Note: {:02X}", altNoteByte1);
         addGenericEvent(beginOffset, curOffset - beginOffset, "Set Alt Note 1",
-                        desc, Type::ChangeState);
+                        eventDesc, Type::ChangeState);
         break;
 
       case EVENT_SETALTNOTE2:
         altNoteByte2 = readByte(curOffset++);
-        desc = fmt::format("Note: {:02X}", altNoteByte2);
+        eventDesc = fmt::format("Note: {:02X}", altNoteByte2);
         addGenericEvent(beginOffset, curOffset - beginOffset, "Set Alt Note 2",
-                        desc, Type::ChangeState);
+                        eventDesc, Type::ChangeState);
         break;
 
       case EVENT_PITCHSLIDEDOWNSHORT: {
@@ -804,10 +804,10 @@ bool RareSnesTrack::readEvent(void) {
 
         // add event without MIDI events
         calculateVolPanFromVolLR(spcVolL, spcVolR, newMidiVol, newMidiPan);
-        desc = fmt::format("Left Volume: {:d}  Right Volume: {:d}  AR: {:d}  DR: {:d}  SL: {:d}  SR: {:d}",
-                           newVolL, newVolR, ar, dr, sl, sr);
+        eventDesc = fmt::format("Left Volume: {:d}  Right Volume: {:d}  AR: {:d}  DR: {:d}  SL: {:d}  SR: {:d}",
+                                newVolL, newVolR, ar, dr, sl, sr);
         addGenericEvent(beginOffset, curOffset - beginOffset,
-                        "Set Vol/ADSR Preset 1", desc, Type::Volume);
+                        "Set Vol/ADSR Preset 1", eventDesc, Type::Volume);
         break;
       }
 
@@ -828,10 +828,10 @@ bool RareSnesTrack::readEvent(void) {
 
         // add event without MIDI events
         calculateVolPanFromVolLR(spcVolL, spcVolR, newMidiVol, newMidiPan);
-        desc = fmt::format("Left Volume: {:d}  Right Volume: {:d}  AR: {:d}  DR: {:d}  SL: {:d}  SR: {:d}",
-                           newVolL, newVolR, ar, dr, sl, sr);
+        eventDesc = fmt::format("Left Volume: {:d}  Right Volume: {:d}  AR: {:d}  DR: {:d}  SL: {:d}  SR: {:d}",
+                                newVolL, newVolR, ar, dr, sl, sr);
         addGenericEvent(beginOffset, curOffset - beginOffset,
-                        "Set Vol/ADSR Preset 2", desc, Type::Volume);
+                        "Set Vol/ADSR Preset 2", eventDesc, Type::Volume);
         break;
       }
 
@@ -852,10 +852,10 @@ bool RareSnesTrack::readEvent(void) {
 
         // add event without MIDI events
         calculateVolPanFromVolLR(spcVolL, spcVolR, newMidiVol, newMidiPan);
-        desc = fmt::format("Left Volume: {:d}  Right Volume: {:d}  AR: {:d}  DR: {:d}  SL: {:d}  SR: {:d}",
-                           newVolL, newVolR, ar, dr, sl, sr);
+        eventDesc = fmt::format("Left Volume: {:d}  Right Volume: {:d}  AR: {:d}  DR: {:d}  SL: {:d}  SR: {:d}",
+                                newVolL, newVolR, ar, dr, sl, sr);
         addGenericEvent(beginOffset, curOffset - beginOffset,
-                        "Set Vol/ADSR Preset 3", desc, Type::Volume);
+                        "Set Vol/ADSR Preset 3", eventDesc, Type::Volume);
         break;
       }
 
@@ -876,9 +876,9 @@ bool RareSnesTrack::readEvent(void) {
 
         // add event without MIDI events
         calculateVolPanFromVolLR(spcVolL, spcVolR, newMidiVol, newMidiPan);
-        desc = fmt::format("Left Volume: {:d}  Right Volume: {:d}  AR: {:d}  DR: {:d}  SL: {:d}  SR: {:d}",
-                           newVolL, newVolR, ar, dr, sl, sr);
-        addGenericEvent(beginOffset, curOffset - beginOffset, "Set Vol/ADSR Preset 4", desc, Type::Volume);
+        eventDesc = fmt::format("Left Volume: {:d}  Right Volume: {:d}  AR: {:d}  DR: {:d}  SL: {:d}  SR: {:d}",
+                                newVolL, newVolR, ar, dr, sl, sr);
+        addGenericEvent(beginOffset, curOffset - beginOffset, "Set Vol/ADSR Preset 4", eventDesc, Type::Volume);
         break;
       }
 
@@ -899,9 +899,9 @@ bool RareSnesTrack::readEvent(void) {
 
         // add event without MIDI events
         calculateVolPanFromVolLR(spcVolL, spcVolR, newMidiVol, newMidiPan);
-        desc = fmt::format("Left Volume: {:d}  Right Volume: {:d}  AR: {:d}  DR: {:d}  SL: {:d}  SR: {:d}",
-                           newVolL, newVolR, ar, dr, sl, sr);
-        addGenericEvent(beginOffset, curOffset - beginOffset, "Set Vol/ADSR Preset 5", desc, Type::Volume);
+        eventDesc = fmt::format("Left Volume: {:d}  Right Volume: {:d}  AR: {:d}  DR: {:d}  SL: {:d}  SR: {:d}",
+                                newVolL, newVolR, ar, dr, sl, sr);
+        addGenericEvent(beginOffset, curOffset - beginOffset, "Set Vol/ADSR Preset 5", eventDesc, Type::Volume);
         break;
       }
 
@@ -970,7 +970,7 @@ bool RareSnesTrack::readEvent(void) {
         s8 newTransp = (s8) readByte(curOffset++);
         s8 newTuning = (s8) readByte(curOffset++);
 
-        desc = fmt::format(
+        eventDesc = fmt::format(
             "Program Number: {:d}  Transpose: {:d}  Tuning: {:d} ({:d} cents)",
             newProg, newTransp, newTuning,
             int(getTuningInSemitones(newTuning) * 100 + 0.5));
@@ -998,7 +998,7 @@ bool RareSnesTrack::readEvent(void) {
         u16 newADSR = getShortBE(curOffset);
         curOffset += 2;
 
-        desc = fmt::format(
+        eventDesc = fmt::format(
             "Program Number: {:d}  Transpose: {:d}  Tuning: {:d} ({:d} cents)  Volume: {:d}, {:d}  ADSR: {:04X}",
             newProg, newTransp, newTuning,
             int(getTuningInSemitones(newTuning) * 100 + 0.5), newVolL, newVolR,
@@ -1050,11 +1050,11 @@ bool RareSnesTrack::readEvent(void) {
 
         // add event without MIDI events
         calculateVolPanFromVolLR(parentSeq->presetVolL[0], parentSeq->presetVolR[0], newMidiVol, newMidiPan);
-        desc = fmt::format(
+        eventDesc = fmt::format(
             "Left Volume 1: {:d}  Right Volume 1: {:d}  Left Volume 2: {:d}  Right Volume 2: {:d}",
             newVolL1, newVolR1, newVolL2, newVolR2);
         addGenericEvent(beginOffset, curOffset - beginOffset, "Set Volume Preset",
-                        desc, Type::Control);
+                        eventDesc, Type::Control);
         break;
       }
 
@@ -1099,14 +1099,14 @@ void RareSnesTrack::onTickEnd(void) {
 
 void RareSnesTrack::addVolLR(u32 offset,
                              u32 length,
-                             s8 spcVolL,
-                             s8 spcVolR,
+                             s8 volL,
+                             s8 volR,
                              const std::string &sEventName) {
   u8 newMidiVol;
   u8 newMidiPan;
-  calculateVolPanFromVolLR(spcVolL, spcVolR, newMidiVol, newMidiPan);
+  calculateVolPanFromVolLR(volL, volR, newMidiVol, newMidiPan);
 
-  auto desc = fmt::format("Left Volume: {:d}  Right Volume: {:d}", spcVolL, spcVolR);
+  auto desc = fmt::format("Left Volume: {:d}  Right Volume: {:d}", volL, volR);
   addGenericEvent(offset, length, sEventName, desc, Type::Volume);
 
   // add MIDI events only if updated
@@ -1118,10 +1118,10 @@ void RareSnesTrack::addVolLR(u32 offset,
   }
 }
 
-void RareSnesTrack::addVolLRNoItem(s8 spcVolL, s8 spcVolR) {
+void RareSnesTrack::addVolLRNoItem(s8 volL, s8 volR) {
   u8 newMidiVol;
   u8 newMidiPan;
-  calculateVolPanFromVolLR(spcVolL, spcVolR, newMidiVol, newMidiPan);
+  calculateVolPanFromVolLR(volL, volR, newMidiVol, newMidiPan);
 
   // add MIDI events only if updated
   if (newMidiVol != vol) {

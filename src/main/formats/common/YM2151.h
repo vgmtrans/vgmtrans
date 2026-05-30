@@ -71,11 +71,11 @@ struct OPMData {
     const char* opNames[4] = { "M1", "C1", "M2", "C2" };
 
     for (int i = 0; i < 4; ++i) {
-      const OP& op = this->op[opIndex[i]];
+      const OP& opData = this->op[opIndex[i]];
       fmt::format_to(
           out,
           "{}: {}   {}   {}   {}  {}  {}   {}   {}   {}   {} {}\n",
-          opNames[i], +op.AR, +op.D1R, +op.D2R, +op.RR, +op.D1L, +op.TL, +op.KS, +op.MUL, +op.DT1, +op.DT2, +op.AMS_EN
+          opNames[i], +opData.AR, +opData.D1R, +opData.D2R, +opData.RR, +opData.D1L, +opData.TL, +opData.KS, +opData.MUL, +opData.DT1, +opData.DT2, +opData.AMS_EN
       );
     }
     return fmt::to_string(buf);

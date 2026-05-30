@@ -101,7 +101,7 @@ class KonamiSnesSeq
   u8 NOTE_DUR_RATE_MAX;
 
   double getTempoInBPM();
-  double getTempoInBPM(u8 tempo);
+  double getTempoInBPM(u8 seqTempo);
 
  private:
   void loadEventMap();

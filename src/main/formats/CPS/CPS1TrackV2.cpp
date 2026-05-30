@@ -211,10 +211,10 @@ bool CPS1TrackV2::readEvent() {
         break;
 
       case 0x08 : {
-        u8 progNum = readByte(curOffset++);
-        addProgramChange(beginOffset, curOffset - beginOffset, progNum % 128);
+        u8 prog = readByte(curOffset++);
+        addProgramChange(beginOffset, curOffset - beginOffset, prog % 128);
         if (channelSynth == CPSSynth::YM2151) {
-          cKeyCorrection = cpsSeq->transposeForInstr(progNum);
+          cKeyCorrection = cpsSeq->transposeForInstr(prog);
         }
         break;
       }
@@ -406,9 +406,9 @@ bool CPS1TrackV2::readEvent() {
         break;
 
       case 0x1A : {
-        u8 masterVol = readByte(curOffset++);
+        u8 newMasterVol = readByte(curOffset++);
         addGenericEvent(beginOffset, curOffset - beginOffset, "Master Volume", "", Type::Unknown);
-        cpsSeq->setMasterVolume(masterVol);
+        cpsSeq->setMasterVolume(newMasterVol);
         break;
       }
 

@@ -14,6 +14,7 @@ function(vgmtrans_enable_project_warnings target)
       $<$<COMPILE_LANG_AND_ID:C,GNU,Clang,AppleClang>:-Wno-sign-compare>
       $<$<COMPILE_LANG_AND_ID:C,GNU,Clang,AppleClang>:-Wcast-align>
       $<$<COMPILE_LANG_AND_ID:C,GNU,Clang,AppleClang>:-Wnull-dereference>
+      $<$<COMPILE_LANG_AND_ID:C,GNU,Clang,AppleClang>:-Wshadow>
 
       $<$<COMPILE_LANG_AND_ID:CXX,GNU,Clang,AppleClang>:-Wall>
       $<$<COMPILE_LANG_AND_ID:CXX,GNU,Clang,AppleClang>:-Wextra>
@@ -21,6 +22,7 @@ function(vgmtrans_enable_project_warnings target)
       $<$<COMPILE_LANG_AND_ID:CXX,GNU,Clang,AppleClang>:-Wno-sign-compare>
       $<$<COMPILE_LANG_AND_ID:CXX,GNU,Clang,AppleClang>:-Wcast-align>
       $<$<COMPILE_LANG_AND_ID:CXX,GNU,Clang,AppleClang>:-Wnull-dereference>
+      $<$<COMPILE_LANG_AND_ID:CXX,GNU,Clang,AppleClang>:-Wshadow>
       $<$<COMPILE_LANG_AND_ID:CXX,GNU,Clang,AppleClang>:-Woverloaded-virtual>
 
       $<$<COMPILE_LANG_AND_ID:C,MSVC>:/W4>

@@ -324,12 +324,12 @@ double KonamiSnesSeq::getTempoInBPM() {
   return getTempoInBPM(tempo);
 }
 
-double KonamiSnesSeq::getTempoInBPM(u8 tempo) {
-  if (tempo == 0) {
+double KonamiSnesSeq::getTempoInBPM(u8 seqTempo) {
+  if (seqTempo == 0) {
     return 1.0; // since tempo 0 cannot be expressed, this function returns a very small value.
   }
 
-  return 60000000.0 / (SEQ_PPQN * (125 * timerFrequency(version))) * (tempo / 256.0);
+  return 60000000.0 / (SEQ_PPQN * (125 * timerFrequency(version))) * (seqTempo / 256.0);
 }
 
 

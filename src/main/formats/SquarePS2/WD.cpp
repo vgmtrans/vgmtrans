@@ -164,9 +164,9 @@ bool WDInstr::loadInstr() {
   }
 
   // First, do key and velocity ranges
-  for (size_t k = 0; k < regions().size(); k++) {
-    auto region = dynamic_cast<WDRgn*>(regions()[k]);
-    auto prevRegion = k > 0 ? regions()[k-1] : nullptr;
+  for (size_t rgnIdx = 0; rgnIdx < regions().size(); rgnIdx++) {
+    auto region = dynamic_cast<WDRgn*>(regions()[rgnIdx]);
+    auto prevRegion = rgnIdx > 0 ? regions()[rgnIdx-1] : nullptr;
     // Key Ranges
     if (region->bFirstRegion)  //&& !instrument[i].region[k].bLastRegion) //used in ffx2 0049 YRP
                                             // battle 1.  check out first instrument, flags are weird
@@ -192,4 +192,3 @@ bool WDInstr::loadInstr() {
 
 WDRgn::WDRgn(WDInstr *instr, u32 offset)
     : VGMRgn(instr, offset, 0x20) {}
- 

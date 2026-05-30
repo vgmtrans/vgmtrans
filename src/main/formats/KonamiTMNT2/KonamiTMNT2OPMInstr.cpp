@@ -35,9 +35,9 @@ bool KonamiTMNT2OPMInstrSet::parseInstrPointers() {
 
     VGMInstr* instr = new VGMInstr(this, instrPtr, sizeof(konami_tmnt2_ym2151_instr), 0, i, name, 0);
     instr->addChild(instrPtr, 1, "RL_FB_CONECT");
-    for (int i = 0; i < 4; ++i) {
-      int offset = instrPtr + 1 + (i * 6);
-      auto opItem = instr->addChild(instrPtr + 1 + (i * 6), 6, fmt::format("OP {}", i));
+    for (int op = 0; op < 4; ++op) {
+      int offset = instrPtr + 1 + (op * 6);
+      auto opItem = instr->addChild(instrPtr + 1 + (op * 6), 6, fmt::format("OP {}", op));
       opItem->addChild(offset, 1, "DT1_MUL");
       opItem->addChild(offset+1, 1, "TL");
       opItem->addChild(offset+2, 1, "KS_AR");

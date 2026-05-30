@@ -95,16 +95,16 @@ bool Vab::parseInstrPointers() {
       readBytes(offCurrProg, 0x10, &newInstr->attr);
 
       const auto progName = fmt::format("Program {:d}", progIndex);
-      VGMHeader *hdr = progsHdr->addHeader(offCurrProg, 0x10, progName);
-      hdr->addChild(offCurrProg + 0x00, 1, "Number of Tones");
-      hdr->addChild(offCurrProg + 0x01, 1, "Volume");
-      hdr->addChild(offCurrProg + 0x02, 1, "Priority");
-      hdr->addChild(offCurrProg + 0x03, 1, "Mode");
-      hdr->addChild(offCurrProg + 0x04, 1, "Pan");
-      hdr->addChild(offCurrProg + 0x05, 1, "Reserved");
-      hdr->addChild(offCurrProg + 0x06, 2, "Attribute");
-      hdr->addChild(offCurrProg + 0x08, 4, "Reserved");
-      hdr->addChild(offCurrProg + 0x0c, 4, "Reserved");
+      VGMHeader *progHdr = progsHdr->addHeader(offCurrProg, 0x10, progName);
+      progHdr->addChild(offCurrProg + 0x00, 1, "Number of Tones");
+      progHdr->addChild(offCurrProg + 0x01, 1, "Volume");
+      progHdr->addChild(offCurrProg + 0x02, 1, "Priority");
+      progHdr->addChild(offCurrProg + 0x03, 1, "Mode");
+      progHdr->addChild(offCurrProg + 0x04, 1, "Pan");
+      progHdr->addChild(offCurrProg + 0x05, 1, "Reserved");
+      progHdr->addChild(offCurrProg + 0x06, 2, "Attribute");
+      progHdr->addChild(offCurrProg + 0x08, 4, "Reserved");
+      progHdr->addChild(offCurrProg + 0x0c, 4, "Reserved");
 
       newInstr->masterVol = readByte(offCurrProg + 0x01);
 

@@ -143,14 +143,14 @@ bool VGMSeq::postLoad() {
   return true;
 }
 
-bool VGMSeq::loadTracks(ReadMode readMode, u32 stopTime) {
+bool VGMSeq::loadTracks(ReadMode seqReadMode, u32 stopTime) {
   // set read mode
-  this->readMode = readMode;
+  this->readMode = seqReadMode;
   for (u32 trackNum = 0; trackNum < nNumTracks; trackNum++) {
-    aTracks[trackNum]->readMode = readMode;
+    aTracks[trackNum]->readMode = seqReadMode;
   }
 
-  if (readMode == READMODE_CONVERT_TO_MIDI) {
+  if (seqReadMode == READMODE_CONVERT_TO_MIDI) {
     m_timedEvents.clear();
   }
 
@@ -351,10 +351,10 @@ bool VGMSeq::saveAsMidi(const std::filesystem::path &filepath, const VGMColl* co
 bool VGMSeq::saveAsMidi(const std::filesystem::path& filepath,
                         const VGMColl* coll,
                         const ConversionContext& context) {
-  MidiFile *midi = this->convertToMidi(coll, context);
-  if (!midi)
+  MidiFile *midiFile = this->convertToMidi(coll, context);
+  if (!midiFile)
     return false;
-  bool result = midi->saveMidiFile(filepath);
-  delete midi;
+  bool result = midiFile->saveMidiFile(filepath);
+  delete midiFile;
   return result;
 }

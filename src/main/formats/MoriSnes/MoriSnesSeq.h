@@ -62,7 +62,7 @@ class MoriSnesSeq : public VGMSeq {
   virtual bool parseTrackPointers();
   virtual void resetVars();
 
-  double getTempoInBPM(u8 tempo, bool fastTempo);
+  double getTempoInBPM(u8 tempo, bool fast);
 
   MoriSnesVersion version;
   std::map<u8, MoriSnesSeqEventType> EventMap;

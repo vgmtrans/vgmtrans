@@ -126,10 +126,10 @@ u8 SegSatSeq::resolveVelocity(u8 vel, const SegSatRgn& rgn, s8 volBias, u8 ch) {
   // differences in future versions (and perhaps older versions too?)
   u8 shift = rate >> 4;
   bool boost = (rate >> 3) & 1;
-  u8 mode = rate & 7;
+  u8 rateMode = rate & 7;
   u8 newVel = base;
   u16 velMargin = vel - point;
-  switch (mode) {
+  switch (rateMode) {
     case 0: break;
     case 1:
       newVel += boost ? (((velMargin & 0x7F) * 12) << shift) >> 3 : (velMargin << shift);

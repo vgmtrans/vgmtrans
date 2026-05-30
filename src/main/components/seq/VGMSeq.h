@@ -127,7 +127,7 @@ class VGMSeq : public VGMFile {
  protected:
   void setConversionContext(const ConversionContext& context) { m_conversionContext = context; }
 
-  virtual bool loadTracks(ReadMode readMode, u32 stopTime = 1000000);
+  virtual bool loadTracks(ReadMode seqReadMode, u32 stopTime = 1000000);
   virtual void loadTracksMain(u32 stopTime);
   virtual bool postLoad();
 

@@ -126,7 +126,7 @@ void CPS1Scanner::loadCPS1(MAMEGame *gameentry, CPS1FormatVer fmt_ver) {
   seq_table_length = numSeqs * sizeof(u16);
 
   // Load the YM2151 Instrument Set
-  auto instrset_name = fmt::format("{} YM2151 instrument set", gameentry->name);
+  auto opmInstrsetName = fmt::format("{} YM2151 instrument set", gameentry->name);
   int opmInstrsetLength;
 
   switch (fmt_ver) {
@@ -135,7 +135,7 @@ void CPS1Scanner::loadCPS1(MAMEGame *gameentry, CPS1FormatVer fmt_ver) {
       opmInstrset = new CPS1OPMInstrSet(programFile,
                                         fmt_ver, masterVol, opm_instr_table_offset,
                                         opmInstrsetLength,
-                                        instrset_name);
+                                        opmInstrsetName);
       break;
 
     case CPS1_V500:
@@ -144,7 +144,7 @@ void CPS1Scanner::loadCPS1(MAMEGame *gameentry, CPS1FormatVer fmt_ver) {
       opmInstrset = new CPS1OPMInstrSet(programFile,
                                         fmt_ver, masterVol, opm_instr_table_offset,
                                         opmInstrsetLength,
-                                        instrset_name);
+                                        opmInstrsetName);
       break;
 
     case CPS1_V100:
@@ -153,14 +153,14 @@ void CPS1Scanner::loadCPS1(MAMEGame *gameentry, CPS1FormatVer fmt_ver) {
       opmInstrset = new CPS1OPMInstrSet(programFile,
                                       fmt_ver, masterVol, opm_instr_table_offset,
                                       opmInstrsetLength,
-                                      instrset_name);
+                                      opmInstrsetName);
       break;
     case CPS1_V425:
       opmInstrsetLength = std::min(127 * static_cast<u32>(sizeof(CPS1OPMInstrDataV4_25)), sample_instr_table_offset);
       opmInstrset = new CPS1OPMInstrSet(programFile,
                                         fmt_ver, masterVol, opm_instr_table_offset,
                                         opmInstrsetLength,
-                                        instrset_name);
+                                        opmInstrsetName);
       break;
     case CPS1_VERSION_UNDEFINED:
       return;
@@ -174,12 +174,12 @@ void CPS1Scanner::loadCPS1(MAMEGame *gameentry, CPS1FormatVer fmt_ver) {
   if (sampsRomGroupEntry && sampsRomGroupEntry->file) {
     RawFile *samplesFile = sampsRomGroupEntry->file;
 
-    auto instrset_name = fmt::format("{} oki msm6295 instrument set", gameentry->name);
+    auto sampleInstrsetName = fmt::format("{} oki msm6295 instrument set", gameentry->name);
     auto sampcoll_name = fmt::format("{} sample collection", gameentry->name);
 
     sampleInstrset = new CPS1SampleInstrSet(programFile,
                                 fmt_ver, sample_instr_table_offset,
-                                instrset_name);
+                                sampleInstrsetName);
     if (!sampleInstrset->loadVGMFile()) {
       delete sampleInstrset;
       sampleInstrset = nullptr;

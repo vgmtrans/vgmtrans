@@ -161,9 +161,9 @@ void MoriSnesSeq::loadEventMap() {
   EventMap[0xe6] = EVENT_TIMEBASE;
 }
 
-double MoriSnesSeq::getTempoInBPM(u8 tempo, bool fastTempo) {
+double MoriSnesSeq::getTempoInBPM(u8 tempo, bool fast) {
   if (tempo != 0) {
-    return 60000000.0 / ((SEQ_PPQN / (fastTempo ? 2 : 1)) * (125 * 0x4f)) * (tempo / 256.0);
+    return 60000000.0 / ((SEQ_PPQN / (fast ? 2 : 1)) * (125 * 0x4f)) * (tempo / 256.0);
   }
   else {
     return 1.0; // since tempo 0 cannot be expressed, this function returns a very small value.

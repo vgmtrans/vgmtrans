@@ -247,10 +247,10 @@ bool CPS1TrackV1::readEvent() {
       break;
 
     case 0x0C: {      // Program Change
-      u8 progNum = readByte(curOffset++);
-      addProgramChange(beginOffset, curOffset - beginOffset, progNum % 128);
+      u8 prog = readByte(curOffset++);
+      addProgramChange(beginOffset, curOffset - beginOffset, prog % 128);
       if (channelSynth == CPSSynth::YM2151) {
-        instrTranspose = cpsSeq->transposeForInstr(progNum);
+        instrTranspose = cpsSeq->transposeForInstr(prog);
       }
       break;
     }

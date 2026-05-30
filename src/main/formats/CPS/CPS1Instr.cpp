@@ -192,9 +192,9 @@ bool CPS1OPMInstrSet::parseInstrPointers() {
         u8 resetLfo = (instrData.LFO_ENABLE_AND_WF >> 1) & 1;
         driverData.push_back(enableLfo);
         driverData.push_back(resetLfo);
-        for (int i = 0; i < 4; i ++) {
-          driverData.push_back(instrData.volData[i].key_scale);
-          driverData.push_back(instrData.volData[i].extra_atten);
+        for (int op = 0; op < 4; op ++) {
+          driverData.push_back(instrData.volData[op].key_scale);
+          driverData.push_back(instrData.volData[op].extra_atten);
         }
 
         addOPMInstrument(instrData.convertToOPMData(masterVol, name), "cps", std::move(driverData));

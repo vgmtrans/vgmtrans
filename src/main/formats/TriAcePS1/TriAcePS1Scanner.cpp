@@ -27,13 +27,13 @@ void TriAcePS1Scanner::searchForSLZSeq(RawFile *file) {
   size_t nFileLength = file->size();
   for (u32 i = 0; i + 0x40 < nFileLength; i++) {
     u32 sig1 = file->readWordBE(i);
-    u8 mode;
+    u8 slzMode;
 
-    mode = sig1 & 0xFF;
+    slzMode = sig1 & 0xFF;
     sig1 >>= 8;
     if (sig1 != 0x534C5A)    // "SLZ" in ASCII
       continue;
-    if (mode > 0x03)
+    if (slzMode > 0x03)
       continue;    // only SLZ v0-3 is supported
     // Note: SLZ v2 is used by a few tracks in Valkyrie Profile.
 
@@ -75,8 +75,8 @@ void TriAcePS1Scanner::searchForSLZSeq(RawFile *file) {
     std::string name = file->tag.hasTitle() ? file->tag.title : file->stem();
     VGMColl *coll = new VGMColl(name);
     coll->useSeq(seq);
-    for (u32 i = 0; i < instrsets.size(); i++)
-      coll->addInstrSet(instrsets[i]);
+    for (u32 setIdx = 0; setIdx < instrsets.size(); setIdx++)
+      coll->addInstrSet(instrsets[setIdx]);
     if (!coll->load()) {
       delete coll;
     }
