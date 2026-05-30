@@ -10,7 +10,7 @@
 #include <utility>
 
 class AkaoInstrSet;
-class AkaoArt;
+struct AkaoArt;
 class AkaoSampColl;
 
 // ********

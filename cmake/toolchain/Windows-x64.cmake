@@ -32,7 +32,6 @@ set(BASE_CFLAGS
     /Zc:__cplusplus   # Report the correct C++ standard in the __cplusplus macro
     /volatile:iso     # Use ISO C++ volatile semantics
     /utf-8            # Set source and execution character sets to UTF-8
-    /W3               # Warning level 3
     /Oy-              # Disable frame pointer omission (greatly improves debugging)
 )
 

@@ -7,8 +7,8 @@
 
 CPS1Seq::CPS1Seq(RawFile *file, u32 offset, CPS1FormatVer fmtVersion, std::string name, std::vector<s8> instrTransposeTable)
     : VGMSeq(CPS1Format::name, file, offset, 0, std::move(name)),
-      fmtVersion(fmtVersion),
-      instrTransposeTable(instrTransposeTable) {
+      instrTransposeTable(instrTransposeTable),
+      fmtVersion(fmtVersion) {
   setUsesMonophonicTracks();
   setAlwaysWriteInitialVol(127);
   setAlwaysWriteInitialMonoMode(true);

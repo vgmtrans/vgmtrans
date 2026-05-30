@@ -31,8 +31,8 @@ KonamiArcadeInstrSet::KonamiArcadeInstrSet(RawFile *file,
                                            u32 drumSampleTableOffset,
                                            KonamiArcadeFormatVer fmtVer)
     : VGMInstrSet(KonamiArcadeFormat::name, file, offset, 0, std::move(name)),
-      m_drumTableOffset(drumTableOffset), m_drumSampleTableOffset(drumSampleTableOffset),
-      m_fmtVer(fmtVer) {
+      m_fmtVer(fmtVer), m_drumTableOffset(drumTableOffset),
+      m_drumSampleTableOffset(drumSampleTableOffset) {
 }
 
 void KonamiArcadeInstrSet::addSampleInfoChildren(VGMItem* sampInfoItem, u32 off) {

@@ -69,7 +69,7 @@ typedef struct _VAGBlk {
 
 
 //InitADSR is shamelessly ripped from P.E.Op.S
-static void initADSR()
+static inline void initADSR()
 {
   // build the rate table according to Neill's rules
   memset(RateTable, 0, sizeof(unsigned long) * 160);

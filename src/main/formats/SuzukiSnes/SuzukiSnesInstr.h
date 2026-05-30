@@ -57,9 +57,9 @@ class SuzukiSnesInstr
                   u16 addrADSRTable,
                   u16 addrTuningTable,
                   const std::string &name = "SuzukiSnesInstr");
-  virtual ~SuzukiSnesInstr();
+  ~SuzukiSnesInstr() override;
 
-  virtual bool loadInstr();
+  bool loadInstr() override;
 
   SuzukiSnesVersion version;
 
@@ -111,14 +111,14 @@ class SuzukiSnesRgn
   SuzukiSnesRgn(VGMInstr *instr,
                 SuzukiSnesVersion ver,
                 u16 addrSRCNTable);
-   virtual ~SuzukiSnesRgn();
+  ~SuzukiSnesRgn() override;
 
   bool initializeCommonRegion(u8 srcn,
                               u32 spcDirAddr,
                               u16 addrADSRTable,
                               u16 addrTuningTable);
   bool initializeNonPercussionRegion(u8 instrNum, u16 addrVolumeTable);
-  virtual bool loadRgn();
+  bool loadRgn() override;
 
   SuzukiSnesVersion version;
 };

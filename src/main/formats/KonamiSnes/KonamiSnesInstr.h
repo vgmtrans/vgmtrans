@@ -28,10 +28,10 @@ class KonamiSnesInstrSet:
                      u32 percInstrOffset,
                      u32 spcDirAddr,
                      const std::string &name = "KonamiSnesInstrSet");
-  virtual ~KonamiSnesInstrSet();
+  ~KonamiSnesInstrSet() override;
 
-  virtual bool parseHeader();
-  virtual bool parseInstrPointers();
+  bool parseHeader() override;
+  bool parseInstrPointers() override;
   void useColl(const VGMColl* coll) override;
   void unuseColl() override;
 
@@ -60,9 +60,9 @@ class KonamiSnesInstr
                   u32 spcDirAddr,
                   bool percussion,
                   const std::string &name = "KonamiSnesInstr");
-  virtual ~KonamiSnesInstr();
+  ~KonamiSnesInstr() override;
 
-  virtual bool loadInstr();
+  bool loadInstr() override;
 
   static bool isValidHeader
       (RawFile *file, KonamiSnesVersion version, u32 addrInstrHeader, u32 spcDirAddr, bool validateSample);
@@ -87,7 +87,7 @@ class KonamiSnesRgn
                 u32 offset,
                 bool percussion,
                 u8 percussionNote = 0);
-  virtual ~KonamiSnesRgn();
+  ~KonamiSnesRgn() override;
 
-  virtual bool loadRgn();
+  bool loadRgn() override;
 };

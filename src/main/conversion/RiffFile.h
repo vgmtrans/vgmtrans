@@ -18,7 +18,7 @@ class Chunk {
 
  public:
   Chunk(const std::string& theId)
-      : m_size(0), data(nullptr) {
+      : data(nullptr), m_size(0) {
     assert(theId.length() == 4);
     memcpy(id, theId.c_str(), 4);
   }

@@ -14,7 +14,7 @@
 #include <vector>
 
 class KonamiTMNT2Seq;
-class MAMEGame;
+struct MAMEGame;
 struct MAMERomGroup;
 struct konami_tmnt2_drum_info;
 

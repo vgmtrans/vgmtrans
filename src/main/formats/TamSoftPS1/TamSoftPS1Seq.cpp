@@ -41,7 +41,8 @@ const u16 TamSoftPS1Seq::PITCH_TABLE[73] = {
 };
 
 TamSoftPS1Seq::TamSoftPS1Seq(RawFile *file, u32 offset, u8 theSong, const std::string &name)
-    : VGMSeq(TamSoftPS1Format::name, file, offset, 0, name), song(theSong), ps2(false), type(0) {
+    : VGMSeq(TamSoftPS1Format::name, file, offset, 0, name), song(theSong), type(0),
+      reverbDepth(0), ps2(false) {
   bLoadTickByTick = true;
   setUseLinearAmplitudeScale(true);
 

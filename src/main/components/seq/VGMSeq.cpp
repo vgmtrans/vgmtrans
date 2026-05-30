@@ -22,10 +22,16 @@ VGMSeq::VGMSeq(const std::string &format, RawFile *file, u32 offset, u32 length,
       midi(nullptr),
       nNumTracks(0),
       readMode(READMODE_ADD_TO_UI),
+      tempoBPM(0),
       time(0),
-      m_use_monophonic_tracks(false),
-      m_use_linear_amplitude_scale(false),
-      m_use_linear_pan_amplitude_scale(false),
+      bLoadTickByTick(false),
+      bIncTickAfterProcessingTracks(true),
+      initialTempoBPM(120),
+      m_ppqn(0),
+      m_initial_volume(100),                    // GM standard (dls1 spec p16)
+      m_initial_expression(127),             //''
+      m_initial_reverb_level(40),                  // GM standard
+      m_initial_pitch_bend_range_cents(200), // GM standard.  Means +/- 2 semitones (4 total range)
       m_always_write_initial_tempo(false),
       m_always_write_initial_vol(false),
       m_always_write_initial_expression(false),
@@ -33,13 +39,9 @@ VGMSeq::VGMSeq(const std::string &format, RawFile *file, u32 offset, u32 length,
       m_always_write_initial_pitch_bend_range(false),
       m_always_write_initial_mono_mode(false),
       m_allow_discontinuous_track_data(false),
-      bLoadTickByTick(false),
-      bIncTickAfterProcessingTracks(true),
-      m_initial_volume(100),                    // GM standard (dls1 spec p16)
-      m_initial_expression(127),             //''
-      m_initial_reverb_level(40),                  // GM standard
-      m_initial_pitch_bend_range_cents(200), // GM standard.  Means +/- 2 semitones (4 total range)
-      initialTempoBPM(120),
+      m_use_monophonic_tracks(false),
+      m_use_linear_amplitude_scale(false),
+      m_use_linear_pan_amplitude_scale(false),
       m_use_reverb(false),
       m_track_control_flow_state(false) {
   setConversionContext(ConversionContext::fromOptions(ConversionOptions::the(), SynthTarget::SoundFont));

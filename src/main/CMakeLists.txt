@@ -101,6 +101,7 @@ endif()
 # ~~~
 
 add_library(vgmtranscore OBJECT)
+vgmtrans_enable_project_warnings(vgmtranscore)
 target_sources(vgmtranscore
   PRIVATE
     LogManager.cpp

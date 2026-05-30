@@ -17,19 +17,19 @@
 VGMSampColl::VGMSampColl(const std::string &format, RawFile *rawfile, u32 offset, u32 length,
                          std::string theName)
     : VGMFile(format, rawfile, offset, length, std::move(theName)),
-      m_should_load_on_instr_set_match(false),
-      bLoaded(false),
       sampDataOffset(0),
-      parInstrSet(nullptr) {
+      parInstrSet(nullptr),
+      m_should_load_on_instr_set_match(false),
+      bLoaded(false) {
 }
 
 VGMSampColl::VGMSampColl(const std::string &format, RawFile *rawfile, VGMInstrSet *instrset,
                          u32 offset, u32 length, std::string theName)
     : VGMFile(format, rawfile, offset, length, std::move(theName)),
-      m_should_load_on_instr_set_match(false),
-      bLoaded(false),
       sampDataOffset(0),
-      parInstrSet(instrset) {
+      parInstrSet(instrset),
+      m_should_load_on_instr_set_match(false),
+      bLoaded(false) {
 }
 
 bool VGMSampColl::loadVGMFile(bool useMatcher) {

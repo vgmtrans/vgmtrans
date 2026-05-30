@@ -26,23 +26,23 @@ class VGMScanner;
       static const _name_##Format _name_##FormatRegisterThis; \
       static const std::string name;                          \
       _name_##Format() : Format(#_name_) { init(); }          \
-      virtual const std::string& getName() { return name; }
+      const std::string& getName() override { return name; }
 
 #define END_FORMAT() \
   }                  \
   ;
 
 #define USING_SCANNER(scanner) \
-  virtual VGMScanner* newScanner() { return new scanner(this); }
+  VGMScanner* newScanner() override { return new scanner(this); }
 
 #define USING_MATCHER(matcher) \
-  virtual Matcher* newMatcher() { return new matcher(this); }
+  Matcher* newMatcher() override { return new matcher(this); }
 
 #define USING_MATCHER_WITH_ARG(matcher, arg) \
-  virtual Matcher* newMatcher() { return new matcher(this, arg); }
+  Matcher* newMatcher() override { return new matcher(this, arg); }
 
 #define USING_COLL(coll) \
-  virtual VGMColl* newCollection() { return new coll(); }
+  VGMColl* newCollection() override { return new coll(); }
 
 #define USES_COLLECTION_FOR_SEQ_CONVERSION() \
   bool usesCollectionDataForSeqConversion() override { return true; }

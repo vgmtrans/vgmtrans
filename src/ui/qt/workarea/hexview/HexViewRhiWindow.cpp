@@ -57,8 +57,8 @@ struct HexViewRhiWindow::BackendData {
 HexViewRhiWindow::HexViewRhiWindow(HexView* view, HexViewRhiRenderer* renderer)
     : m_view(view),
       m_renderer(renderer),
-      m_eventForwarder(view, [this]() { requestUpdate(); }),
-      m_backend(std::make_unique<BackendData>()) {
+      m_backend(std::make_unique<BackendData>()),
+      m_eventForwarder(view, [this]() { requestUpdate(); }) {
   setFlags(Qt::SubWindow | Qt::FramelessWindowHint);
 
 #if defined(Q_OS_WIN)

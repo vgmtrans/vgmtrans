@@ -34,8 +34,8 @@ SuzukiSnesInstrSet::SuzukiSnesInstrSet(RawFile *file,
     spcDirAddr(spcDirAddr),
     addrSRCNTable(addrSRCNTable),
     addrVolumeTable(addrVolumeTable),
-    addrADSRTable(addrADSRTable),
-    addrTuningTable(addrTuningTable) {
+    addrTuningTable(addrTuningTable),
+    addrADSRTable(addrADSRTable) {
 }
 
 bool SuzukiSnesInstrSet::parseHeader() {

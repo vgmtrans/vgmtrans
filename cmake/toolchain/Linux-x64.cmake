@@ -16,12 +16,6 @@ endif()
 
 # Base flags shared by both C and C++ compilers
 set(BASE_C_FLAGS
-    -Wall                   # Enable most standard compiler warnings
-    -Wextra                 # Enable additional extra warnings
-    -Wshadow                # Warn when a local variable shadows another variable
-    -Wunused                # Warn about unused variables, parameters, and functions
-    -Wcast-align            # Warn when a pointer cast increases alignment requirements
-    -Wnull-dereference      # Warn if a potential null pointer dereference is detected
     -fvisibility=hidden     # Hide internal symbols by default (matches Windows behavior)
     -fno-omit-frame-pointer # Disable frame pointer omission for better debugging
 )
@@ -29,8 +23,6 @@ set(BASE_C_FLAGS
 # C++ specific flags
 set(BASE_CXX_FLAGS
     ${BASE_C_FLAGS}
-    -Wold-style-cast     # Warn when using C-style casts instead of C++ casts
-    -Woverloaded-virtual # Warn if a derived class hides base class virtual functions
 )
 
 string(JOIN " " BASE_C_FLAGS_STR ${BASE_C_FLAGS})

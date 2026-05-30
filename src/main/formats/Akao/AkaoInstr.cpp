@@ -254,7 +254,6 @@ bool AkaoDrumKit::loadInstr() {
       rgn->addGeneralItem(rgn_offset + 6, 1, "Attenuation");
       const u8 raw_pan_reverb = readByte(rgn_offset + 7);
       const u8 pan = raw_pan_reverb & 0x7f;
-      const bool reverb = (raw_pan_reverb & 0x80) != 0;
       rgn->addGeneralItem(rgn_offset + 7, 1, "Pan & Reverb On/Off");
       rgn->setPan(pan);
       // TODO: set reverb on/off to the region
@@ -344,14 +343,14 @@ bool AkaoRgn::loadRgn() {
 // ************
 
 AkaoSampColl::AkaoSampColl(RawFile *file, u32 offset, AkaoPs1Version version, std::string name)
-    : VGMSampColl(AkaoFormat::name, file, offset, 0, std::move(name)), starting_art_id(0), sample_set_id(0),
-      version_(version), sample_section_size(0), nNumArts(0), arts_offset(0),
+    : VGMSampColl(AkaoFormat::name, file, offset, 0, std::move(name)), starting_art_id(0), ending_art_id(0),
+      nNumArts(0), sample_set_id(0), version_(version), sample_section_size(0), arts_offset(0),
       sample_section_offset(0) {
 }
 
 AkaoSampColl::AkaoSampColl(RawFile *file, AkaoInstrDatLocation file_location, std::string name)
-    : VGMSampColl(AkaoFormat::name, file, 0, 0, std::move(name)), starting_art_id(0), sample_set_id(0),
-      version_(AkaoPs1Version::VERSION_1_0), sample_section_size(0), nNumArts(0), arts_offset(0),
+    : VGMSampColl(AkaoFormat::name, file, 0, 0, std::move(name)), starting_art_id(0), ending_art_id(0),
+      nNumArts(0), sample_set_id(0), version_(AkaoPs1Version::VERSION_1_0), sample_section_size(0), arts_offset(0),
       sample_section_offset(0), file_location(file_location)
 {
   setOffset(file_location.instrAllOffset);

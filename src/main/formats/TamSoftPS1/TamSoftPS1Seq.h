@@ -12,11 +12,11 @@ class TamSoftPS1Seq:
     public VGMSeq {
  public:
   TamSoftPS1Seq(RawFile *file, u32 offset, u8 theSong, const std::string &name = "TamSoftPS1Seq");
-  virtual ~TamSoftPS1Seq();
+  ~TamSoftPS1Seq() override;
 
-  virtual bool parseHeader();
-  virtual bool parseTrackPointers();
-  virtual void resetVars();
+  bool parseHeader() override;
+  bool parseTrackPointers() override;
+  void resetVars() override;
 
  public:
   static const u16 PITCH_TABLE[73];
@@ -33,8 +33,8 @@ class TamSoftPS1Track
  public:
   TamSoftPS1Track(TamSoftPS1Seq *parentSeq, u32 offset);
 
-  virtual void resetVars();
-  virtual bool readEvent();
+  void resetVars() override;
+  bool readEvent() override;
 
  protected:
   void finalizeAllNotes();

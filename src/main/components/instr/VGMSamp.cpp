@@ -25,8 +25,8 @@ VGMSamp::VGMSamp(VGMSampColl *sampColl, u32 offset, u32 length, u32 dataOffset,
                  u32 dataLen, u8 nChannels, BPS bps, u32 rate,
                  std::string name)
     : VGMItem(sampColl->vgmFile(), offset, length, std::move(name), Type::Sample),
-      dataOff(dataOffset), dataLength(dataLen), m_bps(bps), rate(rate), channels(nChannels),
-      parSampColl(sampColl) {
+      dataOff(dataOffset), dataLength(dataLen), rate(rate), channels(nChannels),
+      parSampColl(sampColl), m_bps(bps) {
 }
 
 double VGMSamp::compressionRatio() const {

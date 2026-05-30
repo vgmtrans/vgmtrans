@@ -1,4 +1,5 @@
 add_executable(vgmtrans-shell)
+vgmtrans_enable_project_warnings(vgmtrans-shell)
 target_sources(vgmtrans-shell
   PRIVATE
     vgmtrans-shell.cpp
