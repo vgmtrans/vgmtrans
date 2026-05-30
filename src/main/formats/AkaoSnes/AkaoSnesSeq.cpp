@@ -1404,11 +1404,11 @@ bool AkaoSnesTrack::readEvent(void) {
       u16 fadeLength = readByte(curOffset++);
       u8 filterIndex = readByte(curOffset++);
 
-      addGenericEvent(beginOffset,
-                      curOffset - beginOffset,
-                      "Echo FIR Fade",
-                      fmt::format("Fade Length: {}  FIR: {}", fadeLength, vol),
-                      Type::Reverb);
+	      addGenericEvent(beginOffset,
+	                      curOffset - beginOffset,
+	                      "Echo FIR Fade",
+	                      fmt::format("Fade Length: {}  FIR: {}", fadeLength, filterIndex),
+	                      Type::Reverb);
       break;
     }
 
@@ -1422,21 +1422,22 @@ bool AkaoSnesTrack::readEvent(void) {
       break;
     }
 
-    case EVENT_ECHO_FIR: {
-      u8 filterIndex = readByte(curOffset++);
-      addGenericEvent(beginOffset,
-        curOffset - beginOffset,
-        "Echo FIR",
-        fmt::format("FIR: {}", vol),
-        Type::Reverb);
-      break;
+	    case EVENT_ECHO_FIR: {
+	      u8 filterIndex = readByte(curOffset++);
+	      addGenericEvent(beginOffset,
+	        curOffset - beginOffset,
+	        "Echo FIR",
+	        fmt::format("FIR: {}", filterIndex),
+	        Type::Reverb);
+	      break;
     }
 
-    case EVENT_CPU_CONTROLED_SET_VALUE: {
-      u8 value = readByte(curOffset++);
-      addUnknown(beginOffset, curOffset - beginOffset, "Set Value for CPU-Controlled Jump", desc);
-      break;
-    }
+	    case EVENT_CPU_CONTROLED_SET_VALUE: {
+	      u8 value = readByte(curOffset++);
+	      addUnknown(beginOffset, curOffset - beginOffset, "Set Value for CPU-Controlled Jump",
+	                 fmt::format("Value: {}", value));
+	      break;
+	    }
 
     case EVENT_CPU_CONTROLED_JUMP: {
       u16 dest = getShortAddress(curOffset);

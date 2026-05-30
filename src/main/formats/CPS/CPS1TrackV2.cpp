@@ -249,12 +249,12 @@ bool CPS1TrackV2::readEvent() {
         }
         addPitchBendAsPercent(beginOffset, curOffset-beginOffset, cents / 200.0);
         break;
-      }
-      case 0x0D : {
-        u8 portamentoRate = readByte(curOffset++);
-        addGenericEvent(beginOffset, curOffset - beginOffset, "Portamento Time", "", Type::PortamentoTime);
-        break;
-      }
+	      }
+	      case 0x0D : {
+	        curOffset++;
+	        addGenericEvent(beginOffset, curOffset - beginOffset, "Portamento Time", "", Type::PortamentoTime);
+	        break;
+	      }
 
       //loop
       case 0x0E :

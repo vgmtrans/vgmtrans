@@ -216,7 +216,7 @@ MoriSnesRgn::MoriSnesRgn(MoriSnesInstr *instr,
   u8 adsr1 = readByte(curOffset++);
   u8 adsr2 = readByte(curOffset++);
   u8 gain = readByte(curOffset++);
-  u8 keyOffDelay = readByte(curOffset++);
+  curOffset++;
   s8 key = readByte(curOffset++);
   u8 tuning = readByte(curOffset++);
 

@@ -201,8 +201,7 @@ void CPS1Scanner::loadCPS1(MAMEGame *gameentry, CPS1FormatVer fmt_ver) {
 
   // Create instrument transpose table
   std::vector<s8> instrTransposeTable;
-  if (opmInstrset && fmt_ver == CPS1_V425 || opmInstrset && fmt_ver == CPS1_V350 ||
-    opmInstrset && fmt_ver == CPS1_V100) {
+  if (opmInstrset && (fmt_ver == CPS1_V425 || fmt_ver == CPS1_V350 || fmt_ver == CPS1_V100)) {
     instrTransposeTable.reserve(opmInstrset->aInstrs.size());
     for (const auto instr : opmInstrset->aInstrs) {
       if (auto* opmInstr = dynamic_cast<CPS1OPMInstr<CPS1OPMInstrDataV4_25>*>(instr); opmInstr != nullptr) {

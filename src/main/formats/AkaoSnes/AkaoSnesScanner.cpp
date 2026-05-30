@@ -340,18 +340,14 @@ void AkaoSnesScanner::searchForAkaoSnesFromARAM(RawFile *file) {
 
   // search for note length table
   u32 ofsReadNoteLength;
-  u16 addrNoteLengthTable;
   AkaoSnesVersion verReadNoteLength;
   if (file->searchBytePattern(ptnReadNoteLengthV4, ofsReadNoteLength)) {
-    addrNoteLengthTable = file->readShort(ofsReadNoteLength + 6);
     verReadNoteLength = AKAOSNES_V4;
   }
   else if (file->searchBytePattern(ptnReadNoteLengthV2, ofsReadNoteLength)) {
-    addrNoteLengthTable = file->readShort(ofsReadNoteLength + 8);
     verReadNoteLength = AKAOSNES_V2;
   }
   else if (file->searchBytePattern(ptnReadNoteLengthV1, ofsReadNoteLength)) {
-    addrNoteLengthTable = file->readShort(ofsReadNoteLength + 8);
     verReadNoteLength = AKAOSNES_V1;
   }
   else {

@@ -88,5 +88,4 @@ class GraphResSnesTrack
 
   u8 loopStackPtr;
   s8 loopCount[GRAPHRESSNES_LOOP_LEVEL_MAX];
-  u16 loopEnd[GRAPHRESSNES_LOOP_LEVEL_MAX];
 };

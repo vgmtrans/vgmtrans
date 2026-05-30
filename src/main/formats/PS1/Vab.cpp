@@ -50,7 +50,6 @@ bool Vab::parseInstrPointers() {
   u32 offToneAttrs = offProgs + (16 * 128);
 
   u16 numPrograms = readShort(offset() + 0x12);
-  u16 numTones = readShort(offset() + 0x14);
   u16 numVAGs = readShort(offset() + 0x16);
 
   u32 offVAGOffsets = offToneAttrs + (32 * 16 * numPrograms);
@@ -117,7 +116,6 @@ bool Vab::parseInstrPointers() {
 
   if ((offVAGOffsets + 2 * 256) <= nEndOffset) {
     char name[256];
-    u32 totalVAGSize = 0;
     VGMHeader *vagOffsetHdr = addHeader(offVAGOffsets, 2 * 256, "VAG Pointer Table");
 
     u32 vagStartOffset = offVAGOffsets + 2 * 256;
@@ -132,7 +130,6 @@ bool Vab::parseInstrPointers() {
       auto absoluteVagOffset = vagStartOffset + vagOffset;
       if (absoluteVagOffset + vagSize <= nEndOffset) {
         m_vagLocations.emplace_back(vagOffset, vagSize);
-        totalVAGSize += vagSize;
       }
       else {
         L_WARN("VAG #{} pointer (offset=0x{:08X}, size={}) is invalid.", i, absoluteVagOffset, vagSize);

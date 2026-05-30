@@ -5,8 +5,6 @@
 #include "PSXSPU.h"
 #include "VGMSamp.h"
 
-const float defaultFFTReverbPercent = 0.5;
-
 /****************************************************************/
 /*																*/
 /*			Instrument Set		(Bank全体)						*/

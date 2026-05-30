@@ -229,7 +229,6 @@ bool CPS2InstrSet::parseInstrPointers() {
         instr_table_ptrs.push_back(readShort(offset() + i * 2));    //get the instr table ptrs
       }
     }
-    int totalInstrs = 0;
     for (u8 i = 0; i < instr_table_ptrs.size(); i++) {
 
       if (fmt_version == CPS3) {
@@ -277,7 +276,6 @@ bool CPS2InstrSet::parseInstrPointers() {
         auto name = fmt::format("Instrument {:d}", k);
         aInstrs.push_back(new CPS2Instr(this, j, instr_info_length, (i * 2) + (k / 128), (k % 128), name));
       }
-      totalInstrs += k;
     }
   }
   return true;

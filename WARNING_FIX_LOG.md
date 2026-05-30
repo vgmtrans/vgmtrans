@@ -20,3 +20,10 @@ This log records significant warning-policy and warning-fix changes made during 
 - Marked the PSX ADSR helper as `inline` because it is defined in a header included by multiple translation units.
 - Corrected mismatched `class`/`struct` forward declarations for AKAO articulation data and MAME metadata.
 - Removed an unused local reverb flag in AKAO drum-region parsing while preserving the UI annotation for the pan/reverb byte.
+
+## Parser And State Warning Cleanup
+
+- Replaced unused parser byte variables with explicit offset advancement when the data is only skipped, preserving event lengths and stream position without manufacturing dummy reads.
+- Removed private parser state fields and local constants that had no readers, including stale sequence-loop, heartbeat-key, PS1 scanner, and FFT reverb placeholders.
+- Added missing undefined-version handling in CPS switch statements so enum switches are exhaustive under the warning policy.
+- Preserved useful decoded values in event descriptions where the warning revealed that the parser was reading data but formatting a different field.

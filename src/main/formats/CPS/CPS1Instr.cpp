@@ -56,6 +56,8 @@ bool CPS1SampleInstrSet::parseInstrPointers() {
         aInstrs.push_back(instr);
       }
       break;
+    case CPS1_VERSION_UNDEFINED:
+      return false;
   }
   return true;
 }
@@ -69,8 +71,7 @@ CPS1SampColl::CPS1SampColl(RawFile *file,
                            u32 offset,
                            u32 length,
                            std::string name)
-    : VGMSampColl(CPS1Format::name, file, offset, length, std::move(name)),
-      instrset(theinstrset) {
+    : VGMSampColl(CPS1Format::name, file, offset, length, std::move(name)) {
 }
 
 
@@ -148,6 +149,8 @@ bool CPS1OPMInstrSet::parseInstrPointers() {
     case CPS1_V425:
       instrSize = sizeof(CPS1OPMInstrDataV4_25);
       break;
+    case CPS1_VERSION_UNDEFINED:
+      return false;
   }
   numInstrs = std::min(length() / static_cast<u32>(instrSize), 128U);
 
@@ -211,6 +214,8 @@ bool CPS1OPMInstrSet::parseInstrPointers() {
         instr->addChild(new VGMItem(this, instrOff+36, 4, "D1L_RR"));
         break;
       }
+      case CPS1_VERSION_UNDEFINED:
+        return false;
     }
   }
   return true;

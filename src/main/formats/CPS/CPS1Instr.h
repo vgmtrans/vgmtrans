@@ -44,8 +44,6 @@ public:
   bool parseSampleInfo() override;
 
 private:
-  std::vector<VGMItem*> samplePointers;
-  CPS1SampleInstrSet *instrset;
 };
 
 

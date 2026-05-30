@@ -91,7 +91,6 @@ void RareSnesInstrSet::ScanAvailableInstruments() {
     }
 
     u16 addrSampStart = readShort(offDirEnt);
-    u16 addrSampLoop = readShort(offDirEnt + 2);
     // not in DIR table
     if (addrSampStart < spcDirAddr + (inst * 4)) {
       continue;

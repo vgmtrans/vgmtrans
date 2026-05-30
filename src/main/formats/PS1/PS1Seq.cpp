@@ -26,7 +26,6 @@ bool PS1Seq::parseHeader() {
   nNumTracks = 16;
 
   u8 numer = readByte(offset() + 0x0D);
-  u8 denom = readByte(offset() + 0x0E);
   if (numer == 0 || numer > 32)                //sanity check
     return false;
 

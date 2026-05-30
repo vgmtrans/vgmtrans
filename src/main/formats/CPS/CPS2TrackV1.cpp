@@ -403,7 +403,7 @@ bool CPS2TrackV1::readEvent() {
         break;
 
       case 0x1A : {
-        u8 masterVol = readByte(curOffset++);
+        curOffset++;
         addGenericEvent(beginOffset, curOffset - beginOffset, "Master Volume", "", Type::Unknown);
         // addMasterVol(beginOffset, curOffset-beginOffset, masterVol);
         break;

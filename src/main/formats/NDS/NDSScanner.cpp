@@ -259,7 +259,6 @@ u32 NDSScanner::loadFromSDAT(RawFile *file, u32 baseOff) {
         }
       }
       
-      NDSInstrSet *instrset = BNKs[bnkIndex].second;
       coll->addSampColl(psg_sampcoll);
       coll->addInstrSet(BNKs[bnkIndex].second);
       for (int j = 0; j < 4; j++) {

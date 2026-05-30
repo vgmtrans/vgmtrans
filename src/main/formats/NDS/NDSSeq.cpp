@@ -39,20 +39,15 @@ bool NDSSeq::parseTrackPointers(void) {
     TrkPtrs->addChild(off, 3, "Valid Tracks");
     off += 3;    //but all we need to do is check for subsequent 0x93 track pointer events
     b = readByte(off);
-    u32 songDelay = 0;
 
     while (b == 0x80) {
-      u32 value;
       u8 c;
       u32 beginOffset = off;
       off++;
-      if ((value = readByte(off++)) & 0x80) {
-        value &= 0x7F;
-        do {
-          value = (value << 7) + ((c = readByte(off++)) & 0x7F);
-        } while (c & 0x80);
+      c = readByte(off++);
+      while (c & 0x80) {
+        c = readByte(off++);
       }
-      songDelay += value;
       TrkPtrs->addChild(beginOffset, off - beginOffset, "Delay");
       //songDelay += SeqTrack::ReadVarLen(++offset);
       b = readByte(off);
@@ -143,25 +138,14 @@ bool NDSTrack::readEvent(void) {
 
       // [loveemu] (ex: Hanjuku Hero DS: NSE_45, New Mario Bros: BGM_AMB_CHIKA, Slime Morimori Dragon Quest 2: SE_187, SE_210, Advance Wars)
       case 0xA0: {
-        u8 subStatusByte;
-        s16 randMin;
-        s16 randMax;
-
-        subStatusByte = readByte(curOffset++);
-        randMin = (signed) readShort(curOffset);
-        curOffset += 2;
-        randMax = (signed) readShort(curOffset);
-        curOffset += 2;
-
+        curOffset += 5;
         addUnknown(beginOffset, curOffset - beginOffset, "Cmd with Random Value");
         break;
       }
 
       // [loveemu] (ex: New Mario Bros: BGM_AMB_SABAKU)
       case 0xA1: {
-        u8 subStatusByte = readByte(curOffset++);
-        u8 varNumber = readByte(curOffset++);
-
+        curOffset += 2;
         addUnknown(beginOffset, curOffset - beginOffset, "Cmd with Variable");
         break;
       }
@@ -184,18 +168,13 @@ bool NDSTrack::readEvent(void) {
       case 0xBB: // [loveemu]
       case 0xBC: // [loveemu]
       case 0xBD: {
-        u8 varNumber;
-        s16 val;
         const char* eventName[] = {
             "Set Variable", "Add Variable", "Sub Variable", "Mul Variable", "Div Variable",
             "Shift Vabiable", "Rand Variable", "", "If Variable ==", "If Variable >=",
             "If Variable >", "If Variable <=", "If Variable <", "If Variable !="
         };
 
-        varNumber = readByte(curOffset++);
-        val = readShort(curOffset);
-        curOffset += 2;
-
+        curOffset += 3;
         addUnknown(beginOffset, curOffset - beginOffset, eventName[status_byte - 0xB0]);
         break;
       }
@@ -213,7 +192,7 @@ bool NDSTrack::readEvent(void) {
 
       // [loveemu] (ex: Castlevania Dawn of Sorrow: SDL_BGM_BOSS1_)
       case 0xC2: {
-        u8 mvol = readByte(curOffset++);
+        curOffset++;
         addUnknown(beginOffset, curOffset - beginOffset, "Master Volume");
         break;
       }

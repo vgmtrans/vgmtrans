@@ -21,7 +21,6 @@ class HeartBeatPS1Seq:
   bool readEvent() override;
 
  private:
-  u8 key;
   u32 seqHeaderOffset;
   u8 runningStatus;
 };
