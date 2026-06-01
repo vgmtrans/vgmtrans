@@ -111,16 +111,15 @@ void initializeSeqDefinition(NinSnesSeqDefinition& definition, const NinSnesProf
     definition.eventMap[static_cast<u8>(statusByte)] = EVENT_NOTE_PARAM;
   }
 
-  for (int statusByte = definition.status.noteMin; statusByte <= definition.status.noteMax;
-       statusByte++) {
+  for (int statusByte = definition.status.noteMin; statusByte <= definition.status.noteMax; statusByte++) {
     definition.eventMap[static_cast<u8>(statusByte)] = EVENT_NOTE;
   }
 
   definition.eventMap[definition.status.noteMax + 1] = EVENT_TIE;
   definition.eventMap[definition.status.noteMax + 2] = EVENT_REST;
 
-  for (int statusByte = definition.status.percussionNoteMin;
-       statusByte <= definition.status.percussionNoteMax; statusByte++) {
+  for (int statusByte = definition.status.percussionNoteMin; statusByte <= definition.status.percussionNoteMax;
+       statusByte++) {
     definition.eventMap[static_cast<u8>(statusByte)] = EVENT_PERCUSSION_NOTE;
   }
 }
@@ -255,6 +254,24 @@ void applyBaseSeqDialect(NinSnesSeqDefinition& definition, const NinSnesProfile&
 
 void applyDerivedSeqOverrides(NinSnesSeqDefinition& definition, const NinSnesProfile& profile) {
   switch (profile.id) {
+    case NinSnesProfileId::AddmusicK:
+      definition.eventMap[0xe6] = EVENT_ADDMUSICK_SUBLOOP;
+      definition.eventMap[0xed] = EVENT_ADDMUSICK_ADSR_GAIN;
+      definition.eventMap[0xf3] = EVENT_ADDMUSICK_SAMPLE_LOAD;
+      definition.eventMap[0xf4] = EVENT_ADDMUSICK_OPTION;
+      definition.eventMap[0xf5] = EVENT_ADDMUSICK_FIR_FILTER;
+      definition.eventMap[0xf6] = EVENT_ADDMUSICK_DSP_WRITE;
+      definition.eventMap[0xf7] = EVENT_ADDMUSICK_DATA_WRITE;
+      definition.eventMap[0xf8] = EVENT_ADDMUSICK_NOISE;
+      definition.eventMap[0xf9] = EVENT_ADDMUSICK_DATA_SEND;
+      definition.eventMap[0xfa] = EVENT_ADDMUSICK_EXTENDED;
+      definition.eventMap[0xfb] = EVENT_ADDMUSICK_ARPEGGIO;
+      definition.eventMap[0xfc] = EVENT_ADDMUSICK_REMOTE_COMMAND;
+      definition.eventMap[0xfd] = EVENT_TREMOLO_OFF;
+      definition.eventMap[0xfe] = EVENT_PITCH_ENVELOPE_OFF;
+      definition.eventMap[0xff] = EVENT_UNKNOWN0;
+      break;
+
     case NinSnesProfileId::Rd1:
       definition.eventMap[0xfb] = EVENT_UNKNOWN2;
       definition.eventMap[0xfc] = EVENT_UNKNOWN0;
@@ -337,108 +354,96 @@ constexpr NinSnesProfile kUnknownProfile{
     NinSnesIntelliModeId::None,
 };
 
-constexpr std::array<NinSnesProfile, 17> kProfiles{{
-    {NinSnesProfileId::Earlier, "Earlier", NinSnesBaseProfileId::Earlier,
-     NinSnesAddressModelId::Direct, NinSnesPlaylistModelId::Standard,
-     NinSnesNoteParamModelId::Standard, NinSnesProgramResolverId::StandardPercussion,
+constexpr std::array<NinSnesProfile, 18> kProfiles{{
+    {NinSnesProfileId::Earlier, "Earlier", NinSnesBaseProfileId::Earlier, NinSnesAddressModelId::Direct,
+     NinSnesPlaylistModelId::Standard, NinSnesNoteParamModelId::Standard, NinSnesProgramResolverId::StandardPercussion,
      NinSnesPanModelId::StandardTable, NinSnesInstrumentLayoutId::Earlier5Byte,
      NinSnesInstrTableAddressModelId::Standard, NinSnesIntelliModeId::None},
 
-    {NinSnesProfileId::Standard, "Standard", NinSnesBaseProfileId::Standard,
-     NinSnesAddressModelId::Direct, NinSnesPlaylistModelId::Standard,
-     NinSnesNoteParamModelId::Standard, NinSnesProgramResolverId::StandardPercussion,
+    {NinSnesProfileId::AddmusicK, "AddmusicK", NinSnesBaseProfileId::Earlier, NinSnesAddressModelId::Direct,
+     NinSnesPlaylistModelId::Standard, NinSnesNoteParamModelId::Standard, NinSnesProgramResolverId::StandardPercussion,
      NinSnesPanModelId::StandardTable, NinSnesInstrumentLayoutId::Standard6Byte,
      NinSnesInstrTableAddressModelId::Standard, NinSnesIntelliModeId::None},
 
-    {NinSnesProfileId::Rd1, "RD1", NinSnesBaseProfileId::Standard,
-     NinSnesAddressModelId::Direct, NinSnesPlaylistModelId::Standard,
-     NinSnesNoteParamModelId::Standard, NinSnesProgramResolverId::StandardPercussion,
+    {NinSnesProfileId::Standard, "Standard", NinSnesBaseProfileId::Standard, NinSnesAddressModelId::Direct,
+     NinSnesPlaylistModelId::Standard, NinSnesNoteParamModelId::Standard, NinSnesProgramResolverId::StandardPercussion,
      NinSnesPanModelId::StandardTable, NinSnesInstrumentLayoutId::Standard6Byte,
      NinSnesInstrTableAddressModelId::Standard, NinSnesIntelliModeId::None},
 
-    {NinSnesProfileId::Rd2, "RD2", NinSnesBaseProfileId::Standard,
-     NinSnesAddressModelId::Direct, NinSnesPlaylistModelId::Standard,
-     NinSnesNoteParamModelId::Standard, NinSnesProgramResolverId::StandardPercussion,
+    {NinSnesProfileId::Rd1, "RD1", NinSnesBaseProfileId::Standard, NinSnesAddressModelId::Direct,
+     NinSnesPlaylistModelId::Standard, NinSnesNoteParamModelId::Standard, NinSnesProgramResolverId::StandardPercussion,
      NinSnesPanModelId::StandardTable, NinSnesInstrumentLayoutId::Standard6Byte,
      NinSnesInstrTableAddressModelId::Standard, NinSnesIntelliModeId::None},
 
-    {NinSnesProfileId::Hal, "HAL", NinSnesBaseProfileId::Standard,
-     NinSnesAddressModelId::Direct, NinSnesPlaylistModelId::Standard,
-     NinSnesNoteParamModelId::Standard, NinSnesProgramResolverId::StandardPercussion,
-     NinSnesPanModelId::HalTable, NinSnesInstrumentLayoutId::Standard6Byte,
+    {NinSnesProfileId::Rd2, "RD2", NinSnesBaseProfileId::Standard, NinSnesAddressModelId::Direct,
+     NinSnesPlaylistModelId::Standard, NinSnesNoteParamModelId::Standard, NinSnesProgramResolverId::StandardPercussion,
+     NinSnesPanModelId::StandardTable, NinSnesInstrumentLayoutId::Standard6Byte,
      NinSnesInstrTableAddressModelId::Standard, NinSnesIntelliModeId::None},
 
-    {NinSnesProfileId::Konami, "Konami", NinSnesBaseProfileId::Standard,
-     NinSnesAddressModelId::KonamiBase, NinSnesPlaylistModelId::Standard,
-     NinSnesNoteParamModelId::Standard, NinSnesProgramResolverId::StandardPercussion,
+    {NinSnesProfileId::Hal, "HAL", NinSnesBaseProfileId::Standard, NinSnesAddressModelId::Direct,
+     NinSnesPlaylistModelId::Standard, NinSnesNoteParamModelId::Standard, NinSnesProgramResolverId::StandardPercussion,
+     NinSnesPanModelId::HalTable, NinSnesInstrumentLayoutId::Standard6Byte, NinSnesInstrTableAddressModelId::Standard,
+     NinSnesIntelliModeId::None},
+
+    {NinSnesProfileId::Konami, "Konami", NinSnesBaseProfileId::Standard, NinSnesAddressModelId::KonamiBase,
+     NinSnesPlaylistModelId::Standard, NinSnesNoteParamModelId::Standard, NinSnesProgramResolverId::StandardPercussion,
      NinSnesPanModelId::StandardTable, NinSnesInstrumentLayoutId::KonamiTuningTable,
      NinSnesInstrTableAddressModelId::Standard, NinSnesIntelliModeId::None},
 
-    {NinSnesProfileId::Lemmings, "Lemmings", NinSnesBaseProfileId::Standard,
-     NinSnesAddressModelId::Direct, NinSnesPlaylistModelId::Standard,
-     NinSnesNoteParamModelId::Lemmings, NinSnesProgramResolverId::StandardPercussion,
+    {NinSnesProfileId::Lemmings, "Lemmings", NinSnesBaseProfileId::Standard, NinSnesAddressModelId::Direct,
+     NinSnesPlaylistModelId::Standard, NinSnesNoteParamModelId::Lemmings, NinSnesProgramResolverId::StandardPercussion,
      NinSnesPanModelId::StandardTable, NinSnesInstrumentLayoutId::Standard6Byte,
      NinSnesInstrTableAddressModelId::Standard, NinSnesIntelliModeId::None},
 
     {NinSnesProfileId::IntelliFe3, "Intelligent Systems FE3", NinSnesBaseProfileId::Intelli,
-     NinSnesAddressModelId::Direct, NinSnesPlaylistModelId::Standard,
-     NinSnesNoteParamModelId::IntelliTable, NinSnesProgramResolverId::Direct,
-     NinSnesPanModelId::StandardTable, NinSnesInstrumentLayoutId::Standard6Byte,
+     NinSnesAddressModelId::Direct, NinSnesPlaylistModelId::Standard, NinSnesNoteParamModelId::IntelliTable,
+     NinSnesProgramResolverId::Direct, NinSnesPanModelId::StandardTable, NinSnesInstrumentLayoutId::Standard6Byte,
      NinSnesInstrTableAddressModelId::Standard, NinSnesIntelliModeId::Fe3},
 
     {NinSnesProfileId::IntelliTa, "Intelligent Systems TA", NinSnesBaseProfileId::Intelli,
-     NinSnesAddressModelId::Direct, NinSnesPlaylistModelId::Standard,
-     NinSnesNoteParamModelId::Standard, NinSnesProgramResolverId::IntelliTaOverride,
-     NinSnesPanModelId::StandardTable, NinSnesInstrumentLayoutId::Standard6Byte,
-     NinSnesInstrTableAddressModelId::Standard, NinSnesIntelliModeId::Ta},
+     NinSnesAddressModelId::Direct, NinSnesPlaylistModelId::Standard, NinSnesNoteParamModelId::Standard,
+     NinSnesProgramResolverId::IntelliTaOverride, NinSnesPanModelId::StandardTable,
+     NinSnesInstrumentLayoutId::Standard6Byte, NinSnesInstrTableAddressModelId::Standard, NinSnesIntelliModeId::Ta},
 
     {NinSnesProfileId::IntelliFe4, "Intelligent Systems FE4", NinSnesBaseProfileId::Intelli,
-     NinSnesAddressModelId::Direct, NinSnesPlaylistModelId::Standard,
-     NinSnesNoteParamModelId::IntelliTable, NinSnesProgramResolverId::Direct,
-     NinSnesPanModelId::StandardTable, NinSnesInstrumentLayoutId::Standard6Byte,
+     NinSnesAddressModelId::Direct, NinSnesPlaylistModelId::Standard, NinSnesNoteParamModelId::IntelliTable,
+     NinSnesProgramResolverId::Direct, NinSnesPanModelId::StandardTable, NinSnesInstrumentLayoutId::Standard6Byte,
      NinSnesInstrTableAddressModelId::Standard, NinSnesIntelliModeId::Fe4},
 
-    {NinSnesProfileId::Human, "Human", NinSnesBaseProfileId::Standard,
-     NinSnesAddressModelId::Direct, NinSnesPlaylistModelId::Standard,
-     NinSnesNoteParamModelId::Standard, NinSnesProgramResolverId::Direct,
-     NinSnesPanModelId::StandardTable, NinSnesInstrumentLayoutId::Standard6Byte,
-     NinSnesInstrTableAddressModelId::Human, NinSnesIntelliModeId::None},
+    {NinSnesProfileId::Human, "Human", NinSnesBaseProfileId::Standard, NinSnesAddressModelId::Direct,
+     NinSnesPlaylistModelId::Standard, NinSnesNoteParamModelId::Standard, NinSnesProgramResolverId::Direct,
+     NinSnesPanModelId::StandardTable, NinSnesInstrumentLayoutId::Standard6Byte, NinSnesInstrTableAddressModelId::Human,
+     NinSnesIntelliModeId::None},
 
-    {NinSnesProfileId::Tose, "TOSE", NinSnesBaseProfileId::Standard,
-     NinSnesAddressModelId::Direct, NinSnesPlaylistModelId::Tose,
-     NinSnesNoteParamModelId::Standard, NinSnesProgramResolverId::StandardPercussion,
-     NinSnesPanModelId::ToseLinear, NinSnesInstrumentLayoutId::Standard6Byte,
-     NinSnesInstrTableAddressModelId::Tose, NinSnesIntelliModeId::None},
+    {NinSnesProfileId::Tose, "TOSE", NinSnesBaseProfileId::Standard, NinSnesAddressModelId::Direct,
+     NinSnesPlaylistModelId::Tose, NinSnesNoteParamModelId::Standard, NinSnesProgramResolverId::StandardPercussion,
+     NinSnesPanModelId::ToseLinear, NinSnesInstrumentLayoutId::Standard6Byte, NinSnesInstrTableAddressModelId::Tose,
+     NinSnesIntelliModeId::None},
 
-    {NinSnesProfileId::QuintetActR, "Quintet ActRaiser", NinSnesBaseProfileId::Standard,
-     NinSnesAddressModelId::Direct, NinSnesPlaylistModelId::Standard,
-     NinSnesNoteParamModelId::Standard, NinSnesProgramResolverId::QuintetActRBase,
+    {NinSnesProfileId::QuintetActR, "Quintet ActRaiser", NinSnesBaseProfileId::Standard, NinSnesAddressModelId::Direct,
+     NinSnesPlaylistModelId::Standard, NinSnesNoteParamModelId::Standard, NinSnesProgramResolverId::QuintetActRBase,
      NinSnesPanModelId::StandardTable, NinSnesInstrumentLayoutId::Standard6Byte,
      NinSnesInstrTableAddressModelId::Standard, NinSnesIntelliModeId::None},
 
     {NinSnesProfileId::QuintetActR2, "Quintet ActRaiser 2", NinSnesBaseProfileId::Standard,
-     NinSnesAddressModelId::Direct, NinSnesPlaylistModelId::Standard,
-     NinSnesNoteParamModelId::Standard, NinSnesProgramResolverId::QuintetLookup,
-     NinSnesPanModelId::StandardTable, NinSnesInstrumentLayoutId::Standard6Byte,
-     NinSnesInstrTableAddressModelId::Standard, NinSnesIntelliModeId::None},
+     NinSnesAddressModelId::Direct, NinSnesPlaylistModelId::Standard, NinSnesNoteParamModelId::Standard,
+     NinSnesProgramResolverId::QuintetLookup, NinSnesPanModelId::StandardTable,
+     NinSnesInstrumentLayoutId::Standard6Byte, NinSnesInstrTableAddressModelId::Standard, NinSnesIntelliModeId::None},
 
     {NinSnesProfileId::QuintetIog, "Quintet Illusion of Gaia", NinSnesBaseProfileId::Standard,
-     NinSnesAddressModelId::Direct, NinSnesPlaylistModelId::Standard,
-     NinSnesNoteParamModelId::Standard, NinSnesProgramResolverId::QuintetLookup,
-     NinSnesPanModelId::StandardTable, NinSnesInstrumentLayoutId::Standard6Byte,
-     NinSnesInstrTableAddressModelId::Standard, NinSnesIntelliModeId::None},
+     NinSnesAddressModelId::Direct, NinSnesPlaylistModelId::Standard, NinSnesNoteParamModelId::Standard,
+     NinSnesProgramResolverId::QuintetLookup, NinSnesPanModelId::StandardTable,
+     NinSnesInstrumentLayoutId::Standard6Byte, NinSnesInstrTableAddressModelId::Standard, NinSnesIntelliModeId::None},
 
-    {NinSnesProfileId::QuintetTs, "Quintet Terranigma", NinSnesBaseProfileId::Standard,
-     NinSnesAddressModelId::Direct, NinSnesPlaylistModelId::Standard,
-     NinSnesNoteParamModelId::Standard, NinSnesProgramResolverId::QuintetLookup,
+    {NinSnesProfileId::QuintetTs, "Quintet Terranigma", NinSnesBaseProfileId::Standard, NinSnesAddressModelId::Direct,
+     NinSnesPlaylistModelId::Standard, NinSnesNoteParamModelId::Standard, NinSnesProgramResolverId::QuintetLookup,
      NinSnesPanModelId::StandardTable, NinSnesInstrumentLayoutId::Standard6Byte,
      NinSnesInstrTableAddressModelId::Standard, NinSnesIntelliModeId::None},
 
     {NinSnesProfileId::FalcomYs4, "Falcom Ys IV", NinSnesBaseProfileId::Standard,
-     NinSnesAddressModelId::FalcomBaseOffset, NinSnesPlaylistModelId::Standard,
-     NinSnesNoteParamModelId::Standard, NinSnesProgramResolverId::StandardPercussion,
-     NinSnesPanModelId::StandardTable, NinSnesInstrumentLayoutId::Standard6Byte,
-     NinSnesInstrTableAddressModelId::Standard, NinSnesIntelliModeId::None},
+     NinSnesAddressModelId::FalcomBaseOffset, NinSnesPlaylistModelId::Standard, NinSnesNoteParamModelId::Standard,
+     NinSnesProgramResolverId::StandardPercussion, NinSnesPanModelId::StandardTable,
+     NinSnesInstrumentLayoutId::Standard6Byte, NinSnesInstrTableAddressModelId::Standard, NinSnesIntelliModeId::None},
 }};
 
 }  // namespace
@@ -452,8 +457,7 @@ const NinSnesProfile& getNinSnesProfile(NinSnesProfileId id) {
 
   return kUnknownProfile;
 }
-u16 convertNinSnesAddress(const NinSnesProfile& profile, u16 rawAddress,
-                               u16 konamiBaseAddress, u16 falcomBaseOffset) {
+u16 convertNinSnesAddress(const NinSnesProfile& profile, u16 rawAddress, u16 konamiBaseAddress, u16 falcomBaseOffset) {
   switch (profile.addressModel) {
     case NinSnesAddressModelId::KonamiBase:
       return static_cast<u16>(konamiBaseAddress + rawAddress);
@@ -467,10 +471,9 @@ u16 convertNinSnesAddress(const NinSnesProfile& profile, u16 rawAddress,
   }
 }
 
-u16 readNinSnesAddress(const NinSnesProfile& profile, const RawFile* file, u32 offset,
-                            u16 konamiBaseAddress, u16 falcomBaseOffset) {
-  return convertNinSnesAddress(profile, file->readShort(offset), konamiBaseAddress,
-                               falcomBaseOffset);
+u16 readNinSnesAddress(const NinSnesProfile& profile, const RawFile* file, u32 offset, u16 konamiBaseAddress,
+                       u16 falcomBaseOffset) {
+  return convertNinSnesAddress(profile, file->readShort(offset), konamiBaseAddress, falcomBaseOffset);
 }
 
 u32 getNinSnesInstrumentHeaderSize(const NinSnesProfile& profile) {
@@ -485,8 +488,7 @@ u16 getNinSnesInstrumentSlotCount(const NinSnesProfile& profile) {
   return 0x80;
 }
 
-bool isBlankNinSnesInstrumentSlot(const NinSnesProfile& profile, const RawFile* file,
-                                  u32 addrInstrHeader) {
+bool isBlankNinSnesInstrumentSlot(const NinSnesProfile& profile, const RawFile* file, u32 addrInstrHeader) {
   const u32 instrItemSize = getNinSnesInstrumentHeaderSize(profile);
   if (addrInstrHeader + instrItemSize > 0x10000) {
     return false;
@@ -506,9 +508,8 @@ bool isBlankNinSnesInstrumentSlot(const NinSnesProfile& profile, const RawFile* 
   return allZero || allFF;
 }
 
-bool isValidNinSnesInstrumentHeader(const NinSnesProfile& profile, const RawFile* file,
-                                    u32 addrInstrHeader, u32 spcDirAddr,
-                                    bool validateSample) {
+bool isValidNinSnesInstrumentHeader(const NinSnesProfile& profile, const RawFile* file, u32 addrInstrHeader,
+                                    u32 spcDirAddr, bool validateSample) {
   const u32 instrItemSize = getNinSnesInstrumentHeaderSize(profile);
   if (addrInstrHeader + instrItemSize > 0x10000) {
     return false;
@@ -516,8 +517,7 @@ bool isValidNinSnesInstrumentHeader(const NinSnesProfile& profile, const RawFile
 
   std::vector<u8> instrHeader(instrItemSize);
   file->readBytes(addrInstrHeader, instrItemSize, instrHeader.data());
-  if (std::all_of(instrHeader.cbegin(), instrHeader.cend(),
-                  [](u8 b) { return b == 0x00 || b == 0xFF; })) {
+  if (std::all_of(instrHeader.cbegin(), instrHeader.cend(), [](u8 b) { return b == 0x00 || b == 0xFF; })) {
     return false;
   }
 
@@ -543,25 +543,21 @@ bool isValidNinSnesInstrumentHeader(const NinSnesProfile& profile, const RawFile
 }
 
 bool requiresNinSnesSampleStartAfterDirEntry(const NinSnesProfile& profile) {
-  return profile.baseProfile == NinSnesBaseProfileId::Earlier ||
-         profile.id == NinSnesProfileId::Standard;
+  return profile.baseProfile == NinSnesBaseProfileId::Earlier || profile.id == NinSnesProfileId::Standard;
 }
 
 bool loadsFullNinSnesSampleDirectory(const NinSnesProfile& profile) {
   return profile.intelliMode == NinSnesIntelliModeId::Ta;
 }
 
-u32 resolveNinSnesProgramNumber(const NinSnesProfile& profile, const RawFile* file,
-                                     u8 instrumentByte, u8 percussionStatusMin,
-                                     u8 percussionBase, u8 quintetBgmInstrBase,
-                                     u16 quintetInstrLookupAddr,
-                                     const std::array<u32, 0x80>* intelliInstrumentProgramMap,
-                                     u8* logicalProgram) {
+u32 resolveNinSnesProgramNumber(const NinSnesProfile& profile, const RawFile* file, u8 instrumentByte,
+                                u8 percussionStatusMin, u8 percussionBase, u8 quintetBgmInstrBase,
+                                u16 quintetInstrLookupAddr, const std::array<u32, 0x80>* intelliInstrumentProgramMap,
+                                u8* logicalProgram) {
   u8 resolvedLogicalProgram = instrumentByte;
 
   if (profile.programResolver != NinSnesProgramResolverId::Direct && instrumentByte >= 0x80) {
-    resolvedLogicalProgram =
-        static_cast<u8>((instrumentByte - percussionStatusMin) + percussionBase);
+    resolvedLogicalProgram = static_cast<u8>((instrumentByte - percussionStatusMin) + percussionBase);
   }
 
   switch (profile.programResolver) {
@@ -587,8 +583,7 @@ u32 resolveNinSnesProgramNumber(const NinSnesProfile& profile, const RawFile* fi
   }
 
   if (profile.programResolver == NinSnesProgramResolverId::IntelliTaOverride &&
-      intelliInstrumentProgramMap != nullptr &&
-      resolvedLogicalProgram < intelliInstrumentProgramMap->size()) {
+      intelliInstrumentProgramMap != nullptr && resolvedLogicalProgram < intelliInstrumentProgramMap->size()) {
     return (*intelliInstrumentProgramMap)[resolvedLogicalProgram];
   }
 
@@ -597,19 +592,16 @@ u32 resolveNinSnesProgramNumber(const NinSnesProfile& profile, const RawFile* fi
 
 bool usesNinSnesIntelliCustomPercTable(const NinSnesProfile& profile, bool runtimeCustomPercTable,
                                        u8 intelliPercFlags) {
-  if (profile.intelliMode == NinSnesIntelliModeId::Ta ||
-      profile.intelliMode == NinSnesIntelliModeId::Fe4) {
+  if (profile.intelliMode == NinSnesIntelliModeId::Ta || profile.intelliMode == NinSnesIntelliModeId::Fe4) {
     return (intelliPercFlags & 0x40) != 0;
   }
 
   return runtimeCustomPercTable;
 }
 
-void setNinSnesIntelliCustomPercTableEnabled(const NinSnesProfile& profile, bool enabled,
-                                             bool& runtimeCustomPercTable,
+void setNinSnesIntelliCustomPercTableEnabled(const NinSnesProfile& profile, bool enabled, bool& runtimeCustomPercTable,
                                              u8& intelliPercFlags) {
-  if (profile.intelliMode == NinSnesIntelliModeId::Ta ||
-      profile.intelliMode == NinSnesIntelliModeId::Fe4) {
+  if (profile.intelliMode == NinSnesIntelliModeId::Ta || profile.intelliMode == NinSnesIntelliModeId::Fe4) {
     if (enabled) {
       intelliPercFlags |= 0x40;
     } else {
@@ -621,8 +613,7 @@ void setNinSnesIntelliCustomPercTableEnabled(const NinSnesProfile& profile, bool
   runtimeCustomPercTable = enabled;
 }
 
-u8 readNinSnesPanTable(const NinSnesProfile& profile, const std::vector<u8>& panTable,
-                            u16 pan) {
+u8 readNinSnesPanTable(const NinSnesProfile& profile, const std::vector<u8>& panTable, u16 pan) {
   if (profile.panModel == NinSnesPanModelId::ToseLinear) {
     return 0;
   }
@@ -647,8 +638,8 @@ u8 readNinSnesPanTable(const NinSnesProfile& profile, const std::vector<u8>& pan
   return volumeRate;
 }
 
-void getNinSnesVolumeBalance(const NinSnesProfile& profile, const std::vector<u8>& panTable,
-                             u16 pan, double& volumeLeft, double& volumeRight) {
+void getNinSnesVolumeBalance(const NinSnesProfile& profile, const std::vector<u8>& panTable, u16 pan,
+                             double& volumeLeft, double& volumeRight) {
   u8 panIndex = pan >> 8;
   if (profile.panModel == NinSnesPanModelId::ToseLinear) {
     if (panIndex <= 10) {
@@ -693,10 +684,8 @@ NinSnesPanState decodeNinSnesPanValue(const NinSnesProfile& profile, u8 pan) {
   };
 }
 
-NinSnesSeqDefinition buildNinSnesSeqDefinition(NinSnesProfileId profileId,
-                                               const std::vector<u8>& volumeTable,
-                                               const std::vector<u8>& durRateTable,
-                                               const std::vector<u8>& panTable,
+NinSnesSeqDefinition buildNinSnesSeqDefinition(NinSnesProfileId profileId, const std::vector<u8>& volumeTable,
+                                               const std::vector<u8>& durRateTable, const std::vector<u8>& panTable,
                                                const std::vector<u8>& intelliDurVolTable) {
   const auto& profile = getNinSnesProfile(profileId);
   NinSnesSeqDefinition definition;

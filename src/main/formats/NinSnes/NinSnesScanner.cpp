@@ -8,7 +8,9 @@
 #include "NinSnesInstr.h"
 #include "NinSnesSeq.h"
 #include "ScannerManager.h"
+#include "SNESDSP.h"
 
+#include <algorithm>
 #include <array>
 #include <optional>
 
@@ -40,6 +42,17 @@ struct NinSnesInstrumentProbeInfo {
   u16 dirAddress = 0;
 };
 
+struct NinSnesAddmusicKCustomInstrInfo {
+  u32 tableAddress = 0;
+  u8 baseInstrument = 0;
+  u8 count = 0;
+};
+
+struct NinSnesDirProbeInfo {
+  u16 address = 0;
+  u8 score = 0;
+};
+
 template <size_t N>
 bool matchNinSnesByteTable(RawFile* file, u16 offset, const std::array<u8, N>& table) {
   return file->matchBytes(table.data(), offset, table.size());
@@ -54,12 +67,60 @@ std::vector<u8> readNinSnesByteTable(RawFile* file, u16 address, u8 length) {
   return table;
 }
 
-u8 countNinSnesVoiceCommands(u8 firstVoiceCmd, u16 addressTable,
-                                  u16 lengthTable) {
+u8 countNinSnesVoiceCommands(u8 firstVoiceCmd, u16 addressTable, u16 lengthTable) {
   if (addressTable < lengthTable && addressTable + (0x100 - firstVoiceCmd) * 2 >= lengthTable) {
     return static_cast<u8>((lengthTable - addressTable) / 2);
   }
   return 0;
+}
+
+NinSnesDirProbeInfo scoreNinSnesDirAddress(RawFile* file, NinSnesProfileId profileId, u32 instrTableAddress,
+                                           u16 dirAddress) {
+  const auto& profile = getNinSnesProfile(profileId);
+  const u32 instrItemSize = NinSnesInstr::expectedSize(profileId);
+  NinSnesDirProbeInfo info{dirAddress, 0};
+
+  for (u8 instrIndex = 0; instrIndex < 32; instrIndex++) {
+    const u32 addrInstrHeader = instrTableAddress + instrItemSize * instrIndex;
+    if (addrInstrHeader + instrItemSize > 0x10000) {
+      break;
+    }
+
+    const u8 srcn = file->readByte(addrInstrHeader);
+    const u8 adsr1 = file->readByte(addrInstrHeader + 1);
+    const u8 gain = file->readByte(addrInstrHeader + 3);
+    if (srcn >= 0x80 || (adsr1 == 0 && gain == 0)) {
+      continue;
+    }
+
+    if (NinSnesInstr::isValidHeader(file, profileId, addrInstrHeader, dirAddress, true)) {
+      if (requiresNinSnesSampleStartAfterDirEntry(profile)) {
+        const u32 addrDirEntry = dirAddress + srcn * 4;
+        if (file->readShort(addrDirEntry) < addrDirEntry + 4) {
+          continue;
+        }
+      }
+      info.score++;
+    }
+  }
+
+  return info;
+}
+
+std::optional<NinSnesDirProbeInfo> inferNinSnesDirAddress(RawFile* file, NinSnesProfileId profileId,
+                                                          u32 instrTableAddress) {
+  NinSnesDirProbeInfo best;
+  for (u32 dirAddress = 0; dirAddress < 0x10000; dirAddress += 0x100) {
+    const auto candidate = scoreNinSnesDirAddress(file, profileId, instrTableAddress, static_cast<u16>(dirAddress));
+    if (candidate.score > best.score) {
+      best = candidate;
+    }
+  }
+
+  if (best.score < 4) {
+    return std::nullopt;
+  }
+  return best;
 }
 
 constexpr std::array<u8, 27> kStandardVcmdLengthTable = {
@@ -74,15 +135,13 @@ constexpr std::array<u8, 40> kIntelliFe3VcmdLengthTable = {
 };
 
 constexpr std::array<u8, 36> kIntelliFe4VcmdLengthTable = {
-    0x01, 0x01, 0x02, 0x03, 0x00, 0x01, 0x02, 0x01, 0x02, 0x01, 0x01, 0x03,
-    0x00, 0x01, 0x02, 0x03, 0x01, 0x03, 0x03, 0x00, 0x01, 0x03, 0x00, 0x03,
-    0x03, 0x03, 0x01, 0x00, 0x00, 0x02, 0x01, 0x00, 0x01, 0x01, 0x01, 0x01,
+    0x01, 0x01, 0x02, 0x03, 0x00, 0x01, 0x02, 0x01, 0x02, 0x01, 0x01, 0x03, 0x00, 0x01, 0x02, 0x03, 0x01, 0x03,
+    0x03, 0x00, 0x01, 0x03, 0x00, 0x03, 0x03, 0x03, 0x01, 0x00, 0x00, 0x02, 0x01, 0x00, 0x01, 0x01, 0x01, 0x01,
 };
 
 constexpr std::array<u8, 36> kIntelliTaVcmdLengthTable = {
-    0x01, 0x01, 0x02, 0x03, 0x00, 0x01, 0x02, 0x01, 0x02, 0x01, 0x01, 0x03,
-    0x00, 0x01, 0x02, 0x03, 0x01, 0x03, 0x03, 0x00, 0x01, 0x03, 0x00, 0x03,
-    0x03, 0x03, 0x01, 0x00, 0x00, 0x02, 0x02, 0x00, 0x01, 0x01, 0x01, 0x01,
+    0x01, 0x01, 0x02, 0x03, 0x00, 0x01, 0x02, 0x01, 0x02, 0x01, 0x01, 0x03, 0x00, 0x01, 0x02, 0x03, 0x01, 0x03,
+    0x03, 0x00, 0x01, 0x03, 0x00, 0x03, 0x03, 0x03, 0x01, 0x00, 0x00, 0x02, 0x02, 0x00, 0x01, 0x01, 0x01, 0x01,
 };
 
 }  // namespace
@@ -96,23 +155,26 @@ void NinSnesScanner::scan(RawFile* file, void* info) {
   }
 }
 
-void NinSnesScanner::loadFromScanResult(RawFile* file, const NinSnesScanResult& scanResult) {
+bool NinSnesScanner::loadFromScanResult(RawFile* file, const NinSnesScanResult& scanResult,
+                                        bool loadInstrumentSet) {
   auto* newSeq = new NinSnesSeq(file, scanResult);
   if (!newSeq->loadVGMFile()) {
     delete newSeq;
-    return;
+    return false;
   }
 
-  if (scanResult.profile == NinSnesProfileId::Unknown || scanResult.instrTableAddr == 0 ||
-      scanResult.spcDirAddr == 0) {
-    return;
+  if (!loadInstrumentSet || scanResult.profile == NinSnesProfileId::Unknown ||
+      scanResult.instrTableAddr == 0 || scanResult.spcDirAddr == 0) {
+    return true;
   }
 
   auto* newInstrSet = new NinSnesInstrSet(file, scanResult);
   if (!newInstrSet->loadVGMFile()) {
     delete newInstrSet;
-    return;
+    return true;
   }
+
+  return true;
 }
 
 void NinSnesScanner::searchForNinSnesFromARAM(RawFile* file) {
@@ -152,6 +214,7 @@ void NinSnesScanner::searchForNinSnesFromARAM(RawFile* file) {
     const BytePattern ptnInitSectionPtr = makeInitSectionPtrPattern(addrSectionPtr);
     const BytePattern ptnInitSectionPtrYI = makeInitSectionPtrYIPattern(addrSectionPtr);
     const BytePattern ptnInitSectionPtrSMW = makeInitSectionPtrSMWPattern(addrSectionPtr);
+    const BytePattern ptnInitSectionPtrSMWAddmusicK = makeInitSectionPtrSMWAddmusicKPattern(addrSectionPtr);
     const BytePattern ptnInitSectionPtrGD3 = makeInitSectionPtrGD3Pattern(addrSectionPtr);
     const BytePattern ptnInitSectionPtrYSFR = makeInitSectionPtrYSFRPattern(addrSectionPtr);
     const BytePattern ptnInitSectionPtrTS = makeInitSectionPtrTSPattern(addrSectionPtr);
@@ -180,6 +243,14 @@ void NinSnesScanner::searchForNinSnesFromARAM(RawFile* file) {
     if (file->searchBytePattern(ptnInitSectionPtrSMW, ofsInitSectionPtr)) {
       info.signature = NinSnesSignatureId::Earlier;
       info.address = file->readShort(ofsInitSectionPtr + 3);
+      return info;
+    }
+
+    if (file->searchBytePattern(ptnInitSectionPtrSMWAddmusicK, ofsInitSectionPtr)) {
+      info.signature = NinSnesSignatureId::Earlier;
+      info.profileId = NinSnesProfileId::AddmusicK;
+      // AddmusicK keeps a dummy word before the real song pointer list.
+      info.address = file->readShort(ofsInitSectionPtr + 3) + 2;
       return info;
     }
 
@@ -213,8 +284,7 @@ void NinSnesScanner::searchForNinSnesFromARAM(RawFile* file) {
         return std::nullopt;
       }
 
-      info.address =
-          file->readByte(ofsInitSongListPtr + 1) | (file->readByte(ofsInitSongListPtr + 4) << 8);
+      info.address = file->readByte(ofsInitSongListPtr + 1) | (file->readByte(ofsInitSongListPtr + 4) << 8);
       return info;
     }
 
@@ -256,10 +326,8 @@ void NinSnesScanner::searchForNinSnesFromARAM(RawFile* file) {
 
       info.firstVoiceCmd = file->readByte(ofsReadVcmdLength + 2);
       info.lengthTable = file->readShort(ofsReadVcmdLength + 7);
-      info.profileId =
-          info.firstVoiceCmd == 0xe0 ? NinSnesProfileId::Tose : NinSnesProfileId::Unknown;
-      info.numCommands =
-          countNinSnesVoiceCommands(info.firstVoiceCmd, info.addressTable, info.lengthTable);
+      info.profileId = info.firstVoiceCmd == 0xe0 ? NinSnesProfileId::Tose : NinSnesProfileId::Unknown;
+      info.numCommands = countNinSnesVoiceCommands(info.firstVoiceCmd, info.addressTable, info.lengthTable);
       return info;
     }
 
@@ -273,8 +341,7 @@ void NinSnesScanner::searchForNinSnesFromARAM(RawFile* file) {
 
       info.firstVoiceCmd = file->readByte(ofsReadVcmdLength + 1);
       info.lengthTable = file->readShort(ofsReadVcmdLength + 9) + info.firstVoiceCmd;
-      info.numCommands =
-          countNinSnesVoiceCommands(info.firstVoiceCmd, info.addressTable, info.lengthTable);
+      info.numCommands = countNinSnesVoiceCommands(info.firstVoiceCmd, info.addressTable, info.lengthTable);
       return info;
     }
 
@@ -302,19 +369,24 @@ void NinSnesScanner::searchForNinSnesFromARAM(RawFile* file) {
       }
     } else if (file->searchBytePattern(ptnJumpToVcmdSMW, ofsJumpToVcmd)) {
       u32 ofsReadVcmdLength;
-      if (!file->searchBytePattern(ptnReadVcmdLengthSMW, ofsReadVcmdLength)) {
+      if (file->searchBytePattern(ptnReadVcmdLengthSMW, ofsReadVcmdLength)) {
+        info.lengthTable = file->readShort(ofsReadVcmdLength + 9) + info.firstVoiceCmd;
+      } else if (file->searchBytePattern(ptnReadVcmdLengthSMWAddmusicK, ofsReadVcmdLength)) {
+        info.profileId = NinSnesProfileId::AddmusicK;
+        info.lengthTable = file->readShort(ofsReadVcmdLength + 35) + info.firstVoiceCmd;
+      } else {
         return std::nullopt;
       }
 
-      info.profileId = NinSnesProfileId::Earlier;
+      if (info.profileId == NinSnesProfileId::Unknown) {
+        info.profileId = NinSnesProfileId::Earlier;
+      }
       info.addressTable = file->readShort(ofsJumpToVcmd + 5) + ((info.firstVoiceCmd * 2) & 0xff);
-      info.lengthTable = file->readShort(ofsReadVcmdLength + 9) + info.firstVoiceCmd;
     } else {
       return std::nullopt;
     }
 
-    info.numCommands =
-        countNinSnesVoiceCommands(info.firstVoiceCmd, info.addressTable, info.lengthTable);
+    info.numCommands = countNinSnesVoiceCommands(info.firstVoiceCmd, info.addressTable, info.lengthTable);
     return info;
   };
 
@@ -340,8 +412,7 @@ void NinSnesScanner::searchForNinSnesFromARAM(RawFile* file) {
   u16 addrVolumeTable = 0;
   std::vector<u8> durRateTable;
   std::vector<u8> volumeTable;
-  auto loadNoteTable = [&](const BytePattern& pattern, u8 durTableOffset,
-                           u8 volumeTableOffset) -> bool {
+  auto loadNoteTable = [&](const BytePattern& pattern, u8 durTableOffset, u8 volumeTableOffset) -> bool {
     if (!file->searchBytePattern(pattern, ofsDispatchNote)) {
       return false;
     }
@@ -365,21 +436,18 @@ void NinSnesScanner::searchForNinSnesFromARAM(RawFile* file) {
     }
 
     if (file->searchBytePattern(ptnDispatchNoteFE3, ofsDispatchNote)) {
-      return firstVoiceCmd == 0xd6 && matchNinSnesByteTable(file, addrVoiceCmdLengthTable,
-                                                            kIntelliFe3VcmdLengthTable)
+      return firstVoiceCmd == 0xd6 && matchNinSnesByteTable(file, addrVoiceCmdLengthTable, kIntelliFe3VcmdLengthTable)
                  ? NinSnesProfileId::IntelliFe3
                  : NinSnesProfileId::Unknown;
     }
 
     if (file->searchBytePattern(ptnDispatchNoteFE4, ofsDispatchNote)) {
-      return firstVoiceCmd == 0xda && matchNinSnesByteTable(file, addrVoiceCmdLengthTable,
-                                                            kIntelliFe4VcmdLengthTable)
+      return firstVoiceCmd == 0xda && matchNinSnesByteTable(file, addrVoiceCmdLengthTable, kIntelliFe4VcmdLengthTable)
                  ? NinSnesProfileId::IntelliFe4
                  : NinSnesProfileId::Unknown;
     }
 
-    return firstVoiceCmd == 0xda &&
-                   matchNinSnesByteTable(file, addrVoiceCmdLengthTable, kIntelliTaVcmdLengthTable)
+    return firstVoiceCmd == 0xda && matchNinSnesByteTable(file, addrVoiceCmdLengthTable, kIntelliTaVcmdLengthTable)
                ? NinSnesProfileId::IntelliTa
                : NinSnesProfileId::Unknown;
   };
@@ -393,8 +461,7 @@ void NinSnesScanner::searchForNinSnesFromARAM(RawFile* file) {
       return firstVoiceCmd == 0xe0 ? NinSnesProfileId::Lemmings : NinSnesProfileId::Unknown;
     }
 
-    if (firstVoiceCmd != 0xe0 ||
-        !matchNinSnesByteTable(file, addrVoiceCmdLengthTable, kStandardVcmdLengthTable)) {
+    if (firstVoiceCmd != 0xe0 || !matchNinSnesByteTable(file, addrVoiceCmdLengthTable, kStandardVcmdLengthTable)) {
       return classifyIntelligentProfile();
     }
 
@@ -417,8 +484,7 @@ void NinSnesScanner::searchForNinSnesFromARAM(RawFile* file) {
 
     u32 ofsRD1VCmd_FA_FE;
     u32 ofsRD2VCmdInstrADSR;
-    const bool hasQuintetLookupTail =
-        numOfVoiceCmd == 32 && file->readByte(addrVoiceCmdLengthTable + 31) == 1;
+    const bool hasQuintetLookupTail = numOfVoiceCmd == 32 && file->readByte(addrVoiceCmdLengthTable + 31) == 1;
 
     if (file->searchBytePattern(ptnRD1VCmd_FA_FE, ofsRD1VCmd_FA_FE)) {
       return NinSnesProfileId::Rd1;
@@ -457,8 +523,7 @@ void NinSnesScanner::searchForNinSnesFromARAM(RawFile* file) {
 
     case NinSnesProgramResolverId::QuintetLookup:
       signature = NinSnesSignatureId::Quintet;
-      quintetAddrBGMInstrLookup =
-          file->readShort(ofsInstrVCmd + (profile.id == NinSnesProfileId::QuintetTs ? 18 : 19));
+      quintetAddrBGMInstrLookup = file->readShort(ofsInstrVCmd + (profile.id == NinSnesProfileId::QuintetTs ? 18 : 19));
       break;
 
     case NinSnesProgramResolverId::Direct:
@@ -471,8 +536,7 @@ void NinSnesScanner::searchForNinSnesFromARAM(RawFile* file) {
   auto readSectionListPtr = [&](u32 addrSectionListPtr) -> u16 {
     u16 firstSectionPtr = file->readShort(addrSectionListPtr);
     if (profile.addressModel == NinSnesAddressModelId::KonamiBase) {
-      firstSectionPtr =
-          convertNinSnesAddress(profile, firstSectionPtr, konamiBaseAddress, falcomBaseOffset);
+      firstSectionPtr = convertNinSnesAddress(profile, firstSectionPtr, konamiBaseAddress, falcomBaseOffset);
     }
     return firstSectionPtr;
   };
@@ -493,8 +557,7 @@ void NinSnesScanner::searchForNinSnesFromARAM(RawFile* file) {
         return true;
       }
 
-      addrTrackStart =
-          convertNinSnesAddress(profile, addrTrackStart, konamiBaseAddress, falcomBaseOffset);
+      addrTrackStart = convertNinSnesAddress(profile, addrTrackStart, konamiBaseAddress, falcomBaseOffset);
       if ((addrTrackStart & 0xff00) == 0 || addrTrackStart == 0xffff) {
         return true;
       }
@@ -505,6 +568,12 @@ void NinSnesScanner::searchForNinSnesFromARAM(RawFile* file) {
   auto findSongListLength = [&]() -> u8 {
     u8 songListLength = 1;
     u16 addrSectionListCutoff = 0xffff;
+    if (profile.id == NinSnesProfileId::AddmusicK) {
+      const u16 firstSectionListPtr = readSectionListPtr(addrSongList);
+      if (firstSectionListPtr >= 0x0100 && firstSectionListPtr < 0xfff0) {
+        addrSectionListCutoff = firstSectionListPtr;
+      }
+    }
 
     for (u8 songIndex = 1; songIndex <= 0x7f; songIndex++) {
       const u32 addrSectionListPtr = addrSongList + songIndex * 2;
@@ -529,8 +598,7 @@ void NinSnesScanner::searchForNinSnesFromARAM(RawFile* file) {
       }
 
       updateFalcomBaseOffset(firstSectionPtr);
-      addrFirstSection =
-          convertNinSnesAddress(profile, addrFirstSection, konamiBaseAddress, falcomBaseOffset);
+      addrFirstSection = convertNinSnesAddress(profile, addrFirstSection, konamiBaseAddress, falcomBaseOffset);
       if (addrFirstSection + 16 > 0x10000 || hasIllegalTrackPointers(addrFirstSection)) {
         break;
       }
@@ -555,16 +623,14 @@ void NinSnesScanner::searchForNinSnesFromARAM(RawFile* file) {
 
       const u16 firstSectionPtr = readSectionListPtr(addrSectionListPtr);
       updateFalcomBaseOffset(firstSectionPtr);
-      if (firstSectionPtr > addrCurrentSection ||
-          (addrCurrentSection % 2) != (firstSectionPtr % 2)) {
+      if (firstSectionPtr > addrCurrentSection || (addrCurrentSection % 2) != (firstSectionPtr % 2)) {
         continue;
       }
 
       u16 curAddress = firstSectionPtr;
       u8 sectionCount = 0;
       while (curAddress >= 0x0100 && curAddress < 0xfff0 && sectionCount < 32) {
-        const u16 addrSection =
-            readNinSnesAddress(profile, file, curAddress, konamiBaseAddress, falcomBaseOffset);
+        const u16 addrSection = readNinSnesAddress(profile, file, curAddress, konamiBaseAddress, falcomBaseOffset);
         if (curAddress == addrCurrentSection) {
           return songIndex;
         }
@@ -580,17 +646,152 @@ void NinSnesScanner::searchForNinSnesFromARAM(RawFile* file) {
     return std::nullopt;
   };
 
-  const u8 songListLength = findSongListLength();
-  const auto guessedSongIndex = findCurrentSongIndex(songListLength);
-  if (!guessedSongIndex) {
-    return;
-  }
+  auto scoreFallbackSongIndex = [&](u8 songIndex) -> std::optional<u32> {
+    const u16 firstSectionPtr = readSectionListPtr(addrSongList + songIndex * 2);
+    if (firstSectionPtr < 0x0100 || firstSectionPtr >= 0xfff0) {
+      return std::nullopt;
+    }
 
-  // load the song
-  u16 addrSongStart = file->readShort(addrSongList + (*guessedSongIndex) * 2);
-  if (profile.addressModel == NinSnesAddressModelId::KonamiBase) {
-    addrSongStart =
-        convertNinSnesAddress(profile, addrSongStart, konamiBaseAddress, falcomBaseOffset);
+    updateFalcomBaseOffset(firstSectionPtr);
+    u16 addrFirstSection =
+        convertNinSnesAddress(profile, file->readShort(firstSectionPtr), konamiBaseAddress, falcomBaseOffset);
+    if (addrFirstSection + 16 > 0x10000 || hasIllegalTrackPointers(addrFirstSection)) {
+      return std::nullopt;
+    }
+
+    u8 trackCount = 0;
+    u16 minTrackStart = 0xffff;
+    u16 maxTrackStart = 0;
+    for (u8 trackIndex = 0; trackIndex < 8; trackIndex++) {
+      const u16 addrTrackStart =
+          convertNinSnesAddress(profile, file->readShort(addrFirstSection + trackIndex * 2), konamiBaseAddress,
+                                falcomBaseOffset);
+      if (addrTrackStart < 0x0100 || addrTrackStart >= 0xfff0) {
+        continue;
+      }
+
+      trackCount++;
+      minTrackStart = std::min(minTrackStart, addrTrackStart);
+      maxTrackStart = std::max(maxTrackStart, addrTrackStart);
+    }
+
+    if (trackCount == 0) {
+      return std::nullopt;
+    }
+
+    return (static_cast<u32>(trackCount) << 16) + (maxTrackStart - minTrackStart);
+  };
+
+  auto findFallbackSongIndex = [&](u8 songListLength) -> std::optional<u8> {
+    std::optional<u8> bestSongIndex;
+    u32 bestScore = 0;
+
+    for (u8 songIndex = 0; songIndex < songListLength; songIndex++) {
+      const auto score = scoreFallbackSongIndex(songIndex);
+      if (!score) {
+        continue;
+      }
+
+      if (profile.id != NinSnesProfileId::AddmusicK) {
+        return songIndex;
+      }
+      if (!bestSongIndex || *score > bestScore) {
+        bestSongIndex = songIndex;
+        bestScore = *score;
+      }
+    }
+
+    return bestSongIndex;
+  };
+
+  auto findValidSongIndexes = [&](u8 songListLength) -> std::vector<u8> {
+    std::vector<u8> songIndexes;
+    for (u8 songIndex = 0; songIndex < songListLength; songIndex++) {
+      if (scoreFallbackSongIndex(songIndex)) {
+        songIndexes.push_back(songIndex);
+      }
+    }
+    return songIndexes;
+  };
+
+  auto findAddmusicKCustomInstrInfo = [&](u16 songStartAddr,
+                                          u16 spcDirAddr) -> std::optional<NinSnesAddmusicKCustomInstrInfo> {
+    if (profile.id != NinSnesProfileId::AddmusicK || songStartAddr < 0x0100 || songStartAddr >= 0xfff0) {
+      return std::nullopt;
+    }
+
+    u32 curOffset = songStartAddr;
+    u16 firstSectionAddr = 0xffff;
+    for (u8 sectionIndex = 0; sectionIndex < 32; sectionIndex++) {
+      if (curOffset + 2 > 0x10000) {
+        return std::nullopt;
+      }
+
+      const u16 sectionAddress = readNinSnesAddress(profile, file, curOffset, konamiBaseAddress, falcomBaseOffset);
+      curOffset += 2;
+      if (sectionAddress == 0) {
+        break;
+      }
+      if (sectionAddress <= 0xff) {
+        if (curOffset + 2 > 0x10000) {
+          return std::nullopt;
+        }
+        curOffset += 2;
+        break;
+      }
+      if (sectionAddress < 0xfff0) {
+        firstSectionAddr = std::min(firstSectionAddr, sectionAddress);
+      }
+    }
+
+    if (firstSectionAddr == 0xffff || firstSectionAddr <= curOffset ||
+        ((firstSectionAddr - curOffset) % 6) != 0) {
+      return std::nullopt;
+    }
+
+    const u32 entryCount = (firstSectionAddr - curOffset) / 6;
+    if (entryCount == 0 || entryCount > 0x40) {
+      return std::nullopt;
+    }
+
+    for (u32 entryIndex = 0; entryIndex < entryCount; entryIndex++) {
+      const u32 entryOffset = curOffset + entryIndex * 6;
+      const u8 srcn = file->readByte(entryOffset);
+      if (srcn >= 0x80) {
+        return std::nullopt;
+      }
+
+      const u32 dirEntryOffset = spcDirAddr + srcn * 4;
+      if (dirEntryOffset + 4 > 0x10000 || !SNESSampColl::isValidSampleDir(file, dirEntryOffset, true)) {
+        return std::nullopt;
+      }
+      if (requiresNinSnesSampleStartAfterDirEntry(profile) && file->readShort(dirEntryOffset) < dirEntryOffset + 4) {
+        return std::nullopt;
+      }
+    }
+
+    return NinSnesAddmusicKCustomInstrInfo{
+        .tableAddress = curOffset,
+        .baseInstrument = 0x1e,
+        .count = static_cast<u8>(entryCount),
+    };
+  };
+
+  const u8 songListLength = findSongListLength();
+  std::vector<u8> songIndexesToLoad;
+  if (profile.id == NinSnesProfileId::AddmusicK) {
+    songIndexesToLoad = findValidSongIndexes(songListLength);
+  } else {
+    auto guessedSongIndex = findCurrentSongIndex(songListLength);
+    if (!guessedSongIndex) {
+      guessedSongIndex = findFallbackSongIndex(songListLength);
+    }
+    if (guessedSongIndex) {
+      songIndexesToLoad.push_back(*guessedSongIndex);
+    }
+  }
+  if (songIndexesToLoad.empty()) {
+    return;
   }
 
   auto findDirAddress = [&]() -> std::optional<u16> {
@@ -625,23 +826,25 @@ void NinSnesScanner::searchForNinSnesFromARAM(RawFile* file) {
     u32 ofsLoadInstrTableAddressASM;
     NinSnesInstrumentProbeInfo info;
     if (file->searchBytePattern(ptnLoadInstrTableAddress, ofsLoadInstrTableAddressASM)) {
-      info.tableAddress = file->readByte(ofsLoadInstrTableAddressASM + 7) |
-                          (file->readByte(ofsLoadInstrTableAddressASM + 10) << 8);
+      info.tableAddress =
+          file->readByte(ofsLoadInstrTableAddressASM + 7) | (file->readByte(ofsLoadInstrTableAddressASM + 10) << 8);
       const u32 firstWord = file->readWord(info.tableAddress);
       if (firstWord == 0 || firstWord == 0xFFFFFFFF) {
         info.tableAddress += 4;
       }
     } else if (file->searchBytePattern(ptnLoadInstrTableAddressSMW, ofsLoadInstrTableAddressASM)) {
-      info.tableAddress = file->readByte(ofsLoadInstrTableAddressASM + 3) |
-                          (file->readByte(ofsLoadInstrTableAddressASM + 6) << 8);
+      info.tableAddress =
+          file->readByte(ofsLoadInstrTableAddressASM + 3) | (file->readByte(ofsLoadInstrTableAddressASM + 6) << 8);
+    } else if (file->searchBytePattern(ptnLoadInstrTableAddressSMWAddmusicK, ofsLoadInstrTableAddressASM)) {
+      info.tableAddress =
+          file->readByte(ofsLoadInstrTableAddressASM + 1) | (file->readByte(ofsLoadInstrTableAddressASM + 4) << 8);
     } else {
       switch (profile.instrTableAddressModel) {
         case NinSnesInstrTableAddressModelId::Human:
           if (file->searchBytePattern(ptnLoadInstrTableAddressCTOW, ofsLoadInstrTableAddressASM)) {
             info.tableAddress = file->readByte(ofsLoadInstrTableAddressASM + 7) |
                                 (file->readByte(ofsLoadInstrTableAddressASM + 10) << 8);
-          } else if (file->searchBytePattern(ptnLoadInstrTableAddressSOS,
-                                             ofsLoadInstrTableAddressASM)) {
+          } else if (file->searchBytePattern(ptnLoadInstrTableAddressSOS, ofsLoadInstrTableAddressASM)) {
             info.tableAddress = file->readByte(ofsLoadInstrTableAddressASM + 1) |
                                 (file->readByte(ofsLoadInstrTableAddressASM + 4) << 8);
           } else {
@@ -667,9 +870,22 @@ void NinSnesScanner::searchForNinSnesFromARAM(RawFile* file) {
     if (info.dirAddress == 0) {
       const auto dirAddress = findDirAddress();
       if (!dirAddress) {
-        return std::nullopt;
+        const auto inferredDirAddress = inferNinSnesDirAddress(file, profile.id, info.tableAddress);
+        if (!inferredDirAddress) {
+          return std::nullopt;
+        }
+        info.dirAddress = inferredDirAddress->address;
+        return info;
       }
       info.dirAddress = *dirAddress;
+    }
+
+    if (profile.id == NinSnesProfileId::AddmusicK) {
+      const auto currentDirScore = scoreNinSnesDirAddress(file, profile.id, info.tableAddress, info.dirAddress);
+      const auto inferredDirAddress = inferNinSnesDirAddress(file, profile.id, info.tableAddress);
+      if (inferredDirAddress && inferredDirAddress->score > currentDirScore.score) {
+        info.dirAddress = inferredDirAddress->address;
+      }
     }
 
     return info;
@@ -699,24 +915,58 @@ void NinSnesScanner::searchForNinSnesFromARAM(RawFile* file) {
     }
   }
 
-  NinSnesScanResult scanResult;
-  scanResult.signature = signature;
-  scanResult.profile = profileId;
-  scanResult.name = name;
-  scanResult.songIndex = *guessedSongIndex;
-  scanResult.songListAddr = addrSongList;
-  scanResult.songStartAddr = addrSongStart;
-  scanResult.sectionPtrAddr = addrSectionPtr;
-  scanResult.instrTableAddr = addrInstrTable;
-  scanResult.spcDirAddr = spcDirAddr;
-  scanResult.konamiBaseAddress = konamiBaseAddress == 0xffff ? 0 : konamiBaseAddress;
-  scanResult.falcomBaseOffset = falcomBaseOffset;
-  scanResult.quintetBGMInstrBase = quintetBGMInstrBase;
-  scanResult.quintetAddrBGMInstrLookup = quintetAddrBGMInstrLookup;
-  scanResult.konamiTuningTableAddress = konamiTuningTableAddress;
-  scanResult.konamiTuningTableSize = konamiTuningTableSize;
-  scanResult.volumeTable = std::move(volumeTable);
-  scanResult.durRateTable = std::move(durRateTable);
+  NinSnesScanResult baseScanResult;
+  baseScanResult.signature = signature;
+  baseScanResult.profile = profileId;
+  baseScanResult.songListAddr = addrSongList;
+  baseScanResult.sectionPtrAddr = addrSectionPtr;
+  baseScanResult.instrTableAddr = addrInstrTable;
+  baseScanResult.spcDirAddr = spcDirAddr;
+  baseScanResult.konamiBaseAddress = konamiBaseAddress == 0xffff ? 0 : konamiBaseAddress;
+  baseScanResult.falcomBaseOffset = falcomBaseOffset;
+  baseScanResult.quintetBGMInstrBase = quintetBGMInstrBase;
+  baseScanResult.quintetAddrBGMInstrLookup = quintetAddrBGMInstrLookup;
+  baseScanResult.konamiTuningTableAddress = konamiTuningTableAddress;
+  baseScanResult.konamiTuningTableSize = konamiTuningTableSize;
+  baseScanResult.volumeTable = volumeTable;
+  baseScanResult.durRateTable = durRateTable;
 
-  loadFromScanResult(file, scanResult);
+  const bool appendSongIndex = profile.id == NinSnesProfileId::AddmusicK || songIndexesToLoad.size() > 1;
+  std::vector<NinSnesScanResult> scanResults;
+  for (const u8 songIndex : songIndexesToLoad) {
+    NinSnesScanResult scanResult = baseScanResult;
+    scanResult.name = appendSongIndex ? name + " (index " + std::to_string(songIndex) + ")" : name;
+    scanResult.songIndex = songIndex;
+    scanResult.songStartAddr = file->readShort(addrSongList + songIndex * 2);
+    if (profile.addressModel == NinSnesAddressModelId::KonamiBase) {
+      scanResult.songStartAddr =
+          convertNinSnesAddress(profile, scanResult.songStartAddr, konamiBaseAddress, falcomBaseOffset);
+    }
+
+    if (const auto customInstrInfo =
+            findAddmusicKCustomInstrInfo(static_cast<u16>(scanResult.songStartAddr), scanResult.spcDirAddr)) {
+      scanResult.addmusicKCustomInstrTableAddr = customInstrInfo->tableAddress;
+      scanResult.addmusicKCustomInstrBase = customInstrInfo->baseInstrument;
+      scanResult.addmusicKCustomInstrCount = customInstrInfo->count;
+    }
+
+    scanResults.push_back(scanResult);
+  }
+
+  std::stable_sort(scanResults.begin(), scanResults.end(), [](const auto& lhs, const auto& rhs) {
+    const bool lhsHasCustomInstruments = lhs.addmusicKCustomInstrCount != 0;
+    const bool rhsHasCustomInstruments = rhs.addmusicKCustomInstrCount != 0;
+    if (lhsHasCustomInstruments != rhsHasCustomInstruments) {
+      return lhsHasCustomInstruments;
+    }
+    return lhs.songStartAddr > rhs.songStartAddr;
+  });
+
+  bool loadedInstrumentSet = false;
+  for (const auto& scanResult : scanResults) {
+    const bool loadInstrumentSet = scanResult.addmusicKCustomInstrCount != 0 || !loadedInstrumentSet;
+    if (loadFromScanResult(file, scanResult, loadInstrumentSet) && scanResult.addmusicKCustomInstrCount == 0) {
+      loadedInstrumentSet = true;
+    }
+  }
 }

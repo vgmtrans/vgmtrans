@@ -11,6 +11,7 @@
 #include "SNESDSP.h"
 #include "VGMColl.h"
 
+#include <array>
 #include <spdlog/fmt/fmt.h>
 
 namespace {
@@ -143,7 +144,8 @@ VGMRgn* createRgnFromHeaderData(VGMInstr* instr,
                                 RawFile* rawFile,
                                 NinSnesProfileId profileId,
                                 u32 spcDirAddr,
-                                const std::array<u8, 6>& regionData) {
+                                const std::array<u8, 6>& regionData,
+                                u32 regionOffset = 0) {
   const auto& profile = getNinSnesProfile(profileId);
   const u8 srcn = regionData[0];
   const u8 adsr1 = regionData[1];
@@ -157,7 +159,7 @@ VGMRgn* createRgnFromHeaderData(VGMInstr* instr,
 
   const auto tuning = calculatePitchTuning(readPitchScale(profile, regionData[4], regionData[5]));
 
-  auto* rgn = new VGMRgn(instr, 0, NinSnesInstr::expectedSize(profileId));
+  auto* rgn = new VGMRgn(instr, regionOffset, NinSnesInstr::expectedSize(profileId));
   rgn->sampOffset = rawFile->readShort(offDirEnt) - spcDirAddr;
   rgn->sampNum = srcn;
   rgn->unityKey = tuning.unityKey;
@@ -195,6 +197,9 @@ NinSnesInstrSet::NinSnesInstrSet(RawFile* file, const NinSnesScanResult& scanRes
   profileId = scanResult.profile;
   konamiTuningTableAddress = scanResult.konamiTuningTableAddress;
   konamiTuningTableSize = scanResult.konamiTuningTableSize;
+  addmusicKCustomInstrTableAddr = scanResult.addmusicKCustomInstrTableAddr;
+  addmusicKCustomInstrBase = scanResult.addmusicKCustomInstrBase;
+  addmusicKCustomInstrCount = scanResult.addmusicKCustomInstrCount;
 }
 
 NinSnesInstrSet::~NinSnesInstrSet() {
@@ -264,6 +269,9 @@ bool NinSnesInstrSet::parseInstrPointers() {
     newInstr->konamiTuningTableSize = konamiTuningTableSize;
     aInstrs.push_back(newInstr);
   }
+
+  addAddmusicKCustomInstruments();
+
   if (aInstrs.size() == 0) {
     return false;
   }
@@ -282,6 +290,51 @@ bool NinSnesInstrSet::parseInstrPointers() {
   }
 
   return true;
+}
+
+void NinSnesInstrSet::addAddmusicKCustomInstruments() {
+  if (profileId != NinSnesProfileId::AddmusicK || addmusicKCustomInstrTableAddr == 0 ||
+      addmusicKCustomInstrCount == 0) {
+    return;
+  }
+
+  for (u8 instrIndex = 0; instrIndex < addmusicKCustomInstrCount; instrIndex++) {
+    const u32 entryOffset = addmusicKCustomInstrTableAddr + instrIndex * 6;
+    if (entryOffset + 6 > 0x10000) {
+      break;
+    }
+
+    const u8 srcn = readByte(entryOffset);
+    std::array<u8, 6> regionData = {
+        srcn,
+        readByte(entryOffset + 1),
+        readByte(entryOffset + 2),
+        readByte(entryOffset + 3),
+        readByte(entryOffset + 4),
+        readByte(entryOffset + 5),
+    };
+
+    auto* newInstr = new VGMInstr(this,
+                                  entryOffset,
+                                  6,
+                                  0,
+                                  addmusicKCustomInstrBase + instrIndex,
+                                  fmt::format("Instrument {}", addmusicKCustomInstrBase + instrIndex));
+    newInstr->addStandardVibratoHandling(nin_snes::vibrato::modulationSpec());
+
+    auto* rgn = createRgnFromHeaderData(newInstr, rawFile(), profileId, spcDirAddr, regionData, entryOffset);
+    if (rgn == nullptr) {
+      delete newInstr;
+      continue;
+    }
+
+    newInstr->addRgn(rgn);
+    aInstrs.push_back(newInstr);
+
+    if (std::find(usedSRCNs.begin(), usedSRCNs.end(), srcn) == usedSRCNs.end()) {
+      usedSRCNs.push_back(srcn);
+    }
+  }
 }
 
 void NinSnesInstrSet::useColl(const VGMColl* coll) {

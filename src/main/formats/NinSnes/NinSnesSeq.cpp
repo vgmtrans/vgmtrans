@@ -2,18 +2,16 @@
 
 #include "base/Types.h"
 #include "NinSnesVibrato.h"
-#include "Options.h"
 
 #include <algorithm>
-
-#include "spdlog/fmt/fmt.h"
 
 DECLARE_FORMAT(NinSnes);
 
 //  **********
 //  NinSnesSeq
 //  **********
-#define SEQ_PPQN 48
+constexpr u16 SEQ_PPQN = 48;
+constexpr u16 ADDMUSICK_SEQ_PPQN = 24;
 
 namespace {
 
@@ -221,7 +219,7 @@ bool NinSnesSeq::addLoopForeverNoItem() {
 }
 
 bool NinSnesSeq::parseHeader() {
-  setPPQN(SEQ_PPQN);
+  setPPQN(profileId == NinSnesProfileId::AddmusicK ? ADDMUSICK_SEQ_PPQN : SEQ_PPQN);
   nNumTracks = MAX_TRACKS;
   createTracks();
 
@@ -420,6 +418,9 @@ double NinSnesSeq::getTempoInBPM() {
 
 double NinSnesSeq::getTempoInBPM(u8 tempoValue) {
   if (tempoValue != 0) {
+    if (profileId == NinSnesProfileId::AddmusicK) {
+      return static_cast<double>(tempoValue) * 2.5;
+    }
     return static_cast<double>(60000000) / (SEQ_PPQN * 2000) * (static_cast<double>(tempoValue) / 256);
   } else {
     return 1.0;  // since tempo 0 cannot be expressed, this function returns a very small value.
