@@ -14,7 +14,7 @@
 * **AkaoSnes:** Added vibrato support.
 * **SuzukiSnes:** Added drum kit support (Seiken Densetsu 3, Super Mario RPG, etc.).
 * **Intelligent Systems:** Improved support for late-era titles (Tetris Attack, Fire Emblem 4, Super Famicom Wars).
-* **SPC:** Fixed loading of older SPC files that do not have ID666 tags.
+* **SPC:** Fixed loading of older SPC files that do not have ID666 tags, improved handling of invalid tags.
 
 **Game Boy Advance (GBA)**
 
