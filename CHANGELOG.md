@@ -8,6 +8,7 @@
 
 * **N-SPC:** Added drum kit, vibrato, and pitch slide support to the standard driver.
 * **N-SPC:** Improved detection of instrument data.
+* **N-SPC:** Added support for AddmusicK.
 * **KonamiSnes:** Added drum kit, portamento, and slide support for volume/pan/pitch.
 * **CapcomSnes:** Added vibrato, tremolo, more accurate portamento support, and fixed pan calculation.
 * **AkaoSnes:** Added vibrato support.
