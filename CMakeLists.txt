@@ -2,7 +2,7 @@
 # Licensed under the zlib license
 # Check the included LICENSE.txt for details
 
-cmake_minimum_required(VERSION 3.23)
+cmake_minimum_required(VERSION 3.24)
 
 project(
   VGMTrans

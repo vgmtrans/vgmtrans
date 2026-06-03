@@ -37,14 +37,5 @@ function(vgmtrans_enable_project_warnings target)
       $<$<COMPILE_LANG_AND_ID:CXX,MSVC>:/wd4458>
   )
 
-  if(VGMTRANS_WARNINGS_AS_ERRORS)
-    target_compile_options(
-      ${target}
-      PRIVATE
-        $<$<COMPILE_LANG_AND_ID:C,GNU,Clang,AppleClang>:-Werror>
-        $<$<COMPILE_LANG_AND_ID:CXX,GNU,Clang,AppleClang>:-Werror>
-        $<$<COMPILE_LANG_AND_ID:C,MSVC>:/WX>
-        $<$<COMPILE_LANG_AND_ID:CXX,MSVC>:/WX>
-    )
-  endif()
+  set_target_properties(${target} PROPERTIES COMPILE_WARNING_AS_ERROR ${VGMTRANS_WARNINGS_AS_ERRORS})
 endfunction()
