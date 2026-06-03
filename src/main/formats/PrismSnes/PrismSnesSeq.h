@@ -124,9 +124,9 @@ class PrismSnesTrack
   u8 loopCountAlt;
   u16 subReturnAddr;
 
-  bool readDeltaTime(u32 &eventOffset, u8 &len);
-  bool readDuration(u32 &eventOffset, u8 len, u8 &durDelta);
-  u8 getDuration(u32 eventOffset, u8 len, u8 durDelta);
+  bool readDeltaTime(u32 &curOffset, u8 &len);
+  bool readDuration(u32 &curOffset, u8 len, u8 &durDelta);
+  u8 getDuration(u32 curOffset, u8 len, u8 durDelta);
 
   void addVolumeEnvelope(u16 envelopeAddress);
   void addPanEnvelope(u16 envelopeAddress);

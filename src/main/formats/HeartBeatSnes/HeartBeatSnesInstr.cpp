@@ -19,14 +19,14 @@ HeartBeatSnesInstrSet::HeartBeatSnesInstrSet(RawFile *file,
                                              HeartBeatSnesVersion ver,
                                              u32 offset,
                                              u32 length,
-                                             u16 srcnTableAddress,
-                                             u8 selectedSongIndex,
-                                             u32 spcDirAddress,
+                                             u16 addrSRCNTable,
+                                             u8 songIndex,
+                                             u32 spcDirAddr,
                                              const std::string &name) :
     VGMInstrSet(HeartBeatSnesFormat::name, file, offset, length, name), version(ver),
-    addrSRCNTable(srcnTableAddress),
-    songIndex(selectedSongIndex),
-    spcDirAddr(spcDirAddress) {
+    addrSRCNTable(addrSRCNTable),
+    songIndex(songIndex),
+    spcDirAddr(spcDirAddr) {
 }
 
 HeartBeatSnesInstrSet::~HeartBeatSnesInstrSet() {
@@ -103,14 +103,14 @@ HeartBeatSnesInstr::HeartBeatSnesInstr(VGMInstrSet *instrSet,
                                        u32 offset,
                                        u32 theBank,
                                        u32 theInstrNum,
-                                       u16 srcnTableAddress,
-                                       u8 selectedSongIndex,
-                                       u32 spcDirAddress,
+                                       u16 addrSRCNTable,
+                                       u8 songIndex,
+                                       u32 spcDirAddr,
                                        const std::string &name) :
     VGMInstr(instrSet, offset, 6, theBank, theInstrNum, name), version(ver),
-    addrSRCNTable(srcnTableAddress),
-    songIndex(selectedSongIndex),
-    spcDirAddr(spcDirAddress) {
+    addrSRCNTable(addrSRCNTable),
+    songIndex(songIndex),
+    spcDirAddr(spcDirAddr) {
 }
 
 HeartBeatSnesInstr::~HeartBeatSnesInstr() {

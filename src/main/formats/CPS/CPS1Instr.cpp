@@ -125,12 +125,12 @@ bool CPS1SampColl::parseSampleInfo() {
 
 CPS1OPMInstrSet::CPS1OPMInstrSet(RawFile *file,
                                CPS1FormatVer version,
-                               u8 masterVolume,
+                               u8 masterVol,
                                u32 offset,
                                u32 length,
                                const std::string& name)
     : YM2151InstrSet(CPS1Format::name, file, offset, length, name),
-      fmt_version(version), masterVol(masterVolume) {
+      fmt_version(version), masterVol(masterVol) {
 }
 
 bool CPS1OPMInstrSet::parseInstrPointers() {

@@ -64,7 +64,7 @@ class CapcomSnesSeq
   CapcomSnesSeq(RawFile *file,
                 CapcomSnesVersion ver,
                 u32 seqdata_offset,
-                bool hasPriorityInHeader,
+                bool priorityInHeader,
                 std::string newName = "Capcom SNES Seq");
   ~CapcomSnesSeq() override = default;
 
@@ -101,7 +101,7 @@ class CapcomSnesTrack
   void onTickEnd() override;
 
   u8 getNoteOctave() const;
-  void setNoteOctave(u8 noteOctave);
+  void setNoteOctave(u8 octave);
   bool isNoteOctaveUp() const;
   void setNoteOctaveUp(bool octave_up);
   bool isNoteDotted() const;

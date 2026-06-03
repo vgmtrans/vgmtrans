@@ -310,17 +310,17 @@ SNESSampColl::SNESSampColl(const std::string &format, VGMInstrSet *instrset, u32
 }
 
 SNESSampColl::SNESSampColl(const std::string &format, RawFile *rawfile, u32 offset,
-                           const std::vector<u8> &targetSourceNumbers, std::string name) :
+                           const std::vector<u8> &targetSRCNs, std::string name) :
     VGMSampColl(format, rawfile, offset, 0, std::move(name)),
     spcDirAddr(offset),
-    targetSRCNs(targetSourceNumbers) {
+    targetSRCNs(targetSRCNs) {
 }
 
 SNESSampColl::SNESSampColl(const std::string &format, VGMInstrSet *instrset, u32 offset,
-                           const std::vector<u8> &targetSourceNumbers, std::string name) :
+                           const std::vector<u8> &targetSRCNs, std::string name) :
     VGMSampColl(format, instrset->rawFile(), instrset, offset, 0, std::move(name)),
     spcDirAddr(offset),
-    targetSRCNs(targetSourceNumbers) {
+    targetSRCNs(targetSRCNs) {
 }
 
 SNESSampColl::~SNESSampColl() {
@@ -404,7 +404,7 @@ SNESSamp::SNESSamp(VGMSampColl *sampColl, u32 offset, u32 length, u32 dataOffset
 
 SNESSamp::~SNESSamp() {}
 
-u32 SNESSamp::getSampleLength(const RawFile *file, u32 offset, bool &hasLoop) {
+u32 SNESSamp::getSampleLength(const RawFile *file, u32 offset, bool &loop) {
   u32 currOffset = offset;
   while (true) {
     if (currOffset + 9 > file->size()) {
@@ -417,7 +417,7 @@ u32 SNESSamp::getSampleLength(const RawFile *file, u32 offset, bool &hasLoop) {
 
     // end?
     if ((flag & 1) != 0) {
-      hasLoop = (flag & 2) != 0;
+      loop = (flag & 2) != 0;
       break;
     }
   }

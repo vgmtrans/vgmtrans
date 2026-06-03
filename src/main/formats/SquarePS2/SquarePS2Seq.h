@@ -22,7 +22,7 @@ class BGMSeq : public VGMSeq {
 
 class BGMTrack : public SeqTrack {
  public:
-  BGMTrack(BGMSeq *sequence, u32 offset = 0, u32 length = 0);
+  BGMTrack(BGMSeq *parentSeq, u32 offset = 0, u32 length = 0);
 
   bool readEvent() override;
 };

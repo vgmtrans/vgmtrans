@@ -901,8 +901,8 @@ bool PrismSnesTrack::readEvent() {
   return bContinue;
 }
 
-bool PrismSnesTrack::readDeltaTime(u32 &eventOffset, u8 &len) {
-  if (eventOffset + 1 > 0x10000) {
+bool PrismSnesTrack::readDeltaTime(u32 &curOffset, u8 &len) {
+  if (curOffset + 1 > 0x10000) {
     return false;
   }
 
@@ -910,18 +910,18 @@ bool PrismSnesTrack::readDeltaTime(u32 &eventOffset, u8 &len) {
     len = defaultLength;
   }
   else {
-    len = readByte(eventOffset++);
+    len = readByte(curOffset++);
   }
   return true;
 }
 
-bool PrismSnesTrack::readDuration(u32 &eventOffset, u8 len, u8 &durDelta) {
-  if (eventOffset + 1 > 0x10000) {
+bool PrismSnesTrack::readDuration(u32 &curOffset, u8 len, u8 &durDelta) {
+  if (curOffset + 1 > 0x10000) {
     return false;
   }
 
   if (manualDuration) {
-    durDelta = readByte(eventOffset++);
+    durDelta = readByte(curOffset++);
   }
   else {
     durDelta = len >> 1;
@@ -938,10 +938,10 @@ bool PrismSnesTrack::readDuration(u32 &eventOffset, u8 len, u8 &durDelta) {
   return true;
 }
 
-u8 PrismSnesTrack::getDuration(u32 eventOffset, u8 len, u8 durDelta) {
+u8 PrismSnesTrack::getDuration(u32 curOffset, u8 len, u8 durDelta) {
   // TODO: adjust duration for slur/tie
-  if (eventOffset + 1 <= 0x10000) {
-    u8 nextStatusByte = readByte(eventOffset);
+  if (curOffset + 1 <= 0x10000) {
+    u8 nextStatusByte = readByte(curOffset);
     if (nextStatusByte == 0xee || nextStatusByte == 0xf4 || nextStatusByte == 0xce || nextStatusByte == 0xf5) {
       durDelta = 0;
     }

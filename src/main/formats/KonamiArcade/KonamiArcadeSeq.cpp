@@ -14,7 +14,7 @@ DECLARE_FORMAT(KonamiArcade);
 
 KonamiArcadeSeq::KonamiArcadeSeq(
   RawFile *file,
-  KonamiArcadeFormatVer formatVersion,
+  KonamiArcadeFormatVer fmtVer,
   u32 offset,
   u32 ramOffset,
   const std::array<KonamiArcadeInstrSet::drum, 46>& drums,
@@ -22,7 +22,7 @@ KonamiArcadeSeq::KonamiArcadeSeq(
   const std::string& name
 )
     : VGMSeq(KonamiArcadeFormat::name, file, offset, 0, name),
-      fmtVer(formatVersion), m_memOffset(ramOffset), m_drums(drums), m_nmiRate(nmiRate) {
+      fmtVer(fmtVer), m_memOffset(ramOffset), m_drums(drums), m_nmiRate(nmiRate) {
   bLoadTickByTick = true;
   setUseLinearAmplitudeScale(true);
   setAllowDiscontinuousTrackData(true);
@@ -95,8 +95,8 @@ bool KonamiArcadeSeq::parseTrackPointers() {
 // *****************
 
 
-KonamiArcadeTrack::KonamiArcadeTrack(KonamiArcadeSeq *sequence, u32 offset, u32 length)
-    : SeqTrack(sequence, offset, length), m_inJump(false) {
+KonamiArcadeTrack::KonamiArcadeTrack(KonamiArcadeSeq *parentSeq, u32 offset, u32 length)
+    : SeqTrack(parentSeq, offset, length), m_inJump(false) {
 }
 
 void KonamiArcadeTrack::resetVars() {

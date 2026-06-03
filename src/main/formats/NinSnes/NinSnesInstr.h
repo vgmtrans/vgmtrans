@@ -22,7 +22,7 @@ class NinSnesInstrSet:
   NinSnesInstrSet(RawFile *file,
                   NinSnesProfileId profile,
                   u32 offset,
-                  u32 spcDirAddress,
+                  u32 spcDirAddr,
                   const std::string &name = "NinSnesInstrSet");
   NinSnesInstrSet(RawFile *file, const NinSnesScanResult& scanResult);
   virtual ~NinSnesInstrSet();
@@ -60,7 +60,7 @@ class NinSnesInstr
                u32 offset,
                u32 theBank,
                u32 theInstrNum,
-               u32 spcDirAddress,
+               u32 spcDirAddr,
                const std::string &name = "NinSnesInstr");
   virtual ~NinSnesInstr();
 

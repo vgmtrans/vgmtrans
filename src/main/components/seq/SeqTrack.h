@@ -198,10 +198,10 @@ private:
   void addForModDestNoItem(ModDest destination, u8 value) const;
   void addLfoModulationEvent(ModDest destination,
                              u32 offset,
-                                     u32 length,
-                                     u8 value,
-                                     const std::string& eventName,
-                                     Type eventType);
+                             u32 length,
+                             u8 value,
+                             const std::string& eventName,
+                             Type type);
   double applyPanVolumeCorrection(double level, LevelController controller) const;
   void addLevelNoItem(double level, LevelController controller, Resolution res, int absTime = -1);
   void reapplyStoredLevelNoItem(LevelController controller, int absTime = -1);
@@ -211,8 +211,7 @@ private:
   void endActiveNoteIndex(s8 key, u32 endTick);
 
  public:
-  SeqEvent* addGenericEvent(u32 offset, u32 length, const std::string &sEventName,
-                            const std::string &sEventDesc, Type eventType);
+  SeqEvent* addGenericEvent(u32 offset, u32 length, const std::string &sEventName, const std::string &sEventDesc, Type type);
   void addSetOctave(u32 offset, u32 length, u8 newOctave, const std::string &sEventName = "Set Octave");
   void addIncrementOctave(u32 offset, u32 length, const std::string &sEventName = "Increment Octave");    // 1,Sep.2009 revise
   void addDecrementOctave(u32 offset, u32 length, const std::string &sEventName = "Decrement Octave");    // 1,Sep.2009 revise
@@ -346,9 +345,7 @@ private:
   void addControllerEventNoItem(u8 controllerType, u8 controllerValue) const;
 
   void addGlobalTranspose(u32 offset, u32 length, s8 semitones, const std::string &sEventName = "Global Transpose");
-  void addMarker(u32 offset, u32 length, const std::string &markername, u8 databyte1,
-                 u8 databyte2, const std::string &sEventName, s8 priority = 0,
-                 Type eventType = Type::Misc);
+  void addMarker(u32 offset, u32 length, const std::string &markername, u8 databyte1, u8 databyte2, const std::string &sEventName, s8 priority = 0, Type type = Type::Misc);
   void addMarkerNoItem(const std::string &markername, u8 databyte1, u8 databyte2, s8 priority) const;
   void insertMarkerNoItem(u32 absTime, const std::string &markername, u8 databyte1, u8 databyte2, s8 priority) const;
 

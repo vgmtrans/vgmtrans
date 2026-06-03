@@ -16,13 +16,13 @@
 class RareSnesInstrSet:
     public VGMInstrSet {
  public:
-  RareSnesInstrSet(RawFile *file, u32 offset, u32 spcDirAddress, const std::string &name = "RareSnesInstrSet");
+  RareSnesInstrSet(RawFile *file, u32 offset, u32 spcDirAddr, const std::string &name = "RareSnesInstrSet");
   RareSnesInstrSet(RawFile *file,
                    u32 offset,
-                   u32 spcDirAddress,
-                   const std::map<u8, s8> &unityKeyHints,
-                   const std::map<u8, s16> &pitchHints,
-                   const std::map<u8, u16> &adsrHints,
+                   u32 spcDirAddr,
+                   const std::map<u8, s8> &instrUnityKeyHints,
+                   const std::map<u8, s16> &instrPitchHints,
+                   const std::map<u8, u16> &instrADSRHints,
                    const std::string &name = "RareSnesInstrSet");
   virtual ~RareSnesInstrSet();
 
@@ -54,10 +54,10 @@ class RareSnesInstr
                 u32 offset,
                 u32 theBank,
                 u32 theInstrNum,
-                u32 spcDirAddress,
-                s8 transposeSemitones = 0,
-                s16 pitchValue = 0,
-                u16 adsrValue = 0x8FE0,
+                u32 spcDirAddr,
+                s8 transpose = 0,
+                s16 pitch = 0,
+                u16 adsr = 0x8FE0,
                 const std::string &name = "RareSnesInstr");
   virtual ~RareSnesInstr();
 
@@ -77,8 +77,7 @@ class RareSnesInstr
 class RareSnesRgn
     : public VGMRgn {
  public:
-  RareSnesRgn(RareSnesInstr *instr, u32 offset, s8 transposeSemitones = 0,
-              s16 pitchValue = 0, u16 adsrValue = 0x8FE0);
+  RareSnesRgn(RareSnesInstr *instr, u32 offset, s8 transpose = 0, s16 pitch = 0, u16 adsr = 0x8FE0);
   virtual ~RareSnesRgn();
 
   virtual bool loadRgn();

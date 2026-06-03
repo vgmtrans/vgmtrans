@@ -16,9 +16,9 @@
 // CapcomSnesInstrSet
 // ****************
 
-CapcomSnesInstrSet::CapcomSnesInstrSet(RawFile *file, u32 offset, u32 spcDirAddress, const std::string &name) :
+CapcomSnesInstrSet::CapcomSnesInstrSet(RawFile *file, u32 offset, u32 spcDirAddr, const std::string &name) :
     VGMInstrSet(CapcomSnesFormat::name, file, offset, 0, name),
-    spcDirAddr(spcDirAddress) {
+    spcDirAddr(spcDirAddr) {
 }
 
 CapcomSnesInstrSet::~CapcomSnesInstrSet() {
@@ -89,9 +89,9 @@ CapcomSnesInstr::CapcomSnesInstr(VGMInstrSet *instrSet,
                                  u32 offset,
                                  u32 theBank,
                                  u32 theInstrNum,
-                                 u32 spcDirAddress,
+                                 u32 spcDirAddr,
                                  const std::string &name) :
-    VGMInstr(instrSet, offset, 6, theBank, theInstrNum, name), spcDirAddr(spcDirAddress) {
+    VGMInstr(instrSet, offset, 6, theBank, theInstrNum, name), spcDirAddr(spcDirAddr) {
 }
 
 CapcomSnesInstr::~CapcomSnesInstr() {}

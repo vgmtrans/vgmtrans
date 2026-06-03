@@ -38,16 +38,16 @@ void NinSnesTrackState::resetVars() {
 //  NinSnesTrack
 //  ************
 
-NinSnesSectionTrackItem::NinSnesSectionTrackItem(NinSnesSeq* sequence, u32 offset,
+NinSnesSectionTrackItem::NinSnesSectionTrackItem(NinSnesSeq* parentSeq, u32 offset,
                                                  u32 length,
                                                  const std::string& theName)
-    : SeqTrack(sequence, offset, length, theName) {
+    : SeqTrack(parentSeq, offset, length, theName) {
   bDetermineTrackLengthEventByEvent = true;
 }
 
-NinSnesTrack::NinSnesTrack(NinSnesSeq* sequence, u32 offset, u32 length,
+NinSnesTrack::NinSnesTrack(NinSnesSeq* parentSeq, u32 offset, u32 length,
                            const std::string& theName)
-    : SeqTrack(sequence, offset, length, theName) {
+    : SeqTrack(parentSeq, offset, length, theName) {
   resetVars();
   bDetermineTrackLengthEventByEvent = true;
 }

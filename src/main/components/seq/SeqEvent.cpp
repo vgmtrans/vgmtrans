@@ -16,9 +16,9 @@ SeqEvent::SeqEvent(SeqTrack *pTrack,
                    u32 offset,
                    u32 length,
                    const std::string &name,
-                   Type eventType,
+                   Type type,
                    const std::string &desc)
-    : VGMItem(pTrack->parentSeq, offset, length, name, eventType), channel(0),
+    : VGMItem(pTrack->parentSeq, offset, length, name, type), channel(0),
       parentTrack(pTrack), m_description(desc) {}
 
 // ***************
@@ -148,8 +148,8 @@ MastVolSlideSeqEvent::MastVolSlideSeqEvent(SeqTrack *pTrack,
 ExpressionSeqEvent::ExpressionSeqEvent(SeqTrack *pTrack, u8 theLevel, u32 offset, u32 length, const std::string &name)
     : SeqEvent(pTrack, offset, length, name, Type::Expression), level(theLevel) { }
 
-ExpressionSeqEvent::ExpressionSeqEvent(SeqTrack *pTrack, double percentLevelValue, u32 offset, u32 length, const std::string &name)
-    : SeqEvent(pTrack, offset, length, name, Type::Expression), percentLevel(percentLevelValue) { }
+ExpressionSeqEvent::ExpressionSeqEvent(SeqTrack *pTrack, double level, u32 offset, u32 length, const std::string &name)
+    : SeqEvent(pTrack, offset, length, name, Type::Expression), percentLevel(level) { }
 
 // ***********************
 // ExpressionSlideSeqEvent
@@ -331,11 +331,11 @@ ProgChangeSeqEvent::ProgChangeSeqEvent(SeqTrack *pTrack,
 // ******************
 
 BankSelectSeqEvent::BankSelectSeqEvent(SeqTrack *pTrack,
-                                       u32 bankNumber,
+                                       u32 bank,
                                        u32 offset,
                                        u32 length,
                                        const std::string &name)
-    : SeqEvent(pTrack, offset, length, name, Type::BankSelect), bank(bankNumber) { }
+    : SeqEvent(pTrack, offset, length, name, Type::BankSelect), bank(bank) { }
 
 // *************
 // TempoSeqEvent

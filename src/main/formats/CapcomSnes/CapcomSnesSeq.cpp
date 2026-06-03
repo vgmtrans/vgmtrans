@@ -39,10 +39,10 @@ const u8 CapcomSnesSeq::panTable[] = {
 CapcomSnesSeq::CapcomSnesSeq(RawFile *file,
                              CapcomSnesVersion ver,
                              u32 seqdataOffset,
-                             bool hasPriorityInHeader,
+                             bool priorityInHeader,
                              std::string name)
     : VGMSeq(CapcomSnesFormat::name, file, seqdataOffset, 0, std::move(name)), version(ver),
-      priorityInHeader(hasPriorityInHeader) {
+      priorityInHeader(priorityInHeader) {
   bLoadTickByTick = true;
   setAllowDiscontinuousTrackData(true);
   setUseLinearAmplitudeScale(true);
@@ -220,8 +220,8 @@ u8 CapcomSnesTrack::getNoteOctave() const {
   return noteAttributes & CAPCOM_SNES_MASK_NOTE_OCTAVE;
 }
 
-void CapcomSnesTrack::setNoteOctave(u8 noteOctave) {
-  noteAttributes = (noteAttributes & ~CAPCOM_SNES_MASK_NOTE_OCTAVE) | (noteOctave & CAPCOM_SNES_MASK_NOTE_OCTAVE);
+void CapcomSnesTrack::setNoteOctave(u8 octave) {
+  noteAttributes = (noteAttributes & ~CAPCOM_SNES_MASK_NOTE_OCTAVE) | (octave & CAPCOM_SNES_MASK_NOTE_OCTAVE);
 }
 
 bool CapcomSnesTrack::isNoteOctaveUp() const {

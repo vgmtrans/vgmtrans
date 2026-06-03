@@ -24,7 +24,7 @@ class SoftCreatSnesSeq
   SoftCreatSnesSeq(RawFile *file,
                    SoftCreatSnesVersion ver,
                    u32 seqdata_offset,
-                   u8 headerAlignmentSize,
+                   u8 headerAlignSize,
                    std::string newName = "SoftCreat SNES Seq");
   virtual ~SoftCreatSnesSeq();
 

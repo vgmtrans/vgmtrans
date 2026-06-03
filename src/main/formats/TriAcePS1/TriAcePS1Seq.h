@@ -34,6 +34,7 @@ class TriAcePS1Seq:
   std::vector<TriAcePS1ScorePattern *> aScorePatterns;
   TriAcePS1ScorePattern *curScorePattern;
   std::map<u32, TriAcePS1ScorePattern *> patternMap;
+  u8 initialTempoBPM;
 };
 
 class TriAcePS1ScorePattern
@@ -47,7 +48,7 @@ class TriAcePS1ScorePattern
 class TriAcePS1Track
     : public SeqTrack {
  public:
-  TriAcePS1Track(TriAcePS1Seq *sequence, u32 offset = 0, u32 length = 0);
+  TriAcePS1Track(TriAcePS1Seq *parentSeq, u32 offset = 0, u32 length = 0);
 
   virtual void loadTrackMainLoop(u32 stopOffset, s32 stopTime);
   u32 readScorePattern(u32 offset);

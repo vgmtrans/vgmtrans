@@ -11,7 +11,7 @@ enum CPS1FormatVer: u8;
 class CPS1TrackV2
     : public SeqTrack {
 public:
-  CPS1TrackV2(VGMSeq *sequence, CPSSynth synth, u32 offset = 0, u32 length = 0);
+  CPS1TrackV2(VGMSeq *parentSeq, CPSSynth channelSynth, u32 offset = 0, u32 length = 0);
   void resetVars() override;
   void addInitialMidiEvents(int trackNum) override;
   bool readEvent() override;

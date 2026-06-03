@@ -174,12 +174,12 @@ void KonamiTMNT2Seq::useColl(const VGMColl* coll) {
 
 KonamiTMNT2Track::KonamiTMNT2Track(
   bool isFmTrack,
-  KonamiTMNT2Seq *sequence,
+  KonamiTMNT2Seq *parentSeq,
   u32 offset,
   u32 length,
   std::string name
 )
-    : SeqTrack(sequence, offset, length, std::move(name)),
+    : SeqTrack(parentSeq, offset, length, std::move(name)),
       m_isFmTrack(isFmTrack) {
   synthType = isFmTrack ? SynthType::YM2151 : SynthType::SoundFont;
   setUseLinearAmplitudeScale(!isFmTrack);

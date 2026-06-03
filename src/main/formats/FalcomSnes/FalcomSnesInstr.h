@@ -26,9 +26,9 @@ class FalcomSnesInstrSet:
   FalcomSnesInstrSet(RawFile *file,
                      FalcomSnesVersion ver,
                      u32 offset,
-                     u32 sampToInstrTableAddress,
-                     u32 spcDirAddress,
-                     const std::map<u8, u16> &adsrHints,
+                     u32 addrSampToInstrTable,
+                     u32 spcDirAddr,
+                     const std::map<u8, u16> &instrADSRHints,
                      const std::string &name = "FalcomSnesInstrSet");
   ~FalcomSnesInstrSet() override;
 
@@ -56,8 +56,8 @@ class FalcomSnesInstr
                   u32 offset,
                   u32 theBank,
                   u32 theInstrNum,
-                  u8 sampleNumber,
-                  u32 spcDirAddress,
+                  u8 srcn,
+                  u32 spcDirAddr,
                   const std::string &name = "FalcomSnesInstr");
   ~FalcomSnesInstr() override;
 

@@ -170,7 +170,7 @@ class VirtFile final : public RawFile {
     VirtFile(const RawFile &, size_t offset = 0);
     VirtFile(const RawFile &, size_t offset, size_t limit);
     VirtFile(const u8 *data, u32 size, std::string name, std::filesystem::path parent_fullpath = "",
-             const VGMTag& fileTag = VGMTag());
+             const VGMTag& tag = VGMTag());
     ~VirtFile() override = default;
 
     [[nodiscard]] std::string name() const override { return m_name; };

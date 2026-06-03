@@ -335,7 +335,7 @@ class PSXSampColl : public VGMSampColl {
               VGMInstrSet *instrset,
               u32 offset,
               u32 length,
-              const std::vector<SizeOffsetPair> &sampleLocations);
+              const std::vector<SizeOffsetPair> &vagLocations);
 
   bool parseSampleInfo() override;        //retrieve sample info, including pointers to data, # channels, rate, etc.
   static PSXSampColl *searchForPSXADPCM(RawFile *file, const std::string &format);
@@ -357,7 +357,7 @@ class PSXSamp : public VGMSamp {
   double compressionRatio() const override;
   void SetLoopOnConversion(bool bDoIt) { bSetLoopOnConversion = bDoIt; }
 
-  static u32 getSampleLength(const RawFile *file, u32 offset, u32 endOffset, bool &hasLoop);
+  static u32 getSampleLength(const RawFile *file, u32 offset, u32 endOffset, bool &loop);
 
  private:
   std::vector<u8> decodeToNativePcm() override;

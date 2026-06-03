@@ -7,8 +7,8 @@
 // TamSoftPS1InstrSet
 // ******************
 
-TamSoftPS1InstrSet::TamSoftPS1InstrSet(RawFile *file, u32 offset, bool isPs2, const std::string &name) :
-    VGMInstrSet(TamSoftPS1Format::name, file, offset, 0, name), ps2(isPs2) {
+TamSoftPS1InstrSet::TamSoftPS1InstrSet(RawFile *file, u32 offset, bool ps2, const std::string &name) :
+    VGMInstrSet(TamSoftPS1Format::name, file, offset, 0, name), ps2(ps2) {
 }
 
 TamSoftPS1InstrSet::~TamSoftPS1InstrSet() {
@@ -56,8 +56,8 @@ bool TamSoftPS1InstrSet::parseInstrPointers() {
 // TamSoftPS1Instr
 // ***************
 
-TamSoftPS1Instr::TamSoftPS1Instr(TamSoftPS1InstrSet *instrSet, u8 instrumentNumber, const std::string &name) :
-    VGMInstr(instrSet, instrSet->offset() + 4 * instrumentNumber, 0x400 + 4, 0, instrumentNumber, name) {
+TamSoftPS1Instr::TamSoftPS1Instr(TamSoftPS1InstrSet *instrSet, u8 instrNum, const std::string &name) :
+    VGMInstr(instrSet, instrSet->offset() + 4 * instrNum, 0x400 + 4, 0, instrNum, name) {
 }
 
 TamSoftPS1Instr::~TamSoftPS1Instr() {

@@ -16,18 +16,18 @@ ConversionContext::ConversionContext()
       dlsModSources(SynthTarget::DLS),
       modulationSynthTarget(SynthTarget::SoundFont) {}
 
-ConversionContext::ConversionContext(BankSelectStyle selectedBankStyle,
-                                     int loopCount,
-                                     bool skipRhythmChannel,
-                                     const ModSourceMap& sf2Sources,
-                                     const ModSourceMap& dlsSources,
-                                     SynthTarget modulationTarget)
-    : bankSelectStyle(selectedBankStyle),
-      sequenceLoops(loopCount),
-      skipChannel10(skipRhythmChannel),
-      sf2ModSources(sf2Sources),
-      dlsModSources(dlsSources),
-      modulationSynthTarget(modulationTarget) {}
+ConversionContext::ConversionContext(BankSelectStyle bankSelectStyle,
+                                     int sequenceLoops,
+                                     bool skipChannel10,
+                                     const ModSourceMap& sf2ModSources,
+                                     const ModSourceMap& dlsModSources,
+                                     SynthTarget modulationSynthTarget)
+    : bankSelectStyle(bankSelectStyle),
+      sequenceLoops(sequenceLoops),
+      skipChannel10(skipChannel10),
+      sf2ModSources(sf2ModSources),
+      dlsModSources(dlsModSources),
+      modulationSynthTarget(modulationSynthTarget) {}
 
 ConversionContext ConversionContext::fromOptions(
     const ConversionOptions& options,

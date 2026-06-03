@@ -81,7 +81,7 @@ class RIFFChunk: public ListTypeChunk {
 ////////////////////////////////////////////////////////////////////////////
 class LISTChunk: public ListTypeChunk {
  public:
-  LISTChunk(const std::string& listType) : ListTypeChunk("LIST", listType) { }
+  LISTChunk(const std::string& type) : ListTypeChunk("LIST", type) { }
 };
 
 

@@ -50,7 +50,7 @@ class DialogicAdpcmSamp
 public:
 
   DialogicAdpcmSamp(
-      VGMSampColl *sampColl, u32 offset, u32 length, u32 theRate, float gainValue, std::string name
+      VGMSampColl *sampColl, u32 offset, u32 length, u32 theRate, float gain, std::string name
   );
   ~DialogicAdpcmSamp() override;
 

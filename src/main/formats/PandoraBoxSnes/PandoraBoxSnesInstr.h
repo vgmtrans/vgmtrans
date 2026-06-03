@@ -19,11 +19,11 @@ class PandoraBoxSnesInstrSet:
  public:
   PandoraBoxSnesInstrSet(RawFile *file,
                          PandoraBoxSnesVersion ver,
-                         u32 spcDirAddress,
-                         u16 localInstrTableAddress,
-                         u16 globalInstrTableAddress,
-                         u8 globalInstrCount,
-                         const std::map<u8, u16> &adsrHints = std::map<u8, u16>(),
+                         u32 spcDirAddr,
+                         u16 addrLocalInstrTable,
+                         u16 addrGlobalInstrTable,
+                         u8 globalInstrumentCount,
+                         const std::map<u8, u16> &instrADSRHints = std::map<u8, u16>(),
                          const std::string &name = "PandoraBoxSnesInstrSet");
   virtual ~PandoraBoxSnesInstrSet();
 
@@ -53,9 +53,9 @@ class PandoraBoxSnesInstr
                       PandoraBoxSnesVersion ver,
                       u32 offset,
                       u8 theInstrNum,
-                      u8 sampleNumber,
-                      u32 spcDirAddress,
-                      u16 adsrValue = 0x8fe0,
+                      u8 srcn,
+                      u32 spcDirAddr,
+                      u16 adsr = 0x8fe0,
                       const std::string &name = "PandoraBoxSnesInstr");
   virtual ~PandoraBoxSnesInstr();
 

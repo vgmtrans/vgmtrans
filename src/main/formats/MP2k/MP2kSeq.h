@@ -53,7 +53,7 @@ private:
   void setLfoSpeed(u8 speed);
   void setLfoDelay(u8 delay);
   void setModulationDepth(u8 depth);
-  void setModulationType(u8 modulationType);
+  void setModulationType(u8 type);
   void applyLfoDepth(bool force);
   void clearLfoOutputs();
   bool lfoOutputsEnabled() const;

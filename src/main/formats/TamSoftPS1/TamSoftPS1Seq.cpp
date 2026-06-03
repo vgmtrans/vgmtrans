@@ -41,7 +41,7 @@ const u16 TamSoftPS1Seq::PITCH_TABLE[73] = {
 };
 
 TamSoftPS1Seq::TamSoftPS1Seq(RawFile *file, u32 offset, u8 theSong, const std::string &name)
-    : VGMSeq(TamSoftPS1Format::name, file, offset, 0, name), song(theSong), seqType(0),
+    : VGMSeq(TamSoftPS1Format::name, file, offset, 0, name), song(theSong), type(0),
       reverbDepth(0), ps2(false) {
   bLoadTickByTick = true;
   setUseLinearAmplitudeScale(true);
@@ -70,7 +70,7 @@ bool TamSoftPS1Seq::parseHeader() {
     return false;
   }
 
-  seqType = readShort(dwSongItemOffset);
+  type = readShort(dwSongItemOffset);
   u16 seqHeaderRelOffset = readShort(dwSongItemOffset + 2);
 
   std::string songTableItemName = fmt::format("Song {}", song);
@@ -82,7 +82,7 @@ bool TamSoftPS1Seq::parseHeader() {
     return false;
   }
 
-  if (seqType == 0) {
+  if (type == 0) {
     // BGM
     u32 dwHeaderOffset = offset() + seqHeaderRelOffset;
 

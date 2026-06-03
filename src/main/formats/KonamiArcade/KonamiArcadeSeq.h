@@ -14,7 +14,7 @@ class KonamiArcadeSeq:
 public:
   KonamiArcadeSeq(
     RawFile *file,
-    KonamiArcadeFormatVer formatVersion,
+    KonamiArcadeFormatVer fmt_version,
     u32 offset,
     u32 memOffset,
     const std::array<KonamiArcadeInstrSet::drum, 46>& drums,
@@ -49,7 +49,7 @@ private:
 class KonamiArcadeTrack
     : public SeqTrack {
 public:
-  KonamiArcadeTrack(KonamiArcadeSeq *sequence, u32 offset = 0, u32 length = 0);
+  KonamiArcadeTrack(KonamiArcadeSeq *parentSeq, u32 offset = 0, u32 length = 0);
 
   void resetVars() override;
   bool readEvent() override;

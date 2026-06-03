@@ -62,20 +62,20 @@ SynthWave *SynthFile::addWave(u16 formatTag,
 //  **********
 
 
-SynthInstr::SynthInstr(u32 bank, u32 instrument, float reverbLevel)
-    : ulBank(bank), ulInstrument(instrument), reverb(reverbLevel) {
+SynthInstr::SynthInstr(u32 bank, u32 instrument, float reverb)
+    : ulBank(bank), ulInstrument(instrument), reverb(reverb) {
   name = fmt::format("Instr bnk {} num {}", bank, instrument);
   //RiffFile::AlignName(name);
 }
 
-SynthInstr::SynthInstr(u32 bank, u32 instrument, std::string instrName, float reverbLevel)
-    : ulBank(bank), ulInstrument(instrument), name(std::move(instrName)), reverb(reverbLevel)  {
+SynthInstr::SynthInstr(u32 bank, u32 instrument, std::string instrName, float reverb)
+    : ulBank(bank), ulInstrument(instrument), name(std::move(instrName)), reverb(reverb)  {
   //RiffFile::AlignName(name);
 }
 
 SynthInstr::SynthInstr(u32 bank, u32 instrument, std::string instrName,
-                       const std::vector<SynthRgn *>& listRgns, float reverbLevel)
-    : ulBank(bank), ulInstrument(instrument), name(std::move(instrName)), reverb(reverbLevel)  {
+                       const std::vector<SynthRgn *>& listRgns, float reverb)
+    : ulBank(bank), ulInstrument(instrument), name(std::move(instrName)), reverb(reverb)  {
   //RiffFile::AlignName(name);
   vRgns = listRgns;
 }

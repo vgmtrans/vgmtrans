@@ -8,8 +8,8 @@
 #include "base/Types.h"
 #include "ScaleConversion.h"
 
-CPS2TrackV2::CPS2TrackV2(CPS2Seq *sequence, u32 offset, u32 length)
-    : SeqTrack(sequence, offset, length) {
+CPS2TrackV2::CPS2TrackV2(CPS2Seq *parentSeq, u32 offset, u32 length)
+    : SeqTrack(parentSeq, offset, length) {
   CPS2TrackV2::resetVars();
 }
 

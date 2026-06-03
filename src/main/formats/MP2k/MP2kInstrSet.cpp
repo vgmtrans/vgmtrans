@@ -215,9 +215,9 @@ int MP2kInstrSet::makeOrGetSample(size_t sample_pointer) {
   return sampColl->samples.size() - 1;
 }
 
-MP2kInstr::MP2kInstr(MP2kInstrSet *set, size_t offset, size_t length, u32 bankNumber, u32 number,
+MP2kInstr::MP2kInstr(MP2kInstrSet *set, size_t offset, size_t length, u32 bank, u32 number,
                      MP2kInstrData data)
-    : VGMInstr(set, offset, length, bankNumber, number), m_type(data.w0 & 0xFF), m_data(data) {
+    : VGMInstr(set, offset, length, bank, number), m_type(data.w0 & 0xFF), m_data(data) {
 }
 
 bool MP2kInstr::loadInstr() {

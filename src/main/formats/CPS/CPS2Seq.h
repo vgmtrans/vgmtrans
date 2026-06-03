@@ -13,8 +13,7 @@ enum CPS2FormatVer: u8;
 class CPS2Seq:
     public VGMSeq {
 public:
-  CPS2Seq(RawFile *file, u32 offset, CPS2FormatVer fmt_version, std::string name,
-          std::vector<s8> transposeTable = {});
+  CPS2Seq(RawFile *file, u32 offset, CPS2FormatVer fmt_version, std::string name, std::vector<s8> instrTransposeTable = {});
   ~CPS2Seq() override;
 
   bool parseHeader() override;

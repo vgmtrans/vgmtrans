@@ -23,7 +23,7 @@ class SeqEvent:
                     u32 offset = 0,
                     u32 length = 0,
                     const std::string &name = "",
-                    Type eventType = Type::Unknown,
+                    Type type = Type::Unknown,
                     const std::string &desc = "");
   ~SeqEvent() override = default;
   std::string description() override {
@@ -238,10 +238,8 @@ class MastVolSlideSeqEvent : public SeqEvent {
 
 class ExpressionSeqEvent : public SeqEvent {
  public:
-  ExpressionSeqEvent(SeqTrack *pTrack, u8 expressionLevel, u32 offset = 0, u32 length = 0,
-                     const std::string &name = "");
-  ExpressionSeqEvent(SeqTrack *pTrack, double percentLevelValue, u32 offset = 0, u32 length = 0,
-                     const std::string &name = "");
+  ExpressionSeqEvent(SeqTrack *pTrack, u8 level, u32 offset = 0, u32 length = 0, const std::string &name = "");
+  ExpressionSeqEvent(SeqTrack *pTrack, double level, u32 offset = 0, u32 length = 0, const std::string &name = "");
 
   std::string description() override {
     if (percentLevel > 0) {
@@ -547,7 +545,7 @@ class ProgChangeSeqEvent : public SeqEvent {
 
 class BankSelectSeqEvent : public SeqEvent {
 public:
-  BankSelectSeqEvent(SeqTrack *pTrack, u32 bankNumber, u32 offset = 0,
+  BankSelectSeqEvent(SeqTrack *pTrack, u32 bank, u32 offset = 0,
                      u32 length = 0, const std::string &name = "");
 
   std::string description() override {
@@ -620,14 +618,13 @@ class MarkerSeqEvent : public SeqEvent {
  public:
   MarkerSeqEvent(SeqTrack *pTrack,
                  const std::string &markername,
-                 u8 markerDataByte1,
-                 u8 markerDataByte2,
+                 u8 databyte1,
+                 u8 databyte2,
                  u32 offset = 0,
                  u32 length = 0,
                  const std::string &name = "",
-                 Type eventType = Type::Marker)
-      : SeqEvent(pTrack, offset, length, name, eventType),
-        databyte1(markerDataByte1), databyte2(markerDataByte2),
+                 Type type = Type::Marker)
+      : SeqEvent(pTrack, offset, length, name, type), databyte1(databyte1), databyte2(databyte2),
         markerName(markername) {}
 
  public:

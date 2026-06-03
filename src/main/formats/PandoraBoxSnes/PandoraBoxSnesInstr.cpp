@@ -16,18 +16,18 @@
 
 PandoraBoxSnesInstrSet::PandoraBoxSnesInstrSet(RawFile *file,
                                                PandoraBoxSnesVersion ver,
-                                               u32 spcDirAddress,
-                                               u16 localInstrTableAddress,
-                                               u16 globalInstrTableAddress,
-                                               u8 globalInstrCount,
-                                               const std::map<u8, u16> &adsrHints,
+                                               u32 spcDirAddr,
+                                               u16 addrLocalInstrTable,
+                                               u16 addrGlobalInstrTable,
+                                               u8 globalInstrumentCount,
+                                               const std::map<u8, u16> &instrADSRHints,
                                                const std::string &name) :
-    VGMInstrSet(PandoraBoxSnesFormat::name, file, localInstrTableAddress, 0, name), version(ver),
-    spcDirAddr(spcDirAddress),
-    addrLocalInstrTable(localInstrTableAddress),
-    addrGlobalInstrTable(globalInstrTableAddress),
-    globalInstrumentCount(globalInstrCount),
-    instrADSRHints(adsrHints) {
+    VGMInstrSet(PandoraBoxSnesFormat::name, file, addrLocalInstrTable, 0, name), version(ver),
+    spcDirAddr(spcDirAddr),
+    addrLocalInstrTable(addrLocalInstrTable),
+    addrGlobalInstrTable(addrGlobalInstrTable),
+    globalInstrumentCount(globalInstrumentCount),
+    instrADSRHints(instrADSRHints) {
 }
 
 PandoraBoxSnesInstrSet::~PandoraBoxSnesInstrSet() {
@@ -114,14 +114,14 @@ PandoraBoxSnesInstr::PandoraBoxSnesInstr(VGMInstrSet *instrSet,
                                          PandoraBoxSnesVersion ver,
                                          u32 offset,
                                          u8 theInstrNum,
-                                         u8 sampleNumber,
-                                         u32 spcDirAddress,
-                                         u16 adsrValue,
+                                         u8 srcn,
+                                         u32 spcDirAddr,
+                                         u16 adsr,
                                          const std::string &name) :
     VGMInstr(instrSet, offset, 1, 0, theInstrNum, name), version(ver),
-    spcDirAddr(spcDirAddress),
-    srcn(sampleNumber),
-    adsr(adsrValue) {
+    spcDirAddr(spcDirAddr),
+    srcn(srcn),
+    adsr(adsr) {
 }
 
 PandoraBoxSnesInstr::~PandoraBoxSnesInstr() {

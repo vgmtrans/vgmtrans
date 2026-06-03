@@ -35,7 +35,7 @@ class ItikitiSnesInstrSet : public VGMInstrSet {
 class ItikitiSnesInstr : public VGMInstr {
  public:
   ItikitiSnesInstr(VGMInstrSet *instrument_set, u32 tuning_offset, u32 adsr_offset,
-                   u32 bankNumber, u32 instrument_number, u8 sampleNumber, u16 spc_dir_offset,
+                   u32 bank, u32 instrument_number, u8 srcn, u16 spc_dir_offset,
                    std::string name = "ItikitiSnesInstr");
 
   bool loadInstr() override;

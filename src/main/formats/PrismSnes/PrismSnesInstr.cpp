@@ -17,18 +17,18 @@
 
 PrismSnesInstrSet::PrismSnesInstrSet(RawFile *file,
                                      PrismSnesVersion ver,
-                                     u32 spcDirAddress,
-                                     u16 adsr1TableAddress,
-                                     u16 adsr2TableAddress,
-                                     u16 tuningTableHighAddress,
-                                     u16 tuningTableLowAddress,
+                                     u32 spcDirAddr,
+                                     u16 addrADSR1Table,
+                                     u16 addrADSR2Table,
+                                     u16 addrTuningTableHigh,
+                                     u16 addrTuningTableLow,
                                      const std::string &name) :
-    VGMInstrSet(PrismSnesFormat::name, file, adsr1TableAddress, 0, name), version(ver),
-    spcDirAddr(spcDirAddress),
-    addrADSR1Table(adsr1TableAddress),
-    addrADSR2Table(adsr2TableAddress),
-    addrTuningTableHigh(tuningTableHighAddress),
-    addrTuningTableLow(tuningTableLowAddress) {}
+    VGMInstrSet(PrismSnesFormat::name, file, addrADSR1Table, 0, name), version(ver),
+    spcDirAddr(spcDirAddr),
+    addrADSR1Table(addrADSR1Table),
+    addrADSR2Table(addrADSR2Table),
+    addrTuningTableHigh(addrTuningTableHigh),
+    addrTuningTableLow(addrTuningTableLow) {}
 
 PrismSnesInstrSet::~PrismSnesInstrSet() {}
 
@@ -103,20 +103,20 @@ bool PrismSnesInstrSet::parseInstrPointers() {
 
 PrismSnesInstr::PrismSnesInstr(VGMInstrSet *instrSet,
                                PrismSnesVersion ver,
-                               u8 sampleNumber,
-                               u32 spcDirAddress,
-                               u16 adsr1EntryAddress,
-                               u16 adsr2EntryAddress,
-                               u16 tuningEntryHighAddress,
-                               u16 tuningEntryLowAddress,
+                               u8 srcn,
+                               u32 spcDirAddr,
+                               u16 addrADSR1Entry,
+                               u16 addrADSR2Entry,
+                               u16 addrTuningEntryHigh,
+                               u16 addrTuningEntryLow,
                                const std::string &name) :
-    VGMInstr(instrSet, adsr1EntryAddress, 0, sampleNumber >> 7, sampleNumber & 0x7f, name), version(ver),
-    srcn(sampleNumber),
-    spcDirAddr(spcDirAddress),
-    addrADSR1Entry(adsr1EntryAddress),
-    addrADSR2Entry(adsr2EntryAddress),
-    addrTuningEntryHigh(tuningEntryHighAddress),
-    addrTuningEntryLow(tuningEntryLowAddress) {
+    VGMInstr(instrSet, addrADSR1Entry, 0, srcn >> 7, srcn & 0x7f, name), version(ver),
+    srcn(srcn),
+    spcDirAddr(spcDirAddr),
+    addrADSR1Entry(addrADSR1Entry),
+    addrADSR2Entry(addrADSR2Entry),
+    addrTuningEntryHigh(addrTuningEntryHigh),
+    addrTuningEntryLow(addrTuningEntryLow) {
 }
 
 PrismSnesInstr::~PrismSnesInstr() {

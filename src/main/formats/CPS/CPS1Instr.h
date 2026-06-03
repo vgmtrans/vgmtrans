@@ -56,7 +56,7 @@ class CPS1OPMInstrSet
 public:
   CPS1OPMInstrSet(RawFile *file,
                  CPS1FormatVer fmt_version,
-                 u8 masterVolume,
+                 u8 masterVol,
                  u32 offset,
                  u32 length,
                  const std::string& name);
@@ -328,13 +328,13 @@ template <class OPMType>
 class CPS1OPMInstr : public VGMInstr {
 public:
   CPS1OPMInstr(VGMInstrSet *instrSet,
-               u8 masterVolume,
+               u8 masterVol,
                u32 offset,
                u32 length,
                u32 theBank,
                u32 theInstrNum,
                const std::string& name)
-    : VGMInstr(instrSet, offset, length, theBank, theInstrNum, name), masterVol(masterVolume) {}
+    : VGMInstr(instrSet, offset, length, theBank, theInstrNum, name), masterVol(masterVol) {}
   ~CPS1OPMInstr() override = default;
 
   bool loadInstr() override {

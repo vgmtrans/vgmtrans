@@ -16,12 +16,12 @@
 
 GraphResSnesInstrSet::GraphResSnesInstrSet(RawFile *file,
                                            GraphResSnesVersion ver,
-                                           u32 spcDirAddress,
-                                           const std::map<u8, u16> &adsrHints,
+                                           u32 spcDirAddr,
+                                           const std::map<u8, u16> &instrADSRHints,
                                            const std::string &name) :
-    VGMInstrSet(GraphResSnesFormat::name, file, spcDirAddress, 0, name), version(ver),
-    spcDirAddr(spcDirAddress),
-    instrADSRHints(adsrHints) {
+    VGMInstrSet(GraphResSnesFormat::name, file, spcDirAddr, 0, name), version(ver),
+    spcDirAddr(spcDirAddr),
+    instrADSRHints(instrADSRHints) {
 }
 
 GraphResSnesInstrSet::~GraphResSnesInstrSet() {
@@ -91,12 +91,12 @@ bool GraphResSnesInstrSet::parseInstrPointers() {
 GraphResSnesInstr::GraphResSnesInstr(VGMInstrSet *instrSet,
                                      GraphResSnesVersion ver,
                                      u8 srcn,
-                                     u32 spcDirAddress,
-                                     u16 adsrValue,
+                                     u32 spcDirAddr,
+                                     u16 adsr,
                                      const std::string &name) :
-    VGMInstr(instrSet, spcDirAddress + srcn * 4, 4, 0, srcn, name), version(ver),
-    spcDirAddr(spcDirAddress),
-    adsr(adsrValue) {
+    VGMInstr(instrSet, spcDirAddr + srcn * 4, 4, 0, srcn, name), version(ver),
+    spcDirAddr(spcDirAddr),
+    adsr(adsr) {
 }
 
 GraphResSnesInstr::~GraphResSnesInstr() {

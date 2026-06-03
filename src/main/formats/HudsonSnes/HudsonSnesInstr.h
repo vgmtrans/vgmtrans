@@ -20,8 +20,8 @@ class HudsonSnesInstrSet:
                      HudsonSnesVersion ver,
                      u32 offset,
                      u32 length,
-                     u32 spcDirAddress,
-                     u32 sampleTuningTableAddress,
+                     u32 spcDirAddr,
+                     u32 addrSampTuningTable,
                      const std::string &name = "HudsonSnesInstrSet");
   virtual ~HudsonSnesInstrSet();
 
@@ -46,9 +46,9 @@ class HudsonSnesInstr
   HudsonSnesInstr(VGMInstrSet *instrSet,
                   HudsonSnesVersion ver,
                   u32 offset,
-                  u8 instrumentNumber,
-                  u32 spcDirAddress,
-                  u32 sampleTuningTableAddress,
+                  u8 instrNum,
+                  u32 spcDirAddr,
+                  u32 addrSampTuningTable,
                   const std::string &name = "HudsonSnesInstr");
   virtual ~HudsonSnesInstr();
 

@@ -83,7 +83,7 @@ class KonamiTMNT2Track : public SeqTrack {
  public:
   KonamiTMNT2Track(
     bool isFmTrack,
-    KonamiTMNT2Seq *sequence,
+    KonamiTMNT2Seq *parentSeq,
     u32 offset = 0,
     u32 length = 0,
     std::string name = "Track"

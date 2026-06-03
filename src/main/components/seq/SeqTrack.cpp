@@ -338,14 +338,14 @@ void SeqTrack::addLfoModulationEvent(ModDest destination,
                                      u32 length,
                                      u8 value,
                                      const std::string& eventName,
-                                     Type eventType) {
+                                     Type type) {
   const bool isNewOffset = onEvent(offset, length);
   recordSeqEvent<SeqEvent>(isNewOffset,
                            getTime(),
                            offset,
                            length,
                            eventName,
-                           eventType,
+                           type,
                            fmt::format("Value: {:d}", value));
   addForModDestNoItem(destination, value);
 }
@@ -437,13 +437,13 @@ SeqEvent* SeqTrack::addGenericEvent(u32 offset,
                                     u32 length,
                                     const std::string &sEventName,
                                     const std::string &sEventDesc,
-                                    Type eventType) {
+                                    Type type) {
   bool isNewOffset = onEvent(offset, length);
 
   if (readMode == READMODE_ADD_TO_UI) {
     if (isNewOffset && m_emitSeqEvents) {
       auto* target = seqEventTarget();
-      auto* event = new SeqEvent(target, offset, length, sEventName, eventType, sEventDesc);
+      auto* event = new SeqEvent(target, offset, length, sEventName, type, sEventDesc);
       event->channel = static_cast<u8>(channel);
       return target->addEvent(event);
     }
@@ -1918,10 +1918,10 @@ void SeqTrack::addMarker(u32 offset,
                          u8 databyte2,
                          const std::string &sEventName,
                          s8 priority,
-                         Type eventType) {
+                         Type type) {
   bool isNewOffset = onEvent(offset, length);
 
-  recordSeqEvent<MarkerSeqEvent>(isNewOffset, getTime(), markername, databyte1, databyte2, offset, length, sEventName, eventType);
+  recordSeqEvent<MarkerSeqEvent>(isNewOffset, getTime(), markername, databyte1, databyte2, offset, length, sEventName, type);
   addMarkerNoItem(markername, databyte1, databyte2, priority);
 }
 

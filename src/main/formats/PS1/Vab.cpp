@@ -143,9 +143,9 @@ bool Vab::parseInstrPointers() {
   return true;
 }
 
-bool Vab::isViableSampCollMatch(VGMSampColl* sampleCollection) {
+bool Vab::isViableSampCollMatch(VGMSampColl* sampColl) {
   size_t sampleIndex = 0;
-  auto sampCollOffset = sampleCollection->offset();
+  auto sampCollOffset = sampColl->offset();
   for (auto& vagLoc : m_vagLocations) {
     if (vagLoc.offset == 0 && vagLoc.size == 0)
       continue;

@@ -529,14 +529,14 @@ void MP2kTrack::setModulationDepth(u8 depth) {
   applyLfoDepth(true);
 }
 
-void MP2kTrack::setModulationType(u8 modulationType) {
-  if (modType == modulationType) {
+void MP2kTrack::setModulationType(u8 type) {
+  if (modType == type) {
     return;
   }
   clearLfoOutputs();
   vibratoLfo.clearReusableFade();
   tremoloLfo.clearReusableFade();
-  modType = modulationType;
+  modType = type;
   applyLfoDepth(true);
 }
 

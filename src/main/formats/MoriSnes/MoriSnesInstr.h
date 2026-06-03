@@ -54,9 +54,9 @@ class MoriSnesInstrSet:
  public:
   MoriSnesInstrSet(RawFile *file,
                    MoriSnesVersion ver,
-                   u32 spcDirAddress,
-                   std::vector<u16> instrAddresses,
-                   std::map<u16, MoriSnesInstrHintDir> instrHints,
+                   u32 spcDirAddr,
+                   std::vector<u16> instrumentAddresses,
+                   std::map<u16, MoriSnesInstrHintDir> instrumentHints,
                    const std::string &name = "MoriSnesInstrSet");
   virtual ~MoriSnesInstrSet();
 
@@ -81,9 +81,9 @@ class MoriSnesInstr
  public:
   MoriSnesInstr(VGMInstrSet *instrSet,
                 MoriSnesVersion ver,
-                u8 instrumentNumber,
-                u32 spcDirAddress,
-                const MoriSnesInstrHintDir &hintDir,
+                u8 instrNum,
+                u32 spcDirAddr,
+                const MoriSnesInstrHintDir &instrHintDir,
                 const std::string &name = "MoriSnesInstr");
   virtual ~MoriSnesInstr();
 

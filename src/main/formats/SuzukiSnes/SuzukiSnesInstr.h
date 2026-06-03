@@ -19,11 +19,11 @@ class SuzukiSnesInstrSet:
 
   SuzukiSnesInstrSet(RawFile *file,
                      SuzukiSnesVersion ver,
-                     u32 spcDirAddress,
-                     u16 srcnTableAddress,
-                     u16 volumeTableAddress,
-                     u16 adsrTableAddress,
-                     u16 tuningTableAddress,
+                     u32 spcDirAddr,
+                     u16 addrSRCNTable,
+                     u16 addrVolumeTable,
+                     u16 addrADSRTable,
+                     u16 addrTuningTable,
                      const std::string &name = "SuzukiSnesInstrSet");
   ~SuzukiSnesInstrSet() override = default;
 
@@ -50,12 +50,12 @@ class SuzukiSnesInstr
  public:
   SuzukiSnesInstr(VGMInstrSet *instrSet,
                   SuzukiSnesVersion ver,
-                  u8 instrumentNumber,
-                  u32 spcDirAddress,
-                  u16 srcnTableAddress,
-                  u16 volumeTableAddress,
-                  u16 adsrTableAddress,
-                  u16 tuningTableAddress,
+                  u8 instrNum,
+                  u32 spcDirAddr,
+                  u16 addrSRCNTable,
+                  u16 addrVolumeTable,
+                  u16 addrADSRTable,
+                  u16 addrTuningTable,
                   const std::string &name = "SuzukiSnesInstr");
   ~SuzukiSnesInstr() override;
 
@@ -81,11 +81,11 @@ public:
   SuzukiSnesDrumKit(VGMInstrSet *instrSet,
                     SuzukiSnesVersion ver,
                     u32 programNum,
-                    u32 spcDirAddress,
-                    u16 srcnTableAddress,
-                    u16 tuningTableAddress,
-                    u16 adsrTableAddress,
-                    u16 drumKitTableAddress,
+                    u32 spcDirAddr,
+                    u16 addrSRCNTable,
+                    u16 addrTuningTable,
+                    u16 addrADSRTable,
+                    u16 addrDrumKitTable,
                   const std::string &name = "SuzukiSnesDrumKit");
   ~SuzukiSnesDrumKit() override = default;
 

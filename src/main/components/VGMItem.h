@@ -86,7 +86,7 @@ public:
           u32 offset,
           u32 length = 0,
           std::string name = "",
-          Type itemType = Type::Unknown);
+          Type type = Type::Unknown);
   virtual ~VGMItem();
 
   friend bool operator>(VGMItem &item1, VGMItem &item2);

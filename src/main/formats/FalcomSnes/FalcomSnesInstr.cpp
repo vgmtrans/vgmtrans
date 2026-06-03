@@ -18,14 +18,14 @@
 FalcomSnesInstrSet::FalcomSnesInstrSet(RawFile *file,
                                        FalcomSnesVersion ver,
                                        u32 offset,
-                                       u32 sampToInstrTableAddress,
-                                       u32 spcDirAddress,
-                                       const std::map<u8, u16> &adsrHints,
+                                       u32 addrSampToInstrTable,
+                                       u32 spcDirAddr,
+                                       const std::map<u8, u16> &instrADSRHints,
                                        const std::string &name) :
     VGMInstrSet(FalcomSnesFormat::name, file, offset, 0, name), version(ver),
-    spcDirAddr(spcDirAddress),
-    addrSampToInstrTable(sampToInstrTableAddress),
-    instrADSRHints(adsrHints) {}
+    spcDirAddr(spcDirAddr),
+    addrSampToInstrTable(addrSampToInstrTable),
+    instrADSRHints(instrADSRHints) {}
 
 FalcomSnesInstrSet::~FalcomSnesInstrSet() {}
 
@@ -110,12 +110,12 @@ FalcomSnesInstr::FalcomSnesInstr(VGMInstrSet *instrSet,
                                  u32 offset,
                                  u32 theBank,
                                  u32 theInstrNum,
-                                 u8 sampleNumber,
-                                 u32 spcDirAddress,
+                                 u8 srcn,
+                                 u32 spcDirAddr,
                                  const std::string &name) :
     VGMInstr(instrSet, offset, 5, theBank, theInstrNum, name), version(ver),
-    srcn(sampleNumber),
-    spcDirAddr(spcDirAddress) {}
+    srcn(srcn),
+    spcDirAddr(spcDirAddr) {}
 
 FalcomSnesInstr::~FalcomSnesInstr() {}
 

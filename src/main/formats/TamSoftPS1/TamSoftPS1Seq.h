@@ -22,7 +22,7 @@ class TamSoftPS1Seq:
   static const u16 PITCH_TABLE[73];
 
   u8 song;
-  u16 seqType;
+  u16 type;
   s16 reverbDepth;
   bool ps2;
 };
