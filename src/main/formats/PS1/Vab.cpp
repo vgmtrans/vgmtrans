@@ -144,7 +144,7 @@ bool Vab::parseInstrPointers() {
 }
 
 bool Vab::isViableSampCollMatch(VGMSampColl* sampColl) {
-  int sampleIndex = 0;
+  size_t sampleIndex = 0;
   auto sampCollOffset = sampColl->offset();
   for (auto& vagLoc : m_vagLocations) {
     if (vagLoc.offset == 0 && vagLoc.size == 0)

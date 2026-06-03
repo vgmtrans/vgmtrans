@@ -53,7 +53,7 @@ bool KonamiArcadeSeq::parseTrackPointers() {
     // Check to see if this sequence uses 16 tracks or 8 tracks for games with only 1 K054539.
     // We'll check for any pattern of 0x0000 where the second set of track pointers would be, as this
     // is typically present.
-    for (int checkPos = offset() + 16; checkPos < offset() + 32; checkPos += 2) {
+    for (u32 checkPos = offset() + 16; checkPos < offset() + 32; checkPos += 2) {
       if (readWord(checkPos) == 0) {
         numTracks = 8;
         break;

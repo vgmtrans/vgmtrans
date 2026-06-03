@@ -23,8 +23,8 @@ public:
       : VGMColl(std::move(name)) {}
 
   bool loadMain() override;
-  std::tuple<std::unordered_map<int, AkaoArt *>, std::unordered_map<int, int>,
-             std::unordered_map<int, AkaoSampColl *>>
+  std::tuple<std::unordered_map<u32, AkaoArt *>, std::unordered_map<u32, int>,
+             std::unordered_map<u32, AkaoSampColl *>>
   mapSampleCollections() const;
 };
 

@@ -13,15 +13,15 @@
 
 // Generate maps to help route the relationships to and from articulations, especially for games
 // that load more than one sample collection at a time.
-std::tuple<std::unordered_map<int, AkaoArt *>, std::unordered_map<int, int>,
-           std::unordered_map<int, AkaoSampColl *>>
+std::tuple<std::unordered_map<u32, AkaoArt *>, std::unordered_map<u32, int>,
+           std::unordered_map<u32, AkaoSampColl *>>
 AkaoColl::mapSampleCollections() const {
   std::vector<AkaoSampColl *> orderedSampColls;
   orderedSampColls.reserve(sampColls().size());
 
-  std::unordered_map<int, AkaoArt *> artIdToArtMap;
-  std::unordered_map<int, int> artIdToSampleNumMap;
-  std::unordered_map<int, AkaoSampColl *> artIdToSampCollMap;
+  std::unordered_map<u32, AkaoArt *> artIdToArtMap;
+  std::unordered_map<u32, int> artIdToSampleNumMap;
+  std::unordered_map<u32, AkaoSampColl *> artIdToSampCollMap;
 
   std::transform(sampColls().begin(), sampColls().end(), std::back_inserter(orderedSampColls),
                  [](VGMSampColl *vgm) { return static_cast<AkaoSampColl *>(vgm); });
@@ -32,8 +32,8 @@ AkaoColl::mapSampleCollections() const {
 
   int cumulativeSamples = 0;
   for (auto *sampcoll : orderedSampColls) {
-    for (int i = 0; i < sampcoll->nNumArts; ++i) {
-      int artId = sampcoll->starting_art_id + i;
+    for (u32 i = 0; i < sampcoll->nNumArts; ++i) {
+      const u32 artId = sampcoll->starting_art_id + i;
       artIdToArtMap[artId] = &sampcoll->akArts[i];
       artIdToSampleNumMap[artId] = sampcoll->akArts[i].sample_num + cumulativeSamples;
       artIdToSampCollMap[artId] = sampcoll;

@@ -114,7 +114,7 @@ bool AkaoMatcher::tryCreateCollection(int id) {
       }
     }
 
-    std::vector<int> requiredArtIds;
+    std::vector<u32> requiredArtIds;
     for (const auto &instr : instrSet->aInstrs) {
       for (const auto &region : instr->regions()) {
         AkaoRgn* akaoRegion = static_cast<AkaoRgn*>(region);
@@ -129,7 +129,7 @@ bool AkaoMatcher::tryCreateCollection(int id) {
     std::vector<AkaoSampColl *> matchingSampColls;
 
     for (auto *sc : sampCollsToCheck) {
-      bool matches = std::any_of(requiredArtIds.begin(), requiredArtIds.end(), [sc](int artId) {
+      bool matches = std::any_of(requiredArtIds.begin(), requiredArtIds.end(), [sc](u32 artId) {
         return artId >= sc->starting_art_id && artId < (sc->starting_art_id + sc->nNumArts);
       });
 
@@ -141,7 +141,7 @@ bool AkaoMatcher::tryCreateCollection(int id) {
         matchingSampColls.push_back(sc);
 
         // Remove the IDs covered by this sample collection
-        auto end = std::remove_if(requiredArtIds.begin(), requiredArtIds.end(), [sc](int artId) {
+        auto end = std::remove_if(requiredArtIds.begin(), requiredArtIds.end(), [sc](u32 artId) {
           return artId >= sc->starting_art_id && artId < (sc->starting_art_id + sc->nNumArts);
         });
 

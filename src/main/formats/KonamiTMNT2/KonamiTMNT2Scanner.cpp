@@ -313,13 +313,13 @@ void KonamiTMNT2Scanner::scanTMNT2(
   std::vector<u32> drumTablePtrs;
   u32 minInstrPtr = std::numeric_limits<u32>::max();
   u32 minDrumPtr =  std::numeric_limits<u32>::max();
-  for (int i = instrTableAddrK053260; i < minInstrPtr && i < drumTableAddr; i += 2) {
+  for (u32 i = instrTableAddrK053260; i < minInstrPtr && i < drumTableAddr; i += 2) {
     u32 instrInfoPtr = programRom->readShort(i);
     minInstrPtr = std::min(minInstrPtr, instrInfoPtr);
     instrPtrs.push_back(instrInfoPtr);
   }
 
-  for (int i = drumTableAddr;; i += 2) {
+  for (u32 i = drumTableAddr;; i += 2) {
     u32 drumInfoPtr = programRom->readShort(i);
     minDrumPtr = std::min(minDrumPtr, drumInfoPtr);
     if (i == minDrumPtr)
@@ -460,7 +460,7 @@ void KonamiTMNT2Scanner::scanVendetta(
 
   // First gather the instrument pointers from the instrument table
   u32 minInstrPtr = std::numeric_limits<u32>::max();
-  for (int i = instrTableOffsetK053260; i < minInstrPtr; i += 2) {
+  for (u32 i = instrTableOffsetK053260; i < minInstrPtr; i += 2) {
     u32 instrInfoPtr = programRom->readShort(i);
     minInstrPtr = std::min(minInstrPtr, instrInfoPtr);
     instrPtrs.push_back(instrInfoPtr);

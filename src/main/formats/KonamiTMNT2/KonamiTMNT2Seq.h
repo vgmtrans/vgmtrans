@@ -48,10 +48,10 @@ class KonamiTMNT2Seq : public VGMSeq {
   s8 masterAttenuationK053260() { return m_masterAttenK053260; }
 
   std::optional<konami_tmnt2_instr_info> instrInfo(int idx) {
-    if (m_collContext.instrInfos.size() <= idx)
+    if (idx < 0 || m_collContext.instrInfos.size() <= static_cast<size_t>(idx))
       return std::nullopt;
 
-    return std::optional {m_collContext.instrInfos[idx]};
+    return std::optional {m_collContext.instrInfos[static_cast<size_t>(idx)]};
   }
   std::optional<konami_tmnt2_drum_info> drumInfo(int tableIdx, int keyIdx) {
     u8 key = (tableIdx * 16) + keyIdx;

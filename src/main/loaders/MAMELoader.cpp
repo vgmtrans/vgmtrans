@@ -19,6 +19,7 @@
 #include <filesystem>
 #include <fstream>
 #include <ranges>
+#include <utility>
 
 #if defined(_WIN32) || defined(WIN32)
 #include <ioapi.h>
@@ -361,7 +362,7 @@ VirtFile* MAMELoader::loadRomGroup(const MAMERomGroup& entry, const std::string&
 
     u8* buf = new u8[info.uncompressed_size];
     ret = unzReadCurrentFile(cur_file, buf, static_cast<u32>(info.uncompressed_size));
-    if (ret != info.uncompressed_size) {
+    if (!std::cmp_equal(ret, info.uncompressed_size)) {
       // error reading file in zip archive
       delete[] buf;
       deleteBuffers(buffers);

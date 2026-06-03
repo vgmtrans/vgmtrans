@@ -153,10 +153,11 @@ bool mainDLSCreation(
         // If a sample offset is provided, then find the sample number based on this offset.
         // see sampOffset declaration in header file for more info.
         if (rgn->sampOffset != -1) {
+          const auto sampOffset = static_cast<u32>(rgn->sampOffset);
           bool bFoundIt = false;
           for (u32 s = 0; s < sampColl->samples.size(); s++) {             //for every sample
-            if (rgn->sampOffset == sampColl->samples[s]->offset() ||
-                rgn->sampOffset == sampColl->samples[s]->offset() - sampColl->offset() - sampColl->sampDataOffset) {
+            if (sampOffset == sampColl->samples[s]->offset() ||
+                sampOffset == sampColl->samples[s]->offset() - sampColl->offset() - sampColl->sampDataOffset) {
               realSampNum = s;
 
               //samples[m]->loop.loopStart = parInstrSet->aInstrs[i]->aRgns[k]->loop.loopStart;

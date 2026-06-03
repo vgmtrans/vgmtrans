@@ -23,6 +23,8 @@ class SegSatSeq:
   bool readEvent() override;
 
  private:
+  static constexpr u32 kInvalidOffset = static_cast<u32>(-1);
+
   const SegSatRgn* resolveRegion(u8 bank, u8 progNum, u8 noteNum);
   constexpr double tlDB(u8 tl);
   u8 resolveVelocity(u8 vel, const SegSatRgn& rgn, s8 volBias, u8 ch);
@@ -34,8 +36,8 @@ class SegSatSeq:
   CollContext m_collContext;
   u32 m_normalTrackOffset;
   int m_remainingNotesInLoop = 0;
-  u32 m_loopEndPos = -1;
-  u32 m_foreverLoopStart = -1;
+  u32 m_loopEndPos = kInvalidOffset;
+  u32 m_foreverLoopStart = kInvalidOffset;
   u32 m_durationAccumulator = 0;
   u8 m_vol[16];
   u8 m_bank[16];

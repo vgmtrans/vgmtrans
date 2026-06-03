@@ -443,7 +443,9 @@ bool SegSatRgn::isRegionValid() {
   if (keyLow == 0xFF) return false;
   if (keyLow > keyHigh) return false;
   u32 instrSetOffset = parInstr->parInstrSet->offset();
-  if (sampOffset == instrSetOffset) return false;
-  if (sampOffset >= instrSetOffset + 0x7FFFE) return false;
+  if (sampOffset < 0) return false;
+  const auto sampleOffset = static_cast<u32>(sampOffset);
+  if (sampleOffset == instrSetOffset) return false;
+  if (sampleOffset >= instrSetOffset + 0x7FFFE) return false;
   return true;
 }

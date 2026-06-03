@@ -34,7 +34,7 @@ u32 CPS3Decrypt::cps3_mask(u32 address, u32 key1, u32 key2)
 
 
 void CPS3Decrypt::cps3_decode(const u32 *src, u32 *dest, u32 key1, u32 key2, u32 length) {
-  for (int i = 0; i < length; i += 4) {
+  for (u32 i = 0; i < length; i += 4) {
     u32 data = swap_bytes32(src[i / 4]) ^ cps3_mask(0x6000000 + i, key1, key2);
     dest[i / 4] = swap_bytes32(data);
   }

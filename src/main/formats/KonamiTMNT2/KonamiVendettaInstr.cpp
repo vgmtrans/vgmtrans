@@ -64,8 +64,8 @@ void KonamiVendettaSampleInstrSet::addSampleInfoItems() {
     numSampInfos * sizeof(konami_vendetta_sample_info),
     "Sample Infos"
   );
-  for (int i = 0; i < numSampInfos; ++i) {
-    u32 offset = m_sampInfosOffset + i * sizeof(konami_vendetta_sample_info);
+  for (size_t i = 0; i < numSampInfos; ++i) {
+    u32 offset = m_sampInfosOffset + static_cast<u32>(i * sizeof(konami_vendetta_sample_info));
     auto sampInfo = sampInfosItem->addChild(
       offset,
       sizeof(konami_vendetta_sample_info),
@@ -95,10 +95,11 @@ bool KonamiVendettaSampleInstrSet::parseMelodicInstrs() {
   auto instrTableItem = addChild(m_instrTableOffsetK053260, m_instrsK053260.size() * 2, "Instrument Table");
   u16 minInstrOffset = -1;
   u16 maxInstrOffset = 0;
-  for (int i = 0; i < m_instrsK053260.size(); ++i) {
-    minInstrOffset = std::min(minInstrOffset, readShort(m_instrTableOffsetK053260 + i * 2));
-    maxInstrOffset = std::max(maxInstrOffset, readShort(m_instrTableOffsetK053260 + i * 2));
-    instrTableItem->addChild(m_instrTableOffsetK053260 + (i * 2), 2, fmt::format("Instrument {} Pointer", i));
+  for (size_t i = 0; i < m_instrsK053260.size(); ++i) {
+    const u32 pointerOffset = m_instrTableOffsetK053260 + static_cast<u32>(i * 2);
+    minInstrOffset = std::min(minInstrOffset, readShort(pointerOffset));
+    maxInstrOffset = std::max(maxInstrOffset, readShort(pointerOffset));
+    instrTableItem->addChild(pointerOffset, 2, fmt::format("Instrument {} Pointer", i));
   }
 
   auto instrsItem = addChild(
@@ -169,7 +170,7 @@ bool KonamiVendettaSampleInstrSet::parseDrums() {
   if (drumInfos.size() == 0)
     return false;
   u16 drumsOffset = drumOffsetToIdx.begin()->first - 3;
-  int numDrumTables = (drumsOffset - m_drumBanksOffset) / 0x20;
+  u32 numDrumTables = (drumsOffset - m_drumBanksOffset) / 0x20;
 
   auto drumBanksItem = addChild(m_drumBanksOffset, numDrumTables * 0x20, "Drum Banks");
 

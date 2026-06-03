@@ -67,7 +67,7 @@ bool KonamiTMNT2SampleInstrSet::parseMelodicInstrs() {
   auto instrTableItem = addChild(m_instrTableAddr, m_instrInfos.size() * 2, "Instrument Table");
   u16 minInstrOffset = -1;
   u16 maxInstrOffset = 0;
-  for (int i = 0; i < m_instrInfos.size(); ++i) {
+  for (size_t i = 0; i < m_instrInfos.size(); ++i) {
     if (m_instrInfos[i].start_hi >= 0x20) {
       instrTableItem->addChild(m_instrTableAddr + (i * 2), 2, "Bad Instr Pointer");
       continue;
@@ -124,7 +124,7 @@ bool KonamiTMNT2SampleInstrSet::parseDrums() {
   auto drumBankTableItem = addChild(m_drumTableAddr, m_drumTables.size() * 2, "Drum Bank Table");
   u16 minDrumOffset = -1;
   u16 maxDrumOffset = 0;
-  for (int i = 0; i < m_drumTables.size(); ++i) {
+  for (size_t i = 0; i < m_drumTables.size(); ++i) {
     u16 ptrOffset = m_drumTableAddr + i * 2;
     u16 ptr = readShort(ptrOffset);
     minDrumOffset = std::min(minDrumOffset, ptr);
@@ -148,11 +148,11 @@ bool KonamiTMNT2SampleInstrSet::parseDrums() {
   minDrumOffset = -1;
   maxDrumOffset = 0;
   int drumNum = 0;
-  for (u32 i = 0; i < m_drumTables.size(); ++i) {
+  for (size_t i = 0; i < m_drumTables.size(); ++i) {
     u16 drumBankTablePtr = readShort(m_drumTableAddr + i * 2);
     auto drumBankTable = m_drumTables[i];
     auto drumBankItem = drumBanksItem->addChild(drumBankTablePtr, drumBankTable.size() * 2, fmt::format("Drum Bank {}", i));
-    for (int j = 0; j < drumBankTable.size(); ++j) {
+    for (size_t j = 0; j < drumBankTable.size(); ++j) {
       u32 ptrOffset = drumBankTablePtr + j * 2;
       u16 ptr = readShort(ptrOffset);
       minDrumOffset = std::min(minDrumOffset, ptr);

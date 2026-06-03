@@ -110,8 +110,8 @@ bool PS1Seq::readEvent() {
 
       constexpr size_t kZeroDataLengthThreshold = 10;
       bool no_next_data = true;
-      for (off_t off = beginOffset; off < beginOffset + kZeroDataLengthThreshold; off++) {
-        if (readByte(off) != 0) {
+      for (size_t i = 0; i < kZeroDataLengthThreshold; i++) {
+        if (readByte(beginOffset + static_cast<off_t>(i)) != 0) {
           no_next_data = false;
           break;
         }

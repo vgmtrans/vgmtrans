@@ -26,8 +26,8 @@ void SegSatSeq::resetVars() {
   VGMSeqNoTrks::resetVars();
 
   m_remainingNotesInLoop = 0;
-  m_loopEndPos = -1;
-  m_foreverLoopStart = -1;
+  m_loopEndPos = kInvalidOffset;
+  m_foreverLoopStart = kInvalidOffset;
   m_durationAccumulator = 0;
   memset(m_vol, 0x7F, 16);
   memset(m_progNum, 0, 16);
@@ -312,7 +312,7 @@ bool SegSatSeq::readEvent() {
         }
         case 0x82:
           addTime(readByte(curOffset++));
-          if (m_foreverLoopStart == -1) {
+          if (m_foreverLoopStart == kInvalidOffset) {
             m_foreverLoopStart = curOffset;
             addGenericEvent(beginOffset, curOffset - beginOffset,
               "Forever Loop Start Point", "", Type::RepeatStart);

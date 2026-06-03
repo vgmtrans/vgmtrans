@@ -112,9 +112,9 @@ bool KonamiArcadeInstrSet::parseInstrPointers() {
     "Drum Kit"
   );
   std::vector<VGMInstr *> aDrumKit;
-  for (int i = 0; i < sizeof(m_drums) / sizeof(drum); ++i) {
+  for (size_t i = 0; i < sizeof(m_drums) / sizeof(m_drums[0]); ++i) {
     drum& d = m_drums[i];
-    u32 off = m_drumTableOffset + i * sizeof(drum);
+    u32 off = m_drumTableOffset + static_cast<u32>(i * sizeof(drum));
     int drumSampNum = numMelodicInstrs + d.samp_num;
 
     if (d.unity_key >= 0x60) {

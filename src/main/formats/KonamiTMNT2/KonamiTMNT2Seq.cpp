@@ -95,13 +95,13 @@ void KonamiTMNT2Seq::resetVars() {
 }
 
 bool KonamiTMNT2Seq::parseTrackPointers() {
-  for (int i = 0; i < m_ym2151TrackOffsets.size(); ++i) {
+  for (size_t i = 0; i < m_ym2151TrackOffsets.size(); ++i) {
     auto offset = m_ym2151TrackOffsets[i];
     auto name = fmt::format("FM Track {}", i);
     auto *track = new KonamiTMNT2Track(true, this, offset, 0, name);
     aTracks.push_back(track);
   }
-  for (int i = 0; i < m_k053260TrackOffsets.size(); ++i) {
+  for (size_t i = 0; i < m_k053260TrackOffsets.size(); ++i) {
     auto offset = m_k053260TrackOffsets[i];
     auto name = fmt::format("Sampled Track {}", i);
     auto *track = new KonamiTMNT2Track(false, this, offset, 0, name);
@@ -121,9 +121,9 @@ void KonamiTMNT2Seq::useColl(const VGMColl* coll) {
   for (auto instrSet : coll->instrSets()) {
     if (auto* tmnt2InstrSet = dynamic_cast<KonamiTMNT2SampleInstrSet*>(instrSet)) {
       m_collContext.instrInfos = tmnt2InstrSet->instrInfos();
-      for (int i = 0; i < tmnt2InstrSet->drumTables().size(); ++i) {
+      for (size_t i = 0; i < tmnt2InstrSet->drumTables().size(); ++i) {
         auto drumBank = tmnt2InstrSet->drumTables()[i];
-        for (int j = 0; j < drumBank.size(); ++j) {
+        for (size_t j = 0; j < drumBank.size(); ++j) {
           m_collContext.drumKeyMap[(i * 16) + j] = drumBank[j];
         }
       }
