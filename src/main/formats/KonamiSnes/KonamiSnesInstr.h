@@ -23,10 +23,10 @@ class KonamiSnesInstrSet:
   KonamiSnesInstrSet(RawFile *file,
                      KonamiSnesVersion ver,
                      u32 offset,
-                     u32 bankedInstrOffset,
-                     u8 firstBankedInstr,
-                     u32 percInstrOffset,
-                     u32 spcDirAddr,
+                     u32 bankedInstrAddress,
+                     u8 firstBankedInstrNumber,
+                     u32 percInstrAddress,
+                     u32 spcDirAddress,
                      const std::string &name = "KonamiSnesInstrSet");
   ~KonamiSnesInstrSet() override;
 
@@ -57,8 +57,8 @@ class KonamiSnesInstr
                   u32 offset,
                   u32 theBank,
                   u32 theInstrNum,
-                  u32 spcDirAddr,
-                  bool percussion,
+                  u32 spcDirAddress,
+                  bool isPercussion,
                   const std::string &name = "KonamiSnesInstr");
   ~KonamiSnesInstr() override;
 

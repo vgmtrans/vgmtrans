@@ -17,12 +17,12 @@
 
 NamcoSnesInstrSet::NamcoSnesInstrSet(RawFile *file,
                                      NamcoSnesVersion ver,
-                                     u32 spcDirAddr,
-                                     u16 addrTuningTable,
+                                     u32 spcDirAddress,
+                                     u16 tuningTableAddress,
                                      const std::string &name) :
-    VGMInstrSet(NamcoSnesFormat::name, file, addrTuningTable, 0, name), version(ver),
-    spcDirAddr(spcDirAddr),
-    addrTuningTable(addrTuningTable) {
+    VGMInstrSet(NamcoSnesFormat::name, file, tuningTableAddress, 0, name), version(ver),
+    spcDirAddr(spcDirAddress),
+    addrTuningTable(tuningTableAddress) {
 }
 
 NamcoSnesInstrSet::~NamcoSnesInstrSet() {
@@ -92,12 +92,12 @@ fmt::format("Instrument {}", srcn));
 NamcoSnesInstr::NamcoSnesInstr(VGMInstrSet *instrSet,
                                NamcoSnesVersion ver,
                                u8 srcn,
-                               u32 spcDirAddr,
-                               u16 addrTuningEntry,
+                               u32 spcDirAddress,
+                               u16 tuningEntryAddress,
                                const std::string &name) :
-    VGMInstr(instrSet, addrTuningEntry, 0, 0, srcn, name), version(ver),
-    spcDirAddr(spcDirAddr),
-    addrTuningEntry(addrTuningEntry) {
+    VGMInstr(instrSet, tuningEntryAddress, 0, 0, srcn, name), version(ver),
+    spcDirAddr(spcDirAddress),
+    addrTuningEntry(tuningEntryAddress) {
 }
 
 NamcoSnesInstr::~NamcoSnesInstr() {

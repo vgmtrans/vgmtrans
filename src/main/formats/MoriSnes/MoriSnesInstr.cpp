@@ -16,14 +16,14 @@
 
 MoriSnesInstrSet::MoriSnesInstrSet(RawFile *file,
                                    MoriSnesVersion ver,
-                                   u32 spcDirAddr,
-                                   std::vector<u16> instrumentAddresses,
-                                   std::map<u16, MoriSnesInstrHintDir> instrumentHints,
+                                   u32 spcDirAddress,
+                                   std::vector<u16> instrAddresses,
+                                   std::map<u16, MoriSnesInstrHintDir> instrHints,
                                    const std::string &name) :
     VGMInstrSet(MoriSnesFormat::name, file, 0, 0, name), version(ver),
-    spcDirAddr(spcDirAddr),
-    instrumentAddresses(instrumentAddresses),
-    instrumentHints(instrumentHints) {
+    spcDirAddr(spcDirAddress),
+    instrumentAddresses(instrAddresses),
+    instrumentHints(instrHints) {
 }
 
 MoriSnesInstrSet::~MoriSnesInstrSet() {}
@@ -141,13 +141,13 @@ bool MoriSnesInstrSet::parseInstrPointers() {
 
 MoriSnesInstr::MoriSnesInstr(VGMInstrSet *instrSet,
                              MoriSnesVersion ver,
-                             u8 instrNum,
-                             u32 spcDirAddr,
-                             const MoriSnesInstrHintDir &instrHintDir,
+                             u8 instrumentNumber,
+                             u32 spcDirAddress,
+                             const MoriSnesInstrHintDir &hintDir,
                              const std::string &name) :
-    VGMInstr(instrSet, instrHintDir.startAddress, instrHintDir.size, 0, instrNum, name), version(ver),
-    spcDirAddr(spcDirAddr),
-    instrHintDir(instrHintDir) {
+    VGMInstr(instrSet, hintDir.startAddress, hintDir.size, 0, instrumentNumber, name), version(ver),
+    spcDirAddr(spcDirAddress),
+    instrHintDir(hintDir) {
 }
 
 MoriSnesInstr::~MoriSnesInstr() {

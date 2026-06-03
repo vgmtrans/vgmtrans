@@ -18,8 +18,8 @@ class NamcoSnesInstrSet:
  public:
   NamcoSnesInstrSet(RawFile *file,
                     NamcoSnesVersion ver,
-                    u32 spcDirAddr,
-                    u16 addrTuningTable,
+                    u32 spcDirAddress,
+                    u16 tuningTableAddress,
                     const std::string &name = "NamcoSnesInstrSet");
   virtual ~NamcoSnesInstrSet();
 
@@ -44,8 +44,8 @@ class NamcoSnesInstr
   NamcoSnesInstr(VGMInstrSet *instrSet,
                  NamcoSnesVersion ver,
                  u8 srcn,
-                 u32 spcDirAddr,
-                 u16 addrTuningEntry,
+                 u32 spcDirAddress,
+                 u16 tuningEntryAddress,
                  const std::string &name = "NamcoSnesInstr");
   virtual ~NamcoSnesInstr();
 

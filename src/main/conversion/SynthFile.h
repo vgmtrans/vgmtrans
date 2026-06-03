@@ -41,10 +41,10 @@ class SynthFile {
 
 class SynthInstr {
  public:
-  SynthInstr(u32 bank, u32 instrument, float reverb);
-  SynthInstr(u32 bank, u32 instrument, std::string instrName, float reverb);
+  SynthInstr(u32 bank, u32 instrument, float reverbLevel);
+  SynthInstr(u32 bank, u32 instrument, std::string instrName, float reverbLevel);
   SynthInstr(u32 bank, u32 instrument, std::string instrName,
-             const std::vector<SynthRgn *>& listRgns, float reverb);
+             const std::vector<SynthRgn *>& listRgns, float reverbLevel);
   ~SynthInstr();
 
   SynthRgn *addRgn();

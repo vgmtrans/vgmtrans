@@ -15,10 +15,10 @@ DECLARE_FORMAT(SoftCreatSnes);
 SoftCreatSnesSeq::SoftCreatSnesSeq(RawFile *file,
                                    SoftCreatSnesVersion ver,
                                    u32 seqdataOffset,
-                                   u8 headerAlignSize,
+                                   u8 headerAlignmentSize,
                                    std::string newName)
     : VGMSeq(SoftCreatSnesFormat::name, file, seqdataOffset, 0, newName), version(ver),
-      headerAlignSize(headerAlignSize) {
+      headerAlignSize(headerAlignmentSize) {
   bLoadTickByTick = true;
   setAllowDiscontinuousTrackData(true);
   setUseLinearAmplitudeScale(true);

@@ -764,14 +764,14 @@ bool MidiEvent::operator>(const MidiEvent &theMidiEvent) const {
 //  *********
 
 
-NoteEvent::NoteEvent(MidiTrack *prntTrk,
-                     u8 channel,
+NoteEvent::NoteEvent(MidiTrack *track,
+                     u8 midiChannel,
                      u32 absoluteTime,
-                     bool bNoteDown,
+                     bool noteDown,
                      u8 theKey,
                      u8 theVel)
-    : MidiEvent(prntTrk, absoluteTime, channel, PRIORITY_LOWER),
-      bNoteDown(bNoteDown),
+    : MidiEvent(track, absoluteTime, midiChannel, PRIORITY_LOWER),
+      bNoteDown(noteDown),
       key(theKey),
       vel(theVel) {
 }
@@ -849,13 +849,13 @@ VolEvent* VolEvent::MakeCopy()
 //  ControllerEvent
 //  ***************
 
-ControllerEvent::ControllerEvent(MidiTrack *prntTrk,
-                                 u8 channel,
+ControllerEvent::ControllerEvent(MidiTrack *track,
+                                 u8 midiChannel,
                                  u32 absoluteTime,
                                  u8 controllerNum,
                                  u8 theDataByte,
                                  s8 thePriority)
-    : MidiEvent(prntTrk, absoluteTime, channel, thePriority), controlNum(controllerNum), dataByte(theDataByte) {
+    : MidiEvent(track, absoluteTime, midiChannel, thePriority), controlNum(controllerNum), dataByte(theDataByte) {
 }
 
 u32 ControllerEvent::writeEvent(std::vector<u8> &buf, u32 time) {
@@ -883,11 +883,11 @@ u32 PortamentoControlEvent::writeEvent(std::vector<u8> &buf, u32 time) {
 //  SysexEvent
 //  **********
 
-SysexEvent::SysexEvent(MidiTrack *prntTrk,
+SysexEvent::SysexEvent(MidiTrack *track,
                        u32 absoluteTime,
-                       const std::vector<u8>& sysexData,
+                       const std::vector<u8>& data,
                        s8 thePriority)
-    : MidiEvent(prntTrk, absoluteTime, 0, thePriority), sysexData(sysexData) {
+    : MidiEvent(track, absoluteTime, 0, thePriority), sysexData(data) {
 }
 
 u32 SysexEvent::writeEvent(std::vector<u8> &buf, u32 time) {
@@ -902,8 +902,8 @@ u32 SysexEvent::writeEvent(std::vector<u8> &buf, u32 time) {
 //  ProgChangeEvent
 //  ***************
 
-ProgChangeEvent::ProgChangeEvent(MidiTrack *prntTrk, u8 channel, u32 absoluteTime, u8 progNum)
-    : MidiEvent(prntTrk, absoluteTime, channel, PRIORITY_HIGH), programNum(progNum) {
+ProgChangeEvent::ProgChangeEvent(MidiTrack *track, u8 midiChannel, u32 absoluteTime, u8 progNum)
+    : MidiEvent(track, absoluteTime, midiChannel, PRIORITY_HIGH), programNum(progNum) {
 }
 
 u32 ProgChangeEvent::writeEvent(std::vector<u8> &buf, u32 time) {
@@ -917,8 +917,8 @@ u32 ProgChangeEvent::writeEvent(std::vector<u8> &buf, u32 time) {
 //  PitchBendEvent
 //  **************
 
-PitchBendEvent::PitchBendEvent(MidiTrack *prntTrk, u8 channel, u32 absoluteTime, s16 bendAmt)
-    : MidiEvent(prntTrk, absoluteTime, channel, PRIORITY_MIDDLE), bend(bendAmt) {
+PitchBendEvent::PitchBendEvent(MidiTrack *track, u8 midiChannel, u32 absoluteTime, s16 bendAmt)
+    : MidiEvent(track, absoluteTime, midiChannel, PRIORITY_MIDDLE), bend(bendAmt) {
 }
 
 u32 PitchBendEvent::writeEvent(std::vector<u8> &buf, u32 time) {
@@ -935,11 +935,11 @@ u32 PitchBendEvent::writeEvent(std::vector<u8> &buf, u32 time) {
 //  ChannelPressureEvent
 //  ********************
 
-ChannelPressureEvent::ChannelPressureEvent(MidiTrack *prntTrk,
-                                           u8 channel,
+ChannelPressureEvent::ChannelPressureEvent(MidiTrack *track,
+                                           u8 midiChannel,
                                            u32 absoluteTime,
                                            u8 pressureAmt)
-    : MidiEvent(prntTrk, absoluteTime, channel, PRIORITY_MIDDLE), pressure(pressureAmt) {
+    : MidiEvent(track, absoluteTime, midiChannel, PRIORITY_MIDDLE), pressure(pressureAmt) {
 }
 
 u32 ChannelPressureEvent::writeEvent(std::vector<u8> &buf, u32 time) {
@@ -953,8 +953,8 @@ u32 ChannelPressureEvent::writeEvent(std::vector<u8> &buf, u32 time) {
 //  TempoEvent
 //  **********
 
-TempoEvent::TempoEvent(MidiTrack *prntTrk, u32 absoluteTime, u32 microSeconds)
-    : MidiEvent(prntTrk, absoluteTime, 0, PRIORITY_HIGHEST), microSecs(microSeconds) {
+TempoEvent::TempoEvent(MidiTrack *track, u32 absoluteTime, u32 microSeconds)
+    : MidiEvent(track, absoluteTime, 0, PRIORITY_HIGHEST), microSecs(microSeconds) {
 }
 
 u32 TempoEvent::writeEvent(std::vector<u8> &buf, u32 time) {
@@ -971,8 +971,8 @@ u32 TempoEvent::writeEvent(std::vector<u8> &buf, u32 time) {
 //  MidiPortEvent
 //  *************
 
-MidiPortEvent::MidiPortEvent(MidiTrack *prntTrk, u32 absoluteTime, u8 port)
-    : MidiEvent(prntTrk, absoluteTime, 0, PRIORITY_HIGHEST), port(port) {
+MidiPortEvent::MidiPortEvent(MidiTrack *track, u32 absoluteTime, u8 portValue)
+    : MidiEvent(track, absoluteTime, 0, PRIORITY_HIGHEST), port(portValue) {
 }
 
 u32 MidiPortEvent::writeEvent(std::vector<u8> &buf, u32 time) {
@@ -984,12 +984,12 @@ u32 MidiPortEvent::writeEvent(std::vector<u8> &buf, u32 time) {
 //  TimeSigEvent
 //  ************
 
-TimeSigEvent::TimeSigEvent(MidiTrack *prntTrk,
+TimeSigEvent::TimeSigEvent(MidiTrack *track,
                            u32 absoluteTime,
                            u8 numerator,
                            u8 denominator,
                            u8 clicksPerQuarter)
-    : MidiEvent(prntTrk, absoluteTime, 0, PRIORITY_HIGHEST), numer(numerator), denom(denominator),
+    : MidiEvent(track, absoluteTime, 0, PRIORITY_HIGHEST), numer(numerator), denom(denominator),
       ticksPerQuarter(clicksPerQuarter) {
 }
 
@@ -1008,8 +1008,8 @@ u32 TimeSigEvent::writeEvent(std::vector<u8> &buf, u32 time) {
 //  EndOfTrackEvent
 //  ***************
 
-EndOfTrackEvent::EndOfTrackEvent(MidiTrack *prntTrk, u32 absoluteTime)
-    : MidiEvent(prntTrk, absoluteTime, 0, PRIORITY_LOWEST) {
+EndOfTrackEvent::EndOfTrackEvent(MidiTrack *track, u32 absoluteTime)
+    : MidiEvent(track, absoluteTime, 0, PRIORITY_LOWEST) {
 }
 
 
@@ -1021,8 +1021,8 @@ u32 EndOfTrackEvent::writeEvent(std::vector<u8> &buf, u32 time) {
 //  TextEvent
 //  *********
 
-TextEvent::TextEvent(MidiTrack *prntTrk, u32 absoluteTime, std::string str)
-    : MidiEvent(prntTrk, absoluteTime, 0, PRIORITY_LOWEST), text(std::move(str)) {
+TextEvent::TextEvent(MidiTrack *track, u32 absoluteTime, std::string str)
+    : MidiEvent(track, absoluteTime, 0, PRIORITY_LOWEST), text(std::move(str)) {
 }
 
 u32 TextEvent::writeEvent(std::vector<u8> &buf, u32 time) {
@@ -1033,8 +1033,8 @@ u32 TextEvent::writeEvent(std::vector<u8> &buf, u32 time) {
 //  SeqNameEvent
 //  ************
 
-SeqNameEvent::SeqNameEvent(MidiTrack *prntTrk, u32 absoluteTime, std::string str)
-    : MidiEvent(prntTrk, absoluteTime, 0, PRIORITY_LOWEST), text(std::move(str)) {
+SeqNameEvent::SeqNameEvent(MidiTrack *track, u32 absoluteTime, std::string str)
+    : MidiEvent(track, absoluteTime, 0, PRIORITY_LOWEST), text(std::move(str)) {
 }
 
 u32 SeqNameEvent::writeEvent(std::vector<u8> &buf, u32 time) {
@@ -1045,8 +1045,8 @@ u32 SeqNameEvent::writeEvent(std::vector<u8> &buf, u32 time) {
 //  TrackNameEvent
 //  **************
 
-TrackNameEvent::TrackNameEvent(MidiTrack *prntTrk, u32 absoluteTime, std::string str)
-    : MidiEvent(prntTrk, absoluteTime, 0, PRIORITY_LOWEST), text(std::move(str)) {
+TrackNameEvent::TrackNameEvent(MidiTrack *track, u32 absoluteTime, std::string str)
+    : MidiEvent(track, absoluteTime, 0, PRIORITY_LOWEST), text(std::move(str)) {
 }
 
 u32 TrackNameEvent::writeEvent(std::vector<u8> &buf, u32 time) {
@@ -1062,8 +1062,8 @@ u32 TrackNameEvent::writeEvent(std::vector<u8> &buf, u32 time) {
 //  **************
 
 
-GlobalTransposeEvent::GlobalTransposeEvent(MidiTrack *prntTrk, u32 absoluteTime, s8 theSemitones)
-    : MidiEvent(prntTrk, absoluteTime, 0, PRIORITY_HIGHEST) {
+GlobalTransposeEvent::GlobalTransposeEvent(MidiTrack *track, u32 absoluteTime, s8 theSemitones)
+    : MidiEvent(track, absoluteTime, 0, PRIORITY_HIGHEST) {
   semitones = theSemitones;
 }
 

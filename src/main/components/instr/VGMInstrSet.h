@@ -64,7 +64,7 @@ class VGMInstr : public VGMItem {
 public:
   VGMInstr(VGMInstrSet *parInstrSet, u32 offset, u32 length, u32 bank,
            u32 instrNum, std::string name = "Instrument",
-           float reverb = defaultReverbPercent);
+           float reverbLevel = defaultReverbPercent);
 
   const std::vector<VGMRgn*>& regions() { return m_regions; }
 

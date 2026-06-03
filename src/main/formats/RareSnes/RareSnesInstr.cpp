@@ -16,26 +16,26 @@
 // RareSnesInstrSet
 // ****************
 
-RareSnesInstrSet::RareSnesInstrSet(RawFile *file, u32 offset, u32 spcDirAddr, const std::string &name) :
+RareSnesInstrSet::RareSnesInstrSet(RawFile *file, u32 offset, u32 spcDirAddress, const std::string &name) :
     VGMInstrSet(RareSnesFormat::name, file, offset, 0, name),
-    spcDirAddr(spcDirAddr),
+    spcDirAddr(spcDirAddress),
     maxSRCNValue(255) {
   Initialize();
 }
 
 RareSnesInstrSet::RareSnesInstrSet(RawFile *file,
                                    u32 offset,
-                                   u32 spcDirAddr,
-                                   const std::map<u8, s8> &instrUnityKeyHints,
-                                   const std::map<u8, s16> &instrPitchHints,
-                                   const std::map<u8, u16> &instrADSRHints,
+                                   u32 spcDirAddress,
+                                   const std::map<u8, s8> &unityKeyHints,
+                                   const std::map<u8, s16> &pitchHints,
+                                   const std::map<u8, u16> &adsrHints,
                                    const std::string &name) :
     VGMInstrSet(RareSnesFormat::name, file, offset, 0, name),
-    spcDirAddr(spcDirAddr),
+    spcDirAddr(spcDirAddress),
     maxSRCNValue(255),
-    instrUnityKeyHints(instrUnityKeyHints),
-    instrPitchHints(instrPitchHints),
-    instrADSRHints(instrADSRHints) {
+    instrUnityKeyHints(unityKeyHints),
+    instrPitchHints(pitchHints),
+    instrADSRHints(adsrHints) {
   Initialize();
 }
 
@@ -178,16 +178,16 @@ RareSnesInstr::RareSnesInstr(VGMInstrSet *instrSet,
                              u32 offset,
                              u32 theBank,
                              u32 theInstrNum,
-                             u32 spcDirAddr,
-                             s8 transpose,
-                             s16 pitch,
-                             u16 adsr,
+                             u32 spcDirAddress,
+                             s8 transposeSemitones,
+                             s16 pitchValue,
+                             u16 adsrValue,
                              const std::string &name) :
     VGMInstr(instrSet, offset, 1, theBank, theInstrNum, name),
-    spcDirAddr(spcDirAddr),
-    transpose(transpose),
-    pitch(pitch),
-    adsr(adsr) {
+    spcDirAddr(spcDirAddress),
+    transpose(transposeSemitones),
+    pitch(pitchValue),
+    adsr(adsrValue) {
 }
 
 RareSnesInstr::~RareSnesInstr() {
@@ -212,11 +212,12 @@ bool RareSnesInstr::loadInstr() {
 // RareSnesRgn
 // ***********
 
-RareSnesRgn::RareSnesRgn(RareSnesInstr *instr, u32 offset, s8 transpose, s16 pitch, u16 adsr) :
+RareSnesRgn::RareSnesRgn(RareSnesInstr *instr, u32 offset, s8 transposeSemitones,
+                         s16 pitchValue, u16 adsrValue) :
     VGMRgn(instr, offset, 1),
-    transpose(transpose),
-    pitch(pitch),
-    adsr(adsr) {
+    transpose(transposeSemitones),
+    pitch(pitchValue),
+    adsr(adsrValue) {
   // normalize (it is needed especially since SF2 pitch correction is signed 8-bit)
   s16 pitchKeyShift = (pitch / 100);
   s8 realTranspose = transpose + pitchKeyShift;

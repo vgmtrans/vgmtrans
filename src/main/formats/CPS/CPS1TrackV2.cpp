@@ -14,9 +14,9 @@
 // CPS1TrackV2
 // ***********
 
-CPS1TrackV2::CPS1TrackV2(VGMSeq *parentSeq, CPSSynth channelSynth, u32 offset, u32 length)
-    : SeqTrack(parentSeq, offset, length), channelSynth(channelSynth) {
-  if (channelSynth == CPSSynth::YM2151) {
+CPS1TrackV2::CPS1TrackV2(VGMSeq *sequence, CPSSynth synth, u32 offset, u32 length)
+    : SeqTrack(sequence, offset, length), channelSynth(synth) {
+  if (synth == CPSSynth::YM2151) {
     synthType = SynthType::YM2151;
   }
   CPS1TrackV2::resetVars();

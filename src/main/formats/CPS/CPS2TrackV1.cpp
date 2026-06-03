@@ -30,8 +30,8 @@ static const u16 vol_table[128] = {
 // *************
 
 
-CPS2TrackV1::CPS2TrackV1(VGMSeq *parentSeq, u32 offset, u32 length)
-    : SeqTrack(parentSeq, offset, length) {
+CPS2TrackV1::CPS2TrackV1(VGMSeq *sequence, u32 offset, u32 length)
+    : SeqTrack(sequence, offset, length) {
   CPS2TrackV1::resetVars();
 }
 

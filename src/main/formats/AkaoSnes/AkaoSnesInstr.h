@@ -19,10 +19,10 @@ class AkaoSnesInstrSet:
 
   AkaoSnesInstrSet(RawFile *file,
                    AkaoSnesVersion ver,
-                   u32 spcDirAddr,
-                   u16 addrTuningTable,
-                   u16 addrADSRTable,
-                   u16 addrDrumKitTable,
+                   u32 spcDirAddress,
+                   u16 tuningTableAddress,
+                   u16 adsrTableAddress,
+                   u16 drumKitTableAddress,
                    const std::string &name = "AkaoSnesInstrSet");
   ~AkaoSnesInstrSet() override;
 
@@ -49,9 +49,9 @@ class AkaoSnesInstr
   AkaoSnesInstr(VGMInstrSet *instrSet,
                 AkaoSnesVersion ver,
                 u8 srcn,
-                u32 spcDirAddr,
-                u16 addrTuningTable,
-                u16 addrADSRTable,
+                u32 spcDirAddress,
+                u16 tuningTableAddress,
+                u16 adsrTableAddress,
                 const std::string &name = "AkaoSnesInstr");
   ~AkaoSnesInstr() override;
 
@@ -75,10 +75,10 @@ public:
   AkaoSnesDrumKit(VGMInstrSet *instrSet,
                   AkaoSnesVersion ver,
                   u32 programNum,
-                  u32 spcDirAddr,
-                  u16 addrTuningTable,
-                  u16 addrADSRTable,
-                  u16 addrDrumKitTable,
+                  u32 spcDirAddress,
+                  u16 tuningTableAddress,
+                  u16 adsrTableAddress,
+                  u16 drumKitTableAddress,
                   const std::string &name = "AkaoSnesDrumKit");
   ~AkaoSnesDrumKit() override;
 

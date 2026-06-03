@@ -18,9 +18,9 @@ class ChunSnesInstrSet:
   ChunSnesInstrSet(RawFile *file,
                    ChunSnesVersion ver,
                    u16 addrInstrSetTable,
-                   u16 addrSampNumTable,
-                   u16 addrSampleTable,
-                   u32 spcDirAddr,
+                   u16 sampNumTableAddress,
+                   u16 sampleTableAddress,
+                   u32 spcDirAddress,
                    const std::string &name = "ChunSnesInstrSet");
   ~ChunSnesInstrSet() override;
 
@@ -47,8 +47,8 @@ class ChunSnesInstr
                 ChunSnesVersion ver,
                 u8 theInstrNum,
                 u16 addrInstr,
-                u16 addrSampleTable,
-                u32 spcDirAddr,
+                u16 sampleTableAddress,
+                u32 spcDirAddress,
                 const std::string &name = "ChunSnesInstr");
   ~ChunSnesInstr() override;
 

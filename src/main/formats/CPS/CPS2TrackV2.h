@@ -59,7 +59,7 @@ enum CPSv2SeqEventType {
 class CPS2TrackV2
     : public SeqTrack {
 public:
-  CPS2TrackV2(CPS2Seq *parentSeq, u32 offset = 0, u32 length = 0);
+  CPS2TrackV2(CPS2Seq *sequence, u32 offset = 0, u32 length = 0);
   void resetVars() override;
   bool readEvent() override;
 

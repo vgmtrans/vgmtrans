@@ -24,18 +24,18 @@ constexpr u16 kSuzukiSnesSd3DrumKitOffset = 16;
 
 SuzukiSnesInstrSet::SuzukiSnesInstrSet(RawFile *file,
                                        SuzukiSnesVersion ver,
-                                       u32 spcDirAddr,
-                                       u16 addrSRCNTable,
-                                       u16 addrVolumeTable,
-                                       u16 addrADSRTable,
-                                       u16 addrTuningTable,
+                                       u32 spcDirAddress,
+                                       u16 srcnTableAddress,
+                                       u16 volumeTableAddress,
+                                       u16 adsrTableAddress,
+                                       u16 tuningTableAddress,
                                        const std::string &name) :
-    VGMInstrSet(SuzukiSnesFormat::name, file, addrSRCNTable, 0, name), version(ver),
-    spcDirAddr(spcDirAddr),
-    addrSRCNTable(addrSRCNTable),
-    addrVolumeTable(addrVolumeTable),
-    addrTuningTable(addrTuningTable),
-    addrADSRTable(addrADSRTable) {
+    VGMInstrSet(SuzukiSnesFormat::name, file, srcnTableAddress, 0, name), version(ver),
+    spcDirAddr(spcDirAddress),
+    addrSRCNTable(srcnTableAddress),
+    addrVolumeTable(volumeTableAddress),
+    addrTuningTable(tuningTableAddress),
+    addrADSRTable(adsrTableAddress) {
 }
 
 bool SuzukiSnesInstrSet::parseHeader() {
@@ -140,19 +140,19 @@ void SuzukiSnesInstrSet::useColl(const VGMColl* coll) {
 
 SuzukiSnesInstr::SuzukiSnesInstr(VGMInstrSet *instrSet,
                                  SuzukiSnesVersion ver,
-                                 u8 instrNum,
-                                 u32 spcDirAddr,
-                                 u16 addrSRCNTable,
-                                 u16 addrVolumeTable,
-                                 u16 addrADSRTable,
-                                 u16 addrTuningTable,
+                                 u8 instrumentNumber,
+                                 u32 spcDirAddress,
+                                 u16 srcnTableAddress,
+                                 u16 volumeTableAddress,
+                                 u16 adsrTableAddress,
+                                 u16 tuningTableAddress,
                                  const std::string &name) :
-    VGMInstr(instrSet, addrSRCNTable, 0, 0, instrNum, name), version(ver),
-    spcDirAddr(spcDirAddr),
-    addrSRCNTable(addrSRCNTable),
-    addrVolumeTable(addrVolumeTable),
-    addrTuningTable(addrTuningTable),
-    addrADSRTable(addrADSRTable) {
+    VGMInstr(instrSet, srcnTableAddress, 0, 0, instrumentNumber, name), version(ver),
+    spcDirAddr(spcDirAddress),
+    addrSRCNTable(srcnTableAddress),
+    addrVolumeTable(volumeTableAddress),
+    addrTuningTable(tuningTableAddress),
+    addrADSRTable(adsrTableAddress) {
 }
 
 SuzukiSnesInstr::~SuzukiSnesInstr() {
@@ -190,18 +190,18 @@ bool SuzukiSnesInstr::loadInstr() {
 SuzukiSnesDrumKit::SuzukiSnesDrumKit(VGMInstrSet *instrSet,
                                      SuzukiSnesVersion ver,
                                      u32 programNum,
-                                     u32 spcDirAddr,
-                                     u16 addrSRCNTable,
-                                     u16 addrTuningTable,
-                                     u16 addrADSRTable,
-                                     u16 addrDrumKitTable,
+                                     u32 spcDirAddress,
+                                     u16 srcnTableAddress,
+                                     u16 tuningTableAddress,
+                                     u16 adsrTableAddress,
+                                     u16 drumKitTableAddress,
                                      const std::string &name) :
-  VGMInstr(instrSet, addrDrumKitTable, 0, programNum >> 7, programNum & 0x7F, name), version(ver),
-  spcDirAddr(spcDirAddr),
-  addrSRCNTable(addrSRCNTable),
-  addrTuningTable(addrTuningTable),
-  addrADSRTable(addrADSRTable),
-  addrDrumKitTable(addrDrumKitTable) {
+  VGMInstr(instrSet, drumKitTableAddress, 0, programNum >> 7, programNum & 0x7F, name), version(ver),
+  spcDirAddr(spcDirAddress),
+  addrSRCNTable(srcnTableAddress),
+  addrTuningTable(tuningTableAddress),
+  addrADSRTable(adsrTableAddress),
+  addrDrumKitTable(drumKitTableAddress) {
 }
 
 bool SuzukiSnesDrumKit::loadInstr() {

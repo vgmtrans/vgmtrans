@@ -63,8 +63,8 @@ bool TriAcePS1Seq::postLoad() {
 // TriAcePS1Track
 // **************
 
-TriAcePS1Track::TriAcePS1Track(TriAcePS1Seq *parentSeq, u32 offset, u32 length)
-    : SeqTrack(parentSeq, offset, length) {
+TriAcePS1Track::TriAcePS1Track(TriAcePS1Seq *sequence, u32 offset, u32 length)
+    : SeqTrack(sequence, offset, length) {
 }
 
 void TriAcePS1Track::loadTrackMainLoop(u32 stopOffset, s32 stopTime) {

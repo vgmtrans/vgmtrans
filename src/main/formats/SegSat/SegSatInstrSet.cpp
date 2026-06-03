@@ -154,8 +154,8 @@ void SegSatInstrSet::assignBankNumber(u8 bankNum) {
 // SegSatInstr
 // ***********
 
-SegSatInstr::SegSatInstr(SegSatInstrSet* set, size_t offset, size_t length, u32 bank, u32 number, const std::string &name)
-    : VGMInstr(set, offset, length, bank, number, name) {
+SegSatInstr::SegSatInstr(SegSatInstrSet* set, size_t offset, size_t length, u32 bankNumber, u32 number, const std::string &name)
+    : VGMInstr(set, offset, length, bankNumber, number, name) {
 }
 
 bool SegSatInstr::loadInstr() {

@@ -17,8 +17,8 @@ class GraphResSnesInstrSet : public VGMInstrSet {
  public:
   GraphResSnesInstrSet(RawFile *file,
                        GraphResSnesVersion ver,
-                       u32 spcDirAddr,
-                       const std::map<u8, u16> &instrADSRHints = std::map<u8, u16>(),
+                       u32 spcDirAddress,
+                       const std::map<u8, u16> &adsrHints = std::map<u8, u16>(),
                        const std::string &name = "GraphResSnesInstrSet");
   ~GraphResSnesInstrSet() override;
 
@@ -42,8 +42,8 @@ class GraphResSnesInstr : public VGMInstr {
   GraphResSnesInstr(VGMInstrSet *instrSet,
                     GraphResSnesVersion ver,
                     u8 srcn,
-                    u32 spcDirAddr,
-                    u16 adsr = 0x8fe0,
+                    u32 spcDirAddress,
+                    u16 adsrValue = 0x8fe0,
                     const std::string &name = "GraphResSnesInstr");
   ~GraphResSnesInstr() override;
 

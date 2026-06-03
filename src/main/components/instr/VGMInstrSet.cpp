@@ -139,9 +139,9 @@ void VGMInstrSet::addTempInstr(VGMInstr* instr) {
 // ********
 
 VGMInstr::VGMInstr(VGMInstrSet *instrSet, u32 offset, u32 length, u32 theBank,
-                   u32 theInstrNum, std::string name, float reverb)
+                   u32 theInstrNum, std::string name, float reverbLevel)
     : VGMItem(instrSet, offset, length, std::move(name), Type::Instrument),
-      bank(theBank), instrNum(theInstrNum), parInstrSet(instrSet), reverb(reverb) {
+      bank(theBank), instrNum(theInstrNum), parInstrSet(instrSet), reverb(reverbLevel) {
 }
 
 void VGMInstr::setBank(u32 bankNum) {

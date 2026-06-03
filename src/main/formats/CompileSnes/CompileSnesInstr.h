@@ -17,9 +17,9 @@ class CompileSnesInstrSet:
  public:
   CompileSnesInstrSet(RawFile *file,
                       CompileSnesVersion ver,
-                      u16 addrTuningTable,
-                      u16 addrPitchTablePtrs,
-                      u32 spcDirAddr,
+                      u16 tuningTableAddress,
+                      u16 pitchTablePtrsAddress,
+                      u32 spcDirAddress,
                       const std::string &name = "CompileSnesInstrSet");
   ~CompileSnesInstrSet() override;
 
@@ -45,9 +45,9 @@ class CompileSnesInstr
   CompileSnesInstr(VGMInstrSet *instrSet,
                    CompileSnesVersion ver,
                    u16 addrTuningTableItem,
-                   u16 addrPitchTablePtrs,
+                   u16 pitchTablePtrsAddress,
                    u8 srcn,
-                   u32 spcDirAddr,
+                   u32 spcDirAddress,
                    const std::string &name = "CompileSnesInstr");
   ~CompileSnesInstr() override;
 

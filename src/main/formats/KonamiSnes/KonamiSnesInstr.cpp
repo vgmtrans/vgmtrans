@@ -115,16 +115,16 @@ std::vector<PercussionHeader> collectPercussionHeaders(RawFile *file,
 KonamiSnesInstrSet::KonamiSnesInstrSet(RawFile *file,
                                        KonamiSnesVersion ver,
                                        u32 offset,
-                                       u32 bankedInstrOffset,
-                                       u8 firstBankedInstr,
-                                       u32 percInstrOffset,
-                                       u32 spcDirAddr,
+                                       u32 bankedInstrAddress,
+                                       u8 firstBankedInstrNumber,
+                                       u32 percInstrAddress,
+                                       u32 spcDirAddress,
                                        const std::string &name) :
     VGMInstrSet(KonamiSnesFormat::name, file, offset, 0, name), version(ver),
-    bankedInstrOffset(bankedInstrOffset),
-    firstBankedInstr(firstBankedInstr),
-    percInstrOffset(percInstrOffset),
-    spcDirAddr(spcDirAddr) {
+    bankedInstrOffset(bankedInstrAddress),
+    firstBankedInstr(firstBankedInstrNumber),
+    percInstrOffset(percInstrAddress),
+    spcDirAddr(spcDirAddress) {
 }
 
 KonamiSnesInstrSet::~KonamiSnesInstrSet() {
@@ -240,13 +240,13 @@ KonamiSnesInstr::KonamiSnesInstr(VGMInstrSet *instrSet,
                                  u32 offset,
                                  u32 theBank,
                                  u32 theInstrNum,
-                                 u32 spcDirAddr,
-                                 bool percussion,
+                                 u32 spcDirAddress,
+                                 bool isPercussion,
                                  const std::string &name) :
     VGMInstr(instrSet, offset, KonamiSnesInstr::expectedSize(ver), theBank, theInstrNum, name),
     version(ver),
-    spcDirAddr(spcDirAddr),
-    percussion(percussion) {
+    spcDirAddr(spcDirAddress),
+    percussion(isPercussion) {
 }
 
 KonamiSnesInstr::~KonamiSnesInstr() {

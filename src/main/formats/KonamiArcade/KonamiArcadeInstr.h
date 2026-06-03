@@ -94,8 +94,8 @@ class KonamiArcadeSampColl
 public:
   KonamiArcadeSampColl(
     RawFile* file,
-    KonamiArcadeInstrSet* instrset,
-    const std::vector<konami_mw_sample_info>& sampInfos,
+    KonamiArcadeInstrSet* parentInstrSet,
+    const std::vector<konami_mw_sample_info>& sampleInfos,
     u32 offset,
     u32 length = 0,
     std::string name = std::string("Konami MW Sample Collection")

@@ -19,12 +19,12 @@ HudsonSnesInstrSet::HudsonSnesInstrSet(RawFile *file,
                                        HudsonSnesVersion ver,
                                        u32 offset,
                                        u32 length,
-                                       u32 spcDirAddr,
-                                       u32 addrSampTuningTable,
+                                       u32 spcDirAddress,
+                                       u32 sampleTuningTableAddress,
                                        const std::string &name) :
     VGMInstrSet(HudsonSnesFormat::name, file, offset, length, name), version(ver),
-    spcDirAddr(spcDirAddr),
-    addrSampTuningTable(addrSampTuningTable) {
+    spcDirAddr(spcDirAddress),
+    addrSampTuningTable(sampleTuningTableAddress) {
 }
 
 HudsonSnesInstrSet::~HudsonSnesInstrSet() {
@@ -81,13 +81,13 @@ bool HudsonSnesInstrSet::parseInstrPointers() {
 HudsonSnesInstr::HudsonSnesInstr(VGMInstrSet *instrSet,
                                  HudsonSnesVersion ver,
                                  u32 offset,
-                                 u8 instrNum,
-                                 u32 spcDirAddr,
-                                 u32 addrSampTuningTable,
+                                 u8 instrumentNumber,
+                                 u32 spcDirAddress,
+                                 u32 sampleTuningTableAddress,
                                  const std::string &name) :
-    VGMInstr(instrSet, offset, 4, 0, instrNum, name), version(ver),
-    spcDirAddr(spcDirAddr),
-    addrSampTuningTable(addrSampTuningTable) {
+    VGMInstr(instrSet, offset, 4, 0, instrumentNumber, name), version(ver),
+    spcDirAddr(spcDirAddress),
+    addrSampTuningTable(sampleTuningTableAddress) {
 }
 
 HudsonSnesInstr::~HudsonSnesInstr() {

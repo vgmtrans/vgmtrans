@@ -106,7 +106,7 @@ public:
   }
 
 protected:
-  bool loadTracks(ReadMode readMode, u32 stopTime = 1000000) override;
+  bool loadTracks(ReadMode seqReadMode, u32 stopTime = 1000000) override;
   bool postLoad() override;
 
   VGMHeader* header;
@@ -192,7 +192,7 @@ public:
 
 class NinSnesSectionTrackItem : public SeqTrack {
 public:
-  NinSnesSectionTrackItem(NinSnesSeq* parentSeq, u32 offset, u32 length,
+  NinSnesSectionTrackItem(NinSnesSeq* sequence, u32 offset, u32 length,
                           const std::string& theName);
 };
 
@@ -206,7 +206,7 @@ public:
     u8 targetNote = 0;
   };
 
-  NinSnesTrack(NinSnesSeq* parentSeq, u32 offset = 0, u32 length = 0,
+  NinSnesTrack(NinSnesSeq* sequence, u32 offset = 0, u32 length = 0,
                const std::string& theName = "NinSnes Track");
 
   void resetVars() override;

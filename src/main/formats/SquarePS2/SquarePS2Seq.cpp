@@ -59,8 +59,8 @@ bool BGMSeq::parseTrackPointers() {
 // ********
 
 
-BGMTrack::BGMTrack(BGMSeq *parentSeq, u32 offset, u32 length)
-    : SeqTrack(parentSeq, offset, length) {
+BGMTrack::BGMTrack(BGMSeq *sequence, u32 offset, u32 length)
+    : SeqTrack(sequence, offset, length) {
 }
 
 

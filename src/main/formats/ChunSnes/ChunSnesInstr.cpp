@@ -18,14 +18,14 @@
 ChunSnesInstrSet::ChunSnesInstrSet(RawFile *file,
                                    ChunSnesVersion ver,
                                    u16 addrInstrSet,
-                                   u16 addrSampNumTable,
-                                   u16 addrSampleTable,
-                                   u32 spcDirAddr,
+                                   u16 sampNumTableAddress,
+                                   u16 sampleTableAddress,
+                                   u32 spcDirAddress,
                                    const std::string &name) :
     VGMInstrSet(ChunSnesFormat::name, file, addrInstrSet, 0, name), version(ver),
-    addrSampNumTable(addrSampNumTable),
-    addrSampleTable(addrSampleTable),
-    spcDirAddr(spcDirAddr) {
+    addrSampNumTable(sampNumTableAddress),
+    addrSampleTable(sampleTableAddress),
+    spcDirAddr(spcDirAddress) {
 }
 
 ChunSnesInstrSet::~ChunSnesInstrSet() {
@@ -115,12 +115,12 @@ ChunSnesInstr::ChunSnesInstr(VGMInstrSet *instrSet,
                              ChunSnesVersion ver,
                              u8 theInstrNum,
                              u16 addrInstr,
-                             u16 addrSampleTable,
-                             u32 spcDirAddr,
+                             u16 sampleTableAddress,
+                             u32 spcDirAddress,
                              const std::string &name) :
     VGMInstr(instrSet, addrInstr, 0, 0, theInstrNum, name), version(ver),
-    addrSampleTable(addrSampleTable),
-    spcDirAddr(spcDirAddr) {}
+    addrSampleTable(sampleTableAddress),
+    spcDirAddr(spcDirAddress) {}
 
 ChunSnesInstr::~ChunSnesInstr() {}
 

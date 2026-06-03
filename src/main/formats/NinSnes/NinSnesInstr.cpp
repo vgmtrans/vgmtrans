@@ -175,14 +175,14 @@ VGMRgn* createRgnFromHeaderData(VGMInstr* instr,
 NinSnesInstrSet::NinSnesInstrSet(RawFile *file,
                                  NinSnesProfileId profile,
                                  u32 offset,
-                                 u32 spcDirAddr,
+                                 u32 spcDirAddress,
                                  const std::string &name) :
     VGMInstrSet(NinSnesFormat::name, file, offset, 0, name),
     signature(NinSnesSignatureId::None),
     profileId(profile),
     konamiTuningTableAddress(0),
     konamiTuningTableSize(0),
-    spcDirAddr(spcDirAddr) {
+    spcDirAddr(spcDirAddress) {
 }
 
 NinSnesInstrSet::NinSnesInstrSet(RawFile* file, const NinSnesScanResult& scanResult)
@@ -392,13 +392,13 @@ NinSnesInstr::NinSnesInstr(VGMInstrSet *instrSet,
                            u32 offset,
                            u32 theBank,
                            u32 theInstrNum,
-                           u32 spcDirAddr,
+                           u32 spcDirAddress,
                            const std::string &name) :
     VGMInstr(instrSet, offset, NinSnesInstr::expectedSize(profile), theBank, theInstrNum, name),
     profileId(profile),
     konamiTuningTableAddress(0),
     konamiTuningTableSize(0),
-    spcDirAddr(spcDirAddr) {
+    spcDirAddr(spcDirAddress) {
 }
 
 NinSnesInstr::~NinSnesInstr() {

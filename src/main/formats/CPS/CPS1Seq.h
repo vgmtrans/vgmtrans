@@ -10,7 +10,8 @@
 class CPS1Seq:
     public VGMSeq {
 public:
-  CPS1Seq(RawFile *file, u32 offset, CPS1FormatVer fmtVersion, std::string name = {}, std::vector<s8> instrTransposeTable = {});
+  CPS1Seq(RawFile *file, u32 offset, CPS1FormatVer formatVersion, std::string name = {},
+          std::vector<s8> transposeTable = {});
   ~CPS1Seq() = default;
 
   bool parseHeader() override;

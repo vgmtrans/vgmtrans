@@ -18,11 +18,11 @@ class PrismSnesInstrSet:
  public:
   PrismSnesInstrSet(RawFile *file,
                     PrismSnesVersion ver,
-                    u32 spcDirAddr,
-                    u16 addrADSR1Table,
-                    u16 addrADSR2Table,
-                    u16 addrTuningTableHigh,
-                    u16 addrTuningTableLow,
+                    u32 spcDirAddress,
+                    u16 adsr1TableAddress,
+                    u16 adsr2TableAddress,
+                    u16 tuningTableHighAddress,
+                    u16 tuningTableLowAddress,
                     const std::string &name = "PrismSnesInstrSet");
   virtual ~PrismSnesInstrSet();
 
@@ -49,12 +49,12 @@ class PrismSnesInstr
  public:
   PrismSnesInstr(VGMInstrSet *instrSet,
                  PrismSnesVersion ver,
-                 u8 srcn,
-                 u32 spcDirAddr,
-                 u16 addrADSR1Entry,
-                 u16 addrADSR2Entry,
-                 u16 addrTuningEntryHigh,
-                 u16 addrTuningEntryLow,
+                 u8 sampleNumber,
+                 u32 spcDirAddress,
+                 u16 adsr1EntryAddress,
+                 u16 adsr2EntryAddress,
+                 u16 tuningEntryHighAddress,
+                 u16 tuningEntryLowAddress,
                  const std::string &name = "PrismSnesInstr");
   virtual ~PrismSnesInstr();
 

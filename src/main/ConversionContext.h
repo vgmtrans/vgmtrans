@@ -13,12 +13,12 @@ class ConversionOptions;
 
 struct ConversionContext {
   ConversionContext();
-  ConversionContext(BankSelectStyle bankSelectStyle,
-                    int sequenceLoops,
-                    bool skipChannel10,
-                    const ModSourceMap& sf2ModSources,
-                    const ModSourceMap& dlsModSources,
-                    SynthTarget modulationSynthTarget);
+  ConversionContext(BankSelectStyle selectedBankStyle,
+                    int loopCount,
+                    bool skipRhythmChannel,
+                    const ModSourceMap& sf2Sources,
+                    const ModSourceMap& dlsSources,
+                    SynthTarget modulationTarget);
 
   static ConversionContext fromOptions(const ConversionOptions& options, SynthTarget modulationSynthTarget);
 

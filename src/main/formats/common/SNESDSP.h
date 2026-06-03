@@ -109,8 +109,8 @@ class SNESSampColl
  public:
   SNESSampColl(const std::string& format, RawFile* rawfile, u32 offset, u32 maxNumSamps = 256);
   SNESSampColl(const std::string& format, VGMInstrSet* instrset, u32 offset, u32 maxNumSamps = 256);
-  SNESSampColl(const std::string& format, RawFile* rawfile, u32 offset, const std::vector<u8>& targetSRCNs, std::string name = "SNESSampColl");
-  SNESSampColl(const std::string& format, VGMInstrSet* instrset, u32 offset, const std::vector<u8>& targetSRCNs, std::string name = "SNESSampColl");
+  SNESSampColl(const std::string& format, RawFile* rawfile, u32 offset, const std::vector<u8>& targetSourceNumbers, std::string name = "SNESSampColl");
+  SNESSampColl(const std::string& format, VGMInstrSet* instrset, u32 offset, const std::vector<u8>& targetSourceNumbers, std::string name = "SNESSampColl");
   ~SNESSampColl() override;
 
   bool parseSampleInfo() override;
@@ -136,7 +136,7 @@ class SNESSamp
            u32 dataLen, u32 loopOffset, std::string name = "BRR");
   ~SNESSamp() override;
 
-  static u32 getSampleLength(const RawFile *file, u32 offset, bool &loop);
+  static u32 getSampleLength(const RawFile *file, u32 offset, bool &hasLoop);
 
   double compressionRatio() const override;
 

@@ -26,7 +26,7 @@ enum class BPS : int {
 class VGMSamp : public VGMItem {
 public:
   VGMSamp(VGMSampColl *sampColl, u32 offset = 0, u32 length = 0, u32 dataOffset = 0,
-          u32 dataLength = 0, u8 channels = 1, BPS bps = BPS::PCM16, u32 rate = 0,
+          u32 dataLength = 0, u8 numChannels = 1, BPS bps = BPS::PCM16, u32 sampleRate = 0,
           std::string name = "Sample");
   ~VGMSamp() override = default;
 

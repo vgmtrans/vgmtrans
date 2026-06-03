@@ -25,12 +25,8 @@ function(vgmtrans_enable_project_warnings target)
 
       $<$<COMPILE_LANG_AND_ID:C,MSVC>:/W4>
       $<$<COMPILE_LANG_AND_ID:C,MSVC>:/wd4100>
-      $<$<COMPILE_LANG_AND_ID:C,MSVC>:/wd4456>
-      $<$<COMPILE_LANG_AND_ID:C,MSVC>:/wd4458>
       $<$<COMPILE_LANG_AND_ID:CXX,MSVC>:/W4>
       $<$<COMPILE_LANG_AND_ID:CXX,MSVC>:/wd4100>
-      $<$<COMPILE_LANG_AND_ID:CXX,MSVC>:/wd4456>
-      $<$<COMPILE_LANG_AND_ID:CXX,MSVC>:/wd4458>
   )
 
   set_target_properties(${target} PROPERTIES COMPILE_WARNING_AS_ERROR ${VGMTRANS_WARNINGS_AS_ERRORS})

@@ -30,8 +30,6 @@ class OrgTrack
   virtual bool readEvent();
 
  public:
-  u8 prevPan;
-
   u16 curNote;
   u8 realTrkNum;
   u16 freq;

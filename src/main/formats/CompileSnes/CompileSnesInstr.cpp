@@ -17,14 +17,14 @@
 
 CompileSnesInstrSet::CompileSnesInstrSet(RawFile *file,
                                          CompileSnesVersion ver,
-                                         u16 addrTuningTable,
-                                         u16 addrPitchTablePtrs,
-                                         u32 spcDirAddr,
+                                         u16 tuningTableAddress,
+                                         u16 pitchTablePtrsAddress,
+                                         u32 spcDirAddress,
                                          const std::string &name)
-    : VGMInstrSet(CompileSnesFormat::name, file, addrTuningTable, 0, name), version(ver),
-      addrTuningTable(addrTuningTable),
-      addrPitchTablePtrs(addrPitchTablePtrs),
-      spcDirAddr(spcDirAddr) {
+    : VGMInstrSet(CompileSnesFormat::name, file, tuningTableAddress, 0, name), version(ver),
+      addrTuningTable(tuningTableAddress),
+      addrPitchTablePtrs(pitchTablePtrsAddress),
+      spcDirAddr(spcDirAddress) {
 }
 
 CompileSnesInstrSet::~CompileSnesInstrSet() {
@@ -88,13 +88,13 @@ bool CompileSnesInstrSet::parseInstrPointers() {
 CompileSnesInstr::CompileSnesInstr(VGMInstrSet *instrSet,
                                    CompileSnesVersion ver,
                                    u16 addrTuningTableItem,
-                                   u16 addrPitchTablePtrs,
+                                   u16 pitchTablePtrsAddress,
                                    u8 srcn,
-                                   u32 spcDirAddr,
+                                   u32 spcDirAddress,
                                    const std::string &name)
     : VGMInstr(instrSet, addrTuningTableItem, CompileSnesInstr::expectedSize(ver), 0, srcn, name), version(ver),
-      addrPitchTablePtrs(addrPitchTablePtrs),
-      spcDirAddr(spcDirAddr) {}
+      addrPitchTablePtrs(pitchTablePtrsAddress),
+      spcDirAddr(spcDirAddress) {}
 
 CompileSnesInstr::~CompileSnesInstr() {}
 

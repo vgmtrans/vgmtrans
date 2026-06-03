@@ -122,10 +122,10 @@ void NinSnesSeq::createTracks() {
   }
 }
 
-bool NinSnesSeq::loadTracks(ReadMode readMode, u32 stopTime) {
-  this->readMode = readMode;
+bool NinSnesSeq::loadTracks(ReadMode seqReadMode, u32 stopTime) {
+  this->readMode = seqReadMode;
   for (auto* track : aTracks) {
-    track->readMode = readMode;
+    track->readMode = seqReadMode;
   }
 
   curOffset = dwStartOffset;

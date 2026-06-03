@@ -154,13 +154,13 @@ bool KonamiArcadeInstrSet::parseInstrPointers() {
 
 KonamiArcadeSampColl::KonamiArcadeSampColl(
     RawFile* file,
-    KonamiArcadeInstrSet* instrset,
-    const std::vector<konami_mw_sample_info>& sampInfos,
+    KonamiArcadeInstrSet* parentInstrSet,
+    const std::vector<konami_mw_sample_info>& sampleInfos,
     u32 offset,
     u32 length,
     std::string name)
     : VGMSampColl(KonamiArcadeFormat::name, file, offset, length, std::move(name)),
-      instrset(instrset), sampInfos(sampInfos) {
+      instrset(parentInstrSet), sampInfos(sampleInfos) {
 }
 
 bool KonamiArcadeSampColl::parseHeader() {

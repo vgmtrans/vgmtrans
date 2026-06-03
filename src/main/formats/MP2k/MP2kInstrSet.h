@@ -45,7 +45,7 @@ struct MP2kInstrData {
 
 class MP2kInstr final : public VGMInstr {
 public:
-  MP2kInstr(MP2kInstrSet *set, size_t offset, size_t length, u32 bank, u32 number,
+  MP2kInstr(MP2kInstrSet *set, size_t offset, size_t length, u32 bankNumber, u32 number,
             MP2kInstrData data);
   ~MP2kInstr() = default;
 

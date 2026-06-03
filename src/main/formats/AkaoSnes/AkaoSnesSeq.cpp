@@ -28,14 +28,14 @@ AkaoSnesSeq::AkaoSnesSeq(RawFile *file,
                          AkaoSnesVersion ver,
                          AkaoSnesMinorVersion minorVer,
                          u32 seqdataOffset,
-                         u32 addrAPURelocBase,
+                         u32 apuRelocBaseAddress,
                          std::string name)
     : VGMSeq(AkaoSnesFormat::name, file, seqdataOffset, 0, std::move(name)),
       version(ver),
       minorVersion(minorVer),
       tempo(akao_snes::modulation::kDefaultTempo),
-      addrAPURelocBase(addrAPURelocBase),
-      addrROMRelocBase(addrAPURelocBase),
+      addrAPURelocBase(apuRelocBaseAddress),
+      addrROMRelocBase(apuRelocBaseAddress),
       addrSequenceEnd(0) {
   bLoadTickByTick = true;
   setAllowDiscontinuousTrackData(true);

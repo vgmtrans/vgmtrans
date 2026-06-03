@@ -23,8 +23,9 @@ struct AkaoInstrDatLocation {
 
   AkaoInstrDatLocation() noexcept : instrAllOffset(0), instrDatOffset(0), startingArticulationId(0), numArticulations(0) {}
 
-  AkaoInstrDatLocation(u32 instrAllOffset, u32 instrDatOffset, u32 startingArticulationId, u32 numArticulations) noexcept
-    : instrAllOffset(instrAllOffset), instrDatOffset(instrDatOffset), startingArticulationId(startingArticulationId), numArticulations(numArticulations) {}
+  AkaoInstrDatLocation(u32 allOffset, u32 datOffset, u32 firstArticulationId, u32 articulationCount) noexcept
+    : instrAllOffset(allOffset), instrDatOffset(datOffset), startingArticulationId(firstArticulationId),
+      numArticulations(articulationCount) {}
 };
 
 // ************
@@ -40,10 +41,10 @@ class AkaoInstrSet final : public VGMInstrSet {
                u32 dkitOff,
                u32 id,
                std::string name = "Akao Instrument Bank");
-  AkaoInstrSet(RawFile *file, u32 end_boundary_offset, AkaoPs1Version version,
-    const std::set<u32>& custom_instrument_addresses, const std::set<u32>& drum_instrument_addresses,
+  AkaoInstrSet(RawFile *file, u32 endBoundaryOffset, AkaoPs1Version version,
+    const std::set<u32>& customInstrumentAddresses, const std::set<u32>& drumInstrumentAddresses,
     u32 id, std::string name = "Akao Instrument Bank");
-  AkaoInstrSet(RawFile *file, u32 offset, u32 end_boundary_offset, AkaoPs1Version version,
+  AkaoInstrSet(RawFile *file, u32 offset, u32 endBoundaryOffset, AkaoPs1Version version,
     u32 id, std::string name = "Akao Instrument Bank (Dummy)");
   bool parseInstrPointers() override;
   void useColl(const VGMColl* coll) override;
@@ -103,7 +104,7 @@ class AkaoRgn final :
     public VGMRgn {
  public:
   AkaoRgn(VGMInstr *instr, u32 offset, u32 length = 0, std::string name = "Region");
-  AkaoRgn(VGMInstr *instr, u32 offset, u32 length, u8 keyLow, u8 keyHigh,
+  AkaoRgn(VGMInstr *instr, u32 offset, u32 length, u8 lowKey, u8 highKey,
           u8 artIDNum, std::string name = "Region");
 
   bool loadRgn() override;
@@ -141,7 +142,7 @@ class AkaoSampColl final :
     public VGMSampColl {
  public:
    AkaoSampColl(RawFile *file, u32 offset, AkaoPs1Version version, std::string name = "Akao Sample Collection");
-   AkaoSampColl(RawFile *file, AkaoInstrDatLocation file_location, std::string name = "Akao Sample Collection");
+   AkaoSampColl(RawFile *file, AkaoInstrDatLocation location, std::string name = "Akao Sample Collection");
 
   bool parseHeader() override;
   bool parseSampleInfo() override;

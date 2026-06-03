@@ -10,8 +10,8 @@
 VGMItem::VGMItem() : type(Type::Unknown), m_vgmfile(nullptr), m_offset(0), m_length(0) {
 }
 
-VGMItem::VGMItem(VGMFile *vgmfile, u32 offset, u32 length, std::string name, Type type)
-    : type(type),
+VGMItem::VGMItem(VGMFile *vgmfile, u32 offset, u32 length, std::string name, Type itemType)
+    : type(itemType),
       m_vgmfile(vgmfile),
       m_offset(offset),
       m_length(length),

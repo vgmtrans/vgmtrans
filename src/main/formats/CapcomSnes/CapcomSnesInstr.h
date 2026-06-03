@@ -16,7 +16,7 @@ class CapcomSnesInstrSet:
     public VGMInstrSet {
  public:
   CapcomSnesInstrSet
-      (RawFile *file, u32 offset, u32 spcDirAddr, const std::string &name = "CapcomSnesInstrSet");
+      (RawFile *file, u32 offset, u32 spcDirAddress, const std::string &name = "CapcomSnesInstrSet");
   ~CapcomSnesInstrSet() override;
 
   bool parseHeader() override;
@@ -38,7 +38,7 @@ class CapcomSnesInstr
                   u32 offset,
                   u32 theBank,
                   u32 theInstrNum,
-                  u32 spcDirAddr,
+                  u32 spcDirAddress,
                   const std::string &name = "CapcomSnesInstr");
   ~CapcomSnesInstr() override;
 

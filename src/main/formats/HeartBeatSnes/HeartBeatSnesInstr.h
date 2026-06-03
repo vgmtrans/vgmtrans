@@ -19,9 +19,9 @@ class HeartBeatSnesInstrSet:
                         HeartBeatSnesVersion ver,
                         u32 offset,
                         u32 length,
-                        u16 addrSRCNTable,
-                        u8 songIndex,
-                        u32 spcDirAddr,
+                        u16 srcnTableAddress,
+                        u8 selectedSongIndex,
+                        u32 spcDirAddress,
                         const std::string &name = "HeartBeatSnesInstrSet");
   ~HeartBeatSnesInstrSet() override;
 
@@ -49,9 +49,9 @@ class HeartBeatSnesInstr
                      u32 offset,
                      u32 theBank,
                      u32 theInstrNum,
-                     u16 addrSRCNTable,
-                     u8 songIndex,
-                     u32 spcDirAddr,
+                     u16 srcnTableAddress,
+                     u8 selectedSongIndex,
+                     u32 spcDirAddress,
                      const std::string &name = "HeartBeatSnesInstr");
   ~HeartBeatSnesInstr() override;
 

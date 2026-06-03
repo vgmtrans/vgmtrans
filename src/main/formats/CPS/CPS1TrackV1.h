@@ -9,7 +9,7 @@
 class CPS1TrackV1
     : public SeqTrack {
 public:
-  CPS1TrackV1(CPS1Seq *parentSeq, CPSSynth channelSynth, u32 offset = 0, u32 length = 0);
+  CPS1TrackV1(CPS1Seq *sequence, CPSSynth synth, u32 offset = 0, u32 length = 0);
   void resetVars() override;
   void addInitialMidiEvents(int trackNum) override;
   bool readEvent() override;

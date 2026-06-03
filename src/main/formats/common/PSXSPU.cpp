@@ -31,9 +31,9 @@ PSXSampColl::PSXSampColl(const string &format,
                          VGMInstrSet *instrset,
                          u32 offset,
                          u32 length,
-                         const std::vector<SizeOffsetPair> &vagLocations)
+                         const std::vector<SizeOffsetPair> &sampleLocations)
     : VGMSampColl(format, instrset->rawFile(), instrset, offset, length, "PSX Sample Collection"),
-      vagLocations(vagLocations) {
+      vagLocations(sampleLocations) {
 }
 
 bool PSXSampColl::parseSampleInfo() {
@@ -461,7 +461,7 @@ std::vector<u8> PSXSamp::decodeToNativePcm() {
   return samples;
 }
 
-u32 PSXSamp::getSampleLength(const RawFile *file, u32 offset, u32 endOffset, bool &loop) {
+u32 PSXSamp::getSampleLength(const RawFile *file, u32 offset, u32 endOffset, bool &hasLoop) {
   u32 curOffset = offset;
   while (curOffset < endOffset) {
     u8 keyFlagByte = file->readByte(curOffset + 1);
@@ -469,7 +469,7 @@ u32 PSXSamp::getSampleLength(const RawFile *file, u32 offset, u32 endOffset, boo
     curOffset += 16;
 
     if ((keyFlagByte & 1) != 0) {
-      loop = (keyFlagByte & 2) != 0;
+      hasLoop = (keyFlagByte & 2) != 0;
       break;
     }
   }

@@ -55,10 +55,10 @@ bool ItikitiSnesInstrSet::parseInstrPointers() {
 }
 
 ItikitiSnesInstr::ItikitiSnesInstr(VGMInstrSet *instrument_set, u32 tuning_offset,
-                                   u32 adsr_offset, u32 bank, u32 instrument_number,
-                                   u8 srcn, u16 spc_dir_offset, std::string name)
-    : VGMInstr(instrument_set, adsr_offset, 2, bank, instrument_number, std::move(name)),
-      m_tuning_offset(tuning_offset), m_adsr_offset(adsr_offset), srcn(srcn),
+                                   u32 adsr_offset, u32 bankNumber, u32 instrument_number,
+                                   u8 sampleNumber, u16 spc_dir_offset, std::string name)
+    : VGMInstr(instrument_set, adsr_offset, 2, bankNumber, instrument_number, std::move(name)),
+      m_tuning_offset(tuning_offset), m_adsr_offset(adsr_offset), srcn(sampleNumber),
       m_spc_dir_offset(spc_dir_offset) {
 }
 

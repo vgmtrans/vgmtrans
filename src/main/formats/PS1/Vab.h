@@ -116,7 +116,7 @@ class Vab:
 
   bool parseHeader() override;
   bool parseInstrPointers() override;
-  bool isViableSampCollMatch(VGMSampColl* sampColl) override;
+  bool isViableSampCollMatch(VGMSampColl* sampleCollection) override;
 
  public:
   VabHdr hdr;

@@ -136,15 +136,15 @@ double clampSecondsRangeMinimum(double seconds);
 u8 midiValueForSecondsInRange(double seconds, double minSeconds, double maxSeconds);
 
 struct SynthModulator {
-  SynthModulator(ModSource explicitSource, ModDest destination, s32 amount)
+  SynthModulator(ModSource explicitSource, ModDest modDestination, s32 modAmount)
       : source(explicitSource),
-        destination(destination),
-        amount(amount) {}
+        destination(modDestination),
+        amount(modAmount) {}
 
-  SynthModulator(ModDest destination, s32 amount)
+  SynthModulator(ModDest modDestination, s32 modAmount)
       : source(std::nullopt),
-        destination(destination),
-        amount(amount) {}
+        destination(modDestination),
+        amount(modAmount) {}
 
   // If source is empty, exporters resolve it from settings using destination.
   std::optional<ModSource> source;

@@ -36,36 +36,36 @@ AkaoInstrSet::AkaoInstrSet(RawFile *file,
   end_boundary_offset = offset() + length;
 }
 
-AkaoInstrSet::AkaoInstrSet(RawFile *file, u32 end_boundary_offset,
-  AkaoPs1Version version, const std::set<u32>& custom_instrument_addresses,
-  const std::set<u32>& drum_instrument_addresses, u32 id, std::string name)
+AkaoInstrSet::AkaoInstrSet(RawFile *file, u32 endBoundaryOffset,
+  AkaoPs1Version version, const std::set<u32>& customInstrumentAddresses,
+  const std::set<u32>& drumInstrumentAddresses, u32 id, std::string name)
   : VGMInstrSet(AkaoFormat::name, file, 0, 0, std::move(name)), bMelInstrs(false), bDrumKit(false),
-  instrSetOff(0), drumkitOff(0), end_boundary_offset(end_boundary_offset), version_(version)
+  instrSetOff(0), drumkitOff(0), end_boundary_offset(endBoundaryOffset), version_(version)
 {
   setId(id);
   u32 first_instrument_offset = 0;
-  if (!custom_instrument_addresses.empty()) {
-    first_instrument_offset = *custom_instrument_addresses.begin();
+  if (!customInstrumentAddresses.empty()) {
+    first_instrument_offset = *customInstrumentAddresses.begin();
     setOffset(first_instrument_offset);
   }
 
-  if (!drum_instrument_addresses.empty()) {
-    const u32 first_drum_offset = *drum_instrument_addresses.begin();
+  if (!drumInstrumentAddresses.empty()) {
+    const u32 first_drum_offset = *drumInstrumentAddresses.begin();
 
-    if (custom_instrument_addresses.empty())
+    if (customInstrumentAddresses.empty())
       setOffset(first_drum_offset);
     else
       setOffset(std::min(first_instrument_offset, first_drum_offset));
   }
 
-  this->custom_instrument_addresses = custom_instrument_addresses;
-  this->drum_instrument_addresses = drum_instrument_addresses;
+  custom_instrument_addresses = customInstrumentAddresses;
+  drum_instrument_addresses = drumInstrumentAddresses;
 }
 
 AkaoInstrSet::AkaoInstrSet(RawFile *file, u32 offset,
-  u32 end_boundary_offset, AkaoPs1Version version, u32 id, std::string name)
+  u32 endBoundaryOffset, AkaoPs1Version version, u32 id, std::string name)
     : VGMInstrSet(AkaoFormat::name, file, offset, 0, std::move(name)), bMelInstrs(false),
-      bDrumKit(false), instrSetOff(0), drumkitOff(0), end_boundary_offset(end_boundary_offset),
+      bDrumKit(false), instrSetOff(0), drumkitOff(0), end_boundary_offset(endBoundaryOffset),
       version_(version)
 {
   setId(id);
@@ -306,9 +306,9 @@ bool AkaoDrumKit::loadInstr() {
 // *******
 // AkaoRgn
 // *******
-AkaoRgn::AkaoRgn(VGMInstr *instr, u32 offset, u32 length, u8 keyLow, u8 keyHigh,
+AkaoRgn::AkaoRgn(VGMInstr *instr, u32 offset, u32 length, u8 lowKey, u8 highKey,
                  u8 artIDNum, std::string name)
-    : VGMRgn(instr, offset, length, keyLow, keyHigh, 0, 0x7F, 0, std::move(name)),
+    : VGMRgn(instr, offset, length, lowKey, highKey, 0, 0x7F, 0, std::move(name)),
       adsr1(0), adsr2(0), artNum(artIDNum), drumRelUnityKey(0) {
 }
 
@@ -348,10 +348,10 @@ AkaoSampColl::AkaoSampColl(RawFile *file, u32 offset, AkaoPs1Version version, st
       sample_section_offset(0) {
 }
 
-AkaoSampColl::AkaoSampColl(RawFile *file, AkaoInstrDatLocation file_location, std::string name)
+AkaoSampColl::AkaoSampColl(RawFile *file, AkaoInstrDatLocation location, std::string name)
     : VGMSampColl(AkaoFormat::name, file, 0, 0, std::move(name)), starting_art_id(0), ending_art_id(0),
       nNumArts(0), sample_set_id(0), version_(AkaoPs1Version::VERSION_1_0), sample_section_size(0), arts_offset(0),
-      sample_section_offset(0), file_location(file_location)
+      sample_section_offset(0), file_location(location)
 {
   setOffset(file_location.instrAllOffset);
   if (offset() > file_location.instrAllOffset) {

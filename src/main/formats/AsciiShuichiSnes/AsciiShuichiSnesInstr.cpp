@@ -18,12 +18,12 @@
 // ************************
 
 AsciiShuichiSnesInstrSet::AsciiShuichiSnesInstrSet(RawFile *file, u32 offset,
-                                                   u32 fineTuningTableAddress,
-                                                   u32 spcDirAddress, const std::string &name)
+                                                   u32 fineTuningTableAddr,
+                                                   u32 spcDirAddr, const std::string &name)
     :
     VGMInstrSet(AsciiShuichiSnesFormat::name, file, offset, 0, name),
-    fineTuningTableAddress(fineTuningTableAddress),
-    spcDirAddress(spcDirAddress) {
+    fineTuningTableAddress(fineTuningTableAddr),
+    spcDirAddress(spcDirAddr) {
 }
 
 bool AsciiShuichiSnesInstrSet::parseHeader() {
@@ -75,12 +75,12 @@ AsciiShuichiSnesInstr::AsciiShuichiSnesInstr(VGMInstrSet *instrSet,
                                  u32 offset,
                                  u32 theBank,
                                  u32 theInstrNum,
-                                 u32 spcDirAddress,
-                                 u32 fineTuningTableAddress,
+                                 u32 spcDirAddr,
+                                 u32 fineTuningTableAddr,
                                  const std::string &name) :
     VGMInstr(instrSet, offset, 6, theBank, theInstrNum, name),
-    spcDirAddress(spcDirAddress),
-    fineTuningTableAddress(fineTuningTableAddress) {
+    spcDirAddress(spcDirAddr),
+    fineTuningTableAddress(fineTuningTableAddr) {
 }
 
 bool AsciiShuichiSnesInstr::loadInstr() {
