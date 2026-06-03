@@ -18,6 +18,8 @@
 #include "VGMSamp.h"
 #include "VGMSampColl.h"
 
+#include <utility>
+
 namespace conversion {
 
 SF2File* createSF2File(const VGMColl& coll) {
@@ -126,13 +128,12 @@ SynthFile* createSynthFile(
         // If a sample offset is provided, then find the sample number based on this offset.
         // see sampOffset declaration in header file for more info.
         if (rgn->sampOffset != -1) {
-          const auto sampOffset = static_cast<u32>(rgn->sampOffset);
           bool bFoundIt = false;
           for (u32 s = 0; s < sampColl->samples.size(); s++) {  //for every sample
             auto sample = sampColl->samples[s];
-            if (sampOffset == sample->offset() ||
-                sampOffset == sample->offset() - sampColl->offset() - sampColl->sampDataOffset) {
-              if (rgn->sampDataLength != -1 && static_cast<u32>(rgn->sampDataLength) != sample->dataLength) {
+            if (std::cmp_equal(rgn->sampOffset, sample->offset()) ||
+                std::cmp_equal(rgn->sampOffset, sample->offset() - sampColl->offset() - sampColl->sampDataOffset)) {
+              if (rgn->sampDataLength != -1 && !std::cmp_equal(rgn->sampDataLength, sample->dataLength)) {
                 continue;
               }
 

@@ -10,6 +10,8 @@
 #include "ScaleConversion.h"
 #include "VGMSamp.h"
 
+#include <utility>
+
 #include <spdlog/fmt/fmt.h>
 
 static const float SDLT[8] = { 1000000.0f, 36.0f, 30.0f, 24.0f, 18.0f, 12.0f, 6.0f, 0.0f };
@@ -443,9 +445,7 @@ bool SegSatRgn::isRegionValid() {
   if (keyLow == 0xFF) return false;
   if (keyLow > keyHigh) return false;
   u32 instrSetOffset = parInstr->parInstrSet->offset();
-  if (sampOffset < 0) return false;
-  const auto sampleOffset = static_cast<u32>(sampOffset);
-  if (sampleOffset == instrSetOffset) return false;
-  if (sampleOffset >= instrSetOffset + 0x7FFFE) return false;
+  if (!std::cmp_greater(sampOffset, instrSetOffset)) return false;
+  if (std::cmp_greater_equal(sampOffset, instrSetOffset + 0x7FFFE)) return false;
   return true;
 }

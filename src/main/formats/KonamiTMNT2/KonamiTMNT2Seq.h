@@ -47,11 +47,11 @@ class KonamiTMNT2Seq : public VGMSeq {
   void setMasterAttenuationK053260(s8 val) { m_masterAttenK053260 = val; }
   s8 masterAttenuationK053260() { return m_masterAttenK053260; }
 
-  std::optional<konami_tmnt2_instr_info> instrInfo(int idx) {
-    if (idx < 0 || m_collContext.instrInfos.size() <= static_cast<size_t>(idx))
+  std::optional<konami_tmnt2_instr_info> instrInfo(size_t idx) {
+    if (m_collContext.instrInfos.size() <= idx)
       return std::nullopt;
 
-    return std::optional {m_collContext.instrInfos[static_cast<size_t>(idx)]};
+    return std::optional {m_collContext.instrInfos[idx]};
   }
   std::optional<konami_tmnt2_drum_info> drumInfo(int tableIdx, int keyIdx) {
     u8 key = (tableIdx * 16) + keyIdx;
@@ -106,7 +106,7 @@ class KonamiTMNT2Track : public SeqTrack {
   bool readEvent() override;
 
 private:
-  std::optional<konami_tmnt2_instr_info> instrInfo(int idx) {
+  std::optional<konami_tmnt2_instr_info> instrInfo(size_t idx) {
     return dynamic_cast<KonamiTMNT2Seq*>(parentSeq)->instrInfo(idx);
   }
   std::optional<konami_tmnt2_drum_info> drumInfo(int tableIdx, int keyIdx) {
