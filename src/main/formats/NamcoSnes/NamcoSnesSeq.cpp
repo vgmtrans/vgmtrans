@@ -15,8 +15,8 @@ static constexpr u8 NOTE_VELOCITY = 100;
 //  NamcoSnesSeq
 //  ************
 
-NamcoSnesSeq::NamcoSnesSeq(RawFile *file, NamcoSnesVersion ver, u32 seqdataOffset, std::string newName)
-    : VGMSeqNoTrks(NamcoSnesFormat::name, file, seqdataOffset, newName),
+NamcoSnesSeq::NamcoSnesSeq(RawFile *file, NamcoSnesVersion ver, u32 seqdataOffset, std::string name)
+    : VGMSeqNoTrks(NamcoSnesFormat::name, file, seqdataOffset, name),
       version(ver) {
   setAllowDiscontinuousTrackData(true);
   VGMSeq::setUseLinearAmplitudeScale(true);

@@ -69,7 +69,7 @@ class ChunSnesSeq
               ChunSnesVersion ver,
               ChunSnesMinorVersion minorVer,
               u32 seqdataOffset,
-              std::string newName = "Chun SNES Seq");
+              std::string name = "Chun SNES Seq");
   ~ChunSnesSeq() override;
 
   bool parseHeader() override;

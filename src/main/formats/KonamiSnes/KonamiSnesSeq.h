@@ -75,7 +75,7 @@ class KonamiSnesSeq
     : public VGMSeq {
  public:
   KonamiSnesSeq
-      (RawFile *file, KonamiSnesVersion ver, u32 seqdataOffset, std::string newName = "Konami SNES Seq");
+      (RawFile *file, KonamiSnesVersion ver, u32 seqdataOffset, std::string name = "Konami SNES Seq");
   ~KonamiSnesSeq() override;
 
   bool parseHeader() override;

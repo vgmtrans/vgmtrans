@@ -171,10 +171,10 @@ bool Vab::isViableSampCollMatch(VGMSampColl* sampColl) {
 VabInstr::VabInstr(VGMInstrSet *instrSet,
                    u32 offset,
                    u32 length,
-                   u32 theBank,
-                   u32 theInstrNum,
+                   u32 bank,
+                   u32 instrNum,
                    const string &name)
-    : VGMInstr(instrSet, offset, length, theBank, theInstrNum, name),
+    : VGMInstr(instrSet, offset, length, bank, instrNum, name),
       masterVol(127) {
 }
 

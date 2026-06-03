@@ -94,7 +94,7 @@ class SonyPS2Instr
     s8 splitDetune;
   } SplitBlock;
 
-  SonyPS2Instr(VGMInstrSet *instrSet, u32 offset, u32 length, u32 theBank, u32 theInstrNum);
+  SonyPS2Instr(VGMInstrSet *instrSet, u32 offset, u32 length, u32 bank, u32 instrNum);
   ~SonyPS2Instr() override;
 
   bool loadInstr() override;

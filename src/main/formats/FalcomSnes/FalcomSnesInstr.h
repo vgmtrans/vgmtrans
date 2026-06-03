@@ -54,8 +54,8 @@ class FalcomSnesInstr
   FalcomSnesInstr(VGMInstrSet *instrSet,
                   FalcomSnesVersion ver,
                   u32 offset,
-                  u32 theBank,
-                  u32 theInstrNum,
+                  u32 bank,
+                  u32 instrNum,
                   u8 srcn,
                   u32 spcDirAddr,
                   const std::string &name = "FalcomSnesInstr");

@@ -23,7 +23,7 @@ public:
       u32 offset,
       u32 length,
       KonamiAdpcmChip chip,
-      u32 theRate,
+      u32 rate,
       std::string name
   );
 

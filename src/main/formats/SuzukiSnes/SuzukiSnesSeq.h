@@ -79,7 +79,7 @@ class SuzukiSnesSeq
     : public VGMSeq {
  public:
   SuzukiSnesSeq
-      (RawFile *file, SuzukiSnesVersion ver, u32 seqdataOffset, std::string newName = "Square SUZUKI SNES Seq");
+      (RawFile *file, SuzukiSnesVersion ver, u32 seqdataOffset, std::string name = "Square SUZUKI SNES Seq");
   virtual ~SuzukiSnesSeq();
 
   virtual bool parseHeader();

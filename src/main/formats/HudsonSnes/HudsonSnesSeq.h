@@ -109,7 +109,7 @@ class HudsonSnesSeq
     : public VGMSeq {
  public:
   HudsonSnesSeq
-      (RawFile *file, HudsonSnesVersion ver, u32 seqdataOffset, std::string newName = "Hudson SNES Seq");
+      (RawFile *file, HudsonSnesVersion ver, u32 seqdataOffset, std::string name = "Hudson SNES Seq");
   ~HudsonSnesSeq() override = default;
 
   bool parseHeader() override;

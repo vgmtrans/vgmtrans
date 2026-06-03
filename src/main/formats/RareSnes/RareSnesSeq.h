@@ -87,7 +87,7 @@ enum RareSnesSeqEventType {
 class RareSnesSeq
     : public VGMSeq {
  public:
-  RareSnesSeq(RawFile *file, RareSnesVersion ver, u32 seqdata_offset, std::string newName = "Rare SNES Seq");
+  RareSnesSeq(RawFile *file, RareSnesVersion ver, u32 seqdata_offset, std::string name = "Rare SNES Seq");
   virtual ~RareSnesSeq();
 
   virtual bool parseHeader();

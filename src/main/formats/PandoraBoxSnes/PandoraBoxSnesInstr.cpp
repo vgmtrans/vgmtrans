@@ -113,12 +113,12 @@ bool PandoraBoxSnesInstrSet::parseInstrPointers() {
 PandoraBoxSnesInstr::PandoraBoxSnesInstr(VGMInstrSet *instrSet,
                                          PandoraBoxSnesVersion ver,
                                          u32 offset,
-                                         u8 theInstrNum,
+                                         u8 instrNum,
                                          u8 srcn,
                                          u32 spcDirAddr,
                                          u16 adsr,
                                          const std::string &name) :
-    VGMInstr(instrSet, offset, 1, 0, theInstrNum, name), version(ver),
+    VGMInstr(instrSet, offset, 1, 0, instrNum, name), version(ver),
     spcDirAddr(spcDirAddr),
     srcn(srcn),
     adsr(adsr) {

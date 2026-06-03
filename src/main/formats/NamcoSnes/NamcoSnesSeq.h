@@ -54,7 +54,7 @@ enum NamcoSnesSeqNoteType {
 class NamcoSnesSeq
     : public VGMSeqNoTrks {
  public:
-  NamcoSnesSeq(RawFile *file, NamcoSnesVersion ver, u32 seqdataOffset, std::string newName = "Namco SNES Seq");
+  NamcoSnesSeq(RawFile *file, NamcoSnesVersion ver, u32 seqdataOffset, std::string name = "Namco SNES Seq");
   virtual ~NamcoSnesSeq();
 
   virtual bool parseHeader();

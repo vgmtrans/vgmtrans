@@ -346,8 +346,8 @@ class PSXSampColl : public VGMSampColl {
 class PSXSamp : public VGMSamp {
  public:
   PSXSamp(VGMSampColl *sampColl, u32 offset, u32 length, u32 dataOffset,
-          u32 dataLen, u8 nChannels, BPS theBPS,
-          u32 theRate, std::string name, bool bSetLoopOnConversion = true);
+          u32 dataLen, u8 nChannels, BPS bps,
+          u32 rate, std::string name, bool bSetLoopOnConversion = true);
   ~PSXSamp() override;
 
   // ratio of space conserved.  should generally be > 1

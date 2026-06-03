@@ -76,7 +76,7 @@ enum class ItikitiSnesSeqEventType {
 
 class ItikitiSnesSeq : public VGMSeq {
  public:
-  ItikitiSnesSeq(RawFile *file, u32 offset, std::string new_name = "Square ITIKITI SNES Seq");
+  ItikitiSnesSeq(RawFile *file, u32 offset, std::string name = "Square ITIKITI SNES Seq");
 
   bool parseHeader() override;
   bool parseTrackPointers() override;

@@ -80,9 +80,9 @@ bool TriAcePS1InstrSet::parseInstrPointers() {
 TriAcePS1Instr::TriAcePS1Instr(VGMInstrSet *instrSet,
                                u32 offset,
                                u32 length,
-                               u32 theBank,
-                               u32 theInstrNum)
-    : VGMInstr(instrSet, offset, length, theBank, theInstrNum),
+                               u32 bank,
+                               u32 instrNum)
+    : VGMInstr(instrSet, offset, length, bank, instrNum),
       rgns(NULL) {
 }
 

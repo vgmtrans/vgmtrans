@@ -58,7 +58,7 @@ class AsciiShuichiSnesSeq
     : public VGMSeq {
  public:
   AsciiShuichiSnesSeq
-      (RawFile *file, u32 seqHeaderOffset, std::string newName = "ASCII Shuichi Ukai SNES Seq");
+      (RawFile *file, u32 seqHeaderOffset, std::string name = "ASCII Shuichi Ukai SNES Seq");
 
   bool parseHeader() override;
   bool parseTrackPointers() override;

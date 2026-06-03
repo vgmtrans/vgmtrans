@@ -103,7 +103,7 @@ class AkaoSnesSeq
               AkaoSnesMinorVersion minorVer,
               u32 seqdataOffset,
               u32 addrAPURelocBase,
-              std::string newName = "Square AKAO SNES Seq");
+              std::string name = "Square AKAO SNES Seq");
   ~AkaoSnesSeq() override;
 
   bool parseHeader() override;

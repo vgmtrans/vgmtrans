@@ -18,8 +18,8 @@ static constexpr std::array<u8, 16> kMasterNoteLengths = {
 static constexpr std::array<u8, 7> kDefaultNoteLengths = {0xc0, 0x60, 0x48, 0x30,
                                                                0x24, 0x18, 0x0c};
 
-ItikitiSnesSeq::ItikitiSnesSeq(RawFile *file, u32 offset, std::string new_name)
-    : VGMSeq(ItikitiSnesFormat::name, file, offset, 0, std::move(new_name)) {
+ItikitiSnesSeq::ItikitiSnesSeq(RawFile *file, u32 offset, std::string name)
+    : VGMSeq(ItikitiSnesFormat::name, file, offset, 0, std::move(name)) {
   bLoadTickByTick = true;
   setAllowDiscontinuousTrackData(true);
   setUseLinearAmplitudeScale(true);

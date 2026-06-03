@@ -40,14 +40,14 @@ void NinSnesTrackState::resetVars() {
 
 NinSnesSectionTrackItem::NinSnesSectionTrackItem(NinSnesSeq* parentSeq, u32 offset,
                                                  u32 length,
-                                                 const std::string& theName)
-    : SeqTrack(parentSeq, offset, length, theName) {
+                                                 const std::string& name)
+    : SeqTrack(parentSeq, offset, length, name) {
   bDetermineTrackLengthEventByEvent = true;
 }
 
 NinSnesTrack::NinSnesTrack(NinSnesSeq* parentSeq, u32 offset, u32 length,
-                           const std::string& theName)
-    : SeqTrack(parentSeq, offset, length, theName) {
+                           const std::string& name)
+    : SeqTrack(parentSeq, offset, length, name) {
   resetVars();
   bDetermineTrackLengthEventByEvent = true;
 }

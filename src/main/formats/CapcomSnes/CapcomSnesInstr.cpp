@@ -87,11 +87,11 @@ bool CapcomSnesInstrSet::parseInstrPointers() {
 
 CapcomSnesInstr::CapcomSnesInstr(VGMInstrSet *instrSet,
                                  u32 offset,
-                                 u32 theBank,
-                                 u32 theInstrNum,
+                                 u32 bank,
+                                 u32 instrNum,
                                  u32 spcDirAddr,
                                  const std::string &name) :
-    VGMInstr(instrSet, offset, 6, theBank, theInstrNum, name), spcDirAddr(spcDirAddr) {
+    VGMInstr(instrSet, offset, 6, bank, instrNum, name), spcDirAddr(spcDirAddr) {
 }
 
 CapcomSnesInstr::~CapcomSnesInstr() {}

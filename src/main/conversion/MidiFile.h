@@ -246,7 +246,7 @@ private:
 
 class MidiEvent {
  public:
-  MidiEvent(MidiTrack *thePrntTrk, u32 absoluteTime, u8 theChannel, s8 thePriority);
+  MidiEvent(MidiTrack *track, u32 absoluteTime, u8 channel, s8 priority);
   virtual ~MidiEvent() = default;
   virtual MidiEventType eventType() = 0;
   bool isMetaEvent();
@@ -286,8 +286,8 @@ class AbsTimeCmp {
 class NoteEvent
     : public MidiEvent {
  public:
-  NoteEvent
-      (MidiTrack *prntTrk, u8 channel, u32 absoluteTime, bool bNoteDown, u8 theKey, u8 theVel = 64);
+  NoteEvent(MidiTrack *track, u8 channel, u32 absoluteTime, bool bNoteDown, u8 key,
+            u8 vel = 64);
   MidiEventType eventType() override { return MIDIEVENT_NOTEON; }
   u32 writeEvent(std::vector<u8> &buf, u32 time) override;
 
@@ -313,12 +313,12 @@ class NoteEvent
 class ControllerEvent
     : public MidiEvent {
  public:
-  ControllerEvent(MidiTrack *prntTrk,
+  ControllerEvent(MidiTrack *track,
                   u8 channel,
                   u32 absoluteTime,
                   u8 controllerNum,
-                  u8 theDataByte,
-                  s8 thePriority = PRIORITY_MIDDLE);
+                  u8 dataByte,
+                  s8 priority = PRIORITY_MIDDLE);
   MidiEventType eventType() override { return MIDIEVENT_UNDEFINED; }
   u32 writeEvent(std::vector<u8> &buf, u32 time) override;
 
@@ -329,10 +329,10 @@ class ControllerEvent
 class SysexEvent
     : public MidiEvent {
 public:
-  SysexEvent(MidiTrack *prntTrk,
+  SysexEvent(MidiTrack *track,
              u32 absoluteTime,
              const std::vector<u8>& sysexData,
-             s8 thePriority = PRIORITY_MIDDLE);
+             s8 priority = PRIORITY_MIDDLE);
   MidiEventType eventType() override { return MIDIEVENT_UNDEFINED; }
   u32 writeEvent(std::vector<u8> &buf, u32 time) override;
 
@@ -342,72 +342,72 @@ public:
 class VolumeEvent
     : public ControllerEvent {
  public:
-  VolumeEvent(MidiTrack *prntTrk, u8 channel, u32 absoluteTime, u8 volume)
-      : ControllerEvent(prntTrk, channel, absoluteTime, 7, volume, PRIORITY_MIDDLE) { }
+  VolumeEvent(MidiTrack *track, u8 channel, u32 absoluteTime, u8 volume)
+      : ControllerEvent(track, channel, absoluteTime, 7, volume, PRIORITY_MIDDLE) { }
   MidiEventType eventType() override { return MIDIEVENT_VOLUME; }
 };
 
 class VolumeFineEvent
     : public ControllerEvent {
 public:
-  VolumeFineEvent(MidiTrack *prntTrk, u8 channel, u32 absoluteTime, u8 volume_lsb)
-      : ControllerEvent(prntTrk, channel, absoluteTime, 39, volume_lsb, PRIORITY_MIDDLE) { }
+  VolumeFineEvent(MidiTrack *track, u8 channel, u32 absoluteTime, u8 volume_lsb)
+      : ControllerEvent(track, channel, absoluteTime, 39, volume_lsb, PRIORITY_MIDDLE) { }
   MidiEventType eventType() override { return MIDIEVENT_VOLUME; }
 };
 
 class ExpressionEvent
     : public ControllerEvent {
  public:
-  ExpressionEvent(MidiTrack *prntTrk, u8 channel, u32 absoluteTime, u8 expression)
-      : ControllerEvent(prntTrk, channel, absoluteTime, 11, expression, PRIORITY_MIDDLE) { }
+  ExpressionEvent(MidiTrack *track, u8 channel, u32 absoluteTime, u8 expression)
+      : ControllerEvent(track, channel, absoluteTime, 11, expression, PRIORITY_MIDDLE) { }
   MidiEventType eventType() override { return MIDIEVENT_EXPRESSION; }
 };
 
 class ExpressionFineEvent
     : public ControllerEvent {
 public:
-  ExpressionFineEvent(MidiTrack *prntTrk, u8 channel, u32 absoluteTime, u8 expression_lsb)
-      : ControllerEvent(prntTrk, channel, absoluteTime, 43, expression_lsb, PRIORITY_MIDDLE) { }
+  ExpressionFineEvent(MidiTrack *track, u8 channel, u32 absoluteTime, u8 expression_lsb)
+      : ControllerEvent(track, channel, absoluteTime, 43, expression_lsb, PRIORITY_MIDDLE) { }
   MidiEventType eventType() override { return MIDIEVENT_EXPRESSION; }
 };
 
 class SustainEvent
     : public ControllerEvent {
  public:
-  SustainEvent(MidiTrack *prntTrk, u8 channel, u32 absoluteTime, u8 depth)
-      : ControllerEvent(prntTrk, channel, absoluteTime, 64, depth, PRIORITY_MIDDLE) { }
+  SustainEvent(MidiTrack *track, u8 channel, u32 absoluteTime, u8 depth)
+      : ControllerEvent(track, channel, absoluteTime, 64, depth, PRIORITY_MIDDLE) { }
   MidiEventType eventType() override { return MIDIEVENT_SUSTAIN; }
 };
 
 class PortamentoEvent
     : public ControllerEvent {
  public:
-  PortamentoEvent(MidiTrack *prntTrk, u8 channel, u32 absoluteTime, u8 bOn)
-      : ControllerEvent(prntTrk, channel, absoluteTime, 65, (bOn) ? 0x7F : 0, PRIORITY_MIDDLE) { }
+  PortamentoEvent(MidiTrack *track, u8 channel, u32 absoluteTime, u8 bOn)
+      : ControllerEvent(track, channel, absoluteTime, 65, (bOn) ? 0x7F : 0, PRIORITY_MIDDLE) { }
   MidiEventType eventType() override { return MIDIEVENT_PORTAMENTO; }
 };
 
 class PortamentoTimeEvent
     : public ControllerEvent {
  public:
-  PortamentoTimeEvent(MidiTrack *prntTrk, u8 channel, u32 absoluteTime, u8 time)
-      : ControllerEvent(prntTrk, channel, absoluteTime, 5, time, PRIORITY_MIDDLE) { }
+  PortamentoTimeEvent(MidiTrack *track, u8 channel, u32 absoluteTime, u8 time)
+      : ControllerEvent(track, channel, absoluteTime, 5, time, PRIORITY_MIDDLE) { }
   MidiEventType eventType() override { return MIDIEVENT_PORTAMENTOTIME; }
 };
 
 class PortamentoTimeFineEvent
     : public ControllerEvent {
 public:
-  PortamentoTimeFineEvent(MidiTrack *prntTrk, u8 channel, u32 absoluteTime, u8 time)
-      : ControllerEvent(prntTrk, channel, absoluteTime, 37, time, PRIORITY_MIDDLE) { }
+  PortamentoTimeFineEvent(MidiTrack *track, u8 channel, u32 absoluteTime, u8 time)
+      : ControllerEvent(track, channel, absoluteTime, 37, time, PRIORITY_MIDDLE) { }
   MidiEventType eventType() override { return MIDIEVENT_PORTAMENTOTIMEFINE; }
 };
 
 class PortamentoControlEvent
     : public ControllerEvent {
 public:
-  PortamentoControlEvent(MidiTrack *prntTrk, u8 channel, u32 absoluteTime, u8 key)
-      : ControllerEvent(prntTrk, channel, absoluteTime, 84, key, PRIORITY_MIDDLE) { }
+  PortamentoControlEvent(MidiTrack *track, u8 channel, u32 absoluteTime, u8 key)
+      : ControllerEvent(track, channel, absoluteTime, 84, key, PRIORITY_MIDDLE) { }
   MidiEventType eventType() override { return MIDIEVENT_PORTAMENTOCONTROL; }
   u32 writeEvent(std::vector<u8> &buf, u32 time) override;
 };
@@ -415,48 +415,48 @@ public:
 class LegatoPedalEvent
     : public ControllerEvent {
 public:
-  LegatoPedalEvent(MidiTrack *prntTrk, u8 channel, u32 absoluteTime, bool bOn)
-      : ControllerEvent(prntTrk, channel, absoluteTime, 68, (bOn) ? 0x7F : 0, PRIORITY_HIGH) { }
+  LegatoPedalEvent(MidiTrack *track, u8 channel, u32 absoluteTime, bool bOn)
+      : ControllerEvent(track, channel, absoluteTime, 68, (bOn) ? 0x7F : 0, PRIORITY_HIGH) { }
   MidiEventType eventType() override { return MIDIEVENT_LEGATOPEDAL; }
 };
 
 class PanEvent
     : public ControllerEvent {
  public:
-  PanEvent(MidiTrack *prntTrk, u8 channel, u32 absoluteTime, u8 pan)
-      : ControllerEvent(prntTrk, channel, absoluteTime, 10, pan, PRIORITY_MIDDLE) { }
+  PanEvent(MidiTrack *track, u8 channel, u32 absoluteTime, u8 pan)
+      : ControllerEvent(track, channel, absoluteTime, 10, pan, PRIORITY_MIDDLE) { }
   MidiEventType eventType() override { return MIDIEVENT_PAN; }
 };
 
 class ModulationEvent
     : public ControllerEvent {
  public:
-  ModulationEvent(MidiTrack *prntTrk, u8 channel, u32 absoluteTime, u8 depth)
-      : ControllerEvent(prntTrk, channel, absoluteTime, 1, depth, PRIORITY_MIDDLE) { }
+  ModulationEvent(MidiTrack *track, u8 channel, u32 absoluteTime, u8 depth)
+      : ControllerEvent(track, channel, absoluteTime, 1, depth, PRIORITY_MIDDLE) { }
   MidiEventType eventType() override { return MIDIEVENT_MODULATION; }
 };
 
 class BreathEvent
     : public ControllerEvent {
  public:
-  BreathEvent(MidiTrack *prntTrk, u8 channel, u32 absoluteTime, u8 depth)
-      : ControllerEvent(prntTrk, channel, absoluteTime, 2, depth, PRIORITY_MIDDLE) { }
+  BreathEvent(MidiTrack *track, u8 channel, u32 absoluteTime, u8 depth)
+      : ControllerEvent(track, channel, absoluteTime, 2, depth, PRIORITY_MIDDLE) { }
   MidiEventType eventType() override { return MIDIEVENT_BREATH; }
 };
 
 class BankSelectEvent
     : public ControllerEvent {
  public:
-  BankSelectEvent(MidiTrack *prntTrk, u8 channel, u32 absoluteTime, u8 bank)
-      : ControllerEvent(prntTrk, channel, absoluteTime, 0, bank, PRIORITY_HIGH) { }
+  BankSelectEvent(MidiTrack *track, u8 channel, u32 absoluteTime, u8 bank)
+      : ControllerEvent(track, channel, absoluteTime, 0, bank, PRIORITY_HIGH) { }
   MidiEventType eventType() override { return MIDIEVENT_BANKSELECT; }
 };
 
 class BankSelectFineEvent
     : public ControllerEvent {
  public:
-  BankSelectFineEvent(MidiTrack *prntTrk, u8 channel, u32 absoluteTime, u8 bank)
-      : ControllerEvent(prntTrk, channel, absoluteTime, 32, bank, PRIORITY_HIGH) { }
+  BankSelectFineEvent(MidiTrack *track, u8 channel, u32 absoluteTime, u8 bank)
+      : ControllerEvent(track, channel, absoluteTime, 32, bank, PRIORITY_HIGH) { }
   MidiEventType eventType() override { return MIDIEVENT_BANKSELECTFINE; }
 };
 
@@ -486,8 +486,8 @@ public:
 class MasterVolEvent
     : public SysexEvent {
 public:
-  MasterVolEvent(MidiTrack *prntTrk, u8 /* channel */, u32 absoluteTime, u8 msb, u8 lsb)
-      : SysexEvent(prntTrk, absoluteTime, {0x07, 0x7F, 0x7F, 0x04, 0x01, lsb, msb }, PRIORITY_HIGHER) { }
+  MasterVolEvent(MidiTrack *track, u8 /* channel */, u32 absoluteTime, u8 msb, u8 lsb)
+      : SysexEvent(track, absoluteTime, {0x07, 0x7F, 0x7F, 0x04, 0x01, lsb, msb }, PRIORITY_HIGHER) { }
   MidiEventType eventType() override { return MIDIEVENT_MASTERVOL; }
 };
 
@@ -506,15 +506,15 @@ public:
 class MonoEvent
     : public ControllerEvent {
  public:
-  MonoEvent(MidiTrack *prntTrk, u8 channel, u32 absoluteTime)
-      : ControllerEvent(prntTrk, channel, absoluteTime, 126, 0, PRIORITY_HIGHER) { }
+  MonoEvent(MidiTrack *track, u8 channel, u32 absoluteTime)
+      : ControllerEvent(track, channel, absoluteTime, 126, 0, PRIORITY_HIGHER) { }
   MidiEventType eventType() override { return MIDIEVENT_MONO; }
 };
 
 class ProgChangeEvent
     : public MidiEvent {
  public:
-  ProgChangeEvent(MidiTrack *prntTrk, u8 channel, u32 absoluteTime, u8 progNum);
+  ProgChangeEvent(MidiTrack *track, u8 channel, u32 absoluteTime, u8 progNum);
   MidiEventType eventType() override { return MIDIEVENT_PROGRAMCHANGE; }
   //virtual ProgChangeEvent* MakeCopy();
   u32 writeEvent(std::vector<u8> &buf, u32 time) override;
@@ -525,7 +525,7 @@ class ProgChangeEvent
 class PitchBendEvent
     : public MidiEvent {
  public:
-  PitchBendEvent(MidiTrack *prntTrk, u8 channel, u32 absoluteTime, s16 bend);
+  PitchBendEvent(MidiTrack *track, u8 channel, u32 absoluteTime, s16 bend);
   MidiEventType eventType() override { return MIDIEVENT_PITCHBEND; }
   //virtual PitchBendEvent* MakeCopy();
   u32 writeEvent(std::vector<u8> &buf, u32 time) override;
@@ -536,7 +536,7 @@ class PitchBendEvent
 class ChannelPressureEvent
     : public MidiEvent {
  public:
-  ChannelPressureEvent(MidiTrack *prntTrk, u8 channel, u32 absoluteTime, u8 pressure);
+  ChannelPressureEvent(MidiTrack *track, u8 channel, u32 absoluteTime, u8 pressure);
   MidiEventType eventType() override { return MIDIEVENT_CHANNELPRESSURE; }
   u32 writeEvent(std::vector<u8> &buf, u32 time) override;
 
@@ -546,7 +546,7 @@ class ChannelPressureEvent
 class TempoEvent
     : public MidiEvent {
  public:
-  TempoEvent(MidiTrack *prntTrk, u32 absoluteTime, u32 microSeconds);
+  TempoEvent(MidiTrack *track, u32 absoluteTime, u32 microSeconds);
   MidiEventType eventType() override { return MIDIEVENT_TEMPO; }
   //virtual TempoEvent* MakeCopy();
   u32 writeEvent(std::vector<u8> &buf, u32 time) override;
@@ -556,7 +556,7 @@ class TempoEvent
 
 class MidiPortEvent : public MidiEvent {
 public:
-  MidiPortEvent(MidiTrack *prntTrk, u32 absoluteTime, u8 port);
+  MidiPortEvent(MidiTrack *track, u32 absoluteTime, u8 port);
   MidiEventType eventType() override { return MIDIEVENT_MIDIPORT; }
   // virtual TimeSigEvent* MakeCopy();
   u32 writeEvent(std::vector<u8> &buf, u32 time) override;
@@ -568,7 +568,7 @@ class TimeSigEvent
     : public MidiEvent {
  public:
   TimeSigEvent
-      (MidiTrack *prntTrk, u32 absoluteTime, u8 numerator, u8 denominator, u8 clicksPerQuarter);
+      (MidiTrack *track, u32 absoluteTime, u8 numerator, u8 denominator, u8 clicksPerQuarter);
   MidiEventType eventType() override { return MIDIEVENT_TIMESIG; }
   //virtual TimeSigEvent* MakeCopy();
   u32 writeEvent(std::vector<u8> &buf, u32 time) override;
@@ -581,7 +581,7 @@ class TimeSigEvent
 class EndOfTrackEvent
     : public MidiEvent {
  public:
-  EndOfTrackEvent(MidiTrack *prntTrk, u32 absoluteTime);
+  EndOfTrackEvent(MidiTrack *track, u32 absoluteTime);
   MidiEventType eventType() override { return MIDIEVENT_ENDOFTRACK; }
   //virtual EndOfTrackEvent* MakeCopy();
   u32 writeEvent(std::vector<u8> &buf, u32 time) override;
@@ -590,7 +590,7 @@ class EndOfTrackEvent
 class TextEvent
     : public MidiEvent {
  public:
-  TextEvent(MidiTrack *prntTrk, u32 absoluteTime, std::string str);
+  TextEvent(MidiTrack *track, u32 absoluteTime, std::string str);
   MidiEventType eventType() override { return MIDIEVENT_TEXT; }
   u32 writeEvent(std::vector<u8> &buf, u32 time) override;
 
@@ -600,7 +600,7 @@ class TextEvent
 class SeqNameEvent
     : public MidiEvent {
  public:
-  SeqNameEvent(MidiTrack *prntTrk, u32 absoluteTime, std::string str);
+  SeqNameEvent(MidiTrack *track, u32 absoluteTime, std::string str);
   MidiEventType eventType() override { return MIDIEVENT_TEXT; }
   u32 writeEvent(std::vector<u8> &buf, u32 time) override;
 
@@ -610,7 +610,7 @@ class SeqNameEvent
 class TrackNameEvent
     : public MidiEvent {
  public:
-  TrackNameEvent(MidiTrack *prntTrk, u32 absoluteTime, std::string str);
+  TrackNameEvent(MidiTrack *track, u32 absoluteTime, std::string str);
   MidiEventType eventType() override { return MIDIEVENT_TEXT; }
   u32 writeEvent(std::vector<u8> &buf, u32 time) override;
 
@@ -621,7 +621,7 @@ class TrackNameEvent
 class GlobalTransposeEvent
     : public MidiEvent {
  public:
-  GlobalTransposeEvent(MidiTrack *prntTrk, u32 absoluteTime, s8 semitones);
+  GlobalTransposeEvent(MidiTrack *track, u32 absoluteTime, s8 semitones);
   MidiEventType eventType() override { return MIDIEVENT_GLOBALTRANSPOSE; }
   u32 writeEvent(std::vector<u8> &buf, u32 time) override;
 
@@ -631,14 +631,14 @@ class GlobalTransposeEvent
 class MarkerEvent
     : public MidiEvent {
  public:
-  MarkerEvent(MidiTrack *prntTrk,
+  MarkerEvent(MidiTrack *track,
               u8 channel,
               u32 absoluteTime,
               const std::string &name,
               u8 databyte1,
               u8 databyte2,
-              s8 thePriority = PRIORITY_MIDDLE)
-      : MidiEvent(prntTrk, absoluteTime, channel, thePriority), name(name), databyte1(databyte1),
+              s8 priority = PRIORITY_MIDDLE)
+      : MidiEvent(track, absoluteTime, channel, priority), name(name), databyte1(databyte1),
         databyte2(databyte2) { }
   MidiEventType eventType() override { return MIDIEVENT_MARKER; }
   u32 writeEvent(std::vector<u8>& /*buf*/, u32 time) override { return time; }
@@ -650,24 +650,24 @@ class MarkerEvent
 class GMResetEvent
     : public SysexEvent {
  public:
-  GMResetEvent(MidiTrack *prntTrk, u32 absoluteTime)
-       : SysexEvent(prntTrk, absoluteTime, { 0x05, 0x7E, 0x7F, 0x09, 0x01 }, PRIORITY_HIGHEST) { }
+  GMResetEvent(MidiTrack *track, u32 absoluteTime)
+       : SysexEvent(track, absoluteTime, { 0x05, 0x7E, 0x7F, 0x09, 0x01 }, PRIORITY_HIGHEST) { }
   MidiEventType eventType() override { return MIDIEVENT_RESET; }
 };
 
 class GM2ResetEvent
     : public SysexEvent {
  public:
-  GM2ResetEvent(MidiTrack *prntTrk, u32 absoluteTime)
-       : SysexEvent(prntTrk, absoluteTime, { 0x05, 0x7E, 0x7F, 0x09, 0x03 }, PRIORITY_HIGHEST) { }
+  GM2ResetEvent(MidiTrack *track, u32 absoluteTime)
+       : SysexEvent(track, absoluteTime, { 0x05, 0x7E, 0x7F, 0x09, 0x03 }, PRIORITY_HIGHEST) { }
   MidiEventType eventType() override { return MIDIEVENT_RESET; }
 };
 
 class GSResetEvent
     : public SysexEvent {
  public:
-  GSResetEvent(MidiTrack *prntTrk, u32 absoluteTime)
-       : SysexEvent(prntTrk, absoluteTime, { 0x0A, 0x41, 0x10, 0x42, 0x12, 0x40, 0x00, 0x7F, 0x00, 0x41 },
+  GSResetEvent(MidiTrack *track, u32 absoluteTime)
+       : SysexEvent(track, absoluteTime, { 0x0A, 0x41, 0x10, 0x42, 0x12, 0x40, 0x00, 0x7F, 0x00, 0x41 },
                     PRIORITY_HIGHEST) { }
   MidiEventType eventType() override { return MIDIEVENT_RESET; }
 };
@@ -675,8 +675,8 @@ class GSResetEvent
 class XGResetEvent
     : public SysexEvent {
  public:
-  XGResetEvent(MidiTrack *prntTrk, u32 absoluteTime)
-       : SysexEvent(prntTrk, absoluteTime,  { 0x08, 0x43, 0x10, 0x4C, 0x00, 0x00, 0x7E, 0x00 },
+  XGResetEvent(MidiTrack *track, u32 absoluteTime)
+       : SysexEvent(track, absoluteTime,  { 0x08, 0x43, 0x10, 0x4C, 0x00, 0x00, 0x7E, 0x00 },
                     PRIORITY_HIGHEST) { }
   MidiEventType eventType() override { return MIDIEVENT_RESET; }
 };

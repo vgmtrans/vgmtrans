@@ -176,14 +176,14 @@ CPS2InstrSet::CPS2InstrSet(RawFile *file,
                          CPS2FormatVer version,
                          u32 offset,
                          int numInstrBanks,
-                         CPSSampleInfoTable *theSampInfoTable,
-                         CPSArticTable *theArticTable,
+                         CPSSampleInfoTable *sampInfoTable,
+                         CPSArticTable *articTable,
                          std::string name)
     : VGMInstrSet(CPS2Format::name, file, offset, 0, std::move(name)),
       fmt_version(version),
       num_instr_banks(numInstrBanks),
-      sampInfoTable(theSampInfoTable),
-      articTable(theArticTable) {
+      sampInfoTable(sampInfoTable),
+      articTable(articTable) {
 }
 
 bool CPS2InstrSet::parseHeader() {
@@ -290,10 +290,10 @@ bool CPS2InstrSet::parseInstrPointers() {
 CPS2Instr::CPS2Instr(VGMInstrSet *instrSet,
                      u32 offset,
                      u32 length,
-                     u32 theBank,
-                     u32 theInstrNum,
+                     u32 bank,
+                     u32 instrNum,
                      std::string name)
-    : VGMInstr(instrSet, offset, length, theBank, theInstrNum, std::move(name)) {
+    : VGMInstr(instrSet, offset, length, bank, instrNum, std::move(name)) {
 }
 
 bool CPS2Instr::loadInstr() {

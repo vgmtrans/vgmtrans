@@ -51,7 +51,7 @@ class GraphResSnesSeq
     : public VGMSeq {
  public:
   GraphResSnesSeq
-      (RawFile *file, GraphResSnesVersion ver, u32 seqdata_offset, std::string newName = "GraphRes SNES Seq");
+      (RawFile *file, GraphResSnesVersion ver, u32 seqdata_offset, std::string name = "GraphRes SNES Seq");
   ~GraphResSnesSeq() override;
 
   bool parseHeader() override;

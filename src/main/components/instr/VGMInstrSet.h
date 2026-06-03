@@ -23,7 +23,7 @@ constexpr float defaultReverbPercent = 0.25;
 class VGMInstrSet : public VGMFile {
 public:
   VGMInstrSet(const std::string &format, RawFile *file, u32 offset, u32 length = 0,
-              std::string name = "VGMInstrSet", VGMSampColl *theSampColl = nullptr);
+              std::string name = "VGMInstrSet", VGMSampColl *sampColl = nullptr);
   ~VGMInstrSet() override;
 
   bool loadVGMFile(bool useMatcher = true) override;

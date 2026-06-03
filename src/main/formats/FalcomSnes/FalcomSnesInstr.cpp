@@ -108,12 +108,12 @@ bool FalcomSnesInstrSet::parseInstrPointers() {
 FalcomSnesInstr::FalcomSnesInstr(VGMInstrSet *instrSet,
                                  FalcomSnesVersion ver,
                                  u32 offset,
-                                 u32 theBank,
-                                 u32 theInstrNum,
+                                 u32 bank,
+                                 u32 instrNum,
                                  u8 srcn,
                                  u32 spcDirAddr,
                                  const std::string &name) :
-    VGMInstr(instrSet, offset, 5, theBank, theInstrNum, name), version(ver),
+    VGMInstr(instrSet, offset, 5, bank, instrNum, name), version(ver),
     srcn(srcn),
     spcDirAddr(spcDirAddr) {}
 

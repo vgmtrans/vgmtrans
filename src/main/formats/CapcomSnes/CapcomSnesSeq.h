@@ -65,7 +65,7 @@ class CapcomSnesSeq
                 CapcomSnesVersion ver,
                 u32 seqdata_offset,
                 bool priorityInHeader,
-                std::string newName = "Capcom SNES Seq");
+                std::string name = "Capcom SNES Seq");
   ~CapcomSnesSeq() override = default;
 
   bool parseHeader() override;

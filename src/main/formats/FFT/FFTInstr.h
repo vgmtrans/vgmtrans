@@ -108,7 +108,7 @@ class WdsInstrSet:
 class WdsInstr
     : public VGMInstr {
  public:
-  WdsInstr(VGMInstrSet *instrSet, u32 offset, u32 length, u32 theBank, u32 theInstrNum);
+  WdsInstr(VGMInstrSet *instrSet, u32 offset, u32 length, u32 bank, u32 instrNum);
   ~WdsInstr() override;
 
   bool loadInstr() override;    //Object "WdsRgn"の生成、

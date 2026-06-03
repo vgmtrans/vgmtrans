@@ -23,9 +23,9 @@
 // ***********
 
 VGMInstrSet::VGMInstrSet(const std::string &format, RawFile *file, u32 offset, u32 length,
-                         std::string name, VGMSampColl *theSampColl)
+                         std::string name, VGMSampColl *sampColl)
     : VGMFile(format, file, offset, length, std::move(name)),
-      sampColl(theSampColl) {
+      sampColl(sampColl) {
 }
 
 VGMInstrSet::~VGMInstrSet() {
@@ -138,10 +138,10 @@ void VGMInstrSet::addTempInstr(VGMInstr* instr) {
 // VGMInstr
 // ********
 
-VGMInstr::VGMInstr(VGMInstrSet *instrSet, u32 offset, u32 length, u32 theBank,
-                   u32 theInstrNum, std::string name, float reverb)
+VGMInstr::VGMInstr(VGMInstrSet *instrSet, u32 offset, u32 length, u32 bank,
+                   u32 instrNum, std::string name, float reverb)
     : VGMItem(instrSet, offset, length, std::move(name), Type::Instrument),
-      bank(theBank), instrNum(theInstrNum), parInstrSet(instrSet), reverb(reverb) {
+      bank(bank), instrNum(instrNum), parInstrSet(instrSet), reverb(reverb) {
 }
 
 void VGMInstr::setBank(u32 bankNum) {

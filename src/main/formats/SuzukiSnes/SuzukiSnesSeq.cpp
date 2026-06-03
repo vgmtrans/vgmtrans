@@ -20,8 +20,8 @@ const u8 SuzukiSnesSeq::NOTE_DUR_TABLE[13] = {
     0x10, 0x0c, 0x08, 0x06, 0x03
 };
 
-SuzukiSnesSeq::SuzukiSnesSeq(RawFile *file, SuzukiSnesVersion ver, u32 seqdataOffset, std::string newName)
-    : VGMSeq(SuzukiSnesFormat::name, file, seqdataOffset, 0, newName),
+SuzukiSnesSeq::SuzukiSnesSeq(RawFile *file, SuzukiSnesVersion ver, u32 seqdataOffset, std::string name)
+    : VGMSeq(SuzukiSnesFormat::name, file, seqdataOffset, 0, name),
       version(ver) {
   bLoadTickByTick = true;
   setAllowDiscontinuousTrackData(true);

@@ -24,7 +24,7 @@ typedef enum {
 
 class SynthFile {
  public:
-  SynthFile(std::string synth_name = "Instrument Set");
+  SynthFile(std::string name = "Instrument Set");
   ~SynthFile();
 
   SynthInstr *addInstr(u32 bank, u32 instrNum, float reverb);

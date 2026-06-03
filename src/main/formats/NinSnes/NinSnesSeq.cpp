@@ -24,11 +24,11 @@ constexpr u16 kNinSnesDefaultPitchBendRangeCents =
 }  // namespace
 
 NinSnesSeq::NinSnesSeq(RawFile* file, NinSnesProfileId profile, u32 offset,
-                       u8 percussion_base, const std::vector<u8>& theVolumeTable,
-                       const std::vector<u8>& theDurRateTable, std::string theName)
-    : VGMSeq(NinSnesFormat::name, file, offset, 0, theName),
+                       u8 percussion_base, const std::vector<u8>& volumeTable,
+                       const std::vector<u8>& durRateTable, std::string name)
+    : VGMSeq(NinSnesFormat::name, file, offset, 0, name),
       signature(NinSnesSignatureId::None), profileId(profile),
-      volumeTable(theVolumeTable), durRateTable(theDurRateTable),
+      volumeTable(volumeTable), durRateTable(durRateTable),
       tempo(nin_snes::vibrato::kDefaultTempo),
       maxVibratoDepthCents(nin_snes::vibrato::kMinMaxDepthCents),
       maxVibratoRateHz(nin_snes::vibrato::kMinMaxRateHz),

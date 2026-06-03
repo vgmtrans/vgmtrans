@@ -10,7 +10,7 @@
 class NDSSeq:
     public VGMSeq {
  public:
-  NDSSeq(RawFile *file, u32 offset, u32 length = 0, std::string theName = "NDSSeq");
+  NDSSeq(RawFile *file, u32 offset, u32 length = 0, std::string name = "NDSSeq");
 
   virtual bool parseHeader();
   virtual bool parseTrackPointers();

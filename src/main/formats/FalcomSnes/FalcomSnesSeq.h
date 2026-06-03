@@ -58,7 +58,7 @@ class FalcomSnesSeq
   FalcomSnesSeq(RawFile *file,
                     FalcomSnesVersion ver,
                     u32 seqdata_offset,
-                    std::string newName = "Falcom SNES Seq");
+                    std::string name = "Falcom SNES Seq");
   ~FalcomSnesSeq() override;
 
   bool parseHeader() override;

@@ -120,7 +120,7 @@ class VGMRgnItem : public VGMItem {
     RIT_ADSR,
   };
 
-  VGMRgnItem(const VGMRgn *rgn, RgnItemType theType, u32 offset, u32 length, std::string name);
+  VGMRgnItem(const VGMRgn *rgn, RgnItemType rgnItemType, u32 offset, u32 length, std::string name);
 
 private:
   static Type resolveType(RgnItemType rgnItemType) {

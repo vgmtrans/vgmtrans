@@ -77,7 +77,7 @@ class HeartBeatSnesSeq
     : public VGMSeq {
  public:
   HeartBeatSnesSeq
-      (RawFile *file, HeartBeatSnesVersion ver, u32 seqdataOffset, std::string newName = "HeartBeat SNES Seq");
+      (RawFile *file, HeartBeatSnesVersion ver, u32 seqdataOffset, std::string name = "HeartBeat SNES Seq");
   ~HeartBeatSnesSeq() override;
 
   bool parseHeader() override;

@@ -233,8 +233,8 @@ public:
   CPS2Instr(VGMInstrSet *instrSet,
            u32 offset,
            u32 length,
-           u32 theBank,
-           u32 theInstrNum,
+           u32 bank,
+           u32 instrNum,
            std::string name);
   ~CPS2Instr() override = default;
   bool loadInstr() override;

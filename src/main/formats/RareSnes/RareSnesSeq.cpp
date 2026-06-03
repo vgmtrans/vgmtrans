@@ -35,8 +35,8 @@ const u16 RareSnesSeq::NOTE_PITCH_TABLE[128] = {
     0x3fff, 0x3fff, 0x3fff, 0x3fff, 0x3fff, 0x3fff, 0x3fff, 0x3fff
 };
 
-RareSnesSeq::RareSnesSeq(RawFile *file, RareSnesVersion ver, u32 seqdataOffset, string newName)
-    : VGMSeq(RareSnesFormat::name, file, seqdataOffset, 0, newName), version(ver) {
+RareSnesSeq::RareSnesSeq(RawFile *file, RareSnesVersion ver, u32 seqdataOffset, string name)
+    : VGMSeq(RareSnesFormat::name, file, seqdataOffset, 0, name), version(ver) {
   bLoadTickByTick = true;
   setAllowDiscontinuousTrackData(true);
 

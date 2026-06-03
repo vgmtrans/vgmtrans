@@ -22,8 +22,8 @@ const u8 PandoraBoxSnesSeq::VOLUME_TABLE[16] = {
 PandoraBoxSnesSeq::PandoraBoxSnesSeq(RawFile *file,
                                      PandoraBoxSnesVersion ver,
                                      u32 seqdataOffset,
-                                     std::string newName)
-    : VGMSeq(PandoraBoxSnesFormat::name, file, seqdataOffset, 0, newName), version(ver) {
+                                     std::string name)
+    : VGMSeq(PandoraBoxSnesFormat::name, file, seqdataOffset, 0, name), version(ver) {
   bLoadTickByTick = true;
   setAllowDiscontinuousTrackData(true);
   setUseLinearAmplitudeScale(true);

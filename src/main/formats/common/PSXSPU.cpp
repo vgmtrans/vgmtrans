@@ -399,9 +399,9 @@ std::vector<PSXSampColl*> PSXSampColl::searchForPSXADPCMs(RawFile* file, const s
 //  *******
 
 PSXSamp::PSXSamp(VGMSampColl *sampColl, u32 offset, u32 length, u32 dataOffset,
-                 u32 dataLen, u8 nChannels, BPS theBPS,
-                 u32 theRate, string name, bool bSetloopOnConversion)
-    : VGMSamp(sampColl, offset, length, dataOffset, dataLen, nChannels, theBPS, theRate, std::move(name)),
+                 u32 dataLen, u8 nChannels, BPS bps,
+                 u32 rate, string name, bool bSetloopOnConversion)
+    : VGMSamp(sampColl, offset, length, dataOffset, dataLen, nChannels, bps, rate, std::move(name)),
       bSetLoopOnConversion(bSetloopOnConversion) {
   bPSXLoopInfoPrioritizing = true;
 }

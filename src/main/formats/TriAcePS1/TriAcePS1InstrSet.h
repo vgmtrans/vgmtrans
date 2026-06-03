@@ -75,7 +75,7 @@ class TriAcePS1Instr
 
 
  public:
-  TriAcePS1Instr(VGMInstrSet *instrSet, u32 offset, u32 length, u32 theBank, u32 theInstrNum);
+  TriAcePS1Instr(VGMInstrSet *instrSet, u32 offset, u32 length, u32 bank, u32 instrNum);
   ~TriAcePS1Instr() { if (rgns) delete[] rgns; }
   virtual bool loadInstr();
 

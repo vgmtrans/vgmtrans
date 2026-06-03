@@ -58,8 +58,8 @@ class NinSnesInstr
   NinSnesInstr(VGMInstrSet *instrSet,
                NinSnesProfileId profile,
                u32 offset,
-               u32 theBank,
-               u32 theInstrNum,
+               u32 bank,
+               u32 instrNum,
                u32 spcDirAddr,
                const std::string &name = "NinSnesInstr");
   virtual ~NinSnesInstr();

@@ -18,15 +18,15 @@ VGMRgn::VGMRgn(VGMInstr *instr, u32 offset, u32 length, std::string name)
       parInstr(instr)
 {}
 
-VGMRgn::VGMRgn(VGMInstr *instr, u32 offset, u32 length, u8 theKeyLow, u8 theKeyHigh,
-               u8 theVelLow, u8 theVelHigh, int theSampNum, std::string name)
+VGMRgn::VGMRgn(VGMInstr *instr, u32 offset, u32 length, u8 keyLow, u8 keyHigh,
+               u8 velLow, u8 velHigh, int sampNum, std::string name)
     : VGMItem(instr->parInstrSet, offset, length, std::move(name)),
       parInstr(instr),
-      keyLow(theKeyLow),
-      keyHigh(theKeyHigh),
-      velLow(theVelLow),
-      velHigh(theVelHigh),
-      sampNum(theSampNum)
+      keyLow(keyLow),
+      keyHigh(keyHigh),
+      velLow(velLow),
+      velHigh(velHigh),
+      sampNum(sampNum)
 {}
 
 void VGMRgn::setRanges(u8 theKeyLow, u8 theKeyHigh, u8 theVelLow, u8 theVelHigh) {

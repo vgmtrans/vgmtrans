@@ -52,7 +52,7 @@ class PandoraBoxSnesInstr
   PandoraBoxSnesInstr(VGMInstrSet *instrSet,
                       PandoraBoxSnesVersion ver,
                       u32 offset,
-                      u8 theInstrNum,
+                      u8 instrNum,
                       u8 srcn,
                       u32 spcDirAddr,
                       u16 adsr = 0x8fe0,

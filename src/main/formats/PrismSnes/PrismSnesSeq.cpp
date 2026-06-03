@@ -29,8 +29,8 @@ const u8 PrismSnesSeq::PAN_TABLE_2[21] = {
     0x7f, 0x7f, 0x7f, 0x7f, 0x7f,
 };
 
-PrismSnesSeq::PrismSnesSeq(RawFile *file, PrismSnesVersion ver, u32 seqdataOffset, std::string newName)
-    : VGMSeq(PrismSnesFormat::name, file, seqdataOffset, 0, newName), version(ver),
+PrismSnesSeq::PrismSnesSeq(RawFile *file, PrismSnesVersion ver, u32 seqdataOffset, std::string name)
+    : VGMSeq(PrismSnesFormat::name, file, seqdataOffset, 0, name), version(ver),
       envContainer(NULL) {
   bLoadTickByTick = true;
   setAllowDiscontinuousTrackData(true);

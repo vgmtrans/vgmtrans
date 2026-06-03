@@ -12,11 +12,11 @@
 
 #include <limits>
 
-VGMFile::VGMFile(std::string fmt, RawFile *theRawFile, u32 offset,
+VGMFile::VGMFile(std::string format, RawFile *rawfile, u32 offset,
                  u32 length, std::string name)
     : VGMItem(this, offset, length, std::move(name)),
-      m_rawfile(theRawFile),
-      m_format(std::move(fmt)),
+      m_rawfile(rawfile),
+      m_format(std::move(format)),
       m_id(std::numeric_limits<u32>::max()) {}
 
 // Only difference between this AddToUI and VGMItemContainer's version is that we do not add

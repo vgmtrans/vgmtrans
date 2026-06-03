@@ -11,7 +11,7 @@
 class TamSoftPS1Seq:
     public VGMSeq {
  public:
-  TamSoftPS1Seq(RawFile *file, u32 offset, u8 theSong, const std::string &name = "TamSoftPS1Seq");
+  TamSoftPS1Seq(RawFile *file, u32 offset, u8 song, const std::string &name = "TamSoftPS1Seq");
   ~TamSoftPS1Seq() override;
 
   bool parseHeader() override;

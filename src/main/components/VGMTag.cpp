@@ -6,9 +6,9 @@
 
 #include "VGMTag.h"
 
-VGMTag::VGMTag(std::string _title, std::string _artist, std::string _album, std::string _comment)
-    : title(std::move(_title)), artist(std::move(_artist)), album(std::move(_album)),
-      comment(std::move(_comment)) {
+VGMTag::VGMTag(std::string title, std::string artist, std::string album, std::string comment)
+    : title(std::move(title)), artist(std::move(artist)), album(std::move(album)),
+      comment(std::move(comment)) {
 }
 
 bool VGMTag::hasTitle() const {

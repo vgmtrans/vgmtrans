@@ -73,12 +73,12 @@ bool AsciiShuichiSnesInstrSet::parseInstrPointers() {
 
 AsciiShuichiSnesInstr::AsciiShuichiSnesInstr(VGMInstrSet *instrSet,
                                  u32 offset,
-                                 u32 theBank,
-                                 u32 theInstrNum,
+                                 u32 bank,
+                                 u32 instrNum,
                                  u32 spcDirAddress,
                                  u32 fineTuningTableAddress,
                                  const std::string &name) :
-    VGMInstr(instrSet, offset, 6, theBank, theInstrNum, name),
+    VGMInstr(instrSet, offset, 6, bank, instrNum, name),
     spcDirAddress(spcDirAddress),
     fineTuningTableAddress(fineTuningTableAddress) {
 }

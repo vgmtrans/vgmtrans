@@ -101,13 +101,13 @@ bool HeartBeatSnesInstrSet::parseInstrPointers() {
 HeartBeatSnesInstr::HeartBeatSnesInstr(VGMInstrSet *instrSet,
                                        HeartBeatSnesVersion ver,
                                        u32 offset,
-                                       u32 theBank,
-                                       u32 theInstrNum,
+                                       u32 bank,
+                                       u32 instrNum,
                                        u16 addrSRCNTable,
                                        u8 songIndex,
                                        u32 spcDirAddr,
                                        const std::string &name) :
-    VGMInstr(instrSet, offset, 6, theBank, theInstrNum, name), version(ver),
+    VGMInstr(instrSet, offset, 6, bank, instrNum, name), version(ver),
     addrSRCNTable(addrSRCNTable),
     songIndex(songIndex),
     spcDirAddr(spcDirAddr) {

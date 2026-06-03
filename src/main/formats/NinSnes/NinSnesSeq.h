@@ -24,9 +24,9 @@ constexpr size_t kNinSnesTrackCount = 8;
 class NinSnesSeq : public VGMSeq {
 public:
   NinSnesSeq(RawFile* file, NinSnesProfileId profile, u32 offset, u8 percussion_base = 0,
-             const std::vector<u8>& theVolumeTable = std::vector<u8>(),
-             const std::vector<u8>& theDurRateTable = std::vector<u8>(),
-             std::string theName = "NinSnes Seq");
+             const std::vector<u8>& volumeTable = std::vector<u8>(),
+             const std::vector<u8>& durRateTable = std::vector<u8>(),
+             std::string name = "NinSnes Seq");
   NinSnesSeq(RawFile* file, const NinSnesScanResult& scanResult);
   virtual ~NinSnesSeq();
 
@@ -193,7 +193,7 @@ public:
 class NinSnesSectionTrackItem : public SeqTrack {
 public:
   NinSnesSectionTrackItem(NinSnesSeq* parentSeq, u32 offset, u32 length,
-                          const std::string& theName);
+                          const std::string& name);
 };
 
 class NinSnesTrack : public SeqTrack {
@@ -207,7 +207,7 @@ public:
   };
 
   NinSnesTrack(NinSnesSeq* parentSeq, u32 offset = 0, u32 length = 0,
-               const std::string& theName = "NinSnes Track");
+               const std::string& name = "NinSnes Track");
 
   void resetVars() override;
   void onTickBegin() override;

@@ -138,8 +138,8 @@ const u8 KonamiSnesSeq::VOL_TABLE[] = {
   0x62, 0x66, 0x6b, 0x6f, 0x73, 0x77, 0x7b, 0x7f
 };
 
-KonamiSnesSeq::KonamiSnesSeq(RawFile *file, KonamiSnesVersion ver, u32 seqdataOffset, std::string newName)
-    : VGMSeq(KonamiSnesFormat::name, file, seqdataOffset, 0, newName),
+KonamiSnesSeq::KonamiSnesSeq(RawFile *file, KonamiSnesVersion ver, u32 seqdataOffset, std::string name)
+    : VGMSeq(KonamiSnesFormat::name, file, seqdataOffset, 0, name),
       maxVibratoDepth(konami_snes::kMinVibratoMaxDepth),
       maxVibratoRateFactor(konami_snes::vibrato::minMaxRateFactor(ver)),
       version(ver) {

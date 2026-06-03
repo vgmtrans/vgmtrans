@@ -30,8 +30,8 @@ class WDInstrSet : public VGMInstrSet {
 
 class WDInstr : public VGMInstr {
  public:
-  WDInstr(VGMInstrSet *instrSet, u32 offset, u32 length, u32 theBank,
-          u32 theInstrNum, const std::string& name);
+  WDInstr(VGMInstrSet *instrSet, u32 offset, u32 length, u32 bank,
+          u32 instrNum, const std::string& name);
   ~WDInstr() override = default;
   bool loadInstr() override;
 };

@@ -151,9 +151,9 @@ void AkaoInstrSet::useColl(const VGMColl* coll) {
 // AkaoInstr
 // *********
 
-AkaoInstr::AkaoInstr(AkaoInstrSet *instrSet, u32 offset, u32 length, u32 theBank,
-                     u32 theInstrNum, std::string name)
-    : VGMInstr(instrSet, offset, length, theBank, theInstrNum, std::move(name)), bDrumKit(false) {
+AkaoInstr::AkaoInstr(AkaoInstrSet *instrSet, u32 offset, u32 length, u32 bank,
+                     u32 instrNum, std::string name)
+    : VGMInstr(instrSet, offset, length, bank, instrNum, std::move(name)), bDrumKit(false) {
 }
 
 bool AkaoInstr::loadInstr() {
@@ -210,9 +210,9 @@ bool AkaoInstr::loadInstr() {
 // AkaoDrumKit
 // ***********
 
-AkaoDrumKit::AkaoDrumKit(AkaoInstrSet *instrSet, u32 offset, u32 length, u32 theBank,
-                         u32 theInstrNum)
-    : AkaoInstr(instrSet, offset, length, theBank, theInstrNum, "Drum Kit") {
+AkaoDrumKit::AkaoDrumKit(AkaoInstrSet *instrSet, u32 offset, u32 length, u32 bank,
+                         u32 instrNum)
+    : AkaoInstr(instrSet, offset, length, bank, instrNum, "Drum Kit") {
   bDrumKit = true;
 }
 

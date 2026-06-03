@@ -113,12 +113,12 @@ bool ChunSnesInstrSet::parseInstrPointers() {
 
 ChunSnesInstr::ChunSnesInstr(VGMInstrSet *instrSet,
                              ChunSnesVersion ver,
-                             u8 theInstrNum,
+                             u8 instrNum,
                              u16 addrInstr,
                              u16 addrSampleTable,
                              u32 spcDirAddr,
                              const std::string &name) :
-    VGMInstr(instrSet, addrInstr, 0, 0, theInstrNum, name), version(ver),
+    VGMInstr(instrSet, addrInstr, 0, 0, instrNum, name), version(ver),
     addrSampleTable(addrSampleTable),
     spcDirAddr(spcDirAddr) {}
 

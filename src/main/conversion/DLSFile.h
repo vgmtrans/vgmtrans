@@ -108,7 +108,7 @@ class DLSWave;
 
 class DLSFile : public RiffFile {
 public:
-  DLSFile(std::string dls_name = "Instrument Set");
+  DLSFile(std::string name = "Instrument Set");
 
   DLSInstr *addInstr(unsigned long bank, unsigned long instrNum);
   DLSInstr *addInstr(unsigned long bank, unsigned long instrNum, std::string Name);

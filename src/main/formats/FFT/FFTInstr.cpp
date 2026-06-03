@@ -100,8 +100,8 @@ bool    WdsInstrSet::parseInstrPointers() {
 //==============================================================
 //		Constructor
 //--------------------------------------------------------------
-WdsInstr::WdsInstr(VGMInstrSet *instrSet, u32 offset, u32 length, u32 theBank, u32 theInstrNum) :
-    VGMInstr(instrSet, offset, length, theBank, theInstrNum) {}
+WdsInstr::WdsInstr(VGMInstrSet *instrSet, u32 offset, u32 length, u32 bank, u32 instrNum) :
+    VGMInstr(instrSet, offset, length, bank, instrNum) {}
 
 //==============================================================
 //		Destructor

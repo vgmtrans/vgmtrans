@@ -29,10 +29,10 @@ KonamiAdpcmSamp::KonamiAdpcmSamp(
     u32 offset,
     u32 length,
     KonamiAdpcmChip chip,
-    u32 theRate,
+    u32 rate,
     std::string name
 )
-    : VGMSamp(sampColl, offset, length, offset, length, 1, BPS::PCM16, theRate, std::move(name)),
+    : VGMSamp(sampColl, offset, length, offset, length, 1, BPS::PCM16, rate, std::move(name)),
       m_chip(chip),
       m_stepTable(nullptr) {
   switch (m_chip) {

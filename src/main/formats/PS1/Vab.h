@@ -136,8 +136,8 @@ class VabInstr
   VabInstr(VGMInstrSet *instrSet,
            u32 offset,
            u32 length,
-           u32 theBank,
-           u32 theInstrNum,
+           u32 bank,
+           u32 instrNum,
            const std::string &name = "Instrument");
   ~VabInstr() override;
 

@@ -17,10 +17,10 @@ class Chunk {
   u8 *data;        //  The actual data not including a possible pad byte to word align
 
  public:
-  Chunk(const std::string& theId)
+  Chunk(const std::string& id)
       : data(nullptr), m_size(0) {
-    assert(theId.length() == 4);
-    memcpy(id, theId.c_str(), 4);
+    assert(id.length() == 4);
+    memcpy(this->id, id.c_str(), 4);
   }
   virtual ~Chunk() {
     if (data != nullptr) {
@@ -54,10 +54,10 @@ class ListTypeChunk: public Chunk {
   std::list<Chunk *> childChunks;
 
  public:
-  ListTypeChunk(const std::string& theId, const std::string& theType)
-      : Chunk(theId) {
-    assert(theType.length() == 4);
-    memcpy(type, theType.c_str(), 4);
+  ListTypeChunk(const std::string& id, const std::string& type)
+      : Chunk(id) {
+    assert(type.length() == 4);
+    memcpy(this->type, type.c_str(), 4);
   }
   ~ListTypeChunk() override {
     deleteList(childChunks);
@@ -90,7 +90,7 @@ class LISTChunk: public ListTypeChunk {
 ////////////////////////////////////////////////////////////////////////////
 class RiffFile: public RIFFChunk {
  public:
-  RiffFile(const std::string& file_name, const std::string& form);
+  RiffFile(const std::string& name, const std::string& form);
 
   static void writeLIST(std::vector<u8> &buf, u32 listName, u32 listSize) {
     pushTypeOnVectBE<u32>(buf, 0x4C495354);    //write "LIST"

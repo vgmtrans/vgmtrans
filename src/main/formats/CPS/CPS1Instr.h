@@ -331,10 +331,10 @@ public:
                u8 masterVol,
                u32 offset,
                u32 length,
-               u32 theBank,
-               u32 theInstrNum,
+               u32 bank,
+               u32 instrNum,
                const std::string& name)
-    : VGMInstr(instrSet, offset, length, theBank, theInstrNum, name), masterVol(masterVol) {}
+    : VGMInstr(instrSet, offset, length, bank, instrNum, name), masterVol(masterVol) {}
   ~CPS1OPMInstr() override = default;
 
   bool loadInstr() override {

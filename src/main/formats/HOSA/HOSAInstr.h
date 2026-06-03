@@ -59,7 +59,7 @@ class HOSAInstr
 
 
  public:
-  HOSAInstr(VGMInstrSet *instrSet, u32 offset, u32 length, u32 theBank, u32 theInstrNum);
+  HOSAInstr(VGMInstrSet *instrSet, u32 offset, u32 length, u32 bank, u32 instrNum);
   ~HOSAInstr() override { if (rgns) delete[] rgns; }
   bool loadInstr() override;
 

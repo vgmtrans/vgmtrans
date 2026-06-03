@@ -177,14 +177,14 @@ const std::vector<u8> &RareSnesInstrSet::getAvailableInstruments() {
 
 RareSnesInstr::RareSnesInstr(VGMInstrSet *instrSet,
                              u32 offset,
-                             u32 theBank,
-                             u32 theInstrNum,
+                             u32 bank,
+                             u32 instrNum,
                              u32 spcDirAddr,
                              s8 transpose,
                              s16 pitch,
                              u16 adsr,
                              const std::string &name) :
-    VGMInstr(instrSet, offset, 1, theBank, theInstrNum, name),
+    VGMInstr(instrSet, offset, 1, bank, instrNum, name),
     spcDirAddr(spcDirAddr),
     transpose(transpose),
     pitch(pitch),

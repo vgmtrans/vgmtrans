@@ -52,8 +52,8 @@ class RareSnesInstr
  public:
   RareSnesInstr(VGMInstrSet *instrSet,
                 u32 offset,
-                u32 theBank,
-                u32 theInstrNum,
+                u32 bank,
+                u32 instrNum,
                 u32 spcDirAddr,
                 s8 transpose = 0,
                 s16 pitch = 0,

@@ -55,8 +55,8 @@ class KonamiSnesInstr
   KonamiSnesInstr(VGMInstrSet *instrSet,
                   KonamiSnesVersion ver,
                   u32 offset,
-                  u32 theBank,
-                  u32 theInstrNum,
+                  u32 bank,
+                  u32 instrNum,
                   u32 spcDirAddr,
                   bool percussion,
                   const std::string &name = "KonamiSnesInstr");

@@ -238,12 +238,12 @@ void KonamiSnesInstrSet::unuseColl() {
 KonamiSnesInstr::KonamiSnesInstr(VGMInstrSet *instrSet,
                                  KonamiSnesVersion ver,
                                  u32 offset,
-                                 u32 theBank,
-                                 u32 theInstrNum,
+                                 u32 bank,
+                                 u32 instrNum,
                                  u32 spcDirAddr,
                                  bool percussion,
                                  const std::string &name) :
-    VGMInstr(instrSet, offset, KonamiSnesInstr::expectedSize(ver), theBank, theInstrNum, name),
+    VGMInstr(instrSet, offset, KonamiSnesInstr::expectedSize(ver), bank, instrNum, name),
     version(ver),
     spcDirAddr(spcDirAddr),
     percussion(percussion) {

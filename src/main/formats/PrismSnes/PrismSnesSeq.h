@@ -78,7 +78,7 @@ enum PrismSnesSeqEventType {
 class PrismSnesSeq
     : public VGMSeq {
  public:
-  PrismSnesSeq(RawFile *file, PrismSnesVersion ver, u32 seqdataOffset, std::string newName = "I'Max SNES Seq");
+  PrismSnesSeq(RawFile *file, PrismSnesVersion ver, u32 seqdataOffset, std::string name = "I'Max SNES Seq");
   virtual ~PrismSnesSeq();
 
   virtual bool parseHeader();

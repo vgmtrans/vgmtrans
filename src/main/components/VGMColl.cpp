@@ -12,7 +12,7 @@
 #include "VGMSampColl.h"
 #include "VGMSeq.h"
 
-VGMColl::VGMColl(std::string theName) : m_name(std::move(theName)) {}
+VGMColl::VGMColl(std::string name) : m_name(std::move(name)) {}
 
 void VGMColl::removeFileAssocs() {
   if (m_seq) {

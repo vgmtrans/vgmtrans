@@ -16,8 +16,8 @@
 //				to DLS or SF2 formats.  Currently, the structure is identical to DLS.
 //  **********************************************************************************
 
-SynthFile::SynthFile(std::string synth_name)
-    : m_name(std::move(synth_name)) {}
+SynthFile::SynthFile(std::string name)
+    : m_name(std::move(name)) {}
 
 SynthFile::~SynthFile() {
   deleteVect(vInstrs);

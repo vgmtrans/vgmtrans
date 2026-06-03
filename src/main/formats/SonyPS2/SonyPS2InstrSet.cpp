@@ -297,9 +297,9 @@ bool SonyPS2InstrSet::parseInstrPointers() {
 SonyPS2Instr::SonyPS2Instr(VGMInstrSet *instrSet,
                            u32 offset,
                            u32 length,
-                           u32 theBank,
-                           u32 theInstrNum)
-    : VGMInstr(instrSet, offset, length, theBank, theInstrNum, "Program Param") {
+                           u32 bank,
+                           u32 instrNum)
+    : VGMInstr(instrSet, offset, length, bank, instrNum, "Program Param") {
   // The regions we create do not line up with any data structure in the format, so we will not add
   // them as children. The format uses "split blocks" to define key regions, but it layers velocity
   // regions on top of them in a separate "sample set params" data structure. As such, split blocks

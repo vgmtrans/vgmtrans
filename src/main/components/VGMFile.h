@@ -17,7 +17,7 @@ class Format;
 
 class VGMFile : public VGMItem {
 public:
-  VGMFile(std::string format, RawFile *theRawFile, u32 offset, u32 length = 0,
+  VGMFile(std::string format, RawFile *rawfile, u32 offset, u32 length = 0,
           std::string name = "VGM File");
   ~VGMFile() override = default;
 

@@ -78,10 +78,10 @@ bool NDSInstrSet::parseInstrPointers() {
 // NDSInstr
 // ********
 
-NDSInstr::NDSInstr(NDSInstrSet* instrSet, u32 offset, u32 length, u32 theBank,
-                   u32 theInstrNum, u8 theInstrType)
-    : VGMInstr(instrSet, offset, length, theBank, theInstrNum, "Instrument", 0),
-      instrType(theInstrType) {
+NDSInstr::NDSInstr(NDSInstrSet* instrSet, u32 offset, u32 length, u32 bank,
+                   u32 instrNum, u8 instrType)
+    : VGMInstr(instrSet, offset, length, bank, instrNum, "Instrument", 0),
+      instrType(instrType) {
 }
 
 bool NDSInstr::loadInstr() {
@@ -369,11 +369,11 @@ bool NDSPSG::parseSampleInfo() {
 // *******
 
 NDSSamp::NDSSamp(VGMSampColl* sampColl, u32 offset, u32 length, u32 dataOffset,
-                 u32 dataLen, u8 nChannels, BPS bps, u32 theRate,
-                 u8 theWaveType, std::string name)
-    : VGMSamp(sampColl, offset, length, dataOffset, dataLen, nChannels, bps, theRate,
+                 u32 dataLen, u8 nChannels, BPS bps, u32 rate,
+                 u8 waveType, std::string name)
+    : VGMSamp(sampColl, offset, length, dataOffset, dataLen, nChannels, bps, rate,
               std::move(name)),
-      waveType(theWaveType) {
+      waveType(waveType) {
 }
 
 double NDSSamp::compressionRatio() const {

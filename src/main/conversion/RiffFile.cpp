@@ -75,8 +75,7 @@ void ListTypeChunk::write(u8 *buffer) {
   }
 }
 
-RiffFile::RiffFile(const std::string& file_name, const std::string& form)
+RiffFile::RiffFile(const std::string& name, const std::string& form)
     : RIFFChunk(form),
-      name(file_name) {
+      name(name) {
 }
-

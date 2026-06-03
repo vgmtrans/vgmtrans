@@ -103,9 +103,9 @@ bool WDInstrSet::parseInstrPointers() {
 // WDInstr
 // *******
 
-WDInstr::WDInstr(VGMInstrSet *instrSet, u32 offset, u32 length, u32 theBank,
-                 u32 theInstrNum, const std::string& name)
-    : VGMInstr(instrSet, offset, length, theBank, theInstrNum, name, defaultWDReverbPercent) {
+WDInstr::WDInstr(VGMInstrSet *instrSet, u32 offset, u32 length, u32 bank,
+                 u32 instrNum, const std::string& name)
+    : VGMInstr(instrSet, offset, length, bank, instrNum, name, defaultWDReverbPercent) {
 }
 
 bool WDInstr::loadInstr() {

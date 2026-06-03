@@ -24,7 +24,7 @@
 //  DLSFile
 //  *******
 
-DLSFile::DLSFile(std::string dls_name) : RiffFile(std::move(dls_name), "DLS ") {}
+DLSFile::DLSFile(std::string name) : RiffFile(std::move(name), "DLS ") {}
 
 std::vector<DLSInstr *> DLSFile::instruments() {
   std::vector<DLSInstr *> instrs(m_instrs.size());

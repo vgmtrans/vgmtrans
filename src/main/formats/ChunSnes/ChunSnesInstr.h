@@ -45,7 +45,7 @@ class ChunSnesInstr
  public:
   ChunSnesInstr(VGMInstrSet *instrSet,
                 ChunSnesVersion ver,
-                u8 theInstrNum,
+                u8 instrNum,
                 u16 addrInstr,
                 u16 addrSampleTable,
                 u32 spcDirAddr,

@@ -15,8 +15,8 @@
 // ***********
 
 VGMSampColl::VGMSampColl(const std::string &format, RawFile *rawfile, u32 offset, u32 length,
-                         std::string theName)
-    : VGMFile(format, rawfile, offset, length, std::move(theName)),
+                         std::string name)
+    : VGMFile(format, rawfile, offset, length, std::move(name)),
       sampDataOffset(0),
       parInstrSet(nullptr),
       m_should_load_on_instr_set_match(false),
@@ -24,8 +24,8 @@ VGMSampColl::VGMSampColl(const std::string &format, RawFile *rawfile, u32 offset
 }
 
 VGMSampColl::VGMSampColl(const std::string &format, RawFile *rawfile, VGMInstrSet *instrset,
-                         u32 offset, u32 length, std::string theName)
-    : VGMFile(format, rawfile, offset, length, std::move(theName)),
+                         u32 offset, u32 length, std::string name)
+    : VGMFile(format, rawfile, offset, length, std::move(name)),
       sampDataOffset(0),
       parInstrSet(instrset),
       m_should_load_on_instr_set_match(false),
@@ -101,8 +101,8 @@ bool VGMSampColl::parseSampleInfo() {
 
 VGMSamp *VGMSampColl::addSamp(u32 offset, u32 length, u32 dataOffset,
                               u32 dataLength, u8 nChannels, BPS bps,
-                              u32 theRate, std::string name) {
-  VGMSamp *newSamp = new VGMSamp(this, offset, length, dataOffset, dataLength, nChannels, bps, theRate, std::move(name));
+                              u32 rate, std::string name) {
+  VGMSamp *newSamp = new VGMSamp(this, offset, length, dataOffset, dataLength, nChannels, bps, rate, std::move(name));
   samples.push_back(newSamp);
   return newSamp;
 }

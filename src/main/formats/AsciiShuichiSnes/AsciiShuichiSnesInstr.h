@@ -35,8 +35,8 @@ class AsciiShuichiSnesInstr
  public:
   AsciiShuichiSnesInstr(VGMInstrSet *instrSet,
                   u32 offset,
-                  u32 theBank,
-                  u32 theInstrNum,
+                  u32 bank,
+                  u32 instrNum,
                   u32 spcDirAddress,
                   u32 fineTuningTableAddress,
                   const std::string &name = "AsciiShuichiSnesInstr");
