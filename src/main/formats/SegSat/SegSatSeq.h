@@ -31,7 +31,7 @@ class SegSatSeq:
 
   struct CollContext {
     std::vector<SegSatVLTable> m_vlTables;
-    std::vector<SegSatInstr> instrs;
+    std::vector<const SegSatInstr*> instrs;
   };
   CollContext m_collContext;
   u32 m_normalTrackOffset;

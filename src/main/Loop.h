@@ -17,8 +17,8 @@ enum LoopMeasure {
 struct Loop {
   int loopStatus       {-1};
   u32 loopType         {0};
-  u8 loopStartMeasure  {LM_BYTES};
-  u8 loopLengthMeasure {LM_BYTES};
+  LoopMeasure loopStartMeasure  {LM_BYTES};
+  LoopMeasure loopLengthMeasure {LM_BYTES};
   u32 loopStart        {0};
   u32 loopLength       {0};
 };

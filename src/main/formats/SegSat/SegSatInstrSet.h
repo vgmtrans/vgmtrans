@@ -106,9 +106,9 @@ public:
 
   virtual bool loadInstr();
 
-  u8 pitchBendRange() { return m_pitchBendRange; }
-  s8 volBias()        { return m_volBias; }
-  u8 portamento()     { return m_portamento; }
+  u8 pitchBendRange() const { return m_pitchBendRange; }
+  s8 volBias() const        { return m_volBias; }
+  u8 portamento() const     { return m_portamento; }
 
 private:
   u8 m_pitchBendRange;

@@ -67,6 +67,7 @@ public:
            float reverb = defaultReverbPercent);
 
   const std::vector<VGMRgn*>& regions() { return m_regions; }
+  const std::vector<VGMRgn*>& regions() const { return m_regions; }
 
   inline void setBank(u32 bankNum);
   inline void setInstrNum(u32 theInstrNum);

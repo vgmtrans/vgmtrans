@@ -54,10 +54,7 @@ void SegSatSeq::useColl(const VGMColl* coll) {
   m_collContext.instrs.reserve(instrSet->aInstrs.size());
 
   for (VGMInstr* instr : instrSet->aInstrs) {
-    const SegSatInstr* pInstr = dynamic_cast<const SegSatInstr*>(instr);
-    SegSatInstr instrCopy = *pInstr;
-    instrCopy.removeChildren();
-    m_collContext.instrs.push_back(instrCopy);
+    m_collContext.instrs.push_back(dynamic_cast<const SegSatInstr*>(instr));
   }
 }
 
@@ -83,10 +80,14 @@ const SegSatRgn* SegSatSeq::resolveRegion(u8 bank, u8 progNum, u8 noteNum) {
   if (progNum >= instrs.size())
     return nullptr;
 
-  const auto& rgns = instrs[progNum].regions();
+  auto* instr = instrs[progNum];
+  if (instr == nullptr)
+    return nullptr;
+
+  const auto& rgns = instr->regions();
   for (const auto* rgn : rgns) {
-    auto segSatRgn = static_cast<const SegSatRgn*>(rgn);
-    if (noteNum >= segSatRgn->keyLow && noteNum <= segSatRgn->keyHigh) {
+    auto segSatRgn = dynamic_cast<const SegSatRgn*>(rgn);
+    if (segSatRgn != nullptr && noteNum >= segSatRgn->keyLow && noteNum <= segSatRgn->keyHigh) {
       return segSatRgn;
     }
   }
@@ -204,8 +205,8 @@ bool SegSatSeq::readEvent() {
 
     u8 progNum = m_progNum[ch];
     auto* rgn = resolveRegion(0, m_progNum[ch], key);
-    if (rgn) {
-      s8 volBias = m_collContext.instrs[progNum].volBias();
+    if (rgn && progNum < m_collContext.instrs.size() && m_collContext.instrs[progNum] != nullptr) {
+      s8 volBias = m_collContext.instrs[progNum]->volBias();
       vel = resolveVelocity(vel, *rgn, volBias, ch);
     } else {
       L_WARN("Didn't find an instrument region with key range covering note event at offset: {:X}", beginOffset);
