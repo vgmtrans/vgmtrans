@@ -675,12 +675,12 @@ bool CapcomSnesTrack::readEvent() {
         u8 repeatSlot;
         const char* repeatEventName;
         switch (eventType) {
-				case EVENT_REPEAT_UNTIL_1: repeatSlot = 0; repeatEventName = "Repeat Until #1"; break;
-				case EVENT_REPEAT_UNTIL_2: repeatSlot = 1; repeatEventName = "Repeat Until #2"; break;
-				case EVENT_REPEAT_UNTIL_3: repeatSlot = 2; repeatEventName = "Repeat Until #3"; break;
-				case EVENT_REPEAT_UNTIL_4: repeatSlot = 3; repeatEventName = "Repeat Until #4"; break;
-				default: return false;
-	        }
+		  case EVENT_REPEAT_UNTIL_1: repeatSlot = 0; repeatEventName = "Repeat Until #1"; break;
+		  case EVENT_REPEAT_UNTIL_2: repeatSlot = 1; repeatEventName = "Repeat Until #2"; break;
+		  case EVENT_REPEAT_UNTIL_3: repeatSlot = 2; repeatEventName = "Repeat Until #3"; break;
+		  case EVENT_REPEAT_UNTIL_4: repeatSlot = 3; repeatEventName = "Repeat Until #4"; break;
+		  default: return false;
+	    }
         desc = fmt::format("Times: {:d}  Destination: ${:04X}", times, dest);
         if (times == 0 && repeatCount[repeatSlot] == 0) {
           // infinite loop
@@ -726,12 +726,12 @@ bool CapcomSnesTrack::readEvent() {
         u8 repeatSlot;
         const char* repeatEventName;
         switch (eventType) {
-				case EVENT_REPEAT_BREAK_1: repeatSlot = 0; repeatEventName = "Repeat Break #1"; break;
-				case EVENT_REPEAT_BREAK_2: repeatSlot = 1; repeatEventName = "Repeat Break #2"; break;
-				case EVENT_REPEAT_BREAK_3: repeatSlot = 2; repeatEventName = "Repeat Break #3"; break;
-				case EVENT_REPEAT_BREAK_4: repeatSlot = 3; repeatEventName = "Repeat Break #4"; break;
-				default: return false;
-	        }
+		  case EVENT_REPEAT_BREAK_1: repeatSlot = 0; repeatEventName = "Repeat Break #1"; break;
+		  case EVENT_REPEAT_BREAK_2: repeatSlot = 1; repeatEventName = "Repeat Break #2"; break;
+		  case EVENT_REPEAT_BREAK_3: repeatSlot = 2; repeatEventName = "Repeat Break #3"; break;
+		  case EVENT_REPEAT_BREAK_4: repeatSlot = 3; repeatEventName = "Repeat Break #4"; break;
+		  default: return false;
+	    }
         desc = fmt::format("Note: {{ Triplet: {}  Slur: {}  2-Octave Up: {} }} Destination: ${:04X}",
                 isNoteTriplet() ? "On" : "Off",
                 isNoteSlurred() ? "On" : "Off",

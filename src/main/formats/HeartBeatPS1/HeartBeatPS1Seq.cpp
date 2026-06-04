@@ -154,6 +154,7 @@ bool HeartBeatPS1Seq::readEvent() {
     case 0x80 : {
       auto key = readByte(curOffset++);
       curOffset++;
+      // auto vel = readByte(curOffset++);
       addNoteOff(beginOffset, curOffset - beginOffset, key);
       break;
     }

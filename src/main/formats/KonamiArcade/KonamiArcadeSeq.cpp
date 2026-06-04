@@ -555,6 +555,9 @@ bool KonamiArcadeTrack::readEvent() {
     // LFO settings (or perhaps just vibrato)
     case 0xE4: {
       curOffset += 3;
+      // u8 depth = readByte(curOffset++); // lower seems to result in more effect. 7F turns off all vibrato regardless of amplitude.
+      // u8 freq = readByte(curOffset++);  // higher results in faster fluctuation
+      // u8 amplitude = readByte(curOffset++); // higher results in greater LFO effect
       addUnknown(beginOffset, curOffset - beginOffset, "Vibrato?");
       break;
     }

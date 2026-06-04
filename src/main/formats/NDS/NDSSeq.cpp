@@ -139,6 +139,15 @@ bool NDSTrack::readEvent(void) {
       // [loveemu] (ex: Hanjuku Hero DS: NSE_45, New Mario Bros: BGM_AMB_CHIKA, Slime Morimori Dragon Quest 2: SE_187, SE_210, Advance Wars)
       case 0xA0: {
         curOffset += 5;
+        // u8 subStatusByte;
+        // s16 randMin;
+        // s16 randMax;
+        //
+        // subStatusByte = readByte(curOffset++);
+        // randMin = (signed) readShort(curOffset);
+        // curOffset += 2;
+        // randMax = (signed) readShort(curOffset);
+        // curOffset += 2;
         addUnknown(beginOffset, curOffset - beginOffset, "Cmd with Random Value");
         break;
       }
@@ -146,6 +155,8 @@ bool NDSTrack::readEvent(void) {
       // [loveemu] (ex: New Mario Bros: BGM_AMB_SABAKU)
       case 0xA1: {
         curOffset += 2;
+        // u8 subStatusByte = readByte(curOffset++);
+        // u8 varNumber = readByte(curOffset++);
         addUnknown(beginOffset, curOffset - beginOffset, "Cmd with Variable");
         break;
       }

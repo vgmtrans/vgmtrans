@@ -977,6 +977,7 @@ bool HudsonSnesTrack::readEvent() {
     case EVENT_PORTAMENTO: {
       u8 portamentoTime = readByte(curOffset++);
       curOffset++;
+      // u8 arg2 = readByte(curOffset++);
 
       if (portamentoTime == 0) {
         addPortamento(beginOffset, curOffset - beginOffset, false);
