@@ -14,7 +14,8 @@ if(NOT TARGET QWindowKit::Widgets)
   set(QWINDOWKIT_INSTALL OFF CACHE BOOL "" FORCE)
   add_subdirectory(${PROJECT_SOURCE_DIR}/lib/qwindowkit
                    ${CMAKE_CURRENT_BINARY_DIR}/lib/qwindowkit
-                   EXCLUDE_FROM_ALL)
+                   EXCLUDE_FROM_ALL
+                   SYSTEM)
 endif()
 
 # D-Bus is used on Linux for the XDG FileTransfer portal

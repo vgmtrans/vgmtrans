@@ -3,9 +3,9 @@
 # ~~~
 
 # mio is a header-only library
-add_subdirectory(${PROJECT_SOURCE_DIR}/lib/mio ${CMAKE_CURRENT_BINARY_DIR}/lib/mio EXCLUDE_FROM_ALL)
+add_subdirectory(${PROJECT_SOURCE_DIR}/lib/mio ${CMAKE_CURRENT_BINARY_DIR}/lib/mio EXCLUDE_FROM_ALL SYSTEM)
 
-# nhlohmann-json is a header-only library,
+# nlohmann-json is a header-only library,
 # but some distros provide it as a system package
 if(USE_SYSTEM_NLOHMANN)
   find_package(nlohmann_json 3.12.0 REQUIRED)
@@ -13,6 +13,7 @@ else()
   message(STATUS "Using vendored nlohmann_json library")
   add_library(nlohmann_json INTERFACE)
   add_library(nlohmann_json::nlohmann_json ALIAS nlohmann_json)
+  set_target_properties(nlohmann_json PROPERTIES SYSTEM ON)
   target_sources(
     nlohmann_json
     INTERFACE
@@ -24,15 +25,15 @@ endif()
 
 if(ENABLE_UI_QT)
   message(STATUS "Using vendored BASS(MIDI) library")
-  add_subdirectory(${PROJECT_SOURCE_DIR}/lib/bass ${CMAKE_CURRENT_BINARY_DIR}/lib/bass EXCLUDE_FROM_ALL)
+  add_subdirectory(${PROJECT_SOURCE_DIR}/lib/bass ${CMAKE_CURRENT_BINARY_DIR}/lib/bass EXCLUDE_FROM_ALL SYSTEM)
 endif()
 
 if(USE_SYSTEM_FMT)
   find_package(fmt 12.1.1 REQUIRED)
-else()  
+else()
   message(STATUS "Using vendored fmt library")
-  add_subdirectory(${PROJECT_SOURCE_DIR}/lib/fmt ${CMAKE_CURRENT_BINARY_DIR}/lib/fmt)
-endif()  
+  add_subdirectory(${PROJECT_SOURCE_DIR}/lib/fmt ${CMAKE_CURRENT_BINARY_DIR}/lib/fmt EXCLUDE_FROM_ALL SYSTEM)
+endif()
 
 if(USE_SYSTEM_SPDLOG)
   set(SPDLOG_FMT_EXTERNAL ${USE_SYSTEM_FMT} CACHE BOOL "Use external fmt library" FORCE)
@@ -40,7 +41,7 @@ if(USE_SYSTEM_SPDLOG)
 else()
   message(STATUS "Using vendored spdlog library")
   set(SPDLOG_FMT_EXTERNAL ON CACHE BOOL "Use external fmt library" FORCE)
-  add_subdirectory(${PROJECT_SOURCE_DIR}/lib/spdlog ${CMAKE_CURRENT_BINARY_DIR}/lib/spdlog EXCLUDE_FROM_ALL)
+  add_subdirectory(${PROJECT_SOURCE_DIR}/lib/spdlog ${CMAKE_CURRENT_BINARY_DIR}/lib/spdlog EXCLUDE_FROM_ALL SYSTEM)
 endif()
 
 if(USE_SYSTEM_ZLIB)
@@ -53,7 +54,7 @@ else()
   set(ZLIB_BUILD_MINIZIP OFF CACHE BOOL "[zlib] Enable building libminizip contrib library" FORCE)
   set(ZLIB_INSTALL OFF CACHE BOOL "[zlib] Enable installation of zlib" FORCE)
 
-  add_subdirectory(${PROJECT_SOURCE_DIR}/lib/zlib ${CMAKE_CURRENT_BINARY_DIR}/lib/zlib EXCLUDE_FROM_ALL)
+  add_subdirectory(${PROJECT_SOURCE_DIR}/lib/zlib ${CMAKE_CURRENT_BINARY_DIR}/lib/zlib EXCLUDE_FROM_ALL SYSTEM)
   add_library(ZLIB::ZLIB INTERFACE IMPORTED GLOBAL)
   set_target_properties(ZLIB::ZLIB PROPERTIES INTERFACE_LINK_LIBRARIES zlibstatic)
 endif()
@@ -72,7 +73,7 @@ else()
     target_sources(minizip PRIVATE "${MINIZIP_DIR}/iowin32.c")
   endif()
 
-  target_include_directories(minizip PUBLIC "${MINIZIP_DIR}")
+  target_include_directories(minizip SYSTEM PUBLIC "${MINIZIP_DIR}")
   target_link_libraries(minizip PUBLIC ZLIB::ZLIB)
 endif()
 
@@ -85,7 +86,7 @@ else()
   set(BUILD_SHARED_LIBS OFF CACHE BOOL "[unarr] Build libunarr as a shared library" FORCE)
   set(USE_SYSTEM_ZLIB ${USE_SYSTEM_ZLIB} CACHE BOOL "[unarr] Build with system zlib if possible" FORCE)
 
-  add_subdirectory(${PROJECT_SOURCE_DIR}/lib/unarr ${CMAKE_CURRENT_BINARY_DIR}/lib/unarr EXCLUDE_FROM_ALL)
+  add_subdirectory(${PROJECT_SOURCE_DIR}/lib/unarr ${CMAKE_CURRENT_BINARY_DIR}/lib/unarr EXCLUDE_FROM_ALL SYSTEM)
 endif()
 
 if(USE_SYSTEM_LIBCHDR)
@@ -93,7 +94,7 @@ if(USE_SYSTEM_LIBCHDR)
 else()
   message(STATUS "Using vendored libchdr library")
   set(WITH_SYSTEM_ZLIB ${USE_SYSTEM_ZLIB} CACHE BOOL "[libchdr] Use system provided zlib library" FORCE)
-  add_subdirectory(${PROJECT_SOURCE_DIR}/lib/libchdr ${CMAKE_CURRENT_BINARY_DIR}/lib/libchdr EXCLUDE_FROM_ALL)
+  add_subdirectory(${PROJECT_SOURCE_DIR}/lib/libchdr ${CMAKE_CURRENT_BINARY_DIR}/lib/libchdr EXCLUDE_FROM_ALL SYSTEM)
 endif()
 
 # ~~~

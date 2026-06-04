@@ -2,6 +2,8 @@
 # Licensed under the zlib license
 # Check the included LICENSE.txt for details
 
+include_guard(GLOBAL)
+
 option(VGMTRANS_WARNINGS_AS_ERRORS "Treat VGMTrans warnings as errors" OFF)
 
 function(vgmtrans_enable_project_warnings target)
@@ -33,5 +35,7 @@ function(vgmtrans_enable_project_warnings target)
       $<$<COMPILE_LANG_AND_ID:CXX,MSVC>:/wd4458>
   )
 
-  set_target_properties(${target} PROPERTIES COMPILE_WARNING_AS_ERROR ${VGMTRANS_WARNINGS_AS_ERRORS})
+  if(VGMTRANS_WARNINGS_AS_ERRORS)
+    set_property(TARGET ${target} PROPERTY COMPILE_WARNING_AS_ERROR ON)
+  endif()
 endfunction()
