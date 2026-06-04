@@ -627,6 +627,7 @@ static void disableRawMode(int fd) {
 /* Use the ESC [6n escape sequence to query the horizontal cursor position
  * and return it. On error -1 is returned, on success the position of the
  * cursor. */
+#ifndef _WIN32
 static int getCursorPosition(int ifd, int ofd) {
     char buf[32];
     int cols, rows;
@@ -648,6 +649,7 @@ static int getCursorPosition(int ifd, int ofd) {
     if (sscanf(buf+2,"%d;%d",&rows,&cols) != 2) return -1;
     return cols;
 }
+#endif
 
 /* Try to get the number of columns in the current terminal, or assume 80
  * if it fails. */
