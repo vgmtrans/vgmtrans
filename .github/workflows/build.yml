@@ -98,6 +98,7 @@ jobs:
       - name: "Prepare build"
         run: >
           cmake --preset "macos-${{ matrix.target }}" \
+            -DVGMTRANS_WARNINGS_AS_ERRORS=ON \
             -DQT_DEBUG_FIND_PACKAGE=${{runner.debug == '1' && 'ON' || 'OFF' }} \
             -DCMAKE_VERBOSE_MAKEFILE=${{runner.debug == '1' && 'ON' || 'OFF' }} \
             -DCMAKE_FIND_DEBUG_MODE=${{runner.debug == '1' && 'ON' || 'OFF' }}
@@ -167,6 +168,7 @@ jobs:
       attestations: write
     env:
       ARTIFACT_BASENAME: ${{ format('VGMTrans-Linux-x86_64-{0}', needs.prepare.outputs.artifact_label) }}
+      VGMTRANS_WARNINGS_AS_ERRORS: ON
     steps:
       - uses: actions/checkout@v6
         with:
@@ -250,6 +252,7 @@ jobs:
           # Windows users get frightened at the sight of GNU directories.
           cmake --preset win-${{ matrix.target }} `
             -DINSTALL_CHANGELOG=ON `
+            -DVGMTRANS_WARNINGS_AS_ERRORS=ON `
             -DQT_DEBUG_FIND_PACKAGE=${{runner.debug == '1' && 'ON' || 'OFF' }} `
             -DCMAKE_VERBOSE_MAKEFILE=${{runner.debug == '1' && 'ON' || 'OFF' }} `
             -DCMAKE_FIND_DEBUG_MODE=${{runner.debug == '1' && 'ON' || 'OFF' }} `

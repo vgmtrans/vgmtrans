@@ -23,6 +23,8 @@ modules:
       - -DINSTALL_CHANGELOG=ON
       - -DUSE_SYSTEM_ZLIB=ON
       - -DVGMTRANS_DATA_DIR=/app/share/vgmtrans
+    secret-opts:
+      - -DVGMTRANS_WARNINGS_AS_ERRORS=$VGMTRANS_WARNINGS_AS_ERRORS
     sources:
       - type: dir
         path: ../../
