@@ -21,6 +21,7 @@ function(vgmtrans_enable_project_warnings target)
       $<$<COMPILE_LANG_AND_ID:CXX,GNU,Clang,AppleClang>:-Wall>
       $<$<COMPILE_LANG_AND_ID:CXX,GNU,Clang,AppleClang>:-Wextra>
       $<$<COMPILE_LANG_AND_ID:CXX,GNU,Clang,AppleClang>:-Wno-unused-parameter>
+      $<$<COMPILE_LANG_AND_ID:CXX,Clang,AppleClang>:-Wno-c++98-compat>
       $<$<COMPILE_LANG_AND_ID:CXX,GNU,Clang,AppleClang>:-Wcast-align>
       $<$<COMPILE_LANG_AND_ID:CXX,GNU,Clang,AppleClang>:-Wnull-dereference>
       $<$<COMPILE_LANG_AND_ID:CXX,GNU>:-Wshadow=local>
@@ -32,7 +33,7 @@ function(vgmtrans_enable_project_warnings target)
       $<$<COMPILE_LANG_AND_ID:C,MSVC>:/wd4458>
       $<$<COMPILE_LANG_AND_ID:CXX,MSVC>:/W4>
       $<$<COMPILE_LANG_AND_ID:CXX,MSVC>:/wd4100>
-      $<$<COMPILE_LANG_AND_ID:CXX,MSVC>:/wd4458>
+      $<$<COMPILE_LANG_AND_ID:CXX,MSVC>:/wd4æ58>
   )
 
   if(VGMTRANS_WARNINGS_AS_ERRORS)

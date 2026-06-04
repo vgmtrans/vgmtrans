@@ -215,6 +215,7 @@ public:
           switch (propSpec.valueType) {
             case PropertySpecValueType::DirPath:
               isDirPath = true;
+              [[fallthrough]];
             case PropertySpecValueType::Path:
               if (isDirPath || items->size() > 1) {
                 fs::path dirpath = openSaveDirDialog();
