@@ -89,13 +89,6 @@ SynthRgn *SynthInstr::addRgn() {
   return vRgns.back();
 }
 
-SynthRgn *SynthInstr::addRgn(const SynthRgn& rgn) {
-  SynthRgn *newRgn = new SynthRgn();
-  *newRgn = rgn;
-  vRgns.insert(vRgns.end(), newRgn);
-  return vRgns.back();
-}
-
 void SynthInstr::addModulator(const SynthModulator& modulator) {
   m_modulators.push_back(modulator);
 }
@@ -170,14 +163,6 @@ void SynthRgn::setFineTune(s16 semitones, s16 cents) {
 
 void SynthRgn::setAttenuationDb(double attenuation) {
   attenDb = attenuation;
-}
-
-//  ********
-//  SynthArt
-//  ********
-
-SynthArt::~SynthArt() {
-  //DeleteVect(vConnBlocks);
 }
 
 void SynthArt::addADSR(double attack, Transform atk_transform, double hold, double decay,

@@ -17,7 +17,6 @@ class VGMTag {
 public:
   VGMTag() = default;
   VGMTag(std::string _title, std::string _artist = "", std::string _album = "", std::string _comment = "");
-  ~VGMTag() = default;
 
   bool hasTitle() const;
   bool hasArtist() const;

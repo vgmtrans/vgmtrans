@@ -48,7 +48,6 @@ class SynthInstr {
   ~SynthInstr();
 
   SynthRgn *addRgn();
-  SynthRgn *addRgn(const SynthRgn& rgn);
 
   void addModulator(const SynthModulator& modulator);
   void addModulator(ModSource source, ModDest destination, ModAmount amount);
@@ -83,7 +82,6 @@ public:
       : usUnityNote(unityNote), sFineTune(fineTune), attenuation(atten), cSampleLoops(sampleLoops),
         ulLoopType(loopType),
         ulLoopStart(loopStart), ulLoopLength(loopLength) { }
-  ~SynthSampInfo() = default;
 
   void setLoopInfo(Loop &loop, VGMSamp *samp);
   void setPitchInfo(u16 unityNote, s16 fineTune, double attenuation);
@@ -146,7 +144,6 @@ private:
 class SynthArt {
  public:
   SynthArt() = default;
-  ~SynthArt();
 
   void addADSR(double attack, Transform atk_transform, double hold, double decay, double sustain_lev,
                double sustain_time, double release_time, Transform rls_transform);

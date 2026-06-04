@@ -53,10 +53,8 @@ typedef struct _VAGHdr {
 
 // Sample Block
 typedef struct _VAGBlk {
-  struct {
-    u8 range : 4;
-    u8 filter : 4;
-  };
+  u8 range : 4;
+  u8 filter : 4;
 
   struct {
     b8 end : 1;      //End block
