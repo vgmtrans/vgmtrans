@@ -131,6 +131,7 @@ void TriAcePS1Scanner::searchForInstrSet(RawFile *file, std::vector<TriAcePS1Ins
 // file is RawFile containing the compressed seq.  cfOff is the compressed file offset.
 TriAcePS1Seq *TriAcePS1Scanner::decompressTriAceSLZFile(RawFile *file, u32 cfOff) {
   u8 cmode = file->readByte(cfOff + 3);                //compression mode
+  // Header +4 is the compressed file size; +12 is the compressed block size.
   u32 ufSize =
       file->readWord(cfOff + 8);            //uncompressed file size (size of resulting file after decompression)
 

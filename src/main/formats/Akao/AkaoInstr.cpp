@@ -254,6 +254,7 @@ bool AkaoDrumKit::loadInstr() {
       rgn->addGeneralItem(rgn_offset + 6, 1, "Attenuation");
       const u8 raw_pan_reverb = readByte(rgn_offset + 7);
       const u8 pan = raw_pan_reverb & 0x7f;
+      // Bit 7 is the region reverb enable flag.
       rgn->addGeneralItem(rgn_offset + 7, 1, "Pan & Reverb On/Off");
       rgn->setPan(pan);
       // TODO: set reverb on/off to the region

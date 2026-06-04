@@ -50,6 +50,7 @@ bool Vab::parseInstrPointers() {
   u32 offToneAttrs = offProgs + (16 * 128);
 
   u16 numPrograms = readShort(offset() + 0x12);
+  // Header +0x14 stores the total tone count; program entries below carry the per-program counts.
   u16 numVAGs = readShort(offset() + 0x16);
 
   u32 offVAGOffsets = offToneAttrs + (32 * 16 * numPrograms);
@@ -120,6 +121,7 @@ bool Vab::parseInstrPointers() {
 
     u32 vagStartOffset = offVAGOffsets + 2 * 256;
     u32 vagOffset = 0;
+    // VAG pointer entries store each compressed sample size divided by 8.
 
     for (u32 i = 1; i < numVAGs + 1; i++) {
       u32 vagSize = readShort(offVAGOffsets + i * 2) * 8;

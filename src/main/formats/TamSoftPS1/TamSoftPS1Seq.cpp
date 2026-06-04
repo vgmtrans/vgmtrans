@@ -245,6 +245,7 @@ bool TamSoftPS1Track::readEvent() {
       }
 
       case 0xE3: {
+        // Operand: u16 a1.
         curOffset += 2;
         addUnknown(beginOffset, curOffset - beginOffset, "NOP", desc);
         break;

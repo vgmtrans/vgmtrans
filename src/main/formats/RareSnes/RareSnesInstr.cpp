@@ -91,6 +91,7 @@ void RareSnesInstrSet::ScanAvailableInstruments() {
     }
 
     u16 addrSampStart = readShort(offDirEnt);
+    // DIR table entry +2 is the BRR loop address.
     // not in DIR table
     if (addrSampStart < spcDirAddr + (inst * 4)) {
       continue;

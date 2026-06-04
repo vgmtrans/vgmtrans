@@ -201,6 +201,7 @@ bool TriAcePS1Track::readEvent(void) {
       //unknown (tempo?)
       case 0x8A : {
         event_dur = readByte(curOffset++);
+        // Operand: u8 val.
         curOffset++;
         addUnknown(beginOffset, curOffset - beginOffset, "Unknown Event (tempo?)");
         break;

@@ -342,12 +342,15 @@ void AkaoSnesScanner::searchForAkaoSnesFromARAM(RawFile *file) {
   u32 ofsReadNoteLength;
   AkaoSnesVersion verReadNoteLength;
   if (file->searchBytePattern(ptnReadNoteLengthV4, ofsReadNoteLength)) {
+    // V4 stores the note length table address at ofsReadNoteLength + 6.
     verReadNoteLength = AKAOSNES_V4;
   }
   else if (file->searchBytePattern(ptnReadNoteLengthV2, ofsReadNoteLength)) {
+    // V1/V2 store the note length table address at ofsReadNoteLength + 8.
     verReadNoteLength = AKAOSNES_V2;
   }
   else if (file->searchBytePattern(ptnReadNoteLengthV1, ofsReadNoteLength)) {
+    // V1/V2 store the note length table address at ofsReadNoteLength + 8.
     verReadNoteLength = AKAOSNES_V1;
   }
   else {

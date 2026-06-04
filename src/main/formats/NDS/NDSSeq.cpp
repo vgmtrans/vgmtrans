@@ -185,6 +185,7 @@ bool NDSTrack::readEvent(void) {
             "If Variable >", "If Variable <=", "If Variable <", "If Variable !="
         };
 
+        // Operands: u8 varNumber, s16 val.
         curOffset += 3;
         addUnknown(beginOffset, curOffset - beginOffset, eventName[status_byte - 0xB0]);
         break;

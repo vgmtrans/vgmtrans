@@ -103,6 +103,7 @@ void SoftCreatSnesScanner::searchForSoftCreatSnesFromARAM(RawFile *file) {
   u8 VCMD_CUTOFF;
   if (file->searchBytePattern(ptnVCmdExec, ofsVCmdExec)) {
     VCMD_CUTOFF = file->readByte(ofsVCmdExec + 6);
+    // The vcmd address table address is stored at ofsVCmdExec + 16.
   } else {
     return;
   }

@@ -229,6 +229,7 @@ bool CPS2InstrSet::parseInstrPointers() {
         instr_table_ptrs.push_back(readShort(offset() + i * 2));    //get the instr table ptrs
       }
     }
+    // Non-CPS3 banks can contain up to 256 instruments each.
     for (u8 i = 0; i < instr_table_ptrs.size(); i++) {
 
       if (fmt_version == CPS3) {

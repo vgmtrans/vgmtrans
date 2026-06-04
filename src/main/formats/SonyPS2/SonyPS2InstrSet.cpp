@@ -330,6 +330,7 @@ bool SonyPS2Instr::loadInstr() {
 
     for (u8 j = 0; j < sampSetParam.nSample; j++) {
       SonyPS2InstrSet::SampleParam &sampParam = sampCk.sampleParam[sampSetParam.sampleIndex[j]];
+      // sampParam.VagIndex indexes vagInfoCk.vagInfoParam; regions currently use the index directly.
       // WE ARE ASSUMING THE VAG SAMPLES ARE STORED CONSECUTIVELY
       int sampNum = sampParam.VagIndex;
       u8 noteLow = splitblock.splitRangeLow;
