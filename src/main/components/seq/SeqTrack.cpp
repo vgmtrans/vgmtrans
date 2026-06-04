@@ -278,11 +278,11 @@ void SeqTrack::addControllerSlide(u32 dur,
     return;
 
   double valInc = static_cast<double>(targVal - prevVal) / dur;
-  s8 newVal = -1;
+  int newVal = -1;
   for (unsigned int i = 0; i < dur; i++) {
-    s8 prevValInSlide = newVal;
+    int prevValInSlide = newVal;
 
-    newVal = std::round(prevVal + (valInc * (i + 1)));
+    newVal = static_cast<int>(std::round(prevVal + (valInc * (i + 1))));
     if (newVal < 0) {
       newVal = 0;
     }
@@ -295,7 +295,7 @@ void SeqTrack::addControllerSlide(u32 dur,
 
     //only create an event if the pan value has changed since the last iteration
     if (prevValInSlide != newVal) {
-      (pMidiTrack->*insertFunc)(channel, newVal, getTime() + i);
+      (pMidiTrack->*insertFunc)(channel, static_cast<u8>(newVal), getTime() + i);
     }
   }
   prevVal = targVal;
@@ -1028,6 +1028,8 @@ void SeqTrack::reapplyStoredLevelNoItem(LevelController controller, int absTime)
       rawLevel = mastVol;
       resolution = masterVolResolution;
       break;
+    default:
+      return;
   }
 
   addLevelNoItem(normalizedLevelFromRaw(rawLevel, resolution), controller, resolution, absTime);

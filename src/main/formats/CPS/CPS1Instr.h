@@ -173,8 +173,8 @@ struct CPS1OPMInstrDataV4_25 {
     if ((bVar3 & 0x80) != 0) {
       bVar2 = -bVar2;
     }
-    s8 cVar1 = bVar2 + 0x10 + key_scale_atten;
-    return cVar1 > 0x7f ? 0x7F : cVar1;
+    int cVar1 = static_cast<s8>(bVar2) + 0x10 + key_scale_atten;
+    return cVar1 > 0x7f ? 0x7F : static_cast<u8>(cVar1);
   }
 
   // Simplified implementation, but might have to revisit the first when we add key scale
@@ -265,8 +265,8 @@ struct CPS1OPMInstrDataV5_02 {
     if ((bVar3 & 0x80) != 0) {
       bVar2 = -bVar2;
     }
-    s8 cVar1 = bVar2 + 0x10 + key_scale_atten;
-    return cVar1 > 0x7f ? 0x7F : cVar1;
+    int cVar1 = static_cast<s8>(bVar2) + 0x10 + key_scale_atten;
+    return cVar1 > 0x7f ? 0x7F : static_cast<u8>(cVar1);
   }
 
   // Simplified implementation, but might have to revisit the first when we add key scale

@@ -76,9 +76,9 @@ u32 NDSScanner::loadFromSDAT(RawFile *file, u32 baseOff) {
   nBnks = file->readWord(file->readWord(INFOoff + 0x10) + INFOoff);
   nWAs = file->readWord(file->readWord(INFOoff + 0x14) + INFOoff);
 
-  u32 pSeqNamePtrList;
-  u32 pBnkNamePtrList;
-  u32 pWANamePtrList;
+  u32 pSeqNamePtrList = 0;
+  u32 pBnkNamePtrList = 0;
+  u32 pWANamePtrList = 0;
   if (hasSYMB) {
     pSeqNamePtrList = file->readWord(SYMBoff + 0x08) + SYMBoff;        //get pointer to list of sequence name pointers
     pBnkNamePtrList = file->readWord(SYMBoff + 0x10) + SYMBoff;        //get pointer to list of bank name pointers

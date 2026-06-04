@@ -57,6 +57,7 @@ bool CPS1SampleInstrSet::parseInstrPointers() {
       }
       break;
     case CPS1_VERSION_UNDEFINED:
+    default:
       return false;
   }
   return true;
@@ -150,6 +151,7 @@ bool CPS1OPMInstrSet::parseInstrPointers() {
       instrSize = sizeof(CPS1OPMInstrDataV4_25);
       break;
     case CPS1_VERSION_UNDEFINED:
+    default:
       return false;
   }
   numInstrs = std::min(length() / static_cast<u32>(instrSize), 128U);
@@ -215,6 +217,7 @@ bool CPS1OPMInstrSet::parseInstrPointers() {
         break;
       }
       case CPS1_VERSION_UNDEFINED:
+      default:
         return false;
     }
   }

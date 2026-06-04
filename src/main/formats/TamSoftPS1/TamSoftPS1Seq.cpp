@@ -194,7 +194,7 @@ bool TamSoftPS1Track::readEvent() {
 
   std::string desc;
 
-  if (statusByte >= 0x00 && statusByte <= 0x7f) {
+  if (statusByte <= 0x7f) {
     // if status_byte == 0, it actually sets 0xffffffff to delta-time o_O
     desc = fmt::format("Delta Time: {:d}", statusByte);
     addGenericEvent(beginOffset, curOffset - beginOffset, "Delta Time", desc, Type::Rest);

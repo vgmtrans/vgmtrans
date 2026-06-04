@@ -52,7 +52,7 @@ bool MAMERomGroup::getHexAttribute(const std::string& attrName, u32* out) const 
 
 MAMERomGroup* MAMEGame::getRomGroupOfType(const std::string& strType) {
   if (auto group = std::ranges::find_if(
-          romgroupentries, [&strType](const auto& group) { return group.type == strType; });
+          romgroupentries, [&strType](const auto& romGroup) { return romGroup.type == strType; });
       group != romgroupentries.end()) {
     return std::addressof(*group);
   }

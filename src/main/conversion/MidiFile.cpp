@@ -232,10 +232,10 @@ void MidiTrack::addNoteByDur_TriAce(u8 channel, s8 key, s8 vel, u32 duration) {
     // Note: In previous TriAce drivers (like MegaDrive and SNES versions),
     //       a Note gets extended by a Note On event at the tick where another note expires.
     //       Valkyrie Profile: 225 Fragments of the Heart confirms, that this is NOT the case in the PS1 version.
-    if (aEvents[curEvt]->absTime > CurDelta && aEvents[curEvt]->eventType() == MIDIEVENT_NOTEON) {
-      NoteEvent *NoteEvt = dynamic_cast<NoteEvent*>(aEvents[curEvt]);
-      if (NoteEvt->key == key && !NoteEvt->bNoteDown) {
-        ContNote = NoteEvt;
+    if (aEvents[curEvt]->absTime > CurDelta) {
+      auto* noteEvt = dynamic_cast<NoteEvent*>(aEvents[curEvt]);
+      if (noteEvt != nullptr && noteEvt->key == key && !noteEvt->bNoteDown) {
+        ContNote = noteEvt;
         break;
       }
     }

@@ -63,6 +63,8 @@ bool CPS1Seq::parseTrackPointers() {
       case CPS1_V502:
         newTrack = new CPS1TrackV2(this, i < 8 ? CPSSynth::YM2151 : CPSSynth::OKIM6295, trkOff + offset());
         break;
+      default:
+        return false;
     }
     aTracks.push_back(newTrack);
     header->addChild(offset() + 1 + (i * 2), 2, "Track Pointer");

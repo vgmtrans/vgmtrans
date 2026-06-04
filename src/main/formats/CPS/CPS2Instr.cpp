@@ -265,7 +265,7 @@ bool CPS2InstrSet::parseInstrPointers() {
       int k = 0;
       u16 endOffset;
       // The following is actually incorrect.  There is a max of 256 instruments per bank
-      if (i + 1 < instr_table_ptrs.size() && instr_table_ptrs[i] < instr_table_ptrs[i+1])
+      if (static_cast<size_t>(i) + 1 < instr_table_ptrs.size() && instr_table_ptrs[i] < instr_table_ptrs[i+1])
         endOffset = instr_table_ptrs[i + 1];
       else
         endOffset = instr_table_ptrs[i] + instr_info_length * 256;//4*0x7F;
@@ -477,10 +477,11 @@ bool CPS2Instr::loadInstr() {
     rgn->release_time = (Rr == 0xFFFF) ? 0 : ticks / UPDATE_RATE_IN_HZ;
     rgn->release_time = linearAmpDecayTimeToLinDBDecayTime(rgn->release_time);
 
-    if (rgn->sampNum == 0xFFFF || rgn->sampNum >= (dynamic_cast<CPS2InstrSet*>(parInstrSet))->sampInfoTable->numSamples)
+    auto *instrSet = static_cast<CPS2InstrSet*>(parInstrSet);
+    if (rgn->sampNum == 0xFFFF || rgn->sampNum >= instrSet->sampInfoTable->numSamples)
       rgn->sampNum = 0;
 
-    rgn->setUnityKey((dynamic_cast<CPS2InstrSet*>(parInstrSet))->sampInfoTable->infos[rgn->sampNum].unity_key);
+    rgn->setUnityKey(instrSet->sampInfoTable->infos[rgn->sampNum].unity_key);
     addRgn(rgn);
   }
   return true;

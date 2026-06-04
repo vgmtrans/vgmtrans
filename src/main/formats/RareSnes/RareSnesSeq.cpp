@@ -1103,7 +1103,7 @@ void RareSnesTrack::addVolLR(u32 offset,
                              s8 volR,
                              const std::string &sEventName) {
   u8 newMidiVol;
-  u8 newMidiPan;
+  u8 newMidiPan = prevPan;
   calculateVolPanFromVolLR(volL, volR, newMidiVol, newMidiPan);
 
   auto desc = fmt::format("Left Volume: {:d}  Right Volume: {:d}", volL, volR);
@@ -1120,7 +1120,7 @@ void RareSnesTrack::addVolLR(u32 offset,
 
 void RareSnesTrack::addVolLRNoItem(s8 volL, s8 volR) {
   u8 newMidiVol;
-  u8 newMidiPan;
+  u8 newMidiPan = prevPan;
   calculateVolPanFromVolLR(volL, volR, newMidiVol, newMidiPan);
 
   // add MIDI events only if updated

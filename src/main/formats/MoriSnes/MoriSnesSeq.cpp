@@ -589,6 +589,7 @@ bool MoriSnesTrack::readEvent() {
       s8 newTranspose = readByte(curOffset++);
       spcTranspose = newTranspose;
       addTranspose(beginOffset, curOffset - beginOffset, spcTranspose);
+      break;
     }
 
     case EVENT_TRANSPOSE_REL: {

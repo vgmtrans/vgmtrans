@@ -506,7 +506,7 @@ void KonamiSnesScanner::scan(RawFile *file, void *info) {
 void KonamiSnesScanner::searchForKonamiSnesFromARAM(RawFile *file) {
   KonamiSnesVersion version = KONAMISNES_NONE;
 
-  bool hasSongList;
+  bool hasSongList = false;
 
   std::string basefilename = file->stem();
   std::string name = file->tag.hasTitle() ? file->tag.title : basefilename;
@@ -518,10 +518,10 @@ void KonamiSnesScanner::searchForKonamiSnesFromARAM(RawFile *file) {
   // find a song header
   u32 ofsSetSongHeaderAddress;
   u32 ofsReadSongList;
-  u16 addrSongHeader;
-  u16 addrSongList;
-  s8 primarySongIndex;
-  u8 vcmdLenItemSize;
+  u16 addrSongHeader = 0;
+  u16 addrSongList = 0;
+  s8 primarySongIndex = 0;
+  u8 vcmdLenItemSize = 0;
   if (file->searchBytePattern(ptnSetSongHeaderAddressGG4, ofsSetSongHeaderAddress)) {
     addrSongHeader = file->readByte(ofsSetSongHeaderAddress + 1) | (file->readByte(ofsSetSongHeaderAddress + 4) << 8);
     vcmdLenItemSize = 2;

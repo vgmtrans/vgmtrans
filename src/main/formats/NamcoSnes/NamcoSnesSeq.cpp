@@ -342,7 +342,7 @@ bool NamcoSnesSeq::readEvent() {
         if ((targetChannels & (0x80 >> trackIndex)) != 0) {
           u8 keyByte = readByte(curOffset++);
 
-          s8 key;
+          s8 key = 0;
           NamcoSnesSeqNoteType noteType;
           if (keyByte >= NOTE_NUMBER_PERCUSSION_MIN) {
             key = keyByte - NOTE_NUMBER_PERCUSSION_MIN;

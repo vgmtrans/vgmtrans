@@ -57,6 +57,10 @@ bool AkaoColl::loadMain() {
     }
     for (auto* vgmregion : instr->regions()) {
       auto *rgn = dynamic_cast<AkaoRgn*>(vgmregion);
+      if (!rgn) {
+        L_ERROR("AkaoInstr contained a region that wasn't an AkaoRgn.");
+        return false;
+      }
       auto itArt = artIdToArtMap.find(rgn->artNum);
 
       if (itArt == artIdToArtMap.end()) {

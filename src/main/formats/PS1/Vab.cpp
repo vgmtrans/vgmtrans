@@ -123,7 +123,7 @@ bool Vab::parseInstrPointers() {
     u32 vagOffset = 0;
     // VAG pointer entries store each compressed sample size divided by 8.
 
-    for (u32 i = 1; i < numVAGs + 1; i++) {
+    for (u32 i = 1; i <= numVAGs; i++) {
       u32 vagSize = readShort(offVAGOffsets + i * 2) * 8;
 
       snprintf(name, 256, "VAG Size /8 #%u", i);

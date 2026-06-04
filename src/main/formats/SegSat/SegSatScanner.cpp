@@ -170,12 +170,13 @@ std::vector<SegSatSeq*> SegSatScanner::searchForSeqs(RawFile *file, bool useMatc
 
     // Calculate if the size of the header + a miniscule single sequence would exceed the file size.
     u16 numSeqs = firstWordBytes[1];
-    if (2 + (numSeqs * 4) + minSeqSize > fileLength)
+    u32 seqTableHeaderSize = 2 + static_cast<u32>(numSeqs) * 4;
+    if (seqTableHeaderSize + minSeqSize > fileLength)
       continue;
 
     // We expect the first seq offset to be immediately after the header
     u32 firstSeqPtr = file->readWordBE(i + 2);
-    if (firstSeqPtr != 2 + (numSeqs * 4))
+    if (firstSeqPtr != seqTableHeaderSize)
       continue;
 
     // Check that sequence pointers don't exceed file size and that they are ordered

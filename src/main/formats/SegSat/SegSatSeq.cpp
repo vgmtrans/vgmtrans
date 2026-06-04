@@ -85,7 +85,7 @@ const SegSatRgn* SegSatSeq::resolveRegion(u8 bank, u8 progNum, u8 noteNum) {
 
   const auto& rgns = instrs[progNum].regions();
   for (const auto* rgn : rgns) {
-    auto segSatRgn = dynamic_cast<const SegSatRgn*>(rgn);
+    auto segSatRgn = static_cast<const SegSatRgn*>(rgn);
     if (noteNum >= segSatRgn->keyLow && noteNum <= segSatRgn->keyHigh) {
       return segSatRgn;
     }

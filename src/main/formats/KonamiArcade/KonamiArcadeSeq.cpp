@@ -387,7 +387,8 @@ bool KonamiArcadeTrack::readEvent() {
         L_DEBUG("{} at {:X}: didn't apply portamento because note duration <= 2.", parentSeq->name(), beginOffset);
         addNoteByDur(beginOffset, curOffset - beginOffset, note, linearVel, actualDuration);
       }
-    } else if (m_slideModeDepth != 0 && m_slideModeDuration > 0 && actualDuration > (m_slideModeDelay + 1)) {
+    } else if (m_slideModeDepth != 0 && m_slideModeDuration > 0 &&
+               actualDuration > static_cast<u32>(m_slideModeDelay + 1)) {
       // Slide note
       u8 slideStartNote = note - m_slideModeDepth;
       addNoteByDurNoItem(slideStartNote, linearVel, m_slideModeDelay + 1);

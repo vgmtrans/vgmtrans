@@ -107,10 +107,10 @@ class KonamiTMNT2Track : public SeqTrack {
 
 private:
   std::optional<konami_tmnt2_instr_info> instrInfo(size_t idx) {
-    return dynamic_cast<KonamiTMNT2Seq*>(parentSeq)->instrInfo(idx);
+    return static_cast<KonamiTMNT2Seq*>(parentSeq)->instrInfo(idx);
   }
   std::optional<konami_tmnt2_drum_info> drumInfo(int tableIdx, int keyIdx) {
-    return dynamic_cast<KonamiTMNT2Seq*>(parentSeq)->drumInfo(tableIdx, keyIdx);
+    return static_cast<KonamiTMNT2Seq*>(parentSeq)->drumInfo(tableIdx, keyIdx);
   }
 
   void setPercussionModeOn() {
