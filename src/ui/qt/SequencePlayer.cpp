@@ -31,20 +31,21 @@ struct DataBlob {
 
 static DWORD mem_read(void *buf, DWORD count, void *handle) {
   auto blob = static_cast<DataBlob *>(handle);
-  if (!buf || !blob || count < 0) {
+  if (!buf || !blob || blob->index >= blob->data.size()) {
     return 0;
   }
 
   /* This function never fails: count is the *maximum* number of bytes the caller wants, not a
    * precise number of bytes to fetch */
-  count = std::clamp(count, DWORD(0), DWORD(blob->data.size() - blob->index));
+  const auto start = static_cast<std::size_t>(blob->index);
+  const auto bytesToRead = std::min<std::size_t>(count, blob->data.size() - start);
 
-  auto position = blob->data.begin() + blob->index;
-  std::copy(position, position + count, static_cast<char *>(buf));
+  auto position = blob->data.begin() + start;
+  std::copy(position, position + bytesToRead, static_cast<char *>(buf));
 
-  blob->index += count;
+  blob->index += bytesToRead;
 
-  return count;
+  return static_cast<DWORD>(bytesToRead);
 }
 
 static BOOL mem_seek(QWORD offset, void *handle) {

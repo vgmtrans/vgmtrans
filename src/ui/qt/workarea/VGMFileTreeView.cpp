@@ -331,17 +331,26 @@ void VGMFileTreeView::seekToTreeItem(QTreeWidgetItem* item, bool allowRepeat) {
 
 // Find the index to insert a child item, sorted by offset, using binary search
 int VGMFileTreeView::getSortedIndex(const QTreeWidgetItem* parent, const VGMTreeItem* item) {
+  if (!parent || !item) {
+    return 0;
+  }
+
   const auto newOffset = item->item_offset();
   int left = 0;
   int right = parent->childCount() - 1;
 
   while (left <= right) {
     int mid = left + (right - left) / 2;
-    VGMTreeItem* childItem = static_cast<VGMTreeItem*>(parent->child(mid));
+    const auto* child = parent->child(mid);
+    if (!child) {
+      return left;
+    }
+    const auto* childItem = static_cast<const VGMTreeItem*>(child);
+    const auto childOffset = childItem->item_offset();
 
-    if (childItem->item_offset() == newOffset) {
+    if (childOffset == newOffset) {
       return mid;
-    } else if (childItem->item_offset() < newOffset) {
+    } else if (childOffset < newOffset) {
       left = mid + 1;
     } else {
       right = mid - 1;

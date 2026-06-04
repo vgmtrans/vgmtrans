@@ -682,16 +682,17 @@ private:
 QPointer<StitchExportBalloon> g_stitchExportBalloon;
 
 StitchExportBalloon* ensureStitchExportBalloon(QWidget* owner) {
-  if (!g_stitchExportBalloon || g_stitchExportBalloon->parentWidget() != owner) {
-    if (g_stitchExportBalloon) {
-      if (g_stitchExportBalloon->isVisible()) {
+  StitchExportBalloon* existingBalloon = g_stitchExportBalloon.data();
+  if (!existingBalloon || existingBalloon->parentWidget() != owner) {
+    if (existingBalloon) {
+      if (existingBalloon->isVisible()) {
         NotificationCenter::the()->setCollectionStitchUiVisible(false);
       }
-      g_stitchExportBalloon->deleteLater();
+      existingBalloon->deleteLater();
     }
     g_stitchExportBalloon = new StitchExportBalloon(owner);
   }
-  return g_stitchExportBalloon;
+  return g_stitchExportBalloon.data();
 }
 
 }  // namespace
